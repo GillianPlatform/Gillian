@@ -1,0 +1,10 @@
+(executable
+ (name gillian_js)
+ (public_name gillian-js)
+ (package gillian-js)
+ (libraries gillian js2jsil_lib semantics test262 cosetteRunner))
+
+; (executable
+;   (name test262)
+;   (modules test262)
+;   (libraries test262_suit))

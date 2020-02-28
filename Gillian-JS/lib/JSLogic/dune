@@ -1,0 +1,4 @@
+(library
+ (name jslogic)
+ (libraries gillian jsil_syntax JS_Parser javert_utils)
+ (flags -open Utils -open Gillian.Utils))

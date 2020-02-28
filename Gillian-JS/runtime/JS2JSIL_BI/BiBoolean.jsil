@@ -1,0 +1,71 @@
+import Internals.jsil;
+
+(* ******************* *)
+(* THE BOOLEAN LIBRARY *)
+(* ******************* *)
+
+(* *** CALL *** *)
+
+proc Boolean_call (xsc, vthis, v) {
+				ret := "i__toBoolean" (v);
+	rlab: return
+};
+
+(* *** CONSTRUCT *** *)
+
+proc Boolean_construct (xsc, vthis, v) {
+			pv := "i__toBoolean" (v);
+
+			ret := "create_default_object" ($lbool_proto, "Boolean", true);
+
+			m := metadata(ret);
+			[m, "@primitiveValue"] := pv;
+
+	rlab: return
+};
+
+(* *** TOSTRING *** *)
+
+proc BP_toString (xsc, vthis) {
+			goto [typeOf vthis = Bool] isb notb;
+
+	isb:	ret := vthis;
+			goto test;
+
+	notb:	goto [typeOf vthis = Obj] class thrw;
+	class:	m := metadata(vthis);
+			c := [m, "@class"];
+			goto [c = "Boolean"] b thrw;
+	b:		ret := [m, "@primitiveValue"];
+	test:	goto [ret = true] rt rf;
+
+	rt:		ret := "true";
+			goto rlab;
+
+	rf:		ret := "false";
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** VALUEOF *** *)
+
+proc BP_valueOf (xsc, vthis) {
+			goto [typeOf vthis = Bool] isb notb;
+
+	isb:	ret := vthis;
+			goto rlab;
+
+	notb:	goto [typeOf vthis = Obj] class thrw;
+	class:	m := metadata(vthis);
+			c := [m, "@class"];
+			goto [c = "Boolean"] b thrw;
+	b:		ret := [m, "@primitiveValue"];
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};

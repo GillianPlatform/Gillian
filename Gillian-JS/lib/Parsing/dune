@@ -1,0 +1,9 @@
+(menhir
+ (modules Javert_Parser))
+
+(ocamllex
+ (modules Javert_Lexer))
+
+(library
+ (name parsing)
+ (libraries gillian gillian.utils jsil_syntax jslogic javert_utils))

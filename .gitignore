@@ -1,0 +1,75 @@
+# Misc Editors
+*.autosave
+.*.swp
+.*.swo
+*~
+
+# Images
+*.png
+*.dot
+
+# examples
+
+# Eclipse
+TAGS
+.metadata
+.paths
+.project
+.projectSettings
+.settings
+
+# OCaml
+*.cma
+*.cmi
+*.cmo
+*.cmx
+*.o
+_build
+*.native
+*.byte
+*.merlin
+
+
+# Mac Rubbish
+.DS_Store
+
+config/config.xml
+src/localconfig.ml
+src/formula_parser/formula_lexer.ml
+src/formula_parser/formula_parser.ml
+src/formula_parser/formula_parser.mli
+tests/dot
+
+rosette/compiled
+
+# Racket
+racket/hp.rkt
+racket/test.rkt
+racket/wp.rkt
+racket/internals_builtins_procs.rkt
+racket/compiled
+
+# LaTeX nonsense
+*.blg
+*.bbl
+*.aux
+*.out
+*.log
+tutorial/main.pdf
+
+# esy + docker stuff
+node_modules
+_esy
+doc
+*.install
+_build.prev
+_release
+
+# gillian specific stuff
+*/environment
+*.env
+
+#Sacha Printing dependency graphs
+with-depgraph.esy.lock
+with-depgraph.json
+see_deps.py

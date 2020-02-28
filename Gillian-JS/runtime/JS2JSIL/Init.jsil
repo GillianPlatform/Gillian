@@ -1,0 +1,807 @@
+import Object.jsil;
+
+(*
+	Procedure: create_default_object
+
+	Creates an object at a given location l,
+		with prototype pr,
+		     class cl, and
+		     extensibility ext
+
+	Does not thrw an error
+*)
+proc create_default_object (pr, cl, ext) {
+
+        goto [cl = undefined] scl text;
+	scl:  cl := "Object";
+	text:	goto [ext = undefined] sext set;
+	sext: ext := true;
+
+        (* Create metadata and object *)
+  set:  m := new(null);
+        ret := new(m);
+
+        (* Set the internal properties in the metadata *)
+        [m, "@proto"] := pr;
+        [m, "@class"] := cl;
+        [m, "@extensible"] := ext;
+
+        return
+};
+
+proc create_default_object_concrete (l, pr, cl, ext) {
+
+        goto [cl = undefined] scl text;
+  scl:  cl := "Object";
+  text: goto [ext = undefined] sext set;
+  sext: ext := true;
+
+        (* Create metadata and object *)
+  set:  m := new(null);
+        ret := new(l m);
+
+        (* Set the internal properties in the metadata *)
+        [m, "@proto"] := pr;
+        [m, "@class"] := cl;
+        [m, "@extensible"] := ext;
+
+        ret := l;
+        return
+};
+
+
+(*
+	Procedure: create_object_with_call_construct
+
+	Creates an object at location l
+		with caller call,
+		     constructor construct, and
+		     length len
+
+	Does not thrw an error
+*)
+proc create_object_with_call_construct (call, construct, len) {
+
+			  ret := "create_default_object" ($lfun_proto, "Function", true);
+
+			  [ret, "length"] := {{ "d", len, false, false, true }};
+
+			  (* Get the metadata *)
+			  m := metadata(ret);
+
+			  (* Set the internal scope, call and construct properties *)
+			  [m, "@scope"] := empty;
+			  [m, "@call"] := call;
+
+			  goto [construct = empty] rlab cstr;
+
+	cstr:	[m, "@construct"] := construct;
+
+  rlab: return
+};
+
+proc create_object_with_call_construct_concrete (l, call, construct, len, opt_proto) {
+
+        proto := $lfun_proto;
+
+        goto [opt_proto = undefined] cont proto;
+
+   proto: proto := opt_proto;
+
+   cont: ret := "create_default_object_concrete" (l, proto, "Function", true);
+
+        (* ES9: Updated to be configurable for the 'length' property *)
+        [ret, "length"] := {{ "d", len, false, false, true }};
+
+        (* Get the metadata *)
+        m := metadata(ret);
+
+        (* Set the internal scope, call and construct properties *)
+        [m, "@scope"] := empty;
+        [m, "@call"] := call;
+
+        goto [construct = empty] rlab cstr;
+
+  cstr: [m, "@construct"] := construct;
+
+  rlab: ret := l;
+        return
+};
+
+(*
+	Procedure: create_function_object
+
+	Creates an new function object
+		with scope chain xsc,
+		     caller call,
+		     constructor construct, and
+		     parameters params
+
+	Does not thrw an error
+*)
+proc create_function_object (xsc, call, construct, params) {
+            len := l-len(params);
+			ret := "create_object_with_call_construct" (call, construct, len);
+
+             m := metadata(ret);
+			[m, "@scope"] := xsc;
+
+			prototype := "Object_construct" ();
+			[prototype, "constructor"] := {{ "d", ret, true, false, true }};
+			[ret, "prototype"]           := {{ "d", prototype, true, false, false }};
+
+			(* Strict mode only *)
+			[ret, "caller"]    := {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }};
+			[ret, "arguments"] := {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }};
+
+			return
+};
+
+
+(*
+	Procedure: setupInitialHeap
+
+	Creates the JavaScript initial heap
+
+	Does not thrw an error
+*)
+proc setupInitialHeap () {
+
+			(* Global object *)
+
+			ret := "create_default_object_concrete" ($lg, $lobj_proto, "Object", true);
+
+  			[$lg, "NaN"]                := {{ "d", nan, false, false, false }};
+  			[$lg, "Infinity"]           := {{ "d", inf, false, false, false }};
+  			[$lg, "undefined"]          := {{ "d", undefined, false, false, false }};
+
+  			[$lg, "eval"]               := {{ "d", $lg_eval, true, false, true }};
+  			[$lg, "parseInt"]           := {{ "d", $lg_parseInt, true, false, true }};
+  			[$lg, "parseFloat"]         := {{ "d", $lg_parseFloat, true, false, true }};
+  			[$lg, "isNaN"]              := {{ "d", $lg_isNan, true, false, true }};
+  			[$lg, "isFinite"]           := {{ "d", $lg_isFinite, true, false, true }};
+  			[$lg, "decodeURI"]          := {{ "d", $lg_decodeURI, true, false, true }};
+  			[$lg, "decodeURIComponent"] := {{ "d", $lg_decodeURIComponent, true, false, true }};
+  			[$lg, "encodeURI"]          := {{ "d", $lg_encodeURI, true, false, true }};
+  			[$lg, "encodeURIComponent"] := {{ "d", $lg_encodeURIComponent, true, false, true }};
+  			[$lg, "Object"]             := {{ "d", $lobj, true, false, true }};
+  			[$lg, "Function"]           := {{ "d", $lfun, true, false, true }};
+ 			[$lg, "Array"]              := {{ "d", $larr, true, false, true }};
+  			[$lg, "String"]             := {{ "d", $lstr, true, false, true }};
+  			[$lg, "Boolean"]            := {{ "d", $lbool, true, false, true }};
+  			[$lg, "Number"]             := {{ "d", $lnum, true, false, true }};
+  			[$lg, "Math"]               := {{ "d", $lmath, true, false, true }};
+  			[$lg, "Date"]               := {{ "d", $ldate, true, false, true }};
+ 			[$lg, "RegExp"]             := {{ "d", $lregexp, true, false, true }};
+  			[$lg, "Error"]              := {{ "d", $lerr, true, false, true }};
+  			[$lg, "EvalError"]          := {{ "d", $leerr, true, false, true }};
+  			[$lg, "RangeError"]         := {{ "d", $lrgerr, true, false, true }};
+  			[$lg, "ReferenceError"]     := {{ "d", $lrferr, true, false, true }};
+  			[$lg, "SyntaxError"]        := {{ "d", $lserr, true, false, true }};
+  			[$lg, "TypeError"]          := {{ "d", $lterr, true, false, true }};
+  			[$lg, "URIError"]           := {{ "d", $luerr, true, false, true }};
+  			[$lg, "JSON"]               := {{ "d", $ljson, true, false, true }};
+
+  			ret := "create_object_with_call_construct_concrete" ($lg_eval, "ExecuteEval", empty, 1);
+  			ret := "create_object_with_call_construct_concrete" ($lg_parseInt, "Object_parseInt", empty, 2);
+  			ret := "create_object_with_call_construct_concrete" ($lg_parseFloat, "Object_parseFloat", empty, 1);
+  			ret := "create_object_with_call_construct_concrete" ($lg_isNan, "Object_isNan", empty, 1);
+  			ret := "create_object_with_call_construct_concrete" ($lg_isFinite, "Object_isFinite", empty, 1);
+  			ret := "create_object_with_call_construct_concrete" ($lg_decodeURI, "Object_decodeURI", empty, 1);
+  			ret := "create_object_with_call_construct_concrete" ($lg_decodeURIComponent, "Object_decodeURIComponent", empty, 1);
+  			ret := "create_object_with_call_construct_concrete" ($lg_encodeURI, "Object_encodeURI", empty, 1);
+  			ret := "create_object_with_call_construct_concrete" ($lg_encodeURIComponent, "Object_encodeURIComponent", empty, 1);
+
+
+
+
+
+  			(* Object object *)
+
+  			ret := "create_object_with_call_construct_concrete" ($lobj, "Object_call", "Object_construct", 1);
+
+  		[$lobj, "prototype"]                := {{ "d", $lobj_proto, false, false, false }};
+			[$lobj, "getPrototypeOf"]           := {{ "d", $lobj_getPrototypeOf, true, false, true }};
+			[$lobj, "getOwnPropertyDescriptor"] := {{ "d", $lobj_getOwnPropertyDescriptor, true, false, true }};
+			[$lobj, "getOwnPropertyNames"]      := {{ "d", $lobj_getOwnPropertyNames, true, false, true }};
+			[$lobj, "create"]                   := {{ "d", $lobj_create, true, false, true }};
+			[$lobj, "defineProperty"]           := {{ "d", $lobj_defineProperty, true, false, true }};
+			[$lobj, "defineProperties"]         := {{ "d", $lobj_defineProperties, true, false, true }};
+			[$lobj, "seal"]                     := {{ "d", $lobj_seal, true, false, true }};
+			[$lobj, "freeze"]                   := {{ "d", $lobj_freeze, true, false, true }};
+			[$lobj, "preventExtensions"]        := {{ "d", $lobj_preventExtensions, true, false, true }};
+			[$lobj, "isSealed"]                 := {{ "d", $lobj_isSealed, true, false, true }};
+			[$lobj, "isFrozen"]                 := {{ "d", $lobj_isFrozen, true, false, true }};
+			[$lobj, "isExtensible"]             := {{ "d", $lobj_isExtensible, true, false, true }};
+			[$lobj, "keys"]                     := {{ "d", $lobj_keys, true, false, true }};
+
+			ret := "create_object_with_call_construct_concrete" ($lobj_getPrototypeOf, "Object_getPrototypeOf", empty, 1);
+  			ret := "create_object_with_call_construct_concrete" ($lobj_getOwnPropertyDescriptor, "Object_getOwnPropertyDescriptor", empty, 2);
+  			ret := "create_object_with_call_construct_concrete" ($lobj_getOwnPropertyNames, "Object_getOwnPropertyNames", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lobj_create, "Object_create", empty, 2);
+  			ret := "create_object_with_call_construct_concrete" ($lobj_defineProperty, "Object_defineProperty", empty, 3);
+ 			ret := "create_object_with_call_construct_concrete" ($lobj_defineProperties, "Object_defineProperties", empty, 2);
+  			ret := "create_object_with_call_construct_concrete" ($lobj_seal, "Object_seal", empty, 1);
+ 			ret := "create_object_with_call_construct_concrete" ($lobj_freeze, "Object_freeze", empty, 1);
+  			ret := "create_object_with_call_construct_concrete" ($lobj_preventExtensions, "Object_preventExtensions", empty, 1);
+  			ret := "create_object_with_call_construct_concrete" ($lobj_isSealed, "Object_isSealed", empty, 1);
+ 			ret := "create_object_with_call_construct_concrete" ($lobj_isFrozen, "Object_isFrozen", empty, 1);
+  			ret := "create_object_with_call_construct_concrete" ($lobj_isExtensible, "Object_isExtensible", empty, 1);
+  			ret := "create_object_with_call_construct_concrete" ($lobj_keys, "Object_keys", empty, 1);
+
+			(* Object.prototype *)
+
+			ret := "create_default_object_concrete" ($lobj_proto, null, "Object", true);
+
+			[$lobj_proto, "constructor"]          := {{ "d", $lobj, true, false, true }};
+			[$lobj_proto, "toString"]             := {{ "d", $lop_toString, true, false, true }};
+			[$lobj_proto, "toLocaleString"]       := {{ "d", $lop_toLocaleString, true, false, true }};
+			[$lobj_proto, "valueOf"]              := {{ "d", $lop_valueOf, true, false, true }};
+			[$lobj_proto, "hasOwnProperty"]       := {{ "d", $lop_hasOwnProperty, true, false, true }};
+			[$lobj_proto, "isPrototypeOf"]        := {{ "d", $lop_isPrototypeOf, true, false, true }};
+			[$lobj_proto, "propertyIsEnumerable"] := {{ "d", $lop_propertyIsEnumerable, true, false, true }};
+      [$lobj_proto, "__proto__"]            := {{ "a", $lop_get_proto_acc, $lop_set_proto_acc, false, true }};
+
+			ret := "create_object_with_call_construct_concrete" ($lop_toString, "OP_toString", empty, 0);
+  			ret := "create_object_with_call_construct_concrete" ($lop_toLocaleString, "OP_toLocaleString", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lop_valueOf, "OP_valueOf", empty, 0);
+  			ret := "create_object_with_call_construct_concrete" ($lop_hasOwnProperty, "OP_hasOwnProperty", empty, 1);
+ 			ret := "create_object_with_call_construct_concrete" ($lop_isPrototypeOf, "OP_isPrototypeOf", empty, 1);
+  			ret := "create_object_with_call_construct_concrete" ($lop_propertyIsEnumerable, "OP_propertyIsEnumerable", empty, 1);
+            ret := "create_object_with_call_construct_concrete" ($lop_get_proto_acc, "OP_get_proto_acc", empty, 0);
+            ret := "create_object_with_call_construct_concrete" ($lop_set_proto_acc, "OP_set_proto_acc", empty, 1);
+
+
+
+
+
+  			(* Function object *)
+
+  			ret := "create_object_with_call_construct_concrete" ($lfun, "Function_call", "Function_construct", 1);
+
+  			[$lfun, "prototype"] := {{ "d", $lfun_proto, false, false, false }};
+
+  			(* Function.prototype *)
+
+   			ret := "create_object_with_call_construct_concrete" ($lfun_proto, "FP_default", empty, 0);
+   			m := metadata($lfun_proto);
+   			[m, "@proto"] := $lobj_proto;
+
+  			[$lfun_proto, "constructor"] := {{ "d", $lfun, true, false, true }};
+  			[$lfun_proto, "toString"]    := {{ "d", $lfp_toString, true, false, true }};
+  			[$lfun_proto, "call"]        := {{ "d", $lfp_call, true, false, true }};
+  			[$lfun_proto, "apply"]       := {{ "d", $lfp_apply, true, false, true }};
+  			[$lfun_proto, "bind"]        := {{ "d", $lfp_bind, true, false, true }};
+
+			ret := "create_object_with_call_construct_concrete" ($lfp_toString, "FP_toString", empty, 0);
+  			ret := "create_object_with_call_construct_concrete" ($lfp_call, "FP_call", empty, 1);
+ 			ret := "create_object_with_call_construct_concrete" ($lfp_apply, "FP_apply", empty, 2);
+  			ret := "create_object_with_call_construct_concrete" ($lfp_bind, "FP_bind", empty, 1);
+
+
+
+
+
+  			(* Array object *)
+
+  			ret := "create_object_with_call_construct_concrete" ($larr, "Array_call", "Array_construct", 1);
+
+  			[$larr, "prototype"] := {{ "d", $larr_proto, false, false, false }};
+  			[$larr, "isArray"]   := {{ "d", $larr_isArray, true, false, true }};
+
+			ret := "create_object_with_call_construct_concrete" ($larr_isArray, "Array_isArray", empty, 1);
+
+			(* Array.prototype *)
+
+			ret := "create_default_object_concrete" ($larr_proto, $lobj_proto, "Array", true);
+
+			[$larr_proto, "length"]         := {{ "d", 0, true, false, true }};
+			[$larr_proto, "constructor"]    := {{ "d", $larr, true, false, true }};
+			[$larr_proto, "toString"]       := {{ "d", $lap_toString, true, false, true }};
+			[$larr_proto, "toLocaleString"] := {{ "d", $lap_toLocaleString, true, false, true }};
+			[$larr_proto, "concat"]         := {{ "d", $lap_concat, true, false, true }};
+			[$larr_proto, "join"]           := {{ "d", $lap_join, true, false, true }};
+			[$larr_proto, "pop"]            := {{ "d", $lap_pop, true, false, true }};
+			[$larr_proto, "push"]           := {{ "d", $lap_push, true, false, true }};
+			[$larr_proto, "reverse"]        := {{ "d", $lap_reverse, true, false, true }};
+			[$larr_proto, "shift"]          := {{ "d", $lap_shift, true, false, true }};
+			[$larr_proto, "slice"]          := {{ "d", $lap_slice, true, false, true }};
+			[$larr_proto, "sort"]           := {{ "d", $lap_sort, true, false, true }};
+			[$larr_proto, "splice"]         := {{ "d", $lap_splice, true, false, true }};
+			[$larr_proto, "unshift"]        := {{ "d", $lap_unshift, true, false, true }};
+			[$larr_proto, "indexOf"]        := {{ "d", $lap_indexOf, true, false, true }};
+			[$larr_proto, "lastIndexOf"]    := {{ "d", $lap_lastIndexOf, true, false, true }};
+			[$larr_proto, "every"]          := {{ "d", $lap_every, true, false, true }};
+			[$larr_proto, "some"]           := {{ "d", $lap_some, true, false, true }};
+			[$larr_proto, "forEach"]        := {{ "d", $lap_forEach, true, false, true }};
+			[$larr_proto, "map"]            := {{ "d", $lap_map, true, false, true }};
+			[$larr_proto, "filter"]         := {{ "d", $lap_filter, true, false, true }};
+			[$larr_proto, "reduce"]         := {{ "d", $lap_reduce, true, false, true }};
+			[$larr_proto, "reduceRight"]    := {{ "d", $lap_reduceRight, true, false, true }};
+
+			ret := "create_object_with_call_construct_concrete" ($lap_toString, "AP_toString", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lap_toLocaleString, "AP_toLocaleString", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lap_concat, "AP_concat", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lap_join, "AP_join", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lap_pop, "AP_pop", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lap_push, "AP_push", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lap_reverse, "AP_reverse", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lap_shift, "AP_shift", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lap_slice, "AP_slice", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($lap_sort, "AP_sort", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lap_splice, "AP_splice", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($lap_unshift, "AP_unshift", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lap_indexOf, "AP_indexOf", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lap_lastIndexOf, "AP_lastIndexOf", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lap_every, "AP_every", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lap_some, "AP_some", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lap_forEach, "AP_forEach", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lap_map, "AP_map", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lap_filter, "AP_filter", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lap_reduce, "AP_reduce", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lap_reduceRight, "AP_reduceRight", empty, 1);
+
+
+
+
+
+			(* String object *)
+
+			ret := "create_object_with_call_construct_concrete" ($lstr, "String_call", "String_construct", 1);
+
+			[$lstr, "prototype"]    := {{ "d", $lstr_proto, false, false, false }};
+			[$lstr, "fromCharCode"] := {{ "d", $lstr_fromCharCode, true, false, true }};
+
+			ret := "create_object_with_call_construct_concrete" ($lstr_fromCharCode, "String_fromCharCode", empty, 1);
+
+			(* String.prototype *)
+
+			ret := "create_default_object_concrete" ($lstr_proto, $lobj_proto, "String", true);
+
+			m := metadata($lstr_proto);
+			[m, "@primitiveValue"]             := "";
+			[$lstr_proto, "length"]            := {{ "d", 0, false, false, true }};
+			[$lstr_proto, "constructor"]       := {{ "d", $lstr, true, false, true }};
+			[$lstr_proto, "toString"]          := {{ "d", $lsp_toString, true, false, true }};
+			[$lstr_proto, "valueOf"]           := {{ "d", $lsp_valueOf, true, false, true }};
+			[$lstr_proto, "charAt"]            := {{ "d", $lsp_charAt, true, false, true }};
+			[$lstr_proto, "charCodeAt"]        := {{ "d", $lsp_charCodeAt, true, false, true }};
+			[$lstr_proto, "concat"]            := {{ "d", $lsp_concat, true, false, true }};
+			[$lstr_proto, "indexOf"]           := {{ "d", $lsp_indexOf, true, false, true }};
+			[$lstr_proto, "lastIndexOf"]       := {{ "d", $lsp_lastIndexOf, true, false, true }};
+			[$lstr_proto, "localeCompare"]     := {{ "d", $lsp_localeCompare, true, false, true }};
+			[$lstr_proto, "match"]             := {{ "d", $lsp_match, true, false, true }};
+			[$lstr_proto, "replace"]           := {{ "d", $lsp_replace, true, false, true }};
+			[$lstr_proto, "search"]            := {{ "d", $lsp_search, true, false, true }};
+			[$lstr_proto, "slice"]             := {{ "d", $lsp_slice, true, false, true }};
+			[$lstr_proto, "split"]             := {{ "d", $lsp_split, true, false, true }};
+			[$lstr_proto, "substring"]         := {{ "d", $lsp_substring, true, false, true }};
+			[$lstr_proto, "toLowerCase"]       := {{ "d", $lsp_toLowerCase, true, false, true }};
+			[$lstr_proto, "toLocaleLowerCase"] := {{ "d", $lso_toLocaleLowerCase, true, false, true }};
+			[$lstr_proto, "toUpperCase"]       := {{ "d", $lsp_toUpperCase, true, false, true }};
+			[$lstr_proto, "toLocaleUpperCase"] := {{ "d", $lsp_toLocaleUpperCase, true, false, true }};
+			[$lstr_proto, "trim"]              := {{ "d", $lsp_trim, true, false, true }};
+
+			ret := "create_object_with_call_construct_concrete" ($lsp_toString, "SP_toString", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lsp_valueOf, "SP_valueOf", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lsp_charAt, "SP_charAt", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lsp_charCodeAt, "SP_charCodeAt", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lsp_concat, "SP_concat", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lsp_indexOf, "SP_indexOf", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lsp_lastIndexOf, "SP_lastIndexOf", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lsp_localeCompare, "SP_localeCompare", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lsp_match, "SP_match", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lsp_replace, "SP_replace", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($lsp_search, "SP_search", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lsp_slice, "SP_slice", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($lsp_split, "SP_split", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($lsp_substring, "SP_substring", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($lsp_toLowerCase, "SP_toLowerCase", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lso_toLocaleLowerCase, "lso_toLocaleLowerCase", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lsp_toUpperCase, "SP_toUpperCase", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lsp_toLocaleUpperCase, "SP_toLocaleUpperCase", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lsp_trim, "SP_trim", empty, 0);
+
+
+
+
+
+			(* Boolean object *)
+
+			ret := "create_object_with_call_construct_concrete" ($lbool, "Boolean_call", "Boolean_construct", 1);
+
+			[$lbool, "prototype"] := {{ "d", $lbool_proto, false, false, false }};
+
+			(* Boolean.prototype *)
+
+			ret := "create_default_object_concrete" ($lbool_proto, $lobj_proto, "Boolean", true);
+
+			m := metadata($lbool_proto);
+			[m, "@primitiveValue"] := false;
+
+			[$lbool_proto, "constructor"] := {{ "d", $lbool, true, false, true }};
+			[$lbool_proto, "toString"]    := {{ "d", $lbp_toString, true, false, true }};
+			[$lbool_proto, "valueOf"]     := {{ "d", $lbp_valueOf, true, false, true }};
+
+			ret := "create_object_with_call_construct_concrete" ($lbp_toString, "BP_toString", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lbp_valueOf, "BP_valueOf", empty, 0);
+
+
+
+
+
+			(* Number object *)
+
+			ret := "create_object_with_call_construct_concrete" ($lnum, "Number_call", "Number_construct", 1);
+
+			[$lnum, "prototype"]         := {{ "d", $lnum_proto, false, false, false }};
+			[$lnum, "MAX_VALUE"]         := {{ "d", $$max_float, false, false, false }};
+			[$lnum, "MIN_VALUE"]         := {{ "d", $$min_float, false, false, false }};
+			[$lnum, "NaN"]               := {{ "d", nan, false, false, false }};
+			[$lnum, "POSITIVE_INFINITY"] := {{ "d", inf, false, false, false }};
+			[$lnum, "NEGATIVE_INFINITY"] := {{ "d", -inf, false, false, false }};
+      [$lnum, "EPSILON"]           := {{ "d", $$epsilon, false, false, false }};
+      [$lnum, "MAX_SAFE_INTEGER"]  := {{ "d", $$max_safe_integer, false, false, false }};
+
+
+			(* Number.prototype *)
+
+			ret := "create_default_object_concrete" ($lnum_proto, $lobj_proto, "Number", true);
+
+			m := metadata($lnum_proto);
+			[m,           "@primitiveValue"]      := 0;
+			[$lnum_proto, "constructor"]          := {{ "d", $lnum, true, false, true }};
+			[$lnum_proto, "toString"]             := {{ "d", $lnp_toString, true, false, true }};
+			[$lnum_proto, "toLocaleString"]       := {{ "d", $lnp_toLocaleString, true, false, true }};
+			[$lnum_proto, "valueOf"]              := {{ "d", $lnp_valueOf, true, false, true }};
+			[$lnum_proto, "toFixed"]              := {{ "d", $lnp_toFixed, true, false, true }};
+			[$lnum_proto, "toExponential"]        := {{ "d", $lnp_toExponential, true, false, true }};
+			[$lnum_proto, "toPrecision"]          := {{ "d", $lnp_toPrecision, true, false, true }};
+
+			ret := "create_object_with_call_construct_concrete" ($lnp_toString, "NP_toString", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lnp_toLocaleString, "NP_toLocaleString", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lnp_valueOf, "NP_valueOf", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lnp_toFixed, "NP_toFixed", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lnp_toExponential, "NP_toExponential", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lnp_toPrecision, "NP_toPrecision", empty, 1);
+
+
+
+
+
+			(* Math object *)
+
+			ret := "create_default_object_concrete" ($lmath, $lobj_proto, "Math", true);
+
+			[$lmath, "E"]       := {{ "d", (m_exp 1),      false, false, false }};
+			[$lmath, "LN10"]    := {{ "d", (m_log 10),     false, false, false }};
+			[$lmath, "LN2"]     := {{ "d", (m_log 2),      false, false, false }};
+			[$lmath, "LOG2E"]   := {{ "d", (1 / m_log 2),  false, false, false }};
+			[$lmath, "LOG10E"]  := {{ "d", (1 / m_log 10), false, false, false }};
+			[$lmath, "PI"]      := {{ "d", $$pi,           false, false, false }};
+			[$lmath, "SQRT1_2"] := {{ "d", (m_sqrt 0.5),   false, false, false }};
+			[$lmath, "SQRT2"]   := {{ "d", (m_sqrt 2.0),   false, false, false }};
+
+			[$lmath, "abs"]    := {{ "d", $lmath_abs, true, false, true }};
+			[$lmath, "acos"]   := {{ "d", $lmath_acos, true, false, true }};
+			[$lmath, "asin"]   := {{ "d", $lmath_asin, true, false, true }};
+			[$lmath, "atan"]   := {{ "d", $lmath_atan, true, false, true }};
+			[$lmath, "atan2"]  := {{ "d", $lmath_atan2, true, false, true }};
+			[$lmath, "ceil"]   := {{ "d", $lmath_ceil, true, false, true }};
+			[$lmath, "cos"]    := {{ "d", $lmath_cos, true, false, true }};
+			[$lmath, "exp"]    := {{ "d", $lmath_exp, true, false, true }};
+			[$lmath, "floor"]  := {{ "d", $lmath_floor, true, false, true }};
+			[$lmath, "log"]    := {{ "d", $lmath_log, true, false, true }};
+			[$lmath, "max"]    := {{ "d", $lmath_max, true, false, true }};
+			[$lmath, "min"]    := {{ "d", $lmath_min, true, false, true }};
+			[$lmath, "pow"]    := {{ "d", $lmath_pow, true, false, true }};
+			[$lmath, "random"] := {{ "d", $lmath_random, true, false, true }};
+			[$lmath, "round"]  := {{ "d", $lmath_round, true, false, true }};
+			[$lmath, "sin"]    := {{ "d", $lmath_sin, true, false, true }};
+			[$lmath, "sqrt"]   := {{ "d", $lmath_sqrt, true, false, true }};
+			[$lmath, "tan"]    := {{ "d", $lmath_tan, true, false, true }};
+
+			ret := "create_object_with_call_construct_concrete" ($lmath_abs, "M_abs", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lmath_acos, "M_acos", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lmath_asin, "M_asin", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lmath_atan, "M_atan", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lmath_atan2, "M_atan2", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($lmath_ceil, "M_ceil", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lmath_cos, "M_cos", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lmath_exp, "M_exp", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lmath_floor, "M_floor", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lmath_log, "M_log", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lmath_max, "M_max", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($lmath_min, "M_min", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($lmath_pow, "M_pow", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($lmath_random, "M_random", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($lmath_round, "M_round", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lmath_sin, "M_sin", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lmath_sqrt, "M_sqrt", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lmath_tan, "M_tan", empty, 1);
+
+
+
+
+
+			(* Date object *)
+
+			ret := "create_object_with_call_construct_concrete" ($ldate, "Date_call", "Date_construct", 7);
+
+			[$ldate, "prototype"] := {{ "d", $ldt_proto, false, false, false }};
+			[$ldate, "parse"]     := {{ "d", $ldt_parse, true, false, true }};
+			[$ldate, "UTC"]       := {{ "d", $ldt_UTC, true, false, true }};
+			[$ldate, "now"]       := {{ "d", $ldt_, true, false, true }};
+
+			ret := "create_object_with_call_construct_concrete" ($ldt_parse, "Date_parse", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($ldt_UTC, "Date_UTC", empty, 7);
+			ret := "create_object_with_call_construct_concrete" ($ldt_, "Date_now", empty, 0);
+
+			(* Date.prototype *)
+
+			ret := "create_default_object_concrete" ($ldt_proto, $lobj_proto, "Date", true);
+
+			[$ldt_proto, "constructor"]          := {{ "d", $ldate, true, false, true }};
+			[$ldt_proto, "toString"]             := {{ "d", $ldp_toString, true, false, true }};
+			[$ldt_proto, "toDateString"]         := {{ "d", $ldp_toDateString, true, false, true }};
+			[$ldt_proto, "toTimeString"]         := {{ "d", $ldp_toTimeString, true, false, true }};
+			[$ldt_proto, "toLocaleString"]       := {{ "d", $ldp_toLocaleString, true, false, true }};
+			[$ldt_proto, "toLocaleDateString"]   := {{ "d", $ldp_toLocaleDateString, true, false, true }};
+			[$ldt_proto, "toLocaleTimeString"]   := {{ "d", $ldp_toLocaleTimeString, true, false, true }};
+			[$ldt_proto, "valueOf"]              := {{ "d", $ldp_valueOf, true, false, true }};
+			[$ldt_proto, "getTime"]              := {{ "d", $ldp_getTime, true, false, true }};
+			[$ldt_proto, "getFullYear"]          := {{ "d", $ldp_getFullYear, true, false, true }};
+			[$ldt_proto, "getUTCFullYear"]       := {{ "d", $ldp_getUTCFullYear, true, false, true }};
+			[$ldt_proto, "getMonth"]             := {{ "d", $ldp_getMonth, true, false, true }};
+			[$ldt_proto, "getUTCMonth"]          := {{ "d", $ldp_getUTCMonth, true, false, true }};
+			[$ldt_proto, "getDate"]              := {{ "d", $ldp_getDate, true, false, true }};
+			[$ldt_proto, "getUTCDate"]           := {{ "d", $ldp_getUTCDate, true, false, true }};
+			[$ldt_proto, "getDay"]               := {{ "d", $ldp_getDay, true, false, true }};
+			[$ldt_proto, "getUTCDay"]            := {{ "d", $ldp_getUTCDay, true, false, true }};
+			[$ldt_proto, "getHours"]             := {{ "d", $ldp_getHours, true, false, true }};
+			[$ldt_proto, "getUTCHours"]          := {{ "d", $ldp_getUTCHours, true, false, true }};
+			[$ldt_proto, "getMinutes"]           := {{ "d", $ldp_getMinutes, true, false, true }};
+			[$ldt_proto, "getUTCMinutes"]        := {{ "d", $ldp_getUTCMinutes, true, false, true }};
+			[$ldt_proto, "getSeconds"]           := {{ "d", $ldp_getSeconds, true, false, true }};
+			[$ldt_proto, "getUTCSeconds"]        := {{ "d", $ldp_getUTCSeconds, true, false, true }};
+			[$ldt_proto, "getMilliseconds"]      := {{ "d", $ldp_getMilliseconds, true, false, true }};
+			[$ldt_proto, "getUTCMilliseconds"]   := {{ "d", $ldp_getUTCMilliseconds, true, false, true }};
+			[$ldt_proto, "getTimezoneOffset"]    := {{ "d", $ldp_getTimezoneOffset, true, false, true }};
+			[$ldt_proto, "setTime"]              := {{ "d", $ldp_setTime, true, false, true }};
+			[$ldt_proto, "setFullYear"]          := {{ "d", $ldp_setFullYear, true, false, true }};
+			[$ldt_proto, "setUTCFullYear"]       := {{ "d", $ldp_setUTCFullYear, true, false, true }};
+			[$ldt_proto, "setMonth"]             := {{ "d", $ldp_setMonth, true, false, true }};
+			[$ldt_proto, "setUTCMonth"]          := {{ "d", $ldp_setUTCMonth, true, false, true }};
+			[$ldt_proto, "setDate"]              := {{ "d", $ldp_setDate, true, false, true }};
+			[$ldt_proto, "setUTCDate"]           := {{ "d", $ldp_setUTCDate, true, false, true }};
+			[$ldt_proto, "setDay"]               := {{ "d", $ldp_setDay, true, false, true }};
+			[$ldt_proto, "setUTCDay"]            := {{ "d", $ldp_setUTCDay, true, false, true }};
+			[$ldt_proto, "setHours"]             := {{ "d", $ldp_setHours, true, false, true }};
+			[$ldt_proto, "setUTCHours"]          := {{ "d", $ldp_setUTCHours, true, false, true }};
+			[$ldt_proto, "setMinutes"]           := {{ "d", $ldp_setMinutes, true, false, true }};
+			[$ldt_proto, "setUTCMinutes"]        := {{ "d", $ldp_setUTCMinutes, true, false, true }};
+			[$ldt_proto, "setSeconds"]           := {{ "d", $ldp_setSeconds, true, false, true }};
+			[$ldt_proto, "setUTCSeconds"]        := {{ "d", $ldp_setUTCSeconds, true, false, true }};
+			[$ldt_proto, "setMilliseconds"]      := {{ "d", $ldp_setMilliseconds, true, false, true }};
+			[$ldt_proto, "setUTCMilliseconds"]   := {{ "d", $ldp_setUTCMilliseconds, true, false, true }};
+			[$ldt_proto, "toUTCString"]          := {{ "d", $ldp_toUTCString, true, false, true }};
+			[$ldt_proto, "toISOString"]          := {{ "d", $ldp_toISOString, true, false, true }};
+			[$ldt_proto, "toJSON"]               := {{ "d", $ldp_toJSON, true, false, true }};
+
+			ret := "create_object_with_call_construct_concrete" ($ldp_toString, "DP_toString", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_toDateString, "DP_toDateString", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_toTimeString, "DP_toTimeString", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_toLocaleString, "DP_toLocaleString", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_toLocaleDateString, "DP_toLocaleDateString", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_toLocaleTimeString, "DP_toLocaleTimeString", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_valueOf, "DP_valueOf", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getTime, "DP_getTime", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getFullYear, "DP_getFullYear", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getUTCFullYear, "DP_getUTCFullYear", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getMonth, "DP_getMonth", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getUTCMonth, "DP_getUTCMonth", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getDate, "DP_getDate", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getUTCDate, "DP_getUTCDate", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getDay, "DP_getDay", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getUTCDay, "DP_getUTCDay", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getHours, "DP_getHours", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getUTCHours, "DP_getUTCHours", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getMinutes, "DP_getMinutes", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getUTCMinutes, "DP_getUTCMinutes", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getSeconds, "DP_getSeconds", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getUTCSeconds, "DP_getUTCSeconds", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getMilliseconds, "DP_getMilliseconds", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getUTCMilliseconds, "DP_getUTCMilliseconds", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_getTimezoneOffset, "DP_getTimezoneOffset", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setTime, "DP_setTime", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setFullYear, "DP_setFullYear", empty, 3);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setUTCFullYear, "DP_setUTCFullYear", empty, 3);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setMonth, "DP_setMonth", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setUTCMonth, "DP_setUTCMonth", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setDate, "DP_setDate", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setUTCDate, "DP_setUTCDate", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setDay, "DP_setDay", empty, 5);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setUTCDay, "DP_setUTCDay", empty, 5);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setHours, "DP_setHours", empty, 4);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setUTCHours, "DP_setUTCHours", empty, 4);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setMinutes, "DP_setMinutes", empty, 3);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setUTCMinutes, "DP_setUTCMinutes", empty, 3);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setSeconds, "DP_setSeconds", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setUTCSeconds, "DP_setUTCSeconds", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setMilliseconds, "DP_setMilliseconds", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($ldp_setUTCMilliseconds, "DP_setUTCMilliseconds", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($ldp_toUTCString, "DP_toUTCString", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_toISOString, "DP_toISOString", empty, 0);
+			ret := "create_object_with_call_construct_concrete" ($ldp_toJSON, "DP_toJSON", empty, 1);
+
+
+
+			(* RegExp object *)
+
+			ret := "create_object_with_call_construct_concrete" ($lregexp, "RegExp_call", "RegExp_construct", 2);
+
+			[$lregexp, "prototype"]      := {{ "d", $lre_proto, false, false, false }};
+
+			(* RegExp.prototype *)
+
+			ret := "create_default_object_concrete" ($lre_proto, $lobj_proto, "Object", true);
+
+			[$lre_proto, "constructor"] := {{ "d", $lregexp, true, false, true }};
+			[$lre_proto, "exec"]        := {{ "d", $lrp_exec, true, false, true }};
+			[$lre_proto, "test"]        := {{ "d", $lrp_test, true, false, true }};
+			[$lre_proto, "toString"]    := {{ "d", $lrp_toString, true, false, true }};
+
+      (* Fix this when RegExps come *)
+			[$lre_proto, "source"]     := {{ "a", $ldp_getUTCDate, undefined, false, true }};
+			[$lre_proto, "global"]     := {{ "a", $ldp_getUTCDate, undefined, false, true }};
+			[$lre_proto, "ignoreCase"] := {{ "a", $ldp_getUTCDate, undefined, false, true }};
+			[$lre_proto, "multiline"]  := {{ "a", $ldp_getUTCDate, undefined, false, true }};
+
+
+			ret := "create_object_with_call_construct_concrete" ($lrp_exec, "RP_exec", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lrp_test, "RP_test", empty, 1);
+			ret := "create_object_with_call_construct_concrete" ($lrp_toString, "RP_toString", empty, 0);
+
+
+
+
+
+			(* JSON object *)
+
+			ret := "create_default_object_concrete" ($ljson, $lobj_proto, "JSON", true);
+
+
+
+			[$ljson, "parse"]     := {{ "d", $ljson_parse,     true, false, true }};
+			[$ljson, "stringify"] := {{ "d", $ljson_stringify, true, false, true }};
+
+			ret := "create_object_with_call_construct_concrete" ($ljson_parse, "JSON_parse", empty, 2);
+			ret := "create_object_with_call_construct_concrete" ($ljson_stringify, "JSON_stringify", empty, 3);
+
+
+
+
+
+			(* Error object *)
+
+			ret := "create_object_with_call_construct_concrete" ($lerr, "Error_call", "Error_construct", 1);
+
+			[$lerr, "prototype"]         := {{ "d", $lerr_proto, false, false, false }};
+
+			(* Error.prototype *)
+
+			ret := "create_default_object_concrete" ($lerr_proto, $lobj_proto, "Object", true);
+
+			[$lerr_proto, "constructor"] := {{ "d", $lerr, true, false, true }};
+			[$lerr_proto, "name"]        := {{ "d", "Error", true, false, true }};
+			[$lerr_proto, "message"]     := {{ "d", "", true, false, true }};
+			[$lerr_proto, "toString"]    := {{ "d", $lep_toString, true, false, true }};
+
+			ret := "create_object_with_call_construct_concrete" ($lep_toString, "EP_toString", empty, 0);
+
+
+
+
+			(* Native errors *)
+
+			ret := "create_object_with_call_construct_concrete" ($leerr,  "EvalError_call",      "Error_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($lrgerr, "RangeError_call",     "Error_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($lrferr, "ReferenceError_call", "Error_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($lserr,  "SyntaxError_call",    "Error_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($lterr,  "TypeError_call",      "Error_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($luerr,  "URIError_call",       "Error_construct", 1, $lerr);
+
+			[$leerr,  "prototype"] := {{ "d", $leerr_proto, false, false, false }};
+			[$lrgerr, "prototype"] := {{ "d", $lrgerr_proto, false, false, false }};
+			[$lrferr, "prototype"] := {{ "d", $lrferr_proto, false, false, false }};
+			[$lserr,  "prototype"] := {{ "d", $lserr_proto, false, false, false }};
+			[$lterr,  "prototype"] := {{ "d", $lterr_proto, false, false, false }};
+			[$luerr,  "prototype"] := {{ "d", $luerr_proto, false, false, false }};
+
+			[$leerr,  "name"] := {{ "d", "EvalError", true, false, true }};
+			[$lrgerr, "name"] := {{ "d", "RangeError", true, false, true }};
+			[$lrferr, "name"] := {{ "d", "ReferenceError", true, false, true }};
+			[$lserr,  "name"] := {{ "d", "SyntaxError", true, false, true }};
+			[$lterr,  "name"] := {{ "d", "TypeError", true, false, true }};
+			[$luerr,  "name"] := {{ "d", "URIError", true, false, true }};
+
+			(* Native error prototypes *)
+
+			ret := "create_default_object_concrete" ($leerr_proto,  $lerr_proto, "Error", true);
+			ret := "create_default_object_concrete" ($lrgerr_proto, $lerr_proto, "Error", true);
+			ret := "create_default_object_concrete" ($lrferr_proto, $lerr_proto, "Error", true);
+			ret := "create_default_object_concrete" ($lserr_proto,  $lerr_proto, "Error", true);
+			ret := "create_default_object_concrete" ($lterr_proto,  $lerr_proto, "Error", true);
+			ret := "create_default_object_concrete" ($luerr_proto,  $lerr_proto, "Error", true);
+
+			[$leerr_proto,  "constructor"]    := {{ "d", $leerr, true, false, true }};
+			[$lrgerr_proto, "constructor"]    := {{ "d", $lrgerr, true, false, true }};
+			[$lrferr_proto, "constructor"]    := {{ "d", $lrferr, true, false, true }};
+			[$lserr_proto,  "constructor"]    := {{ "d", $lserr, true, false, true }};
+			[$lterr_proto,  "constructor"]    := {{ "d", $lterr, true, false, true }};
+			[$luerr_proto,  "constructor"]    := {{ "d", $luerr, true, false, true }};
+
+			[$leerr_proto,  "name"]    := {{ "d", "EvalError", true, false, true }};
+			[$lrgerr_proto, "name"]    := {{ "d", "RangeError", true, false, true }};
+			[$lrferr_proto, "name"]    := {{ "d", "ReferenceError", true, false, true }};
+			[$lserr_proto,  "name"]    := {{ "d", "SyntaxError", true, false, true }};
+			[$lterr_proto,  "name"]    := {{ "d", "TypeError", true, false, true }};
+			[$luerr_proto,  "name"]    := {{ "d", "URIError", true, false, true }};
+
+			[$leerr_proto,  "message"]    := {{ "d", "", true, false, true }};
+			[$lrgerr_proto, "message"]    := {{ "d", "", true, false, true }};
+			[$lrferr_proto, "message"]    := {{ "d", "", true, false, true }};
+			[$lserr_proto,  "message"]    := {{ "d", "", true, false, true }};
+			[$lterr_proto,  "message"]    := {{ "d", "", true, false, true }};
+			[$luerr_proto,  "message"]    := {{ "d", "", true, false, true }};
+
+			(* 13.2.3 The [[ThrowTypeError]] Function Object *)
+			(* Note, this object does not follow the standard Function object construction *)
+			ret := "create_default_object_concrete" ($lthrw_type_error, $lfun_proto, "Function", false);
+
+			m := metadata(ret);
+			[m, "@scope"] := empty;
+			[m, "@formalParameters"] := {{ }};
+			[m, "@call"] := "ThrowTypeError";
+			[ret, "length"] := {{ "d", 0, false, false, true }};
+
+      ret := empty;
+      return
+};
+
+
+(*
+	Procedure: create_arguments_object
+
+	Creates a JavaScript arguments object with arguments list argList
+
+	Does not thrw an error
+*)
+proc create_arguments_object (argList) {
+
+			len := l-len (argList);
+
+			(* Create the arguments object *)
+			ret := "create_default_object" ($lobj_proto, "Arguments", true);
+			obj  := ret;
+
+			(* Define length *)
+			ret := "defineOwnProperty" (obj, "length", {{ "d", len, true, false, true }}, false) with elab;
+
+			(* Loop through values *)
+			indx := len - 1;
+
+	loop:	goto [0 <= indx] head call;
+	head:	ret := "i__toString" (indx) with elab;
+			ret := "defineOwnProperty" (obj, ret, {{ "d", l-nth (argList, indx), true, true, true }}, false) with elab;
+			indx := indx - 1;
+			goto loop;
+
+			(* Set caller and callee *)
+	call:	[obj, "caller"] := {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }};
+			[obj, "callee"] := {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }};
+
+	rlab:	ret := obj;
+        return;
+	elab: throw
+};

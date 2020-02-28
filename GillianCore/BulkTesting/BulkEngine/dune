@@ -1,0 +1,5 @@
+(library
+ (name bulk)
+ (public_name gillian.bulk)
+ (libraries engine gil_syntax utils parserAndCompiler)
+ (flags -open Engine -open Gil_syntax -open Utils))

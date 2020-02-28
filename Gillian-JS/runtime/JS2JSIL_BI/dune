@@ -1,0 +1,7 @@
+(install
+ (files BiArray.jsil BiBoolean.jsil BiDate.jsil BiErrors.jsil BiFunction.jsil
+   BiGlobal.jsil BiHelpers.jsil BiInit.jsil BiInitFantine.jsil
+   BiInternals.jsil BiMath.jsil BiNumber.jsil BiObject.jsil BiRegExp.jsil
+   BiString.jsil)
+ (section share)
+ (package gillian-js))

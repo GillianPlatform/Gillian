@@ -1,0 +1,3 @@
+(library
+ (name cosetteRunner)
+ (libraries js2jsil_lib semantics))

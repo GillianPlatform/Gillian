@@ -1,0 +1,13 @@
+module type M = sig
+  type vt
+
+  type st
+
+  type store_t
+
+  type error_t
+
+  type state_t
+
+  val exec : Prog.t -> state_t -> string -> bool -> state_t
+end

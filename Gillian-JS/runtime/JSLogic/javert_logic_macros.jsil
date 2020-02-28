@@ -1,0 +1,7 @@
+macro
+	GPVUnfold (x) : 
+		if ((typeOf x = List)) then { 
+			if (((l-nth(x, 0) = "o") or ((l-nth(x, 0) = "v") and (l-nth(x, 1) = $lg)))) then { 
+				unfold_all Pi 
+			} 
+		}

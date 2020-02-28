@@ -1,0 +1,594 @@
+import preds_ch15_11_errors.jsil, bis_ch15_11_errors.jsil;
+
+(*
+ * Auxiliary: IsPrimitive
+ *
+ * Parameters: 
+ *   v: JavaScript value
+ *
+ * Behaviour:
+ *   Returns true if v is not an object,
+ *   and false otherwise
+ *
+ * Specifications:
+ *   1) v is not of type object - return true
+ *   2) v is of type object - return false
+ *
+ * Notes:
+ *   1) Only JS types are accepted - undefined, null, boolean, number, string, object. 
+ *   2) To limit branching, we do not have separate specifications for each primitive type.
+ *)
+
+spec i__isPrimitive(v)
+    (** 1 **)
+    [[ typeOf(v) --e-- -{ Undefined, Null, Bool, Num, Str }- ]]
+    [[ ret == true ]]
+    normal;
+
+    (** 2 **)
+    [[ types(v:Obj) ]]
+    [[ ret == false ]]
+    normal
+
+proc i__isPrimitive (v) {
+        tv := typeOf v;
+        goto [tv -e- -{ Undefined, Null, Bool, Num, Str }-] returnTrue testObject;
+
+    returnTrue:
+        ret := true;
+        return;
+
+    testObject:
+        goto [(tv = Obj)] returnFalse impossible;
+
+    returnFalse:
+        ret := false;
+        return;
+
+	impossible: 
+        assume(False)
+};
+
+(*
+ * 9.1. ToPrimitive
+ *
+ * Parameters: 
+ *   v:             JavaScript value
+ *   preferredType: hint for preffered conversion
+ *
+ * Behaviour:
+ *   Converts v to a value of non-object type
+ *
+ * Specifications:
+ *
+ *   1) v is not an object type - return v
+ *   2) TODO:HIGHER-ORDER: v is an object type
+ *)
+
+spec i__isPrimitive(v)
+    (** 1 **)
+    [[ typeOf(v) --e-- -{ Undefined, Null, Bool, Num, Str }- ]]
+    [[ ret == true ]]
+    normal
+
+proc i__toPrimitive (v, preferredType) {
+        prim := "i__isPrimitive" (v);
+        goto [prim] returnTrue fromObject;
+
+    returnTrue:
+        ret := true;
+        return;
+
+	fromObject:
+        ret := "i__defaultValue" (v, preferredType) with elab;
+        return;
+
+	elab: 
+        throw
+};
+
+(*
+ * 9.2. ToNumber
+ *
+ * Parameters: 
+ *   v: JavaScript value
+ *
+ * Behaviour:
+ *   Converts v to a value of type number
+ *
+ * Specifications:
+ *   1) TODO:FLOATING-POINT:undefined -> NaN
+ *   2) null                          -> 0
+ *   3) true                          -> 1
+ *   4) false                         -> 0
+ *   5) number                        -> v
+ *   6) string                        -> convert from string to number,
+ *                                       using the string_to_num JSIL operator,
+ *   7) TODO:HIGHER-ORDER: object     -> conversion to primitive, 
+ *                                       then to number recursively
+ * Notes:
+ *   1) Only JS types are accepted - undefined, null, boolean, number, string, object.
+ *)
+
+spec i__toNumber (v)
+    (** 2 **)
+    [[ v == null ]]
+    [[ ret == 0 ]]
+    normal;
+
+    (** 3 **)
+    [[ v == true ]]
+    [[ ret == 1 ]]
+    normal;
+
+    (** 4 **)
+    [[ v == false ]]
+    [[ ret == 0 ]]
+    normal;
+
+    (** 5 **)
+    [[ (v == #v) * types(#v:Num) ]]
+    [[ ret == #v ]]
+    normal;
+
+    (** 6 **)
+    [[ (v == #v) * types(#v:Str) ]]
+    [[ ret == (string_to_num #v) ]]
+    normal
+
+proc i__toNumber (v) {
+        goto [v = undefined] returnNaN testNull;
+  
+    returnNaN: 
+        ret := nan;
+        return;
+
+    testNull:
+        goto [v = null] returnZero testBool;
+    
+    returnZero:
+        ret := 0;
+        return;
+    
+    testBool:
+        goto [typeOf v = Bool] branchBool testNumber;
+
+    branchBool: 
+        goto [v = true] returnOne returnZero;
+    
+    returnOne:
+        ret := 1;
+        return;
+
+    testNumber:
+        goto [typeOf v = Num] returnNumber testString;
+    
+    returnNumber:
+        ret := v;
+        return;
+    
+    testString:
+        goto [typeOf v = Str] returnString testObject;
+    
+    returnString:
+        ret := string_to_num v;
+        return;
+    
+    testObject:
+        goto [typeOf v = Obj] processObject impossible;
+    
+    processObject:  
+        ret := "i__toPrimitive" (v, "Number") with elab;
+        ret := "i__toNumber" (ret);
+        return;
+        
+    impossible: 
+        assume(False);
+
+    elab: 
+        throw
+};
+
+(*
+ * 9.4. ToInteger
+ *
+ * Parameters: 
+ *   v: JavaScript value
+ *
+ * Behaviour:
+ *   Converts v to an integer
+ *
+ * Specifications:
+ *   TODO:INTEGER-REASONING
+ *)
+proc i__toInteger (v) {
+        ret := "i__toNumber" (v) with elab;
+        ret := num_to_int (ret);
+        return;
+
+    elab: 
+        throw
+};
+
+(*
+ * 9.5. ToInt32
+ *
+ * Parameters: 
+ *   v: JavaScript value
+ *
+ * Behaviour:
+ *   Converts v to a signed 32-bit integer
+ *
+ * Specifications:
+ *   TODO:INTEGER-REASONING
+ *)
+proc i__toInt32 (v) {
+	    ret := "i__toNumber" (v) with elab;
+		ret := num_to_int32 (ret);
+        return;
+
+	elab: 
+        throw
+};
+
+(*
+ * 9.6. ToUint32
+ *
+ * Parameters: 
+ *   v: JavaScript value
+ *
+ * Behaviour:
+ *   Converts v to an unsigned 32-bit integer
+ *
+ * Specifications:
+ *   TODO:INTEGER-REASONING
+ *)
+proc i__toUint32 (v) {
+		ret := "i__toNumber" (v) with elab;
+		ret := num_to_uint32 (ret);
+        return;
+
+	elab: 
+        throw
+};
+
+(*
+ * 9.7. ToUint16
+ *
+ * Parameters: 
+ *   v: JavaScript value
+ *
+ * Behaviour:
+ *   Converts v to an unsigned 16-bit integer
+ *
+ * Specifications:
+ *   TODO:INTEGER-REASONING
+ *)
+proc i__toUint16 (v) {
+		ret := "i__toNumber" (v) with elab;
+		ret := num_to_uint16 (ret);
+        return;
+
+	elab: 
+        throw
+};
+
+(*
+ * 9.8. ToString
+ *
+ * Parameters: 
+ *   v: JavaScript value
+ *
+ * Behaviour:
+ *   Converts v to a value of type string
+ *
+ * Specifications:
+ *   1) undefined                 -> "undefined"
+ *   2) null                      -> "null"
+ *   3) true                      -> "true"
+ *   4) false                     -> "false"
+ *   5) number                    -> convert from number to string,
+ *                                   using the num_to_string JSIL operator,
+ *   6) string                    -> v
+ *   7) TODO:HIGHER-ORDER: object -> conversion to primitive, 
+ *                                   then to string recursively
+ * Notes:
+ *   1) Only JS types are accepted - undefined, null, boolean, number, string, object. 
+ *)
+spec i__toString (v)
+    (** 1 **)
+    [[ v == undefined ]]
+    [[ ret == "undefined" ]]
+    normal;
+
+    (** 2 **)
+    [[ v == null ]]
+    [[ ret == "null" ]]
+    normal;
+
+    (** 3 **)
+    [[ v == true ]]
+    [[ ret == "true" ]]
+    normal;
+
+    (** 4 **)
+    [[ v == false ]]
+    [[ ret == "false" ]]
+    normal;
+
+    (** 5 **)
+    [[ (v == #v) * types(#v:Num) ]]
+    [[ ret == (num_to_string #v) ]]
+    normal;
+
+    (** 6 **)
+    [[ (v == #v) * types(#v:Str) ]]
+    [[ ret == #v ]]
+    normal
+
+proc i__toString (v) {
+        goto [v = undefined] returnUndefined testNull;
+
+	returnUndefined: 
+        ret := "undefined";
+        return;
+
+	testNull:
+        goto [v = null] returnNull testBool;
+
+	returnNull:	
+        ret := "null";
+        return;
+
+	testBool:
+        goto [typeOf v = Bool] branchBool testNumber;
+
+	branchBool:	
+        goto [v = true] returnTrue returnFalse;
+        
+	returnTrue:	
+        ret := "true";
+		return;
+
+	returnFalse:
+        ret := "false";
+        return;
+
+	testNumber:	
+        goto [typeOf v = Num] returnNumber testString;
+
+	returnNumber:	
+        ret := num_to_string v;
+        return;
+
+	testString:
+        goto [typeOf v = Str] returnString testObject;
+
+	returnString:
+        ret := v;
+		return;
+
+	testObject:
+        goto [typeOf v = Obj] returnObject impossible;
+
+	returnObject:
+        ret := "i__toPrimitive" (v, "String") with elab;
+        ret := "i__toString" (ret) with elab;
+        return;
+
+	impossible:
+        assume(False);
+
+	elab: 
+        throw
+};
+
+(*
+ * 9.9. ToObject
+ *
+ * Parameters: 
+ *   v: JavaScript value
+ *
+ * Behaviour:
+ *   Converts v to a value of type object
+ *
+ * Specifications:
+ *   1) undefined -> throw Type Error
+ *   2) null      -> throw Type Error
+ *   3) TODO: boolean   -> create Boolean object with primitive value v
+ *   4) TODO: number    -> create Number object with primitive value v
+ *   5) TODO: string    -> create String object with primitive value v
+ *   6) object    -> return v
+ *)
+
+spec i__toObject (v) 
+    [[ (v == undefined) ]]
+    [[ TypeError(ret) ]]
+    error;
+
+    [[ (v == null) ]]
+    [[ TypeError(ret) ]]
+    error;
+
+    [[ (v == #v) * types(#v:Obj) ]]
+    [[ ret == #v ]]
+    normal
+
+proc i__toObject (v) {
+        goto [v = undefined] throwTypeError testNull;
+
+	testNull:
+        goto [v = null] throwTypeError testBool;
+
+	testBool:
+        goto [typeOf v = Bool] coerceBool testNumber;
+
+	coerceBool:
+        ret := "Boolean_construct" (undefined, undefined, v) with elab;
+        return;
+
+	testNumber:	
+        goto [typeOf v = Num] coerceNumber testString;
+
+	coerceNumber:
+        ret := "Number_construct" (undefined, undefined, v) with elab;
+		return;
+
+	testString:
+        goto [typeOf v = Str] coerceString testObject;
+
+	coerceString:
+        ret := "String_construct" (undefined, undefined, v) with elab;
+		return;
+
+	testObject:
+        goto [typeOf v = Obj] object impossible;
+
+	object:	
+        ret := v;
+        return;
+
+	impossible:	
+        assume(False);
+
+	throwTypeError:	
+        ret := "TypeError" ();
+
+	elab: 
+        throw
+};
+
+(*
+ * 9.10: CheckObjectCoercible
+ *
+ * Parameters: 
+ *   v: JavaScript value
+ *
+ * Behaviour:
+ *   Throws an error if v cannot be coerced to an object,
+ *   i.e. if it is null or undefined
+ *
+ * Specifications:
+ *   1) undefined -> TypeError
+ *   2) null      -> TypeError
+ *   3) otherwise -> empty
+ *
+ * Notes:
+ *   1) Only JS types are accepted - undefined, null, boolean, number, string, object.
+ *   2) To limit branching, we do not have separate specifications for each primitive type.
+ *)
+spec i__checkObjectCoercible (v)
+    [[ v == undefined ]]
+    [[ TypeError(ret) ]]
+    error;
+
+    [[ v == null ]]
+    [[ TypeError(ret) ]]
+    error;
+
+    [[ typeOf(v) --e-- -{ Bool, Num, Str, Obj }- ]]
+    [[ ret == empty ]]
+    normal
+
+proc i__checkObjectCoercible (v) {
+        ret := empty;
+	    goto [(v = undefined) or (v = null)] throwError testType;
+
+	testType:
+        tv := typeOf v; 
+        goto [tv -e- -{ Bool, Num, Str, Obj }-] returnEmpty impossible;
+
+	returnEmpty:
+        return;
+
+	impossible: 
+        assume(False);
+
+	throwError:
+        ret := "TypeError" ();
+	    throw
+};
+
+(*
+ * 9.11: IsCallable
+ *
+ * Parameters: 
+ *   v: JavaScript value
+ *
+ * Behaviour:
+ *   Returns true if v is a callable object,
+ *   and false otherwise
+ *
+ * Specifications:
+ *   1) Object with call    -> true
+ *   2) Object without call -> false
+ *   3) otherwise           -> false
+ *
+ * Notes:
+ *   1) Only JS types are accepted - undefined, null, boolean, number, string, object.
+ *   2) To limit branching, we do not have separate specifications for each primitive type.
+ *)
+
+spec i__isCallable (v)
+
+    [[ (v == #v) * MetaData(#v, #md) * ((#md, "@call") -> none) ]]
+    [[ MetaData(#v, #md) * ((#md, "@call") -> none) * (ret == false) ]]
+    normal;
+
+    [[ (v == #v) * MetaData(#v, #md) * ((#md, "@call") -> #y) * (! (#y == none)) ]]
+    [[ MetaData(#v, #md) * ((#md, "@call") -> #y) * (ret == true) ]]
+    normal;
+
+    [[ typeOf(v) --e-- -{ Undefined, Null, Bool, Num, Str }- ]]
+    [[ ret == false ]]
+    normal
+
+proc i__isCallable (v) {
+        ret := false;
+        goto [typeOf v = Obj] testObject rlab;
+
+    testObject:  
+        m := metadata(v);
+        ret := hasField(m, "@call");
+
+    rlab: 
+        return
+};
+
+(*
+ * 9.12: SameValue
+ *
+ * Parameters: 
+ *   v1, v2: JavaScript value
+ *
+ * Behaviour:
+ *   Returns true if v1 and v2 are the same, and false otherwise
+ *
+ * Specifications:
+ *   1) Two equal values     -> true
+ *   2) Two different values -> false
+ *
+ * Notes:
+ *   1) TODO: Both the code and the spec cut the nan case
+ *)
+
+spec i__sameValue (v1, v2)
+    [[ v1 == v2 ]]
+    [[ ret == true ]]
+    normal;
+
+    [[ ! (v1 == v2) ]]
+    [[ ret == false ]]
+    normal
+
+proc i__sameValue (v1, v2) {
+        goto [v1 = v2] returnTrue returnFalse; 
+
+    returnTrue:    
+        ret := true;
+        return;
+          
+    returnFalse:
+        ret := false;
+        return
+};

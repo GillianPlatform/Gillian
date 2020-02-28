@@ -1,0 +1,7 @@
+(install
+ (files Array.jsil Boolean.jsil Date.jsil Errors.jsil Function.jsil
+   Global.jsil Init.jsil InitFantine.jsil Internals.jsil Math.jsil
+   Number.jsil Object.jsil RegExp.jsil String.jsil harness.js
+   initial_heap.jsil internals_builtins_procs.jsil)
+ (section share)
+ (package gillian-js))

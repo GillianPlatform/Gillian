@@ -1,0 +1,195 @@
+type t =
+  (* Used only for work in compilation *)
+  | WList
+  | WNull
+  | WBool
+  | WString
+  | WPtr
+  | WNum
+  | WAny
+  | WSet
+
+(** Are types t1 and t2 compatible *)
+let compatible t1 t2 =
+  match (t1, t2) with
+  | WAny, _ -> true
+  | _, WAny -> true
+  | t1, t2 when t1 = t2 -> true
+  | _ -> false
+
+let strongest t1 t2 =
+  match (t1, t2) with
+  | WAny, t -> t
+  | t, WAny -> t
+  | _       -> t1
+
+(* careful there is no strongest for two different types *)
+
+let pp fmt t =
+  let s = Format.fprintf fmt "@[%s@]" in
+  match t with
+  | WList   -> s "List"
+  | WNull   -> s "NullType"
+  | WBool   -> s "Bool"
+  | WString -> s "String"
+  | WPtr    -> s "Pointer"
+  | WNum    -> s "Num"
+  | WAny    -> s "Any"
+  | WSet    -> s "Set"
+
+exception Unmatching_types
+
+module TypeMap = Map.Make (struct
+  type t = WLExpr.tt
+
+  let compare = Stdlib.compare
+end)
+
+let of_variable (var : string) (type_context : t TypeMap.t) : t option =
+  TypeMap.find_opt (WLExpr.PVar var) type_context
+
+let of_val v =
+  let open WVal in
+  match v with
+  | Bool _  -> WBool
+  | Num _   -> WNum
+  | Str _   -> WString
+  | Null    -> WNull
+  | VList _ -> WList
+
+(** returns (x, y) when unop takes type x and returns type y *)
+let of_unop u =
+  match u with
+  | WUnOp.NOT  -> (WBool, WBool)
+  | WUnOp.LEN  -> (WList, WNum)
+  | WUnOp.REV  -> (WList, WList)
+  | WUnOp.HEAD -> (WList, WAny)
+  | WUnOp.TAIL -> (WList, WList)
+
+(** returns (x, y, z) when binop takes types x and y and returns type z *)
+let of_binop b =
+  match b with
+  | WBinOp.NEQ | WBinOp.EQUAL -> (WAny, WAny, WBool)
+  | WBinOp.LESSTHAN
+  | WBinOp.GREATERTHAN
+  | WBinOp.LESSEQUAL
+  | WBinOp.GREATEREQUAL -> (WNum, WNum, WBool)
+  | WBinOp.TIMES | WBinOp.DIV | WBinOp.MOD -> (WNum, WNum, WNum)
+  | WBinOp.AND | WBinOp.OR -> (WBool, WBool, WBool)
+  | WBinOp.LSTCONS -> (WAny, WList, WList)
+  | WBinOp.LSTCAT -> (WList, WList, WList)
+  | WBinOp.PLUS | WBinOp.MINUS -> (WAny, WAny, WAny)
+
+(* TODO: improve this, because we can add Ints AND Pointers *)
+
+(** checks and adds to typemap *)
+let needs_to_be expr t knownp =
+  let bare_expr = WLExpr.get expr in
+  match TypeMap.find_opt bare_expr knownp with
+  | Some tp when not (compatible t tp) ->
+      failwith
+        (Format.asprintf
+           "I infered both types %a and %a on expression %a at location %s" pp
+           tp pp t WLExpr.pp expr
+           (CodeLoc.str (WLExpr.get_loc expr)))
+  | Some tp -> TypeMap.add bare_expr (strongest t tp) knownp
+  | None -> TypeMap.add bare_expr t knownp
+
+(** Infers a TypeMap from a logic_expr *)
+let rec infer_logic_expr knownp lexpr =
+  let open WLExpr in
+  let bare_lexpr = get lexpr in
+  match bare_lexpr with
+  | LVal v               -> TypeMap.add bare_lexpr (of_val v) knownp
+  | LBinOp (le1, b, le2) ->
+      let infered = infer_logic_expr (infer_logic_expr knownp le1) le2 in
+      let t1, t2, t3 = of_binop b in
+      TypeMap.add bare_lexpr t3
+        (needs_to_be le1 t1 (needs_to_be le2 t2 infered))
+  | LUnOp (u, le)        ->
+      let infered = infer_logic_expr knownp le in
+      let t1, t2 = of_unop u in
+      TypeMap.add bare_lexpr t2 (needs_to_be le t1 infered)
+  | LVar _               -> knownp
+  | PVar _               -> knownp
+  | LEList lel           ->
+      TypeMap.add bare_lexpr WList (List.fold_left infer_logic_expr knownp lel)
+  | LESet lel            ->
+      TypeMap.add bare_lexpr WSet (List.fold_left infer_logic_expr knownp lel)
+
+(** Single step of inference for that gets a TypeMap from a single assertion *)
+let rec infer_single_assert_step asser known =
+  let same_type e1 e2 knownp =
+    let bare_e1, bare_e2 = (WLExpr.get e1, WLExpr.get e2) in
+    let topt1 = TypeMap.find_opt bare_e1 knownp in
+    let topt2 = TypeMap.find_opt bare_e2 knownp in
+    match (topt1, topt2) with
+    | Some t1, Some t2 when not (compatible t1 t2) ->
+        failwith
+          (Format.asprintf
+             "Expressions %a and %a should have the same type but are of types \
+              %a and %a in assertion %a at location %s"
+             WLExpr.pp e1 WLExpr.pp e2 pp t1 pp t2 WLAssert.pp asser
+             (CodeLoc.str (WLAssert.get_loc asser)))
+    | Some t1, Some t2 -> Some (strongest t1 t2)
+    | Some t1, None -> Some t1
+    | None, Some t2 -> Some t2
+    | None, None -> None
+  in
+  let rec infer_formula f k =
+    match WLFormula.get f with
+    | WLFormula.LTrue | WLFormula.LFalse -> k
+    | WLFormula.LNot f -> infer_formula f k
+    | WLFormula.LAnd (f1, f2) | WLFormula.LOr (f1, f2) ->
+        infer_formula f2 (infer_formula f1 known)
+    | WLFormula.LEq (le1, le2) -> (
+        let bare_le1, bare_le2 = (WLExpr.get le1, WLExpr.get le2) in
+        let infered = infer_logic_expr (infer_logic_expr known le1) le2 in
+        let topt = same_type le1 le2 infered in
+        match topt with
+        | Some t -> TypeMap.add bare_le1 t (TypeMap.add bare_le2 t infered)
+        | None   -> infered )
+    | WLFormula.LLess (le1, le2)
+    | WLFormula.LGreater (le1, le2)
+    | WLFormula.LLessEq (le1, le2)
+    | WLFormula.LGreaterEq (le1, le2) ->
+        let bare_le1, bare_le2 = (WLExpr.get le1, WLExpr.get le2) in
+        let infered = infer_logic_expr (infer_logic_expr known le1) le2 in
+        let inferedp = needs_to_be le1 WNum (needs_to_be le2 WNum infered) in
+        TypeMap.add bare_le1 WNum (TypeMap.add bare_le2 WNum inferedp)
+  in
+  match WLAssert.get asser with
+  | WLAssert.LEmp -> known
+  | WLAssert.LStar (la1, la2) ->
+      infer_single_assert_step la2 (infer_single_assert_step la1 known)
+  | WLAssert.LPred (_, lel) -> List.fold_left infer_logic_expr known lel
+  | WLAssert.LPointsTo (le1, le2) ->
+      let infered =
+        List.fold_left infer_logic_expr (infer_logic_expr known le1) le2
+      in
+      needs_to_be le1 WPtr infered
+  | WLAssert.LBlockPointsTo (le1, le2) ->
+      let infered =
+        List.fold_left infer_logic_expr (infer_logic_expr known le1) le2
+      in
+      needs_to_be le1 WPtr infered
+  | WLAssert.LPure f -> infer_formula f known
+
+let infer_single_assert known asser =
+  let rec find_fixed_point f a =
+    let b = f a in
+    if Stdlib.compare a b = 0 then b else find_fixed_point f b
+  in
+  find_fixed_point (infer_single_assert_step asser) known
+
+let infer_types_pred assert_list =
+  let join _le topt1 topt2 =
+    match (topt1, topt2) with
+    | Some t1, Some t2 when t1 = t2 -> Some t1
+    | _ -> None
+  in
+  let infers_on_asserts =
+    List.map (infer_single_assert TypeMap.empty) assert_list
+  in
+  let f, r = (List.hd infers_on_asserts, List.tl infers_on_asserts) in
+  List.fold_left (TypeMap.merge join) f r

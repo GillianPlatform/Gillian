@@ -1,0 +1,68 @@
+import internal_functions.jsil;
+
+(* ************* *)
+(* 15.11. ERRORS *)
+(* ************* *)
+
+proc Error_construct (xsc, vthis, v) {
+        ret := vthis;
+
+        m := metadata(vthis);
+        [m, "@class"] := "Error";
+        [m, "@extensible"] := true;
+
+        goto [v = undefined] returnNormal message;
+
+    message:
+        xerr := "i__toString" (v) with elab;
+		[ret, "message"] := {{ "d", xerr, true, false, true }};
+
+    returnNormal:
+        return;
+
+	elab: 
+        throw
+};
+
+proc TypeError_call (xsc, vthis, v) {
+		ret := "create_default_object" ($lterr_proto, "Error", true);
+		ret := "Error_construct" (undefined, ret, v) with elab;
+        return;
+
+	elab: 
+        throw
+};
+
+(*
+ * 15.11: TypeError constructor
+ *
+ * Parameters: 
+ *   v: optional message
+ *
+ * Behaviour:
+ *   Returns a new JS Type Error object with an optional message
+ *
+ * Specifications:
+ *   1) no message provided     - result is a Type Error
+ *   2) string message provided - result is a Type Error with message
+ *   .) TODO:STUPID: non-string message provided, needs conversion
+ *)
+
+spec TypeError (v)
+    (** 1 **)
+    [[ v == undefined ]]
+    [[ TypeError(ret) * empty_fields(ret : -{ }-) ]]
+    normal;
+
+    (** 2 **)
+    [[ (v == #v) * types(#v:Str) ]]
+    [[ TypeErrorWithMessage(ret, #v) * empty_fields(ret : -{ "message" }-) ]]
+    normal
+
+proc TypeError (v) {
+        ret := "TypeError_call" (undefined, undefined, v) with elab;
+        return;
+
+    elab:
+        throw
+};

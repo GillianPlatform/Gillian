@@ -1,0 +1,4 @@
+(library
+ (name semantics)
+ (libraries gillian jsil_syntax javert_utils js2jsil_lib)
+ (flags -open Utils -open Gillian.Utils))

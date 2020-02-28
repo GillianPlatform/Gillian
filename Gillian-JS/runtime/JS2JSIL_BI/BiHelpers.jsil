@@ -1,0 +1,32 @@
+proc isBool (x) {
+    assume (typeOf x == Bool);
+    ret := true;
+    return
+};
+
+proc isNumber (x) {
+    assume (typeOf x == Num);
+    ret := true;
+    return
+};
+
+proc isString (x) {
+    assume (typeOf x == Str);
+    ret := true;
+    return
+};
+
+proc isNullableObject (x) {
+            goto [x = null] rlab ob;
+      ob:   assume (typeOf x == Obj);
+    
+    rlab:   ret := true;
+            return
+};
+
+proc isObject (x) {
+    assume (typeOf x == Obj);
+    ret := true;
+    return
+};
+

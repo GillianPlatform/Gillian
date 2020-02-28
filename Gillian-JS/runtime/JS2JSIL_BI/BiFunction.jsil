@@ -1,0 +1,239 @@
+import Internals.jsil, Object.jsil;
+
+proc Function_call() {
+				arguments := args;
+				ret := apply ("Function_construct" :: arguments) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+proc Function_construct () {
+
+				arguments := args;
+				arguments := cdr (cdr arguments);
+
+				length := l-len arguments;
+
+				params := "";
+				body   := "";
+
+				goto [ 0 < length ] pars exec;
+
+	pars:	current := 0;
+
+	loop:	goto [ current < (length - 1) ] body bod;
+	body:	param := l-nth (arguments, current);
+				ret := "i__toString" (param) with elab;
+				param := ret;
+				goto [ params = "" ] add fix;
+	fix:	param := ", " ++ param;
+	add:	params := params ++ param;
+				current := current + 1;
+				goto loop;
+
+	bod:	body := l-nth (arguments, length - 1);
+				ret := "i__toString" (body) with elab;
+				body := ret;
+
+	exec:	ret := extern ExecuteFunctionConstructor (params, body) with serr;
+
+				fid := l-nth (ret, 0);
+				params := l-nth (ret, 1);
+
+				ret := "create_function_object" ({{ $lg }}, fid, fid, params);
+
+	rlab: return;
+
+	serr:	ret := "SyntaxError" (ret);
+	elab: throw
+};
+
+(* *** DEFAULT *** *)
+
+proc FP_default () {
+			ret := undefined;
+
+	rlab: return
+};
+
+(* *** CALL *** *)
+
+proc FP_call () {
+
+			arguments := args;
+			len := l-len (arguments);
+			vthis  := l-nth (arguments, 1);
+
+			ret := "i__isCallable" (vthis);
+			goto [ret] gthis te;
+
+	gthis:	xthis := undefined;
+			goto [len < 3] params sthis;
+	sthis:	xthis := l-nth (arguments, 2);
+
+	params:	pars := {{ }};
+			goto [3 < len] spar body;
+	spar:	pars := cdr (cdr (cdr arguments));
+
+	body:	m := metadata(vthis);
+			body   := [m, "@call"];
+			xscope := [m, "@scope"];
+
+			(* x__se := "SyntaxError" (); *)
+
+			params := l+ ({{ body, xscope, xthis }}, pars);
+
+			ret := apply (params) with elab;
+
+			goto [ret = empty] undef rlab;
+
+	undef:	ret := undefined;
+			goto rlab;
+
+	te:		ret := "TypeError" ();
+			goto elab;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** APPLY *** *)
+
+proc FP_apply (xsc, vthis, this_arg, arg_array) {
+
+			xsc := xsc;
+			vthis := vthis;
+			this_arg := this_arg;
+			arg_array := arg_array;
+
+			params := {{ }};
+
+			ret := "i__isCallable" (vthis);
+			goto [ret] array te;
+
+	array:	goto [(arg_array = null) or (arg_array = undefined)] call isobj;
+
+	isobj:	goto [typeOf (arg_array) = Obj] obj te;
+
+	obj:	ret := "get" (arg_array, "length") with elab;
+			ret := "i__toUint32" (ret) with elab;
+			len := ret;
+			index := 0;
+
+	loop:	goto [index < len] head call;
+
+	head:	ret := "i__toStringComputed" (index) with elab;
+			ret := "get" (arg_array, ret) with elab;
+			params := l+ (params, {{ ret }});
+			index := index + 1;
+			goto loop;
+
+	call:	xthis := this_arg;
+			m := metadata(vthis);
+			body   := [m, "@call"];
+			xscope := [m, "@scope"];
+
+			params := l+ ({{ body, xscope, xthis }}, params);
+
+			ret := apply (params) with elab;
+			goto rlab;
+
+	te:		ret := "TypeError" ();
+			goto elab;
+
+	rlab: return;
+	elab: throw
+};
+
+
+
+(* *** TOSTRING *** *)
+
+proc FP_toString (xsc, vthis) {
+			goto [typeOf (vthis) = Obj] ofun thrw;
+	ofun:	m := metadata(vthis);
+			ret := [m, "@class"];
+			goto [ret = "Function"] retfun thrw;
+	retfun:	ret := "function () {}";
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** HASINSTANCE AFTER BIND *** *)
+
+proc FP_hasInstanceAfterBind (v1, v2) {
+
+			m := metadata(v1);
+			target := [m, "@targetFunction"];
+
+			m := metadata(target);
+			tclass := [m, "@class"];
+			goto [tclass = "Function"] cont thrw;
+
+	cont:	ret := "hasInstance" (target, v2);
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** BIND *** *)
+
+proc FP_bind (xsc, vthis, thisArg) {
+
+			arguments := args;
+
+			(* Is the this callable? *)
+			Target := vthis;
+			ret := "i__isCallable" (Target);
+			goto [ret] cont1 thrw;
+
+	cont1:	A := {{ }};
+			goto [(l-len arguments) < 4] cont2 setarg;
+	setarg:	A := cdr (cdr (cdr arguments));
+
+	cont2:	
+			ret := "create_default_object" ($lfun_proto, "Function", true);
+			F := ret;
+
+			(* Set up properties *)
+			m := metadata(F);
+			[m, "@targetFunction"] := Target;
+			[m, "@boundThis"] := thisArg;
+			[m, "@boundArguments"] := A;
+
+			(* Adapting for our call *)
+			mt := metadata(Target);
+			field_call := [mt, "@call"];
+			[m, "@call"] := field_call;
+
+			(* Adapting for our construct *)
+			field_constr := [mt, "@construct"];
+			[m, "@construct"] := field_constr;
+
+			(* Step 15 onward *)
+			targetClass := [mt, "@class"];
+			goto [targetClass = "Function"] fun nofun;
+
+	fun:	ret := "get" (Target, "length") with elab;
+				L := ret - (l-len A);
+				ret := "M_max" (empty, empty, L, 0);
+				[F, "length"] := {{ "d", ret, false, false, false }};
+				goto tterr;
+
+	nofun:	[F, "length"] := {{ "d", 0, false, false, false }};
+
+	tterr:	[F, "caller"]    := {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }};
+			[F, "arguments"] := {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }};
+
+	rlab:	ret := F;
+				return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};

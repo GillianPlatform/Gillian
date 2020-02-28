@@ -1,0 +1,8 @@
+(install
+ (files binops_archi32_all_exec.gil binops_archi32_bi_exec.gil
+   binops_archi32_non_bi.gil binops_archi64_all_exec.gil
+   binops_archi64_bi_exec.gil binops_archi64_non_bi.gil binops_common.gil
+   internals.gil logic_archi32.gil logic_archi64.gil logic_common.gil
+   stdlib_archi32.gil stdlib_archi64.gil string.gil unops_common.gil)
+ (section share)
+ (package gillian-c))

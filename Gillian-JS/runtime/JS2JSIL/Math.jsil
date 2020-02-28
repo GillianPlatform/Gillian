@@ -1,0 +1,276 @@
+import Internals.jsil;
+
+(* **************** *)
+(* THE MATH LIBRARY *)
+(* **************** *)
+
+(* *** ABS *** *)
+
+proc M_abs (xsc, vthis, x) {
+			ret := "i__toNumber" (x) with elab;
+
+			ret := m_abs (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** ACOS *** *)
+
+proc M_acos (xsc, vthis, x) {
+			ret := "i__toNumber" (x) with elab;
+
+			ret := m_acos (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** ASIN *** *)
+
+proc M_asin (xsc, vthis, x) {
+			ret := "i__toNumber" (x) with elab;
+
+			ret := m_asin (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** ATAN *** *)
+
+proc M_atan (xsc, vthis, x) {
+			ret := "i__toNumber" (x) with elab;
+
+			ret := m_atan (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** CEIL *** *)
+
+proc M_ceil (xsc, vthis, x) {
+			ret := "i__toNumber" (x) with elab;
+
+			ret := m_ceil (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** COS *** *)
+
+proc M_cos (xsc, vthis, x) {
+			ret := "i__toNumber" (x) with elab;
+
+			ret := m_cos (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** EXP *** *)
+
+proc M_exp (xsc, vthis, x) {
+			ret := "i__toNumber" (x) with elab;
+
+			ret := m_exp (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** FLOOR *** *)
+
+proc M_floor (xsc, vthis, x) {
+			ret := "i__toNumber" (x) with elab;
+
+			ret := m_floor (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** LOG *** *)
+
+proc M_log (xsc, vthis, x) {
+			ret := "i__toNumber" (x) with elab;
+
+			ret := m_log (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** ROUND *** *)
+
+proc M_round (xsc, vthis, x) {
+			ret := "i__toNumber" (x) with elab;
+
+			ret := m_round (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** SIN *** *)
+
+proc M_sin (xsc, vthis, x) {
+			ret := "i__toNumber" (x) with elab;
+
+			ret := m_sin (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** SQRT *** *)
+
+proc M_sqrt (xsc, vthis, x) {
+			ret := "i__toNumber" (x) with elab;
+
+			ret := m_sqrt (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** TAN *** *)
+
+proc M_tan (xsc, vthis, x) {
+			ret := "i__toNumber" (x) with elab;
+
+			ret := m_tan (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** ATAN2 *** *)
+
+proc M_atan2 (xsc, vthis, x, y) {
+			ret := "i__toNumber" (x) with elab;
+			x := ret;
+
+			ret := "i__toNumber" (y) with elab;
+			y := ret;
+
+			ret := x m_atan2 y;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** POW *** *)
+
+proc M_pow (xsc, vthis, x, y) {
+			ret := "i__toNumber" (x) with elab;
+			x := ret;
+
+			ret := "i__toNumber" (y) with elab;
+			y := ret;
+
+            goto [(y = 0) or (y = -0)] one next;
+
+    one:    ret := 1;
+            goto rlab;
+
+	next:   goto [((x = 1) or (x = -1)) and ((y = inf) or (y = -inf))] oops set;
+
+	set:	ret := x ** y;
+			goto rlab;
+
+	oops:	ret := nan;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** RANDOM *** *)
+
+proc M_random (xsc, vthis) {
+
+			ret := $$random;
+
+	rlab: return
+};
+
+(* *** MIN *** *)
+
+proc M_min (xsc, vthis) {
+
+			la := args;
+			len := l-len (la);
+			goto [len < 3] ri setup;
+
+	setup: n := 2;
+			   ret := inf;
+			   min := ret;
+
+	loop:	goto [n < len] head rlab;
+
+	head:	cur := l-nth (la, n);
+			  ret := "i__toNumber" (cur) with elab;
+			  cur := ret;
+			  goto [not (cur = cur)] rn comp;
+
+	comp:	sc := m_sgn (cur);
+			  sm := m_sgn (min);
+
+			  goto [sc < sm] swap cmp;
+
+	cmp:	goto [cur < min] swap next;
+	swap:	min := cur;
+	next:	n := n + 1;
+			  goto loop;
+
+	ri:		ret := inf;
+			  return;
+
+	rn:		ret := nan;
+				return;
+
+	rlab: ret := min; 
+	      return;
+
+	elab: throw
+};
+
+proc M_max (xsc, vthis) {
+
+			la := args;
+			len := l-len (la);
+			goto [len < 3] ri setup;
+
+	setup: n := 2;
+			   ret := - inf;
+			   max := ret;
+
+	loop:	goto [n < len] head rlab;
+
+	head:	cur := l-nth (la, n);
+			  ret := "i__toNumber" (cur) with elab;
+			  cur := ret;
+			  goto [not (cur = cur)] rn comp;
+
+	comp:	sc := m_sgn (cur);
+			  sm := m_sgn (max);
+
+			  goto [sm < sc] swap cmp;
+
+	cmp:	goto [max < cur] swap next;
+	swap:	max := cur;
+	next:	n := n + 1;
+			  goto loop;
+
+	ri:		ret := -inf;
+			  return;
+
+	rn:		ret := nan;
+			  return;
+
+	rlab: ret := max; 
+	      return;
+	elab: throw
+};

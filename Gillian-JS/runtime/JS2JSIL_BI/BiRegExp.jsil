@@ -1,0 +1,4 @@
+proc RegExp_construct (xsc, vthis) {
+			ret := "create_default_object" ($lre_proto, "RegExp", true);
+	rlab: return
+};

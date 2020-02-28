@@ -1,0 +1,81 @@
+import Internals.jsil;
+
+(* ****************** *)
+(* THE NUMBER LIBRARY *)
+(* ****************** *)
+
+(* *** CALL *** *)
+
+proc Number_call (xsc, vthis, v) {
+				la := args;
+				len := l-len (la);
+
+				goto [len < 3] zero conv;
+
+	zero:	v := 0;
+
+	conv:	ret := "i__toNumber" (v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** CONSTRUCT *** *)
+
+proc Number_construct (xsc, vthis, v) {
+			la := args;
+			len := l-len (la);
+
+			goto [len < 3] zero init;
+
+	zero:	v := 0;
+
+	init:	pv := "i__toNumber" (v) with elab;
+
+			ret := "create_default_object" ($lnum_proto, "Number", true);
+
+			m := metadata(ret);
+			[m, "@primitiveValue"] := pv;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** VALUEOF *** *)
+
+proc NP_valueOf (xsc, vthis) {
+			goto [typeOf (vthis) = Num] num ionum;
+	num:	ret := vthis;
+			goto rlab;
+
+	ionum:	goto [typeOf (vthis) = Obj] onum thrw;
+	onum:	m := metadata(vthis);
+			ret := [m, "@class"];
+			goto [ret = "Number"] retnum thrw;
+	retnum:	ret := [m, "@primitiveValue"];
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** TOSTRING *** *)
+
+proc NP_toString (xsc, vthis, radix) {
+			goto [typeOf (vthis) = Num] num ionum;
+	num:	ret := vthis;
+			goto retstr;
+
+	ionum:	goto [typeOf (vthis) = Obj] onum thrw;
+	onum:	m := metadata(vthis);
+			ret := [m, "@class"];
+			goto [ret = "Number"] retnum thrw;
+	retnum:	ret := [m, "@primitiveValue"];
+	retstr:	ret := num_to_string (ret);
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};

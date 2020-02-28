@@ -1,0 +1,283 @@
+import Global.jsil;
+
+(* Magic + UTC and daylight conversion *)
+
+proc d__makeDay (year, month, date) {
+			
+			ret := "Object_isFinite" (empty, empty, year) with elab;
+			goto [ret = false] rnan ifnm;
+	ifnm:	ret := "Object_isFinite" (empty, empty, month) with elab;
+			goto [ret = false] rnan ifnd;
+	ifnd:	ret := "Object_isFinite" (empty, empty, date) with elab;
+			goto [ret = false] rnan main;
+
+	main:	ret := "i__toInteger" (year) with elab;
+			y := ret;
+			ret := "i__toInteger" (month) with elab;
+			m := ret;
+			ret := "i__toInteger" (date) with elab;
+			dt := ret;
+
+			ym := y + m_floor (m / 12);
+			mn := m % 12;
+
+			dfy := (365 * (ym - 1970)) + (m_floor ((ym - 1969) / 4)) + (m_floor ((ym - 1601) / 400)) - (m_floor ((ym - 1901) / 100));
+
+			month_days := {{ 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 }};
+			dm := l-nth (month_days, mn);
+
+			leap_year := ((y % 4 = 0) and (not (y % 100 = 0))) or (y % 400 = 0);
+
+			goto [leap_year and (2 <= mn)] add1 finish;
+	add1:	dm := dm + 1;
+
+	finish:	ret := dfy + dm + dt - 1;
+			goto rlab;
+
+	rnan:	ret := nan;
+			goto rlab;
+
+	rlab: return;
+
+	elab: throw
+};
+
+proc d__makeTime (hour, min, sec, ms) {
+
+			ret := "Object_isFinite" (empty, empty, hour) with elab;
+			goto [ret = false] rnan ifnm;
+	ifnm:	ret := "Object_isFinite" (empty, empty, min) with elab;
+			goto [ret = false] rnan ifns;
+	ifns:	ret := "Object_isFinite" (empty, empty, sec) with elab;
+			goto [ret = false] rnan ifnms;
+	ifnms:	ret := "Object_isFinite" (empty, empty, ms) with elab;
+			goto [ret = false] rnan main;
+
+	main:	ret := "i__toInteger" (hour) with elab;
+			h := ret;
+			ret := "i__toInteger" (min) with elab;
+			m := ret;
+			ret := "i__toInteger" (sec) with elab;
+			s := ret;
+			ret := "i__toInteger" (ms) with elab;
+			milli := ret;
+
+			ret := (h * 3600000) + (m * 60000) + (s * 1000) + milli;
+			goto rlab;
+
+	rnan:	ret := nan;
+			goto rlab;
+
+	rlab: return;
+
+	elab: throw
+};
+
+proc d__makeDate (day, time) {
+
+			ret := "Object_isFinite" (empty, empty, day) with elab;
+			goto [ret = false] rnan ifnt;
+	ifnt:	ret := "Object_isFinite" (empty, empty, time) with elab;
+			goto [ret = false] rnan main;
+
+	main:	ret := (day * 86400000) + time;
+			goto rlab;
+
+	rnan:	ret := nan;
+			goto rlab;
+
+	rlab: return;
+
+	elab: throw
+};
+
+proc d__UTC (time) {
+
+			dt := m_round (($$UTCTime - $$LocalTime) / 60000);
+			ret := time + (dt * 60000);
+
+	rlab: return
+};
+
+proc d__TimeClip (time) {
+
+			ret := "Object_isFinite" (empty, empty, time) with elab;
+			goto [ret = false] rnan range;
+	range:	goto [8640000000000000 <= m_abs (time)] rnan main;
+
+	main:	ret := "i__toInteger" (time) with elab;
+			ret := ret + 0;
+			goto rlab;
+
+	rnan:	ret := nan;
+			goto rlab;
+
+	rlab: return;
+
+	elab: throw
+};
+
+(* CONSTRUCTOR *)
+
+proc Date_construct (xsc, vthis) {
+
+			UT := $$UTCTime;
+			LT := $$LocalTime;
+
+			DT := UT - LT;
+
+			arguments := args;
+			len := l-len (arguments);
+			argc := len - 2;
+
+			date := "create_default_object" ($ldt_proto, "Date", true);
+
+			goto [argc = 0] arg0 test1;
+
+			(* No arguments, rtrn now *)
+	arg0:	m := metadata(date);
+			[m, "@primitiveValue"] := $$UTCTime;
+			goto rlab;
+
+
+
+
+	test1:	goto [argc = 1] arg1 test2;
+
+			(* One argument, convert *)
+	arg1:	v := l-nth (arguments, 2);
+			ret := "i__toPrimitive" (v) with elab;
+			goto [typeOf ret = Str] nimpl tonum;
+
+	tonum:  ret := "i__toNumber" (ret) with elab;
+			ret := "d__TimeClip" (ret);
+			m := metadata(date);
+			[m, "@primitiveValue"] := ret;
+			goto rlab;
+
+	nimpl:	ret := magic;
+
+
+
+
+
+			(* More than one argument *)
+	test2:	y := l-nth (arguments, 2);
+			ret := "i__toNumber" (y) with elab;
+			y := ret;
+
+			m := l-nth (arguments, 3);
+			ret := "i__toNumber" (m) with elab;
+			m := ret;
+
+			dt := 1;
+			h := 0;
+			min := 0;
+			s := 0;
+			ms := 0;
+
+			goto [2 < argc] dt th;
+	dt:		dt := l-nth (arguments, 4);
+			ret := "i__toNumber" (dt) with elab;
+			dt := ret;
+
+	th:		goto [3 < argc] h tm;
+	h:		h := l-nth (arguments, 5);
+			ret := "i__toNumber" (h) with elab;
+			h := ret;
+
+	tm:		goto [4 < argc] m ts;
+	m:		min := l-nth (arguments, 6);
+			ret := "i__toNumber" (min) with elab;
+			min := ret;
+
+	ts:		goto [5 < argc] s tms;
+	s:		s := l-nth (arguments, 7);
+			ret := "i__toNumber" (s) with elab;
+			s := ret;
+
+	tms:	goto [6 < argc] ms yr;
+	ms:		ms := l-nth (arguments, 8);
+			ret := "i__toNumber" (ms) with elab;
+			ms := ret;
+
+	yr:		yr := y;
+			goto [not (y = y)] fd tiy;
+	tiy:	ret := "i__toInteger" (y) with elab;
+			goto [(0 <= ret) and (ret <= 99)] adjy fd;
+	adjy:	yr := 1900 + ret;
+
+	fd:		md := "d__makeDay" (yr, m, dt);
+			mt := "d__makeTime" (h, min, s, ms);
+			fd := "d__makeDate" (md, mt);
+
+			utc := "d__UTC" (fd);
+			res := "d__TimeClip" (utc);
+
+			m := metadata(date);
+			[m, "@primitiveValue"] := res;
+
+	rlab:	ret := date;
+				return;
+
+	elab: throw
+};
+
+(* *** VALUEOF *** *)
+
+proc DP_valueOf (xsc, vthis) {
+
+			goto [typeOf vthis = Obj] class tt;
+	class:	m := metadata(vthis);
+			class := [m, "@class"];
+			goto [class = "Date"] rlab tt;
+
+	rlab:	ret := [m, "@primitiveValue"];
+				return;
+
+	tt:		ret := "TypeError" ();
+
+	elab: throw
+};
+
+
+(* *** GETTIME *** *)
+
+proc DP_getTime (xsc, vthis) {
+
+			goto [typeOf vthis = Obj] class tt;
+	class:	m := metadata(vthis);
+			class := [m, "@class"];
+			goto [class = "Date"] rlab tt;
+
+	rlab:	ret := [m, "@primitiveValue"];
+				return;
+
+	tt:		ret := "TypeError" ();
+	elab: throw
+};
+
+
+(* *** GETTIMEZONEOFFSET *** *)
+
+proc DP_getTimezoneOffset (xsc, vthis) {
+
+			goto [typeOf vthis = Obj] class tt;
+	class:	m := metadata(vthis);
+			class := [m, "@class"];
+			goto [class = "Date"] rlab tt;
+
+	rlab:	ret := m_round (($$UTCTime - $$LocalTime) / 60000);
+				return;
+
+	tt:		ret := "TypeError" ();
+
+	elab: throw
+};
+
+(* *** NOW *** *)
+
+proc Date_now (xsc, vthis) {
+		ret := $$UTCTime;
+		return
+};

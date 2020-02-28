@@ -1,0 +1,36 @@
+import Internals.jsil;
+
+(* ***************** *)
+(* THE GLOBAL OBJECT *)
+(* ***************** *)
+
+(* *** ISNAN *** *)
+
+proc Object_isNan (xsc, vthis, v) {
+			ret := "i__toNumber" (v) with elab;
+			goto [not (ret = ret)] r_t r_f;
+
+	r_t:	ret := true;
+			goto rlab;
+
+	r_f:	ret := false;
+
+	rlab: return;
+	elab: throw
+};
+
+
+(* *** ISFINITE *** *)
+
+proc Object_isFinite (xsc, vthis, v) {
+			ret := "i__toNumber" (v) with elab;
+			goto [(not (ret = ret)) or (ret = inf) or (ret = -inf)] r_f r_t;
+
+	r_t:	ret := true;
+			goto rlab;
+
+	r_f:	ret := false;
+
+	rlab: return;
+	elab: throw
+};

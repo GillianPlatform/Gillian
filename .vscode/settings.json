@@ -1,0 +1,11 @@
+{
+  "search.exclude": {
+    "esy.lock/**": true
+  },
+  "files.associations": {
+    "stdlib.h": "c",
+    "stdio.h": "c",
+    "slist.h": "c",
+    "algorithm": "c"
+  }
+}

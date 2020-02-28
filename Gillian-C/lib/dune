@@ -1,0 +1,10 @@
+(menhir
+ (modules annot_parser)
+ (flags --explain))
+
+(ocamllex
+ (modules annot_lexer))
+
+(library
+ (name cgil_lib)
+ (libraries gillian compcert))

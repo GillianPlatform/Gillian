@@ -1,0 +1,46 @@
+import preds_general.jsil;
+
+(* 
+ * Error object
+ * 
+ * An object at location l with prototype is pr is an Error object 
+ * if its class is "Error" and if it is extensible.
+ *)
+pred ErrorObject (+l:Obj, pr:Obj) :
+    JSObjGeneral(l, pr, "Error", true);
+
+(* 
+ * Error object with message
+ * 
+ * An object at location l with prototype is pr is an Error object 
+ * carrying a message m if it is an Error object and its "message"
+ * property is a writable, non-enumerable configurable data property
+ * with value m.
+ *)
+pred ErrorObjectWithMessage (+l:Obj, pr:Obj, m:Str) :
+    ErrorObject(l, pr) *
+    ((l, "message") -> {{ "d", m, true, false, true }});
+
+(* 
+ * Type Error
+ * 
+ * An object is a type error if it is an Error object with the TypeError prototype
+ *)
+pred TypeError(l:Obj) : ErrorObject (l, $lterr_proto);
+pred TypeErrorWithMessage (+l:Obj, m:Str) : ErrorObjectWithMessage(l, $lterr_proto, m);
+
+(* 
+ * Syntax Error
+ * 
+ * An object is a syntax error if it is an Error object with the SyntaxError prototype
+ *)
+pred SyntaxError(l:Obj) : ErrorObject (l, $lserr_proto);
+pred SyntaxErrorWithMessage (+l:Obj, m:Str) : ErrorObjectWithMessage(l, $lserr_proto, m);
+
+(* 
+ * Reference Error
+ * 
+ * An object is a reference error if it is an Error object with the ReferenceError prototype
+ *)
+pred ReferenceError(l:Obj) : ErrorObject (l, $lrferr_proto);
+pred ReferenceErrorWithMessage (+l:Obj, m:Str) : ErrorObjectWithMessage(l, $lrferr_proto, m);

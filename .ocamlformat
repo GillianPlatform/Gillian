@@ -1,0 +1,9 @@
+align-cases=true
+align-constructors-decl=true
+align-variants-decl=true
+assignment-operator=end-line
+break-before-in=fit-or-vertical
+break-cases=fit-or-vertical
+break-collection-expressions=fit-or-vertical
+break-fun-decl=smart
+break-fun-sig=smart

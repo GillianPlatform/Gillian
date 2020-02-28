@@ -1,0 +1,2268 @@
+(* **************************************************
+   ****************    PREDICATES    ****************
+   ************************************************** *)
+
+(*************************
+ **** GENERAL OBJECTS ****
+ *************************)
+
+pred JSObject (l:Obj) :
+  MetaData(l, #md) * MetaData(#md, null) *
+  ((#md, "@proto")      -> $lobj_proto) *
+  ((#md, "@class")      -> "Object") *
+  ((#md, "@extensible") -> true) *
+  empty_fields (#md : -{ "@class", "@extensible", "@proto" }-);
+
+pred JSObjWithProto (+l:Obj, proto) :
+  MetaData(l, #md) * MetaData(#md, null) *
+  ((#md, "@proto")      -> proto) *
+  ((#md, "@class")      -> "Object") *
+  ((#md, "@extensible") -> true) *
+  empty_fields (#md : -{ "@class", "@extensible", "@proto" }-);
+  
+pred JSObjGeneral (+l:Obj, proto, class:Str, ext:Bool) :
+  MetaData(l, #md) * MetaData(#md, null) *
+  ((#md, "@proto")      -> proto) *
+  ((#md, "@class")      -> class) *
+  ((#md, "@extensible") -> ext) *
+  empty_fields (#md : -{ "@class", "@extensible", "@proto" }-);
+
+(**************************
+ **** FUNCTION OBJECTS ****
+ **************************)
+
+pred JSFunctionObject (+l:Obj, fid:Str, sc:List, len:Num, proto:Obj) : 
+  ((l, "length")     -> {{ "d", len, false, false, false }}) *
+  ((l, "arguments")  -> {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }}) *
+  ((l, "caller")     -> {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }}) *
+  ((l, "prototype")  -> {{ "d", proto, true, false, false }}) *
+  MetaData(l, #md) * MetaData(#md, null) *
+  ((#md, "@proto")      -> $lfun_proto) * 
+  ((#md, "@class")      -> "Function") *
+  ((#md, "@extensible") -> true) * 
+  ((#md, "@call")       -> fid) * 
+  ((#md, "@construct")  -> fid) *
+  ((#md, "@scope")      -> sc) *
+  empty_fields(#md : -{ "@call", "@class", "@construct", "@extensible", "@proto", "@scope" }-);
+
+pred JSFunctionObjectStrong (+l:Obj, fid:Str, sc:List, len:Num, proto:Obj) : 
+  JSFunctionObject (l, fid, sc, len, proto) *
+  empty_fields(l : -{ "arguments", "caller", "length", "prototype" }-);
+
+pred JSBIFunction (+l:Obj, fid:Str, len:Num) : 
+  ((l, "length")     -> {{ "d", len, false, false, false }}) *
+  MetaData(l, #md) * MetaData(#md, null) *
+  ((#md, "@proto")      -> $lfun_proto) * 
+  ((#md, "@class")      -> "Function") *
+  ((#md, "@extensible") -> true) * 
+  ((#md, "@call")       -> fid) * 
+  ((#md, "@scope")      -> empty) *
+  empty_fields(#md : -{ "@call", "@class", "@extensible", "@proto", "@scope" }-);
+
+pred BIFunctionObject (+l:Obj, len:Num, proto:Obj, call, construct) : 
+  ((l, "length")     -> {{ "d", len, false, false, false }}) *
+  ((l, "prototype")  -> {{ "d", proto, false, false, false }}) *
+  MetaData(l, #md) * MetaData(#md, null) *
+  ((#md, "@proto")      -> $lfun_proto) * 
+  ((#md, "@class")      -> "Function") *
+  ((#md, "@extensible") -> true) * 
+  ((#md, "@scope")      -> empty) *
+  ((#md, "@call")       -> call) *
+  ((#md, "@construct")  -> construct) *
+  empty_fields(#md : -{ "@call", "@class", "@construct", "@extensible", "@proto", "@scope" }-);
+
+(**************************
+ **** BUILT-IN OBJECTS ****
+ **************************)
+
+pred BooleanObject (+l:Obj, b:Bool) :
+  MetaData(l, #md) * MetaData(#md, null) *
+  ((#md, "@proto")      -> $lbool_proto) *
+  ((#md, "@class")      -> "Boolean") *
+  ((#md, "@extensible") -> true) *
+  ((#md, "@primitiveValue") -> b) *
+  empty_fields (#md : -{ "@class", "@extensible", "@primitiveValue", "@proto" }-);
+  
+pred NumberObject (+l:Obj, n:Num) :
+  MetaData(l, #md) * MetaData(#md, null) * 
+  ((#md, "@proto")      -> $lnum_proto) *
+  ((#md, "@class")      -> "Number") *
+  ((#md, "@extensible") -> true) *
+  ((#md, "@primitiveValue") -> n) *
+  empty_fields (#md : -{ "@class", "@extensible", "@primitiveValue", "@proto" }-);
+
+pred BooleanPrototype () :
+  (($lbool_proto, "constructor") -> {{ "d", $lbool, true, false, true }}) *
+  MetaData($lbool_proto, #bpmd) * MetaData(#bpmd, null) *
+  ((#bpmd, "@proto")          -> $lobj_proto) *
+  ((#bpmd, "@class")          -> "Boolean") *
+  ((#bpmd, "@extensible")     -> true) *
+  ((#bpmd, "@primitiveValue") -> false) *
+  empty_fields (#bpmd : -{ "@class", "@extensible", "@primitiveValue", "@proto" }-);
+  
+pred NumberPrototype () :
+  (($lnum_proto, "constructor") -> {{ "d", $lnum, true, false, true }}) *
+  MetaData($lnum_proto, #npmd) * MetaData(#npmd, null) * 
+  ((#npmd, "@proto")          -> $lobj_proto) *
+  ((#npmd, "@class")          -> "Number") *
+  ((#npmd, "@extensible")     -> true) *
+  ((#npmd, "@primitiveValue") -> 0) *
+  empty_fields (#npmd : -{ "@class", "@extensible", "@primitiveValue", "@proto" }-);
+
+pred GlobalObject () :
+  JSObject ($lg) * 
+  (($lg, "Error") -> {{ "d", $lerr, true, false, true }}) *
+  (($lg, "Object") -> {{ "d", $lobj, true, false, true }}) *
+  (($lg, "DataView") -> {{ "d", $ldv, true, false, true }});
+
+pred GlobalVar (+v, val) :
+  (($lg, v) -> {{ "d", val, true, true, false }}) * types(v : Str); 
+
+pred BI_ObjectObject () : 
+  BIFunctionObject ($lobj, 0, $lobj_proto, "Object_call", "Object_construct") *
+  DataPropConst($lobj, "prototype", $lobj_proto, false) *
+  DataPropGen ($lobj, "create", $lobj_create, true, false, true) * 
+  JSBIFunction($lobj_create, "Object_create", 2) * empty_fields($lobj_create : -{ "length" }-);
+    
+pred ObjectPrototype () :
+  JSObjWithProto ($lobj_proto, null) * empty_fields ($lobj_proto : -{ "hasOwnProperty" }-) *
+  (($lobj_proto, "hasOwnProperty") -> {{ "d", $lop_hasOwnProperty, true, false, true }}) *
+  JSBIFunction($lop_hasOwnProperty, "OP_hasOwnProperty", 1) * empty_fields($lop_hasOwnProperty : -{ "length" }-);
+
+pred ObjectPrototypeComplete () :
+  JSObjWithProto ($lobj_proto, null) * empty_fields ($lobj_proto : -{ "hasOwnProperty", "toString" }-) *
+  (($lobj_proto, "hasOwnProperty") -> {{ "d", $lop_hasOwnProperty, true, false, true }}) *
+  (($lobj_proto, "toString") -> {{ "d", $lop_toString, true, false, true }}) *
+  JSBIFunction($lop_hasOwnProperty, "OP_hasOwnProperty", 1) * empty_fields($lop_hasOwnProperty : -{ "length" }-) * 
+  JSBIFunction($lop_toString, "OP_toString", 1) * empty_fields($lop_toString : -{ "length" }-);
+
+pred FunctionPrototype () :
+  (($lfun_proto, "length") -> {{ "d", 0, false, false, false }}) *
+  (($lfun_proto, "call")   -> {{ "d", $lfp_call, true, false, true }}) *
+  empty_fields($lfun_proto : -{ "call", "length" }-) *
+  MetaData($lfun_proto, #mfp) * MetaData(#mfp, null) *
+  ((#mfp, "@proto")      -> $lobj_proto) *
+  ((#mfp, "@class")      -> "Function") *
+  ((#mfp, "@extensible") -> true) *
+  ((#mfp, "@scope") -> empty) * ((#mfp, "@call") -> "FP_default") *
+  empty_fields(#mfp : -{ "@proto", "@class", "@extensible", "@scope", "@call" }-) *
+  JSBIFunction($lfp_call, "FP_call", 1);
+
+pred BI_ErrorObject () :
+  BIFunctionObject ($lerr, 1, $lerr_proto, "Error_call", "Error_construct");
+
+(***********************
+ **** ERROR OBJECTS ****
+ ***********************)
+ 
+pred ErrorObject (+l:Obj, pr:Obj) :
+  JSObjGeneral(l, pr, "Error", true);
+
+pred ErrorObjectWithMessage (+l:Obj, m:Str) :
+  MetaData(l, #md) *  MetaData(#md, null) *
+  ((l, "message") -> {{"d", m, true, false, true}}) *
+  ((#md, "@proto") -> $lerr_proto) * ((#md, "@class") -> "Error") * ((#md, "@extensible") -> true);
+
+pred TypeError(l:Obj) : ErrorObject (l, $lterr_proto);
+
+pred SyntaxError(l:Obj) : ErrorObject (l, $lserr_proto);
+
+pred ReferenceError(l:Obj) : ErrorObject (l, $lrferr_proto);
+
+(************************
+ ***** INITIAL HEAP *****
+ ************************)
+ 
+pred initialHeapPost (globals) :
+    types(globals:Set) *
+
+    GlobalObject() * 
+    empty_fields ($lg : -u- (-{ "Error", "Object", "DataView" }-, globals) ) *
+
+    ObjectPrototype () *
+    FunctionPrototype () *
+    BooleanPrototype () * empty_fields ($lbool_proto : -{ "constructor" }-) *
+    NumberPrototype ()  * empty_fields ($lnum_proto : -{ "constructor" }-) *
+
+    BI_ErrorObject () * empty_fields($lerr : -{ "length", "prototype" }-) *
+     
+    JSObjGeneral ($lerr_proto, $lobj_proto, "Error", true) * 
+    (($lerr_proto, "message") -> {{ "d", "", true, false, true }}) *
+    empty_fields($lerr_proto : -{ "message" }-);
+
+pred initialHeapPostWeak ( ) :
+    GlobalObject() *
+
+    ObjectPrototype () * 
+
+    FunctionPrototype () * 
+
+    BooleanPrototype () *
+    empty_fields ($lbool_proto : -{ "constructor" }-) *
+
+    NumberPrototype () *
+    empty_fields ($lnum_proto : -{ "constructor" }-) *
+
+    BI_ErrorObject () * empty_fields($lerr : -{ "length", "prototype" }-) *
+
+    JSObjGeneral ($lerr_proto, $lobj_proto, "Error", true) * 
+    (($lerr_proto, "message") -> {{ "d", "", true, false, true }}) *
+    empty_fields($lerr_proto : -{ "message" }-);
+
+(********************
+ **** PROPERTIES ****
+ ********************)
+
+pred DataProp (+l:Obj, +prop:Str, v) :
+  ((l, prop) -> {{ "d", v, true, true, true }}) *
+  (! (v == empty)) * (! (v == none)) * (! (typeOf v == List));
+  
+pred DataPropGen (+l:Obj, +prop:Str, v, writ:Bool, enum:Bool, conf:Bool) : 
+  ((l, prop) -> {{ "d", v, writ, enum, conf }}) *
+  (! (v == empty)) * (! (typeOf v == List));
+  
+pred DataPropConst (+l:Obj, +prop:Str, v, enum:Bool) :
+  ((l, prop) -> {{ "d", v, false, enum, false }}) * 
+  (! (v == empty)) * (! (typeOf v == List));
+
+(*********************
+ **** DESCRIPTORS ****
+ *********************)
+ 
+ (*
+ * Predicate: DataDescriptor
+ *
+ * Resource: none
+ *
+ *)
+pure pred DataDescriptor (d:List) :
+  (d == {{ "d", #dval, #dwrit, #denum, #dconf }}) *
+  types (#dwrit:Bool, #denum:Bool, #dconf:Bool) * 
+  (! (#dval == empty));
+
+ (*
+ * Predicate: AccessorDescriptor
+ *
+ * Resource: none
+ *
+ *)
+pure pred AccessorDescriptor (d:List) :
+  (d == {{ "a", #dget, #dset, #denum, #dconf }}) *
+  types (#denum:Bool, #dconf:Bool) * 
+  (! (#dget == empty)) * (! (#dset == empty));
+
+(*
+ * Predicate: GenericDescriptor
+ *
+ * Resource: none
+ *
+ *)
+pure pred GenericDescriptor (d:List) :
+  (d == {{ "g", #genum, #gconf, #gval, #gwrit, #gget, #gset }});
+
+(*
+ * Predicate: Projection functions for descriptors
+ *
+ * Resource: none
+ *
+ *)
+pure pred desc_val (+d:List, v) :
+    v == l-nth(d, 1);
+
+pure pred desc_writ (+d:List, v:Bool) :
+    v == l-nth(d, 2);
+
+pure pred desc_enum (+d:List, v:Bool) :
+    v == l-nth(d, 3);
+
+pure pred desc_conf (+d:List, v:Bool) :
+    v == l-nth(d, 4);
+    
+(*********************
+ **** OBJECT CELL ****
+ *********************) 
+
+(*
+ * Predicate: Cell_o(l, prop, X)
+ *
+ * Resource:
+ *      (l, prop)
+ *
+ *)
+pred Cell_o (+l:Obj, +prop:Str, d) :
+    ((l, prop) -> d) * (d == none),
+    ((l, prop) -> d) * DataDescriptor(d),
+    ((l, prop) -> d) * AccessorDescriptor(d);
+
+(**************************
+ **** CLASS CLASSIFIERS ***
+ **************************)  
+ 
+(*
+ * Predicate: isClass(c, X)
+ *
+ * Resource:
+ *      (l, "@class")
+ *
+ *)
+pure pred isClass (c:Str, case:Str) :
+  (case == "Array")      * (c == "Array"),
+  (case == "String")     * (c == "String"),
+  (case == "Non-Array")  * (! (c == "Array")),
+  (case == "Non-String") * (! (c == "String")); 
+
+(**********************************
+ **** PI: PROTOTYPE INHERITANCE ***
+ **********************************)
+
+pred Pi (+l:Obj, +prop:Str, d, ls:List, lcls:List, lpv:List) :
+
+    (* Any object, cell exists in the heap *)
+    Cell_o (l, prop, d) * types(d : List) *
+    MetaData(l, #md) * ((#md, "@class") -> #cls) * isClass (#cls, "Non-String") *
+    (ls == {{ l }}) * (lcls == {{ #cls }}) * (lpv == {{ "" }}),
+
+    (* Non-string object, cell does not exist in the heap, down the prototype chain *)
+    Cell_o (l, prop, none) *
+    MetaData(l, #md) * ((#md, "@class") -> #cls) * isClass (#cls, "Non-String") * ((#md, "@proto") -> #lp) *
+    (ls == l :: #lls) * (lcls == #cls :: #lcls) * (lpv == "" :: #lpv) * types(#cls:Str) *
+    (#lls == #lp :: #ols) * (#lcls == #pcls :: #ocls) * (#lpv == #ppv :: #otv) *
+    types(#lp:Obj, #pcls:Str, #ppv:Str) *
+    Pi (#lp, prop, d, #lls, #lcls, #lpv),
+  
+    (* Non-string object, cell does not exist in the heap, end of prototype chain *)
+    Cell_o (l, prop, none) * (d == undefined) *
+    MetaData(l, #md) * ((#md, "@class") -> #cls) * isClass (#cls, "Non-String") *  ((#md, "@proto") -> null) * 
+    (ls == {{ l }}) * (lcls == {{ #cls }}) * (lpv == {{ "" }});
+
+(*******************
+ *******************
+ ***** OBJECTS *****
+ *******************
+ *******************)    
+
+(* ***********************
+ * CREATE_DEFAULT_OBJECT *
+ *************************)
+
+proc create_default_object (pr, cl, ext) {
+
+        goto [cl = undefined] scl text;
+  scl:  cl := "Object";
+  text: goto [ext = undefined] sext set;
+  sext: ext := true;
+  
+        (* Create metadata and object *)
+  set:  m := new(null); 
+        ret := new(m);
+      
+        (* Set the internal properties in the metadata *)
+        [m, "@proto"] := pr;
+        [m, "@class"] := cl;
+        [m, "@extensible"] := ext;
+
+        return
+};
+
+proc create_default_object_concrete (l, pr, cl, ext) {
+
+        goto [cl = undefined] scl text;
+  scl:  cl := "Object";
+  text: goto [ext = undefined] sext set;
+  sext: ext := true;
+  
+        (* Create metadata and object *)
+  set:  m := new(null); 
+        ret := new(l m);
+      
+        (* Set the internal properties in the metadata *)
+        [m, "@proto"] := pr;
+        [m, "@class"] := cl;
+        [m, "@extensible"] := ext;
+
+        ret := l;
+        return
+};
+
+(* ******************
+ * OBJECT_CONSTRUCT *
+ ********************)
+
+spec Object_construct (xsc, vthis, l)
+    
+    [[ (l == #l) * types(#l:Undefined) ]]
+    [[ JSObject(ret) * empty_fields(ret : -{ }-) ]]
+    normal
+    
+    (* TODO: for Object, Boolean, Number, String *)
+
+proc Object_construct (xsc, vthis, l) {
+
+          goto [typeOf l = Obj] obj l1b;
+  obj:    ret := l;
+          return;
+
+  l1b:    goto [(typeOf l = Bool) or (typeOf l = Num) or (typeOf l = Str)] to_obj norm;
+  to_obj: ret := "i__toObject" (l);
+          return;
+
+  norm:   ret := "create_default_object" ($lobj_proto, "Object", true);
+          return
+};
+
+(* ***********************************
+ * CREATE_OBJECT_WITH_CALL_CONSTRUCT *
+ *************************************)
+
+spec create_object_with_call_construct (call, construct, len)
+
+    [[ 
+      (call == #call) * (construct == empty) * (len == #len) *
+      types(#call:Str, #len:Num)
+    ]]
+    [[ 
+      (ret == #l) *
+      ((#l, "length") -> {{ "d", #len, false, false, false }}) * 
+      empty_fields(#l : -{ "length" }-) *
+      MetaData(#l, #md) * MetaData(#md, null) *
+      ((#md, "@proto")      -> $lfun_proto) *
+      ((#md, "@class")      -> "Function") *
+      ((#md, "@extensible") -> true) *
+      ((#md, "@scope")      -> empty) * 
+      ((#md, "@call")       -> #call) *
+      empty_fields(#md : -{ "@call", "@class", "@extensible", "@proto", "@scope" }-)
+    ]]
+    normal;
+
+    [[ 
+      (call == #call) * (construct == #construct) * (len == #len) *
+      types(#call:Str, #construct:Str, #len:Num) 
+    ]]
+    [[ 
+      (ret == #l) *
+      ((#l, "length") -> {{ "d", #len, false, false, false }}) *  
+      empty_fields(#l : -{ "length" }-) *
+      MetaData(#l, #md) * MetaData(#md, null) *
+      ((#md, "@proto")      -> $lfun_proto) *
+      ((#md, "@class")      -> "Function") *
+      ((#md, "@extensible") -> true) *
+      ((#md, "@scope")      -> empty) * 
+      ((#md, "@call")       -> #call) *
+      ((#md, "@construct")  -> #construct) *
+      empty_fields(#md : -{ "@call", "@class", "@construct", "@extensible", "@proto", "@scope" }-)
+    ]]
+    normal
+    
+proc create_object_with_call_construct (call, construct, len) {
+
+        ret := "create_default_object" ($lfun_proto, "Function", true);
+
+        [ret, "length"] := {{ "d", len, false, false, false }};
+
+        (* Get the metadata *)
+        m := metadata(ret);
+      
+        (* Set the internal scope, call and construct properties *)
+        [m, "@scope"] := empty;
+        [m, "@call"] := call;
+      
+        goto [construct = empty] rlab cstr;
+
+  cstr: [m, "@construct"] := construct;
+
+  rlab: return
+};
+
+proc create_object_with_call_construct_concrete (l, call, construct, len) {
+
+        ret := "create_default_object_concrete" (l, $lfun_proto, "Function", true);
+
+        [ret, "length"] := {{ "d", len, false, false, false }};
+
+        (* Get the metadata *)
+        m := metadata(ret);
+      
+        (* Set the internal scope, call and construct properties *)
+        [m, "@scope"] := empty;
+        [m, "@call"] := call;
+      
+        goto [construct = empty] rlab cstr;
+
+  cstr: [m, "@construct"] := construct;
+
+  rlab: ret := l;
+        return
+};
+
+(* ************************
+ * CREATE_FUNCTION_OBJECT *
+ **************************)
+
+spec create_function_object (xsc, call, construct, params)
+
+    [[ 
+      (xsc == #xsc) * (call == #call) * (construct == #construct) * (params == #params) * (#call == #construct) *
+      types(#xsc:List, #call:Str, #construct:Str, #params:List) 
+    ]]
+    [[ 
+      JSFunctionObject(ret, #call, #xsc, #len, #prototype) * 
+      empty_fields(ret : -{ "arguments", "caller", "length", "prototype" }-) *
+      (#len == l-len #params) *
+      JSObject(#prototype) *
+      ((#prototype, "constructor") -> {{ "d", ret, true, false, true }}) *
+      empty_fields(#prototype : -{ "constructor" }-) 
+    ]]
+    normal
+
+proc create_function_object (xsc, call, construct, params) {
+        len := l-len (params);
+        l := new ();
+        l := "create_object_with_call_construct" (call, construct, len);
+
+        m := metadata(l);
+        [m, "@scope"] := xsc;
+
+        prototype := "Object_construct" ();
+        [prototype, "constructor"] := {{ "d", l, true, false, true }};
+        [l, "prototype"]           := {{ "d", prototype, true, false, false }};
+
+        (* Strict mode only *)
+        [l, "caller"]    := {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }};
+        [l, "arguments"] := {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }};
+
+        ret := l;
+
+  rlab: return
+};
+
+(************************
+ ***** INITIAL HEAP *****
+ ************************)
+ 
+spec setupInitialHeap ()
+
+  [[ emp ]]
+  [[ initialHeapPost( -{ }- ) * (ret == empty) ]]
+  normal
+
+proc setupInitialHeap () {
+
+    (* Global object *)
+    ret := "create_default_object_concrete" ($lg, $lobj_proto, "Object", true);
+
+    (* Object.prototype *)
+    ret := "create_default_object_concrete" ($lobj_proto, null, "Object", true);
+    
+    [$lobj_proto, "hasOwnProperty"] := {{ "d", $lop_hasOwnProperty, true, false, true }};
+      
+    ret := "create_object_with_call_construct_concrete" ($lop_hasOwnProperty, "OP_hasOwnProperty", empty, 1);
+
+    (* Function.prototype *)
+    ret := "create_object_with_call_construct_concrete" ($lfun_proto, "FP_default", empty, 0);
+    m := metadata($lfun_proto);
+    [m, "@proto"] := $lobj_proto;
+
+    [$lfun_proto, "call"]        := {{ "d", $lfp_call, true, false, true }};
+
+    ret := "create_object_with_call_construct_concrete" ($lfp_call, "FP_call", empty, 1);
+      
+    (* Boolean.prototype *)
+    ret := "create_default_object_concrete" ($lbool_proto, $lobj_proto, "Boolean", true);
+    
+    m := metadata($lbool_proto); 
+    [m, "@primitiveValue"] := false;
+    [$lbool_proto, "constructor"] := {{ "d", $lbool, true, false, true }};
+    
+    (* Number.prototype *)
+    ret := "create_default_object_concrete" ($lnum_proto, $lobj_proto, "Number", true);
+
+    m := metadata($lnum_proto);
+    [m, "@primitiveValue"] := 0;
+    [$lnum_proto, "constructor"] := {{ "d", $lnum, true, false, true }};
+    
+    (* Error object *)
+    ret := "create_object_with_call_construct_concrete" ($lerr, "Error_call", "Error_construct", 1);
+    [$lg, "Error"] := {{ "d", $lerr, true, false, true }};
+    [$lg, "Object"] := {{ "d", $lobj, true, false, true }};
+    [$lerr, "prototype"] := {{ "d", $lerr_proto, false, false, false }};
+
+    (* Error.prototype *)
+    ret := "create_default_object_concrete" ($lerr_proto, $lobj_proto, "Error", true);
+    [$lerr_proto, "message"] := {{ "d", "", true, false, true }};
+
+    (* Epilogue *)
+    ret := empty;
+    return
+};
+
+(******************
+ ******************
+ ***** ERRORS *****
+ ******************
+ ******************)  
+
+(*******************
+ * ERROR_CONSTRUCT *
+ *******************)
+
+proc Error_construct (xsc, vthis, v) {
+        ret := vthis;
+
+        m := metadata(vthis);
+        [m, "@class"] := "Error";
+        [m, "@extensible"] := true;
+
+        goto [v = undefined] rlab mess;
+
+  mess: ret := "i__toString" (v) with elab;
+        [vthis, "message"] := {{ "d", ret, true, false, true }};
+        ret := vthis;
+
+  rlab: return;
+  elab: throw
+};
+
+(*********************************)
+(* TYPEERROR_CALL and _CONSTRUCT *)
+(*********************************)
+
+proc TypeError_call (xsc, vthis, v) {
+        ret := "create_default_object" ($lterr_proto, "Error", true);
+        ret := "Error_construct" (undefined, ret, v) with elab;
+
+  rlab: return;
+  elab: throw
+};
+
+proc TypeError (v) {
+      ret := "TypeError_call" (undefined, undefined, v) with elab;
+
+  rlab: return;
+  elab: throw
+};
+
+(**************************************)
+(* REFERENCEERROR_CALL and _CONSTRUCT *)
+(**************************************)
+
+proc ReferenceError_call (xsc, vthis, v) {
+        ret := "create_default_object" ($lrferr_proto, "Error", true);
+        ret := "Error_construct" (undefined, ret, v) with elab;
+
+  rlab: return;
+  elab: throw
+};
+
+proc ReferenceError (v) {
+      ret := "ReferenceError_call" (undefined, undefined, v) with elab;
+
+  rlab: return;
+  elab: throw
+};
+
+(***********************************)
+(* SYNTAXERROR_CALL and _CONSTRUCT *)
+(***********************************)
+
+proc SyntaxError_call (xsc, vthis, v) {
+      ret := "create_default_object" ($lserr_proto, "Error", true);
+      ret := "Error_construct" (undefined, ret, v) with elab;
+
+  rlab: return;
+  elab: throw
+};
+
+proc SyntaxError (v) {
+      ret := "SyntaxError_call" (undefined, undefined, v) with elab;
+
+  rlab: return;
+  elab: throw
+};
+
+(*********************************
+ *********************************
+ ***** BUILT-IN CONSTRUCTORS *****
+ *********************************
+ *********************************)  
+
+(* ************************* *)
+(* *** BOOLEAN_CONSTRUCT *** *)
+(* ************************* *)  
+
+spec Boolean_construct (xsc, vthis, v) 
+
+  [[ (v == #v) * types(v:Bool) ]]
+  [[ BooleanObject(ret, #v) * empty_fields(ret : -{ }-) ]]
+  normal
+
+proc Boolean_construct (xsc, vthis, v) {
+        pv := "i__toBoolean" (v);
+
+        ret := "create_default_object" ($lbool_proto, "Boolean", true);
+
+        m := metadata(ret);
+        [m, "@primitiveValue"] := pv;
+
+  rlab: return
+};
+
+(* ************************ *)
+(* *** NUMBER_CONSTRUCT *** *)
+(* ************************ *)
+
+spec Number_construct (xsc, vthis, v) 
+
+  [[ (v == #v) * types(v:Num) ]]
+  [[ NumberObject(ret, #v) * empty_fields(ret : -{ }-) ]]
+  normal
+
+proc Number_construct (xsc, vthis, v) {
+
+  init: pv := "i__toNumber" (v) with elab;
+
+      ret := "create_default_object" ($lnum_proto, "Number", true);
+
+      m := metadata(ret);
+      [m, "@primitiveValue"] := pv;
+
+  rlab: return;
+  elab: throw
+};
+
+(***********************
+ ***********************
+ ***** CONVERSIONS *****
+ ***********************
+ ***********************)  
+
+(* *************
+ * I__TOSTRING *
+ ***************)
+
+spec i__toString (v)
+
+  [[ v == undefined ]]
+  [[ ret == "undefined" ]]
+  normal;
+
+  [[ v == null ]]
+  [[ ret == "null" ]]
+  normal;
+  
+  [[ v == true ]]
+  [[ ret == "true" ]]
+  normal;
+  
+  [[ v == false ]]
+  [[ ret == "false" ]]
+  normal;
+
+  [[ (v == #v) * types(#v:Num) ]]
+  [[ (ret == (num_to_string #v)) ]]
+  normal;
+  
+  [[ (v == #v) * types(#v:Str) ]]
+  [[ (ret == #v) ]]
+  normal
+
+proc i__toString (v) {
+  iu:    goto [v = undefined] undef in;
+  undef: ret := "undefined";
+         return;
+
+  in:    goto [v = null] nul ib;
+  nul:   ret := "null";
+         return;
+
+  ib:    goto [typeOf v = Bool] bool inum;
+  bool:  goto [v = true] is_t is_f;
+  
+  is_t:  ret := "true";
+         return;
+
+  is_f:  ret := "false";
+         return;
+
+  inum:  goto [typeOf v = Num] num is;
+  num:   ret := num_to_string v;
+         return;
+
+  is:    goto [typeOf v = Str] str io;
+  str:   ret := v;
+         return;
+
+  io:    goto [typeOf v = Obj] obj elab;
+  obj:   ret := "i__toPrimitive" (v, "String") with elab;
+         ret := "i__toString" (ret) with elab;
+         return;
+
+  elab:  throw
+};
+
+
+proc OP_toString (sc, v) {
+   ret := "i__toString" (v) with elab; 
+   return; 
+
+ elab: throw  
+}; 
+
+
+
+(* *************
+ * I__TONUMBER *
+ ***************)
+
+proc i__toNumber (v) {
+  iu:    goto [v = undefined] undef in;
+  undef: ret := nan;
+         goto rlab;
+
+  in:    goto [v = null] nul ib;
+  nul:   ret := 0;
+         goto rlab;
+
+  ib:    goto [typeOf v = Bool] bool inum;
+  bool:  goto [v = true] is_t is_f;
+  is_t:  ret := 1;
+         goto rlab;
+  is_f:  ret := 0;
+         goto rlab;
+
+  inum:  goto [typeOf v = Num] num is;
+  num:   ret := v;
+         goto rlab;
+
+  is:   goto [typeOf v = Str] str io;
+  str:  ret := string_to_num v;
+        goto rlab;
+
+  io:   goto [typeOf v = Obj] obj err;
+  obj:  ret := "i__toPrimitive" (v, "Number") with elab;
+        ret := "i__toNumber" (ret);
+        goto rlab;
+
+  rlab: return;
+        
+  err:  ret := "Impossible.";
+  elab: throw
+};
+
+(* *************
+ * I__TOOBJECT *
+ ***************)
+
+spec i__toObject (v) 
+
+  [[ (v == #v) * types(#v:Obj) ]]
+  [[ (ret == #v) ]]
+  normal;
+
+  [[ (v == #v) * types(#v:Bool) ]]
+  [[ BooleanObject(ret, #v) * empty_fields(ret : -{ }-) ]]
+  normal;
+  
+  [[ (v == #v) * types(#v:Num) ]]
+  [[ NumberObject(ret, #v) * empty_fields(ret : -{ }-) ]]
+  normal
+
+proc i__toObject (v) {
+  iu:   goto [v = undefined] thrw in;
+
+  in:   goto [v = null] thrw ib;
+
+  ib:   goto [typeOf v = Bool] bool inum;
+  bool: ret := "Boolean_construct" (undefined, undefined, v);
+      goto rlab;
+
+  inum: goto [typeOf v = Num] num is;
+  num:  ret := "Number_construct" (undefined, undefined, v);
+      goto rlab;
+
+  is:   goto [typeOf v = Str] str io;
+  str:  ret := "String_construct" (undefined, undefined, v);
+      goto rlab;
+
+  io:   goto [typeOf v = Obj] obj oops;
+  obj:  ret := v;
+      goto rlab;
+
+  oops: ret := "ToObject: This should not happen.";
+
+  rlab: return;
+
+  thrw: ret := "Here!";
+      ret := "TypeError" ();
+  elab: throw
+};
+
+(* *************
+ * I_TOBOOLEAN *
+ ***************)
+
+proc i__toBoolean (v) {
+  iu:   goto [v = undefined] undef in;
+  undef:  ret := false;
+      goto rlab;
+
+  in:   goto [v = null] nul ib;
+  nul:  ret := false;
+      goto rlab;
+
+  ib:   goto [typeOf v = Bool] bool inum;
+  bool: ret := v;
+      goto rlab;
+
+  inum: goto [typeOf v = Num] num is;
+  num:  goto [(v = 0) or (not (v = v))] is_f is_t;
+
+  is:   goto [typeOf v = Str] str io;
+  str:  goto [v = ""] is_f is_t;
+      goto rlab;
+
+  io:   goto [typeOf v = Obj] obj oops;
+  obj:  ret := true;
+      goto rlab;
+
+  is_t: ret := true;
+      goto rlab;
+  is_f: ret := false;
+      goto rlab;
+
+  oops: ret := "ToBoolean: This should not happen.";
+
+  rlab: return
+};
+
+(* ********************** *)
+(* *** I__TOPRIMITIVE *** *)
+(* ********************** 
+
+spec i__toPrimitive (v, hint)
+
+    [[ v == undefined ]]
+    [[ ret == undefined ]]
+    normal;
+
+    [[ v == null ]]
+    [[ ret == null ]]
+    normal;
+
+    [[ (v == #v) * types (#v : Num) ]]
+  [[ (ret == #v) ]]
+  normal;
+
+    [[ (v == #v) * types (#v : Bool) ]]
+  [[ (ret == #v) ]]
+  normal;
+
+    [[ (v == #v) * types (#v : Str) ]]
+  [[ (ret == #v) ]]
+  normal *)
+
+proc i__toPrimitive (v, hint) {
+      ret := v;
+      tv := typeOf v;
+
+  iu:   goto [(v = undefined) or (v = null) or
+                (typeOf v = Bool) or (typeOf v = Num) or
+                (typeOf v = Str)] rlab is_obj;
+
+  is_obj: goto [typeOf v = Obj] obj oops;
+  obj:  ret := "defaultValue" (v, hint) with elab;
+      goto rlab;
+
+  oops: ret := "ToPrimitive: This should not happen.";
+      goto elab;
+
+  rlab: return;
+  elab: throw
+};
+
+
+
+(***********************
+ ***********************
+ ***** AUXILIARIES *****
+ ***********************
+ ***********************)  
+
+(* ***************** *)
+(* *** I__TYPEOF *** *)
+(* ***************** 
+
+spec i__typeOf (v)
+
+  [[ (v == #v) * types(#v : Undefined) ]]
+  [[ (ret == "undefined") ]]
+  normal; 
+
+  [[ (v == #v) * types(#v : Null) ]]
+  [[ (ret == "object") ]]
+  normal; 
+  
+  [[ (v == #v) * types(#v : Bool) ]]
+  [[ (ret == "boolean") ]]
+  normal; 
+  
+  [[ (v == #v) * types(#v : Num) ]]
+  [[ (ret == "number") ]]
+  normal; 
+  
+  [[ (v == #v) * types(#v : Str) ]]
+  [[ (ret == "string") ]]
+  normal *)
+
+proc i__typeOf (v) {
+  iu:   goto [v = undefined] undef in;
+  undef:  ret := "undefined";
+      goto rlab;
+
+  in:   goto [v = null] nll ib;
+  nll:  ret := "object";
+      goto rlab;
+
+  ib:   goto [typeOf v = Bool] bool inum;
+  bool: ret := "boolean";
+      goto rlab;
+
+  inum: goto [typeOf v = Num] num is;
+  num:  ret := "number";
+      goto rlab;
+
+  is:   goto [typeOf v = Str] str io;
+  str:  ret := "string";
+      goto rlab;
+
+  io:   goto [typeOf v = Obj] obj oops;
+  obj:  m := metadata(v);
+      ret := hasField(m, "@call");
+      goto [ret] isfun isobj;
+
+  isobj:  ret := "object";
+      goto rlab;
+
+  isfun:  ret := "function";
+      goto rlab;
+
+  oops: ret := "typeOf: This should not happen.";
+      goto elab;
+
+  rlab: return;
+  elab: throw
+};
+
+(* *************************
+   *** I__STRICTEQUALITY ***
+   ************************* *)
+
+spec i__strictEquality (v1, v2)
+
+   [[ (v1 == #v1) * (v2 == #v2) * (#v1 == #v2) ]]
+   [[ ret == true ]]
+   normal;
+
+   [[ (v1 == #v1) * (v2 == #v2) * (! (#v1 == #v2)) ]]
+   [[ ret == false ]]
+   normal;
+
+   [[ (v1 == #v1) * (v2 == #v2) ]]
+   [[ 
+       (ret == true) * (#v1 == #v2);
+       (ret == false) * (! (#v1 == #v2))
+   ]]
+   normal
+
+proc i__strictEquality (v1, v2) {
+      ret := (v1 = v2);
+
+  rlab: return
+};
+
+(* ***************************** *)
+(* *** I__ABSTRACTCOMPARISON *** *)
+(* ***************************** *)
+
+spec i__abstractComparison (v1, v2, leftFirst)
+
+    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) * 
+       types(#v1:Num, #v2:Num, #leftFirst:Bool) * (#v1 <# #v2) ]]
+    [[ (ret == true) ]]
+    normal;
+
+    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) * 
+       types(#v1:Num, #v2:Num, #leftFirst:Bool) * (#v1 == #v2) ]]
+    [[ (ret == false) ]]
+    normal;
+
+    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) * 
+       types(#v1:Num, #v2:Num, #leftFirst:Bool) * (#v2 <# #v1) ]]
+    [[ (ret == false) ]]
+    normal;
+
+    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) * 
+       types(#v1:Num, #v2:Num, #leftFirst:Bool) * (#v2 <=# #v1) ]]
+    [[ (ret == false) ]]
+    normal;
+
+    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) * 
+       types(#v1:Num, #v2:Num, #leftFirst:Bool) ]]
+    [[ 
+        (ret == true) * (#v1 <# v2);
+        (ret == false) * (#v1 == v2);
+        (ret == false) * (#v2 <# v1)
+    ]]
+    normal
+
+proc i__abstractComparison (v1, v2, leftFirst) {
+      goto [(leftFirst = empty) or (leftFirst = true)] eleft eright;
+
+  eleft:  ret := "i__toPrimitive" (v1, "Number") with elab;
+      px := ret;
+      ret := "i__toPrimitive" (v2, "Number") with elab;
+      py := ret;
+      goto is_str;
+
+  eright: ret := "i__toPrimitive" (v2, "Number") with elab;
+      py := ret;
+      ret := "i__toPrimitive" (v1, "Number") with elab;
+      px := ret;
+
+  is_str: goto [(typeOf px = Str) and (typeOf py = Str)] str num;
+
+  str:  ret := (px <s py);
+      goto rlab;
+
+  num:  ret := "i__toNumber" (px) with elab;
+      nx := ret;
+      ret := "i__toNumber" (py) with elab;
+      ny := ret;
+
+      goto [(not (nx = nx)) or (not (ny = ny))] ru eq;
+
+  eq:   goto [nx = ny] rf sl;
+
+  sl:   ret := (nx < ny);
+      goto rlab;
+
+  ru:   ret := undefined;
+      goto rlab;
+
+  rt:   ret := true;
+      goto rlab;
+
+  rf:   ret := false;
+
+  rlab: return;
+  elab: throw
+};
+
+(* *********************
+   *** I__ISCALLABLE ***
+   ********************* 
+
+spec i__isCallable (l)
+
+  [[ (l == #l) * MetaData(#l, #md) * ((#md, "@call") -> none) ]]
+  [[ MetaData(#l, #md) * ((#md, "@call") -> none) * (ret == false) ]]
+  normal;
+
+  [[ (l == #l) * MetaData(#l, #md) * ((#md, "@call") -> #y) * (! (#y == none)) ]]
+  [[ MetaData(#l, #md) * ((#md, "@call") -> #y) * (ret == true) ]]
+  normal *)
+
+proc i__isCallable (l) {
+        ret := false;
+        goto [typeOf l = Obj] obj rlab;
+  obj:  m := metadata(l);
+        ret := hasField(m, "@call");
+  rlab: return
+};
+
+(* **************************
+   *** TODO: I__SAMEVALUE ***
+   ************************** *)
+
+proc i__sameValue (v1, v2) {
+
+  nonum: goto [v1 = v2] rt rf; 
+
+  rt:    ret := true;
+         return;
+          
+  rf:    ret := false;
+  rlab:  return
+};
+ 
+(* ********************************
+   *** I__CHECKASSIGNMENTERRORS ***
+   ******************************** *)
+
+proc i__checkAssignmentErrors (v) {
+			tv := typeOf (v);
+			goto [(tv = List)] prep rlab;
+
+	prep:	fv := l-nth (v, 2);
+            strict := l-nth (v, 3);
+
+	csyn:	goto [strict and (l-nth (v, 0) = "v") and ((fv = "eval") or (fv = "arguments"))] se rlab;
+
+	rlab:	ret := true;
+			return;
+
+	se:		ret := "SyntaxError" ();
+	elab:   throw
+};
+ 
+(* *******************************
+   *** I__CHECKOBJECTCOERCIBLE ***
+   ******************************* *)
+
+proc i__checkObjectCoercible (v) {
+
+         ret := empty;
+
+  iu:    goto [v = undefined] thrw in;
+
+  in:    goto [v = null] thrw other;
+
+  other: goto [(typeOf v = Bool) or (typeOf v = Num) or
+               (typeOf v = Str)  or (typeOf v = Obj)] rlab elab;
+
+  rlab:  return;
+
+  thrw:  ret := "TypeError" ();
+  elab:  throw
+};
+
+
+(* ********************** *)
+(* CONVERSIONS AND CHECKS *)
+(* ********************** *)
+
+(* **********************
+   *** I__ISPRIMITIVE ***
+   ********************** *)
+
+proc i__isPrimitive (v) {
+
+       goto [(v = undefined)] rt c1;
+  c1:  goto [(v = null)] rt c2;
+  c2:  tv := typeOf v;
+       goto [(tv = Bool)] rt c3;
+  c3:  goto [(tv = Num)] rt c4;
+  c4:  goto [(tv = Str)] rt rf;
+
+  rt:  ret := true;
+       return;
+
+  rf:  goto [(tv = Obj)] rf1 wtf;
+  rf1: ret := false;
+       return;
+
+  wtf: assume(False)
+
+};
+
+(* ******************************
+   *** I__ISGENERICDESCRIPTOR ***
+   ****************************** *)
+
+proc i__isGenericDescriptor (desc) {
+      goto [desc = undefined] rf cont;
+
+  cont: dd := "i__isDataDescriptor" (desc);
+        ad := "i__isAccessorDescriptor" (desc);
+        ret := not (dd or ad);
+        goto rlab;
+
+  rf:   ret := false;
+  rlab: return
+};
+
+(* ***************************
+   *** I__ISDATADESCRIPTOR ***
+   *************************** *)
+
+proc i__isDataDescriptor (desc) {
+        goto [desc = undefined] rf cont;
+  cont: d := l-nth (desc, 0);
+        goto [d = "d"] rt gen;
+  gen:  goto [d = "g"] test rf;
+  test: v := l-nth (desc, 3);
+        w := l-nth (desc, 4);
+        goto [(v = empty) and (w = empty)] rf rt;
+  rt:   ret1 := true;
+        goto rlab;
+  rf:   ret2 := false;
+
+  rlab: PHI(ret: ret1, ret2);
+        return
+};
+
+(* *******************************
+   *** I__ISACCESSORDESCRIPTOR ***
+   ******************************* *)
+
+proc i__isAccessorDescriptor (desc) {
+        goto [desc = undefined] rf cont;
+  cont: d := l-nth (desc, 0);
+        goto [d = "a"] rt gen;
+  gen:  goto [d = "g"] test rf;
+  test: g := l-nth (desc, 5);
+        s := l-nth (desc, 6);
+        goto [(g = empty) and (s = empty)] rf rt;
+  rt:   ret1 := true;
+        goto rlab;
+  rf:   ret2 := false;
+
+  rlab: PHI(ret: ret1, ret2);
+        return
+};
+
+(* ***************************
+   *** I__TODATADESCRIPTOR ***
+   *************************** *)
+
+proc i__toDataDescriptor (desc) {
+         d := l-nth (desc, 0);
+         goto [d = "d"] rd cstr;
+
+  cstr:  goto [d = "a"] ra gen;
+
+  ra:    ret1 := {{ "d", undefined, false, l-nth (desc, 3), l-nth (desc, 4) }};
+         goto rlab;
+
+  gen:   df := false;
+         du := undefined;
+
+         e := l-nth (desc, 1);
+         goto [e = empty] fixe conte;
+  conte: skip;
+  fixe:  PHI(ex: df, e);
+
+         c := l-nth (desc, 2);
+         goto [c = empty] fixc contc;
+  contc: skip;
+  fixc:  PHI(cx: df, c);
+
+         v := l-nth (desc, 3);
+         goto [v = empty] fixv contv;
+  contv: skip;
+  fixv:  PHI(vx: du, v);
+
+         w := l-nth (desc, 4);
+         goto [w = empty] fixw contw;
+  contw: skip;
+  fixw:  PHI(wx: df, w);
+
+         ret2 := {{ "d", vx, wx, ex, cx }};
+         goto rlab;
+
+  rd:    ret3 := desc;
+  
+  rlab:  PHI(ret: ret1, ret2, ret3);
+         return
+};
+
+(* **********************************************
+   **********************************************
+   ***********   INTERNAL FUNCTIONS   ***********
+   **********************************************
+   ********************************************** *)
+
+(* *************************
+   *** O__GETOWNPROPERTY ***
+   ************************* *)
+
+(*
+ *    Name: o__getOwnProperty 
+ * Purpose: Get own property of a non-String object
+ *
+ *   Specs:
+ *
+ * 01 - Property not defined, rtrn undefined
+ * 02 - Property defined, rtrn property descriptor
+ *
+ 
+
+spec o__getOwnProperty (l, prop)
+
+    [[ (l == #l) * (prop == #prop) * Cell_o (#l, #prop, none) ]]
+    [[ Cell_o (#l, #prop, none) * (ret == undefined) ]]
+    normal;
+
+    [[ (l == #l) * (prop == #prop) * Cell_o (#l, #prop, #dx) * types(#dx : List) ]]
+    [[ Cell_o (#l, #prop, #dx) * (ret == #dx) ]]
+    normal *)
+
+proc o__getOwnProperty (l, prop) {
+            x := hasField(l, prop);
+            goto [x] hp nhp;      (* Does the field exist? *)
+
+    nhp:    ret := undefined;     (* Field doesn't exist; rtrn undefined *)
+            return;
+
+    hp:     ret := [l, prop];     (* Field exists; rtrn the descriptor *)
+            return
+};
+
+(* **********************
+   *** GETOWNPROPERTY ***
+   ********************** *)
+
+(*
+ *    Name: getOwnProperty 
+ * Purpose: Get own property of a (general) object
+ *
+ *   Specs:
+ *
+ * 01 - Non-string object, property not defined, rtrn undefined
+ * 02 - Non-string object, property defined, rtrn property descriptor
+ *
+ 
+
+spec getOwnProperty (l, prop)
+
+    [[ (l == #l) * (prop == #prop) * Cell_o (#l, #prop, none) *
+       MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
+    [[ Cell_o (#l, #prop, none) * 
+       MetaData(#l, #md) * ((#md, "@class") -> #cls) * (ret == undefined) ]]
+    normal;
+
+    [[ (l == #l) * (prop == #prop) * Cell_o (#l, #prop, #dx) * types(#dx : List) *
+       MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
+    [[ Cell_o (#l, #prop, #dx) * MetaData(#l, #md) * ((#md, "@class") -> #cls) * (ret == #dx) ]]
+    normal *)
+
+proc getOwnProperty (l, prop) {
+
+        m := metadata(l);
+        class := [m, "@class"];
+
+        goto [class = "String"] sgop ogop;
+
+  sgop: ret := "s__getOwnProperty" (l, prop) with elab;
+        return;
+
+  ogop: ret := "o__getOwnProperty" (l, prop) with elab;
+        return;
+
+  elab: throw
+};
+
+(*
+ *    Name: getProperty 
+ * Purpose: Get property of a (general) object, considering prototype inheritance
+ *
+ *   Specs:
+ *
+ * 01 - Get the heap value associated with the appropriate Pi
+ 
+
+spec getProperty (l, prop)
+
+  [[ (l == #l) * (prop == #prop) * Pi (#l, #prop, #d, #ls, #cls, #pv) ]]
+  [[ Pi (#l, #prop, #d, #ls, #cls, #pv) * (ret == #d) ]]
+  normal *)
+
+proc getProperty (l, prop) {
+
+          ret := "getOwnProperty" (l, prop) with elab;
+          goto [ret = undefined] next rlab;
+
+    next: m := metadata(l);
+          proto := [m, "@proto"];
+          goto [proto = null] rlab call;
+
+    call: ret := "getProperty" (proto, prop) with elab;
+
+    rlab: return;
+    elab: throw
+};
+
+(* *********** *)
+(* *** GET *** *)
+(* *********** *)
+
+(*
+ *    Name: get 
+ * Purpose: Get the value of a property of a (general) object in the entire prototype chain
+ *
+ *   Specs:
+ *
+ * 01 - Property not defined in the prototype chain, rtrn undefined ]
+ * 02 - Property defined, data descriptor, get value of the descriptor 
+ 
+
+spec get (l, prop)
+
+    [[ (l == #l) * (prop == #prop) *
+       Pi (#l, #prop, #d, #ls, #cls, #pv) * (#d == undefined)  ]]
+    [[ Pi (#l, #prop, #d, #ls, #cls, #pv) * (ret == undefined) ]]
+    normal;
+    
+    [[ (l == #l) * (prop == #prop) *
+       Pi (#l, #prop, #d, #ls, #cls, #pv) * DataDescriptor(#d) ]]
+    [[ Pi (#l, #prop, #d, #ls, #cls, #pv) * desc_val (#d, ret) ]]
+    normal *)
+
+proc get (l, prop) {
+
+         ret := "getProperty" (l, prop) with elab;
+         goto [ret = undefined] rlab def; (* Does the field exist?    *)
+
+  def:   d := l-nth (ret, 0);             (* Get the descriptor type  *)
+         ret := l-nth (ret, 1);           (* Get the value/getter     *)
+         goto [d = "d"] rlab acc;         (* Is it a data descriptor? *)
+
+  acc:   goto [ret = undefined] rlab get; (* Is the getter defined?               *)
+  get:   m := metadata(ret);
+         xsc := [m, "@scope"];            (* Get the scope of the getter          *)
+         fun := [m, "@call"];             (* Get the name of the getter           *)
+         ret := fun (xsc, l) with elab;   (* Call the getter, errors could happen *)
+
+  rlab:  return;
+  elab:  throw
+};
+
+(* ******************* *)
+(* *** I__GETVALUE *** *)
+(* ******************* *)
+
+(*
+ *    Name: getValue
+ * Purpose: Get the value of SOMETHING
+ *
+ *   Specs:
+ *
+ * 01-06 - Something is not a reference, just rtrn something
+ * 07 - Object reference, undefined
+ * 08 - Object reference, defined
+ * 09 - Variable reference, lg, undefined
+ * 10 - Variable reference, lg, defined
+ * 11 - Variable reference, non-lg, directly from the heap
+ * 12-13 - Base undefined for both variable and object references, rtrn a reference error 
+ *
+ * Remaining:
+ *
+ * Object conversion:
+ * 
+ * 14-19 - Conversion to Number, String, Boolean, property exists or doesn't 
+ *
+ * Unsupported:
+ *
+ * 20-?? - Getters
+ 
+
+spec i__getValue (v)
+
+    [[ v == undefined ]]
+    [[ ret == undefined ]]
+    normal;
+
+    [[ v == null ]]
+    [[ ret == null ]]
+    normal;
+
+    [[ (v == #v) * types (#v : Obj) ]]
+    [[ (ret == #v) ]]
+    normal;
+
+    [[ (v == #v) * types (#v : Num) ]]
+    [[ (ret == #v) ]]
+    normal;
+
+    [[ (v == #v) * types (#v : Bool) ]]
+    [[ (ret == #v) ]]
+    normal;
+
+    [[ (v == #v) * types (#v : Str) ]]
+    [[ (ret == #v) ]]
+    normal;
+
+    [[ (v == {{ "v", undefined, #field, true }}) * types (#field:Str) ]]
+    [[ ReferenceError(ret) ]]
+    error;
+
+    [[ (v == {{ "o", undefined, #field, true }}) * types (#field:Str) ]]
+    [[ ReferenceError(ret) ]]
+    error;
+
+    [[ (v == {{ "o", #obj, #field, true }}) * 
+       Pi (#obj, #field, #d, #ls, #lcls, #lpv) * (#d == undefined) ]]
+    [[ Pi (#obj, #field, #d, #ls, #lcls, #lpv) * (ret == undefined) ]]
+    normal;
+
+    [[ (v == {{ "o", #obj, #field, true }}) * 
+       Pi (#obj, #field, #d, #ls, #lcls, #lpv) * DataDescriptor (#d)  ]]
+    [[ Pi (#obj, #field, #d, #ls, #lcls, #lpv) * desc_val (#d, #desc_val) * (ret == #desc_val) ]]
+    normal;
+
+    [[ (v == {{ "v", $lg, #field, true }}) * 
+       Pi ($lg, #field, #d, #ls, #lcls, #lpv) * (#d == undefined) ]]
+    [[ Pi ($lg, #field, #d, #ls, #lcls, #lpv) * (ret == undefined) ]]
+    normal;
+
+    [[ (v == {{ "v", $lg, #field, true }}) *
+    Pi ($lg, #field, #d, #ls, #lcls, #lpv) * DataDescriptor (#d)  ]]
+    [[ Pi ($lg, #field, #d, #ls, #lcls, #lpv) * desc_val (#d, #desc_val) * (ret == #desc_val) ]]
+    normal;
+
+    [[ (v == {{ "v", #obj, #field, true }}) * (! (#obj == $lg)) * ((#obj, #field) -> #value) * (! (#value == none)) ]]
+    [[ ((#obj, #field) -> #value) * (ret == #value) ]]
+    normal
+
+    (* Now come the more involved specs, which are a bit difficult for the solver. 
+
+    [[ (v == {{ "o", #b, #field }}) * types(#b:Bool) * Pi($lbool_proto, #field, #d, ($lbool_proto :: #ols), ("Boolean" :: #ocls), ("" :: #opv)) * (#d == undefined) ]]
+    [[ Pi($lbool_proto, #field, #d, ($lbool_proto :: #ols), ("Boolean" :: #ocls), ("" :: #opv)) * (ret == undefined) ]]
+    normal;
+
+    [[ (v == {{ "o", #b, #field }}) * types(#b:Bool) * Pi($lbool_proto, #field, #d, ($lbool_proto :: #ols), ("Boolean" :: #ocls), ("" :: #opv)) * DataDescriptor(#d) ]]
+    [[ Pi($lbool_proto, #field, #d, ($lbool_proto :: #ols), ("Boolean" :: #ocls), ("" :: #opv)) * desc_val(#d, #dval) * (ret == #dval) ]]
+    normal;
+
+    [[ (v == {{ "o", #n, #field }}) * types(#n:Num) * Pi($lnum_proto, #field, #d, ($lnum_proto :: #ols), ("Number" :: #ocls), ("" :: #opv)) * (#d == undefined) ]]
+    [[ Pi($lnum_proto, #field, #d, ($lnum_proto :: #ols), ("Number" :: #ocls), ("" :: #opv)) * (ret == undefined) ]]
+    normal;
+
+    [[ (v == {{ "o", #n, #field }}) * types(#n:Num) * Pi($lnum_proto, #field, #d, ($lnum_proto :: #ols), ("Number" :: #ocls), ("" :: #opv)) * DataDescriptor(#d) ]]
+    [[ Pi($lnum_proto, #field, #d, ($lnum_proto :: #ols), ("Number" :: #ocls), ("" :: #opv)) * desc_val(#d, #dval) * (ret == #dval) ]]
+    normal *)
+
+proc i__getValue (v) {
+
+			goto [(typeOf v = List)] rcand dflt;
+
+   	rcand:  rbase := l-nth (v, 1);
+			goto [rbase = undefined] thrw prim;  
+
+	prim:	prim := "i__isPrimitive" (rbase);
+      	    goto [prim] is_pr ref;
+
+	is_pr:  ret := "i__toObject" (rbase) with elab;
+            rfield := l-nth (v, 2);
+			ret := "getProperty" (ret, rfield) with elab;
+			goto [ret = undefined] rlab def;
+	def:	d := l-nth (ret, 0);	(* Get the descriptor type *)
+			ret := l-nth (ret, 1);	(* Get the value/getter *)
+			goto [d = "d"] rlab acc;	(* Is it a data descriptor? *)
+
+	acc:	goto [ret = undefined] rlab get;	(* Is the getter defined? *)
+	get:	m := metadata(ret);
+			xsc := [m, "@scope"];	(* Get the scope of the getter *)
+			fun := [m, "@call"];	(* Get the name of the getter *)
+			ret := fun (xsc, rbase) with elab;	(* Call the getter, errors could happen *)
+			goto [ret = empty] undef rlab;
+	undef:	ret := undefined;
+
+	ref:	rtype := l-nth (v, 0);
+            rfield := l-nth (v, 2);
+            goto [rtype = "o"] oref vref;
+
+	oref:	ret := "get" (rbase, rfield) with elab;
+			return;
+
+	vref:	goto [rbase = $lg] oref er;
+
+	er:		ret := [rbase, rfield];
+			return;
+
+	dflt:	ret := v;
+	rlab:   return;
+
+	thrw:   ret := "ReferenceError" ();
+   	elab:   throw
+};
+
+(* ******************* *)
+(* *** HASPROPERTY *** *)
+(* ******************* 
+
+spec hasProperty (l, prop)
+
+  [[ (l == #l) * (prop == #prop) *
+     Pi (#l, #prop, undefined, #ls, #cls, #pv) ]]
+  [[ Pi (#l, #prop, undefined, #ls, #cls, #pv) * (ret == false) ]]
+  normal;
+
+  [[ (l == #l) * (prop == #prop) *
+     Pi (#l, #prop, #d, #ls, #cls, #pv) * DataDescriptor(#d) ]]
+  [[ Pi (#l, #prop, #d, #ls, #cls, #pv) * (ret == true) ]]
+  normal *)
+
+proc hasProperty (l, prop) {
+        ret := "getProperty" (l, prop) with elab;
+
+  rlab: ret := not (ret = undefined);
+        return;
+
+  elab: throw
+};
+
+(* ********************** *)
+(* *** DELETEPROPERTY *** *)
+(* ********************** *)
+
+spec deleteProperty (l, prop, thrw)
+
+    [[ (l == #l) * (prop == #prop) * Cell_o (#l, #prop, none) *
+       MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
+    [[ Cell_o (#l, #prop, none) * 
+       MetaData(#l, #md) * ((#md, "@class") -> #cls) * (ret == true) ]]
+    normal;
+    
+  [[ (l == #l) * (prop == #prop) *
+     Cell_o(#l, #prop, #d) * DataDescriptor(#d) * desc_conf(#d, true) * 
+     MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
+  [[ Cell_o(#l, #prop, none) * 
+     MetaData(#l, #md) * ((#md, "@class") -> #cls) * (ret == true) ]]
+  normal;
+
+  [[ (l == #l) * (prop == #prop) * (thrw == false) *
+     Cell_o(#l, #prop, #d) * DataDescriptor(#d) * desc_conf(#d, false) * 
+     MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
+  [[ Cell_o(#l, #prop, #d) * 
+     MetaData(#l, #md) * ((#md, "@class") -> #cls) * (ret == false) ]]
+  normal;
+
+  [[ (l == #l) * (prop == #prop) * (thrw == true) *
+     Cell_o(#l, #prop, #d) * DataDescriptor(#d) * desc_conf(#d, false) * 
+     MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
+  [[ Cell_o(#l, #prop, #d) * 
+     MetaData(#l, #md) * ((#md, "@class") -> #cls) * TypeError(ret) ]]
+  error
+
+proc deleteProperty (l, prop, thrw) {
+
+			ret := "getOwnProperty" (l, prop) with elab;
+			goto [ret = undefined] dt cont;
+
+	cont:	c := l-nth (ret, 4);
+			goto [c] del reject;
+	del:	delete (l, prop);
+
+	dt:		ret := true;
+			goto rlab;
+
+	df:		ret := false;
+	rlab:   return;
+
+    reject: goto [thrw] tt df;
+
+    tt:     ret := "TypeError" ();
+    elab:   throw
+};
+
+(* ************** *)
+(* *** CANPUT *** *)
+(* ************** *)
+
+proc canPut (l, prop) {
+
+         ret := "getOwnProperty" (l, prop) with elab;
+  op:    goto [ret = undefined] nop odesc;   (* Does the own property exist? *)
+
+  odesc: d := l-nth (ret, 0);                      (* It does; get the descriptor type     *)
+         goto [d = "d"] odd nop;                   (* Is the descriptor a data descriptor? *)
+
+  odd:   ret := l-nth (ret, 2);                    (* It is; return the Writable attribute *)
+         goto rlab;
+
+  nop:   m := metadata(l);
+         e := [m, "@extensible"];                  (* Get the extensible property *)
+         ret := "getProperty" (l, prop) with elab; (* Does the property exist?    *)
+         goto [ret = undefined] ext desc;          (* It doesn't; rtrn extensible *)
+
+  desc:  d := l-nth (ret, 0);                      (* Get the descriptor type  *)
+         v := l-nth (ret, 2);                      (* Get the writable/setter  *)
+         goto [d = "d"] dd ad;                     (* Is it a data descriptor? *)
+
+  dd:    goto [e] wr ext;                          (* Yes; is the object extensible? *)
+  wr:    ret := v;                                 (* Yes; return writable           *)
+         goto rlab;
+
+  ad:    ret := not (v = undefined);               (* Accessor descriptor *)
+         goto rlab;
+
+  ext:   ret := e;                                 (* Return extensible *)
+
+  rlab:  return;
+  elab:  throw
+};
+
+(* **********************************************
+   **********************************************
+   ***********   BUILT-IN LIBRARIES   ***********
+   **********************************************
+   ********************************************** *)
+
+(* ************************* *)
+(* *** OP_HASOWNPROPERTY *** *)
+(* ************************* *) 
+
+spec OP_hasOwnProperty(xsc, vthis, v)
+
+  [[ (vthis == #l) * (v == #prop) * types(#l : Obj, #prop : Str) * 
+     MetaData(#l, #md) * ((#md, "@class") -> "Object") * Cell_o (#l, #prop, {{ "d", #v, #wr, #en, #co }}) ]]
+  [[ MetaData(#l, #md) * ((#md, "@class") -> "Object") * Cell_o (#l, #prop, {{ "d", #v, #wr, #en, #co }}) * (ret == true) ]]
+  normal;
+  
+  [[ (vthis == #l) * (v == #prop) * types(#l : Obj, #prop : Str) * 
+     MetaData(#l, #md) * ((#md, "@class") -> "Object") * Cell_o (#l, #prop, none) ]]
+  [[ MetaData(#l, #md) * ((#md, "@class") -> "Object") * Cell_o (#l, #prop, none) * (ret == false) ]]
+  normal
+
+proc OP_hasOwnProperty(xsc, vthis, v) {
+        ret := "i__toString" (v) with elab;
+        p := ret;
+
+        ret := "i__toObject" (vthis) with elab;
+        ret := "getOwnProperty" (ret, p) with elab;
+      
+        ret := not (ret = undefined);
+
+  rlab: return;
+  elab: throw
+}; 
+
+(* **************************** *)
+(* *** O__DEFINEOWNPROPERTY *** *)
+(* **************************** *)
+
+proc o__defineOwnProperty (l, prop, desc, thrw) {
+
+          ret_t := true;
+          ret_f := false;
+
+          current := "getOwnProperty" (l, prop) with celab;
+          m := metadata(l);
+          extensible := [m, "@extensible"];
+
+          goto [(current = undefined) and (extensible = false)] reject l4;
+  l4:     goto [(current = undefined) and (extensible = true)] l4a getall;
+
+  l4a:    gd := "i__isGenericDescriptor" (desc);
+          dd := "i__isDataDescriptor" (desc);
+
+          goto [gd or dd] l4a1 l4b;
+
+  l4a1:   ndesc := "i__toDataDescriptor" (desc);
+          [l, prop] := ndesc;
+          goto rlab;
+
+  l4b:    ndesc := "i__toAccessorDescriptor" (desc);
+          [l, prop] := ndesc;
+          goto rlab;
+
+  getall: goto [l-nth (desc, 0) = "d"] ddd odd;
+
+          (* Data *)
+  ddd:    de := l-nth (desc, 3);
+          dc := l-nth (desc, 4);
+          dv := l-nth (desc, 1);
+          dw := l-nth (desc, 2);
+          dg := empty;
+          ds := empty;
+          goto l5;
+
+  odd:    goto [l-nth (desc, 0) = "a"] add gdd;
+
+          (* Accessor *)
+  add:    de := l-nth (desc, 3);
+          dc := l-nth (desc, 4);
+          dv := empty;
+          dw := empty;
+          dg := l-nth (desc, 1);
+          ds := l-nth (desc, 2);
+          goto l5;
+
+         (* Generic *)
+  gdd:    de := l-nth (desc, 1);
+          dc := l-nth (desc, 2);
+          dv := l-nth (desc, 3);
+          dw := l-nth (desc, 4);
+          dg := l-nth (desc, 5);
+          ds := l-nth (desc, 6);
+
+  l5:     goto [(de = empty) and (dc = empty) and (dv = empty) and
+                (dw = empty) and (dg = empty) and (ds = empty)] rlab l6;
+
+  l6:     goto [l-nth (current, 0) = "d"] chd cha;
+
+  chd:    goto [(dg = empty) and (ds = empty)] nxd1 l7;
+  nxd1:   goto [dw = l-nth (current, 2)] nxd2 l7;
+  nxd2:   goto [de = l-nth (current, 3)] nxd3 l7;
+  nxd3:   goto [dc = l-nth (current, 4)] nxd4 l7;
+  nxd4:   t1 := "i__sameValue" (dv, l-nth (current, 1));
+          goto [t1] rlab l7;
+
+  cha:    t1 := (dg = l-nth (current, 1));
+          t2 := (ds = l-nth (current, 2));
+          t3 := (de = l-nth (current, 3));
+          t4 := (dc = l-nth (current, 4));
+
+          goto [t1 and t2 and t3 and t4 and
+               (dv = empty) and (dw = empty)] rlab l7;
+
+  l7:     ct  := l-nth (current, 0);
+          cvg := l-nth (current, 1);
+          cws := l-nth (current, 2);
+          ce  := l-nth (current, 3);
+          cc  := l-nth (current, 4);
+
+          goto [(cc = false) and ((dc = true) or ((not (de = empty)) and (not (ce = de))))] reject l8;
+
+  l8:     gd := "i__isGenericDescriptor" (desc);
+          goto [gd] l12 l9;
+
+  l9:     cdd := "i__isDataDescriptor" (current);
+          ddd := "i__isDataDescriptor" (desc);
+
+          goto [not (cdd = ddd)] l9a l10;
+
+  l9a:    goto [cc = false] reject change;
+  change: goto [cdd = true] toa tod;
+  toa:    goto [dg = empty] sg gs;
+  sg:     dg := undefined;
+  gs:     goto [ds = empty] ss ge1;
+  ss:     ds := undefined;
+  ge1:    goto [de = empty] se1 gc1;
+  se1:    de := ce;
+  gc1:    goto [dc = empty] sc1 spa;
+  sc1:    dc := cc;
+  spa:    [l, prop] := {{ "a", dg, ds, de, dc }};
+          goto rlab;
+
+  tod:    goto [dv = empty] sv gw;
+  sv:     dv := undefined;
+  gw:     goto [dw = empty] sw ge2;
+  sw:     dw := false;
+  ge2:    goto [de = empty] se2 gc2;
+  se2:    de := ce;
+  gc2:    goto [dc = empty] sc2 spd;
+  sc2:    dc := cc;
+  spd:    [l, prop] := {{ "d", dv, dw, de, dc }};
+          goto rlab;
+
+  l10:    goto [cdd = true] l10a l11;
+
+  l10a:   goto [cc = false] l10ai l12;
+  l10ai:  goto [(not (dw = empty)) and ((cws = false) and (dw = true))] reject l10aii;
+  l10aii: t1 := "i__sameValue" (cvg, dv);
+          goto [(cws = false) and (not (dv = empty)) and (not t1)] reject l12;
+
+  l11:    t1 := (dg = l-nth (current, 1));
+          t2 := (ds = l-nth (current, 2));
+          goto [(cc = false) and
+               (((not (dg = empty)) and (not t1)) or
+                ((not (ds = empty)) and (not t2)))] reject l12;
+
+  l12:    re := de;
+          rc := dc;
+          goto [de = empty] rec red;
+  rec:    re := l-nth (current, 3);
+  red:    goto [dc = empty] rcd rd;
+  rcd:    rc := l-nth (current, 4);
+
+  rd:     goto [ct = "d"] l12d l12a;
+
+  l12d:   rv := dv;
+          rw := dw;
+          goto [dv = empty] rvc rvd;
+  rvc:    rv := l-nth (current, 1);
+  rvd:    goto [dw = empty] rwd setd;
+  rwd:    rw := l-nth (current, 2);
+  setd:   [l, prop] := {{ "d", rv, rw, re, rc }};
+          goto rlab;
+
+  l12a:   rg := dg;
+          rs := ds;
+          goto [dg = empty] rgc rgd;
+  rgc:    rg := l-nth (current, 1);
+  rgd:    goto [ds = empty] rsd seta;
+  rsd:    rs := l-nth (current, 2);
+  seta:   [l, prop] := {{ "a", rg, rs, re, rc }};
+          goto rlab;
+ 
+  celab:  ret := current;
+          throw;
+
+  reject: goto [thrw] tt rlab;
+  tt:     ret := "TypeError" ();
+  elab:   throw;
+
+  rlab:   PHI(ret: ret_t, ret_t, ret_t, ret_t, ret_t, ret_t, ret_t, ret_t, ret_t, ret_f);
+          return
+};
+
+(* ************************* *)
+(* *** DEFINEOWNPROPERTY *** *)
+(* ************************* *)
+
+proc defineOwnProperty (l, prop, desc, thrw) {
+
+        m := metadata(l);
+        class := [m, "@class"];
+
+        goto [class = "Array"] adop odop;
+
+  adop: ret_1 := "a__defineOwnProperty" (l, prop, desc, thrw) with elab;
+        goto rlab;
+
+  odop: ret_2 := "o__defineOwnProperty" (l, prop, desc, thrw) with elab;
+  
+  rlab: PHI(ret: ret_1, ret_2);
+        return;
+
+  elab: PHI(ret: ret_1, ret_2);
+        throw
+};
+
+(* *********** *)
+(* *** PUT *** *)
+(* *********** *)
+   
+  (* ******* SUCCESSFUL PUT ******* *)
+
+  (*
+   *  1. Property is not defined in the prototype chain at all, prototype chain of length > 1, object is extensible
+   *  2. Property is defined in the object (DD), data descriptor is writable
+   *  3. Property is defined in the prototype chain, not in the object (DD), object is extensible, data descriptor is writable
+   *  4. Property is not defined in the prototype chain at all, prototype chain of length = 1, object is extensible
+   *)
+
+  (* ******* UNSUCCESSFUL PUT ******* *)
+ 
+  (*
+   *  5. Property is not defined in the prototype chain at all, object is not extensible, thrw
+   *  6. Property is defined in the object (DD), data descriptor is not writable, thrw
+   *  7. Property is defined in the prototype chain, not in the object (DD), object is not extensible, thrw
+   *  8. Property is defined in the prototype chain, not in the object (DD), object is extensible, data descriptor is not writable, thrw
+   *)
+
+proc put (l, prop, value, thrw) {
+            ret := "canPut" (l, prop) with elab;
+            goto [ret] cp reject;
+
+    cp:     ret := "getOwnProperty" (l, prop) with elab;
+            dd := "i__isDataDescriptor" (ret);
+            goto [dd] dd gp;
+
+    dd:     desc := {{ "g", empty, empty, value, empty, empty, empty }};
+            ret := "defineOwnProperty" (l, prop, desc, thrw) with elab;
+            goto remp;
+
+    gp:     ret := "getProperty" (l, prop) with elab;
+            ad := "i__isAccessorDescriptor" (ret);
+            goto [ad] ad def;
+
+    ad:     s := l-nth (ret, 2);
+            m := metadata(s);
+            xsc := [m, "@scope"];
+            fun := [m, "@call"];
+            ret := fun (xsc, l, value) with elab;
+            goto remp;
+
+    def:    desc := {{ "g", true, true, value, true, empty, empty }};
+            ret := "defineOwnProperty" (l, prop, desc, thrw) with elab;
+
+    remp:   ret := empty;
+    rlab:   return;
+
+    reject: goto [thrw] tt remp;
+    tt:     ret := "TypeError" ();
+    elab:   throw
+};
+
+(* ******************* *)
+(* *** I__PUTVALUE *** *)
+(* ******************* *)  
+
+proc i__putValue (v, w) {
+
+			goto [(typeOf v = List)] init thrw;
+
+	init:	rbase := l-nth (v, 1);
+			rfield := l-nth (v, 2);
+            rstrict := l-nth (v, 3);
+			goto [rbase = undefined] thrw prim;
+
+	prim:	prim := "i__isPrimitive"(rbase); 
+	        goto [prim and (not (rbase = undefined)) and (not (rbase = null))] is_pr refr;
+
+	refr:	goto [l-nth (v, 0) = "o"] oref vref;
+
+	oref:	ret := "put" (rbase, rfield, w, rstrict) with elab;
+			goto dflt;
+
+	vref:	goto [rbase = $lg] oref er;
+
+	er:		[rbase, rfield] := w;
+
+	dflt:	ret := empty;
+	rlab:   return;
+
+	thrw:   ret := "ReferenceError" ();
+	elab:   throw;
+
+    		(* WHY GOD, WHY THIS? *)
+
+	is_pr:  ret := "i__toObject" (rbase) with elab;
+			l := ret;
+    		ret := "canPut" (l, rfield) with elab;
+            goto [ret] cp reject;
+
+	cp:     ret := "getProperty" (l, rfield) with elab;
+    		dd := "i__isDataDescriptor" (ret);
+    		goto [dd] reject is_ad;
+
+	is_ad:  ad := "i__isAccessorDescriptor" (ret);
+    		goto [ad] ad reject;
+
+	ad:	    s := l-nth (ret, 2);
+            m := metadata(s);
+            xsc := [m, "@scope"];
+            fun := [m, "@call"];
+            ret := fun (xsc, rbase, w) with elab;
+            goto dflt;
+
+	reject: ret := "TypeError" ();
+    		goto elab
+
+};
+
+(* ************************ *)
+(* Dynamic scope resolution *)
+(* ************************ *)
+
+proc resolveVariable(scopeList, var) {
+
+        length := l-len scopeList;
+        current := length - 1;
+        ret := undefined;
+
+  loop: goto [ 0 <= current ] body rlab;
+
+  body: er_o := l-nth(scopeList, current);
+        er_m := metadata(er_o);
+
+        is_er := hasField(er_m, "@er");
+        goto [ is_er ] er obj;
+
+  er:   has_var := hasField(er_o, var);
+        goto [ has_var ] set next;
+  set:  ret := er_o;
+  rlab: return;
+
+  obj:  prop := "getProperty"(er_o, var);
+        goto [ prop = undefined ] next set;
+
+  next: current := current - 1;
+        goto loop
+};
+
+(* ****************** *)
+(* Function.prototype *)
+(* ****************** *)
+
+proc FP_call () {
+
+          arguments := args;
+          len := l-len (arguments);
+          vthis := l-nth (arguments, 1);
+
+          ret := "i__isCallable" (vthis);
+          goto [ret] gthis te;
+
+  gthis:  xthis := undefined;
+          goto [len < 3] params sthis;
+  sthis:  xthis := l-nth (arguments, 2);
+
+  params: pars := {{ }};
+          goto [3 < len] spar body;
+  spar:   pars := cdr (cdr (cdr arguments));
+
+  body:   m := metadata(vthis);
+          body   := [m, "@call"];
+          xscope := [m, "@scope"];
+
+          x__se := "SyntaxError" ();
+
+          params := l+ ({{ body, xscope, xthis }}, pars);
+
+          ret := apply (params) with elab;
+
+          goto [ret = empty] undef rlab;
+
+  undef:  ret := undefined;
+          return;
+
+  te:     ret := "TypeError" ();
+          throw;
+
+  rlab:   return;
+  elab:   throw
+};
+
+(* ************************ *)
+(* Thorough object deletion *)
+(* ************************ *)
+
+proc i__purge (o) {
+        goto [typeOf(o) = Obj] del rlab;
+
+  del:  m := metadata(o);
+        deleteObject(o);
+        ret := "i__purge"(m);
+        return;
+
+  rlab: ret := true;
+        return
+};
+
+(* *********************** *)
+(* Thorough error deletion *)
+(* *********************** *)
+
+proc i__deleteErrors (r, te, se) {
+          goto [r = te] del_se del_te;
+
+  del_te: ret := "i__purge" (te);
+          goto [r = se] rlab del_se; 
+
+  del_se: ret := "i__purge" (se);
+  rlab:   return
+};
+
+(* *** Object.create *** *)
+
+proc Object_create (xsc, vthis, o, props) {
+      goto [(typeOf o = Obj) or (o = null)] main thrw;
+
+  main: ret := "Object_construct" () with elab;
+      m := metadata(ret);
+      [m, "@proto"] := o;
+
+      goto [props = undefined] rlab props;
+
+  props:  ret := "Object_defineProperties" (xsc, vthis, ret, props) with elab;
+
+  rlab: return;
+
+  thrw: ret := "TypeError" ();
+  elab: throw
+};
+
+(* ************************ *)
+(* Computed access toString *)
+(* ************************ *)
+
+proc i__toStringComputed (v) {
+
+        ret := "i__toString" (v) with elab;
+
+  rlab: return;
+  elab: throw
+};

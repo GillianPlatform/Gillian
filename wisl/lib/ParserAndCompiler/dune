@@ -1,0 +1,11 @@
+(ocamllex
+ (modules WLexer))
+
+(menhir
+ (modules WParser)
+ (flags "--explain"))
+
+(library
+ (name wParserAndCompiler)
+ (libraries gillian wSyntax wUtils wSemantics)
+ (flags -open WSyntax -open WUtils -open WSemantics))

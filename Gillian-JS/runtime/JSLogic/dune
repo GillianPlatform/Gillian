@@ -1,0 +1,6 @@
+(install
+ (files bi_javert_predicates.jsil internal_functions_full.jsil
+   javert_internal_functions.jsil javert_js_predicates.jsil
+   javert_logic_macros.jsil)
+ (section share)
+ (package gillian-js))

@@ -1,0 +1,4 @@
+(library
+ (name jsil_syntax)
+ (libraries gillian)
+ (flags -open Utils -open Gillian.Utils))

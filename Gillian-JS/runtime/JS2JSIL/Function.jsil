@@ -1,0 +1,262 @@
+import Internals.jsil, Object.jsil;
+
+proc Function_call() {
+				arguments := args;
+				ret := apply ("Function_construct" :: arguments) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+proc Function_construct () {
+
+				arguments := args;
+				arguments := cdr (cdr arguments);
+
+				length := l-len arguments;
+
+				params := "";
+				body   := "";
+
+				goto [ 0 < length ] pars exec;
+
+	pars:	current := 0;
+
+	loop:	goto [ current < (length - 1) ] body bod;
+	body:	param := l-nth (arguments, current);
+				ret := "i__toString" (param) with elab;
+				param := ret;
+				goto [ params = "" ] add fix;
+	fix:	param := ", " ++ param;
+	add:	params := params ++ param;
+				current := current + 1;
+				goto loop;
+
+	bod:	body := l-nth (arguments, length - 1);
+				ret := "i__toString" (body) with elab;
+				body := ret;
+
+	exec:	ret := extern ExecuteFunctionConstructor (params, body) with serr;
+
+				fid := l-nth (ret, 0);
+				params := l-nth (ret, 1);
+
+				ret := "create_function_object" ({{ $lg }}, fid, fid, params);
+
+	rlab: return;
+
+	serr:	ret := "SyntaxError" (ret);
+	elab: throw
+};
+
+(* *** DEFAULT *** *)
+
+proc FP_default () {
+			ret := undefined;
+
+	rlab: return
+};
+
+(* *** CALL *** *)
+(* *** CALL *** *)
+(** Section 15.3.4.4: Function.prototype.call(thisArg, [... arguments])
+  Function Prototype Call:
+  -> Parameters:
+    1. xsc: Scope chain called on this procedure
+    2. vthis: Function object that inherited the prototype call
+    3. this_arg: First parameter to prototype call
+    4. <optional arguments>: Optional arguments passed to vthis
+
+  Special notes:
+  In a call expression, the vthis parameter passed to FP_call is the
+  resolved 'this' argument, which may not be the same as the this_arg
+  parameter passed to the call function. This works because an
+  inherited prototype call will resolve as a property reference and
+  the 'this' argument resolution will resolve to the function object.
+  In addition, as an internal method, the prototype call can never
+  be involved via a variable redirection (i.e. fcall = f.call(); fcall();
+  throws a TypeError).
+
+  e.g. take a function call in JS below, where f is a function with
+  scope chain x__scope:
+
+    f.call(1);
+
+  We would get in FP_call the following arguments:
+  1. xsc = x__scope
+  2. vthis = f (the function object representing f)
+  3. this_arg = 1
+*)
+proc FP_call (xsc, vthis, this_arg) {
+          (* Readability sake *)
+          func := vthis;
+
+          is_call := "i__isCallable" (func);
+          goto [is_call] prep te;
+
+  prep:   runtime_args := args;
+          arg_len := l-len (runtime_args);
+          goto [arg_len > 3] opts blank;
+  opts:   opt_args := cdr (cdr (cdr runtime_args));
+          goto res_a;
+  blank:  emp_args := {{ }};
+  res_a:  PHI(arguments: opt_args, emp_args);
+
+          m := metadata(func);
+          body := [m, "@call"];
+          xscope := [m, "@scope"];
+          params := l+ ({{ body, xscope, this_arg }}, arguments);
+          (* Actual function call *)
+          ret_val := apply (params) with elab;
+          goto [ret_val = empty] undef rlab;
+
+  undef:  ret_def := undefined;
+          goto rlab;
+
+  rlab:   PHI(ret: ret_val, ret_def);
+          return;
+
+  te:     type_err := "TypeError" ();
+          goto elab;
+
+  elab:   PHI(ret: ret_val, type_err);
+          throw
+};
+
+(* *** APPLY *** *)
+
+proc FP_apply (xsc, vthis, this_arg, arg_array) {
+
+			xsc := xsc;
+			vthis := vthis;
+			this_arg := this_arg;
+			arg_array := arg_array;
+
+			params := {{ }};
+
+			ret := "i__isCallable" (vthis);
+			goto [ret] array te;
+
+	array:	goto [(arg_array = null) or (arg_array = undefined)] call isobj;
+
+	isobj:	goto [typeOf (arg_array) = Obj] obj te;
+
+	obj:	ret := "get" (arg_array, "length") with elab;
+			ret := "i__toUint32" (ret) with elab;
+			len := ret;
+			index := 0;
+
+	loop:	goto [index < len] head call;
+
+	head:	ret := "i__toString" (index) with elab;
+			ret := "get" (arg_array, ret) with elab;
+			params := l+ (params, {{ ret }});
+			index := index + 1;
+			goto loop;
+
+	call:	xthis := this_arg;
+			m := metadata(vthis);
+			body   := [m, "@call"];
+			xscope := [m, "@scope"];
+
+			params := l+ ({{ body, xscope, xthis }}, params);
+
+			ret := apply (params) with elab;
+			goto rlab;
+
+	te:		ret := "TypeError" ();
+			goto elab;
+
+	rlab: return;
+	elab: throw
+};
+
+
+
+(* *** TOSTRING *** *)
+
+proc FP_toString (xsc, vthis) {
+			goto [typeOf (vthis) = Obj] ofun thrw;
+	ofun:	m := metadata(vthis);
+			ret := [m, "@class"];
+			goto [ret = "Function"] retfun thrw;
+	retfun:	ret := "function () {}";
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** HASINSTANCE AFTER BIND *** *)
+
+proc FP_hasInstanceAfterBind (v1, v2) {
+
+			m := metadata(v1);
+			target := [m, "@targetFunction"];
+
+			m := metadata(target);
+			tclass := [m, "@class"];
+			goto [tclass = "Function"] cont thrw;
+
+	cont:	ret := "hasInstance" (target, v2);
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** BIND *** *)
+
+proc FP_bind (xsc, vthis, thisArg) {
+          arguments := args;
+
+          (* Is the this callable? *)
+          Target := vthis;
+          ret := "i__isCallable" (Target);
+          goto [ret] cont1 thrw;
+
+  cont1:  A := {{ }};
+          goto [(l-len arguments) < 4] cont2 setarg;
+  setarg: A := cdr (cdr (cdr arguments));
+
+  cont2:  ret := "create_default_object" ($lfun_proto, "Function", true);
+          F := ret;
+
+          (* Set up properties *)
+          m := metadata(F);
+          [m, "@targetFunction"] := Target;
+          [m, "@boundThis"] := thisArg;
+          [m, "@boundArguments"] := A;
+
+          (* Adapting for our call *)
+          mt := metadata(Target);
+          field_call := [mt, "@call"];
+          [m, "@call"] := field_call;
+
+          (* Adapting for our construct *)
+          field_constr := [mt, "@construct"];
+          [m, "@construct"] := field_constr;
+
+          (* Step 15 onward *)
+          targetClass := [mt, "@class"];
+          goto [targetClass = "Function"] fun nofun;
+
+  fun:    ret := "get" (Target, "length") with elab;
+          L := ret - (l-len A);
+          ret := "M_max" (empty, empty, L, 0);
+          [F, "length"] := {{ "d", ret, false, false, true }};
+          goto tterr;
+
+  nofun:  [F, "length"] := {{ "d", 0, false, false, true }};
+
+  tterr:  [F, "caller"]    := {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }};
+          [F, "arguments"] := {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }};
+
+  rlab:   ret := F;
+          return;
+
+  thrw:   ret := "TypeError" ();
+  elab:   throw
+};

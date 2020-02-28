@@ -1,0 +1,5 @@
+(install
+ (files bis_ch15_11_errors.jsil ifs_ch9_type_conversions_and_testing.jsil
+   internal_functions.jsil preds_ch15_11_errors.jsil preds_general.jsil)
+ (section share)
+ (package gillian-js))

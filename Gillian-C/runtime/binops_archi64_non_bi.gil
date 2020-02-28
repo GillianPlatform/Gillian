@@ -1,0 +1,95 @@
+proc i__binop_cmplu_le(v1, v2) {
+        goto [ (l-nth(v1, 0.) = "long") and (l-nth(v2, 0.) = "long") ] blon els;
+  blon: ret := "i__value_of_bool"(l-nth(v1, 1.) <= l-nth(v2, 1.));
+        return;
+  els:  goto [
+            (typeOf(l-nth(v1, 0.)) = Obj)
+        and (typeOf(l-nth(v2, 0.)) = Obj)
+        and (l-nth(v1, 0.) = l-nth(v2, 0.))
+        ] smbl unde; (* tests if both are pointers withing the same block *)
+  smbl: t1 := "i__weak_valid_ptr"(l-nth(v1, 0.), l-nth(v1, 1.));
+        t2 := "i__weak_valid_ptr"(l-nth(v2, 0.), l-nth(v2, 1.));
+        goto [ t1 and t2 ] cmpr unde;
+  cmpr: ret := "i__value_of_bool"(l-nth(v1, 1.) <= l-nth(v2, 1.));
+        return;
+  unde: fail[comparison]("Cannot compare non-comparable values")
+};
+
+proc i__binop_cmplu_ge(v1, v2) {
+        goto [ (l-nth(v1, 0.) = "long") and (l-nth(v2, 0.) = "long") ] blon els;
+  blon: ret := "i__value_of_bool"(not (l-nth(v1, 1.) < l-nth(v2, 1.)));
+        return;
+  els:  goto [
+            (typeOf(l-nth(v1, 0.)) = Obj)
+        and (typeOf(l-nth(v2, 0.)) = Obj)
+        and (l-nth(v1, 0.) = l-nth(v2, 0.))
+        ] smbl unde; (* tests if both are pointers withing the same block *)
+  smbl: t1 := "i__weak_valid_ptr"(l-nth(v1, 0.), l-nth(v1, 1.));
+        t2 := "i__weak_valid_ptr"(l-nth(v2, 0.), l-nth(v2, 1.));
+        goto [ t1 and t2 ] cmpr unde;
+  cmpr: ret := "i__value_of_bool"(not (l-nth(v1, 1.) < l-nth(v2, 1.)));
+        return;
+  unde: fail[comparison]("Cannot compare non-comparable values")
+};
+
+proc i__binop_cmplu_lt(v1, v2) {
+        goto [ (l-nth(v1, 0.) = "long") and (l-nth(v2, 0.) = "long") ] blon els;
+  blon: ret := "i__value_of_bool"(l-nth(v1, 1.) < l-nth(v2, 1.));
+        return;
+  els:  goto [
+            (typeOf(l-nth(v1, 0.)) = Obj)
+        and (typeOf(l-nth(v2, 0.)) = Obj)
+        and (l-nth(v1, 0.) = l-nth(v2, 0.))
+        ] smbl unde; (* tests if both are pointers withing the same block *)
+  smbl: t1 := "i__weak_valid_ptr"(l-nth(v1, 0.), l-nth(v1, 1.));
+        t2 := "i__weak_valid_ptr"(l-nth(v2, 0.), l-nth(v2, 1.));
+        goto [ t1 and t2 ] cmpr unde;
+  cmpr: ret := "i__value_of_bool"(l-nth(v1, 1.) < l-nth(v2, 1.));
+        return;
+  unde: fail[comparison]("Cannot compare non-comparable values")
+};
+
+proc i__binop_cmplu_gt(v1, v2) {
+        goto [ (l-nth(v1, 0.) = "long") and (l-nth(v2, 0.) = "long") ] blon els;
+  blon: ret := "i__value_of_bool"(not (l-nth(v1, 1.) <= l-nth(v2, 1.)));
+        return;
+  els:  goto [
+            (typeOf(l-nth(v1, 0.)) = Obj)
+        and (typeOf(l-nth(v2, 0.)) = Obj)
+        and (l-nth(v1, 0.) = l-nth(v2, 0.))
+        ] smbl unde; (* tests if both are pointers withing the same block *)
+  smbl: t1 := "i__weak_valid_ptr"(l-nth(v1, 0.), l-nth(v1, 1.));
+        t2 := "i__weak_valid_ptr"(l-nth(v2, 0.), l-nth(v2, 1.));
+        goto [ t1 and t2 ] cmpr unde;
+  cmpr: ret := "i__value_of_bool"(not (l-nth(v1, 1.) <= l-nth(v2, 1.)));
+        return;
+  unde: fail[comparison]("Cannot compare non-comparable values")
+};
+
+proc i__binop_cmplu_eq(v1, v2) {
+        goto [ (l-nth(v1, 0.) = "long") and (l-nth(v2, 0.) = "long") ] blon els1;
+  blon: ret := "i__value_of_bool"(l-nth(v1, 1.) = l-nth(v2, 1.));
+        return;
+  els1: goto [
+            (typeOf(l-nth(v1, 0.)) = Obj)
+        and (typeOf(l-nth(v2, 0.)) = Obj)
+        ] bobj els2; (* tests if both are pointers withing the same block *)
+  bobj: goto [ (l-nth(v1, 0.) = l-nth(v2, 0.)) ] smbl dfbl;
+  smbl: t1 := "i__weak_valid_ptr"(l-nth(v1, 0.), l-nth(v1, 1.));
+        t2 := "i__weak_valid_ptr"(l-nth(v2, 0.), l-nth(v2, 1.));
+        goto [ t1 and t2 ] cmpr unde;
+  cmpr: ret := "i__value_of_bool"(l-nth(v1, 1.) = l-nth(v2, 1.));
+        return;
+  dfbl: t1 := "i__valid_pointer"(l-nth(v1, 0.), l-nth(v1, 1.));
+        t2 := "i__valid_pointer"(l-nth(v2, 0.), l-nth(v2, 1.));
+        goto [ t1 and t2 ] refl unde;
+  els2: goto [ (typeOf(l-nth(v1, 0.)) = Obj) and (l-nth(v2, 0.) = "long") ] lprl els3;
+  lprl: v1weak := "i__weak_valid_ptr"(l-nth(v1, 0.), l-nth(v1, 1.));
+        goto [ (l-nth(v2, 1.) = 0.) and v1weak ] refl unde;
+  els3: goto [ (typeOf(l-nth(v2, 0.)) = Obj) and (l-nth(v1, 0.) = "long") ] llrp unde;
+  llrp: v2weak := "i__weak_valid_ptr"(l-nth(v2, 0.), l-nth(v2, 1.));
+        goto [ (l-nth(v1, 1.) = 0.) and v2weak ] refl unde; 
+  refl: ret := {{ "int", 0 }};
+        return;     
+  unde: fail[comparison]("Cannot compare non-comparable values")
+};

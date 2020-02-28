@@ -1,0 +1,16 @@
+#!/bin/bash
+
+set -euo pipefail
+
+if command -v esy >/dev/null 2>&1; then
+  echo "[INFO] Running source code formatting"
+  esy format-check
+
+  echo "[INFO] Running build"
+  esy
+
+  exit 0
+else
+  echo >&2 "[WARN] Failed precommit validation: esy isn't available"
+  exit 1
+fi

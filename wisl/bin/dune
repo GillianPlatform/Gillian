@@ -1,0 +1,9 @@
+; (executables
+;   (names cwisl wislverify)
+;   (libraries camelot wisl))
+
+(executable
+ (name wisl)
+ (public_name wisl)
+ (package wisl)
+ (libraries gillian wSemantics wParserAndCompiler wUtils))

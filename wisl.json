@@ -1,0 +1,32 @@
+{
+  "name": "wisl",
+  "version": "0.0.1",
+  "description": "WISL language for students, based on Gillian",
+  "license": "BSD-3-Clause",
+  "esy": {
+    "build": "dune build @install --promote-install-files",
+    "buildsInSource": "_build",
+    "exportedEnv": {
+      "WISL_RUNTIME_PATH": {
+        "val": "#{self.lib}/wisl",
+        "scope": "global"
+      }
+    }
+  },
+  "scripts": {
+    "init:env": "esy -C scripts/setup_environment.sh #{$Z3_DYLIB_FOLDER}",
+    "fmt": "esy -C dune build @fmt --auto-promote"
+  },
+  "dependencies": {
+    "@opam/dune": "^2.0",
+    "@opam/yojson": "1.7.0",
+    "gillian": "*",
+    "ocaml": "^4.8.1"
+  },
+  "resolutions": { "gillian": "link:../GillianCore" },
+  "devDependencies": { 
+    "@opam/ocamlformat": "0.11.0",
+    "@opam/merlin": "*",
+    "ocaml": "4.8.1000"
+  }
+}

@@ -1,0 +1,270 @@
+module ExecMode = Gillian.Utils.ExecMode
+
+module Architecture = struct
+  type t = Arch64 | Arch32
+
+  let a64 = [ Arch64 ]
+
+  let a32 = [ Arch32 ]
+
+  let any_arch = [ Arch32; Arch64 ]
+end
+
+module Imports = struct
+  open ExecMode
+  open Architecture
+
+  let env_path_var = "GILLIAN_C_RUNTIME_PATH"
+
+  type t = { file : string; arch : Architecture.t list; exec : ExecMode.t list }
+
+  (** All imports, should not be used as such, imports should be selected using the [import] function *)
+  let all_imports =
+    [
+      (* Common *)
+      { file = "unops_common.gil"; arch = any_arch; exec = all_exec };
+      { file = "internals.gil"; arch = any_arch; exec = all_exec };
+      { file = "binops_common.gil"; arch = any_arch; exec = all_exec };
+      { file = "logic_common.gil"; arch = any_arch; exec = exec_with_preds };
+      { file = "string.gil"; arch = any_arch; exec = all_exec };
+      (* Arch64 specific *)
+      { file = "stdlib_archi64.gil"; arch = a64; exec = all_exec };
+      { file = "logic_archi64.gil"; arch = a64; exec = exec_with_preds };
+      { file = "binops_archi64_all_exec.gil"; arch = a64; exec = all_exec };
+      { file = "binops_archi64_non_bi.gil"; arch = a64; exec = non_bi_exec };
+      { file = "binops_archi64_bi_exec.gil"; arch = a64; exec = bi_exec };
+      (* Arch32 specific *)
+      { file = "stdlib_archi32.gil"; arch = a32; exec = all_exec };
+      { file = "logic_archi32.gil"; arch = a32; exec = exec_with_preds };
+      { file = "binops_archi32_all_exec.gil"; arch = a32; exec = all_exec };
+      { file = "binops_archi32_non_bi.gil"; arch = a32; exec = non_bi_exec };
+      { file = "binops_archi32_bi_exec.gil"; arch = a32; exec = bi_exec };
+    ]
+
+  let imports arch exec_mode =
+    let select x = List.mem arch x.arch && List.mem exec_mode x.exec in
+    let get_name x = x.file in
+    List.map get_name (List.filter select all_imports)
+end
+
+module Internal_Functions = struct
+  let initialize_genv = "i__initialize_genv"
+
+  let malloc = "i__malloc"
+
+  let calloc = "i__calloc"
+
+  let memmove = "i__memmove"
+
+  let memcpy = "i__memcpy"
+
+  let memset = "i__memset"
+
+  let strcmp = "i__strcmp"
+
+  let free = "i__free"
+
+  let loadv = "i__loadv"
+
+  let storev = "i__storev"
+
+  let free_list = "i__free_list"
+
+  let not_implemented = "i__not_implemented"
+
+  let get_function_name = "i__get_function_name"
+
+  let bool_of_val = "i__bool_of_value"
+end
+
+module BinOp_Functions = struct
+  let add = "i__binop_add"
+
+  let sub = "i__binop_sub"
+
+  let div = "i__binop_div"
+
+  let and_ = "i__binop_and"
+
+  let xor = "i__binop_xor"
+
+  let or_ = "i__binop_or"
+
+  let shl = "i__binop_shl"
+
+  let shru = "i__binop_shru"
+
+  let mul = "i__binop_mul"
+
+  let addl = "i__binop_addl"
+
+  let subl = "i__binop_subl"
+
+  let mull = "i__binop_mull"
+
+  let andl = "i__binop_andl"
+
+  let shrlu = "i__binop_shrlu"
+
+  let shll = "i__binop_shll"
+
+  let orl = "i__binop_orl"
+
+  let xorl = "i__binop_xorl"
+
+  let mulfs = "i__binop_mulfs"
+
+  let divlu = "i__binop_divlu"
+
+  let modlu = "i__binop_modlu"
+
+  let cmpl_le = "i__binop_cmpl_le"
+
+  let cmpu_le = "i__binop_cmpu_le"
+
+  let cmpu_gt = "i__binop_cmpu_gt"
+
+  let cmpu_ne = "i__binop_cmpu_ne"
+
+  let cmpu_eq = "i__binop_cmpu_eq"
+
+  let cmplu_le = "i__binop_cmplu_le"
+
+  let cmplu_eq = "i__binop_cmplu_eq"
+
+  let cmplu_ne = "i__binop_cmplu_ne"
+
+  let cmplu_ge = "i__binop_cmplu_ge"
+
+  let cmplu_lt = "i__binop_cmplu_lt"
+
+  let cmplu_gt = "i__binop_cmplu_gt"
+
+  let cmpfs_ge = "i__binop_cmpfs_ge"
+
+  let cmpfs_le = "i__binop_cmpfs_le"
+
+  let cmp_gt = "i__binop_cmp_gt"
+
+  let cmp_ge = "i__binop_cmp_ge"
+
+  let cmp_lt = "i__binop_cmp_lt"
+
+  let cmp_le = "i__binop_cmp_le"
+
+  let cmp_eq = "i__binop_cmp_eq"
+
+  let cmp_ne = "i__binop_cmp_ne"
+end
+
+module UnOp_Functions = struct
+  let cast8signed = "i__unop_cast8signed"
+
+  let longofint = "i__unop_longofint"
+
+  let longofsingle = "i__unop_longofsingle"
+
+  let longuofsingle = "i__unop_longuofsingle"
+
+  let intoflong = "i__unop_intoflong"
+
+  let longofintu = "i__unop_longofintu"
+
+  let longoffloat = "i__unop_longoffloat"
+
+  let floatofint = "i__unop_floatofint"
+
+  let floatofintu = "i__unop_floatofintu"
+
+  let singleoflongu = "i__unop_singleoflongu"
+
+  let singleofint = "i__unop_singleofint"
+
+  let negl = "i__unop_negl"
+
+  let negint = "i__unop_negint"
+end
+
+module VTypes = struct
+  let int_type = "int"
+
+  let long_type = "long"
+
+  let single_type = "single"
+
+  let float_type = "float"
+end
+
+module Prefix = struct
+  let gvar = "gvar__"
+
+  let uvar = "uvar__"
+
+  let lvar = "#lvar"
+
+  let then_lab = "then"
+
+  let else_lab = "else"
+
+  let endif_lab = "endif"
+
+  let endswitch_lab = "endswitch"
+
+  let end_block_lab = "blockend"
+
+  let loop_lab = "loop"
+
+  let user_lab = "userlab_"
+
+  let default_lab = "default"
+
+  let switch_lab = "switch"
+
+  let case_lab = "case"
+
+  let loc = "$l" (* This should rather be imported from Gillian directly *)
+
+  let internal_preds = "i__"
+
+  let generated_preds = "p__"
+
+  let lloc = "#loc"
+end
+
+module Internal_Predicates = struct
+  let is_int = Prefix.internal_preds ^ "is_int"
+
+  let is_ptr_to_0 = Prefix.internal_preds ^ "is_ptr_to_0"
+
+  let is_ptr_to_0_opt = Prefix.internal_preds ^ "is_ptr_to_0_opt"
+
+  let is_long = Prefix.internal_preds ^ "is_long"
+
+  let is_single = Prefix.internal_preds ^ "is_single"
+
+  let is_float = Prefix.internal_preds ^ "is_float"
+
+  (** Internal value getters *)
+  let ptr_to_0_get = Prefix.internal_preds ^ "ptr_to_0"
+
+  let int_get = Prefix.internal_preds ^ "int"
+
+  let single_get = Prefix.internal_preds ^ "single"
+
+  let long_get = Prefix.internal_preds ^ "long"
+
+  let float_get = Prefix.internal_preds ^ "float"
+
+  (** global_env *)
+  let global_env = Prefix.internal_preds ^ "global_env"
+end
+
+module Symbolic_Constr = struct
+  let symb_int = "symb_int"
+
+  let symb_float = "symb_float"
+
+  let symb_single = "symb_single"
+
+  let symb_long = "symb_long"
+end

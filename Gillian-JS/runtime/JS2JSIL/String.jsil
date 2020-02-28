@@ -1,0 +1,397 @@
+import Internals.jsil;
+
+(* ****************** *)
+(* THE STRING LIBRARY *)
+(* ****************** *)
+
+(* *** GETOWNPROPERTY *** *)
+
+proc s__getOwnProperty (l, prop) {
+					ret := "o__getOwnProperty" (l, prop);
+					goto [ret = undefined] str rlab;
+
+	str:		ret := "i__toInteger" (prop) with elab;
+					idx := ret;
+					goto [idx < 0] r_uf nch;
+	nch:    goto [idx < 4294967295] next r_uf;
+
+	next:		sidx := "i__toString" (idx);
+
+					goto [sidx = prop] index r_uf;
+
+	index:	m := metadata(l);
+					str := [m, "@primitiveValue"];
+					len := s-len (str);
+					goto [len <= idx] r_uf rtrn;
+
+	rtrn: rstr := s-nth (str, idx);
+				ret := {{ "d", rstr, false, true, false }};
+				goto rlab;
+
+	r_uf: ret := undefined;
+	rlab: return;
+	elab: throw
+};
+
+(* *** CALL *** *)
+
+proc String_call (xsc, vthis, s) {
+					la := args;
+					len := l-len (la);
+
+					goto [len < 3] empt to_str;
+
+	empt:		ret := "";
+					goto rlab;
+
+	to_str:	ret := "i__toString" (s) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** CONSTRUCT *** *)
+
+proc String_construct (xsc, vthis, s) {
+					la := args;
+					len := l-len (la);
+
+					goto [len < 3] empt to_str;
+	empt:		pv := "";
+					goto norm;
+	to_str:	ret := "i__toString" (s) with elab;
+					pv := ret;
+
+	norm:		ret := "create_default_object" ($lstr_proto, "String", true);
+
+					m := metadata(ret);
+					[m, "@primitiveValue"] := pv;
+
+					len := s-len (pv);
+
+					s := ret;
+					ret := "defineOwnProperty" (s, "length", {{ "d", len, false, false, false }}, true) with elab;
+					ret := s;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** VALUEOF *** *)
+
+proc SP_valueOf (xsc, vthis) {
+					goto [typeOf (vthis) = Str] str iostr;
+	str:		ret := vthis;
+					goto rlab;
+
+	iostr:	goto [typeOf (vthis) = Obj] ostr thrw;
+	ostr:		m := metadata(vthis);	
+					ret := [m, "@class"];
+					goto [ret = "String"] retstr thrw;
+	retstr:	ret := [m, "@primitiveValue"];
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** TOSTRING *** *)
+
+proc SP_toString (xsc, vthis) {
+					goto [typeOf (vthis) = Str] str iostr;
+	str:		ret := vthis;
+					goto rlab;
+
+	iostr:	goto [typeOf (vthis) = Obj] ostr thrw;
+	ostr:		m := metadata(vthis);
+					ret := [m, "@class"];
+					goto [ret = "String"] retstr thrw;
+	retstr:	ret := [m, "@primitiveValue"];
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** CHARAT *** *)
+proc SP_charAt (xsc, vthis, position) {
+				ret := "i__checkObjectCoercible" (vthis) with elab;
+				ret := "i__toString" (vthis) with elab;
+				S := ret;
+				ret := "i__toInteger" (position) with elab;
+				pos := ret;
+				size := s-len (S);
+				goto [pos < 0] empt next;
+
+	next:	goto [size <= pos] empt fll;
+
+	empt:	ret := "";
+				goto rlab;
+
+	fll:	ret := s-nth (S, pos);
+	rlab: return;
+
+	elab: throw
+};
+
+(* *** CONCAT *** *)
+proc SP_concat () {
+			arguments := args;
+			vthis := l-nth (arguments, 1);
+			num := l-len (arguments);
+
+			ret := "i__checkObjectCoercible" (vthis) with elab;
+			ret := "i__toString" (vthis) with elab;
+			R := ret;
+			idx := 2;
+
+
+	loop:	goto [idx < num] add end;
+
+	add:	next := l-nth (arguments, idx);
+			ret := "i__toString" (next) with elab;
+			nStr := ret;
+			R := R ++ nStr;
+			idx := idx + 1;
+			goto loop;
+
+	end:	ret := R;
+	rlab: return;
+	elab: throw
+};
+
+
+(* *** INDEXOF *** *)
+proc SP_indexOf (xsc, vthis, searchString, position) {
+					ret := "i__checkObjectCoercible" (vthis) with elab;
+					ret := "i__toString" (vthis) with elab;
+					S := ret;
+
+					ret := "i__toString" (searchString) with elab;
+					sStr := ret;
+
+					goto [position = undefined] zero nzero;
+	zero:		pos := 0;
+					goto leng;
+
+	nzero:	ret := "i__toInteger" (position) with elab;
+					pos := ret;
+	leng:		len := s-len (S);
+
+					max := pos;
+					goto [0 < pos] min maxz; 
+	maxz: 	max := 0;
+	min:  	min := max;
+					goto [len < min] minl st;
+	minl: 	min := len;
+	st:			start := min;
+					slen := s-len (sStr);
+
+					goto [slen = 0] empts nempt;
+	empts:	ret := start;
+					goto rlab;
+
+	nempt:	k := start;
+					fink := -1;
+
+	loop:		kslen := k + slen;
+					j := 0;
+					goto [kslen <= len] iloop end;
+
+	iloop:	kj := k + j;
+					skj := s-nth (S, kj);
+					ssj := s-nth (sStr, j);
+					goto [skj = ssj] checkj next;
+
+	checkj:	j := j + 1;
+					goto [not (j < slen)] fin inext;
+	inext:	goto iloop;
+
+	next:		k := k + 1;
+					goto loop;
+
+	fin:		fink := k;
+
+	end:		ret := fink;
+	rlab: return;
+	elab: throw
+
+};
+
+(* *** LASTINDEXOF *** *)
+proc SP_lastIndexOf (xsc, vthis, searchString, position) {
+			ret := "i__checkObjectCoercible" (vthis) with elab;
+			ret := "i__toString" (vthis) with elab;
+			S := ret;
+
+			len := s-len (S);
+
+			ret := "i__toString" (searchString) with elab;
+			sStr := ret;
+
+			ret := "i__toNumber" (position) with elab;
+			npos := ret;
+
+			(* NaN test! *)
+			goto [not (npos = npos)] pnan npnan;
+	pnan:	pos := len + 1;
+			goto sta;
+
+	npnan:	ret := "i__toInteger" (npos) with elab;
+			pos := ret;
+
+	sta:	ret := "M_max" (empty, empty, pos, 0) with elab;
+			max := ret;
+			ret := "M_min" (empty, empty, max, len) with elab;
+			start := ret;
+			slen := s-len (sStr);
+			fink := -1;
+
+			goto [slen = 0] empts nempt;
+	empts:	ret := len;
+			goto rlab;
+
+	nempt:	goto [len < slen] short nshort;
+
+	short:	ret := fink;
+			goto rlab;
+
+	nshort:	goto [len = slen] eqlen norm;
+
+	eqlen:	k := 0;
+			goto loop;
+
+	norm:	k := start - slen;
+
+	loop:	j := 0;
+			goto [k < 0] end iloop;
+
+	iloop:	kj := k + j;
+			skj := s-nth (S, kj);
+			ssj := s-nth (sStr, j);
+			goto [skj = ssj] checkj next;
+
+	checkj:	j := j + 1;
+			goto [not (j < slen)] fin inext;
+	inext:	goto iloop;
+
+	next:	k := k - 1;
+			goto loop;
+
+	fin:	fink := k;
+
+	end:	ret := fink;
+	rlab: return;
+	elab: throw
+};
+
+
+(* *** SLICE *** *)
+proc SP_slice (xsc, vthis, start, end) {
+			ret := "i__checkObjectCoercible" (vthis) with elab;
+			ret := "i__toString" (vthis) with elab;
+			S := ret;
+			len := s-len (S);
+
+			goto [start = undefined] sund snull;
+	sund:	start := 0;
+			goto sdef;
+
+	snull:	goto [start = null] sund sdef;
+
+	sdef:	ret := "i__toInteger" (start) with elab;
+			intS := ret;
+			goto [end = undefined] undef def;
+	undef:	intE := len;
+			goto st;
+
+	def:	ret := "i__toInteger" (end) with elab;
+			intE := ret;
+
+	st:		goto [intS < 0] negS posS;
+	negS:	lis := len + intS;
+			ret := "M_max" (empty, empty, lis, 0) with elab;
+			from := ret;
+			goto endd;
+
+	posS:	ret := "M_min" (empty, empty, intS, len) with elab;
+			from := ret;
+
+	endd:	goto [intE < 0] negE posE;
+	negE:	lie := len + intE;
+			ret := "M_max" (empty, empty, lie, 0) with elab;
+			to := ret;
+			goto sp;
+
+	posE:	ret := "M_min" (empty, empty, intE, len) with elab;
+			to := ret;
+
+	sp:		tfr := to - from;
+			ret := "M_max" (empty, empty, tfr, 0) with elab;
+			span := ret;
+
+			R := "";
+			cnt := 0;
+	loop:	goto [cnt < span] add stop;
+
+	add:	ret := s-nth (S, from);
+			nStr := ret;
+			R := R ++ nStr;
+			cnt := cnt + 1;
+			from := from + 1;
+			goto loop;
+
+	stop:	ret := R;
+	rlab: return;
+
+	elab: throw
+};
+
+(* *** SUBSTRING *** *)
+proc SP_substring (xsc, vthis, start, end) {
+			ret := "i__checkObjectCoercible" (vthis) with elab;
+			ret := "i__toString" (vthis) with elab;
+			S := ret;
+			len := s-len (S);
+
+			ret := "i__toInteger" (start) with elab;
+			intS := ret;
+			goto [end = undefined] undef def;
+	undef:	intE := len;
+			goto fst;
+
+	def:	ret := "i__toInteger" (end) with elab;
+			intE := ret;
+
+	fst:	ret := "M_max" (empty, empty, intS, 0) with elab;
+			ret := "M_min" (empty, empty, ret, len) with elab;
+			finS := ret;
+
+			ret := "M_max" (empty, empty, intE, 0) with elab;
+			ret := "M_min" (empty, empty, ret, len) with elab;
+			finE := ret;
+
+			ret := "M_min" (empty, empty, finS, finE) with elab;
+			from := ret;
+			ret := "M_max" (empty, empty, finS, finE) with elab;
+			to := ret;
+
+			span := to - from;
+			R := "";
+			cnt := 0;
+	loop:	goto [cnt < span] add stop;
+
+	add:	ret := s-nth (S, from);
+			nStr := ret;
+			R := R ++ nStr;
+			cnt := cnt + 1;
+			from := from + 1;
+			goto loop;
+
+	stop:	ret := R;
+	rlab: return;
+
+	elab: throw
+};

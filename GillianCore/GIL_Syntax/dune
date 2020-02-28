@@ -1,0 +1,7 @@
+(library
+ (name gil_syntax)
+ (public_name gillian.gil_syntax)
+ (libraries utils fmt visitors.runtime)
+ (preprocess
+  (pps visitors.ppx))
+ (flags -open Utils -w +A-40-42-41-4))

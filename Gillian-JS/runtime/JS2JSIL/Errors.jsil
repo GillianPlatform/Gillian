@@ -1,0 +1,195 @@
+import Internals.jsil, Init.jsil;
+
+(* ***************** *)
+(* THE ERROR LIBRARY *)
+(* ***************** *)
+
+proc Error_call (xsc, vthis, v) {
+			ret := "create_default_object" ($lerr_proto, "Error", true);
+
+			ret := "Error_construct" (undefined, ret, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+proc Error_construct (xsc, vthis, v) {
+			ret := vthis;
+
+			m := metadata(vthis);
+			[m, "@class"] := "Error";
+			[m, "@extensible"] := true;
+
+			goto [v = undefined] rlab mess;
+
+	mess:	xerr := "i__toString" (v) with elab;
+			[ret, "message"] := {{ "d", xerr, true, false, true }};
+
+	rlab: return;
+	elab: throw
+};
+
+proc Error (v) {
+			ret := "Error_call" (undefined, undefined, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+
+(* *** TOSTRING *** *)
+
+proc EP_toString(xsc, vthis) {
+			goto [typeOf vthis = Obj] init thrw;
+
+	init:	name := "";
+			ret := "get" (vthis, "name") with elab;
+			goto [ret = undefined] msg ndef;
+
+	ndef:	ret := "i__toString" (ret) with elab;
+			name := ret;
+
+	msg:	msg := "";
+			ret := "get" (vthis, "message") with elab;
+			goto [ret = undefined] ccat mdef;
+
+	mdef:	ret := "i__toString" (ret) with elab;
+			msg := ret;
+
+	ccat:	goto [name = ""] nemp cmsg;
+
+	nemp:	ret := msg;
+			goto rlab;
+
+	cmsg:	goto [msg = ""] memp cc;
+
+	memp:	ret := name;
+			goto rlab;
+
+	cc:		ret := name ++ ": " ++ msg;
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* ***************** *)
+(* THE NATIVE ERRORS *)
+(* ***************** *)
+
+(* *** EVALERROR *** *)
+
+proc EvalError_call (xsc, vthis, v) {
+			ret := "create_default_object" ($leerr_proto, "Error", true);
+
+			ret := "Error_construct" (undefined, ret, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+proc EvalError (v) {
+			ret := "EvalError_call" (undefined, undefined, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** RANGEERROR *** *)
+
+proc RangeError_call (xsc, vthis, v) {
+			ret := "create_default_object" ($lrgerr_proto, "Error", true);
+
+			ret := "Error_construct" (undefined, ret, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+proc RangeError (v) {
+			ret := "RangeError_call" (undefined, undefined, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** REFERENCEERROR *** *)
+
+proc ReferenceError_call (xsc, vthis, v) {
+			ret := "create_default_object" ($lrferr_proto, "Error", true);
+
+			ret := "Error_construct" (undefined, ret, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+proc ReferenceError (v) {
+			ret := "ReferenceError_call" (undefined, undefined, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** SYNTAXERROR *** *)
+
+proc SyntaxError_call (xsc, vthis, v) {
+			ret := "create_default_object" ($lserr_proto, "Error", true);
+
+			ret := "Error_construct" (undefined, ret, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+proc SyntaxError (v) {
+			ret := "SyntaxError_call" (undefined, undefined, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** TYPEERROR *** *)
+
+proc TypeError_call (xsc, vthis, v) {
+			ret := "create_default_object" ($lterr_proto, "Error", true);
+
+			ret := "Error_construct" (undefined, ret, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+proc TypeError (v) {
+			ret := "TypeError_call" (undefined, undefined, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+
+
+(* *** URIERROR *** *)
+
+proc URIError_call (xsc, vthis, v) {
+			ret := "create_default_object" ($luerr_proto, "Error", true);
+
+			ret := "Error_construct" (undefined, ret, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+proc URIError (v) {
+			ret := "URIError_call" (undefined, undefined, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+(* 13.2.3.8 [[ThrowTypeError]] *)
+proc ThrowTypeError (xsc, vthis) {
+		ret := "TypeError_call" (undefined, undefined, "Attempt to access function `caller` or `arguments`");
+		throw
+};

@@ -1,0 +1,584 @@
+import Internals.jsil;
+
+(* ****************** *)
+(* THE OBJECT LIBRARY *)
+(* ****************** *)
+
+(*  
+	Procedure: i__getFields
+
+	Returns the list of properties of 
+		object at a given location l
+	
+	The list does not include internals
+		
+	If the object is a string object,
+		then it has additional properties
+*)
+proc i__getFields (l) {
+			  ret := getFields (l);
+
+			  m := metadata(l);
+			  class := [m, "@class"];
+			  goto [class = "String"] add rlab;
+
+	add:	str := [m, "@primitiveValue"];
+			  len := s-len (str);
+
+			  n := len - 1;
+
+	loop:	goto [n < 0] rlab head;
+	head:	sn := num_to_string n;
+			  ret := sn :: ret;
+			  n := n - 1;
+			  goto loop;
+
+	rlab: return
+};
+
+(* *** GETENUMERABLEFIELDS *** *)
+
+proc i__getEnumerableFields (l) {
+			  prop_list := "i__getFields" (l);
+			  ret := "i__getEnumerableFieldsIter" (l, prop_list);
+
+	rlab: return
+};
+
+(* *** GETENUMERABLEFIELDSITER *** *)
+
+proc i__getEnumerableFieldsIter (l, prop_list) {
+			goto [prop_list = nil] nill init;
+
+	nill:	ret := nil;
+			goto rlab;
+
+	init:	xh := car prop_list;
+			xt := cdr prop_list;
+
+			prop := "getOwnProperty" (l, xh);
+			goto [l-nth (prop, 3) = true] yes no;
+
+	no:		fh := nil;
+			goto rcall;
+
+	yes:	fh := xh;
+
+	rcall:	ft := "i__getEnumerableFieldsIter" (l, xt);
+
+			ret := fh :: ft;
+	rlab: return
+};
+
+(* *** GETENUMERABLEFIELDSWITHVALUES *** *)
+
+proc i__getEnumerableFieldsWithValues (l) {
+			prop_list := "i__getEnumerableFields" (l);
+			ret := "i__getEnumerableFieldsWithValuesIter" (l, prop_list) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** GETENUMERABLEFIELDSWITHVALUESITER *** *)
+
+proc i__getEnumerableFieldsWithValuesIter (l, prop_list, g) {
+			goto [prop_list = nil] nill init;
+
+	nill:	ret := {{ nil, nil }};
+			goto rlab;
+
+	init:	xh := car prop_list;
+			xt := cdr prop_list;
+
+			ret := "get" (l, xh) with elab;
+			ret := "i__toPropertyDescriptor" (ret) with elab;
+
+			fh := ret;
+
+	rcall:	ret := "i__getEnumerableFieldsWithValuesIter" (l, xt) with elab;
+
+			ret := {{ prop_list , (fh :: l-nth (ret, 1)) }};
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** GETALLENUMERABLEFIELDS *** *)
+
+proc i__getAllEnumerableFields (l) {
+			props := new ();
+			ret := "i__getAllEnumerableFieldsIter" (l, props, l);
+	rlab: return
+};
+
+(* *** GETALLENUMERABLEFIELDSITER *** *)
+
+proc i__getAllEnumerableFieldsIter (l, props, b) {
+
+			enums := "i__getEnumerableFields" (l);
+
+			len := l-len (enums);
+			n := 0;
+	loop:	goto [n < len] head next;
+
+	head:	hf := hasField (props, l-nth (enums, n));
+			goto [hf] inc test;
+	test:	goto [l = b] add bf;
+	bf:		hf := hasField (b, l-nth (enums, n));
+			goto [hf] inc add;
+	add:	[props, l-nth (enums, n)] := l;
+	inc:	n := n + 1;
+			goto loop;
+
+	next:	m := metadata(l);
+			l := [m, "@proto"];
+			goto [l = null] end deeper;
+
+	deeper:	ret := "i__getAllEnumerableFieldsIter" (l, props, b);
+
+	end:	ret := props;
+
+	rlab: return
+};
+
+(* *** CALL *** *)
+
+proc Object_call (xsc, vthis, v) {
+			goto [(v = undefined) or (v = null) or (v = empty)] cns to_obj;
+
+	cns:	ret := "Object_construct" (xsc, vthis, v);
+			goto rlab;
+
+	to_obj:	ret := "i__toObject" (v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** CONSTRUCT *** *)
+
+proc Object_construct (xsc, vthis, l) {
+			l := l;
+
+			goto [typeOf l = Obj] obj l1b;
+	obj:	ret := l;
+			goto rlab;
+
+	l1b:	goto [(typeOf l = Bool) or (typeOf l = Num) or (typeOf l = Str)] to_obj norm;
+	to_obj:	ret := "i__toObject" (l);
+			goto rlab;
+
+	norm:	ret := "create_default_object" ($lobj_proto, "Object", true);
+	rlab: return
+};
+
+(* *** GETPROTOTYPEOF *** *)
+
+proc Object_getPrototypeOf (xsc, vthis, o) {
+			goto [typeOf o = Obj] proto thrw;
+
+	proto:	m := metadata(o);
+			    ret := [m, "@proto"];
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** GETOWNPROPERTYDESCRIPTOR *** *)
+
+proc Object_getOwnPropertyDescriptor (xsc, vthis, o, prop) {
+			goto [typeOf o = Obj] start thrw;
+
+	start:	ret := "i__toString" (prop) with elab;
+			ret := "getOwnProperty" (o, ret) with elab;
+
+			ret := "i__fromPropertyDescriptor" (ret) with elab;
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** GETOWNPROPERTYNAMES *** *)
+
+proc Object_getOwnPropertyNames (xsc, vthis, o) {
+			goto [not (typeOf o = Obj)] thrw start;
+
+	start:	ret := "Array_construct" (xsc, vthis) with elab;
+
+			n := 0;
+			l := ret;
+			props := "i__getFields" (o);
+			len := l-len (props);
+
+	loop:	goto [n < len] head end;
+	head:	ret := "defineOwnProperty" (l, num_to_string n, {{ "d", l-nth (props, n), true, true, true }}, false) with elab;
+			n := n + 1;
+			goto loop;
+
+	end:	ret := l;
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** CREATE *** *)
+
+proc Object_create (xsc, vthis, o, props) {
+			goto [(typeOf o = Obj) or (o = null)] main thrw;
+
+	main:	ret := "Object_construct" () with elab;
+			m := metadata(ret);
+			[m, "@proto"] := o;
+
+			goto [props = undefined] rlab props;
+
+	props:	ret := "Object_defineProperties" (xsc, vthis, ret, props) with elab;
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** DEFINEPROPERTY *** *)
+
+proc Object_defineProperty (xsc, vthis, o, prop, attr) {
+			goto [typeOf o = Obj] main thrw;
+
+	main:	ret := "i__toString" (prop) with elab;
+			prop := ret;
+
+			ret := "i__toPropertyDescriptor" (attr) with elab;
+
+			ret := "defineOwnProperty" (o, prop, ret, true) with elab;
+
+	end:	ret := o;
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** DEFINEPROPERTIES *** *)
+
+proc Object_defineProperties (xsc, vthis, o, props) {
+			goto [not (typeOf o = Obj)] thrw start;
+
+	start:	ret := "i__toObject" (props) with elab;
+			props := ret;
+
+			ret := "i__getEnumerableFieldsWithValues" (props) with elab;
+
+			props := l-nth (ret, 0);
+			descs := l-nth (ret, 1);
+
+			n := 0;
+			len := l-len (props);
+
+	loop:	goto [n < len] head end;
+	head:	ret := "defineOwnProperty" (o, l-nth (props, n), l-nth (descs, n), true) with elab;
+			n := n + 1;
+			goto loop;
+
+	end:	ret := o;
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** PREVENTEXTENSIONS *** *)
+
+proc Object_preventExtensions (xsc, vthis, o) {
+			goto [typeOf o = Obj] start thrw;
+
+	start:	m := metadata(o);
+			[m, "@extensible"] := false;
+			ret := o;
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** SEAL *** *)
+
+proc Object_seal (xsc, vthis, o) {
+			goto [typeOf o = Obj] start thrw;
+
+	start:	props := "i__getFields" (o);
+
+			n := 0;
+			len := l-len (props);
+
+	loop:	goto [n < len] head ext;
+	head:	ret := "getOwnProperty" (o, l-nth (props, n)) with elab;
+			ret := "defineOwnProperty" (o, l-nth (props, n), {{ l-nth (ret, 0), l-nth (ret, 1), l-nth (ret, 2), l-nth (ret, 3), false }}, true) with elab;
+	next:	n := n + 1;
+			goto loop;
+
+	ext:	m := metadata(o);
+			[m, "@extensible"] := false;
+			ret := o;
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** ISSEALED *** *)
+
+proc Object_isSealed (xsc, vthis, o) {
+			goto [typeOf o = Obj] start thrw;
+
+	start:	props := "i__getFields" (o);
+
+			n := 0;
+			len := l-len (props);
+
+	loop:	goto [n < len] head ext;
+	head:	ret := "getOwnProperty" (o, l-nth (props, n)) with elab;
+			goto [l-nth (ret, 4) = true] r_f next;
+	next:	n := n + 1;
+			goto loop;
+
+	ext:	m := metadata(o);
+			ret := [m, "@extensible"];
+			goto [ret] r_f r_t;
+
+	r_t:	ret := true;
+			goto rlab;
+
+	r_f:	ret := false;
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** FREEZE *** *)
+
+proc Object_freeze (xsc, vthis, o) {
+			goto [typeOf o = Obj] start thrw;
+
+	start:	props := "i__getFields" (o);
+
+			n := 0;
+			len := l-len (props);
+
+	loop:	goto [n < len] head ext;
+	head:	ret := "getOwnProperty" (o, l-nth (props, n)) with elab;
+			ws := l-nth (ret, 2);
+			goto [ws = true] set_w cf;
+	set_w:	ws := false;
+	cf:		ret := "defineOwnProperty" (o, l-nth (props, n), {{ l-nth (ret, 0), l-nth (ret, 1), ws, l-nth (ret, 3), false }}, true) with elab;
+	next:	n := n + 1;
+			goto loop;
+
+	ext:	m := metadata(o);
+			[m, "@extensible"] := false;
+			ret := o;
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** ISFROZEN *** *)
+
+proc Object_isFrozen (xsc, vthis, o) {
+			goto [typeOf o = Obj] start thrw;
+
+	start:	props := "i__getFields" (o);
+
+			n := 0;
+			len := l-len (props);
+
+	loop:	goto [n < len] head ext;
+	head:	ret := "getOwnProperty" (o, l-nth (props, n)) with elab;
+			goto [l-nth (ret, 2) = true] r_f cf;
+	cf:		goto [l-nth (ret, 4) = true] r_f next;
+	next:	n := n + 1;
+			goto loop;
+
+	ext:	m := metadata(o);
+			ret := [m, "@extensible"];
+			goto [ret] r_f r_t;
+
+	r_t:	ret := true;
+			goto rlab;
+
+	r_f:	ret := false;
+
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** ISEXTENSIBLE *** *)
+
+proc Object_isExtensible (xsc, vthis, o) {
+			goto [typeOf o = Obj] start thrw;
+
+	start: 	m := metadata(o);
+			ret := [m, "@extensible"];
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** KEYS *** *)
+
+proc Object_keys (xsc, vthis, o) {
+			goto [not (typeOf o = Obj)] thrw start;
+
+	start:	ret := "Array_construct" () with elab;
+
+			n := 0;
+			l := ret;
+			props := "i__getEnumerableFields" (o);
+			len := l-len (props);
+
+	loop:	goto [n < len] head end;
+	head:	ret := "defineOwnProperty" (l, num_to_string n, {{ "d", l-nth (props, n), true, true, true }}, false) with elab;
+			n := n + 1;
+			goto loop;
+
+	end:	ret := l;
+	rlab: return;
+
+	thrw:	ret := "TypeError" ();
+	elab: throw
+};
+
+(* **************** *)
+(* OBJECT.PROTOTYPE *)
+(* **************** *)
+
+(* *** TOSTRING*** *)
+
+proc OP_toString(xsc, vthis) {
+			goto [vthis = undefined] undef def;
+
+	undef: 	ret := "[object Undefined]";
+			goto rlab;
+
+	def:	goto [vthis = null] nul nnull;
+
+	nul:	ret := "[object Null]";
+			goto rlab;
+
+	nnull:	ret := "i__toObject" (vthis) with elab;
+			m := metadata(ret);
+			c := [m, "@class"];
+			ret := "[object " ++ c ++ "]";
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** TOLOCALESTRING *** *)
+
+proc OP_toLocaleString(xsc, vthis) {
+			ret := "i__toObject" (vthis) with elab;
+			o := ret;
+
+			ret := "get" (o, "toString") with elab;
+			c := "i__isCallable" (ret);
+            goto [c] call thrw;
+
+	call:	m := metadata(ret);
+			scp := [m, "@scope"];
+			fun := [m, "@call"];
+			ret := fun (scp, vthis) with elab;
+
+	rlab: return;
+
+	thrw: 	ret := "TypeError" ();
+	elab: throw
+};
+
+(* *** VALUEOF *** *)
+
+proc OP_valueOf(xsc, vthis) {
+			ret := "i__toObject" (vthis) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+
+(* *** HASOWNPROPERTY*** *)
+
+proc OP_hasOwnProperty(xsc, vthis, v) {
+			ret := "i__toString" (v) with elab;
+			p := ret;
+
+			ret := "i__toObject" (vthis) with elab;
+			ret := "getOwnProperty" (ret, p) with elab;
+
+			goto [ret = undefined] undef def;
+
+	undef:  ret := false;
+			goto rlab;
+
+	def:	ret := true;
+
+	rlab: return;
+	elab: throw
+};
+
+
+(* *** ISPROTOTYPEOF *** *)
+
+proc OP_isPrototypeOf(xsc, vthis, v) {
+			goto [typeOf v = Obj] obj fret;
+
+	obj:	ret := "i__toObject" (vthis) with elab;
+
+	rep:	m := metadata(v);
+			v := [m, "@proto"];
+			goto [v = null] fret nnull;
+
+	nnull:  goto [v = ret] tret rep;
+
+	tret: 	ret := true;
+			goto rlab;
+
+	fret: 	ret := false;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** PROPERTYISENUMERABLE *** *)
+
+proc OP_propertyIsEnumerable(xsc, vthis, v) {
+			ret := "i__toString" (v) with elab;
+			p := ret;
+
+			ret := "i__toObject" (vthis) with elab;
+			ret := "getOwnProperty" (ret, p) with elab;
+
+			goto [ret = undefined] undef def;
+
+	undef:  ret := false;
+			goto rlab;
+
+	def:	ret := l-nth (ret, 3);
+
+	rlab: return;
+	elab: throw
+};

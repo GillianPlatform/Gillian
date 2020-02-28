@@ -1,0 +1,5 @@
+import Init.jsil;
+
+proc main () {
+	rlab:	ret := "setupInitialHeap" ()
+};

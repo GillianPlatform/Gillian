@@ -1,0 +1,5 @@
+(library
+ (name parserAndCompiler)
+ (public_name gillian.parserAndCompiler)
+ (libraries cmdliner gil_syntax utils)
+ (flags -open Gil_syntax -open Utils))

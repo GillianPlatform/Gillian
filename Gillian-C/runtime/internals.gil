@@ -1,0 +1,114 @@
+proc i__get_function_name(v_ptr) {
+         (* The value given should be a pointer *)
+         goto [not (typeOf (l-nth (v_ptr, 0.)) = Obj)] fail1 ctn1;
+  fail1: fail[functionCall]();
+         (* The offset for a pointer to a function should always be 0 *)
+  ctn1:  goto [not ((l-nth (v_ptr, 1.)) = 0.)] fail2 ctn2;
+  fail2: fail[functionCall]();
+  ctn2:  defl := [genv_getdef](l-nth(v_ptr, 0.));
+         typ := l-nth(l-nth(defl, 0.), 0.);
+         val := l-nth(l-nth(defl, 0.), 1.);
+         goto [not (typ = "function")] fail3 ctn3;
+  fail3: fail[functionCall]();
+  ctn3:  ret := val;
+         return
+};
+
+proc i__storev(chunk, vptr, v) {
+       goto [((typeOf vptr) = List) and (l-len vptr = 2) and ((typeOf (l-nth(vptr, 0.))) = Obj) and ((typeOf (l-nth(vptr, 1.))) = Num)] ctn sgf;
+  ctn: u := [mem_store](chunk, l-nth(vptr, 0.), l-nth(vptr, 1.), v);
+       ret := undefined;
+       return;
+  sgf: ret := "segmentation fault";
+       assert (False)
+};
+
+proc i__loadv(chunk, vptr) {
+       goto [((typeOf vptr) = List) and (l-len vptr = 2) and ((typeOf (l-nth(vptr, 0.))) = Obj) and ((typeOf (l-nth(vptr, 1.))) = Num)] ctn sgf;
+  ctn: vload := [mem_load](chunk, l-nth(vptr, 0.), l-nth(vptr, 1.));
+       ret := l-nth(vload, 0.);
+       return;
+  sgf: ret := "segmentation fault";
+       assert (False)
+};
+
+proc i__free_list_aux(l, n) {
+           goto [ n < l-len l ] ctn end;
+      ctn: curr := l-nth(l, n);
+           u := [mem_free](l-nth(curr, 0.), l-nth(curr, 1.), l-nth(curr, 2.));
+           u := "i__free_list_aux"(l, n+1);
+      end: ret := undefined;
+           return
+};
+
+proc i__free_list(l) {
+      u := "i__free_list_aux"(l, 0.);
+      ret := undefined;
+      return
+};
+
+
+proc i__value_of_bool(v) {
+          goto [v] tr fl;
+      tr: ret := {{ "int", 1 }};
+          return;
+      fl: ret := {{ "int", 0 }};
+          return
+};
+
+proc i__bool_of_value(v) {
+            goto [ l-nth(v, 0.) = "int" ] int unde;
+      int:  goto [ l-nth(v, 1.) = 0. ] fl tr;
+      fl:   ret := false;
+            return;
+      tr:   ret := true;
+            return;
+      unde: fail[operator]("Not a boolean value")
+};
+
+proc i__neg_bool_value(v) {
+            goto [ l-nth(v, 0.) = "int" ] int unde;
+      int:  goto [ l-nth(v, 1.) = 0. ] fl tr;
+      fl:   ret := {{ "int", 1. }};
+            return;
+      tr:   ret := {{ "int", 0. }};
+            return;
+      unde: fail[operator]("Cannot neg a non-boolean")
+};
+
+proc i__greater_perm(perma, permb) {
+            goto [
+                (permb = "None")
+            or ((permb = "Nonempty") and ((perma = "Nonempty") or (perma = "Readable") or (perma = "Writable") or (perma = "Freeable")))
+            or ((permb = "Readable") and ((perma = "Readable") or (perma = "Writable") or (perma = "Freeable")))
+            or ((permb = "Writable") and ((perma = "Writable") or (perma = "Freeable")))
+            or ((permb = "Freeable") and (perma = "Freeable"))
+            ] yes no;
+      yes:  ret := true;
+            return;
+      no:   ret := false;
+            return
+};
+
+
+proc i__has_cur_perm(b, o, perm) {
+      perml := [mem_getcurperm](b, o);
+      ret := "i__greater_perm"(l-nth(perml, 0.), perm);
+      return
+};
+
+proc i__valid_pointer(b, o) {
+      ret := "i__has_cur_perm"(b, o, "Nonempty");
+      return
+};
+
+proc i__weak_valid_ptr(b, o) {
+      x := "i__valid_pointer"(b, o);
+      y := "i__valid_pointer"(b, o - 1);
+      ret := x or y;
+      return
+};
+
+proc i__not_implemented() {
+      fail[NotImplemented]()
+};

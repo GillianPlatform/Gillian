@@ -1,0 +1,3 @@
+(library
+ (name gil_syntax_tests)
+ (libraries gil_syntax alcotest))
