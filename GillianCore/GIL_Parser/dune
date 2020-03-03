@@ -1,7 +1,7 @@
 (library
  (name gil_parsing)
  (public_name gillian.gil_parsing)
- (libraries utils gil_syntax)
+ (libraries utils gil_syntax str)
  (flags -open Utils -open Gil_syntax))
 
 (menhir

@@ -6,4 +6,4 @@
 
 (library
  (name parsing)
- (libraries gillian gillian.utils jsil_syntax jslogic javert_utils))
+ (libraries gillian gillian.utils jsil_syntax jslogic javert_utils str))

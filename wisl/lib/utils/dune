@@ -1,3 +1,3 @@
 (library
  (name wUtils)
- (libraries yojson))
+ (libraries yojson str))

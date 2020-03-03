@@ -1,5 +1,5 @@
 (library
  (name bulk_alcotest)
  (public_name gillian.bulk_alcotest)
- (libraries bulk alcotest gil_syntax)
+ (libraries bulk alcotest gil_syntax str)
  (flags -open Bulk -open Gil_syntax))
