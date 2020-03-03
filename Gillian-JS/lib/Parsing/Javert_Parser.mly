@@ -1087,7 +1087,6 @@ js_logic_cmd_target:
 (* fold x(e1, ..., en) *)
   | FOLD; assertion = js_assertion_target; fold_info = option(js_unfold_info_target)
     {
-      Printf.printf "Parsing a JS_FOLD with folding_info: %s\n" (JSLCmd.str_of_folding_info fold_info);
       Fold (assertion, fold_info)
     }
 
