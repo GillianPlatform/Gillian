@@ -590,6 +590,7 @@ cmd_target:
   | VAR; DEFEQ; NEW; LBRACE; option(new_target); RBRACE
     {
       let loc, metadata = (match $5 with
+      | Some (Some arg_a, Some arg_b) -> Some arg_a, Some arg_b
       | Some (Some arg_a, None) -> None, Some arg_a
       | Some (None, Some _) -> raise (Failure "Parser: Impossible")
       | _ -> None, None
