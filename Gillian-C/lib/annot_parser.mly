@@ -1,6 +1,24 @@
 %{
-  open CLogic 
+  open CLogic
 %}
+
+(* punctuation *)
+%token COLON
+%token DOT
+%token SCOLON
+%token COMMA
+%token LBRACE
+%token RBRACE
+%token LCBRACE
+%token RCBRACE
+%token LBRACK
+%token RBRACK
+%token LDBRACK
+%token RDBRACK
+%token SETOP
+%token SETCL
+%token BIGOR
+%token EOF
 
 %token UNKOWN (* Ignored if not in an annotation *)
 %token ANNOT_OPEN
@@ -43,7 +61,6 @@
 %token CFALSE
 %token FORALL
 
-
 (* BinOps *)
 %token MALLOCPOINTSTO
 %token POINTSTO
@@ -68,25 +85,22 @@
 (* NOps *)
 %token SETUNION
 
-(* ASSOCIATIVITY *)
+(* Precedence *)
+%nonassoc DOT
+
+%left IMPLIES
 %left STAR
+%nonassoc LNOT
 
+%nonassoc EQ
+%nonassoc SETSUB
+%left SETDIFF
+%nonassoc LSTCONS
+%left LSTCAT
+%left PLUS
 
-(* punctuation *)
-%token COLON
-%token DOT
-%token SCOLON
-%token COMMA
-%token LBRACE
-%token RBRACE
-%token LCBRACE
-%token RCBRACE
-%token LBRACK
-%token RBRACK
-%token SETOP
-%token SETCL
-%token BIGOR
-%token EOF
+%nonassoc binop_prec
+%nonassoc unop_prec
 
 %start <CLogic.CProg.t> prog
 %start <CLogic.CLCmd.t> logic_command_entry
@@ -119,7 +133,7 @@ exists_opt:
   | res = option(exists) { Option.value ~default:[] res }
 
 exists:
-  | LBRACK; EXISTS; se = separated_list(COMMA, LVAR); RBRACK;
+  | LDBRACK; EXISTS; se = separated_list(COMMA, LVAR); RDBRACK;
     { se }
 
 annot:
@@ -172,7 +186,7 @@ predicate:
       (* ins looks like [Some 0, Some 2] *)
       let ins = List.map Option.get ins in
       (* ins looks like [0, 2] *)
-  		let pred_ins = if (List.length ins) > 0 then ins else (List.mapi (fun i _ -> i) params) in 
+  		let pred_ins = if (List.length ins) > 0 then ins else (List.mapi (fun i _ -> i) params) in
       (* if ins is empty then everything is an in *)
       CPred.{
         name = pname;
@@ -186,7 +200,7 @@ pred_definition:
   | d = option(asrt_annot); a = assertion { (d, a) }
 
 asrt_annot:
-  | LBRACK; lab = IDENTIFIER; exs = with_existentials; RBRACK; { { label = lab; existentials =  exs } }
+  | LDBRACK; lab = IDENTIFIER; exs = with_existentials; RDBRACK; { { label = lab; existentials =  exs } }
 
 with_existentials:
   | exs = option (existentials) { Option.value ~default:[] exs }
@@ -194,7 +208,7 @@ with_existentials:
 existentials:
   | COLON; lvs = separated_nonempty_list(COMMA, lvar_with_gil_type); { lvs }
 
- 
+
 pred_params_ins:
   | inp = option(PLUS); x = IDENTIFIER; typ = option(with_gil_type)
     { let isin = Option.is_some inp in
@@ -264,9 +278,9 @@ expression:
     { CExpr.EList el }
   | NIL { CExpr.EList [] }
   | e1 = expression; b = binop; e2 = expression
-    { CExpr.BinOp (e1, b, e2) }
+    { CExpr.BinOp (e1, b, e2) } %prec binop_prec
   | u = unop; e = expression
-    { CExpr.UnOp (u, e) }
+    { CExpr.UnOp (u, e) } %prec unop_prec
   | SETOP; el = separated_list(COMMA, expression); SETCL
     { CExpr.ESet el }
   | n = nop; LBRACE; el = separated_nonempty_list(COMMA, expression); RBRACE

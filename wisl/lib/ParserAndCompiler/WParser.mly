@@ -66,6 +66,23 @@
 %token <CodeLoc.t> EMP LTRUE LFALSE LSTNIL LNOT
 %token <CodeLoc.t * string> LVAR
 
+(* Precedence *)
+%left LOR
+%left LAND separating_conjunction
+%nonassoc LEQ LLESS LLESSEQ LGREATER LGREATEREQ
+%nonassoc LNOT
+%left OR
+%left AND
+%nonassoc EQUAL NEQ
+%nonassoc LESSTHAN LESSEQUAL GREATERTHAN GREATEREQUAL
+%nonassoc LSTCONS
+%left LSTCAT
+%left PLUS MINUS
+%left TIMES DIV MOD
+
+%nonassoc binop_prec
+%nonassoc unop_prec
+
 (* Types and start *)
 %start <WProg.t> prog
 %start <WLAssert.t> assert_only
@@ -247,13 +264,13 @@ expression:
     { let bare_expr = WExpr.BinOp (e1, b, e2) in
       let lstart, lend = WExpr.get_loc e1, WExpr.get_loc e2 in
       let loc = CodeLoc.merge lstart lend in
-      WExpr.make bare_expr loc }
+      WExpr.make bare_expr loc } %prec binop_prec
   | lu = unop_with_loc; e = expression
     { let (lstart, u) = lu in
       let bare_expr = WExpr.UnOp (u, e) in
       let lend = WExpr.get_loc e in
       let loc = CodeLoc.merge lstart lend in
-      WExpr.make bare_expr loc }
+      WExpr.make bare_expr loc } %prec unop_prec
 
 binop:
   | EQUAL        { WBinOp.EQUAL }
@@ -417,7 +434,7 @@ logic_assertion:
     { let bare_assert = WLAssert.LStar (la1, la2) in
       let lstart, lend = WLAssert.get_loc la1, WLAssert.get_loc la2 in
       let loc = CodeLoc.merge lstart lend in
-      WLAssert.make bare_assert loc }
+      WLAssert.make bare_assert loc } %prec separating_conjunction
   | le1 = logic_expression; ARROW; le2 = separated_nonempty_list(COMMA, logic_expression)
     { let rec get_lend lel =
         match lel with
@@ -521,13 +538,13 @@ logic_expression:
     { let bare_lexpr = WLExpr.LBinOp (e1, b, e2) in
       let lstart, lend = WLExpr.get_loc e1, WLExpr.get_loc e2 in
       let loc = CodeLoc.merge lstart lend in
-      WLExpr.make bare_lexpr loc }
+      WLExpr.make bare_lexpr loc } %prec binop_prec
   | lu = unop_with_loc; e = logic_expression
     { let (lstart, u) = lu in
       let lend = WLExpr.get_loc e in
       let loc = CodeLoc.merge lstart lend in
       let bare_lexpr = WLExpr.LUnOp (u, e) in
-      WLExpr.make bare_lexpr loc }
+      WLExpr.make bare_lexpr loc } %prec unop_prec
   | lstart = LBRACK; l = separated_list(COMMA, logic_expression); lend = RBRACK
     { let loc = CodeLoc.merge lstart lend in
       let bare_lexpr = WLExpr.LEList l in

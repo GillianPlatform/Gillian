@@ -51,7 +51,7 @@ KVMAP* put(int k, int v, KVMAP* kvm) {
     kvm->value = v;
     return kvm;
   } else {
-    __builtin_annot("assert [exists #next] #kvm -m> struct kvnode { #somekey; #somevalue; #next }");
+    __builtin_annot("assert [[exists #next]] #kvm -m> struct kvnode { #somekey; #somevalue; #next }");
     __builtin_annot("if (! (#next = NULL)) { unfold KVMap(#next, #nextkvs, #nextkeys) }");
     KVMAP* rec = put(k, v, kvm->next);
     __builtin_annot("unfold KVMap(rec, #reckvs, #reckeys)");

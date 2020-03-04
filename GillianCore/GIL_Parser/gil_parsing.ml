@@ -47,7 +47,6 @@ let parse_expr_from_string : string -> Expr.t =
   parse_from_string GIL_Parser.top_level_expr_target
 
 let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
-  print_endline ("Parsing: " ^ path);
   let extension = List.hd (List.rev (Str.split (Str.regexp "\\.") path)) in
   let file_previously_normalised = String.equal "ngil" extension in
   Config.previously_normalised := file_previously_normalised;

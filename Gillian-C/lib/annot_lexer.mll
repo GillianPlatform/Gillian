@@ -11,7 +11,7 @@ let next_line lexbuf =
                pos_lnum = pos.pos_lnum + 1
     }
 
-let in_annot = ref false  
+let in_annot = ref false
 
 }
 
@@ -79,6 +79,8 @@ rule read =
   | '}'        { RCBRACE }
   | '['        { LBRACK }
   | ']'        { RBRACK }
+  | "[["       { LDBRACK }
+  | "]]"       { RDBRACK }
   | ';'        { SCOLON }
   | '.'        { DOT }
   | ','        { COMMA }

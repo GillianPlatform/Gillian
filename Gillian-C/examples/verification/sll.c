@@ -22,7 +22,7 @@ SLL* listAppend(SLL* x, int v) {
     return el;
   } else {
     SLL* tailp = listAppend(x->next, v);
-    __builtin_annot("assert [exists #t] list(tailp, #t)");
+    __builtin_annot("assert [[exists #t]] list(tailp, #t)");
     __builtin_annot("unfold list(tailp, #t)");
     __builtin_annot("fold list(tailp, #t)");
     x->next = tailp;
@@ -95,7 +95,7 @@ SLL* listConcat(SLL* x, SLL* y) {
       r = y;
   } else {
     SLL* c = listConcat (x->next, y);
-    __builtin_annot("assert [exists #gamma] list(c, #gamma)");
+    __builtin_annot("assert [[exists #gamma]] list(c, #gamma)");
     __builtin_annot("unfold list(c, #gamma)");
     __builtin_annot("fold list(c, #gamma)");
     x->next = c;
