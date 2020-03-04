@@ -29,10 +29,10 @@ let ( ++ ) e1 e2 =
   | Expr.Lit (Literal.Num n) -> (
       match e1 with
       | Expr.Lit (Literal.Num 0.) -> e2
-      | Expr.BinOp (e1p, BinOp.Plus, Expr.Lit (Literal.Num k)) ->
-          Expr.BinOp (e1p, BinOp.Plus, Expr.Lit (Literal.Num (n +. k)))
-      | e1 -> Expr.BinOp (e1, BinOp.Plus, e2) )
-  | e2 -> Expr.BinOp (e1, BinOp.Plus, e2)
+      | Expr.BinOp (e1p, BinOp.FPlus, Expr.Lit (Literal.Num k)) ->
+          Expr.BinOp (e1p, BinOp.FPlus, Expr.Lit (Literal.Num (n +. k)))
+      | e1 -> Expr.BinOp (e1, BinOp.FPlus, e2) )
+  | e2 -> Expr.BinOp (e1, BinOp.FPlus, e2)
 
 let ( == ) e1 e2 = if e1 = e2 then Asrt.Emp else Asrt.Pure (Eq (e1, e2))
 
@@ -203,7 +203,7 @@ let trans_binop b =
   match b with
   | CBinOp.LstCons -> failwith "LstCons shouldn't be compiled that way"
   | LstCat         -> failwith "LstCat shouldn't be compiled that way"
-  | Plus           -> BinOp.Plus
+  | Plus           -> BinOp.FPlus
   | Equal          -> Equal
   | SetSub         -> BSetSub
   | SetDiff        -> SetDiff

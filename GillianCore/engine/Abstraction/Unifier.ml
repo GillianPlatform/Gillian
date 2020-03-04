@@ -677,7 +677,8 @@ module Make
                 Subst.put subst x v';
                 Some (SS.singleton x, [])
             | Some _                 -> None ) )
-    | BinOp (le_pat1, Plus, Lit (Num i)) | BinOp (Lit (Num i), Plus, le_pat1) ->
+    | BinOp (le_pat1, FPlus, Lit (Num i)) | BinOp (Lit (Num i), FPlus, le_pat1)
+      ->
         let le : Expr.t = Val.to_expr v in
         let le1 : Expr.t = BinOp (le, Minus, Lit (Num i)) in
         let v1 : Val.t = eval_expr le1 in

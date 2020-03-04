@@ -1,5 +1,6 @@
 (menhir
- (modules Javert_Parser))
+ (modules Javert_Parser)
+ (flags --explain))
 
 (ocamllex
  (modules Javert_Lexer))

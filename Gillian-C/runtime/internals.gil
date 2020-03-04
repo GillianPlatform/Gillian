@@ -36,7 +36,7 @@ proc i__free_list_aux(l, n) {
            goto [ n < l-len l ] ctn end;
       ctn: curr := l-nth(l, n);
            u := [mem_free](l-nth(curr, 0.), l-nth(curr, 1.), l-nth(curr, 2.));
-           u := "i__free_list_aux"(l, n+1);
+           u := "i__free_list_aux"(l, n f+ 1);
       end: ret := undefined;
            return
 };

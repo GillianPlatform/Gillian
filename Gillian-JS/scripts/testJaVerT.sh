@@ -14,7 +14,7 @@ FINAL_RETURN=0
 
 if [[ $1 == "fast" ]]; then
 	params="-nochecks -nooutput"
-else 
+else
 	params=""
 fi
 
@@ -28,7 +28,7 @@ echo "Verifying JaVerT examples"
 echo "-------------------------"
 for f in "${jsfiles[@]}"
 do
-  sleep 3
+  sleep 1
 	echo "Verifying: $f.js"
 	if [[ $1 == "count" ]]; then
 		gillian-js verify Examples/JaVerT/$f.js -s --stats

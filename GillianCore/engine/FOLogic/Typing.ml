@@ -149,7 +149,7 @@ let rec infer_types_expr gamma le : unit =
   | EList lle | ESet lle -> List.iter (fun le -> f le) lle
   | BinOp (le1, op, le2) -> (
       match op with
-      | Plus | Minus | Times | Div | Mod ->
+      | FPlus | Minus | Times | Div | Mod ->
           e le1 NumberType;
           e le2 NumberType
       | LstNth ->

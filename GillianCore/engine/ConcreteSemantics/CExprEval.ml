@@ -300,7 +300,7 @@ let rec evaluate_binop
           binary_bool_thing lit1 lit2
             (fun x y -> x <= y)
             "Type Error: Less than or equal: expected numbers, got "
-      | Plus ->
+      | FPlus ->
           binary_num_thing lit1 lit2
             (fun x y -> x +. y)
             "Type Error: Addition: expected numbers, got "

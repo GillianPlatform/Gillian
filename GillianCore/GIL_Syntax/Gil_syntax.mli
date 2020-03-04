@@ -132,7 +132,7 @@ module BinOp : sig
     | LessThan  (** Less *)
     | LessThanEqual  (** Less or equal for numbers *)
     | LessThanString  (** Less or equal for strings *)
-    | Plus  (** Addition *)
+    | FPlus  (** Float addition *)
     | Minus  (** Subtraction *)
     | Times  (** Multiplication *)
     | Div  (** Float division *)
@@ -1036,7 +1036,7 @@ module Visitors : sig
            ; visit_PVar : 'd -> string -> Expr.t
            ; visit_PhiAssignment : 'd -> (string * Expr.t list) list -> 'h Cmd.t
            ; visit_Pi : 'd -> Constant.t
-           ; visit_Plus : 'd -> BinOp.t
+           ; visit_FPlus : 'd -> BinOp.t
            ; visit_Pred : 'd -> string -> Expr.t list -> Asrt.t
            ; visit_Pure : 'd -> Formula.t -> Asrt.t
            ; visit_Random : 'd -> Constant.t
@@ -1348,7 +1348,7 @@ module Visitors : sig
 
       method visit_Pi : 'd -> Constant.t
 
-      method visit_Plus : 'd -> BinOp.t
+      method visit_FPlus : 'd -> BinOp.t
 
       method visit_Pred : 'd -> string -> Expr.t list -> Asrt.t
 
@@ -1617,7 +1617,7 @@ module Visitors : sig
            ; visit_PVar : 'c -> string -> 'f
            ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
            ; visit_Pi : 'c -> 'f
-           ; visit_Plus : 'c -> 'f
+           ; visit_FPlus : 'c -> 'f
            ; visit_Pred : 'c -> string -> Expr.t list -> 'f
            ; visit_Pure : 'c -> Formula.t -> 'f
            ; visit_Random : 'c -> 'f
@@ -1925,7 +1925,7 @@ module Visitors : sig
 
       method visit_Pi : 'c -> 'f
 
-      method visit_Plus : 'c -> 'f
+      method visit_FPlus : 'c -> 'f
 
       method visit_Pred : 'c -> string -> Expr.t list -> 'f
 

@@ -369,7 +369,7 @@ binop_target:
   | LESSTHAN           { LessThan }
   | LESSTHANEQUAL      { LessThanEqual }
   | LESSTHANSTRING     { LessThanString }
-  | PLUS               { Plus }
+  | PLUS               { FPlus }
   | MINUS              { Minus }
   | TIMES              { Times }
   | DIV                { Div }

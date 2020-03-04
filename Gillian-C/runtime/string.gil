@@ -1,17 +1,17 @@
 proc i__strcmp(str1, str2) {
-          goto [((typeOf str1) = List) and ((typeOf str2) = List) and 
+          goto [((typeOf str1) = List) and ((typeOf str2) = List) and
                 ((typeOf (l-nth(str1, 0.))) = Obj) and ((typeOf (l-nth(str2, 0.))) = Obj)]
                 ctn die; (* Check that we have pointers *)
     ctn:  i := 0;
-    loop: char1_ar := [mem_load]("int8signed", l-nth(str1, 0.), l-nth(str1, 1.) + i);
-          char2_ar := [mem_load]("int8signed", l-nth(str2, 0.), l-nth(str2, 1.) + i);
+    loop: char1_ar := [mem_load]("int8signed", l-nth(str1, 0.), l-nth(str1, 1.) f+ i);
+          char2_ar := [mem_load]("int8signed", l-nth(str2, 0.), l-nth(str2, 1.) f+ i);
           char1 := l-nth(char1_ar, 0.);
           char2 := l-nth(char2_ar, 0.);
           goto [ (char1 = {{ "int", 0. }}) and (char2 = {{ "int", 0. }}) ] end ctnl;
     ctnl: goto [ l-nth(char1, 1.) = l-nth(char2, 1.) ] eq neq;
     neq:  ret := {{ "int", l-nth(char1, 1.) - l-nth(char2, 1.) }};
           return;
-    eq:   i := i + 1;
+    eq:   i := i f+ 1;
           goto loop;
     end:  ret := {{ "int", 0. }};
           return;

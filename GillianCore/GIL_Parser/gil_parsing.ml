@@ -12,7 +12,7 @@ let col pos = pos.pos_cnum - pos.pos_bol + 1
 
 let parse start lexbuf =
   try start GIL_Lexer.read lexbuf with
-  | GIL_Lexer.Syntax_error message -> failwith "Syntax error: message"
+  | GIL_Lexer.Syntax_error message -> failwith ("Syntax error: " ^ message)
   | GIL_Parser.Error ->
       let loc_start = lexeme_start_p lexbuf in
       let loc_end = lexeme_end_p lexbuf in
@@ -47,6 +47,7 @@ let parse_expr_from_string : string -> Expr.t =
   parse_from_string GIL_Parser.top_level_expr_target
 
 let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
+  print_endline ("Parsing: " ^ path);
   let extension = List.hd (List.rev (Str.split (Str.regexp "\\.") path)) in
   let file_previously_normalised = String.equal "ngil" extension in
   Config.previously_normalised := file_previously_normalised;
