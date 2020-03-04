@@ -3,7 +3,7 @@
 
 (menhir
  (modules WParser)
- (flags "--explain"))
+ (flags --explain))
 
 (library
  (name wParserAndCompiler)

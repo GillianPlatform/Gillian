@@ -8,10 +8,10 @@ typedef struct dln {
 
 /*@ pred DLL(+x, alpha) {
   (x == NULL) * (alpha == nil);
-  (x -m> struct dln {#val; #prev; #next}) * 
+  (x -m> struct dln {#val; #prev; #next}) *
   DLL(#next, #beta) * (alpha == #val :: #beta) *
   (not (#prev == NULL)) * (not (#next == NULL));
-  (x -m> struct dln {#val; NULL; #next}) * 
+  (x -m> struct dln {#val; NULL; #next}) *
   DLL(#next, #beta) * (alpha == #val :: #beta) *
   (not (#next == NULL));
   (x -m> struct dln {#val; NULL; NULL}) * (alpha == [ #val ]);
@@ -42,7 +42,7 @@ DLL* listConcat(DLL* x, DLL* y) {
     if (x == NULL) {
       return y;
     } else {
-      __builtin_annot("assert [exists #vx, #px, #nx, #gamma] "
+      __builtin_annot("assert [[exists #vx, #px, #nx, #gamma]] "
                       "(x -m> struct dln {#vx; #px; #nx}) * DLL(#nx, #gamma) * "
                       "(#alpha == #h :: #gamma)");
       __builtin_annot("unfold DLL(#nx, #gamma)");
