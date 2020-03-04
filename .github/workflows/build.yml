@@ -12,7 +12,7 @@ jobs:
   build:
     strategy:
       matrix:
-        operating-system: [ macos-latest ]
+        operating-system: [ macos-latest, ubuntu-latest ]
     runs-on: ${{ matrix.operating-system }}
     steps:
     - uses: actions/checkout@v2
@@ -54,7 +54,7 @@ jobs:
   gillian_c_tests:
     strategy:
       matrix:
-        operating-system: [ macos-latest ]
+        operating-system: [ macos-latest, ubuntu-latest ]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
@@ -81,7 +81,7 @@ jobs:
   gillian_js_tests:
     strategy:
       matrix:
-        operating-system: [ macos-latest ]
+        operating-system: [ macos-latest, ubuntu-latest ]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
