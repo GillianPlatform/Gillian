@@ -2,9 +2,7 @@
 
 file=$1
 fold=${file%/*}
-name=${file##*/} 
-
-filename=$(echo "$file" | cut -f 1 -d '.')
+name=${file##*/}
 
 RED='\033[0;31m'
 LIGHTGREEN='\033[1;32m'
@@ -15,14 +13,11 @@ time {
 	echo "-------- Verifying: $file --------"
 	il=il;
 	bi=BI_;
-	echo "Running JS-2-JSIL on file $file"
-	./js2jsil.native -file $file -bi &> /dev/null  
-	rc=$?; if [[ $rc != 0 ]]; then printf "${RED}Failed JS-2-JSIL on $file ${NC}\n"; fi
 	echo "Running ACT on file $file"
-	./act.native -file $filename.gil -js -silent > $file.specs
+	esy x gillian-js act $file -s > $file.specs
 	rc=$?; if [[ $rc != 0 ]]; then echo "Failed ACT on $file"; fi
-	printf "${LIGHTGREEN}" 
-	tail -3 $file.specs 
+	printf "${LIGHTGREEN}"
+	tail -3 $file.specs
 	printf "${NC}"
 }
 #echo ""
