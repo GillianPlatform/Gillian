@@ -365,7 +365,7 @@ let translate_inc_dec x is_plus err =
   (* x_r := x_n +/- 1 *)
   let x_r = fresh_var () in
   let cmd_ass_xr =
-    let (op : BinOp.t) = if is_plus then Plus else Minus in
+    let (op : BinOp.t) = if is_plus then FPlus else Minus in
     LBasic (Assignment (x_r, BinOp (PVar x_n, op, Lit (Num 1.))))
   in
 
@@ -466,7 +466,7 @@ let translate_binop_plus x1 x2 x1_v x2_v err =
   (* x_relse := x1_n + x2_n  *)
   let x_relse = fresh_var () in
   let cmd_ass_xrelse =
-    LBasic (Assignment (x_relse, BinOp (PVar x1_n, Plus, PVar x2_n)))
+    LBasic (Assignment (x_relse, BinOp (PVar x1_n, FPlus, PVar x2_n)))
   in
 
   (* end:  x_r := PHI (x_rthen, x_relse) *)
@@ -5705,7 +5705,7 @@ and translate_statement tr_ctx e =
 
       (* x_c_2 := x_c_1 + 1 *)
       let cmd_ass_incr =
-        LBasic (Assignment (x_c_2, BinOp (PVar x_c_1, Plus, Lit (Num 1.))))
+        LBasic (Assignment (x_c_2, BinOp (PVar x_c_1, FPlus, Lit (Num 1.))))
       in
 
       (*  x_ret_4 := PHI(x_ret_1, break_vars)  *)

@@ -39,7 +39,7 @@ and binop =
   | LessThan
   | LessThanEqual
   | LessThanString
-  | Plus
+  | FPlus
   | Minus
   | Times
   | Div

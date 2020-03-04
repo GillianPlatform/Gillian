@@ -126,7 +126,7 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
         | NOp (LstCat, EList lst :: tl) ->
             BinOp
               ( Lit (Num (float_of_int (List.length lst))),
-                Plus,
+                FPlus,
                 f (UnOp (LstLen, NOp (LstCat, tl))) )
         | le -> UnOp (LstLen, le) )
     | UnOp (op, le) -> UnOp (op, f le)
@@ -815,7 +815,7 @@ let rec reduce_lexpr_loop
         f (BinOp (f le2, LessThan, f le1))
     (* Special equality *)
     | BinOp
-        (BinOp (LVar x, Plus, UnOp (UnaryMinus, LVar y)), Equal, Lit (Num 0.))
+        (BinOp (LVar x, FPlus, UnOp (UnaryMinus, LVar y)), Equal, Lit (Num 0.))
       -> BinOp (LVar x, Equal, LVar y)
     (* List indexing *)
     | BinOp (le, LstNth, idx) -> (
@@ -1054,7 +1054,7 @@ let rec reduce_lexpr_loop
                         in
                         let le =
                           List.fold_left
-                            (fun ac x -> Expr.BinOp (ac, Plus, x))
+                            (fun ac x -> Expr.BinOp (ac, FPlus, x))
                             (List.hd les) (List.tl les)
                         in
                         f le
@@ -1234,10 +1234,10 @@ let rec reduce_lexpr_loop
               f (BinOp (fle2, Minus, UnOp (LstLen, lel)))
             in
             let end_in_first =
-              f (BinOp (UnOp (LstLen, lel), Minus, BinOp (fle2, Plus, fle3)))
+              f (BinOp (UnOp (LstLen, lel), Minus, BinOp (fle2, FPlus, fle3)))
             in
             let end_beyond_first =
-              f (BinOp (BinOp (fle2, Plus, fle3), Minus, UnOp (LstLen, lel)))
+              f (BinOp (BinOp (fle2, FPlus, fle3), Minus, UnOp (LstLen, lel)))
             in
 
             L.(
@@ -1359,9 +1359,9 @@ let rec reduce_lexpr_loop
                   | Some t1, Some t2 ->
                       if t1 = t2 then def else Lit (Bool false)
                   | _, _             -> def )
-            | (Plus | Minus) when lexpr_is_number ~gamma def ->
+            | (FPlus | Minus) when lexpr_is_number ~gamma def ->
                 simplify_arithmetic_lexpr pfs gamma def
-            (* | Plus when (lexpr_is_number ~gamma def) ->
+            (* | FPlus when (lexpr_is_number ~gamma def) ->
                  (match flel, fler with
                  (* 0 is the neutral *)
                  | Lit (Num 0.), x
@@ -1369,10 +1369,10 @@ let rec reduce_lexpr_loop
                  | Lit (Num x), _ when (x == nan) -> Lit (Num nan)
                  | _, Lit (Num x) when (x == nan) -> Lit (Num nan)
                  (* This can be more general *)
-                 | BinOp (Lit (Num x), Plus, y), Lit (Num z) -> BinOp (Lit (Num (x +. z)), Plus, y)
-                 | Lit (Num z), BinOp (Lit (Num x), Plus, y) -> BinOp (Lit (Num (z +. x)), Plus, y)
+                 | BinOp (Lit (Num x), FPlus, y), Lit (Num z) -> BinOp (Lit (Num (x +. z)), FPlus, y)
+                 | Lit (Num z), BinOp (Lit (Num x), FPlus, y) -> BinOp (Lit (Num (z +. x)), FPlus, y)
                  (* Associate to the right *)
-                 | BinOp (flell, Plus, flelr), fler -> BinOp (flell, Plus, BinOp (flelr, Plus, fler))
+                 | BinOp (flell, FPlus, flelr), fler -> BinOp (flell, FPlus, BinOp (flelr, FPlus, fler))
                  (* Rest *)
                  | _, _ -> def
                  )
@@ -1384,7 +1384,7 @@ let rec reduce_lexpr_loop
                  | Lit (Num x), _ when (x == nan) -> Lit (Num nan)
                  | _, Lit (Num x) when (x == nan) -> Lit (Num nan)
                  (* Transform to unary minus *)
-                 | _, _ -> BinOp (flel, Plus, (UnOp (UnaryMinus, fler)))
+                 | _, _ -> BinOp (flel, FPlus, (UnOp (UnaryMinus, fler)))
                  ) *)
             | Times when lexpr_is_number ~gamma def -> (
                 match (flel, fler) with
@@ -1554,22 +1554,22 @@ and reduce_lexpr
 and simplify_arithmetic_lexpr (pfs : PFS.t) (gamma : TypEnv.t) le =
   let f = reduce_lexpr_loop pfs gamma in
   match le with
-  | BinOp (l, Plus, Lit (Num 0.)) | BinOp (Lit (Num 0.), Plus, l) -> l
+  | BinOp (l, FPlus, Lit (Num 0.)) | BinOp (Lit (Num 0.), FPlus, l) -> l
   (* Binary minus to unary minus *)
-  | BinOp (l, Minus, r) -> f (BinOp (l, Plus, UnOp (UnaryMinus, r)))
+  | BinOp (l, Minus, r) -> f (BinOp (l, FPlus, UnOp (UnaryMinus, r)))
   (* Unary minus distributes over + *)
   | UnOp (UnaryMinus, e) -> (
       match e with
-      | BinOp (l, Plus, r) ->
-          f (BinOp (UnOp (UnaryMinus, l), Plus, UnOp (UnaryMinus, r)))
-      | _                  -> le )
-  (* Plus - we collect the positives and the negatives, see what we have and deal with them *)
-  | BinOp (l, Plus, r) -> compose_pluses_minuses (collect_pluses_minuses le)
+      | BinOp (l, FPlus, r) ->
+          f (BinOp (UnOp (UnaryMinus, l), FPlus, UnOp (UnaryMinus, r)))
+      | _                   -> le )
+  (* FPlus - we collect the positives and the negatives, see what we have and deal with them *)
+  | BinOp (l, FPlus, r) -> compose_pluses_minuses (collect_pluses_minuses le)
   | _ -> le
 
 and collect_pluses_minuses (le : Expr.t) : Expr.t list * Expr.t list =
   match le with
-  | BinOp (l, Plus, r)   ->
+  | BinOp (l, FPlus, r)  ->
       let pl, ml = collect_pluses_minuses l in
       let pr, mr = collect_pluses_minuses r in
       (List.sort Stdlib.compare (pl @ pr), List.sort Stdlib.compare (ml @ mr))
@@ -1590,14 +1590,14 @@ and compose_pluses_minuses (pluses_and_minuses : Expr.t list * Expr.t list) :
   let result =
     List.fold_right
       (fun plus (ac : Expr.t) ->
-        if ac = Lit (Num 0.) then plus else BinOp (plus, Plus, ac))
+        if ac = Lit (Num 0.) then plus else BinOp (plus, FPlus, ac))
       (pluses_stay @ minuses_stay)
       (Lit (Num 0.))
   in
   let diff = nump -. numm in
   if diff = 0. then result
   else if result = Lit (Num 0.) then Lit (Num diff)
-  else BinOp (Lit (Num diff), Plus, result)
+  else BinOp (Lit (Num diff), FPlus, result)
 
 and numbers_and_rest (numbers : Expr.t list) =
   List.fold_left
@@ -1917,7 +1917,7 @@ let rec reduce_formula_loop
             | Lit Nono, e | e, Lit Nono -> False
             | Lit (Bool true), BinOp (e1, LessThan, e2) -> Less (e1, e2)
             | Lit (Bool false), BinOp (e1, LessThan, e2) -> Not (Less (e1, e2))
-            (* Plus theory -> theory? I would not go that far *)
+            (* FPlus theory -> theory? I would not go that far *)
             | le1, le2 when lexpr_is_number le1 && lexpr_is_number le2 ->
                 (* Collect the pluses and minuses and separate them into constants and rest *)
                 let pluses1, minuses1 = collect_pluses_minuses le1 in

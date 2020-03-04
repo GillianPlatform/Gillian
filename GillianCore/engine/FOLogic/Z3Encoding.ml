@@ -774,7 +774,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
   in
 
   match op with
-  | Plus          -> binop_numbers_to_numbers mk_add le1 le2
+  | FPlus         -> binop_numbers_to_numbers mk_add le1 le2
   | Minus         -> binop_numbers_to_numbers mk_sub le1 le2
   | Times         -> binop_numbers_to_numbers mk_mul le1 le2
   | Div           -> binop_numbers_to_numbers mk_div le1 le2

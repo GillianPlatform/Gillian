@@ -7,7 +7,7 @@ type t = TypeDef__.binop =
   | LessThanEqual  (** Less or equal for numbers *)
   | LessThanString  (** Less or equal for strings *)
   (* Arithmetic *)
-  | Plus  (** Addition *)
+  | FPlus  (** Float addition *)
   | Minus  (** Subtraction *)
   | Times  (** Multiplication *)
   | Div  (** Float division *)
@@ -48,7 +48,7 @@ let str (x : t) =
   | LessThan            -> "<"
   | LessThanEqual       -> "<="
   | LessThanString      -> "<s"
-  | Plus                -> "+"
+  | FPlus               -> "f+"
   | Minus               -> "-"
   | Times               -> "*"
   | Div                 -> "/"

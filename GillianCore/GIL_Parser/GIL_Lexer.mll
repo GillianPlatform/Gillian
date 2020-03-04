@@ -172,6 +172,7 @@ rule read = parse
   | ">="                 { GIL_Parser.GREATERTHANEQUAL }
   | "<s"                 { GIL_Parser.LESSTHANSTRING}
   | "+"                  { GIL_Parser.PLUS          }
+  | "f+"                 { GIL_Parser.FPLUS         }
   | "-"                  { GIL_Parser.MINUS         }
   | "*"                  { GIL_Parser.TIMES         }
   | "/"                  { GIL_Parser.DIV           }

@@ -50,6 +50,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token GREATERTHANEQUAL
 %token LESSTHANSTRING
 %token PLUS
+%token FPLUS
 %token MINUS
 %token TIMES
 %token DIV
@@ -218,13 +219,11 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
    https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Operators/Operator_Precedence *)
 %left OR
 %left AND
-%left BITWISEOR
-%left BITWISEXOR
-%left BITWISEAND
 %nonassoc EQUAL
-%nonassoc LESSTHAN LESSTHANSTRING LESSTHANEQUAL
+%nonassoc LESSTHAN LESSTHANSTRING LESSTHANEQUAL GREATERTHAN GREATERTHANEQUAL
 %left LEFTSHIFT SIGNEDRIGHTSHIFT UNSIGNEDRIGHTSHIFT LEFTSHIFTL SIGNEDRIGHTSHIFTL UNSIGNEDRIGHTSHIFTL
-%left PLUS MINUS
+%left BITWISEOR BITWISEXOR BITWISEAND BITWISEXORL BITWISEORL BITWISEANDL
+%left FPLUS MINUS
 %left TIMES DIV MOD M_POW
 %left M_ATAN2 STRCAT SETDIFF
 
@@ -583,11 +582,11 @@ g_assertion_target:
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, type_env_pair_target); RBRACE
     { Asrt.Types type_pairs }
 (* (P) *)
-  | LBRACE; ass=g_assertion_target; RBRACE
-    { ass }
+  | LBRACE; g_assertion_target; RBRACE
+    { $2 }
 (* pure *)
-  | f = pure_assertion_target
-    { Asrt.Pure f }
+  | pure_assertion_target
+    { Asrt.Pure $1 }
 ;
 
 g_macro_target:
@@ -894,7 +893,7 @@ binop_target:
   | LESSTHAN           { LessThan }
   | LESSTHANEQUAL      { LessThanEqual }
   | LESSTHANSTRING     { LessThanString }
-  | PLUS               { Plus }
+  | FPLUS              { FPlus }
   | MINUS              { Minus }
   | TIMES              { Times }
   | DIV                { Div }

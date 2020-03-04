@@ -5,7 +5,8 @@
  (flags -open Utils -open Gil_syntax))
 
 (menhir
- (modules GIL_Parser))
+ (modules GIL_Parser)
+ (flags --explain))
 
 (ocamllex
  (modules GIL_Lexer))

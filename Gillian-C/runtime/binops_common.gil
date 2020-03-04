@@ -97,7 +97,7 @@ proc i__binop_mull(v1, v2) {
 proc unsigned(n) {
       max_size := 18446744073709551615;
       ret := n % max_size;
-      ret := ret + max_size;
+      ret := ret f+ max_size;
       ret := ret % max_size;
       fail [unsigned] ("unsigned");
       (* ret := ((n % max_size) + max_size) % max_size; *)

@@ -35,7 +35,7 @@ let compile_binop b =
     | EQUAL -> BinOp.Equal
     | LESSTHAN -> BinOp.LessThan
     | LESSEQUAL -> BinOp.LessThanEqual
-    | PLUS -> BinOp.Plus
+    | PLUS -> BinOp.FPlus
     | MINUS -> BinOp.Minus
     | TIMES -> BinOp.Times
     | DIV -> BinOp.Div
@@ -288,8 +288,8 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
     else
       match e with
       | Expr.Lit (Num n) -> Expr.Lit (Num (n +. float_of_int k))
-      | BinOp (e1, Plus, Lit (Num b)) -> Lit (Num (b +. float_of_int k))
-      | e -> BinOp (e, Plus, Lit (Num (float_of_int k)))
+      | BinOp (e1, FPlus, Lit (Num b)) -> Lit (Num (b +. float_of_int k))
+      | e -> BinOp (e, FPlus, Lit (Num (float_of_int k)))
   in
   (* compiles le1 -> lle, returns the assertion AND the list of existential variables generated *)
   let rec compile_pointsto
