@@ -221,7 +221,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LSETSUB
 %token SETOPEN
 %token SETCLOSE
-(* EOF *)
+(* End-Of-File *)
 %token EOF
 
 (***** Precedence of operators *****)
@@ -243,16 +243,15 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %left BITWISEXOR
 %left BITWISEAND
 %nonassoc EQUAL
-%nonassoc LESSTHAN LESSTHANSTRING LESSTHANEQUAL
+%nonassoc LESSTHAN LESSTHANSTRING LESSTHANEQUAL GREATERTHAN GREATERTHANEQUAL
+%nonassoc LSTCONS
 %left LEFTSHIFT SIGNEDRIGHTSHIFT UNSIGNEDRIGHTSHIFT
 %left PLUS MINUS
 %left TIMES DIV MOD M_POW
-%left M_ATAN2 LSTCAT STRCAT SETDIFF
+%left M_ATAN2 STRCAT SETDIFF
 
 %nonassoc binop_prec
 %nonassoc unop_prec
-
-%nonassoc FLOAT
 
 (* Common *)
 %type <Type.t>       type_target
@@ -461,8 +460,8 @@ pure_assertion_target:
     { SetSub (left_expr, right_expr) }
   | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; ass = pure_assertion_target
     { ForAll (vars, ass) }
-  | LBRACE; f=pure_assertion_target; RBRACE
-    { f }
+  | delimited(LBRACE, pure_assertion_target, RBRACE)
+    { $1 }
 
 program_variable_target:
   | v = VAR { Expr.PVar v }
@@ -577,19 +576,26 @@ use_subst_target:
   | USESUBST; LBRACKET; lab=VAR RBRACKET
       { (lab, []) }
 
+new_target:
+  | expr_target; COMMA; expr_target
+    { Some $1, Some $3}
+  | expr_target
+    { Some $1, None}
+
 cmd_target:
   | SKIP
     { LBasic (Skip) }
   | v=VAR; DEFEQ; e=expr_target
     { LBasic (Assignment (v, e)) }
-  | v=VAR; DEFEQ; NEW; LBRACE; arg_a=option(expr_target); arg_b=option(expr_target); RBRACE
+  | VAR; DEFEQ; NEW; LBRACE; option(new_target); RBRACE
     {
-      let loc, metadata = (match arg_a, arg_b with
-      | Some _, None -> None, arg_a
-      | None, Some _ -> raise (Failure "Parser: This cannot happen")
-      | _, _ -> arg_a, arg_b
+      let loc, metadata = (match $5 with
+      | Some (Some arg_a, Some arg_b) -> Some arg_a, Some arg_b
+      | Some (Some arg_a, None) -> None, Some arg_a
+      | Some (None, Some _) -> raise (Failure "Parser: Impossible")
+      | _ -> None, None
       ) in
-        LBasic (New (v, loc, metadata)) }
+        LBasic (New ($1, loc, metadata)) }
   | v=VAR; DEFEQ; LBRACKET; e1=expr_target; COMMA; e2=expr_target; RBRACKET
     { LBasic (Lookup (v, e1, e2)) }
   | LBRACKET; e1=expr_target; COMMA; e2=expr_target; RBRACKET; DEFEQ; e3=expr_target
@@ -972,8 +978,8 @@ js_pure_assertion_target:
   | LFORALL; vars = separated_nonempty_list(COMMA, js_lvar_type_target); DOT; ass = js_pure_assertion_target
     { ForAll (vars, ass) }
 (* (P) *)
-  | LBRACE; f=js_pure_assertion_target; RBRACE
-    { f }
+  | delimited(LBRACE, js_pure_assertion_target, RBRACE)
+    { $1 }
 
 js_assertion_target:
 (* Pure *)
@@ -1017,13 +1023,13 @@ js_assertion_target:
   | EMPTYFIELDS; LBRACE; le=js_lexpr_target; COLON; domain=js_lexpr_target; RBRACE
     { EmptyFields (le, domain) }
 (* Metadata (eo, em) *)
-  | LMETADATA; LBRACE; eo = js_lexpr_target; em = js_lexpr_target; RBRACE
+  | LMETADATA; LBRACE; eo = js_lexpr_target; COMMA; em = js_lexpr_target; RBRACE
     { (* validate_pred_assertion (name, params); *)
       MetaData (eo, em)
     }
 (* (P) *)
-  | LBRACE; ass=js_assertion_target; RBRACE
-    { ass }
+  | delimited(LBRACE, js_assertion_target, RBRACE)
+    { $1 }
 
 
 (* Predicates *)
@@ -1036,7 +1042,7 @@ js_named_assertion_target:
 js_pred_target:
 (* pred name (arg1, ..., argn) : [def1_id: x1, ...] def1, ..., [def1_id: x1, ...] defn ; *)
   pure = option(PURE); PRED; pred_head = pred_head_target; COLON;
-  definitions = separated_nonempty_list(COMMA, js_named_assertion_target); SCOLON
+  definitions = separated_nonempty_list(COMMA, js_named_assertion_target); SCOLON; EOF
     { (* Add the predicate to the collection *)
       let (name, num_params, params, ins) = pred_head in
       let pure = match pure with | Some _ -> true | None -> false in
@@ -1145,8 +1151,8 @@ js_logic_cmd_target:
 
 
 js_logic_cmds_target:
-  | lcmds = separated_list(SCOLON, js_logic_cmd_target); option(EOF);
-    { lcmds }
+  | separated_list(SCOLON, js_logic_cmd_target); EOF
+    { $1 }
 
 
 top_level_js_assertion_list_target:

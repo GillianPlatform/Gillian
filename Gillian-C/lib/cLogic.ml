@@ -185,7 +185,7 @@ module CLCmd = struct
     | Fold (s, el)     ->
         Format.fprintf fmt "fold @[%s(%a)@]" s (pp_list CExpr.pp) el
     | Assert (a, ex)   ->
-        Format.fprintf fmt "assert_v [exists: %a] @[%a@]"
+        Format.fprintf fmt "assert_v [[exists: %a]] @[%a@]"
           (pp_list Format.pp_print_string)
           ex CAssert.pp a
     | If (e, cl1, cl2) -> (

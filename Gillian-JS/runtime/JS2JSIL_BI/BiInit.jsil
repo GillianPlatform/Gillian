@@ -38,7 +38,7 @@ proc create_default_object_concrete (l, pr, cl, ext) {
 
         (* Create metadata and object *)
   set:  m := new(null);
-        ret := new(l m);
+        ret := new(l, m);
 
         (* Set the internal properties in the metadata *)
         [m, "@proto"] := pr;

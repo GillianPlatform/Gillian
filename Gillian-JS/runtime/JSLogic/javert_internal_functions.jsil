@@ -19,7 +19,7 @@ pred JSObjWithProto (+l:Obj, proto) :
   ((#md, "@class")      -> "Object") *
   ((#md, "@extensible") -> true) *
   empty_fields (#md : -{ "@class", "@extensible", "@proto" }-);
-  
+
 pred JSObjGeneral (+l:Obj, proto, class:Str, ext:Bool) :
   MetaData(l, #md) * MetaData(#md, null) *
   ((#md, "@proto")      -> proto) *
@@ -31,41 +31,41 @@ pred JSObjGeneral (+l:Obj, proto, class:Str, ext:Bool) :
  **** FUNCTION OBJECTS ****
  **************************)
 
-pred JSFunctionObject (+l:Obj, fid:Str, sc:List, len:Num, proto:Obj) : 
+pred JSFunctionObject (+l:Obj, fid:Str, sc:List, len:Num, proto:Obj) :
   ((l, "length")     -> {{ "d", len, false, false, false }}) *
   ((l, "arguments")  -> {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }}) *
   ((l, "caller")     -> {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }}) *
   ((l, "prototype")  -> {{ "d", proto, true, false, false }}) *
   MetaData(l, #md) * MetaData(#md, null) *
-  ((#md, "@proto")      -> $lfun_proto) * 
+  ((#md, "@proto")      -> $lfun_proto) *
   ((#md, "@class")      -> "Function") *
-  ((#md, "@extensible") -> true) * 
-  ((#md, "@call")       -> fid) * 
+  ((#md, "@extensible") -> true) *
+  ((#md, "@call")       -> fid) *
   ((#md, "@construct")  -> fid) *
   ((#md, "@scope")      -> sc) *
   empty_fields(#md : -{ "@call", "@class", "@construct", "@extensible", "@proto", "@scope" }-);
 
-pred JSFunctionObjectStrong (+l:Obj, fid:Str, sc:List, len:Num, proto:Obj) : 
+pred JSFunctionObjectStrong (+l:Obj, fid:Str, sc:List, len:Num, proto:Obj) :
   JSFunctionObject (l, fid, sc, len, proto) *
   empty_fields(l : -{ "arguments", "caller", "length", "prototype" }-);
 
-pred JSBIFunction (+l:Obj, fid:Str, len:Num) : 
+pred JSBIFunction (+l:Obj, fid:Str, len:Num) :
   ((l, "length")     -> {{ "d", len, false, false, false }}) *
   MetaData(l, #md) * MetaData(#md, null) *
-  ((#md, "@proto")      -> $lfun_proto) * 
+  ((#md, "@proto")      -> $lfun_proto) *
   ((#md, "@class")      -> "Function") *
-  ((#md, "@extensible") -> true) * 
-  ((#md, "@call")       -> fid) * 
+  ((#md, "@extensible") -> true) *
+  ((#md, "@call")       -> fid) *
   ((#md, "@scope")      -> empty) *
   empty_fields(#md : -{ "@call", "@class", "@extensible", "@proto", "@scope" }-);
 
-pred BIFunctionObject (+l:Obj, len:Num, proto:Obj, call, construct) : 
+pred BIFunctionObject (+l:Obj, len:Num, proto:Obj, call, construct) :
   ((l, "length")     -> {{ "d", len, false, false, false }}) *
   ((l, "prototype")  -> {{ "d", proto, false, false, false }}) *
   MetaData(l, #md) * MetaData(#md, null) *
-  ((#md, "@proto")      -> $lfun_proto) * 
+  ((#md, "@proto")      -> $lfun_proto) *
   ((#md, "@class")      -> "Function") *
-  ((#md, "@extensible") -> true) * 
+  ((#md, "@extensible") -> true) *
   ((#md, "@scope")      -> empty) *
   ((#md, "@call")       -> call) *
   ((#md, "@construct")  -> construct) *
@@ -82,9 +82,9 @@ pred BooleanObject (+l:Obj, b:Bool) :
   ((#md, "@extensible") -> true) *
   ((#md, "@primitiveValue") -> b) *
   empty_fields (#md : -{ "@class", "@extensible", "@primitiveValue", "@proto" }-);
-  
+
 pred NumberObject (+l:Obj, n:Num) :
-  MetaData(l, #md) * MetaData(#md, null) * 
+  MetaData(l, #md) * MetaData(#md, null) *
   ((#md, "@proto")      -> $lnum_proto) *
   ((#md, "@class")      -> "Number") *
   ((#md, "@extensible") -> true) *
@@ -99,10 +99,10 @@ pred BooleanPrototype () :
   ((#bpmd, "@extensible")     -> true) *
   ((#bpmd, "@primitiveValue") -> false) *
   empty_fields (#bpmd : -{ "@class", "@extensible", "@primitiveValue", "@proto" }-);
-  
+
 pred NumberPrototype () :
   (($lnum_proto, "constructor") -> {{ "d", $lnum, true, false, true }}) *
-  MetaData($lnum_proto, #npmd) * MetaData(#npmd, null) * 
+  MetaData($lnum_proto, #npmd) * MetaData(#npmd, null) *
   ((#npmd, "@proto")          -> $lobj_proto) *
   ((#npmd, "@class")          -> "Number") *
   ((#npmd, "@extensible")     -> true) *
@@ -110,20 +110,20 @@ pred NumberPrototype () :
   empty_fields (#npmd : -{ "@class", "@extensible", "@primitiveValue", "@proto" }-);
 
 pred GlobalObject () :
-  JSObject ($lg) * 
+  JSObject ($lg) *
   (($lg, "Error") -> {{ "d", $lerr, true, false, true }}) *
   (($lg, "Object") -> {{ "d", $lobj, true, false, true }}) *
   (($lg, "DataView") -> {{ "d", $ldv, true, false, true }});
 
 pred GlobalVar (+v, val) :
-  (($lg, v) -> {{ "d", val, true, true, false }}) * types(v : Str); 
+  (($lg, v) -> {{ "d", val, true, true, false }}) * types(v : Str);
 
-pred BI_ObjectObject () : 
+pred BI_ObjectObject () :
   BIFunctionObject ($lobj, 0, $lobj_proto, "Object_call", "Object_construct") *
   DataPropConst($lobj, "prototype", $lobj_proto, false) *
-  DataPropGen ($lobj, "create", $lobj_create, true, false, true) * 
+  DataPropGen ($lobj, "create", $lobj_create, true, false, true) *
   JSBIFunction($lobj_create, "Object_create", 2) * empty_fields($lobj_create : -{ "length" }-);
-    
+
 pred ObjectPrototype () :
   JSObjWithProto ($lobj_proto, null) * empty_fields ($lobj_proto : -{ "hasOwnProperty" }-) *
   (($lobj_proto, "hasOwnProperty") -> {{ "d", $lop_hasOwnProperty, true, false, true }}) *
@@ -133,7 +133,7 @@ pred ObjectPrototypeComplete () :
   JSObjWithProto ($lobj_proto, null) * empty_fields ($lobj_proto : -{ "hasOwnProperty", "toString" }-) *
   (($lobj_proto, "hasOwnProperty") -> {{ "d", $lop_hasOwnProperty, true, false, true }}) *
   (($lobj_proto, "toString") -> {{ "d", $lop_toString, true, false, true }}) *
-  JSBIFunction($lop_hasOwnProperty, "OP_hasOwnProperty", 1) * empty_fields($lop_hasOwnProperty : -{ "length" }-) * 
+  JSBIFunction($lop_hasOwnProperty, "OP_hasOwnProperty", 1) * empty_fields($lop_hasOwnProperty : -{ "length" }-) *
   JSBIFunction($lop_toString, "OP_toString", 1) * empty_fields($lop_toString : -{ "length" }-);
 
 pred FunctionPrototype () :
@@ -154,7 +154,7 @@ pred BI_ErrorObject () :
 (***********************
  **** ERROR OBJECTS ****
  ***********************)
- 
+
 pred ErrorObject (+l:Obj, pr:Obj) :
   JSObjGeneral(l, pr, "Error", true);
 
@@ -172,11 +172,11 @@ pred ReferenceError(l:Obj) : ErrorObject (l, $lrferr_proto);
 (************************
  ***** INITIAL HEAP *****
  ************************)
- 
+
 pred initialHeapPost (globals) :
     types(globals:Set) *
 
-    GlobalObject() * 
+    GlobalObject() *
     empty_fields ($lg : -u- (-{ "Error", "Object", "DataView" }-, globals) ) *
 
     ObjectPrototype () *
@@ -185,17 +185,17 @@ pred initialHeapPost (globals) :
     NumberPrototype ()  * empty_fields ($lnum_proto : -{ "constructor" }-) *
 
     BI_ErrorObject () * empty_fields($lerr : -{ "length", "prototype" }-) *
-     
-    JSObjGeneral ($lerr_proto, $lobj_proto, "Error", true) * 
+
+    JSObjGeneral ($lerr_proto, $lobj_proto, "Error", true) *
     (($lerr_proto, "message") -> {{ "d", "", true, false, true }}) *
     empty_fields($lerr_proto : -{ "message" }-);
 
 pred initialHeapPostWeak ( ) :
     GlobalObject() *
 
-    ObjectPrototype () * 
+    ObjectPrototype () *
 
-    FunctionPrototype () * 
+    FunctionPrototype () *
 
     BooleanPrototype () *
     empty_fields ($lbool_proto : -{ "constructor" }-) *
@@ -205,7 +205,7 @@ pred initialHeapPostWeak ( ) :
 
     BI_ErrorObject () * empty_fields($lerr : -{ "length", "prototype" }-) *
 
-    JSObjGeneral ($lerr_proto, $lobj_proto, "Error", true) * 
+    JSObjGeneral ($lerr_proto, $lobj_proto, "Error", true) *
     (($lerr_proto, "message") -> {{ "d", "", true, false, true }}) *
     empty_fields($lerr_proto : -{ "message" }-);
 
@@ -216,19 +216,19 @@ pred initialHeapPostWeak ( ) :
 pred DataProp (+l:Obj, +prop:Str, v) :
   ((l, prop) -> {{ "d", v, true, true, true }}) *
   (! (v == empty)) * (! (v == none)) * (! (typeOf v == List));
-  
-pred DataPropGen (+l:Obj, +prop:Str, v, writ:Bool, enum:Bool, conf:Bool) : 
+
+pred DataPropGen (+l:Obj, +prop:Str, v, writ:Bool, enum:Bool, conf:Bool) :
   ((l, prop) -> {{ "d", v, writ, enum, conf }}) *
   (! (v == empty)) * (! (typeOf v == List));
-  
+
 pred DataPropConst (+l:Obj, +prop:Str, v, enum:Bool) :
-  ((l, prop) -> {{ "d", v, false, enum, false }}) * 
+  ((l, prop) -> {{ "d", v, false, enum, false }}) *
   (! (v == empty)) * (! (typeOf v == List));
 
 (*********************
  **** DESCRIPTORS ****
  *********************)
- 
+
  (*
  * Predicate: DataDescriptor
  *
@@ -237,7 +237,7 @@ pred DataPropConst (+l:Obj, +prop:Str, v, enum:Bool) :
  *)
 pure pred DataDescriptor (d:List) :
   (d == {{ "d", #dval, #dwrit, #denum, #dconf }}) *
-  types (#dwrit:Bool, #denum:Bool, #dconf:Bool) * 
+  types (#dwrit:Bool, #denum:Bool, #dconf:Bool) *
   (! (#dval == empty));
 
  (*
@@ -248,7 +248,7 @@ pure pred DataDescriptor (d:List) :
  *)
 pure pred AccessorDescriptor (d:List) :
   (d == {{ "a", #dget, #dset, #denum, #dconf }}) *
-  types (#denum:Bool, #dconf:Bool) * 
+  types (#denum:Bool, #dconf:Bool) *
   (! (#dget == empty)) * (! (#dset == empty));
 
 (*
@@ -277,10 +277,10 @@ pure pred desc_enum (+d:List, v:Bool) :
 
 pure pred desc_conf (+d:List, v:Bool) :
     v == l-nth(d, 4);
-    
+
 (*********************
  **** OBJECT CELL ****
- *********************) 
+ *********************)
 
 (*
  * Predicate: Cell_o(l, prop, X)
@@ -296,8 +296,8 @@ pred Cell_o (+l:Obj, +prop:Str, d) :
 
 (**************************
  **** CLASS CLASSIFIERS ***
- **************************)  
- 
+ **************************)
+
 (*
  * Predicate: isClass(c, X)
  *
@@ -309,7 +309,7 @@ pure pred isClass (c:Str, case:Str) :
   (case == "Array")      * (c == "Array"),
   (case == "String")     * (c == "String"),
   (case == "Non-Array")  * (! (c == "Array")),
-  (case == "Non-String") * (! (c == "String")); 
+  (case == "Non-String") * (! (c == "String"));
 
 (**********************************
  **** PI: PROTOTYPE INHERITANCE ***
@@ -329,17 +329,17 @@ pred Pi (+l:Obj, +prop:Str, d, ls:List, lcls:List, lpv:List) :
     (#lls == #lp :: #ols) * (#lcls == #pcls :: #ocls) * (#lpv == #ppv :: #otv) *
     types(#lp:Obj, #pcls:Str, #ppv:Str) *
     Pi (#lp, prop, d, #lls, #lcls, #lpv),
-  
+
     (* Non-string object, cell does not exist in the heap, end of prototype chain *)
     Cell_o (l, prop, none) * (d == undefined) *
-    MetaData(l, #md) * ((#md, "@class") -> #cls) * isClass (#cls, "Non-String") *  ((#md, "@proto") -> null) * 
+    MetaData(l, #md) * ((#md, "@class") -> #cls) * isClass (#cls, "Non-String") *  ((#md, "@proto") -> null) *
     (ls == {{ l }}) * (lcls == {{ #cls }}) * (lpv == {{ "" }});
 
 (*******************
  *******************
  ***** OBJECTS *****
  *******************
- *******************)    
+ *******************)
 
 (* ***********************
  * CREATE_DEFAULT_OBJECT *
@@ -351,11 +351,11 @@ proc create_default_object (pr, cl, ext) {
   scl:  cl := "Object";
   text: goto [ext = undefined] sext set;
   sext: ext := true;
-  
+
         (* Create metadata and object *)
-  set:  m := new(null); 
+  set:  m := new(null);
         ret := new(m);
-      
+
         (* Set the internal properties in the metadata *)
         [m, "@proto"] := pr;
         [m, "@class"] := cl;
@@ -370,11 +370,11 @@ proc create_default_object_concrete (l, pr, cl, ext) {
   scl:  cl := "Object";
   text: goto [ext = undefined] sext set;
   sext: ext := true;
-  
+
         (* Create metadata and object *)
-  set:  m := new(null); 
-        ret := new(l m);
-      
+  set:  m := new(null);
+        ret := new(l, m);
+
         (* Set the internal properties in the metadata *)
         [m, "@proto"] := pr;
         [m, "@class"] := cl;
@@ -389,11 +389,11 @@ proc create_default_object_concrete (l, pr, cl, ext) {
  ********************)
 
 spec Object_construct (xsc, vthis, l)
-    
+
     [[ (l == #l) * types(#l:Undefined) ]]
     [[ JSObject(ret) * empty_fields(ret : -{ }-) ]]
     normal
-    
+
     (* TODO: for Object, Boolean, Number, String *)
 
 proc Object_construct (xsc, vthis, l) {
@@ -416,43 +416,43 @@ proc Object_construct (xsc, vthis, l) {
 
 spec create_object_with_call_construct (call, construct, len)
 
-    [[ 
+    [[
       (call == #call) * (construct == empty) * (len == #len) *
       types(#call:Str, #len:Num)
     ]]
-    [[ 
+    [[
       (ret == #l) *
-      ((#l, "length") -> {{ "d", #len, false, false, false }}) * 
+      ((#l, "length") -> {{ "d", #len, false, false, false }}) *
       empty_fields(#l : -{ "length" }-) *
       MetaData(#l, #md) * MetaData(#md, null) *
       ((#md, "@proto")      -> $lfun_proto) *
       ((#md, "@class")      -> "Function") *
       ((#md, "@extensible") -> true) *
-      ((#md, "@scope")      -> empty) * 
+      ((#md, "@scope")      -> empty) *
       ((#md, "@call")       -> #call) *
       empty_fields(#md : -{ "@call", "@class", "@extensible", "@proto", "@scope" }-)
     ]]
     normal;
 
-    [[ 
+    [[
       (call == #call) * (construct == #construct) * (len == #len) *
-      types(#call:Str, #construct:Str, #len:Num) 
+      types(#call:Str, #construct:Str, #len:Num)
     ]]
-    [[ 
+    [[
       (ret == #l) *
-      ((#l, "length") -> {{ "d", #len, false, false, false }}) *  
+      ((#l, "length") -> {{ "d", #len, false, false, false }}) *
       empty_fields(#l : -{ "length" }-) *
       MetaData(#l, #md) * MetaData(#md, null) *
       ((#md, "@proto")      -> $lfun_proto) *
       ((#md, "@class")      -> "Function") *
       ((#md, "@extensible") -> true) *
-      ((#md, "@scope")      -> empty) * 
+      ((#md, "@scope")      -> empty) *
       ((#md, "@call")       -> #call) *
       ((#md, "@construct")  -> #construct) *
       empty_fields(#md : -{ "@call", "@class", "@construct", "@extensible", "@proto", "@scope" }-)
     ]]
     normal
-    
+
 proc create_object_with_call_construct (call, construct, len) {
 
         ret := "create_default_object" ($lfun_proto, "Function", true);
@@ -461,11 +461,11 @@ proc create_object_with_call_construct (call, construct, len) {
 
         (* Get the metadata *)
         m := metadata(ret);
-      
+
         (* Set the internal scope, call and construct properties *)
         [m, "@scope"] := empty;
         [m, "@call"] := call;
-      
+
         goto [construct = empty] rlab cstr;
 
   cstr: [m, "@construct"] := construct;
@@ -481,11 +481,11 @@ proc create_object_with_call_construct_concrete (l, call, construct, len) {
 
         (* Get the metadata *)
         m := metadata(ret);
-      
+
         (* Set the internal scope, call and construct properties *)
         [m, "@scope"] := empty;
         [m, "@call"] := call;
-      
+
         goto [construct = empty] rlab cstr;
 
   cstr: [m, "@construct"] := construct;
@@ -500,17 +500,17 @@ proc create_object_with_call_construct_concrete (l, call, construct, len) {
 
 spec create_function_object (xsc, call, construct, params)
 
-    [[ 
+    [[
       (xsc == #xsc) * (call == #call) * (construct == #construct) * (params == #params) * (#call == #construct) *
-      types(#xsc:List, #call:Str, #construct:Str, #params:List) 
+      types(#xsc:List, #call:Str, #construct:Str, #params:List)
     ]]
-    [[ 
-      JSFunctionObject(ret, #call, #xsc, #len, #prototype) * 
+    [[
+      JSFunctionObject(ret, #call, #xsc, #len, #prototype) *
       empty_fields(ret : -{ "arguments", "caller", "length", "prototype" }-) *
       (#len == l-len #params) *
       JSObject(#prototype) *
       ((#prototype, "constructor") -> {{ "d", ret, true, false, true }}) *
-      empty_fields(#prototype : -{ "constructor" }-) 
+      empty_fields(#prototype : -{ "constructor" }-)
     ]]
     normal
 
@@ -538,7 +538,7 @@ proc create_function_object (xsc, call, construct, params) {
 (************************
  ***** INITIAL HEAP *****
  ************************)
- 
+
 spec setupInitialHeap ()
 
   [[ emp ]]
@@ -552,9 +552,9 @@ proc setupInitialHeap () {
 
     (* Object.prototype *)
     ret := "create_default_object_concrete" ($lobj_proto, null, "Object", true);
-    
+
     [$lobj_proto, "hasOwnProperty"] := {{ "d", $lop_hasOwnProperty, true, false, true }};
-      
+
     ret := "create_object_with_call_construct_concrete" ($lop_hasOwnProperty, "OP_hasOwnProperty", empty, 1);
 
     (* Function.prototype *)
@@ -565,21 +565,21 @@ proc setupInitialHeap () {
     [$lfun_proto, "call"]        := {{ "d", $lfp_call, true, false, true }};
 
     ret := "create_object_with_call_construct_concrete" ($lfp_call, "FP_call", empty, 1);
-      
+
     (* Boolean.prototype *)
     ret := "create_default_object_concrete" ($lbool_proto, $lobj_proto, "Boolean", true);
-    
-    m := metadata($lbool_proto); 
+
+    m := metadata($lbool_proto);
     [m, "@primitiveValue"] := false;
     [$lbool_proto, "constructor"] := {{ "d", $lbool, true, false, true }};
-    
+
     (* Number.prototype *)
     ret := "create_default_object_concrete" ($lnum_proto, $lobj_proto, "Number", true);
 
     m := metadata($lnum_proto);
     [m, "@primitiveValue"] := 0;
     [$lnum_proto, "constructor"] := {{ "d", $lnum, true, false, true }};
-    
+
     (* Error object *)
     ret := "create_object_with_call_construct_concrete" ($lerr, "Error_call", "Error_construct", 1);
     [$lg, "Error"] := {{ "d", $lerr, true, false, true }};
@@ -599,7 +599,7 @@ proc setupInitialHeap () {
  ******************
  ***** ERRORS *****
  ******************
- ******************)  
+ ******************)
 
 (*******************
  * ERROR_CONSTRUCT *
@@ -683,13 +683,13 @@ proc SyntaxError (v) {
  *********************************
  ***** BUILT-IN CONSTRUCTORS *****
  *********************************
- *********************************)  
+ *********************************)
 
 (* ************************* *)
 (* *** BOOLEAN_CONSTRUCT *** *)
-(* ************************* *)  
+(* ************************* *)
 
-spec Boolean_construct (xsc, vthis, v) 
+spec Boolean_construct (xsc, vthis, v)
 
   [[ (v == #v) * types(v:Bool) ]]
   [[ BooleanObject(ret, #v) * empty_fields(ret : -{ }-) ]]
@@ -710,7 +710,7 @@ proc Boolean_construct (xsc, vthis, v) {
 (* *** NUMBER_CONSTRUCT *** *)
 (* ************************ *)
 
-spec Number_construct (xsc, vthis, v) 
+spec Number_construct (xsc, vthis, v)
 
   [[ (v == #v) * types(v:Num) ]]
   [[ NumberObject(ret, #v) * empty_fields(ret : -{ }-) ]]
@@ -733,7 +733,7 @@ proc Number_construct (xsc, vthis, v) {
  ***********************
  ***** CONVERSIONS *****
  ***********************
- ***********************)  
+ ***********************)
 
 (* *************
  * I__TOSTRING *
@@ -748,11 +748,11 @@ spec i__toString (v)
   [[ v == null ]]
   [[ ret == "null" ]]
   normal;
-  
+
   [[ v == true ]]
   [[ ret == "true" ]]
   normal;
-  
+
   [[ v == false ]]
   [[ ret == "false" ]]
   normal;
@@ -760,7 +760,7 @@ spec i__toString (v)
   [[ (v == #v) * types(#v:Num) ]]
   [[ (ret == (num_to_string #v)) ]]
   normal;
-  
+
   [[ (v == #v) * types(#v:Str) ]]
   [[ (ret == #v) ]]
   normal
@@ -776,7 +776,7 @@ proc i__toString (v) {
 
   ib:    goto [typeOf v = Bool] bool inum;
   bool:  goto [v = true] is_t is_f;
-  
+
   is_t:  ret := "true";
          return;
 
@@ -801,11 +801,11 @@ proc i__toString (v) {
 
 
 proc OP_toString (sc, v) {
-   ret := "i__toString" (v) with elab; 
-   return; 
+   ret := "i__toString" (v) with elab;
+   return;
 
- elab: throw  
-}; 
+ elab: throw
+};
 
 
 
@@ -843,7 +843,7 @@ proc i__toNumber (v) {
         goto rlab;
 
   rlab: return;
-        
+
   err:  ret := "Impossible.";
   elab: throw
 };
@@ -852,7 +852,7 @@ proc i__toNumber (v) {
  * I__TOOBJECT *
  ***************)
 
-spec i__toObject (v) 
+spec i__toObject (v)
 
   [[ (v == #v) * types(#v:Obj) ]]
   [[ (ret == #v) ]]
@@ -861,7 +861,7 @@ spec i__toObject (v)
   [[ (v == #v) * types(#v:Bool) ]]
   [[ BooleanObject(ret, #v) * empty_fields(ret : -{ }-) ]]
   normal;
-  
+
   [[ (v == #v) * types(#v:Num) ]]
   [[ NumberObject(ret, #v) * empty_fields(ret : -{ }-) ]]
   normal
@@ -936,7 +936,7 @@ proc i__toBoolean (v) {
 
 (* ********************** *)
 (* *** I__TOPRIMITIVE *** *)
-(* ********************** 
+(* **********************
 
 spec i__toPrimitive (v, hint)
 
@@ -985,30 +985,30 @@ proc i__toPrimitive (v, hint) {
  ***********************
  ***** AUXILIARIES *****
  ***********************
- ***********************)  
+ ***********************)
 
 (* ***************** *)
 (* *** I__TYPEOF *** *)
-(* ***************** 
+(* *****************
 
 spec i__typeOf (v)
 
   [[ (v == #v) * types(#v : Undefined) ]]
   [[ (ret == "undefined") ]]
-  normal; 
+  normal;
 
   [[ (v == #v) * types(#v : Null) ]]
   [[ (ret == "object") ]]
-  normal; 
-  
+  normal;
+
   [[ (v == #v) * types(#v : Bool) ]]
   [[ (ret == "boolean") ]]
-  normal; 
-  
+  normal;
+
   [[ (v == #v) * types(#v : Num) ]]
   [[ (ret == "number") ]]
-  normal; 
-  
+  normal;
+
   [[ (v == #v) * types(#v : Str) ]]
   [[ (ret == "string") ]]
   normal *)
@@ -1067,7 +1067,7 @@ spec i__strictEquality (v1, v2)
    normal;
 
    [[ (v1 == #v1) * (v2 == #v2) ]]
-   [[ 
+   [[
        (ret == true) * (#v1 == #v2);
        (ret == false) * (! (#v1 == #v2))
    ]]
@@ -1085,29 +1085,29 @@ proc i__strictEquality (v1, v2) {
 
 spec i__abstractComparison (v1, v2, leftFirst)
 
-    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) * 
+    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) *
        types(#v1:Num, #v2:Num, #leftFirst:Bool) * (#v1 <# #v2) ]]
     [[ (ret == true) ]]
     normal;
 
-    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) * 
+    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) *
        types(#v1:Num, #v2:Num, #leftFirst:Bool) * (#v1 == #v2) ]]
     [[ (ret == false) ]]
     normal;
 
-    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) * 
+    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) *
        types(#v1:Num, #v2:Num, #leftFirst:Bool) * (#v2 <# #v1) ]]
     [[ (ret == false) ]]
     normal;
 
-    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) * 
+    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) *
        types(#v1:Num, #v2:Num, #leftFirst:Bool) * (#v2 <=# #v1) ]]
     [[ (ret == false) ]]
     normal;
 
-    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) * 
+    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) *
        types(#v1:Num, #v2:Num, #leftFirst:Bool) ]]
-    [[ 
+    [[
         (ret == true) * (#v1 <# v2);
         (ret == false) * (#v1 == v2);
         (ret == false) * (#v2 <# v1)
@@ -1159,7 +1159,7 @@ proc i__abstractComparison (v1, v2, leftFirst) {
 
 (* *********************
    *** I__ISCALLABLE ***
-   ********************* 
+   *********************
 
 spec i__isCallable (l)
 
@@ -1185,15 +1185,15 @@ proc i__isCallable (l) {
 
 proc i__sameValue (v1, v2) {
 
-  nonum: goto [v1 = v2] rt rf; 
+  nonum: goto [v1 = v2] rt rf;
 
   rt:    ret := true;
          return;
-          
+
   rf:    ret := false;
   rlab:  return
 };
- 
+
 (* ********************************
    *** I__CHECKASSIGNMENTERRORS ***
    ******************************** *)
@@ -1213,7 +1213,7 @@ proc i__checkAssignmentErrors (v) {
 	se:		ret := "SyntaxError" ();
 	elab:   throw
 };
- 
+
 (* *******************************
    *** I__CHECKOBJECTCOERCIBLE ***
    ******************************* *)
@@ -1360,7 +1360,7 @@ proc i__toDataDescriptor (desc) {
          goto rlab;
 
   rd:    ret3 := desc;
-  
+
   rlab:  PHI(ret: ret1, ret2, ret3);
          return
 };
@@ -1376,7 +1376,7 @@ proc i__toDataDescriptor (desc) {
    ************************* *)
 
 (*
- *    Name: o__getOwnProperty 
+ *    Name: o__getOwnProperty
  * Purpose: Get own property of a non-String object
  *
  *   Specs:
@@ -1384,7 +1384,7 @@ proc i__toDataDescriptor (desc) {
  * 01 - Property not defined, rtrn undefined
  * 02 - Property defined, rtrn property descriptor
  *
- 
+
 
 spec o__getOwnProperty (l, prop)
 
@@ -1412,7 +1412,7 @@ proc o__getOwnProperty (l, prop) {
    ********************** *)
 
 (*
- *    Name: getOwnProperty 
+ *    Name: getOwnProperty
  * Purpose: Get own property of a (general) object
  *
  *   Specs:
@@ -1420,13 +1420,13 @@ proc o__getOwnProperty (l, prop) {
  * 01 - Non-string object, property not defined, rtrn undefined
  * 02 - Non-string object, property defined, rtrn property descriptor
  *
- 
+
 
 spec getOwnProperty (l, prop)
 
     [[ (l == #l) * (prop == #prop) * Cell_o (#l, #prop, none) *
        MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
-    [[ Cell_o (#l, #prop, none) * 
+    [[ Cell_o (#l, #prop, none) *
        MetaData(#l, #md) * ((#md, "@class") -> #cls) * (ret == undefined) ]]
     normal;
 
@@ -1452,13 +1452,13 @@ proc getOwnProperty (l, prop) {
 };
 
 (*
- *    Name: getProperty 
+ *    Name: getProperty
  * Purpose: Get property of a (general) object, considering prototype inheritance
  *
  *   Specs:
  *
  * 01 - Get the heap value associated with the appropriate Pi
- 
+
 
 spec getProperty (l, prop)
 
@@ -1486,14 +1486,14 @@ proc getProperty (l, prop) {
 (* *********** *)
 
 (*
- *    Name: get 
+ *    Name: get
  * Purpose: Get the value of a property of a (general) object in the entire prototype chain
  *
  *   Specs:
  *
  * 01 - Property not defined in the prototype chain, rtrn undefined ]
- * 02 - Property defined, data descriptor, get value of the descriptor 
- 
+ * 02 - Property defined, data descriptor, get value of the descriptor
+
 
 spec get (l, prop)
 
@@ -1501,7 +1501,7 @@ spec get (l, prop)
        Pi (#l, #prop, #d, #ls, #cls, #pv) * (#d == undefined)  ]]
     [[ Pi (#l, #prop, #d, #ls, #cls, #pv) * (ret == undefined) ]]
     normal;
-    
+
     [[ (l == #l) * (prop == #prop) *
        Pi (#l, #prop, #d, #ls, #cls, #pv) * DataDescriptor(#d) ]]
     [[ Pi (#l, #prop, #d, #ls, #cls, #pv) * desc_val (#d, ret) ]]
@@ -1542,18 +1542,18 @@ proc get (l, prop) {
  * 09 - Variable reference, lg, undefined
  * 10 - Variable reference, lg, defined
  * 11 - Variable reference, non-lg, directly from the heap
- * 12-13 - Base undefined for both variable and object references, rtrn a reference error 
+ * 12-13 - Base undefined for both variable and object references, rtrn a reference error
  *
  * Remaining:
  *
  * Object conversion:
- * 
- * 14-19 - Conversion to Number, String, Boolean, property exists or doesn't 
+ *
+ * 14-19 - Conversion to Number, String, Boolean, property exists or doesn't
  *
  * Unsupported:
  *
  * 20-?? - Getters
- 
+
 
 spec i__getValue (v)
 
@@ -1589,17 +1589,17 @@ spec i__getValue (v)
     [[ ReferenceError(ret) ]]
     error;
 
-    [[ (v == {{ "o", #obj, #field, true }}) * 
+    [[ (v == {{ "o", #obj, #field, true }}) *
        Pi (#obj, #field, #d, #ls, #lcls, #lpv) * (#d == undefined) ]]
     [[ Pi (#obj, #field, #d, #ls, #lcls, #lpv) * (ret == undefined) ]]
     normal;
 
-    [[ (v == {{ "o", #obj, #field, true }}) * 
+    [[ (v == {{ "o", #obj, #field, true }}) *
        Pi (#obj, #field, #d, #ls, #lcls, #lpv) * DataDescriptor (#d)  ]]
     [[ Pi (#obj, #field, #d, #ls, #lcls, #lpv) * desc_val (#d, #desc_val) * (ret == #desc_val) ]]
     normal;
 
-    [[ (v == {{ "v", $lg, #field, true }}) * 
+    [[ (v == {{ "v", $lg, #field, true }}) *
        Pi ($lg, #field, #d, #ls, #lcls, #lpv) * (#d == undefined) ]]
     [[ Pi ($lg, #field, #d, #ls, #lcls, #lpv) * (ret == undefined) ]]
     normal;
@@ -1613,7 +1613,7 @@ spec i__getValue (v)
     [[ ((#obj, #field) -> #value) * (ret == #value) ]]
     normal
 
-    (* Now come the more involved specs, which are a bit difficult for the solver. 
+    (* Now come the more involved specs, which are a bit difficult for the solver.
 
     [[ (v == {{ "o", #b, #field }}) * types(#b:Bool) * Pi($lbool_proto, #field, #d, ($lbool_proto :: #ols), ("Boolean" :: #ocls), ("" :: #opv)) * (#d == undefined) ]]
     [[ Pi($lbool_proto, #field, #d, ($lbool_proto :: #ols), ("Boolean" :: #ocls), ("" :: #opv)) * (ret == undefined) ]]
@@ -1636,7 +1636,7 @@ proc i__getValue (v) {
 			goto [(typeOf v = List)] rcand dflt;
 
    	rcand:  rbase := l-nth (v, 1);
-			goto [rbase = undefined] thrw prim;  
+			goto [rbase = undefined] thrw prim;
 
 	prim:	prim := "i__isPrimitive" (rbase);
       	    goto [prim] is_pr ref;
@@ -1678,7 +1678,7 @@ proc i__getValue (v) {
 
 (* ******************* *)
 (* *** HASPROPERTY *** *)
-(* ******************* 
+(* *******************
 
 spec hasProperty (l, prop)
 
@@ -1709,28 +1709,28 @@ spec deleteProperty (l, prop, thrw)
 
     [[ (l == #l) * (prop == #prop) * Cell_o (#l, #prop, none) *
        MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
-    [[ Cell_o (#l, #prop, none) * 
+    [[ Cell_o (#l, #prop, none) *
        MetaData(#l, #md) * ((#md, "@class") -> #cls) * (ret == true) ]]
     normal;
-    
+
   [[ (l == #l) * (prop == #prop) *
-     Cell_o(#l, #prop, #d) * DataDescriptor(#d) * desc_conf(#d, true) * 
+     Cell_o(#l, #prop, #d) * DataDescriptor(#d) * desc_conf(#d, true) *
      MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
-  [[ Cell_o(#l, #prop, none) * 
+  [[ Cell_o(#l, #prop, none) *
      MetaData(#l, #md) * ((#md, "@class") -> #cls) * (ret == true) ]]
   normal;
 
   [[ (l == #l) * (prop == #prop) * (thrw == false) *
-     Cell_o(#l, #prop, #d) * DataDescriptor(#d) * desc_conf(#d, false) * 
+     Cell_o(#l, #prop, #d) * DataDescriptor(#d) * desc_conf(#d, false) *
      MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
-  [[ Cell_o(#l, #prop, #d) * 
+  [[ Cell_o(#l, #prop, #d) *
      MetaData(#l, #md) * ((#md, "@class") -> #cls) * (ret == false) ]]
   normal;
 
   [[ (l == #l) * (prop == #prop) * (thrw == true) *
-     Cell_o(#l, #prop, #d) * DataDescriptor(#d) * desc_conf(#d, false) * 
+     Cell_o(#l, #prop, #d) * DataDescriptor(#d) * desc_conf(#d, false) *
      MetaData(#l, #md) * ((#md, "@class") -> #cls) * isClass(#cls, "Non-String") ]]
-  [[ Cell_o(#l, #prop, #d) * 
+  [[ Cell_o(#l, #prop, #d) *
      MetaData(#l, #md) * ((#md, "@class") -> #cls) * TypeError(ret) ]]
   error
 
@@ -1800,16 +1800,16 @@ proc canPut (l, prop) {
 
 (* ************************* *)
 (* *** OP_HASOWNPROPERTY *** *)
-(* ************************* *) 
+(* ************************* *)
 
 spec OP_hasOwnProperty(xsc, vthis, v)
 
-  [[ (vthis == #l) * (v == #prop) * types(#l : Obj, #prop : Str) * 
+  [[ (vthis == #l) * (v == #prop) * types(#l : Obj, #prop : Str) *
      MetaData(#l, #md) * ((#md, "@class") -> "Object") * Cell_o (#l, #prop, {{ "d", #v, #wr, #en, #co }}) ]]
   [[ MetaData(#l, #md) * ((#md, "@class") -> "Object") * Cell_o (#l, #prop, {{ "d", #v, #wr, #en, #co }}) * (ret == true) ]]
   normal;
-  
-  [[ (vthis == #l) * (v == #prop) * types(#l : Obj, #prop : Str) * 
+
+  [[ (vthis == #l) * (v == #prop) * types(#l : Obj, #prop : Str) *
      MetaData(#l, #md) * ((#md, "@class") -> "Object") * Cell_o (#l, #prop, none) ]]
   [[ MetaData(#l, #md) * ((#md, "@class") -> "Object") * Cell_o (#l, #prop, none) * (ret == false) ]]
   normal
@@ -1820,12 +1820,12 @@ proc OP_hasOwnProperty(xsc, vthis, v) {
 
         ret := "i__toObject" (vthis) with elab;
         ret := "getOwnProperty" (ret, p) with elab;
-      
+
         ret := not (ret = undefined);
 
   rlab: return;
   elab: throw
-}; 
+};
 
 (* **************************** *)
 (* *** O__DEFINEOWNPROPERTY *** *)
@@ -1985,7 +1985,7 @@ proc o__defineOwnProperty (l, prop, desc, thrw) {
   rsd:    rs := l-nth (current, 2);
   seta:   [l, prop] := {{ "a", rg, rs, re, rc }};
           goto rlab;
- 
+
   celab:  ret := current;
           throw;
 
@@ -2012,7 +2012,7 @@ proc defineOwnProperty (l, prop, desc, thrw) {
         goto rlab;
 
   odop: ret_2 := "o__defineOwnProperty" (l, prop, desc, thrw) with elab;
-  
+
   rlab: PHI(ret: ret_1, ret_2);
         return;
 
@@ -2023,7 +2023,7 @@ proc defineOwnProperty (l, prop, desc, thrw) {
 (* *********** *)
 (* *** PUT *** *)
 (* *********** *)
-   
+
   (* ******* SUCCESSFUL PUT ******* *)
 
   (*
@@ -2034,7 +2034,7 @@ proc defineOwnProperty (l, prop, desc, thrw) {
    *)
 
   (* ******* UNSUCCESSFUL PUT ******* *)
- 
+
   (*
    *  5. Property is not defined in the prototype chain at all, object is not extensible, thrw
    *  6. Property is defined in the object (DD), data descriptor is not writable, thrw
@@ -2078,7 +2078,7 @@ proc put (l, prop, value, thrw) {
 
 (* ******************* *)
 (* *** I__PUTVALUE *** *)
-(* ******************* *)  
+(* ******************* *)
 
 proc i__putValue (v, w) {
 
@@ -2089,7 +2089,7 @@ proc i__putValue (v, w) {
             rstrict := l-nth (v, 3);
 			goto [rbase = undefined] thrw prim;
 
-	prim:	prim := "i__isPrimitive"(rbase); 
+	prim:	prim := "i__isPrimitive"(rbase);
 	        goto [prim and (not (rbase = undefined)) and (not (rbase = null))] is_pr refr;
 
 	refr:	goto [l-nth (v, 0) = "o"] oref vref;
@@ -2230,7 +2230,7 @@ proc i__deleteErrors (r, te, se) {
           goto [r = te] del_se del_te;
 
   del_te: ret := "i__purge" (te);
-          goto [r = se] rlab del_se; 
+          goto [r = se] rlab del_se;
 
   del_se: ret := "i__purge" (se);
   rlab:   return
