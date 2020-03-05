@@ -974,6 +974,7 @@ module Make
         | USucc state -> unify_assertion astate subst (Asrt.Pure f2)
         | res         -> res )
     | Pure (Eq (le1, le2)) when UP.outs_expr le1 <> SS.empty ->
+        L.verboser (fun fmt -> fmt "Pure equality with non-empty outs");
         let v2 = subst_in_expr_opt le2 in
         Option.fold
           ~some:(fun v2 ->
@@ -1055,6 +1056,7 @@ module Make
               raise (Failure "DEATH. BRANCHING GETPRED INSIDE UNIFICATION.")
           | GPFail errs -> make_resource_fail () )
     | Pure f ->
+        L.verboser (fun fmt -> fmt "Pure formula");
         let sbst_lst = Subst.to_ssubst subst in
         let sbst = SSubst.init sbst_lst in
         let f' = SSubst.substitute_formula sbst false f in

@@ -24,6 +24,10 @@
 %token <CodeLoc.t> SETCLOSE         /* }- */
 %token <CodeLoc.t> VDASH            /* |- */
 
+(* types *)
+%token <CodeLoc.t> TLIST
+%token <CodeLoc.t> TNUM
+
 (* names *)
 %token <CodeLoc.t * string> IDENTIFIER
 
@@ -104,7 +108,7 @@
 %type <WBinOp.t>                                   binop
 %type <WExpr.t>                                    variant_def
 %type <WLCmd.t list>                               proof_def
-%type <string * bool>                              pred_param_ins
+%type <(string * WType.t option) * bool>           pred_param_ins
 %type <CodeLoc.t * string list>                    bindings_with_loc
 %type <WLFormula.t>                                logic_pure_formula
 %type <WLExpr.t>                                   logic_expression
@@ -338,7 +342,7 @@ predicate:
     pred_definitions = separated_nonempty_list(SEMICOLON, logic_assertion);
     lend = RCBRACE;
     { let (_, pred_name) = lpname in
-      let (pred_params, ins) = List.split params_ins in
+      let (pred_params, ins) : (string * WType.t option) list * bool list = List.split params_ins in
       (* ins looks like [true, false, true] *)
       let ins = List.mapi (fun i is_in -> if is_in then Some i else None) ins in
       (* ins looks like [Some 0, None, Some 2] *)
@@ -359,11 +363,15 @@ predicate:
         pred_id;
       } }
 
+type_target:
+  | TLIST { WType.WList }
+  | TNUM { WType.WNum }
+
 pred_param_ins:
-  | inp = option(PLUS); lx = IDENTIFIER
+  | inp = option(PLUS); lx = IDENTIFIER; option(preceded(COLON, type_target))
     { let (_, x) = lx in
       let isin = Option.fold ~some:(fun _ -> true) ~none:false inp in
-      (x, isin) }
+      ((x, $3), isin) }
 
 
 logic_command:

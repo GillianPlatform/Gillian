@@ -70,7 +70,7 @@ type z3_basic_gil_value = {
   null_constructor : FuncDecl.func_decl;
   empty_constructor : FuncDecl.func_decl;
   boolean_constructor : FuncDecl.func_decl;
-  int_constructor: FuncDecl.func_decl;
+  int_constructor : FuncDecl.func_decl;
   number_constructor : FuncDecl.func_decl;
   string_constructor : FuncDecl.func_decl;
   loc_constructor : FuncDecl.func_decl;
@@ -81,7 +81,7 @@ type z3_basic_gil_value = {
   (* accessors *)
   (*************)
   boolean_accessor : FuncDecl.func_decl;
-  int_accessor: FuncDecl.func_decl;
+  int_accessor : FuncDecl.func_decl;
   number_accessor : FuncDecl.func_decl;
   string_accessor : FuncDecl.func_decl;
   loc_accessor : FuncDecl.func_decl;
@@ -785,12 +785,10 @@ let encode_binop (op : BinOp.t) le1 le2 =
 
   let binop_ints_to_ints mk_op le1 le2 =
     let n_le1 =
-      ZExpr.mk_app ctx lit_operations.int_accessor
-        [ mk_singleton_access le1 ]
+      ZExpr.mk_app ctx lit_operations.int_accessor [ mk_singleton_access le1 ]
     in
     let n_le2 =
-      ZExpr.mk_app ctx lit_operations.int_accessor
-        [ mk_singleton_access le2 ]
+      ZExpr.mk_app ctx lit_operations.int_accessor [ mk_singleton_access le2 ]
     in
     let nle1_op_nle2 = mk_op n_le1 n_le2 in
     mk_singleton_elem

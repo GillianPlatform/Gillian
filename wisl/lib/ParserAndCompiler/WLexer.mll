@@ -13,7 +13,6 @@ let letter = ['a'-'z''A'-'Z']
 let gvars = "gvar_" digit+ (* generated variables during compilation *)
 let identifier = letter(letter|digit|'_')*
 let lvar = '#' (letter|digit|'_'|'$')*
-let int = digit+
 let number = digit+
 let loc = "$l" (letter|digit|'_')*
 let white = [' ' '\t']+
@@ -48,6 +47,9 @@ rule read =
   | "lemma"  { LEMMA (curr lexbuf) }
   | "forall" { FORALL (curr lexbuf) }
   | "exists" { EXIST (curr lexbuf) }
+  (* types *)
+  | "List" { TLIST (curr lexbuf) }
+  | "Num" { TNUM (curr lexbuf) }
   (* strings and comments *)
   | '"'      { let () = l_start_string := curr lexbuf in
                read_string (Buffer.create 17) lexbuf }

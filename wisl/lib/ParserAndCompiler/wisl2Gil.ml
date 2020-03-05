@@ -779,9 +779,9 @@ let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials } =
 
 let compile_pred pred =
   let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; _ } = pred in
-  let types = WType.infer_types_pred pred_definitions in
+  let types = WType.infer_types_pred pred_params pred_definitions in
   let getWISLTypes str = (str, WType.of_variable str types) in
-  let paramsWISLType = List.map getWISLTypes pred_params in
+  let paramsWISLType = List.map (fun (x, _) -> getWISLTypes x) pred_params in
   let getGILTypes (str, t) =
     (str, Option.fold ~some:compile_type ~none:None t)
   in

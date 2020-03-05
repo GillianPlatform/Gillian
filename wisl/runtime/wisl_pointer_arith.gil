@@ -5,7 +5,7 @@ import wisl_core.gil;
 proc i__ptr_add (ptr, add_offset) {
   loc := l-nth(ptr, 0.);
   offset := l-nth(ptr, 1.);
-  ret := {{ loc, offset + add_offset }};
+  ret := {{ loc, offset f+ add_offset }};
   return
 };
 
@@ -21,7 +21,7 @@ proc i__add (el, er) {
         return;
         (* Both left and right are numbers *)
   rinp: goto [((typeOf el) = Num) and ((typeOf el) = Num)] nadd err;
-  nadd: ret := el + er; 
+  nadd: ret := el f+ er;
         return;
         (* Incorrect types *)
   err:  err_msg := "Addition: Incorrect Types";
@@ -34,7 +34,7 @@ proc i__minus (el, er) {
   lip:  ret := "i__ptr_add" (el, -er);
         goto end;
         (* Left is not a pointer *)
-  linp: ret := el - er; 
+  linp: ret := el - er;
   end:  return
 };
 
@@ -104,9 +104,9 @@ proc i__gt (el, er) {
 
 (* i__pred_add(x, y, z) is true if executing i__add(x, y) would return z *)
 pred i__pred_add (+el, +er, out):
-      types(el: List, er: Num) * (el == {{ #loc, #offset }}) * (out == {{ #loc, #offset + er }}),
-      types(er: List, el: Num) * (er == {{ #loc, #offset}}) * (out == {{ #loc, #offset + el }}),
-      types(er: Num, el: Num) * out == er + el;
+      types(el: List, er: Num) * (el == {{ #loc, #offset }}) * (out == {{ #loc, #offset f+ er }}),
+      types(er: List, el: Num) * (er == {{ #loc, #offset}}) * (out == {{ #loc, #offset f+ el }}),
+      types(er: Num, el: Num) * out == er f+ el;
 
 (* i__pred_minus(x, y, z) is true if executing i__minus(x, y) would return z *)
 pred i__pred_minus (+el, +er, out):
@@ -133,4 +133,3 @@ pred i__pred_geq (+el, +er, out):
       types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (#offsetl < #offsetr)),
       types(el: Num, er: Num) * (out == (not (el < er)));
 
-      
