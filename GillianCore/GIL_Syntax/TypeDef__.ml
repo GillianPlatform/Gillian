@@ -14,6 +14,7 @@ and typ =
   | EmptyType
   | NoneType
   | BooleanType
+  | IntType
   | NumberType
   | StringType
   | ObjectType
@@ -27,6 +28,7 @@ and literal =
   | Empty
   | Constant  of constant
   | Bool      of bool
+  | Int       of int
   | Num       of float
   | String    of string
   | Loc       of string
@@ -39,6 +41,7 @@ and binop =
   | LessThan
   | LessThanEqual
   | LessThanString
+  | IPlus
   | FPlus
   | Minus
   | Times

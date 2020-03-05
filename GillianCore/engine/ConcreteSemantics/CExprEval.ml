@@ -191,6 +191,18 @@ let binary_num_thing
   in
   Num (f num1 num2)
 
+let binary_int_thing
+    (lit1 : CVal.M.t) (lit2 : CVal.M.t) (f : int -> int -> int) emsg : CVal.M.t
+    =
+  let num1, num2 =
+    match (lit1, lit2) with
+    | Int n1, Int n2 -> (n1, n2)
+    | _              ->
+        raise
+          (TypeError (Fmt.str "%s %a and %a" emsg CVal.M.pp lit1 CVal.M.pp lit2))
+  in
+  Int (f num1 num2)
+
 let binary_bool_thing
     (lit1 : CVal.M.t) (lit2 : CVal.M.t) (f : float -> float -> bool) emsg :
     CVal.M.t =
@@ -300,6 +312,10 @@ let rec evaluate_binop
           binary_bool_thing lit1 lit2
             (fun x y -> x <= y)
             "Type Error: Less than or equal: expected numbers, got "
+      | IPlus ->
+          binary_int_thing lit1 lit2
+            (fun x y -> x + y)
+            "Type Error: Integer Addition: expected integers, got "
       | FPlus ->
           binary_num_thing lit1 lit2
             (fun x y -> x +. y)

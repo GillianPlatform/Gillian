@@ -38,6 +38,7 @@ module Type : sig
     | EmptyType  (** Type of Empty *)
     | NoneType  (** Type of None *)
     | BooleanType  (** Type of booleans *)
+    | IntType  (** Type of integers *)
     | NumberType  (** Type of floats *)
     | StringType  (** Type of strings *)
     | ObjectType  (** Type of objects *)
@@ -60,6 +61,7 @@ module Literal : sig
     | Empty  (** The literal [empty] *)
     | Constant  of Constant.t  (** GIL constants ({!type:Constant.t}) *)
     | Bool      of bool  (** GIL booleans: [true] and [false] *)
+    | Int       of int  (** GIL integers: TODO: understand size *)
     | Num       of float  (** GIL floats - double-precision 64-bit IEEE 754 *)
     | String    of string  (** GIL strings *)
     | Loc       of string  (** GIL locations (uninterpreted symbols) *)
@@ -132,6 +134,7 @@ module BinOp : sig
     | LessThan  (** Less *)
     | LessThanEqual  (** Less or equal for numbers *)
     | LessThanString  (** Less or equal for strings *)
+    | IPlus  (** Integer addition *)
     | FPlus  (** Float addition *)
     | Minus  (** Subtraction *)
     | Times  (** Multiplication *)
@@ -1029,13 +1032,16 @@ module Visitors : sig
            ; visit_Not : 'd -> Formula.t -> Formula.t
            ; visit_Null : 'd -> Literal.t
            ; visit_NullType : 'd -> Type.t
+           ; visit_Int : 'd -> int -> Literal.t
            ; visit_Num : 'd -> float -> Literal.t
+           ; visit_IntType : 'd -> Type.t
            ; visit_NumberType : 'd -> Type.t
            ; visit_ObjectType : 'd -> Type.t
            ; visit_Or : 'd -> Formula.t -> Formula.t -> Formula.t
            ; visit_PVar : 'd -> string -> Expr.t
            ; visit_PhiAssignment : 'd -> (string * Expr.t list) list -> 'h Cmd.t
            ; visit_Pi : 'd -> Constant.t
+           ; visit_IPlus : 'd -> BinOp.t
            ; visit_FPlus : 'd -> BinOp.t
            ; visit_Pred : 'd -> string -> Expr.t list -> Asrt.t
            ; visit_Pure : 'd -> Formula.t -> Asrt.t
@@ -1334,7 +1340,11 @@ module Visitors : sig
 
       method visit_NullType : 'd -> Type.t
 
+      method visit_Int : 'd -> int -> Literal.t
+
       method visit_Num : 'd -> float -> Literal.t
+
+      method visit_IntType : 'd -> Type.t
 
       method visit_NumberType : 'd -> Type.t
 
@@ -1347,6 +1357,8 @@ module Visitors : sig
       method visit_PhiAssignment : 'd -> (string * Expr.t list) list -> 'h Cmd.t
 
       method visit_Pi : 'd -> Constant.t
+
+      method visit_IPlus : 'd -> BinOp.t
 
       method visit_FPlus : 'd -> BinOp.t
 
@@ -1610,13 +1622,16 @@ module Visitors : sig
            ; visit_Not : 'c -> Formula.t -> 'f
            ; visit_Null : 'c -> 'f
            ; visit_NullType : 'c -> 'f
+           ; visit_Int : 'c -> int -> 'f
            ; visit_Num : 'c -> float -> 'f
+           ; visit_IntType : 'c -> 'f
            ; visit_NumberType : 'c -> 'f
            ; visit_ObjectType : 'c -> 'f
            ; visit_Or : 'c -> Formula.t -> Formula.t -> 'f
            ; visit_PVar : 'c -> string -> 'f
            ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
            ; visit_Pi : 'c -> 'f
+           ; visit_IPlus : 'c -> 'f
            ; visit_FPlus : 'c -> 'f
            ; visit_Pred : 'c -> string -> Expr.t list -> 'f
            ; visit_Pure : 'c -> Formula.t -> 'f
@@ -1911,7 +1926,11 @@ module Visitors : sig
 
       method visit_NullType : 'c -> 'f
 
+      method visit_Int : 'c -> int -> 'f
+
       method visit_Num : 'c -> float -> 'f
+
+      method visit_IntType : 'c -> 'f
 
       method visit_NumberType : 'c -> 'f
 
@@ -1924,6 +1943,8 @@ module Visitors : sig
       method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
 
       method visit_Pi : 'c -> 'f
+
+      method visit_IPlus : 'c -> 'f
 
       method visit_FPlus : 'c -> 'f
 
