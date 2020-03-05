@@ -32,7 +32,7 @@
 %token <CodeLoc.t * string> IDENTIFIER
 
 (* values *)
-%token <CodeLoc.t * int> NUMBER
+%token <CodeLoc.t * int> INTEGER
 %token <CodeLoc.t * string> STRING
 
 (* Binary operators *)
@@ -194,7 +194,7 @@ statement:
       let lend = WExpr.get_loc e in
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc }
-  | lx = IDENTIFIER; ASSIGN; NEW; LBRACE; ln = NUMBER; lend = RBRACE
+  | lx = IDENTIFIER; ASSIGN; NEW; LBRACE; ln = INTEGER; lend = RBRACE
     { let (lstart, x) = lx in
     let (_, i) = ln in
       let bare_stmt = WStmt.New (x, i) in
@@ -299,7 +299,7 @@ unop_with_loc:
   | loc = TAIL { (loc, WUnOp.TAIL) }
 
 value_with_loc:
-  | lf = NUMBER   { let (loc, f) = lf in (loc, WVal.Num f) }
+  | lf = INTEGER  { let (loc, f) = lf in (loc, WVal.Num f) }
   | ls = STRING   { let (loc, s) = ls in (loc, WVal.Str s) }
   | loc = TRUE    { (loc, WVal.Bool true) }
   | loc = FALSE   { (loc, WVal.Bool false) }

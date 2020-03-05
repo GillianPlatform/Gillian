@@ -44,7 +44,7 @@ let rec infer_types_to_gamma
       match unop with
       | UNot -> tt = BooleanType && f le BooleanType
       | M_isNaN -> tt = BooleanType && f le NumberType
-      | UnaryMinus
+      | FUnaryMinus
       | BitwiseNot
       | M_sgn
       | M_abs

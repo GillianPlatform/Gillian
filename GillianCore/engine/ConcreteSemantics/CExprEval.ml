@@ -18,7 +18,7 @@ let unary_int_thing (lit : CVal.M.t) (f : float -> float) emsg : CVal.M.t =
 
 let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
   match op with
-  | UNot       -> (
+  | UNot        -> (
       match (lit : CVal.M.t) with
       | Bool b -> Bool (not b)
       | _      ->
@@ -26,33 +26,33 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: Negation: expected boolean, got %a"
                   CVal.M.pp lit)) )
-  | UnaryMinus ->
+  | FUnaryMinus ->
       unary_int_thing lit
         (fun x -> -.x)
         "Type Error: Unary minus: expected number, got "
-  | BitwiseNot ->
+  | BitwiseNot  ->
       unary_int_thing lit int32_bitwise_not
         "Type Error: Bitwise not: expected number, got"
-  | M_abs      ->
+  | M_abs       ->
       unary_int_thing lit abs_float
         "Type Error: Absolute value: expected number, got"
-  | M_acos     ->
+  | M_acos      ->
       unary_int_thing lit acos "Type Error: Arc cosine: expected number, got"
-  | M_asin     ->
+  | M_asin      ->
       unary_int_thing lit asin "Type Error: Arc sine: expected number, got"
-  | M_atan     ->
+  | M_atan      ->
       unary_int_thing lit atan "Type Error: Arc tangent: expected number, got"
-  | M_ceil     ->
+  | M_ceil      ->
       unary_int_thing lit ceil "Type Error: Ceiling: expected number, got"
-  | M_cos      -> unary_int_thing lit cos
-                    "Type Error: Cosine: expected number, got"
-  | M_exp      ->
+  | M_cos       -> unary_int_thing lit cos
+                     "Type Error: Cosine: expected number, got"
+  | M_exp       ->
       unary_int_thing lit exp "Type Error: Exponentiation: expected number, got"
-  | M_floor    ->
+  | M_floor     ->
       unary_int_thing lit floor "Type Error: Floor: expected number, got"
-  | M_log      ->
+  | M_log       ->
       unary_int_thing lit log "Type Error: Unary minus: expected number, got"
-  | M_round    -> (
+  | M_round     -> (
       match lit with
       | Num n -> (
           let sign = copysign 1.0 n in
@@ -74,17 +74,17 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: Round: expected number, got %a" CVal.M.pp
                   lit)) )
-  | M_sgn      ->
+  | M_sgn       ->
       unary_int_thing lit
         (fun x -> copysign 1.0 x)
         "Type Error: Sign: expected number, got"
-  | M_sin      -> unary_int_thing lit sin
-                    "Type Error: Sine: expected number, got"
-  | M_sqrt     ->
+  | M_sin       -> unary_int_thing lit sin
+                     "Type Error: Sine: expected number, got"
+  | M_sqrt      ->
       unary_int_thing lit sqrt "Type Error: Square root: expected number, got"
-  | M_tan      -> unary_int_thing lit tan
-                    "Type Error: Tangent: expected number, got"
-  | ToStringOp -> (
+  | M_tan       -> unary_int_thing lit tan
+                     "Type Error: Tangent: expected number, got"
+  | ToStringOp  -> (
       match lit with
       | Num n -> String (float_to_string_inner n)
       | _     ->
@@ -92,19 +92,19 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: Number to string: expected number, got %a"
                   CVal.M.pp lit)) )
-  | ToIntOp    ->
+  | ToIntOp     ->
       unary_int_thing lit to_int
         "Type Error: Number to integer: expected number, got"
-  | ToUint16Op ->
+  | ToUint16Op  ->
       unary_int_thing lit to_uint16
         "Type Error: Number to unsigned 16-bit integer: expected number, got"
-  | ToInt32Op  ->
+  | ToInt32Op   ->
       unary_int_thing lit to_int32
         "Type Error: Number to 32-bit integer: expected number, got"
-  | ToUint32Op ->
+  | ToUint32Op  ->
       unary_int_thing lit to_uint32
         "Type Error: Number to unsigned 32-bit integer: expected number, got"
-  | ToNumberOp -> (
+  | ToNumberOp  -> (
       match lit with
       | String s ->
           if s = "" then Num 0.
@@ -116,8 +116,8 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: ToNumber: expected string, got %a"
                   CVal.M.pp lit)) )
-  | TypeOf     -> Type (Literal.type_of lit)
-  | Car        -> (
+  | TypeOf      -> Type (Literal.type_of lit)
+  | Car         -> (
       match lit with
       | LList ll -> (
           match ll with
@@ -130,7 +130,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: List head: expected list, got %a" CVal.M.pp
                   lit)) )
-  | Cdr        -> (
+  | Cdr         -> (
       match lit with
       | LList ll -> (
           match ll with
@@ -143,7 +143,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: List tail: expected list, got %a" CVal.M.pp
                   lit)) )
-  | LstLen     -> (
+  | LstLen      -> (
       match lit with
       | LList l -> Num (float_of_int (List.length l))
       | _       ->
@@ -151,7 +151,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: List length: expected list, got: %a"
                   CVal.M.pp lit)) )
-  | LstRev     -> (
+  | LstRev      -> (
       match lit with
       | LList l -> LList (List.rev l)
       | _       ->
@@ -159,7 +159,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: List reverse: expected list, got: %a"
                   CVal.M.pp lit)) )
-  | StrLen     -> (
+  | StrLen      -> (
       match lit with
       | String s -> Num (float_of_int (String.length s))
       | _        ->
@@ -167,7 +167,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: String length: expected string, got: %a"
                   CVal.M.pp lit)) )
-  | M_isNaN    -> (
+  | M_isNaN     -> (
       match lit with
       | Num x when x == nan -> Bool true
       | Num x -> Bool false
@@ -176,7 +176,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: M_isNan: expected number, got: %a"
                   CVal.M.pp lit)) )
-  | SetToList  ->
+  | SetToList   ->
       raise (Exceptions.Unsupported "eval_unop concrete: set-to-list")
 
 let binary_num_thing

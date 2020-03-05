@@ -120,16 +120,16 @@ pred i__pred_lt (+el, +er, out):
 
 (* i__pred_gt(x, y, z) is true if executing i__gt(x, y) would return z *)
 pred i__pred_gt (+el, +er, out):
-      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (#offsetl < #offsetr)),
+      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (not (#offsetl <= #offsetr))),
       types(el: Num, er: Num) * (out == (not (el <= er)));
 
 (* i__pred_leq(x, y, z) is true if executing i__leq(x, y) would return z *)
 pred i__pred_leq (+el, +er, out):
-      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (#offsetl < #offsetr)),
+      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (#offsetl <= #offsetr)),
       types(el: Num, er: Num) * (out == (el <= er));
 
 (* i__pred_geq(x, y, z) is true if executing i__geq(x, y) would return z *)
 pred i__pred_geq (+el, +er, out):
-      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (#offsetl < #offsetr)),
+      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (not (#offsetl < #offsetr))),
       types(el: Num, er: Num) * (out == (not (el < er)));
 

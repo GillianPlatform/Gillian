@@ -346,7 +346,7 @@ expr_target:
 (* - e *)
 (* Unary negation has the same precedence as logical not, not as binary negation. *)
   | MINUS; e=expr_target
-     { UnOp (UnaryMinus, e) } %prec unop_prec
+     { UnOp (FUnaryMinus, e) } %prec unop_prec
 (* {{ e, ..., e }} *)
   | LSTOPEN; exprlist = separated_nonempty_list(COMMA, expr_target); LSTCLOSE
      { EList exprlist }

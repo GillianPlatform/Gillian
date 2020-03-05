@@ -2861,7 +2861,9 @@ let rec translate_expr tr_ctx e :
 
       (* x_r := (negative x_n) *)
       let x_r = fresh_var () in
-      let cmd_ass_xr = LBasic (Assignment (x_r, UnOp (UnaryMinus, PVar x_n))) in
+      let cmd_ass_xr =
+        LBasic (Assignment (x_r, UnOp (FUnaryMinus, PVar x_n)))
+      in
 
       let cmds =
         annotate_first_cmd

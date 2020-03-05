@@ -91,7 +91,7 @@ end
 module UnOp : sig
   (** {b GIL Unary Operators } *)
   type t =
-    | UnaryMinus  (** Unary minus *)
+    | FUnaryMinus  (** Unary minus *)
     | UNot  (** Negation *)
     | BitwiseNot  (** Bitwise negation *)
     | M_isNaN  (** Test for NaN *)
@@ -1083,7 +1083,7 @@ module Visitors : sig
            ; visit_UNot : 'd -> UnOp.t
            ; visit_UTCTime : 'd -> Constant.t
            ; visit_UnOp : 'd -> UnOp.t -> Expr.t -> Expr.t
-           ; visit_UnaryMinus : 'd -> UnOp.t
+           ; visit_FUnaryMinus : 'd -> UnOp.t
            ; visit_Undefined : 'd -> Literal.t
            ; visit_UndefinedType : 'd -> Type.t
            ; visit_Unfold :
@@ -1442,7 +1442,7 @@ module Visitors : sig
 
       method visit_UnOp : 'd -> UnOp.t -> Expr.t -> Expr.t
 
-      method visit_UnaryMinus : 'd -> UnOp.t
+      method visit_FUnaryMinus : 'd -> UnOp.t
 
       method visit_Undefined : 'd -> Literal.t
 
@@ -1673,7 +1673,7 @@ module Visitors : sig
            ; visit_UNot : 'c -> 'f
            ; visit_UTCTime : 'c -> 'f
            ; visit_UnOp : 'c -> UnOp.t -> Expr.t -> 'f
-           ; visit_UnaryMinus : 'c -> 'f
+           ; visit_FUnaryMinus : 'c -> 'f
            ; visit_Undefined : 'c -> 'f
            ; visit_UndefinedType : 'c -> 'f
            ; visit_Unfold :
@@ -2028,7 +2028,7 @@ module Visitors : sig
 
       method visit_UnOp : 'c -> UnOp.t -> Expr.t -> 'f
 
-      method visit_UnaryMinus : 'c -> 'f
+      method visit_FUnaryMinus : 'c -> 'f
 
       method visit_Undefined : 'c -> 'f
 

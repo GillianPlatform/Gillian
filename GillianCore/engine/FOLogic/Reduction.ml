@@ -815,7 +815,7 @@ let rec reduce_lexpr_loop
         f (BinOp (f le2, LessThan, f le1))
     (* Special equality *)
     | BinOp
-        (BinOp (LVar x, FPlus, UnOp (UnaryMinus, LVar y)), Equal, Lit (Num 0.))
+        (BinOp (LVar x, FPlus, UnOp (FUnaryMinus, LVar y)), Equal, Lit (Num 0.))
       -> BinOp (LVar x, Equal, LVar y)
     (* List indexing *)
     | BinOp (le, LstNth, idx) -> (
@@ -1100,7 +1100,7 @@ let rec reduce_lexpr_loop
                       "UnOp(StrLen, list): string is not a GIL string."
                     in
                     raise (ReductionException (def, err_msg)) )
-            | UnaryMinus when lexpr_is_number ~gamma def ->
+            | FUnaryMinus when lexpr_is_number ~gamma def ->
                 simplify_arithmetic_lexpr pfs gamma def
             | _ -> UnOp (op, fle) ) )
     | LstSub (le1, le2, le3) when unification -> (
@@ -1379,12 +1379,12 @@ let rec reduce_lexpr_loop
                | Minus when (lexpr_is_number ~gamma def) ->
                  (match flel, fler with
                  (* 0 is the neutral *)
-                 | Lit (Num 0.), x -> UnOp (UnaryMinus, x)
+                 | Lit (Num 0.), x -> UnOp (FUnaryMinus, x)
                  | x, Lit (Num 0.) -> x
                  | Lit (Num x), _ when (x == nan) -> Lit (Num nan)
                  | _, Lit (Num x) when (x == nan) -> Lit (Num nan)
                  (* Transform to unary minus *)
-                 | _, _ -> BinOp (flel, FPlus, (UnOp (UnaryMinus, fler)))
+                 | _, _ -> BinOp (flel, FPlus, (UnOp (FUnaryMinus, fler)))
                  ) *)
             | Times when lexpr_is_number ~gamma def -> (
                 match (flel, fler) with
@@ -1556,12 +1556,12 @@ and simplify_arithmetic_lexpr (pfs : PFS.t) (gamma : TypEnv.t) le =
   match le with
   | BinOp (l, FPlus, Lit (Num 0.)) | BinOp (Lit (Num 0.), FPlus, l) -> l
   (* Binary minus to unary minus *)
-  | BinOp (l, Minus, r) -> f (BinOp (l, FPlus, UnOp (UnaryMinus, r)))
+  | BinOp (l, Minus, r) -> f (BinOp (l, FPlus, UnOp (FUnaryMinus, r)))
   (* Unary minus distributes over + *)
-  | UnOp (UnaryMinus, e) -> (
+  | UnOp (FUnaryMinus, e) -> (
       match e with
       | BinOp (l, FPlus, r) ->
-          f (BinOp (UnOp (UnaryMinus, l), FPlus, UnOp (UnaryMinus, r)))
+          f (BinOp (UnOp (FUnaryMinus, l), FPlus, UnOp (FUnaryMinus, r)))
       | _                   -> le )
   (* FPlus - we collect the positives and the negatives, see what we have and deal with them *)
   | BinOp (l, FPlus, r) -> compose_pluses_minuses (collect_pluses_minuses le)
@@ -1569,12 +1569,12 @@ and simplify_arithmetic_lexpr (pfs : PFS.t) (gamma : TypEnv.t) le =
 
 and collect_pluses_minuses (le : Expr.t) : Expr.t list * Expr.t list =
   match le with
-  | BinOp (l, FPlus, r)  ->
+  | BinOp (l, FPlus, r)   ->
       let pl, ml = collect_pluses_minuses l in
       let pr, mr = collect_pluses_minuses r in
       (List.sort Stdlib.compare (pl @ pr), List.sort Stdlib.compare (ml @ mr))
-  | UnOp (UnaryMinus, e) -> ([], [ e ])
-  | _                    -> ([ le ], [])
+  | UnOp (FUnaryMinus, e) -> ([], [ e ])
+  | _                     -> ([ le ], [])
 
 and compose_pluses_minuses (pluses_and_minuses : Expr.t list * Expr.t list) :
     Expr.t =
@@ -1584,7 +1584,7 @@ and compose_pluses_minuses (pluses_and_minuses : Expr.t list * Expr.t list) :
   let pluses_stay = List.filter (fun x -> not (List.mem x minuses)) pluses in
   let minuses_stay =
     List.map
-      (fun minus -> Expr.UnOp (UnaryMinus, minus))
+      (fun minus -> Expr.UnOp (FUnaryMinus, minus))
       (List.filter (fun x -> not (List.mem x pluses)) minuses)
   in
   let result =

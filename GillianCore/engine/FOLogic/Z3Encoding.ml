@@ -905,7 +905,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
 
 let encode_unop (op : UnOp.t) le =
   match op with
-  | UnaryMinus ->
+  | FUnaryMinus ->
       let le_n =
         ZExpr.mk_app ctx lit_operations.number_accessor
           [ mk_singleton_access le ]
@@ -913,7 +913,7 @@ let encode_unop (op : UnOp.t) le =
       let op_le_n = Arithmetic.mk_unary_minus ctx le_n in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.number_constructor [ op_le_n ])
-  | LstLen     ->
+  | LstLen      ->
       let le_lst =
         ZExpr.mk_app ctx lit_operations.list_accessor [ mk_singleton_access le ]
       in
@@ -922,7 +922,7 @@ let encode_unop (op : UnOp.t) le =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.number_constructor [ op_le_lst ])
-  | StrLen     ->
+  | StrLen      ->
       let le_s =
         ZExpr.mk_app ctx lit_operations.string_accessor
           [ mk_singleton_access le ]
@@ -930,7 +930,7 @@ let encode_unop (op : UnOp.t) le =
       let op_le_s = ZExpr.mk_app ctx axiomatised_operations.slen_fun [ le_s ] in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.number_constructor [ op_le_s ])
-  | ToStringOp ->
+  | ToStringOp  ->
       let le_n =
         ZExpr.mk_app ctx lit_operations.number_accessor
           [ mk_singleton_access le ]
@@ -940,7 +940,7 @@ let encode_unop (op : UnOp.t) le =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.string_constructor [ op_le_n ])
-  | ToNumberOp ->
+  | ToNumberOp  ->
       let le_s =
         ZExpr.mk_app ctx lit_operations.string_accessor
           [ mk_singleton_access le ]
@@ -950,7 +950,7 @@ let encode_unop (op : UnOp.t) le =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.number_constructor [ op_le_s ])
-  | ToIntOp    ->
+  | ToIntOp     ->
       let le_n =
         ZExpr.mk_app ctx lit_operations.number_accessor
           [ mk_singleton_access le ]
@@ -960,7 +960,7 @@ let encode_unop (op : UnOp.t) le =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.number_constructor [ op_le_n ])
-  | UNot       ->
+  | UNot        ->
       let le_b =
         ZExpr.mk_app ctx lit_operations.boolean_accessor
           [ mk_singleton_access le ]
@@ -968,7 +968,7 @@ let encode_unop (op : UnOp.t) le =
       let op_le_b = Boolean.mk_not ctx le_b in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.boolean_constructor [ op_le_b ])
-  | Cdr        ->
+  | Cdr         ->
       let le_lst =
         ZExpr.mk_app ctx lit_operations.list_accessor [ mk_singleton_access le ]
       in
@@ -977,17 +977,17 @@ let encode_unop (op : UnOp.t) le =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.list_constructor [ op_le_lst ])
-  | Car        ->
+  | Car         ->
       let le_lst =
         ZExpr.mk_app ctx lit_operations.list_accessor [ mk_singleton_access le ]
       in
       let op_le = ZExpr.mk_app ctx list_operations.head_accessor [ le_lst ] in
       mk_singleton_elem op_le
-  | TypeOf     ->
+  | TypeOf      ->
       let res = typeof_expression le in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.type_constructor [ res ])
-  | ToUint32Op ->
+  | ToUint32Op  ->
       let le_n =
         ZExpr.mk_app ctx lit_operations.number_accessor
           [ mk_singleton_access le ]
@@ -998,14 +998,14 @@ let encode_unop (op : UnOp.t) le =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.number_constructor [ op_le_n ])
-  | LstRev     ->
+  | LstRev      ->
       let le_lst =
         ZExpr.mk_app ctx lit_operations.list_accessor [ mk_singleton_access le ]
       in
       let n_le = ZExpr.mk_app ctx axiomatised_operations.lrev_fun [ le_lst ] in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.list_constructor [ n_le ])
-  | _          ->
+  | _           ->
       Printf.printf "SMT encoding: Construct not supported yet - unop - %s!\n"
         (UnOp.str op);
       let msg =

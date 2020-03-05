@@ -108,7 +108,7 @@ rule read =
   (* identifiers *)
   | white    { read lexbuf }
   | newline  { new_line lexbuf; read lexbuf }
-  | number   { NUMBER (curr lexbuf, int_of_string (Lexing.lexeme lexbuf)) }
+  | number   { INTEGER (curr lexbuf, int_of_string (Lexing.lexeme lexbuf)) }
   | gvars    { IDENTIFIER (curr lexbuf, (Lexing.lexeme lexbuf)^"_user") } (* if it has a name of generated var, we add _user *)
   | identifier { IDENTIFIER (curr lexbuf, Lexing.lexeme lexbuf) }
   | lvar       { LVAR (curr lexbuf, Lexing.lexeme lexbuf) }

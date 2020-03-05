@@ -407,7 +407,7 @@ expr_target:
   | e1=expr_target; GREATERTHAN;  e2=expr_target { BinOp (e2, LessThan, e1) }
   | e1=expr_target; GREATERTHANEQUAL; e2=expr_target { BinOp (e2, LessThanEqual, e1) }
   | uop=unop_target; e=expr_target { UnOp (uop, e) } %prec unop_prec
-  | MINUS; e=expr_target { UnOp (UnaryMinus, e) } %prec unop_prec
+  | MINUS; e=expr_target { UnOp (FUnaryMinus, e) } %prec unop_prec
   | LSTOPEN; exprlist = separated_nonempty_list(COMMA, expr_target); LSTCLOSE { EList exprlist }
   | SETOPEN; exprlist = separated_list(COMMA, expr_target); SETCLOSE
      { ESet (Expr.Set.elements (Expr.Set.of_list exprlist)) }
@@ -902,7 +902,7 @@ js_lexpr_target:
 (* - e *)
 (* Unary negation has the same precedence as logical not, not as binary negation. *)
   | MINUS; e=js_lexpr_target
-    { UnOp (UnaryMinus, e) } %prec unop_prec
+    { UnOp (FUnaryMinus, e) } %prec unop_prec
 (* {{ e, ..., e }} *)
   | LSTOPEN; exprlist = separated_nonempty_list(COMMA, js_lexpr_target); LSTCLOSE
     { EList exprlist }

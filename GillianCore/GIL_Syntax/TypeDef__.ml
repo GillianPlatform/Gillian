@@ -71,7 +71,7 @@ and binop =
   | BSetSub
 
 and unop =
-  | UnaryMinus
+  | FUnaryMinus
   | UNot
   | BitwiseNot
   | M_isNaN
