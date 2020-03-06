@@ -1,11 +1,11 @@
 // Doubly-linked list segment, unfolding from the left
-predicate dlsegl(+x, +y, +v, +w, alpha : List, llen : Num) {
+predicate dlsegl(+x, +y, +v, +w, alpha : List, llen : Int) {
   (x == y) * (v == w) * (alpha == nil) * (llen == 0);
   (x -> #a, #z, w) * (alpha == #a :: #beta) * dlsegl(#z, y, v, x, #beta, #_llen) * (llen == 1 + #_llen)
 }
 
 // Doubly-linked list segment, unfolding from the right
-predicate dlsegr(+x, +y, +v, +w, alpha : List, llen : Num) {
+predicate dlsegr(+x, +y, +v, +w, alpha : List, llen : Int) {
   (x == y) * (v == w) * (alpha == nil) * (llen == 0);
   (v -> #a, y, #z) * (alpha == #beta @ [#a]) * dlsegr(x, v, #z, w, #beta, #_llen) * (llen == 1 + #_llen)
 }

@@ -299,7 +299,7 @@ unop_with_loc:
   | loc = TAIL { (loc, WUnOp.TAIL) }
 
 value_with_loc:
-  | lf = INTEGER  { let (loc, f) = lf in (loc, WVal.Num f) }
+  | lf = INTEGER  { let (loc, f) = lf in (loc, WVal.Int f) }
   | ls = STRING   { let (loc, s) = ls in (loc, WVal.Str s) }
   | loc = TRUE    { (loc, WVal.Bool true) }
   | loc = FALSE   { (loc, WVal.Bool false) }

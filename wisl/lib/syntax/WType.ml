@@ -33,7 +33,7 @@ let pp fmt t =
   | WBool   -> s "Bool"
   | WString -> s "String"
   | WPtr    -> s "Pointer"
-  | WInt    -> s "Num"
+  | WInt    -> s "Int"
   | WAny    -> s "Any"
   | WSet    -> s "Set"
 
@@ -52,7 +52,7 @@ let of_val v =
   let open WVal in
   match v with
   | Bool _  -> WBool
-  | Num _   -> WInt
+  | Int _   -> WInt
   | Str _   -> WString
   | Null    -> WNull
   | VList _ -> WList
@@ -211,11 +211,4 @@ let infer_types_pred (params : (string * t option) list) assert_list =
   let result =
     TypeMap.merge join_params_and_asserts infers_on_params infers_on_asserts
   in
-  TypeMap.iter
-    (fun k v ->
-      print_endline
-        (Format.asprintf "Inferred: %a: %a" WLExpr.pp
-           (WLExpr.make k CodeLoc.dummy)
-           pp v))
-    result;
   result

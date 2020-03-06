@@ -799,12 +799,10 @@ let encode_binop (op : BinOp.t) le1 le2 =
 
   let binop_ints_to_booleans mk_op le1 le2 =
     let n_le1 =
-      ZExpr.mk_app ctx lit_operations.int_accessor
-        [ mk_singleton_access le1 ]
+      ZExpr.mk_app ctx lit_operations.int_accessor [ mk_singleton_access le1 ]
     in
     let n_le2 =
-      ZExpr.mk_app ctx lit_operations.int_accessor
-        [ mk_singleton_access le2 ]
+      ZExpr.mk_app ctx lit_operations.int_accessor [ mk_singleton_access le2 ]
     in
     let nle1_op_nle2 = mk_op n_le1 n_le2 in
     mk_singleton_elem
@@ -826,23 +824,23 @@ let encode_binop (op : BinOp.t) le1 le2 =
   in
 
   match op with
-  | IPlus          -> binop_ints_to_ints mk_add le1 le2
-  | IMinus         -> binop_ints_to_ints mk_sub le1 le2
-  | ITimes         -> binop_ints_to_ints mk_mul le1 le2
-  | IDiv           -> binop_ints_to_ints mk_div le1 le2
-  | IMod           -> binop_ints_to_ints mk_mod le1 le2
-  | ILessThan      -> binop_ints_to_booleans (mk_lt ctx) le1 le2
+  | IPlus -> binop_ints_to_ints mk_add le1 le2
+  | IMinus -> binop_ints_to_ints mk_sub le1 le2
+  | ITimes -> binop_ints_to_ints mk_mul le1 le2
+  | IDiv -> binop_ints_to_ints mk_div le1 le2
+  | IMod -> binop_ints_to_ints mk_mod le1 le2
+  | ILessThan -> binop_ints_to_booleans (mk_lt ctx) le1 le2
   | ILessThanEqual -> binop_ints_to_booleans (mk_le ctx) le1 le2
-  | FPlus          -> binop_numbers_to_numbers mk_add le1 le2
-  | FMinus         -> binop_numbers_to_numbers mk_sub le1 le2
-  | FTimes         -> binop_numbers_to_numbers mk_mul le1 le2
-  | FDiv           -> binop_numbers_to_numbers mk_div le1 le2
-  | FLessThan      -> binop_numbers_to_booleans (mk_lt ctx) le1 le2
+  | FPlus -> binop_numbers_to_numbers mk_add le1 le2
+  | FMinus -> binop_numbers_to_numbers mk_sub le1 le2
+  | FTimes -> binop_numbers_to_numbers mk_mul le1 le2
+  | FDiv -> binop_numbers_to_numbers mk_div le1 le2
+  | FLessThan -> binop_numbers_to_booleans (mk_lt ctx) le1 le2
   | FLessThanEqual -> binop_numbers_to_booleans (mk_le ctx) le1 le2
-  | Equal          ->
+  | Equal ->
       ZExpr.mk_app ctx lit_operations.boolean_constructor
         [ Boolean.mk_eq ctx le1 le2 ]
-  | BOr            ->
+  | BOr ->
       let le1_b =
         ZExpr.mk_app ctx lit_operations.boolean_accessor
           [ mk_singleton_access le1 ]
@@ -854,7 +852,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
       let le = Boolean.mk_or ctx [ le1_b; le2_b ] in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.boolean_constructor [ le ])
-  | BAnd           ->
+  | BAnd ->
       let le1_b =
         ZExpr.mk_app ctx lit_operations.boolean_accessor
           [ mk_singleton_access le1 ]
@@ -866,7 +864,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
       let le = Boolean.mk_and ctx [ le1_b; le2_b ] in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.boolean_constructor [ le ])
-  | BSetMem        ->
+  | BSetMem ->
       let le1_mem = mk_singleton_access le1 in
       let le2_set =
         ZExpr.mk_app ctx extended_literal_operations.set_accessor [ le2 ]
@@ -874,7 +872,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
       let le = Set.mk_membership ctx le1_mem le2_set in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.boolean_constructor [ le ])
-  | SetDiff        ->
+  | SetDiff ->
       let le1_set =
         ZExpr.mk_app ctx extended_literal_operations.set_accessor [ le1 ]
       in
@@ -883,7 +881,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
       in
       let le = Set.mk_difference ctx le1_set le2_set in
       ZExpr.mk_app ctx extended_literal_operations.set_constructor [ le ]
-  | BSetSub        ->
+  | BSetSub ->
       let le1_set =
         ZExpr.mk_app ctx extended_literal_operations.set_accessor [ le1 ]
       in
@@ -893,7 +891,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
       let le = Set.mk_subset ctx le1_set le2_set in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.boolean_constructor [ le ])
-  | LstNth         ->
+  | LstNth ->
       let lst' =
         ZExpr.mk_app ctx lit_operations.list_accessor
           [ mk_singleton_access le1 ]
@@ -904,7 +902,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx axiomatised_operations.lnth_fun [ lst'; index' ])
-  | StrNth         ->
+  | StrNth ->
       let str' =
         ZExpr.mk_app ctx lit_operations.string_accessor
           [ mk_singleton_access le1 ]
@@ -919,7 +917,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.string_constructor [ res ])
   (* FIXME: Specify which *)
-  | _              ->
+  | _ ->
       raise
         (Failure
            (Printf.sprintf
@@ -930,8 +928,7 @@ let encode_unop (op : UnOp.t) le =
   match op with
   | IUnaryMinus ->
       let le_n =
-        ZExpr.mk_app ctx lit_operations.int_accessor
-          [ mk_singleton_access le ]
+        ZExpr.mk_app ctx lit_operations.int_accessor [ mk_singleton_access le ]
       in
       let op_le_n = Arithmetic.mk_unary_minus ctx le_n in
       mk_singleton_elem

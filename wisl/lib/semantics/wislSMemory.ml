@@ -122,9 +122,7 @@ let rem_cell heap pfs gamma (loc : vt) (offset : vt) =
 let alloc heap _pfs _gamma (size : int) =
   let loc = WislSHeap.alloc heap size in
   ASucc
-    [
-      (heap, [ Expr.Lit (Literal.Loc loc); Expr.Lit (Literal.Num 0.) ], [], []);
-    ]
+    [ (heap, [ Expr.Lit (Literal.Loc loc); Expr.Lit (Literal.Int 0) ], [], []) ]
 
 let dispose heap pfs gamma loc_expr =
   match resolve_loc pfs gamma loc_expr with
@@ -178,8 +176,8 @@ let execute_action name heap pfs gamma args =
                args) )
   | Alloc   -> (
       match args with
-      | [ Expr.Lit (Literal.Num size) ] when int_of_float size >= 1 ->
-          alloc heap pfs gamma (int_of_float size)
+      | [ Expr.Lit (Literal.Int size) ] when size >= 1 ->
+          alloc heap pfs gamma size
       | args ->
           failwith
             (Format.asprintf

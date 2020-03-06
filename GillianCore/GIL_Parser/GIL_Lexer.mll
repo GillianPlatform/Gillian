@@ -13,6 +13,7 @@
       "Empty",     GIL_Parser.EMPTYTYPELIT;
       "None",      GIL_Parser.NONETYPELIT;
       "Bool",      GIL_Parser.BOOLTYPELIT;
+      "Int",       GIL_Parser.INTTYPELIT;
       "Num",       GIL_Parser.NUMTYPELIT;
       "Str",       GIL_Parser.STRTYPELIT;
       "Obj",       GIL_Parser.OBJTYPELIT;

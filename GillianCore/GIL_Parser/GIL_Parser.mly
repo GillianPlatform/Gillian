@@ -11,6 +11,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token EMPTYTYPELIT
 %token NONETYPELIT
 %token BOOLTYPELIT
+%token INTTYPELIT
 %token NUMTYPELIT
 %token STRTYPELIT
 %token OBJTYPELIT
@@ -356,6 +357,8 @@ expr_target:
      { UnOp (uop, e) } %prec unop_prec
 (* - e *)
 (* Unary negation has the same precedence as logical not, not as binary negation. *)
+  | IMINUS; e=expr_target
+     { UnOp (IUnaryMinus, e) } %prec unop_prec
   | FMINUS; e=expr_target
      { UnOp (FUnaryMinus, e) } %prec unop_prec
 (* {{ e, ..., e }} *)
@@ -987,6 +990,7 @@ type_target:
   | EMPTYTYPELIT { EmptyType }
   | NONETYPELIT  { NoneType }
   | BOOLTYPELIT  { BooleanType }
+  | INTTYPELIT   { IntType }
   | NUMTYPELIT   { NumberType }
   | STRTYPELIT   { StringType }
   | OBJTYPELIT   { ObjectType }

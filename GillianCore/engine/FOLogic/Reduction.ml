@@ -823,6 +823,16 @@ let rec reduce_lexpr_loop
         let fidx = f idx in
         match fidx with
         (* Index is a non-negative integer *)
+        | Lit (Int n) when 0 <= n -> (
+            match lexpr_is_list gamma fle with
+            | true  ->
+                Option.value
+                  ~default:(Expr.BinOp (fle, LstNth, fidx))
+                  (get_nth_of_list pfs fle n)
+            | false ->
+                let err_msg = "LstNth(list, index): list is not a GIL list." in
+                raise (ReductionException (BinOp (fle, LstNth, fidx), err_msg))
+            )
         | Lit (Num n) when Arith_Utils.is_int n && 0. <= n -> (
             match lexpr_is_list gamma fle with
             | true  ->
@@ -834,7 +844,7 @@ let rec reduce_lexpr_loop
                 raise (ReductionException (BinOp (fle, LstNth, fidx), err_msg))
             )
         (* Index is a number, but is either not an integer or is negative *)
-        | Lit (Num n) ->
+        | Lit (Int _) | Lit (Num _) ->
             let err_msg =
               "LstNth(list, index): index is non-integer or smaller than zero."
             in
