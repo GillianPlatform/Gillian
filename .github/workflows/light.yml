@@ -1,12 +1,12 @@
-name: CI
+name: Light
 
 on:
   push:
     branches:
-      - master
+      - '!master'
   pull_request:
     branches:
-      - master
+      - '!master'
 
 jobs:
   build:
@@ -104,73 +104,3 @@ jobs:
       - name: Test JaVerT
         run: './testJaVerT.sh'
         working-directory: 'Gillian/Gillian-JS/environment/'
-  
-  # test262:
-  #   strategy:
-  #     matrix:
-  #       operating-system: [ macos-latest ]
-  #   runs-on: ${{ matrix.operating-system }}
-  #   needs: build
-  #   steps:
-  #     - name: download release
-  #       uses: actions/download-artifact@v1.0.0
-  #       with:
-  #         name: ${{ runner.os }}-release
-  #         path: release
-  #     - name: setting up node
-  #       uses: actions/setup-node@v1.1.0
-  #     - name: install release
-  #       run: npm install -g ./release
-  #     - name: checkout project
-  #       uses: actions/checkout@v2.0.0
-  #       with:
-  #         repository:  giltho/javert-test262
-  #         path: test262
-  #     - name: Test262
-  #       run: 'gillian-js test262 test262/test --ci'
-
-  # collection-c:
-  #   strategy:
-  #     matrix:
-  #       operating-system: [ macos-latest ]
-  #   runs-on: ${{ matrix.operating-system }}
-  #   needs: build
-  #   steps:
-  #     - name: download release
-  #       uses: actions/download-artifact@v1
-  #       with:
-  #         name: ${{ runner.os }}-release
-  #         path: release
-  #     - name: setting up node
-  #       uses: actions/setup-node@v1
-  #     - name: install release
-  #       run: npm install -g ./release
-  #     - name: checkout project
-  #       uses: actions/checkout@v2
-  #       with:
-  #         repository:  giltho/collection-c-for-gillian
-  #         path: collection-c
-  #     - name: Symbolic Testing Collection-C
-  #       run: 'gillian-c bulk-wpst collection-c/for-gillian --ci'
-
-  # test-Buckets:
-  #   strategy:
-  #     matrix:
-  #       operating-system: [ macos-latest ]
-  #   runs-on: ${{ matrix.operating-system }}
-  #   needs: build
-  #   steps:
-  #     - name: download release
-  #       uses: actions/download-artifact@v1
-  #       with:
-  #         name: ${{ runner.os }}-release
-  #         path: release
-  #     - name: setting up node
-  #       uses: actions/setup-node@v1
-  #     - name: install release
-  #       run: npm install -g ./release
-  #     - name: checkout project
-  #       uses: actions/checkout@v2
-  #     - name: Symbolic Testing Buckets.js
-  #       run: 'gillian-js cosette-bulk Gillian-JS/Examples/Cosette/Buckets --ci'
-      
