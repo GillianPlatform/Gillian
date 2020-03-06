@@ -171,6 +171,8 @@ jobs:
         run: npm install -g ./release
       - name: checkout project
         uses: actions/checkout@v2
+        with:
+          path: Gillian
       - name: Symbolic Testing Buckets.js
-        run: 'gillian-js cosette-bulk Gillian-JS/Examples/Cosette/Buckets --ci'
+        run: 'gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci'
       
