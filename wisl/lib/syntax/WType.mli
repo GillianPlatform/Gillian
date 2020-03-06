@@ -1,4 +1,4 @@
-type t = WList | WNull | WBool | WString | WPtr | WNum | WAny | WSet
+type t = WList | WNull | WBool | WString | WPtr | WInt | WAny | WSet
 
 val compatible : t -> t -> bool
 

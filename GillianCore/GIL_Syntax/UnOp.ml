@@ -2,7 +2,8 @@
 
 type t = TypeDef__.unop =
   (* Arithmetic *)
-  | FUnaryMinus  (** Unary minus *)
+  | IUnaryMinus  (** Integer unary minus *)
+  | FUnaryMinus  (** Float unary minus *)
   (* Boolean *)
   | UNot  (** Negation *)
   (* Bitwise *)
@@ -42,6 +43,7 @@ type t = TypeDef__.unop =
 
 let str (x : t) =
   match x with
+  | IUnaryMinus -> "i-"
   | FUnaryMinus -> "-"
   | UNot        -> "not"
   | BitwiseNot  -> "~"

@@ -17,7 +17,7 @@ proc i__malloc(vsz) {
 proc i__init_to_zero(b, curr, max) {
            goto [curr = max] end ctn;
       ctn: u := [mem_store] ("int8unsigned", b, curr, {{ "int", 0. }});
-           u := "i__init_to_zero"(b, curr f+ 1., max);
+           u := "i__init_to_zero"(b, curr + 1., max);
       end: ret := undefined;
            return
 };
@@ -39,7 +39,7 @@ proc i__free(ptr) {
          sz := "i__alloc_size"(l-nth(vszl, 0.));
          goto [ sz < 0 ] die ctn;
    die:  fail[free]("Deallocating a pointer of negative size");
-   ctn:  u := [mem_free](l-nth(ptr, 0.), l-nth(ptr, 1.) - 8, l-nth(ptr, 1.) f+ sz);
+   ctn:  u := [mem_free](l-nth(ptr, 0.), l-nth(ptr, 1.) - 8, l-nth(ptr, 1.) + sz);
          ret := undefined;
          return
 };
@@ -60,7 +60,7 @@ proc i__memset(ptr, vc, vsz) {
             n := "i__alloc_size"(vsz);
             n := n - 1;
       loop: goto [not (n < 0)] ctn end;
-      ctn:  u := [mem_store]("int8unsigned", l-nth(ptr, 0.), l-nth(ptr, 1.) f+ n, vc);
+      ctn:  u := [mem_store]("int8unsigned", l-nth(ptr, 0.), l-nth(ptr, 1.) + n, vc);
             n := n - 1;
             goto loop;
       end:  ret := ptr;

@@ -43,18 +43,30 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 (* Filenames *)
 %token <string> FILENAME
 (* Binary operators *)
-%token EQUAL
-%token LESSTHAN
-%token GREATERTHAN
-%token LESSTHANEQUAL
-%token GREATERTHANEQUAL
-%token LESSTHANSTRING
-%token PLUS
+%token EQ
+
+%token FLT
+%token FGT
+%token FLE
+%token FGE
 %token FPLUS
-%token MINUS
-%token TIMES
-%token DIV
-%token MOD
+%token FMINUS
+%token FTIMES
+%token FDIV
+%token FMOD
+
+%token ILT
+%token IGT
+%token ILE
+%token IGE
+%token IPLUS
+%token IMINUS
+%token ITIMES
+%token IDIV
+%token IMOD
+
+%token SLT
+%token PLUS
 %token AND
 %token OR
 %token BITWISEAND
@@ -75,7 +87,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LSTREV
 %token STRCAT
 (* Unary operators *)
-(* Unary minus uses the same token as binary minus: MINUS *)
+(* Unary minus uses the same token as binary minus: FMINUS *)
 %token NOT
 %token BITWISENOT
 %token M_ISNAN
@@ -147,7 +159,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LEQUAL
 %token LLESSTHAN
 %token LLESSTHANEQUAL
-%token LLESSTHANSTRING
+%token LSLESSTHAN
 %token LEMP
 (*%token LEXISTS *)
 %token LFORALL
@@ -212,19 +224,19 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %left LAND
 %left separating_conjunction
 %right LNOT
-%nonassoc LEQUAL LLESSTHAN LLESSTHANEQUAL LLESSTHANSTRING
+%nonassoc LEQUAL LLESSTHAN LLESSTHANEQUAL LSLESSTHAN
 %nonassoc SETMEM SETSUB LSETMEM LSETSUB
 (* Program operators have higher precedence.*)
 (* Based on JavaScript:
    https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Operators/Operator_Precedence *)
 %left OR
 %left AND
-%nonassoc EQUAL
-%nonassoc LESSTHAN LESSTHANSTRING LESSTHANEQUAL GREATERTHAN GREATERTHANEQUAL
+%nonassoc EQ
+%nonassoc FLT SLT FLE FGT FGE
 %left LEFTSHIFT SIGNEDRIGHTSHIFT UNSIGNEDRIGHTSHIFT LEFTSHIFTL SIGNEDRIGHTSHIFTL UNSIGNEDRIGHTSHIFTL
 %left BITWISEOR BITWISEXOR BITWISEAND BITWISEXORL BITWISEORL BITWISEANDL
-%left FPLUS MINUS
-%left TIMES DIV MOD M_POW
+%left FPLUS FMINUS
+%left FTIMES FDIV FMOD M_POW
 %left M_ATAN2 STRCAT SETDIFF
 
 %nonassoc binop_prec
@@ -267,7 +279,7 @@ proc_head_target:
 ;
 
 use_subst_target:
-  | USESUBST; LBRACKET; lab=VAR; MINUS; subst = separated_list(COMMA, lvar_le_pair_target); RBRACKET
+  | USESUBST; LBRACKET; lab=VAR; FMINUS; subst = separated_list(COMMA, lvar_le_pair_target); RBRACKET
       { (lab, subst) }
   | USESUBST; LBRACKET; lab=VAR RBRACKET
       { (lab, []) }
@@ -336,16 +348,16 @@ expr_target:
 (* e binop e *)
   | e1=expr_target; bop=binop_target; e2=expr_target
       { BinOp (e1, bop, e2) } %prec binop_prec
-  | e1=expr_target; GREATERTHAN; e2=expr_target
-      { BinOp (e2, LessThan, e1) }
-  | e1=expr_target; GREATERTHANEQUAL; e2=expr_target
-      { BinOp (e2, LessThanEqual, e1) }
+  | e1=expr_target; FGT; e2=expr_target
+      { BinOp (e2, FLessThan, e1) }
+  | e1=expr_target; FGE; e2=expr_target
+      { BinOp (e2, FLessThanEqual, e1) }
 (* unop e *)
     | uop=unop_target; e=expr_target
      { UnOp (uop, e) } %prec unop_prec
 (* - e *)
 (* Unary negation has the same precedence as logical not, not as binary negation. *)
-  | MINUS; e=expr_target
+  | FMINUS; e=expr_target
      { UnOp (FUnaryMinus, e) } %prec unop_prec
 (* {{ e, ..., e }} *)
   | LSTOPEN; exprlist = separated_nonempty_list(COMMA, expr_target); LSTCLOSE
@@ -565,10 +577,10 @@ top_level_g_assertion_target:
 g_assertion_target:
 (* P * Q *)
 (* The precedence of the separating conjunction is not the same as the arithmetic product *)
-  | left_ass=g_assertion_target; TIMES; right_ass=g_assertion_target
+  | left_ass=g_assertion_target; FTIMES; right_ass=g_assertion_target
     { Asrt.Star (left_ass, right_ass) } %prec separating_conjunction
 (* <GA>(es; es) *)
-  | LESSTHAN; v=VAR; GREATERTHAN; LBRACE; es1=separated_list(COMMA, expr_target); SCOLON; es2=separated_list(COMMA, expr_target); RBRACE
+  | FLT; v=VAR; FGT; LBRACE; es1=separated_list(COMMA, expr_target); SCOLON; es2=separated_list(COMMA, expr_target); RBRACE
     { Asrt.GA (v, es1, es2) }
 (* emp *)
   | LEMP;
@@ -752,9 +764,9 @@ macro_head_target:
 
 (* <spec_name: #bla, #ble, #bli> *)
 lab_spec_target:
-  | LESSTHAN; sspec_name = VAR; COLON; lvars = separated_list (COMMA, LVAR); GREATERTHAN
+  | FLT; sspec_name = VAR; COLON; lvars = separated_list (COMMA, LVAR); FGT
     { (sspec_name, lvars) }
-  | LESSTHAN; sspec_name = VAR; GREATERTHAN
+  | FLT; sspec_name = VAR; FGT
     { (sspec_name, []) }
 ;
 
@@ -811,8 +823,8 @@ pure_assertion_target:
 (* E <=# E *)
   | left_expr=expr_target; LLESSTHANEQUAL; right_expr=expr_target
     { LessEq (left_expr, right_expr) }
-(* E <s# E *)
-  | left_expr=expr_target; LLESSTHANSTRING; right_expr=expr_target
+(* E s<# E *)
+  | left_expr=expr_target; LSLESSTHAN; right_expr=expr_target
     { StrLess (left_expr, right_expr) }
 (* E --e-- E *)
   | left_expr=expr_target; LSETMEM; right_expr=expr_target
@@ -889,35 +901,42 @@ nop_target:
 ;
 
 binop_target:
-  | EQUAL              { Equal }
-  | LESSTHAN           { LessThan }
-  | LESSTHANEQUAL      { LessThanEqual }
-  | LESSTHANSTRING     { LessThanString }
-  | FPLUS              { FPlus }
-  | MINUS              { Minus }
-  | TIMES              { Times }
-  | DIV                { Div }
-  | MOD                { Mod }
-  | AND                { BAnd }
-  | OR                 { BOr }
-  | BITWISEAND         { BitwiseAnd }
-  | BITWISEOR          { BitwiseOr}
-  | BITWISEXOR         { BitwiseXor }
-  | LEFTSHIFT          { LeftShift }
-  | SIGNEDRIGHTSHIFT   { SignedRightShift }
-  | UNSIGNEDRIGHTSHIFT { UnsignedRightShift }
-  | BITWISEANDL        { BitwiseAndL }
-  | BITWISEORL         { BitwiseOrL }
-  | BITWISEXORL        { BitwiseXorL }
-  | LEFTSHIFTL         { LeftShiftL }
-  | SIGNEDRIGHTSHIFTL  { SignedRightShiftL }
+  | EQ                  { Equal }
+  | ILT                 { ILessThan }
+  | ILE                 { ILessThanEqual }
+  | IPLUS               { IPlus }
+  | IMINUS              { IMinus }
+  | ITIMES              { ITimes }
+  | IDIV                { IDiv }
+  | IMOD                { IMod }
+  | FLT                 { FLessThan }
+  | FLE                 { FLessThanEqual }
+  | FPLUS               { FPlus }
+  | FMINUS              { FMinus }
+  | FTIMES              { FTimes }
+  | FDIV                { FDiv }
+  | FMOD                { FMod }
+  | SLT                 { SLessThan }
+  | AND                 { BAnd }
+  | OR                  { BOr }
+  | BITWISEAND          { BitwiseAnd }
+  | BITWISEOR           { BitwiseOr}
+  | BITWISEXOR          { BitwiseXor }
+  | LEFTSHIFT           { LeftShift }
+  | SIGNEDRIGHTSHIFT    { SignedRightShift }
+  | UNSIGNEDRIGHTSHIFT  { UnsignedRightShift }
+  | BITWISEANDL         { BitwiseAndL }
+  | BITWISEORL          { BitwiseOrL }
+  | BITWISEXORL         { BitwiseXorL }
+  | LEFTSHIFTL          { LeftShiftL }
+  | SIGNEDRIGHTSHIFTL   { SignedRightShiftL }
   | UNSIGNEDRIGHTSHIFTL { UnsignedRightShiftL }
-  | M_ATAN2            { M_atan2 }
-  | M_POW              { M_pow }
-  | STRCAT             { StrCat }
-  | SETDIFF            { SetDiff }
-  | SETMEM             { BSetMem }
-  | SETSUB             { BSetSub }
+  | M_ATAN2             { M_atan2 }
+  | M_POW               { M_pow }
+  | STRCAT              { StrCat }
+  | SETDIFF             { SetDiff }
+  | SETMEM              { BSetMem }
+  | SETSUB              { BSetSub }
 ;
 
 unop_target:

@@ -25,7 +25,7 @@ let compile_type t =
     | WBool   -> Some Type.BooleanType
     | WString -> Some Type.StringType
     | WPtr    -> Some Type.ObjectType
-    | WNum    -> Some Type.NumberType
+    | WInt    -> Some Type.IntType
     | WSet    -> Some Type.SetType
     | WAny    -> None)
 
@@ -33,13 +33,13 @@ let compile_binop b =
   WBinOp.(
     match b with
     | EQUAL -> BinOp.Equal
-    | LESSTHAN -> BinOp.LessThan
-    | LESSEQUAL -> BinOp.LessThanEqual
-    | PLUS -> BinOp.FPlus
-    | MINUS -> BinOp.Minus
-    | TIMES -> BinOp.Times
-    | DIV -> BinOp.Div
-    | MOD -> BinOp.Mod
+    | LESSTHAN -> BinOp.ILessThan
+    | LESSEQUAL -> BinOp.ILessThanEqual
+    | PLUS -> BinOp.IPlus
+    | MINUS -> BinOp.IMinus
+    | TIMES -> BinOp.ITimes
+    | DIV -> BinOp.IDiv
+    | MOD -> BinOp.IMod
     | AND -> BinOp.BAnd
     | OR -> BinOp.BOr
     (* operators that do not exist in gil are compiled separately *)

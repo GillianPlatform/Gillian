@@ -195,7 +195,7 @@ rule read = parse
   | ">"                  { Javert_Parser.GREATERTHAN   }
   | "<="                 { Javert_Parser.LESSTHANEQUAL }
   | ">="                 { Javert_Parser.GREATERTHANEQUAL }
-  | "<s"                 { Javert_Parser.LESSTHANSTRING}
+  | "s<"                 { Javert_Parser.LESSTHANSTRING}
   | "+"                  { Javert_Parser.PLUS          }
   | "-"                  { Javert_Parser.MINUS         }
   | "*"                  { Javert_Parser.TIMES         }
@@ -241,7 +241,7 @@ rule read = parse
   | "=="                 { Javert_Parser.LEQUAL }
   | "<#"                 { Javert_Parser.LLESSTHAN       }
   | "<=#"                { Javert_Parser.LLESSTHANEQUAL  }
-  | "<s#"                { Javert_Parser.LLESSTHANSTRING }
+  | "s<#"                { Javert_Parser.LLESSTHANSTRING }
   (* Separating conjunction uses the same symbol as product, token TIMES *)
   | "->"                 { Javert_Parser.LARROW      }
 (* Logic commands *)

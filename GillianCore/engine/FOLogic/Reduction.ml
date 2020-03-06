@@ -809,10 +809,10 @@ let rec reduce_lexpr_loop
             ) )
     | UnOp (LstRev, UnOp (LstRev, le)) -> f le
     (* Less than and lessthaneq *)
-    | UnOp (UNot, BinOp (le1, LessThan, le2)) ->
-        f (BinOp (f le2, LessThanEqual, f le1))
-    | UnOp (UNot, BinOp (le1, LessThanEqual, le2)) ->
-        f (BinOp (f le2, LessThan, f le1))
+    | UnOp (UNot, BinOp (le1, FLessThan, le2)) ->
+        f (BinOp (f le2, FLessThanEqual, f le1))
+    | UnOp (UNot, BinOp (le1, FLessThanEqual, le2)) ->
+        f (BinOp (f le2, FLessThan, f le1))
     (* Special equality *)
     | BinOp
         (BinOp (LVar x, FPlus, UnOp (FUnaryMinus, LVar y)), Equal, Lit (Num 0.))
@@ -1229,15 +1229,15 @@ let rec reduce_lexpr_loop
                     ((Fmt.to_to_string Expr.pp) (LstSub (fle1, fle2, fle3)))));
             let fle2 = f (substitute_for_length pfs fle2) in
             let fle3 = f (substitute_for_length pfs fle3) in
-            let start_in_first = f (BinOp (UnOp (LstLen, lel), Minus, fle2)) in
+            let start_in_first = f (BinOp (UnOp (LstLen, lel), FMinus, fle2)) in
             let start_beyond_first =
-              f (BinOp (fle2, Minus, UnOp (LstLen, lel)))
+              f (BinOp (fle2, FMinus, UnOp (LstLen, lel)))
             in
             let end_in_first =
-              f (BinOp (UnOp (LstLen, lel), Minus, BinOp (fle2, FPlus, fle3)))
+              f (BinOp (UnOp (LstLen, lel), FMinus, BinOp (fle2, FPlus, fle3)))
             in
             let end_beyond_first =
-              f (BinOp (BinOp (fle2, FPlus, fle3), Minus, UnOp (LstLen, lel)))
+              f (BinOp (BinOp (fle2, FPlus, fle3), FMinus, UnOp (LstLen, lel)))
             in
 
             L.(
@@ -1270,7 +1270,7 @@ let rec reduce_lexpr_loop
                     (LstSub
                        ( NOp (LstCat, ler),
                          Lit (Num 0.),
-                         BinOp (fle3, Minus, start_in_first) ))
+                         BinOp (fle3, FMinus, start_in_first) ))
                 in
                 f (NOp (LstCat, [ prefix; suffix ]))
             (* Sublist starts in first, but we don't know more *)
@@ -1318,14 +1318,15 @@ let rec reduce_lexpr_loop
                                  ( NOp (LstCat, les'' :: ler),
                                    Lit (Num 0.),
                                    BinOp
-                                     (fle3, Minus, Lit (Num (float_of_int nump)))
-                                 );
+                                     ( fle3,
+                                       FMinus,
+                                       Lit (Num (float_of_int nump)) ) );
                              ] )) )
                     else LstSub (fle1, fle2, fle3)
                 | _, _ -> LstSub (fle1, fle2, fle3) )
             | _ -> LstSub (fle1, fle2, fle3) )
         | _, _, _ -> LstSub (fle1, fle2, fle3) )
-    (* CHECK: Times and Div are the same, how does the 'when' scope? *)
+    (* CHECK: FTimes and Div are the same, how does the 'when' scope? *)
     | BinOp (lel, op, ler) -> (
         let flel = f lel in
         let fler = f ler in
@@ -1359,7 +1360,7 @@ let rec reduce_lexpr_loop
                   | Some t1, Some t2 ->
                       if t1 = t2 then def else Lit (Bool false)
                   | _, _             -> def )
-            | (FPlus | Minus) when lexpr_is_number ~gamma def ->
+            | (FPlus | FMinus) when lexpr_is_number ~gamma def ->
                 simplify_arithmetic_lexpr pfs gamma def
             (* | FPlus when (lexpr_is_number ~gamma def) ->
                  (match flel, fler with
@@ -1376,7 +1377,7 @@ let rec reduce_lexpr_loop
                  (* Rest *)
                  | _, _ -> def
                  )
-               | Minus when (lexpr_is_number ~gamma def) ->
+               | FMinus when (lexpr_is_number ~gamma def) ->
                  (match flel, fler with
                  (* 0 is the neutral *)
                  | Lit (Num 0.), x -> UnOp (FUnaryMinus, x)
@@ -1386,19 +1387,19 @@ let rec reduce_lexpr_loop
                  (* Transform to unary minus *)
                  | _, _ -> BinOp (flel, FPlus, (UnOp (FUnaryMinus, fler)))
                  ) *)
-            | Times when lexpr_is_number ~gamma def -> (
+            | FTimes when lexpr_is_number ~gamma def -> (
                 match (flel, fler) with
                 (* 1 is the neutral *)
                 | Lit (Num 1.), x | x, Lit (Num 1.) -> x
                 | Lit (Num x), _ when x == nan -> Lit (Num nan)
                 | _, Lit (Num x) when x == nan -> Lit (Num nan)
-                | BinOp (Lit (Num x), Times, y), Lit (Num z) ->
-                    BinOp (Lit (Num (x *. z)), Times, y)
-                | Lit (Num z), BinOp (Lit (Num x), Times, y) ->
-                    BinOp (Lit (Num (z *. x)), Times, y)
+                | BinOp (Lit (Num x), FTimes, y), Lit (Num z) ->
+                    BinOp (Lit (Num (x *. z)), FTimes, y)
+                | Lit (Num z), BinOp (Lit (Num x), FTimes, y) ->
+                    BinOp (Lit (Num (z *. x)), FTimes, y)
                 (* Rest *)
                 | _, _ -> def )
-            | Div when lexpr_is_number ~gamma def -> (
+            | FDiv when lexpr_is_number ~gamma def -> (
                 match (flel, fler) with
                 (* 1 is the neutral *)
                 | Lit (Num 1.), x | x, Lit (Num 1.) -> x
@@ -1519,7 +1520,7 @@ let rec reduce_lexpr_loop
                 | LVar v, NOp (SetUnion, les) ->
                     if List.mem flel les then Lit (Bool true) else def
                 | _, _ -> def )
-            | LessThan -> (
+            | FLessThan -> (
                 match (flel, fler) with
                 | UnOp (LstLen, _), Lit (Num n) when n <= 0. -> Lit (Bool false)
                 | UnOp (LstLen, le), Lit (Num 1.) -> BinOp (le, Equal, EList [])
@@ -1556,7 +1557,7 @@ and simplify_arithmetic_lexpr (pfs : PFS.t) (gamma : TypEnv.t) le =
   match le with
   | BinOp (l, FPlus, Lit (Num 0.)) | BinOp (Lit (Num 0.), FPlus, l) -> l
   (* Binary minus to unary minus *)
-  | BinOp (l, Minus, r) -> f (BinOp (l, FPlus, UnOp (FUnaryMinus, r)))
+  | BinOp (l, FMinus, r) -> f (BinOp (l, FPlus, UnOp (FUnaryMinus, r)))
   (* Unary minus distributes over + *)
   | UnOp (FUnaryMinus, e) -> (
       match e with
@@ -1915,8 +1916,8 @@ let rec reduce_formula_loop
                 | Some tx ->
                     if tx = NoneType then default e1 e2 re1 re2 else False )
             | Lit Nono, e | e, Lit Nono -> False
-            | Lit (Bool true), BinOp (e1, LessThan, e2) -> Less (e1, e2)
-            | Lit (Bool false), BinOp (e1, LessThan, e2) -> Not (Less (e1, e2))
+            | Lit (Bool true), BinOp (e1, FLessThan, e2) -> Less (e1, e2)
+            | Lit (Bool false), BinOp (e1, FLessThan, e2) -> Not (Less (e1, e2))
             (* FPlus theory -> theory? I would not go that far *)
             | le1, le2 when lexpr_is_number le1 && lexpr_is_number le2 ->
                 (* Collect the pluses and minuses and separate them into constants and rest *)

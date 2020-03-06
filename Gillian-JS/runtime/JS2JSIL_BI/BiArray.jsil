@@ -199,7 +199,7 @@ proc Array_isArray (xsc, vthis, array) {
 			ret := false;
 
 			goto [typeOf (array) = Obj] cls rlab;
-			
+
 	cls:	m := metadata(array);
 			class := [m, "@class"];
 			goto [class = "Array"] rt rlab;
@@ -1612,7 +1612,7 @@ proc a__sortCompare(j, k, compfn, vthis) {
 			strx := ret;
 			ret := "i__toStringComputed" (y) with elab;
 			stry := ret;
-			goto [strx <s stry] nok xy;
+			goto [strx s< stry] nok xy;
 	xy:		goto [not (strx = stry)] yesk nojk;
 
 	rlab: return;

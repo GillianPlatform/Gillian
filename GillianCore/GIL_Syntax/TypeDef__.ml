@@ -38,15 +38,21 @@ and literal =
 
 and binop =
   | Equal
-  | LessThan
-  | LessThanEqual
-  | LessThanString
+  | ILessThan
+  | ILessThanEqual
   | IPlus
+  | IMinus
+  | ITimes
+  | IDiv
+  | IMod
+  | FLessThan
+  | FLessThanEqual
   | FPlus
-  | Minus
-  | Times
-  | Div
-  | Mod
+  | FMinus
+  | FTimes
+  | FDiv
+  | FMod
+  | SLessThan
   | BAnd
   | BOr
   | BitwiseAnd
@@ -71,6 +77,7 @@ and binop =
   | BSetSub
 
 and unop =
+  | IUnaryMinus
   | FUnaryMinus
   | UNot
   | BitwiseNot

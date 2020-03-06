@@ -760,7 +760,7 @@ let simplify_pfs_and_gamma
                            UnOp (LstLen, sl),
                            BinOp
                              ( UnOp (LstLen, LVar ns_var),
-                               Minus,
+                               FMinus,
                                UnOp (LstLen, sl) ) ) ))
             | _, _
               when ( match sl with

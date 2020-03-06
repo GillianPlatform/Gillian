@@ -208,8 +208,8 @@ let rec pp_parametric pp_expr fmt f =
   | Less (e1, e2) -> Fmt.pf fmt "(%a <# %a)" pp_expr e1 pp_expr e2
   (* e1 <<= e2 *)
   | LessEq (e1, e2) -> Fmt.pf fmt "(%a <=# %a)" pp_expr e1 pp_expr e2
-  (* e1 <<s e2 *)
-  | StrLess (e1, e2) -> Fmt.pf fmt "(%a <s# %a)" pp_expr e1 pp_expr e2
+  (* e1 <s< e2 *)
+  | StrLess (e1, e2) -> Fmt.pf fmt "(%a s<# %a)" pp_expr e1 pp_expr e2
   (* forall vars . a *)
   | ForAll (lvars, a) ->
       Fmt.pf fmt "(forall %a . %a)"
@@ -233,13 +233,13 @@ let rec lift_logic_expr (e : Expr.t) : (t * t) option =
   | BinOp (e1, Equal, e2) ->
       let a = Eq (e1, e2) in
       Some (a, Not a)
-  | BinOp (e1, LessThan, e2) ->
+  | BinOp (e1, FLessThan, e2) ->
       let a = Less (e1, e2) in
       Some (a, Not a)
-  | BinOp (e1, LessThanString, e2) ->
+  | BinOp (e1, SLessThan, e2) ->
       let a = StrLess (e1, e2) in
       Some (a, Not a)
-  | BinOp (e1, LessThanEqual, e2) ->
+  | BinOp (e1, FLessThanEqual, e2) ->
       let a = LessEq (e1, e2) in
       Some (a, Not a)
   | BinOp (e1, BSetMem, e2) ->
@@ -275,9 +275,9 @@ let rec to_expr (a : t) : Expr.t option =
       | _                  -> None )
   | ForAll _           -> None
   | Eq (le1, le2)      -> Some (Expr.BinOp (le1, BinOp.Equal, le2))
-  | Less (le1, le2)    -> Some (Expr.BinOp (le1, BinOp.LessThan, le2))
-  | LessEq (le1, le2)  -> Some (Expr.BinOp (le1, BinOp.LessThanEqual, le2))
-  | StrLess (le1, le2) -> Some (Expr.BinOp (le1, BinOp.LessThanString, le2))
+  | Less (le1, le2)    -> Some (Expr.BinOp (le1, BinOp.FLessThan, le2))
+  | LessEq (le1, le2)  -> Some (Expr.BinOp (le1, BinOp.FLessThanEqual, le2))
+  | StrLess (le1, le2) -> Some (Expr.BinOp (le1, BinOp.SLessThan, le2))
   | SetMem (le1, le2)  -> Some (Expr.BinOp (le1, BinOp.BSetMem, le2))
   | SetSub (le1, le2)  -> Some (Expr.BinOp (le1, BinOp.BSetSub, le2))
 

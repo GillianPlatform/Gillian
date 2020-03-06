@@ -5,7 +5,7 @@ type t =
   | WBool
   | WString
   | WPtr
-  | WNum
+  | WInt
   | WAny
   | WSet
 
@@ -33,7 +33,7 @@ let pp fmt t =
   | WBool   -> s "Bool"
   | WString -> s "String"
   | WPtr    -> s "Pointer"
-  | WNum    -> s "Num"
+  | WInt    -> s "Num"
   | WAny    -> s "Any"
   | WSet    -> s "Set"
 
@@ -52,7 +52,7 @@ let of_val v =
   let open WVal in
   match v with
   | Bool _  -> WBool
-  | Num _   -> WNum
+  | Num _   -> WInt
   | Str _   -> WString
   | Null    -> WNull
   | VList _ -> WList
@@ -61,7 +61,7 @@ let of_val v =
 let of_unop u =
   match u with
   | WUnOp.NOT  -> (WBool, WBool)
-  | WUnOp.LEN  -> (WList, WNum)
+  | WUnOp.LEN  -> (WList, WInt)
   | WUnOp.REV  -> (WList, WList)
   | WUnOp.HEAD -> (WList, WAny)
   | WUnOp.TAIL -> (WList, WList)
@@ -73,8 +73,8 @@ let of_binop b =
   | WBinOp.LESSTHAN
   | WBinOp.GREATERTHAN
   | WBinOp.LESSEQUAL
-  | WBinOp.GREATEREQUAL -> (WNum, WNum, WBool)
-  | WBinOp.TIMES | WBinOp.DIV | WBinOp.MOD -> (WNum, WNum, WNum)
+  | WBinOp.GREATEREQUAL -> (WInt, WInt, WBool)
+  | WBinOp.TIMES | WBinOp.DIV | WBinOp.MOD -> (WInt, WInt, WInt)
   | WBinOp.AND | WBinOp.OR -> (WBool, WBool, WBool)
   | WBinOp.LSTCONS -> (WAny, WList, WList)
   | WBinOp.LSTCAT -> (WList, WList, WList)
@@ -155,8 +155,8 @@ let rec infer_single_assert_step asser known =
     | WLFormula.LGreaterEq (le1, le2) ->
         let bare_le1, bare_le2 = (WLExpr.get le1, WLExpr.get le2) in
         let inferred = infer_logic_expr (infer_logic_expr known le1) le2 in
-        let inferredp = needs_to_be le1 WNum (needs_to_be le2 WNum inferred) in
-        TypeMap.add bare_le1 WNum (TypeMap.add bare_le2 WNum inferredp)
+        let inferredp = needs_to_be le1 WInt (needs_to_be le2 WInt inferred) in
+        TypeMap.add bare_le1 WInt (TypeMap.add bare_le2 WInt inferredp)
   in
   match WLAssert.get asser with
   | WLAssert.LEmp -> known

@@ -165,18 +165,30 @@ rule read = parse
   | "$$LocalTime"        { GIL_Parser.LOCALTIME     }
 
 (* Binary operators *)
-  | "="                  { GIL_Parser.EQUAL         }
-  | "<"                  { GIL_Parser.LESSTHAN      }
-  | ">"                  { GIL_Parser.GREATERTHAN   }
-  | "<="                 { GIL_Parser.LESSTHANEQUAL }
-  | ">="                 { GIL_Parser.GREATERTHANEQUAL }
-  | "<s"                 { GIL_Parser.LESSTHANSTRING}
+  | "="                  { GIL_Parser.EQ     }
+
+  | "i<"                 { GIL_Parser.ILT    }
+  | "i>"                 { GIL_Parser.IGT    }
+  | "i<="                { GIL_Parser.ILE    }
+  | "i>="                { GIL_Parser.IGE    }
+  | "i+"                 { GIL_Parser.IPLUS  }
+  | "i-"                 { GIL_Parser.IMINUS }
+  | "i*"                 { GIL_Parser.ITIMES }
+  | "i/"                 { GIL_Parser.IDIV   }
+  | "i%"                 { GIL_Parser.IMOD   }
+
+  | "<"                  { GIL_Parser.FLT    }
+  | ">"                  { GIL_Parser.FGT    }
+  | "<="                 { GIL_Parser.FLE    }
+  | ">="                 { GIL_Parser.FGE    }
+  | "+"                 { GIL_Parser.FPLUS  }
+  | "-"                  { GIL_Parser.FMINUS }
+  | "*"                  { GIL_Parser.FTIMES }
+  | "/"                  { GIL_Parser.FDIV   }
+  | "%"                  { GIL_Parser.FMOD   }
+
+  | "s<"                 { GIL_Parser.SLT           }
   | "+"                  { GIL_Parser.PLUS          }
-  | "f+"                 { GIL_Parser.FPLUS         }
-  | "-"                  { GIL_Parser.MINUS         }
-  | "*"                  { GIL_Parser.TIMES         }
-  | "/"                  { GIL_Parser.DIV           }
-  | "%"                  { GIL_Parser.MOD           }
   | "&"                  { GIL_Parser.BITWISEAND    }
   | "|"                  { GIL_Parser.BITWISEOR     }
   | "^"                  { GIL_Parser.BITWISEXOR    }
@@ -222,7 +234,7 @@ rule read = parse
   | "=="                 { GIL_Parser.LEQUAL }
   | "<#"                 { GIL_Parser.LLESSTHAN       }
   | "<=#"                { GIL_Parser.LLESSTHANEQUAL  }
-  | "<s#"                { GIL_Parser.LLESSTHANSTRING }
+  | "s<#"                { GIL_Parser.LSLESSTHAN }
   (* Separating conjunction uses the same symbol as product, token TIMES *)
 (* Logic commands *)
   | "[*"                 { GIL_Parser.OLCMD     }
