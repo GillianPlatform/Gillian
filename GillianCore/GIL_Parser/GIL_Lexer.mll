@@ -181,14 +181,13 @@ rule read = parse
   | ">"                  { GIL_Parser.FGT    }
   | "<="                 { GIL_Parser.FLE    }
   | ">="                 { GIL_Parser.FGE    }
-  | "+"                 { GIL_Parser.FPLUS  }
+  | "+"                  { GIL_Parser.FPLUS  }
   | "-"                  { GIL_Parser.FMINUS }
   | "*"                  { GIL_Parser.FTIMES }
   | "/"                  { GIL_Parser.FDIV   }
   | "%"                  { GIL_Parser.FMOD   }
 
   | "s<"                 { GIL_Parser.SLT           }
-  | "+"                  { GIL_Parser.PLUS          }
   | "&"                  { GIL_Parser.BITWISEAND    }
   | "|"                  { GIL_Parser.BITWISEOR     }
   | "^"                  { GIL_Parser.BITWISEXOR    }

@@ -66,7 +66,6 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token IMOD
 
 %token SLT
-%token PLUS
 %token AND
 %token OR
 %token BITWISEAND
@@ -232,11 +231,11 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %left OR
 %left AND
 %nonassoc EQ
-%nonassoc FLT SLT FLE FGT FGE
+%nonassoc FLT FLE FGT FGE ILT ILE IGT IGE SLT
 %left LEFTSHIFT SIGNEDRIGHTSHIFT UNSIGNEDRIGHTSHIFT LEFTSHIFTL SIGNEDRIGHTSHIFTL UNSIGNEDRIGHTSHIFTL
 %left BITWISEOR BITWISEXOR BITWISEAND BITWISEXORL BITWISEORL BITWISEANDL
-%left FPLUS FMINUS
-%left FTIMES FDIV FMOD M_POW
+%left FPLUS FMINUS IPLUS IMINUS
+%left FTIMES FDIV FMOD ITIMES IDIV IMOD M_POW
 %left M_ATAN2 STRCAT SETDIFF
 
 %nonassoc binop_prec
@@ -310,7 +309,7 @@ assertion_id_target:
 
 pred_param_target:
   (* Program variable with in-parameter status and optional type *)
-  | in_param = option(PLUS); v = VAR; t = option(preceded(COLON, type_target))
+  | in_param = option(FPLUS); v = VAR; t = option(preceded(COLON, type_target))
     { let in_param = Option.fold ~some:(fun _ -> true) ~none:false in_param in
       (v, t), in_param }
 ;
