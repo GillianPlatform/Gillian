@@ -12,9 +12,16 @@ module Suite = struct
     let exec_mode = Gillian.Utils.ExecMode.Symbolic
   end)
 
+  let contains_substring s1 s2 =
+    let re = Str.regexp_string s2 in
+    try
+      ignore (Str.search_forward re s1 0);
+      true
+    with Not_found -> false
+
   let filter_source s =
     Filename.check_suffix s ".c"
-    && not (!Gillian.Utils.Config.ci && Filename.check_suffix s "bug/")
+    && not (!Gillian.Utils.Config.ci && contains_substring s "bug/")
 end
 
 module Expectations = struct
