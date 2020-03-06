@@ -124,7 +124,7 @@ jobs:
       - name: checkout project
         uses: actions/checkout@v2.0.0
         with:
-          repository:  giltho/javert-test262
+          repository:  GillianPlatform/javert-test262
           path: test262
       - name: Test262
         run: 'gillian-js test262 test262/test --ci'
@@ -148,10 +148,10 @@ jobs:
       - name: checkout project
         uses: actions/checkout@v2
         with:
-          repository:  giltho/collection-c-for-gillian
-          path: collection-c
-      - name: Symbolic Testing Collection-C
-        run: 'gillian-c bulk-wpst collection-c/for-gillian --ci'
+          repository:  GillianPlatform/collections-c-for-gillian
+          path: collections-c
+      - name: Symbolic Testing Collections-C
+        run: 'gillian-c bulk-wpst collections-c/for-gillian --ci'
 
   test-Buckets:
     strategy:
