@@ -1,7 +1,7 @@
 proc i__binop_add(v1, v2) {
         goto [ l-nth(v1, 0.) = "int" ] lint unde;
   lint: goto [ l-nth(v2, 0.) = "int" ] bint unde;
-  bint: ret := {{ "int", l-nth(v1, 1.) f+ l-nth(v2, 1.) }};
+  bint: ret := {{ "int", l-nth(v1, 1.) + l-nth(v2, 1.) }};
         return;
   unde: ret := undefined;
         return
@@ -10,14 +10,14 @@ proc i__binop_add(v1, v2) {
 proc i__binop_addl(v1, v2) {
         goto [ l-nth(v1, 0.) = "long" ] llon loth;
   llon: goto [ l-nth(v2, 0.) = "long" ] blon llro;
-  blon: ret := {{ "long", l-nth(v1, 1.) f+ l-nth(v2, 1.) }};
+  blon: ret := {{ "long", l-nth(v1, 1.) + l-nth(v2, 1.) }};
         return;
   llro: goto [ typeOf(l-nth(v2, 0.)) = Obj ] llrp unde;
-  llrp: ret := {{ l-nth(v2, 0.), l-nth(v1, 1.) f+ l-nth(v2, 1.) }};
+  llrp: ret := {{ l-nth(v2, 0.), l-nth(v1, 1.) + l-nth(v2, 1.) }};
         return;
   loth: goto [ typeOf(l-nth(v1, 0.)) = Obj ] lptr unde;
   lptr: goto [ l-nth(v2, 0.) = "long" ] lprl unde;
-  lprl: ret := {{ l-nth(v1, 0.), l-nth(v1, 1.) f+ l-nth(v2, 1.) }};
+  lprl: ret := {{ l-nth(v1, 0.), l-nth(v1, 1.) + l-nth(v2, 1.) }};
         return;
   unde: ret := undefined;
         return

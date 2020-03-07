@@ -680,7 +680,7 @@ module Make
     | BinOp (le_pat1, FPlus, Lit (Num i)) | BinOp (Lit (Num i), FPlus, le_pat1)
       ->
         let le : Expr.t = Val.to_expr v in
-        let le1 : Expr.t = BinOp (le, Minus, Lit (Num i)) in
+        let le1 : Expr.t = BinOp (le, FMinus, Lit (Num i)) in
         let v1 : Val.t = eval_expr le1 in
         f v1 le_pat1
     | NOp (LstCat, [ x ]) -> f v x
@@ -690,7 +690,7 @@ module Make
         let len : Expr.t = Lit (Num (float_of_int (List.length les))) in
         let le1 : Expr.t = LstSub (le, Lit (Num 0.), len) in
         let le2 : Expr.t =
-          LstSub (le, len, BinOp (UnOp (LstLen, le), Minus, len))
+          LstSub (le, len, BinOp (UnOp (LstLen, le), FMinus, len))
         in
         let v1 : Val.t = eval_expr le1 in
         let v2 : Val.t = eval_expr le2 in
@@ -703,7 +703,7 @@ module Make
           LstSub
             ( le,
               UnOp (LstLen, le_pat1),
-              BinOp (UnOp (LstLen, le), Minus, UnOp (LstLen, le_pat1)) )
+              BinOp (UnOp (LstLen, le), FMinus, UnOp (LstLen, le_pat1)) )
         in
         let v1 : Val.t = eval_expr le1 in
         let v2 : Val.t = eval_expr le2 in
@@ -974,6 +974,7 @@ module Make
         | USucc state -> unify_assertion astate subst (Asrt.Pure f2)
         | res         -> res )
     | Pure (Eq (le1, le2)) when UP.outs_expr le1 <> SS.empty ->
+        L.verboser (fun fmt -> fmt "Pure equality with non-empty outs");
         let v2 = subst_in_expr_opt le2 in
         Option.fold
           ~some:(fun v2 ->
@@ -1055,6 +1056,7 @@ module Make
               raise (Failure "DEATH. BRANCHING GETPRED INSIDE UNIFICATION.")
           | GPFail errs -> make_resource_fail () )
     | Pure f ->
+        L.verboser (fun fmt -> fmt "Pure formula");
         let sbst_lst = Subst.to_ssubst subst in
         let sbst = SSubst.init sbst_lst in
         let f' = SSubst.substitute_formula sbst false f in

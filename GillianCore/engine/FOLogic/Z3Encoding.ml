@@ -53,6 +53,7 @@ type gil_type_constructors = {
   empty_type_constructor : FuncDecl.func_decl;
   none_type_constructor : FuncDecl.func_decl;
   boolean_type_constructor : FuncDecl.func_decl;
+  int_type_constructor : FuncDecl.func_decl;
   number_type_constructor : FuncDecl.func_decl;
   string_type_constructor : FuncDecl.func_decl;
   object_type_constructor : FuncDecl.func_decl;
@@ -69,6 +70,7 @@ type z3_basic_gil_value = {
   null_constructor : FuncDecl.func_decl;
   empty_constructor : FuncDecl.func_decl;
   boolean_constructor : FuncDecl.func_decl;
+  int_constructor : FuncDecl.func_decl;
   number_constructor : FuncDecl.func_decl;
   string_constructor : FuncDecl.func_decl;
   loc_constructor : FuncDecl.func_decl;
@@ -79,6 +81,7 @@ type z3_basic_gil_value = {
   (* accessors *)
   (*************)
   boolean_accessor : FuncDecl.func_decl;
+  int_accessor : FuncDecl.func_decl;
   number_accessor : FuncDecl.func_decl;
   string_accessor : FuncDecl.func_decl;
   loc_accessor : FuncDecl.func_decl;
@@ -91,6 +94,7 @@ type z3_basic_gil_value = {
   null_recognizer : FuncDecl.func_decl;
   empty_recognizer : FuncDecl.func_decl;
   boolean_recognizer : FuncDecl.func_decl;
+  int_recognizer : FuncDecl.func_decl;
   number_recognizer : FuncDecl.func_decl;
   string_recognizer : FuncDecl.func_decl;
   loc_recognizer : FuncDecl.func_decl;
@@ -185,6 +189,8 @@ let mk_div =
     (fun e1 e2 -> Arithmetic.mk_div ctx e1 e2)
     (fun e1 e2 -> FloatingPoint.mk_div ctx rm e1 e2)
 
+let mk_mod = Arithmetic.Integer.mk_mod ctx
+
 let z3_gil_type_sort =
   Enumeration.mk_sort ctx
     (mk_string_symb "GIL_Type")
@@ -195,6 +201,7 @@ let z3_gil_type_sort =
          "EmptyType";
          "NoneType";
          "BooleanType";
+         "IntType";
          "NumberType";
          "StringType";
          "ObjectType";
@@ -211,18 +218,20 @@ let type_operations =
     let empty_type_constructor = List.nth z3_gil_type_constructors 2 in
     let none_type_constructor = List.nth z3_gil_type_constructors 3 in
     let boolean_type_constructor = List.nth z3_gil_type_constructors 4 in
-    let number_type_constructor = List.nth z3_gil_type_constructors 5 in
-    let string_type_constructor = List.nth z3_gil_type_constructors 6 in
-    let object_type_constructor = List.nth z3_gil_type_constructors 7 in
-    let list_type_constructor = List.nth z3_gil_type_constructors 8 in
-    let type_type_constructor = List.nth z3_gil_type_constructors 9 in
-    let set_type_constructor = List.nth z3_gil_type_constructors 10 in
+    let int_type_constructor = List.nth z3_gil_type_constructors 5 in
+    let number_type_constructor = List.nth z3_gil_type_constructors 6 in
+    let string_type_constructor = List.nth z3_gil_type_constructors 7 in
+    let object_type_constructor = List.nth z3_gil_type_constructors 8 in
+    let list_type_constructor = List.nth z3_gil_type_constructors 9 in
+    let type_type_constructor = List.nth z3_gil_type_constructors 10 in
+    let set_type_constructor = List.nth z3_gil_type_constructors 11 in
     {
       undefined_type_constructor;
       null_type_constructor;
       empty_type_constructor;
       none_type_constructor;
       boolean_type_constructor;
+      int_type_constructor;
       number_type_constructor;
       string_type_constructor;
       object_type_constructor;
@@ -253,6 +262,11 @@ let z3_gil_literal_sort, z3_gil_list_sort, lit_operations, list_operations =
       (mk_string_symb "isBool")
       [ mk_string_symb "bValue" ]
       [ Some booleans_sort ] [ 0 ]
+  in
+  let gil_int_constructor =
+    Datatype.mk_constructor ctx (mk_string_symb "Int") (mk_string_symb "isInt")
+      [ mk_string_symb "iValue" ]
+      [ Some ints_sort ] [ 0 ]
   in
   let gil_num_constructor =
     Datatype.mk_constructor ctx (mk_string_symb "Num") (mk_string_symb "isNum")
@@ -308,6 +322,7 @@ let z3_gil_literal_sort, z3_gil_list_sort, lit_operations, list_operations =
           gil_null_constructor;
           gil_empty_constructor;
           gil_bool_constructor;
+          gil_int_constructor;
           gil_num_constructor;
           gil_string_constructor;
           gil_loc_constructor;
@@ -342,20 +357,22 @@ let z3_gil_literal_sort, z3_gil_list_sort, lit_operations, list_operations =
     let null_constructor = List.nth z3_literal_constructors 1 in
     let empty_constructor = List.nth z3_literal_constructors 2 in
     let boolean_constructor = List.nth z3_literal_constructors 3 in
-    let number_constructor = List.nth z3_literal_constructors 4 in
-    let string_constructor = List.nth z3_literal_constructors 5 in
-    let loc_constructor = List.nth z3_literal_constructors 6 in
-    let type_constructor = List.nth z3_literal_constructors 7 in
-    let list_constructor = List.nth z3_literal_constructors 8 in
-    let none_constructor = List.nth z3_literal_constructors 9 in
+    let int_constructor = List.nth z3_literal_constructors 4 in
+    let number_constructor = List.nth z3_literal_constructors 5 in
+    let string_constructor = List.nth z3_literal_constructors 6 in
+    let loc_constructor = List.nth z3_literal_constructors 7 in
+    let type_constructor = List.nth z3_literal_constructors 8 in
+    let list_constructor = List.nth z3_literal_constructors 9 in
+    let none_constructor = List.nth z3_literal_constructors 10 in
 
     let gil_literal_accessors = Datatype.get_accessors z3_gil_literal_sort in
     let boolean_accessor = List.nth (List.nth gil_literal_accessors 3) 0 in
-    let number_accessor = List.nth (List.nth gil_literal_accessors 4) 0 in
-    let string_accessor = List.nth (List.nth gil_literal_accessors 5) 0 in
-    let loc_accessor = List.nth (List.nth gil_literal_accessors 6) 0 in
-    let type_accessor = List.nth (List.nth gil_literal_accessors 7) 0 in
-    let list_accessor = List.nth (List.nth gil_literal_accessors 8) 0 in
+    let int_accessor = List.nth (List.nth gil_literal_accessors 4) 0 in
+    let number_accessor = List.nth (List.nth gil_literal_accessors 5) 0 in
+    let string_accessor = List.nth (List.nth gil_literal_accessors 6) 0 in
+    let loc_accessor = List.nth (List.nth gil_literal_accessors 7) 0 in
+    let type_accessor = List.nth (List.nth gil_literal_accessors 8) 0 in
+    let list_accessor = List.nth (List.nth gil_literal_accessors 9) 0 in
 
     let gil_literal_recognizers =
       Datatype.get_recognizers z3_gil_literal_sort
@@ -364,12 +381,13 @@ let z3_gil_literal_sort, z3_gil_list_sort, lit_operations, list_operations =
     let null_recognizer = List.nth gil_literal_recognizers 1 in
     let empty_recognizer = List.nth gil_literal_recognizers 2 in
     let boolean_recognizer = List.nth gil_literal_recognizers 3 in
-    let number_recognizer = List.nth gil_literal_recognizers 4 in
-    let string_recognizer = List.nth gil_literal_recognizers 5 in
-    let loc_recognizer = List.nth gil_literal_recognizers 6 in
-    let type_recognizer = List.nth gil_literal_recognizers 7 in
-    let list_recognizer = List.nth gil_literal_recognizers 8 in
-    let none_recognizer = List.nth gil_literal_recognizers 9 in
+    let int_recognizer = List.nth gil_literal_recognizers 4 in
+    let number_recognizer = List.nth gil_literal_recognizers 5 in
+    let string_recognizer = List.nth gil_literal_recognizers 6 in
+    let loc_recognizer = List.nth gil_literal_recognizers 7 in
+    let type_recognizer = List.nth gil_literal_recognizers 8 in
+    let list_recognizer = List.nth gil_literal_recognizers 9 in
+    let none_recognizer = List.nth gil_literal_recognizers 10 in
 
     let gil_literal_operations =
       {
@@ -377,6 +395,7 @@ let z3_gil_literal_sort, z3_gil_list_sort, lit_operations, list_operations =
         null_constructor;
         empty_constructor;
         boolean_constructor;
+        int_constructor;
         number_constructor;
         string_constructor;
         loc_constructor;
@@ -384,6 +403,7 @@ let z3_gil_literal_sort, z3_gil_list_sort, lit_operations, list_operations =
         list_constructor;
         none_constructor;
         boolean_accessor;
+        int_accessor;
         number_accessor;
         string_accessor;
         loc_accessor;
@@ -393,6 +413,7 @@ let z3_gil_literal_sort, z3_gil_list_sort, lit_operations, list_operations =
         null_recognizer;
         empty_recognizer;
         boolean_recognizer;
+        int_recognizer;
         number_recognizer;
         string_recognizer;
         loc_recognizer;
@@ -592,6 +613,7 @@ let encode_type (t : Type.t) =
     | NoneType      -> ZExpr.mk_app ctx type_operations.none_type_constructor []
     | BooleanType   ->
         ZExpr.mk_app ctx type_operations.boolean_type_constructor []
+    | IntType       -> ZExpr.mk_app ctx type_operations.int_type_constructor []
     | NumberType    -> ZExpr.mk_app ctx type_operations.number_type_constructor
                          []
     | StringType    -> ZExpr.mk_app ctx type_operations.string_type_constructor
@@ -706,6 +728,10 @@ let rec encode_lit (lit : Literal.t) =
         in
         mk_singleton_elem
           (ZExpr.mk_app ctx lit_operations.boolean_constructor [ b_arg ])
+    | Int i      ->
+        let i_arg = mk_int_i i in
+        mk_singleton_elem
+          (ZExpr.mk_app ctx lit_operations.int_constructor [ i_arg ])
     | Num n      ->
         let sfn = Float.to_string n in
         let n_arg = mk_num_s sfn in
@@ -759,6 +785,30 @@ let encode_binop (op : BinOp.t) le1 le2 =
       (ZExpr.mk_app ctx lit_operations.number_constructor [ nle1_op_nle2 ])
   in
 
+  let binop_ints_to_ints mk_op le1 le2 =
+    let n_le1 =
+      ZExpr.mk_app ctx lit_operations.int_accessor [ mk_singleton_access le1 ]
+    in
+    let n_le2 =
+      ZExpr.mk_app ctx lit_operations.int_accessor [ mk_singleton_access le2 ]
+    in
+    let nle1_op_nle2 = mk_op n_le1 n_le2 in
+    mk_singleton_elem
+      (ZExpr.mk_app ctx lit_operations.int_constructor [ nle1_op_nle2 ])
+  in
+
+  let binop_ints_to_booleans mk_op le1 le2 =
+    let n_le1 =
+      ZExpr.mk_app ctx lit_operations.int_accessor [ mk_singleton_access le1 ]
+    in
+    let n_le2 =
+      ZExpr.mk_app ctx lit_operations.int_accessor [ mk_singleton_access le2 ]
+    in
+    let nle1_op_nle2 = mk_op n_le1 n_le2 in
+    mk_singleton_elem
+      (ZExpr.mk_app ctx lit_operations.boolean_constructor [ nle1_op_nle2 ])
+  in
+
   let binop_numbers_to_booleans mk_op le1 le2 =
     let n_le1 =
       ZExpr.mk_app ctx lit_operations.number_accessor
@@ -774,16 +824,23 @@ let encode_binop (op : BinOp.t) le1 le2 =
   in
 
   match op with
-  | FPlus         -> binop_numbers_to_numbers mk_add le1 le2
-  | Minus         -> binop_numbers_to_numbers mk_sub le1 le2
-  | Times         -> binop_numbers_to_numbers mk_mul le1 le2
-  | Div           -> binop_numbers_to_numbers mk_div le1 le2
-  | LessThan      -> binop_numbers_to_booleans (mk_lt ctx) le1 le2
-  | LessThanEqual -> binop_numbers_to_booleans (mk_le ctx) le1 le2
-  | Equal         ->
+  | IPlus -> binop_ints_to_ints mk_add le1 le2
+  | IMinus -> binop_ints_to_ints mk_sub le1 le2
+  | ITimes -> binop_ints_to_ints mk_mul le1 le2
+  | IDiv -> binop_ints_to_ints mk_div le1 le2
+  | IMod -> binop_ints_to_ints mk_mod le1 le2
+  | ILessThan -> binop_ints_to_booleans (mk_lt ctx) le1 le2
+  | ILessThanEqual -> binop_ints_to_booleans (mk_le ctx) le1 le2
+  | FPlus -> binop_numbers_to_numbers mk_add le1 le2
+  | FMinus -> binop_numbers_to_numbers mk_sub le1 le2
+  | FTimes -> binop_numbers_to_numbers mk_mul le1 le2
+  | FDiv -> binop_numbers_to_numbers mk_div le1 le2
+  | FLessThan -> binop_numbers_to_booleans (mk_lt ctx) le1 le2
+  | FLessThanEqual -> binop_numbers_to_booleans (mk_le ctx) le1 le2
+  | Equal ->
       ZExpr.mk_app ctx lit_operations.boolean_constructor
         [ Boolean.mk_eq ctx le1 le2 ]
-  | BOr           ->
+  | BOr ->
       let le1_b =
         ZExpr.mk_app ctx lit_operations.boolean_accessor
           [ mk_singleton_access le1 ]
@@ -795,7 +852,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
       let le = Boolean.mk_or ctx [ le1_b; le2_b ] in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.boolean_constructor [ le ])
-  | BAnd          ->
+  | BAnd ->
       let le1_b =
         ZExpr.mk_app ctx lit_operations.boolean_accessor
           [ mk_singleton_access le1 ]
@@ -807,7 +864,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
       let le = Boolean.mk_and ctx [ le1_b; le2_b ] in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.boolean_constructor [ le ])
-  | BSetMem       ->
+  | BSetMem ->
       let le1_mem = mk_singleton_access le1 in
       let le2_set =
         ZExpr.mk_app ctx extended_literal_operations.set_accessor [ le2 ]
@@ -815,7 +872,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
       let le = Set.mk_membership ctx le1_mem le2_set in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.boolean_constructor [ le ])
-  | SetDiff       ->
+  | SetDiff ->
       let le1_set =
         ZExpr.mk_app ctx extended_literal_operations.set_accessor [ le1 ]
       in
@@ -824,7 +881,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
       in
       let le = Set.mk_difference ctx le1_set le2_set in
       ZExpr.mk_app ctx extended_literal_operations.set_constructor [ le ]
-  | BSetSub       ->
+  | BSetSub ->
       let le1_set =
         ZExpr.mk_app ctx extended_literal_operations.set_accessor [ le1 ]
       in
@@ -834,7 +891,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
       let le = Set.mk_subset ctx le1_set le2_set in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.boolean_constructor [ le ])
-  | LstNth        ->
+  | LstNth ->
       let lst' =
         ZExpr.mk_app ctx lit_operations.list_accessor
           [ mk_singleton_access le1 ]
@@ -845,7 +902,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx axiomatised_operations.lnth_fun [ lst'; index' ])
-  | StrNth        ->
+  | StrNth ->
       let str' =
         ZExpr.mk_app ctx lit_operations.string_accessor
           [ mk_singleton_access le1 ]
@@ -859,7 +916,8 @@ let encode_binop (op : BinOp.t) le1 le2 =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.string_constructor [ res ])
-  | _             ->
+  (* FIXME: Specify which *)
+  | _ ->
       raise
         (Failure
            (Printf.sprintf
@@ -868,7 +926,14 @@ let encode_binop (op : BinOp.t) le1 le2 =
 
 let encode_unop (op : UnOp.t) le =
   match op with
-  | UnaryMinus ->
+  | IUnaryMinus ->
+      let le_n =
+        ZExpr.mk_app ctx lit_operations.int_accessor [ mk_singleton_access le ]
+      in
+      let op_le_n = Arithmetic.mk_unary_minus ctx le_n in
+      mk_singleton_elem
+        (ZExpr.mk_app ctx lit_operations.int_constructor [ op_le_n ])
+  | FUnaryMinus ->
       let le_n =
         ZExpr.mk_app ctx lit_operations.number_accessor
           [ mk_singleton_access le ]
@@ -876,7 +941,7 @@ let encode_unop (op : UnOp.t) le =
       let op_le_n = Arithmetic.mk_unary_minus ctx le_n in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.number_constructor [ op_le_n ])
-  | LstLen     ->
+  | LstLen      ->
       let le_lst =
         ZExpr.mk_app ctx lit_operations.list_accessor [ mk_singleton_access le ]
       in
@@ -885,7 +950,7 @@ let encode_unop (op : UnOp.t) le =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.number_constructor [ op_le_lst ])
-  | StrLen     ->
+  | StrLen      ->
       let le_s =
         ZExpr.mk_app ctx lit_operations.string_accessor
           [ mk_singleton_access le ]
@@ -893,7 +958,7 @@ let encode_unop (op : UnOp.t) le =
       let op_le_s = ZExpr.mk_app ctx axiomatised_operations.slen_fun [ le_s ] in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.number_constructor [ op_le_s ])
-  | ToStringOp ->
+  | ToStringOp  ->
       let le_n =
         ZExpr.mk_app ctx lit_operations.number_accessor
           [ mk_singleton_access le ]
@@ -903,7 +968,7 @@ let encode_unop (op : UnOp.t) le =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.string_constructor [ op_le_n ])
-  | ToNumberOp ->
+  | ToNumberOp  ->
       let le_s =
         ZExpr.mk_app ctx lit_operations.string_accessor
           [ mk_singleton_access le ]
@@ -913,7 +978,7 @@ let encode_unop (op : UnOp.t) le =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.number_constructor [ op_le_s ])
-  | ToIntOp    ->
+  | ToIntOp     ->
       let le_n =
         ZExpr.mk_app ctx lit_operations.number_accessor
           [ mk_singleton_access le ]
@@ -923,7 +988,7 @@ let encode_unop (op : UnOp.t) le =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.number_constructor [ op_le_n ])
-  | UNot       ->
+  | UNot        ->
       let le_b =
         ZExpr.mk_app ctx lit_operations.boolean_accessor
           [ mk_singleton_access le ]
@@ -931,7 +996,7 @@ let encode_unop (op : UnOp.t) le =
       let op_le_b = Boolean.mk_not ctx le_b in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.boolean_constructor [ op_le_b ])
-  | Cdr        ->
+  | Cdr         ->
       let le_lst =
         ZExpr.mk_app ctx lit_operations.list_accessor [ mk_singleton_access le ]
       in
@@ -940,17 +1005,17 @@ let encode_unop (op : UnOp.t) le =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.list_constructor [ op_le_lst ])
-  | Car        ->
+  | Car         ->
       let le_lst =
         ZExpr.mk_app ctx lit_operations.list_accessor [ mk_singleton_access le ]
       in
       let op_le = ZExpr.mk_app ctx list_operations.head_accessor [ le_lst ] in
       mk_singleton_elem op_le
-  | TypeOf     ->
+  | TypeOf      ->
       let res = typeof_expression le in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.type_constructor [ res ])
-  | ToUint32Op ->
+  | ToUint32Op  ->
       let le_n =
         ZExpr.mk_app ctx lit_operations.number_accessor
           [ mk_singleton_access le ]
@@ -961,14 +1026,14 @@ let encode_unop (op : UnOp.t) le =
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.number_constructor [ op_le_n ])
-  | LstRev     ->
+  | LstRev      ->
       let le_lst =
         ZExpr.mk_app ctx lit_operations.list_accessor [ mk_singleton_access le ]
       in
       let n_le = ZExpr.mk_app ctx axiomatised_operations.lrev_fun [ le_lst ] in
       mk_singleton_elem
         (ZExpr.mk_app ctx lit_operations.list_constructor [ n_le ])
-  | _          ->
+  | _           ->
       Printf.printf "SMT encoding: Construct not supported yet - unop - %s!\n"
         (UnOp.str op);
       let msg =
@@ -1050,7 +1115,7 @@ let rec encode_logical_expression (le : Expr.t) : ZExpr.expr =
 let encode_quantifier quantifier_type ctx quantified_vars var_sorts assertion =
   if List.length quantified_vars > 0 then
     let quantified_assertion =
-      Quantifier.mk_quantifier ctx quantifier_type
+      Quantifier.mk_quantifier_const ctx quantifier_type
         (List.map2
            (fun v s -> ZExpr.mk_const_s ctx v s)
            quantified_vars var_sorts)
@@ -1081,6 +1146,7 @@ let make_recognizer_assertion x (t_x : Type.t) =
   | EmptyType     -> non_set_type_recognizer lit_operations.empty_recognizer
   | NoneType      -> non_set_type_recognizer lit_operations.none_recognizer
   | BooleanType   -> non_set_type_recognizer lit_operations.boolean_recognizer
+  | IntType       -> non_set_type_recognizer lit_operations.int_recognizer
   | NumberType    -> non_set_type_recognizer lit_operations.number_recognizer
   | StringType    -> non_set_type_recognizer lit_operations.string_recognizer
   | ObjectType    -> non_set_type_recognizer lit_operations.loc_recognizer

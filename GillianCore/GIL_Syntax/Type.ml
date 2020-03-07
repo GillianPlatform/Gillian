@@ -8,6 +8,7 @@ type t = TypeDef__.typ =
   | EmptyType  (** Type of Empty          *)
   | NoneType  (** Type of logical values *)
   | BooleanType  (** Type of booleans       *)
+  | IntType  (** Type of integers *)
   | NumberType  (** Type of floats         *)
   | StringType  (** Type of strings        *)
   | ObjectType  (** Type of objects        *)
@@ -23,6 +24,7 @@ let str (x : t) =
   | EmptyType     -> "Empty"
   | NoneType      -> "None"
   | BooleanType   -> "Bool"
+  | IntType       -> "Int"
   | NumberType    -> "Num"
   | StringType    -> "Str"
   | ObjectType    -> "Obj"

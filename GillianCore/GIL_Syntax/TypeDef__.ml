@@ -14,6 +14,7 @@ and typ =
   | EmptyType
   | NoneType
   | BooleanType
+  | IntType
   | NumberType
   | StringType
   | ObjectType
@@ -27,6 +28,7 @@ and literal =
   | Empty
   | Constant  of constant
   | Bool      of bool
+  | Int       of int
   | Num       of float
   | String    of string
   | Loc       of string
@@ -36,14 +38,21 @@ and literal =
 
 and binop =
   | Equal
-  | LessThan
-  | LessThanEqual
-  | LessThanString
+  | ILessThan
+  | ILessThanEqual
+  | IPlus
+  | IMinus
+  | ITimes
+  | IDiv
+  | IMod
+  | FLessThan
+  | FLessThanEqual
   | FPlus
-  | Minus
-  | Times
-  | Div
-  | Mod
+  | FMinus
+  | FTimes
+  | FDiv
+  | FMod
+  | SLessThan
   | BAnd
   | BOr
   | BitwiseAnd
@@ -68,7 +77,8 @@ and binop =
   | BSetSub
 
 and unop =
-  | UnaryMinus
+  | IUnaryMinus
+  | FUnaryMinus
   | UNot
   | BitwiseNot
   | M_isNaN

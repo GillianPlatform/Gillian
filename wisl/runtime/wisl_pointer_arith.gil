@@ -5,23 +5,23 @@ import wisl_core.gil;
 proc i__ptr_add (ptr, add_offset) {
   loc := l-nth(ptr, 0.);
   offset := l-nth(ptr, 1.);
-  ret := {{ loc, offset + add_offset }};
+  ret := {{ loc, offset i+ add_offset }};
   return
 };
 
 proc i__add (el, er) {
-        goto [((typeOf el) = List) and ((typeOf er) = Num)] lip linp;
+        goto [((typeOf el) = List) and ((typeOf er) = Int)] lip linp;
         (* Left is a pointer and right is a number *)
   lip:  ret := "i__ptr_add" (el, er);
         return;
         (* Left is not a pointer *)
-  linp: goto [((typeOf er) = List) and ((typeOf el) = Num)] rip rinp;
+  linp: goto [((typeOf er) = List) and ((typeOf el) = Int)] rip rinp;
         (* Right is a pointer and left is a number *)
   rip:  ret := "i__ptr_add" (er, el);
         return;
         (* Both left and right are numbers *)
-  rinp: goto [((typeOf el) = Num) and ((typeOf el) = Num)] nadd err;
-  nadd: ret := el + er; 
+  rinp: goto [((typeOf el) = Int) and ((typeOf el) = Int)] nadd err;
+  nadd: ret := el i+ er;
         return;
         (* Incorrect types *)
   err:  err_msg := "Addition: Incorrect Types";
@@ -31,10 +31,11 @@ proc i__add (el, er) {
 proc i__minus (el, er) {
         goto [(typeOf el) = List] lip linp;
         (* Left is a pointer *)
-  lip:  ret := "i__ptr_add" (el, -er);
+  lip:  mer := i- er;
+        ret := "i__ptr_add" (el, mer);
         goto end;
         (* Left is not a pointer *)
-  linp: ret := el - er; 
+  linp: ret := el i- er;
   end:  return
 };
 
@@ -44,13 +45,13 @@ proc i__leq (el, er) {
   lip:  locl := l-nth(el, 0.); (* left is a pointer, we assume both are, otherwise, type error *)
         locr := l-nth(er, 0.);
         goto [locr = locr] ok nok;
-  nok:  message := "Cannot compare these two values";
+  nok:  message := "Cannot compare pointers from different blocks";
         fail [message] (locl, locr);
   ok:   offsetl := l-nth(el, 1.);
         offsetr := l-nth(er, 1.);
-        ret := offsetl <= offsetr;
+        ret := offsetl i<= offsetr;
         return;
-  linp: ret := el <= er; (* we assume that both are integer *)
+  linp: ret := el i<= er; (* we assume that both are integer *)
         return
 };
 
@@ -63,9 +64,9 @@ proc i__lt (el, er) {
         fail [message] (locl, locr);
   ok:   offsetl := l-nth(el, 1.);
         offsetr := l-nth(er, 1.);
-        ret := offsetl < offsetr;
+        ret := offsetl i< offsetr;
         return;
-  linp: ret := el < er; (* we assume that both are integer *)
+  linp: ret := el i< er; (* we assume that both are integer *)
         return
 };
 
@@ -78,9 +79,9 @@ proc i__geq (el, er) {
         fail [message] (locl, locr);
   ok:   offsetl := l-nth(el, 1.);
         offsetr := l-nth(er, 1.);
-        ret := not (offsetl < offsetr);
+        ret := not (offsetl i< offsetr);
         return;
-  linp: ret := not (el < er); (* we assume that both are integer *)
+  linp: ret := not (el i< er); (* we assume that both are integer *)
         return
 };
 
@@ -93,9 +94,9 @@ proc i__gt (el, er) {
         fail [message] (locl, locr);
   ok:   offsetl := l-nth(el, 1.);
         offsetr := l-nth(er, 1.);
-        ret := not (offsetl <= offsetr);
+        ret := not (offsetl i<= offsetr);
         return;
-  linp: ret := not (el <= er); (* we assume that both are integer *)
+  linp: ret := not (el i<= er); (* we assume that both are integer *)
         return
 };
 
@@ -104,33 +105,32 @@ proc i__gt (el, er) {
 
 (* i__pred_add(x, y, z) is true if executing i__add(x, y) would return z *)
 pred i__pred_add (+el, +er, out):
-      types(el: List, er: Num) * (el == {{ #loc, #offset }}) * (out == {{ #loc, #offset + er }}),
-      types(er: List, el: Num) * (er == {{ #loc, #offset}}) * (out == {{ #loc, #offset + el }}),
-      types(er: Num, el: Num) * out == er + el;
+      types(el: List, er: Int) * (el == {{ #loc, #offset }}) * (out == {{ #loc, #offset i+ er }}),
+      types(er: List, el: Int) * (er == {{ #loc, #offset}}) * (out == {{ #loc, #offset i+ el }}),
+      types(er: Int, el: Int) * out == er i+ el;
 
 (* i__pred_minus(x, y, z) is true if executing i__minus(x, y) would return z *)
 pred i__pred_minus (+el, +er, out):
-      types(el: List, er: Num) * (el == {{ #loc, #offset }}) * (out == {{ #loc, #offset - er }}),
-      types(er: Num, el: Num) * out == el - er;
+      types(el: List, er: Int) * (el == {{ #loc, #offset }}) * (out == {{ #loc, #offset i- er }}),
+      types(er: Int, el: Int) * out == el i- er;
 
 (* i__pred_lt(x, y, z) is true if executing i__lt(x, y) would return z *)
 pred i__pred_lt (+el, +er, out):
-      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (#offsetl < #offsetr)),
-      types(el: Num, er: Num) * (out == (el < er));
+      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (#offsetl i< #offsetr)),
+      types(el: Int, er: Int) * (out == (el i< er));
 
 (* i__pred_gt(x, y, z) is true if executing i__gt(x, y) would return z *)
 pred i__pred_gt (+el, +er, out):
-      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (#offsetl < #offsetr)),
-      types(el: Num, er: Num) * (out == (not (el <= er)));
+      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (not (#offsetl i<= #offsetr))),
+      types(el: Int, er: Int) * (out == (not (el i<= er)));
 
 (* i__pred_leq(x, y, z) is true if executing i__leq(x, y) would return z *)
 pred i__pred_leq (+el, +er, out):
-      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (#offsetl < #offsetr)),
-      types(el: Num, er: Num) * (out == (el <= er));
+      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (#offsetl i<= #offsetr)),
+      types(el: Int, er: Int) * (out == (el i<= er));
 
 (* i__pred_geq(x, y, z) is true if executing i__geq(x, y) would return z *)
 pred i__pred_geq (+el, +er, out):
-      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (#offsetl < #offsetr)),
-      types(el: Num, er: Num) * (out == (not (el < er)));
+      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (not (#offsetl i< #offsetr))),
+      types(el: Int, er: Int) * (out == (not (el i< er)));
 
-      

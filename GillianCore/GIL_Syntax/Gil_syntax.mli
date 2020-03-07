@@ -38,6 +38,7 @@ module Type : sig
     | EmptyType  (** Type of Empty *)
     | NoneType  (** Type of None *)
     | BooleanType  (** Type of booleans *)
+    | IntType  (** Type of integers *)
     | NumberType  (** Type of floats *)
     | StringType  (** Type of strings *)
     | ObjectType  (** Type of objects *)
@@ -60,6 +61,7 @@ module Literal : sig
     | Empty  (** The literal [empty] *)
     | Constant  of Constant.t  (** GIL constants ({!type:Constant.t}) *)
     | Bool      of bool  (** GIL booleans: [true] and [false] *)
+    | Int       of int  (** GIL integers: TODO: understand size *)
     | Num       of float  (** GIL floats - double-precision 64-bit IEEE 754 *)
     | String    of string  (** GIL strings *)
     | Loc       of string  (** GIL locations (uninterpreted symbols) *)
@@ -89,7 +91,8 @@ end
 module UnOp : sig
   (** {b GIL Unary Operators } *)
   type t =
-    | UnaryMinus  (** Unary minus *)
+    | IUnaryMinus  (** Integer unary minus *)
+    | FUnaryMinus  (** Float unary minus *)
     | UNot  (** Negation *)
     | BitwiseNot  (** Bitwise negation *)
     | M_isNaN  (** Test for NaN *)
@@ -129,14 +132,21 @@ module BinOp : sig
   (** {b GIL Binary Operators } *)
   type t =
     | Equal  (** Equality *)
-    | LessThan  (** Less *)
-    | LessThanEqual  (** Less or equal for numbers *)
-    | LessThanString  (** Less or equal for strings *)
+    | ILessThan  (** Less for integers *)
+    | ILessThanEqual  (** Less or equal for integers *)
+    | IPlus  (** Integer addition *)
+    | IMinus  (** Integer subtraction *)
+    | ITimes  (** Integer multiplication *)
+    | IDiv  (** Integer division *)
+    | IMod  (** Integer modulus *)
+    | FLessThan  (** Less for floats *)
+    | FLessThanEqual  (** Less or equal for floats *)
     | FPlus  (** Float addition *)
-    | Minus  (** Subtraction *)
-    | Times  (** Multiplication *)
-    | Div  (** Float division *)
-    | Mod  (** Modulus *)
+    | FMinus  (** Float subtraction *)
+    | FTimes  (** Float multiplication *)
+    | FDiv  (** Float division *)
+    | FMod  (** Float modulus *)
+    | SLessThan  (** Less or equal for strings *)
     | BAnd  (** Boolean conjunction *)
     | BOr  (** Boolean disjunction *)
     | BitwiseAnd  (** Bitwise conjunction *)
@@ -951,7 +961,8 @@ module Visitors : sig
            ; visit_Car : 'd -> UnOp.t
            ; visit_Cdr : 'd -> UnOp.t
            ; visit_Constant : 'd -> Constant.t -> Literal.t
-           ; visit_Div : 'd -> BinOp.t
+           ; visit_IDiv : 'd -> BinOp.t
+           ; visit_FDiv : 'd -> BinOp.t
            ; visit_ECall :
                'd -> string -> Expr.t -> Expr.t list -> 'h option -> 'h Cmd.t
            ; visit_EList : 'd -> Expr.t list -> Expr.t
@@ -986,9 +997,11 @@ module Visitors : sig
            ; visit_LeftShiftL : 'd -> BinOp.t
            ; visit_Less : 'd -> Expr.t -> Expr.t -> Formula.t
            ; visit_LessEq : 'd -> Expr.t -> Expr.t -> Formula.t
-           ; visit_LessThan : 'd -> BinOp.t
-           ; visit_LessThanEqual : 'd -> BinOp.t
-           ; visit_LessThanString : 'd -> BinOp.t
+           ; visit_ILessThan : 'd -> BinOp.t
+           ; visit_ILessThanEqual : 'd -> BinOp.t
+           ; visit_FLessThan : 'd -> BinOp.t
+           ; visit_FLessThanEqual : 'd -> BinOp.t
+           ; visit_SLessThan : 'd -> BinOp.t
            ; visit_ListType : 'd -> Type.t
            ; visit_Lit : 'd -> Literal.t -> Expr.t
            ; visit_Loc : 'd -> string -> Literal.t
@@ -1020,8 +1033,10 @@ module Visitors : sig
            ; visit_Max_float : 'd -> Constant.t
            ; visit_MaxSafeInteger : 'd -> Constant.t
            ; visit_Min_float : 'd -> Constant.t
-           ; visit_Minus : 'd -> BinOp.t
-           ; visit_Mod : 'd -> BinOp.t
+           ; visit_IMinus : 'd -> BinOp.t
+           ; visit_FMinus : 'd -> BinOp.t
+           ; visit_IMod : 'd -> BinOp.t
+           ; visit_FMod : 'd -> BinOp.t
            ; visit_NOp : 'd -> NOp.t -> Expr.t list -> Expr.t
            ; visit_NoneType : 'd -> Type.t
            ; visit_Nono : 'd -> Literal.t
@@ -1029,13 +1044,16 @@ module Visitors : sig
            ; visit_Not : 'd -> Formula.t -> Formula.t
            ; visit_Null : 'd -> Literal.t
            ; visit_NullType : 'd -> Type.t
+           ; visit_Int : 'd -> int -> Literal.t
            ; visit_Num : 'd -> float -> Literal.t
+           ; visit_IntType : 'd -> Type.t
            ; visit_NumberType : 'd -> Type.t
            ; visit_ObjectType : 'd -> Type.t
            ; visit_Or : 'd -> Formula.t -> Formula.t -> Formula.t
            ; visit_PVar : 'd -> string -> Expr.t
            ; visit_PhiAssignment : 'd -> (string * Expr.t list) list -> 'h Cmd.t
            ; visit_Pi : 'd -> Constant.t
+           ; visit_IPlus : 'd -> BinOp.t
            ; visit_FPlus : 'd -> BinOp.t
            ; visit_Pred : 'd -> string -> Expr.t list -> Asrt.t
            ; visit_Pure : 'd -> Formula.t -> Asrt.t
@@ -1062,7 +1080,8 @@ module Visitors : sig
            ; visit_StrNth : 'd -> BinOp.t
            ; visit_String : 'd -> string -> Literal.t
            ; visit_StringType : 'd -> Type.t
-           ; visit_Times : 'd -> BinOp.t
+           ; visit_ITimes : 'd -> BinOp.t
+           ; visit_FTimes : 'd -> BinOp.t
            ; visit_ToInt32Op : 'd -> UnOp.t
            ; visit_ToIntOp : 'd -> UnOp.t
            ; visit_ToNumberOp : 'd -> UnOp.t
@@ -1077,7 +1096,8 @@ module Visitors : sig
            ; visit_UNot : 'd -> UnOp.t
            ; visit_UTCTime : 'd -> Constant.t
            ; visit_UnOp : 'd -> UnOp.t -> Expr.t -> Expr.t
-           ; visit_UnaryMinus : 'd -> UnOp.t
+           ; visit_IUnaryMinus : 'd -> UnOp.t
+           ; visit_FUnaryMinus : 'd -> UnOp.t
            ; visit_Undefined : 'd -> Literal.t
            ; visit_UndefinedType : 'd -> Type.t
            ; visit_Unfold :
@@ -1183,7 +1203,9 @@ module Visitors : sig
 
       method visit_Constant : 'd -> Constant.t -> Literal.t
 
-      method visit_Div : 'd -> BinOp.t
+      method visit_IDiv : 'd -> BinOp.t
+
+      method visit_FDiv : 'd -> BinOp.t
 
       method visit_ECall :
         'd -> string -> Expr.t -> Expr.t list -> 'h option -> 'h Cmd.t
@@ -1248,11 +1270,15 @@ module Visitors : sig
 
       method visit_LessEq : 'd -> Expr.t -> Expr.t -> Formula.t
 
-      method visit_LessThan : 'd -> BinOp.t
+      method visit_ILessThan : 'd -> BinOp.t
 
-      method visit_LessThanEqual : 'd -> BinOp.t
+      method visit_ILessThanEqual : 'd -> BinOp.t
 
-      method visit_LessThanString : 'd -> BinOp.t
+      method visit_FLessThan : 'd -> BinOp.t
+
+      method visit_FLessThanEqual : 'd -> BinOp.t
+
+      method visit_SLessThan : 'd -> BinOp.t
 
       method visit_ListType : 'd -> Type.t
 
@@ -1316,9 +1342,13 @@ module Visitors : sig
 
       method visit_Min_float : 'd -> Constant.t
 
-      method visit_Minus : 'd -> BinOp.t
+      method visit_IMinus : 'd -> BinOp.t
 
-      method visit_Mod : 'd -> BinOp.t
+      method visit_FMinus : 'd -> BinOp.t
+
+      method visit_IMod : 'd -> BinOp.t
+
+      method visit_FMod : 'd -> BinOp.t
 
       method visit_NOp : 'd -> NOp.t -> Expr.t list -> Expr.t
 
@@ -1334,7 +1364,11 @@ module Visitors : sig
 
       method visit_NullType : 'd -> Type.t
 
+      method visit_Int : 'd -> int -> Literal.t
+
       method visit_Num : 'd -> float -> Literal.t
+
+      method visit_IntType : 'd -> Type.t
 
       method visit_NumberType : 'd -> Type.t
 
@@ -1347,6 +1381,8 @@ module Visitors : sig
       method visit_PhiAssignment : 'd -> (string * Expr.t list) list -> 'h Cmd.t
 
       method visit_Pi : 'd -> Constant.t
+
+      method visit_IPlus : 'd -> BinOp.t
 
       method visit_FPlus : 'd -> BinOp.t
 
@@ -1400,7 +1436,9 @@ module Visitors : sig
 
       method visit_StringType : 'd -> Type.t
 
-      method visit_Times : 'd -> BinOp.t
+      method visit_ITimes : 'd -> BinOp.t
+
+      method visit_FTimes : 'd -> BinOp.t
 
       method visit_ToInt32Op : 'd -> UnOp.t
 
@@ -1430,7 +1468,9 @@ module Visitors : sig
 
       method visit_UnOp : 'd -> UnOp.t -> Expr.t -> Expr.t
 
-      method visit_UnaryMinus : 'd -> UnOp.t
+      method visit_IUnaryMinus : 'd -> UnOp.t
+
+      method visit_FUnaryMinus : 'd -> UnOp.t
 
       method visit_Undefined : 'd -> Literal.t
 
@@ -1532,7 +1572,8 @@ module Visitors : sig
            ; visit_Car : 'c -> 'f
            ; visit_Cdr : 'c -> 'f
            ; visit_Constant : 'c -> Constant.t -> 'f
-           ; visit_Div : 'c -> 'f
+           ; visit_IDiv : 'c -> 'f
+           ; visit_FDiv : 'c -> 'f
            ; visit_ECall :
                'c -> string -> Expr.t -> Expr.t list -> 'g option -> 'f
            ; visit_EList : 'c -> Expr.t list -> 'f
@@ -1567,9 +1608,11 @@ module Visitors : sig
            ; visit_LeftShiftL : 'c -> 'f
            ; visit_Less : 'c -> Expr.t -> Expr.t -> 'f
            ; visit_LessEq : 'c -> Expr.t -> Expr.t -> 'f
-           ; visit_LessThan : 'c -> 'f
-           ; visit_LessThanEqual : 'c -> 'f
-           ; visit_LessThanString : 'c -> 'f
+           ; visit_ILessThan : 'c -> 'f
+           ; visit_ILessThanEqual : 'c -> 'f
+           ; visit_FLessThan : 'c -> 'f
+           ; visit_FLessThanEqual : 'c -> 'f
+           ; visit_SLessThan : 'c -> 'f
            ; visit_ListType : 'c -> 'f
            ; visit_Lit : 'c -> Literal.t -> 'f
            ; visit_Loc : 'c -> string -> 'f
@@ -1601,8 +1644,10 @@ module Visitors : sig
            ; visit_Max_float : 'c -> 'f
            ; visit_MaxSafeInteger : 'c -> 'f
            ; visit_Min_float : 'c -> 'f
-           ; visit_Minus : 'c -> 'f
-           ; visit_Mod : 'c -> 'f
+           ; visit_IMinus : 'c -> 'f
+           ; visit_FMinus : 'c -> 'f
+           ; visit_IMod : 'c -> 'f
+           ; visit_FMod : 'c -> 'f
            ; visit_NOp : 'c -> NOp.t -> Expr.t list -> 'f
            ; visit_NoneType : 'c -> 'f
            ; visit_Nono : 'c -> 'f
@@ -1610,13 +1655,16 @@ module Visitors : sig
            ; visit_Not : 'c -> Formula.t -> 'f
            ; visit_Null : 'c -> 'f
            ; visit_NullType : 'c -> 'f
+           ; visit_Int : 'c -> int -> 'f
            ; visit_Num : 'c -> float -> 'f
+           ; visit_IntType : 'c -> 'f
            ; visit_NumberType : 'c -> 'f
            ; visit_ObjectType : 'c -> 'f
            ; visit_Or : 'c -> Formula.t -> Formula.t -> 'f
            ; visit_PVar : 'c -> string -> 'f
            ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
            ; visit_Pi : 'c -> 'f
+           ; visit_IPlus : 'c -> 'f
            ; visit_FPlus : 'c -> 'f
            ; visit_Pred : 'c -> string -> Expr.t list -> 'f
            ; visit_Pure : 'c -> Formula.t -> 'f
@@ -1643,7 +1691,8 @@ module Visitors : sig
            ; visit_StrNth : 'c -> 'f
            ; visit_String : 'c -> string -> 'f
            ; visit_StringType : 'c -> 'f
-           ; visit_Times : 'c -> 'f
+           ; visit_ITimes : 'c -> 'f
+           ; visit_FTimes : 'c -> 'f
            ; visit_ToInt32Op : 'c -> 'f
            ; visit_ToIntOp : 'c -> 'f
            ; visit_ToNumberOp : 'c -> 'f
@@ -1658,7 +1707,8 @@ module Visitors : sig
            ; visit_UNot : 'c -> 'f
            ; visit_UTCTime : 'c -> 'f
            ; visit_UnOp : 'c -> UnOp.t -> Expr.t -> 'f
-           ; visit_UnaryMinus : 'c -> 'f
+           ; visit_IUnaryMinus : 'c -> 'f
+           ; visit_FUnaryMinus : 'c -> 'f
            ; visit_Undefined : 'c -> 'f
            ; visit_UndefinedType : 'c -> 'f
            ; visit_Unfold :
@@ -1762,7 +1812,9 @@ module Visitors : sig
 
       method visit_Constant : 'c -> Constant.t -> 'f
 
-      method visit_Div : 'c -> 'f
+      method visit_IDiv : 'c -> 'f
+
+      method visit_FDiv : 'c -> 'f
 
       method visit_ECall :
         'c -> string -> Expr.t -> Expr.t list -> 'g option -> 'f
@@ -1825,11 +1877,15 @@ module Visitors : sig
 
       method visit_LessEq : 'c -> Expr.t -> Expr.t -> 'f
 
-      method visit_LessThan : 'c -> 'f
+      method visit_ILessThan : 'c -> 'f
 
-      method visit_LessThanEqual : 'c -> 'f
+      method visit_ILessThanEqual : 'c -> 'f
 
-      method visit_LessThanString : 'c -> 'f
+      method visit_FLessThan : 'c -> 'f
+
+      method visit_FLessThanEqual : 'c -> 'f
+
+      method visit_SLessThan : 'c -> 'f
 
       method visit_ListType : 'c -> 'f
 
@@ -1893,9 +1949,13 @@ module Visitors : sig
 
       method visit_Min_float : 'c -> 'f
 
-      method visit_Minus : 'c -> 'f
+      method visit_IMinus : 'c -> 'f
 
-      method visit_Mod : 'c -> 'f
+      method visit_FMinus : 'c -> 'f
+
+      method visit_IMod : 'c -> 'f
+
+      method visit_FMod : 'c -> 'f
 
       method visit_NOp : 'c -> NOp.t -> Expr.t list -> 'f
 
@@ -1911,7 +1971,11 @@ module Visitors : sig
 
       method visit_NullType : 'c -> 'f
 
+      method visit_Int : 'c -> int -> 'f
+
       method visit_Num : 'c -> float -> 'f
+
+      method visit_IntType : 'c -> 'f
 
       method visit_NumberType : 'c -> 'f
 
@@ -1924,6 +1988,8 @@ module Visitors : sig
       method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> 'f
 
       method visit_Pi : 'c -> 'f
+
+      method visit_IPlus : 'c -> 'f
 
       method visit_FPlus : 'c -> 'f
 
@@ -1977,7 +2043,9 @@ module Visitors : sig
 
       method visit_StringType : 'c -> 'f
 
-      method visit_Times : 'c -> 'f
+      method visit_ITimes : 'c -> 'f
+
+      method visit_FTimes : 'c -> 'f
 
       method visit_ToInt32Op : 'c -> 'f
 
@@ -2007,7 +2075,9 @@ module Visitors : sig
 
       method visit_UnOp : 'c -> UnOp.t -> Expr.t -> 'f
 
-      method visit_UnaryMinus : 'c -> 'f
+      method visit_IUnaryMinus : 'c -> 'f
+
+      method visit_FUnaryMinus : 'c -> 'f
 
       method visit_Undefined : 'c -> 'f
 

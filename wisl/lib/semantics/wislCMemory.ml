@@ -39,12 +39,11 @@ let vstr v = Format.asprintf "%a" Values.pp v
 let get_cell heap params =
   Literal.(
     match params with
-    | [ Loc loc; Num offset_float ] -> (
-        let offset = int_of_float offset_float in
+    | [ Loc loc; Int offset ] -> (
         match WislCHeap.get heap loc offset with
-        | Some value -> ASucc (heap, [ Loc loc; Num offset_float; value ])
+        | Some value -> ASucc (heap, [ Loc loc; Int offset; value ])
         | None       -> AFail [] )
-    | l ->
+    | l                       ->
         failwith
           (Printf.sprintf
              "Invalid parameters for Wisl GetCell Local Action : [ %s ] "
@@ -53,8 +52,7 @@ let get_cell heap params =
 let set_cell heap params =
   Literal.(
     match params with
-    | [ Loc loc; Num offset_float; value ] ->
-        let offset = int_of_float offset_float in
+    | [ Loc loc; Int offset; value ] ->
         let () = WislCHeap.set heap loc offset value in
         ASucc (heap, [])
     | l ->
@@ -66,11 +64,10 @@ let set_cell heap params =
 let rem_cell heap params =
   Literal.(
     match params with
-    | [ Loc loc; Num offset_float ] ->
-        let offset = int_of_float offset_float in
+    | [ Loc loc; Int offset ] ->
         let () = WislCHeap.remove heap loc offset in
         ASucc (heap, [])
-    | l ->
+    | l                       ->
         failwith
           (Printf.sprintf
              "Invalid parameters for Wisl SetCell Local Action : [ %s ] "
@@ -79,11 +76,10 @@ let rem_cell heap params =
 let alloc heap params =
   Literal.(
     match params with
-    | [ Num size_float ] when size_float >= 1. ->
-        let size = int_of_float size_float in
+    | [ Int size ] when size >= 1 ->
         let loc = WislCHeap.alloc heap size in
         let litloc = Loc loc in
-        ASucc (heap, [ litloc; Num 0. ])
+        ASucc (heap, [ litloc; Int 0 ])
         (* returns a pointer to the first element *)
     | l ->
         failwith

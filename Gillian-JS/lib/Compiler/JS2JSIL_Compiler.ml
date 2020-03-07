@@ -365,7 +365,7 @@ let translate_inc_dec x is_plus err =
   (* x_r := x_n +/- 1 *)
   let x_r = fresh_var () in
   let cmd_ass_xr =
-    let (op : BinOp.t) = if is_plus then FPlus else Minus in
+    let (op : BinOp.t) = if is_plus then FPlus else FMinus in
     LBasic (Assignment (x_r, BinOp (PVar x_n, op, Lit (Num 1.))))
   in
 
@@ -394,10 +394,10 @@ let translate_inc_dec x is_plus err =
 let translate_multiplicative_binop x1 x2 x1_v x2_v aop err =
   let jsil_aop : BinOp.t =
     match aop with
-    | JS_Parser.Syntax.Times -> Times
-    | JS_Parser.Syntax.Div   -> Div
-    | JS_Parser.Syntax.Mod   -> Mod
-    | JS_Parser.Syntax.Minus -> Minus
+    | JS_Parser.Syntax.Times -> FTimes
+    | JS_Parser.Syntax.Div   -> FDiv
+    | JS_Parser.Syntax.Mod   -> FMod
+    | JS_Parser.Syntax.Minus -> FMinus
     | _                      -> raise
                                   (Failure
                                      "Illegal binary operator - Impossible case")
@@ -2861,7 +2861,9 @@ let rec translate_expr tr_ctx e :
 
       (* x_r := (negative x_n) *)
       let x_r = fresh_var () in
-      let cmd_ass_xr = LBasic (Assignment (x_r, UnOp (UnaryMinus, PVar x_n))) in
+      let cmd_ass_xr =
+        LBasic (Assignment (x_r, UnOp (FUnaryMinus, PVar x_n)))
+      in
 
       let cmds =
         annotate_first_cmd
@@ -5659,7 +5661,7 @@ and translate_statement tr_ctx e =
 
       (* goto [x_c_1 < len] body end_loop  *)
       let cmd_goto_len =
-        LGuardedGoto (BinOp (PVar x_c_1, LessThan, PVar len), body, end_loop)
+        LGuardedGoto (BinOp (PVar x_c_1, FLessThan, PVar len), body, end_loop)
       in
 
       (* xp := l-nth (xf, x_c_1)  *)

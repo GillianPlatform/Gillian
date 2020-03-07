@@ -44,7 +44,8 @@ let rec infer_types_to_gamma
       match unop with
       | UNot -> tt = BooleanType && f le BooleanType
       | M_isNaN -> tt = BooleanType && f le NumberType
-      | UnaryMinus
+      | IUnaryMinus -> tt = IntType && f le IntType
+      | FUnaryMinus
       | BitwiseNot
       | M_sgn
       | M_abs
@@ -76,31 +77,26 @@ let rec infer_types_to_gamma
   | BinOp (le1, op, le2) -> (
       let (rqt1 : Type.t option), (rqt2 : Type.t option), (rt : Type.t option) =
         match op with
-        | Equal                    -> (None, None, Some BooleanType)
-        | LessThan | LessThanEqual ->
+        | Equal -> (None, None, Some BooleanType)
+        | ILessThan | ILessThanEqual ->
+            (Some IntType, Some IntType, Some BooleanType)
+        | FLessThan | FLessThanEqual ->
             (Some NumberType, Some NumberType, Some BooleanType)
-        | LessThanString           -> ( Some StringType,
-                                        Some StringType,
-                                        Some BooleanType )
-        | BAnd                     -> ( Some BooleanType,
-                                        Some BooleanType,
-                                        Some BooleanType )
-        | BOr                      -> ( Some BooleanType,
-                                        Some BooleanType,
-                                        Some BooleanType )
-        | StrCat                   -> ( Some StringType,
-                                        Some StringType,
-                                        Some StringType )
-        | BSetMem                  -> (None, Some SetType, Some BooleanType)
-        | SetDiff                  -> (Some SetType, Some SetType, Some SetType)
-        | BSetSub                  -> ( Some SetType,
-                                        Some SetType,
-                                        Some BooleanType )
-        | LstNth                   -> (Some ListType, Some NumberType, None)
-        | StrNth                   -> (Some ListType, Some NumberType, None)
-        | _                        -> ( Some NumberType,
-                                        Some NumberType,
-                                        Some NumberType )
+        | SLessThan -> (Some StringType, Some StringType, Some BooleanType)
+        | BAnd -> (Some BooleanType, Some BooleanType, Some BooleanType)
+        | BOr -> (Some BooleanType, Some BooleanType, Some BooleanType)
+        | StrCat -> (Some StringType, Some StringType, Some StringType)
+        | BSetMem -> (None, Some SetType, Some BooleanType)
+        | SetDiff -> (Some SetType, Some SetType, Some SetType)
+        | BSetSub -> (Some SetType, Some SetType, Some BooleanType)
+        | LstNth -> (Some ListType, Some NumberType, None)
+        | StrNth -> (Some ListType, Some NumberType, None)
+        | IPlus | IMinus | ITimes | IMod | IDiv ->
+            (Some IntType, Some IntType, Some IntType)
+        | FPlus | FMinus | FTimes | FMod | FDiv ->
+            (Some NumberType, Some NumberType, Some NumberType)
+        (* FIXME: Specify cases *)
+        | _ -> (Some NumberType, Some NumberType, Some NumberType)
       in
       Option.fold ~some:(fun t -> f le1 t) ~none:true rqt1
       && Option.fold ~some:(fun t -> f le2 t) ~none:true rqt2
@@ -149,7 +145,7 @@ let rec infer_types_expr gamma le : unit =
   | EList lle | ESet lle -> List.iter (fun le -> f le) lle
   | BinOp (le1, op, le2) -> (
       match op with
-      | FPlus | Minus | Times | Div | Mod ->
+      | FPlus | FMinus | FTimes | FDiv | FMod ->
           e le1 NumberType;
           e le2 NumberType
       | LstNth ->
@@ -158,7 +154,9 @@ let rec infer_types_expr gamma le : unit =
       | StrNth ->
           e le1 StringType;
           e le2 NumberType
+      (* FIXME: Specify cases *)
       | _ -> () )
+  (* FIXME: Specify cases *)
   | _ -> ()
 
 let rec infer_types_formula (gamma : TypEnv.t) (a : Formula.t) : unit =
@@ -182,6 +180,7 @@ let rec infer_types_formula (gamma : TypEnv.t) (a : Formula.t) : unit =
   | SetSub (e1, e2) ->
       e e1 SetType;
       e e2 SetType
+  (* FIXME: Specify cases *)
   | _ -> ()
 
 (*****************)
@@ -304,15 +303,20 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
                 let tt : Type.t =
                   match op with
                   | Equal
-                  | LessThan
-                  | LessThanEqual
-                  | LessThanString
+                  | ILessThan
+                  | ILessThanEqual
+                  | FLessThan
+                  | FLessThanEqual
+                  | SLessThan
                   | BAnd
                   | BOr
                   | BSetMem
                   | BSetSub -> BooleanType
                   | SetDiff -> SetType
                   | StrCat -> StringType
+                  | IPlus | IMinus | ITimes | IDiv | IMod -> IntType
+                  | LstNth | StrNth -> raise (Failure "Impossible match case")
+                  (* FIXME: Specify cases *)
                   | _ -> NumberType
                 in
                 infer_type le tt constraints )

@@ -1567,7 +1567,7 @@ proc a__sortCompare(j, k, compfn, vthis) {
 			strx := ret;
 			ret := "i__toString" (y) with elab;
 			stry := ret;
-			goto [strx <s stry] nok xy;
+			goto [strx s< stry] nok xy;
 	xy:		goto [not (strx = stry)] yesk nojk;
 
 	rlab: return;

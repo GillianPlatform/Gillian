@@ -7,7 +7,16 @@ exception TypeError of string
 
 exception EvaluationError of string
 
-let unary_int_thing (lit : CVal.M.t) (f : float -> float) emsg : CVal.M.t =
+let unary_int_thing (lit : CVal.M.t) (f : int -> int) emsg : CVal.M.t =
+  let num =
+    match lit with
+    | Int n -> n
+    | _     -> raise (TypeError (Fmt.str "%s %a" emsg CVal.M.pp lit))
+  in
+  let res = f num in
+  Int res
+
+let unary_num_thing (lit : CVal.M.t) (f : float -> float) emsg : CVal.M.t =
   let num =
     match lit with
     | Num n -> n
@@ -18,7 +27,7 @@ let unary_int_thing (lit : CVal.M.t) (f : float -> float) emsg : CVal.M.t =
 
 let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
   match op with
-  | UNot       -> (
+  | UNot        -> (
       match (lit : CVal.M.t) with
       | Bool b -> Bool (not b)
       | _      ->
@@ -26,33 +35,37 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: Negation: expected boolean, got %a"
                   CVal.M.pp lit)) )
-  | UnaryMinus ->
+  | IUnaryMinus ->
       unary_int_thing lit
+        (fun x -> -x)
+        "Type Error: Integer unary minus: expected integer, got "
+  | FUnaryMinus ->
+      unary_num_thing lit
         (fun x -> -.x)
-        "Type Error: Unary minus: expected number, got "
-  | BitwiseNot ->
-      unary_int_thing lit int32_bitwise_not
+        "Type Error: Float unary minus: expected float, got "
+  | BitwiseNot  ->
+      unary_num_thing lit int32_bitwise_not
         "Type Error: Bitwise not: expected number, got"
-  | M_abs      ->
-      unary_int_thing lit abs_float
+  | M_abs       ->
+      unary_num_thing lit abs_float
         "Type Error: Absolute value: expected number, got"
-  | M_acos     ->
-      unary_int_thing lit acos "Type Error: Arc cosine: expected number, got"
-  | M_asin     ->
-      unary_int_thing lit asin "Type Error: Arc sine: expected number, got"
-  | M_atan     ->
-      unary_int_thing lit atan "Type Error: Arc tangent: expected number, got"
-  | M_ceil     ->
-      unary_int_thing lit ceil "Type Error: Ceiling: expected number, got"
-  | M_cos      -> unary_int_thing lit cos
-                    "Type Error: Cosine: expected number, got"
-  | M_exp      ->
-      unary_int_thing lit exp "Type Error: Exponentiation: expected number, got"
-  | M_floor    ->
-      unary_int_thing lit floor "Type Error: Floor: expected number, got"
-  | M_log      ->
-      unary_int_thing lit log "Type Error: Unary minus: expected number, got"
-  | M_round    -> (
+  | M_acos      ->
+      unary_num_thing lit acos "Type Error: Arc cosine: expected number, got"
+  | M_asin      ->
+      unary_num_thing lit asin "Type Error: Arc sine: expected number, got"
+  | M_atan      ->
+      unary_num_thing lit atan "Type Error: Arc tangent: expected number, got"
+  | M_ceil      ->
+      unary_num_thing lit ceil "Type Error: Ceiling: expected number, got"
+  | M_cos       -> unary_num_thing lit cos
+                     "Type Error: Cosine: expected number, got"
+  | M_exp       ->
+      unary_num_thing lit exp "Type Error: Exponentiation: expected number, got"
+  | M_floor     ->
+      unary_num_thing lit floor "Type Error: Floor: expected number, got"
+  | M_log       ->
+      unary_num_thing lit log "Type Error: Unary minus: expected number, got"
+  | M_round     -> (
       match lit with
       | Num n -> (
           let sign = copysign 1.0 n in
@@ -74,17 +87,17 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: Round: expected number, got %a" CVal.M.pp
                   lit)) )
-  | M_sgn      ->
-      unary_int_thing lit
+  | M_sgn       ->
+      unary_num_thing lit
         (fun x -> copysign 1.0 x)
         "Type Error: Sign: expected number, got"
-  | M_sin      -> unary_int_thing lit sin
-                    "Type Error: Sine: expected number, got"
-  | M_sqrt     ->
-      unary_int_thing lit sqrt "Type Error: Square root: expected number, got"
-  | M_tan      -> unary_int_thing lit tan
-                    "Type Error: Tangent: expected number, got"
-  | ToStringOp -> (
+  | M_sin       -> unary_num_thing lit sin
+                     "Type Error: Sine: expected number, got"
+  | M_sqrt      ->
+      unary_num_thing lit sqrt "Type Error: Square root: expected number, got"
+  | M_tan       -> unary_num_thing lit tan
+                     "Type Error: Tangent: expected number, got"
+  | ToStringOp  -> (
       match lit with
       | Num n -> String (float_to_string_inner n)
       | _     ->
@@ -92,19 +105,19 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: Number to string: expected number, got %a"
                   CVal.M.pp lit)) )
-  | ToIntOp    ->
-      unary_int_thing lit to_int
+  | ToIntOp     ->
+      unary_num_thing lit to_int
         "Type Error: Number to integer: expected number, got"
-  | ToUint16Op ->
-      unary_int_thing lit to_uint16
+  | ToUint16Op  ->
+      unary_num_thing lit to_uint16
         "Type Error: Number to unsigned 16-bit integer: expected number, got"
-  | ToInt32Op  ->
-      unary_int_thing lit to_int32
+  | ToInt32Op   ->
+      unary_num_thing lit to_int32
         "Type Error: Number to 32-bit integer: expected number, got"
-  | ToUint32Op ->
-      unary_int_thing lit to_uint32
+  | ToUint32Op  ->
+      unary_num_thing lit to_uint32
         "Type Error: Number to unsigned 32-bit integer: expected number, got"
-  | ToNumberOp -> (
+  | ToNumberOp  -> (
       match lit with
       | String s ->
           if s = "" then Num 0.
@@ -116,8 +129,8 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: ToNumber: expected string, got %a"
                   CVal.M.pp lit)) )
-  | TypeOf     -> Type (Literal.type_of lit)
-  | Car        -> (
+  | TypeOf      -> Type (Literal.type_of lit)
+  | Car         -> (
       match lit with
       | LList ll -> (
           match ll with
@@ -130,7 +143,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: List head: expected list, got %a" CVal.M.pp
                   lit)) )
-  | Cdr        -> (
+  | Cdr         -> (
       match lit with
       | LList ll -> (
           match ll with
@@ -143,7 +156,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: List tail: expected list, got %a" CVal.M.pp
                   lit)) )
-  | LstLen     -> (
+  | LstLen      -> (
       match lit with
       | LList l -> Num (float_of_int (List.length l))
       | _       ->
@@ -151,7 +164,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: List length: expected list, got: %a"
                   CVal.M.pp lit)) )
-  | LstRev     -> (
+  | LstRev      -> (
       match lit with
       | LList l -> LList (List.rev l)
       | _       ->
@@ -159,7 +172,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: List reverse: expected list, got: %a"
                   CVal.M.pp lit)) )
-  | StrLen     -> (
+  | StrLen      -> (
       match lit with
       | String s -> Num (float_of_int (String.length s))
       | _        ->
@@ -167,7 +180,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: String length: expected string, got: %a"
                   CVal.M.pp lit)) )
-  | M_isNaN    -> (
+  | M_isNaN     -> (
       match lit with
       | Num x when x == nan -> Bool true
       | Num x -> Bool false
@@ -176,7 +189,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: M_isNan: expected number, got: %a"
                   CVal.M.pp lit)) )
-  | SetToList  ->
+  | SetToList   ->
       raise (Exceptions.Unsupported "eval_unop concrete: set-to-list")
 
 let binary_num_thing
@@ -191,7 +204,31 @@ let binary_num_thing
   in
   Num (f num1 num2)
 
-let binary_bool_thing
+let binary_int_thing
+    (lit1 : CVal.M.t) (lit2 : CVal.M.t) (f : int -> int -> int) emsg : CVal.M.t
+    =
+  let num1, num2 =
+    match (lit1, lit2) with
+    | Int n1, Int n2 -> (n1, n2)
+    | _              ->
+        raise
+          (TypeError (Fmt.str "%s %a and %a" emsg CVal.M.pp lit1 CVal.M.pp lit2))
+  in
+  Int (f num1 num2)
+
+let binary_int_bool_thing
+    (lit1 : CVal.M.t) (lit2 : CVal.M.t) (f : int -> int -> bool) emsg : CVal.M.t
+    =
+  let num1, num2 =
+    match (lit1, lit2) with
+    | Int n1, Int n2 -> (n1, n2)
+    | _              ->
+        raise
+          (TypeError (Fmt.str "%s %a and %a" emsg CVal.M.pp lit1 CVal.M.pp lit2))
+  in
+  Bool (f num1 num2)
+
+let binary_num_bool_thing
     (lit1 : CVal.M.t) (lit2 : CVal.M.t) (f : float -> float -> bool) emsg :
     CVal.M.t =
   let num1, num2 =
@@ -255,6 +292,7 @@ let rec evaluate_binop
           | Empty, Empty             -> Bool true
           | Constant c1, Constant c2 -> Bool (c1 = c2)
           | Bool b1, Bool b2         -> Bool (b1 = b2)
+          | Int n1, Int n2           -> Bool (n1 = n2)
           | Num n1, Num n2           -> Bool (n1 = n2)
           | String s1, String s2     -> Bool (s1 = s2)
           | Loc l1, Loc l2           -> Bool (l1 = l2)
@@ -285,38 +323,66 @@ let rec evaluate_binop
                       "Type Error: List indexing: expected string and number, \
                        got %a and %a"
                       CVal.M.pp lit1 CVal.M.pp lit2)) )
-      | LessThan ->
-          binary_bool_thing lit1 lit2
+      | ILessThan ->
+          binary_int_bool_thing lit1 lit2
             (fun x y -> x < y)
             "Type Error: Less than: expected numbers, got "
-      | LessThanString -> (
+      | FLessThan ->
+          binary_num_bool_thing lit1 lit2
+            (fun x y -> x < y)
+            "Type Error: Less than: expected numbers, got "
+      | SLessThan -> (
           match (lit1, lit2) with
           | String s1, String s2 -> Bool (s1 < s2)
           | _, _                 -> raise
                                       (Failure
                                          "Non-string arguments to LessThanString")
           )
-      | LessThanEqual ->
-          binary_bool_thing lit1 lit2
+      | ILessThanEqual ->
+          binary_int_bool_thing lit1 lit2
             (fun x y -> x <= y)
             "Type Error: Less than or equal: expected numbers, got "
+      | FLessThanEqual ->
+          binary_num_bool_thing lit1 lit2
+            (fun x y -> x <= y)
+            "Type Error: Less than or equal: expected numbers, got "
+      | IPlus ->
+          binary_int_thing lit1 lit2
+            (fun x y -> x + y)
+            "Type Error: Integer Addition: expected integers, got "
+      | IMinus ->
+          binary_int_thing lit1 lit2
+            (fun x y -> x - y)
+            "Type Error: Subtraction: expected numbers, got "
+      | ITimes ->
+          binary_int_thing lit1 lit2
+            (fun x y -> x * y)
+            "Type Error: Multiplication: expected numbers, got "
+      | IDiv ->
+          binary_int_thing lit1 lit2
+            (fun x y -> x / y)
+            "Type Error: Division: expected numbers, got "
+      | IMod ->
+          binary_int_thing lit1 lit2
+            (fun x y -> x mod y)
+            "Type Error: Modulus: expected numbers, got "
       | FPlus ->
           binary_num_thing lit1 lit2
             (fun x y -> x +. y)
             "Type Error: Addition: expected numbers, got "
-      | Minus ->
+      | FMinus ->
           binary_num_thing lit1 lit2
             (fun x y -> x -. y)
             "Type Error: Subtraction: expected numbers, got "
-      | Times ->
+      | FTimes ->
           binary_num_thing lit1 lit2
             (fun x y -> x *. y)
             "Type Error: Multiplication: expected numbers, got "
-      | Div ->
+      | FDiv ->
           binary_num_thing lit1 lit2
             (fun x y -> x /. y)
             "Type Error: Division: expected numbers, got "
-      | Mod ->
+      | FMod ->
           binary_num_thing lit1 lit2 mod_float
             "Type Error: Modulus: expected numbers, got "
       | BitwiseAnd ->

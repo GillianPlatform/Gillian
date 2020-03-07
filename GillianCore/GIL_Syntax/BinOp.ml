@@ -3,15 +3,21 @@
 type t = TypeDef__.binop =
   (* Comparison *)
   | Equal  (** Equality *)
-  | LessThan  (** Less *)
-  | LessThanEqual  (** Less or equal for numbers *)
-  | LessThanString  (** Less or equal for strings *)
-  (* Arithmetic *)
+  | ILessThan  (** Less for integers *)
+  | ILessThanEqual  (** Less or equal for integers *)
+  | IPlus  (** Integer addition *)
+  | IMinus  (** Integer subtraction *)
+  | ITimes  (** Integer multiplication *)
+  | IDiv  (** Integer division *)
+  | IMod  (** Integer modulus *)
+  | FLessThan  (** Less for floats *)
+  | FLessThanEqual  (** Less or equal for floats *)
   | FPlus  (** Float addition *)
-  | Minus  (** Subtraction *)
-  | Times  (** Multiplication *)
-  | Div  (** Float division *)
-  | Mod  (** Modulus *)
+  | FMinus  (** Float subtraction *)
+  | FTimes  (** Float multiplication *)
+  | FDiv  (** Float division *)
+  | FMod  (** Float modulus *)
+  | SLessThan  (** Less or equal for strings *)
   (* Boolean *)
   | BAnd  (** Boolean conjunction *)
   | BOr  (** Boolean disjunction *)
@@ -45,14 +51,21 @@ type t = TypeDef__.binop =
 let str (x : t) =
   match x with
   | Equal               -> "="
-  | LessThan            -> "<"
-  | LessThanEqual       -> "<="
-  | LessThanString      -> "<s"
-  | FPlus               -> "f+"
-  | Minus               -> "-"
-  | Times               -> "*"
-  | Div                 -> "/"
-  | Mod                 -> "%"
+  | ILessThan           -> "i<"
+  | ILessThanEqual      -> "i<="
+  | IPlus               -> "i+"
+  | IMinus              -> "i-"
+  | ITimes              -> "i*"
+  | IDiv                -> "i/"
+  | IMod                -> "i%"
+  | FLessThan           -> "<"
+  | FLessThanEqual      -> "<="
+  | FPlus               -> "+"
+  | FMinus              -> "-"
+  | FTimes              -> "*"
+  | FDiv                -> "/"
+  | FMod                -> "%"
+  | SLessThan           -> "s<"
   | BAnd                -> "and"
   | BOr                 -> "or"
   | BitwiseAnd          -> "&"

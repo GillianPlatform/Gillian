@@ -5,7 +5,7 @@ type t =
   | WBool
   | WString
   | WPtr
-  | WNum
+  | WInt
   | WAny
   | WSet
 
@@ -33,7 +33,7 @@ let pp fmt t =
   | WBool   -> s "Bool"
   | WString -> s "String"
   | WPtr    -> s "Pointer"
-  | WNum    -> s "Num"
+  | WInt    -> s "Int"
   | WAny    -> s "Any"
   | WSet    -> s "Set"
 
@@ -52,7 +52,7 @@ let of_val v =
   let open WVal in
   match v with
   | Bool _  -> WBool
-  | Num _   -> WNum
+  | Int _   -> WInt
   | Str _   -> WString
   | Null    -> WNull
   | VList _ -> WList
@@ -61,7 +61,7 @@ let of_val v =
 let of_unop u =
   match u with
   | WUnOp.NOT  -> (WBool, WBool)
-  | WUnOp.LEN  -> (WList, WNum)
+  | WUnOp.LEN  -> (WList, WInt)
   | WUnOp.REV  -> (WList, WList)
   | WUnOp.HEAD -> (WList, WAny)
   | WUnOp.TAIL -> (WList, WList)
@@ -73,8 +73,8 @@ let of_binop b =
   | WBinOp.LESSTHAN
   | WBinOp.GREATERTHAN
   | WBinOp.LESSEQUAL
-  | WBinOp.GREATEREQUAL -> (WNum, WNum, WBool)
-  | WBinOp.TIMES | WBinOp.DIV | WBinOp.MOD -> (WNum, WNum, WNum)
+  | WBinOp.GREATEREQUAL -> (WInt, WInt, WBool)
+  | WBinOp.TIMES | WBinOp.DIV | WBinOp.MOD -> (WInt, WInt, WInt)
   | WBinOp.AND | WBinOp.OR -> (WBool, WBool, WBool)
   | WBinOp.LSTCONS -> (WAny, WList, WList)
   | WBinOp.LSTCAT -> (WList, WList, WList)
@@ -89,7 +89,7 @@ let needs_to_be expr t knownp =
   | Some tp when not (compatible t tp) ->
       failwith
         (Format.asprintf
-           "I infered both types %a and %a on expression %a at location %s" pp
+           "I inferred both types %a and %a on expression %a at location %s" pp
            tp pp t WLExpr.pp expr
            (CodeLoc.str (WLExpr.get_loc expr)))
   | Some tp -> TypeMap.add bare_expr (strongest t tp) knownp
@@ -102,14 +102,14 @@ let rec infer_logic_expr knownp lexpr =
   match bare_lexpr with
   | LVal v               -> TypeMap.add bare_lexpr (of_val v) knownp
   | LBinOp (le1, b, le2) ->
-      let infered = infer_logic_expr (infer_logic_expr knownp le1) le2 in
+      let inferred = infer_logic_expr (infer_logic_expr knownp le1) le2 in
       let t1, t2, t3 = of_binop b in
       TypeMap.add bare_lexpr t3
-        (needs_to_be le1 t1 (needs_to_be le2 t2 infered))
+        (needs_to_be le1 t1 (needs_to_be le2 t2 inferred))
   | LUnOp (u, le)        ->
-      let infered = infer_logic_expr knownp le in
+      let inferred = infer_logic_expr knownp le in
       let t1, t2 = of_unop u in
-      TypeMap.add bare_lexpr t2 (needs_to_be le t1 infered)
+      TypeMap.add bare_lexpr t2 (needs_to_be le t1 inferred)
   | LVar _               -> knownp
   | PVar _               -> knownp
   | LEList lel           ->
@@ -144,19 +144,19 @@ let rec infer_single_assert_step asser known =
         infer_formula f2 (infer_formula f1 known)
     | WLFormula.LEq (le1, le2) -> (
         let bare_le1, bare_le2 = (WLExpr.get le1, WLExpr.get le2) in
-        let infered = infer_logic_expr (infer_logic_expr known le1) le2 in
-        let topt = same_type le1 le2 infered in
+        let inferred = infer_logic_expr (infer_logic_expr known le1) le2 in
+        let topt = same_type le1 le2 inferred in
         match topt with
-        | Some t -> TypeMap.add bare_le1 t (TypeMap.add bare_le2 t infered)
-        | None   -> infered )
+        | Some t -> TypeMap.add bare_le1 t (TypeMap.add bare_le2 t inferred)
+        | None   -> inferred )
     | WLFormula.LLess (le1, le2)
     | WLFormula.LGreater (le1, le2)
     | WLFormula.LLessEq (le1, le2)
     | WLFormula.LGreaterEq (le1, le2) ->
         let bare_le1, bare_le2 = (WLExpr.get le1, WLExpr.get le2) in
-        let infered = infer_logic_expr (infer_logic_expr known le1) le2 in
-        let inferedp = needs_to_be le1 WNum (needs_to_be le2 WNum infered) in
-        TypeMap.add bare_le1 WNum (TypeMap.add bare_le2 WNum inferedp)
+        let inferred = infer_logic_expr (infer_logic_expr known le1) le2 in
+        let inferredp = needs_to_be le1 WInt (needs_to_be le2 WInt inferred) in
+        TypeMap.add bare_le1 WInt (TypeMap.add bare_le2 WInt inferredp)
   in
   match WLAssert.get asser with
   | WLAssert.LEmp -> known
@@ -164,15 +164,15 @@ let rec infer_single_assert_step asser known =
       infer_single_assert_step la2 (infer_single_assert_step la1 known)
   | WLAssert.LPred (_, lel) -> List.fold_left infer_logic_expr known lel
   | WLAssert.LPointsTo (le1, le2) ->
-      let infered =
+      let inferred =
         List.fold_left infer_logic_expr (infer_logic_expr known le1) le2
       in
-      needs_to_be le1 WPtr infered
+      needs_to_be le1 WList inferred
   | WLAssert.LBlockPointsTo (le1, le2) ->
-      let infered =
+      let inferred =
         List.fold_left infer_logic_expr (infer_logic_expr known le1) le2
       in
-      needs_to_be le1 WPtr infered
+      needs_to_be le1 WList inferred
   | WLAssert.LPure f -> infer_formula f known
 
 let infer_single_assert known asser =
@@ -182,14 +182,33 @@ let infer_single_assert known asser =
   in
   find_fixed_point (infer_single_assert_step asser) known
 
-let infer_types_pred assert_list =
-  let join _le topt1 topt2 =
+let infer_types_pred (params : (string * t option) list) assert_list =
+  let join_params_and_asserts _le topt1 topt2 =
+    match (topt1, topt2) with
+    | Some t1, Some t2 when t1 = t2 -> Some t1
+    | Some t, None when t <> WAny -> Some t
+    | None, Some t when t <> WAny -> Some t
+    | _ -> None
+  in
+  let join_asserts _le topt1 topt2 =
     match (topt1, topt2) with
     | Some t1, Some t2 when t1 = t2 -> Some t1
     | _ -> None
   in
+  let infers_on_params =
+    List.fold_left
+      (fun (map : 'a TypeMap.t) (x, ot) ->
+        match ot with
+        | None   -> map
+        | Some t -> TypeMap.add (PVar x) t map)
+      TypeMap.empty params
+  in
   let infers_on_asserts =
     List.map (infer_single_assert TypeMap.empty) assert_list
   in
-  let f, r = (List.hd infers_on_asserts, List.tl infers_on_asserts) in
-  List.fold_left (TypeMap.merge join) f r
+  let hd, tl = (List.hd infers_on_asserts, List.tl infers_on_asserts) in
+  let infers_on_asserts = List.fold_left (TypeMap.merge join_asserts) hd tl in
+  let result =
+    TypeMap.merge join_params_and_asserts infers_on_params infers_on_asserts
+  in
+  result

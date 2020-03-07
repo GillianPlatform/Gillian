@@ -26,7 +26,7 @@ let remove = Hashtbl.remove
 
 let alloc heap size =
   let loc = ALoc.alloc () in
-  let expr_of_int i = Expr.Lit (Literal.Num (float_of_int i)) in
+  let expr_of_int i = Expr.Lit (Literal.Int i) in
   let rec get_list current_offset =
     if current_offset < 0 then []
     else

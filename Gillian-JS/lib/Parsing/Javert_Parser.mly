@@ -365,14 +365,14 @@ unop_target:
 
 binop_target:
   | EQUAL              { Equal }
-  | LESSTHAN           { LessThan }
-  | LESSTHANEQUAL      { LessThanEqual }
-  | LESSTHANSTRING     { LessThanString }
+  | LESSTHAN           { FLessThan }
+  | LESSTHANEQUAL      { FLessThanEqual }
+  | LESSTHANSTRING     { SLessThan }
   | PLUS               { FPlus }
-  | MINUS              { Minus }
-  | TIMES              { Times }
-  | DIV                { Div }
-  | MOD                { Mod }
+  | MINUS              { FMinus }
+  | TIMES              { FTimes }
+  | DIV                { FDiv }
+  | MOD                { FMod }
   | AND                { BAnd }
   | OR                 { BOr }
   | BITWISEAND         { BitwiseAnd }
@@ -404,10 +404,10 @@ expr_target:
   | v = VAR { Expr.PVar v }
   | e1=expr_target; bop=binop_target; e2=expr_target { BinOp (e1, bop, e2) } %prec binop_prec
   | e1=expr_target; LSTCONS; e2=expr_target { NOp (LstCat, [ EList [ e1 ]; e2 ]) }
-  | e1=expr_target; GREATERTHAN;  e2=expr_target { BinOp (e2, LessThan, e1) }
-  | e1=expr_target; GREATERTHANEQUAL; e2=expr_target { BinOp (e2, LessThanEqual, e1) }
+  | e1=expr_target; GREATERTHAN;  e2=expr_target { BinOp (e2, FLessThan, e1) }
+  | e1=expr_target; GREATERTHANEQUAL; e2=expr_target { BinOp (e2, FLessThanEqual, e1) }
   | uop=unop_target; e=expr_target { UnOp (uop, e) } %prec unop_prec
-  | MINUS; e=expr_target { UnOp (UnaryMinus, e) } %prec unop_prec
+  | MINUS; e=expr_target { UnOp (FUnaryMinus, e) } %prec unop_prec
   | LSTOPEN; exprlist = separated_nonempty_list(COMMA, expr_target); LSTCLOSE { EList exprlist }
   | SETOPEN; exprlist = separated_list(COMMA, expr_target); SETCLOSE
      { ESet (Expr.Set.elements (Expr.Set.of_list exprlist)) }
@@ -902,7 +902,7 @@ js_lexpr_target:
 (* - e *)
 (* Unary negation has the same precedence as logical not, not as binary negation. *)
   | MINUS; e=js_lexpr_target
-    { UnOp (UnaryMinus, e) } %prec unop_prec
+    { UnOp (FUnaryMinus, e) } %prec unop_prec
 (* {{ e, ..., e }} *)
   | LSTOPEN; exprlist = separated_nonempty_list(COMMA, js_lexpr_target); LSTCLOSE
     { EList exprlist }
@@ -965,7 +965,7 @@ js_pure_assertion_target:
 (* E <=# E *)
   | left_expr=js_lexpr_target; LLESSTHANEQUAL; right_expr=js_lexpr_target
     { LessEq (left_expr, right_expr) }
-(* E <s# E *)
+(* E s<# E *)
   | left_expr=js_lexpr_target; LLESSTHANSTRING; right_expr=js_lexpr_target
     { StrLess (left_expr, right_expr) }
 (* E --e-- E *)

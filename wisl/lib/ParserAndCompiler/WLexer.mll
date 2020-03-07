@@ -13,8 +13,7 @@ let letter = ['a'-'z''A'-'Z']
 let gvars = "gvar_" digit+ (* generated variables during compilation *)
 let identifier = letter(letter|digit|'_')*
 let lvar = '#' (letter|digit|'_'|'$')*
-let int = digit+
-let number = digit+
+let integer = digit+
 let loc = "$l" (letter|digit|'_')*
 let white = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
@@ -48,6 +47,9 @@ rule read =
   | "lemma"  { LEMMA (curr lexbuf) }
   | "forall" { FORALL (curr lexbuf) }
   | "exists" { EXIST (curr lexbuf) }
+  (* types *)
+  | "List" { TLIST (curr lexbuf) }
+  | "Int" { TINT (curr lexbuf) }
   (* strings and comments *)
   | '"'      { let () = l_start_string := curr lexbuf in
                read_string (Buffer.create 17) lexbuf }
@@ -106,7 +108,7 @@ rule read =
   (* identifiers *)
   | white    { read lexbuf }
   | newline  { new_line lexbuf; read lexbuf }
-  | number   { NUMBER (curr lexbuf, int_of_string (Lexing.lexeme lexbuf)) }
+  | integer   { INTEGER (curr lexbuf, int_of_string (Lexing.lexeme lexbuf)) }
   | gvars    { IDENTIFIER (curr lexbuf, (Lexing.lexeme lexbuf)^"_user") } (* if it has a name of generated var, we add _user *)
   | identifier { IDENTIFIER (curr lexbuf, Lexing.lexeme lexbuf) }
   | lvar       { LVAR (curr lexbuf, Lexing.lexeme lexbuf) }

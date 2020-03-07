@@ -33,7 +33,7 @@ proc i__toPrimitive (v, hint) {
   iu:   prim := "i__isPrimitive" (v);
         goto [prim] rlab obj;
 
-  obj:  assume(False); 
+  obj:  assume(False);
 
   rlab: return;
   elab: throw
@@ -261,7 +261,7 @@ proc defaultValue (l, hint) {
           ret := fun (xsc, l) with elab;
           goto [ret = empty] undef ispr;
   undef:  ret := undefined;
-  ispr:   prim := "i__isPrimitive"(ret); 
+  ispr:   prim := "i__isPrimitive"(ret);
           goto [prim] rlab next;
 
     next: goto [proc_name = "toString"] n s;
@@ -454,7 +454,7 @@ proc o__defineOwnProperty (l, prop, desc, thrw) {
   rsd:    rs := l-nth (current, 2);
   seta:   [l, prop] := {{ "a", rg, rs, re, rc }};
           goto rlab;
- 
+
   celab:  ret := current;
           throw;
 
@@ -745,7 +745,7 @@ proc i__putValue (v, w) {
             rstrict := l-nth (v, 3);
 			goto [rbase = undefined] thrw prim;
 
-	prim:	prim := "i__isPrimitive"(rbase); 
+	prim:	prim := "i__isPrimitive"(rbase);
 	        goto [prim and (not (rbase = undefined)) and (not (rbase = null))] is_pr refr;
 
 	refr:	goto [(typeOf v = List) and (l-nth (v, 0) = "o")] oref vref;
@@ -846,14 +846,14 @@ proc i__toNumber (v) {
   num:  ret := v;
       goto rlab;
 
-  oops: assume (False); 
+  oops: assume (False);
 
   rlab: return;
   elab: throw
 };
 
 proc i__toNumberArray (v) {
- 
+
   inum: goto [typeOf v = Num] num is;
   num:  ret := v;
       goto rlab;
@@ -862,7 +862,7 @@ proc i__toNumberArray (v) {
   str:  ret := string_to_num v;
       goto rlab;
 
-  oops: assume (False); 
+  oops: assume (False);
 
   rlab: return;
   elab: throw
@@ -966,7 +966,7 @@ proc i__toStringComputed (v) {
   num:  ret := num_to_string v;
         goto rlab;
 
-  oops: assume(False); 
+  oops: assume(False);
 
   rlab: return;
   elab: throw
@@ -978,7 +978,7 @@ proc i__toString (v) {
   str:  ret := v;
         goto rlab;
 
-  oops: assume(False); 
+  oops: assume(False);
 
   rlab: return;
   elab: throw
@@ -995,7 +995,7 @@ proc i__toObject (v) {
     obj:    ret := v;
             goto rlab;
 
-    oops:   assume(False); 
+    oops:   assume(False);
 
     rlab:   return;
 
@@ -1116,7 +1116,7 @@ proc i__abstractComparison (v1, v2, leftFirst) {
   is_str: goto [(typeOf px = Str) and (typeOf py = Str)] str num;
 
   str:  assume(False);
-        ret := (px <s py);
+        ret := (px s< py);
         goto rlab;
 
   num:  ret := "i__toNumber" (px) with elab;
@@ -1259,11 +1259,11 @@ proc i__strictEquality (v1, v2) {
 
 proc i__sameValue (v1, v2) {
 
-  nonum: goto [v1 = v2] rt rf; 
+  nonum: goto [v1 = v2] rt rf;
 
   rt:    ret := true;
          return;
-          
+
   rf:    ret := false;
   rlab:  return
 };
@@ -1393,7 +1393,7 @@ proc isNativeError (err) {
 
         (* The error should be an object *)
         goto [typeOf(err) = Obj] md rf;
- 
+
         (* Get metadata, which should also be an object *)
   md:   md := metadata(err);
         goto [typeOf(md) = Obj] hp rf;
@@ -1438,7 +1438,7 @@ proc i__deleteErrors (r, te, se) {
           goto [r = te] del_se del_te;
 
   del_te: ret := "i__purge" (te);
-          goto [r = se] rlab del_se; 
+          goto [r = se] rlab del_se;
 
   del_se: ret := "i__purge" (se);
   rlab:   return

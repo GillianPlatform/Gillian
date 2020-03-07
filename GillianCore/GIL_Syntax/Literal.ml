@@ -8,6 +8,7 @@ type t = TypeDef__.literal =
   | Empty  (** The literal [empty] *)
   | Constant  of Constant.t  (** GIL constants ({!type:GIL_constant}) *)
   | Bool      of bool  (** GIL booleans: [true] and [false] *)
+  | Int       of int  (** GIL integers: TODO: understand size *)
   | Num       of float  (** GIL floats - double-precision 64-bit IEEE 754 *)
   | String    of string  (** GIL strings *)
   | Loc       of string  (** GIL object locations *)
@@ -24,6 +25,7 @@ let rec pp fmt x =
   | Nono       -> Fmt.string fmt "none"
   | Constant c -> Fmt.string fmt (Constant.str c)
   | Bool b     -> if b then Fmt.string fmt "true" else Fmt.string fmt "false"
+  | Int i      -> Fmt.int fmt i
   | Num n      -> Fmt.float fmt n
   | String x   -> Fmt.pf fmt "\"%s\"" x
   | Loc loc    -> Fmt.string fmt loc
@@ -38,6 +40,7 @@ let type_of (x : t) : Type.t =
   | Empty      -> EmptyType
   | Constant _ -> NumberType
   | Bool _     -> BooleanType
+  | Int _      -> IntType
   | Num _      -> NumberType
   | String _   -> StringType
   | Loc _      -> ObjectType

@@ -38,7 +38,7 @@ pred DataDescriptor (d) :
  *)
 pred AccessorDescriptor (d) :
     types (d : List, #denum : Bool, #dconf : Bool) *
-    (! (#dget == empty)) * (! (#dset == empty)) * 
+    (! (#dget == empty)) * (! (#dset == empty)) *
     (d == {{ "a", #dget, #dset, #denum, #dconf }});
 
 (*
@@ -124,7 +124,7 @@ pred Cell_s (l, prop, "none", none, pv) :
 	 Cell_o (l, prop, none) * ((l, "@primitiveValue") -> pv) *
      (#i == num_to_int (string_to_num prop)) * (! IsStringIndex(pv, prop, #i));
 
-pred Cell_s (l, prop, "SI", desc, pv) : 
+pred Cell_s (l, prop, "SI", desc, pv) :
      types(l : Obj, #prop : Str, desc : List, pv : Str, #i : Num, #v : Str) *
 	 (prop == #prop) * Cell_o (l, #prop, none) * ((l, "@primitiveValue") -> pv) *
      (desc == {{ "d", #v, false, true, false }}) *  (#v == s-nth(pv, #i)) *
@@ -215,7 +215,7 @@ pred Pi (l, prop, lcls, d, ls, ltf, lpv) :
 		   #ppv : Str,  #otv  : List) *
 	(#lcls == #pcls :: #ocls) * (#lls == #lp :: #ols) * (#ltf == #ptf :: #otf) * (#lpv == #ppv :: #otv) *
 	(lcls == #cls :: #lcls) * (ls == l :: #lls) * (ltf == false :: #ltf) * (lpv == "" :: #lpv);
-    
+
 (*
  * Resource:
  *		(l, "@class")   via isClass
@@ -268,7 +268,7 @@ pred Pi (l, prop, lcls, d, ls, ltf, lpv) :
 		   #ppv : Str,  #otv  : List) *
 	(#lcls == #pcls :: #ocls) * (#lls == #lp :: #ols) * (#ltf == #ptf :: #otf) * (#lpv == #ppv :: #otv) *
 	(lcls == #cls :: #lcls) * (ls == l :: #lls) * (ltf == true :: #ltf) * (lpv == #pv :: #lpv);
-    
+
 (* ***********************
  * CREATE_DEFAULT_OBJECT *
  *************************)
@@ -338,7 +338,7 @@ spec create_object_with_call_construct (l, call, construct, len)
 	   empty_fields(#l : "@proto", "@class", "@extensible", "@scope", "length", "@call") *
 	   (ret == #l) ]]
     normal;
-    
+
     [[ (l == #l) * (call == #call) * (construct == #construct) * (len == #len) *
 	   types(#l : Obj, #call : Str, #len : Num, #construct: Str) *
        empty_fields (#l : ) ]]
@@ -375,7 +375,7 @@ pred function_object (l, xsc, call, construct, len, prototype) :
 	empty_fields(l : "@proto", "@class", "@extensible", "@scope", "length", "@call", "@construct", "caller", "arguments", "prototype");
 
 spec create_function_object (xsc, call, construct, params)
-    [[ (xsc == #xsc) * (call == #call) * (construct == #construct) * (params == #params) * 
+    [[ (xsc == #xsc) * (call == #call) * (construct == #construct) * (params == #params) *
 	   types(#xsc : List, #call : Str, #construct: Str, #params : List) ]]
     [[ types(#l : Obj, #xsc : List, #call : Str, #construct: Str, #params : List, #len : Num, ret : Obj) *
 	   function_object(ret, #xsc, #call, #construct, #len, prototype) * (#len == l-len #params) *
@@ -389,7 +389,7 @@ proc create_function_object (xsc, call, construct, params) {
 			l := new ();
 			l := "create_object_with_call_construct" (l, call, construct, len);
 
-			[l, "@scope"] := xsc; 
+			[l, "@scope"] := xsc;
 
 			prototype := new ();
 			prototype := "create_default_object" (prototype, $lobj_proto, "Object", true);
@@ -417,10 +417,10 @@ spec Error_construct (xsc, vthis, v)
        ((#vthis, "@class") -> #cls) * ((#vthis, "@extensible") -> #ext) ]]
     [[ (ret == #vthis) * ((#vthis, "@class") -> "Error") * ((#vthis, "@extensible") -> true) ]]
     normal;
-    
+
     (* Error constructor with message of type string *)
     [[ (v == #m) * (vthis == #vthis) *
-	   types (#vthis : Obj, #m : Str) * 
+	   types (#vthis : Obj, #m : Str) *
        ((#vthis, "@class") -> #cls) * ((#vthis, "@extensible") -> #ext) ]]
     [[ (ret == #vthis) * ((#vthis, "@class") -> "Error") * ((#vthis, "@extensible") -> true) * ((#vthis, "message") -> {{ "d", #m, true, false, true }}) ]]
     normal
@@ -450,7 +450,7 @@ spec i__toBoolean (v)
 
 	[[ (v == #v) * types(#v : Bool) ]]
 	[[ (ret == #v) ]]
-	normal; 
+	normal;
 
 	[[ (v == 0) ]]
 	[[ (ret == false) ]]
@@ -458,7 +458,7 @@ spec i__toBoolean (v)
 
 	[[ (v == #v) * types(#v : Num) * (! (#v == 0)) ]]
 	[[ (ret == true) ]]
-	normal		
+	normal
 
 proc i__toBoolean (v) {
 	iu:		goto [v = undefined] undef in;
@@ -599,21 +599,21 @@ proc SyntaxError (v) {
    **************************************** *)
 
 pred initialHeapPre () :
-    (($lg,      "@class") -> none) * 
-    (($lg, 	    "@proto") -> none) * 
+    (($lg,      "@class") -> none) *
+    (($lg, 	    "@proto") -> none) *
     (($lg, "@extensible") -> none) *
     empty_fields ( $lobj_proto : ) * empty_fields ($lfun_proto : ) * empty_fields ($lerr : ) * empty_fields ($lerr_proto : );
-    
+
 pred initialHeapPost () :
-    (($lg,         "@class") -> "Object")   * (($lg,         "@proto") -> $lobj_proto) * (($lg,         "@extensible") -> true) * (($lg,         "Error") -> {{ "d", $lerr, true, false, true }}) * 
+    (($lg,         "@class") -> "Object")   * (($lg,         "@proto") -> $lobj_proto) * (($lg,         "@extensible") -> true) * (($lg,         "Error") -> {{ "d", $lerr, true, false, true }}) *
 	(($lobj_proto, "@class") -> "Object")   * (($lobj_proto, "@proto") -> null)      * (($lobj_proto, "@extensible") -> true) * empty_fields ( $lobj_proto : "@class", "@proto", "@extensible" ) *
 	(($lfun_proto, "@class") -> "Function") * (($lfun_proto, "@proto") -> $lobj_proto) * (($lfun_proto, "@extensible") -> true) *
-	(($lfun_proto, "@scope") -> empty)    * (($lfun_proto, "length") -> {{ "d", 0, false, false, false }}) * (($lfun_proto, "@call") -> "FP_default") * empty_fields($lfun_proto : "@proto", "@class", "@extensible", "@scope", "length", "@call") *	
+	(($lfun_proto, "@scope") -> empty)    * (($lfun_proto, "length") -> {{ "d", 0, false, false, false }}) * (($lfun_proto, "@call") -> "FP_default") * empty_fields($lfun_proto : "@proto", "@class", "@extensible", "@scope", "length", "@call") *
 	(($lerr,       "@class") -> "Function") * (($lerr,       "@proto") -> $lfun_proto) * (($lerr,       "@extensible") -> true) *
-	(($lerr,       "@scope") -> empty)    * (($lerr,       "length") -> {{ "d", 1, false, false, false }}) * (($lerr,       "@call") -> "Error_call") * 
+	(($lerr,       "@scope") -> empty)    * (($lerr,       "length") -> {{ "d", 1, false, false, false }}) * (($lerr,       "@call") -> "Error_call") *
 	(($lerr, "@construct") -> "Error_construct") * (($lerr,  "prototype") -> {{ "d", $lerr_proto, false, false, false }}) * empty_fields($lerr : "@proto", "@class", "@extensible", "@scope", "length", "@call", "@construct", "prototype") *
-	(($lerr_proto, "@class") -> "Error")   * (($lerr_proto, "@proto") -> $lobj_proto) * (($lerr_proto, "@extensible") -> true) * 
-	(($lerr_proto, "message") -> {{ "d", "", true, false, true }}) * empty_fields ($lerr_proto : "@class", "@proto", "@extensible", "message");    
+	(($lerr_proto, "@class") -> "Error")   * (($lerr_proto, "@proto") -> $lobj_proto) * (($lerr_proto, "@extensible") -> true) *
+	(($lerr_proto, "message") -> {{ "d", "", true, false, true }}) * empty_fields ($lerr_proto : "@class", "@proto", "@extensible", "message");
 
 spec setupInitialHeap ()
 
@@ -632,10 +632,10 @@ proc setupInitialHeap () {
 			ret := "create_default_object" ($lobj_proto, null, "Object", true);
 
 			(* Function.prototype *)
-			
+
 			ret := "create_object_with_call_construct" ($lfun_proto, "FP_default", empty, 0);
 			[$lfun_proto, "@proto"] := $lobj_proto;
-			
+
 			(* Error object *)
 
 			ret := "create_object_with_call_construct" ($lerr, "Error_call", "Error_construct", 1);
@@ -830,19 +830,19 @@ proc i__toPrimitive (v, hint) {
 
 spec i__abstractComparison (v1, v2, leftFirst)
 
-    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) * 
+    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) *
        types(#v1 : Num, #v2 : Num, #leftFirst : Bool) *
        (#v1 <# #v2) ]]
     [[ (ret == true) ]]
     normal;
-    
-    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) * 
+
+    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) *
        types(#v1 : Num, #v2 : Num, #leftFirst : Bool) *
        (#v1 == #v2) ]]
     [[ (ret == false) ]]
     normal;
 
-    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) * 
+    [[ (v1 == #v1) * (v2 == #v2) * (leftFirst == #leftFirst) *
        types(#v1 : Num, #v2 : Num, #leftFirst : Bool) *
        (#v2 <# #v1) ]]
     [[ (ret == false) ]]
@@ -864,7 +864,7 @@ proc i__abstractComparison (v1, v2, leftFirst) {
 
 	is_str:	goto [(typeOf px = Str) and (typeOf py = Str)] str num;
 
-	str:	ret := (px <s py);
+	str:	ret := (px s< py);
 			goto rlab;
 
 	num:	ret := "i__toNumber" (px) with elab;
@@ -902,7 +902,7 @@ spec i__abstractEquality (v1, v2)
 	[[ (v1 == null) * (v2 == null) ]]
     [[ (ret == true) ]]
     normal;
-    
+
 	[[ types(v1 : Obj, v2 : Null) ]]
     [[ (ret == false) ]]
     normal
@@ -990,7 +990,7 @@ spec i__toString (v)
 	[[ types(ret : Str, #v : Num) *
 	   (ret == (num_to_string #v)) ]]
 	normal;
-	
+
 	[[ (v == #v) * types(#v : Str) ]]
 	[[ types(ret : Str) * (ret == #v) ]]
 	normal
@@ -1096,7 +1096,7 @@ spec i__isAccessorDescriptor (desc)
     [[ DataDescriptor(desc) ]]
     [[ ret == false ]]
     normal;
-    
+
     (* Data descriptor *)
     [[ AccessorDescriptor(desc) ]]
     [[ ret == true ]]
@@ -1146,7 +1146,7 @@ spec i__isGenericDescriptor (desc)
 	[[ DataDescriptor(desc) ]]
 	[[ ret == false ]]
 	normal;
-	
+
 	(* Accessor descriptor *)
 	[[ AccessorDescriptor(desc) ]]
 	[[ ret == false ]]
@@ -1240,7 +1240,7 @@ spec i__toAccessorDescriptor (desc)
     [[ (desc == #desc) * AccessorDescriptor (#desc) ]]
     [[ (ret == #desc) ]]
     normal
-    
+
 proc i__toAccessorDescriptor (desc) {
 			d := l-nth (desc, 0);
 			goto [d = "a"] rd cstr;
@@ -1465,7 +1465,7 @@ spec i__isCallable (l)
     [[ ((l, "@call") -> none) * types (l : Obj) ]]
     [[ ((l, "@call") -> none) * (ret == false) ]]
     normal;
-	
+
 	[[ ((l, "@call") -> #y) * (! (#y == none)) * types (l : Obj) ]]
     [[ ((l, "@call") -> #y) * (ret == true) ]]
     normal
@@ -1510,7 +1510,7 @@ proc i__checkParameters (fid, params) {
    ************************* *)
 
 (*
- *    Name: o__getOwnProperty 
+ *    Name: o__getOwnProperty
  * Purpose: Get own property of a non-String object
  *
  *   Specs:
@@ -1551,7 +1551,7 @@ proc o__getOwnProperty (l, prop) {
    ************************* *)
 
 (*
- *    Name: o__getOwnProperty 
+ *    Name: o__getOwnProperty
  * Purpose: Get own property of a String object
  *
  *   Specs:
@@ -1610,7 +1610,7 @@ proc s__getOwnProperty (l, prop) {
    ********************** *)
 
 (*
- *    Name: getOwnProperty 
+ *    Name: getOwnProperty
  * Purpose: Get own property of a (general) object
  *
  *   Specs:
@@ -1638,7 +1638,7 @@ spec getOwnProperty (l, prop)
     [[ Cell_o (#l, #prop, #dx) * ((#l, "@class") -> #cls) * isClass(#cls, "Non-String") *
 	   (ret == #dx) ]]
     normal;
-    
+
     [[ (l == #l) * (prop == #prop) *
 	   types (#l : Obj, #prop : Str, #cls : Str) *
 	   Cell_s (#l, #prop, "none", none, #pv) * ((#l, "@class") -> #cls) * isClass(#cls, "String") ]]
@@ -1680,7 +1680,7 @@ proc getOwnProperty (l, prop) {
    ******************* *)
 
 (*
- *    Name: getProperty 
+ *    Name: getProperty
  * Purpose: Get property of a (general) object in the entire prototype chain
  *
  *   Specs:
@@ -1717,14 +1717,14 @@ proc getProperty (l, prop) {
 (* *** *)
 
 (*
- *    Name: get 
+ *    Name: get
  * Purpose: Get the value of a property of a (general) object in the entire prototype chain
  *
  *   Specs:
  *
- * 01 - Property not defined in the prototype chain, rtrn undefined 
- * 02 - Property defined as a data descriptor, get value of the descriptor 
- * 
+ * 01 - Property not defined in the prototype chain, rtrn undefined
+ * 02 - Property defined as a data descriptor, get value of the descriptor
+ *
  * Unsupported:
  *
  * 03 - Property defined as an accessor descriptor
@@ -1779,14 +1779,14 @@ proc get (l, prop) {
  * 09 - Variable reference, lg, undefined
  * 10 - Variable reference, lg, defined
  * 11 - Variable reference, non-lg, directly from the heap
- * 12-13 - Base undefined for both variable and object references, rtrn a reference error 
+ * 12-13 - Base undefined for both variable and object references, rtrn a reference error
  *
  * Remaining:
  *
  * Object conversion:
- * 
+ *
  * 14-15 - TypeError if undefined or null passed
- * 16-21 - Conversion to Number, String, Boolean, property exists or doesn't 
+ * 16-21 - Conversion to Number, String, Boolean, property exists or doesn't
  *
  * Unsupported:
  *
@@ -1843,11 +1843,11 @@ spec i__getValue (v)
     [[ v == undefined ]]
     [[ ret == undefined ]]
     normal;
-    
+
 	[[ (v == {{ "o", undefined, #field }}) * types (#field : Str) * isNamedProperty(#field) ]]
     [[ isReferenceError(ret) ]]
     error;
-    
+
 	[[ (v == {{ "v", undefined, #field }}) * types (#field : Str) * isNamedProperty(#field) ]]
     [[ isReferenceError(ret) ]]
     error
@@ -1905,14 +1905,14 @@ proc i__getValue (v) {
 (* *********** *)
 
 (*
- *    Name: hasProperty 
+ *    Name: hasProperty
  * Purpose: Does the given object have a given property in its prototype chain?
  *
  *   Specs:
  *
- * 01 - Property not defined in the prototype chain, rtrn false 
+ * 01 - Property not defined in the prototype chain, rtrn false
  * 02 - Property defined in the prototype chain, rtrn true
- * 
+ *
  *)
 
 spec hasProperty (l, prop)
@@ -1941,16 +1941,16 @@ proc hasProperty (l, prop) {
 (* ************** *)
 
 (*
- *    Name: deleteProperty 
+ *    Name: deleteProperty
  * Purpose: Delete a given property of a given object, if possible
  *
  *   Specs:
  *
- * 01-02 - Property not defined in the object, rtrn true 
+ * 01-02 - Property not defined in the object, rtrn true
  * 03 - Property defined, configurable, delete, rtrn true
  * 04 - Property defined, not configurable, do not thrw, rtrn false
  * 05 - Property defined, not configurable, thrw a TypeError
- * 
+ *
  *)
 
 spec deleteProperty (l, prop, thrw)
@@ -1984,7 +1984,7 @@ spec deleteProperty (l, prop, thrw)
 	   Pi (#l, #prop, #clsx, #desc, {{ #l }}, #gp_aux_3, #gp_aux_4) * desc_conf(#desc, false) ]]
 	[[ Pi (#l, #prop, #clsx, #desc, {{ #l }}, #gp_aux_3, #gp_aux_4) * isTypeError(ret) ]]
 	error
-	
+
 proc deleteProperty (l, prop, thrw) {
 
 			[* unfold Pi (#l, #prop, #clsx, #desc, #g_aux_2, #g_aux_3, #g_aux_4) *]
@@ -2031,7 +2031,7 @@ spec canPut (l, prop)
 	[[ Pi (#l, #prop, #g_aux_0, #g_aux_1, {{ #l }}, #g_aux_3, #g_aux_4) *
 	   (ret == #writ) ]]
 	normal;
-	
+
 	(* 03 - Property defined as a data descriptor outside, but object not extensible, rtrn false *)
 	[[ (l == #l) * (prop == #prop) *
 	   types (#g_aux_2 : List, #l : Obj, #lp : Obj, #other : List) *
@@ -2050,7 +2050,7 @@ spec canPut (l, prop)
 	[[ Pi (#l, #prop, #g_aux_0, #g_aux_1, #g_aux_2, #g_aux_3, #g_aux_4) *
 	   ((#l, "@extensible") -> true) * (ret == #writ) ]]
 	normal;
-	
+
 	(* 05 - Property defined as an accessor descriptor, rtrn (setter <> undefined) *)
 	[[ (l == #l) * (prop == #prop) *
 	   Pi (#l, #prop, #g_aux_0, #g_aux_1, #g_aux_2, #g_aux_3, #g_aux_4) *
@@ -2098,7 +2098,7 @@ proc canPut (l, prop) {
 (* ******************** *)
 
 (*
- *    Name: o__defineOwnProperty 
+ *    Name: o__defineOwnProperty
  * Purpose: Define a property of a non-Array object
  *
  *   Specs:
@@ -2111,7 +2111,7 @@ proc canPut (l, prop) {
  * 21-26 - Current defined, both non-configurable, enumerables clash
  * 27-32 - Current defined, both data, both non-configurable, enumerables match, writables clash
  * 33-34 - Current defined, both data, both non-configurable, enumarables match, writable, success
- * 
+ *
  *)
 
 spec o__defineOwnProperty (l, prop, desc, thrw)
@@ -2141,10 +2141,10 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
     (* 03 - Current is undefined, object is not extensible, string, thrw *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #cls : Str, #desc : List) *
-	   ((#l, "@class") -> #cls) * 
+	   ((#l, "@class") -> #cls) *
 	   isClass(#cls, "String") * Cell_s (#l, #prop, "none", none, #pv) *
 	   ((#l, "@extensible") -> false) ]]
-    [[ ((#l, "@class") -> #cls) * 
+    [[ ((#l, "@class") -> #cls) *
 	   Cell_s (#l, #prop, "none", none, #pv) * ((#l, "@extensible") -> false) *
 	   isTypeError(err) ]]
     error;
@@ -2171,7 +2171,7 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
 	   Cell_o (#l, #prop, #desc) * ((#l, "@extensible") -> true) *
 	   (ret == true) ]]
     normal;
-    
+
     (* 06 - Current is undefined, object is extensible, non-string, accessor descriptor, success *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == #thrw) *
 	   types (#l : Obj, #prop : Str, #cls : Str, #desc : List, #thrw : Bool) *
@@ -2183,7 +2183,7 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
 	   Cell_o (#l, #prop, #desc) * ((#l, "@extensible") -> true) *
 	   (ret == true) ]]
     normal;
-    
+
 	(* 07 - Current is undefined, object is extensible, string, data descriptor, success *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == #thrw) *
 	   types (#l : Obj, #prop : Str, #cls : Str, #desc : List, #thrw : Bool) *
@@ -2195,7 +2195,7 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
 	   Cell_s (#l, #prop, "NSI", #desc, #pv) * ((#l, "@extensible") -> true) *
 	   (ret == true) ]]
     normal;
-    
+
     (* 08 - Current is undefined, object is extensible, string, accessor descriptor, success *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == #thrw) *
 	   types (#l : Obj, #prop : Str, #cls : Str, #desc : List, #thrw : Bool) *
@@ -2276,7 +2276,7 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
        ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
 	   isClass(#cls, "String") * Cell_s (#l, #prop, "NSI", #dcur, #pv) ]]
     [[ ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
-	   Cell_s (#l, #prop, "NSI", {{ "d", #gval, true, #dec, #dcc }}, #pv) * 
+	   Cell_s (#l, #prop, "NSI", {{ "d", #gval, true, #dec, #dcc }}, #pv) *
 	   (ret == true) ]]
 	normal;
 
@@ -2301,11 +2301,11 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
 	   Cell_o (#l, #prop, #dcur) *
 	   (ret == false) ]]
 	normal;
-	
+
 	(* 17 - Current is defined, configurable is false, descriptor, configurable is true, string, thrw *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
-       Descriptor(#desc) * desc_conf(#desc, true) * 
+       Descriptor(#desc) * desc_conf(#desc, true) *
        ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
 	   isClass(#cls, "String") * Cell_s (#l, #prop, "SI", #dcur, #pv) ]]
     [[ ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
@@ -2350,7 +2350,7 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
 	   types (#ed : Bool, #ec : Bool) *
-       Descriptor(#desc) * desc_conf(#desc, false) * 
+       Descriptor(#desc) * desc_conf(#desc, false) *
        Descriptor(#dcur) * desc_conf(#dcur, false) *
 	   desc_enum(#desc, #ed) * desc_enum(#dcur, #ec) * (! (#ed == #ec)) *
        ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
@@ -2364,7 +2364,7 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == false) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
 	   types (#ed : Bool, #ec : Bool) *
-       Descriptor(#desc) * desc_conf(#desc, false) * 
+       Descriptor(#desc) * desc_conf(#desc, false) *
        Descriptor(#dcur) * desc_conf(#dcur, false) *
 	   desc_enum(#desc, #ed) * desc_enum(#dcur, #ec) * (! (#ed == #ec)) *
        ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
@@ -2373,7 +2373,7 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
 	   Cell_o (#l, #prop, #dcur) *
 	   (ret == false) ]]
 	normal;
-	
+
 	(* 23 - Current is defined, configurable is false, descriptor, configurable is false, enumerables are different, string, thrw *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
@@ -2397,12 +2397,12 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
 	   Cell_s (#l, #prop, "SI", #dcur, #pv)  *
 	   (ret == false) ]]
 	normal;
-	
+
 	(* 25 - Current is defined, configurable is false, descriptor, configurable is false, enumerables are different, string, thrw *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
 	   types (#ed : Bool, #ec : Bool) *
-       Descriptor(#desc) * desc_conf(#desc, false) * 
+       Descriptor(#desc) * desc_conf(#desc, false) *
        Descriptor(#dcur) * desc_conf(#dcur, false) *
 	   desc_enum(#desc, #ed) * desc_enum(#dcur, #ec) * (! (#ed == #ec)) *
        ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
@@ -2416,7 +2416,7 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == false) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
 	   types (#ed : Bool, #ec : Bool) *
-       Descriptor(#desc) * desc_conf(#desc, false) * 
+       Descriptor(#desc) * desc_conf(#desc, false) *
        Descriptor(#dcur) * desc_conf(#dcur, false) *
 	   desc_enum(#desc, #ed) * desc_enum(#dcur, #ec) * (! (#ed == #ec)) *
        ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
@@ -2425,7 +2425,7 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
 	   Cell_s (#l, #prop, "NSI", #dcur, #pv)  *
 	   (ret == false) ]]
 	normal;
-	
+
 	(* 27 - Current is defined, configurables are false, enumerables are same, writables false and true, non-string, thrw *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
@@ -2455,7 +2455,7 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
 	   Cell_o (#l, #prop, #dcur) *
 	   (ret == false) ]]
 	normal;
-	
+
 	(* 29 - Current is defined, configurables are false, enumerables are same, writables false and true, string, thrw *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
@@ -2479,7 +2479,7 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
 	   Cell_s (#l, #prop, "SI", #dcur, #pv) *
 	   (ret == false) ]]
 	normal;
-	
+
 	(* 31 - Current is defined, configurables are false, enumerables are same, writables false and true, string, thrw *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
@@ -2511,7 +2511,7 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
 	normal;
 
 	(* 33 - Current is defined, configurables are false, enumerables are same, writable is true, non-string, success *)
-    [[ (l == #l) * (prop == #prop) * (desc == #desc) * 
+    [[ (l == #l) * (prop == #prop) * (desc == #desc) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool, #thrw : Bool) *
 	   types (#enum : Bool) *
        DataDescriptor(#desc) * DataDescriptor(#dcur) *
@@ -2524,7 +2524,7 @@ spec o__defineOwnProperty (l, prop, desc, thrw)
 	   Cell_o (#l, #prop, #desc) *
 	   (ret == true) ]]
 	normal;
-	
+
 	(* 34 - Current is defined, configurables are false, enumerables are same, writable is true, string, success *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool, #thrw : Bool) *
@@ -2721,7 +2721,7 @@ proc o__defineOwnProperty (l, prop, desc, thrw) {
 (* ***************** *)
 
 (*
- *    Name: defineOwnProperty 
+ *    Name: defineOwnProperty
  * Purpose: Define a property of a general object
  *
  *   Specs:
@@ -2734,7 +2734,7 @@ proc o__defineOwnProperty (l, prop, desc, thrw) {
  * 21-26 - Current defined, both non-configurable, enumerables clash
  * 27-32 - Current defined, both data, both non-configurable, enumerables match, writables clash
  * 33-34 - Current defined, both data, both non-configurable, enumarables match, writable, success
- * 
+ *
  *)
 
 spec defineOwnProperty (l, prop, desc, thrw)
@@ -2767,7 +2767,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
 	   ((#l, "@class") -> #cls) *
 	   isClass(#cls, "String") * Cell_s (#l, #prop, "none", none, #pv) *
 	   ((#l, "@extensible") -> false) ]]
-    [[ ((#l, "@class") -> #cls) * 
+    [[ ((#l, "@class") -> #cls) *
 	   Cell_s (#l, #prop, "none", none, #pv) * ((#l, "@extensible") -> false) *
 	   isTypeError(err) ]]
     error;
@@ -2794,7 +2794,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
 	   Cell_o (#l, #prop, #desc) * ((#l, "@extensible") -> true) *
 	   (ret == true) ]]
     normal;
-    
+
     (* 06 - Current is undefined, object is extensible, non-string, accessor descriptor, success *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == #thrw) *
 	   types (#l : Obj, #prop : Str, #cls : Str, #desc : List, #thrw : Bool) *
@@ -2806,7 +2806,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
 	   Cell_o (#l, #prop, #desc) * ((#l, "@extensible") -> true) *
 	   (ret == true) ]]
     normal;
-    
+
 	(* 07 - Current is undefined, object is extensible, string, data descriptor, success *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == #thrw) *
 	   types (#l : Obj, #prop : Str, #cls : Str, #desc : List, #thrw : Bool) *
@@ -2818,7 +2818,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
 	   Cell_s (#l, #prop, "NSI", #desc, #pv) * ((#l, "@extensible") -> true) *
 	   (ret == true) ]]
     normal;
-    
+
     (* 08 - Current is undefined, object is extensible, string, accessor descriptor, success *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == #thrw) *
 	   types (#l : Obj, #prop : Str, #cls : Str, #desc : List, #thrw : Bool) *
@@ -2899,7 +2899,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
        ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
 	   isClass(#cls, "String") * Cell_s (#l, #prop, "NSI", #dcur, #pv) ]]
     [[ ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
-	   Cell_s (#l, #prop, "NSI", {{ "d", #gval, true, #dec, #dcc }}, #pv) * 
+	   Cell_s (#l, #prop, "NSI", {{ "d", #gval, true, #dec, #dcc }}, #pv) *
 	   (ret == true) ]]
 	normal;
 
@@ -2924,11 +2924,11 @@ spec defineOwnProperty (l, prop, desc, thrw)
 	   Cell_o (#l, #prop, #dcur) *
 	   (ret == false) ]]
 	normal;
-	
+
 	(* 17 - Current is defined, configurable is false, descriptor, configurable is true, string, thrw *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
-       Descriptor(#desc) * desc_conf(#desc, true) * 
+       Descriptor(#desc) * desc_conf(#desc, true) *
        ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
 	   isClass(#cls, "String") * Cell_s (#l, #prop, "SI", #dcur, #pv) ]]
     [[ ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
@@ -2973,7 +2973,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
 	   types (#ed : Bool, #ec : Bool) *
-       Descriptor(#desc) * desc_conf(#desc, false) * 
+       Descriptor(#desc) * desc_conf(#desc, false) *
        Descriptor(#dcur) * desc_conf(#dcur, false) *
 	   desc_enum(#desc, #ed) * desc_enum(#dcur, #ec) * (! (#ed == #ec)) *
        ((#l, "@class") -> #cls) * isClass(#cls, "Non-Array") * ((#l, "@extensible") -> #ext) *
@@ -2987,7 +2987,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == false) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
 	   types (#ed : Bool, #ec : Bool) *
-       Descriptor(#desc) * desc_conf(#desc, false) * 
+       Descriptor(#desc) * desc_conf(#desc, false) *
        Descriptor(#dcur) * desc_conf(#dcur, false) *
 	   desc_enum(#desc, #ed) * desc_enum(#dcur, #ec) * (! (#ed == #ec)) *
        ((#l, "@class") -> #cls) * isClass(#cls, "Non-Array") * ((#l, "@extensible") -> #ext) *
@@ -2996,7 +2996,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
 	   Cell_o (#l, #prop, #dcur) *
 	   (ret == false) ]]
 	normal;
-	
+
 	(* 23 - Current is defined, configurable is false, descriptor, configurable is false, enumerables are different, string, thrw *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
@@ -3020,12 +3020,12 @@ spec defineOwnProperty (l, prop, desc, thrw)
 	   Cell_s (#l, #prop, "SI", #dcur, #pv)  *
 	   (ret == false) ]]
 	normal;
-	
+
 	(* 25 - Current is defined, configurable is false, descriptor, configurable is false, enumerables are different, string, thrw *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
 	   types (#ed : Bool, #ec : Bool) *
-       Descriptor(#desc) * desc_conf(#desc, false) * 
+       Descriptor(#desc) * desc_conf(#desc, false) *
        Descriptor(#dcur) * desc_conf(#dcur, false) *
 	   desc_enum(#desc, #ed) * desc_enum(#dcur, #ec) * (! (#ed == #ec)) *
        ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
@@ -3039,7 +3039,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == false) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
 	   types (#ed : Bool, #ec : Bool) *
-       Descriptor(#desc) * desc_conf(#desc, false) * 
+       Descriptor(#desc) * desc_conf(#desc, false) *
        Descriptor(#dcur) * desc_conf(#dcur, false) *
 	   desc_enum(#desc, #ed) * desc_enum(#dcur, #ec) * (! (#ed == #ec)) *
        ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
@@ -3048,7 +3048,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
 	   Cell_s (#l, #prop, "NSI", #dcur, #pv)  *
 	   (ret == false) ]]
 	normal;
-	
+
 	(* 27 - Current is defined, configurables are false, enumerables are same, writables false and true, non-string, thrw *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
@@ -3078,7 +3078,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
 	   Cell_o (#l, #prop, #dcur) *
 	   (ret == false) ]]
 	normal;
-	
+
 	(* 29 - Current is defined, configurables are false, enumerables are same, writables false and true, string, thrw *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
@@ -3102,7 +3102,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
 	   Cell_s (#l, #prop, "SI", #dcur, #pv) *
 	   (ret == false) ]]
 	normal;
-	
+
 	(* 31 - Current is defined, configurables are false, enumerables are same, writables false and true, string, thrw *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) * (thrw == true) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool) *
@@ -3134,7 +3134,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
 	normal;
 
 	(* 33 - Current is defined, configurables are false, enumerables are same, writable is true, non-string, success *)
-    [[ (l == #l) * (prop == #prop) * (desc == #desc) * 
+    [[ (l == #l) * (prop == #prop) * (desc == #desc) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool, #thrw : Bool) *
 	   types (#enum : Bool) *
        DataDescriptor(#desc) * DataDescriptor(#dcur) *
@@ -3147,7 +3147,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
 	   Cell_o (#l, #prop, #desc) *
 	   (ret == true) ]]
 	normal;
-	
+
 	(* 34 - Current is defined, configurables are false, enumerables are same, writable is true, string, success *)
     [[ (l == #l) * (prop == #prop) * (desc == #desc) *
 	   types (#l : Obj, #prop : Str, #desc : List, #dcur : List, #thrw : Bool, #ext : Bool, #thrw : Bool) *
@@ -3161,7 +3161,7 @@ spec defineOwnProperty (l, prop, desc, thrw)
     [[ ((#l, "@class") -> #cls) * ((#l, "@extensible") -> #ext) *
 	   Cell_s (#l, #prop, "NSI", #desc, #pv) *
 	   (ret == true) ]]
-	normal 
+	normal
 
 proc defineOwnProperty (l, prop, desc, thrw) {
 

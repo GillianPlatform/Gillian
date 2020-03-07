@@ -26,14 +26,6 @@
     },
     "buildsInSource": "_build",
     "exportedEnv": {
-      "DYLD_LIBRARY_PATH": {
-        "val": "#{@opam/z3.lib / 'z3' : $DYLD_LIBRARY_PATH}",
-        "scope": "global"
-      },
-      "LD_LIBRARY_PATH": {
-        "val": "#{@opam/z3.lib / 'z3' : $LD_LIBRARY_PATH}",
-        "scope": "global"
-      },
       "GILLIAN_JS_RUNTIME_PATH": {
         "scope": "global",
         "val": "#{self.share}/gillian-js"
@@ -61,7 +53,7 @@
     "@opam/menhir": "*",
     "@opam/visitors": "20190711",
     "@opam/yojson": "^1.7.0",
-    "@opam/z3": "4.8.1",
+    "@opam/z3": "giltho/esy-z3#b0fdd9a",
     "@reason-native/rely": "^3.1.0",
     "@opam/alcotest": "1.0.1",
     "JS_Parser": "resource-reasoning/JS_Parser#1c8f852",

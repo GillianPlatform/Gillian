@@ -1,4 +1,4 @@
-type t = WList | WNull | WBool | WString | WPtr | WNum | WAny | WSet
+type t = WList | WNull | WBool | WString | WPtr | WInt | WAny | WSet
 
 val compatible : t -> t -> bool
 
@@ -16,4 +16,5 @@ end
 
 val of_variable : string -> t TypeMap.t -> t option
 
-val infer_types_pred : WLAssert.t list -> t TypeMap.t
+val infer_types_pred :
+  (string * t option) list -> WLAssert.t list -> t TypeMap.t

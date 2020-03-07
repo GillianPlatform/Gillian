@@ -25,7 +25,7 @@ let compile_type t =
     | WBool   -> Some Type.BooleanType
     | WString -> Some Type.StringType
     | WPtr    -> Some Type.ObjectType
-    | WNum    -> Some Type.NumberType
+    | WInt    -> Some Type.IntType
     | WSet    -> Some Type.SetType
     | WAny    -> None)
 
@@ -33,13 +33,13 @@ let compile_binop b =
   WBinOp.(
     match b with
     | EQUAL -> BinOp.Equal
-    | LESSTHAN -> BinOp.LessThan
-    | LESSEQUAL -> BinOp.LessThanEqual
-    | PLUS -> BinOp.FPlus
-    | MINUS -> BinOp.Minus
-    | TIMES -> BinOp.Times
-    | DIV -> BinOp.Div
-    | MOD -> BinOp.Mod
+    | LESSTHAN -> BinOp.ILessThan
+    | LESSEQUAL -> BinOp.ILessThanEqual
+    | PLUS -> BinOp.IPlus
+    | MINUS -> BinOp.IMinus
+    | TIMES -> BinOp.ITimes
+    | DIV -> BinOp.IDiv
+    | MOD -> BinOp.IMod
     | AND -> BinOp.BAnd
     | OR -> BinOp.BOr
     (* operators that do not exist in gil are compiled separately *)
@@ -62,7 +62,7 @@ let rec compile_val v =
   match v with
   | Bool b  -> Literal.Bool b
   | Null    -> Literal.Null
-  | Num n   -> Literal.Num (float_of_int n)
+  | Int n   -> Literal.Int n
   | Str s   -> Literal.String s
   | VList l -> Literal.LList (List.map compile_val l)
 
@@ -282,14 +282,15 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
   let compile_lexpr = compile_lexpr ~fname in
   let compile_lformula = compile_lformula ~fname in
   let concat_star = List.fold_left (fun a1 a2 -> Asrt.Star (a1, a2)) in
-  let gil_add e k =
+  let rec gil_add e k =
     (* builds GIL expression that is e + k *)
     if k = 0 then e
     else
       match e with
-      | Expr.Lit (Num n) -> Expr.Lit (Num (n +. float_of_int k))
-      | BinOp (e1, FPlus, Lit (Num b)) -> Lit (Num (b +. float_of_int k))
-      | e -> BinOp (e, FPlus, Lit (Num (float_of_int k)))
+      | Expr.Lit (Int n) -> Expr.Lit (Int (n + k))
+      | BinOp (e1, IPlus, Lit (Int b)) | BinOp (Lit (Int b), IPlus, e1) ->
+          gil_add (gil_add e1 k) b
+      | e -> BinOp (e, IPlus, Lit (Int k))
   in
   (* compiles le1 -> lle, returns the assertion AND the list of existential variables generated *)
   let rec compile_pointsto
@@ -304,7 +305,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
           let expr_offset =
             match bo with
             | Some o when not block -> Expr.LVar o
-            | None when block -> Lit (Num 0.)
+            | None when block -> Lit (Int 0)
             | _ ->
                 failwith
                   "The algorithm to compile pointsto seems to be wrong, cannot \
@@ -318,13 +319,11 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
             if not block then
               let offset = gen_str lgvar in
               (Some offset, Expr.LVar offset)
-            else (None, Lit (Num 0.))
+            else (None, Lit (Int 0))
           in
           ( Option.fold ~some:(fun x -> [ x ]) ~none:[] offset @ (loc :: exs1),
             Asrt.Types
-              [
-                (Expr.LVar loc, Type.ObjectType); (expr_offset, Type.NumberType);
-              ]
+              [ (Expr.LVar loc, Type.ObjectType); (expr_offset, Type.IntType) ]
             :: Asrt.Pure
                  (Formula.Eq (e1, Expr.EList [ Expr.LVar loc; expr_offset ]))
             :: la1,
@@ -536,8 +535,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
   let reassign_vars =
     List.mapi
       (fun i vn ->
-        Cmd.Assignment
-          (vn, BinOp (PVar retv, BinOp.LstNth, Lit (Num (float_of_int i)))))
+        Cmd.Assignment (vn, BinOp (PVar retv, BinOp.LstNth, Lit (Int i))))
       vars
   in
   let annot_while = Annot.init ~origin_id:(WStmt.get_id while_stmt) () in
@@ -565,9 +563,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
                                   "Cannot call get_or_create_lab with en empty \
                                    list"
   in
-  let nth expr n =
-    Expr.BinOp (expr, BinOp.LstNth, Expr.Lit (Literal.Num (float_of_int n)))
-  in
+  let nth expr n = Expr.BinOp (expr, BinOp.LstNth, Expr.Lit (Literal.Int n)) in
   let setcell = WislLActions.str_ac WislLActions.SetCell in
   let dispose = WislLActions.str_ac WislLActions.Dispose in
   let getcell = WislLActions.str_ac WislLActions.GetCell in
@@ -628,7 +624,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let faillab, ctnlab = (gen_str fail_lab, gen_str ctn_lab) in
       let testcmd =
         Cmd.GuardedGoto
-          ( Expr.BinOp (nth e_v_get 1, BinOp.Equal, Expr.Lit (Literal.Num 0.)),
+          ( Expr.BinOp (nth e_v_get 1, BinOp.Equal, Expr.Lit (Literal.Int 0)),
             ctnlab,
             faillab )
       in
@@ -703,9 +699,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
   (* Object Creation *)
   | { snode = New (x, k); sid; _ } :: rest ->
       let annot = Annot.init ~origin_id:sid () in
-      let newcmd =
-        Cmd.LAction (x, alloc, [ Expr.Lit (Literal.Num (float_of_int k)) ])
-      in
+      let newcmd = Cmd.LAction (x, alloc, [ Expr.Lit (Literal.Int k) ]) in
       let comp_rest, new_functions = compile_list rest in
       ((annot, None, newcmd) :: comp_rest, new_functions)
   (* x := new(k) =>
@@ -779,9 +773,9 @@ let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials } =
 
 let compile_pred pred =
   let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; _ } = pred in
-  let types = WType.infer_types_pred pred_definitions in
+  let types = WType.infer_types_pred pred_params pred_definitions in
   let getWISLTypes str = (str, WType.of_variable str types) in
-  let paramsWISLType = List.map getWISLTypes pred_params in
+  let paramsWISLType = List.map (fun (x, _) -> getWISLTypes x) pred_params in
   let getGILTypes (str, t) =
     (str, Option.fold ~some:compile_type ~none:None t)
   in
