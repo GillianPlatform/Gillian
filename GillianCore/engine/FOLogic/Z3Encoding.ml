@@ -1115,7 +1115,7 @@ let rec encode_logical_expression (le : Expr.t) : ZExpr.expr =
 let encode_quantifier quantifier_type ctx quantified_vars var_sorts assertion =
   if List.length quantified_vars > 0 then
     let quantified_assertion =
-      Quantifier.mk_quantifier ctx quantifier_type
+      Quantifier.mk_quantifier_const ctx quantifier_type
         (List.map2
            (fun v s -> ZExpr.mk_const_s ctx v s)
            quantified_vars var_sorts)
