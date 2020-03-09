@@ -31,7 +31,8 @@
         "val": "#{self.share}/gillian-js"
       },
       "WISL_RUNTIME_PATH": { "val": "#{self.share}/wisl", "scope": "global" },
-      "GILLIAN_C_RUNTIME_PATH": { "scope": "global", "val": "#{self.share}/gillian-c" }
+      "GILLIAN_C_RUNTIME_PATH": { "scope": "global", "val": "#{self.share}/gillian-c" },
+      "CPATH": { "scope": "global", "val": "#{self.share / 'include' : $CPATH}"}
     }
   },
   "scripts": {
