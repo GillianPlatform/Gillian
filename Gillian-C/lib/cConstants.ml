@@ -62,6 +62,10 @@ module Internal_Functions = struct
 
   let strcmp = "i__strcmp"
 
+  let strlen = "i__strlen"
+
+  let rand = "i__rand"
+
   let free = "i__free"
 
   let loadv = "i__loadv"
@@ -91,6 +95,10 @@ module BinOp_Functions = struct
   let or_ = "i__binop_or"
 
   let shl = "i__binop_shl"
+
+  let shr = "i__binop_shr"
+
+  let mod_ = "i__binop_mod"
 
   let shru = "i__binop_shru"
 
@@ -162,6 +170,8 @@ module UnOp_Functions = struct
 
   let cast8unsigned = "i__unop_cast8unsigned"
 
+  let cast16signed = "i__unop_cast16signed"
+
   let longofint = "i__unop_longofint"
 
   let longofsingle = "i__unop_longofsingle"
@@ -169,6 +179,8 @@ module UnOp_Functions = struct
   let longuofsingle = "i__unop_longuofsingle"
 
   let intoflong = "i__unop_intoflong"
+
+  let intoffloat = "i__unop_intoffloat"
 
   let longofintu = "i__unop_longofintu"
 
@@ -178,9 +190,13 @@ module UnOp_Functions = struct
 
   let floatofintu = "i__unop_floatofintu"
 
+  let floatofsingle = "i__unop_floatofsingle"
+
   let singleoflongu = "i__unop_singleoflongu"
 
   let singleofint = "i__unop_singleofint"
+
+  let singleoffloat = "i__unop_singleoffloat"
 
   let negl = "i__unop_negl"
 

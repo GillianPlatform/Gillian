@@ -36,18 +36,22 @@ let internal_proc_of_unop uop =
   match uop with
   | Olongofint     -> UnOp_Functions.longofint
   | Ointoflong     -> UnOp_Functions.intoflong
+  | Ointoffloat    -> UnOp_Functions.intoffloat
   | Olongofintu    -> UnOp_Functions.longofintu
   | Olongoffloat   -> UnOp_Functions.longoffloat
   | Olongofsingle  -> UnOp_Functions.longofsingle
   | Olonguofsingle -> UnOp_Functions.longuofsingle
   | Ofloatofint    -> UnOp_Functions.floatofint
   | Ofloatofintu   -> UnOp_Functions.floatofintu
+  | Ofloatofsingle -> UnOp_Functions.floatofsingle
   | Osingleoflongu -> UnOp_Functions.singleoflongu
   | Osingleofint   -> UnOp_Functions.singleofint
+  | Osingleoffloat -> UnOp_Functions.singleoffloat
   | Onegl          -> UnOp_Functions.negl
   | Onegint        -> UnOp_Functions.negint
   | Ocast8signed   -> UnOp_Functions.cast8signed
   | Ocast8unsigned -> UnOp_Functions.cast8unsigned
+  | Ocast16signed  -> UnOp_Functions.cast16signed
   | _              ->
       failwith
         (Printf.sprintf "Unhandled unary operator : %s"
@@ -93,6 +97,8 @@ let trans_binop_expr ?(fname = "main") binop te1 te2 =
   | Omul -> call BinOp_Functions.mul
   | Odiv -> call BinOp_Functions.div
   | Oshl -> call BinOp_Functions.shl
+  | Oshr -> call BinOp_Functions.shr
+  | Omod -> call BinOp_Functions.mod_
   | Oshru -> call BinOp_Functions.shru
   | Oand -> call BinOp_Functions.and_
   | Oor -> call BinOp_Functions.or_
@@ -595,6 +601,10 @@ let intern_impl_of_extern_function ext_f =
       CConstants.Internal_Functions.memmove
   | EF_external ([ 's'; 't'; 'r'; 'c'; 'm'; 'p' ], _) ->
       CConstants.Internal_Functions.strcmp
+  | EF_external ([ 's'; 't'; 'r'; 'l'; 'e'; 'n' ], _) ->
+      CConstants.Internal_Functions.strlen
+  | EF_external ([ 'r'; 'a'; 'n'; 'd' ], _) ->
+      CConstants.Internal_Functions.rand
   | _ -> CConstants.Internal_Functions.not_implemented
 
 let rec trans_globdefs

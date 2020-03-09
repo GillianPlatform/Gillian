@@ -122,6 +122,15 @@ proc i__binop_modlu(v1, v2) {
   unde: fail[operator]("Using %lu operator for non-long elements")
 };
 
+proc i__binop_mod(v1, v2) {
+        goto [ l-nth(v1, 0.) = "int" ] llon unde;
+  llon: goto [ l-nth(v2, 0.) = "int" ] blon unde;
+        assert (! (l-nth(v2, 1.) == 0.));
+  blon: ret := {{ "int", m_floor(l-nth(v1, 1.) % l-nth(v2, 1.)) }};
+        return;
+  unde: fail[operator]("Using % operator for non-int elements")
+};
+
 proc i__binop_mulfs(v1, v2) {
         goto [ l-nth(v1, 0.) = "single" ] llon unde;
   llon: goto [ l-nth(v2, 0.) = "single" ] blon unde;
@@ -177,6 +186,14 @@ proc i__binop_shl(v1, v2) {
   blon: ret := {{ "int", l-nth(v1, 1.) << l-nth(v2, 1.) }};
         return;
   unde: fail[operator]("Using << operator for non-int elements")
+};
+
+proc i__binop_shr(v1, v2) {
+        goto [ l-nth(v1, 0.) = "int" ] llon unde;
+  llon: goto [ l-nth(v2, 0.) = "int" ] blon unde;
+  blon: ret := {{ "int", l-nth(v1, 1.) >> l-nth(v2, 1.) }};
+        return;
+  unde: fail[operator]("Using >> operator for non-int elements")
 };
 
 proc i__binop_shru(v1, v2) {

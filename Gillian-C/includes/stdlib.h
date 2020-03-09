@@ -8,6 +8,7 @@ void free (void* ptr);
 void * memcpy (void * destination, const void * source, size_t num);
 void * memmove (void * destination, const void * source, size_t num);
 void * memset (void * ptr, int value, size_t num);
+int rand(void);
 
 /* FIXME: unimplemented */
 void qsort (void* base, size_t num, size_t size, int (*comparator)(const void*,const void*));

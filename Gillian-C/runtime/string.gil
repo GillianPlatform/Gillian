@@ -17,3 +17,17 @@ proc i__strcmp(str1, str2) {
           return;
     die:  fail[TypeError](str1, str2)
 };
+
+proc i__strlen(str) {
+          goto [((typeOf str) = List) and ((typeOf (l-nth(str, 0.))) = Obj)]
+                ctn die; (* Check that we have pointers *)
+    ctn:  i := 0;
+    loop: char_v := [mem_load]("int8signed", l-nth(str, 0.), l-nth(str, 1.) + i);
+          char := l-nth(char_v, 0.);
+          goto [ (char = {{ "int", 0. }}) ] end ctnl;
+    ctnl: i := i + 1;
+          goto loop;
+    end:  ret := {{ "long", i }};
+          return;
+    die:  fail[TypeError](str)
+};
