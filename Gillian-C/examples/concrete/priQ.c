@@ -39,11 +39,11 @@ PQN* enqueue(PQN* queue, int pri, int val) {
   return insert(queue, makeNode(pri, val));
 }
 
-PQN* isEmpty(PQN* queue) {
+int isEmpty(PQN* queue) {
   return queue == NULL;
 }
 
-PQN* peek(PQN* queue) {
+int peek(PQN* queue) {
   return queue->val;
 }
 

@@ -16,6 +16,10 @@ module Warnings = struct
   let silence_all () =
     wnothing ();
     silence_preprocess ()
+
+  let as_error =
+    find_unit_cmd "-Werror" options
+
 end
 
 module Optim = struct
