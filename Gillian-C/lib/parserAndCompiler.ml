@@ -16,12 +16,12 @@ module TargetLangOptions = struct
       "If you want to hide the global environment from the reporting of heap"
     in
     let hgenv = Arg.(value & flag & info [ "hide-genv" ] ~docs ~doc) in
-    let f burn_csm hide_genv = { burn_csm; hide_genv; } in
+    let f burn_csm hide_genv = { burn_csm; hide_genv } in
     Term.(const f $ bcsm $ hgenv)
 
   let apply { burn_csm = bcsm; hide_genv } =
     burn_csm := bcsm;
-    Config.hide_genv := hide_genv;
+    Config.hide_genv := hide_genv
 end
 
 type err = Errors.errmsg
