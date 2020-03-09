@@ -1,4 +1,5 @@
 open Compcert
+open Config_compcert
 
 let burn_csm = ref false
 
@@ -61,7 +62,8 @@ let parse_annots file =
 
 let parse_and_compile_file path =
   let () = Frontend.init () in
-  if not !Config.warnings then Warnings.silence_all ();
+  if not !Config.warnings then Warnings.silence_all (); (* Silence warnings *)
+  let () = Optim.disable_all () in (* Disable all optims *)
   let pathi = Filename.chop_extension path ^ ".i" in
   let () = Frontend.preprocess path pathi in
   let s = Frontend.parse_c_file path pathi in
