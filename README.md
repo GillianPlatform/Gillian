@@ -22,4 +22,4 @@ This folder contain :
 
 
 # License
-The Gillian Platform is distributed under a BSD 3-Clause License, please see [the license file](./LICENSE)
+Until further notice, Gillian is [NO LICENSE](https://choosealicense.com/no-permission/). Contact us directly if you want to use it.
