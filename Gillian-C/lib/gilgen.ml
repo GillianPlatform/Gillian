@@ -47,6 +47,7 @@ let internal_proc_of_unop uop =
   | Onegl          -> UnOp_Functions.negl
   | Onegint        -> UnOp_Functions.negint
   | Ocast8signed   -> UnOp_Functions.cast8signed
+  | Ocast8unsigned -> UnOp_Functions.cast8unsigned
   | _              ->
       failwith
         (Printf.sprintf "Unhandled unary operator : %s"
@@ -200,8 +201,9 @@ let make_symb_gen ?(fname = "main") assigned_id x type_string =
   let assigned = true_name assigned_id in
   let str_x =
     match x with
-    | Csharpminor.Evar idl -> true_name idl
-    | Csharpminor.Eload (_, Eaddrof idl) -> true_name idl
+    | Csharpminor.Evar idl
+    | Csharpminor.Eload (_, Eaddrof idl)
+    | Csharpminor.Eload (_, Evar idl) -> true_name idl
     | _ ->
         failwith
           (Format.asprintf "symb_int received invalid parameter %a"

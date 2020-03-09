@@ -1,3 +1,4 @@
+#include <gillian-c/gillian-c.h>
 #include <stdlib.h>
 
 /* The implementation is slightly different than the Javascript's one.

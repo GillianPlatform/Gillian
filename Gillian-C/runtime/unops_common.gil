@@ -99,3 +99,11 @@ proc i__unop_cast8signed (i) {
   und: ret := undefined;
        return
 };
+
+proc i__unop_cast8unsigned (i) {
+       goto [ l-nth(i, 0.) = "int" ] ctn und;
+  ctn: ret := i;
+       return;
+  und: ret := undefined;
+       return
+};

@@ -1,3 +1,4 @@
+#include <gillian-c/gillian-c.h>
 #include <stdlib.h>
 
 typedef struct ln {

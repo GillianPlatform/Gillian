@@ -1,0 +1,7 @@
+(install
+ (section share_root)
+ (files
+  (gillian-c.h as include/gillian-c/gillian-c.h)
+  (stdlib.h as include/stdlib.h)
+  (string.h as include/string.h))
+ (package gillian-c))

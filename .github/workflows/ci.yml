@@ -1,4 +1,4 @@
-name: Heavy
+name: CI
 
 on:
   push:
@@ -106,6 +106,7 @@ jobs:
         working-directory: 'Gillian/Gillian-JS/environment/'
   
   test262:
+    if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
     strategy:
       matrix:
         operating-system: [ macos-latest ]
@@ -130,6 +131,7 @@ jobs:
         run: 'gillian-js test262 test262/test --ci'
 
   collection-c:
+    if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
     strategy:
       matrix:
         operating-system: [ macos-latest ]
@@ -154,6 +156,7 @@ jobs:
         run: 'gillian-c bulk-wpst collections-c/for-gillian --ci'
 
   test-Buckets:
+    if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
     strategy:
       matrix:
         operating-system: [ macos-latest ]

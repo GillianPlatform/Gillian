@@ -160,6 +160,8 @@ end
 module UnOp_Functions = struct
   let cast8signed = "i__unop_cast8signed"
 
+  let cast8unsigned = "i__unop_cast8unsigned"
+
   let longofint = "i__unop_longofint"
 
   let longofsingle = "i__unop_longofsingle"
