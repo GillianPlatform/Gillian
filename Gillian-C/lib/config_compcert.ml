@@ -1,5 +1,4 @@
 module Warnings = struct
-
   let options = Compcert.Diagnostics.warning_options
 
   let rec find_unit_cmd pat = function
@@ -17,18 +16,21 @@ module Warnings = struct
   let silence_all () =
     wnothing ();
     silence_preprocess ()
-
 end
 
 module Optim = struct
-
   open Compcert.Clflags
-  let optimization_options = [
-    option_ftailcalls; option_fifconversion; option_fconstprop; option_fcse;
-    option_fredundancy; option_finline; option_finline_functions_called_once;
-  ]
 
-  let disable_all () =
-    List.iter (fun r -> r := false) optimization_options
+  let optimization_options =
+    [
+      option_ftailcalls;
+      option_fifconversion;
+      option_fconstprop;
+      option_fcse;
+      option_fredundancy;
+      option_finline;
+      option_finline_functions_called_once;
+    ]
 
+  let disable_all () = List.iter (fun r -> r := false) optimization_options
 end
