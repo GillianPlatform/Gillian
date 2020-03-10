@@ -68,30 +68,32 @@ let trans_binop_expr ?(fname = "main") binop te1 te2 =
   let open Cminor in
   match binop with
   (* Ocmpl *)
-  | Ocmpl Integers.Cle -> call BinOp_Functions.cmpl_le
-  | Ocmpl Integers.Cge -> call BinOp_Functions.cmpl_ge
+  | Ocmpl Cle -> call BinOp_Functions.cmpl_le
+  | Ocmpl Cge -> call BinOp_Functions.cmpl_ge
+  | Ocmpl Clt -> call BinOp_Functions.cmpl_lt
+  | Ocmpl Ceq -> call BinOp_Functions.cmpl_eq
   (* OCmplu *)
-  | Ocmplu Integers.Ceq -> call BinOp_Functions.cmplu_eq
-  | Ocmplu Integers.Cne -> call BinOp_Functions.cmplu_ne
-  | Ocmplu Integers.Cle -> call BinOp_Functions.cmplu_le
-  | Ocmplu Integers.Cge -> call BinOp_Functions.cmplu_ge
-  | Ocmplu Integers.Clt -> call BinOp_Functions.cmplu_lt
-  | Ocmplu Integers.Cgt -> call BinOp_Functions.cmplu_gt
+  | Ocmplu Ceq -> call BinOp_Functions.cmplu_eq
+  | Ocmplu Cne -> call BinOp_Functions.cmplu_ne
+  | Ocmplu Cle -> call BinOp_Functions.cmplu_le
+  | Ocmplu Cge -> call BinOp_Functions.cmplu_ge
+  | Ocmplu Clt -> call BinOp_Functions.cmplu_lt
+  | Ocmplu Cgt -> call BinOp_Functions.cmplu_gt
   (* OCmpfs *)
-  | Ocmpfs Integers.Cge -> call BinOp_Functions.cmpfs_ge
-  | Ocmpfs Integers.Cle -> call BinOp_Functions.cmpfs_le
+  | Ocmpfs Cge -> call BinOp_Functions.cmpfs_ge
+  | Ocmpfs Cle -> call BinOp_Functions.cmpfs_le
   (* OCmpu *)
-  | Ocmpu Integers.Cle -> call BinOp_Functions.cmpu_le
-  | Ocmpu Integers.Cgt -> call BinOp_Functions.cmpu_gt
-  | Ocmpu Integers.Ceq -> call BinOp_Functions.cmpu_eq
-  | Ocmpu Integers.Cne -> call BinOp_Functions.cmpu_ne
+  | Ocmpu Cle -> call BinOp_Functions.cmpu_le
+  | Ocmpu Cgt -> call BinOp_Functions.cmpu_gt
+  | Ocmpu Ceq -> call BinOp_Functions.cmpu_eq
+  | Ocmpu Cne -> call BinOp_Functions.cmpu_ne
   (* OCmp *)
-  | Ocmp Integers.Cgt -> call BinOp_Functions.cmp_gt
-  | Ocmp Integers.Cge -> call BinOp_Functions.cmp_ge
-  | Ocmp Integers.Ceq -> call BinOp_Functions.cmp_eq
-  | Ocmp Integers.Clt -> call BinOp_Functions.cmp_lt
-  | Ocmp Integers.Cle -> call BinOp_Functions.cmp_le
-  | Ocmp Integers.Cne -> call BinOp_Functions.cmp_ne
+  | Ocmp Cgt -> call BinOp_Functions.cmp_gt
+  | Ocmp Cge -> call BinOp_Functions.cmp_ge
+  | Ocmp Ceq -> call BinOp_Functions.cmp_eq
+  | Ocmp Clt -> call BinOp_Functions.cmp_lt
+  | Ocmp Cle -> call BinOp_Functions.cmp_le
+  | Ocmp Cne -> call BinOp_Functions.cmp_ne
   (* Int ops *)
   | Oadd -> call BinOp_Functions.add
   | Osub -> call BinOp_Functions.sub

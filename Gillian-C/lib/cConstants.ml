@@ -144,6 +144,10 @@ module BinOp_Functions = struct
 
   let cmpl_ge = "i__binop_cmpl_ge"
 
+  let cmpl_lt = "i__binop_cmpl_lt"
+
+  let cmpl_eq = "i__binop_cmpl_eq"
+
   let cmpu_le = "i__binop_cmpu_le"
 
   let cmpu_gt = "i__binop_cmpu_gt"
