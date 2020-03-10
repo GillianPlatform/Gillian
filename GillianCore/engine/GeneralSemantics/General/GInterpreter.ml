@@ -476,21 +476,21 @@ struct
             | _           -> ConfCont (state'', cs, i, i + 1, b_counter)
                              :: rest_confs )
         (* FIXME: It feels like there should be an auto-unfold here if we are in an abstract execution *)
-        | AFail errs -> (
-            let recovery_vals = State.get_recovery_vals errs in
-            let recovery_states : (State.t list, string) result =
-              State.automatic_unfold state recovery_vals
-            in
-            match recovery_states with
-            | Ok recovery_states ->
-                List.map
-                  (fun state -> ConfCont (state, cs, prev, i, b_counter))
-                  recovery_states
-            | _                  ->
-                raise
-                  (Failure
-                     (Format.asprintf "Local Action Failed: %a" Cmd.pp_indexed
-                        cmd)) ) )
+        | AFail errs ->
+            if not (ExecMode.concrete_exec !Config.current_exec_mode) then
+              let recovery_vals = State.get_recovery_vals errs in
+              let recovery_states : (State.t list, string) result =
+                State.automatic_unfold state recovery_vals
+              in
+              match recovery_states with
+              | Ok recovery_states ->
+                  List.map
+                    (fun state -> ConfCont (state, cs, prev, i, b_counter))
+                    recovery_states
+              | _                  ->
+                  raise
+                    (Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd)
+            else Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd )
     | Logic lcmd -> (
         let resulting_states : State.t list = evaluate_lcmd prog lcmd state in
         match lcmd with
@@ -583,8 +583,9 @@ struct
     | ECall (x, pid, args, j) ->
         let pid =
           match pid with
-          | PVar pid -> pid
-          | _        ->
+          | PVar pid         -> pid
+          | Lit (String pid) -> pid
+          | _                ->
               raise
                 (Exceptions.Impossible
                    "Procedure identifier not a program variable")

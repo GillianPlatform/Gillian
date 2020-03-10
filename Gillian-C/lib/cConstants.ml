@@ -64,6 +64,8 @@ module Internal_Functions = struct
 
   let strlen = "i__strlen"
 
+  let strcpy = "i__strcpy"
+
   let rand = "i__rand"
 
   let free = "i__free"
@@ -79,6 +81,8 @@ module Internal_Functions = struct
   let get_function_name = "i__get_function_name"
 
   let bool_of_val = "i__bool_of_value"
+
+  let printf = "EXTERN_printf"
 end
 
 module BinOp_Functions = struct
@@ -110,6 +114,8 @@ module BinOp_Functions = struct
 
   let mull = "i__binop_mull"
 
+  let divl = "i__binop_divl"
+
   let andl = "i__binop_andl"
 
   let shrlu = "i__binop_shrlu"
@@ -120,13 +126,23 @@ module BinOp_Functions = struct
 
   let xorl = "i__binop_xorl"
 
-  let mulfs = "i__binop_mulfs"
-
   let divlu = "i__binop_divlu"
 
   let modlu = "i__binop_modlu"
 
+  let addf = "i__binop_addf"
+
+  let mulfs = "i__binop_mulfs"
+
+  let divf = "i__binop_divf"
+
+  let addfs = "i__binop_addfs"
+
+  let subfs = "i__binop_subfs"
+
   let cmpl_le = "i__binop_cmpl_le"
+
+  let cmpl_ge = "i__binop_cmpl_ge"
 
   let cmpu_le = "i__binop_cmpu_le"
 

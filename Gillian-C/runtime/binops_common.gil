@@ -6,6 +6,14 @@ proc i__binop_cmpl_le(v1, v2) {
   unde: fail[comparison]("Using long comparison operator for non-long elements")
 };
 
+proc i__binop_cmpl_ge(v1, v2) {
+        goto [ l-nth(v1, 0.) = "long" ] llon unde;
+  llon: goto [ l-nth(v2, 0.) = "long" ] blon unde;
+  blon: ret := "i__value_of_bool"(not (l-nth(v1, 1.) < l-nth(v2, 1.)));
+        return;
+  unde: fail[comparison]("Using long comparison operator for non-long elements")
+};
+
 proc i__binop_cmpu_gt(v1, v2) {
       ir := "i__binop_cmpu_le"(v1, v2);
       ret := "i__neg_bool_value"(ir);
@@ -111,6 +119,15 @@ proc i__binop_divlu(v1, v2) {
   blon: ret := {{ "long", m_floor(l-nth(v1, 1.) / l-nth(v2, 1.)) }};
         return;
   unde: fail[operator]("Using /lu operator for non-long elements")
+};
+
+proc i__binop_divl(v1, v2) {
+        goto [ l-nth(v1, 0.) = "long" ] llon unde;
+  llon: goto [ l-nth(v2, 0.) = "long" ] blon unde;
+        assert (! (l-nth(v2, 1.) == 0.));
+  blon: ret := {{ "long", m_floor(l-nth(v1, 1.) / l-nth(v2, 1.)) }};
+        return;
+  unde: fail[operator]("Using /l operator for non-long elements")
 };
 
 proc i__binop_modlu(v1, v2) {
@@ -242,4 +259,40 @@ proc i__binop_xorl(v1, v2) {
   blon: ret := {{ "long", l-nth(v1, 1.) ^l l-nth(v2, 1.) }};
         return;
   unde: fail[operator]("Using ^l operator for non-long elements")
+};
+
+proc i__binop_addf(v1, v2) {
+        goto [ l-nth(v1, 0.) = "float" ] lint unde;
+  lint: goto [ l-nth(v2, 0.) = "float" ] bint unde;
+  bint: ret := {{ "float", l-nth(v1, 1.) + l-nth(v2, 1.) }};
+        return;
+  unde: ret := undefined;
+        return
+};
+
+proc i__binop_divf(v1, v2) {
+        goto [ l-nth(v1, 0.) = "float" ] llon unde;
+  llon: goto [ l-nth(v2, 0.) = "float" ] blon unde;
+        assert (! (l-nth(v2, 1.) == 0.));
+  blon: ret := {{ "float", l-nth(v1, 1.) / l-nth(v2, 1.) }};
+        return;
+  unde: fail[operator]("Using /f operator for non-float elements")
+};
+
+proc i__binop_addfs(v1, v2) {
+        goto [ l-nth(v1, 0.) = "single" ] llon unde;
+  llon: goto [ l-nth(v2, 0.) = "single" ] blon unde;
+        assert (! (l-nth(v2, 1.) == 0.));
+  blon: ret := {{ "single", l-nth(v1, 1.) + l-nth(v2, 1.) }};
+        return;
+  unde: fail[operator]("Using +s operator for non-single elements")
+};
+
+proc i__binop_subfs(v1, v2) {
+        goto [ l-nth(v1, 0.) = "single" ] llon unde;
+  llon: goto [ l-nth(v2, 0.) = "single" ] blon unde;
+        assert (! (l-nth(v2, 1.) == 0.));
+  blon: ret := {{ "single", l-nth(v1, 1.) - l-nth(v2, 1.) }};
+        return;
+  unde: fail[operator]("Using -s operator for non-single elements")
 };

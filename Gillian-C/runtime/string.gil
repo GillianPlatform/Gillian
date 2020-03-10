@@ -31,3 +31,19 @@ proc i__strlen(str) {
           return;
     die:  fail[TypeError](str)
 };
+
+proc i__strcpy(str1, str2) {
+          goto [((typeOf str1) = List) and ((typeOf str2) = List) and
+                ((typeOf (l-nth(str1, 0.))) = Obj) and ((typeOf (l-nth(str2, 0.))) = Obj)]
+                ctn die; (* Check that we have pointers *)
+    ctn:  i := 0;
+    loop: char2_ar := [mem_load]("int8signed", l-nth(str2, 0.), l-nth(str2, 1.) + i);
+          char2 := l-nth(char2_ar, 0.);
+          u := [mem_store]("int8signed", l-nth(str1, 0.), l-nth(str1, 1.) + i, char2);
+          goto [ (char2 = {{ "int", 0. }}) ] end ctnl;
+    ctnl: i := i + 1;
+          goto loop;
+    end:  ret := str1;
+          return;
+    die:  fail[TypeError](str1, str2)
+};
