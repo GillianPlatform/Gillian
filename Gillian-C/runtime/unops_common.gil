@@ -17,6 +17,24 @@ proc i__unop_intoflong (i) {
        return
 };
 
+proc i__unop_intoffloat (i) {
+       goto [ i = undefined ] und nm;
+  nm:  goto [ l-nth(i, 0.) = "float" ] ctn und;
+  ctn: ret := {{ "int", num_to_int l-nth(i, 1.) }};
+       return;
+  und: ret := undefined;
+       return
+};
+
+proc i__unop_intofsingle (i) {
+       goto [ i = undefined ] und nm;
+  nm:  goto [ l-nth(i, 0.) = "single" ] ctn und;
+  ctn: ret := {{ "int", num_to_int l-nth(i, 1.) }};
+       return;
+  und: ret := undefined;
+       return
+};
+
 proc i__unop_longofintu (i) {
        goto [ l-nth(i, 0.) = "int" ] ctn und;
   ctn: ret := {{ "long", l-nth(i, 1.) }};
@@ -36,6 +54,22 @@ proc i__unop_singleoflongu (i) {
 proc i__unop_singleofint (i) {
        goto [ l-nth(i, 0.) = "int" ] ctn und;
   ctn: ret := {{ "single", l-nth(i, 1.) }};
+       return;
+  und: ret := undefined;
+       return
+};
+
+proc i__unop_singleoffloat (i) {
+       goto [ l-nth(i, 0.) = "float" ] ctn und;
+  ctn: ret := {{ "single", l-nth(i, 1.) }};
+       return;
+  und: ret := undefined;
+       return
+};
+
+proc i__unop_floatofsingle (i) {
+       goto [ l-nth(i, 0.) = "single" ] ctn und;
+  ctn: ret := {{ "float", l-nth(i, 1.) }};
        return;
   und: ret := undefined;
        return
@@ -101,6 +135,14 @@ proc i__unop_cast8signed (i) {
 };
 
 proc i__unop_cast8unsigned (i) {
+       goto [ l-nth(i, 0.) = "int" ] ctn und;
+  ctn: ret := i;
+       return;
+  und: ret := undefined;
+       return
+};
+
+proc i__unop_cast16signed (i) {
        goto [ l-nth(i, 0.) = "int" ] ctn und;
   ctn: ret := i;
        return;

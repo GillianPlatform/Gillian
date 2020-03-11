@@ -36,18 +36,23 @@ let internal_proc_of_unop uop =
   match uop with
   | Olongofint     -> UnOp_Functions.longofint
   | Ointoflong     -> UnOp_Functions.intoflong
+  | Ointoffloat    -> UnOp_Functions.intoffloat
+  | Ointofsingle   -> UnOp_Functions.intofsingle
   | Olongofintu    -> UnOp_Functions.longofintu
   | Olongoffloat   -> UnOp_Functions.longoffloat
   | Olongofsingle  -> UnOp_Functions.longofsingle
   | Olonguofsingle -> UnOp_Functions.longuofsingle
   | Ofloatofint    -> UnOp_Functions.floatofint
   | Ofloatofintu   -> UnOp_Functions.floatofintu
+  | Ofloatofsingle -> UnOp_Functions.floatofsingle
   | Osingleoflongu -> UnOp_Functions.singleoflongu
   | Osingleofint   -> UnOp_Functions.singleofint
+  | Osingleoffloat -> UnOp_Functions.singleoffloat
   | Onegl          -> UnOp_Functions.negl
   | Onegint        -> UnOp_Functions.negint
   | Ocast8signed   -> UnOp_Functions.cast8signed
   | Ocast8unsigned -> UnOp_Functions.cast8unsigned
+  | Ocast16signed  -> UnOp_Functions.cast16signed
   | _              ->
       failwith
         (Printf.sprintf "Unhandled unary operator : %s"
@@ -64,50 +69,65 @@ let trans_binop_expr ?(fname = "main") binop te1 te2 =
   let open Cminor in
   match binop with
   (* Ocmpl *)
-  | Ocmpl Integers.Cle -> call BinOp_Functions.cmpl_le
+  | Ocmpl Cle -> call BinOp_Functions.cmpl_le
+  | Ocmpl Cge -> call BinOp_Functions.cmpl_ge
+  | Ocmpl Clt -> call BinOp_Functions.cmpl_lt
+  | Ocmpl Ceq -> call BinOp_Functions.cmpl_eq
   (* OCmplu *)
-  | Ocmplu Integers.Ceq -> call BinOp_Functions.cmplu_eq
-  | Ocmplu Integers.Cne -> call BinOp_Functions.cmplu_ne
-  | Ocmplu Integers.Cle -> call BinOp_Functions.cmplu_le
-  | Ocmplu Integers.Cge -> call BinOp_Functions.cmplu_ge
-  | Ocmplu Integers.Clt -> call BinOp_Functions.cmplu_lt
-  | Ocmplu Integers.Cgt -> call BinOp_Functions.cmplu_gt
+  | Ocmplu Ceq -> call BinOp_Functions.cmplu_eq
+  | Ocmplu Cne -> call BinOp_Functions.cmplu_ne
+  | Ocmplu Cle -> call BinOp_Functions.cmplu_le
+  | Ocmplu Cge -> call BinOp_Functions.cmplu_ge
+  | Ocmplu Clt -> call BinOp_Functions.cmplu_lt
+  | Ocmplu Cgt -> call BinOp_Functions.cmplu_gt
   (* OCmpfs *)
-  | Ocmpfs Integers.Cge -> call BinOp_Functions.cmpfs_ge
-  | Ocmpfs Integers.Cle -> call BinOp_Functions.cmpfs_le
+  | Ocmpfs Cge -> call BinOp_Functions.cmpfs_ge
+  | Ocmpfs Cle -> call BinOp_Functions.cmpfs_le
   (* OCmpu *)
-  | Ocmpu Integers.Cle -> call BinOp_Functions.cmpu_le
-  | Ocmpu Integers.Cgt -> call BinOp_Functions.cmpu_gt
-  | Ocmpu Integers.Ceq -> call BinOp_Functions.cmpu_eq
-  | Ocmpu Integers.Cne -> call BinOp_Functions.cmpu_ne
+  | Ocmpu Cle -> call BinOp_Functions.cmpu_le
+  | Ocmpu Cgt -> call BinOp_Functions.cmpu_gt
+  | Ocmpu Ceq -> call BinOp_Functions.cmpu_eq
+  | Ocmpu Cne -> call BinOp_Functions.cmpu_ne
   (* OCmp *)
-  | Ocmp Integers.Cgt -> call BinOp_Functions.cmp_gt
-  | Ocmp Integers.Cge -> call BinOp_Functions.cmp_ge
-  | Ocmp Integers.Ceq -> call BinOp_Functions.cmp_eq
-  | Ocmp Integers.Clt -> call BinOp_Functions.cmp_lt
-  | Ocmp Integers.Cle -> call BinOp_Functions.cmp_le
-  | Ocmp Integers.Cne -> call BinOp_Functions.cmp_ne
-  (* Others *)
+  | Ocmp Cgt -> call BinOp_Functions.cmp_gt
+  | Ocmp Cge -> call BinOp_Functions.cmp_ge
+  | Ocmp Ceq -> call BinOp_Functions.cmp_eq
+  | Ocmp Clt -> call BinOp_Functions.cmp_lt
+  | Ocmp Cle -> call BinOp_Functions.cmp_le
+  | Ocmp Cne -> call BinOp_Functions.cmp_ne
+  (* Int ops *)
   | Oadd -> call BinOp_Functions.add
   | Osub -> call BinOp_Functions.sub
   | Omul -> call BinOp_Functions.mul
   | Odiv -> call BinOp_Functions.div
   | Oshl -> call BinOp_Functions.shl
-  | Oshru -> call BinOp_Functions.shru
+  | Oshr -> call BinOp_Functions.shr
+  | Omod -> call BinOp_Functions.mod_
   | Oand -> call BinOp_Functions.and_
   | Oor -> call BinOp_Functions.or_
   | Oxor -> call BinOp_Functions.xor
+  (* Int unsgined ops *)
+  | Oshru -> call BinOp_Functions.shru
+  (* Long ops *)
   | Oaddl -> call BinOp_Functions.addl
   | Osubl -> call BinOp_Functions.subl
   | Omull -> call BinOp_Functions.mull
-  | Omulfs -> call BinOp_Functions.mulfs
-  | Odivlu -> call BinOp_Functions.divlu
-  | Omodlu -> call BinOp_Functions.modlu
+  | Odivl -> call BinOp_Functions.divl
   | Oandl -> call BinOp_Functions.andl
-  | Oshrlu -> call BinOp_Functions.shrlu
   | Oshll -> call BinOp_Functions.shll
   | Oorl -> call BinOp_Functions.orl
   | Oxorl -> call BinOp_Functions.xorl
+  (* Long unsigned ops *)
+  | Odivlu -> call BinOp_Functions.divlu
+  | Omodlu -> call BinOp_Functions.modlu
+  | Oshrlu -> call BinOp_Functions.shrlu
+  (* Float ops *)
+  | Oaddf -> call BinOp_Functions.addf
+  | Odivf -> call BinOp_Functions.divf
+  (* Single ops *)
+  | Oaddfs -> call BinOp_Functions.addfs
+  | Osubfs -> call BinOp_Functions.subfs
+  | Omulfs -> call BinOp_Functions.mulfs
   | _ -> failwith "Unhandled"
 
 let rec trans_expr ?(fname = "main") ~local_env expr =
@@ -225,15 +245,16 @@ let make_symb_gen ?(fname = "main") assigned_id x type_string =
   in
   add_annots [ assignment; specvar; assume_list; assume_val_t ]
 
-let is_assert_call e =
+let is_call name e =
   match e with
-  | Csharpminor.Eaddrof l when String.equal (true_name l) "ASSERT" -> true
+  | Csharpminor.Eaddrof l when String.equal (true_name l) name -> true
   | _ -> false
 
-let is_assume_call e =
-  match e with
-  | Csharpminor.Eaddrof l when String.equal (true_name l) "ASSUME" -> true
-  | _ -> false
+let is_assert_call = is_call "ASSERT"
+
+let is_assume_call = is_call "ASSUME"
+
+let is_printf_call = is_call "printf"
 
 let rec trans_stmt ?(fname = "main") ~context stmt =
   let trans_stmt ?(context = context) = trans_stmt ~fname ~context in
@@ -296,7 +317,7 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
   | Sreturn rval_opt -> (
       let leading_cmds, rexpr =
         match rval_opt with
-        | None   -> ([], Expr.Lit Literal.Undefined)
+        | None   -> ([], Expr.Lit Literal.Null)
         | Some e -> trans_expr e
       in
       let annotated_leading_cmds = add_annots leading_cmds in
@@ -350,6 +371,17 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
       let form = Formula.Eq (egil, one) in
       let assert_cmd = Cmd.Logic (Assume form) in
       add_annots (cmds @ [ assert_cmd ])
+  | Scall (None, _, ex, args) when is_printf_call ex ->
+      let cmds, egil = List.split (List.map trans_expr args) in
+      let leftvar = gen_str Prefix.gvar in
+      let cmd =
+        Cmd.ECall
+          ( leftvar,
+            Lit (String CConstants.Internal_Functions.printf),
+            egil,
+            None )
+      in
+      (List.concat cmds |> add_annots) @ [ (empty_annot, None, cmd) ]
   | Scall (optid, _, ex, lexp) ->
       let leftvar =
         match optid with
@@ -580,22 +612,34 @@ let set_global_var symbol def v =
   let setvar = Semantics.LActions.(str_ac (AGlob SetVar)) in
   Cmd.LAction ("u", setvar, [ symexpr; defexpr; sz; id_list_expr; perm_string ])
 
+(* Second part of the return tuple is:
+   * false if it should be a function call
+   * true if it should be an external call
+*)
 let intern_impl_of_extern_function ext_f =
   let open AST in
   match ext_f with
-  | EF_malloc -> CConstants.Internal_Functions.malloc
-  | EF_free -> CConstants.Internal_Functions.free
+  | EF_malloc -> (CConstants.Internal_Functions.malloc, false)
+  | EF_free -> (CConstants.Internal_Functions.free, false)
   | EF_external ([ 'c'; 'a'; 'l'; 'l'; 'o'; 'c' ], _) ->
-      CConstants.Internal_Functions.calloc
+      (CConstants.Internal_Functions.calloc, false)
   | EF_external ([ 'm'; 'e'; 'm'; 'c'; 'p'; 'y' ], _) ->
-      CConstants.Internal_Functions.memcpy
+      (CConstants.Internal_Functions.memcpy, false)
   | EF_external ([ 'm'; 'e'; 'm'; 's'; 'e'; 't' ], _) ->
-      CConstants.Internal_Functions.memset
+      (CConstants.Internal_Functions.memset, false)
   | EF_external ([ 'm'; 'e'; 'm'; 'm'; 'o'; 'v'; 'e' ], _) ->
-      CConstants.Internal_Functions.memmove
+      (CConstants.Internal_Functions.memmove, false)
   | EF_external ([ 's'; 't'; 'r'; 'c'; 'm'; 'p' ], _) ->
-      CConstants.Internal_Functions.strcmp
-  | _ -> CConstants.Internal_Functions.not_implemented
+      (CConstants.Internal_Functions.strcmp, false)
+  | EF_external ([ 's'; 't'; 'r'; 'l'; 'e'; 'n' ], _) ->
+      (CConstants.Internal_Functions.strlen, false)
+  | EF_external ([ 's'; 't'; 'r'; 'c'; 'p'; 'y' ], _) ->
+      (CConstants.Internal_Functions.strcpy, false)
+  | EF_external ([ 'p'; 'r'; 'i'; 'n'; 't'; 'f' ], _) ->
+      (CConstants.Internal_Functions.printf, true)
+  | EF_external ([ 'r'; 'a'; 'n'; 'd' ], _) ->
+      (CConstants.Internal_Functions.rand, false)
+  | _ -> (CConstants.Internal_Functions.not_implemented, false)
 
 let rec trans_globdefs
     ?(gil_annot = Gil_logic_gen.empty)
@@ -625,17 +669,19 @@ let rec trans_globdefs
         trans_function ~gil_annot ~exec_mode symbol f :: fs )
   | (_, Gfun (External f)) :: r
     when String.equal
-           (intern_impl_of_extern_function f)
+           (fst (intern_impl_of_extern_function f))
            CConstants.Internal_Functions.not_implemented -> trans_globdefs r
   | (id, Gfun (External f)) :: r ->
       (* We just indicate in the global env what function should be called at that point *)
       let symbol = true_name id in
       let init_asrts, init_acts, bi_specs, fs = trans_globdefs r in
-      let target = intern_impl_of_extern_function f in
-      let genv_def = Semantics.GEnv.FunDef target in
-      let new_cmd = set_global_function symbol genv_def in
-      let new_asrt = Gil_logic_gen.glob_fun_pred symbol genv_def in
-      (new_asrt :: init_asrts, new_cmd :: init_acts, bi_specs, fs)
+      let target, is_ext_call = intern_impl_of_extern_function f in
+      if not is_ext_call then
+        let genv_def = Semantics.GEnv.FunDef target in
+        let new_cmd = set_global_function symbol genv_def in
+        let new_asrt = Gil_logic_gen.glob_fun_pred symbol genv_def in
+        (new_asrt :: init_asrts, new_cmd :: init_acts, bi_specs, fs)
+      else (init_asrts, init_acts, bi_specs, fs)
   | (id, Gvar v) :: r ->
       let symbol = true_name id in
       let init_asrts, init_acts, bi_specs, fs = trans_globdefs r in

@@ -6,7 +6,7 @@ let burn_csm = ref false
 module TargetLangOptions = struct
   open Cmdliner
 
-  type t = { burn_csm : bool; hide_genv : bool }
+  type t = { burn_csm : bool; hide_genv : bool; warnings : bool }
 
   let term =
     let docs = Manpage.s_common_options in
@@ -16,12 +16,17 @@ module TargetLangOptions = struct
       "If you want to hide the global environment from the reporting of heap"
     in
     let hgenv = Arg.(value & flag & info [ "hide-genv" ] ~docs ~doc) in
-    let f burn_csm hide_genv = { burn_csm; hide_genv } in
-    Term.(const f $ bcsm $ hgenv)
+    let doc = "If you want to silent warnings from CompCert and GCC" in
+    let no_warnings = Arg.(value & flag & info [ "no-warnings" ] ~docs ~doc) in
+    let f burn_csm hide_genv no_warnings =
+      { burn_csm; hide_genv; warnings = not no_warnings }
+    in
+    Term.(const f $ bcsm $ hgenv $ no_warnings)
 
-  let apply { burn_csm = bcsm; hide_genv } =
+  let apply { burn_csm = bcsm; hide_genv; warnings } =
     burn_csm := bcsm;
-    Config.hide_genv := hide_genv
+    Config.hide_genv := hide_genv;
+    Config.warnings := warnings
 end
 
 type err = Errors.errmsg
@@ -56,7 +61,9 @@ let parse_annots file =
 
 let parse_and_compile_file path =
   let () = Frontend.init () in
-  let () = Warnings.as_error () in
+  let () =
+    if !Config.warnings then Warnings.as_error () else Warnings.silence_all ()
+  in
   let () = Optim.disable_all () in
   (* Disable all optims *)
   let pathi = Filename.chop_extension path ^ ".i" in

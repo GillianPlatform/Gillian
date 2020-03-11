@@ -388,4 +388,7 @@ any_C_token:
   | LCBRACE
   | RCBRACE
   | LBRACK
-  | RBRACK { () }
+  | RBRACK
+  | RDBRACK
+  | LDBRACK
+  { () }

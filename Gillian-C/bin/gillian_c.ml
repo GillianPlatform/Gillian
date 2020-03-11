@@ -1,8 +1,7 @@
 open Cgil_lib
 
 module CLI =
-  Gillian.CommandLine.Make (Semantics.CMemory) (Semantics.SMemory)
-    (Gillian.General.External.Dummy)
+  Gillian.CommandLine.Make (Semantics.CMemory) (Semantics.SMemory) (External.M)
     (ParserAndCompiler)
     (struct
       let runners : Gillian.Bulk.Runner.t list =

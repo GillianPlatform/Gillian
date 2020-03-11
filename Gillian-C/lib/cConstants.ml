@@ -62,6 +62,12 @@ module Internal_Functions = struct
 
   let strcmp = "i__strcmp"
 
+  let strlen = "i__strlen"
+
+  let strcpy = "i__strcpy"
+
+  let rand = "i__rand"
+
   let free = "i__free"
 
   let loadv = "i__loadv"
@@ -75,6 +81,8 @@ module Internal_Functions = struct
   let get_function_name = "i__get_function_name"
 
   let bool_of_val = "i__bool_of_value"
+
+  let printf = "EXTERN_printf"
 end
 
 module BinOp_Functions = struct
@@ -92,6 +100,10 @@ module BinOp_Functions = struct
 
   let shl = "i__binop_shl"
 
+  let shr = "i__binop_shr"
+
+  let mod_ = "i__binop_mod"
+
   let shru = "i__binop_shru"
 
   let mul = "i__binop_mul"
@@ -101,6 +113,8 @@ module BinOp_Functions = struct
   let subl = "i__binop_subl"
 
   let mull = "i__binop_mull"
+
+  let divl = "i__binop_divl"
 
   let andl = "i__binop_andl"
 
@@ -112,13 +126,27 @@ module BinOp_Functions = struct
 
   let xorl = "i__binop_xorl"
 
-  let mulfs = "i__binop_mulfs"
-
   let divlu = "i__binop_divlu"
 
   let modlu = "i__binop_modlu"
 
+  let addf = "i__binop_addf"
+
+  let mulfs = "i__binop_mulfs"
+
+  let divf = "i__binop_divf"
+
+  let addfs = "i__binop_addfs"
+
+  let subfs = "i__binop_subfs"
+
   let cmpl_le = "i__binop_cmpl_le"
+
+  let cmpl_ge = "i__binop_cmpl_ge"
+
+  let cmpl_lt = "i__binop_cmpl_lt"
+
+  let cmpl_eq = "i__binop_cmpl_eq"
 
   let cmpu_le = "i__binop_cmpu_le"
 
@@ -162,6 +190,8 @@ module UnOp_Functions = struct
 
   let cast8unsigned = "i__unop_cast8unsigned"
 
+  let cast16signed = "i__unop_cast16signed"
+
   let longofint = "i__unop_longofint"
 
   let longofsingle = "i__unop_longofsingle"
@@ -169,6 +199,10 @@ module UnOp_Functions = struct
   let longuofsingle = "i__unop_longuofsingle"
 
   let intoflong = "i__unop_intoflong"
+
+  let intoffloat = "i__unop_intoffloat"
+
+  let intofsingle = "i__unop_intofsingle"
 
   let longofintu = "i__unop_longofintu"
 
@@ -178,9 +212,13 @@ module UnOp_Functions = struct
 
   let floatofintu = "i__unop_floatofintu"
 
+  let floatofsingle = "i__unop_floatofsingle"
+
   let singleoflongu = "i__unop_singleoflongu"
 
   let singleofint = "i__unop_singleofint"
+
+  let singleoffloat = "i__unop_singleoffloat"
 
   let negl = "i__unop_negl"
 
