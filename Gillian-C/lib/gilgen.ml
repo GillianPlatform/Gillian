@@ -37,6 +37,7 @@ let internal_proc_of_unop uop =
   | Olongofint     -> UnOp_Functions.longofint
   | Ointoflong     -> UnOp_Functions.intoflong
   | Ointoffloat    -> UnOp_Functions.intoffloat
+  | Ointofsingle   -> UnOp_Functions.intofsingle
   | Olongofintu    -> UnOp_Functions.longofintu
   | Olongoffloat   -> UnOp_Functions.longoffloat
   | Olongofsingle  -> UnOp_Functions.longofsingle

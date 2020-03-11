@@ -26,6 +26,15 @@ proc i__unop_intoffloat (i) {
        return
 };
 
+proc i__unop_intofsingle (i) {
+       goto [ i = undefined ] und nm;
+  nm:  goto [ l-nth(i, 0.) = "single" ] ctn und;
+  ctn: ret := {{ "int", num_to_int l-nth(i, 1.) }};
+       return;
+  und: ret := undefined;
+       return
+};
+
 proc i__unop_longofintu (i) {
        goto [ l-nth(i, 0.) = "int" ] ctn und;
   ctn: ret := {{ "long", l-nth(i, 1.) }};

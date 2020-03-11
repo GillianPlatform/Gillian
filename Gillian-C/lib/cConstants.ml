@@ -202,6 +202,8 @@ module UnOp_Functions = struct
 
   let intoffloat = "i__unop_intoffloat"
 
+  let intofsingle = "i__unop_intofsingle"
+
   let longofintu = "i__unop_longofintu"
 
   let longoffloat = "i__unop_longoffloat"

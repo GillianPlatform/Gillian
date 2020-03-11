@@ -68,6 +68,6 @@ proc i__memset(ptr, vc, vsz) {
 };
 
 proc i__rand() {
-  ret := {{ "int", num_to_int $$random }};
+  ret := {{ "int", m_floor ($$random * 32768) }};
   return
 };
