@@ -28,7 +28,9 @@ module LActions : sig
 
   type glob_ga = Fun
 
-  type ga = GMem of mem_ga | GGlob of glob_ga
+  type genv_ga = Symbol | Definition
+
+  type ga = GMem of mem_ga | GGlob of glob_ga | GGenv of genv_ga
 
   (** {3 Serialization of actions} *)
 

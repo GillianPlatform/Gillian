@@ -225,11 +225,12 @@ let trans_simpl_expr se =
   | Num f             -> Lit (Num f)
   | Bool b            -> Lit (Bool b)
 
-let trans_sval sv =
+(* The first element of the result should be a pure assertion : either a formula, or overlapping assertions *)
+let trans_sval (sv : CSVal.t) : Asrt.t * Expr.t =
   let open CConstants.VTypes in
   let mk str v = Expr.EList [ Expr.Lit (String str); v ] in
-  let tnum e = Formula.Eq (UnOp (TypeOf, e), Lit (Type Type.NumberType)) in
-  let tloc e = Formula.Eq (UnOp (TypeOf, e), Lit (Type Type.ObjectType)) in
+  let tnum e = Asrt.Types [ (e, Type.NumberType) ] in
+  let tloc e = Asrt.Types [ (e, Type.ObjectType) ] in
   let tse = trans_simpl_expr in
   match sv with
   | CSVal.Sint se   ->
@@ -246,68 +247,76 @@ let trans_sval sv =
       (tnum eg, mk float_type (tse se))
   | Sptr (se1, se2) ->
       let eg1, eg2 = (tse se1, tse se2) in
-      (tloc eg1 &&& tnum eg2, Expr.EList [ tse se1; tse se2 ])
+      (tloc eg1 ** tnum eg2, Expr.EList [ tse se1; tse se2 ])
+  | Sfunptr symb    ->
+      let lvar = LVar.alloc () in
+      let pred =
+        Asrt.Pred
+          ( CConstants.Internal_Predicates.fun_ptr,
+            [ Lit (String symb); LVar lvar ] )
+      in
+      (pred, Expr.LVar lvar)
 
-let rec trans_expr e =
+let rec trans_expr (e : CExpr.t) : Asrt.t * Expr.t =
   match e with
-  | CExpr.SExpr se          -> (Formula.True, trans_simpl_expr se)
+  | CExpr.SExpr se          -> (Asrt.Emp, trans_simpl_expr se)
   | SVal sv                 -> trans_sval sv
   | EList el                ->
-      let forms, elp = List.split (List.map trans_expr el) in
-      let asrt = fold_and forms in
+      let asrts, elp = List.split (List.map trans_expr el) in
+      let asrt = Asrt.star asrts in
       (asrt, Expr.EList elp)
   | ESet es                 ->
-      let forms, elp = List.split (List.map trans_expr es) in
-      let asrt = fold_and forms in
+      let asrts, elp = List.split (List.map trans_expr es) in
+      let asrt = Asrt.star asrts in
       (asrt, Expr.ESet elp)
   | BinOp (e1, LstCat, e2)  ->
       let a1, eg1 = trans_expr e1 in
       let a2, eg2 = trans_expr e2 in
-      (a1 &&& a2, NOp (LstCat, [ eg1; eg2 ]))
+      (a1 ** a2, NOp (LstCat, [ eg1; eg2 ]))
   | BinOp (e1, LstCons, e2) ->
       let a1, eg1 = trans_expr e1 in
       let a2, eg2 = trans_expr e2 in
-      (a1 &&& a2, NOp (LstCat, [ EList [ eg1 ]; eg2 ]))
+      (a1 ** a2, NOp (LstCat, [ EList [ eg1 ]; eg2 ]))
   | BinOp (e1, b, e2)       ->
       let a1, eg1 = trans_expr e1 in
       let a2, eg2 = trans_expr e2 in
-      (a1 &&& a2, BinOp (eg1, trans_binop b, eg2))
+      (a1 ** a2, BinOp (eg1, trans_binop b, eg2))
   | UnOp (u, e)             ->
       let a, eg = trans_expr e in
       (a, UnOp (trans_unop u, eg))
   | NOp (nop, el)           ->
-      let forms, elp = List.split (List.map trans_expr el) in
-      let asrt = fold_and forms in
+      let asrts, elp = List.split (List.map trans_expr el) in
+      let asrt = Asrt.star asrts in
       let gnop = trans_nop nop in
       (asrt, Expr.NOp (gnop, elp))
 
-let rec trans_form f =
+let rec trans_form (f : CFormula.t) : Asrt.t * Formula.t =
   match f with
-  | CFormula.True     -> (Formula.True, Formula.True)
-  | False             -> (Formula.True, False)
+  | CFormula.True     -> (Emp, Formula.True)
+  | False             -> (Emp, False)
   | Eq (ce1, ce2)     ->
       let f1, eg1 = trans_expr ce1 in
       let f2, eg2 = trans_expr ce2 in
-      (f1 &&& f2, Eq (eg1, eg2))
+      (f1 ** f2, Eq (eg1, eg2))
   | LessEq (ce1, ce2) ->
       let f1, eg1 = trans_expr ce1 in
       let f2, eg2 = trans_expr ce2 in
-      (f1 &&& f2, LessEq (eg1, eg2))
+      (f1 ** f2, LessEq (eg1, eg2))
   | Less (ce1, ce2)   ->
       let f1, eg1 = trans_expr ce1 in
       let f2, eg2 = trans_expr ce2 in
-      (f1 &&& f2, Less (eg1, eg2))
+      (f1 ** f2, Less (eg1, eg2))
   | SetMem (ce1, ce2) ->
       let f1, eg1 = trans_expr ce1 in
       let f2, eg2 = trans_expr ce2 in
-      (f1 &&& f2, SetMem (eg1, eg2))
+      (f1 ** f2, SetMem (eg1, eg2))
   | Not fp            ->
       let a, fpp = trans_form fp in
       (a, Not fpp)
   | Implies (f1, f2)  ->
       let a1, fp1 = trans_form f1 in
       let a2, fp2 = trans_form f2 in
-      (a1 &&& a2, Or (Not fp1, fp2))
+      (a1 ** a2, Or (Not fp1, fp2))
   | ForAll (lvts, f)  ->
       let a, fp = trans_form f in
       (a, ForAll (lvts, fp))
@@ -326,9 +335,9 @@ let malloc_chunk_asrt loc struct_sz =
   in
   Asrt.GA (mem_ga, [ loc; num (-ptr_sz); num 0 ], [ mk_val struct_sz; perm_e ])
 
-let trans_constr ?(fname = "main") ~malloc ann s c =
+let trans_constr ?fname:_ ~malloc ann s c =
   let cenv = ann.cenv in
-  let gen_loc_var () = Expr.LVar (Generators.gen_str fname Prefix.lloc) in
+  let gen_loc_var () = Expr.LVar (LVar.alloc ()) in
   let open CConstants.VTypes in
   let cse = trans_simpl_expr in
   let tnum e = Asrt.Types [ (e, Type.NumberType) ] in
@@ -338,14 +347,13 @@ let trans_constr ?(fname = "main") ~malloc ann s c =
   (* let zero = mk_num 0 in *)
   let ptr_call p l = Asrt.Pred (Internal_Predicates.ptr_to_0_get, [ p; l ]) in
   let sz = function
-    | CSVal.Sint _ -> 4
-    | Slong _      -> 8
-    | Ssingle _    -> 4
-    | Sfloat _     -> 4
-    | Sptr _       -> if Archi.ptr64 then 8 else 4
+    | CSVal.Sint _       -> 4
+    | Slong _            -> 8
+    | Ssingle _          -> 4
+    | Sfloat _           -> 4
+    | Sptr _ | Sfunptr _ -> if Archi.ptr64 then 8 else 4
   in
-  let f_s, s_e = trans_expr s in
-  let a_s = to_assrt_of_gen_form f_s in
+  let a_s, s_e = trans_expr s in
   let locv = gen_loc_var () in
   let pc = ptr_call s_e locv in
   let ga_call loc low high sv =
@@ -398,8 +406,7 @@ let trans_constr ?(fname = "main") ~malloc ann s c =
         | Some c -> c
       in
       let siz = Camlcoq.Z.to_int comp.Ctypes.co_sizeof in
-      let more_forms, params_fields = List.split (List.map trans_expr el) in
-      let more_asrt = List.map (fun x -> to_assrt_of_gen_form x) more_forms in
+      let more_asrt, params_fields = List.split (List.map trans_expr el) in
       let pr =
         Asrt.Pred (struct_pred, [ locv (*; zero *) ] @ params_fields)
         ** fold_star more_asrt
@@ -411,10 +418,9 @@ let rec trans_asrt ?(fname = "main") ?(ann = empty) asrt =
   | CAssert.Star (a1, a2) -> trans_asrt ~ann a1 ** trans_asrt ~ann a2
   | Pure f                ->
       let ma, fp = trans_form f in
-      to_assrt_of_gen_form ma ** Pure fp
+      ma ** Pure fp
   | Pred (p, cel)         ->
-      let fp, gel = List.split (List.map trans_expr cel) in
-      let ap = List.map to_assrt_of_gen_form fp in
+      let ap, gel = List.split (List.map trans_expr cel) in
       fold_star ap ** Pred (p, gel)
   | Emp                   -> Emp
   | PointsTo (s, c)       -> trans_constr ~fname ~malloc:false ann s c
@@ -423,19 +429,18 @@ let rec trans_asrt ?(fname = "main") ?(ann = empty) asrt =
 let rec trans_lcmd ?(fname = "main") ?(ann = empty) lcmd =
   let trans_lcmd = trans_lcmd ~fname ~ann in
   let trans_asrt = trans_asrt ~fname ~ann in
-  let make_assert f =
-    match f with
-    | Formula.True -> []
-    | _            -> [ LCmd.Assert f ]
+  let make_assert = function
+    | Asrt.Emp -> []
+    | a        -> [ LCmd.SL (SepAssert (a, [])) ]
   in
   match lcmd with
   | CLCmd.Fold (pn, el) ->
-      let fp, gel = List.split (List.map trans_expr el) in
-      let to_assert = fold_and fp in
+      let aps, gel = List.split (List.map trans_expr el) in
+      let to_assert = Asrt.star aps in
       make_assert to_assert @ [ SL (Fold (pn, gel, None)) ]
   | Unfold (pn, el)     ->
-      let fp, gel = List.split (List.map trans_expr el) in
-      let to_assert = fold_and fp in
+      let ap, gel = List.split (List.map trans_expr el) in
+      let to_assert = Asrt.star ap in
       make_assert to_assert @ [ SL (Unfold (pn, gel, None, false)) ]
   | Assert (a, ex)      -> [ SL (SepAssert (trans_asrt a, ex)) ]
   | If (e, cl1, cl2)    ->

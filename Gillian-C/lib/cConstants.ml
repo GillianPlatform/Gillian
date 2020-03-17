@@ -297,6 +297,8 @@ module Internal_Predicates = struct
 
   (** global_env *)
   let global_env = Prefix.internal_preds ^ "global_env"
+
+  let fun_ptr = Prefix.internal_preds ^ "function_ptr"
 end
 
 module Symbolic_Constr = struct
