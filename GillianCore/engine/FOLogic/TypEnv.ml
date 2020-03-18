@@ -71,6 +71,18 @@ let fold (x : t) (f : string -> Type.t -> 'a -> 'a) (init : 'a) : 'a =
 (* Update with removal *)
 let update (te : t) (x : string) (t : Type.t) : unit = Hashtbl.replace te x t
 
+let update (te : t) (x : string) (t : Type.t) : unit =
+  match get te x with
+  | None -> Hashtbl.replace te x t
+  | Some t' when t' = t -> ()
+  | Some t' ->
+      ignore
+        (failwith
+           (Format.asprintf
+              "TypEnv update: Conflict: %s has type %s but required extension \
+               is %s"
+              x (Type.str t') (Type.str t)))
+
 let remove (te : t) (x : string) : unit = Hashtbl.remove te x
 
 (* Extend gamma with more_gamma *)

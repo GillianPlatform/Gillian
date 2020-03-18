@@ -44,8 +44,8 @@ struct
       (flag : Flag.t option)
       (label : (string * SS.t) option)
       (to_verify : bool) : t option * (Asrt.t * Asrt.t list) option =
-    (* Step 1 - normalise the precondition *)
     try
+      (* Step 1 - normalise the precondition *)
       match Normaliser.normalise_assertion ~pvars:(SS.of_list params) pre with
       | None                 -> (None, None)
       | Some (ss_pre, subst) -> (
@@ -175,6 +175,15 @@ struct
     match spec.spec_to_verify with
     | false -> ([], spec)
     | true  ->
+        let _ =
+          List.iter
+            (fun (sspec : Spec.st) ->
+              if sspec.ss_posts = [] then
+                failwith
+                  ( "Specification without post-condition for function "
+                  ^ spec.spec_name ))
+            spec.spec_sspecs
+        in
         L.verbose (fun m ->
             m
               ( "-------------------------------------------------------------------------@\n"

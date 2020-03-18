@@ -516,14 +516,26 @@ let trans_sspec ?(ann = empty) fname sspecs =
 
 let trans_spec ?(ann = empty) cl_spec =
   let CSpec.{ fname; params; sspecs } = cl_spec in
-  Spec.
-    {
-      spec_name = fname;
-      spec_params = params;
-      spec_sspecs = List.map (trans_sspec ~ann fname) sspecs;
-      spec_normalised = false;
-      spec_to_verify = true;
-    }
+  let result =
+    Spec.
+      {
+        spec_name = fname;
+        spec_params = params;
+        spec_sspecs = List.map (trans_sspec ~ann fname) sspecs;
+        spec_normalised = false;
+        spec_to_verify = true;
+      }
+  in
+  let _ =
+    List.iter
+      (fun (sspec : Spec.st) ->
+        if sspec.ss_posts = [] then
+          failwith
+            ( "Gillian-C: Specification without post-condition for function "
+            ^ fname ))
+      result.spec_sspecs
+  in
+  result
 
 let add_trans_spec ann cl_spec =
   { ann with specs = trans_spec ~ann cl_spec :: ann.specs }

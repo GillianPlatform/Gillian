@@ -202,7 +202,9 @@ let unfold_spec
     let posts : Asrt.t list =
       List.concat (List.map (auto_unfold preds rec_info) sspec.ss_posts)
     in
+    L.verboser (fun fmt -> fmt "Testing for admissibility");
     let posts = List.filter Simplifications.admissible_assertion posts in
+    if posts = [] then failwith "Unfolding: specification with no post";
     List.map
       (fun pre -> Spec.{ sspec with ss_pre = pre; ss_posts = posts })
       pres
