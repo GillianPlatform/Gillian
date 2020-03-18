@@ -34,4 +34,4 @@ pred i__ptr_to_0 (+e : List, l : Obj):
   (e == {{ l, 0. }});
 
 pred i__function_ptr(+s: Str, l : Obj):
-  <genv_symb>(s; l) * <genv_def>(l; #f) * (#f == {{ "function", _ }});
+  <genv_symb>(s; #ll) * (#ll == {{ l }}) * <genv_def>(l; #f) * (l-nth(l-nth(#f, 0.), 0.) == "function");

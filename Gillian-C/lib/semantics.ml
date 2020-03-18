@@ -587,7 +587,7 @@ module CMemory = struct
     match params with
     | [ Literal.String symbol ] ->
         ASucc (heap, [ Literal.Loc (GEnv.find_symbol heap.genv symbol) ])
-    | _                         -> failwith "invalid call to genvlookup"
+    | _                         -> failwith "invalid call to genvgetsymbol"
 
   let execute_genvsetsymbol heap params =
     match params with
