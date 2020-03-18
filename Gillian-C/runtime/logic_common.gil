@@ -33,5 +33,5 @@ pred i__float (+e: List, k : Num):
 pred i__ptr_to_0 (+e : List, l : Obj):
   (e == {{ l, 0. }});
 
-pred i__function_ptr(s: Str, l : Obj):
+pred i__function_ptr(+s: Str, l : Obj):
   <genv_symb>(s; l) * <genv_def>(l; #f) * (#f == {{ "function", _ }});

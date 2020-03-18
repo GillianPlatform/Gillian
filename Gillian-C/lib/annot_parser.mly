@@ -35,6 +35,7 @@
 %token LONGT
 %token SINGLET
 %token PTRT
+%token FUNPTRT
 %token STRUCT
 
 (* Gil Type things *)
@@ -303,6 +304,8 @@ sval:
     { CSVal.Slong se }
   | PTRT; LBRACE; sl = simple_expr; COMMA; so = simple_expr; RBRACE
     { CSVal.Sptr (sl, so) }
+  | FUNPTRT; LBRACE; s = IDENTIFIER; RBRACE
+    { CSVal.Sfunptr s }
 
 
 simple_expr:
@@ -347,6 +350,7 @@ any_C_token:
   | LONGT
   | SINGLET
   | PTRT
+  | FUNPTRT
   | GNUMT
   | GSETT
   | FORALL
