@@ -21,7 +21,7 @@ module LActions = struct
     | MSet
     | MRem
 
-  type genv_ac = GetSymbol | GetDef | SetSymbol | SetDef
+  type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
 
   type glob_ac = GetFun | SetFun | RemFun | SetVar
 
@@ -68,18 +68,19 @@ module LActions = struct
     | Symbol     -> SetSymbol
 
   let genv_ga_to_deleter = function
-    | _ -> failwith "TRYING TO CALL genv_ga_to_deleter !!!"
+    | Definition -> RemDef
+    | Symbol     -> RemSymbol
 
   let make_map_act tr_mem tr_glob tr_genv = function
     | GMem mga  -> AMem (tr_mem mga)
     | GGlob gga -> AGlob (tr_glob gga)
     | GGenv gge -> AGEnv (tr_genv gge)
 
-  let ga_to_setter =
-    make_map_act mem_ga_to_setter glob_ga_to_setter genv_ga_to_setter
-
   let ga_to_getter =
     make_map_act mem_ga_to_getter glob_ga_to_getter genv_ga_to_getter
+
+  let ga_to_setter =
+    make_map_act mem_ga_to_setter glob_ga_to_setter genv_ga_to_setter
 
   let ga_to_deleter =
     make_map_act mem_ga_to_deleter glob_ga_to_deleter genv_ga_to_deleter
@@ -120,14 +121,18 @@ module LActions = struct
   let str_genv_ac = function
     | GetSymbol -> "getsymbol"
     | SetSymbol -> "setsymbol"
+    | RemSymbol -> "remsymbol"
     | GetDef    -> "getdef"
     | SetDef    -> "setdef"
+    | RemDef    -> "remdef"
 
   let genv_ac_from_str = function
     | "getsymbol" -> GetSymbol
     | "setsymbol" -> SetSymbol
+    | "remsymbol" -> RemSymbol
     | "getdef"    -> GetDef
     | "setdef"    -> SetDef
+    | "remdef"    -> RemDef
     | s           -> failwith ("Unkown Global Env Action : " ^ s)
 
   let str_glob_ac = function
@@ -586,7 +591,7 @@ module CMemory = struct
   let execute_genvgetsymbol heap params =
     match params with
     | [ Literal.String symbol ] ->
-        ASucc (heap, [ Literal.Loc (GEnv.find_symbol heap.genv symbol) ])
+        ASucc (heap, [ String symbol; Loc (GEnv.find_symbol heap.genv symbol) ])
     | _                         -> failwith "invalid call to genvgetsymbol"
 
   let execute_genvsetsymbol heap params =
@@ -609,7 +614,7 @@ module CMemory = struct
     | [ Literal.Loc loc ] ->
         let def = GEnv.find_def heap.genv loc in
         let v = GEnv.serialize_def def in
-        ASucc (heap, [ v ])
+        ASucc (heap, [ Loc loc; v ])
     | _                   -> failwith "invalid call to genvgetdef"
 
   let execute_globsetfun heap params =
@@ -687,7 +692,9 @@ module CMemory = struct
     | AGEnv GetDef -> execute_genvgetdef heap params
     | AGlob SetFun -> execute_globsetfun heap params
     | AGlob SetVar -> execute_globsetvar heap params
-    | AGlob (GetFun | RemFun) | AMem (MGet | MSet | MRem) ->
+    | AGlob (GetFun | RemFun)
+    | AMem (MGet | MSet | MRem)
+    | AGEnv (RemDef | RemSymbol) ->
         failwith
           (Printf.sprintf
              "%s is an action related to a General Assertion, it should never \
@@ -1948,7 +1955,11 @@ module SMemory = struct
         ASucc
           [
             make_branch ~heap
-              ~rets:[ loc_from_loc_name (GEnv.find_symbol heap.genv symbol) ]
+              ~rets:
+                [
+                  Lit (String symbol);
+                  loc_from_loc_name (GEnv.find_symbol heap.genv symbol);
+                ]
               ();
           ]
     | _                       -> failwith "invalid call to genvgetsymbol"
@@ -1962,13 +1973,18 @@ module SMemory = struct
         ASucc [ make_branch ~heap:{ heap with genv } ~rets:[] () ]
     | _ -> failwith "invalid call to genvsetsymbol"
 
+  let execute_genvremsymbol heap _pfs _gamma params =
+    match params with
+    | [ _symbolc ] -> ASucc [ make_branch ~heap ~rets:[] () ]
+    | _            -> failwith "invalid call genvremsymbol"
+
   let execute_genvgetdef heap _pfs _gamma params =
     let open Gillian.Gil_syntax.Expr in
     match params with
     | [ Lit (Loc loc) ] | [ ALoc loc ] ->
         let def = GEnv.find_def heap.genv loc in
         let v = GEnv.serialize_def def in
-        ASucc [ make_branch ~heap ~rets:[ Lit v ] () ]
+        ASucc [ make_branch ~heap ~rets:[ Lit (Loc loc); Lit v ] () ]
     | _ -> failwith "invalid call to genvgetdef"
 
   let execute_genvsetdef heap _pfs _gamma params =
@@ -1978,7 +1994,12 @@ module SMemory = struct
         let def = GEnv.deserialize_def v_def in
         let genv = GEnv.set_def heap.genv loc def in
         ASucc [ make_branch ~heap:{ heap with genv } ~rets:[] () ]
-    | _ -> failwith "invalid call to genvgetdef"
+    | _ -> failwith "invalid call to genvsetdef"
+
+  let execute_genvremdef heap _pfs _gamma params =
+    match params with
+    | [ _loc ] -> ASucc [ make_branch ~heap ~rets:[] () ]
+    | _        -> failwith "invalid call to genvremdef"
 
   let execute_globsetfun heap pfs gamma params =
     let open Gillian.Gil_syntax.Expr in
@@ -2153,8 +2174,10 @@ module SMemory = struct
       | AMem MRem       -> execute_mem_rem !heap pfs gamma params
       | AGEnv GetSymbol -> execute_genvgetsymbol !heap pfs gamma params
       | AGEnv SetSymbol -> execute_genvsetsymbol !heap pfs gamma params
+      | AGEnv RemSymbol -> execute_genvremsymbol !heap pfs gamma params
       | AGEnv GetDef    -> execute_genvgetdef !heap pfs gamma params
       | AGEnv SetDef    -> execute_genvsetdef !heap pfs gamma params
+      | AGEnv RemDef    -> execute_genvremdef !heap pfs gamma params
       | AGlob SetFun    -> execute_globsetfun !heap pfs gamma params
       | AGlob GetFun    -> execute_globgetfun !heap pfs gamma params
       | AGlob RemFun    -> execute_globremfun !heap pfs gamma params

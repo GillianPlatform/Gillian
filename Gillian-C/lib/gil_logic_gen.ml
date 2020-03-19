@@ -136,8 +136,7 @@ let gen_pred_of_struct cenv ann struct_name =
   let comp_opt = Maps.PTree.get id cenv in
   let comp =
     match comp_opt with
-    | None   ->
-        failwith (Printf.sprintf "Structure %s is undefined !" struct_name)
+    | None   -> Fmt.failwith "Structure %s is undefined !" struct_name
     | Some c -> c
   in
   let open Ctypes in

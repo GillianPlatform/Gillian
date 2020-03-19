@@ -6,8 +6,8 @@ proc i__get_function_name(v_ptr) {
   ctn1:  goto [not ((l-nth (v_ptr, 1.)) = 0.)] fail2 ctn2;
   fail2: fail[functionCall]();
   ctn2:  defl := [genv_getdef](l-nth(v_ptr, 0.));
-         typ := l-nth(l-nth(defl, 0.), 0.);
-         val := l-nth(l-nth(defl, 0.), 1.);
+         typ := l-nth(l-nth(defl, 1.), 0.);
+         val := l-nth(l-nth(defl, 1.), 1.);
          goto [not (typ = "function")] fail3 ctn3;
   fail3: fail[functionCall]();
   ctn3:  ret := val;

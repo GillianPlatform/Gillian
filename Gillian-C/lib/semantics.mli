@@ -14,7 +14,7 @@ module LActions : sig
     | MSet  (** loc -> num (low) -> num (high) ->  sval -> perm_opt -> [] *)
     | MRem  (** loc -> num (low) -> num (high) -> [] *)
 
-  type genv_ac = GetSymbol | GetDef | SetSymbol | SetDef
+  type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
 
   type glob_ac = GetFun | SetFun | RemFun | SetVar
 

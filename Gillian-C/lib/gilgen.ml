@@ -176,7 +176,7 @@ let rec trans_expr ?(fname = "main") ~local_env expr =
       in
       let zero = Expr.Lit (Literal.Num 0.) in
       let cmd_assign =
-        Cmd.Assignment (gvar_val, Expr.EList [ nth gvar_act 0; zero ])
+        Cmd.Assignment (gvar_val, Expr.EList [ nth gvar_act 1; zero ])
       in
       let res = EList [ nth gvar_val 0; Lit (Literal.Num 0.) ] in
       ([ cmd_act; cmd_assign ], res)
