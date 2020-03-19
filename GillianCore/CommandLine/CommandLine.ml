@@ -180,6 +180,7 @@ struct
       let () = PC.initialize Concrete in
       Config.no_heap := no_heap;
       Logging.silent := silent;
+      Printexc.record_backtrace (not silent);
       let () =
         Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_paths
       in
@@ -298,6 +299,7 @@ struct
         Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
       in
       let () = Logging.silent := silent in
+      Printexc.record_backtrace (not silent);
       let () = Config.stats := stats in
       let () = Config.parallel := parallel in
       let () = Config.no_heap := no_heap in
@@ -420,6 +422,7 @@ struct
       let () = PC.initialize Verification in
       let () = Config.stats := stats in
       let () = Logging.silent := silent in
+      Printexc.record_backtrace (not silent);
       let () = Config.lemma_proof := not no_lemma_proof in
       let () = Config.manual_proof := manual in
       let () =
@@ -527,6 +530,7 @@ struct
       let () = Config.current_exec_mode := BiAbduction in
       let () = PC.initialize BiAbduction in
       let () = Logging.silent := silent in
+      Printexc.record_backtrace (not silent);
       let () = Config.stats := stats in
       let () = Config.no_heap := no_heap in
       let () = Config.parallel := parallel in

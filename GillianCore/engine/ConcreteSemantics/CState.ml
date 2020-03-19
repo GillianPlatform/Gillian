@@ -93,13 +93,16 @@ module Make
       (state : t)
       (ps : Formula.t list) : t option =
     let les : Expr.t option list = List.map Formula.to_expr ps in
-    let es : Expr.t option list =
-      List.map (fun le -> Option.map (fun x -> x) le) les
-    in
     let bs : CVal.M.t option list =
-      List.map (fun e -> Option.map (eval_expr state) e) es
+      List.map (Option.map (eval_expr state)) les
     in
-    if List.exists (fun expr_b -> expr_b <> Some (Bool true)) bs then Some state
+    if
+      List.for_all
+        (function
+          | Some (Bool true) -> true
+          | _                -> false)
+        bs
+    then Some state
     else None
 
   let assume_t (state : t) (v : vt) (t : Type.t) : t option =
