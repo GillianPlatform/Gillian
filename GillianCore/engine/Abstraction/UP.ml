@@ -460,7 +460,7 @@ let rec pp ft up =
             (iter_bindings ~sep:(any "@\n") List.iteri pp_one_child)
             ch
       in
-      pf ft "Innder Node: @[%a@] with %d children@\n%a" Asrt.pp a
+      pf ft "Inner Node: @[%a@] with %d children@\n%a" Asrt.pp a
         (List.length next_ups) pp_children next_ups
   | LabInner (a, next_ups) ->
       let pp_children ft ch =
@@ -475,7 +475,7 @@ let rec pp ft up =
             (iter_bindings ~sep:(any "@\n") List.iteri pp_one_child)
             ch
       in
-      pf ft "Innder Node: @[<h>%a@] with %d children@\n%a" Asrt.pp a
+      pf ft "Inner Node: @[<h>%a@] with %d children@\n%a" Asrt.pp a
         (List.length next_ups) pp_children next_ups
   | PhantomInner next_ups ->
       let pp_child ft (i, ch) = pf ft "Children %d@\n%a" i pp ch in

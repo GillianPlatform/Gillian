@@ -340,7 +340,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
   let open CConstants.VTypes in
   let cse = trans_simpl_expr in
   let tnum e = Asrt.Types [ (e, Type.NumberType) ] in
-  (* let tloc e = Asrt.Types [ e, Type.ObjectType ] in *)
+  let tloc e = Asrt.Types [ (e, Type.ObjectType) ] in
   let mem_ga = Semantics.LActions.str_ga (GMem SVal) in
   (* let mk_num n = Expr.Lit (Num (float_of_int n)) in *)
   (* let zero = mk_num 0 in *)
@@ -367,6 +367,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
     if malloc then malloc_chunk_asrt locv siz else Asrt.Emp
   in
   let mk str v = Expr.EList [ Expr.Lit (String str); v ] in
+  let mk_ptr l o = Expr.EList [ l; o ] in
   match c with
   | CConstructor.ConsExpr (SVal (Sint se)) ->
       let e = cse se in
@@ -388,13 +389,19 @@ let trans_constr ?fname:_ ~malloc ann s c =
       ga ** pc ** a_s ** tnum e
   | CConstructor.ConsExpr (SVal (Slong se)) ->
       let e = cse se in
-      let siz = sz (Ssingle se) in
+      let siz = sz (Slong se) in
       let sv = mk long_type e in
       let ga = ga_call locv 0 siz sv in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
+  | CConstructor.ConsExpr (SVal (Sptr (sl, so))) ->
+      let l = cse sl in
+      let o = cse so in
+      let siz = sz (Sptr (sl, so)) in
+      let sv = mk_ptr l o in
+      let ga = ga_call locv 0 siz sv in
+      ga ** pc ** a_s ** tloc l ** tnum o ** malloc_chunk siz
   | CConstructor.ConsExpr _ ->
-      failwith
-        (Format.asprintf "Constructor %a is not handled yet" CConstructor.pp c)
+      Fmt.failwith "Constructor %a is not handled yet" CConstructor.pp c
   | CConstructor.ConsStruct (sname, el) ->
       let struct_pred = pred_name_of_struct sname in
       let id = id_of_string sname in
