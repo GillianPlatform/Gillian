@@ -15,13 +15,9 @@ type mem_ac =
 
 type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
 
-type glob_ac = SetVar
-
 type ac =
   | AGEnv of genv_ac  (** Actions related to the memory *)
   | AMem  of mem_ac  (** Actions related to the global environment *)
-  | AGlob of glob_ac
-      (** Actions that are related to both the genv and the memory *)
 
 type mem_ga = SVal
 

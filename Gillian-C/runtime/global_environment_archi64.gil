@@ -1,0 +1,9 @@
+proc i__ptr_chunk() {
+  ret := "int64";
+  return
+};
+
+proc i__ptr_size() {
+  ret := 8;
+  return
+};

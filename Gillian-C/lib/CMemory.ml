@@ -2,8 +2,6 @@ open Gillian.Concrete
 module Mem = Compcert.Memory.Mem
 module Literal = Gillian.Gil_syntax.Literal
 
-let ( let* ) = Option.bind
-
 type vt = Values.t
 
 type st = Subst.t
@@ -40,40 +38,6 @@ let ga_to_getter = LActions.ga_to_getter_str
 let ga_to_deleter = LActions.ga_to_deleter_str
 
 let ga_loc_indexes _ = [ 0 ]
-
-let store_init_data genv mem loc ofs init_data =
-  let block = ValueTranslation.block_of_loc_name loc in
-  let i_to_z = Compcert.Camlcoq.Z.of_sint in
-  let z_ofs = i_to_z ofs in
-  let f32_to_bf = Compcert.Camlcoq.coqfloat32_of_camlfloat in
-  let f_to_bf = Compcert.Camlcoq.coqfloat_of_camlfloat in
-  let open Compcert.AST in
-  let open Compcert.Values in
-  match init_data with
-  | GEnv.Init_int8 n        ->
-      Mem.store Mint8unsigned mem block z_ofs (Vint (i_to_z n))
-  | Init_int16 n            -> Mem.store Mint16unsigned mem block z_ofs
-                                 (Vint (i_to_z n))
-  | Init_int32 n            -> Mem.store Mint32 mem block z_ofs (Vint (i_to_z n))
-  | Init_int64 n            -> Mem.store Mint64 mem block z_ofs
-                                 (Vlong (i_to_z n))
-  | Init_float32 n          -> Mem.store Mfloat32 mem block z_ofs
-                                 (Vfloat (f32_to_bf n))
-  | Init_float64 n          -> Mem.store Mfloat32 mem block z_ofs
-                                 (Vfloat (f_to_bf n))
-  | Init_space _            -> Some mem
-  | Init_addrof (sym, ofsp) ->
-      let locp = GEnv.find_symbol genv sym in
-      let blockp = ValueTranslation.block_of_loc_name locp in
-      let z_ofsp = i_to_z ofsp in
-      Mem.store coq_Mptr mem block z_ofs (Vptr (blockp, z_ofsp))
-
-let rec store_init_data_list genv mem loc ofs id_list =
-  match id_list with
-  | []             -> Some mem
-  | init_data :: r ->
-      let* memp = store_init_data genv mem loc ofs init_data in
-      store_init_data_list genv memp loc (ofs + GEnv.init_data_size init_data) r
 
 let execute_store heap params =
   let open Gillian.Gil_syntax.Literal in
@@ -196,39 +160,6 @@ let execute_genvgetdef heap params =
       ASucc (heap, [ Loc loc; v ])
   | _                   -> failwith "invalid call to genvgetdef"
 
-let execute_globsetvar heap params =
-  match params with
-  | [
-   Literal.String symbol; v_def; Num sz; LList init_data_list; String permission;
-  ] -> (
-      (* First we allocate in memory *)
-      let zero = Compcert.Camlcoq.Z.zero in
-      let comcert_perm = ValueTranslation.permission_of_string permission in
-      let init_data_list_des = List.map GEnv.init_data_of_gil init_data_list in
-      let sz_z = ValueTranslation.z_of_float sz in
-      let memp, block = Mem.alloc heap.mem zero sz_z in
-      let loc_name = ValueTranslation.loc_name_of_block block in
-      let res_mempp = Compcert.Globalenvs.store_zeros memp block zero sz_z in
-      let res_memppp =
-        match res_mempp with
-        | Some mempp ->
-            store_init_data_list heap.genv mempp loc_name 0 init_data_list_des
-        | None       -> None
-      in
-      let res_memf =
-        match res_memppp with
-        | Some memppp -> Mem.drop_perm memppp block zero sz_z comcert_perm
-        | None        -> None
-      in
-      (* Then we set it in the env *)
-      let def = GEnv.deserialize_def v_def in
-      let genvp = GEnv.set_symbol heap.genv symbol loc_name in
-      let genvf = GEnv.set_def genvp loc_name def in
-      match res_memf with
-      | Some memf -> ASucc ({ mem = memf; genv = genvf }, [])
-      | None      -> AFail [] )
-  | _ -> failwith "invalid call to execute_globsetfun"
-
 let execute_action name heap params =
   let open LActions in
   let action = ac_from_str name in
@@ -244,7 +175,6 @@ let execute_action name heap params =
   | AGEnv SetSymbol -> execute_genvsetsymbol heap params
   | AGEnv SetDef -> execute_genvsetdef heap params
   | AGEnv GetDef -> execute_genvgetdef heap params
-  | AGlob SetVar -> execute_globsetvar heap params
   | AMem (MGet | MSet | MRem) | AGEnv (RemDef | RemSymbol) ->
       failwith
         (Printf.sprintf

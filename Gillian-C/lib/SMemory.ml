@@ -776,12 +776,6 @@ module Mem = struct
     let* mem' = storebytes mem loc_name_1 ofs_1 memvals in
     Some (mem', loc_name_1, ofs_1)
 
-  let rec store_zeros mem loc p n =
-    if n <= 0 then Ok mem
-    else
-      let** memp = store Mint8unsigned mem loc p (SVal.SVint (Lit (Num 0.))) in
-      store_zeros memp loc (p + 1) (n - 1)
-
   let drop_perm mem loc ~pfs ~gamma low high perm =
     let loc_name =
       match get_loc_name pfs gamma loc with
@@ -990,33 +984,6 @@ let make_branch ~heap ~rets ?(new_pfs = []) ?(new_gamma = []) () =
 let init () = ref { genv = GEnv.empty; mem = Mem.empty }
 
 let copy h = ref { genv = !h.genv; mem = Mem.copy !h.mem }
-
-(* Memory utils *)
-
-let store_init_data genv mem loc ofs init_data =
-  let num_i i = Expr.Lit (Num (float_of_int i)) in
-  let num_f f = Expr.Lit (Num f) in
-  match init_data with
-  | GEnv.Init_int8 n -> Mem.store Mint8unsigned mem loc ofs (SVint (num_i n))
-  | GEnv.Init_int16 n -> Mem.store Mint16unsigned mem loc ofs (SVint (num_i n))
-  | GEnv.Init_int32 n -> Mem.store Mint32 mem loc ofs (SVint (num_i n))
-  | GEnv.Init_int64 n -> Mem.store Mint64 mem loc ofs (SVlong (num_i n))
-  | GEnv.Init_float32 n -> Mem.store Mfloat32 mem loc ofs (SVfloat (num_f n))
-  | GEnv.Init_float64 n -> Mem.store Mfloat64 mem loc ofs (SVfloat (num_f n))
-  | GEnv.Init_space _ -> Ok mem
-  | GEnv.Init_addrof (sym, ofsp) ->
-      let locp = GEnv.find_symbol genv sym in
-      let i_ofsp = num_i ofsp in
-      Mem.store Compcert.AST.coq_Mptr mem loc ofs (Sptr (locp, i_ofsp))
-
-let rec store_init_data_list genv mem loc ofs id_list =
-  match id_list with
-  | []             -> Ok mem
-  | init_data :: r ->
-      let** memp = store_init_data genv mem loc ofs init_data in
-      store_init_data_list genv memp loc (ofs + GEnv.init_data_size init_data) r
-
-(* Gillian utils *)
 
 (* let subst_spec_vars _ _ = () *)
 
@@ -1263,16 +1230,10 @@ let execute_genvgetdef heap _pfs _gamma params =
   | _ -> failwith "invalid call to genvgetdef"
 
 let execute_genvsetdef heap pfs gamma params =
-  let open Gillian.Gil_syntax.Expr in
   match params with
   | [ lvar_loc; v_def ] ->
       let new_pfs, loc_name = resolve_or_create_loc_name pfs gamma lvar_loc in
-      let concrete_def =
-        match v_def with
-        | Lit v_def              -> v_def
-        | EList [ Lit a; Lit b ] -> LList [ a; b ]
-        | _                      -> fail_ungracefully "execute_genvsetdef" params
-      in
+      let concrete_def = concretize v_def in
       let def = GEnv.deserialize_def concrete_def in
       let genv = GEnv.set_def heap.genv loc_name def in
       ASucc [ make_branch ~heap:{ heap with genv } ~new_pfs ~rets:[] () ]
@@ -1282,48 +1243,6 @@ let execute_genvremdef heap _pfs _gamma params =
   match params with
   | [ _loc ] -> ASucc [ make_branch ~heap ~rets:[] () ]
   | _        -> failwith "invalid call to genvremdef"
-
-let execute_globsetvar heap pfs gamma params =
-  let open Gillian.Gil_syntax.Expr in
-  match params with
-  | [
-   Lit (String symbol);
-   v_def_e;
-   Lit (Num sz);
-   init_data_list_e;
-   Lit (String permission);
-  ] ->
-      let v_def, init_data_list =
-        (concretize v_def_e, concretize init_data_list_e)
-      in
-      let init_data_list =
-        match init_data_list with
-        | Literal.LList l -> l
-        | _               ->
-            failwith
-              (Format.asprintf "init_data_list %a isn't a list !" Literal.pp
-                 init_data_list)
-      in
-      (* First we allocate in memory *)
-      let comcert_perm = ValueTranslation.permission_of_string permission in
-      let init_data_list_des = List.map GEnv.init_data_of_gil init_data_list in
-      let sz_int = int_of_float sz in
-      let memp, loc_name = Mem.alloc heap.mem 0 sz_int in
-      let loc = loc_from_loc_name loc_name in
-      let res =
-        let** mempp = Mem.store_zeros memp loc 0 sz_int in
-        let** memppp =
-          store_init_data_list heap.genv mempp loc 0 init_data_list_des
-        in
-        let memf = Mem.drop_perm memppp ~pfs ~gamma loc 0 sz_int comcert_perm in
-        (* Then we set it in the env *)
-        let def = GEnv.deserialize_def v_def in
-        let genvp = GEnv.set_symbol heap.genv symbol loc_name in
-        let genvf = GEnv.set_def genvp loc_name def in
-        Ok [ make_branch ~heap:{ mem = memf; genv = genvf } ~rets:[] () ]
-      in
-      lift_res res
-  | _ -> failwith "invalid call to execute_globsetvar"
 
 (* Complete fixes  *)
 
@@ -1413,7 +1332,6 @@ let execute_action ac_name heap pfs gamma params =
     | AGEnv GetDef    -> execute_genvgetdef !heap pfs gamma params
     | AGEnv SetDef    -> execute_genvsetdef !heap pfs gamma params
     | AGEnv RemDef    -> execute_genvremdef !heap pfs gamma params
-    | AGlob SetVar    -> execute_globsetvar !heap pfs gamma params
   in
   let () =
     Logging.verboser (fun fmt ->

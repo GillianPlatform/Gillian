@@ -593,9 +593,9 @@ let set_global_function symbol target =
   Cmd.Call
     (gvar, fname, [ Lit (String symbol); Lit (String target) ], None, None)
 
-let set_global_var symbol def v =
+let set_global_var symbol target v =
   let symexpr = Expr.Lit (String symbol) in
-  let defexpr = Expr.Lit (GEnv.serialize_def def) in
+  let target_expr = Expr.Lit (String target) in
   let sz =
     Expr.Lit
       (Literal.Num
@@ -609,8 +609,13 @@ let set_global_var symbol def v =
     List.map ValueTranslation.gil_init_data v.AST.gvar_init
   in
   let id_list_expr = Expr.Lit (Literal.LList init_data_list) in
-  let setvar = LActions.(str_ac (AGlob SetVar)) in
-  Cmd.LAction ("u", setvar, [ symexpr; defexpr; sz; id_list_expr; perm_string ])
+  let setvar = CConstants.Internal_Functions.glob_set_var in
+  Cmd.Call
+    ( "u",
+      Lit (String setvar),
+      [ symexpr; target_expr; sz; id_list_expr; perm_string ],
+      None,
+      None )
 
 (* Second part of the return tuple is:
    * false if it should be a function call
@@ -684,8 +689,7 @@ let rec trans_globdefs
       let symbol = true_name id in
       let init_asrts, init_acts, bi_specs, fs = trans_globdefs r in
       let target = symbol in
-      let genv_def = GEnv.GlobVar target in
-      let new_cmd = set_global_var symbol genv_def v in
+      let new_cmd = set_global_var symbol target v in
       (init_asrts, new_cmd :: init_acts, bi_specs, fs)
 
 let make_init_proc init_cmds =

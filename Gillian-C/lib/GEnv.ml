@@ -2,42 +2,6 @@ open Gillian.Concrete
 module GUtils = Gillian.Utils
 module PMap = GUtils.PMap
 
-type init_data =
-  | Init_int8    of int
-  | Init_int16   of int
-  | Init_int32   of int
-  | Init_int64   of int
-  | Init_float32 of float
-  | Init_float64 of float
-  | Init_space   of int
-  | Init_addrof  of string * int
-
-let init_data_size = function
-  | Init_int8 _    -> 1
-  | Init_int16 _   -> 2
-  | Init_int32 _   -> 4
-  | Init_int64 _   -> 8
-  | Init_float32 _ -> 4
-  | Init_float64 _ -> 8
-  | Init_addrof _  -> if Compcert.Archi.ptr64 then 8 else 4
-  | Init_space n   -> max 0 n
-
-let init_data_of_gil init_data =
-  let open Gillian.Gil_syntax.Literal in
-  match init_data with
-  | LList [ String "int8"; Num n ] -> Init_int8 (int_of_float n)
-  | LList [ String "int16"; Num n ] -> Init_int16 (int_of_float n)
-  | LList [ String "int32"; Num n ] -> Init_int32 (int_of_float n)
-  | LList [ String "int64"; Num n ] -> Init_int64 (int_of_float n)
-  | LList [ String "float32"; Num n ] -> Init_float32 n
-  | LList [ String "float64"; Num n ] -> Init_float64 n
-  | LList [ String "space"; Num n ] -> Init_space (int_of_float n)
-  | LList [ String "addrof"; String sym; Num ofs ] ->
-      Init_addrof (sym, int_of_float ofs)
-  | _ ->
-      failwith
-        (Format.asprintf "Invalid init_data, can't be parsed : %a" pp init_data)
-
 type def = FunDef of string | GlobVar of string
 
 type t = {
@@ -60,14 +24,6 @@ let find_def genv block = PMap.find block genv.defs
 let set_def genv block def =
   let defs = PMap.add block def genv.defs in
   { genv with defs }
-
-let find_def_from_symbol genv sym = find_def genv (find_symbol genv sym)
-
-let rem_symbol_and_def genv sym =
-  let loc_name = find_symbol genv sym in
-  let symb = PMap.remove sym genv.symb in
-  let defs = PMap.remove loc_name genv.defs in
-  { symb; defs }
 
 let empty = { symb = PMap.empty; defs = PMap.empty }
 

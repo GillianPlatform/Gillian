@@ -14,9 +14,7 @@ type mem_ac =
 
 type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
 
-type glob_ac = SetVar
-
-type ac = AGEnv of genv_ac | AMem of mem_ac | AGlob of glob_ac
+type ac = AGEnv of genv_ac | AMem of mem_ac
 
 type mem_ga = SVal
 
@@ -67,8 +65,6 @@ let mem_prefix = "mem"
 
 let genv_prefix = "genv"
 
-let glob_prefix = "glob"
-
 let str_mem_ac = function
   | Alloc      -> "alloc"
   | DropPerm   -> "dropperm"
@@ -111,13 +107,6 @@ let genv_ac_from_str = function
   | "remdef"    -> RemDef
   | s           -> failwith ("Unkown Global Env Action : " ^ s)
 
-let str_glob_ac = function
-  | SetVar -> "setvar"
-
-let glob_ac_from_str = function
-  | "setvar" -> SetVar
-  | s        -> failwith ("Unkown Global Action : " ^ s)
-
 let separator_char = '_'
 
 let separator_string = String.make 1 separator_char
@@ -125,15 +114,12 @@ let separator_string = String.make 1 separator_char
 let str_ac = function
   | AMem mem_ac   -> mem_prefix ^ separator_string ^ str_mem_ac mem_ac
   | AGEnv genv_ac -> genv_prefix ^ separator_string ^ str_genv_ac genv_ac
-  | AGlob glob_ac -> glob_prefix ^ separator_string ^ str_glob_ac glob_ac
 
 let ac_from_str str =
   match String.split_on_char separator_char str with
   | [ pref; ac ] when String.equal pref mem_prefix -> AMem (mem_ac_from_str ac)
   | [ pref; ac ] when String.equal pref genv_prefix ->
       AGEnv (genv_ac_from_str ac)
-  | [ pref; ac ] when String.equal pref glob_prefix ->
-      AGlob (glob_ac_from_str ac)
   | _ -> failwith ("Unkown action : " ^ str)
 
 let str_mem_ga = function
