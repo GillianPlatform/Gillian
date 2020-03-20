@@ -561,12 +561,10 @@ let trans_annots clight_prog log_prog =
   let with_specs = List.fold_left add_trans_spec with_preds log_prog.specs in
   with_specs
 
-let glob_fun_pred symbol def =
-  let ga = LActions.GGlob Fun in
-  let pname = LActions.str_ga ga in
+let glob_fun_pred symbol target =
+  let pname = Internal_Predicates.glob_fun in
   let s_param = Expr.Lit (String symbol) in
-  let def_param = Expr.Lit (GEnv.serialize_def def) in
-  Asrt.GA (pname, [ s_param ], [ def_param ])
+  Asrt.Pred (pname, [ s_param; Lit (String target) ])
 
 let make_global_env_pred init_asrts =
   let def = fold_star init_asrts in

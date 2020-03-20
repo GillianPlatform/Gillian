@@ -587,11 +587,11 @@ let trans_function
       proc_spec = None;
     }
 
-let set_global_function symbol def =
+let set_global_function symbol target =
   let gvar = "u" in
-  let setfun = LActions.(str_ac (AGlob SetFun)) in
-  let ser_def = GEnv.serialize_def def in
-  Cmd.LAction (gvar, setfun, [ Expr.Lit (String symbol); Lit ser_def ])
+  let fname = Expr.Lit (String Internal_Functions.glob_set_fun) in
+  Cmd.Call
+    (gvar, fname, [ Lit (String symbol); Lit (String target) ], None, None)
 
 let set_global_var symbol def v =
   let symexpr = Expr.Lit (String symbol) in
@@ -655,9 +655,8 @@ let rec trans_globdefs
       let init_asrts, init_acts, bi_specs, fs = trans_globdefs r in
       let symbol = true_name id in
       let target = symbol in
-      let genv_def = GEnv.FunDef target in
-      let new_cmd = set_global_function symbol genv_def in
-      let new_asrt = Gil_logic_gen.glob_fun_pred symbol genv_def in
+      let new_cmd = set_global_function symbol target in
+      let new_asrt = Gil_logic_gen.glob_fun_pred symbol target in
       let new_bi_specs =
         if ExecMode.biabduction_exec exec_mode then
           Gil_logic_gen.generate_bispec clight_prog id f :: bi_specs
@@ -677,9 +676,8 @@ let rec trans_globdefs
       let init_asrts, init_acts, bi_specs, fs = trans_globdefs r in
       let target, is_ext_call = intern_impl_of_extern_function f in
       if not is_ext_call then
-        let genv_def = GEnv.FunDef target in
-        let new_cmd = set_global_function symbol genv_def in
-        let new_asrt = Gil_logic_gen.glob_fun_pred symbol genv_def in
+        let new_cmd = set_global_function symbol target in
+        let new_asrt = Gil_logic_gen.glob_fun_pred symbol target in
         (new_asrt :: init_asrts, new_cmd :: init_acts, bi_specs, fs)
       else (init_asrts, init_acts, bi_specs, fs)
   | (id, Gvar v) :: r ->

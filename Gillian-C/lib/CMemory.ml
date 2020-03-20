@@ -196,25 +196,6 @@ let execute_genvgetdef heap params =
       ASucc (heap, [ Loc loc; v ])
   | _                   -> failwith "invalid call to genvgetdef"
 
-let execute_globsetfun heap params =
-  match params with
-  | [ Literal.String symbol; v_def ] -> (
-      (* First we allocate in memory *)
-      let zero, one = Compcert.Camlcoq.Z.(zero, one) in
-      let memp, block = Mem.alloc heap.mem zero one in
-      let res_memf =
-        Mem.drop_perm memp block zero one Compcert.Memtype.Nonempty
-      in
-      (* First we set it in the env *)
-      let def = GEnv.deserialize_def v_def in
-      let loc_name = ValueTranslation.loc_name_of_block block in
-      let genvp = GEnv.set_symbol heap.genv symbol loc_name in
-      let genvf = GEnv.set_def genvp loc_name def in
-      match res_memf with
-      | Some memf -> ASucc ({ mem = memf; genv = genvf }, [])
-      | None      -> AFail [] )
-  | _ -> failwith "invalid call to execute_globsetfun"
-
 let execute_globsetvar heap params =
   match params with
   | [
@@ -263,11 +244,8 @@ let execute_action name heap params =
   | AGEnv SetSymbol -> execute_genvsetsymbol heap params
   | AGEnv SetDef -> execute_genvsetdef heap params
   | AGEnv GetDef -> execute_genvgetdef heap params
-  | AGlob SetFun -> execute_globsetfun heap params
   | AGlob SetVar -> execute_globsetvar heap params
-  | AGlob (GetFun | RemFun)
-  | AMem (MGet | MSet | MRem)
-  | AGEnv (RemDef | RemSymbol) ->
+  | AMem (MGet | MSet | MRem) | AGEnv (RemDef | RemSymbol) ->
       failwith
         (Printf.sprintf
            "%s is an action related to a General Assertion, it should never be \

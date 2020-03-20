@@ -158,12 +158,12 @@ let assertions genv =
   let open Gillian.Gil_syntax in
   let build_asrt s def =
     match def with
-    | FunDef _ as d ->
-        let d_ser = Expr.Lit (serialize_def d) in
+    | FunDef fname ->
         let s_ser = Expr.Lit (String s) in
-        let ga_name = LActions.(str_ga (GGlob Fun)) in
-        Asrt.GA (ga_name, [ s_ser ], [ d_ser ])
-    | GlobVar _     -> failwith "CANNOT MAKE ASSERTION OF GLOBAL VAR YET"
+        let f_ser = Expr.Lit (String fname) in
+        let pname = CConstants.Internal_Predicates.glob_fun in
+        Asrt.Pred (pname, [ s_ser; f_ser ])
+    | GlobVar _    -> failwith "CANNOT MAKE ASSERTION OF GLOBAL VAR YET"
   in
   let assert_symb symb loc =
     let def = find_def genv loc in

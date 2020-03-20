@@ -11,6 +11,37 @@ open Gillian.Gil_syntax
 module Logging = Gillian.Logging
 module SS = GUtils.Containers.SS
 
+(* Some utils first *)
+
+let get_loc_name pfs gamma loc =
+  let open FOLogic in
+  Logging.tmi (fun fmt -> fmt "get_loc_name: %a" Expr.pp loc);
+  let lpfs = PureContext.to_list pfs in
+  match Reduction.reduce_lexpr ~pfs ~gamma loc with
+  | Lit (Loc loc) | ALoc loc -> Some loc
+  | LVar x                   -> (
+      match Reduction.resolve_expr_to_location lpfs (LVar x) with
+      | Some (loc_name, _) -> Some loc_name
+      | _                  -> None )
+  | loc'                     -> (
+      match Reduction.resolve_expr_to_location lpfs loc' with
+      | Some (loc_name, _) -> Some loc_name
+      | None               ->
+          let msg =
+            Format.asprintf "Unsupported location: %a with pfs:\n%a" Expr.pp
+              loc' PureContext.pp pfs
+          in
+          Logging.verboser (fun fmt -> fmt "%s" msg);
+          raise (Failure msg) )
+
+let resolve_or_create_loc_name pfs gamma lvar_loc =
+  match get_loc_name pfs gamma lvar_loc with
+  | None   ->
+      let new_loc_name = ALoc.alloc () in
+      let new_pf = Formula.Eq (ALoc new_loc_name, lvar_loc) in
+      ([ new_pf ], new_loc_name)
+  | Some l -> ([], l)
+
 type vt = Values.t
 
 type st = Subst.t
@@ -450,29 +481,6 @@ module Mem = struct
   end
 
   let pp = PrettyPrint.pp
-
-  (* Location resolving *)
-
-  let get_loc_name pfs gamma loc =
-    let open FOLogic in
-    Logging.tmi (fun fmt -> fmt "get_loc_name: %a" Expr.pp loc);
-    let lpfs = PureContext.to_list pfs in
-    match Reduction.reduce_lexpr ~pfs ~gamma loc with
-    | Lit (Loc loc) | ALoc loc -> Some loc
-    | LVar x                   -> (
-        match Reduction.resolve_expr_to_location lpfs (LVar x) with
-        | Some (loc_name, _) -> Some loc_name
-        | _                  -> None )
-    | loc'                     -> (
-        match Reduction.resolve_expr_to_location lpfs loc' with
-        | Some (loc_name, _) -> Some loc_name
-        | None               ->
-            let msg =
-              Format.asprintf "Unsupported location: %a with pfs:\n%a" Expr.pp
-                loc' PureContext.pp pfs
-            in
-            Logging.verboser (fun fmt -> fmt "%s" msg);
-            raise (Failure msg) )
 
   (* Low-level read/write utils *)
 
@@ -1231,13 +1239,13 @@ let execute_genvgetsymbol heap _pfs _gamma params =
         ]
   | _                       -> failwith "invalid call to genvgetsymbol"
 
-let execute_genvsetsymbol heap _pfs _gamma params =
+let execute_genvsetsymbol heap pfs gamma params =
   let open Gillian.Gil_syntax.Expr in
   match params with
-  | [ Lit (String symbol); Lit (Loc loc) ] | [ Lit (String symbol); ALoc loc ]
-    ->
-      let genv = GEnv.set_symbol heap.genv symbol loc in
-      ASucc [ make_branch ~heap:{ heap with genv } ~rets:[] () ]
+  | [ Lit (String symbol); lvar_loc ] ->
+      let new_pfs, loc_name = resolve_or_create_loc_name pfs gamma lvar_loc in
+      let genv = GEnv.set_symbol heap.genv symbol loc_name in
+      ASucc [ make_branch ~heap:{ heap with genv } ~new_pfs ~rets:[] () ]
   | _ -> failwith "invalid call to genvsetsymbol"
 
 let execute_genvremsymbol heap _pfs _gamma params =
@@ -1254,62 +1262,26 @@ let execute_genvgetdef heap _pfs _gamma params =
       ASucc [ make_branch ~heap ~rets:[ Lit (Loc loc); Lit v ] () ]
   | _ -> failwith "invalid call to genvgetdef"
 
-let execute_genvsetdef heap _pfs _gamma params =
+let execute_genvsetdef heap pfs gamma params =
   let open Gillian.Gil_syntax.Expr in
   match params with
-  | [ Lit (Loc loc); Expr.Lit v_def ] | [ ALoc loc; Expr.Lit v_def ] ->
-      let def = GEnv.deserialize_def v_def in
-      let genv = GEnv.set_def heap.genv loc def in
-      ASucc [ make_branch ~heap:{ heap with genv } ~rets:[] () ]
-  | _ -> failwith "invalid call to genvsetdef"
+  | [ lvar_loc; v_def ] ->
+      let new_pfs, loc_name = resolve_or_create_loc_name pfs gamma lvar_loc in
+      let concrete_def =
+        match v_def with
+        | Lit v_def              -> v_def
+        | EList [ Lit a; Lit b ] -> LList [ a; b ]
+        | _                      -> fail_ungracefully "execute_genvsetdef" params
+      in
+      let def = GEnv.deserialize_def concrete_def in
+      let genv = GEnv.set_def heap.genv loc_name def in
+      ASucc [ make_branch ~heap:{ heap with genv } ~new_pfs ~rets:[] () ]
+  | _                   -> failwith "invalid call to genvsetdef"
 
 let execute_genvremdef heap _pfs _gamma params =
   match params with
   | [ _loc ] -> ASucc [ make_branch ~heap ~rets:[] () ]
   | _        -> failwith "invalid call to genvremdef"
-
-let execute_globsetfun heap pfs gamma params =
-  let open Gillian.Gil_syntax.Expr in
-  match params with
-  | [ Lit (String symbol); v_def_e ] ->
-      let v_def = concretize v_def_e in
-      (* First we allocate in memory *)
-      let memp, loc_name = Mem.alloc heap.mem 0 1 in
-      let loc = loc_from_loc_name loc_name in
-      let memf =
-        Mem.drop_perm memp ~pfs ~gamma loc 0 1 Compcert.Memtype.Nonempty
-      in
-      (* First we set it in the env *)
-      let def = GEnv.deserialize_def v_def in
-      let genvp = GEnv.set_symbol heap.genv symbol loc_name in
-      let genvf = GEnv.set_def genvp loc_name def in
-      ASucc [ make_branch ~heap:{ mem = memf; genv = genvf } ~rets:[] () ]
-  | _ -> failwith "invalid call to execute_globsetfun"
-
-let execute_globgetfun heap _pfs _gamma params =
-  let open Gillian.Gil_syntax.Expr in
-  match params with
-  | [ Lit (String symbol) ] -> (
-      try
-        let def = GEnv.find_def_from_symbol heap.genv symbol in
-        let def_e = Lit (GEnv.serialize_def def) in
-        ASucc [ make_branch ~heap ~rets:[ Lit (String symbol); def_e ] () ]
-      with Not_found -> AFail [] )
-  | _                       -> failwith "invalid call to execute_globgetfun"
-
-let execute_globremfun heap _pfs _gamma params =
-  let open Gillian.Gil_syntax.Expr in
-  match params with
-  | [ Lit (String symbol) ] -> (
-      try
-        let loc_name = GEnv.find_symbol heap.genv symbol in
-        let genv = GEnv.rem_symbol_and_def heap.genv symbol in
-        let mem_opt = Mem.rem heap.mem loc_name 0 1 in
-        match mem_opt with
-        | Some mem -> ASucc [ make_branch ~heap:{ mem; genv } ~rets:[] () ]
-        | None     -> AFail []
-      with Not_found -> AFail [] )
-  | _                       -> failwith "invalid call to execute_globremfun"
 
 let execute_globsetvar heap pfs gamma params =
   let open Gillian.Gil_syntax.Expr in
@@ -1441,9 +1413,6 @@ let execute_action ac_name heap pfs gamma params =
     | AGEnv GetDef    -> execute_genvgetdef !heap pfs gamma params
     | AGEnv SetDef    -> execute_genvsetdef !heap pfs gamma params
     | AGEnv RemDef    -> execute_genvremdef !heap pfs gamma params
-    | AGlob SetFun    -> execute_globsetfun !heap pfs gamma params
-    | AGlob GetFun    -> execute_globgetfun !heap pfs gamma params
-    | AGlob RemFun    -> execute_globremfun !heap pfs gamma params
     | AGlob SetVar    -> execute_globsetvar !heap pfs gamma params
   in
   let () =

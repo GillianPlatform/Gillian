@@ -80,6 +80,8 @@ module Internal_Functions = struct
 
   let get_function_name = "i__get_function_name"
 
+  let glob_set_fun = "i__glob_set_fun"
+
   let bool_of_val = "i__bool_of_value"
 
   let printf = "EXTERN_printf"
@@ -297,6 +299,8 @@ module Internal_Predicates = struct
 
   (** global_env *)
   let global_env = Prefix.internal_preds ^ "global_env"
+
+  let glob_fun = Prefix.internal_preds ^ "glob_fun"
 
   let fun_ptr = Prefix.internal_preds ^ "function_ptr"
 end

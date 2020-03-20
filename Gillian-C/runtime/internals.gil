@@ -37,13 +37,23 @@ proc i__free_list_aux(l, n) {
       ctn: curr := l-nth(l, n);
            u := [mem_free](l-nth(curr, 0.), l-nth(curr, 1.), l-nth(curr, 2.));
            u := "i__free_list_aux"(l, n + 1);
-      end: ret := undefined;
+      end: ret := null;
            return
 };
 
 proc i__free_list(l) {
       u := "i__free_list_aux"(l, 0.);
       ret := undefined;
+      return
+};
+
+proc i__glob_set_fun(symb, fname) {
+      ll := [mem_alloc](0, 1);
+      l := l-nth(ll, 0.);
+      u := [mem_dropperm](l, 0, 1, "Nonempty");
+      u := [genv_setsymbol](symb, l);
+      u := [genv_setdef](l, {{ "function", fname }});
+      ret := null;
       return
 };
 

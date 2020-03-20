@@ -15,7 +15,7 @@ type mem_ac =
 
 type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
 
-type glob_ac = GetFun | SetFun | RemFun | SetVar
+type glob_ac = SetVar
 
 type ac =
   | AGEnv of genv_ac  (** Actions related to the memory *)
@@ -25,11 +25,9 @@ type ac =
 
 type mem_ga = SVal
 
-type glob_ga = Fun
-
 type genv_ga = Symbol | Definition
 
-type ga = GMem of mem_ga | GGlob of glob_ga | GGenv of genv_ga
+type ga = GMem of mem_ga | GGenv of genv_ga
 
 (** {3 Serialization of actions} *)
 
