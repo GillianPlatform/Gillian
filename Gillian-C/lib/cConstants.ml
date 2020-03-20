@@ -24,6 +24,7 @@ module Imports = struct
       (* Common *)
       { file = "unops_common.gil"; arch = any_arch; exec = all_exec };
       { file = "internals.gil"; arch = any_arch; exec = all_exec };
+      { file = "global_environment.gil"; arch = any_arch; exec = all_exec };
       { file = "binops_common.gil"; arch = any_arch; exec = all_exec };
       { file = "logic_common.gil"; arch = any_arch; exec = exec_with_preds };
       { file = "string.gil"; arch = any_arch; exec = all_exec };

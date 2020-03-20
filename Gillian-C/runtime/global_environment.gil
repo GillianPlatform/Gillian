@@ -1,0 +1,25 @@
+proc i__get_function_name(v_ptr) {
+         (* The value given should be a pointer *)
+         goto [not (typeOf (l-nth (v_ptr, 0.)) = Obj)] fail1 ctn1;
+  fail1: fail[functionCall]();
+         (* The offset for a pointer to a function should always be 0 *)
+  ctn1:  goto [not ((l-nth (v_ptr, 1.)) = 0.)] fail2 ctn2;
+  fail2: fail[functionCall]();
+  ctn2:  defl := [genv_getdef](l-nth(v_ptr, 0.));
+         typ := l-nth(l-nth(defl, 1.), 0.);
+         val := l-nth(l-nth(defl, 1.), 1.);
+         goto [not (typ = "function")] fail3 ctn3;
+  fail3: fail[functionCall]();
+  ctn3:  ret := val;
+         return
+};
+
+proc i__glob_set_fun(symb, fname) {
+      ll := [mem_alloc](0, 1);
+      l := l-nth(ll, 0.);
+      u := [mem_dropperm](l, 0, 1, "Nonempty");
+      u := [genv_setsymbol](symb, l);
+      u := [genv_setdef](l, {{ "function", fname }});
+      ret := null;
+      return
+};
