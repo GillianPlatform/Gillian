@@ -196,19 +196,28 @@ let unfold_spec
     (preds : (string, Pred.t) Hashtbl.t)
     (rec_info : (string, bool) Hashtbl.t)
     (spec : Spec.t) : Spec.t =
-  let aux (sspec : Spec.st) : Spec.st list =
+  let aux spec_name (sspec : Spec.st) : Spec.st list =
     let pres : Asrt.t list = auto_unfold preds rec_info sspec.ss_pre in
     let pres = List.filter Simplifications.admissible_assertion pres in
     let posts : Asrt.t list =
       List.concat (List.map (auto_unfold preds rec_info) sspec.ss_posts)
     in
+    L.verboser (fun fmt -> fmt "Testing for admissibility");
     let posts = List.filter Simplifications.admissible_assertion posts in
+    if posts = [] then
+      Fmt.failwith
+        "Unfolding: Postcondition of %s seems invalid, it has been reduced to \
+         no postcondition"
+        spec_name;
     List.map
       (fun pre -> Spec.{ sspec with ss_pre = pre; ss_posts = posts })
       pres
   in
 
-  { spec with spec_sspecs = List.concat (List.map aux spec.spec_sspecs) }
+  {
+    spec with
+    spec_sspecs = List.concat (List.map (aux spec.spec_name) spec.spec_sspecs);
+  }
 
 let unfold_lemma
     (preds : (string, Pred.t) Hashtbl.t)

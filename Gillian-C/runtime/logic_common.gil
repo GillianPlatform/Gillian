@@ -32,3 +32,13 @@ pred i__float (+e: List, k : Num):
 
 pred i__ptr_to_0 (+e : List, l : Obj):
   (e == {{ l, 0. }});
+
+(* Global environment *)
+
+pred i__function_ptr(+s: Str, p : List):
+  i__ptr_to_0(p, #l) * <genv_symb>(s; #l) * <genv_def>(#l; {{ "function" , _ }});
+
+pred i__glob_fun(+symb, +fname):
+  <genv_symb>(symb; #l) *
+  <genv_def>(#l; {{ "function", fname }}) *
+  <mem_sval>(#l, 0, 1; undefined, "Nonempty");

@@ -170,13 +170,13 @@ let rec trans_expr ?(fname = "main") ~local_env expr =
       let name = true_name id in
       let gvar_act = gen_str Prefix.gvar in
       let gvar_val = gen_str Prefix.gvar in
-      let genvlookup = Semantics.LActions.(str_ac (AGEnv GetSymbol)) in
+      let genvlookup = LActions.(str_ac (AGEnv GetSymbol)) in
       let cmd_act =
         Cmd.LAction (gvar_act, genvlookup, [ Expr.Lit (Literal.String name) ])
       in
       let zero = Expr.Lit (Literal.Num 0.) in
       let cmd_assign =
-        Cmd.Assignment (gvar_val, Expr.EList [ nth gvar_act 0; zero ])
+        Cmd.Assignment (gvar_val, Expr.EList [ nth gvar_act 1; zero ])
       in
       let res = EList [ nth gvar_val 0; Lit (Literal.Num 0.) ] in
       ([ cmd_act; cmd_assign ], res)
@@ -517,7 +517,7 @@ let alloc_var fname (name, sz) =
   let gvar = Generators.gen_str fname Prefix.gvar in
   let ocaml_size = ValueTranslation.gil_size_of_compcert sz in
   let expr_size = Expr.Lit (Literal.Num ocaml_size) in
-  let alloc = Semantics.LActions.(str_ac (AMem Alloc)) in
+  let alloc = LActions.(str_ac (AMem Alloc)) in
   let action_cmd =
     Cmd.LAction (gvar, alloc, [ Expr.Lit (Literal.Num 0.); expr_size ])
   in
@@ -587,15 +587,15 @@ let trans_function
       proc_spec = None;
     }
 
-let set_global_function symbol def =
+let set_global_function symbol target =
   let gvar = "u" in
-  let setfun = Semantics.LActions.(str_ac (AGlob SetFun)) in
-  let ser_def = Semantics.GEnv.serialize_def def in
-  Cmd.LAction (gvar, setfun, [ Expr.Lit (String symbol); Lit ser_def ])
+  let fname = Expr.Lit (String Internal_Functions.glob_set_fun) in
+  Cmd.Call
+    (gvar, fname, [ Lit (String symbol); Lit (String target) ], None, None)
 
-let set_global_var symbol def v =
+let set_global_var symbol target v =
   let symexpr = Expr.Lit (String symbol) in
-  let defexpr = Expr.Lit (Semantics.GEnv.serialize_def def) in
+  let target_expr = Expr.Lit (String target) in
   let sz =
     Expr.Lit
       (Literal.Num
@@ -609,8 +609,13 @@ let set_global_var symbol def v =
     List.map ValueTranslation.gil_init_data v.AST.gvar_init
   in
   let id_list_expr = Expr.Lit (Literal.LList init_data_list) in
-  let setvar = Semantics.LActions.(str_ac (AGlob SetVar)) in
-  Cmd.LAction ("u", setvar, [ symexpr; defexpr; sz; id_list_expr; perm_string ])
+  let setvar = CConstants.Internal_Functions.glob_set_var in
+  Cmd.Call
+    ( "u",
+      Lit (String setvar),
+      [ symexpr; target_expr; sz; id_list_expr; perm_string ],
+      None,
+      None )
 
 (* Second part of the return tuple is:
    * false if it should be a function call
@@ -655,9 +660,8 @@ let rec trans_globdefs
       let init_asrts, init_acts, bi_specs, fs = trans_globdefs r in
       let symbol = true_name id in
       let target = symbol in
-      let genv_def = Semantics.GEnv.FunDef target in
-      let new_cmd = set_global_function symbol genv_def in
-      let new_asrt = Gil_logic_gen.glob_fun_pred symbol genv_def in
+      let new_cmd = set_global_function symbol target in
+      let new_asrt = Gil_logic_gen.glob_fun_pred symbol target in
       let new_bi_specs =
         if ExecMode.biabduction_exec exec_mode then
           Gil_logic_gen.generate_bispec clight_prog id f :: bi_specs
@@ -677,17 +681,15 @@ let rec trans_globdefs
       let init_asrts, init_acts, bi_specs, fs = trans_globdefs r in
       let target, is_ext_call = intern_impl_of_extern_function f in
       if not is_ext_call then
-        let genv_def = Semantics.GEnv.FunDef target in
-        let new_cmd = set_global_function symbol genv_def in
-        let new_asrt = Gil_logic_gen.glob_fun_pred symbol genv_def in
+        let new_cmd = set_global_function symbol target in
+        let new_asrt = Gil_logic_gen.glob_fun_pred symbol target in
         (new_asrt :: init_asrts, new_cmd :: init_acts, bi_specs, fs)
       else (init_asrts, init_acts, bi_specs, fs)
   | (id, Gvar v) :: r ->
       let symbol = true_name id in
       let init_asrts, init_acts, bi_specs, fs = trans_globdefs r in
       let target = symbol in
-      let genv_def = Semantics.GEnv.GlobVar target in
-      let new_cmd = set_global_var symbol genv_def v in
+      let new_cmd = set_global_var symbol target v in
       (init_asrts, new_cmd :: init_acts, bi_specs, fs)
 
 let make_init_proc init_cmds =

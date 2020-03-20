@@ -24,17 +24,24 @@ module Imports = struct
       (* Common *)
       { file = "unops_common.gil"; arch = any_arch; exec = all_exec };
       { file = "internals.gil"; arch = any_arch; exec = all_exec };
+      {
+        file = "global_environment_common.gil";
+        arch = any_arch;
+        exec = all_exec;
+      };
       { file = "binops_common.gil"; arch = any_arch; exec = all_exec };
       { file = "logic_common.gil"; arch = any_arch; exec = exec_with_preds };
       { file = "string.gil"; arch = any_arch; exec = all_exec };
       (* Arch64 specific *)
       { file = "stdlib_archi64.gil"; arch = a64; exec = all_exec };
+      { file = "global_environment_archi64.gil"; arch = a64; exec = all_exec };
       { file = "logic_archi64.gil"; arch = a64; exec = exec_with_preds };
       { file = "binops_archi64_all_exec.gil"; arch = a64; exec = all_exec };
       { file = "binops_archi64_non_bi.gil"; arch = a64; exec = non_bi_exec };
       { file = "binops_archi64_bi_exec.gil"; arch = a64; exec = bi_exec };
       (* Arch32 specific *)
       { file = "stdlib_archi32.gil"; arch = a32; exec = all_exec };
+      { file = "global_environment_archi32.gil"; arch = a32; exec = all_exec };
       { file = "logic_archi32.gil"; arch = a32; exec = exec_with_preds };
       { file = "binops_archi32_all_exec.gil"; arch = a32; exec = all_exec };
       { file = "binops_archi32_non_bi.gil"; arch = a32; exec = non_bi_exec };
@@ -79,6 +86,10 @@ module Internal_Functions = struct
   let not_implemented = "i__not_implemented"
 
   let get_function_name = "i__get_function_name"
+
+  let glob_set_fun = "i__glob_set_fun"
+
+  let glob_set_var = "i__glob_set_var"
 
   let bool_of_val = "i__bool_of_value"
 
@@ -297,6 +308,10 @@ module Internal_Predicates = struct
 
   (** global_env *)
   let global_env = Prefix.internal_preds ^ "global_env"
+
+  let glob_fun = Prefix.internal_preds ^ "glob_fun"
+
+  let fun_ptr = Prefix.internal_preds ^ "function_ptr"
 end
 
 module Symbolic_Constr = struct

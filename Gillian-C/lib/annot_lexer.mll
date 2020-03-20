@@ -51,6 +51,7 @@ rule read =
   | "long"     { LONGT }
   | "single"   { SINGLET }
   | "ptr"      { PTRT }
+  | "funptr"   { FUNPTRT }
   | "emp"      { EMP }
   | "True"     { TRUE }
   | "False"    { FALSE }

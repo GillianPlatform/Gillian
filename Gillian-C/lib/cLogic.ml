@@ -65,6 +65,9 @@ module CSVal = struct
     | Ssingle of CSimplExpr.t
     | Slong   of CSimplExpr.t
     | Sptr    of CSimplExpr.t * CSimplExpr.t
+    | Sfunptr of string
+
+  (* Symbol *)
 
   let pp fmt sval =
     let ppse = CSimplExpr.pp in
@@ -74,6 +77,7 @@ module CSVal = struct
     | Sfloat se       -> Format.fprintf fmt "float(%a)" ppse se
     | Ssingle se      -> Format.fprintf fmt "single(%a)" ppse se
     | Sptr (se1, se2) -> Format.fprintf fmt "ptr(%a, %a)" ppse se1 ppse se2
+    | Sfunptr s       -> Format.fprintf fmt "funptr(%s)" s
 end
 
 module CExpr = struct

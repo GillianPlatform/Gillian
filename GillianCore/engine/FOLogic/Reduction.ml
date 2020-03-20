@@ -830,7 +830,10 @@ let rec reduce_lexpr_loop
                   ~default:(Expr.BinOp (fle, LstNth, fidx))
                   (get_nth_of_list pfs fle n)
             | false ->
-                let err_msg = "LstNth(list, index): list is not a GIL list." in
+                let err_msg =
+                  Fmt.str "LstNth(%a, %a): list is not a GIL list." Expr.pp le
+                    Expr.pp idx
+                in
                 raise (ReductionException (BinOp (fle, LstNth, fidx), err_msg))
             )
         | Lit (Num n) when Arith_Utils.is_int n && 0. <= n -> (
@@ -840,7 +843,10 @@ let rec reduce_lexpr_loop
                   ~default:(Expr.BinOp (fle, LstNth, fidx))
                   (get_nth_of_list pfs fle (int_of_float n))
             | false ->
-                let err_msg = "LstNth(list, index): list is not a GIL list." in
+                let err_msg =
+                  Fmt.str "LstNth(%a, %a): list is not a GIL list." Expr.pp le
+                    Expr.pp idx
+                in
                 raise (ReductionException (BinOp (fle, LstNth, fidx), err_msg))
             )
         (* Index is a number, but is either not an integer or is negative *)
