@@ -1,6 +1,6 @@
 open Gillian
 module Outcome =
-  Bulk.Outcome.Make_Symbolic (Semantics.SMemory) (ParserAndCompiler)
+  Bulk.Outcome.Make_Symbolic (SMemory) (ParserAndCompiler)
     (General.External.Dummy)
 
 module Suite = struct

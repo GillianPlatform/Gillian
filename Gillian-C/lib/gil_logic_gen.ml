@@ -106,7 +106,7 @@ let assert_of_member cenv members id typ =
   let perm_exp =
     Expr.Lit (String (ValueTranslation.string_of_permission Memtype.Freeable))
   in
-  let mem_ga = Semantics.LActions.str_ga (GMem SVal) in
+  let mem_ga = LActions.str_ga (GMem SVal) in
   let ga_asrt =
     Asrt.GA
       ( mem_ga,
@@ -123,7 +123,7 @@ let assert_of_hole (low, high) =
   let perm_e =
     Expr.Lit (String (ValueTranslation.string_of_permission Memtype.Freeable))
   in
-  let mem_ga = Semantics.LActions.str_ga (GMem SVal) in
+  let mem_ga = LActions.str_ga (GMem SVal) in
   Asrt.GA
     ( mem_ga,
       [ pvloc; pvoffs ++ num low; pvoffs ++ num high ],
@@ -325,7 +325,7 @@ let malloc_chunk_asrt loc struct_sz =
   let perm_e =
     Expr.Lit (String (ValueTranslation.string_of_permission Memtype.Freeable))
   in
-  let mem_ga = Semantics.LActions.str_ga (GMem SVal) in
+  let mem_ga = LActions.str_ga (GMem SVal) in
   let ptr_sz = if Archi.ptr64 then 8 else 4 in
   let mk_val i =
     if Archi.ptr64 then
@@ -341,7 +341,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
   let cse = trans_simpl_expr in
   let tnum e = Asrt.Types [ (e, Type.NumberType) ] in
   let tloc e = Asrt.Types [ (e, Type.ObjectType) ] in
-  let mem_ga = Semantics.LActions.str_ga (GMem SVal) in
+  let mem_ga = LActions.str_ga (GMem SVal) in
   (* let mk_num n = Expr.Lit (Num (float_of_int n)) in *)
   (* let zero = mk_num 0 in *)
   let ptr_call p l = Asrt.Pred (Internal_Predicates.ptr_to_0_get, [ p; l ]) in
@@ -562,7 +562,6 @@ let trans_annots clight_prog log_prog =
   with_specs
 
 let glob_fun_pred symbol def =
-  let open Semantics in
   let ga = LActions.GGlob Fun in
   let pname = LActions.str_ga ga in
   let s_param = Expr.Lit (String symbol) in
@@ -677,7 +676,7 @@ let asserts_of_rec_member cenv members id typ =
   let perm_exp =
     Expr.Lit (String (ValueTranslation.string_of_permission Memtype.Freeable))
   in
-  let mem_ga = Semantics.LActions.str_ga (GMem SVal) in
+  let mem_ga = LActions.str_ga (GMem SVal) in
   let ga_asrt sval =
     Asrt.GA
       (mem_ga, [ pvloc; pvoffs ++ fo; pvoffs ++ fo ++ sz ], [ sval; perm_exp ])

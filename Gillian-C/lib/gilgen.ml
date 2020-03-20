@@ -170,7 +170,7 @@ let rec trans_expr ?(fname = "main") ~local_env expr =
       let name = true_name id in
       let gvar_act = gen_str Prefix.gvar in
       let gvar_val = gen_str Prefix.gvar in
-      let genvlookup = Semantics.LActions.(str_ac (AGEnv GetSymbol)) in
+      let genvlookup = LActions.(str_ac (AGEnv GetSymbol)) in
       let cmd_act =
         Cmd.LAction (gvar_act, genvlookup, [ Expr.Lit (Literal.String name) ])
       in
@@ -517,7 +517,7 @@ let alloc_var fname (name, sz) =
   let gvar = Generators.gen_str fname Prefix.gvar in
   let ocaml_size = ValueTranslation.gil_size_of_compcert sz in
   let expr_size = Expr.Lit (Literal.Num ocaml_size) in
-  let alloc = Semantics.LActions.(str_ac (AMem Alloc)) in
+  let alloc = LActions.(str_ac (AMem Alloc)) in
   let action_cmd =
     Cmd.LAction (gvar, alloc, [ Expr.Lit (Literal.Num 0.); expr_size ])
   in
@@ -589,13 +589,13 @@ let trans_function
 
 let set_global_function symbol def =
   let gvar = "u" in
-  let setfun = Semantics.LActions.(str_ac (AGlob SetFun)) in
-  let ser_def = Semantics.GEnv.serialize_def def in
+  let setfun = LActions.(str_ac (AGlob SetFun)) in
+  let ser_def = GEnv.serialize_def def in
   Cmd.LAction (gvar, setfun, [ Expr.Lit (String symbol); Lit ser_def ])
 
 let set_global_var symbol def v =
   let symexpr = Expr.Lit (String symbol) in
-  let defexpr = Expr.Lit (Semantics.GEnv.serialize_def def) in
+  let defexpr = Expr.Lit (GEnv.serialize_def def) in
   let sz =
     Expr.Lit
       (Literal.Num
@@ -609,7 +609,7 @@ let set_global_var symbol def v =
     List.map ValueTranslation.gil_init_data v.AST.gvar_init
   in
   let id_list_expr = Expr.Lit (Literal.LList init_data_list) in
-  let setvar = Semantics.LActions.(str_ac (AGlob SetVar)) in
+  let setvar = LActions.(str_ac (AGlob SetVar)) in
   Cmd.LAction ("u", setvar, [ symexpr; defexpr; sz; id_list_expr; perm_string ])
 
 (* Second part of the return tuple is:
@@ -655,7 +655,7 @@ let rec trans_globdefs
       let init_asrts, init_acts, bi_specs, fs = trans_globdefs r in
       let symbol = true_name id in
       let target = symbol in
-      let genv_def = Semantics.GEnv.FunDef target in
+      let genv_def = GEnv.FunDef target in
       let new_cmd = set_global_function symbol genv_def in
       let new_asrt = Gil_logic_gen.glob_fun_pred symbol genv_def in
       let new_bi_specs =
@@ -677,7 +677,7 @@ let rec trans_globdefs
       let init_asrts, init_acts, bi_specs, fs = trans_globdefs r in
       let target, is_ext_call = intern_impl_of_extern_function f in
       if not is_ext_call then
-        let genv_def = Semantics.GEnv.FunDef target in
+        let genv_def = GEnv.FunDef target in
         let new_cmd = set_global_function symbol genv_def in
         let new_asrt = Gil_logic_gen.glob_fun_pred symbol genv_def in
         (new_asrt :: init_asrts, new_cmd :: init_acts, bi_specs, fs)
@@ -686,7 +686,7 @@ let rec trans_globdefs
       let symbol = true_name id in
       let init_asrts, init_acts, bi_specs, fs = trans_globdefs r in
       let target = symbol in
-      let genv_def = Semantics.GEnv.GlobVar target in
+      let genv_def = GEnv.GlobVar target in
       let new_cmd = set_global_var symbol genv_def v in
       (init_asrts, new_cmd :: init_acts, bi_specs, fs)
 
