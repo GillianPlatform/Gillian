@@ -59,7 +59,8 @@ let parse_annots file =
   let () = close_in inx in
   wprog
 
-let parse_and_compile_file path =
+let parse_and_compile_files paths =
+  let path = List.hd paths in
   let () = Frontend.init () in
   let () =
     if !Config.warnings then Warnings.as_error () else Warnings.silence_all ()

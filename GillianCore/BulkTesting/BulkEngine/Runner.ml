@@ -97,7 +97,8 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
           let () = Suite.beforeTest test.Test.info test.path in
           let res =
             match
-              Outcome.ParserAndCompiler.parse_and_compile_file test.Test.path
+              Outcome.ParserAndCompiler.parse_and_compile_files
+                [ test.Test.path ]
             with
             | Error p -> ParseAndCompileError p
             | Ok prog -> (
