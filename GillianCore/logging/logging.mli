@@ -15,6 +15,39 @@ module Mode : sig
   val should_log : level -> bool
 end
 
+module Report : sig
+  type 'a report_builder
+
+  val info :
+    string ->
+    ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
+    'a report_builder
+
+  val log :
+    string ->
+    ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
+    'a report_builder
+
+  val success :
+    string ->
+    ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
+    'a report_builder
+
+  val error :
+    string ->
+    ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
+    'a report_builder
+
+  val warning :
+    string ->
+    ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
+    'a report_builder
+
+  val enter_node : unit -> unit
+
+  val exit_node : unit -> unit
+end
+
 val wrap_up : unit -> unit
 (** Closes all the files *)
 

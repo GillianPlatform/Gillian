@@ -1,3 +1,4 @@
 (library
  (name logging)
- (public_name gillian.logging))
+ (public_name gillian.logging)
+ (libraries uuidm))

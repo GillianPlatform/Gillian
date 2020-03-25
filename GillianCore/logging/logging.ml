@@ -1,4 +1,5 @@
 module Mode = Mode
+module Report = Report
 
 (** File prefix for log files *)
 let log_prefix = "log_"
