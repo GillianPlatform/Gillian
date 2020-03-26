@@ -6,9 +6,6 @@ module Logging = Gillian.Logging
 
 let true_name = ValueTranslation.true_name
 
-let current_arch =
-  if Archi.ptr64 then Architecture.Arch64 else Architecture.Arch32
-
 type context = {
   block_stack : string list;
   local_env : string list;
@@ -646,6 +643,23 @@ let intern_impl_of_extern_function ext_f =
       (CConstants.Internal_Functions.rand, false)
   | _ -> (CConstants.Internal_Functions.not_implemented, false)
 
+let not_implemented func =
+  String.equal
+    (fst (intern_impl_of_extern_function func))
+    CConstants.Internal_Functions.not_implemented
+
+let is_builtin_func func_name =
+  let builtins =
+    "__builtin_debug" :: List.map fst C2C.builtins.builtin_functions
+  in
+  List.mem func_name builtins
+
+type symbol = { name : string; defined : bool }
+
+let is_def_sym symbol = symbol.defined
+
+let sym_name symbol = symbol.name
+
 let rec trans_globdefs
     ?(gil_annot = Gil_logic_gen.empty)
     ?(exec_mode = ExecMode.Verification)
@@ -654,10 +668,10 @@ let rec trans_globdefs
   let open AST in
   let trans_globdefs = trans_globdefs ~clight_prog ~exec_mode ~gil_annot in
   match globdefs with
-  | [] -> ([], [], [], [])
+  | [] -> ([], [], [], [], [])
   | (id, Gfun (Internal f)) :: r ->
       (* Add function to the genv and compile the function *)
-      let init_asrts, init_acts, bi_specs, fs = trans_globdefs r in
+      let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let symbol = true_name id in
       let target = symbol in
       let new_cmd = set_global_function symbol target in
@@ -667,30 +681,49 @@ let rec trans_globdefs
           Gil_logic_gen.generate_bispec clight_prog id f :: bi_specs
         else []
       in
+      let new_sym = { name = symbol; defined = true } in
       ( new_asrt :: init_asrts,
         new_cmd :: init_acts,
         new_bi_specs,
-        trans_function ~gil_annot ~exec_mode symbol f :: fs )
-  | (_, Gfun (External f)) :: r
-    when String.equal
-           (fst (intern_impl_of_extern_function f))
-           CConstants.Internal_Functions.not_implemented -> trans_globdefs r
+        trans_function ~gil_annot ~exec_mode symbol f :: fs,
+        new_sym :: syms )
+  | (id, Gfun (External f)) :: r
+    when is_builtin_func (true_name id) && not_implemented f -> trans_globdefs r
+  | (id, Gfun (External f)) :: r when not_implemented f ->
+      (* Externally defined, non-built-in function *)
+      let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
+      let symbol = true_name id in
+      let new_sym = { name = symbol; defined = false } in
+      (init_asrts, init_acts, bi_specs, fs, new_sym :: syms)
   | (id, Gfun (External f)) :: r ->
       (* We just indicate in the global env what function should be called at that point *)
       let symbol = true_name id in
-      let init_asrts, init_acts, bi_specs, fs = trans_globdefs r in
+      let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let target, is_ext_call = intern_impl_of_extern_function f in
+      let new_sym = { name = symbol; defined = true } in
       if not is_ext_call then
         let new_cmd = set_global_function symbol target in
         let new_asrt = Gil_logic_gen.glob_fun_pred symbol target in
-        (new_asrt :: init_asrts, new_cmd :: init_acts, bi_specs, fs)
-      else (init_asrts, init_acts, bi_specs, fs)
+        ( new_asrt :: init_asrts,
+          new_cmd :: init_acts,
+          bi_specs,
+          fs,
+          new_sym :: syms )
+      else (init_asrts, init_acts, bi_specs, fs, new_sym :: syms)
+  | (id, Gvar v) :: r
+    when Camlcoq.Z.to_int (init_data_list_size v.gvar_init) == 0 ->
+      (* Externally defined global variable *)
+      let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
+      let symbol = true_name id in
+      let new_sym = { name = symbol; defined = false } in
+      (init_asrts, init_acts, bi_specs, fs, new_sym :: syms)
   | (id, Gvar v) :: r ->
       let symbol = true_name id in
-      let init_asrts, init_acts, bi_specs, fs = trans_globdefs r in
+      let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let target = symbol in
       let new_cmd = set_global_var symbol target v in
-      (init_asrts, new_cmd :: init_acts, bi_specs, fs)
+      let new_sym = { name = symbol; defined = true } in
+      (init_asrts, new_cmd :: init_acts, bi_specs, fs, new_sym :: syms)
 
 let make_init_proc init_cmds =
   let end_cmds =
@@ -725,14 +758,11 @@ let trans_program
     in
     hashtbl
   in
-  let init_asrts, init_acts, bi_specs, procedures =
+  let init_asrts, init_acts, bi_specs, procedures, symbols =
     trans_globdefs ~clight_prog ~exec_mode ~gil_annot prog_defs
   in
   let init_pred = Gil_logic_gen.make_global_env_pred init_asrts in
-  let init_proc = make_init_proc init_acts in
-  let procedures_with_init = init_proc :: procedures in
   let get_proc_name proc = proc.Proc.proc_name in
-  let imports = Imports.imports current_arch exec_mode in
   let preds =
     if
       ExecMode.verification_exec exec_mode
@@ -740,18 +770,20 @@ let trans_program
     then [ init_pred ]
     else []
   in
-  Prog.
-    {
-      imports;
-      lemmas = Hashtbl.create 1;
-      preds = make_hashtbl (fun p -> p.Pred.pred_name) preds;
-      only_specs = Hashtbl.create 1;
-      macros = Hashtbl.create 1;
-      bi_specs = make_hashtbl (fun p -> p.BiSpec.bispec_name) bi_specs;
-      proc_names = List.map get_proc_name procedures_with_init;
-      procs = make_hashtbl get_proc_name procedures_with_init;
-      predecessors = Hashtbl.create 1;
-    }
+  ( Prog.
+      {
+        imports = [];
+        lemmas = Hashtbl.create 1;
+        preds = make_hashtbl (fun p -> p.Pred.pred_name) preds;
+        only_specs = Hashtbl.create 1;
+        macros = Hashtbl.create 1;
+        bi_specs = make_hashtbl (fun p -> p.BiSpec.bispec_name) bi_specs;
+        proc_names = List.map get_proc_name procedures;
+        procs = make_hashtbl get_proc_name procedures;
+        predecessors = Hashtbl.create 1;
+      },
+    init_acts,
+    symbols )
 
 let annotate na gan =
   let () =
@@ -775,14 +807,15 @@ let annotate na gan =
   na
 
 let trans_program_with_annots exec_mode clight_prog prog annots =
-  let gan =
+  let gil_annot =
     if ExecMode.verification_exec exec_mode then
       Gil_logic_gen.trans_annots clight_prog annots
     else if ExecMode.biabduction_exec exec_mode then
       Gil_logic_gen.gen_bi_preds clight_prog
     else Gil_logic_gen.empty
   in
-  let non_annotated =
-    trans_program ~clight_prog ~exec_mode ~gil_annot:gan prog
+  let non_annotated_prog, init_acts, symbols =
+    trans_program ~clight_prog ~exec_mode ~gil_annot prog
   in
-  annotate non_annotated gan
+  let annotated_prog = annotate non_annotated_prog gil_annot in
+  (annotated_prog, init_acts, symbols)
