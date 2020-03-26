@@ -766,20 +766,12 @@ let trans_program
   let init_asrts, init_acts, bi_specs, procedures, symbols =
     trans_globdefs ~clight_prog ~exec_mode ~gil_annot prog_defs
   in
-  let init_pred = Gil_logic_gen.make_global_env_pred init_asrts in
   let get_proc_name proc = proc.Proc.proc_name in
-  let preds =
-    if
-      ExecMode.verification_exec exec_mode
-      || ExecMode.biabduction_exec exec_mode
-    then [ init_pred ]
-    else []
-  in
   ( Prog.
       {
         imports = [];
         lemmas = Hashtbl.create 1;
-        preds = make_hashtbl (fun p -> p.Pred.pred_name) preds;
+        preds = Hashtbl.create 1;
         only_specs = Hashtbl.create 1;
         macros = Hashtbl.create 1;
         bi_specs = make_hashtbl (fun p -> p.BiSpec.bispec_name) bi_specs;
@@ -787,6 +779,7 @@ let trans_program
         procs = make_hashtbl get_proc_name procedures;
         predecessors = Hashtbl.create 1;
       },
+    init_asrts,
     init_acts,
     symbols )
 
@@ -819,8 +812,8 @@ let trans_program_with_annots exec_mode clight_prog prog annots =
       Gil_logic_gen.gen_bi_preds clight_prog
     else Gil_logic_gen.empty
   in
-  let non_annotated_prog, init_acts, symbols =
+  let non_annotated_prog, init_asrts, init_acts, symbols =
     trans_program ~clight_prog ~exec_mode ~gil_annot prog
   in
   let annotated_prog = annotate non_annotated_prog gil_annot in
-  (annotated_prog, init_acts, symbols)
+  (annotated_prog, init_asrts, init_acts, symbols)

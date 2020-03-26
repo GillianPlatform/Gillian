@@ -15,11 +15,11 @@ val trans_program :
   ?gil_annot:Gil_logic_gen.gil_annots ->
   clight_prog:Clight.program ->
   Csharpminor.program ->
-  (Annot.t, string) Prog.t * string Cmd.t list * symbol list
+  (Annot.t, string) Prog.t * Asrt.t list * string Cmd.t list * symbol list
 
 val trans_program_with_annots :
   ExecMode.t ->
   Clight.program ->
   Csharpminor.program ->
   CLogic.CProg.t ->
-  (Annot.t, string) Prog.t * string Cmd.t list * symbol list
+  (Annot.t, string) Prog.t * Asrt.t list * string Cmd.t list * symbol list

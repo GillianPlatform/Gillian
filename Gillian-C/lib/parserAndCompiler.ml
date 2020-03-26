@@ -87,13 +87,16 @@ let parse_and_compile_file path exec_mode =
   let annots = parse_annots path in
   Gilgen.trans_program_with_annots exec_mode last_clight csm annots
 
-module Symbol_set = Set.Make (String)
+module Symbol_set = Gillian.Utils.Containers.SS
 
 let linker_error msg symbols =
   let () =
     Symbol_set.iter (fun sym -> Printf.printf (msg ^^ " '%s'\n") sym) symbols
   in
   failwith "linker error"
+
+let add_init_pred exec_mode =
+  ExecMode.verification_exec exec_mode || ExecMode.biabduction_exec exec_mode
 
 let parse_and_compile_files paths =
   let exec_mode = !Gillian.Utils.Config.current_exec_mode in
@@ -111,7 +114,7 @@ let parse_and_compile_files paths =
     match paths with
     | []           -> unresolved_syms
     | path :: rest ->
-        let _, _, symbols = Hashtbl.find compiled_progs path in
+        let _, _, _, symbols = Hashtbl.find compiled_progs path in
         let def, undef = List.partition Gilgen.is_def_sym symbols in
         let def_set = Symbol_set.of_list (List.map Gilgen.sym_name def) in
         let undef_set = Symbol_set.of_list (List.map Gilgen.sym_name undef) in
@@ -134,25 +137,33 @@ let parse_and_compile_files paths =
   (* Create main GIL program with references to all other files *)
   let open Gillian.Gil_syntax in
   let open Gillian.Utils in
-  let rec combine paths combined_imports combined_init_cmds =
+  let rec combine paths comb_imports comb_init_asrts comb_init_cmds =
     match paths with
-    | []           -> (combined_imports, combined_init_cmds)
+    | []           -> (comb_imports, comb_init_asrts, comb_init_cmds)
     | path :: rest ->
-        let prog, init_cmds, _ = Hashtbl.find compiled_progs path in
+        let prog, init_asrts, init_cmds, _ = Hashtbl.find compiled_progs path in
         let gil_path = Filename.chop_extension path ^ ".gil" in
         let () = Io_utils.save_file_pp gil_path Prog.pp_labeled prog in
         combine rest
-          (combined_imports @ [ gil_path ])
-          (combined_init_cmds @ init_cmds)
+          (comb_imports @ [ gil_path ])
+          (comb_init_asrts @ init_asrts)
+          (comb_init_cmds @ init_cmds)
   in
-  let imports, init_cmds = combine (List.tl paths) [] [] in
-  let main_prog, main_init_cmds, _ =
+  let imports, init_asrts, init_cmds = combine (List.tl paths) [] [] [] in
+  let main_prog, main_init_asrts, main_init_cmds, _ =
     Hashtbl.find compiled_progs (List.hd paths)
   in
   let all_imports = Imports.imports current_arch exec_mode @ imports in
   let init_proc = Gilgen.make_init_proc (main_init_cmds @ init_cmds) in
   let init_proc_name = init_proc.Proc.proc_name in
   let () = Hashtbl.add main_prog.procs init_proc_name init_proc in
+  let () =
+    if add_init_pred exec_mode then
+      let init_pred =
+        Gil_logic_gen.make_global_env_pred (main_init_asrts @ init_asrts)
+      in
+      Hashtbl.add main_prog.preds init_pred.Pred.pred_name init_pred
+  in
   Ok
     {
       main_prog with
