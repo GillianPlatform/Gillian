@@ -654,6 +654,10 @@ let is_builtin_func func_name =
   in
   List.mem func_name builtins
 
+let is_gil_func func_name exec_mode =
+  ExecMode.symbolic_exec exec_mode
+  && (String.equal func_name "ASSERT" || String.equal func_name "ASSUME")
+
 type symbol = { name : string; defined : bool }
 
 let is_def_sym symbol = symbol.defined
@@ -688,7 +692,8 @@ let rec trans_globdefs
         trans_function ~gil_annot ~exec_mode symbol f :: fs,
         new_sym :: syms )
   | (id, Gfun (External f)) :: r
-    when is_builtin_func (true_name id) && not_implemented f -> trans_globdefs r
+    when (is_builtin_func (true_name id) && not_implemented f)
+         || is_gil_func (true_name id) exec_mode -> trans_globdefs r
   | (id, Gfun (External f)) :: r when not_implemented f ->
       (* Externally defined, non-built-in function *)
       let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
