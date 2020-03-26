@@ -268,7 +268,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 (********************************)
 
 import_target:
-  IMPORT; imports = separated_nonempty_list(COMMA, FILENAME); SCOLON { imports }
+  IMPORT; imports = separated_nonempty_list(COMMA, STRING); SCOLON { imports }
 ;
 
 proc_head_target:
