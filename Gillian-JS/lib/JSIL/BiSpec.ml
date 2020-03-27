@@ -1,10 +1,10 @@
+(** {b Single JSIL specifications}. *)
 type t = {
   name : string;  (** Procedure/spec name               *)
   params : string list;  (** Procedure/spec parameters         *)
   pre : Asrt.t;  (** Precondition                      *)
   normalised : bool;  (** If the spec is already normalised *)
 }
-(** {b Single JSIL specifications}. *)
 
 type t_tbl = (string, t) Hashtbl.t
 

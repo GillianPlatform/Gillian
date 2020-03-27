@@ -1,12 +1,13 @@
 (***************************************************************)
 
 (***************************************************************)
+
+(** Macros                                                    **)
 type t = TypeDef__.macro = {
   macro_name : string;  (** Name of the macro *)
   macro_params : string list;  (** Actual parameters *)
   macro_definition : LCmd.t list;  (** Macro definition *)
 }
-(** Macros                                                    **)
 
 type t_tbl = (string, t) Hashtbl.t
 

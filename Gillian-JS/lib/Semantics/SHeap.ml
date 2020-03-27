@@ -1,5 +1,5 @@
-open Containers
 (** JSIL Symbolic Heap *)
+open Containers
 
 open Gillian.Gil_syntax
 open Jsil_syntax

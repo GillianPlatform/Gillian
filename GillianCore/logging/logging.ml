@@ -1,12 +1,4 @@
-(** Logging levels *)
-type level =
-  | Normal  (** Normal output *)
-  | Verbose  (** Verbose output *)
-  | Verboser  (** More verbose output *)
-  | TMI  (** Too much information *)
-
-(** Logging enabled *)
-let silent = ref false
+module Mode = Mode
 
 (** File prefix for log files *)
 let log_prefix = "log_"
@@ -20,7 +12,7 @@ let log_extension = "log"
   @param lvl Logging level
   @return Filename of the level
 *)
-let filename (lvl : level) : string =
+let filename (lvl : Mode.level) : string =
   log_prefix
   ^ ( match lvl with
     | Normal   -> "normal"
@@ -45,7 +37,7 @@ let wrap_up () =
   close_out oc_verboser;
   close_out oc_TMI
 
-let log_string lvl msg =
+let log_string (lvl : Mode.level) msg =
   match lvl with
   | Normal   ->
       output_string oc_normal msg;
@@ -64,7 +56,7 @@ let log_string lvl msg =
 (* Unfortunately, since we're writing in several files,
    we have to write into a string first and then write the string several times *)
 let log lvl msgf =
-  if not !silent then
+  if Mode.should_log lvl then
     msgf @@ fun fmt ->
     let k = log_string lvl in
     Format.kasprintf k (fmt ^^ "@\n@?")

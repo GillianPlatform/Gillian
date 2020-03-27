@@ -25,8 +25,8 @@ module type S_with_stringify = sig
   val of_string : string -> t
 end
 
-module Basic () : S_with_stringify with type t = int
 (** Creating a BasicIdentifier module also registers its resetter on its own *)
+module Basic () : S_with_stringify with type t = int
 
 (** Make_with_prefix is assuming that one already registered the resetter of A *)
 module Make_with_prefix

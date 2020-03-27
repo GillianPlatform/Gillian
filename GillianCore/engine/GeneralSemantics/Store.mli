@@ -4,11 +4,11 @@
   GIL stores are mutable.
 *)
 module type S = sig
-  type vt
   (** Type of GIL values *)
+  type vt
 
-  type t
   (** Type of GIL stores *)
+  type t
 
   val bindings : t -> (Var.t * vt) list
   (** Return the set of bindings in a given store *)

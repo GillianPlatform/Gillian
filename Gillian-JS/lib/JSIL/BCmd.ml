@@ -3,8 +3,9 @@
 
 (***************************************************************)
 (***************************************************************)
-open Gillian.Gil_syntax
+
 (** JSIL Basic Commmands                                      **)
+open Gillian.Gil_syntax
 
 type t =
   | Skip  (** Empty command *)

@@ -10,4 +10,4 @@ filename=$1
 
 echo $filename
 
-time gillian-js wpst "$filename" -s --stats
+time gillian-js wpst "$filename" -l disabled --stats

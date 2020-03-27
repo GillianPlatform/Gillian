@@ -1,7 +1,7 @@
 module type S = sig
   module TargetLangOptions : sig
-    type t
     (** Command line options specific to the target language. *)
+    type t
 
     val term : t Cmdliner.Term.t
     (** A term that will be added to every command. *)
@@ -10,8 +10,8 @@ module type S = sig
     (** A side-effect function that will determine the behaviour of the target-language specific options *)
   end
 
-  type err
   (** Type of error that can occur during parsing or compilation *)
+  type err
 
   val pp_err : Format.formatter -> err -> unit
   (** Pretty printer for type {!err} *)

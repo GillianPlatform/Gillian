@@ -14,7 +14,7 @@ time {
 	il=il;
 	bi=BI_;
 	echo "Running ACT on file $file"
-	esy x gillian-js act $file -s > $file.specs
+	esy x gillian-js act $file -l disabled > $file.specs
 	rc=$?; if [[ $rc != 0 ]]; then echo "Failed ACT on $file"; fi
 	printf "${LIGHTGREEN}"
 	tail -3 $file.specs

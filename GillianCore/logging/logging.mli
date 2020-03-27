@@ -1,17 +1,25 @@
-(** Logging Level *)
-type level =
-  | Normal  (** Normal output *)
-  | Verbose  (** Verbose output *)
-  | Verboser  (** More verbose output *)
-  | TMI  (** Too much information *)
+module Mode : sig
+  (** Logging levels *)
+  type level =
+    | Normal  (** Normal output *)
+    | Verbose  (** Verbose output *)
+    | Verboser  (** More verbose output *)
+    | TMI  (** Too much information *)
 
-val silent : bool ref
-(** If true, logging is disabled. False by default. *)
+  type t = Disabled | Enabled of level
+
+  val enabled : unit -> bool
+
+  val set_mode : t -> unit
+
+  val should_log : level -> bool
+end
 
 val wrap_up : unit -> unit
 (** Closes all the files *)
 
-val log : level -> ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
+val log :
+  Mode.level -> ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
 (** This works like a very simplified version of opam's `Logs` library.
     `log TMI (fun m -> m "%a" pp_int 1)`
     will write `1` in the TMI file.

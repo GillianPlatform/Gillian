@@ -1,10 +1,10 @@
+(** {b Single GIL specifications}. *)
 type t = TypeDef__.bispec = {
   bispec_name : string;  (** Procedure/spec name               *)
   bispec_params : string list;  (** Procedure/spec parameters         *)
   bispec_pres : Asrt.t list;  (** Possible preconditions            *)
   bispec_normalised : bool;  (** If the spec is already normalised *)
 }
-(** {b Single GIL specifications}. *)
 
 type t_tbl = (string, t) Hashtbl.t
 

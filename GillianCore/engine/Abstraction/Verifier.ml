@@ -298,7 +298,7 @@ struct
                            test.name test.id);
                      ac )
                    else (
-                     L.log L.Normal (fun m ->
+                     L.log L.Mode.Normal (fun m ->
                          m
                            "VERIFICATION FAILURE: Spec %s %d - post condition \
                             not unifiable\n"

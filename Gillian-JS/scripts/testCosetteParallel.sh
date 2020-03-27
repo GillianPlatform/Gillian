@@ -9,4 +9,4 @@ fi
 filename=$1
 
 echo $filename
-time gillian-js wpst "$filename" -s --parallel
+time gillian-js wpst "$filename" -l disabled --parallel
