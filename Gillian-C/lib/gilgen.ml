@@ -660,6 +660,8 @@ let is_gil_func func_name exec_mode =
 
 type symbol = { name : string; defined : bool }
 
+module Symbol_set = Gillian.Utils.Containers.SS
+
 let is_def_sym symbol = symbol.defined
 
 let sym_name symbol = symbol.name
@@ -668,9 +670,12 @@ let rec trans_globdefs
     ?(gil_annot = Gil_logic_gen.empty)
     ?(exec_mode = ExecMode.Verification)
     ~clight_prog
+    ~public_funcs
     globdefs =
   let open AST in
-  let trans_globdefs = trans_globdefs ~clight_prog ~exec_mode ~gil_annot in
+  let trans_globdefs =
+    trans_globdefs ~clight_prog ~exec_mode ~gil_annot ~public_funcs
+  in
   match globdefs with
   | [] -> ([], [], [], [], [])
   | (id, Gfun (Internal f)) :: r ->
@@ -685,12 +690,17 @@ let rec trans_globdefs
           Gil_logic_gen.generate_bispec clight_prog id f :: bi_specs
         else []
       in
-      let new_sym = { name = symbol; defined = true } in
+      let new_syms =
+        if Symbol_set.mem symbol public_funcs then
+          (* Non-static function *)
+          { name = symbol; defined = true } :: syms
+        else syms
+      in
       ( new_asrt :: init_asrts,
         new_cmd :: init_acts,
         new_bi_specs,
         trans_function ~gil_annot ~exec_mode symbol f :: fs,
-        new_sym :: syms )
+        new_syms )
   | (id, Gfun (External f)) :: r
     when (is_builtin_func (true_name id) && not_implemented f)
          || is_gil_func (true_name id) exec_mode -> trans_globdefs r
@@ -705,16 +715,11 @@ let rec trans_globdefs
       let symbol = true_name id in
       let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let target, is_ext_call = intern_impl_of_extern_function f in
-      let new_sym = { name = symbol; defined = true } in
       if not is_ext_call then
         let new_cmd = set_global_function symbol target in
         let new_asrt = Gil_logic_gen.glob_fun_pred symbol target in
-        ( new_asrt :: init_asrts,
-          new_cmd :: init_acts,
-          bi_specs,
-          fs,
-          new_sym :: syms )
-      else (init_asrts, init_acts, bi_specs, fs, new_sym :: syms)
+        (new_asrt :: init_asrts, new_cmd :: init_acts, bi_specs, fs, syms)
+      else (init_asrts, init_acts, bi_specs, fs, syms)
   | (id, Gvar v) :: r
     when Camlcoq.Z.to_int (init_data_list_size v.gvar_init) == 0 ->
       (* Externally defined global variable *)
@@ -755,7 +760,10 @@ let trans_program
     ?(gil_annot = Gil_logic_gen.empty)
     ~clight_prog
     prog =
-  let AST.{ prog_defs; _ } = prog in
+  let AST.{ prog_defs; prog_public; _ } = prog in
+  let public_funcs =
+    Symbol_set.of_list (List.map (fun id -> true_name id) prog_public)
+  in
   let make_hashtbl get_name deflist =
     let hashtbl = Hashtbl.create 1 in
     let () =
@@ -764,7 +772,7 @@ let trans_program
     hashtbl
   in
   let init_asrts, init_acts, bi_specs, procedures, symbols =
-    trans_globdefs ~clight_prog ~exec_mode ~gil_annot prog_defs
+    trans_globdefs ~clight_prog ~exec_mode ~gil_annot ~public_funcs prog_defs
   in
   let get_proc_name proc = proc.Proc.proc_name in
   ( Prog.

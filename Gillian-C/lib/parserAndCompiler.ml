@@ -128,11 +128,10 @@ let parse_and_compile_file path exec_mode =
   let annots = parse_annots path in
   Gilgen.trans_program_with_annots exec_mode last_clight csm annots
 
-module Symbol_set = Gillian.Utils.Containers.SS
-
 exception Linker_error
 
 let linker_error msg symbols =
+  let open Gilgen in
   let () =
     Symbol_set.iter (fun sym -> Printf.printf (msg ^^ " '%s'\n") sym) symbols
   in
@@ -142,6 +141,7 @@ let add_init_pred exec_mode =
   ExecMode.verification_exec exec_mode || ExecMode.biabduction_exec exec_mode
 
 let parse_and_compile_files paths =
+  let open Gilgen in
   let exec_mode = !Gillian.Utils.Config.current_exec_mode in
   (* Compile all C input files to GIL *)
   let paths = paths @ !Config.source_paths in
@@ -159,17 +159,17 @@ let parse_and_compile_files paths =
     | []           -> unresolved_syms
     | path :: rest ->
         let _, _, _, symbols = Hashtbl.find compiled_progs path in
-        let def, undef = List.partition Gilgen.is_def_sym symbols in
-        let def_set = Symbol_set.of_list (List.map Gilgen.sym_name def) in
-        let undef_set = Symbol_set.of_list (List.map Gilgen.sym_name undef) in
+        let def, undef = List.partition is_def_sym symbols in
+        let def_set = Symbol_set.of_list (List.map sym_name def) in
+        let undef_set = Symbol_set.of_list (List.map sym_name undef) in
         let conflicting_defs = Symbol_set.inter defined_syms def_set in
         let () =
           if not (Symbol_set.is_empty conflicting_defs) then
             linker_error "multiple definitions of" conflicting_defs
         in
-        let unresolved = Symbol_set.diff unresolved_syms def_set in
-        let new_unresolved = Symbol_set.union unresolved undef_set in
+        let unresolved = Symbol_set.union unresolved_syms undef_set in
         let new_defined = Symbol_set.union defined_syms def_set in
+        let new_unresolved = Symbol_set.diff unresolved new_defined in
         link rest new_unresolved new_defined
   in
   let unresolved_syms = link paths Symbol_set.empty Symbol_set.empty in

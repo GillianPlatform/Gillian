@@ -4,6 +4,8 @@ open Gillian.Gil_syntax
 
 type symbol
 
+module Symbol_set = Gillian.Utils.Containers.SS
+
 val is_def_sym : symbol -> bool
 
 val sym_name : symbol -> string
