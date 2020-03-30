@@ -1,4 +1,4 @@
-tests/*.gil
 examples/klee/klee-out*
 examples/klee/klee-last
 *.i
+examples/**/*.gil
