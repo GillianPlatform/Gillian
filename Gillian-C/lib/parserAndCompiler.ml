@@ -2,33 +2,46 @@ open Compcert
 open Config_compcert
 open CConstants
 
-let burn_csm = ref false
-
 let current_arch =
   if Archi.ptr64 then Architecture.Arch64 else Architecture.Arch32
 
 module TargetLangOptions = struct
   open Cmdliner
 
-  type t = { burn_csm : bool; hide_genv : bool; warnings : bool }
+  type t = {
+    include_dirs : string list;
+    burn_csm : bool;
+    hide_genv : bool;
+    warnings : bool;
+  }
 
   let term =
     let docs = Manpage.s_common_options in
-    let doc = "If you want to write the intermediate C#m program into a file" in
-    let bcsm = Arg.(value & flag & info [ "burn-csm" ] ~docs ~doc) in
     let doc =
-      "If you want to hide the global environment from the reporting of heap"
+      "Add $(docv) to the list of directories used to search for included .h \
+       files."
     in
-    let hgenv = Arg.(value & flag & info [ "hide-genv" ] ~docs ~doc) in
-    let doc = "If you want to silent warnings from CompCert and GCC" in
-    let no_warnings = Arg.(value & flag & info [ "no-warnings" ] ~docs ~doc) in
-    let f burn_csm hide_genv no_warnings =
-      { burn_csm; hide_genv; warnings = not no_warnings }
+    let docv = "DIR" in
+    let include_dirs =
+      Arg.(value & opt_all dir [] & info [ "I" ] ~docs ~doc ~docv)
     in
-    Term.(const f $ bcsm $ hgenv $ no_warnings)
 
-  let apply { burn_csm = bcsm; hide_genv; warnings } =
-    burn_csm := bcsm;
+    let doc = "Write the intermediate C#minor program to a file." in
+    let bcsm = Arg.(value & flag & info [ "burn-csm" ] ~docs ~doc) in
+
+    let doc = "Hide the global environment from the heap report." in
+    let hgenv = Arg.(value & flag & info [ "hide-genv" ] ~docs ~doc) in
+
+    let doc = "Silence CompCert warnings." in
+    let no_warnings = Arg.(value & flag & info [ "no-warnings" ] ~docs ~doc) in
+    let f include_dirs burn_csm hide_genv no_warnings =
+      { include_dirs; burn_csm; hide_genv; warnings = not no_warnings }
+    in
+    Term.(const f $ include_dirs $ bcsm $ hgenv $ no_warnings)
+
+  let apply { include_dirs = idirs; burn_csm = bcsm; hide_genv; warnings } =
+    Config.include_dirs := idirs;
+    Config.burn_csm := bcsm;
     Config.hide_genv := hide_genv;
     Config.warnings := warnings
 end
@@ -69,7 +82,8 @@ let parse_and_compile_file path exec_mode =
     if !Config.warnings then Warnings.as_error () else Warnings.silence_all ()
   in
   let () = Optim.disable_all () in
-  (* Disable all optims *)
+  (* Disable all optimisations *)
+  let () = Include.add_include_dirs !Config.include_dirs in
   let pathi = Filename.chop_extension path ^ ".i" in
   let () = Frontend.preprocess path pathi in
   let s = Frontend.parse_c_file path pathi in
@@ -77,7 +91,7 @@ let parse_and_compile_file path exec_mode =
   let last_clight = get_or_print_and_die (SimplLocals.transf_program s) in
   let csm = get_or_print_and_die (Cshmgen.transl_program last_clight) in
   let () =
-    if !burn_csm then
+    if !Config.burn_csm then
       let pathcsm = Filename.chop_extension path ^ ".csm" in
       let oc = open_out pathcsm in
       let fmt = Format.formatter_of_out_channel oc in
@@ -89,11 +103,13 @@ let parse_and_compile_file path exec_mode =
 
 module Symbol_set = Gillian.Utils.Containers.SS
 
+exception Linker_error
+
 let linker_error msg symbols =
   let () =
     Symbol_set.iter (fun sym -> Printf.printf (msg ^^ " '%s'\n") sym) symbols
   in
-  failwith "linker error"
+  raise Linker_error
 
 let add_init_pred exec_mode =
   ExecMode.verification_exec exec_mode || ExecMode.biabduction_exec exec_mode
