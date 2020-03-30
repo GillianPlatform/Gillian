@@ -10,6 +10,7 @@ module TargetLangOptions = struct
 
   type t = {
     include_dirs : string list;
+    source_dirs : string list;
     burn_csm : bool;
     hide_genv : bool;
     warnings : bool;
@@ -17,13 +18,21 @@ module TargetLangOptions = struct
 
   let term =
     let docs = Manpage.s_common_options in
+    let docv = "DIR" in
     let doc =
       "Add $(docv) to the list of directories used to search for included .h \
        files."
     in
-    let docv = "DIR" in
     let include_dirs =
       Arg.(value & opt_all dir [] & info [ "I" ] ~docs ~doc ~docv)
+    in
+
+    let doc =
+      "Add $(docv) to the list of directories used to find .c files to link \
+       against. It is searched recursively."
+    in
+    let source_dirs =
+      Arg.(value & opt_all dir [] & info [ "S"; "source" ] ~docs ~doc ~docv)
     in
 
     let doc = "Write the intermediate C#minor program to a file." in
@@ -34,14 +43,32 @@ module TargetLangOptions = struct
 
     let doc = "Silence CompCert warnings." in
     let no_warnings = Arg.(value & flag & info [ "no-warnings" ] ~docs ~doc) in
-    let f include_dirs burn_csm hide_genv no_warnings =
-      { include_dirs; burn_csm; hide_genv; warnings = not no_warnings }
+    let f include_dirs source_dirs burn_csm hide_genv no_warnings =
+      {
+        include_dirs;
+        source_dirs;
+        burn_csm;
+        hide_genv;
+        warnings = not no_warnings;
+      }
     in
-    Term.(const f $ include_dirs $ bcsm $ hgenv $ no_warnings)
+    Term.(const f $ include_dirs $ source_dirs $ bcsm $ hgenv $ no_warnings)
 
-  let apply { include_dirs = idirs; burn_csm = bcsm; hide_genv; warnings } =
-    Config.include_dirs := idirs;
-    Config.burn_csm := bcsm;
+  let apply { include_dirs; source_dirs; burn_csm; hide_genv; warnings } =
+    let rec get_c_paths dirs =
+      match dirs with
+      | []          -> []
+      | dir :: rest ->
+          let files = Gillian.Utils.Io_utils.get_files dir in
+          let c_files =
+            List.filter (fun p -> Filename.extension p = ".c") files
+          in
+          c_files @ get_c_paths rest
+    in
+    let c_source_paths = get_c_paths source_dirs in
+    Config.include_dirs := include_dirs;
+    Config.source_paths := c_source_paths;
+    Config.burn_csm := burn_csm;
     Config.hide_genv := hide_genv;
     Config.warnings := warnings
 end
@@ -117,6 +144,7 @@ let add_init_pred exec_mode =
 let parse_and_compile_files paths =
   let exec_mode = !Gillian.Utils.Config.current_exec_mode in
   (* Compile all C input files to GIL *)
+  let paths = paths @ !Config.source_paths in
   let compiled_progs = Hashtbl.create 1 in
   let () =
     List.iter
