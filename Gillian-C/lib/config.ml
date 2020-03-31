@@ -7,3 +7,7 @@ let burn_csm = ref false
 let hide_genv = ref false
 
 let warnings = ref true
+
+let hide_undef = ref false
+
+let hide_mult_def = ref false

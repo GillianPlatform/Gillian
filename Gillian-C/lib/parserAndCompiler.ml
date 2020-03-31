@@ -14,6 +14,8 @@ module TargetLangOptions = struct
     burn_csm : bool;
     hide_genv : bool;
     warnings : bool;
+    hide_undef : bool;
+    hide_mult_def : bool;
   }
 
   let term =
@@ -29,7 +31,7 @@ module TargetLangOptions = struct
 
     let doc =
       "Add $(docv) to the list of directories used to find .c files to link \
-       against. It is searched recursively."
+       against. These are searched recursively."
     in
     let source_dirs =
       Arg.(value & opt_all dir [] & info [ "S"; "source" ] ~docs ~doc ~docv)
@@ -43,18 +45,51 @@ module TargetLangOptions = struct
 
     let doc = "Silence CompCert warnings." in
     let no_warnings = Arg.(value & flag & info [ "no-warnings" ] ~docs ~doc) in
-    let f include_dirs source_dirs burn_csm hide_genv no_warnings =
+
+    let doc =
+      "Suppress linker errors about undefined symbols. Warning: might cause \
+       the program to crash unexpectedly."
+    in
+    let hundef = Arg.(value & flag & info [ "ignore-undef" ] ~docs ~doc) in
+
+    let doc =
+      "Suppress linker errors about multiple symbol definitions. Warning: \
+       might cause the program to crash unexpectedly."
+    in
+    let hmultdef = Arg.(value & flag & info [ "ignore-multdef" ] ~docs ~doc) in
+
+    let opt
+        include_dirs
+        source_dirs
+        burn_csm
+        hide_genv
+        no_warnings
+        hide_undef
+        hide_mult_def =
       {
         include_dirs;
         source_dirs;
         burn_csm;
         hide_genv;
         warnings = not no_warnings;
+        hide_undef;
+        hide_mult_def;
       }
     in
-    Term.(const f $ include_dirs $ source_dirs $ bcsm $ hgenv $ no_warnings)
+    Term.(
+      const opt $ include_dirs $ source_dirs $ bcsm $ hgenv $ no_warnings
+      $ hundef $ hmultdef)
 
-  let apply { include_dirs; source_dirs; burn_csm; hide_genv; warnings } =
+  let apply
+      {
+        include_dirs;
+        source_dirs;
+        burn_csm;
+        hide_genv;
+        warnings;
+        hide_undef;
+        hide_mult_def;
+      } =
     let rec get_c_paths dirs =
       match dirs with
       | []          -> []
@@ -70,7 +105,9 @@ module TargetLangOptions = struct
     Config.source_paths := c_source_paths;
     Config.burn_csm := burn_csm;
     Config.hide_genv := hide_genv;
-    Config.warnings := warnings
+    Config.warnings := warnings;
+    Config.hide_undef := hide_undef;
+    Config.hide_mult_def := hide_mult_def
 end
 
 type err = Errors.errmsg
@@ -154,6 +191,8 @@ let parse_and_compile_files paths =
   in
 
   (* Attempt to match all symbol references to definitions *)
+  let hide_undef = !Config.hide_undef in
+  let hide_mult_def = !Config.hide_mult_def in
   let rec link paths unresolved_syms defined_syms =
     match paths with
     | []           -> unresolved_syms
@@ -164,8 +203,8 @@ let parse_and_compile_files paths =
         let undef_set = Symbol_set.of_list (List.map sym_name undef) in
         let conflicting_defs = Symbol_set.inter defined_syms def_set in
         let () =
-          if not (Symbol_set.is_empty conflicting_defs) then
-            linker_error "multiple definitions of" conflicting_defs
+          if (not (Symbol_set.is_empty conflicting_defs)) && not hide_mult_def
+          then linker_error "multiple definitions of" conflicting_defs
         in
         let unresolved = Symbol_set.union unresolved_syms undef_set in
         let new_defined = Symbol_set.union defined_syms def_set in
@@ -174,7 +213,7 @@ let parse_and_compile_files paths =
   in
   let unresolved_syms = link paths Symbol_set.empty Symbol_set.empty in
   let () =
-    if not (Symbol_set.is_empty unresolved_syms) then
+    if (not (Symbol_set.is_empty unresolved_syms)) && not hide_undef then
       linker_error "undefined reference to" unresolved_syms
   in
 
