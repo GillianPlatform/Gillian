@@ -16,11 +16,6 @@ type t = TypeDef__.literal =
   | LList     of t list  (** Lists of GIL literals *)
   | Nono
 
-let remove_trailing_dot float_str =
-  let len = String.length float_str in
-  if float_str.[len - 1] = '.' then String.sub float_str 0 (len - 1)
-  else float_str
-
 (** Print *)
 let rec pp fmt x =
   match x with
@@ -31,7 +26,7 @@ let rec pp fmt x =
   | Constant c -> Fmt.string fmt (Constant.str c)
   | Bool b     -> if b then Fmt.string fmt "true" else Fmt.string fmt "false"
   | Int i      -> Fmt.int fmt i
-  | Num n      -> Fmt.pf fmt "%s" (remove_trailing_dot (Printf.sprintf "%F" n))
+  | Num n      -> Fmt.pf fmt "%F" n
   | String x   -> Fmt.pf fmt "\"%s\"" x
   | Loc loc    -> Fmt.string fmt loc
   | Type t     -> Fmt.string fmt (Type.str t)
