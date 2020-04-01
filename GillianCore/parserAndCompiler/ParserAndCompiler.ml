@@ -16,7 +16,8 @@ module type S = sig
   val pp_err : Format.formatter -> err -> unit
   (** Pretty printer for type {!err} *)
 
-  val parse_and_compile_file : string -> ((Annot.t, string) Prog.t, err) result
+  val parse_and_compile_files :
+    string list -> ((Annot.t, string) Prog.t, err) result
   (** Takes the name of the file and return an ast or an error *)
 
   val other_imports :
@@ -50,7 +51,7 @@ module Dummy : S = struct
       "Please implement the compiling interface to use with the '-compile' \
        flag or test suites"
 
-  let parse_and_compile_file _ =
+  let parse_and_compile_files _ =
     failwith
       "Please implement the compiling interface to use with the '-compile' \
        flag or test suites"

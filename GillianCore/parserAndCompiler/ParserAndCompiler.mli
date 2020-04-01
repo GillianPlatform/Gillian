@@ -21,7 +21,8 @@ module type S = sig
   val pp_err : Format.formatter -> err -> unit
   (** Pretty printer for type {!err} *)
 
-  val parse_and_compile_file : string -> ((Annot.t, string) Prog.t, err) result
+  val parse_and_compile_files :
+    string list -> ((Annot.t, string) Prog.t, err) result
   (** Takes a path to a file, parses it with the user's language, and then compiles it to a GIL program.
       The obtained GIL program should be ready to be analysed. *)
 

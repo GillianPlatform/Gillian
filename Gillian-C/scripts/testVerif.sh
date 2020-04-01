@@ -3,7 +3,6 @@
 FINAL_RETURN=0
 
 if [[ -z "${GITHUB_ACTIONS}" ]]; then
-  echo "building test env..."
   esy x true > /dev/null 2>&1
   esy exec-env > exec.env
   source exec.env

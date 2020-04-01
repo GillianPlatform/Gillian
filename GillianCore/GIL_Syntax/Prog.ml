@@ -112,10 +112,13 @@ let pp ~(show_labels : bool) ~(pp_label : 'b Fmt.t) fmt (prog : ('a, 'b) t) =
     let open Fmt in
     any "@\n" ++ pp
   in
+  let pp_import fmt = function
+    | str -> Fmt.pf fmt "\"%a\"" Fmt.string str
+  in
   let pp_imports fmt = function
     | []   -> ()
     | imps ->
-        Fmt.pf fmt "import @[%a@];" (Fmt.list ~sep:Fmt.comma Fmt.string) imps
+        Fmt.pf fmt "import @[%a@];" (Fmt.list ~sep:Fmt.comma pp_import) imps
   in
   (* let _ = List.for_all (fun name -> Hashtbl.mem prog.procs name) (prog.proc_names) in *)
   let pp_only_spec fmt' spec = Fmt.pf fmt' "only %a" Spec.pp spec in

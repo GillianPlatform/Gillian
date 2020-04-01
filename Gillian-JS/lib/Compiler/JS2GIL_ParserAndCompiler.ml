@@ -77,7 +77,8 @@ let parse_and_compile_jsil path =
   let core_prog = JSIL2GIL.jsil2core_prog jsil_prog in
   Ok core_prog
 
-let parse_and_compile_file path =
+let parse_and_compile_files paths =
+  let path = List.hd paths in
   if !Javert_utils.Js_config.js then parse_and_compile_js path
   else parse_and_compile_jsil path
 

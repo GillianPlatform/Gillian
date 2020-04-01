@@ -151,7 +151,7 @@ jobs:
           repository:  GillianPlatform/collections-c-for-gillian
           path: collections-c
       - name: Symbolic Testing Collections-C
-        run: 'gillian-c bulk-wpst collections-c/for-gillian --ci'
+        run: 'gillian-c bulk-wpst collections-c/for-gillian --ci --ignore-undef'
 
   test-Buckets:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')

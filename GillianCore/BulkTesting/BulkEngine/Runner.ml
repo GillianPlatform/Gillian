@@ -46,28 +46,6 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
     in
     Hashtbl.replace cat_tbl test.path test
 
-  let get_files (path : string) =
-    let open Unix in
-    let rec walk acc_files paths_left =
-      match paths_left with
-      | []        -> acc_files
-      | p :: rest -> (
-          match (stat p).st_kind with
-          (* p is a file *)
-          | S_REG -> walk (p :: acc_files) rest
-          | S_DIR ->
-              (* p is a directory *)
-              let content =
-                List.map (Filename.concat p) (Array.to_list (Sys.readdir p))
-              in
-              (* Content is the list of paths contained in the directory *)
-              walk acc_files (rest @ content)
-          | _ ->
-              (* The path correspond to something else that we'll ignore *)
-              walk acc_files rest )
-    in
-    walk [] [ path ]
-
   let register_one_test file_path =
     let code = Io_utils.load_file file_path in
     let tests =
@@ -97,7 +75,8 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
           let () = Suite.beforeTest test.Test.info test.path in
           let res =
             match
-              Outcome.ParserAndCompiler.parse_and_compile_file test.Test.path
+              Outcome.ParserAndCompiler.parse_and_compile_files
+                [ test.Test.path ]
             with
             | Error p -> ParseAndCompileError p
             | Ok prog -> (
@@ -125,7 +104,9 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
       test_table
 
   let run_all path =
-    let list_files = List.filter Suite.filter_source (get_files path) in
+    let list_files =
+      List.filter Suite.filter_source (Utils.Io_utils.get_files path)
+    in
     Fmt.pr "Registering tests...\n@?";
     let () = Suite.init_suite list_files in
     let () = register_tests list_files in
