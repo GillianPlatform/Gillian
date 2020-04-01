@@ -96,6 +96,12 @@ module Internal_Functions = struct
   let printf = "EXTERN_printf"
 end
 
+module Builtin_Functions = struct
+  let assert_f = "ASSERT"
+
+  let assume_f = "ASSUME"
+end
+
 module BinOp_Functions = struct
   let add = "i__binop_add"
 

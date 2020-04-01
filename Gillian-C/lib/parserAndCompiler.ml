@@ -48,13 +48,13 @@ module TargetLangOptions = struct
 
     let doc =
       "Suppress linker errors about undefined symbols. Warning: might cause \
-       the program to crash unexpectedly."
+       the C program to crash unexpectedly."
     in
     let hundef = Arg.(value & flag & info [ "ignore-undef" ] ~docs ~doc) in
 
     let doc =
       "Suppress linker errors about multiple symbol definitions. Warning: \
-       might cause the program to crash unexpectedly."
+       might cause the C program to crash unexpectedly."
     in
     let hmultdef = Arg.(value & flag & info [ "ignore-multdef" ] ~docs ~doc) in
 

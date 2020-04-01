@@ -247,9 +247,9 @@ let is_call name e =
   | Csharpminor.Eaddrof l when String.equal (true_name l) name -> true
   | _ -> false
 
-let is_assert_call = is_call "ASSERT"
+let is_assert_call = is_call Builtin_Functions.assert_f
 
-let is_assume_call = is_call "ASSUME"
+let is_assume_call = is_call Builtin_Functions.assume_f
 
 let is_printf_call = is_call "printf"
 
@@ -656,7 +656,8 @@ let is_builtin_func func_name =
 
 let is_gil_func func_name exec_mode =
   ExecMode.symbolic_exec exec_mode
-  && (String.equal func_name "ASSERT" || String.equal func_name "ASSUME")
+  && ( String.equal func_name Builtin_Functions.assume_f
+     || String.equal func_name Builtin_Functions.assert_f )
 
 type symbol = { name : string; defined : bool }
 
@@ -761,9 +762,7 @@ let trans_program
     ~clight_prog
     prog =
   let AST.{ prog_defs; prog_public; _ } = prog in
-  let public_funcs =
-    Symbol_set.of_list (List.map (fun id -> true_name id) prog_public)
-  in
+  let public_funcs = Symbol_set.of_list (List.map true_name prog_public) in
   let make_hashtbl get_name deflist =
     let hashtbl = Hashtbl.create 1 in
     let () =
