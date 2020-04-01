@@ -140,6 +140,28 @@ let parse_annots file =
   let () = close_in inx in
   wprog
 
+module Str_set = Gillian.Utils.Containers.SS
+
+let mangle_clashing_vars proc =
+  let reserved_names = Str_set.of_list [ "pred"; "pure" ] in
+  let mangle var =
+    let suffix = if Str_set.mem var reserved_names then "__" else "" in
+    var ^ suffix
+  in
+  let varname_mangler =
+    object
+      inherit [_] Gillian.Gil_syntax.Visitors.map as super
+
+      method! visit_proc env proc =
+        let proc_params = List.map mangle proc.proc_params in
+        let proc = super#visit_proc env proc in
+        { proc with proc_params }
+
+      method! visit_PVar _ var = Gillian.Gil_syntax.Expr.PVar (mangle var)
+    end
+  in
+  varname_mangler#visit_proc () proc
+
 let parse_and_compile_file path exec_mode =
   let () = Frontend.init () in
   let () =
@@ -163,14 +185,25 @@ let parse_and_compile_file path exec_mode =
       close_out oc
   in
   let annots = parse_annots path in
-  Gilgen.trans_program_with_annots exec_mode last_clight csm annots
+  let prog, init_asrts, init_cmds, symbols =
+    Gilgen.trans_program_with_annots exec_mode last_clight csm annots
+  in
+  let trans_procs = Hashtbl.create 1 in
+  let () =
+    Hashtbl.iter
+      (fun proc_name proc_body ->
+        Hashtbl.add trans_procs proc_name (mangle_clashing_vars proc_body))
+      prog.procs
+  in
+  ({ prog with procs = trans_procs }, init_asrts, init_cmds, symbols)
 
 exception Linker_error
 
 let linker_error msg symbols =
-  let open Gilgen in
   let () =
-    Symbol_set.iter (fun sym -> Printf.printf (msg ^^ " '%s'\n") sym) symbols
+    Gilgen.Symbol_set.iter
+      (fun sym -> Printf.printf (msg ^^ " '%s'\n") sym)
+      symbols
   in
   raise Linker_error
 
