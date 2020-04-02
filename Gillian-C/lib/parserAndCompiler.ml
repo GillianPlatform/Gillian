@@ -2,9 +2,6 @@ open Compcert
 open Config_compcert
 open CConstants
 
-let current_arch =
-  if Archi.ptr64 then Architecture.Arch64 else Architecture.Arch32
-
 module TargetLangOptions = struct
   open Cmdliner
 
@@ -206,6 +203,9 @@ let linker_error msg symbols =
       symbols
   in
   raise Linker_error
+
+let current_arch =
+  if Archi.ptr64 then Architecture.Arch64 else Architecture.Arch32
 
 let add_init_pred exec_mode =
   ExecMode.verification_exec exec_mode || ExecMode.biabduction_exec exec_mode
