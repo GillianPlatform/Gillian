@@ -261,7 +261,7 @@ let parse_and_compile_files paths =
         let gil_path = Filename.chop_extension path ^ ".gil" in
         let () = Io_utils.save_file_pp gil_path Prog.pp_labeled prog in
         combine rest
-          (comb_imports @ [ gil_path ])
+          (comb_imports @ [ (gil_path, true) ])
           (comb_init_asrts @ init_asrts)
           (comb_init_cmds @ init_cmds)
   in

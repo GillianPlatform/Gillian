@@ -425,7 +425,7 @@ let jsil2core_prog (prog : EProg.t) : (Annot.t, string) GProg.t =
 
   let result : (Annot.t, string) GProg.t =
     {
-      imports = prog.imports;
+      imports = List.map (fun imp -> (imp, false)) prog.imports;
       preds = translate_tbl prog.preds jsil2gil_pred;
       lemmas = translate_tbl prog.lemmas jsil2gil_lemma;
       only_specs = translate_tbl prog.only_specs jsil2gil_spec;

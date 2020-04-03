@@ -947,7 +947,8 @@ let compile WProg.{ context; predicates; lemmas } =
   let proc_names = Hashtbl.fold (fun s _ l -> s :: l) gil_procs [] in
   Prog.
     {
-      imports = WislConstants.internal_imports;
+      imports =
+        List.map (fun imp -> (imp, false)) WislConstants.internal_imports;
       lemmas = gil_lemmas;
       preds = gil_preds;
       procs = gil_procs;
