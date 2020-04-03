@@ -138,7 +138,19 @@ let eprog_to_prog
         else
           log_verboser (fun m ->
               m "*** WARNING: Procedure %s already exists.@\n" macro_name))
-      program_from.macros
+      program_from.macros;
+
+    Hashtbl.iter
+      (fun bispec_name bispec ->
+        if not (Hashtbl.mem program_to.bi_specs bispec_name) then (
+          log_verboser (fun m ->
+              m "*** MESSAGE: Adding bi-abduction spec: %s.@\n" bispec_name);
+          Hashtbl.add program_to.bi_specs bispec_name bispec )
+        else
+          log_verboser (fun m ->
+              m "*** WARNING: Bi-abduction spec %s already exists.@\n"
+                bispec_name))
+      program_from.bi_specs
   in
   let resolve_imports (program : (Annot.t, string) Prog.t) : unit =
     (* Extend the program with each of the imported programs *)
