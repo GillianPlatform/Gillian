@@ -75,16 +75,12 @@ let eprog_to_prog
     ~(other_imports : (string * (string -> (Annot.t, string) Prog.t)) list)
     (ext_program : (Annot.t, string) Prog.t) : (Annot.t, int) Prog.t =
   let open Prog in
-  (* ----------------------------------------------------
-      Add the declarations in 'program_from' to 'program_to'.
-      -----------------------------------------------------
-  *)
   let extend_declarations
       (program_to : (Annot.t, string) Prog.t)
-      (program_from : (Annot.t, string) Prog.t) : unit =
-    (* Step 1 - Extend the predicates
-       * -----------------------------------------------------------------------------------
-    *)
+      (program_from : (Annot.t, string) Prog.t)
+      (should_verify : bool) : unit =
+    (* Add the declarations in 'program_from' to 'program_to' *)
+    (* Extend the predicates *)
     Hashtbl.iter
       (fun pred_name pred ->
         if Hashtbl.mem program_to.preds pred_name then
@@ -95,22 +91,22 @@ let eprog_to_prog
               m "*** MESSAGE: Adding predicate %s.@\n" pred_name);
         Hashtbl.add program_to.preds pred_name pred)
       program_from.preds;
-    (* Step 2 - Extend the procedures, except where a procedure with the same name already exists
-     * -----------------------------------------------------------------------------------
-     *)
+
+    (* Extend the procedures, except where a procedure with the same name
+       already exists *)
     Hashtbl.iter
-      (fun proc_name (proc : (Annot.t, string) Proc.t) ->
+      (fun proc_name proc ->
         if not (Hashtbl.mem program_to.procs proc_name) then (
           log_verboser (fun m ->
               m "*** MESSAGE: Adding procedure: %s.@\n" proc_name);
-          let adjusted_proc : (Annot.t, string) Proc.t =
+          let adjusted_proc =
             Proc.
               {
                 proc with
                 proc_spec =
                   Option.map
-                    (fun (spec : Spec.t) ->
-                      Spec.{ spec with spec_to_verify = false })
+                    (fun spec ->
+                      Spec.{ spec with spec_to_verify = should_verify })
                     proc.proc_spec;
               }
           in
@@ -119,22 +115,20 @@ let eprog_to_prog
           log_verboser (fun m ->
               m "*** WARNING: Procedure %s already exists.@\n" proc_name))
       program_from.procs;
-    (* Step 3 - Extend the onlyspecs
-       * -----------------------------------------------------------------------------------
-    *)
+
+    (* Extend the only_specs *)
     Hashtbl.iter
-      (fun proc_name proc ->
-        if not (Hashtbl.mem program_to.only_specs proc_name) then (
+      (fun spec_name spec ->
+        if not (Hashtbl.mem program_to.only_specs spec_name) then (
           log_verboser (fun m ->
-              m "*** MESSAGE: Adding onlyspec procedure: %s.@\n" proc_name);
-          Hashtbl.add program_to.only_specs proc_name proc )
+              m "*** MESSAGE: Adding onlyspec procedure: %s.@\n" spec_name);
+          Hashtbl.add program_to.only_specs spec_name spec )
         else
           log_verboser (fun m ->
-              m "*** WARNING: Procedure %s already exists.@\n" proc_name))
+              m "*** WARNING: Procedure %s already exists.@\n" spec_name))
       program_from.only_specs;
-    (* Step 4 - Extend the macros
-       * -----------------------------------------------------------------------------------
-    *)
+
+    (* Extend the macros *)
     Hashtbl.iter
       (fun macro_name macro ->
         if not (Hashtbl.mem program_to.macros macro_name) then (
@@ -144,17 +138,23 @@ let eprog_to_prog
         else
           log_verboser (fun m ->
               m "*** WARNING: Procedure %s already exists.@\n" macro_name))
-      program_from.macros
+      program_from.macros;
+
+    Hashtbl.iter
+      (fun bispec_name bispec ->
+        if not (Hashtbl.mem program_to.bi_specs bispec_name) then (
+          log_verboser (fun m ->
+              m "*** MESSAGE: Adding bi-abduction spec: %s.@\n" bispec_name);
+          Hashtbl.add program_to.bi_specs bispec_name bispec )
+        else
+          log_verboser (fun m ->
+              m "*** WARNING: Bi-abduction spec %s already exists.@\n"
+                bispec_name))
+      program_from.bi_specs
   in
   let resolve_imports (program : (Annot.t, string) Prog.t) : unit =
-    (* 'added_imports' keeps track of the loaded files *)
-    (* Step 1 - Create a hashtable 'added_imports' which keeps track of the loaded files
-     * -----------------------------------------------------------------------------------
-     *)
+    (* Extend the program with each of the imported programs *)
     let added_imports = Hashtbl.create 32 in
-    (* Step 2 - Extend the program with each of the programs in imports
-     * -----------------------------------------------------------------------------------
-     *)
     let resolve_import_path fname =
       let list_paths = "." :: Config.get_runtime_paths () in
       let rec find fn l =
@@ -171,8 +171,8 @@ let eprog_to_prog
     in
     let rec resolve_imports_iter imports =
       match imports with
-      | []                   -> ()
-      | file :: rest_imports ->
+      | [] -> ()
+      | (file, should_verify) :: rest_imports ->
           let open Prog in
           if not (Hashtbl.mem added_imports file) then (
             let file = resolve_import_path file in
@@ -190,7 +190,7 @@ let eprog_to_prog
                                               (Failure "DEATH.resolve_imports")
                 | Some parse_and_compile -> parse_and_compile file
             in
-            extend_declarations program imported_program;
+            extend_declarations program imported_program should_verify;
             resolve_imports_iter (rest_imports @ imported_program.imports) )
     in
     resolve_imports_iter program.imports

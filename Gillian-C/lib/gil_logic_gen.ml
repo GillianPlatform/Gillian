@@ -4,6 +4,9 @@ open Gillian.Gil_syntax
 open CConstants
 open CLogic
 open Compcert
+module Str_set = Gillian.Utils.Containers.SS
+
+let already_annot_structs = ref Str_set.empty
 
 let id_of_string = Camlcoq.intern_string
 
@@ -82,6 +85,19 @@ type gil_annots = {
 }
 
 let empty = { preds = []; specs = []; bispecs = []; cenv = Maps.PTree.empty }
+
+let get_structs_not_annot struct_types =
+  let get_name (Ctypes.Composite (id, _, _, _)) = true_name id in
+  let struct_names = List.map get_name struct_types in
+  let already_annot = !already_annot_structs in
+  let structs_not_annot =
+    List.filter (fun name -> not (Str_set.mem name already_annot)) struct_names
+  in
+  let newly_annot =
+    Str_set.union already_annot (Str_set.of_list structs_not_annot)
+  in
+  already_annot_structs := newly_annot;
+  structs_not_annot
 
 let assert_of_member cenv members id typ =
   let open Ctypes in
@@ -561,13 +577,13 @@ let add_trans_spec ann cl_spec =
   { ann with specs = trans_spec ~ann cl_spec :: ann.specs }
 
 let trans_annots clight_prog log_prog =
-  let get_name (Ctypes.Composite (id, _, _, _)) = true_name id in
   let open Ctypes in
+  let structs_not_annot = get_structs_not_annot clight_prog.prog_types in
   let struct_annots =
     List.fold_left
       (gen_pred_of_struct clight_prog.prog_comp_env)
       { empty with cenv = clight_prog.prog_comp_env }
-      (List.map get_name clight_prog.prog_types)
+      structs_not_annot
   in
   let with_preds =
     List.fold_left add_trans_pred struct_annots log_prog.CProg.preds
@@ -789,11 +805,11 @@ let gen_rec_pred_of_struct cenv ann struct_name =
 
 let gen_bi_preds clight_prog =
   let open Ctypes in
-  let get_name (Ctypes.Composite (id, _, _, _)) = true_name id in
+  let structs_not_annot = get_structs_not_annot clight_prog.prog_types in
   List.fold_left
     (gen_rec_pred_of_struct clight_prog.prog_comp_env)
     { empty with cenv = clight_prog.prog_comp_env }
-    (List.map get_name clight_prog.prog_types)
+    structs_not_annot
 
 let predicate_from_triple (pn, csmt, ct) =
   let is_c_ptr_to_struct = function

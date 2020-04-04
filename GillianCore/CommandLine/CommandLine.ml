@@ -479,7 +479,6 @@ struct
             close_out outc
         | None         -> ()
       in
-      let proc_names = e_prog.proc_names in
       let () =
         L.normal (fun m -> m "*** Stage 2: Transforming the program.@\n")
       in
@@ -498,14 +497,7 @@ struct
       match UP.init_prog prog with
       | Error _  -> raise (Failure "Creation of unification plans failed.")
       | Ok prog' ->
-          let () =
-            L.(
-              verboser (fun m ->
-                  m "Procedure names: %a"
-                    Fmt.(list ~sep:comma string)
-                    proc_names))
-          in
-          let () = Abductor.test_procs prog' proc_names in
+          let () = Abductor.test_procs prog' in
           if !Config.output_verification then
             let () = Prog.update_specs e_prog prog'.prog in
             let eprog_final_str = (Fmt.to_to_string Prog.pp_labeled) e_prog in

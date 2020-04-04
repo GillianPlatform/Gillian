@@ -791,7 +791,7 @@ end
 
 module Prog : sig
   type ('annot, 'label) t = {
-    imports : string list;
+    imports : (string * bool) list;
     lemmas : (string, Lemma.t) Hashtbl.t;
     preds : (string, Pred.t) Hashtbl.t;
     only_specs : (string, Spec.t) Hashtbl.t;
@@ -803,22 +803,22 @@ module Prog : sig
   }
 
   val make :
-    imports:string list ->
+    imports:(string * bool) list ->
     lemmas:(string, Lemma.t) Hashtbl.t ->
     preds:(string, Pred.t) Hashtbl.t ->
     only_specs:(string, Spec.t) Hashtbl.t ->
-    procs:(string, ('a, 'b) Proc.t) Hashtbl.t ->
+    procs:(string, ('annot, 'label) Proc.t) Hashtbl.t ->
     macros:(string, Macro.t) Hashtbl.t ->
     bi_specs:(string, BiSpec.t) Hashtbl.t ->
     proc_names:string list ->
     predecessors:(string * int * int, int) Hashtbl.t ->
     unit ->
-    ('a, 'b) t
+    ('annot, 'label) t
   (** Makes a full program *)
 
   val make_labeled :
     procs:(string, ('annot, string) Proc.t) Hashtbl.t ->
-    imports:string list ->
+    imports:(string * bool) list ->
     lemmas:(string, Lemma.t) Hashtbl.t ->
     preds:(string, Pred.t) Hashtbl.t ->
     only_specs:(string, Spec.t) Hashtbl.t ->
@@ -830,7 +830,7 @@ module Prog : sig
   (** Initialises a labeled program (with empty predecessors, to be computed later) *)
 
   val make_indexed :
-    procs:('a, int) Proc.t list ->
+    procs:('annot, int) Proc.t list ->
     predecessors:(string * int * int * int) list ->
     lemmas:(string, Lemma.t) Hashtbl.t ->
     preds:(string, Pred.t) Hashtbl.t ->
@@ -838,8 +838,8 @@ module Prog : sig
     macros:(string, Macro.t) Hashtbl.t ->
     bi_specs:(string, BiSpec.t) Hashtbl.t ->
     unit ->
-    ('a, int) t
-  (** Initialises an indexed program (with empty proc_names and imports, useless for the rest *)
+    ('annot, int) t
+  (** Initialises an indexed program (with empty proc_names and imports, useless for the rest) *)
 
   val create : unit -> ('a, string) t
   (** Creates an empty program *)
@@ -880,7 +880,7 @@ module Prog : sig
   val update_specs : ('a, 'b) t -> ('c, 'd) t -> unit
   (** Add specs *)
 
-  val update_imports : ('a, 'b) t -> string list -> ('a, 'b) t
+  val update_imports : ('a, 'b) t -> (string * bool) list -> ('a, 'b) t
   (** Add imports *)
 
   val add_lemma : ('a, 'b) t -> Lemma.t -> ('a, 'b) t

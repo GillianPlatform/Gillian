@@ -50,8 +50,7 @@ module Imports = struct
 
   let imports arch exec_mode =
     let select x = List.mem arch x.arch && List.mem exec_mode x.exec in
-    let get_name x = x.file in
-    List.map get_name (List.filter select all_imports)
+    List.map (fun imp -> (imp.file, false)) (List.filter select all_imports)
 end
 
 module Internal_Functions = struct

@@ -2,9 +2,6 @@ open Compcert
 open Config_compcert
 open CConstants
 
-let current_arch =
-  if Archi.ptr64 then Architecture.Arch64 else Architecture.Arch32
-
 module TargetLangOptions = struct
   open Cmdliner
 
@@ -207,6 +204,9 @@ let linker_error msg symbols =
   in
   raise Linker_error
 
+let current_arch =
+  if Archi.ptr64 then Architecture.Arch64 else Architecture.Arch32
+
 let add_init_pred exec_mode =
   ExecMode.verification_exec exec_mode || ExecMode.biabduction_exec exec_mode
 
@@ -261,7 +261,7 @@ let parse_and_compile_files paths =
         let gil_path = Filename.chop_extension path ^ ".gil" in
         let () = Io_utils.save_file_pp gil_path Prog.pp_labeled prog in
         combine rest
-          (comb_imports @ [ gil_path ])
+          (comb_imports @ [ (gil_path, true) ])
           (comb_init_asrts @ init_asrts)
           (comb_init_cmds @ init_cmds)
   in

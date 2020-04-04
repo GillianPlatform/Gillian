@@ -120,13 +120,14 @@
       "bispec",  GIL_Parser.BISPEC;
       "normal",  GIL_Parser.NORMAL;
       "error",   GIL_Parser.ERROR;
-      "fail",   GIL_Parser.FAIL;
+      "fail",    GIL_Parser.FAIL;
 
       (* Procedure definition keywords *)
       "proc", GIL_Parser.PROC;
 
-    (* Others *)
-    "import", GIL_Parser.IMPORT
+      (* Others *)
+      "import", GIL_Parser.IMPORT;
+      "verify", GIL_Parser.VERIFY;
     ]
 }
 
@@ -137,7 +138,6 @@ let identifier = letter(letter|digit|'_')*
 let float = '-'? digit+ ('.' digit*)?
 
 let var2 = "_pvar_" (letter|digit|'_')*
-let filename = (letter|digit|'_')+ '.' (letter|digit|'_')+
 let lvar = '#' (letter|digit|'_'|'$')*
 let lvar2 = "_lvar_" (letter|digit|'_')*
 let normalised_lvar = "##NORMALISED_LVAR" (letter|digit|'_'|'$')*
@@ -154,8 +154,8 @@ rule read = parse
   | "_"                  { GIL_Parser.UNDERSCORE    }
 
   (* Literals *)
-  | "{{"        { GIL_Parser.LSTOPEN   }
-  | "}}"        { GIL_Parser.LSTCLOSE  }
+  | "{{"                 { GIL_Parser.LSTOPEN   }
+  | "}}"                 { GIL_Parser.LSTCLOSE  }
 
 (* Constants *)
   | "$$min_float"        { GIL_Parser.MIN_FLOAT     }
@@ -257,20 +257,17 @@ rule read = parse
   | '}'                  { GIL_Parser.CRBRACKET }
 (* Literals (cont.) *)
   | float                { let n = float_of_string (Lexing.lexeme lexbuf) in
-                             GIL_Parser.FLOAT n }
+                           GIL_Parser.FLOAT n }
   | '"'                  { read_string (Buffer.create 17) lexbuf }
   | loc                  { GIL_Parser.LOC (Lexing.lexeme lexbuf) }
-  | aloc                  { GIL_Parser.ALOC (Lexing.lexeme lexbuf) }
-  | normalised_aloc       { GIL_Parser.ALOC (Lexing.lexeme lexbuf) }
-(* Filenames *)
-  | filename             { GIL_Parser.FILENAME (Lexing.lexeme lexbuf) }
+  | aloc                 { GIL_Parser.ALOC (Lexing.lexeme lexbuf) }
+  | normalised_aloc      { GIL_Parser.ALOC (Lexing.lexeme lexbuf) }
 
   (* Variables: THIS IS NEW *)
   | identifier           { let candidate = Lexing.lexeme lexbuf in
-                            (match (Hashtbl.mem keyword_table candidate) with
-                            | true  -> Hashtbl.find keyword_table candidate
-                            | false -> GIL_Parser.VAR (Lexing.lexeme lexbuf)) }
-
+                           match (Hashtbl.mem keyword_table candidate) with
+                           | true  -> Hashtbl.find keyword_table candidate
+                           | false -> GIL_Parser.VAR (Lexing.lexeme lexbuf) }
   | var2                 { GIL_Parser.VAR (Lexing.lexeme lexbuf) }
 (* Logic variables *)
   | lvar                 { GIL_Parser.LVAR (Lexing.lexeme lexbuf) }
