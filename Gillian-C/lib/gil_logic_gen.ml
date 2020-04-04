@@ -4,9 +4,8 @@ open Gillian.Gil_syntax
 open CConstants
 open CLogic
 open Compcert
+open CompileState
 module Str_set = Gillian.Utils.Containers.SS
-
-let already_annot_structs = ref Str_set.empty
 
 let id_of_string = Camlcoq.intern_string
 

@@ -22,6 +22,10 @@ module Suite = struct
   let filter_source s =
     Filename.check_suffix s ".c"
     && not (!Gillian.Utils.Config.ci && contains_substring s "bug/")
+
+  let beforeEach () =
+    Generators.reset ();
+    CompileState.reset ()
 end
 
 module Expectations = struct
