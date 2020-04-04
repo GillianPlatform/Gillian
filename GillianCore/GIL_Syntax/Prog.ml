@@ -1,8 +1,10 @@
 module L = Logging
 
 type ('annot, 'label) t = {
-  imports : string list;
-  (* Import statements = [Filename : String] *)
+  imports : (string * bool) list;
+      (** List of tuples consisting of the file path and a boolean indicating
+      whether the procedures in the file should be verified. The latter should
+      be [false] for runtime files. *)
   lemmas : (string, Lemma.t) Hashtbl.t;
   (* Lemmas *)
   preds : (string, Pred.t) Hashtbl.t;
@@ -112,12 +114,23 @@ let pp ~(show_labels : bool) ~(pp_label : 'b Fmt.t) fmt (prog : ('a, 'b) t) =
     let open Fmt in
     any "@\n" ++ pp
   in
-  let pp_imports fmt = function
-    | []   -> ()
-    | imps ->
-        Fmt.pf fmt "import @[%a@];" (Fmt.list ~sep:Fmt.comma Fmt.string) imps
+  let pp_import_paths fmt prefix = function
+    | []    -> ()
+    | paths ->
+        let pp_str fmt = function
+          | str -> Fmt.pf fmt "\"%a\"" Fmt.string str
+        in
+        Fmt.pf fmt "%s @[%a@];@\n" prefix (Fmt.list ~sep:Fmt.comma pp_str) paths
   in
-  (* let _ = List.for_all (fun name -> Hashtbl.mem prog.procs name) (prog.proc_names) in *)
+  let pp_imports fmt imports =
+    let reg_imps, imps_to_verify =
+      List.partition (fun (_, should_verify) -> not should_verify) imports
+    in
+    let reg_paths = List.map fst reg_imps in
+    let paths_to_verify = List.map fst imps_to_verify in
+    pp_import_paths fmt "import" reg_paths;
+    pp_import_paths fmt "import verify" paths_to_verify
+  in
   let pp_only_spec fmt' spec = Fmt.pf fmt' "only %a" Spec.pp spec in
   Fmt.pf fmt "%a@\n%a%a%a%a%a" pp_imports prog.imports
     (pp_list (npp Lemma.pp))
@@ -161,7 +174,8 @@ let update_specs (to_update : ('a, 'b) t) (update_with : ('c, 'd) t) : unit =
     update_with.procs;
   Hashtbl.clear to_update.bi_specs
 
-let update_imports (prog : ('a, 'b) t) (imports : string list) : ('a, 'b) t =
+let update_imports (prog : ('a, 'b) t) (imports : (string * bool) list) :
+    ('a, 'b) t =
   { prog with imports }
 
 let add_lemma (prog : ('a, 'b) t) (lemma : Lemma.t) : ('a, 'b) t =

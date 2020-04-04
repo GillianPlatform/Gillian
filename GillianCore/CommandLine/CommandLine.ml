@@ -28,10 +28,10 @@ struct
   module Verification = Verifier.Make (SState) (SPState) (External)
   module Abductor = Abductor.Make (SState) (SPState) (External)
 
-  let file =
+  let files =
     let doc = "Input file." in
     let docv = "FILE" in
-    Arg.(required & pos 0 (some file) None & info [] ~docv ~doc)
+    Arg.(non_empty & pos_all file [] & info [] ~docv ~doc)
 
   let ci =
     let doc = "Indicates that the tool is being run in CI." in
@@ -102,13 +102,13 @@ struct
       in
       Arg.(last & vflag_all [ Verification ] [ concrete; wpst; verif; act ])
 
-    let process_file file =
-      let prog = Stdlib.Result.get_ok (PC.parse_and_compile_file file) in
+    let process_files files =
+      let prog = Stdlib.Result.get_ok (PC.parse_and_compile_files files) in
       Io_utils.save_file_pp
-        (Filename.chop_extension file ^ ".gil")
+        (Filename.chop_extension (List.hd files) ^ ".gil")
         Prog.pp_labeled prog
 
-    let compile file mode runtime_path ci tl_opts =
+    let compile files mode runtime_path ci tl_opts =
       let () = Config.ci := ci in
       let () = PC.TargetLangOptions.apply tl_opts in
       let () = PC.initialize mode in
@@ -116,11 +116,11 @@ struct
       let () =
         Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
       in
-      process_file file
+      process_files files
 
     let compile_t =
       Term.(
-        const compile $ file $ mode $ runtime_path $ ci
+        const compile $ files $ mode $ runtime_path $ ci
         $ PC.TargetLangOptions.term)
 
     let compile_info =
@@ -165,7 +165,7 @@ struct
       return_to_exit (valid_concrete_result ret)
 
     let exec
-        file
+        files
         already_compiled
         silent
         debug
@@ -186,8 +186,8 @@ struct
       in
       let lab_prog =
         if not already_compiled then
-          Stdlib.Result.get_ok PC.(parse_and_compile_file file)
-        else Gil_parsing.parse_eprog_from_file file
+          Stdlib.Result.get_ok PC.(parse_and_compile_files files)
+        else Gil_parsing.parse_eprog_from_file (List.hd files)
       in
       let () =
         match outfile_opt with
@@ -215,7 +215,7 @@ struct
 
     let exec_t =
       Term.(
-        const exec $ file $ already_compiled $ silent $ debug $ output_gil
+        const exec $ files $ already_compiled $ silent $ debug $ output_gil
         $ no_heap $ runtime_path $ ci $ PC.TargetLangOptions.term)
 
     let exec_info =
@@ -232,7 +232,7 @@ struct
   end
 
   module SInterpreterConsole = struct
-    let process_file file already_compiled outfile_opt =
+    let process_files files already_compiled outfile_opt =
       let e_prog =
         if not already_compiled then
           let _ =
@@ -242,12 +242,12 @@ struct
                    *** Stage 1: Parsing program in original language and \
                    compiling to Gil. ***@\n")
           in
-          Stdlib.Result.get_ok PC.(parse_and_compile_file file)
+          Stdlib.Result.get_ok PC.(parse_and_compile_files files)
         else
           let _ =
             L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
           in
-          Gil_parsing.parse_eprog_from_file file
+          Gil_parsing.parse_eprog_from_file (List.hd files)
       in
       let () =
         match outfile_opt with
@@ -281,7 +281,7 @@ struct
           ()
 
     let wpst
-        file
+        files
         already_compiled
         outfile_opt
         no_heap
@@ -303,7 +303,7 @@ struct
       let () = Config.stats := stats in
       let () = Config.parallel := parallel in
       let () = Config.no_heap := no_heap in
-      let () = process_file file already_compiled outfile_opt in
+      let () = process_files files already_compiled outfile_opt in
       let () = if stats then Statistics.print_statistics () in
       let () = Logging.wrap_up () in
       try
@@ -315,7 +315,7 @@ struct
 
     let wpst_t =
       Term.(
-        const wpst $ file $ already_compiled $ output_gil $ no_heap $ silent
+        const wpst $ files $ already_compiled $ output_gil $ no_heap $ silent
         $ stats $ parallel $ runtime_path $ ci $ PC.TargetLangOptions.term)
 
     let wpst_info =
@@ -344,7 +344,7 @@ struct
       let doc = "Disables automatic folding and unfolding heuristics" in
       Arg.(value & flag & info [ "m"; "manual" ] ~doc)
 
-    let process_file file already_compiled outfile_opt no_unfold =
+    let process_files files already_compiled outfile_opt no_unfold =
       let e_prog =
         if not already_compiled then
           let () =
@@ -354,12 +354,12 @@ struct
                    *** Stage 1: Parsing program in original language and \
                    compiling to Gil. ***@\n")
           in
-          Stdlib.Result.get_ok PC.(parse_and_compile_file file)
+          Stdlib.Result.get_ok PC.(parse_and_compile_files files)
         else
           let () =
             L.normal (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
           in
-          Gil_parsing.parse_eprog_from_file file
+          Gil_parsing.parse_eprog_from_file (List.hd files)
       in
       let () =
         match outfile_opt with
@@ -403,7 +403,7 @@ struct
       Verification.verify_procs prog
 
     let verify
-        file
+        files
         already_compiled
         outfile_opt
         no_unfold
@@ -428,13 +428,13 @@ struct
       let () =
         Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
       in
-      let () = process_file file already_compiled outfile_opt no_unfold in
+      let () = process_files files already_compiled outfile_opt no_unfold in
       let () = if stats then Statistics.print_statistics () in
       Logging.wrap_up ()
 
     let verify_t =
       Term.(
-        const verify $ file $ already_compiled $ output_gil $ no_unfold $ stats
+        const verify $ files $ already_compiled $ output_gil $ no_unfold $ stats
         $ no_lemma_proof $ silent $ stats $ manual $ runtime_path $ ci
         $ PC.TargetLangOptions.term)
 
@@ -452,7 +452,8 @@ struct
   end
 
   module ACTConsole = struct
-    let process_file file already_compiled outfile_opt =
+    let process_files files already_compiled outfile_opt =
+      let file = List.hd files in
       let e_prog =
         if not already_compiled then
           let () =
@@ -462,7 +463,7 @@ struct
                    *** Stage 1: Parsing program in original language and \
                    compiling to Gil. ***@\n")
           in
-          Stdlib.Result.get_ok PC.(parse_and_compile_file file)
+          Stdlib.Result.get_ok PC.(parse_and_compile_files files)
         else
           let () =
             L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
@@ -478,7 +479,6 @@ struct
             close_out outc
         | None         -> ()
       in
-      let proc_names = e_prog.proc_names in
       let () =
         L.normal (fun m -> m "*** Stage 2: Transforming the program.@\n")
       in
@@ -497,14 +497,7 @@ struct
       match UP.init_prog prog with
       | Error _  -> raise (Failure "Creation of unification plans failed.")
       | Ok prog' ->
-          let () =
-            L.(
-              verboser (fun m ->
-                  m "Procedure names: %a"
-                    Fmt.(list ~sep:comma string)
-                    proc_names))
-          in
-          let () = Abductor.test_procs prog' proc_names in
+          let () = Abductor.test_procs prog' in
           if !Config.output_verification then
             let () = Prog.update_specs e_prog prog'.prog in
             let eprog_final_str = (Fmt.to_to_string Prog.pp_labeled) e_prog in
@@ -515,7 +508,7 @@ struct
             Io_utils.save_file path' eprog_final_str
 
     let act
-        file
+        files
         already_compiled
         outfile_opt
         no_heap
@@ -537,13 +530,13 @@ struct
       let () =
         Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
       in
-      let () = process_file file already_compiled outfile_opt in
+      let () = process_files files already_compiled outfile_opt in
       let () = if !Config.stats then Statistics.print_statistics () in
       Logging.wrap_up ()
 
     let act_t =
       Term.(
-        const act $ file $ already_compiled $ output_gil $ no_heap $ silent
+        const act $ files $ already_compiled $ output_gil $ no_heap $ silent
         $ stats $ parallel $ runtime_path $ ci $ PC.TargetLangOptions.term)
 
     let act_info =

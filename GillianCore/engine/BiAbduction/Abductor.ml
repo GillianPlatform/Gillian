@@ -169,12 +169,11 @@ struct
     (* update_statistics "make_spec_AbsBi" (time() -. start_time); *)
     (sspec, spec)
 
+  let get_proc_names procs = List.map (fun proc -> proc.Proc.proc_name) procs
+
   let testify (prog : UP.prog) (bi_spec : BiSpec.t) : t list =
     L.verboser (fun m -> m "Bi-testifying: %s" bi_spec.bispec_name);
-    let procs = Prog.get_procs prog.prog in
-    let proc_names =
-      List.map (fun (proc : ('a, 'b) Proc.t) -> proc.proc_name) procs
-    in
+    let proc_names = get_proc_names (Prog.get_procs prog.prog) in
     let params = SS.of_list bi_spec.bispec_params in
     let normalise =
       Normaliser.normalise_assertion ~pred_defs:prog.preds ~pvars:params
@@ -212,18 +211,17 @@ struct
         (Printf.sprintf "ERROR in proc %s with message:\n%s\n" test.name msg);
       []
 
-  let test_procs (prog : UP.prog) (proc_names : string list) : unit =
+  let test_procs (prog : UP.prog) : unit =
     L.verboser (fun m -> m "Starting bi-abductive testing");
-
-    let bispecs =
-      List_utils.get_list_somes
-        (List.map
-           (fun name ->
-             let result = Prog.get_bispec prog.prog name in
-             if result <> None then
-               L.verboser (fun m -> m "Found bi-spec for: %s" name);
-             result)
-           proc_names)
+    let proc_names = get_proc_names (Prog.get_procs prog.prog) in
+    L.verboser (fun m ->
+        m "Procedure names: %a" Fmt.(list ~sep:comma string) proc_names);
+    let bispecs = Prog.get_bispecs prog.prog in
+    let () =
+      List.iter
+        (fun (bispec : Gil_syntax.BiSpec.t) ->
+          L.verboser (fun m -> m "Found bi-spec for: %s" bispec.bispec_name))
+        bispecs
     in
     let tests = List.concat (List.map (testify prog) bispecs) in
 
@@ -273,7 +271,7 @@ struct
            (fun test ->
              ( L.(
                  verboser (fun m ->
-                     m "Running Biabduction on function %s\n" test.name));
+                     m "Running bi-abduction on function %s\n" test.name));
                let rets =
                  run_test
                    (process_symb_exec_result test.name test.params test.state)

@@ -50,8 +50,7 @@ module Imports = struct
 
   let imports arch exec_mode =
     let select x = List.mem arch x.arch && List.mem exec_mode x.exec in
-    let get_name x = x.file in
-    List.map get_name (List.filter select all_imports)
+    List.map (fun imp -> (imp.file, false)) (List.filter select all_imports)
 end
 
 module Internal_Functions = struct
@@ -94,6 +93,12 @@ module Internal_Functions = struct
   let bool_of_val = "i__bool_of_value"
 
   let printf = "EXTERN_printf"
+end
+
+module Builtin_Functions = struct
+  let assert_f = "ASSERT"
+
+  let assume_f = "ASSUME"
 end
 
 module BinOp_Functions = struct

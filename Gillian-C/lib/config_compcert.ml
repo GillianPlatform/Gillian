@@ -36,3 +36,11 @@ module Optim = struct
 
   let disable_all () = List.iter (fun r -> r := false) optimization_options
 end
+
+module Include = struct
+  let add_include_dirs include_dirs =
+    let open Compcert.Clflags in
+    List.iter
+      (fun dir -> prepro_options := dir :: "-I" :: !prepro_options)
+      include_dirs
+end

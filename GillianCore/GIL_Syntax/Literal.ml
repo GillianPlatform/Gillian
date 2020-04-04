@@ -26,7 +26,7 @@ let rec pp fmt x =
   | Constant c -> Fmt.string fmt (Constant.str c)
   | Bool b     -> if b then Fmt.string fmt "true" else Fmt.string fmt "false"
   | Int i      -> Fmt.int fmt i
-  | Num n      -> Fmt.float fmt n
+  | Num n      -> Fmt.pf fmt "%F" n
   | String x   -> Fmt.pf fmt "\"%s\"" x
   | Loc loc    -> Fmt.string fmt loc
   | Type t     -> Fmt.string fmt (Type.str t)

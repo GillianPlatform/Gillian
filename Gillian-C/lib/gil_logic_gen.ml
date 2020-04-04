@@ -4,6 +4,8 @@ open Gillian.Gil_syntax
 open CConstants
 open CLogic
 open Compcert
+open CompileState
+module Str_set = Gillian.Utils.Containers.SS
 
 let id_of_string = Camlcoq.intern_string
 
@@ -36,7 +38,21 @@ let ( ++ ) e1 e2 =
 
 let ( == ) e1 e2 = if e1 = e2 then Asrt.Emp else Asrt.Pure (Eq (e1, e2))
 
-let types e t = Asrt.Types [ (e, t) ]
+let types t e =
+  let static_error () =
+    Fmt.failwith "Statically infered that %a should be of type %s" Expr.pp e
+      (Type.str t)
+  in
+  match e with
+  | Expr.PVar _ | LVar _ -> Asrt.Types [ (e, t) ]
+  | Lit l when t <> Literal.type_of l -> static_error ()
+  | ALoc _ when t <> ObjectType -> static_error ()
+  | EList _ when t <> ListType -> static_error ()
+  | LstSub _ when t <> ListType -> static_error ()
+  | ESet _ when t <> SetType -> static_error ()
+  | BinOp _ | UnOp _ | NOp _ ->
+      static_error () (* Maybe a more precise message ? *)
+  | _ -> Emp
 
 let ( ** ) a1 a2 =
   match (a1, a2) with
@@ -68,6 +84,19 @@ type gil_annots = {
 }
 
 let empty = { preds = []; specs = []; bispecs = []; cenv = Maps.PTree.empty }
+
+let get_structs_not_annot struct_types =
+  let get_name (Ctypes.Composite (id, _, _, _)) = true_name id in
+  let struct_names = List.map get_name struct_types in
+  let already_annot = !already_annot_structs in
+  let structs_not_annot =
+    List.filter (fun name -> not (Str_set.mem name already_annot)) struct_names
+  in
+  let newly_annot =
+    Str_set.union already_annot (Str_set.of_list structs_not_annot)
+  in
+  already_annot_structs := newly_annot;
+  structs_not_annot
 
 let assert_of_member cenv members id typ =
   let open Ctypes in
@@ -228,8 +257,8 @@ let trans_simpl_expr se =
 let trans_sval (sv : CSVal.t) : Asrt.t * Expr.t =
   let open CConstants.VTypes in
   let mk str v = Expr.EList [ Expr.Lit (String str); v ] in
-  let tnum e = Asrt.Types [ (e, Type.NumberType) ] in
-  let tloc e = Asrt.Types [ (e, Type.ObjectType) ] in
+  let tnum = types Type.NumberType in
+  let tloc = types Type.ObjectType in
   let tse = trans_simpl_expr in
   match sv with
   | CSVal.Sint se   ->
@@ -339,8 +368,8 @@ let trans_constr ?fname:_ ~malloc ann s c =
   let gen_loc_var () = Expr.LVar (LVar.alloc ()) in
   let open CConstants.VTypes in
   let cse = trans_simpl_expr in
-  let tnum e = Asrt.Types [ (e, Type.NumberType) ] in
-  let tloc e = Asrt.Types [ (e, Type.ObjectType) ] in
+  let tnum = types NumberType in
+  let tloc = types ObjectType in
   let mem_ga = LActions.str_ga (GMem SVal) in
   (* let mk_num n = Expr.Lit (Num (float_of_int n)) in *)
   (* let zero = mk_num 0 in *)
@@ -463,7 +492,7 @@ let trans_asrt_annot da =
          (fun (ex, topt) ->
            match topt with
            | None   -> (ex, Asrt.Emp)
-           | Some t -> (ex, Asrt.Types [ (Expr.LVar ex, t) ]))
+           | Some t -> (ex, types t (Expr.LVar ex)))
          existentials)
   in
   let a = fold_star typsb in
@@ -547,13 +576,13 @@ let add_trans_spec ann cl_spec =
   { ann with specs = trans_spec ~ann cl_spec :: ann.specs }
 
 let trans_annots clight_prog log_prog =
-  let get_name (Ctypes.Composite (id, _, _, _)) = true_name id in
   let open Ctypes in
+  let structs_not_annot = get_structs_not_annot clight_prog.prog_types in
   let struct_annots =
     List.fold_left
       (gen_pred_of_struct clight_prog.prog_comp_env)
       { empty with cenv = clight_prog.prog_comp_env }
-      (List.map get_name clight_prog.prog_types)
+      structs_not_annot
   in
   let with_preds =
     List.fold_left add_trans_pred struct_annots log_prog.CProg.preds
@@ -601,7 +630,7 @@ let opt_gen param_name pred_name struct_params =
   let loc_list = Expr.EList [ loc; Lit (Num 0.) ] in
   let def_null = pvar == null in
   let def_rec =
-    (pvar == loc_list) ** types loc Type.ObjectType
+    (pvar == loc_list) ** types ObjectType loc
     ** Pred (pred_name, loc :: lv_params)
   in
   [ def_null; def_rec ]
@@ -621,16 +650,14 @@ let asserts_of_rec_member cenv members id typ =
     match typ with
     | Tint _ ->
         let e = mk int_type lvval in
-        [ (e, (pvmember == mk int_type lvval) ** types lvval Type.NumberType) ]
+        [ (e, (pvmember == mk int_type lvval) ** types NumberType lvval) ]
     (* (mk int_type lvval, Asrt.Pred (int_get, [ pvmember; lvval ])) *)
     | Tlong _ ->
         let e = mk int_type lvval in
-        [ (e, (pvmember == mk long_type lvval) ** types lvval Type.NumberType) ]
+        [ (e, (pvmember == mk long_type lvval) ** types NumberType lvval) ]
     | Tfloat _ ->
         let e = mk int_type lvval in
-        [
-          (e, (pvmember == mk float_type lvval) ** types lvval Type.NumberType);
-        ]
+        [ (e, (pvmember == mk float_type lvval) ** types NumberType lvval) ]
     | Tpointer (Tstruct (id, _), _) ->
         let struct_name = true_name id in
         let p_name = rec_pred_name_of_struct struct_name in
@@ -652,8 +679,7 @@ let asserts_of_rec_member cenv members id typ =
         [
           (null, pvmember == null);
           ( obj,
-            (pvmember == obj)
-            ** types lvval Type.ObjectType
+            (pvmember == obj) ** types ObjectType lvval
             ** Pred (p_name, lvval :: struct_params) );
         ]
         (* (pvmember, Asrt.Pred (is_ptr_to_0_opt, [ pvmember ])) *)
@@ -778,11 +804,11 @@ let gen_rec_pred_of_struct cenv ann struct_name =
 
 let gen_bi_preds clight_prog =
   let open Ctypes in
-  let get_name (Ctypes.Composite (id, _, _, _)) = true_name id in
+  let structs_not_annot = get_structs_not_annot clight_prog.prog_types in
   List.fold_left
     (gen_rec_pred_of_struct clight_prog.prog_comp_env)
     { empty with cenv = clight_prog.prog_comp_env }
-    (List.map get_name clight_prog.prog_types)
+    structs_not_annot
 
 let predicate_from_triple (pn, csmt, ct) =
   let is_c_ptr_to_struct = function

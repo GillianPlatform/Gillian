@@ -1,4 +1,4 @@
-import wisl_core.gil;
+import "wisl_core.gil";
 
 (******** INTERNAL FUNCTIONS REGARDING POINTER AND NUMBER OPERATIONS ********)
 

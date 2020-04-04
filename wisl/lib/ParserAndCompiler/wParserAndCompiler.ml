@@ -26,7 +26,7 @@ let parse_file file =
 
 let compile = Wisl2Gil.compile
 
-let parse_and_compile_file file = Ok (compile (parse_file file))
+let parse_and_compile_files files = Ok (compile (parse_file (List.hd files)))
 
 let other_imports = []
 

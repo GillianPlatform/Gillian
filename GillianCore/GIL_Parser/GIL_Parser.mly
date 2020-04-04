@@ -41,8 +41,6 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LSTCLOSE
 (* PVariables *)
 %token <string> VAR
-(* Filenames *)
-%token <string> FILENAME
 (* Binary operators *)
 %token EQ
 
@@ -191,12 +189,12 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 (* Others *)
 %token IMPORT
 %token MACRO
+%token VERIFY
 (* Separators *)
 %token DOT
 %token COMMA
 %token COLON
 %token SCOLON
-(*%token DOT*)
 %token LBRACE
 %token RBRACE
 %token LBRACKET
@@ -268,14 +266,16 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 (********************************)
 
 import_target:
-  IMPORT; imports = separated_nonempty_list(COMMA, FILENAME); SCOLON { imports }
+  IMPORT; imports = separated_nonempty_list(COMMA, STRING); SCOLON { imports }
+;
+
+import_verify_target:
+  IMPORT; VERIFY; imports = separated_nonempty_list(COMMA, STRING); SCOLON { imports }
 ;
 
 proc_head_target:
   PROC; proc_name = VAR; LBRACE; param_list = separated_list(COMMA, VAR); RBRACE
-  {
-    (proc_name, param_list)
-  }
+    { (proc_name, param_list) }
 ;
 
 use_subst_target:
@@ -408,11 +408,17 @@ var_and_le_target:
 (***********************)
 
 gmain_target:
-  | imports = option(import_target); g_prog = gdeclaration_target; EOF
-      {
-        let imports = Option.value ~default:[] imports in
-        Prog.update_imports g_prog imports
-      }
+  imports = option(import_target); imports_to_verify = option(import_verify_target);
+  g_prog = gdeclaration_target; EOF
+    {
+      let imports = List.map (fun path -> (path, false))
+        (Option.value ~default:[] imports)
+      in
+      let imports_to_verify = List.map (fun path -> (path, true))
+        (Option.value ~default:[] imports_to_verify)
+      in
+      Prog.update_imports g_prog (imports @ imports_to_verify);
+    }
 ;
 
 gdeclaration_target:

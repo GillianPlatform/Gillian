@@ -16,7 +16,8 @@ module Suite = struct
 
   let beforeEach () =
     beforeEach ();
-    Generators.reset ()
+    Generators.reset ();
+    CompileState.reset ()
 end
 
 module Expectations = struct
