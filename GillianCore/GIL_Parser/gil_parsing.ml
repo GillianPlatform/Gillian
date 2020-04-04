@@ -1,4 +1,5 @@
 open Lexing
+module L = Logging
 
 module Preprocess_GCmd = PreProcessing_Utils.M (struct
   type t = int Cmd.t
@@ -6,7 +7,7 @@ module Preprocess_GCmd = PreProcessing_Utils.M (struct
   let successors = Cmd.successors
 end)
 
-let log_verboser = Logging.verboser
+module Str_set = Containers.SS
 
 let col pos = pos.pos_cnum - pos.pos_bol + 1
 
@@ -65,161 +66,112 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
   close_in inx;
   prog
 
-(**  Converts a string Prog.t to a Prog.t. Resolving the imports in the meantime.
-     The parameter [other_imports] is a association list, that maps extensions to a parser and compiler.
-     For example, it is possible to import jsil file in a gil program, using [import file.jsil].
-     In order to do so, the [other_imports] list should contain the double [("jsil", parse_and_compile_jsil_file)] where
-     [parse_and_compile_jsil_file] is a function that takes a file name, parses that jsil file and compiles it to a gil program.
-*)
+let combine
+    (existing_components : (string, 'a) Hashtbl.t)
+    (new_components : (string, 'a) Hashtbl.t)
+    (transform : 'a -> 'a)
+    (component_type : string) : unit =
+  Hashtbl.iter
+    (fun comp_name comp ->
+      if not (Hashtbl.mem existing_components comp_name) then (
+        L.verboser (fun m ->
+            m "*** MESSAGE: Adding %s: %s.@\n" component_type comp_name);
+        Hashtbl.add existing_components comp_name (transform comp) )
+      else
+        L.verboser (fun m ->
+            m "*** WARNING: %s %s already exists.@\n"
+              (String.capitalize_ascii component_type)
+              comp_name))
+    new_components
+
+let extend_program
+    (prog : (Annot.t, string) Prog.t)
+    (other_prog : (Annot.t, string) Prog.t)
+    (verify_other_prog : bool) : unit =
+  let transform_proc proc =
+    let open Proc in
+    let new_spec =
+      Option.map
+        (fun spec -> Spec.{ spec with spec_to_verify = verify_other_prog })
+        proc.proc_spec
+    in
+    { proc with proc_spec = new_spec }
+  in
+  let id x = x in
+  combine prog.procs other_prog.procs transform_proc "procedure";
+  combine prog.preds other_prog.preds id "predicate";
+  combine prog.only_specs other_prog.only_specs id "spec-only procedure";
+  combine prog.macros other_prog.macros id "macro";
+  combine prog.bi_specs other_prog.bi_specs id "bi-abduction spec"
+
+let remove_dot file_ext = String.sub file_ext 1 (String.length file_ext - 1)
+
+let resolve_imports
+    (program : (Annot.t, string) Prog.t)
+    (other_imports : (string * (string -> (Annot.t, string) Prog.t)) list) :
+    unit =
+  let resolve_import_path fname =
+    let list_paths = "." :: Config.get_runtime_paths () in
+    let rec find fname paths =
+      match paths with
+      | []           -> failwith (Printf.sprintf "Cannot resolve \"%s\"" fname)
+      | path :: rest ->
+          let complete_path = Filename.concat path fname in
+          if Sys.file_exists complete_path then complete_path
+          else find fname rest
+    in
+    find fname list_paths
+  in
+  let rec resolve_imports_aux imports added_imports =
+    match imports with
+    | [] -> ()
+    | (file, should_verify) :: rest ->
+        let open Prog in
+        if not (Str_set.mem file added_imports) then
+          let file = resolve_import_path file in
+          let extension = Filename.extension file in
+          let imported_prog =
+            if String.equal extension ".gil" then parse_eprog_from_file file
+            else
+              match List.assoc_opt (remove_dot extension) other_imports with
+              | None                   -> failwith
+                                            (Printf.sprintf
+                                               "Cannot import file %s" file)
+              | Some parse_and_compile -> parse_and_compile file
+          in
+          let () = extend_program program imported_prog should_verify in
+          let new_added_imports = Str_set.add file added_imports in
+          resolve_imports_aux (rest @ imported_prog.imports) new_added_imports
+        else resolve_imports_aux rest added_imports
+  in
+  resolve_imports_aux program.imports Str_set.empty
+
+(** Converts a string-labelled [Prog.t] to an index-labelled [Prog.t], 
+    resolving the imports in the meantime. The parameter [other_imports] is an
+    association list that maps extensions to a parser and compiler. For example,
+    it is possible to import a JSIL file in a GIL program using 
+    [import file.jsil]. In order to do so, the [other_imports] list should
+    contain the tuple [("jsil", parse_and_compile_jsil_file)] where 
+    [parse_and_compile_jsil_file] is a function that takes a file path, parses 
+    that as a JSIL program, and compiles it to a GIL program. *)
 let eprog_to_prog
     ~(other_imports : (string * (string -> (Annot.t, string) Prog.t)) list)
     (ext_program : (Annot.t, string) Prog.t) : (Annot.t, int) Prog.t =
   let open Prog in
-  let extend_declarations
-      (program_to : (Annot.t, string) Prog.t)
-      (program_from : (Annot.t, string) Prog.t)
-      (should_verify : bool) : unit =
-    (* Add the declarations in 'program_from' to 'program_to' *)
-    (* Extend the predicates *)
-    Hashtbl.iter
-      (fun pred_name pred ->
-        if Hashtbl.mem program_to.preds pred_name then
-          log_verboser (fun m ->
-              m "*** WARNING: Predicate %s already exists.@\n" pred_name)
-        else
-          log_verboser (fun m ->
-              m "*** MESSAGE: Adding predicate %s.@\n" pred_name);
-        Hashtbl.add program_to.preds pred_name pred)
-      program_from.preds;
-
-    (* Extend the procedures, except where a procedure with the same name
-       already exists *)
-    Hashtbl.iter
-      (fun proc_name proc ->
-        if not (Hashtbl.mem program_to.procs proc_name) then (
-          log_verboser (fun m ->
-              m "*** MESSAGE: Adding procedure: %s.@\n" proc_name);
-          let adjusted_proc =
-            Proc.
-              {
-                proc with
-                proc_spec =
-                  Option.map
-                    (fun spec ->
-                      Spec.{ spec with spec_to_verify = should_verify })
-                    proc.proc_spec;
-              }
-          in
-          Hashtbl.add program_to.procs proc_name adjusted_proc )
-        else
-          log_verboser (fun m ->
-              m "*** WARNING: Procedure %s already exists.@\n" proc_name))
-      program_from.procs;
-
-    (* Extend the only_specs *)
-    Hashtbl.iter
-      (fun spec_name spec ->
-        if not (Hashtbl.mem program_to.only_specs spec_name) then (
-          log_verboser (fun m ->
-              m "*** MESSAGE: Adding onlyspec procedure: %s.@\n" spec_name);
-          Hashtbl.add program_to.only_specs spec_name spec )
-        else
-          log_verboser (fun m ->
-              m "*** WARNING: Procedure %s already exists.@\n" spec_name))
-      program_from.only_specs;
-
-    (* Extend the macros *)
-    Hashtbl.iter
-      (fun macro_name macro ->
-        if not (Hashtbl.mem program_to.macros macro_name) then (
-          log_verboser (fun m ->
-              m "*** MESSAGE: Adding macro: %s.@\n" macro_name);
-          Hashtbl.add program_to.macros macro_name macro )
-        else
-          log_verboser (fun m ->
-              m "*** WARNING: Procedure %s already exists.@\n" macro_name))
-      program_from.macros;
-
-    Hashtbl.iter
-      (fun bispec_name bispec ->
-        if not (Hashtbl.mem program_to.bi_specs bispec_name) then (
-          log_verboser (fun m ->
-              m "*** MESSAGE: Adding bi-abduction spec: %s.@\n" bispec_name);
-          Hashtbl.add program_to.bi_specs bispec_name bispec )
-        else
-          log_verboser (fun m ->
-              m "*** WARNING: Bi-abduction spec %s already exists.@\n"
-                bispec_name))
-      program_from.bi_specs
-  in
-  let resolve_imports (program : (Annot.t, string) Prog.t) : unit =
-    (* Extend the program with each of the imported programs *)
-    let added_imports = Hashtbl.create 32 in
-    let resolve_import_path fname =
-      let list_paths = "." :: Config.get_runtime_paths () in
-      let rec find fn l =
-        match l with
-        | []     -> failwith ("Cannot resolve \"" ^ fname ^ "\"")
-        | p :: r -> (
-            try
-              let complete_path = Filename.concat p fname in
-              let _ = Unix.stat complete_path in
-              complete_path
-            with Unix.Unix_error (Unix.ENOENT, "stat", _) -> find fn r )
-      in
-      find fname list_paths
-    in
-    let rec resolve_imports_iter imports =
-      match imports with
-      | [] -> ()
-      | (file, should_verify) :: rest_imports ->
-          let open Prog in
-          if not (Hashtbl.mem added_imports file) then (
-            let file = resolve_import_path file in
-            let () = Hashtbl.replace added_imports file true in
-            let extension = Filename.extension file in
-            let imported_program =
-              if String.equal extension ".gil" then parse_eprog_from_file file
-              else
-                match
-                  List.assoc_opt
-                    (String.sub extension 1 (String.length extension - 1))
-                    other_imports
-                with
-                | None                   -> raise
-                                              (Failure "DEATH.resolve_imports")
-                | Some parse_and_compile -> parse_and_compile file
-            in
-            extend_declarations program imported_program should_verify;
-            resolve_imports_iter (rest_imports @ imported_program.imports) )
-    in
-    resolve_imports_iter program.imports
-  in
-  (* Step 1 - Add the declarations from the imported files
-     * -----------------------------------------------------------------------------------
-  *)
-  let () = resolve_imports ext_program in
+  let () = resolve_imports ext_program other_imports in
   let proc_of_ext_proc (proc : (Annot.t, string) Proc.t) :
       (Annot.t, int) Proc.t * (string * int * int * int) list =
     let open Proc in
     let name = proc.proc_name in
-    (* Step 2.1 - Desugar labels
-     * -----------------------------------------------------------------------------------
-     *)
+    (* Desugar labels *)
     let proc = Proc.indexed_of_labeled proc in
-    (* Step 2.2 - Get the succ and pred tables
-     * -----------------------------------------------------------------------------------
-     *)
+    (* Get the succ and pred tables *)
     let succ_table, pred_table =
       Preprocess_GCmd.get_succ_pred proc.Proc.proc_body
     in
-    (* Step 2.3 - Compute the which_pred table
-     * -----------------------------------------------------------------------------------
-     *)
+    (* Compute the which_pred table *)
     let predecessors = Preprocess_GCmd.compute_which_preds pred_table in
-    (* Step 2.4 - Update the global_which_pred table with the correct indexes
-       * -----------------------------------------------------------------------------------
-    *)
+    (* Update the global_which_pred table with the correct indexes *)
     let predecessors' =
       List.map
         (fun (prev_cmd, cur_cmd, i) -> (name, prev_cmd, cur_cmd, i))
