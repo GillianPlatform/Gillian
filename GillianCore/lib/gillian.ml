@@ -16,5 +16,5 @@ end
 
 (* module Test262 = Test262_main *)
 
-module Logging = Utils.Logging
+module Logging = Logging
 module Utils = Utils

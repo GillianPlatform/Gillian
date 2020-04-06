@@ -1,0 +1,3 @@
+(library
+ (name logging)
+ (public_name gillian.logging))

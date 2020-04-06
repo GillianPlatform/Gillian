@@ -4,7 +4,7 @@ open Gillian.Utils.Containers
 module Expr = Gillian.Gil_syntax.Expr
 module SSubst = Gillian.Symbolic.Subst
 open Gillian.Gil_syntax
-module L = Gillian.Utils.Logging
+module L = Gillian.Logging
 
 type field_name = Expr.t
 
