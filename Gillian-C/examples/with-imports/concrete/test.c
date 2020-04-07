@@ -3,7 +3,7 @@
 // Defined externally
 extern int x;
 
-int y = 6;
+static int y = 6;
 int z;
 
 // Should only be visible internally
@@ -14,7 +14,7 @@ int main() {
     a = x;
     a = y;
     a = z;
-    a = foo();
-    a = bar();
-    return 0;
+    a = foo(); // Should be assigned 4
+    a = bar(); // Should be assigned 5
+    return 1;
 }

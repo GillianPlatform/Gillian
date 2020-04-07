@@ -592,8 +592,7 @@ let trans_annots clight_prog log_prog =
 
 let glob_fun_pred symbol target =
   let pname = Internal_Predicates.glob_fun in
-  let s_param = Expr.Lit (String symbol) in
-  Asrt.Pred (pname, [ s_param; Lit (String target) ])
+  Asrt.Pred (pname, [ Lit (String symbol); Lit (String target) ])
 
 let make_global_env_pred init_asrts =
   let def = fold_star init_asrts in
@@ -837,8 +836,7 @@ let predicate_from_triple (pn, csmt, ct) =
             parameter %s"
            (PrintAST.name_of_type csmt))
 
-let generate_bispec clight_prog ident f =
-  let fname = true_name ident in
+let generate_bispec clight_prog fname ident f =
   let rec combine a b c =
     match (a, b, c) with
     | [], [], [] -> []
@@ -865,5 +863,8 @@ let generate_bispec clight_prog ident f =
       bispec_normalised = false;
     }
 
-let add_bispec ann clight_prog ident f =
-  { ann with bispecs = generate_bispec clight_prog ident f :: ann.bispecs }
+let add_bispec ann clight_prog fname ident f =
+  {
+    ann with
+    bispecs = generate_bispec clight_prog fname ident f :: ann.bispecs;
+  }

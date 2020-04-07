@@ -1,3 +1,6 @@
+#ifndef GILLIAN_STDLIB_H
+#define GILLIAN_STDLIB_H
+
 #define NULL ((void *)0)
 
 typedef unsigned long size_t;
@@ -19,3 +22,5 @@ int rand(void);
 /* FIXME: unimplemented */
 void qsort(void *base, size_t num, size_t size,
            int (*comparator)(const void *, const void *));
+
+#endif /* GILLIAN_STDLIB_H */

@@ -574,7 +574,7 @@ struct
         let () =
           Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
         in
-        (Runner.run_all runner) path
+        Runner.run_all runner path
       in
       let run_t =
         Term.(
@@ -594,7 +594,7 @@ struct
   end
 
   let default_cmd =
-    let doc = "An analysis toolchains" in
+    let doc = "An analysis toolchain" in
     let sdocs = Manpage.s_common_options in
     let exits = Term.default_exits in
     let man =
