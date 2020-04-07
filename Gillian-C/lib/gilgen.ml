@@ -667,34 +667,45 @@ let is_def_sym symbol = symbol.defined
 
 let sym_name symbol = symbol.name
 
+let mangle_symbol symbol filename mangled_syms =
+  let mangled_sym = filename ^ "__" ^ symbol in
+  Hashtbl.add mangled_syms symbol mangled_sym;
+  mangled_sym
+
 let rec trans_globdefs
     ?(gil_annot = Gil_logic_gen.empty)
     ?(exec_mode = ExecMode.Verification)
     ~clight_prog
-    ~public_funcs
+    ~global_syms
+    ~filename
+    ~mangled_syms
     globdefs =
   let open AST in
   let trans_globdefs =
-    trans_globdefs ~clight_prog ~exec_mode ~gil_annot ~public_funcs
+    trans_globdefs ~clight_prog ~exec_mode ~gil_annot ~global_syms ~filename
+      ~mangled_syms
   in
   match globdefs with
   | [] -> ([], [], [], [], [])
   | (id, Gfun (Internal f)) :: r ->
-      (* Add function to the genv and compile the function *)
+      (* Internally-defined function (has either file or global scope) *)
       let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
-      let symbol = true_name id in
+      let original_sym = true_name id in
+      let has_global_scope = Symbol_set.mem original_sym global_syms in
+      let symbol =
+        if has_global_scope then original_sym
+        else mangle_symbol original_sym filename mangled_syms
+      in
       let target = symbol in
       let new_cmd = set_global_function symbol target in
       let new_asrt = Gil_logic_gen.glob_fun_pred symbol target in
       let new_bi_specs =
         if ExecMode.biabduction_exec exec_mode then
-          Gil_logic_gen.generate_bispec clight_prog id f :: bi_specs
+          Gil_logic_gen.generate_bispec clight_prog symbol id f :: bi_specs
         else []
       in
       let new_syms =
-        if Symbol_set.mem symbol public_funcs then
-          (* Non-static function *)
-          { name = symbol; defined = true } :: syms
+        if has_global_scope then { name = symbol; defined = true } :: syms
         else syms
       in
       ( new_asrt :: init_asrts,
@@ -704,15 +715,17 @@ let rec trans_globdefs
         new_syms )
   | (id, Gfun (External f)) :: r
     when (is_builtin_func (true_name id) && not_implemented f)
-         || is_gil_func (true_name id) exec_mode -> trans_globdefs r
+         || is_gil_func (true_name id) exec_mode ->
+      (* Externally-defined, built-in function with no current implementation *)
+      trans_globdefs r
   | (id, Gfun (External f)) :: r when not_implemented f ->
-      (* Externally defined, non-built-in function *)
+      (* Externally-defined, non-built-in function *)
       let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let symbol = true_name id in
       let new_sym = { name = symbol; defined = false } in
       (init_asrts, init_acts, bi_specs, fs, new_sym :: syms)
   | (id, Gfun (External f)) :: r ->
-      (* We just indicate in the global env what function should be called at that point *)
+      (* Externally-defined, built-in function with existing implementation *)
       let symbol = true_name id in
       let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let target, is_ext_call = intern_impl_of_extern_function f in
@@ -723,18 +736,27 @@ let rec trans_globdefs
       else (init_asrts, init_acts, bi_specs, fs, syms)
   | (id, Gvar v) :: r
     when Camlcoq.Z.to_int (init_data_list_size v.gvar_init) == 0 ->
-      (* Externally defined global variable *)
+      (* Externally-defined global variable *)
       let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let symbol = true_name id in
       let new_sym = { name = symbol; defined = false } in
       (init_asrts, init_acts, bi_specs, fs, new_sym :: syms)
   | (id, Gvar v) :: r ->
-      let symbol = true_name id in
+      (* Internally-defined global variable (has either file or global scope) *)
       let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
+      let original_sym = true_name id in
+      let has_global_scope = Symbol_set.mem original_sym global_syms in
+      let symbol =
+        if has_global_scope then original_sym
+        else mangle_symbol original_sym filename mangled_syms
+      in
       let target = symbol in
       let new_cmd = set_global_var symbol target v in
-      let new_sym = { name = symbol; defined = true } in
-      (init_asrts, new_cmd :: init_acts, bi_specs, fs, new_sym :: syms)
+      let new_syms =
+        if has_global_scope then { name = symbol; defined = true } :: syms
+        else syms
+      in
+      (init_asrts, new_cmd :: init_acts, bi_specs, fs, new_syms)
 
 let make_init_proc init_cmds =
   let end_cmds =
@@ -760,18 +782,21 @@ let trans_program
     ?(exec_mode = ExecMode.Verification)
     ?(gil_annot = Gil_logic_gen.empty)
     ~clight_prog
+    ~filename
+    ~mangled_syms
     prog =
   let AST.{ prog_defs; prog_public; _ } = prog in
-  let public_funcs = Symbol_set.of_list (List.map true_name prog_public) in
+  let global_syms = Symbol_set.of_list (List.map true_name prog_public) in
+  let init_asrts, init_acts, bi_specs, procedures, symbols =
+    trans_globdefs ~clight_prog ~exec_mode ~gil_annot ~global_syms ~filename
+      ~mangled_syms prog_defs
+  in
   let make_hashtbl get_name deflist =
     let hashtbl = Hashtbl.create 1 in
     let () =
       List.iter (fun def -> Hashtbl.add hashtbl (get_name def) def) deflist
     in
     hashtbl
-  in
-  let init_asrts, init_acts, bi_specs, procedures, symbols =
-    trans_globdefs ~clight_prog ~exec_mode ~gil_annot ~public_funcs prog_defs
   in
   let get_proc_name proc = proc.Proc.proc_name in
   ( Prog.
@@ -811,7 +836,8 @@ let annotate na gan =
   in
   na
 
-let trans_program_with_annots exec_mode clight_prog prog annots =
+let trans_program_with_annots
+    exec_mode clight_prog prog filename mangled_syms annots =
   let gil_annot =
     if ExecMode.verification_exec exec_mode then
       Gil_logic_gen.trans_annots clight_prog annots
@@ -820,7 +846,8 @@ let trans_program_with_annots exec_mode clight_prog prog annots =
     else Gil_logic_gen.empty
   in
   let non_annotated_prog, init_asrts, init_acts, symbols =
-    trans_program ~clight_prog ~exec_mode ~gil_annot prog
+    trans_program ~clight_prog ~exec_mode ~gil_annot ~filename ~mangled_syms
+      prog
   in
   let annotated_prog = annotate non_annotated_prog gil_annot in
   (annotated_prog, init_asrts, init_acts, symbols)

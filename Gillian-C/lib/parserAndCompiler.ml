@@ -139,25 +139,33 @@ let parse_annots file =
 
 module Str_set = Gillian.Utils.Containers.SS
 
-let mangle_clashing_vars proc =
+let mangle_proc proc mangled_syms =
   let reserved_names = Str_set.of_list [ "pred"; "pure" ] in
-  let mangle var =
-    let suffix = if Str_set.mem var reserved_names then "__" else "" in
-    var ^ suffix
+  let mangle_var var =
+    let prefix = if Str_set.mem var reserved_names then "v__" else "" in
+    prefix ^ var
   in
-  let varname_mangler =
+  let mangle_symbol sym =
+    match Hashtbl.find_opt mangled_syms sym with
+    | Some mangled_sym -> mangled_sym
+    | None             -> sym
+  in
+  let mangling_visitor =
     object
       inherit [_] Gillian.Gil_syntax.Visitors.map as super
 
       method! visit_proc env proc =
-        let proc_params = List.map mangle proc.proc_params in
+        let proc_params = List.map mangle_var proc.proc_params in
         let proc = super#visit_proc env proc in
         { proc with proc_params }
 
-      method! visit_PVar _ var = Gillian.Gil_syntax.Expr.PVar (mangle var)
+      method! visit_PVar _ var = Gillian.Gil_syntax.Expr.PVar (mangle_var var)
+
+      method! visit_String _ str =
+        Gillian.Gil_syntax.Literal.String (mangle_symbol str)
     end
   in
-  varname_mangler#visit_proc () proc
+  mangling_visitor#visit_proc () proc
 
 let parse_and_compile_file path exec_mode =
   let () = Frontend.init () in
@@ -181,15 +189,18 @@ let parse_and_compile_file path exec_mode =
       let () = Format.fprintf fmt "%a" PrintCsharpminor.print_program csm in
       close_out oc
   in
+  let filename = Filename.basename (Filename.chop_extension path) in
+  let mangled_syms = Hashtbl.create 32 in
   let annots = parse_annots path in
   let prog, init_asrts, init_cmds, symbols =
-    Gilgen.trans_program_with_annots exec_mode last_clight csm annots
+    Gilgen.trans_program_with_annots exec_mode last_clight csm filename
+      mangled_syms annots
   in
   let trans_procs = Hashtbl.create 1 in
   let () =
     Hashtbl.iter
       (fun proc_name proc_body ->
-        Hashtbl.add trans_procs proc_name (mangle_clashing_vars proc_body))
+        Hashtbl.add trans_procs proc_name (mangle_proc proc_body mangled_syms))
       prog.procs
   in
   ({ prog with procs = trans_procs }, init_asrts, init_cmds, symbols)

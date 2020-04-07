@@ -16,6 +16,8 @@ val trans_program :
   ?exec_mode:ExecMode.t ->
   ?gil_annot:Gil_logic_gen.gil_annots ->
   clight_prog:Clight.program ->
+  filename:string ->
+  mangled_syms:(string, string) Hashtbl.t ->
   Csharpminor.program ->
   (Annot.t, string) Prog.t * Asrt.t list * string Cmd.t list * symbol list
 
@@ -23,5 +25,7 @@ val trans_program_with_annots :
   ExecMode.t ->
   Clight.program ->
   Csharpminor.program ->
+  string ->
+  (string, string) Hashtbl.t ->
   CLogic.CProg.t ->
   (Annot.t, string) Prog.t * Asrt.t list * string Cmd.t list * symbol list
