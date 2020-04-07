@@ -51,17 +51,6 @@ end
 val wrap_up : unit -> unit
 (** Closes all the files *)
 
-val log :
-  Mode.level -> ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
-(** This works like a very simplified version of opam's `Logs` library.
-    `log TMI (fun m -> m "%a" pp_int 1)`
-    will write `1` in the TMI file.
-    `log <level>` will write at every level that is stronger than the given level.
-    For example, `log Normal` will write in every file.
-    The pattern is quite simple: it is as if you were formatting with a printf-like function except
-    you get this function in the m argument of the function you give to the logging function.
- *)
-
 val normal : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
 (** `normal` is just `log Normal` *)
 
