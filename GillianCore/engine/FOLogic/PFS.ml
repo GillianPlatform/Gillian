@@ -1,6 +1,6 @@
 (** GIL Pure Formulae *)
-open Containers
 
+open Containers
 open SVal
 module L = Logging
 
