@@ -1,8 +1,5 @@
-(***************************************************************)
+(** {3 Macros} **)
 
-(***************************************************************)
-
-(** Macros                                                    **)
 type t = TypeDef__.macro = {
   macro_name : string;  (** Name of the macro *)
   macro_params : string list;  (** Actual parameters *)
