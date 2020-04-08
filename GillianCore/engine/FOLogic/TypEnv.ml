@@ -1,6 +1,6 @@
-open Containers
 (** GIL Typing Environment *)
 
+open Containers
 open Names
 open SVal
 module L = Logging

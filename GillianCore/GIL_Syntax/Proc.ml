@@ -1,16 +1,16 @@
 (** GIL Procedures *)
 
+(** Labeled procedures. Every command is annotated with a label, and the gotos indicate to which label one should jump.
+    Labels can be of any type. However, we say "labeled" when the labels are strings, and "indexed" when the labels are integers.
+    Most functions in Gillian that work with indexed procedures assume for efficiency that the label of the i-th command is always Some i
+    (starting from 0).
+    *)
 type ('annot, 'label) t = ('annot, 'label) TypeDef__.proc = {
   proc_name : string;
   proc_body : ('annot * 'label option * 'label Cmd.t) array;
   proc_params : string list;
   proc_spec : Spec.t option;
 }
-(** Labeled procedures. Every command is annotated with a label, and the gotos indicate to which label one should jump.
-    Labels can be of any type. However, we say "labeled" when the labels are strings, and "indexed" when the labels are integers.
-    Most functions in Gillian that work with indexed procedures assume for efficiency that the label of the i-th command is always Some i
-    (starting from 0).
-    *)
 
 let get_params proc = proc.proc_params
 

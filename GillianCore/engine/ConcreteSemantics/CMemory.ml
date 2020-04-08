@@ -1,17 +1,17 @@
 module type S = sig
-  type vt = CVal.M.t
   (** Type of GIL values *)
+  type vt = CVal.M.t
 
-  type st = CVal.CSubst.t
   (** Type of GIL substitutions *)
+  type st = CVal.CSubst.t
 
-  type err_t
   (** Errors *)
+  type err_t
 
   type fix_t
 
-  type t
   (** Type of GIL general states *)
+  type t
 
   type action_ret = ASucc of (t * vt list) | AFail of err_t list
 

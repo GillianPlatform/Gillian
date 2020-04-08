@@ -4,7 +4,7 @@
 
 open Containers
 
-let active () = !Config.stats || not !Logging.silent
+let active () = !Config.stats || Logging.Mode.enabled ()
 
 let time () = if not (active ()) then 0. else Sys.time ()
 

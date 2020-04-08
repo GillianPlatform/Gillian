@@ -49,8 +49,8 @@ module Type : sig
   val str : t -> string
   (** Printer *)
 
-  module Set : Set.S with type elt := t
   (** Sets of types *)
+  module Set : Set.S with type elt := t
 end
 
 module Literal : sig
@@ -199,11 +199,11 @@ module Expr : sig
     | EList  of t list  (** Lists of expressions *)
     | ESet   of t list  (** Sets of expressions *)
 
-  module Set : Set.S with type elt := t
   (** Sets of expressions *)
+  module Set : Set.S with type elt := t
 
-  module Map : Map.S with type key := t
   (** Maps with expressions as keys *)
+  module Map : Map.S with type key := t
 
   val equal : t -> t -> bool
   (** Equality *)
@@ -295,8 +295,8 @@ module Formula : sig
     | SetSub  of Expr.t * Expr.t  (** Set subsetness *)
     | ForAll  of (string * Type.t option) list * t  (** Forall *)
 
-  module Set : Set.S with type elt := t
   (** Sets of formulae *)
+  module Set : Set.S with type elt := t
 
   val map :
     (t -> t * bool) option ->
@@ -384,8 +384,8 @@ module Asrt : sig
   val prioritise : t -> t -> int
   (** Sorting of assertions *)
 
-  module Set : Set.S with type elt := t
   (** Sets of assertions *)
+  module Set : Set.S with type elt := t
 
   val map :
     (t -> t * bool) option ->
@@ -516,8 +516,8 @@ end
 module Cmd : sig
   (** {b GIL Commands} *)
 
-  type logic_bindings_t = string * (string * Expr.t) list
   (** Optional bindings for procedure calls *)
+  type logic_bindings_t = string * (string * Expr.t) list
 
   type 'label t =
     | Skip  (** Skip *)
@@ -553,6 +553,7 @@ module Cmd : sig
 end
 
 module Pred : sig
+  (** {b GIL Predicates} *)
   type t = {
     pred_name : string;  (** Name of the predicate *)
     pred_num_params : int;  (** Number of parameters *)
@@ -564,7 +565,6 @@ module Pred : sig
     pred_pure : bool;  (** Is the predicate pure? *)
     pred_normalised : bool;  (** Has the predicate been previously normalised? *)
   }
-  (** {b GIL Predicates} *)
 
   val init : t list -> (string, t) Hashtbl.t
   (** Populates a Hashtbl from the given predicate list *)
@@ -616,6 +616,7 @@ module Pred : sig
 end
 
 module Lemma : sig
+  (** {b GIL Lemmas} *)
   type t = {
     lemma_name : string;  (** Name *)
     lemma_params : string list;  (** Parameters *)
@@ -625,7 +626,6 @@ module Lemma : sig
     lemma_variant : Expr.t option;  (** Variant *)
     lemma_existentials : string list; (* Existentials *)
   }
-  (** {b GIL Lemmas} *)
 
   val pp : Format.formatter -> t -> unit
   (** Pretty-printer *)
@@ -635,12 +635,12 @@ module Lemma : sig
 end
 
 module Macro : sig
+  (** {b GIL Macros } *)
   type t = {
     macro_name : string;  (** Name of the macro *)
     macro_params : string list;  (** Actual parameters *)
     macro_definition : LCmd.t list;  (** Macro definition *)
   }
-  (** {b GIL Macros } *)
 
   val pp : Format.formatter -> t -> unit
   (** Pretty-printer *)
@@ -675,6 +675,7 @@ module Spec : sig
   }
   (** Single GIL specifications. *)
 
+  (** {b Full GIL specifications}. *)
   type t = {
     spec_name : string;  (** Procedure/spec name *)
     spec_params : string list;  (** Procedure/spec parameters *)
@@ -682,7 +683,6 @@ module Spec : sig
     spec_normalised : bool;  (** If the spec is already normalised *)
     spec_to_verify : bool;  (** Should the spec be verified? *)
   }
-  (** {b Full GIL specifications}. *)
 
   val s_init :
     ?ss_label:string * string list ->
@@ -717,13 +717,13 @@ module Spec : sig
 end
 
 module BiSpec : sig
+  (** Bi-abductive specifications *)
   type t = {
     bispec_name : string;  (** Procedure/spec name *)
     bispec_params : string list;  (** Procedure/spec parameters *)
     bispec_pres : Asrt.t list;  (** Possible preconditions *)
     bispec_normalised : bool;  (** If the spec is already normalised *)
   }
-  (** Bi-abductive specifications *)
 
   type t_tbl = (string, t) Hashtbl.t
 
@@ -736,8 +736,8 @@ module BiSpec : sig
 end
 
 module Annot : sig
-  type t
   (** {b GIL annot}. *)
+  type t
 
   val init : ?line_offset:int option -> ?origin_id:int -> unit -> t
   (** Initialize an annotation *)
@@ -749,17 +749,17 @@ module Annot : sig
 end
 
 module Proc : sig
+  (** Labeled procedures. Every command is annotated with a label, and the gotos indicate to which label one should jump.
+    Labels can be of any type. However, we say "labeled" when the labels are strings, and "indexed" when the labels are integers.
+    Most functions in Gillian that work with indexed procedures assume for efficiency that the label of the i-th command is always Some i
+    (starting from 0).
+ *)
   type ('annot, 'label) t = {
     proc_name : string;
     proc_body : ('annot * 'label option * 'label Cmd.t) array;
     proc_params : string list;
     proc_spec : Spec.t option;
   }
-  (** Labeled procedures. Every command is annotated with a label, and the gotos indicate to which label one should jump.
-    Labels can be of any type. However, we say "labeled" when the labels are strings, and "indexed" when the labels are integers.
-    Most functions in Gillian that work with indexed procedures assume for efficiency that the label of the i-th command is always Some i
-    (starting from 0).
- *)
 
   val get_params : ('a, 'b) t -> string list
   (** Gets the parameters of the procedure *)

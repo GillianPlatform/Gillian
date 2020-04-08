@@ -826,7 +826,7 @@ let annotate na gan =
       (fun spec ->
         match Hashtbl.find_opt na.procs spec.Spec.spec_name with
         | None      ->
-            Logging.log Verboser (fun fmt ->
+            Logging.verboser (fun fmt ->
                 fmt "!!!! Spec for %s is declared but the function is not !!!"
                   spec.spec_name)
         | Some proc ->

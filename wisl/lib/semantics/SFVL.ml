@@ -1,6 +1,6 @@
-open Gillian.Utils.Containers
 (** GIL symbolic field-value list *)
 
+open Gillian.Utils.Containers
 module Expr = Gillian.Gil_syntax.Expr
 module SSubst = Gillian.Symbolic.Subst
 open Gillian.Gil_syntax

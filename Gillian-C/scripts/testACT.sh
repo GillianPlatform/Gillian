@@ -8,32 +8,32 @@ if [[ -z "${GITHUB_ACTIONS}" ]]; then
 fi
 
 echo "--- bi-abducing SLL ---"
-time gillian-c act act/sll.c -s
+time gillian-c act act/sll.c -l disabled
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
 echo "--- bi-abducing DLL ---"
-time gillian-c act act/dll.c -s
+time gillian-c act act/dll.c -l disabled
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
 echo "--- bi-abducing PriQ ---"
-time gillian-c act act/priQ.c -s
+time gillian-c act act/priQ.c -l disabled
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
 echo "--- bi-abducing kvmap ---"
-time gillian-c act act/kvmap.c -s
+time gillian-c act act/kvmap.c -l disabled
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
 echo "--- bi-abducing sort ---"
-time gillian-c act act/sort.c -s
+time gillian-c act act/sort.c -l disabled
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
 echo "--- bi-abducing BST ---"
-time gillian-c act act/bst.c -s
+time gillian-c act act/bst.c -l disabled
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 

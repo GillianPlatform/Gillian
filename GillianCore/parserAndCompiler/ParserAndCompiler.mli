@@ -5,8 +5,8 @@ module type S = sig
     (** {2 Target-language specific options}
         For more help, see Cmdliner documentation *)
 
-    type t
     (** Command line options specific to the target language. *)
+    type t
 
     val term : t Cmdliner.Term.t
     (** A term that will be added to every command. *)
@@ -15,8 +15,8 @@ module type S = sig
     (** A side-effect function that will determine the behaviour of the target-language specific options *)
   end
 
-  type err
   (** Type of error that can occur during parsing or compilation *)
+  type err
 
   val pp_err : Format.formatter -> err -> unit
   (** Pretty printer for type {!err} *)
@@ -40,6 +40,6 @@ module type S = sig
   (** Function that will be executed at initialisation. It will be passed the current execution mode as parameter *)
 end
 
-module Dummy : S
 (** Dummy ParserAndCompiler that will simply always fail. This is used when someone wants to build a command line interface
     to only reason about GIL. *)
+module Dummy : S

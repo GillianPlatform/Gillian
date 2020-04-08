@@ -1,1 +1,1 @@
-rm log*
+rm *.log

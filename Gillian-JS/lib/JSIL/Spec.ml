@@ -4,6 +4,7 @@ module Flag = Gillian.Gil_syntax.Flag
 module Expr = Gillian.Gil_syntax.Expr
 module SS = Containers.SS
 
+(** {b Single JSIL specifications}. *)
 type st = {
   pre : Asrt.t;  (** Precondition *)
   posts : Asrt.t list;  (** Postcondition *)
@@ -11,8 +12,8 @@ type st = {
   to_verify : bool;  (** Should the spec be verified? *)
   label : (string * SS.t) option;
 }
-(** {b Single JSIL specifications}. *)
 
+(** {b Full JSIL specifications}. *)
 type t = {
   name : string;  (** Procedure/spec name *)
   params : string list;  (** Procedure/spec parameters *)
@@ -20,7 +21,6 @@ type t = {
   normalised : bool;  (** If the spec is already normalised *)
   to_verify : bool;  (** Should the spec be verified? *)
 }
-(** {b Full JSIL specifications}. *)
 
 (** Creates a JSIL specification given its components *)
 let s_init

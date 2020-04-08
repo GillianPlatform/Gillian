@@ -1,10 +1,7 @@
-module SSubst = Gillian.Symbolic.Subst
-
-(***************************************************************)
-
-(***************************************************************)
+(** {2 Macros} **)
 module Expr = Gillian.Gil_syntax.Expr
-(** Macros                                                    **)
+
+module SSubst = Gillian.Symbolic.Subst
 
 type t = {
   name : string;  (** Name of the macro *)

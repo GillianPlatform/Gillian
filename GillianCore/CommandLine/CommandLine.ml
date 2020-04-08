@@ -44,11 +44,31 @@ struct
     in
     Arg.(value & flag & info [ "a"; "already-compiled" ] ~doc)
 
-  let silent =
-    let doc =
-      "If you want to suppress all reporters. Improves performances a lot"
+  let logging_mode =
+    let open L.Mode in
+    let parse = function
+      | "disabled" -> Result.ok @@ Disabled
+      | "normal"   -> Result.ok @@ Enabled Normal
+      | "verbose"  -> Result.ok @@ Enabled Verbose
+      | "verboser" -> Result.ok @@ Enabled Verboser
+      | "tmi"      -> Result.ok @@ Enabled TMI
+      | other      -> Result.error @@ `Msg ("unknown value \"" ^ other ^ "\"")
     in
-    Arg.(value & flag & info [ "s"; "silent" ] ~doc)
+    let print fmt = function
+      | Disabled         -> Fmt.string fmt "disabled"
+      | Enabled Normal   -> Fmt.string fmt "normal"
+      | Enabled Verbose  -> Fmt.string fmt "verbose"
+      | Enabled Verboser -> Fmt.string fmt "verboser"
+      | Enabled TMI      -> Fmt.string fmt "tmi"
+    in
+
+    let c = Arg.conv (parse, print) in
+    let v = Enabled TMI in
+    let doc =
+      "Controls the verbosity level of logging. The value SETTING must be one \
+       of `disabled', `normal', `verbose', `verboser', `tmi'."
+    in
+    Arg.(value & opt c v & info [ "l"; "logging" ] ~docv:"SETTING" ~doc)
 
   let output_gil =
     let doc =
@@ -167,7 +187,7 @@ struct
     let exec
         files
         already_compiled
-        silent
+        logging_mode
         debug
         outfile_opt
         no_heap
@@ -179,8 +199,8 @@ struct
       let () = Config.current_exec_mode := Concrete in
       let () = PC.initialize Concrete in
       Config.no_heap := no_heap;
-      Logging.silent := silent;
-      Printexc.record_backtrace (not silent);
+      L.Mode.set_mode logging_mode;
+      Printexc.record_backtrace @@ L.Mode.enabled ();
       let () =
         Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_paths
       in
@@ -215,8 +235,8 @@ struct
 
     let exec_t =
       Term.(
-        const exec $ files $ already_compiled $ silent $ debug $ output_gil
-        $ no_heap $ runtime_path $ ci $ PC.TargetLangOptions.term)
+        const exec $ files $ already_compiled $ logging_mode $ debug
+        $ output_gil $ no_heap $ runtime_path $ ci $ PC.TargetLangOptions.term)
 
     let exec_info =
       let doc = "Concretely executes a file of the target language" in
@@ -285,7 +305,7 @@ struct
         already_compiled
         outfile_opt
         no_heap
-        silent
+        logging_mode
         stats
         parallel
         runtime_path
@@ -298,8 +318,8 @@ struct
       let () =
         Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
       in
-      let () = Logging.silent := silent in
-      Printexc.record_backtrace (not silent);
+      let () = L.Mode.set_mode logging_mode in
+      Printexc.record_backtrace @@ L.Mode.enabled ();
       let () = Config.stats := stats in
       let () = Config.parallel := parallel in
       let () = Config.no_heap := no_heap in
@@ -315,8 +335,9 @@ struct
 
     let wpst_t =
       Term.(
-        const wpst $ files $ already_compiled $ output_gil $ no_heap $ silent
-        $ stats $ parallel $ runtime_path $ ci $ PC.TargetLangOptions.term)
+        const wpst $ files $ already_compiled $ output_gil $ no_heap
+        $ logging_mode $ stats $ parallel $ runtime_path $ ci
+        $ PC.TargetLangOptions.term)
 
     let wpst_info =
       let doc = "Symbolically executes a file of the target language" in
@@ -409,7 +430,7 @@ struct
         no_unfold
         stats
         no_lemma_proof
-        silent
+        logging_mode
         stats
         manual
         runtime_path
@@ -421,8 +442,8 @@ struct
       let () = Config.current_exec_mode := Verification in
       let () = PC.initialize Verification in
       let () = Config.stats := stats in
-      let () = Logging.silent := silent in
-      Printexc.record_backtrace (not silent);
+      let () = L.Mode.set_mode logging_mode in
+      Printexc.record_backtrace @@ L.Mode.enabled ();
       let () = Config.lemma_proof := not no_lemma_proof in
       let () = Config.manual_proof := manual in
       let () =
@@ -435,7 +456,7 @@ struct
     let verify_t =
       Term.(
         const verify $ files $ already_compiled $ output_gil $ no_unfold $ stats
-        $ no_lemma_proof $ silent $ stats $ manual $ runtime_path $ ci
+        $ no_lemma_proof $ logging_mode $ stats $ manual $ runtime_path $ ci
         $ PC.TargetLangOptions.term)
 
     let verify_info =
@@ -512,7 +533,7 @@ struct
         already_compiled
         outfile_opt
         no_heap
-        silent
+        logging_mode
         stats
         parallel
         runtime_path
@@ -522,8 +543,8 @@ struct
       let () = PC.TargetLangOptions.apply tl_opts in
       let () = Config.current_exec_mode := BiAbduction in
       let () = PC.initialize BiAbduction in
-      let () = Logging.silent := silent in
-      Printexc.record_backtrace (not silent);
+      let () = L.Mode.set_mode logging_mode in
+      Printexc.record_backtrace @@ L.Mode.enabled ();
       let () = Config.stats := stats in
       let () = Config.no_heap := no_heap in
       let () = Config.parallel := parallel in
@@ -536,8 +557,9 @@ struct
 
     let act_t =
       Term.(
-        const act $ files $ already_compiled $ output_gil $ no_heap $ silent
-        $ stats $ parallel $ runtime_path $ ci $ PC.TargetLangOptions.term)
+        const act $ files $ already_compiled $ output_gil $ no_heap
+        $ logging_mode $ stats $ parallel $ runtime_path $ ci
+        $ PC.TargetLangOptions.term)
 
     let act_info =
       let doc =
@@ -570,7 +592,7 @@ struct
         let () = Config.current_exec_mode := exec_mode in
         let () = PC.initialize exec_mode in
         let () = Config.bulk_print_all_failures := not npaf in
-        Logging.silent := true;
+        Logging.Mode.set_mode Disabled;
         let () =
           Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
         in
