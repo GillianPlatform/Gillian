@@ -1,6 +1,6 @@
 (** JSIL Symbolic Heap *)
-open Containers
 
+open Containers
 open Gillian.Gil_syntax
 open Jsil_syntax
 module SSubst = Gillian.Symbolic.Subst
