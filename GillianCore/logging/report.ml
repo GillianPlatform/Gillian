@@ -16,7 +16,7 @@ let current : Uuidm.t option ref = ref Option.none
 
 let seed = Random.State.make_self_init ()
 
-type 'a report_builder = unit -> 'a t
+type 'a builder = unit -> 'a t
 
 let make ~title ~content ~severity () =
   let report =

@@ -15,32 +15,32 @@ module Mode : sig
 end
 
 module Report : sig
-  type 'a report_builder
+  type 'a builder
 
   val info :
     string ->
     ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a report_builder
+    'a builder
 
   val log :
     string ->
     ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a report_builder
+    'a builder
 
   val success :
     string ->
     ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a report_builder
+    'a builder
 
   val error :
     string ->
     ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a report_builder
+    'a builder
 
   val warning :
     string ->
     ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a report_builder
+    'a builder
 
   val enter_node : unit -> unit
 
