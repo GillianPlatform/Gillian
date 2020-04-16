@@ -7160,7 +7160,7 @@ let js2jsil_eval
               generate_proc offset_converter f_body f_id f_params f_strictness
                 vislist None
           in
-          L.verboser (fun m -> m "Eval proc to execute:@\n%a@\n" EProc.pp proc);
+          L.verbose (fun m -> m "Eval proc to execute:@\n%a@\n" EProc.pp proc);
           let proc' = JSIL2GIL.jsil2core_proc proc in
           let proc'' = GProc.indexed_of_labeled proc' in
           Hashtbl.add prog f_id proc'';
@@ -7211,7 +7211,7 @@ let js2jsil_function_constructor_prop
                 generate_proc offset_converter f_body f_id f_params f_strictness
                   vis_fid None
               in
-              L.verboser (fun m ->
+              L.verbose (fun m ->
                   m "Function constructor proc to execute:@\n%a@\n" EProc.pp
                     proc);
               let proc' = JSIL2GIL.jsil2core_proc proc in

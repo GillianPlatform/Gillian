@@ -190,7 +190,7 @@ module Make (SMemory : SMemory.S) :
 
   let sat_check (state : t) (v : Expr.t) : bool =
     (* let t = time() in *)
-    L.verboser (fun m -> m "SState: sat_check: %a" Expr.pp v);
+    L.verbose (fun m -> m "SState: sat_check: %a" Expr.pp v);
     let _, _, pfs, gamma, _ = state in
     let v = Reduction.reduce_lexpr ~pfs ~gamma v in
     if v = Lit (Bool true) then true
@@ -201,11 +201,11 @@ module Make (SMemory : SMemory.S) :
         | Some (v_asrt, _) -> v_asrt
         | _                -> False
       in
-      L.verboser (fun m -> m "SState: lifted assertion: %a" Formula.pp v_asrt);
+      L.verbose (fun m -> m "SState: lifted assertion: %a" Formula.pp v_asrt);
       let result =
         FOSolver.check_satisfiability (v_asrt :: PFS.to_list pfs) gamma
       in
-      L.(verboser (fun m -> m "SState: sat_check done: %b" result));
+      L.(verbose (fun m -> m "SState: sat_check done: %b" result));
       (* update_statistics "SAT Check" (time() -. t); *)
       result
 
@@ -237,7 +237,7 @@ module Make (SMemory : SMemory.S) :
     let kill_new_lvars = Option.value ~default:true kill_new_lvars in
     let heap, store, pfs, gamma, svars = state in
     let save_spec_vars = if save then (SS.empty, true) else (svars, false) in
-    L.verboser (fun m ->
+    L.verbose (fun m ->
         m
           "-----------------------------------\n\
            STATE BEFORE SIMPLIFICATIONS:\n\
@@ -251,7 +251,7 @@ module Make (SMemory : SMemory.S) :
     SMemory.substitution_in_place subst heap;
     SStore.substitution_in_place subst store;
     if not kill_new_lvars then Typing.naively_infer_type_information pfs gamma;
-    L.verboser (fun m ->
+    L.verbose (fun m ->
         m
           "-----------------------------------\n\
            STATE AFTER SIMPLIFICATIONS:@\n\
@@ -422,8 +422,7 @@ module Make (SMemory : SMemory.S) :
         | Some (loc_name, _) -> Some loc_name
         | _                  -> None )
     | _                        ->
-        L.verboser (fun m ->
-            m "Unsupported location MAKESState: %a" Expr.pp loc);
+        L.verbose (fun m -> m "Unsupported location MAKESState: %a" Expr.pp loc);
         raise
           (Internal_State_Error ([ EType (loc, None, Type.ObjectType) ], state))
 
@@ -535,7 +534,7 @@ module Make (SMemory : SMemory.S) :
           ( (if svars = SS.empty then [] else [ FSVars svars ])
           @ pfixes @ mfixes @ asrts )
     | false ->
-        L.verboser (fun m -> m "Warning: invalid fix.");
+        L.verbose (fun m -> m "Warning: invalid fix.");
         None
 
   let get_fixes ?simple_fix:(sf = true) (state : t) (errs : err_t list) :
@@ -543,7 +542,7 @@ module Make (SMemory : SMemory.S) :
     let pp_fixes fmt fixes =
       Fmt.pf fmt "[[ %a ]]" (Fmt.list ~sep:(Fmt.any ", ") pp_fix) fixes
     in
-    L.verboser (fun m -> m "SState: get_fixes");
+    L.verbose (fun m -> m "SState: get_fixes");
     let heap, store, pfs, gamma, svars = state in
     let one_step_fixes : fix_t list list list =
       List.map
@@ -561,7 +560,7 @@ module Make (SMemory : SMemory.S) :
                 (SMemory.get_fixes ~simple_fix:sf heap pfs gamma err)
           | EPure f             ->
               let result = [ [ FPure f ] ] in
-              L.verboser (fun m ->
+              L.verbose (fun m ->
                   m "@[<v 2>Memory: Fixes found:@\n%a@]"
                     (Fmt.list ~sep:(Fmt.any "@\n") pp_fixes)
                     result);
@@ -581,7 +580,7 @@ module Make (SMemory : SMemory.S) :
                       fixes)
                   fixes
               in
-              L.verboser (fun m ->
+              L.verbose (fun m ->
                   m "@[<v 2>Memory: Fixes found:@\n%a@]"
                     (Fmt.list ~sep:(Fmt.any "@\n") pp_fixes)
                     result);
@@ -599,8 +598,8 @@ module Make (SMemory : SMemory.S) :
       List.map (fun fix -> normalise_fix pfs gamma fix) candidate_fixes
     in
     let result = List_utils.get_list_somes normalised_fixes in
-    L.(verboser (fun m -> m "Normalised fixes: %i" (List.length result)));
-    L.verboser (fun m ->
+    L.(verbose (fun m -> m "Normalised fixes: %i" (List.length result)));
+    L.verbose (fun m ->
         m "%a" (Fmt.list ~sep:(Fmt.any "@\n@\n") pp_fixes) result);
     result
 
@@ -614,7 +613,7 @@ module Make (SMemory : SMemory.S) :
    and returns the resulting state, if successful.
    *)
   let apply_fixes (state : t) (fixes : fix_t list) : t option * Asrt.t list =
-    L.verboser (fun m -> m "SState: apply_fixes");
+    L.verbose (fun m -> m "SState: apply_fixes");
     let heap, store, pfs, gamma, svars = state in
 
     let gas = ref [] in
@@ -631,7 +630,7 @@ module Make (SMemory : SMemory.S) :
           (heap, new_vars)
       | FSVars vars -> (heap, SS.union new_vars vars)
       | FAsrt ga ->
-          L.verboser (fun m ->
+          L.verbose (fun m ->
               m
                 "Warning: Non-abstract states do not support assertion fixes, \
                  hoping you're actually in an abstract state");

@@ -67,7 +67,7 @@ struct
           let pre' = Asrt.star (SPState.to_assertions ss_pre) in
 
           (* Step 3 - postconditions to symbolic states *)
-          L.verboser (fun m ->
+          L.verbose (fun m ->
               m
                 "Processing one postcondition of %s with label %a and \
                  spec_vars: @[<h>%a@].@\n\
@@ -117,7 +117,7 @@ struct
                 List.map (fun post -> (post, (label, None))) posts'
               in
               let post_up = UP.init known_vars SS.empty preds simple_posts in
-              L.verboser (fun m -> m "END of STEP 4@\n");
+              L.verbose (fun m -> m "END of STEP 4@\n");
               match post_up with
               | Error errs ->
                   let msg =
@@ -125,7 +125,7 @@ struct
                       "WARNING: testify failed for %s. Cause: post_up.\n" name
                   in
                   Printf.printf "%s" msg;
-                  L.verboser (fun m -> m "%s" msg);
+                  L.verbose (fun m -> m "%s" msg);
                   (None, None)
               | Ok post_up ->
                   let test =
@@ -201,7 +201,7 @@ struct
         let tests = List_utils.get_list_somes tests in
         let spec_sspecs = List_utils.get_list_somes sspecs in
         let new_spec = { spec with spec_sspecs } in
-        L.verboser (fun m -> m "Simplified SPECS:@\n@[%a@]@\n" Spec.pp new_spec);
+        L.verbose (fun m -> m "Simplified SPECS:@\n@[%a@]@\n" Spec.pp new_spec);
         (tests, new_spec)
 
   let testify_lemma (preds : (string, Pred.t) Hashtbl.t) (lemma : Lemma.t) :
@@ -268,7 +268,7 @@ struct
            (fun ac result ->
              match (result : SAInterpreter.result_t) with
              | ExecRes.RFail (proc, i, state, errs) ->
-                 L.verboser (fun m ->
+                 L.verbose (fun m ->
                      m
                        "VERIFICATION FAILURE: Procedure %s, Command %d\n\
                         Spec %s %d\n\

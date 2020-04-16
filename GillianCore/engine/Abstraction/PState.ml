@@ -279,7 +279,7 @@ module Make
       (astate : t)
       (x : string option)
       (args : vt list) : (t * Flag.t) list =
-    L.verboser (fun m ->
+    L.verbose (fun m ->
         m "INSIDE RUN spec of %s with the following UP:@\n%a@\n" name UP.pp up);
 
     let old_store = get_store astate in
@@ -289,7 +289,7 @@ module Make
     let existential_bindings = Option.value ~default:[] existential_bindings in
     let subst = Subst.init (existential_bindings @ Store.bindings new_store) in
 
-    L.verboser (fun m ->
+    L.verbose (fun m ->
         m "About to use the spec of %s with the following UP:@\n%a@\n" name
           UP.pp up);
 
@@ -442,15 +442,15 @@ module Make
         let vs_ins = List.map eval_expr les_ins in
         match Unifier.get_pred astate pname vs_ins with
         | GPSucc [ (_, vs') ] ->
-            L.verboser (fun m ->
+            L.verbose (fun m ->
                 m "@[<h>Returned values: %a@]" Fmt.(list ~sep:comma Val.pp) vs');
             let vs = Pred.combine_ins_outs pred.pred vs_ins vs' in
-            L.verboser (fun m ->
+            L.verbose (fun m ->
                 m "@[<h>LCMD Unfold about to happen with rec %b info: %a@]" b
                   SLCmd.pp_folding_info unfold_info);
             if b then [ Unifier.rec_unfold astate pname vs ]
             else (
-              L.verboser (fun m ->
+              L.verbose (fun m ->
                   m "@[<h>Values: %a@]" Fmt.(list ~sep:comma Val.pp) vs);
               List.map
                 (fun (_, state) -> state)
@@ -462,7 +462,7 @@ module Make
         let pvars_store = Store.domain store in
         let pvars_a = Asrt.pvars a in
         let pvars_diff = SS.diff pvars_a pvars_store in
-        L.verboser (fun m ->
+        L.verbose (fun m ->
             m "%s" (String.concat ", " (SS.elements pvars_diff)));
         match pvars_diff = SS.empty with
         | false ->
@@ -487,12 +487,12 @@ module Make
             let vars_to_forget = SS.inter state_vars (SS.of_list binders) in
             if vars_to_forget <> SS.empty then (
               let oblivion_subst = fresh_subst vars_to_forget in
-              L.verboser (fun m ->
+              L.verbose (fun m ->
                   m "Forget @[%a@] with subst: %a"
                     Fmt.(iter ~sep:comma SS.iter string)
                     vars_to_forget Subst.pp oblivion_subst);
               substitution_in_place oblivion_subst astate;
-              L.verboser (fun m ->
+              L.verbose (fun m ->
                   m "State after substitution:@\n@[%a@]\n" pp astate) )
             else ();
             match up with
@@ -664,7 +664,7 @@ module Make
             | UPUSucc [ (_, _, _) ] -> (
                 (* Successful Unification *)
                 let id_subst = make_id_subst a in
-                L.verboser (fun m ->
+                L.verbose (fun m ->
                     m "Producing invariant @[<h>%a@] with subst @[%a@]" Asrt.pp
                       invariant Subst.pp id_subst);
                 let new_astate = init (Some pred_defs) in
@@ -806,12 +806,12 @@ module Make
 
   let get_fixes ?simple_fix:(sf = true) (state : t) (errs : err_t list) :
       fix_t list list =
-    L.verboser (fun m -> m "AState: get_fixes");
+    L.verbose (fun m -> m "AState: get_fixes");
     let st, preds, pht = state in
     State.get_fixes ~simple_fix:sf st errs
 
   let apply_fixes (state : t) (fixes : fix_t list) : t option * Asrt.t list =
-    L.verboser (fun m -> m "AState: apply_fixes");
+    L.verbose (fun m -> m "AState: apply_fixes");
     let st, preds, pht = state in
     let ost, asrts = State.apply_fixes st fixes in
     match ost with

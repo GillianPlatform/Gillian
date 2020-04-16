@@ -69,7 +69,7 @@ let rec ins_outs_formula (preds : (string, Pred.t) Hashtbl.t) (form : Formula.t)
     SS.union (SS.union (Formula.lvars f) (Formula.alocs f)) (Formula.pvars f)
   in
 
-  L.verboser (fun m -> m "Formula: @[<h>%a@]" Formula.pp form);
+  L.verbose (fun m -> m "Formula: @[<h>%a@]" Formula.pp form);
 
   match form with
   | Not e        -> [ (ins_f e, SS.empty, form) ]
@@ -84,7 +84,7 @@ let rec ins_outs_formula (preds : (string, Pred.t) Hashtbl.t) (form : Formula.t)
       let outs2 = outs_expr e2 in
 
       L.(
-        verboser (fun m ->
+        verbose (fun m ->
             m "ins: %s: %s\nouts: %s: %s\nins: %s: %s\nouts: %s: %s"
               ((Fmt.to_to_string Expr.pp) e1)
               (String.concat ", " (SS.elements ins1))
@@ -104,7 +104,7 @@ let rec ins_outs_formula (preds : (string, Pred.t) Hashtbl.t) (form : Formula.t)
         else []
       in
       let ios = io_l2r @ io_r2l in
-      L.(verboser (fun m -> m "ios: %d" (List.length ios)));
+      L.(verbose (fun m -> m "ios: %d" (List.length ios)));
       if ios <> [] then ios
       else [ (SS.union ins1 ins2, SS.union outs1 outs2, Formula.Eq (e1, e2)) ]
   | _            -> [ (ins_f form, SS.empty, form) ]
@@ -168,7 +168,7 @@ let s_init
     (st, st) result =
   let prioritise (la : Asrt.t list) = List.sort Asrt.prioritise la in
 
-  L.verboser (fun m -> m "@[<v 2>s_init on:@ @[%a]@ @]" Asrt.pp a);
+  L.verbose (fun m -> m "@[<v 2>s_init on:@ @[%a]@ @]" Asrt.pp a);
 
   let simple_asrts = collect_simple_asrts a in
   let simple_asrts =
@@ -237,10 +237,10 @@ let s_init
              "UP: Should not happen: unification plan creation called with no \
               starting state.")
     | (up, unchecked, _) :: _ when unchecked = SI.empty ->
-        L.verboser (fun m -> m "Successfully created UP.");
+        L.verbose (fun m -> m "Successfully created UP.");
         Ok (List.rev up)
     | (up, unchecked, known_lvars) :: rest -> (
-        L.verboser (fun m ->
+        L.verbose (fun m ->
             m
               "KNOWN VARS: @[%a@].@\n\
                @[<v 2>CUR UP:@\n\
@@ -260,9 +260,9 @@ let s_init
 
         match visit_asrt_lst known_lvars unchecked [] with
         | None                      ->
-            L.verboser (fun m -> m "No assertions left to visit.");
+            L.verbose (fun m -> m "No assertions left to visit.");
             if rest = [] then (
-              L.verboser (fun m -> m "Detecting spec-var existentials.");
+              L.verbose (fun m -> m "Detecting spec-var existentials.");
               let unchckd =
                 List.map
                   (fun i ->
@@ -284,7 +284,7 @@ let s_init
               in
               let unchckd = List.filter (fun u -> u <> SS.empty) unchckd in
               L.(
-                verboser (fun m ->
+                verbose (fun m ->
                     m "\t%s"
                       (String.concat "\n\t"
                          (List.map
@@ -292,11 +292,11 @@ let s_init
                             unchckd))));
               (* if (List.length unchckd > 0) then (
                    let heuristic_var : string = SS.min_elt (List.hd unchckd) in
-                     L.log L.Verboser (lazy ("Heuristically adding existential: " ^ heuristic_var));
+                     L.log L.verbose (lazy ("Heuristically adding existential: " ^ heuristic_var));
                      search [ (up, unchecked, SS.add heuristic_var known_lvars) ]
                  ) else (
                    (* This is where it really ends - couldn't continue naturally, couldn't heuristically extend *) *)
-              L.verboser (fun m -> m "Unification plan creation failure.");
+              L.verbose (fun m -> m "Unification plan creation failure.");
               let unchecked, _ =
                 List.split
                   (List.map
@@ -306,9 +306,9 @@ let s_init
               Error unchecked )
             else search rest
         | Some (new_unchecked, ret) ->
-            (* L.log L.Verboser (lazy "Successfully added more assertions to the UP.");
-               L.(verboser (fun m -> m "States to examine: %d" (List.length ret)));
-               L.(verboser (fun m -> m "Unchecked remaining: %d" (SI.cardinal new_unchecked))); *)
+            (* L.log L.verbose (lazy "Successfully added more assertions to the UP.");
+               L.(verbose (fun m -> m "States to examine: %d" (List.length ret)));
+               L.(verbose (fun m -> m "Unchecked remaining: %d" (SI.cardinal new_unchecked))); *)
             let new_search_states =
               List.map
                 (fun (a, new_known_vars) ->
@@ -507,7 +507,7 @@ let init_specs (preds : (string, Pred.t) Hashtbl.t) (specs : Spec.t list) :
             list =
           List.mapi
             (fun i (sspec : Spec.st) ->
-              L.verboser (fun m ->
+              L.verbose (fun m ->
                   m "lab of sspec %d: @[<h>%a@]" i
                     Fmt.(
                       option
@@ -596,7 +596,7 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
         (* let msg = Printf.sprintf "Predicate definition of %s cannot be turned into UP" pred.name in
            L.fail msg *)
         | Ok up ->
-            L.verboser (fun m ->
+            L.verbose (fun m ->
                 m "Successfully created UP of predicate %s:\n%a" name pp up);
             Hashtbl.replace u_preds name { pred; pure = pred.pred_pure; up })
       preds;
@@ -663,7 +663,7 @@ let rec expr_compatible e e' subst : bool =
         expr_list_compatible (List.combine les les') subst
     | _, _ -> false
   in
-  (* L.(verboser (fun m -> m "Compat expr: %s %s : %b with %s" ((Fmt.to_to_string Expr.pp) e) ((Fmt.to_to_string Expr.pp) e') result (SSubst.str subst))); *)
+  (* L.(verbose (fun m -> m "Compat expr: %s %s : %b with %s" ((Fmt.to_to_string Expr.pp) e) ((Fmt.to_to_string Expr.pp) e') result (SSubst.str subst))); *)
   result
 
 and expr_list_compatible (esses : (Expr.t * Expr.t) list) (subst : SSubst.t) :
@@ -707,7 +707,7 @@ let check_compatibility (ps : Asrt.t list) (qs : Asrt.t list) : SSubst.t option
           Asrt.Set.iter
             (fun q ->
               let cassrts = asrt_compatible p q subst in
-              (* L.(verboser (fun m -> m "Compat asrt: %s %s : %b with %s" (Asrt.str p) (Asrt.str q) cassrts (SSubst.str subst))); *)
+              (* L.(verbose (fun m -> m "Compat asrt: %s %s : %b with %s" (Asrt.str p) (Asrt.str q) cassrts (SSubst.str subst))); *)
               if cassrts then raise (CompatFound q))
             qs;
           false
@@ -880,7 +880,7 @@ let add_spec (prog : prog) (spec : Spec.t) : unit =
         (fun g_up (pre, pre_up, posts) ->
           match pre_up with
           | Error _   ->
-              L.verboser (fun m ->
+              L.verbose (fun m ->
                   m
                     "WARNING!!! IT IS NOT POSSIBLE TO BUILD UP FOR INFERRED \
                      SPEC of %s!PRE:@\n\

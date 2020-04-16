@@ -18,7 +18,7 @@ let rec auto_unfold
           Asrt.Star (asrt1, asrt2))
   | Pred (name, args) -> (
       try
-        (* L.verboser (fun fmt -> fmt "AutoUnfold: %a" Asrt.pp asrt); *)
+        (* L.verbose (fun fmt -> fmt "AutoUnfold: %a" Asrt.pp asrt); *)
         let pred : Pred.t = Hashtbl.find predicates name in
         if Hashtbl.find rec_tbl pred.pred_name && not unfold_rec_predicates then
           [ asrt ]
@@ -32,9 +32,9 @@ let rec auto_unfold
           let new_asrts =
             List.map
               (fun (_, a) ->
-                (* L.verboser (fun fmt -> fmt "Before: %a" Asrt.pp a); *)
+                (* L.verbose (fun fmt -> fmt "Before: %a" Asrt.pp a); *)
                 let result = SVal.SSubst.substitute_asrt subst false a in
-                (* L.verboser (fun fmt -> fmt "After: %a" Asrt.pp result); *)
+                (* L.verbose (fun fmt -> fmt "After: %a" Asrt.pp result); *)
                 result)
               pred.pred_definitions
           in
@@ -178,7 +178,7 @@ let unfold_preds (preds : (string, Pred.t) Hashtbl.t) :
 
   Hashtbl.iter
     (fun name (pred : Pred.t) ->
-      L.verboser (fun fmt -> fmt "Unfolding predicate: %s" pred.pred_name);
+      L.verbose (fun fmt -> fmt "Unfolding predicate: %s" pred.pred_name);
       let definitions' : ((string * string list) option * Asrt.t) list =
         List.flatten
           (List.map
@@ -202,7 +202,7 @@ let unfold_spec
     let posts : Asrt.t list =
       List.concat (List.map (auto_unfold preds rec_info) sspec.ss_posts)
     in
-    L.verboser (fun fmt -> fmt "Testing for admissibility");
+    L.verbose (fun fmt -> fmt "Testing for admissibility");
     let posts = List.filter Simplifications.admissible_assertion posts in
     if posts = [] then
       Fmt.failwith
@@ -223,7 +223,7 @@ let unfold_lemma
     (preds : (string, Pred.t) Hashtbl.t)
     (rec_info : (string, bool) Hashtbl.t)
     (lemma : Lemma.t) : Lemma.t =
-  L.verboser (fun fmt ->
+  L.verbose (fun fmt ->
       fmt "Unfolding lemma: %s with pre-condition\n%a" lemma.lemma_name Asrt.pp
         lemma.lemma_hyp);
   let lemma_hyp : Asrt.t =
@@ -234,7 +234,7 @@ let unfold_lemma
     match unfolded_lemma with
     | [ pre ] -> pre
     | other   ->
-        L.verboser (fun fmt ->
+        L.verbose (fun fmt ->
             fmt "Lemma unfolded to %d preconditions" (List.length other));
         lemma.lemma_hyp
   in

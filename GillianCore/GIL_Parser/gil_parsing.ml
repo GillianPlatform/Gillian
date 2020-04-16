@@ -74,11 +74,11 @@ let combine
   Hashtbl.iter
     (fun comp_name comp ->
       if not (Hashtbl.mem existing_components comp_name) then (
-        L.verboser (fun m ->
+        L.verbose (fun m ->
             m "*** MESSAGE: Adding %s: %s.@\n" component_type comp_name);
         Hashtbl.add existing_components comp_name (transform comp) )
       else
-        L.verboser (fun m ->
+        L.verbose (fun m ->
             m "*** WARNING: %s %s already exists.@\n"
               (String.capitalize_ascii component_type)
               comp_name))

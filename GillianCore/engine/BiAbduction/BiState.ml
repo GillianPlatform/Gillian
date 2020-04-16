@@ -359,7 +359,7 @@ struct
           | USucc state' -> (
               match UP.next up with
               | None                     ->
-                  L.verboser (fun m -> m "ONE SPEC IS DONE!!!@\n");
+                  L.verbose (fun m -> m "ONE SPEC IS DONE!!!@\n");
                   search (rest, (state', state_af, subst, UP.posts up) :: rets)
               | Some [ (up, lab) ]       ->
                   search ((state', state_af, subst, up) :: rest, rets)
@@ -389,8 +389,8 @@ struct
                     errs Subst.pp subst);
 
               if State.can_fix errs then (
-                L.(verboser (fun m -> m "CAN FIX!!!"));
-                L.verboser (fun m ->
+                L.(verbose (fun m -> m "CAN FIX!!!"));
+                L.verbose (fun m ->
                     m "@[<v 2>My state is:@\n%a@]" State.pp state);
                 let ffixes = State.get_fixes state errs in
                 let fixed_states =
@@ -406,9 +406,9 @@ struct
                         (fun state' ->
                           let state_af' = Option.get state_af' in
                           L.(
-                            verboser (fun m -> m "BEFORE THE SIMPLIFICATION!!!"));
+                            verbose (fun m -> m "BEFORE THE SIMPLIFICATION!!!"));
                           let new_subst = State.simplify state' in
-                          L.verboser (fun m ->
+                          L.verbose (fun m ->
                               m "@[<v 2>SIMPLIFICATION SUBST:@\n%a@]" Subst.pp
                                 new_subst);
                           let subst' = compose_substs subst new_subst in
@@ -437,11 +437,11 @@ struct
                 in
 
                 ( if next_search_states = [] then
-                  L.(verboser (fun m -> m "TRIED TO FIX BUT CANNOT FIX!!!")) );
+                  L.(verbose (fun m -> m "TRIED TO FIX BUT CANNOT FIX!!!")) );
 
                 search (next_search_states @ rest, rets) )
               else (
-                L.(verboser (fun m -> m "CANNOT FIX!!!"));
+                L.(verbose (fun m -> m "CANNOT FIX!!!"));
                 search (rest, rets) ) )
     in
     search search_state
@@ -491,7 +491,7 @@ struct
             spec.spec.spec_name UP.pp spec.up));
     let ret_states = unify procs state' state_af subst spec.up in
     L.(
-      verboser (fun m ->
+      verbose (fun m ->
           m "Concluding unification With %d results" (List.length ret_states)));
 
     let result =
@@ -644,7 +644,7 @@ struct
         ASucc rets'
     | State.AFail errs when State.can_fix errs ->
         L.(
-          verboser (fun m ->
+          verbose (fun m ->
               m "BState: EA: %d errors and they can be fixed."
                 (List.length errs)));
         let rets =

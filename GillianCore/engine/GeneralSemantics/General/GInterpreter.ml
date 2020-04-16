@@ -225,7 +225,7 @@ struct
         let macro = Macro.get prog.prog.macros name in
         match macro with
         | None       ->
-            L.verboser (fun m ->
+            L.verbose (fun m ->
                 m "@[<v 2>Current MACRO TABLE:\n%a\n@]" Macro.pp_tbl
                   prog.prog.macros);
             raise
@@ -394,13 +394,13 @@ struct
       match spec with
       | Some spec -> (
           let subst = eval_subst_list state subst in
-          L.verboser (fun fmt -> fmt "ABOUT TO USE THE SPEC OF %s" pid);
+          L.verbose (fun fmt -> fmt "ABOUT TO USE THE SPEC OF %s" pid);
           (* print_to_all ("\tStarting run spec: " ^ pid); *)
           let rets : (State.t * Flag.t) list =
             State.run_spec spec state x args subst
           in
           (* print_to_all ("\tFinished run spec: " ^ pid); *)
-          L.verboser (fun fmt ->
+          L.verbose (fun fmt ->
               fmt "Run_spec returned %d Results" (List.length rets));
           let b_counter =
             if List.length rets > 1 then b_counter + 1 else b_counter
@@ -514,7 +514,7 @@ struct
           | Some (Bool false) -> vtrue
           | _                 -> eval_expr (UnOp (UNot, e))
         in
-        L.verboser (fun fmt ->
+        L.verbose (fun fmt ->
             fmt "Evaluated expressions: %a, %a" Val.pp vt Val.pp vf);
         let can_put_t, can_put_f =
           match lvt with
@@ -625,7 +625,7 @@ struct
               [ ConfCont (state'', cs', prev', j, b_counter) ]
           | _ -> raise (Failure "Malformed callstack")
         in
-        L.verboser (fun m -> m "Returning.");
+        L.verbose (fun m -> m "Returning.");
         result
     | ReturnError -> (
         let v_ret = Store.get store Names.return_variable in
@@ -685,7 +685,7 @@ struct
         let results = hold_results @ results in
         if not retry then results
         else (
-          L.(verboser (fun m -> m "Relaunching suspended confs"));
+          L.(verbose (fun m -> m "Relaunching suspended confs"));
           let hold_confs =
             List.filter (fun (_, pid) -> Hashtbl.mem prog.specs pid) on_hold
           in
@@ -701,7 +701,7 @@ struct
         let _, annot_cmd = get_cmd prog cs i in
         Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
         L.(
-          verboser (fun m ->
+          verbose (fun m ->
               m
                 "Stopping Symbolic Execution due to MAX BRANCHING with %d. \
                  STOPPING CONF:\n"
@@ -717,7 +717,7 @@ struct
     | ConfSusp (fid, state, cs, prev, i, b_counter) :: rest_confs when retry ->
         let conf = ConfCont (state, cs, prev, i, b_counter) in
         L.(
-          verboser (fun m ->
+          verbose (fun m ->
               m "Suspending a computation that was trying to call %s" fid));
         evaluate_cmd_iter ret_fun retry prog hold_results
           ((conf, fid) :: on_hold) rest_confs results

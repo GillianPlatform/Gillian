@@ -2,7 +2,6 @@
 type level =
   | Normal  (** Normal output *)
   | Verbose  (** Verbose output *)
-  | Verboser  (** More verbose output *)
   | TMI  (** Too much information *)
 
 type t = Disabled | Enabled of level
@@ -18,9 +17,8 @@ let should_log msg_lvl =
   | Disabled            -> false
   | Enabled enabled_lvl ->
       let int_of_level = function
-        | Normal   -> 1000
-        | Verbose  -> 2000
-        | Verboser -> 3000
-        | TMI      -> 4000
+        | Normal  -> 1000
+        | Verbose -> 2000
+        | TMI     -> 3000
       in
       int_of_level msg_lvl <= int_of_level enabled_lvl

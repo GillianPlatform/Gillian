@@ -16,8 +16,6 @@ let normal msgf = logr Normal msgf
 
 let verbose msgf = logr Verbose msgf
 
-let verboser msgf = logr Verboser msgf
-
 let tmi msgf = logr TMI msgf
 
 let print_to_all (str : string) =

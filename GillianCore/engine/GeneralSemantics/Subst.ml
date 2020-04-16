@@ -310,7 +310,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
           ( find_in_subst x le (fun () ->
                 let lvar = LVar.alloc () in
                 L.(
-                  verboser (fun m ->
+                  verbose (fun m ->
                       m
                         "General: Subst in lexpr: PVar %s not in subst, \
                          generating fresh: %s"

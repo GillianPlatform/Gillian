@@ -3,7 +3,6 @@ module Mode : sig
   type level =
     | Normal  (** Normal output *)
     | Verbose  (** Verbose output *)
-    | Verboser  (** More verbose output *)
     | TMI  (** Too much information *)
 
   type t = Disabled | Enabled of level
@@ -16,32 +15,32 @@ module Mode : sig
 end
 
 module Report : sig
-  type 'a report_builder
+  type 'a builder
 
   val info :
     string ->
     ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a report_builder
+    'a builder
 
   val log :
     string ->
     ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a report_builder
+    'a builder
 
   val success :
     string ->
     ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a report_builder
+    'a builder
 
   val error :
     string ->
     ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a report_builder
+    'a builder
 
   val warning :
     string ->
     ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a report_builder
+    'a builder
 
   val enter_node : unit -> unit
 
@@ -56,9 +55,6 @@ val normal : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
 
 val verbose : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
 (** `verbose` is just `log Verbose` *)
-
-val verboser : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
-(** `verboser` is just `log Verboser` *)
 
 val tmi : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
 (** `tmi` is just `log TMI` *)
