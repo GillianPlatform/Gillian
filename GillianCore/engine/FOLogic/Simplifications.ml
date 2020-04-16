@@ -205,21 +205,21 @@ let get_set_intersections pfs =
           ( [ (x, Some NumberType) ],
             Or (Not (SetMem (LVar y, LVar set)), Less (LVar elem, LVar z)) )
         when x = y && x = z ->
-          L.(verboser (fun m -> m "Got left: %s, %s" elem set));
+          L.(verbose (fun m -> m "Got left: %s, %s" elem set));
           Hashtbl.add lvars elem set
       | ForAll
           ( [ (x, Some NumberType) ],
             Or (Not (SetMem (LVar y, LVar set)), Less (LVar z, LVar elem)) )
         when x = y && x = z ->
-          L.(verboser (fun m -> m "Got right: %s, %s" elem set));
+          L.(verbose (fun m -> m "Got right: %s, %s" elem set));
           Hashtbl.add rvars elem set
       | _ -> ())
     pfs;
 
-  L.verboser (fun m -> m "v <# set :");
-  Hashtbl.iter (fun v s -> L.(verboser (fun m -> m "\t%s, %s" v s))) lvars;
-  L.verboser (fun m -> m "set <# v :");
-  Hashtbl.iter (fun v s -> L.(verboser (fun m -> m "\t%s, %s" v s))) rvars;
+  L.verbose (fun m -> m "v <# set :");
+  Hashtbl.iter (fun v s -> L.(verbose (fun m -> m "\t%s, %s" v s))) lvars;
+  L.verbose (fun m -> m "set <# v :");
+  Hashtbl.iter (fun v s -> L.(verbose (fun m -> m "\t%s, %s" v s))) rvars;
 
   (*
    *   1. forall (v, s) in lvars -> inter { v }, s = 0
@@ -293,7 +293,7 @@ let resolve_set_existentials
       get_set_intersections (PFS.to_list lpfs @ PFS.to_list rpfs)
     in
     L.(
-      verboser (fun m ->
+      verbose (fun m ->
           m "Intersections we have:\n%s"
             (String.concat "\n"
                (List.map
@@ -332,14 +332,14 @@ let resolve_set_existentials
 
           let sul = Expr.Set.of_list ul in
           let sur = Expr.Set.of_list ur in
-          L.verboser (fun m ->
+          L.verbose (fun m ->
               m "Resolve set existentials: I have found a union equality.");
-          L.verboser (fun m -> m "%a" Formula.pp a);
+          L.verbose (fun m -> m "%a" Formula.pp a);
 
           (* Trying to cut the union *)
           let same_parts = Expr.Set.inter sul sur in
           L.(
-            verboser (fun m ->
+            verbose (fun m ->
                 m "Same parts: %s"
                   (String.concat ", "
                      (List.map
@@ -350,7 +350,7 @@ let resolve_set_existentials
               Expr.Set.diff (Expr.Set.union sul sur) same_parts
             in
             L.(
-              verboser (fun m ->
+              verbose (fun m ->
                   m "%s must not intersect any of %s"
                     (String.concat ", "
                        (List.map
@@ -367,7 +367,7 @@ let resolve_set_existentials
                 (Expr.Set.elements must_not_intersect)
             in
             L.(
-              verboser (fun m ->
+              verbose (fun m ->
                   m "Intersections we need:\n%s"
                     (String.concat "\n"
                        (List.map
@@ -381,7 +381,7 @@ let resolve_set_existentials
               List.map (fun s -> List.mem s intersections) must_not_intersect
             in
             L.(
-              verboser (fun m ->
+              verbose (fun m ->
                   m "And we have: %s"
                     (String.concat ", "
                        (List.map
@@ -406,7 +406,7 @@ let resolve_set_existentials
               match lhs with
               | LVar v when SS.mem v set_exists ->
                   L.(
-                    verboser (fun m ->
+                    verbose (fun m ->
                         m "Managed to instantiate a set existential: %s" v));
                   let temp_subst = SSubst.init [] in
                   SSubst.put temp_subst v rhs;
@@ -439,7 +439,7 @@ let find_impossible_unions
       get_set_intersections (PFS.to_list lpfs @ PFS.to_list rpfs)
     in
     L.(
-      verboser (fun m ->
+      verbose (fun m ->
           m "Intersections we have:\n%s"
             (String.concat "\n"
                (List.map
@@ -456,7 +456,7 @@ let find_impossible_unions
         | Eq (NOp (SetUnion, ul), NOp (SetUnion, ur)) ->
             let sul = Expr.Set.of_list ul in
             let sur = Expr.Set.of_list ur in
-            L.verboser (fun m ->
+            L.verbose (fun m ->
                 m "Find impossible unions: I have found a union equality.");
 
             (* Just for the left *)
@@ -468,7 +468,7 @@ let find_impossible_unions
                     (Expr.Set.elements sur)
                 in
                 L.(
-                  verboser (fun m ->
+                  verbose (fun m ->
                       m "Intersections we need:\n%s"
                         (String.concat "\n"
                            (List.map
@@ -484,7 +484,7 @@ let find_impossible_unions
                     must_not_intersect
                 in
                 L.(
-                  verboser (fun m ->
+                  verbose (fun m ->
                       m "And we have: %s"
                         (String.concat ", "
                            (List.map
@@ -555,11 +555,11 @@ let simplify_pfs_and_gamma
     (lpfs : PFS.t)
     ?(rpfs : PFS.t option)
     (gamma : TypEnv.t) : SSubst.t * SS.t =
-  L.verboser (fun m -> m "Simplifications.simplify_pfs_and_gamma");
-  L.verboser (fun m ->
+  L.verbose (fun m -> m "Simplifications.simplify_pfs_and_gamma");
+  L.verbose (fun m ->
       m "With unification: %s" (if unification then "Yes" else "No"));
-  L.verboser (fun m -> m "  @[%a@]" PFS.pp lpfs);
-  L.verboser (fun m -> m "  @[%a@]" TypEnv.pp gamma);
+  L.verbose (fun m -> m "  @[%a@]" PFS.pp lpfs);
+  L.verbose (fun m -> m "  @[%a@]" TypEnv.pp gamma);
 
   let rpfs : PFS.t = Option.value ~default:(PFS.init ()) rpfs in
   let existentials : SS.t ref =
@@ -622,7 +622,7 @@ let simplify_pfs_and_gamma
 
       (* Pure formulae false *)
       let pfs_false (msg : string) : unit =
-        L.verboser (fun m -> m "Pure formulae false: %s" msg);
+        L.verbose (fun m -> m "Pure formulae false: %s" msg);
         PFS.clear lpfs;
         PFS.extend lpfs False;
         PFS.clear rpfs;
@@ -773,7 +773,7 @@ let simplify_pfs_and_gamma
                    | _                    -> false ->
                 let new_pf = Formula.Eq (UnOp (LstLen, sl), num) in
                 L.(
-                  verboser (fun m ->
+                  verbose (fun m ->
                       m "LSTSUBADD: %s" ((Fmt.to_to_string Formula.pp) new_pf)));
                 PFS.extend lpfs new_pf;
                 n := !n + 1
@@ -814,7 +814,7 @@ let simplify_pfs_and_gamma
                        let temp_subst = SSubst.init [ aloc, Lit (Loc lloc) ] in
                          PFS.substitution_in_place temp_subst lpfs *)
                 | ALoc alocl, ALoc alocr when unification ->
-                    L.verboser (fun fmt ->
+                    L.verbose (fun fmt ->
                         fmt "Two equal alocs: %s and %s" alocl alocr);
                     SSubst.put result alocr (ALoc alocl);
                     let temp_subst = SSubst.init [ (alocr, ALoc alocl) ] in
@@ -866,7 +866,7 @@ let simplify_pfs_and_gamma
                             if SSubst.mem result v then (
                               let le' = Option.get (SSubst.get result v) in
                               L.(
-                                verboser (fun m ->
+                                verbose (fun m ->
                                     m "Multiples in subst: %s %s"
                                       ((Fmt.to_to_string Expr.pp) le)
                                       ((Fmt.to_to_string Expr.pp) le')));
@@ -929,8 +929,8 @@ let simplify_pfs_and_gamma
 
       while not (PFS.equal lpfs !old_pfs) do
         iteration_count := !iteration_count + 1;
-        L.verboser (fun fmt -> fmt "Iteration: %d" !iteration_count);
-        L.verboser (fun fmt -> fmt "PFS:\n%a" PFS.pp lpfs);
+        L.verbose (fun fmt -> fmt "Iteration: %d" !iteration_count);
+        L.verbose (fun fmt -> fmt "PFS:\n%a" PFS.pp lpfs);
 
         old_pfs := PFS.copy lpfs;
 
@@ -974,7 +974,7 @@ let simplify_pfs_and_gamma
                 TypEnv.remove gamma v) )
       done;
 
-      L.verboser (fun m -> m "simplify_pfs_and_gamma completed");
+      L.verbose (fun m -> m "simplify_pfs_and_gamma completed");
       L.(verbose (fun m -> m "PFS:%a" PFS.pp lpfs));
       L.(verbose (fun m -> m "Gamma:\n%a" TypEnv.pp gamma));
 
@@ -996,15 +996,14 @@ let simplify_implication
     (fun (pf : Formula.t) ->
       match pf with
       | Eq (NOp (LstCat, lex), NOp (LstCat, ley)) ->
-          L.verboser (fun fmt -> fmt "SI: LstLen equality: %a" Formula.pp pf);
+          L.verbose (fun fmt -> fmt "SI: LstLen equality: %a" Formula.pp pf);
           let flen_eq =
             Reduction.reduce_formula ~gamma ~pfs:lpfs
               (Eq
                  ( UnOp (LstLen, NOp (LstCat, lex)),
                    UnOp (LstLen, NOp (LstCat, ley)) ))
           in
-          L.verboser (fun fmt ->
-              fmt "SI: Extending with: %a" Formula.pp flen_eq);
+          L.verbose (fun fmt -> fmt "SI: Extending with: %a" Formula.pp flen_eq);
           PFS.extend lpfs flen_eq
       | _ -> ())
     (PFS.to_list lpfs);
@@ -1041,7 +1040,7 @@ let simplify_implication
 
 let admissible_assertion (a : Asrt.t) : bool =
   L.(
-    verboser (fun m ->
+    verbose (fun m ->
         m "-----------\nAdmissible?\n----------\n%s"
           ((Fmt.to_to_string Asrt.pp) a)));
 
@@ -1066,6 +1065,6 @@ let admissible_assertion (a : Asrt.t) : bool =
   separate a;
   let _ = simplify_pfs_and_gamma ~kill_new_lvars:true pfs gamma in
   let res = not (PFS.mem pfs Formula.False) in
-  if res then L.verboser (fun m -> m "Admissible !!")
-  else L.verboser (fun m -> m "Not admissible !!");
+  if res then L.verbose (fun m -> m "Admissible !!")
+  else L.verbose (fun m -> m "Not admissible !!");
   res

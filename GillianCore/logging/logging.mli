@@ -3,7 +3,6 @@ module Mode : sig
   type level =
     | Normal  (** Normal output *)
     | Verbose  (** Verbose output *)
-    | Verboser  (** More verbose output *)
     | TMI  (** Too much information *)
 
   type t = Disabled | Enabled of level
@@ -56,9 +55,6 @@ val normal : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
 
 val verbose : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
 (** `verbose` is just `log Verbose` *)
-
-val verboser : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
-(** `verboser` is just `log Verboser` *)
 
 val tmi : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
 (** `tmi` is just `log TMI` *)

@@ -45,7 +45,7 @@ let normalise_cat (f : Expr.t -> Expr.t) (les : Expr.t list) : Expr.t =
     | _     -> NOp (LstCat, nles)
   in
   if result <> NOp (LstCat, les) then
-    L.verboser (fun fmt ->
+    L.verbose (fun fmt ->
         fmt "NormCat: %a -> %a" Expr.pp (NOp (LstCat, les)) Expr.pp result);
   result
 
@@ -290,7 +290,7 @@ let resolve_var_to_location (lvar : string) (pfs : Formula.t list) :
 let resolve_expr_to_location (pfs : Formula.t list) (e : Expr.t) :
     (string * SSubst.t) option =
   L.(
-    verboser (fun m ->
+    verbose (fun m ->
         m "resolve_expr: %s with pfs:\n%s\n"
           ((Fmt.to_to_string Expr.pp) e)
           (String.concat "\n" (List.map (Fmt.to_to_string Formula.pp) pfs))));
@@ -309,7 +309,7 @@ let resolve_expr_to_location (pfs : Formula.t list) (e : Expr.t) :
             | Eq (e', Lit (Loc l)) when e' = e -> (ac_var, Some l)
             | _ ->
                 L.(
-                  verboser (fun m ->
+                  verbose (fun m ->
                       m "false with: %s\n" ((Fmt.to_to_string Formula.pp) fo)));
                 (ac_var, ac_loc) ))
       (None, None) pfs
@@ -651,7 +651,7 @@ let rec list_prefix (pfs : PFS.t) (la : Expr.t) (lb : Expr.t) : bool * Expr.t =
     | NOp (LstCat, [ x ]) -> x
     | _                   -> lb
   in
-  (* L.verboser (fun fmt -> fmt "List prefix: %a of %a" Expr.pp la Expr.pp lb); *)
+  (* L.verbose (fun fmt -> fmt "List prefix: %a of %a" Expr.pp la Expr.pp lb); *)
   let nono = (false, Expr.Lit Nono) in
   if la = lb then (true, EList [])
   else
@@ -1157,7 +1157,7 @@ let rec reduce_lexpr_loop
         let fle1 = f le1 in
         let fle2 = f le2 in
         let fle3 = f le3 in
-        L.verboser (fun fmt ->
+        L.verbose (fun fmt ->
             fmt "REDUCTION: LstSub(%a, %a, %a)" Expr.pp fle1 Expr.pp fle2
               Expr.pp fle3);
         match (fle1, fle2, fle3) with
@@ -1191,7 +1191,7 @@ let rec reduce_lexpr_loop
                    candidates
                in
                candidates <> [] -> (
-            L.verboser (fun fmt -> fmt "Got in!");
+            L.verbose (fun fmt -> fmt "Got in!");
             let candidates = get_equal_expressions pfs fle1 in
             let candidates =
               List.map (fun (x : Expr.t) -> (x, Expr.lvars x)) candidates
@@ -1201,7 +1201,7 @@ let rec reduce_lexpr_loop
                 (fun (x, lvars) -> Containers.SS.mem lx lvars)
                 candidates
             in
-            L.verboser (fun fmt ->
+            L.verbose (fun fmt ->
                 fmt "Candidates: %s"
                   (String.concat ", "
                      (List.map
@@ -1294,7 +1294,7 @@ let rec reduce_lexpr_loop
                 match (lel, fle2) with
                 (* Cut to start from 0. *)
                 | EList les, Lit (Num l2) when l2 > 0. ->
-                    L.verboser (fun fmt -> fmt "Case 1");
+                    L.verbose (fun fmt -> fmt "Case 1");
                     let les' : Expr.t =
                       EList
                         (Array.to_list
@@ -1303,7 +1303,7 @@ let rec reduce_lexpr_loop
                     in
                     f (LstSub (NOp (LstCat, les' :: ler), Lit (Num 0.), fle3))
                 | EList les, Lit (Num 0.) ->
-                    L.verboser (fun fmt -> fmt "Case 2");
+                    L.verbose (fun fmt -> fmt "Case 2");
                     let l1 = List.length les in
                     let p3, m3 = collect_pluses_minuses fle3 in
                     let nump, pluses = numbers_and_rest p3 in
@@ -1311,7 +1311,7 @@ let rec reduce_lexpr_loop
                     let nump = int_of_float nump in
                     (* Must have something positive and nothing negative in numbers *)
                     if nump > 0 && nump <= l1 && numm = 0. then (
-                      L.verboser (fun fmt ->
+                      L.verbose (fun fmt ->
                           fmt "List: %a Start: %d End: %d" Expr.pp (EList les)
                             nump
                             (List.length les - nump));
@@ -1625,14 +1625,14 @@ and numbers_and_rest (numbers : Expr.t list) =
     (0., []) numbers
 
 and substitute_for_length pfs le =
-  (* L.(verboser (fun m -> m "Inside sub_for_len: %s" ((Fmt.to_to_string Expr.pp) le))); *)
+  (* L.(verbose (fun m -> m "Inside sub_for_len: %s" ((Fmt.to_to_string Expr.pp) le))); *)
   let len = PFS.length pfs in
-  (* L.(verboser (fun m -> m "We have the pfs of length: %d" len)); *)
+  (* L.(verbose (fun m -> m "We have the pfs of length: %d" len)); *)
   let idx = ref 0 in
   let result = ref le in
   while !idx < len do
     let form = PFS.nth_get pfs !idx in
-    (* L.(verboser (fun m -> m "Formula: %s" ((Fmt.to_to_string Formula.pp) form))); *)
+    (* L.(verbose (fun m -> m "Formula: %s" ((Fmt.to_to_string Formula.pp) form))); *)
     ( match form with
     | Eq (UnOp (LstLen, lst'), res) | Eq (res, UnOp (LstLen, lst')) ->
         result :=
@@ -1669,7 +1669,7 @@ and substitute_in_numeric_expr (le_to_find : Expr.t) (le_to_subst : Expr.t) le =
       match (list_subset plf ple, list_subset mif mie) with
       | true, true ->
           L.(
-            verboser (fun m ->
+            verbose (fun m ->
                 m "Subset found: %s %s %s"
                   ((Fmt.to_to_string Expr.pp) le)
                   ((Fmt.to_to_string Expr.pp) le_to_find)

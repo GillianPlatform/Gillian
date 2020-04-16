@@ -1,6 +1,6 @@
 open Lexing
 
-let log_verboser = Gillian.Logging.verboser
+let log_verbose = Gillian.Logging.verbose
 
 let col pos = pos.pos_cnum - pos.pos_bol + 1
 

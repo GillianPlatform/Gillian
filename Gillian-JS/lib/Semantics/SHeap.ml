@@ -261,12 +261,12 @@ let substitution_in_place (subst : SSubst.t) (heap : t) : unit =
     let le_subst = SSubst.subst_in_expr subst ~partial:true in
 
     (*
-      L.(verboser (fun m -> m "CFVL: %d" (Hashtbl.length heap.cfvl)));
-      L.(verboser (fun m -> m "SFVL: %d" (Hashtbl.length heap.sfvl)));
-      L.(verboser (fun m -> m "CDOM: %d" (Hashtbl.length heap.cdom)));
-      L.(verboser (fun m -> m "SDOM: %d" (Hashtbl.length heap.sdom)));
-      L.(verboser (fun m -> m "CMET: %d" (Hashtbl.length heap.cmet)));
-      L.(verboser (fun m -> m "SMET: %d" (Hashtbl.length heap.smet)));
+      L.(verbose (fun m -> m "CFVL: %d" (Hashtbl.length heap.cfvl)));
+      L.(verbose (fun m -> m "SFVL: %d" (Hashtbl.length heap.sfvl)));
+      L.(verbose (fun m -> m "CDOM: %d" (Hashtbl.length heap.cdom)));
+      L.(verbose (fun m -> m "SDOM: %d" (Hashtbl.length heap.sdom)));
+      L.(verbose (fun m -> m "CMET: %d" (Hashtbl.length heap.cmet)));
+      L.(verbose (fun m -> m "SMET: %d" (Hashtbl.length heap.smet)));
     *)
 
     (* Field-value lists *)

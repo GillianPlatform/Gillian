@@ -112,7 +112,7 @@ module M : Gillian.Symbolic.Memory_S = struct
                 "@[<v 2>JSILSMemory: Unsupported location: %a with pfs:@\n%a@]"
                 Expr.pp loc' PFS.pp pfs
             in
-            L.verboser (fun m -> m "%s" msg);
+            L.verbose (fun m -> m "%s" msg);
             raise (Failure msg) )
 
   let fresh_loc ?(loc : vt option) (pfs : PFS.t) (gamma : TypEnv.t) :
@@ -255,7 +255,7 @@ module M : Gillian.Symbolic.Memory_S = struct
                       FOSolver.check_entailment Containers.SS.empty
                         (PFS.to_list pfs) [ full_knowledge ] gamma
                     then (
-                      L.verboser (fun m -> m "GET CELL will branch\n");
+                      L.verbose (fun m -> m "GET CELL will branch\n");
                       let rets : (t * vt list * Formula.t list * 'a) option list
                           =
                         List.map
@@ -329,7 +329,7 @@ module M : Gillian.Symbolic.Memory_S = struct
   let get_full_domain (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) :
       action_ret =
     let loc_name = get_loc_name pfs gamma loc in
-    L.verboser (fun m -> m "%a" SHeap.pp heap);
+    L.verbose (fun m -> m "%a" SHeap.pp heap);
 
     let make_gd_error (loc_name : string) (props : vt list) (dom : vt option) :
         err_t =
@@ -804,7 +804,7 @@ module M : Gillian.Symbolic.Memory_S = struct
         svars (list ~sep:comma GAsrt.pp) gasrts
     in
     let _, fixes, _ = err in
-    L.verboser (fun m ->
+    L.verbose (fun m ->
         m "@[<v 2>Memory: Fixes found:@\n%a@]"
           Fmt.(
             list ~sep:(any "@\n")
@@ -832,7 +832,7 @@ module M : Gillian.Symbolic.Memory_S = struct
           completed_ifixes
       in
 
-      L.verboser (fun m ->
+      L.verbose (fun m ->
           m "@[<v 2>Memory: i-fixes completed: %d@\n%a"
             (List.length completed_ifixes)
             Fmt.(list ~sep:(any "@\n") pp_fix_result)
@@ -857,7 +857,7 @@ module M : Gillian.Symbolic.Memory_S = struct
         | _ -> raise (Failure "Bi-abduction: cannot fix metadata.") )
     (* Missing location: create new *)
     | CFLoc loc_name -> (
-        L.verboser (fun m -> m "CFLoc: %s" loc_name);
+        L.verbose (fun m -> m "CFLoc: %s" loc_name);
         let loc : vt =
           if Names.is_aloc_name loc_name then ALoc loc_name
           else Lit (Loc loc_name)

@@ -177,7 +177,7 @@ module Make
       in
       let pa = DynArray.get preds pred_index in
       if not maintain then (
-        L.verboser (fun m -> m "Removing predicate: %s" name);
+        L.verbose (fun m -> m "Removing predicate: %s" name);
         DynArray.delete preds pred_index );
       Some pa
     with Not_found -> None
@@ -222,7 +222,7 @@ module Make
       let pred_index = DynArray.index_of sel preds in
       let name, vs = DynArray.get preds pred_index in
       if not maintain then (
-        L.verboser (fun m -> m "Removing predicate: %s" name);
+        L.verbose (fun m -> m "Removing predicate: %s" name);
         DynArray.delete preds pred_index );
       Some (name, vs)
     with Not_found -> None

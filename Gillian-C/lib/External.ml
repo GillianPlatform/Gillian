@@ -17,7 +17,7 @@ struct
     let _ = Store.put store x (Val.from_literal Null) in
     let end_state = State.set_store state store in
     let () =
-      Gillian.Logging.verboser (fun m ->
+      Gillian.Logging.verbose (fun m ->
           m "C PRINTF WITH: %a" (Fmt.Dump.list Val.full_pp) v_args)
     in
     [ (end_state, cs, i, i + 1) ]

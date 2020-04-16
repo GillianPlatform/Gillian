@@ -1233,8 +1233,8 @@ let print_model solver =
   match model with
   | Some model ->
       let str_model = Model.to_string model in
-      L.(verboser (fun m -> m "I found the model: \n\n%s" str_model))
-  | None       -> L.(verboser (fun m -> m "No model found."))
+      L.(verbose (fun m -> m "I found the model: \n\n%s" str_model))
+  | None       -> L.(verbose (fun m -> m "No model found."))
 
 let string_of_solver solver =
   let exprs = Solver.get_assertions solver in
@@ -1281,7 +1281,7 @@ let encode_assertions (assertions : Formula.Set.t) (gamma : TypEnv.t) :
 let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
     =
   L.(
-    verboser (fun m ->
+    verbose (fun m ->
         m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma: @[%a@]\n"
           (Fmt.iter ~sep:(Fmt.any "@\n") Formula.Set.iter Formula.pp)
           fs TypEnv.pp gamma));
@@ -1293,13 +1293,13 @@ let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
   let masterSolver = Solver.mk_solver ctx None in
   Solver.add masterSolver encoded_assertions;
   L.(
-    verboser (fun m ->
+    verbose (fun m ->
         m "SAT: About to check the following:\n%s"
           (string_of_solver masterSolver)));
 
   (* Step 3: Check satisfiability *)
   (* let t = Sys.time () in *)
-  L.verboser (fun x -> x "Aqui!");
+  L.verbose (fun x -> x "Aqui!");
   let ret = Solver.check masterSolver [] in
   (* Utils.Statistics.update_statistics "Solver check" (Sys.time () -. t); *)
   L.(
@@ -1326,14 +1326,14 @@ let check_sat (fs : Formula.Set.t) (gamma : TypEnv.t) : bool =
   let ret =
     if cached then (
       let result = Hashtbl.find sat_cache fs in
-      L.(verboser (fun m -> m "SAT check cached with result: %b" result));
+      L.(verbose (fun m -> m "SAT check cached with result: %b" result));
       result )
     else (
-      L.(verboser (fun m -> m "SAT check not found in cache."));
+      L.(verbose (fun m -> m "SAT check not found in cache."));
       let ret = check_sat_core fs gamma in
 
       L.(
-        verboser (fun m ->
+        verbose (fun m ->
             m "Adding to cache : @[%a@]" Formula.pp
               (Formula.conjunct (Formula.Set.elements fs))));
 
@@ -1355,7 +1355,7 @@ let lift_z3_model
     (target_vars : SS.t) : unit =
   let recover_z3_number (n : ZExpr.expr) : float option =
     if ZExpr.is_numeral n then (
-      L.(verboser (fun m -> m "Z3 number: %s" (ZExpr.to_string n)));
+      L.(verbose (fun m -> m "Z3 number: %s" (ZExpr.to_string n)));
       Some (float_of_string (Z3.Arithmetic.Real.to_decimal_string n 16)) )
     else None
   in
@@ -1393,12 +1393,12 @@ let lift_z3_model
     | _               -> None
   in
 
-  L.(verboser (fun m -> m "Inside lift_z3_model"));
+  L.(verbose (fun m -> m "Inside lift_z3_model"));
   SS.iter
     (fun x ->
       let v = lift_z3_val x in
       L.(
-        verboser (fun m ->
+        verbose (fun m ->
             m "Z3 binding for %s: %s\n" x
               (Option.fold ~some:(Fmt.to_to_string Expr.pp) ~none:"NO BINDING!"
                  v)));

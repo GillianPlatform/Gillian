@@ -145,7 +145,7 @@ module Make
     let state, preds, pred_defs = astate in
 
     let print_local_info (i : int) (name : string) (args : Val.t list) : unit =
-      L.verboser (fun m ->
+      L.verbose (fun m ->
           m "Strategy %d: Examining %s(@[<h>%a@])" i name
             Fmt.(list ~sep:comma Val.pp)
             args)
@@ -187,7 +187,7 @@ module Make
             | _     -> true)
           es_inter
       in
-      L.verboser (fun m ->
+      L.verbose (fun m ->
           m "get_pred_with_vs. Strategy 1. Intersection: %s"
             (String.concat ", "
                (List.map (Fmt.to_to_string Expr.pp)
@@ -231,7 +231,7 @@ module Make
             | _     -> true)
           es_inter
       in
-      L.verboser (fun m ->
+      L.verbose (fun m ->
           m "get_pred_with_vs. Strategy 3. Intersection: %s"
             (String.concat ", "
                (List.map (Fmt.to_to_string Expr.pp)
@@ -264,7 +264,7 @@ module Make
   let produce_assertion (astate : t) (subst : Subst.t) (a : Asrt.t) : t option =
     let state, preds, pred_defs = astate in
 
-    L.verboser (fun m ->
+    L.verbose (fun m ->
         m
           "------------------------\n\
            Produce simple assertion: %a@\n\
@@ -324,7 +324,7 @@ module Make
           Option.fold
             ~some:(fun v ->
               L.(
-                verboser (fun m ->
+                verbose (fun m ->
                     m
                       "UNHAPPY. update_store inside produce assertions with \
                        prog variable: %s!!!\n"
@@ -392,7 +392,7 @@ module Make
   let produce_posts (state : t) (subst : Subst.t) (asrts : Asrt.t list) : t list
       =
     L.(
-      verboser (fun m ->
+      verbose (fun m ->
           m
             "@[<v 2>Produce posts: There are %d postconditions to produce. And \
              here they are:@\n\
@@ -443,7 +443,7 @@ module Make
         in
         Subst.extend subst bindings;
         L.(
-          verboser (fun m ->
+          verbose (fun m ->
               m "@[<v 2>Using unfold info, obtained subst:@\n%a@\n" Subst.pp
                 subst));
         defs'
@@ -457,7 +457,7 @@ module Make
     let state, preds, pred_defs = astate in
     let pred = UP.get_pred_def pred_defs pname in
     let params = List.map (fun (x, _) -> x) pred.pred.pred_params in
-    L.verboser (fun m ->
+    L.verbose (fun m ->
         m
           "Combine going to explode. PredName: @[<h>%s@]. Params: @[<h>%a]. \
            Args: @[<h>%a@]"
@@ -469,7 +469,7 @@ module Make
     let subst_i = Subst.init (List_utils.right_combine params args) in
 
     L.(
-      verboser (fun m ->
+      verbose (fun m ->
           m "unfold with unfold_info with:@\n%a@\n" SLCmd.pp_folding_info
             unfold_info));
 
@@ -480,7 +480,7 @@ module Make
                                  "Cannot Unfold Predicate with No Definitions")
       | def :: rest_defs ->
           L.(
-            verboser (fun m ->
+            verbose (fun m ->
                 m "Going to produce %d definitions with subst@\n%a"
                   (List.length (def :: rest_defs))
                   Subst.pp subst_i));
@@ -500,7 +500,7 @@ module Make
           results
     in
 
-    L.verboser (fun m ->
+    L.verbose (fun m ->
         m "Results of unfolding %s(@[<h>%a@]):@\n@[%a@]" pname
           Fmt.(list ~sep:comma string)
           params
@@ -528,18 +528,18 @@ module Make
     | _               -> saved_state
 
   let unfold_all (astate : t) (pname : string) : t =
-    L.verboser (fun m -> m "Starting UNFOLD ALL@\n");
+    L.verbose (fun m -> m "Starting UNFOLD ALL@\n");
     let rec loop astate =
       let _, preds, _ = astate in
       match Preds.remove_by_name preds pname with
       | None             ->
           L.(
-            verboser (fun m ->
+            verbose (fun m ->
                 m "Finishing Unfond_all with state:@[%a@]@\n" pp_astate astate));
           astate
       | Some (pname, vs) ->
           let astate = rec_unfold astate pname vs in
-          L.verboser (fun m ->
+          L.verbose (fun m ->
               m "IN UNFOLD ALL - ONE SUCCESSFUL CALL TO REC UNFOLD@\n");
           loop astate
     in
@@ -548,7 +548,7 @@ module Make
   let unfold_with_vals (astate : t) (vs : Val.t list) :
       (Subst.t * t) list * bool =
     L.(
-      verboser (fun m ->
+      verbose (fun m ->
           m "@[<v 2>Starting unfold_with_vals: @[<h>%a@]@\n%a.@\n"
             Fmt.(list ~sep:comma Val.pp)
             vs pp_astate astate));
@@ -557,23 +557,23 @@ module Make
     else
       match get_pred_with_vs astate vs with
       | Some (pname, v_args) ->
-          L.(verboser (fun m -> m "FOUND STH TO UNFOLD!!!!\n"));
+          L.(verbose (fun m -> m "FOUND STH TO UNFOLD!!!!\n"));
           let rets = unfold (copy_astate astate) pname v_args None in
           L.(
-            verboser (fun m ->
+            verbose (fun m ->
                 m "Unfold complete: %s(@[<h>%a@])" pname
                   Fmt.(list ~sep:comma Val.pp)
                   v_args));
           List.iteri
             (fun i (subst, astate) ->
               L.(
-                verboser (fun m ->
+                verbose (fun m ->
                     m "Result of UNFOLD %d:@\n  @[%a]@\nSubst:@\n  @[%a]@\n" i
                       pp_astate astate Subst.pp subst)))
             rets;
           (rets, true)
       | None                 ->
-          L.(verboser (fun m -> m "NOTHING TO UNFOLD!!!!\n"));
+          L.(verbose (fun m -> m "NOTHING TO UNFOLD!!!!\n"));
           ([ (Subst.init [], astate) ], false)
 
   let unfold_concrete_preds (astate : t) : (st option * t) option =
@@ -606,7 +606,7 @@ module Make
         | []                    -> None
         | [ (subst, astate'') ] ->
             L.(
-              verboser (fun m ->
+              verbose (fun m ->
                   m "unfold_concrete_preds WORKED. Unfolded: %s(@[<h>%a])" name
                     Fmt.(list ~sep:comma Val.pp)
                     vs));
@@ -742,12 +742,12 @@ module Make
   let unify_lexpr (state : State.t) (subst : Subst.t) (v : Val.t) (le : Expr.t)
       : (unit, (Expr.t * Expr.t) option) result =
     let le = Reduction.reduce_lexpr le in
-    L.verboser (fun m -> m "Unify lexpr with v: %a, le: %a" Val.pp v Expr.pp le);
+    L.verbose (fun m -> m "Unify lexpr with v: %a, le: %a" Val.pp v Expr.pp le);
 
     try
       let ret = unify_expr_core state subst v le in
       L.(
-        verboser (fun m ->
+        verbose (fun m ->
             m "Unify lexpr: Entering stage 1 with %a"
               Fmt.(
                 option ~none:(any "None") (fun f (vars, les) ->
@@ -769,7 +769,7 @@ module Make
                 (* TODO: experimental *)
                 (* let e2 = Subst.subst_in_expr subst true e2 in *)
                 L.(
-                  verboser (fun m ->
+                  verbose (fun m ->
                       m "Unify lexpr: Passed to stage 2: %a %a" Val.pp v1
                         Expr.pp e2));
                 let v1' = State.simplify_val state v1 in
@@ -870,7 +870,7 @@ module Make
     with
     | Some (_, vs) ->
         L.(
-          verboser (fun m ->
+          verbose (fun m ->
               m "Returning the following vs: @[<h>%a@]"
                 Fmt.(list ~sep:comma Val.pp)
                 vs));
@@ -890,7 +890,7 @@ module Make
                   let out_params = Pred.out_params pred_def in
                   let vs_outs = List.map (Subst.get subst') out_params in
                   L.(
-                    verboser (fun m ->
+                    verbose (fun m ->
                         m "Out parameters : @[<h>%a@]"
                           Fmt.(
                             list ~sep:comma (option ~none:(any "None") Val.pp))
@@ -930,14 +930,14 @@ module Make
         else
           let vs_ins = List.map Option.get vs_ins in
           L.(
-            verboser (fun m ->
+            verbose (fun m ->
                 m "Executing action: %s with ins: @[<h>%a@]" getter
                   Fmt.(list ~sep:comma Val.pp)
                   vs_ins));
           match State.execute_action getter state vs_ins with
           | ASucc [ (state', vs') ] -> (
               L.(
-                verboser (fun m ->
+                verbose (fun m ->
                     m "@[<v 2>Got state:@\n%a@] and values @[<h>%a@]" State.pp
                       state'
                       Fmt.(list ~sep:comma Val.pp)
@@ -974,7 +974,7 @@ module Make
         | USucc state -> unify_assertion astate subst (Asrt.Pure f2)
         | res         -> res )
     | Pure (Eq (le1, le2)) when UP.outs_expr le1 <> SS.empty ->
-        L.verboser (fun fmt -> fmt "Pure equality with non-empty outs");
+        L.verbose (fun fmt -> fmt "Pure equality with non-empty outs");
         let v2 = subst_in_expr_opt le2 in
         Option.fold
           ~some:(fun v2 ->
@@ -1028,12 +1028,12 @@ module Make
           let vs_ins = List.map Option.get vs_ins in
           match get_pred ~in_unification:true astate pname vs_ins with
           | GPSucc [] ->
-              L.verboser (fun m -> m "SUCCEEDED WITH NOTHING! MEDOOOOOO!!!!!");
+              L.verbose (fun m -> m "SUCCEEDED WITH NOTHING! MEDOOOOOO!!!!!");
               UWTF
           | GPSucc [ (astate', vs_outs) ] -> (
               let les_outs = Pred.out_args pred_def les in
               L.(
-                verboser (fun m ->
+                verbose (fun m ->
                     m
                       "learned the outs of a predicate. going to unify \
                        (@[<h>%a@]) against (@[<h>%a@])!!!@\n"
@@ -1056,7 +1056,7 @@ module Make
               raise (Failure "DEATH. BRANCHING GETPRED INSIDE UNIFICATION.")
           | GPFail errs -> make_resource_fail () )
     | Pure f ->
-        L.verboser (fun fmt -> fmt "Pure formula");
+        L.verbose (fun fmt -> fmt "Pure formula");
         let sbst_lst = Subst.to_ssubst subst in
         let sbst = SSubst.init sbst_lst in
         let f' = SSubst.substitute_formula sbst false f in
@@ -1070,7 +1070,7 @@ module Make
   and unify_up (s_states : search_state) : up_u_res =
     let s_states, errs_so_far = s_states in
     L.(
-      verboser (fun m ->
+      verbose (fun m ->
           m "Unify UP: There are %d states left to consider."
             (List.length s_states)));
     let f = unify_up in

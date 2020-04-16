@@ -537,12 +537,12 @@ struct
       let store_as_subst = SStore.to_ssubst store in
       PFS.substitution store_as_subst pfs;
 
-      L.verboser (fun m -> m "About to simplify.");
+      L.verbose (fun m -> m "About to simplify.");
       let _ =
         Simplifications.simplify_pfs_and_gamma pfs gamma ~unification:true
           ~save_spec_vars:(SS.empty, true)
       in
-      L.verboser (fun m -> m "Done simplifying.");
+      L.verbose (fun m -> m "Done simplifying.");
       pfs
     in
 
@@ -553,7 +553,7 @@ struct
       Hashtbl.fold (fun var le ac -> SS.add var ac) pvar_equalities SS.empty
     in
 
-    L.verboser (fun m ->
+    L.verbose (fun m ->
         m "PVars in normalise_pvar_equalities: %s\n"
           (String.concat ", " (SS.elements p_vars)));
 
@@ -563,12 +563,12 @@ struct
     let pvars_graph = pvars_graph p_vars p_vars_tbl in
     (* 4 *)
     normalise_pvar_equalities pvars_graph p_vars p_vars_tbl;
-    L.verboser (fun m -> m "Going to fill the store now.");
+    L.verbose (fun m -> m "Going to fill the store now.");
     (* 5 *) fill_store args;
-    L.verboser (fun m -> m "Filled store.");
+    L.verbose (fun m -> m "Filled store.");
     (* 6 *)
     let result = normalise_pure_assertions () in
-    L.verboser (fun m -> m "Finished normalising pure assertions.");
+    L.verbose (fun m -> m "Finished normalising pure assertions.");
     result
 
   (** Separate an assertion into:  core_asrts, pure, typing and predicates *)
@@ -599,10 +599,10 @@ struct
       (gamma : TypEnv.t)
       (subst : SSubst.t)
       (type_list : (Expr.t * Type.t) list) : bool =
-    L.verboser (fun m -> m "Normalising types: %d" (List.length type_list));
+    L.verbose (fun m -> m "Normalising types: %d" (List.length type_list));
     List.iter
       (fun (e, t) ->
-        L.verboser (fun m ->
+        L.verbose (fun m ->
             m "%s : %s" ((Fmt.to_to_string Expr.pp) e) (Type.str t)))
       type_list;
 
@@ -794,7 +794,7 @@ struct
     in
     let subst = compose_substs subst subst' in
 
-    L.verboser (fun m ->
+    L.verbose (fun m ->
         m "pfs after overlapping constraints:\n%a\nSubst':\n%a\n"
           (* FIXME: Shouldn't use PFS.to_list but Fmt.iter and PFS.iter *)
           (Fmt.list ~sep:(Fmt.any "@\n") Formula.pp)
@@ -847,12 +847,12 @@ struct
             match SPState.produce astate subst (Asrt.GA (a, ins, outs)) with
             | Some astate -> loop astate rest
             | None        ->
-                L.verboser (fun m ->
+                L.verbose (fun m ->
                     m "Produce GA failed for: %a!\n" Asrt.pp
                       (Asrt.GA (a, ins, outs)));
                 None
           with Failure msg ->
-            L.verboser (fun m ->
+            L.verbose (fun m ->
                 m "Produce GA failed for: %a with error %s\n" Asrt.pp
                   (Asrt.GA (a, ins, outs))
                   msg);
@@ -879,7 +879,7 @@ struct
       (a : Asrt.t) : (SPState.t * SSubst.t) option =
     let falsePFs pfs = PFS.mem pfs False in
     let svars = SS.filter is_spec_var_name (Asrt.lvars a) in
-    L.verboser (fun m ->
+    L.verbose (fun m ->
         m "Normalising assertion blah:\n\t%a\nsvars: @[<h>%a]" Asrt.pp a
           (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
           svars);
@@ -896,12 +896,12 @@ struct
     let c_asrts, pfs, types, preds =
       try separate_assertion a
       with Failure msg ->
-        L.verboser (fun m -> m "I died here terribly with msg: %s!\n" msg);
+        L.verbose (fun m -> m "I died here terribly with msg: %s!\n" msg);
         raise (Failure msg)
     in
 
-    L.verboser (fun m -> m "Separate assertion subst: %a" SSubst.pp subst);
-    L.verboser (fun m -> m "Here are the pfs: %a" PFS.pp (PFS.of_list pfs));
+    L.verbose (fun m -> m "Separate assertion subst: %a" SSubst.pp subst);
+    L.verbose (fun m -> m "Here are the pfs: %a" PFS.pp (PFS.of_list pfs));
 
     (* Step 3 -- Normalise type assertions and pure assertions
        * 3.1 - type assertions -> initialises gamma
@@ -910,7 +910,7 @@ struct
     let success = normalise_types store gamma subst types in
     match success with
     | false ->
-        L.verboser (fun m ->
+        L.verbose (fun m ->
             m
               "WARNING: normalise_assertion: type assertions could not be \
                normalised");
@@ -919,11 +919,11 @@ struct
         let pfs = normalise_pure_assertions store gamma subst pvars pfs in
         match falsePFs pfs with
         | true  ->
-            L.verboser (fun m ->
+            L.verbose (fun m ->
                 m "WARNING: normalise_assertion: pure formulae false");
             None
         | false -> (
-            L.verboser (fun m -> m "Here is the store: %a" SStore.pp store);
+            L.verbose (fun m -> m "Here is the store: %a" SStore.pp store);
             (* Step 4 -- Extend the typing environment using equalities in the pfs *)
             extend_typing_env_using_assertion_info gamma (PFS.to_list pfs);
 
@@ -945,7 +945,7 @@ struct
 
             match astate with
             | None        ->
-                L.verboser (fun m ->
+                L.verbose (fun m ->
                     m "WARNING: normalise_assertion: returning None");
                 None
             | Some astate ->
@@ -958,11 +958,11 @@ struct
                 then (
                   (* Step 9 -- Final simplifications - TO SIMPLIFY!!! *)
                   let _ = SPState.simplify ~unification:true astate in
-                  L.verboser (fun m ->
+                  L.verbose (fun m ->
                       m "AFTER NORMALISATION:@\n%a" SPState.pp astate);
                   Some (astate, subst) )
                 else (
-                  L.verboser (fun m ->
+                  L.verbose (fun m ->
                       m "WARNING: normalise_assertion: returning None");
                   None ) ) )
 end

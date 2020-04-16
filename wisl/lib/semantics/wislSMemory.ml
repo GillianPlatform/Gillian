@@ -40,7 +40,7 @@ let resolve_loc pfs gamma loc =
             Format.asprintf "Unsupported location: %a with pfs:\n%a" Expr.pp
               loc' PureContext.pp pfs
           in
-          Logging.verboser (fun m -> m "%s" msg);
+          Logging.verbose (fun m -> m "%s" msg);
           raise (Failure msg) )
 
 let get_cell heap pfs gamma (loc : vt) (offset : vt) =
@@ -132,7 +132,7 @@ let dispose heap pfs gamma loc_expr =
           let () = WislSHeap.remove heap loc_name in
           ASucc [ (heap, [], [], []) ]
       | None     ->
-          Logging.verboser (fun m ->
+          Logging.verbose (fun m ->
               m
                 "!!!!!!!!!!!!!!!@\n\
                  %s is not in the memory, can't dispose of it !!!@\n\

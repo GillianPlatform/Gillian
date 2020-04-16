@@ -31,7 +31,7 @@ let get_loc_name pfs gamma loc =
             Format.asprintf "Unsupported location: %a with pfs:\n%a" Expr.pp
               loc' PureContext.pp pfs
           in
-          Logging.verboser (fun fmt -> fmt "%s" msg);
+          Logging.verbose (fun fmt -> fmt "%s" msg);
           raise (Failure msg) )
 
 let resolve_or_create_loc_name pfs gamma lvar_loc =
@@ -135,13 +135,13 @@ module SVal = struct
 
   let of_gil_expr ?(pfs = PureContext.init ()) ?(gamma = TypEnv.init ()) sval_e
       =
-    Logging.verboser (fun fmt -> fmt "OF_GIL_EXPR : %a" Expr.pp sval_e);
+    Logging.verbose (fun fmt -> fmt "OF_GIL_EXPR : %a" Expr.pp sval_e);
     let possible_exprs =
       sval_e :: FOLogic.Reduction.get_equal_expressions pfs sval_e
     in
     List.fold_left
       (fun ac exp ->
-        Logging.verboser (fun fmt ->
+        Logging.verbose (fun fmt ->
             fmt "TRYING SUBSTITUTE EXPR : %a" Expr.pp exp);
         match ac with
         | None -> of_gil_expr_almost_concrete ~gamma exp
@@ -269,7 +269,7 @@ module Mem = struct
     | SVsingle _, Mfloat32 -> make 4 v
     | SVfloat _, Mfloat64 -> make 8 v
     | _ ->
-        Logging.verboser (fun fmt ->
+        Logging.verbose (fun fmt ->
             fmt
               "\n\
                Value %a cannot be put into the chunk %s, becoming undefined.\n"
@@ -696,7 +696,7 @@ module Mem = struct
         let new_mem = set_new_loc mem aloc low high sval perm_opt in
         Some (new_mem, [ pf ])
     | Some loc_name ->
-        Logging.verboser (fun fmt -> fmt "Found loc_name %s" loc_name);
+        Logging.verbose (fun fmt -> fmt "Found loc_name %s" loc_name);
         let exists = Option.is_some (find_opt loc_name mem.bounds) in
         let+ new_mem =
           if exists then set_existing_loc mem loc_name low high sval perm_opt
@@ -801,7 +801,7 @@ module Mem = struct
           find_opt new_loc mem.perms )
       with
       | None, None, None ->
-          Logging.verboser (fun fmt -> fmt "New location does not exist");
+          Logging.verbose (fun fmt -> fmt "New location does not exist");
           let* old_low, old_high = find_opt old_loc mem.bounds in
           let* old_contents = find_opt old_loc mem.contents in
           let* old_perms = find_opt old_loc mem.perms in
@@ -837,7 +837,7 @@ module Mem = struct
     in
     match ret_ops with
     | None              ->
-        Logging.verboser (fun fmt -> fmt "Warning: Unable to merge");
+        Logging.verbose (fun fmt -> fmt "Warning: Unable to merge");
         mem (* The old location or new location wasn't found *)
     | Some (l, h, c, p) ->
         {
@@ -852,7 +852,7 @@ module Mem = struct
       let aloc_subst =
         Subst.filter subst (fun var _ -> GUtils.Names.is_aloc_name var)
       in
-      Logging.verboser (fun fmt -> fmt "Aloc subst:\n%a" Subst.pp aloc_subst);
+      Logging.verbose (fun fmt -> fmt "Aloc subst:\n%a" Subst.pp aloc_subst);
       let le_subst = Subst.subst_in_expr subst ~partial:true in
       let sval_subst sv =
         let open SVal in
@@ -881,7 +881,7 @@ module Mem = struct
       (* Then we substitute the locations *)
       Subst.fold aloc_subst
         (fun old_loc new_loc cmem ->
-          Logging.verboser (fun fmt ->
+          Logging.verbose (fun fmt ->
               fmt "Merge locs: %s --> %a" old_loc Expr.pp new_loc);
           let new_loc =
             match new_loc with
@@ -1311,7 +1311,7 @@ let pp fmt h =
 (* Actual action execution *)
 
 let execute_action ac_name heap pfs gamma params =
-  Logging.verboser (fun fmt ->
+  Logging.verbose (fun fmt ->
       fmt "Executing action %s with params %a" ac_name pp_params params);
   let open LActions in
   let a_ret =
@@ -1334,7 +1334,7 @@ let execute_action ac_name heap pfs gamma params =
     | AGEnv RemDef    -> execute_genvremdef !heap pfs gamma params
   in
   let () =
-    Logging.verboser (fun fmt ->
+    Logging.verbose (fun fmt ->
         fmt
           "--------------------@\n\
            RETURNING FROM ACTION@\n\

@@ -216,7 +216,7 @@ let check_satisfiability_with_model (fs : Formula.t list) (gamma : TypEnv.t) :
   in
   let z3_vars = Var.Set.diff lvars (SSubst.domain subst None) in
   L.(
-    verboser (fun m ->
+    verbose (fun m ->
         m "OBTAINED VARS: %s\n" (String.concat ", " (SS.elements z3_vars))));
   match model with
   | None       -> None
@@ -229,7 +229,7 @@ let check_satisfiability_with_model (fs : Formula.t list) (gamma : TypEnv.t) :
 let check_satisfiability
     ?(unification = false) (fs : Formula.t list) (gamma : TypEnv.t) : bool =
   (* let t = time() in *)
-  L.verboser (fun m -> m "Entering FOSolver.check_satisfiability");
+  L.verbose (fun m -> m "Entering FOSolver.check_satisfiability");
   let fs, gamma, _ = simplify_pfs_and_gamma ~unification fs gamma in
   (* let axioms    = get_axioms (Formula.Set.elements fs) gamma in
      let fs           = Formula.Set.union fs (Formula.Set.of_list axioms) in *)

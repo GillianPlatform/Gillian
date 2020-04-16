@@ -50,23 +50,21 @@ struct
       | "disabled" -> Result.ok @@ Disabled
       | "normal"   -> Result.ok @@ Enabled Normal
       | "verbose"  -> Result.ok @@ Enabled Verbose
-      | "verboser" -> Result.ok @@ Enabled Verboser
       | "tmi"      -> Result.ok @@ Enabled TMI
       | other      -> Result.error @@ `Msg ("unknown value \"" ^ other ^ "\"")
     in
     let print fmt = function
-      | Disabled         -> Fmt.string fmt "disabled"
-      | Enabled Normal   -> Fmt.string fmt "normal"
-      | Enabled Verbose  -> Fmt.string fmt "verbose"
-      | Enabled Verboser -> Fmt.string fmt "verboser"
-      | Enabled TMI      -> Fmt.string fmt "tmi"
+      | Disabled        -> Fmt.string fmt "disabled"
+      | Enabled Normal  -> Fmt.string fmt "normal"
+      | Enabled Verbose -> Fmt.string fmt "verbose"
+      | Enabled TMI     -> Fmt.string fmt "tmi"
     in
 
     let c = Arg.conv (parse, print) in
     let v = Enabled TMI in
     let doc =
       "Controls the verbosity level of logging. The value SETTING must be one \
-       of `disabled', `normal', `verbose', `verboser', `tmi'."
+       of `disabled', `normal', `verbose', `tmi'."
     in
     Arg.(value & opt c v & info [ "l"; "logging" ] ~docv:"SETTING" ~doc)
 
@@ -401,7 +399,7 @@ struct
           e_prog
       in
       let () =
-        L.verboser (fun m ->
+        L.verbose (fun m ->
             m "@\nProgram as parsed:@\n%a@\n" Prog.pp_indexed prog)
       in
       let () =
@@ -413,7 +411,7 @@ struct
       in
       let prog = LogicPreprocessing.preprocess prog (not no_unfold) in
       let () =
-        L.verboser (fun m ->
+        L.verbose (fun m ->
             m "@\nProgram after logic Preprocessing:@\n%a@\n" Prog.pp_indexed
               prog)
       in

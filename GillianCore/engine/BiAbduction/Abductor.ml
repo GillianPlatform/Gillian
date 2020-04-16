@@ -172,7 +172,7 @@ struct
   let get_proc_names procs = List.map (fun proc -> proc.Proc.proc_name) procs
 
   let testify (prog : UP.prog) (bi_spec : BiSpec.t) : t list =
-    L.verboser (fun m -> m "Bi-testifying: %s" bi_spec.bispec_name);
+    L.verbose (fun m -> m "Bi-testifying: %s" bi_spec.bispec_name);
     let proc_names = get_proc_names (Prog.get_procs prog.prog) in
     let params = SS.of_list bi_spec.bispec_params in
     let normalise =
@@ -212,21 +212,21 @@ struct
       []
 
   let test_procs (prog : UP.prog) : unit =
-    L.verboser (fun m -> m "Starting bi-abductive testing");
+    L.verbose (fun m -> m "Starting bi-abductive testing");
     let proc_names = get_proc_names (Prog.get_procs prog.prog) in
-    L.verboser (fun m ->
+    L.verbose (fun m ->
         m "Procedure names: %a" Fmt.(list ~sep:comma string) proc_names);
     let bispecs = Prog.get_bispecs prog.prog in
     let () =
       List.iter
         (fun (bispec : Gil_syntax.BiSpec.t) ->
-          L.verboser (fun m -> m "Found bi-spec for: %s" bispec.bispec_name))
+          L.verbose (fun m -> m "Found bi-spec for: %s" bispec.bispec_name))
         bispecs
     in
     let tests = List.concat (List.map (testify prog) bispecs) in
 
     L.(
-      verboser (fun m ->
+      verbose (fun m ->
           m "I have tests for: %s"
             (String.concat ", " (List.map (fun t -> t.name) tests))));
 
@@ -235,7 +235,7 @@ struct
     in
 
     L.(
-      verboser (fun m ->
+      verbose (fun m ->
           m "I have tests for: %s"
             (String.concat ", " (List.map (fun t -> t.name) tests))));
 
@@ -270,7 +270,7 @@ struct
         (List.map
            (fun test ->
              ( L.(
-                 verboser (fun m ->
+                 verbose (fun m ->
                      m "Running bi-abduction on function %s\n" test.name));
                let rets =
                  run_test
