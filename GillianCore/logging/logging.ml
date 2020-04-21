@@ -6,17 +6,17 @@ let current_reporters = ref [ Reporter.file_reporter () ]
 let wrap_up () =
   List.iter (fun reporter -> reporter.Reporter.wrap_up ()) !current_reporters
 
-let logr lvl msgf =
+let log lvl msgf =
   if Mode.should_log lvl then
     List.iter
-      (fun reporter -> reporter.Reporter.report @@ Report.info "" msgf)
+      (fun reporter -> reporter.Reporter.log @@ Report.info "" msgf)
       !current_reporters
 
-let normal msgf = logr Normal msgf
+let normal msgf = log Normal msgf
 
-let verbose msgf = logr Verbose msgf
+let verbose msgf = log Verbose msgf
 
-let tmi msgf = logr TMI msgf
+let tmi msgf = log TMI msgf
 
 let print_to_all (str : string) =
   normal (fun m -> m "%s" str);
