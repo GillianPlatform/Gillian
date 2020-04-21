@@ -4,7 +4,7 @@ let wrap_up = Reporter.wrap_up
 
 let log lvl msgf =
   if Mode.should_log lvl then
-    let report = ReportBuilder.info "" msgf () in
+    let report = ReportBuilder.info "" (Debug msgf) () in
     Reporter.log report
 
 let normal msgf = log Normal msgf
