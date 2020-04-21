@@ -15,36 +15,7 @@ module Mode : sig
 end
 
 module Report : sig
-  type 'a builder
-
-  val info :
-    string ->
-    ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a builder
-
-  val log :
-    string ->
-    ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a builder
-
-  val success :
-    string ->
-    ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a builder
-
-  val error :
-    string ->
-    ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a builder
-
-  val warning :
-    string ->
-    ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
-    'a builder
-
-  val enter_node : unit -> unit
-
-  val exit_node : unit -> unit
+  type phase = ParsingAndCompiling | Parsing | Preprocessing | Verification
 end
 
 val wrap_up : unit -> unit
@@ -64,3 +35,11 @@ val fail : string -> 'a
 
 val print_to_all : string -> unit
 (** Output the strings in every file and prints it to stdout *)
+
+val normal_phase : Report.phase -> unit
+
+val verbose_phase : Report.phase -> unit
+
+val tmi_phase : Report.phase -> unit
+
+val end_phase : Report.phase -> unit
