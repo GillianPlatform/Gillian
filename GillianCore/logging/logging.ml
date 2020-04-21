@@ -8,9 +8,8 @@ let wrap_up () =
 
 let log lvl msgf =
   if Mode.should_log lvl then
-    List.iter
-      (fun reporter -> reporter.Reporter.log @@ Report.info "" msgf)
-      !current_reporters
+    let report = Report.info "" msgf () in
+    List.iter (fun reporter -> reporter.Reporter.log report) !current_reporters
 
 let normal msgf = log Normal msgf
 
