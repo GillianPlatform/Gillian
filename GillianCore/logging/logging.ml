@@ -1,15 +1,12 @@
 module Mode = Mode
 module Report = Report
 
-let current_reporters = ref [ Reporter.file_reporter () ]
-
-let wrap_up () =
-  List.iter (fun reporter -> reporter.Reporter.wrap_up ()) !current_reporters
+let wrap_up = Reporter.wrap_up
 
 let log lvl msgf =
   if Mode.should_log lvl then
     let report = Report.info "" msgf () in
-    List.iter (fun reporter -> reporter.Reporter.log report) !current_reporters
+    Reporter.log report
 
 let normal msgf = log Normal msgf
 
