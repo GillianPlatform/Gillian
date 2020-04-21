@@ -1,11 +1,10 @@
 module Mode = Mode
-module Report = Report
 
 let wrap_up = Reporter.wrap_up
 
 let log lvl msgf =
   if Mode.should_log lvl then
-    let report = Report.info "" msgf () in
+    let report = ReportBuilder.info "" msgf () in
     Reporter.log report
 
 let normal msgf = log Normal msgf
