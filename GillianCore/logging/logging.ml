@@ -1,4 +1,5 @@
 module Mode = Mode
+module Report = Report
 
 let wrap_up = Reporter.wrap_up
 
@@ -21,3 +22,11 @@ let print_to_all (str : string) =
 let fail msg =
   normal (fun m -> m "%a" Format.pp_print_string msg);
   raise (Failure msg)
+
+let normal_phase = ReportBuilder.start_phase Normal
+
+let verbose_phase = ReportBuilder.start_phase Verbose
+
+let tmi_phase = ReportBuilder.start_phase TMI
+
+let end_phase = ReportBuilder.end_phase

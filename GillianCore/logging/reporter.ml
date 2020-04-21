@@ -6,7 +6,10 @@ let file_reporter () =
   let log : 'a. 'a Report.t -> unit =
    fun report ->
     match report.content with
-    | Debug msgf -> msgf @@ fun fmt -> Format.fprintf formatter @@ fmt ^^ "@,@?"
+    | Debug msgf  -> msgf @@ fun fmt -> Format.fprintf formatter @@ fmt ^^ "@,@?"
+    | Phase phase ->
+        Format.fprintf formatter "*** Phase %s ***@,@?"
+        @@ Report.string_of_phase phase
   in
   let wrap_up () = close_out out_channel in
   { log; wrap_up }

@@ -14,6 +14,10 @@ module Mode : sig
   val should_log : level -> bool
 end
 
+module Report : sig
+  type phase = ParsingAndCompiling | Parsing | Preprocessing | Verification
+end
+
 val wrap_up : unit -> unit
 (** Closes all the files *)
 
@@ -31,3 +35,11 @@ val fail : string -> 'a
 
 val print_to_all : string -> unit
 (** Output the strings in every file and prints it to stdout *)
+
+val normal_phase : Report.phase -> unit
+
+val verbose_phase : Report.phase -> unit
+
+val tmi_phase : Report.phase -> unit
+
+val end_phase : Report.phase -> unit

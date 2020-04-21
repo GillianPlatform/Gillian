@@ -1,6 +1,8 @@
 type 'a t = unit -> 'a Report.t
 
-let parents : Uuidm.t Stack.t = Stack.create ()
+let active_parents : (Uuidm.t * Report.phase) Stack.t = Stack.create ()
+
+let all_parents : Report.phase Stack.t = Stack.create ()
 
 let current : Uuidm.t option ref = ref Option.none
 
@@ -13,7 +15,7 @@ let make ~title ~content ~severity () =
       title;
       elapsed_time = Sys.time ();
       previous = !current;
-      parent = Stack.top_opt parents;
+      parent = Option.map fst @@ Stack.top_opt active_parents;
       content;
       severity;
     }
@@ -31,8 +33,19 @@ let error title content = make ~title ~content ~severity:Error
 
 let warning title content = make ~title ~content ~severity:Warning
 
-let enter_node () =
-  Stack.push (Option.get !current) parents;
-  current := Option.none
+let start_phase level phase =
+  if Mode.enabled () then (
+    if Mode.should_log level then (
+      let report = info "" (Phase phase) () in
+      Stack.push (report.id, phase) active_parents;
+      current := None;
+      Reporter.log report );
+    Stack.push phase all_parents )
 
-let exit_node () = current := Option.some @@ Stack.pop parents
+let end_phase phase =
+  if Mode.enabled () then
+    match Stack.top_opt active_parents with
+    | Some (_, p) when p == phase ->
+        current := Option.some @@ fst @@ Stack.pop active_parents;
+        assert (Stack.pop all_parents == phase)
+    | None | Some _ -> assert (Stack.pop all_parents == phase)
