@@ -366,19 +366,17 @@ struct
     let process_files files already_compiled outfile_opt no_unfold =
       let e_prog =
         if not already_compiled then
-          let () =
-            L.normal (fun m ->
-                m
-                  "@\n\
-                   *** Stage 1: Parsing program in original language and \
-                   compiling to Gil. ***@\n")
+          let () = L.normal_phase ParsingAndCompiling in
+          let e_prog =
+            Stdlib.Result.get_ok PC.(parse_and_compile_files files)
           in
-          Stdlib.Result.get_ok PC.(parse_and_compile_files files)
+          let () = L.end_phase ParsingAndCompiling in
+          e_prog
         else
-          let () =
-            L.normal (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
-          in
-          Gil_parsing.parse_eprog_from_file (List.hd files)
+          let () = L.normal_phase Parsing in
+          let e_prog = Gil_parsing.parse_eprog_from_file (List.hd files) in
+          let () = L.end_phase Parsing in
+          e_prog
       in
       let () =
         match outfile_opt with
@@ -389,9 +387,7 @@ struct
             close_out outc
         | None         -> ()
       in
-      let () =
-        L.normal (fun m -> m "@\n*** Stage 2: Transforming the program.@\n")
-      in
+      let () = L.normal_phase Preprocessing in
       (* Prog.perform_syntax_checks e_prog; *)
       let prog =
         Gil_parsing.eprog_to_prog
@@ -402,24 +398,16 @@ struct
         L.verbose (fun m ->
             m "@\nProgram as parsed:@\n%a@\n" Prog.pp_indexed prog)
       in
-      let () =
-        L.normal (fun m ->
-            m "@\n*** Stage 2: DONE transforming the program.@\n")
-      in
-      let () =
-        L.normal (fun m -> m "@\n*** Stage 3: Logic Preprocessing.@\n")
-      in
       let prog = LogicPreprocessing.preprocess prog (not no_unfold) in
       let () =
         L.verbose (fun m ->
             m "@\nProgram after logic Preprocessing:@\n%a@\n" Prog.pp_indexed
               prog)
       in
-      let () =
-        L.normal (fun m -> m "@\n*** Stage 3: DONE Logic Preprocessing.@\n")
-      in
-      let () = L.normal (fun m -> m "@\n*** Stage 4: Verification.@\n") in
-      Verification.verify_procs prog
+      let () = L.end_phase Preprocessing in
+      let () = L.normal_phase Verification in
+      let () = Verification.verify_procs prog in
+      L.end_phase Verification
 
     let verify
         files
