@@ -18,15 +18,17 @@ module type S = sig
 
   val parse_and_compile_files :
     string list -> ((Annot.t, string) Prog.t, err) result
-  (** Takes the name of the file and return an ast or an error *)
+  (** Takes a path to a set of files, parses them with the user's language, and 
+      then compiles them to a single or a set of GIL programs. The returned GIL 
+      program should be ready to be analysed. *)
 
   val other_imports :
     (string * (string -> ((Annot.t, string) Prog.t, err) result)) list
 
   (** [other_imports] is a association list, that maps extensions to a parser and compiler functions.
-     For example, it is possible to import jsil file in a gil program, using [import file.jsil].
-     In order to do so, the [other_imports] list should contain the double [("jsil", parse_and_compile_jsil_file)] where
-     [parse_and_compile_jsil_file] is a function that takes a file name, parses that jsil file and compiles it to a gil program *)
+      For example, it is possible to import jsil file in a gil program, using [import file.jsil].
+      In order to do so, the [other_imports] list should contain the double [("jsil", parse_and_compile_jsil_file)] where
+      [parse_and_compile_jsil_file] is a function that takes a file name, parses that jsil file and compiles it to a gil program *)
 
   val env_var_import_path : string option
   (** Contains the name of the environment variable which contains the path to where the runtime is stored. *)
