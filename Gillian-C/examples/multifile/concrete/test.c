@@ -16,5 +16,5 @@ int main() {
     a = z;
     a = foo(); // Should be assigned 4
     a = bar(); // Should be assigned 5
-    return 1;
+    return 0;
 }

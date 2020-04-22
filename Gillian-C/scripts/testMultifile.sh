@@ -9,16 +9,16 @@ if [[ -z "${GITHUB_ACTIONS}" ]]; then
 fi
 
 echo "--- executing test ---"
-gillian-c exec with-imports/concrete/test.c with-imports/concrete/foo.c -l disabled
+gillian-c exec multifile/concrete/test.c multifile/concrete/foo.c -l disabled
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
 echo "--- verifying BST ---"
-gillian-c verify with-imports/verification/bst.c with-imports/verification/bst_node.c -l disabled
+gillian-c verify multifile/verification/bst.c multifile/verification/bst_node.c -l disabled
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
 echo "--- bi-abducing BST ---"
-gillian-c act with-imports/act/bst.c with-imports/act/bst_node.c -l disabled
+gillian-c act multifile/act/bst.c multifile/act/bst_node.c -l disabled
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
