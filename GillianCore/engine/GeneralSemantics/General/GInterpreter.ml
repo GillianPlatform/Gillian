@@ -41,11 +41,11 @@ struct
 
   exception Interpreter_error of err_t list * State.t
 
-  (** Internal error, carrying a string description *)
   exception Internal_error of string
+  (** Internal error, carrying a string description *)
 
-  (** Syntax error, carrying a string description *)
   exception Syntax_error of string
+  (** Syntax error, carrying a string description *)
 
   let pp_single_result ft res = ExecRes.pp State.pp Val.pp pp_err ft res
 

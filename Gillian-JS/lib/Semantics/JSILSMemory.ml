@@ -13,11 +13,11 @@ open Gillian.Logic
 module M : Gillian.Symbolic.Memory_S = struct
   type vt = SVal.t
 
-  (** Type of JSIL general states *)
   type t = SHeap.t
+  (** Type of JSIL general states *)
 
-  (** Type of JSIL substitutions *)
   type st = SSubst.t
+  (** Type of JSIL substitutions *)
 
   (** Errors *)
   type i_fix_t =

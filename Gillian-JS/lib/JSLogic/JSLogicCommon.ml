@@ -2,8 +2,8 @@ module L = Logging
 module Expr = Gillian.Gil_syntax.Expr
 open Jsil_syntax
 
-(** Tables *)
 module SS = Containers.SS
+(** Tables *)
 
 let small_tbl_size = 1
 

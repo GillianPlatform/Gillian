@@ -4,11 +4,11 @@
     GIL substitutions are mutable.
 *)
 module type S = sig
-  (** Type of GIL values *)
   type vt
+  (** Type of GIL values *)
 
-  (** Type of GIL substitutions *)
   type t
+  (** Type of GIL substitutions *)
 
   val init : (Var.t * vt) list -> t
   (** Substitution constructor, with a list of bindings of the form (variable, value) *)
@@ -95,11 +95,11 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   open Containers
   module L = Logging
 
-  (** Type of GIL values *)
   type vt = Val.t
+  (** Type of GIL values *)
 
-  (** Type of GIL substitutions, implemented as hashtables *)
   type t = (Var.t, vt) Hashtbl.t
+  (** Type of GIL substitutions, implemented as hashtables *)
 
   (**
     Substitution constructor

@@ -1,5 +1,5 @@
-(** {b GIL annot}. *)
 type t
+(** {b GIL annot}. *)
 
 val init : ?line_offset:int option -> ?origin_id:int -> unit -> t
 (** Initialize an annotation *)

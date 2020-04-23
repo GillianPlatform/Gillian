@@ -1,11 +1,11 @@
 module type S = sig
-  (** Additional information one may want to attach to a test case in order to help preprocessing it / interpreting its results *)
   type info
+  (** Additional information one may want to attach to a test case in order to help preprocessing it / interpreting its results *)
 
   val pp_info : Format.formatter -> info -> unit
 
-  (** Tests will be launched by categories to help with the output *)
   type category
+  (** Tests will be launched by categories to help with the output *)
 
   val pp_category : Format.formatter -> category -> unit
 

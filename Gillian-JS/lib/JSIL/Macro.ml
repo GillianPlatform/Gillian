@@ -1,5 +1,5 @@
-(** {2 Macros} **)
 module Expr = Gillian.Gil_syntax.Expr
+(** {2 Macros} **)
 
 module SSubst = Gillian.Symbolic.Subst
 

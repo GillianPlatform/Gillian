@@ -6,11 +6,11 @@ open SVal
   GIL stores are mutable.
 *)
 module type S = sig
-  (** Type of GIL values *)
   type vt
+  (** Type of GIL values *)
 
-  (** Type of GIL stores *)
   type t
+  (** Type of GIL stores *)
 
   val bindings : t -> (Var.t * vt) list
   (** Return the set of bindings in a given store *)
@@ -71,11 +71,11 @@ end
 module Make (Val : Val.S) : S with type vt = Val.t = struct
   module L = Logging
 
-  (** Type of GIL values *)
   type vt = Val.t
+  (** Type of GIL values *)
 
-  (** Actual type of GIL Stores *)
   type t = { conc : (Var.t, vt) Hashtbl.t; symb : (Var.t, vt) Hashtbl.t }
+  (** Actual type of GIL Stores *)
 
   (**
     Store initialisation

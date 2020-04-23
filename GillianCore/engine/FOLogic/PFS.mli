@@ -1,5 +1,5 @@
-(** Type of Gillian pure formulae *)
 type t
+(** Type of Gillian pure formulae *)
 
 val init : unit -> t
 (** [init ()] returns a fresh empty collection of pure formulae *)

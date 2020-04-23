@@ -1,10 +1,10 @@
 (** Interface for GIL Values *)
 module type S = sig
-  (** Type of GIL values *)
   type t
+  (** Type of GIL values *)
 
-  (** Type of substitutions for GIL values *)
   type st
+  (** Type of substitutions for GIL values *)
 
   val pp : Format.formatter -> t -> unit
   (** Printer *)
