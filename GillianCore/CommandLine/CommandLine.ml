@@ -103,6 +103,12 @@ struct
     in
     Arg.(value & flag & info [ "no-print-all-failures" ] ~doc)
 
+  let get_prog_or_fail = function
+    | Ok prog   -> prog
+    | Error err ->
+        Fmt.pf Fmt.stdout "Error during compilation to GIL:\n%a" PC.pp_err err;
+        exit 1
+
   module CompilerConsole = struct
     let mode =
       let open ExecMode in
@@ -121,7 +127,7 @@ struct
       Arg.(last & vflag_all [ Verification ] [ concrete; wpst; verif; act ])
 
     let process_files files =
-      let prog = Stdlib.Result.get_ok (PC.parse_and_compile_files files) in
+      let prog = get_prog_or_fail (PC.parse_and_compile_files files) in
       Io_utils.save_file_pp
         (Filename.chop_extension (List.hd files) ^ ".gil")
         Prog.pp_labeled prog
@@ -204,7 +210,7 @@ struct
       in
       let lab_prog =
         if not already_compiled then
-          Stdlib.Result.get_ok PC.(parse_and_compile_files files)
+          get_prog_or_fail (PC.parse_and_compile_files files)
         else Gil_parsing.parse_eprog_from_file (List.hd files)
       in
       let () =
@@ -260,7 +266,7 @@ struct
                    *** Stage 1: Parsing program in original language and \
                    compiling to Gil. ***@\n")
           in
-          Stdlib.Result.get_ok PC.(parse_and_compile_files files)
+          get_prog_or_fail (PC.parse_and_compile_files files)
         else
           let _ =
             L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
@@ -367,9 +373,7 @@ struct
       let e_prog =
         if not already_compiled then
           let () = L.normal_phase ParsingAndCompiling in
-          let e_prog =
-            Stdlib.Result.get_ok PC.(parse_and_compile_files files)
-          in
+          let e_prog = get_prog_or_fail (PC.parse_and_compile_files files) in
           let () = L.end_phase ParsingAndCompiling in
           e_prog
         else
@@ -470,7 +474,7 @@ struct
                    *** Stage 1: Parsing program in original language and \
                    compiling to Gil. ***@\n")
           in
-          Stdlib.Result.get_ok PC.(parse_and_compile_files files)
+          get_prog_or_fail (PC.parse_and_compile_files files)
         else
           let () =
             L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")

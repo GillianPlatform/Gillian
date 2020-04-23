@@ -26,7 +26,7 @@ type err = JSParserErr of JS_Parser.Error.t | JS2GILErr of string
 
 let pp_err fmt = function
   | JS2GILErr s   -> Fmt.pf fmt "%s" s
-  | JSParserErr s -> Fmt.pf fmt "%s" (JS_Parser.Error.str s)
+  | JSParserErr s -> Fmt.pf fmt "Parsing error: %s\n" (JS_Parser.Error.str s)
 
 let parse_and_compile_js path =
   try
@@ -37,9 +37,9 @@ let parse_and_compile_js path =
       else e_str
     in
     let offset_converter = JS_Utils.memoized_offsetchar_to_offsetline e_str in
-    let e = JS_Parser.parse_string_exn e_str in
+    let js_prog = JS_Parser.parse_string_exn ~program_path:path e_str in
     let (ext_prog : Jsil_syntax.EProg.t), _, _ =
-      JS2JSIL_Compiler.js2jsil e offset_converter
+      JS2JSIL_Compiler.js2jsil js_prog offset_converter
         (ExecMode.verification_exec !Config.current_exec_mode)
     in
     let ext_prog =
@@ -70,7 +70,7 @@ let parse_and_compile_js path =
   | _ ->
       Error
         (JS2GILErr
-           (Printf.sprintf "\nParsing problems with the file '%s'.\n" path))
+           (Printf.sprintf "\nParsing problems with the file '%s'\n" path))
 
 let parse_and_compile_jsil path =
   let jsil_prog = Parsing.parse_jsil_eprog_from_file path in

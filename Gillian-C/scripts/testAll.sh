@@ -31,9 +31,9 @@ rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
 echo "------------------------------------------"
-echo "---------------- IMPORTS -----------------"
+echo "-------------- MULTI-FILE ----------------"
 echo "------------------------------------------"
-./testImports.sh
+./testMultifile.sh
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
