@@ -168,14 +168,6 @@ let mangle_proc proc mangled_syms =
   mangling_visitor#visit_proc () proc
 
 let parse_and_compile_file path exec_mode =
-  let () = Frontend.init () in
-  let () =
-    if !Config.warnings then Warnings.as_error () else Warnings.silence_all ()
-  in
-  let () = Optim.disable_all () in
-  (* Disable all optimisations *)
-  let () = Preprocessor.add_include_dirs !Config.include_dirs in
-  let () = Preprocessor.set_gnuc_for_macos () in
   let pathi = Filename.chop_extension path ^ ".i" in
   let () = Frontend.preprocess path pathi in
   let s = Frontend.parse_c_file path pathi in
@@ -303,9 +295,18 @@ let other_imports = []
 
 let env_var_import_path = Some CConstants.Imports.env_path_var
 
-let initialize = function
+let init_compcert () =
+  Compcert.Frontend.init ();
+  if !Config.warnings then Warnings.as_error () else Warnings.silence_all ();
+  Optimisations.disable_all ();
+  Preprocessor.add_include_dirs !Config.include_dirs;
+  Preprocessor.set_gnuc_for_macos ()
+
+let initialize exec_mode =
+  init_compcert ();
+  match exec_mode with
   | Gillian.Utils.ExecMode.BiAbduction ->
-      let () = Gillian.Utils.Config.bi_unfold_depth := 2 in
+      Gillian.Utils.Config.bi_unfold_depth := 2;
       Gillian.Utils.Config.delay_entailment := true
   | Verification -> Gillian.Utils.Config.delay_entailment := false
   | _ -> ()
