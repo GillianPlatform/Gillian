@@ -262,14 +262,12 @@ let parse_and_compile_files paths =
 
   (* Create main GIL program with references to all other files *)
   let open Gillian.Gil_syntax in
-  let open Gillian.Utils in
   let rec combine paths comb_imports comb_init_asrts comb_init_cmds =
     match paths with
     | []           -> (comb_imports, comb_init_asrts, comb_init_cmds)
     | path :: rest ->
-        let prog, init_asrts, init_cmds, _ = Hashtbl.find compiled_progs path in
+        let _, init_asrts, init_cmds, _ = Hashtbl.find compiled_progs path in
         let gil_path = Filename.chop_extension path ^ ".gil" in
-        let () = Io_utils.save_file_pp gil_path Prog.pp_labeled prog in
         combine rest
           (comb_imports @ [ (gil_path, true) ])
           (comb_init_asrts @ init_asrts)
