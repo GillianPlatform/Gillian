@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         operating-system: [ macos-latest, ubuntu-latest ]
     runs-on: ${{ matrix.operating-system }}
