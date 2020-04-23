@@ -37,10 +37,23 @@ module Optim = struct
   let disable_all () = List.iter (fun r -> r := false) optimization_options
 end
 
-module Include = struct
+module Preprocessor = struct
   let add_include_dirs include_dirs =
     let open Compcert.Clflags in
     List.iter
       (fun dir -> prepro_options := dir :: "-I" :: !prepro_options)
       include_dirs
+
+  let set_gnuc_for_macos () =
+    let is_darwin =
+      try
+        let ic = Unix.open_process_in "uname" in
+        let uname = input_line ic in
+        let () = close_in ic in
+        String.equal uname "Darwin"
+      with _ -> false
+    in
+    if is_darwin then
+      Compcert.Clflags.(
+        prepro_options := "__GNUC__=4" :: "-D" :: !prepro_options)
 end

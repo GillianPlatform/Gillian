@@ -174,7 +174,8 @@ let parse_and_compile_file path exec_mode =
   in
   let () = Optim.disable_all () in
   (* Disable all optimisations *)
-  let () = Include.add_include_dirs !Config.include_dirs in
+  let () = Preprocessor.add_include_dirs !Config.include_dirs in
+  let () = Preprocessor.set_gnuc_for_macos () in
   let pathi = Filename.chop_extension path ^ ".i" in
   let () = Frontend.preprocess path pathi in
   let s = Frontend.parse_c_file path pathi in
