@@ -9,6 +9,8 @@ end)
 
 module Str_set = Containers.SS
 
+let parsed_progs = Hashtbl.create Config.medium_tbl_size
+
 let col pos = pos.pos_cnum - pos.pos_bol + 1
 
 let parse start lexbuf =
@@ -65,6 +67,16 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
   let prog = parse GIL_Parser.gmain_target lexbuf in
   close_in inx;
   prog
+
+let cache_parsed_prog (path : string) (prog : (Annot.t, string) Prog.t) =
+  Hashtbl.add parsed_progs path prog
+
+let parse_prog (path : string) (parse : string -> (Annot.t, string) Prog.t) =
+  if Hashtbl.mem parsed_progs path then Hashtbl.find parsed_progs path
+  else
+    let prog = parse path in
+    cache_parsed_prog path prog;
+    prog
 
 let combine
     (existing_components : (string, 'a) Hashtbl.t)
@@ -131,13 +143,14 @@ let resolve_imports
           let file = resolve_import_path file in
           let extension = Filename.extension file in
           let imported_prog =
-            if String.equal extension ".gil" then parse_eprog_from_file file
+            if String.equal extension ".gil" then
+              parse_prog file parse_eprog_from_file
             else
               match List.assoc_opt (remove_dot extension) other_imports with
               | None                   -> failwith
                                             (Printf.sprintf
                                                "Cannot import file %s" file)
-              | Some parse_and_compile -> parse_and_compile file
+              | Some parse_and_compile -> parse_prog file parse_and_compile
           in
           let () = extend_program program imported_prog should_verify in
           let new_added_imports = Str_set.add file added_imports in

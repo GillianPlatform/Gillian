@@ -107,6 +107,8 @@ module TargetLangOptions = struct
     Config.hide_mult_def := hide_mult_def
 end
 
+let compiled_progs = Hashtbl.create 1
+
 type err = Errors.errmsg
 
 let pp_err fmt e = Driveraux.print_error fmt e
@@ -168,14 +170,6 @@ let mangle_proc proc mangled_syms =
   mangling_visitor#visit_proc () proc
 
 let parse_and_compile_file path exec_mode =
-  let () = Frontend.init () in
-  let () =
-    if !Config.warnings then Warnings.as_error () else Warnings.silence_all ()
-  in
-  let () = Optim.disable_all () in
-  (* Disable all optimisations *)
-  let () = Preprocessor.add_include_dirs !Config.include_dirs in
-  let () = Preprocessor.set_gnuc_for_macos () in
   let pathi = Filename.chop_extension path ^ ".i" in
   let () = Frontend.preprocess path pathi in
   let s = Frontend.parse_c_file path pathi in
@@ -227,11 +221,15 @@ let parse_and_compile_files paths =
   let exec_mode = !Gillian.Utils.Config.current_exec_mode in
   (* Compile all C input files to GIL *)
   let paths = paths @ !Config.source_paths in
-  let compiled_progs = Hashtbl.create 1 in
   let () =
     List.iter
       (fun path ->
-        Hashtbl.add compiled_progs path (parse_and_compile_file path exec_mode))
+        if not (Hashtbl.mem compiled_progs path) then (
+          let ((prog, _, _, _) as compiled_prog) =
+            parse_and_compile_file path exec_mode
+          in
+          Gil_parsing.cache_parsed_prog path prog;
+          Hashtbl.add compiled_progs path compiled_prog ))
       paths
   in
 
@@ -264,14 +262,12 @@ let parse_and_compile_files paths =
 
   (* Create main GIL program with references to all other files *)
   let open Gillian.Gil_syntax in
-  let open Gillian.Utils in
   let rec combine paths comb_imports comb_init_asrts comb_init_cmds =
     match paths with
     | []           -> (comb_imports, comb_init_asrts, comb_init_cmds)
     | path :: rest ->
-        let prog, init_asrts, init_cmds, _ = Hashtbl.find compiled_progs path in
+        let _, init_asrts, init_cmds, _ = Hashtbl.find compiled_progs path in
         let gil_path = Filename.chop_extension path ^ ".gil" in
-        let () = Io_utils.save_file_pp gil_path Prog.pp_labeled prog in
         combine rest
           (comb_imports @ [ (gil_path, true) ])
           (comb_init_asrts @ init_asrts)
@@ -303,9 +299,18 @@ let other_imports = []
 
 let env_var_import_path = Some CConstants.Imports.env_path_var
 
-let initialize = function
+let init_compcert () =
+  Compcert.Frontend.init ();
+  if !Config.warnings then Warnings.as_error () else Warnings.silence_all ();
+  Optimisations.disable_all ();
+  Preprocessor.add_include_dirs !Config.include_dirs;
+  Preprocessor.set_gnuc_for_macos ()
+
+let initialize exec_mode =
+  init_compcert ();
+  match exec_mode with
   | Gillian.Utils.ExecMode.BiAbduction ->
-      let () = Gillian.Utils.Config.bi_unfold_depth := 2 in
+      Gillian.Utils.Config.bi_unfold_depth := 2;
       Gillian.Utils.Config.delay_entailment := true
   | Verification -> Gillian.Utils.Config.delay_entailment := false
   | _ -> ()

@@ -20,10 +20,10 @@ module Warnings = struct
   let as_error = find_unit_cmd "-Werror" options
 end
 
-module Optim = struct
+module Optimisations = struct
   open Compcert.Clflags
 
-  let optimization_options =
+  let options =
     [
       option_ftailcalls;
       option_fifconversion;
@@ -34,7 +34,7 @@ module Optim = struct
       option_finline_functions_called_once;
     ]
 
-  let disable_all () = List.iter (fun r -> r := false) optimization_options
+  let disable_all () = List.iter (fun r -> r := false) options
 end
 
 module Preprocessor = struct
