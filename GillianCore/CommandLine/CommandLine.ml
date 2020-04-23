@@ -98,8 +98,8 @@ struct
 
   let no_print_failures =
     let doc =
-      "Do not print the list of all the failed tests at the end of execution \
-       bulk execution"
+      "Do not print the list of all the failed tests at the end of the bulk \
+       execution"
     in
     Arg.(value & flag & info [ "no-print-all-failures" ] ~doc)
 

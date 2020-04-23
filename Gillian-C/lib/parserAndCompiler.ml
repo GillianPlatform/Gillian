@@ -107,6 +107,8 @@ module TargetLangOptions = struct
     Config.hide_mult_def := hide_mult_def
 end
 
+let compiled_progs = Hashtbl.create 1
+
 type err = Errors.errmsg
 
 let pp_err fmt e = Driveraux.print_error fmt e
@@ -219,11 +221,15 @@ let parse_and_compile_files paths =
   let exec_mode = !Gillian.Utils.Config.current_exec_mode in
   (* Compile all C input files to GIL *)
   let paths = paths @ !Config.source_paths in
-  let compiled_progs = Hashtbl.create 1 in
   let () =
     List.iter
       (fun path ->
-        Hashtbl.add compiled_progs path (parse_and_compile_file path exec_mode))
+        if not (Hashtbl.mem compiled_progs path) then (
+          let ((prog, _, _, _) as compiled_prog) =
+            parse_and_compile_file path exec_mode
+          in
+          Gil_parsing.cache_parsed_prog path prog;
+          Hashtbl.add compiled_progs path compiled_prog ))
       paths
   in
 
