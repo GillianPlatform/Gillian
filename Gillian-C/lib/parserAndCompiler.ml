@@ -196,7 +196,7 @@ let parse_and_compile_file path exec_mode =
   let filename = Filename.basename (Filename.chop_extension path) in
   let mangled_syms = Hashtbl.create 32 in
   let annots = parse_annots path in
-  let prog, init_asrts, init_cmds, symbols =
+  let prog, compilation_data =
     Gilgen.trans_program_with_annots exec_mode last_clight csm filename
       mangled_syms annots
   in
@@ -207,7 +207,7 @@ let parse_and_compile_file path exec_mode =
         Hashtbl.add trans_procs proc_name (mangle_proc proc_body mangled_syms))
       prog.procs
   in
-  ({ prog with procs = trans_procs }, init_asrts, init_cmds, symbols)
+  ({ prog with procs = trans_procs }, compilation_data)
 
 exception Linker_error
 
@@ -233,13 +233,10 @@ let parse_and_compile_files paths =
   let () =
     List.iter
       (fun path ->
-        let gil_path = get_gil_path path in
-        if not (Hashtbl.mem compiled_progs gil_path) then (
-          let ((prog, _, _, _) as compiled_prog) =
-            parse_and_compile_file path exec_mode
-          in
-          Gil_parsing.cache_gil_prog gil_path prog;
-          Hashtbl.add compiled_progs gil_path compiled_prog ))
+        if not (Hashtbl.mem compiled_progs path) then (
+          let prog, compilation_data = parse_and_compile_file path exec_mode in
+          Gil_parsing.cache_gil_prog (get_gil_path path) prog;
+          Hashtbl.add compiled_progs path (prog, compilation_data) ))
       paths
   in
 
@@ -250,8 +247,7 @@ let parse_and_compile_files paths =
     match paths with
     | []           -> unresolved_syms
     | path :: rest ->
-        let gil_path = get_gil_path path in
-        let _, _, _, symbols = Hashtbl.find compiled_progs gil_path in
+        let _, { symbols; _ } = Hashtbl.find compiled_progs path in
         let def, undef = List.partition is_def_sym symbols in
         let def_set = Symbol_set.of_list (List.map sym_name def) in
         let undef_set = Symbol_set.of_list (List.map sym_name undef) in
@@ -277,37 +273,31 @@ let parse_and_compile_files paths =
     match paths with
     | []           -> (comb_imports, comb_init_asrts, comb_init_cmds)
     | path :: rest ->
-        let gil_path = get_gil_path path in
-        let _, init_asrts, init_cmds, _ =
-          Hashtbl.find compiled_progs gil_path
+        let _, { genv_pred_asrts; genv_init_cmds; _ } =
+          Hashtbl.find compiled_progs path
         in
         combine rest
-          (comb_imports @ [ (gil_path, true) ])
-          (comb_init_asrts @ init_asrts)
-          (comb_init_cmds @ init_cmds)
+          (comb_imports @ [ (get_gil_path path, true) ])
+          (comb_init_asrts @ genv_pred_asrts)
+          (comb_init_cmds @ genv_init_cmds)
   in
   let imports, init_asrts, init_cmds = combine (List.tl paths) [] [] [] in
-  let main_prog_path = get_gil_path (List.hd paths) in
-  let main_prog, main_init_asrts, main_init_cmds, _ =
-    Hashtbl.find compiled_progs main_prog_path
+  let main_prog, { genv_pred_asrts; genv_init_cmds; _ } =
+    Hashtbl.find compiled_progs (List.hd paths)
   in
   let all_imports = Imports.imports current_arch exec_mode @ imports in
-  let init_proc = Gilgen.make_init_proc (main_init_cmds @ init_cmds) in
+  let init_proc = Gilgen.make_init_proc (genv_init_cmds @ init_cmds) in
   let init_proc_name = init_proc.Proc.proc_name in
+  let all_proc_names = init_proc_name :: main_prog.proc_names in
   let () = Hashtbl.add main_prog.procs init_proc_name init_proc in
   let () =
     if add_init_pred exec_mode then
       let init_pred =
-        Gil_logic_gen.make_global_env_pred (main_init_asrts @ init_asrts)
+        Gil_logic_gen.make_global_env_pred (genv_pred_asrts @ init_asrts)
       in
       Hashtbl.add main_prog.preds init_pred.Pred.pred_name init_pred
   in
-  Ok
-    {
-      main_prog with
-      imports = all_imports;
-      proc_names = init_proc_name :: main_prog.proc_names;
-    }
+  Ok { main_prog with imports = all_imports; proc_names = all_proc_names }
 
 let other_imports = []
 

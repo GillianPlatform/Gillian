@@ -672,6 +672,12 @@ let mangle_symbol symbol filename mangled_syms =
   Hashtbl.add mangled_syms symbol mangled_sym;
   mangled_sym
 
+type compilation_data = {
+  genv_pred_asrts : Asrt.t list;
+  genv_init_cmds : string Cmd.t list;
+  symbols : symbol list;
+}
+
 let rec trans_globdefs
     ?(gil_annot = Gil_logic_gen.empty)
     ?(exec_mode = ExecMode.Verification)
@@ -811,9 +817,7 @@ let trans_program
         procs = make_hashtbl get_proc_name procedures;
         predecessors = Hashtbl.create 1;
       },
-    init_asrts,
-    init_acts,
-    symbols )
+    { genv_pred_asrts = init_asrts; genv_init_cmds = init_acts; symbols } )
 
 let annotate na gan =
   let () =
@@ -845,9 +849,9 @@ let trans_program_with_annots
       Gil_logic_gen.gen_bi_preds clight_prog
     else Gil_logic_gen.empty
   in
-  let non_annotated_prog, init_asrts, init_acts, symbols =
+  let non_annotated_prog, compilation_data =
     trans_program ~clight_prog ~exec_mode ~gil_annot ~filename ~mangled_syms
       prog
   in
   let annotated_prog = annotate non_annotated_prog gil_annot in
-  (annotated_prog, init_asrts, init_acts, symbols)
+  (annotated_prog, compilation_data)
