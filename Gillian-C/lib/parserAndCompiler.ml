@@ -107,7 +107,16 @@ module TargetLangOptions = struct
     Config.hide_mult_def := hide_mult_def
 end
 
-let compiled_progs = Hashtbl.create 1
+let compiled_progs = Hashtbl.create 16
+
+let gil_paths = Hashtbl.create 16
+
+let get_gil_path c_path =
+  if Hashtbl.mem gil_paths c_path then Hashtbl.find gil_paths c_path
+  else
+    let gil_path = Filename.chop_extension c_path ^ ".gil" in
+    Hashtbl.add gil_paths c_path gil_path;
+    gil_path
 
 type err = Errors.errmsg
 
@@ -224,12 +233,13 @@ let parse_and_compile_files paths =
   let () =
     List.iter
       (fun path ->
-        if not (Hashtbl.mem compiled_progs path) then (
+        let gil_path = get_gil_path path in
+        if not (Hashtbl.mem compiled_progs gil_path) then (
           let ((prog, _, _, _) as compiled_prog) =
             parse_and_compile_file path exec_mode
           in
-          Gil_parsing.cache_parsed_prog path prog;
-          Hashtbl.add compiled_progs path compiled_prog ))
+          Gil_parsing.cache_gil_prog gil_path prog;
+          Hashtbl.add compiled_progs gil_path compiled_prog ))
       paths
   in
 
@@ -240,7 +250,8 @@ let parse_and_compile_files paths =
     match paths with
     | []           -> unresolved_syms
     | path :: rest ->
-        let _, _, _, symbols = Hashtbl.find compiled_progs path in
+        let gil_path = get_gil_path path in
+        let _, _, _, symbols = Hashtbl.find compiled_progs gil_path in
         let def, undef = List.partition is_def_sym symbols in
         let def_set = Symbol_set.of_list (List.map sym_name def) in
         let undef_set = Symbol_set.of_list (List.map sym_name undef) in
@@ -266,16 +277,19 @@ let parse_and_compile_files paths =
     match paths with
     | []           -> (comb_imports, comb_init_asrts, comb_init_cmds)
     | path :: rest ->
-        let _, init_asrts, init_cmds, _ = Hashtbl.find compiled_progs path in
-        let gil_path = Filename.chop_extension path ^ ".gil" in
+        let gil_path = get_gil_path path in
+        let _, init_asrts, init_cmds, _ =
+          Hashtbl.find compiled_progs gil_path
+        in
         combine rest
           (comb_imports @ [ (gil_path, true) ])
           (comb_init_asrts @ init_asrts)
           (comb_init_cmds @ init_cmds)
   in
   let imports, init_asrts, init_cmds = combine (List.tl paths) [] [] [] in
+  let main_prog_path = get_gil_path (List.hd paths) in
   let main_prog, main_init_asrts, main_init_cmds, _ =
-    Hashtbl.find compiled_progs (List.hd paths)
+    Hashtbl.find compiled_progs main_prog_path
   in
   let all_imports = Imports.imports current_arch exec_mode @ imports in
   let init_proc = Gilgen.make_init_proc (main_init_cmds @ init_cmds) in
