@@ -9,8 +9,6 @@ end)
 
 module Str_set = Containers.SS
 
-let parsed_progs = Hashtbl.create Config.medium_tbl_size
-
 let col pos = pos.pos_cnum - pos.pos_bol + 1
 
 let parse start lexbuf =
@@ -68,14 +66,38 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
   close_in inx;
   prog
 
-let cache_parsed_prog (path : string) (prog : (Annot.t, string) Prog.t) =
-  Hashtbl.add parsed_progs path prog
+let cached_progs = Hashtbl.create 32
 
-let parse_prog (path : string) (parse : string -> (Annot.t, string) Prog.t) =
-  if Hashtbl.mem parsed_progs path then Hashtbl.find parsed_progs path
+let cache_gil_prog path prog = Hashtbl.add cached_progs path prog
+
+let resolve_path path =
+  let lookup_paths = "." :: Config.get_runtime_paths () in
+  let rec find fname paths =
+    match paths with
+    | []           -> failwith (Printf.sprintf "Cannot resolve \"%s\"" fname)
+    | path :: rest ->
+        let complete_path = Filename.concat path fname in
+        if Sys.file_exists complete_path then complete_path else find fname rest
+  in
+  find path lookup_paths
+
+let remove_dot file_ext = String.sub file_ext 1 (String.length file_ext - 1)
+
+let fetch_imported_prog path other_imports : (Annot.t, string) Prog.t =
+  if Hashtbl.mem cached_progs path then Hashtbl.find cached_progs path
   else
-    let prog = parse path in
-    cache_parsed_prog path prog;
+    let file = resolve_path path in
+    let extension = Filename.extension file in
+    let prog =
+      if String.equal extension ".gil" then parse_eprog_from_file file
+      else
+        match List.assoc_opt (remove_dot extension) other_imports with
+        | None                   -> failwith
+                                      (Printf.sprintf
+                                         "Cannot import file \"%s\"" file)
+        | Some parse_and_compile -> parse_and_compile file
+    in
+    cache_gil_prog path prog;
     prog
 
 let combine
@@ -116,48 +138,22 @@ let extend_program
   combine prog.macros other_prog.macros id "macro";
   combine prog.bi_specs other_prog.bi_specs id "bi-abduction spec"
 
-let remove_dot file_ext = String.sub file_ext 1 (String.length file_ext - 1)
-
 let resolve_imports
     (program : (Annot.t, string) Prog.t)
     (other_imports : (string * (string -> (Annot.t, string) Prog.t)) list) :
     unit =
-  let resolve_import_path fname =
-    let list_paths = "." :: Config.get_runtime_paths () in
-    let rec find fname paths =
-      match paths with
-      | []           -> failwith (Printf.sprintf "Cannot resolve \"%s\"" fname)
-      | path :: rest ->
-          let complete_path = Filename.concat path fname in
-          if Sys.file_exists complete_path then complete_path
-          else find fname rest
-    in
-    find fname list_paths
-  in
-  let rec resolve_imports_aux imports added_imports =
+  let rec resolve imports added_imports =
     match imports with
     | [] -> ()
     | (file, should_verify) :: rest ->
-        let open Prog in
         if not (Str_set.mem file added_imports) then
-          let file = resolve_import_path file in
-          let extension = Filename.extension file in
-          let imported_prog =
-            if String.equal extension ".gil" then
-              parse_prog file parse_eprog_from_file
-            else
-              match List.assoc_opt (remove_dot extension) other_imports with
-              | None                   -> failwith
-                                            (Printf.sprintf
-                                               "Cannot import file %s" file)
-              | Some parse_and_compile -> parse_prog file parse_and_compile
-          in
+          let imported_prog = fetch_imported_prog file other_imports in
           let () = extend_program program imported_prog should_verify in
           let new_added_imports = Str_set.add file added_imports in
-          resolve_imports_aux (rest @ imported_prog.imports) new_added_imports
-        else resolve_imports_aux rest added_imports
+          resolve (rest @ imported_prog.imports) new_added_imports
+        else resolve rest added_imports
   in
-  resolve_imports_aux program.imports Str_set.empty
+  resolve program.imports Str_set.empty
 
 (** Converts a string-labelled [Prog.t] to an index-labelled [Prog.t], 
     resolving the imports in the meantime. The parameter [other_imports] is an

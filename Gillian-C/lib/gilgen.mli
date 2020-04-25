@@ -10,6 +10,13 @@ val is_def_sym : symbol -> bool
 
 val sym_name : symbol -> string
 
+(** Data exported during compilation and used during linking. *)
+type compilation_data = {
+  genv_pred_asrts : Asrt.t list;
+  genv_init_cmds : string Cmd.t list;
+  symbols : symbol list;
+}
+
 val make_init_proc : string Cmd.t list -> (Annot.t, string) Proc.t
 
 val trans_program :
@@ -19,7 +26,7 @@ val trans_program :
   filename:string ->
   mangled_syms:(string, string) Hashtbl.t ->
   Csharpminor.program ->
-  (Annot.t, string) Prog.t * Asrt.t list * string Cmd.t list * symbol list
+  (Annot.t, string) Prog.t * compilation_data
 
 val trans_program_with_annots :
   ExecMode.t ->
@@ -28,4 +35,4 @@ val trans_program_with_annots :
   string ->
   (string, string) Hashtbl.t ->
   CLogic.CProg.t ->
-  (Annot.t, string) Prog.t * Asrt.t list * string Cmd.t list * symbol list
+  (Annot.t, string) Prog.t * compilation_data
