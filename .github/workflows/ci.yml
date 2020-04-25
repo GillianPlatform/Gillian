@@ -126,7 +126,7 @@ jobs:
         with:
           repository:  GillianPlatform/javert-test262
           path: test262
-          ref: 93e0d0b
+          ref: 93e0d0b04093cabc3234a776eec5cc3e165f3b1a
       - name: Test262
         run: 'gillian-js test262 test262/test --ci'
 
@@ -152,7 +152,7 @@ jobs:
         with:
           repository:  GillianPlatform/collections-c-for-gillian
           path: collections-c
-          ref: 82a8c3c
+          ref: 82a8c3c24d4f182d773aa50cc8e90493dec778a3
       - name: Symbolic Testing Collections-C
         run: './runGillianTests.sh'
         working-directory: collections-c
