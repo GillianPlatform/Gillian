@@ -4,6 +4,7 @@ module L = Logging
 module Type = Gillian.Gil_syntax.Type
 module Expr = Gillian.Gil_syntax.Expr
 
+(** {b JSIL logic predicate}. *)
 type t = {
   name : string;  (** Name of the predicate  *)
   num_params : int;  (** Number of parameters   *)
@@ -14,7 +15,6 @@ type t = {
   pure : bool;  (** Is the predicate pure  *)
   normalised : bool;  (** If the predicate has been previously normalised *)
 }
-(** {b JSIL logic predicate}. *)
 
 (** Creates/populates a Hashtbl from the predicate list pred_defs *)
 let init (preds : t list) : (string, t) Hashtbl.t =

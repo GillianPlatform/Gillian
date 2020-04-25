@@ -1,5 +1,6 @@
 module SS = Containers.SS
 
+(** {b Single GIL specifications}. *)
 type st = TypeDef__.single_spec = {
   ss_pre : Asrt.t;  (** Precondition *)
   ss_posts : Asrt.t list;  (** Postcondition *)
@@ -7,8 +8,8 @@ type st = TypeDef__.single_spec = {
   ss_to_verify : bool;  (** Should the spec be verified? *)
   ss_label : (string * string list) option;
 }
-(** {b Single GIL specifications}. *)
 
+(** {b Full GIL specifications}. *)
 type t = TypeDef__.spec = {
   spec_name : string;  (** Procedure/spec name *)
   spec_params : string list;  (** Procedure/spec parameters *)
@@ -16,7 +17,6 @@ type t = TypeDef__.spec = {
   spec_normalised : bool;  (** If the spec is already normalised *)
   spec_to_verify : bool;  (** Should the spec be verified? *)
 }
-(** {b Full GIL specifications}. *)
 
 (** Creates a GIL specification given its components *)
 let s_init

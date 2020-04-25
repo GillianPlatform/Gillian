@@ -4,20 +4,20 @@
 *)
 
 module type S = sig
-  type vt
   (** Type of GIL values *)
+  type vt
 
-  type t
   (** Type of GIL general states *)
+  type t
 
-  type st
   (** Type of GIL substitutions *)
+  type st
 
-  type store_t
   (** Type of GIL stores *)
+  type store_t
 
-  type m_err_t
   (** Errors *)
+  type m_err_t
 
   type err_t = (m_err_t, vt) StateErr.err_t
 

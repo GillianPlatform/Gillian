@@ -5,14 +5,14 @@ open Javert_utils
 module M : Memory_S = struct
   type vt = Values.t
 
-  type t = CHeap.t
   (** Type of JSIL general states *)
+  type t = CHeap.t
 
-  type st = Subst.t
   (** Type of JSIL substitutions *)
+  type st = Subst.t
 
-  type err_t = unit
   (** Errors *)
+  type err_t = unit
 
   type fix_t = unit
 

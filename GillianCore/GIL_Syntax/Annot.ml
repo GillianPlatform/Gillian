@@ -1,8 +1,8 @@
+(** {b GIL annot}. *)
 type t = {
   line_offset : int option;  (** Better not to know what this is for *)
   origin_id : int;  (** Origin Id, that should be abstracted away *)
 }
-(** {b GIL annot}. *)
 
 (**/**)
 

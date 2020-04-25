@@ -1,6 +1,6 @@
-exception ReductionException of Gil_syntax.Expr.t * string
 (** [ReductionException (e, msg)] denotes an exception raised
      due to an expression [e] being malformed with explanation [msg] *)
+exception ReductionException of Gil_syntax.Expr.t * string
 
 val resolve_expr_to_location :
   Gil_syntax.Formula.t list ->

@@ -1,5 +1,5 @@
-open Gillian.Gil_syntax
 (** {2 JSIL Basic Commmands} **)
+open Gillian.Gil_syntax
 
 type t =
   | Skip  (** Empty command *)

@@ -5,8 +5,6 @@ module type S = sig
 
   type store_t
 
-  type t =
-    (string * vt list * store_t option * Var.t * int * int * int option) list
   (** Type of call stacks: a call stack is a list of tuples, each of which contains
     1) identifier of the current procedure (string)
     2) arguments of the current procedure (list of values)
@@ -16,6 +14,8 @@ module type S = sig
     6) normal continuation index in the calling procedure
     7) optional error continuation index in the calling procedure
   *)
+  type t =
+    (string * vt list * store_t option * Var.t * int * int * int option) list
 
   val get_cur_proc_id : t -> string
   (**
@@ -47,8 +47,6 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
 
   type store_t = Store.t
 
-  type t =
-    (string * Val.t list * Store.t option * Var.t * int * int * int option) list
   (** Type of call stacks: a call stack is a list of tuples, each of which contains
     1) identifier of the current procedure (string)
     2) arguments of the current procedure (list of values)
@@ -58,6 +56,8 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
     6) normal continuation index in the calling procedure
     7) optional error continuation index in the calling procedure
   *)
+  type t =
+    (string * Val.t list * Store.t option * Var.t * int * int * int option) list
 
   (**
     Get current procedure identifier

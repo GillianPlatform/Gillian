@@ -1,9 +1,9 @@
 module type S = sig
-  type vt = SVal.M.t
   (** Type of GIL values *)
+  type vt = SVal.M.t
 
-  type st = SVal.SSubst.t
   (** Type of GIL substitutions *)
+  type st = SVal.SSubst.t
 
   type i_fix_t
 
@@ -11,8 +11,8 @@ module type S = sig
 
   type err_t
 
-  type t
   (** Type of GIL general states *)
+  type t
 
   type action_ret =
     | ASucc of (t * vt list * Formula.t list * (string * Type.t) list) list
