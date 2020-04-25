@@ -126,10 +126,11 @@ jobs:
         with:
           repository:  GillianPlatform/javert-test262
           path: test262
+          ref: 93e0d0b
       - name: Test262
         run: 'gillian-js test262 test262/test --ci'
 
-  collection-c:
+  collections-c:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
     strategy:
       matrix:
@@ -151,6 +152,7 @@ jobs:
         with:
           repository:  GillianPlatform/collections-c-for-gillian
           path: collections-c
+          ref: a8978b0
       - name: Symbolic Testing Collections-C
         run: 'gillian-c bulk-wpst collections-c/for-gillian --ci --ignore-undef'
 
