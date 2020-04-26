@@ -7,3 +7,4 @@ break-cases=fit-or-vertical
 break-collection-expressions=fit-or-vertical
 break-fun-decl=smart
 break-fun-sig=smart
+doc-comments=before

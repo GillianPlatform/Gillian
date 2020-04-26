@@ -14,7 +14,43 @@ let file_reporter () =
   let wrap_up () = close_out out_channel in
   { log; wrap_up }
 
-let reporters = ref [ file_reporter () ]
+let database_reporter () =
+  let () = if Sys.file_exists "db.log" then Sys.remove "db.log" in
+  let database = Sanddb.create_json_database "db.log" (module Report_j) in
+  let serialize_content : 'a. 'a Report.content -> string = function
+    | Debug msgf  ->
+        let str = ref "" in
+        (msgf @@ fun fmt -> Format.kasprintf (fun s -> str := s) fmt);
+        !str
+    | Phase phase -> Format.asprintf "Phase %s" @@ Report.string_of_phase phase
+  in
+  let serialize_severity : Report.severity -> Report_t.severity = function
+    | Info    -> `Info
+    | Log     -> `Log
+    | Success -> `Success
+    | Error   -> `Error
+    | Warning -> `Warning
+  in
+  let log : 'a. 'a Report.t -> unit =
+   fun report ->
+    let report : Report_t.t =
+      {
+        id = Uuidm.to_string report.id;
+        title = report.title;
+        elapsed_time = report.elapsed_time;
+        previous = Option.map Uuidm.to_string report.previous;
+        parent = Option.map Uuidm.to_string report.parent;
+        content = serialize_content report.content;
+        severity = serialize_severity report.severity;
+      }
+    in
+    let _ = Sanddb.insert_record database report in
+    ()
+  in
+  let wrap_up () = () in
+  { log; wrap_up }
+
+let reporters = ref [ file_reporter (); database_reporter () ]
 
 let log report = List.iter (fun reporter -> reporter.log report) !reporters
 
