@@ -819,26 +819,25 @@ let trans_program
       },
     { genv_pred_asrts = init_asrts; genv_init_cmds = init_acts; symbols } )
 
-let annotate na gan =
+let annotate prog gil_annots =
   let () =
     List.iter
-      (fun p -> Hashtbl.add na.Prog.preds p.Pred.pred_name p)
-      gan.Gil_logic_gen.preds
+      (fun p -> Hashtbl.add prog.Prog.preds p.Pred.pred_name p)
+      gil_annots.Gil_logic_gen.preds
   in
   let () =
     List.iter
       (fun spec ->
-        match Hashtbl.find_opt na.procs spec.Spec.spec_name with
+        match Hashtbl.find_opt prog.procs spec.Spec.spec_name with
         | None      ->
             Logging.verbose (fun fmt ->
-                fmt "!!!! Spec for %s is declared but the function is not !!!"
-                  spec.spec_name)
+                fmt "Found spec but no declaration for '%s'" spec.spec_name)
         | Some proc ->
-            Hashtbl.replace na.procs spec.Spec.spec_name
+            Hashtbl.replace prog.procs spec.Spec.spec_name
               { proc with proc_spec = Some spec })
-      gan.specs
+      gil_annots.specs
   in
-  na
+  prog
 
 let trans_program_with_annots
     exec_mode clight_prog prog filename mangled_syms annots =

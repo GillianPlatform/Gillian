@@ -15,4 +15,5 @@ end
 (* module Test262 = Test262_main *)
 
 module Logging = Logging
+module Results = Results
 module Utils = Utils

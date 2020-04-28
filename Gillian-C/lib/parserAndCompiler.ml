@@ -2,6 +2,8 @@ open Compcert
 open Config_compcert
 open CConstants
 
+let small_tbl_size = Gillian.Utils.Config.small_tbl_size
+
 module TargetLangOptions = struct
   open Cmdliner
 
@@ -107,9 +109,9 @@ module TargetLangOptions = struct
     Config.hide_mult_def := hide_mult_def
 end
 
-let compiled_progs = Hashtbl.create 16
+let compiled_progs = Hashtbl.create small_tbl_size
 
-let gil_paths = Hashtbl.create 16
+let gil_paths = Hashtbl.create small_tbl_size
 
 let get_gil_path c_path =
   if Hashtbl.mem gil_paths c_path then Hashtbl.find gil_paths c_path
@@ -117,6 +119,8 @@ let get_gil_path c_path =
     let gil_path = Filename.chop_extension c_path ^ ".gil" in
     Hashtbl.add gil_paths c_path gil_path;
     gil_path
+
+let get_preprocessed_path c_path = Filename.chop_extension c_path ^ ".i"
 
 type err = Errors.errmsg
 
@@ -179,7 +183,7 @@ let mangle_proc proc mangled_syms =
   mangling_visitor#visit_proc () proc
 
 let parse_and_compile_file path exec_mode =
-  let pathi = Filename.chop_extension path ^ ".i" in
+  let pathi = get_preprocessed_path path in
   let () = Frontend.preprocess path pathi in
   let s = Frontend.parse_c_file path pathi in
   let s = get_or_print_and_die (SimplExpr.transl_program s) in
@@ -194,13 +198,13 @@ let parse_and_compile_file path exec_mode =
       close_out oc
   in
   let filename = Filename.basename (Filename.chop_extension path) in
-  let mangled_syms = Hashtbl.create 32 in
+  let mangled_syms = Hashtbl.create small_tbl_size in
   let annots = parse_annots path in
   let prog, compilation_data =
     Gilgen.trans_program_with_annots exec_mode last_clight csm filename
       mangled_syms annots
   in
-  let trans_procs = Hashtbl.create 1 in
+  let trans_procs = Hashtbl.create small_tbl_size in
   let () =
     Hashtbl.iter
       (fun proc_name proc_body ->
@@ -219,10 +223,14 @@ let linker_error msg symbols =
   in
   raise Linker_error
 
+let register_source_paths paths =
+  let contents = List.map get_preprocessed_path paths in
+  Gillian.Results.init_source_paths (List.combine paths contents)
+
 let current_arch =
   if Archi.ptr64 then Architecture.Arch64 else Architecture.Arch32
 
-let add_init_pred exec_mode =
+let is_verif_or_act exec_mode =
   ExecMode.verification_exec exec_mode || ExecMode.biabduction_exec exec_mode
 
 let parse_and_compile_files paths =
@@ -266,6 +274,7 @@ let parse_and_compile_files paths =
     if (not (Symbol_set.is_empty unresolved_syms)) && not hide_undef then
       linker_error "undefined reference to" unresolved_syms
   in
+  let () = register_source_paths paths in
 
   (* Create main GIL program with references to all other files *)
   let open Gillian.Gil_syntax in
@@ -291,7 +300,7 @@ let parse_and_compile_files paths =
   let all_proc_names = init_proc_name :: main_prog.proc_names in
   let () = Hashtbl.add main_prog.procs init_proc_name init_proc in
   let () =
-    if add_init_pred exec_mode then
+    if is_verif_or_act exec_mode then
       let init_pred =
         Gil_logic_gen.make_global_env_pred (genv_pred_asrts @ init_asrts)
       in
