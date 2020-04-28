@@ -1,5 +1,5 @@
 (library
  (name results)
  (public_name gillian.results)
- (libraries utils)
+ (libraries utils fmt)
  (flags -open Utils))

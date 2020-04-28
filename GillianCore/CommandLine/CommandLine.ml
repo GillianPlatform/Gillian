@@ -213,8 +213,9 @@ struct
           get_prog_or_fail (PC.parse_and_compile_files files)
         else Gil_parsing.parse_eprog_from_file (List.hd files)
       in
-      let () = Results.clear_prev_results () in
-      let () = Results.write_results () in
+      let () = Results.read_prev_results () in
+      let changed_files = Results.get_changed_files () in
+      let () = Results.pp_changed_files Format.std_formatter changed_files in
       let () =
         match outfile_opt with
         | Some outfile ->
