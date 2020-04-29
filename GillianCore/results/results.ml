@@ -4,25 +4,18 @@ module SS = Containers.SS
 
 let results_dir = ".gillian"
 
-let sources_file = "sources.json"
-
-let prev_results_exist () =
+let prev_results_exist =
   Sys.file_exists results_dir && Sys.is_directory results_dir
+
+let delete_results_dir () = Io_utils.rm_rf results_dir
+
+let create_results_dir () = Io_utils.safe_mkdir results_dir
+
+let sources_file = "sources.json"
 
 let prev_source_paths = Hashtbl.create Config.small_tbl_size
 
 let new_source_paths = Hashtbl.create Config.small_tbl_size
-
-let init_source_paths paths =
-  List.iter
-    (fun (key, path) ->
-      let contents_hash = Digest.to_hex (Digest.file path) in
-      Hashtbl.add new_source_paths key contents_hash)
-    paths
-
-let clear_prev_results () = Io_utils.rm_rf results_dir
-
-let create_results_dir () = Io_utils.safe_mkdir results_dir
 
 let read_prev_results () =
   let json_path = Filename.concat results_dir sources_file in
@@ -35,6 +28,13 @@ let read_prev_results () =
       Hashtbl.add prev_source_paths path hash)
     sources
 
+let init_source_paths paths =
+  List.iter
+    (fun (key, path) ->
+      let contents_hash = Digest.to_hex (Digest.file path) in
+      Hashtbl.add new_source_paths key contents_hash)
+    paths
+
 type changed_files = {
   changed : string list;
   created : string list;
@@ -43,7 +43,7 @@ type changed_files = {
 
 let pp_changed_files fmt (files : changed_files) =
   let pp_paths sec fmt = function
-    | []    -> ()
+    | []    -> Fmt.pf fmt "%s:@\n<none>@\n" sec
     | paths ->
         let newline = Fmt.any "@\n" in
         Fmt.pf fmt "%s:@\n%a@\n" sec (Fmt.list ~sep:newline Fmt.string) paths
@@ -87,5 +87,17 @@ let write_results () =
          new_source_paths [])
   in
   let () = create_results_dir () in
-  let out_path = Filename.concat results_dir sources_file in
-  Json.to_file ~std:true out_path json
+  let json_path = Filename.concat results_dir sources_file in
+  Json.to_file ~std:true json_path json
+
+let call_graph_file = "call_graph.json"
+
+let read_call_graph () =
+  let json_path = Filename.concat results_dir call_graph_file in
+  CallGraph.from_json (Json.from_file json_path)
+
+let write_call_graph () =
+  let json = CallGraph.to_json GInterpreter.call_graph in
+  let () = create_results_dir () in
+  let json_path = Filename.concat results_dir call_graph_file in
+  Json.to_file ~std:true json_path json
