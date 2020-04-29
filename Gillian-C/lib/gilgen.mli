@@ -23,7 +23,7 @@ val trans_program :
   ?exec_mode:ExecMode.t ->
   ?gil_annot:Gil_logic_gen.gil_annots ->
   clight_prog:Clight.program ->
-  filename:string ->
+  filepath:string ->
   mangled_syms:(string, string) Hashtbl.t ->
   Csharpminor.program ->
   (Annot.t, string) Prog.t * compilation_data

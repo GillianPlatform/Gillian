@@ -402,6 +402,8 @@ let jsil2core_proc (proc : EProc.t) : (Annot.t, string) GProc.t =
   in
   {
     proc_name = proc.name;
+    proc_source_path = None;
+    (* TODO (Alexis): Set to module of proc*)
     proc_body = Array.of_list body';
     proc_params = proc.params;
     proc_spec = Option.map jsil2gil_spec proc.spec;

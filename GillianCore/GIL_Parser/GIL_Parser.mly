@@ -464,7 +464,15 @@ gproc_target:
   proc_spec = option(g_spec_target); proc_head = proc_head_target; CLBRACKET; cmd_list = gcmd_list_target; CRBRACKET; SCOLON
     {
       let proc_name, proc_params = proc_head in
-      let gproc : (Annot.t, string) Proc.t = { proc_name; proc_body = Array.of_list cmd_list; proc_params; proc_spec } in
+      let gproc : (Annot.t, string) Proc.t =
+        {
+          proc_name;
+          proc_source_path = None;
+          proc_body = Array.of_list cmd_list;
+          proc_params;
+          proc_spec;
+        }
+      in
       gproc
     }
 ;

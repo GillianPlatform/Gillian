@@ -1,3 +1,3 @@
 open Gillian.Gil_syntax
 
-val compile : WProg.t -> (Annot.t, string) Prog.t
+val compile : string -> WProg.t -> (Annot.t, string) Prog.t

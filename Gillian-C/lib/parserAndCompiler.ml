@@ -197,12 +197,11 @@ let parse_and_compile_file path exec_mode =
       let () = Format.fprintf fmt "%a" PrintCsharpminor.print_program csm in
       close_out oc
   in
-  let filename = Filename.basename (Filename.chop_extension path) in
   let mangled_syms = Hashtbl.create small_tbl_size in
   let annots = parse_annots path in
   let prog, compilation_data =
-    Gilgen.trans_program_with_annots exec_mode last_clight csm filename
-      mangled_syms annots
+    Gilgen.trans_program_with_annots exec_mode last_clight csm path mangled_syms
+      annots
   in
   let trans_procs = Hashtbl.create small_tbl_size in
   let () =

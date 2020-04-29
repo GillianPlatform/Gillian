@@ -526,6 +526,7 @@ let alloc_var fname (name, sz) =
 let trans_function
     ?(gil_annot = Gil_logic_gen.empty)
     ?(exec_mode = ExecMode.Verification)
+    filepath
     fname
     fdef =
   let { fn_sig = _; fn_params; fn_vars; fn_temps; fn_body } = fdef in
@@ -579,6 +580,7 @@ let trans_function
   Proc.
     {
       proc_name = fname;
+      proc_source_path = Some filepath;
       proc_body = Array.of_list body_with_reg_and_ret;
       proc_params = params;
       proc_spec = None;
@@ -667,7 +669,8 @@ let is_def_sym symbol = symbol.defined
 
 let sym_name symbol = symbol.name
 
-let mangle_symbol symbol filename mangled_syms =
+let mangle_symbol symbol filepath mangled_syms =
+  let filename = Filename.basename (Filename.chop_extension filepath) in
   let mangled_sym = filename ^ "__" ^ symbol in
   Hashtbl.add mangled_syms symbol mangled_sym;
   mangled_sym
@@ -683,12 +686,12 @@ let rec trans_globdefs
     ?(exec_mode = ExecMode.Verification)
     ~clight_prog
     ~global_syms
-    ~filename
+    ~filepath
     ~mangled_syms
     globdefs =
   let open AST in
   let trans_globdefs =
-    trans_globdefs ~clight_prog ~exec_mode ~gil_annot ~global_syms ~filename
+    trans_globdefs ~clight_prog ~exec_mode ~gil_annot ~global_syms ~filepath
       ~mangled_syms
   in
   match globdefs with
@@ -700,7 +703,7 @@ let rec trans_globdefs
       let has_global_scope = Symbol_set.mem original_sym global_syms in
       let symbol =
         if has_global_scope then original_sym
-        else mangle_symbol original_sym filename mangled_syms
+        else mangle_symbol original_sym filepath mangled_syms
       in
       let target = symbol in
       let new_cmd = set_global_function symbol target in
@@ -717,7 +720,7 @@ let rec trans_globdefs
       ( new_asrt :: init_asrts,
         new_cmd :: init_acts,
         new_bi_specs,
-        trans_function ~gil_annot ~exec_mode symbol f :: fs,
+        trans_function ~gil_annot ~exec_mode filepath symbol f :: fs,
         new_syms )
   | (id, Gfun (External f)) :: r
     when (is_builtin_func (true_name id) && not_implemented f)
@@ -754,7 +757,7 @@ let rec trans_globdefs
       let has_global_scope = Symbol_set.mem original_sym global_syms in
       let symbol =
         if has_global_scope then original_sym
-        else mangle_symbol original_sym filename mangled_syms
+        else mangle_symbol original_sym filepath mangled_syms
       in
       let target = symbol in
       let new_cmd = set_global_var symbol target v in
@@ -779,6 +782,7 @@ let make_init_proc init_cmds =
   Proc.
     {
       proc_name = CConstants.Internal_Functions.initialize_genv;
+      proc_source_path = None;
       proc_params = [];
       proc_spec = None;
       proc_body = Array.of_list all_cmds;
@@ -788,13 +792,13 @@ let trans_program
     ?(exec_mode = ExecMode.Verification)
     ?(gil_annot = Gil_logic_gen.empty)
     ~clight_prog
-    ~filename
+    ~filepath
     ~mangled_syms
     prog =
   let AST.{ prog_defs; prog_public; _ } = prog in
   let global_syms = Symbol_set.of_list (List.map true_name prog_public) in
   let init_asrts, init_acts, bi_specs, procedures, symbols =
-    trans_globdefs ~clight_prog ~exec_mode ~gil_annot ~global_syms ~filename
+    trans_globdefs ~clight_prog ~exec_mode ~gil_annot ~global_syms ~filepath
       ~mangled_syms prog_defs
   in
   let make_hashtbl get_name deflist =
@@ -840,7 +844,7 @@ let annotate prog gil_annots =
   prog
 
 let trans_program_with_annots
-    exec_mode clight_prog prog filename mangled_syms annots =
+    exec_mode clight_prog prog filepath mangled_syms annots =
   let gil_annot =
     if ExecMode.verification_exec exec_mode then
       Gil_logic_gen.trans_annots clight_prog annots
@@ -849,7 +853,7 @@ let trans_program_with_annots
     else Gil_logic_gen.empty
   in
   let non_annotated_prog, compilation_data =
-    trans_program ~clight_prog ~exec_mode ~gil_annot ~filename ~mangled_syms
+    trans_program ~clight_prog ~exec_mode ~gil_annot ~filepath ~mangled_syms
       prog
   in
   let annotated_prog = annotate non_annotated_prog gil_annot in

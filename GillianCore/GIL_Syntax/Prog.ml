@@ -3,8 +3,8 @@ module L = Logging
 type ('annot, 'label) t = {
   imports : (string * bool) list;
       (** List of tuples consisting of the file path and a boolean indicating
-      whether the procedures in the file should be verified. The latter should
-      be [false] for runtime files. *)
+          whether the procedures in the file should be verified. The latter 
+          should be [false] for runtime files. *)
   lemmas : (string, Lemma.t) Hashtbl.t;
   (* Lemmas *)
   preds : (string, Pred.t) Hashtbl.t;
@@ -117,9 +117,7 @@ let pp ~(show_labels : bool) ~(pp_label : 'b Fmt.t) fmt (prog : ('a, 'b) t) =
   let pp_import_paths fmt prefix = function
     | []    -> ()
     | paths ->
-        let pp_str fmt = function
-          | str -> Fmt.pf fmt "\"%a\"" Fmt.string str
-        in
+        let pp_str fmt = Fmt.pf fmt "\"%a\"" Fmt.string in
         Fmt.pf fmt "%s @[%a@];@\n" prefix (Fmt.list ~sep:Fmt.comma pp_str) paths
   in
   let pp_imports fmt imports =

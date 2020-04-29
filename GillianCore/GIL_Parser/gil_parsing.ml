@@ -66,7 +66,7 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
   close_in inx;
   prog
 
-let cached_progs = Hashtbl.create 32
+let cached_progs = Hashtbl.create Config.small_tbl_size
 
 let cache_gil_prog path prog = Hashtbl.add cached_progs path prog
 
@@ -159,10 +159,10 @@ let resolve_imports
     resolving the imports in the meantime. The parameter [other_imports] is an
     association list that maps extensions to a parser and compiler. For example,
     it is possible to import a JSIL file in a GIL program using 
-    [import file.jsil]. In order to do so, the [other_imports] list should
+    [import "file.jsil";]. In order to do so, the [other_imports] list should
     contain the tuple [("jsil", parse_and_compile_jsil_file)] where 
     [parse_and_compile_jsil_file] is a function that takes a file path, parses 
-    that as a JSIL program, and compiles it to a GIL program. *)
+    the file as a JSIL program, and compiles this to a GIL program. *)
 let eprog_to_prog
     ~(other_imports : (string * (string -> (Annot.t, string) Prog.t)) list)
     (ext_program : (Annot.t, string) Prog.t) : (Annot.t, int) Prog.t =
@@ -205,8 +205,7 @@ let eprog_to_prog
     Proc: proc_name
     (0, 0)
     ...
-    -----------------------------------------------------
-*)
+    ----------------------------------------------------- *)
 let parse_line_numbers (ln_str : string) : (string * int, int * bool) Hashtbl.t
     =
   let strs = Str.split (Str.regexp_string "Proc: ") ln_str in

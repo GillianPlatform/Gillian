@@ -795,9 +795,12 @@ let compile_pred pred =
       pred_pure = false;
     }
 
-let rec compile_function WFun.{ name; params; body; spec; return_expr; _ } =
+let rec compile_function
+    filepath WFun.{ name; params; body; spec; return_expr; _ } =
   let lbodylist, new_functions = compile_stmt_list ~fname:name body in
-  let other_procs = List.concat (List.map compile_function new_functions) in
+  let other_procs =
+    List.concat (List.map (compile_function filepath) new_functions)
+  in
   let cmdle, comp_ret_expr = compile_expr ~fname:name return_expr in
   let retassigncmds =
     cmdle
@@ -814,6 +817,7 @@ let rec compile_function WFun.{ name; params; body; spec; return_expr; _ } =
   Proc.
     {
       proc_name = name;
+      proc_source_path = Some filepath;
       proc_body = gil_body;
       proc_spec = gil_spec;
       proc_params = params;
@@ -922,7 +926,7 @@ let compile_lemma
       lemma_existentials;
     }
 
-let compile WProg.{ context; predicates; lemmas } =
+let compile filepath WProg.{ context; predicates; lemmas } =
   (* stuff useful to build hashtables *)
   let make_hashtbl get_name deflist =
     let hashtbl = Hashtbl.create (List.length deflist) in
@@ -935,7 +939,7 @@ let compile WProg.{ context; predicates; lemmas } =
   let get_pred_name pred = pred.Pred.pred_name in
   let get_lemma_name lemma = lemma.Lemma.lemma_name in
   (* compile everything *)
-  let comp_context = List.map compile_function context in
+  let comp_context = List.map (compile_function filepath) context in
   let comp_preds = List.map compile_pred predicates in
   let comp_lemmas =
     List.map (fun lemma -> compile_lemma (preprocess_lemma lemma)) lemmas

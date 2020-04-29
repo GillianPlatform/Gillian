@@ -7,6 +7,7 @@
     *)
 type ('annot, 'label) t = ('annot, 'label) TypeDef__.proc = {
   proc_name : string;
+  proc_source_path : string option;
   proc_body : ('annot * 'label option * 'label Cmd.t) array;
   proc_params : string list;
   proc_spec : Spec.t option;
@@ -20,6 +21,7 @@ let pp ~(show_labels : bool) ~(pp_label : 'a Fmt.t) fmt labproc =
     proc_body = body;
     proc_params = params;
     proc_spec = spec;
+    _;
   } =
     labproc
   in
