@@ -66,6 +66,7 @@
     "ocaml": "^4.8.0"
   },
   "devDependencies": {
+    "@opam/cinaps": "v0.13.0",
     "@opam/utop": "*",
     "@opam/merlin": "*",
     "@opam/odoc": "*",
