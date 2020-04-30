@@ -60,25 +60,35 @@ let pp fmt call_graph =
 
 let id_of_proc_name proc_name = "proc_" ^ proc_name
 
-let get_or_make_node nodes id proc_name =
-  match Hashtbl.find_opt nodes id with
+let get_node_opt call_graph id = Hashtbl.find_opt call_graph.nodes id
+
+let get_node call_graph id =
+  match get_node_opt call_graph id with
+  | Some node -> node
+  | None      -> failwith (Printf.sprintf "could not find node with id '%s'" id)
+
+let get_or_make_node call_graph id proc_name =
+  match get_node_opt call_graph id with
   | Some node -> node
   | None      ->
       let node = Node.make id proc_name [] in
-      Hashtbl.add nodes id node;
+      Hashtbl.add call_graph.nodes id node;
       node
 
 let add_edge call_graph id pname child_id child_pname =
-  let node = get_or_make_node call_graph.nodes id pname in
-  ignore (get_or_make_node call_graph.nodes child_id child_pname);
+  let node = get_or_make_node call_graph id pname in
+  ignore (get_or_make_node call_graph child_id child_pname);
   if not (List.mem child_id node.children) then Node.add_child node child_id
 
+let contains call_graph id = Option.is_some (get_node_opt call_graph id)
+
+let get_proc_name call_graph id = (get_node call_graph id).proc_name
+
+let get_children call_graph id = (get_node call_graph id).children
+
+let remove call_graph id = Hashtbl.remove call_graph.nodes id
+
 let to_reverse_graph call_graph =
-  let get_pname id =
-    match Hashtbl.find_opt call_graph.nodes id with
-    | Some node -> node.proc_name
-    | None      -> failwith (Printf.sprintf "could not find node with id %s" id)
-  in
   let reverse_graph = make () in
   let () =
     Hashtbl.iter
@@ -86,7 +96,7 @@ let to_reverse_graph call_graph =
         let pname = node.proc_name in
         List.iter
           (fun child_id ->
-            let child_pname = get_pname child_id in
+            let child_pname = get_proc_name call_graph child_id in
             add_edge reverse_graph child_id child_pname id pname)
           node.children)
       call_graph.nodes

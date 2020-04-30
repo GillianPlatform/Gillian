@@ -223,8 +223,12 @@ let linker_error msg symbols =
   raise Linker_error
 
 let register_source_paths paths =
-  let contents = List.map get_preprocessed_path paths in
-  Gillian.Results.init_source_paths (List.combine paths contents)
+  let cur_paths = Results.cur_source_paths in
+  List.iter
+    (fun path ->
+      let contents_path = get_preprocessed_path path in
+      Results.SourcePaths.add_source_path cur_paths path ~contents_path ())
+    paths
 
 let current_arch =
   if Archi.ptr64 then Architecture.Arch64 else Architecture.Arch32

@@ -213,9 +213,6 @@ struct
           get_prog_or_fail (PC.parse_and_compile_files files)
         else Gil_parsing.parse_eprog_from_file (List.hd files)
       in
-      let () = Results.read_prev_results () in
-      let changed_files = Results.get_changed_files () in
-      let () = Results.pp_changed_files Format.std_formatter changed_files in
       let () =
         match outfile_opt with
         | Some outfile ->
@@ -401,6 +398,9 @@ struct
           ~other_imports:(convert_other_imports PC.other_imports)
           e_prog
       in
+      let to_verify = Results.get_procs_to_verify prog in
+      print_endline "To verify:";
+      Containers.SS.iter print_endline to_verify;
       let () =
         L.verbose (fun m ->
             m "@\nProgram as parsed:@\n%a@\n" Prog.pp_indexed prog)
@@ -414,6 +414,9 @@ struct
       let () = L.end_phase Preprocessing in
       let () = L.normal_phase Verification in
       let () = Verification.verify_procs prog in
+      let sources = Results.cur_source_paths in
+      let call_graph = GInterpreter.call_graph in
+      Results.write_results { sources; call_graph };
       L.end_phase Verification
 
     let verify
