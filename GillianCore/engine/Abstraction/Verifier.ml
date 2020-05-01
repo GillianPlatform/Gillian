@@ -32,7 +32,7 @@ struct
     spec_vars : SS.t;
   }
 
-  let global_results = Hashtbl.create Config.medium_tbl_size
+  let global_results = VerificationResults.make ()
 
   let testify
       (preds : (string, Pred.t) Hashtbl.t)
@@ -242,11 +242,11 @@ struct
     | true  ->
         L.verbose (fun m ->
             m "Analyse result: Postcondition unified successfully");
-        Hashtbl.replace global_results (test.name, test.id) true;
+        VerificationResults.set_result global_results test.name test.id true;
         true
     | false ->
         L.normal (fun m -> m "Analyse result: Postcondition not unifiable.");
-        Hashtbl.replace global_results (test.name, test.id) false;
+        VerificationResults.set_result global_results test.name test.id false;
         false
 
   let make_post_subst (test : t) (post_state : SPState.t) : SSubst.t =
@@ -377,14 +377,20 @@ struct
             let rets = SAInterpreter.evaluate_lcmds prog proof state' in
             analyse_lemma_results test rets )
 
-  let verify_procs (prog : ('a, int) Prog.t) : unit =
+  let verify_procs (prog : (Annot.t, int) Prog.t) (procs_to_verify : SS.t) :
+      VerificationResults.t * CallGraph.t =
     let preds = prog.preds in
 
     let start_time = Sys.time () in
 
     (* STEP 1: Get the specs to verify *)
-    Printf.printf "Obtaining specs to verify.\n";
-    let specs_to_verify : Spec.t list = Prog.get_proc_specs prog in
+    Printf.printf "Obtaining specs to verify...\n";
+    let all_specs : Spec.t list = Prog.get_proc_specs prog in
+    let specs_to_verify, rem_specs =
+      List.partition
+        (fun spec -> SS.mem spec.Spec.spec_name procs_to_verify)
+        all_specs
+    in
 
     (* STEP 2: Convert specs to symbolic tests *)
     (* Printf.printf "Converting symbolic tests from specs: %f\n" (cur_time -. start_time); *)
@@ -452,7 +458,8 @@ struct
           Printf.sprintf "%s %f%!" msg (end_time -. start_time)
         in
         Printf.printf "%s\n" msg;
-        L.normal (fun m -> m "%s" msg)
+        L.normal (fun m -> m "%s" msg);
+        (global_results, SAInterpreter.call_graph)
 end
 
 module From_scratch (SMemory : SMemory.S) (External : External.S) = struct

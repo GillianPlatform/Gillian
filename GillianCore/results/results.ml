@@ -15,6 +15,8 @@ module Filenames = struct
   let sources = "sources.json"
 
   let call_graph = "call_graph.json"
+
+  let verif_results = "verif_results.json"
 end
 
 module SourcePaths = struct
@@ -51,7 +53,11 @@ end
 
 let cur_source_paths = SourcePaths.make ()
 
-type results = { sources : SourcePaths.t; call_graph : CallGraph.t }
+type results = {
+  sources : SourcePaths.t;
+  call_graph : CallGraph.t;
+  results : VerificationResults.t;
+}
 
 let read_prev_results () =
   let read_json filename =
@@ -61,9 +67,10 @@ let read_prev_results () =
   {
     sources = SourcePaths.from_json (read_json Filenames.sources);
     call_graph = CallGraph.from_json (read_json Filenames.call_graph);
+    results = VerificationResults.from_json (read_json Filenames.verif_results);
   }
 
-let write_results { sources; call_graph } =
+let write_results { sources; call_graph; results } =
   let write_json json filename =
     let json_path = Filename.concat results_dir filename in
     Json.to_file ~std:true json_path json
@@ -71,7 +78,8 @@ let write_results { sources; call_graph } =
   delete_results_dir ();
   create_results_dir ();
   write_json (SourcePaths.to_json sources) Filenames.sources;
-  write_json (CallGraph.to_json call_graph) Filenames.call_graph
+  write_json (CallGraph.to_json call_graph) Filenames.call_graph;
+  write_json (VerificationResults.to_json results) Filenames.verif_results
 
 type changed_files = {
   changed : string list;
@@ -140,11 +148,11 @@ let is_in_graph call_graph proc_name =
 let get_procs_to_verify (prog : (Annot.t, int) Prog.t) =
   if not prev_results_exist then to_key_set prog.procs
   else
-    let { sources; call_graph } = read_prev_results () in
+    let { sources; call_graph; _ } = read_prev_results () in
     let ({ changed; created; deleted } as changed_files) =
       get_changed_files sources cur_source_paths
     in
-    let () = pp_changed_files Format.std_formatter changed_files in
+    (* let () = pp_changed_files Format.std_formatter changed_files in *)
     let changed_files_procs = map_concat (get_procs_with_path prog) changed in
     let new_files_procs = map_concat (get_procs_with_path prog) created in
     let deleted_files_procs = map_concat (get_procs_with_path prog) deleted in

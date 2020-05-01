@@ -398,9 +398,6 @@ struct
           ~other_imports:(convert_other_imports PC.other_imports)
           e_prog
       in
-      let to_verify = Results.get_procs_to_verify prog in
-      print_endline "To verify:";
-      Containers.SS.iter print_endline to_verify;
       let () =
         L.verbose (fun m ->
             m "@\nProgram as parsed:@\n%a@\n" Prog.pp_indexed prog)
@@ -413,10 +410,10 @@ struct
       in
       let () = L.end_phase Preprocessing in
       let () = L.normal_phase Verification in
-      let () = Verification.verify_procs prog in
+      let to_verify = Results.get_procs_to_verify prog in
+      let results, call_graph = Verification.verify_procs prog to_verify in
       let sources = Results.cur_source_paths in
-      let call_graph = GInterpreter.call_graph in
-      Results.write_results { sources; call_graph };
+      Results.write_results { sources; call_graph; results };
       L.end_phase Verification
 
     let verify

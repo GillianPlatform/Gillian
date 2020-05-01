@@ -1,8 +1,6 @@
 open Literal
 module L = Logging
 
-let call_graph = CallGraph.make ()
-
 (** General GIL Interpreter *)
 module Make
     (Val : Val.S)
@@ -50,6 +48,8 @@ struct
   exception Syntax_error of string
 
   let pp_single_result ft res = ExecRes.pp State.pp Val.pp pp_err ft res
+
+  let call_graph = CallGraph.make ()
 
   (* ******************* *
    * Auxiliary Functions *
