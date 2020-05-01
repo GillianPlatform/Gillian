@@ -62,6 +62,7 @@ let is_in_graph call_graph proc_name =
   CallGraph.contains call_graph (CallGraph.id_of_proc_name proc_name)
 
 let get_procs_to_verify prog prev_source_paths prev_call_graph =
+  (* TODO (Alexis): Procedures from deleted files? *)
   let ({ changed; created; _ } as changed_files) =
     get_changed_files prev_source_paths ResultsDir.cur_source_paths
   in

@@ -26,8 +26,8 @@ module SourcePaths = struct
 
   let make () : t = Hashtbl.create Config.small_tbl_size
 
-  let add_source_path paths path ?(contents_path = path) () =
-    let contents_hash = Digest.to_hex (Digest.file contents_path) in
+  let add_source_path paths path =
+    let contents_hash = Digest.to_hex (Digest.file path) in
     Hashtbl.add paths path contents_hash
 
   let from_json json =
@@ -59,7 +59,7 @@ type t = {
   results : VerificationResults.t;
 }
 
-let read_results_dir () : t =
+let read_results_dir () =
   let read_json filename =
     let json_path = Filename.concat results_dir filename in
     Json.from_file json_path

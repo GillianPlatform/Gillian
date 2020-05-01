@@ -224,11 +224,10 @@ let linker_error msg symbols =
 
 let register_source_paths paths =
   let open Results in
-  let cur_paths = ResultsDir.cur_source_paths in
   List.iter
     (fun path ->
-      let contents_path = get_preprocessed_path path in
-      ResultsDir.SourcePaths.add_source_path cur_paths path ~contents_path ())
+      (* TODO (Alexis): Header files? *)
+      ResultsDir.SourcePaths.add_source_path ResultsDir.cur_source_paths path)
     paths
 
 let current_arch =
