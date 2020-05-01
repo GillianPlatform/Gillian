@@ -73,3 +73,6 @@ _release
 with-depgraph.esy.lock
 with-depgraph.json
 see_deps.py
+
+# Development container
+.devcontainer
