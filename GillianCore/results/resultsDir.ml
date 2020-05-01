@@ -2,7 +2,7 @@ open Containers
 module Json = Yojson.Basic
 module Json_utils = Yojson.Basic.Util
 
-let results_dir = ".gillian"
+let results_dir = Config.results_dir
 
 let prev_results_exist =
   Sys.file_exists results_dir && Sys.is_directory results_dir

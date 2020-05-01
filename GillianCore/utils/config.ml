@@ -2,6 +2,9 @@
     Mostly composed of modifiable flags, or hardcoded values.  *)
 
 (** {2 global config} *)
+
+let results_dir = ".gillian"
+
 let ci = ref false
 
 let current_exec_mode : ExecMode.t ref = ref ExecMode.Verification

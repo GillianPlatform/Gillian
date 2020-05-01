@@ -71,7 +71,7 @@ struct
 
   let output_gil =
     let doc =
-      "If specified, will write into the compiled GIL program into $(docv)."
+      "If specified, will write the compiled GIL program into $(docv)."
     in
     let docv = "OUTPUT" in
     Arg.(
@@ -104,10 +104,17 @@ struct
     in
     Arg.(value & flag & info [ "no-print-all-failures" ] ~doc)
 
+  let incremental =
+    let doc =
+      "Perform analysis in incremental mode, where only the changed parts of \
+       code are re-analysed."
+    in
+    Arg.(value & flag & info [ "inc"; "incremental" ] ~doc)
+
   let get_prog_or_fail = function
     | Ok prog   -> prog
     | Error err ->
-        Fmt.pf Fmt.stdout "Error during compilation to GIL:\n%a" PC.pp_err err;
+        Fmt.pr "Error during compilation to GIL:\n%a" PC.pp_err err;
         exit 1
 
   module CompilerConsole = struct
@@ -359,18 +366,18 @@ struct
 
   module VerificationConsole = struct
     let no_lemma_proof =
-      let doc = "If you do not want to verify the proofs of lemmas" in
+      let doc = "Do not verify the proofs of lemmas." in
       Arg.(value & flag & info [ "no-lemma-proof" ] ~doc)
 
     let no_unfold =
-      let doc = "Disables automatic unfolding of non-recursive predicates" in
+      let doc = "Disable automatic unfolding of non-recursive predicates." in
       Arg.(value & flag & info [ "no-unfold" ] ~doc)
 
     let manual =
-      let doc = "Disables automatic folding and unfolding heuristics" in
+      let doc = "Disable automatic folding and unfolding heuristics." in
       Arg.(value & flag & info [ "m"; "manual" ] ~doc)
 
-    let process_files files already_compiled outfile_opt no_unfold =
+    let process_files files already_compiled outfile_opt no_unfold incremental =
       let e_prog =
         if not already_compiled then
           let () = L.normal_phase ParsingAndCompiling in
@@ -412,7 +419,7 @@ struct
       let () = L.normal_phase Verification in
       let open ResultsDir in
       let () =
-        if prev_results_exist then
+        if incremental && prev_results_exist then
           (* Only analyse changed procedures *)
           let { sources; call_graph; results } = read_results_dir () in
           let to_verify =
@@ -446,6 +453,7 @@ struct
         manual
         runtime_path
         ci
+        incremental
         tl_opts =
       let () = Fmt_tty.setup_std_outputs () in
       let () = Config.ci := ci in
@@ -460,7 +468,9 @@ struct
       let () =
         Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
       in
-      let () = process_files files already_compiled outfile_opt no_unfold in
+      let () =
+        process_files files already_compiled outfile_opt no_unfold incremental
+      in
       let () = if stats then Statistics.print_statistics () in
       Logging.wrap_up ()
 
@@ -468,7 +478,7 @@ struct
       Term.(
         const verify $ files $ already_compiled $ output_gil $ no_unfold $ stats
         $ no_lemma_proof $ logging_mode $ stats $ manual $ runtime_path $ ci
-        $ PC.TargetLangOptions.term)
+        $ incremental $ PC.TargetLangOptions.term)
 
     let verify_info =
       let doc = "Verifies a file of the target language" in
