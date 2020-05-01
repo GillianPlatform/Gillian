@@ -1,6 +1,7 @@
 open Cmdliner
 module ParserAndCompiler = ParserAndCompiler
 module L = Logging
+module SS = Containers.SS
 
 let convert_other_imports oi =
   List.map
@@ -405,15 +406,32 @@ struct
       let prog = LogicPreprocessing.preprocess prog (not no_unfold) in
       let () =
         L.verbose (fun m ->
-            m "@\nProgram after logic Preprocessing:@\n%a@\n" Prog.pp_indexed
+            m "@\nProgram after logic preprocessing:@\n%a@\n" Prog.pp_indexed
               prog)
       in
-      let () = L.end_phase Preprocessing in
       let () = L.normal_phase Verification in
-      let to_verify = Results.get_procs_to_verify prog in
-      let results, call_graph = Verification.verify_procs prog to_verify in
-      let sources = Results.cur_source_paths in
-      Results.write_results { sources; call_graph; results };
+      let open ResultsDir in
+      let () =
+        if prev_results_exist then
+          (* Only analyse changed procedures *)
+          let { sources; call_graph; results } = read_results_dir () in
+          let to_verify =
+            ChangeTracker.get_procs_to_verify prog sources call_graph
+          in
+          let cur_results, cur_call_graph =
+            Verification.verify_procs prog to_verify ~prev_results:results ()
+          in
+          let call_graph = CallGraph.merge_graphs call_graph cur_call_graph in
+          let results = VerificationResults.merge_results results cur_results in
+          write_results_dir { sources = cur_source_paths; call_graph; results }
+        else
+          (* Analyse all procedures *)
+          let to_verify = Containers.to_key_set prog.procs in
+          let results, call_graph =
+            Verification.verify_procs prog to_verify ()
+          in
+          write_results_dir { sources = cur_source_paths; call_graph; results }
+      in
       L.end_phase Verification
 
     let verify

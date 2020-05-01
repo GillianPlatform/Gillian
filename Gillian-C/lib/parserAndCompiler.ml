@@ -223,11 +223,12 @@ let linker_error msg symbols =
   raise Linker_error
 
 let register_source_paths paths =
-  let cur_paths = Results.cur_source_paths in
+  let open Results in
+  let cur_paths = ResultsDir.cur_source_paths in
   List.iter
     (fun path ->
       let contents_path = get_preprocessed_path path in
-      Results.SourcePaths.add_source_path cur_paths path ~contents_path ())
+      ResultsDir.SourcePaths.add_source_path cur_paths path ~contents_path ())
     paths
 
 let current_arch =

@@ -8,6 +8,14 @@ let make () : t = Hashtbl.create Config.small_tbl_size
 let set_result results proc_name spec_id verified =
   Hashtbl.replace results (proc_name, spec_id) verified
 
+let merge_results results other_results =
+  let () =
+    Hashtbl.iter
+      (fun id verified -> Hashtbl.replace results id verified)
+      other_results
+  in
+  results
+
 let to_json results =
   `List
     (Hashtbl.fold

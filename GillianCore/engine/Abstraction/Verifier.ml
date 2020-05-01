@@ -377,8 +377,28 @@ struct
             let rets = SAInterpreter.evaluate_lcmds prog proof state' in
             analyse_lemma_results test rets )
 
-  let verify_procs (prog : (Annot.t, int) Prog.t) (procs_to_verify : SS.t) :
-      VerificationResults.t * CallGraph.t =
+  let check_previously_verified prev_results cur_verified =
+    match prev_results with
+    | None         -> true
+    | Some results ->
+        Hashtbl.fold
+          (fun (pname, _) verified acc ->
+            if not (SS.mem pname cur_verified) then (
+              let msg =
+                "Reading one previous spec of procedure " ^ pname ^ "... "
+              in
+              L.tmi (fun fmt -> fmt "%s" msg);
+              Fmt.pr "%s" msg;
+              print_success_or_failure verified;
+              verified && acc )
+            else true && acc)
+          results true
+
+  let verify_procs
+      (prog : (Annot.t, int) Prog.t)
+      (procs_to_verify : SS.t)
+      ?(prev_results : VerificationResults.t option)
+      () : VerificationResults.t * CallGraph.t =
     let preds = prog.preds in
 
     let start_time = Sys.time () in
@@ -448,9 +468,10 @@ struct
             (fun ac test -> if verify prog' test then ac else false)
             true (tests' @ tests)
         in
-
         let end_time = Sys.time () in
-
+        let success =
+          success && check_previously_verified prev_results procs_to_verify
+        in
         let msg : string =
           if success then "All specs succeeded:" else "There were failures:"
         in

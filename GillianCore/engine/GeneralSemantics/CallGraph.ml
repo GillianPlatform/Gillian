@@ -103,6 +103,14 @@ let to_reverse_graph call_graph =
   in
   reverse_graph
 
+let merge_graphs call_graph other_graph =
+  let () =
+    Hashtbl.iter
+      (fun id node -> Hashtbl.replace call_graph.nodes id node)
+      other_graph.nodes
+  in
+  call_graph
+
 let to_json call_graph =
   `List
     (Hashtbl.fold
