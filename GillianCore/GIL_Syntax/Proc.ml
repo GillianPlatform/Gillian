@@ -18,10 +18,10 @@ let get_params proc = proc.proc_params
 let pp ~(show_labels : bool) ~(pp_label : 'a Fmt.t) fmt labproc =
   let {
     proc_name = name;
+    proc_source_path = path;
     proc_body = body;
     proc_params = params;
     proc_spec = spec;
-    _;
   } =
     labproc
   in
@@ -48,10 +48,14 @@ let pp ~(show_labels : bool) ~(pp_label : 'a Fmt.t) fmt labproc =
   in
   let pp_spec_opt fmt = function
     | None      -> ()
-    | Some spec -> Spec.pp fmt spec
+    | Some spec -> Fmt.pf fmt "%a@\n" Spec.pp spec
   in
-  Fmt.pf fmt "@[%a@\n@[<v 2>proc %s(%a) {@\n%a@\n@]@\n};@\n@]" pp_spec_opt spec
-    name
+  let pp_path_opt fmt = function
+    | None   -> Fmt.pf fmt "@nopath@\n"
+    | Some _ -> ()
+  in
+  Fmt.pf fmt "@[%a%a@[<v 2>proc %s(%a) {@\n%a@]@\n};@\n@]" pp_spec_opt spec
+    pp_path_opt path name
     (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
     params
     (Fmt.array ~sep:(Fmt.any ";@\n") pp_cmd_triple)

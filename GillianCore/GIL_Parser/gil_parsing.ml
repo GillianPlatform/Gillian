@@ -7,7 +7,7 @@ module Preprocess_GCmd = PreProcessing_Utils.M (struct
   let successors = Cmd.successors
 end)
 
-module Str_set = Containers.SS
+module SS = Containers.SS
 
 let col pos = pos.pos_cnum - pos.pos_bol + 1
 
@@ -47,6 +47,20 @@ let parse_eprog_from_string : string -> (Annot.t, string) Prog.t =
 let parse_expr_from_string : string -> Expr.t =
   parse_from_string GIL_Parser.top_level_expr_target
 
+let set_proc_paths procs path =
+  let procs' = Hashtbl.create Config.small_tbl_size in
+  let () =
+    Hashtbl.iter
+      (fun pname (proc : (Annot.t, string) Proc.t) ->
+        let proc_source_path =
+          if SS.mem pname !Parser_state.procs_with_no_paths then None
+          else Some path
+        in
+        Hashtbl.add procs' pname { proc with proc_source_path })
+      procs
+  in
+  procs'
+
 let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
   let extension = List.hd (List.rev (Str.split (Str.regexp "\\.") path)) in
   let file_previously_normalised = String.equal "ngil" extension in
@@ -64,7 +78,9 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
   lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = path };
   let prog = parse GIL_Parser.gmain_target lexbuf in
   close_in inx;
-  prog
+  let procs = set_proc_paths prog.procs path in
+  Parser_state.reset ();
+  { prog with procs }
 
 let cached_progs = Hashtbl.create Config.small_tbl_size
 
@@ -146,14 +162,14 @@ let resolve_imports
     match imports with
     | [] -> ()
     | (file, should_verify) :: rest ->
-        if not (Str_set.mem file added_imports) then
+        if not (SS.mem file added_imports) then
           let imported_prog = fetch_imported_prog file other_imports in
           let () = extend_program program imported_prog should_verify in
-          let new_added_imports = Str_set.add file added_imports in
+          let new_added_imports = SS.add file added_imports in
           resolve (rest @ imported_prog.imports) new_added_imports
         else resolve rest added_imports
   in
-  resolve program.imports Str_set.empty
+  resolve program.imports SS.empty
 
 (** Converts a string-labelled [Prog.t] to an index-labelled [Prog.t], 
     resolving the imports in the meantime. The parameter [other_imports] is an

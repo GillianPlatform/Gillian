@@ -1,6 +1,7 @@
 open Compcert
 open Config_compcert
 open CConstants
+module SS = Gillian.Utils.Containers.SS
 
 let small_tbl_size = Gillian.Utils.Config.small_tbl_size
 
@@ -152,12 +153,10 @@ let parse_annots file =
   let () = close_in inx in
   wprog
 
-module Str_set = Gillian.Utils.Containers.SS
-
 let mangle_proc proc mangled_syms =
-  let reserved_names = Str_set.of_list [ "pred"; "pure" ] in
+  let reserved_names = SS.of_list [ "pred"; "pure" ] in
   let mangle_var var =
-    let prefix = if Str_set.mem var reserved_names then "v__" else "" in
+    let prefix = if SS.mem var reserved_names then "v__" else "" in
     prefix ^ var
   in
   let mangle_symbol sym =

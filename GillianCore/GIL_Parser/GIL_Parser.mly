@@ -1,5 +1,6 @@
 %{
 open Containers
+open Parser_state
 let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %}
 
@@ -190,6 +191,8 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token IMPORT
 %token MACRO
 %token VERIFY
+(* Directives *)
+%token NO_PATH
 (* Separators *)
 %token DOT
 %token COMMA
@@ -461,13 +464,24 @@ gdeclaration_target:
 
 (* [spec;] proc xpto (x, y) { cmd_list }; *)
 gproc_target:
-  proc_spec = option(g_spec_target); proc_head = proc_head_target; CLBRACKET; cmd_list = gcmd_list_target; CRBRACKET; SCOLON
+  proc_spec = option(g_spec_target);
+  no_path = option(NO_PATH);
+  proc_head = proc_head_target;
+  CLBRACKET;
+  cmd_list = gcmd_list_target;
+  CRBRACKET;
+  SCOLON
     {
       let proc_name, proc_params = proc_head in
+      let () =
+        if Option.is_some no_path then
+        procs_with_no_paths := SS.add proc_name !procs_with_no_paths
+      in
       let gproc : (Annot.t, string) Proc.t =
         {
           proc_name;
           proc_source_path = None;
+          proc_internal = false;
           proc_body = Array.of_list cmd_list;
           proc_params;
           proc_spec;

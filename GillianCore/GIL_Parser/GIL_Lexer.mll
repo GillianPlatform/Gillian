@@ -262,8 +262,10 @@ rule read = parse
   | loc                  { GIL_Parser.LOC (Lexing.lexeme lexbuf) }
   | aloc                 { GIL_Parser.ALOC (Lexing.lexeme lexbuf) }
   | normalised_aloc      { GIL_Parser.ALOC (Lexing.lexeme lexbuf) }
+(* Directives *)
+  | "@nopath"            { GIL_Parser.NO_PATH }
 
-  (* Variables: THIS IS NEW *)
+(* Variables *)
   | identifier           { let candidate = Lexing.lexeme lexbuf in
                            match (Hashtbl.mem keyword_table candidate) with
                            | true  -> Hashtbl.find keyword_table candidate
