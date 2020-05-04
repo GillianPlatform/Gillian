@@ -1,3 +1,5 @@
+internal;
+
 proc i__binop_cmplu_le(v1, v2) {
         goto [ (l-nth(v1, 0.) = "long") and (l-nth(v2, 0.) = "long") ] blon els;
   blon: ret := "i__value_of_bool"(l-nth(v1, 1.) <= l-nth(v2, 1.));

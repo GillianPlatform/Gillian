@@ -129,9 +129,10 @@ struct
            ------------------------------------------------------@]@\n"
           (Sys.time ()) LCmd.pp lcmd State.pp state)
 
-  let get_proc_path_opt (prog : UP.prog) proc_name =
-    let proc = Option.get (Prog.get_proc prog.prog proc_name) in
-    proc.proc_source_path
+  let is_internal_proc (prog : UP.prog) proc_name =
+    match Prog.get_proc prog.prog proc_name with
+    | Some proc -> proc.proc_internal
+    | None      -> false
 
   (* ************** *
    * Main Functions *
@@ -364,14 +365,12 @@ struct
               (Interpreter_error
                  ([ EProc (Val.from_literal (String pid)) ], state))
       in
-      let caller_name = CallStack.get_cur_proc_id cs in
-      let caller_path = get_proc_path_opt prog caller_name in
-      let callee_path = get_proc_path_opt prog pid in
+      let caller = CallStack.get_cur_proc_id cs in
       let () =
-        if Option.is_some caller_path && Option.is_some callee_path then
-          let caller_id = CallGraph.id_of_proc_name caller_name in
+        if not (is_internal_proc prog caller || is_internal_proc prog pid) then
+          let caller_id = CallGraph.id_of_proc_name caller in
           let callee_id = CallGraph.id_of_proc_name pid in
-          CallGraph.add_edge call_graph caller_id caller_name callee_id pid
+          CallGraph.add_edge call_graph caller_id caller callee_id pid
       in
       let prmlen = List.length params in
 

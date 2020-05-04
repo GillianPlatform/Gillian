@@ -818,6 +818,7 @@ let rec compile_function
     {
       proc_name = name;
       proc_source_path = Some filepath;
+      proc_internal = false;
       proc_body = gil_body;
       proc_spec = gil_spec;
       proc_params = params;

@@ -1,3 +1,5 @@
+internal;
+
 proc i__ptr_chunk() {
   ret := "int32";
   return

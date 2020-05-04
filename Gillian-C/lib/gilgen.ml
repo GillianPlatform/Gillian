@@ -581,6 +581,7 @@ let trans_function
     {
       proc_name = fname;
       proc_source_path = Some filepath;
+      proc_internal = false;
       proc_body = Array.of_list body_with_reg_and_ret;
       proc_params = params;
       proc_spec = None;
@@ -783,6 +784,7 @@ let make_init_proc init_cmds =
     {
       proc_name = CConstants.Internal_Functions.initialize_genv;
       proc_source_path = None;
+      proc_internal = true;
       proc_params = [];
       proc_spec = None;
       proc_body = Array.of_list all_cmds;

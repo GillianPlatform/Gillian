@@ -1,3 +1,5 @@
+internal;
+
 proc i__get_function_name(v_ptr) {
          (* The value given should be a pointer *)
          goto [not (typeOf (l-nth (v_ptr, 0.)) = Obj)] fail1 ctn1;

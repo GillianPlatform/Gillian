@@ -1,3 +1,5 @@
+internal;
+
 proc i__binop_add(v1, v2) {
         goto [ l-nth(v1, 0.) = "int" ] lint unde;
   lint: goto [ l-nth(v2, 0.) = "int" ] bint unde;

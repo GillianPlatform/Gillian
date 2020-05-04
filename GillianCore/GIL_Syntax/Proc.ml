@@ -8,6 +8,7 @@
 type ('annot, 'label) t = ('annot, 'label) TypeDef__.proc = {
   proc_name : string;
   proc_source_path : string option;
+  proc_internal : bool;
   proc_body : ('annot * 'label option * 'label Cmd.t) array;
   proc_params : string list;
   proc_spec : Spec.t option;
@@ -19,6 +20,7 @@ let pp ~(show_labels : bool) ~(pp_label : 'a Fmt.t) fmt labproc =
   let {
     proc_name = name;
     proc_source_path = path;
+    proc_internal = internal;
     proc_body = body;
     proc_params = params;
     proc_spec = spec;
@@ -54,8 +56,12 @@ let pp ~(show_labels : bool) ~(pp_label : 'a Fmt.t) fmt labproc =
     | None   -> Fmt.pf fmt "@nopath@\n"
     | Some _ -> ()
   in
-  Fmt.pf fmt "@[%a%a@[<v 2>proc %s(%a) {@\n%a@]@\n};@\n@]" pp_spec_opt spec
-    pp_path_opt path name
+  let pp_internal fmt = function
+    | true  -> Fmt.pf fmt "@internal@\n"
+    | false -> ()
+  in
+  Fmt.pf fmt "@[%a%a%a@[<v 2>proc %s(%a) {@\n%a@]@\n};@\n@]" pp_spec_opt spec
+    pp_path_opt path pp_internal internal name
     (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
     params
     (Fmt.array ~sep:(Fmt.any ";@\n") pp_cmd_triple)

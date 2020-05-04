@@ -1,3 +1,5 @@
+internal;
+
 (* Type testers *)
 
 pred i__is_int (e: List):

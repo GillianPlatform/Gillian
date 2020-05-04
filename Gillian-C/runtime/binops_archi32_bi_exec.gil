@@ -1,3 +1,5 @@
+internal;
+
 (* In bi-abduction, we're giving meaning to comparing freed pointers in the same block,
    and killing other branches. *)
 proc i__binop_cmpu_le(v1, v2) {

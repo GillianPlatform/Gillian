@@ -1,3 +1,5 @@
+internal;
+
 (******** PREDICATES REGARDING CELLS ********)
 
 (* ptr -> value in WISL *)

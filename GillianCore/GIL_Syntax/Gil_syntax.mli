@@ -757,6 +757,7 @@ module Proc : sig
   type ('annot, 'label) t = {
     proc_name : string;
     proc_source_path : string option;
+    proc_internal : bool;
     proc_body : ('annot * 'label option * 'label Cmd.t) array;
     proc_params : string list;
     proc_spec : Spec.t option;

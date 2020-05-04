@@ -1,3 +1,5 @@
+internal;
+
 proc i__strcmp(str1, str2) {
           goto [((typeOf str1) = List) and ((typeOf str2) = List) and
                 ((typeOf (l-nth(str1, 0.))) = Obj) and ((typeOf (l-nth(str2, 0.))) = Obj)]

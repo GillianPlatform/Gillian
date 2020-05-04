@@ -1,6 +1,7 @@
 %{
 open Containers
 open Parser_state
+
 let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %}
 
@@ -193,6 +194,8 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token VERIFY
 (* Directives *)
 %token NO_PATH
+%token INTERNAL
+%token INTERNAL_FILE
 (* Separators *)
 %token DOT
 %token COMMA
@@ -411,9 +414,13 @@ var_and_le_target:
 (***********************)
 
 gmain_target:
-  imports = option(import_target); imports_to_verify = option(import_verify_target);
-  g_prog = gdeclaration_target; EOF
+  internal = option(INTERNAL_FILE);
+  imports = option(import_target);
+  imports_to_verify = option(import_verify_target);
+  g_prog = gdeclaration_target;
+  EOF
     {
+      internal_file := Option.is_some internal;
       let imports = List.map (fun path -> (path, false))
         (Option.value ~default:[] imports)
       in
@@ -466,6 +473,7 @@ gdeclaration_target:
 gproc_target:
   proc_spec = option(g_spec_target);
   no_path = option(NO_PATH);
+  internal = option(INTERNAL);
   proc_head = proc_head_target;
   CLBRACKET;
   cmd_list = gcmd_list_target;
@@ -481,7 +489,7 @@ gproc_target:
         {
           proc_name;
           proc_source_path = None;
-          proc_internal = false;
+          proc_internal = Option.is_some internal;
           proc_body = Array.of_list cmd_list;
           proc_params;
           proc_spec;

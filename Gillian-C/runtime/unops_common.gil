@@ -1,4 +1,5 @@
 (* These are not correct at all if the values get any higher.. *)
+internal;
 
 proc i__unop_longofint (i) {
        goto [ l-nth(i, 0.) = "int" ] ctn und;

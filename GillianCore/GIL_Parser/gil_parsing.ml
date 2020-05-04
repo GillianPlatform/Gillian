@@ -47,8 +47,9 @@ let parse_eprog_from_string : string -> (Annot.t, string) Prog.t =
 let parse_expr_from_string : string -> Expr.t =
   parse_from_string GIL_Parser.top_level_expr_target
 
-let set_proc_paths procs path =
+let trans_procs procs path =
   let procs' = Hashtbl.create Config.small_tbl_size in
+  let internal_file = !Parser_state.internal_file in
   let () =
     Hashtbl.iter
       (fun pname (proc : (Annot.t, string) Proc.t) ->
@@ -56,7 +57,8 @@ let set_proc_paths procs path =
           if SS.mem pname !Parser_state.procs_with_no_paths then None
           else Some path
         in
-        Hashtbl.add procs' pname { proc with proc_source_path })
+        let proc_internal = proc.proc_internal || internal_file in
+        Hashtbl.add procs' pname { proc with proc_source_path; proc_internal })
       procs
   in
   procs'
@@ -78,7 +80,7 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
   lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = path };
   let prog = parse GIL_Parser.gmain_target lexbuf in
   close_in inx;
-  let procs = set_proc_paths prog.procs path in
+  let procs = trans_procs prog.procs path in
   Parser_state.reset ();
   { prog with procs }
 

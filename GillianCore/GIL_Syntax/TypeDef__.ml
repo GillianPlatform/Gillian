@@ -236,6 +236,7 @@ and macro = {
 and ('annot, 'label) proc = {
   proc_name : string;
   proc_source_path : string option;
+  proc_internal : bool;
   proc_body : ('annot * 'label option * 'label cmd) array;
   proc_params : string list;
   proc_spec : spec option;
