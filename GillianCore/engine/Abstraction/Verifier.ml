@@ -398,7 +398,7 @@ struct
       (prog : (Annot.t, int) Prog.t)
       (procs_to_verify : SS.t)
       ?(prev_results : VerificationResults.t option)
-      () : VerificationResults.t * CallGraph.t =
+      () : unit =
     let preds = prog.preds in
 
     let start_time = Sys.time () in
@@ -479,8 +479,38 @@ struct
           Printf.sprintf "%s %f%!" msg (end_time -. start_time)
         in
         Printf.printf "%s\n" msg;
-        L.normal (fun m -> m "%s" msg);
+        L.normal (fun m -> m "%s" msg)
+
+  let get_all_noninternal_procs (prog : (Annot.t, int) Prog.t) : SS.t =
+    let procs =
+      Hashtbl.fold
+        (fun pname (proc : (Annot.t, int) Proc.t) acc ->
+          if not proc.proc_internal then pname :: acc else acc)
+        prog.procs []
+    in
+    SS.of_list procs
+
+  let verify_prog (prog : (Annot.t, int) Prog.t) (incremental : bool) : unit =
+    let open ResultsDir in
+    if incremental && prev_results_exist then
+      (* Only analyse changed procedures *)
+      let { sources; call_graph; results } = read_results_dir () in
+      let to_verify =
+        ChangeTracker.get_procs_to_verify prog sources call_graph
+      in
+      let () = verify_procs prog to_verify ~prev_results:results () in
+      let cur_results, cur_call_graph =
         (global_results, SAInterpreter.call_graph)
+      in
+      let call_graph = CallGraph.merge_graphs call_graph cur_call_graph in
+      let results = VerificationResults.merge_results results cur_results in
+      write_results_dir { sources = cur_source_paths; call_graph; results }
+    else
+      (* Analyse all procedures *)
+      let to_verify = get_all_noninternal_procs prog in
+      let () = verify_procs prog to_verify () in
+      let results, call_graph = (global_results, SAInterpreter.call_graph) in
+      write_results_dir { sources = cur_source_paths; call_graph; results }
 end
 
 module From_scratch (SMemory : SMemory.S) (External : External.S) = struct

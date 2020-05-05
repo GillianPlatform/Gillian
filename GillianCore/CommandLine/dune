@@ -1,5 +1,5 @@
 (library
  (name commandLine)
  (public_name gillian.commandLine)
- (libraries cmdliner fmt.tty gil_syntax utils engine bulk logging results)
- (flags -open Gil_syntax -open Utils -open Engine -open Bulk -open Results))
+ (libraries cmdliner fmt.tty gil_syntax utils engine bulk logging)
+ (flags -open Gil_syntax -open Utils -open Engine -open Bulk))

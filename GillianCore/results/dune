@@ -1,5 +1,7 @@
 (library
  (name results)
  (public_name gillian.results)
- (libraries utils engine gil_syntax fmt)
- (flags -open Utils -open Engine -open Gil_syntax))
+ (libraries utils gil_syntax fmt ppx_deriving_yojson.runtime)
+ (preprocess
+  (pps ppx_deriving_yojson))
+ (flags -open Utils -open Gil_syntax))

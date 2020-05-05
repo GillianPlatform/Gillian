@@ -4,7 +4,5 @@
  (name engine)
  (public_name gillian.engine)
  (libraries utils z3 menhirLib fmt cmdliner str gil_syntax gil_parsing
-   logging ppx_deriving_yojson.runtime)
- (preprocess
-  (pps ppx_deriving_yojson))
- (flags -open Utils -open Gil_syntax))
+   logging results)
+ (flags -open Utils -open Gil_syntax -open Results))

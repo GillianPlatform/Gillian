@@ -16,6 +16,9 @@ let pp_changed_files fmt (files : changed_files) =
   Fmt.pf fmt "%a%a%a" (pp_paths "Changed") files.changed (pp_paths "Created")
     files.created (pp_paths "Deleted") files.deleted
 
+let to_key_set (table : (string, 'b) Hashtbl.t) : SS.t =
+  Hashtbl.fold (fun key _ keys -> SS.add key keys) table SS.empty
+
 let to_list (set : SS.t) : string list =
   SS.fold (fun elem acc -> elem :: acc) set []
 
