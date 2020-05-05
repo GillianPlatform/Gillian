@@ -1,5 +1,5 @@
 {
-  "checksum": "f997aa4cdc6fdd02873b21b2233fd88f",
+  "checksum": "d769ccd6b9e488db21963ddf0186c1a6",
   "root": "gillian-ecosystem-dev@link-dev:./esy.json",
   "node": {
     "ocaml@4.8.1000@d41d8cd9": {
@@ -31,10 +31,10 @@
         "@opam/yojson@opam:1.7.0@7056d985",
         "@opam/visitors@opam:20190711@924ba3cb",
         "@opam/uuidm@opam:0.9.7@bf725775", "@opam/sanddb@opam:0.2@9593edda",
+        "@opam/ppx_deriving_yojson@opam:3.5.2@ca415fbe",
         "@opam/menhir@opam:20190924@004407ff",
         "@opam/fmt@opam:0.8.8@01c3a23c", "@opam/dune@opam:2.5.1@a0c1e658",
         "@opam/cmdliner@opam:1.0.4@93208aac",
-        "@opam/cinaps@opam:v0.13.0@366f5597",
         "@opam/batteries@opam:3.0.0@8b2b498b",
         "@opam/alcotest@opam:1.0.1@412cd081"
       ],
@@ -42,7 +42,8 @@
         "ocaml@4.8.1000@d41d8cd9", "@opam/utop@opam:2.5.0@e1664c74",
         "@opam/odoc@opam:1.5.0@35218f5f",
         "@opam/ocamlformat@opam:0.14.1@bad09513",
-        "@opam/merlin@opam:3.3.4@5fcabf21"
+        "@opam/merlin@opam:3.3.4@5fcabf21",
+        "@opam/cinaps@opam:v0.13.0@366f5597"
       ]
     },
     "esy-gmp@archive:https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz#sha1:9dc6981197a7d92f339192eea974f5eca48fcffe@186b9388": {
@@ -871,6 +872,38 @@
       ],
       "devDependencies": [
         "ocaml@4.8.1000@d41d8cd9", "@opam/dune@opam:2.5.1@a0c1e658"
+      ]
+    },
+    "@opam/ppx_deriving_yojson@opam:3.5.2@ca415fbe": {
+      "id": "@opam/ppx_deriving_yojson@opam:3.5.2@ca415fbe",
+      "name": "@opam/ppx_deriving_yojson",
+      "version": "opam:3.5.2",
+      "source": {
+        "type": "install",
+        "source": [
+          "archive:https://opam.ocaml.org/cache/sha256/05/05fd2cf932b54d59daf8aaa23e74ca27c2a20301b753130e344c311910a39b63#sha256:05fd2cf932b54d59daf8aaa23e74ca27c2a20301b753130e344c311910a39b63",
+          "archive:https://github.com/ocaml-ppx/ppx_deriving_yojson/archive/v3.5.2.tar.gz#sha256:05fd2cf932b54d59daf8aaa23e74ca27c2a20301b753130e344c311910a39b63"
+        ],
+        "opam": {
+          "name": "ppx_deriving_yojson",
+          "version": "3.5.2",
+          "path": "esy.lock/opam/ppx_deriving_yojson.3.5.2"
+        }
+      },
+      "overrides": [],
+      "dependencies": [
+        "ocaml@4.8.1000@d41d8cd9", "@opam/yojson@opam:1.7.0@7056d985",
+        "@opam/result@opam:1.5@6b753c82", "@opam/ppxfind@opam:1.4@1e01d2a5",
+        "@opam/ppx_tools@opam:6.0+4.08.0@5f5453f4",
+        "@opam/ppx_deriving@opam:4.4.1@208c6c8f",
+        "@opam/dune@opam:2.5.1@a0c1e658", "@opam/cppo@opam:1.6.6@f4f83858",
+        "@esy-ocaml/substs@0.0.1@d41d8cd9"
+      ],
+      "devDependencies": [
+        "ocaml@4.8.1000@d41d8cd9", "@opam/yojson@opam:1.7.0@7056d985",
+        "@opam/result@opam:1.5@6b753c82",
+        "@opam/ppx_deriving@opam:4.4.1@208c6c8f",
+        "@opam/dune@opam:2.5.1@a0c1e658"
       ]
     },
     "@opam/ppx_deriving@opam:4.4.1@208c6c8f": {

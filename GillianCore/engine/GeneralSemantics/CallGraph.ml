@@ -1,26 +1,21 @@
-module Json = Yojson.Basic
-module Json_utils = Yojson.Basic.Util
-
 module type NodeSig = sig
   type t = private {
     id : string;
     proc_name : string;
     mutable children : string list;
   }
+  [@@deriving yojson { exn = true }]
 
   val make : string -> string -> string list -> t
 
   val add_child : t -> string -> unit
 
   val pp : Format.formatter -> t -> unit
-
-  val to_json : t -> Json.t
-
-  val from_json : Json.t -> t
 end
 
 module Node : NodeSig = struct
   type t = { id : string; proc_name : string; mutable children : string list }
+  [@@deriving yojson { exn = true }]
 
   let make id proc_name children = { id; proc_name; children }
 
@@ -30,22 +25,6 @@ module Node : NodeSig = struct
     let pp_succ fmt = Fmt.pf fmt "    |--> <%s>" in
     let sep = Fmt.any "@\n" in
     Fmt.pf fmt "<%s>@\n%a@\n" node.id (Fmt.list ~sep pp_succ) node.children
-
-  let to_json node =
-    let id_field = ("id", `String node.id) in
-    let pname_field = ("proc_name", `String node.proc_name) in
-    let children_field =
-      ("children", `List (List.map (fun c -> `String c) node.children))
-    in
-    `Assoc [ id_field; pname_field; children_field ]
-
-  let from_json json =
-    let node_obj = Json_utils.to_assoc json in
-    let id = Json_utils.to_string (List.assoc "id" node_obj) in
-    let proc_name = Json_utils.to_string (List.assoc "proc_name" node_obj) in
-    let children_list = Json_utils.to_list (List.assoc "children" node_obj) in
-    let children = List.map Json_utils.to_string children_list in
-    { id; proc_name; children }
 end
 
 type t = { nodes : (string, Node.t) Hashtbl.t }
@@ -111,19 +90,19 @@ let merge_graphs call_graph other_graph =
   in
   call_graph
 
-let to_json call_graph =
+let to_yojson call_graph =
   `List
     (Hashtbl.fold
-       (fun id node acc -> Node.to_json node :: acc)
+       (fun id node acc -> Node.to_yojson node :: acc)
        call_graph.nodes [])
 
-let from_json json =
+let of_yojson_exn json =
   let call_graph = make () in
   let () =
     List.iter
       (fun json ->
-        let node = Node.from_json json in
+        let node = Node.of_yojson_exn json in
         Hashtbl.add call_graph.nodes node.id node)
-      (Json_utils.to_list json)
+      (Yojson.Safe.Util.to_list json)
   in
   call_graph
