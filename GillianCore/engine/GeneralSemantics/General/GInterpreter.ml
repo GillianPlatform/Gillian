@@ -51,6 +51,8 @@ struct
 
   let call_graph = CallGraph.make ()
 
+  let reset () = CallGraph.reset call_graph
+
   (* ******************* *
    * Auxiliary Functions *
    * ******************* *)

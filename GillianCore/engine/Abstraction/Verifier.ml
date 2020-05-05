@@ -34,6 +34,10 @@ struct
 
   let global_results = VerificationResults.make ()
 
+  let reset () =
+    VerificationResults.reset global_results;
+    SAInterpreter.reset ()
+
   let testify
       (preds : (string, Pred.t) Hashtbl.t)
       (name : string)
@@ -492,6 +496,7 @@ struct
 
   let verify_prog (prog : (Annot.t, int) Prog.t) (incremental : bool) : unit =
     let open ResultsDir in
+    let cur_source_paths = ChangeTracker.cur_source_paths in
     if incremental && prev_results_exist then
       (* Only analyse changed procedures *)
       let { sources; call_graph; results } = read_results_dir () in

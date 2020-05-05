@@ -31,6 +31,8 @@ type t = { nodes : (string, Node.t) Hashtbl.t }
 
 let make () = { nodes = Hashtbl.create Config.small_tbl_size }
 
+let reset call_graph = Hashtbl.reset call_graph.nodes
+
 let pp fmt call_graph =
   let node_list =
     Hashtbl.fold (fun _ node acc -> node :: acc) call_graph.nodes []

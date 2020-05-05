@@ -1,5 +1,9 @@
 open Containers
 
+let cur_source_paths = SourcePaths.make ()
+
+let reset () = SourcePaths.reset cur_source_paths
+
 type changed_files = {
   changed : string list;
   created : string list;
@@ -67,7 +71,7 @@ let is_in_graph call_graph proc_name =
 let get_procs_to_verify prog prev_source_paths prev_call_graph =
   (* TODO (Alexis): Procedures from deleted files? *)
   let ({ changed; created; _ } as changed_files) =
-    get_changed_files prev_source_paths ResultsDir.cur_source_paths
+    get_changed_files prev_source_paths cur_source_paths
   in
   (* let () = pp_changed_files Format.std_formatter changed_files in *)
   let changed_files_procs = map_concat (get_procs_with_path prog) changed in

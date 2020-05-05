@@ -226,7 +226,7 @@ let register_source_paths paths =
   List.iter
     (fun path ->
       (* TODO (Alexis): Header files? *)
-      ResultsDir.SourcePaths.add_source_path ResultsDir.cur_source_paths path)
+      SourcePaths.add_source_path ChangeTracker.cur_source_paths path)
     paths
 
 let current_arch =

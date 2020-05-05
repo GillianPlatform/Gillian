@@ -2,6 +2,8 @@ type t = (string * int, bool) Hashtbl.t
 
 let make () : t = Hashtbl.create Config.small_tbl_size
 
+let reset : t -> unit = Hashtbl.reset
+
 let set_result results proc_name spec_id verified =
   Hashtbl.replace results (proc_name, spec_id) verified
 
