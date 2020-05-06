@@ -121,8 +121,6 @@ let get_gil_path c_path =
     Hashtbl.add gil_paths c_path gil_path;
     gil_path
 
-let get_preprocessed_path c_path = Filename.chop_extension c_path ^ ".i"
-
 type err = Errors.errmsg
 
 let pp_err fmt e = Driveraux.print_error fmt e
@@ -181,12 +179,29 @@ let mangle_proc proc mangled_syms =
   in
   mangling_visitor#visit_proc () proc
 
+let parse_dependencies_file deps_file =
+  let file_str = Gillian.Utils.Io_utils.load_file deps_file in
+  let delims = Str.regexp "[ \\( \\\\\\)\n\r\t]+" in
+  let parts = Str.split delims file_str in
+  let header_path = Str.regexp ".*\\.h" in
+  List.filter (fun part -> Str.string_match header_path part 0) parts
+
+let get_included_headers c_path =
+  let deps_path = Filename.chop_extension c_path ^ ".deps" in
+  let prev_options = Preprocessor.get_options () in
+  Preprocessor.set_output_dependencies_opts deps_path;
+  Frontend.preprocess c_path "-";
+  Preprocessor.restore_options prev_options;
+  parse_dependencies_file deps_path
+
 let parse_and_compile_file path exec_mode =
-  let pathi = get_preprocessed_path path in
+  let pathi = Filename.chop_extension path ^ ".i" in
   let () = Frontend.preprocess path pathi in
-  let s = Frontend.parse_c_file path pathi in
-  let s = get_or_print_and_die (SimplExpr.transl_program s) in
-  let last_clight = get_or_print_and_die (SimplLocals.transf_program s) in
+  let header_paths = get_included_headers path in
+  List.iter print_endline header_paths;
+  let c_prog = Frontend.parse_c_file path pathi in
+  let clight = get_or_print_and_die (SimplExpr.transl_program c_prog) in
+  let last_clight = get_or_print_and_die (SimplLocals.transf_program clight) in
   let csm = get_or_print_and_die (Cshmgen.transl_program last_clight) in
   let () =
     if !Config.burn_csm then
