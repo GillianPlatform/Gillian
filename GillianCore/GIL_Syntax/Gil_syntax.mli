@@ -862,6 +862,9 @@ module Prog : sig
   val get_procs : ?proc_names:string list -> ('a, 'b) t -> ('a, 'b) Proc.t list
   (** Get all procedures *)
 
+  val get_noninternal_proc_names : ('a, 'b) t -> string list
+  (** Get names of all procedures not marked as internal *)
+
   val get_proc : ('a, 'b) t -> string -> ('a, 'b) Proc.t option
   (** Get a specific procedure *)
 

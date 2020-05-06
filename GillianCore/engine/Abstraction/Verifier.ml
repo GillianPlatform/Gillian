@@ -485,24 +485,26 @@ struct
         Printf.printf "%s\n" msg;
         L.normal (fun m -> m "%s" msg)
 
-  let get_all_noninternal_procs (prog : (Annot.t, int) Prog.t) : SS.t =
-    let procs =
-      Hashtbl.fold
-        (fun pname (proc : (Annot.t, int) Proc.t) acc ->
-          if not proc.proc_internal then pname :: acc else acc)
-        prog.procs []
-    in
-    SS.of_list procs
+  let prune_call_graph call_graph proc_names =
+    let proc_ids = List.map CallGraph.id_of_proc_name proc_names in
+    List.iter (CallGraph.remove call_graph) proc_ids
+
+  let prune_results results proc_names =
+    List.iter (VerificationResults.remove results) proc_names
 
   let verify_prog (prog : (Annot.t, int) Prog.t) (incremental : bool) : unit =
     let open ResultsDir in
-    let cur_source_paths = ChangeTracker.cur_source_paths in
+    let open ChangeTracker in
     if incremental && prev_results_exist then
       (* Only analyse changed procedures *)
       let { sources; call_graph; results } = read_results_dir () in
-      let to_verify =
-        ChangeTracker.get_procs_to_verify prog sources call_graph
+      let ({ changed_procs; new_procs; deleted_procs; dependents } as changes) =
+        get_changed_procs prog sources call_graph
       in
+      let () = Fmt.pr "%a" ChangeTracker.pp changes in
+      let () = prune_call_graph call_graph deleted_procs in
+      let () = prune_results results deleted_procs in
+      let to_verify = SS.of_list (changed_procs @ new_procs @ dependents) in
       let () = verify_procs prog to_verify ~prev_results:results () in
       let cur_results, cur_call_graph =
         (global_results, SAInterpreter.call_graph)
@@ -512,7 +514,7 @@ struct
       write_results_dir { sources = cur_source_paths; call_graph; results }
     else
       (* Analyse all procedures *)
-      let to_verify = get_all_noninternal_procs prog in
+      let to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
       let () = verify_procs prog to_verify () in
       let results, call_graph = (global_results, SAInterpreter.call_graph) in
       write_results_dir { sources = cur_source_paths; call_graph; results }

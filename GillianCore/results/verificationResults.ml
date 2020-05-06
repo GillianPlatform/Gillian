@@ -7,6 +7,12 @@ let reset : t -> unit = Hashtbl.reset
 let set_result results proc_name spec_id verified =
   Hashtbl.replace results (proc_name, spec_id) verified
 
+let remove results proc_name =
+  Hashtbl.filter_map_inplace
+    (fun (pname, _) verified ->
+      if not (String.equal pname proc_name) then Some verified else None)
+    results
+
 let merge_results results other_results =
   let () =
     Hashtbl.iter

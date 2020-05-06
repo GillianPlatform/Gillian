@@ -65,6 +65,11 @@ let contains call_graph id = Option.is_some (get_node_opt call_graph id)
 
 let get_proc_name call_graph id = (get_node call_graph id).proc_name
 
+let get_proc_names call_graph =
+  Hashtbl.fold
+    (fun id (node : Node.t) acc -> node.proc_name :: acc)
+    call_graph.nodes []
+
 let get_children call_graph id = (get_node call_graph id).children
 
 let remove call_graph id = Hashtbl.remove call_graph.nodes id

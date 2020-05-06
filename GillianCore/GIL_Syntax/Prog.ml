@@ -102,6 +102,12 @@ let get_procs ?(proc_names : string list option) (prog : ('a, 'b) t) :
   in
   List.map (fun proc_name -> Hashtbl.find prog.procs proc_name) proc_names
 
+let get_noninternal_proc_names (prog : ('a, 'b) t) : string list =
+  Hashtbl.fold
+    (fun pname (proc : ('a, 'b) Proc.t) acc ->
+      if not proc.proc_internal then pname :: acc else acc)
+    prog.procs []
+
 let get_proc (prog : ('a, 'b) t) (proc_name : string) : ('a, 'b) Proc.t option =
   Hashtbl.find_opt prog.procs proc_name
 
