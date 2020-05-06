@@ -511,13 +511,13 @@ struct
       in
       let call_graph = CallGraph.merge_graphs call_graph cur_call_graph in
       let results = VerificationResults.merge_results results cur_results in
-      write_results_dir { sources = cur_source_paths; call_graph; results }
+      write_results_dir { sources = cur_source_files; call_graph; results }
     else
       (* Analyse all procedures *)
       let to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
       let () = verify_procs prog to_verify () in
       let results, call_graph = (global_results, SAInterpreter.call_graph) in
-      write_results_dir { sources = cur_source_paths; call_graph; results }
+      write_results_dir { sources = cur_source_files; call_graph; results }
 end
 
 module From_scratch (SMemory : SMemory.S) (External : External.S) = struct

@@ -1,8 +1,8 @@
 open Containers
 
-let cur_source_paths = SourcePaths.make ()
+let cur_source_files = SourceFiles.make ()
 
-let reset () = SourcePaths.reset cur_source_paths
+let reset () = SourceFiles.reset cur_source_files
 
 type t = {
   changed_procs : string list;
@@ -30,21 +30,25 @@ let to_key_set (table : (string, 'b) Hashtbl.t) : SS.t =
 let to_list (set : SS.t) : string list =
   SS.fold (fun elem acc -> elem :: acc) set []
 
-let get_changed_files prev_paths new_paths =
+let get_changed_files prev_files new_files =
   let rec get_changed paths changed =
     match paths with
     | []           -> changed
     | path :: rest ->
         (* Check if file contents have changed *)
-        let prev_hash = Hashtbl.find prev_paths path in
-        let new_hash = Hashtbl.find new_paths path in
+        let prev_hash = SourceFiles.get_contents_hash prev_files path in
+        let new_hash = SourceFiles.get_contents_hash new_files path in
+        let contents_changed = not (String.equal prev_hash new_hash) in
+        let dependents = SourceFiles.get_dependents new_files path in
         let changed =
-          if String.equal prev_hash new_hash then changed else path :: changed
+          if List.length dependents = 0 && contents_changed then path :: changed
+          else if contents_changed then dependents @ changed
+          else changed
         in
         get_changed rest changed
   in
-  let prev_paths = to_key_set prev_paths in
-  let new_paths = to_key_set new_paths in
+  let prev_paths = to_key_set prev_files in
+  let new_paths = to_key_set new_files in
   let created = to_list (SS.diff new_paths prev_paths) in
   let existing = to_list (SS.inter prev_paths new_paths) in
   let changed = get_changed existing [] in
@@ -71,8 +75,8 @@ let get_proc_callers reverse_graph proc_name =
 let is_in_graph call_graph proc_name =
   CallGraph.contains call_graph (CallGraph.id_of_proc_name proc_name)
 
-let get_changed_procs prog prev_source_paths prev_call_graph =
-  let changed, created = get_changed_files prev_source_paths cur_source_paths in
+let get_changed_procs prog prev_source_files prev_call_graph =
+  let changed, created = get_changed_files prev_source_files cur_source_files in
   let changed_files_procs = map_concat (get_procs_with_path prog) changed in
   let new_files_procs = map_concat (get_procs_with_path prog) created in
   (* Distinguish between new procedures and those that existed before *)

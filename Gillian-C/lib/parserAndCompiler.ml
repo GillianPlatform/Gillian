@@ -112,14 +112,9 @@ end
 
 let compiled_progs = Hashtbl.create small_tbl_size
 
-let gil_paths = Hashtbl.create small_tbl_size
+let get_gil_path c_path = Filename.chop_extension c_path ^ ".gil"
 
-let get_gil_path c_path =
-  if Hashtbl.mem gil_paths c_path then Hashtbl.find gil_paths c_path
-  else
-    let gil_path = Filename.chop_extension c_path ^ ".gil" in
-    Hashtbl.add gil_paths c_path gil_path;
-    gil_path
+let get_deps_path c_path = Filename.chop_extension c_path ^ ".deps"
 
 type err = Errors.errmsg
 
@@ -179,26 +174,16 @@ let mangle_proc proc mangled_syms =
   in
   mangling_visitor#visit_proc () proc
 
-let parse_dependencies_file deps_file =
-  let file_str = Gillian.Utils.Io_utils.load_file deps_file in
-  let delims = Str.regexp "[ \\( \\\\\\)\n\r\t]+" in
-  let parts = Str.split delims file_str in
-  let header_path = Str.regexp ".*\\.h" in
-  List.filter (fun part -> Str.string_match header_path part 0) parts
-
-let get_included_headers c_path =
-  let deps_path = Filename.chop_extension c_path ^ ".deps" in
+let write_dependencies_file c_path =
   let prev_options = Preprocessor.get_options () in
-  Preprocessor.set_output_dependencies_opts deps_path;
+  Preprocessor.set_output_dependencies_opts (get_deps_path c_path);
   Frontend.preprocess c_path "-";
-  Preprocessor.restore_options prev_options;
-  parse_dependencies_file deps_path
+  Preprocessor.restore_options prev_options
 
 let parse_and_compile_file path exec_mode =
   let pathi = Filename.chop_extension path ^ ".i" in
   let () = Frontend.preprocess path pathi in
-  let header_paths = get_included_headers path in
-  List.iter print_endline header_paths;
+  let () = write_dependencies_file path in
   let c_prog = Frontend.parse_c_file path pathi in
   let clight = get_or_print_and_die (SimplExpr.transl_program c_prog) in
   let last_clight = get_or_print_and_die (SimplLocals.transf_program clight) in
@@ -236,12 +221,23 @@ let linker_error msg symbols =
   in
   raise Linker_error
 
-let register_source_paths paths =
+let parse_dependencies_file deps_file =
+  let file_str = Gillian.Utils.Io_utils.load_file deps_file in
+  let delims = Str.regexp "[ \\( \\\\\\)\n\r\t]+" in
+  let parts = Str.split delims file_str in
+  let header_path = Str.regexp ".*\\.h" in
+  List.filter (fun part -> Str.string_match header_path part 0) parts
+
+let register_source_files paths =
   let open Results in
   List.iter
     (fun path ->
-      (* TODO (Alexis): Header files? *)
-      SourcePaths.add_source_path ChangeTracker.cur_source_paths path)
+      let headers = parse_dependencies_file (get_deps_path path) in
+      SourceFiles.add_source_file ChangeTracker.cur_source_files path;
+      List.iter
+        (fun header ->
+          SourceFiles.add_dependency ChangeTracker.cur_source_files header path)
+        headers)
     paths
 
 let current_arch =
@@ -291,7 +287,7 @@ let parse_and_compile_files paths =
     if (not (Symbol_set.is_empty unresolved_syms)) && not hide_undef then
       linker_error "undefined reference to" unresolved_syms
   in
-  let () = register_source_paths paths in
+  let () = register_source_files paths in
 
   (* Create main GIL program with references to all other files *)
   let open Gillian.Gil_syntax in

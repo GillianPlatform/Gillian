@@ -18,7 +18,7 @@ let delete_results_dir () = Io_utils.rm_rf results_dir
 let create_results_dir () = Io_utils.safe_mkdir results_dir
 
 type t = {
-  sources : SourcePaths.t;
+  sources : SourceFiles.t;
   call_graph : CallGraph.t;
   results : VerificationResults.t;
 }
@@ -29,7 +29,7 @@ let read_results_dir () =
     Yojson.Safe.from_file json_path
   in
   {
-    sources = SourcePaths.of_yojson_exn (read_json Filenames.sources);
+    sources = SourceFiles.of_yojson_exn (read_json Filenames.sources);
     call_graph = CallGraph.of_yojson_exn (read_json Filenames.call_graph);
     results =
       VerificationResults.of_yojson_exn (read_json Filenames.verif_results);
@@ -44,6 +44,6 @@ let write_results_dir { sources; call_graph; results } =
   in
   delete_results_dir ();
   create_results_dir ();
-  write_json (SourcePaths.to_yojson sources) Filenames.sources;
+  write_json (SourceFiles.to_yojson sources) Filenames.sources;
   write_json (CallGraph.to_yojson call_graph) Filenames.call_graph;
   write_json (VerificationResults.to_yojson results) Filenames.verif_results
