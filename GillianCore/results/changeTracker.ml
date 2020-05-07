@@ -21,7 +21,7 @@ let pp fmt changes =
   Fmt.pf fmt "%a%a%a%a" (pp_procs "Changed procs") changes.changed_procs
     (pp_procs "New procs") changes.new_procs (pp_procs "Deleted procs")
     changes.deleted_procs
-    (pp_procs "Transitive dependents of changed procs")
+    (pp_procs "Transitive dependents")
     changes.dependents
 
 let to_key_set (table : (string, 'b) Hashtbl.t) : SS.t =

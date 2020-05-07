@@ -501,7 +501,6 @@ struct
       let ({ changed_procs; new_procs; deleted_procs; dependents } as changes) =
         get_changed_procs prog sources call_graph
       in
-      let () = Fmt.pr "%a" ChangeTracker.pp changes in
       let () = prune_call_graph call_graph deleted_procs in
       let () = prune_results results deleted_procs in
       let to_verify = SS.of_list (changed_procs @ new_procs @ dependents) in
@@ -511,13 +510,16 @@ struct
       in
       let call_graph = CallGraph.merge_graphs call_graph cur_call_graph in
       let results = VerificationResults.merge_results results cur_results in
-      write_results_dir { sources = cur_source_files; call_graph; results }
+      let diff = Fmt.str "%a" ChangeTracker.pp changes in
+      write_results_dir
+        { sources = cur_source_files; call_graph; results; diff }
     else
       (* Analyse all procedures *)
       let to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
       let () = verify_procs prog to_verify () in
       let results, call_graph = (global_results, SAInterpreter.call_graph) in
-      write_results_dir { sources = cur_source_files; call_graph; results }
+      write_results_dir
+        { sources = cur_source_files; call_graph; results; diff = "" }
 end
 
 module From_scratch (SMemory : SMemory.S) (External : External.S) = struct
