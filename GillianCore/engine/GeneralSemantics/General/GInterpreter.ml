@@ -370,9 +370,7 @@ struct
       let caller = CallStack.get_cur_proc_id cs in
       let () =
         if not (is_internal_proc prog caller || is_internal_proc prog pid) then
-          let caller_id = CallGraph.id_of_proc_name caller in
-          let callee_id = CallGraph.id_of_proc_name pid in
-          CallGraph.add_edge call_graph caller_id caller callee_id pid
+          CallGraph.add_proc_call call_graph caller pid
       in
       let prmlen = List.length params in
 

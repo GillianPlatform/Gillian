@@ -54,26 +54,23 @@ let get_changed_files prev_files new_files =
   let changed = get_changed existing [] in
   (changed, created)
 
-let get_procs_with_path prog path =
+let get_procs_with_path (prog : ('a, 'b) Prog.t) path =
   let string_opt_equal string str_opt =
     match str_opt with
     | Some str -> String.equal string str
     | None     -> false
   in
   Hashtbl.fold
-    (fun pname (proc : (Annot.t, int) Proc.t) acc ->
+    (fun pname (proc : ('a, 'b) Proc.t) acc ->
       if string_opt_equal path proc.proc_source_path then pname :: acc else acc)
-    prog.Prog.procs []
+    prog.procs []
 
 let map_concat f list = List.concat (List.map f list)
 
 let get_proc_callers reverse_graph proc_name =
   let proc_id = CallGraph.id_of_proc_name proc_name in
   let caller_ids = CallGraph.get_children reverse_graph proc_id in
-  List.map (CallGraph.get_proc_name reverse_graph) caller_ids
-
-let is_in_graph call_graph proc_name =
-  CallGraph.contains call_graph (CallGraph.id_of_proc_name proc_name)
+  List.map (CallGraph.get_name reverse_graph) caller_ids
 
 let get_changed_procs prog prev_source_files prev_call_graph =
   let changed, created = get_changed_files prev_source_files cur_source_files in
@@ -81,10 +78,10 @@ let get_changed_procs prog prev_source_files prev_call_graph =
   let new_files_procs = map_concat (get_procs_with_path prog) created in
   (* Distinguish between new procedures and those that existed before *)
   let changed_procs, new_procs =
-    List.partition (is_in_graph prev_call_graph) changed_files_procs
+    List.partition (CallGraph.contains_proc prev_call_graph) changed_files_procs
   in
   let other_changed_procs, other_new_procs =
-    List.partition (is_in_graph prev_call_graph) new_files_procs
+    List.partition (CallGraph.contains_proc prev_call_graph) new_files_procs
   in
   let changed_procs = changed_procs @ other_changed_procs in
   let new_procs = new_procs @ other_new_procs in

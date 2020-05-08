@@ -419,27 +419,26 @@ struct
     in
     List.map get_preds_in_asrt all_asrts |> List.concat |> SS.of_list
 
-  let get_preds_used_by_proc pname (prog : UP.prog) =
+  let record_preds_used_by_proc pname (prog : UP.prog) =
     let spec_preds = get_preds_in_spec (Hashtbl.find prog.specs pname).spec in
-    Printf.printf "Preds in spec of %s:\n" pname;
-    SS.iter print_endline spec_preds;
     let proc =
       match Prog.get_proc prog.prog pname with
       | Some proc -> proc
       | None      -> failwith (Printf.sprintf "could not find proc %s" pname)
     in
     let body_preds = get_preds_in_body proc.proc_body in
-    Printf.printf "Preds in body of %s:\n" pname;
-    SS.iter print_endline body_preds
+    let all_preds_used = SS.union spec_preds body_preds in
+    SS.iter
+      (CallGraph.add_proc_pred_use SAInterpreter.call_graph pname)
+      all_preds_used
 
-  let get_preds_used_by_pred pred_name (pred : Pred.t) =
+  let record_preds_used_by_pred pred_name (pred : Pred.t) =
     (* TODO (Alexis): Should this be done before or after logic preprocessing? *)
     let preds =
       List.map (fun (_, asrt) -> get_preds_in_asrt asrt) pred.pred_definitions
       |> List.concat |> SS.of_list
     in
-    Printf.printf "Preds used by pred %s:\n" pred_name;
-    SS.iter print_endline preds
+    SS.iter (CallGraph.add_pred_call SAInterpreter.call_graph pred_name) preds
 
   let check_previously_verified prev_results cur_verified =
     match prev_results with
@@ -524,6 +523,11 @@ struct
     match UP.init_prog prog with
     | Error _  -> raise (Failure "Creation of unification plans failed.")
     | Ok prog' ->
+        List.iter (fun test -> record_preds_used_by_proc test.name prog') tests;
+        Hashtbl.iter
+          (fun pred_name (pred : UP.pred) ->
+            record_preds_used_by_pred pred_name pred.pred)
+          prog'.preds;
         (* STEP 5: Run the symbolic tests *)
         let cur_time = Sys.time () in
         Printf.printf "Running symbolic tests: %f\n" (cur_time -. start_time);
@@ -532,11 +536,6 @@ struct
             (fun ac test -> if verify prog' test then ac else false)
             true (tests' @ tests)
         in
-        List.iter (fun test -> get_preds_used_by_proc test.name prog') tests;
-        Hashtbl.iter
-          (fun pred_name (pred : UP.pred) ->
-            get_preds_used_by_pred pred_name pred.pred)
-          prog'.preds;
         let end_time = Sys.time () in
         let success =
           success && check_previously_verified prev_results procs_to_verify
