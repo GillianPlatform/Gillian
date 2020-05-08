@@ -134,7 +134,7 @@ struct
   let is_internal_proc (prog : UP.prog) proc_name =
     match Prog.get_proc prog.prog proc_name with
     | Some proc -> proc.proc_internal
-    | None      -> false
+    | None      -> failwith (Printf.sprintf "could not find proc %s" proc_name)
 
   (* ************** *
    * Main Functions *

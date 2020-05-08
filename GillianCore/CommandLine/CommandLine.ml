@@ -416,6 +416,7 @@ struct
             m "@\nProgram after logic preprocessing:@\n%a@\n" Prog.pp_indexed
               prog)
       in
+      let () = L.end_phase Preprocessing in
       L.normal_phase Verification;
       Verification.verify_prog prog incremental;
       L.end_phase Verification

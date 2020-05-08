@@ -381,6 +381,66 @@ struct
             let rets = SAInterpreter.evaluate_lcmds prog proof state' in
             analyse_lemma_results test rets )
 
+  let rec get_preds_in_asrt (asrt : Asrt.t) =
+    match asrt with
+    | Pred (name, _)     -> [ name ]
+    | Star (left, right) -> get_preds_in_asrt left @ get_preds_in_asrt right
+    | _                  -> []
+
+  let get_preds_in_slcmd (slcmd : SLCmd.t) =
+    match slcmd with
+    | SepAssert (asrt, _)    -> get_preds_in_asrt asrt
+    | Invariant (asrt, _)    -> get_preds_in_asrt asrt
+    | Fold (pred, _, _)      -> [ pred ]
+    | Unfold (pred, _, _, _) -> [ pred ]
+    | GUnfold pred           -> [ pred ]
+    | _                      -> []
+
+  let get_preds_in_lcmd (lcmd : LCmd.t) =
+    match lcmd with
+    | SL slcmd -> get_preds_in_slcmd slcmd
+    | _        -> []
+
+  let get_preds_in_cmd (cmd : int Cmd.t) =
+    match cmd with
+    | Logic lcmd -> get_preds_in_lcmd lcmd
+    | _          -> []
+
+  let get_preds_in_body (body : (Annot.t * int option * int Cmd.t) array) =
+    let get_preds (_, _, cmd) = get_preds_in_cmd cmd in
+    Array.map get_preds body |> Array.to_list |> List.concat |> SS.of_list
+
+  let get_preds_in_spec (spec : Spec.t) =
+    let all_asrts =
+      List.fold_left
+        (fun acc (single_spec : Spec.st) ->
+          (single_spec.ss_pre :: single_spec.ss_posts) @ acc)
+        [] spec.spec_sspecs
+    in
+    List.map get_preds_in_asrt all_asrts |> List.concat |> SS.of_list
+
+  let get_preds_used_by_proc pname (prog : UP.prog) =
+    let spec_preds = get_preds_in_spec (Hashtbl.find prog.specs pname).spec in
+    Printf.printf "Preds in spec of %s:\n" pname;
+    SS.iter print_endline spec_preds;
+    let proc =
+      match Prog.get_proc prog.prog pname with
+      | Some proc -> proc
+      | None      -> failwith (Printf.sprintf "could not find proc %s" pname)
+    in
+    let body_preds = get_preds_in_body proc.proc_body in
+    Printf.printf "Preds in body of %s:\n" pname;
+    SS.iter print_endline body_preds
+
+  let get_preds_used_by_pred pred_name (pred : Pred.t) =
+    (* TODO (Alexis): Should this be done before or after logic preprocessing? *)
+    let preds =
+      List.map (fun (_, asrt) -> get_preds_in_asrt asrt) pred.pred_definitions
+      |> List.concat |> SS.of_list
+    in
+    Printf.printf "Preds used by pred %s:\n" pred_name;
+    SS.iter print_endline preds
+
   let check_previously_verified prev_results cur_verified =
     match prev_results with
     | None         -> true
@@ -472,6 +532,11 @@ struct
             (fun ac test -> if verify prog' test then ac else false)
             true (tests' @ tests)
         in
+        List.iter (fun test -> get_preds_used_by_proc test.name prog') tests;
+        Hashtbl.iter
+          (fun pred_name (pred : UP.pred) ->
+            get_preds_used_by_pred pred_name pred.pred)
+          prog'.preds;
         let end_time = Sys.time () in
         let success =
           success && check_previously_verified prev_results procs_to_verify
