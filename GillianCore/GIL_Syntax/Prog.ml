@@ -102,6 +102,9 @@ let get_procs ?(proc_names : string list option) (prog : ('a, 'b) t) :
   in
   List.map (fun proc_name -> Hashtbl.find prog.procs proc_name) proc_names
 
+let get_bispecs (prog : ('a, 'b) t) : BiSpec.t list =
+  Hashtbl.fold (fun _ bi_spec ac -> bi_spec :: ac) prog.bi_specs []
+
 let get_noninternal_proc_names (prog : ('a, 'b) t) : string list =
   Hashtbl.fold
     (fun pname (proc : ('a, 'b) Proc.t) acc ->
@@ -111,8 +114,18 @@ let get_noninternal_proc_names (prog : ('a, 'b) t) : string list =
 let get_proc (prog : ('a, 'b) t) (proc_name : string) : ('a, 'b) Proc.t option =
   Hashtbl.find_opt prog.procs proc_name
 
-let get_bispecs (prog : ('a, 'b) t) : BiSpec.t list =
-  Hashtbl.fold (fun _ bi_spec ac -> bi_spec :: ac) prog.bi_specs []
+let get_proc_exn (prog : ('a, 'b) t) (proc_name : string) : ('a, 'b) Proc.t =
+  match get_proc prog proc_name with
+  | Some proc -> proc
+  | None      -> failwith (Printf.sprintf "could not find proc %s" proc_name)
+
+let get_pred (prog : ('a, 'b) t) (pred_name : string) : Pred.t option =
+  Hashtbl.find_opt prog.preds pred_name
+
+let get_pred_exn (prog : ('a, 'b) t) (pred_name : string) : Pred.t =
+  match get_pred prog pred_name with
+  | Some pred -> pred
+  | None      -> failwith (Printf.sprintf "could not find pred %s" pred_name)
 
 let pp ~(show_labels : bool) ~(pp_label : 'b Fmt.t) fmt (prog : ('a, 'b) t) =
   let pp_list ppp = Fmt.list ~sep:(Fmt.any "@\n") ppp in

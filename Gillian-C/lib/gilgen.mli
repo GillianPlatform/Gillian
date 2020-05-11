@@ -32,7 +32,7 @@ val trans_program_with_annots :
   ExecMode.t ->
   Clight.program ->
   Csharpminor.program ->
-  string ->
-  (string, string) Hashtbl.t ->
+  filepath:string ->
+  mangled_syms:(string, string) Hashtbl.t ->
   CLogic.CProg.t ->
   (Annot.t, string) Prog.t * compilation_data

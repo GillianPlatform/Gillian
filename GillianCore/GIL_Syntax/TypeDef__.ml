@@ -186,6 +186,8 @@ and flag = Normal | Error
 
 and pred = {
   pred_name : string;
+  pred_source_path : string option;
+  pred_internal : bool;
   pred_num_params : int;
   pred_params : (string * typ option) list;
   pred_ins : int list;

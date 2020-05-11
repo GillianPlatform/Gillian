@@ -2,6 +2,8 @@ open Containers
 
 type t = TypeDef__.pred = {
   pred_name : string;  (** Name of the predicate  *)
+  pred_source_path : string option;
+  pred_internal : bool;
   pred_num_params : int;  (** Number of parameters   *)
   pred_params : (string * Type.t option) list;  (** Actual parameters      *)
   pred_ins : int list;  (** Ins                    *)
@@ -86,8 +88,17 @@ let pp fmt pred =
   let pp_def fmt' (id_exs, asser) =
     Fmt.pf fmt' "%a%a" (Fmt.option pp_id_exs) id_exs Asrt.pp asser
   in
-  Fmt.pf fmt "@[<hov 2>@[<h>pred %s(%a) :@]@\n%a;@]@\n" pred.pred_name pp_params
-    pred.pred_params
+  let pp_path_opt fmt = function
+    | None   -> Fmt.pf fmt "@nopath@\n"
+    | Some _ -> ()
+  in
+  let pp_internal fmt = function
+    | true  -> Fmt.pf fmt "@internal@\n"
+    | false -> ()
+  in
+  Fmt.pf fmt "%a%a@[<hov 2>@[<h>pred %s(%a) :@]@\n%a;@]@\n" pp_path_opt
+    pred.pred_source_path pp_internal pred.pred_internal pred.pred_name
+    pp_params pred.pred_params
     Fmt.(list ~sep:(any ",@\n") (hovbox ~indent:2 pp_def))
     pred.pred_definitions
 

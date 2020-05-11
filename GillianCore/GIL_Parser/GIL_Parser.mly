@@ -471,9 +471,9 @@ gdeclaration_target:
 
 (* [spec;] proc xpto (x, y) { cmd_list }; *)
 gproc_target:
-  proc_spec = option(g_spec_target);
   no_path = option(NO_PATH);
   internal = option(INTERNAL);
+  proc_spec = option(g_spec_target);
   proc_head = proc_head_target;
   CLBRACKET;
   cmd_list = gcmd_list_target;
@@ -483,9 +483,9 @@ gproc_target:
       let proc_name, proc_params = proc_head in
       let () =
         if Option.is_some no_path then
-        procs_with_no_paths := SS.add proc_name !procs_with_no_paths
+          procs_with_no_paths := SS.add proc_name !procs_with_no_paths
       in
-      let gproc : (Annot.t, string) Proc.t =
+      Proc.
         {
           proc_name;
           proc_source_path = None;
@@ -494,8 +494,6 @@ gproc_target:
           proc_params;
           proc_spec;
         }
-      in
-      gproc
     }
 ;
 
@@ -724,25 +722,36 @@ g_logic_cmd_target:
      { Branch fo }
 ;
 
-
 (* pred name (arg1, ..., argn) : def1, ..., defn ; *)
 g_pred_target:
-  p = option(PURE); PRED; pred_head = pred_head_target; COLON;
-  pred_definitions = separated_nonempty_list(COMMA, g_named_assertion_target); SCOLON
+  no_path = option(NO_PATH);
+  internal = option(INTERNAL);
+  pure = option(PURE);
+  PRED;
+  pred_head = pred_head_target;
+  COLON;
+  pred_definitions = separated_nonempty_list(COMMA, g_named_assertion_target);
+  SCOLON
   {
-    let pred_pure = match p with | Some _ -> true | None -> false in
+    let pred_pure = Option.is_some pure in
     let (pred_name, pred_num_params, pred_params, pred_ins) = pred_head in
+    let () =
+      if Option.is_some no_path then
+        preds_with_no_paths := SS.add pred_name !preds_with_no_paths
+    in
     let pred_normalised = !Config.previously_normalised in
-    let pred : Pred.t = {
-      pred_name;
-      pred_num_params;
-      pred_params;
-      pred_ins;
-      pred_definitions;
-      pred_pure;
-      pred_normalised
-    } in
-    pred
+    Pred.
+      {
+        pred_name;
+        pred_source_path = None;
+        pred_internal = Option.is_some internal;
+        pred_num_params;
+        pred_params;
+        pred_ins;
+        pred_definitions;
+        pred_pure;
+        pred_normalised;
+      }
   }
 ;
 

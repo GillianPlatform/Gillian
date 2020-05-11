@@ -60,8 +60,8 @@ let pp ~(show_labels : bool) ~(pp_label : 'a Fmt.t) fmt labproc =
     | true  -> Fmt.pf fmt "@internal@\n"
     | false -> ()
   in
-  Fmt.pf fmt "@[%a%a%a@[<v 2>proc %s(%a) {@\n%a@]@\n};@\n@]" pp_spec_opt spec
-    pp_path_opt path pp_internal internal name
+  Fmt.pf fmt "@[%a%a%a@[<v 2>proc %s(%a) {@\n%a@]@\n};@\n@]" pp_path_opt path
+    pp_internal internal pp_spec_opt spec name
     (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
     params
     (Fmt.array ~sep:(Fmt.any ";@\n") pp_cmd_triple)

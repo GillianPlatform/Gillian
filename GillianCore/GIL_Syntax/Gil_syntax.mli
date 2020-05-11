@@ -556,6 +556,8 @@ module Pred : sig
   (** {b GIL Predicates} *)
   type t = {
     pred_name : string;  (** Name of the predicate *)
+    pred_source_path : string option;
+    pred_internal : bool;
     pred_num_params : int;  (** Number of parameters *)
     pred_params : (string * Type.t option) list;
         (** Parameter names and (optional) types *)
@@ -862,14 +864,23 @@ module Prog : sig
   val get_procs : ?proc_names:string list -> ('a, 'b) t -> ('a, 'b) Proc.t list
   (** Get all procedures *)
 
+  val get_bispecs : ('a, 'b) t -> BiSpec.t list
+  (** Get all bi-abductive specs *)
+
   val get_noninternal_proc_names : ('a, 'b) t -> string list
   (** Get names of all procedures not marked as internal *)
 
   val get_proc : ('a, 'b) t -> string -> ('a, 'b) Proc.t option
   (** Get a specific procedure *)
 
-  val get_bispecs : ('a, 'b) t -> BiSpec.t list
-  (** Get all bi-abductive specs *)
+  val get_proc_exn : ('a, 'b) t -> string -> ('a, 'b) Proc.t
+  (** Get a specific procedure *)
+
+  val get_pred : ('a, 'b) t -> string -> Pred.t option
+  (** Get a specific procedure *)
+
+  val get_pred_exn : ('a, 'b) t -> string -> Pred.t
+  (** Get a specific procedure *)
 
   val get_bispec : ('a, 'b) t -> string -> BiSpec.t option
   (** Get a specific bi-abductive spec *)

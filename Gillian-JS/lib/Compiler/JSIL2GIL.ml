@@ -107,6 +107,9 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
 let jsil2gil_pred (pred : Pred.t) : GPred.t =
   {
     pred_name = pred.name;
+    pred_source_path = None;
+    pred_internal = false;
+    (* TODO (Alexis): Set depending on module of pred *)
     pred_num_params = pred.num_params;
     pred_params = pred.params;
     pred_ins = pred.ins;

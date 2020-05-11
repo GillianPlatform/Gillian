@@ -387,6 +387,15 @@ struct
     | Star (left, right) -> get_preds_in_asrt left @ get_preds_in_asrt right
     | _                  -> []
 
+  let get_preds_in_spec (spec : Spec.t) =
+    let all_asrts =
+      List.fold_left
+        (fun acc (single_spec : Spec.st) ->
+          (single_spec.ss_pre :: single_spec.ss_posts) @ acc)
+        [] spec.spec_sspecs
+    in
+    List.map get_preds_in_asrt all_asrts |> List.concat |> SS.of_list
+
   let get_preds_in_slcmd (slcmd : SLCmd.t) =
     match slcmd with
     | SepAssert (asrt, _)    -> get_preds_in_asrt asrt
@@ -410,35 +419,33 @@ struct
     let get_preds (_, _, cmd) = get_preds_in_cmd cmd in
     Array.map get_preds body |> Array.to_list |> List.concat |> SS.of_list
 
-  let get_preds_in_spec (spec : Spec.t) =
-    let all_asrts =
-      List.fold_left
-        (fun acc (single_spec : Spec.st) ->
-          (single_spec.ss_pre :: single_spec.ss_posts) @ acc)
-        [] spec.spec_sspecs
-    in
-    List.map get_preds_in_asrt all_asrts |> List.concat |> SS.of_list
+  let filter_internal_preds (prog : UP.prog) (pred_names : SS.t) =
+    SS.filter
+      (fun pred_name ->
+        let pred = Prog.get_pred_exn prog.prog pred_name in
+        not pred.pred_internal)
+      pred_names
 
-  let record_preds_used_by_proc pname (prog : UP.prog) =
-    let spec_preds = get_preds_in_spec (Hashtbl.find prog.specs pname).spec in
-    let proc =
-      match Prog.get_proc prog.prog pname with
-      | Some proc -> proc
-      | None      -> failwith (Printf.sprintf "could not find proc %s" pname)
-    in
+  let record_preds_used_by_proc proc_name (prog : UP.prog) =
+    let proc = Prog.get_proc_exn prog.prog proc_name in
+    let spec_preds = get_preds_in_spec (Option.get proc.proc_spec) in
     let body_preds = get_preds_in_body proc.proc_body in
-    let all_preds_used = SS.union spec_preds body_preds in
+    let all_preds_used =
+      filter_internal_preds prog (SS.union spec_preds body_preds)
+    in
     SS.iter
-      (CallGraph.add_proc_pred_use SAInterpreter.call_graph pname)
+      (CallGraph.add_proc_pred_use SAInterpreter.call_graph proc_name)
       all_preds_used
 
-  let record_preds_used_by_pred pred_name (pred : Pred.t) =
-    (* TODO (Alexis): Should this be done before or after logic preprocessing? *)
-    let preds =
+  let record_preds_used_by_pred pred_name (prog : UP.prog) =
+    let pred = Prog.get_pred_exn prog.prog pred_name in
+    let preds_used =
       List.map (fun (_, asrt) -> get_preds_in_asrt asrt) pred.pred_definitions
-      |> List.concat |> SS.of_list
+      |> List.concat |> SS.of_list |> filter_internal_preds prog
     in
-    SS.iter (CallGraph.add_pred_call SAInterpreter.call_graph pred_name) preds
+    SS.iter
+      (CallGraph.add_pred_call SAInterpreter.call_graph pred_name)
+      preds_used
 
   let check_previously_verified prev_results cur_verified =
     match prev_results with
@@ -525,8 +532,7 @@ struct
     | Ok prog' ->
         List.iter (fun test -> record_preds_used_by_proc test.name prog') tests;
         Hashtbl.iter
-          (fun pred_name (pred : UP.pred) ->
-            record_preds_used_by_pred pred_name pred.pred)
+          (fun pred_name _ -> record_preds_used_by_pred pred_name prog')
           prog'.preds;
         (* STEP 5: Run the symbolic tests *)
         let cur_time = Sys.time () in
@@ -563,7 +569,7 @@ struct
       (* Only analyse changed procedures *)
       let { sources; call_graph; results } = read_results_dir () in
       let ({ changed_procs; new_procs; deleted_procs; dependents } as changes) =
-        get_changed_procs prog sources call_graph
+        get_changes prog sources call_graph
       in
       let () = prune_call_graph call_graph deleted_procs in
       let () = prune_results results deleted_procs in

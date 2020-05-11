@@ -47,9 +47,8 @@ let parse_eprog_from_string : string -> (Annot.t, string) Prog.t =
 let parse_expr_from_string : string -> Expr.t =
   parse_from_string GIL_Parser.top_level_expr_target
 
-let trans_procs procs path =
+let trans_procs procs path internal_file =
   let procs' = Hashtbl.create Config.small_tbl_size in
-  let internal_file = !Parser_state.internal_file in
   let () =
     Hashtbl.iter
       (fun pname (proc : (Annot.t, string) Proc.t) ->
@@ -62,6 +61,22 @@ let trans_procs procs path =
       procs
   in
   procs'
+
+let trans_preds preds path internal_file =
+  let preds' = Hashtbl.create Config.small_tbl_size in
+  let internal_file = !Parser_state.internal_file in
+  let () =
+    Hashtbl.iter
+      (fun pname (pred : Pred.t) ->
+        let pred_source_path =
+          if SS.mem pname !Parser_state.preds_with_no_paths then None
+          else Some path
+        in
+        let pred_internal = pred.pred_internal || internal_file in
+        Hashtbl.add preds' pname { pred with pred_source_path; pred_internal })
+      preds
+  in
+  preds'
 
 let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
   let extension = List.hd (List.rev (Str.split (Str.regexp "\\.") path)) in
@@ -80,9 +95,11 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
   lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = path };
   let prog = parse GIL_Parser.gmain_target lexbuf in
   close_in inx;
-  let procs = trans_procs prog.procs path in
+  let internal_file = !Parser_state.internal_file in
+  let procs = trans_procs prog.procs path internal_file in
+  let preds = trans_preds prog.preds path internal_file in
   Parser_state.reset ();
-  { prog with procs }
+  { prog with procs; preds }
 
 let cached_progs = Hashtbl.create Config.small_tbl_size
 

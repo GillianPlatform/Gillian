@@ -216,6 +216,8 @@ let gen_pred_of_struct cenv ann struct_name =
     Pred.
       {
         pred_name;
+        pred_source_path = None;
+        pred_internal = true;
         pred_ins;
         pred_num_params;
         pred_params;
@@ -497,7 +499,7 @@ let trans_asrt_annot da =
   let a = fold_star typsb in
   (a, (label, exs))
 
-let trans_pred ?(ann = empty) cl_pred =
+let trans_pred ?(ann = empty) ~filepath cl_pred =
   let CPred.
         { name = pred_name; params = pred_params; definitions; ins = pred_ins }
       =
@@ -517,6 +519,8 @@ let trans_pred ?(ann = empty) cl_pred =
   Pred.
     {
       pred_name;
+      pred_source_path = Some filepath;
+      pred_internal = false;
       pred_num_params;
       pred_params;
       pred_ins;
@@ -525,8 +529,8 @@ let trans_pred ?(ann = empty) cl_pred =
       pred_normalised = false;
     }
 
-let add_trans_pred ann cl_pred =
-  { ann with preds = trans_pred ~ann cl_pred :: ann.preds }
+let add_trans_pred filepath ann cl_pred =
+  { ann with preds = trans_pred ~filepath ~ann cl_pred :: ann.preds }
 
 let trans_sspec ?(ann = empty) fname sspecs =
   let CSpec.{ pre; posts; spec_annot } = sspecs in
@@ -574,7 +578,7 @@ let trans_spec ?(ann = empty) cl_spec =
 let add_trans_spec ann cl_spec =
   { ann with specs = trans_spec ~ann cl_spec :: ann.specs }
 
-let trans_annots clight_prog log_prog =
+let trans_annots clight_prog log_prog filepath =
   let open Ctypes in
   let structs_not_annot = get_structs_not_annot clight_prog.prog_types in
   let struct_annots =
@@ -584,7 +588,7 @@ let trans_annots clight_prog log_prog =
       structs_not_annot
   in
   let with_preds =
-    List.fold_left add_trans_pred struct_annots log_prog.CProg.preds
+    List.fold_left (add_trans_pred filepath) struct_annots log_prog.CProg.preds
   in
   let with_specs = List.fold_left add_trans_spec with_preds log_prog.specs in
   with_specs
@@ -598,6 +602,8 @@ let make_global_env_pred init_asrts =
   Pred.
     {
       pred_name = CConstants.Internal_Predicates.global_env;
+      pred_source_path = None;
+      pred_internal = true;
       pred_num_params = 0;
       pred_params = [];
       pred_ins = [];
@@ -776,6 +782,8 @@ let gen_rec_pred_of_struct cenv ann struct_name =
     Pred.
       {
         pred_name;
+        pred_source_path = None;
+        pred_internal = true;
         pred_ins;
         pred_num_params;
         pred_params;
@@ -790,6 +798,8 @@ let gen_rec_pred_of_struct cenv ann struct_name =
     Pred.
       {
         pred_name = opt_pred_name;
+        pred_source_path = None;
+        pred_internal = true;
         pred_ins = [ 0 ];
         pred_num_params = 1;
         pred_params = [ (opt_param_name, Some Type.ListType) ];

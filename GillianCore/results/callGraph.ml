@@ -98,6 +98,14 @@ let get_proc_names call_graph =
       | _    -> acc)
     call_graph.nodes []
 
+let get_pred_names call_graph =
+  Hashtbl.fold
+    (fun id (node : Node.t) acc ->
+      match node.ntype with
+      | Pred -> node.name :: acc
+      | _    -> acc)
+    call_graph.nodes []
+
 let contains_proc call_graph proc_name =
   let proc_id = id_of_proc_name proc_name in
   Option.is_some (get_node_opt call_graph proc_id)
@@ -105,6 +113,16 @@ let contains_proc call_graph proc_name =
 let contains_pred call_graph pred_name =
   let pred_id = id_of_pred_name pred_name in
   Option.is_some (get_node_opt call_graph pred_id)
+
+let is_proc call_graph id =
+  match (get_node call_graph id).ntype with
+  | Proc -> true
+  | _    -> false
+
+let is_pred call_graph id =
+  match (get_node call_graph id).ntype with
+  | Pred -> true
+  | _    -> false
 
 let remove call_graph id = Hashtbl.remove call_graph.nodes id
 

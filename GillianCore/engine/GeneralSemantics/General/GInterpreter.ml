@@ -132,9 +132,7 @@ struct
           (Sys.time ()) LCmd.pp lcmd State.pp state)
 
   let is_internal_proc (prog : UP.prog) proc_name =
-    match Prog.get_proc prog.prog proc_name with
-    | Some proc -> proc.proc_internal
-    | None      -> failwith (Printf.sprintf "could not find proc %s" proc_name)
+    (Prog.get_proc_exn prog.prog proc_name).proc_internal
 
   (* ************** *
    * Main Functions *

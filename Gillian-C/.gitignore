@@ -2,4 +2,5 @@ examples/klee/klee-out*
 examples/klee/klee-last
 *.i
 *.deps
+*.csm
 examples/**/*.gil

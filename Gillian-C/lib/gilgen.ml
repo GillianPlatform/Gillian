@@ -846,10 +846,10 @@ let annotate prog gil_annots =
   prog
 
 let trans_program_with_annots
-    exec_mode clight_prog prog filepath mangled_syms annots =
+    exec_mode clight_prog prog ~filepath ~mangled_syms annots =
   let gil_annot =
     if ExecMode.verification_exec exec_mode then
-      Gil_logic_gen.trans_annots clight_prog annots
+      Gil_logic_gen.trans_annots clight_prog annots filepath
     else if ExecMode.biabduction_exec exec_mode then
       Gil_logic_gen.gen_bi_preds clight_prog
     else Gil_logic_gen.empty
