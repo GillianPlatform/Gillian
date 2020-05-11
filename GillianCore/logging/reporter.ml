@@ -1,6 +1,6 @@
-type t = < log : 'a. 'a Report.t -> unit ; wrap_up : unit -> unit >
+type 'b t = < log : 'a. ('a, 'b) Report.t -> unit ; wrap_up : unit -> unit >
 
-class file_reporter () =
+class ['b] file_reporter () =
   let out_channel = open_out "out.log" in
   let formatter = Format.formatter_of_out_channel out_channel in
   object
@@ -8,32 +8,34 @@ class file_reporter () =
 
     val out_channel = out_channel
 
-    method log : 'a. 'a Report.t -> unit =
+    method log : 'a. ('a, 'b) Report.t -> unit =
       fun report ->
         match report.content with
-        | Debug msgf  ->
+        | Debug msgf   ->
             msgf @@ fun fmt -> Format.fprintf formatter @@ fmt ^^ "@,@?"
-        | Phase phase ->
+        | Phase phase  ->
             Format.fprintf formatter "*** Phase %s ***@,@?"
             @@ Report.string_of_phase phase
+        | TargetLang _ -> ()
 
     method wrap_up () = close_out out_channel
   end
 
-class database_reporter () =
+class ['b] database_reporter () =
   object (self)
     val database =
       if Sys.file_exists "db.log" then Sys.remove "db.log";
       Sanddb.create_json_database "db.log" (module Report_j)
 
-    method private serialize_content : 'a. 'a Report.content -> string =
+    method private serialize_content : 'a. ('a, 'b) Report.content -> string =
       function
-      | Debug msgf  ->
+      | Debug msgf   ->
           let str = ref "" in
           (msgf @@ fun fmt -> Format.kasprintf (fun s -> str := s) fmt);
           !str
-      | Phase phase ->
+      | Phase phase  ->
           Format.asprintf "Phase %s" @@ Report.string_of_phase phase
+      | TargetLang _ -> ""
 
     method private serialize_severity : Report.severity -> Report_t.severity =
       function
@@ -43,7 +45,7 @@ class database_reporter () =
       | Error   -> `Error
       | Warning -> `Warning
 
-    method log : 'a. 'a Report.t -> unit =
+    method log : 'a. ('a, 'b) Report.t -> unit =
       fun report ->
         let report : Report_t.t =
           {
@@ -62,10 +64,16 @@ class database_reporter () =
     method wrap_up () = ()
   end
 
-let reporters : t list ref =
-  ref [ new file_reporter (); new database_reporter () ]
+type default
 
-let log report =
-  List.iter (fun (reporter : t) -> reporter#log report) !reporters
+let fr : default t = new file_reporter ()
 
-let wrap_up () = List.iter (fun reporter -> reporter#wrap_up ()) !reporters
+let dr : default t = new database_reporter ()
+
+let log r =
+  fr#log r;
+  dr#log r
+
+let wrap_up () =
+  fr#wrap_up ();
+  dr#wrap_up ()
