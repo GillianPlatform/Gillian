@@ -265,7 +265,7 @@ rule read = parse
 (* Directives *)
   | "@nopath"            { GIL_Parser.NO_PATH }
   | "@internal"          { GIL_Parser.INTERNAL }
-  | "internal;"          { GIL_Parser.INTERNAL_FILE }
+  | "#internal"          { GIL_Parser.INTERNAL_FILE }
 (* Variables *)
   | identifier           { let candidate = Lexing.lexeme lexbuf in
                            match (Hashtbl.mem keyword_table candidate) with

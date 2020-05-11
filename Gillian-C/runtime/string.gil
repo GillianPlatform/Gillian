@@ -1,4 +1,4 @@
-internal;
+#internal
 
 proc i__strcmp(str1, str2) {
           goto [((typeOf str1) = List) and ((typeOf str2) = List) and

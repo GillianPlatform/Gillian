@@ -1,4 +1,4 @@
-internal;
+#internal
 
 (* In bi-abduction, we're giving meaning to comparing freed pointers in the same block,
    and killing other branches. *)

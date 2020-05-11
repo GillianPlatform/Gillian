@@ -1,4 +1,4 @@
-internal;
+#internal
 
 proc i__binop_cmplu_le(v1, v2) {
         goto [ (l-nth(v1, 0.) = "long") and (l-nth(v2, 0.) = "long") ] blon els;

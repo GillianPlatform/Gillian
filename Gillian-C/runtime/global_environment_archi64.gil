@@ -1,4 +1,4 @@
-internal;
+#internal
 
 proc i__ptr_chunk() {
   ret := "int64";

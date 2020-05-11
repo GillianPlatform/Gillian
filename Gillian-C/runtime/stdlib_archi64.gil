@@ -1,4 +1,4 @@
-internal;
+#internal
 
 proc i__alloc_size(vsz) {
           goto [ l-nth(vsz, 0.) = "long" ] long oth;

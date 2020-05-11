@@ -1,4 +1,4 @@
-internal;
+#internal
 
 proc i__binop_cmpu_le(v1, v2) {
         goto [ (l-nth(v1, 0.) = "int") and (l-nth(v2, 0.) = "int") ] bint else;

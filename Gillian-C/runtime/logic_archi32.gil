@@ -1,4 +1,4 @@
-internal;
+#internal
 
 pred i__is_ptr_to_0_opt (e: List):
   e == {{ "int", 0. }},

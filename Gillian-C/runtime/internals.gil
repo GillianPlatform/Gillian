@@ -1,4 +1,4 @@
-internal;
+#internal
 
 proc i__storev(chunk, vptr, v) {
        goto [((typeOf vptr) = List) and (l-len vptr = 2) and ((typeOf (l-nth(vptr, 0.))) = Obj) and ((typeOf (l-nth(vptr, 1.))) = Num)] ctn sgf;
