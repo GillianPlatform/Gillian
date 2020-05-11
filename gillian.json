@@ -5,17 +5,7 @@
   "license": "BSD-3-Clause",
   "esy": {
     "build": "dune build -p gillian",
-    "buildsInSource": "_build",
-    "exportedEnv": {
-      "DYLD_LIBRARY_PATH": {
-        "val": "#{@opam/z3.lib / 'z3' : $DYLD_LIBRARY_PATH}",
-        "scope": "global"
-      },
-      "LD_LIBRARY_PATH": {
-        "val": "#{@opam/z3.lib / 'z3' : $LD_LIBRARY_PATH}",
-        "scope": "global"
-      }
-    }
+    "buildsInSource": "_build"
   },
   "dependencies": {
     "@opam/cmdliner": "*",

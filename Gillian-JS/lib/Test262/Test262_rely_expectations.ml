@@ -1,5 +1,5 @@
 type matcher =
-  Gillian.Bulk_rely.OutcomeExt.Make(Test262_outcome).ext Rely.matchers
+  Gillian_bulk_rely.OutcomeExt.Make(Test262_outcome).ext Rely.matchers
 
 type outcome = Test262_outcome.t
 

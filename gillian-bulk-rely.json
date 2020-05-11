@@ -1,16 +1,15 @@
 {
-  "name": "gillian-bulk-alcotest",
+  "name": "gillian-bulk-rely",
   "version": "0.0.1",
-  "description": "Alcotest backend for Gillian Bulk testing",
+  "description": "Rely backend for Gillian Bulk testing",
   "license": "BSD-3-Clause",
   "esy": {
-    "build": "dune build -p gillian-bulk-alcotest",
-    "buildsInSource": "_build"
-  },
+    "build": "dune build -p gillian-bulk-rely",
+    "buildsInSource": "_build",
   "dependencies": {
     "gillian": "GillianPlatform/Gillian:gillian.json",
     "@opam/dune": "^2.0",
-    "@opam/alcotest": "1.0.1",
+    "@reason-native/rely": "^3.1.0",
     "ocaml": "^4.8.0"
   },
   "devDependencies": {
