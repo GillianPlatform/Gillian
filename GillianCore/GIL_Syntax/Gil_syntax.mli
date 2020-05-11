@@ -2155,4 +2155,30 @@ module Visitors : sig
 
       method virtual private zero : 'f
     end
+
+  module Utils : sig
+    module SS = Containers.SS
+
+    class list_monoid :
+      object
+        method private zero : 'b list
+
+        method private plus : 'a list -> 'a list -> 'a list
+      end
+
+    class ss_monoid :
+      object
+        method private zero : SS.t
+
+        method private plus : SS.t -> SS.t -> SS.t
+      end
+
+    class two_list_monoid :
+      object
+        method private zero : 'c list * 'd list
+
+        method private plus :
+          'a list * 'b list -> 'a list * 'b list -> 'a list * 'b list
+      end
+  end
 end

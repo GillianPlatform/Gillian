@@ -381,43 +381,20 @@ struct
             let rets = SAInterpreter.evaluate_lcmds prog proof state' in
             analyse_lemma_results test rets )
 
-  let rec get_preds_in_asrt (asrt : Asrt.t) =
-    match asrt with
-    | Pred (name, _)     -> [ name ]
-    | Star (left, right) -> get_preds_in_asrt left @ get_preds_in_asrt right
-    | _                  -> []
+  let pred_extracting_visitor =
+    object
+      inherit [_] Visitors.reduce
 
-  let get_preds_in_spec (spec : Spec.t) =
-    let all_asrts =
-      List.fold_left
-        (fun acc (single_spec : Spec.st) ->
-          (single_spec.ss_pre :: single_spec.ss_posts) @ acc)
-        [] spec.spec_sspecs
-    in
-    List.map get_preds_in_asrt all_asrts |> List.concat |> SS.of_list
+      inherit Visitors.Utils.ss_monoid
 
-  let get_preds_in_slcmd (slcmd : SLCmd.t) =
-    match slcmd with
-    | SepAssert (asrt, _)    -> get_preds_in_asrt asrt
-    | Invariant (asrt, _)    -> get_preds_in_asrt asrt
-    | Fold (pred, _, _)      -> [ pred ]
-    | Unfold (pred, _, _, _) -> [ pred ]
-    | GUnfold pred           -> [ pred ]
-    | _                      -> []
+      method! visit_Pred _ pred_name _ = SS.singleton pred_name
 
-  let get_preds_in_lcmd (lcmd : LCmd.t) =
-    match lcmd with
-    | SL slcmd -> get_preds_in_slcmd slcmd
-    | _        -> []
+      method! visit_Fold _ pred_name _ _ = SS.singleton pred_name
 
-  let get_preds_in_cmd (cmd : int Cmd.t) =
-    match cmd with
-    | Logic lcmd -> get_preds_in_lcmd lcmd
-    | _          -> []
+      method! visit_Unfold _ pred_name _ _ _ = SS.singleton pred_name
 
-  let get_preds_in_body (body : (Annot.t * int option * int Cmd.t) array) =
-    let get_preds (_, _, cmd) = get_preds_in_cmd cmd in
-    Array.map get_preds body |> Array.to_list |> List.concat |> SS.of_list
+      method! visit_GUnfold _ pred_name = SS.singleton pred_name
+    end
 
   let filter_internal_preds (prog : UP.prog) (pred_names : SS.t) =
     SS.filter
@@ -428,20 +405,17 @@ struct
 
   let record_preds_used_by_proc proc_name (prog : UP.prog) =
     let proc = Prog.get_proc_exn prog.prog proc_name in
-    let spec_preds = get_preds_in_spec (Option.get proc.proc_spec) in
-    let body_preds = get_preds_in_body proc.proc_body in
-    let all_preds_used =
-      filter_internal_preds prog (SS.union spec_preds body_preds)
+    let preds_used =
+      filter_internal_preds prog (pred_extracting_visitor#visit_proc () proc)
     in
     SS.iter
       (CallGraph.add_proc_pred_use SAInterpreter.call_graph proc_name)
-      all_preds_used
+      preds_used
 
   let record_preds_used_by_pred pred_name (prog : UP.prog) =
     let pred = Prog.get_pred_exn prog.prog pred_name in
     let preds_used =
-      List.map (fun (_, asrt) -> get_preds_in_asrt asrt) pred.pred_definitions
-      |> List.concat |> SS.of_list |> filter_internal_preds prog
+      filter_internal_preds prog (pred_extracting_visitor#visit_pred () pred)
     in
     SS.iter
       (CallGraph.add_pred_call SAInterpreter.call_graph pred_name)
