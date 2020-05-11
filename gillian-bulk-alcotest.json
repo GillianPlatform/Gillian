@@ -1,10 +1,10 @@
 {
-  "name": "gillian",
+  "name": "gillian-bulk-alcotest",
   "version": "0.0.1",
-  "description": "Gillian package",
+  "description": "Alcotest backend for Gillian Bulk testing",
   "license": "BSD-3-Clause",
   "esy": {
-    "build": "dune build -p gillian",
+    "build": "dune build -p gillian-bulk-alcotest",
     "buildsInSource": "_build",
     "exportedEnv": {
       "DYLD_LIBRARY_PATH": {
@@ -18,14 +18,9 @@
     }
   },
   "dependencies": {
-    "@opam/cmdliner": "*",
+    "gillian": "GillianPlatform/Gillian:gillian.json",
     "@opam/dune": "^2.0",
-    "@opam/batteries": "^3.0.0",
-    "@opam/fmt": "^0.8.8",
-    "@opam/menhir": "*",
-    "@opam/visitors": "20190711",
-    "@reason-native/rely": "^3.1.0",
-    "@opam/z3": "4.8.1",
+    "@opam/alcotest": "1.0.1",
     "ocaml": "^4.8.0"
   },
   "devDependencies": {
