@@ -229,7 +229,7 @@ let parse_dependencies_file deps_file =
   List.filter (fun part -> Str.string_match header_path part 0) parts
 
 let register_source_files paths =
-  let open Results in
+  let open IncrementalAnalysis in
   List.iter
     (fun path ->
       let headers = parse_dependencies_file (get_deps_path path) in

@@ -4,5 +4,5 @@
  (name engine)
  (public_name gillian.engine)
  (libraries utils z3 menhirLib fmt cmdliner str gil_syntax gil_parsing
-   logging results)
- (flags -open Utils -open Gil_syntax -open Results))
+   logging incrementalAnalysis)
+ (flags -open Utils -open Gil_syntax -open IncrementalAnalysis))
