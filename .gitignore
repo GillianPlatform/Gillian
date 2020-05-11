@@ -8,7 +8,9 @@
 *.png
 *.dot
 
-# examples
+# Python things
+__pycache__
+*.pyc
 
 # Eclipse
 TAGS
