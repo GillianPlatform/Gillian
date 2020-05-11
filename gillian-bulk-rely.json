@@ -1,0 +1,20 @@
+{
+  "name": "gillian-bulk-rely",
+  "version": "0.0.1",
+  "description": "Rely backend for Gillian Bulk testing",
+  "license": "BSD-3-Clause",
+  "esy": {
+    "build": "dune build -p gillian-bulk-rely",
+    "buildsInSource": "_build",
+  "dependencies": {
+    "gillian": "GillianPlatform/Gillian:gillian.json",
+    "@opam/dune": "^2.0",
+    "@reason-native/rely": "^3.1.0",
+    "ocaml": "^4.8.0"
+  },
+  "devDependencies": {
+    "@opam/merlin": "*",
+    "@opam/odoc": "*",
+    "ocaml": "4.8.1000"
+  }
+}

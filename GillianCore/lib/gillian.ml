@@ -5,8 +5,6 @@ module Symbolic = Engine.Symbolic
 module Concrete = Engine.Concrete
 module General = Engine.General
 module Bulk = Bulk
-module Bulk_rely = Bulk_rely
-module Bulk_alcotest = Bulk_alcotest
 
 module Logic = struct
   module Reduction = Engine.Reduction

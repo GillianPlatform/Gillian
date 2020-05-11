@@ -29,7 +29,7 @@ module Suite = struct
 end
 
 module Expectations = struct
-  type matcher = Bulk_rely.OutcomeExt.Make(Outcome).ext Rely.matchers
+  type matcher = Gillian_bulk_rely.OutcomeExt.Make(Outcome).ext Rely.matchers
 
   type outcome = Outcome.t
 
@@ -41,4 +41,4 @@ module Expectations = struct
     (expect.ext.outcome outcome).allBranches.toFinishInNormalMode ()
 end
 
-include Bulk_rely.RelyRunner.Make (Outcome) (Suite) (Expectations)
+include Gillian_bulk_rely.RelyRunner.Make (Outcome) (Suite) (Expectations)

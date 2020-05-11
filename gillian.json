@@ -5,17 +5,7 @@
   "license": "BSD-3-Clause",
   "esy": {
     "build": "dune build -p gillian",
-    "buildsInSource": "_build",
-    "exportedEnv": {
-      "DYLD_LIBRARY_PATH": {
-        "val": "#{@opam/z3.lib / 'z3' : $DYLD_LIBRARY_PATH}",
-        "scope": "global"
-      },
-      "LD_LIBRARY_PATH": {
-        "val": "#{@opam/z3.lib / 'z3' : $LD_LIBRARY_PATH}",
-        "scope": "global"
-      }
-    }
+    "buildsInSource": "_build"
   },
   "dependencies": {
     "@opam/cmdliner": "*",
@@ -25,7 +15,6 @@
     "@opam/menhir": "*",
     "@opam/visitors": "20190711",
     "@reason-native/rely": "^3.1.0",
-    "@opam/alcotest": "1.0.1",
     "@opam/z3": "4.8.1",
     "ocaml": "^4.8.0"
   },
