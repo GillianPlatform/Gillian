@@ -6,18 +6,25 @@ let string_of_phase = function
   | Preprocessing       -> "Preprocessing"
   | Verification        -> "Verification"
 
-type 'a content =
-  | Debug of ((('a, Format.formatter, unit) format -> 'a) -> unit)
-  | Phase of phase
+type target_lang_agnostic = TargetLangAgnostic
+
+type target_lang_specific = TargetLangSpecific
+
+type ('a, 'b, 'c) content =
+  | Debug      :
+      ((('b, Format.formatter, unit) format -> 'b) -> unit)
+      -> (target_lang_agnostic, 'b, _) content
+  | Phase      : phase -> (target_lang_agnostic, _, _) content
+  | TargetLang : 'c -> (target_lang_specific, _, 'c) content
 
 type severity = Info | Log | Success | Error | Warning
 
-type 'a t = {
+type ('a, 'b, 'c) t = {
   id : Uuidm.t;
   title : string;
   elapsed_time : float;
   previous : Uuidm.t option;
   parent : Uuidm.t option;
-  content : 'a content;
+  content : ('a, 'b, 'c) content;
   severity : severity;
 }
