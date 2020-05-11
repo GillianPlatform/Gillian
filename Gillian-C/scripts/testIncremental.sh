@@ -29,3 +29,8 @@ echo "--- test_remove_proc ---"
 incremental/verification/test_remove_proc/run.sh
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
+
+echo "--- test_change_pred ---"
+incremental/verification/test_remove_proc/run.sh
+rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
+printf "\n\n"
