@@ -111,11 +111,38 @@ struct
     in
     Arg.(value & flag & info [ "inc"; "incremental" ] ~doc)
 
+  let result_directory =
+    (* Default value is taken from the non-modified config *)
+    let default = Config.results_dir () in
+    let doc =
+      Printf.sprintf
+        "Set result directory relative path to $(docv). Defaults to \"%s\""
+        default
+    in
+    let docv = "OUT_DIR" in
+    Arg.(value & opt string default & info [ "result-dir" ] ~doc ~docv)
+
   let get_prog_or_fail = function
     | Ok prog   -> prog
     | Error err ->
         Fmt.pr "Error during compilation to GIL:\n%a" PC.pp_err err;
         exit 1
+
+  let with_common (term : (unit -> unit) Term.t) : unit Term.t =
+    let apply_common logging_mode runtime_path ci tl_opts result_dir =
+      Config.set_result_dir result_dir;
+      Config.ci := ci;
+      Logging.Mode.set_mode logging_mode;
+      Printexc.record_backtrace (Logging.Mode.enabled ());
+      PC.TargetLangOptions.apply tl_opts;
+      Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
+    in
+    let common_term =
+      Term.(
+        const apply_common $ logging_mode $ runtime_path $ ci
+        $ PC.TargetLangOptions.term $ result_directory)
+    in
+    Term.(term $ common_term)
 
   module CompilerConsole = struct
     let mode =
@@ -196,26 +223,10 @@ struct
       in
       return_to_exit (valid_concrete_result ret)
 
-    let exec
-        files
-        already_compiled
-        logging_mode
-        debug
-        outfile_opt
-        no_heap
-        runtime_paths
-        ci
-        tl_opts =
-      let () = Config.ci := ci in
-      let () = PC.TargetLangOptions.apply tl_opts in
+    let exec files already_compiled debug outfile_opt no_heap () =
       let () = Config.current_exec_mode := Concrete in
       let () = PC.initialize Concrete in
       Config.no_heap := no_heap;
-      L.Mode.set_mode logging_mode;
-      Printexc.record_backtrace @@ L.Mode.enabled ();
-      let () =
-        Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_paths
-      in
       let lab_prog =
         if not already_compiled then
           get_prog_or_fail (PC.parse_and_compile_files files)
@@ -247,8 +258,7 @@ struct
 
     let exec_t =
       Term.(
-        const exec $ files $ already_compiled $ logging_mode $ debug
-        $ output_gil $ no_heap $ runtime_path $ ci $ PC.TargetLangOptions.term)
+        const exec $ files $ already_compiled $ debug $ output_gil $ no_heap)
 
     let exec_info =
       let doc = "Concretely executes a file of the target language" in
@@ -260,7 +270,7 @@ struct
       in
       Term.info "exec" ~doc ~exits:Term.default_exits ~man
 
-    let exec_cmd = (exec_t, exec_info)
+    let exec_cmd = (with_common exec_t, exec_info)
   end
 
   module SInterpreterConsole = struct
@@ -312,25 +322,9 @@ struct
           in
           ()
 
-    let wpst
-        files
-        already_compiled
-        outfile_opt
-        no_heap
-        logging_mode
-        stats
-        parallel
-        runtime_path
-        ci
-        tl_opts =
-      let () = Config.ci := ci in
-      let () = PC.TargetLangOptions.apply tl_opts in
+    let wpst files already_compiled outfile_opt no_heap stats parallel () =
       let () = Config.current_exec_mode := Symbolic in
       let () = PC.initialize Symbolic in
-      let () =
-        Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
-      in
-      let () = L.Mode.set_mode logging_mode in
       Printexc.record_backtrace @@ L.Mode.enabled ();
       let () = Config.stats := stats in
       let () = Config.parallel := parallel in
@@ -347,9 +341,8 @@ struct
 
     let wpst_t =
       Term.(
-        const wpst $ files $ already_compiled $ output_gil $ no_heap
-        $ logging_mode $ stats $ parallel $ runtime_path $ ci
-        $ PC.TargetLangOptions.term)
+        const wpst $ files $ already_compiled $ output_gil $ no_heap $ stats
+        $ parallel)
 
     let wpst_info =
       let doc = "Symbolically executes a file of the target language" in
@@ -361,7 +354,7 @@ struct
       in
       Term.info "wpst" ~doc ~exits:Term.default_exits ~man
 
-    let wpst_cmd = (wpst_t, wpst_info)
+    let wpst_cmd = (with_common wpst_t, wpst_info)
   end
 
   module VerificationConsole = struct
@@ -428,26 +421,16 @@ struct
         no_unfold
         stats
         no_lemma_proof
-        logging_mode
         stats
         manual
-        runtime_path
-        ci
         incremental
-        tl_opts =
+        () =
       let () = Fmt_tty.setup_std_outputs () in
-      let () = Config.ci := ci in
-      let () = PC.TargetLangOptions.apply tl_opts in
       let () = Config.current_exec_mode := Verification in
       let () = PC.initialize Verification in
       let () = Config.stats := stats in
-      let () = L.Mode.set_mode logging_mode in
-      Printexc.record_backtrace @@ L.Mode.enabled ();
       let () = Config.lemma_proof := not no_lemma_proof in
       let () = Config.manual_proof := manual in
-      let () =
-        Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
-      in
       let () =
         process_files files already_compiled outfile_opt no_unfold incremental
       in
@@ -457,8 +440,7 @@ struct
     let verify_t =
       Term.(
         const verify $ files $ already_compiled $ output_gil $ no_unfold $ stats
-        $ no_lemma_proof $ logging_mode $ stats $ manual $ runtime_path $ ci
-        $ incremental $ PC.TargetLangOptions.term)
+        $ no_lemma_proof $ stats $ manual $ incremental)
 
     let verify_info =
       let doc = "Verifies a file of the target language" in
@@ -470,7 +452,7 @@ struct
       in
       Term.info "verify" ~doc ~exits:Term.default_exits ~man
 
-    let verify_cmd = (verify_t, verify_info)
+    let verify_cmd = (with_common verify_t, verify_info)
   end
 
   module ACTConsole = struct
@@ -529,38 +511,20 @@ struct
             let path' = folder_path ^ "/" ^ fname' in
             Io_utils.save_file path' eprog_final_str
 
-    let act
-        files
-        already_compiled
-        outfile_opt
-        no_heap
-        logging_mode
-        stats
-        parallel
-        runtime_path
-        ci
-        tl_opts =
-      let () = Config.ci := ci in
-      let () = PC.TargetLangOptions.apply tl_opts in
+    let act files already_compiled outfile_opt no_heap stats parallel () =
       let () = Config.current_exec_mode := BiAbduction in
       let () = PC.initialize BiAbduction in
-      let () = L.Mode.set_mode logging_mode in
-      Printexc.record_backtrace @@ L.Mode.enabled ();
       let () = Config.stats := stats in
       let () = Config.no_heap := no_heap in
       let () = Config.parallel := parallel in
-      let () =
-        Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
-      in
       let () = process_files files already_compiled outfile_opt in
       let () = if !Config.stats then Statistics.print_statistics () in
       Logging.wrap_up ()
 
     let act_t =
       Term.(
-        const act $ files $ already_compiled $ output_gil $ no_heap
-        $ logging_mode $ stats $ parallel $ runtime_path $ ci
-        $ PC.TargetLangOptions.term)
+        const act $ files $ already_compiled $ output_gil $ no_heap $ stats
+        $ parallel)
 
     let act_info =
       let doc =
@@ -576,7 +540,7 @@ struct
       in
       Term.info "act" ~doc ~exits:Term.default_exits ~man
 
-    let act_cmd = (act_t, act_info)
+    let act_cmd = (with_common act_t, act_info)
   end
 
   module BulkConsole = struct
@@ -587,23 +551,15 @@ struct
         let docv = "PATH" in
         Arg.(required & pos 0 (some file) None & info [] ~docv ~doc)
       in
-      let run path tl_opts npaf runtime_path ci =
-        let () = Config.ci := ci in
-        let () = PC.TargetLangOptions.apply tl_opts in
+      let run path npaf () =
         let () = Config.current_exec_mode := exec_mode in
         let () = PC.initialize exec_mode in
         let () = Config.bulk_print_all_failures := not npaf in
         Logging.Mode.set_mode Disabled;
-        let () =
-          Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
-        in
+        Printexc.record_backtrace false;
         Runner.run_all runner path
       in
-      let run_t =
-        Term.(
-          const run $ path_t $ PC.TargetLangOptions.term $ no_print_failures
-          $ runtime_path $ ci)
-      in
+      let run_t = Term.(const run $ path_t $ no_print_failures) in
       let run_info =
         let doc = "Executes a predefined test-suite" in
         let man =
@@ -611,7 +567,7 @@ struct
         in
         Term.info (Runner.cmd_name runner) ~doc ~exits:Term.default_exits ~man
       in
-      (run_t, run_info)
+      (with_common run_t, run_info)
 
     let bulk_cmds = List.map make_bulk_console Runners.runners
   end

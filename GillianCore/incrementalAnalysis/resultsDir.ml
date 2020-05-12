@@ -12,12 +12,12 @@ end
 
 let results_dir = Config.results_dir
 
-let prev_results_exist =
-  Sys.file_exists results_dir && Sys.is_directory results_dir
+let prev_results_exist () =
+  Sys.file_exists (results_dir ()) && Sys.is_directory (results_dir ())
 
-let delete_results_dir () = Io_utils.rm_rf results_dir
+let delete_results_dir () = Io_utils.rm_rf (results_dir ())
 
-let create_results_dir () = Io_utils.safe_mkdir results_dir
+let create_results_dir () = Io_utils.safe_mkdir (results_dir ())
 
 type t = {
   sources : SourceFiles.t;
@@ -28,7 +28,7 @@ type t = {
 
 let read_results_dir () =
   let read_json filename =
-    let json_path = Filename.concat results_dir filename in
+    let json_path = Filename.concat (results_dir ()) filename in
     Yojson.Safe.from_file json_path
   in
   {
@@ -41,13 +41,13 @@ let read_results_dir () =
 
 let write_results_dir { sources; call_graph; results; diff } =
   let write_json json filename =
-    let json_path = Filename.concat results_dir filename in
+    let json_path = Filename.concat (results_dir ()) filename in
     let channel = open_out json_path in
     Yojson.Safe.pretty_to_channel ~std:true channel json;
     close_out channel
   in
   let write_str str fileanme =
-    let out_path = Filename.concat results_dir fileanme in
+    let out_path = Filename.concat (results_dir ()) fileanme in
     let channel = open_out out_path in
     Fmt.pf (Format.formatter_of_out_channel channel) "%s" str;
     close_out channel

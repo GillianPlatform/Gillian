@@ -3,7 +3,9 @@
 
 (** {2 global config} *)
 
-let results_dir = ".gillian"
+let results_dir, set_result_dir =
+  let rd = ref ".gillian" in
+  ((fun () -> !rd), fun r -> rd := r)
 
 let ci = ref false
 

@@ -539,7 +539,7 @@ struct
   let verify_prog (prog : (Annot.t, int) Prog.t) (incremental : bool) : unit =
     let open ResultsDir in
     let open ChangeTracker in
-    if incremental && prev_results_exist then
+    if incremental && prev_results_exist () then
       (* Only analyse changed procedures *)
       let { sources; call_graph; results } = read_results_dir () in
       let ({ changed_procs; new_procs; deleted_procs; dependents } as changes) =
