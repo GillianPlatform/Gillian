@@ -1,0 +1,55 @@
+(* -*- tuareg -*- *)
+
+
+module J = Jbuild_plugin.V1;;
+
+let runtime_dir = "../../../../runtime"
+
+let runtime_glob = Filename.concat runtime_dir "*.gil"
+
+let runtime =
+  List.filter (fun x -> Filename.check_suffix x ".gil")
+  (Array.to_list (Sys.readdir runtime_dir))
+
+let src_before =
+  List.map (Filename.concat "src_before")
+    (Array.to_list (Sys.readdir "src_before"))
+
+let src_after =
+  List.map (Filename.concat "src_after")
+    (Array.to_list (Sys.readdir "src_after"))
+
+let deps = runtime @ src_before @ src_after
+
+let copy f =
+  Printf.sprintf {|(copy %s %s)|} f (Filename.basename f)
+
+let src_files = ["bst_a.c"; "bst_b.c"];;
+
+Printf.ksprintf J.send {|
+
+  (include_subdirs unqualified)
+
+  (copy_files %s)
+
+  (rule
+    (alias runtest)
+    (action (diff diff.txt.expected diff.txt)))
+
+  (rule
+    (deps %s)
+    (targets diff.txt)
+    (action
+      (progn
+        %s
+        (run gillian-c verify -l disabled -R . --inc --result-dir out %s)
+        %s
+        (run gillian-c verify -l disabled -R . --inc --result-dir out %s)
+        (run cp out/diff.txt ./))))
+|}
+  runtime_glob
+  (String.concat "\n" deps)
+  (String.concat "\n" (List.map copy src_before))
+  (String.concat " " src_files)
+  (String.concat "\n" (List.map copy src_after))
+  (String.concat " " src_files)
