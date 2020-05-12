@@ -33,19 +33,15 @@ Printf.ksprintf J.send {|
   (copy_files %s)
 
   (rule
-    (alias runtest)
-    (action (diff diff.txt.expected diff.txt)))
-
-  (rule
     (deps %s)
-    (targets diff.txt)
+    (alias runtest)
     (action
       (progn
         %s
-        (run gillian-c verify -l disabled -R . --inc --result-dir out %s)
+        (run gillian-c verify -l disabled -R . --inc %s)
         %s
-        (run gillian-c verify -l disabled -R . --inc --result-dir out %s)
-        (run cp out/diff.txt ./))))
+        (run gillian-c verify -l disabled -R . --inc %s)
+        (diff? diff.txt.expected .gillian/diff.txt))))
 |}
   runtime_glob
   (String.concat "\n" deps)
