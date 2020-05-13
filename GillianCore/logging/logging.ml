@@ -5,7 +5,11 @@ let wrap_up = Reporter.wrap_up
 
 let log lvl ?title ?severity msgf =
   if Mode.should_log lvl then
-    let report = ReportBuilder.make ?title ~content:(Debug msgf) ?severity () in
+    let report =
+      ReportBuilder.make ?title
+        ~content:(Debug (Report.PackedPP.make msgf))
+        ?severity ()
+    in
     Reporter.log report
 
 let normal ?title ?severity msgf = log Normal ?title ?severity msgf

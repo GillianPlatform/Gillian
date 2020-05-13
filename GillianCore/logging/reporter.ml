@@ -1,12 +1,13 @@
-type t = { log : 'a. 'a Report.t -> unit; wrap_up : unit -> unit }
+type t = { log : Report.t -> unit; wrap_up : unit -> unit }
 
 let file_reporter () =
   let out_channel = open_out "out.log" in
   let formatter = Format.formatter_of_out_channel out_channel in
-  let log : 'a. 'a Report.t -> unit =
-   fun report ->
+  let log (report : Report.t) =
     match report.content with
-    | Debug msgf  -> msgf @@ fun fmt -> Format.fprintf formatter @@ fmt ^^ "@,@?"
+    | Debug msgf  ->
+        Report.PackedPP.pf formatter msgf;
+        Format.fprintf formatter "@,@?"
     | Phase phase ->
         Format.fprintf formatter "*** Phase %s ***@,@?"
         @@ Report.string_of_phase phase
@@ -17,11 +18,8 @@ let file_reporter () =
 let database_reporter () =
   let () = if Sys.file_exists "db.log" then Sys.remove "db.log" in
   let database = Sanddb.create_json_database "db.log" (module Report_j) in
-  let serialize_content : 'a. 'a Report.content -> string = function
-    | Debug msgf  ->
-        let str = ref "" in
-        (msgf @@ fun fmt -> Format.kasprintf (fun s -> str := s) fmt);
-        !str
+  let serialize_content : Report.content -> string = function
+    | Debug msgf  -> Report.PackedPP.str msgf
     | Phase phase -> Format.asprintf "Phase %s" @@ Report.string_of_phase phase
   in
   let serialize_severity : Report.severity -> Report_t.severity = function
@@ -31,8 +29,7 @@ let database_reporter () =
     | Error   -> `Error
     | Warning -> `Warning
   in
-  let log : 'a. 'a Report.t -> unit =
-   fun report ->
+  let log (report : Report.t) =
     let report : Report_t.t =
       {
         id = Uuidm.to_string report.id;
