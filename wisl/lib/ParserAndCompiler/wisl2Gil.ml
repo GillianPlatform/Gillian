@@ -886,6 +886,7 @@ let preprocess_lemma
     }
 
 let compile_lemma
+    filepath
     WLemma.
       {
         lemma_name;
@@ -921,6 +922,8 @@ let compile_lemma
   Lemma.
     {
       lemma_name;
+      lemma_source_path = Some filepath;
+      lemma_internal = false;
       lemma_params;
       lemma_proof;
       lemma_variant;
@@ -945,7 +948,9 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
   let comp_context = List.map (compile_function filepath) context in
   let comp_preds = List.map (compile_pred filepath) predicates in
   let comp_lemmas =
-    List.map (fun lemma -> compile_lemma (preprocess_lemma lemma)) lemmas
+    List.map
+      (fun lemma -> compile_lemma filepath (preprocess_lemma lemma))
+      lemmas
   in
   (* build the hashtables *)
   let gil_procs = make_hashtbl get_proc_name (List.concat comp_context) in

@@ -440,8 +440,8 @@ struct
     (* STEP 1: Get the specs to verify *)
     Printf.printf "Obtaining specs to verify...\n";
     let all_specs : Spec.t list = Prog.get_proc_specs prog in
-    let specs_to_verify, rem_specs =
-      List.partition
+    let specs_to_verify =
+      List.filter
         (fun spec -> SS.mem spec.Spec.spec_name procs_to_verify)
         all_specs
     in
@@ -453,10 +453,7 @@ struct
         (List.map
            (fun spec ->
              let tests, new_spec = testify_spec preds spec in
-             let proc =
-               try Hashtbl.find prog.procs spec.spec_name
-               with _ -> raise (Failure "DEATH")
-             in
+             let proc = Prog.get_proc_exn prog spec.spec_name in
              Hashtbl.replace prog.procs proc.proc_name
                { proc with proc_spec = Some new_spec };
              tests)

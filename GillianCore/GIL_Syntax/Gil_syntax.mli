@@ -621,6 +621,8 @@ module Lemma : sig
   (** {b GIL Lemmas} *)
   type t = {
     lemma_name : string;  (** Name *)
+    lemma_source_path : string option;
+    lemma_internal : bool;
     lemma_params : string list;  (** Parameters *)
     lemma_hyp : Asrt.t;  (** Hypothesis *)
     lemma_concs : Asrt.t list;  (** Conclusion *)

@@ -198,6 +198,8 @@ and pred = {
 
 and lemma = {
   lemma_name : string;
+  lemma_source_path : string option;
+  lemma_internal : bool;
   lemma_params : string list;
   lemma_hyp : assertion;
   lemma_concs : assertion list;

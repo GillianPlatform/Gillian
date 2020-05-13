@@ -96,6 +96,9 @@ let jsil2gil_spec (spec : Spec.t) : GSpec.t =
 let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
   {
     lemma_name = lemma.name;
+    lemma_source_path = None;
+    lemma_internal = false;
+    (* TODO (Alexis): Set depending on module of pred *)
     lemma_params = lemma.params;
     lemma_hyp = jsil2gil_asrt lemma.pre;
     lemma_concs = List.map jsil2gil_asrt lemma.posts;

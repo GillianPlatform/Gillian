@@ -479,22 +479,22 @@ gproc_target:
   cmd_list = gcmd_list_target;
   CRBRACKET;
   SCOLON
-    {
-      let proc_name, proc_params = proc_head in
-      let () =
-        if Option.is_some no_path then
-          procs_with_no_paths := SS.add proc_name !procs_with_no_paths
-      in
-      Proc.
-        {
-          proc_name;
-          proc_source_path = None;
-          proc_internal = Option.is_some internal;
-          proc_body = Array.of_list cmd_list;
-          proc_params;
-          proc_spec;
-        }
-    }
+  {
+    let proc_name, proc_params = proc_head in
+    let () =
+      if Option.is_some no_path then
+        procs_with_no_paths := SS.add proc_name !procs_with_no_paths
+    in
+    Proc.
+      {
+        proc_name;
+        proc_source_path = None;
+        proc_internal = Option.is_some internal;
+        proc_body = Array.of_list cmd_list;
+        proc_params;
+        proc_spec;
+      }
+  }
 ;
 
 gcmd_list_target:
@@ -771,13 +771,34 @@ g_lemma_target:
      [[ pre ]]
      [[ post ]] [existentials: a, b, c]
      [* proof_body *] *)
-  LEMMA; lemma_head = lemma_head_target; lemma_variant = option(lemma_variant_target);
-    lemma_hyp = g_spec_line; lemma_concs = g_mult_spec_line; lemma_existentials=option(existentials_target); lemma_proof = option(g_lemma_proof_target);
+  no_path = option(NO_PATH);
+  internal = option(INTERNAL);
+  LEMMA;
+  lemma_head = lemma_head_target;
+  lemma_variant = option(lemma_variant_target);
+  lemma_hyp = g_spec_line;
+  lemma_concs = g_mult_spec_line;
+  lemma_existentials = option(existentials_target);
+  lemma_proof = option(g_lemma_proof_target);
   {
-      let (lemma_name, lemma_params) = lemma_head in
-      let lemma_existentials = Option.value ~default:[] lemma_existentials in
-      let lemma : Lemma.t = { lemma_name; lemma_params; lemma_hyp; lemma_concs; lemma_variant; lemma_proof; lemma_existentials} in
-      lemma
+    let lemma_name, lemma_params = lemma_head in
+    let () =
+      if Option.is_some no_path then
+        lemmas_with_no_paths := SS.add lemma_name !lemmas_with_no_paths
+    in
+    let lemma_existentials = Option.value ~default:[] lemma_existentials in
+    Lemma.
+      {
+        lemma_name;
+        lemma_source_path = None;
+        lemma_internal = Option.is_some internal;
+        lemma_params;
+        lemma_hyp;
+        lemma_concs;
+        lemma_variant;
+        lemma_proof;
+        lemma_existentials;
+      }
   }
 ;
 
