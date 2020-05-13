@@ -26,9 +26,16 @@ let parse_file file =
 
 let compile = Wisl2Gil.compile
 
+let create_compilation_result path prog =
+  let open CommandLine.ParserAndCompiler in
+  let open IncrementalAnalysis in
+  let source_files = SourceFiles.make () in
+  SourceFiles.add_source_file source_files path;
+  { gil_progs = [ (path, prog) ]; source_files }
+
 let parse_and_compile_files files =
   let path = List.hd files in
-  Ok (compile path (parse_file path))
+  Ok (create_compilation_result path (compile path (parse_file path)))
 
 let other_imports = []
 

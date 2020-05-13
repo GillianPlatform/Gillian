@@ -562,13 +562,21 @@ struct
         Printf.printf "%s\n" msg;
         L.normal (fun m -> m "%s" msg)
 
-  let verify_prog (prog : (Annot.t, int) Prog.t) (incremental : bool) : unit =
+  let verify_prog
+      (prog : (Annot.t, int) Prog.t)
+      (incremental : bool)
+      (source_files : SourceFiles.t option) : unit =
     let open ResultsDir in
     let open ChangeTracker in
     if incremental && prev_results_exist () then
       (* Only verify changed procedures and lemmas *)
+      let cur_source_files =
+        match source_files with
+        | Some files -> files
+        | None       -> failwith "Cannot use -a in incremental mode"
+      in
       let { sources; call_graph; results } = read_results_dir () in
-      let changes = get_changes prog sources call_graph in
+      let changes = get_changes prog sources call_graph cur_source_files in
       let () = CallGraph.prune_procs call_graph changes.deleted_procs in
       let () = CallGraph.prune_lemmas call_graph changes.deleted_lemmas in
       let () =
@@ -597,6 +605,9 @@ struct
         { sources = cur_source_files; call_graph; results; diff }
     else
       (* Analyse all procedures and lemmas *)
+      let cur_source_files =
+        Option.value ~default:(SourceFiles.make ()) source_files
+      in
       let procs_to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
       let lemmas_to_verify =
         SS.of_list (Prog.get_noninternal_lemma_names prog)
