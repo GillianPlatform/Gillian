@@ -111,26 +111,23 @@ let get_proc_callers reverse_graph proc_name =
   List.map (CallGraph.get_name reverse_graph) caller_ids
 
 let get_pred_dependents reverse_graph pred_name =
+  let open CallGraph in
   let rec get_dependents visited to_visit dependents =
     match to_visit with
     | []         -> dependents
     | id :: rest ->
-        if not (SS.mem id visited) then
-          let children = CallGraph.get_children reverse_graph id in
-          let pred_ids =
-            List.filter (CallGraph.is_pred reverse_graph) children
-          in
-          let proc_ids =
-            List.filter (CallGraph.is_proc reverse_graph) children
-          in
-          let new_visited = SS.add id visited in
+        if not (IdSet.mem id visited) then
+          let children = get_children reverse_graph id in
+          let pred_ids = List.filter (is_pred reverse_graph) children in
+          let proc_ids = List.filter (is_proc reverse_graph) children in
+          let new_visited = IdSet.add id visited in
           let new_to_visit = to_visit @ pred_ids in
           let new_dependents = dependents @ proc_ids in
           get_dependents new_visited new_to_visit new_dependents
         else get_dependents visited rest dependents
   in
-  let pred_id = CallGraph.id_of_pred_name pred_name in
-  let dependent_proc_ids = get_dependents SS.empty [ pred_id ] [] in
+  let pred_id = id_of_pred_name pred_name in
+  let dependent_proc_ids = get_dependents IdSet.empty [ pred_id ] [] in
   List.map (CallGraph.get_name reverse_graph) dependent_proc_ids
 
 let get_changes prog prev_source_files prev_call_graph =

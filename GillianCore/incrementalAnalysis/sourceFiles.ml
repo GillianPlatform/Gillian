@@ -1,4 +1,4 @@
-module type SourceFileSig = sig
+module SourceFile : sig
   type t = private {
     path : string;
     contents : string;
@@ -6,12 +6,10 @@ module type SourceFileSig = sig
   }
   [@@deriving yojson { exn = true }]
 
-  val make : string -> string list -> t
+  val make : path:string -> dependents:string list -> t
 
   val add_dependent : t -> string -> unit
-end
-
-module SourceFile : SourceFileSig = struct
+end = struct
   type t = {
     path : string;
     contents : string;
@@ -19,7 +17,7 @@ module SourceFile : SourceFileSig = struct
   }
   [@@deriving yojson { exn = true }]
 
-  let make path dependents =
+  let make ~path ~dependents =
     let contents = Digest.to_hex (Digest.file path) in
     { path; contents; dependents }
 
@@ -36,7 +34,7 @@ let get_or_make_file files path =
   match Hashtbl.find_opt files path with
   | Some file -> file
   | None      ->
-      let file = SourceFile.make path [] in
+      let file = SourceFile.make ~path ~dependents:[] in
       Hashtbl.add files path file;
       file
 

@@ -422,21 +422,11 @@ struct
       preds_used
 
   let check_previously_verified prev_results cur_verified =
-    match prev_results with
-    | None         -> true
-    | Some results ->
-        Hashtbl.fold
-          (fun (pname, _) verified acc ->
-            if not (SS.mem pname cur_verified) then (
-              let msg =
-                "Reading one previous spec of procedure " ^ pname ^ "... "
-              in
-              L.tmi (fun fmt -> fmt "%s" msg);
-              Fmt.pr "%s" msg;
-              print_success_or_failure verified;
-              verified && acc )
-            else true && acc)
-          results true
+    Option.fold ~none:true
+      ~some:(fun x ->
+        VerificationResults.check_previously_verified
+          ~printer:print_success_or_failure x cur_verified)
+      prev_results
 
   let verify_procs
       (prog : (Annot.t, int) Prog.t)
@@ -529,13 +519,6 @@ struct
         Printf.printf "%s\n" msg;
         L.normal (fun m -> m "%s" msg)
 
-  let prune_call_graph call_graph proc_names =
-    let proc_ids = List.map CallGraph.id_of_proc_name proc_names in
-    List.iter (CallGraph.remove call_graph) proc_ids
-
-  let prune_results results proc_names =
-    List.iter (VerificationResults.remove results) proc_names
-
   let verify_prog (prog : (Annot.t, int) Prog.t) (incremental : bool) : unit =
     let open ResultsDir in
     let open ChangeTracker in
@@ -545,15 +528,15 @@ struct
       let ({ changed_procs; new_procs; deleted_procs; dependents } as changes) =
         get_changes prog sources call_graph
       in
-      let () = prune_call_graph call_graph deleted_procs in
-      let () = prune_results results deleted_procs in
+      let () = CallGraph.prune call_graph deleted_procs in
+      let () = VerificationResults.prune results deleted_procs in
       let to_verify = SS.of_list (changed_procs @ new_procs @ dependents) in
       let () = verify_procs prog to_verify ~prev_results:results () in
       let cur_results, cur_call_graph =
         (global_results, SAInterpreter.call_graph)
       in
-      let call_graph = CallGraph.merge_graphs call_graph cur_call_graph in
-      let results = VerificationResults.merge_results results cur_results in
+      let call_graph = CallGraph.merge call_graph cur_call_graph in
+      let results = VerificationResults.merge results cur_results in
       let diff = Fmt.str "%a" ChangeTracker.pp changes in
       write_results_dir
         { sources = cur_source_files; call_graph; results; diff }

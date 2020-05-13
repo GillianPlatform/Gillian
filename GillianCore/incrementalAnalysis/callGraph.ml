@@ -1,6 +1,6 @@
 type ntype = Proc | Pred [@@deriving yojson { exn = true }]
 
-module type NodeSig = sig
+module Node : sig
   type t = private {
     id : string;
     ntype : ntype;
@@ -14,9 +14,7 @@ module type NodeSig = sig
   val add_child : t -> string -> unit
 
   val pp : Format.formatter -> t -> unit
-end
-
-module Node : NodeSig = struct
+end = struct
   type t = {
     id : string;
     ntype : ntype;
@@ -36,6 +34,10 @@ module Node : NodeSig = struct
 end
 
 type t = { nodes : (string, Node.t) Hashtbl.t }
+
+type id = string
+
+module IdSet = Containers.SS
 
 let make () = { nodes = Hashtbl.create Config.small_tbl_size }
 
@@ -126,6 +128,10 @@ let is_pred call_graph id =
 
 let remove call_graph id = Hashtbl.remove call_graph.nodes id
 
+let prune call_graph proc_names =
+  let proc_ids = List.map id_of_proc_name proc_names in
+  List.iter (remove call_graph) proc_ids
+
 let to_reverse_graph call_graph =
   let reverse_graph = make () in
   let () =
@@ -140,7 +146,7 @@ let to_reverse_graph call_graph =
   in
   reverse_graph
 
-let merge_graphs call_graph other_graph =
+let merge call_graph other_graph =
   let () =
     Hashtbl.iter
       (fun id node -> Hashtbl.replace call_graph.nodes id node)

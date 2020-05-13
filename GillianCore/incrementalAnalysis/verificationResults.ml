@@ -13,13 +13,27 @@ let remove results proc_name =
       if not (String.equal pname proc_name) then Some verified else None)
     results
 
-let merge_results results other_results =
+let prune results proc_names = List.iter (remove results) proc_names
+
+let merge results other_results =
   let () =
     Hashtbl.iter
       (fun id verified -> Hashtbl.replace results id verified)
       other_results
   in
   results
+
+let check_previously_verified ?(printer = fun _ -> ()) results cur_verified =
+  Hashtbl.fold
+    (fun (pname, _) verified acc ->
+      if not (Containers.SS.mem pname cur_verified) then (
+        let msg = "Reading one previous spec of procedure " ^ pname ^ "... " in
+        Logging.tmi (fun fmt -> fmt "%s" msg);
+        Fmt.pr "%s" msg;
+        printer verified;
+        verified && acc )
+      else true && acc)
+    results true
 
 let to_yojson results =
   `List
