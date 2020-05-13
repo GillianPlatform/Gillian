@@ -10,8 +10,6 @@ module Mode : sig
   val enabled : unit -> bool
 
   val set_mode : t -> unit
-
-  val should_log : level -> bool
 end
 
 module Report : sig
