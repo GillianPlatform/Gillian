@@ -111,21 +111,44 @@ let get_noninternal_proc_names (prog : ('a, 'b) t) : string list =
       if not proc.proc_internal then pname :: acc else acc)
     prog.procs []
 
-let get_proc (prog : ('a, 'b) t) (proc_name : string) : ('a, 'b) Proc.t option =
-  Hashtbl.find_opt prog.procs proc_name
+let get_proc (prog : ('a, 'b) t) (name : string) : ('a, 'b) Proc.t option =
+  Hashtbl.find_opt prog.procs name
 
-let get_proc_exn (prog : ('a, 'b) t) (proc_name : string) : ('a, 'b) Proc.t =
-  match get_proc prog proc_name with
+let get_proc_exn (prog : ('a, 'b) t) (name : string) : ('a, 'b) Proc.t =
+  match get_proc prog name with
   | Some proc -> proc
-  | None      -> failwith (Printf.sprintf "could not find proc %s" proc_name)
+  | None      -> failwith (Printf.sprintf "could not find proc %s" name)
 
-let get_pred (prog : ('a, 'b) t) (pred_name : string) : Pred.t option =
-  Hashtbl.find_opt prog.preds pred_name
+let get_pred (prog : ('a, 'b) t) (name : string) : Pred.t option =
+  Hashtbl.find_opt prog.preds name
 
-let get_pred_exn (prog : ('a, 'b) t) (pred_name : string) : Pred.t =
-  match get_pred prog pred_name with
+let get_pred_exn (prog : ('a, 'b) t) (name : string) : Pred.t =
+  match get_pred prog name with
   | Some pred -> pred
-  | None      -> failwith (Printf.sprintf "could not find pred %s" pred_name)
+  | None      -> failwith (Printf.sprintf "could not find pred %s" name)
+
+let get_bispec (prog : ('a, 'b) t) (name : string) : BiSpec.t option =
+  Hashtbl.find_opt prog.bi_specs name
+
+let get_bispec_exn (prog : ('a, 'b) t) (name : string) : BiSpec.t =
+  match get_bispec prog name with
+  | Some bispec -> bispec
+  | None        -> failwith (Printf.sprintf "could not find bispec %s" name)
+
+let get_lemma (prog : ('a, 'b) t) (name : string) : Lemma.t option =
+  Hashtbl.find_opt prog.lemmas name
+
+let get_lemma_exn (prog : ('a, 'b) t) (name : string) : Lemma.t =
+  match get_lemma prog name with
+  | Some lemma -> lemma
+  | None       -> failwith (Printf.sprintf "could not find lemma %s" name)
+
+let get_proc_specs (prog : ('a, 'b) t) : Spec.t list =
+  List.rev
+    (Hashtbl.fold
+       (fun _ (proc : ('a, 'b) Proc.t) ac ->
+         Option.fold ~some:(fun spec -> spec :: ac) ~none:ac proc.proc_spec)
+       prog.procs [])
 
 let pp ~(show_labels : bool) ~(pp_label : 'b Fmt.t) fmt (prog : ('a, 'b) t) =
   let pp_list ppp = Fmt.list ~sep:(Fmt.any "@\n") ppp in
@@ -218,18 +241,3 @@ let add_macro (prog : ('a, 'b) t) (macro : Macro.t) : ('a, 'b) t =
 let add_bispec (prog : ('a, 'b) t) (bi_spec : BiSpec.t) : ('a, 'b) t =
   Hashtbl.add prog.bi_specs bi_spec.bispec_name bi_spec;
   prog
-
-let get_bispec (prog : ('a, 'b) t) : string -> BiSpec.t option =
-  Hashtbl.find_opt prog.bi_specs
-
-let get_lemma (prog : ('a, 'b) t) (name : string) : Lemma.t =
-  try Hashtbl.find prog.lemmas name
-  with Not_found ->
-    raise (Failure (Printf.sprintf "DEATH. Lemma %s does not exist" name))
-
-let get_proc_specs (prog : ('a, 'b) t) : Spec.t list =
-  List.rev
-    (Hashtbl.fold
-       (fun _ (proc : ('a, 'b) Proc.t) ac ->
-         Option.fold ~some:(fun spec -> spec :: ac) ~none:ac proc.proc_spec)
-       prog.procs [])

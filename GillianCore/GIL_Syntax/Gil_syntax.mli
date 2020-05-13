@@ -876,19 +876,25 @@ module Prog : sig
   (** Get a specific procedure *)
 
   val get_proc_exn : ('a, 'b) t -> string -> ('a, 'b) Proc.t
-  (** Get a specific procedure *)
+  (** Get a specific procedure. Raises [Failure] if it does not exist *)
 
   val get_pred : ('a, 'b) t -> string -> Pred.t option
-  (** Get a specific procedure *)
+  (** Get a specific predicate *)
 
   val get_pred_exn : ('a, 'b) t -> string -> Pred.t
-  (** Get a specific procedure *)
+  (** Get a specific predicate. Raises [Failure] if it does not exist *)
 
   val get_bispec : ('a, 'b) t -> string -> BiSpec.t option
   (** Get a specific bi-abductive spec *)
 
-  val get_lemma : ('a, 'b) t -> string -> Lemma.t
+  val get_bispec_exn : ('a, 'b) t -> string -> BiSpec.t
+  (** Get a specific bi-abductive spec. Raises [Failure] if it does not exist *)
+
+  val get_lemma : ('a, 'b) t -> string -> Lemma.t option
   (** Get a specific lemma *)
+
+  val get_lemma_exn : ('a, 'b) t -> string -> Lemma.t
+  (** Get a specific lemma. Raises [Failure] if it does not exist *)
 
   val get_proc_specs : ('a, 'b) t -> Spec.t list
   (** Get all specifications *)

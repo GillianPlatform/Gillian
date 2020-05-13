@@ -367,7 +367,7 @@ struct
               (List.length rets) SAInterpreter.pp_result rets);
         analyse_proc_results test flag rets
     | None      -> (
-        let lemma = Prog.get_lemma prog.prog test.name in
+        let lemma = Prog.get_lemma_exn prog.prog test.name in
         match lemma.lemma_proof with
         | None       ->
             if !Config.lemma_proof then
@@ -403,14 +403,52 @@ struct
         not pred.pred_internal)
       pred_names
 
-  let record_preds_used_by_proc proc_name (prog : UP.prog) =
+  let lemma_extracting_visitor =
+    object
+      inherit [_] Visitors.reduce
+
+      inherit Visitors.Utils.ss_monoid
+
+      method! visit_ApplyLem _ lemma_name _ _ = SS.singleton lemma_name
+    end
+
+  let filter_internal_lemmas (prog : UP.prog) (lemma_names : SS.t) =
+    SS.filter
+      (fun lemma_name ->
+        let lemma = Prog.get_lemma_exn prog.prog lemma_name in
+        not lemma.lemma_internal)
+      lemma_names
+
+  let record_proc_dependencies proc_name (prog : UP.prog) =
     let proc = Prog.get_proc_exn prog.prog proc_name in
     let preds_used =
       filter_internal_preds prog (pred_extracting_visitor#visit_proc () proc)
     in
+    let lemmas_used =
+      filter_internal_lemmas prog (lemma_extracting_visitor#visit_proc () proc)
+    in
     SS.iter
       (CallGraph.add_proc_pred_use SAInterpreter.call_graph proc_name)
-      preds_used
+      preds_used;
+    SS.iter
+      (CallGraph.add_proc_lemma_use SAInterpreter.call_graph proc_name)
+      lemmas_used
+
+  let record_lemma_dependencies lemma_name (prog : UP.prog) =
+    let lemma = Prog.get_lemma_exn prog.prog lemma_name in
+    let preds_used =
+      filter_internal_preds prog (pred_extracting_visitor#visit_lemma () lemma)
+    in
+    let lemmas_used =
+      filter_internal_lemmas prog
+        (lemma_extracting_visitor#visit_lemma () lemma)
+    in
+    SS.iter
+      (CallGraph.add_lemma_pred_use SAInterpreter.call_graph lemma_name)
+      preds_used;
+    SS.iter
+      (CallGraph.add_lemma_call SAInterpreter.call_graph lemma_name)
+      lemmas_used
 
   let record_preds_used_by_pred pred_name (prog : UP.prog) =
     let pred = Prog.get_pred_exn prog.prog pred_name in
@@ -491,11 +529,14 @@ struct
     match UP.init_prog prog with
     | Error _  -> raise (Failure "Creation of unification plans failed.")
     | Ok prog' ->
-        List.iter (fun test -> record_preds_used_by_proc test.name prog') tests;
+        (* STEP 5: Determine static dependencies and add to call graph *)
+        List.iter (fun test -> record_proc_dependencies test.name prog') tests;
+        List.iter (fun test -> record_lemma_dependencies test.name prog') tests';
         Hashtbl.iter
           (fun pred_name _ -> record_preds_used_by_pred pred_name prog')
           prog'.preds;
-        (* STEP 5: Run the symbolic tests *)
+
+        (* STEP 6: Run the symbolic tests *)
         let cur_time = Sys.time () in
         Printf.printf "Running symbolic tests: %f\n" (cur_time -. start_time);
         let success : bool =
