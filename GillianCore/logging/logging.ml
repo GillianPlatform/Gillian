@@ -3,16 +3,16 @@ module Report = Report
 
 let wrap_up = Reporter.wrap_up
 
-let log lvl msgf =
+let log lvl ?title ?severity msgf =
   if Mode.should_log lvl then
-    let report = ReportBuilder.info "" (Debug msgf) () in
+    let report = ReportBuilder.make ?title ~content:(Debug msgf) ?severity () in
     Reporter.log report
 
-let normal msgf = log Normal msgf
+let normal ?title ?severity msgf = log Normal ?title ?severity msgf
 
-let verbose msgf = log Verbose msgf
+let verbose ?title ?severity msgf = log Verbose ?title ?severity msgf
 
-let tmi msgf = log TMI msgf
+let tmi ?title ?severity msgf = log TMI ?title ?severity msgf
 
 let print_to_all (str : string) =
   normal (fun m -> m "%s" str);
@@ -20,7 +20,7 @@ let print_to_all (str : string) =
 
 (* Failure *)
 let fail msg =
-  normal (fun m -> m "%a" Format.pp_print_string msg);
+  normal ~severity:Error (fun m -> m "%a" Format.pp_print_string msg);
   raise (Failure msg)
 
 let normal_phase = ReportBuilder.start_phase Normal
@@ -35,9 +35,10 @@ let end_phase = ReportBuilder.end_phase
   let () =
     print_newline ();
     Printf.printf
-      "let phaseBefore level phase () = ReportBuilder.start_phase level phase";
+      "let phase_before level ?title ?severity phase () = \
+       ReportBuilder.start_phase level ?severity ?title phase";
     print_newline ();
-    Printf.printf "let phaseAfter phase () = ReportBuilder.end_phase phase";
+    Printf.printf "let phase_after phase () = ReportBuilder.end_phase phase";
     print_newline ();
     let dec i =
       let args =
@@ -53,8 +54,9 @@ let end_phase = ReportBuilder.end_phase
         i args args;
       print_newline ();
       Printf.printf
-        "let withPhase%d level phase f = dec%d ~before:(phaseBefore level \
-         phase) ~after:(phaseAfter phase) f"
+        "let with_phase%d level ?title ?severity phase f = dec%d \
+         ~before:(phase_before level ?title ?severity phase) \
+         ~after:(phase_after phase) f"
         i i;
       print_newline ()
     in
@@ -62,9 +64,10 @@ let end_phase = ReportBuilder.end_phase
       dec i
     done
 *)
-let phaseBefore level phase () = ReportBuilder.start_phase level phase
+let phase_before level ?title ?severity phase () =
+  ReportBuilder.start_phase level ?severity ?title phase
 
-let phaseAfter phase () = ReportBuilder.end_phase phase
+let phase_after phase () = ReportBuilder.end_phase phase
 
 let dec1 ~before ~after f =
   let wrapper a1 =
@@ -75,8 +78,10 @@ let dec1 ~before ~after f =
   in
   wrapper
 
-let withPhase1 level phase f =
-  dec1 ~before:(phaseBefore level phase) ~after:(phaseAfter phase) f
+let with_phase1 level ?title ?severity phase f =
+  dec1
+    ~before:(phase_before level ?title ?severity phase)
+    ~after:(phase_after phase) f
 
 let dec2 ~before ~after f =
   let wrapper a1 a2 =
@@ -87,8 +92,10 @@ let dec2 ~before ~after f =
   in
   wrapper
 
-let withPhase2 level phase f =
-  dec2 ~before:(phaseBefore level phase) ~after:(phaseAfter phase) f
+let with_phase2 level ?title ?severity phase f =
+  dec2
+    ~before:(phase_before level ?title ?severity phase)
+    ~after:(phase_after phase) f
 
 let dec3 ~before ~after f =
   let wrapper a1 a2 a3 =
@@ -99,8 +106,10 @@ let dec3 ~before ~after f =
   in
   wrapper
 
-let withPhase3 level phase f =
-  dec3 ~before:(phaseBefore level phase) ~after:(phaseAfter phase) f
+let with_phase3 level ?title ?severity phase f =
+  dec3
+    ~before:(phase_before level ?title ?severity phase)
+    ~after:(phase_after phase) f
 
 let dec4 ~before ~after f =
   let wrapper a1 a2 a3 a4 =
@@ -111,8 +120,10 @@ let dec4 ~before ~after f =
   in
   wrapper
 
-let withPhase4 level phase f =
-  dec4 ~before:(phaseBefore level phase) ~after:(phaseAfter phase) f
+let with_phase4 level ?title ?severity phase f =
+  dec4
+    ~before:(phase_before level ?title ?severity phase)
+    ~after:(phase_after phase) f
 
 let dec5 ~before ~after f =
   let wrapper a1 a2 a3 a4 a5 =
@@ -123,7 +134,9 @@ let dec5 ~before ~after f =
   in
   wrapper
 
-let withPhase5 level phase f =
-  dec5 ~before:(phaseBefore level phase) ~after:(phaseAfter phase) f
+let with_phase5 level ?title ?severity phase f =
+  dec5
+    ~before:(phase_before level ?title ?severity phase)
+    ~after:(phase_after phase) f
 
 (*$*)
