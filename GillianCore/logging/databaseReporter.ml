@@ -24,20 +24,6 @@ let get_database () = (get_state ()).database
 
 class t =
   object (self)
-    method private serialize_content : Report.content -> string =
-      function
-      | Debug msgf  -> Report.PackedPP.str msgf
-      | Phase phase ->
-          Format.asprintf "Phase %s" @@ Report.string_of_phase phase
-
-    method private serialize_severity : Report.severity -> Report_t.severity =
-      function
-      | Info    -> `Info
-      | Log     -> `Log
-      | Success -> `Success
-      | Error   -> `Error
-      | Warning -> `Warning
-
     method log (report : Report.t) =
       if enabled () then
         let report : Report_t.t =
@@ -51,8 +37,21 @@ class t =
             severity = self#serialize_severity report.severity;
           }
         in
-        let _ = Sanddb.insert_record self#database report in
-        ()
+        ignore @@ Sanddb.insert_record self#database report
+
+    method private serialize_content : Report.content -> string =
+      function
+      | Debug msgf  -> Report.PackedPP.str msgf
+      | Phase phase ->
+          Format.asprintf "Phase %s" @@ Report.string_of_phase phase
+
+    method private serialize_severity : Report.severity -> Report_t.severity =
+      function
+      | Info    -> `Info
+      | Log     -> `Log
+      | Success -> `Success
+      | Error   -> `Error
+      | Warning -> `Warning
 
     method private database = get_database ()
 
