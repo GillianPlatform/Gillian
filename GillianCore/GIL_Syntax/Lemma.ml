@@ -1,6 +1,8 @@
 type t = TypeDef__.lemma = {
   lemma_name : string;
   (* Name of the lemma *)
+  lemma_source_path : string option;
+  lemma_internal : bool;
   lemma_params : string list;
   (* Params *)
   lemma_hyp : Asrt.t;
@@ -22,8 +24,20 @@ let pp fmt lemma =
       (Fmt.list ~sep:(Fmt.any "@\n") LCmd.pp)
       proof
   in
+  let pp_path_opt fmt = function
+    | None   -> Fmt.pf fmt "@nopath@\n"
+    | Some _ -> ()
+  in
+  let pp_internal fmt = function
+    | true  -> Fmt.pf fmt "@internal@\n"
+    | false -> ()
+  in
   Fmt.pf fmt
-    "@[<hov 2>lemma %s(%a)@\n[[  @[<hov 0>%a@] ]]@\n[[  @[<hov 0>%a@] ]]@\n%a@]"
+    "%a%a@[<hov 2>lemma %s(%a)@\n\
+     [[  @[<hov 0>%a@] ]]@\n\
+     [[  @[<hov 0>%a@] ]]@\n\
+     %a@]"
+    pp_path_opt lemma.lemma_source_path pp_internal lemma.lemma_internal
     lemma.lemma_name
     (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
     lemma.lemma_params Asrt.pp lemma.lemma_hyp

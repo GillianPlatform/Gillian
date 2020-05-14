@@ -1,4 +1,4 @@
-# Misc Editors
+# Misc editors
 *.autosave
 .*.swp
 .*.swo
@@ -31,8 +31,7 @@ _build
 *.byte
 *.merlin
 
-
-# Mac Rubbish
+# Mac rubbish
 .DS_Store
 
 config/config.xml
@@ -67,11 +66,12 @@ doc
 _build.prev
 _release
 
-# gillian specific stuff
+# Gillian-specific stuff
 */environment
 *.env
+**/.gillian
 
-#Sacha Printing dependency graphs
+# Dependency graphs
 with-depgraph.esy.lock
 with-depgraph.json
 see_deps.py

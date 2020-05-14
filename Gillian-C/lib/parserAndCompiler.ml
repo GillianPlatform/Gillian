@@ -1,6 +1,9 @@
 open Compcert
 open Config_compcert
 open CConstants
+module SS = Gillian.Utils.Containers.SS
+
+let small_tbl_size = Gillian.Utils.Config.small_tbl_size
 
 module TargetLangOptions = struct
   open Cmdliner
@@ -107,16 +110,11 @@ module TargetLangOptions = struct
     Config.hide_mult_def := hide_mult_def
 end
 
-let compiled_progs = Hashtbl.create 16
+let compiled_progs = Hashtbl.create small_tbl_size
 
-let gil_paths = Hashtbl.create 16
+let get_gil_path c_path = Filename.chop_extension c_path ^ ".gil"
 
-let get_gil_path c_path =
-  if Hashtbl.mem gil_paths c_path then Hashtbl.find gil_paths c_path
-  else
-    let gil_path = Filename.chop_extension c_path ^ ".gil" in
-    Hashtbl.add gil_paths c_path gil_path;
-    gil_path
+let get_deps_path c_path = Filename.chop_extension c_path ^ ".deps"
 
 type err = Errors.errmsg
 
@@ -148,12 +146,10 @@ let parse_annots file =
   let () = close_in inx in
   wprog
 
-module Str_set = Gillian.Utils.Containers.SS
-
 let mangle_proc proc mangled_syms =
-  let reserved_names = Str_set.of_list [ "pred"; "pure" ] in
+  let reserved_names = SS.of_list [ "pred"; "pure" ] in
   let mangle_var var =
-    let prefix = if Str_set.mem var reserved_names then "v__" else "" in
+    let prefix = if SS.mem var reserved_names then "v__" else "" in
     prefix ^ var
   in
   let mangle_symbol sym =
@@ -178,12 +174,19 @@ let mangle_proc proc mangled_syms =
   in
   mangling_visitor#visit_proc () proc
 
+let write_dependencies_file c_path =
+  let prev_options = Preprocessor.get_options () in
+  Preprocessor.set_output_dependencies_opts (get_deps_path c_path);
+  Frontend.preprocess c_path "-";
+  Preprocessor.restore_options prev_options
+
 let parse_and_compile_file path exec_mode =
   let pathi = Filename.chop_extension path ^ ".i" in
   let () = Frontend.preprocess path pathi in
-  let s = Frontend.parse_c_file path pathi in
-  let s = get_or_print_and_die (SimplExpr.transl_program s) in
-  let last_clight = get_or_print_and_die (SimplLocals.transf_program s) in
+  let () = write_dependencies_file path in
+  let c_prog = Frontend.parse_c_file path pathi in
+  let clight = get_or_print_and_die (SimplExpr.transl_program c_prog) in
+  let last_clight = get_or_print_and_die (SimplLocals.transf_program clight) in
   let csm = get_or_print_and_die (Cshmgen.transl_program last_clight) in
   let () =
     if !Config.burn_csm then
@@ -193,14 +196,13 @@ let parse_and_compile_file path exec_mode =
       let () = Format.fprintf fmt "%a" PrintCsharpminor.print_program csm in
       close_out oc
   in
-  let filename = Filename.basename (Filename.chop_extension path) in
-  let mangled_syms = Hashtbl.create 32 in
+  let mangled_syms = Hashtbl.create small_tbl_size in
   let annots = parse_annots path in
   let prog, compilation_data =
-    Gilgen.trans_program_with_annots exec_mode last_clight csm filename
-      mangled_syms annots
+    Gilgen.trans_program_with_annots exec_mode last_clight csm ~filepath:path
+      ~mangled_syms annots
   in
-  let trans_procs = Hashtbl.create 1 in
+  let trans_procs = Hashtbl.create small_tbl_size in
   let () =
     Hashtbl.iter
       (fun proc_name proc_body ->
@@ -219,10 +221,29 @@ let linker_error msg symbols =
   in
   raise Linker_error
 
+let parse_dependencies_file deps_file =
+  let file_str = Gillian.Utils.Io_utils.load_file deps_file in
+  let delims = Str.regexp "[ \\( \\\\\\)\n\r\t]+" in
+  let parts = Str.split delims file_str in
+  let header_path = Str.regexp ".*\\.h" in
+  List.filter (fun part -> Str.string_match header_path part 0) parts
+
+let register_source_files paths =
+  let open IncrementalAnalysis in
+  List.iter
+    (fun path ->
+      let headers = parse_dependencies_file (get_deps_path path) in
+      SourceFiles.add_source_file ChangeTracker.cur_source_files path;
+      List.iter
+        (fun header ->
+          SourceFiles.add_dependency ChangeTracker.cur_source_files header path)
+        headers)
+    paths
+
 let current_arch =
   if Archi.ptr64 then Architecture.Arch64 else Architecture.Arch32
 
-let add_init_pred exec_mode =
+let is_verif_or_act exec_mode =
   ExecMode.verification_exec exec_mode || ExecMode.biabduction_exec exec_mode
 
 let parse_and_compile_files paths =
@@ -266,6 +287,7 @@ let parse_and_compile_files paths =
     if (not (Symbol_set.is_empty unresolved_syms)) && not hide_undef then
       linker_error "undefined reference to" unresolved_syms
   in
+  let () = register_source_files paths in
 
   (* Create main GIL program with references to all other files *)
   let open Gillian.Gil_syntax in
@@ -291,7 +313,7 @@ let parse_and_compile_files paths =
   let all_proc_names = init_proc_name :: main_prog.proc_names in
   let () = Hashtbl.add main_prog.procs init_proc_name init_proc in
   let () =
-    if add_init_pred exec_mode then
+    if is_verif_or_act exec_mode then
       let init_pred =
         Gil_logic_gen.make_global_env_pred (genv_pred_asrts @ init_asrts)
       in

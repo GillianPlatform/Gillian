@@ -1,0 +1,7 @@
+(library
+ (name incrementalAnalysis)
+ (public_name gillian.incrementalAnalysis)
+ (libraries utils gil_syntax fmt ppx_deriving_yojson.runtime)
+ (preprocess
+  (pps ppx_deriving_yojson))
+ (flags -open Utils -open Gil_syntax))

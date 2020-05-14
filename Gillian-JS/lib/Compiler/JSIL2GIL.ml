@@ -96,6 +96,9 @@ let jsil2gil_spec (spec : Spec.t) : GSpec.t =
 let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
   {
     lemma_name = lemma.name;
+    lemma_source_path = None;
+    lemma_internal = false;
+    (* TODO (Alexis): Set depending on module of pred *)
     lemma_params = lemma.params;
     lemma_hyp = jsil2gil_asrt lemma.pre;
     lemma_concs = List.map jsil2gil_asrt lemma.posts;
@@ -107,6 +110,9 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
 let jsil2gil_pred (pred : Pred.t) : GPred.t =
   {
     pred_name = pred.name;
+    pred_source_path = None;
+    pred_internal = false;
+    (* TODO (Alexis): Set depending on module of pred *)
     pred_num_params = pred.num_params;
     pred_params = pred.params;
     pred_ins = pred.ins;
@@ -402,6 +408,9 @@ let jsil2core_proc (proc : EProc.t) : (Annot.t, string) GProc.t =
   in
   {
     proc_name = proc.name;
+    proc_source_path = None;
+    proc_internal = false;
+    (* TODO (Alexis): Set depending on module of proc *)
     proc_body = Array.of_list body';
     proc_params = proc.params;
     proc_spec = Option.map jsil2gil_spec proc.spec;

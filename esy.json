@@ -60,6 +60,7 @@
     "@opam/uuidm": "0.9.7",
     "@opam/visitors": "20190711",
     "@opam/yojson": "^1.7.0",
+    "@opam/ppx_deriving_yojson": "^3.5.2",
     "@opam/z3": "giltho/esy-z3#b0fdd9a",
     "@reason-native/rely": "^3.1.0",
     "JS_Parser": "GillianPlatform/JS_Parser#24b27e3",

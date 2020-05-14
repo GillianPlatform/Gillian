@@ -2,6 +2,11 @@
     Mostly composed of modifiable flags, or hardcoded values.  *)
 
 (** {2 global config} *)
+
+let results_dir, set_result_dir =
+  let rd = ref ".gillian" in
+  ((fun () -> !rd), fun r -> rd := r)
+
 let ci = ref false
 
 let current_exec_mode : ExecMode.t ref = ref ExecMode.Verification

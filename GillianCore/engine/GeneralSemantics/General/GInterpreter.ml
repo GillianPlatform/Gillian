@@ -49,6 +49,10 @@ struct
 
   let pp_single_result ft res = ExecRes.pp State.pp Val.pp pp_err ft res
 
+  let call_graph = CallGraph.make ()
+
+  let reset () = CallGraph.reset call_graph
+
   (* ******************* *
    * Auxiliary Functions *
    * ******************* *)
@@ -126,6 +130,9 @@ struct
            %a@\n\
            ------------------------------------------------------@]@\n"
           (Sys.time ()) LCmd.pp lcmd State.pp state)
+
+  let is_internal_proc (prog : UP.prog) proc_name =
+    (Prog.get_proc_exn prog.prog proc_name).proc_internal
 
   (* ************** *
    * Main Functions *
@@ -357,6 +364,11 @@ struct
             raise
               (Interpreter_error
                  ([ EProc (Val.from_literal (String pid)) ], state))
+      in
+      let caller = CallStack.get_cur_proc_id cs in
+      let () =
+        if not (is_internal_proc prog caller || is_internal_proc prog pid) then
+          CallGraph.add_proc_call call_graph caller pid
       in
       let prmlen = List.length params in
 

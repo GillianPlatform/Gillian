@@ -32,7 +32,11 @@ struct
     spec_vars : SS.t;
   }
 
-  let global_results = Hashtbl.create Config.medium_tbl_size
+  let global_results = VerificationResults.make ()
+
+  let reset () =
+    VerificationResults.reset global_results;
+    SAInterpreter.reset ()
 
   let testify
       (preds : (string, Pred.t) Hashtbl.t)
@@ -175,7 +179,7 @@ struct
     match spec.spec_to_verify with
     | false -> ([], spec)
     | true  ->
-        let _ =
+        let () =
           List.iter
             (fun (sspec : Spec.st) ->
               if sspec.ss_posts = [] then
@@ -242,11 +246,11 @@ struct
     | true  ->
         L.verbose (fun m ->
             m "Analyse result: Postcondition unified successfully");
-        Hashtbl.replace global_results (test.name, test.id) true;
+        VerificationResults.set_result global_results test.name test.id true;
         true
     | false ->
         L.normal (fun m -> m "Analyse result: Postcondition not unifiable.");
-        Hashtbl.replace global_results (test.name, test.id) false;
+        VerificationResults.set_result global_results test.name test.id false;
         false
 
   let make_post_subst (test : t) (post_state : SPState.t) : SSubst.t =
@@ -363,7 +367,7 @@ struct
               (List.length rets) SAInterpreter.pp_result rets);
         analyse_proc_results test flag rets
     | None      -> (
-        let lemma = Prog.get_lemma prog.prog test.name in
+        let lemma = Prog.get_lemma_exn prog.prog test.name in
         match lemma.lemma_proof with
         | None       ->
             if !Config.lemma_proof then
@@ -377,14 +381,106 @@ struct
             let rets = SAInterpreter.evaluate_lcmds prog proof state' in
             analyse_lemma_results test rets )
 
-  let verify_procs (prog : ('a, int) Prog.t) : unit =
-    let preds = prog.preds in
+  let pred_extracting_visitor =
+    object
+      inherit [_] Visitors.reduce
 
+      inherit Visitors.Utils.ss_monoid
+
+      method! visit_Pred _ pred_name _ = SS.singleton pred_name
+
+      method! visit_Fold _ pred_name _ _ = SS.singleton pred_name
+
+      method! visit_Unfold _ pred_name _ _ _ = SS.singleton pred_name
+
+      method! visit_GUnfold _ pred_name = SS.singleton pred_name
+    end
+
+  let filter_internal_preds (prog : UP.prog) (pred_names : SS.t) =
+    SS.filter
+      (fun pred_name ->
+        let pred = Prog.get_pred_exn prog.prog pred_name in
+        not pred.pred_internal)
+      pred_names
+
+  let lemma_extracting_visitor =
+    object
+      inherit [_] Visitors.reduce
+
+      inherit Visitors.Utils.ss_monoid
+
+      method! visit_ApplyLem _ lemma_name _ _ = SS.singleton lemma_name
+    end
+
+  let filter_internal_lemmas (prog : UP.prog) (lemma_names : SS.t) =
+    SS.filter
+      (fun lemma_name ->
+        let lemma = Prog.get_lemma_exn prog.prog lemma_name in
+        not lemma.lemma_internal)
+      lemma_names
+
+  let record_proc_dependencies proc_name (prog : UP.prog) =
+    let proc = Prog.get_proc_exn prog.prog proc_name in
+    let preds_used =
+      filter_internal_preds prog (pred_extracting_visitor#visit_proc () proc)
+    in
+    let lemmas_used =
+      filter_internal_lemmas prog (lemma_extracting_visitor#visit_proc () proc)
+    in
+    SS.iter
+      (CallGraph.add_proc_pred_use SAInterpreter.call_graph proc_name)
+      preds_used;
+    SS.iter
+      (CallGraph.add_proc_lemma_use SAInterpreter.call_graph proc_name)
+      lemmas_used
+
+  let record_lemma_dependencies lemma_name (prog : UP.prog) =
+    let lemma = Prog.get_lemma_exn prog.prog lemma_name in
+    let preds_used =
+      filter_internal_preds prog (pred_extracting_visitor#visit_lemma () lemma)
+    in
+    let lemmas_used =
+      filter_internal_lemmas prog
+        (lemma_extracting_visitor#visit_lemma () lemma)
+    in
+    SS.iter
+      (CallGraph.add_lemma_pred_use SAInterpreter.call_graph lemma_name)
+      preds_used;
+    SS.iter
+      (CallGraph.add_lemma_call SAInterpreter.call_graph lemma_name)
+      lemmas_used
+
+  let record_preds_used_by_pred pred_name (prog : UP.prog) =
+    let pred = Prog.get_pred_exn prog.prog pred_name in
+    let preds_used =
+      filter_internal_preds prog (pred_extracting_visitor#visit_pred () pred)
+    in
+    SS.iter
+      (CallGraph.add_pred_call SAInterpreter.call_graph pred_name)
+      preds_used
+
+  let check_previously_verified prev_results cur_verified =
+    Option.fold ~none:true
+      ~some:(fun res ->
+        VerificationResults.check_previously_verified
+          ~printer:print_success_or_failure res cur_verified)
+      prev_results
+
+  let verify_procs
+      ?(prev_results : VerificationResults.t option)
+      (prog : (Annot.t, int) Prog.t)
+      (pnames_to_verify : SS.t)
+      (lnames_to_verify : SS.t) : unit =
+    let preds = prog.preds in
     let start_time = Sys.time () in
 
     (* STEP 1: Get the specs to verify *)
-    Printf.printf "Obtaining specs to verify.\n";
-    let specs_to_verify : Spec.t list = Prog.get_proc_specs prog in
+    Printf.printf "Obtaining specs to verify...\n";
+    let specs_to_verify =
+      List.filter
+        (fun (spec : Spec.t) -> SS.mem spec.spec_name pnames_to_verify)
+        (Prog.get_proc_specs prog)
+    in
 
     (* STEP 2: Convert specs to symbolic tests *)
     (* Printf.printf "Converting symbolic tests from specs: %f\n" (cur_time -. start_time); *)
@@ -393,17 +489,22 @@ struct
         (List.map
            (fun spec ->
              let tests, new_spec = testify_spec preds spec in
-             let proc =
-               try Hashtbl.find prog.procs spec.spec_name
-               with _ -> raise (Failure "DEATH")
-             in
+             let proc = Prog.get_proc_exn prog spec.spec_name in
              Hashtbl.replace prog.procs proc.proc_name
                { proc with proc_spec = Some new_spec };
              tests)
            specs_to_verify)
     in
+    Printf.printf "Obtained %d symbolic tests\n" (List.length tests);
 
-    (* STEP 3: Convert lemmas to symbolic tests *)
+    (* STEP 3: Get the lemmas to verify *)
+    let lemmas_to_verify =
+      List.filter
+        (fun (lemma : Lemma.t) -> SS.mem lemma.lemma_name lnames_to_verify)
+        (Prog.get_lemmas prog)
+    in
+
+    (* STEP 4: Convert lemmas to symbolic tests *)
     (* Printf.printf "Converting symbolic tests from lemmas: %f\n" (cur_time -. start_time); *)
     let tests' : t list =
       List.concat
@@ -412,10 +513,8 @@ struct
              let tests, new_lemma = testify_lemma preds lemma in
              Hashtbl.replace prog.lemmas lemma.lemma_name new_lemma;
              tests)
-           (Prog.get_lemmas prog))
+           lemmas_to_verify)
     in
-
-    Printf.printf "Obtained %d symbolic tests\n" (List.length tests);
 
     L.verbose (fun m ->
         m
@@ -434,7 +533,14 @@ struct
     match UP.init_prog prog with
     | Error _  -> raise (Failure "Creation of unification plans failed.")
     | Ok prog' ->
-        (* STEP 5: Run the symbolic tests *)
+        (* STEP 5: Determine static dependencies and add to call graph *)
+        List.iter (fun test -> record_proc_dependencies test.name prog') tests;
+        List.iter (fun test -> record_lemma_dependencies test.name prog') tests';
+        Hashtbl.iter
+          (fun pred_name _ -> record_preds_used_by_pred pred_name prog')
+          prog'.preds;
+
+        (* STEP 6: Run the symbolic tests *)
         let cur_time = Sys.time () in
         Printf.printf "Running symbolic tests: %f\n" (cur_time -. start_time);
         let success : bool =
@@ -442,9 +548,11 @@ struct
             (fun ac test -> if verify prog' test then ac else false)
             true (tests' @ tests)
         in
-
         let end_time = Sys.time () in
-
+        let cur_verified = SS.union pnames_to_verify lnames_to_verify in
+        let success =
+          success && check_previously_verified prev_results cur_verified
+        in
         let msg : string =
           if success then "All specs succeeded:" else "There were failures:"
         in
@@ -453,6 +561,50 @@ struct
         in
         Printf.printf "%s\n" msg;
         L.normal (fun m -> m "%s" msg)
+
+  let verify_prog (prog : (Annot.t, int) Prog.t) (incremental : bool) : unit =
+    let open ResultsDir in
+    let open ChangeTracker in
+    if incremental && prev_results_exist () then
+      (* Only verify changed procedures and lemmas *)
+      let { sources; call_graph; results } = read_results_dir () in
+      let changes = get_changes prog sources call_graph in
+      let () = CallGraph.prune_procs call_graph changes.deleted_procs in
+      let () = CallGraph.prune_lemmas call_graph changes.deleted_lemmas in
+      let () =
+        VerificationResults.prune results
+          (changes.deleted_procs @ changes.deleted_lemmas)
+      in
+      let procs_to_verify =
+        SS.of_list
+          (changes.changed_procs @ changes.new_procs @ changes.dependent_procs)
+      in
+      let lemmas_to_verify =
+        SS.of_list
+          ( changes.changed_lemmas @ changes.new_lemmas
+          @ changes.dependent_lemmas )
+      in
+      let () =
+        verify_procs ~prev_results:results prog procs_to_verify lemmas_to_verify
+      in
+      let cur_results, cur_call_graph =
+        (global_results, SAInterpreter.call_graph)
+      in
+      let call_graph = CallGraph.merge call_graph cur_call_graph in
+      let results = VerificationResults.merge results cur_results in
+      let diff = Fmt.str "%a" ChangeTracker.pp changes in
+      write_results_dir
+        { sources = cur_source_files; call_graph; results; diff }
+    else
+      (* Analyse all procedures and lemmas *)
+      let procs_to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
+      let lemmas_to_verify =
+        SS.of_list (Prog.get_noninternal_lemma_names prog)
+      in
+      let () = verify_procs prog procs_to_verify lemmas_to_verify in
+      let results, call_graph = (global_results, SAInterpreter.call_graph) in
+      write_results_dir
+        { sources = cur_source_files; call_graph; results; diff = "" }
 end
 
 module From_scratch (SMemory : SMemory.S) (External : External.S) = struct

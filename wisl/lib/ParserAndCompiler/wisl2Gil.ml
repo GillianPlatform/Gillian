@@ -771,7 +771,7 @@ let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials } =
   in
   Spec.init fname fparams [ single_spec ] false true
 
-let compile_pred pred =
+let compile_pred filepath pred =
   let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; _ } = pred in
   let types = WType.infer_types_pred pred_params pred_definitions in
   let getWISLTypes str = (str, WType.of_variable str types) in
@@ -787,6 +787,8 @@ let compile_pred pred =
   Pred.
     {
       pred_name;
+      pred_source_path = Some filepath;
+      pred_internal = false;
       pred_num_params = List.length pred_params;
       pred_params;
       pred_ins;
@@ -795,9 +797,12 @@ let compile_pred pred =
       pred_pure = false;
     }
 
-let rec compile_function WFun.{ name; params; body; spec; return_expr; _ } =
+let rec compile_function
+    filepath WFun.{ name; params; body; spec; return_expr; _ } =
   let lbodylist, new_functions = compile_stmt_list ~fname:name body in
-  let other_procs = List.concat (List.map compile_function new_functions) in
+  let other_procs =
+    List.concat (List.map (compile_function filepath) new_functions)
+  in
   let cmdle, comp_ret_expr = compile_expr ~fname:name return_expr in
   let retassigncmds =
     cmdle
@@ -814,6 +819,8 @@ let rec compile_function WFun.{ name; params; body; spec; return_expr; _ } =
   Proc.
     {
       proc_name = name;
+      proc_source_path = Some filepath;
+      proc_internal = false;
       proc_body = gil_body;
       proc_spec = gil_spec;
       proc_params = params;
@@ -879,6 +886,7 @@ let preprocess_lemma
     }
 
 let compile_lemma
+    filepath
     WLemma.
       {
         lemma_name;
@@ -914,6 +922,8 @@ let compile_lemma
   Lemma.
     {
       lemma_name;
+      lemma_source_path = Some filepath;
+      lemma_internal = false;
       lemma_params;
       lemma_proof;
       lemma_variant;
@@ -922,7 +932,7 @@ let compile_lemma
       lemma_existentials;
     }
 
-let compile WProg.{ context; predicates; lemmas } =
+let compile ~filepath WProg.{ context; predicates; lemmas } =
   (* stuff useful to build hashtables *)
   let make_hashtbl get_name deflist =
     let hashtbl = Hashtbl.create (List.length deflist) in
@@ -935,10 +945,12 @@ let compile WProg.{ context; predicates; lemmas } =
   let get_pred_name pred = pred.Pred.pred_name in
   let get_lemma_name lemma = lemma.Lemma.lemma_name in
   (* compile everything *)
-  let comp_context = List.map compile_function context in
-  let comp_preds = List.map compile_pred predicates in
+  let comp_context = List.map (compile_function filepath) context in
+  let comp_preds = List.map (compile_pred filepath) predicates in
   let comp_lemmas =
-    List.map (fun lemma -> compile_lemma (preprocess_lemma lemma)) lemmas
+    List.map
+      (fun lemma -> compile_lemma filepath (preprocess_lemma lemma))
+      lemmas
   in
   (* build the hashtables *)
   let gil_procs = make_hashtbl get_proc_name (List.concat comp_context) in

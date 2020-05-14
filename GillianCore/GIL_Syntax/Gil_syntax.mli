@@ -556,6 +556,8 @@ module Pred : sig
   (** {b GIL Predicates} *)
   type t = {
     pred_name : string;  (** Name of the predicate *)
+    pred_source_path : string option;
+    pred_internal : bool;
     pred_num_params : int;  (** Number of parameters *)
     pred_params : (string * Type.t option) list;
         (** Parameter names and (optional) types *)
@@ -619,6 +621,8 @@ module Lemma : sig
   (** {b GIL Lemmas} *)
   type t = {
     lemma_name : string;  (** Name *)
+    lemma_source_path : string option;
+    lemma_internal : bool;
     lemma_params : string list;  (** Parameters *)
     lemma_hyp : Asrt.t;  (** Hypothesis *)
     lemma_concs : Asrt.t list;  (** Conclusion *)
@@ -756,6 +760,8 @@ module Proc : sig
  *)
   type ('annot, 'label) t = {
     proc_name : string;
+    proc_source_path : string option;
+    proc_internal : bool;
     proc_body : ('annot * 'label option * 'label Cmd.t) array;
     proc_params : string list;
     proc_spec : Spec.t option;
@@ -860,17 +866,42 @@ module Prog : sig
   val get_procs : ?proc_names:string list -> ('a, 'b) t -> ('a, 'b) Proc.t list
   (** Get all procedures *)
 
+  val get_bispecs : ('a, 'b) t -> BiSpec.t list
+  (** Get all bi-abductive specs *)
+
+  val get_noninternal_proc_names : ('a, 'b) t -> string list
+  (** Get names of all procedures not marked as internal *)
+
+  val get_noninternal_pred_names : ('a, 'b) t -> string list
+  (** Get names of all predicates not marked as internal *)
+
+  val get_noninternal_lemma_names : ('a, 'b) t -> string list
+  (** Get names of all lemmas not marked as internal *)
+
   val get_proc : ('a, 'b) t -> string -> ('a, 'b) Proc.t option
   (** Get a specific procedure *)
 
-  val get_bispecs : ('a, 'b) t -> BiSpec.t list
-  (** Get all bi-abductive specs *)
+  val get_proc_exn : ('a, 'b) t -> string -> ('a, 'b) Proc.t
+  (** Get a specific procedure. Raises [Failure] if it does not exist *)
+  (* FIXME: should raise Not_found instead *)
+
+  val get_pred : ('a, 'b) t -> string -> Pred.t option
+  (** Get a specific predicate *)
+
+  val get_pred_exn : ('a, 'b) t -> string -> Pred.t
+  (** Get a specific predicate. Raises [Failure] if it does not exist *)
 
   val get_bispec : ('a, 'b) t -> string -> BiSpec.t option
   (** Get a specific bi-abductive spec *)
 
-  val get_lemma : ('a, 'b) t -> string -> Lemma.t
+  val get_bispec_exn : ('a, 'b) t -> string -> BiSpec.t
+  (** Get a specific bi-abductive spec. Raises [Failure] if it does not exist *)
+
+  val get_lemma : ('a, 'b) t -> string -> Lemma.t option
   (** Get a specific lemma *)
+
+  val get_lemma_exn : ('a, 'b) t -> string -> Lemma.t
+  (** Get a specific lemma. Raises [Failure] if it does not exist *)
 
   val get_proc_specs : ('a, 'b) t -> Spec.t list
   (** Get all specifications *)
@@ -2139,4 +2170,30 @@ module Visitors : sig
 
       method virtual private zero : 'f
     end
+
+  module Utils : sig
+    module SS = Containers.SS
+
+    class list_monoid :
+      object
+        method private zero : 'b list
+
+        method private plus : 'a list -> 'a list -> 'a list
+      end
+
+    class ss_monoid :
+      object
+        method private zero : SS.t
+
+        method private plus : SS.t -> SS.t -> SS.t
+      end
+
+    class two_list_monoid :
+      object
+        method private zero : 'c list * 'd list
+
+        method private plus :
+          'a list * 'b list -> 'a list * 'b list -> 'a list * 'b list
+      end
+  end
 end

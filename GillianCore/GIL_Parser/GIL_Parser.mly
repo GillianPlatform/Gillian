@@ -1,5 +1,7 @@
 %{
 open Containers
+open Parser_state
+
 let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %}
 
@@ -190,6 +192,10 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token IMPORT
 %token MACRO
 %token VERIFY
+(* Directives *)
+%token NO_PATH
+%token INTERNAL
+%token INTERNAL_FILE
 (* Separators *)
 %token DOT
 %token COMMA
@@ -408,9 +414,13 @@ var_and_le_target:
 (***********************)
 
 gmain_target:
-  imports = option(import_target); imports_to_verify = option(import_verify_target);
-  g_prog = gdeclaration_target; EOF
+  internal = option(INTERNAL_FILE);
+  imports = option(import_target);
+  imports_to_verify = option(import_verify_target);
+  g_prog = gdeclaration_target;
+  EOF
     {
+      internal_file := Option.is_some internal;
       let imports = List.map (fun path -> (path, false))
         (Option.value ~default:[] imports)
       in
@@ -461,12 +471,30 @@ gdeclaration_target:
 
 (* [spec;] proc xpto (x, y) { cmd_list }; *)
 gproc_target:
-  proc_spec = option(g_spec_target); proc_head = proc_head_target; CLBRACKET; cmd_list = gcmd_list_target; CRBRACKET; SCOLON
-    {
-      let proc_name, proc_params = proc_head in
-      let gproc : (Annot.t, string) Proc.t = { proc_name; proc_body = Array.of_list cmd_list; proc_params; proc_spec } in
-      gproc
-    }
+  no_path = option(NO_PATH);
+  internal = option(INTERNAL);
+  proc_spec = option(g_spec_target);
+  proc_head = proc_head_target;
+  CLBRACKET;
+  cmd_list = gcmd_list_target;
+  CRBRACKET;
+  SCOLON
+  {
+    let proc_name, proc_params = proc_head in
+    let () =
+      if Option.is_some no_path then
+        procs_with_no_paths := SS.add proc_name !procs_with_no_paths
+    in
+    Proc.
+      {
+        proc_name;
+        proc_source_path = None;
+        proc_internal = Option.is_some internal;
+        proc_body = Array.of_list cmd_list;
+        proc_params;
+        proc_spec;
+      }
+  }
 ;
 
 gcmd_list_target:
@@ -694,25 +722,36 @@ g_logic_cmd_target:
      { Branch fo }
 ;
 
-
 (* pred name (arg1, ..., argn) : def1, ..., defn ; *)
 g_pred_target:
-  p = option(PURE); PRED; pred_head = pred_head_target; COLON;
-  pred_definitions = separated_nonempty_list(COMMA, g_named_assertion_target); SCOLON
+  no_path = option(NO_PATH);
+  internal = option(INTERNAL);
+  pure = option(PURE);
+  PRED;
+  pred_head = pred_head_target;
+  COLON;
+  pred_definitions = separated_nonempty_list(COMMA, g_named_assertion_target);
+  SCOLON
   {
-    let pred_pure = match p with | Some _ -> true | None -> false in
+    let pred_pure = Option.is_some pure in
     let (pred_name, pred_num_params, pred_params, pred_ins) = pred_head in
+    let () =
+      if Option.is_some no_path then
+        preds_with_no_paths := SS.add pred_name !preds_with_no_paths
+    in
     let pred_normalised = !Config.previously_normalised in
-    let pred : Pred.t = {
-      pred_name;
-      pred_num_params;
-      pred_params;
-      pred_ins;
-      pred_definitions;
-      pred_pure;
-      pred_normalised
-    } in
-    pred
+    Pred.
+      {
+        pred_name;
+        pred_source_path = None;
+        pred_internal = Option.is_some internal;
+        pred_num_params;
+        pred_params;
+        pred_ins;
+        pred_definitions;
+        pred_pure;
+        pred_normalised;
+      }
   }
 ;
 
@@ -732,13 +771,34 @@ g_lemma_target:
      [[ pre ]]
      [[ post ]] [existentials: a, b, c]
      [* proof_body *] *)
-  LEMMA; lemma_head = lemma_head_target; lemma_variant = option(lemma_variant_target);
-    lemma_hyp = g_spec_line; lemma_concs = g_mult_spec_line; lemma_existentials=option(existentials_target); lemma_proof = option(g_lemma_proof_target);
+  no_path = option(NO_PATH);
+  internal = option(INTERNAL);
+  LEMMA;
+  lemma_head = lemma_head_target;
+  lemma_variant = option(lemma_variant_target);
+  lemma_hyp = g_spec_line;
+  lemma_concs = g_mult_spec_line;
+  lemma_existentials = option(existentials_target);
+  lemma_proof = option(g_lemma_proof_target);
   {
-      let (lemma_name, lemma_params) = lemma_head in
-      let lemma_existentials = Option.value ~default:[] lemma_existentials in
-      let lemma : Lemma.t = { lemma_name; lemma_params; lemma_hyp; lemma_concs; lemma_variant; lemma_proof; lemma_existentials} in
-      lemma
+    let lemma_name, lemma_params = lemma_head in
+    let () =
+      if Option.is_some no_path then
+        lemmas_with_no_paths := SS.add lemma_name !lemmas_with_no_paths
+    in
+    let lemma_existentials = Option.value ~default:[] lemma_existentials in
+    Lemma.
+      {
+        lemma_name;
+        lemma_source_path = None;
+        lemma_internal = Option.is_some internal;
+        lemma_params;
+        lemma_hyp;
+        lemma_concs;
+        lemma_variant;
+        lemma_proof;
+        lemma_existentials;
+      }
   }
 ;
 

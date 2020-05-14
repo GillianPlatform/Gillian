@@ -186,6 +186,8 @@ and flag = Normal | Error
 
 and pred = {
   pred_name : string;
+  pred_source_path : string option;
+  pred_internal : bool;
   pred_num_params : int;
   pred_params : (string * typ option) list;
   pred_ins : int list;
@@ -196,6 +198,8 @@ and pred = {
 
 and lemma = {
   lemma_name : string;
+  lemma_source_path : string option;
+  lemma_internal : bool;
   lemma_params : string list;
   lemma_hyp : assertion;
   lemma_concs : assertion list;
@@ -235,6 +239,8 @@ and macro = {
 
 and ('annot, 'label) proc = {
   proc_name : string;
+  proc_source_path : string option;
+  proc_internal : bool;
   proc_body : ('annot * 'label option * 'label cmd) array;
   proc_params : string list;
   proc_spec : spec option;

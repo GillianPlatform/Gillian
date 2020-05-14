@@ -1,5 +1,15 @@
-(** Create folder safely *)
+(** Create a folder safely *)
 let safe_mkdir path = if not (Sys.file_exists path) then Unix.mkdir path 0o777
+
+(** Delete a folder and all its contents *)
+let rec rm_r path =
+  if Sys.is_directory path then (
+    Sys.readdir path
+    |> Array.iter (fun fname -> rm_r (Filename.concat path fname));
+    Unix.rmdir path )
+  else Sys.remove path
+
+let rm_rf path = if Sys.file_exists path then rm_r path
 
 (** Save string to file *)
 let save_file path data =
@@ -17,7 +27,7 @@ let save_file_pp
   Format.pp_print_flush foc ();
   close_out oc
 
-(** Load file given his path *)
+(** Load a file given its path *)
 let load_file f : string =
   let ic = open_in f in
   let n = in_channel_length ic in
