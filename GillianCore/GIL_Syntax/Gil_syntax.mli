@@ -883,6 +883,7 @@ module Prog : sig
 
   val get_proc_exn : ('a, 'b) t -> string -> ('a, 'b) Proc.t
   (** Get a specific procedure. Raises [Failure] if it does not exist *)
+  (* FIXME: should raise Not_found instead *)
 
   val get_pred : ('a, 'b) t -> string -> Pred.t option
   (** Get a specific predicate *)
