@@ -179,7 +179,7 @@ struct
     match spec.spec_to_verify with
     | false -> ([], spec)
     | true  ->
-        let _ =
+        let () =
           List.iter
             (fun (sspec : Spec.st) ->
               if sspec.ss_posts = [] then
@@ -461,27 +461,25 @@ struct
 
   let check_previously_verified prev_results cur_verified =
     Option.fold ~none:true
-      ~some:(fun x ->
+      ~some:(fun res ->
         VerificationResults.check_previously_verified
-          ~printer:print_success_or_failure x cur_verified)
+          ~printer:print_success_or_failure res cur_verified)
       prev_results
 
   let verify_procs
-      (prog : (Annot.t, int) Prog.t)
-      (procs_to_verify : SS.t)
       ?(prev_results : VerificationResults.t option)
-      () : unit =
+      (prog : (Annot.t, int) Prog.t)
+      (pnames_to_verify : SS.t)
+      (lnames_to_verify : SS.t) : unit =
     let preds = prog.preds in
-
     let start_time = Sys.time () in
 
     (* STEP 1: Get the specs to verify *)
     Printf.printf "Obtaining specs to verify...\n";
-    let all_specs : Spec.t list = Prog.get_proc_specs prog in
     let specs_to_verify =
       List.filter
-        (fun spec -> SS.mem spec.Spec.spec_name procs_to_verify)
-        all_specs
+        (fun (spec : Spec.t) -> SS.mem spec.spec_name pnames_to_verify)
+        (Prog.get_proc_specs prog)
     in
 
     (* STEP 2: Convert specs to symbolic tests *)
@@ -497,8 +495,16 @@ struct
              tests)
            specs_to_verify)
     in
+    Printf.printf "Obtained %d symbolic tests\n" (List.length tests);
 
-    (* STEP 3: Convert lemmas to symbolic tests *)
+    (* STEP 3: Get the lemmas to verify *)
+    let lemmas_to_verify =
+      List.filter
+        (fun (lemma : Lemma.t) -> SS.mem lemma.lemma_name lnames_to_verify)
+        (Prog.get_lemmas prog)
+    in
+
+    (* STEP 4: Convert lemmas to symbolic tests *)
     (* Printf.printf "Converting symbolic tests from lemmas: %f\n" (cur_time -. start_time); *)
     let tests' : t list =
       List.concat
@@ -507,10 +513,8 @@ struct
              let tests, new_lemma = testify_lemma preds lemma in
              Hashtbl.replace prog.lemmas lemma.lemma_name new_lemma;
              tests)
-           (Prog.get_lemmas prog))
+           lemmas_to_verify)
     in
-
-    Printf.printf "Obtained %d symbolic tests\n" (List.length tests);
 
     L.verbose (fun m ->
         m
@@ -545,8 +549,9 @@ struct
             true (tests' @ tests)
         in
         let end_time = Sys.time () in
+        let cur_verified = SS.union pnames_to_verify lnames_to_verify in
         let success =
-          success && check_previously_verified prev_results procs_to_verify
+          success && check_previously_verified prev_results cur_verified
         in
         let msg : string =
           if success then "All specs succeeded:" else "There were failures:"
@@ -574,12 +579,14 @@ struct
         SS.of_list
           (changes.changed_procs @ changes.new_procs @ changes.dependent_procs)
       in
-      let _ =
+      let lemmas_to_verify =
         SS.of_list
           ( changes.changed_lemmas @ changes.new_lemmas
           @ changes.dependent_lemmas )
       in
-      let () = verify_procs prog procs_to_verify ~prev_results:results () in
+      let () =
+        verify_procs ~prev_results:results prog procs_to_verify lemmas_to_verify
+      in
       let cur_results, cur_call_graph =
         (global_results, SAInterpreter.call_graph)
       in
@@ -590,9 +597,11 @@ struct
         { sources = cur_source_files; call_graph; results; diff }
     else
       (* Analyse all procedures and lemmas *)
-      let to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
-      let _ = SS.of_list (Prog.get_noninternal_lemma_names prog) in
-      let () = verify_procs prog to_verify () in
+      let procs_to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
+      let lemmas_to_verify =
+        SS.of_list (Prog.get_noninternal_lemma_names prog)
+      in
+      let () = verify_procs prog procs_to_verify lemmas_to_verify in
       let results, call_graph = (global_results, SAInterpreter.call_graph) in
       write_results_dir
         { sources = cur_source_files; call_graph; results; diff = "" }
