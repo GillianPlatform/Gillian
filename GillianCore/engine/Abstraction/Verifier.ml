@@ -561,15 +561,25 @@ struct
     let open ResultsDir in
     let open ChangeTracker in
     if incremental && prev_results_exist () then
-      (* Only analyse changed procedures *)
+      (* Only verify changed procedures and lemmas *)
       let { sources; call_graph; results } = read_results_dir () in
-      let ({ changed_procs; new_procs; deleted_procs; dependents } as changes) =
-        get_changes prog sources call_graph
+      let changes = get_changes prog sources call_graph in
+      let () = CallGraph.prune_procs call_graph changes.deleted_procs in
+      let () = CallGraph.prune_lemmas call_graph changes.deleted_lemmas in
+      let () =
+        VerificationResults.prune results
+          (changes.deleted_procs @ changes.deleted_lemmas)
       in
-      let () = CallGraph.prune call_graph deleted_procs in
-      let () = VerificationResults.prune results deleted_procs in
-      let to_verify = SS.of_list (changed_procs @ new_procs @ dependents) in
-      let () = verify_procs prog to_verify ~prev_results:results () in
+      let procs_to_verify =
+        SS.of_list
+          (changes.changed_procs @ changes.new_procs @ changes.dependent_procs)
+      in
+      let _ =
+        SS.of_list
+          ( changes.changed_lemmas @ changes.new_lemmas
+          @ changes.dependent_lemmas )
+      in
+      let () = verify_procs prog procs_to_verify ~prev_results:results () in
       let cur_results, cur_call_graph =
         (global_results, SAInterpreter.call_graph)
       in
@@ -579,8 +589,9 @@ struct
       write_results_dir
         { sources = cur_source_files; call_graph; results; diff }
     else
-      (* Analyse all procedures *)
+      (* Analyse all procedures and lemmas *)
       let to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
+      let _ = SS.of_list (Prog.get_noninternal_lemma_names prog) in
       let () = verify_procs prog to_verify () in
       let results, call_graph = (global_results, SAInterpreter.call_graph) in
       write_results_dir

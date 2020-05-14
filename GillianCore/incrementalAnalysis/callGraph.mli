@@ -14,9 +14,6 @@ val reset : t -> unit
 
 val to_reverse_graph : t -> t
 
-val prune : t -> string list -> unit
-(** [prune call_graph proc_names]  *)
-
 val merge : t -> t -> t
 
 (** {3 Getters and Setters} *)
@@ -40,6 +37,10 @@ val get_proc_names : t -> string list
 val get_pred_names : t -> string list
 
 val get_lemma_names : t -> string list
+
+val prune_procs : t -> string list -> unit
+
+val prune_lemmas : t -> string list -> unit
 
 (** {3 Filters} *)
 

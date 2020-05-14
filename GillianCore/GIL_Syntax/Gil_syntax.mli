@@ -872,6 +872,12 @@ module Prog : sig
   val get_noninternal_proc_names : ('a, 'b) t -> string list
   (** Get names of all procedures not marked as internal *)
 
+  val get_noninternal_pred_names : ('a, 'b) t -> string list
+  (** Get names of all predicates not marked as internal *)
+
+  val get_noninternal_lemma_names : ('a, 'b) t -> string list
+  (** Get names of all lemmas not marked as internal *)
+
   val get_proc : ('a, 'b) t -> string -> ('a, 'b) Proc.t option
   (** Get a specific procedure *)
 

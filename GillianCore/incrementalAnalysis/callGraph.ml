@@ -157,9 +157,13 @@ let is_lemma call_graph id =
 
 let remove call_graph id = Hashtbl.remove call_graph.nodes id
 
-let prune call_graph proc_names =
+let prune_procs call_graph proc_names =
   let proc_ids = List.map id_of_proc_name proc_names in
   List.iter (remove call_graph) proc_ids
+
+let prune_lemmas call_graph lemma_names =
+  let lemma_ids = List.map id_of_lemma_name lemma_names in
+  List.iter (remove call_graph) lemma_ids
 
 let to_reverse_graph call_graph =
   let reverse_graph = make () in

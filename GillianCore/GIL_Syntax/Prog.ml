@@ -107,9 +107,21 @@ let get_bispecs (prog : ('a, 'b) t) : BiSpec.t list =
 
 let get_noninternal_proc_names (prog : ('a, 'b) t) : string list =
   Hashtbl.fold
-    (fun pname (proc : ('a, 'b) Proc.t) acc ->
-      if not proc.proc_internal then pname :: acc else acc)
+    (fun name (proc : ('a, 'b) Proc.t) acc ->
+      if not proc.proc_internal then name :: acc else acc)
     prog.procs []
+
+let get_noninternal_pred_names (prog : ('a, 'b) t) : string list =
+  Hashtbl.fold
+    (fun name (pred : Pred.t) acc ->
+      if not pred.pred_internal then name :: acc else acc)
+    prog.preds []
+
+let get_noninternal_lemma_names (prog : ('a, 'b) t) : string list =
+  Hashtbl.fold
+    (fun name (lemma : Lemma.t) acc ->
+      if not lemma.lemma_internal then name :: acc else acc)
+    prog.lemmas []
 
 let get_proc (prog : ('a, 'b) t) (name : string) : ('a, 'b) Proc.t option =
   Hashtbl.find_opt prog.procs name

@@ -1,5 +1,6 @@
 #include "bst.h"
 
+// Some change either in the spec or body
 /*@ spec make_node(v) {
   requires: (v == #v) * (#v == int(#vv))
   ensures:  BST(ret, -{ #vv }-)
@@ -9,6 +10,5 @@ BST *make_node(int v) {
     new_node->value = v;
     new_node->left = NULL;
     new_node->right = NULL;
-    // Some change in the body
     return new_node;
 }
