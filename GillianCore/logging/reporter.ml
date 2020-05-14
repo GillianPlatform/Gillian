@@ -1,57 +1,41 @@
-type t = { log : 'a. 'a Report.t -> unit; wrap_up : unit -> unit }
+type t = < log : Report.t -> unit ; wrap_up : unit >
 
-let file_reporter () =
-  let out_channel = open_out "out.log" in
-  let formatter = Format.formatter_of_out_channel out_channel in
-  let log : 'a. 'a Report.t -> unit =
-   fun report ->
-    match report.content with
-    | Debug msgf  -> msgf @@ fun fmt -> Format.fprintf formatter @@ fmt ^^ "@,@?"
-    | Phase phase ->
-        Format.fprintf formatter "*** Phase %s ***@,@?"
-        @@ Report.string_of_phase phase
-  in
-  let wrap_up () = close_out out_channel in
-  { log; wrap_up }
+module Make (P : sig
+  val enabled : bool
 
-let database_reporter () =
-  let () = if Sys.file_exists "db.log" then Sys.remove "db.log" in
-  let database = Sanddb.create_json_database "db.log" (module Report_j) in
-  let serialize_content : 'a. 'a Report.content -> string = function
-    | Debug msgf  ->
-        let str = ref "" in
-        (msgf @@ fun fmt -> Format.kasprintf (fun s -> str := s) fmt);
-        !str
-    | Phase phase -> Format.asprintf "Phase %s" @@ Report.string_of_phase phase
-  in
-  let serialize_severity : Report.severity -> Report_t.severity = function
-    | Info    -> `Info
-    | Log     -> `Log
-    | Success -> `Success
-    | Error   -> `Error
-    | Warning -> `Warning
-  in
-  let log : 'a. 'a Report.t -> unit =
-   fun report ->
-    let report : Report_t.t =
-      {
-        id = Uuidm.to_string report.id;
-        title = report.title;
-        elapsed_time = report.elapsed_time;
-        previous = Option.map Uuidm.to_string report.previous;
-        parent = Option.map Uuidm.to_string report.parent;
-        content = serialize_content report.content;
-        severity = serialize_severity report.severity;
-      }
-    in
-    let _ = Sanddb.insert_record database report in
-    ()
-  in
-  let wrap_up () = () in
-  { log; wrap_up }
+  type conf
 
-let reporters = ref [ file_reporter (); database_reporter () ]
+  val conf : conf
 
-let log report = List.iter (fun reporter -> reporter.log report) !reporters
+  type state
 
-let wrap_up () = List.iter (fun reporter -> reporter.wrap_up ()) !reporters
+  val initialize : conf -> state
+
+  val wrap_up : state -> unit
+end) =
+struct
+  let enabled, enable, disable =
+    let enabled = ref P.enabled in
+    ( (fun () -> !enabled),
+      (fun () -> enabled := true),
+      fun () -> enabled := false )
+
+  type conf = P.conf
+
+  type state = P.state
+
+  let state = ref None
+
+  let get_state () =
+    match !state with
+    | None   ->
+        let s = P.initialize P.conf in
+        state := Some s;
+        s
+    | Some s -> s
+
+  let wrap_up () =
+    match !state with
+    | None   -> ()
+    | Some s -> P.wrap_up s
+end

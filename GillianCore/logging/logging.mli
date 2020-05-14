@@ -10,24 +10,36 @@ module Mode : sig
   val enabled : unit -> bool
 
   val set_mode : t -> unit
-
-  val should_log : level -> bool
 end
 
 module Report : sig
   type phase = ParsingAndCompiling | Parsing | Preprocessing | Verification
+
+  type severity = Info | Log | Success | Error | Warning
 end
 
 val wrap_up : unit -> unit
 (** Closes all the files *)
 
-val normal : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
+val normal :
+  ?title:string ->
+  ?severity:Report.severity ->
+  ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
+  unit
 (** `normal` is just `log Normal` *)
 
-val verbose : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
+val verbose :
+  ?title:string ->
+  ?severity:Report.severity ->
+  ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
+  unit
 (** `verbose` is just `log Verbose` *)
 
-val tmi : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> unit
+val tmi :
+  ?title:string ->
+  ?severity:Report.severity ->
+  ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
+  unit
 (** `tmi` is just `log TMI` *)
 
 val fail : string -> 'a
@@ -36,11 +48,14 @@ val fail : string -> 'a
 val print_to_all : string -> unit
 (** Output the strings in every file and prints it to stdout *)
 
-val normal_phase : Report.phase -> unit
+val normal_phase :
+  ?title:string -> ?severity:Report.severity -> Report.phase -> unit
 
-val verbose_phase : Report.phase -> unit
+val verbose_phase :
+  ?title:string -> ?severity:Report.severity -> Report.phase -> unit
 
-val tmi_phase : Report.phase -> unit
+val tmi_phase :
+  ?title:string -> ?severity:Report.severity -> Report.phase -> unit
 
 val end_phase : Report.phase -> unit
 
@@ -55,7 +70,9 @@ val end_phase : Report.phase -> unit
         in
         aux 1
       in
-      Printf.printf "val withPhase%d : Mode.level -> Report.phase -> (%s) -> %s"
+      Printf.printf
+        "val with_phase%d : Mode.level -> ?title:string -> \
+         ?severity:Report.severity -> Report.phase -> (%s) -> %s"
         i args args;
       print_newline ()
     in
@@ -63,13 +80,29 @@ val end_phase : Report.phase -> unit
       dec i
     done
 *)
-val withPhase1 : Mode.level -> Report.phase -> ('a1 -> 'a2) -> 'a1 -> 'a2
-
-val withPhase2 :
-  Mode.level -> Report.phase -> ('a1 -> 'a2 -> 'a3) -> 'a1 -> 'a2 -> 'a3
-
-val withPhase3 :
+val with_phase1 :
   Mode.level ->
+  ?title:string ->
+  ?severity:Report.severity ->
+  Report.phase ->
+  ('a1 -> 'a2) ->
+  'a1 ->
+  'a2
+
+val with_phase2 :
+  Mode.level ->
+  ?title:string ->
+  ?severity:Report.severity ->
+  Report.phase ->
+  ('a1 -> 'a2 -> 'a3) ->
+  'a1 ->
+  'a2 ->
+  'a3
+
+val with_phase3 :
+  Mode.level ->
+  ?title:string ->
+  ?severity:Report.severity ->
   Report.phase ->
   ('a1 -> 'a2 -> 'a3 -> 'a4) ->
   'a1 ->
@@ -77,8 +110,10 @@ val withPhase3 :
   'a3 ->
   'a4
 
-val withPhase4 :
+val with_phase4 :
   Mode.level ->
+  ?title:string ->
+  ?severity:Report.severity ->
   Report.phase ->
   ('a1 -> 'a2 -> 'a3 -> 'a4 -> 'a5) ->
   'a1 ->
@@ -87,8 +122,10 @@ val withPhase4 :
   'a4 ->
   'a5
 
-val withPhase5 :
+val with_phase5 :
   Mode.level ->
+  ?title:string ->
+  ?severity:Report.severity ->
   Report.phase ->
   ('a1 -> 'a2 -> 'a3 -> 'a4 -> 'a5 -> 'a6) ->
   'a1 ->

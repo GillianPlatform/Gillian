@@ -1,4 +1,4 @@
-type 'a t = unit -> 'a Report.t
+type t = unit -> Report.t
 
 let active_parents : (Uuidm.t * Report.phase) Stack.t = Stack.create ()
 
@@ -8,8 +8,8 @@ let current : Uuidm.t option ref = ref Option.none
 
 let seed = Random.State.make_self_init ()
 
-let make ~title ~content ~severity () =
-  let report : 'a Report.t =
+let make ?(title = "") ~content ?(severity = Report.Log) () =
+  let report : Report.t =
     {
       id = Uuidm.v4_gen seed ();
       title;
@@ -23,23 +23,13 @@ let make ~title ~content ~severity () =
   current := Some report.id;
   report
 
-let info title content = make ~title ~content ~severity:Info
-
-let log title content = make ~title ~content ~severity:Log
-
-let success title content = make ~title ~content ~severity:Success
-
-let error title content = make ~title ~content ~severity:Error
-
-let warning title content = make ~title ~content ~severity:Warning
-
-let start_phase level phase =
+let start_phase level ?title ?severity phase =
   if Mode.enabled () then (
     if Mode.should_log level then (
-      let report = info "" (Phase phase) () in
+      let report = make ?title ~content:(Phase phase) ?severity () in
       Stack.push (report.id, phase) active_parents;
       current := None;
-      Reporter.log report );
+      Default.log report );
     Stack.push phase all_parents )
 
 let end_phase phase =
