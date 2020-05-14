@@ -47,3 +47,11 @@ class virtual ['a] t =
 
     method wrap_up = wrap_up ()
   end
+
+let default : type a. unit -> a t =
+ fun () ->
+  object
+    inherit [a] t
+
+    method private target_lang _ = ()
+  end
