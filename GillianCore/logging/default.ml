@@ -1,8 +1,5 @@
 let reporters =
-  [
-    (new FileReporter.t () :> Reporter.t);
-    (new DatabaseReporter.t () :> Reporter.t);
-  ]
+  [ (new FileReporter.t :> Reporter.t); (new DatabaseReporter.t :> Reporter.t) ]
 
 let log report = List.iter (fun reporter -> reporter#log report) reporters
 
