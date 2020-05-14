@@ -1,7 +1,7 @@
 module Mode = Mode
 module Report = Report
 
-let wrap_up = Reporter.wrap_up
+let wrap_up = Default.wrap_up
 
 let log lvl ?title ?severity msgf =
   if Mode.should_log lvl then
@@ -10,7 +10,7 @@ let log lvl ?title ?severity msgf =
         ~content:(Debug (Report.PackedPP.make msgf))
         ?severity ()
     in
-    Reporter.log report
+    Default.log report
 
 let normal ?title ?severity msgf = log Normal ?title ?severity msgf
 

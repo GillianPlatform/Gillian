@@ -29,7 +29,7 @@ let start_phase level ?title ?severity phase =
       let report = make ?title ~content:(Phase phase) ?severity () in
       Stack.push (report.id, phase) active_parents;
       current := None;
-      Reporter.log report );
+      Default.log report );
     Stack.push phase all_parents )
 
 let end_phase phase =
