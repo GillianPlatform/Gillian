@@ -457,7 +457,13 @@ struct
   end
 
   module ACTConsole = struct
-    let process_files files already_compiled outfile_opt =
+    let emit_specs =
+      let doc =
+        "Emit the final GIL program containing all the derived specifications."
+      in
+      Arg.(value & flag & info [ "emit-specs" ] ~doc)
+
+    let process_files files already_compiled outfile_opt emit_specs =
       let file = List.hd files in
       let e_prog =
         if not already_compiled then (
@@ -493,35 +499,35 @@ struct
             m "@\n*** Stage 2: DONE transforming the program.@\n")
       in
       let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.@\n") in
-      Config.unfolding := false;
+      let () = Config.unfolding := false in
       let prog = LogicPreprocessing.preprocess prog true in
       match UP.init_prog prog with
       | Error _  -> raise (Failure "Creation of unification plans failed.")
       | Ok prog' ->
           let () = Abductor.test_procs prog' in
-          if !Config.output_verification then
+          if emit_specs then
             let () = Prog.update_specs e_prog prog'.prog in
-            let eprog_final_str = (Fmt.to_to_string Prog.pp_labeled) e_prog in
-            let fname = Filename.basename file in
-            let folder_path = Filename.dirname file in
-            let fname' = "BI_" ^ fname in
-            let path' = folder_path ^ "/" ^ fname' in
-            Io_utils.save_file path' eprog_final_str
+            let fname = Filename.chop_extension (Filename.basename file) in
+            let dirname = Filename.dirname file in
+            let out_path = Filename.concat dirname (fname ^ "_bi.gil") in
+            Io_utils.save_file_pp out_path Prog.pp_labeled e_prog
 
-    let act files already_compiled outfile_opt no_heap stats parallel () =
+    let act
+        files already_compiled outfile_opt no_heap stats parallel emit_specs ()
+        =
       let () = Config.current_exec_mode := BiAbduction in
       let () = PC.initialize BiAbduction in
       let () = Config.stats := stats in
       let () = Config.no_heap := no_heap in
       let () = Config.parallel := parallel in
-      let () = process_files files already_compiled outfile_opt in
+      let () = process_files files already_compiled outfile_opt emit_specs in
       let () = if !Config.stats then Statistics.print_statistics () in
       Logging.wrap_up ()
 
     let act_t =
       Term.(
         const act $ files $ already_compiled $ output_gil $ no_heap $ stats
-        $ parallel)
+        $ parallel $ emit_specs)
 
     let act_info =
       let doc =
