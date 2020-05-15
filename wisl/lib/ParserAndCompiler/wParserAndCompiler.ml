@@ -30,8 +30,9 @@ let create_compilation_result path prog =
   let open CommandLine.ParserAndCompiler in
   let open IncrementalAnalysis in
   let source_files = SourceFiles.make () in
-  SourceFiles.add_source_file source_files path;
-  { gil_progs = [ (path, prog) ]; source_files }
+  let () = SourceFiles.add_source_file source_files path in
+  let gil_path = Filename.chop_extension path ^ ".gil" in
+  { gil_progs = [ (gil_path, prog) ]; source_files }
 
 let parse_and_compile_files files =
   let path = List.hd files in
