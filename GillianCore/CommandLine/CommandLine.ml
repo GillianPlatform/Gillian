@@ -122,8 +122,13 @@ struct
     let docv = "OUT_DIR" in
     Arg.(value & opt string default & info [ "result-dir" ] ~doc ~docv)
 
-  let get_prog_or_fail = function
-    | Ok prog   -> prog
+  let get_progs_or_fail = function
+    | Ok progs  -> (
+        match progs.ParserAndCompiler.gil_progs with
+        | [] ->
+            Fmt.pr "Error: expected at least one GIL program";
+            exit 1
+        | _  -> progs )
     | Error err ->
         Fmt.pr "Error during compilation to GIL:\n%a" PC.pp_err err;
         exit 1
@@ -144,6 +149,15 @@ struct
     in
     Term.(term $ common_term)
 
+  let burn_gil prog outfile_opt =
+    match outfile_opt with
+    | Some outfile ->
+        let outc = open_out outfile in
+        let fmt = Format.formatter_of_out_channel outc in
+        let () = Prog.pp_labeled fmt prog in
+        close_out outc
+    | None         -> ()
+
   module CompilerConsole = struct
     let mode =
       let open ExecMode in
@@ -162,10 +176,10 @@ struct
       Arg.(last & vflag_all [ Verification ] [ concrete; wpst; verif; act ])
 
     let process_files files =
-      let prog = get_prog_or_fail (PC.parse_and_compile_files files) in
-      Io_utils.save_file_pp
-        (Filename.chop_extension (List.hd files) ^ ".gil")
-        Prog.pp_labeled prog
+      let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
+      List.iter
+        (fun (path, prog) -> Io_utils.save_file_pp path Prog.pp_labeled prog)
+        progs.gil_progs
 
     let compile files mode runtime_path ci tl_opts =
       let () = Config.ci := ci in
@@ -226,25 +240,20 @@ struct
     let exec files already_compiled debug outfile_opt no_heap () =
       let () = Config.current_exec_mode := Concrete in
       let () = PC.initialize Concrete in
-      Config.no_heap := no_heap;
-      let lab_prog =
-        if not already_compiled then
-          get_prog_or_fail (PC.parse_and_compile_files files)
+      let () = Config.no_heap := no_heap in
+      let e_prog =
+        if not already_compiled then (
+          let e_progs =
+            (get_progs_or_fail (PC.parse_and_compile_files files)).gil_progs
+          in
+          Gil_parsing.cache_labelled_progs e_progs;
+          List.hd (List.map snd e_progs) )
         else Gil_parsing.parse_eprog_from_file (List.hd files)
-      in
-      let () =
-        match outfile_opt with
-        | Some outfile ->
-            let outc = open_out outfile in
-            let fmt = Format.formatter_of_out_channel outc in
-            let () = Prog.pp_labeled fmt lab_prog in
-            close_out outc
-        | None         -> ()
       in
       let prog =
         Gil_parsing.eprog_to_prog
           ~other_imports:(convert_other_imports PC.other_imports)
-          lab_prog
+          e_prog
       in
       let () = run debug prog in
       Logging.wrap_up ()
@@ -276,30 +285,26 @@ struct
   module SInterpreterConsole = struct
     let process_files files already_compiled outfile_opt =
       let e_prog =
-        if not already_compiled then
-          let _ =
+        if not already_compiled then (
+          let () =
             L.verbose (fun m ->
                 m
                   "@\n\
                    *** Stage 1: Parsing program in original language and \
                    compiling to Gil. ***@\n")
           in
-          get_prog_or_fail (PC.parse_and_compile_files files)
+          let e_progs =
+            (get_progs_or_fail (PC.parse_and_compile_files files)).gil_progs
+          in
+          Gil_parsing.cache_labelled_progs e_progs;
+          List.hd (List.map snd e_progs) )
         else
-          let _ =
+          let () =
             L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
           in
           Gil_parsing.parse_eprog_from_file (List.hd files)
       in
-      let () =
-        match outfile_opt with
-        | Some outfile ->
-            let outc = open_out outfile in
-            let fmt = Format.formatter_of_out_channel outc in
-            let () = Prog.pp_labeled fmt e_prog in
-            close_out outc
-        | None         -> ()
-      in
+      let () = burn_gil e_prog outfile_opt in
       let () =
         L.normal (fun m -> m "*** Stage 2: Transforming the program.\n")
       in
@@ -371,27 +376,23 @@ struct
       Arg.(value & flag & info [ "m"; "manual" ] ~doc)
 
     let process_files files already_compiled outfile_opt no_unfold incremental =
-      let e_prog =
+      let e_prog, source_files_opt =
         if not already_compiled then
           let () = L.normal_phase ParsingAndCompiling in
-          let e_prog = get_prog_or_fail (PC.parse_and_compile_files files) in
+          let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
           let () = L.end_phase ParsingAndCompiling in
-          e_prog
+          let e_progs = progs.gil_progs in
+          let () = Gil_parsing.cache_labelled_progs e_progs in
+          let e_prog = List.hd (List.map snd e_progs) in
+          let source_files = progs.source_files in
+          (e_prog, Some source_files)
         else
           let () = L.normal_phase Parsing in
           let e_prog = Gil_parsing.parse_eprog_from_file (List.hd files) in
           let () = L.end_phase Parsing in
-          e_prog
+          (e_prog, None)
       in
-      let () =
-        match outfile_opt with
-        | Some outfile ->
-            let outc = open_out outfile in
-            let fmt = Format.formatter_of_out_channel outc in
-            let () = Prog.pp_labeled fmt e_prog in
-            close_out outc
-        | None         -> ()
-      in
+      let () = burn_gil e_prog outfile_opt in
       let () = L.normal_phase Preprocessing in
       (* Prog.perform_syntax_checks e_prog; *)
       let prog =
@@ -411,7 +412,7 @@ struct
       in
       let () = L.end_phase Preprocessing in
       L.normal_phase Verification;
-      Verification.verify_prog prog incremental;
+      Verification.verify_prog prog incremental source_files_opt;
       L.end_phase Verification
 
     let verify
@@ -459,7 +460,7 @@ struct
     let process_files files already_compiled outfile_opt =
       let file = List.hd files in
       let e_prog =
-        if not already_compiled then
+        if not already_compiled then (
           let () =
             L.verbose (fun m ->
                 m
@@ -467,22 +468,18 @@ struct
                    *** Stage 1: Parsing program in original language and \
                    compiling to Gil. ***@\n")
           in
-          get_prog_or_fail (PC.parse_and_compile_files files)
+          let e_progs =
+            (get_progs_or_fail (PC.parse_and_compile_files files)).gil_progs
+          in
+          Gil_parsing.cache_labelled_progs e_progs;
+          List.hd (List.map snd e_progs) )
         else
           let () =
             L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
           in
           Gil_parsing.parse_eprog_from_file file
       in
-      let () =
-        match outfile_opt with
-        | Some outfile ->
-            let outc = open_out outfile in
-            let fmt = Format.formatter_of_out_channel outc in
-            let () = Prog.pp_labeled fmt e_prog in
-            close_out outc
-        | None         -> ()
-      in
+      let () = burn_gil e_prog outfile_opt in
       let () =
         L.normal (fun m -> m "*** Stage 2: Transforming the program.@\n")
       in
