@@ -35,6 +35,8 @@ jobs:
     - name: Esy build
       run: 'esy build'
       id: esy-build
+    - name: Basic checks
+      run: 'esy test'
     - name: Format checking
       run: 'esy format-check'
     - name: Building release

@@ -47,7 +47,8 @@
     "init:env":
       "sh -c \"esy js:init:env && esy c:init:env && esy wisl:init:env\"",
     "install-githooks": "./githooks/install.py",
-    "clean-githooks": "./githooks/clean.py"
+    "clean-githooks": "./githooks/clean.py",
+    "test": "dune test"
   },
   "dependencies": {
     "@opam/alcotest": "1.0.1",
