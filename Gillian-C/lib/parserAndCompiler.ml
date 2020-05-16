@@ -221,6 +221,12 @@ let linker_error msg symbols =
   in
   raise Linker_error
 
+let current_arch =
+  if Archi.ptr64 then Architecture.Arch64 else Architecture.Arch32
+
+let is_verif_or_act exec_mode =
+  ExecMode.verification_exec exec_mode || ExecMode.biabduction_exec exec_mode
+
 let parse_dependencies_file deps_file =
   let file_str = Gillian.Utils.Io_utils.load_file deps_file in
   let delims = Str.regexp "[ \\( \\\\\\)\n\r\t]+" in
@@ -228,23 +234,24 @@ let parse_dependencies_file deps_file =
   let header_path = Str.regexp ".*\\.h" in
   List.filter (fun part -> Str.string_match header_path part 0) parts
 
-let register_source_files paths =
+let create_compilation_result gil_progs =
   let open IncrementalAnalysis in
-  List.iter
-    (fun path ->
-      let headers = parse_dependencies_file (get_deps_path path) in
-      SourceFiles.add_source_file ChangeTracker.cur_source_files path;
-      List.iter
-        (fun header ->
-          SourceFiles.add_dependency ChangeTracker.cur_source_files header path)
-        headers)
-    paths
-
-let current_arch =
-  if Archi.ptr64 then Architecture.Arch64 else Architecture.Arch32
-
-let is_verif_or_act exec_mode =
-  ExecMode.verification_exec exec_mode || ExecMode.biabduction_exec exec_mode
+  let open CommandLine.ParserAndCompiler in
+  let source_files = SourceFiles.make () in
+  let gil_progs =
+    List.map
+      (fun (path, prog) ->
+        let headers = parse_dependencies_file (get_deps_path path) in
+        SourceFiles.add_source_file source_files path;
+        let () =
+          List.iter
+            (fun header -> SourceFiles.add_dependency source_files header path)
+            headers
+        in
+        (get_gil_path path, prog))
+      gil_progs
+  in
+  { gil_progs; source_files }
 
 let parse_and_compile_files paths =
   let open Gilgen in
@@ -254,10 +261,9 @@ let parse_and_compile_files paths =
   let () =
     List.iter
       (fun path ->
-        if not (Hashtbl.mem compiled_progs path) then (
+        if not (Hashtbl.mem compiled_progs path) then
           let prog, compilation_data = parse_and_compile_file path exec_mode in
-          Gil_parsing.cache_gil_prog (get_gil_path path) prog;
-          Hashtbl.add compiled_progs path (prog, compilation_data) ))
+          Hashtbl.add compiled_progs path (prog, compilation_data))
       paths
   in
 
@@ -287,7 +293,6 @@ let parse_and_compile_files paths =
     if (not (Symbol_set.is_empty unresolved_syms)) && not hide_undef then
       linker_error "undefined reference to" unresolved_syms
   in
-  let () = register_source_files paths in
 
   (* Create main GIL program with references to all other files *)
   let open Gillian.Gil_syntax in
@@ -304,6 +309,7 @@ let parse_and_compile_files paths =
           (comb_init_cmds @ genv_init_cmds)
   in
   let imports, init_asrts, init_cmds = combine (List.tl paths) [] [] [] in
+  let main_path = List.hd paths in
   let main_prog, { genv_pred_asrts; genv_init_cmds; _ } =
     Hashtbl.find compiled_progs (List.hd paths)
   in
@@ -319,7 +325,18 @@ let parse_and_compile_files paths =
       in
       Hashtbl.add main_prog.preds init_pred.Pred.pred_name init_pred
   in
-  Ok { main_prog with imports = all_imports; proc_names = all_proc_names }
+  let main_prog =
+    { main_prog with imports = all_imports; proc_names = all_proc_names }
+  in
+  let all_other_progs =
+    Hashtbl.fold
+      (fun path (prog, _) acc -> (path, prog) :: acc)
+      compiled_progs []
+  in
+  let all_progs =
+    (main_path, main_prog) :: List.remove_assoc main_path all_other_progs
+  in
+  Ok (create_compilation_result all_progs)
 
 let other_imports = []
 

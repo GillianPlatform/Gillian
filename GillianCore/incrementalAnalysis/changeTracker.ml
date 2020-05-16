@@ -1,9 +1,5 @@
 open Containers
 
-let cur_source_files = SourceFiles.make ()
-
-let reset () = SourceFiles.reset cur_source_files
-
 type t = {
   changed_procs : string list;
   new_procs : string list;
@@ -157,7 +153,7 @@ let get_dependent_procs_and_lemmas reverse_graph start_ids ~filter_id =
   in
   get_dependents IdSet.empty start_ids SS.empty SS.empty
 
-let get_changes prog prev_source_files prev_call_graph =
+let get_changes prog prev_source_files prev_call_graph cur_source_files =
   let changed_files, new_files =
     get_changed_files prev_source_files cur_source_files
   in

@@ -67,6 +67,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
 
   let execute_test expect test =
     let open Outcome in
+    let open ParserAndCompiler in
     let result = ref (Outcome.FailedExec "Execution failure") in
     let () =
       Backend.check_not_throw expect (fun () ->
@@ -74,20 +75,15 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
           let () = Utils.Allocators.reset_all () in
           let () = Suite.beforeTest test.Test.info test.path in
           let res =
-            match
-              Outcome.ParserAndCompiler.parse_and_compile_files
-                [ test.Test.path ]
-            with
-            | Error p -> ParseAndCompileError p
-            | Ok prog -> (
-                match
-                  UP.init_prog
-                    (Gil_parsing.eprog_to_prog
-                       ~other_imports:
-                         (convert_other_imports
-                            Outcome.ParserAndCompiler.other_imports)
-                       prog)
-                with
+            match parse_and_compile_files [ test.Test.path ] with
+            | Error err -> ParseAndCompileError err
+            | Ok progs  -> (
+                let e_progs = progs.gil_progs in
+                let () = Gil_parsing.cache_labelled_progs e_progs in
+                let e_prog = List.hd (List.map snd e_progs) in
+                let other_imports = convert_other_imports other_imports in
+                let prog = Gil_parsing.eprog_to_prog ~other_imports e_prog in
+                match UP.init_prog prog with
                 | Error _ -> failwith "Failed to create unification plan"
                 | Ok prog ->
                     let ret = CInterpreter.evaluate_prog prog in
