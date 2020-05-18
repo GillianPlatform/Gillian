@@ -12,59 +12,59 @@ module type S = sig
   (** Type of GIL stores *)
   type t
 
-  val bindings : t -> (Var.t * vt) list
   (** Return the set of bindings in a given store *)
+  val bindings : t -> (Var.t * vt) list
 
-  val copy : t -> t
   (** Store copy *)
+  val copy : t -> t
 
-  val domain : t -> Var.Set.t
   (** Store domain *)
+  val domain : t -> Var.Set.t
 
-  val filter : t -> (Var.t -> vt -> vt option) -> unit
   (** Store filtering *)
+  val filter : t -> (Var.t -> vt -> vt option) -> unit
 
-  val fold : t -> (Var.t -> vt -> 'a -> 'a) -> 'a -> 'a
   (** Store fold *)
+  val fold : t -> (Var.t -> vt -> 'a -> 'a) -> 'a -> 'a
 
-  val get : t -> Var.t -> vt option
   (** Return value of a given variable, if possible *)
+  val get : t -> Var.t -> vt option
 
-  val get_unsafe : t -> Var.t -> vt
   (** Return value of a given variable or throw *)
+  val get_unsafe : t -> Var.t -> vt
 
-  val init : (Var.t * vt) list -> t
   (** Store constructor, with a list of bindings of the form (variable, value) *)
+  val init : (Var.t * vt) list -> t
 
-  val iter : t -> (Var.t -> vt -> unit) -> unit
   (** Store iterator *)
+  val iter : t -> (Var.t -> vt -> unit) -> unit
 
-  val mem : t -> Var.t -> bool
   (** Store membership *)
+  val mem : t -> Var.t -> bool
 
-  val partition : t -> (vt -> bool) -> Var.Set.t * Var.Set.t
   (** Partition store domain *)
+  val partition : t -> (vt -> bool) -> Var.Set.t * Var.Set.t
 
-  val projection : t -> Var.t list -> t
   (** Store projection (returns new store) *)
+  val projection : t -> Var.t list -> t
 
-  val put : t -> Var.t -> vt -> unit
   (** Update value of variable in store *)
+  val put : t -> Var.t -> vt -> unit
 
-  val remove : t -> Var.t -> unit
   (** Remove value of variable in store *)
+  val remove : t -> Var.t -> unit
 
-  val pp : Format.formatter -> t -> unit
   (** Store printer *)
+  val pp : Format.formatter -> t -> unit
 
-  val to_ssubst : t -> SSubst.t
   (** Converts the store into an ssubst *)
+  val to_ssubst : t -> SSubst.t
 
-  val symbolics : t -> Var.Set.t
   (** Symbolic indices *)
+  val symbolics : t -> Var.Set.t
 
-  val lvars : t -> Var.Set.t
   (** Logical variables *)
+  val lvars : t -> Var.Set.t
 end
 
 (** Implementation of GIL Stores *)

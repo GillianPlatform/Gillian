@@ -1,7 +1,7 @@
 (** {2 Allocators} *)
 
-val register_resetter : (unit -> unit) -> unit
 (** Allocators's resetters should be registers so that Bulk Execution can reset them at every start *)
+val register_resetter : (unit -> unit) -> unit
 
 val reset_all : unit -> unit
 

@@ -18,35 +18,35 @@ module Report : sig
   type severity = Info | Log | Success | Error | Warning
 end
 
-val wrap_up : unit -> unit
 (** Closes all the files *)
+val wrap_up : unit -> unit
 
+(** `normal` is just `log Normal` *)
 val normal :
   ?title:string ->
   ?severity:Report.severity ->
   ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
   unit
-(** `normal` is just `log Normal` *)
 
+(** `verbose` is just `log Verbose` *)
 val verbose :
   ?title:string ->
   ?severity:Report.severity ->
   ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
   unit
-(** `verbose` is just `log Verbose` *)
 
+(** `tmi` is just `log TMI` *)
 val tmi :
   ?title:string ->
   ?severity:Report.severity ->
   ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
   unit
-(** `tmi` is just `log TMI` *)
 
-val fail : string -> 'a
 (** Writes the string and then raises a failure. *)
+val fail : string -> 'a
 
-val print_to_all : string -> unit
 (** Output the strings in every file and prints it to stdout *)
+val print_to_all : string -> unit
 
 val normal_phase :
   ?title:string -> ?severity:Report.severity -> Report.phase -> unit

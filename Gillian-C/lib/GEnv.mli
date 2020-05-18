@@ -13,25 +13,25 @@ type t = {
       (** maps loc names to definitions *)
 }
 
-val find_symbol : t -> string -> string
 (** Finds a location name given symbol in the global environment *)
+val find_symbol : t -> string -> string
 
-val find_def : t -> string -> def
 (** Finds a definition given its location name in the global environment *)
+val find_def : t -> string -> def
 
-val set_symbol : t -> string -> string -> t
 (** [set_symbol genv symbol locname ]
     Returns a new global environment where the symbol [symbol] is associated with the location [locname] *)
+val set_symbol : t -> string -> string -> t
 
-val set_def : t -> string -> def -> t
 (** [set_def genv locname def ]
     Returns a new global environment where the block [locname] is associated with the global definition [def] *)
+val set_def : t -> string -> def -> t
 
-val empty : t
 (** Empty global environment *)
+val empty : t
 
-val pp : Format.formatter -> t -> unit
 (** Pretty printer for the global environment *)
+val pp : Format.formatter -> t -> unit
 
 (** {3 Symbolic things} *)
 

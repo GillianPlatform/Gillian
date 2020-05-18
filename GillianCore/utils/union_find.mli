@@ -26,24 +26,24 @@ module type S = sig
 
   type t
 
-  val init : unit -> t
   (** [init ()] initialises a new, empty union-find *)
+  val init : unit -> t
 
-  val copy : t -> t
   (** [copy uf] copies the given union-find *)
+  val copy : t -> t
 
-  val add : t -> elt -> unit
   (** [add uf e] creates a new element [e] in the union-find [uf] *)
+  val add : t -> elt -> unit
 
-  val rep : t -> elt -> elt
   (** [rep uf e] finds the representative of node [e] in the union-find [uf] *)
+  val rep : t -> elt -> elt
 
-  val union : t -> elt -> elt -> unit
   (** [union uf e1 e2] merges elements [e1] and [e2] in the 
         union-find [uf], performing path compression along the way. *)
+  val union : t -> elt -> elt -> unit
 
-  val fold : ('a -> elt * elt -> 'a) -> 'a -> t -> 'a
   (** [fold f ac uf] folds over the union find uf *)
+  val fold : ('a -> elt * elt -> 'a) -> 'a -> t -> 'a
 end
 
 module Make (Eq : EqType) : S with type elt = Eq.t

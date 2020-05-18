@@ -13,11 +13,11 @@ module type S = sig
 
   val initialise : state_t -> preds_t -> UP.preds_tbl_t option -> t
 
-  val get_preds : t -> preds_t
   (** Get preds of given symbolic state *)
+  val get_preds : t -> preds_t
 
-  val set_preds : t -> preds_t -> t
   (** Set preds of given symbolic state *)
+  val set_preds : t -> preds_t -> t
 
   val unify : t -> st -> UP.t -> bool
 

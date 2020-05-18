@@ -29,8 +29,8 @@ module type S = sig
 
   type u_res = UWTF | USucc of t | UFail of err_t list
 
-  val init : UP.preds_tbl_t option -> t
   (** Initialisation *)
+  val init : UP.preds_tbl_t option -> t
 
   val struct_init :
     UP.preds_tbl_t option ->
@@ -52,53 +52,53 @@ module type S = sig
 
   val is_overlapping_asrt : string -> bool
 
-  val eval_expr : t -> Expr.t -> vt
   (** Expression Evaluation *)
+  val eval_expr : t -> Expr.t -> vt
 
-  val get_store : t -> store_t
   (** Get store of given symbolic state *)
+  val get_store : t -> store_t
 
-  val set_store : t -> store_t -> t
   (** Set store of given symbolic state *)
+  val set_store : t -> store_t -> t
 
-  val assume : ?unfold:bool -> t -> vt -> t list
   (** Assume expression *)
+  val assume : ?unfold:bool -> t -> vt -> t list
 
+  (** Assume assertion *)
   val assume_a :
     ?unification:bool -> ?production:bool -> t -> Formula.t list -> t option
-  (** Assume assertion *)
 
-  val assume_t : t -> vt -> Type.t -> t option
   (** Assume type *)
+  val assume_t : t -> vt -> Type.t -> t option
 
-  val sat_check : t -> vt -> bool
   (** Satisfiability check *)
+  val sat_check : t -> vt -> bool
 
   val sat_check_f : t -> Formula.t list -> st option
 
-  val assert_a : t -> Formula.t list -> bool
   (** Assert assertion *)
+  val assert_a : t -> Formula.t list -> bool
 
-  val equals : t -> vt -> vt -> bool
   (** Value Equality *)
+  val equals : t -> vt -> vt -> bool
 
-  val get_type : t -> vt -> Type.t option
   (** Value Type *)
+  val get_type : t -> vt -> Type.t option
 
+  (** State simplification *)
   val simplify :
     ?save:bool -> ?kill_new_lvars:bool -> ?unification:bool -> t -> st
-  (** State simplification *)
 
-  val simplify_val : t -> vt -> vt
   (** Value simplification *)
+  val simplify_val : t -> vt -> vt
 
-  val to_loc : t -> vt -> (t * vt) option
   (** Convert value to object location, with possible allocation *)
+  val to_loc : t -> vt -> (t * vt) option
 
   val fresh_loc : ?loc:vt -> t -> vt
 
-  val pp : Format.formatter -> t -> unit
   (** Printer *)
+  val pp : Format.formatter -> t -> unit
 
   val pp_err : Format.formatter -> err_t -> unit
 
@@ -106,20 +106,20 @@ module type S = sig
 
   val get_recovery_vals : err_t list -> vt list
 
-  val copy : t -> t
   (** State Copy *)
+  val copy : t -> t
 
-  val add_spec_vars : t -> Var.Set.t -> t
   (** Add Spec Var *)
+  val add_spec_vars : t -> Var.Set.t -> t
 
-  val get_spec_vars : t -> Var.Set.t
   (** Get Spec Vars *)
+  val get_spec_vars : t -> Var.Set.t
 
-  val get_lvars : t -> Var.Set.t
   (** Get all logical variables *)
+  val get_lvars : t -> Var.Set.t
 
-  val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
   (** Turns a state into a list of assertions *)
+  val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
 
   val evaluate_slcmd : UP.prog -> SLCmd.t -> t -> t list
 
