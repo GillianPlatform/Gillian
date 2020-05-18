@@ -302,6 +302,7 @@ let rec evaluate_binop
           | _, _                     -> Bool false )
       | LstNth -> (
           match (lit1, lit2) with
+          | LList list, Int n -> List.nth list n
           | LList list, Num n when is_int n -> List.nth list (int_of_float n)
           | LList list, Num -0. -> List.nth list 0
           | _, _ ->
