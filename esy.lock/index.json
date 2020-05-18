@@ -1,5 +1,5 @@
 {
-  "checksum": "ffd0613884d5cae5472cbfba34c8b380",
+  "checksum": "598f7b282c4019f753767f2dc172a1da",
   "root": "gillian-ecosystem-dev@link-dev:./esy.json",
   "node": {
     "ocaml@4.8.1000@d41d8cd9": {
@@ -40,9 +40,12 @@
       ],
       "devDependencies": [
         "ocaml@4.8.1000@d41d8cd9", "@opam/utop@opam:2.5.0@e1664c74",
+        "@opam/shexp@opam:v0.13.0@5c63479c",
         "@opam/odoc@opam:1.5.0@cdaef451",
         "@opam/ocamlformat@opam:0.14.2@53883ae0",
+        "@opam/ocamlfind@opam:1.8.1@ff07b0f9",
         "@opam/merlin@opam:3.3.4@980b49f2",
+        "@opam/fileutils@opam:0.6.2@2c57b3ad",
         "@opam/cmitomli@opam:1.0.0@e096e52a",
         "@opam/cinaps@opam:v0.13.0@366f5597"
       ]
@@ -768,6 +771,64 @@
         "@opam/ppx_bench@opam:v0.13.0@d978bee1",
         "@opam/ppx_assert@opam:v0.13.0@6e02f83c",
         "@opam/dune@opam:2.5.1@a0c1e658", "@opam/base@opam:v0.13.2@c3150775"
+      ]
+    },
+    "@opam/spawn@opam:v0.13.0@b3937806": {
+      "id": "@opam/spawn@opam:v0.13.0@b3937806",
+      "name": "@opam/spawn",
+      "version": "opam:v0.13.0",
+      "source": {
+        "type": "install",
+        "source": [
+          "archive:https://opam.ocaml.org/cache/md5/6e/6eaadbf8f9231415b51658da6b8b090f#md5:6eaadbf8f9231415b51658da6b8b090f",
+          "archive:https://github.com/janestreet/spawn/releases/download/v0.13.0/spawn-v0.13.0.tbz#md5:6eaadbf8f9231415b51658da6b8b090f"
+        ],
+        "opam": {
+          "name": "spawn",
+          "version": "v0.13.0",
+          "path": "esy.lock/opam/spawn.v0.13.0"
+        }
+      },
+      "overrides": [],
+      "dependencies": [
+        "ocaml@4.8.1000@d41d8cd9", "@opam/dune@opam:2.5.1@a0c1e658",
+        "@esy-ocaml/substs@0.0.1@d41d8cd9"
+      ],
+      "devDependencies": [
+        "ocaml@4.8.1000@d41d8cd9", "@opam/dune@opam:2.5.1@a0c1e658"
+      ]
+    },
+    "@opam/shexp@opam:v0.13.0@5c63479c": {
+      "id": "@opam/shexp@opam:v0.13.0@5c63479c",
+      "name": "@opam/shexp",
+      "version": "opam:v0.13.0",
+      "source": {
+        "type": "install",
+        "source": [
+          "archive:https://opam.ocaml.org/cache/md5/13/13002fde6249703d06ff820906cd96c9#md5:13002fde6249703d06ff820906cd96c9",
+          "archive:https://ocaml.janestreet.com/ocaml-core/v0.13/files/shexp-v0.13.0.tar.gz#md5:13002fde6249703d06ff820906cd96c9"
+        ],
+        "opam": {
+          "name": "shexp",
+          "version": "v0.13.0",
+          "path": "esy.lock/opam/shexp.v0.13.0"
+        }
+      },
+      "overrides": [],
+      "dependencies": [
+        "ocaml@4.8.1000@d41d8cd9", "@opam/spawn@opam:v0.13.0@b3937806",
+        "@opam/posixat@opam:v0.13.0@e8bc1a31",
+        "@opam/dune@opam:2.5.1@a0c1e658",
+        "@opam/base-threads@opam:base@36803084",
+        "@opam/base@opam:v0.13.2@c3150775",
+        "@esy-ocaml/substs@0.0.1@d41d8cd9"
+      ],
+      "devDependencies": [
+        "ocaml@4.8.1000@d41d8cd9", "@opam/spawn@opam:v0.13.0@b3937806",
+        "@opam/posixat@opam:v0.13.0@e8bc1a31",
+        "@opam/dune@opam:2.5.1@a0c1e658",
+        "@opam/base-threads@opam:base@36803084",
+        "@opam/base@opam:v0.13.2@c3150775"
       ]
     },
     "@opam/sexplib0@opam:v0.13.0@3f54c2be": {
@@ -1999,6 +2060,37 @@
         "@opam/dune@opam:2.5.1@a0c1e658", "@opam/base@opam:v0.13.2@c3150775"
       ]
     },
+    "@opam/posixat@opam:v0.13.0@e8bc1a31": {
+      "id": "@opam/posixat@opam:v0.13.0@e8bc1a31",
+      "name": "@opam/posixat",
+      "version": "opam:v0.13.0",
+      "source": {
+        "type": "install",
+        "source": [
+          "archive:https://opam.ocaml.org/cache/md5/25/25c9bc258eff7ab358538f2e9565c594#md5:25c9bc258eff7ab358538f2e9565c594",
+          "archive:https://ocaml.janestreet.com/ocaml-core/v0.13/files/posixat-v0.13.0.tar.gz#md5:25c9bc258eff7ab358538f2e9565c594"
+        ],
+        "opam": {
+          "name": "posixat",
+          "version": "v0.13.0",
+          "path": "esy.lock/opam/posixat.v0.13.0"
+        }
+      },
+      "overrides": [],
+      "dependencies": [
+        "ocaml@4.8.1000@d41d8cd9",
+        "@opam/ppx_sexp_conv@opam:v0.13.0@53058ed2",
+        "@opam/ppx_optcomp@opam:v0.13.0@35a02c58",
+        "@opam/dune@opam:2.5.1@a0c1e658", "@opam/base@opam:v0.13.2@c3150775",
+        "@esy-ocaml/substs@0.0.1@d41d8cd9"
+      ],
+      "devDependencies": [
+        "ocaml@4.8.1000@d41d8cd9",
+        "@opam/ppx_sexp_conv@opam:v0.13.0@53058ed2",
+        "@opam/ppx_optcomp@opam:v0.13.0@35a02c58",
+        "@opam/dune@opam:2.5.1@a0c1e658", "@opam/base@opam:v0.13.2@c3150775"
+      ]
+    },
     "@opam/odoc@opam:1.5.0@cdaef451": {
       "id": "@opam/odoc@opam:1.5.0@cdaef451",
       "name": "@opam/odoc",
@@ -2747,6 +2839,37 @@
       ],
       "devDependencies": [
         "ocaml@4.8.1000@d41d8cd9", "@opam/dune@opam:2.5.1@a0c1e658"
+      ]
+    },
+    "@opam/fileutils@opam:0.6.2@2c57b3ad": {
+      "id": "@opam/fileutils@opam:0.6.2@2c57b3ad",
+      "name": "@opam/fileutils",
+      "version": "opam:0.6.2",
+      "source": {
+        "type": "install",
+        "source": [
+          "archive:https://opam.ocaml.org/cache/sha256/c7/c73d94247b6aef1450853ed14677ae58e9701376475d3f29ca730472a0171e1d#sha256:c73d94247b6aef1450853ed14677ae58e9701376475d3f29ca730472a0171e1d",
+          "archive:https://github.com/gildor478/ocaml-fileutils/releases/download/v0.6.2/fileutils-v0.6.2.tbz#sha256:c73d94247b6aef1450853ed14677ae58e9701376475d3f29ca730472a0171e1d"
+        ],
+        "opam": {
+          "name": "fileutils",
+          "version": "0.6.2",
+          "path": "esy.lock/opam/fileutils.0.6.2"
+        }
+      },
+      "overrides": [],
+      "dependencies": [
+        "ocaml@4.8.1000@d41d8cd9", "@opam/stdlib-shims@opam:0.1.0@d957c903",
+        "@opam/dune@opam:2.5.1@a0c1e658",
+        "@opam/base-unix@opam:base@87d0b2eb",
+        "@opam/base-bytes@opam:base@19d0c2ff",
+        "@esy-ocaml/substs@0.0.1@d41d8cd9"
+      ],
+      "devDependencies": [
+        "ocaml@4.8.1000@d41d8cd9", "@opam/stdlib-shims@opam:0.1.0@d957c903",
+        "@opam/dune@opam:2.5.1@a0c1e658",
+        "@opam/base-unix@opam:base@87d0b2eb",
+        "@opam/base-bytes@opam:base@19d0c2ff"
       ]
     },
     "@opam/fieldslib@opam:v0.13.0@e5d61627": {
