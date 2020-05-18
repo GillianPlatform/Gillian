@@ -6,32 +6,32 @@ module type S = sig
   (** Type of substitutions for GIL values *)
   type st
 
-  val pp : Format.formatter -> t -> unit
   (** Printer *)
+  val pp : Format.formatter -> t -> unit
 
   val full_pp : Format.formatter -> t -> unit
 
-  val to_literal : t -> Literal.t option
   (** Convert a value to a literal, if possible *)
+  val to_literal : t -> Literal.t option
 
-  val from_literal : Literal.t -> t
   (** Convert a literal to a value, always possible *)
+  val from_literal : Literal.t -> t
 
-  val to_expr : t -> Expr.t
   (** Convert a value to a logical expression, always possible *)
+  val to_expr : t -> Expr.t
 
-  val from_expr : Expr.t -> t option
   (** Converts a logical expression to a value, if possible *)
+  val from_expr : Expr.t -> t option
 
-  val from_list : t list -> t
   (** Convert a list of values to a single value, always possible *)
+  val from_list : t list -> t
 
-  val from_lvar_name : string -> t
   (** Converts a logical variable name into a value *)
+  val from_lvar_name : string -> t
 
-  val to_list : t -> t list option
   (** Convert a value to a list of values, if possible *)
+  val to_list : t -> t list option
 
-  val is_concrete : t -> bool
   (** Is the value concrete? *)
+  val is_concrete : t -> bool
 end

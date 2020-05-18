@@ -59,8 +59,8 @@ module type S = sig
 
   val substitution_in_place : st -> t -> unit
 
-  val to_assertions : t -> Asrt.t list
   (** Turns a predicate set into a list of assertions *)
+  val to_assertions : t -> Asrt.t list
 
   val index_of : t -> (abs_t -> bool) -> int option
 

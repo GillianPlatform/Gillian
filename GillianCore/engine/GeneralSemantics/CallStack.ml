@@ -17,29 +17,29 @@ module type S = sig
   type t =
     (string * vt list * store_t option * Var.t * int * int * int option) list
 
-  val get_cur_proc_id : t -> string
   (**
     Get current procedure identifier
 
     @param cs Target call stack
     @return Identifier of the procedure currently being executed
   *)
+  val get_cur_proc_id : t -> string
 
-  val get_cur_args : t -> vt list
   (**
     Get current arguments
 
     @param cs Target call stack
     @return Arguments of the procedure currently being executed
   *)
+  val get_cur_args : t -> vt list
 
-  val copy : t -> t
   (**
     Call stack copy
 
     @param cs Target call stack
     @return Copy of the given call stack
   *)
+  val copy : t -> t
 end
 
 module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct

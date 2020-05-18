@@ -27,11 +27,11 @@ type ga = GMem of mem_ga | GGenv of genv_ga
 
 (** {3 Serialization of actions} *)
 
-val str_ac : ac -> string
 (** Serializes an action into a string *)
+val str_ac : ac -> string
 
-val ac_from_str : string -> ac
 (** Deserializes a string into an action *)
+val ac_from_str : string -> ac
 
 (** {3 Global assertion and their actions} *)
 

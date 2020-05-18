@@ -10,77 +10,77 @@ module type S = sig
   (** Type of GIL substitutions *)
   type t
 
-  val init : (Var.t * vt) list -> t
   (** Substitution constructor, with a list of bindings of the form (variable, value) *)
+  val init : (Var.t * vt) list -> t
 
-  val is_empty : t -> bool
   (** Is the substitution empty? *)
+  val is_empty : t -> bool
 
-  val clear : t -> unit
   (** Reset substitution *)
+  val clear : t -> unit
 
-  val domain : t -> (Var.t -> bool) option -> Var.Set.t
   (** Domain of the substitution *)
+  val domain : t -> (Var.t -> bool) option -> Var.Set.t
 
-  val range : t -> vt list
   (** Range of the substitution *)
+  val range : t -> vt list
 
-  val get : t -> Var.t -> vt option
   (** Substitution lookup *)
+  val get : t -> Var.t -> vt option
 
-  val add : t -> Var.t -> vt -> unit
   (** Substitution incremental update *)
+  val add : t -> Var.t -> vt -> unit
 
-  val put : t -> Var.t -> vt -> unit
   (** Substitution update *)
+  val put : t -> Var.t -> vt -> unit
 
-  val mem : t -> Var.t -> bool
   (** Substitution membership *)
+  val mem : t -> Var.t -> bool
 
-  val copy : t -> t
   (** Substitution copy *)
+  val copy : t -> t
 
-  val extend : t -> (Var.t * vt) list -> unit
   (** Substitution extension with a list of bindings *)
+  val extend : t -> (Var.t * vt) list -> unit
 
-  val merge_left : t -> t -> unit
   (** Substution merge into left *)
+  val merge_left : t -> t -> unit
 
-  val compatible : t -> t -> bool
   (** Compatible substitutions *)
+  val compatible : t -> t -> bool
 
-  val filter : t -> (Var.t -> vt -> bool) -> t
   (** Substitution filter *)
+  val filter : t -> (Var.t -> vt -> bool) -> t
 
-  val projection : t -> Var.Set.t -> t
   (** Substitution variable filter *)
+  val projection : t -> Var.Set.t -> t
 
-  val iter : t -> (Var.t -> vt -> unit) -> unit
   (** Substitution iterator *)
+  val iter : t -> (Var.t -> vt -> unit) -> unit
 
-  val fold : t -> (Var.t -> vt -> 'a -> 'a) -> 'a -> 'a
   (** Substitution fold *)
+  val fold : t -> (Var.t -> vt -> 'a -> 'a) -> 'a -> 'a
 
-  val pp : Format.formatter -> t -> unit
   (** Pretty Printer *)
+  val pp : Format.formatter -> t -> unit
 
   val filter_in_place : t -> (Var.t -> vt -> vt option) -> unit
 
-  val to_list : t -> (Var.t * vt) list
   (** Convert substitution to list *)
+  val to_list : t -> (Var.t * vt) list
 
-  val subst_in_expr : t -> partial:bool -> Expr.t -> Expr.t
   (** Substitution inside a logical expression *)
+  val subst_in_expr : t -> partial:bool -> Expr.t -> Expr.t
 
-  val subst_in_expr_opt : t -> Expr.t -> Expr.t option
   (** Optional substitution inside a logical expression *)
+  val subst_in_expr_opt : t -> Expr.t -> Expr.t option
 
-  val to_ssubst : t -> (Var.t * Expr.t) list
   (** Convert to a symbolic substitution *)
+  val to_ssubst : t -> (Var.t * Expr.t) list
 
-  val to_formulae : t -> Formula.t list
   (** creates a list of equalities from the substitution table
     before substitution_to_list *)
+  val to_formulae : t -> Formula.t list
 
   val substitute_formula : t -> partial:bool -> Formula.t -> Formula.t
 

@@ -26,8 +26,8 @@ module Constant : sig
     | UTCTime  (** Current UTC time *)
     | LocalTime  (** Current local time *)
 
-  val str : t -> string
   (** Printer *)
+  val str : t -> string
 end
 
 module Type : sig
@@ -46,8 +46,8 @@ module Type : sig
     | TypeType  (** Type of types *)
     | SetType  (** Type of sets *)
 
-  val str : t -> string
   (** Printer *)
+  val str : t -> string
 
   (** Sets of types *)
   module Set : Set.S with type elt := t
@@ -69,23 +69,23 @@ module Literal : sig
     | LList     of t list  (** Lists of GIL literals *)
     | Nono  (** Negative information *)
 
-  val pp : t Fmt.t
   (** Pretty-printer *)
+  val pp : t Fmt.t
 
-  val type_of : t -> Type.t
   (** [typeof lit] returns the type of the literal [lit] *)
+  val type_of : t -> Type.t
 
-  val evaluate_constant : Constant.t -> t
   (** [evaluate_constant c] evaluates the constant [c] *)
+  val evaluate_constant : Constant.t -> t
 
-  val from_list : t list -> t
   (** [from_list lst] builds a GIL list [LList lst] from the OCaml list [lst] *)
+  val from_list : t list -> t
 
-  val to_list : t -> t list option
   (** [to_list lit] returns [Some l] if [lit = LList l], and otherwise [None] *)
+  val to_list : t -> t list option
 
-  val base_elements : t -> t list
   (** [base_elements lit] Returns a list of all non-list literals occurring in [lit] *)
+  val base_elements : t -> t list
 end
 
 module UnOp : sig
@@ -124,8 +124,8 @@ module UnOp : sig
     | SetToList  (** From set to list *)
     | StrLen  (** String length *)
 
-  val str : t -> string
   (** Printer *)
+  val str : t -> string
 end
 
 module BinOp : sig
@@ -170,8 +170,8 @@ module BinOp : sig
     | BSetMem  (** Set membership *)
     | BSetSub  (** Subset *)
 
-  val str : t -> string
   (** Printer *)
+  val str : t -> string
 end
 
 module NOp : sig
@@ -181,8 +181,8 @@ module NOp : sig
     | SetUnion  (** Set union *)
     | SetInter  (** Set intersection *)
 
-  val str : t -> string
   (** Printer *)
+  val str : t -> string
 end
 
 module Expr : sig
@@ -205,77 +205,77 @@ module Expr : sig
   (** Maps with expressions as keys *)
   module Map : Map.S with type key := t
 
-  val equal : t -> t -> bool
   (** Equality *)
+  val equal : t -> t -> bool
 
-  val map : (t -> t * bool) -> (t -> t) option -> t -> t
   (** Mapper *)
+  val map : (t -> t * bool) -> (t -> t) option -> t -> t
 
-  val map_opt : (t -> t option * bool) -> (t -> t) option -> t -> t option
   (** Optional mapper *)
+  val map_opt : (t -> t option * bool) -> (t -> t) option -> t -> t option
 
-  val pp : t Fmt.t
   (** Pretty-printer *)
+  val pp : t Fmt.t
 
-  val full_pp : t Fmt.t
   (** Pretty-printer with constructors (will not parse) *)
+  val full_pp : t Fmt.t
 
-  val to_list : t -> t list option
   (** If the expression is a list (either an [EList _] of Lit (LList _)), returns the list of expressions. *)
+  val to_list : t -> t list option
 
-  val from_list : t list -> t
   (** [from_list] [EList] with the provided elements *)
+  val from_list : t list -> t
 
+  (** Folder *)
   val fold :
     (t -> 'b -> 'b -> 'a list -> 'a) -> (t -> 'b -> 'b) option -> 'b -> t -> 'a
-  (** Folder *)
 
-  val lvars : t -> SS.t
   (** [lvars e] returns all logical variables in [e] *)
+  val lvars : t -> SS.t
 
-  val pvars : t -> SS.t
   (** [pvars e] returns all program variables in [e] *)
+  val pvars : t -> SS.t
 
-  val alocs : t -> SS.t
   (** [alocs e] returns all abstract locations in [e] *)
+  val alocs : t -> SS.t
 
-  val clocs : t -> SS.t
   (** [clocs e] returns all concrete locations in [e] *)
+  val clocs : t -> SS.t
 
-  val vars : t -> SS.t
   (** [vars e] returns all variables in [e] (includes lvars, pvars, alocs and clocs) *)
+  val vars : t -> SS.t
 
-  val substitutables : t -> SS.t
   (** [substitutables e] returns all lvars and alocs *)
+  val substitutables : t -> SS.t
 
-  val is_concrete : t -> bool
   (** [is_concrete e] returns [true] iff the expression contains no lvar or aloc *)
+  val is_concrete : t -> bool
 
-  val all_literals : t list -> bool
   (** [all_literals lst] returns [true] iff all elements of the given list [lst] are literals *)
+  val all_literals : t list -> bool
 
-  val from_lit_list : Literal.t -> t
   (** [from_lit_list lst] lifts a literal list to an expression list *)
+  val from_lit_list : Literal.t -> t
 
-  val lists : t -> t list
   (** [lists e] all sub-expressions of [e] of the form [Lit (LList lst)] and [EList lst] *)
+  val lists : t -> t list
 
-  val subst_clocs : (string -> t) -> t -> t
   (** [subst_clocs subst e] substitutes expressions of the form [Lit (Loc l)] with [subst l] in [e] *)
+  val subst_clocs : (string -> t) -> t -> t
 
-  val from_var_name : string -> t
   (** [from_var_name var] returns either an aloc, an lvar or a pvar if [var] name matches one of these types
     (see {!Utils.Names.is_aloc_name}, {!Utils.Names.is_lvar_name} and {!Utils.Names.is_pvar_name}) *)
+  val from_var_name : string -> t
 
-  val loc_from_loc_name : string -> t
   (** [loc_from_loc_name loc] Has the same behaviour as [from_var_name] except that it returns either an [ALoc loc] or a [Lit (Loc loc)] *)
+  val loc_from_loc_name : string -> t
 
-  val subst_expr_for_expr : to_subst:t -> subst_with:t -> t -> t
   (** [subst_expr_for_expr ~to_subst ~subst_with expr] substitutes every occurence of the expression [to_subst] with the expression [subst_with] in [expr] *)
+  val subst_expr_for_expr : to_subst:t -> subst_with:t -> t -> t
 
-  val base_elements : t -> t list
   (** [base_elements e] returns the list containing all logical variables,
       abstract locations, and non-list literals in [e] *)
+  val base_elements : t -> t list
 end
 
 module Formula : sig
@@ -298,14 +298,15 @@ module Formula : sig
   (** Sets of formulae *)
   module Set : Set.S with type elt := t
 
+  (** Deprecated. Use {!Visitors.map} instead *)
   val map :
     (t -> t * bool) option ->
     (t -> t) option ->
     (Expr.t -> Expr.t) option ->
     t ->
     t
-  (** Deprecated. Use {!Visitors.map} instead *)
 
+  (** Deprecated. Use {!Visitors.reduce} instead *)
   val fold :
     (Expr.t -> 'a) option ->
     (t -> 'b -> 'b -> 'a list -> 'a) ->
@@ -313,59 +314,58 @@ module Formula : sig
     'b ->
     t ->
     'a
-  (** Deprecated. Use {!Visitors.reduce} instead *)
 
-  val lvars : t -> SS.t
   (** Get all the logical variables*)
+  val lvars : t -> SS.t
 
-  val pvars : t -> SS.t
   (** Get all the program variables *)
+  val pvars : t -> SS.t
 
-  val alocs : t -> SS.t
   (** Get all the abstract locations *)
+  val alocs : t -> SS.t
 
-  val clocs : t -> SS.t
   (** Get all the concrete locations *)
+  val clocs : t -> SS.t
 
-  val lists : t -> Expr.t list
   (** Get all the logical expressions of the formula of the form (Lit (LList lst)) and (EList lst) *)
+  val lists : t -> Expr.t list
 
-  val list_lexprs : t -> Expr.t list
   (** Get all the list expressions *)
+  val list_lexprs : t -> Expr.t list
 
-  val push_in_negations : t -> t
   (** [push_in_negations a] takes negations off the toplevel of [a] and pushes them in the leaves.
     For example [push_in_negations (Not (And (True, False)))] returns [Or (False, False)] *)
+  val push_in_negations : t -> t
 
-  val pp : Format.formatter -> t -> unit
   (** Pretty-printer *)
+  val pp : Format.formatter -> t -> unit
 
-  val full_pp : Format.formatter -> t -> unit
   (** Pretty-printer with constructors (will not parse) *)
+  val full_pp : Format.formatter -> t -> unit
 
-  val lift_logic_expr : Expr.t -> (t * t) option
   (** Lifts an expression to a formula, if possible. It returns
       the lifted expression and its negation *)
+  val lift_logic_expr : Expr.t -> (t * t) option
 
-  val to_expr : t -> Expr.t option
   (** Unlifts the formula to an expression, if possible *)
+  val to_expr : t -> Expr.t option
 
-  val conjunct : t list -> t
   (** [conjunct \[a1; ...; an\]] returns [a1 /\ ... /\ an] *)
+  val conjunct : t list -> t
 
-  val disjunct : t list -> t
   (** [disjunct \[a1; ...; an\]] returns [a1 \/ ... \/ an] *)
+  val disjunct : t list -> t
 
   val subst_expr_for_expr : to_subst:Expr.t -> subst_with:Expr.t -> t -> t
 
-  val subst_clocs : (string -> Expr.t) -> t -> t
   (** [subst_clocs subst e] Substitutes expressions of the form [Lit (Loc l)] with [subst l] in [e] *)
+  val subst_clocs : (string -> Expr.t) -> t -> t
 
-  val get_disjuncts : t -> t list
   (** [get_disjuncts (a1 \/ ... \/ an)] returns [\[a1; ...; an\]] *)
+  val get_disjuncts : t -> t list
 
-  val strings_and_numbers : t -> string list * float list
   (** Returns a list of strings and a list of numbers that are contained in the formula *)
+  val strings_and_numbers : t -> string list * float list
 end
 
 module Asrt : sig
@@ -378,15 +378,16 @@ module Asrt : sig
     | Types of (Expr.t * Type.t) list  (** Typing assertion *)
     | GA    of string * Expr.t list * Expr.t list  (** Core assertion *)
 
-  val compare : t -> t -> int
   (** Comparison of assertions *)
+  val compare : t -> t -> int
 
-  val prioritise : t -> t -> int
   (** Sorting of assertions *)
+  val prioritise : t -> t -> int
 
   (** Sets of assertions *)
   module Set : Set.S with type elt := t
 
+  (** Deprecated, use {!Visitors.map} instead. *)
   val map :
     (t -> t * bool) option ->
     (t -> t) option ->
@@ -394,7 +395,6 @@ module Asrt : sig
     (Formula.t -> Formula.t) option ->
     t ->
     t
-  (** Deprecated, use {!Visitors.map} instead. *)
 
   val fold :
     (Expr.t -> 'a) option ->
@@ -405,57 +405,57 @@ module Asrt : sig
     t ->
     'a
 
-  val lists : t -> Expr.t list
   (** Get all the logical expressions of [a] of the form (Lit (LList lst)) and (EList lst) *)
+  val lists : t -> Expr.t list
 
-  val list_lexprs : t -> Expr.t list
   (** Get all the logical expressions of [a] that denote a list
    and are not logical variables *)
+  val list_lexprs : t -> Expr.t list
 
-  val lvars : t -> SS.t
   (** Get all the logical variables in [a] *)
+  val lvars : t -> SS.t
 
-  val pvars : t -> SS.t
   (** Get all the program variables in [a] *)
+  val pvars : t -> SS.t
 
-  val alocs : t -> SS.t
   (** Get all the abstract locations in [a] *)
+  val alocs : t -> SS.t
 
-  val clocs : t -> SS.t
   (** Get all the concrete locations in [a] *)
+  val clocs : t -> SS.t
 
-  val vars : t -> SS.t
   (** Get all the variables in [a] (includes lvars, pvars, alocs and clocs) *)
+  val vars : t -> SS.t
 
-  val pred_names : t -> string list
   (** Returns a list with the names of the predicates that occur in [a] *)
+  val pred_names : t -> string list
 
+  (** Returns a list with the pure assertions that occur in [a] *)
   val pure_asrts : t -> Formula.t list
-  (** Returns a list with the pure assertions that occur in [a] *)
 
+  (** Returns a list with the pure assertions that occur in [a] *)
   val simple_asrts : t -> t list
-  (** Returns a list with the pure assertions that occur in [a] *)
 
-  val is_pure_asrt : t -> bool
   (** Check if [a] is a pure assertion *)
+  val is_pure_asrt : t -> bool
 
-  val is_pure_non_rec_asrt : t -> bool
   (** Check if [a] is a pure assertion & non-recursive assertion.
    It assumes that only pure assertions are universally quantified *)
+  val is_pure_non_rec_asrt : t -> bool
 
-  val make_pure : t -> Formula.t
   (** Eliminate LStar and LTypes assertions.
    LTypes disappears. LStar is replaced by LAnd.
    This function expects its argument to be a PURE assertion. *)
+  val make_pure : t -> Formula.t
 
-  val pp : Format.formatter -> t -> unit
   (** Pretty-printer *)
+  val pp : Format.formatter -> t -> unit
 
-  val star : t list -> t
   (** [star \[a1; a2; ...; an\] will return \[a1 * a2 * ... * an\]] *)
+  val star : t list -> t
 
-  val subst_clocs : (string -> Expr.t) -> t -> t
   (** [subst_clocs subst a] Substitutes expressions of the form [Lit (Loc l)] with [subst l] in [a] *)
+  val subst_clocs : (string -> Expr.t) -> t -> t
 end
 
 module SLCmd : sig
@@ -473,19 +473,19 @@ module SLCmd : sig
     | SepAssert of Asrt.t * string list  (** Assert *)
     | Invariant of Asrt.t * string list  (** Invariant *)
 
+  (** Deprecated. Use {!Visitors.map} instead *)
   val map :
     (t -> t) option ->
     (Asrt.t -> Asrt.t) option ->
     (Expr.t -> Expr.t) option ->
     t ->
     t
-  (** Deprecated. Use {!Visitors.map} instead *)
 
-  val pp_folding_info : (string * (string * Expr.t) list) option Fmt.t
   (** Pretty-printer of folding info *)
+  val pp_folding_info : (string * (string * Expr.t) list) option Fmt.t
 
-  val pp : Format.formatter -> t -> unit
   (** Pretty-printer *)
+  val pp : Format.formatter -> t -> unit
 end
 
 module LCmd : sig
@@ -500,6 +500,7 @@ module LCmd : sig
     | SpecVar    of string list  (** Specification variables (spec vars) *)
     | SL         of SLCmd.t  (** Separation-logic-related commands ({!type:SLCmd.t}) *)
 
+  (** Deprecated. Use {!Visitors} instead *)
   val map :
     (t -> t) option ->
     (Expr.t -> Expr.t) option ->
@@ -507,10 +508,9 @@ module LCmd : sig
     (SLCmd.t -> SLCmd.t) option ->
     t ->
     t
-  (** Deprecated. Use {!Visitors} instead *)
 
-  val pp : t Fmt.t
   (** Pretty-printer *)
+  val pp : t Fmt.t
 end
 
 module Cmd : sig
@@ -539,17 +539,17 @@ module Cmd : sig
     | ReturnError  (** Error return *)
     | Fail          of string * Expr.t list  (** Failure *)
 
-  val pp : pp_label:'a Fmt.t -> Format.formatter -> 'a t -> unit
   (** Pretty-printer *)
+  val pp : pp_label:'a Fmt.t -> Format.formatter -> 'a t -> unit
 
-  val pp_labeled : Format.formatter -> string t -> unit
   (** Pretty-printer for labelled programs *)
+  val pp_labeled : Format.formatter -> string t -> unit
 
-  val pp_indexed : Format.formatter -> int t -> unit
   (** Pretty-printer for integer-indexed programs *)
+  val pp_indexed : Format.formatter -> int t -> unit
 
-  val successors : int t -> int -> int list
   (** Possible successors of an command (in integer indexing) *)
+  val successors : int t -> int -> int list
 end
 
 module Pred : sig
@@ -568,42 +568,43 @@ module Pred : sig
     pred_normalised : bool;  (** Has the predicate been previously normalised? *)
   }
 
-  val init : t list -> (string, t) Hashtbl.t
   (** Populates a Hashtbl from the given predicate list *)
+  val init : t list -> (string, t) Hashtbl.t
 
-  val ins_and_outs : t -> Utils.Containers.SI.t * Utils.Containers.SI.t
   (** Returns the sets of in- and out-parameters of a predicate *)
+  val ins_and_outs : t -> Utils.Containers.SI.t * Utils.Containers.SI.t
 
+  (** Returns the names of in-parameters *)
   val in_params : t -> string list
-  (** Returns the names of in-parameters *)
 
-  val in_args : t -> 'a list -> 'a list
   (** Returns the in-parameters given all parameters *)
+  val in_args : t -> 'a list -> 'a list
 
-  val out_params : t -> string list
   (** Returns the names of in-parameters *)
+  val out_params : t -> string list
 
-  val out_args : t -> 'a list -> 'a list
   (** Returns the out-parameters given all parameters *)
+  val out_args : t -> 'a list -> 'a list
 
-  val pp : Format.formatter -> t -> unit
   (** Pretty-printer *)
+  val pp : Format.formatter -> t -> unit
 
-  val check_pvars : (string, t) Hashtbl.t -> unit
   (** Sanity check on program variables inside normalised predicates *)
+  val check_pvars : (string, t) Hashtbl.t -> unit
 
-  val explicit_param_types : (string, t) Hashtbl.t -> t -> t
   (** Infers parameter types and makes them explicit in the assertions *)
+  val explicit_param_types : (string, t) Hashtbl.t -> t -> t
 
-  val combine_ins_outs : t -> 'a list -> 'a list -> 'a list
   (** Combines a list of ins and a list of outs putting them in the right order
     according to a given predicate. *)
+  val combine_ins_outs : t -> 'a list -> 'a list -> 'a list
 
-  val iter_ins_outs :
-    t -> ('a -> unit) -> ('b -> unit) -> 'a list * 'b list -> unit
   (** [iter_ins_outs p f_ins f_outs (ins, outs)] will iterate, applying [f_ins] on the [ins] and
     [f_outs] on the [outs], in the order specified *)
+  val iter_ins_outs :
+    t -> ('a -> unit) -> ('b -> unit) -> 'a list * 'b list -> unit
 
+  (** Prints the ins and outs in the right order *)
   val pp_ins_outs :
     t ->
     (Format.formatter -> 'a -> unit) ->
@@ -611,10 +612,9 @@ module Pred : sig
     Format.formatter ->
     'a list * 'b list ->
     unit
-  (** Prints the ins and outs in the right order *)
 
-  val get : (string, t) Hashtbl.t -> string -> t
   (** Retrieves a predicate definition by name *)
+  val get : (string, t) Hashtbl.t -> string -> t
 end
 
 module Lemma : sig
@@ -631,11 +631,11 @@ module Lemma : sig
     lemma_existentials : string list; (* Existentials *)
   }
 
-  val pp : Format.formatter -> t -> unit
   (** Pretty-printer *)
+  val pp : Format.formatter -> t -> unit
 
-  val parameter_types : (string, Pred.t) Hashtbl.t -> t -> t
   (** Infers types of parameters and adds them to the contained assertions *)
+  val parameter_types : (string, Pred.t) Hashtbl.t -> t -> t
 end
 
 module Macro : sig
@@ -646,14 +646,14 @@ module Macro : sig
     macro_definition : LCmd.t list;  (** Macro definition *)
   }
 
-  val pp : Format.formatter -> t -> unit
   (** Pretty-printer *)
+  val pp : Format.formatter -> t -> unit
 
-  val pp_tbl : (string, t) Hashtbl.t Fmt.t
   (** Table pretty-printer *)
+  val pp_tbl : (string, t) Hashtbl.t Fmt.t
 
-  val get : (string, t) Hashtbl.t -> string -> t option
   (** Retrieves a macro definition by name *)
+  val get : (string, t) Hashtbl.t -> string -> t option
 end
 
 module Flag : sig
@@ -688,6 +688,7 @@ module Spec : sig
     spec_to_verify : bool;  (** Should the spec be verified? *)
   }
 
+  (** [s_init ~ss_label ss_pre ss_posts ss_flag ss_to_verify] creates a single specification with the given values *)
   val s_init :
     ?ss_label:string * string list ->
     Asrt.t ->
@@ -695,29 +696,28 @@ module Spec : sig
     Flag.t ->
     bool ->
     st
-  (** [s_init ~ss_label ss_pre ss_posts ss_flag ss_to_verify] creates a single specification with the given values *)
 
-  val init : string -> string list -> st list -> bool -> bool -> t
   (** [init spec_name spec_params spec_sspecs spec_normalised spec_to_verify] creates a full specification with the given values *)
+  val init : string -> string list -> st list -> bool -> bool -> t
 
-  val extend : t -> st list -> t
   (** Extends a full specfiication with a single specification *)
+  val extend : t -> st list -> t
 
-  val get_params : t -> string list
   (** Return the list of parameters of a Spec *)
+  val get_params : t -> string list
 
   val pp_sspec : Format.formatter -> st -> unit
 
   val pp : Format.formatter -> t -> unit
 
-  val parameter_types : (string, Pred.t) Hashtbl.t -> t -> t
   (** Makes the types of parameters explicit in the assertions *)
+  val parameter_types : (string, Pred.t) Hashtbl.t -> t -> t
 
+  (** For legacy purpose, some functions use string sets instead of string lists existentials.
+    This function allows for a smooth translation *)
   val label_vars_to_set :
     ('a * Utils.Containers.SS.elt list) option ->
     ('a * Utils.Containers.SS.t) option
-  (** For legacy purpose, some functions use string sets instead of string lists existentials.
-    This function allows for a smooth translation *)
 end
 
 module BiSpec : sig
@@ -735,19 +735,19 @@ module BiSpec : sig
 
   val init_tbl : unit -> t_tbl
 
-  val pp : Format.formatter -> t -> unit
   (** Pretty-printer *)
+  val pp : Format.formatter -> t -> unit
 end
 
 module Annot : sig
   (** {b GIL annot}. *)
   type t
 
-  val init : ?line_offset:int option -> ?origin_id:int -> unit -> t
   (** Initialize an annotation *)
+  val init : ?line_offset:int option -> ?origin_id:int -> unit -> t
 
-  val get_line_offset : t -> int option
   (** get the line offset *)
+  val get_line_offset : t -> int option
 
   val line_info_to_str : (string * int * int) list -> string
 end
@@ -767,29 +767,29 @@ module Proc : sig
     proc_spec : Spec.t option;
   }
 
-  val get_params : ('a, 'b) t -> string list
   (** Gets the parameters of the procedure *)
+  val get_params : ('a, 'b) t -> string list
 
+  (** If the [show_labels] flag is true, the labels will be written before the command they correspond to *)
   val pp :
     show_labels:bool ->
     pp_label:'a Fmt.t ->
     Format.formatter ->
     ('b, 'a) t ->
     unit
-  (** If the [show_labels] flag is true, the labels will be written before the command they correspond to *)
 
-  val pp_labeled : Format.formatter -> ('a, string) t -> unit
   (** Print labelled *)
+  val pp_labeled : Format.formatter -> ('a, string) t -> unit
 
-  val pp_indexed : Format.formatter -> ('a, int) t -> unit
   (** Print indexed *)
+  val pp_indexed : Format.formatter -> ('a, int) t -> unit
 
-  val line_info : (Annot.t, 'a) t -> (string * int * int) list
   (** Line information *)
+  val line_info : (Annot.t, 'a) t -> (string * int * int) list
 
-  val indexed_of_labeled : (Annot.t, string) t -> (Annot.t, int) t
   (** Returns the indexed procedure for a labeled procedures where the labels can be of any type.
     Equality of labels is decided by structural equality *)
+  val indexed_of_labeled : (Annot.t, string) t -> (Annot.t, int) t
 
   val check_proc_spec_correspondence :
     (string, (Annot.t, 'a) t) Hashtbl.t -> unit
@@ -808,6 +808,7 @@ module Prog : sig
     predecessors : (string * int * int, int) Hashtbl.t;
   }
 
+  (** Makes a full program *)
   val make :
     imports:(string * bool) list ->
     lemmas:(string, Lemma.t) Hashtbl.t ->
@@ -820,8 +821,8 @@ module Prog : sig
     predecessors:(string * int * int, int) Hashtbl.t ->
     unit ->
     ('annot, 'label) t
-  (** Makes a full program *)
 
+  (** Initialises a labeled program (with empty predecessors, to be computed later) *)
   val make_labeled :
     procs:(string, ('annot, string) Proc.t) Hashtbl.t ->
     imports:(string * bool) list ->
@@ -833,8 +834,8 @@ module Prog : sig
     proc_names:string list ->
     unit ->
     ('annot, string) t
-  (** Initialises a labeled program (with empty predecessors, to be computed later) *)
 
+  (** Initialises an indexed program (with empty proc_names and imports, useless for the rest) *)
   val make_indexed :
     procs:('annot, int) Proc.t list ->
     predecessors:(string * int * int * int) list ->
@@ -845,110 +846,109 @@ module Prog : sig
     bi_specs:(string, BiSpec.t) Hashtbl.t ->
     unit ->
     ('annot, int) t
-  (** Initialises an indexed program (with empty proc_names and imports, useless for the rest) *)
 
-  val create : unit -> ('a, string) t
   (** Creates an empty program *)
+  val create : unit -> ('a, string) t
 
   (** {3 Getters} *)
   val get_lemmas : ('a, 'b) t -> Lemma.t list
   (** Get all lemmas *)
 
-  val get_preds : ('a, 'b) t -> Pred.t list
   (** Get all predicates *)
+  val get_preds : ('a, 'b) t -> Pred.t list
 
-  val get_ospecs : ('a, 'b) t -> Spec.t list
   (** Get all only-specs *)
+  val get_ospecs : ('a, 'b) t -> Spec.t list
 
-  val get_specs : ('a, 'b) t -> Spec.t list
   (** Get all specs *)
+  val get_specs : ('a, 'b) t -> Spec.t list
 
-  val get_procs : ?proc_names:string list -> ('a, 'b) t -> ('a, 'b) Proc.t list
   (** Get all procedures *)
+  val get_procs : ?proc_names:string list -> ('a, 'b) t -> ('a, 'b) Proc.t list
 
-  val get_bispecs : ('a, 'b) t -> BiSpec.t list
   (** Get all bi-abductive specs *)
+  val get_bispecs : ('a, 'b) t -> BiSpec.t list
 
-  val get_noninternal_proc_names : ('a, 'b) t -> string list
   (** Get names of all procedures not marked as internal *)
+  val get_noninternal_proc_names : ('a, 'b) t -> string list
 
-  val get_noninternal_pred_names : ('a, 'b) t -> string list
   (** Get names of all predicates not marked as internal *)
+  val get_noninternal_pred_names : ('a, 'b) t -> string list
 
-  val get_noninternal_lemma_names : ('a, 'b) t -> string list
   (** Get names of all lemmas not marked as internal *)
+  val get_noninternal_lemma_names : ('a, 'b) t -> string list
 
-  val get_proc : ('a, 'b) t -> string -> ('a, 'b) Proc.t option
   (** Get a specific procedure *)
+  val get_proc : ('a, 'b) t -> string -> ('a, 'b) Proc.t option
 
-  val get_proc_exn : ('a, 'b) t -> string -> ('a, 'b) Proc.t
   (** Get a specific procedure. Raises [Failure] if it does not exist *)
+  val get_proc_exn : ('a, 'b) t -> string -> ('a, 'b) Proc.t
 
   (* FIXME: should raise Not_found instead *)
 
-  val get_pred : ('a, 'b) t -> string -> Pred.t option
   (** Get a specific predicate *)
+  val get_pred : ('a, 'b) t -> string -> Pred.t option
 
-  val get_pred_exn : ('a, 'b) t -> string -> Pred.t
   (** Get a specific predicate. Raises [Failure] if it does not exist *)
+  val get_pred_exn : ('a, 'b) t -> string -> Pred.t
 
-  val get_bispec : ('a, 'b) t -> string -> BiSpec.t option
   (** Get a specific bi-abductive spec *)
+  val get_bispec : ('a, 'b) t -> string -> BiSpec.t option
 
-  val get_bispec_exn : ('a, 'b) t -> string -> BiSpec.t
   (** Get a specific bi-abductive spec. Raises [Failure] if it does not exist *)
+  val get_bispec_exn : ('a, 'b) t -> string -> BiSpec.t
 
-  val get_lemma : ('a, 'b) t -> string -> Lemma.t option
   (** Get a specific lemma *)
+  val get_lemma : ('a, 'b) t -> string -> Lemma.t option
 
-  val get_lemma_exn : ('a, 'b) t -> string -> Lemma.t
   (** Get a specific lemma. Raises [Failure] if it does not exist *)
+  val get_lemma_exn : ('a, 'b) t -> string -> Lemma.t
 
-  val get_proc_specs : ('a, 'b) t -> Spec.t list
   (** Get all specifications *)
+  val get_proc_specs : ('a, 'b) t -> Spec.t list
 
   (** {3 Setters} *)
 
-  val update_specs : ('a, 'b) t -> ('c, 'd) t -> unit
   (** Add specs *)
+  val update_specs : ('a, 'b) t -> ('c, 'd) t -> unit
 
-  val update_imports : ('a, 'b) t -> (string * bool) list -> ('a, 'b) t
   (** Add imports *)
+  val update_imports : ('a, 'b) t -> (string * bool) list -> ('a, 'b) t
 
-  val add_lemma : ('a, 'b) t -> Lemma.t -> ('a, 'b) t
   (** Add a lemma *)
+  val add_lemma : ('a, 'b) t -> Lemma.t -> ('a, 'b) t
 
-  val add_pred : ('a, 'b) t -> Pred.t -> ('a, 'b) t
   (** Add a predicate *)
+  val add_pred : ('a, 'b) t -> Pred.t -> ('a, 'b) t
 
-  val add_ospec : ('a, 'b) t -> Spec.t -> ('a, 'b) t
   (** Add an only-spec *)
+  val add_ospec : ('a, 'b) t -> Spec.t -> ('a, 'b) t
 
-  val add_proc : ('a, 'b) t -> ('a, 'b) Proc.t -> ('a, 'b) t
   (** Add a proc *)
+  val add_proc : ('a, 'b) t -> ('a, 'b) Proc.t -> ('a, 'b) t
 
-  val add_macro : ('a, 'b) t -> Macro.t -> ('a, 'b) t
   (** Add a macro *)
+  val add_macro : ('a, 'b) t -> Macro.t -> ('a, 'b) t
 
-  val add_bispec : ('a, 'b) t -> BiSpec.t -> ('a, 'b) t
   (** Add a bi-abductive spec *)
+  val add_bispec : ('a, 'b) t -> BiSpec.t -> ('a, 'b) t
 
+  (** {3 Printers} *)
   val pp :
     show_labels:bool ->
     pp_label:'b Fmt.t ->
     Format.formatter ->
     ('a, 'b) t ->
     unit
-  (** {3 Printers} *)
 
-  val pp_labeled : Format.formatter -> ('a, string) t -> unit
   (** Print labelled *)
+  val pp_labeled : Format.formatter -> ('a, string) t -> unit
 
-  val pp_indexed : Format.formatter -> ('a, int) t -> unit
   (** Print indexed *)
+  val pp_indexed : Format.formatter -> ('a, int) t -> unit
 
-  val line_info : (Annot.t, 'b) t -> (string * int * int) list
   (** Line information *)
+  val line_info : (Annot.t, 'b) t -> (string * int * int) list
 end
 
 module Visitors : sig

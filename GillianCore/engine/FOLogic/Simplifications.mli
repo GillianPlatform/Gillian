@@ -1,12 +1,3 @@
-val simplify_pfs_and_gamma :
-  ?unification:bool ->
-  ?kill_new_lvars:bool ->
-  ?save_spec_vars:Utils.Containers.SS.t * bool ->
-  ?existentials:Utils.Containers.SS.t ->
-  PFS.t ->
-  ?rpfs:PFS.t ->
-  TypEnv.t ->
-  SVal.SSubst.t * Utils.Containers.SS.t
 (** [simplify_pfs_and_gamma ?unification ?kill_new_lvars ?save_spec_vars ?existentials lpfs ?rpfs gamma]
     simplifies the pure formule [lpfs] and the typing environment [gamma], attempting to instantiate
     the (optional) [existentials] and returning the learned bindings and a (possibly smaller) new set
@@ -18,14 +9,23 @@ val simplify_pfs_and_gamma :
     If the [save_spec_vars] parameter is [(_, true)], all spec variables will be preserved.
     If the [save_spec_vars] parameter is [(var_set, false)], only the spec variables in [var_set] will be preserved.
     The [unification] flag should not be used by Gillian instantiation developers. *)
+val simplify_pfs_and_gamma :
+  ?unification:bool ->
+  ?kill_new_lvars:bool ->
+  ?save_spec_vars:Utils.Containers.SS.t * bool ->
+  ?existentials:Utils.Containers.SS.t ->
+  PFS.t ->
+  ?rpfs:PFS.t ->
+  TypEnv.t ->
+  SVal.SSubst.t * Utils.Containers.SS.t
 
-val simplify_implication :
-  Utils.Containers.SS.t -> PFS.t -> PFS.t -> TypEnv.t -> Utils.Containers.SS.t
 (** [simplify_implication existentials lpfs rpfs gamma]
     simplifies the entailment << ∃ [existentials]. [lpfs] => [rpfs] >>
     under the typing environment [gamma], attempting to instantiate the
     [existentials] and returning a (possibly smaller) new set of existentials *)
+val simplify_implication :
+  Utils.Containers.SS.t -> PFS.t -> PFS.t -> TypEnv.t -> Utils.Containers.SS.t
 
-val admissible_assertion : Gil_syntax.Asrt.t -> bool
 (** [admissible_assertion a] checks whether or not the assertion [a] is
     a contradiction only using the reductions/simplifications *)
+val admissible_assertion : Gil_syntax.Asrt.t -> bool

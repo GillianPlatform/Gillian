@@ -15,11 +15,11 @@ module type S = sig
 
   type action_ret = ASucc of (t * vt list) | AFail of err_t list
 
-  val init : unit -> t
   (** Initialisation *)
+  val init : unit -> t
 
-  val execute_action : string -> t -> vt list -> action_ret
   (** Execute action *)
+  val execute_action : string -> t -> vt list -> action_ret
 
   val ga_to_setter : string -> string
 
@@ -31,11 +31,11 @@ module type S = sig
 
   val is_overlapping_asrt : string -> bool
 
-  val copy : t -> t
   (** State Copy *)
+  val copy : t -> t
 
-  val pp : Format.formatter -> t -> unit
   (** Printer *)
+  val pp : Format.formatter -> t -> unit
 
   val substitution_in_place : st -> t -> unit
 
