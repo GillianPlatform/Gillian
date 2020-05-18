@@ -8,12 +8,24 @@ module Filenames = struct
   let verif_results = "verif_results.json"
 
   let diff = "diff.txt"
+
+  let exec_mode = "exec_mode.txt"
 end
 
 let results_dir = Config.results_dir
 
 let prev_results_exist () =
-  Sys.file_exists (results_dir ()) && Sys.is_directory (results_dir ())
+  let results_dir = results_dir () in
+  if not (Sys.file_exists results_dir && Sys.is_directory results_dir) then
+    false
+  else
+    (* Do not use previous results if the analysis mode has changed *)
+    let read_str filename =
+      let file_path = Filename.concat results_dir filename in
+      Io_utils.load_file file_path
+    in
+    let prev_exec_mode = ExecMode.of_string (read_str Filenames.exec_mode) in
+    prev_exec_mode = !Config.current_exec_mode
 
 let delete_results_dir () = Io_utils.rm_rf (results_dir ())
 
@@ -46,10 +58,10 @@ let write_results_dir { sources; call_graph; results; diff } =
     Yojson.Safe.pretty_to_channel ~std:true channel json;
     close_out channel
   in
-  let write_str str fileanme =
-    let out_path = Filename.concat (results_dir ()) fileanme in
+  let write_str str filename =
+    let out_path = Filename.concat (results_dir ()) filename in
     let channel = open_out out_path in
-    Fmt.pf (Format.formatter_of_out_channel channel) "%s" str;
+    Printf.fprintf channel "%s" str;
     close_out channel
   in
   delete_results_dir ();
@@ -57,4 +69,5 @@ let write_results_dir { sources; call_graph; results; diff } =
   write_json (SourceFiles.yojson_of_t sources) Filenames.sources;
   write_json (CallGraph.yojson_of_t call_graph) Filenames.call_graph;
   write_json (VerificationResults.yojson_of_t results) Filenames.verif_results;
+  write_str (ExecMode.to_string !Config.current_exec_mode) Filenames.exec_mode;
   write_str diff Filenames.diff
