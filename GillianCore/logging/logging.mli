@@ -15,7 +15,56 @@ end
 module Report : sig
   type phase = ParsingAndCompiling | Parsing | Preprocessing | Verification
 
+  type agnostic = Agnostic
+
+  type specific = Specific
+
   type severity = Info | Log | Success | Error | Warning
+
+  type ('a, 'b) t
+end
+
+module Reporter : sig
+  type 'a t =
+    < log_agnostic : 'a. (Report.agnostic, 'a) Report.t -> unit
+    ; log_specific : (Report.specific, 'a) Report.t -> unit
+    ; wrap_up : unit >
+end
+
+module FileReporter : sig
+  val enable : unit -> unit
+
+  val disable : unit -> unit
+
+  class virtual ['a] t :
+    object
+      method log_agnostic : (Report.agnostic, 'a0) Report.t -> unit
+
+      method private formatter : Format.formatter
+
+      method log_specific : (Report.specific, 'a) Report.t -> unit
+
+      method virtual private target_lang : 'a -> unit
+
+      method wrap_up : unit
+    end
+end
+
+module DatabaseReporter : sig
+  val enable : unit -> unit
+
+  val disable : unit -> unit
+
+  class virtual ['a] t :
+    object
+      method log_agnostic : (Report.agnostic, 'a0) Report.t -> unit
+
+      method log_specific : (Report.specific, 'a) Report.t -> unit
+
+      method virtual private serialize_target_lang : 'a -> string
+
+      method wrap_up : unit
+    end
 end
 
 (** Closes all the files *)
@@ -58,6 +107,26 @@ val tmi_phase :
   ?title:string -> ?severity:Report.severity -> Report.phase -> unit
 
 val end_phase : Report.phase -> unit
+
+module Make : functor
+  (TargetLang : sig
+     type t
+
+     val file_reporter : t FileReporter.t option
+
+     val database_reporter : t DatabaseReporter.t option
+   end)
+  -> sig
+  val normal :
+    ?title:string -> ?severity:Report.severity -> TargetLang.t -> unit
+
+  val verbose :
+    ?title:string -> ?severity:Report.severity -> TargetLang.t -> unit
+
+  val tmi : ?title:string -> ?severity:Report.severity -> TargetLang.t -> unit
+
+  val wrap_up : unit -> unit
+end
 
 (*$
   let () =

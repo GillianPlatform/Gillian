@@ -23,19 +23,35 @@ let get_formatter () =
   let state = get_state () in
   state.formatter
 
-class t =
+class virtual ['a] t =
   object (self)
-    method log (report : Report.t) =
-      if enabled () then
-        match report.content with
-        | Debug msgf  ->
-            Report.PackedPP.pf self#formatter msgf;
-            Format.fprintf self#formatter "@,@?"
-        | Phase phase ->
-            Format.fprintf self#formatter "*** Phase %s ***@,@?"
-            @@ Report.string_of_phase phase
+    method log_agnostic : 'a. (Report.agnostic, 'a) Report.t -> unit =
+      fun report ->
+        if enabled () then
+          match report.content with
+          | Debug msgf  ->
+              Report.PackedPP.pf self#formatter msgf;
+              Format.fprintf self#formatter "@,@?"
+          | Phase phase ->
+              Format.fprintf self#formatter "*** Phase %s ***@,@?"
+              @@ Report.string_of_phase phase
 
     method private formatter = get_formatter ()
 
+    method log_specific (report : (Report.specific, 'a) Report.t) =
+      if enabled () then
+        match report.content with
+        | TargetLang tl -> self#target_lang tl
+
+    method virtual private target_lang : 'a -> unit
+
     method wrap_up = wrap_up ()
+  end
+
+let default : type a. unit -> a t =
+ fun () ->
+  object
+    inherit [a] t
+
+    method private target_lang _ = ()
   end

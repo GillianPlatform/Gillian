@@ -27,16 +27,23 @@ let string_of_phase = function
   | Preprocessing       -> "Preprocessing"
   | Verification        -> "Verification"
 
-type content = Debug of PackedPP.t | Phase of phase
+type agnostic = Agnostic
+
+type specific = Specific
+
+type ('kind, 'tl) content =
+  | Debug      : PackedPP.t -> (agnostic, _) content
+  | Phase      : phase -> (agnostic, _) content
+  | TargetLang : 'tl -> (specific, 'tl) content
 
 type severity = Info | Log | Success | Error | Warning
 
-type t = {
+type ('a, 'b) t = {
   id : Uuidm.t;
   title : string;
   elapsed_time : float;
   previous : Uuidm.t option;
   parent : Uuidm.t option;
-  content : content;
+  content : ('a, 'b) content;
   severity : severity;
 }
