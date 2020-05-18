@@ -12,7 +12,7 @@ let install hook =
   let absorg = Filename.concat githooksFolder hook in
   Printf.printf "%s -> %s" absorg absdest;
   FileUtil.cp [ absorg ] absdest;
-  Unix.chmod ((Unix.stat absdest).st_perm + 0o100) absdest
+  Unix.chmod absdest ((Unix.stat absdest).st_perm + 0o100) 
   
 
-let () = List.iter install hooks_names
+let () = Stdlib.List.iter install hooks_names
