@@ -6,8 +6,7 @@ let reset : t -> unit = Hashtbl.reset
 
 let set_spec results proc_name spec = Hashtbl.replace results proc_name spec
 
-let get_all_specs ?filter results =
-  let filter = Option.value ~default:(fun _ -> true) filter in
+let get_all_specs ?(filter = fun _ -> true) results =
   Hashtbl.fold
     (fun name spec acc -> if filter name then spec :: acc else acc)
     results []
