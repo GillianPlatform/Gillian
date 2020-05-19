@@ -155,13 +155,6 @@ let get_lemma_exn (prog : ('a, 'b) t) (name : string) : Lemma.t =
   | Some lemma -> lemma
   | None       -> failwith (Printf.sprintf "could not find lemma %s" name)
 
-let get_proc_specs (prog : ('a, 'b) t) : Spec.t list =
-  List.rev
-    (Hashtbl.fold
-       (fun _ (proc : ('a, 'b) Proc.t) ac ->
-         Option.fold ~some:(fun spec -> spec :: ac) ~none:ac proc.proc_spec)
-       prog.procs [])
-
 let pp ~(show_labels : bool) ~(pp_label : 'b Fmt.t) fmt (prog : ('a, 'b) t) =
   let pp_list ppp = Fmt.list ~sep:(Fmt.any "@\n") ppp in
   let npp pp =

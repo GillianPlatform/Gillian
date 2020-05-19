@@ -463,10 +463,11 @@ struct
       in
       Arg.(value & flag & info [ "emit-specs" ] ~doc)
 
-    let process_files files already_compiled outfile_opt emit_specs =
+    let process_files files already_compiled outfile_opt emit_specs incremental
+        =
       let file = List.hd files in
-      let e_prog =
-        if not already_compiled then (
+      let e_prog, source_files_opt =
+        if not already_compiled then
           let () =
             L.verbose (fun m ->
                 m
@@ -474,16 +475,17 @@ struct
                    *** Stage 1: Parsing program in original language and \
                    compiling to Gil. ***@\n")
           in
-          let e_progs =
-            (get_progs_or_fail (PC.parse_and_compile_files files)).gil_progs
-          in
-          Gil_parsing.cache_labelled_progs e_progs;
-          List.hd (List.map snd e_progs) )
+          let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
+          let e_progs = progs.gil_progs in
+          let () = Gil_parsing.cache_labelled_progs e_progs in
+          let e_prog = List.hd (List.map snd e_progs) in
+          let source_files = progs.source_files in
+          (e_prog, Some source_files)
         else
           let () =
             L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
           in
-          Gil_parsing.parse_eprog_from_file file
+          (Gil_parsing.parse_eprog_from_file file, None)
       in
       let () = burn_gil e_prog outfile_opt in
       let () =
@@ -504,7 +506,7 @@ struct
       match UP.init_prog prog with
       | Error _  -> raise (Failure "Creation of unification plans failed.")
       | Ok prog' ->
-          let () = Abductor.test_procs prog' in
+          let () = Abductor.test_prog prog' incremental source_files_opt in
           if emit_specs then
             let () = Prog.update_specs e_prog prog'.prog in
             let fname = Filename.chop_extension (Filename.basename file) in
@@ -513,21 +515,30 @@ struct
             Io_utils.save_file_pp out_path Prog.pp_labeled e_prog
 
     let act
-        files already_compiled outfile_opt no_heap stats parallel emit_specs ()
-        =
+        files
+        already_compiled
+        outfile_opt
+        no_heap
+        stats
+        parallel
+        emit_specs
+        incremental
+        () =
       let () = Config.current_exec_mode := BiAbduction in
       let () = PC.initialize BiAbduction in
       let () = Config.stats := stats in
       let () = Config.no_heap := no_heap in
       let () = Config.parallel := parallel in
-      let () = process_files files already_compiled outfile_opt emit_specs in
+      let () =
+        process_files files already_compiled outfile_opt emit_specs incremental
+      in
       let () = if !Config.stats then Statistics.print_statistics () in
       Logging.wrap_up ()
 
     let act_t =
       Term.(
         const act $ files $ already_compiled $ output_gil $ no_heap $ stats
-        $ parallel $ emit_specs)
+        $ parallel $ emit_specs $ incremental)
 
     let act_info =
       let doc =

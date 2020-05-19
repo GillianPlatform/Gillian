@@ -84,6 +84,10 @@ let add_edge call_graph ntype name child_ntype child_name =
   ignore (get_or_make_node call_graph child_id child_ntype child_name);
   if not (List.mem child_id node.children) then Node.add_child node child_id
 
+let add_proc call_graph proc_name =
+  let proc_id = id_of_proc_name proc_name in
+  ignore (get_or_make_node call_graph proc_id Proc proc_name)
+
 let add_proc_call call_graph caller callee =
   add_edge call_graph Proc caller Proc callee
 

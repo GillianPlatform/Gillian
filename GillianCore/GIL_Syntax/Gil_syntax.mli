@@ -718,6 +718,15 @@ module Spec : sig
   val label_vars_to_set :
     ('a * Utils.Containers.SS.elt list) option ->
     ('a * Utils.Containers.SS.t) option
+<<<<<<< HEAD
+=======
+  (** For legacy purpose, some functions use string sets instead of string lists existentials.
+    This function allows for a smooth translation *)
+
+  val to_yojson : t -> Yojson.Safe.t
+
+  val of_yojson_exn : Yojson.Safe.t -> t
+>>>>>>> Add support for incremental bi-abduction
 end
 
 module BiSpec : sig
@@ -903,9 +912,6 @@ module Prog : sig
 
   (** Get a specific lemma. Raises [Failure] if it does not exist *)
   val get_lemma_exn : ('a, 'b) t -> string -> Lemma.t
-
-  (** Get all specifications *)
-  val get_proc_specs : ('a, 'b) t -> Spec.t list
 
   (** {3 Setters} *)
 

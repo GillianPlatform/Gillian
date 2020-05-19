@@ -1,7 +1,7 @@
 (library
  (name gil_syntax)
  (public_name gillian.gil_syntax)
- (libraries utils fmt visitors.runtime)
+ (libraries utils fmt visitors.runtime ppx_deriving_yojson.runtime)
  (preprocess
-  (pps visitors.ppx))
+  (pps visitors.ppx ppx_deriving_yojson))
  (flags -open Utils -w +A-40-42-41-4))

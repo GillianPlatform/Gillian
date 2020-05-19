@@ -99,3 +99,7 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (spec : t) : t =
 
 let label_vars_to_set lab =
   Option.map (fun (l, vl) -> (l, Containers.SS.of_list vl)) lab
+
+let to_yojson = TypeDef__.spec_to_yojson
+
+let of_yojson_exn = TypeDef__.spec_of_yojson_exn
