@@ -1,7 +1,5 @@
 open Containers
-module L = Logging
 
-(** General GIL Interpreter *)
 module Make
     (SState : State.S
                 with type vt = SVal.M.t
@@ -208,7 +206,7 @@ struct
       in
       specs
     with Failure msg ->
-      Logging.print_to_all
+      L.print_to_all
         (Printf.sprintf "ERROR in proc %s with message:\n%s\n" test.name msg);
       []
 
@@ -218,8 +216,7 @@ struct
       (to_test : SS.t) : BiAbductionResults.t =
     L.verbose (fun m -> m "Starting bi-abductive testing");
     let proc_names = get_proc_names prog.prog in
-    L.verbose (fun m ->
-        m "Procedure names: %a" Fmt.(list ~sep:comma string) proc_names);
+    L.verbose (fun m -> m "Proc names: %s" (String.concat ", " proc_names));
     let bispecs = Prog.get_bispecs prog.prog in
     let () =
       List.iter
@@ -232,19 +229,16 @@ struct
         (fun (bispec : BiSpec.t) -> SS.mem bispec.bispec_name to_test)
         bispecs
     in
-    let tests = List.concat (List.map (testify prog) bispecs_to_test) in
-    L.(
-      verbose (fun m ->
-          m "I have tests for: %s"
-            (String.concat ", " (List.map (fun t -> t.name) tests))));
 
+    let tests = List.concat (List.map (testify prog) bispecs_to_test) in
+    let test_names tests =
+      String.concat ", " (List.map (fun t -> t.name) tests)
+    in
+    L.verbose (fun m -> m "I have tests for: %s" (test_names tests));
     let tests =
       List.sort (fun test1 test2 -> Stdlib.compare test1.name test2.name) tests
     in
-    L.(
-      verbose (fun m ->
-          m "I have tests for: %s"
-            (String.concat ", " (List.map (fun t -> t.name) tests))));
+    L.verbose (fun m -> m "I have tests for: %s" (test_names tests));
 
     let filter spec_name = not (SS.mem spec_name to_test) in
     let prev_specs =
@@ -255,10 +249,9 @@ struct
     let prev_spec_names =
       List.map (fun (spec : Spec.t) -> spec.spec_name) prev_specs
     in
-    L.(
-      verbose (fun m ->
-          m "I will use the previously-stored specs of: %s"
-            (String.concat ", " prev_spec_names)));
+    L.verbose (fun m ->
+        m "I will use the previously-stored specs of: %s"
+          (String.concat ", " prev_spec_names));
     List.iter (fun spec -> UP.add_spec prog spec) prev_specs;
 
     let process_spec name params state_pre state_post flag : Spec.t * Spec.t =
@@ -280,10 +273,11 @@ struct
           (sspec, false)
       | RSucc (fl, _, state_f) ->
           let sspec, spec = process_spec name params state_i state_f fl in
-          ( try UP.add_spec prog spec
+          let () =
+            try UP.add_spec prog spec
             with _ ->
               Printf.printf "when trying to build an UP for %s, I died!\n" name
-          );
+          in
           (sspec, true)
     in
 
@@ -291,21 +285,19 @@ struct
       List.split
         (List.map
            (fun test ->
-             ( L.(
-                 verbose (fun m ->
-                     m "Running bi-abduction on function %s\n" test.name));
-               let rets =
-                 run_test
-                   (process_symb_exec_result test.name test.params test.state)
-                   prog test
-               in
-               let succ_specs, bug_specs =
-                 List.partition (fun (_, b) -> b) rets
-               in
-               let succ_specs = List.map (fun (spec, _) -> spec) succ_specs in
-               let bug_specs = List.map (fun (spec, _) -> spec) bug_specs in
-               (bug_specs, succ_specs)
-               : Spec.t list * Spec.t list ))
+             L.verbose (fun m ->
+                 m "Running bi-abduction on function %s\n" test.name);
+             let rets =
+               run_test
+                 (process_symb_exec_result test.name test.params test.state)
+                 prog test
+             in
+             let succ_specs, bug_specs =
+               List.partition (fun (_, b) -> b) rets
+             in
+             let succ_specs = List.map (fun (spec, _) -> spec) succ_specs in
+             let bug_specs = List.map (fun (spec, _) -> spec) bug_specs in
+             (bug_specs, succ_specs))
            tests)
     in
 
@@ -342,7 +334,7 @@ struct
     let offset = if auxiliaries then 12 else 0 in
     let len_succ = len_succ - offset in
     let () =
-      Logging.print_to_all
+      L.print_to_all
         (Printf.sprintf "SUCCESS SPECS: %d\nERROR SPECS: %d\nBUG SPECS: %d"
            len_succ (List.length error_specs) (List.length bug_specs))
     in
@@ -372,15 +364,19 @@ struct
       let proc_changes =
         get_changes prog.prog source_files call_graph cur_source_files
       in
-      let () = CallGraph.prune_procs call_graph proc_changes.deleted_procs in
-      let () = BiAbductionResults.prune results proc_changes.deleted_procs in
+      let procs_to_prune =
+        proc_changes.changed_procs @ proc_changes.deleted_procs
+        @ proc_changes.dependent_procs
+      in
+      let () = CallGraph.prune_procs call_graph procs_to_prune in
+      let () = BiAbductionResults.prune results procs_to_prune in
       let procs_to_test =
         SS.of_list
           ( proc_changes.changed_procs @ proc_changes.new_procs
           @ proc_changes.dependent_procs )
       in
-      let cur_call_graph = SBAInterpreter.call_graph in
       let cur_results = test_procs ~prev_results:results prog procs_to_test in
+      let cur_call_graph = SBAInterpreter.call_graph in
       let call_graph = CallGraph.merge call_graph cur_call_graph in
       let results = BiAbductionResults.merge results cur_results in
       let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in

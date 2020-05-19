@@ -88,6 +88,14 @@ let add_proc call_graph proc_name =
   let proc_id = id_of_proc_name proc_name in
   ignore (get_or_make_node call_graph proc_id Proc proc_name)
 
+let add_pred call_graph pred_name =
+  let pred_id = id_of_pred_name pred_name in
+  ignore (get_or_make_node call_graph pred_id Pred pred_name)
+
+let add_lemma call_graph lemma_name =
+  let lemma_id = id_of_lemma_name lemma_name in
+  ignore (get_or_make_node call_graph lemma_id Lemma lemma_name)
+
 let add_proc_call call_graph caller callee =
   add_edge call_graph Proc caller Proc callee
 
@@ -134,17 +142,16 @@ let get_lemma_names call_graph =
       | _     -> acc)
     call_graph.nodes []
 
+let contains_id call_graph id = Option.is_some (get_node_opt call_graph id)
+
 let contains_proc call_graph proc_name =
-  let proc_id = id_of_proc_name proc_name in
-  Option.is_some (get_node_opt call_graph proc_id)
+  contains_id call_graph (id_of_proc_name proc_name)
 
 let contains_pred call_graph pred_name =
-  let pred_id = id_of_pred_name pred_name in
-  Option.is_some (get_node_opt call_graph pred_id)
+  contains_id call_graph (id_of_pred_name pred_name)
 
 let contains_lemma call_graph lemma_name =
-  let lemma_id = id_of_lemma_name lemma_name in
-  Option.is_some (get_node_opt call_graph lemma_id)
+  contains_id call_graph (id_of_lemma_name lemma_name)
 
 let is_proc call_graph id =
   match (get_node call_graph id).ntype with
@@ -180,7 +187,12 @@ let to_reverse_graph call_graph =
           (fun child_id ->
             let child = get_node call_graph child_id in
             add_edge reverse_graph child.ntype child.name node.ntype node.name)
-          node.children)
+          node.children;
+        (* Include entry for node (in case it did not have any children) *)
+        match node.ntype with
+        | Proc  -> add_proc reverse_graph node.name
+        | Pred  -> add_pred reverse_graph node.name
+        | Lemma -> add_lemma reverse_graph node.name)
       call_graph.nodes
   in
   reverse_graph
@@ -188,7 +200,9 @@ let to_reverse_graph call_graph =
 let merge call_graph other_graph =
   let () =
     Hashtbl.iter
-      (fun id node -> Hashtbl.replace call_graph.nodes id node)
+      (fun id node ->
+        if not (contains_id call_graph id) then
+          Hashtbl.add call_graph.nodes id node)
       other_graph.nodes
   in
   call_graph

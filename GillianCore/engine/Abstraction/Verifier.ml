@@ -582,8 +582,16 @@ struct
       let proc_changes, lemma_changes =
         get_verif_changes prog source_files call_graph cur_source_files
       in
-      let () = CallGraph.prune_procs call_graph proc_changes.deleted_procs in
-      let () = CallGraph.prune_lemmas call_graph lemma_changes.deleted_lemmas in
+      let procs_to_prune =
+        proc_changes.changed_procs @ proc_changes.deleted_procs
+        @ proc_changes.dependent_procs
+      in
+      let lemmas_to_prune =
+        lemma_changes.changed_lemmas @ lemma_changes.deleted_lemmas
+        @ lemma_changes.dependent_lemmas
+      in
+      let () = CallGraph.prune_procs call_graph procs_to_prune in
+      let () = CallGraph.prune_lemmas call_graph lemmas_to_prune in
       let () =
         VerificationResults.prune results
           (proc_changes.deleted_procs @ lemma_changes.deleted_lemmas)
@@ -618,8 +626,7 @@ struct
       in
       let () = verify_procs prog procs_to_verify lemmas_to_verify in
       let call_graph = SAInterpreter.call_graph in
-      let results = global_results in
-      write_verif_results cur_source_files call_graph ~diff:"" results
+      write_verif_results cur_source_files call_graph ~diff:"" global_results
 end
 
 module From_scratch (SMemory : SMemory.S) (External : External.S) = struct
