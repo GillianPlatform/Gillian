@@ -10,8 +10,8 @@ val get_all_specs : ?filter:(string -> bool) -> t -> Spec.t list
 
 val remove : t -> string -> unit
 
-val prune : t -> string list -> unit
 (** [prune results proc_names] *)
+val prune : t -> string list -> unit
 
 val merge : t -> t -> t
 
