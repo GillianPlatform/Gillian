@@ -1,7 +1,9 @@
 (library
  (name logging)
  (public_name gillian.logging)
- (libraries sanddb uuidm))
+ (libraries sanddb uuidm)
+ (preprocess
+  (pps ppx_yojson_conv)))
 
 (rule
  (targets report_t.ml report_t.mli)
@@ -14,9 +16,3 @@
  (deps report.atd)
  (action
   (run atdgen -j %{deps})))
-
-(rule
- (targets report_b.ml report_b.mli)
- (deps report.atd)
- (action
-  (run atdgen -b %{deps})))

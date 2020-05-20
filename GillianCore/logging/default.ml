@@ -11,7 +11,7 @@ let database_reporter =
   object
     inherit [t] DatabaseReporter.t
 
-    method private serialize_specific _ = ""
+    method private specific_serializer _ = `Null
   end
 
 let reporters =

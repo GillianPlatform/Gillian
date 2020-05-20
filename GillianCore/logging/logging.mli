@@ -52,7 +52,7 @@ module DatabaseReporter : sig
 
       method wrap_up : unit
 
-      method virtual private serialize_specific : 'a -> string
+      method virtual private specific_serializer : 'a -> Yojson.Safe.t
     end
 end
 
