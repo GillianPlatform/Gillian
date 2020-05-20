@@ -1,4 +1,4 @@
-type ntype = Proc | Pred | Lemma [@@deriving yojson { exn = true }]
+type ntype = Proc | Pred | Lemma [@@deriving yojson]
 
 module Node : sig
   type t = private {
@@ -7,7 +7,7 @@ module Node : sig
     name : string;
     mutable children : string list;
   }
-  [@@deriving yojson { exn = true }]
+  [@@deriving yojson]
 
   val make : string -> ntype -> string -> string list -> t
 
@@ -21,7 +21,7 @@ end = struct
     name : string;
     mutable children : string list;
   }
-  [@@deriving yojson { exn = true }]
+  [@@deriving yojson]
 
   let make id ntype name children = { id; ntype; name; children }
 
@@ -33,7 +33,9 @@ end = struct
     Fmt.pf fmt "<%s>@\n%a@\n" node.id (Fmt.list ~sep pp_succ) node.children
 end
 
-type t = { nodes : (string, Node.t) Hashtbl.t }
+type ('a, 'b) hashtbl = ('a, 'b) Hashtbl.t
+
+type t = { nodes : (string, Node.t) hashtbl } [@@deriving yojson]
 
 type id = string
 
@@ -184,22 +186,5 @@ let merge call_graph other_graph =
     Hashtbl.iter
       (fun id node -> Hashtbl.replace call_graph.nodes id node)
       other_graph.nodes
-  in
-  call_graph
-
-let to_yojson call_graph =
-  `List
-    (Hashtbl.fold
-       (fun id node acc -> Node.to_yojson node :: acc)
-       call_graph.nodes [])
-
-let of_yojson_exn json =
-  let call_graph = make () in
-  let () =
-    List.iter
-      (fun json ->
-        let node = Node.of_yojson_exn json in
-        Hashtbl.add call_graph.nodes node.id node)
-      (Yojson.Safe.Util.to_list json)
   in
   call_graph

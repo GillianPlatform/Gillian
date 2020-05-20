@@ -4,7 +4,7 @@ module SourceFile : sig
     contents : string;
     mutable dependents : string list;
   }
-  [@@deriving yojson { exn = true }]
+  [@@deriving yojson]
 
   val make : path:string -> dependents:string list -> t
 
@@ -15,7 +15,7 @@ end = struct
     contents : string;
     mutable dependents : string list;
   }
-  [@@deriving yojson { exn = true }]
+  [@@deriving yojson]
 
   let make ~path ~dependents =
     let contents = Digest.to_hex (Digest.file path) in
@@ -24,7 +24,9 @@ end = struct
   let add_dependent file dep = file.dependents <- dep :: file.dependents
 end
 
-type t = (string, SourceFile.t) Hashtbl.t
+type ('a, 'b) hashtbl = ('a, 'b) Hashtbl.t
+
+type t = (string, SourceFile.t) hashtbl [@@deriving yojson]
 
 let make () : t = Hashtbl.create Config.small_tbl_size
 
@@ -52,20 +54,3 @@ let get_file files path : SourceFile.t =
 let get_contents_hash files path = (get_file files path).contents
 
 let get_dependents files path = (get_file files path).dependents
-
-let to_yojson files =
-  `List
-    (Hashtbl.fold
-       (fun path file acc -> SourceFile.to_yojson file :: acc)
-       files [])
-
-let of_yojson_exn json =
-  let files = make () in
-  let () =
-    List.iter
-      (fun json ->
-        let file = SourceFile.of_yojson_exn json in
-        Hashtbl.add files file.path file)
-      (Yojson.Safe.Util.to_list json)
-  in
-  files

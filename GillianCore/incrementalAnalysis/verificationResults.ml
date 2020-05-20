@@ -1,4 +1,6 @@
-type t = (string * int, bool) Hashtbl.t
+type ('a, 'b) hashtbl = ('a, 'b) Hashtbl.t
+
+type t = (string * int, bool) hashtbl [@@deriving yojson]
 
 let make () : t = Hashtbl.create Config.small_tbl_size
 
@@ -34,32 +36,3 @@ let check_previously_verified ?(printer = fun _ -> ()) results cur_verified =
         verified && acc )
       else true && acc)
     results true
-
-let to_yojson results =
-  `List
-    (Hashtbl.fold
-       (fun (name, id) verified acc ->
-         let fields =
-           [
-             ("test_name", `String name);
-             ("test_id", `Int id);
-             ("verified", `Bool verified);
-           ]
-         in
-         `Assoc fields :: acc)
-       results [])
-
-let of_yojson_exn json =
-  let open Yojson.Safe.Util in
-  let results = make () in
-  let () =
-    List.iter
-      (fun json ->
-        let result = to_assoc json in
-        let test_name = to_string (List.assoc "test_name" result) in
-        let test_id = to_int (List.assoc "test_id" result) in
-        let verified = to_bool (List.assoc "verified" result) in
-        set_result results test_name test_id verified)
-      (to_list json)
-  in
-  results
