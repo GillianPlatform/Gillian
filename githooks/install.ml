@@ -10,7 +10,7 @@
 let install hook =
   let absdest = Filename.concat destination hook in
   let absorg = Filename.concat githooksFolder hook in
-  Printf.printf "%s -> %s" absorg absdest;
+  Printf.printf "%s -> %s\n" absorg absdest;
   FileUtil.cp [ absorg ] absdest;
   Unix.chmod absdest ((Unix.stat absdest).st_perm + 0o100) 
   
