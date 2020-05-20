@@ -3,10 +3,10 @@
 // Defined externally
 extern int x;
 
-static int y = 6;
 int z;
 
 // Should only be visible internally
+static int y = 6;
 static int bar() { return 5; }
 
 int main() {
