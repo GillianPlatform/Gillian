@@ -1,6 +1,6 @@
 (** {3 Type definitions} *)
 
-type t
+type t [@@deriving yojson]
 
 type id
 
@@ -69,7 +69,3 @@ val get_name : t -> id -> string
 (** {3 Serialization} *)
 
 val pp : Format.formatter -> t -> unit
-
-val to_yojson : t -> Yojson.Safe.t
-
-val of_yojson_exn : Yojson.Safe.t -> t

@@ -32,10 +32,10 @@ let read_results_dir () =
     Yojson.Safe.from_file json_path
   in
   {
-    sources = SourceFiles.of_yojson_exn (read_json Filenames.sources);
-    call_graph = CallGraph.of_yojson_exn (read_json Filenames.call_graph);
+    sources = SourceFiles.t_of_yojson (read_json Filenames.sources);
+    call_graph = CallGraph.t_of_yojson (read_json Filenames.call_graph);
     results =
-      VerificationResults.of_yojson_exn (read_json Filenames.verif_results);
+      VerificationResults.t_of_yojson (read_json Filenames.verif_results);
     diff = "";
   }
 
@@ -54,7 +54,7 @@ let write_results_dir { sources; call_graph; results; diff } =
   in
   delete_results_dir ();
   create_results_dir ();
-  write_json (SourceFiles.to_yojson sources) Filenames.sources;
-  write_json (CallGraph.to_yojson call_graph) Filenames.call_graph;
-  write_json (VerificationResults.to_yojson results) Filenames.verif_results;
+  write_json (SourceFiles.yojson_of_t sources) Filenames.sources;
+  write_json (CallGraph.yojson_of_t call_graph) Filenames.call_graph;
+  write_json (VerificationResults.yojson_of_t results) Filenames.verif_results;
   write_str diff Filenames.diff
