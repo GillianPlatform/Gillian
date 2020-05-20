@@ -167,12 +167,9 @@ struct
     (* update_statistics "make_spec_AbsBi" (time() -. start_time); *)
     (sspec, spec)
 
-  let get_proc_names (prog : ('a, 'b) Prog.t) : string list =
-    Hashtbl.fold (fun name _ acc -> name :: acc) prog.procs []
-
   let testify (prog : UP.prog) (bi_spec : BiSpec.t) : t list =
     L.verbose (fun m -> m "Bi-testifying: %s" bi_spec.bispec_name);
-    let proc_names = get_proc_names prog.prog in
+    let proc_names = Prog.get_proc_names prog.prog in
     let params = SS.of_list bi_spec.bispec_params in
     let normalise =
       Normaliser.normalise_assertion ~pred_defs:prog.preds ~pvars:params
@@ -215,7 +212,7 @@ struct
       (prog : UP.prog)
       (to_test : SS.t) : BiAbductionResults.t =
     L.verbose (fun m -> m "Starting bi-abductive testing");
-    let proc_names = get_proc_names prog.prog in
+    let proc_names = Prog.get_proc_names prog.prog in
     L.verbose (fun m -> m "Proc names: %s" (String.concat ", " proc_names));
     let bispecs = Prog.get_bispecs prog.prog in
     let () =
@@ -386,7 +383,9 @@ struct
       let cur_source_files =
         Option.value ~default:(SourceFiles.make ()) source_files
       in
-      let procs_to_test = SS.of_list (get_proc_names prog.prog) in
+      let procs_to_test =
+        SS.of_list (Prog.get_noninternal_proc_names prog.prog)
+      in
       let results = test_procs prog procs_to_test in
       let call_graph = SBAInterpreter.call_graph in
       write_biabduction_results cur_source_files call_graph ~diff:"" results

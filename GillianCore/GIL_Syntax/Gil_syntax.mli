@@ -718,15 +718,12 @@ module Spec : sig
   val label_vars_to_set :
     ('a * Utils.Containers.SS.elt list) option ->
     ('a * Utils.Containers.SS.t) option
-<<<<<<< HEAD
-=======
   (** For legacy purpose, some functions use string sets instead of string lists existentials.
     This function allows for a smooth translation *)
 
   val to_yojson : t -> Yojson.Safe.t
 
   val of_yojson_exn : Yojson.Safe.t -> t
->>>>>>> Add support for incremental bi-abduction
 end
 
 module BiSpec : sig
@@ -878,8 +875,11 @@ module Prog : sig
   (** Get all bi-abductive specs *)
   val get_bispecs : ('a, 'b) t -> BiSpec.t list
 
-  (** Get names of all procedures not marked as internal *)
+  val get_proc_names : ('a, 'b) t -> string list
+  (** Get names of all procedures *)
+
   val get_noninternal_proc_names : ('a, 'b) t -> string list
+  (** Get names of all procedures not marked as internal *)
 
   (** Get names of all predicates not marked as internal *)
   val get_noninternal_pred_names : ('a, 'b) t -> string list

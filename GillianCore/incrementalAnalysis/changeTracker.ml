@@ -109,7 +109,7 @@ let get_changed_elements
 let get_proc_changes prog =
   get_changed_elements ~extract_elems:(get_procs_with_path prog)
     ~cg_contains:CallGraph.contains_proc ~cg_get_all:CallGraph.get_proc_names
-    ~cur_elems:(Prog.get_noninternal_proc_names prog)
+    ~cur_elems:(Prog.get_proc_names prog)
 
 let get_pred_changes prog =
   get_changed_elements ~extract_elems:(get_preds_with_path prog)

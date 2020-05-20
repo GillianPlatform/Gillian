@@ -79,7 +79,7 @@ struct
 
   let update_store (state : State.t) (x : string) (v : Val.t) : State.t =
     let store = State.get_store state in
-    let _ = Store.put store x v in
+    let () = Store.put store x v in
     let state' = State.set_store state store in
     state'
 
@@ -130,9 +130,6 @@ struct
            %a@\n\
            ------------------------------------------------------@]@\n"
           (Sys.time ()) LCmd.pp lcmd State.pp state)
-
-  let is_internal_proc (prog : UP.prog) proc_name =
-    (Prog.get_proc_exn prog.prog proc_name).proc_internal
 
   (* ************** *
    * Main Functions *
@@ -366,14 +363,11 @@ struct
                  ([ EProc (Val.from_literal (String pid)) ], state))
       in
       let caller = CallStack.get_cur_proc_id cs in
-      let () =
-        if not (is_internal_proc prog caller || is_internal_proc prog pid) then
-          CallGraph.add_proc_call call_graph caller pid
-      in
+      let () = CallGraph.add_proc_call call_graph caller pid in
       let prmlen = List.length params in
 
       let args = Array.make prmlen (Val.from_literal Undefined) in
-      let _ =
+      let () =
         List.iteri (fun i v_arg -> if i < prmlen then args.(i) <- v_arg) v_args
       in
       let args = Array.to_list args in
@@ -751,10 +745,7 @@ struct
       (name : string)
       (params : string list)
       (state : State.t) : 'a list =
-    let () =
-      if not (is_internal_proc prog name) then
-        CallGraph.add_proc call_graph name
-    in
+    let () = CallGraph.add_proc call_graph name in
     L.normal (fun m ->
         m
           ( "*******************************************@\n"

@@ -59,6 +59,7 @@ let make_indexed
   List.iter
     (fun (name, j, i, k) -> Hashtbl.replace predecessors_tbl (name, j, i) k)
     predecessors;
+  (* FIXME: Why would proc_names be empty? pp wouldn't work properly *)
   make ~predecessors:predecessors_tbl ~procs:procs_tbl ~imports:[]
     ~proc_names:[]
 
@@ -104,6 +105,9 @@ let get_procs ?(proc_names : string list option) (prog : ('a, 'b) t) :
 
 let get_bispecs (prog : ('a, 'b) t) : BiSpec.t list =
   Hashtbl.fold (fun _ bi_spec ac -> bi_spec :: ac) prog.bi_specs []
+
+let get_proc_names (prog : ('a, 'b) t) : string list =
+  Hashtbl.fold (fun name _ acc -> name :: acc) prog.procs []
 
 let get_noninternal_proc_names (prog : ('a, 'b) t) : string list =
   Hashtbl.fold

@@ -593,8 +593,7 @@ struct
       let () = CallGraph.prune_procs call_graph procs_to_prune in
       let () = CallGraph.prune_lemmas call_graph lemmas_to_prune in
       let () =
-        VerificationResults.prune results
-          (proc_changes.deleted_procs @ lemma_changes.deleted_lemmas)
+        VerificationResults.prune results (procs_to_prune @ lemmas_to_prune)
       in
       let procs_to_verify =
         SS.of_list
