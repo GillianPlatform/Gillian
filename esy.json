@@ -58,6 +58,7 @@
     "@opam/fmt": "^0.8.8",
     "@opam/menhir": "*",
     "@opam/ppx_deriving_yojson": "^3.5.2",
+    "@opam/ppx_yojson_conv": "v0.13.0",
     "@opam/sanddb": "0.2",
     "@opam/uuidm": "0.9.7",
     "@opam/visitors": "20190711",
