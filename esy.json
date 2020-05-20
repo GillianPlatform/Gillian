@@ -46,9 +46,9 @@
     "wisl:init:env": "wisl/scripts/setup_environment.sh",
     "init:env":
       "sh -c \"esy js:init:env && esy c:init:env && esy wisl:init:env\"",
-    "install-githooks": "./githooks/install.py",
-    "clean-githooks": "./githooks/clean.py",
-    "test": "dune test"
+    "test": "dune test",
+    "install-githooks": "./githooks/install.ml",
+    "clean-githooks": "./githooks/clean.ml"
   },
   "dependencies": {
     "@opam/alcotest": "1.0.1",
@@ -69,12 +69,15 @@
     "ocaml": "^4.8.0"
   },
   "devDependencies": {
+    "ocaml": "4.8.1000",
+    "@opam/ocamlfind": "1.8.1",
     "@opam/cinaps": "v0.13.0",
     "@opam/cmitomli": "1.0.0",
+    "@opam/fileutils": "0.6.2",
     "@opam/utop": "*",
+    "@opam/shexp": "v0.13.0",
     "@opam/merlin": "*",
     "@opam/odoc": "*",
-    "@opam/ocamlformat": "*",
-    "ocaml": "4.8.1000"
+    "@opam/ocamlformat": "0.14.2"
   }
 }
