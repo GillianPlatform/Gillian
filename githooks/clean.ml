@@ -9,5 +9,8 @@
 
 let abshooks = Stdlib.List.map (Filename.concat destination) hooks_names
 
+let () =
+  Stdlib.List.iter (Printf.printf "Cleaning %s\n") abshooks
+
 let () = FileUtil.rm abshooks
 
