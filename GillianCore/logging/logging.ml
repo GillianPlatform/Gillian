@@ -10,7 +10,7 @@ let log lvl ?title ?severity msgf =
   if Mode.should_log lvl then
     let report =
       ReportBuilder.make ?title
-        ~content:(Debug (Report.PackedPP.make msgf))
+        ~content:(Agnostic (Debug (Report.PackedPP.make msgf)))
         ?severity ()
     in
     Default.log report
@@ -57,12 +57,12 @@ struct
           ((database_reporter :> t Reporter.t option), DatabaseReporter.default);
         ]
 
-  let log lvl ?title ?severity tl =
+  let log lvl ?title ?severity content =
     if Mode.should_log lvl then
       let report =
-        ReportBuilder.make ?title ~content:(TargetLang tl) ?severity ()
+        ReportBuilder.make ?title ~content:(Specific content) ?severity ()
       in
-      List.iter (fun reporter -> reporter#log_specific report) reporters
+      List.iter (fun reporter -> reporter#log report) reporters
 
   let normal = log Normal
 

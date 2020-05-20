@@ -15,20 +15,13 @@ end
 module Report : sig
   type phase = ParsingAndCompiling | Parsing | Preprocessing | Verification
 
-  type agnostic = Agnostic
-
-  type specific = Specific
-
   type severity = Info | Log | Success | Error | Warning
 
-  type ('a, 'b) t
+  type 'a t
 end
 
 module Reporter : sig
-  type 'a t =
-    < log_agnostic : 'a. (Report.agnostic, 'a) Report.t -> unit
-    ; log_specific : (Report.specific, 'a) Report.t -> unit
-    ; wrap_up : unit >
+  type 'a t = < log : 'a Report.t -> unit ; wrap_up : unit >
 end
 
 module FileReporter : sig
@@ -38,15 +31,13 @@ module FileReporter : sig
 
   class virtual ['a] t :
     object
-      method log_agnostic : (Report.agnostic, 'a0) Report.t -> unit
-
-      method private formatter : Format.formatter
-
-      method log_specific : (Report.specific, 'a) Report.t -> unit
-
-      method virtual private target_lang : 'a -> unit
+      method log : 'a Report.t -> unit
 
       method wrap_up : unit
+
+      method virtual private log_specific : 'a -> unit
+
+      method private formatter : Format.formatter
     end
 end
 
@@ -57,13 +48,11 @@ module DatabaseReporter : sig
 
   class virtual ['a] t :
     object
-      method log_agnostic : (Report.agnostic, 'a0) Report.t -> unit
-
-      method log_specific : (Report.specific, 'a) Report.t -> unit
-
-      method virtual private serialize_target_lang : 'a -> string
+      method log : 'a Report.t -> unit
 
       method wrap_up : unit
+
+      method virtual private serialize_specific : 'a -> string
     end
 end
 

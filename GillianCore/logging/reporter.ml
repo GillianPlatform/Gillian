@@ -1,7 +1,4 @@
-type 'a t =
-  < log_agnostic : 'a. (Report.agnostic, 'a) Report.t -> unit
-  ; log_specific : (Report.specific, 'a) Report.t -> unit
-  ; wrap_up : unit >
+type 'a t = < log : 'a Report.t -> unit ; wrap_up : unit >
 
 module Make (P : sig
   val enabled : bool
