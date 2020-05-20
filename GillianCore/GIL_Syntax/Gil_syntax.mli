@@ -719,9 +719,9 @@ module Spec : sig
     ('a * Utils.Containers.SS.elt list) option ->
     ('a * Utils.Containers.SS.t) option
 
-  val to_yojson : t -> Yojson.Safe.t
+  val yojson_of_t : t -> Yojson.Safe.t
 
-  val of_yojson_exn : Yojson.Safe.t -> t
+  val t_of_yojson : Yojson.Safe.t -> t
 end
 
 module BiSpec : sig

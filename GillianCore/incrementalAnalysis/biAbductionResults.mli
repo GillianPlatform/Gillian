@@ -1,4 +1,4 @@
-type t
+type t [@@deriving yojson]
 
 val make : unit -> t
 
@@ -14,7 +14,3 @@ val remove : t -> string -> unit
 val prune : t -> string list -> unit
 
 val merge : t -> t -> t
-
-val to_yojson : t -> Yojson.Safe.t
-
-val of_yojson_exn : Yojson.Safe.t -> t

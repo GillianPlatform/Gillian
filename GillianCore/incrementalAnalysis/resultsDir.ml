@@ -76,11 +76,11 @@ let write_results_dir sources call_graph ~diff results_json results_filename =
   write_str diff Filenames.diff
 
 let write_verif_results sources call_graph ~diff results =
-  let results_json = VerificationResults.to_yojson results in
+  let results_json = VerificationResults.yojson_of_t results in
   let results_filename = Filenames.verif_results in
   write_results_dir sources call_graph ~diff results_json results_filename
 
 let write_biabduction_results sources call_graph ~diff results =
-  let results_json = BiAbductionResults.to_yojson results in
+  let results_json = BiAbductionResults.yojson_of_t results in
   let results_filename = Filenames.biabduction_results in
   write_results_dir sources call_graph ~diff results_json results_filename
