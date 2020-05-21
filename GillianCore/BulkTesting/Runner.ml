@@ -3,7 +3,7 @@ module type S = sig
 
   val exec_mode : ExecMode.t
 
-  val run_all : string -> unit
+  val run_all : test_suite_path:string -> unit
 end
 
 module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
@@ -25,6 +25,10 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
     GInterpreter.Make (Outcome.Val) (Outcome.Subst) (Outcome.Store)
       (Outcome.State)
       (Outcome.External)
+
+  let bulk_source_files = SourceFiles.make ()
+
+  let bulk_call_graph = CInterpreter.call_graph
 
   (** The test_table maps category to category tables.
       A category table maps file names to tests *)
@@ -65,6 +69,9 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
         (ext, fun_with_exn))
       oi
 
+  let get_main_prefix test_path =
+    Filename.basename (Filename.chop_extension test_path)
+
   let execute_test expect test =
     let open Outcome in
     let open ParserAndCompiler in
@@ -76,7 +83,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
           let () = CInterpreter.reset () in
           let () = Suite.beforeTest test.Test.info test.path in
           let res =
-            match parse_and_compile_files [ test.Test.path ] with
+            match parse_and_compile_files [ test.path ] with
             | Error err -> ParseAndCompileError err
             | Ok progs  -> (
                 let e_progs = progs.gil_progs in
@@ -87,7 +94,10 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
                 match UP.init_prog prog with
                 | Error _ -> failwith "Failed to create unification plan"
                 | Ok prog ->
+                    let main_prefix = get_main_prefix test.path in
+                    let () = CInterpreter.set_main_proc_prefix main_prefix in
                     let ret = CInterpreter.evaluate_prog prog in
+                    let () = CInterpreter.reset_main_proc_prefix in
                     FinishedExec ret )
           in
           result := res)
@@ -100,15 +110,16 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
          ~expectation:Expectations.expectation ~test_runner:execute_test)
       test_table
 
-  let run_all path =
+  let run_all ~test_suite_path =
     let list_files =
-      List.filter Suite.filter_source (Utils.Io_utils.get_files path)
+      List.filter Suite.filter_source (Utils.Io_utils.get_files test_suite_path)
     in
     Fmt.pr "Registering tests...\n@?";
     let () = Suite.init_suite list_files in
     let () = register_tests list_files in
     let () = register_expectations () in
-    Backend.run ()
+    Backend.run ();
+    ResultsDir.write_symbolic_results bulk_source_files bulk_call_graph ~diff:""
 end
 
 type t = (module S)

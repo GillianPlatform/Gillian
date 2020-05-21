@@ -49,9 +49,20 @@ struct
 
   let pp_single_result ft res = ExecRes.pp State.pp Val.pp pp_err ft res
 
-  let call_graph = CallGraph.make ()
+  let call_graph = CallGraph.make ~init_capacity:128 ()
 
   let reset () = CallGraph.reset call_graph
+
+  let main_proc_prefix = ref (None : string option)
+
+  let set_main_proc_prefix prefix = main_proc_prefix := Some prefix
+
+  let reset_main_proc_prefix = main_proc_prefix := None
+
+  let mangle_proc_name = function
+    | "main" when Option.is_some !main_proc_prefix ->
+        Option.get !main_proc_prefix ^ "__main"
+    | other -> other
 
   (* ******************* *
    * Auxiliary Functions *
@@ -362,7 +373,7 @@ struct
               (Interpreter_error
                  ([ EProc (Val.from_literal (String pid)) ], state))
       in
-      let caller = CallStack.get_cur_proc_id cs in
+      let caller = mangle_proc_name (CallStack.get_cur_proc_id cs) in
       let () = CallGraph.add_proc_call call_graph caller pid in
       let prmlen = List.length params in
 
@@ -745,7 +756,7 @@ struct
       (name : string)
       (params : string list)
       (state : State.t) : 'a list =
-    let () = CallGraph.add_proc call_graph name in
+    let () = CallGraph.add_proc call_graph (mangle_proc_name name) in
     L.normal (fun m ->
         m
           ( "*******************************************@\n"

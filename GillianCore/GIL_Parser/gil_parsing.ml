@@ -109,7 +109,10 @@ let cached_progs = Hashtbl.create Config.small_tbl_size
 let cache_gil_prog path prog = Hashtbl.add cached_progs path prog
 
 let cache_labelled_progs (progs : (string * (Annot.t, string) Prog.t) list) =
-  List.iter (fun (path, prog) -> cache_gil_prog path prog) progs
+  List.iter
+    (fun (path, prog) ->
+      if not (Hashtbl.mem cached_progs path) then cache_gil_prog path prog)
+    progs
 
 let resolve_path path =
   let lookup_paths = "." :: Config.get_runtime_paths () in
