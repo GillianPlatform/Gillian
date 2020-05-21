@@ -110,7 +110,10 @@ module TargetLangOptions = struct
     Config.hide_mult_def := hide_mult_def
 end
 
+(** Caches to improve bulk execution performance *)
 let compiled_progs = Hashtbl.create small_tbl_size
+
+let included_headers_cache = Hashtbl.create small_tbl_size
 
 let get_gil_path c_path = Filename.chop_extension c_path ^ ".gil"
 
@@ -234,6 +237,14 @@ let parse_dependencies_file deps_file =
   let header_path = Str.regexp ".*\\.h" in
   List.filter (fun part -> Str.string_match header_path part 0) parts
 
+let get_included_headers deps_file =
+  if Hashtbl.mem included_headers_cache deps_file then
+    Hashtbl.find included_headers_cache deps_file
+  else
+    let included_headers = parse_dependencies_file deps_file in
+    Hashtbl.add included_headers_cache deps_file included_headers;
+    included_headers
+
 let create_compilation_result gil_progs =
   let open IncrementalAnalysis in
   let open CommandLine.ParserAndCompiler in
@@ -241,8 +252,8 @@ let create_compilation_result gil_progs =
   let gil_progs =
     List.map
       (fun (path, prog) ->
-        let headers = parse_dependencies_file (get_deps_path path) in
-        SourceFiles.add_source_file source_files path;
+        let () = SourceFiles.add_source_file source_files path in
+        let headers = get_included_headers (get_deps_path path) in
         let () =
           List.iter
             (fun header -> SourceFiles.add_dependency source_files header path)
@@ -330,12 +341,11 @@ let parse_and_compile_files paths =
   in
   let all_other_progs =
     Hashtbl.fold
-      (fun path (prog, _) acc -> (path, prog) :: acc)
+      (fun path (prog, _) acc ->
+        if not (String.equal path main_path) then (path, prog) :: acc else acc)
       compiled_progs []
   in
-  let all_progs =
-    (main_path, main_prog) :: List.remove_assoc main_path all_other_progs
-  in
+  let all_progs = (main_path, main_prog) :: all_other_progs in
   Ok (create_compilation_result all_progs)
 
 let other_imports = []
