@@ -13,6 +13,12 @@ type t = TypeDef__.expr =
   | NOp    of NOp.t * t list  (** n-ary operators         *)
   | EList  of t list  (** Lists of expressions    *)
   | ESet   of t list  (** Sets of expressions     *)
+  
+(** {3 builders} *)
+
+let lit x = Lit x
+let num n = lit (Num n)
+let int n = lit(Int n)
 
 module MyExpr = struct
   type nonrec t = t
@@ -184,7 +190,6 @@ let substitutables (le : t) : SS.t =
   in
   SS.of_list (fold fe_ac None None le)
 
-(** Is --e-- concrete? *)
 let rec is_concrete (le : t) : bool =
   let f = is_concrete in
 
@@ -256,6 +261,8 @@ let from_var_name (var_name : string) : t =
 let loc_from_loc_name (loc_name : string) : t =
   if is_aloc_name loc_name then ALoc loc_name else Lit (Loc loc_name)
 
+(** {2 Visitors} *)
+  
 let subst_expr_for_expr ~to_subst ~subst_with expr =
   let v =
     object

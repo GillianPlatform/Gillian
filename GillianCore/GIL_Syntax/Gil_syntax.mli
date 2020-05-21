@@ -199,6 +199,10 @@ module Expr : sig
     | EList  of t list  (** Lists of expressions *)
     | ESet   of t list  (** Sets of expressions *)
 
+  val lit : Literal.t -> t
+  val num : float -> t
+  val int : int -> t
+    
   (** Sets of expressions *)
   module Set : Set.S with type elt := t
 
