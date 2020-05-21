@@ -126,7 +126,7 @@ let map_to_names call_graph = List.map (CallGraph.get_name call_graph)
 
 let get_proc_callers
     reverse_graph start_ids ?(stop_search = fun _ -> false) ~filter_id () =
-  (* Perform a breadth-first traversal of the reverse graph *)
+  (* Perform a breadth-first traversal of the reverse call graph *)
   let open CallGraph in
   let rec get_callers visited to_visit dep_procs =
     match to_visit with
@@ -149,7 +149,7 @@ let get_proc_callers
   get_callers IdSet.empty start_ids SS.empty
 
 let get_dependent_procs_and_lemmas reverse_graph start_ids ~filter_id =
-  (* Perform a breadth-first traversal of the reverse graph *)
+  (* Perform a breadth-first traversal of the reverse call graph *)
   let open CallGraph in
   let rec get_dependents visited to_visit dep_procs dep_lemmas =
     match to_visit with

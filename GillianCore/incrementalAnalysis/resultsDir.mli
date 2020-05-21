@@ -6,8 +6,12 @@ val read_verif_results :
 val read_biabduction_results :
   unit -> SourceFiles.t * CallGraph.t * BiAbductionResults.t
 
+val read_symbolic_results : unit -> SourceFiles.t * CallGraph.t
+
 val write_verif_results :
   SourceFiles.t -> CallGraph.t -> diff:string -> VerificationResults.t -> unit
 
 val write_biabduction_results :
   SourceFiles.t -> CallGraph.t -> diff:string -> BiAbductionResults.t -> unit
+
+val write_symbolic_results : SourceFiles.t -> CallGraph.t -> diff:string -> unit

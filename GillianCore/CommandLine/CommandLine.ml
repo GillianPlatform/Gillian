@@ -149,7 +149,7 @@ struct
     | Ok progs  -> (
         match progs.ParserAndCompiler.gil_progs with
         | [] ->
-            Fmt.pr "Error: expected at least one GIL program";
+            Fmt.pr "Error: expected at least one GIL program\n";
             exit 1
         | _  -> progs )
     | Error err ->
@@ -308,9 +308,48 @@ struct
   end
 
   module SInterpreterConsole = struct
-    let process_files files already_compiled outfile_opt =
-      let e_prog =
-        if not already_compiled then (
+    let run (prog : UP.prog) incremental source_files =
+      let open ResultsDir in
+      let open ChangeTracker in
+      let run_main prog =
+        ignore
+          (SInterpreter.evaluate_proc
+             (fun x -> x)
+             prog "main" [] (SState.init None))
+      in
+      if incremental && prev_results_exist () then (
+        (* Only re-run program if transitive callees of main proc have changed *)
+        let cur_source_files =
+          match source_files with
+          | Some files -> files
+          | None       -> failwith "Cannot use -a in incremental mode"
+        in
+        let source_files, call_graph = read_symbolic_results () in
+        let proc_changes =
+          get_changes prog.prog source_files call_graph cur_source_files
+        in
+        let changed_procs =
+          SS.of_list
+            ( proc_changes.changed_procs @ proc_changes.new_procs
+            @ proc_changes.dependent_procs )
+        in
+        if SS.mem "main" changed_procs then
+          let () = run_main prog in
+          let cur_call_graph = SInterpreter.call_graph in
+          let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
+          write_symbolic_results cur_source_files cur_call_graph ~diff )
+      else
+        (* Always re-run program *)
+        let cur_source_files =
+          Option.value ~default:(SourceFiles.make ()) source_files
+        in
+        let () = run_main prog in
+        let call_graph = SInterpreter.call_graph in
+        write_symbolic_results cur_source_files call_graph ~diff:""
+
+    let process_files files already_compiled outfile_opt incremental =
+      let e_prog, source_files_opt =
+        if not already_compiled then
           let () =
             L.verbose (fun m ->
                 m
@@ -318,16 +357,17 @@ struct
                    *** Stage 1: Parsing program in original language and \
                    compiling to Gil. ***@\n")
           in
-          let e_progs =
-            (get_progs_or_fail (PC.parse_and_compile_files files)).gil_progs
-          in
-          Gil_parsing.cache_labelled_progs (List.tl e_progs);
-          snd (List.hd e_progs) )
+          let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
+          let e_progs = progs.gil_progs in
+          let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
+          let e_prog = snd (List.hd e_progs) in
+          let source_files = progs.source_files in
+          (e_prog, Some source_files)
         else
           let () =
             L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
           in
-          Gil_parsing.parse_eprog_from_file (List.hd files)
+          (Gil_parsing.parse_eprog_from_file (List.hd files), None)
       in
       let () = burn_gil e_prog outfile_opt in
       let () =
@@ -344,22 +384,18 @@ struct
       let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.\n") in
       match UP.init_prog prog with
       | Error _  -> failwith "Creation of unification plans failed"
-      | Ok prog' ->
-          let _rets : SInterpreter.result_t list =
-            SInterpreter.evaluate_proc
-              (fun x -> x)
-              prog' "main" [] (SState.init None)
-          in
-          ()
+      | Ok prog' -> run prog' incremental source_files_opt
 
-    let wpst files already_compiled outfile_opt no_heap stats parallel () =
+    let wpst
+        files already_compiled outfile_opt no_heap stats parallel incremental ()
+        =
       let () = Config.current_exec_mode := Symbolic in
       let () = PC.initialize Symbolic in
-      Printexc.record_backtrace @@ L.Mode.enabled ();
+      let () = Printexc.record_backtrace @@ L.Mode.enabled () in
       let () = Config.stats := stats in
       let () = Config.parallel := parallel in
       let () = Config.no_heap := no_heap in
-      let () = process_files files already_compiled outfile_opt in
+      let () = process_files files already_compiled outfile_opt incremental in
       let () = if stats then Statistics.print_statistics () in
       let () = Logging.wrap_up () in
       try
@@ -372,7 +408,7 @@ struct
     let wpst_t =
       Term.(
         const wpst $ files $ already_compiled $ output_gil $ no_heap $ stats
-        $ parallel)
+        $ parallel $ incremental)
 
     let wpst_info =
       let doc = "Symbolically executes a file of the target language" in
@@ -439,7 +475,6 @@ struct
         no_unfold
         stats
         no_lemma_proof
-        stats
         manual
         incremental
         () =
@@ -458,7 +493,7 @@ struct
     let verify_t =
       Term.(
         const verify $ files $ already_compiled $ output_gil $ no_unfold $ stats
-        $ no_lemma_proof $ stats $ manual $ incremental)
+        $ no_lemma_proof $ manual $ incremental)
 
     let verify_info =
       let doc = "Verifies a file of the target language" in
@@ -565,7 +600,7 @@ struct
         [
           `S Manpage.s_description;
           `P
-            "Uses Automatic Compositional Testing on a given file , after \
+            "Uses Automatic Compositional Testing on a given file, after \
              compiling it to GIL";
         ]
       in
@@ -586,8 +621,8 @@ struct
         let () = Config.current_exec_mode := exec_mode in
         let () = PC.initialize exec_mode in
         let () = Config.bulk_print_all_failures := not npaf in
-        Logging.Mode.set_mode Disabled;
-        Printexc.record_backtrace false;
+        let () = Logging.Mode.set_mode Disabled in
+        let () = Printexc.record_backtrace false in
         Runner.run_all runner path
       in
       let run_t = Term.(const run $ path_t $ no_print_failures) in
