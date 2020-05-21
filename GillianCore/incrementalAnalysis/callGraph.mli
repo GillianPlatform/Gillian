@@ -18,6 +18,12 @@ val merge : t -> t -> t
 
 (** {3 Getters and Setters} *)
 
+val add_proc : t -> string -> unit
+
+val add_pred : t -> string -> unit
+
+val add_lemma : t -> string -> unit
+
 val add_proc_call : t -> string -> string -> unit
 
 val add_pred_call : t -> string -> string -> unit

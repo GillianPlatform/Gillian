@@ -1,4 +1,4 @@
-#include "bst_node.h"
+#include "bst.h"
 
 /*@ pred BST(+x, K) {
   (x == NULL) * (K == -{ }-);
@@ -26,14 +26,28 @@
   (K == -{ #val }-)
 } */
 
-/*@ spec makeNode(v) {
-  requires: (v == #v) * (#v == int(#vv))
-  ensures:  BST(ret, -{ #vv }-)
+// Functions without specs that remain unchanged
+BST *make_node_wrapper_b(int v) { return make_node(v); }
+
+BST *make_node_wrapper_a(int v) { return make_node_wrapper_b(v); }
+
+/*@ spec insert(v, t) {
+  requires: (v == int(#vv)) * (t == #t) * BST(#t, #K)
+  ensures:  BST(ret, -u- (#K, -{ #vv }-))
 }*/
-BST *makeNode(int v) {
-    BST *new_node = malloc(sizeof(BST));
-    new_node->value = v;
-    new_node->left = NULL;
-    new_node->right = NULL;
-    return new_node;
+BST *insert(int v, BST *t) {
+    BST *tmp;
+    if (t == NULL) {
+        return make_node_wrapper_a(v);
+    };
+    if (v < t->value) {
+        tmp = insert(v, t->left);
+        __builtin_annot("unfold BST(tmp, -u- (-{ #vv }-, #KL))");
+        t->left = tmp;
+    } else if (v > t->value) {
+        tmp = insert(v, t->right);
+        __builtin_annot("unfold BST(tmp, -u- (-{ #vv }-, #KR))");
+        t->right = tmp;
+    }
+    return t;
 }

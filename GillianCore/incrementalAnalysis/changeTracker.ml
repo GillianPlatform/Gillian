@@ -1,17 +1,20 @@
 open Containers
 
-type t = {
+type proc_changes = {
   changed_procs : string list;
   new_procs : string list;
   deleted_procs : string list;
   dependent_procs : string list;
+}
+
+type lemma_changes = {
   changed_lemmas : string list;
   new_lemmas : string list;
   deleted_lemmas : string list;
   dependent_lemmas : string list;
 }
 
-let pp fmt changes =
+let pp_proc_changes fmt changes =
   let pp_elem_list sec fmt = function
     | []    -> Fmt.pf fmt "%s:@\n<none>@\n" sec
     | procs ->
@@ -106,7 +109,7 @@ let get_changed_elements
 let get_proc_changes prog =
   get_changed_elements ~extract_elems:(get_procs_with_path prog)
     ~cg_contains:CallGraph.contains_proc ~cg_get_all:CallGraph.get_proc_names
-    ~cur_elems:(Prog.get_noninternal_proc_names prog)
+    ~cur_elems:(Prog.get_proc_names prog)
 
 let get_pred_changes prog =
   get_changed_elements ~extract_elems:(get_preds_with_path prog)
@@ -121,12 +124,29 @@ let get_lemma_changes prog =
 
 let map_to_names call_graph = List.map (CallGraph.get_name call_graph)
 
-let get_proc_callers reverse_graph proc_name ~filter_id =
-  let proc_id = CallGraph.id_of_proc_name proc_name in
-  let caller_ids =
-    List.filter filter_id (CallGraph.get_children reverse_graph proc_id)
+let get_proc_callers
+    reverse_graph start_ids ?(stop_search = fun _ -> false) ~filter_id () =
+  (* Perform a breadth-first traversal of the reverse graph *)
+  let open CallGraph in
+  let rec get_callers visited to_visit dep_procs =
+    match to_visit with
+    | []         -> dep_procs
+    | id :: rest ->
+        if not (IdSet.mem id visited) then
+          let new_visited = IdSet.add id visited in
+          if not (stop_search id) then
+            let children =
+              List.filter filter_id (get_children reverse_graph id)
+            in
+            let proc_ids = List.filter (is_proc reverse_graph) children in
+            let new_to_visit = rest @ proc_ids in
+            let proc_names = map_to_names reverse_graph proc_ids in
+            let new_dep_procs = SS.union dep_procs (SS.of_list proc_names) in
+            get_callers new_visited new_to_visit new_dep_procs
+          else get_callers new_visited rest dep_procs
+        else get_callers visited rest dep_procs
   in
-  map_to_names reverse_graph caller_ids
+  get_callers IdSet.empty start_ids SS.empty
 
 let get_dependent_procs_and_lemmas reverse_graph start_ids ~filter_id =
   (* Perform a breadth-first traversal of the reverse graph *)
@@ -143,7 +163,7 @@ let get_dependent_procs_and_lemmas reverse_graph start_ids ~filter_id =
           let proc_ids = List.filter (is_proc reverse_graph) children in
           let lemma_ids = List.filter (is_lemma reverse_graph) children in
           let new_visited = IdSet.add id visited in
-          let new_to_visit = to_visit @ pred_ids @ lemma_ids in
+          let new_to_visit = rest @ pred_ids @ lemma_ids in
           let proc_names = map_to_names reverse_graph proc_ids in
           let lemma_names = map_to_names reverse_graph lemma_ids in
           let new_dep_procs = SS.union dep_procs (SS.of_list proc_names) in
@@ -160,6 +180,21 @@ let get_changes prog prev_source_files prev_call_graph cur_source_files =
   let changed_procs, new_procs, deleted_procs =
     get_proc_changes prog changed_files new_files prev_call_graph
   in
+  let reverse_graph = CallGraph.to_reverse_graph prev_call_graph in
+  (* Determine all transitive callers of changed procedures *)
+  let changed_proc_ids = List.map CallGraph.id_of_proc_name changed_procs in
+  let changed_set = CallGraph.IdSet.of_list changed_proc_ids in
+  let filter_id id = not (CallGraph.IdSet.mem id changed_set) in
+  let callers = get_proc_callers reverse_graph changed_proc_ids ~filter_id () in
+  { changed_procs; new_procs; deleted_procs; dependent_procs = to_list callers }
+
+let get_verif_changes prog prev_source_files prev_call_graph cur_source_files =
+  let changed_files, new_files =
+    get_changed_files prev_source_files cur_source_files
+  in
+  let changed_procs, new_procs, deleted_procs =
+    get_proc_changes prog changed_files new_files prev_call_graph
+  in
   let changed_preds, _, _ =
     get_pred_changes prog changed_files new_files prev_call_graph
   in
@@ -167,18 +202,25 @@ let get_changes prog prev_source_files prev_call_graph cur_source_files =
     get_lemma_changes prog changed_files new_files prev_call_graph
   in
   let reverse_graph = CallGraph.to_reverse_graph prev_call_graph in
-
-  (* Determine callers of changed procedures that did not themselves change *)
   let changed_proc_ids = List.map CallGraph.id_of_proc_name changed_procs in
   let changed_pred_ids = List.map CallGraph.id_of_pred_name changed_preds in
   let changed_lemma_ids = List.map CallGraph.id_of_lemma_name changed_lemmas in
-  let changed_ids = changed_proc_ids @ changed_pred_ids @ changed_lemma_ids in
-  let changed_ids_set = CallGraph.IdSet.of_list changed_ids in
-  let filter_id id = not (CallGraph.IdSet.mem id changed_ids_set) in
-  let callers =
-    map_concat (get_proc_callers reverse_graph ~filter_id) changed_procs
+  let changed_ids =
+    CallGraph.IdSet.of_list
+      (changed_proc_ids @ changed_pred_ids @ changed_lemma_ids)
   in
-  let dependent_procs = SS.of_list callers in
+
+  (* Determine closest callers with specs of changed procedures *)
+  let filter_id id = not (CallGraph.IdSet.mem id changed_ids) in
+  let stop_search id =
+    let not_in_start_ids = not (List.mem id changed_proc_ids) in
+    let proc_name = CallGraph.get_name reverse_graph id in
+    let proc = Prog.get_proc_exn prog proc_name in
+    not_in_start_ids && Option.is_some proc.proc_spec
+  in
+  let dependent_procs =
+    get_proc_callers reverse_graph changed_proc_ids ~stop_search ~filter_id ()
+  in
 
   (* Determine transitive dependents of changed predicates and lemmas *)
   let start_ids = changed_pred_ids @ changed_lemma_ids in
@@ -187,13 +229,16 @@ let get_changes prog prev_source_files prev_call_graph cur_source_files =
   in
   let dependent_procs = SS.union dependent_procs trans_dep_procs in
   let dependent_lemmas = trans_dep_lemmas in
-  {
-    changed_procs;
-    new_procs;
-    deleted_procs;
-    dependent_procs = to_list dependent_procs;
-    changed_lemmas;
-    new_lemmas;
-    deleted_lemmas;
-    dependent_lemmas = to_list dependent_lemmas;
-  }
+
+  ( {
+      changed_procs;
+      new_procs;
+      deleted_procs;
+      dependent_procs = to_list dependent_procs;
+    },
+    {
+      changed_lemmas;
+      new_lemmas;
+      deleted_lemmas;
+      dependent_lemmas = to_list dependent_lemmas;
+    } )

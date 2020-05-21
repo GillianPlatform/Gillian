@@ -718,6 +718,10 @@ module Spec : sig
   val label_vars_to_set :
     ('a * Utils.Containers.SS.elt list) option ->
     ('a * Utils.Containers.SS.t) option
+
+  val yojson_of_t : t -> Yojson.Safe.t
+
+  val t_of_yojson : Yojson.Safe.t -> t
 end
 
 module BiSpec : sig
@@ -869,6 +873,9 @@ module Prog : sig
   (** Get all bi-abductive specs *)
   val get_bispecs : ('a, 'b) t -> BiSpec.t list
 
+  (** Get names of all procedures *)
+  val get_proc_names : ('a, 'b) t -> string list
+
   (** Get names of all procedures not marked as internal *)
   val get_noninternal_proc_names : ('a, 'b) t -> string list
 
@@ -903,9 +910,6 @@ module Prog : sig
 
   (** Get a specific lemma. Raises [Failure] if it does not exist *)
   val get_lemma_exn : ('a, 'b) t -> string -> Lemma.t
-
-  (** Get all specifications *)
-  val get_proc_specs : ('a, 'b) t -> Spec.t list
 
   (** {3 Setters} *)
 

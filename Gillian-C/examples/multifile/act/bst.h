@@ -8,4 +8,6 @@ typedef struct bstn {
     struct bstn *right;
 } BST;
 
-BST *a_makeNode(int v);
+BST *a_make_node(int v);
+
+int d_find_min(BST *t);

@@ -212,6 +212,7 @@ let gen_pred_of_struct cenv ann struct_name =
   let holes = get_holes comp.co_members in
   let holes_asserts = List.map assert_of_hole holes in
   let def = fold_star holes_asserts ** def_without_holes in
+  (* TODO (Alexis): How to handle changes in structs? *)
   let n_pred =
     Pred.
       {

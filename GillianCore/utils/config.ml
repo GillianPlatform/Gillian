@@ -29,9 +29,6 @@ let big_tbl_size = 1
 (** This value seems to never be modified *)
 let bug_specs_propagation = ref false
 
-(** This value seems to never be modified *)
-let output_verification = ref false
-
 (** {2 Debugging configuration} *)
 
 let debug = ref false

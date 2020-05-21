@@ -8,17 +8,17 @@ if [[ -z "${GITHUB_ACTIONS}" ]]; then
   source exec.env
 fi
 
-echo "--- executing test ---"
-gillian-c exec multifile/concrete/test.c multifile/concrete/foo.c -l disabled
+echo "--- executing main.c ---"
+gillian-c exec -l disabled multifile/concrete/main.c multifile/concrete/foo.c
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
 echo "--- verifying BST ---"
-gillian-c verify multifile/verification/bst.c multifile/verification/bst_node.c -l disabled
+gillian-c verify -l disabled multifile/verification/bst_a.c multifile/verification/bst_b.c
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
 echo "--- bi-abducing BST ---"
-gillian-c act multifile/act/bst.c multifile/act/bst_node.c -l disabled
+gillian-c act -l disabled multifile/act/bst_a.c multifile/act/bst_b.c
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"

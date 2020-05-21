@@ -8,4 +8,4 @@ typedef struct bstn {
     struct bstn *right;
 } BST;
 
-BST *makeNode(int v);
+BST *a_make_node(int v);

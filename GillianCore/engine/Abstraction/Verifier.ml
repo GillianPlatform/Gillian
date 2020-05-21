@@ -479,7 +479,7 @@ struct
     let specs_to_verify =
       List.filter
         (fun (spec : Spec.t) -> SS.mem spec.spec_name pnames_to_verify)
-        (Prog.get_proc_specs prog)
+        (Prog.get_specs prog)
     in
 
     (* STEP 2: Convert specs to symbolic tests *)
@@ -495,9 +495,9 @@ struct
              tests)
            specs_to_verify)
     in
-    Printf.printf "Obtained %d symbolic tests\n" (List.length tests);
 
     (* STEP 3: Get the lemmas to verify *)
+    Printf.printf "Obtaining lemmas to verify...\n";
     let lemmas_to_verify =
       List.filter
         (fun (lemma : Lemma.t) -> SS.mem lemma.lemma_name lnames_to_verify)
@@ -515,6 +515,9 @@ struct
              tests)
            lemmas_to_verify)
     in
+
+    Printf.printf "Obtained %d symbolic tests in total\n"
+      (List.length tests + List.length tests');
 
     L.verbose (fun m ->
         m
@@ -575,34 +578,42 @@ struct
         | Some files -> files
         | None       -> failwith "Cannot use -a in incremental mode"
       in
-      let { sources; call_graph; results } = read_results_dir () in
-      let changes = get_changes prog sources call_graph cur_source_files in
-      let () = CallGraph.prune_procs call_graph changes.deleted_procs in
-      let () = CallGraph.prune_lemmas call_graph changes.deleted_lemmas in
+      let source_files, call_graph, results = read_verif_results () in
+      let proc_changes, lemma_changes =
+        get_verif_changes prog source_files call_graph cur_source_files
+      in
+      let procs_to_prune =
+        proc_changes.changed_procs @ proc_changes.deleted_procs
+        @ proc_changes.dependent_procs
+      in
+      let lemmas_to_prune =
+        lemma_changes.changed_lemmas @ lemma_changes.deleted_lemmas
+        @ lemma_changes.dependent_lemmas
+      in
+      let () = CallGraph.prune_procs call_graph procs_to_prune in
+      let () = CallGraph.prune_lemmas call_graph lemmas_to_prune in
       let () =
-        VerificationResults.prune results
-          (changes.deleted_procs @ changes.deleted_lemmas)
+        VerificationResults.prune results (procs_to_prune @ lemmas_to_prune)
       in
       let procs_to_verify =
         SS.of_list
-          (changes.changed_procs @ changes.new_procs @ changes.dependent_procs)
+          ( proc_changes.changed_procs @ proc_changes.new_procs
+          @ proc_changes.dependent_procs )
       in
       let lemmas_to_verify =
         SS.of_list
-          ( changes.changed_lemmas @ changes.new_lemmas
-          @ changes.dependent_lemmas )
+          ( lemma_changes.changed_lemmas @ lemma_changes.new_lemmas
+          @ lemma_changes.dependent_lemmas )
       in
       let () =
         verify_procs ~prev_results:results prog procs_to_verify lemmas_to_verify
       in
-      let cur_results, cur_call_graph =
-        (global_results, SAInterpreter.call_graph)
-      in
+      let cur_call_graph = SAInterpreter.call_graph in
+      let cur_results = global_results in
       let call_graph = CallGraph.merge call_graph cur_call_graph in
       let results = VerificationResults.merge results cur_results in
-      let diff = Fmt.str "%a" ChangeTracker.pp changes in
-      write_results_dir
-        { sources = cur_source_files; call_graph; results; diff }
+      let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
+      write_verif_results cur_source_files call_graph ~diff results
     else
       (* Analyse all procedures and lemmas *)
       let cur_source_files =
@@ -613,9 +624,8 @@ struct
         SS.of_list (Prog.get_noninternal_lemma_names prog)
       in
       let () = verify_procs prog procs_to_verify lemmas_to_verify in
-      let results, call_graph = (global_results, SAInterpreter.call_graph) in
-      write_results_dir
-        { sources = cur_source_files; call_graph; results; diff = "" }
+      let call_graph = SAInterpreter.call_graph in
+      write_verif_results cur_source_files call_graph ~diff:"" global_results
 end
 
 module From_scratch (SMemory : SMemory.S) (External : External.S) = struct

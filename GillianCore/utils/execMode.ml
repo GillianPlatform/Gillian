@@ -23,3 +23,16 @@ let non_bi_exec = [ Concrete; Verification; Symbolic ]
 let exec_with_preds = [ Verification; BiAbduction ]
 
 let bi_exec = [ BiAbduction ]
+
+let to_string = function
+  | Concrete     -> "concrete"
+  | Verification -> "verif"
+  | Symbolic     -> "wpst"
+  | BiAbduction  -> "act"
+
+let of_string = function
+  | "concrete" -> Concrete
+  | "verif"    -> Verification
+  | "wpst"     -> Symbolic
+  | "act"      -> BiAbduction
+  | other      -> failwith (Printf.sprintf "unknown exec mode \"%s\"" other)
