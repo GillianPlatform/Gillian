@@ -1,8 +1,6 @@
 type 'a t = < log : 'a Report.t -> unit ; wrap_up : unit >
 
 module Make (P : sig
-  val enabled : bool
-
   type conf
 
   val conf : conf
@@ -14,11 +12,9 @@ module Make (P : sig
   val wrap_up : state -> unit
 end) =
 struct
-  let enabled, enable, disable =
-    let enabled = ref P.enabled in
-    ( (fun () -> !enabled),
-      (fun () -> enabled := true),
-      fun () -> enabled := false )
+  let enabled, enable =
+    let enabled = ref false in
+    ((fun () -> !enabled), fun () -> enabled := true)
 
   type conf = P.conf
 

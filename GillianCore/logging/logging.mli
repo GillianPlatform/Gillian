@@ -27,8 +27,6 @@ end
 module FileReporter : sig
   val enable : unit -> unit
 
-  val disable : unit -> unit
-
   class virtual ['a] t :
     object
       method log : 'a Report.t -> unit
@@ -43,8 +41,6 @@ end
 
 module DatabaseReporter : sig
   val enable : unit -> unit
-
-  val disable : unit -> unit
 
   class virtual ['a] t :
     object

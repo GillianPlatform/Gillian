@@ -69,6 +69,29 @@ struct
     in
     Arg.(value & opt c v & info [ "l"; "logging" ] ~docv:"SETTING" ~doc)
 
+  type reporter_switch = { name : string; enable : unit -> unit }
+
+  let reporters =
+    let parse : string -> (reporter_switch, [> `Msg of string ]) Result.t =
+      function
+      | "file"            -> Ok { name = "file"; enable = L.FileReporter.enable }
+      | "database" | "db" ->
+          Ok { name = "database"; enable = L.DatabaseReporter.enable }
+      | other             -> Result.error
+                             @@ `Msg ("unknown value \"" ^ other ^ "\"")
+    in
+    let print fmt (switch : reporter_switch) = Fmt.string fmt switch.name in
+    let c = Arg.(list & conv (parse, print)) in
+    let v : reporter_switch list list =
+      [ [ { name = "file"; enable = L.FileReporter.enable } ] ]
+    in
+    let doc =
+      "Controls which reporters are used when logging. The value REPORTERS \
+       must be a comma separated list of REPORTER values. A REPORTER value \
+       must be one of `file`, `database`, `db`."
+    in
+    Arg.(value & opt_all c v & info [ "r"; "reporters" ] ~docv:"REPORTERS" ~doc)
+
   let output_gil =
     let doc =
       "If specified, will write the compiled GIL program into $(docv)."
@@ -134,17 +157,19 @@ struct
         exit 1
 
   let with_common (term : (unit -> unit) Term.t) : unit Term.t =
-    let apply_common logging_mode runtime_path ci tl_opts result_dir =
+    let apply_common logging_mode reporters runtime_path ci tl_opts result_dir =
       Config.set_result_dir result_dir;
       Config.ci := ci;
       Logging.Mode.set_mode logging_mode;
+      let reporters = List.flatten reporters in
+      List.iter (fun reporter -> reporter.enable ()) reporters;
       Printexc.record_backtrace (Logging.Mode.enabled ());
       PC.TargetLangOptions.apply tl_opts;
       Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
     in
     let common_term =
       Term.(
-        const apply_common $ logging_mode $ runtime_path $ ci
+        const apply_common $ logging_mode $ reporters $ runtime_path $ ci
         $ PC.TargetLangOptions.term $ result_directory)
     in
     Term.(term $ common_term)
