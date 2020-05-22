@@ -1,25 +1,41 @@
+type uuidm = Uuidm.t
+
+let yojson_of_uuidm uuidm = Uuidm.to_string uuidm |> yojson_of_string
+
+let uuidm_of_yojson yojson =
+  string_of_yojson yojson |> Uuidm.of_string |> Option.get
+
 module PackedPP : sig
-  type t
+  type t [@@deriving yojson]
 
   val make : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> t
 
   val pf : Format.formatter -> t -> unit
 
-  val str : t -> string
+  val to_string : t -> string
+
+  val of_string : string -> t
 end = struct
   type t = PP : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> t
 
   let make x = PP x
 
-  let pf fmt (PP msgf) = msgf @@ Format.fprintf fmt
+  let pf fmt (PP msgf) = Format.fprintf fmt |> msgf
 
-  let str (PP msgf) =
+  let to_string (PP msgf) =
     let str = ref "" in
-    let () = msgf @@ fun fmt -> Format.kasprintf (fun s -> str := s) fmt in
+    (fun fmt -> Format.kasprintf (fun s -> str := s) fmt) |> msgf;
     !str
+
+  let of_string s = PP (fun m -> m "%s" s)
+
+  let yojson_of_t t = to_string t |> yojson_of_string
+
+  let t_of_yojson yojson = string_of_yojson yojson |> of_string
 end
 
 type phase = ParsingAndCompiling | Parsing | Preprocessing | Verification
+[@@deriving yojson]
 
 let string_of_phase = function
   | ParsingAndCompiling -> "ParsingAndCompiling"
@@ -27,23 +43,21 @@ let string_of_phase = function
   | Preprocessing       -> "Preprocessing"
   | Verification        -> "Verification"
 
-type agnostic = Agnostic
+type agnostic_content = Debug of PackedPP.t | Phase of phase
+[@@deriving yojson]
 
-type specific = Specific
+type 'a content = Agnostic of agnostic_content | Specific of 'a
+[@@deriving yojson]
 
-type ('kind, 'tl) content =
-  | Debug      : PackedPP.t -> (agnostic, _) content
-  | Phase      : phase -> (agnostic, _) content
-  | TargetLang : 'tl -> (specific, 'tl) content
+type severity = Info | Log | Success | Error | Warning [@@deriving yojson]
 
-type severity = Info | Log | Success | Error | Warning
-
-type ('a, 'b) t = {
-  id : Uuidm.t;
+type 'a t = {
+  id : uuidm;
   title : string;
   elapsed_time : float;
-  previous : Uuidm.t option;
-  parent : Uuidm.t option;
-  content : ('a, 'b) content;
+  previous : uuidm option;
+  parent : uuidm option;
+  content : 'a content;
   severity : severity;
 }
+[@@deriving yojson]

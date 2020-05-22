@@ -1,22 +1,6 @@
 (library
  (name logging)
  (public_name gillian.logging)
- (libraries sanddb uuidm))
-
-(rule
- (targets report_t.ml report_t.mli)
- (deps report.atd)
- (action
-  (run atdgen -t %{deps})))
-
-(rule
- (targets report_j.ml report_j.mli)
- (deps report.atd)
- (action
-  (run atdgen -j %{deps})))
-
-(rule
- (targets report_b.ml report_b.mli)
- (deps report.atd)
- (action
-  (run atdgen -b %{deps})))
+ (libraries uuidm)
+ (preprocess
+  (pps ppx_yojson_conv)))
