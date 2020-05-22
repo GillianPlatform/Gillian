@@ -59,7 +59,7 @@ let get_cell heap pfs gamma (loc : vt) (offset : vt) =
                      according to the path condition and typing env *)
               match
                 SFVL.get_first
-                  (fun name -> FOSolver.is_equal name offset pfs gamma)
+                  (fun name -> FOSolver.is_equal ~pfs ~gamma name offset)
                   fvl
               with
               | Some (o, v) ->
@@ -93,7 +93,7 @@ let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) =
      we create a new fvl from empty
      This is supposedly correct because, since we got it before, we
      suppose the offset to be correctly found. *)
-  let equality_test a b = FOSolver.is_equal a b pfs gamma in
+  let equality_test a b = FOSolver.is_equal ~pfs ~gamma a b in
   let () =
     WislSHeap.set_fvl heap loc_name
       (SFVL.add_with_test ~equality_test offset value

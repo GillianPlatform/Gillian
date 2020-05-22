@@ -221,7 +221,7 @@ module M : Gillian.Symbolic.Memory_S = struct
               match
                 ( dom,
                   SFVL.get_first
-                    (fun name -> FOSolver.is_equal name prop pfs gamma)
+                    (fun name -> FOSolver.is_equal ~pfs ~gamma name prop)
                     fv_list )
               with
               | None, None         ->

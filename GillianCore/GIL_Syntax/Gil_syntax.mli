@@ -200,9 +200,19 @@ module Expr : sig
     | ESet   of t list  (** Sets of expressions *)
 
   val lit : Literal.t -> t
+
   val num : float -> t
+
   val int : int -> t
-    
+
+  val typeof : t -> t
+
+  module Infix : sig
+    val ( +. ) : t -> t -> t
+
+    val ( + ) : t -> t -> t
+  end
+
   (** Sets of expressions *)
   module Set : Set.S with type elt := t
 
@@ -370,6 +380,26 @@ module Formula : sig
 
   (** Returns a list of strings and a list of numbers that are contained in the formula *)
   val strings_and_numbers : t -> string list * float list
+
+  module Infix : sig
+    (** Same as Not *)
+    val ( #! ) : t -> t
+
+    (** Same as Or *)
+    val ( #|| ) : t -> t -> t
+
+    (** Same as And *)
+    val ( #&& ) : t -> t -> t
+
+    (** Same as Eq *)
+    val ( #== ) : Expr.t -> Expr.t -> t
+
+    (** Same as Less *)
+    val ( #< ) : Expr.t -> Expr.t -> t
+
+    (** Same as LessEq *)
+    val ( #<= ) : Expr.t -> Expr.t -> t
+  end
 end
 
 module Asrt : sig

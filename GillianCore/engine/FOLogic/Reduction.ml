@@ -1983,6 +1983,11 @@ let rec reduce_formula_loop
         let re2 = fe e2 in
         match (re1, re2) with
         | Lit (Num x), Lit (Num y) -> if x <= y then True else False
+        | Lit (Num x), Lit (Int y) ->
+            if x <= Float.of_int y then True else False
+        | Lit (Int x), Lit (Num y) ->
+            if Float.of_int x <= y then True else False
+        | Lit (Int x), Lit (Int y) -> if x <= y then True else False
         | re1, re2                 ->
             if PFS.mem pfs (LessEq (re2, re1)) then Eq (re1, re2)
             else if PFS.mem pfs (Less (re1, re2)) then True

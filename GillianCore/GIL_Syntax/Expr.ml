@@ -13,12 +13,22 @@ type t = TypeDef__.expr =
   | NOp    of NOp.t * t list  (** n-ary operators         *)
   | EList  of t list  (** Lists of expressions    *)
   | ESet   of t list  (** Sets of expressions     *)
-  
+
 (** {3 builders} *)
 
 let lit x = Lit x
+
 let num n = lit (Num n)
-let int n = lit(Int n)
+
+let int n = lit (Int n)
+
+let typeof x = UnOp (TypeOf, x)
+
+module Infix = struct
+  let ( +. ) a b = BinOp (a, FPlus, b)
+
+  let ( + ) a b = BinOp (a, IPlus, b)
+end
 
 module MyExpr = struct
   type nonrec t = t
@@ -262,7 +272,7 @@ let loc_from_loc_name (loc_name : string) : t =
   if is_aloc_name loc_name then ALoc loc_name else Lit (Loc loc_name)
 
 (** {2 Visitors} *)
-  
+
 let subst_expr_for_expr ~to_subst ~subst_with expr =
   let v =
     object

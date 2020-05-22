@@ -25,9 +25,12 @@ val check_entailment :
 (** [is_equal e1 e2 pfs gamma] checks whether or not
     << pfs, gamma |- e1 = e2 >>. *)
 val is_equal :
-  Gil_syntax.Expr.t -> Gil_syntax.Expr.t -> PFS.t -> TypEnv.t -> bool
+  pfs:PFS.t -> gamma:TypEnv.t -> Gil_syntax.Expr.t -> Gil_syntax.Expr.t -> bool
 
 (** [is_different e1 e2 pfs gamma] checks whether or not
     << pfs, gamma |- e1 <> e2 >>. *)
 val is_different :
-  Gil_syntax.Expr.t -> Gil_syntax.Expr.t -> PFS.t -> TypEnv.t -> bool
+  pfs:PFS.t -> gamma:TypEnv.t -> Gil_syntax.Expr.t -> Gil_syntax.Expr.t -> bool
+
+val is_less_or_equal :
+  pfs:PFS.t -> gamma:TypEnv.t -> Gil_syntax.Expr.t -> Gil_syntax.Expr.t -> bool

@@ -321,3 +321,17 @@ let strings_and_numbers =
     end
   in
   v#visit_formula ()
+
+module Infix = struct
+  let ( #! ) a = Not a
+
+  let ( #== ) a b = Eq (a, b)
+
+  let ( #|| ) a b = Or (a, b)
+
+  let ( #&& ) a b = And (a, b)
+
+  let ( #< ) a b = Less (a, b)
+
+  let ( #<= ) a b = LessEq (a, b)
+end
