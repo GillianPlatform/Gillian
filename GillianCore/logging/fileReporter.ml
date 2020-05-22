@@ -7,9 +7,7 @@ end
 include Reporter.Make (struct
   include Types
 
-  let enabled = true
-
-  let conf = { filename = "out.log" }
+  let conf = { filename = "file.log" }
 
   let initialize { filename; _ } =
     let out_channel = open_out filename in

@@ -7,8 +7,6 @@ end
 include Reporter.Make (struct
   include Types
 
-  let enabled = false
-
   let conf = { filename = "database.log" }
 
   let initialize { filename; _ } =
