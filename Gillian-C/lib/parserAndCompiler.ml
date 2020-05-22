@@ -252,11 +252,13 @@ let create_compilation_result gil_progs =
   let gil_progs =
     List.map
       (fun (path, prog) ->
-        let () = SourceFiles.add_source_file source_files path in
+        let () = SourceFiles.add_source_file source_files ~path in
         let headers = get_included_headers (get_deps_path path) in
         let () =
           List.iter
-            (fun header -> SourceFiles.add_dependency source_files header path)
+            (fun header ->
+              SourceFiles.add_dependency source_files ~path:header
+                ~dependent_path:path)
             headers
         in
         (get_gil_path path, prog))

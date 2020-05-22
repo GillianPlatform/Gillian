@@ -36,7 +36,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
       ( Suite.category,
         (string, (Suite.info, Suite.category) Test.t) Hashtbl.t )
       Hashtbl.t =
-    Hashtbl.create 1
+    Hashtbl.create Config.small_tbl_size
 
   let add_test_to_table (test : (Suite.info, Suite.category) Test.t) =
     let cat_tbl_opt = Hashtbl.find_opt test_table test.category in
@@ -44,7 +44,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
       match cat_tbl_opt with
       | Some c -> c
       | None   ->
-          let new_cat_tbl = Hashtbl.create 1 in
+          let new_cat_tbl = Hashtbl.create Config.small_tbl_size in
           let () = Hashtbl.replace test_table test.category new_cat_tbl in
           new_cat_tbl
     in

@@ -357,15 +357,18 @@ struct
         | Some files -> files
         | None       -> failwith "Cannot use -a in incremental mode"
       in
-      let source_files, call_graph, results = read_biabduction_results () in
+      let prev_source_files, prev_call_graph, results =
+        read_biabduction_results ()
+      in
       let proc_changes =
-        get_changes prog.prog source_files call_graph cur_source_files
+        get_changes prog.prog ~prev_source_files ~prev_call_graph
+          ~cur_source_files
       in
       let procs_to_prune =
         proc_changes.changed_procs @ proc_changes.deleted_procs
         @ proc_changes.dependent_procs
       in
-      let () = CallGraph.prune_procs call_graph procs_to_prune in
+      let () = CallGraph.prune_procs prev_call_graph procs_to_prune in
       let () = BiAbductionResults.prune results procs_to_prune in
       let procs_to_test =
         SS.of_list
@@ -374,7 +377,7 @@ struct
       in
       let cur_results = test_procs ~prev_results:results prog procs_to_test in
       let cur_call_graph = SBAInterpreter.call_graph in
-      let call_graph = CallGraph.merge call_graph cur_call_graph in
+      let call_graph = CallGraph.merge prev_call_graph cur_call_graph in
       let results = BiAbductionResults.merge results cur_results in
       let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
       write_biabduction_results cur_source_files call_graph ~diff results

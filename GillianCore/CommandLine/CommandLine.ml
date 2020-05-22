@@ -324,9 +324,10 @@ struct
           | Some files -> files
           | None       -> failwith "Cannot use -a in incremental mode"
         in
-        let source_files, call_graph = read_symbolic_results () in
+        let prev_source_files, prev_call_graph = read_symbolic_results () in
         let proc_changes =
-          get_changes prog.prog source_files call_graph cur_source_files
+          get_changes prog.prog ~prev_source_files ~prev_call_graph
+            ~cur_source_files
         in
         let changed_procs =
           SS.of_list
