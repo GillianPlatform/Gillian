@@ -30,11 +30,11 @@ let set_not_empty () = (get_state ()).empty <- false
 class virtual ['a] t =
   object (self)
     method log (report : 'a Report.t) =
-      if enabled () then
+      if enabled () then (
         if is_empty () then set_not_empty ()
         else Printf.fprintf self#out_channel ",\n";
-      Report.yojson_of_t self#specific_serializer report
-      |> Yojson.Safe.to_channel self#out_channel
+        Report.yojson_of_t self#specific_serializer report
+        |> Yojson.Safe.to_channel self#out_channel )
 
     method wrap_up = wrap_up ()
 
