@@ -3,6 +3,7 @@ open Compcert
 open Csharpminor
 open CConstants
 module Logging = Gillian.Logging
+module SS = Gillian.Utils.Containers.SS
 
 let true_name = ValueTranslation.true_name
 
@@ -664,8 +665,6 @@ let is_gil_func func_name exec_mode =
 
 type symbol = { name : string; defined : bool }
 
-module Symbol_set = Gillian.Utils.Containers.SS
-
 let is_def_sym symbol = symbol.defined
 
 let sym_name symbol = symbol.name
@@ -701,7 +700,7 @@ let rec trans_globdefs
       (* Internally-defined function (has either file or global scope) *)
       let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let original_sym = true_name id in
-      let has_global_scope = Symbol_set.mem original_sym global_syms in
+      let has_global_scope = SS.mem original_sym global_syms in
       let symbol =
         if has_global_scope then original_sym
         else mangle_symbol original_sym filepath mangled_syms
@@ -755,7 +754,7 @@ let rec trans_globdefs
       (* Internally-defined global variable (has either file or global scope) *)
       let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let original_sym = true_name id in
-      let has_global_scope = Symbol_set.mem original_sym global_syms in
+      let has_global_scope = SS.mem original_sym global_syms in
       let symbol =
         if has_global_scope then original_sym
         else mangle_symbol original_sym filepath mangled_syms
@@ -798,7 +797,7 @@ let trans_program
     ~mangled_syms
     prog =
   let AST.{ prog_defs; prog_public; _ } = prog in
-  let global_syms = Symbol_set.of_list (List.map true_name prog_public) in
+  let global_syms = SS.of_list (List.map true_name prog_public) in
   let init_asrts, init_acts, bi_specs, procedures, symbols =
     trans_globdefs ~clight_prog ~exec_mode ~gil_annot ~global_syms ~filepath
       ~mangled_syms prog_defs
@@ -846,7 +845,7 @@ let annotate prog gil_annots =
   prog
 
 let trans_program_with_annots
-    exec_mode clight_prog prog ~filepath ~mangled_syms annots =
+    ~exec_mode ~clight_prog ~filepath ~mangled_syms prog annots =
   let gil_annot =
     if ExecMode.verification_exec exec_mode then
       Gil_logic_gen.trans_annots clight_prog annots filepath
@@ -855,7 +854,7 @@ let trans_program_with_annots
     else Gil_logic_gen.empty
   in
   let non_annotated_prog, compilation_data =
-    trans_program ~clight_prog ~exec_mode ~gil_annot ~filepath ~mangled_syms
+    trans_program ~exec_mode ~gil_annot ~clight_prog ~filepath ~mangled_syms
       prog
   in
   let annotated_prog = annotate non_annotated_prog gil_annot in
