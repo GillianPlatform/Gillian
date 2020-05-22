@@ -279,7 +279,7 @@ let trans_sval (sv : CSVal.t) : Asrt.t * Expr.t =
       let eg1, eg2 = (tse se1, tse se2) in
       (tloc eg1 ** tnum eg2, Expr.EList [ tse se1; tse se2 ])
   | Sfunptr symb    ->
-      let lvar = LVar.alloc () in
+      let lvar = Gillian.Utils.Generators.fresh_lvar () in
       let pred =
         Asrt.Pred
           ( CConstants.Internal_Predicates.fun_ptr,
@@ -367,7 +367,7 @@ let malloc_chunk_asrt loc struct_sz =
 
 let trans_constr ?fname:_ ~malloc ann s c =
   let cenv = ann.cenv in
-  let gen_loc_var () = Expr.LVar (LVar.alloc ()) in
+  let gen_loc_var () = Expr.LVar (Gillian.Utils.Generators.fresh_lvar ()) in
   let open CConstants.VTypes in
   let cse = trans_simpl_expr in
   let tnum = types NumberType in
