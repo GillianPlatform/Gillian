@@ -16,6 +16,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
                    and type matcher = Backend(Outcome)(Suite).matcher
                    and type outcome = Outcome.t) : S = struct
   module Backend = Backend (Outcome) (Suite)
+  module PC = Outcome.ParserAndCompiler
 
   let cmd_name = Suite.cmd_name
 
@@ -26,9 +27,11 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
       (Outcome.State)
       (Outcome.External)
 
-  let bulk_source_files = SourceFiles.make ()
+  let compilation_results = Hashtbl.create Config.small_tbl_size
 
-  let bulk_call_graph = CInterpreter.call_graph
+  let cur_source_files = Hashtbl.create Config.small_tbl_size
+
+  let cur_call_graphs = Hashtbl.create Config.small_tbl_size
 
   (** The test_table maps category to category tables.
       A category table maps file names to tests *)
@@ -69,35 +72,54 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
         (ext, fun_with_exn))
       oi
 
-  let get_main_prefix test_path =
-    Filename.basename (Filename.chop_extension test_path)
+  let compile_tests () =
+    let open Outcome in
+    let tests =
+      Hashtbl.fold
+        (fun _ tests_for_cat acc ->
+          Hashtbl.fold (fun _ test acc -> test :: acc) tests_for_cat [] @ acc)
+        test_table []
+    in
+    List.iter
+      (fun (test : (Suite.info, Suite.category) Test.t) ->
+        let () = Generators.reset () in
+        let () = Suite.beforeEach () in
+        let () = Suite.beforeTest test.info test.path in
+        let compilation_res, source_files =
+          match PC.parse_and_compile_files [ test.path ] with
+          | Error err -> (Error err, None)
+          | Ok progs  ->
+              let e_progs = progs.gil_progs in
+              let () = Gil_parsing.cache_labelled_progs e_progs in
+              let e_prog = snd (List.hd e_progs) in
+              let other_imports = convert_other_imports PC.other_imports in
+              let prog = Gil_parsing.eprog_to_prog ~other_imports e_prog in
+              (Ok prog, Some progs.source_files)
+        in
+        Hashtbl.add compilation_results test.path compilation_res;
+        Option.fold ~none:()
+          ~some:(fun files -> Hashtbl.add cur_source_files test.path files)
+          source_files)
+      tests
 
   let execute_test expect test =
     let open Outcome in
-    let open ParserAndCompiler in
     let result = ref (Outcome.FailedExec "Execution failure") in
     let () =
       Backend.check_not_throw expect (fun () ->
-          let () = Utils.Generators.reset () in
-          let () = Utils.Allocators.reset_all () in
+          let () = Allocators.reset_all () in
           let () = CInterpreter.reset () in
-          let () = Suite.beforeTest test.Test.info test.path in
           let res =
-            match parse_and_compile_files [ test.path ] with
+            match Hashtbl.find compilation_results test.Test.path with
             | Error err -> ParseAndCompileError err
-            | Ok progs  -> (
-                let e_progs = progs.gil_progs in
-                let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
-                let e_prog = snd (List.hd e_progs) in
-                let other_imports = convert_other_imports other_imports in
-                let prog = Gil_parsing.eprog_to_prog ~other_imports e_prog in
+            | Ok prog   -> (
                 match UP.init_prog prog with
                 | Error _ -> failwith "Failed to create unification plan"
                 | Ok prog ->
-                    let main_prefix = get_main_prefix test.path in
-                    let () = CInterpreter.set_main_proc_prefix main_prefix in
                     let ret = CInterpreter.evaluate_prog prog in
-                    let () = CInterpreter.reset_main_proc_prefix in
+                    let call_graph = CInterpreter.call_graph in
+                    let copy = CallGraph.merge (CallGraph.make ()) call_graph in
+                    Hashtbl.add cur_call_graphs test.path copy;
                     FinishedExec ret )
           in
           result := res)
@@ -111,15 +133,18 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
       test_table
 
   let run_all ~test_suite_path =
+    let start_time = Sys.time () in
     let list_files =
       List.filter Suite.filter_source (Utils.Io_utils.get_files test_suite_path)
     in
-    Fmt.pr "Registering tests...\n@?";
+    Fmt.pr "Registering and compiling tests...\n@?";
     let () = Suite.init_suite list_files in
     let () = register_tests list_files in
+    let () = compile_tests () in
+    let cur_time = Sys.time () in
+    Fmt.pr "Time to compile all: %f\n@?" (cur_time -. start_time);
     let () = register_expectations () in
-    Backend.run ();
-    ResultsDir.write_symbolic_results bulk_source_files bulk_call_graph ~diff:""
+    Backend.run ()
 end
 
 type t = (module S)
