@@ -19,8 +19,16 @@ end = struct
   }
   [@@deriving yojson]
 
+  let hash_cache = Hashtbl.create Config.small_tbl_size
+
   let make ~path ~dependents =
-    let contents = Digest.to_hex (Digest.file path) in
+    let contents =
+      if Hashtbl.mem hash_cache path then Hashtbl.find hash_cache path
+      else
+        let hash = Digest.to_hex (Digest.file path) in
+        Hashtbl.add hash_cache path hash;
+        hash
+    in
     { path; contents; dependents }
 
   let add_dependent file dep = file.dependents <- dep :: file.dependents
