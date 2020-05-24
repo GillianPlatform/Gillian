@@ -8,6 +8,7 @@ if [[ -z "${GITHUB_ACTIONS}" ]]; then
   source exec.env
 fi
 
+# TODO (Alexis): Make incremental analysis thread-safe to allow the use of --parallel
 echo "--- testing SLL ---"
 time gillian-c wpst symbolic/sll.c -l disabled
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi

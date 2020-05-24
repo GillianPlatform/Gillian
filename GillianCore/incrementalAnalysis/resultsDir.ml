@@ -3,7 +3,11 @@ open Containers
 module Filenames = struct
   let sources = "sources.json"
 
+  let sources_dir = "sources"
+
   let call_graph = "call_graph.json"
+
+  let call_graphs_dir = "call_graphs"
 
   let verif_results = "verif_results.json"
 
@@ -54,8 +58,36 @@ let read_biabduction_results () =
 
 let read_symbolic_results = read_results_dir
 
-let write_json json filename =
-  let json_path = Filename.concat (results_dir ()) filename in
+let read_bulk_symbolic_results () =
+  let read_table dirname of_json =
+    let dir_path = Filename.concat (results_dir ()) dirname in
+    let json_paths = Io_utils.get_files dir_path in
+    let table = Hashtbl.create Config.small_tbl_size in
+    let () =
+      List.iter
+        (fun path ->
+          let json = Yojson.Safe.from_file path in
+          Hashtbl.add table path (of_json json))
+        json_paths
+    in
+    table
+  in
+  let source_files = read_table Filenames.sources_dir SourceFiles.t_of_yojson in
+  let call_graphs =
+    read_table Filenames.call_graphs_dir CallGraph.t_of_yojson
+  in
+  (source_files, call_graphs)
+
+let write_json json ?dirname filename =
+  let dir_path =
+    Option.fold ~none:(results_dir ())
+      ~some:(fun dirname ->
+        let dir_path = Filename.concat (results_dir ()) dirname in
+        Io_utils.safe_mkdir dir_path;
+        dir_path)
+      dirname
+  in
+  let json_path = Filename.concat dir_path filename in
   let channel = open_out json_path in
   Yojson.Safe.pretty_to_channel ~std:true channel json;
   close_out channel
@@ -85,3 +117,16 @@ let write_biabduction_results sources call_graph ~diff results =
   write_json results_json Filenames.biabduction_results
 
 let write_symbolic_results = write_results_dir
+
+let write_bulk_symbolic_results sources_table call_graph_table =
+  let write_table table dirname to_json =
+    Hashtbl.iter
+      (fun test_path results ->
+        let test_name = Filename.basename (Filename.chop_extension test_path) in
+        write_json (to_json results) ~dirname (test_name ^ ".json"))
+      table
+  in
+  delete_results_dir ();
+  create_results_dir ();
+  write_table sources_table Filenames.sources_dir SourceFiles.yojson_of_t;
+  write_table call_graph_table Filenames.call_graphs_dir CallGraph.yojson_of_t

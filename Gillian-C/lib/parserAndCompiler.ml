@@ -100,9 +100,8 @@ module TargetLangOptions = struct
           in
           c_files @ get_c_paths rest
     in
-    let c_source_paths = get_c_paths source_dirs in
     Config.include_dirs := include_dirs;
-    Config.source_paths := c_source_paths;
+    Config.source_paths := get_c_paths source_dirs;
     Config.burn_csm := burn_csm;
     Config.hide_genv := hide_genv;
     Config.warnings := warnings;

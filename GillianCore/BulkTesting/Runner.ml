@@ -133,6 +133,11 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
       test_table
 
   let run_all ~test_suite_path =
+    let _, prev_call_graphs = ResultsDir.read_bulk_symbolic_results () in
+    Hashtbl.iter
+      (fun path call_graph ->
+        Fmt.pr "call graph for %s:\n%a\n@?" path CallGraph.pp call_graph)
+      prev_call_graphs;
     let start_time = Sys.time () in
     let list_files =
       List.filter Suite.filter_source (Utils.Io_utils.get_files test_suite_path)
@@ -142,9 +147,10 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
     let () = register_tests list_files in
     let () = compile_tests () in
     let cur_time = Sys.time () in
-    Fmt.pr "Time to compile all: %f\n@?" (cur_time -. start_time);
+    Fmt.pr "Time to compile all: %.3fs\n@?" (cur_time -. start_time);
     let () = register_expectations () in
-    Backend.run ()
+    Backend.run ();
+    ResultsDir.write_bulk_symbolic_results cur_source_files cur_call_graphs
 end
 
 type t = (module S)
