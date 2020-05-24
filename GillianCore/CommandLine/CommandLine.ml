@@ -317,7 +317,7 @@ struct
              (fun x -> x)
              prog "main" [] (SState.init None))
       in
-      if incremental && prev_results_exist () then (
+      if incremental && prev_results_exist () then
         (* Only re-run program if transitive callees of main proc have changed *)
         let cur_source_files =
           match source_files with
@@ -338,7 +338,8 @@ struct
           let () = run_main prog in
           let cur_call_graph = SInterpreter.call_graph in
           let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
-          write_symbolic_results cur_source_files cur_call_graph ~diff )
+          write_symbolic_results cur_source_files cur_call_graph ~diff
+        else write_symbolic_results cur_source_files prev_call_graph ~diff:""
       else
         (* Always re-run program *)
         let cur_source_files =
@@ -618,15 +619,15 @@ struct
         let docv = "PATH" in
         Arg.(required & pos 0 (some file) None & info [] ~docv ~doc)
       in
-      let run path npaf () =
+      let run path npaf incremental () =
         let () = Config.current_exec_mode := exec_mode in
         let () = PC.initialize exec_mode in
         let () = Config.bulk_print_all_failures := not npaf in
         let () = Logging.Mode.set_mode Disabled in
         let () = Printexc.record_backtrace false in
-        Runner.run_all runner path
+        Runner.run_all runner path incremental
       in
-      let run_t = Term.(const run $ path_t $ no_print_failures) in
+      let run_t = Term.(const run $ path_t $ no_print_failures $ incremental) in
       let run_info =
         let doc = "Executes a predefined test-suite" in
         let man =

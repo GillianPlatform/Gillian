@@ -7,7 +7,7 @@ module Filenames = struct
 
   let call_graph = "call_graph.json"
 
-  let call_graphs_dir = "call_graphs"
+  let call_graphs_dir = "call-graphs"
 
   let verif_results = "verif_results.json"
 
@@ -66,8 +66,9 @@ let read_bulk_symbolic_results () =
     let () =
       List.iter
         (fun path ->
+          let test_name = Filename.basename (Filename.chop_extension path) in
           let json = Yojson.Safe.from_file path in
-          Hashtbl.add table path (of_json json))
+          Hashtbl.add table test_name (of_json json))
         json_paths
     in
     table
@@ -92,13 +93,13 @@ let write_json json ?dirname filename =
   Yojson.Safe.pretty_to_channel ~std:true channel json;
   close_out channel
 
+let write_str str filename =
+  let out_path = Filename.concat (results_dir ()) filename in
+  let channel = open_out out_path in
+  Printf.fprintf channel "%s" str;
+  close_out channel
+
 let write_results_dir sources call_graph ~diff =
-  let write_str str filename =
-    let out_path = Filename.concat (results_dir ()) filename in
-    let channel = open_out out_path in
-    Printf.fprintf channel "%s" str;
-    close_out channel
-  in
   delete_results_dir ();
   create_results_dir ();
   write_json (SourceFiles.yojson_of_t sources) Filenames.sources;
@@ -121,12 +122,12 @@ let write_symbolic_results = write_results_dir
 let write_bulk_symbolic_results sources_table call_graph_table =
   let write_table table dirname to_json =
     Hashtbl.iter
-      (fun test_path results ->
-        let test_name = Filename.basename (Filename.chop_extension test_path) in
+      (fun test_name results ->
         write_json (to_json results) ~dirname (test_name ^ ".json"))
       table
   in
   delete_results_dir ();
   create_results_dir ();
   write_table sources_table Filenames.sources_dir SourceFiles.yojson_of_t;
-  write_table call_graph_table Filenames.call_graphs_dir CallGraph.yojson_of_t
+  write_table call_graph_table Filenames.call_graphs_dir CallGraph.yojson_of_t;
+  write_str (ExecMode.to_string !Config.current_exec_mode) Filenames.exec_mode

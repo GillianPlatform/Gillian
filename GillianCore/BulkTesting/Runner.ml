@@ -3,7 +3,7 @@ module type S = sig
 
   val exec_mode : ExecMode.t
 
-  val run_all : test_suite_path:string -> unit
+  val run_all : test_suite_path:string -> incremental:bool -> unit
 end
 
 module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
@@ -33,8 +33,8 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
 
   let cur_call_graphs = Hashtbl.create Config.small_tbl_size
 
-  (** The test_table maps category to category tables.
-      A category table maps file names to tests *)
+  (** The [test_table] maps categories to category tables. A category table maps
+      file paths to tests. *)
   let test_table :
       ( Suite.category,
         (string, (Suite.info, Suite.category) Test.t) Hashtbl.t )
@@ -72,6 +72,9 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
         (ext, fun_with_exn))
       oi
 
+  let get_test_filename (test : (Suite.info, Suite.category) Test.t) =
+    Filename.basename (Filename.chop_extension test.path)
+
   let compile_tests () =
     let open Outcome in
     let tests =
@@ -96,11 +99,48 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
               let prog = Gil_parsing.eprog_to_prog ~other_imports e_prog in
               (Ok prog, Some progs.source_files)
         in
+        let filename = get_test_filename test in
         Hashtbl.add compilation_results test.path compilation_res;
         Option.fold ~none:()
-          ~some:(fun files -> Hashtbl.add cur_source_files test.path files)
+          ~some:(fun files -> Hashtbl.add cur_source_files filename files)
           source_files)
       tests
+
+  let filter_tests () =
+    let open Containers in
+    let () = Fmt.pr "Determining minimum number of tests to run...\n@?" in
+    let source_files, call_graphs = ResultsDir.read_bulk_symbolic_results () in
+    let skipped = ref 0 in
+    let filter_cat_table =
+      Hashtbl.filter_map_inplace (fun test_path test ->
+          match Hashtbl.find compilation_results test_path with
+          | Error _ -> Some test
+          | Ok prog -> (
+              let filename = get_test_filename test in
+              let cur_source_files = Hashtbl.find cur_source_files filename in
+              let prev_sources_opt = Hashtbl.find_opt source_files filename in
+              let prev_graph_opt = Hashtbl.find_opt call_graphs filename in
+              match (prev_sources_opt, prev_graph_opt) with
+              | Some prev_source_files, Some prev_call_graph ->
+                  let proc_changes =
+                    ChangeTracker.get_changes prog ~prev_source_files
+                      ~prev_call_graph ~cur_source_files
+                  in
+                  let changed_procs =
+                    SS.of_list
+                      ( proc_changes.changed_procs @ proc_changes.new_procs
+                      @ proc_changes.dependent_procs )
+                  in
+                  if SS.mem "main" changed_procs then Some test
+                  else (
+                    (* Keep previous call graph *)
+                    Hashtbl.add cur_call_graphs filename prev_call_graph;
+                    skipped := !skipped + 1;
+                    None )
+              | _ -> Some test ))
+    in
+    Hashtbl.iter (fun _ cat_table -> filter_cat_table cat_table) test_table;
+    Fmt.pr "Skipping %d test(s)\n@?" !skipped
 
   let execute_test expect test =
     let open Outcome in
@@ -109,8 +149,9 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
       Backend.check_not_throw expect (fun () ->
           let () = Allocators.reset_all () in
           let () = CInterpreter.reset () in
+          let filename = get_test_filename test in
           let res =
-            match Hashtbl.find compilation_results test.Test.path with
+            match Hashtbl.find compilation_results test.path with
             | Error err -> ParseAndCompileError err
             | Ok prog   -> (
                 match UP.init_prog prog with
@@ -119,7 +160,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
                     let ret = CInterpreter.evaluate_prog prog in
                     let call_graph = CInterpreter.call_graph in
                     let copy = CallGraph.merge (CallGraph.make ()) call_graph in
-                    Hashtbl.add cur_call_graphs test.path copy;
+                    Hashtbl.add cur_call_graphs filename copy;
                     FinishedExec ret )
           in
           result := res)
@@ -132,25 +173,26 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
          ~expectation:Expectations.expectation ~test_runner:execute_test)
       test_table
 
-  let run_all ~test_suite_path =
-    let _, prev_call_graphs = ResultsDir.read_bulk_symbolic_results () in
-    Hashtbl.iter
-      (fun path call_graph ->
-        Fmt.pr "call graph for %s:\n%a\n@?" path CallGraph.pp call_graph)
-      prev_call_graphs;
+  let run_all ~test_suite_path ~incremental =
+    let is_wpst = ExecMode.symbolic_exec exec_mode in
     let start_time = Sys.time () in
     let list_files =
       List.filter Suite.filter_source (Utils.Io_utils.get_files test_suite_path)
     in
-    Fmt.pr "Registering and compiling tests...\n@?";
+    let () = Fmt.pr "Registering and compiling tests...\n@?" in
     let () = Suite.init_suite list_files in
     let () = register_tests list_files in
     let () = compile_tests () in
     let cur_time = Sys.time () in
-    Fmt.pr "Time to compile all: %.3fs\n@?" (cur_time -. start_time);
+    let () = Fmt.pr "Time to compile all: %.3fs\n@?" (cur_time -. start_time) in
+    let () =
+      if is_wpst && incremental && ResultsDir.prev_results_exist () then
+        filter_tests ()
+    in
     let () = register_expectations () in
-    Backend.run ();
-    ResultsDir.write_bulk_symbolic_results cur_source_files cur_call_graphs
+    let () = Backend.run () in
+    if is_wpst then
+      ResultsDir.write_bulk_symbolic_results cur_source_files cur_call_graphs
 end
 
 type t = (module S)
