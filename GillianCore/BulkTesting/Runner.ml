@@ -17,15 +17,14 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
                    and type outcome = Outcome.t) : S = struct
   module Backend = Backend (Outcome) (Suite)
   module PC = Outcome.ParserAndCompiler
+  module Interpreter =
+    GInterpreter.Make (Outcome.Val) (Outcome.Subst) (Outcome.Store)
+      (Outcome.State)
+      (Outcome.External)
 
   let cmd_name = Suite.cmd_name
 
   let exec_mode = Suite.exec_mode
-
-  module CInterpreter =
-    GInterpreter.Make (Outcome.Val) (Outcome.Subst) (Outcome.Store)
-      (Outcome.State)
-      (Outcome.External)
 
   let compilation_results = Hashtbl.create Config.small_tbl_size
 
@@ -148,7 +147,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
     let () =
       Backend.check_not_throw expect (fun () ->
           let () = Allocators.reset_all () in
-          let () = CInterpreter.reset () in
+          let () = Interpreter.reset () in
           let filename = get_test_filename test in
           let res =
             match Hashtbl.find compilation_results test.path with
@@ -157,8 +156,8 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
                 match UP.init_prog prog with
                 | Error _ -> failwith "Failed to create unification plan"
                 | Ok prog ->
-                    let ret = CInterpreter.evaluate_prog prog in
-                    let call_graph = CInterpreter.call_graph in
+                    let ret = Interpreter.evaluate_prog prog in
+                    let call_graph = Interpreter.call_graph in
                     let copy = CallGraph.merge (CallGraph.make ()) call_graph in
                     Hashtbl.add cur_call_graphs filename copy;
                     FinishedExec ret )
