@@ -11,34 +11,9 @@ let float_of_z z = float_of_int (Camlcoq.Z.to_int z)
 
 let z_of_float z = Camlcoq.Z.of_sint (int_of_float z)
 
-let string_of_chunk chunk =
-  let open AST in
-  match chunk with
-  | Mint8signed    -> "int8signed"
-  | Mint8unsigned  -> "int8unsigned"
-  | Mint16signed   -> "int16signed"
-  | Mint16unsigned -> "int16unsigned"
-  | Mint32         -> "int32"
-  | Mint64         -> "int64"
-  | Mfloat32       -> "float32"
-  | Mfloat64       -> "float64"
-  | Many32         -> "any32"
-  | Many64         -> "any64"
+let string_of_chunk = Chunk.to_string
 
-let chunk_of_string str =
-  let open AST in
-  match str with
-  | "int8signed"    -> Mint8signed
-  | "int8unsigned"  -> Mint8unsigned
-  | "int16signed"   -> Mint16signed
-  | "int16unsigned" -> Mint16unsigned
-  | "int32"         -> Mint32
-  | "int64"         -> Mint64
-  | "float32"       -> Mfloat32
-  | "float64"       -> Mfloat64
-  | "any32"         -> Many32
-  | "any64"         -> Many64
-  | _               -> failwith ("unknown chunk : " ^ str)
+let chunk_of_string = Chunk.of_string
 
 let loc_name_of_block block =
   let int_block = Camlcoq.P.to_int block in
