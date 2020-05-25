@@ -20,13 +20,13 @@ let parse start lexbuf =
       let unexpected_token = lexeme lexbuf in
       let message =
         Printf.sprintf
-          "unexpected token : %s at loc %i:%i-%i:%i while reading %s"
+          "unexpected token: %s at loc %i:%i-%i:%i while reading %s"
           unexpected_token loc_start.pos_lnum (col loc_start) loc_end.pos_lnum
           (col loc_end)
           ( if String.equal loc_start.pos_fname "" then "a string"
           else loc_start.pos_fname )
       in
-      failwith ("Parser Error, " ^ message)
+      failwith ("Parsing error: " ^ message)
 
 let parse_from_string start str =
   let lexbuf = from_string str in
@@ -34,11 +34,11 @@ let parse_from_string start str =
   try parse start lexbuf with
   | Failure msg ->
       failwith
-        (Printf.sprintf "Failed while trying to parse the string :@\n%s@\n%s"
-           str msg)
+        (Printf.sprintf "Failed while trying to parse the string:@\n%s@\n%s" str
+           msg)
   | _           ->
       failwith
-        (Printf.sprintf "Unkown parsing error while parsing the string :@\n%s"
+        (Printf.sprintf "Unkown parsing error while parsing the string:@\n%s"
            str)
 
 let parse_eprog_from_string : string -> (Annot.t, string) Prog.t =
@@ -51,56 +51,72 @@ let trans_procs procs path internal_file =
   let procs' = Hashtbl.create Config.small_tbl_size in
   let () =
     Hashtbl.iter
-      (fun pname (proc : (Annot.t, string) Proc.t) ->
+      (fun name (proc : (Annot.t, string) Proc.t) ->
         let proc_source_path =
-          if SS.mem pname !Parser_state.procs_with_no_paths then None
+          if SS.mem name !Parser_state.procs_with_no_paths then None
           else Some path
         in
         let proc_internal = proc.proc_internal || internal_file in
-        Hashtbl.add procs' pname { proc with proc_source_path; proc_internal })
+        Hashtbl.add procs' name { proc with proc_source_path; proc_internal })
       procs
   in
   procs'
 
 let trans_preds preds path internal_file =
   let preds' = Hashtbl.create Config.small_tbl_size in
-  let internal_file = !Parser_state.internal_file in
   let () =
     Hashtbl.iter
-      (fun pname (pred : Pred.t) ->
+      (fun name (pred : Pred.t) ->
         let pred_source_path =
-          if SS.mem pname !Parser_state.preds_with_no_paths then None
+          if SS.mem name !Parser_state.preds_with_no_paths then None
           else Some path
         in
         let pred_internal = pred.pred_internal || internal_file in
-        Hashtbl.add preds' pname { pred with pred_source_path; pred_internal })
+        Hashtbl.add preds' name { pred with pred_source_path; pred_internal })
       preds
   in
   preds'
 
+let trans_lemmas lemmas path internal_file =
+  let lemmas' = Hashtbl.create Config.small_tbl_size in
+  let () =
+    Hashtbl.iter
+      (fun name (lemma : Lemma.t) ->
+        let lemma_source_path =
+          if SS.mem name !Parser_state.lemmas_with_no_paths then None
+          else Some path
+        in
+        let lemma_internal = lemma.lemma_internal || internal_file in
+        Hashtbl.add lemmas' name
+          { lemma with lemma_source_path; lemma_internal })
+      lemmas
+  in
+  lemmas'
+
 let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
   let f path =
-    let extension = List.hd (List.rev (Str.split (Str.regexp "\\.") path)) in
-    let file_previously_normalised = String.equal "ngil" extension in
-    Config.previously_normalised := file_previously_normalised;
     (* Check that the file is of a valid type *)
-    ( match file_previously_normalised || String.equal "gil" extension with
-    | true  -> ()
-    | false ->
-        raise
-          (Failure
-             (Printf.sprintf "Failed to import %s: not a .gil or .ngil file."
-                path)) );
-    let inx = open_in path in
-    let lexbuf = Lexing.from_channel inx in
-    lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = path };
+    let extension = Filename.extension path in
+    let prev_normalised = String.equal extension "ngil" in
+    let () = Config.previously_normalised := prev_normalised in
+    let () =
+      if not (prev_normalised || String.equal extension "gil") then
+        failwith (Printf.sprintf "Error: %s is not a .gil or .ngil file" path)
+    in
+    (* Parse file *)
+    let in_channel = open_in path in
+    let lexbuf = Lexing.from_channel in_channel in
+    let () = lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = path } in
     let prog = parse GIL_Parser.gmain_target lexbuf in
-    close_in inx;
+    let () = close_in in_channel in
+
+    (* Correctly label components that have @internal and/or @nopath directives *)
     let internal_file = !Parser_state.internal_file in
     let procs = trans_procs prog.procs path internal_file in
     let preds = trans_preds prog.preds path internal_file in
+    let lemmas = trans_lemmas prog.lemmas path internal_file in
     Parser_state.reset ();
-    { prog with procs; preds }
+    { prog with procs; preds; lemmas }
   in
   L.with_normal_phase "Program parsing" (fun () -> f path)
 
