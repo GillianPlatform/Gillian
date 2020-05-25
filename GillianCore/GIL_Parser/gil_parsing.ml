@@ -9,6 +9,17 @@ end)
 
 module SS = Containers.SS
 
+(** Used to avoid redundant parsing. *)
+let cached_progs = Hashtbl.create Config.small_tbl_size
+
+let cache_gil_prog path prog = Hashtbl.add cached_progs path prog
+
+let cache_labelled_progs (progs : (string * (Annot.t, string) Prog.t) list) =
+  List.iter
+    (fun (path, prog) ->
+      if not (Hashtbl.mem cached_progs path) then cache_gil_prog path prog)
+    progs
+
 let col pos = pos.pos_cnum - pos.pos_bol + 1
 
 let parse start lexbuf =
@@ -120,16 +131,6 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
   in
   L.with_normal_phase "Program parsing" (fun () -> f path)
 
-let cached_progs = Hashtbl.create Config.small_tbl_size
-
-let cache_gil_prog path prog = Hashtbl.add cached_progs path prog
-
-let cache_labelled_progs (progs : (string * (Annot.t, string) Prog.t) list) =
-  List.iter
-    (fun (path, prog) ->
-      if not (Hashtbl.mem cached_progs path) then cache_gil_prog path prog)
-    progs
-
 let resolve_path path =
   let lookup_paths = "." :: Config.get_runtime_paths () in
   let rec find fname paths =
@@ -215,17 +216,7 @@ let resolve_imports
   in
   resolve program.imports SS.empty
 
-(** Converts a string-labelled [Prog.t] to an index-labelled [Prog.t], 
-    resolving the imports in the meantime. The parameter [other_imports] is an
-    association list that maps extensions to a parser and compiler. For example,
-    it is possible to import a JSIL file in a GIL program using 
-    [import "file.jsil";]. In order to do so, the [other_imports] list should
-    contain the tuple [("jsil", parse_and_compile_jsil_file)] where 
-    [parse_and_compile_jsil_file] is a function that takes a file path, parses 
-    the file as a JSIL program, and compiles this to a GIL program. *)
-let eprog_to_prog
-    ~(other_imports : (string * (string -> (Annot.t, string) Prog.t)) list)
-    (ext_program : (Annot.t, string) Prog.t) : (Annot.t, int) Prog.t =
+let eprog_to_prog ~other_imports ext_program =
   let open Prog in
   let () = resolve_imports ext_program other_imports in
   let proc_of_ext_proc (proc : (Annot.t, string) Proc.t) :
@@ -259,34 +250,3 @@ let eprog_to_prog
   Prog.make_indexed ~lemmas:ext_program.lemmas ~preds:ext_program.preds
     ~only_specs:ext_program.only_specs ~procs ~predecessors
     ~macros:ext_program.macros ~bi_specs:ext_program.bi_specs ()
-
-(** ----------------------------------------------------
-    Parse a line_numbers file.
-    Proc: proc_name
-    (0, 0)
-    ...
-    ----------------------------------------------------- *)
-let parse_line_numbers (ln_str : string) : (string * int, int * bool) Hashtbl.t
-    =
-  let strs = Str.split (Str.regexp_string "Proc: ") ln_str in
-  let line_info = Hashtbl.create Config.big_tbl_size in
-  List.iter
-    (fun str ->
-      let memory = Hashtbl.create Config.small_tbl_size in
-      let index = String.index str '\n' in
-      let proc_name = String.sub str 0 index in
-      let proc_line_info =
-        String.sub str (index + 1) (String.length str - (index + 1))
-      in
-      let lines = Str.split (Str.regexp_string "\n") proc_line_info in
-      List.iter
-        (fun line ->
-          Scanf.sscanf line "(%d, %d)" (fun x y ->
-              if Hashtbl.mem memory y then
-                Hashtbl.replace line_info (proc_name, x) (y, false)
-              else (
-                Hashtbl.replace memory y true;
-                Hashtbl.replace line_info (proc_name, x) (y, true) )))
-        lines)
-    strs;
-  line_info
