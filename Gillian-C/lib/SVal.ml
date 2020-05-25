@@ -13,6 +13,17 @@ type t =
   | SVsingle   of Expr.t
   | SVfloat    of Expr.t
 
+let equal a b =
+  match (a, b) with
+  | SUndefined, SUndefined -> true
+  | Sptr (la, oa), Sptr (lb, ob) when String.equal la lb && Expr.equal oa ob ->
+      true
+  | SVint a, SVint b when Expr.equal a b -> true
+  | SVlong a, SVlong b when Expr.equal a b -> true
+  | SVsingle a, SVsingle b when Expr.equal a b -> true
+  | SVfloat a, SVfloat b when Expr.equal a b -> true
+  | _, _ -> false
+
 type typ = Compcert.AST.typ =
   | Tint
   | Tfloat
