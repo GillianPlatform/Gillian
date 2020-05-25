@@ -1,4 +1,5 @@
 module Mode = Mode
+module Phase = Phase
 module Report = Report
 module Reporter = Reporter
 module FileReporter = FileReporter

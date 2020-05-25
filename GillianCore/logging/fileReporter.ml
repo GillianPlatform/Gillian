@@ -37,8 +37,7 @@ class virtual ['a] t =
           Report.PackedPP.pf self#formatter msgf;
           Format.fprintf self#formatter "@,@?"
       | Phase phase ->
-          Format.fprintf self#formatter "*** Phase %s ***@,@?"
-          @@ Report.string_of_phase phase
+          Format.fprintf self#formatter "*** Phase %s ***@,@?" phase
 
     method virtual private log_specific : 'a -> unit
 
