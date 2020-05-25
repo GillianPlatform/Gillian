@@ -70,7 +70,6 @@
   "devDependencies": {
     "ocaml": "4.8.1000",
     "@opam/ocamlfind": "1.8.1",
-    "@opam/cinaps": "v0.13.0",
     "@opam/cmitomli": "1.0.0",
     "@opam/fileutils": "0.6.2",
     "@opam/utop": "*",

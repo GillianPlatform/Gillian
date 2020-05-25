@@ -9,7 +9,7 @@ depexts: [
   ["python2.7"] {os-family = "debian"}
   ["python27"] {os-distribution = "nixos"}
   ["python"] {os-distribution = "alpine"}
-  ["python"] {os-distribution = "centos"}
+  ["python2"] {os-distribution = "centos"}
   ["python2"] {os-distribution = "fedora"}
   ["python2"] {os-distribution = "arch"}
   ["python"] {os-family = "suse"}
