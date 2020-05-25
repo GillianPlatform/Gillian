@@ -35,8 +35,12 @@ let create_compilation_result path prog =
   { gil_progs = [ (gil_path, prog) ]; source_files }
 
 let parse_and_compile_files files =
-  let path = List.hd files in
-  Ok (create_compilation_result path (compile path (parse_file path)))
+  let f files =
+    let path = List.hd files in
+    Ok (create_compilation_result path (compile path (parse_file path)))
+  in
+  Logging.with_normal_phase "Program parsing and compilation" (fun () ->
+      f files)
 
 let other_imports = []
 

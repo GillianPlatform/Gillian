@@ -569,63 +569,70 @@ struct
       (prog : (Annot.t, int) Prog.t)
       (incremental : bool)
       (source_files : SourceFiles.t option) : unit =
-    let open ResultsDir in
-    let open ChangeTracker in
-    if incremental && prev_results_exist () then
-      (* Only verify changed procedures and lemmas *)
-      let cur_source_files =
-        match source_files with
-        | Some files -> files
-        | None       -> failwith "Cannot use -a in incremental mode"
-      in
-      let source_files, call_graph, results = read_verif_results () in
-      let proc_changes, lemma_changes =
-        get_verif_changes prog source_files call_graph cur_source_files
-      in
-      let procs_to_prune =
-        proc_changes.changed_procs @ proc_changes.deleted_procs
-        @ proc_changes.dependent_procs
-      in
-      let lemmas_to_prune =
-        lemma_changes.changed_lemmas @ lemma_changes.deleted_lemmas
-        @ lemma_changes.dependent_lemmas
-      in
-      let () = CallGraph.prune_procs call_graph procs_to_prune in
-      let () = CallGraph.prune_lemmas call_graph lemmas_to_prune in
-      let () =
-        VerificationResults.prune results (procs_to_prune @ lemmas_to_prune)
-      in
-      let procs_to_verify =
-        SS.of_list
-          ( proc_changes.changed_procs @ proc_changes.new_procs
-          @ proc_changes.dependent_procs )
-      in
-      let lemmas_to_verify =
-        SS.of_list
-          ( lemma_changes.changed_lemmas @ lemma_changes.new_lemmas
-          @ lemma_changes.dependent_lemmas )
-      in
-      let () =
-        verify_procs ~prev_results:results prog procs_to_verify lemmas_to_verify
-      in
-      let cur_call_graph = SAInterpreter.call_graph in
-      let cur_results = global_results in
-      let call_graph = CallGraph.merge call_graph cur_call_graph in
-      let results = VerificationResults.merge results cur_results in
-      let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
-      write_verif_results cur_source_files call_graph ~diff results
-    else
-      (* Analyse all procedures and lemmas *)
-      let cur_source_files =
-        Option.value ~default:(SourceFiles.make ()) source_files
-      in
-      let procs_to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
-      let lemmas_to_verify =
-        SS.of_list (Prog.get_noninternal_lemma_names prog)
-      in
-      let () = verify_procs prog procs_to_verify lemmas_to_verify in
-      let call_graph = SAInterpreter.call_graph in
-      write_verif_results cur_source_files call_graph ~diff:"" global_results
+    let f prog incremental source_files =
+      let open ResultsDir in
+      let open ChangeTracker in
+      if incremental && prev_results_exist () then
+        (* Only verify changed procedures and lemmas *)
+        let cur_source_files =
+          match source_files with
+          | Some files -> files
+          | None       -> failwith "Cannot use -a in incremental mode"
+        in
+        let source_files, call_graph, results = read_verif_results () in
+        let proc_changes, lemma_changes =
+          get_verif_changes prog source_files call_graph cur_source_files
+        in
+        let procs_to_prune =
+          proc_changes.changed_procs @ proc_changes.deleted_procs
+          @ proc_changes.dependent_procs
+        in
+        let lemmas_to_prune =
+          lemma_changes.changed_lemmas @ lemma_changes.deleted_lemmas
+          @ lemma_changes.dependent_lemmas
+        in
+        let () = CallGraph.prune_procs call_graph procs_to_prune in
+        let () = CallGraph.prune_lemmas call_graph lemmas_to_prune in
+        let () =
+          VerificationResults.prune results (procs_to_prune @ lemmas_to_prune)
+        in
+        let procs_to_verify =
+          SS.of_list
+            ( proc_changes.changed_procs @ proc_changes.new_procs
+            @ proc_changes.dependent_procs )
+        in
+        let lemmas_to_verify =
+          SS.of_list
+            ( lemma_changes.changed_lemmas @ lemma_changes.new_lemmas
+            @ lemma_changes.dependent_lemmas )
+        in
+        let () =
+          verify_procs ~prev_results:results prog procs_to_verify
+            lemmas_to_verify
+        in
+        let cur_call_graph = SAInterpreter.call_graph in
+        let cur_results = global_results in
+        let call_graph = CallGraph.merge call_graph cur_call_graph in
+        let results = VerificationResults.merge results cur_results in
+        let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
+        write_verif_results cur_source_files call_graph ~diff results
+      else
+        (* Analyse all procedures and lemmas *)
+        let cur_source_files =
+          Option.value ~default:(SourceFiles.make ()) source_files
+        in
+        let procs_to_verify =
+          SS.of_list (Prog.get_noninternal_proc_names prog)
+        in
+        let lemmas_to_verify =
+          SS.of_list (Prog.get_noninternal_lemma_names prog)
+        in
+        let () = verify_procs prog procs_to_verify lemmas_to_verify in
+        let call_graph = SAInterpreter.call_graph in
+        write_verif_results cur_source_files call_graph ~diff:"" global_results
+    in
+    L.with_normal_phase "Program verification" (fun () ->
+        f prog incremental source_files)
 end
 
 module From_scratch (SMemory : SMemory.S) (External : External.S) = struct

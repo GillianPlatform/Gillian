@@ -79,27 +79,30 @@ let trans_preds preds path internal_file =
   preds'
 
 let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
-  let extension = List.hd (List.rev (Str.split (Str.regexp "\\.") path)) in
-  let file_previously_normalised = String.equal "ngil" extension in
-  Config.previously_normalised := file_previously_normalised;
-  (* Check that the file is of a valid type *)
-  ( match file_previously_normalised || String.equal "gil" extension with
-  | true  -> ()
-  | false ->
-      raise
-        (Failure
-           (Printf.sprintf "Failed to import %s: not a .gil or .ngil file."
-              path)) );
-  let inx = open_in path in
-  let lexbuf = Lexing.from_channel inx in
-  lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = path };
-  let prog = parse GIL_Parser.gmain_target lexbuf in
-  close_in inx;
-  let internal_file = !Parser_state.internal_file in
-  let procs = trans_procs prog.procs path internal_file in
-  let preds = trans_preds prog.preds path internal_file in
-  Parser_state.reset ();
-  { prog with procs; preds }
+  let f path =
+    let extension = List.hd (List.rev (Str.split (Str.regexp "\\.") path)) in
+    let file_previously_normalised = String.equal "ngil" extension in
+    Config.previously_normalised := file_previously_normalised;
+    (* Check that the file is of a valid type *)
+    ( match file_previously_normalised || String.equal "gil" extension with
+    | true  -> ()
+    | false ->
+        raise
+          (Failure
+             (Printf.sprintf "Failed to import %s: not a .gil or .ngil file."
+                path)) );
+    let inx = open_in path in
+    let lexbuf = Lexing.from_channel inx in
+    lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = path };
+    let prog = parse GIL_Parser.gmain_target lexbuf in
+    close_in inx;
+    let internal_file = !Parser_state.internal_file in
+    let procs = trans_procs prog.procs path internal_file in
+    let preds = trans_preds prog.preds path internal_file in
+    Parser_state.reset ();
+    { prog with procs; preds }
+  in
+  L.with_normal_phase "Program parsing" (fun () -> f path)
 
 let cached_progs = Hashtbl.create Config.small_tbl_size
 
