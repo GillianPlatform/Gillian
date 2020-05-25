@@ -1,16 +1,18 @@
+![CI](https://github.com/GillianPlatform/Gillian/workflows/CI/badge.svg?branch=master)
+
 # The Gillian Platform
 
 ## Structure
 
-This folder contain :
+The project contains:
 
 ```bash
 .
-├── Gillian-C # Instatiation of Gillian for CompCert-C
-├── Gillian-JS # Instantiation of Gillian for JS
-├── GillianCore # Contains the Gillian Library
-└── wisl # Instantiation of Gillian to a small while language
-         # for research and teaching.
+├── Gillian-C   # Instantiation of Gillian for CompCert-C.
+├── Gillian-JS  # Instantiation of Gillian for ES5 JavaScript.
+├── GillianCore # The Gillian library.
+└── wisl        # Instantiation of Gillian for a small While language
+                # for research and teaching.
 ```
 
 ## Documentation
@@ -18,7 +20,7 @@ This folder contain :
 - For using Gillian as a library to build your analysis tool, please follow [these instructions](https://gillianplatform.github.io/docs/start)
 - For Gillian-JS, please follow [these instructions](https://gillianplatform.github.io/docs/js/intro)
 - For Gillian-C, please follow [these instructions](https://gillianplatform.github.io/docs/c/intro)
-- For developing The Gillian Platform or playing with its code, please follow [these instructions](https://gillianplatform.github.io/docs/development/install)
+- For developing the Gillian platform or playing with its code, please follow [these instructions](https://gillianplatform.github.io/docs/development/install)
 
 
 # License
