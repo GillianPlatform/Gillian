@@ -9,9 +9,8 @@ type t = Compcert.AST.memory_chunk =
   | Mfloat64
   | Many32
   | Many64
-  
-let of_string = 
-  function
+
+let of_string = function
   | "int8signed"    -> Mint8signed
   | "int8unsigned"  -> Mint8unsigned
   | "int16signed"   -> Mint16signed
@@ -22,10 +21,9 @@ let of_string =
   | "float64"       -> Mfloat64
   | "any32"         -> Many32
   | "any64"         -> Many64
-  | str               -> failwith ("unknown chunk : " ^ str)
-  
-let to_string =
-  function 
+  | str             -> failwith ("unknown chunk : " ^ str)
+
+let to_string = function
   | Mint8signed    -> "int8signed"
   | Mint8unsigned  -> "int8unsigned"
   | Mint16signed   -> "int16signed"
@@ -36,9 +34,8 @@ let to_string =
   | Mfloat64       -> "float64"
   | Many32         -> "any32"
   | Many64         -> "any64"
-  
-let pp fmt chunk =
-  Fmt.pf fmt "%s" (to_string chunk)
+
+let pp fmt chunk = Fmt.pf fmt "%s" (to_string chunk)
 
 let type_of = Compcert.AST.type_of_chunk
 
