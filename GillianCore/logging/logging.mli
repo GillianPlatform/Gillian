@@ -12,9 +12,11 @@ module Mode : sig
   val set_mode : t -> unit
 end
 
-module Report : sig
-  type phase = ParsingAndCompiling | Parsing | Preprocessing | Verification
+module Phase : sig
+  type t = string
+end
 
+module Report : sig
   type severity = Info | Log | Success | Error | Warning
 
   type 'a t
@@ -82,16 +84,23 @@ val fail : string -> 'a
 (** Output the strings in every file and prints it to stdout *)
 val print_to_all : string -> unit
 
-val normal_phase :
-  ?title:string -> ?severity:Report.severity -> Report.phase -> unit
+val normal_phase : ?title:string -> ?severity:Report.severity -> Phase.t -> unit
 
 val verbose_phase :
-  ?title:string -> ?severity:Report.severity -> Report.phase -> unit
+  ?title:string -> ?severity:Report.severity -> Phase.t -> unit
 
-val tmi_phase :
-  ?title:string -> ?severity:Report.severity -> Report.phase -> unit
+val tmi_phase : ?title:string -> ?severity:Report.severity -> Phase.t -> unit
 
-val end_phase : Report.phase -> unit
+val end_phase : Phase.t -> unit
+
+val with_normal_phase :
+  ?title:string -> ?severity:Report.severity -> Phase.t -> (unit -> 'a) -> 'a
+
+val with_verbose_phase :
+  ?title:string -> ?severity:Report.severity -> Phase.t -> (unit -> 'a) -> 'a
+
+val with_tmi_phase :
+  ?title:string -> ?severity:Report.severity -> Phase.t -> (unit -> 'a) -> 'a
 
 module Make : functor
   (TargetLang : sig
@@ -112,81 +121,3 @@ module Make : functor
 
   val wrap_up : unit -> unit
 end
-
-(*$
-  let () =
-    print_newline ();
-    let dec i =
-      let args =
-        let rec aux = function
-          | j when j == i + 1 -> Printf.sprintf "'a%d" j
-          | j -> Printf.sprintf "'a%d -> %s" j @@ aux @@ (j + 1)
-        in
-        aux 1
-      in
-      Printf.printf
-        "val with_phase%d : Mode.level -> ?title:string -> \
-         ?severity:Report.severity -> Report.phase -> (%s) -> %s"
-        i args args;
-      print_newline ()
-    in
-    for i = 1 to 5 do
-      dec i
-    done
-*)
-val with_phase1 :
-  Mode.level ->
-  ?title:string ->
-  ?severity:Report.severity ->
-  Report.phase ->
-  ('a1 -> 'a2) ->
-  'a1 ->
-  'a2
-
-val with_phase2 :
-  Mode.level ->
-  ?title:string ->
-  ?severity:Report.severity ->
-  Report.phase ->
-  ('a1 -> 'a2 -> 'a3) ->
-  'a1 ->
-  'a2 ->
-  'a3
-
-val with_phase3 :
-  Mode.level ->
-  ?title:string ->
-  ?severity:Report.severity ->
-  Report.phase ->
-  ('a1 -> 'a2 -> 'a3 -> 'a4) ->
-  'a1 ->
-  'a2 ->
-  'a3 ->
-  'a4
-
-val with_phase4 :
-  Mode.level ->
-  ?title:string ->
-  ?severity:Report.severity ->
-  Report.phase ->
-  ('a1 -> 'a2 -> 'a3 -> 'a4 -> 'a5) ->
-  'a1 ->
-  'a2 ->
-  'a3 ->
-  'a4 ->
-  'a5
-
-val with_phase5 :
-  Mode.level ->
-  ?title:string ->
-  ?severity:Report.severity ->
-  Report.phase ->
-  ('a1 -> 'a2 -> 'a3 -> 'a4 -> 'a5 -> 'a6) ->
-  'a1 ->
-  'a2 ->
-  'a3 ->
-  'a4 ->
-  'a5 ->
-  'a6
-
-(*$*)

@@ -1,8 +1,8 @@
 type 'a t = unit -> 'a Report.t
 
-let active_parents : (Uuidm.t * Report.phase) Stack.t = Stack.create ()
+let active_parents : (Uuidm.t * Phase.t) Stack.t = Stack.create ()
 
-let all_parents : Report.phase Stack.t = Stack.create ()
+let all_parents : Phase.t Stack.t = Stack.create ()
 
 let current : Uuidm.t option ref = ref Option.none
 
@@ -38,4 +38,4 @@ let end_phase phase =
     | Some (_, p) when p == phase ->
         current := Option.some @@ fst @@ Stack.pop active_parents;
         assert (Stack.pop all_parents == phase)
-    | None | Some _ -> assert (Stack.pop all_parents == phase)
+    | None | Some _ -> assert (Stack.pop all_parents |> String.equal phase)

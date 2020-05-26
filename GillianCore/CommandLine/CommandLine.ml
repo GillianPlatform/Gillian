@@ -403,22 +403,17 @@ struct
     let process_files files already_compiled outfile_opt no_unfold incremental =
       let e_prog, source_files_opt =
         if not already_compiled then
-          let () = L.normal_phase ParsingAndCompiling in
           let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
-          let () = L.end_phase ParsingAndCompiling in
           let e_progs = progs.gil_progs in
           let () = Gil_parsing.cache_labelled_progs e_progs in
           let e_prog = List.hd (List.map snd e_progs) in
           let source_files = progs.source_files in
           (e_prog, Some source_files)
         else
-          let () = L.normal_phase Parsing in
           let e_prog = Gil_parsing.parse_eprog_from_file (List.hd files) in
-          let () = L.end_phase Parsing in
           (e_prog, None)
       in
       let () = burn_gil e_prog outfile_opt in
-      let () = L.normal_phase Preprocessing in
       (* Prog.perform_syntax_checks e_prog; *)
       let prog =
         Gil_parsing.eprog_to_prog
@@ -435,10 +430,7 @@ struct
             m "@\nProgram after logic preprocessing:@\n%a@\n" Prog.pp_indexed
               prog)
       in
-      let () = L.end_phase Preprocessing in
-      L.normal_phase Verification;
-      Verification.verify_prog prog incremental source_files_opt;
-      L.end_phase Verification
+      Verification.verify_prog prog incremental source_files_opt
 
     let verify
         files

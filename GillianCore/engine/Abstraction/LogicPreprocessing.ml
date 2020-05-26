@@ -438,30 +438,33 @@ let unfold_bispecs
     ) procs *)
 
 let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
-  let procs = prog.procs in
-  let preds = prog.preds in
-  let lemmas = prog.lemmas in
-  let onlyspecs = prog.only_specs in
+  let f (prog : ('a, int) Prog.t) unfold =
+    let procs = prog.procs in
+    let preds = prog.preds in
+    let lemmas = prog.lemmas in
+    let onlyspecs = prog.only_specs in
 
-  let procs', preds', lemmas' = explicit_param_types procs preds lemmas in
+    let procs', preds', lemmas' = explicit_param_types procs preds lemmas in
 
-  let preds'', procs'', bi_specs, lemmas'', onlyspecs' =
-    match unfold with
-    | false -> (preds', procs', prog.bi_specs, lemmas', onlyspecs)
-    | true  ->
-        let preds'', rec_info = unfold_preds preds' in
-        let procs'' = unfold_procs preds'' rec_info procs' in
-        let bi_specs = unfold_bispecs preds'' rec_info prog.bi_specs in
-        let lemmas'' = unfold_lemmas preds'' rec_info lemmas' in
-        let onlyspecs' = unfold_specs preds'' rec_info onlyspecs in
-        (* create_partial_matches procs'';  *)
-        (preds'', procs'', bi_specs, lemmas'', onlyspecs')
+    let preds'', procs'', bi_specs, lemmas'', onlyspecs' =
+      match unfold with
+      | false -> (preds', procs', prog.bi_specs, lemmas', onlyspecs)
+      | true  ->
+          let preds'', rec_info = unfold_preds preds' in
+          let procs'' = unfold_procs preds'' rec_info procs' in
+          let bi_specs = unfold_bispecs preds'' rec_info prog.bi_specs in
+          let lemmas'' = unfold_lemmas preds'' rec_info lemmas' in
+          let onlyspecs' = unfold_specs preds'' rec_info onlyspecs in
+          (* create_partial_matches procs'';  *)
+          (preds'', procs'', bi_specs, lemmas'', onlyspecs')
+    in
+    {
+      prog with
+      preds = preds'';
+      procs = procs'';
+      bi_specs;
+      lemmas = lemmas'';
+      only_specs = onlyspecs';
+    }
   in
-  {
-    prog with
-    preds = preds'';
-    procs = procs'';
-    bi_specs;
-    lemmas = lemmas'';
-    only_specs = onlyspecs';
-  }
+  L.with_normal_phase "Logic preprocessing" (fun () -> f prog unfold)

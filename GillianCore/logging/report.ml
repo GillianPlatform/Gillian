@@ -34,16 +34,7 @@ end = struct
   let t_of_yojson yojson = string_of_yojson yojson |> of_string
 end
 
-type phase = ParsingAndCompiling | Parsing | Preprocessing | Verification
-[@@deriving yojson]
-
-let string_of_phase = function
-  | ParsingAndCompiling -> "ParsingAndCompiling"
-  | Parsing             -> "Parsing"
-  | Preprocessing       -> "Preprocessing"
-  | Verification        -> "Verification"
-
-type agnostic_content = Debug of PackedPP.t | Phase of phase
+type agnostic_content = Debug of PackedPP.t | Phase of Phase.t
 [@@deriving yojson]
 
 type 'a content = Agnostic of agnostic_content | Specific of 'a
