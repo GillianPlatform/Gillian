@@ -35,7 +35,7 @@ let start_phase level ?title ?severity phase =
 let end_phase phase =
   if Mode.enabled () then
     match Stack.top_opt active_parents with
-    | Some (_, p) when p == phase ->
-        current := Option.some @@ fst @@ Stack.pop active_parents;
-        assert (Stack.pop all_parents == phase)
+    | Some (_, p) when String.equal p phase ->
+        current := Stack.pop active_parents |> fst |> Option.some;
+        assert (Stack.pop all_parents |> String.equal phase)
     | None | Some _ -> assert (Stack.pop all_parents |> String.equal phase)
