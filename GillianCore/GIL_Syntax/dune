@@ -4,4 +4,4 @@
  (libraries utils fmt visitors.runtime)
  (preprocess
   (pps visitors.ppx ppx_yojson_conv))
- (flags -open Utils -w +A-40-42-41-4))
+ (flags -open Utils -w +A-40-42-41-4-66))
