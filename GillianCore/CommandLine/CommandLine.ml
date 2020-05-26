@@ -271,8 +271,8 @@ struct
           let e_progs =
             (get_progs_or_fail (PC.parse_and_compile_files files)).gil_progs
           in
-          Gil_parsing.cache_labelled_progs e_progs;
-          List.hd (List.map snd e_progs) )
+          Gil_parsing.cache_labelled_progs (List.tl e_progs);
+          snd (List.hd e_progs) )
         else Gil_parsing.parse_eprog_from_file (List.hd files)
       in
       let prog =
@@ -321,8 +321,8 @@ struct
           let e_progs =
             (get_progs_or_fail (PC.parse_and_compile_files files)).gil_progs
           in
-          Gil_parsing.cache_labelled_progs e_progs;
-          List.hd (List.map snd e_progs) )
+          Gil_parsing.cache_labelled_progs (List.tl e_progs);
+          snd (List.hd e_progs) )
         else
           let () =
             L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
@@ -405,8 +405,8 @@ struct
         if not already_compiled then
           let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
           let e_progs = progs.gil_progs in
-          let () = Gil_parsing.cache_labelled_progs e_progs in
-          let e_prog = List.hd (List.map snd e_progs) in
+          let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
+          let e_prog = snd (List.hd e_progs) in
           let source_files = progs.source_files in
           (e_prog, Some source_files)
         else
@@ -494,8 +494,8 @@ struct
           in
           let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
           let e_progs = progs.gil_progs in
-          let () = Gil_parsing.cache_labelled_progs e_progs in
-          let e_prog = List.hd (List.map snd e_progs) in
+          let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
+          let e_prog = snd (List.hd e_progs) in
           let source_files = progs.source_files in
           (e_prog, Some source_files)
         else
