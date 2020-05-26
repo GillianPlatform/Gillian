@@ -101,14 +101,15 @@ module Node = struct
     | Zero                    -> Fmt.pf fmt "ZERO"
     | Single { chunk; value } ->
         Fmt.pf fmt "(%a : %a)" SVal.pp value Chunk.pp chunk
-        
-  let equal a b = match (a, b) with
-  | Hole, Hole -> true
-  | AllocatedUnkown, AllocatedUnkown -> true
-  | Zero, Zero -> true
-  | Single { chunk=ca;value = va }, Single { chunk=cb; value=vb} ->
-    Chunk.equal ca cb && SVal.equal va vb
-  | _ -> false
+
+  let equal a b =
+    match (a, b) with
+    | Hole, Hole -> true
+    | AllocatedUnkown, AllocatedUnkown -> true
+    | Zero, Zero -> true
+    | Single { chunk = ca; value = va }, Single { chunk = cb; value = vb } ->
+        Chunk.equal ca cb && SVal.equal va vb
+    | _ -> false
 
   let split = function
     (* TODO: Improve this *)
@@ -145,17 +146,19 @@ module Tree = struct
         children
     in
     (Fmt.parens (Fmt.vbox pp_aux)) fmt t
-    
-  let rec equal ?(pfs=Gillian.Symbolic.PureContext.init ()) ?(gamma=Gillian.Symbolic.TypEnv.init ()) a b =
-    Node.equal a.node b.node &&
-    Range.equal ~pfs ~gamma a.span b.span &&
-    (match a.children, b.children with
+
+  let rec equal
+      ?(pfs = Gillian.Symbolic.PureContext.init ())
+      ?(gamma = Gillian.Symbolic.TypEnv.init ())
+      a
+      b =
+    Node.equal a.node b.node
+    && Range.equal ~pfs ~gamma a.span b.span
+    &&
+    match (a.children, b.children) with
     | None, None -> true
-    | Some (a1, a2), Some (b1, b2) ->
-      equal a1 b1 && equal a2 b2
+    | Some (a1, a2), Some (b1, b2) -> equal a1 b1 && equal a2 b2
     | _ -> false
-    )
-    
 
   let make ~node ~span ?children () = { node; span; children }
 
@@ -263,15 +266,21 @@ let pp fmt = function
         Fmt.pf fmt "%a@ %a@ %a" Range.pp span Perm.pp perm Tree.pp root
       in
       (Fmt.parens (Fmt.vbox pp_aux)) fmt (perm, span, root)
-      
-let equal ?(pfs=Gillian.Symbolic.PureContext.init ()) ?(gamma=Gillian.Symbolic.TypEnv.init ()) a b = match (a, b) with
-| Freed, Freed -> true
-| Tree { perm=pa; span=sa; root=ra}, Tree { perm=pb; span=sb; root=rb} ->
-  (let open Perm.Infix in pa =% pb) &&
-  Range.equal ~pfs ~gamma sa sb &&
-  Tree.equal ~pfs ~gamma ra rb
-| _ -> false
-  
+
+let equal
+    ?(pfs = Gillian.Symbolic.PureContext.init ())
+    ?(gamma = Gillian.Symbolic.TypEnv.init ())
+    a
+    b =
+  match (a, b) with
+  | Freed, Freed -> true
+  | ( Tree { perm = pa; span = sa; root = ra },
+      Tree { perm = pb; span = sb; root = rb } ) ->
+      (let open Perm.Infix in
+      pa =% pb)
+      && Range.equal ~pfs ~gamma sa sb
+      && Tree.equal ~pfs ~gamma ra rb
+  | _ -> false
 
 let get_root = function
   | Freed  -> Error UseAfterFree

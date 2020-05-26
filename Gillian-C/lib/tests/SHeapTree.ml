@@ -28,8 +28,8 @@ module AlmostConcrete = struct
     | Error e       -> failf "Read after alloc errored with \"%a\""
                          SHeapTree.pp_err e
     | Ok (value, _) ->
-        check sval "Reading right after alloc should yield undefined" 
-          SUndefined value
+        check sval "Reading right after alloc should yield undefined" SUndefined
+          value
 
   let read_after_alloc_middle () =
     let mem = alloc (n (-8.)) (n 16.) in
@@ -39,8 +39,7 @@ module AlmostConcrete = struct
                          SHeapTree.pp_err e
     | Ok (value, _) ->
         check sval "Reading right after alloc should succeed yield undefined"
-          SUndefined
-          value 
+          SUndefined value
 
   let read_after_write () =
     let res =
@@ -53,46 +52,42 @@ module AlmostConcrete = struct
       "Reading right after alloc should succeed yield the right value"
       (Ok (SVlong (n 16.)))
       res
-  
+
   let read_after_free () =
-    let e = 
+    let e =
       let mem = alloc (n (-8.)) (n 32.) in
-      let* mem = free mem (n (-8.)) (n 32.) in 
+      let* mem = free mem (n (-8.)) (n 32.) in
       check heaptree "After freeing, the memory is freed" Freed mem;
-      get mem (n (0.)) Mint32
+      get mem (n 0.) Mint32
     in
     check get_result "Read after free should result in an error"
-      (Error UseAfterFree)
-      e
-  
+      (Error UseAfterFree) e
+
   let write_after_free () =
-    let e = 
+    let e =
       let mem = alloc (n (-8.)) (n 32.) in
-      let* mem = free mem (n (-8.)) (n 32.) in 
+      let* mem = free mem (n (-8.)) (n 32.) in
       check heaptree "After freeing, the memory is freed" Freed mem;
-      set mem (n (0.)) Mint32 (SVint (n 1000.))
+      set mem (n 0.) Mint32 (SVint (n 1000.))
     in
     check (result heaptree err) "Read after free should result in an error"
-      (Error UseAfterFree)
-      e
-    
-  let write_buffer_overrun () = 
-    let e = 
+      (Error UseAfterFree) e
+
+  let write_buffer_overrun () =
+    let e =
       let mem = alloc (n (-8.)) (n 32.) in
-      set mem (n (36.)) Mint32 (SVint (n 1000.))
+      set mem (n 36.) Mint32 (SVint (n 1000.))
     in
     check (result heaptree err) "Read after free should result in an error"
-      (Error BufferOverrun)
-      e
-  
-  let read_buffer_overrun () = 
-    let e = 
+      (Error BufferOverrun) e
+
+  let read_buffer_overrun () =
+    let e =
       let mem = alloc (n (-8.)) (n 32.) in
-      get mem (n (36.)) Mint32
+      get mem (n 36.) Mint32
     in
     check get_result "Read after free should result in an error"
-      (Error BufferOverrun)
-      e
+      (Error BufferOverrun) e
 
   let tests =
     [
@@ -102,6 +97,6 @@ module AlmostConcrete = struct
       ("read after free", `Quick, read_after_free);
       ("write after free", `Quick, write_after_free);
       ("read buffer overrun", `Quick, read_buffer_overrun);
-      ("write buffer overrun", `Quick, write_buffer_overrun)
+      ("write buffer overrun", `Quick, write_buffer_overrun);
     ]
 end
