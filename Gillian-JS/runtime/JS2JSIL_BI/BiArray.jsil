@@ -7,60 +7,77 @@ import Internals.jsil;
 (* *** CONSTRUCT *** *)
 
 proc Array_call () {
-			params := args;
-			params := "Array_construct" :: params;
-			ret := apply(params) with elab;
+        arguments := args;
+        params := "Array_construct" :: arguments;
+        ret := apply(params) with elab;
 
-	rlab: return;
-	elab: throw
+  rlab: return;
+  elab: throw
 };
 
-proc Array_construct () {
+(** Array Constructor (inner function of Array_call)
+  Runtime arguments:
+  1. xsc: Current scope chain
+  2. vthis: Resolved thisArg for the function call
+  3. Optional arguments, either of form:
+    (a) [len]: Length of new array to create
+    (b) [... items]: item(s) to initialise in the array
 
-			la := args;
-			len := l-len (la);
+  Note: We skip the first three arguments because we do not use
+  them for the Array constructor (they are passed in as part of
+  a standard function call). So theoretically, you can pass in
+  anything in the first three arguments and it would still work.
+*)
+proc Array_construct (xsc, vthis) {
+            (* Default array construction *)
+            array := "create_default_object" ($larr_proto, "Array", true);
+            [array, "length"] := {{ "d", 0, true, false, true }};
 
-			ret := "create_default_object" ($larr_proto, "Array", true);
+            (* All runtime arguments *)
+            arguments := args;
+            (* Optional arguments (4) *)
+            opt_args := cdr (cdr arguments);
+            len := l-len (opt_args);
+            goto [len = 0] rlab ltest;
+  ltest:    goto [len = 1] arr_a arr_b;
 
-			[ret, "length"] := {{ "d", 0, true, false, true }};
-			array := ret;
+            (* Form 4(a): new Array(len) *)
+  arr_a:    len := l-nth (opt_args, 0);
+            prop_name := "length";
+            prop_num := "0";
+            goto [typeOf len = Num] check set;
+  check:    len_32 := "i__toUint32" (len) with elab;
+            goto [len = len_32] set thrw;
 
-			goto [len < 3] rtrn ltest;
+  set:      PHI(prop_a: prop_num, prop_name; enum: true, false);
+            ret_def_a := "a__defineOwnProperty" (array, prop_a, {{ "d", len, true, enum, true }}, true) with elab;
+            goto rlab;
 
-	ltest:	goto [len = 3] len3 other;
+            (* Form 4(b): new Array([item1 [, item2 [, ...]]] *)
+  arr_b:    start_n := 0;
+  loop:	    PHI(n: start_n, next_n);
+            goto [n < len] head rlab;
+  head:     prop_b := "i__toString" (n) with elab;
+            prop_val := l-nth (opt_args, n);
+            ret_def_b := "a__defineOwnProperty" (array, prop_b, {{ "d", prop_val, true, true, true }}, true) with elab;
+            next_n := n + 1;
+            goto loop;
 
-	len3:	len := l-nth (la, 2);
-			goto [typeOf len = Num] len0 setl;
-	len0:	ret := "i__toUint32" (len) with elab;
-			goto [len = ret] dop re;
-	dop:	prop := "length";
-			conf := false;
-			goto set;
+            (* Normal return *)
+  rlab:	    ret := array;
+            return;
 
-	setl:	prop := "0";
-			conf := true;
-	set:	ret := "a__defineOwnProperty" (array, prop, {{ "d", len, true, conf, true }}, true) with elab;
-			goto rtrn;
-
-	other:	n := 2;
-	loop:	goto [n < len] head rtrn;
-	head:	prop := num_to_string (n - 2);
-			ret := "a__defineOwnProperty" (array, prop, {{ "d", l-nth (la, n), true, true, true }}, true) with elab;
-			n := n + 1;
-			goto loop;
-
-	rtrn:	ret := array;
-	rlab: return;
-
-	re:		ret := "RangeError" ();
-	elab: throw
+            (* Error return *)
+  thrw:     range_err := "RangeError" ();
+  elab:     PHI(ret: len_32, ret_def_a, prop, ret_def_b, range_err);
+            throw
 };
 
 (* *** ISIDX *** *)
 
 proc a__isIdx (s) {
-			ret := "i__toUint32Array" (s) with elab;
-			ret := "i__toStringComputed" (ret) with elab;
+			ret := "i__toUint32" (s) with elab;
+			ret := "i__toString" (ret) with elab;
 
 			goto [ret = s] check ret_f;
 
@@ -87,7 +104,7 @@ proc a__defineOwnProperty (l, prop, desc, thrw) {
 	is_idx:	idxp := "a__isIdx" (prop);
 			goto [idxp] idx norm;
 
-	idx:	index := "i__toUint32Array" (prop);
+	idx:	index := "i__toUint32" (prop);
 			index := index;
 			oldLen := oldLen;
 			ret := l-nth (oldLenDesc, 2);
@@ -136,7 +153,7 @@ proc a__defineOwnProperty (l, prop, desc, thrw) {
 	slai:	ret := "o__defineOwnProperty" (l, "length", desc, thrw) with elab;
 			goto rlab;
 
-	slb:	ret := "i__toUint32Array" (dv) with elab;
+	slb:	ret := "i__toUint32" (dv) with elab;
 			newLen := ret;
 			ret := "i__toNumber" (dv) with elab;
 			goto [not (newLen = ret)] rgerr sle;
@@ -162,7 +179,7 @@ proc a__defineOwnProperty (l, prop, desc, thrw) {
 
 	loop:	goto [newLen < oldLen] head slm;
 	head:	oldLen := oldLen - 1;
-			ret := num_to_string oldLen;
+			ret := "i__toString" (oldLen) with elab;
 			ret := "deleteProperty" (l, ret, false) with elab;
 			goto [ret = false] fix next;
 
@@ -213,28 +230,28 @@ proc Array_isArray (xsc, vthis, array) {
 (* *** TOSTRING *** *)
 
 proc AP_toString (xsc, vthis) {
-			ret := "i__toObject" (vthis) with elab;
-			vthis := ret;
+          arr_obj := "i__toObject" (vthis) with elab;
+          arr_join := "get" (arr_obj, "join") with elab;
 
-			ret := "get" ( vthis, "join") with elab;
-			func := ret;
+          is_call := "i__isCallable" (arr_join);
+          goto [is_call] norm setfun;
 
-			ret := "i__isCallable" (func);
-			goto [ret] norm setfun;
+  setfun: op_toString := $lop_toString;
 
-	setfun:	func := $lop_toString;
+  norm:   PHI(f_o: arr_join, op_toString);
+          m := metadata(f_o);
+          xsc := [m, "@scope"];
+          fun := [m, "@call"];
+          ret_val := fun (xsc, arr_obj) with elab;
+          goto [ret_val = empty] undef rlab;
 
-	norm:	m := metadata(func);
-			xsc := [m, "@scope"];
-			fun := [m, "@call"];
-			ret := fun (xsc, vthis) with elab;
-			goto [ret = empty] undef rlab;
-	undef:	ret := undefined;
+  undef:  ret_def := undefined;
 
-	rlab: return;
+  rlab:   PHI(ret: ret_val, ret_def);
+          return;
 
-	thrw:	ret := "TypeError" ();
-	elab: throw
+  elab:   PHI(ret: arr_obj, arr_join, ret_val);
+          throw
 };
 
 (* *** JOIN *** *)
@@ -244,7 +261,7 @@ proc AP_join (xsc, vthis, sep) {
 			vthis := ret;
 
 			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
+			ret := "i__toLength" (ret) with elab;
 			len := ret;
 
 			goto [sep = undefined] ssep sssep;
@@ -271,7 +288,7 @@ proc AP_join (xsc, vthis, sep) {
 	head:	R := R ++ sep;
 
 			next := "";
-			ret := num_to_string k;
+			ret := "i__toString" (k) with elab;
 			ret := "get" ( vthis, ret) with elab;
 
 			goto [(ret = undefined) or (ret = null)] cc def;
@@ -294,58 +311,63 @@ proc AP_join (xsc, vthis, sep) {
 
 (* *** POP *** *)
 proc AP_pop (xsc, vthis) {
-			ret := "i__toObject" (vthis) with elab;
-			vthis := ret;
+        arr_obj := "i__toObject" (vthis) with elab;
 
-			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
-			len := ret;
+        len_val := "get" (arr_obj, "length") with elab;
+        len := "i__toLength" (len_val) with elab;
 
-			goto [len = 0] zero nz;
+        goto [len = 0] zero pop;
 
-	zero:	ret := "put" (vthis, "length", 0, true) with elab;
-			ret := undefined;
-			goto rlab;
+  zero:	put_len1 := "put" (arr_obj, "length", 0, true) with elab;
+        ret_undef := undefined;
+        goto rlab;
 
-	nz:		indx := num_to_string (len - 1);
-			elem := "get" ( vthis, indx) with elab;
-			ret := "deleteProperty" (vthis, indx, true) with elab;
-			ret := "put" (vthis, "length", (len - 1), true) with elab;
-			ret := elem;
+  pop:  indx := "i__toString" (len - 1);
+        elem := "get" (arr_obj, indx) with elab;
+        del_prop := "deleteProperty" (arr_obj, indx, true) with elab;
+        put_len2 := "put" (arr_obj, "length", (len - 1), true) with elab;
+        ret_elem := elem;
 
-	rlab: return;
-	elab: throw
+  rlab: PHI(ret: ret_undef, ret_elem);
+        return;
+  elab: PHI(ret: arr_obj, len_val, len, put_len1, elem, del_prop, put_len2);
+        throw
 };
 
 (* *** PUSH *** *)
-proc AP_push() {
-			arguments := args;
-			vthis := l-nth (arguments, 1);
+proc AP_push (xsc, vthis) {
+        arguments := args;
 
-			ret := "i__toObject" (vthis) with elab;
-			vthis := ret;
+        arr_obj := "i__toObject" (vthis) with elab;
+        len_val := "get" (arr_obj, "length") with elab;
+        len := "i__toLength" (len_val) with elab;
 
-			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
-			len := ret;
+        items := cdr (cdr arguments);
+        arg_count := l-len (items);
 
-			n := 2;
-			num := l-len (arguments);
+        (* ES6+: check if result length is greater than 2^53 - 1 *)
+        (* Equiv number representation: 9007199254740991 *)
+        goto [(len + arg_count) > $$max_safe_integer] thrw cont;
 
-	loop:	goto [n < num] add stop;
+  cont: start := 0;
+  loop:	PHI(i: start, next_i);
+        goto [i < arg_count] add stop;
 
-	add:	elem := l-nth (arguments, n);
-			strn := num_to_string len;
-			ret := "put" (vthis, strn, elem, true) with elab;
-			n := n + 1;
-			len := len + 1;
-			goto loop;
+  add:  elem := l-nth (items, i);
+        strn := "i__toString" (len);
+        put_elem := "put" (arr_obj, strn, elem, true) with elab;
+        len := len + 1;
+        next_i := i + 1;
+        goto loop;
 
-	stop:	ret := "put" (vthis, "length", len, true) with elab;
-			ret := len;
+  stop:	put_n := "put" (arr_obj, "length", len, true) with elab;
+        ret := len;
+  rlab: return;
 
-	rlab: return;
-	elab: throw
+  thrw: type_err := "TypeError" ();
+
+  elab: PHI(ret: arr_obj, len_Val, len, put_elem, put_n, type_err);
+        throw
 };
 
 
@@ -355,7 +377,7 @@ proc AP_toLocaleString(xsc, vthis) {
 			vthis := ret;
 
 			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
+			ret := "i__toLength" (ret) with elab;
 			len := ret;
 
 			sep := ",";
@@ -365,7 +387,7 @@ proc AP_toLocaleString(xsc, vthis) {
 	empt:	ret := "";
 			goto rlab;
 
-	fill:	ret := num_to_string k;
+	fill:	ret := "i__toString" (k) with elab;
 			ret := "get" ( vthis, ret) with elab;
 			goto [ (ret = undefined) or (ret = null) ] un def;
 
@@ -410,81 +432,71 @@ proc AP_toLocaleString(xsc, vthis) {
 };
 
 (* *** CONCAT *** *)
-proc AP_concat() {
-			arguments := args;
-			vthis := l-nth (arguments, 1);
+proc AP_concat(xsc, vthis) {
+          (* 0. Get the optional arguments *)
+          arguments := args;
+          opt_args := cdr (cdr arguments);
 
-			ret := "i__toObject" (vthis) with elab;
-			vthis := ret;
+          (* 1. ToObject *)
+          ret := "i__toObject" (vthis) with elab;
+          vthis := ret;
 
-			(* The resulting array *)
-			ret := "Array_construct" () with elab;
-			A := ret;
+          (* 2. Empty array (result to be) *)
+          ret := "Array_construct" (empty, empty) with elab;
+          A := ret;
 
-			(* We are starting from property "0" *)
-			n := 0;
+          (* 3. Start from 0 *)
+          n := 0;
 
-			(* Once the loop repeats, we will be
-			   concatenating from the third argument.
-			   First two are the scope and the this. *)
-			idx := 2;
+          (* 4. Internal list over which to iterate *)
+          opt_args := vthis :: opt_args;
 
-			(* Get the number of arguments *)
-			num := l-len (arguments);
+          (* ++ Outer loop start: iterate over optional items given ++ *)
+  loop:	  goto [opt_args = {{ }} ] end add;
 
-			(* We are starting with the this object *)
-			elem := vthis;
+  add:	  item := car opt_args;
+          opt_args := cdr opt_args;
 
-			(* Indicator that we are in the first loop *)
-			f := 0;
-			goto cont;
+  cont:	  goto [typeOf (item) = Obj] cls narr;
+  cls:    m := metadata(item);
+          c := [m, "@class"];
+          goto [c = "Array"] arr narr;
 
-	loop:	goto [idx < num] add end;
+          (* item is an array object *)
+  arr:    k := 0;
+          ret := "get" (item, "length") with elab;
+          len := ret;
 
-	add:	elem := l-nth (arguments, idx);
-			f := 1;
+          (* ++ Inner loop for array item ++ *)
+  lp:     goto [k < len] loop2 loop;
 
-	cont:	goto [typeOf (elem) = Obj] cls narr;
-	cls:	m := metadata(elem);
-			c := [m, "@class"];
-			goto [c = "Array"] arr narr;
+  loop2:  ret := "i__toString" (k) with elab;
+          p := ret;
+          ret := "hasProperty" (item, p) with elab;
+          goto [ret] tt next;
 
-	arr:	k := 0;
-			ret := "get" ( elem, "length") with elab;
-			len := ret;
+  tt:     ret := "get" ( item, p) with elab;
+          se := ret;
+          ret := "i__toString" (n) with elab;
+          ret := "a__defineOwnProperty" (A, ret, {{ "d", se, true, true, true }}, false) with elab;
 
-	lp:		goto [k < len] loop2 nnext;
+  next:   n := n + 1;
+          k := k + 1;
+          goto lp;
 
-	loop2:	ret := num_to_string k;
-			p := ret;
+          (* item is NOT an array object *)
+  narr:   ret := "i__toString" (n) with elab;
+          ret := "a__defineOwnProperty" (A, ret, {{ "d", item, true, true, true }}, false) with elab;
+          n := n + 1;
+          goto loop;
+          (* -- Outer loop end -- *)
 
-			ret := "hasProperty" (elem, p) with elab;
-			goto [ret] tt next;
+          (* ES6+: Set length property directly *)
+  end:    ret := "put" (A, "length", n, true) with elab;
+          ret := A;
 
-	tt:		ret := "get" ( elem, p) with elab;
-			se := ret;
-			ret := num_to_string n;
-			ret := "a__defineOwnProperty" (A, ret, {{ "d", se, true, true, true }}, false) with elab;
-
-	next:	n := n + 1;
-			k := k + 1;
-			goto lp;
-
-	nnext:	goto [f = 0] loop inc;
-	inc:	idx := idx + 1;
-			goto loop;
-
-	narr:	ret := num_to_string n;
-			ret := "a__defineOwnProperty" (A, ret, {{ "d", elem, true, true, true }}, false) with elab;
-			n := n + 1;
-			goto [f = 0] loop iinc;
-	iinc:	idx := idx + 1;
-			goto loop;
-
-	end:	ret := A;
-
-	rlab: return;
-	elab: throw
+  rlab:   return;
+  elab:   throw
 };
 
 (* *** REVERSE *** *)
@@ -493,7 +505,7 @@ proc AP_reverse(xsc, vthis) {
 			vthis := ret;
 
 			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
+			ret := "i__toLength" (ret) with elab;
 			len := ret;
 
 			mid := m_floor (len / 2);
@@ -502,9 +514,9 @@ proc AP_reverse(xsc, vthis) {
 	loop:	goto [not (mid = lower)] rev end;
 
 	rev:	upper := (len - lower) - 1;
-			ret := num_to_string upper;
+			ret := "i__toString" (upper) with elab;
 			upperP := ret;
-			ret := num_to_string lower;
+			ret := "i__toString" (lower) with elab;
 			lowerP := ret;
 			ret := "get" ( vthis, lowerP) with elab;
 			lowerV := ret;
@@ -548,7 +560,7 @@ proc AP_shift(xsc, vthis) {
 			vthis := ret;
 
 			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
+			ret := "i__toLength" (ret) with elab;
 			len := ret;
 
 			goto [len = 0] zero nz;
@@ -562,10 +574,10 @@ proc AP_shift(xsc, vthis) {
 
 			k := 1;
 	loop:	goto [k < len] less end;
-	less:	ret := num_to_string k;
+	less:	ret := "i__toString" (k) with elab;
 			from := ret;
 			kk := k - 1;
-			ret := num_to_string kk;
+			ret := "i__toString" (kk) with elab;
 			to := ret;
 			ret := "hasProperty" (vthis, from) with elab;
 			goto [ret] t f;
@@ -579,7 +591,7 @@ proc AP_shift(xsc, vthis) {
 			goto loop;
 
 	end:	len := len - 1;
-			ret := num_to_string len;
+			ret := "i__toString" (len) with elab;
 			ret := "deleteProperty" (vthis, ret, true) with elab;
 			ret := "put" (vthis, "length", len, true) with elab;
 			ret := first;
@@ -593,11 +605,8 @@ proc AP_slice(xsc, vthis, start, end) {
 			ret := "i__toObject" (vthis) with elab;
 			vthis := ret;
 
-			ret := "Array_construct" () with elab;
-			A := ret;
-
 			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
+			ret := "i__toLength" (ret) with elab;
 			len := ret;
 
 			ret := "i__toInteger" (start) with elab;
@@ -637,9 +646,18 @@ proc AP_slice(xsc, vthis, start, end) {
 	gr3:	final := len;
 
 	setn:	n := 0;
+
+            count := final - k;
+            goto [final - k < 0] zero create;
+
+    zero:   count := 0;
+
+    create: ret := "Array_construct" (empty, empty, count) with elab;
+			A := ret;
+
 	loop:	goto [k < final] next end;
 
-	next:	ret := num_to_string k;
+	next:	ret := "i__toString" (k) with elab;
 			pk := ret;
 
 			ret := "hasProperty" (vthis, pk) with elab;
@@ -648,7 +666,7 @@ proc AP_slice(xsc, vthis, start, end) {
 
 	tt:		ret := "get" ( vthis, pk) with elab;
 			kval := ret;
-			ret := "i__toStringComputed" (n) with elab;
+			ret := "i__toString" (n) with elab;
 			strn := ret;
 			ret := "a__defineOwnProperty" (A, strn, {{ "d", kval, true, true, true }}, false) with elab;
 
@@ -671,7 +689,7 @@ proc AP_unshift() {
 			vthis := ret;
 
 			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
+			ret := "i__toLength" (ret) with elab;
 			len := ret;
 			k := len;
 
@@ -680,12 +698,12 @@ proc AP_unshift() {
 
 	loop1:	goto [not (k <= 0)] next1 end1;
 	next1:	ret := k - 1;
-			ret := num_to_string ret;
+			ret := "i__toString" (ret) with elab;
 			from := ret;
 
 			ret := k + argc;
 			ret := ret - 1;
-			ret := num_to_string ret;
+			ret := "i__toString" (ret) with elab;
 			to := ret;
 
 			ret := "hasProperty" (vthis, from) with elab;
@@ -708,7 +726,7 @@ proc AP_unshift() {
 
 	loop:	goto [nm < num] next end;
 	next:	elem := l-nth(arguments, nm);
-			ret := num_to_string j;
+			ret := "i__toString" (j) with elab;
 			strj := ret;
 			ret := "put" (vthis, strj, elem, true) with elab;
 			j := j + 1;
@@ -723,7 +741,7 @@ proc AP_unshift() {
 	elab: throw
 };
 
-(* * SPLICE * *)
+(* *** SPLICE *** *)
 proc AP_splice() {
 			arguments := args;
 			vthis := l-nth (arguments, 1);
@@ -742,11 +760,11 @@ proc AP_splice() {
 	tobj:	ret := "i__toObject" (vthis) with elab;
 			vthis := ret;
 
-			ret := "Array_construct" () with elab;
+			ret := "Array_construct" (empty, empty) with elab;
 			A := ret;
 
 			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
+			ret := "i__toLength" (ret) with elab;
 			len := ret;
 
 			ret := "i__toInteger" (start) with elab;
@@ -879,697 +897,634 @@ proc AP_splice() {
 };
 
 (* *** INDEXOF *** *)
-proc AP_indexOf() {
-			arguments := args;
-			vthis  := l-nth (arguments, 1);
-			num := l-len (arguments);
+proc AP_indexOf (xsc, vthis, search_elem) {
+          arguments := args;
+          num := l-len (arguments);
 
-			selem := undefined;
-	        goto [num <= 2] tobj selem;
-	selem:	selem := l-nth (arguments, 2);
+          arr_obj := "i__toObject" (vthis) with elab;
+          get_len := "get" (arr_obj, "length") with elab;
+          len := "i__toLength" (get_len) with elab;
 
-	tobj:	ret := "i__toObject" (vthis) with elab;
-			vthis := ret;
+          goto [len = 0] neg1 next;
 
-			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
-			len := ret;
+  next:	  goto [num > 3] nem em;
 
-			goto [len = 0] neg1 next;
+  em:     n := 0;
+          goto nlen;
 
-	next:	goto [num <= 3] em nem;
+          (* Optional fromIndex argument *)
+  nem:    fi := l-nth (arguments, 3);
+          n := "i__toInteger" (fi) with elab;
 
-	em:		n := 0;
-			goto nlen;
+  nlen:	  goto [(len <= n)] neg1 next2;
 
-	nem:	fi := l-nth (arguments, 3);
-			ret := "i__toInteger" (fi) with elab;
-			n := ret;
+  next2:  goto [n < 0] lelse lif;
 
-	nlen:	goto [(len <= n)] neg1 next2;
+  lif:    k := m_abs n;
+          goto loop;
 
-	next2:	goto [n < 0] lelse lif;
+  lelse:  k := m_abs n;
+          k := len - k;
+          goto [k < 0] zero loop;
 
-	lif:	k := m_abs n;
-			goto loop;
+  zero:	  k := 0;
 
-	lelse:	k := m_abs n;
-			k := len - k;
-			goto [k < 0] zero loop;
+  loop:	  goto [k < len] lp neg1;
 
-	zero:	k := 0;
+  lp:     strk := "i__toString" (k) with elab;
+          kpres := "hasProperty" (arr_obj, strk) with elab;
 
-	loop:	goto [k < len] lp neg1;
+          goto [kpres] next3 end;
 
-	lp:		ret := num_to_string k;
-			strk := ret;
-			ret := "hasProperty" (vthis, strk) with elab;
-			kpres := ret;
+  next3:  elemk := "get" ( arr_obj, strk) with elab;
 
-			goto [kpres] next3 end;
+          strict_eq := "i__strictEquality" (search_elem, elemk) with elab;
+          goto [strict_eq] r end;
 
-	next3:	ret := "get" ( vthis, strk) with elab;
-			elemk := ret;
+  r:      ret_k := k;
+          goto rlab;
 
-			ret := "i__strictEquality" (selem, elemk) with elab;
-			goto [ret] r end;
+  end:    k := k + 1;
+          goto loop;
 
-	r:		ret := k;
-			goto rlab;
+  neg1:   ret_neg_1 := -1;
+  rlab:   PHI(ret: ret_k, ret_neg_1);
+          return;
 
-	end:	k := k + 1;
-			goto loop;
-
-	neg1:	ret := -1;
-	rlab: return;
-	elab: throw
+  elab:   PHI(ret: arr_obj, get_len, len, n, strk, kpres, elemk, strict_eq);
+          throw
 };
 
 (* *** LASTINDEXOF *** *)
-proc AP_lastIndexOf() {
-			arguments := args;
-			vthis  := l-nth (arguments, 1);
-			num := l-len (arguments);
+proc AP_lastIndexOf (xsc, vthis, search_elem) {
+          arguments := args;
+          num := l-len (arguments);
 
-			selem := undefined;
-	        goto [num <= 2] tobj selem;
-	selem:	selem := l-nth (arguments, 2);
+          arr_obj := "i__toObject" (vthis) with elab;
+          get_len := "get" (arr_obj, "length") with elab;
+          len := "i__toLength" (get_len) with elab;
 
-	tobj:	ret := "i__toObject" (vthis) with elab;
-			vthis := ret;
+          goto [len = 0] neg1 next;
 
-			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
-			len := ret;
+  next:   goto [num > 3] nem em;
 
-			goto [len = 0] neg1 next;
+  em:     n := len - 1;
+          goto nlen;
 
-	next:	goto [num <= 3] em nem;
+          (* Optional fromIndex argument *)
+  nem:    fi := l-nth (arguments, 3);
+          n := "i__toInteger" (fi) with elab;
 
-	em:		n := len - 1;
-			goto nlen;
+  nlen:   goto [n < 0] lelse lif;
+  lif:    len1 := len - 1;
+          goto [n <= len1] ls gr;
+  ls:     k := m_abs n;
+          goto loop;
+  gr:     k := len1;
+          goto loop;
 
-	nem:	fi := l-nth (arguments, 3);
-			ret := "i__toInteger" (fi) with elab;
-			n := ret;
+  lelse:  k := m_abs n;
+          k := len - k;
 
-	nlen:	goto [n < 0] lelse lif;
-	lif:	len1 := len - 1;
-			goto [n <= len1] ls gr;
-	ls:		k := m_abs n;
-			goto loop;
-	gr:		k := len1;
-			goto loop;
+  loop:   goto [not (k < 0)] lp neg1;
+  lp:     strk := "i__toString" (k) with elab;
+          kpres := "hasProperty" (arr_obj, strk) with elab;
+          goto [kpres] tt ff;
 
-	lelse:	k := m_abs n;
-			k := len - k;
+  tt:     elemk := "get" (arr_obj, strk) with elab;
+          strict_eq := "i__strictEquality" (search_elem, elemk) with elab;
+          goto [strict_eq] r ff;
+  r:      ret_k := k;
+          goto rlab;
 
-	loop:	goto [not (k < 0)] lp neg1;
-	lp:		ret := num_to_string k;
-			strk := ret;
-			ret := "hasProperty" (vthis, strk) with elab;
-			kpres := ret;
-			goto [kpres] tt ff;
+  ff:     k := k - 1;
+          goto loop;
 
-	tt:		ret := "get" ( vthis, strk) with elab;
-			elemk := ret;
-			ret := "i__strictEquality" (selem, elemk) with elab;
-			goto [ret] r ff;
-	r:		ret := k;
-			goto rlab;
+  neg1:   ret_neg_1 := -1;
 
-	ff:		k := k - 1;
-			goto loop;
-
-	neg1:	ret := -1;
-
-	rlab: return;
-	elab: throw
+  rlab:   PHI(ret: ret_k, ret_neg_1);
+          return;
+  elab:   PHI(ret: arr_obj, get_len, len, n, strk, kpres, elemk, strict_eq);
+          throw
 };
 
 (* *** EVERY *** *)
-proc AP_every() {
-			arguments := args;
-			vthis  := l-nth (arguments, 1);
-			num := l-len (arguments);
+proc AP_every(xsc, vthis, cbf) {
+          arguments := args;
+          num := l-len (arguments);
 
-			cbf := undefined;
-	        goto [num <= 2] tobj cbf;
-	cbf:	cbf := l-nth (arguments, 2);
+          arr_obj := "i__toObject" (vthis) with elab;
 
-	tobj:	ret := "i__toObject" (vthis) with elab;
-			vthis := ret;
+          get_len := "get" (arr_obj, "length") with elab;
+          len := "i__toLength" (get_len) with elab;
 
-			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
-			len := ret;
+          is_call := "i__isCallable" (cbf);
+          goto [is_call] cont thrw;
 
-			ret := "i__isCallable" (cbf);
-			goto [ret] cont thrw;
+          (* Check if optional thisArg is supplied at runtime *)
+  cont:   goto [num > 3] def set_t;
+  def:    def_t := l-nth (arguments, 3);
+  set_t:  PHI(t: undefined, def_t);
 
-	cont:	goto [num <= 3] undef def;
+          (* Call callbackfn on every element *)
+          k := 0;
+  loop:	  goto [k < len] next end;
 
-	def:	t := l-nth (arguments, 3);
-			goto setk;
-	undef:	t := undefined;
+  next:   pk := "i__toString" (k) with elab;
+          kpres := "hasProperty" (arr_obj, pk) with elab;
+          goto [kpres] tt ff;
 
-	setk:	k := 0;
-	loop:	goto [k < len] next end;
+  tt:     kval := "get" (arr_obj, pk) with elab;
+          m := metadata(cbf);
+          scp := [m, "@scope"];
+          fun := [m, "@call"];
+          tr := fun (scp, t, kval, k, arr_obj) with elab;
+          tr_bool := "i__toBoolean" (tr) with elab;
+          goto [tr_bool] ff retf;
 
-	next:	ret := num_to_string k;
-			pk := ret;
-			ret := "hasProperty" (vthis, pk) with elab;
-			kpres := ret;
-			goto [kpres] tt ff;
+  retf:   goto rlab;
 
-	tt:		ret := "get" ( vthis, pk) with elab;
-			kval := ret;
-			m := metadata(cbf);
-			scp := [m, "@scope"];
-			fun := [m, "@call"];
-			ret := fun (scp, t, kval, k, vthis) with elab;
-			tr := ret;
-			ret := "i__toBoolean" (tr) with elab;
-			goto [ret] ff retf;
+  ff:     k := k + 1;
+          goto loop;
+          (* End of loop *)
+  end:    skip;
 
-	retf:	ret := false;
-			goto rlab;
+  rlab:   PHI(ret: false, true);
+          return;
 
-	ff:		k := k + 1;
-			goto loop;
-
-	end:	ret := true;
-
-	rlab: return;
-
-	thrw:	ret := "TypeError" ();
-	elab: throw
+  thrw:	  type_err := "TypeError" ();
+  elab:   PHI(ret: arr_obj, get_len, len, pk, kpres, kval, tr, tr_bool, type_err);
+          throw
 };
 
 (* *** SOME *** *)
-proc AP_some() {
-			arguments := args;
-			vthis  := l-nth (arguments, 1);
-			num := l-len (arguments);
+proc AP_some(xsc, vthis, callbackfn) {
+          arguments := args;
+          num := l-len (arguments);
 
-			cbf := undefined;
-	        goto [num <= 2] tobj cbf;
-	cbf:	cbf := l-nth (arguments, 2);
+          arr_obj := "i__toObject" (vthis) with elab;
+          get_len := "get" (arr_obj, "length") with elab;
+          len := "i__toLength" (get_len) with elab;
 
-	tobj:	ret := "i__toObject" (vthis) with elab;
+          is_call := "i__isCallable" (callbackfn);
+          goto [is_call] cont thrw;
 
-			vthis := ret;
+          (* Check if optional thisArg is supplied at runtime *)
+  cont:   goto [num > 3] def set_t;
+  def:    def_t := l-nth (arguments, 3);
+  set_t:  PHI(t: undefined, def_t);
 
-			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
-			len := ret;
+          k := 0;
+          (* Call callbackfn on every element *)
+  loop:	  goto [k < len] next end;
 
-			ret := "i__isCallable" (cbf);
-			goto [ret] cont thrw;
+  next:   pk := "i__toString" (k) with elab;
+          kpres := "hasProperty" (arr_obj, pk) with elab;
+          goto [kpres] tt ff;
 
-	cont:	goto [num <= 3] undef def;
+  tt:     kval := "get" (arr_obj, pk) with elab;
+          m := metadata(callbackfn);
+          scp := [m, "@scope"];
+          fun := [m, "@call"];
+          tr := fun (scp, t, kval, k, arr_obj) with elab;
+          tr_bool := "i__toBoolean" (tr) with elab;
+          goto [tr_bool] done ff;
 
-	def:	t := l-nth (arguments, 3);
-			goto setk;
-	undef:	t := undefined;
+  done:   ret_true := true;
+          goto rlab;
 
-	setk:	k := 0;
-	loop:	goto [k < len] next end;
+  ff:     k := k + 1;
+          goto loop;
+          (* End of loop *)
+  end:    ret_false := false;
 
-	next:	ret := num_to_string k;
-			pk := ret;
-			ret := "hasProperty" (vthis, pk) with elab;
-			kpres := ret;
-			goto [kpres] tt ff;
+  rlab:   PHI(ret: ret_true, ret_false);
+          return;
 
-	tt:		ret := "get" ( vthis, pk) with elab;
-			kval := ret;
-			m := metadata(cbf);
-			scp := [m, "@scope"];
-			fun := [m, "@call"];
-			ret := fun (scp, t, kval, k, vthis) with elab;
-			tr := ret;
-			ret := "i__toBoolean" (tr) with elab;
-			goto [ret] rett ff;
-
-	rett:	ret := true;
-			goto rlab;
-
-	ff:		k := k + 1;
-			goto loop;
-
-	end:	ret := false;
-
-	rlab: return;
-
-	thrw:	ret := "TypeError" ();
-	elab: throw
+  thrw:	  type_err := "TypeError" ();
+  elab:   PHI(ret: arr_obj, get_len, len, pk, kpres, kval, tr, tr_bool, type_err);
+          throw
 };
 
 (* *** FOREACH *** *)
-proc AP_forEach() {
-			arguments := args;
-			vthis  := l-nth (arguments, 1);
-			num := l-len (arguments);
+proc AP_forEach(xsc, vthis, callbackfn) {
+          arguments := args;
+          num := l-len (arguments);
 
-			cbf := undefined;
-	        goto [num <= 2] tobj cbf;
-	cbf:	cbf := l-nth (arguments, 2);
+          arr_obj := "i__toObject" (vthis) with elab;
+          get_len := "get" (arr_obj, "length") with elab;
+          len := "i__toLength" (get_len) with elab;
 
-	tobj:	ret := "i__toObject" (vthis) with elab;
-			vthis := ret;
+          is_call := "i__isCallable" (callbackfn);
+          goto [is_call] cont thrw;
 
-			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
-			len := ret;
+          (* Check if optional thisArg is supplied at runtime *)
+  cont:   undef_t := undefined;
+          goto [num > 3] def set_t;
+  def:    def_t := l-nth (arguments, 3);
+  set_t:  PHI(t: undef_t, def_t);
 
-			ret := "i__isCallable" (cbf);
-			goto [ret] cont thrw;
+          start := 0;
+  loop:   PHI(k: start, next_k);
+          goto [k < len] next end;
 
-	cont:	goto [num <= 3] undef def;
+  next:   pk := "i__toString" (k) with elab;
+          kpres := "hasProperty" (arr_obj, pk) with elab;
+          goto [kpres] tt ff;
 
-	def:	t := l-nth (arguments, 3);
-			goto setk;
-	undef:	t := undefined;
+  tt:     kval := "get" (arr_obj, pk) with elab;
+          m := metadata(callbackfn);
+          scp := [m, "@scope"];
+          fun := [m, "@call"];
+          ret_val := fun (scp, t, kval, k, arr_obj) with elab;
 
-	setk:	k := 0;
-	loop:	goto [k < len] next end;
+  ff:     next_k := k + 1;
+          goto loop;
 
-	next:	ret := num_to_string k;
-			pk := ret;
-			ret := "hasProperty" (vthis, pk) with elab;
-			kpres := ret;
-			goto [kpres] tt ff;
+  end:    ret := undefined;
+          return;
 
-	tt:		ret := "get" ( vthis, pk) with elab;
-			kval := ret;
-			m := metadata(cbf);
-			scp := [m, "@scope"];
-			fun := [m, "@call"];
-			ret := fun (scp, t, kval, k, vthis) with elab;
-
-	ff:		k := k + 1;
-			goto loop;
-
-	end:	ret := undefined;
-
-	rlab: return;
-
-	thrw:	ret := "TypeError" ();
-	elab: throw
+  thrw:   type_err := "TypeError" ();
+  elab:   PHI(ret: arr_obj, get_len, len, pk, kpres, kval, ret_val, type_err);
+          throw
 };
 
 (* *** MAP *** *)
-proc AP_map() {
-			arguments := args;
-			vthis  := l-nth (arguments, 1);
-			num := l-len (arguments);
+proc AP_map(xsc, vthis, callbackfn) {
+          arguments := args;
+          num := l-len (arguments);
 
-			cbf := undefined;
-	        goto [num <= 2] tobj cbf;
-	cbf:	cbf := l-nth (arguments, 2);
+          arr_obj := "i__toObject" (vthis) with elab;
+          get_len := "get" (arr_obj, "length") with elab;
+          len := "i__toLength" (get_len) with elab;
 
-	tobj:	ret := "i__toObject" (vthis) with elab;
-			vthis := ret;
+          is_call := "i__isCallable" (callbackfn);
+          goto [is_call] cont thrw;
 
-			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
-			len := ret;
+          (* Check if optional thisArg is supplied at runtime *)
+  cont:	  undef_t := undefined;
+          goto [num > 3] def set_t;
+  def:    def_t := l-nth (arguments, 3);
+  set_t:  PHI(t: undef_t, def_t);
 
-			ret := "i__isCallable" (cbf);
-			goto [ret] cont thrw;
+          new_arr := "Array_construct" (empty, empty, len) with elab;
 
-	cont:	goto [num <= 3] undef def;
+          (* Loop start *)
+          start := 0;
+  loop:	  PHI(k: start, next_k);
+          goto [k < len] next end;
 
-	def:	t := l-nth (arguments, 3);
-			goto seta;
-	undef:	t := undefined;
+  next:	  pk := "i__toString" (k) with elab;
+          kpres := "hasProperty" (arr_obj, pk) with elab;
+          goto [kpres] tt ff;
 
-	seta:	ret := "Array_construct" (empty, empty, len) with elab;
-			A := ret;
-			k := 0;
-	loop:	goto [k < len] next end;
+  tt:     kval := "get" (arr_obj, pk) with elab;
+          m := metadata(callbackfn);
+          scp := [m, "@scope"];
+          fun := [m, "@call"];
+          mapv := fun (scp, t, kval, k, arr_obj) with elab;
+          ret_def := "a__defineOwnProperty" (new_arr, pk, {{ "d", mapv, true, true, true }}, false) with elab;
 
-	next:	ret := num_to_string k;
-			pk := ret;
-			ret := "hasProperty" (vthis, pk) with elab;
-			kpres := ret;
-			goto [kpres] tt ff;
+  ff:     next_k := k + 1;
+          goto loop;
+          (* Loop end *)
+          (* Normal/ return *)
+  end:    ret := new_arr;
+          return;
 
-	tt:		ret := "get" ( vthis, pk) with elab;
-			kval := ret;
-			m := metadata(cbf);
-			scp := [m, "@scope"];
-			fun := [m, "@call"];
-			ret := fun (scp, t, kval, k, vthis) with elab;
-			mapv := ret;
-			ret := "a__defineOwnProperty" (A, pk, {{ "d", mapv, true, true, true }}, false) with elab;
-
-	ff:		k := k + 1;
-			goto loop;
-
-	end:	ret := A;
-	rlab: return;
-
-	thrw:	ret := "TypeError" ();
-	elab: throw
+          (* Error return *)
+  thrw:   type_err := "TypeError" ();
+  elab:   PHI(ret: arr_obj, get_len, len, new_arr, pk, kpres, kval, mapv, ret_def, type_err);
+          throw
 };
 
 (* *** FILTER *** *)
-proc AP_filter() {
-			arguments := args;
-			vthis  := l-nth (arguments, 1);
-			num := l-len (arguments);
+proc AP_filter(xsc, vthis, callbackfn) {
+          arguments := args;
+          num := l-len (arguments);
 
-			cbf := undefined;
-	        goto [num <= 2] tobj cbf;
-	cbf:	cbf := l-nth (arguments, 2);
+          arr_obj := "i__toObject" (vthis) with elab;
+          get_len := "get" (arr_obj, "length") with elab;
+          len := "i__toLength" (get_len) with elab;
 
-	tobj:	ret := "i__toObject" (vthis) with elab;
-			vthis := ret;
+          is_call := "i__isCallable" (callbackfn);
+          goto [is_call] cont thrw;
 
-			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
-			len := ret;
+          (* Check if optional thisArg is supplied at runtime *)
+  cont:	  undef_t := undefined;
+          goto [num > 3] def set_t;
+  def:    def_t := l-nth (arguments, 3);
+  set_t:  PHI(t: undef_t, def_t);
 
-			ret := "i__isCallable" (cbf);
-			goto [ret] cont thrw;
+  seta:   new_arr := "Array_construct" (empty, empty) with elab;
 
-	cont:	goto [num <= 3] undef def;
+          (* Loop start *)
+          start := 0;
+          to_init := 0;
+  loop:   PHI(k: start, next_k; to: to_init, next_to);
+          goto [k < len] next end;
 
-	def:	t := l-nth (arguments, 3);
-			goto seta;
-	undef:	t := undefined;
+  next:   pk := "i__toString" (k) with elab;
+          kpres := "hasProperty" (arr_obj, pk) with elab;
+          goto [kpres] tt ff;
 
-	seta:	ret := "Array_construct" () with elab;
-			A := ret;
-			k := 0;
-			to := 0;
-	loop:	goto [k < len] next end;
+  tt:     kval := "get" (arr_obj, pk) with elab;
+          m := metadata(callbackfn);
+          scp := [m, "@scope"];
+          fun := [m, "@call"];
+          maybe_fret := fun (scp, t, kval, k, arr_obj) with elab;
+          goto [maybe_fret = empty] set_fr phi_fr;
+  set_fr: fr_undef := undefined;
+  phi_fr: PHI(selected: maybe_fret, fr_undef);
+          is_sel := "i__toBoolean" (selected) with elab;
+          goto [is_sel] rett ff;
 
-	next:	ret := num_to_string k;
-			pk := ret;
-			ret := "hasProperty" (vthis, pk) with elab;
-			kpres := ret;
-			goto [kpres] tt ff;
+  rett:   strt := "i__toString" (to) with elab;
+          ret_def := "a__defineOwnProperty" (new_arr, strt, {{ "d", kval, true, true, true }}, false) with elab;
+          to_1 := to + 1;
 
-	tt:		ret := "get" ( vthis, pk) with elab;
-			kval := ret;
-			m := metadata(cbf);
-			scp := [m, "@scope"];
-			fun := [m, "@call"];
-			ret := fun (scp, t, kval, k, vthis) with elab;
-			goto [ret = empty] udef sel;
-	udef:	ret := undefined;
+  ff:     PHI(next_to: to, to, to_1);
+          next_k := k + 1;
+          goto loop;
+          (* Loop end *)
 
-	sel:	sel := ret;
-			ret := "i__toBoolean" (sel) with elab;
-			goto [ret] rett ff;
+          (* Normal return *)
+  end:    ret := new_arr;
+          return;
 
-	rett:	ret := num_to_string to;
-			strt := ret;
-			ret := "a__defineOwnProperty" (A, strt, {{ "d", kval, true, true, true }}, false) with elab;
-			to := to + 1;
-
-	ff:		k := k + 1;
-			goto loop;
-
-	end:	ret := A;
-	rlab: return;
-
-	thrw:	ret := "TypeError" ();
-	elab: throw
+          (* Error return *)
+  thrw:   ret := "TypeError" ();
+  elab:   PHI(ret: arr_obj, get_len, len, new_arr, pk, kpres, kval, maybe_fret, is_sel, strt, ret_def, ret);
+          throw
 };
 
 (* *** REDUCE *** *)
-proc AP_reduce() {
-			arguments := args;
-			vthis  := l-nth (arguments, 1);
-			num := l-len (arguments);
+(** Section 15.4.4.21
+  Array.prototype.reduce(callbackfn, [, initalValue])
+  Parameters:
+  -> First 3 parameters are JSIL procedure parameters.
+  4. callbackfn: Function to call during the reduce operation
+  5. Optional initialValue parameter.
+  (Not SSA)
+*)
+proc AP_reduce(xsc, vthis, callbackfn) {
+          arguments := args;
+          num := l-len (arguments);
 
-			cbf := undefined;
-	        goto [num <= 2] tobj cbf;
-	cbf:	cbf := l-nth (arguments, 2);
+          arr_obj := "i__toObject" (vthis) with elab;
+          get_len := "get" (arr_obj, "length") with elab;
+          len := "i__toLength" (get_len) with elab;
 
-	tobj:	ret := "i__toObject" (vthis) with elab;
+          is_call := "i__isCallable" (callbackfn);
+          goto [is_call] check thrw;
 
-			vthis := ret;
+  check:  goto [(len = 0) and (num <= 3)] thrw set_k;
 
-			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
-			len := ret;
+  set_k:  k := 0;
+          (* Check if optional initialValue is supplied at runtime *)
+          goto [num > 3] set_a lelse;
+  set_a:  acc := l-nth (arguments, 3);
+          goto loop2;
 
-			ret := "i__isCallable" (cbf);
-			goto [ret] setk thrw;
+          (* Else clause comes first by algorithm *)
+  lelse:  kpres := false;
+          (* First Loop Start *)
+  loop:   goto [(not kpres) and (k < len)] next1 end1;
+  next1:  pk := "i__toString" (k) with elab;
+          kpres := "hasProperty" (arr_obj, pk) with elab;
+          goto [kpres] tt ff;
 
-	setk:	k := 0;
-			goto [num <= 3] lelse lif;
+  tt:	    acc := "get" (arr_obj, pk) with elab;
 
-	lif:	acc := l-nth (arguments, 3);
-			goto loop2;
+  ff:     k := k + 1;
+          goto loop;
+          (* First Loop End *)
 
-	lelse:	goto [len = 0] thrw cont;
-	cont:	kpres := false;
-	loop:	goto [kpres] end1 kf;
-	kf:		goto [k < len] next1 end1;
+  end1:   goto [kpres] loop2 thrw;
 
-	next1:	ret := num_to_string k;
-			pk := ret;
-			ret := "hasProperty" (vthis, pk) with elab;
-			kpres := ret;
-			goto [kpres] tt ff;
+          (* Second Loop Start *)
+  loop2:  goto [k < len] next2 end;
+  next2:  pk := "i__toString" (k) with elab;
+          kpres := "hasProperty" (arr_obj, pk) with elab;
+          goto [kpres] t f;
 
-	tt:		ret := "get" ( vthis, pk) with elab;
-			acc := ret;
+  t:      kval := "get" (arr_obj, pk) with elab;
+          m := metadata(callbackfn);
+          scp := [m, "@scope"];
+          fun := [m, "@call"];
+          acc := fun (scp, undefined, acc, kval, k, arr_obj) with elab;
 
-	ff:		k := k + 1;
-			goto loop;
+  f:      k := k + 1;
+          goto loop2;
+          (* Second Loop End *)
 
-	end1:	goto [kpres] loop2 thrw;
-	loop2:	goto [k < len] next2 end;
+  end:    ret := acc;
+  rlab:   return;
 
-	next2:	ret := num_to_string k;
-			pk := ret;
-			ret := "hasProperty" (vthis, pk) with elab;
-			kpres := ret;
-			goto [kpres] t f;
-
-	t:		ret := "get" ( vthis, pk) with elab;
-			kval := ret;
-			m := metadata(cbf);
-			scp := [m, "@scope"];
-			fun := [m, "@call"];
-			ret := fun (scp, undefined, acc, kval, k, vthis) with elab;
-			acc := ret;
-
-	f:		k := k + 1;
-			goto loop2;
-
-	end:	ret := acc;
-	rlab: return;
-
-	thrw:	ret := "TypeError" ();
-	elab: throw
+  thrw:	  type_err := "TypeError" ();
+  elab:   PHI(ret: arr_obj, get_len, len, pk, kpres, acc, pk, kpres, kval, acc, type_err);
+          throw
 };
 
 (* *** REDUCERIGHT *** *)
-proc AP_reduceRight() {
-			arguments := args;
-			vthis  := l-nth (arguments, 1);
-			num := l-len (arguments);
+(** Section 15.4.4.22
+  Array.prototype.reduceRight(callbackfn, [, initalValue])
+  Parameters:
+  -> First 3 parameters are JSIL procedure parameters.
+  4. callbackfn: Function to call during the reduce operation
+  5. Optional initialValue parameter.
+  (Not SSA)
+*)
+proc AP_reduceRight(xsc, vthis, callbackfn) {
+          arguments := args;
+          num := l-len (arguments);
 
-			cbf := undefined;
-	        goto [num <= 2] tobj cbf;
-	cbf:	cbf := l-nth (arguments, 2);
+          arr_obj := "i__toObject" (vthis) with elab;
+          get_len := "get" (arr_obj, "length") with elab;
+          len := "i__toLength" (get_len) with elab;
 
-	tobj:	ret := "i__toObject" (vthis) with elab;
-			vthis := ret;
+          is_call := "i__isCallable" (callbackfn);
+          goto [is_call] check thrw;
 
-			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
-			len := ret;
+  check:  goto [(len = 0) and (num <= 3)] thrw setk;
 
-			ret := "i__isCallable" (cbf);
-			goto [ret] setk thrw;
+  setk:	  k := len - 1;
+          goto [num > 3] set_a lelse;
 
-	setk:	k := len - 1;
-			goto [num <= 3] lelse lif;
+  set_a:  acc := l-nth (arguments, 3);
+          goto loop2;
 
-	lif:	acc := l-nth (arguments, 3);
-			goto loop2;
+  lelse:  kpres := false;
 
-	lelse:	goto [len = 0] thrw cont;
-	cont:	kpres := false;
-	loop:	goto [kpres] end1 kf;
-	kf:		goto [not (k < 0)] next1 end1;
+          (* First Loop Start *)
+  loop:	  goto [(not kpres) and (0 <= k)] next1 end1;
 
-	next1:	ret := num_to_string k;
-			pk := ret;
-			ret := "hasProperty" (vthis, pk) with elab;
-			kpres := ret;
-			goto [kpres] tt ff;
+  next1:  pk := "i__toString" (k) with elab;
+          kpres := "hasProperty" (arr_obj, pk) with elab;
+          goto [kpres] tt ff;
 
-	tt:		ret := "get" ( vthis, pk) with elab;
-			acc := ret;
+  tt:     acc := "get" (arr_obj, pk) with elab;
 
-	ff:		k := k - 1;
-			goto loop;
+  ff:     k := k - 1;
+          goto loop;
+          (* First Loop End *)
+  end1:   goto [kpres] loop2 thrw;
 
-	end1:	goto [kpres] loop2 thrw;
-	loop2:	goto [not (k < 0)] next2 end;
+          (* Second Loop Start *)
+  loop2:  goto [not (k < 0)] next2 end;
 
-	next2:	ret := num_to_string k;
-			pk := ret;
-			ret := "hasProperty" (vthis, pk) with elab;
-			kpres := ret;
-			goto [kpres] t f;
+  next2:  pk := "i__toString" (k) with elab;
+          kpres := "hasProperty" (arr_obj, pk) with elab;
+          goto [kpres] t f;
 
-	t:		ret := "get" ( vthis, pk) with elab;
-			kval := ret;
-			m := metadata(cbf);
-			scp := [m, "@scope"];
-			fun := [m, "@call"];
-			ret := fun (scp, undefined, acc, kval, k, vthis) with elab;
-			acc := ret;
+  t:      kval := "get" (arr_obj, pk) with elab;
+          m := metadata(callbackfn);
+          scp := [m, "@scope"];
+          fun := [m, "@call"];
+          acc := fun (scp, undefined, acc, kval, k, arr_obj) with elab;
 
-	f:		k := k - 1;
-			goto loop2;
-	end:	ret := acc;
-	rlab: return;
+  f:      k := k - 1;
+          goto loop2;
+          (* Second Loop End *)
+          (* Normal return *)
+  end:    ret := acc;
+  rlab:   return;
 
-	thrw:	ret := "TypeError" ();
-	elab: throw
+          (* Error return *)
+  thrw:	  type_err := "TypeError" ();
+  elab:   PHI(ret: arr_obj, get_len, len, pk, kpres, acc, pk, kpres, kval, acc, type_err);
+          throw
 };
 
 (* *** SORT *** *)
 proc AP_sort(xsc, vthis, compfn) {
-			ret := "i__toObject" (vthis) with elab;
-			vthis := ret;
+          ret := "i__toObject" (vthis) with elab;
+          vthis := ret;
 
-			ret := "get" ( vthis, "length") with elab;
-			ret := "i__toUint32" (ret) with elab;
-			len := ret;
+          ret := "get" ( vthis, "length") with elab;
+          ret := "i__toLength" (ret) with elab;
+          len := ret;
 
-	(* 4 special conditions for implementation defined sort could be checked, maybe TODO *)
+  (* 4 special conditions for implementation defined sort could be checked, maybe TODO *)
 
-	(* check if vthis is sparse *)
-	cs:		i := 0;
-	cslp:	goto [i < len] check done;
+  (* check if vthis is sparse *)
+  cs:     i := 0;
+  cslp:	  goto [i < len] check done;
 
-	check:	ret := num_to_string i;
-			stri := ret;
-			ret := "getOwnProperty" (vthis, stri) with elab;
-			elem := ret;
-			goto [elem = undefined] spt spf;
-	spt:	spar := true;
-			goto otw;
+  check:  ret := "i__toString" (i) with elab;
+          stri := ret;
+          ret := "getOwnProperty" (vthis, stri) with elab;
+          elem := ret;
+          goto [elem = undefined] spt spf;
+  spt:    spar := true;
+          goto otw;
 
-	spf:	i := i + 1;
-			goto cslp;
+  spf:    i := i + 1;
+          goto cslp;
 
-	done:	spar := false;
-	(* end of sparse check *)
+  done:	  spar := false;
+  (* end of sparse check *)
 
-	otw:	goto [len < 2] fin cont;
+  otw:    goto [len < 2] fin cont;
 
-	cont:	ret := "Array_construct" () with elab;
-			stack := ret;
+  cont:	  ret := "Array_construct" (empty, empty) with elab;
+          stack := ret;
 
-			ret := "AP_push" (empty, stack, 0);
-			len1 := len - 1;
-			ret := "AP_push" (empty, stack, len1);
+          ret := "AP_push" (empty, stack, 0);
+          len1 := len - 1;
+          ret := "AP_push" (empty, stack, len1);
 
-			size := 1;
+          size := 1;
 
-	while1:	goto [not (size <= 0)] ltz fin;
+  while1: goto [not (size <= 0)] ltz fin;
 
-	ltz:	ret := "AP_pop" (empty, stack);
-			end := ret;
-			ret := "i__toStringComputed" (end) with elab;
-			strend := ret;
-			ret := "AP_pop" (empty, stack);
-			start := ret;
+  ltz:    ret := "AP_pop" (empty, stack);
+          end := ret;
+          ret := "i__toString" (end) with elab;
+          strend := ret;
+          ret := "AP_pop" (empty, stack);
+          start := ret;
 
-			size := size - 1;
-			l := start;
-			curr := start;
+          size := size - 1;
+          l := start;
+          curr := start;
 
-	while2:	goto [curr < end] next1 end1;
+  while2:	goto [curr < end] next1 end1;
 
-	next1:	ret := "a__sortCompare" (curr, end, compfn, vthis) with elab;
-			goto [ret < 0] less nless;
+  next1:  ret := "a__sortCompare" (curr, end, compfn, vthis) with elab;
+          goto [ret < 0] less nless;
 
-	less:	ret := num_to_string l;
-			strl := ret;
-			ret := num_to_string curr;
-			strcurr := ret;
-			ret := "get" ( vthis, strcurr) with elab;
-			tmp := ret;
-			ret := "hasProperty" (vthis, strl) with elab;
-			goto [ret] iina niina;
+  less:	  ret := "i__toString" (l) with elab;
+          strl := ret;
+          ret := "i__toString" (curr) with elab;
+          strcurr := ret;
+          ret := "get" (vthis, strcurr) with elab;
+          tmp := ret;
+          ret := "hasProperty" (vthis, strl) with elab;
+          goto [ret] iina niina;
 
-	iina:	(* swap l and current *)
-			ret := "get" ( vthis, strl) with elab;
-			ret := "put" (vthis, strcurr, ret, true) with elab;
-			ret := "put" (vthis, strl, tmp, true) with elab;
-			goto incl;
+  (* swap l and current *)
+  iina:	  ret := "get" (vthis, strl) with elab;
+          ret := "put" (vthis, strcurr, ret, true) with elab;
+          ret := "put" (vthis, strl, tmp, true) with elab;
+          goto incl;
 
-	niina:	ret := "put" (vthis, strl, tmp, true) with elab;
-			ret := "deleteProperty" (vthis, strcurr, true) with elab;
+  niina:  ret := "put" (vthis, strl, tmp, true) with elab;
+          ret := "deleteProperty" (vthis, strcurr, true) with elab;
 
-	incl:	l := l + 1;
+  incl:   l := l + 1;
 
-	nless:	curr := curr + 1;
-			goto while2;
+  nless:  curr := curr + 1;
+          goto while2;
 
-	end1:	goto [l < end] sw nsw;
+  end1:	  goto [l < end] sw nsw;
 
-	sw:		ret := num_to_string l;
-			strl := ret;
-			ret := "get" ( vthis, strend) with elab;
-			el := ret;
-			ret := "hasProperty" (vthis, strl) with elab;
-			goto [ret] ina nina;
+  sw:     ret := "i__toString" (l) with elab;
+          strl := ret;
+          ret := "get" (vthis, strend) with elab;
+          el := ret;
+          ret := "hasProperty" (vthis, strl) with elab;
+          goto [ret] ina nina;
 
-	ina:	ret := "get" ( vthis, strl) with elab;
-			ret := "put" (vthis, strend, ret, true) with elab;
-			ret := "put" (vthis, strl, el, true) with elab;
-			goto nsw;
+  ina:    ret := "get" (vthis, strl) with elab;
+          ret := "put" (vthis, strend, ret, true) with elab;
+          ret := "put" (vthis, strl, el, true) with elab;
+          goto nsw;
 
-	nina:	ret := "hasProperty" (vthis, strend) with elab;
-			goto [ret] del nsw;
+  nina:   ret := "hasProperty" (vthis, strend) with elab;
+          goto [ret] del nsw;
 
-	del:	ret := "put" (vthis, strl, el, true) with elab;
-			ret := "deleteProperty" (vthis, strend, true) with elab;
+  del:    ret := "put" (vthis, strl, el, true) with elab;
+          ret := "deleteProperty" (vthis, strend, true) with elab;
 
-	nsw:	ll := l + 1;
-			goto [not (end <= ll)] more nmore;
+  nsw:    ll := l + 1;
+          goto [not (end <= ll)] more nmore;
 
-	more:	ret := "AP_push" (empty, stack, ll);
-			ret := "AP_push" (empty, stack, end);
-			size := size + 1;
+  more:	  ret := "AP_push" (empty, stack, ll);
+          ret := "AP_push" (empty, stack, end);
+          size := size + 1;
 
-	nmore:	l := l - 1;
-			goto [not (l <= start)] ifs while1;
+  nmore:  l := l - 1;
+          goto [not (l <= start)] ifs while1;
 
-	ifs:	ret := "AP_push" (empty, stack, start);
-			ret := "AP_push" (empty, stack, l);
-			size := size + 1;
-			goto while1;
+  ifs:    ret := "AP_push" (empty, stack, start);
+          ret := "AP_push" (empty, stack, l);
+          size := size + 1;
+          goto while1;
 
-	fin:	ret := vthis;
-	rlab: return;
+  fin:    ret := vthis;
+  rlab:   return;
 
-	thrw:	ret := "TypeError" ();
-	elab: throw
+  thrw:   ret := "TypeError" ();
+  elab:   throw
 };
 
 (* *** SORTCOMPARE *** *)
 proc a__sortCompare(j, k, compfn, vthis) {
 
-			ret := "i__toStringComputed" (j) with elab;
+			ret := "i__toString" (j) with elab;
 			strj := ret;
-			ret := "i__toStringComputed" (k) with elab;
+			ret := "i__toString" (k) with elab;
 			strk := ret;
 			ret := "hasProperty" (vthis, strj) with elab;
 			hasj := ret;
@@ -1608,9 +1563,9 @@ proc a__sortCompare(j, k, compfn, vthis) {
 			ret := fun (scp, undefined, x, y) with elab;
 			goto rlab;
 
-	cont1:	ret := "i__toStringComputed" (x) with elab;
+	cont1:	ret := "i__toString" (x) with elab;
 			strx := ret;
-			ret := "i__toStringComputed" (y) with elab;
+			ret := "i__toString" (y) with elab;
 			stry := ret;
 			goto [strx s< stry] nok xy;
 	xy:		goto [not (strx = stry)] yesk nojk;

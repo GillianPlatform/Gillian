@@ -596,7 +596,7 @@ proc create_arguments_object (argList) {
       indx := len - 1;
 
   loop: goto [0 <= indx] head call;
-  head: ret := "i__toStringComputed" (indx) with elab;
+  head: ret := "i__toString" (indx) with elab;
       ret := "defineOwnProperty" (obj, ret, {{ "d", l-nth (argList, indx), true, true, true }}, false) with elab;
       indx := indx - 1;
       goto loop;

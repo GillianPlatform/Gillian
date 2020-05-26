@@ -1431,9 +1431,10 @@ proc i__purge (o) {
         goto [typeOf(o) = Obj] del rlab;
 
   del:  m := metadata(o);
-        deleteObject(o);
-        ret := "i__purge"(m);
-        return;
+        goto [typeOf(m) = Obj] delm delo;
+
+  delm: deleteObject(m);
+  delo: deleteObject(o);
 
   rlab: ret := true;
         return

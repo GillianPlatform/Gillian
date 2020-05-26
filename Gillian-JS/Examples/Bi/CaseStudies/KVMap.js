@@ -4,6 +4,7 @@
   @id a_Map
 */
 function a_Map () {
+  /* Annotation */ isObject(this);
 	this._contents = {};
 	return this;
 }
@@ -12,15 +13,19 @@ function a_Map () {
   @id b_validKey
 */
 function b_validKey (key) {
-	return (typeof(key) === "string" && key !== "hasOwnProperty")
+	return (typeof(key) === "string")
 }
 
 /*
   @id c_mapGet
 */
 function mapGet (o, k) {
+
+  /* Annotation */ isObject(o);
+
   if (b_validKey(k)) {
-	    if (o._contents.hasOwnProperty(k)) { 
+      /* Annotation */ isObject(o._contents);
+	    if (o._contents.hasOwnProperty(k)) {
 	    	var result = o._contents[k];
 	        return result
 	    } else { return null }
@@ -33,8 +38,11 @@ function mapGet (o, k) {
 */
 function d_mapPut (o, k, v) {
 
-  if (b_validKey(k)) { 
-    o._contents[k] = v; 
+  /* Annotation */ isObject(o);
+
+  if (b_validKey(k)) {
+     /* Annotation */ isObject(o._contents);
+    o._contents[k] = v;
     return v;
   } else
     throw new Error("Invalid Key")

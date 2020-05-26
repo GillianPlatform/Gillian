@@ -397,37 +397,69 @@ struct
         ConfCont (ret_state, new_cs, i, new_j, b_counter)
       in
 
-      match spec with
-      | Some spec -> (
-          let subst = eval_subst_list state subst in
-          L.verbose (fun fmt -> fmt "ABOUT TO USE THE SPEC OF %s" pid);
-          (* print_to_all ("\tStarting run spec: " ^ pid); *)
-          let rets : (State.t * Flag.t) list =
-            State.run_spec spec state x args subst
-          in
-          (* print_to_all ("\tFinished run spec: " ^ pid); *)
-          L.verbose (fun fmt ->
-              fmt "Run_spec returned %d Results" (List.length rets));
-          let b_counter =
-            if List.length rets > 1 then b_counter + 1 else b_counter
-          in
-          match rets with
-          | (ret_state, fl) :: rest_rets ->
-              process_ret false ret_state fl b_counter
-              :: List.map
-                   (fun (ret_state, fl) ->
-                     process_ret true ret_state fl b_counter)
-                   rest_rets
-          | _ -> [] )
-      | _         ->
-          if Hashtbl.mem prog.prog.bi_specs pid then
-            [ ConfSusp (pid, state, cs, prev, i, b_counter) ]
-          else
-            let new_store = Store.init (List.combine params args) in
-            let old_store = State.get_store state in
-            let state' = State.set_store state new_store in
-            let cs' = (pid, v_args, Some old_store, x, i, i + 1, j) :: cs in
-            [ ConfCont (state', cs', -1, 0, b_counter) ]
+      let is_internal_proc proc_name =
+        (Prog.get_proc_exn prog.prog proc_name).proc_internal
+      in
+
+      let symb_exec_proc () =
+        let new_store = Store.init (List.combine params args) in
+        let old_store = State.get_store state in
+        let state' = State.set_store state new_store in
+        let cs' = (pid, v_args, Some old_store, x, i, i + 1, j) :: cs in
+        [ ConfCont (state', cs', -1, 0, b_counter) ]
+      in
+
+      (* Recursive call *)
+      match
+        ( ExecMode.biabduction_exec !Config.current_exec_mode,
+          pid = caller,
+          is_internal_proc pid )
+      with
+      | true, true, false ->
+          (* Do not use specs for recursive calls ever in bi-abduction *)
+          let depth = CallStack.recursive_depth cs pid in
+          if depth < !Config.bi_unroll_depth then
+            let () =
+              L.verbose (fun fmt ->
+                  fmt "Recursive call for %s with depth %d" pid depth)
+            in
+            let () =
+              print_endline
+                (Printf.sprintf "Recursive call for %s with depth %d" pid depth)
+            in
+            symb_exec_proc () (* and cut off once max depth is reached *)
+          else []
+      | true, false, false
+        when List.length
+               (List.filter is_internal_proc (CallStack.get_cur_procs cs))
+             < !Config.bi_no_spec_depth -> symb_exec_proc ()
+      | _ -> (
+          match spec with
+          | Some spec -> (
+              let subst = eval_subst_list state subst in
+              L.verbose (fun fmt -> fmt "ABOUT TO USE THE SPEC OF %s" pid);
+              (* print_to_all ("\tStarting run spec: " ^ pid); *)
+              let rets : (State.t * Flag.t) list =
+                State.run_spec spec state x args subst
+              in
+              (* print_to_all ("\tFinished run spec: " ^ pid); *)
+              L.verbose (fun fmt ->
+                  fmt "Run_spec returned %d Results" (List.length rets));
+              let b_counter =
+                if List.length rets > 1 then b_counter + 1 else b_counter
+              in
+              match rets with
+              | (ret_state, fl) :: rest_rets ->
+                  process_ret false ret_state fl b_counter
+                  :: List.map
+                       (fun (ret_state, fl) ->
+                         process_ret true ret_state fl b_counter)
+                       rest_rets
+              | _ -> [] )
+          | _         ->
+              if Hashtbl.mem prog.prog.bi_specs pid then
+                [ ConfSusp (pid, state, cs, prev, i, b_counter) ]
+              else symb_exec_proc () )
     in
 
     match cmd with
@@ -457,8 +489,7 @@ struct
             let ret_len = 1 + List.length rest_rets in
             let b_counter = b_counter + if ret_len > 1 then 1 else 0 in
             match
-              ( ret_len >= 3 && !Config.parallel && !Config.multi_thread,
-                ret_len = 2 && !Config.parallel && !Config.multi_thread )
+              (ret_len >= 3 && !Config.parallel, ret_len = 2 && !Config.parallel)
               (* XXX: && !Config.act_threads < !Config.max_threads ) *)
             with
             | true, _     -> (
@@ -560,7 +591,7 @@ struct
             sp
         in
         match
-          List.length result = 2 && !Config.parallel && !Config.multi_thread
+          List.length result = 2 && !Config.parallel
           (* XXX: && !Config.act_threads < !Config.max_threads *)
         with
         | true  -> (
