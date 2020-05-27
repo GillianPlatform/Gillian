@@ -108,10 +108,10 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
   let f path =
     (* Check that the file is of a valid type *)
     let extension = Filename.extension path in
-    let prev_normalised = String.equal extension "ngil" in
+    let prev_normalised = String.equal extension ".ngil" in
     let () = Config.previously_normalised := prev_normalised in
     let () =
-      if not (prev_normalised || String.equal extension "gil") then
+      if not (prev_normalised || String.equal extension ".gil") then
         failwith (Printf.sprintf "Error: %s is not a .gil or .ngil file" path)
     in
     (* Parse file *)
