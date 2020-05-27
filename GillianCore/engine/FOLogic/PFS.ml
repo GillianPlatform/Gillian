@@ -40,7 +40,7 @@ let length (pfs : t) = ExtList.length pfs
 
 let copy (pfs : t) : t = ExtList.copy pfs
 
-let merge_into_left (pfs_l : t) (pfs_r : t) : unit = ExtList.concat pfs_r pfs_l
+let merge_into_left (pfs_l : t) (pfs_r : t) : unit = ExtList.concat pfs_l pfs_r
 
 let set (pfs : t) (reset : Formula.t list) : unit =
   clear pfs;
