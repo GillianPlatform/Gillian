@@ -409,30 +409,21 @@ struct
         [ ConfCont (state', cs', -1, 0, b_counter) ]
       in
 
-      (* Recursive call *)
       match
         ( ExecMode.biabduction_exec !Config.current_exec_mode,
           pid = caller,
-          is_internal_proc pid )
+          is_internal_proc pid,
+          CallStack.recursive_depth cs pid >= !Config.bi_unroll_depth )
       with
-      | true, true, false ->
-          (* Do not use specs for recursive calls ever in bi-abduction *)
-          let depth = CallStack.recursive_depth cs pid in
-          if depth < !Config.bi_unroll_depth then
-            let () =
-              L.verbose (fun fmt ->
-                  fmt "Recursive call for %s with depth %d" pid depth)
-            in
-            let () =
-              print_endline
-                (Printf.sprintf "Recursive call for %s with depth %d" pid depth)
-            in
-            symb_exec_proc () (* and cut off once max depth is reached *)
-          else []
-      | true, false, false
-        when List.length
-               (List.filter is_internal_proc (CallStack.get_cur_procs cs))
-             < !Config.bi_no_spec_depth -> symb_exec_proc ()
+      (* In bi-abduction, reached max depth of recursive calls *)
+      | true, _, _, true -> []
+      (* In bi-abduction, recursive call *)
+      | true, true, false, _ -> symb_exec_proc ()
+      (* TODO: When JS internals work
+         | true, false, false
+           when List.length
+                  (List.filter is_internal_proc (CallStack.get_cur_procs cs))
+                < !Config.bi_no_spec_depth -> symb_exec_proc () *)
       | _ -> (
           match spec with
           | Some spec -> (
