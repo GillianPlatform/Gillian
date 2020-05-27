@@ -109,9 +109,10 @@ module TargetLangOptions = struct
     Config.hide_mult_def := hide_mult_def
 end
 
-(** Caches to improve bulk execution performance *)
+(** Cache of compiled but unlinked GIL programs and their compilation data. *)
 let compiled_progs = Hashtbl.create small_tbl_size
 
+(** Cache of header paths included in each source .c path. *)
 let included_headers_cache = Hashtbl.create small_tbl_size
 
 let get_gil_path c_path = Filename.chop_extension c_path ^ ".gil"
@@ -335,10 +336,13 @@ let parse_and_compile_files paths =
   let main_prog =
     { main_prog with imports = all_imports; proc_names = all_proc_names }
   in
+  let paths_set = SS.of_list paths in
   let all_other_progs =
     Hashtbl.fold
       (fun path (prog, _) acc ->
-        if not (String.equal path main_path) then (path, prog) :: acc else acc)
+        if (not (String.equal path main_path)) && SS.mem path paths_set then
+          (path, prog) :: acc
+        else acc)
       compiled_progs []
   in
   let all_progs = (main_path, main_prog) :: all_other_progs in

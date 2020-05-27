@@ -92,7 +92,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
           | Error err -> (Error err, None)
           | Ok progs  ->
               let e_progs = progs.gil_progs in
-              let () = Gil_parsing.cache_labelled_progs e_progs in
+              let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
               let e_prog = snd (List.hd e_progs) in
               let other_imports = convert_other_imports PC.other_imports in
               let prog = Gil_parsing.eprog_to_prog ~other_imports e_prog in
