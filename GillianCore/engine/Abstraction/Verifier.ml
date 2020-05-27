@@ -579,7 +579,9 @@ struct
           | Some files -> files
           | None       -> failwith "Cannot use -a in incremental mode"
         in
-        let prev_source_files, prev_call_graph, results = read_verif_results () in
+        let prev_source_files, prev_call_graph, results =
+          read_verif_results ()
+        in
         let proc_changes, lemma_changes =
           get_verif_changes prog ~prev_source_files ~prev_call_graph
             ~cur_source_files
@@ -608,7 +610,8 @@ struct
             @ lemma_changes.dependent_lemmas )
         in
         let () =
-          verify_procs ~prev_results:results prog procs_to_verify lemmas_to_verify
+          verify_procs ~prev_results:results prog procs_to_verify
+            lemmas_to_verify
         in
         let cur_call_graph = SAInterpreter.call_graph in
         let cur_results = global_results in
@@ -621,7 +624,9 @@ struct
         let cur_source_files =
           Option.value ~default:(SourceFiles.make ()) source_files
         in
-        let procs_to_verify = SS.of_list (Prog.get_noninternal_proc_names prog) in
+        let procs_to_verify =
+          SS.of_list (Prog.get_noninternal_proc_names prog)
+        in
         let lemmas_to_verify =
           SS.of_list (Prog.get_noninternal_lemma_names prog)
         in
