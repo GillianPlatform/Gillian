@@ -27,13 +27,6 @@ let mem (pfs : t) (f : Formula.t) = ExtList.mem f pfs
 let extend (pfs : t) (a : Formula.t) : unit =
   if not (mem pfs a) then ExtList.add a pfs
 
-(* 
-let nth_get (pfs : t) (n : int) = DynArray.get pfs n
-
-let nth_set (pfs : t) (n : int) = DynArray.set pfs n *)
-(* 
-let nth_delete (pfs : t) (n : int) : unit = DynArray.delete pfs n *)
-
 let clear (pfs : t) : unit = ExtList.clear pfs
 
 let length (pfs : t) = ExtList.length pfs
@@ -82,8 +75,6 @@ let sort (p_formulae : t) : unit =
   set p_formulae (var_eqs @ llen_eqs @ others)
 
 let iter = ExtList.iter
-
-let iteri = ExtList.iteri
 
 let fold_left = ExtList.fold_left
 

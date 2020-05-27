@@ -30,14 +30,6 @@ let append x l =
       last.next <- cell;
       l.last <- cell
 
-let remove_first l =
-  match l.first with
-  | Nil                    -> ()
-  | Cons { next = Nil; _ } -> clear l
-  | Cons { next; _ }       ->
-      l.length <- l.length - 1;
-      l.first <- next
-
 let add = append
 
 let length t = t.length
@@ -120,15 +112,6 @@ let iter f t =
         iter f next
   in
   iter f t.first
-
-let iteri f t =
-  let rec iteri f i = function
-    | Nil                     -> ()
-    | Cons { contents; next } ->
-        f i contents;
-        iteri f (i + 1) next
-  in
-  iteri f 0 t.first
 
 let for_all2 f la lb =
   let rec aux = function

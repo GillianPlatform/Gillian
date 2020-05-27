@@ -49,9 +49,6 @@ val set : t -> Formula.t list -> unit
 (** [iter f pfs] iterates over the pure formulae [pfs] using the function [f] *)
 val iter : (Formula.t -> unit) -> t -> unit
 
-(** [iteri f pfs] iterates over the pure formulae [pfs] using the function [f], keeping track of the index *)
-val iteri : (int -> Formula.t -> unit) -> t -> unit
-
 (** [fold_left f ac pfs] folds over the pure formulae [pfs] using the function [f] and initial accumulator [ac] *)
 val fold_left : ('a -> Formula.t -> 'a) -> 'a -> t -> 'a
 
