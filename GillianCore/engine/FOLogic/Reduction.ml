@@ -1626,21 +1626,13 @@ and numbers_and_rest (numbers : Expr.t list) =
 
 and substitute_for_length pfs le =
   (* L.(verbose (fun m -> m "Inside sub_for_len: %s" ((Fmt.to_to_string Expr.pp) le))); *)
-  let len = PFS.length pfs in
-  (* L.(verbose (fun m -> m "We have the pfs of length: %d" len)); *)
-  let idx = ref 0 in
-  let result = ref le in
-  while !idx < len do
-    let form = PFS.nth_get pfs !idx in
-    (* L.(verbose (fun m -> m "Formula: %s" ((Fmt.to_to_string Formula.pp) form))); *)
-    ( match form with
-    | Eq (UnOp (LstLen, lst'), res) | Eq (res, UnOp (LstLen, lst')) ->
-        result :=
-          substitute_in_numeric_expr res (Expr.UnOp (LstLen, lst')) !result
-    | _ -> () );
-    idx := !idx + 1
-  done;
-  !result
+  PFS.fold_left
+    (fun acc form ->
+      match form with
+      | Eq (UnOp (LstLen, lst'), res) | Eq (res, UnOp (LstLen, lst')) ->
+          substitute_in_numeric_expr res (Expr.UnOp (LstLen, lst')) acc
+      | _ -> acc)
+    le pfs
 
 and check_ge_zero le : bool option =
   let pluses, minuses = collect_pluses_minuses le in
@@ -1684,27 +1676,18 @@ and substitute_in_numeric_expr (le_to_find : Expr.t) (le_to_subst : Expr.t) le =
 
 and substitute_in_numeric_formula (le_to_find : Expr.t) (le_to_subst : Expr.t) f
     =
-  let result =
-    Formula.map None None
-      (Some (substitute_in_numeric_expr le_to_find le_to_subst))
-      f
-  in
-  result
+  Formula.map None None
+    (Some (substitute_in_numeric_expr le_to_find le_to_subst))
+    f
 
 and substitute_in_pfs (le_to_find : Expr.t) (le_to_subst : Expr.t) (pfs : PFS.t)
     : unit =
-  let len = PFS.length pfs in
-  let idx = ref 0 in
-  while !idx < len do
-    let form = PFS.nth_get pfs !idx in
-    let form' =
+  PFS.map_inplace
+    (fun form ->
       match form with
       | Eq (lx, ly) when lx = le_to_subst || ly = le_to_subst -> form
-      | _ -> substitute_in_numeric_formula le_to_find le_to_subst form
-    in
-    PFS.nth_set pfs !idx form';
-    idx := !idx + 1
-  done
+      | _ -> substitute_in_numeric_formula le_to_find le_to_subst form)
+    pfs
 
 let rec reduce_formula_loop
     (unification : bool) (pfs : PFS.t) (gamma : TypEnv.t) (a : Formula.t) :
