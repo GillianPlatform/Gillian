@@ -749,7 +749,7 @@ module Make
   let get_all_preds ?(keep : bool option) (sel : abs_t -> bool) (astate : t) :
       abs_t list =
     let _, preds, _ = astate in
-    Preds.find_all ?keep sel preds
+    Preds.get_all ~maintain:(Option.value ~default:true keep) sel preds
 
   let set_pred (astate : t) (pred : abs_t) : unit =
     let _, preds, _ = astate in

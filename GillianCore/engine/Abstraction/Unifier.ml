@@ -160,10 +160,9 @@ module Make
     in
 
     let apply_strategies (strategies : (string * Val.t list -> bool) list) :
-        int option =
+        (string * Val.t list) option =
       List.fold_left
-        (fun ac strategy ->
-          if ac <> None then ac else Preds.index_of preds strategy)
+        (fun ac strategy -> if ac <> None then ac else Preds.pop preds strategy)
         None strategies
     in
 
@@ -250,16 +249,7 @@ module Make
       let inter = SS.inter lvars_args lvars_state in
       inter <> SS.empty
     in
-
-    let index =
-      apply_strategies [ strategy_1; strategy_2; strategy_3; strategy_4 ]
-    in
-    match index with
-    | None       -> None
-    | Some index ->
-        let pred_a = Preds.get_index preds index in
-        Preds.remove_index preds index;
-        Some pred_a
+    apply_strategies [ strategy_1; strategy_2; strategy_3; strategy_4 ]
 
   let produce_assertion (astate : t) (subst : Subst.t) (a : Asrt.t) : t option =
     let state, preds, pred_defs = astate in
@@ -598,7 +588,7 @@ module Make
       | false -> false
     in
 
-    let pred_to_unfold = Preds.find false preds should_unfold in
+    let pred_to_unfold = Preds.pop preds should_unfold in
     match pred_to_unfold with
     | Some (name, vs) -> (
         let next_states = unfold astate name vs None in

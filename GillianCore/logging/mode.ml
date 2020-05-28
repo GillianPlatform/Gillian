@@ -6,7 +6,7 @@ type level =
 
 type t = Disabled | Enabled of level
 
-let logging_mode = ref @@ Enabled TMI
+let logging_mode = ref @@ Enabled Verbose
 
 let enabled () = !logging_mode <> Disabled
 

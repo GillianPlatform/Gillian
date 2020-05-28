@@ -7,10 +7,8 @@ val serialize_def : def -> Values.t
 val deserialize_def : Values.t -> def
 
 type t = {
-  symb : (string, string) Gillian.Utils.PMap.t;
-      (** maps symbols to loc names *)
-  defs : (string, def) Gillian.Utils.PMap.t;
-      (** maps loc names to definitions *)
+  symb : (string, string) PMap.t;  (** maps symbols to loc names *)
+  defs : (string, def) PMap.t;  (** maps loc names to definitions *)
 }
 
 (** Finds a location name given symbol in the global environment *)
