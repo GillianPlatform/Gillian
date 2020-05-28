@@ -1,21 +1,31 @@
 open Containers
 
 module Filenames = struct
+  (* Common *)
+
+  let exec_mode = "exec_mode.txt"
+
+  (* Used in verification, bi-abduction and individual symbolic testing *)
+
   let sources = "sources.json"
 
-  let sources_dir = "sources"
-
   let call_graph = "call_graph.json"
-
-  let call_graphs_dir = "call-graphs"
 
   let verif_results = "verif_results.json"
 
   let biabduction_results = "specs.json"
 
-  let diff = "diff.txt" (* File used in tests and for debugging *)
+  (* Used in bulk symbolic testing *)
 
-  let exec_mode = "exec_mode.txt"
+  let sources_dir = "sources"
+
+  let call_graphs_dir = "call-graphs"
+
+  let tests_ran = "tests_ran.txt"
+
+  (* Used in tests and for debugging *)
+
+  let diff = "diff.txt"
 end
 
 let results_dir = Config.results_dir
@@ -119,7 +129,15 @@ let write_biabduction_results sources call_graph ~diff results =
 
 let write_symbolic_results = write_results_dir
 
-let write_bulk_symbolic_results sources_table call_graph_table =
+let write_bulk_symbolic_results ~tests_ran sources_table call_graph_table =
+  let write_str_list str_list filename =
+    let out_path = Filename.concat (results_dir ()) filename in
+    let channel = open_out out_path in
+    let fmt = Format.formatter_of_out_channel channel in
+    let newline = Fmt.any "@\n" in
+    Fmt.pf fmt "%a@?" (Fmt.list ~sep:newline Fmt.string) str_list;
+    close_out channel
+  in
   let write_table table dirname to_json =
     Hashtbl.iter
       (fun test_name results ->
@@ -128,6 +146,7 @@ let write_bulk_symbolic_results sources_table call_graph_table =
   in
   delete_results_dir ();
   create_results_dir ();
+  write_str_list tests_ran Filenames.tests_ran;
   write_table sources_table Filenames.sources_dir SourceFiles.yojson_of_t;
   write_table call_graph_table Filenames.call_graphs_dir CallGraph.yojson_of_t;
   write_str (ExecMode.to_string !Config.current_exec_mode) Filenames.exec_mode

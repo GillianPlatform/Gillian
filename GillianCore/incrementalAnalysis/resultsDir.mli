@@ -20,4 +20,7 @@ val write_biabduction_results :
 val write_symbolic_results : SourceFiles.t -> CallGraph.t -> diff:string -> unit
 
 val write_bulk_symbolic_results :
-  (string, SourceFiles.t) Hashtbl.t -> (string, CallGraph.t) Hashtbl.t -> unit
+  tests_ran:string list ->
+  (string, SourceFiles.t) Hashtbl.t ->
+  (string, CallGraph.t) Hashtbl.t ->
+  unit
