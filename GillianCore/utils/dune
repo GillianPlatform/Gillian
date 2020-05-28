@@ -1,4 +1,4 @@
 (library
  (name utils)
  (public_name gillian.utils)
- (libraries unix str batteries logging fmt))
+ (libraries unix str logging fmt))
