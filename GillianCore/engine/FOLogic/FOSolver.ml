@@ -237,6 +237,9 @@ let check_satisfiability
   (* update_statistics "FOS: CheckSat" (time() -. t); *)
   result
 
+let sat ~pfs ~gamma formulae : bool =
+  check_satisfiability (formulae @ PFS.to_list pfs) gamma
+
 (** ************
   * ENTAILMENT *
   * ************ **)
@@ -418,3 +421,23 @@ let is_less_or_equal ~pfs ~gamma e1 e2 =
              ^ (Fmt.to_to_string Formula.pp) feq ))
   in
   result
+
+let resolve_loc_name ~pfs ~gamma loc =
+  Logging.tmi (fun fmt -> fmt "get_loc_name: %a" Expr.pp loc);
+  let lpfs = PFS.to_list pfs in
+  match Reduction.reduce_lexpr ~pfs ~gamma loc with
+  | Lit (Loc loc) | ALoc loc -> Some loc
+  | LVar x                   -> (
+      match Reduction.resolve_expr_to_location lpfs (LVar x) with
+      | Some (loc_name, _) -> Some loc_name
+      | _                  -> None )
+  | loc'                     -> (
+      match Reduction.resolve_expr_to_location lpfs loc' with
+      | Some (loc_name, _) -> Some loc_name
+      | None               ->
+          let msg =
+            Format.asprintf "Unsupported location: %a with pfs:\n%a" Expr.pp
+              loc' PFS.pp pfs
+          in
+          Logging.verbose (fun fmt -> fmt "%s" msg);
+          raise (Failure msg) )

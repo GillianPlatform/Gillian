@@ -34,3 +34,6 @@ val is_different :
 
 val is_less_or_equal :
   pfs:PFS.t -> gamma:TypEnv.t -> Gil_syntax.Expr.t -> Gil_syntax.Expr.t -> bool
+
+val resolve_loc_name :
+  pfs:PFS.t -> gamma:TypEnv.t -> Gil_syntax.Expr.t -> string option

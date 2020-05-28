@@ -12,26 +12,7 @@ module SS = GUtils.Containers.SS
 
 (* Some utils first *)
 
-let get_loc_name pfs gamma loc =
-  let open FOLogic in
-  Logging.tmi (fun fmt -> fmt "get_loc_name: %a" Expr.pp loc);
-  let lpfs = PureContext.to_list pfs in
-  match Reduction.reduce_lexpr ~pfs ~gamma loc with
-  | Lit (Loc loc) | ALoc loc -> Some loc
-  | LVar x                   -> (
-      match Reduction.resolve_expr_to_location lpfs (LVar x) with
-      | Some (loc_name, _) -> Some loc_name
-      | _                  -> None )
-  | loc'                     -> (
-      match Reduction.resolve_expr_to_location lpfs loc' with
-      | Some (loc_name, _) -> Some loc_name
-      | None               ->
-          let msg =
-            Format.asprintf "Unsupported location: %a with pfs:\n%a" Expr.pp
-              loc' PureContext.pp pfs
-          in
-          Logging.verbose (fun fmt -> fmt "%s" msg);
-          raise (Failure msg) )
+let get_loc_name pfs gamma = Gillian.Logic.FOSolver.resolve_loc_name ~pfs ~gamma
 
 let resolve_or_create_loc_name pfs gamma lvar_loc =
   match get_loc_name pfs gamma lvar_loc with
