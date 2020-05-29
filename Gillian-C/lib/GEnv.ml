@@ -1,6 +1,5 @@
 open Gillian.Concrete
 module GUtils = Gillian.Utils
-module PMap = GUtils.PMap
 
 type def = FunDef of string | GlobVar of string
 

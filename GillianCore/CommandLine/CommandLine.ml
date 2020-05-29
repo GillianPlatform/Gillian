@@ -62,7 +62,7 @@ struct
     in
 
     let c = Arg.conv (parse, print) in
-    let v = Enabled TMI in
+    let v = Enabled Verbose in
     let doc =
       "Controls the verbosity level of logging. The value SETTING must be one \
        of `disabled', `normal', `verbose', `tmi'."

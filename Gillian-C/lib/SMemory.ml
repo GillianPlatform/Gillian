@@ -1,5 +1,4 @@
 module GUtils = Gillian.Utils
-module PMap = GUtils.PMap
 module Result = Stdlib.Result
 
 let ( let* ) = Option.bind
