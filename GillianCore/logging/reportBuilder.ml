@@ -8,7 +8,18 @@ let current : Uuidm.t option ref = ref Option.none
 
 let seed = Random.State.make_self_init ()
 
-let make ?(title = "") ~content ?(severity = Report.Log) () =
+let make ?title ~(content : 'a Report.content) ?(severity = Report.Log) () =
+  let title =
+    match title with
+    | None       -> (
+        match content with
+        | Agnostic content -> (
+            match content with
+            | Debug _     -> "Debug message"
+            | Phase phase -> Printf.sprintf "%s phase" phase )
+        | Specific _       -> "Target language specific report" )
+    | Some title -> title
+  in
   let report : 'a Report.t =
     {
       id = Uuidm.v4_gen seed ();
