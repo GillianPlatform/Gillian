@@ -326,7 +326,7 @@ struct
         in
         let prev_source_files, prev_call_graph = read_symbolic_results () in
         let proc_changes =
-          get_changes prog.prog ~prev_source_files ~prev_call_graph
+          get_sym_changes prog.prog ~prev_source_files ~prev_call_graph
             ~cur_source_files
         in
         let changed_procs =

@@ -1,13 +1,12 @@
 open Lexing
 module L = Logging
+module SS = Containers.SS
 
 module Preprocess_GCmd = PreProcessing_Utils.M (struct
   type t = int Cmd.t
 
   let successors = Cmd.successors
 end)
-
-module SS = Containers.SS
 
 (** Used to avoid redundant parsing. *)
 let cached_progs = Hashtbl.create Config.small_tbl_size

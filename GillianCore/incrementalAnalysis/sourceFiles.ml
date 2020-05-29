@@ -40,7 +40,7 @@ type t = (string, SourceFile.t) hashtbl [@@deriving yojson]
 
 let make () : t = Hashtbl.create Config.small_tbl_size
 
-let reset : t -> unit = Hashtbl.reset
+let reset = Hashtbl.reset
 
 let get_or_make_file files path =
   match Hashtbl.find_opt files path with
