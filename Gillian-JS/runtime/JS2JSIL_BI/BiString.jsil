@@ -15,7 +15,7 @@ proc s__getOwnProperty (l, prop) {
 					goto [idx < 0] r_uf nch;
 	nch:    goto [idx < 4294967295] next r_uf;
 
-	next:		sidx := "i__toStringComputed" (idx);
+	next:		sidx := "i__toString" (idx);
 
 					goto [sidx = prop] index r_uf;
 
@@ -118,7 +118,7 @@ proc SP_toString (xsc, vthis) {
 (* *** CHARAT *** *)
 proc SP_charAt (xsc, vthis, position) {
 				ret := "i__checkObjectCoercible" (vthis) with elab;
-				ret := "i__toStringUncut" (vthis) with elab;
+				ret := "i__toString" (vthis) with elab;
 				S := ret;
 				ret := "i__toInteger" (position) with elab;
 				pos := ret;
@@ -143,7 +143,7 @@ proc SP_concat () {
 			num := l-len (arguments);
 
 			ret := "i__checkObjectCoercible" (vthis) with elab;
-			ret := "i__toStringUncut" (vthis) with elab;
+			ret := "i__toString" (vthis) with elab;
 			R := ret;
 			idx := 2;
 
@@ -151,7 +151,7 @@ proc SP_concat () {
 	loop:	goto [idx < num] add end;
 
 	add:	next := l-nth (arguments, idx);
-			ret := "i__toStringUncut" (next) with elab;
+			ret := "i__toString" (next) with elab;
 			nStr := ret;
 			R := R ++ nStr;
 			idx := idx + 1;
@@ -166,7 +166,7 @@ proc SP_concat () {
 (* *** INDEXOF *** *)
 proc SP_indexOf (xsc, vthis, searchString, position) {
 					ret := "i__checkObjectCoercible" (vthis) with elab;
-					ret := "i__toStringUncut" (vthis) with elab;
+					ret := "i__toString" (vthis) with elab;
 					S := ret;
 
 					ret := "i__toString" (searchString) with elab;
@@ -223,7 +223,7 @@ proc SP_indexOf (xsc, vthis, searchString, position) {
 (* *** LASTINDEXOF *** *)
 proc SP_lastIndexOf (xsc, vthis, searchString, position) {
 			ret := "i__checkObjectCoercible" (vthis) with elab;
-			ret := "i__toStringUncut" (vthis) with elab;
+			ret := "i__toString" (vthis) with elab;
 			S := ret;
 
 			len := s-len (S);
@@ -291,7 +291,7 @@ proc SP_lastIndexOf (xsc, vthis, searchString, position) {
 (* *** SLICE *** *)
 proc SP_slice (xsc, vthis, start, end) {
 			ret := "i__checkObjectCoercible" (vthis) with elab;
-			ret := "i__toStringUncut" (vthis) with elab;
+			ret := "i__toString" (vthis) with elab;
 			S := ret;
 			len := s-len (S);
 
@@ -336,12 +336,12 @@ proc SP_slice (xsc, vthis, start, end) {
 			cnt := 0;
 	loop:	goto [cnt < span] add stop;
 
-	add: ret := s-nth (S, from);
-  		 nStr := ret;
-			 R := R ++ nStr;
-			 cnt := cnt + 1;
-			 from := from + 1;
-			 goto loop;
+	add:	ret := s-nth (S, from);
+			nStr := ret;
+			R := R ++ nStr;
+			cnt := cnt + 1;
+			from := from + 1;
+			goto loop;
 
 	stop:	ret := R;
 	rlab: return;
@@ -352,7 +352,7 @@ proc SP_slice (xsc, vthis, start, end) {
 (* *** SUBSTRING *** *)
 proc SP_substring (xsc, vthis, start, end) {
 			ret := "i__checkObjectCoercible" (vthis) with elab;
-			ret := "i__toStringUncut" (vthis) with elab;
+			ret := "i__toString" (vthis) with elab;
 			S := ret;
 			len := s-len (S);
 
@@ -383,12 +383,12 @@ proc SP_substring (xsc, vthis, start, end) {
 			cnt := 0;
 	loop:	goto [cnt < span] add stop;
 
-	add: ret := s-nth (S, from);
-			 nStr := ret;
-			 R := R ++ nStr;
-			 cnt := cnt + 1;
-			 from := from + 1;
-			 goto loop;
+	add:	ret := s-nth (S, from);
+			nStr := ret;
+			R := R ++ nStr;
+			cnt := cnt + 1;
+			from := from + 1;
+			goto loop;
 
 	stop:	ret := R;
 	rlab: return;

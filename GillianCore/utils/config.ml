@@ -48,8 +48,6 @@ let lemma_proof = ref true
 
 (** {2 Parallel threading} *)
 
-let multi_thread = ref true
-
 let parallel = ref false
 
 (** {2 Statistics} *)
@@ -63,6 +61,10 @@ let stats = ref false
 let bi_dflt = ref true
 
 let bi_unfold_depth = ref 1
+
+let bi_unroll_depth = ref 1
+
+let bi_no_spec_depth = ref 0
 
 let delay_entailment = ref true
 
