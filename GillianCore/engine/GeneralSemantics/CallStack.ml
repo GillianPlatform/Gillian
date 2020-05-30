@@ -92,4 +92,20 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
     List.map
       (fun (a, b, c, d, e, f, g) -> (a, b, Option.map Store.copy c, d, e, f, g))
       cs
+
+  (**
+    Call stack recursive depth
+
+    @param cs Target call stack
+    @param pid Identified of the target procedure
+    @return The number of times the pid been recursively called
+  *)
+  let recursive_depth (cs : t) (pid : string) : int =
+    List.fold_left
+      (fun ac (pid', b, c, d, e, f, g) -> if pid' = pid then ac + 1 else ac)
+      (-1) cs
+
+  let get_cur_procs (cs : t) : string list =
+    List.rev
+      (List.fold_left (fun ac (pid', b, c, d, e, f, g) -> pid' :: ac) [] cs)
 end

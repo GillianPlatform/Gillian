@@ -307,11 +307,7 @@ let resolve_expr_to_location (pfs : Formula.t list) (e : Expr.t) :
             | Eq (Lit (Loc l), e') when e' = e -> (ac_var, Some l)
             | Eq (e', ALoc l) when e' = e -> (ac_var, Some l)
             | Eq (e', Lit (Loc l)) when e' = e -> (ac_var, Some l)
-            | _ ->
-                L.(
-                  verbose (fun m ->
-                      m "false with: %s\n" ((Fmt.to_to_string Formula.pp) fo)));
-                (ac_var, ac_loc) ))
+            | _ -> (ac_var, ac_loc) ))
       (None, None) pfs
   in
 

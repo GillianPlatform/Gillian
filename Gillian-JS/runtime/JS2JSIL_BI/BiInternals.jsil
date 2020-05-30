@@ -2,41 +2,59 @@
 (* CONVERSIONS AND CHECKS *)
 (* ********************** *)
 
+(* *** TO LENGTH *** *)
+
+proc i__toLength (v) {
+
+		   ret := "i__toInteger"(v) with elab;
+		   goto [ret <= 0] rlab nzero;
+
+	nzero: goto [ret <= 9007199254740991] min rlab;
+    min:   return;
+
+
+	rlab: PHI(ret: 0, 9007199254740991);
+          return;
+
+	elab: throw
+};
+
 (* *** ISPRIMITIVE *** *)
 
 proc i__isPrimitive (v) {
 
-       goto [(v = undefined)] rt c1;
-  c1:  goto [(v = null)] rt c2;
-  c2:  tv := typeOf v;
-       goto [(tv = Bool)] rt c3;
-  c3:  goto [(tv = Num)] rt c4;
-  c4:  goto [(tv = Str)] rt rf;
+	     goto [(v = undefined)] rt c1;
+	c1:  goto [(v = null)] rt c2;
+	c2:	 tv := typeOf v;
+	     goto [(tv = Bool)] rt c3;
+	c3:  goto [(tv = Num)] rt c4;
+	c4:  goto [(tv = Str)] rt rf;
 
-  rt:  ret := true;
-       return;
+	rt:  ret := true;
+	     return;
 
-  rf:  goto [(tv = Obj)] rf1 wtf;
-  rf1: ret := false;
-       return;
+	rf:  goto [(tv = Obj)] rf1 wtf;
+	rf1: ret := false;
+	     return;
 
-  wtf: assume(False)
+	wtf: assume(False)
 
 };
 
 (* *** TOPRIMITIVE *** *)
 
 proc i__toPrimitive (v, hint) {
-        ret := v;
-        tv := typeOf v;
 
-  iu:   prim := "i__isPrimitive" (v);
-        goto [prim] rlab obj;
+		  ret := v;
+		  tv := typeOf v;
 
-  obj:  assume(False);
+	iu:	  prim := "i__isPrimitive" (v);
+	      goto [prim] rlab obj;
 
-  rlab: return;
-  elab: throw
+	obj:  ret := "defaultValue" (v, hint) with elab;
+
+	rlab: return;
+	elab: throw
 };
 
 (* ************** *)
@@ -48,29 +66,28 @@ proc i__toPrimitive (v, hint) {
  * Branch on class: string or non-string
  *)
 proc getOwnProperty (l, prop) {
+		  m := metadata(l);
+		  class := [m, "@class"];
 
-        m := metadata(l);
-        class := [m, "@class"];
+		  goto [class = "String"] sgop ogop;
 
-        goto [class = "String"] sgop ogop;
+	sgop: ret := "s__getOwnProperty" (l, prop) with elab;
+		  goto rlab;
 
-  sgop: ret := "s__getOwnProperty" (l, prop) with elab;
-        goto rlab;
+	ogop: ret := "o__getOwnProperty" (l, prop) with elab;
 
-  ogop: ret := "o__getOwnProperty" (l, prop) with elab;
-
-  rlab: return;
-  elab: throw
+	rlab: return;
+	elab: throw
 };
 
 proc o__getOwnProperty (l, prop) {
-            x := hasField(l, prop);
-            goto [x] hp nhp;      (* Does the field exist? *)
+          x := hasField(l, prop);
+          goto [x] hp nhp; 		  (* Does the field exist? *)
 
-    nhp:    ret := undefined;   (* Field doesn't exist; rtrn undefined *)
-            goto rlab;
+    nhp:  ret := undefined;		  (* Field doesn't exist; rtrn undefined *)
+          goto rlab;
 
-    hp:     ret := [l, prop];     (* Field exists; rtrn the descriptor *)
+    hp:   ret := [l, prop];		  (* Field exists; rtrn the descriptor *)
 
     rlab: return
 };
@@ -81,17 +98,17 @@ proc o__getOwnProperty (l, prop) {
 
 proc getProperty (l, prop) {
 
-       ret := "getOwnProperty" (l, prop) with elab;
-       goto [ret = undefined] next rlab;
+		  ret := "getOwnProperty" (l, prop) with elab;
+		  goto [ret = undefined] next rlab;
 
- next: m := metadata(l);
-       proto := [m, "@proto"];
-       goto [proto = null] rlab call;
+    next: m := metadata(l);
+          proto := [m, "@proto"];
+          goto [proto = null] rlab call;
 
- call: ret := "getProperty" (proto, prop) with elab;
+    call: ret := "getProperty" (proto, prop) with elab;
 
- rlab: return;
- elab: throw
+    rlab: return;
+    elab: throw
 };
 
 (* *** *)
@@ -100,23 +117,23 @@ proc getProperty (l, prop) {
 
 proc get (l, prop) {
 
-      ret := "getProperty" (l, prop) with elab;
-      goto [ret = undefined] rlab def;    (* Does the field exist?    *)
+			ret := "getProperty" (l, prop) with elab;
+			goto [ret = undefined] rlab def;		(* Does the field exist?    *)
 
-  def:  d := l-nth (ret, 0);          (* Get the descriptor type  *)
-      ret := l-nth (ret, 1);        (* Get the value/getter     *)
-      goto [d = "d"] rlab acc;        (* Is it a data descriptor? *)
+	def:	d := l-nth (ret, 0);					(* Get the descriptor type  *)
+			ret := l-nth (ret, 1);				(* Get the value/getter     *)
+			goto [d = "d"] rlab acc;				(* Is it a data descriptor? *)
 
-  acc:  goto [ret = undefined] rlab get;    (* Is the getter defined?               *)
-  get:  m := metadata(ret);
-      xsc := [m, "@scope"];       (* Get the scope of the getter          *)
-      fun := [m, "@call"];          (* Get the name of the getter           *)
-      ret := fun (xsc, l) with elab;      (* Call the getter, errors could happen *)
-      goto [ret = empty] undef rlab;
-  undef:  ret := undefined;
+	acc:	goto [ret = undefined] rlab get;		(* Is the getter defined?               *)
+	get:	m := metadata(ret);
+			xsc := [m, "@scope"];				(* Get the scope of the getter          *)
+			fun := [m, "@call"];					(* Get the name of the getter           *)
+			ret := fun (xsc, l) with elab;			(* Call the getter, errors could happen *)
+			goto [ret = empty] undef rlab;
+	undef:	ret := undefined;
 
-  rlab: return;
-  elab: throw
+	rlab: return;
+	elab: throw
 };
 
 (* ****** *)
@@ -125,31 +142,31 @@ proc get (l, prop) {
 
 proc canPut (l, prop) {
             ret := "getOwnProperty" (l, prop) with elab;
-  op:   goto [ret = undefined] nop odesc;   (* Does the own property exist? *)
+	op:		goto [ret = undefined] nop odesc; 	(* Does the own property exist? *)
 
-  odesc:  d := l-nth (ret, 0);            (* It does; get the descriptor type *)
-      goto [d = "d"] odd nop;             (* Is the descriptor a data descriptor? *)
+	odesc:	d := l-nth (ret, 0);						(* It does; get the descriptor type *)
+			goto [d = "d"] odd nop;					    (* Is the descriptor a data descriptor? *)
 
-  odd:  ret := l-nth (ret, 2);          (* It is; rtrn the Writable attribute *)
-      goto rlab;
+	odd:	ret := l-nth (ret, 2);					(* It is; rtrn the Writable attribute *)
+			goto rlab;
 
-  nop:  m := metadata(l);
-      e := [m, "@extensible"];           (* Get the extensible property *)
-      ret := "getProperty" (l, prop) with elab; (* Does the property exist? *)
-      goto [ret = undefined] ext desc;       (* It doesn't; rtrn extensible *)
+	nop:	m := metadata(l);
+			e := [m, "@extensible"];				   (* Get the extensible property *)
+			ret := "getProperty" (l, prop) with elab; (* Does the property exist? *)
+			goto [ret = undefined] ext desc;		   (* It doesn't; rtrn extensible *)
 
-  desc: d := l-nth (ret, 0);          (* Get the descriptor type *)
-      v := l-nth (ret, 2);          (* Get the writable/setter *)
-      goto [d = "d"] dd ad;         (* Is it a data descriptor? *)
+	desc:	d := l-nth (ret, 0);					(* Get the descriptor type *)
+			v := l-nth (ret, 2);					(* Get the writable/setter *)
+			goto [d = "d"] dd ad;					(* Is it a data descriptor? *)
 
-  dd:   goto [e] wr ext;            (* Yes; is the object extensible? *)
-  wr:   ret := v;               (* Yes; rtrn writable *)
-      goto rlab;
+	dd:		goto [e] wr ext;						(* Yes; is the object extensible? *)
+	wr:		ret := v;								(* Yes; rtrn writable *)
+			goto rlab;
 
-  ad:   ret := not (v = undefined);       (* Accessor descriptor *)
-      goto rlab;
+	ad:		ret := not (v = undefined); 			(* Accessor descriptor *)
+			goto rlab;
 
-  ext:  ret := e;               (* Return extensible *)
+	ext:	ret := e;								(* Return extensible *)
 
     rlab: return;
     elab: throw
@@ -164,33 +181,33 @@ proc put (l, prop, value, thrw) {
             goto [ret] cp reject;
 
     cp:     ret := "getOwnProperty" (l, prop) with elab;
-        dd := "i__isDataDescriptor" (ret);
-        goto [dd] dd gp;
+    		dd := "i__isDataDescriptor" (ret);
+    		goto [dd] dd gp;
 
-    dd:   desc := {{ "g", empty, empty, value, empty, empty, empty }};
-        ret := "defineOwnProperty" (l, prop, desc, thrw) with elab;
-        goto remp;
+    dd:		desc := {{ "g", empty, empty, value, empty, empty, empty }};
+    		ret := "defineOwnProperty" (l, prop, desc, thrw) with elab;
+    		goto remp;
 
-    gp:   ret := "getProperty" (l, prop) with elab;
-        ad := "i__isAccessorDescriptor" (ret);
-        goto [ad] ad def;
+    gp:		ret := "getProperty" (l, prop) with elab;
+    		ad := "i__isAccessorDescriptor" (ret);
+    		goto [ad] ad def;
 
-    ad:   s := l-nth (ret, 2);
-        m := metadata(s);
-        xsc := [m, "@scope"];
-        fun := [m, "@call"];
-        ret := fun (xsc, l, value) with elab;
-        goto remp;
+    ad:		s := l-nth (ret, 2);
+    		m := metadata(s);
+    		xsc := [m, "@scope"];
+    		fun := [m, "@call"];
+    		ret := fun (xsc, l, value) with elab;
+    		goto remp;
 
-    def:  desc := {{ "g", true, true, value, true, empty, empty }};
-        ret := "defineOwnProperty" (l, prop, desc, thrw) with elab;
+    def:	desc := {{ "g", true, true, value, true, empty, empty }};
+    		ret := "defineOwnProperty" (l, prop, desc, thrw) with elab;
 
     remp:   ret := empty;
-    rlab: return;
+    rlab:   return;
 
     reject: goto [thrw] tt remp;
     tt:     ret := "TypeError" ();
-    elab: throw
+    elab:   throw
 };
 
 (* *********** *)
@@ -198,12 +215,12 @@ proc put (l, prop, value, thrw) {
 (* *********** *)
 
 proc hasProperty (l, prop) {
-      ret := "getProperty" (l, prop) with elab;
+			ret := "getProperty" (l, prop) with elab;
 
-  rlab: ret := not (ret = undefined);
-        return;
+	rlab:	ret := not (ret = undefined);
+				return;
 
-  elab: throw
+	elab: throw
 };
 
 (* ************** *)
@@ -211,23 +228,23 @@ proc hasProperty (l, prop) {
 (* ************** *)
 
 proc deleteProperty (l, prop, thrw) {
-      ret := "getOwnProperty" (l, prop) with elab;
-      goto [ret = undefined] dt cont;
+			ret := "getOwnProperty" (l, prop) with elab;
+			goto [ret = undefined] dt cont;
 
-  cont: c := l-nth (ret, 4);
-      goto [c] del reject;
-  del:  delete (l, prop);
+	cont:	c := l-nth (ret, 4);
+			goto [c] del reject;
+	del:	delete (l, prop);
 
-  dt:   ret := true;
-      goto rlab;
+	dt:		ret := true;
+			goto rlab;
 
-  df:   ret := false;
-  rlab: return;
+	df:		ret := false;
+	rlab:   return;
 
     reject: goto [thrw] tt df;
 
     tt:     ret := "TypeError" ();
-    elab: throw
+    elab:   throw
 };
 
 (* ************ *)
@@ -235,45 +252,45 @@ proc deleteProperty (l, prop, thrw) {
 (* ************ *)
 
 proc defaultValue (l, hint) {
-        goto [hint = empty] hint init;
+			  goto [hint = empty] hint init;
 
-  hint: hint := "Number";
-        m := metadata(l);
-        class := [m, "@class"];
-        goto [class = "Date"] hs init;
-  hs:   hint := "String";
+	hint:  hint := "Number";
+		   m := metadata(l);
+		   class := [m, "@class"];
+		   goto [class = "Date"] hs init;
+	hs:	   hint := "String";
 
-  init: pass := 0;
-        goto [hint = "String"] s n;
+	init:  pass := 0;
+           goto [hint = "String"] s n;
 
-  main: goto [pass = 2] thrw cc;
+	main:  goto [pass = 2] thrw cc;
 
-    cc: pass := pass + 1;
-        ret := "get" (l, proc_name) with elab;
-        goto [ret = undefined] next is_c;
+    cc:	   pass := pass + 1;
+    	   ret := "get" (l, proc_name) with elab;
+    	   goto [ret = undefined] next is_c;
 
-    is_c: c := "i__isCallable" (ret);
-               goto [c] call next;
+    is_c:  c := "i__isCallable" (ret);
+           goto [c] call next;
 
-    call: m := metadata(ret);
-          xsc := [m, "@scope"];
-          fun := [m, "@call"];
-          ret := fun (xsc, l) with elab;
-          goto [ret = empty] undef ispr;
-  undef:  ret := undefined;
-  ispr:   prim := "i__isPrimitive"(ret);
-          goto [prim] rlab next;
+    call:  m := metadata(ret);
+    	   xsc := [m, "@scope"];
+           fun := [m, "@call"];
+           ret := fun (xsc, l) with elab;
+		   goto [ret = empty] undef ispr;
+	undef: ret := undefined;
+	ispr:  prim := "i__isPrimitive"(ret);
+	       goto [prim] rlab next;
 
-    next: goto [proc_name = "toString"] n s;
-    rlab: return;
+    next:  goto [proc_name = "toString"] n s;
+    rlab:  return;
 
-    s: proc_name := "toString";
-       goto main;
-    n: proc_name := "valueOf";
-       goto main;
+    s:     proc_name := "toString";
+    	   goto main;
+    n:     proc_name := "valueOf";
+    	   goto main;
 
-    thrw: ret := "TypeError" ();
-    elab: throw
+    thrw:  ret := "TypeError" ();
+    elab:  throw
 };
 
 (* ***************** *)
@@ -286,18 +303,18 @@ proc defaultValue (l, hint) {
  *)
 proc defineOwnProperty (l, prop, desc, thrw) {
 
-      m := metadata(l);
-      class := [m, "@class"];
+		  m := metadata(l);
+		  class := [m, "@class"];
 
-      goto [class = "Array"] adop odop;
+		  goto [class = "Array"] adop odop;
 
-  adop: ret := "a__defineOwnProperty" (l, prop, desc, thrw) with elab;
-      goto rlab;
+	adop: ret := "a__defineOwnProperty" (l, prop, desc, thrw) with elab;
+		  goto rlab;
 
-  odop: ret := "o__defineOwnProperty" (l, prop, desc, thrw) with elab;
+	odop: ret := "o__defineOwnProperty" (l, prop, desc, thrw) with elab;
 
-  rlab: return;
-  elab: throw
+	rlab: return;
+	elab: throw
 };
 
 proc o__defineOwnProperty (l, prop, desc, thrw) {
@@ -473,201 +490,201 @@ proc o__defineOwnProperty (l, prop, desc, thrw) {
 (* *** ISDATADESCRIPTOR *** *)
 
 proc i__isDataDescriptor (desc) {
-      goto [desc = undefined] rf cont;
-  cont: d := l-nth (desc, 0);
-      goto [d = "d"] rt gen;
-  gen:  goto [d = "g"] test rf;
-  test: v := l-nth (desc, 3);
-      w := l-nth (desc, 4);
-      goto [(v = empty) and (w = empty)] rf rt;
-  rt:   ret := true;
-      goto rlab;
-  rf:   ret := false;
-  rlab: return
+			goto [desc = undefined] rf cont;
+	cont:	d := l-nth (desc, 0);
+			goto [d = "d"] rt gen;
+	gen:	goto [d = "g"] test rf;
+	test:	v := l-nth (desc, 3);
+			w := l-nth (desc, 4);
+			goto [(v = empty) and (w = empty)] rf rt;
+	rt:		ret := true;
+			goto rlab;
+	rf:		ret := false;
+	rlab: return
 };
 
 (* *** ISACCESSORDESCRIPTOR *** *)
 
 proc i__isAccessorDescriptor (desc) {
-      goto [desc = undefined] rf cont;
-  cont: d := l-nth (desc, 0);
-      goto [d = "a"] rt gen;
-  gen:  goto [d = "g"] test rf;
-  test: g := l-nth (desc, 5);
-      s := l-nth (desc, 6);
-      goto [(g = empty) and (s = empty)] rf rt;
-  rt:   ret := true;
-      goto rlab;
-  rf:   ret := false;
-  rlab: return
+			goto [desc = undefined] rf cont;
+	cont:	d := l-nth (desc, 0);
+			goto [d = "a"] rt gen;
+	gen:	goto [d = "g"] test rf;
+	test:	g := l-nth (desc, 5);
+			s := l-nth (desc, 6);
+			goto [(g = empty) and (s = empty)] rf rt;
+	rt:		ret := true;
+			goto rlab;
+	rf:		ret := false;
+	rlab: return
 };
 
 (* *** ISGENERICDESCRIPTOR *** *)
 
 proc i__isGenericDescriptor (desc) {
-      goto [desc = undefined] rf cont;
+			goto [desc = undefined] rf cont;
 
-  cont: dd := "i__isDataDescriptor" (desc);
-      ad := "i__isAccessorDescriptor" (desc);
-      ret := not (dd or ad);
-      goto rlab;
+	cont:	dd := "i__isDataDescriptor" (desc);
+			ad := "i__isAccessorDescriptor" (desc);
+			ret := not (dd or ad);
+			goto rlab;
 
-  rf:   ret := false;
-  rlab: return
+	rf:		ret := false;
+	rlab: return
 };
 
 (* *** TODATADESCRIPTOR *** *)
 
 proc i__toDataDescriptor (desc) {
-      d := l-nth (desc, 0);
-      goto [d = "d"] rd cstr;
+			d := l-nth (desc, 0);
+			goto [d = "d"] rd cstr;
 
-  cstr: goto [d = "a"] ra gen;
+	cstr:	goto [d = "a"] ra gen;
 
-  ra:   ret := {{ "d", undefined, false, l-nth (desc, 3), l-nth (desc, 4) }};
-      goto rlab;
+	ra:		ret := {{ "d", undefined, false, l-nth (desc, 3), l-nth (desc, 4) }};
+			goto rlab;
 
-  gen:  e := l-nth (desc, 1);
-      c := l-nth (desc, 2);
-      v := l-nth (desc, 3);
-      w := l-nth (desc, 4);
+	gen:	e := l-nth (desc, 1);
+			c := l-nth (desc, 2);
+			v := l-nth (desc, 3);
+			w := l-nth (desc, 4);
 
-      goto [e = empty] fixe c;
-  fixe: e := false;
-  c:    goto [c = empty] fixc v;
-  fixc: c := false;
-  v:    goto [v = empty] fixv w;
-  fixv: v := undefined;
-  w:    goto [w = empty] fixw fixed;
-  fixw: w := false;
+			goto [e = empty] fixe c;
+	fixe:	e := false;
+	c:		goto [c = empty] fixc v;
+	fixc:	c := false;
+	v:		goto [v = empty] fixv w;
+	fixv:	v := undefined;
+	w:		goto [w = empty] fixw fixed;
+	fixw:	w := false;
 
-  fixed:  ret := {{ "d", v, w, e, c }};
-      goto rlab;
+	fixed:	ret := {{ "d", v, w, e, c }};
+			goto rlab;
 
-  rd:   ret := desc;
-  rlab: return
+	rd:		ret := desc;
+	rlab: return
 };
 
 (* *** TOACCESSORDESCRIPTOR *** *)
 
 proc i__toAccessorDescriptor (desc) {
-      d := l-nth (desc, 0);
-      goto [d = "a"] rd cstr;
+			d := l-nth (desc, 0);
+			goto [d = "a"] rd cstr;
 
-  cstr: goto [d = "d"] ac gen;
+	cstr:	goto [d = "d"] ac gen;
 
-  ac:   ret := {{ "a", undefined, undefined, l-nth (desc, 3), l-nth (desc, 4) }};
-      goto rlab;
+	ac:		ret := {{ "a", undefined, undefined, l-nth (desc, 3), l-nth (desc, 4) }};
+			goto rlab;
 
-  gen:  e := l-nth (desc, 1);
-      c := l-nth (desc, 2);
-      g := l-nth (desc, 5);
-      s := l-nth (desc, 6);
+	gen:	e := l-nth (desc, 1);
+			c := l-nth (desc, 2);
+			g := l-nth (desc, 5);
+			s := l-nth (desc, 6);
 
-      goto [e = empty] fixe c;
-  fixe: e := false;
-  c:    goto [c = empty] fixc v;
-  fixc: c := false;
-  v:    goto [g = empty] fixg w;
-  fixg: g := undefined;
-  w:    goto [s = empty] fixs fixed;
-  fixs: s := undefined;
+			goto [e = empty] fixe c;
+	fixe:	e := false;
+	c:		goto [c = empty] fixc v;
+	fixc:	c := false;
+	v:		goto [g = empty] fixg w;
+	fixg:	g := undefined;
+	w:		goto [s = empty] fixs fixed;
+	fixs:	s := undefined;
 
-  fixed:  ret := {{ "a", g, s, e, c }};
-      goto rlab;
+	fixed:	ret := {{ "a", g, s, e, c }};
+			goto rlab;
 
-  rd:   ret := desc;
-  rlab: return
+	rd:		ret := desc;
+	rlab: return
 };
 
 (* *** FROMPROPERTYDESCRIPTOR *** *)
 
 proc i__fromPropertyDescriptor (desc) {
-      goto [desc = undefined] undef def;
+			goto [desc = undefined] undef def;
 
-  def:  ret := "Object_construct" ();
+	def:	ret := "Object_construct" ();
 
-      dd := "i__isDataDescriptor" (desc);
-      goto [dd] dd is_ac;
+			dd := "i__isDataDescriptor" (desc);
+			goto [dd] dd is_ac;
 
-  dd:   res := "defineOwnProperty" (ret, "value",    {{ "d", l-nth (desc, 1), true, true, true}}, false);
-      res := "defineOwnProperty" (ret, "writable", {{ "d", l-nth (desc, 2), true, true, true}}, false);
-      goto ec;
+	dd:		res := "defineOwnProperty" (ret, "value",    {{ "d", l-nth (desc, 1), true, true, true}}, false);
+			res := "defineOwnProperty" (ret, "writable", {{ "d", l-nth (desc, 2), true, true, true}}, false);
+			goto ec;
 
-  is_ac:  ad := "i__isAccessorDescriptor" (desc);
-      goto [ad] ad oops;
+	is_ac:	ad := "i__isAccessorDescriptor" (desc);
+			goto [ad] ad oops;
 
-  ad:   res := "defineOwnProperty" (ret, "get", {{ "d", l-nth (desc, 1), true, true, true}}, false);
-      res := "defineOwnProperty" (ret, "set", {{ "d", l-nth (desc, 2), true, true, true}}, false);
+	ad:		res := "defineOwnProperty" (ret, "get", {{ "d", l-nth (desc, 1), true, true, true}}, false);
+			res := "defineOwnProperty" (ret, "set", {{ "d", l-nth (desc, 2), true, true, true}}, false);
 
-  ec:   res := "defineOwnProperty" (ret, "enumerable",   {{ "d", l-nth (desc, 3), true, true, true}}, false);
-      res := "defineOwnProperty" (ret, "configurable", {{ "d", l-nth (desc, 4), true, true, true}}, false);
-      goto rlab;
+	ec:		res := "defineOwnProperty" (ret, "enumerable",   {{ "d", l-nth (desc, 3), true, true, true}}, false);
+			res := "defineOwnProperty" (ret, "configurable", {{ "d", l-nth (desc, 4), true, true, true}}, false);
+			goto rlab;
 
-  oops: ret := "fromPropertyDescriptor: This should not happen";
-        throw;
+	oops:	ret := "fromPropertyDescriptor: This should not happen";
+			  throw;
 
-  undef:  ret := undefined;
-  rlab: return
+	undef:	ret := undefined;
+	rlab: return
 };
 
 (* *** TOPROPERTYDESCRIPTOR *** *)
 
 proc i__toPropertyDescriptor (v) {
-      goto [typeOf v = Obj] init thrw;
+			goto [typeOf v = Obj] init thrw;
 
-  init: dv := empty;
-      dw := empty;
-      dg := empty;
-      ds := empty;
-      de := empty;
-      dc := empty;
+	init:	dv := empty;
+			dw := empty;
+			dg := empty;
+			ds := empty;
+			de := empty;
+			dc := empty;
 
-  has_de: res := "hasProperty" (v, "enumerable");
-      goto [res] de has_dc;
-  de:   ret := "get" (v, "enumerable") with elab;
-      ret := "i__toBoolean" (ret);
-      de := ret;
+	has_de:	res := "hasProperty" (v, "enumerable");
+			goto [res] de has_dc;
+	de:		ret := "get" (v, "enumerable") with elab;
+			ret := "i__toBoolean" (ret);
+			de := ret;
 
-  has_dc: res := "hasProperty" (v, "configurable");
-      goto [res] dc has_dv;
-  dc:   ret := "get" (v, "configurable") with elab;
-      ret := "i__toBoolean" (ret);
-      dc := ret;
+	has_dc:	res := "hasProperty" (v, "configurable");
+			goto [res] dc has_dv;
+	dc:		ret := "get" (v, "configurable") with elab;
+			ret := "i__toBoolean" (ret);
+			dc := ret;
 
-  has_dv: res := "hasProperty" (v, "value");
-      goto [res] dv has_dw;
-  dv:   ret := "get" (v, "value") with elab;
-      dv := ret;
+	has_dv:	res := "hasProperty" (v, "value");
+			goto [res] dv has_dw;
+	dv:		ret := "get" (v, "value") with elab;
+			dv := ret;
 
-  has_dw: res := "hasProperty" (v, "writable");
-      goto [res] dw has_dg;
-  dw:   ret := "get" (v, "writable") with elab;
-      ret := "i__toBoolean" (ret);
-      dw := ret;
+	has_dw:	res := "hasProperty" (v, "writable");
+			goto [res] dw has_dg;
+	dw:		ret := "get" (v, "writable") with elab;
+			ret := "i__toBoolean" (ret);
+			dw := ret;
 
-  has_dg: res := "hasProperty" (v, "get");
-      goto [res] dg has_ds;
-  dg:   ret := "get" (v, "get") with elab;
-      call := "i__isCallable" (ret);
-      goto [call or (ret = undefined)] get thrw;
-  get:  dg := ret;
+	has_dg:	res := "hasProperty" (v, "get");
+			goto [res] dg has_ds;
+	dg:		ret := "get" (v, "get") with elab;
+			call := "i__isCallable" (ret);
+			goto [call or (ret = undefined)] get thrw;
+	get:	dg := ret;
 
-  has_ds: res := "hasProperty" (v, "set");
-      goto [res] ds check;
-  ds:   ret := "get" (v, "set") with elab;
-      call := "i__isCallable" (ret);
-      goto [call or (ret = undefined)] set thrw;
-  set:  ds := ret;
+	has_ds:	res := "hasProperty" (v, "set");
+			goto [res] ds check;
+	ds:		ret := "get" (v, "set") with elab;
+			call := "i__isCallable" (ret);
+			goto [call or (ret = undefined)] set thrw;
+	set:	ds := ret;
 
-  check:  goto [(not (dg = empty)) or (not (ds = empty))] vw rtrn;
-  vw:   goto [(not (dv = empty)) or (not (dw = empty))] thrw rtrn;
+	check:	goto [(not (dg = empty)) or (not (ds = empty))] vw rtrn;
+	vw:		goto [(not (dv = empty)) or (not (dw = empty))] thrw rtrn;
 
-  rtrn: ret := {{ "g", de, dc, dv, dw, dg, ds }};
+	rtrn:	ret := {{ "g", de, dc, dv, dw, dg, ds }};
 
-  rlab: return;
+	rlab: return;
 
-  thrw:  ret := "TypeError" ();
+	thrw:  ret := "TypeError" ();
     elab: throw
 
 };
@@ -680,6 +697,7 @@ proc i__toPropertyDescriptor (v) {
 (* GETVALUE *)
 (* ******** *)
 
+(* ADJUST FOR NON-STRICT, THIS IS NOT CLEAR AT ALL *)
 proc i__getValue (v) {
 
 			goto [(typeOf v = List)] rcand dflt;
@@ -804,203 +822,188 @@ proc i__putValue (v, w) {
 (* *** TOBOOLEAN *** *)
 
 proc i__toBoolean (v) {
-  iu:   goto [v = undefined] undef in;
-  undef:  ret := false;
-      goto rlab;
+	iu:		goto [v = undefined] undef in;
+	undef:	ret := false;
+			goto rlab;
 
-  in:   goto [v = null] nll ib;
-  nll:  ret := false;
-      goto rlab;
+	in:		goto [v = null] nll ib;
+	nll:	ret := false;
+			goto rlab;
 
-  ib:   goto [typeOf v = Bool] bool inum;
-  bool: ret := v;
-      goto rlab;
+	ib:		goto [typeOf v = Bool] bool inum;
+	bool:	ret := v;
+			goto rlab;
 
-  inum: goto [typeOf v = Num] num is;
-  num:  goto [(v = 0) or (not (v = v))] is_f is_t;
+	inum:	goto [typeOf v = Num] num is;
+	num:	goto [(v = 0) or (not (v = v))] is_f is_t;
 
-  is:   goto [typeOf v = Str] str io;
-  str:  goto [v = ""] is_f is_t;
-      goto rlab;
+	is:		goto [typeOf v = Str] str io;
+	str:	goto [v = ""] is_f is_t;
+			goto rlab;
 
-  io:   goto [typeOf v = Obj] obj oops;
-  obj:  ret := true;
-      goto rlab;
+	io:		goto [typeOf v = Obj] obj oops;
+	obj:	ret := true;
+			goto rlab;
 
-  is_t: ret := true;
-      goto rlab;
-  is_f: ret := false;
-      goto rlab;
+	is_t:	ret := true;
+			goto rlab;
+	is_f:	ret := false;
+			goto rlab;
 
-  oops: ret := "ToBoolean: This should not happen.";
-        throw;
+	oops:	ret := "ToBoolean: This should not happen.";
+	      throw;
 
-  rlab: return
+	rlab: return
 };
 
 (* *** TONUMBER *** *)
 
 proc i__toNumber (v) {
+	iu:		goto [v = undefined] undef in;
+	undef:	ret := nan;
+			goto rlab;
 
-  inum: goto [typeOf v = Num] num oops;
-  num:  ret := v;
-      goto rlab;
+	in:		goto [v = null] nll ib;
+	nll:	ret := 0;
+			goto rlab;
 
-  oops: assume (False);
+	ib:		goto [typeOf v = Bool] bool inum;
+	bool:	goto [v = true] is_t is_f;
+	is_t:	ret := 1;
+			goto rlab;
+	is_f:	ret := 0;
+			goto rlab;
 
-  rlab: return;
-  elab: throw
+	inum:	goto [typeOf v = Num] num is;
+	num:	ret := v;
+			goto rlab;
+
+	is:		goto [typeOf v = Str] str io;
+	str:	ret := string_to_num v;
+			goto rlab;
+
+	io:		goto [typeOf v = Obj] obj oops;
+	obj:	ret := "i__toPrimitive" (v, "Number") with elab;
+			ret := "i__toNumber" (ret);
+			goto rlab;
+
+	oops:	ret := "ToNumber: This should not happen.";
+	      throw;
+
+	rlab: return;
+	elab: throw
 };
-
-proc i__toNumberArray (v) {
-
-  inum: goto [typeOf v = Num] num is;
-  num:  ret := v;
-      goto rlab;
-
-  is:   goto [typeOf v = Str] str oops;
-  str:  ret := string_to_num v;
-      goto rlab;
-
-  oops: assume (False);
-
-  rlab: return;
-  elab: throw
-};
-
 
 (* *** TOINTEGER *** *)
 
 proc i__toInteger (v) {
-      ret := "i__toNumber" (v) with elab;
-      ret := num_to_int (ret);
+			ret := "i__toNumber" (v) with elab;
+			ret := num_to_int (ret);
 
-  rlab: return;
-  elab: throw
+	rlab: return;
+	elab: throw
 };
 
 (* *** TOINT32 *** *)
 
 proc i__toInt32 (v) {
-      ret := "i__toNumber" (v) with elab;
-      ret := num_to_int32 (ret);
+			ret := "i__toNumber" (v) with elab;
+			ret := num_to_int32 (ret);
 
-  rlab: return;
-  elab: throw
+	rlab: return;
+	elab: throw
 };
 
 (* *** TOUINT32 *** *)
 
 proc i__toUint32 (v) {
-      ret := "i__toNumber" (v) with elab;
-      ret := num_to_uint32 (ret);
+			ret := "i__toNumber" (v) with elab;
+			ret := num_to_uint32 (ret);
 
-  rlab: return;
-  elab: throw
-};
-
-proc i__toUint32Array (v) {
-      ret := "i__toNumberArray" (v) with elab;
-      ret := num_to_uint32 (ret);
-
-  rlab: return;
-  elab: throw
+	rlab: return;
+	elab: throw
 };
 
 (* *** TOUINT16 *** *)
 
 proc i__toUint16 (v) {
-      ret := "i__toNumber" (v) with elab;
-      ret := num_to_uint16 (ret);
+			ret := "i__toNumber" (v) with elab;
+			ret := num_to_uint16 (ret);
 
-  rlab: return;
-  elab: throw
+	rlab: return;
+	elab: throw
 };
 
 (* *** TOSTRING *** *)
 
-proc i__toStringUncut (v) {
-      v := v;
-
-  iu:    goto [v = undefined] undef in;
-  undef: ret := "undefined";
-         goto rlab;
-
-  in:   goto [v = null] nll ib;
-  nll:  ret := "null";
-        goto rlab;
-
-  ib:   goto [typeOf v = Bool] bool inum;
-  bool: goto [v = true] is_t is_f;
-  is_t: ret := "true";
-        goto rlab;
-  is_f: ret := "false";
-        goto rlab;
-
-  inum: goto [typeOf v = Num] num is;
-  num:  ret := num_to_string v;
-        goto rlab;
-
-  is:   goto [typeOf v = Str] str io;
-  str:  ret := v;
-        goto rlab;
-
-  io:   goto [typeOf v = Obj] obj oops;
-  obj:  ret := "i__toPrimitive" (v, "String") with elab;
-        ret := "i__toStringUncut" (ret) with elab;
-        goto rlab;
-
-  oops: assume(False);
-
-  rlab: return;
-  elab: throw
-};
-
-proc i__toStringComputed (v) {
-
-  is:   goto [typeOf v = Str] str inum;
-  str:  ret := v;
-        goto rlab;
-
-  inum: goto [typeOf v = Num] num oops;
-  num:  ret := num_to_string v;
-        goto rlab;
-
-  oops: assume(False);
-
-  rlab: return;
-  elab: throw
-};
-
 proc i__toString (v) {
+			v := v;
 
-  is:   goto [typeOf v = Str] str oops;
-  str:  ret := v;
-        goto rlab;
+	iu:		 goto [v = undefined] undef in;
+	undef: ret := "undefined";
+			   goto rlab;
 
-  oops: assume(False);
+	in:		goto [v = null] nll ib;
+	nll:	ret := "null";
+			goto rlab;
 
-  rlab: return;
-  elab: throw
+	ib:		goto [typeOf v = Bool] bool inum;
+	bool:	goto [v = true] is_t is_f;
+	is_t:	ret := "true";
+			goto rlab;
+	is_f:	ret := "false";
+			goto rlab;
+
+	inum:	goto [typeOf v = Num] num is;
+	num:	ret := num_to_string v;
+			goto rlab;
+
+	is:		goto [typeOf v = Str] str io;
+	str:	ret := v;
+			goto rlab;
+
+	io:		goto [typeOf v = Obj] obj oops;
+	obj:	ret := "i__toPrimitive" (v, "String") with elab;
+			ret := "i__toString" (ret) with elab;
+			goto rlab;
+
+	oops:	ret := "ToString: This should not happen.";
+	        throw;
+
+	rlab:   return;
+	elab:   throw
 };
 
 (* *** TOOBJECT *** *)
 
 proc i__toObject (v) {
-    iu:		goto [v = undefined] thrw in;
+	iu:		goto [v = undefined] thrw in;
 
-    in:		goto [v = null] thrw io;
+	in:		goto [v = null] thrw ib;
 
-    io:     goto [typeOf v = Obj] obj oops;
-    obj:    ret := v;
-            goto rlab;
+	ib:		goto [typeOf v = Bool] bool inum;
+	bool:	ret := "Boolean_construct" (undefined, undefined, v);
+			goto rlab;
 
-    oops:   assume(False);
+	inum:	goto [typeOf v = Num] num is;
+	num:	ret := "Number_construct" (undefined, undefined, v);
+			goto rlab;
 
-    rlab:   return;
+	is:		goto [typeOf v = Str] str io;
+	str:	ret := "String_construct" (undefined, undefined, v);
+			goto rlab;
 
-    thrw:   ret := "TypeError" ();
-    elab:   throw
+	io:		goto [typeOf v = Obj] obj oops;
+	obj:	ret := v;
+			goto rlab;
+
+	oops:	ret := "ToObject: This should not happen.";
+	        throw;
+
+	rlab:   return;
+
+	thrw:   ret := "TypeError" ();
+	elab:   throw
 };
 
 (* ******************** *)
@@ -1009,24 +1012,23 @@ proc i__toObject (v) {
 
 proc i__checkObjectCoercible (v) {
 
-         ret := empty;
+			   ret := empty;
 
-  iu:    goto [v = undefined] thrw in;
+	iu:	   goto [v = undefined] thrw in;
+	in:	   goto [v = null] thrw other;
 
-  in:    goto [v = null] thrw other;
+	other: tv := typeOf v;
+	       goto [(tv = Bool)] rlab c1;
+	c1:    goto [(tv = Num)]  rlab c2;
+	c2:    goto [(tv = Str)]  rlab c3;
+	c3:    goto [(tv = Obj)]  rlab wtf;
 
-  other: tv := typeOf v;
-         goto [(tv = Bool)] rlab c1;
-  c1:    goto [(tv = Num)]  rlab c2;
-  c2:    goto [(tv = Str)]  rlab c3;
-  c3:    goto [(tv = Obj)]  rlab wtf;
+	rlab: return;
 
-  rlab: return;
+	wtf:  assume(False);
 
-  wtf:  assume(False);
-
-  thrw: ret := "TypeError" ();
-        throw
+	thrw: ret := "TypeError" ();
+	      throw
 };
 
 (* ********** *)
@@ -1034,11 +1036,11 @@ proc i__checkObjectCoercible (v) {
 (* ********** *)
 
 proc i__isCallable (l) {
-      ret := false;
-      goto [typeOf l = Obj] obj rlab;
-  obj:  m := metadata(l);
-      ret := hasField(m, "@call");
-  rlab: return
+			ret := false;
+			goto [typeOf l = Obj] obj rlab;
+	obj:	m := metadata(l);
+			ret := hasField(m, "@call");
+	rlab: return
 };
 
 (* ********** *)
@@ -1046,53 +1048,53 @@ proc i__isCallable (l) {
 (* ********** *)
 
 proc i__isReserved (v) {
-      ret := false;
+			ret := false;
 
-  next00: goto [v = "break"] is next01;
-  next01: goto [v = "case"] is next02;
-  next02: goto [v = "catch"] is next03;
-  next03: goto [v = "continue"] is next04;
-  next04: goto [v = "debugger"] is next05;
-  next05: goto [v = "default"] is next06;
-  next06: goto [v = "delete"] is next07;
-  next07: goto [v = "do"] is next08;
-  next08: goto [v = "else"] is next09;
-  next09: goto [v = "finally"] is next10;
-  next10: goto [v = "for"] is next11;
-  next11: goto [v = "function"] is next12;
-  next12: goto [v = "if"] is next13;
-  next13: goto [v = "in"] is next14;
-  next14: goto [v = "instanceof"] is next15;
-  next15: goto [v = "new"] is next16;
-  next16: goto [v = "rtrn"] is next17;
-  next17: goto [v = "switch"] is next18;
-  next18: goto [v = "this"] is next19;
-  next19: goto [v = "thrw"] is next20;
-  next20: goto [v = "try"] is next21;
-  next21: goto [v = "typeof"] is next22;
-  next22: goto [v = "var"] is next23;
-  next23: goto [v = "void"] is next24;
-  next24: goto [v = "while"] is next25;
-  next25: goto [v = "with"] is next26;
-  next26: goto [v = "class"] is next27;
-  next27: goto [v = "const"] is next28;
-  next28: goto [v = "enum"] is next29;
-  next29: goto [v = "export"] is next30;
-  next30: goto [v = "extends"] is next31;
-  next31: goto [v = "import"] is next32;
-  next32: goto [v = "super"] is next33;
-  next33: goto [v = "implements"] is next34;
-  next34: goto [v = "interface"] is next35;
-  next35: goto [v = "let"] is next36;
-  next36: goto [v = "package"] is next37;
-  next37: goto [v = "private"] is next38;
-  next38: goto [v = "protected"] is next39;
-  next39: goto [v = "public"] is next40;
-  next40: goto [v = "static"] is next41;
-  next41: goto [v = "yield"] is rlab;
+	next00:	goto [v = "break"] is next01;
+	next01:	goto [v = "case"] is next02;
+	next02:	goto [v = "catch"] is next03;
+	next03:	goto [v = "continue"] is next04;
+	next04:	goto [v = "debugger"] is next05;
+	next05:	goto [v = "default"] is next06;
+	next06:	goto [v = "delete"] is next07;
+	next07:	goto [v = "do"] is next08;
+	next08:	goto [v = "else"] is next09;
+	next09:	goto [v = "finally"] is next10;
+	next10:	goto [v = "for"] is next11;
+	next11:	goto [v = "function"] is next12;
+	next12:	goto [v = "if"] is next13;
+	next13:	goto [v = "in"] is next14;
+	next14:	goto [v = "instanceof"] is next15;
+	next15:	goto [v = "new"] is next16;
+	next16:	goto [v = "rtrn"] is next17;
+	next17:	goto [v = "switch"] is next18;
+	next18:	goto [v = "this"] is next19;
+	next19:	goto [v = "thrw"] is next20;
+	next20:	goto [v = "try"] is next21;
+	next21:	goto [v = "typeof"] is next22;
+	next22:	goto [v = "var"] is next23;
+	next23:	goto [v = "void"] is next24;
+	next24:	goto [v = "while"] is next25;
+	next25:	goto [v = "with"] is next26;
+	next26:	goto [v = "class"] is next27;
+	next27:	goto [v = "const"] is next28;
+	next28:	goto [v = "enum"] is next29;
+	next29:	goto [v = "export"] is next30;
+	next30:	goto [v = "extends"] is next31;
+	next31:	goto [v = "import"] is next32;
+	next32:	goto [v = "super"] is next33;
+	next33:	goto [v = "implements"] is next34;
+	next34:	goto [v = "interface"] is next35;
+	next35:	goto [v = "let"] is next36;
+	next36:	goto [v = "package"] is next37;
+	next37:	goto [v = "private"] is next38;
+	next38:	goto [v = "protected"] is next39;
+	next39:	goto [v = "public"] is next40;
+	next40:	goto [v = "static"] is next41;
+	next41:	goto [v = "yield"] is rlab;
 
-  is:   ret := true;
-  rlab: return
+	is:		ret := true;
+	rlab:   return
 };
 
 (* ******************* *)
@@ -1100,54 +1102,53 @@ proc i__isReserved (v) {
 (* ******************* *)
 
 proc i__abstractComparison (v1, v2, leftFirst) {
-      goto [(leftFirst = empty) or (leftFirst = true)] eleft eright;
+			goto [(leftFirst = empty) or (leftFirst = true)] eleft eright;
 
-  eleft:  ret := "i__toPrimitive" (v1, "Number") with elab;
-      px := ret;
-      ret := "i__toPrimitive" (v2, "Number") with elab;
-      py := ret;
-      goto is_str;
+	eleft:	ret := "i__toPrimitive" (v1, "Number") with elab;
+			px := ret;
+			ret := "i__toPrimitive" (v2, "Number") with elab;
+			py := ret;
+			goto is_str;
 
-  eright: ret := "i__toPrimitive" (v2, "Number") with elab;
-      py := ret;
-      ret := "i__toPrimitive" (v1, "Number") with elab;
-      px := ret;
+	eright:	ret := "i__toPrimitive" (v2, "Number") with elab;
+			py := ret;
+			ret := "i__toPrimitive" (v1, "Number") with elab;
+			px := ret;
 
-  is_str: goto [(typeOf px = Str) and (typeOf py = Str)] str num;
+	is_str:	goto [(typeOf px = Str) and (typeOf py = Str)] str num;
 
-  str:  assume(False);
-        ret := (px s< py);
-        goto rlab;
+	str:	ret := (px s< py);
+			goto rlab;
 
-  num:  ret := "i__toNumber" (px) with elab;
-      nx := ret;
-      ret := "i__toNumber" (py) with elab;
-      ny := ret;
+	num:	ret := "i__toNumber" (px) with elab;
+			nx := ret;
+			ret := "i__toNumber" (py) with elab;
+			ny := ret;
 
-      goto [(not (nx = nx)) or (not (ny = ny))] ru eq;
+			goto [(not (nx = nx)) or (not (ny = ny))] ru eq;
 
-  eq: goto [nx = ny] rf sl;
+	eq:	goto [nx = ny] rf sl;
 
 (*
-  sh:   goto [nx = inf] rf si;
-  si:   goto [ny = inf] rt sj;
-  sj:   goto [ny = -inf] rf sk;
-  sk:   goto [nx = -inf] rt sl;
+	sh:		goto [nx = inf] rf si;
+	si:		goto [ny = inf] rt sj;
+	sj:		goto [ny = -inf] rf sk;
+	sk:		goto [nx = -inf] rt sl;
 *)
 
-  sl:   ret := (nx < ny);
-      goto rlab;
+	sl:		ret := (nx < ny);
+			goto rlab;
 
-  ru:   ret := undefined;
-      goto rlab;
+	ru:		ret := undefined;
+			goto rlab;
 
-  rt:   ret := true;
-      goto rlab;
+	rt:		ret := true;
+			goto rlab;
 
-  rf:   ret := false;
+	rf:		ret := false;
 
-  rlab: return;
-  elab: throw
+	rlab: return;
+	elab: throw
 };
 
 (* ****** *)
@@ -1155,41 +1156,41 @@ proc i__abstractComparison (v1, v2, leftFirst) {
 (* ****** *)
 
 proc i__typeOf (v) {
-  iu:    goto [v = undefined] undef in;
-  undef: ret := "undefined";
-         goto rlab;
+	iu:		 goto [v = undefined] undef in;
+	undef: ret := "undefined";
+			   goto rlab;
 
-  in:    goto [v = null] nll ib;
-  nll:   ret := "object";
-         goto rlab;
+	in:		 goto [v = null] nll ib;
+	nll:	 ret := "object";
+			   goto rlab;
 
-  ib:    goto [typeOf v = Bool] bool inum;
-  bool:  ret := "boolean";
-         goto rlab;
+	ib:		 goto [typeOf v = Bool] bool inum;
+	bool:	 ret := "boolean";
+			   goto rlab;
 
-  inum:  goto [typeOf v = Num] num is;
-  num:   ret := "number";
-         goto rlab;
+	inum:	 goto [typeOf v = Num] num is;
+	num:	 ret := "number";
+			   goto rlab;
 
-  is:    goto [typeOf v = Str] str io;
-  str:   ret := "string";
-         goto rlab;
+	is:		 goto [typeOf v = Str] str io;
+	str:	 ret := "string";
+			   goto rlab;
 
-  io:    goto [typeOf v = Obj] obj oops;
-  obj:   m := metadata(v);
-         ret := hasField(m, "@call");
-         goto [ret] isfun isobj;
+	io:		 goto [typeOf v = Obj] obj oops;
+	obj:	 m := metadata(v);
+			   ret := hasField(m, "@call");
+			   goto [ret] isfun isobj;
 
-  isobj: ret := "object";
-         goto rlab;
+	isobj: ret := "object";
+			   goto rlab;
 
-  isfun: ret := "function";
-         goto rlab;
+	isfun: ret := "function";
+			   goto rlab;
 
-  oops:  assume(False);
+	oops:	 assume(False);
 
-  rlab:  return;
-  elab:  throw
+	rlab:  return;
+	elab:  throw
 };
 
 (* **************** *)
@@ -1197,60 +1198,60 @@ proc i__typeOf (v) {
 (* **************** *)
 
 proc i__abstractEquality (v1, v2) {
-      tv1 := typeOf v1;
-      tv2 := typeOf v2;
+			tv1 := typeOf v1;
+			tv2 := typeOf v2;
 
-      goto [(tv1 = tv2) or (tv1 = tv2) or (tv2 = tv1)] same diff;
+			goto [(tv1 = tv2) or (tv1 = tv2) or (tv2 = tv1)] same diff;
 
-  same: goto [(tv1 = Undefined) or (tv1 = Null) or
-                (tv1 = Bool)   or (tv1 = Num) or
-                (tv1 = Str)    or (tv1 = Obj)] ieq oops;
-  ieq:  ret := (v1 = v2);
-      goto rlab;
+	same:	goto [(tv1 = Undefined) or (tv1 = Null) or
+	              (tv1 = Bool)   or (tv1 = Num) or
+	              (tv1 = Str)    or (tv1 = Obj)] ieq oops;
+	ieq:	ret := (v1 = v2);
+			goto rlab;
 
-  diff: goto [((tv1 = Undefined) and (tv2 = Null)) or
-            ((tv1 = Null) and (tv2 = Undefined))] rt dns;
+	diff:	goto [((tv1 = Undefined) and (tv2 = Null)) or
+			      ((tv1 = Null) and (tv2 = Undefined))] rt dns;
 
-  dns:  goto [(tv1 = Num) and (tv2 = Str)] tn2 dsn;
-  tn2:  ret := "i__toNumber" (v2) with elab;
-      ret := "i__abstractEquality" (v1, ret) with elab;
-      goto rlab;
+	dns:	goto [(tv1 = Num) and (tv2 = Str)] tn2 dsn;
+	tn2:	ret := "i__toNumber" (v2) with elab;
+			ret := "i__abstractEquality" (v1, ret) with elab;
+			goto rlab;
 
-  dsn:  goto [(tv1 = Str) and (tv2 = Num)] tn1 s1b;
-  tn1:  ret := "i__toNumber" (v1) with elab;
-      ret := "i__abstractEquality" (ret, v2) with elab;
-      goto rlab;
+	dsn:	goto [(tv1 = Str) and (tv2 = Num)] tn1 s1b;
+	tn1:	ret := "i__toNumber" (v1) with elab;
+			ret := "i__abstractEquality" (ret, v2) with elab;
+			goto rlab;
 
-  s1b:  goto [tv1 = Bool] tn1 s2b;
-  s2b:  goto [tv2 = Bool] tn2 s2o;
+	s1b:	goto [tv1 = Bool] tn1 s2b;
+	s2b:	goto [tv2 = Bool] tn2 s2o;
 
-  s2o:  goto [((tv1 = Num) or (tv1 = Str)) and (tv2 = Obj)] tp2 s1o;
-  tp2:  ret := "i__toPrimitive" (v2) with elab;
-      ret := "i__abstractEquality" (v1, ret) with elab;
-      goto rlab;
+	s2o:	goto [((tv1 = Num) or (tv1 = Str)) and (tv2 = Obj)] tp2 s1o;
+	tp2:	ret := "i__toPrimitive" (v2) with elab;
+			ret := "i__abstractEquality" (v1, ret) with elab;
+			goto rlab;
 
-  s1o:  goto [(tv1 = Obj) and ((tv2 = Num) or (tv2 = Str))] tp1 rf;
-  tp1:  ret := "i__toPrimitive" (v1) with elab;
-      ret := "i__abstractEquality" (ret, v2) with elab;
-      goto rlab;
+	s1o:	goto [(tv1 = Obj) and ((tv2 = Num) or (tv2 = Str))] tp1 rf;
+	tp1:	ret := "i__toPrimitive" (v1) with elab;
+			ret := "i__abstractEquality" (ret, v2) with elab;
+			goto rlab;
 
-  rt:   ret := true;
-      goto rlab;
+	rt:		ret := true;
+			goto rlab;
 
-  rf:   ret := false;
-      goto rlab;
+	rf:		ret := false;
+			goto rlab;
 
-  oops: ret := "AbstractEquality: This should not happen.";
-        throw;
+	oops:	ret := "AbstractEquality: This should not happen.";
+			  throw;
 
-  rlab: return;
-  elab: throw
+	rlab: return;
+	elab: throw
 };
 
 proc i__strictEquality (v1, v2) {
-      ret := (v1 = v2);
+			ret := (v1 = v2);
 
-  rlab: return
+	rlab: return
 };
 
 (* ********* *)
@@ -1258,14 +1259,22 @@ proc i__strictEquality (v1, v2) {
 (* ********* *)
 
 proc i__sameValue (v1, v2) {
+			ret := (v1 = v2);
 
-  nonum: goto [v1 = v2] rt rf;
+			goto [(typeOf v1 = Num) and (typeOf v2 = Num)] inan rlab;
 
-  rt:    ret := true;
-         return;
+	inan:	goto [(not (v1 = v1)) and (not (v2 = v2))] rt zero;
+	zero:	goto [(v1 = 0) and (v2 = 0)] fix rlab;
 
-  rf:    ret := false;
-  rlab:  return
+	fix:	sv1 := m_sgn (v1);
+			sv2 := m_sgn (v2);
+
+			ret := (sv1 = sv2);
+			goto rlab;
+
+	rt:		ret := true;
+
+	rlab:	return
 };
 
 (* ********************* *)
@@ -1294,22 +1303,22 @@ proc i__checkAssignmentErrors (v) {
 
 proc i__checkParameters (fid, params) {
 
-      goto [(fid = "eval") or (fid = "arguments")] se pars;
+			goto [(fid = "eval") or (fid = "arguments")] se pars;
 
-  pars: n := 0;
-      l := l-len (params);
+	pars:	n := 0;
+			l := l-len (params);
 
-  loop: goto [n < l] head rlab;
-  head: par := l-nth (params, n);
-      goto [(par = "eval") or (par = "arguments")] se next;
-  next: n := n + 1;
-      goto loop;
+	loop:	goto [n < l] head rlab;
+	head:	par := l-nth (params, n);
+			goto [(par = "eval") or (par = "arguments")] se next;
+	next:	n := n + 1;
+			goto loop;
 
-  rlab: ret := true;
-        return;
+	rlab:	ret := true;
+				return;
 
-  se:   ret := "SyntaxError" ();
-  elab: throw
+	se:		ret := "SyntaxError" ();
+	elab: throw
 };
 
 (* *********** *)
@@ -1317,39 +1326,39 @@ proc i__checkParameters (fid, params) {
 (* *********** *)
 
 proc hasInstance(v1, v2) {
-      m := metadata(v1);
-      to_bind := hasField(m, "@targetFunction");
-      goto [to_bind] bind_l norm;
+			m := metadata(v1);
+			to_bind := hasField(m, "@targetFunction");
+			goto [to_bind] bind_l norm;
 
-  bind_l: ret := "FP_hasInstanceAfterBind" (v1, v2) with elab;
-      goto rlab;
+  bind_l:	ret := "FP_hasInstanceAfterBind" (v1, v2) with elab;
+			goto rlab;
 
-  norm: ret := "f__hasInstance" (v1, v2) with elab;
+	norm:	ret := "f__hasInstance" (v1, v2) with elab;
 
-  rlab: return;
-  elab: throw
+	rlab: return;
+	elab: throw
 };
 
 proc f__hasInstance(v1, v2) {
 
-      goto [not (typeOf (v2) = Obj)] rf s2;
+			goto [not (typeOf (v2) = Obj)] rf s2;
 
-  s2:   ret := "get" (v1, "prototype") with elab;
-      goto [not (typeOf (ret) = Obj)] thrw s4;
+	s2:		ret := "get" (v1, "prototype") with elab;
+			goto [not (typeOf (ret) = Obj)] thrw s4;
 
-  s4:   m := metadata(v2);
-      v2 := [m, "@proto"];
-      goto [v2 = null] rf s4c;
-  s4c:  goto [ret = v2] rt s4;
+	s4:		m := metadata(v2);
+			v2 := [m, "@proto"];
+			goto [v2 = null] rf s4c;
+	s4c:	goto [ret = v2] rt s4;
 
-  rt:   ret := true;
-      goto rlab;
+	rt:		ret := true;
+			goto rlab;
 
-  rf:   ret := false;
-  rlab: return;
+	rf:		ret := false;
+	rlab: return;
 
-  thrw: ret := "TypeError" ();
-  elab: throw
+	thrw:	ret := "TypeError" ();
+	elab: throw
 };
 
 (* ************************ *)
@@ -1358,31 +1367,31 @@ proc f__hasInstance(v1, v2) {
 
 proc resolveVariable(scopeList, var) {
 
-        length := l-len scopeList;
-        current := length - 1;
-        ret := undefined;
+				length := l-len scopeList;
+				current := length - 1;
+				ret := undefined;
 
-  loop: goto [ 0 <= current ] body rlab;
+	loop:	goto [ 0 <= current ] body rlab;
 
-  body: er_o := l-nth(scopeList, current);
-        er_m := metadata(er_o);
+	body: er_o := l-nth(scopeList, current);
+				er_m := metadata(er_o);
 
-        is_er := hasField(er_m, "@er");
-        goto [ is_er ] er obj;
+				is_er := hasField(er_m, "@er");
+				goto [ is_er ] er obj;
 
-  er:   has_var := hasField(er_o, var);
-        goto [ has_var ] set next;
-  set:  ret := er_o;
-        goto rlab;
+	er:		has_var := hasField(er_o, var);
+				goto [ has_var ] set next;
+	set:	ret := er_o;
+				goto rlab;
 
-  obj:  prop := "getProperty"(er_o, var);
-        goto [ prop = undefined ] next set;
+	obj:	prop := "getProperty"(er_o, var);
+				goto [ prop = undefined ] next set;
 
-  next: current := current - 1;
-        goto loop;
+	next:	current := current - 1;
+				goto loop;
 
-  rlab: return;
-  elab: throw
+	rlab: return;
+	elab: throw
 };
 
 (* ******************** *)
@@ -1392,25 +1401,25 @@ proc resolveVariable(scopeList, var) {
 proc isNativeError (err) {
 
         (* The error should be an object *)
-        goto [typeOf(err) = Obj] md rf;
+	      goto [typeOf(err) = Obj] md rf;
 
         (* Get metadata, which should also be an object *)
-  md:   md := metadata(err);
-        goto [typeOf(md) = Obj] hp rf;
+	md:   md := metadata(err);
+	      goto [typeOf(md) = Obj] hp rf;
 
         (* The metadata should have the "@proto" field *)
-  hp:   hp := hasField(md, "@proto");
-        goto [ hp ] gp rf;
+	hp:   hp := hasField(md, "@proto");
+	      goto [ hp ] gp rf;
 
         (* If the prototype is a native error prototype, return true; otherwise, false *)
   gp:   proto := [md, "@proto"];
         goto [ (proto = $lterr_proto) or (proto = $lrferr_proto) or (proto = $lserr_proto) or (proto = $lrgerr_proto) ] rt rf;
 
         (* Throw error *)
-  rt:   ret := true;
-        return;
+	rt:   ret := true;
+	      return;
 
-  rf:   ret := false;
+	rf:   ret := false;
         return
 };
 
@@ -1422,9 +1431,10 @@ proc i__purge (o) {
         goto [typeOf(o) = Obj] del rlab;
 
   del:  m := metadata(o);
-        deleteObject(o);
-        ret := "i__purge"(m);
-        return;
+        goto [typeOf(m) = Obj] delm delo;
+
+  delm: deleteObject(m);
+  delo: deleteObject(o);
 
   rlab: ret := true;
         return
@@ -1442,4 +1452,16 @@ proc i__deleteErrors (r, te, se) {
 
   del_se: ret := "i__purge" (se);
   rlab:   return
+};
+
+(* ************************ *)
+(* Computed access toString *)
+(* ************************ *)
+
+proc i__toStringComputed (v) {
+
+        ret := "i__toString" (v) with elab;
+
+  rlab: return;
+  elab: throw
 };
