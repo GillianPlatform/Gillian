@@ -6,8 +6,9 @@ type ('to_continue, 'terminated) t = {
 }
 
 let pp ~pp_cont ~pp_term fmt t =
-  Fmt.pf fmt "@[to continue: @[%a@]@,terminated: @[%a@]@]"
-    (Fmt.Dump.list pp_cont) t.to_continue (Fmt.Dump.list pp_term) t.terminated
+  Fmt.pf fmt "@[to continue: @[%a@]%aterminated: @[%a@]@]"
+    (Fmt.Dump.list pp_cont) t.to_continue Fmt.comma () (Fmt.Dump.list pp_term)
+    t.terminated
 
 let equal ~eq_cont ~eq_term a b =
   try
@@ -15,13 +16,19 @@ let equal ~eq_cont ~eq_term a b =
     && List.for_all2 eq_term a.terminated b.terminated
   with Invalid_argument _ -> false
 
+let make ~cont ~term = { to_continue = cont; terminated = term }
+
 let empty = { to_continue = []; terminated = [] }
+
+let to_continue x = x.to_continue
+
+let terminated x = x.terminated
 
 let return x = { to_continue = [ x ]; terminated = [] }
 
 let terminate x = { to_continue = []; terminated = [ x ] }
 
-let terminated x = List.compare_length_with x.to_continue 0 = 0
+let is_terminated x = List.compare_length_with x.to_continue 0 = 0
 
 let branch2 x y = { to_continue = [ x; y ]; terminated = [] }
 

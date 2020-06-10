@@ -333,5 +333,9 @@ module Infix = struct
 
   let ( #< ) a b = Less (a, b)
 
+  let ( #> ) a b = Less (b, a)
+
   let ( #<= ) a b = LessEq (a, b)
+
+  let ( #>= ) a b = LessEq (b, a)
 end

@@ -1,4 +1,4 @@
-module Results = Cgil_lib.Results
+module Results = Monadic.Results
 open Results
 
 let pp_terminated fmt = function
@@ -65,7 +65,8 @@ let init_exec = return init_state
 let rec exec_prog ?(exec = init_exec) prog =
   let open Infix in
   let res = exec >>= fun state -> exec_cmd ~state prog.(state.pc) in
-  if Results.terminated res then res.terminated else exec_prog ~exec:res prog
+  if Results.is_terminated res then Results.terminated res
+  else exec_prog ~exec:res prog
 
 let one_by_one_test =
   let open Syntax in
@@ -78,7 +79,7 @@ let one_by_one_test =
     in
     Alcotest.(check exec_monad)
       "Should all terminate with expected"
-      { to_continue = []; terminated = [ `Success 2; `Success 1 ] }
+      (Results.make ~cont:[] ~term:[ `Success 2; `Success 1 ])
       res
   in
   ("one by one", `Quick, run)

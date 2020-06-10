@@ -1,6 +1,6 @@
 (executable
  (name run_tests)
- (libraries alcotest cgil_lib engine gil_syntax))
+ (libraries alcotest cgil_lib monadic engine gil_syntax))
 
 (rule
  (alias runtest)

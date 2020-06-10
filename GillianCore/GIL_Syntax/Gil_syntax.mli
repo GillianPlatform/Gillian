@@ -397,8 +397,14 @@ module Formula : sig
     (** Same as Less *)
     val ( #< ) : Expr.t -> Expr.t -> t
 
+    (** [a #> b] if [Less (b, a)]*)
+    val ( #> ) : Expr.t -> Expr.t -> t
+
     (** Same as LessEq *)
     val ( #<= ) : Expr.t -> Expr.t -> t
+
+    (** [a #>= b] is [LessEq (b, a)] *)
+    val ( #>= ) : Expr.t -> Expr.t -> t
   end
 end
 

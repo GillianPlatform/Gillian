@@ -12,6 +12,9 @@ val check_satisfiability_with_model :
 val check_satisfiability :
   ?unification:bool -> Gil_syntax.Formula.t list -> TypEnv.t -> bool
 
+(** A different API for [check_satisfiability] better adapted for usage in memory models *)
+val sat : pfs:PFS.t -> gamma:TypEnv.t -> Gil_syntax.Formula.t list -> bool
+
 (** [check_entailment existentials lpfs rpfs gamma] checks whether or not
     the entailment << ∃ [existentials]. [lpfs] => [rpfs] >> holds
     under the typing environment [gamma]. *)
