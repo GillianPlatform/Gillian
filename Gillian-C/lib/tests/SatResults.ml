@@ -25,10 +25,13 @@ let sat_res :
     (SatResults.pp ~pp_cont ~pp_term)
     (SatResults.equal ~eq_cont ~eq_term)
 
+let branch pc = branch_on_sat ~pc
+
 let basic =
   let run () =
     let open Gil_syntax in
     let open Formula.Infix in
+    let open Syntax in
     let pfs = Gillian.Symbolic.PureContext.init () in
     let gamma = Gillian.Symbolic.TypEnv.init () in
     let pc = Pc.make ~pfs ~gamma () in
@@ -40,12 +43,15 @@ let basic =
       branch_on_sat ~pc x#<zero
         ~then_branch:(fun pc -> SatResults.return ~pc (`Continue (-1)))
         ~else_branch:(fun pc ->
-          branch_on_sat ~pc x#>ten
-            ~then_branch:(fun pc -> SatResults.return ~pc (`Continue 1))
-            ~else_branch:(fun pc -> SatResults.terminate ~pc `Error))
+          let** `Continue n, pc =
+            branch_on_sat ~pc x#>ten
+              ~then_branch:(fun pc -> SatResults.return ~pc (`Continue 1))
+              ~else_branch:(fun pc -> SatResults.terminate ~pc `Error)
+          in
+          SatResults.return ~pc (`Continue (n + 1)))
     in
     let tb = (`Continue (-1), Pc.extend pc [ x#<zero ]) in
-    let etb = (`Continue 1, Pc.extend pc [ Formula.Not x#<zero; x#>ten ]) in
+    let etb = (`Continue 2, Pc.extend pc [ Formula.Not x#<zero; x#>ten ]) in
     let eeb =
       (`Error, Pc.extend pc [ Formula.Not x#<zero; Formula.Not x#>ten ])
     in
