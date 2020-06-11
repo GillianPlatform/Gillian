@@ -627,18 +627,14 @@ let simplify_pfs_and_gamma
             | _ -> `Replace whole )
         | (Eq (LstSub (lst, start, num), sl) | Eq (sl, LstSub (lst, start, num)))
           when unification -> `Replace whole
-        | Eq (UnOp (LstLen, le), Lit (Num len))
-        | Eq (Lit (Num len), UnOp (LstLen, le)) -> (
-            match Arith_Utils.is_int len with
-            | false -> stop_explain "List length not an integer."
-            | true  ->
-                let len = int_of_float len in
-                let le_vars =
-                  Array.to_list (Array.init len (fun _ -> LVar.alloc ()))
-                in
-                vars_to_kill := SS.union !vars_to_kill (SS.of_list le_vars);
-                let le' = List.map (fun x -> Expr.LVar x) le_vars in
-                rec_call (Eq (le, EList le')) )
+        | Eq (UnOp (LstLen, le), Lit (Int len))
+        | Eq (Lit (Int len), UnOp (LstLen, le)) ->
+            let le_vars =
+              Array.to_list (Array.init len (fun _ -> LVar.alloc ()))
+            in
+            vars_to_kill := SS.union !vars_to_kill (SS.of_list le_vars);
+            let le' = List.map (fun x -> Expr.LVar x) le_vars in
+            rec_call (Eq (le, EList le'))
         | Eq (NOp (LstCat, les), EList [])
         | Eq (NOp (LstCat, les), Lit (LList [])) ->
             let eqs = List.map (fun le -> Formula.Eq (le, EList [])) les in
@@ -702,7 +698,7 @@ let simplify_pfs_and_gamma
                            UnOp (LstLen, sl),
                            BinOp
                              ( UnOp (LstLen, LVar ns_var),
-                               FMinus,
+                               IMinus,
                                UnOp (LstLen, sl) ) ) ));
                 rec_call (Eq (lst, NOp (LstCat, [ EList prefix; LVar ns_var ])))
             | _, _

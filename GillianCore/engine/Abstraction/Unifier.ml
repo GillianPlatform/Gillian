@@ -678,9 +678,9 @@ module Make
     | NOp (LstCat, EList les :: le_pat2) ->
         let le : Expr.t = Val.to_expr v in
         let len : Expr.t = Lit (Num (float_of_int (List.length les))) in
-        let le1 : Expr.t = LstSub (le, Lit (Num 0.), len) in
+        let le1 : Expr.t = LstSub (le, Lit (Int 0), len) in
         let le2 : Expr.t =
-          LstSub (le, len, BinOp (UnOp (LstLen, le), FMinus, len))
+          LstSub (le, len, BinOp (UnOp (LstLen, le), IMinus, len))
         in
         let v1 : Val.t = eval_expr le1 in
         let v2 : Val.t = eval_expr le2 in
@@ -688,12 +688,12 @@ module Make
     (* First concatted expr is known, but is not an EList *)
     | NOp (LstCat, le_pat1 :: le_pat2) when is_known subst le_pat1 ->
         let le : Expr.t = Val.to_expr v in
-        let le1 : Expr.t = LstSub (le, Lit (Num 0.), UnOp (LstLen, le_pat1)) in
+        let le1 : Expr.t = LstSub (le, Lit (Int 0), UnOp (LstLen, le_pat1)) in
         let le2 : Expr.t =
           LstSub
             ( le,
               UnOp (LstLen, le_pat1),
-              BinOp (UnOp (LstLen, le), FMinus, UnOp (LstLen, le_pat1)) )
+              BinOp (UnOp (LstLen, le), IMinus, UnOp (LstLen, le_pat1)) )
         in
         let v1 : Val.t = eval_expr le1 in
         let v2 : Val.t = eval_expr le2 in

@@ -287,19 +287,20 @@ let rec evaluate_binop
           raise (Exceptions.Impossible "eval_binop concrete: by construction")
       | Equal -> (
           match (lit1, lit2) with
-          | Undefined, Undefined     -> Bool true
-          | Null, Null               -> Bool true
-          | Empty, Empty             -> Bool true
+          | Undefined, Undefined -> Bool true
+          | Null, Null -> Bool true
+          | Empty, Empty -> Bool true
           | Constant c1, Constant c2 -> Bool (c1 = c2)
-          | Bool b1, Bool b2         -> Bool (b1 = b2)
-          | Int n1, Int n2           -> Bool (n1 = n2)
-          | Num n1, Num n2           -> Bool (n1 = n2)
-          | String s1, String s2     -> Bool (s1 = s2)
-          | Loc l1, Loc l2           -> Bool (l1 = l2)
-          | Type t1, Type t2         -> Bool (t1 = t2)
-          | LList l1, LList l2       -> Bool (l1 = l2)
-          | Nono, Nono               -> Bool true
-          | _, _                     -> Bool false )
+          | Bool b1, Bool b2 -> Bool (b1 = b2)
+          | Int n1, Int n2 -> Bool (n1 = n2)
+          | Num n1, Num n2 -> Bool (n1 = n2)
+          | Int n1, Num n2 | Num n2, Int n1 -> Bool (n2 = float_of_int n1)
+          | String s1, String s2 -> Bool (s1 = s2)
+          | Loc l1, Loc l2 -> Bool (l1 = l2)
+          | Type t1, Type t2 -> Bool (t1 = t2)
+          | LList l1, LList l2 -> Bool (l1 = l2)
+          | Nono, Nono -> Bool true
+          | _, _ -> Bool false )
       | LstNth -> (
           match (lit1, lit2) with
           | LList list, Int n -> List.nth list n
@@ -490,12 +491,9 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
         let ve2 = ee e1 in
         let ve3 = ee e1 in
         match (ve1, ve2, ve3) with
-        | LList les, Num _start, Num _end -> (
+        | LList les, Int _start, Int _end -> (
             try
-              LList
-                (Array.to_list
-                   (Array.sub (Array.of_list les) (int_of_float _start)
-                      (int_of_float _end)))
+              LList (Array.to_list (Array.sub (Array.of_list les) _start _end))
             with _ -> raise (Failure "Sublist out of bounds") )
         | _ ->
             raise

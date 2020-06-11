@@ -1051,15 +1051,17 @@ let encode_nop (op : NOp.t) les =
       let le = Set.mk_intersection ctx les in
       ZExpr.mk_app ctx extended_literal_operations.set_constructor [ le ]
   | LstCat   ->
+      let lesx =
+        List.map
+          (fun x -> ZExpr.mk_app ctx lit_operations.list_accessor [ x ])
+          les
+      in
       let n_le =
         List.fold_left
           (fun ac next ->
             (* Unpack ac *)
-            let ac = ZExpr.mk_app ctx lit_operations.list_accessor [ ac ] in
-            (* Unpack next one *)
-            let next = ZExpr.mk_app ctx lit_operations.list_accessor [ next ] in
             ZExpr.mk_app ctx axiomatised_operations.lcat_fun [ ac; next ])
-          (List.hd les) (List.tl les)
+          (List.hd lesx) (List.tl lesx)
       in
       (* Repack *)
       mk_singleton_elem
