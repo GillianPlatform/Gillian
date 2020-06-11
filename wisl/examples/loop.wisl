@@ -9,10 +9,13 @@ predicate lseg(+x, +y, alpha) {
   (x -> #a, #z) * (alpha == #a :: #beta) * lseg(#z, y, #beta)
 }
 
-lemma lseg_to_list(x, alpha) {
+lemma lseg_to_list {
+  statement:
+    forall x, alpha.
+      lseg(x, null, alpha) |- list(x, alpha)
+
   variant: len alpha
-  hypothesis: (x == #x) * (alpha == #alpha) * lseg(#x, null, #alpha)
-  conclusion: list(#x, #alpha)
+
   proof: unfold lseg(#x, null, #alpha);
          if (#x = null) {
            fold list(#x, #alpha)
@@ -23,16 +26,13 @@ lemma lseg_to_list(x, alpha) {
          }
 }
 
-lemma lseg_append(x, y, alpha, a, z) {
+lemma lseg_append {
+  statement:
+    forall x, y, alpha, a, z.
+      lseg(x, y, alpha) * (y -> a, z) |- lseg(x, z, alpha @ [a])
+
   variant: len alpha
   
-  hypothesis: (x == #x) * (y == #y) * (alpha == #alpha) * (a == #a) * (z == #z) *
-              lseg(#x, #y, #alpha) * 
-              (#y -> #a, #z) 
-
-  conclusion: lseg(#x, #z, #alpha @ [ #a ])
-  
-
   proof: unfold lseg(#x, #y, #alpha);
          if (#alpha = []) {
            fold lseg(#x, #z, #alpha @ [#a])
@@ -49,7 +49,7 @@ function llen(x) {
   n := 0;
   [[ fold lseg(#x, y, []) ]];
   [[ invariant {exists: #a1, #a2} lseg(#x, y, #a1) * list(y, #a2) * (#alpha == #a1 @ #a2) * (n == len #a1) ]];
-  while (y != null) {
+  while (not (y = null)) {
     [[ unfold list(y, #a2) ]];
     [[ assert {exists: #y, #b, #t} (y == #y) * (#y -> #b, #t) ]];
     y := [y+1];
@@ -60,4 +60,3 @@ function llen(x) {
   return n
 }
 { list(#x, alpha) * (ret == len(#alpha)) }
-
