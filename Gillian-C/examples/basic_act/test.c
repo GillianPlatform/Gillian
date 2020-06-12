@@ -8,6 +8,6 @@ int deref(int* x) {
     }
 }
 
-int deref_bug(float* x) {
+float deref_bug(float* x) {
   return *x ;
 }

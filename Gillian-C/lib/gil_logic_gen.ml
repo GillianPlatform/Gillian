@@ -831,7 +831,7 @@ let predicate_from_triple (pn, csmt, ct) =
   let pred_name_of_ptr_scal =
     let open Internal_Predicates in
     function
-    | Ctypes.Tpointer (Tfloat _, _) -> is_ptr_to_float_opt
+    | Ctypes.Tpointer (Tfloat _, _) -> is_ptr_to_single_opt
     | Ctypes.Tpointer (Tint _, _) -> is_ptr_to_int_opt
     | Ctypes.Tpointer (Tlong _, _) -> is_ptr_to_long_opt
     | _ -> failwith "Cannot happen"
