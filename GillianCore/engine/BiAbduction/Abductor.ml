@@ -254,15 +254,23 @@ struct
         succ_specs
     in
 
-    L.normal (fun m ->
-        m "@[<v 2>BUG SPECS:@\n%a@]@\n"
-          Fmt.(list ~sep:(any "@\n") (UP.pp_spec ~preds:prog.preds))
-          bug_specs);
+    let bug_specs_txt =
+      Format.asprintf "@[<v 2>BUG SPECS:@\n%a@]@\n"
+        Fmt.(list ~sep:(any "@\n") (UP.pp_spec ~preds:prog.preds))
+        bug_specs
+    in
+    let normal_specs_txt =
+      Format.asprintf "@[<v 2>SUCCESSFUL SPECS:@\n%a@]@\n"
+        Fmt.(list ~sep:(any "@\n") (UP.pp_spec ~preds:prog.preds))
+        succ_specs
+    in
 
-    L.normal (fun m ->
-        m "@[<v 2>SUCCESSFUL SPECS:@\n%a@]@\n"
-          Fmt.(list ~sep:(any "@\n") (UP.pp_spec ~preds:prog.preds))
-          succ_specs);
+    if !Config.specs_to_stdout then (
+      L.print_to_all bug_specs_txt;
+      L.print_to_all normal_specs_txt )
+    else (
+      L.normal (fun m -> m "%s" bug_specs_txt);
+      L.normal (fun m -> m "%s" normal_specs_txt) );
 
     (* This is a hack to not count auxiliary functions that are bi-abduced *)
     let len_succ = List.length succ_specs in
