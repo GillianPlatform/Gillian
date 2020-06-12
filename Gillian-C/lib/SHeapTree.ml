@@ -214,7 +214,7 @@ module Tree = struct
               ~else_branch:(fun pc ->
                 SatResults.branch_on_sat ~pc
                   (Range.is_inside range right.span)
-                  ~then_branch:(fun _ ->
+                  ~then_branch:(fun pc ->
                     let++ right = frame_single ~pc right low chunk in
                     with_children t ~left ~right)
                   ~else_branch:(fun pc ->
