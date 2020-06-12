@@ -37,13 +37,14 @@ SUCCESSFUL SPECS:
     
   spec deref_bug (x)
     [[ (x == {{_$l_2, 0.}}) *
-       <mem_sval>(_$l_2, 0., 4.; {{"float", _lvar_10}}, "Freeable") *
+       <mem_sval>(_$l_2, 0., 4.; {{"single", _lvar_10}}, "Freeable") *
        types(_lvar_10 : Num) *
        i__glob_fun("deref""deref") *
        i__glob_fun("deref_bug""deref_bug") ]]
-    [[ (ret == undefined) *
+    [[ (ret == {{"single", _lvar_10}}) *
        (x == {{_$l_2, 0.}}) *
-       <mem_sval>(_$l_2, 0., 4.; {{"float", _lvar_10}}, "Freeable") *
+       types(_lvar_10 : Num) *
+       <mem_sval>(_$l_2, 0., 4.; {{"single", _lvar_10}}, "Freeable") *
        types(_lvar_10 : Num) *
        i__glob_fun("deref""deref") *
        i__glob_fun("deref_bug""deref_bug") ]]
