@@ -824,6 +824,18 @@ let predicate_from_triple (pn, csmt, ct) =
     | Ctypes.Tpointer (Ctypes.Tstruct _, _) -> true
     | _ -> false
   in
+  let is_c_ptr_to_scalar = function
+    | Ctypes.Tpointer ((Tfloat _ | Tint _ | Tlong _), _) -> true
+    | _ -> false
+  in
+  let pred_name_of_ptr_scal =
+    let open Internal_Predicates in
+    function
+    | Ctypes.Tpointer (Tfloat _, _) -> is_ptr_to_float_opt
+    | Ctypes.Tpointer (Tint _, _) -> is_ptr_to_int_opt
+    | Ctypes.Tpointer (Tlong _, _) -> is_ptr_to_long_opt
+    | _ -> failwith "Cannot happen"
+  in
   let struct_name = function
     | Ctypes.Tpointer (Ctypes.Tstruct (id, _), _) -> true_name id
     | _ -> failwith "Cannot happen"
@@ -835,6 +847,10 @@ let predicate_from_triple (pn, csmt, ct) =
       pred (opt_rec_pred_name_of_struct (struct_name ct))
   | AST.Tlong when Archi.ptr64 && is_c_ptr_to_struct ct ->
       pred (opt_rec_pred_name_of_struct (struct_name ct))
+  | AST.Tint when (not Archi.ptr64) && is_c_ptr_to_scalar ct ->
+      pred (pred_name_of_ptr_scal ct)
+  | AST.Tlong when Archi.ptr64 && is_c_ptr_to_scalar ct ->
+      pred (pred_name_of_ptr_scal ct)
   | AST.Tint -> pred is_int
   | AST.Tlong -> pred is_long
   | AST.Tsingle -> pred is_single
