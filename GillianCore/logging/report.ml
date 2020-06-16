@@ -34,8 +34,7 @@ end = struct
   let t_of_yojson yojson = string_of_yojson yojson |> of_string
 end
 
-type agnostic_content = Debug of PackedPP.t | Phase of Phase.t
-[@@deriving yojson]
+type agnostic_content = Debug of PackedPP.t | Phase [@@deriving yojson]
 
 type 'a content = Agnostic of agnostic_content | Specific of 'a
 [@@deriving yojson]

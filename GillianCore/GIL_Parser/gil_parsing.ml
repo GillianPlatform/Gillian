@@ -102,7 +102,7 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
     Parser_state.reset ();
     { prog with procs; preds }
   in
-  L.with_normal_phase "Program parsing" (fun () -> f path)
+  L.with_normal_phase ~title:"Program parsing" (fun () -> f path)
 
 let cached_progs = Hashtbl.create Config.small_tbl_size
 

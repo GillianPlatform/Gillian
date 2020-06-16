@@ -1,5 +1,4 @@
 module Mode = Mode
-module Phase = Phase
 module Report = Report
 module Reporter = Reporter
 module FileReporter = FileReporter
@@ -39,22 +38,20 @@ let tmi_phase = ReportBuilder.start_phase TMI
 
 let end_phase = ReportBuilder.end_phase
 
-let with_phase level ?title ?severity phase f =
-  ReportBuilder.start_phase level ?title ?severity phase;
+let with_phase level ?title ?severity f =
+  let phase = ReportBuilder.start_phase level ?title ?severity () in
   let result = try Ok (f ()) with e -> Error e in
   ReportBuilder.end_phase phase;
   match result with
   | Ok ok   -> ok
   | Error e -> raise e
 
-let with_normal_phase ?title ?severity phase f =
-  with_phase Normal ?title ?severity phase f
+let with_normal_phase ?title ?severity f = with_phase Normal ?title ?severity f
 
-let with_verbose_phase ?title ?severity phase f =
-  with_phase Verbose ?title ?severity phase f
+let with_verbose_phase ?title ?severity f =
+  with_phase Verbose ?title ?severity f
 
-let with_tmi_phase ?title ?severity phase f =
-  with_phase TMI ?title ?severity phase f
+let with_tmi_phase ?title ?severity f = with_phase TMI ?title ?severity f
 
 module Make (TargetLang : sig
   type t
