@@ -41,9 +41,11 @@ let end_phase = ReportBuilder.end_phase
 
 let with_phase level ?title ?severity phase f =
   ReportBuilder.start_phase level ?title ?severity phase;
-  let result = f () in
+  let result = try Ok (f ()) with e -> Error e in
   ReportBuilder.end_phase phase;
-  result
+  match result with
+  | Ok ok   -> ok
+  | Error e -> raise e
 
 let with_normal_phase ?title ?severity phase f =
   with_phase Normal ?title ?severity phase f
