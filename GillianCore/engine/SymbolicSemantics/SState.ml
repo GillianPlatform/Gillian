@@ -219,7 +219,7 @@ module Make (SMemory : SMemory.S) :
 
   let equals (state : t) (le1 : vt) (le2 : vt) : bool =
     let _, _, pfs, gamma, _ = state in
-    let result = FOSolver.is_equal le1 le2 pfs gamma in
+    let result = FOSolver.is_equal ~pfs ~gamma le1 le2 in
     result
 
   let get_type (state : t) (le : vt) : Type.t option =

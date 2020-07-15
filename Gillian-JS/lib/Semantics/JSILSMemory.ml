@@ -93,27 +93,8 @@ module M : Gillian.Symbolic.Memory_S = struct
 
   let init () : t = SHeap.init ()
 
-  let get_loc_name (pfs : PFS.t) (gamma : TypEnv.t) (loc : Expr.t) :
-      string option =
-    L.(tmi (fun m -> m "get_loc_name: %s" ((Fmt.to_to_string Expr.pp) loc)));
-    let lpfs = PFS.to_list pfs in
-    match Reduction.reduce_lexpr ~pfs ~gamma loc with
-    | Lit (Loc loc) | ALoc loc -> Some loc
-    | LVar x                   -> (
-        match Reduction.resolve_expr_to_location lpfs (LVar x) with
-        | Some (loc_name, _) -> Some loc_name
-        | _                  -> None )
-    | loc'                     -> (
-        match Reduction.resolve_expr_to_location lpfs loc' with
-        | Some (loc_name, _) -> Some loc_name
-        | None               ->
-            let msg =
-              Fmt.str
-                "@[<v 2>JSILSMemory: Unsupported location: %a with pfs:@\n%a@]"
-                Expr.pp loc' PFS.pp pfs
-            in
-            L.verbose (fun m -> m "%s" msg);
-            raise (Failure msg) )
+  let get_loc_name pfs gamma =
+    Gillian.Logic.FOSolver.resolve_loc_name ~pfs ~gamma
 
   let fresh_loc ?(loc : vt option) (pfs : PFS.t) (gamma : TypEnv.t) :
       string * vt * Formula.t list =
@@ -219,7 +200,7 @@ module M : Gillian.Symbolic.Memory_S = struct
               match
                 ( dom,
                   SFVL.get_first
-                    (fun name -> FOSolver.is_equal name prop pfs gamma)
+                    (fun name -> FOSolver.is_equal ~pfs ~gamma name prop)
                     fv_list )
               with
               | None, None         ->
