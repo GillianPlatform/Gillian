@@ -76,10 +76,13 @@ let parse_and_compile_js path =
         (JS2GILErr
            (Printf.sprintf "\nParser post-processing threw an EarlyError: %s\n"
               e))
+
+(*
   | _ ->
       Error
         (JS2GILErr
            (Printf.sprintf "\nParsing problems with the file '%s'\n" path))
+  *)
 
 let parse_and_compile_jsil path =
   let jsil_prog = Parsing.parse_jsil_eprog_from_file path in

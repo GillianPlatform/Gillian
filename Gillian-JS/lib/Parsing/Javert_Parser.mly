@@ -915,6 +915,9 @@ js_lexpr_target:
 (* s-nth(e1, e2) *)
   | STRNTH; LBRACE; e1=js_lexpr_target; COMMA; e2=js_lexpr_target; RBRACE
     { BinOp (e1, StrNth, e2) }
+(* l-sub(e1, e2, e3) *)
+| LSTSUB; LBRACE; e1=js_lexpr_target; COMMA; e2=js_lexpr_target; COMMA; e3 = js_lexpr_target; RBRACE
+    { LstSub (e1, e2, e3) }
 (* this *)
   | THIS { This }
 (* (e) *)

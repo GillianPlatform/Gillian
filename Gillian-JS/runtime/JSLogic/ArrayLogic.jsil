@@ -1,0 +1,75 @@
+(* *********************************************
+   ****************    Array    ****************
+   ********************************************* *)
+
+(*********************************
+ **** Common Array Structure  ****
+ *********************************)
+
+pred ArrayStructure(a:Obj, arrayLength:Num) :
+  ((a, "push") -> none) *                            (* Push must be found in the prototype *)
+  ((a, "map")  -> none) *
+
+  MetaData(a, #md) * MetaData(#md, null) *
+  ((#md, "@proto")                 -> $larr_proto) * (* Prototype is the array prototype    *)
+  ((#md, "@class")                 -> "Array") *     (* Class is "Array"                    *)
+  ((#md, "@extensible")            -> true) *        (* Array buffers are extensible        *)
+  empty_fields (#md : -{ "@class", "@extensible", "@proto" }-) *
+
+  ((a, "length") -> {{ "d", arrayLength, true, false, false }});
+
+(*******************************
+ **** Array of Uint8Arrays  ****
+ *******************************)
+
+pred ArrayOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num, +contentsLength:Num) :
+    (contents == {{ }}) * (contentsLength == 0),
+
+    (contentsLength == l-len contents) *
+    (#index == num_to_string start) *
+    (contents == #element :: #rest) *
+    (#rest_start == start + 1) *
+    (#rest_length == contentsLength - 1) *
+    DataProp(a, #index, #ui8a) *
+    Uint8Array (#ui8a, #ab, 0, #viewSize) *
+    ArrayBuffer(#ab, #element) *
+    (#viewSize == l-len #element) *
+    ArrayOfUInt8ArraysContents(a, #rest, #rest_start, #rest_length);
+
+pred ArrayOfUInt8Arrays (+a:Obj, contents:List, arrayLength:Num) :
+    ArrayStructure(a, arrayLength) *
+    ArrayOfUInt8ArraysContents(a, contents, 0, arrayLength);
+
+(* ----------------------------------------------------------------------------------- *)
+
+pred ArrayOfArraysOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num, contentsLength:Num) :
+    (contents == {{ }}) * (contentsLength == 0),
+
+    (#index == num_to_string start) *
+    (contents == #elementContents :: #rest) *
+    DataProp(a, #index, #aui8a) *
+    ArrayOfUInt8Arrays (#aui8a, #elementContents, _) *
+    (contentsLength == l-len contents) *
+    (#rest_start == start + 1) *
+    (#rest_contents == contentsLength - 1) *
+    ArrayOfArraysOfUInt8ArraysContents(a, #rest, #rest_start, #rest_contents);
+
+pred ArrayOfArraysOfUInt8Arrays (+a:Obj, contents:List, arrayLength:Num) :
+    ArrayStructure(a, arrayLength) *
+    ArrayOfArraysOfUInt8ArraysContents(a, contents, 0, arrayLength);
+
+(**************************
+ **** Array Prototype  ****
+ **************************)
+
+pred ArrayPrototype () :
+  JSObjWithProto ($larr_proto, $lobj_proto) *
+  empty_fields ($larr_proto : -{ "push", "map" }-) *
+
+  (($larr_proto, "push") -> {{ "d", $lap_push, true, false, true }}) * (* Array.prototype.push  *)
+  (($larr_proto, "map")  -> {{ "d", $lap_map,  true, false, true }}) * (* Array.prototype.map   *)
+
+  JSBIFunction($lap_push, "AP_push", 1) * (* Actual push function *)
+    empty_fields($lap_push : -{ "length" }-) *
+  JSBIFunction($lap_map, "AP_map", 1) *  (* Actual map function *)
+    empty_fields($lap_map : -{ "length" }-);

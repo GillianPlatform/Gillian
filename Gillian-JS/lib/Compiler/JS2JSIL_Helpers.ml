@@ -62,7 +62,14 @@ let js2jsil_imports_cosette =
   ]
 
 let js2jsil_logic_imports =
-  [ "javert_internal_functions.jsil"; "javert_logic_macros.jsil" ]
+  [
+    "javert_internal_functions.jsil";
+    "javert_logic_macros.jsil";
+    "ArrayBuffer.jsil";
+    "ArrayLogic.jsil";
+    "DataView.jsil";
+    "Uint8Array.jsil";
+  ]
 
 let js2jsil_imports_bi =
   [

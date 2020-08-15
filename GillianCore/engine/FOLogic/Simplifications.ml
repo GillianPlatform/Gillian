@@ -625,8 +625,6 @@ let simplify_pfs_and_gamma
                          ( LstCat,
                            [ EList (List.append prepend [ elem ]); append ] ) ))
             | _ -> `Replace whole )
-        | (Eq (LstSub (lst, start, num), sl) | Eq (sl, LstSub (lst, start, num)))
-          when unification -> `Replace whole
         | Eq (UnOp (LstLen, le), Lit (Num len))
         | Eq (Lit (Num len), UnOp (LstLen, le)) -> (
             match Arith_Utils.is_int len with
@@ -645,8 +643,8 @@ let simplify_pfs_and_gamma
             List.iter (fun eq -> extend_with eq) eqs;
             `Filter
         (* Sublist *)
-        | Eq (LstSub (lst, start, num), sl) | Eq (sl, LstSub (lst, start, num))
-          -> (
+        | (Eq (LstSub (lst, start, num), sl) | Eq (sl, LstSub (lst, start, num)))
+          when not unification -> (
             match (start, num) with
             (* We know both the start and the length *)
             | Lit (Num st), Lit (Num el)
@@ -705,22 +703,24 @@ let simplify_pfs_and_gamma
                                FMinus,
                                UnOp (LstLen, sl) ) ) ));
                 rec_call (Eq (lst, NOp (LstCat, [ EList prefix; LVar ns_var ])))
-            | _, _
-              when ( match sl with
-                   | Lit (LList _) | EList _ -> false
-                   | _                       -> true )
-                   && (not (num = UnOp (LstLen, sl)))
-                   &&
-                   match num with
-                   | Lit (Num _) | LVar _ -> true
-                   | _                    -> false ->
-                let new_pf = Formula.Eq (UnOp (LstLen, sl), num) in
-                L.(
-                  verbose (fun m ->
-                      m "LSTSUBADD: %s" ((Fmt.to_to_string Formula.pp) new_pf)));
-                PFS.extend lpfs new_pf;
-                `Replace whole
-            | _ -> `Replace whole )
+            | _, _ ->
+                let prefix_lvar = LVar.alloc () in
+                let suffix_lvar = LVar.alloc () in
+                vars_to_kill :=
+                  SS.add prefix_lvar (SS.add suffix_lvar !vars_to_kill);
+                let lst_eq =
+                  Formula.Eq
+                    ( lst,
+                      NOp (LstCat, [ LVar prefix_lvar; sl; LVar suffix_lvar ])
+                    )
+                in
+                let len_pr =
+                  Formula.Eq (UnOp (LstLen, LVar prefix_lvar), start)
+                in
+                let len_sl = Formula.Eq (UnOp (LstLen, sl), num) in
+                extend_with len_pr;
+                extend_with len_sl;
+                rec_call lst_eq )
         | Eq (le1, le2) -> (
             let te1, _, _ = Typing.type_lexpr gamma le1 in
             let te2, _, _ = Typing.type_lexpr gamma le2 in

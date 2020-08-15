@@ -1,0 +1,186 @@
+(* ************************************************
+   ****************    DataView    ****************
+   ************************************************ *)
+
+(* Interpretation: one byte as an unsigned 8-bit integer *)
+pure pred rawToUInt8(+bytes:List, num:Num) :
+    (bytes == {{ #b0 }}) * (num == #b0) * 
+    (0 <=# #b0) * (#b0 <# 256);
+
+(* Interpretation: two bytes as an unsigned 16-bit integer *)
+pure pred rawToUInt16(+bytes:List, +littleEndian:Bool, num:Num) :
+    (littleEndian == false) * 
+    (#b0 == l-nth(bytes, 0)) * (#b1 == l-nth(bytes, 1)) * 
+    (0 <=# #b0) * (#b0 <# 256) *
+    (0 <=# #b1) * (#b1 <# 256) *
+    (num == (#b0 * 256) + #b1),
+
+    (littleEndian == true) *
+    (#b0 == l-nth(bytes, 0)) * (#b1 == l-nth(bytes, 1)) * 
+    (0 <=# #b0) * (#b0 <# 256) *
+    (0 <=# #b1) * (#b1 <# 256) *
+    (num == (#b1 * 256) + #b0);
+
+(* Interpretation: four bytes as an unsigned 32-bit integer *)
+pure pred rawToUInt32(+bytes:List, +littleEndian:Bool, num:Num) :
+    (littleEndian == false) * (num == (l-nth(bytes, 0) * 16777216) + (l-nth(bytes, 1) * 65536) + (l-nth(bytes, 2) * 256) + l-nth(bytes, 3)),
+    (littleEndian == true) *  (num == (l-nth(bytes, 3) * 16777216) + (l-nth(bytes, 2) * 65536) + (l-nth(bytes, 1) * 256) + l-nth(bytes, 0));
+
+(******************************
+ **** Data View Instances  ****
+ ******************************)
+
+pred DataView (+dv:Obj, buffer:Obj, byteOffset:Num, byteLength:Num) :
+  ((dv, "buffer") -> none) *                    (* Functions to be found in the prototype      *)
+  ((dv, "byteLength") -> none) *
+  ((dv, "byteOffset") -> none) *
+  ((dv, "constructor") -> none) *
+  ((dv, "getUint8") -> none) *
+  ((dv, "getUint16") -> none) *
+  ((dv, "getUint32") -> none) *
+  ((dv, "setUint8") -> none) *
+  ((dv, "setUint16") -> none) *
+  ((dv, "setUint32") -> none) *
+
+  MetaData(dv, #md) * MetaData(#md, null) * 
+  ((#md, "@proto")             -> $ldv_proto) * (* Prototype is the Data View prototype        *)
+  ((#md, "@class")             -> "DataView") * (* Class is "DataView" (doesn't exist in ES6+) *)
+  ((#md, "@extensible")        -> true) *       (* Data Views are extensible                   *)
+  ((#md, "@ViewedArrayBuffer") -> buffer) *     (* Viewed array buffer                         *)
+  ((#md, "@ByteOffset")        -> byteOffset) * (* Offset inside the array buffer              *)
+  ((#md, "@ByteLength")        -> byteLength) * (* Length of the view                          *)
+
+  (* No other internal properties *)
+  empty_fields (#md : -{ "@class", "@extensible", "@proto", "@ViewedArrayBuffer", "@ByteOffset", "@ByteLength" }-) *
+  
+  (* Well-formedness *)
+  (0 <=# byteOffset) * (0 <=# byteLength);
+
+(******************************
+ **** Data View Prototype  ****
+ ******************************)
+
+pred DataViewPrototype () :
+  JSObjWithProto ($ldv_proto, $lobj_proto) * 
+  empty_fields ($ldv_proto : -{ "buffer", "byteLength", "byteOffset", "constructor", 
+                                "getUint8", "getUint16", "getUint32", "setUint8", "setUint16", "setUint32" }-) *
+  
+  (($ldv_proto, "buffer")      -> {{ "a", $ldv_buffer,     undefined, false, true }}) * (* DataView.prototype.buffer      *)
+  (($ldv_proto, "byteLength")  -> {{ "a", $ldv_byteLength, undefined, false, true }}) * (* DataView.prototype.byteLength  *)
+  (($ldv_proto, "byteOffset")  -> {{ "a", $ldv_byteOffset, undefined, false, true }}) * (* DataView.prototype.byteOffset  *)
+  (($ldv_proto, "constructor") -> {{ "d", $ldv, true, false, true }}) *                 (* DataView.prototype.constructor *)
+  (($ldv_proto, "getUint8")    -> {{ "d", $ldv_getUint8,  true, false, true }}) *       (* DataView.prototype.getUint8    *)
+  (($ldv_proto, "getUint16")   -> {{ "d", $ldv_getUint16, true, false, true }}) *       (* DataView.prototype.getUint16   *)
+  (($ldv_proto, "getUint32")   -> {{ "d", $ldv_getUint32, true, false, true }}) *       (* DataView.prototype.getUint32   *)
+  (($ldv_proto, "setUint8")    -> {{ "d", $ldv_setUint8,  true, false, true }}) *       (* DataView.prototype.setUint8    *)
+  (($ldv_proto, "setUint16")   -> {{ "d", $ldv_setUint16, true, false, true }}) *       (* DataView.prototype.setUint16   *)
+  (($ldv_proto, "setUint32")   -> {{ "d", $ldv_setUint32, true, false, true }}) *       (* DataView.prototype.setUint32   *)
+
+  JSBIFunction($ldv_buffer, "DVP_buffer", 0) * (* Actual buffer function *)
+  empty_fields($ldv_buffer : -{ "length" }-) * 
+
+  JSBIFunction($ldv_byteLength, "DVP_byteLength", 0) * (* Actual byteLength function *)
+  empty_fields($ldv_byteLength : -{ "length" }-) * 
+
+  JSBIFunction($ldv_byteOffset, "DVP_byteOffset", 0) * (* Actual byteOffset function *)
+  empty_fields($ldv_byteOffset : -{ "length" }-) * 
+
+  JSBIFunction($ldv_getUint8, "DVP_getUint8", 1) * (* Actual getUint8 function *)
+  empty_fields($ldv_getUint8 : -{ "length" }-) *
+
+  JSBIFunction($ldv_getUint16, "DVP_getUint16", 2) * (* Actual getUint16 function *)
+  empty_fields($ldv_getUint16 : -{ "length" }-) *
+
+  JSBIFunction($ldv_getUint32, "DVP_getUint32", 2) * (* Actual getUint32 function *)
+  empty_fields($ldv_getUint32 : -{ "length" }-) *
+
+  JSBIFunction($ldv_setUint8, "DVP_setUint8", 2) * (* Actual setUint8 function *)
+  empty_fields($ldv_setUint8 : -{ "length" }-) *
+
+  JSBIFunction($ldv_setUint16, "DVP_setUint16", 3) * (* Actual setUint16 function *)
+  empty_fields($ldv_setUint16 : -{ "length" }-) *
+
+  JSBIFunction($ldv_setUint32, "DVP_setUint32", 3) * (* Actual setUint32 function *)
+  empty_fields($ldv_setUint32 : -{ "length" }-);
+
+(**********************************
+ **** Built-in DataView Object ****
+ **********************************)
+
+pred BI_DataViewObject () :
+  BIFunctionObject ($ldv, 1, $lfun_proto, empty, "DV_construct");
+
+(********************************************************************
+ **** Axiomatic specifications of the DataView-related functions ****
+ ********************************************************************)
+
+only spec DV_construct (x_sc, v_this, buffer, byteOffset, byteLength)
+    [[ (buffer == #buffer) * (byteOffset == #byteOffset) * (byteLength == #byteLength) *
+       ArrayBuffer(#buffer, #data) * (#bufferLength == l-len #data) * 
+       (0 <=# #byteOffset) * (0 <=# #byteLength) *
+       (#byteOffset + #byteLength <=# #bufferLength) ]]
+    [[ ArrayBuffer(#buffer, #data) * DataView(ret, #buffer, #byteOffset, #byteLength) ]]
+    normal
+
+only spec DVP_buffer (xsc, vthis)
+    [[ (vthis == #vthis) * DataView(#vthis, #buffer, #byteOffset, #byteLength) ]]
+    [[ DataView(#vthis, #buffer, #byteOffset, #byteLength) * (ret == #buffer) ]]
+    normal
+    
+only spec DVP_byteLength (xsc, vthis)
+    [[ (vthis == #vthis) * DataView(#vthis, #buffer, #byteOffset, #byteLength) ]]
+    [[ DataView(#vthis, #buffer, #byteOffset, #byteLength) * (ret == #byteLength) ]]
+    normal
+
+only spec DVP_byteOffset (xsc, vthis)
+    [[ (vthis == #vthis) * DataView(#vthis, #buffer, #byteOffset, #byteLength) ]]
+    [[ DataView(#vthis, #buffer, #byteOffset, #byteLength) * (ret == #byteOffset) ]]
+    normal
+
+only spec DVP_getUint8 (xsc, vthis, byteOffset)
+    [[ (vthis == #vthis) * (byteOffset == #byteOffset) * 
+       DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
+       (0 <=# byteOffset) * (#elementSize == 1) * (#byteOffset + #elementSize <=# #viewSize) * 
+       (#view == l-sub(#data, #viewOffset, #viewSize)) ]]
+    [[ DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
+       (#raw == l-sub (#view, #byteOffset, #elementSize)) *
+       rawToUInt8(#raw, ret) ]]
+    normal
+
+only spec DVP_getUint16 (xsc, vthis, byteOffset, littleEndian)
+    [[ (vthis == #vthis) * (byteOffset == #byteOffset) * (littleEndian == undefined) *
+       DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
+       (0 <=# byteOffset) * (#elementSize == 2) * (#byteOffset + #elementSize <=# #viewSize) * 
+       (#view == l-sub(#data, #viewOffset, #viewSize)) ]]
+    [[ DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
+       (#raw == l-sub (#view, #byteOffset, #elementSize)) * 
+       rawToUInt16(#raw, false, ret) ]]
+    normal;
+
+    [[ (vthis == #vthis) * (byteOffset == #byteOffset) * (littleEndian == #littleEndian) *
+       DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
+       (0 <=# byteOffset) * (#elementSize == 2) * (#byteOffset + #elementSize <=# #viewSize) * 
+       (#view == l-sub(#data, #viewOffset, #viewSize)) ]]
+    [[ DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
+       (#raw== l-sub (#view, #byteOffset, #elementSize)) * 
+       rawToUInt16(#raw, #littleEndian, ret) ]]
+    normal
+
+only spec DVP_getUint32 (xsc, vthis, byteOffset, littleEndian)
+    [[ (vthis == #vthis) * (byteOffset == #byteOffset) * (littleEndian == undefined) *
+       DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
+       (0 <=# byteOffset) * (#elementSize == 4) * (#byteOffset + #elementSize <=# #viewSize) * 
+       (#view == l-sub(#data, #viewOffset, #viewSize)) ]]
+    [[ DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
+       (#raw == l-sub (#view, #byteOffset, #elementSize)) * 
+       rawToUInt32(#raw, false, ret) ]]
+    normal;
+
+    [[ (vthis == #vthis) * (byteOffset == #byteOffset) * (littleEndian == #littleEndian) *
+       DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
+       (0 <=# byteOffset) * (#elementSize == 4) * (#byteOffset + #elementSize <=# #viewSize) * 
+       (#view == l-sub(#data, #viewOffset, #viewSize)) ]]
+    [[ DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
+       (#raw == l-sub (#view, #byteOffset, #elementSize)) * 
+       rawToUInt32(#raw, #littleEndian, ret) ]]
+    normal
