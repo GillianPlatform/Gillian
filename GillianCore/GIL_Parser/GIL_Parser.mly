@@ -167,6 +167,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 (* Logic predicates *)
 %token PURE
 %token PRED
+%token NOUNFOLD
 (* Logic commands *)
 %token OLCMD
 %token CLCMD
@@ -727,6 +728,7 @@ g_pred_target:
   no_path = option(NO_PATH);
   internal = option(INTERNAL);
   pure = option(PURE);
+  nounfold = option(NOUNFOLD);
   PRED;
   pred_head = pred_head_target;
   COLON;
@@ -734,6 +736,7 @@ g_pred_target:
   SCOLON
   {
     let pred_pure = Option.is_some pure in
+    let pred_nounfold = Option.is_some nounfold in
     let (pred_name, pred_num_params, pred_params, pred_ins) = pred_head in
     let () =
       if Option.is_some no_path then
@@ -750,6 +753,7 @@ g_pred_target:
         pred_ins;
         pred_definitions;
         pred_pure;
+        pred_nounfold;
         pred_normalised;
       }
   }

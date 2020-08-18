@@ -193,6 +193,7 @@ and pred = {
   pred_ins : int list;
   pred_definitions : ((string * string list) option * assertion) list;
   pred_pure : bool;
+  pred_nounfold : bool;
   pred_normalised : bool;
 }
 

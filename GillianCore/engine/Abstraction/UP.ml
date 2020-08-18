@@ -43,6 +43,14 @@ exception UPError of up_err_t
 
 (* I need an ins_expr *)
 
+let invertible_binop (le : Expr.t) : bool =
+  match le with
+  | BinOp (_, FPlus, _) | BinOp (_, IPlus, _) -> true
+  | _ -> false
+
+let ins_expr e =
+  SS.union (SS.union (Expr.lvars e) (Expr.alocs e)) (Expr.pvars e)
+
 let rec outs_expr (le : Expr.t) : SS.t =
   let f = outs_expr in
   match le with
@@ -59,12 +67,21 @@ let rec outs_expr (le : Expr.t) : SS.t =
   | EList les -> List.fold_left (fun ac le -> SS.union (f le) ac) SS.empty les
   | _ -> SS.empty
 
+(* FIXME: this needs to be much more general than it is *)
+let rec invertible_ios (le : Expr.t) : (SS.t * SS.t) list =
+  match le with
+  | BinOp (o1, FPlus, o2) ->
+      let io1, oo1 = (ins_expr o1, outs_expr o1) in
+      let io2, oo2 = (ins_expr o2, outs_expr o2) in
+      let ios_1 = if SS.cardinal oo2 = 1 then [ (io1, oo2) ] else [] in
+      let ios_2 = if SS.cardinal oo1 = 1 then [ (io2, oo1) ] else [] in
+      ios_1 @ ios_2
+  | _                     -> []
+
 let rec ins_outs_formula (preds : (string, Pred.t) Hashtbl.t) (form : Formula.t)
     : (SS.t * SS.t * Formula.t) list =
   let f = ins_outs_formula preds in
-  let ins_e e =
-    SS.union (SS.union (Expr.lvars e) (Expr.alocs e)) (Expr.pvars e)
-  in
+
   let ins_f f =
     SS.union (SS.union (Formula.lvars f) (Formula.alocs f)) (Formula.pvars f)
   in
@@ -78,9 +95,9 @@ let rec ins_outs_formula (preds : (string, Pred.t) Hashtbl.t) (form : Formula.t)
         (fun (ins1, outs1, f1) (ins2, outs2, f2) ->
           (SS.union ins1 ins2, SS.union outs1 outs2, Formula.And (f1, f2)))
   | Eq (e1, e2)  ->
-      let ins1 = ins_e e1 in
+      let ins1 = ins_expr e1 in
       let outs1 = outs_expr e1 in
-      let ins2 = ins_e e2 in
+      let ins2 = ins_expr e2 in
       let outs2 = outs_expr e2 in
 
       L.(
@@ -103,7 +120,23 @@ let rec ins_outs_formula (preds : (string, Pred.t) Hashtbl.t) (form : Formula.t)
         if SS.subset ins1 outs1 then [ (ins2, outs1, Formula.Eq (e1, e2)) ]
         else []
       in
-      let ios = io_l2r @ io_r2l in
+      (* FIXME: Understand how to generalise this *)
+      let io_invertibles =
+        let ios_1 = invertible_ios e1 in
+        let ios_1 =
+          List.map
+            (fun (ins, outs) -> (SS.union ins2 ins, outs, Formula.Eq (e2, e1)))
+            ios_1
+        in
+        let ios_2 = invertible_ios e2 in
+        let ios_2 =
+          List.map
+            (fun (ins, outs) -> (SS.union ins1 ins, outs, Formula.Eq (e1, e2)))
+            ios_2
+        in
+        ios_1 @ ios_2
+      in
+      let ios = io_l2r @ io_r2l @ io_invertibles in
       L.(verbose (fun m -> m "ios: %d" (List.length ios)));
       if ios <> [] then ios
       else [ (SS.union ins1 ins2, SS.union outs1 outs2, Formula.Eq (e1, e2)) ]

@@ -9,6 +9,7 @@ type t = {
   ins : int list;
   definitions : ((string * string list) option * JSAsrt.t) list;
   pure : bool;
+  nounfold : bool;
 }
 
 let js2jsil
@@ -28,5 +29,6 @@ let js2jsil
     ins = pred_def.ins;
     definitions = jsil_definitions;
     pure = pred_def.pure;
+    nounfold = pred_def.nounfold;
     normalised = false;
   }

@@ -772,10 +772,11 @@ struct
            aloc in *)
     core_asrt
 
-  let rec normalise_core_asrts
+  let normalise_core_asrts
       (store : SStore.t)
       (pfs : PFS.t)
       (gamma : TypEnv.t)
+      (svars : SS.t)
       (subst : SSubst.t)
       (c_asrts : (string * Expr.t list * Expr.t list) list) :
       (string * Expr.t list * Expr.t list) list * SSubst.t =
@@ -789,16 +790,17 @@ struct
     let fos = generate_overlapping_constraints c_asrts' in
     List.iter (fun fo -> PFS.extend new_pfs fo) fos;
     let subst', _ =
-      Simplifications.simplify_pfs_and_gamma new_pfs gamma
+      Simplifications.simplify_pfs_and_gamma new_pfs gamma ~unification:true
         ~save_spec_vars:(SS.empty, true)
     in
     let subst = compose_substs subst subst' in
+    let subst' = SSubst.filter subst' (fun x _ -> not (SS.mem x svars)) in
 
     L.verbose (fun m ->
-        m "pfs after overlapping constraints:\n%a\nSubst':\n%a\n"
+        m "pfs after overlapping constraints:\n%a\nSubst:\n%a\nSubst':\n%a\n"
           (* FIXME: Shouldn't use PFS.to_list but Fmt.iter and PFS.iter *)
           (Fmt.list ~sep:(Fmt.any "@\n") Formula.pp)
-          (PFS.to_list new_pfs) SSubst.pp subst');
+          (PFS.to_list new_pfs) SSubst.pp subst SSubst.pp subst');
 
     let f_subst = SSubst.subst_in_expr subst' ~partial:true in
     let c_asrts'' =
@@ -835,6 +837,11 @@ struct
     let lv_bnds = List.map (fun x -> (x, Expr.LVar x)) (SS.elements lvars) in
     let al_bnds = List.map (fun l -> (l, Expr.ALoc l)) (SS.elements alocs) in
     let subst = SSubst.init (lv_bnds @ al_bnds) in
+
+    L.verbose (fun m ->
+        m "Subst in produce asrts:\n%a"
+          (* FIXME: Shouldn't use PFS.to_list but Fmt.iter and PFS.iter *)
+          SSubst.pp subst);
 
     let rec loop
         (astate : SPState.t)
@@ -880,7 +887,7 @@ struct
     let falsePFs pfs = PFS.mem pfs False in
     let svars = SS.filter is_spec_var_name (Asrt.lvars a) in
     L.verbose (fun m ->
-        m "Normalising assertion blah:\n\t%a\nsvars: @[<h>%a]" Asrt.pp a
+        m "Normalising assertion:\n\t%a\nsvars: @[<h>%a]" Asrt.pp a
           (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
           svars);
 
@@ -912,7 +919,7 @@ struct
     | false ->
         L.verbose (fun m ->
             m
-              "WARNING: normalise_assertion: type assertions could not be \
+              "ERROR: normalise_assertion: type assertions could not be \
                normalised");
         None
     | true  -> (
@@ -920,7 +927,7 @@ struct
         match falsePFs pfs with
         | true  ->
             L.verbose (fun m ->
-                m "WARNING: normalise_assertion: pure formulae false");
+                m "ERROR: normalise_assertion: pure formulae false");
             None
         | false -> (
             L.verbose (fun m -> m "Here is the store: %a" SStore.pp store);
@@ -929,7 +936,7 @@ struct
 
             (* Step 5 -- normalise core assertions *)
             let c_asrts', subst =
-              normalise_core_asrts store pfs gamma subst c_asrts
+              normalise_core_asrts store pfs gamma svars subst c_asrts
             in
 
             (* Step 6 -- Extend pfs with info on subst *)

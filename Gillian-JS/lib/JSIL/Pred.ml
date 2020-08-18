@@ -13,6 +13,7 @@ type t = {
   definitions : ((string * string list) option * Asrt.t) list;
       (** Predicate definitions  *)
   pure : bool;  (** Is the predicate pure  *)
+  nounfold : bool;  (** Should the predicate be unfolded? *)
   normalised : bool;  (** If the predicate has been previously normalised *)
 }
 
@@ -98,10 +99,19 @@ let pp fmt pred =
           Fmt.pf fmt "[%s: %a]" id Fmt.(list ~sep:(any ", ") string) exs
         else Fmt.pf fmt "[%s]" id
   in
+  let pp_pure fmt = function
+    | true  -> Fmt.pf fmt "pure "
+    | false -> ()
+  in
+  let pp_nounfold fmt = function
+    | true  -> Fmt.pf fmt "nounfold "
+    | false -> ()
+  in
   let pp_def fmt (id_ex, asrt) =
     Fmt.pf fmt "%a%a" pp_id_ex id_ex Asrt.pp asrt
   in
-  Fmt.pf fmt "@[<v 2>pred %s(%a):@\n%a;@]" name
+  Fmt.pf fmt "@[<v 2>%a%apred %s(%a):@\n%a;@]" pp_pure pred.pure pp_nounfold
+    pred.nounfold name
     Fmt.(list ~sep:(any ", ") pp_param)
     params_with_info
     Fmt.(list ~sep:(any ",@\n") pp_def)
@@ -195,6 +205,7 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
     ins = pred.ins;
     definitions = new_defs;
     pure = pred.pure;
+    nounfold = pred.nounfold;
     normalised = pred.normalised;
   }
 

@@ -124,9 +124,9 @@ pred BI_ObjectObject () :
   DataPropGen ($lobj, "create", $lobj_create, true, false, true) *
   JSBIFunction($lobj_create, "Object_create", 2) * empty_fields($lobj_create : -{ "length" }-);
 
-pred ObjectPrototype () :
-  JSObjWithProto ($lobj_proto, null) * empty_fields ($lobj_proto : -{ "hasOwnProperty" }-) *
-  (($lobj_proto, "hasOwnProperty") -> {{ "d", $lop_hasOwnProperty, true, false, true }}) *
+nounfold pred ObjectPrototype (proto) :
+  JSObjWithProto (proto, null) * empty_fields (proto : -{ "hasOwnProperty" }-) *
+  ((proto, "hasOwnProperty") -> {{ "d", $lop_hasOwnProperty, true, false, true }}) *
   JSBIFunction($lop_hasOwnProperty, "OP_hasOwnProperty", 1) * empty_fields($lop_hasOwnProperty : -{ "length" }-);
 
 pred ObjectPrototypeComplete () :
@@ -179,7 +179,7 @@ pred initialHeapPost (globals) :
     GlobalObject() *
     empty_fields ($lg : -u- (-{ "Error", "Object", "DataView" }-, globals) ) *
 
-    ObjectPrototype () *
+    ObjectPrototype ($lobj_proto) *
     FunctionPrototype () *
     BooleanPrototype () * empty_fields ($lbool_proto : -{ "constructor" }-) *
     NumberPrototype ()  * empty_fields ($lnum_proto : -{ "constructor" }-) *
@@ -193,7 +193,7 @@ pred initialHeapPost (globals) :
 pred initialHeapPostWeak ( ) :
     GlobalObject() *
 
-    ObjectPrototype () *
+    ObjectPrototype ($lobj_proto) *
 
     FunctionPrototype () *
 

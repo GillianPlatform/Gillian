@@ -173,6 +173,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 (* Logic predicates *)
 %token PURE
 %token PRED
+%token NOUNFOLD
 (* Logic commands *)
 %token OLCMD
 %token CLCMD
@@ -756,12 +757,13 @@ pred_head_target:
   }
 
 pred_target:
-  p = option(PURE); PRED; pred_head = pred_head_target; COLON;
+  p = option(PURE); n = option(NOUNFOLD); PRED; pred_head = pred_head_target; COLON;
   definitions = separated_nonempty_list(COMMA, named_assertion_target); SCOLON
   { let pure = match p with | Some _ -> true | None -> false in
+    let nounfold = match n with | Some _ -> true | None -> false in
     let (name, num_params, params, ins) = pred_head in
     let normalised = !Config.previously_normalised in
-    Pred.{ name; num_params; params; ins; definitions; pure; normalised } }
+    Pred.{ name; num_params; params; ins; definitions; pure; nounfold; normalised } }
 
 /* MACROS */
 
@@ -1044,12 +1046,13 @@ js_named_assertion_target:
 
 js_pred_target:
 (* pred name (arg1, ..., argn) : [def1_id: x1, ...] def1, ..., [def1_id: x1, ...] defn ; *)
-  pure = option(PURE); PRED; pred_head = pred_head_target; COLON;
+  PRED; pure = option(PURE); nounfold = option(NOUNFOLD); pred_head = pred_head_target; COLON;
   definitions = separated_nonempty_list(COMMA, js_named_assertion_target); SCOLON; EOF
     { (* Add the predicate to the collection *)
       let (name, num_params, params, ins) = pred_head in
       let pure = match pure with | Some _ -> true | None -> false in
-      Jslogic.JSPred.{ name; num_params; params; ins; definitions; pure }
+      let nounfold = match nounfold with | Some _ -> true | None -> false in
+      Jslogic.JSPred.{ name; num_params; params; ins; definitions; pure; nounfold }
     }
 
 

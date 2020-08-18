@@ -795,6 +795,7 @@ let compile_pred filepath pred =
       pred_definitions = List.map build_def pred_definitions;
       pred_normalised = false;
       pred_pure = false;
+      pred_nounfold = false;
     }
 
 let rec compile_function

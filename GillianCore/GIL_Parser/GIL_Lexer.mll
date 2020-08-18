@@ -91,6 +91,7 @@
       (* Logic predicates *)
       "pure", GIL_Parser.PURE;
       "pred", GIL_Parser.PRED;
+      "nounfold", GIL_Parser.NOUNFOLD;
 
       (* Logic commands *)
       "fold",         GIL_Parser.FOLD;

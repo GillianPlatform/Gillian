@@ -105,6 +105,7 @@
       (* Logic predicates *)
       "pure", Javert_Parser.PURE;
       "pred", Javert_Parser.PRED;
+      "nounfold", Javert_Parser.NOUNFOLD;
 
       (* Logic commands *)
       "fold",         Javert_Parser.FOLD;

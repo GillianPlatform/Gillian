@@ -402,11 +402,15 @@ let rec get_length_of_list (lst : Expr.t) : int option =
   let f = get_length_of_list in
 
   match lst with
-  | PVar _            -> None
-  | LVar _            -> None
-  | Lit (LList l)     -> Some (List.length l)
-  | EList l           -> Some (List.length l)
-  | NOp (LstCat, les) -> (
+  | PVar _             -> None
+  | LVar _             -> None
+  | Lit (LList l)      -> Some (List.length l)
+  | EList l            -> Some (List.length l)
+  | LstSub (_, _, len) -> (
+      match len with
+      | Lit (Num len) when Float.is_integer len -> Some (int_of_float len)
+      | _ -> None )
+  | NOp (LstCat, les)  -> (
       let lens = List.map f les in
       match List.exists (fun x -> x = None) lens with
       | true  -> None
@@ -414,7 +418,7 @@ let rec get_length_of_list (lst : Expr.t) : int option =
           let lens = List.map Option.get lens in
           let lens = List.fold_left (fun ac x -> ac + x) 0 lens in
           Some lens )
-  | _                 ->
+  | _                  ->
       raise
         (Failure
            (Printf.sprintf "get_length_of_list: list equals %s, impossible"
@@ -448,6 +452,21 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
   | EList l ->
       assert (idx < List.length l);
       Some (List.nth l idx)
+  | LstSub (lst, Lit (Num start), Lit (Num len))
+    when Float.is_integer start && Float.is_integer len -> (
+      let start = int_of_float start in
+      let len = int_of_float len in
+      match lst with
+      | EList l       ->
+          assert (idx < len);
+          assert (start + idx < List.length l);
+          Some (List.nth l (start + idx))
+      | Lit (LList l) ->
+          assert (idx < len);
+          assert (start + idx < List.length l);
+          Some (Lit (List.nth l (start + idx)))
+      | _             -> None )
+  | LstSub _ -> None
   | NOp (LstCat, lel :: ler) ->
       Option.value ~default:None
         (Option.map
@@ -1056,11 +1075,12 @@ let rec reduce_lexpr_loop
                 match lexpr_is_list gamma fle with
                 | true  -> (
                     match fle with
-                    | Lit (LList le)    ->
+                    | Lit (LList le)     ->
                         Lit (Num (float_of_int (List.length le)))
-                    | EList le          -> Lit
-                                             (Num (float_of_int (List.length le)))
-                    | NOp (LstCat, les) ->
+                    | EList le           -> Lit
+                                              (Num
+                                                 (float_of_int (List.length le)))
+                    | NOp (LstCat, les)  ->
                         let les =
                           List.map (fun x -> Expr.UnOp (LstLen, x)) les
                         in
@@ -1070,7 +1090,8 @@ let rec reduce_lexpr_loop
                             (List.hd les) (List.tl les)
                         in
                         f le
-                    | _                 -> def )
+                    | LstSub (_, _, len) -> len
+                    | _                  -> def )
                 | false ->
                     let err_msg =
                       "UnOp(LstLen, list): list is not a GIL list."
@@ -1536,7 +1557,12 @@ let rec reduce_lexpr_loop
                 match (flel, fler) with
                 | UnOp (LstLen, _), Lit (Num n) when n <= 0. -> Lit (Bool false)
                 | UnOp (LstLen, le), Lit (Num 1.) -> BinOp (le, Equal, EList [])
-                | _, _ -> def )
+                | flel, Lit (Num 0.) -> def
+                | _, _ ->
+                    f
+                      (BinOp
+                         (BinOp (flel, FMinus, fler), FLessThan, Lit (Num 0.)))
+                )
             | _ -> def ) )
     (* The remaining cases cannot be reduced *)
     | _ -> le
@@ -1963,17 +1989,16 @@ let rec reduce_formula_loop
                 then f (Eq (ls, rs))
                 else default e1 e2 re1 re2
             | _, _ -> default e1 e2 re1 re2 )
-    | Less (e1, e2) -> (
+    | Less (e1, e2) ->
         let re1 = fe e1 in
         let re2 = fe e2 in
-        match (re1, re2) with
-        | Lit (Num x), Lit (Num y) -> if x < y then True else False
-        | UnOp (LstLen, _), Lit (Num 0.) -> False
-        | UnOp (LstLen, le), Lit (Num 1.) -> Eq (le, EList [])
-        | re1, re2 ->
-            if PFS.mem pfs (LessEq (re2, re1)) then False
-            else if PFS.mem pfs (Less (re2, re1)) then False
-            else Less (re1, re2) )
+        if PFS.mem pfs (LessEq (re2, re1)) then False
+        else if PFS.mem pfs (Less (re2, re1)) then False
+        else
+          let le = Option.get (Formula.to_expr (Less (re1, re2))) in
+          let re = fe le in
+          let result, _ = Option.get (Formula.lift_logic_expr re) in
+          result
     | LessEq (e1, e2) -> (
         let re1 = fe e1 in
         let re2 = fe e2 in

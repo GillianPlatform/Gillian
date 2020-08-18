@@ -20,8 +20,10 @@ let rec auto_unfold
       try
         (* L.verbose (fun fmt -> fmt "AutoUnfold: %a" Asrt.pp asrt); *)
         let pred : Pred.t = Hashtbl.find predicates name in
-        if Hashtbl.find rec_tbl pred.pred_name && not unfold_rec_predicates then
-          [ asrt ]
+        if
+          (Hashtbl.find rec_tbl pred.pred_name && not unfold_rec_predicates)
+          || pred.pred_nounfold
+        then [ asrt ]
         else
           (* If it is not, replace the predicate assertion for the list of its definitions
              substituting the formal parameters of the predicate with the corresponding

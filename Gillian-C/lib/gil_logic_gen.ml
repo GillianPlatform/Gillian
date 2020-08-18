@@ -223,6 +223,7 @@ let gen_pred_of_struct cenv ann struct_name =
         pred_num_params;
         pred_params;
         pred_pure = false;
+        pred_nounfold = false;
         pred_normalised = false;
         pred_definitions = [ (None, def) ];
       }
@@ -527,6 +528,7 @@ let trans_pred ?(ann = empty) ~filepath cl_pred =
       pred_ins;
       pred_definitions;
       pred_pure = false;
+      pred_nounfold = false;
       pred_normalised = false;
     }
 
@@ -610,6 +612,7 @@ let make_global_env_pred init_asrts =
       pred_ins = [];
       pred_definitions = [ (None, def) ];
       pred_pure = false;
+      pred_nounfold = false;
       pred_normalised = false;
     }
 
@@ -789,6 +792,7 @@ let gen_rec_pred_of_struct cenv ann struct_name =
         pred_num_params;
         pred_params;
         pred_pure = false;
+        pred_nounfold = false;
         pred_normalised = false;
         pred_definitions;
       }
@@ -805,6 +809,7 @@ let gen_rec_pred_of_struct cenv ann struct_name =
         pred_num_params = 1;
         pred_params = [ (opt_param_name, Some Type.ListType) ];
         pred_pure = false;
+        pred_nounfold = false;
         pred_normalised = false;
         pred_definitions = List.map (fun x -> (None, x)) opt_defs;
       }

@@ -409,48 +409,53 @@ struct
         [ ConfCont (state', cs', -1, 0, b_counter) ]
       in
 
-      match
-        ( ExecMode.biabduction_exec !Config.current_exec_mode,
-          pid = caller,
-          is_internal_proc pid,
-          CallStack.recursive_depth cs pid >= !Config.bi_unroll_depth )
-      with
-      (* In bi-abduction, reached max depth of recursive calls *)
-      | true, _, _, true -> []
-      (* In bi-abduction, recursive call *)
-      | true, true, false, _ -> symb_exec_proc ()
-      (* TODO: When JS internals work
-         | true, false, false
-           when List.length
-                  (List.filter is_internal_proc (CallStack.get_cur_procs cs))
-                < !Config.bi_no_spec_depth -> symb_exec_proc () *)
-      | _ -> (
-          match spec with
-          | Some spec -> (
-              let subst = eval_subst_list state subst in
-              L.verbose (fun fmt -> fmt "ABOUT TO USE THE SPEC OF %s" pid);
-              (* print_to_all ("\tStarting run spec: " ^ pid); *)
-              let rets : (State.t * Flag.t) list =
-                State.run_spec spec state x args subst
-              in
-              (* print_to_all ("\tFinished run spec: " ^ pid); *)
-              L.verbose (fun fmt ->
-                  fmt "Run_spec returned %d Results" (List.length rets));
-              let b_counter =
-                if List.length rets > 1 then b_counter + 1 else b_counter
-              in
-              match rets with
-              | (ret_state, fl) :: rest_rets ->
-                  process_ret false ret_state fl b_counter
-                  :: List.map
-                       (fun (ret_state, fl) ->
-                         process_ret true ret_state fl b_counter)
-                       rest_rets
-              | _ -> [] )
-          | _         ->
-              if Hashtbl.mem prog.prog.bi_specs pid then
-                [ ConfSusp (pid, state, cs, prev, i, b_counter) ]
-              else symb_exec_proc () )
+      let spec_exec_proc () =
+        match spec with
+        | Some spec -> (
+            let subst = eval_subst_list state subst in
+            L.verbose (fun fmt -> fmt "ABOUT TO USE THE SPEC OF %s" pid);
+            (* print_to_all ("\tStarting run spec: " ^ pid); *)
+            let rets : (State.t * Flag.t) list =
+              State.run_spec spec state x args subst
+            in
+            (* print_to_all ("\tFinished run spec: " ^ pid); *)
+            L.verbose (fun fmt ->
+                fmt "Run_spec returned %d Results" (List.length rets));
+            let b_counter =
+              if List.length rets > 1 then b_counter + 1 else b_counter
+            in
+            match rets with
+            | (ret_state, fl) :: rest_rets ->
+                process_ret false ret_state fl b_counter
+                :: List.map
+                     (fun (ret_state, fl) ->
+                       process_ret true ret_state fl b_counter)
+                     rest_rets
+            | _ -> [] )
+        | None      ->
+            if Hashtbl.mem prog.prog.bi_specs pid then
+              [ ConfSusp (pid, state, cs, prev, i, b_counter) ]
+            else symb_exec_proc ()
+      in
+
+      match ExecMode.biabduction_exec !Config.current_exec_mode with
+      | true -> (
+          match
+            ( pid = caller,
+              is_internal_proc pid,
+              CallStack.recursive_depth cs pid >= !Config.bi_unroll_depth )
+          with
+          (* In bi-abduction, reached max depth of recursive calls *)
+          | _, _, true -> []
+          (* In bi-abduction, recursive call *)
+          | true, false, _ -> symb_exec_proc ()
+          (* TODO: When JS internals work
+             | true, false, false
+               when List.length
+                      (List.filter is_internal_proc (CallStack.get_cur_procs cs))
+                    < !Config.bi_no_spec_depth -> symb_exec_proc () *)
+          | _ -> spec_exec_proc () )
+      | _    -> spec_exec_proc ()
     in
 
     match cmd with

@@ -62,12 +62,12 @@ pred ArrayOfArraysOfUInt8Arrays (+a:Obj, contents:List, arrayLength:Num) :
  **** Array Prototype  ****
  **************************)
 
-pred ArrayPrototype () :
-  JSObjWithProto ($larr_proto, $lobj_proto) *
-  empty_fields ($larr_proto : -{ "push", "map" }-) *
+nounfold pred ArrayPrototype (proto) :
+  JSObjWithProto (proto, $lobj_proto) *
+  empty_fields (proto : -{ "push", "map" }-) *
 
-  (($larr_proto, "push") -> {{ "d", $lap_push, true, false, true }}) * (* Array.prototype.push  *)
-  (($larr_proto, "map")  -> {{ "d", $lap_map,  true, false, true }}) * (* Array.prototype.map   *)
+  ((proto, "push") -> {{ "d", $lap_push, true, false, true }}) * (* Array.prototype.push  *)
+  ((proto, "map")  -> {{ "d", $lap_map,  true, false, true }}) * (* Array.prototype.map   *)
 
   JSBIFunction($lap_push, "AP_push", 1) * (* Actual push function *)
     empty_fields($lap_push : -{ "length" }-) *

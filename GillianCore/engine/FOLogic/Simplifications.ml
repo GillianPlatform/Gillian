@@ -720,7 +720,23 @@ let simplify_pfs_and_gamma
                 let len_sl = Formula.Eq (UnOp (LstLen, sl), num) in
                 extend_with len_pr;
                 extend_with len_sl;
-                rec_call lst_eq )
+                `Replace lst_eq
+                (* | _, _
+                     when ( match sl with
+                          | Lit (LList _) | EList _ | LVar _ -> false
+                          | _                       -> true )
+                          && (not (num = UnOp (LstLen, sl)))
+                          &&
+                          match num with
+                          | Lit (Num _) | LVar _ -> true
+                          | _                    -> false ->
+                       let new_pf = Formula.Eq (UnOp (LstLen, sl), num) in
+                       L.(
+                         verbose (fun m ->
+                             m "LSTSUBADD: %s" ((Fmt.to_to_string Formula.pp) new_pf)));
+                       PFS.extend lpfs new_pf;
+                       `Replace whole
+                   | _ -> `Replace whole ) *) )
         | Eq (le1, le2) -> (
             let te1, _, _ = Typing.type_lexpr gamma le1 in
             let te2, _, _ = Typing.type_lexpr gamma le2 in

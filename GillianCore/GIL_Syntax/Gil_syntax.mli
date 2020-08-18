@@ -605,6 +605,7 @@ module Pred : sig
     pred_definitions : ((string * string list) option * Asrt.t) list;
         (** Predicate definitions *)
     pred_pure : bool;  (** Is the predicate pure? *)
+    pred_nounfold : bool;  (** Should the predicate be unfolded? *)
     pred_normalised : bool;  (** Has the predicate been previously normalised? *)
   }
 

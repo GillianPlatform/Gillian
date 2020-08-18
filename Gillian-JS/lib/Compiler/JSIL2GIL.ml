@@ -119,6 +119,7 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
     pred_definitions =
       List.map (fun (info, asrt) -> (info, jsil2gil_asrt asrt)) pred.definitions;
     pred_pure = pred.pure;
+    pred_nounfold = pred.nounfold;
     pred_normalised = pred.normalised;
   }
 
