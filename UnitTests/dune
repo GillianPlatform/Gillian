@@ -1,5 +1,0 @@
-(executable
- (name UP_tests)
- (public_name GUT_UP_tests)
- (package gillian-unit-tests)
- (libraries gillian oUnit))

@@ -1,6 +1,6 @@
 (executable
  (name run_tests)
- (libraries alcotest gil_syntax_tests))
+ (libraries alcotest gil_syntax_tests gillian))
 
 (rule
  (alias runtest)
