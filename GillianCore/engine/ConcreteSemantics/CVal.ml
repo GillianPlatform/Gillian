@@ -13,6 +13,8 @@ module rec M : (Val.S with type st = CSubst.t and type t = Literal.t) = struct
 
   let full_pp = Literal.pp
 
+  let full_pp_list = Fmt.list ~sep:(Fmt.any "; ") full_pp
+
   let to_literal lit = Some lit
 
   let from_literal lit = lit

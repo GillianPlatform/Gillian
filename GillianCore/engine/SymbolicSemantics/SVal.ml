@@ -15,6 +15,8 @@ module rec M : (Val.S with type t = Expr.t and type st = SSubst.t) = struct
 
   let full_pp = Expr.full_pp
 
+  let full_pp_list = Fmt.list ~sep:(Fmt.any "; ") full_pp
+
   let to_literal le =
     match (le : Expr.t) with
     | Lit lit -> Some lit

@@ -262,6 +262,9 @@ module Expr : sig
   (** [substitutables e] returns all lvars and alocs *)
   val substitutables : t -> SS.t
 
+  (** [unifiables e] returns all pvars, lvars, and alocs as proper expressions *)
+  val unifiables : t -> Set.t
+
   (** [is_concrete e] returns [true] iff the expression contains no lvar or aloc *)
   val is_concrete : t -> bool
 

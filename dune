@@ -1,2 +1,2 @@
 (dirs wisl GillianCore Gillian-Rely-Runner Gillian-JS Gillian-C
-  Gillian-Alcotest)
+  Gillian-Alcotest UnitTests)

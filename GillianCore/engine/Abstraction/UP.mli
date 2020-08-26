@@ -25,6 +25,10 @@ type up_err_t =
   | UPAssert    of Asrt.t * Asrt.t list list
   | UPInvariant of Asrt.t * Asrt.t list list
 
+module KB = Expr.Set
+
+val missing : KB.t -> Expr.t -> KB.t list
+
 val collect_simple_asrts : Asrt.t -> Asrt.t list
 
 val init :

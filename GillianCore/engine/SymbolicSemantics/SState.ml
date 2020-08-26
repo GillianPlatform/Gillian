@@ -230,11 +230,10 @@ module Make (SMemory : SMemory.S) :
 
   let simplify
       ?(save = false)
-      ?(kill_new_lvars : bool option)
+      ?(kill_new_lvars = true)
       ?(unification = false)
       (state : t) : st =
     (* let start_time = time() in  *)
-    let kill_new_lvars = Option.value ~default:true kill_new_lvars in
     let heap, store, pfs, gamma, svars = state in
     let save_spec_vars = if save then (SS.empty, true) else (svars, false) in
     L.verbose (fun m ->
@@ -248,6 +247,7 @@ module Make (SMemory : SMemory.S) :
       Simplifications.simplify_pfs_and_gamma ~kill_new_lvars pfs gamma
         ~unification ~save_spec_vars
     in
+    let subst = SSubst.filter subst (fun x _ -> not (SS.mem x svars)) in
     SMemory.substitution_in_place subst heap;
     SStore.substitution_in_place subst store;
     if not kill_new_lvars then Typing.naively_infer_type_information pfs gamma;

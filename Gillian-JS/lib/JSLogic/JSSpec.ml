@@ -29,7 +29,7 @@ let rec js2jsil_st
 
   let pre' : Asrt.t =
     JSAsrt.js2jsil (Some fid) cc_tbl vis_tbl fun_tbl
-      (Some (Expr.LVar var_scope)) pre
+      (Some (Expr.PVar var_scope)) pre
   in
   let post' : Asrt.t list =
     List.map

@@ -96,6 +96,7 @@ struct
           let posts =
             List.map (fun p -> SVal.SSubst.substitute_asrt subst true p) posts
           in
+          let posts = List.map Reduction.reduce_assertion posts in
           let posts' =
             List.filter (fun p -> Simplifications.admissible_assertion p) posts
           in

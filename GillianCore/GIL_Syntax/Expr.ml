@@ -123,16 +123,20 @@ let rec pp fmt e =
 
 let rec full_pp fmt e =
   match e with
-  | Lit _    -> Fmt.pf fmt "(Lit %a)" pp e
-  | PVar _   -> Fmt.pf fmt "PVar %a" pp e
-  | LVar _   -> Fmt.pf fmt "LVar %a" pp e
-  | ALoc _   -> Fmt.pf fmt "ALoc %a" pp e
-  | BinOp _  -> Fmt.pf fmt "(BinOp: %a)" pp e
-  | UnOp _   -> Fmt.pf fmt "(UnOp %a)" pp e
-  | LstSub _ -> Fmt.pf fmt "(LstSub %a)" pp e
-  | NOp _    -> Fmt.pf fmt "(NOp %a)" pp e
-  | EList ll -> Fmt.pf fmt "{{ @[%a@] }}" (Fmt.list ~sep:Fmt.comma full_pp) ll
-  | _        -> pp fmt e
+  | Lit _               -> Fmt.pf fmt "Lit %a" pp e
+  | PVar _              -> Fmt.pf fmt "PVar %a" pp e
+  | LVar _              -> Fmt.pf fmt "LVar %a" pp e
+  | ALoc _              -> Fmt.pf fmt "ALoc %a" pp e
+  | BinOp (e1, op, e2)  ->
+      Fmt.pf fmt "(%a %s %a)" full_pp e1 (BinOp.str op) full_pp e2
+  | UnOp (op, e)        -> Fmt.pf fmt "(%s %a)" (UnOp.str op) pp e
+  | LstSub (e1, e2, e3) ->
+      Fmt.pf fmt "l-sub(%a, %a, %a)" full_pp e1 full_pp e2 full_pp e3
+  | NOp _               -> Fmt.pf fmt "(NOp %a)" pp e
+  | EList ll            -> Fmt.pf fmt "{{ @[%a@] }}"
+                             (Fmt.list ~sep:Fmt.comma full_pp)
+                             ll
+  | _                   -> pp fmt e
 
 (** From expression to expression *)
 let to_expr (le : t) : t = le
@@ -199,6 +203,14 @@ let substitutables (le : t) : SS.t =
     | _               -> List.concat ac
   in
   SS.of_list (fold fe_ac None None le)
+
+let unifiables (le : t) : Set.t =
+  let fe_ac le _ _ ac =
+    match le with
+    | LVar _ | PVar _ | ALoc _ -> [ le ]
+    | _                        -> List.concat ac
+  in
+  Set.of_list (fold fe_ac None None le)
 
 let rec is_concrete (le : t) : bool =
   let f = is_concrete in

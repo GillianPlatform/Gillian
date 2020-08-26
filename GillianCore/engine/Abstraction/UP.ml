@@ -41,12 +41,53 @@ type up_err_t =
 
 exception UPError of up_err_t
 
-(* I need an ins_expr *)
+(** Knowledge bases *)
+module KB = Expr.Set
 
-let invertible_binop (le : Expr.t) : bool =
-  match le with
-  | BinOp (_, FPlus, _) | BinOp (_, IPlus, _) -> true
-  | _ -> false
+(** [missing kb e] returns a list of unifiables that are missing
+    in order for the expression [e] to be known under knowledge
+    base [kb]. The expression is required to have previously been
+    fully reduced. *)
+let rec missing (kb : KB.t) (e : Expr.t) : KB.t list =
+  let f = missing kb in
+  let join (le : Expr.t list) =
+    let mle = List.map f le in
+    let cpmle = List_utils.list_product mle in
+    let umle =
+      List.map
+        (fun le -> List.fold_left (fun m e -> KB.union m e) KB.empty le)
+        cpmle
+    in
+    if List.mem KB.empty umle then [ KB.empty ] else umle
+  in
+  match KB.mem e kb with
+  | true  -> [ KB.empty ]
+  | false -> (
+      match e with
+      (* Literals are always known *)
+      | Lit _ -> [ KB.empty ]
+      (* Program variables, logical variables, and abstract locations
+         are known if and only if they are in the knowledge base *)
+      | PVar _ | LVar _ | ALoc _ -> [ KB.singleton e ]
+      | UnOp (LstLen, e1) -> (
+          (* If a LstLen exists, then it must be of a program or a logical variable.
+             All other cases (literal list, expression list, list concat, sub-list)
+             must have been taken care of by reduction *)
+          match e1 with
+          | PVar _ | LVar _ -> (
+              match KB.mem e1 kb with
+              | true  -> [ KB.empty ]
+              | false -> [ KB.singleton e; KB.singleton e1 ] )
+          | _               ->
+              raise
+                (Failure
+                   (Format.asprintf
+                      "UP.missing: impossible LstLen in unification: %a" Expr.pp
+                      e)) )
+      | UnOp (_, e) -> f e
+      | BinOp (e1, _, e2) -> join [ e1; e2 ]
+      | NOp (_, le) | EList le | ESet le -> join le
+      | LstSub (e1, e2, e3) -> join [ e1; e2; e3 ] )
 
 let ins_expr e =
   SS.union (SS.union (Expr.lvars e) (Expr.alocs e)) (Expr.pvars e)
@@ -66,17 +107,6 @@ let rec outs_expr (le : Expr.t) : SS.t =
      | BinOp (le1, LstCat, EList les) -> SS.union (f le1) (f (EList les)) *)
   | EList les -> List.fold_left (fun ac le -> SS.union (f le) ac) SS.empty les
   | _ -> SS.empty
-
-(* FIXME: this needs to be much more general than it is *)
-let rec invertible_ios (le : Expr.t) : (SS.t * SS.t) list =
-  match le with
-  | BinOp (o1, FPlus, o2) ->
-      let io1, oo1 = (ins_expr o1, outs_expr o1) in
-      let io2, oo2 = (ins_expr o2, outs_expr o2) in
-      let ios_1 = if SS.cardinal oo2 = 1 then [ (io1, oo2) ] else [] in
-      let ios_2 = if SS.cardinal oo1 = 1 then [ (io2, oo1) ] else [] in
-      ios_1 @ ios_2
-  | _                     -> []
 
 let rec ins_outs_formula (preds : (string, Pred.t) Hashtbl.t) (form : Formula.t)
     : (SS.t * SS.t * Formula.t) list =
@@ -120,23 +150,7 @@ let rec ins_outs_formula (preds : (string, Pred.t) Hashtbl.t) (form : Formula.t)
         if SS.subset ins1 outs1 then [ (ins2, outs1, Formula.Eq (e1, e2)) ]
         else []
       in
-      (* FIXME: Understand how to generalise this *)
-      let io_invertibles =
-        let ios_1 = invertible_ios e1 in
-        let ios_1 =
-          List.map
-            (fun (ins, outs) -> (SS.union ins2 ins, outs, Formula.Eq (e2, e1)))
-            ios_1
-        in
-        let ios_2 = invertible_ios e2 in
-        let ios_2 =
-          List.map
-            (fun (ins, outs) -> (SS.union ins1 ins, outs, Formula.Eq (e1, e2)))
-            ios_2
-        in
-        ios_1 @ ios_2
-      in
-      let ios = io_l2r @ io_r2l @ io_invertibles in
+      let ios = io_l2r @ io_r2l in
       L.(verbose (fun m -> m "ios: %d" (List.length ios)));
       if ios <> [] then ios
       else [ (SS.union ins1 ins2, SS.union outs1 outs2, Formula.Eq (e1, e2)) ]

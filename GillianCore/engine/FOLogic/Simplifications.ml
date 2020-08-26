@@ -643,100 +643,21 @@ let simplify_pfs_and_gamma
             List.iter (fun eq -> extend_with eq) eqs;
             `Filter
         (* Sublist *)
-        | (Eq (LstSub (lst, start, num), sl) | Eq (sl, LstSub (lst, start, num)))
-          when not unification -> (
-            match (start, num) with
-            (* We know both the start and the length *)
-            | Lit (Num st), Lit (Num el)
-              when Arith_Utils.is_int st && Arith_Utils.is_int el ->
-                (* Prefix *)
-                let prefix_lvars =
-                  Array.to_list
-                    (Array.init (int_of_float st) (fun _ -> LVar.alloc ()))
-                in
-                vars_to_kill := SS.union !vars_to_kill (SS.of_list prefix_lvars);
-                let prefix = List.map (fun x -> Expr.LVar x) prefix_lvars in
-                (* Create sublist *)
-                let sublist_lvars =
-                  Array.to_list
-                    (Array.init (int_of_float el) (fun _ -> LVar.alloc ()))
-                in
-                vars_to_kill :=
-                  SS.union !vars_to_kill (SS.of_list sublist_lvars);
-                let sublist = List.map (fun x -> Expr.LVar x) sublist_lvars in
-                (* Suffix *)
-                let suffix = LVar.alloc () in
-                vars_to_kill := SS.add suffix !vars_to_kill;
-                extend_with (Eq (sl, EList sublist));
-                rec_call
-                  (Eq
-                     ( lst,
-                       NOp (LstCat, [ EList (prefix @ sublist); LVar suffix ])
-                     ))
-            (* We know just the start *)
-            | Lit (Num st), _ when Arith_Utils.is_int st ->
-                (* Prefix *)
-                let prefix_lvars =
-                  Array.to_list
-                    (Array.init (int_of_float st) (fun _ -> LVar.alloc ()))
-                in
-                vars_to_kill := SS.union !vars_to_kill (SS.of_list prefix_lvars);
-                let prefix = List.map (fun x -> Expr.LVar x) prefix_lvars in
-                (* Suffix *)
-                let suffix = LVar.alloc () in
-                let ns_var = LVar.alloc () in
-                let ns_len_var = LVar.alloc () in
-                vars_to_kill :=
-                  SS.add suffix
-                    (SS.add ns_var (SS.add ns_len_var !vars_to_kill));
-                extend_with
-                  (Eq (LVar ns_var, NOp (LstCat, [ sl; LVar suffix ])));
-                extend_with (Eq (UnOp (LstLen, sl), num));
-                extend_with
-                  (Eq
-                     ( LVar suffix,
-                       LstSub
-                         ( LVar ns_var,
-                           UnOp (LstLen, sl),
-                           BinOp
-                             ( UnOp (LstLen, LVar ns_var),
-                               FMinus,
-                               UnOp (LstLen, sl) ) ) ));
-                rec_call (Eq (lst, NOp (LstCat, [ EList prefix; LVar ns_var ])))
-            | _, _ ->
-                let prefix_lvar = LVar.alloc () in
-                let suffix_lvar = LVar.alloc () in
-                vars_to_kill :=
-                  SS.add prefix_lvar (SS.add suffix_lvar !vars_to_kill);
-                let lst_eq =
-                  Formula.Eq
-                    ( lst,
-                      NOp (LstCat, [ LVar prefix_lvar; sl; LVar suffix_lvar ])
-                    )
-                in
-                let len_pr =
-                  Formula.Eq (UnOp (LstLen, LVar prefix_lvar), start)
-                in
-                let len_sl = Formula.Eq (UnOp (LstLen, sl), num) in
-                extend_with len_pr;
-                extend_with len_sl;
-                `Replace lst_eq
-                (* | _, _
-                     when ( match sl with
-                          | Lit (LList _) | EList _ | LVar _ -> false
-                          | _                       -> true )
-                          && (not (num = UnOp (LstLen, sl)))
-                          &&
-                          match num with
-                          | Lit (Num _) | LVar _ -> true
-                          | _                    -> false ->
-                       let new_pf = Formula.Eq (UnOp (LstLen, sl), num) in
-                       L.(
-                         verbose (fun m ->
-                             m "LSTSUBADD: %s" ((Fmt.to_to_string Formula.pp) new_pf)));
-                       PFS.extend lpfs new_pf;
-                       `Replace whole
-                   | _ -> `Replace whole ) *) )
+        | Eq (LstSub (lst, start, num), sl) | Eq (sl, LstSub (lst, start, num))
+          ->
+            let prefix_lvar = LVar.alloc () in
+            let suffix_lvar = LVar.alloc () in
+            vars_to_kill :=
+              SS.add prefix_lvar (SS.add suffix_lvar !vars_to_kill);
+            let lst_eq =
+              Formula.Eq
+                (lst, NOp (LstCat, [ LVar prefix_lvar; sl; LVar suffix_lvar ]))
+            in
+            let len_pr = Formula.Eq (UnOp (LstLen, LVar prefix_lvar), start) in
+            let len_sl = Formula.Eq (UnOp (LstLen, sl), num) in
+            extend_with len_pr;
+            extend_with len_sl;
+            `Replace lst_eq
         | Eq (le1, le2) -> (
             let te1, _, _ = Typing.type_lexpr gamma le1 in
             let te2, _, _ = Typing.type_lexpr gamma le2 in

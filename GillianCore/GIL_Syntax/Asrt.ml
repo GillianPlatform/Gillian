@@ -256,6 +256,22 @@ let make_pure (a : t) : Formula.t =
     Formula.conjunct fs
   else raise (Failure "DEATH. make_pure")
 
+let rec full_pp fmt a =
+  match a with
+  | Star (a1, a2)       -> Fmt.pf fmt "%a *@ %a" full_pp a1 full_pp a2
+  | Emp                 -> Fmt.string fmt "emp"
+  | Pred (name, params) ->
+      Fmt.pf fmt "@[<h>%s(%a)@]" name
+        (Fmt.list ~sep:Fmt.comma Expr.full_pp)
+        params
+  | Types tls           ->
+      let pp_tl f (e, t) = Fmt.pf f "%a : %s" Expr.full_pp e (Type.str t) in
+      Fmt.pf fmt "types(@[%a@])" (Fmt.list ~sep:Fmt.comma pp_tl) tls
+  | Pure f              -> Formula.full_pp fmt f
+  | GA (a, ins, outs)   ->
+      let pp_e_l = Fmt.list ~sep:Fmt.comma Expr.full_pp in
+      Fmt.pf fmt "@[<h><%s>(%a; %a)@]" a pp_e_l ins pp_e_l outs
+
 (** GIL logic assertions *)
 let rec pp fmt a =
   match a with

@@ -271,7 +271,7 @@ let rec js2jsil_tactic
   let vis_list = get_vis_list vis_tbl fid in
   let scope_chain_list = vislist_2_les vis_list (List.length vis_list) in
   let a' =
-    js2jsil (Some fid) cc_tbl vis_tbl fun_tbl (Some (Expr.LVar scope_var)) a
+    js2jsil (Some fid) cc_tbl vis_tbl fun_tbl (Some (Expr.PVar scope_var)) a
   in
 
   (*  x__scope == {{ #x1, ..., #xn }} *)

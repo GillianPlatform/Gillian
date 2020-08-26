@@ -64,6 +64,9 @@ module type S = sig
   (** Pretty Printer *)
   val pp : Format.formatter -> t -> unit
 
+  (** Full pretty Printer *)
+  val full_pp : Format.formatter -> t -> unit
+
   val filter_in_place : t -> (Var.t -> vt -> vt option) -> unit
 
   (** Convert substitution to list *)
@@ -255,6 +258,19 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   *)
   let pp fmt (subst : t) =
     let pp_pair fmt (v, v_val) = Fmt.pf fmt "@[<h>(%s: %a)@]" v Val.pp v_val in
+    Fmt.pf fmt "[ @[%a@] ]" (Fmt.hashtbl ~sep:Fmt.comma pp_pair) subst
+
+  (**
+    Substitution full pretty_printer
+
+    @param fmt Formatter
+    @param subst Target substitution
+    @return unit
+  *)
+  let full_pp fmt (subst : t) =
+    let pp_pair fmt (v, v_val) =
+      Fmt.pf fmt "@[<h>(%s: %a)@]" v Val.full_pp v_val
+    in
     Fmt.pf fmt "[ @[%a@] ]" (Fmt.hashtbl ~sep:Fmt.comma pp_pair) subst
 
   (**

@@ -825,7 +825,10 @@ struct
 
     let (lvars : SS.t), (alocs : SS.t) =
       List.fold_left
-        (fun (ret1, ret2) (_, ins, outs) ->
+        (fun (ret1, ret2) (id, ins, outs) ->
+          L.verbose (fun m ->
+              m "(%s\n%a\n%a)\n" id SVal.M.full_pp_list ins SVal.M.full_pp_list
+                outs);
           let lv_ins, al_ins = f_aux ins in
           let lv_outs, al_outs = f_aux outs in
           let ret1' = SS.union ret1 (SS.union lv_ins lv_outs) in
@@ -841,7 +844,7 @@ struct
     L.verbose (fun m ->
         m "Subst in produce asrts:\n%a"
           (* FIXME: Shouldn't use PFS.to_list but Fmt.iter and PFS.iter *)
-          SSubst.pp subst);
+          SSubst.full_pp subst);
 
     let rec loop
         (astate : SPState.t)
@@ -919,7 +922,7 @@ struct
     | false ->
         L.verbose (fun m ->
             m
-              "ERROR: normalise_assertion: type assertions could not be \
+              "WARNING: normalise_assertion: type assertions could not be \
                normalised");
         None
     | true  -> (
@@ -927,7 +930,7 @@ struct
         match falsePFs pfs with
         | true  ->
             L.verbose (fun m ->
-                m "ERROR: normalise_assertion: pure formulae false");
+                m "WARNING: normalise_assertion: pure formulae false");
             None
         | false -> (
             L.verbose (fun m -> m "Here is the store: %a" SStore.pp store);
