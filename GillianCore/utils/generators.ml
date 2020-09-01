@@ -22,10 +22,14 @@ let fresh_loc, reset_loc = fresh_sth lloc_prefix
 (** Program variable counter *)
 let fresh_pvar, reset_pvar = fresh_sth pvar_prefix
 
-(** Logical  variable counter *)
+(** Logical variable counter *)
+let fresh_lvar, reset_lvar = fresh_sth lvar_prefix
+
+(** Logical variable counter *)
 let fresh_lvar_bi, reset_lvar_bi = fresh_sth lvar_prefix_bi
 
 let reset () =
   reset_loc ();
   reset_pvar ();
+  reset_lvar ();
   reset_lvar_bi ()

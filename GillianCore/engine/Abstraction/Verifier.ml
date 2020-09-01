@@ -579,9 +579,12 @@ struct
           | Some files -> files
           | None       -> failwith "Cannot use -a in incremental mode"
         in
-        let source_files, call_graph, results = read_verif_results () in
+        let prev_source_files, prev_call_graph, results =
+          read_verif_results ()
+        in
         let proc_changes, lemma_changes =
-          get_verif_changes prog source_files call_graph cur_source_files
+          get_verif_changes prog ~prev_source_files ~prev_call_graph
+            ~cur_source_files
         in
         let procs_to_prune =
           proc_changes.changed_procs @ proc_changes.deleted_procs
@@ -591,8 +594,8 @@ struct
           lemma_changes.changed_lemmas @ lemma_changes.deleted_lemmas
           @ lemma_changes.dependent_lemmas
         in
-        let () = CallGraph.prune_procs call_graph procs_to_prune in
-        let () = CallGraph.prune_lemmas call_graph lemmas_to_prune in
+        let () = CallGraph.prune_procs prev_call_graph procs_to_prune in
+        let () = CallGraph.prune_lemmas prev_call_graph lemmas_to_prune in
         let () =
           VerificationResults.prune results (procs_to_prune @ lemmas_to_prune)
         in
@@ -612,7 +615,7 @@ struct
         in
         let cur_call_graph = SAInterpreter.call_graph in
         let cur_results = global_results in
-        let call_graph = CallGraph.merge call_graph cur_call_graph in
+        let call_graph = CallGraph.merge prev_call_graph cur_call_graph in
         let results = VerificationResults.merge results cur_results in
         let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
         write_verif_results cur_source_files call_graph ~diff results

@@ -1,3 +1,5 @@
+open Containers
+
 module SourceFile : sig
   type t = private {
     path : string;
@@ -17,8 +19,16 @@ end = struct
   }
   [@@deriving yojson]
 
+  let hash_cache = Hashtbl.create Config.small_tbl_size
+
   let make ~path ~dependents =
-    let contents = Digest.to_hex (Digest.file path) in
+    let contents =
+      if Hashtbl.mem hash_cache path then Hashtbl.find hash_cache path
+      else
+        let hash = Digest.to_hex (Digest.file path) in
+        Hashtbl.add hash_cache path hash;
+        hash
+    in
     { path; contents; dependents }
 
   let add_dependent file dep = file.dependents <- dep :: file.dependents
@@ -40,10 +50,10 @@ let get_or_make_file files path =
       Hashtbl.add files path file;
       file
 
-let add_source_file files path = ignore (get_or_make_file files path)
+let add_source_file files ~path = ignore (get_or_make_file files path)
 
-let add_dependency files path dependent =
-  SourceFile.add_dependent (get_or_make_file files path) dependent
+let add_dependency files ~path ~dependent_path =
+  SourceFile.add_dependent (get_or_make_file files path) dependent_path
 
 let get_file files path : SourceFile.t =
   match Hashtbl.find_opt files path with
@@ -51,6 +61,11 @@ let get_file files path : SourceFile.t =
   | None      ->
       failwith (Printf.sprintf "could not find file entry with path '%s'" path)
 
-let get_contents_hash files path = (get_file files path).contents
+let get_contents_hash files ~path = (get_file files path).contents
 
-let get_dependents files path = (get_file files path).dependents
+let get_dependents files ~path = (get_file files path).dependents
+
+let to_key_set (table : (string, 'b) Hashtbl.t) : SS.t =
+  Hashtbl.fold (fun key _ keys -> SS.add key keys) table SS.empty
+
+let get_paths_set = to_key_set

@@ -8,7 +8,7 @@ module IdSet : Set.S with type elt = id
 
 (** {3 General manipulations } *)
 
-val make : unit -> t
+val make : ?init_capacity:int -> unit -> t
 
 val reset : t -> unit
 

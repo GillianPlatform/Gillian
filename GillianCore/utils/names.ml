@@ -16,10 +16,10 @@ let pvar_prefix = "_pvar_"
 (** Abstract location prefix  *)
 let aloc_prefix = "_$l_"
 
-(** Logical  variable prefix  *)
+(** Logical variable prefix  *)
 let lvar_prefix = "_lvar_"
 
-(** Logical  variable prefix  *)
+(** Logical variable prefix  *)
 let lvar_prefix_bi = "_lvar_bi_"
 
 (** {2 Name testers} *)
