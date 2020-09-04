@@ -141,7 +141,7 @@ module type S = sig
 
   val clean_up : t -> unit
 
-  val unify_assertion : t -> st -> Asrt.t -> u_res
+  val unify_assertion : t -> st -> UP.step -> u_res
 
   val produce_posts : t -> st -> Asrt.t list -> t list
 

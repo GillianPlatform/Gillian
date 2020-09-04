@@ -56,9 +56,17 @@ let substitution_in_place subst heap =
   in
   (* Then we replace within the locations themselves *)
   let aloc_subst =
-    Subst.filter subst (fun var _ -> Gillian.Utils.Names.is_aloc_name var)
+    Subst.filter subst (fun var _ ->
+        match var with
+        | ALoc _ -> true
+        | _      -> false)
   in
   Subst.iter aloc_subst (fun aloc new_loc ->
+      let aloc =
+        match aloc with
+        | ALoc loc -> loc
+        | _        -> raise (Failure "Impossible by construction")
+      in
       let new_loc_str =
         match new_loc with
         | Expr.Lit (Literal.Loc loc) -> loc

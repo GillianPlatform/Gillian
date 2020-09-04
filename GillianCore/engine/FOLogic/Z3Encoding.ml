@@ -1351,8 +1351,8 @@ let check_sat (fs : Formula.Set.t) (gamma : TypEnv.t) : bool =
 let lift_z3_model
     (model : Model.model)
     (gamma : TypEnv.t)
-    (subst : SSubst.t)
-    (target_vars : SS.t) : unit =
+    (subst : SESubst.t)
+    (target_vars : Expr.Set.t) : unit =
   let recover_z3_number (n : ZExpr.expr) : float option =
     if ZExpr.is_numeral n then (
       L.(verbose (fun m -> m "Z3 number: %s" (ZExpr.to_string n)));
@@ -1394,13 +1394,20 @@ let lift_z3_model
   in
 
   L.(verbose (fun m -> m "Inside lift_z3_model"));
-  SS.iter
+  Expr.Set.iter
     (fun x ->
+      let x =
+        match x with
+        | LVar x -> x
+        | _      ->
+            raise
+              (Failure "INtERNAL ERROR: Z3 lifting of a non-logical variable")
+      in
       let v = lift_z3_val x in
       L.(
         verbose (fun m ->
             m "Z3 binding for %s: %s\n" x
               (Option.fold ~some:(Fmt.to_to_string Expr.pp) ~none:"NO BINDING!"
                  v)));
-      Option.fold ~some:(SSubst.put subst x) ~none:() v)
+      Option.fold ~some:(SESubst.put subst (LVar x)) ~none:() v)
     target_vars

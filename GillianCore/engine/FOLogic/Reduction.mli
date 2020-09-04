@@ -7,13 +7,18 @@ exception ReductionException of Gil_syntax.Expr.t * string
     If successful, it returns that location, together with any
     bindings learned during the resolution. *)
 val resolve_expr_to_location :
-  Gil_syntax.Formula.t list ->
-  Gil_syntax.Expr.t ->
-  (string * SVal.SSubst.t) option
+  PFS.t -> TypEnv.t -> Gil_syntax.Expr.t -> string option
 
 (** [get_equal_expressions pfs e] returns a list of expressions that
     equal [e] under the pure formulae [pfs]. *)
 val get_equal_expressions : PFS.t -> Gil_syntax.Expr.t -> Gil_syntax.Expr.t list
+
+val understand_lstcat :
+  PFS.t ->
+  TypEnv.t ->
+  Expr.t list ->
+  Expr.t list ->
+  (Formula.t * Containers.SS.t) option
 
 (** [reduce_lexpr ?unification ?reduce_lvars ?pfs ?gamma e] reduces the
     expression [e] given (optional) pure formulae [pfs] and typing environment [gamma].

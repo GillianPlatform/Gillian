@@ -3,19 +3,19 @@ open Containers
 module Make
     (SState : State.S
                 with type vt = SVal.M.t
-                 and type st = SVal.SSubst.t
+                 and type st = SVal.SESubst.t
                  and type store_t = SStore.t)
     (SPState : PState.S
                  with type vt = SVal.M.t
-                  and type st = SVal.SSubst.t
+                  and type st = SVal.SESubst.t
                   and type store_t = SStore.t
                   and type preds_t = Preds.SPreds.t)
     (External : External.S) =
 struct
   module L = Logging
-  module SSubst = SVal.SSubst
+  module SSubst = SVal.SESubst
   module SAInterpreter =
-    GInterpreter.Make (SVal.M) (SVal.SSubst) (SStore) (SPState) (External)
+    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SPState) (External)
   module Normaliser = Normaliser.Make (SPState)
 
   let print_success_or_failure success =
@@ -29,7 +29,7 @@ struct
     pre_state : SPState.t;
     post_up : UP.t;
     flag : Flag.t option;
-    spec_vars : SS.t;
+    spec_vars : Expr.Set.t;
   }
 
   let global_results = VerificationResults.make ()
@@ -54,19 +54,27 @@ struct
       | None                 -> (None, None)
       | Some (ss_pre, subst) -> (
           (* Step 2 - spec_vars = lvars(pre)\dom(subst) -U- alocs(range(subst)) *)
-          let lvars = Asrt.lvars pre in
+          let lvars =
+            SS.filter (fun x -> Names.is_spec_var_name x) (Asrt.lvars pre)
+          in
+          let lvars =
+            Expr.Set.of_list
+              (List.map (fun x -> Expr.LVar x) (SS.elements lvars))
+          in
           let subst_dom = SSubst.domain subst None in
-          let get_aloc x =
-            match (x : Expr.t) with
-            | ALoc loc -> Some loc
+          let get_aloc e =
+            match (e : Expr.t) with
+            | ALoc loc -> Some e
             | _        -> None
           in
           let alocs =
-            SS.of_list
+            Expr.Set.of_list
               (List_utils.get_list_somes
                  (List.map get_aloc (SSubst.range subst)))
           in
-          let spec_vars = SS.union (SS.diff lvars subst_dom) alocs in
+          let spec_vars =
+            Expr.Set.union (Expr.Set.diff lvars subst_dom) alocs
+          in
 
           let pre' = Asrt.star (SPState.to_assertions ss_pre) in
 
@@ -88,13 +96,20 @@ struct
                         (iter ~sep:comma SS.iter string)
                         e))
                 label
-                Fmt.(iter ~sep:comma SS.iter string)
+                Fmt.(iter ~sep:comma Expr.Set.iter Expr.pp)
                 spec_vars Asrt.pp pre SPState.pp ss_pre (List.length posts)
                 Fmt.(list ~sep:(any "@\n") Asrt.pp)
                 posts);
 
+          (* Do not substitute program variables in the postcondition *)
+          let subst =
+            SSubst.filter subst (fun e v ->
+                match e with
+                | PVar _ -> false
+                | _      -> true)
+          in
           let posts =
-            List.map (fun p -> SVal.SSubst.substitute_asrt subst true p) posts
+            List.map (fun p -> SSubst.substitute_asrt subst true p) posts
           in
           let posts = List.map Reduction.reduce_assertion posts in
           let posts' =
@@ -111,17 +126,32 @@ struct
           | true  -> (
               (* Step 4 - create a unification plan for the postconditions and s_test *)
               (* let known_vars    = SS.add Names.return_variable (SS.union (SS.of_list params) spec_vars) in *)
-              let known_vars = SS.add Names.return_variable spec_vars in
-              let known_vars =
-                SS.union known_vars
+              L.verbose (fun fmt -> fmt "Creating UPs for posts of %s" name);
+              let pvar_params =
+                Expr.Set.of_list (List.map (fun x -> Expr.PVar x) params)
+              in
+              let known_unifiables =
+                Expr.Set.add (PVar Names.return_variable)
+                  (Expr.Set.union pvar_params spec_vars)
+              in
+              let known_unifiables =
+                Expr.Set.union known_unifiables
                   (Option.fold
-                     ~some:(fun (_, existentials) -> existentials)
-                     ~none:SS.empty label)
+                     ~some:(fun (_, existentials) ->
+                       let existentials =
+                         List.map
+                           (fun x -> Expr.LVar x)
+                           (SS.elements existentials)
+                       in
+                       Expr.Set.of_list existentials)
+                     ~none:Expr.Set.empty label)
               in
               let simple_posts =
                 List.map (fun post -> (post, (label, None))) posts'
               in
-              let post_up = UP.init known_vars SS.empty preds simple_posts in
+              let post_up =
+                UP.init known_unifiables Expr.Set.empty preds simple_posts
+              in
               L.verbose (fun m -> m "END of STEP 4@\n");
               match post_up with
               | Error errs ->
@@ -231,12 +261,13 @@ struct
     (* Adding spec vars in the post to the subst - these are effectively the existentials of the post *)
     List.iter
       (fun x ->
-        if not (SSubst.mem subst x) then SSubst.add subst x (Expr.LVar x))
-      (Var.Set.elements (SPState.get_spec_vars state));
+        if not (SSubst.mem subst (LVar x)) then
+          SSubst.add subst (LVar x) (LVar x))
+      (SS.elements (SPState.get_spec_vars state));
 
     (* TODO: Understand if this should be done: setup all program variables in the subst *)
     SStore.iter (SPState.get_store state) (fun v value ->
-        if not (SSubst.mem subst v) then SSubst.put subst v value);
+        if not (SSubst.mem subst (PVar v)) then SSubst.put subst (PVar v) value);
 
     (* Option.may (fun v_ret -> SSubst.put subst Names.return_variable v_ret)
        (SStore.get (SState.get_store state) Names.return_variable); *)
@@ -256,12 +287,12 @@ struct
 
   let make_post_subst (test : t) (post_state : SPState.t) : SSubst.t =
     let subst_lst =
-      List.map
-        (fun x ->
-          if Names.is_aloc_name x then (x, Expr.ALoc x) else (x, Expr.LVar x))
-        (SS.elements test.spec_vars)
+      List.map (fun e -> (e, e)) (Expr.Set.elements test.spec_vars)
     in
     let params_subst_lst = SStore.bindings (SPState.get_store post_state) in
+    let params_subst_lst =
+      List.map (fun (x, v) -> (Expr.PVar x, v)) params_subst_lst
+    in
     let subst = SSubst.init (subst_lst @ params_subst_lst) in
     subst
 
@@ -646,7 +677,7 @@ module From_scratch (SMemory : SMemory.S) (External : External.S) = struct
 
   include Make
             (INTERNAL__.SState)
-            (PState.Make (SVal.M) (SVal.SSubst) (SStore) (INTERNAL__.SState)
+            (PState.Make (SVal.M) (SVal.SESubst) (SStore) (INTERNAL__.SState)
                (Preds.SPreds))
             (External)
 end

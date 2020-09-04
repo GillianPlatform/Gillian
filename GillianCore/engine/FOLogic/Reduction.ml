@@ -7,16 +7,20 @@ module L = Logging
 module CStore = Store.Make (CVal.M)
 
 let normalise_cat (f : Expr.t -> Expr.t) (les : Expr.t list) : Expr.t =
+  (* L.verbose (fun fmt ->
+      fmt "inside normalise cat: %a" Expr.pp (NOp (LstCat, les))); *)
   (* Recursively process each catted list and destroy inner LstCats *)
   let nles =
     List.concat
       (List.map
          (fun x ->
-           match f x with
+           let fx = f x in
+           match fx with
            | NOp (LstCat, les) -> les
-           | _                 -> [ x ])
+           | _                 -> [ fx ])
          les)
   in
+  (* L.verbose (fun fmt -> fmt "nles, v1: %a" Expr.pp (NOp (LstCat, nles))); *)
   (* Bring lists of literals together, part 1 *)
   let lsts, nles =
     List.fold_left
@@ -44,9 +48,9 @@ let normalise_cat (f : Expr.t -> Expr.t) (les : Expr.t list) : Expr.t =
     | [ x ] -> x
     | _     -> NOp (LstCat, nles)
   in
-  if result <> NOp (LstCat, les) then
-    L.verbose (fun fmt ->
-        fmt "NormCat: %a -> %a" Expr.pp (NOp (LstCat, les)) Expr.pp result);
+  (* if result <> NOp (LstCat, les) then
+     L.verbose (fun fmt ->
+         fmt "NormCat: %a -> %a" Expr.pp (NOp (LstCat, les)) Expr.pp result); *)
   result
 
 (** Rewrite logical expressions involving lists as:
@@ -287,34 +291,32 @@ let resolve_var_to_location (lvar : string) (pfs : Formula.t list) :
 
   loop original_pfs
 
-let resolve_expr_to_location (pfs : Formula.t list) (e : Expr.t) :
-    (string * SSubst.t) option =
-  L.(
-    verbose (fun m ->
-        m "resolve_expr: %s with pfs:\n%s\n"
-          ((Fmt.to_to_string Expr.pp) e)
-          (String.concat "\n" (List.map (Fmt.to_to_string Formula.pp) pfs))));
-  let ac_var, ac_loc =
-    List.fold_left
-      (fun (ac_var, ac_loc) fo ->
-        match ac_loc with
-        | Some _ -> (ac_var, ac_loc)
-        | None   -> (
-            match (fo : Formula.t) with
-            | Eq (LVar x, e') when e' = e -> (Some x, None)
-            | Eq (e', LVar x) when e' = e -> (Some x, None)
-            | Eq (ALoc l, e') when e' = e -> (ac_var, Some l)
-            | Eq (Lit (Loc l), e') when e' = e -> (ac_var, Some l)
-            | Eq (e', ALoc l) when e' = e -> (ac_var, Some l)
-            | Eq (e', Lit (Loc l)) when e' = e -> (ac_var, Some l)
-            | _ -> (ac_var, ac_loc) ))
-      (None, None) pfs
-  in
+(**********************************)
+(* Pure formulae helper functions *)
+(**********************************)
 
-  match (ac_var, ac_loc) with
-  | _, Some loc -> Some (loc, SSubst.init [])
-  | Some x, _   -> resolve_var_to_location x pfs
-  | _           -> None
+let find_equalities (pfs : PFS.t) (le : Expr.t) : Expr.t list =
+  let lpfs = PFS.to_list pfs in
+  let lpfs =
+    List.find_all
+      (fun x ->
+        match x with
+        | Formula.Eq (x, y) -> x = le || y = le
+        | _                 -> false)
+      lpfs
+  in
+  let result =
+    List.map
+      (fun x ->
+        match x with
+        | Formula.Eq (x, y) -> if x = le then y else x
+        | _                 ->
+            raise
+              (Exceptions.Impossible
+                 "find_equalities_in_pfs: guarantee by match/filter"))
+      lpfs
+  in
+  result
 
 (***************************)
 (* TYPING HELPER FUNCTIONS *)
@@ -358,40 +360,14 @@ let lexpr_is_set (gamma : TypEnv.t) (le : Expr.t) : bool =
   typable gamma le SetType
 
 let get_equal_expressions (pfs : PFS.t) nle =
-  PFS.fold_left
-    (fun ac a ->
-      match (a : Formula.t) with
-      | Eq (le1, le2) when le1 = nle -> le2 :: ac
-      | Eq (le2, le1) when le1 = nle -> le2 :: ac
-      | _ -> ac)
-    [] pfs
-
-(**********************************)
-(* Pure formulae helper functions *)
-(**********************************)
-
-let find_first_equality_in_pfs (pfs : PFS.t) (le : Expr.t) : Expr.t option =
-  let lpfs = PFS.to_list pfs in
-  let lpfs =
-    List.find_opt
-      (fun x ->
-        match x with
-        | Formula.Eq (x, y) -> x = le || y = le
-        | _                 -> false)
-      lpfs
-  in
-  let result =
-    Option.map
-      (fun x ->
-        match x with
-        | Formula.Eq (x, y) -> if x = le then y else x
-        | _                 ->
-            raise
-              (Exceptions.Impossible
-                 "find_first_equality_in_pfs: guarantee by match/filter"))
-      lpfs
-  in
-  result
+  List.rev
+    (PFS.fold_left
+       (fun ac a ->
+         match (a : Formula.t) with
+         | Eq (le1, le2) when le1 = nle -> le2 :: ac
+         | Eq (le2, le1) when le1 = nle -> le2 :: ac
+         | _ -> ac)
+       [] pfs)
 
 (***********************************)
 (* LIST REASONING HELPER FUNCTIONS *)
@@ -492,11 +468,11 @@ let rec get_head_and_tail_of_list
   (* Nothing can be done for variables *)
   | PVar _ -> None
   | LVar _ -> (
-      let ole = find_first_equality_in_pfs pfs lst in
+      let ole = get_equal_expressions pfs lst in
       match ole with
-      | None -> None
-      | Some le when Expr.Set.mem le unacceptable -> None
-      | Some le ->
+      | [] -> None
+      | le :: _ when Expr.Set.mem le unacceptable -> None
+      | le :: _ ->
           get_head_and_tail_of_list pfs (Expr.Set.add lst unacceptable) le )
   (* Base lists of literals and logical expressions *)
   | Lit (LList l) ->
@@ -726,6 +702,145 @@ let rec list_prefix (pfs : PFS.t) (la : Expr.t) (lb : Expr.t) : bool * Expr.t =
 (* REDUCTION *)
 (*************)
 
+(** Canonical symbolic numbers *)
+type cnum = { conc : float; symb : float Expr.Map.t }
+
+(* CNumber singleton - use carefully *)
+let cnum_singleton (e : Expr.t) : cnum =
+  match e with
+  | Lit (Num n) -> { conc = n; symb = Expr.Map.empty }
+  | _           -> { conc = 0.; symb = Expr.Map.singleton e 1. }
+
+(* CNumber unary minus *)
+let cnum_uminus (cn : cnum) : cnum =
+  { conc = -.cn.conc; symb = Expr.Map.map (fun x -> -.x) cn.symb }
+
+(* CNumber addition *)
+let cnum_plus (cn1 : cnum) (cn2 : cnum) =
+  let conc = cn1.conc +. cn2.conc in
+  let symb =
+    Expr.Map.fold
+      (fun e v sum ->
+        match Expr.Map.find_opt e sum with
+        | None    -> Expr.Map.add e v sum
+        | Some v' -> (
+            let v = v +. v' in
+            match v = 0. with
+            | true  -> Expr.Map.remove e sum
+            | false -> Expr.Map.add e v sum ))
+      cn2.symb cn1.symb
+  in
+  { conc; symb }
+
+(* CNumber subtraction *)
+let cnum_minus (cn1 : cnum) (cn2 : cnum) = cnum_plus cn1 (cnum_uminus cn2)
+
+(* CNumber constant multiplication *)
+let cnum_cmult (c : float) (cn : cnum) =
+  { conc = cn.conc *. c; symb = Expr.Map.map (fun v -> v *. c) cn.symb }
+
+let cnum_cdiv (c : float) (cn : cnum) =
+  assert (c <> 0.);
+  { conc = cn.conc /. c; symb = Expr.Map.map (fun v -> v /. c) cn.symb }
+
+let cnum_is_cposint (cn : cnum) : bool =
+  Expr.Map.is_empty cn.symb && Float.is_integer cn.conc && cn.conc >= 0.
+
+(* CNumber to Expression *)
+let cnum_to_expr (cn : cnum) : Expr.t =
+  match Expr.Map.is_empty cn.symb with
+  | true  -> Expr.Lit (Num cn.conc)
+  | false -> (
+      let erest =
+        Expr.Map.fold
+          (fun e v erest ->
+            let factor = if v = 1. then e else BinOp (Lit (Num v), FTimes, e) in
+            if erest = Expr.Lit Nono then factor
+            else BinOp (erest, FPlus, factor))
+          cn.symb (Lit Nono)
+      in
+      match cn.conc = 0. with
+      | true  -> erest
+      | false -> BinOp (Lit (Num cn.conc), FPlus, erest) )
+
+(* Expression to CNumber *)
+let rec expr_to_cnum (e : Expr.t) =
+  let f = expr_to_cnum in
+  match e with
+  (* Unary minus *)
+  | UnOp (FUnaryMinus, e) -> cnum_uminus (f e)
+  (* Addition and subtraction *)
+  | BinOp (e1, FPlus, e2) -> cnum_plus (f e1) (f e2)
+  | BinOp (e1, FMinus, e2) -> cnum_minus (f e1) (f e2)
+  (* Multiplication with one operand being a number *)
+  | BinOp (Lit (Num c), FTimes, e) | BinOp (e, FTimes, Lit (Num c)) ->
+      cnum_cmult c (f e)
+  (* Error cases *)
+  | _ -> cnum_singleton e
+
+let rec canonicalise (e : Expr.t) : Expr.t =
+  let sort (e1 : Expr.t) (e2 : Expr.t) : Expr.t * Expr.t =
+    if Stdlib.compare e1 e2 > 0 then (e2, e1) else (e1, e2)
+  in
+
+  let f = canonicalise in
+  match e with
+  | BinOp (e1, FPlus, e2) ->
+      let fe1 = f e1 in
+      let fe2 = f e2 in
+      let fe1, fe2 = sort fe1 fe2 in
+      BinOp (fe1, FPlus, fe2)
+  (* Binary minus to unary minus *)
+  | BinOp (e1, FMinus, e2) -> f (BinOp (e1, FPlus, UnOp (FUnaryMinus, e2)))
+  | UnOp (FUnaryMinus, e) -> (
+      let ce = f e in
+      match ce with
+      | BinOp (e1, FPlus, e2) ->
+          BinOp (f (UnOp (FUnaryMinus, e1)), FPlus, f (UnOp (FUnaryMinus, e2)))
+      | _                     -> UnOp (FUnaryMinus, ce) )
+  | BinOp (e1, FTimes, e2) -> (
+      let fe1 = f e1 in
+      let fe2 = f e2 in
+      match (fe1, fe2) with
+      | BinOp (e1, FPlus, e2), fe2 ->
+          f (BinOp (BinOp (e1, FTimes, fe2), FPlus, BinOp (e2, FTimes, fe2)))
+      | fe1, BinOp (e1, FPlus, e2) ->
+          f (BinOp (BinOp (fe1, FTimes, e1), FPlus, BinOp (fe1, FTimes, e2)))
+      | fe1, fe2                   ->
+          let fe1, fe2 = sort fe1 fe2 in
+          BinOp (fe1, FTimes, fe2) )
+  | _ -> e
+
+let cut (el : Expr.t) (er : Expr.t) : bool * Expr.t * Expr.t =
+  (* L.verbose (fun fmt -> fmt "In cut: %a, %a" Expr.pp el Expr.pp er); *)
+  let success = ref false in
+  let cl = expr_to_cnum (canonicalise el) in
+  let cr = expr_to_cnum (canonicalise er) in
+  let nl, nr =
+    if cl.conc = 0. || cr.conc = 0. then (cl.conc, cr.conc)
+    else (
+      success := true;
+      if cl.conc > cr.conc then (cl.conc -. cr.conc, 0.)
+      else (0., cr.conc -. cl.conc) )
+  in
+  let restl, restr =
+    Expr.Map.fold
+      (fun e vr (restl, restr) ->
+        match Expr.Map.find_opt e restl with
+        | None    -> (restl, restr)
+        | Some vl -> (
+            match vl = vr with
+            | true  -> (Expr.Map.remove e restl, Expr.Map.remove e restr)
+            | false ->
+                if vl > vr then
+                  (Expr.Map.add e (vl -. vr) restl, Expr.Map.remove e restr)
+                else (Expr.Map.remove e restl, Expr.Map.add e (vr -. vl) restr)
+            ))
+      cr.symb (cl.symb, cr.symb)
+  in
+  let cl, cr = ({ conc = nl; symb = restl }, { conc = nr; symb = restr }) in
+  (!success, cnum_to_expr cl, cnum_to_expr cr)
+
 (**
   Reduction of logical expressions
 
@@ -849,6 +964,7 @@ let rec reduce_lexpr_loop
                   Fmt.str "LstNth(%a, %a): list is not a GIL list." Expr.pp le
                     Expr.pp idx
                 in
+                L.normal (fun fmt -> fmt "%s" err_msg);
                 raise (ReductionException (BinOp (fle, LstNth, fidx), err_msg))
             )
         | Lit (Num n) when Arith_Utils.is_int n && 0. <= n -> (
@@ -862,6 +978,7 @@ let rec reduce_lexpr_loop
                   Fmt.str "LstNth(%a, %a): list is not a GIL list." Expr.pp le
                     Expr.pp idx
                 in
+                L.normal (fun fmt -> fmt "%s" err_msg);
                 raise (ReductionException (BinOp (fle, LstNth, fidx), err_msg))
             )
         (* Index is a number, but is either not an integer or is negative *)
@@ -1136,40 +1253,6 @@ let rec reduce_lexpr_loop
             | FUnaryMinus when lexpr_is_number ~gamma def ->
                 simplify_arithmetic_lexpr pfs gamma def
             | _ -> UnOp (op, fle) ) )
-    | LstSub (le1, le2, le3) when unification -> (
-        let fle1 = f le1 in
-        let fle2 = f le2 in
-        let fle3 = f le3 in
-        match (fle1, fle2, fle3) with
-        | NOp (LstCat, EList les :: _), Lit (Num s), Lit (Num l)
-          when List.length les >= int_of_float (s +. l) ->
-            f (LstSub (EList les, fle2, fle3))
-        | NOp (LstCat, EList les :: y), Lit (Num s), fle3
-          when List.length les = int_of_float s ->
-            f (LstSub (NOp (LstCat, y), Lit (Num 0.), fle3))
-        | LVar x, Lit (Num 0.), UnOp (LstLen, LVar y) when y = x -> LVar x
-        | EList lst, Lit (Num _start), Lit (Num _end) -> (
-            try
-              EList
-                (Array.to_list
-                   (Array.sub (Array.of_list lst) (int_of_float _start)
-                      (int_of_float _end)))
-            with _ ->
-              raise
-                (ReductionException
-                   (LstSub (le1, le2, le3), "Invalid List Expression")) )
-        | Lit (LList lst), Lit (Num _start), Lit (Num _end) -> (
-            try
-              Lit
-                (LList
-                   (Array.to_list
-                      (Array.sub (Array.of_list lst) (int_of_float _start)
-                         (int_of_float _end))))
-            with _ ->
-              raise
-                (ReductionException
-                   (LstSub (le1, le2, le3), "Invalid List Expression")) )
-        | _ -> LstSub (fle1, fle2, fle3) )
     | LstSub (le1, le2, le3) -> (
         let fle1 = f le1 in
         let fle2 = f le2 in
@@ -1218,12 +1301,12 @@ let rec reduce_lexpr_loop
                 (fun (x, lvars) -> Containers.SS.mem lx lvars)
                 candidates
             in
-            L.verbose (fun fmt ->
+            (* L.verbose (fun fmt ->
                 fmt "Candidates: %s"
                   (String.concat ", "
                      (List.map
                         (fun (c, _) -> Fmt.to_to_string Expr.pp c)
-                        candidates)));
+                        candidates))); *)
             match fst (List.hd candidates) with
             | LVar ly when ly = lx -> LVar lx
             | NOp (LstCat, [ flx; _ ]) when flx = LVar lx -> LVar lx
@@ -1285,10 +1368,10 @@ let rec reduce_lexpr_loop
                     ((Fmt.to_to_string Expr.pp) start_beyond_first)
                     ((Fmt.to_to_string Expr.pp) end_beyond_first)));
             match
-              ( check_ge_zero start_in_first,
-                check_ge_zero start_beyond_first,
-                check_ge_zero end_in_first,
-                check_ge_zero end_beyond_first )
+              ( check_ge_zero ~top_level:true pfs start_in_first,
+                check_ge_zero ~top_level:true pfs start_beyond_first,
+                check_ge_zero ~top_level:true pfs end_in_first,
+                check_ge_zero ~top_level:true pfs end_beyond_first )
             with
             (* Sublist certainly starts beyond first *)
             | _, Some true, _, _ ->
@@ -1557,12 +1640,28 @@ let rec reduce_lexpr_loop
                 match (flel, fler) with
                 | UnOp (LstLen, _), Lit (Num n) when n <= 0. -> Lit (Bool false)
                 | UnOp (LstLen, le), Lit (Num 1.) -> BinOp (le, Equal, EList [])
-                | flel, Lit (Num 0.) -> def
-                | _, _ ->
-                    f
-                      (BinOp
-                         (BinOp (flel, FMinus, fler), FLessThan, Lit (Num 0.)))
+                | _ ->
+                    let success, el, er = cut flel fler in
+                    let f = if success then f else fun x -> x in
+                    f (BinOp (el, FLessThan, er))
+                    (* | _, _ ->
+                        f
+                          (BinOp
+                             (BinOp (flel, FMinus, fler), FLessThan, Lit (Num 0.))) *)
                 )
+            | FLessThanEqual -> (
+                L.verbose (fun fmt ->
+                    fmt "Reducing <=: %a, %a" Expr.pp flel Expr.pp fler);
+                let success, el, er = cut flel fler in
+                match success with
+                | false -> (
+                    match
+                      check_ge_zero ~top_level:true pfs
+                        (f (BinOp (fler, FMinus, flel)))
+                    with
+                    | Some x -> Lit (Bool x)
+                    | None   -> def )
+                | true  -> f (BinOp (el, FLessThanEqual, er)) )
             | _ -> def ) )
     (* The remaining cases cannot be reduced *)
     | _ -> le
@@ -1620,6 +1719,7 @@ and compose_pluses_minuses (pluses_and_minuses : Expr.t list * Expr.t list) :
   let pluses, minuses = pluses_and_minuses in
   let nump, pluses = numbers_and_rest pluses in
   let numm, minuses = numbers_and_rest minuses in
+  (* FIXME: THIS IS A DISASTER *)
   let pluses_stay = List.filter (fun x -> not (List.mem x minuses)) pluses in
   let minuses_stay =
     List.map
@@ -1656,21 +1756,37 @@ and substitute_for_length pfs le =
       | _ -> acc)
     le pfs
 
-and check_ge_zero le : bool option =
-  let pluses, minuses = collect_pluses_minuses le in
-  let nump, pluses = numbers_and_rest pluses in
-  let numm, minuses = numbers_and_rest minuses in
-  if not (numm = 0. && minuses == []) then None
-  else if nump < 0. then None
-  else
-    List.fold_left
-      (fun ac plus ->
-        if ac <> Some true then ac
-        else
-          match plus with
-          | Expr.UnOp (LstLen, _) -> ac
-          | _                     -> None)
-      (Some true) pluses
+and check_ge_zero ?(top_level = false) (pfs : PFS.t) (e : Expr.t) : bool option
+    =
+  L.verbose (fun fmt -> fmt "Check >= 0: %a" Expr.pp e);
+  let f = check_ge_zero pfs in
+  match e with
+  | Lit (Num n) -> Some (n >= 0.)
+  | UnOp (LstLen, _) | UnOp (StrLen, _) -> Some true
+  | (LVar _ | PVar _) when not top_level ->
+      if
+        List.exists
+          (fun pf -> PFS.mem pfs pf)
+          [ Formula.LessEq (Lit (Num 0.), e); Formula.Less (Lit (Num 0.), e) ]
+      then Some true
+      else if PFS.mem pfs (Formula.Less (e, Lit (Num 0.))) then Some false
+      else None
+  | LVar _ | PVar _ -> None
+  | UnOp (FUnaryMinus, e') -> Option.map (fun b -> not b) (f e')
+  | _ -> (
+      let ce = expr_to_cnum e in
+      match ce.conc >= 0. with
+      | false -> None
+      | true  ->
+          Expr.Map.fold
+            (fun e' c result ->
+              if result <> Some true then result
+              else if c > 0. then f e'
+              else
+                match f (UnOp (FUnaryMinus, e')) with
+                | Some true -> Some true
+                | _         -> None)
+            ce.symb (Some true) )
 
 and substitute_in_numeric_expr (le_to_find : Expr.t) (le_to_subst : Expr.t) le =
   let f = substitute_in_numeric_expr le_to_find le_to_subst in
@@ -1682,12 +1798,12 @@ and substitute_in_numeric_expr (le_to_find : Expr.t) (le_to_subst : Expr.t) le =
       let ple, mie = collect_pluses_minuses le in
       match (list_subset plf ple, list_subset mif mie) with
       | true, true ->
-          L.(
-            verbose (fun m ->
-                m "Subset found: %s %s %s"
-                  ((Fmt.to_to_string Expr.pp) le)
-                  ((Fmt.to_to_string Expr.pp) le_to_find)
-                  ((Fmt.to_to_string Expr.pp) le_to_subst)));
+          (* L.(
+             verbose (fun m ->
+                 m "Subset found: %s %s %s"
+                   ((Fmt.to_to_string Expr.pp) le)
+                   ((Fmt.to_to_string Expr.pp) le_to_find)
+                   ((Fmt.to_to_string Expr.pp) le_to_subst))); *)
           let pls, mis = collect_pluses_minuses le_to_subst in
           let pluses = pls @ list_dif ple plf in
           let minuses = mis @ list_dif mie mif in
@@ -1710,6 +1826,76 @@ and substitute_in_pfs (le_to_find : Expr.t) (le_to_subst : Expr.t) (pfs : PFS.t)
       | Eq (lx, ly) when lx = le_to_subst || ly = le_to_subst -> form
       | _ -> substitute_in_numeric_formula le_to_find le_to_subst form)
     pfs
+
+let resolve_expr_to_location (pfs : PFS.t) (gamma : TypEnv.t) (e : Expr.t) :
+    string option =
+  let max_fuel = 5 in
+
+  let rec resolve_expr_to_location_aux
+      (fuel : int) (tried : Expr.Set.t) (to_try : Expr.t list) : string option =
+    let f = resolve_expr_to_location_aux (fuel - 1) in
+    match fuel = 0 with
+    | true  -> None
+    | false -> (
+        match to_try with
+        | []        -> None
+        | e :: rest -> (
+            match e with
+            | Lit (Loc loc) | ALoc loc -> Some loc
+            | _                        -> (
+                let equal_e = get_equal_expressions pfs e in
+                let equal_e = List.map (reduce_lexpr ~pfs ~gamma) equal_e in
+                let ores =
+                  List.find_opt
+                    (fun x ->
+                      match x with
+                      | Expr.ALoc _ | Lit (Loc _) -> true
+                      | _                         -> false)
+                    equal_e
+                in
+                match ores with
+                | Some (ALoc loc) | Some (Lit (Loc loc)) -> Some loc
+                | _ -> (
+                    let lvars_e =
+                      List.map
+                        (fun x -> Expr.LVar x)
+                        (Containers.SS.elements (Expr.lvars e))
+                    in
+                    let found_subst =
+                      List.map
+                        (fun e -> (e, get_equal_expressions pfs e))
+                        lvars_e
+                    in
+                    let found_subst =
+                      List.filter_map
+                        (fun (e, es) ->
+                          match es with
+                          | []      -> None
+                          | es :: _ -> Some (e, es))
+                        found_subst
+                    in
+                    let subst_e =
+                      List.fold_left
+                        (fun (e : Expr.t) (e_to, e_with) ->
+                          Expr.subst_expr_for_expr ~to_subst:e_to
+                            ~subst_with:e_with e)
+                        e found_subst
+                    in
+                    let subst_e = reduce_lexpr ~pfs ~gamma subst_e in
+                    match subst_e with
+                    | ALoc loc | Lit (Loc loc) -> Some loc
+                    | _                        ->
+                        let new_tried = Expr.Set.add e tried in
+                        let new_to_try = equal_e @ [ subst_e ] in
+                        let new_to_try =
+                          List.filter
+                            (fun e -> not (Expr.Set.mem e new_tried))
+                            new_to_try
+                        in
+                        f new_tried new_to_try ) ) ) )
+  in
+
+  resolve_expr_to_location_aux max_fuel Expr.Set.empty [ e ]
 
 let rec reduce_formula_loop
     (unification : bool) (pfs : PFS.t) (gamma : TypEnv.t) (a : Formula.t) :
@@ -2013,7 +2199,11 @@ let rec reduce_formula_loop
             if PFS.mem pfs (LessEq (re2, re1)) then Eq (re1, re2)
             else if PFS.mem pfs (Less (re1, re2)) then True
             else if PFS.mem pfs (Less (re2, re1)) then False
-            else LessEq (re1, re2) )
+            else
+              let le = Option.get (Formula.to_expr (LessEq (re1, re2))) in
+              let re = fe le in
+              let result, _ = Option.get (Formula.lift_logic_expr re) in
+              result )
     | SetMem (leb, NOp (SetUnion, lle)) ->
         let rleb = fe leb in
         let formula : Formula.t =
@@ -2114,6 +2304,155 @@ let reduce_formula
     ?(gamma = TypEnv.init ())
     (a : Formula.t) : Formula.t =
   reduce_formula_loop unification pfs gamma a
+
+let find_list_length_eqs (pfs : PFS.t) (e : Expr.t) : cnum list =
+  let llen_expr = Expr.UnOp (LstLen, e) in
+  let found_lengths =
+    PFS.fold_left
+      (fun found pf ->
+        match pf with
+        | Eq (e1, e2) when e1 = llen_expr -> expr_to_cnum e2 :: found
+        | Eq (e1, e2) when e2 = llen_expr -> expr_to_cnum e1 :: found
+        | _ -> found)
+      [] pfs
+  in
+  List.rev found_lengths
+
+let relate_llen
+    (pfs : PFS.t) (gamma : TypEnv.t) (e : Expr.t) (lcat : Expr.t list) :
+    (Formula.t * Containers.SS.t) option =
+  (* Loop *)
+  let rec relate_llen_loop (llen : cnum) (ac : Expr.t list) (lcat : Expr.t list)
+      : (Expr.t list * int) option =
+    let decide () =
+      if cnum_is_cposint llen then Some (ac, int_of_float llen.conc) else None
+    in
+    match lcat with
+    | []        -> decide ()
+    | e :: rest -> (
+        let e_llen = reduce_lexpr ~pfs ~gamma (Expr.UnOp (LstLen, e)) in
+        let new_llen = cnum_minus llen (expr_to_cnum e_llen) in
+        match e_llen with
+        | Lit (Num n) -> (
+            match new_llen.conc >= 0. with
+            | true  -> relate_llen_loop new_llen (ac @ [ e ]) rest
+            | false -> decide () )
+        | _           -> (
+            match Expr.Map.find_opt e_llen new_llen.symb with
+            (* Non-integer coefficient, fail *)
+            | Some n when not (Float.is_integer n) -> None
+            (* Subtracted too much, decide *)
+            | Some n when n < 0. -> decide ()
+            (* Otherwise, proceed *)
+            | _ -> relate_llen_loop new_llen (ac @ [ e ]) rest ) )
+  in
+
+  (* Auxiliary function *)
+  let relate_llen_aux (e : Expr.t) (llen : cnum) (lcat : Expr.t list) =
+    L.verbose (fun fmt ->
+        fmt "Relate llen aux: %a: %a, %a" Expr.pp e Expr.pp (cnum_to_expr llen)
+          Fmt.(brackets (list ~sep:semi Expr.pp))
+          lcat);
+    Option.map
+      (fun (les, n) ->
+        let new_vars = Array.to_list (Array.init n (fun _ -> LVar.alloc ())) in
+        let new_lvars = List.map (fun x -> Expr.LVar x) new_vars in
+        let new_lvars =
+          match new_lvars with
+          | [] -> []
+          | _  -> [ Expr.EList new_lvars ]
+        in
+        let pf = Formula.Eq (e, NOp (LstCat, les @ new_lvars)) in
+        L.verbose (fun fmt -> fmt "Constructed equality: %a" Formula.pp pf);
+        (pf, Containers.SS.of_list new_vars))
+      (relate_llen_loop llen [] lcat)
+  in
+
+  L.verbose (fun fmt ->
+      fmt "Relate llen: %a, %a" Expr.pp e
+        Fmt.(brackets (list ~sep:semi Expr.pp))
+        lcat);
+  (* Get info about list length, if any *)
+  let llens = find_list_length_eqs pfs e in
+  List.fold_left
+    (fun result llen ->
+      if result <> None then result else relate_llen_aux e llen lcat)
+    None llens
+
+let understand_lstcat
+    (pfs : PFS.t) (gamma : TypEnv.t) (lcat : Expr.t list) (rcat : Expr.t list) :
+    (Formula.t * Containers.SS.t) option =
+  L.verbose (fun fmt ->
+      fmt "Understanding LstCat: %a, %a"
+        Fmt.(brackets (list ~sep:semi Expr.pp))
+        lcat
+        Fmt.(brackets (list ~sep:semi Expr.pp))
+        rcat);
+  match (lcat, rcat) with
+  | [], _ | _, [] | [ _ ], _ | _, [ _ ] ->
+      raise
+        (Failure
+           "INTERNAL ERROR: understand_lstcat: empty or one-element \
+            concatenation")
+  | el :: restl, er :: restr -> (
+      match relate_llen pfs gamma el rcat with
+      | Some result -> Some result
+      | None        -> relate_llen pfs gamma er lcat )
+
+let get_llen_difference
+    (pfs : PFS.t) (gamma : TypEnv.t) (el : Expr.t) (er : Expr.t) : int option =
+  match (get_length_of_list el, get_length_of_list er) with
+  (* Can find lengths, it's a Christmas miracle *)
+  | Some lx, Some ly -> Some (lx - ly)
+  | _ -> (
+      L.verbose (fun fmt ->
+          fmt "Searching for length diff: %a and %a" Expr.pp el Expr.pp er);
+      let lel = Expr.UnOp (LstLen, el) in
+      let ler = Expr.UnOp (LstLen, er) in
+      let candidates =
+        PFS.fold_left
+          (fun ac pf ->
+            match reduce_formula ~pfs ~gamma pf with
+            | Eq (e1, e2) when lexpr_is_number ~gamma e1 -> (
+                (* L.verbose (fun fmt -> fmt "Candidate pf: %a" Formula.pp pf); *)
+                let diff =
+                  expr_to_cnum (canonicalise (BinOp (e1, FMinus, e2)))
+                in
+                match
+                  ( Expr.Map.find_opt lel diff.symb,
+                    Expr.Map.find_opt ler diff.symb )
+                with
+                | Some cl, Some cr ->
+                    assert (cl <> 0. && cr <> 0.);
+                    (* L.verbose (fun fmt ->
+                        fmt "Got coefficients: %f and %f" cl cr); *)
+                    let ndiff = cl +. cr in
+                    if ndiff = 0. then
+                      let new_diff_rest =
+                        Expr.Map.remove ler (Expr.Map.remove lel diff.symb)
+                      in
+                      let diff = { conc = diff.conc; symb = new_diff_rest } in
+                      let diff = cnum_cdiv (-.cl) diff in
+                      cnum_to_expr diff :: ac
+                    else ac
+                | _                -> ac )
+            | _ -> ac)
+          [] pfs
+      in
+      let candidates =
+        List.filter_map
+          (fun e ->
+            match e with
+            | Expr.Lit (Num n) -> Some n
+            | _                -> None)
+          candidates
+      in
+      let candidates = List.sort_uniq Stdlib.compare candidates in
+      match candidates with
+      | [ n ] when Float.is_integer n ->
+          L.verbose (fun fmt -> fmt "Found answer: %d" (int_of_float n));
+          Some (int_of_float n)
+      | _ -> None )
 
 exception PFSFalse
 

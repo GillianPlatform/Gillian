@@ -124,7 +124,7 @@ pred BI_ObjectObject () :
   DataPropGen ($lobj, "create", $lobj_create, true, false, true) *
   JSBIFunction($lobj_create, "Object_create", 2) * empty_fields($lobj_create : -{ "length" }-);
 
-nounfold pred ObjectPrototype (proto) :
+nounfold pred ObjectPrototype (+proto) :
   JSObjWithProto (proto, null) * empty_fields (proto : -{ "hasOwnProperty" }-) *
   ((proto, "hasOwnProperty") -> {{ "d", $lop_hasOwnProperty, true, false, true }}) *
   JSBIFunction($lop_hasOwnProperty, "OP_hasOwnProperty", 1) * empty_fields($lop_hasOwnProperty : -{ "length" }-);
@@ -179,7 +179,7 @@ pred initialHeapPost (globals) :
     GlobalObject() *
     empty_fields ($lg : -u- (-{ "Error", "Object", "DataView" }-, globals) ) *
 
-    ObjectPrototype ($lobj_proto) *
+    ObjectPrototype($lobj_proto) *
     FunctionPrototype () *
     BooleanPrototype () * empty_fields ($lbool_proto : -{ "constructor" }-) *
     NumberPrototype ()  * empty_fields ($lnum_proto : -{ "constructor" }-) *
@@ -193,7 +193,7 @@ pred initialHeapPost (globals) :
 pred initialHeapPostWeak ( ) :
     GlobalObject() *
 
-    ObjectPrototype ($lobj_proto) *
+    ObjectPrototype($lobj_proto) *
 
     FunctionPrototype () *
 
@@ -1055,23 +1055,6 @@ proc i__typeOf (v) {
 (* *************************
    *** I__STRICTEQUALITY ***
    ************************* *)
-
-spec i__strictEquality (v1, v2)
-
-   [[ (v1 == #v1) * (v2 == #v2) * (#v1 == #v2) ]]
-   [[ ret == true ]]
-   normal;
-
-   [[ (v1 == #v1) * (v2 == #v2) * (! (#v1 == #v2)) ]]
-   [[ ret == false ]]
-   normal;
-
-   [[ (v1 == #v1) * (v2 == #v2) ]]
-   [[
-       (ret == true) * (#v1 == #v2);
-       (ret == false) * (! (#v1 == #v2))
-   ]]
-   normal
 
 proc i__strictEquality (v1, v2) {
       ret := (v1 = v2);

@@ -56,6 +56,57 @@ let rec map
     in
     f_a_after a''
 
+let rec map_opt
+    (f_a_before : (t -> t option * bool) option)
+    (f_a_after : (t -> t) option)
+    (f_e : (Expr.t -> Expr.t option) option)
+    (a : t) : t option =
+  (* Map recursively to assertions and expressions *)
+  let map_a = map_opt f_a_before f_a_after f_e in
+  let map_e = Option.value ~default:(fun x -> Some x) f_e in
+  let f_a_before = Option.value ~default:(fun x -> (Some x, true)) f_a_before in
+  let f_a_after = Option.value ~default:(fun x -> x) f_a_after in
+  let a', recurse = f_a_before a in
+
+  let aux_a_single a f =
+    let ma = map_a a in
+    Option.map f ma
+  in
+
+  let aux_a_double a1 a2 f =
+    let ma1, ma2 = (map_a a1, map_a a2) in
+    if ma1 = None || ma2 = None then None
+    else Some (f (Option.get ma1) (Option.get ma2))
+  in
+
+  let aux_e e1 e2 f =
+    let me1, me2 = (map_e e1, map_e e2) in
+    if me1 = None || me2 = None then None
+    else Some (f (Option.get me1) (Option.get me2))
+  in
+
+  match a' with
+  | None    -> None
+  | Some a' ->
+      if not recurse then Some a'
+      else
+        let a'' =
+          match a' with
+          | And (a1, a2)     -> aux_a_double a1 a2 (fun a1 a2 -> And (a1, a2))
+          | Or (a1, a2)      -> aux_a_double a1 a2 (fun a1 a2 -> Or (a1, a2))
+          | Not a            -> aux_a_single a (fun a -> Not a)
+          | True             -> Some True
+          | False            -> Some False
+          | Eq (e1, e2)      -> aux_e e1 e2 (fun e1 e2 -> Eq (e1, e2))
+          | Less (e1, e2)    -> aux_e e1 e2 (fun e1 e2 -> Less (e1, e2))
+          | LessEq (e1, e2)  -> aux_e e1 e2 (fun e1 e2 -> LessEq (e1, e2))
+          | StrLess (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> StrLess (e1, e2))
+          | SetMem (e1, e2)  -> aux_e e1 e2 (fun e1 e2 -> SetMem (e1, e2))
+          | SetSub (e1, e2)  -> aux_e e1 e2 (fun e1 e2 -> SetSub (e1, e2))
+          | ForAll (bt, a)   -> aux_a_single a (fun a -> ForAll (bt, a))
+        in
+        Option.map f_a_after a''
+
 let rec fold
     (feo : (Expr.t -> 'a) option)
     (f_ac : t -> 'b -> 'b -> 'a list -> 'a)

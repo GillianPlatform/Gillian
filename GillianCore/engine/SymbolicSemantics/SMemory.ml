@@ -3,7 +3,7 @@ module type S = sig
   type vt = SVal.M.t
 
   (** Type of GIL substitutions *)
-  type st = SVal.SSubst.t
+  type st = SVal.SESubst.t
 
   type i_fix_t
 

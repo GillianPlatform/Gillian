@@ -3,16 +3,16 @@ open Containers
 open Names
 open Generators
 module L = Logging
-module SSubst = SVal.SSubst
+module SSubst = SVal.SESubst
 
 module Make (SMemory : SMemory.S) :
   State.S
-    with type st = SVal.SSubst.t
+    with type st = SVal.SESubst.t
      and type vt = SVal.M.t
      and type store_t = SStore.t = struct
   type vt = SVal.M.t
 
-  type st = SVal.M.st
+  type st = SVal.M.et
 
   type heap_t = SMemory.t
 
@@ -247,7 +247,12 @@ module Make (SMemory : SMemory.S) :
       Simplifications.simplify_pfs_and_gamma ~kill_new_lvars pfs gamma
         ~unification ~save_spec_vars
     in
-    let subst = SSubst.filter subst (fun x _ -> not (SS.mem x svars)) in
+    let subst =
+      SSubst.filter subst (fun x _ ->
+          match x with
+          | LVar x | PVar x | ALoc x -> not (SS.mem x svars)
+          | _                        -> true)
+    in
     SMemory.substitution_in_place subst heap;
     SStore.substitution_in_place subst store;
     if not kill_new_lvars then Typing.naively_infer_type_information pfs gamma;
@@ -260,7 +265,7 @@ module Make (SMemory : SMemory.S) :
            @[<v 2>with substitution:@\n\
            @[%a@]@\n\
            -----------------------------------"
-          pp state SVal.SSubst.pp subst);
+          pp state SSubst.pp subst);
     (* update_statistics) "Simplify" (time() -. start_time); *)
     subst
 
@@ -274,11 +279,11 @@ module Make (SMemory : SMemory.S) :
     match loc with
     | Lit (Loc loc_name) | ALoc loc_name -> Some (state, loc)
     | LVar x -> (
-        match Reduction.resolve_expr_to_location (PFS.to_list pfs) (LVar x) with
-        | Some (loc_name, _) ->
+        match Reduction.resolve_expr_to_location pfs gamma (LVar x) with
+        | Some loc_name ->
             if is_aloc_name loc_name then Some (state, ALoc loc_name)
             else Some (state, Lit (Loc loc_name))
-        | None               ->
+        | None          ->
             let new_aloc = ALoc.alloc () in
             let p : Formula.t = Eq (LVar x, ALoc new_aloc) in
             if FOSolver.check_satisfiability (p :: PFS.to_list pfs) gamma then (
@@ -372,7 +377,7 @@ module Make (SMemory : SMemory.S) :
     PFS.substitution subst pfs;
     Typing.substitution_in_place subst gamma
 
-  let unify_assertion (state : t) (subst : st) (p : Asrt.t) : u_res =
+  let unify_assertion (state : t) (subst : st) (step : UP.step) : u_res =
     raise (Failure "Unify assertion from non-abstract symbolic state.")
 
   let produce_posts (state : t) (subst : st) (asrts : Asrt.t list) : t list =
@@ -397,14 +402,13 @@ module Make (SMemory : SMemory.S) :
               match TypEnv.get gamma y with
               | Some ObjectType -> (
                   match
-                    Reduction.resolve_expr_to_location (PFS.to_list pfs)
-                      (LVar y)
+                    Reduction.resolve_expr_to_location pfs gamma (LVar y)
                   with
-                  | Some (loc_name, _) ->
+                  | Some loc_name ->
                       if is_aloc_name loc_name then
                         (x, Expr.ALoc loc_name) :: ac
                       else ac
-                  | _                  -> ac )
+                  | _             -> ac )
               | _               -> ac )
           | _      -> ac)
         []
@@ -414,13 +418,11 @@ module Make (SMemory : SMemory.S) :
   (* Auxiliary Functions *)
   let get_loc_name (loc : Expr.t) state : string option =
     L.(tmi (fun m -> m "get_loc_name: %s" ((Fmt.to_to_string Expr.pp) loc)));
-    let _, _, pfs, _, _ = state in
+    let _, _, pfs, gamma, _ = state in
     match loc with
     | Lit (Loc loc) | ALoc loc -> Some loc
-    | LVar x                   -> (
-        match Reduction.resolve_expr_to_location (PFS.to_list pfs) (LVar x) with
-        | Some (loc_name, _) -> Some loc_name
-        | _                  -> None )
+    | LVar x                   -> Reduction.resolve_expr_to_location pfs gamma
+                                    (LVar x)
     | _                        ->
         L.verbose (fun m -> m "Unsupported location MAKESState: %a" Expr.pp loc);
         raise

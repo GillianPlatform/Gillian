@@ -20,12 +20,12 @@ module Make
 struct
   module CState = CState.Make (CMemory)
   module CInterpreter =
-    GInterpreter.Make (CVal.M) (CVal.CSubst) (CStore) (CState) (External)
+    GInterpreter.Make (CVal.M) (CVal.CESubst) (CStore) (CState) (External)
   module SState = SState.Make (SMemory)
   module SInterpreter =
-    GInterpreter.Make (SVal.M) (SVal.SSubst) (SStore) (SState) (External)
+    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (External)
   module SPState =
-    PState.Make (SVal.M) (SVal.SSubst) (SStore) (SState) (Preds.SPreds)
+    PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
   module Verification = Verifier.Make (SState) (SPState) (External)
   module Abductor = Abductor.Make (SState) (SPState) (External)
 

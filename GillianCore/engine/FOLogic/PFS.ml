@@ -39,8 +39,8 @@ let set (pfs : t) (reset : Formula.t list) : unit =
   clear pfs;
   merge_into_left pfs (of_list reset)
 
-let substitution (subst : SSubst.t) (pfs : t) : unit =
-  ExtList.map_inplace (SSubst.substitute_formula ~partial:true subst) pfs
+let substitution (subst : SESubst.t) (pfs : t) : unit =
+  ExtList.map_inplace (SESubst.substitute_formula ~partial:true subst) pfs
 
 let subst_expr_for_expr (to_subst : Expr.t) (subst_with : Expr.t) (pfs : t) :
     unit =

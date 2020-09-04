@@ -65,12 +65,13 @@ let add_initial_label cmds lab metadata =
 
 let prefix_lcmds
     (lcmds : LCmd.t list)
-    (invariant : Asrt.t option)
+    (invariant : (Asrt.t * string list) option)
     (cmds : (Annot.t * string option * LabCmd.t) list) :
     (Annot.t * string option * LabCmd.t) list =
   let lcmds =
     Option.fold
-      ~some:(fun inv -> lcmds @ [ LCmd.SL (Invariant (inv, [])) ])
+      ~some:(fun (inv, binders) ->
+        lcmds @ [ LCmd.SL (Invariant (inv, binders)) ])
       ~none:lcmds invariant
   in
   let lcmds = List.map (fun lcmd -> LabCmd.LLogic lcmd) lcmds in
@@ -2067,7 +2068,7 @@ let rec translate_expr tr_ctx e :
                 let x_v, cmd_gv_x, errs_x_v =
                   make_get_value_call x_expr tr_ctx.tr_err_lab
                 in
-                SSubst.put subst x (PVar x_v);
+                SSubst.put subst (PVar x) (PVar x_v);
                 ( cmds @ new_cmds @ [ annotate_cmd cmd_gv_x None ],
                   errs @ new_errs @ errs_x_v ))
               ([], []) (SS.elements xs)
@@ -2111,7 +2112,7 @@ let rec translate_expr tr_ctx e :
                 let x_v, cmd_gv_x, errs_x_v =
                   make_get_value_call x_expr tr_ctx.tr_err_lab
                 in
-                SSubst.put subst x (PVar x_v);
+                SSubst.put subst (PVar x) (PVar x_v);
                 ( cmds @ new_cmds @ [ annotate_cmd cmd_gv_x None ],
                   errs @ new_errs @ errs_x_v ))
               ([], []) (SS.elements xs)

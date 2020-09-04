@@ -671,8 +671,12 @@ g_logic_cmd_target:
     { SL (GUnfold name) }
 
 (* invariant (a) [existentials: x, y, z] *)
-  | INVARIANT; LBRACE; a = g_assertion_target; RBRACE; existentials = option(existentials_target)
-    { SL (Invariant (a, Option.value ~default:[ ] existentials)) }
+  | INVARIANT; LBRACE; a = g_assertion_target; RBRACE; binders = option(binders_target)
+    { SL (Invariant (a, Option.value ~default:[ ] binders)) }
+
+(* assert_* (a) [bind: x, y, z] *)
+  | SEPASSERT; LBRACE; a = g_assertion_target; RBRACE; binders = option(binders_target)
+    { SL (SepAssert (a, Option.value ~default:[ ] binders)) }
 
 (* apply lemma_name(args) [bind: x, y ] *)
    | SEPAPPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE; binders = option(binders_target)
@@ -680,10 +684,6 @@ g_logic_cmd_target:
       let binders = Option.value ~default:[] binders in
       SL (ApplyLem (lemma_name, params, binders))
     }
-
-(* assert_* (a) [bind: x, y, z] *)
-  | SEPASSERT; LBRACE; a = g_assertion_target; RBRACE; binders = option(binders_target)
-    { SL (SepAssert (a, Option.value ~default:[ ] binders)) }
 
 (* if(le) { lcmd* } else { lcmd* } *)
   | LIF; LBRACE; le=expr_target; RBRACE; LTHEN; CLBRACKET;

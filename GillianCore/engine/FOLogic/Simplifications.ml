@@ -22,7 +22,7 @@ type simpl_val_type = {
   simpl_gamma : (Var.t * Type.t) list;
   simpl_pfs : Formula.t list;
   simpl_existentials : SS.t;
-  subst : SVal.SSubst.t;
+  subst : SVal.SESubst.t;
 }
 
 (* Simplification cache *)
@@ -370,8 +370,8 @@ let resolve_set_existentials
                   L.(
                     verbose (fun m ->
                         m "Managed to instantiate a set existential: %s" v));
-                  let temp_subst = SSubst.init [] in
-                  SSubst.put temp_subst v rhs;
+                  let temp_subst = SESubst.init [] in
+                  SESubst.put temp_subst (LVar v) rhs;
                   PFS.substitution temp_subst rpfs;
                   exists := SS.remove v !exists;
                   while TypEnv.mem gamma v do
@@ -500,7 +500,7 @@ let simplify_pfs_and_gamma
     ?(existentials : SS.t option)
     (lpfs : PFS.t)
     ?(rpfs : PFS.t option)
-    (gamma : TypEnv.t) : SSubst.t * SS.t =
+    (gamma : TypEnv.t) : SESubst.t * SS.t =
   L.verbose (fun m -> m "Simplifications.simplify_pfs_and_gamma");
   L.verbose (fun m ->
       m "With unification: %s" (if unification then "Yes" else "No"));
@@ -536,9 +536,9 @@ let simplify_pfs_and_gamma
         PFS.clear rpfs;
         PFS.extend rpfs True );
 
-      (SSubst.copy subst, simpl_existentials)
+      (SESubst.copy subst, simpl_existentials)
   | false ->
-      let result = SSubst.init [] in
+      let result = SESubst.init [] in
 
       let vars_to_save, save_all =
         Option.value ~default:(SS.empty, false) save_spec_vars
@@ -550,11 +550,12 @@ let simplify_pfs_and_gamma
       (* Unit types *)
       let simplify_unit_types () =
         TypEnv.iter gamma (fun x t ->
+            let e = Expr.from_var_name x in
             match t with
-            | UndefinedType -> SSubst.put result x (Lit Undefined)
-            | NullType      -> SSubst.put result x (Lit Null)
-            | EmptyType     -> SSubst.put result x (Lit Empty)
-            | NoneType      -> SSubst.put result x (Lit Nono)
+            | UndefinedType -> SESubst.put result e (Lit Undefined)
+            | NullType      -> SESubst.put result e (Lit Null)
+            | EmptyType     -> SESubst.put result e (Lit Empty)
+            | NoneType      -> SESubst.put result e (Lit Nono)
             | _             -> ())
       in
 
@@ -638,10 +639,20 @@ let simplify_pfs_and_gamma
                 let le' = List.map (fun x -> Expr.LVar x) le_vars in
                 rec_call (Eq (le, EList le')) )
         | Eq (NOp (LstCat, les), EList [])
-        | Eq (NOp (LstCat, les), Lit (LList [])) ->
+        | Eq (NOp (LstCat, les), Lit (LList []))
+        | Eq (EList [], NOp (LstCat, les))
+        | Eq (Lit (LList []), NOp (LstCat, les)) ->
             let eqs = List.map (fun le -> Formula.Eq (le, EList [])) les in
             List.iter (fun eq -> extend_with eq) eqs;
             `Filter
+        (* Two list concats, Satan save us *)
+        | Eq (NOp (LstCat, lcat), NOp (LstCat, rcat)) -> (
+            match Reduction.understand_lstcat lpfs gamma lcat rcat with
+            | None                -> `Replace whole
+            | Some (pf, new_vars) ->
+                extend_with pf;
+                vars_to_kill := SS.union !vars_to_kill new_vars;
+                `Replace whole )
         (* Sublist *)
         | Eq (LstSub (lst, start, num), sl) | Eq (sl, LstSub (lst, start, num))
           ->
@@ -689,17 +700,19 @@ let simplify_pfs_and_gamma
                     (* TODO: What should actually happen here... *)
                     stop_explain
                       "Abtract location never equal to a concrete location"
-                    (* SSubst.put result aloc (Lit (Loc lloc));
-                       let temp_subst = SSubst.init [ aloc, Lit (Loc lloc) ] in
+                    (* SESubst.put result aloc (Lit (Loc lloc));
+                       let temp_subst = SESubst.init [ aloc, Lit (Loc lloc) ] in
                          PFS.substitution_in_place temp_subst lpfs *)
                 | ALoc alocl, ALoc alocr when unification ->
                     L.verbose (fun fmt ->
                         fmt "Two equal alocs: %s and %s" alocl alocr);
-                    SSubst.put result alocr (ALoc alocl);
-                    let temp_subst = SSubst.init [ (alocr, ALoc alocl) ] in
+                    SESubst.put result (ALoc alocr) (ALoc alocl);
+                    let temp_subst =
+                      SESubst.init [ (ALoc alocr, ALoc alocl) ]
+                    in
                     PFS.substitution temp_subst lpfs;
                     let substituted =
-                      SSubst.substitute_formula ~partial:true temp_subst whole
+                      SESubst.substitute_formula ~partial:true temp_subst whole
                     in
                     rec_call substituted
                 | ALoc alocl, ALoc alocr when not unification ->
@@ -743,25 +756,26 @@ let simplify_pfs_and_gamma
                           | Some tv, Some tle when tv <> tle ->
                               Error "Type mismatch"
                           | _ ->
-                              let temp_subst = SSubst.init [ (v, le) ] in
+                              let temp_subst = SESubst.init [ (LVar v, le) ] in
                               PFS.substitution temp_subst lpfs;
 
-                              if SSubst.mem result v then (
-                                let le' = Option.get (SSubst.get result v) in
-                                L.(
-                                  verbose (fun m ->
-                                      m "Multiples in subst: %s %s"
-                                        ((Fmt.to_to_string Expr.pp) le)
-                                        ((Fmt.to_to_string Expr.pp) le')));
-                                if
-                                  le <> le' && not (PFS.mem lpfs (Eq (le, le')))
-                                then PFS.extend lpfs (Eq (le, le')) );
-                              SSubst.iter result (fun x le ->
+                              ( if SESubst.mem result (LVar v) then
+                                let le' =
+                                  Option.get (SESubst.get result (LVar v))
+                                in
+                                (* L.(
+                                   verbose (fun m ->
+                                       m "Multiples in subst: %s %s"
+                                         ((Fmt.to_to_string Expr.pp) le)
+                                         ((Fmt.to_to_string Expr.pp) le'))); *)
+                                if le <> le' then PFS.extend lpfs (Eq (le, le'))
+                              );
+                              SESubst.iter result (fun x le ->
                                   let sle =
-                                    SSubst.subst_in_expr temp_subst true le
+                                    SESubst.subst_in_expr temp_subst true le
                                   in
-                                  SSubst.put result x sle);
-                              SSubst.put result v le;
+                                  SESubst.put result x sle);
+                              SESubst.put result (LVar v) le;
 
                               existentials := SS.remove v !existentials;
 
@@ -853,14 +867,17 @@ let simplify_pfs_and_gamma
           || (PFS.length lpfs > 0 && not (PFS.get_nth 0 lpfs = Some False))
         then (
           (* Step 3 - Bring back my variables *)
-          SSubst.iter result (fun v le ->
-              if
-                (not (SS.mem v !vars_to_kill))
-                && ( save_all
-                   || (kill_new_lvars && SS.mem v vars_to_save)
-                   || ((not kill_new_lvars) && vars_to_save <> SS.empty) )
-                && not (Names.is_aloc_name v)
-              then PFS.extend lpfs (Eq (LVar v, le)));
+          SESubst.iter result (fun v le ->
+              match v with
+              | LVar v ->
+                  if
+                    (not (SS.mem v !vars_to_kill))
+                    && ( save_all
+                       || (kill_new_lvars && SS.mem v vars_to_save)
+                       || ((not kill_new_lvars) && vars_to_save <> SS.empty) )
+                    && not (Names.is_aloc_name v)
+                  then PFS.extend lpfs (Eq (LVar v, le))
+              | _      -> ());
 
           sanitise_pfs_no_store ~unification gamma lpfs;
           PFS.sort lpfs;
@@ -880,7 +897,7 @@ let simplify_pfs_and_gamma
           simpl_gamma = TypEnv.to_list gamma;
           simpl_pfs = PFS.to_list lpfs;
           simpl_existentials = !existentials;
-          subst = SSubst.copy result;
+          subst = SESubst.copy result;
         }
       in
       Hashtbl.replace simplification_cache key cached_simplification;
@@ -935,7 +952,7 @@ let admissible_assertion (a : Asrt.t) : bool =
   L.(
     verbose (fun m ->
         m "-----------\nAdmissible?\n----------\n%s"
-          ((Fmt.to_to_string Asrt.pp) a)));
+          ((Fmt.to_to_string Asrt.full_pp) a)));
 
   let pfs = PFS.init () in
   let gamma = TypEnv.init () in

@@ -85,7 +85,10 @@ let substitution subst genv =
   let open Gillian.Gil_syntax in
   let open Gillian.Symbolic in
   let aloc_subst =
-    Subst.filter subst (fun var _ -> GUtils.Names.is_aloc_name var)
+    Subst.filter subst (fun var _ ->
+        match var with
+        | ALoc _ -> true
+        | _      -> false)
   in
   let rename old_loc new_loc pmap =
     match find_opt old_loc pmap with
@@ -95,6 +98,11 @@ let substitution subst genv =
   (* Then we substitute the locations *)
   Subst.fold aloc_subst
     (fun old_loc new_loc cgenv ->
+      let old_loc =
+        match old_loc with
+        | ALoc loc -> loc
+        | _        -> raise (Failure "Impossible by construction")
+      in
       let new_loc =
         match new_loc with
         | Lit (Loc loc) | ALoc loc -> loc

@@ -10,12 +10,12 @@ open Containers
 module Make
     (CMemory : CMemory.S with type vt = CVal.M.t and type st = CVal.M.st) :
   State.S
-    with type st = CVal.CSubst.t
+    with type st = CVal.CESubst.t
      and type vt = Literal.t
      and type store_t = CStore.t = struct
   type vt = CVal.M.t
 
-  type st = CVal.CSubst.t
+  type st = CVal.CESubst.t
 
   type store_t = CStore.t
 
@@ -146,7 +146,7 @@ module Make
       ?(kill_new_lvars : bool option)
       ?(unification = false)
       (state : t) : st =
-    CVal.CSubst.init []
+    CVal.CESubst.init []
 
   let simplify_val state v = v
 
@@ -203,7 +203,7 @@ module Make
 
   let clean_up (state : t) = raise (Failure "Cleanup of concrete state.")
 
-  let unify_assertion (state : t) (subst : st) (p : Asrt.t) : u_res =
+  let unify_assertion (state : t) (subst : st) (step : UP.step) : u_res =
     raise (Failure "Unify assertion from concrete state.")
 
   let produce_posts (state : t) (subst : st) (asrts : Asrt.t list) : t list =

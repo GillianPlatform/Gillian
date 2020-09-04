@@ -6,10 +6,14 @@
 
 module L = Logging
 
-module rec M : (Val.S with type t = Expr.t and type st = SSubst.t) = struct
+module rec M :
+  (Val.S with type t = Expr.t and type st = SSubst.t and type et = SESubst.t) =
+struct
   type t = Expr.t
 
   type st = SSubst.t
+
+  type et = SESubst.t
 
   let pp = Expr.pp
 
@@ -38,3 +42,4 @@ module rec M : (Val.S with type t = Expr.t and type st = SSubst.t) = struct
 end
 
 and SSubst : (Subst.S with type vt = M.t) = Subst.Make (M)
+and SESubst : (ESubst.S with type vt = M.t) = ESubst.Make (M)

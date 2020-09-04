@@ -58,7 +58,7 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
 
   (** Converts the store into an ssubst *)
-  val to_ssubst : t -> SSubst.t
+  val to_ssubst : t -> SESubst.t
 
   (** Symbolic indices *)
   val symbolics : t -> Var.Set.t
@@ -265,9 +265,9 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param store to turn into an ssubst
     @return ssubst mapping the store variables to lexprs
   *)
-  let to_ssubst (store : t) : SSubst.t =
-    let subst = SSubst.init [] in
-    iter store (fun x v -> SSubst.put subst x (Val.to_expr v));
+  let to_ssubst (store : t) : SESubst.t =
+    let subst = SESubst.init [] in
+    iter store (fun x v -> SESubst.put subst (Expr.PVar x) (Val.to_expr v));
     subst
 
   (**

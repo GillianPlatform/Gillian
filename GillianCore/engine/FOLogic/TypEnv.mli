@@ -54,6 +54,6 @@ val to_list : t -> (Var.t * Type.t) list
 
 val to_list_expr : t -> (Expr.t * Type.t) list
 
-val substitution : t -> SSubst.t -> bool -> t
+val substitution : t -> SESubst.t -> bool -> t
 
 val is_well_formed : t -> bool

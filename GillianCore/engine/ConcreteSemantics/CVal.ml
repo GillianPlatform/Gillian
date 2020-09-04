@@ -4,10 +4,14 @@
 (*                   *)
 (*********************)
 
-module rec M : (Val.S with type st = CSubst.t and type t = Literal.t) = struct
+module rec M :
+  (Val.S with type t = Literal.t and type st = CSubst.t and type et = CESubst.t) =
+struct
   type t = Literal.t
 
   type st = CSubst.t
+
+  type et = CESubst.t
 
   let pp = Literal.pp
 
@@ -37,3 +41,4 @@ module rec M : (Val.S with type st = CSubst.t and type t = Literal.t) = struct
 end
 
 and CSubst : (Subst.S with type vt = M.t) = Subst.Make (M)
+and CESubst : (ESubst.S with type vt = M.t) = ESubst.Make (M)

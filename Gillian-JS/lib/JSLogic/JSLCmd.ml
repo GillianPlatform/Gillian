@@ -12,7 +12,7 @@ type t =
   | ApplyLemma of string * JSExpr.t list  (** Lemma         *)
   | Macro      of string * JSExpr.t list  (** Macro         *)
   | Assert     of (JSAsrt.t * string list)  (** Assert        *)
-  | Invariant  of JSAsrt.t  (** Assert        *)
+  | Invariant  of (JSAsrt.t * string list)  (** Invariant     *)
   | UseSubst   of string * (string * JSExpr.t) list
 
 let rec js2jsil

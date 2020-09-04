@@ -56,7 +56,7 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
 
   (** Converts the store into an ssubst *)
-  val to_ssubst : t -> SVal.SSubst.t
+  val to_ssubst : t -> SVal.SESubst.t
 
   (** Symbolic indices *)
   val symbolics : t -> Var.Set.t

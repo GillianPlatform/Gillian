@@ -34,9 +34,9 @@ let pp fmt labproc =
   Fmt.pf fmt "@[%a@\n@[<v 2>proc %s(%a) {@\n%a@\n@]@\n};@\n@]"
     Fmt.(option Spec.pp)
     spec name
-    (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
+    Fmt.(list ~sep:comma Fmt.string)
     params
-    (Fmt.array ~sep:(Fmt.any ";@\n") pp_cmd_triple)
+    Fmt.(array ~sep:(any ";@\n") pp_cmd_triple)
     body
 
 let line_info (proc : t) : (string * int * int) list =

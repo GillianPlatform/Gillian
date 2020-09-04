@@ -256,7 +256,7 @@ let merge_loc (heap : t) (new_loc : string) (old_loc : string) : unit =
 (** Modifies --heap-- in place updating it to subst(heap) *)
 let substitution_in_place (subst : SSubst.t) (heap : t) : unit =
   (* If the substitution is empty, there is nothing to be done *)
-  if not (SSubst.domain subst None = SS.empty) then (
+  if not (SSubst.domain subst None = Expr.Set.empty) then (
     (* The substitution is not empty *)
     let le_subst = SSubst.subst_in_expr subst ~partial:true in
 
@@ -307,9 +307,17 @@ let substitution_in_place (subst : SSubst.t) (heap : t) : unit =
 
     (* Now we need to deal with any substitutions in the locations themselves *)
     let aloc_subst =
-      SSubst.filter subst (fun var _ -> Names.is_aloc_name var)
+      SSubst.filter subst (fun var _ ->
+          match var with
+          | ALoc _ -> true
+          | _      -> false)
     in
     SSubst.iter aloc_subst (fun aloc new_loc ->
+        let aloc =
+          match aloc with
+          | ALoc loc -> loc
+          | _        -> raise (Failure "Impossible by construction")
+        in
         let new_loc =
           match (new_loc : Expr.t) with
           | Lit (Loc loc) -> loc

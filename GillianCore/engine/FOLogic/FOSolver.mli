@@ -3,7 +3,7 @@
     under the typing environment [gamma]. If this is the case,
     the function returns the appropriate logical environment. *)
 val check_satisfiability_with_model :
-  Gil_syntax.Formula.t list -> TypEnv.t -> SVal.SSubst.t option
+  Gil_syntax.Formula.t list -> TypEnv.t -> SVal.SESubst.t option
 
 (** [check_satisfiability ?unification pfs gamma]
     checks whether or not the pure formulae [pfs] are satisfiable

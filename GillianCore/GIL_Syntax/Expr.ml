@@ -204,14 +204,6 @@ let substitutables (le : t) : SS.t =
   in
   SS.of_list (fold fe_ac None None le)
 
-let unifiables (le : t) : Set.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | LVar _ | PVar _ | ALoc _ -> [ le ]
-    | _                        -> List.concat ac
-  in
-  Set.of_list (fold fe_ac None None le)
-
 let rec is_concrete (le : t) : bool =
   let f = is_concrete in
 
@@ -325,3 +317,21 @@ let pvars (e : t) : SS.t =
     end
   in
   v#visit_expr () e
+
+let var_to_expr (x : string) : t =
+  match Names.is_lvar_name x with
+  | true  -> LVar x
+  | false -> (
+      match Names.is_aloc_name x with
+      | true  -> ALoc x
+      | false -> (
+          match Names.is_pvar_name x with
+          | true  -> PVar x
+          | false -> raise (Failure ("var_to_expr: Impossible unifiable: " ^ x))
+          ) )
+
+let is_unifiable (e : t) : bool =
+  match e with
+  | PVar _ | LVar _ | ALoc _ | UnOp (LstLen, PVar _) | UnOp (LstLen, LVar _) ->
+      true
+  | _ -> false

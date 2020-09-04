@@ -73,3 +73,22 @@ nounfold pred ArrayPrototype (proto) :
     empty_fields($lap_push : -{ "length" }-) *
   JSBIFunction($lap_map, "AP_map", 1) *  (* Actual map function *)
     empty_fields($lap_map : -{ "length" }-);
+
+(*******************************************************************
+ **** Axiomatic specifications of the Array prototype functions ****
+ *******************************************************************)
+
+only spec AP_push (xsc, vthis, element)
+    [[ (vthis == #vthis) * (element == #ui8a) *
+       Uint8Array (#ui8a, #ab, 0, #viewSize) *
+       ArrayBuffer(#ab, #element) *
+       (#viewSize == l-len #element) *
+       ArrayOfUInt8Arrays(#vthis, #contents, #arraylength) ]]
+    [[ ArrayOfUInt8Arrays(#vthis, l+ (#contents, {{ #element }}), #arraylength + 1) * (ret == undefined) ]]
+    normal;
+
+    [[ (vthis == #vthis) * (element == #aui8a) *
+       ArrayOfUInt8Arrays (#aui8a, #aContents, _) *
+       ArrayOfArraysOfUInt8Arrays(#vthis, #contents, #arraylength) ]]
+    [[ ArrayOfArraysOfUInt8Arrays(#vthis, l+ (#contents, {{ #aContents }}), #arraylength + 1) * (ret == undefined) ]]
+    normal

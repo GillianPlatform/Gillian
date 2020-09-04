@@ -82,13 +82,5 @@ let rec pp fmt (lcmd : t) : unit =
         binders
   | SepAssert (a, binders) ->
       Fmt.pf fmt "sep_assert (%a) %a" Asrt.pp a pp_binders binders
-  | Invariant (a, existentials) ->
-      let pp_exs f exs =
-        match exs with
-        | [] -> ()
-        | _  ->
-            Fmt.pf f "[existentials: %a]"
-              (Fmt.list ~sep:Fmt.comma Fmt.string)
-              exs
-      in
-      Fmt.pf fmt "invariant (%a) %a" Asrt.pp a pp_exs existentials
+  | Invariant (a, binders) ->
+      Fmt.pf fmt "invariant (%a) %a" Asrt.pp a pp_binders binders

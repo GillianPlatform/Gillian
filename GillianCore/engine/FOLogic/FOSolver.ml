@@ -194,7 +194,7 @@ let get_axioms assertions gamma =
 
 let simplify_pfs_and_gamma
     ?(unification = false) (fs : Formula.t list) (gamma : TypEnv.t) :
-    Formula.Set.t * TypEnv.t * SSubst.t =
+    Formula.Set.t * TypEnv.t * SESubst.t =
   let gamma = TypEnv.copy gamma in
   let pfs = PFS.of_list fs in
   let subst, _ =
@@ -205,19 +205,27 @@ let simplify_pfs_and_gamma
   (fs_set, gamma, subst)
 
 let check_satisfiability_with_model (fs : Formula.t list) (gamma : TypEnv.t) :
-    SSubst.t option =
+    SESubst.t option =
   let fs, gamma, subst = simplify_pfs_and_gamma fs gamma in
   let model = Z3Encoding.check_sat_core fs gamma in
   let lvars =
     List.fold_left
-      (fun ac vs -> Var.Set.union ac vs)
-      Var.Set.empty
+      (fun ac vs ->
+        let vs =
+          Expr.Set.of_list (List.map (fun x -> Expr.LVar x) (SS.elements vs))
+        in
+        Expr.Set.union ac vs)
+      Expr.Set.empty
       (List.map Formula.lvars (Formula.Set.elements fs))
   in
-  let z3_vars = Var.Set.diff lvars (SSubst.domain subst None) in
+  let z3_vars = Expr.Set.diff lvars (SESubst.domain subst None) in
   L.(
     verbose (fun m ->
-        m "OBTAINED VARS: %s\n" (String.concat ", " (SS.elements z3_vars))));
+        m "OBTAINED VARS: %s\n"
+          (String.concat ", "
+             (List.map
+                (fun e -> Format.asprintf "%a" Expr.pp e)
+                (Expr.Set.elements z3_vars)))));
   match model with
   | None       -> None
   | Some model -> (
@@ -424,17 +432,14 @@ let is_less_or_equal ~pfs ~gamma e1 e2 =
 
 let resolve_loc_name ~pfs ~gamma loc =
   Logging.tmi (fun fmt -> fmt "get_loc_name: %a" Expr.pp loc);
-  let lpfs = PFS.to_list pfs in
   match Reduction.reduce_lexpr ~pfs ~gamma loc with
   | Lit (Loc loc) | ALoc loc -> Some loc
-  | LVar x                   -> (
-      match Reduction.resolve_expr_to_location lpfs (LVar x) with
-      | Some (loc_name, _) -> Some loc_name
-      | _                  -> None )
+  | LVar x                   -> Reduction.resolve_expr_to_location pfs gamma
+                                  (LVar x)
   | loc'                     -> (
-      match Reduction.resolve_expr_to_location lpfs loc' with
-      | Some (loc_name, _) -> Some loc_name
-      | None               ->
+      match Reduction.resolve_expr_to_location pfs gamma loc' with
+      | Some loc_name -> Some loc_name
+      | None          ->
           let msg =
             Format.asprintf "Unsupported location: %a with pfs:\n%a" Expr.pp
               loc' PFS.pp pfs

@@ -1,5 +1,16 @@
 open Containers
 
+type outs = (Expr.t * Expr.t) list
+
+val outs_pp : outs Fmt.t
+
+(** The [up_step] type represents a unification plan step,
+    consisting of an assertion together with the possible
+    learned outs *)
+type step = Asrt.t * outs
+
+val step_pp : step Fmt.t
+
 type t
 
 type pred = { pred : Pred.t; pure : bool; up : t }
@@ -27,21 +38,24 @@ type up_err_t =
 
 module KB = Expr.Set
 
-val missing : KB.t -> Expr.t -> KB.t list
+val learn_expr :
+  ?top_level:bool -> KB.t -> Gil_syntax.Expr.t -> Gil_syntax.Expr.t -> outs
+
+val ins_outs_expr : KB.t -> Expr.t -> Expr.t -> (KB.t * outs) list
 
 val collect_simple_asrts : Asrt.t -> Asrt.t list
 
 val init :
   ?use_params:bool ->
-  SS.t ->
-  SS.t ->
+  KB.t ->
+  KB.t ->
   (string, Pred.t) Hashtbl.t ->
   (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list ->
   (t, Asrt.t list list) result
 
 val next : ?lab:string -> t -> (t * (string * SS.t) option) list option
 
-val head : t -> Asrt.t option
+val head : t -> step option
 
 val posts : t -> (Flag.t * Asrt.t list) option
 
@@ -79,8 +93,6 @@ val pp_normal_spec :
   Format.formatter ->
   Spec.t ->
   unit
-
-val outs_expr : Expr.t -> SS.t
 
 val add_spec : prog -> Spec.t -> unit
 

@@ -699,10 +699,13 @@ module Mem = struct
         }
 
   let substitution subst mem =
-    if not (Subst.domain subst None = SS.empty) then (
+    if not (Subst.domain subst None = Expr.Set.empty) then (
       (* The substitution is not empty *)
       let aloc_subst =
-        Subst.filter subst (fun var _ -> GUtils.Names.is_aloc_name var)
+        Subst.filter subst (fun var _ ->
+            match var with
+            | ALoc _ -> true
+            | _      -> false)
       in
       Logging.verbose (fun fmt -> fmt "Aloc subst:\n%a" Subst.pp aloc_subst);
       let le_subst = Subst.subst_in_expr subst ~partial:true in
@@ -715,7 +718,7 @@ module Mem = struct
         | SVsingle v       -> SVsingle (le_subst v)
         | SUndefined       -> SUndefined
         | Sptr (loc, offs) -> (
-            match Subst.get aloc_subst loc with
+            match Subst.get aloc_subst (ALoc loc) with
             | Some (ALoc nloc) | Some (Lit (Loc nloc)) ->
                 Sptr (nloc, le_subst offs)
             | Some nloc ->
@@ -733,6 +736,11 @@ module Mem = struct
       (* Then we substitute the locations *)
       Subst.fold aloc_subst
         (fun old_loc new_loc cmem ->
+          let old_loc =
+            match old_loc with
+            | ALoc loc -> loc
+            | _        -> raise (Failure "Impossible by construction")
+          in
           Logging.verbose (fun fmt ->
               fmt "Merge locs: %s --> %a" old_loc Expr.pp new_loc);
           let new_loc =

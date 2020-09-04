@@ -53,9 +53,9 @@ let pp fmt lcmd =
   | LPhiAssignment lva ->
       let vars, var_args = List.split lva in
       Fmt.pf fmt "PHI(%a: %a)"
-        (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
+        Fmt.(list ~sep:comma string)
         vars
-        (Fmt.list ~sep:(Fmt.any "; ") pp_params)
+        Fmt.(list ~sep:semi pp_params)
         var_args
   | LReturnNormal -> Fmt.string fmt "return"
   | LReturnError -> Fmt.string fmt "throw"

@@ -6,6 +6,9 @@ module type S = sig
   (** Type of substitutions for GIL values *)
   type st
 
+  (** Type of extended substitutions for GIL values *)
+  type et
+
   (** Printer *)
   val pp : Format.formatter -> t -> unit
 

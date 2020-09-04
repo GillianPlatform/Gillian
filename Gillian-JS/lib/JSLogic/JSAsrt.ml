@@ -86,7 +86,8 @@ let rec js2jsil
   | PointsTo (le1, le2, le3) -> Asrt.PointsTo (fe le1, fe le2, fe le3)
   | MetaData (le1, le2) -> Asrt.MetaData (fe le1, fe le2)
   | Emp -> Asrt.Emp
-  | Types vts -> Asrt.Types (List.map (fun (v, t) -> (Expr.LVar v, t)) vts)
+  | Types vts ->
+      Asrt.Types (List.map (fun (v, t) -> (Expr.from_var_name v, t)) vts)
   | EmptyFields (e, domain) -> Asrt.EmptyFields (fe e, fe domain)
   | Pred (name, [ loc; Lit (String fid); sch; args_len; fproto ])
     when name = "JSFunctionObject" || name = "JSFunctionObjectStrong" ->

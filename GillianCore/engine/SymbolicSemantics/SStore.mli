@@ -44,12 +44,12 @@ val alocs : t -> Var.Set.t
 
 val assertions : t -> Formula.t list
 
-val substitution_in_place : SVal.SSubst.t -> t -> unit
+val substitution_in_place : SVal.SESubst.t -> t -> unit
 
 val is_well_formed : t -> bool
 
 val bindings : t -> (Var.t * vt) list
 
-val to_ssubst : t -> SVal.SSubst.t
+val to_ssubst : t -> SVal.SESubst.t
 
 val symbolics : t -> Var.Set.t

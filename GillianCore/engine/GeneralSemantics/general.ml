@@ -1,6 +1,7 @@
 module CallStack = CallStack
 module Val = Val
 module Subst = Subst
+module ESubst = ESubst
 module Store = Store
 module State = State
 module External = External

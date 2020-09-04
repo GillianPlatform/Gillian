@@ -53,7 +53,7 @@ end
 
 module Make
     (Val : Val.S)
-    (Subst : Subst.S with type vt = Val.t and type t = Val.st) :
-  S with type vt = Val.t and type st = Subst.t
+    (ESubst : ESubst.S with type vt = Val.t and type t = Val.et) :
+  S with type vt = Val.t and type st = ESubst.t
 
-module SPreds : S with type vt = SVal.M.t and type st = SVal.SSubst.t
+module SPreds : S with type vt = SVal.M.t and type st = SVal.SESubst.t

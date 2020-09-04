@@ -531,13 +531,13 @@ logic_cmd_target:
     { SL (Unfold (name, les, unfold_info, true)) }
   | UNFOLDALL; name = VAR
     { SL (GUnfold name) }
-  | INVARIANT; LBRACE; a = assertion_target; RBRACE; existentials = option(existentials_target)
-    { SL (Invariant (a, Option.value ~default:[ ] existentials)) }
+  | INVARIANT; LBRACE; a = assertion_target; RBRACE; binders = option(binders_target)
+    { SL (Invariant (a, Option.value ~default:[ ] binders)) }
+  | SEPASSERT; LBRACE; a = assertion_target; RBRACE; binders = option(binders_target)
+    { SL (SepAssert (a, Option.value ~default:[ ] binders)) }
   | SEPAPPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE; binders = option(binders_target)
     { let binders = Option.value ~default:[] binders in
       SL (ApplyLem (lemma_name, params, binders)) }
-  | SEPASSERT; LBRACE; a = assertion_target; RBRACE; binders = option(binders_target)
-    { SL (SepAssert (a, Option.value ~default:[ ] binders)) }
   | LIF; LBRACE; le=expr_target; RBRACE; LTHEN; CLBRACKET;
       then_lcmds = separated_list(SCOLON, logic_cmd_target);
       CRBRACKET; LELSE; CLBRACKET;
@@ -1136,8 +1136,8 @@ js_logic_cmd_target:
     { Assert (a, Option.value ~default:[ ] binders) }
 
 (* invariant a *)
-  | INVARIANT; a = js_assertion_target
-    { Invariant a  }
+  | INVARIANT; a = js_assertion_target; binders = option(binders_target);
+    { Invariant (a, Option.value ~default:[ ] binders)  }
 
 (* apply lemma_name(args) *)
    | APPLY; LEMMA; lemma_name = VAR; LBRACE; params = separated_list(COMMA, js_lexpr_target); RBRACE

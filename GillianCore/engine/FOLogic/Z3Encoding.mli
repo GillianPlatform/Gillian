@@ -12,4 +12,4 @@ val check_sat : Gil_syntax.Formula.Set.t -> TypEnv.t -> bool
     z3 model [model] into the substutition [subst]
     given the typing environment [gamma]. *)
 val lift_z3_model :
-  Z3.Model.model -> TypEnv.t -> SVal.SSubst.t -> Utils.Containers.SS.t -> unit
+  Z3.Model.model -> TypEnv.t -> SVal.SESubst.t -> Expr.Set.t -> unit

@@ -262,9 +262,6 @@ module Expr : sig
   (** [substitutables e] returns all lvars and alocs *)
   val substitutables : t -> SS.t
 
-  (** [unifiables e] returns all pvars, lvars, and alocs as proper expressions *)
-  val unifiables : t -> Set.t
-
   (** [is_concrete e] returns [true] iff the expression contains no lvar or aloc *)
   val is_concrete : t -> bool
 
@@ -293,6 +290,12 @@ module Expr : sig
   (** [base_elements e] returns the list containing all logical variables,
       abstract locations, and non-list literals in [e] *)
   val base_elements : t -> t list
+
+  (** [var_to_expr x] returns the expression representing the program/logical variable or abstract location [x] *)
+  val var_to_expr : string -> t
+
+  (** [is_unifiable x] returns whether or not the expression [e] is unifiable *)
+  val is_unifiable : t -> bool
 end
 
 module Formula : sig
@@ -322,6 +325,13 @@ module Formula : sig
     (Expr.t -> Expr.t) option ->
     t ->
     t
+
+  val map_opt :
+    (t -> t option * bool) option ->
+    (t -> t) option ->
+    (Expr.t -> Expr.t option) option ->
+    t ->
+    t option
 
   (** Deprecated. Use {!Visitors.reduce} instead *)
   val fold :
@@ -493,6 +503,9 @@ module Asrt : sig
 
   (** Pretty-printer *)
   val pp : Format.formatter -> t -> unit
+
+  (** Full pretty-printer *)
+  val full_pp : Format.formatter -> t -> unit
 
   (** [star \[a1; a2; ...; an\] will return \[a1 * a2 * ... * an\]] *)
   val star : t list -> t

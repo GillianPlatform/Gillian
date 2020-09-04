@@ -225,9 +225,10 @@ let join (pred1 : t) (pred2 : t) : t =
   else
     let p1_params, _ = List.split pred1.params in
     let p2_params, _ = List.split pred2.params in
+    let mapper var = Expr.PVar var in
     let subst =
       SSubst.init
-        (List.combine p2_params (List.map (fun var -> Expr.PVar var) p1_params))
+        (List.combine (List.map mapper p2_params) (List.map mapper p1_params))
     in
     let defs =
       pred1.definitions

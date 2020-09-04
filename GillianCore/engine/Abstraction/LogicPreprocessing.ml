@@ -200,11 +200,12 @@ let unfold_spec
     (spec : Spec.t) : Spec.t =
   let aux spec_name (sspec : Spec.st) : Spec.st list =
     let pres : Asrt.t list = auto_unfold preds rec_info sspec.ss_pre in
+    L.verbose (fun fmt -> fmt "Pre admissibility: %s" spec_name);
     let pres = List.filter Simplifications.admissible_assertion pres in
     let posts : Asrt.t list =
       List.concat (List.map (auto_unfold preds rec_info) sspec.ss_posts)
     in
-    L.verbose (fun fmt -> fmt "Testing for admissibility");
+    L.verbose (fun fmt -> fmt "Post admissibility: %s" spec_name);
     let posts = List.filter Simplifications.admissible_assertion posts in
     if posts = [] then
       Fmt.failwith
@@ -215,11 +216,11 @@ let unfold_spec
       (fun pre -> Spec.{ sspec with ss_pre = pre; ss_posts = posts })
       pres
   in
-
-  {
-    spec with
-    spec_sspecs = List.concat (List.map (aux spec.spec_name) spec.spec_sspecs);
-  }
+  let spec_sspecs =
+    List.concat (List.map (aux spec.spec_name) spec.spec_sspecs)
+  in
+  assert (spec_sspecs <> []);
+  { spec with spec_sspecs }
 
 let unfold_lemma
     (preds : (string, Pred.t) Hashtbl.t)

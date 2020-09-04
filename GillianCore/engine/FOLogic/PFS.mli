@@ -21,7 +21,7 @@ val mem : t -> Formula.t -> bool
 (** [extend pfs f] extends the pure formulae [pfs] with the formula [f] *)
 val extend : t -> Formula.t -> unit
 
-(* 
+(*
 (** [nth_get pfs n] returns the n-th pure formula of [pfs] *)
 val nth_get : t -> int -> Formula.t
 
@@ -56,7 +56,7 @@ val fold_left : ('a -> Formula.t -> 'a) -> 'a -> t -> 'a
 val map_inplace : (Formula.t -> Formula.t) -> t -> unit
 
 (** [substitution subst pfs] substitutes the substutition subst in the pure formulae [pfs] in-place *)
-val substitution : SVal.SSubst.t -> t -> unit
+val substitution : SVal.SESubst.t -> t -> unit
 
 (** [subst_expr_for_expr e_to_subst e_subst pfs] substitutes the expression [e_to_subst] with the expression [e_subst] in the pure formulae [pfs] in-place *)
 val subst_expr_for_expr : Expr.t -> Expr.t -> t -> unit

@@ -4,11 +4,11 @@ module L = Logging
 (** General GIL Interpreter *)
 module Make
     (Val : Val.S)
-    (Subst : Subst.S with type vt = Val.t and type t = Val.st)
+    (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
     (State : State.S
                with type vt = Val.t
-                and type st = Subst.t
+                and type st = ESubst.t
                 and type store_t = Store.t)
     (External : External.S) =
 struct
@@ -17,7 +17,7 @@ struct
    * *************** *)
 
   module CallStack = CallStack.Make (Val) (Store)
-  module External = External (Val) (Subst) (Store) (State) (CallStack)
+  module External = External (Val) (ESubst) (Store) (State) (CallStack)
 
   type state = State.t
 
@@ -172,7 +172,7 @@ struct
                     x)) )
     | Assume f ->
         let store_subst = Store.to_ssubst (State.get_store state) in
-        let f' = SVal.SSubst.substitute_formula store_subst ~partial:true f in
+        let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
         (* Printf.printf "Assuming %s\n" (Formula.str f'); *)
         let fos =
           if ExecMode.biabduction_exec !Config.current_exec_mode then
@@ -206,7 +206,7 @@ struct
     | SpecVar xs -> [ State.add_spec_vars state (Var.Set.of_list xs) ]
     | Assert f -> (
         let store_subst = Store.to_ssubst (State.get_store state) in
-        let f' = SVal.SSubst.substitute_formula store_subst ~partial:true f in
+        let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
         match State.assert_a state [ f' ] with
         | true  -> [ state ]
         | false ->
@@ -218,7 +218,7 @@ struct
                  @[<v 2>Failing Model:@\n\
                  %a@]@\n"
                 Formula.pp f'
-                Fmt.(option ~none:(any "CANNOT CREATE MODEL") Subst.pp)
+                Fmt.(option ~none:(any "CANNOT CREATE MODEL") ESubst.pp)
                 failing_model
             in
             if not (ExecMode.biabduction_exec !Config.current_exec_mode) then

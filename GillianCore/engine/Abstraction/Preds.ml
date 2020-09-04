@@ -53,13 +53,13 @@ end
 
 module Make
     (Val : Val.S)
-    (Subst : Subst.S with type vt = Val.t and type t = Val.st) :
-  S with type vt = Val.t and type st = Subst.t = struct
+    (ESubst : ESubst.S with type vt = Val.t and type t = Val.et) :
+  S with type vt = Val.t and type st = ESubst.t = struct
   module L = Logging
 
   type vt = Val.t
 
-  type st = Subst.t
+  type st = ESubst.t
 
   type abs_t = string * vt list
 
@@ -151,7 +151,7 @@ module Make
     getter preds predicate
 
   let subst_in_val (subst : st) (v : vt) : vt =
-    let le' = Subst.subst_in_expr subst true (Val.to_expr v) in
+    let le' = ESubst.subst_in_expr subst true (Val.to_expr v) in
     Option.fold ~some:(fun v -> v) ~none:v (Val.from_expr le')
 
   (** Updates --preds-- to subst(preds) *)
@@ -170,4 +170,4 @@ module Make
     List.sort Asrt.compare (List.map pred_to_assert preds)
 end
 
-module SPreds = Make (SVal.M) (SVal.SSubst)
+module SPreds = Make (SVal.M) (SVal.SESubst)

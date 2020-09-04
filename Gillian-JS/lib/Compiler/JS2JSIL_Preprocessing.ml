@@ -452,7 +452,7 @@ let translate_invariant_in_exp
     (fun_tbl : pre_fun_tbl_type)
     (fid : string)
     (sc_var : string)
-    (e : JS_Parser.Syntax.exp) : Asrt.t option =
+    (e : JS_Parser.Syntax.exp) : (Asrt.t * string list) option =
   let invariant =
     List.filter
       (fun annot -> annot.annot_type == JS_Parser.Syntax.Invariant)
@@ -462,9 +462,19 @@ let translate_invariant_in_exp
   | _ :: _ :: _   ->
       raise (Failure "DEATH: No more than one invariant per command")
   | []            -> None
-  | [ invariant ] ->
-      let a = parse_js_logic_assertion_from_string invariant.annot_formula in
-      Some (JSAsrt.js2jsil_tactic cc_tbl vis_tbl fun_tbl fid sc_var a)
+  | [ invariant ] -> (
+      let inv =
+        List.hd
+          (parse_js_logic_commands_from_string
+             ("invariant " ^ invariant.annot_formula))
+      in
+      match inv with
+      | Invariant (inv_a, inv_binders) ->
+          let inv_a =
+            JSAsrt.js2jsil_tactic cc_tbl vis_tbl fun_tbl fid sc_var inv_a
+          in
+          Some (inv_a, inv_binders)
+      | _ -> L.fail "Impossible: invariant parsed incorrectly" )
 
 let translate_single_func_specs
     (cc_tbl : cc_tbl_type)

@@ -113,10 +113,11 @@ let filter_vars_in_place (gamma : t) (vars : SS.t) : unit =
   filter_in_place gamma (fun v -> SS.mem v vars)
 
 (* Perform substitution, return new typing environment *)
-let rec substitution (x : t) (subst : SSubst.t) (partial : bool) : t =
+let rec substitution (x : t) (subst : SESubst.t) (partial : bool) : t =
   let new_gamma = init () in
   iter x (fun var v_type ->
-      let new_var = SSubst.get subst var in
+      let evar = Expr.from_var_name var in
+      let new_var = SESubst.get subst evar in
       match new_var with
       | Some (LVar new_var) -> update new_gamma new_var v_type
       | Some _              -> if partial then update new_gamma var v_type
@@ -124,7 +125,7 @@ let rec substitution (x : t) (subst : SSubst.t) (partial : bool) : t =
           if partial then update new_gamma var v_type
           else if Names.is_lvar_name var then (
             let new_lvar = LVar.alloc () in
-            SSubst.put subst var (LVar new_lvar);
+            SESubst.put subst evar (LVar new_lvar);
             update new_gamma new_lvar v_type ));
   new_gamma
 

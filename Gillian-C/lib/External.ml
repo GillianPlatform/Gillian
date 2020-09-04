@@ -4,11 +4,11 @@ open Gillian.General
 (** JSIL external procedure calls *)
 module M
     (Val : Val.S)
-    (Subst : Subst.S with type vt = Val.t and type t = Val.st)
+    (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
     (State : State.S
                with type vt = Val.t
-                and type st = Subst.t
+                and type st = ESubst.t
                 and type store_t = Store.t)
     (CallStack : CallStack.S with type vt = Val.t and type store_t = Store.t) =
 struct

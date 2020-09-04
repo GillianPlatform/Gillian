@@ -3,21 +3,21 @@ open Containers
 module Make
     (SState : State.S
                 with type vt = SVal.M.t
-                 and type st = SVal.SSubst.t
+                 and type st = SVal.SESubst.t
                  and type store_t = SStore.t)
     (SPState : PState.S
                  with type vt = SVal.M.t
-                  and type st = SVal.SSubst.t
+                  and type st = SVal.SESubst.t
                   and type store_t = SStore.t
                   and type preds_t = Preds.SPreds.t)
     (External : External.S) =
 struct
   module L = Logging
-  module SSubst = SVal.SSubst
+  module SSubst = SVal.SESubst
   module Normaliser = Normaliser.Make (SPState)
-  module SBAState = BiState.Make (SVal.M) (SVal.SSubst) (SStore) (SPState)
+  module SBAState = BiState.Make (SVal.M) (SVal.SESubst) (SStore) (SPState)
   module SBAInterpreter =
-    GInterpreter.Make (SVal.M) (SVal.SSubst) (SStore) (SBAState) (External)
+    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SBAState) (External)
 
   type bi_state_t = SBAState.t
 
@@ -31,10 +31,10 @@ struct
     let lvars = Asrt.lvars a in
     let alocs = Asrt.alocs a in
     let lvar_bindings =
-      List.map (fun x -> (x, Expr.LVar x)) (SS.elements lvars)
+      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (SS.elements lvars)
     in
     let aloc_bindings =
-      List.map (fun x -> (x, Expr.ALoc x)) (SS.elements alocs)
+      List.map (fun x -> (Expr.LVar x, Expr.ALoc x)) (SS.elements alocs)
     in
     let bindings = lvar_bindings @ aloc_bindings in
     let bindings' =
@@ -425,7 +425,7 @@ module From_scratch (SMemory : SMemory.S) (External : External.S) = struct
 
   include Make
             (INTERNAL__.SState)
-            (PState.Make (SVal.M) (SVal.SSubst) (SStore) (INTERNAL__.SState)
+            (PState.Make (SVal.M) (SVal.SESubst) (SStore) (INTERNAL__.SState)
                (Preds.SPreds))
             (External)
 end
