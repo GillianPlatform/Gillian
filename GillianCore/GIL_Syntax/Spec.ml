@@ -103,3 +103,6 @@ let label_vars_to_set lab =
 let yojson_of_t = TypeDef__.yojson_of_spec
 
 let t_of_yojson = TypeDef__.spec_of_yojson
+
+let hash_of_t (spec : t) =
+  Fmt.str "%a" pp spec |> Digest.string |> Digest.to_hex

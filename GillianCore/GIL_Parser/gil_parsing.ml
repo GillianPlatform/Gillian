@@ -1,5 +1,6 @@
 open Lexing
 module L = Logging
+module SS = Containers.SS
 
 module Preprocess_GCmd = PreProcessing_Utils.M (struct
   type t = int Cmd.t
@@ -7,7 +8,16 @@ module Preprocess_GCmd = PreProcessing_Utils.M (struct
   let successors = Cmd.successors
 end)
 
-module SS = Containers.SS
+(** Used to avoid redundant parsing. *)
+let cached_progs = Hashtbl.create Config.small_tbl_size
+
+let cache_gil_prog path prog = Hashtbl.add cached_progs path prog
+
+let cache_labelled_progs (progs : (string * (Annot.t, string) Prog.t) list) =
+  List.iter
+    (fun (path, prog) ->
+      if not (Hashtbl.mem cached_progs path) then cache_gil_prog path prog)
+    progs
 
 (** Used to avoid redundant parsing. *)
 let cached_progs = Hashtbl.create Config.small_tbl_size

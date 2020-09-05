@@ -94,8 +94,8 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
         match (prev_sources_opt, prev_graph_opt) with
         | Some prev_source_files, Some prev_call_graph ->
             let proc_changes =
-              ChangeTracker.get_changes prog ~prev_source_files ~prev_call_graph
-                ~cur_source_files
+              ChangeTracker.get_sym_changes prog ~prev_source_files
+                ~prev_call_graph ~cur_source_files
             in
             let changed_procs =
               SS.of_list

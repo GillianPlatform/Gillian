@@ -197,110 +197,54 @@ struct
   let run_test (ret_fun : result_t -> Spec.t * bool) (prog : UP.prog) (test : t)
       : (Spec.t * bool) list =
     let state = SBAState.copy test.state in
-    try
-      let specs : (Spec.t * bool) list =
-        SBAInterpreter.evaluate_proc ret_fun prog test.name test.params state
-      in
-      specs
+    try SBAInterpreter.evaluate_proc ret_fun prog test.name test.params state
     with Failure msg ->
       L.print_to_all
         (Printf.sprintf "ERROR in proc %s with message:\n%s\n" test.name msg);
       []
 
-  let test_procs
-      ?(prev_results : BiAbductionResults.t option)
+  let process_sym_exec_result
       (prog : UP.prog)
-      (to_test : SS.t) : BiAbductionResults.t =
-    L.verbose (fun m -> m "Starting bi-abductive testing");
-    let proc_names = Prog.get_proc_names prog.prog in
-    L.verbose (fun m -> m "Proc names: %s" (String.concat ", " proc_names));
-    let bispecs = Prog.get_bispecs prog.prog in
-    let () =
-      List.iter
-        (fun (bispec : BiSpec.t) ->
-          L.verbose (fun m -> m "Found bi-spec for: %s" bispec.bispec_name))
-        bispecs
-    in
-    let bispecs_to_test =
-      List.filter
-        (fun (bispec : BiSpec.t) -> SS.mem bispec.bispec_name to_test)
-        bispecs
-    in
+      (name : string)
+      (params : string list)
+      (state_i : bi_state_t)
+      (result : result_t) : Spec.t * bool =
+    let process_spec = make_spec prog in
+    let state_i = SBAState.copy state_i in
+    match result with
+    | RFail (_, _, state_f, errs) ->
+        let sspec, spec = process_spec name params state_i state_f Flag.Error in
+        if !Config.bug_specs_propagation then UP.add_spec prog spec;
+        (sspec, false)
+    | RSucc (fl, _, state_f) ->
+        let sspec, spec = process_spec name params state_i state_f fl in
+        let () =
+          try UP.add_spec prog spec
+          with _ ->
+            Printf.printf "when trying to build an UP for %s, I died!\n" name
+        in
+        (sspec, true)
 
-    let tests = List.concat (List.map (testify prog) bispecs_to_test) in
-    let test_names tests =
-      String.concat ", " (List.map (fun t -> t.name) tests)
-    in
-    L.verbose (fun m -> m "I have tests for: %s" (test_names tests));
-    let tests =
-      List.sort (fun test1 test2 -> Stdlib.compare test1.name test2.name) tests
-    in
-    L.verbose (fun m -> m "I have tests for: %s" (test_names tests));
-
-    let filter spec_name = not (SS.mem spec_name to_test) in
-    let prev_specs =
-      Option.fold ~none:[]
-        ~some:(fun results -> BiAbductionResults.get_all_specs ~filter results)
-        prev_results
-    in
-    let prev_spec_names =
-      List.map (fun (spec : Spec.t) -> spec.spec_name) prev_specs
-    in
-    L.verbose (fun m ->
-        m "I will use the previously-stored specs of: %s"
-          (String.concat ", " prev_spec_names));
-    List.iter (fun spec -> UP.add_spec prog spec) prev_specs;
-
-    let process_spec name params state_pre state_post flag : Spec.t * Spec.t =
-      make_spec prog name params state_pre state_post flag
-    in
-
-    let process_symb_exec_result
-        (name : string)
-        (params : string list)
-        (state_i : bi_state_t)
-        (result : result_t) : Spec.t * bool =
-      let state_i = SBAState.copy state_i in
-      match result with
-      | RFail (_, _, state_f, errs) ->
-          let sspec, spec =
-            process_spec name params state_i state_f Flag.Error
+  let run_tests (prog : UP.prog) (tests : t list) =
+    let rec run_tests_aux tests succ_specs bug_specs =
+      match tests with
+      | []           -> (succ_specs, bug_specs)
+      | test :: rest ->
+          L.verbose (fun m -> m "Running bi-abduction on %s\n" test.name);
+          let rets =
+            run_test
+              (process_sym_exec_result prog test.name test.params test.state)
+              prog test
           in
-          if !Config.bug_specs_propagation then UP.add_spec prog spec;
-          (sspec, false)
-      | RSucc (fl, _, state_f) ->
-          let sspec, spec = process_spec name params state_i state_f fl in
-          let () =
-            try UP.add_spec prog spec
-            with _ ->
-              Printf.printf "when trying to build an UP for %s, I died!\n" name
-          in
-          (sspec, true)
+          let cur_succ_specs, cur_bug_specs = List.partition snd rets in
+          let new_succ_specs = succ_specs @ List.map fst cur_succ_specs in
+          let new_bug_specs = bug_specs @ List.map fst cur_bug_specs in
+          run_tests_aux rest new_succ_specs new_bug_specs
     in
+    run_tests_aux tests [] []
 
-    let bug_specs, succ_specs =
-      List.split
-        (List.map
-           (fun test ->
-             L.verbose (fun m ->
-                 m "Running bi-abduction on function %s\n" test.name);
-             let rets =
-               run_test
-                 (process_symb_exec_result test.name test.params test.state)
-                 prog test
-             in
-             let succ_specs, bug_specs =
-               List.partition (fun (_, b) -> b) rets
-             in
-             let succ_specs = List.map (fun (spec, _) -> spec) succ_specs in
-             let bug_specs = List.map (fun (spec, _) -> spec) bug_specs in
-             (bug_specs, succ_specs))
-           tests)
-    in
-
-    let succ_specs : Spec.t list = List.concat succ_specs in
-    let bug_specs : Spec.t list = List.concat bug_specs in
-
+  let get_test_results
+      (prog : UP.prog) (succ_specs : Spec.t list) (bug_specs : Spec.t list) =
     let succ_specs, error_specs =
       List.partition
         (fun (spec : Spec.t) ->
@@ -344,6 +288,85 @@ struct
     in
     results
 
+  let str_concat = String.concat ", "
+
+  let test_procs (prog : UP.prog) =
+    L.verbose (fun m -> m "Starting bi-abductive testing in normal mode");
+    let proc_names = Prog.get_noninternal_proc_names prog.prog in
+    L.verbose (fun m -> m "Proc names: %s" (str_concat proc_names));
+    let bi_specs = List.map (Prog.get_bispec_exn prog.prog) proc_names in
+
+    let tests = List.concat_map (testify prog) bi_specs in
+    let test_names tests = str_concat (List.map (fun t -> t.name) tests) in
+    L.verbose (fun m -> m "I have tests for: %s" (test_names tests));
+    let tests = List.sort (fun t1 t2 -> Stdlib.compare t1.name t2.name) tests in
+    L.verbose (fun m -> m "I have tests for: %s" (test_names tests));
+    let succ_specs, bug_specs = run_tests prog tests in
+    get_test_results prog succ_specs bug_specs
+
+  let specs_equal (spec_a : Spec.t) (spec_b : Spec.t) =
+    (* FIXME: Perform a more robust comparsion based on unification *)
+    String.equal (Spec.hash_of_t spec_a) (Spec.hash_of_t spec_b)
+
+  let test_procs_incrementally
+      (prog : UP.prog)
+      ~(prev_results : BiAbductionResults.t)
+      ~(reverse_graph : CallGraph.t)
+      ~(changed_procs : string list)
+      ~(to_test : string list) =
+    L.verbose (fun m -> m "Starting bi-abductive testing in incremental mode");
+    let to_test_set = SS.of_list to_test in
+    let filter spec_name = not (SS.mem spec_name to_test_set) in
+    let prev_specs = BiAbductionResults.get_all_specs ~filter prev_results in
+    let prev_spec_names =
+      str_concat (List.map (fun (s : Spec.t) -> s.spec_name) prev_specs)
+    in
+    L.verbose (fun m -> m "I will use the stored specs of: %s" prev_spec_names);
+    List.iter (fun spec -> UP.add_spec prog spec) prev_specs;
+
+    let rec test_procs_aux to_test checked succ_specs bug_specs =
+      (* FIXME: Keep tests in a heap/priority queue *)
+      match to_test with
+      | []                -> (succ_specs, bug_specs)
+      | proc_name :: rest ->
+          let () = UP.remove_spec prog proc_name in
+          let tests = testify prog (Prog.get_bispec_exn prog.prog proc_name) in
+          let cur_succ_specs, cur_bug_specs = run_tests prog tests in
+          let checked = SS.add proc_name checked in
+          let new_to_test =
+            if BiAbductionResults.contains_spec prev_results proc_name then
+              let prev_spec =
+                BiAbductionResults.get_spec_exn prev_results proc_name
+              in
+              let new_spec = (Hashtbl.find prog.specs proc_name).spec in
+              if not (specs_equal prev_spec new_spec) then (
+                L.verbose (fun m -> m "The spec of %s has changed" proc_name);
+                (* Must also check immediate callers *)
+                let callers =
+                  ChangeTracker.get_callers prog.prog ~reverse_graph
+                    ~excluded_procs:changed_procs ~proc_name
+                in
+                let callers =
+                  List.filter (fun name -> not (SS.mem name checked)) callers
+                in
+                L.verbose (fun m ->
+                    m "I will check its callers: %s" (str_concat callers));
+                List.sort Stdlib.compare (rest @ callers) )
+              else (
+                L.verbose (fun m -> m "The spec of %s is unchanged" proc_name);
+                rest )
+            else rest
+          in
+          let new_succ_specs = succ_specs @ cur_succ_specs in
+          let new_bug_specs = bug_specs @ cur_bug_specs in
+          test_procs_aux new_to_test checked new_succ_specs new_bug_specs
+    in
+    (* Keep list sorted to ensure tests are executed in the required order *)
+    let to_test = List.sort Stdlib.compare to_test in
+    L.verbose (fun m -> m "I will begin by checking: %s" (str_concat to_test));
+    let succ_specs, bug_specs = test_procs_aux to_test SS.empty [] [] in
+    get_test_results prog succ_specs bug_specs
+
   let test_prog
       (prog : UP.prog)
       (incremental : bool)
@@ -357,28 +380,24 @@ struct
         | Some files -> files
         | None       -> failwith "Cannot use -a in incremental mode"
       in
-      let prev_source_files, prev_call_graph, results =
+      let prev_source_files, prev_call_graph, prev_results =
         read_biabduction_results ()
       in
       let proc_changes =
         get_changes prog.prog ~prev_source_files ~prev_call_graph
           ~cur_source_files
       in
-      let procs_to_prune =
-        proc_changes.changed_procs @ proc_changes.deleted_procs
-        @ proc_changes.dependent_procs
+      let to_test = proc_changes.changed_procs @ proc_changes.new_procs in
+      let to_prune = proc_changes.changed_procs @ proc_changes.deleted_procs in
+      let reverse_graph = CallGraph.to_reverse_graph prev_call_graph in
+      let cur_results =
+        test_procs_incrementally prog ~prev_results ~reverse_graph
+          ~changed_procs:proc_changes.changed_procs ~to_test
       in
-      let () = CallGraph.prune_procs prev_call_graph procs_to_prune in
-      let () = BiAbductionResults.prune results procs_to_prune in
-      let procs_to_test =
-        SS.of_list
-          ( proc_changes.changed_procs @ proc_changes.new_procs
-          @ proc_changes.dependent_procs )
-      in
-      let cur_results = test_procs ~prev_results:results prog procs_to_test in
       let cur_call_graph = SBAInterpreter.call_graph in
+      let () = CallGraph.prune_procs prev_call_graph to_prune in
       let call_graph = CallGraph.merge prev_call_graph cur_call_graph in
-      let results = BiAbductionResults.merge results cur_results in
+      let results = BiAbductionResults.merge prev_results cur_results in
       let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
       write_biabduction_results cur_source_files call_graph ~diff results
     else
@@ -386,11 +405,8 @@ struct
       let cur_source_files =
         Option.value ~default:(SourceFiles.make ()) source_files
       in
-      let procs_to_test =
-        SS.of_list (Prog.get_noninternal_proc_names prog.prog)
-      in
-      let results = test_procs prog procs_to_test in
       let call_graph = SBAInterpreter.call_graph in
+      let results = test_procs prog in
       write_biabduction_results cur_source_files call_graph ~diff:"" results
 end
 

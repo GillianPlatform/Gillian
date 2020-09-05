@@ -80,6 +80,8 @@ val outs_expr : Expr.t -> SS.t
 
 val add_spec : prog -> Spec.t -> unit
 
+val remove_spec : prog -> string -> unit
+
 val get_lemma : prog -> string -> (lemma, unit) result
 
 val update_coverage : prog -> string -> int -> unit

@@ -21,9 +21,26 @@ val get_changes :
   cur_source_files:SourceFiles.t ->
   proc_changes
 
+val get_sym_changes :
+  ('a, 'b) Prog.t ->
+  prev_source_files:SourceFiles.t ->
+  prev_call_graph:CallGraph.t ->
+  cur_source_files:SourceFiles.t ->
+  proc_changes
+
 val get_verif_changes :
   ('a, 'b) Prog.t ->
   prev_source_files:SourceFiles.t ->
   prev_call_graph:CallGraph.t ->
   cur_source_files:SourceFiles.t ->
   proc_changes * lemma_changes
+
+(** Finds the closest, non-internal callers of [proc_name] using the given
+    reverse call graph, ignoring any procedures in [excluded_procs] along the
+    way. *)
+val get_callers :
+  ('a, 'b) Prog.t ->
+  reverse_graph:CallGraph.t ->
+  excluded_procs:string list ->
+  proc_name:string ->
+  string list
