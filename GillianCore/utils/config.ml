@@ -46,7 +46,7 @@ let unfolding = ref true
 let manual_proof = ref false
 
 (* let perform_syntax_checks = ref false *)
-let lemma_proof = ref true
+let lemma_proof = ref false
 
 (** {2 Parallel threading} *)
 

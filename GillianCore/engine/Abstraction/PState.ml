@@ -735,14 +735,14 @@ module Make
                     let success =
                       List.for_all (fun (x, x_v) -> x_v <> None) new_bindings
                     in
-                    let new_bindings =
-                      List.map
-                        (fun (x, x_v) -> (x, Option.get x_v))
-                        new_bindings
-                    in
                     if not success then
                       raise (Failure "Assert failed - binders not captured")
                     else
+                      let new_bindings =
+                        List.map
+                          (fun (x, x_v) -> (x, Option.get x_v))
+                          new_bindings
+                      in
                       let bindings =
                         List.filter
                           (fun (e, v) ->

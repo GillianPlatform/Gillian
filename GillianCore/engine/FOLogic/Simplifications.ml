@@ -880,12 +880,16 @@ let simplify_pfs_and_gamma
               | _      -> ());
 
           sanitise_pfs_no_store ~unification gamma lpfs;
-          PFS.sort lpfs;
 
           let current_lvars = SS.union (PFS.lvars lpfs) (PFS.lvars rpfs) in
           TypEnv.iter gamma (fun v _ ->
               if SS.mem v !vars_to_kill && not (SS.mem v current_lvars) then
-                TypEnv.remove gamma v) )
+                TypEnv.remove gamma v);
+
+          (* TypEnv.iter gamma (fun v t -> match t with
+             | Type.ListType -> PFS.extend lpfs (LessEq (Lit (Num 0.), UnOp (LstLen, Expr.from_var_name v)))
+             | _ -> ()); *)
+          PFS.sort lpfs )
       done;
 
       L.verbose (fun m -> m "simplify_pfs_and_gamma completed");

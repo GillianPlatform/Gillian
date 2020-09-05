@@ -50,7 +50,7 @@ function needs (condition, errorMessage) {
     @pre
         (elementCount == #elementCount) * (fieldsPerElement == #fieldsPerElement) * (buffer == #buffer) * (readPos == #readPos) *
 
-        (0 <=# elementCount) * (0 <=# #fieldsPerElement) * (0 <=# #readPos) *
+        (0 <=# #elementCount) * (0 <=# #fieldsPerElement) * (0 <=# #readPos) *
 
         Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
         ArrayBuffer(#ab, #data) *
@@ -93,26 +93,41 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
     var elements = [];
 
     /*
-      @tactic apply lemma ElementsPureFacts(#view, #readPos, #elementCount, #fieldsPerElement, #elementList, #elementsLength)
-    */
-    /*
+      @tactic
+        apply lemma ElementsPureFacts(#view, #readPos, #elementCount, #fieldsPerElement, #elementList, #elementsLength)
+
       @invariant
-        scope(elements : #readElements) * scope(readPos : #currentReadPos) * scope(elementCount : #currentElementCount) *
-        Elements(#view, #currentReadPos, #currentElementCount, #fieldsPerElement, #remainingElementsList, #remainingElementsLength) *
-        Elements(#view, #readPos, #elementCount - #currentElementCount, #fieldsPerElement, #doneElementsList, #doneElementsLength) *
-        (#elementList == l+ (#doneElementsList, #remainingElementsList)) *
-        (#elementsLength == #doneElementsLength + #remainingElementsLength) *
-        (#readPos + #doneElementsLength == #currentReadPos) *
-        ArrayOfArraysOfUInt8Arrays(#readElements, #doneElementsList, #elementCount - #currentElementCount)
-        [bind : #readElements, #currentReadPos, #currentElementCount, #remainingElementsList, #remainingElementsLength, #doneElementsList, #doneElementsLength]
+        scope(elements : #doneEls) * scope(readPos : #outerLoopReadPos) * scope(elementCount : #elementsLeft) *
+        Elements(#view, #outerLoopReadPos, #elementsLeft, #fieldsPerElement, #remainingElsList, #remainingElsLength) *
+        Elements(#view, #readPos, #elementCount - #elementsLeft, #fieldsPerElement, #doneElsList, #doneElsLength) *
+        (#elementList == l+ (#doneElsList, #remainingElsList)) *
+        (#elementsLength == #doneElsLength + #remainingElsLength) *
+        (#readPos + #doneElsLength == #outerLoopReadPos) *
+        ArrayOfArraysOfUInt8Arrays(#doneEls, #doneElsList, #elementCount - #elementsLeft)
+        [bind : #doneEls, #outerLoopReadPos, #elementsLeft, #remainingElsList, #remainingElsLength, #doneElsList, #doneElsLength]
     */
     while (elementCount--) {
+      /* @tactic
+          apply lemma ElementsPureFacts(#view, #readPos, #elementCount - #elementsLeft, #fieldsPerElement, #doneElsList, #doneElsLength);
+          assert Element(#view, #outerLoopReadPos, #fieldsPerElement, #fieldsList, #elementLength) [bind: #fieldsList, #elementLength];
+          apply lemma ElementPureFacts(#view, #outerLoopReadPos, #fieldsPerElement, #fieldsList, #elementLength) */
 
       var element = []
       var fieldCount = fieldsPerElement
 
-      /* @invariant True */
+      /* @invariant
+          scope(element : #doneEl) * scope(readPos : #innerLoopReadPos) * scope(fieldCount : #fieldsLeft) *
+          Element(#view, #innerLoopReadPos, #fieldsLeft, #remainingElList, #remainingElLength) *
+          Element(#view, #outerLoopReadPos, #fieldsPerElement - #fieldsLeft, #doneElList, #doneElLength) *
+          (#fieldsList == l+ (#doneElList, #remainingElList)) *
+          (#elementLength == #doneElLength + #remainingElLength) *
+          (#outerLoopReadPos + #doneElLength == #innerLoopReadPos) *
+          ArrayOfUInt8Arrays(#doneEl, #doneElList, #fieldsPerElement - #fieldsLeft)
+          [bind: #doneEl, #innerLoopReadPos, #fieldsLeft, #remainingElList, #remainingElLength, #doneElList, #doneElLength] */
       while (fieldCount--) {
+        /* @tactic
+            apply lemma ElementPureFacts(#view, #outerLoopReadPos, #fieldsPerElement - #fieldsLeft, #doneElList, #doneElLength);
+            apply lemma ElementPureFacts(#view, #innerLoopReadPos, #fieldsLeft, #remainingElList, #remainingElLength) */
         /* Check for early return (Postcondition): Enough data must exist to read the Uint16 length value. */
         if (readPos + 2 > dataView.byteLength) return false
         var length = dataView.getUint16(readPos, false) // big endian
@@ -120,71 +135,15 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
         /* Check for early return (Postcondition): Enough data must exist length of the value. */
         if (readPos + length > dataView.byteLength) return false
         var fieldBinary = buffer.slice(readPos, readPos + length)
-        element.push(fieldBinary)
         readPos += length
+        /* @tactic assert #remainingElList == l+ ({{ #fld }}, #rfld) [bind: #fld, #rfld];
+           apply lemma ElementAppend(#view, #outerLoopReadPos, #fieldsPerElement - #fieldsLeft, #doneElList, #doneElLength, #fieldsLeft, #fld, #rfld, #remainingElLength) */
+        element.push(fieldBinary)
       }
       /* @tactic
-          assert Element(#view, (#readPos + #doneElementsLength), #fieldsPerElement, #readElementFieldList, #readElementLength) [bind: #readElementFieldList, #readElementLength];
-          apply lemma ElementsAppend(#view, #readPos, (#elementCount - #currentElementCount), #fieldsPerElement, #doneElementsList, #doneElementsLength, #readElementFieldList, #readElementLength) */
+          apply lemma ElementsAppend(#view, #readPos, (#elementCount - #elementsLeft), #fieldsPerElement, #doneElsList, #doneElsLength, #doneElList, #doneElLength) */
       elements.push(element);
     }
 
     return { elements, readPos }
-
-    /*
-        @id aux_readElement
-
-        @pre (element == #element) * (fieldCount == #fieldCount) *
-             scope(buffer : #buffer) *
-             scope(dataView : #dataView) *
-             scope(readPos : #readPos) *
-             scope(aux_readElement : #aux_readElement) *
-             (#are_sc == $$scope) *
-
-             DataView(#dataView, #ab, #viewOffset, #viewSize) *
-             Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
-             ArrayBuffer(#ab, #data) *
-             (#view == l-sub(#data, #viewOffset, #viewSize)) *
-             Element(#view, #readPos, #fieldCount, #fieldList, #fieldsLength) *
-             ArrayOfUInt8Arrays(#element, #oldFields, #oldFieldCount) *
-
-             JSFunctionObject(#aux_readElement, "aux_readElement", #are_sc, #are_len,  #are_proto) *
-             DataViewPrototype($ldv_proto) * Uint8ArrayPrototype($lui8ar_proto) * ArrayPrototype ($larr_proto)
-
-        @post scope(buffer : #buffer) *
-              scope(dataView : #dataView) *
-              scope(readPos : #ret_readPos) *
-              scope(aux_readElement : #aux_readElement) *
-
-              (#ret_readPos == #readPos + #fieldsLength) *
-              DataView(#dataView, #ab, #viewOffset, #viewSize) *
-              Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
-              ArrayBuffer(#ab, #data) *
-              (#view == l-sub(#data, #viewOffset, #viewSize)) *
-              Element(#view, #readPos, #fieldCount, #fieldList, #fieldsLength) *
-              ArrayOfUInt8Arrays(#element, l+ (#oldFields, #fieldList), #oldFieldCount + #fieldCount) *
-
-              JSFunctionObject(#aux_readElement, "aux_readElement", #are_sc, #are_len, #are_proto) *
-              DataViewPrototype($ldv_proto) * Uint8ArrayPrototype($lui8ar_proto) * ArrayPrototype ($larr_proto) *
-              (ret == #element)
-    */
-   /*
-    function aux_readElement (element, fieldCount) {
-
-        if (fieldCount--) {
-
-            if (readPos + 2 > dataView.byteLength) return false
-            var length = dataView.getUint16(readPos, false) // big endian
-            readPos += 2
-            /* Check for early return (Postcondition): Enough data must exist length of the value.
-            if (readPos + length > dataView.byteLength) return false
-            var fieldBinary = buffer.slice(readPos, readPos + length)
-            element.push(fieldBinary)
-            readPos += length
-
-            return aux_readElement (element, fieldCount);
-        }
-
-        return element
-    } */
 }

@@ -97,33 +97,23 @@ only spec AP_push (xsc, vthis, element)
  **** The Elements Predicate ****
  ********************************)
 
-pred Element(+view:List, +readPos:Num, +fieldCount: Num, fieldList:List, elementLength:Num) :
-    (0 <=# readPos) * (fieldCount == 0) * (fieldList == {{ }}) * (elementLength == 0) *
+pred Field(+view:List, +readPos:Num, field:List, fieldLength:Num) :
+    (#rawFL == l-sub (view, readPos, 2)) *
+    rawToUInt16(#rawFL, false, fieldLength) *
+    (field == l-sub(view, readPos + 2, fieldLength));
+
+pred Element(+view:List, +readPos:Num, +fieldCount: Num, fieldsList:List, elementLength:Num) :
+    (0 <=# readPos) * (fieldCount == 0) * (fieldsList == {{ }}) * (elementLength == 0) *
     (readPos + elementLength <=# l-len view),
 
     (0 <=# readPos) * (0 <# fieldCount) * (0 <# elementLength) *
-    (#rawFL == l-sub (view, readPos, 2)) *
-    rawToUInt16(#rawFL, false, #fieldLength) *
-    (#field == l-sub(view, readPos + 2, #fieldLength)) *
+    Field(view, readPos, #field, #fieldLength) *
     (#restFieldCount == fieldCount - 1) *
     Element(view, readPos + 2 + #fieldLength, #restFieldCount, #restFields, #restElementLength) *
     (0 <=# #restElementLength) *
-    (fieldList == #field :: #restFields) *
+    (fieldsList == #field :: #restFields) *
     (elementLength == 2 + #fieldLength + #restElementLength) *
     (readPos + elementLength <=# l-len view);
-
-pred Elements(+view:List, +readPos:Num, +elementCount: Num, +fieldCount: Num, elementList:List, elementsLength:Num) :
-    (0 <=# readPos) * (elementCount == 0) * (0 <# fieldCount) * (elementList == {{ }}) * (elementsLength == 0) *
-    (readPos + elementsLength <=# l-len view),
-
-    (0 <=# readPos) * (0 <# elementCount) * (0 <# fieldCount) * (0 <# elementsLength) *
-    Element(view, readPos, fieldCount, #element, #elementLength) *
-    (#restElementCount == elementCount - 1) *
-    Elements(view, readPos + #elementLength, #restElementCount, fieldCount, #restElements, #restElementsLength) *
-    (0 <=# #restElementsLength) *
-    (elementList == #element :: #restElements) *
-    (elementsLength == #elementLength + #restElementsLength) *
-    (readPos + elementsLength <=# l-len view);
 
 lemma ElementPureFacts(view, readPos, fieldCount, fieldList, elementLength)
     [[ (view == #view) * (readPos == #readPos) * (fieldCount == #fieldCount) *
@@ -137,6 +127,28 @@ lemma ElementPureFacts(view, readPos, fieldCount, fieldList, elementLength)
 [*
     unfold Element (#view, #readPos, #fieldCount, #fieldList, #elementLength)
  *]
+
+lemma ElementAppend(view, readPos, fC1, fL1, eL1, fC2, field, fL2, eL2)
+    [[ (view == #view) * (readPos == #readPos) * (fC1 == #fC1) * (fL1 == #fL1) * (eL1 == #eL1) *
+       (fC2 == #fC2) * (field == #field) * (fL2 == #fL2) * (eL2 == #eL2) *
+       Element(#view, #readPos, #fC1, #fL1, #eL1) *
+       Element(#view, #readPos + #eL1, #fC2, l+({{ #field }}, #fL2), #eL2) *
+       (#shift == 2 + l-len #field) ]]
+    [[ Element(#view, #readPos + #eL1 + #shift, #fC2 - 1, #fL2, #eL2 - #shift) *
+       Element(#view, #readPos, #fC1 + 1, l+ (#fL1, {{ #field }}), #eL1 + #shift) ]]
+
+pred Elements(+view:List, +readPos:Num, +elementCount: Num, +fieldCount: Num, elementsList:List, elementsLength:Num) :
+    (0 <=# readPos) * (elementCount == 0) * (0 <# fieldCount) * (elementsList == {{ }}) * (elementsLength == 0) *
+    (readPos + elementsLength <=# l-len view),
+
+    (0 <=# readPos) * (0 <# elementCount) * (0 <# fieldCount) * (0 <# elementsLength) *
+    Element(view, readPos, fieldCount, #fieldsList, #elementLength) *
+    (#restElementCount == elementCount - 1) *
+    Elements(view, readPos + #elementLength, #restElementCount, fieldCount, #restElements, #restElementsLength) *
+    (0 <=# #restElementsLength) *
+    (elementsList == #fieldsList :: #restElements) *
+    (elementsLength == #elementLength + #restElementsLength) *
+    (readPos + elementsLength <=# l-len view);
 
 lemma ElementsPureFacts(view, readPos, elementCount, fieldCount, elementList, elementsLength)
     [[ (view == #view) * (readPos == #readPos) * (elementCount == #elementCount) *
@@ -154,21 +166,18 @@ lemma ElementsPureFacts(view, readPos, elementCount, fieldCount, elementList, el
 
 lemma ElementsAppend(view, readPos, elementCount, fieldCount, elementList, elementsLength, fieldList, elementLength)
     [[ (view == #view) * (readPos == #readPos) * (elementCount == #elementCount) *
-        (fieldCount == #fieldCount) * (elementList == #elementList) * (elementsLength == #elementsLength) *
-        (fieldList == #fieldList) * (elementLength == #elementLength) *
-        Elements(#view, #readPos, #elementCount, #fieldCount, #elementList, #elementsLength) *
-        Element (#view, #readPos + #elementsLength, #fieldCount, #fieldList, #elementLength) ]]
+       (fieldCount == #fieldCount) * (elementList == #elementList) * (elementsLength == #elementsLength) *
+       (fieldList == #fieldList) * (elementLength == #elementLength) *
+       Elements(#view, #readPos, #elementCount, #fieldCount, #elementList, #elementsLength) *
+       Element (#view, #readPos + #elementsLength, #fieldCount, #fieldList, #elementLength) ]]
     [[ Elements(#view, #readPos, #elementCount + 1, #fieldCount, l+ (#elementList, {{ #fieldList }}), #elementsLength + #elementLength) ]]
 [*
     sep_apply ElementsPureFacts(#view, #readPos, #elementCount, #fieldCount, #elementList, #elementsLength);
     unfold Elements(#view, #readPos, #elementCount, #fieldCount, #elementList, #elementsLength);
-    if (#elementCount = 0) then {
-      sep_assert (0 == 0)
-    } else {
+    if (not (#elementCount = 0)) then {
       sep_assert (Element(#view, #readPos, #fieldCount, #newElementFieldList, #newElementLength)) [bind: #newElementFieldList, #newElementLength];
       sep_apply ElementPureFacts(#view, #readPos, #fieldCount, #newElementFieldList, #newElementLength);
       sep_assert (Elements(#view, (#readPos + #newElementLength), (#elementCount - 1), #fieldCount, #remainingElementsList, #remainingElementsLength)) [bind: #remainingElementsList, #remainingElementsLength];
-      sep_apply ElementsAppend(#view, (#readPos + #newElementLength), (#elementCount - 1), #fieldCount, #remainingElementsList, #remainingElementsLength, #fieldList, #elementLength);
-      fold Elements(#view, #readPos, #elementCount + 1, #fieldCount, l+ (#elementList, {{ #fieldList }}), #elementsLength + #elementLength)
+      sep_apply ElementsAppend(#view, (#readPos + #newElementLength), (#elementCount - 1), #fieldCount, #remainingElementsList, #remainingElementsLength, #fieldList, #elementLength)
     }
  *]

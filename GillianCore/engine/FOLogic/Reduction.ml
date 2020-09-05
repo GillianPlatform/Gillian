@@ -1133,6 +1133,7 @@ let rec reduce_lexpr_loop
           | []    -> ESet []
           | [ x ] -> x
           | _     -> NOp (SetInter, fles) )
+    | UnOp (FUnaryMinus, UnOp (FUnaryMinus, e)) -> f e
     | UnOp (op, le) -> (
         let fle = f le in
         let def = Expr.UnOp (op, fle) in
@@ -1650,8 +1651,8 @@ let rec reduce_lexpr_loop
                              (BinOp (flel, FMinus, fler), FLessThan, Lit (Num 0.))) *)
                 )
             | FLessThanEqual -> (
-                L.verbose (fun fmt ->
-                    fmt "Reducing <=: %a, %a" Expr.pp flel Expr.pp fler);
+                (* L.verbose (fun fmt ->
+                    fmt "Reducing <=: %a, %a" Expr.pp flel Expr.pp fler); *)
                 let success, el, er = cut flel fler in
                 match success with
                 | false -> (
@@ -1905,6 +1906,7 @@ let rec reduce_formula_loop
 
   let result : Formula.t =
     match a with
+    | Eq (e1, e2) when e1 = e2 && lexpr_is_list gamma e1 -> True
     | Eq (Lit (LList ll), Lit (LList lr)) -> if ll = lr then True else False
     | Eq (EList le, Lit (LList ll)) | Eq (Lit (LList ll), EList le) ->
         if List.length ll <> List.length le then False
@@ -2035,6 +2037,13 @@ let rec reduce_formula_loop
                 f (Eq (UnOp (LstLen, e1), el))
             | NOp (LstCat, fl :: rl), NOp (LstCat, fr :: rr) when fl = fr ->
                 f (Eq (NOp (LstCat, rl), NOp (LstCat, rr)))
+            | NOp (LstCat, fl :: rl), NOp (LstCat, fr :: rr)
+              when List.hd (List.rev (fl :: rl)) = List.hd (List.rev (fr :: rr))
+              ->
+                f
+                  (Eq
+                     ( NOp (LstCat, List.rev (List.tl (List.rev (fl :: rl)))),
+                       NOp (LstCat, List.rev (List.tl (List.rev (fr :: rr)))) ))
             | le1, le2
               when ( match le1 with
                    | LVar _ -> false

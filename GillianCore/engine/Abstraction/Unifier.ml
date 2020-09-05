@@ -1044,6 +1044,10 @@ module Make
         if failure then make_resource_fail ()
         else
           let vs_ins = List.map Option.get vs_ins in
+          L.verbose (fun m ->
+              m "Looking for ins: %a"
+                Fmt.(brackets (list ~sep:comma Val.pp))
+                vs_ins);
           match get_pred ~in_unification:true astate pname vs_ins with
           | GPSucc [] ->
               L.verbose (fun m -> m "SUCCEEDED WITH NOTHING! MEDOOOOOO!!!!!");
