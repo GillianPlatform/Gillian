@@ -64,7 +64,7 @@ proc create_object_with_call_construct (call, construct, len) {
 
 			  ret := "create_default_object" ($lfun_proto, "Function", true);
 
-			  [ret, "length"] := {{ "d", len, false, false, false }};
+			  [ret, "length"] := {{ "d", len, false, false, true }};
 
 			  (* Get the metadata *)
 			  m := metadata(ret);
@@ -80,11 +80,18 @@ proc create_object_with_call_construct (call, construct, len) {
   rlab: return
 };
 
-proc create_object_with_call_construct_concrete (l, call, construct, len) {
+proc create_object_with_call_construct_concrete (l, call, construct, len, opt_proto) {
 
-        ret := "create_default_object_concrete" (l, $lfun_proto, "Function", true);
+        proto := $lfun_proto;
 
-        [ret, "length"] := {{ "d", len, false, false, false }};
+        goto [opt_proto = undefined] cont proto;
+
+   proto: proto := opt_proto;
+
+   cont: ret := "create_default_object_concrete" (l, proto, "Function", true);
+
+        (* ES9: Updated to be configurable for the 'length' property *)
+        [ret, "length"] := {{ "d", len, false, false, true }};
 
         (* Get the metadata *)
         m := metadata(ret);
@@ -233,6 +240,7 @@ proc setupInitialHeap () {
 			[$lobj_proto, "hasOwnProperty"]       := {{ "d", $lop_hasOwnProperty, true, false, true }};
 			[$lobj_proto, "isPrototypeOf"]        := {{ "d", $lop_isPrototypeOf, true, false, true }};
 			[$lobj_proto, "propertyIsEnumerable"] := {{ "d", $lop_propertyIsEnumerable, true, false, true }};
+      [$lobj_proto, "__proto__"]            := {{ "a", $lop_get_proto_acc, $lop_set_proto_acc, false, true }};
 
 			ret := "create_object_with_call_construct_concrete" ($lop_toString, "OP_toString", empty, 0);
   			ret := "create_object_with_call_construct_concrete" ($lop_toLocaleString, "OP_toLocaleString", empty, 0);
@@ -240,6 +248,8 @@ proc setupInitialHeap () {
   			ret := "create_object_with_call_construct_concrete" ($lop_hasOwnProperty, "OP_hasOwnProperty", empty, 1);
  			ret := "create_object_with_call_construct_concrete" ($lop_isPrototypeOf, "OP_isPrototypeOf", empty, 1);
   			ret := "create_object_with_call_construct_concrete" ($lop_propertyIsEnumerable, "OP_propertyIsEnumerable", empty, 1);
+            ret := "create_object_with_call_construct_concrete" ($lop_get_proto_acc, "OP_get_proto_acc", empty, 0);
+            ret := "create_object_with_call_construct_concrete" ($lop_set_proto_acc, "OP_set_proto_acc", empty, 1);
 
 
 
@@ -285,7 +295,7 @@ proc setupInitialHeap () {
 
 			ret := "create_default_object_concrete" ($larr_proto, $lobj_proto, "Array", true);
 
-			[$larr_proto, "length"]         := {{ "d", 0, true, false, false }};
+			[$larr_proto, "length"]         := {{ "d", 0, true, false, true }};
 			[$larr_proto, "constructor"]    := {{ "d", $larr, true, false, true }};
 			[$larr_proto, "toString"]       := {{ "d", $lap_toString, true, false, true }};
 			[$larr_proto, "toLocaleString"] := {{ "d", $lap_toLocaleString, true, false, true }};
@@ -350,7 +360,7 @@ proc setupInitialHeap () {
 
 			m := metadata($lstr_proto);
 			[m, "@primitiveValue"]             := "";
-			[$lstr_proto, "length"]            := {{ "d", 0, false, false, false }};
+			[$lstr_proto, "length"]            := {{ "d", 0, false, false, true }};
 			[$lstr_proto, "constructor"]       := {{ "d", $lstr, true, false, true }};
 			[$lstr_proto, "toString"]          := {{ "d", $lsp_toString, true, false, true }};
 			[$lstr_proto, "valueOf"]           := {{ "d", $lsp_valueOf, true, false, true }};
@@ -430,6 +440,9 @@ proc setupInitialHeap () {
 			[$lnum, "NaN"]               := {{ "d", nan, false, false, false }};
 			[$lnum, "POSITIVE_INFINITY"] := {{ "d", inf, false, false, false }};
 			[$lnum, "NEGATIVE_INFINITY"] := {{ "d", -inf, false, false, false }};
+      [$lnum, "EPSILON"]           := {{ "d", $$epsilon, false, false, false }};
+      [$lnum, "MAX_SAFE_INTEGER"]  := {{ "d", $$max_safe_integer, false, false, false }};
+
 
 			(* Number.prototype *)
 
@@ -528,8 +541,6 @@ proc setupInitialHeap () {
 
 			ret := "create_default_object_concrete" ($ldt_proto, $lobj_proto, "Date", true);
 
-      (*
-
 			[$ldt_proto, "constructor"]          := {{ "d", $ldate, true, false, true }};
 			[$ldt_proto, "toString"]             := {{ "d", $ldp_toString, true, false, true }};
 			[$ldt_proto, "toDateString"]         := {{ "d", $ldp_toDateString, true, false, true }};
@@ -623,8 +634,6 @@ proc setupInitialHeap () {
 			ret := "create_object_with_call_construct_concrete" ($ldp_toISOString, "DP_toISOString", empty, 0);
 			ret := "create_object_with_call_construct_concrete" ($ldp_toJSON, "DP_toJSON", empty, 1);
 
-      *)
-
 
 
 			(* RegExp object *)
@@ -635,20 +644,25 @@ proc setupInitialHeap () {
 
 			(* RegExp.prototype *)
 
-			ret := "create_default_object_concrete" ($lre_proto, $lobj_proto, "RegExp", true);
-
-      (*
+			ret := "create_default_object_concrete" ($lre_proto, $lobj_proto, "Object", true);
 
 			[$lre_proto, "constructor"] := {{ "d", $lregexp, true, false, true }};
 			[$lre_proto, "exec"]        := {{ "d", $lrp_exec, true, false, true }};
 			[$lre_proto, "test"]        := {{ "d", $lrp_test, true, false, true }};
 			[$lre_proto, "toString"]    := {{ "d", $lrp_toString, true, false, true }};
 
+      (* Fix this when RegExps come *)
+			[$lre_proto, "source"]     := {{ "a", $ldp_getUTCDate, undefined, false, true }};
+			[$lre_proto, "global"]     := {{ "a", $ldp_getUTCDate, undefined, false, true }};
+			[$lre_proto, "ignoreCase"] := {{ "a", $ldp_getUTCDate, undefined, false, true }};
+			[$lre_proto, "multiline"]  := {{ "a", $ldp_getUTCDate, undefined, false, true }};
+
+
 			ret := "create_object_with_call_construct_concrete" ($lrp_exec, "RP_exec", empty, 1);
 			ret := "create_object_with_call_construct_concrete" ($lrp_test, "RP_test", empty, 1);
 			ret := "create_object_with_call_construct_concrete" ($lrp_toString, "RP_toString", empty, 0);
 
-      *)
+
 
 
 
@@ -656,7 +670,7 @@ proc setupInitialHeap () {
 
 			ret := "create_default_object_concrete" ($ljson, $lobj_proto, "JSON", true);
 
-      (*
+
 
 			[$ljson, "parse"]     := {{ "d", $ljson_parse,     true, false, true }};
 			[$ljson, "stringify"] := {{ "d", $ljson_stringify, true, false, true }};
@@ -664,7 +678,6 @@ proc setupInitialHeap () {
 			ret := "create_object_with_call_construct_concrete" ($ljson_parse, "JSON_parse", empty, 2);
 			ret := "create_object_with_call_construct_concrete" ($ljson_stringify, "JSON_stringify", empty, 3);
 
-      *)
 
 
 
@@ -677,7 +690,7 @@ proc setupInitialHeap () {
 
 			(* Error.prototype *)
 
-			ret := "create_default_object_concrete" ($lerr_proto, $lobj_proto, "Error", true);
+			ret := "create_default_object_concrete" ($lerr_proto, $lobj_proto, "Object", true);
 
 			[$lerr_proto, "constructor"] := {{ "d", $lerr, true, false, true }};
 			[$lerr_proto, "name"]        := {{ "d", "Error", true, false, true }};
@@ -691,12 +704,12 @@ proc setupInitialHeap () {
 
 			(* Native errors *)
 
-			ret := "create_object_with_call_construct_concrete" ($leerr,  "EvalError_call",      "Error_construct", 1);
-			ret := "create_object_with_call_construct_concrete" ($lrgerr, "RangeError_call",     "Error_construct", 1);
-			ret := "create_object_with_call_construct_concrete" ($lrferr, "ReferenceError_call", "Error_construct", 1);
-			ret := "create_object_with_call_construct_concrete" ($lserr,  "SyntaxError_call",    "Error_construct", 1);
-			ret := "create_object_with_call_construct_concrete" ($lterr,  "TypeError_call",      "Error_construct", 1);
-			ret := "create_object_with_call_construct_concrete" ($luerr,  "URIError_call",       "Error_construct", 1);
+			ret := "create_object_with_call_construct_concrete" ($leerr,  "EvalError_call",      "Error_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($lrgerr, "RangeError_call",     "Error_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($lrferr, "ReferenceError_call", "Error_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($lserr,  "SyntaxError_call",    "Error_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($lterr,  "TypeError_call",      "Error_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($luerr,  "URIError_call",       "Error_construct", 1, $lerr);
 
 			[$leerr,  "prototype"] := {{ "d", $leerr_proto, false, false, false }};
 			[$lrgerr, "prototype"] := {{ "d", $lrgerr_proto, false, false, false }};
@@ -750,7 +763,7 @@ proc setupInitialHeap () {
 			[m, "@scope"] := empty;
 			[m, "@formalParameters"] := {{ }};
 			[m, "@call"] := "ThrowTypeError";
-			[ret, "length"] := {{ "d", 0, false, false, false }};
+			[ret, "length"] := {{ "d", 0, false, false, true }};
 
       ret := empty;
       return
@@ -779,7 +792,7 @@ proc create_arguments_object (argList) {
 			indx := len - 1;
 
 	loop:	goto [0 <= indx] head call;
-	head:	ret := "i__toStringComputed" (indx) with elab;
+	head:	ret := "i__toString" (indx) with elab;
 			ret := "defineOwnProperty" (obj, ret, {{ "d", l-nth (argList, indx), true, true, true }}, false) with elab;
 			indx := indx - 1;
 			goto loop;

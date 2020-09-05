@@ -4,14 +4,14 @@ import Internals.jsil;
 (* THE OBJECT LIBRARY *)
 (* ****************** *)
 
-(*  
+(*
 	Procedure: i__getFields
 
-	Returns the list of properties of 
+	Returns the list of properties of
 		object at a given location l
-	
+
 	The list does not include internals
-		
+
 	If the object is a string object,
 		then it has additional properties
 *)
@@ -62,11 +62,11 @@ proc i__getEnumerableFieldsIter (l, prop_list) {
 	no:		fh := nil;
 			goto rcall;
 
-	yes:	fh := xh;
+	yes:	fh := {{ xh }};
 
 	rcall:	ft := "i__getEnumerableFieldsIter" (l, xt);
 
-			ret := fh :: ft;
+			ret := l+ (fh, ft);
 	rlab: return
 };
 
@@ -176,21 +176,22 @@ proc Object_construct (xsc, vthis, l) {
 (* *** GETPROTOTYPEOF *** *)
 
 proc Object_getPrototypeOf (xsc, vthis, o) {
-			goto [typeOf o = Obj] proto thrw;
+			ret := "i__toObject"(o) with elab;
 
-	proto:	m := metadata(o);
-			    ret := [m, "@proto"];
+	proto:	m := metadata(ret);
+			ret := [m, "@proto"];
 
-	rlab: return;
+	rlab:   return;
 
 	thrw:	ret := "TypeError" ();
-	elab: throw
+	elab:   throw
 };
 
 (* *** GETOWNPROPERTYDESCRIPTOR *** *)
 
 proc Object_getOwnPropertyDescriptor (xsc, vthis, o, prop) {
-			goto [typeOf o = Obj] start thrw;
+			ret := "i__toObject"(o) with elab;
+            o := ret;
 
 	start:	ret := "i__toString" (prop) with elab;
 			ret := "getOwnProperty" (o, ret) with elab;
@@ -206,7 +207,8 @@ proc Object_getOwnPropertyDescriptor (xsc, vthis, o, prop) {
 (* *** GETOWNPROPERTYNAMES *** *)
 
 proc Object_getOwnPropertyNames (xsc, vthis, o) {
-			goto [not (typeOf o = Obj)] thrw start;
+			ret := "i__toObject"(o) with elab;
+            o := ret;
 
 	start:	ret := "Array_construct" (xsc, vthis) with elab;
 
@@ -296,11 +298,11 @@ proc Object_defineProperties (xsc, vthis, o, props) {
 (* *** PREVENTEXTENSIONS *** *)
 
 proc Object_preventExtensions (xsc, vthis, o) {
-			goto [typeOf o = Obj] start thrw;
+			goto [typeOf o = Obj] start ret_o;
 
 	start:	m := metadata(o);
 			[m, "@extensible"] := false;
-			ret := o;
+	ret_o:  ret := o;
 
 	rlab: return;
 
@@ -311,7 +313,7 @@ proc Object_preventExtensions (xsc, vthis, o) {
 (* *** SEAL *** *)
 
 proc Object_seal (xsc, vthis, o) {
-			goto [typeOf o = Obj] start thrw;
+			goto [typeOf o = Obj] start ret_o;
 
 	start:	props := "i__getFields" (o);
 
@@ -326,18 +328,18 @@ proc Object_seal (xsc, vthis, o) {
 
 	ext:	m := metadata(o);
 			[m, "@extensible"] := false;
-			ret := o;
+	ret_o:  ret := o;
 
 	rlab: return;
 
-	thrw:	ret := "TypeError" ();
+	thrw: ret := "TypeError" ();
 	elab: throw
 };
 
 (* *** ISSEALED *** *)
 
 proc Object_isSealed (xsc, vthis, o) {
-			goto [typeOf o = Obj] start thrw;
+			goto [typeOf o = Obj] start r_t;
 
 	start:	props := "i__getFields" (o);
 
@@ -368,7 +370,7 @@ proc Object_isSealed (xsc, vthis, o) {
 (* *** FREEZE *** *)
 
 proc Object_freeze (xsc, vthis, o) {
-			goto [typeOf o = Obj] start thrw;
+			goto [typeOf o = Obj] start ret_o;
 
 	start:	props := "i__getFields" (o);
 
@@ -386,7 +388,7 @@ proc Object_freeze (xsc, vthis, o) {
 
 	ext:	m := metadata(o);
 			[m, "@extensible"] := false;
-			ret := o;
+	ret_o:  ret := o;
 
 	rlab: return;
 
@@ -397,7 +399,7 @@ proc Object_freeze (xsc, vthis, o) {
 (* *** ISFROZEN *** *)
 
 proc Object_isFrozen (xsc, vthis, o) {
-			goto [typeOf o = Obj] start thrw;
+			goto [typeOf o = Obj] start r_t;
 
 	start:	props := "i__getFields" (o);
 
@@ -429,22 +431,23 @@ proc Object_isFrozen (xsc, vthis, o) {
 (* *** ISEXTENSIBLE *** *)
 
 proc Object_isExtensible (xsc, vthis, o) {
-			goto [typeOf o = Obj] start thrw;
+			goto [typeOf o = Obj] start ret_f;
 
 	start: 	m := metadata(o);
-			ret := [m, "@extensible"];
-	rlab: return;
+		    ret := [m, "@extensible"];
+	rlab:   return;
 
-	thrw:	ret := "TypeError" ();
-	elab: throw
+	ret_f:	ret := false;
+	        return
 };
 
 (* *** KEYS *** *)
 
 proc Object_keys (xsc, vthis, o) {
-			goto [not (typeOf o = Obj)] thrw start;
+			ret := "i__toObject" (o) with elab;
+            o := ret;
 
-	start:	ret := "Array_construct" () with elab;
+	start:	ret := "Array_construct" (xsc, vthis) with elab;
 
 			n := 0;
 			l := ret;
@@ -457,7 +460,7 @@ proc Object_keys (xsc, vthis, o) {
 			goto loop;
 
 	end:	ret := l;
-	rlab: return;
+	rlab:   return;
 
 	thrw:	ret := "TypeError" ();
 	elab: throw
@@ -581,4 +584,40 @@ proc OP_propertyIsEnumerable(xsc, vthis, v) {
 
 	rlab: return;
 	elab: throw
+};
+
+(* *** __proto__ getter *** *)
+
+proc OP_get_proto_acc (xsc, vthis) {
+
+          ret := "i__toObject"(vthis) with elab;
+
+          ret := metadata(ret);
+          ret := [ret, "@proto"];
+
+          return;
+    elab: throw
+};
+
+(* *** __proto__ setter *** *)
+
+proc OP_set_proto_acc (xsc, vthis, o) {
+                ret := "i__checkObjectCoercible"(vthis) with elab;
+
+			    goto [(typeOf o = Obj) or (typeOf o = Null)] cont ret_undef;
+
+	ret_undef:	ret := undefined;
+                return;
+
+	cont:       goto [(typeOf vthis = Obj)] is_obj ret_undef;
+
+    is_obj:     m := metadata(vthis);
+                e := [m, "@extensible"];
+                goto [e] set thrw;
+
+	set:        [m, "@proto"] := o;
+                return;
+
+	thrw:       ret := "TypeError" ();
+	elab:       throw
 };

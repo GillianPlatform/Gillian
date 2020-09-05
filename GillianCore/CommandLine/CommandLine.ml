@@ -134,6 +134,19 @@ struct
     in
     Arg.(value & flag & info [ "inc"; "incremental" ] ~doc)
 
+  let bi_unroll_depth =
+    let default = 1 in
+    let doc =
+      "How many times are recursive calls called/loops unrolled in \
+       bi-abduction."
+    in
+    Arg.(value & opt int default & info [ "bi-unroll" ] ~doc)
+
+  let bi_no_spec_depth =
+    let default = 0 in
+    let doc = "The depth at which we start to re-use specs in bi-abduction." in
+    Arg.(value & opt int default & info [ "bi-no-spec" ] ~doc)
+
   let result_directory =
     (* Default value is taken from the non-modified config *)
     let default = Config.results_dir () in
@@ -577,12 +590,16 @@ struct
         parallel
         emit_specs
         incremental
+        bi_unroll_depth
+        bi_no_spec_depth
         () =
       let () = Config.current_exec_mode := BiAbduction in
       let () = PC.initialize BiAbduction in
       let () = Config.stats := stats in
       let () = Config.no_heap := no_heap in
       let () = Config.parallel := parallel in
+      let () = Config.bi_unroll_depth := bi_unroll_depth in
+      let () = Config.bi_no_spec_depth := bi_no_spec_depth in
       let () =
         process_files files already_compiled outfile_opt emit_specs incremental
       in
@@ -592,7 +609,8 @@ struct
     let act_t =
       Term.(
         const act $ files $ already_compiled $ output_gil $ no_heap $ stats
-        $ parallel $ emit_specs $ incremental)
+        $ parallel $ emit_specs $ incremental $ bi_unroll_depth
+        $ bi_no_spec_depth)
 
     let act_info =
       let doc =

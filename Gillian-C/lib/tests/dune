@@ -1,0 +1,8 @@
+(executable
+ (name run_tests)
+ (libraries alcotest cgil_lib monadic engine gil_syntax))
+
+(rule
+ (alias runtest)
+ (action
+  (run ./run_tests.exe -q --color=always)))
