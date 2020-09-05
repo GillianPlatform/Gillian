@@ -31,10 +31,10 @@ let pp fmt labproc =
           (max_size_lab - String.length l)
           LabCmd.pp cmd
   in
-  Fmt.pf fmt "%a@\n@[<v 2>proc %s(%a) {@\n%a@\n@]@\n};@\n"
+  Fmt.pf fmt "@[%a@\n@[<v 2>proc %s(%a) {@\n%a@\n@]@\n};@\n@]"
     Fmt.(option Spec.pp)
     spec name
-    Fmt.(list ~sep:comma Fmt.string)
+    Fmt.(list ~sep:(Fmt.any ", ") Fmt.string)
     params
     Fmt.(array ~sep:(any ";@\n") pp_cmd_triple)
     body

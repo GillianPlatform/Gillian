@@ -121,7 +121,8 @@ module type S = sig
   (** Turns a state into a list of assertions *)
   val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
 
-  val evaluate_slcmd : UP.prog -> SLCmd.t -> t -> t list
+  val evaluate_slcmd :
+    ?revisited_invariant:bool -> UP.prog -> SLCmd.t -> t -> t list
 
   val run_spec :
     UP.spec ->

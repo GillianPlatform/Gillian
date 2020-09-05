@@ -144,8 +144,11 @@ struct
     @param preds Current predicate set
     @return List of states/predicate sets resulting from the evaluation
   *)
-  let rec evaluate_lcmd (prog : UP.prog) (lcmd : LCmd.t) (state : State.t) :
-      State.t list =
+  let rec evaluate_lcmd
+      ?(revisited_invariant = false)
+      (prog : UP.prog)
+      (lcmd : LCmd.t)
+      (state : State.t) : State.t list =
     let eval_expr = make_eval_expr state in
 
     print_lconfiguration lcmd state;
@@ -296,7 +299,7 @@ struct
             (State.assume_a state' [ Not fof ])
         in
         state @ state'
-    | SL sl_cmd -> State.evaluate_slcmd prog sl_cmd state
+    | SL sl_cmd -> State.evaluate_slcmd ~revisited_invariant prog sl_cmd state
 
   and evaluate_lcmds (prog : UP.prog) (lcmds : LCmd.t list) (state : State.t) :
       State.t list =
@@ -525,10 +528,15 @@ struct
                     (Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd)
             else Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd )
     | Logic lcmd -> (
-        let resulting_states : State.t list = evaluate_lcmd prog lcmd state in
         match lcmd with
-        | SL (Invariant _) when not first_time -> []
+        | SL (Invariant _) when not first_time ->
+            let _ = evaluate_lcmd ~revisited_invariant:true prog lcmd state in
+            let () = L.verbose (fun fmt -> fmt "Invariant re-established.") in
+            []
         | _ ->
+            let resulting_states : State.t list =
+              evaluate_lcmd prog lcmd state
+            in
             let b_counter =
               if List.length resulting_states > 1 then b_counter + 1
               else b_counter

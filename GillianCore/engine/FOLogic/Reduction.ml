@@ -1257,9 +1257,9 @@ let rec reduce_lexpr_loop
         let fle1 = f le1 in
         let fle2 = f le2 in
         let fle3 = f le3 in
-        L.verbose (fun fmt ->
+        (* L.verbose (fun fmt ->
             fmt "REDUCTION: LstSub(%a, %a, %a)" Expr.pp fle1 Expr.pp fle2
-              Expr.pp fle3);
+              Expr.pp fle3); *)
         match (fle1, fle2, fle3) with
         | _, _, Lit (Num 0.) -> EList []
         | flx, Lit (Num 0.), UnOp (LstLen, fle1) when flx = fle1 -> fle1
@@ -1758,7 +1758,7 @@ and substitute_for_length pfs le =
 
 and check_ge_zero ?(top_level = false) (pfs : PFS.t) (e : Expr.t) : bool option
     =
-  L.verbose (fun fmt -> fmt "Check >= 0: %a" Expr.pp e);
+  (* L.verbose (fun fmt -> fmt "Check >= 0: %a" Expr.pp e); *)
   let f = check_ge_zero pfs in
   match e with
   | Lit (Num n) -> Some (n >= 0.)
@@ -1980,7 +1980,6 @@ let rec reduce_formula_loop
               let a' : Formula.t = Eq (re1, re2) in
               if re1 = e1 && re2 = e2 then a' else f a'
             in
-
             match (re1, re2) with
             | ALoc _, Lit (Loc _) | Lit (Loc _), ALoc _ -> False
             | ALoc x, ALoc y when (not unification) && x <> y -> False
@@ -2127,39 +2126,8 @@ let rec reduce_formula_loop
             | Lit (Bool false), BinOp (e1, FLessThan, e2) -> Not (Less (e1, e2))
             (* FPlus theory -> theory? I would not go that far *)
             | le1, le2 when lexpr_is_number le1 && lexpr_is_number le2 ->
-                (* Collect the pluses and minuses and separate them into constants and rest *)
-                let pluses1, minuses1 = collect_pluses_minuses le1 in
-                let nump1, pluses1 = numbers_and_rest pluses1 in
-                let numm1, minuses1 = numbers_and_rest minuses1 in
-                let pluses2, minuses2 = collect_pluses_minuses le2 in
-                let nump2, pluses2 = numbers_and_rest pluses2 in
-                let numm2, minuses2 = numbers_and_rest minuses2 in
-
-                (* Calculate the constant and place it on the left *)
-                let nump = nump1 -. nump2 in
-                let numm = numm1 -. numm2 in
-                let num = nump -. numm in
-
-                let numl, numr = if num > 0. then (num, 0.) else (0., -.num) in
-                let list_diff la lb =
-                  List.filter (fun x -> not (List.mem x lb)) la
-                in
-                let pll = list_diff pluses1 pluses2 in
-                let plr = list_diff pluses2 pluses1 in
-                let mil = list_diff minuses1 minuses2 in
-                let mir = list_diff minuses2 minuses1 in
-
-                let fl =
-                  compose_pluses_minuses
-                    ( (if numl = 0. then [] else [ Expr.Lit (Num numl) ]) @ pll,
-                      mil )
-                in
-                let fr =
-                  compose_pluses_minuses
-                    ( (if numr = 0. then [] else [ Expr.Lit (Num numr) ]) @ plr,
-                      mir )
-                in
-                Eq (fl, fr)
+                let success, le1', le2' = cut le1 le2 in
+                if success then Eq (le1', le2') else Eq (le1, le2)
             (* Very special cases *)
             | UnOp (TypeOf, BinOp (_, StrCat, _)), Lit (Type t)
               when t <> StringType -> False

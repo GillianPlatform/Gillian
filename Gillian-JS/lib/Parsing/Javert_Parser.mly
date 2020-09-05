@@ -812,7 +812,8 @@ declaration_target:
     { EProg.add_lemma prog lemma }
 
   | lemma = jsil_lemma_target
-    { let prog = EProg.full_init () in EProg.add_lemma prog lemma }
+    {
+      let prog = EProg.full_init () in EProg.add_lemma prog lemma }
 
   | prog = declaration_target; pred = pred_target
     { EProg.add_pred prog pred }

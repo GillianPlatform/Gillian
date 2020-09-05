@@ -5480,15 +5480,20 @@ and translate_statement tr_ctx e =
         make_loop_end x_ret_1 x_ret_1 cur_breaks end_loop true
       in
 
+      (* Place invariant exactly where it's supposed to be *)
+      let head_cmds =
+        match invariant with
+        | Some (a, binders) ->
+            [
+              (Some head, LabCmd.LLogic (LCmd.SL (Invariant (a, binders))));
+              (None, cmd_ass_ret_1);
+            ]
+        | None              -> [ (Some head, cmd_ass_ret_1) ]
+      in
+
       let cmds2 = add_initial_label cmds2 body metadata in
       let cmds =
-        annotate_cmds
-          [
-            (None, cmd_ass_ret_0);
-            (*           x_ret_0 := empty                         *)
-            (Some head, cmd_ass_ret_1);
-            (* head:     x_ret_1 := PHI(x_ret_0, x_ret_3)           *)
-          ]
+        annotate_cmds ((None, cmd_ass_ret_0) :: head_cmds)
         @ cmds1
         @ annotate_cmds
             [
@@ -5520,7 +5525,8 @@ and translate_statement tr_ctx e =
         @ annotate_cmds cmds_end_loop
       in
       let errs = errs1 @ errs_x1_v @ [ x1_b ] @ errs2 @ errs_x2_v in
-      let cmds = annotate_first_cmd cmds in
+      (* Non-invariant commands go before all commands *)
+      let cmds = prefix_lcmds lcmds None cmds in
       (cmds, PVar x_ret_5, errs, rets2, outer_breaks, outer_conts)
   | JS_Parser.Syntax.ForIn (e1, e2, e3) ->
       (*

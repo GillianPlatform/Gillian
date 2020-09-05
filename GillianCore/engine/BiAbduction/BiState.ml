@@ -204,12 +204,15 @@ struct
     let _, state, _ = bi_state in
     State.to_assertions ?to_keep state
 
-  let rec evaluate_slcmd (prog : UP.prog) (lcmd : SLCmd.t) (bi_state : t) :
-      t list =
+  let rec evaluate_slcmd
+      ?(revisited_invariant = false)
+      (prog : UP.prog)
+      (lcmd : SLCmd.t)
+      (bi_state : t) : t list =
     let procs, state, state_af = bi_state in
     List.map
       (fun state' -> (procs, state', state_af))
-      (State.evaluate_slcmd prog lcmd state)
+      (State.evaluate_slcmd ~revisited_invariant prog lcmd state)
 
   let unfolding_vals (bi_state : t) (fs : Formula.t list) : vt list =
     let procs, state, _ = bi_state in

@@ -965,7 +965,8 @@ module Make
                         let pf : Formula.t =
                           Eq (Val.to_expr vd, Val.to_expr od)
                         in
-                        (State.assert_a state [ pf ], pf))
+                        let success = State.assert_a state [ pf ] in
+                        (success, pf))
                     (true, True) vos eos
                 in
                 (success, fail_pf)
@@ -1062,6 +1063,7 @@ module Make
               let success, fail_pf =
                 unify_ins_outs_lists state' outs vs_outs les_outs
               in
+              L.verbose (fun fmt -> fmt "Outs unification: %b" success);
               match success with
               | true  -> USucc astate'
               | false -> UFail [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ]
@@ -1181,11 +1183,15 @@ module Make
             ~none:(USucc state) cur_step
         in
         match ret with
-        | UWTF         -> UPUSucc []
+        | UWTF         ->
+            L.verbose (fun fmt -> fmt "Impossible. UWTF.");
+            UPUSucc []
         | USucc state' -> (
             match UP.next up with
-            | None                     -> UPUSucc
-                                            [ (state', subst, UP.posts up) ]
+            | None                     ->
+                L.verbose (fun fmt ->
+                    fmt "Unifier.unify_up: Unification successful.");
+                UPUSucc [ (state', subst, UP.posts up) ]
             | Some [ (up, lab) ]       ->
                 if complete_subst subst lab then
                   f ((state', subst, up) :: rest, errs_so_far)
@@ -1234,6 +1240,7 @@ module Make
     let subst_i = ESubst.copy subst in
 
     let merge_upu_res (rets : up_u_res list) : up_u_res =
+      L.verbose (fun fmt -> fmt "Inside merge_upu_res");
       let ret_succs, ret_fails =
         List.partition
           (fun ret ->
@@ -1264,11 +1271,15 @@ module Make
         UPUSucc (List.concat rets)
     in
 
+    L.verbose (fun fmt -> fmt "Unifier.unify: about to unify UP.");
     let ret = unify_up ([ (astate, subst, up) ], []) in
     match ret with
-    | UPUSucc _ -> ret
+    | UPUSucc _ ->
+        L.verbose (fun fmt -> fmt "Unifier.unify: Success");
+        ret
     | UPUFail errs
       when !Config.unfolding && State.can_fix errs && not in_unification ->
+        L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
         let vals = State.get_recovery_vals errs in
         L.(
           verbose (fun m ->
@@ -1295,5 +1306,7 @@ module Make
               sp
           in
           merge_upu_res rets )
-    | UPUFail errs -> ret
+    | UPUFail errs ->
+        L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
+        ret
 end

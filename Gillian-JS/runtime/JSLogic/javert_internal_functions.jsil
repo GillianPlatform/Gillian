@@ -124,7 +124,7 @@ pred BI_ObjectObject () :
   DataPropGen ($lobj, "create", $lobj_create, true, false, true) *
   JSBIFunction($lobj_create, "Object_create", 2) * empty_fields($lobj_create : -{ "length" }-);
 
-nounfold pred ObjectPrototype (+proto) :
+pred ObjectPrototype (+proto) :
   JSObjWithProto (proto, null) * empty_fields (proto : -{ "hasOwnProperty" }-) *
   ((proto, "hasOwnProperty") -> {{ "d", $lop_hasOwnProperty, true, false, true }}) *
   JSBIFunction($lop_hasOwnProperty, "OP_hasOwnProperty", 1) * empty_fields($lop_hasOwnProperty : -{ "length" }-);
