@@ -1,24 +1,5 @@
 'use strict';
 
-/*****************************
- *****************************
- *******               *******
- *******   Internals   *******
- *******               *******
- *****************************
- *****************************/
-
-/*
-    @pred JSInternals () :
-        GlobalObject () *
-        ObjectPrototype($lobj_proto) *
-        ArrayPrototype ($larr_proto) *
-        ArrayBufferPrototype ($lab_proto) *
-        BI_DataViewObject () *
-        DataViewPrototype($ldv_proto) *
-        Uint8ArrayPrototype($lui8ar_proto);
-*/
-
 /*************************
  *************************
  *******           *******
@@ -49,17 +30,10 @@ function needs (condition, errorMessage) {
 
     @pre
         (elementCount == #elementCount) * (fieldsPerElement == #fieldsPerElement) * (buffer == #buffer) * (readPos == #readPos) *
-
-        (0 <=# #elementCount) * (0 <=# #fieldsPerElement) * (0 <=# #readPos) *
-
         Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
         ArrayBuffer(#ab, #data) *
         (#view == l-sub(#data, #viewOffset, #viewSize)) *
         Elements(#view, #readPos, #elementCount, #fieldsPerElement, #elementList, #elementsLength) *
-
-        (0 <=# #elementsLength) *
-        (#readPos + #elementsLength <=# #viewSize) *
-
         scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
         JSInternals ()
 
@@ -84,6 +58,8 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
         buffer.byteLength
     );
 
+    /* @tactic apply lemma ElementsPureFacts(#view, #readPos, #elementCount, #fieldsPerElement, #elementList, #elementsLength) */
+
     /* Well-formedness: readPos must be within the byte length of the buffer given. */
     needs(readPos >= 0 && dataView.byteLength >= readPos, 'readPos out of bounds.')
 
@@ -93,9 +69,6 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
     var elements = [];
 
     /*
-      @tactic
-        apply lemma ElementsPureFacts(#view, #readPos, #elementCount, #fieldsPerElement, #elementList, #elementsLength)
-
       @invariant
         scope(elements : #doneEls) * scope(readPos : #outerLoopReadPos) * scope(elementCount : #elementsLeft) *
         Elements(#view, #outerLoopReadPos, #elementsLeft, #fieldsPerElement, #remainingElsList, #remainingElsLength) *

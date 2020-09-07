@@ -93,9 +93,18 @@ only spec AP_push (xsc, vthis, element)
     [[ ArrayOfArraysOfUInt8Arrays(#vthis, l+ (#contents, {{ #aContents }}), #arraylength + 1) * (ret == undefined) ]]
     normal
 
-(********************************
- **** The Elements Predicate ****
- ********************************)
+(*********************
+ **** OTHER STUFF ****
+ *********************)
+
+pred JSInternals () :
+    GlobalObject () *
+    ObjectPrototype($lobj_proto) *
+    ArrayPrototype ($larr_proto) *
+    ArrayBufferPrototype ($lab_proto) *
+    BI_DataViewObject () *
+    DataViewPrototype($ldv_proto) *
+    Uint8ArrayPrototype($lui8ar_proto);
 
 pred Field(+view:List, +readPos:Num, field:List, fieldLength:Num) :
     (#rawFL == l-sub (view, readPos, 2)) *
