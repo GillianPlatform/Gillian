@@ -491,12 +491,16 @@ let rec get_fun_decls exp =
   in
   js_fold f_ac (fun x y -> y) true exp
 
-let rec get_names_of_named_function_expressions exp : string list =
+let get_names_of_named_function_expressions exp : string list =
   let f_ac exp state prev_state ac =
     match exp.exp_stx with
     | FunctionExp (_, Some name, _, _) -> name :: ac
     | _ -> ac
   in
+  js_fold f_ac (fun x y -> y) true exp
+
+let get_all_annots exp : JS_Parser.Syntax.annotation list =
+  let f_ac exp state prev_state ac = exp.exp_annot @ ac in
   js_fold f_ac (fun x y -> y) true exp
 
 let func_decls_in_elem exp : exp list =

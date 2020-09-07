@@ -31,7 +31,7 @@ pred Uint8Array (+ar:Obj, buffer:Obj, byteOffset:Num, arrayLength:Num) :
  **** Uint8Array Prototype  ****
  *******************************)
 
-pred Uint8ArrayPrototype (+proto) :
+nounfold pred Uint8ArrayPrototype (+proto) :
   JSObjWithProto (proto, $lobj_proto) *
   empty_fields (proto : -{ "buffer", "byteLength", "byteOffset", "constructor", "slice" }-) *
 

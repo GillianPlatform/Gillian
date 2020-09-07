@@ -1442,6 +1442,30 @@ let rec reduce_lexpr_loop
                     else LstSub (fle1, fle2, fle3)
                 | _, _ -> LstSub (fle1, fle2, fle3) )
             | _ -> LstSub (fle1, fle2, fle3) )
+        | LVar x, start, num
+          when List.exists
+                 (fun x ->
+                   match x with
+                   | Expr.LVar _ -> false
+                   | _           -> true)
+                 (find_equalities pfs (LVar x)) ->
+            let eqs =
+              List.filter
+                (fun x ->
+                  match x with
+                  | Expr.LVar _ -> false
+                  | _           -> true)
+                (find_equalities pfs (LVar x))
+            in
+            let subst_expr = List.hd eqs in
+            let new_start =
+              Expr.subst_expr_for_expr (LVar x) subst_expr start
+            in
+            let new_num = Expr.subst_expr_for_expr (LVar x) subst_expr num in
+            let att_exp = Expr.LstSub (subst_expr, new_start, new_num) in
+            let reduced_att_exp = f att_exp in
+            if att_exp = reduced_att_exp then LstSub (fle1, fle2, fle3)
+            else reduced_att_exp
         | _, _, _ -> LstSub (fle1, fle2, fle3) )
     (* CHECK: FTimes and Div are the same, how does the 'when' scope? *)
     | BinOp (lel, op, ler) -> (

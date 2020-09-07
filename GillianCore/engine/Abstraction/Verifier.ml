@@ -20,7 +20,8 @@ struct
 
   let print_success_or_failure success =
     if success then Fmt.pr "%a" (Fmt.styled `Green Fmt.string) "Success\n"
-    else Fmt.pr "%a" (Fmt.styled `Red Fmt.string) "Failure\n"
+    else Fmt.pr "%a" (Fmt.styled `Red Fmt.string) "Failure\n";
+    Format.print_flush ()
 
   type t = {
     name : string;

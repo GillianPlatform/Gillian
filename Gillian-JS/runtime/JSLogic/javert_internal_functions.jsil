@@ -75,6 +75,15 @@ pred BIFunctionObject (+l:Obj, len:Num, proto:Obj, call, construct) :
  **** BUILT-IN OBJECTS ****
  **************************)
 
+pred JSInternals () :
+    GlobalObject () *
+    ObjectPrototype($lobj_proto) *
+    ArrayPrototype ($larr_proto) *
+    ArrayBufferPrototype ($lab_proto) *
+    BI_DataViewObject () *
+    DataViewPrototype($ldv_proto) *
+    Uint8ArrayPrototype($lui8ar_proto);
+
 pred BooleanObject (+l:Obj, b:Bool) :
   MetaData(l, #md) * MetaData(#md, null) *
   ((#md, "@proto")      -> $lbool_proto) *
@@ -224,6 +233,10 @@ pred DataPropGen (+l:Obj, +prop:Str, v, writ:Bool, enum:Bool, conf:Bool) :
 pred DataPropConst (+l:Obj, +prop:Str, v, enum:Bool) :
   ((l, prop) -> {{ "d", v, false, enum, false }}) *
   (! (v == empty)) * (! (typeOf v == List));
+
+pred readOnlyProperty (+l:Obj, +prop:Str, v) :
+  ((l, prop) -> {{ "d", v, false, true, false }}) *
+  (! (v == empty));
 
 (*********************
  **** DESCRIPTORS ****
@@ -2250,3 +2263,4 @@ proc i__toStringComputed (v) {
   rlab: return;
   elab: throw
 };
+

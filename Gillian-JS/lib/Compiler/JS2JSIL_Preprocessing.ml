@@ -609,7 +609,7 @@ let translate_only_specs cc_tbl old_fun_tbl fun_tbl vis_tbl js_only_specs =
                 JSSpec.js2jsil_st pre post cc_tbl vis_tbl (Hashtbl.create 0)
                   name params
               in
-              { pre; posts = post; flag; to_verify = true; label }
+              { pre; posts = post; flag; to_verify = false; label }
               : Spec.st ))
           sspecs
       in
@@ -657,14 +657,15 @@ let preprocess
   let e, _ = propagate_annotations e in
 
   (* 3 - obtaining and compiling only-specs        *)
-  let top_annots = get_top_level_annot e in
-  let js_only_specs = get_only_specs_from_annots top_annots in
+  let annots = get_all_annots e in
+  let js_only_specs = get_only_specs_from_annots annots in
   let old_fun_tbl : pre_fun_tbl_type = Hashtbl.create medium_tbl_size in
   let only_specs =
     translate_only_specs cc_tbl old_fun_tbl fun_tbl vis_tbl js_only_specs
   in
 
   (* 4 - Adding the main to the translation tables *)
+  let top_annots = get_top_level_annot e in
   let main_tbl = Hashtbl.create medium_tbl_size in
   List.iter (fun v -> Hashtbl.replace main_tbl v main_fid) (get_all_vars_f e []);
   Hashtbl.add cc_tbl main_fid main_tbl;

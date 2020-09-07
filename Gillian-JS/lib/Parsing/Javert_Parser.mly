@@ -1077,7 +1077,7 @@ js_only_spec_target:
   sspecs = separated_nonempty_list(SCOLON, js_pre_post_target); EOF
   {
     let (name, params) = spec_head in
-    { name; params; sspecs  }
+    { name; params; sspecs }
   }
 
 

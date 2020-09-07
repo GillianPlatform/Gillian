@@ -67,6 +67,7 @@ let js2jsil_logic_imports =
     "javert_logic_macros.jsil";
     "ArrayBuffer.jsil";
     "ArrayLogic.jsil";
+    "AmazonLogic.jsil";
     "DataView.jsil";
     "Uint8Array.jsil";
   ]

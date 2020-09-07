@@ -572,7 +572,10 @@ gcmd_target:
 g_only_spec_target:
 (* only <spec> *)
   ONLY; spec = g_spec_target
-  { spec }
+  {
+    let new_sspecs = List.map (fun (sspec : Spec.st) -> { sspec with ss_to_verify = false }) spec.spec_sspecs in
+    { spec with spec_sspecs = new_sspecs; spec_to_verify = false }
+  }
 ;
 
 g_spec_target:

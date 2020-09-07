@@ -3,7 +3,7 @@ module L = Logging
 type ('annot, 'label) t = {
   imports : (string * bool) list;
       (** List of tuples consisting of the file path and a boolean indicating
-          whether the procedures in the file should be verified. The latter 
+          whether the procedures in the file should be verified. The latter
           should be [false] for runtime files. *)
   lemmas : (string, Lemma.t) Hashtbl.t;
   (* Lemmas *)

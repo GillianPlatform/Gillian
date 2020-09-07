@@ -224,7 +224,7 @@ module Make (SMemory : SMemory.S) :
 
   let get_type (state : t) (le : vt) : Type.t option =
     let _, _, pfs, gamma, _ = state in
-    let le = Reduction.reduce_lexpr ?gamma:(Some gamma) ?pfs:(Some pfs) le in
+    let le = Reduction.reduce_lexpr ~gamma ~pfs le in
     let t, _, _ = Typing.type_lexpr gamma le in
     t
 

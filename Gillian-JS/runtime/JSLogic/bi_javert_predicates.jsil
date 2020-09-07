@@ -19,7 +19,7 @@ pred JSObjWithProto (+l:Obj, proto) :
   ((#md, "@class")      -> "Object") *
   ((#md, "@extensible") -> true) *
   empty_fields (#md : -{ "@class", "@extensible", "@proto" }-);
-  
+
 pred JSObjGeneral (+l:Obj, proto, class:Str, ext:Bool) :
   MetaData(l, #md) * MetaData(#md, null) *
   ((#md, "@proto")      -> proto) *
@@ -37,41 +37,41 @@ pred JSObjGeneralWeak (+l:Obj, proto, class:Str, ext:Bool) :
  **** FUNCTION OBJECTS ****
  **************************)
 
-pred JSFunctionObject (+l:Obj, fid:Str, sc:List, len:Num, proto:Obj) : 
+pred JSFunctionObject (+l:Obj, fid:Str, sc:List, len:Num, proto:Obj) :
   ((l, "length")     -> {{ "d", len, false, false, false }}) *
   ((l, "arguments")  -> {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }}) *
   ((l, "caller")     -> {{ "a", $lthrw_type_error, $lthrw_type_error, false, false }}) *
   ((l, "prototype")  -> {{ "d", proto, true, false, false }}) *
   MetaData(l, #md) * MetaData(#md, null) *
-  ((#md, "@proto")      -> $lfun_proto) * 
+  ((#md, "@proto")      -> $lfun_proto) *
   ((#md, "@class")      -> "Function") *
-  ((#md, "@extensible") -> true) * 
-  ((#md, "@call")       -> fid) * 
+  ((#md, "@extensible") -> true) *
+  ((#md, "@call")       -> fid) *
   ((#md, "@construct")  -> fid) *
   ((#md, "@scope")      -> sc) *
   empty_fields(#md : -{ "@call", "@class", "@construct", "@extensible", "@proto", "@scope" }-);
 
-pred JSFunctionObjectStrong (+l:Obj, fid:Str, sc:List, len:Num, proto:Obj) : 
+pred JSFunctionObjectStrong (+l:Obj, fid:Str, sc:List, len:Num, proto:Obj) :
   JSFunctionObject (l, fid, sc, len, proto) *
   empty_fields(l : -{ "arguments", "caller", "length", "prototype" }-);
 
-pred JSBIFunction (+l:Obj, fid:Str, len:Num) : 
+pred JSBIFunction (+l:Obj, fid:Str, len:Num) :
   ((l, "length")     -> {{ "d", len, false, false, false }}) *
   MetaData(l, #md) * MetaData(#md, null) *
-  ((#md, "@proto")      -> $lfun_proto) * 
+  ((#md, "@proto")      -> $lfun_proto) *
   ((#md, "@class")      -> "Function") *
-  ((#md, "@extensible") -> true) * 
-  ((#md, "@call")       -> fid) * 
+  ((#md, "@extensible") -> true) *
+  ((#md, "@call")       -> fid) *
   ((#md, "@scope")      -> empty) *
   empty_fields(#md : -{ "@call", "@class", "@extensible", "@proto", "@scope" }-);
 
-pred BIFunctionObject (+l:Obj, len:Num, proto:Obj) : 
+pred BIFunctionObject (+l:Obj, len:Num, proto:Obj) :
   ((l, "length")     -> {{ "d", len, false, false, false }}) *
   ((l, "prototype")  -> {{ "d", proto, false, false, false }}) *
   MetaData(l, #md) * MetaData(#md, null) *
-  ((#md, "@proto")      -> $lfun_proto) * 
+  ((#md, "@proto")      -> $lfun_proto) *
   ((#md, "@class")      -> "Function") *
-  ((#md, "@extensible") -> true) * 
+  ((#md, "@extensible") -> true) *
   ((#md, "@scope")      -> empty) *
   empty_fields(#md : -{ "@call", "@class", "@construct", "@extensible", "@proto", "@scope" }-);
 
@@ -86,9 +86,9 @@ pred BooleanObject (+l:Obj, b:Bool) :
   ((#md, "@extensible") -> true) *
   ((#md, "@primitiveValue") -> b) *
   empty_fields (#md : -{ "@class", "@extensible", "@primitiveValue", "@proto" }-);
-  
+
 pred NumberObject (+l:Obj, n:Num) :
-  MetaData(l, #md) * MetaData(#md, null) * 
+  MetaData(l, #md) * MetaData(#md, null) *
   ((#md, "@proto")      -> $lnum_proto) *
   ((#md, "@class")      -> "Number") *
   ((#md, "@extensible") -> true) *
@@ -113,10 +113,10 @@ pred BooleanPrototype () :
   ((#bpmd, "@extensible")     -> true) *
   ((#bpmd, "@primitiveValue") -> false) *
   empty_fields (#bpmd : -{ "@class", "@extensible", "@primitiveValue", "@proto" }-);
-  
+
 pred NumberPrototype () :
   (($lnum_proto, "constructor") -> {{ "d", $lnum, true, false, true }}) *
-  MetaData($lnum_proto, #npmd) * MetaData(#npmd, null) * 
+  MetaData($lnum_proto, #npmd) * MetaData(#npmd, null) *
   ((#npmd, "@proto")          -> $lobj_proto) *
   ((#npmd, "@class")          -> "Number") *
   ((#npmd, "@extensible")     -> true) *
@@ -124,14 +124,14 @@ pred NumberPrototype () :
   empty_fields (#npmd : -{ "@class", "@extensible", "@primitiveValue", "@proto" }-);
 
 pred GlobalObject () :
-  JSObject ($lg) * (($lg, "Error") -> {{ "d", $lerr, true, false, true }}) * 
-    (($lg, "Object") -> {{ "d", $lobj, true, false, true }}) * 
+  JSObject ($lg) * (($lg, "Error") -> {{ "d", $lerr, true, false, true }}) *
+    (($lg, "Object") -> {{ "d", $lobj, true, false, true }}) *
     (($lg, "undefined") -> {{ "d", undefined, false, false, false }});
 
 pred GlobalVar (+v, val) :
-  (($lg, v) -> {{ "d", val, true, true, false }}) * types(v : Str); 
+  (($lg, v) -> {{ "d", val, true, true, false }}) * types(v : Str);
 
-pred BI_ObjectObject () : 
+pred BI_ObjectObject () :
   BIFunctionObject ($lobj, 0, $lobj_proto) *
   MetaData($lobj, #mlobj) * ((#mlobj, "@call") -> "Object_call") * ((#mlobj, "@construct") -> "Object_construct");
 
@@ -155,9 +155,9 @@ pred BI_ErrorObject () :
   MetaData($lerr, #mlerr) * ((#mlerr, "@call") -> "Error_call") * ((#mlerr, "@construct") -> "Error_construct");
 
 pred StringPrototype () :
-  (($lstr_proto, "constructor") -> {{ "d", $lstr, true, false, true }}) * 
+  (($lstr_proto, "constructor") -> {{ "d", $lstr, true, false, true }}) *
   empty_fields ($lstr_proto : -{ "constructor" }-) *
-  MetaData($lstr_proto, #spmd) * MetaData(#spmd, null) * 
+  MetaData($lstr_proto, #spmd) * MetaData(#spmd, null) *
   ((#spmd, "@proto")  -> $lobj_proto) *
   ((#spmd, "@class")  -> "String") *
   ((#spmd, "@extensible")     -> true) *
@@ -168,14 +168,14 @@ pred StringPrototype () :
 (***********************
  **** ERROR OBJECTS ****
  ***********************)
- 
+
 pred ErrorObject (+l:Obj, pr:Obj) :
   JSObjGeneral(l, pr, "Error", true);
 
 pred ErrorWithMessage (+l:Obj, m:Str) :
   MetaData(l, #md) *  MetaData(#md, null) *
   ((l, "message") -> {{"d", m, true, false, true}}) *
-  ((#md, "@proto") -> $lerr_proto) * ((#md, "@class") -> "Error") * ((#md, "@extensible") -> true) * 
+  ((#md, "@proto") -> $lerr_proto) * ((#md, "@class") -> "Error") * ((#md, "@extensible") -> true) *
   empty_fields(l : -{ "message" }-);
 
 pred TypeError(l:Obj) : ErrorObject (l, $lterr_proto);
@@ -193,14 +193,14 @@ pred ReferenceErrorComplete (l:Obj) : ReferenceError (l) * empty_fields(l : -{ }
 (************************
  ***** INITIAL HEAP *****
  ************************)
- 
+
 pred initialHeapPost (globals) :
     types(globals:Set) *
 
-    GlobalObject() * 
+    GlobalObject() *
     empty_fields ($lg : -u- (-{ "Error" }-, globals) ) *
 
-    BI_ObjectObject () * 
+    BI_ObjectObject () *
     ObjectPrototype () *
 
     FunctionPrototype () *
@@ -210,8 +210,8 @@ pred initialHeapPost (globals) :
     NumberPrototype ()  * empty_fields ($lnum_proto : -{ "constructor" }-) *
 
     BI_ErrorObject () * empty_fields($lerr : -{ "length", "prototype" }-) *
-     
-    JSObjGeneral ($lerr_proto, $lobj_proto, "Error", true) * 
+
+    JSObjGeneral ($lerr_proto, $lobj_proto, "Error", true) *
     (($lerr_proto, "message") -> {{ "d", "", true, false, true }}) *
     empty_fields($lerr_proto : -{ "message" }-);
 
@@ -219,10 +219,10 @@ pred initialHeapPostWeak ( ) :
 
     GlobalObject() *
 
-    BI_ObjectObject () * 
-    ObjectPrototype () * 
+    BI_ObjectObject () *
+    ObjectPrototype () *
 
-    FunctionPrototype () * 
+    FunctionPrototype () *
 
     BooleanPrototype () *
     empty_fields ($lbool_proto : -{ "constructor" }-) *
@@ -232,13 +232,13 @@ pred initialHeapPostWeak ( ) :
 
     BI_ErrorObject () * empty_fields($lerr : -{ "length", "prototype" }-) *
 
-    JSObjGeneral ($lerr_proto, $lobj_proto, "Error", true) * 
+    JSObjGeneral ($lerr_proto, $lobj_proto, "Error", true) *
     (($lerr_proto, "message") -> {{ "d", "", true, false, true }}) *
-    empty_fields($lerr_proto : -{ "message" }-) * 
+    empty_fields($lerr_proto : -{ "message" }-) *
 
     StringPrototype ();
 
-  
+
 (********************
  **** PROPERTIES ****
  ********************)
@@ -246,30 +246,30 @@ pred initialHeapPostWeak ( ) :
 pred DataProp (+l:Obj, +prop:Str, v) :
   ((l, prop) -> {{ "d", v, true, true, true }}) *
   (! (v == empty));
-  
-pred DataPropGen (+l:Obj, +prop:Str, v, writ:Bool, enum:Bool, conf:Bool) : 
+
+pred DataPropGen (+l:Obj, +prop:Str, v, writ:Bool, enum:Bool, conf:Bool) :
   ((l, prop) -> {{ "d", v, writ, enum, conf }}) *
   (! (v == empty));
-  
+
 pred DataPropConst (+l:Obj, +prop:Str, v, enum:Bool) :
-  ((l, prop) -> {{ "d", v, false, enum, false }}) * 
+  ((l, prop) -> {{ "d", v, false, enum, false }}) *
   (! (v == empty));
 
 (****************
  **** ARRAYS ****
  ****************)
 
-pred ArrayObj(x : Obj) : 
+pred ArrayObj(x : Obj) :
   JSObjWithProto(x, $larr_proto) *
-  DataProp(x, "length", #len) * 
-  ((x, "splice") -> none) * 
-  types(#len : Num); 
+  DataProp(x, "length", #len) *
+  ((x, "splice") -> none) *
+  types(#len : Num);
 
-pred ArrayProto() : 
-  JSObject($larr_proto) * 
-  DataProp($larr_proto, "length", 0) * 
-  DataProp($larr_proto, "splice", #splice) * 
-  JSFunctionObject (#splice, "AP_splice", {{ }}, 0, #y); 
+pred ArrayProto() :
+  JSObject($larr_proto) *
+  DataProp($larr_proto, "length", 0) *
+  DataProp($larr_proto, "splice", #splice) *
+  JSFunctionObject (#splice, "AP_splice", {{ }}, 0, #y);
 
 pred array_sequence(+length : Num, seq : Set) :
   (0 == length) * (seq == -{ }-),
@@ -286,7 +286,7 @@ pred JSArray (+l:Obj, length:Num, contents:List):
   ((#md, "@class")      -> "Array") *
   ((#md, "@extensible") -> true) *
   empty_fields (#md : -{ "@class", "@extensible", "@proto" }-) *
-  DataPropGen(l, "length", length, true, false, false) * 
-  JSArrayContents(l, length, 0, contents) * 
+  DataPropGen(l, "length", length, true, false, false) *
+  JSArrayContents(l, length, 0, contents) *
   array_sequence(length, #ef_seq) *
   empty_fields(l : -u- (#ef_seq, -{ "length" }-));

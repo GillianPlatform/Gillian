@@ -1,0 +1,137 @@
+(******************
+ **** ELEMENTS ****
+ ******************)
+
+pred Field(+view:List, +readPos:Num, field:List, fieldLength:Num) :
+    (#rawFL == l-sub (view, readPos, 2)) *
+    rawToUInt16(#rawFL, false, fieldLength) *
+    (field == l-sub(view, readPos + 2, fieldLength));
+
+pred Element(+view:List, +readPos:Num, +fieldCount: Num, fieldsList:List, elementLength:Num) :
+    (0 <=# readPos) * (fieldCount == 0) * (fieldsList == {{ }}) * (elementLength == 0) *
+    (readPos + elementLength <=# l-len view),
+
+    (0 <=# readPos) * (0 <# fieldCount) * (0 <# elementLength) *
+    Field(view, readPos, #field, #fieldLength) *
+    (#restFieldCount == fieldCount - 1) *
+    Element(view, readPos + 2 + #fieldLength, #restFieldCount, #restFields, #restElementLength) *
+    (0 <=# #restElementLength) *
+    (fieldsList == #field :: #restFields) *
+    (elementLength == 2 + #fieldLength + #restElementLength) *
+    (readPos + elementLength <=# l-len view);
+
+lemma ElementPureFacts(view, readPos, fieldCount, fieldList, elementLength)
+    [[ (view == #view) * (readPos == #readPos) * (fieldCount == #fieldCount) *
+       (fieldList == #fieldList) * (elementLength == #elementLength) *
+       Element (#view, #readPos, #fieldCount, #fieldList, #elementLength) ]]
+    [[ Element (#view, #readPos, #fieldCount, #fieldList, #elementLength) *
+       (0 <=# #readPos) *
+       (0 <=# #fieldCount) *
+       (0 <=# #elementLength) *
+       (#readPos + #elementLength <=# l-len #view) ]] [* *]
+
+lemma NonEmptyElementLength(view, readPos, fieldCount, field, restFieldList, elementLength)
+    [[ (view == #view) * (readPos == #readPos) * (fieldCount == #fieldCount) *
+       (field == #field) * (restFieldList == #restFieldList) * (elementLength == #elementLength) *
+       Element (#view, #readPos, #fieldCount, l+({{ #field }}, #restFieldList), #elementLength) ]]
+    [[ Element (#view, #readPos, #fieldCount, l+({{ #field }}, #restFieldList), #elementLength) *
+       (2 + l-len #field <=# #elementLength) ]] [* *]
+
+lemma ElementAppend(view, readPos, fC1, fL1, eL1, fC2, field, fL2, eL2)
+    [[ (view == #view) * (readPos == #readPos) * (fC1 == #fC1) * (fL1 == #fL1) * (eL1 == #eL1) *
+       (fC2 == #fC2) * (field == #field) * (fL2 == #fL2) * (eL2 == #eL2) *
+       Element(#view, #readPos, #fC1, #fL1, #eL1) *
+       Element(#view, #readPos + #eL1, #fC2, l+({{ #field }}, #fL2), #eL2) *
+       (#shift == 2 + l-len #field) ]]
+    [[ Element(#view, #readPos, #fC1 + 1, l+ (#fL1, {{ #field }}), #eL1 + #shift) *
+       Element(#view, #readPos + #eL1 + #shift, #fC2 - 1, #fL2, #eL2 - #shift) ]]
+[*
+    sep_apply ElementPureFacts(#view, #readPos, #fC1, #fL1, #eL1);
+    sep_apply ElementPureFacts(#view, #readPos + #eL1, #fC2, l+({{ #field }}, #fL2), #eL2);
+    sep_apply NonEmptyElementLength(#view, #readPos + #eL1, #fC2, #field, #fL2, #eL2);
+    unfold Element(#view, #readPos, #fC1, #fL1, #eL1);
+    if (not (#fC1 = 0)) then {
+      sep_assert (#fL1 == l+ ({{ #fl1 }}, #rfl1)) [bind: #fl1, #rfl1];
+      sep_assert (Element(#view, 2 + (l-len #fl1) + #readPos, #fC1 - 1, #rfl1, #reL1)) [bind: #reL1];
+      sep_apply ElementPureFacts(#view, 2 + (l-len #fl1) + #readPos, #fC1 - 1, #rfl1, #reL1);
+      sep_apply ElementAppend(#view, 2 + (l-len #fl1) + #readPos, #fC1 - 1, #rfl1, #reL1, #fC2, #field, #fL2, #eL2);
+      fold Element(#view, #readPos, #fC1 + 1, l+ (#fL1, {{ #field }}), #eL1 + #shift)
+    }
+ *]
+
+pred Elements(+view:List, +readPos:Num, +elementCount: Num, +fieldCount: Num, elementsList:List, elementsLength:Num) :
+    (0 <=# readPos) * (elementCount == 0) * (0 <# fieldCount) * (elementsList == {{ }}) * (elementsLength == 0) *
+    (readPos + elementsLength <=# l-len view),
+
+    (0 <=# readPos) * (0 <# elementCount) * (0 <# fieldCount) * (0 <# elementsLength) *
+    Element(view, readPos, fieldCount, #fieldsList, #elementLength) *
+    (#restElementCount == elementCount - 1) *
+    Elements(view, readPos + #elementLength, #restElementCount, fieldCount, #restElements, #restElementsLength) *
+    (0 <=# #restElementsLength) *
+    (elementsList == #fieldsList :: #restElements) *
+    (elementsLength == #elementLength + #restElementsLength) *
+    (readPos + elementsLength <=# l-len view);
+
+lemma ElementsPureFacts(view, readPos, elementCount, fieldCount, elementList, elementsLength)
+    [[ (view == #view) * (readPos == #readPos) * (elementCount == #elementCount) *
+       (fieldCount == #fieldCount) * (elementList == #elementList) * (elementsLength == #elementsLength) *
+       Elements (#view, #readPos, #elementCount, #fieldCount, #elementList, #elementsLength) ]]
+    [[ Elements (#view, #readPos, #elementCount, #fieldCount, #elementList, #elementsLength) *
+       (0 <=# #readPos) *
+       (0 <# #fieldCount) *
+       (0 <=# #elementCount) *
+       (0 <=# #elementsLength) *
+       (#readPos + #elementsLength <=# l-len #view) ]] [* *]
+
+lemma ElementsAppend(view, readPos, elementCount, fieldCount, elementList, elementsLength, fieldList, elementLength)
+    [[ (view == #view) * (readPos == #readPos) * (elementCount == #elementCount) *
+       (fieldCount == #fieldCount) * (elementList == #elementList) * (elementsLength == #elementsLength) *
+       (fieldList == #fieldList) * (elementLength == #elementLength) *
+       Elements(#view, #readPos, #elementCount, #fieldCount, #elementList, #elementsLength) *
+       Element (#view, #readPos + #elementsLength, #fieldCount, #fieldList, #elementLength) ]]
+    [[ Elements(#view, #readPos, #elementCount + 1, #fieldCount, l+ (#elementList, {{ #fieldList }}), #elementsLength + #elementLength) ]]
+[*
+    unfold Elements(#view, #readPos, #elementCount, #fieldCount, #elementList, #elementsLength);
+    if (not (#elementCount = 0)) then {
+      sep_assert (Element(#view, #readPos, #fieldCount, #newElementFieldList, #newElementLength)) [bind: #newElementFieldList, #newElementLength];
+      sep_apply ElementPureFacts(#view, #readPos, #fieldCount, #newElementFieldList, #newElementLength);
+      sep_assert (Elements(#view, (#readPos + #newElementLength), (#elementCount - 1), #fieldCount, #remainingElementsList, #remainingElementsLength)) [bind: #remainingElementsList, #remainingElementsLength];
+      sep_apply ElementsAppend(#view, (#readPos + #newElementLength), (#elementCount - 1), #fieldCount, #remainingElementsList, #remainingElementsLength, #fieldList, #elementLength)
+    }
+ *]
+
+(****************************
+**** ENCRYPTED DATA KEYS ****
+*****************************)
+
+pred RawEncryptedDataKeys(+rawHeaderData, +start, keyCount:Num, EDKs:List, EDKLength:Num) :
+    (#rawEC == l-sub (rawHeaderData, start, 2)) *
+    rawToUInt16(#rawEC, false, keyCount) *
+    (0 <# keyCount) *
+    Elements(rawHeaderData, start + 2, keyCount, 3, EDKs, #EDKLength) *
+    (EDKLength == #EDKLength + 2);
+
+lemma RawEncryptedDataKeysPureFacts(rawHeaderData, start, keyCount, EDKs, EDKLength)
+    [[ (rawHeaderData == #rawHeaderData) * (start == #start) *
+       (keyCount == #keyCount) * (EDKs == #EDKs) * (EDKLength == #EDKLength) *
+       RawEncryptedDataKeys(#rawHeaderData, #start, #keyCount, #EDKs, #EDKLength) ]]
+    [[ RawEncryptedDataKeys(#rawHeaderData, #start, #keyCount, #EDKs, #EDKLength) *
+       (0 <=# #start) * (0 <# keyCount) * (2 <=# #EDKLength) ]]
+[*
+    sep_apply ElementsPureFacts(#rawHeaderData, #start + 2, #keyCount, 3, #EDKs, #EDKLength - 2)
+ *]
+
+(***************
+**** toUTF8 ****
+****************)
+
+(* FIXME: toUt8 is abstract *)
+nounfold pred toUtf8(+rawData:List, utf8Data:Str) : (utf8Data == "");
+
+(* toUtf8 is injective *)
+lemma toUtf8(rawData1, utf8Data1, rawData2, utf8Data2)
+    [[ (rawData1 == #rawData1) * (utf8Data1 == #utf8Data1) *
+       (rawData2 == #rawData2) * (utf8Data2 == #utf8Data2) *
+       toUtf8(#rawData1, #utf8Data1) * toUtf8(#rawData2, #utf8Data2) ]]
+    [[ (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
+       (! (#rawData1 == #rawData2)) * (! (#utf8Data1 == #utf8Data2)) ]]
