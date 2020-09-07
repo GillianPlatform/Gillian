@@ -33,11 +33,10 @@ class virtual ['a] t =
 
     method private log_agnostic =
       function
-      | Debug msgf  ->
+      | Debug msgf ->
           Report.PackedPP.pf self#formatter msgf;
           Format.fprintf self#formatter "@,@?"
-      | Phase phase ->
-          Format.fprintf self#formatter "*** Phase %s ***@,@?" phase
+      | Phase      -> Format.fprintf self#formatter "*** Phase ***@,@?"
 
     method virtual private log_specific : 'a -> unit
 

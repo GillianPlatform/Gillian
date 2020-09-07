@@ -1,8 +1,6 @@
 type 'a t = unit -> 'a Report.t
 
-let active_parents : (Uuidm.t * Phase.t) Stack.t = Stack.create ()
-
-let all_parents : Phase.t Stack.t = Stack.create ()
+let parents : Uuidm.t Stack.t = Stack.create ()
 
 let current : Uuidm.t option ref = ref Option.none
 
@@ -15,8 +13,8 @@ let make ?title ~(content : 'a Report.content) ?(severity = Report.Log) () =
         match content with
         | Agnostic content -> (
             match content with
-            | Debug _     -> "Debug message"
-            | Phase phase -> Printf.sprintf "%s phase" phase )
+            | Debug _ -> "Debug message"
+            | Phase   -> "Phase" )
         | Specific _       -> "Target language specific report" )
     | Some title -> title
   in
@@ -26,7 +24,7 @@ let make ?title ~(content : 'a Report.content) ?(severity = Report.Log) () =
       title;
       elapsed_time = Sys.time ();
       previous = !current;
-      parent = Option.map fst @@ Stack.top_opt active_parents;
+      parent = Stack.top_opt parents;
       content;
       severity;
     }
@@ -34,19 +32,17 @@ let make ?title ~(content : 'a Report.content) ?(severity = Report.Log) () =
   current := Some report.id;
   report
 
-let start_phase level ?title ?severity phase =
-  if Mode.enabled () then (
-    if Mode.should_log level then (
-      let report = make ?title ~content:(Agnostic (Phase phase)) ?severity () in
-      Stack.push (report.id, phase) active_parents;
-      current := None;
-      Default.log report );
-    Stack.push phase all_parents )
+let start_phase level ?title ?severity () =
+  if Mode.should_log level then (
+    let report = make ?title ~content:(Agnostic Phase) ?severity () in
+    Stack.push report.id parents;
+    current := None;
+    Default.log report;
+    Some report.id )
+  else None
 
-let end_phase phase =
-  if Mode.enabled () then
-    match Stack.top_opt active_parents with
-    | Some (_, p) when String.equal p phase ->
-        current := Stack.pop active_parents |> fst |> Option.some;
-        assert (Stack.pop all_parents |> String.equal phase)
-    | None | Some _ -> assert (Stack.pop all_parents |> String.equal phase)
+let end_phase = function
+  | None    -> ()
+  | Some id ->
+      assert (Uuidm.equal id (Stack.pop parents));
+      current := Some id

@@ -634,7 +634,7 @@ struct
         let call_graph = SAInterpreter.call_graph in
         write_verif_results cur_source_files call_graph ~diff:"" global_results
     in
-    L.with_normal_phase "Program verification" (fun () ->
+    L.with_normal_phase ~title:"Program verification" (fun () ->
         f prog incremental source_files)
 end
 

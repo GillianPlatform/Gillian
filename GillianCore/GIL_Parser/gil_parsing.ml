@@ -139,7 +139,7 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
     Parser_state.reset ();
     { prog with procs; preds; lemmas }
   in
-  L.with_normal_phase "Program parsing" (fun () -> f path)
+  L.with_normal_phase ~title:"Program parsing" (fun () -> f path)
 
 let resolve_path path =
   let lookup_paths = "." :: Config.get_runtime_paths () in

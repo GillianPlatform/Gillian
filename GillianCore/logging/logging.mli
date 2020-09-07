@@ -12,10 +12,6 @@ module Mode : sig
   val set_mode : t -> unit
 end
 
-module Phase : sig
-  type t = string
-end
-
 module Report : sig
   type severity = Info | Log | Success | Error | Warning
 
@@ -84,23 +80,25 @@ val fail : string -> 'a
 (** Output the strings in every file and prints it to stdout *)
 val print_to_all : string -> unit
 
-val normal_phase : ?title:string -> ?severity:Report.severity -> Phase.t -> unit
+val normal_phase :
+  ?title:string -> ?severity:Report.severity -> unit -> Uuidm.t option
 
 val verbose_phase :
-  ?title:string -> ?severity:Report.severity -> Phase.t -> unit
+  ?title:string -> ?severity:Report.severity -> unit -> Uuidm.t option
 
-val tmi_phase : ?title:string -> ?severity:Report.severity -> Phase.t -> unit
+val tmi_phase :
+  ?title:string -> ?severity:Report.severity -> unit -> Uuidm.t option
 
-val end_phase : Phase.t -> unit
+val end_phase : Uuidm.t option -> unit
 
 val with_normal_phase :
-  ?title:string -> ?severity:Report.severity -> Phase.t -> (unit -> 'a) -> 'a
+  ?title:string -> ?severity:Report.severity -> (unit -> 'a) -> 'a
 
 val with_verbose_phase :
-  ?title:string -> ?severity:Report.severity -> Phase.t -> (unit -> 'a) -> 'a
+  ?title:string -> ?severity:Report.severity -> (unit -> 'a) -> 'a
 
 val with_tmi_phase :
-  ?title:string -> ?severity:Report.severity -> Phase.t -> (unit -> 'a) -> 'a
+  ?title:string -> ?severity:Report.severity -> (unit -> 'a) -> 'a
 
 module Make : functor
   (TargetLang : sig
