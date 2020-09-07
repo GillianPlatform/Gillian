@@ -530,6 +530,10 @@ struct
       in
       Arg.(value & flag & info [ "emit-specs" ] ~doc)
 
+    let specs_to_stdout =
+      let doc = "Emit specs to stdout, useful for testing." in
+      Arg.(value & flag & info [ "specs-to-stdout" ] ~doc)
+
     let process_files files already_compiled outfile_opt emit_specs incremental
         =
       let file = List.hd files in
@@ -589,6 +593,7 @@ struct
         stats
         parallel
         emit_specs
+        specs_to_stdout
         incremental
         bi_unroll_depth
         bi_no_spec_depth
@@ -600,6 +605,7 @@ struct
       let () = Config.parallel := parallel in
       let () = Config.bi_unroll_depth := bi_unroll_depth in
       let () = Config.bi_no_spec_depth := bi_no_spec_depth in
+      let () = Config.specs_to_stdout := specs_to_stdout in
       let () =
         process_files files already_compiled outfile_opt emit_specs incremental
       in
@@ -609,8 +615,8 @@ struct
     let act_t =
       Term.(
         const act $ files $ already_compiled $ output_gil $ no_heap $ stats
-        $ parallel $ emit_specs $ incremental $ bi_unroll_depth
-        $ bi_no_spec_depth)
+        $ parallel $ emit_specs $ specs_to_stdout $ incremental
+        $ bi_unroll_depth $ bi_no_spec_depth)
 
     let act_info =
       let doc =

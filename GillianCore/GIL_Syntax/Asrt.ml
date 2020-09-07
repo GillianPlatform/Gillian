@@ -271,8 +271,6 @@ let rec pp fmt a =
       let pp_e_l = Fmt.list ~sep:Fmt.comma Expr.pp in
       Fmt.pf fmt "@[<h><%s>(%a; %a)@]" a pp_e_l ins pp_e_l outs
 
-let pp_list = Fmt.list ~sep:(Fmt.any "    ") pp
-
 let star (asses : t list) : t =
   List.fold_left
     (fun ac a ->

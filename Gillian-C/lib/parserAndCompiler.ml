@@ -16,6 +16,7 @@ module TargetLangOptions = struct
     warnings : bool;
     hide_undef : bool;
     hide_mult_def : bool;
+    verbose_compcert : bool;
   }
 
   let term =
@@ -58,6 +59,11 @@ module TargetLangOptions = struct
     in
     let hmultdef = Arg.(value & flag & info [ "ignore-multdef" ] ~docs ~doc) in
 
+    let doc = "Verbose Compcert invocation" in
+    let verbose_compcert =
+      Arg.(value & flag & info [ "verbose-compcert" ] ~docs ~doc)
+    in
+
     let opt
         include_dirs
         source_dirs
@@ -65,7 +71,8 @@ module TargetLangOptions = struct
         hide_genv
         no_warnings
         hide_undef
-        hide_mult_def =
+        hide_mult_def
+        verbose_compcert =
       {
         include_dirs;
         source_dirs;
@@ -74,11 +81,12 @@ module TargetLangOptions = struct
         warnings = not no_warnings;
         hide_undef;
         hide_mult_def;
+        verbose_compcert;
       }
     in
     Term.(
       const opt $ include_dirs $ source_dirs $ bcsm $ hgenv $ no_warnings
-      $ hundef $ hmultdef)
+      $ hundef $ hmultdef $ verbose_compcert)
 
   let apply
       {
@@ -89,6 +97,7 @@ module TargetLangOptions = struct
         warnings;
         hide_undef;
         hide_mult_def;
+        verbose_compcert;
       } =
     let rec get_c_paths dirs =
       match dirs with
@@ -106,7 +115,8 @@ module TargetLangOptions = struct
     Config.hide_genv := hide_genv;
     Config.warnings := warnings;
     Config.hide_undef := hide_undef;
-    Config.hide_mult_def := hide_mult_def
+    Config.hide_mult_def := hide_mult_def;
+    Config.verbose_compcert := verbose_compcert
 end
 
 (** Cache of compiled but unlinked GIL programs and their compilation data. *)
@@ -355,6 +365,7 @@ let env_var_import_path = Some CConstants.Imports.env_path_var
 let init_compcert () =
   Frontend.init ();
   if !Config.warnings then Warnings.as_error () else Warnings.silence_all ();
+  if !Config.verbose_compcert then Config_compcert.set_verbose_invocation ();
   Optimisations.disable_all ();
   Preprocessor.add_include_dirs !Config.include_dirs;
   Preprocessor.set_gnuc_for_macos ()
