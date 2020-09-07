@@ -1,9 +1,11 @@
 type uuidm = Uuidm.t
 
-let yojson_of_uuidm uuidm = Uuidm.to_string uuidm |> yojson_of_string
+let yojson_of_uuidm uuidm = yojson_of_string (Uuidm.to_string uuidm)
 
 let uuidm_of_yojson yojson =
-  string_of_yojson yojson |> Uuidm.of_string |> Option.get
+  Option.get (Uuidm.of_string (string_of_yojson yojson))
+
+type id = int * uuidm [@@deriving yojson]
 
 module PackedPP : sig
   type t [@@deriving yojson]
@@ -42,11 +44,11 @@ type 'a content = Agnostic of agnostic_content | Specific of 'a
 type severity = Info | Log | Success | Error | Warning [@@deriving yojson]
 
 type 'a t = {
-  id : uuidm;
+  id : id;
   title : string;
   elapsed_time : float;
-  previous : uuidm option;
-  parent : uuidm option;
+  previous : id option;
+  parent : id option;
   content : 'a content;
   severity : severity;
 }

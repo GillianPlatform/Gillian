@@ -13,6 +13,8 @@ module Mode : sig
 end
 
 module Report : sig
+  type id
+
   type severity = Info | Log | Success | Error | Warning
 
   type 'a t
@@ -81,15 +83,15 @@ val fail : string -> 'a
 val print_to_all : string -> unit
 
 val normal_phase :
-  ?title:string -> ?severity:Report.severity -> unit -> Uuidm.t option
+  ?title:string -> ?severity:Report.severity -> unit -> Report.id option
 
 val verbose_phase :
-  ?title:string -> ?severity:Report.severity -> unit -> Uuidm.t option
+  ?title:string -> ?severity:Report.severity -> unit -> Report.id option
 
 val tmi_phase :
-  ?title:string -> ?severity:Report.severity -> unit -> Uuidm.t option
+  ?title:string -> ?severity:Report.severity -> unit -> Report.id option
 
-val end_phase : Uuidm.t option -> unit
+val end_phase : Report.id option -> unit
 
 val with_normal_phase :
   ?title:string -> ?severity:Report.severity -> (unit -> 'a) -> 'a

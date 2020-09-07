@@ -1,44 +1,42 @@
 module Types = struct
   type conf = { filename : string }
 
-  type state = { out_channel : out_channel; mutable empty : bool }
+  type state = { fd : Unix.file_descr }
 end
 
 include Reporter.Make (struct
   include Types
 
-  let conf = { filename = "database.log" }
+  let conf =
+    let filename = "database.log" in
+    if Sys.file_exists filename then Sys.remove filename;
+    { filename }
 
-  let initialize { filename; _ } =
-    let out_channel = open_out filename in
-    Printf.fprintf out_channel "[";
-    { out_channel; empty = true }
+  let initialize { filename } =
+    (* rw-r--r-- *)
+    let perm = 0o644 in
+    { fd = Unix.openfile filename [ O_WRONLY; O_APPEND; O_CREAT ] perm }
 
-  let wrap_up { out_channel; _ } =
-    Printf.fprintf out_channel "]";
-    close_out out_channel
+  let wrap_up { fd } = Unix.close fd
 end)
 
-let get_out_channel () = (get_state ()).out_channel
+let get_fd () = (get_state ()).fd
 
-let is_empty () = (get_state ()).empty
-
-let set_not_empty () = (get_state ()).empty <- false
+let write yojson =
+  let yojson = Yojson.Safe.to_string yojson ^ "\n" in
+  Unix.lockf (get_fd ()) F_LOCK 0;
+  ignore (Unix.write_substring (get_fd ()) yojson 0 (String.length yojson));
+  Unix.lockf (get_fd ()) F_ULOCK 0
 
 class virtual ['a] t =
   object (self)
     method log (report : 'a Report.t) =
-      if enabled () then (
-        if is_empty () then set_not_empty ()
-        else Printf.fprintf self#out_channel ",\n";
-        Report.yojson_of_t self#specific_serializer report
-        |> Yojson.Safe.to_channel self#out_channel )
+      if enabled () then
+        write (Report.yojson_of_t self#specific_serializer report)
 
     method wrap_up = wrap_up ()
 
     method virtual private specific_serializer : 'a -> Yojson.Safe.t
-
-    method private out_channel = get_out_channel ()
   end
 
 let default : type a. unit -> a t =
