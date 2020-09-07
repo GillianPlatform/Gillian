@@ -9,7 +9,8 @@
  (action
   (with-stdout-to
    %{target}
-   (run gillian-c act -l disabled -R . --specs-to-stdout test.c))))
+   (run gillian-c act -l disabled -R . --specs-to-stdout --verbose-compcert
+     test.c))))
 
 (rule
  (alias runtest)
