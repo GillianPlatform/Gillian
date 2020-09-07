@@ -101,7 +101,7 @@ only spec AP_map (xsc, vthis, cfun)
     ]]
     [[
         JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
-        ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs, #keyCount) *
+        ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs, #keyCount) * types(ret : Obj) *
         DecodedEncryptedDataKeys(ret, #EDKs, #keyCount)
     ]]
     normal
