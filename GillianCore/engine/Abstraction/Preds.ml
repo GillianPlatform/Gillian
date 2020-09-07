@@ -137,18 +137,48 @@ module Make
       (args : vt list)
       (ins : int list)
       (f_eq : vt -> vt -> bool) : abs_t option =
-    let getter = if maintain then find else pop in
-    let predicate (name', args') =
-      if not (name = name') then false
-      else
-        let args' = List.map (fun i -> List.nth args' i) ins in
-        List.for_all
-          (fun (arg, arg') ->
-            L.tmi (fun m -> m "Checking if %a = %a\n" Val.pp arg Val.pp arg');
-            f_eq arg arg')
-          (List.combine args args')
+    let sort (candidates : (vt list * vt list) list) (targets : vt list) =
+      let equals (candidates : vt list) (targets : vt list) =
+        List.fold_left2
+          (fun sum c t -> if c = t then sum - 1 else sum)
+          0 candidates targets
+      in
+      let sort_fun (p1 : vt list * vt list) (p2 : vt list * vt list) =
+        let p1 = fst p1 in
+        let p2 = fst p2 in
+        Stdlib.compare (equals p1 targets) (equals p2 targets)
+      in
+      List.sort sort_fun candidates
     in
-    getter preds predicate
+    let matcher (args', _) =
+      List.for_all
+        (fun (arg, arg') ->
+          L.tmi (fun m -> m "Checking if %a = %a\n" Val.pp arg Val.pp arg');
+          f_eq arg arg')
+        (List.combine args args')
+    in
+    let candidates = find_all preds (fun (pname, _) -> name = pname) in
+    let candidates = List.map (fun (_, args) -> args) candidates in
+    let candidates =
+      List.map
+        (fun args -> (List.map (fun i -> List.nth args i) ins, args))
+        candidates
+    in
+    let candidates = sort candidates args in
+    let result =
+      List.fold_left
+        (fun (res : abs_t option) (candidate : vt list * vt list) ->
+          if res <> None then res
+          else if matcher candidate then Some (name, snd candidate)
+          else None)
+        None candidates
+    in
+    match result with
+    | None        -> None
+    | Some result -> (
+        match maintain with
+        | true  -> Some result
+        | false -> pop preds (fun pred -> pred = result) )
 
   let subst_in_val (subst : st) (v : vt) : vt =
     let le' = ESubst.subst_in_expr subst true (Val.to_expr v) in

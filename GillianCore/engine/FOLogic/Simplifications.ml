@@ -886,9 +886,12 @@ let simplify_pfs_and_gamma
               if SS.mem v !vars_to_kill && not (SS.mem v current_lvars) then
                 TypEnv.remove gamma v);
 
-          (* TypEnv.iter gamma (fun v t -> match t with
-             | Type.ListType -> PFS.extend lpfs (LessEq (Lit (Num 0.), UnOp (LstLen, Expr.from_var_name v)))
-             | _ -> ()); *)
+          TypEnv.iter gamma (fun v t ->
+              match t with
+              | Type.ListType ->
+                  PFS.extend lpfs
+                    (LessEq (Lit (Num 0.), UnOp (LstLen, Expr.from_var_name v)))
+              | _             -> ());
           PFS.sort lpfs )
       done;
 

@@ -257,7 +257,3 @@ let combine_ins_outs (pred : t) (ins : 'a list) (outs : 'a list) : 'a list =
   List.rev (loop ins outs [] 0)
 
 let empty_pred_tbl () = Hashtbl.create Config.small_tbl_size
-
-let get_pred (pred_defs : (string, t) Hashtbl.t) (name : string) : t =
-  try Hashtbl.find pred_defs name
-  with _ -> raise (Failure "DEATH. PRED NOT FOUND!")

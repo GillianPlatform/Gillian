@@ -107,10 +107,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
         [bind : #doneEls, #outerLoopReadPos, #elementsLeft, #remainingElsList, #remainingElsLength, #doneElsList, #doneElsLength]
     */
     while (elementCount--) {
-      /* @tactic
-          apply lemma ElementsPureFacts(#view, #readPos, #elementCount - #elementsLeft, #fieldsPerElement, #doneElsList, #doneElsLength);
-          assert Element(#view, #outerLoopReadPos, #fieldsPerElement, #fieldsList, #elementLength) [bind: #fieldsList, #elementLength];
-          apply lemma ElementPureFacts(#view, #outerLoopReadPos, #fieldsPerElement, #fieldsList, #elementLength) */
+      /* @tactic assert Element(#view, #outerLoopReadPos, #fieldsPerElement, #fieldsList, #elementLength) [bind: #fieldsList, #elementLength] */
 
       var element = []
       var fieldCount = fieldsPerElement
@@ -125,9 +122,6 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
           ArrayOfUInt8Arrays(#doneEl, #doneElList, #fieldsPerElement - #fieldsLeft)
           [bind: #doneEl, #innerLoopReadPos, #fieldsLeft, #remainingElList, #remainingElLength, #doneElList, #doneElLength] */
       while (fieldCount--) {
-        /* @tactic
-            apply lemma ElementPureFacts(#view, #outerLoopReadPos, #fieldsPerElement - #fieldsLeft, #doneElList, #doneElLength);
-            apply lemma ElementPureFacts(#view, #innerLoopReadPos, #fieldsLeft, #remainingElList, #remainingElLength) */
         /* Check for early return (Postcondition): Enough data must exist to read the Uint16 length value. */
         if (readPos + 2 > dataView.byteLength) return false
         var length = dataView.getUint16(readPos, false) // big endian
