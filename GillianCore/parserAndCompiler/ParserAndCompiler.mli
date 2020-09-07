@@ -1,5 +1,5 @@
 (** This defines an interface that allows a user to indicate how to parse their own programming language,
-    preprocess the obtained language and compile it to GIL (type [LabProg.t]) *)
+    preprocess the obtained language and compile it to GIL (type [Prog.t]) *)
 
 type compiled_progs = {
   gil_progs : (string * (Annot.t, string) Prog.t) list;

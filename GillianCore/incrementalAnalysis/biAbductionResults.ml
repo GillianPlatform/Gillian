@@ -4,9 +4,13 @@ type t = (string, Spec.t) hashtbl [@@deriving yojson]
 
 let make () : t = Hashtbl.create Config.small_tbl_size
 
-let reset : t -> unit = Hashtbl.reset
+let reset = Hashtbl.reset
 
-let set_spec results proc_name spec = Hashtbl.replace results proc_name spec
+let set_spec = Hashtbl.replace
+
+let contains_spec = Hashtbl.mem
+
+let get_spec_exn = Hashtbl.find
 
 let get_all_specs ?(filter = fun _ -> true) results =
   Hashtbl.fold

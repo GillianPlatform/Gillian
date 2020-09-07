@@ -1,0 +1,56 @@
+BUG SPECS:
+  spec deref_bug (x)
+    ;
+    [[ (x == {{"long", 0.}}) *
+       i__glob_fun("deref""deref") *
+       i__glob_fun("deref_bug""deref_bug") ]]
+    [[ (ret == "segmentation fault") *
+       i__glob_fun("deref""deref") *
+       i__glob_fun("deref_bug""deref_bug") ]]
+    error
+
+SUCCESSFUL SPECS:
+  spec deref (x)
+    [[ (x == {{"long", 0.}}) *
+       i__glob_fun("deref""deref") *
+       i__glob_fun("deref_bug""deref_bug") ]]
+    [[ (ret == {{"int", 0.}}) *
+       (x == {{"long", 0.}}) *
+       i__glob_fun("deref""deref") *
+       i__glob_fun("deref_bug""deref_bug") ]]
+    normal;
+    
+  spec deref (x)
+    [[ (x == {{_$l_7, 0.}}) *
+       <mem_sval>(_$l_7, 0., 4.; {{"int", _lvar_6}}, "Freeable") *
+       types(_lvar_6 : Num) *
+       i__glob_fun("deref""deref") *
+       i__glob_fun("deref_bug""deref_bug") ]]
+    [[ (ret == {{"int", _lvar_6}}) *
+       (x == {{_$l_7, 0.}}) *
+       types(_lvar_6 : Num) *
+       <mem_sval>(_$l_7, 0., 4.; {{"int", _lvar_6}}, "Freeable") *
+       types(_lvar_6 : Num) *
+       i__glob_fun("deref""deref") *
+       i__glob_fun("deref_bug""deref_bug") ]]
+    normal;
+    
+  spec deref_bug (x)
+    [[ (x == {{_$l_2, 0.}}) *
+       <mem_sval>(_$l_2, 0., 4.; {{"single", _lvar_10}}, "Freeable") *
+       types(_lvar_10 : Num) *
+       i__glob_fun("deref""deref") *
+       i__glob_fun("deref_bug""deref_bug") ]]
+    [[ (ret == {{"single", _lvar_10}}) *
+       (x == {{_$l_2, 0.}}) *
+       types(_lvar_10 : Num) *
+       <mem_sval>(_$l_2, 0., 4.; {{"single", _lvar_10}}, "Freeable") *
+       types(_lvar_10 : Num) *
+       i__glob_fun("deref""deref") *
+       i__glob_fun("deref_bug""deref_bug") ]]
+    normal;
+    
+
+SUCCESS SPECS: 3
+ERROR SPECS: 0
+BUG SPECS: 1

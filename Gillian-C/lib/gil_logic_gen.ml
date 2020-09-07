@@ -279,7 +279,7 @@ let trans_sval (sv : CSVal.t) : Asrt.t * Expr.t =
       let eg1, eg2 = (tse se1, tse se2) in
       (tloc eg1 ** tnum eg2, Expr.EList [ tse se1; tse se2 ])
   | Sfunptr symb    ->
-      let lvar = LVar.alloc () in
+      let lvar = Gillian.Utils.Generators.fresh_lvar () in
       let pred =
         Asrt.Pred
           ( CConstants.Internal_Predicates.fun_ptr,
@@ -367,7 +367,7 @@ let malloc_chunk_asrt loc struct_sz =
 
 let trans_constr ?fname:_ ~malloc ann s c =
   let cenv = ann.cenv in
-  let gen_loc_var () = Expr.LVar (LVar.alloc ()) in
+  let gen_loc_var () = Expr.LVar (Gillian.Utils.Generators.fresh_lvar ()) in
   let open CConstants.VTypes in
   let cse = trans_simpl_expr in
   let tnum = types NumberType in
@@ -824,6 +824,18 @@ let predicate_from_triple (pn, csmt, ct) =
     | Ctypes.Tpointer (Ctypes.Tstruct _, _) -> true
     | _ -> false
   in
+  let is_c_ptr_to_scalar = function
+    | Ctypes.Tpointer ((Tfloat _ | Tint _ | Tlong _), _) -> true
+    | _ -> false
+  in
+  let pred_name_of_ptr_scal =
+    let open Internal_Predicates in
+    function
+    | Ctypes.Tpointer (Tfloat _, _) -> is_ptr_to_single_opt
+    | Ctypes.Tpointer (Tint _, _) -> is_ptr_to_int_opt
+    | Ctypes.Tpointer (Tlong _, _) -> is_ptr_to_long_opt
+    | _ -> failwith "Cannot happen"
+  in
   let struct_name = function
     | Ctypes.Tpointer (Ctypes.Tstruct (id, _), _) -> true_name id
     | _ -> failwith "Cannot happen"
@@ -835,6 +847,10 @@ let predicate_from_triple (pn, csmt, ct) =
       pred (opt_rec_pred_name_of_struct (struct_name ct))
   | AST.Tlong when Archi.ptr64 && is_c_ptr_to_struct ct ->
       pred (opt_rec_pred_name_of_struct (struct_name ct))
+  | AST.Tint when (not Archi.ptr64) && is_c_ptr_to_scalar ct ->
+      pred (pred_name_of_ptr_scal ct)
+  | AST.Tlong when Archi.ptr64 && is_c_ptr_to_scalar ct ->
+      pred (pred_name_of_ptr_scal ct)
   | AST.Tint -> pred is_int
   | AST.Tlong -> pred is_long
   | AST.Tsingle -> pred is_single

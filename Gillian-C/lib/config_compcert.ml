@@ -1,5 +1,7 @@
 open Compcert.Clflags
 
+let set_verbose_invocation () = option_v := true
+
 module Warnings = struct
   let options = Compcert.Diagnostics.warning_options
 

@@ -16,6 +16,7 @@ module TargetLangOptions = struct
     warnings : bool;
     hide_undef : bool;
     hide_mult_def : bool;
+    verbose_compcert : bool;
   }
 
   let term =
@@ -58,6 +59,11 @@ module TargetLangOptions = struct
     in
     let hmultdef = Arg.(value & flag & info [ "ignore-multdef" ] ~docs ~doc) in
 
+    let doc = "Verbose Compcert invocation" in
+    let verbose_compcert =
+      Arg.(value & flag & info [ "verbose-compcert" ] ~docs ~doc)
+    in
+
     let opt
         include_dirs
         source_dirs
@@ -65,7 +71,8 @@ module TargetLangOptions = struct
         hide_genv
         no_warnings
         hide_undef
-        hide_mult_def =
+        hide_mult_def
+        verbose_compcert =
       {
         include_dirs;
         source_dirs;
@@ -74,11 +81,12 @@ module TargetLangOptions = struct
         warnings = not no_warnings;
         hide_undef;
         hide_mult_def;
+        verbose_compcert;
       }
     in
     Term.(
       const opt $ include_dirs $ source_dirs $ bcsm $ hgenv $ no_warnings
-      $ hundef $ hmultdef)
+      $ hundef $ hmultdef $ verbose_compcert)
 
   let apply
       {
@@ -89,6 +97,7 @@ module TargetLangOptions = struct
         warnings;
         hide_undef;
         hide_mult_def;
+        verbose_compcert;
       } =
     let rec get_c_paths dirs =
       match dirs with
@@ -100,17 +109,21 @@ module TargetLangOptions = struct
           in
           c_files @ get_c_paths rest
     in
-    let c_source_paths = get_c_paths source_dirs in
     Config.include_dirs := include_dirs;
-    Config.source_paths := c_source_paths;
+    Config.source_paths := get_c_paths source_dirs;
     Config.burn_csm := burn_csm;
     Config.hide_genv := hide_genv;
     Config.warnings := warnings;
     Config.hide_undef := hide_undef;
-    Config.hide_mult_def := hide_mult_def
+    Config.hide_mult_def := hide_mult_def;
+    Config.verbose_compcert := verbose_compcert
 end
 
+(** Cache of compiled but unlinked GIL programs and their compilation data. *)
 let compiled_progs = Hashtbl.create small_tbl_size
+
+(** Cache of header paths included in each source .c path. *)
+let included_headers_cache = Hashtbl.create small_tbl_size
 
 let get_gil_path c_path = Filename.chop_extension c_path ^ ".gil"
 
@@ -199,8 +212,8 @@ let parse_and_compile_file path exec_mode =
   let mangled_syms = Hashtbl.create small_tbl_size in
   let annots = parse_annots path in
   let prog, compilation_data =
-    Gilgen.trans_program_with_annots exec_mode last_clight csm ~filepath:path
-      ~mangled_syms annots
+    Gilgen.trans_program_with_annots ~exec_mode ~clight_prog:last_clight
+      ~filepath:path ~mangled_syms csm annots
   in
   let trans_procs = Hashtbl.create small_tbl_size in
   let () =
@@ -214,11 +227,7 @@ let parse_and_compile_file path exec_mode =
 exception Linker_error
 
 let linker_error msg symbols =
-  let () =
-    Gilgen.Symbol_set.iter
-      (fun sym -> Printf.printf (msg ^^ " '%s'\n") sym)
-      symbols
-  in
+  let () = SS.iter (fun sym -> Printf.printf "%s '%s'\n" msg sym) symbols in
   raise Linker_error
 
 let current_arch =
@@ -234,6 +243,14 @@ let parse_dependencies_file deps_file =
   let header_path = Str.regexp ".*\\.h" in
   List.filter (fun part -> Str.string_match header_path part 0) parts
 
+let get_included_headers deps_file =
+  if Hashtbl.mem included_headers_cache deps_file then
+    Hashtbl.find included_headers_cache deps_file
+  else
+    let included_headers = parse_dependencies_file deps_file in
+    Hashtbl.add included_headers_cache deps_file included_headers;
+    included_headers
+
 let create_compilation_result gil_progs =
   let open IncrementalAnalysis in
   let open CommandLine.ParserAndCompiler in
@@ -241,11 +258,13 @@ let create_compilation_result gil_progs =
   let gil_progs =
     List.map
       (fun (path, prog) ->
-        let headers = parse_dependencies_file (get_deps_path path) in
-        SourceFiles.add_source_file source_files path;
+        let () = SourceFiles.add_source_file source_files ~path in
+        let headers = get_included_headers (get_deps_path path) in
         let () =
           List.iter
-            (fun header -> SourceFiles.add_dependency source_files header path)
+            (fun header ->
+              SourceFiles.add_dependency source_files ~path:header
+                ~dependent_path:path)
             headers
         in
         (get_gil_path path, prog))
@@ -254,7 +273,6 @@ let create_compilation_result gil_progs =
   { gil_progs; source_files }
 
 let parse_and_compile_files paths =
-  let open Gilgen in
   let exec_mode = !Gillian.Utils.Config.current_exec_mode in
   (* Compile all C input files to GIL *)
   let paths = paths @ !Config.source_paths in
@@ -262,8 +280,8 @@ let parse_and_compile_files paths =
     List.iter
       (fun path ->
         if not (Hashtbl.mem compiled_progs path) then
-          let prog, compilation_data = parse_and_compile_file path exec_mode in
-          Hashtbl.add compiled_progs path (prog, compilation_data))
+          Hashtbl.add compiled_progs path
+            (parse_and_compile_file path exec_mode))
       paths
   in
 
@@ -274,23 +292,23 @@ let parse_and_compile_files paths =
     match paths with
     | []           -> unresolved_syms
     | path :: rest ->
-        let _, { symbols; _ } = Hashtbl.find compiled_progs path in
-        let def, undef = List.partition is_def_sym symbols in
-        let def_set = Symbol_set.of_list (List.map sym_name def) in
-        let undef_set = Symbol_set.of_list (List.map sym_name undef) in
-        let conflicting_defs = Symbol_set.inter defined_syms def_set in
+        let _, Gilgen.{ symbols; _ } = Hashtbl.find compiled_progs path in
+        let def, undef = List.partition Gilgen.is_def_sym symbols in
+        let def_set = SS.of_list (List.map Gilgen.sym_name def) in
+        let undef_set = SS.of_list (List.map Gilgen.sym_name undef) in
+        let conflicting_defs = SS.inter defined_syms def_set in
         let () =
-          if (not (Symbol_set.is_empty conflicting_defs)) && not hide_mult_def
-          then linker_error "multiple definitions of" conflicting_defs
+          if (not (SS.is_empty conflicting_defs)) && not hide_mult_def then
+            linker_error "multiple definitions of" conflicting_defs
         in
-        let unresolved = Symbol_set.union unresolved_syms undef_set in
-        let new_defined = Symbol_set.union defined_syms def_set in
-        let new_unresolved = Symbol_set.diff unresolved new_defined in
+        let unresolved = SS.union unresolved_syms undef_set in
+        let new_defined = SS.union defined_syms def_set in
+        let new_unresolved = SS.diff unresolved new_defined in
         link rest new_unresolved new_defined
   in
-  let unresolved_syms = link paths Symbol_set.empty Symbol_set.empty in
+  let unresolved_syms = link paths SS.empty SS.empty in
   let () =
-    if (not (Symbol_set.is_empty unresolved_syms)) && not hide_undef then
+    if (not (SS.is_empty unresolved_syms)) && not hide_undef then
       linker_error "undefined reference to" unresolved_syms
   in
 
@@ -300,7 +318,7 @@ let parse_and_compile_files paths =
     match paths with
     | []           -> (comb_imports, comb_init_asrts, comb_init_cmds)
     | path :: rest ->
-        let _, { genv_pred_asrts; genv_init_cmds; _ } =
+        let _, Gilgen.{ genv_pred_asrts; genv_init_cmds; _ } =
           Hashtbl.find compiled_progs path
         in
         combine rest
@@ -310,7 +328,7 @@ let parse_and_compile_files paths =
   in
   let imports, init_asrts, init_cmds = combine (List.tl paths) [] [] [] in
   let main_path = List.hd paths in
-  let main_prog, { genv_pred_asrts; genv_init_cmds; _ } =
+  let main_prog, Gilgen.{ genv_pred_asrts; genv_init_cmds; _ } =
     Hashtbl.find compiled_progs (List.hd paths)
   in
   let all_imports = Imports.imports current_arch exec_mode @ imports in
@@ -328,14 +346,16 @@ let parse_and_compile_files paths =
   let main_prog =
     { main_prog with imports = all_imports; proc_names = all_proc_names }
   in
+  let paths_set = SS.of_list paths in
   let all_other_progs =
     Hashtbl.fold
-      (fun path (prog, _) acc -> (path, prog) :: acc)
+      (fun path (prog, _) acc ->
+        if (not (String.equal path main_path)) && SS.mem path paths_set then
+          (path, prog) :: acc
+        else acc)
       compiled_progs []
   in
-  let all_progs =
-    (main_path, main_prog) :: List.remove_assoc main_path all_other_progs
-  in
+  let all_progs = (main_path, main_prog) :: all_other_progs in
   Ok (create_compilation_result all_progs)
 
 let other_imports = []
@@ -343,8 +363,9 @@ let other_imports = []
 let env_var_import_path = Some CConstants.Imports.env_path_var
 
 let init_compcert () =
-  Compcert.Frontend.init ();
+  Frontend.init ();
   if !Config.warnings then Warnings.as_error () else Warnings.silence_all ();
+  if !Config.verbose_compcert then Config_compcert.set_verbose_invocation ();
   Optimisations.disable_all ();
   Preprocessor.add_include_dirs !Config.include_dirs;
   Preprocessor.set_gnuc_for_macos ()

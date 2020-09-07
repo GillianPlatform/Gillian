@@ -24,24 +24,7 @@ type action_ret =
 let init () = WislSHeap.init ()
 
 let resolve_loc pfs gamma loc =
-  Logging.tmi (fun m -> m "get_loc_name: %a" Expr.pp loc);
-  let lpfs = PureContext.to_list pfs in
-  match Reduction.reduce_lexpr ~pfs ~gamma loc with
-  | Expr.Lit (Literal.Loc loc) | Expr.ALoc loc -> Some loc
-  | Expr.LVar x -> (
-      match Reduction.resolve_expr_to_location lpfs (LVar x) with
-      | Some (loc_name, _) -> Some loc_name
-      | _                  -> None )
-  | loc' -> (
-      match Reduction.resolve_expr_to_location lpfs loc' with
-      | Some (loc_name, _) -> Some loc_name
-      | None               ->
-          let msg =
-            Format.asprintf "Unsupported location: %a with pfs:\n%a" Expr.pp
-              loc' PureContext.pp pfs
-          in
-          Logging.verbose (fun m -> m "%s" msg);
-          raise (Failure msg) )
+  Gillian.Logic.FOSolver.resolve_loc_name ~pfs ~gamma loc
 
 let get_cell heap pfs gamma (loc : vt) (offset : vt) =
   match resolve_loc pfs gamma loc with
@@ -59,7 +42,7 @@ let get_cell heap pfs gamma (loc : vt) (offset : vt) =
                      according to the path condition and typing env *)
               match
                 SFVL.get_first
-                  (fun name -> FOSolver.is_equal name offset pfs gamma)
+                  (fun name -> FOSolver.is_equal ~pfs ~gamma name offset)
                   fvl
               with
               | Some (o, v) ->
@@ -93,7 +76,7 @@ let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) =
      we create a new fvl from empty
      This is supposedly correct because, since we got it before, we
      suppose the offset to be correctly found. *)
-  let equality_test a b = FOSolver.is_equal a b pfs gamma in
+  let equality_test a b = FOSolver.is_equal ~pfs ~gamma a b in
   let () =
     WislSHeap.set_fvl heap loc_name
       (SFVL.add_with_test ~equality_test offset value

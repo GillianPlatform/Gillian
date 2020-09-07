@@ -30,9 +30,6 @@ let pp_proc_changes fmt changes =
     (pp_elems "Transitive dependents")
     changes.dependent_procs
 
-let to_key_set (table : (string, 'b) Hashtbl.t) : SS.t =
-  Hashtbl.fold (fun key _ keys -> SS.add key keys) table SS.empty
-
 let to_list (set : SS.t) : string list =
   SS.fold (fun elem acc -> elem :: acc) set []
 
@@ -42,10 +39,10 @@ let get_changed_files prev_files new_files =
     | []           -> changed
     | path :: rest ->
         (* Check if file contents have changed *)
-        let prev_hash = SourceFiles.get_contents_hash prev_files path in
-        let new_hash = SourceFiles.get_contents_hash new_files path in
+        let prev_hash = SourceFiles.get_contents_hash prev_files ~path in
+        let new_hash = SourceFiles.get_contents_hash new_files ~path in
         let contents_changed = not (String.equal prev_hash new_hash) in
-        let dependents = SourceFiles.get_dependents new_files path in
+        let dependents = SourceFiles.get_dependents new_files ~path in
         let changed =
           if List.length dependents = 0 && contents_changed then path :: changed
           else if contents_changed then dependents @ changed
@@ -53,8 +50,8 @@ let get_changed_files prev_files new_files =
         in
         get_changed rest changed
   in
-  let prev_paths = to_key_set prev_files in
-  let new_paths = to_key_set new_files in
+  let prev_paths = SourceFiles.get_paths_set prev_files in
+  let new_paths = SourceFiles.get_paths_set new_files in
   let created = to_list (SS.diff new_paths prev_paths) in
   let existing = to_list (SS.inter prev_paths new_paths) in
   let changed = get_changed existing [] in
@@ -81,8 +78,6 @@ let get_lemmas_with_path (prog : ('a, 'b) Prog.t) path =
       if string_opt_equal path lemma.lemma_source_path then name :: acc else acc)
     prog.lemmas []
 
-let map_concat f list = List.concat (List.map f list)
-
 let get_changed_elements
     ~extract_elems
     ~cg_contains
@@ -91,8 +86,8 @@ let get_changed_elements
     changed_files
     new_files
     prev_call_graph =
-  let changed_files_elems = map_concat extract_elems changed_files in
-  let new_files_elems = map_concat extract_elems new_files in
+  let changed_files_elems = List.concat_map extract_elems changed_files in
+  let new_files_elems = List.concat_map extract_elems new_files in
   let changed_elems, new_elems =
     List.partition (cg_contains prev_call_graph) changed_files_elems
   in
@@ -126,7 +121,7 @@ let map_to_names call_graph = List.map (CallGraph.get_name call_graph)
 
 let get_proc_callers
     reverse_graph start_ids ?(stop_search = fun _ -> false) ~filter_id () =
-  (* Perform a breadth-first traversal of the reverse graph *)
+  (* Perform a breadth-first traversal of the reverse call graph *)
   let open CallGraph in
   let rec get_callers visited to_visit dep_procs =
     match to_visit with
@@ -149,7 +144,7 @@ let get_proc_callers
   get_callers IdSet.empty start_ids SS.empty
 
 let get_dependent_procs_and_lemmas reverse_graph start_ids ~filter_id =
-  (* Perform a breadth-first traversal of the reverse graph *)
+  (* Perform a breadth-first traversal of the reverse call graph *)
   let open CallGraph in
   let rec get_dependents visited to_visit dep_procs dep_lemmas =
     match to_visit with
@@ -173,7 +168,16 @@ let get_dependent_procs_and_lemmas reverse_graph start_ids ~filter_id =
   in
   get_dependents IdSet.empty start_ids SS.empty SS.empty
 
-let get_changes prog prev_source_files prev_call_graph cur_source_files =
+let get_changes prog ~prev_source_files ~prev_call_graph ~cur_source_files =
+  let changed_files, new_files =
+    get_changed_files prev_source_files cur_source_files
+  in
+  let changed_procs, new_procs, deleted_procs =
+    get_proc_changes prog changed_files new_files prev_call_graph
+  in
+  { changed_procs; new_procs; deleted_procs; dependent_procs = [] }
+
+let get_sym_changes prog ~prev_source_files ~prev_call_graph ~cur_source_files =
   let changed_files, new_files =
     get_changed_files prev_source_files cur_source_files
   in
@@ -188,7 +192,8 @@ let get_changes prog prev_source_files prev_call_graph cur_source_files =
   let callers = get_proc_callers reverse_graph changed_proc_ids ~filter_id () in
   { changed_procs; new_procs; deleted_procs; dependent_procs = to_list callers }
 
-let get_verif_changes prog prev_source_files prev_call_graph cur_source_files =
+let get_verif_changes prog ~prev_source_files ~prev_call_graph ~cur_source_files
+    =
   let changed_files, new_files =
     get_changed_files prev_source_files cur_source_files
   in
@@ -242,3 +247,16 @@ let get_verif_changes prog prev_source_files prev_call_graph cur_source_files =
       deleted_lemmas;
       dependent_lemmas = to_list dependent_lemmas;
     } )
+
+let get_callers prog ~reverse_graph ~excluded_procs ~proc_name =
+  let start_id = CallGraph.id_of_proc_name proc_name in
+  let excluded_ids = List.map CallGraph.id_of_proc_name excluded_procs in
+  let excluded_ids_set = CallGraph.IdSet.of_list excluded_ids in
+  let filter_id id = not (CallGraph.IdSet.mem id excluded_ids_set) in
+  let stop_search id =
+    let not_start_proc = Stdlib.compare id start_id != 0 in
+    let proc = Prog.get_proc_exn prog proc_name in
+    not_start_proc && not proc.proc_internal
+  in
+  to_list
+    (get_proc_callers reverse_graph [ start_id ] ~stop_search ~filter_id ())

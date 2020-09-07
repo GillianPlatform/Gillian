@@ -41,7 +41,8 @@ type id = string
 
 module IdSet = Containers.SS
 
-let make () = { nodes = Hashtbl.create Config.small_tbl_size }
+let make ?(init_capacity = Config.small_tbl_size) () =
+  { nodes = Hashtbl.create init_capacity }
 
 let reset call_graph = Hashtbl.reset call_graph.nodes
 

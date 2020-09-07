@@ -905,6 +905,11 @@ let add_spec (prog : prog) (spec : Spec.t) : unit =
   Hashtbl.replace prog.prog.procs spec.spec_name
     { proc with proc_spec = Some new_uspec.spec }
 
+let remove_spec (prog : prog) spec_name =
+  let proc = Prog.get_proc_exn prog.prog spec_name in
+  Hashtbl.replace prog.prog.procs spec_name { proc with proc_spec = None };
+  Hashtbl.remove prog.specs spec_name
+
 let update_coverage (prog : prog) (proc_name : string) (index : int) : unit =
   try
     let count = Hashtbl.find prog.coverage (proc_name, index) in

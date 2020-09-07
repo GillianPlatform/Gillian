@@ -294,6 +294,14 @@ module Internal_Predicates = struct
 
   let is_ptr_to_0_opt = Prefix.internal_preds ^ "is_ptr_to_0_opt"
 
+  let is_ptr_to_int_opt = Prefix.internal_preds ^ "is_ptr_to_int_opt"
+
+  let is_ptr_to_float_opt = Prefix.internal_preds ^ "is_ptr_to_float_opt"
+
+  let is_ptr_to_long_opt = Prefix.internal_preds ^ "is_ptr_to_long_opt"
+
+  let is_ptr_to_single_opt = Prefix.internal_preds ^ "is_ptr_to_single_opt"
+
   let is_long = Prefix.internal_preds ^ "is_long"
 
   let is_single = Prefix.internal_preds ^ "is_single"

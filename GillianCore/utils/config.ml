@@ -26,6 +26,8 @@ let big_tbl_size = 1
 (** {2 Bi-abduction configuration}
     These values seem to never be modified.. *)
 
+let specs_to_stdout = ref false
+
 (** This value seems to never be modified *)
 let bug_specs_propagation = ref false
 

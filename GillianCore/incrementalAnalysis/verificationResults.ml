@@ -4,7 +4,7 @@ type t = (string * int, bool) hashtbl [@@deriving yojson]
 
 let make () : t = Hashtbl.create Config.small_tbl_size
 
-let reset : t -> unit = Hashtbl.reset
+let reset = Hashtbl.reset
 
 let set_result results test_name test_id verified =
   Hashtbl.replace results (test_name, test_id) verified

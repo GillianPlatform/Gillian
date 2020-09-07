@@ -86,21 +86,20 @@ module M : Memory_S = struct
                 LList (List.map (fun prop -> Literal.String prop) props);
               ] )
 
-  let get_metadata ?(remove : bool option) (heap : t) (loc : vt) : action_ret =
+  let get_metadata ?(remove = false) (heap : t) (loc : vt) : action_ret =
     let loc =
       match loc with
       | Loc loc -> loc
       | _       -> raise (Failure "Illegal get_metadata")
     in
 
-    let remove = Option.value ~default:false remove in
     if remove then
       raise
         (Failure "Concrete get_metadata. Remove Option must be implemented!")
     else
       match CHeap.get heap loc with
-      | None           -> AFail []
-      | Some (obj, vm) -> ASucc (heap, [ Loc loc; vm ])
+      | None         -> AFail []
+      | Some (_, vm) -> ASucc (heap, [ Loc loc; vm ])
 
   let set_domain (heap : t) (loc : vt) (dom : vt) : action_ret =
     raise (Failure "domain_update illegal in concrete semantics")

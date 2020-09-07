@@ -49,7 +49,7 @@ struct
 
   let pp_single_result ft res = ExecRes.pp State.pp Val.pp pp_err ft res
 
-  let call_graph = CallGraph.make ()
+  let call_graph = CallGraph.make ~init_capacity:128 ()
 
   let reset () = CallGraph.reset call_graph
 

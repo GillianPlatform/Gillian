@@ -4,7 +4,7 @@ val make : unit -> t
 
 val reset : t -> unit
 
-(** [prune results proc_names] *)
+(** [prune results proc_and_lemma_names] *)
 val prune : t -> string list -> unit
 
 val merge : t -> t -> t

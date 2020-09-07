@@ -62,16 +62,16 @@ module Make
 
   let pp_what_test_did fmt = function
     | ParseAndCompileError e ->
-        Fmt.pf fmt "failed at parsing time with error %a"
+        Fmt.pf fmt "failed at parsing time with error: %a"
           ParserAndCompiler.pp_err e
     | FailedExec msg ->
-        Fmt.pf fmt "failed at execution with message : \"%s\"" msg
+        Fmt.pf fmt "failed at execution with message: \"%s\"" msg
     | FinishedExec [ RSucc _ ] ->
         Fmt.pf fmt "finished its execution successfully"
     | FinishedExec [ RFail (proc, i, _, errs) ] ->
         Fmt.pf fmt
           "finished its execution with failure in proc %s at command %i with \
-           errors %a"
+           errors: %a"
           proc i
           (Fmt.Dump.list (ExecErr.pp Val.pp State.pp_err))
           errs

@@ -93,27 +93,8 @@ module M : Gillian.Symbolic.Memory_S = struct
 
   let init () : t = SHeap.init ()
 
-  let get_loc_name (pfs : PFS.t) (gamma : TypEnv.t) (loc : Expr.t) :
-      string option =
-    L.(tmi (fun m -> m "get_loc_name: %s" ((Fmt.to_to_string Expr.pp) loc)));
-    let lpfs = PFS.to_list pfs in
-    match Reduction.reduce_lexpr ~pfs ~gamma loc with
-    | Lit (Loc loc) | ALoc loc -> Some loc
-    | LVar x                   -> (
-        match Reduction.resolve_expr_to_location lpfs (LVar x) with
-        | Some (loc_name, _) -> Some loc_name
-        | _                  -> None )
-    | loc'                     -> (
-        match Reduction.resolve_expr_to_location lpfs loc' with
-        | Some (loc_name, _) -> Some loc_name
-        | None               ->
-            let msg =
-              Fmt.str
-                "@[<v 2>JSILSMemory: Unsupported location: %a with pfs:@\n%a@]"
-                Expr.pp loc' PFS.pp pfs
-            in
-            L.verbose (fun m -> m "%s" msg);
-            raise (Failure msg) )
+  let get_loc_name pfs gamma =
+    Gillian.Logic.FOSolver.resolve_loc_name ~pfs ~gamma
 
   let fresh_loc ?(loc : vt option) (pfs : PFS.t) (gamma : TypEnv.t) :
       string * vt * Formula.t list =
@@ -164,11 +145,9 @@ module M : Gillian.Symbolic.Memory_S = struct
       (gamma : TypEnv.t)
       (loc : vt)
       (prop : vt)
-      (v : vt option) : action_ret =
+      (v : vt) : action_ret =
     let loc_name, _, new_pfs = fresh_loc ~loc pfs gamma in
-    ( match v with
-    | None   -> SHeap.set_fv_pair heap loc_name prop (Lit Nono)
-    | Some v -> SHeap.set_fv_pair heap loc_name prop v );
+    SHeap.set_fv_pair heap loc_name prop v;
     ASucc [ (heap, [], new_pfs, []) ]
 
   let get_cell
@@ -221,7 +200,7 @@ module M : Gillian.Symbolic.Memory_S = struct
               match
                 ( dom,
                   SFVL.get_first
-                    (fun name -> FOSolver.is_equal name prop pfs gamma)
+                    (fun name -> FOSolver.is_equal ~pfs ~gamma name prop)
                     fv_list )
               with
               | None, None         ->
@@ -549,7 +528,7 @@ module M : Gillian.Symbolic.Memory_S = struct
       | _             -> raise (Failure "Internal Error. execute_action")
     else if action = JSILNames.setCell then
       match args with
-      | [ loc; prop; v ] -> set_cell heap pfs gamma loc prop (Some v)
+      | [ loc; prop; v ] -> set_cell heap pfs gamma loc prop v
       | _                -> raise
                               (Failure "Internal Error. execute_action. setCell")
     else if action = JSILNames.delCell then
@@ -867,7 +846,7 @@ module M : Gillian.Symbolic.Memory_S = struct
         | _ -> raise (Failure "Bi-abduction: cannot fix missing location.") )
     (* Missing cell: create new *)
     | CFCell (l, p, v) -> (
-        match set_cell mem pfs gamma l p (Some v) with
+        match set_cell mem pfs gamma l p v with
         | ASucc [ (mem, [], new_pfs, []) ] ->
             List.iter (fun f -> PFS.extend pfs f) new_pfs;
             mem

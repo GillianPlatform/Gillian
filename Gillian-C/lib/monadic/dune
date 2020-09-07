@@ -1,0 +1,3 @@
+(library
+ (name monadic)
+ (libraries fmt gillian))

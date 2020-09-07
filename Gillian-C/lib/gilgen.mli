@@ -4,8 +4,6 @@ open Gillian.Gil_syntax
 
 type symbol
 
-module Symbol_set = Gillian.Utils.Containers.SS
-
 val is_def_sym : symbol -> bool
 
 val sym_name : symbol -> string
@@ -29,10 +27,10 @@ val trans_program :
   (Annot.t, string) Prog.t * compilation_data
 
 val trans_program_with_annots :
-  ExecMode.t ->
-  Clight.program ->
-  Csharpminor.program ->
+  exec_mode:ExecMode.t ->
+  clight_prog:Clight.program ->
   filepath:string ->
   mangled_syms:(string, string) Hashtbl.t ->
+  Csharpminor.program ->
   CLogic.CProg.t ->
   (Annot.t, string) Prog.t * compilation_data
