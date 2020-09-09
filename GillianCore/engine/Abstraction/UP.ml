@@ -185,14 +185,17 @@ let rec learn_expr
       in
       match is_known_expr kb e_length with
       | true  ->
-          let e_known = (e, Expr.LstSub (base_expr, Lit (Num 0.), e_length)) in
-          let rest_known =
-            ( Expr.NOp (LstCat, rest),
-              Expr.LstSub
-                (base_expr, e_length, BinOp (overall_length, FMinus, e_length))
-            )
+          let e_base_expr = Expr.LstSub (base_expr, Lit (Num 0.), e_length) in
+          let e_outs = f e_base_expr e in
+          let kb' : KB.t =
+            List.fold_left (fun kb (u, _) -> KB.add u kb) kb e_outs
           in
-          learn_expr_list kb [ e_known; rest_known ]
+          let rest = Expr.NOp (LstCat, rest) in
+          let rest_base_expr =
+            Expr.LstSub
+              (base_expr, e_length, BinOp (overall_length, FMinus, e_length))
+          in
+          e_outs @ learn_expr kb' rest_base_expr rest
       | false -> [] )
   (* Floating-point plus is invertible *)
   | BinOp (e1, FPlus, e2) -> (
@@ -1053,9 +1056,8 @@ let add_spec (prog : prog) (spec : Spec.t) : unit =
     match up with
     | Error _ ->
         let msg =
-          Fmt.str
-            "Spec addition: specification of %s cannot be turned into UP. %a"
-            spec.spec_name Spec.pp spec
+          Fmt.str "Spec addition: specification of %s cannot be turned into UP."
+            spec.spec_name
         in
         L.fail msg
     | Ok up   ->

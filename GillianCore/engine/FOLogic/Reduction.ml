@@ -2059,6 +2059,15 @@ let rec reduce_formula_loop
                    f (Eq (full_list, BinOp (UnOp (LstRev, plist_right), LstCat, plist_left))) *)
             | LstSub (e1, Lit (Num 0.), el), e2 when e1 = e2 ->
                 f (Eq (UnOp (LstLen, e1), el))
+            | LstSub (lst, start, Lit (Num n)), EList decomposition
+              when let n = int_of_float n in
+                   List.length decomposition = n
+                   &&
+                   let indices = List.mapi (fun i _ -> i) decomposition in
+                   List.for_all2
+                     (fun d i ->
+                       d = Expr.BinOp (re1, LstNth, Lit (Num (float_of_int i))))
+                     decomposition indices -> True
             | NOp (LstCat, fl :: rl), NOp (LstCat, fr :: rr) when fl = fr ->
                 f (Eq (NOp (LstCat, rl), NOp (LstCat, rr)))
             | NOp (LstCat, fl :: rl), NOp (LstCat, fr :: rr)

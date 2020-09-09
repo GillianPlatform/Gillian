@@ -121,17 +121,88 @@ lemma RawEncryptedDataKeysPureFacts(rawHeaderData, start, keyCount, EDKs, EDKLen
     sep_apply ElementsPureFacts(#rawHeaderData, #start + 2, #keyCount, 3, #EDKs, #EDKLength - 2)
  *]
 
-(***************
-**** toUTF8 ****
-****************)
+(****************************
+**** toUTF8 and fromUtf8 ****
+*****************************)
 
 (* FIXME: toUt8 is abstract *)
-nounfold pred toUtf8(+rawData:List, utf8Data:Str) : (utf8Data == "");
+pure nounfold pred toUtf8(+rawData:List, utf8Data:Str) : (utf8Data == "");
 
 (* toUtf8 is injective *)
-lemma toUtf8(rawData1, utf8Data1, rawData2, utf8Data2)
+lemma toUtf8Injective(rawData1, utf8Data1, rawData2, utf8Data2)
     [[ (rawData1 == #rawData1) * (utf8Data1 == #utf8Data1) *
        (rawData2 == #rawData2) * (utf8Data2 == #utf8Data2) *
        toUtf8(#rawData1, #utf8Data1) * toUtf8(#rawData2, #utf8Data2) ]]
     [[ (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
        (! (#rawData1 == #rawData2)) * (! (#utf8Data1 == #utf8Data2)) ]]
+
+(* FIXME: fromUt8 is abstract *)
+pure nounfold pred fromUtf8(+utf8Data:Str, rawData:List) : (rawData == {{ }});
+
+(* toUtf8 is injective *)
+lemma fromUtf8Injective(utf8Data1, rawData1, utf8Data2, rawData2)
+    [[ (utf8Data1 == #utf8Data1) * (rawData1 == #rawData1) *
+       (utf8Data2 == #utf8Data2) * (rawData2 == #rawData2) *
+       fromUtf8(#utf8Data1, #rawData1) * fromUtf8(#utf8Data2, #rawData2) ]]
+    [[ (#utf8Data1 == #utf8Data2) * (#rawData1 == #rawData2);
+       (! (#utf8Data1 == #utf8Data2)) * (! (#rawData1 == #rawData2)) ]]
+
+(* Invertibility to -> from *)
+lemma toUtf8fromUtf8(rawData)
+  [[ (rawData == #rawData) * toUtf8(#rawData, #utf8Data) ]]
+  [[ fromUtf8(#utf8Data, #rawData) ]]
+
+(* Invertibility from -> to *)
+lemma fromUtf8toUtf8(utf8Data)
+  [[ (utf8Data == #utf8Data) * fromUtf8(#utf8Data, #rawData) ]]
+  [[ toUtf8(#rawData, #utf8Data) ]]
+
+(**************************************
+ **** Arrays of EncryptedDataKeys  ****
+ **************************************)
+
+pred ArrayOfEDKsContents(+a:Obj, contents:List, +start:Num, +contentsLength:Num) :
+    (contents == {{ }}) * (contentsLength == 0),
+
+    (#index == num_to_string start) *
+    DataProp(a, #index, #edk) *
+    EncryptedDataKey(#edk, #pId, #pInfo, #encryptedDataKey, #rawInfo) *
+    fromUtf8(#rawId, #pId) * fromUtf8(#pInfo, #rawInfo) *
+    (#element == {{ #rawId, #rawInfo, #encryptedDataKey }}) *
+    (contentsLength == l-len contents) *
+    (contents == #element :: #rest) *
+    (#rest_start == start + 1) *
+    (#rest_length == contentsLength - 1) *
+    ArrayOfEDKsContents(a, #rest, #rest_start, #rest_length);
+
+pred PreDecodedEncryptedDataKeys (+a:Obj, EDKs:List, arrayLength:Num) :
+    ArrayStructure(a, arrayLength) *
+    ArrayOfEDKsContents(a, EDKs, 0, arrayLength);
+
+pred FrozenArrayOfEDKsContents(+a:Obj, contents:List, +start:Num, +contentsLength:Num) :
+    (contents == {{ }}) * (contentsLength == 0),
+
+    (#index == num_to_string start) *
+    readOnlyProperty(a, #index, #edk) *
+    EncryptedDataKey(#edk, #pId, #pInfo, #encryptedDataKey, #rawInfo) *
+    fromUtf8(#rawId, #pId) * fromUtf8(#pInfo, #rawInfo) *
+    (#edk == {{ #rawId, #rawInfo, #encryptedDataKey }}) *
+    (contentsLength == l-len contents) *
+    (contents == #edk :: #rest_contents) *
+    (#rest_start == start + 1) *
+    (#rest_length == contentsLength - 1) *
+    FrozenArrayOfEDKsContents(a, #rest_contents, #rest_start, #rest_length);
+
+pred DecodedEncryptedDataKeys (+a:Obj, contents:List, arrayLength:Num) :
+    FrozenArrayStructure(a, arrayLength) *
+    FrozenArrayOfEDKsContents(a, contents, 0, arrayLength);
+
+(* ********************* *)
+(* *** OBJECT_FREEZE *** *)
+(* ********************* *)
+
+only spec Object_freeze(xsc, vthis, l)
+
+  [[ (l == #l) * PreDecodedEncryptedDataKeys(#l, #EDKs, #keyCount) ]]
+  [[ DecodedEncryptedDataKeys(#l, #EDKs, #keyCount) * (ret == #l) ]]
+  normal

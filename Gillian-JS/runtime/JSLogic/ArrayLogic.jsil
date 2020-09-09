@@ -18,6 +18,18 @@ pred ArrayStructure(a:Obj, arrayLength:Num) :
 
   ((a, "length") -> {{ "d", arrayLength, true, false, false }});
 
+pred FrozenArrayStructure(a:Obj, arrayLength:Num) :
+  ((a, "push") -> none) *                            (* Push must be found in the prototype *)
+  ((a, "map")  -> none) *
+
+  MetaData(a, #md) * MetaData(#md, null) *
+  ((#md, "@proto")                 -> $larr_proto) * (* Prototype is the array prototype    *)
+  ((#md, "@class")                 -> "Array") *     (* Class is "Array"                    *)
+  ((#md, "@extensible")            -> false) *       (* Frozen arrays are not extensible    *)
+  empty_fields (#md : -{ "@class", "@extensible", "@proto" }-) *
+
+  ((a, "length") -> {{ "d", arrayLength, false, false, false }});
+
 (*******************************
  **** Array of Uint8Arrays  ****
  *******************************)
@@ -42,7 +54,7 @@ pred ArrayOfUInt8Arrays (+a:Obj, contents:List, arrayLength:Num) :
 
 (* ----------------------------------------------------------------------------------- *)
 
-pred ArrayOfArraysOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num, contentsLength:Num) :
+pred ArrayOfArraysOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num, +contentsLength:Num) :
     (contents == {{ }}) * (contentsLength == 0),
 
     (#index == num_to_string start) *
@@ -102,6 +114,6 @@ only spec AP_map (xsc, vthis, cfun)
     [[
         JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
         ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs, #keyCount) *
-        types(ret : Obj) * DecodedEncryptedDataKeys(ret, #EDKs, #keyCount)
+        types(ret : Obj) * PreDecodedEncryptedDataKeys(ret, #EDKs, #keyCount)
     ]]
     normal

@@ -221,7 +221,9 @@ struct
         let () =
           try UP.add_spec prog spec
           with _ ->
-            Printf.printf "when trying to build an UP for %s, I died!\n" name
+            L.fail
+              (Format.asprintf "When trying to build an UP for %s, I died!"
+                 name)
         in
         (sspec, true)
 

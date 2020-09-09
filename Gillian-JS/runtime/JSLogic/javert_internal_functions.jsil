@@ -80,6 +80,7 @@ pred JSInternals () :
     ObjectPrototype($lobj_proto) *
     ArrayPrototype ($larr_proto) *
     ArrayBufferPrototype ($lab_proto) *
+    BI_ObjectObject () *
     BI_DataViewObject () *
     DataViewPrototype($ldv_proto) *
     Uint8ArrayPrototype($lui8ar_proto);
@@ -129,9 +130,10 @@ pred GlobalVar (+v, val) :
 
 pred BI_ObjectObject () :
   BIFunctionObject ($lobj, 0, $lobj_proto, "Object_call", "Object_construct") *
-  DataPropConst($lobj, "prototype", $lobj_proto, false) *
-  DataPropGen ($lobj, "create", $lobj_create, true, false, true) *
-  JSBIFunction($lobj_create, "Object_create", 2) * empty_fields($lobj_create : -{ "length" }-);
+  DataPropGen($lobj, "create", $lobj_create, true, false, true) *
+  DataPropGen($lobj, "freeze", $lobj_freeze, true, false, true) *
+  JSBIFunction($lobj_create, "Object_create", 2) * empty_fields($lobj_create : -{ "length" }-) *
+  JSBIFunction($lobj_freeze, "Object_freeze", 2) * empty_fields($lobj_freeze : -{ "length" }-);
 
 pred ObjectPrototype (+proto) :
   JSObjWithProto (proto, null) * empty_fields (proto : -{ "hasOwnProperty" }-) *
@@ -1793,6 +1795,7 @@ proc canPut (l, prop) {
    ***********   BUILT-IN LIBRARIES   ***********
    **********************************************
    ********************************************** *)
+
 
 (* ************************* *)
 (* *** OP_HASOWNPROPERTY *** *)
