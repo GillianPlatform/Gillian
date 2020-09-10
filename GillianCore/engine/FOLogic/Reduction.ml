@@ -1494,74 +1494,7 @@ let rec reduce_lexpr_loop
             L.verbose (fun fmt ->
                 fmt "LSUB: Contains first result: %a" Expr.pp result);
             result
-        | lst, start, num -> (
-            let base_expr = Expr.LstSub (fle1, fle2, fle3) in
-
-            let rec find_inn (lst : Expr.t) (start : Expr.t) =
-              match lst with
-              | LstSub (lst', start', _) -> find_inn lst' start'
-              | _                        -> (lst, start)
-            in
-
-            let inn_lst, inn_start = find_inn lst start in
-            match (inn_lst, inn_start) with
-            | LVar x, _
-              when List.exists
-                     (fun x ->
-                       match x with
-                       | Expr.LVar _ -> false
-                       | _           -> true)
-                     (find_equalities pfs (LVar x)) ->
-                L.verbose (fun fmt ->
-                    fmt "Reducing: %a\n1st: Innermost list and start: %a and %a"
-                      Expr.pp base_expr Expr.pp inn_lst Expr.pp inn_start);
-                let eqs =
-                  List.filter
-                    (fun x ->
-                      match x with
-                      | Expr.LVar _ -> false
-                      | _           -> true)
-                    (find_equalities pfs (LVar x))
-                in
-                let subst_expr = List.hd eqs in
-                let att_exp =
-                  Expr.subst_expr_for_expr (LVar x) subst_expr base_expr
-                in
-                let reduced_att_exp = f att_exp in
-                L.verbose (fun fmt ->
-                    fmt "1st: Attempted and reduced expr: %a and %a" Expr.pp
-                      att_exp Expr.pp reduced_att_exp);
-                if att_exp = reduced_att_exp then LstSub (fle1, fle2, fle3)
-                else reduced_att_exp
-            | _, LVar x
-              when List.exists
-                     (fun x ->
-                       match x with
-                       | Expr.LVar _ -> false
-                       | _           -> true)
-                     (find_equalities pfs (LVar x)) ->
-                L.verbose (fun fmt ->
-                    fmt "Reducing: %a\n2nd: Innermost list and start: %a and %a"
-                      Expr.pp base_expr Expr.pp inn_lst Expr.pp inn_start);
-                let eqs =
-                  List.filter
-                    (fun x ->
-                      match x with
-                      | Expr.LVar _ -> false
-                      | _           -> true)
-                    (find_equalities pfs (LVar x))
-                in
-                let subst_expr = List.hd eqs in
-                let att_exp =
-                  Expr.subst_expr_for_expr (LVar x) subst_expr base_expr
-                in
-                let reduced_att_exp = f att_exp in
-                L.verbose (fun fmt ->
-                    fmt "2nd: Attempted and reduced expr: %a and %a" Expr.pp
-                      att_exp Expr.pp reduced_att_exp);
-                if att_exp = reduced_att_exp then LstSub (fle1, fle2, fle3)
-                else reduced_att_exp
-            | _, _ -> LstSub (fle1, fle2, fle3) ) )
+        | _ -> LstSub (fle1, fle2, fle3) )
     (* CHECK: FTimes and Div are the same, how does the 'when' scope? *)
     | BinOp (lel, op, ler) -> (
         let flel = f lel in
@@ -1903,9 +1836,6 @@ and check_ge_zero ?(top_level = false) (pfs : PFS.t) (e : Expr.t) : bool option
             ce.symb (Some true) )
 
 and substitute_in_numeric_expr (le_to_find : Expr.t) (le_to_subst : Expr.t) le =
-  L.verbose (fun fmt ->
-      fmt "SINE: %a becomes %a in %a" Expr.pp le_to_find Expr.pp le_to_subst
-        Expr.pp le);
   Expr.subst_expr_for_expr le_to_find le_to_subst le
 
 and substitute_in_numeric_formula (le_to_find : Expr.t) (le_to_subst : Expr.t) f
