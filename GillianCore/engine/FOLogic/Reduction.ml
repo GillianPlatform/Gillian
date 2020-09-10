@@ -12,8 +12,9 @@ let normalise_cat (f : Expr.t -> Expr.t) (les : Expr.t list) : Expr.t =
   (* Recursively process each catted list and destroy inner LstCats *)
   let nles =
     List.concat
-      (List.map
-         (fun x ->
+      (List.mapi
+         (fun i x ->
+           (* L.verbose (fun fmt -> fmt "Cat: %d: %a" i Expr.pp x); *)
            let fx = f x in
            match fx with
            | NOp (LstCat, les) -> les
@@ -854,6 +855,14 @@ let rec reduce_lexpr_loop
     (gamma : TypEnv.t)
     (le : Expr.t) =
   let f = reduce_lexpr_loop ~unification ~reduce_lvars pfs gamma in
+
+  (* L.verbose (fun fmt -> fmt "Reducing Expr: %a" Expr.pp le); *)
+  let rec find_lstsub_inn (lst : Expr.t) (start : Expr.t) =
+    match lst with
+    | LstSub (lst', start', _) -> find_lstsub_inn lst' start'
+    | _                        -> (lst, start)
+  in
+
   let result : Expr.t =
     match le with
     | BinOp (Lit (LList ll), Equal, Lit (LList lr)) -> Lit (Bool (ll = lr))
@@ -1134,6 +1143,7 @@ let rec reduce_lexpr_loop
           | [ x ] -> x
           | _     -> NOp (SetInter, fles) )
     | UnOp (FUnaryMinus, UnOp (FUnaryMinus, e)) -> f e
+    | UnOp (LstLen, LstSub (_, _, e)) -> f e
     | UnOp (op, le) -> (
         let fle = f le in
         let def = Expr.UnOp (op, fle) in
@@ -1254,6 +1264,86 @@ let rec reduce_lexpr_loop
             | FUnaryMinus when lexpr_is_number ~gamma def ->
                 simplify_arithmetic_lexpr pfs gamma def
             | _ -> UnOp (op, fle) ) )
+    (* Nested L-sub *)
+    | LstSub (LstSub (ile1, ile2, ile3), fle2, fle3)
+      when match find_lstsub_inn ile1 ile2 with
+           | LVar x, _
+             when List.exists
+                    (fun x ->
+                      match x with
+                      | Expr.LVar _ -> false
+                      | _           -> true)
+                    (find_equalities pfs (LVar x)) -> true
+           | _, LVar x
+             when List.exists
+                    (fun x ->
+                      match x with
+                      | Expr.LVar _ -> false
+                      | _           -> true)
+                    (find_equalities pfs (LVar x)) -> true
+           | _ -> false -> (
+        let fle1 = Expr.LstSub (ile1, ile2, ile3) in
+        let base_expr = Expr.LstSub (fle1, fle2, fle3) in
+
+        let inn_lst, inn_start = find_lstsub_inn ile1 ile2 in
+        match (inn_lst, inn_start) with
+        | LVar x, _
+          when List.exists
+                 (fun x ->
+                   match x with
+                   | Expr.LVar _ -> false
+                   | _           -> true)
+                 (find_equalities pfs (LVar x)) ->
+            L.verbose (fun fmt ->
+                fmt "Reducing: %a\n1st: Innermost list and start: %a and %a"
+                  Expr.pp base_expr Expr.pp inn_lst Expr.pp inn_start);
+            let eqs =
+              List.filter
+                (fun x ->
+                  match x with
+                  | Expr.LVar _ -> false
+                  | _           -> true)
+                (find_equalities pfs (LVar x))
+            in
+            let subst_expr = List.hd eqs in
+            let att_exp =
+              Expr.subst_expr_for_expr (LVar x) subst_expr base_expr
+            in
+            let reduced_att_exp = f att_exp in
+            L.verbose (fun fmt ->
+                fmt "1st: Attempted and reduced expr: %a and %a" Expr.pp att_exp
+                  Expr.pp reduced_att_exp);
+            if att_exp = reduced_att_exp then LstSub (fle1, fle2, fle3)
+            else reduced_att_exp
+        | _, LVar x
+          when List.exists
+                 (fun x ->
+                   match x with
+                   | Expr.LVar _ -> false
+                   | _           -> true)
+                 (find_equalities pfs (LVar x)) ->
+            L.verbose (fun fmt ->
+                fmt "Reducing: %a\n2nd: Innermost list and start: %a and %a"
+                  Expr.pp base_expr Expr.pp inn_lst Expr.pp inn_start);
+            let eqs =
+              List.filter
+                (fun x ->
+                  match x with
+                  | Expr.LVar _ -> false
+                  | _           -> true)
+                (find_equalities pfs (LVar x))
+            in
+            let subst_expr = List.hd eqs in
+            let att_exp =
+              Expr.subst_expr_for_expr (LVar x) subst_expr base_expr
+            in
+            let reduced_att_exp = f att_exp in
+            L.verbose (fun fmt ->
+                fmt "2nd: Attempted and reduced expr: %a and %a" Expr.pp att_exp
+                  Expr.pp reduced_att_exp);
+            if att_exp = reduced_att_exp then LstSub (fle1, fle2, fle3)
+            else reduced_att_exp
+        | _, _ -> LstSub (fle1, fle2, fle3) )
     | LstSub (le1, le2, le3) -> (
         let fle1 = f le1 in
         let fle2 = f le2 in
@@ -1325,9 +1415,11 @@ let rec reduce_lexpr_loop
                    (Array.sub (Array.of_list lst) (int_of_float _start)
                       (int_of_float _end)))
             with _ ->
+              L.verbose (fun fmt ->
+                  fmt "ILE: %a" Expr.pp (LstSub (fle1, fle2, fle3)));
               raise
                 (ReductionException
-                   (LstSub (le1, le2, le3), "Invalid List Expression")) )
+                   (LstSub (fle1, fle2, fle3), "Invalid List Expression")) )
         | Lit (LList lst), Lit (Num _start), Lit (Num _end) -> (
             try
               Lit
@@ -1336,137 +1428,140 @@ let rec reduce_lexpr_loop
                       (Array.sub (Array.of_list lst) (int_of_float _start)
                          (int_of_float _end))))
             with _ ->
+              L.verbose (fun fmt ->
+                  fmt "ILE: %a" Expr.pp (LstSub (fle1, fle2, fle3)));
               raise
                 (ReductionException
-                   (LstSub (le1, le2, le3), "Invalid List Expression")) )
-        | NOp (LstCat, lel :: ler), fle2, fle3 -> (
-            L.(
-              tmi (fun m ->
-                  m "RED: %s"
-                    ((Fmt.to_to_string Expr.pp) (LstSub (fle1, fle2, fle3)))));
-            let fle2 = f (substitute_for_length pfs fle2) in
-            let fle3 = f (substitute_for_length pfs fle3) in
-            let start_in_first = f (BinOp (UnOp (LstLen, lel), FMinus, fle2)) in
-            let start_beyond_first =
-              f (BinOp (fle2, FMinus, UnOp (LstLen, lel)))
+                   (LstSub (fle1, fle2, fle3), "Invalid List Expression")) )
+        (* COMPLEX: LSTSUB AND LSTCAT *)
+        | NOp (LstCat, lel :: ler), fle2, fle3
+          when (* Sub starts after first cat *)
+               let lel_len = Expr.UnOp (LstLen, lel) in
+               let diff = f (BinOp (fle2, FMinus, lel_len)) in
+               check_ge_zero ~top_level:true pfs diff = Some true ->
+            L.verbose (fun fmt ->
+                fmt "LSUB: Start after first: %a" Expr.pp
+                  (LstSub (fle1, fle2, fle3)));
+            let result =
+              f
+                (LstSub
+                   ( NOp (LstCat, ler),
+                     BinOp (fle2, FMinus, Expr.UnOp (LstLen, lel)),
+                     fle3 ))
             in
-            let end_in_first =
-              f (BinOp (UnOp (LstLen, lel), FMinus, BinOp (fle2, FPlus, fle3)))
+            L.verbose (fun fmt ->
+                fmt "LSUB: Start after first result: %a" Expr.pp result);
+            result
+        | NOp (LstCat, EList lel :: ler), Lit (Num n), fle3 when n > 0. ->
+            (* Sub starts inside first cat *)
+            L.verbose (fun fmt ->
+                fmt "LSUB: Start inside first: %a" Expr.pp
+                  (LstSub (fle1, fle2, fle3)));
+            let rest_of_lel =
+              Expr.LstSub
+                ( EList lel,
+                  fle2,
+                  BinOp
+                    (Lit (Num (float_of_int (List.length lel))), FMinus, fle2)
+                )
             in
-            let end_beyond_first =
-              f (BinOp (BinOp (fle2, FPlus, fle3), FMinus, UnOp (LstLen, lel)))
+            let result =
+              f (LstSub (NOp (LstCat, rest_of_lel :: ler), Lit (Num 0.), fle3))
+            in
+            L.verbose (fun fmt ->
+                fmt "LSUB: Start inside first result: %a" Expr.pp result);
+            result
+        | NOp (LstCat, lel :: ler), Lit (Num 0.), fle3
+          when (* Sub starts after first cat *)
+               let lel_len = Expr.UnOp (LstLen, lel) in
+               let diff = f (BinOp (fle3, FMinus, lel_len)) in
+               check_ge_zero ~top_level:true pfs diff = Some true ->
+            L.verbose (fun fmt ->
+                fmt "LSUB: Contains first: %a" Expr.pp
+                  (LstSub (fle1, fle2, fle3)));
+            let result =
+              f
+                (NOp
+                   ( LstCat,
+                     [
+                       lel;
+                       LstSub
+                         ( NOp (LstCat, ler),
+                           Lit (Num 0.),
+                           BinOp (fle3, FMinus, UnOp (LstLen, lel)) );
+                     ] ))
+            in
+            L.verbose (fun fmt ->
+                fmt "LSUB: Contains first result: %a" Expr.pp result);
+            result
+        | lst, start, num -> (
+            let base_expr = Expr.LstSub (fle1, fle2, fle3) in
+
+            let rec find_inn (lst : Expr.t) (start : Expr.t) =
+              match lst with
+              | LstSub (lst', start', _) -> find_inn lst' start'
+              | _                        -> (lst, start)
             in
 
-            L.(
-              tmi (fun m ->
-                  m
-                    "Start in first: %s\n\
-                     End in first: %s\n\
-                     Start beyond first: %s\n\
-                     End beyond first%s"
-                    ((Fmt.to_to_string Expr.pp) start_in_first)
-                    ((Fmt.to_to_string Expr.pp) end_in_first)
-                    ((Fmt.to_to_string Expr.pp) start_beyond_first)
-                    ((Fmt.to_to_string Expr.pp) end_beyond_first)));
-            match
-              ( check_ge_zero ~top_level:true pfs start_in_first,
-                check_ge_zero ~top_level:true pfs start_beyond_first,
-                check_ge_zero ~top_level:true pfs end_in_first,
-                check_ge_zero ~top_level:true pfs end_beyond_first )
-            with
-            (* Sublist certainly starts beyond first *)
-            | _, Some true, _, _ ->
-                f (LstSub (NOp (LstCat, ler), start_beyond_first, fle3))
-            (* Sublist fully contained in first *)
-            | Some true, _, Some true, _ -> f (LstSub (lel, fle2, fle3))
-            (* Sublist contains part of first *)
-            | Some true, _, _, Some true ->
-                let prefix = f (LstSub (lel, fle2, start_in_first)) in
-                let suffix =
-                  f
-                    (LstSub
-                       ( NOp (LstCat, ler),
-                         Lit (Num 0.),
-                         BinOp (fle3, FMinus, start_in_first) ))
+            let inn_lst, inn_start = find_inn lst start in
+            match (inn_lst, inn_start) with
+            | LVar x, _
+              when List.exists
+                     (fun x ->
+                       match x with
+                       | Expr.LVar _ -> false
+                       | _           -> true)
+                     (find_equalities pfs (LVar x)) ->
+                L.verbose (fun fmt ->
+                    fmt "Reducing: %a\n1st: Innermost list and start: %a and %a"
+                      Expr.pp base_expr Expr.pp inn_lst Expr.pp inn_start);
+                let eqs =
+                  List.filter
+                    (fun x ->
+                      match x with
+                      | Expr.LVar _ -> false
+                      | _           -> true)
+                    (find_equalities pfs (LVar x))
                 in
-                f (NOp (LstCat, [ prefix; suffix ]))
-            (* Sublist starts in first, but we don't know more *)
-            | Some true, _, _, _ -> (
-                match (lel, fle2) with
-                (* Cut to start from 0. *)
-                | EList les, Lit (Num l2) when l2 > 0. ->
-                    L.verbose (fun fmt -> fmt "Case 1");
-                    let les' : Expr.t =
-                      EList
-                        (Array.to_list
-                           (Array.sub (Array.of_list les) (int_of_float l2)
-                              (List.length les - int_of_float l2)))
-                    in
-                    f (LstSub (NOp (LstCat, les' :: ler), Lit (Num 0.), fle3))
-                | EList les, Lit (Num 0.) ->
-                    L.verbose (fun fmt -> fmt "Case 2");
-                    let l1 = List.length les in
-                    let p3, m3 = collect_pluses_minuses fle3 in
-                    let nump, pluses = numbers_and_rest p3 in
-                    let numm, minuses = numbers_and_rest m3 in
-                    let nump = int_of_float nump in
-                    (* Must have something positive and nothing negative in numbers *)
-                    if nump > 0 && nump <= l1 && numm = 0. then (
-                      L.verbose (fun fmt ->
-                          fmt "List: %a Start: %d End: %d" Expr.pp (EList les)
-                            nump
-                            (List.length les - nump));
-                      let les' : Expr.t =
-                        EList
-                          (Array.to_list (Array.sub (Array.of_list les) 0 nump))
-                      in
-                      let les'' : Expr.t =
-                        EList
-                          (Array.to_list
-                             (Array.sub (Array.of_list les) nump
-                                (List.length les - nump)))
-                      in
-                      f
-                        (NOp
-                           ( LstCat,
-                             [
-                               les';
-                               LstSub
-                                 ( NOp (LstCat, les'' :: ler),
-                                   Lit (Num 0.),
-                                   BinOp
-                                     ( fle3,
-                                       FMinus,
-                                       Lit (Num (float_of_int nump)) ) );
-                             ] )) )
-                    else LstSub (fle1, fle2, fle3)
-                | _, _ -> LstSub (fle1, fle2, fle3) )
-            | _ -> LstSub (fle1, fle2, fle3) )
-        | LVar x, start, num
-          when List.exists
-                 (fun x ->
-                   match x with
-                   | Expr.LVar _ -> false
-                   | _           -> true)
-                 (find_equalities pfs (LVar x)) ->
-            let eqs =
-              List.filter
-                (fun x ->
-                  match x with
-                  | Expr.LVar _ -> false
-                  | _           -> true)
-                (find_equalities pfs (LVar x))
-            in
-            let subst_expr = List.hd eqs in
-            let new_start =
-              Expr.subst_expr_for_expr (LVar x) subst_expr start
-            in
-            let new_num = Expr.subst_expr_for_expr (LVar x) subst_expr num in
-            let att_exp = Expr.LstSub (subst_expr, new_start, new_num) in
-            let reduced_att_exp = f att_exp in
-            if att_exp = reduced_att_exp then LstSub (fle1, fle2, fle3)
-            else reduced_att_exp
-        | _, _, _ -> LstSub (fle1, fle2, fle3) )
+                let subst_expr = List.hd eqs in
+                let att_exp =
+                  Expr.subst_expr_for_expr (LVar x) subst_expr base_expr
+                in
+                let reduced_att_exp = f att_exp in
+                L.verbose (fun fmt ->
+                    fmt "1st: Attempted and reduced expr: %a and %a" Expr.pp
+                      att_exp Expr.pp reduced_att_exp);
+                if att_exp = reduced_att_exp then LstSub (fle1, fle2, fle3)
+                else reduced_att_exp
+            | _, LVar x
+              when List.exists
+                     (fun x ->
+                       match x with
+                       | Expr.LVar _ -> false
+                       | _           -> true)
+                     (find_equalities pfs (LVar x)) ->
+                L.verbose (fun fmt ->
+                    fmt "Reducing: %a\n2nd: Innermost list and start: %a and %a"
+                      Expr.pp base_expr Expr.pp inn_lst Expr.pp inn_start);
+                let eqs =
+                  List.filter
+                    (fun x ->
+                      match x with
+                      | Expr.LVar _ -> false
+                      | _           -> true)
+                    (find_equalities pfs (LVar x))
+                in
+                let subst_expr = List.hd eqs in
+                let att_exp =
+                  Expr.subst_expr_for_expr (LVar x) subst_expr base_expr
+                in
+                let reduced_att_exp = f att_exp in
+                L.verbose (fun fmt ->
+                    fmt "2nd: Attempted and reduced expr: %a and %a" Expr.pp
+                      att_exp Expr.pp reduced_att_exp);
+                if att_exp = reduced_att_exp then LstSub (fle1, fle2, fle3)
+                else reduced_att_exp
+            | _, _ -> LstSub (fle1, fle2, fle3) ) )
     (* CHECK: FTimes and Div are the same, how does the 'when' scope? *)
     | BinOp (lel, op, ler) -> (
         let flel = f lel in
@@ -1727,7 +1822,10 @@ and simplify_arithmetic_lexpr (pfs : PFS.t) (gamma : TypEnv.t) le =
           f (BinOp (UnOp (FUnaryMinus, l), FPlus, UnOp (FUnaryMinus, r)))
       | _                   -> le )
   (* FPlus - we collect the positives and the negatives, see what we have and deal with them *)
-  | BinOp (l, FPlus, r) -> compose_pluses_minuses (collect_pluses_minuses le)
+  | BinOp (l, FPlus, r) ->
+      let cl = expr_to_cnum l in
+      let cr = expr_to_cnum r in
+      cnum_to_expr (cnum_plus cl cr)
   | _ -> le
 
 and collect_pluses_minuses (le : Expr.t) : Expr.t list * Expr.t list =
@@ -1771,16 +1869,6 @@ and numbers_and_rest (numbers : Expr.t list) =
       | _                -> (nump, num :: restp))
     (0., []) numbers
 
-and substitute_for_length pfs le =
-  (* L.(verbose (fun m -> m "Inside sub_for_len: %s" ((Fmt.to_to_string Expr.pp) le))); *)
-  PFS.fold_left
-    (fun acc form ->
-      match form with
-      | Eq (UnOp (LstLen, lst'), res) | Eq (res, UnOp (LstLen, lst')) ->
-          substitute_in_numeric_expr res (Expr.UnOp (LstLen, lst')) acc
-      | _ -> acc)
-    le pfs
-
 and check_ge_zero ?(top_level = false) (pfs : PFS.t) (e : Expr.t) : bool option
     =
   (* L.verbose (fun fmt -> fmt "Check >= 0: %a" Expr.pp e); *)
@@ -1806,6 +1894,7 @@ and check_ge_zero ?(top_level = false) (pfs : PFS.t) (e : Expr.t) : bool option
           Expr.Map.fold
             (fun e' c result ->
               if result <> Some true then result
+              else if e' = e then None
               else if c > 0. then f e'
               else
                 match f (UnOp (FUnaryMinus, e')) with
@@ -1814,28 +1903,10 @@ and check_ge_zero ?(top_level = false) (pfs : PFS.t) (e : Expr.t) : bool option
             ce.symb (Some true) )
 
 and substitute_in_numeric_expr (le_to_find : Expr.t) (le_to_subst : Expr.t) le =
-  let f = substitute_in_numeric_expr le_to_find le_to_subst in
-  let list_subset la lb = List.for_all (fun x -> List.mem x lb) la in
-  let list_dif la lb = List.filter (fun x -> not (List.mem x lb)) la in
-  match le with
-  | le when lexpr_is_number le -> (
-      let plf, mif = collect_pluses_minuses le_to_find in
-      let ple, mie = collect_pluses_minuses le in
-      match (list_subset plf ple, list_subset mif mie) with
-      | true, true ->
-          (* L.(
-             verbose (fun m ->
-                 m "Subset found: %s %s %s"
-                   ((Fmt.to_to_string Expr.pp) le)
-                   ((Fmt.to_to_string Expr.pp) le_to_find)
-                   ((Fmt.to_to_string Expr.pp) le_to_subst))); *)
-          let pls, mis = collect_pluses_minuses le_to_subst in
-          let pluses = pls @ list_dif ple plf in
-          let minuses = mis @ list_dif mie mif in
-          compose_pluses_minuses (pluses, minuses)
-      | _          -> le )
-  | LstSub (le1, le2, le3) -> LstSub (le1, f le2, f le3)
-  | _ -> le
+  L.verbose (fun fmt ->
+      fmt "SINE: %a becomes %a in %a" Expr.pp le_to_find Expr.pp le_to_subst
+        Expr.pp le);
+  Expr.subst_expr_for_expr le_to_find le_to_subst le
 
 and substitute_in_numeric_formula (le_to_find : Expr.t) (le_to_subst : Expr.t) f
     =
@@ -1927,7 +1998,7 @@ let rec reduce_formula_loop
     Formula.t =
   let f = reduce_formula_loop unification pfs gamma in
   let fe = reduce_lexpr_loop ~unification pfs gamma in
-
+  (* L.verbose (fun fmt -> fmt "Reducing Formula: %a" Formula.pp a); *)
   let result : Formula.t =
     match a with
     | Eq (e1, e2) when e1 = e2 && lexpr_is_list gamma e1 -> True
@@ -2186,34 +2257,22 @@ let rec reduce_formula_loop
                 else default e1 e2 re1 re2
             | _, _ -> default e1 e2 re1 re2 )
     | Less (e1, e2) ->
-        let re1 = fe e1 in
-        let re2 = fe e2 in
-        if PFS.mem pfs (LessEq (re2, re1)) then False
-        else if PFS.mem pfs (Less (re2, re1)) then False
+        if PFS.mem pfs (LessEq (e2, e1)) then False
+        else if PFS.mem pfs (Less (e2, e1)) then False
         else
-          let le = Option.get (Formula.to_expr (Less (re1, re2))) in
+          let le = Option.get (Formula.to_expr (Less (e1, e2))) in
           let re = fe le in
           let result, _ = Option.get (Formula.lift_logic_expr re) in
           result
-    | LessEq (e1, e2) -> (
-        let re1 = fe e1 in
-        let re2 = fe e2 in
-        match (re1, re2) with
-        | Lit (Num x), Lit (Num y) -> if x <= y then True else False
-        | Lit (Num x), Lit (Int y) ->
-            if x <= Float.of_int y then True else False
-        | Lit (Int x), Lit (Num y) ->
-            if Float.of_int x <= y then True else False
-        | Lit (Int x), Lit (Int y) -> if x <= y then True else False
-        | re1, re2                 ->
-            if PFS.mem pfs (LessEq (re2, re1)) then Eq (re1, re2)
-            else if PFS.mem pfs (Less (re1, re2)) then True
-            else if PFS.mem pfs (Less (re2, re1)) then False
-            else
-              let le = Option.get (Formula.to_expr (LessEq (re1, re2))) in
-              let re = fe le in
-              let result, _ = Option.get (Formula.lift_logic_expr re) in
-              result )
+    | LessEq (e1, e2) ->
+        if PFS.mem pfs (LessEq (e2, e1)) then Eq (e1, e2)
+        else if PFS.mem pfs (Less (e1, e2)) then True
+        else if PFS.mem pfs (Less (e2, e1)) then False
+        else
+          let le = Option.get (Formula.to_expr (LessEq (e1, e2))) in
+          let re = fe le in
+          let result, _ = Option.get (Formula.lift_logic_expr re) in
+          result
     | SetMem (leb, NOp (SetUnion, lle)) ->
         let rleb = fe leb in
         let formula : Formula.t =

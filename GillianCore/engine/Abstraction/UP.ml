@@ -125,7 +125,13 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
       | UnOp (_, e) -> f e
       | BinOp (e1, _, e2) -> join [ e1; e2 ]
       | NOp (_, le) | EList le | ESet le -> join le
-      | LstSub (e1, e2, e3) -> join [ e1; e2; e3 ] )
+      | LstSub (e1, e2, e3) ->
+          let result = join [ e1; e2; e3 ] in
+          L.verbose (fun fmt ->
+              fmt "Missing for %a: %a" Expr.pp e
+                Fmt.(brackets (list ~sep:semi kb_pp))
+                result);
+          result )
 
 (** [is_known kb e] returns true if the expression [e] is known
     under knowledge base [kb], and false otherwise *)
@@ -176,13 +182,16 @@ let rec learn_expr
   | NOp (LstCat, []) -> f base_expr (EList [])
   | NOp (LstCat, [ x ]) -> f base_expr x
   | NOp (LstCat, e :: rest) -> (
-      let overall_length : Expr.t = UnOp (LstLen, base_expr) in
-      let e_length : Expr.t =
-        match e with
-        | Lit (LList le) -> Lit (Num (float_of_int (List.length le)))
-        | EList le       -> Lit (Num (float_of_int (List.length le)))
-        | _              -> UnOp (LstLen, e)
+      let list_length (lst : Expr.t) : Expr.t =
+        match lst with
+        | Lit (LList l)      -> Lit (Num (float_of_int (List.length l)))
+        | EList l            -> Lit (Num (float_of_int (List.length l)))
+        | LstSub (_, _, len) -> len
+        | _                  -> UnOp (LstLen, lst)
       in
+
+      let overall_length : Expr.t = list_length base_expr in
+      let e_length : Expr.t = list_length e in
       match is_known_expr kb e_length with
       | true  ->
           let e_base_expr = Expr.LstSub (base_expr, Lit (Num 0.), e_length) in

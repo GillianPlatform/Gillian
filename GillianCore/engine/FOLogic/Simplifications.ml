@@ -934,7 +934,9 @@ let simplify_implication
   PFS.substitution subst rpfs;
 
   (* Additional *)
+  L.verbose (fun fmt -> fmt "REDUCING RPFS:\n%a" PFS.pp rpfs);
   PFS.map_inplace (Reduction.reduce_formula ~gamma ~pfs:lpfs) rpfs;
+  L.verbose (fun fmt -> fmt "REDUCED RPFS:\n%a" PFS.pp rpfs);
 
   sanitise_pfs_no_store gamma rpfs;
   clean_up_stuff exists lpfs rpfs;
