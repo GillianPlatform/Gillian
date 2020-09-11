@@ -2004,6 +2004,19 @@ let rec reduce_formula_loop
   let result : Formula.t =
     match a with
     | Eq (e1, e2) when e1 = e2 && lexpr_is_list gamma e1 -> True
+    (* FIXME: INTEGER BYTE-BY-BYTE BREAKDOWN *)
+    | Eq
+        ( Lit (Num n),
+          BinOp (BinOp (Lit (Num 256.), FTimes, LVar b1), FPlus, LVar b0) )
+      when PFS.mem pfs (LessEq (Lit (Num 0.), LVar b0))
+           && PFS.mem pfs (LessEq (Lit (Num 0.), LVar b1))
+           && PFS.mem pfs (Less (LVar b0, Lit (Num 256.)))
+           && PFS.mem pfs (Less (LVar b1, Lit (Num 256.))) ->
+        if n > 65535. then False
+        else
+          let vb1 = floor (n /. 256.) in
+          let vb0 = n -. vb1 in
+          Formula.And (Eq (LVar b1, Lit (Num vb1)), Eq (LVar b0, Lit (Num vb0)))
     | Eq (Lit (LList ll), Lit (LList lr)) -> if ll = lr then True else False
     | Eq (EList le, Lit (LList ll)) | Eq (Lit (LList ll), EList le) ->
         if List.length ll <> List.length le then False

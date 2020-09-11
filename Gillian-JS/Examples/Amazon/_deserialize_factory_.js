@@ -324,7 +324,9 @@ function deserializeEncryptedDataKeys(buffer, startPos) {
 /*
     @pred AlgorithmSuiteIdentifierObject(o) :
         JSObject(o) *
-        DataProp(o, "20", "ALG_AES128_GCM_IV12_TAG16") * DataProp(o, "ALG_AES128_GCM_IV12_TAG16", 20);
+        DataProp(o, "20",  "ALG_AES128_GCM_IV12_TAG16") * DataProp(o, "ALG_AES128_GCM_IV12_TAG16", 20) *
+        DataProp(o, "70",  "ALG_AES192_GCM_IV12_TAG16") * DataProp(o, "ALG_AES192_GCM_IV12_TAG16", 70) *
+        DataProp(o, "120", "ALG_AES256_GCM_IV12_TAG16") * DataProp(o, "ALG_AES256_GCM_IV12_TAG16", 120);
 */
 var AlgorithmSuiteIdentifier;
 
@@ -338,7 +340,9 @@ var AlgorithmSuiteIdentifier;
 
 /*
     @pred pure AlgorithmSuite(+numId, stringId, ivLength, tagLength) :
-        (numId == 20) * (stringId == "ALG_AES128_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128);
+        (numId == 20)  * (stringId == "ALG_AES128_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128),
+        (numId == 70)  * (stringId == "ALG_AES192_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128),
+        (numId == 120) * (stringId == "ALG_AES256_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128);
 
     @pred AlgorithmSuiteObject(+aso: Obj, ivLength: Num, tagLength: Num) :
         JSObject(aso) *
