@@ -627,7 +627,8 @@ let simplify_pfs_and_gamma
                            [ EList (List.append prepend [ elem ]); append ] ) ))
             | _ -> `Replace whole )
         | Eq (UnOp (LstLen, le), Lit (Num len))
-        | Eq (Lit (Num len), UnOp (LstLen, le)) -> (
+        | Eq (Lit (Num len), UnOp (LstLen, le))
+          when not unification -> (
             match Arith_Utils.is_int len with
             | false -> stop_explain "List length not an integer."
             | true  ->

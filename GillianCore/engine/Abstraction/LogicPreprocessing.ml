@@ -18,7 +18,7 @@ let rec auto_unfold
           Asrt.Star (asrt1, asrt2))
   | Pred (name, args) -> (
       try
-        (* L.verbose (fun fmt -> fmt "AutoUnfold: %a" Asrt.pp asrt); *)
+        L.tmi (fun fmt -> fmt "AutoUnfold: %a : %s" Asrt.pp asrt name);
         let pred : Pred.t = Hashtbl.find predicates name in
         if
           (Hashtbl.find rec_tbl pred.pred_name && not unfold_rec_predicates)
@@ -306,6 +306,7 @@ let explicit_param_types
   let copy_lemmas = Hashtbl.create small_tbl_size in
 
   let join_preds (pred1 : Pred.t) (pred2 : Pred.t) : Pred.t =
+    L.tmi (fun fmt -> fmt "Join preds: %s, %s" pred1.pred_name pred2.pred_name);
     if
       pred1.pred_name <> pred2.pred_name
       || pred1.pred_num_params <> pred2.pred_num_params

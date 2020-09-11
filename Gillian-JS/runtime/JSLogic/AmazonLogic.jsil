@@ -104,7 +104,7 @@ lemma ElementsAppend(view, readPos, elementCount, fieldCount, elementList, eleme
 **** ENCRYPTED DATA KEYS ****
 *****************************)
 
-pred RawEncryptedDataKeys(+rawHeaderData, +start, keyCount:Num, EDKs:List, EDKLength:Num) :
+nounfold pred RawEncryptedDataKeys(+rawHeaderData, +start, keyCount:Num, EDKs:List, EDKLength:Num) :
     (#rawEC == l-sub (rawHeaderData, start, 2)) *
     rawToUInt16(#rawEC, false, keyCount) *
     (0 <# keyCount) *

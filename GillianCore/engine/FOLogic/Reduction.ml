@@ -905,8 +905,9 @@ let rec reduce_lexpr_loop
         | Lit l :: _ -> Lit l
         | _          ->
             raise
-              (Exceptions.Impossible "reduce_lexpr: guaranteed by match/filter")
-        )
+              (Exceptions.Impossible
+                 "reduce_lexpr: LVar x when reducing lvars: guaranteed by \
+                  match/filter") )
     (* Base lists *)
     | EList les -> (
         let fles = List.map f les in
@@ -929,7 +930,8 @@ let rec reduce_lexpr_loop
                   | _          ->
                       raise
                         (Exceptions.Impossible
-                           "reduce_lexpr: guaranteed by match/filter"))
+                           "reduce_lexpr: all literals: guaranteed by \
+                            match/filter"))
                 fles
             in
             Lit (LList lits) )
@@ -1346,8 +1348,8 @@ let rec reduce_lexpr_loop
         | _, _ -> LstSub (fle1, fle2, fle3) )
     | LstSub (le1, le2, le3) -> (
         let fle1 = f le1 in
-        let fle2 = f le2 in
-        let fle3 = f le3 in
+        let fle2 = substitute_for_list_length pfs (f le2) in
+        let fle3 = substitute_for_list_length pfs (f le3) in
         (* L.verbose (fun fmt ->
             fmt "REDUCTION: LstSub(%a, %a, %a)" Expr.pp fle1 Expr.pp fle2
               Expr.pp fle3); *)
@@ -1392,19 +1394,14 @@ let rec reduce_lexpr_loop
                 (fun (x, lvars) -> Containers.SS.mem lx lvars)
                 candidates
             in
-            (* L.verbose (fun fmt ->
-                fmt "Candidates: %s"
-                  (String.concat ", "
-                     (List.map
-                        (fun (c, _) -> Fmt.to_to_string Expr.pp c)
-                        candidates))); *)
-            match fst (List.hd candidates) with
+            let leading_candidate = fst (List.hd candidates) in
+            match leading_candidate with
             | LVar ly when ly = lx -> LVar lx
-            | NOp (LstCat, [ flx; _ ]) when flx = LVar lx -> LVar lx
+            | NOp (LstCat, flx :: _) when flx = LVar lx -> LVar lx
             | _ ->
                 raise
                   (Exceptions.Impossible
-                     "reduce_lexpr: guaranteed by match/filter") )
+                     "reduce_lexpr: candidates: guaranteed by match/filter") )
         | NOp (LstCat, EList les :: _), Lit (Num s), Lit (Num f)
           when List.length les >= int_of_float (s +. f) ->
             LstSub (EList les, fle2, fle3)
@@ -1836,22 +1833,97 @@ and check_ge_zero ?(top_level = false) (pfs : PFS.t) (e : Expr.t) : bool option
             ce.symb (Some true) )
 
 and substitute_in_numeric_expr (le_to_find : Expr.t) (le_to_subst : Expr.t) le =
-  Expr.subst_expr_for_expr le_to_find le_to_subst le
+  let f = substitute_in_numeric_expr le_to_find le_to_subst in
+  match le_to_find with
+  (* Understand if le_to_find appears with a precise coefficient, and if it does, substitute *)
+  | le_tf when lexpr_is_number le_tf -> (
+      let c_le_tf = expr_to_cnum le_tf in
+      let c_le_tf_symb = Expr.Map.bindings c_le_tf.symb in
+      match c_le_tf_symb with
+      | [] -> le
+      | _  -> (
+          let c_le = expr_to_cnum le in
+          let coeffs =
+            List.map
+              (fun (factor, _) -> Expr.Map.find_opt factor c_le.symb)
+              c_le_tf_symb
+          in
+          match List.for_all (fun c -> c <> None) coeffs with
+          | false -> le
+          | true  -> (
+              let scaled_coeffs =
+                List.map2
+                  (fun c (_, s) -> Option.get c /. s)
+                  coeffs c_le_tf_symb
+              in
+              L.verbose (fun fmt ->
+                  fmt "SINE :: letf: %a, le: %a" Expr.pp le_to_find Expr.pp le);
+              L.verbose (fun fmt ->
+                  fmt "Coefficients in le    :: %a"
+                    Fmt.(brackets (list ~sep:comma float))
+                    (List.map (fun (_, v) -> v) c_le_tf_symb));
+              L.verbose (fun fmt ->
+                  fmt "Coefficients in le_tf :: %a"
+                    Fmt.(brackets (list ~sep:comma float))
+                    scaled_coeffs);
+              let coeff = List.hd scaled_coeffs in
+              match List.for_all (fun x -> x = coeff) scaled_coeffs with
+              | false -> le
+              | true  -> (
+                  let base_diff = c_le.conc -. c_le_tf.conc in
+                  match
+                    (c_le.conc >= 0. && base_diff >= 0.)
+                    || (c_le.conc < 0. && base_diff <= 0.)
+                  with
+                  | false -> le
+                  | true  ->
+                      let c_le_tf = cnum_cmult coeff c_le_tf in
+                      let c_diff = cnum_minus c_le c_le_tf in
+                      L.verbose (fun fmt ->
+                          fmt "After subtraction: %a" Expr.pp
+                            (cnum_to_expr c_diff));
+                      let c_to_subst =
+                        cnum_cmult coeff (expr_to_cnum le_to_subst)
+                      in
+                      let result = cnum_to_expr (cnum_plus c_diff c_to_subst) in
+                      L.verbose (fun fmt ->
+                          fmt "After re-addition: %a" Expr.pp result);
+                      result ) ) ) )
+  (* Recursively for LstSub *)
+  | LstSub (lst, start, num) -> LstSub (lst, f start, f num)
+  | _ -> le
 
-and substitute_in_numeric_formula (le_to_find : Expr.t) (le_to_subst : Expr.t) f
-    =
-  Formula.map None None
-    (Some (substitute_in_numeric_expr le_to_find le_to_subst))
-    f
+and substitute_for_specific_length
+    (pfs : PFS.t) (len_to_subst : Expr.t) (le : Expr.t) : Expr.t =
+  let len_expr = Expr.UnOp (LstLen, len_to_subst) in
+  let eqs = find_equalities pfs len_expr in
+  let results =
+    List.map (fun eq -> substitute_in_numeric_expr eq len_expr le) eqs
+  in
+  let results = List.filter (fun x -> x <> le) results in
+  match results with
+  | [ result ] -> result
+  | _          -> le
 
-and substitute_in_pfs (le_to_find : Expr.t) (le_to_subst : Expr.t) (pfs : PFS.t)
-    : unit =
-  PFS.map_inplace
-    (fun form ->
-      match form with
-      | Eq (lx, ly) when lx = le_to_subst || ly = le_to_subst -> form
-      | _ -> substitute_in_numeric_formula le_to_find le_to_subst form)
-    pfs
+and substitute_for_list_length (pfs : PFS.t) (le : Expr.t) : Expr.t =
+  let len_eqs =
+    List.filter_map
+      (fun pf ->
+        match pf with
+        | Formula.Eq (UnOp (LstLen, LVar x), lex)
+          when match lex with
+               | UnOp (LstLen, LVar _) | Lit _ -> false
+               | _ -> true -> Some (Expr.LVar x, lex)
+        | Eq (lex, UnOp (LstLen, LVar x))
+          when match lex with
+               | UnOp (LstLen, LVar _) | Lit _ -> false
+               | _ -> true -> Some (Expr.LVar x, lex)
+        | _ -> None)
+      (PFS.to_list pfs)
+  in
+  List.fold_left
+    (fun le (len_expr, lex) -> substitute_for_specific_length pfs len_expr le)
+    le len_eqs
 
 let resolve_expr_to_location (pfs : PFS.t) (gamma : TypEnv.t) (e : Expr.t) :
     string option =
@@ -2040,18 +2112,6 @@ let rec reduce_formula_loop
                 Not (Eq (x, y))
             | UnOp (UNot, BinOp (x, Equal, y)), Lit (Bool false) ->
                 Not (Eq (x, y))
-            | UnOp (LstLen, le), le'
-              when match le' with
-                   | Lit (Num _) -> false
-                   | _           -> true ->
-                substitute_in_pfs le' (UnOp (LstLen, le)) pfs;
-                Eq (UnOp (LstLen, le), le')
-            | le', UnOp (LstLen, le)
-              when match le' with
-                   | Lit (Num _) -> false
-                   | _           -> true ->
-                substitute_in_pfs le' (UnOp (LstLen, le)) pfs;
-                Eq (UnOp (LstLen, le), le')
             | UnOp (LstRev, ll), UnOp (LstRev, rl) -> f (Eq (ll, rl))
             (* TODO: This is a specialised simplification, not sure for what, disabled for now
                | UnOp  (LstRev, full_list), BinOp (UnOp (LstRev, plist_left), LstCat, plist_right)
@@ -2118,7 +2178,8 @@ let rec reduce_formula_loop
                 | _  ->
                     raise
                       (Exceptions.Impossible
-                         "reduce_formula: guaranteed by match/filter") )
+                         "reduce_formula: string stuff: guaranteed by \
+                          match/filter") )
             (* String #2 *)
             | BinOp (sl1, StrCat, sr1), BinOp (sl2, StrCat, sr2) when sl1 = sl2
               -> f (Eq (sr1, sr2))

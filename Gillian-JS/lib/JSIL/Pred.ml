@@ -161,6 +161,7 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
     let f_a_after a : Asrt.t =
       match (a : Asrt.t) with
       | Pred (name, les) ->
+          L.tmi (fun fmt -> fmt "Pred explicit parameter types: %s" name);
           let pred =
             try Hashtbl.find preds name
             with _ ->
@@ -213,6 +214,7 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
    Joining predicate definitions together
 *)
 let join (pred1 : t) (pred2 : t) : t =
+  L.tmi (fun fmt -> fmt "Join: %s %s" pred1.name pred2.name);
   if pred1.name <> pred2.name || pred1.num_params <> pred2.num_params then
     let msg =
       Printf.sprintf

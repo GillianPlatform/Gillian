@@ -69,6 +69,7 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (spec : t) : t =
     let f_a_after a : Asrt.t =
       match (a : Asrt.t) with
       | Pred (name, les) ->
+          Logging.tmi (fun fmt -> fmt "Pred parameter types: %s" name);
           let pred =
             try Hashtbl.find preds name
             with _ ->

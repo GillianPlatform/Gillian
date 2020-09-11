@@ -165,6 +165,10 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
                    ( "DEATH. parameter_types: predicate " ^ name
                    ^ " does not exist." ))
           in
+          Logging.tmi (fun fmt ->
+              fmt "Gillian explicit param types: %s (%d, %d)" pred.pred_name
+                (List.length pred.pred_params)
+                (List.length les));
           let ac_types =
             List.fold_left
               (fun ac_types ((_, t_x), le) ->
