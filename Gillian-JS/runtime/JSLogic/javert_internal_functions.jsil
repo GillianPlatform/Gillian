@@ -80,6 +80,7 @@ pred JSInternals () :
     ObjectPrototype($lobj_proto) *
     ArrayPrototype ($larr_proto) *
     ArrayBufferPrototype ($lab_proto) *
+    BI_ErrorObject () *
     BI_ObjectObject () *
     BI_DataViewObject () *
     DataViewPrototype($ldv_proto) *

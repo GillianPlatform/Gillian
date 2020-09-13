@@ -325,8 +325,7 @@ function deserializeEncryptedDataKeys(buffer, startPos) {
     @pred AlgorithmSuiteIdentifierObject(o) :
         JSObject(o) *
         DataProp(o, "20",  "ALG_AES128_GCM_IV12_TAG16") * DataProp(o, "ALG_AES128_GCM_IV12_TAG16", 20) *
-        DataProp(o, "70",  "ALG_AES192_GCM_IV12_TAG16") * DataProp(o, "ALG_AES192_GCM_IV12_TAG16", 70) *
-        DataProp(o, "120", "ALG_AES256_GCM_IV12_TAG16") * DataProp(o, "ALG_AES256_GCM_IV12_TAG16", 120);
+        DataProp(o, "70",  "ALG_AES192_GCM_IV12_TAG16") * DataProp(o, "ALG_AES192_GCM_IV12_TAG16", 70);
 */
 var AlgorithmSuiteIdentifier;
 
@@ -341,8 +340,7 @@ var AlgorithmSuiteIdentifier;
 /*
     @pred pure AlgorithmSuite(+numId, stringId, ivLength, tagLength) :
         (numId == 20)  * (stringId == "ALG_AES128_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128),
-        (numId == 70)  * (stringId == "ALG_AES192_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128),
-        (numId == 120) * (stringId == "ALG_AES256_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128);
+        (numId == 70)  * (stringId == "ALG_AES192_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128);
 
     @pred AlgorithmSuiteObject(+aso: Obj, ivLength: Num, tagLength: Num) :
         JSObject(aso) *
@@ -374,9 +372,9 @@ var SdkSuite = function (suiteId) { };
     @pred correctVersionAndType(+version, +type) :
       (version == 1) * (type == 128);
 
-    @pred nounfold SerializedHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
-                                                    part_two, EC,
-                                                    part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
+    @pred SerializedHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+                                           part_two, EC,
+                                           part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
         (rawHeaderData == l+ (part_one, part_two)) *
         (l-len part_one == 22) *
         (part_one == l+ (
@@ -401,7 +399,8 @@ var SdkSuite = function (suiteId) { };
         rawToUInt32(#rawFrameLength, false, frameLength) *
         (headerLength == 22 + rECLength + #EDKsLength + 1 + 4 + 1 + 4) *
         (l-len headerIv == headerIvLength) *
-        (l-len headerAuthTag == #tagLength / 8);
+        (l-len headerAuthTag == #tagLength / 8) *
+        (headerLength + headerIvLength + #tagLength / 8 <=# l-len rawHeaderData);
 
     @pred MessageHeader(+messageHeader, version, type, suiteId, messageId, EDKs, contentType, headerIvLength, frameLength) :
         JSObject(messageHeader) *
@@ -437,19 +436,29 @@ var SdkSuite = function (suiteId) { };
 */
 
 /**
+  @pred nounfold Header(definition, +byteLength,
+                        +rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+                                        part_two, EC,
+                                        part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
+        (definition == "Complete Header") *
+        SerializedHeader(rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+                                        part_two, EC,
+                                        part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag);
+*/
+
+/**
     @id deserializeMessageHeader
 
     @pre (messageBuffer == #messageBuffer) *
          Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
-         SerializedHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
-                                 #part_two, #EC,
-                                 #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) *
+         (#byteOffset + #byteLength <=# l-len #data) *
+         Header("Complete Header", #byteLength,
+                #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
+                       #part_two, #EC,
+                       #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) *
 
          AlgorithmSuite(#suiteId, #stringId, #headerIvLength, #tagLength) *
-         (#tagLengthBytes == #tagLength / 8) *
-
-         (#headerLength + #headerIvLength + #tagLengthBytes <=# #byteLength) * (#byteOffset + #byteLength <=# l-len #data) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(AlgorithmSuiteIdentifier : #ASIObject) * AlgorithmSuiteIdentifierObject(#ASIObject) *
@@ -459,9 +468,10 @@ var SdkSuite = function (suiteId) { };
          JSInternals ()
 
     @post Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
-          SerializedHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
-                                  #part_two, #EC,
-                                  #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) *
+          Header("Complete Header", #byteLength,
+                 #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
+                        #part_two, #EC,
+                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) *
           AlgorithmSuite(#suiteId, #stringId, #headerIvLength, #tagLength) *
 
           HeaderInfo(ret, #version, #type, #suiteId, #messageId, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #rawHeaderData, #headerIv, #headerAuthTag) *
@@ -482,9 +492,10 @@ function deserializeMessageHeader(messageBuffer) {
     * the Node.js Buffer object.  The offset and length *must* be
     * passed to the DataView otherwise I will get unexpected results.
     */
-    /* @tactic unfold SerializedHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
-                                              #part_two, #EC,
-                                              #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) */
+    /* @tactic unfold Header(#definition, #byteLength,
+                             #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
+                                    #part_two, #EC,
+                                    #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) */
     var dataView = new DataView(
       messageBuffer.buffer,
       messageBuffer.byteOffset,
