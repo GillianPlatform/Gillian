@@ -100,26 +100,42 @@ lemma ElementsAppend(view, readPos, elementCount, fieldCount, elementList, eleme
     }
  *]
 
+nounfold pred IncompleteElements(byteLength:Num, view:List, readPos:Num, elementCount: Num, fieldCount: Num) :
+  (byteLength <# readPos + 2);
+
 (****************************
 **** ENCRYPTED DATA KEYS ****
 *****************************)
 
-nounfold pred RawEncryptedDataKeys(+rawHeaderData, +start, keyCount:Num, EDKs:List, EDKLength:Num) :
+nounfold pred CompleteRawEncryptedDataKeys(+rawHeaderData:List, +start:Num, keyCount:Num, EDKs:List, EDKLength:Num) :
     (#rawEC == l-sub (rawHeaderData, start, 2)) *
     rawToUInt16(#rawEC, false, keyCount) *
     (0 <# keyCount) *
     Elements(rawHeaderData, start + 2, keyCount, 3, EDKs, #EDKLength) *
     (EDKLength == #EDKLength + 2);
 
-lemma RawEncryptedDataKeysPureFacts(rawHeaderData, start, keyCount, EDKs, EDKLength)
+lemma CompleteRawEncryptedDataKeysPureFacts(rawHeaderData, start, keyCount, EDKs, EDKLength)
     [[ (rawHeaderData == #rawHeaderData) * (start == #start) *
        (keyCount == #keyCount) * (EDKs == #EDKs) * (EDKLength == #EDKLength) *
-       RawEncryptedDataKeys(#rawHeaderData, #start, #keyCount, #EDKs, #EDKLength) ]]
-    [[ RawEncryptedDataKeys(#rawHeaderData, #start, #keyCount, #EDKs, #EDKLength) *
+       CompleteRawEncryptedDataKeys(#rawHeaderData, #start, #keyCount, #EDKs, #EDKLength) ]]
+    [[ CompleteRawEncryptedDataKeys(#rawHeaderData, #start, #keyCount, #EDKs, #EDKLength) *
        (0 <=# #start) * (0 <# keyCount) * (2 <=# #EDKLength) ]]
 [*
     sep_apply ElementsPureFacts(#rawHeaderData, #start + 2, #keyCount, 3, #EDKs, #EDKLength - 2)
  *]
+
+pred IncompleteRawEncryptedDataKeys(+byteLength:Num, +rawHeaderData:List, +start:Num) :
+    (byteLength <# start + 2),
+
+    (start + 2 <=# byteLength) *
+    (#rawEC == l-sub (rawHeaderData, start, 2)) *
+    rawToUInt16(#rawEC, false, #keyCount) *
+    (0 <# #keyCount) *
+    IncompleteElements(byteLength, rawHeaderData, start + 2, #keyCount, 3);
+
+pred RawEncryptedDataKeys(definition:Str, +byteLength:Num, +rawHeaderData:List, +start:Num, keyCount:Num, EDKs:List, EDKLength:Num) :
+  (definition == "Complete EDKs") * CompleteRawEncryptedDataKeys(rawHeaderData, start, keyCount, EDKs, EDKLength),
+  (definition == "Incomplete EDKs") * IncompleteRawEncryptedDataKeys(byteLength, rawHeaderData, start) * (keyCount == 0) * (EDKs == {{ }}) * (EDKLength == 0);
 
 (****************************
 **** toUTF8 and fromUtf8 ****

@@ -28,20 +28,37 @@ function needs (condition, errorMessage) {
 /*
     @id readElements
 
-    @pre
+    @onlyspec readElements (elementCount, fieldsPerElement, buffer, readPos)
+    [[
+        (elementCount == #elementCount) * (fieldsPerElement == #fieldsPerElement) * (buffer == #buffer) * (readPos == #readPos) *
+        Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
+        ArrayBuffer(#ab, #data) *
+        (#view == l-sub(#data, #viewOffset, #viewSize)) *
+        IncompleteElements(#viewSize, #view, #readPos, #elementCount, #fieldsPerElement) *
+        JSInternals ()
+    ]]
+    [[
+        Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
+        ArrayBuffer(#ab, #data) *
+        IncompleteElements(#viewSize, #view, #readPos, #elementCount, #fieldsPerElement) *
+        JSInternals () *
+
+        (ret == false)
+    ]]
+    normal;
+
+    [[
       (elementCount == #elementCount) * (fieldsPerElement == #fieldsPerElement) * (buffer == #buffer) * (readPos == #readPos) *
       Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
       (#view == l-sub(#data, #viewOffset, #viewSize)) *
       Elements(#view, #readPos, #elementCount, #fieldsPerElement, #elementList, #elementsLength) *
-      scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
       JSInternals ()
-
-    @post
+    ]]
+    [[
       Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
-      Elements(#view, #readPos, #elementCount, #fieldsPerElement, #elementList, #elementsLength) *scope(needs : #needs) *
-      JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
+      Elements(#view, #readPos, #elementCount, #fieldsPerElement, #elementList, #elementsLength) *
       JSInternals () *
 
       JSObject(ret) *
@@ -49,6 +66,8 @@ function needs (condition, errorMessage) {
             ArrayOfArraysOfUInt8Arrays(#elements, #elementList, #elementCount) *
         DataProp(ret, "readPos", #ret_readPos) *
             (#ret_readPos == #readPos + #elementsLength)
+    ]]
+    normal
 */
 function readElements(elementCount, fieldsPerElement, buffer, readPos) {
 
@@ -217,9 +236,10 @@ var toUtf8 = function (buffer) { };
     @pre (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
-         RawEncryptedDataKeys(#view, #startPos, #EDKCount, #EDKs, #EDKsLength) *
+         (#definition == "Complete EDKs") *
+         RawEncryptedDataKeys(#definition, #byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength) *
 
-         (#startPos + #EDKsLength <=# #byteLength) *
+         (0 <=# startPos) * (#startPos + #EDKsLength <=# #byteLength) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
@@ -227,7 +247,7 @@ var toUtf8 = function (buffer) { };
 
     @post Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
-          RawEncryptedDataKeys(#view, #startPos, #EDKCount, #EDKs, #EDKsLength) *
+          RawEncryptedDataKeys(#definition, #byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength) *
 
           JSObject(ret) *
             DataProp(ret, "encryptedDataKeys", #dEDKs) *
@@ -237,9 +257,35 @@ var toUtf8 = function (buffer) { };
           scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
           scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
           JSInternals ()
+
+    @pre (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
+         Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
+         (#view == l-sub(#data, #byteOffset, #byteLength)) *
+         (#definition == "Incomplete EDKs") *
+         RawEncryptedDataKeys(#definition, #byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength) *
+
+         (0 <=# startPos) * (#startPos <=# #byteLength) *
+
+         scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
+         scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
+         JSInternals()
+
+    @post Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
+          (#view == l-sub(#data, #byteOffset, #byteLength)) *
+          RawEncryptedDataKeys(#definition, #byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength) *
+
+          (ret == false) *
+
+          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
+          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
+          JSInternals ()
 */
 function deserializeEncryptedDataKeys(buffer, startPos) {
-  /* @tactic unfold RawEncryptedDataKeys(#view, #startPos, #EDKCount, #EDKs, #EDKsLength) */
+  /* @tactic
+      if (#definition = "Complete EDKs") then {
+        unfold CompleteRawEncryptedDataKeys(#view, #startPos, #EDKCount, #EDKs, #EDKsLength)
+      } */
+
   /* Precondition: startPos must be within the byte length of the buffer given. */
   needs(
     buffer.byteLength >= startPos && startPos >= 0,
@@ -372,9 +418,64 @@ var SdkSuite = function (suiteId) { };
     @pred correctVersionAndType(+version, +type) :
       (version == 1) * (type == 128);
 
-    @pred SerializedHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
-                                           part_two, EC,
-                                           part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
+    @pred nounfold IncompleteHeader(+byteLength, +rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+                                                        part_two, EC,
+                                                        part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
+        (byteLength <# 22) *
+
+        (part_one == {{ }}) * (version == 0) * (type == 0) * (suiteId == 0) * (messageId == {{ }}) * (rECLength == 0) *
+        (part_two == {{ }}) * (EC == {{ }}) *
+        (part_three == {{ }}) * (EDKs == {{ }}) * (contentType == 0) * (headerIvLength == 0) *
+        (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
+
+        (22 <=# byteLength) *
+        (rawHeaderData == l+ (part_one, part_two)) *
+        (l-len part_one == 22) *
+        (part_one == l+ (
+          {{ version, type }},
+          #rawSuiteId,
+          messageId,
+          #rawContextLength)) *
+        (l-len #rawSuiteId == 2) *
+        (l-len messageId == 16) *
+        (l-len #rawContextLength == 2) *
+        correctVersionAndType(version, type) *
+        rawToUInt16(#rawSuiteId, false, suiteId) *
+        AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
+        rawToUInt16(#rawContextLength, false, rECLength) *
+        (byteLength <# 22 + rECLength) *
+
+        (EC == {{ }}) *
+        (part_three == {{ }}) * (EDKs == {{ }}) * (contentType == 0) *
+        (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
+
+        (22 <=# byteLength) *
+        (rawHeaderData == l+ (part_one, part_two)) *
+        (l-len part_one == 22) *
+        (part_one == l+ (
+          {{ version, type }},
+          #rawSuiteId,
+          messageId,
+          #rawContextLength)) *
+        (l-len #rawSuiteId == 2) *
+        (l-len messageId == 16) *
+        (l-len #rawContextLength == 2) *
+        correctVersionAndType(version, type) *
+        rawToUInt16(#rawSuiteId, false, suiteId) *
+        AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
+        rawToUInt16(#rawContextLength, false, rECLength) *
+        (22 + rECLength <=# byteLength) *
+
+        (part_two == l+ (EC, part_three)) *
+        (l-len EC == rECLength) *
+
+        IncompleteRawEncryptedDataKeys(byteLength, rawHeaderData, 22 + rECLength) *
+        (EDKs == {{ }}) * (contentType == 0) *
+        (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }});
+
+    @pred nounfold CompleteHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+                                         part_two, EC,
+                                         part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
         (rawHeaderData == l+ (part_one, part_two)) *
         (l-len part_one == 22) *
         (part_one == l+ (
@@ -393,7 +494,7 @@ var SdkSuite = function (suiteId) { };
         (part_two == l+ (EC, part_three)) *
         (part_three == l+ (#edks, {{ contentType }}, {{ 0., 0., 0., 0. }}, {{ headerIvLength }}, #rawFrameLength, headerIv, headerAuthTag)) *
         (l-len EC == rECLength) *
-        RawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        CompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
         (#EDKsLength == l-len #edks) *
         (l-len #rawFrameLength == 4) *
         rawToUInt32(#rawFrameLength, false, frameLength) *
@@ -440,10 +541,16 @@ var SdkSuite = function (suiteId) { };
                         +rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
                                         part_two, EC,
                                         part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
+
         (definition == "Complete Header") *
-        SerializedHeader(rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
-                                        part_two, EC,
-                                        part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag);
+        CompleteHeader(rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+                                      part_two, EC,
+                                      part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag),
+
+        (definition == "Incomplete Header") *
+        IncompleteHeader(byteLength, rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+                                                    part_two, EC,
+                                                    part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag);
 */
 
 /**
@@ -453,12 +560,11 @@ var SdkSuite = function (suiteId) { };
          Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#byteOffset + #byteLength <=# l-len #data) *
-         Header("Complete Header", #byteLength,
+         (#definition == "Complete Header") *
+         Header(#definition, #byteLength,
                 #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
                        #part_two, #EC,
                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) *
-
-         AlgorithmSuite(#suiteId, #stringId, #headerIvLength, #tagLength) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(AlgorithmSuiteIdentifier : #ASIObject) * AlgorithmSuiteIdentifierObject(#ASIObject) *
@@ -468,14 +574,45 @@ var SdkSuite = function (suiteId) { };
          JSInternals ()
 
     @post Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
-          Header("Complete Header", #byteLength,
+          Header(#definition, #byteLength,
                  #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
                         #part_two, #EC,
                         #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) *
-          AlgorithmSuite(#suiteId, #stringId, #headerIvLength, #tagLength) *
 
           HeaderInfo(ret, #version, #type, #suiteId, #messageId, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #rawHeaderData, #headerIv, #headerAuthTag) *
           (#rawHeaderData == l-sub(#view, 0, #headerLength)) *
+
+          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
+          scope(AlgorithmSuiteIdentifier : #ASIObject) * AlgorithmSuiteIdentifierObject(#ASIObject) *
+          scope(deserializeEncryptedDataKeys : #DEDKObject) * JSFunctionObject(#DEDKObject, "deserializeEncryptedDataKeys", #ds_sc, #ds_len, #ds_proto) *
+          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
+          scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
+          JSInternals()
+
+    @pre (messageBuffer == #messageBuffer) *
+         Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
+         (#view == l-sub(#data, #byteOffset, #byteLength)) *
+         (#byteOffset + #byteLength <=# l-len #data) *
+         (#definition == "Incomplete Header") *
+         Header(#definition, #byteLength,
+                #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
+                       #part_two, #EC,
+                       #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) *
+
+         scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
+         scope(AlgorithmSuiteIdentifier : #ASIObject) * AlgorithmSuiteIdentifierObject(#ASIObject) *
+         scope(deserializeEncryptedDataKeys : #DEDKObject) * JSFunctionObject(#DEDKObject, "deserializeEncryptedDataKeys", #ds_sc, #ds_len, #ds_proto) *
+         scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
+         scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
+         JSInternals ()
+
+    @post Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
+          Header(#definition, #byteLength,
+                 #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
+                        #part_two, #EC,
+                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) *
+
+          (ret == false) *
 
           scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
           scope(AlgorithmSuiteIdentifier : #ASIObject) * AlgorithmSuiteIdentifierObject(#ASIObject) *
@@ -496,6 +633,16 @@ function deserializeMessageHeader(messageBuffer) {
                              #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
                                     #part_two, #EC,
                                     #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) */
+    /* @tactic
+      if (#definition = "Complete Header") then {
+        unfold CompleteHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
+                                     #part_two, #EC,
+                                      #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
+      } else {
+        unfold IncompleteHeader(#byteLength, #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
+                                                    #part_two, #EC,
+                                                    #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
+      } */
     var dataView = new DataView(
       messageBuffer.buffer,
       messageBuffer.byteOffset,
@@ -527,7 +674,7 @@ function deserializeMessageHeader(messageBuffer) {
     /* Check for early return (Postcondition): Not Enough Data. Need to have all of the context in bytes before we can parse the next section.
     * This is the first variable length section.
     */
-    if (22 > dataView.byteLength) return false // not enough data
+    if (22 + contextLength > dataView.byteLength) return false // not enough data
 
     var encryptionContext = // decodeEncryptionContext(
       messageBuffer.slice(22, 22 + contextLength)

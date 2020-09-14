@@ -492,6 +492,21 @@ let s_init (kb : KB.t) (preds : (string, Pred.t) Hashtbl.t) (a : Asrt.t) :
     (* Check if any ins are fully known *)
     let act_ios = List.filter (fun (ins, _) -> KB.subset ins kb) ios in
     (* And produce the appropriate outs *)
+    let with_empty_outs = List.filter (fun (_, outs) -> outs = []) act_ios in
+    match with_empty_outs with
+    | [] -> List.map (fun (_, outs) -> (a, outs)) act_ios
+    | _  -> [ (a, []) ]
+  in
+
+  (* Check if the assertion at index i can be added to the unification
+     plan - its ins need to be contained in the current known lvars *)
+  let visit_asrt (kb : KB.t) (i : int) : step list =
+    (* Get assertion ins and outs *)
+    let a = simple_asrts_io.(i) in
+    let ios = ins_outs_assertion preds kb a in
+    (* Check if any ins are fully known *)
+    let act_ios = List.filter (fun (ins, _) -> KB.subset ins kb) ios in
+    (* And produce the appropriate outs *)
     List.map (fun (_, outs) -> (a, outs)) act_ios
   in
 

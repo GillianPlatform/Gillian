@@ -1296,9 +1296,9 @@ let rec reduce_lexpr_loop
                    | Expr.LVar _ -> false
                    | _           -> true)
                  (find_equalities pfs (LVar x)) ->
-            L.verbose (fun fmt ->
+            (* L.verbose (fun fmt ->
                 fmt "Reducing: %a\n1st: Innermost list and start: %a and %a"
-                  Expr.pp base_expr Expr.pp inn_lst Expr.pp inn_start);
+                  Expr.pp base_expr Expr.pp inn_lst Expr.pp inn_start); *)
             let eqs =
               List.filter
                 (fun x ->
@@ -1312,9 +1312,9 @@ let rec reduce_lexpr_loop
               Expr.subst_expr_for_expr (LVar x) subst_expr base_expr
             in
             let reduced_att_exp = f att_exp in
-            L.verbose (fun fmt ->
+            (* L.verbose (fun fmt ->
                 fmt "1st: Attempted and reduced expr: %a and %a" Expr.pp att_exp
-                  Expr.pp reduced_att_exp);
+                  Expr.pp reduced_att_exp); *)
             if att_exp = reduced_att_exp then LstSub (fle1, fle2, fle3)
             else reduced_att_exp
         | _, LVar x
@@ -1324,9 +1324,9 @@ let rec reduce_lexpr_loop
                    | Expr.LVar _ -> false
                    | _           -> true)
                  (find_equalities pfs (LVar x)) ->
-            L.verbose (fun fmt ->
+            (* L.verbose (fun fmt ->
                 fmt "Reducing: %a\n2nd: Innermost list and start: %a and %a"
-                  Expr.pp base_expr Expr.pp inn_lst Expr.pp inn_start);
+                  Expr.pp base_expr Expr.pp inn_lst Expr.pp inn_start); *)
             let eqs =
               List.filter
                 (fun x ->
@@ -1340,9 +1340,9 @@ let rec reduce_lexpr_loop
               Expr.subst_expr_for_expr (LVar x) subst_expr base_expr
             in
             let reduced_att_exp = f att_exp in
-            L.verbose (fun fmt ->
+            (* L.verbose (fun fmt ->
                 fmt "2nd: Attempted and reduced expr: %a and %a" Expr.pp att_exp
-                  Expr.pp reduced_att_exp);
+                  Expr.pp reduced_att_exp); *)
             if att_exp = reduced_att_exp then LstSub (fle1, fle2, fle3)
             else reduced_att_exp
         | _, _ -> LstSub (fle1, fle2, fle3) )
@@ -2017,6 +2017,18 @@ let rec reduce_formula_loop
           let vb1 = floor (n /. 256.) in
           let vb0 = n -. vb1 in
           Formula.And (Eq (LVar b1, Lit (Num vb1)), Eq (LVar b0, Lit (Num vb0)))
+    | Eq
+        ( BinOp (BinOp (Lit (Num 256.), FTimes, LVar b1), FPlus, LVar b0),
+          Lit (Num n) )
+      when PFS.mem pfs (LessEq (Lit (Num 0.), LVar b0))
+           && PFS.mem pfs (LessEq (Lit (Num 0.), LVar b1))
+           && PFS.mem pfs (Less (LVar b0, Lit (Num 256.)))
+           && PFS.mem pfs (Less (LVar b1, Lit (Num 256.))) ->
+        if n > 65535. then False
+        else
+          let vb1 = floor (n /. 256.) in
+          let vb0 = n -. vb1 in
+          Formula.And (Eq (LVar b1, Lit (Num vb1)), Eq (LVar b0, Lit (Num vb0)))
     | Eq (Lit (LList ll), Lit (LList lr)) -> if ll = lr then True else False
     | Eq (EList le, Lit (LList ll)) | Eq (Lit (LList ll), EList le) ->
         if List.length ll <> List.length le then False
@@ -2151,6 +2163,11 @@ let rec reduce_formula_loop
                   (Eq
                      ( NOp (LstCat, List.rev (List.tl (List.rev (fl :: rl)))),
                        NOp (LstCat, List.rev (List.tl (List.rev (fr :: rr)))) ))
+            | ( LVar lst,
+                NOp (LstCat, LstSub (LVar lst', Lit (Num 0.), split) :: rest) )
+              when lst = lst'
+                   && PFS.mem pfs (Less (UnOp (LstLen, LVar lst), split)) ->
+                False
             | le1, le2
               when ( match le1 with
                    | LVar _ -> false
@@ -2404,7 +2421,23 @@ let relate_llen
     | []        -> decide ()
     | e :: rest -> (
         let e_llen = reduce_lexpr ~pfs ~gamma (Expr.UnOp (LstLen, e)) in
+        let e_llen =
+          let eqs = find_equalities pfs e_llen in
+          match
+            List.filter
+              (fun e ->
+                match e with
+                | Expr.Lit (Num _) -> true
+                | _                -> false)
+              eqs
+          with
+          | [] -> e_llen
+          | _  -> List.hd eqs
+        in
         let new_llen = cnum_minus llen (expr_to_cnum e_llen) in
+        L.verbose (fun fmt ->
+            fmt "relate_llen_loop: %a consumed, %a left" Expr.pp e Expr.pp
+              (cnum_to_expr new_llen));
         match e_llen with
         | Lit (Num n) -> (
             match new_llen.conc >= 0. with

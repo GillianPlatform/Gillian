@@ -348,7 +348,10 @@ module Make
           let ret = produce_assertion astate subst a in
           match ret with
           | Some astate' -> loop (rest_as, astate')
-          | None         -> None )
+          | None         ->
+              L.verbose (fun fmt ->
+                  fmt "PRODUCE: couldn't produce assertion: %a" Asrt.pp a);
+              None )
     in
 
     let ret = loop (sas, astate) in
@@ -1182,9 +1185,14 @@ module Make
     | (state, subst, up) :: rest -> (
         let cur_step : UP.step option = UP.head up in
         let ret =
-          Option.fold
-            ~some:(unify_assertion state subst)
-            ~none:(USucc state) cur_step
+          try
+            Option.fold
+              ~some:(unify_assertion state subst)
+              ~none:(USucc state) cur_step
+          with _ ->
+            L.verbose (fun fmt ->
+                fmt "WARNING: UNCAUGHT EXCEPTION IN UNIFY-ASSERTION.");
+            UFail []
         in
         match ret with
         | UWTF         ->

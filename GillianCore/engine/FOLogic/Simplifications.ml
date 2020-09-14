@@ -626,6 +626,8 @@ let simplify_pfs_and_gamma
                          ( LstCat,
                            [ EList (List.append prepend [ elem ]); append ] ) ))
             | _ -> `Replace whole )
+        | Eq (UnOp (LstLen, le), Lit (Num 0.))
+        | Eq (Lit (Num 0.), UnOp (LstLen, le)) -> rec_call (Eq (le, EList []))
         | Eq (UnOp (LstLen, le), Lit (Num len))
         | Eq (Lit (Num len), UnOp (LstLen, le))
           when not unification -> (
