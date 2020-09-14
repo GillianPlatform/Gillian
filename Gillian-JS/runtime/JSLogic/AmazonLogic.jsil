@@ -124,7 +124,7 @@ lemma CompleteRawEncryptedDataKeysPureFacts(rawHeaderData, start, keyCount, EDKs
     sep_apply ElementsPureFacts(#rawHeaderData, #start + 2, #keyCount, 3, #EDKs, #EDKLength - 2)
  *]
 
-pred IncompleteRawEncryptedDataKeys(+byteLength:Num, +rawHeaderData:List, +start:Num) :
+nounfold pred IncompleteRawEncryptedDataKeys(+byteLength:Num, +rawHeaderData:List, +start:Num) :
     (byteLength <# start + 2),
 
     (start + 2 <=# byteLength) *

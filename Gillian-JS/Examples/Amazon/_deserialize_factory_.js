@@ -284,6 +284,8 @@ function deserializeEncryptedDataKeys(buffer, startPos) {
   /* @tactic
       if (#definition = "Complete EDKs") then {
         unfold CompleteRawEncryptedDataKeys(#view, #startPos, #EDKCount, #EDKs, #EDKsLength)
+      } else {
+        unfold IncompleteRawEncryptedDataKeys(#byteLength, #view, #startPos)
       } */
 
   /* Precondition: startPos must be within the byte length of the buffer given. */
@@ -471,7 +473,39 @@ var SdkSuite = function (suiteId) { };
 
         IncompleteRawEncryptedDataKeys(byteLength, rawHeaderData, 22 + rECLength) *
         (EDKs == {{ }}) * (contentType == 0) *
-        (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }});
+        (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
+
+        (22 <=# byteLength) *
+        (rawHeaderData == l+ (part_one, part_two)) *
+        (l-len part_one == 22) *
+        (part_one == l+ (
+          {{ version, type }},
+          #rawSuiteId,
+          messageId,
+          #rawContextLength)) *
+        (l-len #rawSuiteId == 2) *
+        (l-len messageId == 16) *
+        (l-len #rawContextLength == 2) *
+        correctVersionAndType(version, type) *
+        rawToUInt16(#rawSuiteId, false, suiteId) *
+        AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
+        rawToUInt16(#rawContextLength, false, rECLength) *
+        (22 + rECLength <=# byteLength) *
+
+        (part_two == l+ (EC, part_three)) *
+        (l-len EC == rECLength) *
+
+        (part_three == l+ (#edks, {{ contentType }}, {{ 0., 0., 0., 0. }}, {{ headerIvLength }}, #rawFrameLength, #rest)) *
+        CompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        (#EDKsLength == l-len #edks) *
+        (l-len #rawFrameLength == 4) *
+        rawToUInt32(#rawFrameLength, false, frameLength) *
+        (headerLength == 22 + rECLength + #EDKsLength + 1 + 4 + 1 + 4) *
+        (l-len headerIv == headerIvLength) *
+        (l-len headerAuthTag == #tagLength / 8) *
+        (byteLength <# headerLength + headerIvLength + (#tagLength / 8)) *
+
+        (headerIv == {{ }}) * (headerAuthTag == {{ }});
 
     @pred nounfold CompleteHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
                                          part_two, EC,
@@ -501,7 +535,7 @@ var SdkSuite = function (suiteId) { };
         (headerLength == 22 + rECLength + #EDKsLength + 1 + 4 + 1 + 4) *
         (l-len headerIv == headerIvLength) *
         (l-len headerAuthTag == #tagLength / 8) *
-        (headerLength + headerIvLength + #tagLength / 8 <=# l-len rawHeaderData);
+        (headerLength + headerIvLength + (#tagLength / 8) <=# l-len rawHeaderData);
 
     @pred MessageHeader(+messageHeader, version, type, suiteId, messageId, EDKs, contentType, headerIvLength, frameLength) :
         JSObject(messageHeader) *
@@ -633,8 +667,7 @@ function deserializeMessageHeader(messageBuffer) {
                              #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
                                     #part_two, #EC,
                                     #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) */
-    /* @tactic
-      if (#definition = "Complete Header") then {
+    /* @tactic if (#definition = "Complete Header") then {
         unfold CompleteHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
                                      #part_two, #EC,
                                       #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
