@@ -429,6 +429,9 @@ module M : Gillian.Symbolic.Memory_S = struct
       action_ret =
     let loc_name = get_loc_name pfs gamma loc in
 
+    L.verbose (fun fmt -> fmt "Get partial domain");
+    L.verbose (fun fmt -> fmt "Expected domain: %a" SVal.pp e_dom);
+
     let f loc_name =
       let loc = Expr.loc_from_loc_name loc_name in
       match SHeap.get heap loc_name with
@@ -436,12 +439,17 @@ module M : Gillian.Symbolic.Memory_S = struct
       | Some ((fv_list, None), _) ->
           raise (Failure "DEATH. get_partial_domain. missing domain")
       | Some ((fv_list, Some dom), mtdt) -> (
+          L.verbose (fun fmt -> fmt "Domain: %a" Expr.pp dom);
           let none_fv_list, pos_fv_list =
             SFVL.partition (fun _ fv -> fv = Lit Nono) fv_list
           in
           (* Called from the entailment - compute all negative resource associated with
              the location whose name is loc_name *)
           let none_props = SFVL.field_names none_fv_list in
+          L.verbose (fun fmt ->
+              fmt "None-props in heap: %a"
+                Fmt.(brackets (list ~sep:comma Expr.pp))
+                none_props);
           let dom' = Expr.BinOp (dom, SetDiff, ESet none_props) in
           let dom'' =
             Reduction.reduce_lexpr ?gamma:(Some gamma) ?pfs:(Some pfs) dom'

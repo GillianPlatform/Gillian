@@ -10,21 +10,34 @@ pure pred rawToUInt8(+bytes:List, num:Num) :
 (* Interpretation: two bytes as an unsigned 16-bit integer *)
 pure pred rawToUInt16(+bytes:List, +littleEndian:Bool, num:Num) :
     (littleEndian == false) *
-    (#b0 == l-nth(bytes, 0)) * (#b1 == l-nth(bytes, 1)) *
+    (bytes == {{ #b0, #b1 }}) *
     (0 <=# #b0) * (#b0 <# 256) *
     (0 <=# #b1) * (#b1 <# 256) *
     (num == (#b0 * 256) + #b1),
 
     (littleEndian == true) *
-    (#b0 == l-nth(bytes, 0)) * (#b1 == l-nth(bytes, 1)) *
+    (bytes == {{ #b0, #b1 }}) *
     (0 <=# #b0) * (#b0 <# 256) *
     (0 <=# #b1) * (#b1 <# 256) *
     (num == (#b1 * 256) + #b0);
 
 (* Interpretation: four bytes as an unsigned 32-bit integer *)
 pure pred rawToUInt32(+bytes:List, +littleEndian:Bool, num:Num) :
-    (littleEndian == false) * (num == (l-nth(bytes, 0) * 16777216) + (l-nth(bytes, 1) * 65536) + (l-nth(bytes, 2) * 256) + l-nth(bytes, 3)),
-    (littleEndian == true) *  (num == (l-nth(bytes, 3) * 16777216) + (l-nth(bytes, 2) * 65536) + (l-nth(bytes, 1) * 256) + l-nth(bytes, 0));
+    (littleEndian == false) *
+    (bytes == {{ #b0, #b1, #b2, #b3 }}) *
+    (0 <=# #b0) * (#b0 <# 256) *
+    (0 <=# #b1) * (#b1 <# 256) *
+    (0 <=# #b2) * (#b2 <# 256) *
+    (0 <=# #b3) * (#b3 <# 256) *
+    (num == (#b0 * 16777216) + (#b1 * 65536) + (#b2 * 256) + #b3),
+
+    (littleEndian == true) *
+    (bytes == {{ #b0, #b1, #b2, #b3 }}) *
+    (0 <=# #b0) * (#b0 <# 256) *
+    (0 <=# #b1) * (#b1 <# 256) *
+    (0 <=# #b2) * (#b2 <# 256) *
+    (0 <=# #b3) * (#b3 <# 256) *
+    (num == (#b3 * 16777216) + (#b2 * 65536) + (#b1 * 256) + #b0);
 
 (******************************
  **** Data View Instances  ****

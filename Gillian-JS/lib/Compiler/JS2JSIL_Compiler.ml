@@ -2543,8 +2543,8 @@ let rec translate_expr tr_ctx e :
       in
       let errs =
         errs_ef @ errs_xf_val @ errs_args @ [ var_te; var_te ]
-        @ if_verification [] [ x_rbind ]
-        @ [ x_ecall; x_rcall ]
+        @ if_verification [] [ x_rbind; x_ecall ]
+        @ [ x_rcall ]
       in
       (cmds, PVar (if_verification x_rcall x_r1), errs)
   | JS_Parser.Syntax.Unary_op (JS_Parser.Syntax.Post_Incr, e) ->

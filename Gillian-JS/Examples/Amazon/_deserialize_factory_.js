@@ -30,24 +30,6 @@ function needs (condition, errorMessage) {
 
     @onlyspec readElements (elementCount, fieldsPerElement, buffer, readPos)
     [[
-        (elementCount == #elementCount) * (fieldsPerElement == #fieldsPerElement) * (buffer == #buffer) * (readPos == #readPos) *
-        Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
-        ArrayBuffer(#ab, #data) *
-        (#view == l-sub(#data, #viewOffset, #viewSize)) *
-        IncompleteElements(#viewSize, #view, #readPos, #elementCount, #fieldsPerElement) *
-        JSInternals ()
-    ]]
-    [[
-        Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
-        ArrayBuffer(#ab, #data) *
-        IncompleteElements(#viewSize, #view, #readPos, #elementCount, #fieldsPerElement) *
-        JSInternals () *
-
-        (ret == false)
-    ]]
-    normal;
-
-    [[
       (elementCount == #elementCount) * (fieldsPerElement == #fieldsPerElement) * (buffer == #buffer) * (readPos == #readPos) *
       Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
@@ -66,6 +48,24 @@ function needs (condition, errorMessage) {
             ArrayOfArraysOfUInt8Arrays(#elements, #elementList, #elementCount) *
         DataProp(ret, "readPos", #ret_readPos) *
             (#ret_readPos == #readPos + #elementsLength)
+    ]]
+    normal;
+
+    [[
+        (elementCount == #elementCount) * (fieldsPerElement == #fieldsPerElement) * (buffer == #buffer) * (readPos == #readPos) *
+        Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
+        ArrayBuffer(#ab, #data) *
+        (#view == l-sub(#data, #viewOffset, #viewSize)) *
+        IncompleteElements(#viewSize, #view, #readPos, #elementCount, #fieldsPerElement) *
+        JSInternals ()
+    ]]
+    [[
+        Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
+        ArrayBuffer(#ab, #data) *
+        IncompleteElements(#viewSize, #view, #readPos, #elementCount, #fieldsPerElement) *
+        JSInternals () *
+
+        (ret == false)
     ]]
     normal
 */
@@ -373,7 +373,8 @@ function deserializeEncryptedDataKeys(buffer, startPos) {
     @pred AlgorithmSuiteIdentifierObject(o) :
         JSObject(o) *
         DataProp(o, "20",  "ALG_AES128_GCM_IV12_TAG16") * DataProp(o, "ALG_AES128_GCM_IV12_TAG16", 20) *
-        DataProp(o, "70",  "ALG_AES192_GCM_IV12_TAG16") * DataProp(o, "ALG_AES192_GCM_IV12_TAG16", 70);
+        DataProp(o, "70",  "ALG_AES192_GCM_IV12_TAG16") * DataProp(o, "ALG_AES192_GCM_IV12_TAG16", 70) *
+        empty_fields(o : -{ "20", "70", "ALG_AES128_GCM_IV12_TAG16", "ALG_AES192_GCM_IV12_TAG16" }-);
 */
 var AlgorithmSuiteIdentifier;
 
@@ -389,6 +390,10 @@ var AlgorithmSuiteIdentifier;
     @pred pure AlgorithmSuite(+numId, stringId, ivLength, tagLength) :
         (numId == 20)  * (stringId == "ALG_AES128_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128),
         (numId == 70)  * (stringId == "ALG_AES192_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128);
+
+    @pred pure BrokenAlgorithmSuite(+numId, errorMessage) :
+        (! (numId == 20)) * (! (numId == 70)) * (errorMessage == "Unsupported algorithm suite.");
+
 
     @pred AlgorithmSuiteObject(+aso: Obj, ivLength: Num, tagLength: Num) :
         JSObject(aso) *
@@ -417,18 +422,68 @@ var SdkSuite = function (suiteId) { };
  ********************************************/
 
 /**
-    @pred correctVersionAndType(+version, +type) :
+    @pred CorrectVersionAndType(+version, +type) :
       (version == 1) * (type == 128);
 
-    @pred nounfold IncompleteHeader(+byteLength, +rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
-                                                        part_two, EC,
-                                                        part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
-        (byteLength <# 22) *
+    @pred BrokenVersionAndType(+version:Num, +type:Num, errorMessage:Str) :
+        (version == 65) * (type == 89) * (errorMessage == "Malformed Header: This blob may be base64 encoded."),
+        (! (version == 1) \/ ! (type == 128)) * (! (version == 65) \/ ! (type == 89)) * (errorMessage == "Malformed Header.");
 
-        (part_one == {{ }}) * (version == 0) * (type == 0) * (suiteId == 0) * (messageId == {{ }}) * (rECLength == 0) *
+    @pred nounfold BrokenHeader(errorMessage, +byteLength, +rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+                                                                           part_two, EC,
+                                                                           part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
+        (22 <=# byteLength) *
+        (rawHeaderData == l+ ({{ version, type }}, #rest)) *
+        BrokenVersionAndType(version, type, errorMessage) *
+
+        (part_one == {{ }}) *
+        (suiteId == 0) * (messageId == {{ }}) * (rECLength == 0) *
         (part_two == {{ }}) * (EC == {{ }}) *
         (part_three == {{ }}) * (EDKs == {{ }}) * (contentType == 0) * (headerIvLength == 0) *
         (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
+
+        (22 <=# byteLength) *
+        (rawHeaderData == l+ ({{ version, type }}, #rawSuiteId, #rest)) *
+        (l-len #rawSuiteId == 2) *
+        CorrectVersionAndType(version, type) *
+        rawToUInt16(#rawSuiteId, false, suiteId) *
+        BrokenAlgorithmSuite(suiteId, errorMessage) *
+
+        (part_one == {{ }}) * (messageId == {{ }}) * (rECLength == 0) *
+        (part_two == {{ }}) * (EC == {{ }}) *
+        (part_three == {{ }}) * (EDKs == {{ }}) * (contentType == 0) * (headerIvLength == 0) *
+        (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
+
+		    (22 <=# byteLength) *
+        (rawHeaderData == l+ (part_one, part_two)) *
+        (l-len part_one == 22) *
+        (part_one == l+ (
+          {{ version, type }},
+          #rawSuiteId,
+          messageId,
+          #rawContextLength)) *
+        (l-len #rawSuiteId == 2) *
+        (l-len messageId == 16) *
+        (l-len #rawContextLength == 2) *
+        CorrectVersionAndType(version, type) *
+        rawToUInt16(#rawSuiteId, false, suiteId) *
+        AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
+        rawToUInt16(#rawContextLength, false, rECLength) *
+        (22 + rECLength <=# byteLength) *
+
+        (part_two == l+ (EC, part_three)) *
+        (part_three == l+ (#edks, {{ contentType }}, #rawReservedBytes, #rest)) *
+        (l-len EC == rECLength) *
+        CompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        (#EDKsLength == l-len #edks) *
+        (l-len #rawReservedBytes == 4) *
+        rawToUInt32(#rawReservedBytes, false, #reservedBytes) *
+        (! (#reservedBytes == 0)) *
+        (headerLength == 22 + rECLength + #EDKsLength + 1 + 4 + 1 + 4) *
+        (headerLength + headerIvLength + (#tagLength / 8) <=# byteLength) *
+
+        (errorMessage == "Malformed Header") *
+        (frameLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
 
         (22 <=# byteLength) *
         (rawHeaderData == l+ (part_one, part_two)) *
@@ -441,7 +496,42 @@ var SdkSuite = function (suiteId) { };
         (l-len #rawSuiteId == 2) *
         (l-len messageId == 16) *
         (l-len #rawContextLength == 2) *
-        correctVersionAndType(version, type) *
+        CorrectVersionAndType(version, type) *
+        rawToUInt16(#rawSuiteId, false, suiteId) *
+        AlgorithmSuite(suiteId, #stringId, #ivLength, #tagLength) *
+        rawToUInt16(#rawContextLength, false, rECLength) *
+        (22 + rECLength <=# byteLength) *
+
+        (part_two == l+ (EC, part_three)) *
+        (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rest)) *
+        (l-len EC == rECLength) *
+        CompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        (#EDKsLength == l-len #edks) *
+        (headerLength == 22 + rECLength + #EDKsLength + 1 + 4 + 1 + 4) *
+        (headerLength + #ivLength + (#tagLength / 8) <=# byteLength) *
+        (! (headerIvLength == #ivLength)) *
+
+        (errorMessage == "Malformed Header") *
+        (frameLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }});
+
+    @pred nounfold IncompleteHeader(+byteLength, +rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+                                                                 part_two, EC,
+                                                                 part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
+        (byteLength <# 22) *
+
+        (part_one == {{ }}) * (version == 0) * (type == 0) * (suiteId == 0) * (messageId == {{ }}) * (rECLength == 0) *
+        (part_two == {{ }}) * (EC == {{ }}) *
+        (part_three == {{ }}) * (EDKs == {{ }}) * (contentType == 0) * (headerIvLength == 0) *
+        (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
+
+        (22 <=# byteLength) *
+        (rawHeaderData == l+ (part_one, part_two)) *
+        (l-len part_one == 22) *
+        (part_one == l+ ({{ version, type }}, #rawSuiteId, messageId, #rawContextLength)) *
+        (l-len #rawSuiteId == 2) *
+        (l-len messageId == 16) *
+        (l-len #rawContextLength == 2) *
+        CorrectVersionAndType(version, type) *
         rawToUInt16(#rawSuiteId, false, suiteId) *
         AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
         rawToUInt16(#rawContextLength, false, rECLength) *
@@ -454,15 +544,11 @@ var SdkSuite = function (suiteId) { };
         (22 <=# byteLength) *
         (rawHeaderData == l+ (part_one, part_two)) *
         (l-len part_one == 22) *
-        (part_one == l+ (
-          {{ version, type }},
-          #rawSuiteId,
-          messageId,
-          #rawContextLength)) *
+        (part_one == l+ ({{ version, type }}, #rawSuiteId, messageId, #rawContextLength)) *
         (l-len #rawSuiteId == 2) *
         (l-len messageId == 16) *
         (l-len #rawContextLength == 2) *
-        correctVersionAndType(version, type) *
+        CorrectVersionAndType(version, type) *
         rawToUInt16(#rawSuiteId, false, suiteId) *
         AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
         rawToUInt16(#rawContextLength, false, rECLength) *
@@ -478,15 +564,11 @@ var SdkSuite = function (suiteId) { };
         (22 <=# byteLength) *
         (rawHeaderData == l+ (part_one, part_two)) *
         (l-len part_one == 22) *
-        (part_one == l+ (
-          {{ version, type }},
-          #rawSuiteId,
-          messageId,
-          #rawContextLength)) *
+        (part_one == l+ ({{ version, type }}, #rawSuiteId, messageId, #rawContextLength)) *
         (l-len #rawSuiteId == 2) *
         (l-len messageId == 16) *
         (l-len #rawContextLength == 2) *
-        correctVersionAndType(version, type) *
+        CorrectVersionAndType(version, type) *
         rawToUInt16(#rawSuiteId, false, suiteId) *
         AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
         rawToUInt16(#rawContextLength, false, rECLength) *
@@ -495,7 +577,7 @@ var SdkSuite = function (suiteId) { };
         (part_two == l+ (EC, part_three)) *
         (l-len EC == rECLength) *
 
-        (part_three == l+ (#edks, {{ contentType }}, {{ 0., 0., 0., 0. }}, {{ headerIvLength }}, #rawFrameLength, #rest)) *
+        (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, #rest)) *
         CompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
         (#EDKsLength == l-len #edks) *
         (l-len #rawFrameLength == 4) *
@@ -508,8 +590,8 @@ var SdkSuite = function (suiteId) { };
         (headerIv == {{ }}) * (headerAuthTag == {{ }});
 
     @pred nounfold CompleteHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
-                                         part_two, EC,
-                                         part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
+                                                  part_two, EC,
+                                                  part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
         (rawHeaderData == l+ (part_one, part_two)) *
         (l-len part_one == 22) *
         (part_one == l+ (
@@ -520,13 +602,13 @@ var SdkSuite = function (suiteId) { };
         (l-len #rawSuiteId == 2) *
         (l-len messageId == 16) *
         (l-len #rawContextLength == 2) *
-        correctVersionAndType(version, type) *
+        CorrectVersionAndType(version, type) *
         rawToUInt16(#rawSuiteId, false, suiteId) *
         AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
         rawToUInt16(#rawContextLength, false, rECLength) *
 
         (part_two == l+ (EC, part_three)) *
-        (part_three == l+ (#edks, {{ contentType }}, {{ 0., 0., 0., 0. }}, {{ headerIvLength }}, #rawFrameLength, headerIv, headerAuthTag)) *
+        (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, headerIv, headerAuthTag)) *
         (l-len EC == rECLength) *
         CompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
         (#EDKsLength == l-len #edks) *
@@ -574,17 +656,26 @@ var SdkSuite = function (suiteId) { };
   @pred nounfold Header(definition, +byteLength,
                         +rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
                                         part_two, EC,
-                                        part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
+                                        part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag,
+                        errorMessage) :
 
         (definition == "Complete Header") *
         CompleteHeader(rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
                                       part_two, EC,
-                                      part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag),
+                                      part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) *
+        (errorMessage == ""),
 
         (definition == "Incomplete Header") *
         IncompleteHeader(byteLength, rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
                                                     part_two, EC,
-                                                    part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag);
+                                                    part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) *
+        (errorMessage == ""),
+
+        (definition == "Broken Header") *
+        BrokenHeader(errorMessage, byteLength, rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+                                                              part_two, EC,
+                                                              part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag);
+
 */
 
 /**
@@ -598,7 +689,8 @@ var SdkSuite = function (suiteId) { };
          Header(#definition, #byteLength,
                 #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
                        #part_two, #EC,
-                       #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) *
+                       #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
+                #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(AlgorithmSuiteIdentifier : #ASIObject) * AlgorithmSuiteIdentifierObject(#ASIObject) *
@@ -611,7 +703,8 @@ var SdkSuite = function (suiteId) { };
           Header(#definition, #byteLength,
                  #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
                         #part_two, #EC,
-                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) *
+                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
+                 #errorMessage) *
 
           HeaderInfo(ret, #version, #type, #suiteId, #messageId, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #rawHeaderData, #headerIv, #headerAuthTag) *
           (#rawHeaderData == l-sub(#view, 0, #headerLength)) *
@@ -631,7 +724,8 @@ var SdkSuite = function (suiteId) { };
          Header(#definition, #byteLength,
                 #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
                        #part_two, #EC,
-                       #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) *
+                       #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
+                #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(AlgorithmSuiteIdentifier : #ASIObject) * AlgorithmSuiteIdentifierObject(#ASIObject) *
@@ -644,9 +738,45 @@ var SdkSuite = function (suiteId) { };
           Header(#definition, #byteLength,
                  #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
                         #part_two, #EC,
-                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) *
+                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
+                 #errorMessage) *
 
           (ret == false) *
+
+          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
+          scope(AlgorithmSuiteIdentifier : #ASIObject) * AlgorithmSuiteIdentifierObject(#ASIObject) *
+          scope(deserializeEncryptedDataKeys : #DEDKObject) * JSFunctionObject(#DEDKObject, "deserializeEncryptedDataKeys", #ds_sc, #ds_len, #ds_proto) *
+          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
+          scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
+          JSInternals()
+
+    @pre (messageBuffer == #messageBuffer) *
+         Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
+         (#view == l-sub(#data, #byteOffset, #byteLength)) *
+         (#byteOffset + #byteLength <=# l-len #data) *
+         (#definition == "Broken Header") *
+         Header(#definition, #byteLength,
+                #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
+                       #part_two, #EC,
+                       #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
+                #errorMessage) *
+
+         scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
+         scope(AlgorithmSuiteIdentifier : #ASIObject) * AlgorithmSuiteIdentifierObject(#ASIObject) *
+         scope(deserializeEncryptedDataKeys : #DEDKObject) * JSFunctionObject(#DEDKObject, "deserializeEncryptedDataKeys", #ds_sc, #ds_len, #ds_proto) *
+         scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
+         scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
+         JSInternals ()
+
+    @posterr
+          Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
+          Header(#definition, #byteLength,
+                 #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
+                        #part_two, #EC,
+                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
+                 #errorMessage) *
+
+          ErrorObjectWithMessage(ret, #errorMessage) *
 
           scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
           scope(AlgorithmSuiteIdentifier : #ASIObject) * AlgorithmSuiteIdentifierObject(#ASIObject) *
@@ -663,19 +793,16 @@ function deserializeMessageHeader(messageBuffer) {
     * the Node.js Buffer object.  The offset and length *must* be
     * passed to the DataView otherwise I will get unexpected results.
     */
-    /* @tactic unfold Header(#definition, #byteLength,
-                             #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
-                                    #part_two, #EC,
-                                    #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag) */
-    /* @tactic if (#definition = "Complete Header") then {
-        unfold CompleteHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
-                                     #part_two, #EC,
-                                      #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
-      } else {
-        unfold IncompleteHeader(#byteLength, #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
-                                                    #part_two, #EC,
-                                                    #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
-      } */
+    /* @tactic unfold Header(#definition, #byteLength, #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #EC, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #errorMessage) */
+    /* @tactic
+        if (#definition = "Complete Header") then {
+          unfold CompleteHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #EC, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
+        } else { if (#definition = "Incomplete Header") then {
+            unfold IncompleteHeader(#byteLength, #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #EC, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
+          } else {
+            unfold BrokenHeader(#errorMessage, #byteLength, #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #EC, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
+          }
+        }*/
     var dataView = new DataView(
       messageBuffer.buffer,
       messageBuffer.byteOffset,

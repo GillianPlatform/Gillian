@@ -442,6 +442,13 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
           assert (idx < len);
           assert (start + idx < List.length l);
           Some (Lit (List.nth l (start + idx)))
+      | LVar x        -> (
+          let eqs = find_equalities pfs (LVar x) in
+          let candidates = List.map (fun e -> f e idx) eqs in
+          let candidates = List.filter (fun x -> x <> None) candidates in
+          match candidates with
+          | []     -> None
+          | x :: _ -> Some (Option.get x) )
       | _             -> None )
   | LstSub _ -> None
   | NOp (LstCat, lel :: ler) ->
@@ -558,7 +565,15 @@ let is_different (pfs : Formula.t list) (li : Expr.t) (lj : Expr.t) :
   | true  -> Some false
   | false -> (
       match (li, lj) with
-      | Expr.Lit x, Expr.Lit y when x <> y -> Some true
+      | Expr.Lit x, Lit y when x <> y -> Some true
+      | UnOp (ToStringOp, _), Lit (String "")
+      | Lit (String ""), UnOp (ToStringOp, _) -> Some true
+      | UnOp (ToStringOp, _), Lit (String s)
+        when not (Str.string_match (Str.regexp "0-9") (Str.first_chars s 1) 0)
+        -> Some true
+      | Lit (String s), UnOp (ToStringOp, _)
+        when not (Str.string_match (Str.regexp "0-9") (Str.first_chars s 1) 0)
+        -> Some true
       | _, _ ->
           if
             List.mem (Formula.Not (Formula.Eq (li, lj))) pfs
@@ -1624,6 +1639,28 @@ let rec reduce_lexpr_loop
                       if List.for_all (fun x -> set_member pfs x s) left then
                         ESet []
                       else def
+                  | ESet left, ESet right ->
+                      L.verbose (fun fmt -> fmt "Inside relevant SetDiff case.");
+                      let candidate_result =
+                        Expr.Set.elements
+                          (Expr.Set.diff (Expr.Set.of_list left)
+                             (Expr.Set.of_list right))
+                      in
+                      L.verbose (fun fmt ->
+                          fmt "Candidate result: %a"
+                            Fmt.(brackets (list ~sep:comma Expr.pp))
+                            candidate_result);
+                      let result =
+                        if
+                          List.for_all
+                            (fun x -> not_set_member pfs x (ESet right))
+                            candidate_result
+                        then Expr.ESet candidate_result
+                        else def
+                      in
+                      L.verbose (fun fmt ->
+                          fmt "Actual result: %a" Expr.pp result);
+                      result
                   | NOp (SetUnion, les), _ ->
                       let diffs =
                         List.map (fun le -> f (BinOp (le, SetDiff, fler))) les
