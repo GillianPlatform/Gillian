@@ -100,43 +100,79 @@ lemma ElementsAppend(view, readPos, elementCount, fieldCount, elementList, eleme
     }
  *]
 
-nounfold pred IncompleteElements(byteLength:Num, view:List, readPos:Num, elementCount: Num, fieldCount: Num) :
-  (byteLength <# readPos + 2);
+(**************************
+ *** INCOMPLETE ELEMENT ***
+ **************************)
+
+(* An element that cannot be read from a given buffer of data *)
+nounfold pred IncompleteElement(+view:List, +readPos:Num, +fieldCount: Num) :
+    (* Base case: not enough data to read length of next field *)
+    (0 <=# readPos) * (0 <# fieldCount) * (readPos <=# l-len view) *
+    (l-len view <# readPos + 2),
+
+    (* Base case: enough data to read length of next field, but not enough data to read next field *)
+    (0 <=# readPos) * (0 <# fieldCount) * (readPos + 2 <=# l-len view) *
+    (#rawFL == l-sub (view, readPos, 2)) *
+    rawToUInt16(#rawFL, false, #fieldLength) *
+    (l-len view <# readPos + 2 + #fieldLength),
+
+    (* Recursive case: enough data to read one field, but not enough data to read the remaining ones *)
+    (0 <=# readPos) * (1 <# fieldCount) *
+    Field(view, readPos, #field, #fieldLength) *
+    (#restFieldCount == fieldCount - 1) *
+    (readPos + 2 + #fieldLength <=# l-len view) *
+    IncompleteElement(view, readPos + 2 + #fieldLength, #restFieldCount);
+
+(***************************
+ *** INCOMPLETE ELEMENTS ***
+ ***************************)
+
+(* A sequence of elements that cannot be read from a given buffer of data *)
+nounfold pred IncompleteElements(view:List, readPos:Num, elementCount: Num, fieldCount: Num) :
+  (* Base case: single incomplete element *)
+  (0 <=# readPos) * (readPos <=# l-len view) * (0 <# elementCount) * (0 <# fieldCount) *
+  IncompleteElement(view, readPos, fieldCount),
+
+  (* Recursive case: enough data to read first element, but not enough data to read the remaining ones *)
+  (0 <=# readPos) * (readPos <=# l-len view) * (1 <# elementCount) * (0 <# fieldCount) *
+  Element(view, readPos, fieldCount, #fieldList, #elementLength) *
+  (#restElementCount == elementCount - 1) *
+  IncompleteElements(view, readPos + #elementLength, #restElementCount, fieldCount);
 
 (****************************
 **** ENCRYPTED DATA KEYS ****
 *****************************)
 
-nounfold pred CompleteRawEncryptedDataKeys(+byteLength:Num, +rawHeaderData:List, +start:Num, keyCount:Num, EDKs:List, EDKsLength:Num) :
-    (0 <=# start) * (start <=# byteLength) *
+nounfold pred CompleteRawEncryptedDataKeys(+rawHeaderData:List, +start:Num, keyCount:Num, EDKs:List, EDKsLength:Num) :
+    (0 <=# start) * (start <=# l-len rawHeaderData) *
     (#rawEC == l-sub (rawHeaderData, start, 2)) *
     rawToUInt16(#rawEC, false, keyCount) *
     (0 <# keyCount) *
     Elements(rawHeaderData, start + 2, keyCount, 3, EDKs, #EDKsLength) *
     (EDKsLength == #EDKsLength + 2) *
-    (start + EDKsLength <=# byteLength);
+    (start + EDKsLength <=# l-len rawHeaderData);
 
-nounfold pred IncompleteRawEncryptedDataKeys(+byteLength:Num, +rawHeaderData:List, +start:Num) :
-    (0 <=# start) * (start <=# byteLength) * (byteLength <# start + 2),
+nounfold pred IncompleteRawEncryptedDataKeys(+rawHeaderData:List, +start:Num) :
+    (0 <=# start) * (start <=# l-len rawHeaderData) * (l-len rawHeaderData <# start + 2),
 
-    (0 <=# start) * (start + 2 <=# byteLength) *
+    (0 <=# start) * (start + 2 <=# l-len rawHeaderData) *
     (#rawEC == l-sub (rawHeaderData, start, 2)) *
     rawToUInt16(#rawEC, false, #keyCount) *
     (0 <# #keyCount) *
-    IncompleteElements(byteLength, rawHeaderData, start + 2, #keyCount, 3);
+    IncompleteElements(rawHeaderData, start + 2, #keyCount, 3);
 
-nounfold pred BrokenRawEncryptedDataKeys(errorMessage: Str, +byteLength:Num, +rawHeaderData:List, +start:Num) :
-    ((start <# 0) \/ (byteLength <# start)) * (errorMessage == "deserializeMessageHeader: startPos out of bounds."),
+nounfold pred BrokenRawEncryptedDataKeys(errorMessage: Str, +rawHeaderData:List, +start:Num) :
+    ((start <# 0) \/ (l-len rawHeaderData <# start)) * (errorMessage == "deserializeMessageHeader: startPos out of bounds."),
 
-    (0 <=# start) * (start + 2 <=# byteLength) *
+    (0 <=# start) * (start + 2 <=# l-len rawHeaderData) *
     (#rawEC == l-sub (rawHeaderData, start, 2)) *
     rawToUInt16(#rawEC, false, 0) *
     (errorMessage == "Malformed Header: No EncryptedDataKey found.");
 
-pred RawEncryptedDataKeys(definition:Str, +byteLength:Num, +rawHeaderData:List, +start:Num, keyCount:Num, EDKs:List, EDKsLength:Num, errorMessage:Str) :
-  (definition == "Complete EDKs") * CompleteRawEncryptedDataKeys(byteLength, rawHeaderData, start, keyCount, EDKs, EDKsLength) * (errorMessage == ""),
-  (definition == "Incomplete EDKs") * IncompleteRawEncryptedDataKeys(byteLength, rawHeaderData, start) * (keyCount == 0) * (EDKs == {{ }}) * (EDKsLength == 0) * (errorMessage == ""),
-  (definition == "Broken EDKs") * BrokenRawEncryptedDataKeys(errorMessage, byteLength, rawHeaderData, start) * (keyCount == 0) * (EDKs == {{ }}) * (EDKsLength == 0);
+pred RawEncryptedDataKeys(definition:Str, +rawHeaderData:List, +start:Num, keyCount:Num, EDKs:List, EDKsLength:Num, errorMessage:Str) :
+  (definition == "Complete EDKs") * CompleteRawEncryptedDataKeys(rawHeaderData, start, keyCount, EDKs, EDKsLength) * (errorMessage == ""),
+  (definition == "Incomplete EDKs") * IncompleteRawEncryptedDataKeys(rawHeaderData, start) * (keyCount == 0) * (EDKs == {{ }}) * (EDKsLength == 0) * (errorMessage == ""),
+  (definition == "Broken EDKs") * BrokenRawEncryptedDataKeys(errorMessage, rawHeaderData, start) * (keyCount == 0) * (EDKs == {{ }}) * (EDKsLength == 0);
 
 (****************************
 **** toUTF8 and fromUtf8 ****
@@ -213,6 +249,43 @@ pred FrozenArrayOfEDKsContents(+a:Obj, contents:List, +start:Num, +contentsLengt
 pred DecodedEncryptedDataKeys (+a:Obj, contents:List, arrayLength:Num) :
     FrozenArrayStructure(a, arrayLength) *
     FrozenArrayOfEDKsContents(a, contents, 0, arrayLength);
+
+(* ************************** *)
+(* *** ENCRYPTION CONTEXT *** *)
+(* ************************** *)
+
+nounfold pred CompleteRawEncryptionContext(+EC:List, keyCount:Num, ECKs:List) :
+    (l-len EC == 2) * (keyCount == 0) * (ECKs == {{ }}) * rawToUInt16(EC, false, keyCount),
+
+    (2 <# l-len EC) *
+    (#rawKC == l-sub (EC, 0, 2)) *
+    rawToUInt16(#rawKC, false, keyCount) *
+    (0 <# keyCount) *
+    Elements(EC, 2, keyCount, 2, ECKs, #ECKsLength) *
+    (2 + #ECKsLength == l-len EC);
+
+nounfold pred BrokenRawEncryptionContext(errorMessage:Str, +EC:List) :
+    (2 <# l-len EC) *
+    (#rawKC == l-sub (EC, 0, 2)) *
+    rawToUInt16(#rawKC, false, #keyCount) *
+    (0 <# #keyCount) *
+    IncompleteElements(EC, 2, #keyCount, 2) *
+    (errorMessage == "decodeEncryptionContext: Underflow, not enough data."),
+
+    (2 <# l-len EC) *
+    (#rawKC == l-sub (EC, 0, 2)) *
+    rawToUInt16(#rawKC, false, #keyCount) *
+    (0 <# #keyCount) *
+    Elements(EC, 2, #keyCount, 2, #ECKs, #ECKsLength) *
+    (! (#ECKsLength + 2 == l-len EC)) *
+    (errorMessage == "decodeEncryptionContext: Overflow, too much data.");
+
+pred RawEncryptionContext(definition:Str, +EC:List, keyCount:Num, ECKs:List, errorMessage:Str) :
+  (definition == "Complete EC") * CompleteRawEncryptionContext(EC, keyCount, ECKs) * (errorMessage == ""),
+  (definition == "Broken EC")   * BrokenRawEncryptionContext(errorMessage, EC) * (keyCount == 0) * (ECKs == {{ }});
+
+pred DecodedEncryptionContext(+dECObj : Obj) :
+    JSObjWithProto(dECObj, null);
 
 (* ********************* *)
 (* *** OBJECT_FREEZE *** *)
