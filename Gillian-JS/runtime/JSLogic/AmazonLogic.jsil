@@ -107,35 +107,36 @@ nounfold pred IncompleteElements(byteLength:Num, view:List, readPos:Num, element
 **** ENCRYPTED DATA KEYS ****
 *****************************)
 
-nounfold pred CompleteRawEncryptedDataKeys(+rawHeaderData:List, +start:Num, keyCount:Num, EDKs:List, EDKLength:Num) :
+nounfold pred CompleteRawEncryptedDataKeys(+byteLength:Num, +rawHeaderData:List, +start:Num, keyCount:Num, EDKs:List, EDKsLength:Num) :
+    (0 <=# start) * (start <=# byteLength) *
     (#rawEC == l-sub (rawHeaderData, start, 2)) *
     rawToUInt16(#rawEC, false, keyCount) *
     (0 <# keyCount) *
-    Elements(rawHeaderData, start + 2, keyCount, 3, EDKs, #EDKLength) *
-    (EDKLength == #EDKLength + 2);
-
-lemma CompleteRawEncryptedDataKeysPureFacts(rawHeaderData, start, keyCount, EDKs, EDKLength)
-    [[ (rawHeaderData == #rawHeaderData) * (start == #start) *
-       (keyCount == #keyCount) * (EDKs == #EDKs) * (EDKLength == #EDKLength) *
-       CompleteRawEncryptedDataKeys(#rawHeaderData, #start, #keyCount, #EDKs, #EDKLength) ]]
-    [[ CompleteRawEncryptedDataKeys(#rawHeaderData, #start, #keyCount, #EDKs, #EDKLength) *
-       (0 <=# #start) * (0 <# keyCount) * (2 <=# #EDKLength) ]]
-[*
-    sep_apply ElementsPureFacts(#rawHeaderData, #start + 2, #keyCount, 3, #EDKs, #EDKLength - 2)
- *]
+    Elements(rawHeaderData, start + 2, keyCount, 3, EDKs, #EDKsLength) *
+    (EDKsLength == #EDKsLength + 2) *
+    (start + EDKsLength <=# byteLength);
 
 nounfold pred IncompleteRawEncryptedDataKeys(+byteLength:Num, +rawHeaderData:List, +start:Num) :
-    (byteLength <# start + 2),
+    (0 <=# start) * (start <=# byteLength) * (byteLength <# start + 2),
 
-    (start + 2 <=# byteLength) *
+    (0 <=# start) * (start + 2 <=# byteLength) *
     (#rawEC == l-sub (rawHeaderData, start, 2)) *
     rawToUInt16(#rawEC, false, #keyCount) *
     (0 <# #keyCount) *
     IncompleteElements(byteLength, rawHeaderData, start + 2, #keyCount, 3);
 
-pred RawEncryptedDataKeys(definition:Str, +byteLength:Num, +rawHeaderData:List, +start:Num, keyCount:Num, EDKs:List, EDKLength:Num) :
-  (definition == "Complete EDKs") * CompleteRawEncryptedDataKeys(rawHeaderData, start, keyCount, EDKs, EDKLength),
-  (definition == "Incomplete EDKs") * IncompleteRawEncryptedDataKeys(byteLength, rawHeaderData, start) * (keyCount == 0) * (EDKs == {{ }}) * (EDKLength == 0);
+nounfold pred BrokenRawEncryptedDataKeys(errorMessage: Str, +byteLength:Num, +rawHeaderData:List, +start:Num) :
+    ((start <# 0) \/ (byteLength <# start)) * (errorMessage == "deserializeMessageHeader: startPos out of bounds."),
+
+    (0 <=# start) * (start + 2 <=# byteLength) *
+    (#rawEC == l-sub (rawHeaderData, start, 2)) *
+    rawToUInt16(#rawEC, false, 0) *
+    (errorMessage == "Malformed Header: No EncryptedDataKey found.");
+
+pred RawEncryptedDataKeys(definition:Str, +byteLength:Num, +rawHeaderData:List, +start:Num, keyCount:Num, EDKs:List, EDKsLength:Num, errorMessage:Str) :
+  (definition == "Complete EDKs") * CompleteRawEncryptedDataKeys(byteLength, rawHeaderData, start, keyCount, EDKs, EDKsLength) * (errorMessage == ""),
+  (definition == "Incomplete EDKs") * IncompleteRawEncryptedDataKeys(byteLength, rawHeaderData, start) * (keyCount == 0) * (EDKs == {{ }}) * (EDKsLength == 0) * (errorMessage == ""),
+  (definition == "Broken EDKs") * BrokenRawEncryptedDataKeys(errorMessage, byteLength, rawHeaderData, start) * (keyCount == 0) * (EDKs == {{ }}) * (EDKsLength == 0);
 
 (****************************
 **** toUTF8 and fromUtf8 ****

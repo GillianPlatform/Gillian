@@ -237,9 +237,7 @@ var toUtf8 = function (buffer) { };
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#definition == "Complete EDKs") *
-         RawEncryptedDataKeys(#definition, #byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength) *
-
-         (0 <=# startPos) * (#startPos + #EDKsLength <=# #byteLength) *
+         RawEncryptedDataKeys(#definition, #byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength, #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
@@ -247,7 +245,7 @@ var toUtf8 = function (buffer) { };
 
     @post Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
-          RawEncryptedDataKeys(#definition, #byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength) *
+          RawEncryptedDataKeys(#definition, #byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength, #errorMessage) *
 
           JSObject(ret) *
             DataProp(ret, "encryptedDataKeys", #dEDKs) *
@@ -262,9 +260,7 @@ var toUtf8 = function (buffer) { };
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#definition == "Incomplete EDKs") *
-         RawEncryptedDataKeys(#definition, #byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength) *
-
-         (0 <=# startPos) * (#startPos <=# #byteLength) *
+         RawEncryptedDataKeys(#definition, #byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength, #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
@@ -272,26 +268,49 @@ var toUtf8 = function (buffer) { };
 
     @post Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
-          RawEncryptedDataKeys(#definition, #byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength) *
+          RawEncryptedDataKeys(#definition, #byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength, #errorMessage) *
 
           (ret == false) *
 
           scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
           scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
           JSInternals ()
+
+    @pre (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
+         Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
+         (#view == l-sub(#data, #byteOffset, #byteLength)) *
+         (#definition == "Broken EDKs") *
+         RawEncryptedDataKeys(#definition, #byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength, #errorMessage) *
+
+         scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
+         JSInternals()
+
+    @posterr
+          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
+          (#view == l-sub(#data, #byteOffset, #byteLength)) *
+          RawEncryptedDataKeys(#definition, #byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength, #errorMessage) *
+
+          ErrorObjectWithMessage(ret, #errorMessage) *
+
+          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
+          JSInternals ()
 */
 function deserializeEncryptedDataKeys(buffer, startPos) {
   /* @tactic
       if (#definition = "Complete EDKs") then {
-        unfold CompleteRawEncryptedDataKeys(#view, #startPos, #EDKCount, #EDKs, #EDKsLength)
+        unfold CompleteRawEncryptedDataKeys(#byteLength, #view, #startPos, #EDKCount, #EDKs, #EDKsLength)
       } else {
-        unfold IncompleteRawEncryptedDataKeys(#byteLength, #view, #startPos)
+          if (#definition = "Incomplete EDKs") then {
+            unfold IncompleteRawEncryptedDataKeys(#byteLength, #view, #startPos)
+          } else {
+            unfold BrokenRawEncryptedDataKeys(#errorMessage, #byteLength, #view, #startPos)
+          }
       } */
 
   /* Precondition: startPos must be within the byte length of the buffer given. */
   needs(
     buffer.byteLength >= startPos && startPos >= 0,
-    'startPos out of bounds.'
+    'deserializeMessageHeader: startPos out of bounds.'
   )
 
   /* Check for early return (Postcondition): Need to have at least Uint16 (2) bytes of data. */
@@ -311,7 +330,7 @@ function deserializeEncryptedDataKeys(buffer, startPos) {
   var encryptedDataKeysCount = dataView.getUint16(startPos, false) // big endian
 
   /* Precondition: There must be at least 1 EncryptedDataKey element. */
-  needs(encryptedDataKeysCount, 'No EncryptedDataKey found.')
+  needs(encryptedDataKeysCount, 'Malformed Header: No EncryptedDataKey found.')
 
   var elementInfo = readElements(
     encryptedDataKeysCount,
@@ -392,7 +411,7 @@ var AlgorithmSuiteIdentifier;
         (numId == 70)  * (stringId == "ALG_AES192_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128);
 
     @pred pure BrokenAlgorithmSuite(+numId, errorMessage) :
-        (! (numId == 20)) * (! (numId == 70)) * (errorMessage == "Unsupported algorithm suite.");
+        (! (numId == 20)) * (! (numId == 70)) * (errorMessage == "Malformed Header: Unsupported algorithm suite.");
 
 
     @pred AlgorithmSuiteObject(+aso: Obj, ivLength: Num, tagLength: Num) :
@@ -427,7 +446,7 @@ var SdkSuite = function (suiteId) { };
 
     @pred BrokenVersionAndType(+version:Num, +type:Num, errorMessage:Str) :
         (version == 65) * (type == 89) * (errorMessage == "Malformed Header: This blob may be base64 encoded."),
-        (! (version == 1) \/ ! (type == 128)) * (! (version == 65) \/ ! (type == 89)) * (errorMessage == "Malformed Header.");
+        (! (version == 1) \/ ! (type == 128)) * (! (version == 65) \/ ! (type == 89)) * (errorMessage == "Malformed Header: Unsupported version and/or type.");
 
     @pred nounfold BrokenHeader(errorMessage, +byteLength, +rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
                                                                            part_two, EC,
@@ -454,6 +473,30 @@ var SdkSuite = function (suiteId) { };
         (part_three == {{ }}) * (EDKs == {{ }}) * (contentType == 0) * (headerIvLength == 0) *
         (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
 
+        (22 <=# byteLength) *
+        (rawHeaderData == l+ (part_one, part_two)) *
+        (l-len part_one == 22) *
+        (part_one == l+ (
+          {{ version, type }},
+          #rawSuiteId,
+          messageId,
+          #rawContextLength)) *
+        (l-len #rawSuiteId == 2) *
+        (l-len messageId == 16) *
+        (l-len #rawContextLength == 2) *
+        CorrectVersionAndType(version, type) *
+        rawToUInt16(#rawSuiteId, false, suiteId) *
+        AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
+        rawToUInt16(#rawContextLength, false, rECLength) *
+        (22 + rECLength <=# byteLength) *
+
+        (part_two == l+ (EC, part_three)) *
+        (l-len EC == rECLength) *
+        BrokenRawEncryptedDataKeys(errorMessage, byteLength, rawHeaderData, 22 + rECLength) *
+
+        (EDKs == {{ }}) * (contentType == 0) * (frameLength == 0) *
+        (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
+
 		    (22 <=# byteLength) *
         (rawHeaderData == l+ (part_one, part_two)) *
         (l-len part_one == 22) *
@@ -474,7 +517,7 @@ var SdkSuite = function (suiteId) { };
         (part_two == l+ (EC, part_three)) *
         (part_three == l+ (#edks, {{ contentType }}, #rawReservedBytes, #rest)) *
         (l-len EC == rECLength) *
-        CompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        CompleteRawEncryptedDataKeys(byteLength, rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
         (#EDKsLength == l-len #edks) *
         (l-len #rawReservedBytes == 4) *
         rawToUInt32(#rawReservedBytes, false, #reservedBytes) *
@@ -482,7 +525,7 @@ var SdkSuite = function (suiteId) { };
         (headerLength == 22 + rECLength + #EDKsLength + 1 + 4 + 1 + 4) *
         (headerLength + headerIvLength + (#tagLength / 8) <=# byteLength) *
 
-        (errorMessage == "Malformed Header") *
+        (errorMessage == "Malformed Header: Reserved bytes not equal to zero.") *
         (frameLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
 
         (22 <=# byteLength) *
@@ -505,13 +548,13 @@ var SdkSuite = function (suiteId) { };
         (part_two == l+ (EC, part_three)) *
         (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rest)) *
         (l-len EC == rECLength) *
-        CompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        CompleteRawEncryptedDataKeys(byteLength, rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
         (#EDKsLength == l-len #edks) *
         (headerLength == 22 + rECLength + #EDKsLength + 1 + 4 + 1 + 4) *
         (headerLength + #ivLength + (#tagLength / 8) <=# byteLength) *
         (! (headerIvLength == #ivLength)) *
 
-        (errorMessage == "Malformed Header") *
+        (errorMessage == "Malformed Header: Mismatch between expected and obtained IV length.") *
         (frameLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }});
 
     @pred nounfold IncompleteHeader(+byteLength, +rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
@@ -578,7 +621,7 @@ var SdkSuite = function (suiteId) { };
         (l-len EC == rECLength) *
 
         (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, #rest)) *
-        CompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        CompleteRawEncryptedDataKeys(byteLength, rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
         (#EDKsLength == l-len #edks) *
         (l-len #rawFrameLength == 4) *
         rawToUInt32(#rawFrameLength, false, frameLength) *
@@ -610,7 +653,7 @@ var SdkSuite = function (suiteId) { };
         (part_two == l+ (EC, part_three)) *
         (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, headerIv, headerAuthTag)) *
         (l-len EC == rECLength) *
-        CompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        CompleteRawEncryptedDataKeys(l-len rawHeaderData, rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
         (#EDKsLength == l-len #edks) *
         (l-len #rawFrameLength == 4) *
         rawToUInt32(#rawFrameLength, false, frameLength) *
@@ -802,7 +845,7 @@ function deserializeMessageHeader(messageBuffer) {
           } else {
             unfold BrokenHeader(#errorMessage, #byteLength, #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #EC, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
           }
-        }*/
+        } */
     var dataView = new DataView(
       messageBuffer.buffer,
       messageBuffer.byteOffset,
@@ -822,12 +865,12 @@ function deserializeMessageHeader(messageBuffer) {
       version === 1 && type === 128,
       version === 65 && type === 89
         ? 'Malformed Header: This blob may be base64 encoded.'
-        : 'Malformed Header.'
+        : 'Malformed Header: Unsupported version and/or type.'
     )
 
     var suiteId = dataView.getUint16(2, false)  // big endian
     /* Precondition: suiteId must match supported algorithm suite */
-    needs(AlgorithmSuiteIdentifier[suiteId], 'Unsupported algorithm suite.')
+    needs(AlgorithmSuiteIdentifier[suiteId], 'Malformed Header: Unsupported algorithm suite.')
     var messageId = messageBuffer.slice(4, 20)
     var contextLength = dataView.getUint16(20, false) // big endian
 
@@ -869,10 +912,10 @@ function deserializeMessageHeader(messageBuffer) {
     /* Postcondition: reservedBytes are defined as 0,0,0,0
      * See: https://docs.aws.amazon.com/encryption-sdk/latest/developer-guide/message-format.html#header-reserved
      */
-    needs(reservedBytes === 0, 'Malformed Header')
+    needs(reservedBytes === 0, 'Malformed Header: Reserved bytes not equal to zero.')
     var headerIvLength = dataView.getUint8(readPos + 1 + 4)
     /* Postcondition: The headerIvLength must match the algorithm suite specification. */
-    needs(headerIvLength === ivLength, 'Malformed Header')
+    needs(headerIvLength === ivLength, 'Malformed Header: Mismatch between expected and obtained IV length.')
     var frameLength = dataView.getUint32(readPos + 1 + 4 + 1, false) // big endian
     var rawHeader = messageBuffer.slice(0, headerLength)
 
