@@ -170,9 +170,9 @@ nounfold pred BrokenRawEncryptedDataKeys(errorMessage: Str, +rawHeaderData:List,
     (errorMessage == "Malformed Header: No EncryptedDataKey found.");
 
 pred RawEncryptedDataKeys(definition:Str, +rawHeaderData:List, +start:Num, keyCount:Num, EDKs:List, EDKsLength:Num, errorMessage:Str) :
-  (definition == "Complete EDKs") * CompleteRawEncryptedDataKeys(rawHeaderData, start, keyCount, EDKs, EDKsLength) * (errorMessage == ""),
-  (definition == "Incomplete EDKs") * IncompleteRawEncryptedDataKeys(rawHeaderData, start) * (keyCount == 0) * (EDKs == {{ }}) * (EDKsLength == 0) * (errorMessage == ""),
-  (definition == "Broken EDKs") * BrokenRawEncryptedDataKeys(errorMessage, rawHeaderData, start) * (keyCount == 0) * (EDKs == {{ }}) * (EDKsLength == 0);
+  (definition == "Complete") * CompleteRawEncryptedDataKeys(rawHeaderData, start, keyCount, EDKs, EDKsLength) * (errorMessage == ""),
+  (definition == "Incomplete") * IncompleteRawEncryptedDataKeys(rawHeaderData, start) * (keyCount == 0) * (EDKs == {{ }}) * (EDKsLength == 0) * (errorMessage == ""),
+  (definition == "Broken") * BrokenRawEncryptedDataKeys(errorMessage, rawHeaderData, start) * (keyCount == 0) * (EDKs == {{ }}) * (EDKsLength == 0);
 
 (****************************
 **** toUTF8 and fromUtf8 ****
@@ -254,14 +254,14 @@ pred DecodedEncryptedDataKeys (+a:Obj, contents:List, arrayLength:Num) :
 (* *** ENCRYPTION CONTEXT *** *)
 (* ************************** *)
 
-nounfold pred CompleteRawEncryptionContext(+EC:List, keyCount:Num, ECKs:List) :
-    (l-len EC == 2) * (keyCount == 0) * (ECKs == {{ }}) * rawToUInt16(EC, false, keyCount),
+nounfold pred CompleteRawEncryptionContext(+EC:List, ECKs:List) :
+    (l-len EC == 2) * (ECKs == {{ }}) * rawToUInt16(EC, false, 0),
 
     (2 <# l-len EC) *
     (#rawKC == l-sub (EC, 0, 2)) *
-    rawToUInt16(#rawKC, false, keyCount) *
-    (0 <# keyCount) *
-    Elements(EC, 2, keyCount, 2, ECKs, #ECKsLength) *
+    rawToUInt16(#rawKC, false, #keyCount) *
+    (0 <# #keyCount) *
+    Elements(EC, 2, #keyCount, 2, ECKs, #ECKsLength) *
     (2 + #ECKsLength == l-len EC);
 
 nounfold pred BrokenRawEncryptionContext(errorMessage:Str, +EC:List) :
@@ -280,9 +280,9 @@ nounfold pred BrokenRawEncryptionContext(errorMessage:Str, +EC:List) :
     (! (#ECKsLength + 2 == l-len EC)) *
     (errorMessage == "decodeEncryptionContext: Overflow, too much data.");
 
-pred RawEncryptionContext(definition:Str, +EC:List, keyCount:Num, ECKs:List, errorMessage:Str) :
-  (definition == "Complete EC") * CompleteRawEncryptionContext(EC, keyCount, ECKs) * (errorMessage == ""),
-  (definition == "Broken EC")   * BrokenRawEncryptionContext(errorMessage, EC) * (keyCount == 0) * (ECKs == {{ }});
+pred RawEncryptionContext(definition:Str, +EC:List, ECKs:List, errorMessage:Str) :
+  (definition == "Complete") * CompleteRawEncryptionContext(EC, ECKs) * (errorMessage == ""),
+  (definition == "Broken")   * BrokenRawEncryptionContext(errorMessage, EC) * (ECKs == {{ }});
 
 pred DecodedEncryptionContext(+dECObj : Obj) :
     JSObjWithProto(dECObj, null);
