@@ -2465,7 +2465,10 @@ let relate_llen
               (fun e ->
                 match e with
                 | Expr.Lit (Num _) -> true
-                | _                -> false)
+                | e
+                  when Containers.SS.subset (Expr.lvars e)
+                         (Expr.lvars (cnum_to_expr llen)) -> true
+                | _ -> false)
               eqs
           with
           | [] -> e_llen

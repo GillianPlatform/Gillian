@@ -223,9 +223,17 @@ lemma ElementsPureFacts(buffer, readPos, eCount, fCount, eList, esLength)
     [[ (buffer == #buffer) * (readPos == #readPos) * (eCount == #eCount) *
        (fCount == #fCount) * (eList == #eList) * (esLength == #esLength) *
        Elements(#definition, #buffer, #readPos, #eCount, #fCount, #eList, #esLength) ]]
-    [[ Elements(#definition, #buffer, #readPos, #eCount, #fCount, #eList, #esLength) *
+    [[
+       (#definition == "Complete") *
+       Elements(#definition, #buffer, #readPos, #eCount, #fCount, #eList, #esLength) *
        (0 <=# #readPos) * (#readPos <=# l-len #buffer) *
-       (0 <=# #eCount) * (0 <# #fCount) * (0 <=# #esLength) ]]
+       (0 <=# #eCount) * (0 <# #fCount) * (0 <=# #esLength);
+
+       (#definition == "Incomplete") *
+       Elements(#definition, #buffer, #readPos, #eCount, #fCount, #eList, #esLength) *
+       (0 <=# #readPos) * (#readPos <=# l-len #buffer) *
+       (0 <# #eCount) * (0 <# #fCount) * (0 <=# #esLength)
+    ]]
     [*
       unfold Elements(#definition, #buffer, #readPos, #eCount, #fCount, #eList, #esLength);
       if (#definition = "Complete") then {
@@ -392,3 +400,16 @@ only spec Object_freeze(xsc, vthis, l)
   [[ (l == #l) * PreDecodedEncryptedDataKeys(#l, #EDKs, #keyCount) ]]
   [[ DecodedEncryptedDataKeys(#l, #EDKs, #keyCount) * (ret == #l) ]]
   normal
+
+    nounfold pred EncryptedDataKey(+EDK, pId:Str, pInfo:Str, encryptedDataKey:List, rawInfo:List) :
+        JSObjGeneral(EDK, $l_edk_proto, "Object", false) *
+        readOnlyProperty(EDK, "providerId", pId) *
+        readOnlyProperty(EDK, "providerInfo", pInfo) *
+        readOnlyProperty(EDK, "encryptedDataKey", #aEDK) *
+            Uint8Array(#aEDK, #abEDK, 0, #viewSizeEDK) *
+            ArrayBuffer(#abEDK, encryptedDataKey) *
+            (#viewSizeEDK == l-len encryptedDataKey) *
+        readOnlyProperty(EDK, "rawInfo", #aRInfo) *
+            Uint8Array(#aRInfo, #abRInfo, 0, #viewSizeRInfo) *
+            ArrayBuffer(#abRInfo, rawInfo) *
+            (#viewSizeRInfo == l-len rawInfo);
