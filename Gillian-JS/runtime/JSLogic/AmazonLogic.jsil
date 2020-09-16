@@ -2,101 +2,130 @@
  **** ELEMENTS ****
  ******************)
 
-pred Field(+view:List, +readPos:Num, field:List, fieldLength:Num) :
-    (#rawFL == l-sub (view, readPos, 2)) *
-    rawToUInt16(#rawFL, false, fieldLength) *
-    (field == l-sub(view, readPos + 2, fieldLength));
+pred Field(+buffer:List, +readPos:Num, field:List, fLength:Num) :
+    (#rawFL == l-sub (buffer, readPos, 2)) *
+    rawToUInt16(#rawFL, false, fLength) *
+    (field == l-sub(buffer, readPos + 2, fLength));
 
-pred CElement(+view:List, +readPos:Num, +fieldCount: Num, fieldsList:List, elementLength:Num) :
-    (0 <=# readPos) * (fieldCount == 0) * (fieldsList == {{ }}) * (elementLength == 0) *
-    (readPos + elementLength <=# l-len view),
+lemma FieldPureFacts(buffer, readPos, field, fLength)
+  [[ (buffer == #buffer) * (readPos == #readPos) * (field == #field) * (fLength == #fLength) *
+     Field(#buffer, #readPos, #field, #fLength) ]]
+  [[ Field(#buffer, #readPos, #field, #fLength) *
+     (0 <=# #fLength) ]]
+  [* *]
 
-    (0 <=# readPos) * (0 <# fieldCount) * (0 <# elementLength) *
-    Field(view, readPos, #field, #fieldLength) *
-    (#restFieldCount == fieldCount - 1) *
-    CElement(view, readPos + 2 + #fieldLength, #restFieldCount, #restFields, #restElementLength) *
-    (0 <=# #restElementLength) *
-    (fieldsList == #field :: #restFields) *
-    (elementLength == 2 + #fieldLength + #restElementLength) *
-    (readPos + elementLength <=# l-len view);
+pred CElement(+buffer:List, +readPos:Num, +fCount: Num, fList:List, eLength:Num) :
+    (0 <=# readPos) * (readPos <=# l-len buffer) * (fCount == 0) * (fList == {{ }}) * (eLength == 0),
 
-lemma CElementPureFacts(view, readPos, fieldCount, fieldList, elementLength)
-    [[ (view == #view) * (readPos == #readPos) * (fieldCount == #fieldCount) *
-       (fieldList == #fieldList) * (elementLength == #elementLength) *
-       CElement(#view, #readPos, #fieldCount, #fieldList, #elementLength) ]]
-    [[ CElement(#view, #readPos, #fieldCount, #fieldList, #elementLength) *
-       (0 <=# #readPos) *
-       (0 <=# #fieldCount) *
-       (0 <=# #elementLength) *
-       (#readPos + #elementLength <=# l-len #view) ]] [* *]
+    (0 <=# readPos) * (readPos <=# l-len buffer) * (0 <# fCount) *
+    Field(buffer, readPos, #field, #fLength) *
+    (#restFCount == fCount - 1) *
+    CElement(buffer, readPos + 2 + #fLength, #restFCount, #restFields, #restELength) *
+    (fList == #field :: #restFields) *
+    (eLength == 2 + #fLength + #restELength) *
+    (readPos + eLength <=# l-len buffer);
 
-lemma NonEmptyCElementLength(view, readPos, fieldCount, field, restFieldList, elementLength)
-    [[ (view == #view) * (readPos == #readPos) * (fieldCount == #fieldCount) *
-       (field == #field) * (restFieldList == #restFieldList) * (elementLength == #elementLength) *
-       CElement(#view, #readPos, #fieldCount, l+({{ #field }}, #restFieldList), #elementLength) ]]
-    [[ CElement(#view, #readPos, #fieldCount, l+({{ #field }}, #restFieldList), #elementLength) *
-       (2 + l-len #field <=# #elementLength) ]] [* *]
+lemma CElementPureFacts(buffer, readPos, fCount, fList, eLength)
+    [[ (buffer == #buffer) * (readPos == #readPos) * (fCount == #fCount) * (fList == #fList) * (eLength == #eLength) *
+       CElement(#buffer, #readPos, #fCount, #fList, #eLength) ]]
+    [[ CElement(#buffer, #readPos, #fCount, #fList, #eLength) *
+       (0 <=# #readPos) * (#readPos <=# l-len #buffer) * (0 <=# #fCount) * (0 <=# #eLength) *
+       (#readPos + #eLength <=# l-len #buffer) ]]
+    [*
+      unfold CElement(#buffer, #readPos, #fCount, #fList, #eLength);
+      if (0 < #fCount) then {
+        sep_assert (Field(#buffer, #readPos, #field, #fLength)) [bind: #field, #fLength];
+        sep_apply FieldPureFacts(#buffer, #readPos, #field, #fLength);
+        sep_assert (CElement(#buffer, #readPos + 2 + #fLength, #fCount - 1, #restFields, #restELength)) [bind: #restFields, #restELength];
+        sep_apply CElementPureFacts(#buffer, #readPos + 2 + #fLength, #fCount - 1, #restFields, #restELength)
+      }
+     *]
 
-lemma CElementAppend(view, readPos, fC1, fL1, eL1, fC2, field, fL2, eL2)
-    [[ (view == #view) * (readPos == #readPos) * (fC1 == #fC1) * (fL1 == #fL1) * (eL1 == #eL1) *
+lemma NonEmptyCElementLength(buffer, readPos, fCount, field, restFields, eLength)
+    [[ (buffer == #buffer) * (readPos == #readPos) * (fCount == #fCount) *
+       (field == #field) * (restFields == #restFields) * (eLength == #eLength) *
+       CElement(#buffer, #readPos, #fCount, l+({{ #field }}, #restFields), #eLength) ]]
+    [[ CElement(#buffer, #readPos, #fCount, l+({{ #field }}, #restFields), #eLength) *
+       (2 + l-len #field <=# #eLength) ]]
+    [*
+      unfold CElement(#buffer, #readPos, #fCount, l+({{ #field }}, #restFields), #eLength);
+      sep_assert (Field(#buffer, #readPos, #field, #fLength)) [bind: #fLength];
+      sep_assert (CElement(#buffer, #readPos + 2 + #fLength, #fCount - 1, #restFields, #restELength)) [bind: #restELength];
+      sep_apply CElementPureFacts(#buffer, #readPos + 2 + #fLength, #fCount - 1, #restFields, #restELength)
+     *]
+
+lemma PositiveCElementLength(buffer, readPos, fCount, fList, eLength)
+    [[ (buffer == #buffer) * (readPos == #readPos) * (fCount == #fCount) * (fList == #fList) * (eLength == #eLength) *
+       CElement(#buffer, #readPos, #fCount, #fList, #eLength) * (0 <# #fCount) ]]
+    [[ CElement(#buffer, #readPos, #fCount, #fList, #eLength) *
+       (0 <# #eLength) ]]
+    [*
+      unfold CElement(#buffer, #readPos, #fCount, #fList, #eLength);
+      sep_assert (Field(#buffer, #readPos, #field, #fLength)) [bind: #fLength];
+      sep_assert (CElement(#buffer, #readPos + 2 + #fLength, #fCount - 1, #restFields, #restELength)) [bind: #restELength];
+      sep_apply CElementPureFacts(#buffer, #readPos + 2 + #fLength, #fCount - 1, #restFields, #restELength)
+     *]
+
+lemma CElementAppend(buffer, readPos, fC1, fL1, eL1, fC2, field, fL2, eL2)
+    [[ (buffer == #buffer) * (readPos == #readPos) * (fC1 == #fC1) * (fL1 == #fL1) * (eL1 == #eL1) *
        (fC2 == #fC2) * (field == #field) * (fL2 == #fL2) * (eL2 == #eL2) *
-       CElement(#view, #readPos, #fC1, #fL1, #eL1) *
-       CElement(#view, #readPos + #eL1, #fC2, l+({{ #field }}, #fL2), #eL2) *
+       CElement(#buffer, #readPos, #fC1, #fL1, #eL1) *
+       CElement(#buffer, #readPos + #eL1, #fC2, l+({{ #field }}, #fL2), #eL2) *
        (#shift == 2 + l-len #field) ]]
-    [[ CElement(#view, #readPos, #fC1 + 1, l+ (#fL1, {{ #field }}), #eL1 + #shift) *
-       CElement(#view, #readPos + #eL1 + #shift, #fC2 - 1, #fL2, #eL2 - #shift) ]]
-[*
-    sep_apply CElementPureFacts(#view, #readPos, #fC1, #fL1, #eL1);
-    sep_apply CElementPureFacts(#view, #readPos + #eL1, #fC2, l+({{ #field }}, #fL2), #eL2);
-    sep_apply NonEmptyCElementLength(#view, #readPos + #eL1, #fC2, #field, #fL2, #eL2);
-    unfold CElement(#view, #readPos, #fC1, #fL1, #eL1);
+    [[ CElement(#buffer, #readPos, #fC1 + 1, l+ (#fL1, {{ #field }}), #eL1 + #shift) *
+       CElement(#buffer, #readPos + #eL1 + #shift, #fC2 - 1, #fL2, #eL2 - #shift) ]]
+  [*
+    sep_apply CElementPureFacts(#buffer, #readPos, #fC1, #fL1, #eL1);
+    sep_apply CElementPureFacts(#buffer, #readPos + #eL1, #fC2, l+({{ #field }}, #fL2), #eL2);
+    sep_apply NonEmptyCElementLength(#buffer, #readPos + #eL1, #fC2, #field, #fL2, #eL2);
+    unfold CElement(#buffer, #readPos, #fC1, #fL1, #eL1);
     if (not (#fC1 = 0)) then {
       sep_assert (#fL1 == l+ ({{ #fl1 }}, #rfl1)) [bind: #fl1, #rfl1];
-      sep_assert (CElement(#view, 2 + (l-len #fl1) + #readPos, #fC1 - 1, #rfl1, #reL1)) [bind: #reL1];
-      sep_apply CElementPureFacts(#view, 2 + (l-len #fl1) + #readPos, #fC1 - 1, #rfl1, #reL1);
-      sep_apply CElementAppend(#view, 2 + (l-len #fl1) + #readPos, #fC1 - 1, #rfl1, #reL1, #fC2, #field, #fL2, #eL2);
-      fold CElement(#view, #readPos, #fC1 + 1, l+ (#fL1, {{ #field }}), #eL1 + #shift)
+      sep_assert (CElement(#buffer, 2 + (l-len #fl1) + #readPos, #fC1 - 1, #rfl1, #reL1)) [bind: #reL1];
+      sep_apply CElementPureFacts(#buffer, 2 + (l-len #fl1) + #readPos, #fC1 - 1, #rfl1, #reL1);
+      sep_apply CElementAppend(#buffer, 2 + (l-len #fl1) + #readPos, #fC1 - 1, #rfl1, #reL1, #fC2, #field, #fL2, #eL2);
+      fold CElement(#buffer, #readPos, #fC1 + 1, l+ (#fL1, {{ #field }}), #eL1 + #shift)
     }
- *]
+  *]
 
-pred CElements(+view:List, +readPos:Num, +elementCount: Num, +fieldCount: Num, elementsList:List, elementsLength:Num) :
+pred CElements(+buffer:List, +readPos:Num, +elementCount: Num, +fieldCount: Num, elementsList:List, elementsLength:Num) :
     (0 <=# readPos) * (elementCount == 0) * (0 <# fieldCount) * (elementsList == {{ }}) * (elementsLength == 0) *
-    (readPos + elementsLength <=# l-len view),
+    (readPos + elementsLength <=# l-len buffer),
 
     (0 <=# readPos) * (0 <# elementCount) * (0 <# fieldCount) * (0 <# elementsLength) *
-    CElement(view, readPos, fieldCount, #fieldsList, #elementLength) *
+    CElement(buffer, readPos, fieldCount, #fieldsList, #elementLength) *
     (#restElementCount == elementCount - 1) *
-    CElements(view, readPos + #elementLength, #restElementCount, fieldCount, #restElements, #restElementsLength) *
+    CElements(buffer, readPos + #elementLength, #restElementCount, fieldCount, #restElements, #restElementsLength) *
     (0 <=# #restElementsLength) *
     (elementsList == #fieldsList :: #restElements) *
     (elementsLength == #elementLength + #restElementsLength) *
-    (readPos + elementsLength <=# l-len view);
+    (readPos + elementsLength <=# l-len buffer);
 
-lemma CElementsPureFacts(view, readPos, elementCount, fieldCount, elementList, elementsLength)
-    [[ (view == #view) * (readPos == #readPos) * (elementCount == #elementCount) *
-       (fieldCount == #fieldCount) * (elementList == #elementList) * (elementsLength == #elementsLength) *
-       CElements(#view, #readPos, #elementCount, #fieldCount, #elementList, #elementsLength) ]]
-    [[ CElements(#view, #readPos, #elementCount, #fieldCount, #elementList, #elementsLength) *
-       (0 <=# #readPos) *
-       (0 <# #fieldCount) *
-       (0 <=# #elementCount) *
-       (0 <=# #elementsLength) *
-       (#readPos + #elementsLength <=# l-len #view) ]] [* *]
+lemma CElementsPureFacts(buffer, readPos, eCount, fCount, eList, esLength)
+    [[ (buffer == #buffer) * (readPos == #readPos) * (eCount == #eCount) * (fCount == #fCount) * (eList == #eList) * (esLength == #esLength) *
+       CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength) ]]
+    [[ CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength) *
+       (0 <=# #readPos) * (#readPos <=# l-len #buffer) * (0 <=# eCount) * (0 <# #fCount) * (0 <=# #esLength) *
+       (#readPos + #esLength <=# l-len #buffer) ]]
+    [* *]
 
-lemma CElementsAppend(view, readPos, elementCount, fieldCount, elementList, elementsLength, fieldList, elementLength)
-    [[ (view == #view) * (readPos == #readPos) * (elementCount == #elementCount) *
-       (fieldCount == #fieldCount) * (elementList == #elementList) * (elementsLength == #elementsLength) *
-       (fieldList == #fieldList) * (elementLength == #elementLength) *
-       CElements(#view, #readPos, #elementCount, #fieldCount, #elementList, #elementsLength) *
-       CElement(#view, #readPos + #elementsLength, #fieldCount, #fieldList, #elementLength) ]]
-    [[ CElements(#view, #readPos, #elementCount + 1, #fieldCount, l+ (#elementList, {{ #fieldList }}), #elementsLength + #elementLength) ]]
+lemma CElementsAppend(buffer, readPos, eCount, fCount, eList, esLength, fList, eLength)
+    [[ (buffer == #buffer) * (readPos == #readPos) * (eCount == #eCount) *
+       (fCount == #fCount) * (eList == #eList) * (esLength == #esLength) *
+       (fList == #fList) * (eLength == #eLength) *
+       CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength) *
+       CElement(#buffer, #readPos + #esLength, #fCount, #fList, #eLength) ]]
+    [[ CElements(#buffer, #readPos, #eCount + 1, #fCount, l+ (#eList, {{ #fList }}), #esLength + #eLength) ]]
 [*
-    unfold CElements(#view, #readPos, #elementCount, #fieldCount, #elementList, #elementsLength);
-    if (not (#elementCount = 0)) then {
-      sep_assert (CElement(#view, #readPos, #fieldCount, #newElementFieldList, #newElementLength)) [bind: #newElementFieldList, #newElementLength];
-      sep_apply CElementPureFacts(#view, #readPos, #fieldCount, #newElementFieldList, #newElementLength);
-      sep_assert (CElements(#view, (#readPos + #newElementLength), (#elementCount - 1), #fieldCount, #remainingElementsList, #remainingElementsLength)) [bind: #remainingElementsList, #remainingElementsLength];
-      sep_apply CElementsAppend(#view, (#readPos + #newElementLength), (#elementCount - 1), #fieldCount, #remainingElementsList, #remainingElementsLength, #fieldList, #elementLength)
+    sep_apply CElementsPureFacts(#buffer, #readPos, #eCount, #fCount, #eList, #esLength);
+    sep_apply CElementPureFacts(#buffer, #readPos + #esLength, #fCount, #fList, #eLength);
+    sep_apply PositiveCElementLength(#buffer, #readPos + #esLength, #fCount, #fList, #eLength);
+    unfold CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength);
+    if (not (#eCount = 0)) then {
+      sep_assert (CElement(#buffer, #readPos, #fCount, #newElementFieldList, #newElementLength)) [bind: #newElementFieldList, #newElementLength];
+      sep_apply CElementPureFacts(#buffer, #readPos, #fCount, #newElementFieldList, #newElementLength);
+      sep_assert (CElements(#buffer, (#readPos + #newElementLength), (#eCount - 1), #fCount, #remainingElementsList, #remainingElementsLength)) [bind: #remainingElementsList, #remainingElementsLength];
+      sep_apply CElementsAppend(#buffer, (#readPos + #newElementLength), (#eCount - 1), #fCount, #remainingElementsList, #remainingElementsLength, #fList, #eLength)
     }
  *]
 
@@ -105,39 +134,106 @@ lemma CElementsAppend(view, readPos, elementCount, fieldCount, elementList, elem
  **************************)
 
 (* An element that cannot be read from a given buffer of data *)
-nounfold pred ICElement(+view:List, +readPos:Num, +fieldCount: Num) :
+pred IElement(+buffer:List, +readPos:Num, +fCount: Num, fList:List, eLength:Num) :
     (* Base case: not enough data to read length of next field *)
-    (0 <=# readPos) * (0 <# fieldCount) * (readPos <=# l-len view) *
-    (l-len view <# readPos + 2),
+    (0 <=# readPos) * (0 <# fCount) *
+    (readPos <=# l-len buffer) * (l-len buffer <# readPos + 2) *
+    (fList == {{ }}) * (eLength == l-len buffer - readPos),
 
     (* Base case: enough data to read length of next field, but not enough data to read next field *)
-    (0 <=# readPos) * (0 <# fieldCount) * (readPos + 2 <=# l-len view) *
-    (#rawFL == l-sub (view, readPos, 2)) *
-    rawToUInt16(#rawFL, false, #fieldLength) *
-    (l-len view <# readPos + 2 + #fieldLength),
+    (0 <=# readPos) * (0 <# fCount) * (readPos + 2 <=# l-len buffer) *
+    (#rawFL == l-sub (buffer, readPos, 2)) *
+    rawToUInt16(#rawFL, false, #fLength) *
+    (l-len buffer <# readPos + 2 + #fLength) *
+    (fList == {{ }}) * (eLength == l-len buffer - (readPos + 2)),
 
     (* Recursive case: enough data to read one field, but not enough data to read the remaining ones *)
-    (0 <=# readPos) * (1 <# fieldCount) *
-    Field(view, readPos, #field, #fieldLength) *
-    (#restFieldCount == fieldCount - 1) *
-    (readPos + 2 + #fieldLength <=# l-len view) *
-    ICElement(view, readPos + 2 + #fieldLength, #restFieldCount);
+    (0 <=# readPos) * (1 <# fCount) *
+    Field(buffer, readPos, #field, #fLength) *
+    (#restFCount == fCount - 1) *
+    (readPos + 2 + #fLength <=# l-len buffer) *
+    IElement(buffer, readPos + 2 + #fLength, #restFCount, #restFList, #restELength) *
+    (fList == #field :: #restFList) *
+    (eLength == 2 + #fLength + #restELength);
+
+lemma IElementPureFacts(buffer, readPos, fCount, fList, eLength)
+    [[ (buffer == #buffer) * (readPos == #readPos) * (fCount == #fCount) * (fList == #fList) * (eLength == #eLength) *
+       IElement(#buffer, #readPos, #fCount, #fList, #eLength) ]]
+    [[ IElement(#buffer, #readPos, #fCount, #fList, #eLength) *
+       (0 <=# #readPos) * (#readPos <=# l-len #buffer) * (0 <# #fCount) * (0 <=# #eLength) ]]
+    [*
+      unfold IElement(#buffer, #readPos, #fCount, #fList, #eLength);
+      if (not (#fList = {{ }})) then {
+        sep_assert (Field(#buffer, #readPos, #field, #fLength)) [bind: #field, #fLength];
+        sep_apply FieldPureFacts(#buffer, #readPos, #field, #fLength);
+        sep_assert (IElement(#buffer, #readPos + 2 + #fLength, #fCount - 1, #restFields, #restELength)) [bind: #restFields, #restELength];
+        sep_apply IElementPureFacts(#buffer, #readPos + 2 + #fLength, #fCount - 1, #restFields, #restELength)
+      }
+     *]
 
 (***************************
  *** INCOMPLETE ELEMENTS ***
  ***************************)
 
 (* A sequence of elements that cannot be read from a given buffer of data *)
-nounfold pred IElements(view:List, readPos:Num, elementCount: Num, fieldCount: Num) :
+pred IElements(+buffer:List, +readPos:Num, +eCount: Num, +fCount: Num, eList:List, esLength:Num) :
   (* Base case: single incomplete element *)
-  (0 <=# readPos) * (readPos <=# l-len view) * (0 <# elementCount) * (0 <# fieldCount) *
-  ICElement(view, readPos, fieldCount),
+  (0 <=# readPos) * (readPos <=# l-len buffer) * (0 <# eCount) * (0 <# fCount) *
+  IElement(buffer, readPos, fCount, #fList, esLength) * eList == {{ }},
 
   (* Recursive case: enough data to read first element, but not enough data to read the remaining ones *)
-  (0 <=# readPos) * (readPos <=# l-len view) * (1 <# elementCount) * (0 <# fieldCount) *
-  CElement(view, readPos, fieldCount, #fieldList, #elementLength) *
-  (#restElementCount == elementCount - 1) *
-  IElements(view, readPos + #elementLength, #restElementCount, fieldCount);
+  (0 <=# readPos) * (readPos <=# l-len buffer) * (1 <# eCount) * (0 <# fCount) *
+  CElement(buffer, readPos, fCount, #fList, #eLength) *
+  (#restECount == eCount - 1) *
+  IElements(buffer, readPos + #eLength, #restECount, fCount, #restEList, #restESLength) *
+  (eList == #fList :: #restEList) *
+  (esLength == #eLength + #restESLength);
+
+lemma IElementsPureFacts(buffer, readPos, eCount, fCount, eList, esLength)
+    [[ (buffer == #buffer) * (readPos == #readPos) * (eCount == #eCount) * (fCount == #fCount) * (eList == #eList) * (esLength == #esLength) *
+       IElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength) ]]
+    [[ IElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength) *
+       (0 <=# #readPos) * (#readPos <=# l-len #buffer) * (0 <# eCount) * (0 <# #fCount) * (0 <=# #esLength) ]]
+    [*
+      unfold IElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength);
+      if (#eList = {{ }}) then {
+        sep_assert (IElement(#buffer, #readPos, #fCount, #fList, #esLength)) [bind : #fList];
+        sep_apply IElementPureFacts(#buffer, #readPos, #fCount, #fList, #esLength)
+      } else {
+        sep_assert (CElement(#buffer, #readPos, #fCount, #fList, #eLength)) [bind : #fList, #eLength];
+        sep_apply CElementPureFacts(#buffer, #readPos, #fCount, #fList, #eLength);
+        sep_assert (IElements(#buffer, #readPos + #eLength, #eCount - 1, #fCount, #restEList, #restESLength)) [bind: #restEList, #restESLength];
+        sep_apply IElementsPureFacts(#buffer, #readPos + #eLength, #eCount - 1, #fCount, #restEList, #restESLength)
+      }
+    *]
+
+(************************
+ *** GENERAL ELEMENTS ***
+ ************************)
+
+nounfold pred Element(definition:Str, +buffer:List, +readPos:Num, +fCount: Num, fList:List, eLength:Num) :
+      (definition == "Complete")   * CElement(buffer, readPos, fCount, fList, eLength),
+      (definition == "Incomplete") * IElement(buffer, readPos, fCount, fList, eLength);
+
+nounfold pred Elements(definition:Str, +buffer:List, +readPos:Num, +eCount: Num, +fCount: Num, eList:List, esLength:Num) :
+      (definition == "Complete")   * CElements(buffer, readPos, eCount, fCount, eList, esLength),
+      (definition == "Incomplete") * IElements(buffer, readPos, eCount, fCount, eList, esLength);
+
+lemma ElementsPureFacts(buffer, readPos, eCount, fCount, eList, esLength)
+    [[ (buffer == #buffer) * (readPos == #readPos) * (eCount == #eCount) *
+       (fCount == #fCount) * (eList == #eList) * (esLength == #esLength) *
+       Elements(#definition, #buffer, #readPos, #eCount, #fCount, #eList, #esLength) ]]
+    [[ Elements(#definition, #buffer, #readPos, #eCount, #fCount, #eList, #esLength) *
+       (0 <=# #readPos) * (#readPos <=# l-len #buffer) *
+       (0 <=# #eCount) * (0 <# #fCount) * (0 <=# #esLength) ]]
+    [*
+      unfold Elements(#definition, #buffer, #readPos, #eCount, #fCount, #eList, #esLength);
+      if (#definition = "Complete") then {
+        sep_apply CElementsPureFacts(#buffer, #readPos, #eCount, #fCount, #eList, #esLength)
+      } else {
+        sep_apply IElementsPureFacts(#buffer, #readPos, #eCount, #fCount, #eList, #esLength)
+      }
+    *]
 
 (****************************
 **** ENCRYPTED DATA KEYS ****
@@ -159,7 +255,7 @@ nounfold pred IRawEncryptedDataKeys(+rawHeaderData:List, +start:Num) :
     (#rawEC == l-sub (rawHeaderData, start, 2)) *
     rawToUInt16(#rawEC, false, #keyCount) *
     (0 <# #keyCount) *
-    IElements(rawHeaderData, start + 2, #keyCount, 3);
+    IElements(rawHeaderData, start + 2, #keyCount, 3, #eList, #esLength);
 
 nounfold pred BRawEncryptedDataKeys(errorMessage: Str, +rawHeaderData:List, +start:Num) :
     ((start <# 0) \/ (l-len rawHeaderData <# start)) * (errorMessage == "deserializeMessageHeader: startPos out of bounds."),
@@ -269,7 +365,7 @@ nounfold pred BRawEncryptionContext(errorMessage:Str, +EC:List) :
     (#rawKC == l-sub (EC, 0, 2)) *
     rawToUInt16(#rawKC, false, #keyCount) *
     (0 <# #keyCount) *
-    IElements(EC, 2, #keyCount, 2) *
+    IElements(EC, 2, #keyCount, 2, #eList, #esLength) *
     (errorMessage == "decodeEncryptionContext: Underflow, not enough data."),
 
     (2 <# l-len EC) *
@@ -296,3 +392,16 @@ only spec Object_freeze(xsc, vthis, l)
   [[ (l == #l) * PreDecodedEncryptedDataKeys(#l, #EDKs, #keyCount) ]]
   [[ DecodedEncryptedDataKeys(#l, #EDKs, #keyCount) * (ret == #l) ]]
   normal
+
+      nounfold pred EncryptedDataKey(+EDK, pId:Str, pInfo:Str, encryptedDataKey:List, rawInfo:List) :
+        JSObjGeneral(EDK, $l_edk_proto, "Object", false) *
+        readOnlyProperty(EDK, "providerId", pId) *
+        readOnlyProperty(EDK, "providerInfo", pInfo) *
+        readOnlyProperty(EDK, "encryptedDataKey", #aEDK) *
+            Uint8Array(#aEDK, #abEDK, 0, #viewSizeEDK) *
+            ArrayBuffer(#abEDK, encryptedDataKey) *
+            (#viewSizeEDK == l-len encryptedDataKey) *
+        readOnlyProperty(EDK, "rawInfo", #aRInfo) *
+            Uint8Array(#aRInfo, #abRInfo, 0, #viewSizeRInfo) *
+            ArrayBuffer(#abRInfo, rawInfo) *
+            (#viewSizeRInfo == l-len rawInfo);

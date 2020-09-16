@@ -56,13 +56,13 @@ function needs (condition, errorMessage) {
         Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
         ArrayBuffer(#ab, #data) *
         (#view == l-sub(#data, #viewOffset, #viewSize)) *
-        IElements(#view, #readPos, #elementCount, #fieldsPerElement) *
+        IElements(#view, #readPos, #elementCount, #fieldsPerElement, #eList, #eLength) *
         JSInternals ()
     ]]
     [[
         Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
         ArrayBuffer(#ab, #data) *
-        IElements(#view, #readPos, #elementCount, #fieldsPerElement) *
+        IElements(#view, #readPos, #elementCount, #fieldsPerElement, #eList, #eLength) *
         JSInternals () *
 
         (ret == false)
