@@ -34,13 +34,13 @@ function needs (condition, errorMessage) {
       Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
       (#view == l-sub(#data, #viewOffset, #viewSize)) *
-      Elements(#view, #readPos, #elementCount, #fieldsPerElement, #elementList, #elementsLength) *
+      CElements(#view, #readPos, #elementCount, #fieldsPerElement, #elementList, #elementsLength) *
       JSInternals ()
     ]]
     [[
       Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
-      Elements(#view, #readPos, #elementCount, #fieldsPerElement, #elementList, #elementsLength) *
+      CElements(#view, #readPos, #elementCount, #fieldsPerElement, #elementList, #elementsLength) *
       JSInternals () *
 
       JSObject(ret) *
@@ -56,13 +56,13 @@ function needs (condition, errorMessage) {
         Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
         ArrayBuffer(#ab, #data) *
         (#view == l-sub(#data, #viewOffset, #viewSize)) *
-        IncompleteElements(#view, #readPos, #elementCount, #fieldsPerElement) *
+        IElements(#view, #readPos, #elementCount, #fieldsPerElement) *
         JSInternals ()
     ]]
     [[
         Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
         ArrayBuffer(#ab, #data) *
-        IncompleteElements(#view, #readPos, #elementCount, #fieldsPerElement) *
+        IElements(#view, #readPos, #elementCount, #fieldsPerElement) *
         JSInternals () *
 
         (ret == false)
@@ -90,8 +90,8 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
     /*
       @invariant
         scope(elements : #doneEls) * scope(readPos : #outerLoopReadPos) * scope(elementCount : #elementsLeft) *
-        Elements(#view, #outerLoopReadPos, #elementsLeft, #fieldsPerElement, #remainingElsList, #remainingElsLength) *
-        Elements(#view, #readPos, #elementCount - #elementsLeft, #fieldsPerElement, #doneElsList, #doneElsLength) *
+        CElements(#view, #outerLoopReadPos, #elementsLeft, #fieldsPerElement, #remainingElsList, #remainingElsLength) *
+        CElements(#view, #readPos, #elementCount - #elementsLeft, #fieldsPerElement, #doneElsList, #doneElsLength) *
         (#elementList == l+ (#doneElsList, #remainingElsList)) *
         (#elementsLength == #doneElsLength + #remainingElsLength) *
         (#readPos + #doneElsLength == #outerLoopReadPos) *
@@ -99,15 +99,15 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
         [bind : #doneEls, #outerLoopReadPos, #elementsLeft, #remainingElsList, #remainingElsLength, #doneElsList, #doneElsLength]
     */
     while (elementCount--) {
-      /* @tactic assert Element(#view, #outerLoopReadPos, #fieldsPerElement, #fieldsList, #elementLength) [bind: #fieldsList, #elementLength] */
+      /* @tactic assert CElement(#view, #outerLoopReadPos, #fieldsPerElement, #fieldsList, #elementLength) [bind: #fieldsList, #elementLength] */
 
       var element = []
       var fieldCount = fieldsPerElement
 
       /* @invariant
           scope(element : #doneEl) * scope(readPos : #innerLoopReadPos) * scope(fieldCount : #fieldsLeft) *
-          Element(#view, #innerLoopReadPos, #fieldsLeft, #remainingElList, #remainingElLength) *
-          Element(#view, #outerLoopReadPos, #fieldsPerElement - #fieldsLeft, #doneElList, #doneElLength) *
+          CElement(#view, #innerLoopReadPos, #fieldsLeft, #remainingElList, #remainingElLength) *
+          CElement(#view, #outerLoopReadPos, #fieldsPerElement - #fieldsLeft, #doneElList, #doneElLength) *
           (#fieldsList == l+ (#doneElList, #remainingElList)) *
           (#elementLength == #doneElLength + #remainingElLength) *
           (#outerLoopReadPos + #doneElLength == #innerLoopReadPos) *
@@ -123,11 +123,11 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
         var fieldBinary = buffer.slice(readPos, readPos + length)
         readPos += length
         /* @tactic assert #remainingElList == l+ ({{ #fld }}, #rfld) [bind: #fld, #rfld];
-           apply lemma ElementAppend(#view, #outerLoopReadPos, #fieldsPerElement - #fieldsLeft, #doneElList, #doneElLength, #fieldsLeft, #fld, #rfld, #remainingElLength) */
+           apply lemma CElementAppend(#view, #outerLoopReadPos, #fieldsPerElement - #fieldsLeft, #doneElList, #doneElLength, #fieldsLeft, #fld, #rfld, #remainingElLength) */
         element.push(fieldBinary)
       }
       /* @tactic
-          apply lemma ElementsAppend(#view, #readPos, (#elementCount - #elementsLeft), #fieldsPerElement, #doneElsList, #doneElsLength, #doneElList, #doneElLength) */
+          apply lemma CElementsAppend(#view, #readPos, (#elementCount - #elementsLeft), #fieldsPerElement, #doneElsList, #doneElsLength, #doneElList, #doneElLength) */
       elements.push(element);
     }
 
@@ -275,9 +275,9 @@ var toUtf8 = function (buffer) { };
 function decodeEncryptionContext(encodedEncryptionContext) {
   /* @tactic
       if (#definition = "Complete") then {
-        unfold CompleteRawEncryptionContext(#EC, #ECKs)
+        unfold CRawEncryptionContext(#EC, #ECKs)
       } else {
-        unfold BrokenRawEncryptionContext(#errorMessage, #EC)
+        unfold BRawEncryptionContext(#errorMessage, #EC)
       }
    */
 
@@ -403,12 +403,12 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 function deserializeEncryptedDataKeys(buffer, startPos) {
   /* @tactic
       if (#definition = "Complete") then {
-        unfold CompleteRawEncryptedDataKeys(#view, #startPos, #EDKCount, #EDKs, #EDKsLength)
+        unfold CRawEncryptedDataKeys(#view, #startPos, #EDKCount, #EDKs, #EDKsLength)
       } else {
           if (#definition = "Incomplete") then {
-            unfold IncompleteRawEncryptedDataKeys(#view, #startPos)
+            unfold IRawEncryptedDataKeys(#view, #startPos)
           } else {
-            unfold BrokenRawEncryptedDataKeys(#errorMessage, #view, #startPos)
+            unfold BRawEncryptedDataKeys(#errorMessage, #view, #startPos)
           }
       } */
 
@@ -515,7 +515,7 @@ var AlgorithmSuiteIdentifier;
         (numId == 20)  * (stringId == "ALG_AES128_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128),
         (numId == 70)  * (stringId == "ALG_AES192_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128);
 
-    @pred pure BrokenAlgorithmSuite(+numId, errorMessage) :
+    @pred pure BAlgorithmSuite(+numId, errorMessage) :
         (! (numId == 20)) * (! (numId == 70)) * (errorMessage == "Malformed Header: Unsupported algorithm suite.");
 
 
@@ -549,16 +549,16 @@ var SdkSuite = function (suiteId) { };
     @pred CorrectVersionAndType(+version, +type) :
       (version == 1) * (type == 128);
 
-    @pred BrokenVersionAndType(+version:Num, +type:Num, errorMessage:Str) :
+    @pred BVersionAndType(+version:Num, +type:Num, errorMessage:Str) :
         (version == 65) * (type == 89) * (errorMessage == "Malformed Header: This blob may be base64 encoded."),
         (! (version == 1) \/ ! (type == 128)) * (! (version == 65) \/ ! (type == 89)) * (errorMessage == "Malformed Header: Unsupported version and/or type.");
 
-    @pred nounfold BrokenHeader(errorMessage, +rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+    @pred nounfold BHeader(errorMessage, +rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
                                                                            part_two, ECKs,
                                                                            part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
         (22 <=# l-len rawHeaderData) *
         (rawHeaderData == l+ ({{ version, type }}, #rest)) *
-        BrokenVersionAndType(version, type, errorMessage) *
+        BVersionAndType(version, type, errorMessage) *
 
         (part_one == {{ }}) *
         (suiteId == 0) * (messageId == {{ }}) * (rECLength == 0) *
@@ -571,7 +571,7 @@ var SdkSuite = function (suiteId) { };
         (l-len #rawSuiteId == 2) *
         CorrectVersionAndType(version, type) *
         rawToUInt16(#rawSuiteId, false, suiteId) *
-        BrokenAlgorithmSuite(suiteId, errorMessage) *
+        BAlgorithmSuite(suiteId, errorMessage) *
 
         (part_one == {{ }}) * (messageId == {{ }}) * (rECLength == 0) *
         (part_two == {{ }}) * (ECKs == {{ }}) *
@@ -593,7 +593,7 @@ var SdkSuite = function (suiteId) { };
 
         (part_two == l+ (#EC, part_three)) *
         (l-len #EC == rECLength) *
-        BrokenRawEncryptionContext(errorMessage, #EC) *
+        BRawEncryptionContext(errorMessage, #EC) *
 
         (ECKs == {{ }}) * (EDKs == {{ }}) * (contentType == 0) * (frameLength == 0) *
         (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
@@ -613,8 +613,8 @@ var SdkSuite = function (suiteId) { };
 
         (part_two == l+ (#EC, part_three)) *
         (l-len #EC == rECLength) *
-        CompleteRawEncryptionContext(#EC, ECKs) *
-        BrokenRawEncryptedDataKeys(errorMessage, rawHeaderData, 22 + rECLength) *
+        CRawEncryptionContext(#EC, ECKs) *
+        BRawEncryptedDataKeys(errorMessage, rawHeaderData, 22 + rECLength) *
 
         (EDKs == {{ }}) * (contentType == 0) * (frameLength == 0) *
         (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
@@ -634,9 +634,9 @@ var SdkSuite = function (suiteId) { };
 
         (part_two == l+ (#EC, part_three)) *
         (l-len #EC == rECLength) *
-        CompleteRawEncryptionContext(#EC, ECKs) *
+        CRawEncryptionContext(#EC, ECKs) *
         (part_three == l+ (#edks, {{ contentType }}, #rawReservedBytes, #rest)) *
-        CompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        CRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
         (#EDKsLength == l-len #edks) *
         (l-len #rawReservedBytes == 4) *
         rawToUInt32(#rawReservedBytes, false, #reservedBytes) *
@@ -662,9 +662,9 @@ var SdkSuite = function (suiteId) { };
 
         (part_two == l+ (#EC, part_three)) *
         (l-len #EC == rECLength) *
-        CompleteRawEncryptionContext(#EC, ECKs) *
+        CRawEncryptionContext(#EC, ECKs) *
         (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rest)) *
-        CompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        CRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
         (#EDKsLength == l-len #edks) *
         (headerLength == 22 + rECLength + #EDKsLength + 1 + 4 + 1 + 4) *
         (headerLength + #ivLength + (#tagLength / 8) <=# l-len rawHeaderData) *
@@ -673,7 +673,7 @@ var SdkSuite = function (suiteId) { };
         (errorMessage == "Malformed Header: Mismatch between expected and obtained IV length.") *
         (frameLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }});
 
-    @pred nounfold IncompleteHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+    @pred nounfold IHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
                                                     part_two, ECKs,
                                                     part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
         (l-len rawHeaderData <# 22) *
@@ -715,9 +715,9 @@ var SdkSuite = function (suiteId) { };
 
         (part_two == l+ (#EC, part_three)) *
         (l-len #EC == rECLength) *
-        CompleteRawEncryptionContext(#EC, ECKs) *
+        CRawEncryptionContext(#EC, ECKs) *
 
-        IncompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength) *
+        IRawEncryptedDataKeys(rawHeaderData, 22 + rECLength) *
         (EDKs == {{ }}) * (contentType == 0) *
         (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
 
@@ -736,10 +736,10 @@ var SdkSuite = function (suiteId) { };
 
         (part_two == l+ (#EC, part_three)) *
         (l-len #EC == rECLength) *
-        CompleteRawEncryptionContext(#EC, ECKs) *
+        CRawEncryptionContext(#EC, ECKs) *
 
         (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, #rest)) *
-        CompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        CRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
         (#EDKsLength == l-len #edks) *
         (l-len #rawFrameLength == 4) *
         rawToUInt32(#rawFrameLength, false, frameLength) *
@@ -750,7 +750,7 @@ var SdkSuite = function (suiteId) { };
 
         (headerIv == {{ }}) * (headerAuthTag == {{ }});
 
-    @pred nounfold CompleteHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+    @pred nounfold CHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
                                                   part_two, ECKs,
                                                   part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
         (rawHeaderData == l+ (part_one, part_two)) *
@@ -770,9 +770,9 @@ var SdkSuite = function (suiteId) { };
 
         (part_two == l+ (#EC, part_three)) *
         (l-len #EC == rECLength) *
-        CompleteRawEncryptionContext(#EC, ECKs) *
+        CRawEncryptionContext(#EC, ECKs) *
         (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, headerIv, headerAuthTag)) *
-        CompleteRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        CRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
         (#EDKsLength == l-len #edks) *
         (l-len #rawFrameLength == 4) *
         rawToUInt32(#rawFrameLength, false, frameLength) *
@@ -824,19 +824,19 @@ var SdkSuite = function (suiteId) { };
                         errorMessage) :
 
         (definition == "Complete") *
-        CompleteHeader(rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+        CHeader(rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
                                       part_two, ECKs,
                                       part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) *
         (errorMessage == ""),
 
         (definition == "Incomplete") *
-        IncompleteHeader(rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+        IHeader(rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
                                         part_two, ECKs,
                                         part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) *
         (errorMessage == ""),
 
         (definition == "Broken") *
-        BrokenHeader(errorMessage, rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
+        BHeader(errorMessage, rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
                                                   part_two, ECKs,
                                                   part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag);
 
@@ -965,11 +965,11 @@ function deserializeMessageHeader(messageBuffer) {
     /* @tactic unfold Header(#definition, #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #errorMessage) */
     /* @tactic
         if (#definition = "Complete") then {
-          unfold CompleteHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
+          unfold CHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
         } else { if (#definition = "Incomplete") then {
-            unfold IncompleteHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
+            unfold IHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
           } else {
-            unfold BrokenHeader(#errorMessage, #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
+            unfold BHeader(#errorMessage, #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
           }
         } */
     var dataView = new DataView(
