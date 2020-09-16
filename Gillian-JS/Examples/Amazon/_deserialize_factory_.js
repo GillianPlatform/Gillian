@@ -30,39 +30,42 @@ function needs (condition, errorMessage) {
 
     @onlyspec readElements (elementCount, fieldsPerElement, buffer, readPos)
     [[
-      (elementCount == #elementCount) * (fieldsPerElement == #fieldsPerElement) * (buffer == #buffer) * (readPos == #readPos) *
+      (elementCount == #eCount) * (fieldsPerElement == #fCount) * (buffer == #buffer) * (readPos == #readPos) *
       Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
       (#view == l-sub(#data, #viewOffset, #viewSize)) *
-      CElements(#view, #readPos, #elementCount, #fieldsPerElement, #elementList, #elementsLength) *
+      (#definition == "Complete") *
+      Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
+
       JSInternals ()
     ]]
     [[
       Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
-      CElements(#view, #readPos, #elementCount, #fieldsPerElement, #elementList, #elementsLength) *
+      Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
       JSInternals () *
 
       JSObject(ret) *
         DataProp(ret, "elements", #elements) *
-            ArrayOfArraysOfUInt8Arrays(#elements, #elementList, #elementCount) *
+            ArrayOfArraysOfUInt8Arrays(#elements, #eList, #eCount) *
         DataProp(ret, "readPos", #ret_readPos) *
-            (#ret_readPos == #readPos + #elementsLength)
+            (#ret_readPos == #readPos + #esLength)
     ]]
     normal;
 
     [[
-        (elementCount == #elementCount) * (fieldsPerElement == #fieldsPerElement) * (buffer == #buffer) * (readPos == #readPos) *
+        (elementCount == #eCount) * (fieldsPerElement == #fCount) * (buffer == #buffer) * (readPos == #readPos) *
         Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
         ArrayBuffer(#ab, #data) *
         (#view == l-sub(#data, #viewOffset, #viewSize)) *
-        IElements(#view, #readPos, #elementCount, #fieldsPerElement, #eList, #eLength) *
+        (#definition == "Incomplete") *
+        Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
         JSInternals ()
     ]]
     [[
         Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
         ArrayBuffer(#ab, #data) *
-        IElements(#view, #readPos, #elementCount, #fieldsPerElement, #eList, #eLength) *
+        Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
         JSInternals () *
 
         (ret == false)

@@ -244,7 +244,7 @@ nounfold pred CRawEncryptedDataKeys(+rawHeaderData:List, +start:Num, keyCount:Nu
     (#rawEC == l-sub (rawHeaderData, start, 2)) *
     rawToUInt16(#rawEC, false, keyCount) *
     (0 <# keyCount) *
-    CElements(rawHeaderData, start + 2, keyCount, 3, EDKs, #EDKsLength) *
+    Elements("Complete", rawHeaderData, start + 2, keyCount, 3, EDKs, #EDKsLength) *
     (EDKsLength == #EDKsLength + 2) *
     (start + EDKsLength <=# l-len rawHeaderData);
 
@@ -255,7 +255,7 @@ nounfold pred IRawEncryptedDataKeys(+rawHeaderData:List, +start:Num) :
     (#rawEC == l-sub (rawHeaderData, start, 2)) *
     rawToUInt16(#rawEC, false, #keyCount) *
     (0 <# #keyCount) *
-    IElements(rawHeaderData, start + 2, #keyCount, 3, #eList, #esLength);
+    Elements("Incomplete", rawHeaderData, start + 2, #keyCount, 3, #eList, #esLength);
 
 nounfold pred BRawEncryptedDataKeys(errorMessage: Str, +rawHeaderData:List, +start:Num) :
     ((start <# 0) \/ (l-len rawHeaderData <# start)) * (errorMessage == "deserializeMessageHeader: startPos out of bounds."),
@@ -357,7 +357,7 @@ nounfold pred CRawEncryptionContext(+EC:List, ECKs:List) :
     (#rawKC == l-sub (EC, 0, 2)) *
     rawToUInt16(#rawKC, false, #keyCount) *
     (0 <# #keyCount) *
-    CElements(EC, 2, #keyCount, 2, ECKs, #ECKsLength) *
+    Elements("Complete", EC, 2, #keyCount, 2, ECKs, #ECKsLength) *
     (2 + #ECKsLength == l-len EC);
 
 nounfold pred BRawEncryptionContext(errorMessage:Str, +EC:List) :
@@ -365,14 +365,14 @@ nounfold pred BRawEncryptionContext(errorMessage:Str, +EC:List) :
     (#rawKC == l-sub (EC, 0, 2)) *
     rawToUInt16(#rawKC, false, #keyCount) *
     (0 <# #keyCount) *
-    IElements(EC, 2, #keyCount, 2, #eList, #esLength) *
+    Elements("Incomplete", EC, 2, #keyCount, 2, #eList, #esLength) *
     (errorMessage == "decodeEncryptionContext: Underflow, not enough data."),
 
     (2 <# l-len EC) *
     (#rawKC == l-sub (EC, 0, 2)) *
     rawToUInt16(#rawKC, false, #keyCount) *
     (0 <# #keyCount) *
-    CElements(EC, 2, #keyCount, 2, #ECKs, #ECKsLength) *
+    Elements("Complete", EC, 2, #keyCount, 2, #ECKs, #ECKsLength) *
     (! (#ECKsLength + 2 == l-len EC)) *
     (errorMessage == "decodeEncryptionContext: Overflow, too much data.");
 
@@ -388,6 +388,7 @@ pred DecodedEncryptionContext(+dECObj : Obj) :
 (* ********************* *)
 
 only spec Object_freeze(xsc, vthis, l)
+
   [[ (l == #l) * PreDecodedEncryptedDataKeys(#l, #EDKs, #keyCount) ]]
   [[ DecodedEncryptedDataKeys(#l, #EDKs, #keyCount) * (ret == #l) ]]
   normal
