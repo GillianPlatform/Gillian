@@ -28,7 +28,7 @@ function needs (condition, errorMessage) {
 /**
     @id readElements
 
-    @pred nounfold LoopInvariantElement(+definition, +remainingElsList, +view, +outerLoopReadPos, +fCount, fList, eLength) :
+    @pred nounfold innerLoopInvariantElement(+definition, +remainingElsList, +view, +outerLoopReadPos, +fCount, fList, eLength) :
       (definition == "Complete") * CElement(view, outerLoopReadPos, fCount, fList, eLength),
       (definition == "Incomplete") * (remainingElsList == {{ }}) * IElement(view, outerLoopReadPos, fCount, fList, eLength),
       (definition == "Incomplete") * (! (remainingElsList == {{ }})) * CElement(view, outerLoopReadPos, fCount, fList, eLength);
@@ -114,7 +114,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
 
     /* @invariant
         scope(element : #doneEl) * scope(readPos : #innerLoopReadPos) * scope(fieldCount : #fLeft) *
-        LoopInvariantElement(#definition, #remainingElsList, #view, #innerLoopReadPos, #fLeft, #remainingElList, #remainingElLength) *
+        innerLoopInvariantElement(#definition, #remainingElsList, #view, #innerLoopReadPos, #fLeft, #remainingElList, #remainingElLength) *
         CElement(#view, #outerLoopReadPos, #fCount - #fLeft, #doneElList, #doneElLength) *
         (#fList == l+ (#doneElList, #remainingElList)) *
         (#eLength == #doneElLength + #remainingElLength) *
@@ -160,7 +160,8 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
            apply lemma AppendFieldCC(#view, #outerLoopReadPos, #fCount - #fLeft, #doneElList, #doneElLength, #fLeft, #fld, #rfld, #remainingElLength)
          } else {
            apply lemma AppendFieldCI(#view, #outerLoopReadPos, #fCount - #fLeft, #doneElList, #doneElLength, #fLeft, #fld, #rfld, #remainingElLength)
-         }*/
+         }
+      */
       element.push(fieldBinary)
     }
     /* @tactic
@@ -194,23 +195,6 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
  ************************************/
 
 /*
-    @pred EDKPrototype () :
-      JSObjGeneral($l_edk_proto, null, "Object", false) *
-      empty_fields($l_edk_proto : -{ }-);
-
-    @pred nounfold EncryptedDataKey(+EDK, pId:Str, pInfo:Str, encryptedDataKey:List, rawInfo:List) :
-        JSObjGeneral(EDK, $l_edk_proto, "Object", false) *
-        readOnlyProperty(EDK, "providerId", pId) *
-        readOnlyProperty(EDK, "providerInfo", pInfo) *
-        readOnlyProperty(EDK, "encryptedDataKey", #aEDK) *
-            Uint8Array(#aEDK, #abEDK, 0, #viewSizeEDK) *
-            ArrayBuffer(#abEDK, encryptedDataKey) *
-            (#viewSizeEDK == l-len encryptedDataKey) *
-        readOnlyProperty(EDK, "rawInfo", #aRInfo) *
-            Uint8Array(#aRInfo, #abRInfo, 0, #viewSizeRInfo) *
-            ArrayBuffer(#abRInfo, rawInfo) *
-            (#viewSizeRInfo == l-len rawInfo);
-
     @id EncryptedDataKey
 
     @onlyspec EncryptedDataKey (edk)
@@ -444,6 +428,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 */
 function deserializeEncryptedDataKeys(buffer, startPos) {
   /* @tactic
+      unfold RawEncryptedDataKeys(#definition, #view, #startPos, #EDKCount, #EDKs, #EDKsLength, #errorMessage);
       if (#definition = "Complete") then {
         unfold CRawEncryptedDataKeys(#view, #startPos, #EDKCount, #EDKs, #EDKsLength)
       } else {
@@ -656,12 +641,12 @@ var SdkSuite = function (suiteId) { };
         (part_two == l+ (#EC, part_three)) *
         (l-len #EC == rECLength) *
         CRawEncryptionContext(#EC, ECKs) *
-        BRawEncryptedDataKeys(errorMessage, rawHeaderData, 22 + rECLength) *
+        RawEncryptedDataKeys("Broken", rawHeaderData, 22 + rECLength, _, _, _, errorMessage) *
 
         (EDKs == {{ }}) * (contentType == 0) * (frameLength == 0) *
         (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
 
-		    (22 <=# l-len rawHeaderData) *
+		(22 <=# l-len rawHeaderData) *
         (rawHeaderData == l+ (part_one, part_two)) *
         (l-len part_one == 22) *
         (part_one == l+ ({{ version, type }}, #rawSuiteId, messageId, #rawContextLength)) *
@@ -678,7 +663,7 @@ var SdkSuite = function (suiteId) { };
         (l-len #EC == rECLength) *
         CRawEncryptionContext(#EC, ECKs) *
         (part_three == l+ (#edks, {{ contentType }}, #rawReservedBytes, #rest)) *
-        CRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength, _) *
         (#EDKsLength == l-len #edks) *
         (l-len #rawReservedBytes == 4) *
         rawToUInt32(#rawReservedBytes, false, #reservedBytes) *
@@ -706,7 +691,7 @@ var SdkSuite = function (suiteId) { };
         (l-len #EC == rECLength) *
         CRawEncryptionContext(#EC, ECKs) *
         (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rest)) *
-        CRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength, _) *
         (#EDKsLength == l-len #edks) *
         (headerLength == 22 + rECLength + #EDKsLength + 1 + 4 + 1 + 4) *
         (headerLength + #ivLength + (#tagLength / 8) <=# l-len rawHeaderData) *
@@ -759,9 +744,8 @@ var SdkSuite = function (suiteId) { };
         (l-len #EC == rECLength) *
         CRawEncryptionContext(#EC, ECKs) *
 
-        IRawEncryptedDataKeys(rawHeaderData, 22 + rECLength) *
-        (EDKs == {{ }}) * (contentType == 0) *
-        (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
+        RawEncryptedDataKeys("Incomplete", rawHeaderData, 22 + rECLength, _, EDKs, _, errorMessage) *
+        (contentType == 0) * (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
 
         (22 <=# l-len rawHeaderData) *
         (rawHeaderData == l+ (part_one, part_two)) *
@@ -781,7 +765,7 @@ var SdkSuite = function (suiteId) { };
         CRawEncryptionContext(#EC, ECKs) *
 
         (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, #rest)) *
-        CRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength, _) *
         (#EDKsLength == l-len #edks) *
         (l-len #rawFrameLength == 4) *
         rawToUInt32(#rawFrameLength, false, frameLength) *
@@ -814,7 +798,7 @@ var SdkSuite = function (suiteId) { };
         (l-len #EC == rECLength) *
         CRawEncryptionContext(#EC, ECKs) *
         (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, headerIv, headerAuthTag)) *
-        CRawEncryptedDataKeys(rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength) *
+        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength, _) *
         (#EDKsLength == l-len #edks) *
         (l-len #rawFrameLength == 4) *
         rawToUInt32(#rawFrameLength, false, frameLength) *
