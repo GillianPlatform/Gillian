@@ -25,14 +25,6 @@ function needs (condition, errorMessage) {
  ********************************
  ********************************/
 
-/********************************
- ********************************
- *******                  *******
- *******   readElements   *******
- *******                  *******
- ********************************
- ********************************/
-
 /**
     @id readElements
 
@@ -46,13 +38,13 @@ function needs (condition, errorMessage) {
       Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
       (#view == l-sub(#data, #viewOffset, #viewSize)) *
-      (#definition == "Complete") *
       Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
 
       scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
       JSInternals ()
 
     @post
+      (#definition == "Complete") *
       Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
       Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
@@ -63,28 +55,17 @@ function needs (condition, errorMessage) {
         DataProp(ret, "elements", #elements) *
             ArrayOfArraysOfUInt8Arrays(#elements, #eList, #eCount) *
         DataProp(ret, "readPos", #ret_readPos) *
-            (#ret_readPos == #readPos + #esLength)
+            (#ret_readPos == #readPos + #esLength);
 
-    @pre
-        (elementCount == #eCount) * (fieldsPerElement == #fCount) * (buffer == #buffer) * (readPos == #readPos) *
-        Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
-        ArrayBuffer(#ab, #data) *
-        (#view == l-sub(#data, #viewOffset, #viewSize)) *
-        (#definition == "Incomplete") *
-        Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
+      (#definition == "Incomplete") *
+      Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
+      ArrayBuffer(#ab, #data) *
+      Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
 
-        scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
-        JSInternals ()
+      scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
+      JSInternals () *
 
-    @post
-        Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
-        ArrayBuffer(#ab, #data) *
-        Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
-
-        scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
-        JSInternals () *
-
-        (ret == false)
+      (ret == false)
 */
 function readElements(elementCount, fieldsPerElement, buffer, readPos) {
   /* @tactic apply lemma ElementsPureFacts(#view, #readPos, #eCount, #fCount, #eList, #esLength) */
@@ -130,7 +111,6 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
           }
         }
      */
-
     var element = []
     var fieldCount = fieldsPerElement
 
@@ -154,11 +134,27 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
       */
       /* Check for early return (Postcondition): Enough data must exist to read the Uint16 length value. */
       if (readPos + 2 > dataView.byteLength)
+        /*
+          @tactic
+            fold IElement(#view, #innerLoopReadPos, #fLeft, #remainingElList, #remainingElLength);
+            apply lemma CIElementFullAppend(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remainingElList, #remainingElLength);
+            assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remainingElsLength);
+            assert Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remainingElsList, #remainingElsLength);
+            apply lemma CElementsFullAppend(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remainingElsList, #remainingElsLength)
+         */
         return false
       var length = dataView.getUint16(readPos, false) // big endian
       readPos += 2
       /* Check for early return (Postcondition): Enough data must exist length of the value. */
       if (readPos + length > dataView.byteLength)
+        /*
+          @tactic
+            fold IElement(#view, #innerLoopReadPos, #fLeft, #remainingElList, #remainingElLength);
+            apply lemma CIElementFullAppend(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remainingElList, #remainingElLength);
+            assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remainingElsLength);
+            assert Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remainingElsList, #remainingElsLength);
+            apply lemma CElementsFullAppend(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remainingElsList, #remainingElsLength)
+         */
         return false
       var fieldBinary = buffer.slice(readPos, readPos + length)
       readPos += length
@@ -166,6 +162,8 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
          assert (#remainingElList == l+ ({{ #fld }}, #rfld)) [bind: #fld, #rfld];
          if (#definition = "Complete") then {
            apply lemma CElementAppend(#view, #outerLoopReadPos, #fCount - #fLeft, #doneElList, #doneElLength, #fLeft, #fld, #rfld, #remainingElLength)
+         } else {
+           apply lemma CIElementAppend(#view, #outerLoopReadPos, #fCount - #fLeft, #doneElList, #doneElLength, #fLeft, #fld, #rfld, #remainingElLength)
          }*/
       element.push(fieldBinary)
     }
