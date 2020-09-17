@@ -54,21 +54,19 @@ pred ArrayOfUInt8Arrays (+a:Obj, contents:List, arrayLength:Num) :
 
 (* ----------------------------------------------------------------------------------- *)
 
-pred ArrayOfArraysOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num, +contentsLength:Num) :
+pred ArrayOfArraysOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num) :
     (contents == {{ }}) * (contentsLength == 0),
 
     (#index == num_to_string start) *
     (contents == #elementContents :: #rest) *
     DataProp(a, #index, #aui8a) *
     ArrayOfUInt8Arrays (#aui8a, #elementContents, _) *
-    (contentsLength == l-len contents) *
     (#rest_start == start + 1) *
-    (#rest_contents == contentsLength - 1) *
-    ArrayOfArraysOfUInt8ArraysContents(a, #rest, #rest_start, #rest_contents);
+    ArrayOfArraysOfUInt8ArraysContents(a, #rest, #rest_start);
 
-pred ArrayOfArraysOfUInt8Arrays (+a:Obj, contents:List, arrayLength:Num) :
-    ArrayStructure(a, arrayLength) *
-    ArrayOfArraysOfUInt8ArraysContents(a, contents, 0, arrayLength);
+pred ArrayOfArraysOfUInt8Arrays (+a:Obj, contents:List) :
+    ArrayStructure(a, l-len contents) *
+    ArrayOfArraysOfUInt8ArraysContents(a, contents, 0);
 
 (**************************
  **** Array Prototype  ****
@@ -101,7 +99,7 @@ only spec AP_push (xsc, vthis, element)
 
     [[ (vthis == #vthis) * (element == #aui8a) *
        ArrayOfUInt8Arrays (#aui8a, #aContents, _) *
-       ArrayOfArraysOfUInt8Arrays(#vthis, #contents, #arraylength) ]]
-    [[ ArrayOfArraysOfUInt8Arrays(#vthis, l+ (#contents, {{ #aContents }}), #arraylength + 1) * (ret == undefined) ]]
+       ArrayOfArraysOfUInt8Arrays(#vthis, #contents) ]]
+    [[ ArrayOfArraysOfUInt8Arrays(#vthis, l+ (#contents, {{ #aContents }})) * (ret == undefined) ]]
     normal
 

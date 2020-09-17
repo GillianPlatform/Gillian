@@ -558,12 +558,12 @@ pred DecodedEncryptionContext(+dECObj : Obj) :
 *)
 
 (* Complete serialised EDKs *)
-nounfold pred CRawEncryptedDataKeys(+buffer:List, +readPos:Num, keyCount:Num, EDKs:List, EDKsLength:Num) :
+nounfold pred CRawEncryptedDataKeys(+buffer:List, +readPos:Num, EDKs:List, EDKsLength:Num) :
     (0 <=# readPos) * (readPos <=# l-len buffer) *
     (#rawEC == l-sub (buffer, readPos, 2)) *
-    rawToUInt16(#rawEC, false, keyCount) *
-    (0 <# keyCount) *
-    Elements("Complete", buffer, readPos + 2, keyCount, 3, EDKs, #EDKsLength) *
+    rawToUInt16(#rawEC, false, #keyCount) *
+    (0 <# #keyCount) *
+    Elements("Complete", buffer, readPos + 2, #keyCount, 3, EDKs, #EDKsLength) *
     (EDKsLength == #EDKsLength + 2);
 
 (* Incomplete serialised EDKs *)
@@ -590,10 +590,10 @@ nounfold pred BRawEncryptedDataKeys(errorMessage: Str, +buffer:List, +readPos:Nu
     (errorMessage == "Malformed Header: No EncryptedDataKey found.");
 
 (* General serialised EDKs *)
-nounfold pred RawEncryptedDataKeys(definition:Str, +buffer:List, +readPos:Num, keyCount:Num, EDKs:List, EDKsLength:Num, errorMessage:Str) :
-  (definition == "Complete") * CRawEncryptedDataKeys(buffer, readPos, keyCount, EDKs, EDKsLength) * (errorMessage == ""),
-  (definition == "Incomplete") * IRawEncryptedDataKeys(buffer, readPos) * (keyCount == 0) * (EDKs == {{ }}) * (EDKsLength == 0) * (errorMessage == ""),
-  (definition == "Broken") * BRawEncryptedDataKeys(errorMessage, buffer, readPos) * (keyCount == 0) * (EDKs == {{ }}) * (EDKsLength == 0);
+nounfold pred RawEncryptedDataKeys(definition:Str, +buffer:List, +readPos:Num, EDKs:List, EDKsLength:Num, errorMessage:Str) :
+  (definition == "Complete") * CRawEncryptedDataKeys(buffer, readPos, EDKs, EDKsLength) * (errorMessage == ""),
+  (definition == "Incomplete") * IRawEncryptedDataKeys(buffer, readPos) * (EDKs == {{ }}) * (EDKsLength == 0) * (errorMessage == ""),
+  (definition == "Broken") * BRawEncryptedDataKeys(errorMessage, buffer, readPos) * (EDKs == {{ }}) * (EDKsLength == 0);
 
 (***** EDK objects *****)
 
@@ -619,7 +619,7 @@ nounfold pred EncryptedDataKey(+EDK, pId:Str, pInfo:Str, encryptedDataKey:List, 
 (***** Arrays of deserialised EDKs *****)
 
 (* Live array of deserialised EDKs *)
-pred ArrayOfDEDKsContents(+a:Obj, contents:List, +start:Num, +contentsLength:Num) :
+pred ArrayOfDEDKsContents(+a:Obj, contents:List, +start:Num) :
     (contents == {{ }}) * (contentsLength == 0),
 
     (#index == num_to_string start) *
@@ -627,14 +627,12 @@ pred ArrayOfDEDKsContents(+a:Obj, contents:List, +start:Num, +contentsLength:Num
     EncryptedDataKey(#edk, #pId, #pInfo, #encryptedDataKey, #rawInfo) *
     fromUtf8(#rawId, #pId) * fromUtf8(#pInfo, #rawInfo) *
     (#element == {{ #rawId, #rawInfo, #encryptedDataKey }}) *
-    (contentsLength == l-len contents) *
     (contents == #element :: #rest) *
     (#rest_start == start + 1) *
-    (#rest_length == contentsLength - 1) *
-    ArrayOfDEDKsContents(a, #rest, #rest_start, #rest_length);
+    ArrayOfDEDKsContents(a, #rest, #rest_start);
 
 (* Frozen array of deserialised EDKs *)
-pred FrozenArrayOfDEDKsContents(+a:Obj, contents:List, +start:Num, +contentsLength:Num) :
+pred FrozenArrayOfDEDKsContents(+a:Obj, contents:List, +start:Num) :
     (contents == {{ }}) * (contentsLength == 0),
 
     (#index == num_to_string start) *
@@ -642,23 +640,21 @@ pred FrozenArrayOfDEDKsContents(+a:Obj, contents:List, +start:Num, +contentsLeng
     EncryptedDataKey(#edk, #pId, #pInfo, #encryptedDataKey, #rawInfo) *
     fromUtf8(#rawId, #pId) * fromUtf8(#pInfo, #rawInfo) *
     (#edk == {{ #rawId, #rawInfo, #encryptedDataKey }}) *
-    (contentsLength == l-len contents) *
     (contents == #edk :: #rest_contents) *
     (#rest_start == start + 1) *
-    (#rest_length == contentsLength - 1) *
-    FrozenArrayOfDEDKsContents(a, #rest_contents, #rest_start, #rest_length);
+    FrozenArrayOfDEDKsContents(a, #rest_contents, #rest_start);
 
 (***** Deserialised EDKs *****)
 
 (* EDKs are first deserialised into a live array *)
-pred LiveDeserialisedEncryptedDataKeys (+a:Obj, EDKs:List, arrayLength:Num) :
-    ArrayStructure(a, arrayLength) *
-    ArrayOfDEDKsContents(a, EDKs, 0, arrayLength);
+pred LiveDeserialisedEncryptedDataKeys (+a:Obj, EDKs:List) :
+    ArrayStructure(a, l-len EDKs) *
+    ArrayOfDEDKsContents(a, EDKs, 0);
 
 (* Deserialised EDKs are ultimately provided as a frozen array *)
-pred DeserialisedEncryptedDataKeys (+a:Obj, contents:List, arrayLength:Num) :
-    FrozenArrayStructure(a, arrayLength) *
-    FrozenArrayOfDEDKsContents(a, contents, 0, arrayLength);
+pred DeserialisedEncryptedDataKeys (+a:Obj, contents:List) :
+    FrozenArrayStructure(a, l-len contents) *
+    FrozenArrayOfDEDKsContents(a, contents, 0);
 
 (***** AXIOMATISED EDK-RELATED INTERNALS *****)
 
@@ -667,22 +663,22 @@ only spec AP_map (xsc, vthis, cfun)
 [[
     (vthis == #vthis) * (cfun == #cfun) *
     JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
-    ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs, #keyCount)
+    ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs)
 ]]
 [[
     JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
-    ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs, #keyCount) *
-    types(ret : Obj) * LiveDeserialisedEncryptedDataKeys(ret, #EDKs, #keyCount)
+    ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs) *
+    types(ret : Obj) * LiveDeserialisedEncryptedDataKeys(ret, #EDKs)
 ]]
 normal
 
 (* Freezing an array of decoded EDKs *)
 only spec Object_freeze(xsc, vthis, l)
 [[
-    (l == #l) * LiveDeserialisedEncryptedDataKeys(#l, #EDKs, #keyCount)
+    (l == #l) * LiveDeserialisedEncryptedDataKeys(#l, #EDKs)
 ]]
 [[
-    DeserialisedEncryptedDataKeys(#l, #EDKs, #keyCount) * (ret == #l)
+    DeserialisedEncryptedDataKeys(#l, #EDKs) * (ret == #l)
 ]]
 normal
 

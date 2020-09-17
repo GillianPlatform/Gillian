@@ -53,7 +53,7 @@ function needs (condition, errorMessage) {
 
       JSObject(ret) *
         DataProp(ret, "elements", #elements) *
-            ArrayOfArraysOfUInt8Arrays(#elements, #eList, #eCount) *
+            ArrayOfArraysOfUInt8Arrays(#elements, #eList) *
         DataProp(ret, "readPos", #ret_readPos) *
             (#ret_readPos == #readPos + #esLength);
 
@@ -91,7 +91,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
       (#eList == l+ (#doneElsList, #remainingElsList)) *
       (#esLength == #doneElsLength + #remainingElsLength) *
       (#readPos + #doneElsLength == #outerLoopReadPos) *
-      ArrayOfArraysOfUInt8Arrays(#doneEls, #doneElsList, #eCount - #eLeft)
+      ArrayOfArraysOfUInt8Arrays(#doneEls, #doneElsList)
       [bind : #doneEls, #outerLoopReadPos, #eLeft, #remainingElsList, #remainingElsLength, #doneElsList, #doneElsLength]
   */
   while (elementCount--) {
@@ -377,7 +377,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          ((#definition == "Complete") \/ (#definition == "Incomplete")) *
-         RawEncryptedDataKeys(#definition, #view, #startPos, #EDKCount, #EDKs, #EDKsLength, #errorMessage) *
+         RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
@@ -385,12 +385,12 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 
     @post Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
-          RawEncryptedDataKeys(#definition, #view, #startPos, #EDKCount, #EDKs, #EDKsLength, #errorMessage) *
+          RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
 
           (#definition == "Complete") *
           JSObject(ret) *
             DataProp(ret, "encryptedDataKeys", #dEDKs) *
-                DeserialisedEncryptedDataKeys(#dEDKs, #EDKs, #EDKCount) *
+                DeserialisedEncryptedDataKeys(#dEDKs, #EDKs) *
             DataProp(ret, "readPos", #startPos + #EDKsLength) *
 
           scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
@@ -399,7 +399,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 
           Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
-          RawEncryptedDataKeys(#definition, #view, #startPos, #EDKCount, #EDKs, #EDKsLength, #errorMessage) *
+          RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
 
           (#definition == "Incomplete") * (ret == false) *
 
@@ -411,7 +411,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#definition == "Broken") *
-         RawEncryptedDataKeys(#definition, #view, #startPos, #EDKCount, #EDKs, #EDKsLength, #errorMessage) *
+         RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          JSInternals()
@@ -419,7 +419,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
     @posterr
           Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
-          RawEncryptedDataKeys(#definition, #view, #startPos, #EDKCount, #EDKs, #EDKsLength, #errorMessage) *
+          RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
 
           ErrorObjectWithMessage(ret, #errorMessage) *
 
@@ -428,9 +428,9 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 */
 function deserializeEncryptedDataKeys(buffer, startPos) {
   /* @tactic
-      unfold RawEncryptedDataKeys(#definition, #view, #startPos, #EDKCount, #EDKs, #EDKsLength, #errorMessage);
+      unfold RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage);
       if (#definition = "Complete") then {
-        unfold CRawEncryptedDataKeys(#view, #startPos, #EDKCount, #EDKs, #EDKsLength)
+        unfold CRawEncryptedDataKeys(#view, #startPos, #EDKs, #EDKsLength)
       } else {
           if (#definition = "Incomplete") then {
             unfold IRawEncryptedDataKeys(#view, #startPos)
@@ -641,7 +641,7 @@ var SdkSuite = function (suiteId) { };
         (part_two == l+ (#EC, part_three)) *
         (l-len #EC == rECLength) *
         CRawEncryptionContext(#EC, ECKs) *
-        RawEncryptedDataKeys("Broken", rawHeaderData, 22 + rECLength, _, _, _, errorMessage) *
+        RawEncryptedDataKeys("Broken", rawHeaderData, 22 + rECLength, _, _, errorMessage) *
 
         (EDKs == {{ }}) * (contentType == 0) * (frameLength == 0) *
         (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
@@ -663,7 +663,7 @@ var SdkSuite = function (suiteId) { };
         (l-len #EC == rECLength) *
         CRawEncryptionContext(#EC, ECKs) *
         (part_three == l+ (#edks, {{ contentType }}, #rawReservedBytes, #rest)) *
-        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength, _) *
+        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, EDKs, #EDKsLength, _) *
         (#EDKsLength == l-len #edks) *
         (l-len #rawReservedBytes == 4) *
         rawToUInt32(#rawReservedBytes, false, #reservedBytes) *
@@ -691,7 +691,7 @@ var SdkSuite = function (suiteId) { };
         (l-len #EC == rECLength) *
         CRawEncryptionContext(#EC, ECKs) *
         (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rest)) *
-        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength, _) *
+        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, EDKs, #EDKsLength, _) *
         (#EDKsLength == l-len #edks) *
         (headerLength == 22 + rECLength + #EDKsLength + 1 + 4 + 1 + 4) *
         (headerLength + #ivLength + (#tagLength / 8) <=# l-len rawHeaderData) *
@@ -744,7 +744,7 @@ var SdkSuite = function (suiteId) { };
         (l-len #EC == rECLength) *
         CRawEncryptionContext(#EC, ECKs) *
 
-        RawEncryptedDataKeys("Incomplete", rawHeaderData, 22 + rECLength, _, EDKs, _, errorMessage) *
+        RawEncryptedDataKeys("Incomplete", rawHeaderData, 22 + rECLength, EDKs, _, errorMessage) *
         (contentType == 0) * (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
 
         (22 <=# l-len rawHeaderData) *
@@ -765,7 +765,7 @@ var SdkSuite = function (suiteId) { };
         CRawEncryptionContext(#EC, ECKs) *
 
         (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, #rest)) *
-        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength, _) *
+        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, EDKs, #EDKsLength, _) *
         (#EDKsLength == l-len #edks) *
         (l-len #rawFrameLength == 4) *
         rawToUInt32(#rawFrameLength, false, frameLength) *
@@ -798,7 +798,7 @@ var SdkSuite = function (suiteId) { };
         (l-len #EC == rECLength) *
         CRawEncryptionContext(#EC, ECKs) *
         (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, headerIv, headerAuthTag)) *
-        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, #edkCount, EDKs, #EDKsLength, _) *
+        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, EDKs, #EDKsLength, _) *
         (#EDKsLength == l-len #edks) *
         (l-len #rawFrameLength == 4) *
         rawToUInt32(#rawFrameLength, false, frameLength) *
@@ -818,7 +818,7 @@ var SdkSuite = function (suiteId) { };
         DataProp(messageHeader, "encryptionContext", #dECObj) *
             DecodedEncryptionContext(#dECObj) *
         DataProp(messageHeader, "encryptedDataKeys", #dEDKs) *
-            DeserialisedEncryptedDataKeys(#dEDKs, EDKs, #keyCount) *
+            DeserialisedEncryptedDataKeys(#dEDKs, EDKs) *
         DataProp(messageHeader, "contentType", contentType) *
         DataProp(messageHeader, "headerIvLength", headerIvLength) *
         DataProp(messageHeader, "frameLength", frameLength);
