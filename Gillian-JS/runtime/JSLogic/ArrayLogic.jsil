@@ -105,15 +105,3 @@ only spec AP_push (xsc, vthis, element)
     [[ ArrayOfArraysOfUInt8Arrays(#vthis, l+ (#contents, {{ #aContents }}), #arraylength + 1) * (ret == undefined) ]]
     normal
 
-only spec AP_map (xsc, vthis, cfun)
-    [[
-        (vthis == #vthis) * (cfun == #cfun) *
-        JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
-        ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs, #keyCount)
-    ]]
-    [[
-        JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
-        ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs, #keyCount) *
-        types(ret : Obj) * PreDecodedEncryptedDataKeys(ret, #EDKs, #keyCount)
-    ]]
-    normal

@@ -693,6 +693,9 @@ module Lemma : sig
 
   (** Infers types of parameters and adds them to the contained assertions *)
   val parameter_types : (string, Pred.t) Hashtbl.t -> t -> t
+
+  (** Adds bindings from parameters to logical variables *)
+  val add_param_bindings : t -> t
 end
 
 module Macro : sig

@@ -450,6 +450,14 @@ let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
 
     let procs', preds', lemmas' = explicit_param_types procs preds lemmas in
 
+    let () =
+      Hashtbl.iter
+        (fun name lemma ->
+          let lemma = Lemma.add_param_bindings lemma in
+          Hashtbl.replace lemmas' name lemma)
+        lemmas'
+    in
+
     let preds'', procs'', bi_specs, lemmas'', onlyspecs' =
       match unfold with
       | false -> (preds', procs', prog.bi_specs, lemmas', onlyspecs)
