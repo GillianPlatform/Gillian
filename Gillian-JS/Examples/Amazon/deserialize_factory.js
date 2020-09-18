@@ -194,7 +194,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
  ************************************
  ************************************/
 
-/*
+/**
     @id EncryptedDataKey
 
     @onlyspec EncryptedDataKey (edk)
@@ -239,7 +239,7 @@ var EncryptedDataKey = function (edk) { };
  **************************
  **************************/
 
- /*
+ /**
     @id toUtf8
 
     @onlyspec toUtf8 (buffer)
@@ -520,13 +520,6 @@ function deserializeEncryptedDataKeys(buffer, startPos) {
  ********************************************
  ********************************************/
 
-/*
-    @pred AlgorithmSuiteIdentifierObject(o) :
-        JSObject(o) *
-        DataProp(o, "20",  "ALG_AES128_GCM_IV12_TAG16") * DataProp(o, "ALG_AES128_GCM_IV12_TAG16", 20) *
-        DataProp(o, "70",  "ALG_AES192_GCM_IV12_TAG16") * DataProp(o, "ALG_AES192_GCM_IV12_TAG16", 70) *
-        empty_fields(o : -{ "20", "70", "ALG_AES128_GCM_IV12_TAG16", "ALG_AES192_GCM_IV12_TAG16" }-);
-*/
 var AlgorithmSuiteIdentifier;
 
 /****************************
@@ -538,23 +531,10 @@ var AlgorithmSuiteIdentifier;
  ****************************/
 
 /*
-    @pred pure AlgorithmSuite(+numId, stringId, ivLength, tagLength) :
-        (numId == 20)  * (stringId == "ALG_AES128_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128),
-        (numId == 70)  * (stringId == "ALG_AES192_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128);
-
-    @pred pure BAlgorithmSuite(+numId, errorMessage) :
-        (! (numId == 20)) * (! (numId == 70)) * (errorMessage == "Malformed Header: Unsupported algorithm suite.");
-
-
-    @pred AlgorithmSuiteObject(+aso: Obj, ivLength: Num, tagLength: Num) :
-        JSObject(aso) *
-        readOnlyProperty(aso, "ivLength",  ivLength) *
-        readOnlyProperty(aso, "tagLength", tagLength);
-
     @onlyspec SdkSuite (suiteId)
         [[
             JSObject(this) * ((this, "ivLength") -> none) * ((this, "tagLength") -> none) *
-            AlgorithmSuite(suiteId, #stringId, #ivLength, #tagLength)
+            CAlgorithmSuite(suiteId, #stringId, #ivLength, #tagLength)
         ]]
         [[
             AlgorithmSuiteObject(this, #ivLength, #tagLength) *
@@ -571,302 +551,6 @@ var SdkSuite = function (suiteId) { };
  *******                              *******
  ********************************************
  ********************************************/
-
-/**
-    @pred CorrectVersionAndType(+version, +type) :
-      (version == 1) * (type == 128);
-
-    @pred BVersionAndType(+version:Num, +type:Num, errorMessage:Str) :
-        (version == 65) * (type == 89) * (errorMessage == "Malformed Header: This blob may be base64 encoded."),
-        (! (version == 1) \/ ! (type == 128)) * (! (version == 65) \/ ! (type == 89)) * (errorMessage == "Malformed Header: Unsupported version and/or type.");
-
-    @pred nounfold BHeader(errorMessage, +rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
-                                                                           part_two, ECKs,
-                                                                           part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
-        (22 <=# l-len rawHeaderData) *
-        (rawHeaderData == l+ ({{ version, type }}, #rest)) *
-        BVersionAndType(version, type, errorMessage) *
-
-        (part_one == {{ }}) *
-        (suiteId == 0) * (messageId == {{ }}) * (rECLength == 0) *
-        (part_two == {{ }}) * (ECKs == {{ }}) *
-        (part_three == {{ }}) * (EDKs == {{ }}) * (contentType == 0) * (headerIvLength == 0) *
-        (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
-
-        (22 <=# l-len rawHeaderData) *
-        (rawHeaderData == l+ ({{ version, type }}, #rawSuiteId, #rest)) *
-        (l-len #rawSuiteId == 2) *
-        CorrectVersionAndType(version, type) *
-        rawToUInt16(#rawSuiteId, false, suiteId) *
-        BAlgorithmSuite(suiteId, errorMessage) *
-
-        (part_one == {{ }}) * (messageId == {{ }}) * (rECLength == 0) *
-        (part_two == {{ }}) * (ECKs == {{ }}) *
-        (part_three == {{ }}) * (EDKs == {{ }}) * (contentType == 0) * (headerIvLength == 0) *
-        (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
-
-        (22 <=# l-len rawHeaderData) *
-        (rawHeaderData == l+ (part_one, part_two)) *
-        (l-len part_one == 22) *
-        (part_one == l+ ({{ version, type }}, #rawSuiteId, messageId, #rawContextLength)) *
-        (l-len #rawSuiteId == 2) *
-        (l-len messageId == 16) *
-        (l-len #rawContextLength == 2) *
-        CorrectVersionAndType(version, type) *
-        rawToUInt16(#rawSuiteId, false, suiteId) *
-        AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
-        rawToUInt16(#rawContextLength, false, rECLength) *
-        (22 + rECLength <=# l-len rawHeaderData) *
-
-        (part_two == l+ (#EC, part_three)) *
-        (l-len #EC == rECLength) *
-        BRawEncryptionContext(errorMessage, #EC) *
-
-        (ECKs == {{ }}) * (EDKs == {{ }}) * (contentType == 0) * (frameLength == 0) *
-        (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
-
-        (22 <=# l-len rawHeaderData) *
-        (rawHeaderData == l+ (part_one, part_two)) *
-        (l-len part_one == 22) *
-        (part_one == l+ ({{ version, type }}, #rawSuiteId, messageId, #rawContextLength)) *
-        (l-len #rawSuiteId == 2) *
-        (l-len messageId == 16) *
-        (l-len #rawContextLength == 2) *
-        CorrectVersionAndType(version, type) *
-        rawToUInt16(#rawSuiteId, false, suiteId) *
-        AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
-        rawToUInt16(#rawContextLength, false, rECLength) *
-        (22 + rECLength <=# l-len rawHeaderData) *
-
-        (part_two == l+ (#EC, part_three)) *
-        (l-len #EC == rECLength) *
-        CRawEncryptionContext(#EC, ECKs) *
-        RawEncryptedDataKeys("Broken", rawHeaderData, 22 + rECLength, _, _, errorMessage) *
-
-        (EDKs == {{ }}) * (contentType == 0) * (frameLength == 0) *
-        (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
-
-		(22 <=# l-len rawHeaderData) *
-        (rawHeaderData == l+ (part_one, part_two)) *
-        (l-len part_one == 22) *
-        (part_one == l+ ({{ version, type }}, #rawSuiteId, messageId, #rawContextLength)) *
-        (l-len #rawSuiteId == 2) *
-        (l-len messageId == 16) *
-        (l-len #rawContextLength == 2) *
-        CorrectVersionAndType(version, type) *
-        rawToUInt16(#rawSuiteId, false, suiteId) *
-        AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
-        rawToUInt16(#rawContextLength, false, rECLength) *
-        (22 + rECLength <=# l-len rawHeaderData) *
-
-        (part_two == l+ (#EC, part_three)) *
-        (l-len #EC == rECLength) *
-        CRawEncryptionContext(#EC, ECKs) *
-        (part_three == l+ (#edks, {{ contentType }}, #rawReservedBytes, #rest)) *
-        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, EDKs, #EDKsLength, _) *
-        (#EDKsLength == l-len #edks) *
-        (l-len #rawReservedBytes == 4) *
-        rawToUInt32(#rawReservedBytes, false, #reservedBytes) *
-        (! (#reservedBytes == 0)) *
-        (headerLength == 22 + rECLength + #EDKsLength + 1 + 4 + 1 + 4) *
-        (headerLength + headerIvLength + (#tagLength / 8) <=# l-len rawHeaderData) *
-
-        (errorMessage == "Malformed Header: Reserved bytes not equal to zero.") *
-        (frameLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
-
-        (22 <=# l-len rawHeaderData) *
-        (rawHeaderData == l+ (part_one, part_two)) *
-        (l-len part_one == 22) *
-        (part_one == l+ ({{ version, type }}, #rawSuiteId, messageId, #rawContextLength)) *
-        (l-len #rawSuiteId == 2) *
-        (l-len messageId == 16) *
-        (l-len #rawContextLength == 2) *
-        CorrectVersionAndType(version, type) *
-        rawToUInt16(#rawSuiteId, false, suiteId) *
-        AlgorithmSuite(suiteId, #stringId, #ivLength, #tagLength) *
-        rawToUInt16(#rawContextLength, false, rECLength) *
-        (22 + rECLength <=# l-len rawHeaderData) *
-
-        (part_two == l+ (#EC, part_three)) *
-        (l-len #EC == rECLength) *
-        CRawEncryptionContext(#EC, ECKs) *
-        (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rest)) *
-        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, EDKs, #EDKsLength, _) *
-        (#EDKsLength == l-len #edks) *
-        (headerLength == 22 + rECLength + #EDKsLength + 1 + 4 + 1 + 4) *
-        (headerLength + #ivLength + (#tagLength / 8) <=# l-len rawHeaderData) *
-        (! (headerIvLength == #ivLength)) *
-
-        (errorMessage == "Malformed Header: Mismatch between expected and obtained IV length.") *
-        (frameLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }});
-
-    @pred nounfold IHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
-                                                    part_two, ECKs,
-                                                    part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
-        (l-len rawHeaderData <# 22) *
-
-        (part_one == {{ }}) * (version == 0) * (type == 0) * (suiteId == 0) * (messageId == {{ }}) * (rECLength == 0) *
-        (part_two == {{ }}) * (ECKs == {{ }}) *
-        (part_three == {{ }}) * (EDKs == {{ }}) * (contentType == 0) * (headerIvLength == 0) *
-        (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
-
-        (22 <=# l-len rawHeaderData) *
-        (rawHeaderData == l+ (part_one, part_two)) *
-        (l-len part_one == 22) *
-        (part_one == l+ ({{ version, type }}, #rawSuiteId, messageId, #rawContextLength)) *
-        (l-len #rawSuiteId == 2) *
-        (l-len messageId == 16) *
-        (l-len #rawContextLength == 2) *
-        CorrectVersionAndType(version, type) *
-        rawToUInt16(#rawSuiteId, false, suiteId) *
-        AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
-        rawToUInt16(#rawContextLength, false, rECLength) *
-        (l-len rawHeaderData <# 22 + rECLength) *
-
-        (ECKs == {{ }}) *
-        (part_three == {{ }}) * (EDKs == {{ }}) * (contentType == 0) *
-        (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
-
-        (22 <=# l-len rawHeaderData) *
-        (rawHeaderData == l+ (part_one, part_two)) *
-        (l-len part_one == 22) *
-        (part_one == l+ ({{ version, type }}, #rawSuiteId, messageId, #rawContextLength)) *
-        (l-len #rawSuiteId == 2) *
-        (l-len messageId == 16) *
-        (l-len #rawContextLength == 2) *
-        CorrectVersionAndType(version, type) *
-        rawToUInt16(#rawSuiteId, false, suiteId) *
-        AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
-        rawToUInt16(#rawContextLength, false, rECLength) *
-        (22 + rECLength <=# l-len rawHeaderData) *
-
-        (part_two == l+ (#EC, part_three)) *
-        (l-len #EC == rECLength) *
-        CRawEncryptionContext(#EC, ECKs) *
-
-        RawEncryptedDataKeys("Incomplete", rawHeaderData, 22 + rECLength, EDKs, _, errorMessage) *
-        (contentType == 0) * (frameLength == 0) * (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
-
-        (22 <=# l-len rawHeaderData) *
-        (rawHeaderData == l+ (part_one, part_two)) *
-        (l-len part_one == 22) *
-        (part_one == l+ ({{ version, type }}, #rawSuiteId, messageId, #rawContextLength)) *
-        (l-len #rawSuiteId == 2) *
-        (l-len messageId == 16) *
-        (l-len #rawContextLength == 2) *
-        CorrectVersionAndType(version, type) *
-        rawToUInt16(#rawSuiteId, false, suiteId) *
-        AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
-        rawToUInt16(#rawContextLength, false, rECLength) *
-        (22 + rECLength <=# l-len rawHeaderData) *
-
-        (part_two == l+ (#EC, part_three)) *
-        (l-len #EC == rECLength) *
-        CRawEncryptionContext(#EC, ECKs) *
-
-        (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, #rest)) *
-        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, EDKs, #EDKsLength, _) *
-        (#EDKsLength == l-len #edks) *
-        (l-len #rawFrameLength == 4) *
-        rawToUInt32(#rawFrameLength, false, frameLength) *
-        (headerLength == 22 + rECLength + #EDKsLength + 1 + 4 + 1 + 4) *
-        (l-len headerIv == headerIvLength) *
-        (l-len headerAuthTag == #tagLength / 8) *
-        (l-len rawHeaderData <# headerLength + headerIvLength + (#tagLength / 8)) *
-
-        (headerIv == {{ }}) * (headerAuthTag == {{ }});
-
-    @pred nounfold CHeader(+rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
-                                                  part_two, ECKs,
-                                                  part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) :
-        (rawHeaderData == l+ (part_one, part_two)) *
-        (l-len part_one == 22) *
-        (part_one == l+ (
-          {{ version, type }},
-          #rawSuiteId,
-          messageId,
-          #rawContextLength)) *
-        (l-len #rawSuiteId == 2) *
-        (l-len messageId == 16) *
-        (l-len #rawContextLength == 2) *
-        CorrectVersionAndType(version, type) *
-        rawToUInt16(#rawSuiteId, false, suiteId) *
-        AlgorithmSuite(suiteId, #stringId, headerIvLength, #tagLength) *
-        rawToUInt16(#rawContextLength, false, rECLength) *
-
-        (part_two == l+ (#EC, part_three)) *
-        (l-len #EC == rECLength) *
-        CRawEncryptionContext(#EC, ECKs) *
-        (part_three == l+ (#edks, {{ contentType }}, {{ 0, 0, 0, 0 }}, {{ headerIvLength }}, #rawFrameLength, headerIv, headerAuthTag)) *
-        RawEncryptedDataKeys("Complete", rawHeaderData, 22 + rECLength, EDKs, #EDKsLength, _) *
-        (#EDKsLength == l-len #edks) *
-        (l-len #rawFrameLength == 4) *
-        rawToUInt32(#rawFrameLength, false, frameLength) *
-        (headerLength == 22 + rECLength + #EDKsLength + 1 + 4 + 1 + 4) *
-        (l-len headerIv == headerIvLength) *
-        (l-len headerAuthTag == #tagLength / 8) *
-        (headerLength + headerIvLength + (#tagLength / 8) <=# l-len rawHeaderData);
-
-    @pred MessageHeader(+messageHeader, version, type, suiteId, messageId, EDKs, contentType, headerIvLength, frameLength) :
-        JSObject(messageHeader) *
-        DataProp(messageHeader, "version", version) *
-        DataProp(messageHeader, "type", type) *
-        DataProp(messageHeader, "suiteId", suiteId) *
-        DataProp(messageHeader, "messageId", #ui8aMessageId) *
-            Uint8Array(#ui8aMessageId, #abMessageId, 0, 16) *
-            ArrayBuffer(#abMessageId, messageId) *
-        DataProp(messageHeader, "encryptionContext", #dECObj) *
-            DecodedEncryptionContext(#dECObj) *
-        DataProp(messageHeader, "encryptedDataKeys", #dEDKs) *
-            DeserialisedEncryptedDataKeys(#dEDKs, EDKs) *
-        DataProp(messageHeader, "contentType", contentType) *
-        DataProp(messageHeader, "headerIvLength", headerIvLength) *
-        DataProp(messageHeader, "frameLength", frameLength);
-
-    @pred nounfold HeaderInfo(+headerInfo, version, type, suiteId, messageId, EDKs, contentType, headerIvLength,
-                              frameLength, headerLength, rawHeaderData, headerIv, headerAuthTag) :
-        JSObject(headerInfo) *
-        DataProp(headerInfo, "messageHeader", #messageHeader) *
-            MessageHeader(#messageHeader, version, type, suiteId, messageId, EDKs, contentType, headerIvLength, frameLength) *
-        DataProp(headerInfo, "headerLength", headerLength) *
-        DataProp(headerInfo, "algorithmSuite", #algoSuiteObject) *
-            AlgorithmSuiteObject(#algoSuiteObject, headerIvLength, #tagLength) *
-        DataProp(headerInfo, "rawHeader", #rawHeader) *
-            Uint8Array(#rawHeader, #rawBuffer, 0, headerLength) *
-            ArrayBuffer(#rawBuffer, rawHeaderData) *
-        DataProp(headerInfo, "headerIv", #ui8aHeaderIv) *
-            Uint8Array(#ui8aHeaderIv, #abHeaderIv, 0, headerIvLength) *
-            ArrayBuffer(#abHeaderIv, headerIv) *
-        DataProp(headerInfo, "headerAuthTag", #ui8aHeaderAuthTag) *
-            Uint8Array(#ui8aHeaderAuthTag, #abHeaderAuthTag, 0, #tagLength / 8) *
-            ArrayBuffer(#abHeaderAuthTag, headerAuthTag);
-*/
-
-/**
-  @pred nounfold Header(definition,
-                        +rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
-                                        part_two, ECKs,
-                                        part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag,
-                        errorMessage) :
-
-        (definition == "Complete") *
-        CHeader(rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
-                                      part_two, ECKs,
-                                      part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) *
-        (errorMessage == ""),
-
-        (definition == "Incomplete") *
-        IHeader(rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
-                                        part_two, ECKs,
-                                        part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag) *
-        (errorMessage == ""),
-
-        (definition == "Broken") *
-        BHeader(errorMessage, rawHeaderData, part_one, version, type, suiteId, messageId, rECLength,
-                                                  part_two, ECKs,
-                                                  part_three, EDKs, contentType, headerIvLength, frameLength, headerLength, headerIv, headerAuthTag);
-
-*/
 
 /**
     @id deserializeMessageHeader
@@ -970,6 +654,12 @@ function deserializeMessageHeader(messageBuffer) {
     * the Node.js Buffer object.  The offset and length *must* be
     * passed to the DataView otherwise I will get unexpected results.
     */
+    var dataView = new DataView(
+      messageBuffer.buffer,
+      messageBuffer.byteOffset,
+      messageBuffer.byteLength
+    )
+
     /* @tactic unfold Header(#definition, #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #errorMessage) */
     /* @tactic
         if (#definition = "Complete") then {
@@ -977,14 +667,9 @@ function deserializeMessageHeader(messageBuffer) {
         } else { if (#definition = "Incomplete") then {
             unfold IHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
           } else {
-            unfold BHeader(#errorMessage, #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
+            unfold BHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #errorMessage)
           }
         } */
-    var dataView = new DataView(
-      messageBuffer.buffer,
-      messageBuffer.byteOffset,
-      messageBuffer.byteLength
-    )
 
     /* Check for early return (Postcondition): Not Enough Data. Need to have at least 22 bytes of data to begin parsing.
     * The first 22 bytes of the header are fixed length.  After that
