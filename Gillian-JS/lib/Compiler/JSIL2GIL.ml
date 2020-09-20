@@ -90,6 +90,7 @@ let jsil2gil_spec (spec : Spec.t) : GSpec.t =
     spec_params = spec.params;
     spec_sspecs = List.map jsil2gil_sspec spec.sspecs;
     spec_normalised = spec.normalised;
+    spec_incomplete = spec.incomplete;
     spec_to_verify = spec.to_verify;
   }
 

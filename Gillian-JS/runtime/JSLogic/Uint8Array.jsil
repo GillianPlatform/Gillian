@@ -57,22 +57,22 @@ nounfold pred Uint8ArrayPrototype (+proto) :
  **** Axiomatic specifications of the Uint8Array-related functions ****
  **********************************************************************)
 
-only spec UI8ARP_buffer (xsc, vthis)
+axiomatic spec UI8ARP_buffer (xsc, vthis)
     [[ (vthis == #vthis) * Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) ]]
     [[ Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) * (ret == #buffer) ]]
     normal
 
-only spec UI8ARP_byteLength (xsc, vthis)
+axiomatic spec UI8ARP_byteLength (xsc, vthis)
     [[ (vthis == #vthis) * Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) ]]
     [[ Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) * (ret == #arrayLength) ]]
     normal
 
-only spec UI8ARP_byteOffset (xsc, vthis)
+axiomatic spec UI8ARP_byteOffset (xsc, vthis)
     [[ (vthis == #vthis) * Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) ]]
     [[ Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) * (ret == #byteOffset) ]]
     normal
 
-only spec UI8ARP_slice (xsc, vthis, start, end)
+axiomatic spec UI8ARP_slice (xsc, vthis, start, end)
     [[ (vthis == #vthis) *
        Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) * ArrayBuffer(#buffer, #data) *
        (0 <=# start) * (0 <=# end) * (end <=# #arrayLength) *

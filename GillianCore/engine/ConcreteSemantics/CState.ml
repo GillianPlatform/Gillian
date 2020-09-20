@@ -188,7 +188,7 @@ module Make
       ?(revisited_invariant = false)
       (prog : UP.prog)
       (slcmd : SLCmd.t)
-      (state : t) : t list =
+      (state : t) : (t list, string) result =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 
   let substitution_in_place (subst : st) (state : t) : unit = ()

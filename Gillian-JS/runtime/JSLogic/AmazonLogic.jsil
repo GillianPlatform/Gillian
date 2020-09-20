@@ -659,7 +659,7 @@ pred DeserialisedEncryptedDataKeys (+a:Obj, contents:List) :
 (***** AXIOMATISED EDK-RELATED INTERNALS *****)
 
 (* Mapping EDKs into the resulting decoded EDK array *)
-only spec AP_map (xsc, vthis, cfun)
+axiomatic incomplete spec AP_map (xsc, vthis, cfun)
 [[
     (vthis == #vthis) * (cfun == #cfun) *
     JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
@@ -673,7 +673,7 @@ only spec AP_map (xsc, vthis, cfun)
 normal
 
 (* Freezing an array of decoded EDKs *)
-only spec Object_freeze(xsc, vthis, l)
+axiomatic spec Object_freeze(xsc, vthis, l)
 [[
     (l == #l) * LiveDeserialisedEncryptedDataKeys(#l, #EDKs)
 ]]
@@ -1076,3 +1076,143 @@ nounfold pred HeaderInfo(+headerInfo, version, type, suiteId, messageId, EDKs, c
     DataProp(headerInfo, "headerAuthTag", #ui8aHeaderAuthTag) *
         Uint8Array(#ui8aHeaderAuthTag, #abHeaderAuthTag, 0, #tagLength / 8) *
         ArrayBuffer(#abHeaderAuthTag, headerAuthTag);
+
+(******************************
+ ******************************
+ *******                *******
+ *******   Additional   *******
+ *******   Internal/    *******
+ *******   Built-in     *******
+ *******   Functions    *******
+ *******                *******
+ ******************************
+ ******************************)
+
+(* *** Conversion to an integer *** *)
+proc i__toInteger (v) {
+			ret := "i__toNumber" (v) with elab;
+			ret := num_to_int (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** Conversion to a 32-bit integer *** *)
+proc i__toUint32 (v) {
+			ret := "i__toNumber" (v) with elab;
+			ret := num_to_uint32 (ret);
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** Conversion to an array length *** *)
+proc i__toLength (v) {
+
+		   ret := "i__toInteger"(v) with elab;
+		   goto [ret <= 0] rlab nzero;
+
+	nzero: goto [ret <= 9007199254740991] min rlab;
+    min:   return;
+
+
+	rlab: PHI(ret: 0, 9007199254740991);
+          return;
+
+	elab: throw
+};
+
+(* *** Array constructor *** *)
+proc Array_construct (xsc, vthis) {
+            (* Default array construction *)
+            array := "create_default_object" ($larr_proto, "Array", true);
+            [array, "length"] := {{ "d", 0, true, false, true }};
+
+            (* All runtime arguments *)
+            arguments := args;
+            (* Optional arguments (4) *)
+            opt_args := cdr (cdr arguments);
+            len := l-len (opt_args);
+            goto [len = 0] rlab ltest;
+  ltest:    goto [len = 1] arr_a arr_b;
+
+            (* Form 4(a): new Array(len) *)
+  arr_a:    len := l-nth (opt_args, 0);
+            prop_name := "length";
+            prop_num := "0";
+            goto [typeOf len = Num] check set;
+  check:    len_32 := "i__toUint32" (len) with elab;
+            goto [len = len_32] set thrw;
+
+  set:      PHI(prop_a: prop_num, prop_name; enum: true, false);
+            ret_def_a := "a__defineOwnProperty" (array, prop_a, {{ "d", len, true, enum, true }}, true) with elab;
+            goto rlab;
+
+            (* Form 4(b): new Array([item1 [, item2 [, ...]]] *)
+  arr_b:    start_n := 0;
+  loop:	    PHI(n: start_n, next_n);
+            goto [n < len] head rlab;
+  head:     prop_b := "i__toString" (n) with elab;
+            prop_val := l-nth (opt_args, n);
+            ret_def_b := "a__defineOwnProperty" (array, prop_b, {{ "d", prop_val, true, true, true }}, true) with elab;
+            next_n := n + 1;
+            goto loop;
+
+            (* Normal return *)
+  rlab:	    ret := array;
+            return;
+
+            (* Error return *)
+  thrw:     range_err := "RangeError" ();
+  elab:     PHI(ret: len_32, ret_def_a, prop, ret_def_b, range_err);
+            throw
+};
+
+(* *** Array.prototype.map implementation *** *)
+proc AP_map(xsc, vthis, callbackfn) {
+          arguments := args;
+          num := l-len (arguments);
+
+          arr_obj := "i__toObject" (vthis) with elab;
+          get_len := "get" (arr_obj, "length") with elab;
+          len := "i__toLength" (get_len) with elab;
+
+          is_call := "i__isCallable" (callbackfn);
+          goto [is_call] cont thrw;
+
+          (* Check if optional thisArg is supplied at runtime *)
+  cont:	  undef_t := undefined;
+          goto [num > 3] def set_t;
+  def:    def_t := l-nth (arguments, 3);
+  set_t:  PHI(t: undef_t, def_t);
+
+          new_arr := "Array_construct" (empty, empty, len) with elab;
+
+          (* Loop start *)
+          start := 0;
+  loop:	  PHI(k: start, next_k);
+          goto [k < len] next end;
+
+  next:	  pk := "i__toString" (k) with elab;
+          kpres := "hasProperty" (arr_obj, pk) with elab;
+          goto [kpres] tt ff;
+
+  tt:     kval := "get" (arr_obj, pk) with elab;
+          m := metadata(callbackfn);
+          scp := [m, "@scope"];
+          fun := [m, "@call"];
+          mapv := fun (scp, t, kval, k, arr_obj) with elab;
+          ret_def := "a__defineOwnProperty" (new_arr, pk, {{ "d", mapv, true, true, true }}, false) with elab;
+
+  ff:     next_k := k + 1;
+          goto loop;
+          (* Loop end *)
+          (* Normal/ return *)
+  end:    ret := new_arr;
+          return;
+
+          (* Error return *)
+  thrw:   type_err := "TypeError" ();
+  elab:   PHI(ret: arr_obj, get_len, len, new_arr, pk, kpres, kval, mapv, ret_def, type_err);
+          throw
+};

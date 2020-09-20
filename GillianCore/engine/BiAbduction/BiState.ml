@@ -208,11 +208,10 @@ struct
       ?(revisited_invariant = false)
       (prog : UP.prog)
       (lcmd : SLCmd.t)
-      (bi_state : t) : t list =
+      (bi_state : t) : (t list, string) result =
     let procs, state, state_af = bi_state in
-    List.map
-      (fun state' -> (procs, state', state_af))
-      (State.evaluate_slcmd ~revisited_invariant prog lcmd state)
+    Result.bind (State.evaluate_slcmd ~revisited_invariant prog lcmd state)
+      (fun x -> Ok (List.map (fun state' -> (procs, state', state_af)) x))
 
   let unfolding_vals (bi_state : t) (fs : Formula.t list) : vt list =
     let procs, state, _ = bi_state in
@@ -323,6 +322,7 @@ struct
           };
         ];
       spec_normalised = true;
+      spec_incomplete = false;
       spec_to_verify = false;
     }
 

@@ -146,6 +146,7 @@ struct
               };
             ];
           spec_normalised = true;
+          spec_incomplete = false;
           spec_to_verify = false;
         }
       in

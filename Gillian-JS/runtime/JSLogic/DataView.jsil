@@ -127,7 +127,7 @@ pred BI_DataViewObject () :
  **** Axiomatic specifications of the DataView-related functions ****
  ********************************************************************)
 
-only spec DV_construct (x_sc, v_this, buffer, byteOffset, byteLength)
+axiomatic spec DV_construct (x_sc, v_this, buffer, byteOffset, byteLength)
     [[ (buffer == #buffer) * (byteOffset == #byteOffset) * (byteLength == #byteLength) *
        ArrayBuffer(#buffer, #data) * (#bufferLength == l-len #data) *
        (0 <=# #byteOffset) * (0 <=# #byteLength) *
@@ -135,22 +135,22 @@ only spec DV_construct (x_sc, v_this, buffer, byteOffset, byteLength)
     [[ ArrayBuffer(#buffer, #data) * DataView(ret, #buffer, #byteOffset, #byteLength) ]]
     normal
 
-only spec DVP_buffer (xsc, vthis)
+axiomatic spec DVP_buffer (xsc, vthis)
     [[ (vthis == #vthis) * DataView(#vthis, #buffer, #byteOffset, #byteLength) ]]
     [[ DataView(#vthis, #buffer, #byteOffset, #byteLength) * (ret == #buffer) ]]
     normal
 
-only spec DVP_byteLength (xsc, vthis)
+axiomatic spec DVP_byteLength (xsc, vthis)
     [[ (vthis == #vthis) * DataView(#vthis, #buffer, #byteOffset, #byteLength) ]]
     [[ DataView(#vthis, #buffer, #byteOffset, #byteLength) * (ret == #byteLength) ]]
     normal
 
-only spec DVP_byteOffset (xsc, vthis)
+axiomatic spec DVP_byteOffset (xsc, vthis)
     [[ (vthis == #vthis) * DataView(#vthis, #buffer, #byteOffset, #byteLength) ]]
     [[ DataView(#vthis, #buffer, #byteOffset, #byteLength) * (ret == #byteOffset) ]]
     normal
 
-only spec DVP_getUint8 (xsc, vthis, byteOffset)
+axiomatic spec DVP_getUint8 (xsc, vthis, byteOffset)
     [[ (vthis == #vthis) * (byteOffset == #byteOffset) *
        DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
        (0 <=# byteOffset) * (#elementSize == 1) * (#byteOffset + #elementSize <=# #viewSize) *
@@ -160,7 +160,7 @@ only spec DVP_getUint8 (xsc, vthis, byteOffset)
        rawToUInt8(#raw, ret) ]]
     normal
 
-only spec DVP_getUint16 (xsc, vthis, byteOffset, littleEndian)
+axiomatic spec DVP_getUint16 (xsc, vthis, byteOffset, littleEndian)
     [[ (vthis == #vthis) * (byteOffset == #byteOffset) * (littleEndian == undefined) *
        DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
        (0 <=# byteOffset) * (#elementSize == 2) * (#byteOffset + #elementSize <=# #viewSize) *
@@ -179,7 +179,7 @@ only spec DVP_getUint16 (xsc, vthis, byteOffset, littleEndian)
        rawToUInt16(#raw, #littleEndian, ret) ]]
     normal
 
-only spec DVP_getUint32 (xsc, vthis, byteOffset, littleEndian)
+axiomatic spec DVP_getUint32 (xsc, vthis, byteOffset, littleEndian)
     [[ (vthis == #vthis) * (byteOffset == #byteOffset) * (littleEndian == undefined) *
        DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
        (0 <=# byteOffset) * (#elementSize == 4) * (#byteOffset + #elementSize <=# #viewSize) *

@@ -186,14 +186,15 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LTHEN
 %token LELSE
 (* Procedure specification keywords *)
-%token ONLY
+%token AXIOMATIC
+%token INCOMPLETE
 %token SPEC
 %token BISPEC
 %token LEMMA
 %token VARIANT
 %token NORMAL
 %token ERROR
-(* JS only spec specifics *)
+(* JS axiomatic spec specifics *)
 %token JSOS
 (* Procedure definition keywords *)
 %token PROC
@@ -672,15 +673,17 @@ spec_head_target:
   { (spec_name, spec_params) }
 
 spec_target:
-  SPEC; spec_head = spec_head_target;
+  incomplete = option(INCOMPLETE); SPEC; spec_head = spec_head_target;
   proc_specs = separated_nonempty_list(SCOLON, pre_post_target)
   { let (name, params) = spec_head in
+    let incomplete = (incomplete <> None) in
     let is_normalised = !Config.previously_normalised in
     Spec.{
       name = name;
       params = params;
       sspecs = proc_specs;
       normalised = is_normalised;
+      incomplete;
       to_verify = true }
   }
 
@@ -779,12 +782,13 @@ macro_target:
 /* ONLY SPECS */
 
 only_spec_target:
-(* only spec xpto (x, y) pre: assertion, post: assertion, flag: NORMAL|ERROR *)
-  ONLY; SPEC; head = spec_head_target;
+(* axiomatic spec xpto (x, y) pre: assertion, post: assertion, flag: NORMAL|ERROR *)
+  AXIOMATIC; incomplete = option(INCOMPLETE); SPEC; head = spec_head_target;
   sspecs = separated_nonempty_list(SCOLON, pre_post_target);
   { let (name, params) = head in
     let normalised = !Config.previously_normalised in
-    Spec.{ name; params; sspecs; normalised; to_verify = true } }
+    let incomplete = (incomplete <> None) in
+    Spec.{ name; params; sspecs; normalised; incomplete; to_verify = false } }
 
 
 /* BI ABDUCTION SPECIFICATIONS */

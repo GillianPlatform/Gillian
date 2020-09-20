@@ -222,6 +222,7 @@ and spec = {
   spec_params : string list;
   spec_sspecs : single_spec list;
   spec_normalised : bool;
+  spec_incomplete : bool;
   spec_to_verify : bool;
 }
 

@@ -19,6 +19,7 @@ type t = {
   params : string list;  (** Procedure/spec parameters *)
   sspecs : st list;  (** List of single specifications *)
   normalised : bool;  (** If the spec is already normalised *)
+  incomplete : bool;  (** If the spec is incomplete *)
   to_verify : bool;  (** Should the spec be verified? *)
 }
 
@@ -36,8 +37,9 @@ let init
     (params : string list)
     (sspecs : st list)
     (normalised : bool)
+    (incomplete : bool)
     (to_verify : bool) : t =
-  { name; params; sspecs; normalised; to_verify }
+  { name; params; sspecs; normalised; incomplete; to_verify }
 
 let extend (spec : t) (sspecs : st list) : t =
   { spec with sspecs = sspecs @ spec.sspecs }

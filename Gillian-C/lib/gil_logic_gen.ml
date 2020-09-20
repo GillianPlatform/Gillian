@@ -564,6 +564,7 @@ let trans_spec ?(ann = empty) cl_spec =
         spec_params = params;
         spec_sspecs = List.map (trans_sspec ~ann fname) sspecs;
         spec_normalised = false;
+        spec_incomplete = false;
         spec_to_verify = true;
       }
   in

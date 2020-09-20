@@ -88,7 +88,7 @@ nounfold pred ArrayPrototype (proto) :
  **** Axiomatic specifications of the Array prototype functions ****
  *******************************************************************)
 
-only spec AP_push (xsc, vthis, element)
+axiomatic spec AP_push (xsc, vthis, element)
     [[ (vthis == #vthis) * (element == #ui8a) *
        Uint8Array (#ui8a, #ab, 0, #viewSize) *
        ArrayBuffer(#ab, #element) *

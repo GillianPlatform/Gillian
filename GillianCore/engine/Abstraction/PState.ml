@@ -269,7 +269,7 @@ module Make
         let state' = set_store state store in
         state'
 
-  (* FIXME: This needs to change -> we need to return a unfication ret type, so we can
+  (* FIXME: This needs to change -> we need to return a unification ret type, so we can
       compose with bi-abduction at the spec level *)
   let run_spec_aux
       ?(existential_bindings : (string * vt) list option)
@@ -278,12 +278,11 @@ module Make
       (up : UP.t)
       (astate : t)
       (x : string option)
-      (args : vt list) : (t * Flag.t) list =
+      (args : vt list) : ((t * Flag.t) list, Unifier.err_t list) result =
     L.verbose (fun m ->
         m "INSIDE RUN spec of %s with the following UP:@\n%a@\n" name UP.pp up);
 
     let old_store = get_store astate in
-    let old_astate = copy astate in
     let new_store = Store.init (List.combine params args) in
     let astate' = set_store astate new_store in
     let existential_bindings = Option.value ~default:[] existential_bindings in
@@ -302,56 +301,55 @@ module Make
 
     match Unifier.unify astate' subst up with
     | UPUSucc rets ->
-        (* Successful Unification *)
-        List.concat
-          (List.map
-             (fun (frame_state, subst, posts) ->
-               let fl, posts =
-                 match posts with
-                 | Some (fl, posts) -> (fl, posts)
-                 | _                ->
-                     let msg =
-                       Printf.sprintf
-                         "SYNTAX ERROR: Spec of %s does not have a \
-                          postcondition"
-                         name
-                     in
-                     L.normal (fun m -> m "%s" msg);
-                     raise (Failure msg)
-               in
+        Ok
+          ((* Successful Unification *)
+           List.concat
+             (List.map
+                (fun (frame_state, subst, posts) ->
+                  let fl, posts =
+                    match posts with
+                    | Some (fl, posts) -> (fl, posts)
+                    | _                ->
+                        let msg =
+                          Printf.sprintf
+                            "SYNTAX ERROR: Spec of %s does not have a \
+                             postcondition"
+                            name
+                        in
+                        L.normal (fun m -> m "%s" msg);
+                        raise (Failure msg)
+                  in
 
-               let sp = Unifier.produce_posts frame_state subst posts in
+                  let sp = Unifier.produce_posts frame_state subst posts in
 
-               List.map
-                 (fun final_state ->
-                   let final_store = get_store final_state in
-                   let v_ret = Store.get final_store Names.return_variable in
-                   let final_state =
-                     set_store final_state (Store.copy old_store)
-                   in
-                   let v_ret =
-                     Option.value
-                       ~default:(Option.get (Val.from_expr (Lit Undefined)))
-                       v_ret
-                   in
-                   let final_state = update_store final_state x v_ret in
-                   let _ = simplify ~unification:true final_state in
-                   let subst, final_state =
-                     Option.get (Unifier.unfold_concrete_preds final_state)
-                   in
-                   (final_state, fl))
-                 sp)
-             rets)
+                  List.map
+                    (fun final_state ->
+                      let final_store = get_store final_state in
+                      let v_ret = Store.get final_store Names.return_variable in
+                      let final_state =
+                        set_store final_state (Store.copy old_store)
+                      in
+                      let v_ret =
+                        Option.value
+                          ~default:(Option.get (Val.from_expr (Lit Undefined)))
+                          v_ret
+                      in
+                      let final_state = update_store final_state x v_ret in
+                      let _ = simplify ~unification:true final_state in
+                      let subst, final_state =
+                        Option.get (Unifier.unfold_concrete_preds final_state)
+                      in
+                      (final_state, fl))
+                    sp)
+                rets))
     | UPUFail errs ->
         let msg =
           Fmt.str
-            "WARNING: Failed to unify against the precondition of procedure %s@\n\
-             @[<v 2>STATE:@\n\
-             @[%a@]@]"
-            name pp old_astate
+            "WARNING: Failed to unify against the precondition of procedure %s"
+            name
         in
         L.normal (fun m -> m "%s" msg);
-        raise (Failure msg)
+        Error errs
 
   let fresh_subst (xs : SS.t) : ESubst.t =
     let xs = SS.elements xs in
@@ -392,7 +390,7 @@ module Make
       ?(revisited_invariant = false)
       (prog : UP.prog)
       (lcmd : SLCmd.t)
-      (astate : t) : t list =
+      (astate : t) : (t list, string) result =
     let state, preds, pred_defs = astate in
     let eval_expr e =
       try State.eval_expr state e
@@ -438,7 +436,7 @@ module Make
                 Pred.combine_ins_outs pred.pred vs vs_outs
             in
             Preds.extend preds' (pname, arg_vs);
-            [ astate' ]
+            Ok [ astate' ]
         | _ ->
             let msg =
               Fmt.str "@[<h>IMPOSSIBLE FOLD for %s(%a) with folding_info: %a@]"
@@ -462,15 +460,16 @@ module Make
             L.verbose (fun m ->
                 m "@[<h>LCMD Unfold about to happen with rec %b info: %a@]" b
                   SLCmd.pp_folding_info unfold_info);
-            if b then [ Unifier.rec_unfold astate pname vs ]
+            if b then Ok [ Unifier.rec_unfold astate pname vs ]
             else (
               L.verbose (fun m ->
                   m "@[<h>Values: %a@]" Fmt.(list ~sep:comma Val.pp) vs);
-              List.map
-                (fun (_, state) -> state)
-                (Unifier.unfold astate pname vs unfold_info) )
+              Ok
+                (List.map
+                   (fun (_, state) -> state)
+                   (Unifier.unfold astate pname vs unfold_info)) )
         | _                   -> raise (Failure "IMPOSSIBLE UNFOLD") )
-    | GUnfold pname -> [ Unifier.unfold_all astate pname ]
+    | GUnfold pname -> Ok [ Unifier.unfold_all astate pname ]
     | SepAssert (a, binders) -> (
         let store = State.get_store state in
         let pvars_store = Store.domain store in
@@ -594,7 +593,7 @@ module Make
                           let _ =
                             State.simplify ~kill_new_lvars:false new_state'
                           in
-                          [ (new_state', new_preds, pred_defs) ]
+                          Ok [ (new_state', new_preds, pred_defs) ]
                       | _               ->
                           let msg =
                             Fmt.str
@@ -602,7 +601,7 @@ module Make
                                produce variable bindings."
                               Asrt.pp a
                           in
-                          raise (Failure msg) )
+                          Error msg )
                 | UPUSucc _ ->
                     raise
                       (Exceptions.Unsupported
@@ -636,7 +635,7 @@ module Make
         match lemma with
         | Error _  ->
             raise (Failure (Printf.sprintf "Lemma %s does not exist" lname))
-        | Ok lemma ->
+        | Ok lemma -> (
             let v_args : vt list = List.map eval_expr args in
             (* Printf.printf "apply lemma. binders: %s. existentials: %s\n\n"
                (String.concat ", " binders) (String.concat ", " lemma.lemma.existentials); *)
@@ -649,12 +648,21 @@ module Make
               run_spec_aux ~existential_bindings lname lemma.lemma.lemma_params
                 lemma.up astate None v_args
             in
-            List.map
-              (fun (astate, _) ->
-                let astate = add_spec_vars astate (Var.Set.of_list binders) in
-                let _ = simplify ~unification:true astate in
-                astate)
-              rets )
+            match rets with
+            | Ok rets    ->
+                Ok
+                  (List.map
+                     (fun (astate, _) ->
+                       let astate =
+                         add_spec_vars astate (Var.Set.of_list binders)
+                       in
+                       let _ = simplify ~unification:true astate in
+                       astate)
+                     rets)
+            | Error errs ->
+                Error
+                  (Format.asprintf "Cannot apply lemma %s in state\n%a" lname pp
+                     astate) ) )
     | Invariant (a, binders) -> (
         let store = State.get_store state in
         let pvars_store = Store.domain store in
@@ -783,7 +791,7 @@ module Make
                           let _ =
                             State.simplify ~kill_new_lvars:false new_state'
                           in
-                          [ (new_state', new_preds, pred_defs) ]
+                          Ok [ (new_state', new_preds, pred_defs) ]
                       | _               ->
                           let msg =
                             Fmt.str
@@ -791,7 +799,7 @@ module Make
                                produce variable bindings."
                               Asrt.pp a
                           in
-                          raise (Failure msg) )
+                          Error msg )
                 | UPUSucc _ ->
                     raise
                       (Exceptions.Unsupported
@@ -836,7 +844,13 @@ module Make
           run_spec_aux ~existential_bindings:subst_lst spec.spec.spec_name
             spec.spec.spec_params spec.up astate (Some x) args
     in
-    results
+    match results with
+    | Ok results -> results
+    | Error msg  ->
+        L.normal (fun fmt ->
+            fmt "WARNING: Unable to use specification of function %s"
+              spec.spec.spec_name);
+        []
 
   let unify (astate : t) (subst : st) (up : UP.t) : bool =
     let result =

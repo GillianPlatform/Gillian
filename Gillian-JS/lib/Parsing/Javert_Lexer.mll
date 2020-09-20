@@ -128,19 +128,20 @@
       "branch",       Javert_Parser.BRANCH;
       "use_subst",    Javert_Parser.USESUBST;
 
-     (* JS only spec specifics *)
+     (* JS axiomatic spec specifics *)
      "js_only_spec", Javert_Parser.JSOS;
 
       (* Procedure specification keywords *)
-      "only",    Javert_Parser.ONLY;
-      "lemma",   Javert_Parser.LEMMA;
-      "variant", Javert_Parser.VARIANT;
-      "spec",    Javert_Parser.SPEC;
-      "bispec",  Javert_Parser.BISPEC;
-      "normal",  Javert_Parser.NORMAL;
-      "error",   Javert_Parser.ERROR;
+      "axiomatic",    Javert_Parser.AXIOMATIC;
+      "incomplete",   Javert_Parser.INCOMPLETE;
+      "lemma",        Javert_Parser.LEMMA;
+      "variant",      Javert_Parser.VARIANT;
+      "spec",         Javert_Parser.SPEC;
+      "bispec",       Javert_Parser.BISPEC;
+      "normal",       Javert_Parser.NORMAL;
+      "error",        Javert_Parser.ERROR;
 
-      (* JS only spec specifics *)
+      (* JS axiomatic spec specifics *)
       "js_only_spec", Javert_Parser.JSOS;
 
       (* Procedure definition keywords *)

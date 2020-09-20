@@ -373,7 +373,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 /*
     @id deserializeEncryptedDataKeys
 
-    @pre (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
+    @prex (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          ((#definition == "Complete") \/ (#definition == "Incomplete")) *
@@ -383,7 +383,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
          JSInternals()
 
-    @post Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
+    @postx Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
           RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
 
@@ -407,7 +407,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
           scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
           JSInternals ()
 
-    @pre (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
+    @prex (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#definition == "Broken") *
@@ -416,7 +416,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          JSInternals()
 
-    @posterr
+    @posterrx
           Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
           RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
@@ -555,7 +555,7 @@ var SdkSuite = function (suiteId) { };
 /**
     @id deserializeMessageHeader
 
-    @pre (messageBuffer == #messageBuffer) *
+    @prex (messageBuffer == #messageBuffer) *
          Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#byteOffset + #byteLength <=# l-len #data) *
@@ -574,7 +574,7 @@ var SdkSuite = function (suiteId) { };
          scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
          JSInternals ()
 
-    @post Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
+    @postx Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
           Header(#definition,
                  #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
                         #part_two, #ECKs,
@@ -610,7 +610,7 @@ var SdkSuite = function (suiteId) { };
           scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
           JSInternals()
 
-    @pre (messageBuffer == #messageBuffer) *
+    @prex (messageBuffer == #messageBuffer) *
          Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#byteOffset + #byteLength <=# l-len #data) *
@@ -629,7 +629,7 @@ var SdkSuite = function (suiteId) { };
          scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
          JSInternals ()
 
-    @posterr
+    @posterrx
           Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
           Header(#definition,
                  #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,

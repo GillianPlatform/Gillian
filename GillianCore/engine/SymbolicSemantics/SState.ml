@@ -345,7 +345,7 @@ module Make (SMemory : SMemory.S) :
       ?(revisited_invariant = false)
       (prog : UP.prog)
       (slcmd : SLCmd.t)
-      (state : t) : t list =
+      (state : t) : (t list, string) result =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 
   let run_spec

@@ -122,7 +122,11 @@ module type S = sig
   val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
 
   val evaluate_slcmd :
-    ?revisited_invariant:bool -> UP.prog -> SLCmd.t -> t -> t list
+    ?revisited_invariant:bool ->
+    UP.prog ->
+    SLCmd.t ->
+    t ->
+    (t list, string) result
 
   val run_spec :
     UP.spec ->

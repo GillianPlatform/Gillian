@@ -179,7 +179,8 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LTHEN
 %token LELSE
 (* Procedure specification keywords *)
-%token ONLY
+%token AXIOMATIC
+%token INCOMPLETE
 %token SPEC
 %token BISPEC
 %token LEMMA
@@ -571,7 +572,7 @@ gcmd_target:
 
 g_only_spec_target:
 (* only <spec> *)
-  ONLY; spec = g_spec_target
+  AXIOMATIC; spec = g_spec_target
   {
     let new_sspecs = List.map (fun (sspec : Spec.st) -> { sspec with ss_to_verify = false }) spec.spec_sspecs in
     { spec with spec_sspecs = new_sspecs; spec_to_verify = false }
@@ -579,13 +580,14 @@ g_only_spec_target:
 ;
 
 g_spec_target:
-(* spec xpto (x, y) [[ assertion ]] [[ post1; ...; postn ]] NORMAL|ERROR *)
-  SPEC; spec_head = spec_head_target;
+(* (incomplete) spec xpto (x, y) [[ assertion ]] [[ post1; ...; postn ]] NORMAL|ERROR *)
+  incomplete = option(INCOMPLETE); SPEC; spec_head = spec_head_target;
   spec_sspecs = separated_nonempty_list(SCOLON, g_sspec_target)
   { let (spec_name, spec_params) = spec_head in
     let spec_normalised = !Config.previously_normalised in
     let spec_to_verify = true in
-    let spec : Spec.t = { spec_name; spec_params; spec_sspecs; spec_normalised; spec_to_verify } in
+    let spec_incomplete = (incomplete <> None) in
+    let spec : Spec.t = { spec_name; spec_params; spec_sspecs; spec_normalised; spec_incomplete; spec_to_verify } in
     spec
   }
 ;

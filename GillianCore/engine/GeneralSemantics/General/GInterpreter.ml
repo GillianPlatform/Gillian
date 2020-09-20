@@ -299,7 +299,10 @@ struct
             (State.assume_a state' [ Not fof ])
         in
         state @ state'
-    | SL sl_cmd -> State.evaluate_slcmd ~revisited_invariant prog sl_cmd state
+    | SL sl_cmd -> (
+        match State.evaluate_slcmd ~revisited_invariant prog sl_cmd state with
+        | Ok result -> result
+        | Error msg -> L.fail msg )
 
   and evaluate_lcmds (prog : UP.prog) (lcmds : LCmd.t list) (state : State.t) :
       State.t list =
@@ -434,7 +437,18 @@ struct
                      (fun (ret_state, fl) ->
                        process_ret true ret_state fl b_counter)
                      rest_rets
-            | _ -> [] )
+            (* Run spec returned no results *)
+            | _ -> (
+                match spec.spec.spec_incomplete with
+                | true  ->
+                    L.normal (fun fmt ->
+                        fmt "Proceeding with symbolic execution.");
+                    symb_exec_proc ()
+                | false ->
+                    L.fail
+                      (Format.asprintf
+                         "ERROR: Unable to use specification of function %s"
+                         spec.spec.spec_name) ) )
         | None      ->
             if Hashtbl.mem prog.prog.bi_specs pid then
               [ ConfSusp (pid, state, cs, prev, i, b_counter) ]

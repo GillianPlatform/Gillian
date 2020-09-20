@@ -42,12 +42,12 @@ nounfold pred ArrayBufferPrototype (proto) :
  **** Axiomatic specifications of the ArrayBuffer prototype functions ****
  *************************************************************************)
 
-only spec ABP_byteLength (xsc, vthis)
+axiomatic spec ABP_byteLength (xsc, vthis)
     [[ (vthis == #vthis) * ArrayBuffer(#vthis, #data) ]]
     [[ ArrayBuffer(#vthis, #data) * (ret == l-len #data) ]]
     normal
 
-only spec ABP_slice (xsc, vthis, start, end)
+axiomatic spec ABP_slice (xsc, vthis, start, end)
     [[ (vthis == #vthis) * ArrayBuffer(#vthis, #data) * (0 <=# start) * (end <=# (l-len #data)) ]]
     [[ ArrayBuffer(#vthis, #data) * ArrayBuffer(ret, #sub_array) * (#sub_array == l-sub (#data, start, end - start)) ]]
     normal
