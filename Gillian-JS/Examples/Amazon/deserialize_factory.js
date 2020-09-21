@@ -276,6 +276,7 @@ var toUtf8 = function (buffer) { };
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
+         scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
          JSInternals()
 
     @post Uint8Array(#eEC, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
@@ -285,6 +286,7 @@ var toUtf8 = function (buffer) { };
 
           scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
           scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
+          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
           JSInternals ()
 
     @pre (this == undefined) * (encodedEncryptionContext == #eEC) *
@@ -368,11 +370,18 @@ function decodeEncryptionContext(encodedEncryptionContext) {
         @tactic
         apply lemma ArrayOfArraysOfUInt8ArraysContentsFacts(#elements, #done, 0, #count);
         apply lemma ArrayOfArraysOfUInt8ArraysContentsFacts(#elements, #left, #count, #pairsCount - #count);
-        unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count)
+        unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count);
+        assert ((#elements, num_to_string #count) -> {{ "d", #element, true, true, true }}) [bind: #element];
+        assert ((#element, "length") -> {{ "d", #eLength, true, false, false }}) [bind: #eLength];
+        assert (ArrayOfUInt8ArraysContents(#element, #ECK, 0., #eLength)) [bind: #ECK];
+        apply lemma ArrayOfUInt8ArraysContentsFacts(#element, #ECK, 0., #eLength);
+        assert (#left == l+ ({{ #ECK }}, #rest_left)) [bind: #rest_left];
+        apply lemma CElementsElementLength(#EC, 2., ((256. * #b0) + #b1), 2., #ECKs, (l-len #rest), #done, #ECK, #rest_left);
+        assert (#ECK == {{ #new_key, #new_value }})
     */
-   var pre_stuff = 0;
+    var [key, value] = elements[count].map(toUtf8)
 
-  //   var [key, value] = elements[count].map(toUtf8)
+  //
   //   /* Postcondition: The number of keys in the encryptionContext must match the pairsCount.
   //     * If the same Key value is serialized...
   //     */
@@ -412,6 +421,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
+         scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
          JSInternals()
 
@@ -426,6 +436,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
             DataProp(ret, "readPos", #startPos + #EDKsLength) *
 
           scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
+          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
           scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
           JSInternals ();
 
@@ -436,6 +447,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
           (#definition == "Incomplete") * (ret == false) *
 
           scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
+          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
           scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
           JSInternals ()
 
@@ -604,6 +616,7 @@ var SdkSuite = function (suiteId) { };
          scope(deserializeEncryptedDataKeys : #DEDKObject) * JSFunctionObject(#DEDKObject, "deserializeEncryptedDataKeys", #ds_sc, #ds_len, #ds_proto) *
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
          scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
+         scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
          JSInternals ()
 
     @post Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
@@ -623,6 +636,7 @@ var SdkSuite = function (suiteId) { };
           scope(deserializeEncryptedDataKeys : #DEDKObject) * JSFunctionObject(#DEDKObject, "deserializeEncryptedDataKeys", #ds_sc, #ds_len, #ds_proto) *
           scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
           scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
+          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
           JSInternals();
 
           Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
@@ -659,6 +673,7 @@ var SdkSuite = function (suiteId) { };
          scope(deserializeEncryptedDataKeys : #DEDKObject) * JSFunctionObject(#DEDKObject, "deserializeEncryptedDataKeys", #ds_sc, #ds_len, #ds_proto) *
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
          scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
+         scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
          JSInternals ()
 
     @posterr
@@ -677,6 +692,7 @@ var SdkSuite = function (suiteId) { };
           scope(deserializeEncryptedDataKeys : #DEDKObject) * JSFunctionObject(#DEDKObject, "deserializeEncryptedDataKeys", #ds_sc, #ds_len, #ds_proto) *
           scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
           scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
+          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
           JSInternals()
 */
 function deserializeMessageHeader(messageBuffer) {

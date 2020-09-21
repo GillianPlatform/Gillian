@@ -52,6 +52,16 @@ pred ArrayOfUInt8Arrays (+a:Obj, contents:List, arrayLength:Num) :
     ArrayStructure(a, arrayLength) *
     ArrayOfUInt8ArraysContents(a, contents, 0, arrayLength);
 
+lemma ArrayOfUInt8ArraysContentsFacts(a, contents, start, contentsLength)
+[[
+    ArrayOfUInt8ArraysContents(#a, #contents, #start, #contentsLength)
+]]
+[[
+    ArrayOfUInt8ArraysContents(#a, #contents, #start, #contentsLength) *
+    (#contentsLength == l-len #contents)
+]]
+[* *]
+
 (* ----------------------------------------------------------------------------------- *)
 
 pred ArrayOfArraysOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num, +contentsLength:Num) :

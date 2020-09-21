@@ -20,7 +20,7 @@ module type S = sig
 
   val is_empty : t -> bool
 
-  val extend : t -> abs_t -> unit
+  val extend : ?pure:bool -> t -> abs_t -> unit
 
   val pop : t -> (abs_t -> bool) -> abs_t option
 
@@ -81,7 +81,11 @@ module Make
   let is_empty (preds : t) : bool = List.compare_length_with !preds 0 = 0
 
   (** Extends --preds-- with --pa-- *)
-  let extend (preds : t) (pa : abs_t) : unit = preds := pa :: !preds
+  let extend ?(pure = false) (preds : t) (pa : abs_t) : unit =
+    preds :=
+      match pure with
+      | true when List.mem pa !preds -> !preds
+      | _ -> pa :: !preds
 
   let pop preds f =
     let rec val_and_remove passed = function

@@ -20,7 +20,7 @@ module type S = sig
 
   val is_empty : t -> bool
 
-  val extend : t -> abs_t -> unit
+  val extend : ?pure:bool -> t -> abs_t -> unit
 
   val pop : t -> (abs_t -> bool) -> abs_t option
 

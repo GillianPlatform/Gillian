@@ -435,7 +435,7 @@ module Make
                 in
                 Pred.combine_ins_outs pred.pred vs vs_outs
             in
-            Preds.extend preds' (pname, arg_vs);
+            Preds.extend ~pure:pred.pure preds' (pname, arg_vs);
             Ok [ astate' ]
         | _ ->
             let msg =
@@ -903,8 +903,10 @@ module Make
     Preds.get_all ~maintain:(Option.value ~default:true keep) sel preds
 
   let set_pred (astate : t) (pred : abs_t) : unit =
-    let _, preds, _ = astate in
-    Preds.extend preds pred
+    let _, preds, preds_table = astate in
+    let pred_name, _ = pred in
+    let pure = (Hashtbl.find preds_table pred_name).pure in
+    Preds.extend ~pure preds pred
 
   let update_subst (astate : t) (subst : st) : unit =
     let state, _, _ = astate in
@@ -980,4 +982,8 @@ module Make
             (Some state) asrts
         in
         (ost, [])
+
+  let get_equal_values astate =
+    let state, _, _ = astate in
+    State.get_equal_values state
 end

@@ -167,4 +167,6 @@ module type S = sig
   val get_fixes : ?simple_fix:bool -> t -> err_t list -> fix_t list list
 
   val apply_fixes : t -> fix_t list -> t option * Asrt.t list
+
+  val get_equal_values : t -> vt list -> vt list
 end

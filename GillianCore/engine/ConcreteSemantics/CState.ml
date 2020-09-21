@@ -258,4 +258,6 @@ module Make
 
   let apply_fixes (state : t) (fixes : fix_t list) : t option * Asrt.t list =
     raise (Failure "Concrete: apply_fixes not implemented in CState.Make")
+
+  let get_equal_values _ vs = vs
 end

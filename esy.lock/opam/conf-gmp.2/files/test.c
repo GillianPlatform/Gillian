@@ -4,5 +4,7 @@
 #endif
 
 void test(void) {
-	__gmp_init();
+  mpz_t n;
+  mpz_init(n);
+  mpz_clear(n);
 }

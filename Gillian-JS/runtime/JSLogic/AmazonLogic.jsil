@@ -458,28 +458,39 @@ lemma ElementsFacts(buffer, readPos, eCount, fCount, eList, esLength)
 *]
 
 (* An entire complete element sequence can be prepended to a general element sequence *)
-lemma PrependCElementsE(definition, buffer, readPos, eC1, fC, fL1, eL1, eC2, fL2, eL2)
+lemma PrependCElementsE(definition, buffer, readPos, eCount1, fCount, fList1, esLength1, eCount2, fList2, esLength2)
 [[
-    CElements(#buffer, #readPos, #eC1, #fC, #fL1, #eL1) *
-    Elements(#definition, #buffer, #readPos + #eL1, #eC2, #fC, #fL2, #eL2)
+    CElements(#buffer, #readPos, #eCount1, #fCount, #fList1, #esLength1) *
+    Elements(#definition, #buffer, #readPos + #esLength1, #eCount2, #fCount, #fList2, #esLength2)
 ]]
 [[
-    Elements(#definition, #buffer, #readPos, #eC1 + #eC2, #fC, l+ (#fL1, #fL2), #eL1 + #eL2)
+    Elements(#definition, #buffer, #readPos, #eCount1 + #eCount2, #fCount, l+ (#fList1, #fList2), #esLength1 + #esLength2)
 ]]
 [*
-    sep_apply ElementsFacts(#buffer, #readPos + #eL1, #eC2, #fC, #fL2, #eL2);
-    unfold CElements(#buffer, #readPos, #eC1, #fC, #fL1, #eL1);
-    if (0 < #eC1) then {
-        sep_assert (CElement(#buffer, #readPos, #fC, #fList, #eLength)) [bind: #fList, #eLength];
-        sep_assert (CElements(#buffer, #readPos + #eLength, #eC1 - 1, #fC, #restElements, #restESLength)) [bind: #restElements, #restESLength];
-        sep_apply CElementFacts(#buffer, #readPos, #fC, #fList, #eLength);
-        sep_apply CElementsFacts(#buffer, #readPos + #eLength, #eC1 - 1, #fC, #restElements, #restESLength);
-        sep_apply PrependCElementsE(#definition, #buffer, #readPos + #eLength, #eC1 - 1, #fC, #restElements, #restESLength, #eC2, #fL2, #eL2);
+    sep_apply ElementsFacts(#buffer, #readPos + #esLength1, #eCount2, #fCount, #fList2, #esLength2);
+    unfold CElements(#buffer, #readPos, #eCount1, #fCount, #fList1, #esLength1);
+    if (0 < #eCount1) then {
+        sep_assert (CElement(#buffer, #readPos, #fCount, #fList, #eLength)) [bind: #fList, #eLength];
+        sep_assert (CElements(#buffer, #readPos + #eLength, #eCount1 - 1, #fCount, #restElements, #restESLength)) [bind: #restElements, #restESLength];
+        sep_apply CElementFacts(#buffer, #readPos, #fCount, #fList, #eLength);
+        sep_apply CElementsFacts(#buffer, #readPos + #eLength, #eCount1 - 1, #fCount, #restElements, #restESLength);
+        sep_apply PrependCElementsE(#definition, #buffer, #readPos + #eLength, #eCount1 - 1, #fCount, #restElements, #restESLength, #eCount2, #fList2, #esLength2);
         if (#definition = "Complete") then {
-            sep_apply CElementsFacts(#buffer, #readPos + #eLength, #eC1 + #eC2 - 1, #fC, l+ (#restElements, #fL2), #restESLength + #eL2)
+            sep_apply CElementsFacts(#buffer, #readPos + #eLength, #eCount1 + #eCount2 - 1, #fCount, l+ (#restElements, #fList2), #restESLength + #esLength2)
         }
     }
 *]
+
+lemma CElementsElementLength(buffer, readPos, eCount, fCount, fList, esLength, prefix, element, suffix)
+[[
+    CElements(#buffer, #readPos, #eCount, #fCount, #fList, #eList) *
+    (#fList == l+ (#prefix, {{ #element }}, #suffix))
+]]
+[[
+    CElements(#buffer, #readPos, #eCount, #fCount, #fList, #eList) *
+    (l-len #element == #fCount)
+]]
+(* FIXME: PROOF *)
 
 (******************************
  ******************************
@@ -1086,7 +1097,6 @@ nounfold pred HeaderInfo(+headerInfo, version, type, suiteId, messageId, EDKs, c
  *****************************
  *****************************)
 
-(* An entire complete element sequence can be prepended to a general element sequence *)
 lemma IntegerLtPlusOneLe(a, b)
 [[
     (#a <# #b)
@@ -1138,6 +1148,141 @@ proc i__toLength (v) {
           return;
 
 	elab: throw
+};
+
+(* *** Is a string an array index *** *)
+proc a__isIdx (s) {
+			ret := "i__toUint32" (s) with elab;
+			ret := "i__toString" (ret) with elab;
+
+			goto [ret = s] check ret_f;
+
+	check:	ret := not (ret = "4294967295");
+			goto rlab;
+
+	ret_f:	ret := false;
+
+	rlab: return;
+	elab: throw
+};
+
+(* *** Array defineOwnProperty *** *)
+proc a__defineOwnProperty (l, prop, desc, thrw) {
+
+			oldLenDesc := "getOwnProperty" (l, "length");
+			oldLen := l-nth (oldLenDesc, 1);
+			ret := "i__toUint32" (oldLen) with elab;
+			oldLenNum := ret;
+
+			goto [prop = "length"] getall is_idx;
+
+	is_idx:	idxp := "a__isIdx" (prop);
+			goto [idxp] idx norm;
+
+	idx:	index := "i__toUint32" (prop);
+			index := index;
+			oldLen := oldLen;
+			ret := l-nth (oldLenDesc, 2);
+			goto [(not (index < oldLenNum)) and (not (l-nth (oldLenDesc, 2)))] reject idop;
+	idop:	ret := "o__defineOwnProperty" (l, prop, desc, false) with elab;
+			goto [ret = false] reject ilen;
+	ilen:	goto [not (index < oldLenNum)] setl rlab;
+	setl:	ret := "o__defineOwnProperty" (l, "length", {{ "d", (index + 1), l-nth (oldLenDesc, 2), l-nth (oldLenDesc, 3), l-nth (oldLenDesc, 4) }}, false);
+			goto rlab;
+
+	norm:	ret := "o__defineOwnProperty" (l, prop, desc, thrw) with elab;
+			goto rlab;
+
+	getall:	goto [l-nth (desc, 0) = "d"] ddd odd;
+
+			(* Data *)
+	ddd:	de := l-nth (desc, 3);
+			dc := l-nth (desc, 4);
+			dv := l-nth (desc, 1);
+			dw := l-nth (desc, 2);
+			dg := empty;
+			ds := empty;
+			goto sla;
+
+	odd:	goto [l-nth (desc, 0) = "a"] add gdd;
+
+			(* Accessor *)
+	add:	de := l-nth (desc, 3);
+			dc := l-nth (desc, 4);
+			dv := empty;
+			dw := empty;
+			dg := l-nth (desc, 1);
+			ds := l-nth (desc, 2);
+			goto sla;
+
+			(* Generic *)
+	gdd:	de := l-nth (desc, 1);
+			dc := l-nth (desc, 2);
+			dv := l-nth (desc, 3);
+			dw := l-nth (desc, 4);
+			dg := l-nth (desc, 5);
+			ds := l-nth (desc, 6);
+
+	sla:	goto [dv = empty] slai slb;
+
+	slai:	ret := "o__defineOwnProperty" (l, "length", desc, thrw) with elab;
+			goto rlab;
+
+	slb:	ret := "i__toUint32" (dv) with elab;
+			newLen := ret;
+			ret := "i__toNumber" (dv) with elab;
+			goto [not (newLen = ret)] rgerr sle;
+
+	sle:	dv := newLen;
+			goto [not (newLen < oldLenNum)] slfi slg;
+
+	slfi:	ret := "o__defineOwnProperty" (l, "length", {{ "g", de, dc, dv, dw, dg, ds }}, thrw) with elab;
+			goto rlab;
+
+	slg:	goto [l-nth (oldLenDesc, 2) = false] reject slh;
+
+	slh:	goto [dw = false] sli slh1;
+
+	slh1:	newWritable := true;
+			goto slj;
+
+	sli:	newWritable := false;
+			dw := true;
+
+	slj:	ret := "o__defineOwnProperty" (l, "length", {{ "g", de, dc, dv, dw, dg, ds }}, thrw) with elab;
+			goto [ret = false] tf loop;
+
+	loop:	goto [newLen < oldLen] head slm;
+	head:	oldLen := oldLen - 1;
+			ret := "i__toString" (oldLen) with elab;
+			ret := "deleteProperty" (l, ret, false) with elab;
+			goto [ret = false] fix next;
+
+	fix:	dv := oldLen + 1;
+			goto [newWritable = false] setwr defl;
+	setwr:	dw := false;
+	defl:	ret := "o__defineOwnProperty" (l, "length", {{ "g", de, dc, dv, dw, dg, ds }}, thrw) with elab;
+			goto reject;
+
+	next:	goto loop;
+
+	slm:	goto [newWritable = false] slmi sln;
+
+	slmi:	ret := "o__defineOwnProperty" (l, "length", {{ "g", empty, empty, empty, false, empty, empty }}, false) with elab;
+
+	sln:	ret := true;
+	rlab: return;
+
+	rgerr:	ret := "RangeError" ();
+			goto elab;
+
+	reject:	goto [thrw] tt tf;
+
+	tt:		ret := "TypeError" ();
+	elab: throw;
+
+	tf:		ret := false;
+			goto rlab
 };
 
 (* *** Array constructor *** *)

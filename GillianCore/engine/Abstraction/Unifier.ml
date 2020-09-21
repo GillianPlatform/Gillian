@@ -170,6 +170,11 @@ module Make
       print_local_info 1 name args;
       let pred_def = get_pred_def name in
       let in_args = Pred.in_args pred_def args in
+      L.verbose (fun fmt ->
+          fmt "Original values: %a" Fmt.(brackets (list ~sep:comma Val.pp)) vs);
+      let vs = State.get_equal_values state vs in
+      L.verbose (fun fmt ->
+          fmt "Extended values: %a" Fmt.(brackets (list ~sep:comma Val.pp)) vs);
       let vs_inter = List_utils.list_inter vs in_args in
       let es_inter =
         List.fold_left
@@ -296,7 +301,8 @@ module Make
         if failure then None
         else
           let vs = List.map Option.get vs in
-          Preds.extend preds (pname, vs);
+          let pure = (Hashtbl.find pred_defs pname).pure in
+          Preds.extend ~pure preds (pname, vs);
           Some (state, preds, pred_defs)
     | Pure (Eq (PVar x, le)) | Pure (Eq (le, PVar x)) ->
         if ESubst.mem subst (PVar x) then
@@ -1077,7 +1083,7 @@ module Make
               )
           | GPSucc _ ->
               raise (Failure "DEATH. BRANCHING GETPRED INSIDE UNIFICATION.")
-          | GPFail errs -> make_resource_fail () )
+          | GPFail errs -> UFail errs )
     (* Conjunction should not be here *)
     | Pure (Formula.And (f1, f2)) ->
         raise (Failure "Unify assertion: And: should have been reduced")
@@ -1189,10 +1195,16 @@ module Make
             Option.fold
               ~some:(unify_assertion state subst)
               ~none:(USucc state) cur_step
-          with _ ->
+          with _ -> (
             L.verbose (fun fmt ->
                 fmt "WARNING: UNCAUGHT EXCEPTION IN UNIFY-ASSERTION.");
-            UFail []
+            let a = fst (Option.get cur_step) in
+            match a with
+            | Pure pf ->
+                let bstate, _, _ = state in
+                let vs = State.unfolding_vals bstate [ pf ] in
+                UFail [ EAsrt (vs, Not pf, [ [ Pure pf ] ]) ]
+            | _       -> UFail [] )
         in
         match ret with
         | UWTF         ->

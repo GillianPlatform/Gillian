@@ -655,4 +655,8 @@ module Make (SMemory : SMemory.S) :
 
     let heap', new_vars = apply_fixes_rec heap SS.empty fixes in
     (Some (heap, store, pfs, gamma, SS.union svars new_vars), !gas)
+
+  let get_equal_values state les =
+    let _, _, pfs, gamma, _ = state in
+    les @ List.concat_map (Reduction.get_equal_expressions pfs) les
 end

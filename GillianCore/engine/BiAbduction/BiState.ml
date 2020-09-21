@@ -676,4 +676,8 @@ struct
         let rets = List_utils.get_list_somes rets in
         merge_action_results rets
     | State.AFail errs -> AFail errs
+
+  let get_equal_values bi_state =
+    let _, state, _ = bi_state in
+    State.get_equal_values state
 end

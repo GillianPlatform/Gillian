@@ -63,7 +63,7 @@
     "@opam/yojson": "^1.7.0",
     "@opam/z3": "giltho/esy-z3#b0fdd9a",
     "@reason-native/rely": "^3.1.0",
-    "JS_Parser": "GillianPlatform/JS_Parser#8924ffcff23c9b263ec0d255415d3f6d14e8129d",
+    "JS_Parser": "GillianPlatform/JS_Parser#ba9b695f41bdb0ef83c47ead362f6428a0ea5857",
     "compcert": "giltho/CompCert#6bdcc61",
     "ocaml": "^4.10.0"
   },
