@@ -4,6 +4,8 @@ open Gillian.Symbolic
 module Pc : sig
   type t
 
+  val init : unit -> t
+
   val empty : t
 
   val make :
@@ -120,4 +122,28 @@ module SatResults : sig
 
     val ( let++ ) : ('a, 'c) t -> ('a -> 'b) -> ('b, 'c) t
   end
+end
+
+module Branch : sig
+  type 'a t
+
+  val pp : 'a Fmt.t -> 'a t Fmt.t
+
+  val value : 'a t -> 'a
+
+  val learned : 'a t -> Formula.Set.t
+end
+
+module Delayed : sig
+  type 'a t
+
+  val return : 'a -> 'a t
+
+  val branch_on :
+    Formula.t ->
+    then_branch:(unit -> 'a t) ->
+    else_branch:(unit -> 'a t) ->
+    'a t
+
+  val resolve : curr_pc:Pc.t -> 'a t -> 'a Branch.t list
 end

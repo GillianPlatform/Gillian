@@ -17,6 +17,9 @@ type t = {
   learned : Formula.Set.t;
 }
 
+let copy { id; pfs; gamma; learned } =
+  { id; pfs = PureContext.copy pfs; gamma = TypEnv.copy gamma; learned }
+
 let check_inconsistency { id = ida; _ } { id = idb; _ } =
   if not (Int.equal ida idb) then
     failwith "Inconsisten use of Action Path Conditions"
@@ -24,7 +27,9 @@ let check_inconsistency { id = ida; _ } { id = idb; _ } =
 let make ~pfs ~gamma ?(learned = []) () =
   { id = id_gen (); pfs; gamma; learned = Formula.Set.of_list learned }
 
-let empty = make ~pfs:(PureContext.init ()) ~gamma:(TypEnv.init ()) ()
+let init () = make ~pfs:(PureContext.init ()) ~gamma:(TypEnv.init ()) ()
+
+let empty = init ()
 
 let merge pca pcb =
   let { id; pfs; gamma; learned } = pca in

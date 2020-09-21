@@ -4,6 +4,7 @@ let test_suites : unit Alcotest.test list =
     ("Gillian-C.SHeapTree.with-logic", SHeapTree.With_logic.tests);
     ("Gillian-C.Results", Results.tests);
     ("Gillian-C.SatResults", SatResults.tests);
+    ("Gillian-C.Delayed", Delayed.tests);
   ]
 
 let () = Alcotest.run "Gillian-C" test_suites
