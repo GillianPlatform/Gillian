@@ -987,7 +987,7 @@ let rec reduce_lexpr_loop
                   (get_nth_of_list pfs fle n)
             | false ->
                 let err_msg =
-                  Fmt.str "LstNth(%a, %a): list is not a GIL list." Expr.pp le
+                  Fmt.str "LstNth(%a, %a): list is not a GIL list." Expr.pp fle
                     Expr.pp idx
                 in
                 L.normal (fun fmt -> fmt "%s" err_msg);
@@ -1001,7 +1001,7 @@ let rec reduce_lexpr_loop
                   (get_nth_of_list pfs fle (int_of_float n))
             | false ->
                 let err_msg =
-                  Fmt.str "LstNth(%a, %a): list is not a GIL list." Expr.pp le
+                  Fmt.str "LstNth(%a, %a): list is not a GIL list." Expr.pp fle
                     Expr.pp idx
                 in
                 L.normal (fun fmt -> fmt "%s" err_msg);
@@ -1098,6 +1098,8 @@ let rec reduce_lexpr_loop
         | []    -> ESet []
         | [ x ] -> x
         | _     -> NOp (SetUnion, fles) )
+    | NOp (LstCat, fst :: rest) when PFS.mem pfs (Eq (fst, EList [])) ->
+        f (NOp (LstCat, rest))
     | NOp (LstCat, les) -> normalise_cat f les
     | NOp (SetInter, [ BinOp (le1, SetDiff, le2); ESet le3 ]) ->
         f (NOp (SetInter, [ le2; BinOp (ESet le3, SetDiff, le1) ]))
@@ -1374,6 +1376,34 @@ let rec reduce_lexpr_loop
         | NOp (LstCat, [ x ]), fle2, fle3 -> f (LstSub (x, fle2, fle3))
         | NOp (LstCat, flx :: _), Lit (Num 0.), UnOp (LstLen, fle1)
           when flx = fle1 -> fle1
+        | NOp (LstCat, flx :: _), Lit (Num 0.), Lit (Num n)
+          when let eqs = get_equal_expressions pfs flx in
+               List.exists
+                 (fun e ->
+                   match e with
+                   | Expr.EList les -> List.length les >= int_of_float n
+                   | Lit (LList les) -> List.length les >= int_of_float n
+                   | NOp (LstCat, EList les :: _) ->
+                       List.length les >= int_of_float n
+                   | NOp (LstCat, Lit (LList les) :: _) ->
+                       List.length les >= int_of_float n
+                   | _ -> false)
+                 eqs ->
+            let eqs = get_equal_expressions pfs flx in
+            let e =
+              List.find
+                (fun e ->
+                  match e with
+                  | Expr.EList les -> List.length les >= int_of_float n
+                  | Lit (LList les) -> List.length les >= int_of_float n
+                  | NOp (LstCat, EList les :: _) ->
+                      List.length les >= int_of_float n
+                  | NOp (LstCat, Lit (LList les) :: _) ->
+                      List.length les >= int_of_float n
+                  | _ -> false)
+                eqs
+            in
+            f (LstSub (e, Lit (Num 0.), Lit (Num n)))
         | fle1, UnOp (LstLen, lx), fle3 when fst (list_prefix pfs lx fle1) ->
             let _, suffix = list_prefix pfs lx fle1 in
             f (LstSub (suffix, Lit (Num 0.), fle3))
@@ -1484,7 +1514,7 @@ let rec reduce_lexpr_loop
                 fmt "LSUB: Start inside first result: %a" Expr.pp result);
             result
         | NOp (LstCat, lel :: ler), Lit (Num 0.), fle3
-          when (* Sub starts after first cat *)
+          when (* Sub ends after first cat *)
                let lel_len = Expr.UnOp (LstLen, lel) in
                let diff = f (BinOp (fle3, FMinus, lel_len)) in
                check_ge_zero ~top_level:true pfs diff = Some true ->
@@ -2089,6 +2119,14 @@ let rec reduce_formula_loop
               (List.hd eqs) (List.tl eqs)
           in
           f conj
+    | Eq (NOp (LstCat, les), LVar x)
+      when List.mem (Expr.LVar x) les
+           && List.exists
+                (fun e ->
+                  match e with
+                  | Expr.EList (_ :: _) | Lit (LList (_ :: _)) -> true
+                  | _ -> false)
+                les -> False
     | And (a1, a2) -> (
         let fa1 = f a1 in
         let fa2 = f a2 in

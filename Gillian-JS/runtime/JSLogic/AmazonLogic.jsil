@@ -1105,6 +1105,138 @@ lemma IntegerLtPlusOneLe(a, b)
     (#a + 1 <=# #b)
 ]]
 
+(*************************************
+ *************************************
+ *******                       *******
+ *******   Objects-as-Tables   *******
+ *******                       *******
+ *************************************
+ *************************************)
+
+(* First projection *)
+pure pred FirstProj(+lst:List, fProj:List) :
+    (lst == {{ }}) * (fProj == {{ }}),
+
+    (lst == {{ #fst, _ }} :: #rest) *
+    FirstProj(#rest, #fProjRest) *
+    (fProj == #fst :: #fProjRest);
+
+lemma FirstProjAppendPair(lst, fProj, prop, value)
+[[
+    FirstProj(#lst, #fProj)
+]]
+[[
+    FirstProj(l+ (#lst, {{ {{ #prop, #value }} }}), l+ (#fProj, {{ #prop }}))
+]]
+[*
+    unfold FirstProj(#lst, #fProj);
+    if (not (#lst = {{ }})) then {
+        sep_assert (#lst == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
+        sep_assert (FirstProj(#restPVPairs, #restProj)) [bind: #restProj];
+        sep_apply FirstProjAppendPair(#restPVPairs, #restProj, #prop, #value)
+    }
+*]
+
+pure pred ListToSet(+lst:List, set:Set) :
+    (lst == {{ }}) * (set == -{ }-),
+
+    (lst == #e :: #restLst) *
+    ListToSet(#restLst, #restSet) *
+    (set == -u- (-{ #e }-, #restSet));
+
+lemma ListToSetAddProp(lst, set, prop)
+[[
+    ListToSet(#lst, #set)
+]]
+[[
+    ListToSet(l+ (#lst, {{ #prop }}), -u- (#set, -{ #prop }-))
+]]
+[*
+    unfold ListToSet(#lst, #prop);
+    if (not (#lst = {{ }})) then {
+        sep_assert (#lst == l+ ({{ #fProp }}, #restLst)) [bind: #fProp, #restLst];
+        sep_assert (ListToSet(#restLst, #restSet)) [bind: #restSet];
+        sep_apply ListToSetAddProp(#restLst, #restSet, #prop)
+    }
+*]
+
+(* Object properties as a table *)
+pred ObjectTableStructure(+l:Obj, +pvPairs:List) :
+    (* Base case - no properties left *)
+    (pvPairs == {{ }}),
+
+    (* Recursive case - one property and the rest *)
+    (pvPairs == {{ #prop, #value }} :: #restPVPairs) *
+    DataProp(l, #prop, #value) *
+    ObjectTableStructure(l, #restPVPairs);
+
+(* Complete Object-as-Table predicate, with empty fields *)
+nounfold pred ObjectTable(+l:Obj, +pvPairs:List) :
+    ObjectTableStructure(l, pvPairs) *
+    FirstProj(pvPairs, #pList) *
+    ListToSet(#pList, #pSet) *
+    empty_fields(l : #pSet);
+
+(* Object-as-Table absent property *)
+lemma ObjectTableAbsentProperty(l, pvPairs, prop)
+[[
+    ObjectTableStructure(#l, #pvPairs) *
+    FirstProj(#pvPairs, #pList) *
+    ListToSet(#pList, #pSet) *
+    empty_fields(l : #pSet) *
+    (! (#prop --e-- #pSet))
+]]
+[[
+    ObjectTableStructure(#l, #pvPairs) *
+    ((#l, #prop) -> none) *
+    empty_fields(#l : -u- (#pSet, -{ #prop }-))
+]]
+[*  *]
+
+
+(* Appending property to Object-as-Table structure from the right *)
+lemma ObjectTableStructureAppendPVPair(l, pvPairs, prop, value)
+[[
+    ObjectTableStructure(#l, #pvPairs) *
+    FirstProj(#pvPairs, #pList) *
+    ListToSet(#pList, #pSet) *
+    (! (#prop --e-- #pSet)) *
+    DataProp(#l, #prop, #value)
+]]
+[[
+    ObjectTableStructure(#l, l+ (#pvPairs, {{ {{ #prop, #value }} }}))
+]]
+[*
+    unfold ObjectTableStructure(#l, #pvPairs);
+    if (not (#pvPairs = {{ }})) then {
+        sep_assert (#pvPairs == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
+        sep_assert (ObjectTableStructure(#l, #restPVPairs));
+        unfold FirstProj(#pvPairs, #pList);
+        unfold ListToSet(#pList, #pSet);
+        sep_apply ObjectTableStructureAppendPVPair(#l, #restPVPairs, #prop, #value);
+        sep_assert(True)
+    }
+ *]
+
+(* Appending property to Object-as-Table from the right *)
+lemma ObjectTableAppendPVPair(l, pvPairs, prop, value)
+[[
+    ObjectTableStructure(#l, #pvPairs) *
+    FirstProj(#pvPairs, #pList) *
+    ListToSet(#pList, #pSet) *
+    (! (#prop --e-- #pSet)) *
+    DataProp(#l, #prop, #value) *
+    empty_fields(l : -u- (#pSet, -{ #prop }-))
+]]
+[[
+    ObjectTable(#l, l+ (#pvPairs, {{ {{ #prop, #value }} }}))
+]]
+[*
+    sep_apply ObjectTableStructureAppendPVPair(#l, #pvPairs, #prop, #value);
+    sep_apply FirstProjAppendPair(#pvPairs, #pList, #prop, #value);
+    sep_apply ListToSetAddProp(#pList, #pSet, #prop)
+ *]
+
 (******************************
  ******************************
  *******                *******
