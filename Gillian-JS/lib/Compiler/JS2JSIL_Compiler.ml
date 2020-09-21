@@ -5940,16 +5940,20 @@ and translate_statement tr_ctx e =
 
       let cmds4 = add_initial_label cmds4 body metadata in
 
+      (* Place invariant exactly where it's supposed to be *)
+      let head_cmds =
+        match invariant with
+        | Some (a, binders) ->
+            [
+              (Some head, LabCmd.LLogic (LCmd.SL (Invariant (a, binders))));
+              (None, cmd_ass_ret_1);
+            ]
+        | None              -> [ (Some head, cmd_ass_ret_1) ]
+      in
+
       let cmds =
         cmds1
-        @ annotate_cmds
-            [
-              (*              cmds1                                        *)
-              (None, cmd_ass_ret_0);
-              (*              x_ret_0 := empty                           *)
-              (Some head, cmd_ass_ret_1);
-              (* head:        x_ret_1 := PHI(x_ret_0, x_ret_3)             *)
-            ]
+        @ annotate_cmds ((None, cmd_ass_ret_0) :: head_cmds)
         @ cmds2
         @ annotate_cmds
             [
@@ -5988,7 +5992,7 @@ and translate_statement tr_ctx e =
       let errs =
         errs1 @ errs2 @ errs_x2_v @ [ x2_b ] @ errs4 @ errs_x4_v @ errs3
       in
-      let cmds = annotate_first_cmd cmds in
+      let cmds = prefix_lcmds lcmds None cmds in
       (cmds, PVar x_ret_5, errs, rets4, outer_breaks, outer_conts)
   | JS_Parser.Syntax.Return e -> (
       (*

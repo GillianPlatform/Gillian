@@ -35,7 +35,7 @@ pred FrozenArrayStructure(a:Obj, arrayLength:Num) :
  *******************************)
 
 pred ArrayOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num, +contentsLength:Num) :
-    (contents == {{ }}) * (contentsLength == 0),
+    (contentsLength == 0) * (contents == {{ }}),
 
     (contentsLength == l-len contents) *
     (#index == num_to_string start) *
@@ -54,19 +54,42 @@ pred ArrayOfUInt8Arrays (+a:Obj, contents:List, arrayLength:Num) :
 
 (* ----------------------------------------------------------------------------------- *)
 
-pred ArrayOfArraysOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num) :
-    (contents == {{ }}) * (contentsLength == 0),
+pred ArrayOfArraysOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num, +contentsLength:Num) :
+    (contentsLength == 0) * (contents == {{ }}),
 
+    (contentsLength == l-len contents) *
     (#index == num_to_string start) *
     (contents == #elementContents :: #rest) *
+    (#rest_length == contentsLength - 1) *
     DataProp(a, #index, #aui8a) *
     ArrayOfUInt8Arrays (#aui8a, #elementContents, _) *
     (#rest_start == start + 1) *
-    ArrayOfArraysOfUInt8ArraysContents(a, #rest, #rest_start);
+    ArrayOfArraysOfUInt8ArraysContents(a, #rest, #rest_start, #rest_length);
 
 pred ArrayOfArraysOfUInt8Arrays (+a:Obj, contents:List) :
     ArrayStructure(a, l-len contents) *
-    ArrayOfArraysOfUInt8ArraysContents(a, contents, 0);
+    ArrayOfArraysOfUInt8ArraysContents(a, contents, 0, l-len contents);
+
+lemma ArrayOfArraysOfUInt8ArraysContentsFacts(a, contents, start, contentsLength)
+[[
+    ArrayOfArraysOfUInt8ArraysContents(#a, #contents, #start, #contentsLength)
+]]
+[[
+    ArrayOfArraysOfUInt8ArraysContents(#a, #contents, #start, #contentsLength) *
+    (#contentsLength == l-len #contents)
+]]
+[* *]
+
+lemma ArrayOfArraysOfUInt8ArraysContentsAppend(a, contents, start, contentsLength)
+[[
+    ArrayOfArraysOfUInt8ArraysContents(#a, #contents, #start, #contentsLength) *
+    DataProp(#a, num_to_string (#start + #contentsLength), #aui8a) *
+    ArrayOfUInt8Arrays (#aui8a, #elementContents, #elementLength)
+]]
+[[
+    ArrayOfArraysOfUInt8ArraysContents(#a, l+ (#contents, {{ #elementContents }}), #start, #contentsLength + 1)
+]]
+
 
 (**************************
  **** Array Prototype  ****

@@ -347,7 +347,31 @@ function decodeEncryptionContext(encodedEncryptionContext) {
     'decodeEncryptionContext: Overflow, too much data.'
   )
 
-  // for (var count = 0; count < pairsCount; count++) {
+  /*
+    @tactic
+        assert ((#EC == l+ ({{ #b0, #b1 }}, #rest)) * Elements("Complete", #EC, 2, ((256 * #b0) + #b1), 2, #ECKs, l-len #rest)) [bind: #b0, #b1, #rest];
+        unfold Elements("Complete", #EC, 2, ((256 * #b0) + #b1), 2, #ECKs, l-len #rest);
+        apply lemma CElementsFacts(#EC, 2, ((256 * #b0) + #b1), 2, #ECKs, l-len #rest);
+        assert (
+            scope(pairsCount: #pairsCount) * (#pairsCount == l-len #ECKs) *
+            scope(elements: #elements) * ArrayOfArraysOfUInt8Arrays(#elements, #ECKs) *
+            scope(encryptionContext: #dECObj) * JSObjWithProto(#dECObj, null) * empty_fields(#dECObj : -{ }-)
+        ) [bind: #pairsCount, #elements, #dECObj]
+
+    @invariant
+        scope(count: #count) * (#count <=# #pairsCount) *
+        ArrayOfArraysOfUInt8ArraysContents(#elements, #done, 0, #count) *
+        ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count) *
+        (#ECKs == l+ (#done, #left)) [bind: #count, #done, #left] */
+  for (var count = 0; count < pairsCount; count++) {
+    /*
+        @tactic
+        apply lemma ArrayOfArraysOfUInt8ArraysContentsFacts(#elements, #done, 0, #count);
+        apply lemma ArrayOfArraysOfUInt8ArraysContentsFacts(#elements, #left, #count, #pairsCount - #count);
+        unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count)
+    */
+   var pre_stuff = 0;
+
   //   var [key, value] = elements[count].map(toUtf8)
   //   /* Postcondition: The number of keys in the encryptionContext must match the pairsCount.
   //     * If the same Key value is serialized...
@@ -357,7 +381,15 @@ function decodeEncryptionContext(encodedEncryptionContext) {
   //     'Duplicate encryption context key value.'
   //   )
   //   encryptionContext[key] = value
-  // }
+
+    /*
+        @tactic
+        apply lemma ArrayOfArraysOfUInt8ArraysContentsAppend(#elements, #done, 0, #count);
+        apply lemma IntegerLtPlusOneLe(#count, #pairsCount)
+    */
+    var post_stuff = 0;
+  }
+  /* @tactic assert (scope(count : (l-len #ECKs))) */
   // Object.freeze(encryptionContext)
   return encryptionContext
 }
@@ -370,10 +402,10 @@ function decodeEncryptionContext(encodedEncryptionContext) {
  ************************************************
  ************************************************/
 
-/*
+/**
     @id deserializeEncryptedDataKeys
 
-    @prex (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
+    @pre (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          ((#definition == "Complete") \/ (#definition == "Incomplete")) *
@@ -383,7 +415,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
          JSInternals()
 
-    @postx Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
+    @post Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
           RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
 
@@ -407,7 +439,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
           scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
           JSInternals ()
 
-    @prex (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
+    @pre (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#definition == "Broken") *
@@ -416,7 +448,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          JSInternals()
 
-    @posterrx
+    @posterr
           Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
           RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
@@ -555,7 +587,7 @@ var SdkSuite = function (suiteId) { };
 /**
     @id deserializeMessageHeader
 
-    @prex (messageBuffer == #messageBuffer) *
+    @pre (messageBuffer == #messageBuffer) *
          Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#byteOffset + #byteLength <=# l-len #data) *
@@ -574,7 +606,7 @@ var SdkSuite = function (suiteId) { };
          scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
          JSInternals ()
 
-    @postx Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
+    @post Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
           Header(#definition,
                  #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
                         #part_two, #ECKs,
@@ -610,7 +642,7 @@ var SdkSuite = function (suiteId) { };
           scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
           JSInternals()
 
-    @prex (messageBuffer == #messageBuffer) *
+    @pre (messageBuffer == #messageBuffer) *
          Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#byteOffset + #byteLength <=# l-len #data) *
@@ -629,7 +661,7 @@ var SdkSuite = function (suiteId) { };
          scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
          JSInternals ()
 
-    @posterrx
+    @posterr
           Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
           Header(#definition,
                  #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,

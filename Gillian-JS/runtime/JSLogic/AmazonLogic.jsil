@@ -182,7 +182,7 @@ lemma CElementsFacts(buffer, readPos, eCount, fCount, eList, esLength)
 [[
     CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength) *
     (0 <=# #readPos) * (0 <=# #eCount) * (0 <# #fCount) * (0 <=# #esLength) *
-    (#readPos + #esLength <=# l-len #buffer)
+    (#readPos + #esLength <=# l-len #buffer) * (#eCount == l-len #eList)
 ]]
 [*
     unfold CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength);
@@ -501,7 +501,7 @@ lemma PrependCElementsE(definition, buffer, readPos, eC1, fC, fL1, eL1, eC2, fL2
 
 (* Complete serialised encryption context *)
 nounfold pred CRawEncryptionContext(+buffer:List, ECKs:List) :
-    (l-len buffer == 2) * (ECKs == {{ }}) * rawToUInt16(buffer, false, 0),
+    (l-len buffer == 0) * (ECKs == {{ }}),
 
     (2 <# l-len buffer) *
     (#rawKC == l-sub (buffer, 0, 2)) *
@@ -1076,6 +1076,24 @@ nounfold pred HeaderInfo(+headerInfo, version, type, suiteId, messageId, EDKs, c
     DataProp(headerInfo, "headerAuthTag", #ui8aHeaderAuthTag) *
         Uint8Array(#ui8aHeaderAuthTag, #abHeaderAuthTag, 0, #tagLength / 8) *
         ArrayBuffer(#abHeaderAuthTag, headerAuthTag);
+
+(*****************************
+ *****************************
+ *******               *******
+ *******   Integer     *******
+ *******   Reasoning   *******
+ *******               *******
+ *****************************
+ *****************************)
+
+(* An entire complete element sequence can be prepended to a general element sequence *)
+lemma IntegerLtPlusOneLe(a, b)
+[[
+    (#a <# #b)
+]]
+[[
+    (#a + 1 <=# #b)
+]]
 
 (******************************
  ******************************
