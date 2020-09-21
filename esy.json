@@ -73,7 +73,7 @@
     "@opam/fileutils": "0.6.2",
     "@opam/utop": "*",
     "@opam/shexp": "v0.13.0",
-    "@opam/merlin": "*",
+    "@opam/ocaml-lsp-server": "ocaml/ocaml-lsp:ocaml-lsp-server.opam#0358d7",
     "@opam/odoc": "*",
     "@opam/ocamlformat": "0.14.2"
   }
