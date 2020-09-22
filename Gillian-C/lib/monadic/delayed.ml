@@ -2,9 +2,13 @@ module Formula = Gil_syntax.Formula
 
 type 'a guarded_thunk = { guard : Formula.t; thunk : unit -> 'a }
 
-and 'a t = Final of 'a | Branching of 'a t guarded_thunk list
+and _ t =
+  | Final     : 'a -> 'a t
+  | Branching : 'a t guarded_thunk list -> 'a t
+  | Bound     : ('a t * ('a -> 'b t)) -> 'b t
 
-let rec resolve ~curr_pc (process : 'a t) : 'a Branch.t list =
+let rec resolve : type a. curr_pc:Pc.t -> a t -> a Branch.t list =
+ fun ~curr_pc process ->
   match process with
   | Final z            -> [ { pc = curr_pc; value = z } ]
   | Branching branches ->
@@ -19,8 +23,18 @@ let rec resolve ~curr_pc (process : 'a t) : 'a Branch.t list =
           branches
       in
       List.concat different_branches
+  | Bound (x, f)       ->
+      let branches_of_first_comp = resolve ~curr_pc x in
+      let continue =
+        List.map
+          (fun Branch.{ pc; value } -> resolve ~curr_pc:pc (f value))
+          branches_of_first_comp
+      in
+      List.concat continue
 
 let return x = Final x
+
+let bind x f = Bound (x, f)
 
 let branch_on guard ~(then_branch : unit -> 'a t) ~(else_branch : unit -> 'a t)
     =
@@ -29,3 +43,11 @@ let branch_on guard ~(then_branch : unit -> 'a t) ~(else_branch : unit -> 'a t)
       { guard; thunk = then_branch };
       { guard = Formula.Not guard; thunk = else_branch };
     ]
+
+let map x f = Bound (x, fun x -> Final (f x))
+
+module Syntax = struct
+  let ( let* ) = bind
+
+  let ( let+ ) = map
+end
