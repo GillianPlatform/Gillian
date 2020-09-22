@@ -70,7 +70,7 @@ lemma CElementFacts(buffer, readPos, fCount, fList, eLength)
 [[
     CElement(#buffer, #readPos, #fCount, #fList, #eLength) *
     (0 <=# #readPos) * (0 <=# #fCount) * (0 <=# #eLength) *
-    (#readPos + #eLength <=# l-len #buffer)
+    (#readPos + #eLength <=# l-len #buffer) * (l-len #fList == #fCount)
 ]]
 [*
     unfold CElement(#buffer, #readPos, #fCount, #fList, #eLength);
@@ -482,16 +482,28 @@ lemma PrependCElementsE(definition, buffer, readPos, eCount1, fCount, fList1, es
 *]
 
 (* Every element of an element sequence has the same number of fields *)
-lemma CElementsElementLength(buffer, readPos, eCount, fCount, fList, prefix, element, suffix)
+lemma CElementsElementLength(buffer, readPos, eCount, fCount, eList, prefix, element, suffix)
 [[
-    CElements(#buffer, #readPos, #eCount, #fCount, #fList, #eList) *
-    (#fList == l+ (#prefix, {{ #element }}, #suffix))
+    CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength) *
+    (#eList == l+ (#prefix, {{ #element }}, #suffix))
 ]]
 [[
-    CElements(#buffer, #readPos, #eCount, #fCount, #fList, #eList) *
+    CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength) *
     (l-len #element == #fCount)
 ]]
-(* FIXME: PROOF *)
+[*
+    sep_apply DestructList(#prefix);
+    unfold CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength);
+    if (#prefix = {{ }}) then {
+        sep_assert (CElement(#buffer, #readPos, #fCount, #element, #elementLength)) [bind: #elementLength];
+        sep_apply CElementFacts(#buffer, #readPos, #fCount, #element, #elementLength)
+    } else {
+        sep_assert (CElement(#buffer, #readPos, #fCount, #fList, #elementLength)) [bind: #elementLength];
+        sep_assert (#prefix == #head :: #rest) [bind: #head, #rest];
+        sep_assert (CElements(#buffer, (#readPos + #elementLength), (#eCount - 1), #fCount, l+ (#rest, {{#element}}, #suffix), #restESLength)) [bind: #restESLength];
+        sep_apply CElementsElementLength(#buffer, (#readPos + #elementLength), (#eCount - 1), #fCount, l+ (#rest, {{#element}}, #suffix), #rest, #element, #suffix)
+    }
+ *]
 
 (******************************
  ******************************
