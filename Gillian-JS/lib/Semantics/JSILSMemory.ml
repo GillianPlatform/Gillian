@@ -517,7 +517,7 @@ module M : Gillian.Symbolic.Memory_S = struct
     let f (loc_name : string) : unit =
       Option.fold
         ~some:(fun ((fv_list, dom), mtdt) ->
-          SHeap.set heap loc_name fv_list dom None;
+          SHeap.set heap loc_name fv_list None mtdt;
           ())
         ~none:() (SHeap.get heap loc_name)
     in

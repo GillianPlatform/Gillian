@@ -124,7 +124,8 @@ pred GlobalObject () :
   JSObject ($lg) *
   (($lg, "Error") -> {{ "d", $lerr, true, false, true }}) *
   (($lg, "Object") -> {{ "d", $lobj, true, false, true }}) *
-  (($lg, "DataView") -> {{ "d", $ldv, true, false, true }});
+  (($lg, "DataView") -> {{ "d", $ldv, true, false, true }}) *
+  (($lg, "undefined") -> {{ "d", undefined, false, false, false }});
 
 pred GlobalVar (+v, val) :
   (($lg, v) -> {{ "d", val, true, true, false }}) * types(v : Str);

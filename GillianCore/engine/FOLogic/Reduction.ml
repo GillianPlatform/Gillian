@@ -1363,13 +1363,41 @@ let rec reduce_lexpr_loop
             if att_exp = reduced_att_exp then LstSub (fle1, fle2, fle3)
             else reduced_att_exp
         | _, _ -> LstSub (fle1, fle2, fle3) )
+    | LstSub (l, Lit (Num n), BinOp (UnOp (LstLen, l'), FMinus, Lit (Num n')))
+      when l = l' && n = n'
+           &&
+           let eqs = get_equal_expressions pfs l in
+           List.exists
+             (fun e ->
+               match e with
+               | Expr.NOp (LstCat, EList les :: _) ->
+                   List.length les = int_of_float n
+               | NOp (LstCat, Lit (LList les) :: _) ->
+                   List.length les = int_of_float n
+               | _ -> false)
+             eqs ->
+        let eqs = get_equal_expressions pfs l in
+        let cat =
+          List.filter_map
+            (fun e ->
+              match e with
+              | Expr.NOp (LstCat, EList les :: rest)
+                when List.length les = int_of_float n ->
+                  Some (Expr.NOp (LstCat, rest))
+              | NOp (LstCat, Lit (LList les) :: rest)
+                when List.length les = int_of_float n ->
+                  Some (NOp (LstCat, rest))
+              | _ -> None)
+            eqs
+        in
+        f (List.hd cat)
     | LstSub (le1, le2, le3) -> (
         let fle1 = f le1 in
         let fle2 = substitute_for_list_length pfs (f le2) in
         let fle3 = substitute_for_list_length pfs (f le3) in
-        (* L.verbose (fun fmt ->
+        L.tmi (fun fmt ->
             fmt "REDUCTION: LstSub(%a, %a, %a)" Expr.pp fle1 Expr.pp fle2
-              Expr.pp fle3); *)
+              Expr.pp fle3);
         match (fle1, fle2, fle3) with
         | _, _, Lit (Num 0.) -> EList []
         | flx, Lit (Num 0.), UnOp (LstLen, fle1) when flx = fle1 -> fle1
@@ -1390,20 +1418,58 @@ let rec reduce_lexpr_loop
                    | _ -> false)
                  eqs ->
             let eqs = get_equal_expressions pfs flx in
-            let e =
-              List.find
+            let eqs =
+              List.filter_map
                 (fun e ->
                   match e with
-                  | Expr.EList les -> List.length les >= int_of_float n
-                  | Lit (LList les) -> List.length les >= int_of_float n
-                  | NOp (LstCat, EList les :: _) ->
-                      List.length les >= int_of_float n
-                  | NOp (LstCat, Lit (LList les) :: _) ->
-                      List.length les >= int_of_float n
-                  | _ -> false)
+                  | Expr.EList les when List.length les >= int_of_float n ->
+                      Some (Expr.EList les)
+                  | Lit (LList les) when List.length les >= int_of_float n ->
+                      Some (Lit (LList les))
+                  | NOp (LstCat, EList les :: _)
+                    when List.length les >= int_of_float n -> Some (EList les)
+                  | NOp (LstCat, Lit (LList les) :: _)
+                    when List.length les >= int_of_float n ->
+                      Some (Lit (LList les))
+                  | _ -> None)
                 eqs
             in
-            f (LstSub (e, Lit (Num 0.), Lit (Num n)))
+            f (LstSub (List.hd eqs, Lit (Num 0.), Lit (Num n)))
+        | le, Lit (Num 0.), Lit (Num n)
+          when ( match le with
+               | EList _ | Lit (LList _) -> false
+               | _                       -> true )
+               &&
+               let eqs = get_equal_expressions pfs le in
+               List.exists
+                 (fun e ->
+                   match e with
+                   | Expr.EList les -> List.length les >= int_of_float n
+                   | Lit (LList les) -> List.length les >= int_of_float n
+                   | NOp (LstCat, EList les :: _) ->
+                       List.length les >= int_of_float n
+                   | NOp (LstCat, Lit (LList les) :: _) ->
+                       List.length les >= int_of_float n
+                   | _ -> false)
+                 eqs ->
+            let eqs = get_equal_expressions pfs le in
+            let eqs =
+              List.filter_map
+                (fun e ->
+                  match e with
+                  | Expr.EList les when List.length les >= int_of_float n ->
+                      Some (Expr.EList les)
+                  | Lit (LList les) when List.length les >= int_of_float n ->
+                      Some (Lit (LList les))
+                  | NOp (LstCat, EList les :: _)
+                    when List.length les >= int_of_float n -> Some (EList les)
+                  | NOp (LstCat, Lit (LList les) :: _)
+                    when List.length les >= int_of_float n ->
+                      Some (Lit (LList les))
+                  | _ -> None)
+                eqs
+            in
+            f (LstSub (List.hd eqs, Lit (Num 0.), Lit (Num n)))
         | fle1, UnOp (LstLen, lx), fle3 when fst (list_prefix pfs lx fle1) ->
             let _, suffix = list_prefix pfs lx fle1 in
             f (LstSub (suffix, Lit (Num 0.), fle3))

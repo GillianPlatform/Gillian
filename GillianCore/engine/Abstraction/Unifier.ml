@@ -931,9 +931,10 @@ module Make
           Some
             (List.map
                (fun (u, e) ->
+                 let se = ESubst.subst_in_expr pvar_subst ~partial:true e in
                  ( u,
-                   Reduction.reduce_lexpr ~unification:true
-                     (ESubst.subst_in_expr pvar_subst ~partial:true e) ))
+                   try Reduction.reduce_lexpr ~unification:true se
+                   with _ -> se ))
                outs)
         with _ -> None
       in

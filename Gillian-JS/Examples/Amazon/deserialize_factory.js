@@ -28,10 +28,10 @@ function needs (condition, errorMessage) {
 /**
     @id readElements
 
-    @pred nounfold innerLoopInvariantElement(+definition, +remainingElsList, +view, +outerLoopReadPos, +fCount, fList, eLength) :
+    @pred nounfold innerLoopInvariantElement(+definition, +remElsList, +view, +outerLoopReadPos, +fCount, fList, eLength) :
       (definition == "Complete") * CElement(view, outerLoopReadPos, fCount, fList, eLength),
-      (definition == "Incomplete") * (remainingElsList == {{ }}) * IElement(view, outerLoopReadPos, fCount, fList, eLength),
-      (definition == "Incomplete") * (! (remainingElsList == {{ }})) * CElement(view, outerLoopReadPos, fCount, fList, eLength);
+      (definition == "Incomplete") * (remElsList == {{ }}) * IElement(view, outerLoopReadPos, fCount, fList, eLength),
+      (definition == "Incomplete") * (! (remElsList == {{ }})) * CElement(view, outerLoopReadPos, fCount, fList, eLength);
 
     @pre
       (elementCount == #eCount) * (fieldsPerElement == #fCount) * (buffer == #buffer) * (readPos == #readPos) *
@@ -68,122 +68,111 @@ function needs (condition, errorMessage) {
       (ret == false)
 */
 function readElements(elementCount, fieldsPerElement, buffer, readPos) {
-  /* @tactic apply lemma ElementsFacts(#view, #readPos, #eCount, #fCount, #eList, #esLength) */
-  var dataView = new DataView(
-      buffer.buffer,
-      buffer.byteOffset,
-      buffer.byteLength
-  );
+    /* @tactic apply lemma ElementsFacts(#view, #readPos, #eCount, #fCount, #eList, #esLength) */
+    var dataView = new DataView(
+        buffer.buffer,
+        buffer.byteOffset,
+        buffer.byteLength
+    );
 
-  /* Well-formedness: readPos must be within the byte length of the buffer given. */
-  needs(readPos >= 0 && dataView.byteLength >= readPos, 'readPos out of bounds.')
+    needs(readPos >= 0 && dataView.byteLength >= readPos, 'readPos out of bounds.')
+    needs(elementCount >= 0, 'elementCount must be positive.')
 
-  /* Well-formedness: elementCount must not be negative. */
-  needs(elementCount >= 0, 'elementCount must be positive.')
-
-  var elements = [];
-
-  /*
-    @invariant
-      scope(elements : #doneEls) * scope(readPos : #outerLoopReadPos) * scope(elementCount : #eLeft) *
-      CElements(#view, #readPos, #eCount - #eLeft, #fCount, #doneElsList, #doneElsLength) *
-      Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remainingElsList, #remainingElsLength) *
-      (#eList == l+ (#doneElsList, #remainingElsList)) *
-      (#esLength == #doneElsLength + #remainingElsLength) *
-      (#readPos + #doneElsLength == #outerLoopReadPos) *
-      ArrayOfArraysOfUInt8Arrays(#doneEls, #doneElsList)
-      [bind : #doneEls, #outerLoopReadPos, #eLeft, #remainingElsList, #remainingElsLength, #doneElsList, #doneElsLength]
-  */
-  while (elementCount--) {
-    /* @tactic
-        if (#definition = "Complete") then {
-          apply lemma CElementsFacts(#view, #outerLoopReadPos, #eLeft, #fCount, #remainingElsList, #remainingElsLength);
-          unfold CElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remainingElsList, #remainingElsLength);
-          assert CElement(#view, #outerLoopReadPos, #fCount, #fList, #eLength) [bind: #fList, #eLength]
-        } else {
-          unfold IElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remainingElsList, #remainingElsLength);
-          if (#remainingElsList = {{ }}) then {
-            assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remainingElsLength) [bind: #fList]
-          } else {
-            assert CElement(#view, #outerLoopReadPos, #fCount, #fList, #eLength) [bind: #fList, #eLength]
-          }
-        }
-     */
-    var element = []
-    var fieldCount = fieldsPerElement
+    var elements = [];
 
     /* @invariant
-        scope(element : #doneEl) * scope(readPos : #innerLoopReadPos) * scope(fieldCount : #fLeft) *
-        innerLoopInvariantElement(#definition, #remainingElsList, #view, #innerLoopReadPos, #fLeft, #remainingElList, #remainingElLength) *
-        CElement(#view, #outerLoopReadPos, #fCount - #fLeft, #doneElList, #doneElLength) *
-        (#fList == l+ (#doneElList, #remainingElList)) *
-        (#eLength == #doneElLength + #remainingElLength) *
-        (#outerLoopReadPos + #doneElLength == #innerLoopReadPos) *
-        ArrayOfUInt8Arrays(#doneEl, #doneElList, #fCount - #fLeft)
-        [bind: #doneEl, #innerLoopReadPos, #fLeft, #remainingElList, #remainingElLength, #doneElList, #doneElLength] */
-    while (fieldCount--) {
-      /* @tactic
-          if (#definition = "Complete") then {
-            unfold CElement(#view, #innerLoopReadPos, #fLeft, #remainingElList, #remainingElLength)
-          };
-          if ((#definition = "Incomplete") and (#remainingElsList = {{ }})) then {
-            unfold IElement(#view, #innerLoopReadPos, #fLeft, #remainingElList, #remainingElLength)
-          }
-      */
-      /* Check for early return (Postcondition): Enough data must exist to read the Uint16 length value. */
-      if (readPos + 2 > dataView.byteLength)
-        /*
-          @tactic
-            apply lemma PrependCElementI(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remainingElList, #remainingElLength);
-            assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remainingElsLength);
-            assert Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remainingElsList, #remainingElsLength);
-            apply lemma PrependCElementsE(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remainingElsList, #remainingElsLength)
-         */
-        return false
-      var length = dataView.getUint16(readPos, false) // big endian
-      readPos += 2
-      /* Check for early return (Postcondition): Enough data must exist length of the value. */
-      if (readPos + length > dataView.byteLength)
-        /*
-          @tactic
-            apply lemma PrependCElementI(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remainingElList, #remainingElLength);
-            assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remainingElsLength);
-            assert Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remainingElsList, #remainingElsLength);
-            apply lemma PrependCElementsE(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remainingElsList, #remainingElsLength)
-         */
-        return false
-      var fieldBinary = buffer.slice(readPos, readPos + length)
-      readPos += length
-      /* @tactic
-         assert (#remainingElList == l+ ({{ #fld }}, #rfld)) [bind: #fld, #rfld];
-         if (#definition = "Complete") then {
-           apply lemma AppendFieldCC(#view, #outerLoopReadPos, #fCount - #fLeft, #doneElList, #doneElLength, #fLeft, #fld, #rfld, #remainingElLength)
-         } else {
-           apply lemma AppendFieldCI(#view, #outerLoopReadPos, #fCount - #fLeft, #doneElList, #doneElLength, #fLeft, #fld, #rfld, #remainingElLength)
-         }
-      */
-      element.push(fieldBinary)
+        scope(elements : #doneEls) * scope(readPos : #outerLoopReadPos) * scope(elementCount : #eLeft) *
+        CElements(#view, #readPos, #eCount - #eLeft, #fCount, #doneElsList, #doneElsLength) *
+        Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) *
+        (#eList == l+ (#doneElsList, #remElsList)) *
+        (#esLength == #doneElsLength + #remElsLength) *
+        (#readPos + #doneElsLength == #outerLoopReadPos) *
+        ArrayOfArraysOfUInt8Arrays(#doneEls, #doneElsList)
+        [bind : #doneEls, #outerLoopReadPos, #eLeft, #remElsList, #remElsLength, #doneElsList, #doneElsLength] */
+    while (elementCount--) {
+        /* @tactic
+            if (#definition = "Complete") then {
+                apply lemma CElementsFacts(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+                unfold CElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+                assert CElement(#view, #outerLoopReadPos, #fCount, #fList, #eLength) [bind: #fList, #eLength]
+            } else {
+                unfold IElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+                if (#remElsList = {{ }}) then {
+                    assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remElsLength) [bind: #fList]
+                } else {
+                    assert CElement(#view, #outerLoopReadPos, #fCount, #fList, #eLength) [bind: #fList, #eLength]
+                }
+            } */
+        var element = []
+        var fieldCount = fieldsPerElement
+
+        /* @invariant
+            scope(element : #doneEl) * scope(readPos : #innerLoopReadPos) * scope(fieldCount : #fLeft) *
+            innerLoopInvariantElement(#definition, #remElsList, #view, #innerLoopReadPos, #fLeft, #remElList, #remElLength) *
+            CElement(#view, #outerLoopReadPos, #fCount - #fLeft, #doneElList, #doneElLength) *
+            (#fList == l+ (#doneElList, #remElList)) *
+            (#eLength == #doneElLength + #remElLength) *
+            (#outerLoopReadPos + #doneElLength == #innerLoopReadPos) *
+            ArrayOfUInt8Arrays(#doneEl, #doneElList, #fCount - #fLeft)
+            [bind: #doneEl, #innerLoopReadPos, #fLeft, #remElList, #remElLength, #doneElList, #doneElLength] */
+        while (fieldCount--) {
+            /* @tactic
+                if (#definition = "Complete") then {
+                    unfold CElement(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength)
+                };
+                if ((#definition = "Incomplete") and (#remElsList = {{ }})) then {
+                    unfold IElement(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength)
+                } */
+            if (readPos + 2 > dataView.byteLength)
+                /* @tactic
+                    apply lemma PrependCElementI(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remElList, #remElLength);
+                    assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remElsLength);
+                    assert Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+                    apply lemma PrependCElementsE(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remElsList, #remElsLength)
+                */
+                return false
+
+            var length = dataView.getUint16(readPos, false) // big endian
+            readPos += 2
+
+            if (readPos + length > dataView.byteLength)
+                /* @tactic
+                    apply lemma PrependCElementI(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remElList, #remElLength);
+                    assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remElsLength);
+                    assert Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+                    apply lemma PrependCElementsE(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remElsList, #remElsLength)
+                */
+                return false
+
+            var fieldBinary = buffer.slice(readPos, readPos + length)
+            readPos += length
+            /* @tactic
+                assert (#remElList == #fld :: #rfld) [bind: #fld, #rfld];
+                if (#definition = "Complete") then {
+                    apply lemma AppendFieldCC(#view, #outerLoopReadPos, #fCount - #fLeft, #doneElList, #doneElLength, #fLeft, #fld, #rfld, #remElLength)
+                } else {
+                    apply lemma AppendFieldCI(#view, #outerLoopReadPos, #fCount - #fLeft, #doneElList, #doneElLength, #fLeft, #fld, #rfld, #remElLength)
+                } */
+            element.push(fieldBinary)
+        }
+
+        /* @tactic
+            if (#definition = "Complete") then {
+                unfold CElement(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength);
+                apply lemma CElementsAppend(#view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #doneElList, #doneElLength)
+            } else {
+                unfold IElement(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength)
+            } */
+        elements.push(element);
     }
+
     /* @tactic
         if (#definition = "Complete") then {
-          unfold CElement(#view, #innerLoopReadPos, #fLeft, #remainingElList, #remainingElLength);
-          apply lemma CElementsAppend(#view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #doneElList, #doneElLength)
+            unfold CElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength)
         } else {
-          unfold IElement(#view, #innerLoopReadPos, #fLeft, #remainingElList, #remainingElLength)
-        }
-    */
-    elements.push(element);
-  }
-
-  /*
-    @tactic
-    if (#definition = "Complete") then {
-      unfold CElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remainingElsList, #remainingElsLength)
-    } else {
-      unfold IElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remainingElsList, #remainingElsLength)
-    }
-  */
-  return { elements, readPos }
+            unfold IElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength)
+        } */
+    return { elements, readPos }
 }
 
 /************************************
@@ -251,7 +240,8 @@ var EncryptedDataKey = function (edk) { };
         [[
             Uint8Array (#buffer, #ab, 0, #length) *
             ArrayBuffer(#ab, #element) *
-            toUtf8(#element, ret)
+            toUtf8(#element, ret) *
+            types(ret:Str)
         ]]
         normal
 */
@@ -282,7 +272,7 @@ var toUtf8 = function (buffer) { };
     @post Uint8Array(#eEC, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           RawEncryptionContext(#definition, #EC, #ECKs, #errorMessage) *
 
-          DecodedEncryptionContext(ret) *
+          DecodedEncryptionContext(ret, #ECKs) *
 
           scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
           scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
@@ -297,6 +287,7 @@ var toUtf8 = function (buffer) { };
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
+         scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
          JSInternals()
 
     @posterr
@@ -307,6 +298,7 @@ var toUtf8 = function (buffer) { };
 
           scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
           scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
+          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
           JSInternals ()
 */
 function decodeEncryptionContext(encodedEncryptionContext) {
@@ -321,6 +313,8 @@ function decodeEncryptionContext(encodedEncryptionContext) {
   var encryptionContext = Object.create(null)
   /* Check for early return (Postcondition): The case of 0 length is defined as an empty object. */
   if (!encodedEncryptionContext.byteLength) {
+    /* @tactic use_subst [object_table : (#PVPairs: {{ }}) ] */
+    Object.freeze(encryptionContext);
     return encryptionContext
   }
   /* Uint8Array is a view on top of the underlying ArrayBuffer.
@@ -357,14 +351,24 @@ function decodeEncryptionContext(encodedEncryptionContext) {
         assert (
             scope(pairsCount: #pairsCount) * (#pairsCount == l-len #ECKs) *
             scope(elements: #elements) * ArrayOfArraysOfUInt8Arrays(#elements, #ECKs) *
-            scope(encryptionContext: #dECObj) * JSObjWithProto(#dECObj, null) * empty_fields(#dECObj : -{ }-)
-        ) [bind: #pairsCount, #elements, #dECObj]
+            scope(encryptionContext: #dECObj) * JSObjWithProto(#dECObj, null) * empty_fields(#dECObj : -{ }-) *
+            toUtf8MapPair(#ECKs, #utf8ECKs) * FirstProj(#ECKs, #rProps) * Unique(#rProps)
+        ) [bind: #pairsCount, #elements, #dECObj, #utf8ECKs, #rProps]
 
     @invariant
+        scope(pairsCount: #pairsCount) * scope(elements: #elements) * scope(encryptionContext: #dECObj) *
+        ArrayPrototype ($larr_proto) * ObjectPrototype($lobj_proto) * GlobalObject () *
+        scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
+        scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
+        toUtf8MapPair(#ECKs, #utf8ECKs) * FirstProj(#ECKs, #rProps) * types(#rProps : List) * Unique(#rProps) *
+
         scope(count: #count) * (#count <=# #pairsCount) *
         ArrayOfArraysOfUInt8ArraysContents(#elements, #done, 0, #count) *
         ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count) *
-        (#ECKs == l+ (#done, #left)) [bind: #count, #done, #left] */
+        (#ECKs == l+ (#done, #left)) *
+        toUtf8MapPair(#done, #utf8Done) * types(#utf8Done : List) *
+        JSObjWithProto(#dECObj, null) * ObjectTable(#dECObj, #utf8Done)
+        [bind: #count, #done, #left, #utf8Done] */
   for (var count = 0; count < pairsCount; count++) {
     /*
         @tactic
@@ -375,31 +379,59 @@ function decodeEncryptionContext(encodedEncryptionContext) {
         assert ((#element, "length") -> {{ "d", #eLength, true, false, false }}) [bind: #eLength];
         assert (ArrayOfUInt8ArraysContents(#element, #ECK, 0., #eLength)) [bind: #ECK];
         apply lemma ArrayOfUInt8ArraysContentsFacts(#element, #ECK, 0., #eLength);
-        assert (#left == l+ ({{ #ECK }}, #rest_left)) [bind: #rest_left];
-        apply lemma CElementsElementLength(#EC, 2., ((256. * #b0) + #b1), 2., #ECKs, (l-len #rest), #done, #ECK, #rest_left);
-        assert (#ECK == {{ #new_key, #new_value }})
+        assert (#left == #ECK :: #rest_left) [bind: #rest_left];
+        apply lemma CElementsElementLength(#EC, 2., ((256. * #b0) + #b1), 2., #ECKs, #done, #ECK, #rest_left);
+        assert (#ECK == {{ #new_prop, #new_value }})
     */
     var [key, value] = elements[count].map(toUtf8)
-
 
     /* Postcondition: The number of keys in the encryptionContext must match the pairsCount.
      * If the same Key value is serialized...
      */
-  //   needs(
-  //     encryptionContext[key] === undefined,
-  //     'Duplicate encryption context key value.'
-  //   )
-  //   encryptionContext[key] = value
+    /*
+        @tactic
+            assert (toUtf8(#new_prop, #utf8NProp)) [bind: #utf8NProp];
+            assert (toUtf8(#new_value, #utf8NVal)) [bind: #utf8NVal];
+            unfold ObjectTable(#dECObj, #utf8Done);
+            assert (FirstProj(#utf8Done, #doneProps)) [bind: #doneProps];
+            assert (ListToSet(#doneProps, #donePropsSet)) [bind: #donePropsSet];
+            apply lemma FirstProjConcatSplit(#ECKs, #done, #left);
+            assert (FirstProj(#done, #doneRProps) * FirstProj(#left, #leftRProps)) [bind: #doneRProps, #leftRProps];
+            apply lemma ProduceListToSet(#doneRProps); assert(ListToSet(#doneRProps, #doneRPropsSet)) [bind: #doneRPropsSet];
+            apply lemma ProduceListToSet(#leftRProps); assert(ListToSet(#leftRProps, #leftRPropsSet)) [bind: #leftRPropsSet];
+            apply lemma FirstProjConcatSplit(#left, {{ {{#new_prop, #new_value}} }}, #rest_left);
+            unfold FirstProj({{{{#new_prop, #new_value}}}}, _); unfold FirstProj({{}}, _);
+            apply lemma HeadInSet(#leftRProps);
+            apply lemma UniqueConcatSplitNotInSuffix(#rProps, #doneRProps, #leftRProps, #new_prop);
+            apply lemma FirstProjToUtf8MapPairCompat(#done);
+            apply lemma NotInListToUtf8(#new_prop, #doneRProps);
+            apply lemma ObjectTableAbsentProperty(#dECObj, #utf8Done, #utf8NProp)
+    */
+    needs(
+        encryptionContext[key] === undefined,
+        'Duplicate encryption context key value.'
+    )
+    encryptionContext[key] = value
 
     /*
         @tactic
-        apply lemma ArrayOfArraysOfUInt8ArraysContentsAppend(#elements, #done, 0, #count);
-        apply lemma IntegerLtPlusOneLe(#count, #pairsCount)
+            apply lemma ArrayOfArraysOfUInt8ArraysContentsAppend(#elements, #done, 0, #count);
+            apply lemma IntegerLtPlusOneLe(#count, #pairsCount);
+            apply lemma ObjectTableStructureAppendPVPair(#dECObj, #utf8Done, #utf8NProp, #utf8NVal);
+            apply lemma toUtf8MapPairAppendPair(#done, #utf8Done, #new_prop, #new_value);
+            apply lemma FirstProjAppendPair(#utf8Done, #doneProps, #utf8NProp, #utf8NVal);
+            apply lemma ListToSetAddElement(#doneProps, #donePropsSet, #utf8NProp)
     */
-    var post_stuff = 0;
+    0 === 0;
   }
-  /* @tactic assert (scope(count : (l-len #ECKs))) */
-  // Object.freeze(encryptionContext)
+
+  /*
+    @tactic
+        unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count);
+        apply lemma toUtf8MapPairInjective(#ECKs, #utf8ECKs, #done, #utf8Done);
+        use_subst [object_table : (#PVPairs: #utf8ECKs) ]
+  */
+  Object.freeze(encryptionContext)
   return encryptionContext
 }
 
@@ -414,7 +446,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 /**
     @id deserializeEncryptedDataKeys
 
-    @prex (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
+    @pre (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          ((#definition == "Complete") \/ (#definition == "Incomplete")) *
@@ -425,7 +457,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
          JSInternals()
 
-    @postx Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
+    @post Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
           RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
 
@@ -451,7 +483,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
           scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
           JSInternals ()
 
-    @prex (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
+    @pre (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#definition == "Broken") *
@@ -460,7 +492,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          JSInternals()
 
-    @posterrx
+    @posterr
           Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
           RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
@@ -599,7 +631,7 @@ var SdkSuite = function (suiteId) { };
 /**
     @id deserializeMessageHeader
 
-    @prex (messageBuffer == #messageBuffer) *
+    @pre (messageBuffer == #messageBuffer) *
          Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#byteOffset + #byteLength <=# l-len #data) *
@@ -619,7 +651,7 @@ var SdkSuite = function (suiteId) { };
          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
          JSInternals ()
 
-    @postx Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
+    @post Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
           Header(#definition,
                  #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
                         #part_two, #ECKs,
@@ -627,7 +659,7 @@ var SdkSuite = function (suiteId) { };
                  #errorMessage) *
 
           (#definition == "Complete") *
-          HeaderInfo(ret, #version, #type, #suiteId, #messageId, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #rawHeaderData, #headerIv, #headerAuthTag) *
+          HeaderInfo(ret, #version, #type, #suiteId, #messageId, #ECKs, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #rawHeaderData, #headerIv, #headerAuthTag) *
           (#rawHeaderData == l-sub(#view, 0, #headerLength)) *
 
           scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
@@ -656,7 +688,7 @@ var SdkSuite = function (suiteId) { };
           scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
           JSInternals()
 
-    @prex (messageBuffer == #messageBuffer) *
+    @pre (messageBuffer == #messageBuffer) *
          Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#byteOffset + #byteLength <=# l-len #data) *
@@ -676,7 +708,7 @@ var SdkSuite = function (suiteId) { };
          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
          JSInternals ()
 
-    @posterrx
+    @posterr
           Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
           Header(#definition,
                  #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,

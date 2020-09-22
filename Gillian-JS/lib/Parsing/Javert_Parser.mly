@@ -570,7 +570,7 @@ call_with_target:
   WITH; i=VAR { i }
 
 lvar_le_pair_target:
-  lv = LVAR; COLON; e=expr_target { (lv, e )}
+  LBRACE; lv = LVAR; COLON; e=expr_target; RBRACE { (lv, e )}
 
 use_subst_target:
   | USESUBST; LBRACKET; lab=VAR; MINUS; subst = separated_list(COMMA, lvar_le_pair_target); RBRACKET
@@ -1086,7 +1086,7 @@ js_only_spec_target:
 
 
 js_lvar_le_pair_target:
-  lv = LVAR; COLON; le=js_lexpr_target { (lv, le )}
+  LBRACE; lv = LVAR; COLON; le=js_lexpr_target; RBRACE { (lv, le )}
 
 js_var_and_le_target:
   | LBRACE; lvar = LVAR; DEFEQ; le = js_lexpr_target; RBRACE;
@@ -1140,6 +1140,10 @@ js_logic_cmd_target:
   | ASSERT; a = js_assertion_target; binders = option(binders_target);
     { Assert (a, Option.value ~default:[ ] binders) }
 
+(* assume a *)
+  | ASSUME; a = js_pure_assertion_target;
+    { Assume a }
+
 (* invariant a *)
   | INVARIANT; a = js_assertion_target; binders = option(binders_target);
     { Invariant (a, Option.value ~default:[ ] binders)  }
@@ -1150,8 +1154,8 @@ js_logic_cmd_target:
       ApplyLemma (lemma_name, params)
     }
 
-(* use_subst [ spec_lab - #x: bla, #y: ble] *)
-  | USESUBST; LBRACKET; spec_lab=VAR; MINUS; subst_lst = separated_nonempty_list(COMMA, js_lvar_le_pair_target); RBRACKET
+(* use_subst [ spec_lab : #x: bla, #y: ble] *)
+  | USESUBST; LBRACKET; spec_lab=VAR; COLON; subst_lst = separated_nonempty_list(COMMA, js_lvar_le_pair_target); RBRACKET
      {
         UseSubst(spec_lab, subst_lst)
      }

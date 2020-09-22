@@ -481,7 +481,8 @@ lemma PrependCElementsE(definition, buffer, readPos, eCount1, fCount, fList1, es
     }
 *]
 
-lemma CElementsElementLength(buffer, readPos, eCount, fCount, fList, esLength, prefix, element, suffix)
+(* Every element of an element sequence has the same number of fields *)
+lemma CElementsElementLength(buffer, readPos, eCount, fCount, fList, prefix, element, suffix)
 [[
     CElements(#buffer, #readPos, #eCount, #fCount, #fList, #eList) *
     (#fList == l+ (#prefix, {{ #element }}, #suffix))
@@ -519,6 +520,7 @@ nounfold pred CRawEncryptionContext(+buffer:List, ECKs:List) :
     rawToUInt16(#rawKC, false, #keyCount) *
     (0 <# #keyCount) *
     Elements("Complete", buffer, 2, #keyCount, 2, ECKs, #ECKsLength) *
+    toUtf8MapPair(ECKs, #utf8ECKs) * FirstProj(ECKs, #ECKeys) * Unique(#ECKeys) *
     (2 + #ECKsLength == l-len buffer);
 
 (* Broken serialised encryption context *)
@@ -545,9 +547,17 @@ pred RawEncryptionContext(definition:Str, +buffer:List, ECKs:List, errorMessage:
   (definition == "Complete") * CRawEncryptionContext(buffer, ECKs) * (errorMessage == ""),
   (definition == "Broken")   * BRawEncryptionContext(errorMessage, buffer) * (ECKs == {{ }});
 
-(* TODO: Decoded encryption context *)
-pred DecodedEncryptionContext(+dECObj : Obj) :
-    JSObjWithProto(dECObj, null);
+(* Live decoded encryption context *)
+pred LiveDecodedEncryptionContext(+dECObj : Obj, +ECKs : List) :
+    JSObjWithProto(dECObj, null) *
+    toUtf8MapPair(ECKs, #utf8ECKs) *
+    ObjectTable(dECObj, #utf8ECKs);
+
+(* Decoded encryption context *)
+pred DecodedEncryptionContext(+dECObj : Obj, +ECKs : List) :
+    JSObjGeneral(dECObj, null, "Object", false) *
+    toUtf8MapPair(ECKs, #utf8ECKs) *
+    FrozenObjectTable(dECObj, #utf8ECKs);
 
 (*****************************
  *****************************
@@ -667,32 +677,6 @@ pred DeserialisedEncryptedDataKeys (+a:Obj, contents:List) :
     FrozenArrayStructure(a, l-len contents) *
     FrozenArrayOfDEDKsContents(a, contents, 0);
 
-(***** AXIOMATISED EDK-RELATED INTERNALS *****)
-
-(* Mapping EDKs into the resulting decoded EDK array *)
-axiomatic incomplete spec AP_map (xsc, vthis, cfun)
-[[
-    (vthis == #vthis) * (cfun == #cfun) *
-    JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
-    ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs)
-]]
-[[
-    JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
-    ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs) *
-    types(ret : Obj) * LiveDeserialisedEncryptedDataKeys(ret, #EDKs)
-]]
-normal
-
-(* Freezing an array of decoded EDKs *)
-axiomatic spec Object_freeze(xsc, vthis, l)
-[[
-    (l == #l) * LiveDeserialisedEncryptedDataKeys(#l, #EDKs)
-]]
-[[
-    DeserialisedEncryptedDataKeys(#l, #EDKs) * (ret == #l)
-]]
-normal
-
 (************************************
  ************************************
  *******                      *******
@@ -738,6 +722,79 @@ lemma fromUtf8toUtf8(utf8Data)
   [[ fromUtf8(#utf8Data, #rawData) ]]
   [[ toUtf8(#rawData, #utf8Data) ]]
 
+(* UTF-8 Mapping of lists *)
+pure pred toUtf8Map(+data : List, utf8Data : List) :
+    (data == {{ }}) * (utf8Data == {{ }}),
+
+    (data == #fst :: #rest) *
+    (toUtf8(#fst, #utf8Fst)) *
+    toUtf8Map(#rest, #utf8Rest) *
+    (utf8Data == #utf8Fst :: #utf8Rest);
+
+(* toUtf8MapPair is injective *)
+lemma toUtf8MapInjective(rawData1, utf8Data1, rawData2, utf8Data2)
+    [[ toUtf8Map(#rawData1, #utf8Data1) * toUtf8Map(#rawData2, #utf8Data2) ]]
+    [[ (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
+       (! (#rawData1 == #rawData2)) * (! (#utf8Data1 == #utf8Data2)) ]]
+[*
+    unfold toUtf8Map(#rawData1, #utf8Data1);
+    unfold toUtf8Map(#rawData2, #utf8Data2);
+    if ((not (#rawData1 = {{ }})) and (not (#rawData2 = {{ }}))) then {
+        sep_assert ((#rawData1 == #rd1 :: #restd1) * (#rawData2 == #rd2 :: #restd2) *
+                    (#utf8Data1 == #ut1 :: #restu1) * (#utf8Data2 == #ut2 :: #restu2))
+                    [bind: #rd1, #restd1, #rd2, #restd2, #ut1, #restu1, #ut2, #restu2];
+        sep_apply toUtf8Injective(#rd1, #ut1, #rd2, #ut2);
+        sep_apply toUtf8MapInjective(#restd1, #restu1, #restd2, #restu2)
+    }
+ *]
+
+(* UTF-8 Mapping of lists of pairs *)
+pure pred toUtf8MapPair(+data : List, utf8Data : List) :
+    (data == {{ }}) * (utf8Data == {{ }}),
+
+    (data == {{ #prop, #value }} :: #rest) *
+    (toUtf8(#prop, #utf8Prop)) *
+    (toUtf8(#value, #utf8Value)) *
+    toUtf8MapPair(#rest, #utf8Rest) *
+    (utf8Data == {{ #utf8Prop, #utf8Value }} :: #utf8Rest);
+
+(* toUtf8MapPair is injective *)
+lemma toUtf8MapPairInjective(rawData1, utf8Data1, rawData2, utf8Data2)
+    [[ toUtf8MapPair(#rawData1, #utf8Data1) * toUtf8MapPair(#rawData2, #utf8Data2) ]]
+    [[ (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
+       (! (#rawData1 == #rawData2)) * (! (#utf8Data1 == #utf8Data2)) ]]
+[*
+    unfold toUtf8MapPair(#rawData1, #utf8Data1);
+    unfold toUtf8MapPair(#rawData2, #utf8Data2);
+    if ((not (#rawData1 = {{ }})) and (not (#rawData2 = {{ }}))) then {
+        sep_assert ((#rawData1 == {{ #p1, #v1 }} :: #restd1) * (#rawData2 == {{ #p2, #v2 }} :: #restd2) *
+                    (#utf8Data1 == {{ #up1, #uv1 }} :: #restu1) * (#utf8Data2 == {{ #up2, #uv2 }} :: #restu2))
+                    [bind: #p1, #v1, #restd1, #p2, #v2, #restd2, #up1, #uv1, #restu1, #up2, #uv2, #restu2];
+        sep_apply toUtf8Injective(#p1, #up1, #p2, #up2);
+        sep_apply toUtf8Injective(#v1, #uv1, #v2, #uv2);
+        sep_apply toUtf8MapPairInjective(#restd1, #restu1, #restd2, #restu2)
+    }
+ *]
+
+(* Appending a pair to a mapping of lists of pairs *)
+lemma toUtf8MapPairAppendPair(data, utf8Data, prop, value)
+[[
+    toUtf8MapPair(#data, #utf8Data) *
+    toUtf8(#prop, #utf8Prop) *
+    toUtf8(#value, #utf8Value)
+]]
+[[
+    toUtf8MapPair(l+ (#data, {{ {{ #prop, #value }} }}), l+ (#utf8Data, {{ {{ #utf8Prop, #utf8Value }} }}))
+]]
+[*
+    unfold toUtf8MapPair(#data, #utf8Data);
+    if (not (#data = {{ }})) then {
+        sep_assert (#data == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
+        sep_assert (toUtf8MapPair(#restPVPairs, #restUtf8Data)) [bind: #restUtf8Data];
+        sep_apply toUtf8MapPairAppendPair(#restPVPairs, #restUtf8Data, #prop, #value)
+    }
+*]
+
 (*****************************
  *****************************
  *******               *******
@@ -755,12 +812,12 @@ pred AlgorithmSuiteIdentifierObject(o) :
     empty_fields(o : -{ "20", "70", "ALG_AES128_GCM_IV12_TAG16", "ALG_AES192_GCM_IV12_TAG16" }-);
 
 (* Correctly formed algorithm suite *)
-pure pred CAlgorithmSuite(+numId, stringId, ivLength, tagLength) :
+pred CAlgorithmSuite(+numId, stringId, ivLength, tagLength) :
     (numId == 20)  * (stringId == "ALG_AES128_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128),
     (numId == 70)  * (stringId == "ALG_AES192_GCM_IV12_TAG16") * (ivLength == 12) * (tagLength == 128);
 
 (* Broken algorithm suite *)
-pure pred BAlgorithmSuite(+numId, errorMessage) :
+pred BAlgorithmSuite(+numId, errorMessage) :
     (! (numId == 20)) * (! (numId == 70)) * (errorMessage == "Malformed Header: Unsupported algorithm suite.");
 
 (*
@@ -1053,7 +1110,7 @@ nounfold pred Header(definition, +rawHeaderData, part_one, version, type, suiteI
   ********   Header         *******)
 
 (* Deserialised main part of the message header *)
-nounfold pred MessageHeader(+messageHeader, version, type, suiteId, messageId, EDKs, contentType, headerIvLength, frameLength) :
+nounfold pred MessageHeader(+messageHeader, version, type, suiteId, messageId, +ECKs, EDKs, contentType, headerIvLength, frameLength) :
     JSObject(messageHeader) *
     DataProp(messageHeader, "version", version) *
     DataProp(messageHeader, "type", type) *
@@ -1062,7 +1119,7 @@ nounfold pred MessageHeader(+messageHeader, version, type, suiteId, messageId, E
         Uint8Array(#ui8aMessageId, #abMessageId, 0, 16) *
         ArrayBuffer(#abMessageId, messageId) *
     DataProp(messageHeader, "encryptionContext", #dECObj) *
-        DecodedEncryptionContext(#dECObj) *
+        DecodedEncryptionContext(#dECObj, ECKs) *
     DataProp(messageHeader, "encryptedDataKeys", #dEDKs) *
         DeserialisedEncryptedDataKeys(#dEDKs, EDKs) *
     DataProp(messageHeader, "contentType", contentType) *
@@ -1070,11 +1127,11 @@ nounfold pred MessageHeader(+messageHeader, version, type, suiteId, messageId, E
     DataProp(messageHeader, "frameLength", frameLength);
 
 (* Entire deserialised header *)
-nounfold pred HeaderInfo(+headerInfo, version, type, suiteId, messageId, EDKs, contentType, headerIvLength,
+nounfold pred HeaderInfo(+headerInfo, version, type, suiteId, messageId, +ECKs, EDKs, contentType, headerIvLength,
                             frameLength, headerLength, rawHeaderData, headerIv, headerAuthTag) :
     JSObject(headerInfo) *
     DataProp(headerInfo, "messageHeader", #messageHeader) *
-        MessageHeader(#messageHeader, version, type, suiteId, messageId, EDKs, contentType, headerIvLength, frameLength) *
+        MessageHeader(#messageHeader, version, type, suiteId, messageId, ECKs, EDKs, contentType, headerIvLength, frameLength) *
     DataProp(headerInfo, "headerLength", headerLength) *
     DataProp(headerInfo, "algorithmSuite", #algoSuiteObject) *
         AlgorithmSuiteObject(#algoSuiteObject, headerIvLength, #tagLength) *
@@ -1097,6 +1154,7 @@ nounfold pred HeaderInfo(+headerInfo, version, type, suiteId, messageId, EDKs, c
  *****************************
  *****************************)
 
+(* For integers a and b, if a < b, then a + 1 <= b *)
 lemma IntegerLtPlusOneLe(a, b)
 [[
     (#a <# #b)
@@ -1105,15 +1163,34 @@ lemma IntegerLtPlusOneLe(a, b)
     (#a + 1 <=# #b)
 ]]
 
-(*************************************
- *************************************
- *******                       *******
- *******   Objects-as-Tables   *******
- *******                       *******
- *************************************
- *************************************)
+(*****************************
+ *****************************
+ *******               *******
+ *******   List        *******
+ *******   Reasoning   *******
+ *******               *******
+ *****************************
+ *****************************)
 
-(* First projection *)
+(* Destruct on the structure of a list *)
+lemma DestructList(lst)
+[[
+    types(#lst: List)
+]]
+[[
+    (#lst == {{ }});
+    (#lst == #hd :: #tl)
+]]
+
+(*****************************************
+ *****************************************
+ *******                           *******
+ *******   List first projection   *******
+ *******                           *******
+ *****************************************
+ *****************************************)
+
+(* First projection of a list of pairs *)
 pure pred FirstProj(+lst:List, fProj:List) :
     (lst == {{ }}) * (fProj == {{ }}),
 
@@ -1121,6 +1198,7 @@ pure pred FirstProj(+lst:List, fProj:List) :
     FirstProj(#rest, #fProjRest) *
     (fProj == #fst :: #fProjRest);
 
+(* Adding a pair to a first projection *)
 lemma FirstProjAppendPair(lst, fProj, prop, value)
 [[
     FirstProj(#lst, #fProj)
@@ -1137,6 +1215,58 @@ lemma FirstProjAppendPair(lst, fProj, prop, value)
     }
 *]
 
+(* First projection goes through concatenation *)
+lemma FirstProjConcatSplit(PVPairs, prefix, suffix)
+[[
+    (#PVPairs == l+ (#prefix, #suffix)) *
+    FirstProj(#PVPairs, #props)
+]]
+[[
+    FirstProj(#prefix, #preProps) * FirstProj(#suffix, #sufProps) *
+    (#props == l+ (#preProps, #sufProps))
+]]
+[*
+    unfold FirstProj(#PVPairs, #props);
+    if (not (#PVPairs = {{ }})) then {
+        sep_assert (l+ (#prefix, #suffix) == {{ #prop, #value }} :: #restPVPairs) [bind: #prop, #value, #restPVPairs];
+        sep_assert (FirstProj(#restPVPairs, #restProps));
+        sep_apply DestructList(#prefix);
+        if (not (#prefix = {{ }})) then {
+            sep_assert ((#prefix == {{ #prop, #value }} :: #restPrefix) * (#restPVPairs == l+ (#restPrefix, #suffix))) [bind: #restPrefix];
+            sep_apply FirstProjConcatSplit(#restPVPairs, #restPrefix, #suffix)
+        }
+    }
+*]
+
+(* Compatibility of first projection and toUtf8 *)
+lemma FirstProjToUtf8MapPairCompat(PVPairs)
+[[
+    FirstProj(#PVPairs, #props) *
+    toUtf8MapPair(#PVPairs, #utf8PVPairs) *
+    FirstProj(#utf8PVPairs, #utf8Props)
+]]
+[[
+    toUtf8Map(#props, #utf8Props)
+]]
+[*
+    unfold FirstProj(#PVPairs, #props);
+    unfold toUtf8MapPair(#PVPairs, #utf8PVPairs);
+    unfold FirstProj(#utf8PVPairs, #utf8Props);
+    if (not (#PVPairs = {{ }})) then {
+        sep_assert ((#PVPairs == l+ ({{ {{ _, _}} }}, #restPVPairs))) [bind: #restPVPairs];
+        sep_apply FirstProjToUtf8MapPairCompat(#restPVPairs)
+    }
+ *]
+
+(******************************************
+ ******************************************
+ *******                            *******
+ *******   List to Set conversion   *******
+ *******                            *******
+ ******************************************
+ ******************************************)
+
+(* Converting a list to a set *)
 pure pred ListToSet(+lst:List, set:Set) :
     (lst == {{ }}) * (set == -{ }-),
 
@@ -1144,21 +1274,119 @@ pure pred ListToSet(+lst:List, set:Set) :
     ListToSet(#restLst, #restSet) *
     (set == -u- (-{ #e }-, #restSet));
 
-lemma ListToSetAddProp(lst, set, prop)
+(* Any list can be converted to a set *)
+lemma ProduceListToSet(lst)
+[[
+    types(lst: List)
+]]
+[[
+    ListToSet(#lst, #set)
+]]
+[*
+    sep_apply DestructList(#lst);
+    if (not (#lst = {{ }})) then {
+        sep_assert (#lst == #head :: #rest) [bind: #head, #rest];
+        sep_apply ProduceListToSet(#rest)
+    }
+ *]
+
+(* Adding an element in list-to-set conversion *)
+lemma ListToSetAddElement(lst, set, element)
 [[
     ListToSet(#lst, #set)
 ]]
 [[
-    ListToSet(l+ (#lst, {{ #prop }}), -u- (#set, -{ #prop }-))
+    ListToSet(l+ (#lst, {{ #element }}), -u- (#set, -{ #element }-))
 ]]
 [*
-    unfold ListToSet(#lst, #prop);
+    unfold ListToSet(#lst, #element);
     if (not (#lst = {{ }})) then {
         sep_assert (#lst == l+ ({{ #fProp }}, #restLst)) [bind: #fProp, #restLst];
         sep_assert (ListToSet(#restLst, #restSet)) [bind: #restSet];
-        sep_apply ListToSetAddProp(#restLst, #restSet, #prop)
+        sep_apply ListToSetAddElement(#restLst, #restSet, #element)
     }
 *]
+
+(* A head of a list is always in the corresponding set *)
+lemma HeadInSet(lst)
+[[
+    (#lst == #hd :: #tl) *
+    ListToSet(#lst, #set)
+]]
+[[
+    (#hd --e-- #set)
+]]
+[* *]
+
+(* toUtf8 mapping and list membership *)
+lemma NotInListToUtf8(prop, props)
+[[
+    ListToSet(#props, #propsSet) *
+    (! (#prop --e-- #propsSet)) *
+    toUtf8(#prop, #utf8Prop) *
+    toUtf8Map(#props, #utf8Props) *
+    ListToSet(#utf8Props, #utf8PropsSet)
+]]
+[[
+    (! (#utf8Prop --e-- #utf8PropsSet))
+]]
+[*
+    unfold ListToSet(#props, #propsSet);
+    unfold toUtf8Map(#props, #utf8Props);
+    unfold ListToSet(#utf8Props, #utf8PropsSet);
+
+    if (not (#props = {{ }})) then {
+        sep_assert (#props == #fstProp :: #rest) [bind: #rest];
+        sep_assert (toUtf8(#fstProp, #utf8FstProp)) [bind: #utf8FstProp];
+        sep_apply toUtf8Injective(#prop, #utf8Prop, #fstProp, #utf8FstProp);
+        sep_apply NotInListToUtf8(#prop, #rest)
+    }
+ *]
+
+(********************************
+ ********************************
+ *******                  *******
+ *******   Unique lists   *******
+ *******                  *******
+ ********************************
+ ********************************)
+
+(* Lists without duplicates *)
+pure pred Unique(+l:List) :
+    (l == {{ }}),
+
+    (l == #fst :: #rest) *
+    ListToSet(#rest, #setRest) *
+    (! (#fst --e-- #setRest)) *
+    Unique(#setRest);
+
+(* In a unique list split into a left and a right sublist,
+   no element from the right is on the left *)
+lemma UniqueConcatSplitNotInSuffix(props, prefix, suffix, prop)
+[[
+    (#props == l+ (#prefix, #suffix)) * Unique(#props) *
+    ListToSet(#prefix, #setPrefix) * ListToSet(#suffix, #setSuffix) *
+    (#prop --e-- #setSuffix)
+]]
+[[
+    (! (#prop --e-- #setPrefix))
+]]
+[*
+    sep_apply DestructList(#prefix);
+    if (not (#prefix = {{ }})) then {
+        sep_assert (#prefix == #firstProp :: #restPrefix) [bind: #firstProp, #restPrefix];
+        unfold Unique(#props); unfold ListToSet(#prefix, #setPrefix);
+        sep_apply UniqueConcatSplitNotInSuffix(l+ (#restPrefix, #suffix), #restPrefix, #suffix, #prop)
+    }
+*]
+
+(*************************************
+ *************************************
+ *******                       *******
+ *******   Objects-as-Tables   *******
+ *******                       *******
+ *************************************
+ *************************************)
 
 (* Object properties as a table *)
 pred ObjectTableStructure(+l:Obj, +pvPairs:List) :
@@ -1170,7 +1398,7 @@ pred ObjectTableStructure(+l:Obj, +pvPairs:List) :
     DataProp(l, #prop, #value) *
     ObjectTableStructure(l, #restPVPairs);
 
-(* Complete Object-as-Table predicate, with empty fields *)
+(* Complete Object-as-Table predicate *)
 nounfold pred ObjectTable(+l:Obj, +pvPairs:List) :
     ObjectTableStructure(l, pvPairs) *
     FirstProj(pvPairs, #pList) *
@@ -1192,7 +1420,6 @@ lemma ObjectTableAbsentProperty(l, pvPairs, prop)
     empty_fields(#l : -u- (#pSet, -{ #prop }-))
 ]]
 [*  *]
-
 
 (* Appending property to Object-as-Table structure from the right *)
 lemma ObjectTableStructureAppendPVPair(l, pvPairs, prop, value)
@@ -1232,10 +1459,27 @@ lemma ObjectTableAppendPVPair(l, pvPairs, prop, value)
     ObjectTable(#l, l+ (#pvPairs, {{ {{ #prop, #value }} }}))
 ]]
 [*
-    sep_apply ObjectTableStructureAppendPVPair(#l, #pvPairs, #prop, #value);
     sep_apply FirstProjAppendPair(#pvPairs, #pList, #prop, #value);
-    sep_apply ListToSetAddProp(#pList, #pSet, #prop)
+    sep_apply ListToSetAddElement(#pList, #pSet, #prop);
+    sep_apply ObjectTableStructureAppendPVPair(#l, #pvPairs, #prop, #value)
  *]
+
+(* Frozen object properties *)
+pred FrozenObjectTableStructure(+l:Obj, +pvPairs:List) :
+    (* Base case - no properties left *)
+    (pvPairs == {{ }}),
+
+    (* Recursive case - one property and the rest *)
+    (pvPairs == {{ #prop, #value }} :: #restPVPairs) *
+    DataPropConst(l, #prop, #value, true) *
+    FrozenObjectTableStructure(l, #restPVPairs);
+
+(* Frozen Object-as-Table predicate *)
+nounfold pred FrozenObjectTable(+l:Obj, +pvPairs:List) :
+    FrozenObjectTableStructure(l, pvPairs) *
+    FirstProj(pvPairs, #pList) *
+    ListToSet(#pList, #pSet) *
+    empty_fields(l : #pSet);
 
 (******************************
  ******************************
@@ -1247,6 +1491,46 @@ lemma ObjectTableAppendPVPair(l, pvPairs, prop, value)
  *******                *******
  ******************************
  ******************************)
+
+(* *** Array.prototype.map *** *)
+axiomatic incomplete spec AP_map (xsc, vthis, cfun)
+(* Mapping EDKs into the resulting decoded EDK array *)
+[[
+    (vthis == #vthis) * (cfun == #cfun) *
+    JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
+    ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs)
+]]
+[[
+    JSFunctionObject(#cfun, "aux_deserializeEncryptedDataKey", #a_sc, #a_len, #a_proto) *
+    ArrayOfArraysOfUInt8Arrays(#vthis, #EDKs) *
+    types(ret : Obj) * LiveDeserialisedEncryptedDataKeys(ret, #EDKs)
+]]
+normal
+
+(* *** Object.freeze *** *)
+axiomatic spec Object_freeze(xsc, vthis, l)
+(* Freezing an array of deserialised EDKs *)
+<deserialised_EDKS>
+[[
+    (l == #l) * LiveDeserialisedEncryptedDataKeys(#l, #EDKs)
+]]
+[[
+    DeserialisedEncryptedDataKeys(#l, #EDKs) * (ret == #l)
+]]
+normal;
+
+(* Freezing an Object-as-Table *)
+<object_table : #PVPairs>
+[[
+    (l == #l) *
+    JSObjGeneral(#l, #proto, #class, #ext) *
+    ObjectTable(#l, #PVPairs)
+]]
+[[
+    JSObjGeneral(#l, #proto, #class, false) *
+    FrozenObjectTable(#l, #PVPairs)
+]]
+normal
 
 (* *** Conversion to an integer *** *)
 proc i__toInteger (v) {

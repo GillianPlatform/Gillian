@@ -12,6 +12,7 @@ type t =
   | ApplyLemma of string * JSExpr.t list  (** Lemma         *)
   | Macro      of string * JSExpr.t list  (** Macro         *)
   | Assert     of (JSAsrt.t * string list)  (** Assert        *)
+  | Assume     of JSAsrt.pt  (** Assume *)
   | Invariant  of (JSAsrt.t * string list)  (** Invariant     *)
   | UseSubst   of string * (string * JSExpr.t) list
 
@@ -52,6 +53,7 @@ let rec js2jsil
         JSAsrt.js2jsil_tactic cc_tbl vis_tbl fun_tbl fid scope_var assertion
       in
       [ LCmd.SL (SepAssert (a', binders)) ]
+  | Assume pf -> [ LCmd.Assume (JSAsrt.js2jsil_pure None pf) ]
   | Macro (s, les) -> [ LCmd.Macro (s, List.map fe les) ]
   | If (le, lcthen, lcelse) ->
       [

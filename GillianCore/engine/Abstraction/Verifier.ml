@@ -539,6 +539,11 @@ struct
 
     (* STEP 4: Convert lemmas to symbolic tests *)
     (* Printf.printf "Converting symbolic tests from lemmas: %f\n" (cur_time -. start_time); *)
+    let lemmas_to_verify =
+      List.sort
+        (fun (l1 : Lemma.t) l2 -> Stdlib.compare l1.lemma_name l2.lemma_name)
+        lemmas_to_verify
+    in
     let tests' : t list =
       List.concat
         (List.map
