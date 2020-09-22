@@ -1,7 +1,7 @@
-open Gillian.Gil_syntax
-module PureContext = Gillian.Symbolic.PureContext
-module TypEnv = Gillian.Symbolic.TypEnv
-module FOSolver = Gillian.Logic.FOSolver
+open Gil_syntax
+module PureContext = Engine.PFS
+module TypEnv = Engine.TypEnv
+module FOSolver = Engine.FOSolver
 
 let id_gen =
   let i = ref 0 in

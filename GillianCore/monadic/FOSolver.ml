@@ -1,6 +1,6 @@
-module FOSolver = Gillian.Logic.FOSolver
-module PFS = Gillian.Symbolic.PureContext
-module Formula = Gillian.Gil_syntax.Formula
+module FOSolver = Engine.FOSolver
+module PFS = Engine.PFS
+module Formula = Gil_syntax.Formula
 
 (** FIXME: optimization? *)
 let build_full_pfs (pc : Pc.t) =

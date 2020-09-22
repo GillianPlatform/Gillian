@@ -7,4 +7,4 @@
 
 (library
  (name cgil_lib)
- (libraries gillian compcert monadic batteries))
+ (libraries gillian compcert batteries))

@@ -1,13 +1,13 @@
-open Gillian.Symbolic
-open Gillian.Utils
+open Utils
+open Engine
 open Gil_syntax
 
 module type S = sig
   (** Type of GIL values *)
-  type vt = Values.t
+  type vt = SVal.M.t
 
   (** Type of GIL substitutions *)
-  type st = Subst.t
+  type st = SVal.SSubst.t
 
   type i_fix_t
 
@@ -69,15 +69,15 @@ module type S = sig
   val get_fixes :
     ?simple_fix:bool ->
     t ->
-    PureContext.t ->
+    PFS.t ->
     TypEnv.t ->
     err_t ->
     (c_fix_t list * Formula.t list * Containers.SS.t * Asrt.t list) list
 
-  val apply_fix : t -> PureContext.t -> TypEnv.t -> c_fix_t -> t
+  val apply_fix : t -> PFS.t -> TypEnv.t -> c_fix_t -> t
 end
 
-module Lift (MSM : S) : Memory_S = struct
+module Lift (MSM : S) : SMemory.S = struct
   include MSM
 
   type action_ret =
