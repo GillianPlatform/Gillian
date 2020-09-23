@@ -361,16 +361,14 @@ struct
     let rec init_pvar_equalities (fs : Formula.t list) : unit =
       List.iter
         (fun (f : Formula.t) ->
-          ( match f with
-            | Eq (PVar x, e) | Eq (e, PVar x) ->
-                if
-                  (not (Hashtbl.mem pvar_equalities x))
-                  && not (SStore.mem store x)
-                then Hashtbl.add pvar_equalities x e
-                else
-                  Stack.push (Formula.Eq (PVar x, e)) non_store_pure_assertions
-            | _ -> Stack.push f non_store_pure_assertions
-            : unit ))
+          match f with
+          | Eq (PVar x, e) | Eq (e, PVar x) ->
+              if
+                (not (Hashtbl.mem pvar_equalities x))
+                && not (SStore.mem store x)
+              then Hashtbl.add pvar_equalities x e
+              else Stack.push (Formula.Eq (PVar x, e)) non_store_pure_assertions
+          | _ -> Stack.push f non_store_pure_assertions)
         fs
     in
 
@@ -713,12 +711,11 @@ struct
 
       Hashtbl.fold
         (fun (a : _) (a_asrts : (Expr.t list * Expr.t list) list)
-             (ac : Formula.t list) ->
-          ( let pre_constraints =
-              List_utils.cross_product a_asrts a_asrts f_aux
-            in
-            List.map generate_constraint pre_constraints
-            : Formula.t list ))
+             (ac : Formula.t list) : Formula.t list ->
+          let pre_constraints =
+            List_utils.cross_product a_asrts a_asrts f_aux
+          in
+          List.map generate_constraint pre_constraints)
         summary []
     in
 

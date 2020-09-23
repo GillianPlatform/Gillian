@@ -160,14 +160,12 @@ let make_relevant_axioms
 let get_axioms assertions gamma =
   (* Get list variables *)
   let list_vars =
-    List.map
-      (fun x -> (LVar x : Expr.t))
-      (TypEnv.get_vars_of_type gamma ListType)
+    List.map (fun x : Expr.t -> LVar x) (TypEnv.get_vars_of_type gamma ListType)
   in
   (* Get string variables *)
   let string_vars =
     List.map
-      (fun x -> (LVar x : Expr.t))
+      (fun x : Expr.t -> LVar x)
       (TypEnv.get_vars_of_type gamma StringType)
   in
   (* Get list expressions *)
@@ -309,7 +307,7 @@ let check_entailment
       (* let axioms   = get_axioms (left_fs @ right_fs) gamma in *)
       let right_fs =
         List.map
-          (fun f -> (Formula.push_in_negations (Not f) : Formula.t))
+          (fun f : Formula.t -> Formula.push_in_negations (Not f))
           right_fs
       in
       let right_f : Formula.t =

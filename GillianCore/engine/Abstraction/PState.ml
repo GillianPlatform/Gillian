@@ -467,9 +467,7 @@ module Make
         match pvars_diff = SS.empty with
         | false ->
             let pvars_errs : err_t list =
-              List.map
-                (fun pvar -> (EVar pvar : err_t))
-                (SS.elements pvars_diff)
+              List.map (fun pvar -> StateErr.EVar pvar) (SS.elements pvars_diff)
             in
             raise (Internal_State_Error (pvars_errs, astate))
         | true  -> (

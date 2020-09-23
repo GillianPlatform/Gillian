@@ -206,16 +206,15 @@ let resolve_var_to_location (lvar : string) (pfs : Formula.t list) :
   let original_pfs =
     List.map
       (fun (a : Formula.t) ->
-        ( match (a : Formula.t) with
-          | Eq (le1, le2) -> (
-              let le1' = normalise_list_expressions le1 in
-              match (le1' : Expr.t) with
-              | EList _ | NOp (LstCat, _) -> Eq (le1', le2)
-              | _                         ->
-                  let le2' = normalise_list_expressions le2 in
-                  Eq (le1', le2') )
-          | _             -> a
-          : Formula.t ))
+        match (a : Formula.t) with
+        | Eq (le1, le2) -> (
+            let le1' = normalise_list_expressions le1 in
+            match (le1' : Expr.t) with
+            | EList _ | NOp (LstCat, _) -> Formula.Eq (le1', le2)
+            | _                         ->
+                let le2' = normalise_list_expressions le2 in
+                Eq (le1', le2') )
+        | _             -> a)
       pfs
   in
 
@@ -272,7 +271,7 @@ let resolve_var_to_location (lvar : string) (pfs : Formula.t list) :
   and shallow_loop_lists lst_1 lst_2 found_other_bindings =
     shallow_loop
       (List.map2
-         (fun (le1 : Expr.t) (le2 : Expr.t) -> (Eq (le1, le2) : Formula.t))
+         (fun (le1 : Expr.t) (le2 : Expr.t) : Formula.t -> Eq (le1, le2))
          lst_1 lst_2)
       [] found_other_bindings
   in
@@ -1997,10 +1996,9 @@ let rec reduce_formula_loop
           | le :: lle ->
               let rle = fe le in
               List.fold_left
-                (fun ac le ->
-                  ( let rle = fe le in
-                    Or (ac, SetMem (rleb, rle))
-                    : Formula.t ))
+                (fun ac le : Formula.t ->
+                  let rle = fe le in
+                  Or (ac, SetMem (rleb, rle)))
                 (SetMem (rleb, rle))
                 lle
         in
@@ -2014,10 +2012,9 @@ let rec reduce_formula_loop
           | le :: lle ->
               let rle = fe le in
               List.fold_left
-                (fun ac le ->
-                  ( let rle = fe le in
-                    And (ac, SetMem (rleb, rle))
-                    : Formula.t ))
+                (fun ac le : Formula.t ->
+                  let rle = fe le in
+                  And (ac, SetMem (rleb, rle)))
                 (SetMem (rleb, rle))
                 lle
         in
@@ -2033,15 +2030,14 @@ let rec reduce_formula_loop
         let rleb = fe leb in
         let rles = List.map (fun le -> fe le) les in
         let result : Formula.t list =
-          List.map (fun le -> (Eq (rleb, le) : Formula.t)) rles
+          List.map (fun le : Formula.t -> Eq (rleb, le)) rles
         in
         let result =
           List.fold_left
-            (fun ac eq ->
-              ( match (ac : Formula.t) with
-                | False -> eq
-                | _     -> Or (ac, eq)
-                : Formula.t ))
+            (fun ac eq : Formula.t ->
+              match (ac : Formula.t) with
+              | False -> eq
+              | _     -> Or (ac, eq))
             False result
         in
         f result

@@ -12,11 +12,11 @@ let simple_test =
       let open Formula.Infix in
       let x = var "x" in
       let two = n 2. in
-      branch_on x#>two
+      branch_on x #> two
         ~then_branch:(fun () -> return 1)
         ~else_branch:(fun () ->
           let three = n 3. in
-          branch_on x#==three
+          branch_on x #== three
             ~then_branch:(fun () ->
               (* This can't happen, because we know that [not (x #> 2)] *)
               return 2)

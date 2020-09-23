@@ -1,4 +1,4 @@
-version=0.14.2
+version=0.15.0
 align-cases=true
 align-constructors-decl=true
 align-variants-decl=true
