@@ -144,13 +144,16 @@ module Make
     let sort (candidates : (vt list * vt list) list) (targets : vt list) =
       let equals (candidates : vt list) (targets : vt list) =
         List.fold_left2
-          (fun sum c t -> if c = t then sum - 1 else sum)
+          (fun sum c t ->
+            L.tmi (fun fmt ->
+                fmt "Candidate equals: %a vs %a" Val.pp c Val.pp t);
+            if c = t then sum - 1 else sum)
           0 candidates targets
       in
       let sort_fun (p1 : vt list * vt list) (p2 : vt list * vt list) =
-        let p1 = fst p1 in
-        let p2 = fst p2 in
-        Stdlib.compare (equals p1 targets) (equals p2 targets)
+        let i1, o1 = p1 in
+        let i2, o2 = p2 in
+        Stdlib.compare (equals i1 targets) (equals i2 targets)
       in
       List.sort sort_fun candidates
     in

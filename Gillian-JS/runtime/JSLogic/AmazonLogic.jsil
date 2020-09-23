@@ -1210,6 +1210,15 @@ pure pred FirstProj(+lst:List, fProj:List) :
     FirstProj(#rest, #fProjRest) *
     (fProj == #fst :: #fProjRest);
 
+(* FirstProj is a function *)
+lemma FirstProjFunction(lst1, proj1, lst2, proj2)
+[[
+    FirstProj(#lst1, #proj1) * FirstProj(#lst2, #proj2) * (#lst1 == #lst2)
+]]
+[[
+    (#proj1 == #proj2)
+]]
+
 (* Adding a pair to a first projection *)
 lemma FirstProjAppendPair(lst, fProj, prop, value)
 [[
@@ -1230,23 +1239,21 @@ lemma FirstProjAppendPair(lst, fProj, prop, value)
 (* First projection goes through concatenation *)
 lemma FirstProjConcatSplit(PVPairs, prefix, suffix)
 [[
-    (#PVPairs == l+ (#prefix, #suffix)) *
-    FirstProj(#PVPairs, #props)
+    (#PVPairs == l+ (#prefix, #suffix)) * FirstProj(#PVPairs, #props) *
+    FirstProj(#prefix, #preProps) * FirstProj(#suffix, #sufProps)
 ]]
 [[
-    FirstProj(#prefix, #preProps) * FirstProj(#suffix, #sufProps) *
     (#props == l+ (#preProps, #sufProps))
 ]]
 [*
-    unfold FirstProj(#PVPairs, #props);
-    if (not (#PVPairs = {{ }})) then {
-        sep_assert (l+ (#prefix, #suffix) == {{ #prop, #value }} :: #restPVPairs) [bind: #prop, #value, #restPVPairs];
-        sep_assert (FirstProj(#restPVPairs, #restProps));
-        sep_apply DestructList(#prefix);
-        if (not (#prefix = {{ }})) then {
-            sep_assert ((#prefix == {{ #prop, #value }} :: #restPrefix) * (#restPVPairs == l+ (#restPrefix, #suffix))) [bind: #restPrefix];
-            sep_apply FirstProjConcatSplit(#restPVPairs, #restPrefix, #suffix)
-        }
+    sep_apply DestructList(#prefix);
+    unfold FirstProj(#prefix, #preProps);
+    if (#prefix = {{ }}) then {
+        sep_apply FirstProjFunction(#PVPairs, #props, #suffix, #sufProps)
+    } else {
+        sep_assert (#prefix == {{ #prop, #value }} :: #restPrefix) [bind: #restPrefix];
+        unfold FirstProj(#PVPairs, #props); unfold FirstProj(#prefix, #preProps);
+        sep_apply FirstProjConcatSplit(l+(#restPrefix, #suffix), #restPrefix, #suffix)
     }
 *]
 
@@ -1285,6 +1292,35 @@ pure pred ListToSet(+lst:List, set:Set) :
     (lst == #e :: #restLst) *
     ListToSet(#restLst, #restSet) *
     (set == -u- (-{ #e }-, #restSet));
+
+(* ListToSet is a function *)
+lemma ListToSetFunction(lst1, set1, lst2, set2)
+[[
+    ListToSet(#lst1, #set1) * ListToSet(#lst2, #set2) * (#lst1 == #lst2)
+]]
+[[
+    (#set1 == #set2)
+]]
+
+(* ListToSet concat-union compatibility *)
+lemma ListToSetUnion(lst1, lst2)
+[[
+    ListToSet(#lst1, #set1) * ListToSet(#lst2, #set2) * ListToSet(l+ (#lst1, #lst2), #uset)
+]]
+[[
+    (#uset == -u- (#set1, #set2))
+]]
+[*
+    unfold ListToSet(#lst1, #set1);
+    if (#lst1 = {{ }}) then {
+        sep_assert (#x == l+ (#lst1, #lst2)) [bind: #x];
+        sep_apply ListToSetFunction(#lst2, #set2, #x, #uset)
+    } else {
+        sep_assert (#lst1 == #h1 :: #rest1) [bind: #h1, #rest1];
+        unfold ListToSet(l+ (#lst1, #lst2), #uset);
+        sep_apply ListToSetUnion(#rest1, #lst2)
+    }
+ *]
 
 (* Any list can be converted to a set *)
 lemma ProduceListToSet(lst)
@@ -1370,7 +1406,7 @@ pure pred Unique(+l:List) :
     (l == #fst :: #rest) *
     ListToSet(#rest, #setRest) *
     (! (#fst --e-- #setRest)) *
-    Unique(#setRest);
+    Unique(#rest);
 
 (* In a unique list split into a left and a right sublist,
    no element from the right is on the left *)
@@ -1388,9 +1424,46 @@ lemma UniqueConcatSplitNotInSuffix(props, prefix, suffix, prop)
     if (not (#prefix = {{ }})) then {
         sep_assert (#prefix == #firstProp :: #restPrefix) [bind: #firstProp, #restPrefix];
         unfold Unique(#props); unfold ListToSet(#prefix, #setPrefix);
-        sep_apply UniqueConcatSplitNotInSuffix(l+ (#restPrefix, #suffix), #restPrefix, #suffix, #prop)
+        sep_apply UniqueConcatSplitNotInSuffix(l+ (#restPrefix, #suffix), #restPrefix, #suffix, #prop);
+        branch(#firstProp == #prop);
+        if (#firstProp = #prop) then {
+            sep_apply ListToSetUnion(#restPrefix, #suffix)
+        }
+    } else {
+        unfold ListToSet(#prefix, #setPrefix)
     }
 *]
+
+(* Appending an element to a unique list *)
+lemma UniqueAppendElement(lst, element)
+[[
+    Unique(#lst) * ListToSet(#lst, #set) *
+    (! (#element --e-- #set))
+]]
+[[
+    Unique(l+ (#lst, {{ #element }}))
+]]
+
+(************************************
+ ************************************
+ *******                      *******
+ *******   Duplicated lists   *******
+ *******                      *******
+ ************************************
+ ************************************)
+
+(* Lists with duplicates *)
+pure pred Duplicated(+l:List) :
+    (* Either the head is duplicated *)
+    (l == #fst :: #rest) *
+    ListToSet(#rest, #setRest) *
+    (#fst --e-- #setRest),
+
+    (* Or the duplication is in the tail *)
+    (l == #fst :: #rest) *
+    ListToSet(#rest, #setRest) *
+    (! (#fst --e-- #setRest)) *
+    Duplicated(#setRest);
 
 (*************************************
  *************************************

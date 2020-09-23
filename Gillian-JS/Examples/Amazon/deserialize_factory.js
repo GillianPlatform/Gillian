@@ -256,6 +256,11 @@ var toUtf8 = function (buffer) { };
  *******************************************/
 
 /**
+
+    @pred nounfold UniqueOrDuplicated(definition:Str, rProps:List) :
+        (definition == "Complete") * Unique(rProps),
+        (definition == "Broken") * Duplicated(rProps);
+
     @id decodeEncryptionContext
 
     @pre (this == undefined) * (encodedEncryptionContext == #eEC) *
@@ -360,18 +365,22 @@ function decodeEncryptionContext(encodedEncryptionContext) {
         ArrayPrototype ($larr_proto) * ObjectPrototype($lobj_proto) * GlobalObject () *
         scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
         scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
-        toUtf8MapPair(#ECKs, #utf8ECKs) * FirstProj(#ECKs, #rProps) * types(#rProps : List) * Unique(#rProps) *
+        toUtf8MapPair(#ECKs, #utf8ECKs) * FirstProj(#ECKs, #rProps) * types(#rProps : List) *
+        UniqueOrDuplicated(#definition, #rProps) *
 
         scope(count: #count) * (#count <=# #pairsCount) *
         ArrayOfArraysOfUInt8ArraysContents(#elements, #done, 0, #count) *
         ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count) *
         (#ECKs == l+ (#done, #left)) *
+        FirstProj(#done, #doneRProps) * types(#doneRProps : List) * Unique(#doneRProps) *
+        FirstProj(#left, #leftRProps) * types(#leftRProps : List) * UniqueOrDuplicated(#definition, #leftRProps) *
         toUtf8MapPair(#done, #utf8Done) * types(#utf8Done : List) *
         JSObjWithProto(#dECObj, null) * ObjectTable(#dECObj, #utf8Done)
-        [bind: #count, #done, #left, #utf8Done] */
+        [bind: #count, #done, #left, #doneRProps, #leftRProps, #utf8Done] */
   for (var count = 0; count < pairsCount; count++) {
     /*
         @tactic
+        unfold UniqueOrDuplicated(#definition, #rProps); unfold UniqueOrDuplicated(#definition, #leftRProps);
         apply lemma ArrayOfArraysOfUInt8ArraysContentsFacts(#elements, #done, 0, #count);
         apply lemma ArrayOfArraysOfUInt8ArraysContentsFacts(#elements, #left, #count, #pairsCount - #count);
         unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count);
@@ -396,16 +405,15 @@ function decodeEncryptionContext(encodedEncryptionContext) {
             assert (FirstProj(#utf8Done, #doneProps)) [bind: #doneProps];
             assert (ListToSet(#doneProps, #donePropsSet)) [bind: #donePropsSet];
             apply lemma FirstProjConcatSplit(#ECKs, #done, #left);
-            assert (FirstProj(#done, #doneRProps) * FirstProj(#left, #leftRProps)) [bind: #doneRProps, #leftRProps];
-            apply lemma ProduceListToSet(#doneRProps); assert(ListToSet(#doneRProps, #doneRPropsSet)) [bind: #doneRPropsSet];
-            apply lemma ProduceListToSet(#leftRProps); assert(ListToSet(#leftRProps, #leftRPropsSet)) [bind: #leftRPropsSet];
-            apply lemma FirstProjConcatSplit(#left, {{ {{#new_prop, #new_value}} }}, #rest_left);
-            unfold FirstProj({{{{#new_prop, #new_value}}}}, _); unfold FirstProj({{}}, _);
+            apply lemma ProduceListToSet(#doneRProps); apply lemma ProduceListToSet(#leftRProps);
+            unfold FirstProj(#left, #leftRProps);
             apply lemma HeadInSet(#leftRProps);
-            apply lemma UniqueConcatSplitNotInSuffix(#rProps, #doneRProps, #leftRProps, #new_prop);
-            apply lemma FirstProjToUtf8MapPairCompat(#done);
-            apply lemma NotInListToUtf8(#new_prop, #doneRProps);
-            apply lemma ObjectTableAbsentProperty(#dECObj, #utf8Done, #utf8NProp)
+            if (#definition = "Complete") then {
+                apply lemma UniqueConcatSplitNotInSuffix(#rProps, #doneRProps, #leftRProps, #new_prop);
+                apply lemma FirstProjToUtf8MapPairCompat(#done);
+                apply lemma NotInListToUtf8(#new_prop, #doneRProps);
+                apply lemma ObjectTableAbsentProperty(#dECObj, #utf8Done, #utf8NProp)
+            }
     */
     needs(
         encryptionContext[key] === undefined,
@@ -419,8 +427,13 @@ function decodeEncryptionContext(encodedEncryptionContext) {
             apply lemma IntegerLtPlusOneLe(#count, #pairsCount);
             apply lemma ObjectTableStructureAppendPVPair(#dECObj, #utf8Done, #utf8NProp, #utf8NVal);
             apply lemma toUtf8MapPairAppendPair(#done, #utf8Done, #new_prop, #new_value);
+            apply lemma FirstProjAppendPair(#done, #doneRProps, #new_prop, #new_value);
             apply lemma FirstProjAppendPair(#utf8Done, #doneProps, #utf8NProp, #utf8NVal);
-            apply lemma ListToSetAddElement(#doneProps, #donePropsSet, #utf8NProp)
+            apply lemma ListToSetAddElement(#doneProps, #donePropsSet, #utf8NProp);
+            apply lemma UniqueAppendElement(#doneRProps, #new_prop);
+            if (#definition = "Complete") then {
+                unfold Unique(#leftRProps)
+            }
     */
     0 === 0;
   }
@@ -446,7 +459,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 /**
     @id deserializeEncryptedDataKeys
 
-    @pre (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
+    @prex (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          ((#definition == "Complete") \/ (#definition == "Incomplete")) *
@@ -457,7 +470,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
          JSInternals()
 
-    @post Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
+    @postx Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
           RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
 
@@ -483,7 +496,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
           scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
           JSInternals ()
 
-    @pre (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
+    @prex (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#definition == "Broken") *
@@ -492,7 +505,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          JSInternals()
 
-    @posterr
+    @posterrx
           Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
           RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
@@ -631,7 +644,7 @@ var SdkSuite = function (suiteId) { };
 /**
     @id deserializeMessageHeader
 
-    @pre (messageBuffer == #messageBuffer) *
+    @prex (messageBuffer == #messageBuffer) *
          Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#byteOffset + #byteLength <=# l-len #data) *
@@ -651,7 +664,7 @@ var SdkSuite = function (suiteId) { };
          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
          JSInternals ()
 
-    @post Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
+    @postx Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
           Header(#definition,
                  #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
                         #part_two, #ECKs,
@@ -688,7 +701,7 @@ var SdkSuite = function (suiteId) { };
           scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
           JSInternals()
 
-    @pre (messageBuffer == #messageBuffer) *
+    @prex (messageBuffer == #messageBuffer) *
          Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#byteOffset + #byteLength <=# l-len #data) *
@@ -708,7 +721,7 @@ var SdkSuite = function (suiteId) { };
          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
          JSInternals ()
 
-    @posterr
+    @posterrx
           Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
           Header(#definition,
                  #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,

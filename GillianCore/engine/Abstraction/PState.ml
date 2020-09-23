@@ -392,6 +392,7 @@ module Make
       (lcmd : SLCmd.t)
       (astate : t) : (t list, string) result =
     let state, preds, pred_defs = astate in
+
     let eval_expr e =
       try State.eval_expr state e
       with State.Internal_State_Error (errs, s) ->
