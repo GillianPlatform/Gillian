@@ -2,6 +2,7 @@ module Formula = Gil_syntax.Formula
 
 type 'a guarded_thunk = { guard : Formula.t; thunk : unit -> 'a }
 
+(** When using Branching, it should be certain that the paths are complete *)
 and _ t =
   | Final     : 'a -> 'a t
   | Branching : 'a t guarded_thunk list -> 'a t
@@ -12,17 +13,34 @@ let rec resolve : type a. curr_pc:Pc.t -> a t -> a Branch.t list =
   match process with
   | Final z            -> [ { pc = curr_pc; value = z } ]
   | Branching branches ->
-      let different_branches =
-        List.filter_map
-          (fun { guard; thunk } ->
-            if FOSolver.sat ~pc:curr_pc guard then
-              let extended_pc = Pc.extend (Pc.copy curr_pc) [ guard ] in
-              let new_delayed = thunk () in
-              Some (resolve ~curr_pc:extended_pc new_delayed)
-            else None)
-          branches
+      let get_branches l =
+        let rec loop acc no_sat_path l =
+          match l with
+          | []                    -> acc
+          | [ { guard; thunk } ]  ->
+              let should_go_in =
+                if no_sat_path then
+                  (* No previoues path was SAT, so this one has to be *)
+                  true
+                else FOSolver.sat ~pc:curr_pc guard
+              in
+              if should_go_in then
+                let extended_pc = Pc.extend (Pc.copy curr_pc) [ guard ] in
+                let new_delayed = thunk () in
+                let follow_up = resolve ~curr_pc:extended_pc new_delayed in
+                loop (follow_up @ acc) false []
+              else loop acc false []
+          | { guard; thunk } :: r ->
+              if FOSolver.sat ~pc:curr_pc guard then
+                let extended_pc = Pc.extend (Pc.copy curr_pc) [ guard ] in
+                let new_delayed = thunk () in
+                let follow_up = resolve ~curr_pc:extended_pc new_delayed in
+                loop (follow_up @ acc) false r
+              else loop acc no_sat_path r
+        in
+        loop [] true l
       in
-      List.concat different_branches
+      get_branches branches
   | Bound (x, f)       ->
       let branches_of_first_comp = resolve ~curr_pc x in
       let continue =
