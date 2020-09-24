@@ -717,9 +717,13 @@ pure nounfold pred toUtf8(+rawData:List, utf8Data:Str) : (utf8Data == "");
 
 (* toUtf8 is injective *)
 lemma toUtf8Injective(rawData1, utf8Data1, rawData2, utf8Data2)
-    [[ toUtf8(#rawData1, #utf8Data1) * toUtf8(#rawData2, #utf8Data2) ]]
-    [[ (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
-       (! (#rawData1 == #rawData2)) * (! (#utf8Data1 == #utf8Data2)) ]]
+[[
+    toUtf8(#rawData1, #utf8Data1) * toUtf8(#rawData2, #utf8Data2)
+]]
+[[
+    (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
+    (! (#rawData1 == #rawData2)) * (! (#utf8Data1 == #utf8Data2))
+]]
 
 (*
     fromUtf8(utf8Data, rawData) is an abstract predicate which
@@ -730,19 +734,31 @@ pure nounfold pred fromUtf8(+utf8Data:Str, rawData:List) : (rawData == {{ }});
 
 (* fromUtf8 is injective *)
 lemma fromUtf8Injective(utf8Data1, rawData1, utf8Data2, rawData2)
-    [[ fromUtf8(#utf8Data1, #rawData1) * fromUtf8(#utf8Data2, #rawData2) ]]
-    [[ (#utf8Data1 == #utf8Data2) * (#rawData1 == #rawData2);
-       (! (#utf8Data1 == #utf8Data2)) * (! (#rawData1 == #rawData2)) ]]
+[[
+    fromUtf8(#utf8Data1, #rawData1) * fromUtf8(#utf8Data2, #rawData2)
+]]
+[[
+    (#utf8Data1 == #utf8Data2) * (#rawData1 == #rawData2);
+    (! (#utf8Data1 == #utf8Data2)) * (! (#rawData1 == #rawData2))
+]]
 
 (* Invertibility of toUtf8 with respect to fromUtf8 *)
 lemma toUtf8fromUtf8(rawData)
-  [[ toUtf8(#rawData, #utf8Data) ]]
-  [[ fromUtf8(#utf8Data, #rawData) ]]
+[[
+    toUtf8(#rawData, #utf8Data)
+]]
+[[
+    fromUtf8(#utf8Data, #rawData)
+]]
 
 (* Invertibility of fromUtf8 with respect to toUtf8 *)
 lemma fromUtf8toUtf8(utf8Data)
-  [[ fromUtf8(#utf8Data, #rawData) ]]
-  [[ toUtf8(#rawData, #utf8Data) ]]
+[[
+    fromUtf8(#utf8Data, #rawData)
+]]
+[[
+    toUtf8(#rawData, #utf8Data)
+]]
 
 (* UTF-8 Mapping of lists *)
 pure pred toUtf8Map(+data : List, utf8Data : List) :
@@ -755,9 +771,13 @@ pure pred toUtf8Map(+data : List, utf8Data : List) :
 
 (* toUtf8MapPair is injective *)
 lemma toUtf8MapInjective(rawData1, utf8Data1, rawData2, utf8Data2)
-    [[ toUtf8Map(#rawData1, #utf8Data1) * toUtf8Map(#rawData2, #utf8Data2) ]]
-    [[ (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
-       (! (#rawData1 == #rawData2)) * (! (#utf8Data1 == #utf8Data2)) ]]
+[[
+    toUtf8Map(#rawData1, #utf8Data1) * toUtf8Map(#rawData2, #utf8Data2)
+]]
+[[
+    (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
+    (! (#rawData1 == #rawData2)) * (! (#utf8Data1 == #utf8Data2))
+]]
 [*
     unfold toUtf8Map(#rawData1, #utf8Data1);
     unfold toUtf8Map(#rawData2, #utf8Data2);
@@ -782,9 +802,13 @@ pure pred toUtf8MapPair(+data : List, utf8Data : List) :
 
 (* toUtf8MapPair is injective *)
 lemma toUtf8MapPairInjective(rawData1, utf8Data1, rawData2, utf8Data2)
-    [[ toUtf8MapPair(#rawData1, #utf8Data1) * toUtf8MapPair(#rawData2, #utf8Data2) ]]
-    [[ (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
-       (! (#rawData1 == #rawData2)) * (! (#utf8Data1 == #utf8Data2)) ]]
+[[
+    toUtf8MapPair(#rawData1, #utf8Data1) * toUtf8MapPair(#rawData2, #utf8Data2)
+]]
+[[
+    (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
+    (! (#rawData1 == #rawData2)) * (! (#utf8Data1 == #utf8Data2))
+]]
 [*
     unfold toUtf8MapPair(#rawData1, #utf8Data1);
     unfold toUtf8MapPair(#rawData2, #utf8Data2);
