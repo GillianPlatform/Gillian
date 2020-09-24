@@ -140,7 +140,7 @@ pred ObjectPrototype () :
   (($lobj_proto, "hasOwnProperty") -> {{ "d", $lop_hasOwnProperty, true, false, true }}) *
   JSBIFunction($lop_hasOwnProperty, "OP_hasOwnProperty", 1) * empty_fields($lop_hasOwnProperty : -{ "length" }-);
 
-pred FunctionPrototype () :
+pred FunctionPrototype ($lfun_proto) :
   JSObjGeneralWeak ($lfun_proto, $lobj_proto, "Function", true) *
   (($lfun_proto, "length") -> {{ "d", 0, false, false, false }}) *
   (($lfun_proto, "call")   -> {{ "d", $lfp_call, true, false, true }}) *
@@ -203,7 +203,7 @@ pred initialHeapPost (globals) :
     BI_ObjectObject () *
     ObjectPrototype () *
 
-    FunctionPrototype () *
+    FunctionPrototype ($lfun_proto) *
 
     BooleanPrototype () * empty_fields ($lbool_proto : -{ "constructor" }-) *
 
@@ -222,7 +222,7 @@ pred initialHeapPostWeak ( ) :
     BI_ObjectObject () *
     ObjectPrototype () *
 
-    FunctionPrototype () *
+    FunctionPrototype ($lfun_proto) *
 
     BooleanPrototype () *
     empty_fields ($lbool_proto : -{ "constructor" }-) *

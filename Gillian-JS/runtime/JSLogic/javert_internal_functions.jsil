@@ -78,6 +78,7 @@ pred BIFunctionObject (+l:Obj, len:Num, proto:Obj, call, construct) :
 pred JSInternals () :
     GlobalObject () *
     ObjectPrototype($lobj_proto) *
+    FunctionPrototype($lfun_proto) *
     ArrayPrototype ($larr_proto) *
     ArrayBufferPrototype ($lab_proto) *
     BI_ErrorObject () *
@@ -149,11 +150,11 @@ pred ObjectPrototypeComplete () :
   JSBIFunction($lop_hasOwnProperty, "OP_hasOwnProperty", 1) * empty_fields($lop_hasOwnProperty : -{ "length" }-) *
   JSBIFunction($lop_toString, "OP_toString", 1) * empty_fields($lop_toString : -{ "length" }-);
 
-pred FunctionPrototype () :
-  (($lfun_proto, "length") -> {{ "d", 0, false, false, false }}) *
-  (($lfun_proto, "call")   -> {{ "d", $lfp_call, true, false, true }}) *
-  empty_fields($lfun_proto : -{ "call", "length" }-) *
-  MetaData($lfun_proto, #mfp) * MetaData(#mfp, null) *
+pred FunctionPrototype (proto) :
+  ((proto, "length") -> {{ "d", 0, false, false, false }}) *
+  ((proto, "call")   -> {{ "d", $lfp_call, true, false, true }}) *
+  empty_fields(proto : -{ "call", "length" }-) *
+  MetaData(proto, #mfp) * MetaData(#mfp, null) *
   ((#mfp, "@proto")      -> $lobj_proto) *
   ((#mfp, "@class")      -> "Function") *
   ((#mfp, "@extensible") -> true) *
@@ -193,7 +194,7 @@ pred initialHeapPost (globals) :
     empty_fields ($lg : -u- (-{ "Error", "Object", "DataView" }-, globals) ) *
 
     ObjectPrototype($lobj_proto) *
-    FunctionPrototype () *
+    FunctionPrototype ($lfun_proto) *
     BooleanPrototype () * empty_fields ($lbool_proto : -{ "constructor" }-) *
     NumberPrototype ()  * empty_fields ($lnum_proto : -{ "constructor" }-) *
 
@@ -208,7 +209,7 @@ pred initialHeapPostWeak ( ) :
 
     ObjectPrototype($lobj_proto) *
 
-    FunctionPrototype () *
+    FunctionPrototype ($lfun_proto) *
 
     BooleanPrototype () *
     empty_fields ($lbool_proto : -{ "constructor" }-) *

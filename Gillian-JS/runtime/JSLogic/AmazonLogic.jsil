@@ -536,28 +536,38 @@ nounfold pred CRawEncryptionContext(+buffer:List, ECKs:List) :
     (2 + #ECKsLength == l-len buffer);
 
 (* Broken serialised encryption context *)
-nounfold pred BRawEncryptionContext(errorMessage:Str, +buffer:List) :
-    (* Not enough data provided *)
+nounfold pred BRawEncryptionContext(errorMessage:Str, +buffer:List, ECKs:List) :
+    (* Not enough data provided
     (2 <# l-len buffer) *
     (#rawKC == l-sub (buffer, 0, 2)) *
     rawToUInt16(#rawKC, false, #keyCount) *
-    (0 <# #keyCount) *
+    (0 <# #keyCount) * (ECKs == {{ }}) *
     Elements("Incomplete", buffer, 2, #keyCount, 2, #eList, #esLength) *
     (errorMessage == "decodeEncryptionContext: Underflow, not enough data."),
 
-    (* Too much data provided *)
+    (* Too much data provided
     (2 <# l-len buffer) *
     (#rawKC == l-sub (buffer, 0, 2)) *
     rawToUInt16(#rawKC, false, #keyCount) *
     (0 <# #keyCount) *
-    Elements("Complete", buffer, 2, #keyCount, 2, #ECKs, #ECKsLength) *
+    Elements("Complete", buffer, 2, #keyCount, 2, ECKs, #ECKsLength) *
     (! (#ECKsLength + 2 == l-len buffer)) *
-    (errorMessage == "decodeEncryptionContext: Overflow, too much data.");
+    (errorMessage == "decodeEncryptionContext: Overflow, too much data."), *)
+
+    (* Duplicated key in context *)
+    (2 <# l-len buffer) *
+    (#rawKC == l-sub (buffer, 0, 2)) *
+    rawToUInt16(#rawKC, false, #keyCount) *
+    (0 <# #keyCount) *
+    Elements("Complete", buffer, 2, #keyCount, 2, ECKs, #ECKsLength) *
+    toUtf8MapPair(ECKs, #utf8ECKs) * FirstProj(ECKs, #ECKeys) * Duplicated({{ }}, #ECKeys) *
+    (2 + #ECKsLength == l-len buffer) *
+    (errorMessage == "decodeEncryptionContext: Duplicate encryption context key value.");
 
 (* General serialised encryption context *)
 pred RawEncryptionContext(definition:Str, +buffer:List, ECKs:List, errorMessage:Str) :
   (definition == "Complete") * CRawEncryptionContext(buffer, ECKs) * (errorMessage == ""),
-  (definition == "Broken")   * BRawEncryptionContext(errorMessage, buffer) * (ECKs == {{ }});
+  (definition == "Broken")   * BRawEncryptionContext(errorMessage, buffer, ECKs);
 
 (* Live decoded encryption context *)
 pred LiveDecodedEncryptionContext(+dECObj : Obj, +ECKs : List) :
@@ -1019,9 +1029,9 @@ nounfold pred BHeader(+rawHeaderData, part_one, version, type, suiteId, messageI
 
     (part_two == l+ (#EC, part_three)) *
     (l-len #EC == rECLength) *
-    BRawEncryptionContext(errorMessage, #EC) *
+    BRawEncryptionContext(errorMessage, #EC, ECKs) *
 
-    (ECKs == {{ }}) * (EDKs == {{ }}) * (contentType == 0) * (frameLength == 0) *
+    (EDKs == {{ }}) * (contentType == 0) * (frameLength == 0) *
     (headerLength == 0) * (headerIv == {{ }}) * (headerAuthTag == {{ }}),
 
     (* Broken encrypted data keys *)
@@ -1294,7 +1304,7 @@ pure pred ListToSet(+lst:List, set:Set) :
     (set == -u- (-{ #e }-, #restSet));
 
 (* ListToSet is a function *)
-lemma ListToSetFunction(lst1, set1, lst2, set2)
+lemma ListToSetFunction(lst1, lst2)
 [[
     ListToSet(#lst1, #set1) * ListToSet(#lst2, #set2) * (#lst1 == #lst2)
 ]]
@@ -1314,7 +1324,7 @@ lemma ListToSetUnion(lst1, lst2)
     unfold ListToSet(#lst1, #set1);
     if (#lst1 = {{ }}) then {
         sep_assert (#x == l+ (#lst1, #lst2)) [bind: #x];
-        sep_apply ListToSetFunction(#lst2, #set2, #x, #uset)
+        sep_apply ListToSetFunction(#lst2, #x)
     } else {
         sep_assert (#lst1 == #h1 :: #rest1) [bind: #h1, #rest1];
         unfold ListToSet(l+ (#lst1, #lst2), #uset);
@@ -1366,7 +1376,36 @@ lemma HeadInSet(lst)
 ]]
 [* *]
 
-(* toUtf8 mapping and list membership *)
+(* toUtf8 mapping and list membership, positive *)
+lemma InListToUtf8(prop, props)
+[[
+    ListToSet(#props, #propsSet) *
+    (#prop --e-- #propsSet) *
+    toUtf8(#prop, #utf8Prop) *
+    toUtf8Map(#props, #utf8Props) *
+    ListToSet(#utf8Props, #utf8PropsSet)
+]]
+[[
+    (#utf8Prop --e-- #utf8PropsSet)
+]]
+[*
+    unfold ListToSet(#props, #propsSet);
+    if (not (#props = {{ }})) then {
+        sep_assert (#props == #fstProp :: #rest) [bind: #rest];
+        unfold toUtf8Map(#props, #utf8Props);
+        sep_assert (toUtf8(#fstProp, #utf8FstProp)) [bind: #utf8FstProp];
+        sep_assert (#utf8Props == #utf8FstProp :: #restUtf8) [bind: #restUtf8];
+        unfold ListToSet(#utf8Props, #utf8PropsSet);
+        if (#prop = #fstProp) then {
+            sep_apply toUtf8Injective(#prop, #utf8Prop, #fstProp, #utf8FstProp)
+        } else {
+            sep_apply toUtf8Injective(#prop, #utf8Prop, #fstProp, #utf8FstProp);
+            sep_apply InListToUtf8(#prop, #rest)
+        }
+    }
+ *]
+
+(* toUtf8 mapping and list membership, negative *)
 lemma NotInListToUtf8(prop, props)
 [[
     ListToSet(#props, #propsSet) *
@@ -1453,17 +1492,17 @@ lemma UniqueAppendElement(lst, element)
  ************************************)
 
 (* Lists with duplicates *)
-pure pred Duplicated(+l:List) :
+pure pred Duplicated(+prefix:List, +suffix:List) :
     (* Either the head is duplicated *)
-    (l == #fst :: #rest) *
-    ListToSet(#rest, #setRest) *
-    (#fst --e-- #setRest),
+    (suffix == #fst :: #rest) *
+    ListToSet(prefix, #preSet) *
+    (#fst --e-- #preSet),
 
     (* Or the duplication is in the tail *)
-    (l == #fst :: #rest) *
-    ListToSet(#rest, #setRest) *
-    (! (#fst --e-- #setRest)) *
-    Duplicated(#setRest);
+    (suffix == #fst :: #rest) *
+    ListToSet(prefix, #preSet) *
+    (! (#fst --e-- #preSet)) *
+    Duplicated(l+ (prefix, {{ #fst }}), #rest);
 
 (*************************************
  *************************************
@@ -1474,56 +1513,99 @@ pure pred Duplicated(+l:List) :
  *************************************)
 
 (* Object properties as a table *)
-pred ObjectTableStructure(+l:Obj, +pvPairs:List) :
+pred ObjectTableStructure(+l:Obj, +PVPairs:List) :
     (* Base case - no properties left *)
-    (pvPairs == {{ }}),
+    (PVPairs == {{ }}),
 
     (* Recursive case - one property and the rest *)
-    (pvPairs == {{ #prop, #value }} :: #restPVPairs) *
-    DataProp(l, #prop, #value) *
+    (PVPairs == {{ #prop, #value }} :: #restPVPairs) *
+    DataProp(l, #prop, #value) * types(#value : Str) *
     ObjectTableStructure(l, #restPVPairs);
 
 (* Complete Object-as-Table predicate *)
-nounfold pred ObjectTable(+l:Obj, +pvPairs:List) :
-    ObjectTableStructure(l, pvPairs) *
-    FirstProj(pvPairs, #pList) *
+nounfold pred ObjectTable(+l:Obj, +PVPairs:List) :
+    ObjectTableStructure(l, PVPairs) *
+    FirstProj(PVPairs, #pList) *
     ListToSet(#pList, #pSet) *
     empty_fields(l : #pSet);
 
 (* Object-as-Table absent property *)
-lemma ObjectTableAbsentProperty(l, pvPairs, prop)
+lemma ObjectTableAbsentProperty(l, PVPairs, prop)
 [[
-    ObjectTableStructure(#l, #pvPairs) *
-    FirstProj(#pvPairs, #pList) *
+    ObjectTableStructure(#l, #PVPairs) *
+    FirstProj(#PVPairs, #pList) *
     ListToSet(#pList, #pSet) *
     empty_fields(l : #pSet) *
     (! (#prop --e-- #pSet))
 ]]
 [[
-    ObjectTableStructure(#l, #pvPairs) *
+    ObjectTableStructure(#l, #PVPairs) *
     ((#l, #prop) -> none) *
     empty_fields(#l : -u- (#pSet, -{ #prop }-))
 ]]
 [*  *]
 
-(* Appending property to Object-as-Table structure from the right *)
-lemma ObjectTableStructureAppendPVPair(l, pvPairs, prop, value)
+(* Removing a property from a list of prop-value pairs *)
+pred RemoveProp(+PVPairs : List, +prop : Str, found : Bool, value : Str, newPairs : List) :
+    (PVPairs == {{ }}) * (found == false) * (value == "") * (newPairs == {{ }}),
+
+    (PVPairs == {{ prop, value }} :: newPairs) * (found == true),
+
+    (PVPairs == {{ #fstProp, #fstValue }} :: #restPVPairs) *
+    (! (#fstProp == prop)) * RemoveProp(#restPVPairs, prop, false, value, newPairs) *
+    (found == false),
+
+    (PVPairs == {{ #fstProp, #fstValue }} :: #restPVPairs) *
+    (! (#fstProp == prop)) * RemoveProp(#restPVPairs, prop, true, value, #restNewPairs) *
+    (found == true) * (newPairs == {{ #fstProp, #fstValue }} :: #restNewPairs);
+
+(* Object-as-Table present property *)
+lemma ObjectTablePresentProperty(l, PVPairs, prop)
 [[
-    ObjectTableStructure(#l, #pvPairs) *
-    FirstProj(#pvPairs, #pList) *
+    ObjectTableStructure(#l, #PVPairs) *
+    FirstProj(#PVPairs, #pList) *
     ListToSet(#pList, #pSet) *
-    (! (#prop --e-- #pSet)) *
-    DataProp(#l, #prop, #value)
+    (#prop --e-- #pSet)
 ]]
 [[
-    ObjectTableStructure(#l, l+ (#pvPairs, {{ {{ #prop, #value }} }}))
+    RemoveProp(#PVPairs, #prop, true, #value, #newPairs) *
+    ObjectTableStructure(#l, #newPairs) *
+    DataProp(#l, #prop, #value) * types(#value : Str)
 ]]
 [*
-    unfold ObjectTableStructure(#l, #pvPairs);
-    if (not (#pvPairs = {{ }})) then {
-        sep_assert (#pvPairs == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
+    unfold ObjectTableStructure(#l, #PVPairs);
+    if (#PVPairs = {{ }}) then {
+        unfold FirstProj(#PVPairs, #pList);
+        unfold ListToSet(#pList, #pSet)
+    } else {
+        sep_assert (#PVPairs == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
         sep_assert (ObjectTableStructure(#l, #restPVPairs));
-        unfold FirstProj(#pvPairs, #pList);
+        if (not (#fProp = #prop)) then {
+            unfold FirstProj(#PVPairs, #pList);
+            unfold ListToSet(#pList, #pSet);
+            sep_apply ObjectTablePresentProperty(#l, #restPVPairs, #prop)
+        }
+    }
+ *]
+
+(* Appending property to Object-as-Table structure from the right *)
+lemma ObjectTableStructureAppendPVPair(l, PVPairs, prop, value)
+[[
+    ObjectTableStructure(#l, #PVPairs) *
+    FirstProj(#PVPairs, #pList) *
+    ListToSet(#pList, #pSet) *
+    (! (#prop --e-- #pSet)) *
+    DataProp(#l, #prop, #value) * types(#value : Str)
+]]
+[[
+    ObjectTableStructure(#l, l+ (#PVPairs, {{ {{ #prop, #value }} }}))
+]]
+[*
+    unfold ObjectTableStructure(#l, #PVPairs);
+    if (not (#PVPairs = {{ }})) then {
+        sep_assert (#PVPairs == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
+        sep_assert (ObjectTableStructure(#l, #restPVPairs));
+        unfold FirstProj(#PVPairs, #pList);
         unfold ListToSet(#pList, #pSet);
         sep_apply ObjectTableStructureAppendPVPair(#l, #restPVPairs, #prop, #value);
         sep_assert(True)
@@ -1531,38 +1613,38 @@ lemma ObjectTableStructureAppendPVPair(l, pvPairs, prop, value)
  *]
 
 (* Appending property to Object-as-Table from the right *)
-lemma ObjectTableAppendPVPair(l, pvPairs, prop, value)
+lemma ObjectTableAppendPVPair(l, PVPairs, prop, value)
 [[
-    ObjectTableStructure(#l, #pvPairs) *
-    FirstProj(#pvPairs, #pList) *
+    ObjectTableStructure(#l, #PVPairs) *
+    FirstProj(#PVPairs, #pList) *
     ListToSet(#pList, #pSet) *
     (! (#prop --e-- #pSet)) *
-    DataProp(#l, #prop, #value) *
+    DataProp(#l, #prop, #value) * types(#value : Str) *
     empty_fields(l : -u- (#pSet, -{ #prop }-))
 ]]
 [[
-    ObjectTable(#l, l+ (#pvPairs, {{ {{ #prop, #value }} }}))
+    ObjectTable(#l, l+ (#PVPairs, {{ {{ #prop, #value }} }}))
 ]]
 [*
-    sep_apply FirstProjAppendPair(#pvPairs, #pList, #prop, #value);
+    sep_apply FirstProjAppendPair(#PVPairs, #pList, #prop, #value);
     sep_apply ListToSetAddElement(#pList, #pSet, #prop);
-    sep_apply ObjectTableStructureAppendPVPair(#l, #pvPairs, #prop, #value)
+    sep_apply ObjectTableStructureAppendPVPair(#l, #PVPairs, #prop, #value)
  *]
 
 (* Frozen object properties *)
-pred FrozenObjectTableStructure(+l:Obj, +pvPairs:List) :
+pred FrozenObjectTableStructure(+l:Obj, +PVPairs:List) :
     (* Base case - no properties left *)
-    (pvPairs == {{ }}),
+    (PVPairs == {{ }}),
 
     (* Recursive case - one property and the rest *)
-    (pvPairs == {{ #prop, #value }} :: #restPVPairs) *
+    (PVPairs == {{ #prop, #value }} :: #restPVPairs) *
     DataPropConst(l, #prop, #value, true) *
     FrozenObjectTableStructure(l, #restPVPairs);
 
 (* Frozen Object-as-Table predicate *)
-nounfold pred FrozenObjectTable(+l:Obj, +pvPairs:List) :
-    FrozenObjectTableStructure(l, pvPairs) *
-    FirstProj(pvPairs, #pList) *
+nounfold pred FrozenObjectTable(+l:Obj, +PVPairs:List) :
+    FrozenObjectTableStructure(l, PVPairs) *
+    FirstProj(PVPairs, #pList) *
     ListToSet(#pList, #pSet) *
     empty_fields(l : #pSet);
 

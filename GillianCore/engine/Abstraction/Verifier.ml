@@ -389,6 +389,8 @@ struct
         let msg = "Verifying one spec of procedure " ^ test.name ^ "... " in
         L.tmi (fun fmt -> fmt "%s" msg);
         Fmt.pr "%s" msg;
+        (* Reset coverage for every procedure in verification *)
+        let prog = { prog with coverage = Hashtbl.create 1 } in
         (* TEST for procedure *)
         let rets =
           SAInterpreter.evaluate_proc
