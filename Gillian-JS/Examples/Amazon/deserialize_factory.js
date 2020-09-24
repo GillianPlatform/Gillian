@@ -667,7 +667,7 @@ var SdkSuite = function (suiteId) { };
          (#byteOffset + #byteLength <=# l-len #data) *
          ((#definition == "Complete") \/ (#definition == "Incomplete")) *
          Header(#definition,
-                #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
+                #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                        #part_two, #ECKs,
                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
                 #errorMessage) *
@@ -683,7 +683,7 @@ var SdkSuite = function (suiteId) { };
 
     @post Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
           Header(#definition,
-                 #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
+                 #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                         #part_two, #ECKs,
                         #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
                  #errorMessage) *
@@ -703,7 +703,7 @@ var SdkSuite = function (suiteId) { };
 
           Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
           Header(#definition,
-                 #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
+                 #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                         #part_two, #ECKs,
                         #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
                  #errorMessage) *
@@ -724,7 +724,7 @@ var SdkSuite = function (suiteId) { };
          (#byteOffset + #byteLength <=# l-len #data) *
          (#definition == "Broken") *
          Header(#definition,
-                #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
+                #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                        #part_two, #ECKs,
                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
                 #errorMessage) *
@@ -741,7 +741,7 @@ var SdkSuite = function (suiteId) { };
     @posterr
           Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
           Header(#definition,
-                 #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength,
+                 #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                         #part_two, #ECKs,
                         #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
                  #errorMessage) *
@@ -770,14 +770,14 @@ function deserializeMessageHeader(messageBuffer) {
       messageBuffer.byteLength
     )
 
-    /* @tactic unfold Header(#definition, #view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #errorMessage) */
+    /* @tactic unfold Header(#definition, #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #errorMessage) */
     /* @tactic
         if (#definition = "Complete") then {
-          unfold CHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
+          unfold CHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
         } else { if (#definition = "Incomplete") then {
-            unfold IHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
+            unfold IHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
           } else {
-            unfold BHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #rECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #errorMessage)
+            unfold BHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #errorMessage)
           }
         } */
 
