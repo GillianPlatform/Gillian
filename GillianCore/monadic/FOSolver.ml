@@ -11,6 +11,20 @@ let build_full_pfs (pc : Pc.t) =
 let sat ~(pc : Pc.t) formula =
   FOSolver.sat ~pfs:(build_full_pfs pc) ~gamma:pc.gamma [ formula ]
 
+let check_entailment ~(pc : Pc.t) formula =
+  let pfs = build_full_pfs pc in
+  let gamma = pc.gamma in
+  let f =
+    Engine.Reduction.reduce_formula ~gamma:pc.gamma ~pfs:(build_full_pfs pc)
+      formula
+  in
+  match f with
+  | True  -> true
+  | False -> false
+  | _     ->
+      FOSolver.check_entailment Utils.Containers.SS.empty (PFS.to_list pfs)
+        [ f ] gamma
+
 let of_comp_fun comp ~(pc : Pc.t) e1 e2 =
   comp ~pfs:(build_full_pfs pc) ~gamma:pc.gamma e1 e2
 

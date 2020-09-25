@@ -1,5 +1,9 @@
 open Ppxlib
 
-val ext_name : string
+module Extension_name : sig
+  type t = Sat | Ent
 
-val expand : expression -> expression
+  val to_string : t -> string
+end
+
+val expand : ext:Extension_name.t -> expression -> expression
