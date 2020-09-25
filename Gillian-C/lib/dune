@@ -7,4 +7,6 @@
 
 (library
  (name cgil_lib)
- (libraries gillian compcert batteries))
+ (libraries gillian compcert batteries ppx_sat.runtime)
+ (preprocess
+  (pps ppx_sat)))
