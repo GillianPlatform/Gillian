@@ -76,12 +76,18 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
     );
 
     needs(readPos >= 0 && dataView.byteLength >= readPos, 'readPos out of bounds.')
-    needs(elementCount >= 0, 'elementCount must be positive.')
+    /* Precondition: elementCount and fieldsPerElement must be non-negative. */
+    needs(elementCount >= 0 && fieldsPerElement >= 0, 'elementCount and fieldsPerElement must be non-negative.')
 
     var elements = [];
 
     /* @invariant
+        scope(buffer: #buffer) *
+        scope(dataView: #dataView) * DataView(#dataView, #ab, #viewOffset, #viewSize) *
         scope(elements : #doneEls) * scope(readPos : #outerLoopReadPos) * scope(elementCount : #eLeft) *
+        scope(element: _) * scope(fieldCount: _) * scope(fieldBinary: _) *
+        JSInternals() *
+
         CElements(#view, #readPos, #eCount - #eLeft, #fCount, #doneElsList, #doneElsLength) *
         Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) *
         (#eList == l+ (#doneElsList, #remElsList)) *
@@ -350,14 +356,17 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 
   /*
     @tactic
-        assert ((#EC == l+ ({{ #b0, #b1 }}, #rest)) * Elements("Complete", #EC, 2, ((256 * #b0) + #b1), 2, #ECKs, l-len #rest)) [bind: #b0, #b1, #rest];
+        assert (
+            (#EC == l+ ({{ #b0, #b1 }}, #rest)) *
+            Elements("Complete", #EC, 2, ((256 * #b0) + #b1), 2, #ECKs, l-len #rest)
+        ) [bind: #b0, #b1, #rest];
         unfold Elements("Complete", #EC, 2, ((256 * #b0) + #b1), 2, #ECKs, l-len #rest);
         apply lemma CElementsFacts(#EC, 2, ((256 * #b0) + #b1), 2, #ECKs, l-len #rest);
         assert (
             scope(pairsCount: #pairsCount) * (#pairsCount == l-len #ECKs) *
             scope(elements: #elements) * ArrayOfArraysOfUInt8Arrays(#elements, #ECKs) *
             scope(encryptionContext: #dECObj) * JSObjWithProto(#dECObj, null) * empty_fields(#dECObj : -{ }-) *
-            toUtf8MapPair(#ECKs, #utf8ECKs) * FirstProj(#ECKs, #rProps) * UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps)
+            toUtf8PairMap(#ECKs, #utf8ECKs) * FirstProj(#ECKs, #rProps) * UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps)
         ) [bind: #pairsCount, #elements, #dECObj, #utf8ECKs, #rProps]
 
     @invariant
@@ -365,7 +374,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
         ArrayPrototype ($larr_proto) * ObjectPrototype($lobj_proto) * GlobalObject () *
         scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
         scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
-        toUtf8MapPair(#ECKs, #utf8ECKs) * FirstProj(#ECKs, #rProps) * types(#rProps : List) *
+        toUtf8PairMap(#ECKs, #utf8ECKs) * FirstProj(#ECKs, #rProps) * types(#rProps : List) *
         UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps) *
 
         scope(count: #count) * (#count <=# #pairsCount) *
@@ -374,13 +383,14 @@ function decodeEncryptionContext(encodedEncryptionContext) {
         (#ECKs == l+ (#done, #left)) *
         FirstProj(#done, #doneRProps) * types(#doneRProps : List) * Unique(#doneRProps) *
         FirstProj(#left, #leftRProps) * types(#leftRProps : List) * UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps) *
-        toUtf8MapPair(#done, #utf8Done) * types(#utf8Done : List) *
+        toUtf8PairMap(#done, #utf8Done) * types(#utf8Done : List) *
         JSObjWithProto(#dECObj, null) * ObjectTable(#dECObj, #utf8Done)
         [bind: #count, #done, #left, #doneRProps, #leftRProps, #utf8Done] */
   for (var count = 0; count < pairsCount; count++) {
     /*
         @tactic
-        unfold UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps); unfold UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps);
+        unfold UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps);
+        unfold UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps);
         apply lemma ArrayOfArraysOfUInt8ArraysContentsFacts(#elements, #done, 0, #count);
         apply lemma ArrayOfArraysOfUInt8ArraysContentsFacts(#elements, #left, #count, #pairsCount - #count);
         unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count);
@@ -439,7 +449,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
             apply lemma ArrayOfArraysOfUInt8ArraysContentsAppend(#elements, #done, 0, #count);
             apply lemma IntegerLtPlusOneLe(#count, #pairsCount);
             apply lemma ObjectTableStructureAppendPVPair(#dECObj, #utf8Done, #utf8NProp, #utf8NVal);
-            apply lemma toUtf8MapPairAppendPair(#done, #utf8Done, #new_prop, #new_value);
+            apply lemma toUtf8PairMapAppendPair(#done, #utf8Done, #new_prop, #new_value);
             apply lemma FirstProjAppendPair(#done, #doneRProps, #new_prop, #new_value);
             apply lemma FirstProjAppendPair(#utf8Done, #doneProps, #utf8NProp, #utf8NVal);
             apply lemma ListToSetAddElement(#doneProps, #donePropsSet, #utf8NProp);
@@ -454,7 +464,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
   /*
     @tactic
         unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count);
-        apply lemma toUtf8MapPairInjective(#ECKs, #utf8ECKs, #done, #utf8Done);
+        apply lemma toUtf8PairMapInjective(#ECKs, #utf8ECKs, #done, #utf8Done);
         if (#definition = "Broken") then {
             unfold FirstProj(#left, #leftRProps);
             unfold UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps);

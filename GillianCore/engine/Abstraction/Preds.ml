@@ -157,6 +157,14 @@ module Make
       in
       List.sort sort_fun candidates
     in
+    let basic_matcher (args', _) =
+      List.for_all
+        (fun (arg, arg') ->
+          L.tmi (fun m ->
+              m "Checking if %a = %a syntactically\n" Val.pp arg Val.pp arg');
+          arg = arg')
+        (List.combine args args')
+    in
     let matcher (args', _) =
       List.for_all
         (fun (arg, arg') ->
@@ -172,13 +180,26 @@ module Make
         candidates
     in
     let candidates = sort candidates args in
+    (* First attempt: syntactic equality *)
     let result =
       List.fold_left
         (fun (res : abs_t option) (candidate : vt list * vt list) ->
           if res <> None then res
-          else if matcher candidate then Some (name, snd candidate)
+          else if basic_matcher candidate then Some (name, snd candidate)
           else None)
         None candidates
+    in
+    (* Next attempt: provided comparator *)
+    let result =
+      match result with
+      | None        ->
+          List.fold_left
+            (fun (res : abs_t option) (candidate : vt list * vt list) ->
+              if res <> None then res
+              else if matcher candidate then Some (name, snd candidate)
+              else None)
+            None candidates
+      | Some result -> Some result
     in
     match result with
     | None        -> None
