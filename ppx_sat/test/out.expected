@@ -17,3 +17,14 @@
     gamma: ;
     learned: [(! (x <=# 0.)); (! (x <=# 1.)); (1. <=# x); (2. <=# x)]};
   value: 12}]
+
+[{pc: {pfs: [];
+       gamma: ;
+       learned: [True]};
+  value: -1}]
+
+[{pc: {pfs: [(x == 2.)];
+       gamma: ;
+       learned: [(x == 2.)]};
+  value: 2}]
+
