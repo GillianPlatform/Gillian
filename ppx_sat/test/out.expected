@@ -1,30 +1,37 @@
 [{pc:
    {pfs: [(! (x == 1.))];
     gamma: ;
-    learned: [(! (1. <=# x)); (! (x <=# 0.)); (x <=# 1.)]};
+    learned: [(! (1. <=# x)); (! (x <=# 0.)); (x <=# 1.)];
+    learned_types: []};
   value: 0},
- {pc: {pfs: [(! (x == 1.))];
-       gamma: ;
-       learned: [(! (1. <=# x)); (x <=# 0.)]};
+ {pc:
+   {pfs: [(! (x == 1.))];
+    gamma: ;
+    learned: [(! (1. <=# x)); (x <=# 0.)];
+    learned_types: []};
   value: -1},
  {pc:
    {pfs: [(! (x == 1.))];
     gamma: ;
-    learned: [(! (2. <=# x)); (! (x <=# 0.)); (! (x <=# 1.)); (1. <=# x)]};
+    learned: [(! (2. <=# x)); (! (x <=# 0.)); (! (x <=# 1.)); (1. <=# x)];
+    learned_types: []};
   value: 11},
  {pc:
    {pfs: [(! (x == 1.))];
     gamma: ;
-    learned: [(! (x <=# 0.)); (! (x <=# 1.)); (1. <=# x); (2. <=# x)]};
+    learned: [(! (x <=# 0.)); (! (x <=# 1.)); (1. <=# x); (2. <=# x)];
+    learned_types: []};
   value: 12}]
 
 [{pc: {pfs: [];
        gamma: ;
-       learned: [True]};
+       learned: [True];
+       learned_types: []};
   value: -1}]
 
 [{pc: {pfs: [(x == 2.)];
        gamma: ;
-       learned: [(x == 2.)]};
+       learned: [(x == 2.)];
+       learned_types: []};
   value: 2}]
 
