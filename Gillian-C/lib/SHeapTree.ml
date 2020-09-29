@@ -1,6 +1,8 @@
 open Gil_syntax
 open Monadic
 module DR = Delayed_result
+module DO = Delayed_option
+module SS = Utils.Containers.SS
 
 module Perm = struct
   type t = Compcert.Memtype.permission =
@@ -15,6 +17,10 @@ module Perm = struct
     | Readable -> 2
     | Nonempty -> 1
 
+  let opt_to_int = function
+    | None   -> 0
+    | Some x -> to_int x
+
   let pp fmt = function
     | Freeable -> Fmt.pf fmt "Freeable"
     | Writable -> Fmt.pf fmt "Writable"
@@ -25,13 +31,18 @@ module Perm = struct
     let ( >% ), ( <% ), ( <=% ), ( >=% ), ( =% ) =
       let make op a b = op (to_int a) (to_int b) in
       (make ( > ), make ( < ), make ( <= ), make ( >= ), make ( = ))
+
+    let ( >%? ), ( <%? ), ( <=%? ), ( >=%? ), ( =%? ) =
+      let make op a b = op (opt_to_int a) (opt_to_int b) in
+      (make ( > ), make ( < ), make ( <= ), make ( >= ), make ( = ))
   end
 end
 
 type err =
   | UseAfterFree
   | BufferOverrun
-  | InsufficientPermission of { required : Perm.t; actual : Perm.t }
+  | InsufficientPermission of { required : Perm.t; actual : Perm.t option }
+  | InvalidAlignment       of { alignment : int; offset : Expr.t }
   | MissingResource
   | Unhandled              of string
 
@@ -40,7 +51,12 @@ let pp_err fmt = function
   | BufferOverrun -> Fmt.pf fmt "Buffer Overrun"
   | InsufficientPermission { required; actual } ->
       Fmt.pf fmt "Insufficient Permision: Got %a but required %a" Perm.pp
-        required Perm.pp actual
+        required
+        (Fmt.option ~none:(Fmt.any "None") Perm.pp)
+        actual
+  | InvalidAlignment { alignment; offset } ->
+      Fmt.pf fmt "Invalid alignment: %d should divide %a" alignment Expr.pp
+        offset
   | MissingResource -> Fmt.pf fmt "MissingResource"
   | Unhandled e -> Fmt.pf fmt "Unhandled error with message : %s" e
 
@@ -52,7 +68,7 @@ let err_equal a b =
   | ( InsufficientPermission { required = ra; actual = aa },
       InsufficientPermission { required = rb; actual = ab } ) ->
       let open Perm.Infix in
-      ra =% rb && aa =% ab
+      ra =% rb && aa =%? ab
   | Unhandled a, Unhandled b -> String.equal a b
   | _ -> false
 
@@ -85,6 +101,8 @@ module Range = struct
   let split_at (l, h) x = ((l, x), (x, h))
 
   let extract (il, ih) (ol, oh) = ((ol, il), (il, ih), (ih, oh))
+
+  let lvars (a, b) = SS.union (Expr.lvars a) (Expr.lvars b)
 end
 
 module Node = struct
@@ -138,6 +156,10 @@ module Node = struct
     | SVfloat _, Mfloat64 -> Single { chunk; value = sval }
     | Sptr _, c when Chunk.equal c Chunk.ptr -> Single { chunk; value = sval }
     | _ -> Single { chunk; value = SUndefined }
+
+  let lvars = function
+    | NotOwned | Hole | AllocatedUnkown | Zero -> SS.empty
+    | Single { value = e; _ } -> SVal.lvars e
 end
 
 module Tree = struct
@@ -225,7 +247,8 @@ module Tree = struct
 
   let rec get_framed t low chunk =
     let range = Range.of_low_and_chunk low chunk in
-    if%ent Range.is_equal t.span range then DR.ok (Node.decode ~chunk t.node)
+    if%ent Range.is_equal t.span range then
+      DR.of_result (Node.decode ~chunk t.node)
     else
       match t.children with
       | None               -> DR.error
@@ -258,6 +281,16 @@ module Tree = struct
               let++ right = set_framed right low chunk sval in
               with_children t ~left ~right
             else DR.error (Unhandled "Children not in partition in get_framed")
+
+  let rec lvars { node; span; children } =
+    let node_lvars = Node.lvars node in
+    let span_lvars = Range.lvars span in
+    let children_lvars =
+      match children with
+      | Some (a, b) -> SS.union (lvars a) (lvars b)
+      | None        -> SS.empty
+    in
+    SS.union (SS.union node_lvars span_lvars) children_lvars
 end
 
 type t = Freed | Tree of { perm : Perm.t; span : Range.t; root : Tree.t }
@@ -285,8 +318,21 @@ let get_root = function
   | Tree x -> Ok x.root
 
 let get_perm = function
-  | Freed  -> Error UseAfterFree
-  | Tree x -> Ok x.perm
+  | Freed  -> None
+  | Tree x -> Some x.perm
+
+let get_perm_at ofs = function
+  | Freed  -> DO.none ()
+  | Tree x ->
+      let open Formula.Infix in
+      let l, h = x.span in
+      if%sat l #<= ofs #&& (ofs #< h) then DO.some x.perm else DO.none ()
+
+let get_min_perm_between low high = function
+  | Freed  -> DO.none ()
+  | Tree x ->
+      if%sat Range.is_inside (low, high) x.span then DO.some x.perm
+      else DO.none ()
 
 let get_span = function
   | Freed  -> Error UseAfterFree
@@ -307,10 +353,10 @@ let drop_perm t low high new_perm =
   let open DR.Syntax in
   let** cl, hl = DR.of_result (get_span t) in
   if%ent cl #== low #&& (hl #== high) then
-    let** curr_perm = DR.of_result (get_perm t) in
+    let** curr_perm = DR.of_option ~none:BufferOverrun (get_perm t) in
     if new_perm >% curr_perm then
       DR.error
-        (InsufficientPermission { required = new_perm; actual = curr_perm })
+        (InsufficientPermission { required = new_perm; actual = Some curr_perm })
     else
       let++ root = DR.of_result (get_root t) in
       Tree { root; span = Range.make cl hl; perm = new_perm }
@@ -324,10 +370,10 @@ let free t low high =
   let open Formula.Infix in
   let** cl, hl = DR.of_result (get_span t) in
   if%ent cl #== low #&& (hl #== high) then
-    let** curr_perm = DR.of_result (get_perm t) in
+    let** curr_perm = DR.of_option ~none:BufferOverrun (get_perm t) in
     if curr_perm <% Freeable then
       DR.error
-        (InsufficientPermission { required = Freeable; actual = curr_perm })
+        (InsufficientPermission { required = Freeable; actual = Some curr_perm })
     else DR.ok Freed
   else
     DR.error
@@ -356,3 +402,36 @@ let set t low chunk sval =
     let+* root_set = Tree.set_framed root_framed low chunk sval in
     with_root t root_set
   else DR.error BufferOverrun
+
+let check_valid_access t chunk ofs perm =
+  let open Delayed.Syntax in
+  let open Perm.Infix in
+  let open Formula.Infix in
+  let open Expr.Infix in
+  let sz = Expr.num (float_of_int (Chunk.size chunk)) in
+  let al = Chunk.align chunk in
+  let al_expr = Expr.num (float_of_int al) in
+  let high = ofs +. sz in
+  let* cur_perm = get_min_perm_between ofs high t in
+  let has_perm = cur_perm >=%? Some perm in
+  if has_perm then
+    let divides x y =
+      Expr.(y #== (num 0.) #|| ((BinOp (y, FMod, x)) #== (Expr.num 0.)))
+    in
+    if%sat divides al_expr ofs then DR.ok ()
+    else DR.error (InvalidAlignment { alignment = al; offset = ofs })
+  else DR.error (InsufficientPermission { actual = cur_perm; required = perm })
+
+let load t chunk ofs =
+  let open DR.Syntax in
+  let** () = check_valid_access t chunk ofs Readable in
+  get t ofs chunk
+
+let store t chunk ofs value =
+  let open DR.Syntax in
+  let** () = check_valid_access t chunk ofs Readable in
+  set t ofs chunk value
+
+let lvars = function
+  | Freed                  -> SS.empty
+  | Tree { span; root; _ } -> SS.union (Range.lvars span) (Tree.lvars root)
