@@ -1,4 +1,5 @@
 open Cgil_lib
+module SMemory = Gillian.Monadic.MonadicSMemory.Lift (MonadicSMemory)
 
 module CLI =
   Gillian.CommandLine.Make (CMemory) (SMemory) (External.M) (ParserAndCompiler)
