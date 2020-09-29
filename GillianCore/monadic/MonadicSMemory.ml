@@ -96,7 +96,9 @@ module Lift (MSM : S) : SMemory.S = struct
             match Branch.value br with
             | Failure err -> aux acc_succ (err :: acc_fail) rest
             | Success s   ->
-                aux ((Branch.learned br, s) :: acc_succ) acc_fail rest )
+                aux
+                  ((Branch.learned br, Branch.learned_types br, s) :: acc_succ)
+                  acc_fail rest )
       in
       aux [] [] res
     in
@@ -106,9 +108,8 @@ module Lift (MSM : S) : SMemory.S = struct
     else
       let asucs =
         List.map
-          (fun (fset, (t, vtl)) ->
-            (* FIXME: change here when typenv becomes availalbe *)
-            (t, vtl, List.of_seq (Formula.Set.to_seq fset), []))
+          (fun (fset, glis, (t, vtl)) ->
+            (t, vtl, List.of_seq (Formula.Set.to_seq fset), glis))
           successes
       in
       ASucc asucs

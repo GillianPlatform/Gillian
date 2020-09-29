@@ -69,7 +69,6 @@ let fold (x : t) (f : string -> Type.t -> 'a -> 'a) (init : 'a) : 'a =
   Hashtbl.fold f x init
 
 (* Update with removal *)
-let update (te : t) (x : string) (t : Type.t) : unit = Hashtbl.replace te x t
 
 let update (te : t) (x : string) (t : Type.t) : unit =
   match get te x with
