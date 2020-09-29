@@ -22,7 +22,15 @@ let num n = lit (Num n)
 
 let int n = lit (Int n)
 
+let string s = lit (String s)
+
 let typeof x = UnOp (TypeOf, x)
+
+let list_nth x n = BinOp (x, LstNth, num (float_of_int n))
+
+let list_length x = UnOp (LstLen, x)
+
+let type_ t = Lit (Type t)
 
 module Infix = struct
   let ( +. ) a b = BinOp (a, FPlus, b)

@@ -16,6 +16,8 @@ type t = TypeDef__.formula =
 
 let compare = Stdlib.compare
 
+let of_bool b = if b then True else False
+
 module MyFormula = struct
   type nonrec t = t
 
@@ -179,6 +181,12 @@ and push_in_negations_on (a : t) : t =
   | _            -> Not a
 
 and push_in_negations (a : t) : t = push_in_negations_off a
+
+let rec split_conjunct_formulae (f : t) : t list =
+  match f with
+  | And (f1, f2)      -> split_conjunct_formulae f1 @ split_conjunct_formulae f2
+  | Not (Or (f1, f2)) -> split_conjunct_formulae (And (Not f1, Not f2))
+  | f                 -> [ f ]
 
 (****** Pretty Printing *********)
 

@@ -205,6 +205,14 @@ module Expr : sig
 
   val int : int -> t
 
+  val string : string -> t
+
+  val type_ : Type.t -> t
+
+  val list_length : t -> t
+
+  val list_nth : t -> int -> t
+
   val typeof : t -> t
 
   module Infix : sig
@@ -309,6 +317,8 @@ module Formula : sig
     | SetSub  of Expr.t * Expr.t  (** Set subsetness *)
     | ForAll  of (string * Type.t option) list * t  (** Forall *)
 
+  val of_bool : bool -> t
+
   (** Sets of formulae *)
   module Set : Set.S with type elt := t
 
@@ -350,6 +360,9 @@ module Formula : sig
   (** [push_in_negations a] takes negations off the toplevel of [a] and pushes them in the leaves.
     For example [push_in_negations (Not (And (True, False)))] returns [Or (False, False)] *)
   val push_in_negations : t -> t
+
+  (** Turns [f1 /\ f2 /\ f3] into [\[f1; f2; f3\]] *)
+  val split_conjunct_formulae : t -> t list
 
   (** Pretty-printer *)
   val pp : Format.formatter -> t -> unit
