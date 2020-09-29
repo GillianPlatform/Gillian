@@ -150,7 +150,7 @@ and bindings = string * (string * expr) list
 
 and slcmd =
   | Fold      of string * expr list * bindings option
-  | Unfold    of string * expr list * bindings option * bool
+  | Unfold    of string * expr list * (string * string) list option * bool
   | GUnfold   of string
   | ApplyLem  of string * expr list * string list
   | SepAssert of assertion * string list

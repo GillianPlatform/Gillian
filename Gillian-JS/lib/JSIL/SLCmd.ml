@@ -8,10 +8,12 @@ module Expr = Gillian.Gil_syntax.Expr
 
 type folding_info = string * (string * Expr.t) list
 
+type unfold_info = (string * string) list
+
 (** {b JSIL Separation Logic commands}. *)
 type t =
   | Fold      of string * Expr.t list * folding_info option  (** Fold             *)
-  | Unfold    of string * Expr.t list * folding_info option * bool
+  | Unfold    of string * Expr.t list * unfold_info option * bool
       (** Unfold           *)
   | GUnfold   of string  (** Global Unfold    *)
   | ApplyLem  of string * Expr.t list * string list  (** Apply lemma      *)
@@ -37,13 +39,8 @@ let map
         ( name,
           List.map map_e les,
           Some (s, List.map (fun (x, e) -> (x, map_e e)) l) )
-  | Unfold (name, les, None, b) -> Unfold (name, List.map map_e les, None, b)
-  | Unfold (name, les, Some (s, l), b) ->
-      Unfold
-        ( name,
-          List.map map_e les,
-          Some (s, List.map (fun (x, e) -> (x, map_e e)) l),
-          b )
+  | Unfold (name, les, unfold_info, b) ->
+      Unfold (name, List.map map_e les, unfold_info, b)
   | GUnfold name -> GUnfold name
   | ApplyLem (s, l, existentials) -> ApplyLem (s, List.map map_e l, existentials)
   | SepAssert (a, binders) -> SepAssert (map_a a, binders)
@@ -62,6 +59,13 @@ let pp_folding_info =
   in
   Fmt.option pp_non_opt
 
+let pp_unfold_info =
+  let pp_ui f (v1, v2) = Fmt.pf f "(%s := %s)" v1 v2 in
+  let pp_non_opt f uil =
+    Fmt.pf f " [bind: %a]" (Fmt.list ~sep:(Fmt.any " and ") pp_ui) uil
+  in
+  Fmt.option pp_non_opt
+
 let rec pp fmt (lcmd : t) : unit =
   let pp_args = Fmt.list ~sep:Fmt.comma Expr.pp in
   let pp_binders f b =
@@ -74,7 +78,7 @@ let rec pp fmt (lcmd : t) : unit =
       Fmt.pf fmt "fold %s(%a)%a" name pp_args les pp_folding_info fold_info
   | Unfold (name, les, unfold_info, b) ->
       let keyword = if b then "unfold*" else "unfold" in
-      Fmt.pf fmt "%s %s(%a) %a" keyword name pp_args les pp_folding_info
+      Fmt.pf fmt "%s %s(%a) %a" keyword name pp_args les pp_unfold_info
         unfold_info
   | GUnfold name -> Fmt.pf fmt "unfold_all %s" name
   | ApplyLem (lem_name, lparams, binders) ->

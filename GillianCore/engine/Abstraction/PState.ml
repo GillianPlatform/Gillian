@@ -234,21 +234,6 @@ module Make
     let state, _, _ = astate in
     State.get_lvars state
 
-  let get_folded_pred (astate : t) (pname : string) (vs_ins : Val.t list) :
-      action_ret =
-    let state, preds, pred_defs = astate in
-    let pred = UP.get_pred_def pred_defs pname in
-    let pred_def = pred.pred in
-    let pred_pure = pred.pure in
-    match
-      Preds.get_pred pred_pure preds pname vs_ins pred_def.pred_ins
-        (State.equals state)
-    with
-    | Some (_, vs) ->
-        let vs_outs = Pred.out_args pred_def vs in
-        ASucc [ ((state, preds, pred_defs), vs_outs) ]
-    | _            -> AFail [ EAsrt (vs_ins, True, []) ]
-
   let to_assertions ?(to_keep : SS.t option) (astate : t) : Asrt.t list =
     let state, preds, _ = astate in
     let s_asrts = State.to_assertions ?to_keep state in
@@ -448,19 +433,18 @@ module Make
             raise (Failure msg) )
     | Unfold (pname, les, unfold_info, b) -> (
         let pred = UP.get_pred_def prog.preds pname in
-        let les_ins =
-          if List.length les < List.length pred.pred.pred_params then les
-          else Pred.in_args pred.pred les
-        in
-        let vs_ins = List.map eval_expr les_ins in
-        match Unifier.get_pred astate pname vs_ins with
+        let vs = List.map eval_expr les in
+        let vs_ins = Pred.in_args pred.pred vs in
+        let vs = List.map (fun x -> Some x) vs in
+        (* FIXME: make sure correct number of params *)
+        match Unifier.get_pred astate pname vs with
         | GPSucc [ (_, vs') ] ->
             L.verbose (fun m ->
                 m "@[<h>Returned values: %a@]" Fmt.(list ~sep:comma Val.pp) vs');
             let vs = Pred.combine_ins_outs pred.pred vs_ins vs' in
             L.verbose (fun m ->
                 m "@[<h>LCMD Unfold about to happen with rec %b info: %a@]" b
-                  SLCmd.pp_folding_info unfold_info);
+                  SLCmd.pp_unfold_info unfold_info);
             if b then Ok [ Unifier.rec_unfold astate pname vs ]
             else (
               L.verbose (fun m ->

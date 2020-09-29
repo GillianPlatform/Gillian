@@ -36,8 +36,8 @@ module type S = sig
     maintain:bool ->
     t ->
     string ->
-    vt list ->
-    int list ->
+    vt option list ->
+    Containers.SI.t ->
     (vt -> vt -> bool) ->
     abs_t option
 

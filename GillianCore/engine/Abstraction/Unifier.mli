@@ -21,7 +21,7 @@ module type S = sig
 
   type u_res = UWTF | USucc of t | UFail of err_t list
 
-  type unfold_info_t = string * (string * Expr.t) list
+  type unfold_info_t = (string * string) list
 
   val produce_assertion : t -> st -> Asrt.t -> t option
 
@@ -45,7 +45,7 @@ module type S = sig
 
   val unify : ?in_unification:bool -> t -> st -> UP.t -> up_u_res
 
-  val get_pred : ?in_unification:bool -> t -> string -> vt list -> gp_ret
+  val get_pred : ?in_unification:bool -> t -> string -> vt option list -> gp_ret
 end
 
 module Make

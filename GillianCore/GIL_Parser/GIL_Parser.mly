@@ -410,6 +410,10 @@ var_and_le_target:
     { (lvar, le) }
 ;
 
+var_and_var_target:
+  | LBRACE; lvar1 = LVAR; DEFEQ; lvar2 = LVAR; RBRACE;
+    { (lvar1, lvar2) }
+;
 
 (***********************)
 (********* GIL *********)
@@ -660,7 +664,7 @@ g_named_assertion_target:
 (* TODO: Check that the assertions are only predicates, or deal with full assertions in the execution *)
 g_logic_cmd_target:
 (* fold x(e1, ..., en) *)
-  | FOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(unfold_info_target)
+  | FOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(logic_bindings_target)
     { SL (Fold (name, les, fold_info)) }
 
 (* unfold x(e1, ..., en) [ def with #x := le1 and ... ] *)
@@ -860,9 +864,15 @@ macro_head_def_target:
 ;
 
 (* [ def with #x := le1 and ... ] *)
-unfold_info_target:
+logic_bindings_target:
   | LBRACKET; id = VAR; WITH; var_les = separated_list(AND, var_and_le_target); RBRACKET
     { (id, var_les) }
+;
+
+(* [bind: (#x := le1) and ... ] *)
+unfold_info_target:
+  | LBRACKET; BIND; COLON; var_les = separated_list(AND, var_and_var_target); RBRACKET
+    { var_les }
 ;
 
 binders_target:

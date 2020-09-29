@@ -1348,12 +1348,11 @@ lemma ListToSetUnion(lst1, lst2)
     (#uset == -u- (#set1, #set2))
 ]]
 [*
-    unfold ListToSet(#lst1, #set1);
+    sep_assert (#x == l+ (#lst1, #lst2)) [bind: #x];
+    unfold ListToSet(#lst1, #set1) [bind: (#e := #h1) and (#restLst := #rest1) and (#restSet := #restSet1)];
     if (#lst1 = {{ }}) then {
-        sep_assert (#x == l+ (#lst1, #lst2)) [bind: #x];
         sep_apply ListToSetFunction(#lst2, #x)
     } else {
-        sep_assert (#lst1 == #h1 :: #rest1) [bind: #h1, #rest1];
         unfold ListToSet(l+ (#lst1, #lst2), #uset);
         sep_apply ListToSetUnion(#rest1, #lst2)
     }

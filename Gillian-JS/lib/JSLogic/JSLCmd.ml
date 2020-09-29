@@ -4,8 +4,7 @@ open Jsil_syntax
 type t =
   | Fold       of JSAsrt.t * (string * (string * JSExpr.t) list) option
       (** Fold          *)
-  | Unfold     of JSAsrt.t * (string * (string * JSExpr.t) list) option
-      (** Single Unfold *)
+  | Unfold     of JSAsrt.t * (string * string) list option  (** Single Unfold *)
   | GUnfold    of string  (** Global unfold *)
   | Flash      of JSAsrt.t  (** Unfold/fold   *)
   | If         of JSExpr.t * t list * t list  (** If-then-else  *)
@@ -43,10 +42,7 @@ let rec js2jsil
         LCmd.SL (Fold (p_name, les', None));
       ]
   | Unfold (Pred (s, les), unfold_info) ->
-      [
-        LCmd.SL
-          (Unfold (s, List.map fe les, translate_folding_info unfold_info, false));
-      ]
+      [ LCmd.SL (Unfold (s, List.map fe les, unfold_info, false)) ]
   | GUnfold name -> [ LCmd.SL (GUnfold name) ]
   | Assert (assertion, binders) ->
       let a' =
@@ -68,15 +64,12 @@ let rec js2jsil
       raise (Failure "DEATH. USESUBST CANNOT BE TRANSLATED!!!")
   | _ -> raise (Failure "Unsupported JS logic command")
 
-let str_of_folding_info
-    (unfold_info : (string * (string * JSExpr.t) list) option) : string =
+let str_of_folding_info (unfold_info : (string * string) list option) : string =
   match unfold_info with
-  | None -> ""
-  | Some (id, unfold_info_list) ->
+  | None                  -> ""
+  | Some unfold_info_list ->
       let unfold_info_list =
-        List.map
-          (fun (v, le) -> "(" ^ v ^ " := " ^ JSExpr.str le ^ ")")
-          unfold_info_list
+        List.map (fun (v1, v2) -> "(" ^ v1 ^ " := " ^ v2 ^ ")") unfold_info_list
       in
       let unfold_info_list_str = String.concat " and " unfold_info_list in
-      " [ " ^ id ^ " with " ^ unfold_info_list_str ^ " ]"
+      " [bind: " ^ unfold_info_list_str ^ " ]"

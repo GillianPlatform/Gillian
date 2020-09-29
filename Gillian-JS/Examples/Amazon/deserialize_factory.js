@@ -99,15 +99,9 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
         /* @tactic
             if (#definition = "Complete") then {
                 apply lemma CElementsFacts(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
-                unfold CElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
-                assert CElement(#view, #outerLoopReadPos, #fCount, #fList, #eLength) [bind: #fList, #eLength]
+                unfold CElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) [bind: (#element := #fList) and (#eLength := #eLength)]
             } else {
-                unfold IElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
-                if (#remElsList = {{ }}) then {
-                    assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remElsLength) [bind: #fList]
-                } else {
-                    assert CElement(#view, #outerLoopReadPos, #fCount, #fList, #eLength) [bind: #fList, #eLength]
-                }
+                unfold IElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) [bind: (#fList := #fList) and (#eLength := #eLength)]
             } */
         var element = []
         var fieldCount = fieldsPerElement
@@ -411,9 +405,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
         @tactic
             assert (toUtf8(#new_prop, #utf8NProp)) [bind: #utf8NProp];
             assert (toUtf8(#new_value, #utf8NVal)) [bind: #utf8NVal];
-            unfold ObjectTable(#dECObj, #utf8Done);
-            assert (FirstProj(#utf8Done, #doneProps)) [bind: #doneProps];
-            assert (ListToSet(#doneProps, #donePropsSet)) [bind: #donePropsSet];
+            unfold ObjectTable(#dECObj, #utf8Done) [bind: (#pList := #doneProps) and (#pSet := #donePropsSet)];
             apply lemma FirstProjConcatSplit(#ECKs, #done, #left);
             apply lemma ProduceListToSet(#doneRProps); apply lemma ProduceListToSet(#leftRProps);
             assert (ListToSet(#doneRProps, #doneRPropsSet)) [bind: #doneRPropsSet];
@@ -611,7 +603,7 @@ function deserializeEncryptedDataKeys(buffer, startPos) {
               EncryptedDataKey(ret, #pId, #pInfo, #encryptedDataKey, #rawInfo)
     */
     element => {
-      /* FIXME: Implement the array deconstructor */
+      /* Implement the array deconstructor */
       var [rawId, rawInfo, encryptedDataKey] = element
       var providerId = toUtf8(rawId)
       var providerInfo = toUtf8(rawInfo)

@@ -521,8 +521,7 @@ module SLCmd : sig
                    * Expr.t list
                    * (string * (string * Expr.t) list) option
         (** Fold predicate *)
-    | Unfold    of
-        string * Expr.t list * (string * (string * Expr.t) list) option * bool
+    | Unfold    of string * Expr.t list * (string * string) list option * bool
         (** Unfold predicate *)
     | GUnfold   of string  (** Global Unfold *)
     | ApplyLem  of string * Expr.t list * string list  (** Apply lemma *)
@@ -539,6 +538,8 @@ module SLCmd : sig
 
   (** Pretty-printer of folding info *)
   val pp_folding_info : (string * (string * Expr.t) list) option Fmt.t
+
+  val pp_unfold_info : (string * string) list option Fmt.t
 
   (** Pretty-printer *)
   val pp : Format.formatter -> t -> unit
@@ -1205,7 +1206,7 @@ module Visitors : sig
                'd ->
                string ->
                Expr.t list ->
-               (string * (string * Expr.t) list) option ->
+               (string * string) list option ->
                bool ->
                SLCmd.t
            ; visit_UnsignedRightShift : 'd -> BinOp.t
@@ -1581,7 +1582,7 @@ module Visitors : sig
         'd ->
         string ->
         Expr.t list ->
-        (string * (string * Expr.t) list) option ->
+        (string * string) list option ->
         bool ->
         SLCmd.t
 
@@ -1816,7 +1817,7 @@ module Visitors : sig
                'c ->
                string ->
                Expr.t list ->
-               (string * (string * Expr.t) list) option ->
+               (string * string) list option ->
                bool ->
                'f
            ; visit_UnsignedRightShift : 'c -> 'f
@@ -2188,7 +2189,7 @@ module Visitors : sig
         'c ->
         string ->
         Expr.t list ->
-        (string * (string * Expr.t) list) option ->
+        (string * string) list option ->
         bool ->
         'f
 

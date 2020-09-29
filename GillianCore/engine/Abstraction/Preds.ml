@@ -36,8 +36,8 @@ module type S = sig
     maintain:bool ->
     t ->
     string ->
-    vt list ->
-    int list ->
+    vt option list ->
+    Containers.SI.t ->
     (vt -> vt -> bool) ->
     abs_t option
 
@@ -138,75 +138,83 @@ module Make
       ~(maintain : bool)
       (preds : t)
       (name : string)
-      (args : vt list)
-      (ins : int list)
+      (args : vt option list)
+      (ins : Containers.SI.t)
       (f_eq : vt -> vt -> bool) : abs_t option =
-    let sort (candidates : (vt list * vt list) list) (targets : vt list) =
-      let equals (candidates : vt list) (targets : vt list) =
+    (* Auxiliary printers *)
+    let lv_pp = Fmt.(parens (list ~sep:comma Val.pp)) in
+    let ov_pp = Fmt.(option ~none:(any "None") Val.pp) in
+    let lov_pp = Fmt.(parens (list ~sep:comma ov_pp)) in
+    (* How many ins do we need to find *)
+    let ins_count = Containers.SI.cardinal ins in
+    L.verbose (fun fmt ->
+        fmt "Preds.get_pred: Looking for: %s%a" name lov_pp args);
+    (* Evaluate a candidate predicate with respect to the desired ins and outs and an equality function *)
+    let eval_cand_with_fun
+        (candidate : vt list)
+        (targets : vt option list)
+        (f_eq : vt -> vt -> bool) : bool * (int * int) =
+      let candidate = List.mapi (fun i cv -> (i, cv)) candidate in
+      let icount, ocount =
         List.fold_left2
-          (fun sum c t ->
-            L.tmi (fun fmt ->
-                fmt "Candidate equals: %a vs %a" Val.pp c Val.pp t);
-            if c = t then sum - 1 else sum)
-          0 candidates targets
+          (fun (ic, oc) (i, cv) tv ->
+            match tv with
+            | None -> (ic, oc)
+            | Some tv when not (f_eq cv tv) -> (ic, oc)
+            | _ -> if Containers.SI.mem i ins then (ic + 1, oc) else (ic, oc + 1))
+          (0, 0) candidate targets
       in
-      let sort_fun (p1 : vt list * vt list) (p2 : vt list * vt list) =
-        let i1, o1 = p1 in
-        let i2, o2 = p2 in
-        Stdlib.compare (equals i1 targets) (equals i2 targets)
-      in
-      List.sort sort_fun candidates
+      let result = (icount = ins_count, (icount, ocount)) in
+      result
     in
-    let basic_matcher (args', _) =
-      List.for_all
-        (fun (arg, arg') ->
-          L.tmi (fun m ->
-              m "Checking if %a = %a syntactically\n" Val.pp arg Val.pp arg');
-          arg = arg')
-        (List.combine args args')
-    in
-    let matcher (args', _) =
-      List.for_all
-        (fun (arg, arg') ->
-          L.tmi (fun m -> m "Checking if %a = %a\n" Val.pp arg Val.pp arg');
-          f_eq arg arg')
-        (List.combine args args')
+    (* Sort the candidate predicates according to the number of ins matched,
+       and then the number of outs matched, in decreasing order of matches *)
+    let find_pred
+        (candidates : vt list list)
+        (targets : vt option list)
+        (f_eq : vt -> vt -> bool) =
+      List.fold_left
+        (fun (b', i', o', result) candidate ->
+          let b, (i, o) =
+            try
+              (* In case something goes wrong with the evaluation, ignore *)
+              eval_cand_with_fun candidate targets f_eq
+            with _ -> (false, (0, 0))
+          in
+          let ccurrent = (b', i', o', result) in
+          let cnew = (b, i, o, candidate) in
+          match (b', b) with
+          | false, true -> cnew
+          | true, false -> ccurrent
+          | _           -> (
+              match (i > i', i' > i) with
+              | true, _ -> cnew
+              | _, true -> ccurrent
+              | _       -> if o > o' then cnew else ccurrent ))
+        (false, 0, 0, []) candidates
     in
     let candidates = find_all preds (fun (pname, _) -> name = pname) in
     let candidates = List.map (fun (_, args) -> args) candidates in
-    let candidates =
-      List.map
-        (fun args -> (List.map (fun i -> List.nth args i) ins, args))
-        candidates
-    in
-    let candidates = sort candidates args in
-    (* First attempt: syntactic equality *)
-    let result =
-      List.fold_left
-        (fun (res : abs_t option) (candidate : vt list * vt list) ->
-          if res <> None then res
-          else if basic_matcher candidate then Some (name, snd candidate)
-          else None)
-        None candidates
-    in
-    (* Next attempt: provided comparator *)
-    let result =
-      match result with
-      | None        ->
-          List.fold_left
-            (fun (res : abs_t option) (candidate : vt list * vt list) ->
-              if res <> None then res
-              else if matcher candidate then Some (name, snd candidate)
-              else None)
-            None candidates
-      | Some result -> Some result
-    in
-    match result with
-    | None        -> None
-    | Some result -> (
+    L.verbose (fun fmt ->
+        fmt "Found %d candidates: \n%a" (List.length candidates)
+          Fmt.(list ~sep:(any "@\n") lv_pp)
+          candidates);
+    L.verbose (fun fmt -> fmt "Syntactic search.");
+    let syntactic_result = find_pred candidates args ( = ) in
+    match syntactic_result with
+    | true, _, _, result -> (
         match maintain with
-        | true  -> Some result
-        | false -> pop preds (fun pred -> pred = result) )
+        | true  -> Some (name, result)
+        | false -> pop preds (fun pred -> pred = (name, result)) )
+    | false, _, _, _     -> (
+        L.verbose (fun fmt -> fmt "Semantic search.");
+        let semantic_result = find_pred candidates args f_eq in
+        match semantic_result with
+        | true, _, _, result -> (
+            match maintain with
+            | true  -> Some (name, result)
+            | false -> pop preds (fun pred -> pred = (name, result)) )
+        | false, _, _, _     -> None )
 
   let subst_in_val (subst : st) (v : vt) : vt =
     let le' = ESubst.subst_in_expr subst true (Val.to_expr v) in

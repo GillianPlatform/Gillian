@@ -515,7 +515,12 @@ var_and_le_target:
   | LBRACE; lvar = LVAR; DEFEQ; le = expr_target; RBRACE;
     { (lvar, le) }
 
-unfold_info_target:
+var_and_var_target:
+  | LBRACE; lvar1 = LVAR; DEFEQ; lvar2 = LVAR; RBRACE;
+    { (lvar1, lvar2) }
+;
+
+logic_bindings_target:
   | LBRACKET; id = VAR; WITH; var_les = separated_list(AND, var_and_le_target); RBRACKET
     { (id, var_les) }
 
@@ -523,8 +528,14 @@ existentials_target:
   | LBRACKET; EXISTENTIALS; COLON; xs = separated_list(COMMA, LVAR); RBRACKET
     { xs }
 
+(* [bind: (#x := le1) and ... ] *)
+unfold_info_target:
+  | LBRACKET; BIND; COLON; unfold_info = separated_list(AND, var_and_var_target); RBRACKET
+    { unfold_info }
+;
+
 logic_cmd_target:
-  | FOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(unfold_info_target)
+  | FOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(logic_bindings_target)
     { SL (Fold (name, les, fold_info)) }
   | UNFOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
     { SL (Unfold (name, les, unfold_info, false)) }
@@ -1096,16 +1107,22 @@ js_macro_head_target:
  | name = VAR; LBRACE; params = separated_list(COMMA, js_lexpr_target); RBRACE
    { (name, params) }
 
-js_unfold_info_target:
+js_logic_bindings_target:
   | LBRACKET; id = VAR; WITH; var_les = separated_list(AND, js_var_and_le_target); RBRACKET
     { (id, var_les) }
 
+(* [bind: (#x := le1) and ... ] *)
+js_unfold_info_target:
+  | LBRACKET; BIND; COLON; unfold_info = separated_list(AND, var_and_var_target); RBRACKET
+    { unfold_info }
+
 js_logic_cmd_target:
 (* fold x(e1, ..., en) *)
-  | FOLD; assertion = js_assertion_target; fold_info = option(js_unfold_info_target)
+  | FOLD; assertion = js_assertion_target; fold_info = option(js_logic_bindings_target)
     {
       Fold (assertion, fold_info)
     }
+
 
 (* unfold x(e1, ..., en) [ def1 with x1 := le1, ..., xn := len ] *)
   | UNFOLD; assertion = js_assertion_target; unfold_info = option(js_unfold_info_target)
