@@ -134,6 +134,13 @@ let to_gil_expr gexpr =
   | SVsingle n              ->
       (EList [ Lit (String single_type); n ], [ (n, Type.NumberType) ])
 
+let lvars =
+  let open Utils.Containers in
+  function
+  | SUndefined -> SS.empty
+  | Sptr (_, e) -> Expr.lvars e
+  | SVint e | SVfloat e | SVsingle e | SVlong e -> Expr.lvars e
+
 let pp fmt v =
   let se = Expr.pp in
   let f = Format.fprintf in
