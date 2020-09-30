@@ -387,73 +387,91 @@ module Make
     match lcmd with
     | Fold (pname, les, folding_info) -> (
         let pred = UP.get_pred_def prog.preds pname in
-        let vs = List.map eval_expr les in
-        let params = List.map (fun (x, _) -> x) pred.pred.pred_params in
-        let i_bindings =
-          Option.fold
-            ~some:(fun (def, bindings) ->
-              List.map (fun (x, e) -> (Expr.LVar x, eval_expr e)) bindings)
-            ~none:[] folding_info
-        in
-        let param_bindings =
-          if List.length params = List.length vs then List.combine params vs
-          else List.combine (Pred.in_params pred.pred) vs
-        in
-        let param_bindings =
-          List.map (fun (x, v) -> (Expr.PVar x, v)) param_bindings
-        in
-        let subst = ESubst.init (i_bindings @ param_bindings) in
-        match Unifier.unify astate subst pred.up with
-        | UPUSucc [ (astate', subst', _) ] ->
-            let _, preds', _ = astate' in
-            let arg_vs =
-              if List.length params = List.length vs then vs
-              else
-                let out_params = Pred.out_params pred.pred in
-                let vs_outs =
-                  List.map
-                    (fun x ->
-                      let v_x = ESubst.get subst' (PVar x) in
-                      match v_x with
-                      | Some v_x -> v_x
-                      | None     -> raise (Failure "DEATH. evaluate_slcmd. fold"))
-                    out_params
+        match pred.pred.pred_abstract with
+        | true  ->
+            raise
+              (Failure
+                 (Format.asprintf "Impossible: Unfold of abstract predicate %s"
+                    pname))
+        | false -> (
+            let vs = List.map eval_expr les in
+            let params = List.map (fun (x, _) -> x) pred.pred.pred_params in
+            let i_bindings =
+              Option.fold
+                ~some:(fun (def, bindings) ->
+                  List.map (fun (x, e) -> (Expr.LVar x, eval_expr e)) bindings)
+                ~none:[] folding_info
+            in
+            let param_bindings =
+              if List.length params = List.length vs then List.combine params vs
+              else List.combine (Pred.in_params pred.pred) vs
+            in
+            let param_bindings =
+              List.map (fun (x, v) -> (Expr.PVar x, v)) param_bindings
+            in
+            let subst = ESubst.init (i_bindings @ param_bindings) in
+            match Unifier.unify astate subst pred.up with
+            | UPUSucc [ (astate', subst', _) ] ->
+                let _, preds', _ = astate' in
+                let arg_vs =
+                  if List.length params = List.length vs then vs
+                  else
+                    let out_params = Pred.out_params pred.pred in
+                    let vs_outs =
+                      List.map
+                        (fun x ->
+                          let v_x = ESubst.get subst' (PVar x) in
+                          match v_x with
+                          | Some v_x -> v_x
+                          | None     ->
+                              raise (Failure "DEATH. evaluate_slcmd. fold"))
+                        out_params
+                    in
+                    Pred.combine_ins_outs pred.pred vs vs_outs
                 in
-                Pred.combine_ins_outs pred.pred vs vs_outs
-            in
-            Preds.extend ~pure:pred.pure preds' (pname, arg_vs);
-            Ok [ astate' ]
-        | _ ->
-            let msg =
-              Fmt.str "@[<h>IMPOSSIBLE FOLD for %s(%a) with folding_info: %a@]"
-                pname
-                Fmt.(list ~sep:comma Val.pp)
-                vs SLCmd.pp_folding_info folding_info
-            in
-            raise (Failure msg) )
+                Preds.extend ~pure:pred.pure preds' (pname, arg_vs);
+                Ok [ astate' ]
+            | _ ->
+                let msg =
+                  Fmt.str
+                    "@[<h>IMPOSSIBLE FOLD for %s(%a) with folding_info: %a@]"
+                    pname
+                    Fmt.(list ~sep:comma Val.pp)
+                    vs SLCmd.pp_folding_info folding_info
+                in
+                raise (Failure msg) ) )
     | Unfold (pname, les, unfold_info, b) -> (
         let pred = UP.get_pred_def prog.preds pname in
-        let vs = List.map eval_expr les in
-        let vs_ins = Pred.in_args pred.pred vs in
-        let vs = List.map (fun x -> Some x) vs in
-        (* FIXME: make sure correct number of params *)
-        match Unifier.get_pred astate pname vs with
-        | GPSucc [ (_, vs') ] ->
-            L.verbose (fun m ->
-                m "@[<h>Returned values: %a@]" Fmt.(list ~sep:comma Val.pp) vs');
-            let vs = Pred.combine_ins_outs pred.pred vs_ins vs' in
-            L.verbose (fun m ->
-                m "@[<h>LCMD Unfold about to happen with rec %b info: %a@]" b
-                  SLCmd.pp_unfold_info unfold_info);
-            if b then Ok [ Unifier.rec_unfold astate pname vs ]
-            else (
-              L.verbose (fun m ->
-                  m "@[<h>Values: %a@]" Fmt.(list ~sep:comma Val.pp) vs);
-              Ok
-                (List.map
-                   (fun (_, state) -> state)
-                   (Unifier.unfold astate pname vs unfold_info)) )
-        | _                   -> raise (Failure "IMPOSSIBLE UNFOLD") )
+        match pred.pred.pred_abstract with
+        | true  ->
+            raise
+              (Failure
+                 (Format.asprintf "Impossible: Unfold of abstract predicate %s"
+                    pname))
+        | false -> (
+            let vs = List.map eval_expr les in
+            let vs_ins = Pred.in_args pred.pred vs in
+            let vs = List.map (fun x -> Some x) vs in
+            (* FIXME: make sure correct number of params *)
+            match Unifier.get_pred astate pname vs with
+            | GPSucc [ (_, vs') ] ->
+                L.verbose (fun m ->
+                    m "@[<h>Returned values: %a@]"
+                      Fmt.(list ~sep:comma Val.pp)
+                      vs');
+                let vs = Pred.combine_ins_outs pred.pred vs_ins vs' in
+                L.verbose (fun m ->
+                    m "@[<h>LCMD Unfold about to happen with rec %b info: %a@]"
+                      b SLCmd.pp_unfold_info unfold_info);
+                if b then Ok [ Unifier.rec_unfold astate pname vs ]
+                else (
+                  L.verbose (fun m ->
+                      m "@[<h>Values: %a@]" Fmt.(list ~sep:comma Val.pp) vs);
+                  Ok
+                    (List.map
+                       (fun (_, state) -> state)
+                       (Unifier.unfold astate pname vs unfold_info)) )
+            | _                   -> raise (Failure "IMPOSSIBLE UNFOLD") ) )
     | GUnfold pname -> Ok [ Unifier.unfold_all astate pname ]
     | SepAssert (a, binders) -> (
         let store = State.get_store state in

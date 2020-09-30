@@ -80,9 +80,9 @@ lemma CElementFacts(buffer, readPos, fCount, fList, eLength)
     unfold CElement(#buffer, #readPos, #fCount, #fList, #eLength);
     if (0 < #fCount) then {
         sep_assert (Field(#buffer, #readPos, #field, #fLength)) [bind: #field, #fLength];
-        sep_apply FieldFacts(#buffer, #readPos, #field, #fLength);
+        apply FieldFacts(#buffer, #readPos, #field, #fLength);
         sep_assert (CElement(#buffer, #readPos + #fLength, #fCount - 1, #restFields, #restELength)) [bind: #restFields, #restELength];
-        sep_apply CElementFacts(#buffer, #readPos + #fLength, #fCount - 1, #restFields, #restELength)
+        apply CElementFacts(#buffer, #readPos + #fLength, #fCount - 1, #restFields, #restELength)
     }
 *]
 
@@ -99,7 +99,7 @@ lemma CElementFirstFieldLength(buffer, readPos, fCount, field, restFields, eLeng
     unfold CElement(#buffer, #readPos, #fCount, l+({{ #field }}, #restFields), #eLength);
     sep_assert (Field(#buffer, #readPos, #field, #fLength)) [bind: #fLength];
     sep_assert (CElement(#buffer, #readPos + #fLength, #fCount - 1, #restFields, #restELength)) [bind: #restELength];
-    sep_apply CElementFacts(#buffer, #readPos + #fLength, #fCount - 1, #restFields, #restELength)
+    apply CElementFacts(#buffer, #readPos + #fLength, #fCount - 1, #restFields, #restELength)
 *]
 
 (* The length of a non-empty complete element is strictly positive *)
@@ -115,7 +115,7 @@ lemma CElementNonEmptyPositiveLength(buffer, readPos, fCount, fList, eLength)
     unfold CElement(#buffer, #readPos, #fCount, #fList, #eLength);
     sep_assert (Field(#buffer, #readPos, #field, #fLength)) [bind: #fLength];
     sep_assert (CElement(#buffer, #readPos + #fLength, #fCount - 1, #restFields, #restELength)) [bind: #restELength];
-    sep_apply CElementFacts(#buffer, #readPos + #fLength, #fCount - 1, #restFields, #restELength)
+    apply CElementFacts(#buffer, #readPos + #fLength, #fCount - 1, #restFields, #restELength)
 *]
 
 (* Appending the first field of a given complete element to a complete element on its left *)
@@ -130,15 +130,15 @@ lemma AppendFieldCC(buffer, readPos, fCount1, fList1, eLength1, fCount2, field, 
     CElement(#buffer, #readPos + #eLength1 + #shift, #fCount2 - 1, #fList2, #eLength2 - #shift)
 ]]
 [*
-    sep_apply CElementFacts(#buffer, #readPos, #fCount1, #fList1, #eLength1);
-    sep_apply CElementFacts(#buffer, #readPos + #eLength1, #fCount2, l+({{ #field }}, #fList2), #eLength2);
-    sep_apply CElementFirstFieldLength(#buffer, #readPos + #eLength1, #fCount2, #field, #fList2, #eLength2);
+    apply CElementFacts(#buffer, #readPos, #fCount1, #fList1, #eLength1);
+    apply CElementFacts(#buffer, #readPos + #eLength1, #fCount2, l+({{ #field }}, #fList2), #eLength2);
+    apply CElementFirstFieldLength(#buffer, #readPos + #eLength1, #fCount2, #field, #fList2, #eLength2);
     unfold CElement(#buffer, #readPos, #fCount1, #fList1, #eLength1);
     if (0 < #fCount1) then {
         sep_assert (#fList1 == l+ ({{ #fl1 }}, #rfl1)) [bind: #fl1, #rfl1];
         sep_assert (CElement(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1)) [bind: #reL1];
-        sep_apply CElementFacts(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1);
-        sep_apply AppendFieldCC(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1, #fCount2, #field, #fList2, #eLength2)
+        apply CElementFacts(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1);
+        apply AppendFieldCC(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1, #fCount2, #field, #fList2, #eLength2)
     }
 *]
 
@@ -193,7 +193,7 @@ lemma CElementsFacts(buffer, readPos, eCount, fCount, eList, esLength)
     if (0 < #eCount) then {
         sep_assert (CElement(#buffer, #readPos, #fCount, #fList, #eLength)) [bind: #fList, #eLength];
         sep_assert (CElements(#buffer, #readPos + #eLength, #eCount - 1, #fCount, #restEList, #restESLength)) [bind: #restEList, #restESLength];
-        sep_apply CElementsFacts(#buffer, #readPos + #eLength, #eCount - 1, #fCount, #restEList, #restESLength)
+        apply CElementsFacts(#buffer, #readPos + #eLength, #eCount - 1, #fCount, #restEList, #restESLength)
     }
 *]
 
@@ -207,15 +207,15 @@ lemma CElementsAppend(buffer, readPos, eCount, fCount, eList, esLength, fList, e
     CElements(#buffer, #readPos, #eCount + 1, #fCount, l+ (#eList, {{ #fList }}), #esLength + #eLength)
 ]]
 [*
-    sep_apply CElementsFacts(#buffer, #readPos, #eCount, #fCount, #eList, #esLength);
-    sep_apply CElementFacts(#buffer, #readPos + #esLength, #fCount, #fList, #eLength);
-    sep_apply CElementNonEmptyPositiveLength(#buffer, #readPos + #esLength, #fCount, #fList, #eLength);
+    apply CElementsFacts(#buffer, #readPos, #eCount, #fCount, #eList, #esLength);
+    apply CElementFacts(#buffer, #readPos + #esLength, #fCount, #fList, #eLength);
+    apply CElementNonEmptyPositiveLength(#buffer, #readPos + #esLength, #fCount, #fList, #eLength);
     unfold CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength);
     if (0 < #eCount) then {
         sep_assert (CElement(#buffer, #readPos, #fCount, #newElementFieldList, #newElementLength)) [bind: #newElementFieldList, #newElementLength];
-        sep_apply CElementFacts(#buffer, #readPos, #fCount, #newElementFieldList, #newElementLength);
+        apply CElementFacts(#buffer, #readPos, #fCount, #newElementFieldList, #newElementLength);
         sep_assert (CElements(#buffer, (#readPos + #newElementLength), (#eCount - 1), #fCount, #remainingElementsList, #remainingElementsLength)) [bind: #remainingElementsList, #remainingElementsLength];
-        sep_apply CElementsAppend(#buffer, (#readPos + #newElementLength), (#eCount - 1), #fCount, #remainingElementsList, #remainingElementsLength, #fList, #eLength)
+        apply CElementsAppend(#buffer, (#readPos + #newElementLength), (#eCount - 1), #fCount, #remainingElementsList, #remainingElementsLength, #fList, #eLength)
     }
  *]
 
@@ -297,9 +297,9 @@ lemma IElementFacts(buffer, readPos, fCount, fList, eLength)
     unfold IElement(#buffer, #readPos, #fCount, #fList, #eLength);
     if (not (#fList = {{ }})) then {
         sep_assert (Field(#buffer, #readPos, #field, #fLength)) [bind: #field, #fLength];
-        sep_apply FieldFacts(#buffer, #readPos, #field, #fLength);
+        apply FieldFacts(#buffer, #readPos, #field, #fLength);
         sep_assert (IElement(#buffer, #readPos + #fLength, #fCount - 1, #restFields, #restELength)) [bind: #restFields, #restELength];
-        sep_apply IElementFacts(#buffer, #readPos + #fLength, #fCount - 1, #restFields, #restELength)
+        apply IElementFacts(#buffer, #readPos + #fLength, #fCount - 1, #restFields, #restELength)
     }
 *]
 
@@ -315,16 +315,16 @@ lemma AppendFieldCI(buffer, readPos, fCount1, fList1, eLength1, fCount2, field, 
     IElement(#buffer, #readPos + #eLength1 + #shift, #fCount2 - 1, #fList2, #eLength2 - #shift)
 ]]
 [*
-    sep_apply CElementFacts(#buffer, #readPos, #fCount1, #fList1, #eLength1);
-    sep_apply IElementFacts(#buffer, #readPos + #eLength1, #fCount2, l+({{ #field }}, #fList2), #eLength2);
+    apply CElementFacts(#buffer, #readPos, #fCount1, #fList1, #eLength1);
+    apply IElementFacts(#buffer, #readPos + #eLength1, #fCount2, l+({{ #field }}, #fList2), #eLength2);
     unfold CElement(#buffer, #readPos, #fCount1, #fList1, #eLength1);
     if (0 < #fCount1) then {
         sep_assert (#fList1 == l+ ({{ #fl1 }}, #rfl1)) [bind: #fl1, #rfl1];
         sep_assert (CElement(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1)) [bind: #reL1];
-        sep_apply CElementFacts(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1);
-        sep_apply AppendFieldCI(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1, #fCount2, #field, #fList2, #eLength2);
+        apply CElementFacts(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1);
+        apply AppendFieldCI(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1, #fCount2, #field, #fList2, #eLength2);
         sep_assert (IElement(#buffer, #readPos + #eLength1 + #shift, #fCount2 - 1, #fList2, #eLength2 - #shift));
-        sep_apply IElementFacts(#buffer, #readPos + #eLength1 + #shift, #fCount2 - 1, #fList2, #eLength2 - #shift)
+        apply IElementFacts(#buffer, #readPos + #eLength1 + #shift, #fCount2 - 1, #fList2, #eLength2 - #shift)
     }
 *]
 
@@ -338,14 +338,14 @@ lemma PrependCElementI(buffer, readPos, fCount1, fList1, eLength1, fCount2, fLis
     IElement(#buffer, #readPos, #fCount1 + #fCount2, l+ (#fList1, #fList2), #eLength1 + #eLength2)
 ]]
 [*
-    sep_apply CElementFacts(#buffer, #readPos, #fCount1, #fList1, #eLength1);
-    sep_apply IElementFacts(#buffer, #readPos + #eLength1, #fCount2, #fList2, #eLength2);
+    apply CElementFacts(#buffer, #readPos, #fCount1, #fList1, #eLength1);
+    apply IElementFacts(#buffer, #readPos + #eLength1, #fCount2, #fList2, #eLength2);
     unfold CElement(#buffer, #readPos, #fCount1, #fList1, #eLength1);
     if (0 < #fCount1) then {
         sep_assert (#fList1 == l+ ({{ #fl1 }}, #rfl1)) [bind: #fl1, #rfl1];
         sep_assert (CElement(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1)) [bind: #reL1];
-        sep_apply CElementFacts(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1);
-        sep_apply PrependCElementI(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1, #fCount2, #fList2, #eLength2)
+        apply CElementFacts(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1);
+        apply PrependCElementI(#buffer, 2 + (l-len #fl1) + #readPos, #fCount1 - 1, #rfl1, #reL1, #fCount2, #fList2, #eLength2)
     }
 *]
 
@@ -405,12 +405,12 @@ lemma IElementsFacts(buffer, readPos, eCount, fCount, eList, esLength)
     unfold IElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength);
     if (#eList = {{ }}) then {
         sep_assert (IElement(#buffer, #readPos, #fCount, #fList, #esLength)) [bind : #fList];
-        sep_apply IElementFacts(#buffer, #readPos, #fCount, #fList, #esLength)
+        apply IElementFacts(#buffer, #readPos, #fCount, #fList, #esLength)
     } else {
         sep_assert (CElement(#buffer, #readPos, #fCount, #fList, #eLength)) [bind : #fList, #eLength];
-        sep_apply CElementFacts(#buffer, #readPos, #fCount, #fList, #eLength);
+        apply CElementFacts(#buffer, #readPos, #fCount, #fList, #eLength);
         sep_assert (IElements(#buffer, #readPos + #eLength, #eCount - 1, #fCount, #restEList, #restESLength)) [bind: #restEList, #restESLength];
-        sep_apply IElementsFacts(#buffer, #readPos + #eLength, #eCount - 1, #fCount, #restEList, #restESLength)
+        apply IElementsFacts(#buffer, #readPos + #eLength, #eCount - 1, #fCount, #restEList, #restESLength)
     }
 *]
 
@@ -455,9 +455,9 @@ lemma ElementsFacts(buffer, readPos, eCount, fCount, eList, esLength)
 [*
     unfold Elements(#definition, #buffer, #readPos, #eCount, #fCount, #eList, #esLength);
     if (#definition = "Complete") then {
-        sep_apply CElementsFacts(#buffer, #readPos, #eCount, #fCount, #eList, #esLength)
+        apply CElementsFacts(#buffer, #readPos, #eCount, #fCount, #eList, #esLength)
     } else {
-        sep_apply IElementsFacts(#buffer, #readPos, #eCount, #fCount, #eList, #esLength)
+        apply IElementsFacts(#buffer, #readPos, #eCount, #fCount, #eList, #esLength)
     }
 *]
 
@@ -471,16 +471,16 @@ lemma PrependCElementsE(definition, buffer, readPos, eCount1, fCount, fList1, es
     Elements(#definition, #buffer, #readPos, #eCount1 + #eCount2, #fCount, l+ (#fList1, #fList2), #esLength1 + #esLength2)
 ]]
 [*
-    sep_apply ElementsFacts(#buffer, #readPos + #esLength1, #eCount2, #fCount, #fList2, #esLength2);
+    apply ElementsFacts(#buffer, #readPos + #esLength1, #eCount2, #fCount, #fList2, #esLength2);
     unfold CElements(#buffer, #readPos, #eCount1, #fCount, #fList1, #esLength1);
     if (0 < #eCount1) then {
         sep_assert (CElement(#buffer, #readPos, #fCount, #fList, #eLength)) [bind: #fList, #eLength];
         sep_assert (CElements(#buffer, #readPos + #eLength, #eCount1 - 1, #fCount, #restElements, #restESLength)) [bind: #restElements, #restESLength];
-        sep_apply CElementFacts(#buffer, #readPos, #fCount, #fList, #eLength);
-        sep_apply CElementsFacts(#buffer, #readPos + #eLength, #eCount1 - 1, #fCount, #restElements, #restESLength);
-        sep_apply PrependCElementsE(#definition, #buffer, #readPos + #eLength, #eCount1 - 1, #fCount, #restElements, #restESLength, #eCount2, #fList2, #esLength2);
+        apply CElementFacts(#buffer, #readPos, #fCount, #fList, #eLength);
+        apply CElementsFacts(#buffer, #readPos + #eLength, #eCount1 - 1, #fCount, #restElements, #restESLength);
+        apply PrependCElementsE(#definition, #buffer, #readPos + #eLength, #eCount1 - 1, #fCount, #restElements, #restESLength, #eCount2, #fList2, #esLength2);
         if (#definition = "Complete") then {
-            sep_apply CElementsFacts(#buffer, #readPos + #eLength, #eCount1 + #eCount2 - 1, #fCount, l+ (#restElements, #fList2), #restESLength + #esLength2)
+            apply CElementsFacts(#buffer, #readPos + #eLength, #eCount1 + #eCount2 - 1, #fCount, l+ (#restElements, #fList2), #restESLength + #esLength2)
         }
     }
 *]
@@ -496,16 +496,16 @@ lemma CElementsElementLength(buffer, readPos, eCount, fCount, eList, prefix, ele
     (l-len #element == #fCount)
 ]]
 [*
-    sep_apply DestructList(#prefix);
+    apply DestructList(#prefix);
     unfold CElements(#buffer, #readPos, #eCount, #fCount, #eList, #esLength);
     if (#prefix = {{ }}) then {
         sep_assert (CElement(#buffer, #readPos, #fCount, #element, #elementLength)) [bind: #elementLength];
-        sep_apply CElementFacts(#buffer, #readPos, #fCount, #element, #elementLength)
+        apply CElementFacts(#buffer, #readPos, #fCount, #element, #elementLength)
     } else {
         sep_assert (CElement(#buffer, #readPos, #fCount, #fList, #elementLength)) [bind: #elementLength];
         sep_assert (#prefix == #head :: #rest) [bind: #head, #rest];
         sep_assert (CElements(#buffer, (#readPos + #elementLength), (#eCount - 1), #fCount, l+ (#rest, {{#element}}, #suffix), #restESLength)) [bind: #restESLength];
-        sep_apply CElementsElementLength(#buffer, (#readPos + #elementLength), (#eCount - 1), #fCount, l+ (#rest, {{#element}}, #suffix), #rest, #element, #suffix)
+        apply CElementsElementLength(#buffer, (#readPos + #elementLength), (#eCount - 1), #fCount, l+ (#rest, {{#element}}, #suffix), #rest, #element, #suffix)
     }
  *]
 
@@ -716,7 +716,7 @@ pred DeserialisedEncryptedDataKeys (+a:Obj, contents:List) :
     denotes that the string utf8Data is obtained by converting
     the raw bytes rawData to UTF-8 format
 *)
-pure nounfold pred toUtf8(+rawData:List, utf8Data:Str) : (utf8Data == "");
+abstract pure pred toUtf8(+rawData:List, utf8Data:Str);
 
 (* toUtf8 is injective *)
 lemma toUtf8Injective(rawData1, utf8Data1, rawData2, utf8Data2)
@@ -733,7 +733,7 @@ lemma toUtf8Injective(rawData1, utf8Data1, rawData2, utf8Data2)
     denotes that the raw bytes rawData are obtained by converting
     the string utf8Data into bytes
 *)
-pure nounfold pred fromUtf8(+utf8Data:Str, rawData:List) : (rawData == {{ }});
+abstract pure pred fromUtf8(+utf8Data:Str, rawData:List);
 
 (* fromUtf8 is injective *)
 lemma fromUtf8Injective(utf8Data1, rawData1, utf8Data2, rawData2)
@@ -788,8 +788,8 @@ lemma toUtf8MapInjective(rawData1, utf8Data1, rawData2, utf8Data2)
         sep_assert ((#rawData1 == #rd1 :: #restd1) * (#rawData2 == #rd2 :: #restd2) *
                     (#utf8Data1 == #ut1 :: #restu1) * (#utf8Data2 == #ut2 :: #restu2))
                     [bind: #rd1, #restd1, #rd2, #restd2, #ut1, #restu1, #ut2, #restu2];
-        sep_apply toUtf8Injective(#rd1, #ut1, #rd2, #ut2);
-        sep_apply toUtf8MapInjective(#restd1, #restu1, #restd2, #restu2)
+        apply toUtf8Injective(#rd1, #ut1, #rd2, #ut2);
+        apply toUtf8MapInjective(#restd1, #restu1, #restd2, #restu2)
     }
  *]
 
@@ -819,9 +819,9 @@ lemma toUtf8PairMapInjective(rawData1, utf8Data1, rawData2, utf8Data2)
         sep_assert ((#rawData1 == {{ #p1, #v1 }} :: #restd1) * (#rawData2 == {{ #p2, #v2 }} :: #restd2) *
                     (#utf8Data1 == {{ #up1, #uv1 }} :: #restu1) * (#utf8Data2 == {{ #up2, #uv2 }} :: #restu2))
                     [bind: #p1, #v1, #restd1, #p2, #v2, #restd2, #up1, #uv1, #restu1, #up2, #uv2, #restu2];
-        sep_apply toUtf8Injective(#p1, #up1, #p2, #up2);
-        sep_apply toUtf8Injective(#v1, #uv1, #v2, #uv2);
-        sep_apply toUtf8PairMapInjective(#restd1, #restu1, #restd2, #restu2)
+        apply toUtf8Injective(#p1, #up1, #p2, #up2);
+        apply toUtf8Injective(#v1, #uv1, #v2, #uv2);
+        apply toUtf8PairMapInjective(#restd1, #restu1, #restd2, #restu2)
     }
  *]
 
@@ -840,7 +840,7 @@ lemma toUtf8PairMapAppendPair(data, utf8Data, prop, value)
     if (not (#data = {{ }})) then {
         sep_assert (#data == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
         sep_assert (toUtf8PairMap(#restPVPairs, #restUtf8Data)) [bind: #restUtf8Data];
-        sep_apply toUtf8PairMapAppendPair(#restPVPairs, #restUtf8Data, #prop, #value)
+        apply toUtf8PairMapAppendPair(#restPVPairs, #restUtf8Data, #prop, #value)
     }
 *]
 
@@ -1260,7 +1260,7 @@ lemma FirstProjFunction(lst1, proj1, lst2, proj2)
     unfold FirstProj(#lst1, #proj1) [bind: (#fst := #fst1) and (#rest := #rest1) and (#fProjRest := #fProjRest1)];
     if (not (#lst1 = {{ }})) then {
         unfold FirstProj(#lst2, #proj2) [bind: (#fst := #fst2) and (#rest := #rest2) and (#fProjRest := #fProjRest2)];
-        sep_apply FirstProjFunction(#rest1, #fProjRest1, #rest2, #fProjRest2)
+        apply FirstProjFunction(#rest1, #fProjRest1, #rest2, #fProjRest2)
     }
  *]
 
@@ -1277,7 +1277,7 @@ lemma FirstProjAppendPair(lst, fProj, prop, value)
     if (not (#lst = {{ }})) then {
         sep_assert (#lst == l+ ({{{{ #fProp, #fValue }}}}, #restPVPairs)) [bind: #fProp, #fValue, #restPVPairs];
         sep_assert (FirstProj(#restPVPairs, #restProj)) [bind: #restProj];
-        sep_apply FirstProjAppendPair(#restPVPairs, #restProj, #prop, #value)
+        apply FirstProjAppendPair(#restPVPairs, #restProj, #prop, #value)
     }
 *]
 
@@ -1291,14 +1291,14 @@ lemma FirstProjConcatSplit(PVPairs, prefix, suffix)
     (#props == l+ (#preProps, #sufProps))
 ]]
 [*
-    sep_apply DestructList(#prefix);
+    apply DestructList(#prefix);
     unfold FirstProj(#prefix, #preProps);
     if (#prefix = {{ }}) then {
-        sep_apply FirstProjFunction(#PVPairs, #props, #suffix, #sufProps)
+        apply FirstProjFunction(#PVPairs, #props, #suffix, #sufProps)
     } else {
         sep_assert (#prefix == {{ #prop, #value }} :: #restPrefix) [bind: #restPrefix];
         unfold FirstProj(#PVPairs, #props); unfold FirstProj(#prefix, #preProps);
-        sep_apply FirstProjConcatSplit(l+(#restPrefix, #suffix), #restPrefix, #suffix)
+        apply FirstProjConcatSplit(l+(#restPrefix, #suffix), #restPrefix, #suffix)
     }
 *]
 
@@ -1318,7 +1318,7 @@ lemma FirstProjToUtf8MapPairCompat(PVPairs)
     unfold FirstProj(#utf8PVPairs, #utf8Props);
     if (not (#PVPairs = {{ }})) then {
         sep_assert ((#PVPairs == l+ ({{ {{ _, _}} }}, #restPVPairs))) [bind: #restPVPairs];
-        sep_apply FirstProjToUtf8MapPairCompat(#restPVPairs)
+        apply FirstProjToUtf8MapPairCompat(#restPVPairs)
     }
  *]
 
@@ -1350,7 +1350,7 @@ lemma ListToSetFunction(lst1, set1, lst2, set2)
     unfold ListToSet(#lst1, #set1) [bind: (#e := #h1) and (#restLst := #t1) and (#restSet := #restSet1)];
     if (not (#lst1 = {{ }})) then {
         unfold ListToSet(#lst2, #set2) [bind: (#e := #h2) and (#restLst := #t2) and (#restSet := #restSet2)];
-        sep_apply ListToSetFunction(#t1, #restSet1, #t2, #restSet2)
+        apply ListToSetFunction(#t1, #restSet1, #t2, #restSet2)
     }
  *]
 
@@ -1366,10 +1366,10 @@ lemma ListToSetUnion(lst1, lst2)
     sep_assert (#x == l+ (#lst1, #lst2)) [bind: #x];
     unfold ListToSet(#lst1, #set1) [bind: (#e := #h1) and (#restLst := #rest1) and (#restSet := #restSet1)];
     if (#lst1 = {{ }}) then {
-        sep_apply ListToSetFunction(#lst2, #set2, #x, #uset)
+        apply ListToSetFunction(#lst2, #set2, #x, #uset)
     } else {
         unfold ListToSet(l+ (#lst1, #lst2), #uset);
-        sep_apply ListToSetUnion(#rest1, #lst2)
+        apply ListToSetUnion(#rest1, #lst2)
     }
  *]
 
@@ -1382,10 +1382,10 @@ lemma ProduceListToSet(lst)
     ListToSet(#lst, #set)
 ]]
 [*
-    sep_apply DestructList(#lst);
+    apply DestructList(#lst);
     if (not (#lst = {{ }})) then {
         sep_assert (#lst == #head :: #rest) [bind: #head, #rest];
-        sep_apply ProduceListToSet(#rest)
+        apply ProduceListToSet(#rest)
     }
  *]
 
@@ -1402,7 +1402,7 @@ lemma ListToSetAddElement(lst, set, element)
     if (not (#lst = {{ }})) then {
         sep_assert (#lst == l+ ({{ #fProp }}, #restLst)) [bind: #fProp, #restLst];
         sep_assert (ListToSet(#restLst, #restSet)) [bind: #restSet];
-        sep_apply ListToSetAddElement(#restLst, #restSet, #element)
+        apply ListToSetAddElement(#restLst, #restSet, #element)
     }
 *]
 
@@ -1438,10 +1438,10 @@ lemma InListToUtf8(prop, props)
         sep_assert (#utf8Props == #utf8FstProp :: #restUtf8) [bind: #restUtf8];
         unfold ListToSet(#utf8Props, #utf8PropsSet);
         if (#prop = #fstProp) then {
-            sep_apply toUtf8Injective(#prop, #utf8Prop, #fstProp, #utf8FstProp)
+            apply toUtf8Injective(#prop, #utf8Prop, #fstProp, #utf8FstProp)
         } else {
-            sep_apply toUtf8Injective(#prop, #utf8Prop, #fstProp, #utf8FstProp);
-            sep_apply InListToUtf8(#prop, #rest)
+            apply toUtf8Injective(#prop, #utf8Prop, #fstProp, #utf8FstProp);
+            apply InListToUtf8(#prop, #rest)
         }
     }
  *]
@@ -1466,8 +1466,8 @@ lemma NotInListToUtf8(prop, props)
     if (not (#props = {{ }})) then {
         sep_assert (#props == #fstProp :: #rest) [bind: #rest];
         sep_assert (toUtf8(#fstProp, #utf8FstProp)) [bind: #utf8FstProp];
-        sep_apply toUtf8Injective(#prop, #utf8Prop, #fstProp, #utf8FstProp);
-        sep_apply NotInListToUtf8(#prop, #rest)
+        apply toUtf8Injective(#prop, #utf8Prop, #fstProp, #utf8FstProp);
+        apply NotInListToUtf8(#prop, #rest)
     }
  *]
 
@@ -1500,14 +1500,14 @@ lemma UniqueConcatSplitNotInSuffix(props, prefix, suffix, prop)
     (! (#prop --e-- #setPrefix))
 ]]
 [*
-    sep_apply DestructList(#prefix);
+    apply DestructList(#prefix);
     if (not (#prefix = {{ }})) then {
         sep_assert (#prefix == #firstProp :: #restPrefix) [bind: #firstProp, #restPrefix];
         unfold Unique(#props); unfold ListToSet(#prefix, #setPrefix);
-        sep_apply UniqueConcatSplitNotInSuffix(l+ (#restPrefix, #suffix), #restPrefix, #suffix, #prop);
+        apply UniqueConcatSplitNotInSuffix(l+ (#restPrefix, #suffix), #restPrefix, #suffix, #prop);
         branch(#firstProp == #prop);
         if (#firstProp = #prop) then {
-            sep_apply ListToSetUnion(#restPrefix, #suffix)
+            apply ListToSetUnion(#restPrefix, #suffix)
         }
     } else {
         unfold ListToSet(#prefix, #setPrefix)
@@ -1527,9 +1527,9 @@ lemma UniqueAppendElement(lst, element)
     unfold Unique(#lst) [bind: (#fst := #fst) and (#rest := #rest) and (#setRest := #setRest1)];
     if (not (#lst = {{ }})) then {
         unfold ListToSet(#lst, #set) [bind: (#restSet := #setRest2)];
-        sep_apply ListToSetFunction(#rest, #setRest1, #rest, #setRest2);
-        sep_apply UniqueAppendElement(#rest, #element);
-        sep_apply ListToSetAddElement(#rest, #setRest2, #element)
+        apply ListToSetFunction(#rest, #setRest1, #rest, #setRest2);
+        apply UniqueAppendElement(#rest, #element);
+        apply ListToSetAddElement(#rest, #setRest2, #element)
     }
  *]
 
@@ -1633,7 +1633,7 @@ lemma ObjectTablePresentProperty(l, PVPairs, prop)
         if (not (#fProp = #prop)) then {
             unfold FirstProj(#PVPairs, #pList);
             unfold ListToSet(#pList, #pSet);
-            sep_apply ObjectTablePresentProperty(#l, #restPVPairs, #prop)
+            apply ObjectTablePresentProperty(#l, #restPVPairs, #prop)
         }
     }
  *]
@@ -1657,7 +1657,7 @@ lemma ObjectTableStructureAppendPVPair(l, PVPairs, prop, value)
         sep_assert (ObjectTableStructure(#l, #restPVPairs));
         unfold FirstProj(#PVPairs, #pList);
         unfold ListToSet(#pList, #pSet);
-        sep_apply ObjectTableStructureAppendPVPair(#l, #restPVPairs, #prop, #value);
+        apply ObjectTableStructureAppendPVPair(#l, #restPVPairs, #prop, #value);
         sep_assert(True)
     }
  *]
@@ -1676,9 +1676,9 @@ lemma ObjectTableAppendPVPair(l, PVPairs, prop, value)
     ObjectTable(#l, l+ (#PVPairs, {{ {{ #prop, #value }} }}))
 ]]
 [*
-    sep_apply FirstProjAppendPair(#PVPairs, #pList, #prop, #value);
-    sep_apply ListToSetAddElement(#pList, #pSet, #prop);
-    sep_apply ObjectTableStructureAppendPVPair(#l, #PVPairs, #prop, #value)
+    apply FirstProjAppendPair(#PVPairs, #pList, #prop, #value);
+    apply ListToSetAddElement(#pList, #pSet, #prop);
+    apply ObjectTableStructureAppendPVPair(#l, #PVPairs, #prop, #value)
  *]
 
 (* Frozen object properties *)

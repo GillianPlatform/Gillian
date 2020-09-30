@@ -121,7 +121,6 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token ASSUME
 %token ASSERT
 %token SEPASSERT
-%token SEPAPPLY
 %token INVARIANT
 %token ASSUME_TYPE
 %token SPEC_VAR
@@ -165,6 +164,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LFORALL
 %token LTYPES
 (* Logic predicates *)
+%token ABSTRACT
 %token PURE
 %token PRED
 %token NOUNFOLD
@@ -688,7 +688,7 @@ g_logic_cmd_target:
     { SL (SepAssert (a, Option.value ~default:[ ] binders)) }
 
 (* apply lemma_name(args) [bind: x, y ] *)
-   | SEPAPPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE; binders = option(binders_target)
+   | APPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE; binders = option(binders_target)
     {
       let binders = Option.value ~default:[] binders in
       SL (ApplyLem (lemma_name, params, binders))
@@ -732,21 +732,30 @@ g_logic_cmd_target:
      { Branch fo }
 ;
 
+g_pred_def_target:
+  COLON; defs = separated_nonempty_list(COMMA, g_named_assertion_target)
+  { defs }
+
 (* pred name (arg1, ..., argn) : def1, ..., defn ; *)
 g_pred_target:
   no_path = option(NO_PATH);
   internal = option(INTERNAL);
+  abstract = option(ABSTRACT);
   pure = option(PURE);
   nounfold = option(NOUNFOLD);
   PRED;
   pred_head = pred_head_target;
-  COLON;
-  pred_definitions = separated_nonempty_list(COMMA, g_named_assertion_target);
+  pred_definitions = option(g_pred_def_target);
   SCOLON
   {
+    let pred_abstract = Option.is_some abstract in
     let pred_pure = Option.is_some pure in
-    let pred_nounfold = Option.is_some nounfold in
+    let pred_nounfold = pred_abstract || Option.is_some nounfold in
     let (pred_name, pred_num_params, pred_params, pred_ins) = pred_head in
+    let pred_definitions = Option.value ~default:[] pred_definitions in
+    let () = if (pred_abstract <> (pred_definitions = [])) then
+      raise (Failure (Format.asprintf "Malformed predicate %s: either abstract with definition or non-abstract without definition." pred_name))
+    in
     let () =
       if Option.is_some no_path then
         preds_with_no_paths := SS.add pred_name !preds_with_no_paths
@@ -762,6 +771,7 @@ g_pred_target:
         pred_ins;
         pred_definitions;
         pred_pure;
+        pred_abstract;
         pred_nounfold;
         pred_normalised;
       }

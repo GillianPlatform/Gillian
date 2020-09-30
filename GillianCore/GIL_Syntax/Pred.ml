@@ -10,6 +10,7 @@ type t = TypeDef__.pred = {
   pred_definitions : ((string * string list) option * Asrt.t) list;
       (** Predicate definitions  *)
   pred_pure : bool;  (** Is the predicate pure  *)
+  pred_abstract : bool;  (** Is the predicate abstract *)
   pred_nounfold : bool;  (** Should the predicate be unfolded automatically *)
   pred_normalised : bool;  (** If the predicate has been previously normalised *)
 }
@@ -97,6 +98,10 @@ let pp fmt pred =
     | true  -> Fmt.pf fmt "@internal@\n"
     | false -> ()
   in
+  let pp_abstract fmt = function
+    | true  -> Fmt.pf fmt "abstract "
+    | false -> ()
+  in
   let pp_pure fmt = function
     | true  -> Fmt.pf fmt "pure "
     | false -> ()
@@ -105,9 +110,10 @@ let pp fmt pred =
     | true  -> Fmt.pf fmt "nounfold "
     | false -> ()
   in
-  Fmt.pf fmt "%a%a@[<hov 2>@[<h>%a%apred %s(%a) :@]@\n%a;@]@\n" pp_path_opt
-    pred.pred_source_path pp_internal pred.pred_internal pp_pure pred.pred_pure
-    pp_nounfold pred.pred_nounfold pred.pred_name pp_params pred.pred_params
+  Fmt.pf fmt "%a%a@[<hov 2>@[<h>%a%a%apred %s(%a) :@]@\n%a;@]@\n" pp_path_opt
+    pred.pred_source_path pp_internal pred.pred_internal pp_abstract
+    pred.pred_abstract pp_pure pred.pred_pure pp_nounfold pred.pred_nounfold
+    pred.pred_name pp_params pred.pred_params
     Fmt.(list ~sep:(any ",@\n") (hovbox ~indent:2 pp_def))
     pred.pred_definitions
 

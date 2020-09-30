@@ -8,6 +8,7 @@ type t = {
   params : (string * Type.t option) list;
   ins : int list;
   definitions : ((string * string list) option * JSAsrt.t) list;
+  abstract : bool;
   pure : bool;
   nounfold : bool;
 }
@@ -29,6 +30,7 @@ let js2jsil
     ins = pred_def.ins;
     definitions = jsil_definitions;
     pure = pred_def.pure;
+    abstract = pred_def.abstract;
     nounfold = pred_def.nounfold;
     normalised = false;
   }

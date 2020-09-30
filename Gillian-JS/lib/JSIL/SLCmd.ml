@@ -82,8 +82,7 @@ let rec pp fmt (lcmd : t) : unit =
         unfold_info
   | GUnfold name -> Fmt.pf fmt "unfold_all %s" name
   | ApplyLem (lem_name, lparams, binders) ->
-      Fmt.pf fmt "sep_apply %s(%a) %a" lem_name pp_args lparams pp_binders
-        binders
+      Fmt.pf fmt "apply %s(%a) %a" lem_name pp_args lparams pp_binders binders
   | SepAssert (a, binders) ->
       Fmt.pf fmt "sep_assert (%a) %a" Asrt.pp a pp_binders binders
   | Invariant (a, binders) ->

@@ -169,89 +169,106 @@ module Make
     let strategy_1 ((name, args) : string * Val.t list) : bool =
       print_local_info 1 name args;
       let pred_def = get_pred_def name in
-      let in_args = Pred.in_args pred_def args in
-      L.verbose (fun fmt ->
-          fmt "Original values: %a" Fmt.(brackets (list ~sep:comma Val.pp)) vs);
-      let vs = State.get_equal_values state vs in
-      L.verbose (fun fmt ->
-          fmt "Extended values: %a" Fmt.(brackets (list ~sep:comma Val.pp)) vs);
-      let vs_inter = List_utils.list_inter vs in_args in
-      let es_inter =
-        List.fold_left
-          (fun ac e -> Expr.Set.add e ac)
-          Expr.Set.empty
-          (List.map Val.to_expr vs_inter)
-      in
-      let es_inter =
-        Expr.Set.filter
-          (fun e ->
-            match e with
-            | Lit _ -> false
-            | _     -> true)
-          es_inter
-      in
-      L.verbose (fun m ->
-          m "get_pred_with_vs. Strategy 1. Intersection: %s"
-            (String.concat ", "
-               (List.map (Fmt.to_to_string Expr.pp)
-                  (Expr.Set.elements es_inter))));
-      es_inter <> Expr.Set.empty
+      match pred_def.pred_abstract with
+      | true  -> false
+      | false ->
+          let in_args = Pred.in_args pred_def args in
+          L.verbose (fun fmt ->
+              fmt "Original values: %a"
+                Fmt.(brackets (list ~sep:comma Val.pp))
+                vs);
+          let vs = State.get_equal_values state vs in
+          L.verbose (fun fmt ->
+              fmt "Extended values: %a"
+                Fmt.(brackets (list ~sep:comma Val.pp))
+                vs);
+          let vs_inter = List_utils.list_inter vs in_args in
+          let es_inter =
+            List.fold_left
+              (fun ac e -> Expr.Set.add e ac)
+              Expr.Set.empty
+              (List.map Val.to_expr vs_inter)
+          in
+          let es_inter =
+            Expr.Set.filter
+              (fun e ->
+                match e with
+                | Lit _ -> false
+                | _     -> true)
+              es_inter
+          in
+          L.verbose (fun m ->
+              m "get_pred_with_vs. Strategy 1. Intersection: %s"
+                (String.concat ", "
+                   (List.map (Fmt.to_to_string Expr.pp)
+                      (Expr.Set.elements es_inter))));
+          es_inter <> Expr.Set.empty
     in
 
     (* Strategy 2: Predicate has all literals as in-parameters *)
     let strategy_2 ((name, args) : string * Val.t list) : bool =
       print_local_info 2 name args;
       let pred_def = get_pred_def name in
-      let in_args = Pred.in_args pred_def args in
-      let all_literals =
-        List.map
-          (fun (x : Expr.t) ->
-            match x with
-            | Lit _ -> true
-            | _     -> false)
-          (List.map Val.to_expr in_args)
-      in
-      List.for_all (fun x -> x = true) all_literals
+      match pred_def.pred_abstract with
+      | true  -> false
+      | false ->
+          let in_args = Pred.in_args pred_def args in
+          let all_literals =
+            List.map
+              (fun (x : Expr.t) ->
+                match x with
+                | Lit _ -> true
+                | _     -> false)
+              (List.map Val.to_expr in_args)
+          in
+          List.for_all (fun x -> x = true) all_literals
     in
 
     (* Strategy 3: The values that we are looking for are in the out-parameters *)
     let strategy_3 ((name, args) : string * Val.t list) : bool =
       print_local_info 3 name args;
       let pred_def = get_pred_def name in
-      let out_args = Pred.out_args pred_def args in
-      let vs_inter = List_utils.list_inter vs out_args in
-      let es_inter =
-        List.fold_left
-          (fun ac e -> Expr.Set.add e ac)
-          Expr.Set.empty
-          (List.map Val.to_expr vs_inter)
-      in
-      let es_inter =
-        Expr.Set.filter
-          (fun e ->
-            match e with
-            | Lit _ -> false
-            | _     -> true)
-          es_inter
-      in
-      L.verbose (fun m ->
-          m "get_pred_with_vs. Strategy 3. Intersection: %s"
-            (String.concat ", "
-               (List.map (Fmt.to_to_string Expr.pp)
-                  (Expr.Set.elements es_inter))));
-      es_inter <> Expr.Set.empty
+      match pred_def.pred_abstract with
+      | true  -> false
+      | false ->
+          let out_args = Pred.out_args pred_def args in
+          let vs_inter = List_utils.list_inter vs out_args in
+          let es_inter =
+            List.fold_left
+              (fun ac e -> Expr.Set.add e ac)
+              Expr.Set.empty
+              (List.map Val.to_expr vs_inter)
+          in
+          let es_inter =
+            Expr.Set.filter
+              (fun e ->
+                match e with
+                | Lit _ -> false
+                | _     -> true)
+              es_inter
+          in
+          L.verbose (fun m ->
+              m "get_pred_with_vs. Strategy 3. Intersection: %s"
+                (String.concat ", "
+                   (List.map (Fmt.to_to_string Expr.pp)
+                      (Expr.Set.elements es_inter))));
+          es_inter <> Expr.Set.empty
     in
 
     (* Strategy 3: Predicate has non-literal parameters in pure formulae *)
     let strategy_4 ((name, args) : string * Val.t list) : bool =
       print_local_info 4 name args;
-      let lvars_state = State.get_spec_vars state in
-      let lvars_args =
-        List.fold_left SS.union SS.empty
-          (List.map (fun x -> Expr.lvars (Val.to_expr x)) args)
-      in
-      let inter = SS.inter lvars_args lvars_state in
-      inter <> SS.empty
+      let pred_def = get_pred_def name in
+      match pred_def.pred_abstract with
+      | true  -> false
+      | false ->
+          let lvars_state = State.get_spec_vars state in
+          let lvars_args =
+            List.fold_left SS.union SS.empty
+              (List.map (fun x -> Expr.lvars (Val.to_expr x)) args)
+          in
+          let inter = SS.inter lvars_args lvars_state in
+          inter <> SS.empty
     in
     apply_strategies [ strategy_1; strategy_2; strategy_3; strategy_4 ]
 
@@ -864,7 +881,7 @@ module Make
                 Fmt.(list ~sep:comma Val.pp)
                 vs));
         GPSucc [ (astate, Pred.out_args pred_def vs) ]
-    | _ when not !Config.manual_proof -> (
+    | _ when (not !Config.manual_proof) && not pred_def.pred_abstract -> (
         (* Recursive Case - Folding required *)
         L.verbose (fun m -> m "Recursive case - attempting to fold.");
         let up = pred.up in

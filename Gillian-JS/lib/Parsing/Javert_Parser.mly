@@ -118,7 +118,6 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token ASSUME
 %token ASSERT
 %token SEPASSERT
-%token SEPAPPLY
 %token INVARIANT
 %token ASSUME_TYPE
 %token SPEC_VAR
@@ -171,6 +170,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LTYPES
 %token LMETADATA
 (* Logic predicates *)
+%token ABSTRACT
 %token PURE
 %token PRED
 %token NOUNFOLD
@@ -547,7 +547,7 @@ logic_cmd_target:
     { SL (Invariant (a, Option.value ~default:[ ] binders)) }
   | SEPASSERT; LBRACE; a = assertion_target; RBRACE; binders = option(binders_target)
     { SL (SepAssert (a, Option.value ~default:[ ] binders)) }
-  | SEPAPPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE; binders = option(binders_target)
+  | APPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE; binders = option(binders_target)
     { let binders = Option.value ~default:[] binders in
       SL (ApplyLem (lemma_name, params, binders)) }
   | LIF; LBRACE; le=expr_target; RBRACE; LTHEN; CLBRACKET;
@@ -562,8 +562,6 @@ logic_cmd_target:
     { If (le, then_lcmds, [])}
   | macro = macro_head_target;
     { let (name, params) = macro in Macro (name, params) }
-  | ASSERT; LBRACE; a = pure_assertion_target; RBRACE
-    { Assert a }
   | ASSUME; LBRACE; a = pure_assertion_target; RBRACE
     { Assume a }
   | ASSUME_TYPE; LBRACE; x=LVAR; COMMA; t=type_target; RBRACE
@@ -770,14 +768,24 @@ pred_head_target:
     (name, num_params, params, ins)
   }
 
+pred_defs_target:
+  COLON; defs = separated_nonempty_list(COMMA, named_assertion_target)
+  { defs }
+
 pred_target:
-  p = option(PURE); n = option(NOUNFOLD); PRED; pred_head = pred_head_target; COLON;
-  definitions = separated_nonempty_list(COMMA, named_assertion_target); SCOLON
-  { let pure = match p with | Some _ -> true | None -> false in
-    let nounfold = match n with | Some _ -> true | None -> false in
+  a = option(ABSTRACT); n = option(NOUNFOLD); p = option(PURE); PRED; pred_head = pred_head_target;
+  definitions = option(pred_defs_target); SCOLON
+  {
+    let abstract = Option.is_some a in
+    let nounfold = abstract || Option.is_some n in
+    let pure = Option.is_some p in
     let (name, num_params, params, ins) = pred_head in
+    let definitions = Option.value ~default:[] definitions in
+    let () = if (abstract <> (definitions = [])) then
+      raise (Failure (Format.asprintf "JSIL: Malformed predicate %s: either abstract with definition or non-abstract without definition." name))
+    in
     let normalised = !Config.previously_normalised in
-    Pred.{ name; num_params; params; ins; definitions; pure; nounfold; normalised } }
+    Pred.{ name; num_params; params; ins; definitions; pure; abstract; nounfold; normalised } }
 
 /* MACROS */
 
@@ -1055,20 +1063,28 @@ js_assertion_target:
 
 (* Predicates *)
 
-
 js_named_assertion_target:
   id = option(assertion_id_target); a = js_assertion_target
   { (id, a) }
 
+js_pred_defs_target:
+  COLON; defs = separated_nonempty_list(COMMA, js_named_assertion_target)
+  { defs }
+
 js_pred_target:
 (* pred name (arg1, ..., argn) : [def1_id: x1, ...] def1, ..., [def1_id: x1, ...] defn ; *)
-  PRED; pure = option(PURE); nounfold = option(NOUNFOLD); pred_head = pred_head_target; COLON;
-  definitions = separated_nonempty_list(COMMA, js_named_assertion_target); SCOLON; EOF
+  PRED; abstract=option(ABSTRACT); nounfold = option(NOUNFOLD); pure = option(PURE); pred_head = pred_head_target;
+  definitions = option(js_pred_defs_target); SCOLON; EOF
     { (* Add the predicate to the collection *)
       let (name, num_params, params, ins) = pred_head in
-      let pure = match pure with | Some _ -> true | None -> false in
-      let nounfold = match nounfold with | Some _ -> true | None -> false in
-      Jslogic.JSPred.{ name; num_params; params; ins; definitions; pure; nounfold }
+      let abstract = Option.is_some abstract in
+      let nounfold = abstract || Option.is_some nounfold in
+      let pure = Option.is_some pure in
+      let definitions = Option.value ~default:[] definitions in
+      let () = if (abstract <> (definitions = [])) then
+        raise (Failure (Format.asprintf "JS: Malformed predicate %s: either abstract with definition or non-abstract without definition." name))
+      in
+      Jslogic.JSPred.{ name; num_params; params; ins; definitions; abstract; pure; nounfold }
     }
 
 
@@ -1166,7 +1182,7 @@ js_logic_cmd_target:
     { Invariant (a, Option.value ~default:[ ] binders)  }
 
 (* apply lemma_name(args) *)
-   | APPLY; LEMMA; lemma_name = VAR; LBRACE; params = separated_list(COMMA, js_lexpr_target); RBRACE
+   | APPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, js_lexpr_target); RBRACE
      {
       ApplyLemma (lemma_name, params)
     }

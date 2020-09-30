@@ -76,7 +76,7 @@ let pp fmt lcmd =
         pp_unfold_info unfold_info
   | GUnfold name -> Fmt.pf fmt "unfold_all %s" name
   | ApplyLem (lem_name, lparams, binders) ->
-      Fmt.pf fmt "@[sep_apply %s%a %a@]" lem_name (Fmt.parens pp_args) lparams
+      Fmt.pf fmt "@[apply %s%a %a@]" lem_name (Fmt.parens pp_args) lparams
         pp_binders binders
   | SepAssert (a, binders) ->
       Fmt.pf fmt "@[sep_assert %a %a@]" (Fmt.parens Asrt.pp) a pp_binders

@@ -103,6 +103,7 @@
       "MetaData",     Javert_Parser.LMETADATA;
 
       (* Logic predicates *)
+      "abstract", Javert_Parser.ABSTRACT;
       "pure", Javert_Parser.PURE;
       "pred", Javert_Parser.PRED;
       "nounfold", Javert_Parser.NOUNFOLD;
@@ -124,7 +125,6 @@
       "bind",         Javert_Parser.BIND;
       "existentials", Javert_Parser.EXISTENTIALS;
       "sep_assert",   Javert_Parser.SEPASSERT;
-      "sep_apply",    Javert_Parser.SEPAPPLY;
       "branch",       Javert_Parser.BRANCH;
       "use_subst",    Javert_Parser.USESUBST;
 

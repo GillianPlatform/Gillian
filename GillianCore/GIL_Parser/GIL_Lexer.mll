@@ -89,6 +89,7 @@
       "forall",       GIL_Parser.LFORALL;
 
       (* Logic predicates *)
+      "abstract", GIL_Parser.ABSTRACT;
       "pure", GIL_Parser.PURE;
       "pred", GIL_Parser.PRED;
       "nounfold", GIL_Parser.NOUNFOLD;
@@ -109,7 +110,6 @@
       "bind",         GIL_Parser.BIND;
       "existentials", GIL_Parser.EXISTENTIALS;
       "sep_assert",   GIL_Parser.SEPASSERT;
-      "sep_apply",    GIL_Parser.SEPAPPLY;
       "branch",       GIL_Parser.BRANCH;
       "use_subst",    GIL_Parser.USESUBST;
 
