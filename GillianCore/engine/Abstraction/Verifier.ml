@@ -51,7 +51,10 @@ struct
       (to_verify : bool) : t option * (Asrt.t * Asrt.t list) option =
     try
       (* Step 1 - normalise the precondition *)
-      match Normaliser.normalise_assertion ~pvars:(SS.of_list params) pre with
+      match
+        Normaliser.normalise_assertion ~raw_pred_defs:preds
+          ~pvars:(SS.of_list params) pre
+      with
       | None                 -> (None, None)
       | Some (ss_pre, subst) -> (
           (* Step 2 - spec_vars = lvars(pre)\dom(subst) -U- alocs(range(subst)) *)

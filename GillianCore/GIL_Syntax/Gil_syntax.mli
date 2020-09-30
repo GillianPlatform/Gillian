@@ -621,6 +621,7 @@ module Pred : sig
     pred_ins : int list;  (** Ins *)
     pred_definitions : ((string * string list) option * Asrt.t) list;
         (** Predicate definitions *)
+    pred_facts : Formula.t list;  (** Facts that hold for every definition *)
     pred_pure : bool;  (** Is the predicate pure? *)
     pred_abstract : bool;  (**  Is the predicate abstract? *)
     pred_nounfold : bool;  (** Should the predicate be unfolded? *)

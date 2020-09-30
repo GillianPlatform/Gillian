@@ -48,19 +48,11 @@ pred ArrayOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num, +contentsLeng
     (#viewSize == l-len #element) *
     ArrayOfUInt8ArraysContents(a, #rest, #rest_start, #rest_length);
 
+    facts: (contentsLength == l-len contents);
+
 pred ArrayOfUInt8Arrays (+a:Obj, contents:List, arrayLength:Num) :
     ArrayStructure(a, arrayLength) *
     ArrayOfUInt8ArraysContents(a, contents, 0, arrayLength);
-
-lemma ArrayOfUInt8ArraysContentsFacts(a, contents, start, contentsLength)
-[[
-    ArrayOfUInt8ArraysContents(#a, #contents, #start, #contentsLength)
-]]
-[[
-    ArrayOfUInt8ArraysContents(#a, #contents, #start, #contentsLength) *
-    (#contentsLength == l-len #contents)
-]]
-[* *]
 
 (* ----------------------------------------------------------------------------------- *)
 
@@ -76,19 +68,11 @@ pred ArrayOfArraysOfUInt8ArraysContents(+a:Obj, contents:List, +start:Num, +cont
     (#rest_start == start + 1) *
     ArrayOfArraysOfUInt8ArraysContents(a, #rest, #rest_start, #rest_length);
 
+    facts: (contentsLength == l-len contents);
+
 pred ArrayOfArraysOfUInt8Arrays (+a:Obj, contents:List) :
     ArrayStructure(a, l-len contents) *
     ArrayOfArraysOfUInt8ArraysContents(a, contents, 0, l-len contents);
-
-lemma ArrayOfArraysOfUInt8ArraysContentsFacts(a, contents, start, contentsLength)
-[[
-    ArrayOfArraysOfUInt8ArraysContents(#a, #contents, #start, #contentsLength)
-]]
-[[
-    ArrayOfArraysOfUInt8ArraysContents(#a, #contents, #start, #contentsLength) *
-    (#contentsLength == l-len #contents)
-]]
-[* *]
 
 lemma ArrayOfArraysOfUInt8ArraysContentsAppend(a, contents, start, contentsLength)
 [[

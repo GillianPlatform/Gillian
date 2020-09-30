@@ -93,6 +93,7 @@
       "pure", GIL_Parser.PURE;
       "pred", GIL_Parser.PRED;
       "nounfold", GIL_Parser.NOUNFOLD;
+      "facts", GIL_Parser.FACTS;
 
       (* Logic commands *)
       "fold",         GIL_Parser.FOLD;

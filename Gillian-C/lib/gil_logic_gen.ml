@@ -222,7 +222,8 @@ let gen_pred_of_struct cenv ann struct_name =
         pred_ins;
         pred_num_params;
         pred_params;
-        (* FIXME: ADD SUPPORT FOR PURE, ABSTRACT, NOUNFOLD *)
+        (* FIXME: ADD SUPPORT FOR PURE, ABSTRACT, NOUNFOLD, FACTS *)
+        pred_facts = [];
         pred_pure = false;
         pred_abstract = false;
         pred_nounfold = false;
@@ -530,6 +531,7 @@ let trans_pred ?(ann = empty) ~filepath cl_pred =
       pred_ins;
       pred_definitions;
       (* FIXME: ADD SUPPORT FOR PURE, ABSTRACT, NOUNFOLD *)
+      pred_facts = [];
       pred_pure = false;
       pred_abstract = false;
       pred_nounfold = false;
@@ -617,6 +619,7 @@ let make_global_env_pred init_asrts =
       pred_ins = [];
       pred_definitions = [ (None, def) ];
       (* FIXME: ADD SUPPORT FOR PURE, ABSTRACT, NOUNFOLD *)
+      pred_facts = [];
       pred_pure = false;
       pred_abstract = false;
       pred_nounfold = false;
@@ -799,6 +802,7 @@ let gen_rec_pred_of_struct cenv ann struct_name =
         pred_num_params;
         pred_params;
         (* FIXME: ADD SUPPORT FOR PURE, ABSTRACT, NOUNFOLD *)
+        pred_facts = [];
         pred_pure = false;
         pred_abstract = false;
         pred_nounfold = false;
@@ -818,6 +822,7 @@ let gen_rec_pred_of_struct cenv ann struct_name =
         pred_num_params = 1;
         pred_params = [ (opt_param_name, Some Type.ListType) ];
         (* FIXME: ADD SUPPORT FOR PURE, ABSTRACT, NOUNFOLD *)
+        pred_facts = [];
         pred_pure = false;
         pred_abstract = false;
         pred_nounfold = false;

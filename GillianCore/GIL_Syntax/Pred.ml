@@ -9,6 +9,7 @@ type t = TypeDef__.pred = {
   pred_ins : int list;  (** Ins                    *)
   pred_definitions : ((string * string list) option * Asrt.t) list;
       (** Predicate definitions  *)
+  pred_facts : Formula.t list;  (** Facts that hold for every definition *)
   pred_pure : bool;  (** Is the predicate pure  *)
   pred_abstract : bool;  (** Is the predicate abstract *)
   pred_nounfold : bool;  (** Should the predicate be unfolded automatically *)
@@ -110,12 +111,20 @@ let pp fmt pred =
     | true  -> Fmt.pf fmt "nounfold "
     | false -> ()
   in
-  Fmt.pf fmt "%a%a@[<hov 2>@[<h>%a%a%apred %s(%a) :@]@\n%a;@]@\n" pp_path_opt
+  let pp_facts fmt = function
+    | []    -> ()
+    | facts ->
+        Fmt.pf fmt "@\nfacts: %a;"
+          Fmt.(list ~sep:(any " and ") Formula.pp)
+          facts
+  in
+
+  Fmt.pf fmt "%a%a@[<hov 2>@[<h>%a%a%apred %s(%a) :@]@\n%a;%a@]@\n" pp_path_opt
     pred.pred_source_path pp_internal pred.pred_internal pp_abstract
     pred.pred_abstract pp_pure pred.pred_pure pp_nounfold pred.pred_nounfold
     pred.pred_name pp_params pred.pred_params
     Fmt.(list ~sep:(any ",@\n") (hovbox ~indent:2 pp_def))
-    pred.pred_definitions
+    pred.pred_definitions pp_facts pred.pred_facts
 
 let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
   let check_pred_pvars (pred_name : string) (predicate : t) : unit =

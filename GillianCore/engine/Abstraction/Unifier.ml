@@ -272,8 +272,8 @@ module Make
     in
     apply_strategies [ strategy_1; strategy_2; strategy_3; strategy_4 ]
 
-  let produce_assertion (astate : t) (subst : ESubst.t) (a : Asrt.t) : t option
-      =
+  let rec produce_assertion (astate : t) (subst : ESubst.t) (a : Asrt.t) :
+      t option =
     let state, preds, pred_defs = astate in
 
     L.verbose (fun m ->
@@ -312,15 +312,36 @@ module Make
             (Some state) les
         in
         Option.map (fun state -> (state, preds, pred_defs)) state'
-    | Pred (pname, les) ->
+    | Pred (pname, les) -> (
         let vs = List.map (subst_in_expr subst) les in
         let failure = List.exists (fun x -> x = None) vs in
         if failure then None
         else
           let vs = List.map Option.get vs in
-          let pure = (Hashtbl.find pred_defs pname).pure in
-          Preds.extend ~pure preds (pname, vs);
-          Some (state, preds, pred_defs)
+          let pred_def = Hashtbl.find pred_defs pname in
+          let ostate =
+            match pred_def.pred.pred_facts with
+            | []    -> Some astate
+            | facts ->
+                let params, _ = List.split pred_def.pred.pred_params in
+                let params = List.map (fun x -> Expr.PVar x) params in
+                let facts =
+                  List.fold_left
+                    (fun facts (param, le) ->
+                      List.map
+                        (fun fact -> Formula.subst_expr_for_expr param le fact)
+                        facts)
+                    facts (List.combine params les)
+                in
+                let facts = List.map (fun fact -> Asrt.Pure fact) facts in
+                produce_asrt_list (state, preds, pred_defs) subst facts
+          in
+          let pure = pred_def.pure in
+          match ostate with
+          | None -> None
+          | Some (state, preds, pred_defs) ->
+              Preds.extend ~pure preds (pname, vs);
+              Some (state, preds, pred_defs) )
     | Pure (Eq (PVar x, le)) | Pure (Eq (le, PVar x)) ->
         if ESubst.mem subst (PVar x) then
           let v_x = ESubst.get subst (PVar x) in
@@ -357,7 +378,7 @@ module Make
         | Some state' -> Some (state', preds, pred_defs) )
     | _ -> L.fail "Produce simple assertion: unsupported assertion"
 
-  let produce_asrt_list (astate : t) (subst : ESubst.t) (sas : Asrt.t list) :
+  and produce_asrt_list (astate : t) (subst : ESubst.t) (sas : Asrt.t list) :
       t option =
     let state, preds, _ = astate in
     let _ =

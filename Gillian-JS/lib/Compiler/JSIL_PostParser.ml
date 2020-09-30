@@ -276,6 +276,7 @@ let create_pre_scope_pred
     params;
     ins = [ 0 ];
     definitions = [ (None, Asrt.star (a_schain :: a_vars)) ];
+    facts = [];
     pure = false;
     abstract = false;
     nounfold = false;
@@ -313,6 +314,7 @@ let create_function_predicate
     params = [ ("x", None) ];
     ins = [ 0 ];
     definitions = [ (None, Asrt.star [ fo_asrt; proto_asrt ]) ];
+    facts = [];
     pure = false;
     abstract = false;
     nounfold = false;
@@ -397,6 +399,7 @@ let create_post_scope_pred
     ins = [ 0; 1 ];
     definitions =
       [ (None, Asrt.star (pre_scope_asrt :: (args_asrts @ er_asrts))) ];
+    facts = [];
     pure = false;
     abstract = false;
     nounfold = false;

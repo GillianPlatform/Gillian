@@ -10,6 +10,7 @@ module Make
       It returns the appropriate predicate state and all learned bindings. *)
   val normalise_assertion :
     ?pred_defs:UP.preds_tbl_t ->
+    ?raw_pred_defs:(string, Pred.t) Hashtbl.t ->
     ?gamma:TypEnv.t ->
     ?subst:SVal.SESubst.t ->
     ?pvars:Utils.Containers.SS.t ->

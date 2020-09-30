@@ -35,6 +35,10 @@ let rec auto_unfold
             List.map
               (fun (_, a) ->
                 (* L.verbose (fun fmt -> fmt "Before: %a" Asrt.pp a); *)
+                let facts =
+                  List.map (fun fact -> Asrt.Pure fact) pred.pred_facts
+                in
+                let a = Asrt.star (a :: facts) in
                 let result = SVal.SSubst.substitute_asrt subst false a in
                 (* L.verbose (fun fmt -> fmt "After: %a" Asrt.pp result); *)
                 result)

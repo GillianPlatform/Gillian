@@ -650,7 +650,9 @@ struct
 
   (** Normalise Predicate Assertions (Initialise Predicate Set) *)
   let normalise_preds
+      (pred_defs : (string, Pred.t) Hashtbl.t)
       (store : SStore.t)
+      (pfs : PFS.t)
       (gamma : TypEnv.t)
       (subst : SVal.SESubst.t)
       (pred_asrts : (string * Expr.t list) list) : SPreds.t =
@@ -658,7 +660,20 @@ struct
     let preds = SPreds.init [] in
 
     List.iter
-      (fun (pn, les) -> SPreds.extend preds (pn, List.map fe les))
+      (fun (pn, les) ->
+        let pred_def = Hashtbl.find pred_defs pn in
+        let params, _ = List.split pred_def.pred_params in
+        let params = List.map (fun x -> Expr.PVar x) params in
+        let facts =
+          List.fold_left
+            (fun facts (param, le) ->
+              List.map
+                (fun fact -> Formula.subst_expr_for_expr param le fact)
+                facts)
+            pred_def.pred_facts (List.combine params les)
+        in
+        List.iter (fun fact -> PFS.extend pfs fact) facts;
+        SPreds.extend preds (pn, List.map fe les))
       pred_asrts;
 
     preds
@@ -904,6 +919,8 @@ struct
   (** Given an assertion creates a symbolic state and a substitution *)
   let normalise_assertion
       ?(pred_defs : UP.preds_tbl_t option)
+      ?(raw_pred_defs : (string, Pred.t) Hashtbl.t =
+        Hashtbl.create Config.small_tbl_size)
       ?(gamma = TypEnv.init ())
       ?(subst = SESubst.init [])
       ?(pvars : SS.t option)
@@ -967,7 +984,9 @@ struct
             List.iter (fun pf -> PFS.extend pfs pf) (subst_to_pfs subst);
 
             (* Step 7 -- Construct the state *)
-            let preds' = normalise_preds store gamma subst preds in
+            let preds' =
+              normalise_preds raw_pred_defs store pfs gamma subst preds
+            in
             let astate : SPState.t =
               SPState.struct_init pred_defs store pfs gamma svars
             in

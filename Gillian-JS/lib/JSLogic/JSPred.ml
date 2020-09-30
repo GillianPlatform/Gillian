@@ -1,5 +1,6 @@
 open JSLogicCommon
 module Type = Gillian.Gil_syntax.Type
+module Formula = Gillian.Gil_syntax.Formula
 module Pred = Jsil_syntax.Pred
 
 type t = {
@@ -8,6 +9,7 @@ type t = {
   params : (string * Type.t option) list;
   ins : int list;
   definitions : ((string * string list) option * JSAsrt.t) list;
+  facts : Formula.t list;
   abstract : bool;
   pure : bool;
   nounfold : bool;
@@ -29,6 +31,7 @@ let js2jsil
     params = pred_def.params;
     ins = pred_def.ins;
     definitions = jsil_definitions;
+    facts = pred_def.facts;
     pure = pred_def.pure;
     abstract = pred_def.abstract;
     nounfold = pred_def.nounfold;

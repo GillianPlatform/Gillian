@@ -68,7 +68,6 @@ function needs (condition, errorMessage) {
       (ret == false)
 */
 function readElements(elementCount, fieldsPerElement, buffer, readPos) {
-    /* @tactic apply ElementsFacts(#view, #readPos, #eCount, #fCount, #eList, #esLength) */
     var dataView = new DataView(
         buffer.buffer,
         buffer.byteOffset,
@@ -98,7 +97,6 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
     while (elementCount--) {
         /* @tactic
             if (#definition = "Complete") then {
-                apply CElementsFacts(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
                 unfold CElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) [bind: (#element := #fList) and (#eLength := #eLength)]
             } else {
                 unfold IElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) [bind: (#fList := #fList) and (#eLength := #eLength)]
@@ -355,7 +353,6 @@ function decodeEncryptionContext(encodedEncryptionContext) {
             Elements("Complete", #EC, 2, ((256 * #b0) + #b1), 2, #ECKs, l-len #rest)
         ) [bind: #b0, #b1, #rest];
         unfold Elements("Complete", #EC, 2, ((256 * #b0) + #b1), 2, #ECKs, l-len #rest);
-        apply CElementsFacts(#EC, 2, ((256 * #b0) + #b1), 2, #ECKs, l-len #rest);
         assert (
             scope(pairsCount: #pairsCount) * (#pairsCount == l-len #ECKs) *
             scope(elements: #elements) * ArrayOfArraysOfUInt8Arrays(#elements, #ECKs) *
@@ -383,18 +380,11 @@ function decodeEncryptionContext(encodedEncryptionContext) {
   for (var count = 0; count < pairsCount; count++) {
     /*
         @tactic
-        unfold UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps);
-        unfold UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps);
-        apply ArrayOfArraysOfUInt8ArraysContentsFacts(#elements, #done, 0, #count);
-        apply ArrayOfArraysOfUInt8ArraysContentsFacts(#elements, #left, #count, #pairsCount - #count);
-        unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count);
-        assert ((#elements, num_to_string #count) -> {{ "d", #element, true, true, true }}) [bind: #element];
-        assert ((#element, "length") -> {{ "d", #eLength, true, false, false }}) [bind: #eLength];
-        assert (ArrayOfUInt8ArraysContents(#element, #ECK, 0., #eLength)) [bind: #ECK];
-        apply ArrayOfUInt8ArraysContentsFacts(#element, #ECK, 0., #eLength);
-        assert (#left == #ECK :: #rest_left) [bind: #rest_left];
-        apply CElementsElementLength(#EC, 2., ((256. * #b0) + #b1), 2., #ECKs, #done, #ECK, #rest_left);
-        assert (#ECK == {{ #new_prop, #new_value }})
+            unfold UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps);
+            unfold UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps);
+            unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count) [bind: (#elementContents := #ECK) and (#rest := #rest_left)];
+            apply CElementsElementLength(#EC, 2., ((256. * #b0) + #b1), 2., #ECKs, #done, #ECK, #rest_left);
+            assert (#ECK == {{ #new_prop, #new_value }})
     */
     var [key, value] = elements[count].map(toUtf8)
 

@@ -3,6 +3,7 @@ open Containers
 module L = Logging
 module Type = Gillian.Gil_syntax.Type
 module Expr = Gillian.Gil_syntax.Expr
+module Formula = Gillian.Gil_syntax.Formula
 
 (** {b JSIL logic predicate}. *)
 type t = {
@@ -12,6 +13,7 @@ type t = {
   ins : int list;  (** Ins                    *)
   definitions : ((string * string list) option * Asrt.t) list;
       (** Predicate definitions  *)
+  facts : Formula.t list;  (** Facts about the predicate *)
   pure : bool;  (** Is the predicate pure  *)
   abstract : bool;  (** Is the predicate abstract  *)
   nounfold : bool;  (** Should the predicate be unfolded? *)
@@ -115,12 +117,19 @@ let pp fmt pred =
   let pp_def fmt (id_ex, asrt) =
     Fmt.pf fmt "%a%a" pp_id_ex id_ex Asrt.pp asrt
   in
-  Fmt.pf fmt "@[<v 2>%a%a%apred %s(%a):@\n%a;@]" pp_abstract pred.abstract
+  let pp_facts fmt = function
+    | []    -> ()
+    | facts ->
+        Fmt.pf fmt "@\nfacts: %a;"
+          Fmt.(list ~sep:(any " and ") Formula.pp)
+          facts
+  in
+  Fmt.pf fmt "@[<v 2>%a%a%apred %s(%a):@\n%a;%a@]" pp_abstract pred.abstract
     pp_pure pred.pure pp_nounfold pred.nounfold name
     Fmt.(list ~sep:(any ", ") pp_param)
     params_with_info
     Fmt.(list ~sep:(any ",@\n") pp_def)
-    definitions
+    definitions pp_facts pred.facts
 
 let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
   let check_pred_pvars (pred_name : string) (predicate : t) : unit =
@@ -210,6 +219,7 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
     params = pred.params;
     ins = pred.ins;
     definitions = new_defs;
+    facts = pred.facts;
     pure = pred.pure;
     abstract = pred.abstract;
     nounfold = pred.nounfold;
