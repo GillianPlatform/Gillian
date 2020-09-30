@@ -1212,7 +1212,7 @@ module Make
             [
               EAsrt
                 ( List.map Option.get (List.filter (fun x -> x <> None) les),
-                  True,
+                  Not (Formula.conjunct corrections),
                   [ [ Pure (Formula.conjunct corrections) ] ] );
             ]
     (* LTrue, LFalse, LEmp, LStar *)

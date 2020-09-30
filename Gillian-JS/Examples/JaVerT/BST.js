@@ -1,7 +1,7 @@
 "use strict";
 
 /**
-	@pred NullableObject(o) :
+	@pred nounfold NullableObject(o) :
 		types (o : Obj),
 		types (o : Null);
 
@@ -16,7 +16,7 @@
 		(K == -u- (#KL, -{ #val }-, #KR)) *
 		(forall #x : Num. ((! (#x --e-- #KL)) \/ (#x <# #val))) *
 		(forall #x : Num. ((! (#x --e-- #KR)) \/ (#val <# #x))) *
-		types(#val : Num, #KL : Set, #KR : Set);
+        types(#val : Num, #KL : Set, #KR : Set);
 */
 
 /**
@@ -41,10 +41,10 @@ function make_node(v)
 /**
 	@id insert
 
-	@pre
+    @pre
+        (v == #v) * (t == #t) *
 		GlobalObject() * ObjectPrototype($lobj_proto) *
-		BST(t, #K) *
-		(v == #v) * types (#v : Num) *
+		BST(#t, #K) * types (#v : Num) *
 		scope(make_node : #makeNode) * JSFunctionObject(#makeNode, "makeNode", _, _, _) *
 		scope(insert : #insert) * JSFunctionObject(#insert, "insert", _, _, _)
 
@@ -119,7 +119,6 @@ function find_min(t)
 {
 	var result;
 
-  /* @tactic unfold BST(#t, #K) */
 	if (t.left === null)
 		result = t.value;
 	else
@@ -153,7 +152,7 @@ function remove(v, t)
 		if (t.left === null) {
 				return t.right;
 			}
-		else
+        else
 		if (t.right === null) {
 	  			return t.left;
 			}
@@ -163,9 +162,9 @@ function remove(v, t)
 			t.value = min;
 		}
 	}
-	else if (v < t.value)
+    else if (v < t.value)
 		t.left = remove(v, t.left);
-	else
+    else
 		t.right = remove(v, t.right);
 
   return t;

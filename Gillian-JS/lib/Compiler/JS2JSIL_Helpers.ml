@@ -61,16 +61,18 @@ let js2jsil_imports_cosette =
     "Errors.jsil";
   ]
 
-let js2jsil_logic_imports =
+let js2jsil_amazon_imports = [ "AmazonLogic.jsil" ]
+
+let js2jsil_logic_imports () =
   [
     "javert_internal_functions.jsil";
     "javert_logic_macros.jsil";
     "ArrayBuffer.jsil";
     "ArrayLogic.jsil";
-    "AmazonLogic.jsil";
     "DataView.jsil";
     "Uint8Array.jsil";
   ]
+  @ if !Javert_utils.Js_config.amazon then js2jsil_amazon_imports else []
 
 let js2jsil_imports_bi =
   [

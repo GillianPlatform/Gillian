@@ -3,7 +3,7 @@ let burn_jsil = ref false
 module TargetLangOptions = struct
   open Cmdliner
 
-  type t = { jsil : bool; harness : bool; burn_jsil : bool }
+  type t = { jsil : bool; harness : bool; burn_jsil : bool; amazon : bool }
 
   let term =
     let docs = Manpage.s_common_options in
@@ -13,13 +13,18 @@ module TargetLangOptions = struct
     let harness = Arg.(value & flag & info [ "harness" ] ~docs ~doc) in
     let doc = "If you want to write the intermediate JSIL file" in
     let burn_jsil = Arg.(value & flag & info [ "burn-jsil" ] ~docs ~doc) in
-    let f jsil harness burn_jsil = { jsil; harness; burn_jsil } in
-    Term.(const f $ jsil $ harness $ burn_jsil)
+    let doc = "Verifying Amazon code" in
+    let amazon = Arg.(value & flag & info [ "amazon" ] ~docs ~doc) in
+    let f jsil harness burn_jsil amazon =
+      { jsil; harness; burn_jsil; amazon }
+    in
+    Term.(const f $ jsil $ harness $ burn_jsil $ amazon)
 
-  let apply { jsil; harness; burn_jsil = conf_burn_jsil } =
+  let apply { jsil; harness; burn_jsil = conf_burn_jsil; amazon } =
     burn_jsil := conf_burn_jsil;
     Javert_utils.Js_config.js := not jsil;
-    Javert_utils.Js_config.js2jsil_harnessing := harness
+    Javert_utils.Js_config.js2jsil_harnessing := harness;
+    Javert_utils.Js_config.amazon := amazon
 end
 
 type err = JSParserErr of JS_Parser.Error.t | JS2GILErr of string

@@ -7239,7 +7239,7 @@ let js2jsil_function_constructor_prop
   proc_fun_constr
 
 let compute_imports (for_verification : bool) : string list =
-  if for_verification then js2jsil_logic_imports
+  if for_verification then js2jsil_logic_imports ()
   else if ExecMode.biabduction_exec !Config.current_exec_mode then
     js2jsil_imports_bi
   else if ExecMode.symbolic_exec !Config.current_exec_mode then

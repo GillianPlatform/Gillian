@@ -31,10 +31,10 @@ do
   sleep 1
 	echo "Verifying: $f.js"
 	if [[ $1 == "count" ]]; then
-		gillian-js verify Examples/JaVerT/$f.js -l disabled --stats
+		gillian-js verify Examples/JaVerT/$f.js -l disabled --stats --no-lemma-proof
 		rc=$?
 	else
-		gillian-js verify Examples/JaVerT/$f.js -l disabled
+		gillian-js verify Examples/JaVerT/$f.js -l disabled --no-lemma-proof
 		rc=$?
 	fi
 	if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi

@@ -23,6 +23,8 @@ let cosette = ref false
 
 let js = ref true
 
+let amazon = ref false
+
 (** {2 Other config} *)
 let env_var_import_path = "GILLIAN_JS_RUNTIME_PATH"
 
