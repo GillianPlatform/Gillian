@@ -418,9 +418,8 @@ function decodeEncryptionContext(encodedEncryptionContext) {
                 apply lemma ObjectTableAbsentProperty(#dECObj, #utf8Done, #utf8NProp)
             } else {
                 apply lemma FirstProjToUtf8MapPairCompat(#done);
-                assert (#x == #doneRProps) [bind: #x];
-                unfold Duplicated(#x, #leftRProps);
-                apply lemma ListToSetFunction(#doneRProps, #x);
+                unfold Duplicated(#doneRProps, #leftRProps) [bind: (#preSet := #doneRPropsSet2)];
+                apply lemma ListToSetFunction(#doneRProps, #doneRPropsSet, #doneRProps, #doneRPropsSet2);
                 if (#new_prop -e- #doneRPropsSet) then {
                     apply lemma InListToUtf8(#new_prop, #doneRProps);
                     apply lemma ObjectTablePresentProperty(#dECObj, #utf8Done, #utf8NProp)

@@ -1230,6 +1230,7 @@ lemma DestructList(lst)
     (#lst == {{ }});
     (#lst == #hd :: #tl)
 ]]
+(* TODO: PROOF *)
 
 (*****************************************
  *****************************************
@@ -1255,6 +1256,13 @@ lemma FirstProjFunction(lst1, proj1, lst2, proj2)
 [[
     (#proj1 == #proj2)
 ]]
+[*
+    unfold FirstProj(#lst1, #proj1) [bind: (#fst := #fst1) and (#rest := #rest1) and (#fProjRest := #fProjRest1)];
+    if (not (#lst1 = {{ }})) then {
+        unfold FirstProj(#lst2, #proj2) [bind: (#fst := #fst2) and (#rest := #rest2) and (#fProjRest := #fProjRest2)];
+        sep_apply FirstProjFunction(#rest1, #fProjRest1, #rest2, #fProjRest2)
+    }
+ *]
 
 (* Adding a pair to a first projection *)
 lemma FirstProjAppendPair(lst, fProj, prop, value)
@@ -1331,13 +1339,20 @@ pure pred ListToSet(+lst:List, set:Set) :
     (set == -u- (-{ #e }-, #restSet));
 
 (* ListToSet is a function *)
-lemma ListToSetFunction(lst1, lst2)
+lemma ListToSetFunction(lst1, set1, lst2, set2)
 [[
     ListToSet(#lst1, #set1) * ListToSet(#lst2, #set2) * (#lst1 == #lst2)
 ]]
 [[
     (#set1 == #set2)
 ]]
+[*
+    unfold ListToSet(#lst1, #set1) [bind: (#e := #h1) and (#restLst := #t1) and (#restSet := #restSet1)];
+    if (not (#lst1 = {{ }})) then {
+        unfold ListToSet(#lst2, #set2) [bind: (#e := #h2) and (#restLst := #t2) and (#restSet := #restSet2)];
+        sep_apply ListToSetFunction(#t1, #restSet1, #t2, #restSet2)
+    }
+ *]
 
 (* ListToSet concat-union compatibility *)
 lemma ListToSetUnion(lst1, lst2)
@@ -1351,7 +1366,7 @@ lemma ListToSetUnion(lst1, lst2)
     sep_assert (#x == l+ (#lst1, #lst2)) [bind: #x];
     unfold ListToSet(#lst1, #set1) [bind: (#e := #h1) and (#restLst := #rest1) and (#restSet := #restSet1)];
     if (#lst1 = {{ }}) then {
-        sep_apply ListToSetFunction(#lst2, #x)
+        sep_apply ListToSetFunction(#lst2, #set2, #x, #uset)
     } else {
         unfold ListToSet(l+ (#lst1, #lst2), #uset);
         sep_apply ListToSetUnion(#rest1, #lst2)
@@ -1508,6 +1523,15 @@ lemma UniqueAppendElement(lst, element)
 [[
     Unique(l+ (#lst, {{ #element }}))
 ]]
+[*
+    unfold Unique(#lst) [bind: (#fst := #fst) and (#rest := #rest) and (#setRest := #setRest1)];
+    if (not (#lst = {{ }})) then {
+        unfold ListToSet(#lst, #set) [bind: (#restSet := #setRest2)];
+        sep_apply ListToSetFunction(#rest, #setRest1, #rest, #setRest2);
+        sep_apply UniqueAppendElement(#rest, #element);
+        sep_apply ListToSetAddElement(#rest, #setRest2, #element)
+    }
+ *]
 
 (************************************
  ************************************

@@ -147,6 +147,13 @@ module Make
     let lov_pp = Fmt.(parens (list ~sep:comma ov_pp)) in
     (* How many ins do we need to find *)
     let ins_count = Containers.SI.cardinal ins in
+    (* How many outs do we know *)
+    let outs_count =
+      List.mapi
+        (fun i arg -> if Containers.SI.mem i ins || arg = None then 0 else 1)
+        args
+    in
+    let outs_count = List.fold_left (fun sum i -> sum + i) 0 outs_count in
     L.verbose (fun fmt ->
         fmt "Preds.get_pred: Looking for: %s%a" name lov_pp args);
     (* Evaluate a candidate predicate with respect to the desired ins and outs and an equality function *)
@@ -160,7 +167,8 @@ module Make
           (fun (ic, oc) (i, cv) tv ->
             match tv with
             | None -> (ic, oc)
-            | Some tv when not (f_eq cv tv) -> (ic, oc)
+            (* First check syntactic equality and only then try f_eq *)
+            | Some tv when cv <> tv && not (f_eq cv tv) -> (ic, oc)
             | _ -> if Containers.SI.mem i ins then (ic + 1, oc) else (ic, oc + 1))
           (0, 0) candidate targets
       in
@@ -175,23 +183,31 @@ module Make
         (f_eq : vt -> vt -> bool) =
       List.fold_left
         (fun (b', i', o', result) candidate ->
-          let b, (i, o) =
-            try
-              (* In case something goes wrong with the evaluation, ignore *)
-              eval_cand_with_fun candidate targets f_eq
-            with _ -> (false, (0, 0))
-          in
           let ccurrent = (b', i', o', result) in
-          let cnew = (b, i, o, candidate) in
-          match (b', b) with
-          | false, true -> cnew
-          | true, false -> ccurrent
-          | _           -> (
-              match (i > i', i' > i) with
-              | true, _ -> cnew
-              | _, true -> ccurrent
-              | _       -> if o > o' then cnew else ccurrent ))
+          if i' = ins_count && o' = outs_count then ccurrent
+          else
+            let b, (i, o) =
+              try
+                (* In case something goes wrong with the evaluation, ignore *)
+                eval_cand_with_fun candidate targets f_eq
+              with _ -> (false, (0, 0))
+            in
+            let cnew = (b, i, o, candidate) in
+            match (b', b) with
+            | false, true -> cnew
+            | true, false -> ccurrent
+            | _           -> (
+                match (i > i', i' > i) with
+                | true, _ -> cnew
+                | _, true -> ccurrent
+                | _       -> if o > o' then cnew else ccurrent ))
         (false, 0, 0, []) candidates
+    in
+    (* Frame off found predicate *)
+    let frame_off name args =
+      match maintain with
+      | true  -> Some (name, args)
+      | false -> pop preds (fun pred -> pred = (name, args))
     in
     let candidates = find_all preds (fun (pname, _) -> name = pname) in
     let candidates = List.map (fun (_, args) -> args) candidates in
@@ -199,22 +215,24 @@ module Make
         fmt "Found %d candidates: \n%a" (List.length candidates)
           Fmt.(list ~sep:(any "@\n") lv_pp)
           candidates);
-    L.verbose (fun fmt -> fmt "Syntactic search.");
     let syntactic_result = find_pred candidates args ( = ) in
     match syntactic_result with
-    | true, _, _, result -> (
-        match maintain with
-        | true  -> Some (name, result)
-        | false -> pop preds (fun pred -> pred = (name, result)) )
-    | false, _, _, _     -> (
-        L.verbose (fun fmt -> fmt "Semantic search.");
+    | true, _, o, syntactic_result when o = outs_count ->
+        frame_off name syntactic_result
+    | true, _, o, syntactic_result -> (
         let semantic_result = find_pred candidates args f_eq in
         match semantic_result with
-        | true, _, _, result -> (
-            match maintain with
-            | true  -> Some (name, result)
-            | false -> pop preds (fun pred -> pred = (name, result)) )
-        | false, _, _, _     -> None )
+        | true, _, o', semantic_result ->
+            let result =
+              if o >= o' then syntactic_result else semantic_result
+            in
+            frame_off name result
+        | false, _, _, _ -> frame_off name syntactic_result )
+    | false, _, _, _ -> (
+        let semantic_result = find_pred candidates args f_eq in
+        match semantic_result with
+        | true, _, o', semantic_result -> frame_off name semantic_result
+        | false, _, _, _ -> None )
 
   let subst_in_val (subst : st) (v : vt) : vt =
     let le' = ESubst.subst_in_expr subst true (Val.to_expr v) in
