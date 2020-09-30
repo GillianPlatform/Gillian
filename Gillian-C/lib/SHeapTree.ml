@@ -108,25 +108,20 @@ end
 module Node = struct
   type t =
     | NotOwned
-    | Hole
-    | AllocatedUnkown
+    | Undef
     | Zero
-    | Single          of { chunk : Compcert.AST.memory_chunk; value : SVal.t }
+    | Single   of { chunk : Compcert.AST.memory_chunk; value : SVal.t }
 
   let pp fmt = function
     | NotOwned                -> Fmt.pf fmt "NOT OWNED"
-    | Hole                    -> Fmt.pf fmt "HOLE"
-    | AllocatedUnkown         -> Fmt.pf fmt "ALLOCATED UNKOWN"
+    | Undef                   -> Fmt.pf fmt "UNDEF"
     | Zero                    -> Fmt.pf fmt "ZERO"
     | Single { chunk; value } ->
         Fmt.pf fmt "(%a : %a)" SVal.pp value Chunk.pp chunk
 
   let equal a b =
     match (a, b) with
-    | Hole, Hole
-    | AllocatedUnkown, AllocatedUnkown
-    | Zero, Zero
-    | NotOwned, NotOwned -> true
+    | Undef, Undef | Zero, Zero | NotOwned, NotOwned -> true
     | Single { chunk = ca; value = va }, Single { chunk = cb; value = vb } ->
         Chunk.equal ca cb && SVal.equal va vb
     | _ -> false
@@ -134,15 +129,21 @@ module Node = struct
   let split = function
     (* TODO: Improve this *)
     | NotOwned -> (NotOwned, NotOwned)
-    | Hole -> (Hole, Hole)
-    | AllocatedUnkown -> (AllocatedUnkown, AllocatedUnkown)
+    | Undef -> (Undef, Undef)
     | Zero -> (Zero, Zero)
-    | Single _ -> (AllocatedUnkown, AllocatedUnkown)
+    | Single _ -> (Undef, Undef)
+
+  let merge ~left:a ~right:b =
+    (* In the future, this can get more precise, for example composing single values *)
+    match (a, b) with
+    | NotOwned, _ | _, NotOwned -> NotOwned
+    | Zero, Zero                -> Zero
+    | _, _                      -> Undef
 
   let decode ~chunk t =
     match t with
     | NotOwned -> Error MissingResource
-    | Hole | AllocatedUnkown -> Ok SVal.SUndefined
+    | Undef -> Ok SVal.SUndefined
     | Zero -> Ok (SVal.zero_of_chunk chunk)
     | Single { chunk = m_chunk; value } ->
         Ok (if Chunk.equal m_chunk chunk then value else SUndefined)
@@ -158,7 +159,7 @@ module Node = struct
     | _ -> Single { chunk; value = SUndefined }
 
   let lvars = function
-    | NotOwned | Hole | AllocatedUnkown | Zero -> SS.empty
+    | NotOwned | Undef | Zero -> SS.empty
     | Single { value = e; _ } -> SVal.lvars e
 end
 
@@ -188,7 +189,7 @@ module Tree = struct
 
   let with_node t node = { t with node }
 
-  let allocatedUnkown span = make ~node:AllocatedUnkown ~span ()
+  let undefined span = make ~node:Undef ~span ()
 
   let rec split ~range t : (t * t) Delayed.t =
     (* We're assuming that range is inside old_span *)
@@ -206,7 +207,7 @@ module Tree = struct
     else
       if%sat oh #== nh then
         let left_node, right_node = Node.split t.node in
-        let left_span, right_span = Range.split_at old_span nh in
+        let left_span, right_span = Range.split_at old_span nl in
         let left = make ~node:left_node ~span:left_span () in
         let right = make ~node:right_node ~span:right_span () in
         Delayed.return (left, right)
@@ -231,7 +232,7 @@ module Tree = struct
       match t.children with
       | Some (left, right) ->
           if%sat Range.is_inside range left.span then
-            let++ t = frame_single left low chunk in
+            let++ left = frame_single left low chunk in
             with_children t ~left ~right
           else
             if%sat Range.is_inside range right.span then
@@ -261,6 +262,12 @@ module Tree = struct
               get_framed right low chunk
             else DR.error (Unhandled "Children not in partition in get_framed")
 
+  let of_children ~left ~right =
+    let span = (fst left.span, snd right.span) in
+    let children = Some (left, right) in
+    let node = Node.merge ~left:left.node ~right:right.node in
+    { span; children; node }
+
   let rec set_framed t low chunk sval =
     let open DR.Syntax in
     let range = Range.of_low_and_chunk low chunk in
@@ -275,11 +282,11 @@ module Tree = struct
       | Some (left, right) ->
           if%ent Range.is_inside range left.span then
             let++ left = set_framed left low chunk sval in
-            with_children t ~left ~right
+            of_children ~left ~right
           else
             if%ent Range.is_inside range right.span then
               let++ right = set_framed right low chunk sval in
-              with_children t ~left ~right
+              of_children ~left ~right
             else DR.error (Unhandled "Children not in partition in get_framed")
 
   let rec lvars { node; span; children } =
@@ -293,15 +300,15 @@ module Tree = struct
     SS.union (SS.union node_lvars span_lvars) children_lvars
 end
 
-type t = Freed | Tree of { perm : Perm.t; span : Range.t; root : Tree.t }
+type t = Freed | Tree of { perm : Perm.t; bounds : Range.t; root : Tree.t }
 
 let pp fmt = function
-  | Freed                     -> Fmt.pf fmt "FREED"
-  | Tree { perm; span; root } ->
+  | Freed -> Fmt.pf fmt "FREED"
+  | Tree { perm; bounds; root } ->
       let pp_aux fmt (perm, span, root) =
         Fmt.pf fmt "%a@ %a@ %a" Range.pp span Perm.pp perm Tree.pp root
       in
-      (Fmt.parens (Fmt.vbox pp_aux)) fmt (perm, span, root)
+      (Fmt.parens (Fmt.vbox pp_aux)) fmt (perm, bounds, root)
 
 (* let equal ?(pc = Pc.empty) a b =
   match (a, b) with
@@ -312,6 +319,10 @@ let pp fmt = function
       pa =% pb)
       && Range.equal sa sb && Tree.equal ~pc ra rb
   | _ -> false *)
+
+let lvars = function
+  | Freed                    -> SS.empty
+  | Tree { bounds; root; _ } -> SS.union (Range.lvars bounds) (Tree.lvars root)
 
 let get_root = function
   | Freed  -> Error UseAfterFree
@@ -325,18 +336,18 @@ let get_perm_at ofs = function
   | Freed  -> DO.none ()
   | Tree x ->
       let open Formula.Infix in
-      let l, h = x.span in
+      let l, h = x.bounds in
       if%sat l #<= ofs #&& (ofs #< h) then DO.some x.perm else DO.none ()
 
 let get_min_perm_between low high = function
   | Freed  -> DO.none ()
   | Tree x ->
-      if%sat Range.is_inside (low, high) x.span then DO.some x.perm
+      if%sat Range.is_inside (low, high) x.bounds then DO.some x.perm
       else DO.none ()
 
 let get_span = function
   | Freed  -> Error UseAfterFree
-  | Tree x -> Ok x.span
+  | Tree x -> Ok x.bounds
 
 let with_root t root =
   match t with
@@ -344,8 +355,8 @@ let with_root t root =
   | Tree x -> Ok (Tree { x with root })
 
 let alloc low high =
-  let span = Range.make low high in
-  Tree { perm = Freeable; root = Tree.allocatedUnkown span; span }
+  let bounds = Range.make low high in
+  Tree { perm = Freeable; root = Tree.undefined bounds; bounds }
 
 let drop_perm t low high new_perm =
   let open Perm.Infix in
@@ -359,7 +370,7 @@ let drop_perm t low high new_perm =
         (InsufficientPermission { required = new_perm; actual = Some curr_perm })
     else
       let++ root = DR.of_result (get_root t) in
-      Tree { root; span = Range.make cl hl; perm = new_perm }
+      Tree { root; bounds = Range.make cl hl; perm = new_perm }
   else
     DR.error
       (Unhandled "Modifying permission on range different from object span")
@@ -431,7 +442,3 @@ let store t chunk ofs value =
   let open DR.Syntax in
   let** () = check_valid_access t chunk ofs Readable in
   set t ofs chunk value
-
-let lvars = function
-  | Freed                  -> SS.empty
-  | Tree { span; root; _ } -> SS.union (Range.lvars span) (Tree.lvars root)

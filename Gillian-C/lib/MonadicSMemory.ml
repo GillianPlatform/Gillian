@@ -428,7 +428,10 @@ let ga_loc_indexes = LActions.ga_loc_indexes_str
 
 (** Things defined for BiAbduction *)
 
-let get_recovery_vals _e = failwith "Not ready for bi-abduction yet"
+let get_recovery_vals = function
+  | InvalidLocation e -> [ e ]
+  | MissingLocResource l | SHeapTreeErr { at_location = l; _ } ->
+      [ Expr.loc_from_loc_name l ]
 
 let get_failing_constraint _e = failwith "Not ready for bi-abduction yet"
 
