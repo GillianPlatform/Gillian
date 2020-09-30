@@ -213,7 +213,21 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
       pred.pred_definitions
   in
   let new_defs = List.map (fun (oid, a) -> (oid, pt_asrt a)) new_defs in
-  { pred with pred_definitions = new_defs }
+  let new_facts =
+    List.fold_right
+      (fun (x, t_x) new_facts ->
+        match t_x with
+        | None     -> new_facts
+        | Some t_x ->
+            Gil_syntax__.Formula.Eq (UnOp (TypeOf, PVar x), Lit (Type t_x))
+            :: new_facts)
+      pred.pred_params []
+  in
+  {
+    pred with
+    pred_definitions = new_defs;
+    pred_facts = pred.pred_facts @ new_facts;
+  }
 
 let combine_ins_outs (pred : t) (ins : 'a list) (outs : 'a list) : 'a list =
   let in_indexes = SI.of_list pred.pred_ins in

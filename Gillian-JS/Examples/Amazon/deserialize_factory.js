@@ -238,8 +238,7 @@ var EncryptedDataKey = function (edk) { };
         [[
             Uint8Array (#buffer, #ab, 0, #length) *
             ArrayBuffer(#ab, #element) *
-            toUtf8(#element, ret) *
-            types(ret:Str)
+            toUtf8(#element, ret)
         ]]
         normal
 */
@@ -365,16 +364,16 @@ function decodeEncryptionContext(encodedEncryptionContext) {
         ArrayPrototype ($larr_proto) * ObjectPrototype($lobj_proto) * GlobalObject () *
         scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
         scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
-        toUtf8PairMap(#ECKs, #utf8ECKs) * FirstProj(#ECKs, #rProps) * types(#rProps : List) *
+        toUtf8PairMap(#ECKs, #utf8ECKs) * FirstProj(#ECKs, #rProps) *
         UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps) *
 
         scope(count: #count) * (#count <=# #pairsCount) *
         ArrayOfArraysOfUInt8ArraysContents(#elements, #done, 0, #count) *
         ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count) *
         (#ECKs == l+ (#done, #left)) *
-        FirstProj(#done, #doneRProps) * types(#doneRProps : List) * Unique(#doneRProps) *
-        FirstProj(#left, #leftRProps) * types(#leftRProps : List) * UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps) *
-        toUtf8PairMap(#done, #utf8Done) * types(#utf8Done : List) *
+        FirstProj(#done, #doneRProps) * Unique(#doneRProps) *
+        FirstProj(#left, #leftRProps) * UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps) *
+        toUtf8PairMap(#done, #utf8Done) *
         JSObjWithProto(#dECObj, null) * ObjectTable(#dECObj, #utf8Done)
         [bind: #count, #done, #left, #doneRProps, #leftRProps, #utf8Done] */
   for (var count = 0; count < pairsCount; count++) {
