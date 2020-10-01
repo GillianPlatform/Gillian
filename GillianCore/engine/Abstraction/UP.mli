@@ -13,7 +13,7 @@ val step_pp : step Fmt.t
 
 type t
 
-type pred = { pred : Pred.t; pure : bool; up : t }
+type pred = { pred : Pred.t; up : t }
 
 type spec = { spec : Spec.t; up : t }
 
@@ -49,7 +49,7 @@ val init :
   ?use_params:bool ->
   KB.t ->
   KB.t ->
-  (string, Pred.t) Hashtbl.t ->
+  (string, int list) Hashtbl.t ->
   (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list ->
   (t, Asrt.t list list) result
 
@@ -60,6 +60,9 @@ val head : t -> step option
 val posts : t -> (Flag.t * Asrt.t list) option
 
 val init_prog : (Annot.t, int) Prog.t -> (prog, up_err_t) result
+
+val init_preds :
+  (string, Pred.t) Hashtbl.t -> ((string, pred) Hashtbl.t, up_err_t) result
 
 val pp : Format.formatter -> t -> unit
 

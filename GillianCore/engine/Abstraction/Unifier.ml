@@ -336,7 +336,7 @@ module Make
                 let facts = List.map (fun fact -> Asrt.Pure fact) facts in
                 produce_asrt_list (state, preds, pred_defs) subst facts
           in
-          let pure = pred_def.pure in
+          let pure = pred_def.pred.pred_pure in
           match ostate with
           | None -> None
           | Some (state, preds, pred_defs) ->
@@ -889,7 +889,7 @@ module Make
     let state, preds, pred_defs = astate in
     let pred = UP.get_pred_def pred_defs pname in
     let pred_def = pred.pred in
-    let pred_pure = pred.pure in
+    let pred_pure = pred_def.pred_pure in
     match
       Preds.get_pred pred_pure preds pname vs
         (Containers.SI.of_list pred_def.pred_ins)

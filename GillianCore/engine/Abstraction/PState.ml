@@ -429,7 +429,7 @@ module Make
                     in
                     Pred.combine_ins_outs pred.pred vs vs_outs
                 in
-                Preds.extend ~pure:pred.pure preds' (pname, arg_vs);
+                Preds.extend ~pure:pred.pred.pred_pure preds' (pname, arg_vs);
                 Ok [ astate' ]
             | _ ->
                 let msg =
@@ -506,8 +506,18 @@ module Make
             let known_unifiables =
               Expr.Set.of_list (known_lvars @ asrt_alocs)
             in
+
+            let pred_ins =
+              Hashtbl.fold
+                (fun name (pred : Pred.t) pred_ins ->
+                  Hashtbl.add pred_ins name pred.pred_ins;
+                  pred_ins)
+                prog.prog.preds
+                (Hashtbl.create Config.medium_tbl_size)
+            in
+
             let up =
-              UP.init known_unifiables Expr.Set.empty prog.prog.preds
+              UP.init known_unifiables Expr.Set.empty pred_ins
                 [ (a, (None, None)) ]
             in
             let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
@@ -699,8 +709,16 @@ module Make
             let known_unifiables =
               Expr.Set.of_list (known_lvars @ asrt_alocs)
             in
+            let pred_ins =
+              Hashtbl.fold
+                (fun name (pred : Pred.t) pred_ins ->
+                  Hashtbl.add pred_ins name pred.pred_ins;
+                  pred_ins)
+                prog.prog.preds
+                (Hashtbl.create Config.medium_tbl_size)
+            in
             let up =
-              UP.init known_unifiables Expr.Set.empty prog.prog.preds
+              UP.init known_unifiables Expr.Set.empty pred_ins
                 [ (a, (None, None)) ]
             in
             (* This will not do anything in the original pass,
@@ -908,7 +926,7 @@ module Make
   let set_pred (astate : t) (pred : abs_t) : unit =
     let _, preds, preds_table = astate in
     let pred_name, _ = pred in
-    let pure = (Hashtbl.find preds_table pred_name).pure in
+    let pure = (Hashtbl.find preds_table pred_name).pred.pred_pure in
     Preds.extend ~pure preds pred
 
   let update_subst (astate : t) (subst : st) : unit =

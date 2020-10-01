@@ -32,7 +32,7 @@ type t =
   | PhantomInner    of t list
   | LabPhantomInner of (t * (string * SS.t) option) list
 
-type pred = { pred : Pred.t; pure : bool; up : t }
+type pred = { pred : Pred.t; up : t }
 
 type spec = { spec : Spec.t; up : t }
 
@@ -420,13 +420,13 @@ let rec ins_outs_formula (kb : KB.t) (pf : Formula.t) : (KB.t * outs) list =
 (** [ins_outs_assertion kb a] returns a list of possible ins-outs pairs
     for a given assertion [a] under a given knowledge base [kb] *)
 let ins_outs_assertion
-    (preds : (string, Pred.t) Hashtbl.t) (kb : KB.t) (asrt : Asrt.t) :
+    (pred_ins : (string, int list) Hashtbl.t) (kb : KB.t) (asrt : Asrt.t) :
     (KB.t * outs) list =
   let get_pred_ins name =
-    match Hashtbl.find_opt preds name with
-    | None      -> raise
-                     (Failure ("ins_outs_assertion. Unknown Predicate: " ^ name))
-    | Some pred -> pred.pred_ins
+    match Hashtbl.find_opt pred_ins name with
+    | None     -> raise
+                    (Failure ("ins_outs_assertion. Unknown Predicate: " ^ name))
+    | Some ins -> ins
   in
   match (asrt : Asrt.t) with
   | Pure form -> ins_outs_formula kb form
@@ -461,7 +461,7 @@ let rec collect_simple_asrts (a : Asrt.t) : Asrt.t list =
       | _         -> f a )
   | Star (a1, a2)          -> f a1 @ f a2
 
-let s_init (kb : KB.t) (preds : (string, Pred.t) Hashtbl.t) (a : Asrt.t) :
+let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
     (pt, Asrt.t list) result =
   let prioritise (la : Asrt.t list) = List.sort Asrt.prioritise la in
 
@@ -640,7 +640,7 @@ let init
     ?(use_params : bool option)
     (known_unifiables : KB.t)
     (params : KB.t)
-    (preds : (string, Pred.t) Hashtbl.t)
+    (preds : (string, int list) Hashtbl.t)
     (asrts_posts :
       (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list)
     : (t, Asrt.t list list) result =
@@ -776,7 +776,7 @@ let rec pp ft up =
         (iter_bindings ~sep:(any "@\n") List.iteri pp_child)
         next_ups
 
-let init_specs (preds : (string, Pred.t) Hashtbl.t) (specs : Spec.t list) :
+let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
     ((string, spec) Hashtbl.t, up_err_t) result =
   let u_specs = Hashtbl.create Config.medium_tbl_size in
   try
@@ -826,7 +826,7 @@ let init_specs (preds : (string, Pred.t) Hashtbl.t) (specs : Spec.t list) :
     Ok u_specs
   with UPError e -> Error e
 
-let init_lemmas (preds : (string, Pred.t) Hashtbl.t) (lemmas : Lemma.t list) :
+let init_lemmas (preds : (string, int list) Hashtbl.t) (lemmas : Lemma.t list) :
     ((string, lemma) Hashtbl.t, up_err_t) result =
   let u_lemmas = Hashtbl.create Config.medium_tbl_size in
   try
@@ -858,6 +858,16 @@ let init_lemmas (preds : (string, Pred.t) Hashtbl.t) (lemmas : Lemma.t list) :
 let init_preds (preds : (string, Pred.t) Hashtbl.t) :
     ((string, pred) Hashtbl.t, up_err_t) result =
   let u_preds = Hashtbl.create Config.medium_tbl_size in
+
+  let pred_ins =
+    Hashtbl.fold
+      (fun name (pred : Pred.t) pred_ins ->
+        Hashtbl.add pred_ins name pred.pred_ins;
+        pred_ins)
+      preds
+      (Hashtbl.create Config.medium_tbl_size)
+  in
+
   try
     Hashtbl.iter
       (fun name (pred : Pred.t) ->
@@ -881,14 +891,14 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
             pred.pred_definitions
         in
 
-        match init known_params KB.empty preds defs with
+        match init known_params KB.empty pred_ins defs with
         | Error err -> raise (UPError (UPPred (pred.pred_name, err)))
         (* let msg = Printf.sprintf "Predicate definition of %s cannot be turned into UP" pred.name in
            L.fail msg *)
         | Ok up ->
             L.verbose (fun m ->
                 m "Successfully created UP of predicate %s:\n%a" name pp up);
-            Hashtbl.replace u_preds name { pred; pure = pred.pred_pure; up })
+            Hashtbl.replace u_preds name { pred; up })
       preds;
     Ok u_preds
   with UPError e -> Error e
@@ -903,14 +913,23 @@ let init_prog (prog : ('a, int) Prog.t) : (prog, up_err_t) result =
   match preds_tbl with
   | Error e      -> Error e
   | Ok preds_tbl -> (
+      let pred_ins =
+        Hashtbl.fold
+          (fun name (pred : pred) pred_ins ->
+            Hashtbl.add pred_ins name pred.pred.pred_ins;
+            pred_ins)
+          preds_tbl
+          (Hashtbl.create Config.medium_tbl_size)
+      in
+
       let lemmas_tbl : ((string, lemma) Hashtbl.t, up_err_t) result =
-        init_lemmas prog.preds lemmas
+        init_lemmas pred_ins lemmas
       in
       match lemmas_tbl with
       | Error e       -> Error e
       | Ok lemmas_tbl -> (
           let specs_tbl : ((string, spec) Hashtbl.t, up_err_t) result =
-            init_specs prog.preds all_specs
+            init_specs pred_ins all_specs
           in
           match specs_tbl with
           | Error e      -> Error e
@@ -1048,6 +1067,15 @@ let add_spec (prog : prog) (spec : Spec.t) : unit =
     | Some proc -> proc
   in
 
+  let pred_ins =
+    Hashtbl.fold
+      (fun name (pred : pred) pred_ins ->
+        Hashtbl.add pred_ins name pred.pred.pred_ins;
+        pred_ins)
+      prog.preds
+      (Hashtbl.create Config.medium_tbl_size)
+  in
+
   let posts_from_sspecs sspecs =
     List.map
       (fun (sspec : Spec.st) ->
@@ -1061,7 +1089,7 @@ let add_spec (prog : prog) (spec : Spec.t) : unit =
         (fun (x, y) -> (x, (None, y)))
         (posts_from_sspecs spec.spec_sspecs)
     in
-    let up = init ~use_params:true KB.empty params prog.prog.preds posts in
+    let up = init ~use_params:true KB.empty params pred_ins posts in
     match up with
     | Error _ ->
         let msg =
@@ -1081,7 +1109,7 @@ let add_spec (prog : prog) (spec : Spec.t) : unit =
     let spec = Spec.extend uspec.spec sspecs in
     let ups =
       List.map
-        (fun (asrt, posts) -> (asrt, s_init params prog.prog.preds asrt, posts))
+        (fun (asrt, posts) -> (asrt, s_init params pred_ins asrt, posts))
         (posts_from_sspecs sspecs)
     in
     let new_gup =
