@@ -591,7 +591,7 @@ g_spec_target:
   { let (spec_name, spec_params) = spec_head in
     let spec_normalised = !Config.previously_normalised in
     let spec_to_verify = true in
-    let spec_incomplete = (incomplete <> None) in
+    let spec_incomplete = Option.is_some incomplete in
     let spec : Spec.t = { spec_name; spec_params; spec_sspecs; spec_normalised; spec_incomplete; spec_to_verify } in
     spec
   }
