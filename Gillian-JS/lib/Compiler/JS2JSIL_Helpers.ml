@@ -1,6 +1,5 @@
 open Gillian.Gil_syntax
 open Jsil_syntax
-module L = Logging
 
 let small_tbl_size = 1
 
@@ -365,6 +364,8 @@ let fresh_loop_body_label, reset_loop_body_label = fresh_sth "loop_b_"
 
 let fresh_loop_end_label, reset_loop_end_label = fresh_sth "loop_e_"
 
+let fresh_loop_identifier, reset_loop_identifier = fresh_sth "loop_id_"
+
 let fresh_tcf_finally_label, reset_tcf_finally_label = fresh_sth "finally_"
 
 let fresh_tcf_end_label, reset_tcf_end_label = fresh_sth "end_tcf_"
@@ -479,6 +480,7 @@ type translation_context = {
   tr_sc_var : string;
   tr_vis_list : string list;
   tr_loop_list : loop_list_type;
+  tr_loops : string list;
   tr_previous : Expr.t option;
   tr_js_lab : string option;
   tr_ret_lab : string;
@@ -489,6 +491,7 @@ type translation_context = {
 
 let make_translation_ctx
     ?(loop_list = [])
+    ?(loops = [])
     ?(previous = None)
     ?(js_lab = None)
     offset_converter
@@ -503,6 +506,7 @@ let make_translation_ctx
     tr_sc_var = sc_var;
     tr_vis_list = vis_list;
     tr_loop_list = loop_list;
+    tr_loops = loops;
     tr_previous = previous;
     tr_js_lab = js_lab;
     tr_ret_lab = "rlab";
@@ -515,6 +519,7 @@ let update_tr_ctx
     ?ret_lab
     ?err
     ?loop_list
+    ?loops
     ?previous
     ?lab
     ?vis_list
@@ -532,6 +537,8 @@ let update_tr_ctx
   (* vis_list   *)
   let new_loop_list = Option.value ~default:tr_ctx.tr_loop_list loop_list in
   (* loop_list   *)
+  let new_loops = Option.value ~default:tr_ctx.tr_loops loops in
+  (* loops       *)
   let new_previous = Option.value ~default:tr_ctx.tr_previous previous in
   (* previous   *)
   let new_lab = Option.value ~default:tr_ctx.tr_js_lab lab in
@@ -550,6 +557,7 @@ let update_tr_ctx
     tr_err_lab = new_err_lab;
     tr_vis_list = new_vis_list;
     tr_loop_list = new_loop_list;
+    tr_loops = new_loops;
     tr_previous = new_previous;
     tr_js_lab = new_lab;
     tr_er_fid = new_er_fid;

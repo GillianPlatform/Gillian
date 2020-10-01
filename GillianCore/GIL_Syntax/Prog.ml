@@ -1,5 +1,3 @@
-module L = Logging
-
 type ('annot, 'label) t = {
   imports : (string * bool) list;
       (** List of tuples consisting of the file path and a boolean indicating

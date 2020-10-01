@@ -785,7 +785,9 @@ let rec translate_expr tr_ctx e :
   (* All the other commands must get the offsets and nothing else *)
   let js_char_offset = e.JS_Parser.Syntax.exp_offset in
   let js_line_offset = tr_ctx.tr_offset_converter js_char_offset in
-  let metadata : Annot.t = Annot.init ~line_offset:(Some js_line_offset) () in
+  let metadata : Annot.t =
+    Annot.init ~line_offset:(Some js_line_offset) ~loop_info:tr_ctx.tr_loops ()
+  in
   let annotate_cmds = annotate_cmds_top_level metadata in
   let annotate_cmd cmd lab = annotate_cmd_top_level metadata (lab, cmd) in
 
@@ -1237,8 +1239,6 @@ let rec translate_expr tr_ctx e :
    Section 11.1.4 - Array Initialiser
   *)
   | JS_Parser.Syntax.Array eos ->
-      (* raise (Failure "not implemented yet - array literal") *)
-
       (* xfvm := metadata (x_f_val)
          let xarrm = fresh_var () in
          let cmd_xarrm = annotate_cmd (LBasic (New (xarrm, None, Some (Lit Null)))) None in
@@ -4128,7 +4128,9 @@ and translate_statement tr_ctx e =
   (* All the other commands must get the offsets and nothing else *)
   let js_char_offset = e.JS_Parser.Syntax.exp_offset in
   let js_line_offset = tr_ctx.tr_offset_converter js_char_offset in
-  let metadata : Annot.t = Annot.init ~line_offset:(Some js_line_offset) () in
+  let metadata : Annot.t =
+    Annot.init ~line_offset:(Some js_line_offset) ~loop_info:tr_ctx.tr_loops ()
+  in
   let annotate_cmds = annotate_cmds_top_level metadata in
   let annotate_cmd cmd lab = annotate_cmd_top_level metadata (lab, cmd) in
 
@@ -5414,13 +5416,17 @@ and translate_statement tr_ctx e =
        *)
       let head, guard, body, cont, end_loop = fresh_loop_vars () in
 
-      let cmds1, x1, errs1 = fe e1 in
       let new_loop_list =
         (Some cont, end_loop, tr_ctx.tr_js_lab, true) :: tr_ctx.tr_loop_list
       in
+      let new_loop_id = fresh_loop_identifier () in
+      let new_loops = new_loop_id :: tr_ctx.tr_loops in
       let new_ctx =
-        update_tr_ctx ~previous:None ~lab:None ~loop_list:new_loop_list tr_ctx
+        update_tr_ctx ~previous:None ~lab:None ~loop_list:new_loop_list
+          ~loops:new_loops tr_ctx
       in
+
+      let cmds1, x1, errs1 = translate_expr new_ctx e1 in
       let cmds2, x2, errs2, rets2, breaks2, conts2 =
         translate_statement new_ctx e2
       in
@@ -5492,10 +5498,18 @@ and translate_statement tr_ctx e =
       in
 
       let cmds2 = add_initial_label cmds2 body metadata in
+
+      (* Set up the new annotation *)
+      let metadata = Annot.set_loop_info metadata new_loops in
+      let annotate_loop_cmds = annotate_cmds_top_level metadata in
+
       let cmds =
-        annotate_cmds ((None, cmd_ass_ret_0) :: head_cmds)
+        (* This command is not in the loop *)
+        annotate_cmds [ (None, cmd_ass_ret_0) ]
+        (* But these from here on in are *)
+        @ annotate_loop_cmds head_cmds
         @ cmds1
-        @ annotate_cmds
+        @ annotate_loop_cmds
             [
               (*           cmds1                                      *)
               (None, cmd_gv_x1);
@@ -5506,7 +5520,7 @@ and translate_statement tr_ctx e =
               (*           goto [x1_b] body endwhile                  *);
             ]
         @ cmds2
-        @ annotate_cmds
+        @ annotate_loop_cmds
             [
               (* body:     cmds2                                      *)
               (None, cmd_gv_x2);
@@ -5522,6 +5536,7 @@ and translate_statement tr_ctx e =
               (None, LGoto head);
               (*           goto head                                  *)
             ]
+        (* These commands are out of the loop *)
         @ annotate_cmds cmds_end_loop
       in
       let errs = errs1 @ errs_x1_v @ [ x1_b ] @ errs2 @ errs_x2_v in

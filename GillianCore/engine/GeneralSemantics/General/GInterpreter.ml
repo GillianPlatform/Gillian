@@ -113,12 +113,16 @@ struct
            --%s: %i--@\n\
            TIME: %f@\n\
            CMD: %a@\n\
+           LOOPS: %a@\n\
            BRANCHING: %d@\n\
            @\n\
            %a@\n\
            ------------------------------------------------------@]\n"
           (CallStack.get_cur_proc_id cs)
-          i (Sys.time ()) Cmd.pp_indexed cmd b_counter State.pp state)
+          i (Sys.time ()) Cmd.pp_indexed cmd
+          Fmt.(brackets (list ~sep:comma string))
+          (Annot.get_loop_info annot)
+          b_counter State.pp state)
 
   let print_lconfiguration (lcmd : LCmd.t) (state : State.t) : unit =
     L.normal (fun m ->
