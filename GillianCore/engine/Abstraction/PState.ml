@@ -362,6 +362,181 @@ module Make
     let subst_lst = lvars_subst @ alocs_subst in
     ESubst.init subst_lst
 
+  let unify_invariant
+      (prog : UP.prog)
+      (revisited : bool)
+      (astate : t)
+      (a : Asrt.t)
+      (binders : string list) : t * t =
+    let state, preds, pred_defs = astate in
+    let store = State.get_store state in
+    let pvars_store = Store.domain store in
+    let pvars_a = Asrt.pvars a in
+    let pvars_diff = SS.diff pvars_a pvars_store in
+    L.verbose (fun m -> m "%s" (String.concat ", " (SS.elements pvars_diff)));
+    match pvars_diff = SS.empty with
+    | false ->
+        let pvars_errs : err_t list =
+          List.map (fun pvar -> (EVar pvar : err_t)) (SS.elements pvars_diff)
+        in
+        raise (Internal_State_Error (pvars_errs, astate))
+    | true  -> (
+        (* TODO: I would like to not forget the store, but let's see... *)
+        let store_subst = Store.to_ssubst store in
+        let a = SVal.SESubst.substitute_asrt store_subst true a in
+        let state_lvars = State.get_lvars state in
+        let known_lvars =
+          SS.elements
+            (SS.diff (SS.inter state_lvars (Asrt.lvars a)) (SS.of_list binders))
+        in
+        let known_lvars = List.map (fun x -> Expr.LVar x) known_lvars in
+        let asrt_alocs =
+          List.map (fun x -> Expr.ALoc x) (SS.elements (Asrt.alocs a))
+        in
+        let known_unifiables = Expr.Set.of_list (known_lvars @ asrt_alocs) in
+        let pred_ins =
+          Hashtbl.fold
+            (fun name (pred : Pred.t) pred_ins ->
+              Hashtbl.add pred_ins name pred.pred_ins;
+              pred_ins)
+            prog.prog.preds
+            (Hashtbl.create Config.medium_tbl_size)
+        in
+        let up =
+          UP.init known_unifiables Expr.Set.empty pred_ins [ (a, (None, None)) ]
+        in
+        (* This will not do anything in the original pass,
+           but will do precisely what is needed in the re-establishment *)
+        let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
+        if vars_to_forget <> SS.empty then (
+          let oblivion_subst = fresh_subst vars_to_forget in
+          L.verbose (fun m ->
+              m "Forget @[%a@] with subst: %a"
+                Fmt.(iter ~sep:comma SS.iter string)
+                vars_to_forget ESubst.pp oblivion_subst);
+          substitution_in_place oblivion_subst astate;
+          L.verbose (fun m ->
+              m "State after substitution:@\n@[%a@]\n" pp astate) )
+        else ();
+        match up with
+        | Error asrts -> raise (Preprocessing_Error [ UPAssert (a, asrts) ])
+        | Ok up       -> (
+            let bindings =
+              List.map
+                (fun (e : Expr.t) ->
+                  let id =
+                    match e with
+                    | LVar x | ALoc x -> e
+                    | _               ->
+                        raise
+                          (Failure
+                             "Impossible: unifiable not an lvar or an aloc")
+                  in
+                  (id, Option.get (Val.from_expr e)))
+                (Expr.Set.elements known_unifiables)
+            in
+            let old_astate = copy astate in
+            let subst = ESubst.init bindings in
+            let u_ret = Unifier.unify astate subst up in
+            match u_ret with
+            | UPUSucc [ (new_state, subst', _) ] -> (
+                (* Successful Unification *)
+                (* TODO: understand if the frame state should have the subst produced *)
+                let frame_state = copy new_state in
+
+                let lbinders = List.map (fun x -> Expr.LVar x) binders in
+                let new_bindings =
+                  List.map (fun e -> (e, ESubst.get subst' e)) lbinders
+                in
+                let success =
+                  List.for_all (fun (x, x_v) -> x_v <> None) new_bindings
+                in
+                if not success then
+                  raise (Failure "Assert failed - binders not captured")
+                else
+                  let new_bindings =
+                    List.map (fun (x, x_v) -> (x, Option.get x_v)) new_bindings
+                  in
+                  let bindings =
+                    List.filter
+                      (fun (e, v) ->
+                        (not (List.mem e lbinders)) && e <> Val.to_expr v)
+                      (ESubst.to_list subst')
+                  in
+                  L.verbose (fun fmt ->
+                      fmt "Additional bindings: %a"
+                        Fmt.(
+                          brackets
+                            (list ~sep:semi
+                               (parens (pair ~sep:comma Expr.pp Val.pp))))
+                        bindings);
+                  let bindings =
+                    match revisited with
+                    | false -> bindings
+                    | true  -> new_bindings @ bindings
+                  in
+                  let bindings =
+                    List.map
+                      (fun (e, e_v) -> Asrt.Pure (Eq (e, Val.to_expr e_v)))
+                      bindings
+                  in
+                  let a_bindings = Asrt.star bindings in
+                  let subst_bindings = make_id_subst a_bindings in
+                  let full_subst = make_id_subst a in
+                  let _ = ESubst.merge_left full_subst subst_bindings in
+                  let a_substed =
+                    ESubst.substitute_asrt subst_bindings true a
+                  in
+                  let a_produce = Asrt.star [ a_bindings; a_substed ] in
+                  (* Create empty state *)
+                  let empty_state =
+                    (State.init None, Preds.init [], pred_defs)
+                  in
+                  let empty_state = set_store empty_state store in
+                  match Unifier.produce empty_state full_subst a_produce with
+                  | Some new_astate ->
+                      let new_state, new_preds, pred_defs = new_astate in
+                      let new_state' =
+                        State.add_spec_vars new_state (SS.of_list binders)
+                      in
+                      let _ = State.simplify ~kill_new_lvars:false new_state' in
+                      (frame_state, (new_state', new_preds, pred_defs))
+                  | _               ->
+                      let msg =
+                        Fmt.str
+                          "Assert failed with argument %a. unable to produce \
+                           variable bindings."
+                          Asrt.pp a
+                      in
+                      L.fail msg )
+            | UPUSucc _ ->
+                raise
+                  (Exceptions.Unsupported
+                     "sep_assert: unification resulted in multiple returns")
+            | UPUFail errs ->
+                let fail_pfs : Formula.t list =
+                  List.map State.get_failing_constraint errs
+                in
+                let fail_pfs =
+                  List.filter (fun (f : Formula.t) -> f <> True) fail_pfs
+                in
+
+                let failing_model = State.sat_check_f state fail_pfs in
+                let () =
+                  Fmt.pr
+                    "Assert failed with argument @[<h>%a@]. Unification failed.@\n\
+                     @[<v 2>Errors:@\n\
+                     %a.@]@\n\
+                     @[<v 2>Failing Model:@\n\
+                     %a@]@\n"
+                    Asrt.pp a
+                    Fmt.(list ~sep:(any "@\n") State.pp_err)
+                    errs
+                    Fmt.(option ~none:(any "CANNOT CREATE MODEL") ESubst.pp)
+                    failing_model
+                in
+                raise (Internal_State_Error (errs, old_astate)) ) )
+
   (**
     Evaluation of logic commands
 
@@ -371,11 +546,8 @@ module Make
     @param preds Current predicate set
     @return List of states/predicate sets resulting from the evaluation
   *)
-  let rec evaluate_slcmd
-      ?(revisited_invariant = false)
-      (prog : UP.prog)
-      (lcmd : SLCmd.t)
-      (astate : t) : (t list, string) result =
+  let rec evaluate_slcmd (prog : UP.prog) (lcmd : SLCmd.t) (astate : t) :
+      (t list, string) result =
     let state, preds, pred_defs = astate in
 
     let eval_expr e =
@@ -676,179 +848,9 @@ module Make
                 Error
                   (Format.asprintf "Cannot apply lemma %s in state\n%a" lname pp
                      astate) ) )
-    | Invariant (a, binders) -> (
-        let store = State.get_store state in
-        let pvars_store = Store.domain store in
-        let pvars_a = Asrt.pvars a in
-        let pvars_diff = SS.diff pvars_a pvars_store in
-        L.verbose (fun m ->
-            m "%s" (String.concat ", " (SS.elements pvars_diff)));
-        match pvars_diff = SS.empty with
-        | false ->
-            let pvars_errs : err_t list =
-              List.map
-                (fun pvar -> (EVar pvar : err_t))
-                (SS.elements pvars_diff)
-            in
-            raise (Internal_State_Error (pvars_errs, astate))
-        | true  -> (
-            (* TODO: I would like to not forget the store, but let's see... *)
-            let store_subst = Store.to_ssubst store in
-            let a = SVal.SESubst.substitute_asrt store_subst true a in
-            let state_lvars = State.get_lvars state in
-            let known_lvars =
-              SS.elements
-                (SS.diff
-                   (SS.inter state_lvars (Asrt.lvars a))
-                   (SS.of_list binders))
-            in
-            let known_lvars = List.map (fun x -> Expr.LVar x) known_lvars in
-            let asrt_alocs =
-              List.map (fun x -> Expr.ALoc x) (SS.elements (Asrt.alocs a))
-            in
-            let known_unifiables =
-              Expr.Set.of_list (known_lvars @ asrt_alocs)
-            in
-            let pred_ins =
-              Hashtbl.fold
-                (fun name (pred : Pred.t) pred_ins ->
-                  Hashtbl.add pred_ins name pred.pred_ins;
-                  pred_ins)
-                prog.prog.preds
-                (Hashtbl.create Config.medium_tbl_size)
-            in
-            let up =
-              UP.init known_unifiables Expr.Set.empty pred_ins
-                [ (a, (None, None)) ]
-            in
-            (* This will not do anything in the original pass,
-               but will do precisely what is needed in the re-establishment *)
-            let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
-            if vars_to_forget <> SS.empty then (
-              let oblivion_subst = fresh_subst vars_to_forget in
-              L.verbose (fun m ->
-                  m "Forget @[%a@] with subst: %a"
-                    Fmt.(iter ~sep:comma SS.iter string)
-                    vars_to_forget ESubst.pp oblivion_subst);
-              substitution_in_place oblivion_subst astate;
-              L.verbose (fun m ->
-                  m "State after substitution:@\n@[%a@]\n" pp astate) )
-            else ();
-            match up with
-            | Error asrts -> raise (Preprocessing_Error [ UPAssert (a, asrts) ])
-            | Ok up       -> (
-                let bindings =
-                  List.map
-                    (fun (e : Expr.t) ->
-                      let id =
-                        match e with
-                        | LVar x | ALoc x -> e
-                        | _               ->
-                            raise
-                              (Failure
-                                 "Impossible: unifiable not an lvar or an aloc")
-                      in
-                      (id, Option.get (Val.from_expr e)))
-                    (Expr.Set.elements known_unifiables)
-                in
-                let old_astate = copy astate in
-                let subst = ESubst.init bindings in
-                let u_ret = Unifier.unify astate subst up in
-                match u_ret with
-                | UPUSucc [ (new_state, subst', _) ] -> (
-                    (* Successful Unification *)
-                    let lbinders = List.map (fun x -> Expr.LVar x) binders in
-                    let new_bindings =
-                      List.map (fun e -> (e, ESubst.get subst' e)) lbinders
-                    in
-                    let success =
-                      List.for_all (fun (x, x_v) -> x_v <> None) new_bindings
-                    in
-                    if not success then
-                      raise (Failure "Assert failed - binders not captured")
-                    else
-                      let new_bindings =
-                        List.map
-                          (fun (x, x_v) -> (x, Option.get x_v))
-                          new_bindings
-                      in
-                      let bindings =
-                        List.filter
-                          (fun (e, v) ->
-                            (not (List.mem e lbinders)) && e <> Val.to_expr v)
-                          (ESubst.to_list subst')
-                      in
-                      L.verbose (fun fmt ->
-                          fmt "Additional bindings: %a"
-                            Fmt.(
-                              brackets
-                                (list ~sep:semi
-                                   (parens (pair ~sep:comma Expr.pp Val.pp))))
-                            bindings);
-                      let bindings =
-                        match revisited_invariant with
-                        | false -> bindings
-                        | true  -> new_bindings @ bindings
-                      in
-                      let bindings =
-                        List.map
-                          (fun (e, e_v) -> Asrt.Pure (Eq (e, Val.to_expr e_v)))
-                          bindings
-                      in
-                      let a_bindings = Asrt.star bindings in
-                      let subst_bindings = make_id_subst a_bindings in
-                      let full_subst = make_id_subst a in
-                      let _ = ESubst.merge_left full_subst subst_bindings in
-                      let a_substed =
-                        ESubst.substitute_asrt subst_bindings true a
-                      in
-                      let a_produce = Asrt.star [ a_bindings; a_substed ] in
-                      match Unifier.produce new_state full_subst a_produce with
-                      | Some new_astate ->
-                          let new_state, new_preds, pred_defs = new_astate in
-                          let new_state' =
-                            State.add_spec_vars new_state (SS.of_list binders)
-                          in
-                          let _ =
-                            State.simplify ~kill_new_lvars:false new_state'
-                          in
-                          Ok [ (new_state', new_preds, pred_defs) ]
-                      | _               ->
-                          let msg =
-                            Fmt.str
-                              "Assert failed with argument %a. unable to \
-                               produce variable bindings."
-                              Asrt.pp a
-                          in
-                          Error msg )
-                | UPUSucc _ ->
-                    raise
-                      (Exceptions.Unsupported
-                         "sep_assert: unification resulted in multiple returns")
-                | UPUFail errs ->
-                    let fail_pfs : Formula.t list =
-                      List.map State.get_failing_constraint errs
-                    in
-                    let fail_pfs =
-                      List.filter (fun (f : Formula.t) -> f <> True) fail_pfs
-                    in
-
-                    let failing_model = State.sat_check_f state fail_pfs in
-                    let () =
-                      Fmt.pr
-                        "Assert failed with argument @[<h>%a@]. Unification \
-                         failed.@\n\
-                         @[<v 2>Errors:@\n\
-                         %a.@]@\n\
-                         @[<v 2>Failing Model:@\n\
-                         %a@]@\n"
-                        Asrt.pp a
-                        Fmt.(list ~sep:(any "@\n") State.pp_err)
-                        errs
-                        Fmt.(option ~none:(any "CANNOT CREATE MODEL") ESubst.pp)
-                        failing_model
-                    in
-                    raise (Internal_State_Error (errs, old_astate)) ) ) )
+    | Invariant (a, binders) ->
+        raise
+          (Failure "Invariant must be treated by the unify_invariant function")
 
   let run_spec
       (spec : UP.spec)

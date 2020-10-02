@@ -205,11 +205,8 @@ struct
     @param preds Current predicate set
     @return List of states/predicate sets resulting from the evaluation
   *)
-  let rec evaluate_lcmd
-      ?(revisited_invariant = false)
-      (prog : UP.prog)
-      (lcmd : LCmd.t)
-      (state : State.t) : State.t list =
+  let rec evaluate_lcmd (prog : UP.prog) (lcmd : LCmd.t) (state : State.t) :
+      State.t list =
     let eval_expr = make_eval_expr state in
 
     print_lconfiguration lcmd state;
@@ -361,7 +358,7 @@ struct
         in
         state @ state'
     | SL sl_cmd -> (
-        match State.evaluate_slcmd ~revisited_invariant prog sl_cmd state with
+        match State.evaluate_slcmd prog sl_cmd state with
         | Ok result -> result
         | Error msg -> L.fail msg )
 
@@ -652,10 +649,18 @@ struct
     | Logic lcmd -> (
         match lcmd with
         (* Invariant being revisited *)
-        | SL (Invariant _) when prev_loop_ids = loop_ids ->
-            let _ = evaluate_lcmd ~revisited_invariant:true prog lcmd state in
+        | SL (Invariant (a, binders)) when prev_loop_ids = loop_ids ->
+            let _ = State.unify_invariant prog true state a binders in
             let () = L.verbose (fun fmt -> fmt "Invariant re-established.") in
             []
+        | SL (Invariant (a, binders)) ->
+            let (frame, state) : State.t * State.t =
+              State.unify_invariant prog false state a binders
+            in
+            let iframes =
+              (List.hd loop_ids :: fst iframes, frame :: snd iframes)
+            in
+            [ ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter) ]
         (* TODO: INVARIANT *)
         | _ ->
             let resulting_states : State.t list =

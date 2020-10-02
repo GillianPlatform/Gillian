@@ -341,12 +341,12 @@ module Make (SMemory : SMemory.S) :
       asrts_store @ SMemory.assertions heap @ asrts_pfs
       @ [ Types (TypEnv.to_list_expr gamma) ]
 
-  let evaluate_slcmd
-      ?(revisited_invariant = false)
-      (prog : UP.prog)
-      (slcmd : SLCmd.t)
-      (state : t) : (t list, string) result =
+  let evaluate_slcmd (prog : UP.prog) (slcmd : SLCmd.t) (state : t) :
+      (t list, string) result =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
+
+  let unify_invariant prog revisited state a binders =
+    raise (Failure "ERROR: unify_invariant called for pure symbolic execution")
 
   let run_spec
       (spec : UP.spec)

@@ -184,12 +184,12 @@ module Make
   let unfolding_vals (state : t) (fs : Formula.t list) : vt list =
     raise (Failure "ERROR: unfolding_vals called for non-abstract execution")
 
-  let evaluate_slcmd
-      ?(revisited_invariant = false)
-      (prog : UP.prog)
-      (slcmd : SLCmd.t)
-      (state : t) : (t list, string) result =
+  let evaluate_slcmd (prog : UP.prog) (slcmd : SLCmd.t) (state : t) :
+      (t list, string) result =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
+
+  let unify_invariant prog revisited state a binders =
+    raise (Failure "ERROR: unify_invariant called for concrete execution")
 
   let substitution_in_place (subst : st) (state : t) : unit = ()
 
