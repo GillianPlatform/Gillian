@@ -7,5 +7,9 @@
     "stdio.h": "c",
     "slist.h": "c",
     "algorithm": "c"
-  }
+},
+"ocaml.sandbox": {
+    "kind": "esy",
+    "root": "/Users/PetarMax/Projects/Gillian"
+}
 }

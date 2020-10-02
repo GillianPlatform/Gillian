@@ -5862,9 +5862,34 @@ and translate_statement tr_ctx e =
       let x1_v, cmd_gv_x1, errs_x1_v =
         make_get_value_call x1 tr_ctx.tr_err_lab
       in
+
+      (* x_ret_0 := empty  *)
+      let x_ret_0, cmd_ass_ret_0 = make_empty_ass () in
+
       let cmds1, errs1 =
-        (cmds1 @ [ annotate_cmd cmd_gv_x1 None ], errs1 @ [ x1_v ])
+        ( cmds1
+          @ [ annotate_cmd cmd_gv_x1 None; annotate_cmd cmd_ass_ret_0 None ],
+          errs1 @ [ x1_v ] )
       in
+
+      let head, guard, body, cont, end_loop = fresh_loop_vars () in
+
+      let new_loop_list =
+        (Some cont, end_loop, tr_ctx.tr_js_lab, true) :: tr_ctx.tr_loop_list
+      in
+
+      let new_loop_id = fresh_loop_identifier () in
+      let new_loops = new_loop_id :: tr_ctx.tr_loops in
+      let new_ctx =
+        update_tr_ctx ~previous:None ~lab:None ~loop_list:new_loop_list
+          ~loops:new_loops tr_ctx
+      in
+      let fe = translate_expr new_ctx in
+
+      (* Set up the new annotation *)
+      let metadata = Annot.set_loop_info metadata new_loops in
+      let annotate_cmd = annotate_cmd_top_level metadata in
+      let annotate_cmds = annotate_cmds_top_level metadata in
 
       let cmds2, x2, errs2 =
         match e2 with
@@ -5872,7 +5897,7 @@ and translate_statement tr_ctx e =
         | None    ->
             let x2 = fresh_var () in
             let cmd_ass_x2 =
-              annotate_cmd (LBasic (Assignment (x2, Lit (Bool true)))) None
+              annotate_cmd (None, LBasic (Assignment (x2, Lit (Bool true))))
             in
             ([ cmd_ass_x2 ], PVar x2, [])
       in
@@ -5882,30 +5907,19 @@ and translate_statement tr_ctx e =
         | Some e3 -> fe e3
         | None    ->
             let x3_v, cmd_ass_x3v = make_empty_ass () in
-            ([ annotate_cmd cmd_ass_x3v None ], PVar x3_v, [])
+            ([ annotate_cmd (None, cmd_ass_x3v) ], PVar x3_v, [])
       in
 
-      let head, guard, body, cont, end_loop = fresh_loop_vars () in
-
-      let new_loop_list =
-        (Some cont, end_loop, tr_ctx.tr_js_lab, true) :: tr_ctx.tr_loop_list
-      in
-      let new_ctx =
-        update_tr_ctx ~previous:None ~lab:None ~loop_list:new_loop_list tr_ctx
-      in
       let cmds4, x4, errs4, rets4, breaks4, conts4 =
         translate_statement new_ctx e4
       in
 
       let cur_breaks, outer_breaks =
-        filter_cur_jumps breaks4 tr_ctx.tr_js_lab true
+        filter_cur_jumps breaks4 new_ctx.tr_js_lab true
       in
       let cur_conts, outer_conts =
-        filter_cur_jumps conts4 tr_ctx.tr_js_lab true
+        filter_cur_jumps conts4 new_ctx.tr_js_lab true
       in
-
-      (* x_ret_0 := empty  *)
-      let x_ret_0, cmd_ass_ret_0 = make_empty_ass () in
 
       (* head:     x_ret_1 := PHI(x_ret_0, x_ret_3)  *)
       let x_ret_1 = fresh_var () in
@@ -5967,9 +5981,7 @@ and translate_statement tr_ctx e =
       in
 
       let cmds =
-        cmds1
-        @ annotate_cmds ((None, cmd_ass_ret_0) :: head_cmds)
-        @ cmds2
+        cmds1 @ annotate_cmds head_cmds @ cmds2
         @ annotate_cmds
             [
               (*              cmds2                                        *)
@@ -6024,6 +6036,10 @@ and translate_statement tr_ctx e =
         x_r := i__getValue(x) with err
         goto ret_lab
     *)
+      (* When we hit a return, we automatically exit all loops *)
+      let new_ctx = update_tr_ctx ~loops:[] tr_ctx in
+      let metadata = Annot.set_loop_info metadata [] in
+      let annotate_cmd cmd lab = annotate_cmd_top_level metadata (lab, cmd) in
       match e with
       | None   ->
           let x_r = fresh_var () in
@@ -6032,19 +6048,19 @@ and translate_statement tr_ctx e =
             annotate_cmd (LBasic (Assignment (x_r, Lit Undefined))) None
           in
           (* goto lab_ret *)
-          let cmd_goto_ret = annotate_cmd (LGoto tr_ctx.tr_ret_lab) None in
+          let cmd_goto_ret = annotate_cmd (LGoto new_ctx.tr_ret_lab) None in
           let cmds = [ cmd_xr_ass; cmd_goto_ret ] in
           let cmds = annotate_first_cmd cmds in
           (cmds, PVar x_r, [], [ x_r ], [], [])
       | Some e ->
-          let cmds, x, errs = fe e in
+          let cmds, x, errs = translate_expr new_ctx e in
           (* x_r := i__getValue(x) with err *)
           let x_r, cmd_gv_x, errs_x_r =
-            make_get_value_call x tr_ctx.tr_err_lab
+            make_get_value_call x new_ctx.tr_err_lab
           in
           let cmd_gv_x = annotate_cmd cmd_gv_x None in
           (* goto ret_lab *)
-          let cmd_goto_ret = annotate_cmd (LGoto tr_ctx.tr_ret_lab) None in
+          let cmd_goto_ret = annotate_cmd (LGoto new_ctx.tr_ret_lab) None in
           let cmds = cmds @ [ cmd_gv_x; cmd_goto_ret ] in
           let cmds = annotate_first_cmd cmds in
           (cmds, PVar x_r, errs @ errs_x_r, [ x_r ], [], []) )
