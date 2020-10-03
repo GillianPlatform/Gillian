@@ -421,27 +421,27 @@ module Make
              -----------------@\n\
              Produce assertion: @[%a@]" Asrt.pp a));
     let sas = UP.collect_simple_asrts a in
-    let pure, impure =
-      List.partition
-        (fun a ->
-          match a with
-          | Asrt.Pure (Eq (ALoc _, _)) -> false
-          | Asrt.Pure (Eq (_, ALoc _)) -> false
-          | Asrt.Pure _                -> true
-          | _                          -> false)
-        sas
-    in
-    let pure =
-      Asrt.Pure
-        (Formula.conjunct
-           (List.map
-              (fun a ->
-                match a with
-                | Asrt.Pure pf -> pf
-                | _            -> L.fail "Impossible")
-              pure))
-    in
-    produce_asrt_list astate subst ([ pure ] @ impure)
+    (* let pure, impure =
+         List.partition
+           (fun a ->
+             match a with
+             | Asrt.Pure (Eq (ALoc _, _)) -> false
+             | Asrt.Pure (Eq (_, ALoc _)) -> false
+             | Asrt.Pure _                -> true
+             | _                          -> false)
+           sas
+       in
+       let pure =
+         Asrt.Pure
+           (Formula.conjunct
+              (List.map
+                 (fun a ->
+                   match a with
+                   | Asrt.Pure pf -> pf
+                   | _            -> L.fail "Impossible")
+                 pure))
+       in *)
+    produce_asrt_list astate subst sas
 
   let produce_posts (state : t) (subst : ESubst.t) (asrts : Asrt.t list) :
       t list =
