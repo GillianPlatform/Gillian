@@ -2129,8 +2129,11 @@ let resolve_expr_to_location (pfs : PFS.t) (gamma : TypEnv.t) (e : Expr.t) :
   resolve_expr_to_location_aux max_fuel Expr.Set.empty [ e ]
 
 let rec reduce_formula_loop
-    (unification : bool) (pfs : PFS.t) (gamma : TypEnv.t) (a : Formula.t) :
-    Formula.t =
+    ?(top_level = false)
+    (unification : bool)
+    (pfs : PFS.t)
+    (gamma : TypEnv.t)
+    (a : Formula.t) : Formula.t =
   let f = reduce_formula_loop unification pfs gamma in
   let fe = reduce_lexpr_loop ~unification pfs gamma in
   (* L.verbose (fun fmt -> fmt "Reducing Formula: %a" Formula.pp a); *)
@@ -2141,7 +2144,8 @@ let rec reduce_formula_loop
     | Eq
         ( Lit (Num n),
           BinOp (BinOp (Lit (Num 256.), FTimes, LVar b1), FPlus, LVar b0) )
-      when PFS.mem pfs (LessEq (Lit (Num 0.), LVar b0))
+      when top_level
+           && PFS.mem pfs (LessEq (Lit (Num 0.), LVar b0))
            && PFS.mem pfs (LessEq (Lit (Num 0.), LVar b1))
            && PFS.mem pfs (Less (LVar b0, Lit (Num 256.)))
            && PFS.mem pfs (Less (LVar b1, Lit (Num 256.))) ->
@@ -2153,7 +2157,8 @@ let rec reduce_formula_loop
     | Eq
         ( BinOp (BinOp (Lit (Num 256.), FTimes, LVar b1), FPlus, LVar b0),
           Lit (Num n) )
-      when PFS.mem pfs (LessEq (Lit (Num 0.), LVar b0))
+      when top_level
+           && PFS.mem pfs (LessEq (Lit (Num 0.), LVar b0))
            && PFS.mem pfs (LessEq (Lit (Num 0.), LVar b1))
            && PFS.mem pfs (Less (LVar b0, Lit (Num 256.)))
            && PFS.mem pfs (Less (LVar b1, Lit (Num 256.))) ->
@@ -2534,7 +2539,7 @@ let reduce_formula
     ?(pfs : PFS.t = PFS.init ())
     ?(gamma = TypEnv.init ())
     (a : Formula.t) : Formula.t =
-  reduce_formula_loop unification pfs gamma a
+  reduce_formula_loop ~top_level:true unification pfs gamma a
 
 let find_list_length_eqs (pfs : PFS.t) (e : Expr.t) : cnum list =
   let llen_expr = Expr.UnOp (LstLen, e) in
@@ -2763,7 +2768,8 @@ let rec reduce_assertion_loop
     | Pred (name, les) ->
         Pred (name, List.map (reduce_lexpr_loop ~unification pfs gamma) les)
     (* Pure assertions *)
-    | Pure f -> Pure (reduce_formula_loop unification pfs gamma f)
+    | Pure f ->
+        Pure (reduce_formula_loop ~top_level:true unification pfs gamma f)
     (* Types *)
     | Types lvt -> (
         try

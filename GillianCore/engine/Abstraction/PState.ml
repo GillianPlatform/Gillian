@@ -578,6 +578,7 @@ module Make
                      (Format.asprintf "Unable to produce frame for loop %s" id)
                | Some astate -> astate
              in
+             let _ = simplify ~kill_new_lvars:true astate in
              (astate, (List.tl ids, List.tl frames)))
          (astate, iframes) ids)
 
