@@ -368,7 +368,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
         scope(pairsCount: #pairsCount) * scope(elements: #elements) * scope(encryptionContext: #dECObj) *
         scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
         scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
-        scope(mappedKVPair: _) * scope(key: _) * scope(value: _) *
+        scope(key: _) * scope(value: _) *
         toUtf8PairMap(#ECKs, #utf8ECKs) * FirstProj(#ECKs, #rProps) *
         CElements(#EC, 2., ((256. * #b0) + #b1), 2., #ECKs, (l-len #rest)) *
         UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps) *
@@ -396,11 +396,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
     */
 
     // FIXME: FIX THE PARSER!
-    // var [key, value] = elements[count].map(toUtf8)
-
-    var mappedKVPair = elements[count].map(toUtf8);
-    var key = mappedKVPair[0];
-    var value = mappedKVPair[1];
+    var [key, value] = elements[count].map(toUtf8)
 
     /* Postcondition: The number of keys in the encryptionContext must match the pairsCount.
      * If the same Key value is serialized...
