@@ -408,11 +408,12 @@ struct
     if !Config.stats then Statistics.exec_cmds := !Statistics.exec_cmds + 1;
     UP.update_coverage prog proc_name i;
 
-    let _ =
+    let state =
       match loop_action with
-      | Nothing     -> ()
+      | Nothing     -> state
       | FrameOff id ->
-          L.verbose (fun fmt -> fmt "INFO: Expecting to frame off %s" id)
+          L.verbose (fun fmt -> fmt "INFO: Expecting to frame off %s" id);
+          state
       | FrameOn ids ->
           L.verbose (fun fmt ->
               fmt "INFO: Going to frame on %a" pp_str_list ids);

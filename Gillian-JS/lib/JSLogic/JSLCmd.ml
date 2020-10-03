@@ -1,5 +1,6 @@
 open JSLogicCommon
 open Jsil_syntax
+module Formula = Gillian.Gil_syntax.Formula
 
 type t =
   | Fold       of JSAsrt.t * (string * (string * JSExpr.t) list) option
@@ -8,6 +9,7 @@ type t =
   | GUnfold    of string  (** Global unfold *)
   | Flash      of JSAsrt.t  (** Unfold/fold   *)
   | If         of JSExpr.t * t list * t list  (** If-then-else  *)
+  | Branch     of JSAsrt.pt (* Branching *)
   | ApplyLemma of string * JSExpr.t list  (** Lemma         *)
   | Macro      of string * JSExpr.t list  (** Macro         *)
   | Assert     of (JSAsrt.t * string list)  (** Assert        *)
@@ -62,6 +64,7 @@ let rec js2jsil
       [ LCmd.SL (ApplyLem (lname, List.map fe lparams, [])) ]
   | UseSubst (lab, subst_lst) ->
       raise (Failure "DEATH. USESUBST CANNOT BE TRANSLATED!!!")
+  | Branch pf -> [ Branch (JSAsrt.js2jsil_pure None pf) ]
   | _ -> raise (Failure "Unsupported JS logic command")
 
 let str_of_folding_info (unfold_info : (string * string) list option) : string =

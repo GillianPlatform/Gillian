@@ -496,6 +496,12 @@ module Make
           m "unfold with unfold_info with:@\n%a@\n" SLCmd.pp_unfold_info
             unfold_info));
 
+    let new_spec_vars =
+      match unfold_info with
+      | None          -> SS.empty
+      | Some bindings -> SS.of_list (snd (List.split bindings))
+    in
+
     let rets =
       match use_unfold_info unfold_info pred.pred state subst_i with
       | []               -> raise
@@ -507,6 +513,9 @@ module Make
                 m "Going to produce %d definitions with subst@\n%a"
                   (List.length (def :: rest_defs))
                   ESubst.pp subst_i));
+          let state, preds, pred_defs = astate in
+          let state' = State.add_spec_vars state new_spec_vars in
+          let astate = (state', preds, pred_defs) in
           let results =
             List.map
               (fun def ->

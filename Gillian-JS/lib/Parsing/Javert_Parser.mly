@@ -1161,6 +1161,9 @@ js_logic_cmd_target:
   | UNFOLDALL; name = VAR;
     { GUnfold name }
 
+  | BRANCH; LBRACE; pf = js_pure_assertion_target; RBRACE
+    { Branch pf }
+
 (* flash x(e1, ..., en) *)
   | FLASH; assertion = js_assertion_target;
     { Flash (assertion) }

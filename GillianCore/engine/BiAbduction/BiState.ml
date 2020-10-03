@@ -213,6 +213,9 @@ struct
   let unify_invariant prog revisited bi_state a binders =
     raise (Failure "ERROR: unify_invariant called for bi-abductive execution")
 
+  let clear_resource state =
+    raise (Failure "ERROR: clear_resource called for bi-abdutive execution")
+
   let frame_on state iframes ids =
     raise (Failure "ERROR: framing called for bi-abductive execution")
 

@@ -362,6 +362,21 @@ module Make
     let subst_lst = lvars_subst @ alocs_subst in
     ESubst.init subst_lst
 
+  let clear_resource (astate : t) =
+    let state, preds, pred_defs = astate in
+    let state = State.clear_resource state in
+    let preds_list = Preds.to_list preds in
+    List.iter
+      (fun (name, vs) ->
+        let pred_def = Hashtbl.find pred_defs name in
+        if not pred_def.pred.pred_pure then
+          let _ =
+            Preds.pop preds (fun (name', vs') -> name' = name && vs' = vs)
+          in
+          ())
+      preds_list;
+    (state, preds, pred_defs)
+
   let unify_invariant
       (prog : UP.prog)
       (revisited : bool)
@@ -441,8 +456,9 @@ module Make
             match u_ret with
             | UPUSucc [ (new_state, subst', _) ] -> (
                 (* Successful Unification *)
-                (* TODO: understand if the frame state should have the subst produced *)
+                (* TODO: Should the frame state have the subst produced? *)
                 let frame_state = copy new_state in
+                let frame_state = set_store frame_state (Store.init []) in
 
                 let lbinders = List.map (fun x -> Expr.LVar x) binders in
                 let new_bindings =
@@ -452,7 +468,8 @@ module Make
                   List.for_all (fun (x, x_v) -> x_v <> None) new_bindings
                 in
                 if not success then
-                  raise (Failure "Assert failed - binders not captured")
+                  raise
+                    (Failure "UNIFY INVARIANT FAILURE: binders not captured")
                 else
                   let new_bindings =
                     List.map (fun (x, x_v) -> (x, Option.get x_v)) new_bindings
@@ -489,11 +506,11 @@ module Make
                   in
                   let a_produce = Asrt.star [ a_bindings; a_substed ] in
                   (* Create empty state *)
-                  let empty_state =
-                    (State.init None, Preds.init [], pred_defs)
-                  in
-                  let empty_state = set_store empty_state store in
-                  match Unifier.produce empty_state full_subst a_produce with
+                  let invariant_state : t = clear_resource new_state in
+                  let invariant_state = set_store invariant_state store in
+                  match
+                    Unifier.produce invariant_state full_subst a_produce
+                  with
                   | Some new_astate ->
                       let new_state, new_preds, pred_defs = new_astate in
                       let new_state' =
@@ -507,7 +524,7 @@ module Make
                   | _               ->
                       let msg =
                         Fmt.str
-                          "Assert failed with argument %a. unable to produce \
+                          "UNIFY INVARIANT FAILURE: %a. unable to produce \
                            variable bindings."
                           Asrt.pp a
                       in
@@ -515,7 +532,8 @@ module Make
             | UPUSucc _ ->
                 raise
                   (Exceptions.Unsupported
-                     "sep_assert: unification resulted in multiple returns")
+                     "UNIFY INVARIANT FAILURE: unification resulted in \
+                      multiple returns")
             | UPUFail errs ->
                 let fail_pfs : Formula.t list =
                   List.map State.get_failing_constraint errs
@@ -526,33 +544,42 @@ module Make
 
                 let failing_model = State.sat_check_f state fail_pfs in
                 let () =
-                  Fmt.pr
-                    "Assert failed with argument @[<h>%a@]. Unification failed.@\n\
-                     @[<v 2>Errors:@\n\
-                     %a.@]@\n\
-                     @[<v 2>Failing Model:@\n\
-                     %a@]@\n"
-                    Asrt.pp a
-                    Fmt.(list ~sep:(any "@\n") State.pp_err)
-                    errs
-                    Fmt.(option ~none:(any "CANNOT CREATE MODEL") ESubst.pp)
-                    failing_model
+                  L.print_to_all
+                    (Format.asprintf
+                       "UNIFY INVARIANT FAILURE: with argument @[<h>%a@]. \
+                        Unification failed.@\n\
+                        @[<v 2>Errors:@\n\
+                        %a.@]@\n\
+                        @[<v 2>Failing Model:@\n\
+                        %a@]@\n"
+                       Asrt.pp a
+                       Fmt.(list ~sep:(any "@\n") State.pp_err)
+                       errs
+                       Fmt.(option ~none:(any "CANNOT CREATE MODEL") ESubst.pp)
+                       failing_model)
                 in
                 raise (Internal_State_Error (errs, old_astate)) ) )
 
   let frame_on (astate : t) (iframes : string list * t list) (ids : string list)
-      =
-    let _ =
-      List.fold_left
-        (fun iframes id' ->
-          let ids, frames = iframes in
-          let id, frame = (List.hd ids, List.hd frames) in
-          if id <> id' then L.fail "Framing: Malformed loop identifiers."
-          else (* TODO: FRAMING *)
-            (List.tl ids, List.tl frames))
-        iframes ids
-    in
-    ()
+      : t =
+    fst
+      (List.fold_left
+         (fun (astate, iframes) id' ->
+           let ids, frames = iframes in
+           let id, frame = (List.hd ids, List.hd frames) in
+           if id <> id' then L.fail "Framing: Malformed loop identifiers."
+           else
+             let astate =
+               let frame_asrt = Asrt.star (to_assertions frame) in
+               let full_subst = make_id_subst frame_asrt in
+               match Unifier.produce astate full_subst frame_asrt with
+               | None        ->
+                   L.fail
+                     (Format.asprintf "Unable to produce frame for loop %s" id)
+               | Some astate -> astate
+             in
+             (astate, (List.tl ids, List.tl frames)))
+         (astate, iframes) ids)
 
   (**
     Evaluation of logic commands
@@ -792,8 +819,11 @@ module Make
                           let new_state' =
                             State.add_spec_vars new_state (SS.of_list binders)
                           in
-                          let _ =
-                            State.simplify ~kill_new_lvars:false new_state'
+                          let subst =
+                            State.simplify ~kill_new_lvars:true new_state'
+                          in
+                          let () =
+                            Preds.substitution_in_place subst new_preds
                           in
                           Ok [ (new_state', new_preds, pred_defs) ]
                       | _               ->

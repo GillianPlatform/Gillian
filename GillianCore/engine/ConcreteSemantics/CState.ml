@@ -194,6 +194,9 @@ module Make
   let frame_on state iframes ids =
     raise (Failure "ERROR: framing called for concrete execution")
 
+  let clear_resource state =
+    raise (Failure "ERROR: clear_resource called for concrete execution")
+
   let substitution_in_place (subst : st) (state : t) : unit = ()
 
   let fresh_val (state : t) =

@@ -28,10 +28,10 @@ function needs (condition, errorMessage) {
 /**
     @id readElements
 
-    @pred nounfold innerLoopInvariantElement(+definition, +remElsList, +view, +outerLoopReadPos, +fCount, fList, eLength) :
-      (definition == "Complete") * CElement(view, outerLoopReadPos, fCount, fList, eLength),
-      (definition == "Incomplete") * (remElsList == {{ }}) * IElement(view, outerLoopReadPos, fCount, fList, eLength),
-      (definition == "Incomplete") * (! (remElsList == {{ }})) * CElement(view, outerLoopReadPos, fCount, fList, eLength);
+    @pred nounfold innerLoopInvariantFacts(+definition, +remElsList, +view, +innerLoopReadPos, +fLeft, +remElList, +eLength, +remElsLength, +doneElLength, remElLength) :
+      (definition == "Complete") * CElement(view, innerLoopReadPos, fLeft, remElList, remElLength) * (eLength == doneElLength + remElLength),
+      (definition == "Incomplete") * (remElsList == {{ }}) * IElement(view, innerLoopReadPos, fLeft, remElList, remElLength) * (remElsLength == doneElLength + remElLength),
+      (definition == "Incomplete") * (! (remElsList == {{ }})) * CElement(view, innerLoopReadPos, fLeft, remElList, remElLength) * (eLength == doneElLength + remElLength);
 
     @pre
       (elementCount == #eCount) * (fieldsPerElement == #fCount) * (buffer == #buffer) * (readPos == #readPos) *
@@ -81,10 +81,11 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
     var elements = [];
 
     /* @invariant
-        scope(buffer: #buffer) *
+        scope(buffer: #buffer) * Uint8Array (#buffer, #ab, #viewOffset, #viewSize) * ArrayBuffer(#ab, #data) *
         scope(dataView: #dataView) * DataView(#dataView, #ab, #viewOffset, #viewSize) *
-        scope(elements : #doneEls) * scope(readPos : #outerLoopReadPos) * scope(elementCount : #eLeft) *
-        scope(element: _) * scope(fieldCount: _) * scope(fieldBinary: _) *
+        scope(elements : #doneEls) * scope(readPos : #outerLoopReadPos) *
+        scope(elementCount : #eLeft) * scope(fieldsPerElement: #fCount) *
+        scope(element: _) * scope(fieldCount: _) * scope(fieldBinary: _) * scope(length: _) *
         JSInternals() *
 
         CElements(#view, #readPos, #eCount - #eLeft, #fCount, #doneElsList, #doneElsLength) *
@@ -105,16 +106,21 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
         var fieldCount = fieldsPerElement
 
         /* @invariant
+            scope(buffer: #buffer) * Uint8Array (#buffer, #ab, #viewOffset, #viewSize) * ArrayBuffer(#ab, #data) *
+            scope(dataView: #dataView) * DataView(#dataView, #ab, #viewOffset, #viewSize) *
             scope(element : #doneEl) * scope(readPos : #innerLoopReadPos) * scope(fieldCount : #fLeft) *
-            innerLoopInvariantElement(#definition, #remElsList, #view, #innerLoopReadPos, #fLeft, #remElList, #remElLength) *
+            scope(fieldBinary: _) * scope(length: _) *
+            JSInternals() *
+
             CElement(#view, #outerLoopReadPos, #fCount - #fLeft, #doneElList, #doneElLength) *
             (#fList == l+ (#doneElList, #remElList)) *
-            (#eLength == #doneElLength + #remElLength) *
+            innerLoopInvariantFacts(#definition, #remElsList, #view, #innerLoopReadPos, #fLeft, #remElList, #eLength, #remElsLength, #doneElLength, #remElLength) *
             (#outerLoopReadPos + #doneElLength == #innerLoopReadPos) *
             ArrayOfUInt8Arrays(#doneEl, #doneElList, #fCount - #fLeft)
             [bind: #doneEl, #innerLoopReadPos, #fLeft, #remElList, #remElLength, #doneElList, #doneElLength] */
         while (fieldCount--) {
             /* @tactic
+                unfold innerLoopInvariantFacts(#definition, #remElsList, #view, #innerLoopReadPos, #fLeft, #remElList, #eLength, #remElsLength, #doneElLength, #remElLength);
                 if (#definition = "Complete") then {
                     unfold CElement(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength)
                 } else {
@@ -259,7 +265,7 @@ var toUtf8 = function (buffer) { };
 
     @id decodeEncryptionContext
 
-    @prex (this == undefined) * (encodedEncryptionContext == #eEC) *
+    @pre (this == undefined) * (encodedEncryptionContext == #eEC) *
          Uint8Array(#eEC, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#EC == l-sub(#data, #byteOffset, #byteLength)) *
          (#definition == "Complete") *
@@ -270,7 +276,7 @@ var toUtf8 = function (buffer) { };
          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
          JSInternals()
 
-    @postx Uint8Array(#eEC, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
+    @post Uint8Array(#eEC, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           RawEncryptionContext(#definition, #EC, #ECKs, #errorMessage) *
 
           DecodedEncryptionContext(ret, #ECKs) *
@@ -280,7 +286,7 @@ var toUtf8 = function (buffer) { };
           scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
           JSInternals ()
 
-    @prex (this == undefined) * (encodedEncryptionContext == #eEC) *
+    @pre (this == undefined) * (encodedEncryptionContext == #eEC) *
          Uint8Array(#eEC, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#EC == l-sub(#data, #byteOffset, #byteLength)) *
          (#definition == "Broken") *
@@ -291,7 +297,7 @@ var toUtf8 = function (buffer) { };
          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
          JSInternals()
 
-    @posterrx
+    @posterr
           Uint8Array(#eEC, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           RawEncryptionContext(#definition, #EC, #ECKs, #errorMessage) *
 
@@ -360,13 +366,16 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 
     @invariant
         scope(pairsCount: #pairsCount) * scope(elements: #elements) * scope(encryptionContext: #dECObj) *
-        ArrayPrototype ($larr_proto) * ObjectPrototype($lobj_proto) * GlobalObject () *
         scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
         scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
+        scope(mappedKVPair: _) * scope(key: _) * scope(value: _) *
         toUtf8PairMap(#ECKs, #utf8ECKs) * FirstProj(#ECKs, #rProps) *
+        CElements(#EC, 2., ((256. * #b0) + #b1), 2., #ECKs, (l-len #rest)) *
         UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps) *
+        JSInternals() *
 
         scope(count: #count) * (#count <=# #pairsCount) *
+        ArrayStructure(#elements, #pairsCount) *
         ArrayOfArraysOfUInt8ArraysContents(#elements, #done, 0, #count) *
         ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count) *
         (#ECKs == l+ (#done, #left)) *
@@ -378,13 +387,20 @@ function decodeEncryptionContext(encodedEncryptionContext) {
   for (var count = 0; count < pairsCount; count++) {
     /*
         @tactic
+            unfold ArrayStructure(#elements, #pairsCount);
             unfold UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps);
             unfold UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps);
             unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count) [bind: (#elementContents := #ECK) and (#rest := #rest_left)];
             apply CElementsElementLength(#EC, 2., ((256. * #b0) + #b1), 2., #ECKs, #done, #ECK, #rest_left);
             assert (#ECK == {{ #new_prop, #new_value }})
     */
-    var [key, value] = elements[count].map(toUtf8)
+
+    // FIXME: FIX THE PARSER!
+    // var [key, value] = elements[count].map(toUtf8)
+
+    var mappedKVPair = elements[count].map(toUtf8);
+    var key = mappedKVPair[0];
+    var value = mappedKVPair[1];
 
     /* Postcondition: The number of keys in the encryptionContext must match the pairsCount.
      * If the same Key value is serialized...
@@ -466,7 +482,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
 /**
     @id deserializeEncryptedDataKeys
 
-    @prex (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
+    @pre (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          ((#definition == "Complete") \/ (#definition == "Incomplete")) *
@@ -477,7 +493,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
          JSInternals()
 
-    @postx Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
+    @post Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           (#view == l-sub(#data, #byteOffset, #byteLength)) *
           RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
 
@@ -503,7 +519,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
           scope(readElements : #readElements) * JSFunctionObject(#readElements, "readElements", #rE_sc, #rE_len, #rE_proto) *
           JSInternals ()
 
-    @prex (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
+    @pre (this == undefined) * (buffer == #buffer) * (startPos == #startPos) *
          Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#definition == "Broken") *
@@ -512,7 +528,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          JSInternals()
 
-    @posterrx
+    @posterr
           Uint8Array(#buffer, #aBuffer, #byteOffset, #byteLength) * ArrayBuffer(#aBuffer, #data) *
           RawEncryptedDataKeys(#definition, #view, #startPos, #EDKs, #EDKsLength, #errorMessage) *
 
@@ -650,7 +666,7 @@ var SdkSuite = function (suiteId) { };
 /**
     @id deserializeMessageHeader
 
-    @prex (messageBuffer == #messageBuffer) *
+    @pre (messageBuffer == #messageBuffer) *
          Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#byteOffset + #byteLength <=# l-len #data) *
@@ -670,7 +686,7 @@ var SdkSuite = function (suiteId) { };
          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
          JSInternals ()
 
-    @postx Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
+    @post Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
           Header(#definition,
                  #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                         #part_two, #ECKs,
@@ -707,7 +723,7 @@ var SdkSuite = function (suiteId) { };
           scope(SdkSuite : #SdkObject) * JSFunctionObject(#SdkObject, "SdkSuite", #s_sc, #s_len, $lobj_proto) *
           JSInternals()
 
-    @prex (messageBuffer == #messageBuffer) *
+    @pre (messageBuffer == #messageBuffer) *
          Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
          (#view == l-sub(#data, #byteOffset, #byteLength)) *
          (#byteOffset + #byteLength <=# l-len #data) *
@@ -727,7 +743,7 @@ var SdkSuite = function (suiteId) { };
          scope(toUtf8: #toUtf8) * JSFunctionObject(#toUtf8, "toUtf8", #t_sc, #t_len, #t_proto) *
          JSInternals ()
 
-    @posterrx
+    @posterr
           Uint8Array(#messageBuffer, #buffer, #byteOffset, #byteLength) * ArrayBuffer(#buffer, #data) *
           Header(#definition,
                  #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
