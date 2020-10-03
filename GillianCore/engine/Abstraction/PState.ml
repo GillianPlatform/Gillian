@@ -499,8 +499,11 @@ module Make
                       let new_state' =
                         State.add_spec_vars new_state (SS.of_list binders)
                       in
-                      let _ = State.simplify ~kill_new_lvars:false new_state' in
-                      (frame_state, (new_state', new_preds, pred_defs))
+                      let invariant_state =
+                        (new_state', new_preds, pred_defs)
+                      in
+                      let _ = simplify ~kill_new_lvars:true invariant_state in
+                      (frame_state, invariant_state)
                   | _               ->
                       let msg =
                         Fmt.str
@@ -536,6 +539,20 @@ module Make
                     failing_model
                 in
                 raise (Internal_State_Error (errs, old_astate)) ) )
+
+  let frame_on (astate : t) (iframes : string list * t list) (ids : string list)
+      =
+    let _ =
+      List.fold_left
+        (fun iframes id' ->
+          let ids, frames = iframes in
+          let id, frame = (List.hd ids, List.hd frames) in
+          if id <> id' then L.fail "Framing: Malformed loop identifiers."
+          else (* TODO: FRAMING *)
+            (List.tl ids, List.tl frames))
+        iframes ids
+    in
+    ()
 
   (**
     Evaluation of logic commands

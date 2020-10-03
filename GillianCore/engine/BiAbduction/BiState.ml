@@ -213,6 +213,9 @@ struct
   let unify_invariant prog revisited bi_state a binders =
     raise (Failure "ERROR: unify_invariant called for bi-abductive execution")
 
+  let frame_on state iframes ids =
+    raise (Failure "ERROR: framing called for bi-abductive execution")
+
   let unfolding_vals (bi_state : t) (fs : Formula.t list) : vt list =
     let procs, state, _ = bi_state in
     State.unfolding_vals state fs

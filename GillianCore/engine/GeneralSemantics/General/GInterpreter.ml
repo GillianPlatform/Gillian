@@ -401,7 +401,6 @@ struct
        the loop ids that have come from the call stack *)
     let loop_ids = Annot.get_loop_info annot @ CallStack.get_loop_ids cs in
 
-    (* TODO: RE-FRAMING *)
     let loop_action : loop_action =
       understand_loop_action loop_ids prev_loop_ids
     in
@@ -416,7 +415,8 @@ struct
           L.verbose (fun fmt -> fmt "INFO: Expecting to frame off %s" id)
       | FrameOn ids ->
           L.verbose (fun fmt ->
-              fmt "INFO: Expecting to frame on %a" pp_str_list ids)
+              fmt "INFO: Going to frame on %a" pp_str_list ids);
+          State.frame_on state iframes ids
       | Malformed   -> L.fail "Malformed loop identifiers"
     in
 
@@ -654,6 +654,7 @@ struct
             let () = L.verbose (fun fmt -> fmt "Invariant re-established.") in
             []
         | SL (Invariant (a, binders)) ->
+            assert (loop_action = FrameOff (List.hd loop_ids));
             let (frame, state) : State.t * State.t =
               State.unify_invariant prog false state a binders
             in
@@ -661,7 +662,6 @@ struct
               (List.hd loop_ids :: fst iframes, frame :: snd iframes)
             in
             [ ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter) ]
-        (* TODO: INVARIANT *)
         | _ ->
             let resulting_states : State.t list =
               evaluate_lcmd prog lcmd state

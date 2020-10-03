@@ -125,6 +125,8 @@ module type S = sig
 
   val unify_invariant : UP.prog -> bool -> t -> Asrt.t -> string list -> t * t
 
+  val frame_on : t -> string list * t list -> string list -> unit
+
   val run_spec :
     UP.spec ->
     t ->

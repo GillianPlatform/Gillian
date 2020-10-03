@@ -348,6 +348,9 @@ module Make (SMemory : SMemory.S) :
   let unify_invariant prog revisited state a binders =
     raise (Failure "ERROR: unify_invariant called for pure symbolic execution")
 
+  let frame_on state iframes ids =
+    raise (Failure "ERROR: framing called for symbolic execution")
+
   let run_spec
       (spec : UP.spec)
       (state : t)

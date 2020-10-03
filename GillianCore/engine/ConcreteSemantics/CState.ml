@@ -191,6 +191,9 @@ module Make
   let unify_invariant prog revisited state a binders =
     raise (Failure "ERROR: unify_invariant called for concrete execution")
 
+  let frame_on state iframes ids =
+    raise (Failure "ERROR: framing called for concrete execution")
+
   let substitution_in_place (subst : st) (state : t) : unit = ()
 
   let fresh_val (state : t) =
