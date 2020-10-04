@@ -49,9 +49,10 @@ module Make (SMemory : SMemory.S) :
     in
     Fmt.pf fmt
       "@[<h>SPEC VARS: %a@]@\n\
-       @[<v 2>HEAP:@\n\
-       %a@]@\n\
        @[<v 2>STORE:@\n\
+       %a@]@\n\
+       @\n\
+       @[<v 2>MEMORY:@\n\
        %a@]@\n\
        @\n\
        @[<v 2>PURE FORMULAE:@\n\
@@ -60,7 +61,7 @@ module Make (SMemory : SMemory.S) :
        @[<v 2>TYPING ENVIRONMENT:@\n\
        %a@]"
       (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
-      svars pp_heap heap SStore.pp store PFS.pp pfs TypEnv.pp gamma
+      svars SStore.pp store pp_heap heap PFS.pp pfs TypEnv.pp gamma
 
   let pp_by_need cmd fmt state =
     let heap, store, pfs, gamma, svars = state in

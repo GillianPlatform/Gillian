@@ -129,7 +129,7 @@ module Make
       "-----------------------------------------@\n\
        @[<v 2>STORE:@\n\
        %a@]@\n\
-       @[<v 2>HEAP:@\n\
+       @[<v 2>MEMORY:@\n\
        %a@]@\n"
       CStore.pp store pp_heap heap
 

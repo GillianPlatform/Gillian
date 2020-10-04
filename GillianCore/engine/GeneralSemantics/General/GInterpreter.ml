@@ -170,17 +170,6 @@ struct
           (CallStack.get_loop_ids cs)
           b_counter (State.pp_by_need cmd) state)
 
-  let print_lconfiguration (lcmd : LCmd.t) (state : State.t) : unit =
-    L.normal (fun m ->
-        m
-          "@[------------------------------------------------------@\n\
-           TIME: %f@\n\
-           LCMD: %a@\n\
-           @\n\
-           %a@\n\
-           ------------------------------------------------------@]@\n"
-          (Sys.time ()) LCmd.pp lcmd State.pp state)
-
   let check_loop_ids actual expected =
     match actual = expected with
     | false ->
@@ -208,9 +197,6 @@ struct
   let rec evaluate_lcmd (prog : UP.prog) (lcmd : LCmd.t) (state : State.t) :
       State.t list =
     let eval_expr = make_eval_expr state in
-
-    print_lconfiguration lcmd state;
-
     match lcmd with
     | AssumeType (x, t) -> (
         match Val.from_expr (LVar x) with
