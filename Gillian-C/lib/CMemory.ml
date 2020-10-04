@@ -175,7 +175,17 @@ let execute_action name heap params =
   | AGEnv SetSymbol -> execute_genvsetsymbol heap params
   | AGEnv SetDef -> execute_genvsetdef heap params
   | AGEnv GetDef -> execute_genvgetdef heap params
-  | AMem (MGet | MSet | MRem) | AGEnv (RemDef | RemSymbol) ->
+  | AMem
+      ( GetSingle
+      | SetSingle
+      | RemSingle
+      | GetBounds
+      | SetBounds
+      | RemBounds
+      | GetHole
+      | SetHole
+      | RemHole )
+  | AGEnv (RemDef | RemSymbol) ->
       failwith
         (Printf.sprintf
            "%s is an action related to a General Assertion, it should never be \

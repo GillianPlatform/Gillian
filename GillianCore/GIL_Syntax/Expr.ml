@@ -24,18 +24,44 @@ let int n = lit (Int n)
 
 let string s = lit (String s)
 
-let typeof x = UnOp (TypeOf, x)
+let typeof x =
+  match x with
+  | ALoc _ | Lit (Loc _)    -> Lit (Type ObjectType)
+  | EList _ | Lit (LList _) -> Lit (Type ListType)
+  | ESet _                  -> Lit (Type SetType)
+  | _                       -> UnOp (TypeOf, x)
 
-let list_nth x n = BinOp (x, LstNth, num (float_of_int n))
+let list_nth x n =
+  match x with
+  | EList l when n < List.length l -> List.nth l n
+  | Lit (LList l) when n < List.length l -> Lit (List.nth l n)
+  | _ -> BinOp (x, LstNth, num (float_of_int n))
 
-let list_length x = UnOp (LstLen, x)
+let list_length x =
+  match x with
+  | EList l       -> Lit (Num (float_of_int (List.length l)))
+  | Lit (LList l) -> Lit (Num (float_of_int (List.length l)))
+  | _             -> UnOp (LstLen, x)
+
+let fmod a b =
+  match (a, b) with
+  | Lit (Num a), Lit (Num b) -> Lit (Num (mod_float a b))
+  | _                        -> BinOp (a, FMod, b)
 
 let type_ t = Lit (Type t)
 
 module Infix = struct
-  let ( +. ) a b = BinOp (a, FPlus, b)
+  let ( +. ) a b =
+    match (a, b) with
+    | Lit (Num 0.), x | x, Lit (Num 0.) -> x
+    | Lit (Num x), Lit (Num y) -> Lit (Num (x +. y))
+    | _ -> BinOp (a, FPlus, b)
 
-  let ( + ) a b = BinOp (a, IPlus, b)
+  let ( + ) a b =
+    match (a, b) with
+    | Lit (Int 0), x | x, Lit (Int 0) -> x
+    | Lit (Int x), Lit (Int y) -> Lit (Int (x + y))
+    | _ -> BinOp (a, IPlus, b)
 end
 
 module MyExpr = struct

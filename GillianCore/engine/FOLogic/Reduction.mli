@@ -45,3 +45,5 @@ val reduce_assertion :
   ?gamma:TypEnv.t ->
   Gil_syntax.Asrt.t ->
   Gil_syntax.Asrt.t
+
+val is_tautology : ?pfs:PFS.t -> ?gamma:TypEnv.t -> Gil_syntax.Formula.t -> bool

@@ -215,6 +215,8 @@ module Expr : sig
 
   val typeof : t -> t
 
+  val fmod : t -> t -> t
+
   module Infix : sig
     val ( +. ) : t -> t -> t
 
@@ -396,7 +398,7 @@ module Formula : sig
 
   module Infix : sig
     (** Same as Not *)
-    val ( #! ) : t -> t
+    val fnot : t -> t
 
     (** Same as Or *)
     val ( #|| ) : t -> t -> t
@@ -410,13 +412,13 @@ module Formula : sig
     (** Same as Less *)
     val ( #< ) : Expr.t -> Expr.t -> t
 
-    (** [a #> b] if [Less (b, a)]*)
+    (** [a #> b] if [Not Less (b, a)]*)
     val ( #> ) : Expr.t -> Expr.t -> t
 
     (** Same as LessEq *)
     val ( #<= ) : Expr.t -> Expr.t -> t
 
-    (** [a #>= b] is [LessEq (b, a)] *)
+    (** [a #>= b] is [Not Less (b, a)] *)
     val ( #>= ) : Expr.t -> Expr.t -> t
   end
 end
@@ -509,6 +511,11 @@ module Asrt : sig
 
   (** [subst_clocs subst a] Substitutes expressions of the form [Lit (Loc l)] with [subst l] in [a] *)
   val subst_clocs : (string -> Expr.t) -> t -> t
+
+  module Infix : sig
+    (** Star constructor *)
+    val ( ** ) : t -> t -> t
+  end
 end
 
 module SLCmd : sig

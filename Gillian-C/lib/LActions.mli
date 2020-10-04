@@ -8,10 +8,15 @@ type mem_ac =
   | Load
   | Free
   | Move
-  | MGet
-      (** loc -> num (low) -> num (high) -> [ loc; num; num, sval; perm_opt ] *)
-  | MSet  (** loc -> num (low) -> num (high) ->  sval -> perm_opt -> [] *)
-  | MRem  (** loc -> num (low) -> num (high) -> [] *)
+  | GetSingle
+  | SetSingle
+  | RemSingle
+  | GetHole
+  | SetHole
+  | RemHole
+  | GetBounds
+  | SetBounds
+  | RemBounds
 
 type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
 
@@ -19,7 +24,7 @@ type ac =
   | AGEnv of genv_ac  (** Actions related to the memory *)
   | AMem  of mem_ac  (** Actions related to the global environment *)
 
-type mem_ga = SVal
+type mem_ga = Single | Hole | Bounds
 
 type genv_ga = Symbol | Definition
 

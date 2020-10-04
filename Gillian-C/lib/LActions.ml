@@ -8,15 +8,21 @@ type mem_ac =
   | Load
   | Free
   | Move
-  | MGet
-  | MSet
-  | MRem
+  | GetSingle
+  | SetSingle
+  | RemSingle
+  | GetHole
+  | SetHole
+  | RemHole
+  | GetBounds
+  | SetBounds
+  | RemBounds
 
 type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
 
 type ac = AGEnv of genv_ac | AMem of mem_ac
 
-type mem_ga = SVal
+type mem_ga = Single | Hole | Bounds
 
 type genv_ga = Symbol | Definition
 
@@ -25,17 +31,23 @@ type ga = GMem of mem_ga | GGenv of genv_ga
 (* Some things about the semantics of these Actions *)
 
 let is_overlapping_asrt = function
-  | GGenv _ -> true
-  | _       -> false
+  | GMem Bounds | GGenv _ -> true
+  | _                     -> false
 
 let mem_ga_to_setter = function
-  | SVal -> MSet
+  | Single -> SetSingle
+  | Hole   -> SetHole
+  | Bounds -> SetBounds
 
 let mem_ga_to_getter = function
-  | SVal -> MGet
+  | Single -> GetSingle
+  | Hole   -> GetHole
+  | Bounds -> GetBounds
 
 let mem_ga_to_deleter = function
-  | SVal -> MRem
+  | Single -> RemSingle
+  | Hole   -> RemHole
+  | Bounds -> RemBounds
 
 let genv_ga_to_getter = function
   | Definition -> GetDef
@@ -73,9 +85,15 @@ let str_mem_ac = function
   | Load       -> "load"
   | Move       -> "move"
   | Free       -> "free"
-  | MGet       -> "get"
-  | MSet       -> "set"
-  | MRem       -> "rem"
+  | GetSingle  -> "get_single"
+  | SetSingle  -> "set_single"
+  | RemSingle  -> "rem_single"
+  | GetBounds  -> "get_bounds"
+  | SetBounds  -> "set_bounds"
+  | RemBounds  -> "rem_bounds"
+  | GetHole    -> "get_hole"
+  | SetHole    -> "set_hole"
+  | RemHole    -> "rem_hole"
 
 let mem_ac_from_str = function
   | "alloc"      -> Alloc
@@ -85,9 +103,15 @@ let mem_ac_from_str = function
   | "load"       -> Load
   | "free"       -> Free
   | "move"       -> Move
-  | "get"        -> MGet
-  | "set"        -> MSet
-  | "rem"        -> MRem
+  | "get_single" -> GetSingle
+  | "set_single" -> SetSingle
+  | "rem_single" -> RemSingle
+  | "get_bounds" -> GetBounds
+  | "set_bounds" -> SetBounds
+  | "rem_bounds" -> RemBounds
+  | "get_hole"   -> GetHole
+  | "set_hole"   -> SetHole
+  | "rem_hole"   -> RemHole
   | s            -> failwith ("Unkown Memory Action : " ^ s)
 
 let str_genv_ac = function
@@ -123,15 +147,19 @@ let ac_from_str str =
   | _ -> failwith ("Unkown action : " ^ str)
 
 let str_mem_ga = function
-  | SVal -> "sval"
+  | Single -> "single"
+  | Hole   -> "hole"
+  | Bounds -> "bounds"
 
 let str_genv_ga = function
   | Definition -> "def"
   | Symbol     -> "symb"
 
 let mem_ga_from_str = function
-  | "sval" -> SVal
-  | str    -> failwith ("Unkown memory assertion : " ^ str)
+  | "single" -> Single
+  | "bounds" -> Bounds
+  | "hole"   -> Hole
+  | str      -> failwith ("Unkown memory assertion : " ^ str)
 
 let genv_ga_from_str = function
   | "symb" -> Symbol
@@ -163,7 +191,9 @@ let is_overlapping_asrt_str str = ga_from_str str |> is_overlapping_asrt
 
 let ga_loc_indexes ga =
   match ga with
-  | GMem SVal        -> [ 0 ]
+  | GMem Single      -> [ 0 ]
+  | GMem Hole        -> [ 0 ]
+  | GMem Bounds      -> [ 0 ]
   | GGenv Definition -> [ 0 ]
   | GGenv Symbol     -> []
 

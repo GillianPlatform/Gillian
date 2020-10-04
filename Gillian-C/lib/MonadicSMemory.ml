@@ -380,15 +380,16 @@ let execute_action ~action_name heap params =
     | AMem Load       -> execute_load !heap params
     | AMem Free       -> execute_free !heap params
     | AMem Move       -> execute_move !heap params
-    | AMem MGet       -> execute_mem_get !heap params
-    | AMem MSet       -> execute_mem_set !heap params
-    | AMem MRem       -> execute_mem_rem !heap params
+    | AMem GetSingle  -> execute_mem_get !heap params
+    | AMem SetSingle  -> execute_mem_set !heap params
+    | AMem RemSingle  -> execute_mem_rem !heap params
     | AGEnv GetSymbol -> execute_genvgetsymbol !heap params
     | AGEnv SetSymbol -> execute_genvsetsymbol !heap params
     | AGEnv RemSymbol -> execute_genvremsymbol !heap params
     | AGEnv GetDef    -> execute_genvgetdef !heap params
     | AGEnv SetDef    -> execute_genvsetdef !heap params
     | AGEnv RemDef    -> execute_genvremdef !heap params
+    | _               -> failwith "bite"
   in
   lift_dr a_ret
 

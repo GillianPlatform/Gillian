@@ -48,6 +48,11 @@ let pfs_to_pfs_and_gamma pfs =
   aux pfs
 
 let extend pc fs =
+  let fs = List.concat_map Formula.split_conjunct_formulae fs in
+  let pfs, gamma = (pc.pfs, pc.gamma) in
+  let fs =
+    List.filter (fun f -> not (Engine.Reduction.is_tautology ~pfs ~gamma f)) fs
+  in
   let new_pfs, new_gamma = pfs_to_pfs_and_gamma fs in
   {
     pc with

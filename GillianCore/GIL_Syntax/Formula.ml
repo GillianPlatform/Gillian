@@ -331,19 +331,48 @@ let strings_and_numbers =
   v#visit_formula ()
 
 module Infix = struct
-  let ( #! ) a = Not a
+  let fnot a =
+    match a with
+    | True  -> False
+    | False -> True
+    | Not x -> x
+    | _     -> Not a
 
-  let ( #== ) a b = Eq (a, b)
+  let ( #== ) a b =
+    match (a, b) with
+    | Expr.Lit la, Expr.Lit lb -> of_bool (Literal.equal la lb)
+    | a, b when a == b -> True
+    | _ -> Eq (a, b)
 
-  let ( #|| ) a b = Or (a, b)
+  let ( #|| ) a b =
+    match (a, b) with
+    | True, _ | _, True   -> True
+    | False, f | f, False -> f
+    | _                   -> Or (a, b)
 
-  let ( #&& ) a b = And (a, b)
+  let ( #&& ) a b =
+    match (a, b) with
+    | True, f | f, True   -> f
+    | False, _ | _, False -> False
+    | _                   -> And (a, b)
 
-  let ( #< ) a b = Less (a, b)
+  let ( #< ) a b =
+    match (a, b) with
+    | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x < y)
+    | _ -> Less (a, b)
 
-  let ( #> ) a b = Less (b, a)
+  let ( #> ) a b =
+    match (a, b) with
+    | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x < y)
+    | _ -> Not (LessEq (a, b))
 
-  let ( #<= ) a b = LessEq (a, b)
+  let ( #<= ) a b =
+    match (a, b) with
+    | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x <= y)
+    | _ -> LessEq (a, b)
 
-  let ( #>= ) a b = LessEq (b, a)
+  let ( #>= ) a b =
+    match (a, b) with
+    | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x >= y)
+    | _ -> Not (Less (a, b))
 end

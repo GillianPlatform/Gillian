@@ -2179,3 +2179,8 @@ let reduce_assertion
     (a : Asrt.t) : Asrt.t =
   let a = reduce_types a in
   reduce_assertion_loop unification pfs gamma a
+
+let is_tautology ?pfs ?gamma formula =
+  match reduce_formula ?pfs ?gamma formula with
+  | True -> true
+  | _    -> false

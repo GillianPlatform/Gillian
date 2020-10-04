@@ -282,3 +282,10 @@ let subst_clocs (subst : string -> Expr.t) (a : t) : t =
     (Some (Expr.subst_clocs subst))
     (Some (Formula.subst_clocs subst))
     a
+
+module Infix = struct
+  let ( ** ) a b =
+    match (a, b) with
+    | Pure True, x | x, Pure True | Emp, x | x, Emp -> x
+    | _ -> Star (a, b)
+end

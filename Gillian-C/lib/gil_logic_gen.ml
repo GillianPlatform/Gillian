@@ -5,6 +5,8 @@ open CLogic
 open Compcert
 open CompileState
 module Str_set = Gillian.Utils.Containers.SS
+open Asrt.Infix
+open Formula.Infix
 
 let id_of_string = Camlcoq.intern_string
 
@@ -23,19 +25,12 @@ let rec_pred_name_of_struct struct_name =
 let opt_rec_pred_name_of_struct struct_name =
   Prefix.generated_preds ^ "opt_rec_struct_" ^ struct_name
 
-let ( ++ ) e1 e2 =
-  match e2 with
-  (* Small optim *)
-  | Expr.Lit (Literal.Num 0.) -> e1
-  | Expr.Lit (Literal.Num n) -> (
-      match e1 with
-      | Expr.Lit (Literal.Num 0.) -> e2
-      | Expr.BinOp (e1p, BinOp.FPlus, Expr.Lit (Literal.Num k)) ->
-          Expr.BinOp (e1p, BinOp.FPlus, Expr.Lit (Literal.Num (n +. k)))
-      | e1 -> Expr.BinOp (e1, BinOp.FPlus, e2) )
-  | e2 -> Expr.BinOp (e1, BinOp.FPlus, e2)
+let ( ++ ) = Expr.Infix.( +. )
 
-let ( == ) e1 e2 = if e1 = e2 then Asrt.Emp else Asrt.Pure (Eq (e1, e2))
+let ( == ) e1 e2 =
+  match e1 #== e2 with
+  | True -> Asrt.Emp
+  | f    -> Pure f
 
 let types t e =
   let static_error () =
@@ -53,22 +48,9 @@ let types t e =
       static_error () (* Maybe a more precise message ? *)
   | _ -> Emp
 
-let ( ** ) a1 a2 =
-  match (a1, a2) with
-  | Asrt.Emp, a2 -> a2
-  | a1, Asrt.Emp -> a1
-  | _, _         -> Star (a1, a2)
+let fold_star l = List.fold_left ( ** ) Emp l
 
-let fold_star l = List.fold_left (fun a b -> a ** b) Asrt.Emp l
-
-let ( &&& ) f1 f2 =
-  let open Formula in
-  match (f1, f2) with
-  | True, f | f, True   -> f
-  | False, _ | _, False -> False
-  | _                   -> And (f1, f2)
-
-let fold_and l = List.fold_left (fun a b -> a &&& b) Formula.True l
+let fold_and l = List.fold_left (fun a b -> a #&& b) Formula.True l
 
 let to_assrt_of_gen_form f =
   match f with
@@ -130,16 +112,13 @@ let assert_of_member cenv members id typ =
           (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
              e)
   in
-  let sz = Expr.Lit (Num (float_of_int (Camlcoq.Z.to_int (sizeof cenv typ)))) in
-  let perm_exp =
-    Expr.Lit (String (ValueTranslation.string_of_permission Memtype.Freeable))
+  let chunk =
+    match Ctypes.access_mode typ with
+    | By_value chunk -> chunk
+    | _              -> failwith "Invalid access mode for some type"
   in
-  let mem_ga = LActions.str_ga (GMem SVal) in
   let ga_asrt =
-    Asrt.GA
-      ( mem_ga,
-        [ pvloc; pvoffs ++ fo; pvoffs ++ fo ++ sz ],
-        [ e_to_use; perm_exp ] )
+    Constr.single ~loc:pvloc ~ofs:(pvoffs ++ fo) ~chunk ~sval:e_to_use
   in
   getter_or_type_pred ** ga_asrt
 
@@ -148,14 +127,7 @@ let assert_of_hole (low, high) =
   (* let pvoffs = Expr.PVar offs_param_name in *)
   let pvoffs = Expr.Lit (Num 0.) in
   let num k = Expr.Lit (Num (float_of_int k)) in
-  let perm_e =
-    Expr.Lit (String (ValueTranslation.string_of_permission Memtype.Freeable))
-  in
-  let mem_ga = LActions.str_ga (GMem SVal) in
-  Asrt.GA
-    ( mem_ga,
-      [ pvloc; pvoffs ++ num low; pvoffs ++ num high ],
-      [ Expr.Lit Literal.Undefined; perm_e ] )
+  Constr.hole ~loc:pvloc ~low:(pvoffs ++ num low) ~high:(pvoffs ++ num high)
 
 let gen_pred_of_struct cenv ann struct_name =
   let pred_name = pred_name_of_struct struct_name in
@@ -353,17 +325,15 @@ let rec trans_form (f : CFormula.t) : Asrt.t * Formula.t =
 
 let malloc_chunk_asrt loc struct_sz =
   let num k = Expr.Lit (Num (float_of_int k)) in
-  let perm_e =
-    Expr.Lit (String (ValueTranslation.string_of_permission Memtype.Freeable))
-  in
-  let mem_ga = LActions.str_ga (GMem SVal) in
-  let ptr_sz = if Archi.ptr64 then 8 else 4 in
   let mk_val i =
     if Archi.ptr64 then
       Expr.EList [ Lit (String CConstants.VTypes.long_type); num i ]
     else Expr.EList [ Lit (String CConstants.VTypes.int_type); num i ]
   in
-  Asrt.GA (mem_ga, [ loc; num (-ptr_sz); num 0 ], [ mk_val struct_sz; perm_e ])
+  let chunk = if Archi.ptr64 then Chunk.Mint64 else Chunk.Mint32 in
+  let sz = Chunk.size chunk in
+  let ofs = num (-sz) in
+  Constr.single ~loc ~ofs ~chunk ~sval:(mk_val struct_sz)
 
 let trans_constr ?fname:_ ~malloc ann s c =
   let cenv = ann.cenv in
@@ -372,7 +342,6 @@ let trans_constr ?fname:_ ~malloc ann s c =
   let cse = trans_simpl_expr in
   let tnum = types NumberType in
   let tloc = types ObjectType in
-  let mem_ga = LActions.str_ga (GMem SVal) in
   (* let mk_num n = Expr.Lit (Num (float_of_int n)) in *)
   (* let zero = mk_num 0 in *)
   let ptr_call p l = Asrt.Pred (Internal_Predicates.ptr_to_0_get, [ p; l ]) in
@@ -386,14 +355,6 @@ let trans_constr ?fname:_ ~malloc ann s c =
   let a_s, s_e = trans_expr s in
   let locv = gen_loc_var () in
   let pc = ptr_call s_e locv in
-  let ga_call loc low high sv =
-    let perm =
-      Expr.Lit (String (ValueTranslation.string_of_permission Memtype.Freeable))
-    in
-    let low_e = Expr.Lit (Num (float_of_int low)) in
-    let high_e = Expr.Lit (Num (float_of_int high)) in
-    Asrt.GA (mem_ga, [ loc; low_e; high_e ], [ sv; perm ])
-  in
   let malloc_chunk siz =
     if malloc then malloc_chunk_asrt locv siz else Asrt.Emp
   in
@@ -402,34 +363,41 @@ let trans_constr ?fname:_ ~malloc ann s c =
   match c with
   | CConstructor.ConsExpr (SVal (Sint se)) ->
       let e = cse se in
-      let siz = sz (Sint se) in
+      let chunk = Chunk.Mint32 in
       let sv = mk int_type e in
-      let ga = ga_call locv 0 siz sv in
+      let siz = sz (Sint se) in
+      (* FIXME: at some point this will not be 0 anymore *)
+      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Sfloat se)) ->
       let e = cse se in
+      let chunk = Chunk.Mfloat32 in
       let siz = sz (Sfloat se) in
       let sv = mk float_type e in
-      let ga = ga_call locv 0 siz sv in
+      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Ssingle se)) ->
       let e = cse se in
+      let chunk = Chunk.Mfloat32 in
+      (* FIXME: this is probably wrong *)
       let siz = sz (Ssingle se) in
       let sv = mk single_type e in
-      let ga = ga_call locv 0 siz sv in
-      ga ** pc ** a_s ** tnum e
+      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv in
+      ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Slong se)) ->
       let e = cse se in
+      let chunk = Chunk.Mint64 in
       let siz = sz (Slong se) in
       let sv = mk long_type e in
-      let ga = ga_call locv 0 siz sv in
+      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Sptr (sl, so))) ->
       let l = cse sl in
       let o = cse so in
+      let chunk = Chunk.ptr in
       let siz = sz (Sptr (sl, so)) in
       let sv = mk_ptr l o in
-      let ga = ga_call locv 0 siz sv in
+      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv in
       ga ** pc ** a_s ** tloc l ** tnum o ** malloc_chunk siz
   | CConstructor.ConsExpr _ ->
       Fmt.failwith "Constructor %a is not handled yet" CConstructor.pp c
@@ -705,7 +673,7 @@ let asserts_of_rec_member cenv members id typ =
   let perm_exp =
     Expr.Lit (String (ValueTranslation.string_of_permission Memtype.Freeable))
   in
-  let mem_ga = LActions.str_ga (GMem SVal) in
+  let mem_ga = LActions.str_ga (GMem Single) in
   let ga_asrt sval =
     Asrt.GA
       (mem_ga, [ pvloc; pvoffs ++ fo; pvoffs ++ fo ++ sz ], [ sval; perm_exp ])

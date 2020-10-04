@@ -15,7 +15,12 @@ let build_full_gamma (pc : Pc.t) =
   copied
 
 let sat ~(pc : Pc.t) formula =
-  FOSolver.sat ~pfs:(build_full_pfs pc) ~gamma:(build_full_gamma pc) [ formula ]
+  let pfs = build_full_pfs pc in
+  let gamma = build_full_gamma pc in
+  match Engine.Reduction.reduce_formula ~pfs ~gamma formula with
+  | True    -> true
+  | False   -> false
+  | formula -> FOSolver.sat ~pfs ~gamma [ formula ]
 
 let check_entailment ~(pc : Pc.t) formula =
   let pfs = build_full_pfs pc in
