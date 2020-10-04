@@ -236,13 +236,13 @@ let check_satisfiability_with_model (fs : Formula.t list) (gamma : TypEnv.t) :
 
 let check_satisfiability
     ?(unification = false) (fs : Formula.t list) (gamma : TypEnv.t) : bool =
-  (* let t = Sys.time () in *)
+  let t = Sys.time () in
   L.verbose (fun m -> m "Entering FOSolver.check_satisfiability");
   let fs, gamma, _ = simplify_pfs_and_gamma ~unification fs gamma in
   (* let axioms    = get_axioms (Formula.Set.elements fs) gamma in
      let fs           = Formula.Set.union fs (Formula.Set.of_list axioms) in *)
   let result = Z3Encoding.check_sat fs gamma in
-  (* Utils.Statistics.update_statistics "FOS: CheckSat" (Sys.time () -. t); *)
+  Utils.Statistics.update_statistics "FOS: CheckSat" (Sys.time () -. t);
   result
 
 let sat ~pfs ~gamma formulae : bool =
@@ -273,6 +273,7 @@ let check_entailment
   (* SOUNDNESS !!DANGER!!: call to simplify_implication       *)
   (* Simplify maximally the implication to be checked         *)
   (* Remove from the typing environment the unused variables  *)
+  let t = Sys.time () in
   let gamma = TypEnv.copy gamma in
   let left_fs = PFS.of_list left_fs in
   let right_fs = PFS.of_list right_fs in
@@ -290,9 +291,7 @@ let check_entailment
   let gamma_right = TypEnv.filter gamma (fun v -> SS.mem v existentials) in
 
   (* If left side is false, return false *)
-  if List.length left_fs > 0 && List.hd left_fs = False then false
-    (* If right side is false, return false *)
-  else if List.length right_fs > 0 && List.hd right_fs = False then false
+  if List.mem Formula.False (left_fs @ right_fs) then false
   else
     (* Check satisfiability of left side *)
     let left_sat =
@@ -340,6 +339,7 @@ let check_entailment
           gamma_left
       in
       L.(verbose (fun m -> m "Entailment returned %b" (not ret)));
+      Utils.Statistics.update_statistics "FOS: CheckSat" (Sys.time () -. t);
       not ret
 
 let is_equal_on_lexprs e1 e2 pfs : bool option =

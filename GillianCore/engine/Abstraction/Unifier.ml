@@ -323,7 +323,7 @@ module Make
             match pred_def.pred.pred_facts with
             | []    -> Some astate
             | facts ->
-                (* let t = Sys.time () in *)
+                let t = Sys.time () in
                 let params, _ = List.split pred_def.pred.pred_params in
                 let params = List.map (fun x -> Expr.PVar x) params in
                 let facts =
@@ -338,8 +338,8 @@ module Make
                 let result =
                   produce_assertion (state, preds, pred_defs) subst facts
                 in
-                (* Utils.Statistics.update_statistics "Produce facts"
-                   (Sys.time () -. t); *)
+                Utils.Statistics.update_statistics "Produce facts"
+                  (Sys.time () -. t);
                 result
           in
           let pure = pred_def.pred.pred_pure in
@@ -1211,7 +1211,7 @@ module Make
             | Some pf ->
                 let discharges_pf =
                   List.fold_left
-                    (fun ac x -> Formula.And (ac, x))
+                    (fun ac x -> if ac = Formula.True then x else And (ac, x))
                     True discharges
                 in
                 let discharges_pf =

@@ -1441,6 +1441,14 @@ let rec reduce_lexpr_loop
                | _                       -> true )
                &&
                let eqs = get_equal_expressions pfs le in
+               let eqs =
+                 match le with
+                 | LVar x ->
+                     List.filter
+                       (fun eq -> not (Containers.SS.mem x (Expr.lvars eq)))
+                       eqs
+                 | _      -> eqs
+               in
                List.exists
                  (fun e ->
                    match e with
@@ -1452,6 +1460,7 @@ let rec reduce_lexpr_loop
                        List.length les >= int_of_float n
                    | _ -> false)
                  eqs ->
+            L.tmi (fun fmt -> fmt "Expected case");
             let eqs = get_equal_expressions pfs le in
             let eqs =
               List.filter_map
@@ -1469,6 +1478,8 @@ let rec reduce_lexpr_loop
                   | _ -> None)
                 eqs
             in
+            L.tmi (fun fmt ->
+                fmt "EQs: %a" Fmt.(brackets (list ~sep:comma Expr.pp)) eqs);
             f (LstSub (List.hd eqs, Lit (Num 0.), Lit (Num n)))
         | fle1, UnOp (LstLen, lx), fle3 when fst (list_prefix pfs lx fle1) ->
             let _, suffix = list_prefix pfs lx fle1 in
