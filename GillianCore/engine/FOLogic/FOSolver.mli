@@ -20,7 +20,7 @@ val sat : pfs:PFS.t -> gamma:TypEnv.t -> Gil_syntax.Formula.t list -> bool
     under the typing environment [gamma]. *)
 val check_entailment :
   Utils.Containers.SS.t ->
-  Gil_syntax.Formula.t list ->
+  PFS.t ->
   Gil_syntax.Formula.t list ->
   TypEnv.t ->
   bool

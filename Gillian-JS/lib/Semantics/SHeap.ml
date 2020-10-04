@@ -434,6 +434,32 @@ let pp ft heap =
   in
   (list ~sep:(any "@\n") pp_one) ft sorted_locs_with_vals
 
+let pp_by_need locs ft heap =
+  let domain = domain heap in
+  let existent_locs = SS.inter locs domain in
+  let target_locs =
+    SS.fold
+      (fun loc tlocs ->
+        match get_met heap loc with
+        | (Some (Lit (Loc x)) | Some (ALoc x)) when SS.mem x domain ->
+            SS.add x tlocs
+        | _ -> tlocs)
+      existent_locs existent_locs
+  in
+  let sorted_locs_with_vals =
+    List.map
+      (fun loc -> (loc, Option.get (get heap loc)))
+      (SS.elements target_locs)
+  in
+  let open Fmt in
+  let pp_one ft (loc, ((fv_pairs, domain), metadata)) =
+    pf ft "@[%s |-> [ @[%a@] | @[%a@] ] with metadata %a@]" loc SFVL.pp fv_pairs
+      (option Expr.pp) domain
+      (option ~none:(any "unknown") Expr.pp)
+      metadata
+  in
+  (list ~sep:(any "@\n") pp_one) ft sorted_locs_with_vals
+
 let get_inv_metadata (heap : t) : (Expr.t, Expr.t) Hashtbl.t =
   let inv_metadata = Hashtbl.create Config.medium_tbl_size in
   let traverse_metadata_table mt : unit =

@@ -57,6 +57,9 @@ module type S = sig
   (** Store printer *)
   val pp : Format.formatter -> t -> unit
 
+  (** Store printer by need *)
+  val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
+
   (** Converts the store into an ssubst *)
   val to_ssubst : t -> SESubst.t
 
@@ -256,6 +259,20 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     in
     let bindings =
       List.sort (fun (v, _) (w, _) -> Stdlib.compare v w) (bindings store)
+    in
+    (Fmt.list ~sep pp_pair) fmt bindings
+
+  let pp_by_need (pvars : Containers.SS.t) fmt (store : t) =
+    let sep = Fmt.any "@\n" in
+    let pp_pair =
+      Fmt.(hbox (parens (pair ~sep:(any ": ") string Val.full_pp)))
+    in
+    let bindings =
+      List.sort (fun (v, _) (w, _) -> Stdlib.compare v w) (bindings store)
+    in
+    (* Filter for the ones needed *)
+    let bindings =
+      List.filter (fun (v, _) -> Containers.SS.mem v pvars) bindings
     in
     (Fmt.list ~sep pp_pair) fmt bindings
 

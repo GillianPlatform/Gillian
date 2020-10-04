@@ -168,7 +168,7 @@ struct
           (Annot.get_loop_info annot)
           pp_str_list
           (CallStack.get_loop_ids cs)
-          b_counter State.pp state)
+          b_counter (State.pp_by_need cmd) state)
 
   let print_lconfiguration (lcmd : LCmd.t) (state : State.t) : unit =
     L.normal (fun m ->

@@ -184,6 +184,17 @@ let clocs (a : t) : SS.t =
   let f_ac _ _ _ ac = List.concat ac in
   SS.of_list (fold (Some fe) f_ac None None a)
 
+(* Get all the locations in [a] *)
+let locs (a : t) : SS.t =
+  let fe_ac le _ _ ac =
+    match le with
+    | Expr.ALoc l | Lit (Loc l) -> l :: List.concat ac
+    | _                         -> List.concat ac
+  in
+  let fe = Expr.fold fe_ac None None in
+  let f_ac _ _ _ ac = List.concat ac in
+  SS.of_list (fold (Some fe) f_ac None None a)
+
 (* Get all the logical expressions of --a-- of the form (Lit (LList lst)) and (EList lst)  *)
 let lists (a : t) : Expr.t list =
   let f_ac _ _ _ ac = List.concat ac in

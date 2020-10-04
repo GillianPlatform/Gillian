@@ -256,6 +256,9 @@ module Expr : sig
   (** [clocs e] returns all concrete locations in [e] *)
   val clocs : t -> SS.t
 
+  (** [locs e] returns all concrete and abstract locations in [e] *)
+  val locs : t -> SS.t
+
   (** [vars e] returns all variables in [e] (includes lvars, pvars, alocs and clocs) *)
   val vars : t -> SS.t
 
@@ -607,6 +610,15 @@ module Cmd : sig
 
   (** Possible successors of an command (in integer indexing) *)
   val successors : int t -> int -> int list
+
+  (** Program variable collector *)
+  val pvars : 'a t -> Containers.SS.t
+
+  (** Logical variable collector *)
+  val lvars : 'a t -> Containers.SS.t
+
+  (** Location collector *)
+  val locs : 'a t -> Containers.SS.t
 end
 
 module Pred : sig

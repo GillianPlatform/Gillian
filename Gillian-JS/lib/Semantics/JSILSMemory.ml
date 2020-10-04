@@ -114,6 +114,8 @@ module M : Gillian.Symbolic.Memory_S = struct
 
   let pp fmt (heap : t) : unit = SHeap.pp fmt heap
 
+  let pp_by_need locs fmt heap = SHeap.pp_by_need locs fmt heap
+
   let copy (heap : t) : t = SHeap.copy heap
 
   let init () : t = SHeap.init ()
@@ -239,8 +241,8 @@ module M : Gillian.Symbolic.Memory_S = struct
               | Some dom, None     ->
                   let a_set_inclusion : Formula.t = Not (SetMem (prop, dom)) in
                   if
-                    FOSolver.check_entailment Containers.SS.empty
-                      (PFS.to_list pfs) [ a_set_inclusion ] gamma
+                    FOSolver.check_entailment Containers.SS.empty pfs
+                      [ a_set_inclusion ] gamma
                   then (
                     let new_domain : Expr.t =
                       NOp (SetUnion, [ dom; ESet [ prop ] ])
@@ -256,8 +258,8 @@ module M : Gillian.Symbolic.Memory_S = struct
                     let f_names : Expr.t list = SFVL.field_names fv_list in
                     let full_knowledge : Formula.t = Eq (dom, ESet f_names) in
                     if
-                      FOSolver.check_entailment Containers.SS.empty
-                        (PFS.to_list pfs) [ full_knowledge ] gamma
+                      FOSolver.check_entailment Containers.SS.empty pfs
+                        [ full_knowledge ] gamma
                     then (
                       L.verbose (fun m -> m "GET CELL will branch\n");
                       let rets : (t * vt list * Formula.t list * 'a) option list
@@ -354,8 +356,8 @@ module M : Gillian.Symbolic.Memory_S = struct
           let props = SFVL.field_names fv_list in
           let a_set_equality : Formula.t = Eq (dom, ESet props) in
           let solver_ret =
-            FOSolver.check_entailment Containers.SS.empty (PFS.to_list pfs)
-              [ a_set_equality ] gamma
+            FOSolver.check_entailment Containers.SS.empty pfs [ a_set_equality ]
+              gamma
           in
           if solver_ret then
             ASucc
@@ -520,8 +522,8 @@ module M : Gillian.Symbolic.Memory_S = struct
           let props = SFVL.field_names fv_list in
           let a_set_equality : Formula.t = Eq (dom, ESet props) in
           let solver_ret =
-            FOSolver.check_entailment Containers.SS.empty (PFS.to_list pfs)
-              [ a_set_equality ] gamma
+            FOSolver.check_entailment Containers.SS.empty pfs [ a_set_equality ]
+              gamma
           in
           if solver_ret then
             let _, pos_fv_list =

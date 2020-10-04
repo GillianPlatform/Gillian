@@ -28,6 +28,8 @@ val remove : t -> Var.t -> unit
 
 val pp : Format.formatter -> t -> unit
 
+val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
+
 val iter : t -> (Var.t -> Expr.t -> unit) -> unit
 
 val fold : t -> (Var.t -> Expr.t -> 'a -> 'a) -> 'a -> 'a

@@ -62,6 +62,56 @@ module Make (SMemory : SMemory.S) :
       (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
       svars pp_heap heap SStore.pp store PFS.pp pfs TypEnv.pp gamma
 
+  let pp_by_need cmd fmt state =
+    let heap, store, pfs, gamma, svars = state in
+    (* Program variables and locations from the command *)
+    let cmd_pvars, cmd_locs = (Cmd.pvars cmd, Cmd.locs cmd) in
+    (* Locations from the store *)
+    let store_locs =
+      SS.fold
+        (fun pvar ac ->
+          match SStore.get store pvar with
+          | None   -> ac
+          | Some e -> SS.union ac (Expr.locs e))
+        cmd_pvars SS.empty
+    in
+    let locs = SS.union cmd_locs store_locs in
+    let tenv_lvars = TypEnv.get_var_type_pairs gamma in
+    let tenv_lvars =
+      List.filter_map
+        (fun (x, _) -> if Names.is_lvar_name x then Some x else None)
+        tenv_lvars
+    in
+    let tenv_lvars = SS.of_list tenv_lvars in
+
+    (* TODO: Locations for the heap *)
+    (* TODO: Logical variables for the pfs and gamma *)
+    let pp_heap fmt heap =
+      if !Config.no_heap then Fmt.string fmt "NO MEMORY PRINTED"
+      else SMemory.pp_by_need locs fmt heap
+    in
+    Fmt.pf fmt
+      "@[<h>SPEC VARS: %a@]@\n\
+       @\n\
+       @[<v 2>STORE:@\n\
+       %a@]@\n\
+       @\n\
+       @[<v 2>MEMORY:@\n\
+       %a@]@\n\
+       @\n\
+       @[<v 2>PURE FORMULAE:@\n\
+       %a@]@\n\
+       @\n\
+       @[<v 2>TYPING ENVIRONMENT:@\n\
+       %a@]"
+      (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
+      svars
+      (SStore.pp_by_need cmd_pvars)
+      store pp_heap heap PFS.pp pfs
+      (TypEnv.pp_by_need
+         (List.fold_left SS.union SS.empty [ cmd_pvars; tenv_lvars ]))
+      gamma
+
   let init (pred_defs : UP.preds_tbl_t option) =
     (SMemory.init (), SStore.init [], PFS.init (), TypEnv.init (), SS.empty)
 
@@ -215,7 +265,7 @@ module Make (SMemory : SMemory.S) :
 
   let assert_a (state : t) (ps : Formula.t list) : bool =
     let _, _, pfs, gamma, _ = state in
-    FOSolver.check_entailment SS.empty (PFS.to_list pfs) ps gamma
+    FOSolver.check_entailment SS.empty pfs ps gamma
 
   let equals (state : t) (le1 : vt) (le2 : vt) : bool =
     let _, _, pfs, gamma, _ = state in

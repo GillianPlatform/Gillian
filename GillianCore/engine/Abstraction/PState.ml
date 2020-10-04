@@ -221,6 +221,12 @@ module Make
     let state, preds, _ = astate in
     Fmt.pf fmt "%a@\n@[<v 2>PREDICATES:@\n%a@]@\n" State.pp state Preds.pp preds
 
+  let pp_by_need cmd fmt astate : unit =
+    let state, preds, _ = astate in
+    (* TODO: Pred printing by need *)
+    Fmt.pf fmt "%a@\n@[<v 2>PREDICATES:@\n%a@]@\n" (State.pp_by_need cmd) state
+      Preds.pp preds
+
   let add_spec_vars (astate : t) (vs : Var.Set.t) : t =
     let state, preds, pred_defs = astate in
     let state' = State.add_spec_vars state vs in

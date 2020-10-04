@@ -133,6 +133,9 @@ module Make
        %a@]@\n"
       CStore.pp store pp_heap heap
 
+  (* TODO: By-need formatter *)
+  let pp_by_need _ fmt state = pp fmt state
+
   let copy state =
     let cheap, cstore, vts = state in
     (CMemory.copy cheap, CStore.copy cstore, vts)

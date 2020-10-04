@@ -195,6 +195,14 @@ let clocs (le : t) : SS.t =
   in
   SS.of_list (fold fe_ac None None le)
 
+let locs (le : t) : SS.t =
+  let fe_ac le _ _ ac =
+    match le with
+    | Lit (Loc l) | ALoc l -> l :: List.concat ac
+    | _                    -> List.concat ac
+  in
+  SS.of_list (fold fe_ac None None le)
+
 (** Get all substitutables in --e-- *)
 let substitutables (le : t) : SS.t =
   let fe_ac le _ _ ac =

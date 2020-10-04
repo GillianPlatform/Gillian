@@ -1,5 +1,6 @@
 module SSubst = Gillian.Symbolic.Subst
 module Expr = Gillian.Gil_syntax.Expr
+module SS = Containers.SS
 
 (***************************************************************)
 (** Separation Logic Commmands                                **)

@@ -187,6 +187,9 @@ struct
       Fmt.(iter ~sep:comma SS.iter string)
       procs State.pp state State.pp state_af
 
+  (* TODO: By-need formatter *)
+  let pp_by_need _ fmt state = pp fmt state
+
   let add_spec_vars (bi_state : t) (vs : Var.Set.t) : t =
     let procs, state, state_af = bi_state in
     let state' = State.add_spec_vars state vs in

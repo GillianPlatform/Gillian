@@ -254,7 +254,7 @@ let sat ~pfs ~gamma formulae : bool =
 
 let check_entailment
     (existentials : SS.t)
-    (left_fs : Formula.t list)
+    (left_fs : PFS.t)
     (right_fs : Formula.t list)
     (gamma : TypEnv.t) : bool =
   L.verbose (fun m ->
@@ -267,15 +267,15 @@ let check_entailment
          Gamma:@\n\
          %a@\n"
         (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
-        existentials PFS.pp (PFS.of_list left_fs) PFS.pp (PFS.of_list right_fs)
-        TypEnv.pp gamma);
+        existentials PFS.pp left_fs PFS.pp (PFS.of_list right_fs) TypEnv.pp
+        gamma);
 
   (* SOUNDNESS !!DANGER!!: call to simplify_implication       *)
   (* Simplify maximally the implication to be checked         *)
   (* Remove from the typing environment the unused variables  *)
   let t = Sys.time () in
+  let left_fs = PFS.copy left_fs in
   let gamma = TypEnv.copy gamma in
-  let left_fs = PFS.of_list left_fs in
   let right_fs = PFS.of_list right_fs in
   let left_lvars = PFS.lvars left_fs in
   let right_lvars = PFS.lvars right_fs in
@@ -383,6 +383,7 @@ let is_equal_on_lexprs e1 e2 pfs : bool option =
       | _, _ -> None )
 
 let is_equal ~pfs ~gamma e1 e2 =
+  let t = Sys.time () in
   let feq =
     Reduction.reduce_formula ?gamma:(Some gamma) ?pfs:(Some pfs) (Eq (e1, e2))
   in
@@ -390,28 +391,31 @@ let is_equal ~pfs ~gamma e1 e2 =
     match feq with
     | True         -> true
     | False        -> false
-    | Eq _ | And _ -> check_entailment SS.empty (PFS.to_list pfs) [ feq ] gamma
+    | Eq _ | And _ -> check_entailment SS.empty pfs [ feq ] gamma
     | _            ->
         raise
           (Failure
              ( "Equality reduced to something unexpected: "
              ^ (Fmt.to_to_string Formula.pp) feq ))
   in
+  Utils.Statistics.update_statistics "FOS: is_equal" (Sys.time () -. t);
   result
 
 let is_different ~pfs ~gamma e1 e2 =
+  let t = Sys.time () in
   let feq = Reduction.reduce_formula ~gamma ~pfs (Not (Eq (e1, e2))) in
   let result =
     match feq with
     | True  -> true
     | False -> false
-    | Not _ -> check_entailment SS.empty (PFS.to_list pfs) [ feq ] gamma
+    | Not _ -> check_entailment SS.empty pfs [ feq ] gamma
     | _     ->
         raise
           (Failure
              ( "Inequality reduced to something unexpected: "
              ^ (Fmt.to_to_string Formula.pp) feq ))
   in
+  Utils.Statistics.update_statistics "FOS: is different" (Sys.time () -. t);
   result
 
 let is_less_or_equal ~pfs ~gamma e1 e2 =
@@ -421,7 +425,7 @@ let is_less_or_equal ~pfs ~gamma e1 e2 =
     | True        -> true
     | False       -> false
     | Eq (ra, rb) -> is_equal ~pfs ~gamma ra rb
-    | LessEq _    -> check_entailment SS.empty (PFS.to_list pfs) [ feq ] gamma
+    | LessEq _    -> check_entailment SS.empty pfs [ feq ] gamma
     | _           ->
         raise
           (Failure

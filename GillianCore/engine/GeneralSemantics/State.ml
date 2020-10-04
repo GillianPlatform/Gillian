@@ -97,8 +97,10 @@ module type S = sig
 
   val fresh_loc : ?loc:vt -> t -> vt
 
-  (** Printer *)
+  (** Printers *)
   val pp : Format.formatter -> t -> unit
+
+  val pp_by_need : 'a Cmd.t -> Format.formatter -> t -> unit
 
   val pp_err : Format.formatter -> err_t -> unit
 

@@ -3,6 +3,8 @@
 
 (***************************************************************)
 
+module SS = Containers.SS
+
 type folding_info = string * (string * Expr.t) list
 
 type unfold_info = (string * string) list
@@ -42,6 +44,50 @@ let map
   | ApplyLem (s, l, existentials) -> ApplyLem (s, List.map map_e l, existentials)
   | SepAssert (a, binders) -> SepAssert (map_a a, binders)
   | Invariant (a, existentials) -> Invariant (map_a a, existentials)
+
+let fold = List.fold_left SS.union SS.empty
+
+let pvars (slcmd : t) : SS.t =
+  let pvars_es es = fold (List.map Expr.pvars es) in
+  match slcmd with
+  | Fold (_, es, _) | Unfold (_, es, _, _) | ApplyLem (_, es, _) -> pvars_es es
+  | GUnfold _ -> SS.empty
+  | SepAssert (a, _) | Invariant (a, _) -> Asrt.pvars a
+
+let lvars (slcmd : t) : SS.t =
+  let lvars_es es = fold (List.map Expr.lvars es) in
+  match slcmd with
+  | Fold (_, es, finfo)    ->
+      let lvars_finfo =
+        match finfo with
+        | None          -> SS.empty
+        | Some (_, les) ->
+            let _, es = List.split les in
+            fold (List.map Expr.lvars es)
+      in
+      SS.union lvars_finfo (lvars_es es)
+  | Unfold (_, es, _, _)   -> lvars_es es
+  | ApplyLem (_, es, _)    -> lvars_es es
+  | GUnfold _              -> SS.empty
+  | SepAssert (a, binders) -> SS.union (Asrt.lvars a) (SS.of_list binders)
+  | Invariant (a, _)       -> Asrt.lvars a
+
+let locs (slcmd : t) : SS.t =
+  let locs_es es = fold (List.map Expr.locs es) in
+  match slcmd with
+  | Fold (_, es, finfo) ->
+      let lvars_finfo =
+        match finfo with
+        | None          -> SS.empty
+        | Some (_, les) ->
+            let _, es = List.split les in
+            fold (List.map Expr.locs es)
+      in
+      SS.union lvars_finfo (locs_es es)
+  | Unfold (_, es, _, _) -> locs_es es
+  | ApplyLem (_, es, _) -> locs_es es
+  | GUnfold _ -> SS.empty
+  | SepAssert (a, _) | Invariant (a, _) -> Asrt.locs a
 
 let pp_folding_info =
   let pp_ui f (v, le) = Fmt.pf f "(%s := %a)" v Expr.pp le in

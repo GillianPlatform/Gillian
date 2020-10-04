@@ -192,6 +192,8 @@ let copy = WislSHeap.copy
 
 let pp fmt h = Format.fprintf fmt "%s" (WislSHeap.str h)
 
+let pp_by_need _ fmt h = pp fmt h
+
 let pp_err _ _ = ()
 
 let get_recovery_vals _ _ = []

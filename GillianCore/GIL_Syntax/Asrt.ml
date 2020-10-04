@@ -187,6 +187,18 @@ let clocs (a : t) : SS.t =
   let fp = Formula.fold (Some fe) f_ac None None in
   SS.of_list (fold (Some fe) (Some fp) f_ac None None a)
 
+(* Get all the concrete locations in [a] *)
+let locs (a : t) : SS.t =
+  let fe_ac le _ _ ac =
+    match le with
+    | Expr.ALoc l | Lit (Loc l) -> l :: List.concat ac
+    | _                         -> List.concat ac
+  in
+  let fe = Expr.fold fe_ac None None in
+  let f_ac _ _ _ ac = List.concat ac in
+  let fp = Formula.fold (Some fe) f_ac None None in
+  SS.of_list (fold (Some fe) (Some fp) f_ac None None a)
+
 (* Get all the variables in [a] *)
 let vars (a : t) : SS.t =
   let vars = [ alocs a; clocs a; lvars a; pvars a ] in

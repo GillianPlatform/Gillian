@@ -34,6 +34,8 @@ val empty : t -> bool
 
 val pp : Format.formatter -> t -> unit
 
+val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
+
 val update : t -> string -> Type.t -> unit
 
 val remove : t -> string -> unit

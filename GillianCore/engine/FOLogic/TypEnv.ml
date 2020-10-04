@@ -7,10 +7,6 @@ module L = Logging
 
 type t = (string, Type.t) Hashtbl.t
 
-let pp fmt tenv =
-  let pp_pair fmt (v, vt) = Fmt.pf fmt "(%s: %s)" v (Type.str vt) in
-  (Fmt.hashtbl ~sep:(Fmt.any "@\n") pp_pair) fmt tenv
-
 (*************************************)
 (** Typing Environment Functions    **)
 
@@ -67,6 +63,19 @@ let iter (x : t) (f : string -> Type.t -> unit) : unit = Hashtbl.iter f x
 
 let fold (x : t) (f : string -> Type.t -> 'a -> 'a) (init : 'a) : 'a =
   Hashtbl.fold f x init
+
+let pp fmt tenv =
+  let pp_pair fmt (v, vt) = Fmt.pf fmt "(%s: %s)" v (Type.str vt) in
+  let bindings = fold tenv (fun x t ac -> (x, t) :: ac) [] in
+  let bindings = List.sort (fun (v, _) (w, _) -> Stdlib.compare v w) bindings in
+  (Fmt.list ~sep:(Fmt.any "@\n") pp_pair) fmt bindings
+
+let pp_by_need vars fmt tenv =
+  let pp_pair fmt (v, vt) = Fmt.pf fmt "(%s: %s)" v (Type.str vt) in
+  let bindings = fold tenv (fun x t ac -> (x, t) :: ac) [] in
+  let bindings = List.sort (fun (v, _) (w, _) -> Stdlib.compare v w) bindings in
+  let bindings = List.filter (fun (v, _) -> SS.mem v vars) bindings in
+  (Fmt.list ~sep:(Fmt.any "@\n") pp_pair) fmt bindings
 
 (* Update with removal *)
 let update (te : t) (x : string) (t : Type.t) : unit = Hashtbl.replace te x t

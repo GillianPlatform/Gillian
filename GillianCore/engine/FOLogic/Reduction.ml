@@ -1881,7 +1881,10 @@ and reduce_lexpr
     ?(pfs = PFS.init ())
     ?(gamma = TypEnv.init ())
     (le : Expr.t) =
-  reduce_lexpr_loop ~unification ~reduce_lvars pfs gamma le
+  let t = Sys.time () in
+  let result = reduce_lexpr_loop ~unification ~reduce_lvars pfs gamma le in
+  Utils.Statistics.update_statistics "Reduce Expression" (Sys.time () -. t);
+  result
 
 and simplify_arithmetic_lexpr (pfs : PFS.t) (gamma : TypEnv.t) le =
   let f = reduce_lexpr_loop pfs gamma in
@@ -2550,7 +2553,10 @@ let reduce_formula
     ?(pfs : PFS.t = PFS.init ())
     ?(gamma = TypEnv.init ())
     (a : Formula.t) : Formula.t =
-  reduce_formula_loop ~top_level:true unification pfs gamma a
+  let t = Sys.time () in
+  let result = reduce_formula_loop ~top_level:true unification pfs gamma a in
+  Utils.Statistics.update_statistics "Reduce formula" (Sys.time () -. t);
+  result
 
 let find_list_length_eqs (pfs : PFS.t) (e : Expr.t) : cnum list =
   let llen_expr = Expr.UnOp (LstLen, e) in
