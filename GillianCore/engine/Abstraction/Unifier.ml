@@ -323,7 +323,7 @@ module Make
             match pred_def.pred.pred_facts with
             | []    -> Some astate
             | facts ->
-                let t = Sys.time () in
+                (* let t = Sys.time () in *)
                 let params, _ = List.split pred_def.pred.pred_params in
                 let params = List.map (fun x -> Expr.PVar x) params in
                 let facts =
@@ -338,8 +338,8 @@ module Make
                 let result =
                   produce_assertion (state, preds, pred_defs) subst facts
                 in
-                Utils.Statistics.update_statistics "Produce facts"
-                  (Sys.time () -. t);
+                (* Utils.Statistics.update_statistics "Produce facts"
+                   (Sys.time () -. t); *)
                 result
           in
           let pure = pred_def.pred.pred_pure in
@@ -1378,7 +1378,8 @@ module Make
     | UPUFail errs
       when !Config.unfolding && State.can_fix errs && not in_unification ->
         L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
-        let vals = State.get_recovery_vals errs in
+        let state, _, _ = astate_i in
+        let vals = State.get_recovery_vals state errs in
         L.(
           verbose (fun m ->
               m

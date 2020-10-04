@@ -1238,7 +1238,7 @@ let ga_loc_indexes = LActions.ga_loc_indexes_str
 
 (** Things defined for BiAbduction *)
 
-let get_recovery_vals e = e.recovery_values
+let get_recovery_vals _ e = e.recovery_values
 
 let get_failing_constraint e = e.failing_constraint
 

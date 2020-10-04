@@ -1017,7 +1017,9 @@ module Make
 
   let pp_fix = State.pp_fix
 
-  let get_recovery_vals = State.get_recovery_vals
+  let get_recovery_vals astate vs =
+    let state, _, _ = astate in
+    State.get_recovery_vals state vs
 
   let automatic_unfold (astate : t) (rvs : vt list) : (t list, string) result =
     let next_states, worked = Unifier.unfold_with_vals astate rvs in

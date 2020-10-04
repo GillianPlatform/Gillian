@@ -436,13 +436,20 @@ let pp ft heap =
 
 let get_inv_metadata (heap : t) : (Expr.t, Expr.t) Hashtbl.t =
   let inv_metadata = Hashtbl.create Config.medium_tbl_size in
-  (* Hashtbl.iter
-     (fun loc (_, e_metadata) ->
-       match e_metadata with
-         | None -> ()
-         | Some e_metadata ->
-             let loc_e = if (is_lloc_name loc) then Expr.Lit (Loc loc) else ALoc loc in
-             Hashtbl.add inv_metadata e_metadata loc_e) heap; *)
+  let traverse_metadata_table mt : unit =
+    Hashtbl.iter
+      (fun loc e_metadata ->
+        match e_metadata with
+        | None            -> ()
+        | Some e_metadata ->
+            let loc_e =
+              if Names.is_lloc_name loc then Expr.Lit (Loc loc) else ALoc loc
+            in
+            Hashtbl.add inv_metadata e_metadata loc_e)
+      mt
+  in
+  traverse_metadata_table heap.smet;
+  traverse_metadata_table heap.cmet;
   inv_metadata
 
 let clean_up (heap : t) : unit =

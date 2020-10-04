@@ -6,7 +6,7 @@
  **** Uint8Array Instances  ****
  *******************************)
 
-pred Uint8Array (+ar:Obj, buffer:Obj, byteOffset:Num, arrayLength:Num) :
+nounfold pred Uint8Array (+ar:Obj, buffer:Obj, byteOffset:Num, arrayLength:Num) :
   ((ar, "buffer")     -> none) *                   (* Functions to be found in the prototype      *)
   ((ar, "byteLength") -> none) *
   ((ar, "byteOffset") -> none) *

@@ -607,7 +607,7 @@ struct
   let get_failing_constraint (err : err_t) : Formula.t =
     raise (Failure "get_failing_constraint not implemented in MakeBiState")
 
-  let get_recovery_vals (errs : err_t list) : vt list =
+  let get_recovery_vals (bi_state : t) (errs : err_t list) : vt list =
     raise (Failure "get_recovery_vals not implemented in MakeBiState")
 
   let automatic_unfold _ _ : (t list, string) result =
@@ -639,8 +639,6 @@ struct
   let pp_err = State.pp_err
 
   let pp_fix = State.pp_fix
-
-  let get_recovery_vals = State.get_recovery_vals
 
   let get_failing_constraint = State.get_failing_constraint
 

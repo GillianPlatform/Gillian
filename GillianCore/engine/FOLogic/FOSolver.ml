@@ -236,13 +236,13 @@ let check_satisfiability_with_model (fs : Formula.t list) (gamma : TypEnv.t) :
 
 let check_satisfiability
     ?(unification = false) (fs : Formula.t list) (gamma : TypEnv.t) : bool =
-  let t = Sys.time () in
+  (* let t = Sys.time () in *)
   L.verbose (fun m -> m "Entering FOSolver.check_satisfiability");
   let fs, gamma, _ = simplify_pfs_and_gamma ~unification fs gamma in
   (* let axioms    = get_axioms (Formula.Set.elements fs) gamma in
      let fs           = Formula.Set.union fs (Formula.Set.of_list axioms) in *)
   let result = Z3Encoding.check_sat fs gamma in
-  Utils.Statistics.update_statistics "FOS: CheckSat" (Sys.time () -. t);
+  (* Utils.Statistics.update_statistics "FOS: CheckSat" (Sys.time () -. t); *)
   result
 
 let sat ~pfs ~gamma formulae : bool =

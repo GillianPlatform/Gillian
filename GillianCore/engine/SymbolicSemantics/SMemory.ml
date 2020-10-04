@@ -56,7 +56,7 @@ module type S = sig
 
   val pp_c_fix : Format.formatter -> c_fix_t -> unit
 
-  val get_recovery_vals : err_t -> vt list
+  val get_recovery_vals : t -> err_t -> vt list
 
   val pp_err : Format.formatter -> err_t -> unit
 

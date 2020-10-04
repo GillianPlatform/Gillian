@@ -631,7 +631,7 @@ struct
                 :: rest_confs )
         | AFail errs ->
             if not (ExecMode.concrete_exec !Config.current_exec_mode) then
-              let recovery_vals = State.get_recovery_vals errs in
+              let recovery_vals = State.get_recovery_vals state errs in
               let recovery_states : (State.t list, string) result =
                 State.automatic_unfold state recovery_vals
               in

@@ -104,7 +104,7 @@ module type S = sig
 
   val pp_fix : Format.formatter -> fix_t -> unit
 
-  val get_recovery_vals : err_t list -> vt list
+  val get_recovery_vals : t -> err_t list -> vt list
 
   (** State Copy *)
   val copy : t -> t

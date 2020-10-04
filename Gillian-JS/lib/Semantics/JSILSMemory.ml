@@ -71,9 +71,34 @@ module M : Gillian.Symbolic.Memory_S = struct
     pf ft "@[<h><[%a], %a, %a>@]" (list ~sep:comma SVal.pp) vs Formula.pp f
       (list ~sep:semi pp_fixes) fixes
 
-  let get_recovery_vals (err : err_t) : vt list =
+  let get_recovery_vals (heap : t) (err : err_t) : vt list =
     let ufl_vs, _, _ = err in
-    ufl_vs
+    L.verbose (fun fmt ->
+        fmt "JSIL SMemory: Recovery values: %a"
+          Fmt.(brackets (list ~sep:comma Expr.pp))
+          ufl_vs);
+    let ufl_alocs =
+      List.filter
+        (fun e ->
+          match e with
+          | Expr.ALoc _ | Lit (Loc _) -> true
+          | _                         -> false)
+        ufl_vs
+    in
+    match ufl_alocs with
+    | []    -> ufl_vs
+    | alocs ->
+        let imeta = SHeap.get_inv_metadata heap in
+        (* Perhaps we are looking for metadata? *)
+        let metadata_recovery_vals =
+          List.fold_left
+            (fun mrvs aloc ->
+              match Hashtbl.find_opt imeta aloc with
+              | Some md -> md :: mrvs
+              | _       -> mrvs)
+            [] alocs
+        in
+        ufl_vs @ metadata_recovery_vals
 
   let assertions ?(to_keep : Containers.SS.t option) (heap : t) : GAsrt.t list =
     List.map JSIL2GIL.jsil2gil_asrt (SHeap.assertions heap)

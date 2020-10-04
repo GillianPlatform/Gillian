@@ -189,7 +189,7 @@ module Make (SMemory : SMemory.S) :
         Some state
 
   let sat_check (state : t) (v : Expr.t) : bool =
-    let t = Sys.time () in
+    (* let t = Sys.time () in *)
     L.verbose (fun m -> m "SState: sat_check: %a" Expr.pp v);
     let _, _, pfs, gamma, _ = state in
     let v = Reduction.reduce_lexpr ~pfs ~gamma v in
@@ -206,7 +206,7 @@ module Make (SMemory : SMemory.S) :
         FOSolver.check_satisfiability (v_asrt :: PFS.to_list pfs) gamma
       in
       L.(verbose (fun m -> m "SState: sat_check done: %b" result));
-      Utils.Statistics.update_statistics "SAT Check" (Sys.time () -. t);
+      (* Utils.Statistics.update_statistics "SAT Check" (Sys.time () -. t); *)
       result
 
   let sat_check_f (state : t) (fs : Formula.t list) : st option =
@@ -233,7 +233,7 @@ module Make (SMemory : SMemory.S) :
       ?(kill_new_lvars = true)
       ?(unification = false)
       (state : t) : st =
-    let start_time = Sys.time () in
+    (* let start_time = Sys.time () in *)
     let heap, store, pfs, gamma, svars = state in
     let save_spec_vars = if save then (SS.empty, true) else (svars, false) in
     L.verbose (fun m ->
@@ -266,7 +266,7 @@ module Make (SMemory : SMemory.S) :
            @[%a@]@\n\
            -----------------------------------"
           pp state SSubst.pp subst);
-    Utils.Statistics.update_statistics "Simplify" (Sys.time () -. start_time);
+    (* Utils.Statistics.update_statistics "Simplify" (Sys.time () -. start_time); *)
     subst
 
   let simplify_val (state : t) (v : vt) : vt =
@@ -510,8 +510,9 @@ module Make (SMemory : SMemory.S) :
           vs
     | FAsrt ga  -> Fmt.pf fmt "SFSVar(@[<h>%a@])" Asrt.pp ga
 
-  let get_recovery_vals (errs : err_t list) : vt list =
-    StateErr.get_recovery_vals errs SMemory.get_recovery_vals
+  let get_recovery_vals (state : t) (errs : err_t list) : vt list =
+    let heap, _, _, _, _ = state in
+    StateErr.get_recovery_vals errs (SMemory.get_recovery_vals heap)
 
   let automatic_unfold _ _ : (t list, string) result =
     Error "Automatic unfold not supported in symbolic execution"

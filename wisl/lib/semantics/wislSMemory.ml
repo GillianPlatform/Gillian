@@ -194,7 +194,7 @@ let pp fmt h = Format.fprintf fmt "%s" (WislSHeap.str h)
 
 let pp_err _ _ = ()
 
-let get_recovery_vals _ = []
+let get_recovery_vals _ _ = []
 
 let pp_c_fix _ _ = ()
 

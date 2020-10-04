@@ -43,7 +43,7 @@ pure pred rawToUInt32(+bytes:List, +littleEndian:Bool, num:Num) :
  **** Data View Instances  ****
  ******************************)
 
-pred DataView (+dv:Obj, buffer:Obj, byteOffset:Num, byteLength:Num) :
+nounfold pred DataView (+dv:Obj, buffer:Obj, byteOffset:Num, byteLength:Num) :
   ((dv, "buffer") -> none) *                    (* Functions to be found in the prototype      *)
   ((dv, "byteLength") -> none) *
   ((dv, "byteOffset") -> none) *
@@ -69,9 +69,9 @@ pred DataView (+dv:Obj, buffer:Obj, byteOffset:Num, byteLength:Num) :
   (* Well-formedness *)
   (0 <=# byteOffset) * (0 <=# byteLength);
 
-(******************************
- **** Data View Prototype  ****
- ******************************)
+(*****************************
+ **** DataView Prototype  ****
+ *****************************)
 
 nounfold pred DataViewPrototype (proto) :
   JSObjWithProto (proto, $lobj_proto) *
