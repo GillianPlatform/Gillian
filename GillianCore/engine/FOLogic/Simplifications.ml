@@ -273,22 +273,20 @@ let resolve_set_existentials
           let ul =
             List.flatten
               (List.map
-                 (fun (u : Expr.t) ->
-                   ( match (u : Expr.t) with
-                     | ESet x ->
-                         List.map (fun (x : Expr.t) -> (ESet [ x ] : Expr.t)) x
-                     | _      -> [ u ]
-                     : Expr.t list ))
+                 (fun (u : Expr.t) : Expr.t list ->
+                   match (u : Expr.t) with
+                   | ESet x ->
+                       List.map (fun (x : Expr.t) : Expr.t -> ESet [ x ]) x
+                   | _      -> [ u ])
                  ul)
           in
           let ur =
             List.flatten
               (List.map
-                 (fun (u : Expr.t) ->
-                   ( match u with
-                     | ESet x -> List.map (fun x -> (ESet [ x ] : Expr.t)) x
-                     | _      -> [ u ]
-                     : Expr.t list ))
+                 (fun (u : Expr.t) : Expr.t list ->
+                   match u with
+                   | ESet x -> List.map (fun x : Expr.t -> ESet [ x ]) x
+                   | _      -> [ u ])
                  ur)
           in
 

@@ -40,20 +40,20 @@ let basic =
     let zero = n 0. in
     let ten = n 10. in
     let res =
-      branch_on_sat ~pc x#<zero
+      branch_on_sat ~pc x #< zero
         ~then_branch:(fun pc -> SatResults.return ~pc (`Continue (-1)))
         ~else_branch:(fun pc ->
           let** `Continue n, pc =
-            branch_on_sat ~pc x#>ten
+            branch_on_sat ~pc x #> ten
               ~then_branch:(fun pc -> SatResults.return ~pc (`Continue 1))
               ~else_branch:(fun pc -> SatResults.terminate ~pc `Error)
           in
           SatResults.return ~pc (`Continue (n + 1)))
     in
-    let tb = (`Continue (-1), Pc.extend pc [ x#<zero ]) in
-    let etb = (`Continue 2, Pc.extend pc [ Formula.Not x#<zero; x#>ten ]) in
+    let tb = (`Continue (-1), Pc.extend pc [ x #< zero ]) in
+    let etb = (`Continue 2, Pc.extend pc [ Formula.Not x #< zero; x #> ten ]) in
     let eeb =
-      (`Error, Pc.extend pc [ Formula.Not x#<zero; Formula.Not x#>ten ])
+      (`Error, Pc.extend pc [ Formula.Not x #< zero; Formula.Not x #> ten ])
     in
     Alcotest.(check sat_res)
       "Should branch properly"

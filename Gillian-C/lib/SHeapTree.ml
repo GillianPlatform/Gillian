@@ -68,7 +68,7 @@ module Range = struct
 
   let is_equal (la, ha) (lb, hb) =
     let open Formula.Infix in
-    la #== lb #&& (ha#==hb)
+    la #== lb #&& (ha #== hb)
 
   let equal ~pc (la, ha) (lb, hb) =
     let ( = ) = FOSolver.is_equal ~pc in
@@ -76,7 +76,7 @@ module Range = struct
 
   let is_inside (la, ha) (lb, hb) =
     let open Formula.Infix in
-    lb #<= la #&& (ha#<=hb)
+    lb #<= la #&& (ha #<= hb)
 
   let inside ~pc (la, ha) (lb, hb) =
     let ( <= ) = FOSolver.is_less_or_equal ~pc in
@@ -170,7 +170,7 @@ module Tree = struct
     let old_span = t.span in
     let ol, oh = old_span in
     let nl, nh = range in
-    SatResults.branch_on_sat ~pc ol#==nl
+    SatResults.branch_on_sat ~pc ol #== nl
       ~then_branch:(fun pc ->
         let left_node, right_node = Node.split t.node in
         let left_span, right_span = Range.split_at old_span nh in
@@ -178,7 +178,7 @@ module Tree = struct
         let right = make ~node:right_node ~span:right_span () in
         SatResults.return ~pc (left, right))
       ~else_branch:(fun pc ->
-        SatResults.branch_on_sat ~pc oh#==nh
+        SatResults.branch_on_sat ~pc oh #== nh
           ~then_branch:(fun pc ->
             let left_node, right_node = Node.split t.node in
             let left_span, right_span = Range.split_at old_span nh in

@@ -371,7 +371,7 @@ let wf_assertions_of_obj (heap : t) (loc : string) : Formula.t list =
   let spps = SFVL.field_names sfvl in
   let props = List_utils.cross_product spps (cpps @ spps) (fun x y -> (x, y)) in
   let props = List.filter (fun (x, y) -> x <> y) props in
-  List.map (fun (x, y) -> (Not (Eq (x, y)) : Formula.t)) props
+  List.map (fun (x, y) : Formula.t -> Not (Eq (x, y))) props
 
 let wf_assertions (heap : t) : Formula.t list =
   let domain = domain heap in

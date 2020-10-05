@@ -605,13 +605,12 @@ let translate_only_specs cc_tbl old_fun_tbl fun_tbl vis_tbl js_only_specs =
       Hashtbl.replace vis_tbl name [ name; main_fid ];
       let sspecs =
         List.map
-          (fun { JSSpec.pre; JSSpec.post; JSSpec.flag; JSSpec.label } ->
-            ( let pre, post =
-                JSSpec.js2jsil_st pre post cc_tbl vis_tbl (Hashtbl.create 0)
-                  name params
-              in
-              { pre; posts = post; flag; to_verify = false; label }
-              : Spec.st ))
+          (fun { JSSpec.pre; JSSpec.post; JSSpec.flag; JSSpec.label } : Spec.st ->
+            let pre, post =
+              JSSpec.js2jsil_st pre post cc_tbl vis_tbl (Hashtbl.create 0) name
+                params
+            in
+            { pre; posts = post; flag; to_verify = false; label })
           sspecs
       in
       let spec : Spec.t =
