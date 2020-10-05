@@ -334,6 +334,7 @@ let malloc_chunk_asrt loc struct_sz =
   let sz = Chunk.size chunk in
   let ofs = num (-sz) in
   Constr.single ~loc ~ofs ~chunk ~sval:(mk_val struct_sz)
+  ** Constr.bounds ~loc ~low:(num (-sz)) ~high:(num struct_sz)
 
 let trans_constr ?fname:_ ~malloc ann s c =
   let cenv = ann.cenv in

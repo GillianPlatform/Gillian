@@ -45,6 +45,8 @@ type err =
   | InvalidAlignment       of { alignment : int; offset : Expr.t }
   | MissingResource
   | Unhandled              of string
+  | RemovingNotOwned
+  | HoleNotUndefined
 
 let pp_err fmt = function
   | UseAfterFree -> Fmt.pf fmt "Use After Free"
@@ -59,6 +61,8 @@ let pp_err fmt = function
         offset
   | MissingResource -> Fmt.pf fmt "MissingResource"
   | Unhandled e -> Fmt.pf fmt "Unhandled error with message : %s" e
+  | RemovingNotOwned -> Fmt.pf fmt "Removing not owned"
+  | HoleNotUndefined -> Fmt.pf fmt "Hole not undefined"
 
 let err_equal a b =
   match (a, b) with
@@ -208,6 +212,9 @@ module Tree = struct
 
   let undefined span = make ~node:Undef ~span ()
 
+  let create_root range =
+    { children = None; span = range; node = NotOwned Totally }
+
   let is_entirely_owned_between ~tree low high =
     let range = (low, high) in
     let rec check_child child range =
@@ -290,7 +297,7 @@ module Tree = struct
           }
       else Delayed.return t
 
-  let frame_single (t : t) (low : Expr.t) (chunk : Chunk.t) : (t, err) DR.t =
+  let frame_range (t : t) (range : Range.t) : (t, err) DR.t =
     let open DR.Syntax in
     let rec frame_inside (t : t) (range : Range.t) : (t, err) DR.t =
       if%sat Range.is_equal range t.span then DR.ok t
@@ -308,26 +315,33 @@ module Tree = struct
             let+ left, right = split ~range t in
             Ok (with_children t ~left ~right)
     in
-    let range = Range.of_low_and_chunk low chunk in
     let open Delayed.Syntax in
     let* root = extend_if_needed t range in
     frame_inside root range
 
-  let rec get_framed t low chunk =
+  let frame_single (t : t) (low : Expr.t) (chunk : Chunk.t) : (t, err) DR.t =
     let range = Range.of_low_and_chunk low chunk in
-    if%ent Range.is_equal t.span range then
-      DR.of_result (Node.decode ~chunk t.node)
+    frame_range t range
+
+  let rec get_framed_node t range =
+    if%ent Range.is_equal t.span range then DR.ok t.node
     else
       match t.children with
       | None               -> DR.error
                                 (Unhandled
                                    "Value should have been framed beforhand")
       | Some (left, right) ->
-          if%ent Range.is_inside range left.span then get_framed left low chunk
+          if%ent Range.is_inside range left.span then get_framed_node left range
           else
             if%ent Range.is_inside range right.span then
-              get_framed right low chunk
+              get_framed_node right range
             else DR.error (Unhandled "Children not in partition in get_framed")
+
+  let get_framed_single t low chunk =
+    let open DR.Syntax in
+    let range = Range.of_low_and_chunk low chunk in
+    let** node = get_framed_node t range in
+    DR.of_result (Node.decode ~chunk node)
 
   let of_children ~left ~right =
     let span = (fst left.span, snd right.span) in
@@ -335,12 +349,9 @@ module Tree = struct
     let node = Node.merge ~left:left.node ~right:right.node in
     { span; children; node }
 
-  let rec set_framed t low chunk sval =
+  let rec set_node_framed t range node =
     let open DR.Syntax in
-    let range = Range.of_low_and_chunk low chunk in
-    if%ent Range.is_equal t.span range then
-      let node = Node.encode ~chunk sval in
-      DR.ok (with_node t node)
+    if%ent Range.is_equal t.span range then DR.ok (with_node t node)
     else
       match t.children with
       | None               -> DR.error
@@ -348,13 +359,18 @@ module Tree = struct
                                    "Value should have been framed beforhand")
       | Some (left, right) ->
           if%ent Range.is_inside range left.span then
-            let++ left = set_framed left low chunk sval in
+            let++ left = set_node_framed left range node in
             of_children ~left ~right
           else
             if%ent Range.is_inside range right.span then
-              let++ right = set_framed right low chunk sval in
+              let++ right = set_node_framed right range node in
               of_children ~left ~right
             else DR.error (Unhandled "Children not in partition in get_framed")
+
+  let set_single_framed t low chunk sval =
+    let range = Range.of_low_and_chunk low chunk in
+    let node = Node.encode ~chunk sval in
+    set_node_framed t range node
 
   let rec lvars { node; span; children } =
     let node_lvars = Node.lvars node in
@@ -369,55 +385,61 @@ end
 
 type t =
   | Freed
-  | Tree  of { perm : Perm.t; bounds : Range.t; root : Tree.t option }
+  | Tree  of { perm : Perm.t; bounds : Range.t option; root : Tree.t option }
 
 let pp fmt = function
   | Freed -> Fmt.pf fmt "FREED"
   | Tree { perm; bounds; root } ->
-      let pp_aux fmt (perm, span, root) =
-        Fmt.pf fmt "%a@ %a@ %a" Range.pp span Perm.pp perm
+      let pp_aux fmt (perm, bounds, root) =
+        Fmt.pf fmt "%a@ %a@ %a"
+          (Fmt.option ~none:(Fmt.any "NO BOUNDS") Range.pp)
+          bounds Perm.pp perm
           (Fmt.option ~none:(Fmt.any "EMPTY") Tree.pp)
           root
       in
       (Fmt.parens (Fmt.vbox pp_aux)) fmt (perm, bounds, root)
 
 let empty () =
-  let bounds = (Expr.LVar (LVar.alloc ()), Expr.LVar (LVar.alloc ())) in
+  let bounds = None in
   let perm = Perm.Freeable in
   let root = None in
-  Tree { bounds; perm; root }
+  Delayed.return (Tree { bounds; perm; root })
 
 let lvars = function
   | Freed                    -> SS.empty
   | Tree { bounds; root; _ } ->
-      SS.union (Range.lvars bounds)
+      SS.union
+        (Option.fold ~none:SS.empty ~some:Range.lvars bounds)
         (Option.fold ~none:SS.empty ~some:Tree.lvars root)
 
 let get_root = function
   | Freed  -> Error UseAfterFree
   | Tree x -> Ok x.root
 
-let get_perm t =
+let get_perm_opt t =
   match t with
   | Freed  -> None
   | Tree x -> Some x.perm
+
+let get_perm_res t =
+  match t with
+  | Freed  -> Error UseAfterFree
+  | Tree x -> Ok x.perm
 
 let set_perm t perm =
   match t with
   | Freed  -> Error UseAfterFree
   | Tree x -> Ok (Tree { x with perm })
 
-let get_perm_at ofs = function
-  | Freed  -> DO.none ()
-  | Tree x ->
-      let open Formula.Infix in
-      let l, h = x.bounds in
-      if%sat l #<= ofs #&& (ofs #< h) then DO.some x.perm else DO.none ()
+let is_in_bounds range bounds =
+  match bounds with
+  | None        -> Formula.True
+  | Some bounds -> Range.is_inside range bounds
 
 let get_min_perm_between low high = function
   | Freed  -> DO.none ()
   | Tree x ->
-      if%sat Range.is_inside (low, high) x.bounds then
+      if%sat is_in_bounds (low, high) x.bounds then
         match x.root with
         | None      -> DO.none ()
         | Some tree ->
@@ -426,85 +448,198 @@ let get_min_perm_between low high = function
             if owned then DO.some x.perm else DO.none ()
       else DO.none ()
 
+let get_perm_at ofs =
+  let open Expr.Infix in
+  get_min_perm_between ofs (ofs +. Expr.num 1.)
+
 let get_bounds = function
   | Freed  -> Error UseAfterFree
   | Tree x -> Ok x.bounds
 
-let set_bounds t _bounds =
-  match t with
-  | Freed   -> Error UseAfterFree
-  | Tree _x -> Ok t
-
-let with_root t root =
+let set_bounds t bounds =
   match t with
   | Freed  -> Error UseAfterFree
-  | Tree x -> Ok (Tree { x with root = Some root })
+  | Tree x -> Ok (Tree { x with bounds })
+
+let with_root_opt t root =
+  match t with
+  | Freed  -> Error UseAfterFree
+  | Tree x -> Ok (Tree { x with root })
+
+let with_root t root = with_root_opt t (Some root)
 
 let alloc low high =
   let bounds = Range.make low high in
-  Tree { perm = Freeable; root = Some (Tree.undefined bounds); bounds }
+  Tree
+    {
+      perm = Freeable;
+      root = Some (Tree.undefined bounds);
+      bounds = Some bounds;
+    }
 
-let drop_perm t low high new_perm =
-  let open Perm.Infix in
-  let open Formula.Infix in
-  let open DR.Syntax in
-  let** cl, hl = DR.of_result (get_bounds t) in
-  if%ent cl #== low #&& (hl #== high) then
-    let** curr_perm = DR.of_option ~none:BufferOverrun (get_perm t) in
-    if new_perm >% curr_perm then
-      DR.error
-        (InsufficientPermission { required = new_perm; actual = Some curr_perm })
-    else
-      let++ root = DR.of_result (get_root t) in
-      Tree { root; bounds = Range.make cl hl; perm = new_perm }
-  else
-    DR.error
-      (Unhandled "Modifying permission on range different from object span")
+let drop_perm t _low _high new_perm =
+  match t with
+  | Freed  -> Error UseAfterFree
+  | Tree x -> (
+      match x.perm with
+      | Freeable -> Ok (Tree { x with perm = new_perm })
+      | _        ->
+          Error
+            (InsufficientPermission
+               { required = Freeable; actual = Some x.perm }) )
 
 let free t low high =
-  let open Perm.Infix in
   let open DR.Syntax in
-  let open Formula.Infix in
-  let** cl, hl = DR.of_result (get_bounds t) in
-  if%ent cl #== low #&& (hl #== high) then
-    let** curr_perm = DR.of_option ~none:BufferOverrun (get_perm t) in
-    if curr_perm <% Freeable then
-      DR.error
-        (InsufficientPermission { required = Freeable; actual = Some curr_perm })
-    else DR.ok Freed
-  else
-    DR.error
-      (Unhandled
-         "Freeing only part of an object (this might need fixing in the MM)")
+  let open Delayed.Syntax in
+  let** bounds = DR.of_result (get_bounds t) in
+  match t with
+  (* Can't free something already freed *)
+  | Freed -> DR.error UseAfterFree
+  | Tree tree -> (
+      (* Can only free if entirely freeable *)
+      match tree.perm with
+      | Freeable -> (
+          (* We need to own the entire object to free it, including what's outside of the bounds *)
+          match bounds with
+          | None        -> DR.error MissingResource
+          | Some bounds ->
+              if%ent Range.is_equal (low, high) bounds then
+                match tree.root with
+                | None      -> DR.error MissingResource
+                | Some root ->
+                    let* owned =
+                      Tree.is_entirely_owned_between ~tree:root low high
+                    in
+                    if owned then DR.ok Freed else DR.error MissingResource
+              else
+                DR.error
+                  (Unhandled
+                     "Freeing only part of an object (this might need fixing \
+                      in the MM)") )
+      | _        ->
+          DR.error
+            (InsufficientPermission
+               { required = Freeable; actual = Some tree.perm }) )
 
-let get t low chunk =
+let get_single t low chunk =
   let open DR.Syntax in
   let range = Range.of_low_and_chunk low chunk in
   let** span = DR.of_result (get_bounds t) in
-  if%sat Range.is_inside range span then
+  if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
     | None      -> DR.error MissingResource
     | Some root ->
         let** root_framed = Tree.frame_single root low chunk in
-        let** value = Tree.get_framed root_framed low chunk in
+        let** value = Tree.get_framed_single root_framed low chunk in
         let++ wroot = DR.of_result (with_root t root_framed) in
         (value, wroot)
   else DR.error BufferOverrun
 
-let set t low chunk sval =
+let set_single t low chunk sval =
   let open DR.Syntax in
   let range = Range.of_low_and_chunk low chunk in
+  let** root = DR.of_result (get_root t) in
+  let** root_set =
+    match root with
+    | None      -> Tree.set_single_framed (Tree.create_root range) low chunk sval
+    | Some root ->
+        let** root_framed = Tree.frame_single root low chunk in
+        Tree.set_single_framed root_framed low chunk sval
+  in
+  let** bounds = DR.of_result (get_bounds t) in
+  let learned =
+    match bounds with
+    | None        -> []
+    | Some bounds -> [ Range.is_inside range bounds ]
+  in
+  DR.of_result ~learned (with_root t root_set)
+
+let rem_single t low chunk =
+  let open DR.Syntax in
+  let range = Range.of_low_and_chunk low chunk in
+  let** root = DR.of_result (get_root t) in
+  let** root_set =
+    match root with
+    | None      -> DR.ok None
+    | Some root ->
+        let** root_framed = Tree.frame_single root low chunk in
+        let** root_set =
+          Tree.set_node_framed root_framed range (NotOwned Totally)
+        in
+        DR.ok (Some root_set)
+  in
+  let** bounds = DR.of_result (get_bounds t) in
+  let learned =
+    match bounds with
+    | None        -> []
+    | Some bounds -> [ Range.is_inside range bounds ]
+  in
+  DR.of_result ~learned (with_root_opt t root_set)
+
+let get_hole t low high =
+  let open DR.Syntax in
+  let range = (low, high) in
   let** span = DR.of_result (get_bounds t) in
-  if%sat Range.is_inside range span then
+  if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
     | None      -> DR.error MissingResource
     | Some root ->
-        let** root_framed = Tree.frame_single root low chunk in
-        let+* root_set = Tree.set_framed root_framed low chunk sval in
-        with_root t root_set
+        let** root_framed = Tree.frame_range root range in
+        let** node = Tree.get_framed_node root_framed range in
+        let res =
+          match node with
+          | Undef      -> Ok ()
+          | NotOwned _ -> Error MissingResource
+          | _          -> Error HoleNotUndefined
+        in
+        let++ wroot =
+          DR.of_result (Result.bind res (fun () -> with_root t root_framed))
+        in
+        wroot
   else DR.error BufferOverrun
+
+let set_hole t low high =
+  let open DR.Syntax in
+  let range = (low, high) in
+  let** root = DR.of_result (get_root t) in
+  let** root_set =
+    match root with
+    | None      -> Tree.set_node_framed (Tree.create_root range) range Undef
+    | Some root ->
+        let** root_framed = Tree.frame_range root range in
+        Tree.set_node_framed root_framed range Undef
+  in
+  let** bounds = DR.of_result (get_bounds t) in
+  let learned =
+    match bounds with
+    | None        -> []
+    | Some bounds -> [ Range.is_inside range bounds ]
+  in
+  DR.of_result ~learned (with_root t root_set)
+
+let rem_hole t low high =
+  let open DR.Syntax in
+  let range = (low, high) in
+  let** root = DR.of_result (get_root t) in
+  let** root_set =
+    match root with
+    | None      -> DR.ok None
+    | Some root ->
+        let** root_framed = Tree.frame_range root range in
+        let** root_set =
+          Tree.set_node_framed root_framed range (NotOwned Totally)
+        in
+        DR.ok (Some root_set)
+  in
+  let** bounds = DR.of_result (get_bounds t) in
+  let learned =
+    match bounds with
+    | None        -> []
+    | Some bounds -> [ Range.is_inside range bounds ]
+  in
+  DR.of_result ~learned (with_root_opt t root_set)
 
 let check_valid_access t chunk ofs perm =
   let open Delayed.Syntax in
@@ -528,9 +663,9 @@ let check_valid_access t chunk ofs perm =
 let load t chunk ofs =
   let open DR.Syntax in
   let** () = check_valid_access t chunk ofs Readable in
-  get t ofs chunk
+  get_single t ofs chunk
 
 let store t chunk ofs value =
   let open DR.Syntax in
   let** () = check_valid_access t chunk ofs Readable in
-  set t ofs chunk value
+  set_single t ofs chunk value

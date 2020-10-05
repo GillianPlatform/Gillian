@@ -10,4 +10,6 @@ let single ~loc ~ofs ~chunk ~sval =
 
 let hole ~loc ~low ~high = pred (GMem Hole) [ loc; low; high ] []
 
-let bounds ~loc ~low ~high = pred (GMem Bounds) [ loc ] [ low; high ]
+let bounds ~loc ~low ~high =
+  let bounds = Expr.EList [ low; high ] in
+  pred (GMem Bounds) [ loc ] [ bounds ]

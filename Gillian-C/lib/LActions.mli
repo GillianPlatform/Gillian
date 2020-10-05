@@ -17,6 +17,9 @@ type mem_ac =
   | GetBounds
   | SetBounds
   | RemBounds
+  | GetPerm
+  | SetPerm
+  | RemPerm
 
 type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
 
@@ -24,7 +27,7 @@ type ac =
   | AGEnv of genv_ac  (** Actions related to the memory *)
   | AMem  of mem_ac  (** Actions related to the global environment *)
 
-type mem_ga = Single | Hole | Bounds
+type mem_ga = Single | Hole | Bounds | Perm
 
 type genv_ga = Symbol | Definition
 

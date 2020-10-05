@@ -7,8 +7,12 @@ type 'a guarded_thunk = { guard : Formula.t; thunk : unit -> 'a }
 
 (** When using Branching, it should be certain that the paths are complete *)
 and _ t =
-  | Final            : { final_value : 'a; additional_knowledge : Formula.t list } -> 'a
-                                                                                t
+  | Final            : {
+      final_value : 'a;
+      additional_knowledge : Formula.t list;
+      additional_type_knowledge : (string * Gil_syntax.Type.t) list;
+    }
+      -> 'a t
   | BranchEntailment : 'a t guarded_thunk list -> 'a t
   | BranchSat        : 'a t guarded_thunk list -> 'a t
   | ResolveLoc       : Expr.t -> string option t
@@ -19,8 +23,16 @@ let guarded_thunk_of_pair (guard, thunk) = { guard; thunk }
 let rec resolve : type a. curr_pc:Pc.t -> a t -> a Branch.t list =
  fun ~curr_pc process ->
   match process with
-  | Final { final_value; additional_knowledge } ->
-      [ { pc = Pc.extend curr_pc additional_knowledge; value = final_value } ]
+  | Final { final_value; additional_knowledge; additional_type_knowledge } ->
+      [
+        {
+          pc =
+            Pc.extend
+              (Pc.extend_types curr_pc additional_type_knowledge)
+              additional_knowledge;
+          value = final_value;
+        };
+      ]
   | BranchSat branches ->
       let get_branches l =
         let rec loop acc no_sat_path l =
@@ -85,8 +97,13 @@ let rec resolve : type a. curr_pc:Pc.t -> a t -> a Branch.t list =
         { pc = curr_pc; value = FOSolver.resolve_loc_name ~pc:curr_pc loc_expr };
       ]
 
-let return ?(learned = []) final_value =
-  Final { final_value; additional_knowledge = learned }
+let return ?(learned = []) ?(learned_types = []) final_value =
+  Final
+    {
+      final_value;
+      additional_knowledge = learned;
+      additional_type_knowledge = learned_types;
+    }
 
 let bind x f = Bound (x, f)
 

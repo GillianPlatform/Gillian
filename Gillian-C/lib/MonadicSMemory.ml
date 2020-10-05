@@ -62,6 +62,11 @@ module Mem = struct
     DR.of_option ~none:(MissingLocResource loc_name)
       (SMap.find_opt loc_name mem)
 
+  let get_or_create_tree mem loc_name =
+    match SMap.find_opt loc_name mem with
+    | Some t -> Delayed.return t
+    | None   -> SHeapTree.empty ()
+
   let alloc mem low high =
     let loc = ALoc.alloc () in
     let tree = SHeapTree.alloc low high in
@@ -78,7 +83,8 @@ module Mem = struct
     let** loc_name = resolve_loc_result loc in
     let** tree = get_tree_res mem loc_name in
     let++ new_tree =
-      map_lift_err loc_name (SHeapTree.drop_perm tree low high new_perm)
+      map_lift_err loc_name
+        (DR.of_result (SHeapTree.drop_perm tree low high new_perm))
     in
     SMap.add loc_name new_tree mem
 
@@ -107,23 +113,97 @@ module Mem = struct
     let++ new_tree = map_lift_err loc_name (SHeapTree.free tree low high) in
     SMap.add loc_name new_tree mem
 
-  let get mem loc ofs chunk =
+  let get_single mem loc ofs chunk =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
     let** tree = get_tree_res mem loc_name in
     let++ sval, new_tree =
-      map_lift_err loc_name (SHeapTree.get tree ofs chunk)
+      map_lift_err loc_name (SHeapTree.get_single tree ofs chunk)
     in
     (SMap.add loc_name new_tree mem, loc_name, sval)
 
-  let set mem loc ofs chunk sval =
+  let set_single mem loc ofs chunk sval =
     let open DR.Syntax in
     let* loc_name = resolve_or_create_loc_name loc in
-    let** tree = get_tree_res mem loc_name in
+    let* tree = get_or_create_tree mem loc_name in
     let++ new_tree =
-      map_lift_err loc_name (SHeapTree.set tree ofs chunk sval)
+      map_lift_err loc_name (SHeapTree.set_single tree ofs chunk sval)
     in
     SMap.add loc_name new_tree mem
+
+  let rem_single mem loc ofs chunk =
+    let open DR.Syntax in
+    let* loc_name = Delayed.resolve_loc loc in
+    match Option.bind loc_name (fun l -> SMap.find_opt l mem) with
+    | None      -> DR.ok mem
+    | Some tree ->
+        let loc_name = Option.get loc_name in
+        let++ new_tree =
+          map_lift_err loc_name (SHeapTree.rem_single tree ofs chunk)
+        in
+        SMap.add loc_name new_tree mem
+
+  let get_hole mem loc low high =
+    let open DR.Syntax in
+    let** loc_name = resolve_loc_result loc in
+    let** tree = get_tree_res mem loc_name in
+    let++ new_tree = map_lift_err loc_name (SHeapTree.get_hole tree low high) in
+    (SMap.add loc_name new_tree mem, loc_name)
+
+  let set_hole mem loc low high =
+    let open DR.Syntax in
+    let* loc_name = resolve_or_create_loc_name loc in
+    let* tree = get_or_create_tree mem loc_name in
+    let++ new_tree = map_lift_err loc_name (SHeapTree.set_hole tree low high) in
+    SMap.add loc_name new_tree mem
+
+  let rem_hole mem loc low high =
+    let open DR.Syntax in
+    let* loc_name = Delayed.resolve_loc loc in
+    match Option.bind loc_name (fun l -> SMap.find_opt l mem) with
+    | None      -> DR.ok mem
+    | Some tree ->
+        let loc_name = Option.get loc_name in
+        let++ new_tree =
+          map_lift_err loc_name (SHeapTree.rem_hole tree low high)
+        in
+        SMap.add loc_name new_tree mem
+
+  let get_perm mem loc =
+    let open DR.Syntax in
+    let** loc_name = resolve_loc_result loc in
+    let** tree = get_tree_res mem loc_name in
+    let++ perm =
+      map_lift_err loc_name (DR.of_result (SHeapTree.get_perm_res tree))
+    in
+    (loc_name, perm)
+
+  let set_perm mem loc perm =
+    let open DR.Syntax in
+    let** loc_name = resolve_loc_result loc in
+    let** tree = get_tree_res mem loc_name in
+    let++ tree_set =
+      map_lift_err loc_name (DR.of_result (SHeapTree.set_perm tree perm))
+    in
+    SMap.add loc_name tree_set mem
+
+  let get_bounds mem loc =
+    let open DR.Syntax in
+    let** loc_name = resolve_loc_result loc in
+    let** tree = get_tree_res mem loc_name in
+    let++ bounds =
+      map_lift_err loc_name (DR.of_result (SHeapTree.get_bounds tree))
+    in
+    (loc_name, bounds)
+
+  let set_bounds mem loc bounds =
+    let open DR.Syntax in
+    let** loc_name = resolve_loc_result loc in
+    let** tree = get_tree_res mem loc_name in
+    let++ tree_set =
+      map_lift_err loc_name (DR.of_result (SHeapTree.set_bounds tree bounds))
+    in
+    SMap.add loc_name tree_set mem
 
   let lvars mem =
     let open Utils.Containers in
@@ -249,35 +329,120 @@ let execute_move _heap params =
       failwith "Move not implemented yet"
   | _ -> fail_ungracefully "wrong call to execute_move" params
 
-let execute_mem_get heap params =
+let execute_get_single heap params =
   let open DR.Syntax in
   match params with
   | [ loc; ofs; Expr.Lit (String chunk_string) ] ->
       let chunk = ValueTranslation.chunk_of_string chunk_string in
-      let** mem, loc_name, sval = Mem.get heap.mem loc ofs chunk in
+      let** mem, loc_name, sval = Mem.get_single heap.mem loc ofs chunk in
       let loc_e = expr_of_loc_name loc_name in
       let* sval_e = SVal.to_gil_expr sval in
       DR.ok
         (make_branch ~heap:{ heap with mem }
            ~rets:[ loc_e; ofs; Expr.Lit (String chunk_string); sval_e ]
            ())
-  | _ -> fail_ungracefully "mem_get" params
+  | _ -> fail_ungracefully "get_single" params
 
-let execute_mem_set heap params =
+let execute_set_single heap params =
   let open DR.Syntax in
   match params with
   | [ loc; ofs; Expr.Lit (String chunk_string); sval_e ] ->
       let chunk = ValueTranslation.chunk_of_string chunk_string in
       let* sval = SVal.of_gil_expr_exn sval_e in
-      let++ mem = Mem.set heap.mem loc ofs chunk sval in
+      let++ mem = Mem.set_single heap.mem loc ofs chunk sval in
       make_branch ~heap:{ heap with mem } ~rets:[] ()
-  | _ -> fail_ungracefully "mem_set" params
+  | _ -> fail_ungracefully "set_single" params
 
-let execute_mem_rem _heap params =
+let execute_rem_single heap params =
+  let open DR.Syntax in
   match params with
-  | [ _loc; _ofs; Expr.Lit (String _chunk_string) ] ->
-      failwith "Mem_rem isn't implemented yet"
-  | _ -> fail_ungracefully "mem_rem" params
+  | [ loc; ofs; Expr.Lit (String chunk_string) ] ->
+      let chunk = ValueTranslation.chunk_of_string chunk_string in
+      let++ mem = Mem.rem_single heap.mem loc ofs chunk in
+      make_branch ~heap:{ heap with mem } ~rets:[] ()
+  | _ -> fail_ungracefully "rem_single" params
+
+let execute_get_hole heap params =
+  let open DR.Syntax in
+  match params with
+  | [ loc; low; high ] ->
+      let** mem, loc_name = Mem.get_hole heap.mem loc low high in
+      let loc_e = expr_of_loc_name loc_name in
+      DR.ok (make_branch ~heap:{ heap with mem } ~rets:[ loc_e; low; high ] ())
+  | _                  -> fail_ungracefully "get_hole" params
+
+let execute_set_hole heap params =
+  let open DR.Syntax in
+  match params with
+  | [ loc; low; high ] ->
+      let++ mem = Mem.set_hole heap.mem loc low high in
+      make_branch ~heap:{ heap with mem } ~rets:[] ()
+  | _                  -> fail_ungracefully "set_hole" params
+
+let execute_rem_hole heap params =
+  let open DR.Syntax in
+  match params with
+  | [ loc; low; high ] ->
+      let++ mem = Mem.rem_hole heap.mem loc low high in
+      make_branch ~heap:{ heap with mem } ~rets:[] ()
+  | _                  -> fail_ungracefully "rem_hole" params
+
+let execute_get_bounds heap params =
+  let open DR.Syntax in
+  match params with
+  | [ loc ] ->
+      let++ loc_name, bounds = Mem.get_bounds heap.mem loc in
+      let bounds_e =
+        match bounds with
+        | None             -> Expr.Lit Null
+        | Some (low, high) -> Expr.EList [ low; high ]
+      in
+      let loc_e = expr_of_loc_name loc_name in
+      make_branch ~heap ~rets:[ loc_e; bounds_e ] ()
+  | _       -> fail_ungracefully "get_bounds" params
+
+let execute_set_bounds heap params =
+  let open DR.Syntax in
+  match params with
+  | [ loc; bounds_e ] ->
+      let bounds =
+        match bounds_e with
+        | Expr.EList [ low; high ] -> Some (low, high)
+        | Lit Null                 -> None
+        | _                        -> fail_ungracefully "set_bounds" params
+      in
+      let++ mem = Mem.set_bounds heap.mem loc bounds in
+      make_branch ~heap:{ heap with mem } ~rets:[] ()
+  | _                 -> fail_ungracefully "set_bounds" params
+
+let execute_rem_bounds heap params =
+  match params with
+  | [ _loc ] -> DR.ok (make_branch ~heap ~rets:[] ())
+  | _        -> fail_ungracefully "rem_bounds" params
+
+let execute_get_perm heap params =
+  let open DR.Syntax in
+  match params with
+  | [ loc ] ->
+      let++ loc_name, perm = Mem.get_perm heap.mem loc in
+      let loc_e = expr_of_loc_name loc_name in
+      let perm_string = ValueTranslation.string_of_permission perm in
+      make_branch ~heap ~rets:[ loc_e; Expr.string perm_string ] ()
+  | _       -> fail_ungracefully "get_perm" params
+
+let execute_set_perm heap params =
+  let open DR.Syntax in
+  match params with
+  | [ loc; Expr.Lit (String perm_string) ] ->
+      let perm = ValueTranslation.permission_of_string perm_string in
+      let++ mem = Mem.set_perm heap.mem loc perm in
+      make_branch ~heap:{ heap with mem } ~rets:[] ()
+  | _ -> fail_ungracefully "set_perm" params
+
+let execute_rem_perm heap params =
+  match params with
+  | [ _loc ] -> DR.ok (make_branch ~heap ~rets:[] ())
+  | _        -> fail_ungracefully "rem_perm" params
 
 let execute_genvgetsymbol heap params =
   let open Gillian.Gil_syntax.Expr in
@@ -380,16 +545,24 @@ let execute_action ~action_name heap params =
     | AMem Load       -> execute_load !heap params
     | AMem Free       -> execute_free !heap params
     | AMem Move       -> execute_move !heap params
-    | AMem GetSingle  -> execute_mem_get !heap params
-    | AMem SetSingle  -> execute_mem_set !heap params
-    | AMem RemSingle  -> execute_mem_rem !heap params
+    | AMem GetSingle  -> execute_get_single !heap params
+    | AMem SetSingle  -> execute_set_single !heap params
+    | AMem RemSingle  -> execute_rem_single !heap params
+    | AMem GetBounds  -> execute_get_bounds !heap params
+    | AMem SetBounds  -> execute_set_bounds !heap params
+    | AMem RemBounds  -> execute_rem_bounds !heap params
+    | AMem GetPerm    -> execute_get_perm !heap params
+    | AMem SetPerm    -> execute_set_perm !heap params
+    | AMem RemPerm    -> execute_rem_perm !heap params
+    | AMem GetHole    -> execute_get_hole !heap params
+    | AMem SetHole    -> execute_set_hole !heap params
+    | AMem RemHole    -> execute_rem_hole !heap params
     | AGEnv GetSymbol -> execute_genvgetsymbol !heap params
     | AGEnv SetSymbol -> execute_genvsetsymbol !heap params
     | AGEnv RemSymbol -> execute_genvremsymbol !heap params
     | AGEnv GetDef    -> execute_genvgetdef !heap params
     | AGEnv SetDef    -> execute_genvsetdef !heap params
     | AGEnv RemDef    -> execute_genvremdef !heap params
-    | _               -> failwith "bite"
   in
   lift_dr a_ret
 

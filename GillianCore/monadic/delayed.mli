@@ -4,7 +4,8 @@ type 'a t
 
 val resolve : curr_pc:Pc.t -> 'a t -> 'a Branch.t list
 
-val return : ?learned:Formula.t list -> 'a -> 'a t
+val return :
+  ?learned:Formula.t list -> ?learned_types:(string * Type.t) list -> 'a -> 'a t
 
 val resolve_loc : Expr.t -> string option t
 
