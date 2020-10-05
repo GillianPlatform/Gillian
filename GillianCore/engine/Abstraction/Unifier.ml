@@ -323,7 +323,7 @@ module Make
             match pred_def.pred.pred_facts with
             | []    -> Some astate
             | facts ->
-                let t = Sys.time () in
+                (* let t = Sys.time () in *)
                 let params, _ = List.split pred_def.pred.pred_params in
                 let params = List.map (fun x -> Expr.PVar x) params in
                 let facts =
@@ -338,8 +338,8 @@ module Make
                 let result =
                   produce_assertion (state, preds, pred_defs) subst facts
                 in
-                Utils.Statistics.update_statistics "Produce facts"
-                  (Sys.time () -. t);
+                (* Utils.Statistics.update_statistics "Produce facts"
+                   (Sys.time () -. t); *)
                 result
           in
           let pure = pred_def.pred.pred_pure in
@@ -357,7 +357,8 @@ module Make
               Option.fold
                 ~some:(fun state -> Some (state, preds, pred_defs))
                 ~none:None
-                (State.assume_a ~unification:true state
+                (State.assume_a ~unification:true
+                   ~production:!Config.delay_entailment state
                    [ Eq (Val.to_expr v_x, Val.to_expr v_le) ])
           | _                   -> None
         else
@@ -408,7 +409,10 @@ module Make
     match ret with
     | None -> None
     | Some (state, preds, preds_tbl) -> (
-        let admissible = State.assume_a ~unification:true state [ True ] in
+        let admissible =
+          State.assume_a ~time:"Produce: final check" ~unification:true state
+            [ True ]
+        in
         match admissible with
         | None       -> None
         | Some state -> Some (state, preds, preds_tbl) )

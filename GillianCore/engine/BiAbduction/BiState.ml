@@ -123,6 +123,7 @@ struct
   let assume_a
       ?(unification = false)
       ?(production = false)
+      ?(time = "")
       (bi_state : t)
       (fs : Formula.t list) : t option =
     let procs, state, state_af = bi_state in

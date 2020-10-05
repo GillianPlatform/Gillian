@@ -90,6 +90,7 @@ module Make
   let assume_a
       ?(unification = false)
       ?(production = false)
+      ?(time = "")
       (state : t)
       (ps : Formula.t list) : t option =
     let les : Expr.t option list = List.map Formula.to_expr ps in

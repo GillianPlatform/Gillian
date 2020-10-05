@@ -235,14 +235,17 @@ let check_satisfiability_with_model (fs : Formula.t list) (gamma : TypEnv.t) :
       with _ -> None )
 
 let check_satisfiability
-    ?(unification = false) (fs : Formula.t list) (gamma : TypEnv.t) : bool =
-  let t = Sys.time () in
+    ?(unification = false) ?(time = "") (fs : Formula.t list) (gamma : TypEnv.t)
+    : bool =
+  (* let t = if time = "" then 0. else Sys.time () in *)
   L.verbose (fun m -> m "Entering FOSolver.check_satisfiability");
   let fs, gamma, _ = simplify_pfs_and_gamma ~unification fs gamma in
   (* let axioms    = get_axioms (Formula.Set.elements fs) gamma in
      let fs           = Formula.Set.union fs (Formula.Set.of_list axioms) in *)
   let result = Z3Encoding.check_sat fs gamma in
-  Utils.Statistics.update_statistics "FOS: CheckSat" (Sys.time () -. t);
+  (* if time <> "" then
+     Utils.Statistics.update_statistics ("FOS: CheckSat: " ^ time)
+       (Sys.time () -. t); *)
   result
 
 let sat ~pfs ~gamma formulae : bool =
@@ -273,7 +276,7 @@ let check_entailment
   (* SOUNDNESS !!DANGER!!: call to simplify_implication       *)
   (* Simplify maximally the implication to be checked         *)
   (* Remove from the typing environment the unused variables  *)
-  let t = Sys.time () in
+  (* let t = Sys.time () in *)
   let left_fs = PFS.copy left_fs in
   let gamma = TypEnv.copy gamma in
   let right_fs = PFS.of_list right_fs in
@@ -339,7 +342,8 @@ let check_entailment
           gamma_left
       in
       L.(verbose (fun m -> m "Entailment returned %b" (not ret)));
-      Utils.Statistics.update_statistics "FOS: CheckSat" (Sys.time () -. t);
+      (* Utils.Statistics.update_statistics "FOS: CheckEntailment"
+         (Sys.time () -. t); *)
       not ret
 
 let is_equal_on_lexprs e1 e2 pfs : bool option =
@@ -383,7 +387,7 @@ let is_equal_on_lexprs e1 e2 pfs : bool option =
       | _, _ -> None )
 
 let is_equal ~pfs ~gamma e1 e2 =
-  let t = Sys.time () in
+  (* let t = Sys.time () in *)
   let feq =
     Reduction.reduce_formula ?gamma:(Some gamma) ?pfs:(Some pfs) (Eq (e1, e2))
   in
@@ -398,11 +402,11 @@ let is_equal ~pfs ~gamma e1 e2 =
              ( "Equality reduced to something unexpected: "
              ^ (Fmt.to_to_string Formula.pp) feq ))
   in
-  Utils.Statistics.update_statistics "FOS: is_equal" (Sys.time () -. t);
+  (* Utils.Statistics.update_statistics "FOS: is_equal" (Sys.time () -. t); *)
   result
 
 let is_different ~pfs ~gamma e1 e2 =
-  let t = Sys.time () in
+  (* let t = Sys.time () in *)
   let feq = Reduction.reduce_formula ~gamma ~pfs (Not (Eq (e1, e2))) in
   let result =
     match feq with
@@ -415,7 +419,7 @@ let is_different ~pfs ~gamma e1 e2 =
              ( "Inequality reduced to something unexpected: "
              ^ (Fmt.to_to_string Formula.pp) feq ))
   in
-  Utils.Statistics.update_statistics "FOS: is different" (Sys.time () -. t);
+  (* Utils.Statistics.update_statistics "FOS: is different" (Sys.time () -. t); *)
   result
 
 let is_less_or_equal ~pfs ~gamma e1 e2 =

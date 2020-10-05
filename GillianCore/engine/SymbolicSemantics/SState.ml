@@ -214,14 +214,23 @@ module Make (SMemory : SMemory.S) :
   let assume_a
       ?(unification = false)
       ?(production = false)
+      ?(time = "")
       (state : t)
       (ps : Formula.t list) : t option =
     let _, _, pfs, gamma, _ = state in
-    let ps = List.map (Reduction.reduce_formula ~pfs ~gamma) ps in
+    let ps =
+      List.map
+        (Reduction.reduce_formula
+           ~time:("SState: assume_a: " ^ time)
+           ~pfs ~gamma)
+        ps
+    in
     let result =
       if
         production
-        || FOSolver.check_satisfiability ~unification
+        || FOSolver.check_satisfiability
+             ~time:("SState: assume_a: " ^ time)
+             ~unification
              (ps @ PFS.to_list pfs)
              gamma
       then (
@@ -240,7 +249,6 @@ module Make (SMemory : SMemory.S) :
         Some state
 
   let sat_check (state : t) (v : Expr.t) : bool =
-    let t = Sys.time () in
     L.verbose (fun m -> m "SState: sat_check: %a" Expr.pp v);
     let _, _, pfs, gamma, _ = state in
     let v = Reduction.reduce_lexpr ~pfs ~gamma v in
@@ -257,7 +265,6 @@ module Make (SMemory : SMemory.S) :
         FOSolver.check_satisfiability (v_asrt :: PFS.to_list pfs) gamma
       in
       L.(verbose (fun m -> m "SState: sat_check done: %b" result));
-      Utils.Statistics.update_statistics "SAT Check" (Sys.time () -. t);
       result
 
   let sat_check_f (state : t) (fs : Formula.t list) : st option =
@@ -284,7 +291,6 @@ module Make (SMemory : SMemory.S) :
       ?(kill_new_lvars = true)
       ?(unification = false)
       (state : t) : st =
-    let start_time = Sys.time () in
     let heap, store, pfs, gamma, svars = state in
     let save_spec_vars = if save then (SS.empty, true) else (svars, false) in
     L.verbose (fun m ->
@@ -317,7 +323,6 @@ module Make (SMemory : SMemory.S) :
            @[%a@]@\n\
            -----------------------------------"
           pp state SSubst.pp subst);
-    Utils.Statistics.update_statistics "Simplify" (Sys.time () -. start_time);
     subst
 
   let simplify_val (state : t) (v : vt) : vt =

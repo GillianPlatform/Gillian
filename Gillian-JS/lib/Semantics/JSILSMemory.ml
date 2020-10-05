@@ -269,6 +269,7 @@ module M : Gillian.Symbolic.Memory_S = struct
                             let new_f : Formula.t = Eq (f_name, prop) in
                             let sat =
                               FOSolver.check_satisfiability
+                                ~time:"JS getCell branch: heap"
                                 (new_f :: PFS.to_list pfs) gamma
                             in
                             match sat with
@@ -291,8 +292,9 @@ module M : Gillian.Symbolic.Memory_S = struct
                       (* I need the case in which the prop does not exist *)
                       let new_f : Formula.t = Not (SetMem (prop, dom)) in
                       let sat =
-                        FOSolver.check_satisfiability (new_f :: PFS.to_list pfs)
-                          gamma
+                        FOSolver.check_satisfiability
+                          ~time:"JS getCell branch: domain"
+                          (new_f :: PFS.to_list pfs) gamma
                       in
                       let dom_ret =
                         match sat with

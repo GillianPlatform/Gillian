@@ -36,6 +36,7 @@ val reduce_lexpr :
     The [unification] flag should not be used by Gillian instantiation developers. *)
 val reduce_formula :
   ?unification:bool ->
+  ?time:string ->
   ?pfs:PFS.t ->
   ?gamma:TypEnv.t ->
   Gil_syntax.Formula.t ->

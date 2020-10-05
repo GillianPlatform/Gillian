@@ -10,7 +10,11 @@ val check_satisfiability_with_model :
     under the typing environment [gamma]. The [unification] flag should
     not be used by Gillian instantiation developers. *)
 val check_satisfiability :
-  ?unification:bool -> Gil_syntax.Formula.t list -> TypEnv.t -> bool
+  ?unification:bool ->
+  ?time:string ->
+  Gil_syntax.Formula.t list ->
+  TypEnv.t ->
+  bool
 
 (** A different API for [check_satisfiability] better adapted for usage in memory models *)
 val sat : pfs:PFS.t -> gamma:TypEnv.t -> Gil_syntax.Formula.t list -> bool

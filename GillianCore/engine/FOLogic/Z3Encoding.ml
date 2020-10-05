@@ -1298,9 +1298,9 @@ let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
           (string_of_solver masterSolver)));
 
   (* Step 3: Check satisfiability *)
-  let t = Sys.time () in
+  (* let t = Sys.time () in *)
   let ret = Solver.check masterSolver [] in
-  Utils.Statistics.update_statistics "Solver check" (Sys.time () -. t);
+  (* Utils.Statistics.update_statistics "Solver check" (Sys.time () -. t); *)
   L.(
     verbose (fun m -> m "The solver returned: %s" (Solver.string_of_status ret)));
 

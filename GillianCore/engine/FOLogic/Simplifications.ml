@@ -507,7 +507,7 @@ let simplify_pfs_and_gamma
   L.verbose (fun m -> m "  @[%a@]" PFS.pp lpfs);
   L.verbose (fun m -> m "  @[%a@]" TypEnv.pp gamma);
 
-  let t = Sys.time () in
+  (* let t = Sys.time () in *)
   let rpfs : PFS.t = Option.value ~default:(PFS.init ()) rpfs in
   let existentials : SS.t ref =
     ref (Option.value ~default:SS.empty existentials)
@@ -912,15 +912,14 @@ let simplify_pfs_and_gamma
         }
       in
       Hashtbl.replace simplification_cache key cached_simplification;
-      Utils.Statistics.update_statistics "FOS: SimplifyPFSandGamma"
-        (Sys.time () -. t);
+      (* Utils.Statistics.update_statistics "FOS: SimplifyPFSandGamma"
+         (Sys.time () -. t); *)
       (* Step 5 - conclude *)
       (result, !existentials)
 
 let simplify_implication
     (exists : SS.t) (lpfs : PFS.t) (rpfs : PFS.t) (gamma : TypEnv.t) =
-  let t = Sys.time () in
-
+  (* let t = Sys.time () in *)
   List.iter
     (fun (pf : Formula.t) ->
       match pf with
@@ -963,8 +962,8 @@ let simplify_implication
            %a\n"
           (Fmt.iter ~sep:(Fmt.any ", ") SS.iter Fmt.string)
           exists PFS.pp lpfs PFS.pp rpfs TypEnv.pp gamma));
-  Utils.Statistics.update_statistics "FOS: SimplifyImplication"
-    (Sys.time () -. t);
+  (* Utils.Statistics.update_statistics "FOS: SimplifyImplication"
+     (Sys.time () -. t); *)
   exists
 
 let admissible_assertion (a : Asrt.t) : bool =

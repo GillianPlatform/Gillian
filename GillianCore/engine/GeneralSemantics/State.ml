@@ -66,7 +66,12 @@ module type S = sig
 
   (** Assume assertion *)
   val assume_a :
-    ?unification:bool -> ?production:bool -> t -> Formula.t list -> t option
+    ?unification:bool ->
+    ?production:bool ->
+    ?time:string ->
+    t ->
+    Formula.t list ->
+    t option
 
   (** Assume type *)
   val assume_t : t -> vt -> Type.t -> t option

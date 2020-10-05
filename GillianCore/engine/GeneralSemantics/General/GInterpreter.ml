@@ -242,14 +242,8 @@ struct
              (fun (f'', state) ->
                match State.assume_a state [ f'' ] with
                | Some state' -> [ state' ]
-               | _           ->
-                   (* Printf.printf "WARNING: ASSUMING FALSE\n"; *)
-                   [])
+               | _           -> [])
              fos)
-    (*
-        (match State.assume_a state [ f' ] with
-          | Some state' -> [ state' ]
-          | _ -> (* Printf.printf "WARNING: ASSUMING FALSE\n"; *) []) *)
     | SpecVar xs -> [ State.add_spec_vars state (Var.Set.of_list xs) ]
     | Assert f -> (
         let store_subst = Store.to_ssubst (State.get_store state) in
@@ -388,10 +382,12 @@ struct
     let loop_ids = Annot.get_loop_info annot @ CallStack.get_loop_ids cs in
 
     let loop_action : loop_action =
-      understand_loop_action loop_ids prev_loop_ids
+      if ExecMode.verification_exec !Config.current_exec_mode then
+        understand_loop_action loop_ids prev_loop_ids
+      else Nothing
     in
 
-    if !Config.stats then Statistics.exec_cmds := !Statistics.exec_cmds + 1;
+    (* if !Config.stats then Statistics.exec_cmds := !Statistics.exec_cmds + 1; *)
     UP.update_coverage prog proc_name i;
 
     let state =

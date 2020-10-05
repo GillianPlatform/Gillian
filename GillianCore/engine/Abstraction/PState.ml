@@ -166,10 +166,11 @@ module Make
   let assume_a
       ?(unification = false)
       ?(production = false)
+      ?(time = "")
       (astate : t)
       (fs : Formula.t list) : t option =
     let state, preds, pred_defs = astate in
-    match State.assume_a ~unification ~production state fs with
+    match State.assume_a ~unification ~production ~time state fs with
     | Some state -> Some (state, preds, pred_defs)
     | None       -> None
 
