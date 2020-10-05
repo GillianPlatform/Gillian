@@ -141,7 +141,8 @@ module Mem = struct
         let++ new_tree =
           map_lift_err loc_name (SHeapTree.rem_single tree ofs chunk)
         in
-        SMap.add loc_name new_tree mem
+        if SHeapTree.is_empty new_tree then SMap.remove loc_name mem
+        else SMap.add loc_name new_tree mem
 
   let get_freed mem loc =
     let open DR.Syntax in
@@ -189,7 +190,8 @@ module Mem = struct
         let++ new_tree =
           map_lift_err loc_name (SHeapTree.rem_hole tree low high)
         in
-        SMap.add loc_name new_tree mem
+        if SHeapTree.is_empty new_tree then SMap.remove loc_name mem
+        else SMap.add loc_name new_tree mem
 
   let get_perm mem loc =
     let open DR.Syntax in
