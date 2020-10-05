@@ -187,7 +187,10 @@ let execute_action name heap params =
       | RemHole
       | GetPerm
       | SetPerm
-      | RemPerm )
+      | RemPerm
+      | GetFreed
+      | SetFreed
+      | RemFreed )
   | AGEnv (RemDef | RemSymbol) ->
       failwith
         (Printf.sprintf

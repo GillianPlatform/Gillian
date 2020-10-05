@@ -20,12 +20,15 @@ type mem_ac =
   | GetPerm
   | SetPerm
   | RemPerm
+  | GetFreed
+  | SetFreed
+  | RemFreed
 
 type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
 
 type ac = AGEnv of genv_ac | AMem of mem_ac
 
-type mem_ga = Single | Hole | Bounds | Perm
+type mem_ga = Single | Hole | Bounds | Perm | Freed
 
 type genv_ga = Symbol | Definition
 
@@ -42,18 +45,21 @@ let mem_ga_to_setter = function
   | Hole   -> SetHole
   | Bounds -> SetBounds
   | Perm   -> SetPerm
+  | Freed  -> SetFreed
 
 let mem_ga_to_getter = function
   | Single -> GetSingle
   | Hole   -> GetHole
   | Bounds -> GetBounds
   | Perm   -> GetPerm
+  | Freed  -> GetFreed
 
 let mem_ga_to_deleter = function
   | Single -> RemSingle
   | Hole   -> RemHole
   | Bounds -> RemBounds
   | Perm   -> RemPerm
+  | Freed  -> RemFreed
 
 let genv_ga_to_getter = function
   | Definition -> GetDef
@@ -103,6 +109,9 @@ let str_mem_ac = function
   | GetPerm    -> "get_perm"
   | SetPerm    -> "set_perm"
   | RemPerm    -> "rem_perm"
+  | GetFreed   -> "get_freed"
+  | SetFreed   -> "set_freed"
+  | RemFreed   -> "rem_freed"
 
 let mem_ac_from_str = function
   | "alloc"      -> Alloc
@@ -124,6 +133,9 @@ let mem_ac_from_str = function
   | "get_perm"   -> GetPerm
   | "set_perm"   -> SetPerm
   | "rem_perm"   -> RemPerm
+  | "get_freed"  -> GetFreed
+  | "set_freed"  -> SetFreed
+  | "rem_freed"  -> RemFreed
   | s            -> failwith ("Unkown Memory Action : " ^ s)
 
 let str_genv_ac = function
@@ -163,6 +175,7 @@ let str_mem_ga = function
   | Hole   -> "hole"
   | Bounds -> "bounds"
   | Perm   -> "perm"
+  | Freed  -> "freed"
 
 let str_genv_ga = function
   | Definition -> "def"
@@ -172,6 +185,7 @@ let mem_ga_from_str = function
   | "single" -> Single
   | "bounds" -> Bounds
   | "hole"   -> Hole
+  | "freed"  -> Freed
   | str      -> failwith ("Unkown memory assertion : " ^ str)
 
 let genv_ga_from_str = function
@@ -208,6 +222,7 @@ let ga_loc_indexes ga =
   | GMem Hole        -> [ 0 ]
   | GMem Bounds      -> [ 0 ]
   | GMem Perm        -> [ 0 ]
+  | GMem Freed       -> [ 0 ]
   | GGenv Definition -> [ 0 ]
   | GGenv Symbol     -> []
 

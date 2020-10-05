@@ -47,6 +47,7 @@ type err =
   | Unhandled              of string
   | RemovingNotOwned
   | HoleNotUndefined
+  | MemoryNotFreed
 
 let pp_err fmt = function
   | UseAfterFree -> Fmt.pf fmt "Use After Free"
@@ -63,6 +64,7 @@ let pp_err fmt = function
   | Unhandled e -> Fmt.pf fmt "Unhandled error with message : %s" e
   | RemovingNotOwned -> Fmt.pf fmt "Removing not owned"
   | HoleNotUndefined -> Fmt.pf fmt "Hole not undefined"
+  | MemoryNotFreed -> Fmt.pf fmt "MemoryNotFreed"
 
 let err_equal a b =
   match (a, b) with
@@ -126,20 +128,18 @@ module Node = struct
 
   type t =
     | NotOwned of qty
-    | Undef
-    | Zero
+    | Undef    of qty
     | Single   of { chunk : Compcert.AST.memory_chunk; value : SVal.t }
 
   let pp fmt = function
     | NotOwned qty            -> Fmt.pf fmt "%s NOT OWNED" (str_qty qty)
-    | Undef                   -> Fmt.pf fmt "UNDEF"
-    | Zero                    -> Fmt.pf fmt "ZERO"
+    | Undef qty               -> Fmt.pf fmt "%s UNDEF" (str_qty qty)
     | Single { chunk; value } ->
         Fmt.pf fmt "(%a : %a)" SVal.pp value Chunk.pp chunk
 
   let equal a b =
     match (a, b) with
-    | Undef, Undef | Zero, Zero -> true
+    | Undef x, Undef y -> x == y
     | NotOwned x, NotOwned y -> x == y
     | Single { chunk = ca; value = va }, Single { chunk = cb; value = vb } ->
         Chunk.equal ca cb && SVal.equal va vb
@@ -148,9 +148,9 @@ module Node = struct
   let split = function
     (* TODO: Improve this *)
     | NotOwned Totally -> (NotOwned Totally, NotOwned Totally)
-    | Undef -> (Undef, Undef)
-    | Zero -> (Zero, Zero)
-    | Single _ -> (Undef, Undef)
+    | Undef Totally -> (Undef Totally, Undef Totally)
+    | Single _ -> (Undef Totally, Undef Totally)
+    | Undef Partially -> failwith "Should never split a partially undef node"
     | NotOwned Partially -> failwith "Should never split a partially owned node"
 
   let merge ~left:a ~right:b =
@@ -158,14 +158,13 @@ module Node = struct
     match (a, b) with
     | NotOwned Totally, NotOwned Totally -> NotOwned Totally
     | NotOwned _, _ | _, NotOwned _ -> NotOwned Partially
-    | Zero, Zero -> Zero
-    | _, _ -> Undef
+    | Undef Totally, Undef Totally -> Undef Totally
+    | _, _ -> Undef Partially
 
   let decode ~chunk t =
     match t with
     | NotOwned _ -> Error MissingResource
-    | Undef -> Ok SVal.SUndefined
-    | Zero -> Ok (SVal.zero_of_chunk chunk)
+    | Undef _ -> Ok SVal.SUndefined
     | Single { chunk = m_chunk; value } ->
         Ok (if Chunk.equal m_chunk chunk then value else SUndefined)
 
@@ -180,8 +179,8 @@ module Node = struct
     | _ -> Single { chunk; value = SUndefined }
 
   let lvars = function
-    | NotOwned _ | Undef | Zero -> SS.empty
-    | Single { value = e; _ }   -> SVal.lvars e
+    | NotOwned _ | Undef _    -> SS.empty
+    | Single { value = e; _ } -> SVal.lvars e
 end
 
 module Tree = struct
@@ -194,6 +193,11 @@ module Tree = struct
         children
     in
     (Fmt.parens (Fmt.vbox pp_aux)) fmt t
+
+  let is_empty { node; _ } =
+    match node with
+    | NotOwned Totally -> true
+    | _                -> false
 
   let rec equal ~pc a b =
     Node.equal a.node b.node
@@ -210,7 +214,7 @@ module Tree = struct
 
   let with_node t node = { t with node }
 
-  let undefined span = make ~node:Undef ~span ()
+  let undefined span = make ~node:(Undef Totally) ~span ()
 
   let create_root range =
     { children = None; span = range; node = NotOwned Totally }
@@ -381,6 +385,25 @@ module Tree = struct
       | None        -> SS.empty
     in
     SS.union (SS.union node_lvars span_lvars) children_lvars
+
+  let rec assertions ~loc { node; span; children } =
+    match node with
+    | NotOwned Totally -> []
+    | NotOwned Partially | Undef Partially ->
+        let left, right = Option.get children in
+        assertions ~loc left @ assertions ~loc right
+    | Undef Totally ->
+        let low, high = span in
+        [ Constr.hole ~loc ~low ~high ]
+    | Single { chunk; value } ->
+        let sval, types = SVal.to_gil_expr value in
+        let types =
+          List.map
+            (let open Formula.Infix in
+            fun (x, t) -> Asrt.Pure (Expr.typeof x) #== (Lit (Type t)))
+            types
+        in
+        Constr.single ~loc ~ofs:(fst span) ~chunk ~sval :: types
 end
 
 type t =
@@ -404,6 +427,15 @@ let empty () =
   let perm = Perm.Freeable in
   let root = None in
   Delayed.return (Tree { bounds; perm; root })
+
+let is_empty t =
+  match t with
+  | Freed                    -> false
+  | Tree { bounds; root; _ } ->
+      Option.is_none bounds
+      && Option.fold ~none:true ~some:(fun root -> Tree.is_empty root) root
+
+let freed = Freed
 
 let lvars = function
   | Freed                    -> SS.empty
@@ -590,9 +622,9 @@ let get_hole t low high =
         let** node = Tree.get_framed_node root_framed range in
         let res =
           match node with
-          | Undef      -> Ok ()
-          | NotOwned _ -> Error MissingResource
-          | _          -> Error HoleNotUndefined
+          | Undef Totally -> Ok ()
+          | NotOwned _    -> Error MissingResource
+          | _             -> Error HoleNotUndefined
         in
         let++ wroot =
           DR.of_result (Result.bind res (fun () -> with_root t root_framed))
@@ -606,10 +638,11 @@ let set_hole t low high =
   let** root = DR.of_result (get_root t) in
   let** root_set =
     match root with
-    | None      -> Tree.set_node_framed (Tree.create_root range) range Undef
+    | None      ->
+        Tree.set_node_framed (Tree.create_root range) range (Undef Totally)
     | Some root ->
         let** root_framed = Tree.frame_range root range in
-        Tree.set_node_framed root_framed range Undef
+        Tree.set_node_framed root_framed range (Undef Totally)
   in
   let** bounds = DR.of_result (get_bounds t) in
   let learned =
@@ -641,6 +674,11 @@ let rem_hole t low high =
   in
   DR.of_result ~learned (with_root_opt t root_set)
 
+let get_freed t =
+  match t with
+  | Freed -> Ok ()
+  | _     -> Error MemoryNotFreed
+
 let check_valid_access t chunk ofs perm =
   let open Delayed.Syntax in
   let open Perm.Infix in
@@ -669,3 +707,18 @@ let store t chunk ofs value =
   let open DR.Syntax in
   let** () = check_valid_access t chunk ofs Readable in
   set_single t ofs chunk value
+
+let assertions ~loc t =
+  match t with
+  | Freed  -> [ Constr.freed ~loc ]
+  | Tree x ->
+      let bounds = Constr.bounds_opt ~loc ~bounds:x.bounds in
+      let perm = Constr.perm ~loc ~perm:x.perm in
+      let tree =
+        match x.root with
+        | None      -> []
+        | Some root -> Tree.assertions ~loc root
+      in
+      bounds :: perm :: tree
+
+(* For now freed locations are just ignored, but in the future they should be represented by a predicate *)

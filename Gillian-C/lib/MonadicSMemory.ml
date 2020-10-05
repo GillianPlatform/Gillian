@@ -143,6 +143,28 @@ module Mem = struct
         in
         SMap.add loc_name new_tree mem
 
+  let get_freed mem loc =
+    let open DR.Syntax in
+    let** loc_name = resolve_loc_result loc in
+    let** tree = get_tree_res mem loc_name in
+    DR.of_result (SHeapTree.get_freed tree) |> map_lift_err loc_name
+
+  let set_freed mem loc =
+    let+ loc_name = resolve_or_create_loc_name loc in
+    SMap.add loc_name SHeapTree.freed mem
+
+  let rem_freed mem loc =
+    let open DR.Syntax in
+    let* loc_name = Delayed.resolve_loc loc in
+    match Option.bind loc_name (fun l -> SMap.find_opt l mem) with
+    | None      -> DR.ok mem
+    | Some tree ->
+        let loc_name = Option.get loc_name in
+        let++ () =
+          map_lift_err loc_name (DR.of_result (SHeapTree.get_freed tree))
+        in
+        SMap.remove loc_name mem
+
   let get_hole mem loc low high =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
@@ -387,6 +409,29 @@ let execute_rem_hole heap params =
       make_branch ~heap:{ heap with mem } ~rets:[] ()
   | _                  -> fail_ungracefully "rem_hole" params
 
+let execute_get_freed heap params =
+  let open DR.Syntax in
+  match params with
+  | [ loc ] ->
+      let++ () = Mem.get_freed heap.mem loc in
+      make_branch ~heap ~rets:[] ()
+  | _       -> fail_ungracefully "get_freed" params
+
+let execute_set_freed heap params =
+  match params with
+  | [ loc ] ->
+      let+ mem = Mem.set_freed heap.mem loc in
+      Ok (make_branch ~heap:{ heap with mem } ~rets:[] ())
+  | _       -> fail_ungracefully "set_freed" params
+
+let execute_rem_freed heap params =
+  let open DR.Syntax in
+  match params with
+  | [ loc ] ->
+      let++ mem = Mem.rem_freed heap.mem loc in
+      make_branch ~heap:{ heap with mem } ~rets:[] ()
+  | _       -> fail_ungracefully "rem_freed" params
+
 let execute_get_bounds heap params =
   let open DR.Syntax in
   match params with
@@ -557,6 +602,9 @@ let execute_action ~action_name heap params =
     | AMem GetHole    -> execute_get_hole !heap params
     | AMem SetHole    -> execute_set_hole !heap params
     | AMem RemHole    -> execute_rem_hole !heap params
+    | AMem GetFreed   -> execute_get_freed !heap params
+    | AMem SetFreed   -> execute_set_freed !heap params
+    | AMem RemFreed   -> execute_rem_freed !heap params
     | AGEnv GetSymbol -> execute_genvgetsymbol !heap params
     | AGEnv SetSymbol -> execute_genvsetsymbol !heap params
     | AGEnv RemSymbol -> execute_genvremsymbol !heap params

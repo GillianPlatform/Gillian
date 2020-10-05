@@ -116,7 +116,10 @@ let if_sure
 
 let branch_on guard ~(then_ : unit -> 'a t) ~(else_ : unit -> 'a t) =
   BranchSat
-    [ { guard; thunk = then_ }; { guard = Formula.Not guard; thunk = else_ } ]
+    [
+      { guard; thunk = then_ };
+      { guard = Formula.Infix.fnot guard; thunk = else_ };
+    ]
 
 let branch_entailment branches =
   BranchEntailment (List.map guarded_thunk_of_pair branches)
