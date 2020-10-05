@@ -233,6 +233,13 @@ module Mem = struct
       (fun _ tree acc -> SS.union (SHeapTree.lvars tree) acc)
       mem SS.empty
 
+  let assertions ~exclude mem =
+    SMap.fold
+      (fun loc tree acc ->
+        if not (List.mem loc exclude) then SHeapTree.assertions ~loc tree @ acc
+        else acc)
+      mem []
+
   let pp ft mem =
     let open Fmt in
     pf ft "%a" (Dump.iter_bindings SMap.iter nop string SHeapTree.pp) mem
@@ -636,7 +643,10 @@ let clean_up _ = ()
 
 let lvars heap = Mem.lvars !heap.mem
 
-let assertions ?to_keep:_ _heap = failwith "assertions not implemented"
+let assertions ?to_keep:_ heap =
+  let genv_locs, genv_asrts = GEnv.assertions !heap.genv in
+  let mem_asrts = Mem.assertions ~exclude:genv_locs !heap.mem in
+  genv_asrts @ mem_asrts
 
 (* let genv_locs, genv_asrts = GEnv.assertions !heap.genv in
    let mem_asrts = Mem.assertions ~exclude:genv_locs !heap.mem in

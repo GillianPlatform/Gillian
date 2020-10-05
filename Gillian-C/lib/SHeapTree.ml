@@ -709,6 +709,7 @@ let store t chunk ofs value =
   set_single t ofs chunk value
 
 let assertions ~loc t =
+  let loc = Expr.loc_from_loc_name loc in
   match t with
   | Freed  -> [ Constr.freed ~loc ]
   | Tree x ->
