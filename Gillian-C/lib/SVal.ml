@@ -151,3 +151,18 @@ let pp fmt v =
   | SVlong i      -> f fmt "Long(%a)" se i
   | SVfloat i     -> f fmt "Float(%a)" se i
   | SVsingle i    -> f fmt "Single(%a)" se i
+
+let substitution ~le_subst ~aloc_subst sv =
+  match sv with
+  | SVint v          -> SVint (le_subst v)
+  | SVfloat v        -> SVfloat (le_subst v)
+  | SVlong v         -> SVlong (le_subst v)
+  | SVsingle v       -> SVsingle (le_subst v)
+  | SUndefined       -> SUndefined
+  | Sptr (loc, offs) -> (
+      match Subst.get aloc_subst loc with
+      | Some (ALoc nloc) | Some (Lit (Loc nloc)) -> Sptr (nloc, le_subst offs)
+      | Some nloc ->
+          failwith
+            (Format.asprintf "Heap substitution fail for loc: %a" Expr.pp nloc)
+      | None -> Sptr (loc, le_subst offs) )

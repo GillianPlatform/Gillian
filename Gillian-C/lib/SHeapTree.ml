@@ -117,6 +117,8 @@ module Range = struct
   let extract (il, ih) (ol, oh) = ((ol, il), (il, ih), (ih, oh))
 
   let lvars (a, b) = SS.union (Expr.lvars a) (Expr.lvars b)
+
+  let substitution ~le_subst (a, b) = (le_subst a, le_subst b)
 end
 
 module Node = struct
@@ -181,6 +183,10 @@ module Node = struct
   let lvars = function
     | NotOwned _ | Undef _    -> SS.empty
     | Single { value = e; _ } -> SVal.lvars e
+
+  let substitution ~sval_subst = function
+    | Single { chunk; value } -> Single { chunk; value = sval_subst value }
+    | other                   -> other
 end
 
 module Tree = struct
@@ -404,6 +410,18 @@ module Tree = struct
             types
         in
         Constr.single ~loc ~ofs:(fst span) ~chunk ~sval :: types
+
+  let rec substitution ~sval_subst ~le_subst { node; span; children } =
+    let node = Node.substitution ~sval_subst node in
+    let span = Range.substitution ~le_subst span in
+    let children =
+      Option.map
+        (fun (left, right) ->
+          let f = substitution ~sval_subst ~le_subst in
+          (f left, f right))
+        children
+    in
+    { node; span; children }
 end
 
 type t =
@@ -722,4 +740,25 @@ let assertions ~loc t =
       in
       bounds :: perm :: tree
 
-(* For now freed locations are just ignored, but in the future they should be represented by a predicate *)
+(* let merge old new_ =
+  (* the new tree has priority over the old tree. *)
+  match (new_, old) with
+  | Freed, Freed -> Freed
+  | Tree new_tree, Tree old_tree ->
+    let def_bounds = (
+      match new_tree.bounds with
+      | Some bounds -> Some bounds
+      | None -> old_tree.bounds
+    ) in
+    let def_permission = new_tree.perm in
+    let def_root = 
+  | _ -> failwith "Incompatible trees to merge"
+     *)
+
+let substitution ~le_subst ~sval_subst t =
+  match t with
+  | Freed -> Freed
+  | Tree { bounds; perm; root } ->
+      let bounds = Option.map (Range.substitution ~le_subst) bounds in
+      let root = Option.map (Tree.substitution ~sval_subst ~le_subst) root in
+      Tree { bounds; perm; root }

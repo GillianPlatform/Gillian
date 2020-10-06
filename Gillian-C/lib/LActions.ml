@@ -97,21 +97,21 @@ let str_mem_ac = function
   | Load       -> "load"
   | Move       -> "move"
   | Free       -> "free"
-  | GetSingle  -> "get_single"
-  | SetSingle  -> "set_single"
-  | RemSingle  -> "rem_single"
-  | GetBounds  -> "get_bounds"
-  | SetBounds  -> "set_bounds"
-  | RemBounds  -> "rem_bounds"
-  | GetHole    -> "get_hole"
-  | SetHole    -> "set_hole"
-  | RemHole    -> "rem_hole"
-  | GetPerm    -> "get_perm"
-  | SetPerm    -> "set_perm"
-  | RemPerm    -> "rem_perm"
-  | GetFreed   -> "get_freed"
-  | SetFreed   -> "set_freed"
-  | RemFreed   -> "rem_freed"
+  | GetSingle  -> "getSingle"
+  | SetSingle  -> "setSingle"
+  | RemSingle  -> "remSingle"
+  | GetBounds  -> "getBounds"
+  | SetBounds  -> "setBounds"
+  | RemBounds  -> "remBounds"
+  | GetHole    -> "getHole"
+  | SetHole    -> "setHole"
+  | RemHole    -> "remHole"
+  | GetPerm    -> "getPerm"
+  | SetPerm    -> "setPerm"
+  | RemPerm    -> "remPerm"
+  | GetFreed   -> "getFreed"
+  | SetFreed   -> "setFreed"
+  | RemFreed   -> "remFreed"
 
 let mem_ac_from_str = function
   | "alloc"      -> Alloc
@@ -121,21 +121,21 @@ let mem_ac_from_str = function
   | "load"       -> Load
   | "free"       -> Free
   | "move"       -> Move
-  | "get_single" -> GetSingle
-  | "set_single" -> SetSingle
-  | "rem_single" -> RemSingle
-  | "get_bounds" -> GetBounds
-  | "set_bounds" -> SetBounds
-  | "rem_bounds" -> RemBounds
-  | "get_hole"   -> GetHole
-  | "set_hole"   -> SetHole
-  | "rem_hole"   -> RemHole
-  | "get_perm"   -> GetPerm
-  | "set_perm"   -> SetPerm
-  | "rem_perm"   -> RemPerm
-  | "get_freed"  -> GetFreed
-  | "set_freed"  -> SetFreed
-  | "rem_freed"  -> RemFreed
+  | "getSingle"  -> GetSingle
+  | "setSingle"  -> SetSingle
+  | "remSingle"  -> RemSingle
+  | "getBounds"  -> GetBounds
+  | "setBounds"  -> SetBounds
+  | "remBounds"  -> RemBounds
+  | "getHole"    -> GetHole
+  | "setHole"    -> SetHole
+  | "remHole"    -> RemHole
+  | "getPerm"    -> GetPerm
+  | "setPerm"    -> SetPerm
+  | "remPerm"    -> RemPerm
+  | "getFreed"   -> GetFreed
+  | "setFreed"   -> SetFreed
+  | "remFreed"   -> RemFreed
   | s            -> failwith ("Unkown Memory Action : " ^ s)
 
 let str_genv_ac = function
@@ -186,6 +186,7 @@ let mem_ga_from_str = function
   | "bounds" -> Bounds
   | "hole"   -> Hole
   | "freed"  -> Freed
+  | "perm"   -> Perm
   | str      -> failwith ("Unkown memory assertion : " ^ str)
 
 let genv_ga_from_str = function

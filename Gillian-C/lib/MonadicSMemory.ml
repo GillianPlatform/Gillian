@@ -242,6 +242,49 @@ module Mem = struct
         else acc)
       mem []
 
+  (* let merge_locs old_loc new_loc mem =
+       let ret_ops =
+       let ( let* ) = Option.bind in
+       match SMap.find_opt new_loc mem with
+       | None ->
+         Logging.verbose (fun fmt -> fmt "New location does not exist");
+         SMap.find_opt old_loc mem
+       | Some new_tree ->
+         let* old_tree = SMap.find_opt old_loc mem in
+         let def_perm = new_tree.perm in
+
+       in
+     match ret_ops with
+     | None -> Logging.verbose ?severity:Warning (fun fmt -> fmt -> "Warning: Unable to merge, tree not found at old_loc");
+       mem
+     | Some tree ->
+       SMap.remove old_loc mem |> SMap.add new_loc tree *)
+
+  let substitution subst mem =
+    if not (Subst.domain subst None = SS.empty) then
+      let aloc_subst =
+        Subst.filter subst (fun var _ -> GUtils.Names.is_aloc_name var)
+      in
+      let le_subst = Subst.subst_in_expr subst ~partial:true in
+      let sval_subst = SVal.substitution ~aloc_subst ~le_subst in
+      let subst_tree = SHeapTree.substitution ~le_subst ~sval_subst in
+      let substituted = SMap.map subst_tree mem in
+      (* FIXME: need to merge locations at some point... *)
+      (* Subst.fold aloc_subst
+         (fun old_loc new_loc acc ->
+           Logging.verbose (fun fmt ->
+               fmt "SHOULD Merge locs: %s --> %a" old_loc Expr.pp new_loc);
+           let _new_loc =
+             match new_loc with
+             | Lit (Loc loc) | ALoc loc -> loc
+             | _                        ->
+                 Fmt.failwith "Heap substitution failed for loc : %a" Expr.pp
+                   new_loc
+           in
+           acc) *)
+      substituted
+    else mem
+
   let pp ft mem =
     let open Fmt in
     pf ft "%a" (Dump.iter_bindings SMap.iter nop string SHeapTree.pp) mem
@@ -461,9 +504,10 @@ let execute_set_bounds heap params =
   | [ loc; bounds_e ] ->
       let bounds =
         match bounds_e with
-        | Expr.EList [ low; high ] -> Some (low, high)
-        | Lit Null                 -> None
-        | _                        -> fail_ungracefully "set_bounds" params
+        | Expr.EList [ low; high ]  -> Some (low, high)
+        | Lit (LList [ low; high ]) -> Some (Lit low, Lit high)
+        | Lit Null                  -> None
+        | _                         -> fail_ungracefully "set_bounds" params
       in
       let++ mem = Mem.set_bounds heap.mem loc bounds in
       make_branch ~heap:{ heap with mem } ~rets:[] ()
@@ -513,10 +557,9 @@ let execute_genvgetsymbol heap params =
   | _                       -> fail_ungracefully "genv_getsymbol" params
 
 let execute_genvsetsymbol heap params =
-  let open DR.Syntax in
   match params with
   | [ Expr.Lit (String symbol); lvar_loc ] ->
-      let** loc_name = resolve_loc_result lvar_loc in
+      let* loc_name = resolve_or_create_loc_name lvar_loc in
       let genv = GEnv.set_symbol heap.genv symbol loc_name in
       DR.ok (make_branch ~heap:{ heap with genv } ~rets:[] ())
   | _ -> fail_ungracefully "genv_getsymbol" params
@@ -632,7 +675,11 @@ let ga_to_getter = LActions.ga_to_getter_str
 let ga_to_deleter = LActions.ga_to_deleter_str
 
 (* Serialization and operations *)
-let substitution_in_place _subst _heap = failwith "substitution not implemented"
+let substitution_in_place subst heap =
+  let { mem; genv } = !heap in
+  let genv = GEnv.substitution subst genv in
+  let mem = Mem.substitution subst mem in
+  heap := { mem; genv }
 
 (* let { mem; genv } = !heap in
    let nmem = Mem.substitution subst mem in
