@@ -1,5 +1,8 @@
-open Pretty_utils
 module GilType = Gillian.Gil_syntax.Type
+
+let pp_option pp = Fmt.option ~none:(Fmt.any "None") pp
+
+let pp_list ?(sep = Fmt.any ", ") = Fmt.list ~sep
 
 type assert_annot = {
   label : string;
@@ -112,7 +115,7 @@ module CConstructor = struct
     | ConsExpr e         -> CExpr.pp fmt e
     | ConsStruct (s, el) ->
         Format.fprintf fmt "@[<v 2>struct %s {@ %a@]@ }" s
-          (pp_list ~sep:(format_of_string ";@ ") CExpr.pp)
+          (pp_list ~sep:(Fmt.any ";@ ") CExpr.pp)
           el
 
   (* | ConsTyp (s, el) ->
@@ -196,14 +199,14 @@ module CLCmd = struct
         match cl2 with
         | [] ->
             Format.fprintf fmt "@[<v 2>if (%a) {@\n%a@]@\n}" CExpr.pp e
-              (pp_list ~sep:(format_of_string ";@\n") pp)
+              (pp_list ~sep:(Fmt.any ";@\n") pp)
               cl1
         | _  ->
             Format.fprintf fmt
               "@[<v 2>if (%a) {@\n%a@]@\n@[<v 2>} else {@\n%a@]@\n}" CExpr.pp e
-              (pp_list ~sep:(format_of_string ";@\n") pp)
+              (pp_list ~sep:(Fmt.any ";@\n") pp)
               cl1
-              (pp_list ~sep:(format_of_string ";@\n") pp)
+              (pp_list ~sep:(Fmt.any ";@\n") pp)
               cl2 )
 end
 
@@ -238,7 +241,7 @@ module CPred = struct
   let pp fmt pred =
     Format.fprintf fmt "@[<v 2>pred %s(%a) {@\n%a@]@\n}" pred.name pp_params
       (pred.params, pred.ins)
-      (pp_list ~sep:(format_of_string ";@\n") pp_def)
+      (pp_list ~sep:(Fmt.any ";@\n") pp_def)
       pred.definitions
 end
 
@@ -255,14 +258,14 @@ module CSpec = struct
     Format.fprintf fmt "%arequires: @[%a@]@\nensures:  @[%a@]"
       (pp_option (pp_assert_annot ~post:(format_of_string "@\n")))
       sspec.spec_annot CAssert.pp sspec.pre
-      (pp_list ~sep:(format_of_string ";@\n") CAssert.pp)
+      (pp_list ~sep:(Fmt.any ";@\n") CAssert.pp)
       sspec.posts
 
   let pp fmt spec =
     Format.fprintf fmt "@[<v 2>spec %s(%a) {@\n%a@]@\n}" spec.fname
       (pp_list Format.pp_print_string)
       spec.params
-      (pp_list ~sep:(format_of_string "@\nOR@\n") pp_sspec)
+      (pp_list ~sep:(Fmt.any "@\nOR@\n") pp_sspec)
       spec.sspecs
 end
 
