@@ -52,6 +52,10 @@ let lemma_proof = ref false
 
 let parallel = ref false
 
+(** {2 Limited printing} *)
+
+let pbn = ref false
+
 (** {2 Statistics} *)
 
 let stats = ref false

@@ -499,12 +499,6 @@ let simplify_pfs_and_gamma
     (lpfs : PFS.t)
     ?(rpfs : PFS.t option)
     (gamma : TypEnv.t) : SESubst.t * SS.t =
-  L.verbose (fun m -> m "Simplifications.simplify_pfs_and_gamma");
-  L.verbose (fun m ->
-      m "With unification: %s" (if unification then "Yes" else "No"));
-  L.verbose (fun m -> m "  @[%a@]" PFS.pp lpfs);
-  L.verbose (fun m -> m "  @[%a@]" TypEnv.pp gamma);
-
   (* let t = Sys.time () in *)
   let rpfs : PFS.t = Option.value ~default:(PFS.init ()) rpfs in
   let existentials : SS.t ref =
@@ -537,6 +531,12 @@ let simplify_pfs_and_gamma
 
       (SESubst.copy subst, simpl_existentials)
   | false ->
+      L.verbose (fun m -> m "PFS/Gamma simplification:");
+      L.verbose (fun m ->
+          m "With unification: %s" (if unification then "Yes" else "No"));
+      L.verbose (fun m -> m "PFS:@\n@[%a@]\n" PFS.pp lpfs);
+      L.verbose (fun m -> m "Gamma:@\n@[%a@]\n" TypEnv.pp gamma);
+
       let result = SESubst.init [] in
 
       let vars_to_save, save_all =
@@ -849,8 +849,8 @@ let simplify_pfs_and_gamma
 
       while not (PFS.equal lpfs !old_pfs) do
         iteration_count := !iteration_count + 1;
-        L.verbose (fun fmt -> fmt "Iteration: %d" !iteration_count);
-        L.verbose (fun fmt -> fmt "PFS:\n%a" PFS.pp lpfs);
+        L.tmi (fun fmt -> fmt "Iteration: %d" !iteration_count);
+        L.tmi (fun fmt -> fmt "PFS:\n%a" PFS.pp lpfs);
 
         old_pfs := PFS.copy lpfs;
 
@@ -897,9 +897,9 @@ let simplify_pfs_and_gamma
           PFS.sort lpfs )
       done;
 
-      L.verbose (fun m -> m "simplify_pfs_and_gamma completed");
-      L.(verbose (fun m -> m "PFS:%a" PFS.pp lpfs));
-      L.(verbose (fun m -> m "Gamma:\n%a" TypEnv.pp gamma));
+      L.verbose (fun m -> m "PFS/Gamma simplification completed:\n");
+      L.(verbose (fun m -> m "PFS:@\n%a@\n" PFS.pp lpfs));
+      L.(verbose (fun m -> m "Gamma:@\n%a@\n" TypEnv.pp gamma));
 
       let cached_simplification =
         {
@@ -922,14 +922,12 @@ let simplify_implication
     (fun (pf : Formula.t) ->
       match pf with
       | Eq (NOp (LstCat, lex), NOp (LstCat, ley)) ->
-          L.verbose (fun fmt -> fmt "SI: LstLen equality: %a" Formula.pp pf);
           let flen_eq =
             Reduction.reduce_formula ~gamma ~pfs:lpfs
               (Eq
                  ( UnOp (LstLen, NOp (LstCat, lex)),
                    UnOp (LstLen, NOp (LstCat, ley)) ))
           in
-          L.verbose (fun fmt -> fmt "SI: Extending with: %a" Formula.pp flen_eq);
           PFS.extend lpfs flen_eq
       | _ -> ())
     (PFS.to_list lpfs);
@@ -939,7 +937,6 @@ let simplify_implication
   PFS.substitution subst rpfs;
 
   (* Additional *)
-  L.verbose (fun fmt -> fmt "REDUCING RPFS:\n%a" PFS.pp rpfs);
   PFS.map_inplace (Reduction.reduce_formula ~gamma ~pfs:lpfs) rpfs;
   L.verbose (fun fmt -> fmt "REDUCED RPFS:\n%a" PFS.pp rpfs);
 

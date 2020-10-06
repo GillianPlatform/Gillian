@@ -152,12 +152,22 @@ struct
       (i : int)
       (b_counter : int) : unit =
     let annot, cmd = cmd in
+    let state_printer =
+      match !Config.pbn with
+      | false -> State.pp
+      | true  ->
+          let pvars, lvars, locs =
+            (Cmd.pvars cmd, Cmd.lvars cmd, Cmd.locs cmd)
+          in
+          State.pp_by_need pvars lvars locs
+    in
     L.normal (fun m ->
         m
           "@[------------------------------------------------------@\n\
            --%s: %i--@\n\
            TIME: %f@\n\
            CMD: %a@\n\
+           PROCS: %a@\n\
            LOOPS: %a ++ %a@\n\
            BRANCHING: %d@\n\
            @\n\
@@ -165,10 +175,12 @@ struct
            ------------------------------------------------------@]\n"
           (CallStack.get_cur_proc_id cs)
           i (Sys.time ()) Cmd.pp_indexed cmd pp_str_list
+          (CallStack.get_cur_procs cs)
+          pp_str_list
           (Annot.get_loop_info annot)
           pp_str_list
           (CallStack.get_loop_ids cs)
-          b_counter (State.pp_by_need cmd) state)
+          b_counter state_printer state)
 
   let check_loop_ids actual expected =
     match actual = expected with

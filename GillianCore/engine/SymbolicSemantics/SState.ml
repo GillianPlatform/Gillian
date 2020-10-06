@@ -63,20 +63,35 @@ module Make (SMemory : SMemory.S) :
       (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
       svars SStore.pp store pp_heap heap PFS.pp pfs TypEnv.pp gamma
 
-  let pp_by_need cmd fmt state =
+  let pp_by_need cmd_pvars cmd_lvars cmd_locs fmt state =
     let heap, store, pfs, gamma, svars = state in
-    (* Program variables and locations from the command *)
-    let cmd_pvars, cmd_locs = (Cmd.pvars cmd, Cmd.locs cmd) in
-    (* Locations from the store *)
-    let store_locs =
+    (* Logical variables and locations from the store *)
+    let store_lvars, store_locs =
       SS.fold
         (fun pvar ac ->
           match SStore.get store pvar with
           | None   -> ac
-          | Some e -> SS.union ac (Expr.locs e))
-        cmd_pvars SS.empty
+          | Some e ->
+              (SS.union (fst ac) (Expr.lvars e), SS.union (snd ac) (Expr.locs e)))
+        cmd_pvars (SS.empty, SS.empty)
     in
-    let locs = SS.union cmd_locs store_locs in
+    (* LVars: commands + store *)
+    let lvars = SS.union cmd_lvars store_lvars in
+    (* Locations found in the pfs *)
+    let pfs_locs =
+      SS.fold
+        (fun x ac ->
+          match Reduction.resolve_expr_to_location pfs gamma (LVar x) with
+          | Some loc -> SS.add loc ac
+          | None     -> ac)
+        lvars SS.empty
+    in
+    let pp_str_list = Fmt.(brackets (list ~sep:comma string)) in
+    L.verbose (fun fmt -> fmt "pfs_locs: %a" pp_str_list (SS.elements pfs_locs));
+    (* Locations: command + store + pfs *)
+    let locs =
+      List.fold_left SS.union SS.empty [ cmd_locs; store_locs; pfs_locs ]
+    in
     let tenv_lvars = TypEnv.get_var_type_pairs gamma in
     let tenv_lvars =
       List.filter_map

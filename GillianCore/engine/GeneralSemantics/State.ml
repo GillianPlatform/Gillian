@@ -105,7 +105,13 @@ module type S = sig
   (** Printers *)
   val pp : Format.formatter -> t -> unit
 
-  val pp_by_need : 'a Cmd.t -> Format.formatter -> t -> unit
+  val pp_by_need :
+    Containers.SS.t ->
+    Containers.SS.t ->
+    Containers.SS.t ->
+    Format.formatter ->
+    t ->
+    unit
 
   val pp_err : Format.formatter -> err_t -> unit
 

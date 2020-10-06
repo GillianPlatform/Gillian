@@ -158,6 +158,10 @@ struct
     let docv = "OUT_DIR" in
     Arg.(value & opt string default & info [ "result-dir" ] ~doc ~docv)
 
+  let pbn =
+    let doc = "Print-by-need." in
+    Arg.(value & flag & info [ "pbn"; "print-by-need" ] ~doc)
+
   let get_progs_or_fail = function
     | Ok progs  -> (
         match progs.ParserAndCompiler.gil_progs with
@@ -170,7 +174,8 @@ struct
         exit 1
 
   let with_common (term : (unit -> unit) Term.t) : unit Term.t =
-    let apply_common logging_mode reporters runtime_path ci tl_opts result_dir =
+    let apply_common
+        logging_mode reporters runtime_path ci tl_opts result_dir pbn =
       Config.set_result_dir result_dir;
       Config.ci := ci;
       Logging.Mode.set_mode logging_mode;
@@ -178,12 +183,13 @@ struct
       List.iter (fun reporter -> reporter.enable ()) reporters;
       Printexc.record_backtrace (Logging.Mode.enabled ());
       PC.TargetLangOptions.apply tl_opts;
-      Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
+      Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path;
+      Config.pbn := pbn
     in
     let common_term =
       Term.(
         const apply_common $ logging_mode $ reporters $ runtime_path $ ci
-        $ PC.TargetLangOptions.term $ result_directory)
+        $ PC.TargetLangOptions.term $ result_directory $ pbn)
     in
     Term.(term $ common_term)
 

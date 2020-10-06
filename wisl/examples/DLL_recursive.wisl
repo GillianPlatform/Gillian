@@ -35,7 +35,9 @@ lemma dlsegr_append_left {
   statement:
     forall x, a, z, w, y, v, alpha, llen.
       (x -> a, z, w) * dlsegr(z, y, v, x, alpha, llen) |- dlsegr(x, y, v, w, a :: alpha, 1 + llen)
+
   variant: len alpha
+
   proof:
     unfold dlsegr(z, y, v, x, alpha, llen);
     if (#alpha = nil) {
@@ -53,7 +55,9 @@ lemma dlseg_l_to_r {
   statement:
     forall x, y, v, w, alpha, llen.
       dlsegl(x, y, v, w, alpha, llen) |- dlsegr(x, y, v, w, alpha, llen)
+
   variant: len alpha
+
   proof:
     unfold dlsegl(x, y, v, w, alpha, llen);
     if (alpha = nil) {
@@ -72,6 +76,7 @@ lemma dlseg_r_to_l {
       dlsegr(x, y, v, w, alpha, llen) |- dlsegl(x, y, v, w, alpha, llen)
 
   variant: len alpha
+
   proof:
     unfold dlsegr(x, y, v, w, alpha, llen);
     if (alpha = nil) {

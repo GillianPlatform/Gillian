@@ -110,6 +110,12 @@ module Make
     let state, preds, _ = astate in
     Fmt.pf fmt "%a@\nPREDS:@\n%a@\n" State.pp state Preds.pp preds
 
+  let pp_astate_by_need (pvars : SS.t) (lvars : SS.t) (locs : SS.t) fmt astate =
+    let state, preds, _ = astate in
+    Fmt.pf fmt "%a@\n@\nPREDS:@\n%a@\n"
+      (State.pp_by_need pvars lvars locs)
+      state Preds.pp preds
+
   let copy_astate (astate : t) : t =
     let state, preds, pred_defs = astate in
     (State.copy state, Preds.copy preds, pred_defs)
@@ -280,12 +286,8 @@ module Make
         m
           "------------------------\n\
            Produce simple assertion: %a@\n\
-           @[<v 2>Subst:%a@]@\n\
-           @[<v 2>STATE:@\n\
-           %a@]@\n\
-           @[<v 2>PREDS:@\n\
-           %a@]\n"
-          Asrt.pp a ESubst.pp subst State.pp state Preds.pp preds);
+           @[<v 2>Subst:%a@]@\n"
+          Asrt.pp a ESubst.pp subst);
 
     match a with
     | GA (a_id, ins, outs) -> (
@@ -685,187 +687,6 @@ module Make
     let s_le = ESubst.subst_in_expr_opt subst le in
     not (s_le = None)
 
-  (**
-    Unification of two logical expressions
-
-    @param subst  Substitution
-    @param le     Value
-    @param le_pat Logical expression
-
-    @return If the unification is possible: set of newly found variables, list of discharges
-            and updates the substitution destructively
-  *)
-
-  (*
-  let rec unify_expr_core
-      (state : State.t) (subst : ESubst.t) (v : Val.t) (le_pat : Expr.t) :
-      (SS.t * (Val.t * Expr.t) list) option =
-    L.(
-      tmi (fun m ->
-          m "unify_expr_core: val: %a. le_pat: %a. subst: %a" Val.pp v Expr.pp
-            le_pat ESubst.pp subst));
-
-    let f = unify_expr_core state subst in
-
-    let eval_expr = State.eval_expr state in
-
-    let f2 v1 le_pat1 v2 le_pat2 =
-      Option.fold
-        ~some:(fun (new_vars1, discharges1) ->
-          Option.fold
-            ~some:(fun (new_vars2, discharges2) ->
-              Some (new_vars2, discharges1 @ discharges2))
-            ~none:None (f v2 le_pat2))
-        ~none:None (f v1 le_pat1)
-    in
-
-    match le_pat with
-    | Lit _ ->
-        let le = Val.to_expr v in
-        if le = le_pat then Some (SS.empty, [])
-        else Some (SS.empty, [ (v, le_pat) ])
-    | PVar x | LVar x -> (
-        match Subst.get subst x with
-        | Some v' -> Some (SS.empty, [ (v, Val.to_expr v') ])
-        | None    ->
-            let v' = State.simplify_val state v in
-            Subst.put subst x v';
-            Some (SS.singleton x, []) )
-    | ALoc x -> (
-        match Subst.get subst x with
-        | Some v' -> Some (SS.empty, [ (v, Val.to_expr v') ])
-        | None    -> (
-            let v' = State.simplify_val state v in
-            let tv = State.get_type state v' in
-            match tv with
-            | Some ObjectType | None ->
-                Subst.put subst x v';
-                Some (SS.singleton x, [])
-            | Some _                 -> None ) )
-    | BinOp (le_pat1, FPlus, Lit (Num i)) | BinOp (Lit (Num i), FPlus, le_pat1)
-      ->
-        let le : Expr.t = Val.to_expr v in
-        let le1 : Expr.t = BinOp (le, FMinus, Lit (Num i)) in
-        let v1 : Val.t = eval_expr le1 in
-        f v1 le_pat1
-    | NOp (LstCat, [ x ]) -> f v x
-    (* First concatted expr is an EList *)
-    | NOp (LstCat, EList les :: le_pat2) ->
-        let le : Expr.t = Val.to_expr v in
-        let len : Expr.t = Lit (Num (float_of_int (List.length les))) in
-        let le1 : Expr.t = LstSub (le, Lit (Num 0.), len) in
-        let le2 : Expr.t =
-          LstSub (le, len, BinOp (UnOp (LstLen, le), FMinus, len))
-        in
-        let v1 : Val.t = eval_expr le1 in
-        let v2 : Val.t = eval_expr le2 in
-        f2 v1 (EList les) v2 (NOp (LstCat, le_pat2))
-    (* First concatted expr is known, but is not an EList *)
-    | NOp (LstCat, le_pat1 :: le_pat2) when is_known subst le_pat1 ->
-        let le : Expr.t = Val.to_expr v in
-        let le1 : Expr.t = LstSub (le, Lit (Num 0.), UnOp (LstLen, le_pat1)) in
-        let le2 : Expr.t =
-          LstSub
-            ( le,
-              UnOp (LstLen, le_pat1),
-              BinOp (UnOp (LstLen, le), FMinus, UnOp (LstLen, le_pat1)) )
-        in
-        let v1 : Val.t = eval_expr le1 in
-        let v2 : Val.t = eval_expr le2 in
-        f2 v1 le_pat1 v2 (NOp (LstCat, le_pat2))
-    (* TODO: This one needs to be generalised, but not yet
-       | BinOp (le_pat1, LstCat, EList le_pat2)
-           when ((List.length le_pat2) > 0) && ((list_uvs (le_pat1 :: le_pat2)) <> SS.empty) ->
-           (match List.rev le_pat2 with
-             | le_pat2_last :: le_pat2_prefix ->
-               let le  : Expr.t = Val.to_expr v in
-               let le1 : Expr.t = UnOp (Car, UnOp (LstRev, le)) in
-               let le2 : Expr.t = UnOp (Cdr, UnOp (LstRev, le)) in
-               let v1  : Val.t  = eval_expr le1 in
-               let v2  : Val.t  = eval_expr le2 in
-               f2 v1 le_pat2_last v2 (BinOp (EList le_pat2_prefix, LstCat, UnOp (LstRev, le_pat1)))
-             | _ -> raise (Failure "DEATH. unify_expr_core")) *)
-
-    (* TODO: These two should not be relevant
-       | BinOp (EList [], LstCat, le_pat2) -> f v le_pat2
-       | BinOp (le_pat1, LstCat, EList []) -> f v le_pat1 *)
-    | UnOp (LstRev, le_pat) ->
-        let le : Expr.t = Val.to_expr v in
-        let le' : Expr.t = UnOp (LstRev, le) in
-        let v1 : Val.t = eval_expr le' in
-        f v1 le_pat
-    | EList (le_pat_hd :: le_pat_tl) ->
-        let le : Expr.t = Val.to_expr v in
-        let le1 : Expr.t = UnOp (Car, le) in
-        let le2 : Expr.t = UnOp (Cdr, le) in
-        let v1 : Val.t = eval_expr le1 in
-        let v2 : Val.t = eval_expr le2 in
-        f2 v1 le_pat_hd v2 (EList le_pat_tl)
-    | _ -> Some (SS.empty, [ (v, le_pat) ])
-
-  (* I don't know how much recovery information we can give when the unification of lexprs fails *)
-  let unify_lexpr (state : State.t) (subst : ESubst.t) (v : Val.t) (le : Expr.t)
-      : (unit, (Expr.t * Expr.t) option) result =
-    let le = Reduction.reduce_lexpr le in
-    L.verbose (fun m -> m "Unify lexpr with v: %a, le: %a" Val.pp v Expr.pp le);
-
-    try
-      let ret = unify_expr_core state subst v le in
-      L.(
-        verbose (fun m ->
-            m "Unify lexpr: Entering stage 1 with %a"
-              Fmt.(
-                option ~none:(any "None") (fun f (vars, les) ->
-                    pf f "@[<h>Some { %a }, [ %a ]@]"
-                      (iter ~sep:comma SS.iter string)
-                      vars
-                      (list ~sep:comma (fun f' (a, b) ->
-                           pf f' "(%a, %a)" Val.pp a Expr.pp b))
-                      les))
-              ret));
-
-      match ret with
-      (* Error and we have no way of fixing *)
-      | None -> Error None
-      | Some (_, discharges) ->
-          let eqs : (Expr.t * Expr.t) list =
-            List.map
-              (fun (v1, e2) ->
-                (* TODO: experimental *)
-                (* let e2 = Subst.subst_in_expr subst true e2 in *)
-                L.(
-                  verbose (fun m ->
-                      m "Unify lexpr: Passed to stage 2: %a %a" Val.pp v1
-                        Expr.pp e2));
-                let v1' = State.simplify_val state v1 in
-                (Val.to_expr v1', e2))
-              discharges
-          in
-          (* Fold over here *)
-          let result =
-            List.fold_left
-              (fun res (e1, e2) ->
-                match res with
-                | Error x -> Error x
-                | Ok ()   -> (
-                    match State.assert_a state [ Eq (e1, e2) ] with
-                    | true  -> Ok ()
-                    | false -> Error (Some (e1, e2)) ))
-              (Ok ()) eqs
-          in
-          result
-    with Reduction.ReductionException _ -> Error None
-
-  let unify_lexprs
-      (state : State.t) (subst : ESubst.t) (lst : (Val.t * Expr.t) list) :
-      (unit, (Expr.t * Expr.t) option) result =
-    List.fold_left
-      (fun res (v, le) ->
-        match res with
-        | Error x -> Error x
-        | Ok ()   -> unify_lexpr state subst v le)
-      (Ok ()) lst *)
-
   let complete_subst (subst : ESubst.t) (lab : (string * SS.t) option) : bool =
     match lab with
     | None                   -> true
@@ -1060,6 +881,48 @@ module Make
 
     let make_resource_fail () = UFail [ EAsrt ([], True, []) ] in
 
+    let a = fst step in
+    (* Get pvars, lvars, locs from the assertion *)
+    let a_pvars, a_lvars, a_locs = (Asrt.pvars a, Asrt.lvars a, Asrt.locs a) in
+    let filter_vars = SS.union a_pvars (SS.union a_lvars a_locs) in
+
+    (* From the subst, we take any pair that has any of those and collect
+       the pvars, lvars, and alocs, from their values *)
+    let s_pvars, s_lvars, s_locs =
+      ESubst.fold subst
+        (fun e v (s_pvars, s_lvars, s_locs) ->
+          let pvars, lvars, locs = (Expr.pvars e, Expr.lvars e, Expr.locs e) in
+          if
+            Containers.SS.inter
+              (List.fold_left SS.union SS.empty [ pvars; lvars; locs ])
+              filter_vars
+            <> SS.empty
+          then
+            ( SS.union s_pvars (Expr.pvars (Val.to_expr v)),
+              SS.union s_lvars (Expr.lvars (Val.to_expr v)),
+              SS.union s_locs (Expr.locs (Val.to_expr v)) )
+          else (s_pvars, s_lvars, s_locs))
+        (SS.empty, SS.empty, SS.empty)
+    in
+
+    let subst_pp =
+      match !Config.pbn with
+      | false -> ESubst.pp
+      | true  -> ESubst.pp_by_need (SS.union a_pvars (SS.union a_lvars a_locs))
+    in
+
+    let pp_str_list = Fmt.(brackets (list ~sep:comma string)) in
+
+    L.verbose (fun fmt ->
+        fmt "Substs:\n%a\n%a\n%a" pp_str_list (SS.elements s_pvars) pp_str_list
+          (SS.elements s_lvars) pp_str_list (SS.elements s_locs));
+
+    let pp_astate =
+      match !Config.pbn with
+      | false -> pp_astate
+      | true  -> pp_astate_by_need s_pvars s_lvars s_locs
+    in
+
     L.verbose (fun m ->
         m
           "Unify assertion: @[<h>%a@]@\n\
@@ -1067,7 +930,7 @@ module Make
            %a@]@\n\
            @[<v 2>STATE:@\n\
            %a@]"
-          UP.step_pp step ESubst.pp subst pp_astate astate);
+          UP.step_pp step subst_pp subst pp_astate astate);
 
     let p, outs = step in
     match (p : Asrt.t) with
@@ -1085,12 +948,12 @@ module Make
                   vs_ins));
           match State.execute_action getter state vs_ins with
           | ASucc [ (state', vs') ] -> (
-              L.(
-                verbose (fun m ->
-                    m "@[<v 2>Got state:@\n%a@] and values @[<h>%a@]" State.pp
-                      state'
-                      Fmt.(list ~sep:comma Val.pp)
-                      vs'));
+              (* L.(
+                 verbose (fun m ->
+                     m "@[<v 2>Got state:@\n%a@] and values @[<h>%a@]" State.pp
+                       state'
+                       Fmt.(list ~sep:comma Val.pp)
+                       vs')); *)
               let vs_ins', vs_outs =
                 List_utils.divide_list_by_index vs' (List.length vs_ins)
               in
@@ -1324,13 +1187,15 @@ module Make
               verbose (fun m ->
                   m
                     "@[<v 2>WARNING: Unify Assertion Failed: @[<h>%a@] with \
-                     errors:@\n\
+                     subst @\n\
+                     %a in state @\n\
+                     %a with errors:@\n\
                      %a@]"
                     Fmt.(
                       option
                         ~none:(any "no assertion - phantom node")
                         UP.step_pp)
-                    cur_step
+                    cur_step ESubst.pp subst pp_astate state
                     Fmt.(list ~sep:(any "@\n") State.pp_err)
                     errs));
             f (rest, errs @ errs_so_far) )

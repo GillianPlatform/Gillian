@@ -480,6 +480,9 @@ module Asrt : sig
   (** Get all the concrete locations in [a] *)
   val clocs : t -> SS.t
 
+  (** Get all locations in [a] *)
+  val locs : t -> SS.t
+
   (** Get all the variables in [a] (includes lvars, pvars, alocs and clocs) *)
   val vars : t -> SS.t
 

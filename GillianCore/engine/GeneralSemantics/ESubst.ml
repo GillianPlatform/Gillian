@@ -64,6 +64,9 @@ module type S = sig
   (** Full pretty Printer *)
   val full_pp : Format.formatter -> t -> unit
 
+  (** Selective Pretty Printer *)
+  val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
+
   val filter_in_place : t -> (Expr.t -> vt -> vt option) -> unit
 
   (** Convert substitution to list *)
@@ -266,7 +269,33 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     let pp_pair fmt (e, e_val) =
       Fmt.pf fmt "@[<h>(%a: %a)@]" Expr.pp e Val.pp e_val
     in
-    Fmt.pf fmt "[ @[%a@] ]" (Fmt.hashtbl ~sep:Fmt.comma pp_pair) subst
+    let bindings = fold subst (fun x t ac -> (x, t) :: ac) [] in
+    let bindings =
+      List.sort (fun (v, _) (w, _) -> Stdlib.compare v w) bindings
+    in
+    Fmt.pf fmt "[ @[%a@] ]" (Fmt.list ~sep:Fmt.comma pp_pair) bindings
+
+  let pp_by_need (filter_vars : Containers.SS.t) fmt (subst : t) =
+    let pp_pair fmt (e, e_val) =
+      Fmt.pf fmt "@[<h>(%a: %a)@]" Expr.pp e Val.pp e_val
+    in
+    let bindings = fold subst (fun x t ac -> (x, t) :: ac) [] in
+    let bindings =
+      List.sort (fun (v, _) (w, _) -> Stdlib.compare v w) bindings
+    in
+    let bindings =
+      List.filter
+        (fun (v, _) ->
+          let pvars, lvars, alocs =
+            (Expr.pvars v, Expr.lvars v, Expr.alocs v)
+          in
+          Containers.SS.inter
+            (SS.union pvars (SS.union lvars alocs))
+            filter_vars
+          <> Containers.SS.empty)
+        bindings
+    in
+    Fmt.pf fmt "[ @[%a@] ]" (Fmt.list ~sep:Fmt.comma pp_pair) bindings
 
   (**
     Substitution full pretty_printer

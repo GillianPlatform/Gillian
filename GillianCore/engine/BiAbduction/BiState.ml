@@ -189,7 +189,7 @@ struct
       procs State.pp state State.pp state_af
 
   (* TODO: By-need formatter *)
-  let pp_by_need _ fmt state = pp fmt state
+  let pp_by_need _ _ _ fmt state = pp fmt state
 
   let add_spec_vars (bi_state : t) (vs : Var.Set.t) : t =
     let procs, state, state_af = bi_state in
