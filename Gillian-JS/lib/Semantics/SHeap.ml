@@ -434,22 +434,27 @@ let pp ft heap =
   in
   (list ~sep:(any "@\n") pp_one) ft sorted_locs_with_vals
 
+let get_print_info locs heap =
+  let domain = domain heap in
+  let metadata_locs =
+    SS.fold
+      (fun loc locs ->
+        match get_met heap loc with
+        | (Some (Lit (Loc x)) | Some (ALoc x)) when SS.mem x domain ->
+            SS.add x locs
+        | _ -> locs)
+      locs SS.empty
+  in
+  (* TODO: Traverse locations and collect info about other locations and lvars *)
+  (SS.empty, metadata_locs)
+
 let pp_by_need locs ft heap =
   let domain = domain heap in
   let existent_locs = SS.inter locs domain in
-  let target_locs =
-    SS.fold
-      (fun loc tlocs ->
-        match get_met heap loc with
-        | (Some (Lit (Loc x)) | Some (ALoc x)) when SS.mem x domain ->
-            SS.add x tlocs
-        | _ -> tlocs)
-      existent_locs existent_locs
-  in
   let sorted_locs_with_vals =
     List.map
       (fun loc -> (loc, Option.get (get heap loc)))
-      (SS.elements target_locs)
+      (SS.elements existent_locs)
   in
   let open Fmt in
   let pp_one ft (loc, ((fv_pairs, domain), metadata)) =

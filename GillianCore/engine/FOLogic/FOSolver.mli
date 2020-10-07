@@ -12,6 +12,7 @@ val check_satisfiability_with_model :
 val check_satisfiability :
   ?unification:bool ->
   ?time:string ->
+  ?relevant_info:Containers.SS.t * Containers.SS.t * Containers.SS.t ->
   Gil_syntax.Formula.t list ->
   TypEnv.t ->
   bool

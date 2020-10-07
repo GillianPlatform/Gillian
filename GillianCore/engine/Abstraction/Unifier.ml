@@ -284,10 +284,10 @@ module Make
 
     L.verbose (fun m ->
         m
-          "------------------------\n\
-           Produce simple assertion: %a@\n\
-           @[<v 2>Subst:%a@]@\n"
-          Asrt.pp a ESubst.pp subst);
+          "-------------------------@\n\
+           Produce simple assertion: @[<h>%a@]@\n\
+           -------------------------@\n"
+          Asrt.pp a);
 
     match a with
     | GA (a_id, ins, outs) -> (
@@ -376,9 +376,16 @@ module Make
             ~none:None (subst_in_expr subst le)
     | Pure f -> (
         let f' = ESubst.substitute_formula subst false f in
-        L.(
-          verbose (fun m ->
-              m "About to assume %a in state %a" Formula.pp f' State.pp state));
+        (* let pp_state =
+             match !Config.pbn with
+             | false -> State.pp
+             | true  ->
+                 let pvars, lvars, locs = Formula.get_print_info f' in
+                 State.pp_by_need pvars lvars locs
+           in
+           L.(
+             verbose (fun m ->
+                  m "About to assume %a in state:\n%a" Formula.pp f' pp_state state)); *)
         (* FIXME: Understand why this causes a bug in Gillian-C *)
         match
           State.assume_a ~production:!Config.delay_entailment state [ f' ]
@@ -881,56 +888,61 @@ module Make
 
     let make_resource_fail () = UFail [ EAsrt ([], True, []) ] in
 
-    let a = fst step in
-    (* Get pvars, lvars, locs from the assertion *)
-    let a_pvars, a_lvars, a_locs = (Asrt.pvars a, Asrt.lvars a, Asrt.locs a) in
-    let filter_vars = SS.union a_pvars (SS.union a_lvars a_locs) in
+    if Logging.Mode.enabled () then (
+      let a = fst step in
+      (* Get pvars, lvars, locs from the assertion *)
+      let a_pvars, a_lvars, a_locs =
+        (Asrt.pvars a, Asrt.lvars a, Asrt.locs a)
+      in
+      let filter_vars = SS.union a_pvars (SS.union a_lvars a_locs) in
 
-    (* From the subst, we take any pair that has any of those and collect
-       the pvars, lvars, and alocs, from their values *)
-    let s_pvars, s_lvars, s_locs =
-      ESubst.fold subst
-        (fun e v (s_pvars, s_lvars, s_locs) ->
-          let pvars, lvars, locs = (Expr.pvars e, Expr.lvars e, Expr.locs e) in
-          if
-            Containers.SS.inter
-              (List.fold_left SS.union SS.empty [ pvars; lvars; locs ])
-              filter_vars
-            <> SS.empty
-          then
-            ( SS.union s_pvars (Expr.pvars (Val.to_expr v)),
-              SS.union s_lvars (Expr.lvars (Val.to_expr v)),
-              SS.union s_locs (Expr.locs (Val.to_expr v)) )
-          else (s_pvars, s_lvars, s_locs))
-        (SS.empty, SS.empty, SS.empty)
-    in
+      (* From the subst, we take any pair that has any of those and collect
+         the pvars, lvars, and alocs, from their values *)
+      let s_pvars, s_lvars, s_locs =
+        ESubst.fold subst
+          (fun e v (s_pvars, s_lvars, s_locs) ->
+            let pvars, lvars, locs =
+              (Expr.pvars e, Expr.lvars e, Expr.locs e)
+            in
+            if
+              Containers.SS.inter
+                (List.fold_left SS.union SS.empty [ pvars; lvars; locs ])
+                filter_vars
+              <> SS.empty
+            then
+              ( SS.union s_pvars (Expr.pvars (Val.to_expr v)),
+                SS.union s_lvars (Expr.lvars (Val.to_expr v)),
+                SS.union s_locs (Expr.locs (Val.to_expr v)) )
+            else (s_pvars, s_lvars, s_locs))
+          (SS.empty, SS.empty, SS.empty)
+      in
 
-    let subst_pp =
-      match !Config.pbn with
-      | false -> ESubst.pp
-      | true  -> ESubst.pp_by_need (SS.union a_pvars (SS.union a_lvars a_locs))
-    in
+      let subst_pp =
+        match !Config.pbn with
+        | false -> ESubst.pp
+        | true  -> ESubst.pp_by_need (SS.union a_pvars (SS.union a_lvars a_locs))
+      in
 
-    let pp_str_list = Fmt.(brackets (list ~sep:comma string)) in
+      let pp_str_list = Fmt.(brackets (list ~sep:comma string)) in
 
-    L.verbose (fun fmt ->
-        fmt "Substs:\n%a\n%a\n%a" pp_str_list (SS.elements s_pvars) pp_str_list
-          (SS.elements s_lvars) pp_str_list (SS.elements s_locs));
+      L.verbose (fun fmt ->
+          fmt "Substs:\n%a\n%a\n%a" pp_str_list (SS.elements s_pvars)
+            pp_str_list (SS.elements s_lvars) pp_str_list (SS.elements s_locs));
 
-    let pp_astate =
-      match !Config.pbn with
-      | false -> pp_astate
-      | true  -> pp_astate_by_need s_pvars s_lvars s_locs
-    in
+      let pp_astate =
+        match !Config.pbn with
+        | false -> pp_astate
+        | true  -> pp_astate_by_need s_pvars s_lvars s_locs
+      in
 
-    L.verbose (fun m ->
-        m
-          "Unify assertion: @[<h>%a@]@\n\
-           @[<v 2>Subst:@\n\
-           %a@]@\n\
-           @[<v 2>STATE:@\n\
-           %a@]"
-          UP.step_pp step subst_pp subst pp_astate astate);
+      L.verbose (fun m ->
+          m
+            "Unify assertion: @[<h>%a@]@\n\
+             @[<v 2>Subst:@\n\
+             %a@]@\n\
+             @[<v 2>STATE:@\n\
+             %a@]"
+            UP.step_pp step subst_pp subst pp_astate astate) );
 
     let p, outs = step in
     match (p : Asrt.t) with
@@ -1030,7 +1042,6 @@ module Make
         raise (Failure "Unify assertion: And: should have been reduced")
     (* Other pure assertions *)
     | Pure f -> (
-        L.verbose (fun fmt -> fmt "Unifying pure formula %a" Formula.pp f);
         let success, discharges =
           List.fold_left
             (fun (success, discharges) (u, out) ->

@@ -192,7 +192,11 @@ let copy = WislSHeap.copy
 
 let pp fmt h = Format.fprintf fmt "%s" (WislSHeap.str h)
 
+(* TODO: Implement properly *)
 let pp_by_need _ fmt h = pp fmt h
+
+(* TODO: Implement properly *)
+let get_print_info _ _ = (SS.empty, SS.empty)
 
 let pp_err _ _ = ()
 

@@ -93,3 +93,46 @@ let filter_map = ExtList.filter_map
 let exists = ExtList.exists
 
 let get_nth = ExtList.nth
+
+let rec get_relevant_info (pvars : SS.t) (lvars : SS.t) (locs : SS.t) (pfs : t)
+    : SS.t * SS.t * SS.t =
+  let relevant = SS.union lvars locs in
+  let new_pvars, new_lvars, new_locs =
+    fold_left
+      (fun (new_pvars, new_lvars, new_locs) pf ->
+        let pf_pvars, pf_lvars, pf_locs = Formula.get_print_info pf in
+        let pf_relevant =
+          List.fold_left SS.union SS.empty [ pf_pvars; pf_lvars; pf_locs ]
+        in
+        if SS.inter relevant pf_relevant = SS.empty then
+          (new_pvars, new_lvars, new_locs)
+        else
+          ( SS.union new_pvars pf_pvars,
+            SS.union new_lvars pf_lvars,
+            SS.union new_locs pf_locs ))
+      (SS.empty, SS.empty, SS.empty)
+      pfs
+  in
+  if new_lvars = lvars && new_locs = locs then (new_pvars, new_lvars, new_locs)
+  else get_relevant_info new_pvars new_lvars new_locs pfs
+
+let filter_with_info relevant_info (pfs : t) : t =
+  let pvars, lvars, locs = relevant_info in
+
+  let pvars, lvars, locs = get_relevant_info pvars lvars locs pfs in
+
+  let relevant = List.fold_left SS.union SS.empty [ lvars; locs ] in
+  let filtered_pfs = copy pfs in
+  let () =
+    filter
+      (fun pf ->
+        not
+          (SS.is_empty
+             (SS.inter relevant (SS.union (Formula.lvars pf) (Formula.locs pf)))))
+      filtered_pfs
+  in
+  filtered_pfs
+
+let pp_by_need relevant_info fmt pfs =
+  let filtered_pfs = filter_with_info relevant_info pfs in
+  pp fmt filtered_pfs

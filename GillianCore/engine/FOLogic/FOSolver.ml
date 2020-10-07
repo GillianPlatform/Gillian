@@ -191,10 +191,17 @@ let get_axioms assertions gamma =
   * **************** **)
 
 let simplify_pfs_and_gamma
-    ?(unification = false) (fs : Formula.t list) (gamma : TypEnv.t) :
-    Formula.Set.t * TypEnv.t * SESubst.t =
-  let gamma = TypEnv.copy gamma in
-  let pfs = PFS.of_list fs in
+    ?(unification = false)
+    ?relevant_info
+    (fs : Formula.t list)
+    (gamma : TypEnv.t) : Formula.Set.t * TypEnv.t * SESubst.t =
+  let pfs, gamma =
+    match relevant_info with
+    | None               -> (PFS.of_list fs, TypEnv.copy gamma)
+    | Some relevant_info ->
+        ( PFS.filter_with_info relevant_info (PFS.of_list fs),
+          TypEnv.filter_with_info relevant_info gamma )
+  in
   let subst, _ =
     Simplifications.simplify_pfs_and_gamma ~unification pfs gamma
   in
@@ -233,11 +240,16 @@ let check_satisfiability_with_model (fs : Formula.t list) (gamma : TypEnv.t) :
       with _ -> None )
 
 let check_satisfiability
-    ?(unification = false) ?(time = "") (fs : Formula.t list) (gamma : TypEnv.t)
-    : bool =
+    ?(unification = false)
+    ?(time = "")
+    ?relevant_info
+    (fs : Formula.t list)
+    (gamma : TypEnv.t) : bool =
   (* let t = if time = "" then 0. else Sys.time () in *)
   L.verbose (fun m -> m "Entering FOSolver.check_satisfiability");
-  let fs, gamma, _ = simplify_pfs_and_gamma ~unification fs gamma in
+  let fs, gamma, _ =
+    simplify_pfs_and_gamma ?relevant_info ~unification fs gamma
+  in
   (* let axioms    = get_axioms (Formula.Set.elements fs) gamma in
      let fs           = Formula.Set.union fs (Formula.Set.of_list axioms) in *)
   let result = Z3Encoding.check_sat fs gamma in
@@ -298,6 +310,7 @@ let check_entailment
     let left_sat =
       Z3Encoding.check_sat (Formula.Set.of_list left_fs) gamma_left
     in
+    assert left_sat;
 
     (* If the right side is empty or left side is not satisfiable, return the result of
        checking left-side satisfiability *)

@@ -195,6 +195,8 @@ let locs (a : t) : SS.t =
   let f_ac _ _ _ ac = List.concat ac in
   SS.of_list (fold (Some fe) f_ac None None a)
 
+let get_print_info (a : t) = (pvars a, lvars a, locs a)
+
 (* Get all the logical expressions of --a-- of the form (Lit (LList lst)) and (EList lst)  *)
 let lists (a : t) : Expr.t list =
   let f_ac _ _ _ ac = List.concat ac in

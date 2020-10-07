@@ -116,6 +116,8 @@ module M : Gillian.Symbolic.Memory_S = struct
 
   let pp_by_need locs fmt heap = SHeap.pp_by_need locs fmt heap
 
+  let get_print_info = SHeap.get_print_info
+
   let copy (heap : t) : t = SHeap.copy heap
 
   let init () : t = SHeap.init ()

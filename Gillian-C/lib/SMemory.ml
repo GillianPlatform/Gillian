@@ -1166,9 +1166,11 @@ let pp fmt h =
   Format.fprintf fmt "GEnv : @[%a@]@\nMem  : @[%a@]" GEnv.pp !h.genv
     (Mem.pp ~genv:!h.genv) !h.mem
 
+(* TODO: implement properly *)
 let pp_by_need (_ : SS.t) fmt h = pp fmt h
 
-(* let str_noheap _ = "NO HEAP PRINTED" *)
+(* TODO: implement properly *)
+let get_print_info _ _ = (SS.empty, SS.empty)
 
 (* Actual action execution *)
 

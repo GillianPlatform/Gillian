@@ -294,8 +294,6 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return Set of variables that can be affected by substitution
   *)
   let symbolics (store : t) : Var.Set.t =
-    L.(verbose (fun m -> m "SCON: %d" (Hashtbl.length store.conc)));
-    L.(verbose (fun m -> m "SSYM: %d" (Hashtbl.length store.symb)));
     Hashtbl.fold (fun v _ ac -> Var.Set.add v ac) store.symb Var.Set.empty
 
   let lvars (store : t) : Var.Set.t =

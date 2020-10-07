@@ -59,3 +59,6 @@ val to_list_expr : t -> (Expr.t * Type.t) list
 val substitution : t -> SESubst.t -> bool -> t
 
 val is_well_formed : t -> bool
+
+val filter_with_info :
+  Containers.SS.t * Containers.SS.t * Containers.SS.t -> t -> t

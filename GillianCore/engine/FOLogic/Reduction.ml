@@ -1435,11 +1435,17 @@ let rec reduce_lexpr_loop
             in
             f (LstSub (List.hd eqs, Lit (Num 0.), Lit (Num n)))
         | le, Lit (Num 0.), Lit (Num n)
-          when ( match le with
-               | EList _ | Lit (LList _) -> false
-               | _                       -> true )
+          when ( L.tmi (fun fmt -> fmt "Trying for expected case");
+                 match le with
+                 | EList _ | Lit (LList _) -> false
+                 | _                       -> true )
                &&
                let eqs = get_equal_expressions pfs le in
+               L.tmi (fun fmt -> fmt "PFS:\n%a" PFS.pp pfs);
+               L.tmi (fun fmt ->
+                   fmt "Found eqs: %a: %a" Expr.pp le
+                     Fmt.(list ~sep:comma Expr.pp)
+                     eqs);
                let eqs =
                  match le with
                  | LVar x ->

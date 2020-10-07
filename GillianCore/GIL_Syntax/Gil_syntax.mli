@@ -357,6 +357,12 @@ module Formula : sig
   (** Get all the concrete locations *)
   val clocs : t -> SS.t
 
+  (** Get all locations *)
+  val locs : t -> SS.t
+
+  (** Get print info *)
+  val get_print_info : t -> SS.t * SS.t * SS.t
+
   (** Get all the logical expressions of the formula of the form (Lit (LList lst)) and (EList lst) *)
   val lists : t -> Expr.t list
 

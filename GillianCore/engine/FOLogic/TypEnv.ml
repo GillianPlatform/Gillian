@@ -161,3 +161,8 @@ let reset (x : t) (reset : (Var.t * Type.t) list) =
   List.iter (fun (y, t) -> Hashtbl.replace x y t) reset
 
 let is_well_formed (x : t) : bool = true
+
+let filter_with_info relevant_info (x : t) =
+  let pvars, lvars, locs = relevant_info in
+  let relevant = List.fold_left SS.union SS.empty [ pvars; lvars; locs ] in
+  filter x (fun x -> SS.mem x relevant)

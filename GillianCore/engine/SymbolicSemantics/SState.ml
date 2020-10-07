@@ -63,8 +63,44 @@ module Make (SMemory : SMemory.S) :
       (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
       svars SStore.pp store pp_heap heap PFS.pp pfs TypEnv.pp gamma
 
-  let pp_by_need cmd_pvars cmd_lvars cmd_locs fmt state =
-    let heap, store, pfs, gamma, svars = state in
+  let pp_by_need pvars cmd_lvars cmd_locs fmt state =
+    let memory, store, pfs, gamma, svars = state in
+
+    let rec get_print_info (lvars : SS.t) (locs : SS.t) : SS.t * SS.t =
+      (* let pp_str_list = Fmt.(brackets (list ~sep:comma string)) in
+         let () =
+           L.verbose (fun fmt ->
+               fmt "get_print_info:@\nLVars: %a@\nLocs:%a\n" pp_str_list
+                 (SS.elements lvars) pp_str_list (SS.elements locs))
+         in *)
+      (* Get locs from lvars... *)
+      let pfs_locs =
+        SS.fold
+          (fun x ac ->
+            match Reduction.resolve_expr_to_location pfs gamma (LVar x) with
+            | Some loc -> SS.add loc ac
+            | None     -> ac)
+          lvars SS.empty
+      in
+      (* ...and add them to the current locs *)
+      let new_locs = SS.union locs pfs_locs in
+      (* Get relevant lvars and locs from the memory... *)
+      let mem_lvars, mem_locs = SMemory.get_print_info new_locs memory in
+      (* ...and add them accordingly *)
+      let new_lvars = SS.union lvars mem_lvars in
+      let new_locs = SS.union new_locs mem_locs in
+      (* Learn more from the pfs... *)
+      let _, more_lvars, more_locs =
+        PFS.get_relevant_info pvars new_lvars new_locs pfs
+      in
+      (* ...and add that accordingly *)
+      let new_lvars = SS.union new_lvars more_lvars in
+      let new_locs = SS.union new_locs more_locs in
+      (* If nothing has been learned, stop; otherwise, retry *)
+      if SS.equal lvars new_lvars && SS.equal locs new_locs then (lvars, locs)
+      else get_print_info new_lvars new_locs
+    in
+
     (* Logical variables and locations from the store *)
     let store_lvars, store_locs =
       SS.fold
@@ -73,38 +109,21 @@ module Make (SMemory : SMemory.S) :
           | None   -> ac
           | Some e ->
               (SS.union (fst ac) (Expr.lvars e), SS.union (snd ac) (Expr.locs e)))
-        cmd_pvars (SS.empty, SS.empty)
+        pvars (SS.empty, SS.empty)
     in
     (* LVars: commands + store *)
     let lvars = SS.union cmd_lvars store_lvars in
+    let locs = SS.union cmd_locs store_locs in
     (* Locations found in the pfs *)
-    let pfs_locs =
-      SS.fold
-        (fun x ac ->
-          match Reduction.resolve_expr_to_location pfs gamma (LVar x) with
-          | Some loc -> SS.add loc ac
-          | None     -> ac)
-        lvars SS.empty
-    in
-    let pp_str_list = Fmt.(brackets (list ~sep:comma string)) in
-    L.verbose (fun fmt -> fmt "pfs_locs: %a" pp_str_list (SS.elements pfs_locs));
-    (* Locations: command + store + pfs *)
-    let locs =
-      List.fold_left SS.union SS.empty [ cmd_locs; store_locs; pfs_locs ]
-    in
-    let tenv_lvars = TypEnv.get_var_type_pairs gamma in
-    let tenv_lvars =
-      List.filter_map
-        (fun (x, _) -> if Names.is_lvar_name x then Some x else None)
-        tenv_lvars
-    in
-    let tenv_lvars = SS.of_list tenv_lvars in
+    let lvars, locs = get_print_info lvars locs in
+    (* Filter spec vars *)
+    let svars = SS.filter (fun x -> SS.mem x lvars) svars in
 
     (* TODO: Locations for the heap *)
     (* TODO: Logical variables for the pfs and gamma *)
-    let pp_heap fmt heap =
+    let pp_memory fmt memory =
       if !Config.no_heap then Fmt.string fmt "NO MEMORY PRINTED"
-      else SMemory.pp_by_need locs fmt heap
+      else SMemory.pp_by_need locs fmt memory
     in
     Fmt.pf fmt
       "@[<h>SPEC VARS: %a@]@\n\
@@ -121,11 +140,10 @@ module Make (SMemory : SMemory.S) :
        @[<v 2>TYPING ENVIRONMENT:@\n\
        %a@]"
       (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
-      svars
-      (SStore.pp_by_need cmd_pvars)
-      store pp_heap heap PFS.pp pfs
-      (TypEnv.pp_by_need
-         (List.fold_left SS.union SS.empty [ cmd_pvars; tenv_lvars ]))
+      svars (SStore.pp_by_need pvars) store pp_memory memory
+      (PFS.pp_by_need (pvars, lvars, locs))
+      pfs
+      (TypEnv.pp_by_need (List.fold_left SS.union SS.empty [ pvars; lvars ]))
       gamma
 
   let init (pred_defs : UP.preds_tbl_t option) =
@@ -221,7 +239,6 @@ module Make (SMemory : SMemory.S) :
         if v_asrt = False then []
         else (
           PFS.extend pfs v_asrt;
-          L.verbose (fun fmt -> fmt "Assumed state: %a" pp state);
           [ state ] )
     in
     result
@@ -275,9 +292,11 @@ module Make (SMemory : SMemory.S) :
         | Some (v_asrt, _) -> v_asrt
         | _                -> False
       in
-      L.verbose (fun m -> m "SState: lifted assertion: %a" Formula.pp v_asrt);
+      let relevant_info = (Expr.pvars v, Expr.lvars v, Expr.locs v) in
       let result =
-        FOSolver.check_satisfiability (v_asrt :: PFS.to_list pfs) gamma
+        FOSolver.check_satisfiability ~relevant_info
+          (v_asrt :: PFS.to_list pfs)
+          gamma
       in
       L.(verbose (fun m -> m "SState: sat_check done: %b" result));
       result

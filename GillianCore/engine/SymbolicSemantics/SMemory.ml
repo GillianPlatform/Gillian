@@ -42,6 +42,8 @@ module type S = sig
 
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
 
+  val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
+
   val substitution_in_place : st -> t -> unit
 
   val fresh_val : t -> vt

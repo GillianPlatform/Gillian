@@ -1282,7 +1282,7 @@ let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
     =
   L.(
     verbose (fun m ->
-        m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma: @[%a@]\n"
+        m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma:@\n@[%a@]\n"
           (Fmt.iter ~sep:(Fmt.any "@\n") Formula.Set.iter Formula.pp)
           fs TypEnv.pp gamma));
 
@@ -1292,11 +1292,10 @@ let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
   (* Step 2: Reset the solver and add the encoded formulae *)
   let masterSolver = Solver.mk_solver ctx None in
   Solver.add masterSolver encoded_assertions;
-  L.(
-    verbose (fun m ->
-        m "SAT: About to check the following:\n%s"
-          (string_of_solver masterSolver)));
-
+  (* L.(
+     verbose (fun m ->
+         m "SAT: About to check the following:\n%s"
+           (string_of_solver masterSolver))); *)
   (* Step 3: Check satisfiability *)
   (* let t = Sys.time () in *)
   let ret = Solver.check masterSolver [] in
