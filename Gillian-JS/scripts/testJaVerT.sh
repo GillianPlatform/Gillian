@@ -8,7 +8,7 @@ if [[ -z "${GITHUB_ACTIONS}" ]]; then
 fi
 # Bash array format: ("one" "two" "three")
 # JS Files to test
-declare -a jsfiles=("BST" "KVMap" "PriQ" "SLL" "DLL" "Sort")
+declare -a jsfiles=("BST" "PriQ" "SLL" "DLL" "Sort")
 
 FINAL_RETURN=0
 

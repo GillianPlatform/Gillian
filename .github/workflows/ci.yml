@@ -105,6 +105,9 @@ jobs:
       - name: Test JaVerT
         run: './testJaVerT.sh'
         working-directory: 'Gillian/Gillian-JS/environment/'
+      - name: Test Amazon
+        run: 'gillian-js verify deserialize_factory.js --no-lemma-proof --amazon -l disabled'
+        working-directory: 'Gillian/Gillian-JS/Examples/Amazon/'
   
   test262:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
