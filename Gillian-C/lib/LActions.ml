@@ -17,9 +17,6 @@ type mem_ac =
   | GetBounds
   | SetBounds
   | RemBounds
-  | GetPerm
-  | SetPerm
-  | RemPerm
   | GetFreed
   | SetFreed
   | RemFreed
@@ -28,7 +25,7 @@ type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
 
 type ac = AGEnv of genv_ac | AMem of mem_ac
 
-type mem_ga = Single | Hole | Bounds | Perm | Freed
+type mem_ga = Single | Hole | Bounds | Freed
 
 type genv_ga = Symbol | Definition
 
@@ -37,28 +34,25 @@ type ga = GMem of mem_ga | GGenv of genv_ga
 (* Some things about the semantics of these Actions *)
 
 let is_overlapping_asrt = function
-  | GMem Perm | GGenv _ -> true
-  | _                   -> false
+  | GGenv _ -> true
+  | _       -> false
 
 let mem_ga_to_setter = function
   | Single -> SetSingle
   | Hole   -> SetHole
   | Bounds -> SetBounds
-  | Perm   -> SetPerm
   | Freed  -> SetFreed
 
 let mem_ga_to_getter = function
   | Single -> GetSingle
   | Hole   -> GetHole
   | Bounds -> GetBounds
-  | Perm   -> GetPerm
   | Freed  -> GetFreed
 
 let mem_ga_to_deleter = function
   | Single -> RemSingle
   | Hole   -> RemHole
   | Bounds -> RemBounds
-  | Perm   -> RemPerm
   | Freed  -> RemFreed
 
 let genv_ga_to_getter = function
@@ -106,9 +100,6 @@ let str_mem_ac = function
   | GetHole    -> "getHole"
   | SetHole    -> "setHole"
   | RemHole    -> "remHole"
-  | GetPerm    -> "getPerm"
-  | SetPerm    -> "setPerm"
-  | RemPerm    -> "remPerm"
   | GetFreed   -> "getFreed"
   | SetFreed   -> "setFreed"
   | RemFreed   -> "remFreed"
@@ -130,9 +121,6 @@ let mem_ac_from_str = function
   | "getHole"    -> GetHole
   | "setHole"    -> SetHole
   | "remHole"    -> RemHole
-  | "getPerm"    -> GetPerm
-  | "setPerm"    -> SetPerm
-  | "remPerm"    -> RemPerm
   | "getFreed"   -> GetFreed
   | "setFreed"   -> SetFreed
   | "remFreed"   -> RemFreed
@@ -174,7 +162,6 @@ let str_mem_ga = function
   | Single -> "single"
   | Hole   -> "hole"
   | Bounds -> "bounds"
-  | Perm   -> "perm"
   | Freed  -> "freed"
 
 let str_genv_ga = function
@@ -186,7 +173,6 @@ let mem_ga_from_str = function
   | "bounds" -> Bounds
   | "hole"   -> Hole
   | "freed"  -> Freed
-  | "perm"   -> Perm
   | str      -> failwith ("Unkown memory assertion : " ^ str)
 
 let genv_ga_from_str = function
@@ -222,7 +208,6 @@ let ga_loc_indexes ga =
   | GMem Single      -> [ 0 ]
   | GMem Hole        -> [ 0 ]
   | GMem Bounds      -> [ 0 ]
-  | GMem Perm        -> [ 0 ]
   | GMem Freed       -> [ 0 ]
   | GGenv Definition -> [ 0 ]
   | GGenv Symbol     -> []

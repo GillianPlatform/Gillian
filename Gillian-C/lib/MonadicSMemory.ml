@@ -65,7 +65,7 @@ module Mem = struct
   let get_or_create_tree mem loc_name =
     match SMap.find_opt loc_name mem with
     | Some t -> Delayed.return t
-    | None   -> SHeapTree.empty ()
+    | None   -> Delayed.return SHeapTree.empty
 
   let alloc mem low high =
     let loc = ALoc.alloc () in
@@ -285,9 +285,19 @@ module Mem = struct
       substituted
     else mem
 
-  let pp ft mem =
+  let pp ?(genv = GEnv.empty) ft mem =
+    let is_fun loc =
+      try
+        match GEnv.find_def genv loc with
+        | FunDef _ -> true
+        | _        -> false
+      with Not_found -> false
+    in
+    let iter_exclude f map =
+      SMap.iter (fun loc x -> if not (is_fun loc) then f loc x) map
+    in
     let open Fmt in
-    pf ft "%a" (Dump.iter_bindings SMap.iter nop string SHeapTree.pp) mem
+    pf ft "%a" (Dump.iter_bindings iter_exclude nop string SHeapTree.pp) mem
 end
 
 type t' = { genv : GEnv.t; mem : Mem.t }
@@ -622,8 +632,8 @@ let pp_err fmt (e : err_t) =
 (* let str_of_err e = Format.asprintf "%a" pp_err e *)
 
 let pp fmt h =
-  Format.fprintf fmt "GEnv : @[%a@]@\nMem  : @[%a@]" GEnv.pp !h.genv Mem.pp
-    !h.mem
+  Format.fprintf fmt "GEnv : @[%a@]@\nMem  : @[%a@]" GEnv.pp !h.genv
+    (Mem.pp ~genv:!h.genv) !h.mem
 
 (* let str_noheap _ = "NO HEAP PRINTED" *)
 

@@ -1,5 +1,5 @@
 {
-  "checksum": "13f2c71ec5a1fc18cb6020c53a446741",
+  "checksum": "a70e12de8adb374de90267f6be5a4d3e",
   "root": "gillian-ecosystem-dev@link-dev:./esy.json",
   "node": {
     "ocaml@4.10.0@d41d8cd9": {
@@ -34,7 +34,7 @@
         "@opam/ppxlib@opam:0.14.0@f5ad0360",
         "@opam/ppx_yojson_conv@opam:v0.14.0@97845f62",
         "@opam/menhir@opam:20190924@004407ff",
-        "@opam/fmt@opam:0.8.8@01c3a23c", "@opam/dune@opam:2.7.1@f5f493bc",
+        "@opam/fmt@opam:0.8.9@e0843a5b", "@opam/dune@opam:2.7.1@f5f493bc",
         "@opam/cmdliner@opam:1.0.4@93208aac",
         "@opam/batteries@opam:3.0.0@736a4556",
         "@opam/alcotest@opam:1.0.1@8ab09718"
@@ -45,7 +45,7 @@
         "@opam/odoc@opam:1.5.1@52a58c0b",
         "@opam/ocamlformat@opam:0.15.0@8e036963",
         "@opam/ocamlfind@opam:1.8.1@ff07b0f9",
-        "@opam/ocaml-lsp-server@github:ocaml/ocaml-lsp:ocaml-lsp-server.opam#0358d7@d41d8cd9",
+        "@opam/ocaml-lsp-server@github:ocaml/ocaml-lsp:ocaml-lsp-server.opam#b264d8f@d41d8cd9",
         "@opam/fileutils@opam:0.6.2@2c57b3ad",
         "@opam/cmitomli@opam:1.0.0@e096e52a"
       ]
@@ -1385,14 +1385,14 @@
         "@opam/dune@opam:2.7.1@f5f493bc"
       ]
     },
-    "@opam/ocaml-lsp-server@github:ocaml/ocaml-lsp:ocaml-lsp-server.opam#0358d7@d41d8cd9": {
+    "@opam/ocaml-lsp-server@github:ocaml/ocaml-lsp:ocaml-lsp-server.opam#b264d8f@d41d8cd9": {
       "id":
-        "@opam/ocaml-lsp-server@github:ocaml/ocaml-lsp:ocaml-lsp-server.opam#0358d7@d41d8cd9",
+        "@opam/ocaml-lsp-server@github:ocaml/ocaml-lsp:ocaml-lsp-server.opam#b264d8f@d41d8cd9",
       "name": "@opam/ocaml-lsp-server",
-      "version": "github:ocaml/ocaml-lsp:ocaml-lsp-server.opam#0358d7",
+      "version": "github:ocaml/ocaml-lsp:ocaml-lsp-server.opam#b264d8f",
       "source": {
         "type": "install",
-        "source": [ "github:ocaml/ocaml-lsp:ocaml-lsp-server.opam#0358d7" ]
+        "source": [ "github:ocaml/ocaml-lsp:ocaml-lsp-server.opam#b264d8f" ]
       },
       "overrides": [],
       "dependencies": [
@@ -1809,20 +1809,20 @@
         "ocaml@4.10.0@d41d8cd9", "@opam/astring@opam:0.8.5@1300cee8"
       ]
     },
-    "@opam/fmt@opam:0.8.8@01c3a23c": {
-      "id": "@opam/fmt@opam:0.8.8@01c3a23c",
+    "@opam/fmt@opam:0.8.9@e0843a5b": {
+      "id": "@opam/fmt@opam:0.8.9@e0843a5b",
       "name": "@opam/fmt",
-      "version": "opam:0.8.8",
+      "version": "opam:0.8.9",
       "source": {
         "type": "install",
         "source": [
-          "archive:https://opam.ocaml.org/cache/md5/47/473490fcfdf3ff0a8ccee226b873d4b2#md5:473490fcfdf3ff0a8ccee226b873d4b2",
-          "archive:https://erratique.ch/software/fmt/releases/fmt-0.8.8.tbz#md5:473490fcfdf3ff0a8ccee226b873d4b2"
+          "archive:https://opam.ocaml.org/cache/md5/40/4001b51cde90ea4fd99a4a5033ecf411#md5:4001b51cde90ea4fd99a4a5033ecf411",
+          "archive:https://erratique.ch/software/fmt/releases/fmt-0.8.9.tbz#md5:4001b51cde90ea4fd99a4a5033ecf411"
         ],
         "opam": {
           "name": "fmt",
-          "version": "0.8.8",
-          "path": "esy.lock/opam/fmt.0.8.8"
+          "version": "0.8.9",
+          "path": "esy.lock/opam/fmt.0.8.9"
         }
       },
       "overrides": [],
@@ -2440,7 +2440,7 @@
       "dependencies": [
         "ocaml@4.10.0@d41d8cd9", "@opam/uuidm@opam:0.9.7@bf725775",
         "@opam/stdlib-shims@opam:0.1.0@8c116481",
-        "@opam/re@opam:1.9.0@d4d5e13d", "@opam/fmt@opam:0.8.8@01c3a23c",
+        "@opam/re@opam:1.9.0@d4d5e13d", "@opam/fmt@opam:0.8.9@e0843a5b",
         "@opam/dune@opam:2.7.1@f5f493bc",
         "@opam/cmdliner@opam:1.0.4@93208aac",
         "@opam/astring@opam:0.8.5@1300cee8",
@@ -2449,7 +2449,7 @@
       "devDependencies": [
         "ocaml@4.10.0@d41d8cd9", "@opam/uuidm@opam:0.9.7@bf725775",
         "@opam/stdlib-shims@opam:0.1.0@8c116481",
-        "@opam/re@opam:1.9.0@d4d5e13d", "@opam/fmt@opam:0.8.8@01c3a23c",
+        "@opam/re@opam:1.9.0@d4d5e13d", "@opam/fmt@opam:0.8.9@e0843a5b",
         "@opam/dune@opam:2.7.1@f5f493bc",
         "@opam/cmdliner@opam:1.0.4@93208aac",
         "@opam/astring@opam:0.8.5@1300cee8"

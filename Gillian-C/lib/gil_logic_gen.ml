@@ -118,7 +118,7 @@ let assert_of_member cenv members id typ =
     | _              -> failwith "Invalid access mode for some type"
   in
   let ga_asrt =
-    Constr.single ~loc:pvloc ~ofs:(pvoffs ++ fo) ~chunk ~sval:e_to_use
+    Constr.single ~loc:pvloc ~ofs:(pvoffs ++ fo) ~chunk ~sval:e_to_use ~perm:(Some Freeable)
   in
   getter_or_type_pred ** ga_asrt
 
@@ -127,7 +127,7 @@ let assert_of_hole (low, high) =
   (* let pvoffs = Expr.PVar offs_param_name in *)
   let pvoffs = Expr.Lit (Num 0.) in
   let num k = Expr.Lit (Num (float_of_int k)) in
-  Constr.hole ~loc:pvloc ~low:(pvoffs ++ num low) ~high:(pvoffs ++ num high)
+  Constr.hole ~loc:pvloc ~low:(pvoffs ++ num low) ~high:(pvoffs ++ num high) ~perm:(Some Freeable)
 
 let gen_pred_of_struct cenv ann struct_name =
   let pred_name = pred_name_of_struct struct_name in
@@ -333,7 +333,7 @@ let malloc_chunk_asrt loc struct_sz =
   let chunk = if Archi.ptr64 then Chunk.Mint64 else Chunk.Mint32 in
   let sz = Chunk.size chunk in
   let ofs = num (-sz) in
-  Constr.single ~loc ~ofs ~chunk ~sval:(mk_val struct_sz)
+  Constr.single ~loc ~ofs ~chunk ~sval:(mk_val struct_sz) ~perm:(Some Freeable)
   ** Constr.bounds ~loc ~low:(num (-sz)) ~high:(num struct_sz)
 
 let trans_constr ?fname:_ ~malloc ann s c =
@@ -368,14 +368,14 @@ let trans_constr ?fname:_ ~malloc ann s c =
       let sv = mk int_type e in
       let siz = sz (Sint se) in
       (* FIXME: at some point this will not be 0 anymore *)
-      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv in
+      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv ~perm:(Some Freeable) in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Sfloat se)) ->
       let e = cse se in
       let chunk = Chunk.Mfloat32 in
       let siz = sz (Sfloat se) in
       let sv = mk float_type e in
-      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv in
+      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv ~perm:(Some Freeable) in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Ssingle se)) ->
       let e = cse se in
@@ -383,14 +383,14 @@ let trans_constr ?fname:_ ~malloc ann s c =
       (* FIXME: this is probably wrong *)
       let siz = sz (Ssingle se) in
       let sv = mk single_type e in
-      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv in
+      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv ~perm:(Some Freeable) in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Slong se)) ->
       let e = cse se in
       let chunk = Chunk.Mint64 in
       let siz = sz (Slong se) in
       let sv = mk long_type e in
-      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv in
+      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv ~perm:(Some Freeable) in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Sptr (sl, so))) ->
       let l = cse sl in
@@ -398,7 +398,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
       let chunk = Chunk.ptr in
       let siz = sz (Sptr (sl, so)) in
       let sv = mk_ptr l o in
-      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv in
+      let ga = Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv ~perm:(Some Freeable) in
       ga ** pc ** a_s ** tloc l ** tnum o ** malloc_chunk siz
   | CConstructor.ConsExpr _ ->
       Fmt.failwith "Constructor %a is not handled yet" CConstructor.pp c

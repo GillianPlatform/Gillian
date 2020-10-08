@@ -4,11 +4,14 @@ let pred ga ins outs =
   let ga_name = LActions.str_ga ga in
   Asrt.GA (ga_name, ins, outs)
 
-let single ~loc ~ofs ~chunk ~sval =
+let single ~loc ~ofs ~chunk ~sval ~perm =
   let chunk = Expr.Lit (String (ValueTranslation.string_of_chunk chunk)) in
-  pred (GMem Single) [ loc; ofs; chunk ] [ sval ]
+  let perm = Expr.Lit (String (ValueTranslation.string_of_permission_opt perm)) in
+  pred (GMem Single) [ loc; ofs; chunk ] [ sval; perm ]
 
-let hole ~loc ~low ~high = pred (GMem Hole) [ loc; low; high ] []
+let hole ~loc ~low ~high ~perm =
+  let perm = Expr.Lit (String (ValueTranslation.string_of_permission_opt perm)) in
+  pred (GMem Hole) [ loc; low; high ] [ perm ]
 
 let bounds ~loc ~low ~high =
   let bounds = Expr.EList [ low; high ] in
@@ -22,7 +25,3 @@ let bounds_opt ~loc ~bounds:b =
   | Some (low, high) -> bounds ~loc ~low ~high
 
 let freed ~loc = pred (GMem Freed) [ loc ] []
-
-let perm ~loc ~perm =
-  let perm = Expr.Lit (String (ValueTranslation.string_of_permission perm)) in
-  pred (GMem Perm) [ loc ] [ perm ]
