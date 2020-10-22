@@ -6,11 +6,15 @@ let pred ga ins outs =
 
 let single ~loc ~ofs ~chunk ~sval ~perm =
   let chunk = Expr.Lit (String (ValueTranslation.string_of_chunk chunk)) in
-  let perm = Expr.Lit (String (ValueTranslation.string_of_permission_opt perm)) in
+  let perm =
+    Expr.Lit (String (ValueTranslation.string_of_permission_opt perm))
+  in
   pred (GMem Single) [ loc; ofs; chunk ] [ sval; perm ]
 
 let hole ~loc ~low ~high ~perm =
-  let perm = Expr.Lit (String (ValueTranslation.string_of_permission_opt perm)) in
+  let perm =
+    Expr.Lit (String (ValueTranslation.string_of_permission_opt perm))
+  in
   pred (GMem Hole) [ loc; low; high ] [ perm ]
 
 let bounds ~loc ~low ~high =
