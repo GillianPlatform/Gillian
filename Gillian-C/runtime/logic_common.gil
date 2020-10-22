@@ -43,5 +43,4 @@ pred i__function_ptr(+s: Str, p : List):
 pred i__glob_fun(+symb, +fname):
   <genv_symb>(symb; #l) *
   <genv_def>(#l; {{ "function", fname }}) *
-  <mem_hole>(#l, 0, 1;) *
-  <mem_perm>(#l; "Nonempty");
+  <mem_hole>(#l, 0, 1; "Nonempty");

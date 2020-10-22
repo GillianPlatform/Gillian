@@ -7,20 +7,20 @@ pred i__is_ptr_to_0_opt (e: List):
 pred i__is_ptr_to_int_opt (+e: List):
   e == {{ "long", 0. }},
   i__ptr_to_0(e, #l) *
-  <mem_single>(#l, 0, "int32"; {{ "int", #i }});
+  <mem_single>(#l, 0, "int32"; {{ "int", #i }}, "Freeable");
   
 pred i__is_ptr_to_float_opt (+e: List):
   e == {{ "long", 0. }},
   i__ptr_to_0(e, #l) *
-  <mem_single>(#l, 0, "float32"; {{ "float", #i }});
+  <mem_single>(#l, 0, "float32"; {{ "float", #i }}, "Freeable");
   
 pred i__is_ptr_to_long_opt (+e: List):
   e == {{ "long", 0. }},
   i__ptr_to_0(e, #l) *
-  <mem_single>(#l, 0, "int64"; {{ "long", #i }});
+  <mem_single>(#l, 0, "int64"; {{ "long", #i }}, "Freeable");
   
 pred i__is_ptr_to_single_opt (+e: List):
   e == {{ "long", 0. }},
   i__ptr_to_0(e, #l) *
-  <mem_single>(#l, 0, "float32"; {{ "single", #i }});
+  <mem_single>(#l, 0, "float32"; {{ "single", #i }}, "Freeable");
   
