@@ -378,8 +378,8 @@ module Tree = struct
               else DR.error (Unhandled "wrong pre-cut")
         | None               ->
             let open Delayed.Syntax in
-            let+ node, left, right = split ~range t in
-            Ok (node, rebuild_parent t ~left ~right)
+            let* _, left, right = split ~range t in
+            frame_inside (with_children t ~left ~right) range
     in
     let open Delayed.Syntax in
     let* root = extend_if_needed t range in
