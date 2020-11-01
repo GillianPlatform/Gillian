@@ -29,7 +29,7 @@ let rec js2jsil_st
 
   let pre' : Asrt.t =
     JSAsrt.js2jsil (Some fid) cc_tbl vis_tbl fun_tbl
-      (Some (Expr.LVar var_scope)) pre
+      (Some (Expr.PVar var_scope)) pre
   in
   let post' : Asrt.t list =
     List.map
@@ -65,7 +65,7 @@ let rec js2jsil_st
     Asrt.Pure (Eq (Expr.PVar var_this, Expr.LVar this_logic_var_name))
   in
   (*  x__scope == {{ #x1, ..., #xn }} *)
-  let a_scope_pre =
+  let a_scope =
     Asrt.Pure (Eq (Expr.PVar var_scope, Expr.EList scope_chain_list))
   in
 
@@ -80,6 +80,6 @@ let rec js2jsil_st
   if fid = main_fid then (pre', post')
   else
     ( Asrt.star
-        ( [ pre'; a_scope_pre ] (* a_mds_ers @ a_scope_mds @ *) @ [ a_this ]
+        ( [ pre'; a_scope ] (* a_mds_ers @ a_scope_mds @ *) @ [ a_this ]
         @ params_not_empty @ params_not_none @ params_and_lists ),
-      List.map (fun post -> Asrt.star [ post; a_this ]) post' )
+      List.map (fun post -> Asrt.star [ post; a_this; a_scope ]) post' )

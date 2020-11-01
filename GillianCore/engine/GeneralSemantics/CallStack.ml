@@ -9,13 +9,22 @@ module type S = sig
     1) identifier of the current procedure (string)
     2) arguments of the current procedure (list of values)
     3) calling store
-    4) variable that should hold the return value
-    5) index of the calling procedure from whence the procedure was called
-    6) normal continuation index in the calling procedure
-    7) optional error continuation index in the calling procedure
+    4) a list of loop invariant identifiers
+    5) variable that should hold the return value
+    6) index of the calling procedure from whence the procedure was called
+    7) normal continuation index in the calling procedure
+    8) optional error continuation index in the calling procedure
   *)
   type t =
-    (string * vt list * store_t option * Var.t * int * int * int option) list
+    ( string
+    * vt list
+    * store_t option
+    * string list
+    * Var.t
+    * int
+    * int
+    * int option )
+    list
 
   (**
     Get current procedure identifier
@@ -32,6 +41,14 @@ module type S = sig
     @return Arguments of the procedure currently being executed
   *)
   val get_cur_args : t -> vt list
+
+  (**
+    Get current loop identifiers
+
+    @param cs Target call stack
+    @return List of current loop identifiers
+  *)
+  val get_loop_ids : t -> string list
 
   (**
     Call stack copy
@@ -57,7 +74,15 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
     7) optional error continuation index in the calling procedure
   *)
   type t =
-    (string * Val.t list * Store.t option * Var.t * int * int * int option) list
+    ( string
+    * Val.t list
+    * Store.t option
+    * string list
+    * Var.t
+    * int
+    * int
+    * int option )
+    list
 
   (**
     Get current procedure identifier
@@ -68,7 +93,7 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
 
   let get_cur_proc_id (cs : t) : string =
     match cs with
-    | (pid, _, _, _, _, _, _) :: _ -> pid
+    | (pid, _, _, _, _, _, _, _) :: _ -> pid
     | _ -> raise (Failure "Malformed configuration")
 
   (**
@@ -79,7 +104,17 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
   *)
   let get_cur_args (cs : t) : Val.t list =
     match cs with
-    | (_, args, _, _, _, _, _) :: _ -> args
+    | (_, args, _, _, _, _, _, _) :: _ -> args
+    | _ -> raise (Failure "Malformed configuration")
+
+  (**
+    Get current arguments
+
+    @param cs Target call stack
+    @return List of current loop identifiers
+  *)
+  let get_loop_ids = function
+    | (_, _, _, loop_ids, _, _, _, _) :: _ -> loop_ids
     | _ -> raise (Failure "Malformed configuration")
 
   (**
@@ -90,7 +125,8 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
   *)
   let copy (cs : t) : t =
     List.map
-      (fun (a, b, c, d, e, f, g) -> (a, b, Option.map Store.copy c, d, e, f, g))
+      (fun (a, b, c, d, e, f, g, h) ->
+        (a, b, Option.map Store.copy c, d, e, f, g, h))
       cs
 
   (**
@@ -102,10 +138,10 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
   *)
   let recursive_depth (cs : t) (pid : string) : int =
     List.fold_left
-      (fun ac (pid', b, c, d, e, f, g) -> if pid' = pid then ac + 1 else ac)
+      (fun ac (pid', b, c, d, e, f, g, h) -> if pid' = pid then ac + 1 else ac)
       (-1) cs
 
   let get_cur_procs (cs : t) : string list =
     List.rev
-      (List.fold_left (fun ac (pid', b, c, d, e, f, g) -> pid' :: ac) [] cs)
+      (List.fold_left (fun ac (pid', b, c, d, e, f, g, h) -> pid' :: ac) [] cs)
 end

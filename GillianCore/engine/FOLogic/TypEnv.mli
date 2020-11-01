@@ -34,6 +34,8 @@ val empty : t -> bool
 
 val pp : Format.formatter -> t -> unit
 
+val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
+
 val update : t -> string -> Type.t -> unit
 
 val remove : t -> string -> unit
@@ -54,6 +56,9 @@ val to_list : t -> (Var.t * Type.t) list
 
 val to_list_expr : t -> (Expr.t * Type.t) list
 
-val substitution : t -> SSubst.t -> bool -> t
+val substitution : t -> SESubst.t -> bool -> t
 
 val is_well_formed : t -> bool
+
+val filter_with_info :
+  Containers.SS.t * Containers.SS.t * Containers.SS.t -> t -> t

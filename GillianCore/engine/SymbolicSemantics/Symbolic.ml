@@ -1,5 +1,5 @@
 module Values = SVal.M
-module Subst = SVal.SSubst
+module Subst = SVal.SESubst
 module PureContext = PFS
 module TypEnv = TypEnv
 

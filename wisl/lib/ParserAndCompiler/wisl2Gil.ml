@@ -769,7 +769,7 @@ let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials } =
     | Some ss_label ->
         Spec.s_init ~ss_label comp_pre [ comp_post ] Flag.Normal true
   in
-  Spec.init fname fparams [ single_spec ] false true
+  Spec.init fname fparams [ single_spec ] false false true
 
 let compile_pred filepath pred =
   let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; _ } = pred in
@@ -794,7 +794,11 @@ let compile_pred filepath pred =
       pred_ins;
       pred_definitions = List.map build_def pred_definitions;
       pred_normalised = false;
+      (* FIXME: ADD SUPPORT FOR ABSTRACT, PURE, NOUNFOLD *)
+      pred_facts = [];
+      pred_abstract = false;
       pred_pure = false;
+      pred_nounfold = false;
     }
 
 let rec compile_function

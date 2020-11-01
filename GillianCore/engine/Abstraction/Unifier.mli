@@ -21,7 +21,7 @@ module type S = sig
 
   type u_res = UWTF | USucc of t | UFail of err_t list
 
-  type unfold_info_t = string * (string * Expr.t) list
+  type unfold_info_t = (string * string) list
 
   val produce_assertion : t -> st -> Asrt.t -> t option
 
@@ -39,27 +39,27 @@ module type S = sig
 
   val unfold_concrete_preds : t -> (st option * t) option
 
-  val unify_assertion : t -> st -> Asrt.t -> u_res
+  val unify_assertion : t -> st -> UP.step -> u_res
 
   val unify_up : search_state -> up_u_res
 
   val unify : ?in_unification:bool -> t -> st -> UP.t -> up_u_res
 
-  val get_pred : ?in_unification:bool -> t -> string -> vt list -> gp_ret
+  val get_pred : ?in_unification:bool -> t -> string -> vt option list -> gp_ret
 end
 
 module Make
     (Val : Val.S)
-    (Subst : Subst.S with type vt = Val.t and type t = Val.st)
+    (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
     (State : State.S
                with type vt = Val.t
-                and type st = Subst.t
+                and type st = ESubst.t
                 and type store_t = Store.t)
-    (Preds : Preds.S with type vt = Val.t and type st = Subst.t) :
+    (Preds : Preds.S with type vt = Val.t and type st = ESubst.t) :
   S
     with type vt = Val.t
-     and type st = Subst.t
+     and type st = ESubst.t
      and type state_t = State.t
      and type preds_t = Preds.t
      and type err_t = State.err_t

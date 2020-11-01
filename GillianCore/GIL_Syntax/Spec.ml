@@ -15,6 +15,7 @@ type t = TypeDef__.spec = {
   spec_params : string list;  (** Procedure/spec parameters *)
   spec_sspecs : st list;  (** List of single specifications *)
   spec_normalised : bool;  (** If the spec is already normalised *)
+  spec_incomplete : bool;  (** If the spec is incomplete *)
   spec_to_verify : bool;  (** Should the spec be verified? *)
 }
 
@@ -32,8 +33,16 @@ let init
     (spec_params : string list)
     (spec_sspecs : st list)
     (spec_normalised : bool)
+    (spec_incomplete : bool)
     (spec_to_verify : bool) : t =
-  { spec_name; spec_params; spec_sspecs; spec_normalised; spec_to_verify }
+  {
+    spec_name;
+    spec_params;
+    spec_sspecs;
+    spec_normalised;
+    spec_incomplete;
+    spec_to_verify;
+  }
 
 let extend (spec : t) (sspecs : st list) : t =
   { spec with spec_sspecs = sspecs @ spec.spec_sspecs }

@@ -72,9 +72,15 @@ let var_te = "x__te"
 
 let var_se = "x__se"
 
+let var_er = "x__er"
+
 let var_this = "x__this"
 
 let var_scope = "x__scope"
+
+let logic_var_scope = "#x__scope"
+
+let var_scope_final = "x__scope_f"
 
 let funobj_pred_name = "JSFunctionObject"
 

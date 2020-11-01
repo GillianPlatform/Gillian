@@ -20,7 +20,7 @@ module type S = sig
 
   val is_empty : t -> bool
 
-  val extend : t -> abs_t -> unit
+  val extend : ?pure:bool -> t -> abs_t -> unit
 
   val pop : t -> (abs_t -> bool) -> abs_t option
 
@@ -36,8 +36,8 @@ module type S = sig
     maintain:bool ->
     t ->
     string ->
-    vt list ->
-    int list ->
+    vt option list ->
+    Containers.SI.t ->
     (vt -> vt -> bool) ->
     abs_t option
 
@@ -53,13 +53,13 @@ end
 
 module Make
     (Val : Val.S)
-    (Subst : Subst.S with type vt = Val.t and type t = Val.st) :
-  S with type vt = Val.t and type st = Subst.t = struct
+    (ESubst : ESubst.S with type vt = Val.t and type t = Val.et) :
+  S with type vt = Val.t and type st = ESubst.t = struct
   module L = Logging
 
   type vt = Val.t
 
-  type st = Subst.t
+  type st = ESubst.t
 
   type abs_t = string * vt list
 
@@ -81,7 +81,11 @@ module Make
   let is_empty (preds : t) : bool = List.compare_length_with !preds 0 = 0
 
   (** Extends --preds-- with --pa-- *)
-  let extend (preds : t) (pa : abs_t) : unit = preds := pa :: !preds
+  let extend ?(pure = false) (preds : t) (pa : abs_t) : unit =
+    preds :=
+      match pure with
+      | true when List.mem pa !preds -> !preds
+      | _ -> pa :: !preds
 
   let pop preds f =
     let rec val_and_remove passed = function
@@ -134,24 +138,104 @@ module Make
       ~(maintain : bool)
       (preds : t)
       (name : string)
-      (args : vt list)
-      (ins : int list)
+      (args : vt option list)
+      (ins : Containers.SI.t)
       (f_eq : vt -> vt -> bool) : abs_t option =
-    let getter = if maintain then find else pop in
-    let predicate (name', args') =
-      if not (name = name') then false
-      else
-        let args' = List.map (fun i -> List.nth args' i) ins in
-        List.for_all
-          (fun (arg, arg') ->
-            L.tmi (fun m -> m "Checking if %a = %a\n" Val.pp arg Val.pp arg');
-            f_eq arg arg')
-          (List.combine args args')
+    (* Auxiliary printers *)
+    let lv_pp = Fmt.(parens (list ~sep:comma Val.pp)) in
+    let ov_pp = Fmt.(option ~none:(any "None") Val.pp) in
+    let lov_pp = Fmt.(parens (list ~sep:comma ov_pp)) in
+    (* How many ins do we need to find *)
+    let ins_count = Containers.SI.cardinal ins in
+    (* How many outs do we know *)
+    let outs_count =
+      List.mapi
+        (fun i arg -> if Containers.SI.mem i ins || arg = None then 0 else 1)
+        args
     in
-    getter preds predicate
+    let outs_count = List.fold_left (fun sum i -> sum + i) 0 outs_count in
+    L.verbose (fun fmt ->
+        fmt "Preds.get_pred: Looking for: %s%a" name lov_pp args);
+    (* Evaluate a candidate predicate with respect to the desired ins and outs and an equality function *)
+    let eval_cand_with_fun
+        (candidate : vt list)
+        (targets : vt option list)
+        (f_eq : vt -> vt -> bool) : bool * (int * int) =
+      let candidate = List.mapi (fun i cv -> (i, cv)) candidate in
+      let icount, ocount =
+        List.fold_left2
+          (fun (ic, oc) (i, cv) tv ->
+            match tv with
+            | None -> (ic, oc)
+            (* First check syntactic equality and only then try f_eq *)
+            | Some tv when cv <> tv && not (f_eq cv tv) -> (ic, oc)
+            | _ -> if Containers.SI.mem i ins then (ic + 1, oc) else (ic, oc + 1))
+          (0, 0) candidate targets
+      in
+      let result = (icount = ins_count, (icount, ocount)) in
+      result
+    in
+    (* Sort the candidate predicates according to the number of ins matched,
+       and then the number of outs matched, in decreasing order of matches *)
+    let find_pred
+        (candidates : vt list list)
+        (targets : vt option list)
+        (f_eq : vt -> vt -> bool) =
+      List.fold_left
+        (fun (b', i', o', result) candidate ->
+          let ccurrent = (b', i', o', result) in
+          if i' = ins_count && o' = outs_count then ccurrent
+          else
+            let b, (i, o) =
+              try
+                (* In case something goes wrong with the evaluation, ignore *)
+                eval_cand_with_fun candidate targets f_eq
+              with _ -> (false, (0, 0))
+            in
+            let cnew = (b, i, o, candidate) in
+            match (b', b) with
+            | false, true -> cnew
+            | true, false -> ccurrent
+            | _           -> (
+                match (i > i', i' > i) with
+                | true, _ -> cnew
+                | _, true -> ccurrent
+                | _       -> if o > o' then cnew else ccurrent ))
+        (false, 0, 0, []) candidates
+    in
+    (* Frame off found predicate *)
+    let frame_off name args =
+      match maintain with
+      | true  -> Some (name, args)
+      | false -> pop preds (fun pred -> pred = (name, args))
+    in
+    let candidates = find_all preds (fun (pname, _) -> name = pname) in
+    let candidates = List.map (fun (_, args) -> args) candidates in
+    L.verbose (fun fmt ->
+        fmt "Found %d candidates: \n%a" (List.length candidates)
+          Fmt.(list ~sep:(any "@\n") lv_pp)
+          candidates);
+    let syntactic_result = find_pred candidates args ( = ) in
+    match syntactic_result with
+    | true, _, o, syntactic_result when o = outs_count ->
+        frame_off name syntactic_result
+    | true, _, o, syntactic_result -> (
+        let semantic_result = find_pred candidates args f_eq in
+        match semantic_result with
+        | true, _, o', semantic_result ->
+            let result =
+              if o >= o' then syntactic_result else semantic_result
+            in
+            frame_off name result
+        | false, _, _, _ -> frame_off name syntactic_result )
+    | false, _, _, _ -> (
+        let semantic_result = find_pred candidates args f_eq in
+        match semantic_result with
+        | true, _, o', semantic_result -> frame_off name semantic_result
+        | false, _, _, _ -> None )
 
   let subst_in_val (subst : st) (v : vt) : vt =
-    let le' = Subst.subst_in_expr subst true (Val.to_expr v) in
+    let le' = ESubst.subst_in_expr subst true (Val.to_expr v) in
     Option.fold ~some:(fun v -> v) ~none:v (Val.from_expr le')
 
   (** Updates --preds-- to subst(preds) *)
@@ -170,4 +254,4 @@ module Make
     List.sort Asrt.compare (List.map pred_to_assert preds)
 end
 
-module SPreds = Make (SVal.M) (SVal.SSubst)
+module SPreds = Make (SVal.M) (SVal.SESubst)

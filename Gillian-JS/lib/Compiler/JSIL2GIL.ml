@@ -90,6 +90,7 @@ let jsil2gil_spec (spec : Spec.t) : GSpec.t =
     spec_params = spec.params;
     spec_sspecs = List.map jsil2gil_sspec spec.sspecs;
     spec_normalised = spec.normalised;
+    spec_incomplete = spec.incomplete;
     spec_to_verify = spec.to_verify;
   }
 
@@ -118,7 +119,10 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
     pred_ins = pred.ins;
     pred_definitions =
       List.map (fun (info, asrt) -> (info, jsil2gil_asrt asrt)) pred.definitions;
+    pred_facts = pred.facts;
     pred_pure = pred.pure;
+    pred_abstract = pred.abstract;
+    pred_nounfold = pred.nounfold;
     pred_normalised = pred.normalised;
   }
 

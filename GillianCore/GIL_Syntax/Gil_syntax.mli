@@ -266,6 +266,9 @@ module Expr : sig
   (** [clocs e] returns all concrete locations in [e] *)
   val clocs : t -> SS.t
 
+  (** [locs e] returns all concrete and abstract locations in [e] *)
+  val locs : t -> SS.t
+
   (** [vars e] returns all variables in [e] (includes lvars, pvars, alocs and clocs) *)
   val vars : t -> SS.t
 
@@ -300,6 +303,12 @@ module Expr : sig
   (** [base_elements e] returns the list containing all logical variables,
       abstract locations, and non-list literals in [e] *)
   val base_elements : t -> t list
+
+  (** [var_to_expr x] returns the expression representing the program/logical variable or abstract location [x] *)
+  val var_to_expr : string -> t
+
+  (** [is_unifiable x] returns whether or not the expression [e] is unifiable *)
+  val is_unifiable : t -> bool
 end
 
 module Formula : sig
@@ -332,6 +341,13 @@ module Formula : sig
     t ->
     t
 
+  val map_opt :
+    (t -> t option * bool) option ->
+    (t -> t) option ->
+    (Expr.t -> Expr.t option) option ->
+    t ->
+    t option
+
   (** Deprecated. Use {!Visitors.reduce} instead *)
   val fold :
     (Expr.t -> 'a) option ->
@@ -352,6 +368,12 @@ module Formula : sig
 
   (** Get all the concrete locations *)
   val clocs : t -> SS.t
+
+  (** Get all locations *)
+  val locs : t -> SS.t
+
+  (** Get print info *)
+  val get_print_info : t -> SS.t * SS.t * SS.t
 
   (** Get all the logical expressions of the formula of the form (Lit (LList lst)) and (EList lst) *)
   val lists : t -> Expr.t list
@@ -479,6 +501,9 @@ module Asrt : sig
   (** Get all the concrete locations in [a] *)
   val clocs : t -> SS.t
 
+  (** Get all locations in [a] *)
+  val locs : t -> SS.t
+
   (** Get all the variables in [a] (includes lvars, pvars, alocs and clocs) *)
   val vars : t -> SS.t
 
@@ -506,6 +531,9 @@ module Asrt : sig
   (** Pretty-printer *)
   val pp : Format.formatter -> t -> unit
 
+  (** Full pretty-printer *)
+  val full_pp : Format.formatter -> t -> unit
+
   (** [star \[a1; a2; ...; an\] will return \[a1 * a2 * ... * an\]] *)
   val star : t list -> t
 
@@ -525,8 +553,7 @@ module SLCmd : sig
                    * Expr.t list
                    * (string * (string * Expr.t) list) option
         (** Fold predicate *)
-    | Unfold    of
-        string * Expr.t list * (string * (string * Expr.t) list) option * bool
+    | Unfold    of string * Expr.t list * (string * string) list option * bool
         (** Unfold predicate *)
     | GUnfold   of string  (** Global Unfold *)
     | ApplyLem  of string * Expr.t list * string list  (** Apply lemma *)
@@ -543,6 +570,8 @@ module SLCmd : sig
 
   (** Pretty-printer of folding info *)
   val pp_folding_info : (string * (string * Expr.t) list) option Fmt.t
+
+  val pp_unfold_info : (string * string) list option Fmt.t
 
   (** Pretty-printer *)
   val pp : Format.formatter -> t -> unit
@@ -610,6 +639,15 @@ module Cmd : sig
 
   (** Possible successors of an command (in integer indexing) *)
   val successors : int t -> int -> int list
+
+  (** Program variable collector *)
+  val pvars : 'a t -> Containers.SS.t
+
+  (** Logical variable collector *)
+  val lvars : 'a t -> Containers.SS.t
+
+  (** Location collector *)
+  val locs : 'a t -> Containers.SS.t
 end
 
 module Pred : sig
@@ -624,7 +662,10 @@ module Pred : sig
     pred_ins : int list;  (** Ins *)
     pred_definitions : ((string * string list) option * Asrt.t) list;
         (** Predicate definitions *)
+    pred_facts : Formula.t list;  (** Facts that hold for every definition *)
     pred_pure : bool;  (** Is the predicate pure? *)
+    pred_abstract : bool;  (**  Is the predicate abstract? *)
+    pred_nounfold : bool;  (** Should the predicate be unfolded? *)
     pred_normalised : bool;  (** Has the predicate been previously normalised? *)
   }
 
@@ -696,6 +737,9 @@ module Lemma : sig
 
   (** Infers types of parameters and adds them to the contained assertions *)
   val parameter_types : (string, Pred.t) Hashtbl.t -> t -> t
+
+  (** Adds bindings from parameters to logical variables *)
+  val add_param_bindings : t -> t
 end
 
 module Macro : sig
@@ -745,6 +789,7 @@ module Spec : sig
     spec_params : string list;  (** Procedure/spec parameters *)
     spec_sspecs : st list;  (** List of single specifications *)
     spec_normalised : bool;  (** If the spec is already normalised *)
+    spec_incomplete : bool;  (**  If the spec is incomplete *)
     spec_to_verify : bool;  (** Should the spec be verified? *)
   }
 
@@ -758,7 +803,7 @@ module Spec : sig
     st
 
   (** [init spec_name spec_params spec_sspecs spec_normalised spec_to_verify] creates a full specification with the given values *)
-  val init : string -> string list -> st list -> bool -> bool -> t
+  val init : string -> string list -> st list -> bool -> bool -> bool -> t
 
   (** Extends a full specfiication with a single specification *)
   val extend : t -> st list -> t
@@ -812,7 +857,18 @@ module Annot : sig
   type t
 
   (** Initialize an annotation *)
-  val init : ?line_offset:int option -> ?origin_id:int -> unit -> t
+  val init :
+    ?line_offset:int option ->
+    ?origin_id:int ->
+    ?loop_info:string list ->
+    unit ->
+    t
+
+  (** Get the loop info *)
+  val get_loop_info : t -> string list
+
+  (** Set the loop info *)
+  val set_loop_info : t -> string list -> t
 
   (** get the line offset *)
   val get_line_offset : t -> int option
@@ -1204,7 +1260,7 @@ module Visitors : sig
                'd ->
                string ->
                Expr.t list ->
-               (string * (string * Expr.t) list) option ->
+               (string * string) list option ->
                bool ->
                SLCmd.t
            ; visit_UnsignedRightShift : 'd -> BinOp.t
@@ -1580,7 +1636,7 @@ module Visitors : sig
         'd ->
         string ->
         Expr.t list ->
-        (string * (string * Expr.t) list) option ->
+        (string * string) list option ->
         bool ->
         SLCmd.t
 
@@ -1815,7 +1871,7 @@ module Visitors : sig
                'c ->
                string ->
                Expr.t list ->
-               (string * (string * Expr.t) list) option ->
+               (string * string) list option ->
                bool ->
                'f
            ; visit_UnsignedRightShift : 'c -> 'f
@@ -2187,7 +2243,7 @@ module Visitors : sig
         'c ->
         string ->
         Expr.t list ->
-        (string * (string * Expr.t) list) option ->
+        (string * string) list option ->
         bool ->
         'f
 

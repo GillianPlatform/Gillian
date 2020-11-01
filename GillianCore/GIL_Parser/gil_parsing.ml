@@ -213,6 +213,7 @@ let extend_program
   combine prog.procs other_prog.procs transform_proc "procedure";
   combine prog.preds other_prog.preds id "predicate";
   combine prog.only_specs other_prog.only_specs id "spec-only procedure";
+  combine prog.lemmas other_prog.lemmas id "lemmas";
   combine prog.macros other_prog.macros id "macro";
   combine prog.bi_specs other_prog.bi_specs id "bi-abduction spec"
 

@@ -9,11 +9,11 @@ module Annot = Gillian.Gil_syntax.Annot
 (** JSIL external procedure calls *)
 module M
     (Val : Val.S)
-    (Subst : Subst.S with type vt = Val.t and type t = Val.st)
+    (ESubst : Engine.ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
     (State : State.S
                with type vt = Val.t
-                and type st = Subst.t
+                and type st = ESubst.t
                 and type store_t = Store.t)
     (CallStack : CallStack.S with type vt = Val.t and type store_t = Store.t) =
 struct
@@ -97,8 +97,16 @@ struct
                     let new_store = Store.init (List.combine params args) in
                     let old_store = State.get_store state in
                     let state' = State.set_store state new_store in
+                    let loop_ids = CallStack.get_loop_ids cs in
                     let cs' =
-                      (proc_eval, eval_v_args, Some old_store, x, i, i + 1, j)
+                      ( proc_eval,
+                        eval_v_args,
+                        Some old_store,
+                        loop_ids,
+                        x,
+                        i,
+                        i + 1,
+                        j )
                       :: cs
                     in
                     [ (state', cs', -1, 0) ]

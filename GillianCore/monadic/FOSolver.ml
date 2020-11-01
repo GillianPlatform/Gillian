@@ -29,9 +29,7 @@ let check_entailment ~(pc : Pc.t) formula =
   match f with
   | True  -> true
   | False -> false
-  | _     ->
-      FOSolver.check_entailment Utils.Containers.SS.empty (PFS.to_list pfs)
-        [ f ] gamma
+  | _     -> FOSolver.check_entailment Utils.Containers.SS.empty pfs [ f ] gamma
 
 let of_comp_fun comp ~(pc : Pc.t) e1 e2 =
   comp ~pfs:(build_full_pfs pc) ~gamma:(build_full_gamma pc) e1 e2

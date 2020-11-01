@@ -1,14 +1,14 @@
 {
   "name": "esy-gmp",
-  "version": "6.1.2001",
+  "version": "6.2.0",
   "description": "GMP packaged for esy",
-  "source": "https://gmplib.org/download/gmp/gmp-6.1.2.tar.xz#9dc6981197a7d92f339192eea974f5eca48fcffe",
+  "source": "https://gmplib.org/download/gmp/gmp-6.2.0.tar.xz#052a5411dc74054240eec58132d2cf41211d0ff6",
   "override": {
     "buildsInSource": true,
     "build": [
       "find ./ -exec touch -t 200905010101 {} +",
       "./configure --enable-fat --prefix=#{self.install} #{os == 'windows' ? '--host x86_64-w64-mingw32' : ''} --with-pic",
-      "make"
+      "make -j4"
     ],
     "install": [
       "make install"
@@ -33,6 +33,10 @@
       "CPATH": {
         "scope": "global",
         "val": "#{self.install / 'include'}:$CPATH"
+      },
+      "PKG_CONFIG_PATH": {
+        "val": "#{self.lib / 'pkgconfig' : $PKG_CONFIG_PATH}",
+        "scope": "global"
       }
     }
   }

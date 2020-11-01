@@ -34,16 +34,16 @@ end
 
 module Make
     (Val : Val.S)
-    (Subst : Subst.S with type vt = Val.t and type t = Val.st)
+    (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
     (State : State.S
                with type vt = Val.t
-                and type st = Subst.t
+                and type st = ESubst.t
                 and type store_t = Store.t)
-    (Preds : Preds.S with type vt = Val.t and type st = Subst.t) :
+    (Preds : Preds.S with type vt = Val.t and type st = ESubst.t) :
   S
     with type vt = Val.t
-     and type st = Subst.t
+     and type st = ESubst.t
      and type store_t = Store.t
      and type state_t = State.t
      and type preds_t = Preds.t

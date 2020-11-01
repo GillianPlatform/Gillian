@@ -55,8 +55,11 @@ module type S = sig
   (** Store printer *)
   val pp : Format.formatter -> t -> unit
 
+  (** Store printer by need *)
+  val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
+
   (** Converts the store into an ssubst *)
-  val to_ssubst : t -> SVal.SSubst.t
+  val to_ssubst : t -> SVal.SESubst.t
 
   (** Symbolic indices *)
   val symbolics : t -> Var.Set.t

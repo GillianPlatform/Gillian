@@ -452,7 +452,7 @@ let translate_invariant_in_exp
     (fun_tbl : pre_fun_tbl_type)
     (fid : string)
     (sc_var : string)
-    (e : JS_Parser.Syntax.exp) : Asrt.t option =
+    (e : JS_Parser.Syntax.exp) : (Asrt.t * string list) option =
   let invariant =
     List.filter
       (fun annot -> annot.annot_type == JS_Parser.Syntax.Invariant)
@@ -462,9 +462,19 @@ let translate_invariant_in_exp
   | _ :: _ :: _   ->
       raise (Failure "DEATH: No more than one invariant per command")
   | []            -> None
-  | [ invariant ] ->
-      let a = parse_js_logic_assertion_from_string invariant.annot_formula in
-      Some (JSAsrt.js2jsil_tactic cc_tbl vis_tbl fun_tbl fid sc_var a)
+  | [ invariant ] -> (
+      let inv =
+        List.hd
+          (parse_js_logic_commands_from_string
+             ("invariant " ^ invariant.annot_formula))
+      in
+      match inv with
+      | Invariant (inv_a, inv_binders) ->
+          let inv_a =
+            JSAsrt.js2jsil_tactic cc_tbl vis_tbl fun_tbl fid sc_var inv_a
+          in
+          Some (inv_a, inv_binders)
+      | _ -> L.fail "Impossible: invariant parsed incorrectly" )
 
 let translate_single_func_specs
     (cc_tbl : cc_tbl_type)
@@ -536,7 +546,8 @@ let translate_single_func_specs
 
   let fun_spec =
     if List.length single_specs > 0 then
-      Some (Spec.init fid fun_args single_specs false true)
+      (* TODO: Understand incompleteness *)
+      Some (Spec.init fid fun_args single_specs false false true)
     else None
   in
   fun_spec
@@ -599,7 +610,7 @@ let translate_only_specs cc_tbl old_fun_tbl fun_tbl vis_tbl js_only_specs =
               JSSpec.js2jsil_st pre post cc_tbl vis_tbl (Hashtbl.create 0) name
                 params
             in
-            Spec.{ pre; posts = post; flag; to_verify = true; label })
+            Spec.{ pre; posts = post; flag; to_verify = false; label })
           sspecs
       in
       let spec : Spec.t =
@@ -609,6 +620,7 @@ let translate_only_specs cc_tbl old_fun_tbl fun_tbl vis_tbl js_only_specs =
             [ JS2JSIL_Helpers.var_scope; JS2JSIL_Helpers.var_this ] @ params;
           sspecs;
           normalised = false;
+          incomplete = false;
           to_verify = true;
         }
       in
@@ -646,14 +658,15 @@ let preprocess
   let e, _ = propagate_annotations e in
 
   (* 3 - obtaining and compiling only-specs        *)
-  let top_annots = get_top_level_annot e in
-  let js_only_specs = get_only_specs_from_annots top_annots in
+  let annots = get_all_annots e in
+  let js_only_specs = get_only_specs_from_annots annots in
   let old_fun_tbl : pre_fun_tbl_type = Hashtbl.create medium_tbl_size in
   let only_specs =
     translate_only_specs cc_tbl old_fun_tbl fun_tbl vis_tbl js_only_specs
   in
 
   (* 4 - Adding the main to the translation tables *)
+  let top_annots = get_top_level_annot e in
   let main_tbl = Hashtbl.create medium_tbl_size in
   List.iter (fun v -> Hashtbl.replace main_tbl v main_fid) (get_all_vars_f e []);
   Hashtbl.add cc_tbl main_fid main_tbl;

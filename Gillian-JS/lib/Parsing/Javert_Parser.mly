@@ -118,7 +118,6 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token ASSUME
 %token ASSERT
 %token SEPASSERT
-%token SEPAPPLY
 %token INVARIANT
 %token ASSUME_TYPE
 %token SPEC_VAR
@@ -171,8 +170,11 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LTYPES
 %token LMETADATA
 (* Logic predicates *)
+%token ABSTRACT
 %token PURE
 %token PRED
+%token NOUNFOLD
+%token FACTS
 (* Logic commands *)
 %token OLCMD
 %token CLCMD
@@ -185,14 +187,15 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LTHEN
 %token LELSE
 (* Procedure specification keywords *)
-%token ONLY
+%token AXIOMATIC
+%token INCOMPLETE
 %token SPEC
 %token BISPEC
 %token LEMMA
 %token VARIANT
 %token NORMAL
 %token ERROR
-(* JS only spec specifics *)
+(* JS axiomatic spec specifics *)
 %token JSOS
 (* Procedure definition keywords *)
 %token PROC
@@ -513,7 +516,12 @@ var_and_le_target:
   | LBRACE; lvar = LVAR; DEFEQ; le = expr_target; RBRACE;
     { (lvar, le) }
 
-unfold_info_target:
+var_and_var_target:
+  | LBRACE; lvar1 = LVAR; DEFEQ; lvar2 = LVAR; RBRACE;
+    { (lvar1, lvar2) }
+;
+
+logic_bindings_target:
   | LBRACKET; id = VAR; WITH; var_les = separated_list(AND, var_and_le_target); RBRACKET
     { (id, var_les) }
 
@@ -521,8 +529,14 @@ existentials_target:
   | LBRACKET; EXISTENTIALS; COLON; xs = separated_list(COMMA, LVAR); RBRACKET
     { xs }
 
+(* [bind: (#x := le1) and ... ] *)
+unfold_info_target:
+  | LBRACKET; BIND; COLON; unfold_info = separated_list(AND, var_and_var_target); RBRACKET
+    { unfold_info }
+;
+
 logic_cmd_target:
-  | FOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(unfold_info_target)
+  | FOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(logic_bindings_target)
     { SL (Fold (name, les, fold_info)) }
   | UNFOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
     { SL (Unfold (name, les, unfold_info, false)) }
@@ -530,13 +544,13 @@ logic_cmd_target:
     { SL (Unfold (name, les, unfold_info, true)) }
   | UNFOLDALL; name = VAR
     { SL (GUnfold name) }
-  | INVARIANT; LBRACE; a = assertion_target; RBRACE; existentials = option(existentials_target)
-    { SL (Invariant (a, Option.value ~default:[ ] existentials)) }
-  | SEPAPPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE; binders = option(binders_target)
-    { let binders = Option.value ~default:[] binders in
-      SL (ApplyLem (lemma_name, params, binders)) }
+  | INVARIANT; LBRACE; a = assertion_target; RBRACE; binders = option(binders_target)
+    { SL (Invariant (a, Option.value ~default:[ ] binders)) }
   | SEPASSERT; LBRACE; a = assertion_target; RBRACE; binders = option(binders_target)
     { SL (SepAssert (a, Option.value ~default:[ ] binders)) }
+  | APPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE; binders = option(binders_target)
+    { let binders = Option.value ~default:[] binders in
+      SL (ApplyLem (lemma_name, params, binders)) }
   | LIF; LBRACE; le=expr_target; RBRACE; LTHEN; CLBRACKET;
       then_lcmds = separated_list(SCOLON, logic_cmd_target);
       CRBRACKET; LELSE; CLBRACKET;
@@ -549,8 +563,6 @@ logic_cmd_target:
     { If (le, then_lcmds, [])}
   | macro = macro_head_target;
     { let (name, params) = macro in Macro (name, params) }
-  | ASSERT; LBRACE; a = pure_assertion_target; RBRACE
-    { Assert a }
   | ASSUME; LBRACE; a = pure_assertion_target; RBRACE
     { Assume a }
   | ASSUME_TYPE; LBRACE; x=LVAR; COMMA; t=type_target; RBRACE
@@ -568,7 +580,7 @@ call_with_target:
   WITH; i=VAR { i }
 
 lvar_le_pair_target:
-  lv = LVAR; COLON; e=expr_target { (lv, e )}
+  LBRACE; lv = LVAR; COLON; e=expr_target; RBRACE { (lv, e )}
 
 use_subst_target:
   | USESUBST; LBRACKET; lab=VAR; MINUS; subst = separated_list(COMMA, lvar_le_pair_target); RBRACKET
@@ -671,15 +683,17 @@ spec_head_target:
   { (spec_name, spec_params) }
 
 spec_target:
-  SPEC; spec_head = spec_head_target;
+  incomplete = option(INCOMPLETE); SPEC; spec_head = spec_head_target;
   proc_specs = separated_nonempty_list(SCOLON, pre_post_target)
   { let (name, params) = spec_head in
+    let incomplete = (incomplete <> None) in
     let is_normalised = !Config.previously_normalised in
     Spec.{
       name = name;
       params = params;
       sspecs = proc_specs;
       normalised = is_normalised;
+      incomplete;
       to_verify = true }
   }
 
@@ -755,13 +769,30 @@ pred_head_target:
     (name, num_params, params, ins)
   }
 
+pred_defs_target:
+  COLON; defs = separated_nonempty_list(COMMA, named_assertion_target)
+  { defs }
+
+pred_facts_target:
+  FACTS; COLON; facts = separated_nonempty_list(AND, pure_assertion_target); SCOLON
+  { facts }
+
 pred_target:
-  p = option(PURE); PRED; pred_head = pred_head_target; COLON;
-  definitions = separated_nonempty_list(COMMA, named_assertion_target); SCOLON
-  { let pure = match p with | Some _ -> true | None -> false in
+  a = option(ABSTRACT); n = option(NOUNFOLD); p = option(PURE); PRED; pred_head = pred_head_target;
+  definitions = option(pred_defs_target); SCOLON;
+  facts=option(pred_facts_target);
+  {
+    let abstract = Option.is_some a in
+    let nounfold = abstract || Option.is_some n in
+    let pure = Option.is_some p in
     let (name, num_params, params, ins) = pred_head in
+    let definitions = Option.value ~default:[] definitions in
+    let () = if (abstract <> (definitions = [])) then
+      raise (Failure (Format.asprintf "JSIL: Malformed predicate %s: either abstract with definition or non-abstract without definition." name))
+    in
     let normalised = !Config.previously_normalised in
-    Pred.{ name; num_params; params; ins; definitions; pure; normalised } }
+    let facts = Option.value ~default:[] facts in
+    Pred.{ name; num_params; params; ins; definitions; facts; pure; abstract; nounfold; normalised } }
 
 /* MACROS */
 
@@ -777,12 +808,13 @@ macro_target:
 /* ONLY SPECS */
 
 only_spec_target:
-(* only spec xpto (x, y) pre: assertion, post: assertion, flag: NORMAL|ERROR *)
-  ONLY; SPEC; head = spec_head_target;
+(* axiomatic spec xpto (x, y) pre: assertion, post: assertion, flag: NORMAL|ERROR *)
+  AXIOMATIC; incomplete = option(INCOMPLETE); SPEC; head = spec_head_target;
   sspecs = separated_nonempty_list(SCOLON, pre_post_target);
   { let (name, params) = head in
     let normalised = !Config.previously_normalised in
-    Spec.{ name; params; sspecs; normalised; to_verify = true } }
+    let incomplete = (incomplete <> None) in
+    Spec.{ name; params; sspecs; normalised; incomplete; to_verify = false } }
 
 
 /* BI ABDUCTION SPECIFICATIONS */
@@ -810,7 +842,8 @@ declaration_target:
     { EProg.add_lemma prog lemma }
 
   | lemma = jsil_lemma_target
-    { let prog = EProg.full_init () in EProg.add_lemma prog lemma }
+    {
+      let prog = EProg.full_init () in EProg.add_lemma prog lemma }
 
   | prog = declaration_target; pred = pred_target
     { EProg.add_pred prog pred }
@@ -915,6 +948,9 @@ js_lexpr_target:
 (* s-nth(e1, e2) *)
   | STRNTH; LBRACE; e1=js_lexpr_target; COMMA; e2=js_lexpr_target; RBRACE
     { BinOp (e1, StrNth, e2) }
+(* l-sub(e1, e2, e3) *)
+| LSTSUB; LBRACE; e1=js_lexpr_target; COMMA; e2=js_lexpr_target; COMMA; e3 = js_lexpr_target; RBRACE
+    { LstSub (e1, e2, e3) }
 (* this *)
   | THIS { This }
 (* (e) *)
@@ -1034,19 +1070,34 @@ js_assertion_target:
 
 (* Predicates *)
 
-
 js_named_assertion_target:
   id = option(assertion_id_target); a = js_assertion_target
   { (id, a) }
 
+js_pred_defs_target:
+  COLON; defs = separated_nonempty_list(COMMA, js_named_assertion_target)
+  { defs }
+
+js_pred_facts_target:
+  FACTS; COLON; facts = separated_nonempty_list(AND, pure_assertion_target); SCOLON
+  { facts }
+
 js_pred_target:
 (* pred name (arg1, ..., argn) : [def1_id: x1, ...] def1, ..., [def1_id: x1, ...] defn ; *)
-  pure = option(PURE); PRED; pred_head = pred_head_target; COLON;
-  definitions = separated_nonempty_list(COMMA, js_named_assertion_target); SCOLON; EOF
+  PRED; abstract=option(ABSTRACT); nounfold = option(NOUNFOLD); pure = option(PURE); pred_head = pred_head_target;
+  definitions = option(js_pred_defs_target); SCOLON;
+  facts=option(js_pred_facts_target); EOF
     { (* Add the predicate to the collection *)
       let (name, num_params, params, ins) = pred_head in
-      let pure = match pure with | Some _ -> true | None -> false in
-      Jslogic.JSPred.{ name; num_params; params; ins; definitions; pure }
+      let abstract = Option.is_some abstract in
+      let nounfold = abstract || Option.is_some nounfold in
+      let pure = Option.is_some pure in
+      let definitions = Option.value ~default:[] definitions in
+      let facts = Option.value ~default:[] facts in
+      let () = if (abstract <> (definitions = [])) then
+        raise (Failure (Format.asprintf "JS: Malformed predicate %s: either abstract with definition or non-abstract without definition." name))
+      in
+      Jslogic.JSPred.{ name; num_params; params; ins; definitions; facts; abstract; pure; nounfold }
     }
 
 
@@ -1070,12 +1121,12 @@ js_only_spec_target:
   sspecs = separated_nonempty_list(SCOLON, js_pre_post_target); EOF
   {
     let (name, params) = spec_head in
-    { name; params; sspecs  }
+    { name; params; sspecs }
   }
 
 
 js_lvar_le_pair_target:
-  lv = LVAR; COLON; le=js_lexpr_target { (lv, le )}
+  LBRACE; lv = LVAR; COLON; le=js_lexpr_target; RBRACE { (lv, le )}
 
 js_var_and_le_target:
   | LBRACE; lvar = LVAR; DEFEQ; le = js_lexpr_target; RBRACE;
@@ -1085,16 +1136,22 @@ js_macro_head_target:
  | name = VAR; LBRACE; params = separated_list(COMMA, js_lexpr_target); RBRACE
    { (name, params) }
 
-js_unfold_info_target:
+js_logic_bindings_target:
   | LBRACKET; id = VAR; WITH; var_les = separated_list(AND, js_var_and_le_target); RBRACKET
     { (id, var_les) }
 
+(* [bind: (#x := le1) and ... ] *)
+js_unfold_info_target:
+  | LBRACKET; BIND; COLON; unfold_info = separated_list(AND, var_and_var_target); RBRACKET
+    { unfold_info }
+
 js_logic_cmd_target:
 (* fold x(e1, ..., en) *)
-  | FOLD; assertion = js_assertion_target; fold_info = option(js_unfold_info_target)
+  | FOLD; assertion = js_assertion_target; fold_info = option(js_logic_bindings_target)
     {
       Fold (assertion, fold_info)
     }
+
 
 (* unfold x(e1, ..., en) [ def1 with x1 := le1, ..., xn := len ] *)
   | UNFOLD; assertion = js_assertion_target; unfold_info = option(js_unfold_info_target)
@@ -1103,6 +1160,9 @@ js_logic_cmd_target:
 (* unfold_all x *)
   | UNFOLDALL; name = VAR;
     { GUnfold name }
+
+  | BRANCH; LBRACE; pf = js_pure_assertion_target; RBRACE
+    { Branch pf }
 
 (* flash x(e1, ..., en) *)
   | FLASH; assertion = js_assertion_target;
@@ -1129,18 +1189,22 @@ js_logic_cmd_target:
   | ASSERT; a = js_assertion_target; binders = option(binders_target);
     { Assert (a, Option.value ~default:[ ] binders) }
 
+(* assume a *)
+  | ASSUME; a = js_pure_assertion_target;
+    { Assume a }
+
 (* invariant a *)
-  | INVARIANT; a = js_assertion_target
-    { Invariant a  }
+  | INVARIANT; a = js_assertion_target; binders = option(binders_target);
+    { Invariant (a, Option.value ~default:[ ] binders)  }
 
 (* apply lemma_name(args) *)
-   | APPLY; LEMMA; lemma_name = VAR; LBRACE; params = separated_list(COMMA, js_lexpr_target); RBRACE
+   | APPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, js_lexpr_target); RBRACE
      {
       ApplyLemma (lemma_name, params)
     }
 
-(* use_subst [ spec_lab - #x: bla, #y: ble] *)
-  | USESUBST; LBRACKET; spec_lab=VAR; MINUS; subst_lst = separated_nonempty_list(COMMA, js_lvar_le_pair_target); RBRACKET
+(* use_subst [ spec_lab : #x: bla, #y: ble] *)
+  | USESUBST; LBRACKET; spec_lab=VAR; COLON; subst_lst = separated_nonempty_list(COMMA, js_lvar_le_pair_target); RBRACKET
      {
         UseSubst(spec_lab, subst_lst)
      }

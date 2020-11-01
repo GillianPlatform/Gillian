@@ -187,6 +187,18 @@ let clocs (a : t) : SS.t =
   let fp = Formula.fold (Some fe) f_ac None None in
   SS.of_list (fold (Some fe) (Some fp) f_ac None None a)
 
+(* Get all the concrete locations in [a] *)
+let locs (a : t) : SS.t =
+  let fe_ac le _ _ ac =
+    match le with
+    | Expr.ALoc l | Lit (Loc l) -> l :: List.concat ac
+    | _                         -> List.concat ac
+  in
+  let fe = Expr.fold fe_ac None None in
+  let f_ac _ _ _ ac = List.concat ac in
+  let fp = Formula.fold (Some fe) f_ac None None in
+  SS.of_list (fold (Some fe) (Some fp) f_ac None None a)
+
 (* Get all the variables in [a] *)
 let vars (a : t) : SS.t =
   let vars = [ alocs a; clocs a; lvars a; pvars a ] in
@@ -255,6 +267,22 @@ let make_pure (a : t) : Formula.t =
     in
     Formula.conjunct fs
   else raise (Failure "DEATH. make_pure")
+
+let rec full_pp fmt a =
+  match a with
+  | Star (a1, a2)       -> Fmt.pf fmt "%a *@ %a" full_pp a1 full_pp a2
+  | Emp                 -> Fmt.string fmt "emp"
+  | Pred (name, params) ->
+      Fmt.pf fmt "@[<h>%s(%a)@]" name
+        (Fmt.list ~sep:Fmt.comma Expr.full_pp)
+        params
+  | Types tls           ->
+      let pp_tl f (e, t) = Fmt.pf f "%a : %s" Expr.full_pp e (Type.str t) in
+      Fmt.pf fmt "types(@[%a@])" (Fmt.list ~sep:Fmt.comma pp_tl) tls
+  | Pure f              -> Formula.full_pp fmt f
+  | GA (a, ins, outs)   ->
+      let pp_e_l = Fmt.list ~sep:Fmt.comma Expr.full_pp in
+      Fmt.pf fmt "@[<h><%s>(%a; %a)@]" a pp_e_l ins pp_e_l outs
 
 (** GIL logic assertions *)
 let rec pp fmt a =

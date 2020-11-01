@@ -157,16 +157,20 @@ let rec pp fmt e =
 
 let rec full_pp fmt e =
   match e with
-  | Lit _    -> Fmt.pf fmt "(Lit %a)" pp e
-  | PVar _   -> Fmt.pf fmt "PVar %a" pp e
-  | LVar _   -> Fmt.pf fmt "LVar %a" pp e
-  | ALoc _   -> Fmt.pf fmt "ALoc %a" pp e
-  | BinOp _  -> Fmt.pf fmt "(BinOp: %a)" pp e
-  | UnOp _   -> Fmt.pf fmt "(UnOp %a)" pp e
-  | LstSub _ -> Fmt.pf fmt "(LstSub %a)" pp e
-  | NOp _    -> Fmt.pf fmt "(NOp %a)" pp e
-  | EList ll -> Fmt.pf fmt "{{ @[%a@] }}" (Fmt.list ~sep:Fmt.comma full_pp) ll
-  | _        -> pp fmt e
+  | Lit _               -> Fmt.pf fmt "Lit %a" pp e
+  | PVar _              -> Fmt.pf fmt "PVar %a" pp e
+  | LVar _              -> Fmt.pf fmt "LVar %a" pp e
+  | ALoc _              -> Fmt.pf fmt "ALoc %a" pp e
+  | BinOp (e1, op, e2)  ->
+      Fmt.pf fmt "(%a %s %a)" full_pp e1 (BinOp.str op) full_pp e2
+  | UnOp (op, e)        -> Fmt.pf fmt "(%s %a)" (UnOp.str op) pp e
+  | LstSub (e1, e2, e3) ->
+      Fmt.pf fmt "l-sub(%a, %a, %a)" full_pp e1 full_pp e2 full_pp e3
+  | NOp _               -> Fmt.pf fmt "(NOp %a)" pp e
+  | EList ll            -> Fmt.pf fmt "{{ @[%a@] }}"
+                             (Fmt.list ~sep:Fmt.comma full_pp)
+                             ll
+  | _                   -> pp fmt e
 
 (** From expression to expression *)
 let to_expr (le : t) : t = le
@@ -222,6 +226,14 @@ let clocs (le : t) : SS.t =
     match le with
     | Lit (Loc l) -> l :: List.concat ac
     | _           -> List.concat ac
+  in
+  SS.of_list (fold fe_ac None None le)
+
+let locs (le : t) : SS.t =
+  let fe_ac le _ _ ac =
+    match le with
+    | Lit (Loc l) | ALoc l -> l :: List.concat ac
+    | _                    -> List.concat ac
   in
   SS.of_list (fold fe_ac None None le)
 
@@ -347,3 +359,21 @@ let pvars (e : t) : SS.t =
     end
   in
   v#visit_expr () e
+
+let var_to_expr (x : string) : t =
+  match Names.is_lvar_name x with
+  | true  -> LVar x
+  | false -> (
+      match Names.is_aloc_name x with
+      | true  -> ALoc x
+      | false -> (
+          match Names.is_pvar_name x with
+          | true  -> PVar x
+          | false -> raise (Failure ("var_to_expr: Impossible unifiable: " ^ x))
+          ) )
+
+let is_unifiable (e : t) : bool =
+  match e with
+  | PVar _ | LVar _ | ALoc _ | UnOp (LstLen, PVar _) | UnOp (LstLen, LVar _) ->
+      true
+  | _ -> false

@@ -2,7 +2,7 @@ open Names
 open Generators
 open Containers
 module L = Logging
-module SSubst = SVal.SSubst
+module SESubst = SVal.SESubst
 module SPreds = Preds.SPreds
 
 let new_aloc_name var = aloc_prefix ^ var
@@ -12,7 +12,7 @@ let new_lvar_name var = lvar_prefix ^ var
 module Make
     (SPState : PState.S
                  with type vt = SVal.M.t
-                  and type st = SVal.SSubst.t
+                  and type st = SVal.SESubst.t
                   and type store_t = SStore.t
                   and type preds_t = SPreds.t) =
 struct
@@ -107,11 +107,11 @@ struct
   let rec normalise_lexpr
       ?(no_types : unit option)
       ?(store : SStore.t option)
-      ?(subst : SSubst.t option)
+      ?(subst : SESubst.t option)
       (gamma : TypEnv.t)
       (le : Expr.t) =
     let store = Option.value ~default:(SStore.init []) store in
-    let subst = Option.value ~default:(SSubst.init []) subst in
+    let subst = Option.value ~default:(SESubst.init []) subst in
 
     let f = normalise_lexpr ?no_types ~store ~subst gamma in
 
@@ -119,7 +119,7 @@ struct
       match (le : Expr.t) with
       | Lit _                  -> le
       | LVar lvar              ->
-          Option.value ~default:(Expr.LVar lvar) (SSubst.get subst lvar)
+          Option.value ~default:(Expr.LVar lvar) (SESubst.get subst le)
       | ALoc aloc              ->
           ALoc aloc
           (* raise (Failure "Unsupported expression during normalization: ALoc") Why not ALoc aloc? *)
@@ -130,7 +130,7 @@ struct
           | None       ->
               let new_lvar = LVar.alloc () in
               SStore.put store pvar (LVar new_lvar);
-              SSubst.put subst pvar (LVar new_lvar);
+              SESubst.put subst (PVar pvar) (LVar new_lvar);
               LVar new_lvar )
       | BinOp (le1, bop, le2)  -> (
           let nle1 = f le1 in
@@ -293,7 +293,7 @@ struct
       ?(no_types : unit option)
       (store : SStore.t)
       (gamma : TypEnv.t)
-      (subst : SSubst.t)
+      (subst : SESubst.t)
       (le : Expr.t) : Expr.t =
     let le' = normalise_lexpr ?no_types ~store ~subst gamma le in
     le'
@@ -309,7 +309,7 @@ struct
       ?(no_types : unit option)
       (store : SStore.t)
       (gamma : TypEnv.t)
-      (subst : SSubst.t)
+      (subst : SESubst.t)
       (assertion : Formula.t) : Formula.t =
     let fa = normalise_pure_assertion ?no_types store gamma subst in
     let fant = normalise_pure_assertion ~no_types:() store gamma subst in
@@ -345,7 +345,7 @@ struct
   let normalise_pure_assertions
       (store : SStore.t)
       (gamma : TypEnv.t)
-      (subst : SSubst.t)
+      (subst : SESubst.t)
       (args : SS.t option)
       (fs : Formula.t list) : PFS.t =
     let pvar_equalities = Hashtbl.create 1 in
@@ -360,7 +360,7 @@ struct
      *)
     let rec init_pvar_equalities (fs : Formula.t list) : unit =
       List.iter
-        (fun (f : Formula.t) ->
+        (fun (f : Formula.t) : unit ->
           match f with
           | Eq (PVar x, e) | Eq (e, PVar x) ->
               if
@@ -595,7 +595,7 @@ struct
   let normalise_types
       (store : SStore.t)
       (gamma : TypEnv.t)
-      (subst : SSubst.t)
+      (subst : SESubst.t)
       (type_list : (Expr.t * Type.t) list) : bool =
     L.verbose (fun m -> m "Normalising types: %d" (List.length type_list));
     List.iter
@@ -648,15 +648,41 @@ struct
 
   (** Normalise Predicate Assertions (Initialise Predicate Set) *)
   let normalise_preds
+      (pred_defs : (string, UP.pred) Hashtbl.t option)
       (store : SStore.t)
+      (pfs : PFS.t)
       (gamma : TypEnv.t)
-      (subst : SVal.SSubst.t)
+      (subst : SVal.SESubst.t)
       (pred_asrts : (string * Expr.t list) list) : SPreds.t =
     let fe = normalise_logic_expression store gamma subst in
     let preds = SPreds.init [] in
+    let pred_defs =
+      Option.value ~default:(Hashtbl.create Config.small_tbl_size) pred_defs
+    in
 
     List.iter
-      (fun (pn, les) -> SPreds.extend preds (pn, List.map fe les))
+      (fun (pn, les) ->
+        let pred_def = Hashtbl.find_opt pred_defs pn in
+        match pred_def with
+        | None          ->
+            L.fail
+              (Format.asprintf
+                 "Impossible: Predicate %s not found in predicate table during \
+                  normalisation."
+                 pn)
+        | Some pred_def ->
+            let params, _ = List.split pred_def.pred.pred_params in
+            let params = List.map (fun x -> Expr.PVar x) params in
+            let facts =
+              List.fold_left
+                (fun facts (param, le) ->
+                  List.map
+                    (fun fact -> Formula.subst_expr_for_expr param le fact)
+                    facts)
+                pred_def.pred.pred_facts (List.combine params les)
+            in
+            List.iter (fun fact -> PFS.extend pfs fact) facts;
+            SPreds.extend preds (pn, List.map fe les))
       pred_asrts;
 
     preds
@@ -721,19 +747,19 @@ struct
 
     summary_to_constraints (partition c_asrts)
 
-  let compose_substs (subst1 : SSubst.t) (subst2 : SSubst.t) : SSubst.t =
-    let bnds = SSubst.to_list subst1 in
+  let compose_substs (subst1 : SESubst.t) (subst2 : SESubst.t) : SESubst.t =
+    let bnds = SESubst.to_list subst1 in
     let bnds' =
-      List.map (fun (x, e) -> (x, SSubst.subst_in_expr subst2 true e)) bnds
+      List.map (fun (x, e) -> (x, SESubst.subst_in_expr subst2 true e)) bnds
     in
-    SSubst.init bnds'
+    SESubst.init bnds'
 
   let normalise_core_asrt
       (store : SStore.t)
       (new_pfs : PFS.t)
       (pfs : PFS.t)
       (gamma : TypEnv.t)
-      (subst : SSubst.t)
+      (subst : SESubst.t)
       (core_asrt : string * Expr.t list * Expr.t list) :
       string * Expr.t list * Expr.t list =
     (* FIXME: Why is this here and what does it do? *)
@@ -769,13 +795,14 @@ struct
            aloc in *)
     core_asrt
 
-  let rec normalise_core_asrts
+  let normalise_core_asrts
       (store : SStore.t)
       (pfs : PFS.t)
       (gamma : TypEnv.t)
-      (subst : SSubst.t)
+      (svars : SS.t)
+      (subst : SESubst.t)
       (c_asrts : (string * Expr.t list * Expr.t list) list) :
-      (string * Expr.t list * Expr.t list) list * SSubst.t =
+      (string * Expr.t list * Expr.t list) list * SESubst.t =
     let new_pfs = PFS.copy pfs in
     let fe = normalise_logic_expression store gamma subst in
     let c_asrts' =
@@ -786,18 +813,24 @@ struct
     let fos = generate_overlapping_constraints c_asrts' in
     List.iter (fun fo -> PFS.extend new_pfs fo) fos;
     let subst', _ =
-      Simplifications.simplify_pfs_and_gamma new_pfs gamma
+      Simplifications.simplify_pfs_and_gamma new_pfs gamma ~unification:true
         ~save_spec_vars:(SS.empty, true)
     in
     let subst = compose_substs subst subst' in
+    let lsvars =
+      Expr.Set.of_list (List.map (fun x -> Expr.LVar x) (SS.elements svars))
+    in
+    let subst' =
+      SESubst.filter subst' (fun x _ -> not (Expr.Set.mem x lsvars))
+    in
 
     L.verbose (fun m ->
-        m "pfs after overlapping constraints:\n%a\nSubst':\n%a\n"
+        m "pfs after overlapping constraints:\n%a\nSubst:\n%a\nSubst':\n%a\n"
           (* FIXME: Shouldn't use PFS.to_list but Fmt.iter and PFS.iter *)
           (Fmt.list ~sep:(Fmt.any "@\n") Formula.pp)
-          (PFS.to_list new_pfs) SSubst.pp subst');
+          (PFS.to_list new_pfs) SESubst.pp subst SESubst.pp subst');
 
-    let f_subst = SSubst.subst_in_expr subst' ~partial:true in
+    let f_subst = SESubst.subst_in_expr subst' ~partial:true in
     let c_asrts'' =
       List.map
         (fun (a, ins, outs) -> (a, List.map f_subst ins, List.map f_subst outs))
@@ -820,7 +853,10 @@ struct
 
     let (lvars : SS.t), (alocs : SS.t) =
       List.fold_left
-        (fun (ret1, ret2) (_, ins, outs) ->
+        (fun (ret1, ret2) (id, ins, outs) ->
+          L.verbose (fun m ->
+              m "(%s\n%a\n%a)\n" id SVal.M.full_pp_list ins SVal.M.full_pp_list
+                outs);
           let lv_ins, al_ins = f_aux ins in
           let lv_outs, al_outs = f_aux outs in
           let ret1' = SS.union ret1 (SS.union lv_ins lv_outs) in
@@ -829,9 +865,18 @@ struct
         (SS.empty, SS.empty) core_asrts
     in
 
-    let lv_bnds = List.map (fun x -> (x, Expr.LVar x)) (SS.elements lvars) in
-    let al_bnds = List.map (fun l -> (l, Expr.ALoc l)) (SS.elements alocs) in
-    let subst = SSubst.init (lv_bnds @ al_bnds) in
+    let lv_bnds =
+      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (SS.elements lvars)
+    in
+    let al_bnds =
+      List.map (fun l -> (Expr.ALoc l, Expr.ALoc l)) (SS.elements alocs)
+    in
+    let subst = SESubst.init (lv_bnds @ al_bnds) in
+
+    L.verbose (fun m ->
+        m "Subst in produce asrts:\n%a"
+          (* FIXME: Shouldn't use PFS.to_list but Fmt.iter and PFS.iter *)
+          SESubst.full_pp subst);
 
     let rec loop
         (astate : SPState.t)
@@ -858,26 +903,39 @@ struct
 
     loop astate core_asrts
 
-  let subst_to_pfs ?(svars : SS.t option) (subst : SSubst.t) : Formula.t list =
-    let subst_lvs = SSubst.to_list subst in
+  let subst_to_pfs ?(svars : SS.t option) (subst : SESubst.t) : Formula.t list =
+    let subst_lvs = SESubst.to_list subst in
     let subst_lvs' =
       match svars with
-      | Some svars -> List.filter (fun (x, _) -> SS.mem x svars) subst_lvs
-      | None       -> List.filter (fun (x, _) -> is_lvar_name x) subst_lvs
+      | Some svars ->
+          List.filter
+            (fun (e, _) ->
+              match e with
+              | Expr.LVar x -> SS.mem x svars
+              | _           -> false)
+            subst_lvs
+      | None       ->
+          List.filter
+            (fun (e, _) ->
+              match e with
+              | Expr.LVar x -> true
+              | _           -> false)
+            subst_lvs
     in
-    List.map (fun (x, le) -> Formula.Eq (Expr.from_var_name x, le)) subst_lvs'
+    List.map (fun (e, le) -> Formula.Eq (e, le)) subst_lvs'
 
   (** Given an assertion creates a symbolic state and a substitution *)
   let normalise_assertion
       ?(pred_defs : UP.preds_tbl_t option)
       ?(gamma = TypEnv.init ())
-      ?(subst = SSubst.init [])
+      ?(subst = SESubst.init [])
       ?(pvars : SS.t option)
-      (a : Asrt.t) : (SPState.t * SSubst.t) option =
+      (a : Asrt.t) : (SPState.t * SESubst.t) option =
     let falsePFs pfs = PFS.mem pfs False in
     let svars = SS.filter is_spec_var_name (Asrt.lvars a) in
+
     L.verbose (fun m ->
-        m "Normalising assertion blah:\n\t%a\nsvars: @[<h>%a]" Asrt.pp a
+        m "Normalising assertion:\n\t%a\nsvars: @[<h>%a]" Asrt.pp a
           (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
           svars);
 
@@ -887,7 +945,7 @@ struct
     (* Step 2a -- Create empty symbolic heap, symbolic store, typing environment, and substitution *)
     let store = SStore.init [] in
     let gamma = TypEnv.copy gamma in
-    let subst = SSubst.copy subst in
+    let subst = SESubst.copy subst in
 
     (* Step 2b -- Separate assertion *)
     let c_asrts, pfs, types, preds =
@@ -897,7 +955,7 @@ struct
         raise (Failure msg)
     in
 
-    L.verbose (fun m -> m "Separate assertion subst: %a" SSubst.pp subst);
+    L.verbose (fun m -> m "Separate assertion subst: %a" SESubst.pp subst);
     L.verbose (fun m -> m "Here are the pfs: %a" PFS.pp (PFS.of_list pfs));
 
     (* Step 3 -- Normalise type assertions and pure assertions
@@ -926,14 +984,16 @@ struct
 
             (* Step 5 -- normalise core assertions *)
             let c_asrts', subst =
-              normalise_core_asrts store pfs gamma subst c_asrts
+              normalise_core_asrts store pfs gamma svars subst c_asrts
             in
 
             (* Step 6 -- Extend pfs with info on subst *)
             List.iter (fun pf -> PFS.extend pfs pf) (subst_to_pfs subst);
 
             (* Step 7 -- Construct the state *)
-            let preds' = normalise_preds store gamma subst preds in
+            let preds' =
+              normalise_preds pred_defs store pfs gamma subst preds
+            in
             let astate : SPState.t =
               SPState.struct_init pred_defs store pfs gamma svars
             in

@@ -17,7 +17,7 @@ val simplify_pfs_and_gamma :
   PFS.t ->
   ?rpfs:PFS.t ->
   TypEnv.t ->
-  SVal.SSubst.t * Utils.Containers.SS.t
+  SVal.SESubst.t * Utils.Containers.SS.t
 
 (** [simplify_implication existentials lpfs rpfs gamma]
     simplifies the entailment << ∃ [existentials]. [lpfs] => [rpfs] >>

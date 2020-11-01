@@ -63,18 +63,18 @@
     "@opam/yojson": "^1.7.0",
     "@opam/z3": "giltho/esy-z3#b0fdd9a",
     "@reason-native/rely": "^3.1.0",
-    "JS_Parser": "GillianPlatform/JS_Parser#24b27e3",
+    "JS_Parser": "GillianPlatform/JS_Parser#93f9512",
     "compcert": "giltho/CompCert#6bdcc61",
     "ocaml": "^4.10.0"
   },
   "devDependencies": {
     "ocaml": "4.10.0",
-    "@opam/ocamlfind": "1.8.1",
-    "@opam/cmitomli": "1.0.0",
-    "@opam/fileutils": "0.6.2",
+    "@opam/ocamlfind": "*",
+    "@opam/cmitomli": "*",
+    "@opam/fileutils": "*",
     "@opam/utop": "*",
     "@opam/shexp": "v0.14.0",
-    "@opam/ocaml-lsp-server": "ocaml/ocaml-lsp:ocaml-lsp-server.opam#b264d8f",
+    "@opam/ocaml-lsp-server": "*",
     "@opam/odoc": "*",
     "@opam/ocamlformat": "0.15.0"
   }

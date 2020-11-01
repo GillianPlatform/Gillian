@@ -10,12 +10,12 @@ open Containers
 module Make
     (CMemory : CMemory.S with type vt = CVal.M.t and type st = CVal.M.st) :
   State.S
-    with type st = CVal.CSubst.t
+    with type st = CVal.CESubst.t
      and type vt = Literal.t
      and type store_t = CStore.t = struct
   type vt = CVal.M.t
 
-  type st = CVal.CSubst.t
+  type st = CVal.CESubst.t
 
   type store_t = CStore.t
 
@@ -90,6 +90,7 @@ module Make
   let assume_a
       ?(unification = false)
       ?(production = false)
+      ?(time = "")
       (state : t)
       (ps : Formula.t list) : t option =
     let les : Expr.t option list = List.map Formula.to_expr ps in
@@ -129,9 +130,12 @@ module Make
       "-----------------------------------------@\n\
        @[<v 2>STORE:@\n\
        %a@]@\n\
-       @[<v 2>HEAP:@\n\
+       @[<v 2>MEMORY:@\n\
        %a@]@\n"
       CStore.pp store pp_heap heap
+
+  (* TODO: By-need formatter *)
+  let pp_by_need _ _ _ fmt state = pp fmt state
 
   let copy state =
     let cheap, cstore, vts = state in
@@ -146,7 +150,7 @@ module Make
       ?(kill_new_lvars : bool option)
       ?(unification = false)
       (state : t) : st =
-    CVal.CSubst.init []
+    CVal.CESubst.init []
 
   let simplify_val state v = v
 
@@ -184,8 +188,18 @@ module Make
   let unfolding_vals (state : t) (fs : Formula.t list) : vt list =
     raise (Failure "ERROR: unfolding_vals called for non-abstract execution")
 
-  let evaluate_slcmd (prog : UP.prog) (slcmd : SLCmd.t) (state : t) : t list =
+  let evaluate_slcmd (prog : UP.prog) (slcmd : SLCmd.t) (state : t) :
+      (t list, string) result =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
+
+  let unify_invariant prog revisited state a binders =
+    raise (Failure "ERROR: unify_invariant called for concrete execution")
+
+  let frame_on state iframes ids =
+    raise (Failure "ERROR: framing called for concrete execution")
+
+  let clear_resource state =
+    raise (Failure "ERROR: clear_resource called for concrete execution")
 
   let substitution_in_place (subst : st) (state : t) : unit = ()
 
@@ -203,7 +217,7 @@ module Make
 
   let clean_up (state : t) = raise (Failure "Cleanup of concrete state.")
 
-  let unify_assertion (state : t) (subst : st) (p : Asrt.t) : u_res =
+  let unify_assertion (state : t) (subst : st) (step : UP.step) : u_res =
     raise (Failure "Unify assertion from concrete state.")
 
   let produce_posts (state : t) (subst : st) (asrts : Asrt.t list) : t list =
@@ -254,4 +268,6 @@ module Make
 
   let apply_fixes (state : t) (fixes : fix_t list) : t option * Asrt.t list =
     raise (Failure "Concrete: apply_fixes not implemented in CState.Make")
+
+  let get_equal_values _ vs = vs
 end

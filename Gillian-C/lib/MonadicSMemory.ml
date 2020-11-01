@@ -255,12 +255,17 @@ module Mem = struct
        SMap.remove old_loc mem |> SMap.add new_loc tree *)
 
   let substitution subst mem =
-    if not (Subst.domain subst None = SS.empty) then
-      let aloc_subst =
-        Subst.filter subst (fun var _ -> GUtils.Names.is_aloc_name var)
+    if not (Subst.domain subst None = Expr.Set.empty) then
+      let _aloc_subst =
+        Subst.fold subst
+          (fun l r acc ->
+            match l with
+            | ALoc aloc -> (aloc, r) :: acc
+            | _         -> acc)
+          []
       in
       let le_subst = Subst.subst_in_expr subst ~partial:true in
-      let sval_subst = SVal.substitution ~aloc_subst ~le_subst in
+      let sval_subst = SVal.substitution ~le_subst in
       let subst_tree = SHeapTree.substitution ~le_subst ~sval_subst in
       let substituted = SMap.map subst_tree mem in
       (* FIXME: need to merge locations at some point... *)
@@ -631,6 +636,10 @@ let pp fmt h =
   Format.fprintf fmt "GEnv : @[%a@]@\nMem  : @[%a@]" GEnv.pp !h.genv
     (Mem.pp ~genv:!h.genv) !h.mem
 
+let pp_by_need (_ : SS.t) fmt h = pp fmt h
+
+let get_print_info _ _ = (SS.empty, SS.empty)
+
 (* let str_noheap _ = "NO HEAP PRINTED" *)
 
 (* Actual action execution *)
@@ -712,7 +721,7 @@ let ga_loc_indexes = LActions.ga_loc_indexes_str
 
 (** Things defined for BiAbduction *)
 
-let get_recovery_vals = function
+let get_recovery_vals _ = function
   | InvalidLocation e -> [ e ]
   | MissingLocResource l | SHeapTreeErr { at_location = l; _ } ->
       [ Expr.loc_from_loc_name l ]

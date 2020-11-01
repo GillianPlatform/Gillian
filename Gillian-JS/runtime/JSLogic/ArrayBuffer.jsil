@@ -1,0 +1,53 @@
+(* ***************************************************
+   ****************    ArrayBuffer    ****************
+   *************************************************** *)
+
+(*********************************
+ **** Array Buffer Instances  ****
+ *********************************)
+
+nounfold pred ArrayBuffer (+ab:Obj, data:List) :
+  ((ab, "slice") -> none) *                            (* Slice must be found in the prototype           *)
+
+  MetaData(ab, #md) * MetaData(#md, null) *
+  ((#md, "@proto")                 -> $lab_proto) *    (* Prototype is the array buffer prototype        *)
+  ((#md, "@class")                 -> "ArrayBuffer") * (* Class is "ArrayBuffer" (doesn't exist in ES6+) *)
+  ((#md, "@extensible")            -> true) *          (* Array buffers are extensible                   *)
+  ((#md, "@ArrayBufferData")       -> data) *          (* Array buffer contents                          *)
+  ((#md, "@ArrayBufferByteLength") -> #len_data) *     (* Array buffer length                            *)
+  (#len_data == l-len data) *
+
+  (* No other internal properties *)
+  empty_fields (#md : -{ "@class", "@extensible", "@proto", "@ArrayBufferData", "@ArrayBufferByteLength" }-);
+
+(*********************************
+ **** Array Buffer Prototype  ****
+ *********************************)
+
+nounfold pred ArrayBufferPrototype (proto) :
+  JSObjWithProto (proto, $lobj_proto) *
+  empty_fields (proto : -{ "byteLength", "constructor", "slice" }-) *
+
+  ((proto, "byteLength")  -> {{ "a", $lab_byteLength, undefined, false, true }}) * (* Array.prototype.bytelength  *)
+  ((proto, "constructor") -> {{ "d", $lab, true, false, true }}) *                 (* Array.prototype.constructor *)
+  ((proto, "slice")       -> {{ "d", $lab_slice, true, false, true }}) *           (* Array.prototype.slice       *)
+
+  JSBIFunction($lab_byteLength, "ABP_byteLength", 0) * (* Actual byteLength function *)
+  empty_fields($lab_byteLength : -{ "length" }-) *
+
+  JSBIFunction($lab_slice, "ABP_slice", 2) * (* Actual slice function *)
+  empty_fields($lab_slice : -{ "length" }-);
+
+(*************************************************************************
+ **** Axiomatic specifications of the ArrayBuffer prototype functions ****
+ *************************************************************************)
+
+axiomatic spec ABP_byteLength (xsc, vthis)
+    [[ (vthis == #vthis) * ArrayBuffer(#vthis, #data) ]]
+    [[ ArrayBuffer(#vthis, #data) * (ret == l-len #data) ]]
+    normal
+
+axiomatic spec ABP_slice (xsc, vthis, start, end)
+    [[ (vthis == #vthis) * ArrayBuffer(#vthis, #data) * (0 <=# start) * (end <=# (l-len #data)) ]]
+    [[ ArrayBuffer(#vthis, #data) * ArrayBuffer(ret, #sub_array) * (#sub_array == l-sub (#data, start, end - start)) ]]
+    normal

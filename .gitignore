@@ -78,3 +78,6 @@ see_deps.py
 
 # Development container
 .devcontainer
+
+# VSCode
+.vscode/settings.json

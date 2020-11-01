@@ -1,7 +1,7 @@
 "use strict";
 
 /**
-	@pred NullableObject(o) :
+	@pred nounfold NullableObject(o) :
 		types (o : Obj),
 		types (o : Null);
 
@@ -16,7 +16,7 @@
 		(K == -u- (#KL, -{ #val }-, #KR)) *
 		(forall #x : Num. ((! (#x --e-- #KL)) \/ (#x <# #val))) *
 		(forall #x : Num. ((! (#x --e-- #KR)) \/ (#val <# #x))) *
-		types(#val : Num, #KL : Set, #KR : Set);
+        types(#val : Num, #KL : Set, #KR : Set);
 */
 
 /**
@@ -41,15 +41,15 @@ function make_node(v)
 /**
 	@id insert
 
-	@pre
-		GlobalObject() * ObjectPrototype() *
-		BST(t, #K) *
-		(v == #v) * types (#v : Num) *
+    @pre
+        (v == #v) * (t == #t) *
+		GlobalObject() * ObjectPrototype($lobj_proto) *
+		BST(#t, #K) * types (#v : Num) *
 		scope(make_node : #makeNode) * JSFunctionObject(#makeNode, "makeNode", _, _, _) *
 		scope(insert : #insert) * JSFunctionObject(#insert, "insert", _, _, _)
 
 	@post
-		GlobalObject() * ObjectPrototype() *
+		GlobalObject() * ObjectPrototype($lobj_proto) *
 		BST(ret, -u- (#K, -{ #v }-)) * types (ret : Obj) *
 		scope(make_node : #makeNode) * JSFunctionObject(#makeNode, "makeNode", _, _, _) *
 		scope(insert : #insert) * JSFunctionObject(#insert, "insert", _, _, _)
@@ -76,12 +76,12 @@ function insert(v, t)
 	@pre
 		(t == #t) * BST(#t, #K) * (v == #v) * types (#v : Num) *
 		scope(find : #find) * JSFunctionObject(#find, "find", _, _, _) *
-		GlobalObject() * ObjectPrototype()
+		GlobalObject() * ObjectPrototype($lobj_proto)
 
 	@post
 		BST(#t, #K) * (ret == (#v -e- #K)) *
 		scope(find : #find) * JSFunctionObject(#find, "find", _, _, _) *
-		GlobalObject() * ObjectPrototype()
+		GlobalObject() * ObjectPrototype($lobj_proto)
 */
 function find (v, t)
 {
@@ -105,12 +105,12 @@ function find (v, t)
 	@id findMin
 
 	@pre
-		GlobalObject() * ObjectPrototype() *
+		GlobalObject() * ObjectPrototype($lobj_proto) *
 		(t == #t) * BST(#t, #K) * types(#t : Obj) *
 		scope(find_min : #findMin) * JSFunctionObject(#findMin, "findMin", _, _, _)
 
 	@post
-		GlobalObject() * ObjectPrototype() *
+		GlobalObject() * ObjectPrototype($lobj_proto) *
 		BST(#t, #K) * (ret --e-- #K) * types(ret : Num) *
 		(forall #x : Num. ((! (#x --e-- #K)) \/ (ret <=# #x))) *
 		scope(find_min : #findMin) * JSFunctionObject(#findMin, "findMin", _, _, _)
@@ -119,7 +119,6 @@ function find_min(t)
 {
 	var result;
 
-  /* @tactic unfold BST(#t, #K) */
 	if (t.left === null)
 		result = t.value;
 	else
@@ -132,14 +131,14 @@ function find_min(t)
 	@id remove
 
 	@pre
-		GlobalObject() * ObjectPrototype() *
+		GlobalObject() * ObjectPrototype($lobj_proto) *
 		(t == #t) * BST(#t, #K) *
 		(v == #v) * types (#v : Num) *
 		scope(remove : #remove) * JSFunctionObject(#remove, "remove", _, _, _) *
 		scope(find_min : #findMin) * JSFunctionObject(#findMin, "findMin", _, _, _)
 
 	@post
-		GlobalObject() * ObjectPrototype() *
+		GlobalObject() * ObjectPrototype($lobj_proto) *
 		BST(ret, #K_new) * (#K_new == #K -d- -{ #v }-) * NullableObject(ret) *
 		scope(remove : #remove) * JSFunctionObject(#remove, "remove", _, _, _) *
 		scope(find_min : #findMin) * JSFunctionObject(#findMin, "findMin", _, _, _)
@@ -153,7 +152,7 @@ function remove(v, t)
 		if (t.left === null) {
 				return t.right;
 			}
-		else
+        else
 		if (t.right === null) {
 	  			return t.left;
 			}
@@ -163,9 +162,9 @@ function remove(v, t)
 			t.value = min;
 		}
 	}
-	else if (v < t.value)
+    else if (v < t.value)
 		t.left = remove(v, t.left);
-	else
+    else
 		t.right = remove(v, t.right);
 
   return t;

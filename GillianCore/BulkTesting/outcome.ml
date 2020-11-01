@@ -2,14 +2,14 @@
 module type S = sig
   module Val : Val.S
 
-  module Subst : Subst.S with type vt = Val.t and type t = Val.st
+  module ESubst : ESubst.S with type vt = Val.t and type t = Val.et
 
   module Store : Store.S with type vt = Val.t
 
   module State :
     State.S
       with type vt = Val.t
-       and type st = Subst.t
+       and type st = ESubst.t
        and type store_t = Store.t
 
   module ParserAndCompiler : ParserAndCompiler.S
@@ -32,17 +32,17 @@ end
 
 module Make
     (ValP : Val.S)
-    (SubstP : Subst.S with type vt = ValP.t and type t = ValP.st)
+    (ESubstP : ESubst.S with type vt = ValP.t and type t = ValP.et)
     (StoreP : Store.S with type vt = ValP.t)
     (StateP : State.S
                 with type vt = ValP.t
-                 and type st = SubstP.t
+                 and type st = ESubstP.t
                  and type store_t = StoreP.t)
     (PC : ParserAndCompiler.S)
     (ExternalP : External.S) :
   S
     with module Val = ValP
-     and module Subst = SubstP
+     and module ESubst = ESubstP
      and module Store = StoreP
      and module State = StateP
      and module ParserAndCompiler = PC
@@ -50,7 +50,7 @@ module Make
   module Val = ValP
   module ParserAndCompiler = PC
   module State = StateP
-  module Subst = SubstP
+  module ESubst = ESubstP
   module Store = StoreP
   module External = ExternalP
 
@@ -83,6 +83,6 @@ module Make
 end
 
 module Make_Concrete (CMemory : CMemory.S) =
-  Make (CVal.M) (CVal.CSubst) (CStore) (CState.Make (CMemory))
+  Make (CVal.M) (CVal.CESubst) (CStore) (CState.Make (CMemory))
 module Make_Symbolic (SMemory : SMemory.S) =
-  Make (SVal.M) (SVal.SSubst) (SStore) (SState.Make (SMemory))
+  Make (SVal.M) (SVal.SESubst) (SStore) (SState.Make (SMemory))

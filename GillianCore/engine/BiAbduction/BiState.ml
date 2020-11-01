@@ -4,19 +4,19 @@ module L = Logging
 
 module Make
     (Val : Val.S)
-    (Subst : Subst.S with type vt = Val.t and type t = Val.st)
+    (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
     (State : State.S
                with type vt = Val.t
-                and type st = Subst.t
+                and type st = ESubst.t
                 and type store_t = Store.t) =
 struct
-  module Preds = Preds.Make (Val) (Subst)
-  module AState = PState.Make (Val) (Subst) (Store) (State) (Preds)
+  module Preds = Preds.Make (Val) (ESubst)
+  module AState = PState.Make (Val) (ESubst) (Store) (State) (Preds)
 
   type vt = Val.t
 
-  type st = Subst.t
+  type st = ESubst.t
 
   type store_t = Store.t
 
@@ -123,6 +123,7 @@ struct
   let assume_a
       ?(unification = false)
       ?(production = false)
+      ?(time = "")
       (bi_state : t)
       (fs : Formula.t list) : t option =
     let procs, state, state_af = bi_state in
@@ -140,7 +141,7 @@ struct
     let _, state, _ = bi_state in
     State.sat_check state v
 
-  let sat_check_f (bi_state : t) (fs : Formula.t list) : Subst.t option =
+  let sat_check_f (bi_state : t) (fs : Formula.t list) : ESubst.t option =
     let _, state, _ = bi_state in
     State.sat_check_f state fs
 
@@ -164,14 +165,16 @@ struct
       ?(save = false)
       ?(kill_new_lvars : bool option)
       ?(unification = false)
-      (bi_state : t) : Subst.t =
+      (bi_state : t) : ESubst.t =
     let kill_new_lvars = Option.value ~default:true kill_new_lvars in
     let procs, state, state_af = bi_state in
     let subst = State.simplify ~save ~kill_new_lvars state in
     (* let subst'          = Subst.copy subst in *)
     let svars = State.get_spec_vars state in
-    Subst.filter_in_place subst (fun x x_v ->
-        if SS.mem x svars then None else Some x_v);
+    ESubst.filter_in_place subst (fun x x_v ->
+        match x with
+        | LVar x -> if SS.mem x svars then None else Some x_v
+        | _      -> Some x_v);
     State.substitution_in_place subst state_af;
     subst
 
@@ -184,6 +187,9 @@ struct
     Fmt.pf fmt "PROCS:@\n@[<h>%a@]@\nMAIN STATE:@\n%a@\nANTI FRAME:@\n%a@\n"
       Fmt.(iter ~sep:comma SS.iter string)
       procs State.pp state State.pp state_af
+
+  (* TODO: By-need formatter *)
+  let pp_by_need _ _ _ fmt state = pp fmt state
 
   let add_spec_vars (bi_state : t) (vs : Var.Set.t) : t =
     let procs, state, state_af = bi_state in
@@ -203,11 +209,19 @@ struct
     State.to_assertions ?to_keep state
 
   let rec evaluate_slcmd (prog : UP.prog) (lcmd : SLCmd.t) (bi_state : t) :
-      t list =
+      (t list, string) result =
     let procs, state, state_af = bi_state in
-    List.map
-      (fun state' -> (procs, state', state_af))
-      (State.evaluate_slcmd prog lcmd state)
+    Result.bind (State.evaluate_slcmd prog lcmd state) (fun x ->
+        Ok (List.map (fun state' -> (procs, state', state_af)) x))
+
+  let unify_invariant prog revisited bi_state a binders =
+    raise (Failure "ERROR: unify_invariant called for bi-abductive execution")
+
+  let clear_resource state =
+    raise (Failure "ERROR: clear_resource called for bi-abdutive execution")
+
+  let frame_on state iframes ids =
+    raise (Failure "ERROR: framing called for bi-abductive execution")
 
   let unfolding_vals (bi_state : t) (fs : Formula.t list) : vt list =
     let procs, state, _ = bi_state in
@@ -226,14 +240,14 @@ struct
     let _, state, _ = bi_state in
     State.clean_up state
 
-  let make_id_subst (a : Asrt.t) : Subst.t =
+  let make_id_subst (a : Asrt.t) : ESubst.t =
     let lvars = Asrt.lvars a in
     let alocs = Asrt.alocs a in
     let lvar_bindings =
-      List.map (fun x -> (x, Expr.LVar x)) (SS.elements lvars)
+      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (SS.elements lvars)
     in
     let aloc_bindings =
-      List.map (fun x -> (x, Expr.ALoc x)) (SS.elements alocs)
+      List.map (fun x -> (Expr.LVar x, Expr.ALoc x)) (SS.elements alocs)
     in
     let bindings = lvar_bindings @ aloc_bindings in
     let bindings' =
@@ -244,7 +258,7 @@ struct
           | _      -> raise (Failure "DEATH. make_id_subst"))
         bindings
     in
-    Subst.init bindings'
+    ESubst.init bindings'
 
   let get_components (bi_state : t) : State.t * State.t =
     let _, state, state_af = bi_state in
@@ -318,21 +332,22 @@ struct
           };
         ];
       spec_normalised = true;
+      spec_incomplete = true;
       spec_to_verify = false;
     }
 
   let subst_in_val (subst : st) (v : vt) : vt =
-    match Val.from_expr (Subst.subst_in_expr subst true (Val.to_expr v)) with
+    match Val.from_expr (ESubst.subst_in_expr subst true (Val.to_expr v)) with
     | Some v -> v
     | None   -> v
 
   let compose_substs (subst1 : st) (subst2 : st) : st =
     let bindings =
-      Subst.fold subst1
+      ESubst.fold subst1
         (fun x v bindings -> (x, subst_in_val subst2 v) :: bindings)
         []
     in
-    Subst.init bindings
+    ESubst.init bindings
 
   type post_res = (Flag.t * Asrt.t list) option
 
@@ -340,7 +355,7 @@ struct
       (procs : SS.t)
       (state : State.t)
       (state_af : State.t)
-      (subst : Subst.t)
+      (subst : ESubst.t)
       (up : UP.t) : (state_t * state_t * st * post_res) list =
     let search_state = ([ (state, state_af, subst, up) ], []) in
 
@@ -348,11 +363,11 @@ struct
       match search_state with
       | [], rets -> rets
       | (state, state_af, subst, up) :: rest, rets -> (
-          let cur_asrt : Asrt.t option = UP.head up in
+          let cur_step : UP.step option = UP.head up in
           let ret : State.u_res =
             Option.fold
               ~some:(State.unify_assertion state subst)
-              ~none:(State.USucc state) cur_asrt
+              ~none:(State.USucc state) cur_step
           in
           match ret with
           | UWTF         -> search (rest, rets)
@@ -370,13 +385,14 @@ struct
                          (fun (up, lab) ->
                            ( State.copy state',
                              State.copy state_af,
-                             Subst.copy subst,
+                             ESubst.copy subst,
                              up ))
                          ups'
                   in
                   search (next_states @ rest, rets)
               | Some []                  -> search (rest, rets) )
           | UFail errs   ->
+              let cur_asrt = Option.map fst cur_step in
               L.verbose (fun m ->
                   m
                     "@[<v 2>WARNING: Unify Assertion Failed: %a with errors: \
@@ -386,7 +402,7 @@ struct
                       option ~none:(any "no assertion - phantom node") Asrt.pp)
                     cur_asrt
                     Fmt.(list ~sep:(any "@\n") State.pp_err)
-                    errs Subst.pp subst);
+                    errs ESubst.pp subst);
 
               if State.can_fix errs then (
                 L.(verbose (fun m -> m "CAN FIX!!!"));
@@ -409,7 +425,7 @@ struct
                             verbose (fun m -> m "BEFORE THE SIMPLIFICATION!!!"));
                           let new_subst = State.simplify state' in
                           L.verbose (fun m ->
-                              m "@[<v 2>SIMPLIFICATION SUBST:@\n%a@]" Subst.pp
+                              m "@[<v 2>SIMPLIFICATION SUBST:@\n%a@]" ESubst.pp
                                 new_subst);
                           let subst' = compose_substs subst new_subst in
                           L.(
@@ -417,8 +433,11 @@ struct
                                 m "@[<v 2>AF BEFORE SIMPLIFICATION:@\n%a@]@\n"
                                   State.pp state_af'));
                           let svars = State.get_spec_vars state' in
-                          Subst.filter_in_place new_subst (fun x x_v ->
-                              if SS.mem x svars then None else Some x_v);
+                          ESubst.filter_in_place new_subst (fun x x_v ->
+                              match x with
+                              | LVar x ->
+                                  if SS.mem x svars then None else Some x_v
+                              | _      -> Some x_v);
                           State.substitution_in_place new_subst state_af';
                           L.(
                             verbose (fun m ->
@@ -472,7 +491,7 @@ struct
       verbose (fun m ->
           m "ARGS: @[<h>%a@]. SUBST:@\n%a"
             Fmt.(list ~sep:comma Val.pp)
-            args Subst.pp subst_i));
+            args ESubst.pp subst_i));
 
     let procs, state, state_af = bi_state in
 
@@ -480,7 +499,11 @@ struct
 
     let new_store = Store.init (List.combine spec.spec.spec_params args) in
     let state' = State.set_store state new_store in
-    let subst = Subst.init (Store.bindings new_store) in
+    let store_bindings = Store.bindings new_store in
+    let store_bindings =
+      List.map (fun (x, v) -> (Expr.PVar x, v)) store_bindings
+    in
+    let subst = ESubst.init store_bindings in
 
     L.(
       verbose (fun m ->
@@ -520,7 +543,7 @@ struct
                       %a@]@\n\
                       @[<v 2>ANTI FRAME:@\n\
                       %a@]@\n"
-                     Subst.pp subst State.pp frame_state State.pp state_af));
+                     ESubst.pp subst State.pp frame_state State.pp state_af));
 
              let sp : State.t list =
                State.produce_posts frame_state subst posts
@@ -568,7 +591,7 @@ struct
   let produce (state : t) (subst : st) (asrts : Asrt.t) : t option =
     raise (Failure "produce_posts from bi_state.")
 
-  let unify_assertion (state : t) (subst : st) (p : Asrt.t) : u_res =
+  let unify_assertion (state : t) (subst : st) (step : UP.step) : u_res =
     raise (Failure "Unify assertion from bi_state.")
 
   let update_subst (state : t) (subst : st) : unit = ()
@@ -588,7 +611,7 @@ struct
   let get_failing_constraint (err : err_t) : Formula.t =
     raise (Failure "get_failing_constraint not implemented in MakeBiState")
 
-  let get_recovery_vals (errs : err_t list) : vt list =
+  let get_recovery_vals (bi_state : t) (errs : err_t list) : vt list =
     raise (Failure "get_recovery_vals not implemented in MakeBiState")
 
   let automatic_unfold _ _ : (t list, string) result =
@@ -620,8 +643,6 @@ struct
   let pp_err = State.pp_err
 
   let pp_fix = State.pp_fix
-
-  let get_recovery_vals = State.get_recovery_vals
 
   let get_failing_constraint = State.get_failing_constraint
 
@@ -663,4 +684,8 @@ struct
         let rets = List_utils.get_list_somes rets in
         merge_action_results rets
     | State.AFail errs -> AFail errs
+
+  let get_equal_values bi_state =
+    let _, state, _ = bi_state in
+    State.get_equal_values state
 end

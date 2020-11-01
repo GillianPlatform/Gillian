@@ -103,8 +103,11 @@
       "MetaData",     Javert_Parser.LMETADATA;
 
       (* Logic predicates *)
+      "abstract", Javert_Parser.ABSTRACT;
       "pure", Javert_Parser.PURE;
       "pred", Javert_Parser.PRED;
+      "nounfold", Javert_Parser.NOUNFOLD;
+      "facts", Javert_Parser.FACTS;
 
       (* Logic commands *)
       "fold",         Javert_Parser.FOLD;
@@ -123,23 +126,23 @@
       "bind",         Javert_Parser.BIND;
       "existentials", Javert_Parser.EXISTENTIALS;
       "sep_assert",   Javert_Parser.SEPASSERT;
-      "sep_apply",    Javert_Parser.SEPAPPLY;
       "branch",       Javert_Parser.BRANCH;
       "use_subst",    Javert_Parser.USESUBST;
 
-     (* JS only spec specifics *)
+     (* JS axiomatic spec specifics *)
      "js_only_spec", Javert_Parser.JSOS;
 
       (* Procedure specification keywords *)
-      "only",    Javert_Parser.ONLY;
-      "lemma",   Javert_Parser.LEMMA;
-      "variant", Javert_Parser.VARIANT;
-      "spec",    Javert_Parser.SPEC;
-      "bispec",  Javert_Parser.BISPEC;
-      "normal",  Javert_Parser.NORMAL;
-      "error",   Javert_Parser.ERROR;
+      "axiomatic",    Javert_Parser.AXIOMATIC;
+      "incomplete",   Javert_Parser.INCOMPLETE;
+      "lemma",        Javert_Parser.LEMMA;
+      "variant",      Javert_Parser.VARIANT;
+      "spec",         Javert_Parser.SPEC;
+      "bispec",       Javert_Parser.BISPEC;
+      "normal",       Javert_Parser.NORMAL;
+      "error",        Javert_Parser.ERROR;
 
-      (* JS only spec specifics *)
+      (* JS axiomatic spec specifics *)
       "js_only_spec", Javert_Parser.JSOS;
 
       (* Procedure definition keywords *)

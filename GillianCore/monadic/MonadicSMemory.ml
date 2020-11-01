@@ -7,7 +7,7 @@ module type S = sig
   type vt = SVal.M.t
 
   (** Type of GIL substitutions *)
-  type st = SVal.SSubst.t
+  type st = SVal.SESubst.t
 
   type i_fix_t
 
@@ -59,7 +59,7 @@ module type S = sig
 
   val pp_c_fix : Format.formatter -> c_fix_t -> unit
 
-  val get_recovery_vals : err_t -> vt list
+  val get_recovery_vals : t -> err_t -> vt list
 
   val pp_err : Format.formatter -> err_t -> unit
 
@@ -75,6 +75,10 @@ module type S = sig
     (c_fix_t list * Formula.t list * Containers.SS.t * Asrt.t list) list
 
   val apply_fix : t -> PFS.t -> TypEnv.t -> c_fix_t -> t
+
+  val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
+
+  val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
 end
 
 module Lift (MSM : S) : SMemory.S = struct

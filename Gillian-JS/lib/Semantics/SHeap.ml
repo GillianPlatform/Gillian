@@ -256,7 +256,7 @@ let merge_loc (heap : t) (new_loc : string) (old_loc : string) : unit =
 (** Modifies --heap-- in place updating it to subst(heap) *)
 let substitution_in_place (subst : SSubst.t) (heap : t) : unit =
   (* If the substitution is empty, there is nothing to be done *)
-  if not (SSubst.domain subst None = SS.empty) then (
+  if not (SSubst.domain subst None = Expr.Set.empty) then (
     (* The substitution is not empty *)
     let le_subst = SSubst.subst_in_expr subst ~partial:true in
 
@@ -307,9 +307,17 @@ let substitution_in_place (subst : SSubst.t) (heap : t) : unit =
 
     (* Now we need to deal with any substitutions in the locations themselves *)
     let aloc_subst =
-      SSubst.filter subst (fun var _ -> Names.is_aloc_name var)
+      SSubst.filter subst (fun var _ ->
+          match var with
+          | ALoc _ -> true
+          | _      -> false)
     in
     SSubst.iter aloc_subst (fun aloc new_loc ->
+        let aloc =
+          match aloc with
+          | ALoc loc -> loc
+          | _        -> raise (Failure "Impossible by construction")
+        in
         let new_loc =
           match (new_loc : Expr.t) with
           | Lit (Loc loc) -> loc
@@ -363,7 +371,7 @@ let wf_assertions_of_obj (heap : t) (loc : string) : Formula.t list =
   let spps = SFVL.field_names sfvl in
   let props = List_utils.cross_product spps (cpps @ spps) (fun x y -> (x, y)) in
   let props = List.filter (fun (x, y) -> x <> y) props in
-  List.map (fun (x, y) -> Formula.Not (Eq (x, y))) props
+  List.map (fun (x, y) : Formula.t -> Not (Eq (x, y))) props
 
 let wf_assertions (heap : t) : Formula.t list =
   let domain = domain heap in
@@ -426,15 +434,53 @@ let pp ft heap =
   in
   (list ~sep:(any "@\n") pp_one) ft sorted_locs_with_vals
 
+let get_print_info locs heap =
+  let domain = domain heap in
+  let metadata_locs =
+    SS.fold
+      (fun loc locs ->
+        match get_met heap loc with
+        | (Some (Lit (Loc x)) | Some (ALoc x)) when SS.mem x domain ->
+            SS.add x locs
+        | _ -> locs)
+      locs SS.empty
+  in
+  (* TODO: Traverse locations and collect info about other locations and lvars *)
+  (SS.empty, metadata_locs)
+
+let pp_by_need locs ft heap =
+  let domain = domain heap in
+  let existent_locs = SS.inter locs domain in
+  let sorted_locs_with_vals =
+    List.map
+      (fun loc -> (loc, Option.get (get heap loc)))
+      (SS.elements existent_locs)
+  in
+  let open Fmt in
+  let pp_one ft (loc, ((fv_pairs, domain), metadata)) =
+    pf ft "@[%s |-> [ @[%a@] | @[%a@] ] with metadata %a@]" loc SFVL.pp fv_pairs
+      (option Expr.pp) domain
+      (option ~none:(any "unknown") Expr.pp)
+      metadata
+  in
+  (list ~sep:(any "@\n") pp_one) ft sorted_locs_with_vals
+
 let get_inv_metadata (heap : t) : (Expr.t, Expr.t) Hashtbl.t =
   let inv_metadata = Hashtbl.create Config.medium_tbl_size in
-  (* Hashtbl.iter
-     (fun loc (_, e_metadata) ->
-       match e_metadata with
-         | None -> ()
-         | Some e_metadata ->
-             let loc_e = if (is_lloc_name loc) then Expr.Lit (Loc loc) else ALoc loc in
-             Hashtbl.add inv_metadata e_metadata loc_e) heap; *)
+  let traverse_metadata_table mt : unit =
+    Hashtbl.iter
+      (fun loc e_metadata ->
+        match e_metadata with
+        | None            -> ()
+        | Some e_metadata ->
+            let loc_e =
+              if Names.is_lloc_name loc then Expr.Lit (Loc loc) else ALoc loc
+            in
+            Hashtbl.add inv_metadata e_metadata loc_e)
+      mt
+  in
+  traverse_metadata_table heap.smet;
+  traverse_metadata_table heap.cmet;
   inv_metadata
 
 let clean_up (heap : t) : unit =

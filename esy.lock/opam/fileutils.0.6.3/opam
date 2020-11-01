@@ -39,9 +39,9 @@ It also providesa module to manipulate abstract filenames:
 """
 url {
   src:
-    "https://github.com/gildor478/ocaml-fileutils/releases/download/v0.6.2/fileutils-v0.6.2.tbz"
+    "https://github.com/gildor478/ocaml-fileutils/releases/download/v0.6.3/fileutils-v0.6.3.tbz"
   checksum: [
-    "sha256=c73d94247b6aef1450853ed14677ae58e9701376475d3f29ca730472a0171e1d"
-    "sha512=104c7389832f22ec189ce6f1596144b28dcaeea7d23d5b19d369c44e54326e97fcb7b4f4c4a8d2965523e63b35b594a1351b7e630dde590871efe512fe38853c"
+    "sha256=eff581c488e9309eb02268bbfa3d4c9c30ff40d45f7b1e9ef300b3ef0e831462"
+    "sha512=2c5e75b894e9f5e3b003d61977a87f5c6964a89d844949eedc55f97c5875cc52052182420bbb4e73925d306479c66400df74e4adfccc5b2102347d13e99505cf"
   ]
 }

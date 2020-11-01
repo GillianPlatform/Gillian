@@ -1,6 +1,7 @@
 (install
  (files bi_javert_predicates.jsil internal_functions_full.jsil
    javert_internal_functions.jsil javert_js_predicates.jsil
-   javert_logic_macros.jsil)
+   javert_logic_macros.jsil ArrayBuffer.jsil DataView.jsil Uint8Array.jsil
+   ArrayLogic.jsil AmazonLogic.jsil)
  (section share)
  (package gillian-js))

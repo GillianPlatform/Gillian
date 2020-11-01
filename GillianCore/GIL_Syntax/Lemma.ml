@@ -80,3 +80,15 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (lemma : t) : t =
     lemma_hyp = pt_asrt lemma.lemma_hyp;
     lemma_concs = List.map pt_asrt lemma.lemma_concs;
   }
+
+let add_param_bindings (lemma : t) =
+  let params = lemma.lemma_params in
+  let lvar_params = List.map (fun x -> "#" ^ x) params in
+  let param_eqs =
+    List.map2
+      (fun pv lv -> Asrt.Pure (Eq (PVar pv, LVar lv)))
+      params lvar_params
+  in
+  let param_eqs = Asrt.star param_eqs in
+  let lemma_hyp = Asrt.Star (param_eqs, lemma.lemma_hyp) in
+  { lemma with lemma_hyp }

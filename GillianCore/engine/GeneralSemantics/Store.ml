@@ -57,8 +57,11 @@ module type S = sig
   (** Store printer *)
   val pp : Format.formatter -> t -> unit
 
+  (** Store printer by need *)
+  val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
+
   (** Converts the store into an ssubst *)
-  val to_ssubst : t -> SSubst.t
+  val to_ssubst : t -> SESubst.t
 
   (** Symbolic indices *)
   val symbolics : t -> Var.Set.t
@@ -259,15 +262,29 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     in
     (Fmt.list ~sep pp_pair) fmt bindings
 
+  let pp_by_need (pvars : Containers.SS.t) fmt (store : t) =
+    let sep = Fmt.any "@\n" in
+    let pp_pair =
+      Fmt.(hbox (parens (pair ~sep:(any ": ") string Val.full_pp)))
+    in
+    let bindings =
+      List.sort (fun (v, _) (w, _) -> Stdlib.compare v w) (bindings store)
+    in
+    (* Filter for the ones needed *)
+    let bindings =
+      List.filter (fun (v, _) -> Containers.SS.mem v pvars) bindings
+    in
+    (Fmt.list ~sep pp_pair) fmt bindings
+
   (**
     Store to substitution
 
     @param store to turn into an ssubst
     @return ssubst mapping the store variables to lexprs
   *)
-  let to_ssubst (store : t) : SSubst.t =
-    let subst = SSubst.init [] in
-    iter store (fun x v -> SSubst.put subst x (Val.to_expr v));
+  let to_ssubst (store : t) : SESubst.t =
+    let subst = SESubst.init [] in
+    iter store (fun x v -> SESubst.put subst (Expr.PVar x) (Val.to_expr v));
     subst
 
   (**
@@ -277,8 +294,6 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return Set of variables that can be affected by substitution
   *)
   let symbolics (store : t) : Var.Set.t =
-    L.(verbose (fun m -> m "SCON: %d" (Hashtbl.length store.conc)));
-    L.(verbose (fun m -> m "SSYM: %d" (Hashtbl.length store.symb)));
     Hashtbl.fold (fun v _ ac -> Var.Set.add v ac) store.symb Var.Set.empty
 
   let lvars (store : t) : Var.Set.t =

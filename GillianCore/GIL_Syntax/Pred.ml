@@ -9,7 +9,10 @@ type t = TypeDef__.pred = {
   pred_ins : int list;  (** Ins                    *)
   pred_definitions : ((string * string list) option * Asrt.t) list;
       (** Predicate definitions  *)
+  pred_facts : Formula.t list;  (** Facts that hold for every definition *)
   pred_pure : bool;  (** Is the predicate pure  *)
+  pred_abstract : bool;  (** Is the predicate abstract *)
+  pred_nounfold : bool;  (** Should the predicate be unfolded automatically *)
   pred_normalised : bool;  (** If the predicate has been previously normalised *)
 }
 
@@ -96,11 +99,32 @@ let pp fmt pred =
     | true  -> Fmt.pf fmt "@internal@\n"
     | false -> ()
   in
-  Fmt.pf fmt "%a%a@[<hov 2>@[<h>pred %s(%a) :@]@\n%a;@]@\n" pp_path_opt
-    pred.pred_source_path pp_internal pred.pred_internal pred.pred_name
-    pp_params pred.pred_params
+  let pp_abstract fmt = function
+    | true  -> Fmt.pf fmt "abstract "
+    | false -> ()
+  in
+  let pp_pure fmt = function
+    | true  -> Fmt.pf fmt "pure "
+    | false -> ()
+  in
+  let pp_nounfold fmt = function
+    | true  -> Fmt.pf fmt "nounfold "
+    | false -> ()
+  in
+  let pp_facts fmt = function
+    | []    -> ()
+    | facts ->
+        Fmt.pf fmt "@\nfacts: %a;"
+          Fmt.(list ~sep:(any " and ") Formula.pp)
+          facts
+  in
+
+  Fmt.pf fmt "%a%a@[<hov 2>@[<h>%a%a%apred %s(%a) :@]@\n%a;%a@]@\n" pp_path_opt
+    pred.pred_source_path pp_internal pred.pred_internal pp_abstract
+    pred.pred_abstract pp_pure pred.pred_pure pp_nounfold pred.pred_nounfold
+    pred.pred_name pp_params pred.pred_params
     Fmt.(list ~sep:(any ",@\n") (hovbox ~indent:2 pp_def))
-    pred.pred_definitions
+    pred.pred_definitions pp_facts pred.pred_facts
 
 let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
   let check_pred_pvars (pred_name : string) (predicate : t) : unit =
@@ -156,6 +180,10 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
                    ( "DEATH. parameter_types: predicate " ^ name
                    ^ " does not exist." ))
           in
+          Logging.tmi (fun fmt ->
+              fmt "Gillian explicit param types: %s (%d, %d)" pred.pred_name
+                (List.length pred.pred_params)
+                (List.length les));
           let ac_types =
             List.fold_left
               (fun ac_types ((_, t_x), le) ->
@@ -185,7 +213,21 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
       pred.pred_definitions
   in
   let new_defs = List.map (fun (oid, a) -> (oid, pt_asrt a)) new_defs in
-  { pred with pred_definitions = new_defs }
+  let new_facts =
+    List.fold_right
+      (fun (x, t_x) new_facts ->
+        match t_x with
+        | None     -> new_facts
+        | Some t_x ->
+            Gil_syntax__.Formula.Eq (UnOp (TypeOf, PVar x), Lit (Type t_x))
+            :: new_facts)
+      pred.pred_params []
+  in
+  {
+    pred with
+    pred_definitions = new_defs;
+    pred_facts = pred.pred_facts @ new_facts;
+  }
 
 let combine_ins_outs (pred : t) (ins : 'a list) (outs : 'a list) : 'a list =
   let in_indexes = SI.of_list pred.pred_ins in

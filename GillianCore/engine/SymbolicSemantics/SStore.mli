@@ -28,6 +28,8 @@ val remove : t -> Var.t -> unit
 
 val pp : Format.formatter -> t -> unit
 
+val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
+
 val iter : t -> (Var.t -> Expr.t -> unit) -> unit
 
 val fold : t -> (Var.t -> Expr.t -> 'a -> 'a) -> 'a -> 'a
@@ -44,12 +46,12 @@ val alocs : t -> Var.Set.t
 
 val assertions : t -> Formula.t list
 
-val substitution_in_place : SVal.SSubst.t -> t -> unit
+val substitution_in_place : SVal.SESubst.t -> t -> unit
 
 val is_well_formed : t -> bool
 
 val bindings : t -> (Var.t * vt) list
 
-val to_ssubst : t -> SVal.SSubst.t
+val to_ssubst : t -> SVal.SESubst.t
 
 val symbolics : t -> Var.Set.t

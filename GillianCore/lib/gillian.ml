@@ -13,6 +13,10 @@ module Logic = struct
   module Simplifications = Engine.Simplifications
 end
 
+module Abstraction = struct
+  module UP = Engine.UP
+end
+
 (* module Test262 = Test262_main *)
 
 module Logging = Logging

@@ -1282,7 +1282,7 @@ let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
     =
   L.(
     verbose (fun m ->
-        m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma: @[%a@]\n"
+        m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma:@\n@[%a@]\n"
           (Fmt.iter ~sep:(Fmt.any "@\n") Formula.Set.iter Formula.pp)
           fs TypEnv.pp gamma));
 
@@ -1292,14 +1292,12 @@ let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
   (* Step 2: Reset the solver and add the encoded formulae *)
   let masterSolver = Solver.mk_solver ctx None in
   Solver.add masterSolver encoded_assertions;
-  L.(
-    verbose (fun m ->
-        m "SAT: About to check the following:\n%s"
-          (string_of_solver masterSolver)));
-
+  (* L.(
+     verbose (fun m ->
+         m "SAT: About to check the following:\n%s"
+           (string_of_solver masterSolver))); *)
   (* Step 3: Check satisfiability *)
   (* let t = Sys.time () in *)
-  L.verbose (fun x -> x "Aqui!");
   let ret = Solver.check masterSolver [] in
   (* Utils.Statistics.update_statistics "Solver check" (Sys.time () -. t); *)
   L.(
@@ -1351,8 +1349,8 @@ let check_sat (fs : Formula.Set.t) (gamma : TypEnv.t) : bool =
 let lift_z3_model
     (model : Model.model)
     (gamma : TypEnv.t)
-    (subst : SSubst.t)
-    (target_vars : SS.t) : unit =
+    (subst : SESubst.t)
+    (target_vars : Expr.Set.t) : unit =
   let recover_z3_number (n : ZExpr.expr) : float option =
     if ZExpr.is_numeral n then (
       L.(verbose (fun m -> m "Z3 number: %s" (ZExpr.to_string n)));
@@ -1394,13 +1392,20 @@ let lift_z3_model
   in
 
   L.(verbose (fun m -> m "Inside lift_z3_model"));
-  SS.iter
+  Expr.Set.iter
     (fun x ->
+      let x =
+        match x with
+        | LVar x -> x
+        | _      ->
+            raise
+              (Failure "INtERNAL ERROR: Z3 lifting of a non-logical variable")
+      in
       let v = lift_z3_val x in
       L.(
         verbose (fun m ->
             m "Z3 binding for %s: %s\n" x
               (Option.fold ~some:(Fmt.to_to_string Expr.pp) ~none:"NO BINDING!"
                  v)));
-      Option.fold ~some:(SSubst.put subst x) ~none:() v)
+      Option.fold ~some:(SESubst.put subst (LVar x)) ~none:() v)
     target_vars

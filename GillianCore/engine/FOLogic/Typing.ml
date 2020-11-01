@@ -1,5 +1,5 @@
 module L = Logging
-module SSubst = SVal.SSubst
+module SSubst = SVal.SESubst
 
 exception Break
 
@@ -398,15 +398,18 @@ let naively_infer_type_information (pfs : PFS.t) (gamma : TypEnv.t) : unit =
     pfs
 
 let rec substitution_in_place (subst : SSubst.t) (gamma : TypEnv.t) : unit =
-  let ve_pairs : (string * Expr.t) list = SSubst.to_list subst in
+  let ve_pairs : (Expr.t * Expr.t) list = SSubst.to_list subst in
   let et_pairs : (Expr.t * Type.t) list =
     List.fold_left
       (fun ac (x, e) ->
-        Option.fold
-          ~some:(fun x_type ->
-            TypEnv.remove gamma x;
-            (e, x_type) :: ac)
-          ~none:ac (TypEnv.get gamma x))
+        match x with
+        | Expr.LVar x | PVar x ->
+            Option.fold
+              ~some:(fun x_type ->
+                TypEnv.remove gamma x;
+                (e, x_type) :: ac)
+              ~none:ac (TypEnv.get gamma x)
+        | _                    -> ac)
       [] ve_pairs
   in
   let gamma' = reverse_type_lexpr true gamma et_pairs in

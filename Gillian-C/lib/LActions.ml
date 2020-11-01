@@ -178,7 +178,7 @@ let mem_ga_from_str = function
 let genv_ga_from_str = function
   | "symb" -> Symbol
   | "def"  -> Definition
-  | str    -> failwith ("Unkown global assertion : " ^ str)
+  | str    -> failwith ("Unknown global assertion : " ^ str)
 
 let str_ga = function
   | GMem mem_ga   -> mem_prefix ^ separator_string ^ str_mem_ga mem_ga
@@ -189,7 +189,7 @@ let ga_from_str str =
   | [ pref; ga ] when String.equal pref mem_prefix -> GMem (mem_ga_from_str ga)
   | [ pref; ga ] when String.equal pref genv_prefix ->
       GGenv (genv_ga_from_str ga)
-  | _ -> failwith ("Unkown GA : " ^ str)
+  | _ -> failwith ("Unknown GA : " ^ str)
 
 let ga_to_action_str action str = ga_from_str str |> action |> str_ac
 

@@ -150,7 +150,7 @@ and bindings = string * (string * expr) list
 
 and slcmd =
   | Fold      of string * expr list * bindings option
-  | Unfold    of string * expr list * bindings option * bool
+  | Unfold    of string * expr list * (string * string) list option * bool
   | GUnfold   of string
   | ApplyLem  of string * expr list * string list
   | SepAssert of assertion * string list
@@ -192,7 +192,10 @@ and pred = {
   pred_params : (string * typ option) list;
   pred_ins : int list;
   pred_definitions : ((string * string list) option * assertion) list;
+  pred_facts : formula list;
   pred_pure : bool;
+  pred_abstract : bool;
+  pred_nounfold : bool;
   pred_normalised : bool;
 }
 
@@ -221,6 +224,7 @@ and spec = {
   spec_params : string list;
   spec_sspecs : single_spec list;
   spec_normalised : bool;
+  spec_incomplete : bool;
   spec_to_verify : bool;
 }
 

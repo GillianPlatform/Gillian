@@ -3,6 +3,7 @@ open Containers
 module L = Logging
 module Type = Gillian.Gil_syntax.Type
 module Expr = Gillian.Gil_syntax.Expr
+module Formula = Gillian.Gil_syntax.Formula
 
 (** {b JSIL logic predicate}. *)
 type t = {
@@ -12,7 +13,10 @@ type t = {
   ins : int list;  (** Ins                    *)
   definitions : ((string * string list) option * Asrt.t) list;
       (** Predicate definitions  *)
+  facts : Formula.t list;  (** Facts about the predicate *)
   pure : bool;  (** Is the predicate pure  *)
+  abstract : bool;  (** Is the predicate abstract  *)
+  nounfold : bool;  (** Should the predicate be unfolded? *)
   normalised : bool;  (** If the predicate has been previously normalised *)
 }
 
@@ -98,14 +102,34 @@ let pp fmt pred =
           Fmt.pf fmt "[%s: %a]" id Fmt.(list ~sep:(any ", ") string) exs
         else Fmt.pf fmt "[%s]" id
   in
+  let pp_abstract fmt = function
+    | true  -> Fmt.pf fmt "abstract "
+    | false -> ()
+  in
+  let pp_pure fmt = function
+    | true  -> Fmt.pf fmt "pure "
+    | false -> ()
+  in
+  let pp_nounfold fmt = function
+    | true  -> Fmt.pf fmt "nounfold "
+    | false -> ()
+  in
   let pp_def fmt (id_ex, asrt) =
     Fmt.pf fmt "%a%a" pp_id_ex id_ex Asrt.pp asrt
   in
-  Fmt.pf fmt "@[<v 2>pred %s(%a):@\n%a;@]" name
+  let pp_facts fmt = function
+    | []    -> ()
+    | facts ->
+        Fmt.pf fmt "@\nfacts: %a;"
+          Fmt.(list ~sep:(any " and ") Formula.pp)
+          facts
+  in
+  Fmt.pf fmt "@[<v 2>%a%a%apred %s(%a):@\n%a;%a@]" pp_abstract pred.abstract
+    pp_pure pred.pure pp_nounfold pred.nounfold name
     Fmt.(list ~sep:(any ", ") pp_param)
     params_with_info
     Fmt.(list ~sep:(any ",@\n") pp_def)
-    definitions
+    definitions pp_facts pred.facts
 
 let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
   let check_pred_pvars (pred_name : string) (predicate : t) : unit =
@@ -151,6 +175,7 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
     let f_a_after a : Asrt.t =
       match (a : Asrt.t) with
       | Pred (name, les) ->
+          L.tmi (fun fmt -> fmt "Pred explicit parameter types: %s" name);
           let pred =
             try Hashtbl.find preds name
             with _ ->
@@ -194,7 +219,10 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
     params = pred.params;
     ins = pred.ins;
     definitions = new_defs;
+    facts = pred.facts;
     pure = pred.pure;
+    abstract = pred.abstract;
+    nounfold = pred.nounfold;
     normalised = pred.normalised;
   }
 
@@ -202,6 +230,7 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
    Joining predicate definitions together
 *)
 let join (pred1 : t) (pred2 : t) : t =
+  L.tmi (fun fmt -> fmt "Join: %s %s" pred1.name pred2.name);
   if pred1.name <> pred2.name || pred1.num_params <> pred2.num_params then
     let msg =
       Printf.sprintf
@@ -214,9 +243,10 @@ let join (pred1 : t) (pred2 : t) : t =
   else
     let p1_params, _ = List.split pred1.params in
     let p2_params, _ = List.split pred2.params in
+    let mapper var = Expr.PVar var in
     let subst =
       SSubst.init
-        (List.combine p2_params (List.map (fun var -> Expr.PVar var) p1_params))
+        (List.combine (List.map mapper p2_params) (List.map mapper p1_params))
     in
     let defs =
       pred1.definitions
@@ -245,7 +275,3 @@ let combine_ins_outs (pred : t) (ins : 'a list) (outs : 'a list) : 'a list =
   List.rev (loop ins outs [] 0)
 
 let empty_pred_tbl () = Hashtbl.create Config.small_tbl_size
-
-let get_pred (pred_defs : (string, t) Hashtbl.t) (name : string) : t =
-  try Hashtbl.find pred_defs name
-  with _ -> raise (Failure "DEATH. PRED NOT FOUND!")

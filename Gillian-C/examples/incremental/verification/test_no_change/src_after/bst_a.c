@@ -48,13 +48,9 @@ BST *insert(int v, BST *t) {
 }
 
 /*@ spec find(v, t) {
-  requires: (v == int(#vv)) * (t == #t) * BST(#t, #K) * (#vv --e-- #K)
-  ensures:  BST(#t, #K) * (ret == TRUE)
-
-  OR
-
-  requires: (v == int(#vv)) * (t == #t) * BST(#t, #K) * (not (#vv --e-- #K))
-  ensures:  BST(#t, #K) * (ret == FALSE)
+  requires: (v == int(#vv)) * (t == #t) * BST(#t, #K)
+  ensures:  BST(#t, #K) * (#vv --e-- #K) * (ret == TRUE);
+            BST(#t, #K) * (not (#vv --e-- #K)) * (ret == FALSE)
 } */
 int find(int v, BST *t) {
     if (t == NULL) {

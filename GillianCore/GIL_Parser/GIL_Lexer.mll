@@ -89,8 +89,11 @@
       "forall",       GIL_Parser.LFORALL;
 
       (* Logic predicates *)
+      "abstract", GIL_Parser.ABSTRACT;
       "pure", GIL_Parser.PURE;
       "pred", GIL_Parser.PRED;
+      "nounfold", GIL_Parser.NOUNFOLD;
+      "facts", GIL_Parser.FACTS;
 
       (* Logic commands *)
       "fold",         GIL_Parser.FOLD;
@@ -108,19 +111,19 @@
       "bind",         GIL_Parser.BIND;
       "existentials", GIL_Parser.EXISTENTIALS;
       "sep_assert",   GIL_Parser.SEPASSERT;
-      "sep_apply",    GIL_Parser.SEPAPPLY;
       "branch",       GIL_Parser.BRANCH;
       "use_subst",    GIL_Parser.USESUBST;
 
       (* Procedure specification keywords *)
-      "only",    GIL_Parser.ONLY;
-      "lemma",   GIL_Parser.LEMMA;
-      "variant", GIL_Parser.VARIANT;
-      "spec",    GIL_Parser.SPEC;
-      "bispec",  GIL_Parser.BISPEC;
-      "normal",  GIL_Parser.NORMAL;
-      "error",   GIL_Parser.ERROR;
-      "fail",    GIL_Parser.FAIL;
+      "axiomatic",    GIL_Parser.AXIOMATIC;
+      "incomplete",   GIL_Parser.INCOMPLETE;
+      "lemma",        GIL_Parser.LEMMA;
+      "variant",      GIL_Parser.VARIANT;
+      "spec",         GIL_Parser.SPEC;
+      "bispec",       GIL_Parser.BISPEC;
+      "normal",       GIL_Parser.NORMAL;
+      "error",        GIL_Parser.ERROR;
+      "fail",         GIL_Parser.FAIL;
 
       (* Procedure definition keywords *)
       "proc", GIL_Parser.PROC;

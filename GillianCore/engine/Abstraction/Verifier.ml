@@ -3,24 +3,25 @@ open Containers
 module Make
     (SState : State.S
                 with type vt = SVal.M.t
-                 and type st = SVal.SSubst.t
+                 and type st = SVal.SESubst.t
                  and type store_t = SStore.t)
     (SPState : PState.S
                  with type vt = SVal.M.t
-                  and type st = SVal.SSubst.t
+                  and type st = SVal.SESubst.t
                   and type store_t = SStore.t
                   and type preds_t = Preds.SPreds.t)
     (External : External.S) =
 struct
   module L = Logging
-  module SSubst = SVal.SSubst
+  module SSubst = SVal.SESubst
   module SAInterpreter =
-    GInterpreter.Make (SVal.M) (SVal.SSubst) (SStore) (SPState) (External)
+    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SPState) (External)
   module Normaliser = Normaliser.Make (SPState)
 
   let print_success_or_failure success =
     if success then Fmt.pr "%a" (Fmt.styled `Green Fmt.string) "Success\n"
-    else Fmt.pr "%a" (Fmt.styled `Red Fmt.string) "Failure\n"
+    else Fmt.pr "%a" (Fmt.styled `Red Fmt.string) "Failure\n";
+    Format.print_flush ()
 
   type t = {
     name : string;
@@ -29,7 +30,7 @@ struct
     pre_state : SPState.t;
     post_up : UP.t;
     flag : Flag.t option;
-    spec_vars : SS.t;
+    spec_vars : Expr.Set.t;
   }
 
   let global_results = VerificationResults.make ()
@@ -39,7 +40,8 @@ struct
     SAInterpreter.reset ()
 
   let testify
-      (preds : (string, Pred.t) Hashtbl.t)
+      (preds : (string, UP.pred) Hashtbl.t)
+      (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
       (params : string list)
       (id : int)
@@ -50,23 +52,34 @@ struct
       (to_verify : bool) : t option * (Asrt.t * Asrt.t list) option =
     try
       (* Step 1 - normalise the precondition *)
-      match Normaliser.normalise_assertion ~pvars:(SS.of_list params) pre with
+      match
+        Normaliser.normalise_assertion ~pred_defs:preds
+          ~pvars:(SS.of_list params) pre
+      with
       | None                 -> (None, None)
       | Some (ss_pre, subst) -> (
           (* Step 2 - spec_vars = lvars(pre)\dom(subst) -U- alocs(range(subst)) *)
-          let lvars = Asrt.lvars pre in
+          let lvars =
+            SS.filter (fun x -> Names.is_spec_var_name x) (Asrt.lvars pre)
+          in
+          let lvars =
+            Expr.Set.of_list
+              (List.map (fun x -> Expr.LVar x) (SS.elements lvars))
+          in
           let subst_dom = SSubst.domain subst None in
-          let get_aloc x =
-            match (x : Expr.t) with
-            | ALoc loc -> Some loc
+          let get_aloc e =
+            match (e : Expr.t) with
+            | ALoc loc -> Some e
             | _        -> None
           in
           let alocs =
-            SS.of_list
+            Expr.Set.of_list
               (List_utils.get_list_somes
                  (List.map get_aloc (SSubst.range subst)))
           in
-          let spec_vars = SS.union (SS.diff lvars subst_dom) alocs in
+          let spec_vars =
+            Expr.Set.union (Expr.Set.diff lvars subst_dom) alocs
+          in
 
           let pre' = Asrt.star (SPState.to_assertions ss_pre) in
 
@@ -88,14 +101,22 @@ struct
                         (iter ~sep:comma SS.iter string)
                         e))
                 label
-                Fmt.(iter ~sep:comma SS.iter string)
+                Fmt.(iter ~sep:comma Expr.Set.iter Expr.pp)
                 spec_vars Asrt.pp pre SPState.pp ss_pre (List.length posts)
                 Fmt.(list ~sep:(any "@\n") Asrt.pp)
                 posts);
 
-          let posts =
-            List.map (fun p -> SVal.SSubst.substitute_asrt subst true p) posts
+          (* Do not substitute program variables in the postcondition *)
+          let subst =
+            SSubst.filter subst (fun e v ->
+                match e with
+                | PVar _ -> false
+                | _      -> true)
           in
+          let posts =
+            List.map (fun p -> SSubst.substitute_asrt subst true p) posts
+          in
+          let posts = List.map Reduction.reduce_assertion posts in
           let posts' =
             List.filter (fun p -> Simplifications.admissible_assertion p) posts
           in
@@ -110,17 +131,32 @@ struct
           | true  -> (
               (* Step 4 - create a unification plan for the postconditions and s_test *)
               (* let known_vars    = SS.add Names.return_variable (SS.union (SS.of_list params) spec_vars) in *)
-              let known_vars = SS.add Names.return_variable spec_vars in
-              let known_vars =
-                SS.union known_vars
+              L.verbose (fun fmt -> fmt "Creating UPs for posts of %s" name);
+              let pvar_params =
+                Expr.Set.of_list (List.map (fun x -> Expr.PVar x) params)
+              in
+              let known_unifiables =
+                Expr.Set.add (PVar Names.return_variable)
+                  (Expr.Set.union pvar_params spec_vars)
+              in
+              let known_unifiables =
+                Expr.Set.union known_unifiables
                   (Option.fold
-                     ~some:(fun (_, existentials) -> existentials)
-                     ~none:SS.empty label)
+                     ~some:(fun (_, existentials) ->
+                       let existentials =
+                         List.map
+                           (fun x -> Expr.LVar x)
+                           (SS.elements existentials)
+                       in
+                       Expr.Set.of_list existentials)
+                     ~none:Expr.Set.empty label)
               in
               let simple_posts =
                 List.map (fun post -> (post, (label, None))) posts'
               in
-              let post_up = UP.init known_vars SS.empty preds simple_posts in
+              let post_up =
+                UP.init known_unifiables Expr.Set.empty pred_ins simple_posts
+              in
               L.verbose (fun m -> m "END of STEP 4@\n");
               match post_up with
               | Error errs ->
@@ -156,13 +192,14 @@ struct
       (None, None)
 
   let testify_sspec
-      (preds : (string, Pred.t) Hashtbl.t)
+      (preds : UP.preds_tbl_t)
+      (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
       (params : string list)
       (id : int)
       (sspec : Spec.st) : t option * Spec.st option =
     let stest, sspec' =
-      testify preds name params id sspec.ss_pre sspec.ss_posts
+      testify preds pred_ins name params id sspec.ss_pre sspec.ss_posts
         (Some sspec.ss_flag)
         (Spec.label_vars_to_set sspec.ss_label)
         sspec.ss_to_verify
@@ -174,8 +211,10 @@ struct
     in
     (stest, sspec')
 
-  let testify_spec (preds : (string, Pred.t) Hashtbl.t) (spec : Spec.t) :
-      t list * Spec.t =
+  let testify_spec
+      (preds : UP.preds_tbl_t)
+      (pred_ins : (string, int list) Hashtbl.t)
+      (spec : Spec.t) : t list * Spec.t =
     match spec.spec_to_verify with
     | false -> ([], spec)
     | true  ->
@@ -199,7 +238,7 @@ struct
         let tests, sspecs =
           List.split
             (List.mapi
-               (testify_sspec preds spec.spec_name spec.spec_params)
+               (testify_sspec preds pred_ins spec.spec_name spec.spec_params)
                spec.spec_sspecs)
         in
         let tests = List_utils.get_list_somes tests in
@@ -208,11 +247,13 @@ struct
         L.verbose (fun m -> m "Simplified SPECS:@\n@[%a@]@\n" Spec.pp new_spec);
         (tests, new_spec)
 
-  let testify_lemma (preds : (string, Pred.t) Hashtbl.t) (lemma : Lemma.t) :
-      t list * Lemma.t =
+  let testify_lemma
+      (preds : UP.preds_tbl_t)
+      (pred_ins : (string, int list) Hashtbl.t)
+      (lemma : Lemma.t) : t list * Lemma.t =
     let test, sspec =
-      testify preds lemma.lemma_name lemma.lemma_params 0 lemma.lemma_hyp
-        lemma.lemma_concs None None true
+      testify preds pred_ins lemma.lemma_name lemma.lemma_params 0
+        lemma.lemma_hyp lemma.lemma_concs None None true
     in
     let tests = Option.fold ~some:(fun test -> [ test ]) ~none:[] test in
     match sspec with
@@ -230,12 +271,13 @@ struct
     (* Adding spec vars in the post to the subst - these are effectively the existentials of the post *)
     List.iter
       (fun x ->
-        if not (SSubst.mem subst x) then SSubst.add subst x (Expr.LVar x))
-      (Var.Set.elements (SPState.get_spec_vars state));
+        if not (SSubst.mem subst (LVar x)) then
+          SSubst.add subst (LVar x) (LVar x))
+      (SS.elements (SPState.get_spec_vars state));
 
     (* TODO: Understand if this should be done: setup all program variables in the subst *)
     SStore.iter (SPState.get_store state) (fun v value ->
-        if not (SSubst.mem subst v) then SSubst.put subst v value);
+        if not (SSubst.mem subst (PVar v)) then SSubst.put subst (PVar v) value);
 
     (* Option.may (fun v_ret -> SSubst.put subst Names.return_variable v_ret)
        (SStore.get (SState.get_store state) Names.return_variable); *)
@@ -255,12 +297,12 @@ struct
 
   let make_post_subst (test : t) (post_state : SPState.t) : SSubst.t =
     let subst_lst =
-      List.map
-        (fun x ->
-          if Names.is_aloc_name x then (x, Expr.ALoc x) else (x, Expr.LVar x))
-        (SS.elements test.spec_vars)
+      List.map (fun e -> (e, e)) (Expr.Set.elements test.spec_vars)
     in
     let params_subst_lst = SStore.bindings (SPState.get_store post_state) in
+    let params_subst_lst =
+      List.map (fun (x, v) -> (Expr.PVar x, v)) params_subst_lst
+    in
     let subst = SSubst.init (subst_lst @ params_subst_lst) in
     subst
 
@@ -348,7 +390,7 @@ struct
     success
 
   let verify (prog : UP.prog) (test : t) : bool =
-    let state' = SPState.add_pred_defs prog.preds test.pre_state in
+    let state = test.pre_state in
 
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
     match test.flag with
@@ -356,11 +398,13 @@ struct
         let msg = "Verifying one spec of procedure " ^ test.name ^ "... " in
         L.tmi (fun fmt -> fmt "%s" msg);
         Fmt.pr "%s" msg;
+        (* Reset coverage for every procedure in verification *)
+        let prog = { prog with coverage = Hashtbl.create 1 } in
         (* TEST for procedure *)
         let rets =
           SAInterpreter.evaluate_proc
             (fun x -> x)
-            prog test.name test.params state'
+            prog test.name test.params state
         in
         L.verbose (fun m ->
             m "Verification: Concluded evaluation: %d obtained results.%a@\n"
@@ -378,7 +422,7 @@ struct
             let msg = "Verifying lemma " ^ test.name ^ "... " in
             L.tmi (fun fmt -> fmt "%s" msg);
             Fmt.pr "%s" msg;
-            let rets = SAInterpreter.evaluate_lcmds prog proof state' in
+            let rets = SAInterpreter.evaluate_lcmds prog proof state in
             analyse_lemma_results test rets )
 
   let pred_extracting_visitor =
@@ -471,99 +515,122 @@ struct
       (prog : (Annot.t, int) Prog.t)
       (pnames_to_verify : SS.t)
       (lnames_to_verify : SS.t) : unit =
-    let preds = prog.preds in
     let start_time = Sys.time () in
 
-    (* STEP 1: Get the specs to verify *)
-    Printf.printf "Obtaining specs to verify...\n";
-    let specs_to_verify =
-      List.filter
-        (fun (spec : Spec.t) -> SS.mem spec.spec_name pnames_to_verify)
-        (Prog.get_specs prog)
-    in
-
-    (* STEP 2: Convert specs to symbolic tests *)
-    (* Printf.printf "Converting symbolic tests from specs: %f\n" (cur_time -. start_time); *)
-    let tests : t list =
-      List.concat
-        (List.map
-           (fun spec ->
-             let tests, new_spec = testify_spec preds spec in
-             let proc = Prog.get_proc_exn prog spec.spec_name in
-             Hashtbl.replace prog.procs proc.proc_name
-               { proc with proc_spec = Some new_spec };
-             tests)
-           specs_to_verify)
-    in
-
-    (* STEP 3: Get the lemmas to verify *)
-    Printf.printf "Obtaining lemmas to verify...\n";
-    let lemmas_to_verify =
-      List.filter
-        (fun (lemma : Lemma.t) -> SS.mem lemma.lemma_name lnames_to_verify)
-        (Prog.get_lemmas prog)
-    in
-
-    (* STEP 4: Convert lemmas to symbolic tests *)
-    (* Printf.printf "Converting symbolic tests from lemmas: %f\n" (cur_time -. start_time); *)
-    let tests' : t list =
-      List.concat
-        (List.map
-           (fun lemma ->
-             let tests, new_lemma = testify_lemma preds lemma in
-             Hashtbl.replace prog.lemmas lemma.lemma_name new_lemma;
-             tests)
-           lemmas_to_verify)
-    in
-
-    Printf.printf "Obtained %d symbolic tests in total\n"
-      (List.length tests + List.length tests');
-
-    L.verbose (fun m ->
-        m
-          ( "@[-------------------------------------------------------------------------@\n"
-          ^^ "UNFOLDED and SIMPLIFIED SPECS and LEMMAS@\n%a@\n%a"
-          ^^ "@\n\
-              -------------------------------------------------------------------------@]"
-          )
-          Fmt.(list ~sep:(any "@\n") Spec.pp)
-          (Prog.get_specs prog)
-          Fmt.(list ~sep:(any "@\n") Lemma.pp)
-          (Prog.get_lemmas prog));
-
-    (* STEP 4: Create unification plans for specs and predicates *)
-    (* Printf.printf "Creating unification plans: %f\n" (cur_time -. start_time); *)
-    match UP.init_prog prog with
-    | Error _  -> raise (Failure "Creation of unification plans failed.")
-    | Ok prog' ->
-        (* STEP 5: Determine static dependencies and add to call graph *)
-        List.iter (fun test -> record_proc_dependencies test.name prog') tests;
-        List.iter (fun test -> record_lemma_dependencies test.name prog') tests';
-        Hashtbl.iter
-          (fun pred_name _ -> record_preds_used_by_pred pred_name prog')
-          prog'.preds;
-
-        (* STEP 6: Run the symbolic tests *)
-        let cur_time = Sys.time () in
-        Printf.printf "Running symbolic tests: %f\n" (cur_time -. start_time);
-        let success : bool =
-          List.fold_left
-            (fun ac test -> if verify prog' test then ac else false)
-            true (tests' @ tests)
+    let ipreds = UP.init_preds prog.preds in
+    match ipreds with
+    | Error e  ->
+        raise (Failure "Creation of unification plans for predicates failed.")
+    | Ok preds -> (
+        let pred_ins =
+          Hashtbl.fold
+            (fun name (pred : UP.pred) pred_ins ->
+              Hashtbl.add pred_ins name pred.pred.pred_ins;
+              pred_ins)
+            preds
+            (Hashtbl.create Config.medium_tbl_size)
         in
-        let end_time = Sys.time () in
-        let cur_verified = SS.union pnames_to_verify lnames_to_verify in
-        let success =
-          success && check_previously_verified prev_results cur_verified
+
+        (* STEP 1: Get the specs to verify *)
+        Printf.printf "Obtaining specs to verify...\n";
+        let specs_to_verify =
+          List.filter
+            (fun (spec : Spec.t) -> SS.mem spec.spec_name pnames_to_verify)
+            (Prog.get_specs prog)
         in
-        let msg : string =
-          if success then "All specs succeeded:" else "There were failures:"
+
+        (* STEP 2: Convert specs to symbolic tests *)
+        (* Printf.printf "Converting symbolic tests from specs: %f\n" (cur_time -. start_time); *)
+        let tests : t list =
+          List.concat
+            (List.map
+               (fun spec ->
+                 let tests, new_spec = testify_spec preds pred_ins spec in
+                 let proc = Prog.get_proc_exn prog spec.spec_name in
+                 Hashtbl.replace prog.procs proc.proc_name
+                   { proc with proc_spec = Some new_spec };
+                 tests)
+               specs_to_verify)
         in
-        let msg : string =
-          Printf.sprintf "%s %f%!" msg (end_time -. start_time)
+
+        (* STEP 3: Get the lemmas to verify *)
+        Printf.printf "Obtaining lemmas to verify...\n";
+        let lemmas_to_verify =
+          List.filter
+            (fun (lemma : Lemma.t) -> SS.mem lemma.lemma_name lnames_to_verify)
+            (Prog.get_lemmas prog)
         in
-        Printf.printf "%s\n" msg;
-        L.normal (fun m -> m "%s" msg)
+
+        (* STEP 4: Convert lemmas to symbolic tests *)
+        (* Printf.printf "Converting symbolic tests from lemmas: %f\n" (cur_time -. start_time); *)
+        let lemmas_to_verify =
+          List.sort
+            (fun (l1 : Lemma.t) l2 ->
+              Stdlib.compare l1.lemma_name l2.lemma_name)
+            lemmas_to_verify
+        in
+        let tests' : t list =
+          List.concat
+            (List.map
+               (fun lemma ->
+                 let tests, new_lemma = testify_lemma preds pred_ins lemma in
+                 Hashtbl.replace prog.lemmas lemma.lemma_name new_lemma;
+                 tests)
+               lemmas_to_verify)
+        in
+
+        Printf.printf "Obtained %d symbolic tests in total\n"
+          (List.length tests + List.length tests');
+
+        L.verbose (fun m ->
+            m
+              ( "@[-------------------------------------------------------------------------@\n"
+              ^^ "UNFOLDED and SIMPLIFIED SPECS and LEMMAS@\n%a@\n%a"
+              ^^ "@\n\
+                  -------------------------------------------------------------------------@]"
+              )
+              Fmt.(list ~sep:(any "@\n") Spec.pp)
+              (Prog.get_specs prog)
+              Fmt.(list ~sep:(any "@\n") Lemma.pp)
+              (Prog.get_lemmas prog));
+
+        (* STEP 4: Create unification plans for specs and predicates *)
+        (* Printf.printf "Creating unification plans: %f\n" (cur_time -. start_time); *)
+        match UP.init_prog prog with
+        | Error _  -> raise (Failure "Creation of unification plans failed.")
+        | Ok prog' ->
+            (* STEP 5: Determine static dependencies and add to call graph *)
+            List.iter
+              (fun test -> record_proc_dependencies test.name prog')
+              tests;
+            List.iter
+              (fun test -> record_lemma_dependencies test.name prog')
+              tests';
+            Hashtbl.iter
+              (fun pred_name _ -> record_preds_used_by_pred pred_name prog')
+              prog'.preds;
+
+            (* STEP 6: Run the symbolic tests *)
+            let cur_time = Sys.time () in
+            Printf.printf "Running symbolic tests: %f\n" (cur_time -. start_time);
+            let success : bool =
+              List.fold_left
+                (fun ac test -> if verify prog' test then ac else false)
+                true (tests' @ tests)
+            in
+            let end_time = Sys.time () in
+            let cur_verified = SS.union pnames_to_verify lnames_to_verify in
+            let success =
+              success && check_previously_verified prev_results cur_verified
+            in
+            let msg : string =
+              if success then "All specs succeeded:" else "There were failures:"
+            in
+            let msg : string =
+              Printf.sprintf "%s %f%!" msg (end_time -. start_time)
+            in
+            Printf.printf "%s\n" msg;
+            L.normal (fun m -> m "%s" msg) )
 
   let verify_prog
       (prog : (Annot.t, int) Prog.t)
@@ -645,7 +712,7 @@ module From_scratch (SMemory : SMemory.S) (External : External.S) = struct
 
   include Make
             (INTERNAL__.SState)
-            (PState.Make (SVal.M) (SVal.SSubst) (SStore) (INTERNAL__.SState)
+            (PState.Make (SVal.M) (SVal.SESubst) (SStore) (INTERNAL__.SState)
                (Preds.SPreds))
             (External)
 end
