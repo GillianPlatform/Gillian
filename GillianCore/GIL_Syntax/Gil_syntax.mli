@@ -209,9 +209,19 @@ module Expr : sig
 
   val type_ : Type.t -> t
 
+  val list : t list -> t
+
   val list_length : t -> t
 
   val list_nth : t -> int -> t
+
+  val list_nth_e : t -> t -> t
+
+  val list_sub : lst:t -> start:t -> size:t -> t
+
+  val list_cons : t -> t -> t
+
+  val list_cat : t -> t -> t
 
   val typeof : t -> t
 
@@ -220,7 +230,22 @@ module Expr : sig
   module Infix : sig
     val ( +. ) : t -> t -> t
 
+    val ( -. ) : t -> t -> t
+
+    val ( *. ) : t -> t -> t
+
+    val ( /. ) : t -> t -> t
+
     val ( + ) : t -> t -> t
+
+    val ( - ) : t -> t -> t
+
+    val ( * ) : t -> t -> t
+
+    val ( / ) : t -> t -> t
+
+    (** [a @+ b] is [list_cat a b] *)
+    val ( @+ ) : t -> t -> t
   end
 
   (** Sets of expressions *)
@@ -422,6 +447,9 @@ module Formula : sig
     (** Same as Not *)
     val fnot : t -> t
 
+    (** Same as Forall *)
+    val forall : (string * Type.t option) list -> t -> t
+
     (** Same as Or *)
     val ( #|| ) : t -> t -> t
 
@@ -442,6 +470,9 @@ module Formula : sig
 
     (** [a #>= b] is [Not Less (b, a)] *)
     val ( #>= ) : Expr.t -> Expr.t -> t
+
+    (** [fa #=> fb] is [(fnot fa) #|| fb] *)
+    val ( #=> ) : t -> t -> t
   end
 end
 

@@ -7,11 +7,6 @@ let cross_product (l1 : 'a list) (l2 : 'b list) (f : 'a -> 'b -> 'c) : 'c list =
 
 let remove_duplicates l = List.sort_uniq Stdlib.compare l
 
-let list_sub (lst : 'a list) (i : int) (len : int) : 'a list =
-  let a = Array.of_list lst in
-  let a' = Array.sub a i len in
-  Array.to_list a'
-
 let list_inter (lst1 : 'a list) (lst2 : 'a list) : 'a list =
   let lst =
     cross_product lst1 lst2 (fun a b -> if a = b then Some a else None)
@@ -69,3 +64,18 @@ let rec flaky_map (f : 'a -> 'b option) (xs : 'a list) : 'b list option =
           match flaky_map f xs' with
           | None     -> None
           | Some ys' -> Some (y :: ys') ) )
+
+let list_sub l ofs len =
+  let rec aux l i acc =
+    if i >= ofs + len then Some (List.rev acc)
+    else
+      match l with
+      | [] -> None
+      | a :: r when i >= ofs -> aux r (i + 1) (a :: acc)
+      | _ :: r -> aux r (i + 1) acc
+  in
+  aux l 0 []
+
+let make n el =
+  let rec aux acc i = if i <= 0 then acc else aux (el :: acc) (i - 1) in
+  aux [] n

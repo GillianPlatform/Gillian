@@ -11,6 +11,13 @@ let single ~loc ~ofs ~chunk ~sval ~perm =
   in
   pred (GMem Single) [ loc; ofs; chunk ] [ sval; perm ]
 
+let array ~loc ~ofs ~chunk ~size ~sval_arr ~perm =
+  let chunk = Expr.Lit (String (ValueTranslation.string_of_chunk chunk)) in
+  let perm =
+    Expr.Lit (String (ValueTranslation.string_of_permission_opt perm))
+  in
+  pred (GMem Array) [ loc; ofs; size; chunk ] [ sval_arr; perm ]
+
 let hole ~loc ~low ~high ~perm =
   let perm =
     Expr.Lit (String (ValueTranslation.string_of_permission_opt perm))

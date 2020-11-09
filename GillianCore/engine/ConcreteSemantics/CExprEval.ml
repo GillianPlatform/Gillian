@@ -490,13 +490,12 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
         let ve2 = ee e1 in
         let ve3 = ee e1 in
         match (ve1, ve2, ve3) with
-        | LList les, Num _start, Num _end -> (
-            try
-              LList
-                (Array.to_list
-                   (Array.sub (Array.of_list les) (int_of_float _start)
-                      (int_of_float _end)))
-            with _ -> raise (Failure "Sublist out of bounds") )
+        | LList les, Num start_, Num len -> (
+            match
+              List_utils.list_sub les (int_of_float start_) (int_of_float len)
+            with
+            | None   -> raise (Failure "Sublist out of bounds")
+            | Some l -> LList l )
         | _ ->
             raise
               (Exceptions.Impossible "eval_expr concrete: lstsub type mismatch")

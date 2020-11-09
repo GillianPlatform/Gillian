@@ -3,6 +3,9 @@ open Monadic
 module DR = Delayed_result
 module DO = Delayed_option
 module SS = Utils.Containers.SS
+module NSVal = SVal
+module SVal = MonadicSVal
+module SVArr = SVal.SVArray
 
 type err =
   | UseAfterFree
@@ -60,25 +63,22 @@ module Range = struct
     let len = Expr.num (float_of_int (Chunk.size chunk)) in
     (low, low +. len)
 
+  let of_low_chunk_and_size low chunk size =
+    let open Expr.Infix in
+    let sz_chunk = Expr.num (float_of_int (Chunk.size chunk)) in
+    (low, low +. (sz_chunk *. size))
+
   let is_equal (la, ha) (lb, hb) =
     let open Formula.Infix in
     la #== lb #&& (ha #== hb)
 
-  let is_before (_, ha) (lb, _) =
-    let open Formula.Infix in
-    ha #<= lb
-
-  let is_after (la, _) (_, hb) =
-    let open Formula.Infix in
-    hb #<= la
-
-  (* let sure_equal ~pc (la, ha) (lb, hb) =
-     let ( = ) = FOSolver.is_equal ~pc in
-     la = lb && ha = hb *)
-
   let is_inside (la, ha) (lb, hb) =
     let open Formula.Infix in
     lb #<= la #&& (ha #<= hb)
+
+  let point_strictly_inside x (l, h) =
+    let open Formula.Infix in
+    l #< x #&& (x #< h)
 
   let split_at (l, h) x = ((l, x), (x, h))
 
@@ -97,6 +97,7 @@ module Node = struct
   type mem_val =
     | Undef  of qty
     | Single of { chunk : Compcert.AST.memory_chunk; value : SVal.t }
+    | Array  of { chunk : Compcert.AST.memory_chunk; values : SVArr.t }
 
   type t =
     | NotOwned of qty
@@ -136,13 +137,14 @@ module Node = struct
     | MemVal { exact_perm; mem_val; _ } -> (
         match mem_val with
         | Undef qty               ->
-            Fmt.pf fmt "%s UNDEF (%a)" (str_qty qty)
-              (Fmt.option ~none:(Fmt.any "None") Perm.pp)
+            Fmt.pf fmt "%s UNDEF (%a)" (str_qty qty) (Fmt.Dump.option Perm.pp)
               exact_perm
         | Single { chunk; value } ->
             Fmt.pf fmt "(%a : %a) (%a)" SVal.pp value Chunk.pp chunk
-              (Fmt.option ~none:(Fmt.any "None") Perm.pp)
-              exact_perm )
+              (Fmt.Dump.option Perm.pp) exact_perm
+        | Array { chunk; values } ->
+            Fmt.pf fmt "(%a : many %a) (%a)" SVArr.pp values Chunk.pp chunk
+              (Fmt.Dump.option Perm.pp) exact_perm )
 
   let check_perm required node =
     match required with
@@ -176,23 +178,38 @@ module Node = struct
          | _ -> false )
      | _ -> false *)
 
-  let split = function
-    (* TODO: Improve this *)
-    | NotOwned Totally -> (NotOwned Totally, NotOwned Totally)
+  let split ~span:(low, high) ~at =
+    let open Delayed in
+    let open Syntax in
+    function
+    | NotOwned Totally -> return (NotOwned Totally, NotOwned Totally)
     | NotOwned Partially -> failwith "Should never split a partially owned node"
     | MemVal { exact_perm; min_perm; mem_val } -> (
         let mk mem_val = MemVal { min_perm; exact_perm; mem_val } in
         match mem_val with
-        | Undef Totally   -> (mk (Undef Totally), mk (Undef Totally))
-        | Single _        -> (mk (Undef Totally), mk (Undef Totally))
-        | Undef Partially ->
+        | Undef Totally           -> return
+                                       (mk (Undef Totally), mk (Undef Totally))
+        | Single _                -> return
+                                       (mk (Undef Totally), mk (Undef Totally))
+        | Array { chunk; values } ->
+            let open Expr.Infix in
+            let sz = Expr.num (float_of_int (Chunk.size chunk)) in
+            let len_left = (at -. low) /. sz in
+            let len_right = (high -. at) /. sz in
+            let* left_arr = SVArr.array_sub values low len_left in
+            let+ right_arr = SVArr.array_sub values at len_right in
+            ( mk (Array { chunk; values = left_arr }),
+              mk (Array { chunk; values = right_arr }) )
+        | Undef Partially         ->
             failwith "Should never split a partially undef node" )
 
   let merge ~left:a ~right:b =
+    let ret = Delayed.return in
+    let open Delayed.Syntax in
     (* In the future, this can get more precise, for example composing single values *)
     match (a, b) with
-    | NotOwned Totally, NotOwned Totally -> NotOwned Totally
-    | NotOwned _, _ | _, NotOwned _ -> NotOwned Partially
+    | NotOwned Totally, NotOwned Totally -> ret (NotOwned Totally)
+    | NotOwned _, _ | _, NotOwned _ -> ret (NotOwned Partially)
     | ( MemVal { exact_perm = ex_perma; min_perm = min_perma; mem_val = vala },
         MemVal { exact_perm = ex_permb; min_perm = min_permb; mem_val = valb } )
       -> (
@@ -204,8 +221,25 @@ module Node = struct
         in
         let mk mem_val = MemVal { min_perm; mem_val; exact_perm } in
         match (vala, valb) with
-        | Undef Totally, Undef Totally -> mk (Undef Totally)
-        | _, _ -> mk (Undef Partially) )
+        | Undef Totally, Undef Totally -> ret (mk (Undef Totally))
+        | ( Single { chunk = chunk_l; value = value_l },
+            Single { chunk = chunk_r; value = value_r } )
+          when Chunk.equal chunk_l chunk_r ->
+            let arr =
+              Array { chunk = chunk_l; values = Conc [ value_l; value_r ] }
+            in
+            ret (mk arr)
+        | ( Single { chunk = chunk_l; value = value_l },
+            Array { chunk = chunk_r; values = values_r } )
+          when Chunk.equal chunk_l chunk_r ->
+            let+ values = SVArr.array_cons value_l values_r in
+            mk (Array { chunk = chunk_l; values })
+        | ( Array { chunk = chunk_l; values = values_l },
+            Single { chunk = chunk_r; value = value_r } )
+          when Chunk.equal chunk_l chunk_r ->
+            let+ values = SVArr.array_append values_l value_r in
+            mk (Array { chunk = chunk_l; values })
+        | _, _ -> ret (mk (Undef Partially)) )
 
   let decode ~chunk t =
     match t with
@@ -216,6 +250,23 @@ module Node = struct
         Ok
           ( if Chunk.equal m_chunk chunk then (value, exact_perm)
           else (SUndefined, exact_perm) )
+    | MemVal { mem_val = Array _; exact_perm; _ } ->
+        (* FIXME: if the array is of size 1, we can be more precise*)
+        Ok (SVal.SUndefined, exact_perm)
+
+  let decode_arr ~chunk t =
+    match t with
+    | NotOwned _ -> Error MissingResource
+    | MemVal { mem_val = Undef _; exact_perm; _ } ->
+        Ok (SVArr.AllUndef, exact_perm)
+    | MemVal { mem_val = Single { chunk = m_chunk; value }; exact_perm; _ } ->
+        Ok
+          ( if Chunk.equal m_chunk chunk then (Conc [ value ], exact_perm)
+          else (AllUndef, exact_perm) )
+    | MemVal { mem_val = Array { chunk = m_chunk; values }; exact_perm; _ } ->
+        Ok
+          ( if Chunk.equal m_chunk chunk then (values, exact_perm)
+          else (AllUndef, exact_perm) )
 
   let encode ~(perm : Perm.t) ~(chunk : Chunk.t) (sval : SVal.t) =
     let mem_val =
@@ -229,6 +280,11 @@ module Node = struct
       | Sptr _, c when Chunk.equal c Chunk.ptr -> Single { chunk; value = sval }
       | _ -> Single { chunk; value = SUndefined }
     in
+    MemVal { exact_perm = Some perm; min_perm = perm; mem_val }
+
+  let encode_arr ~(perm : Perm.t) ~(chunk : Chunk.t) (sarr : SVArr.t) =
+    (* FIXME: this is probably wrong *)
+    let mem_val = Array { chunk; values = sarr } in
     MemVal { exact_perm = Some perm; min_perm = perm; mem_val }
 
   let lvars = function
@@ -272,24 +328,33 @@ module Tree = struct
 
   let make ~node ~span ?children () = { node; span; children }
 
-  let with_children t ~left ~right = { t with children = Some (left, right) }
+  let with_children t ~left ~right =
+    Delayed.return { t with children = Some (left, right) }
 
-  let of_children _ ~left ~right =
+  let of_children_s ~left ~right =
+    let open Delayed.Syntax in
     let span = (fst left.span, snd right.span) in
-    let node = Node.merge ~left:left.node ~right:right.node in
+    let+ node = Node.merge ~left:left.node ~right:right.node in
     let children = Some (left, right) in
     { span; children; node }
+
+  let of_children _ ~left ~right = of_children_s ~left ~right
 
   let update_parent_perm t ~left ~right =
     let { node; span; _ } = t in
     let new_node =
       Node.update_parent_perm node ~left:left.node ~right:right.node
     in
-    { node = new_node; span; children = Some (left, right) }
+    Delayed.return { node = new_node; span; children = Some (left, right) }
 
   let sval_leaf ~low ~perm ~value ~chunk =
     let node = Node.encode ~perm ~chunk value in
     let span = Range.of_low_and_chunk low chunk in
+    make ~node ~span ()
+
+  let sarr_leaf ~low ~perm ~size ~array ~chunk =
+    let node = Node.encode_arr ~perm ~chunk array in
+    let span = Range.of_low_chunk_and_size low chunk size in
     make ~node ~span ()
 
   let undefined ?(perm = Perm.Freeable) span =
@@ -307,60 +372,90 @@ module Tree = struct
     let ol, oh = old_span in
     let nl, nh = range in
     if%sat ol #== nl then
-      let left_node, right_node = Node.split t.node in
+      let at = nh in
+      let* left_node, right_node = Node.split ~span:old_span ~at t.node in
       let left_span, right_span = Range.split_at old_span nh in
       let left = make ~node:left_node ~span:left_span () in
       let right = make ~node:right_node ~span:right_span () in
       Delayed.return (left_node, left, right)
     else
       if%sat oh #== nh then
-        let left_node, right_node = Node.split t.node in
+        let at = nl in
+        let* left_node, right_node = Node.split ~span:old_span ~at t.node in
         let left_span, right_span = Range.split_at old_span nl in
         let left = make ~node:left_node ~span:left_span () in
         let right = make ~node:right_node ~span:right_span () in
         Delayed.return (left_node, left, right)
       else
         (* We're first splitting on the left then splitting again on the right *)
-        let left_node, right_node = Node.split t.node in
+        let* left_node, right_node = Node.split ~span:old_span ~at:nl t.node in
         let left_span, right_span = Range.split_at old_span nl in
         let left = make ~node:left_node ~span:left_span () in
         let full_right = make ~node:right_node ~span:right_span () in
         let* node, right_left, right_right = split ~range full_right in
-        let right =
+        let* right =
           with_children full_right ~left:right_left ~right:right_right
         in
         Delayed.return (node, left, right)
 
   let extend_if_needed t range =
-    if%sat Range.is_before range t.span then
-      let new_left_span = (fst range, fst t.span) in
-      let new_left_tree =
-        { node = NotOwned Totally; span = new_left_span; children = None }
-      in
-      let new_range = (fst range, snd t.span) in
-      let new_children = Some (new_left_tree, t) in
-      Delayed.return
-        { node = NotOwned Partially; span = new_range; children = new_children }
-    else
-      if%sat Range.is_after range t.span then
-        let new_right_span = (snd t.span, snd range) in
-        let new_right_tree =
-          { node = NotOwned Totally; span = new_right_span; children = None }
-        in
-        let new_range = (fst t.span, snd range) in
-        let new_children = Some (t, new_right_tree) in
+    let open Formula.Infix in
+    let open Delayed.Syntax in
+    let rl, rh = range in
+    let sl, sh = t.span in
+    let* t_with_left =
+      if%sat rl #< sl then
+        let new_left_tree = make ~node:(NotOwned Totally) ~span:(rl, sl) () in
+        let children = (new_left_tree, t) in
         Delayed.return
-          {
-            node = NotOwned Partially;
-            span = new_range;
-            children = new_children;
-          }
+          (make ~node:(NotOwned Partially) ~span:(rl, sh) ~children ())
       else Delayed.return t
+    in
+    let new_sl, _ = t_with_left.span in
+    if%sat rh #> sh then
+      let new_right_tree = make ~node:(NotOwned Totally) ~span:(sh, rh) () in
+      let children = (t_with_left, new_right_tree) in
+      Delayed.return
+        (make ~node:(NotOwned Partially) ~span:(new_sl, rh) ~children ())
+    else Delayed.return t_with_left
 
   let frame_range (t : t) ~replace_node ~rebuild_parent (range : Range.t) :
       (Node.t * t, err) DR.t =
     let open DR.Syntax in
-    let rec frame_inside (t : t) (range : Range.t) =
+    let open Delayed.Syntax in
+    let rec extract (t : t) (range : Range.t) : (t * t option) Delayed.t =
+      (* First result is the extracted tree, second is the remain *)
+      let open Delayed in
+      let open Syntax in
+      if%sat Range.is_equal range t.span then return (t, None)
+      else
+        let left, right = Option.get t.children in
+        if%sat Range.is_inside range left.span then
+          let* extracted, new_left = extract left range in
+          let+ new_self =
+            match new_left with
+            | Some left -> of_children_s ~right ~left
+            | None      -> Delayed.return right
+          in
+          (extracted, Some new_self)
+        else
+          let* extracted, new_right = extract right range in
+          let+ new_self =
+            match new_right with
+            | Some right -> of_children_s ~right ~left
+            | None       -> Delayed.return left
+          in
+          (extracted, Some new_self)
+    in
+    let rec add_to_the_right t addition : t Delayed.t =
+      match t.children with
+      | None               -> of_children_s ~left:t ~right:addition
+      | Some (left, right) ->
+          let* new_right = add_to_the_right right addition in
+          of_children_s ~left ~right:new_right
+    in
+    let rec frame_inside ~replace_node ~rebuild_parent (t : t) (range : Range.t)
+        =
       if%sat Range.is_equal range t.span then
         match replace_node t with
         | Ok new_tree -> DR.ok (t.node, new_tree)
@@ -368,22 +463,51 @@ module Tree = struct
       else
         match t.children with
         | Some (left, right) ->
-            if%sat Range.is_inside range left.span then
-              let++ node, left = frame_inside left range in
-              (node, rebuild_parent t ~left ~right)
+            let _, mid = left.span in
+            let () =
+              let mid2, _ = right.span in
+              if mid != mid2 then failwith "Wrong split"
+            in
+            if%sat Range.point_strictly_inside mid range then
+              let _, h = range in
+              let upper_range = (mid, h) in
+              let dont_replace_node t = Ok t in
+              let** _, right =
+                frame_inside ~replace_node:dont_replace_node
+                  ~rebuild_parent:with_children right upper_range
+              in
+              let* extracted, right_opt = extract right upper_range in
+              let* left = add_to_the_right left extracted in
+              let* new_self =
+                match right_opt with
+                | Some right -> of_children_s ~left ~right
+                | None       -> Delayed.return left
+              in
+              frame_inside ~replace_node ~rebuild_parent new_self range
             else
-              if%sat Range.is_inside range right.span then
-                let++ node, right = frame_inside right range in
-                (node, rebuild_parent t ~left ~right)
-              else DR.error (Unhandled "wrong pre-cut")
+              if%sat Range.is_inside range left.span then
+                let** node, left =
+                  frame_inside ~replace_node ~rebuild_parent left range
+                in
+                let+ new_parent = rebuild_parent t ~left ~right in
+                Ok (node, new_parent)
+              else
+                if%sat Range.is_inside range right.span then
+                  let** node, right =
+                    frame_inside ~replace_node ~rebuild_parent right range
+                  in
+                  let+ new_parent = rebuild_parent t ~left ~right in
+                  Ok (node, new_parent)
+                else DR.error (Unhandled "wrong pre-cut")
         | None               ->
             let open Delayed.Syntax in
             let* _, left, right = split ~range t in
-            frame_inside (with_children t ~left ~right) range
+            let* new_self = with_children t ~left ~right in
+            frame_inside ~replace_node ~rebuild_parent new_self range
     in
     let open Delayed.Syntax in
     let* root = extend_if_needed t range in
-    frame_inside root range
+    frame_inside ~replace_node ~rebuild_parent root range
 
   let get_node (t : t) range : (Node.t * t, err) DR.t =
     let replace_node x = Ok x in
@@ -394,6 +518,31 @@ module Tree = struct
     let open DR.Syntax in
     let replace_node _ = Ok (make ~node ~span:range ()) in
     let rebuild_parent = of_children in
+    let++ _, t = frame_range t ~replace_node ~rebuild_parent range in
+    t
+
+  let get_array (t : t) (low : Expr.t) (chunk : Chunk.t) (size : Expr.t) :
+      (SVArr.t * Perm.t option * t, err) DR.t =
+    let open DR.Syntax in
+    let replace_node x = Ok x in
+    let rebuild_parent = with_children in
+    let range = Range.of_low_chunk_and_size low chunk size in
+    let+* node, tree = frame_range t ~replace_node ~rebuild_parent range in
+    Result.map
+      (fun (arr, perm) -> (arr, perm, tree))
+      (Node.decode_arr ~chunk node)
+
+  let set_array
+      (t : t)
+      (low : Expr.t)
+      (size : Expr.t)
+      (chunk : Chunk.t)
+      (array : SVArr.t)
+      (perm : Perm.t) : (t, err) DR.t =
+    let open DR.Syntax in
+    let replace_node _ = Ok (sarr_leaf ~low ~chunk ~array ~size ~perm) in
+    let rebuild_parent = of_children in
+    let range = Range.of_low_chunk_and_size low chunk size in
     let++ _, t = frame_range t ~replace_node ~rebuild_parent range in
     t
 
@@ -505,23 +654,38 @@ module Tree = struct
     SS.union (SS.union node_lvars span_lvars) children_lvars
 
   let rec assertions ~loc { node; span; children } =
+    let low, high = span in
     match node with
     | NotOwned Totally -> []
     | NotOwned Partially | MemVal { mem_val = Undef Partially; _ } ->
         let left, right = Option.get children in
         assertions ~loc left @ assertions ~loc right
     | MemVal { mem_val = Undef Totally; exact_perm = perm; _ } ->
-        let low, high = span in
         [ Constr.hole ~loc ~low ~high ~perm ]
     | MemVal { mem_val = Single { chunk; value }; exact_perm = perm; _ } ->
-        let sval, types = SVal.to_gil_expr value in
+        let sval, types = NSVal.to_gil_expr value in
         let types =
           List.map
             (let open Formula.Infix in
-            fun (x, t) -> Asrt.Pure (Expr.typeof x) #== (Lit (Type t)))
+            fun (x, t) -> Asrt.Pure (Expr.typeof x) #== (Expr.type_ t))
             types
         in
-        Constr.single ~loc ~ofs:(fst span) ~chunk ~sval ~perm :: types
+        Constr.single ~loc ~ofs:low ~chunk ~sval ~perm :: types
+    | MemVal { mem_val = Array { chunk; values }; exact_perm = perm; _ } -> (
+        let chksize = Chunk.size_expr chunk in
+        let total_size =
+          let open Expr.Infix in
+          (high -. low) /. chksize
+        in
+        match values with
+        | AllUndef -> [ Constr.hole ~loc ~low ~high ~perm ]
+        | array    ->
+            let e, learned =
+              SVArr.to_gil_expr_undelayed ~range:span array ~chunk
+            in
+            let learned = List.map (fun x -> Asrt.Pure x) learned in
+            Constr.array ~loc ~ofs:low ~perm ~chunk ~size:total_size ~sval_arr:e
+            :: learned )
 
   let rec substitution ~sval_subst ~le_subst { node; span; children } =
     let node = Node.substitution ~sval_subst node in
@@ -689,6 +853,53 @@ let set_single t low chunk sval perm =
 let rem_single t low chunk =
   let open DR.Syntax in
   let range = Range.of_low_and_chunk low chunk in
+  let** root = DR.of_result (get_root t) in
+  let** root_set =
+    match root with
+    | None      -> DR.ok None
+    | Some root ->
+        let** root_set = Tree.set_node root range Node.not_owned in
+        DR.ok (Some root_set)
+  in
+  let** bounds = DR.of_result (get_bounds t) in
+  let learned =
+    match bounds with
+    | None        -> []
+    | Some bounds -> [ Range.is_inside range bounds ]
+  in
+  DR.of_result ~learned (with_root_opt t root_set)
+
+let get_array t low size chunk =
+  let open DR.Syntax in
+  let range = Range.of_low_chunk_and_size low chunk size in
+  let** span = DR.of_result (get_bounds t) in
+  if%sat is_in_bounds range span then
+    let** root = DR.of_result (get_root t) in
+    match root with
+    | None      -> DR.error MissingResource
+    | Some root ->
+        let** array, perm, root_framed = Tree.get_array root low chunk size in
+        let++ wroot = DR.of_result (with_root t root_framed) in
+        (array, perm, wroot)
+  else DR.error BufferOverrun
+
+let set_array t low size chunk array perm =
+  let open DR.Syntax in
+  let range = Range.of_low_chunk_and_size low chunk size in
+  let** root = DR.of_result (get_root t) in
+  let root = Option.value root ~default:(Tree.create_root range) in
+  let** root_set = Tree.set_array root low size chunk array perm in
+  let** bounds = DR.of_result (get_bounds t) in
+  let learned =
+    match bounds with
+    | None        -> []
+    | Some bounds -> [ Range.is_inside range bounds ]
+  in
+  DR.of_result ~learned (with_root t root_set)
+
+let rem_array t low size chunk =
+  let open DR.Syntax in
+  let range = Range.of_low_chunk_and_size low chunk size in
   let** root = DR.of_result (get_root t) in
   let** root_set =
     match root with

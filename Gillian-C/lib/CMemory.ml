@@ -179,6 +179,9 @@ let execute_action name heap params =
       ( GetSingle
       | SetSingle
       | RemSingle
+      | GetArray
+      | SetArray
+      | RemArray
       | GetBounds
       | SetBounds
       | RemBounds

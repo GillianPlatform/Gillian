@@ -23,6 +23,8 @@ type 'a d_or_error = ('a, err) Delayed_result.t
 
 module Range : sig
   type t = Expr.t * Expr.t
+
+  val of_low_chunk_and_size : Expr.t -> Chunk.t -> Expr.t -> t
 end
 
 type t
@@ -49,6 +51,24 @@ val get_single :
 val set_single : t -> Expr.t -> Chunk.t -> SVal.t -> Perm.t -> t d_or_error
 
 val rem_single : t -> Expr.t -> Chunk.t -> t d_or_error
+
+val get_array :
+  t ->
+  Expr.t ->
+  Expr.t ->
+  Chunk.t ->
+  (MonadicSVal.SVArray.t * Perm.t option * t) d_or_error
+
+val set_array :
+  t ->
+  Expr.t ->
+  Expr.t ->
+  Chunk.t ->
+  MonadicSVal.SVArray.t ->
+  Perm.t ->
+  t d_or_error
+
+val rem_array : t -> Expr.t -> Expr.t -> Chunk.t -> t d_or_error
 
 val get_hole : t -> Expr.t -> Expr.t -> (t * Perm.t option) d_or_error
 

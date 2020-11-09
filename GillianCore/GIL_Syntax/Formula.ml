@@ -402,6 +402,8 @@ module Infix = struct
     | Not x -> x
     | _     -> Not a
 
+  let forall params f = ForAll (params, f)
+
   let ( #== ) a b =
     match (a, b) with
     | Expr.Lit la, Expr.Lit lb -> of_bool (Literal.equal la lb)
@@ -439,4 +441,6 @@ module Infix = struct
     match (a, b) with
     | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x >= y)
     | _ -> Not (Less (a, b))
+
+  let ( #=> ) fa fb = (fnot fa) #|| fb
 end

@@ -94,8 +94,10 @@ struct
         | n when n > 0 -> Malformed
         (* We have exited at least one loop *)
         | n ->
-            let ids = List_utils.list_sub previous 0 (-n) in
-            let rest = List_utils.list_sub previous (-n) (len_prev + n) in
+            let ids = Option.get (List_utils.list_sub previous 0 (-n)) in
+            let rest =
+              Option.get (List_utils.list_sub previous (-n) (len_prev + n))
+            in
             if rest <> current then Malformed else FrameOn ids )
 
   (* ******************* *

@@ -37,11 +37,69 @@ let list_nth x n =
   | Lit (LList l) when n < List.length l -> Lit (List.nth l n)
   | _ -> BinOp (x, LstNth, num (float_of_int n))
 
+let list_nth_e x n =
+  match n with
+  | Lit (Num n) -> list_nth x (int_of_float n)
+  | _           -> BinOp (x, LstNth, n)
+
 let list_length x =
   match x with
   | EList l       -> Lit (Num (float_of_int (List.length l)))
   | Lit (LList l) -> Lit (Num (float_of_int (List.length l)))
   | _             -> UnOp (LstLen, x)
+
+let list_sub ~lst ~start ~size =
+  match (lst, start, size) with
+  | EList el, Lit (Num startf), Lit (Num sizef) -> (
+      match
+        List_utils.list_sub el (int_of_float startf) (int_of_float sizef)
+      with
+      | None        -> LstSub (lst, start, size)
+      | Some sublst -> EList sublst )
+  | Lit (LList ll), Lit (Num startf), Lit (Num sizef) -> (
+      match
+        List_utils.list_sub ll (int_of_float startf) (int_of_float sizef)
+      with
+      | None        -> LstSub (lst, start, size)
+      | Some sublst -> Lit (LList sublst) )
+  | _ -> LstSub (lst, start, size)
+
+let list_cat la lb =
+  let lift l = List.map (fun x -> Lit x) l in
+  match (la, lb) with
+  | Lit (LList la), Lit (LList lb) -> Lit (LList (la @ lb))
+  | Lit (LList la), EList lb -> EList (lift la @ lb)
+  | EList la, Lit (LList lb) -> EList (la @ lift lb)
+  | EList la, EList lb -> EList (la @ lb)
+  | NOp (LstCat, las), NOp (LstCat, lbs) -> NOp (LstCat, las @ lbs)
+  | NOp (LstCat, las), lb -> NOp (LstCat, las @ [ lb ])
+  | la, NOp (LstCat, lbs) -> NOp (LstCat, la :: lbs)
+  | la, lb -> NOp (LstCat, [ la; lb ])
+
+let list_cons el r =
+  let sgl =
+    match el with
+    | Lit x -> Lit (LList [ x ])
+    | e     -> EList [ e ]
+  in
+  list_cat sgl r
+
+let list el =
+  if
+    List.for_all
+      (function
+        | Lit _ -> true
+        | _     -> false)
+      el
+  then
+    Lit
+      (LList
+         (List.map
+            (function
+              | Lit l -> l
+              | _     -> assert false)
+            el))
+  else EList el
 
 let fmod a b =
   match (a, b) with
@@ -57,11 +115,53 @@ module Infix = struct
     | Lit (Num x), Lit (Num y) -> Lit (Num (x +. y))
     | _ -> BinOp (a, FPlus, b)
 
+  let ( -. ) a b =
+    match (a, b) with
+    | x, Lit (Num 0.)          -> x
+    | Lit (Num 0.), x          -> UnOp (FUnaryMinus, x)
+    | Lit (Num x), Lit (Num y) -> Lit (Num (x -. y))
+    | _                        -> BinOp (a, FMinus, b)
+
+  let ( *. ) a b =
+    match (a, b) with
+    | Lit (Num 0.), _ | _, Lit (Num 0.) -> Lit (Num 0.)
+    | Lit (Num 1.), x | x, Lit (Num 1.) -> x
+    | Lit (Num x), Lit (Num y) -> Lit (Num (x *. y))
+    | _ -> BinOp (a, FTimes, b)
+
+  let ( /. ) a b =
+    match (a, b) with
+    | x, Lit (Num 1.)          -> x
+    | Lit (Num x), Lit (Num y) -> Lit (Num (x /. y))
+    | _                        -> BinOp (a, FDiv, b)
+
   let ( + ) a b =
     match (a, b) with
     | Lit (Int 0), x | x, Lit (Int 0) -> x
     | Lit (Int x), Lit (Int y) -> Lit (Int (x + y))
     | _ -> BinOp (a, IPlus, b)
+
+  let ( - ) a b =
+    match (a, b) with
+    | x, Lit (Int 0)           -> x
+    | Lit (Num 0.), x          -> UnOp (IUnaryMinus, x)
+    | Lit (Int x), Lit (Int y) -> Lit (Int (x - y))
+    | _                        -> BinOp (a, IMinus, b)
+
+  let ( * ) a b =
+    match (a, b) with
+    | Lit (Int 0), _ | _, Lit (Int 0) -> Lit (Int 0)
+    | Lit (Int 1), x | x, Lit (Int 1) -> x
+    | Lit (Int x), Lit (Int y) -> Lit (Int (x * y))
+    | _ -> BinOp (a, ITimes, b)
+
+  let ( / ) a b =
+    match (a, b) with
+    | x, Lit (Int 1)           -> x
+    | Lit (Int x), Lit (Int y) -> Lit (Int (x / y))
+    | _                        -> BinOp (a, IDiv, b)
+
+  let ( @+ ) = list_cat
 end
 
 module MyExpr = struct

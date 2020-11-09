@@ -11,6 +11,9 @@ type mem_ac =
   | GetSingle
   | SetSingle
   | RemSingle
+  | GetArray
+  | SetArray
+  | RemArray
   | GetHole
   | SetHole
   | RemHole
@@ -25,7 +28,7 @@ type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
 
 type ac = AGEnv of genv_ac | AMem of mem_ac
 
-type mem_ga = Single | Hole | Bounds | Freed
+type mem_ga = Single | Array | Hole | Bounds | Freed
 
 type genv_ga = Symbol | Definition
 
@@ -39,18 +42,21 @@ let is_overlapping_asrt = function
 
 let mem_ga_to_setter = function
   | Single -> SetSingle
+  | Array  -> SetArray
   | Hole   -> SetHole
   | Bounds -> SetBounds
   | Freed  -> SetFreed
 
 let mem_ga_to_getter = function
   | Single -> GetSingle
+  | Array  -> GetArray
   | Hole   -> GetHole
   | Bounds -> GetBounds
   | Freed  -> GetFreed
 
 let mem_ga_to_deleter = function
   | Single -> RemSingle
+  | Array  -> RemArray
   | Hole   -> RemHole
   | Bounds -> RemBounds
   | Freed  -> RemFreed
@@ -94,6 +100,9 @@ let str_mem_ac = function
   | GetSingle  -> "getSingle"
   | SetSingle  -> "setSingle"
   | RemSingle  -> "remSingle"
+  | GetArray   -> "getArray"
+  | SetArray   -> "setArray"
+  | RemArray   -> "remArray"
   | GetBounds  -> "getBounds"
   | SetBounds  -> "setBounds"
   | RemBounds  -> "remBounds"
@@ -115,6 +124,9 @@ let mem_ac_from_str = function
   | "getSingle"  -> GetSingle
   | "setSingle"  -> SetSingle
   | "remSingle"  -> RemSingle
+  | "getArray"   -> GetArray
+  | "setArray"   -> SetArray
+  | "remArray"   -> RemArray
   | "getBounds"  -> GetBounds
   | "setBounds"  -> SetBounds
   | "remBounds"  -> RemBounds
@@ -160,6 +172,7 @@ let ac_from_str str =
 
 let str_mem_ga = function
   | Single -> "single"
+  | Array  -> "array"
   | Hole   -> "hole"
   | Bounds -> "bounds"
   | Freed  -> "freed"
@@ -170,6 +183,7 @@ let str_genv_ga = function
 
 let mem_ga_from_str = function
   | "single" -> Single
+  | "array"  -> Array
   | "bounds" -> Bounds
   | "hole"   -> Hole
   | "freed"  -> Freed
@@ -206,6 +220,7 @@ let is_overlapping_asrt_str str = ga_from_str str |> is_overlapping_asrt
 let ga_loc_indexes ga =
   match ga with
   | GMem Single      -> [ 0 ]
+  | GMem Array       -> [ 0 ]
   | GMem Hole        -> [ 0 ]
   | GMem Bounds      -> [ 0 ]
   | GMem Freed       -> [ 0 ]

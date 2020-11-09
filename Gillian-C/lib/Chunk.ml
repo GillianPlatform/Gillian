@@ -43,6 +43,8 @@ let size chunk =
   let open Compcert in
   Camlcoq.Z.to_int (Memdata.size_chunk chunk)
 
+let size_expr chunk = Gil_syntax.Expr.num (float_of_int (size chunk))
+
 let align chunk =
   let open Compcert in
   Camlcoq.Z.to_int (Memdata.align_chunk chunk)

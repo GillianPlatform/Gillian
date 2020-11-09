@@ -143,6 +143,37 @@ module Mem = struct
         if SHeapTree.is_empty new_tree then SMap.remove loc_name mem
         else SMap.add loc_name new_tree mem
 
+  let get_array mem loc ofs size chunk =
+    let open DR.Syntax in
+    let** loc_name = resolve_loc_result loc in
+    let** tree = get_tree_res mem loc_name in
+    let++ sarr, perm, new_tree =
+      map_lift_err loc_name (SHeapTree.get_array tree ofs size chunk)
+    in
+    (SMap.add loc_name new_tree mem, loc_name, sarr, perm)
+
+  let set_array mem loc ofs size chunk array perm =
+    let open DR.Syntax in
+    let* loc_name = resolve_or_create_loc_name loc in
+    let* tree = get_or_create_tree mem loc_name in
+    let++ new_tree =
+      map_lift_err loc_name (SHeapTree.set_array tree ofs size chunk array perm)
+    in
+    SMap.add loc_name new_tree mem
+
+  let rem_array mem loc ofs size chunk =
+    let open DR.Syntax in
+    let* loc_name = Delayed.resolve_loc loc in
+    match Option.bind loc_name (fun l -> SMap.find_opt l mem) with
+    | None      -> DR.ok mem
+    | Some tree ->
+        let loc_name = Option.get loc_name in
+        let++ new_tree =
+          map_lift_err loc_name (SHeapTree.rem_array tree ofs size chunk)
+        in
+        if SHeapTree.is_empty new_tree then SMap.remove loc_name mem
+        else SMap.add loc_name new_tree mem
+
   let get_freed mem loc =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
@@ -461,6 +492,58 @@ let execute_rem_single heap params =
       make_branch ~heap:{ heap with mem } ~rets:[] ()
   | _ -> fail_ungracefully "rem_single" params
 
+let execute_get_array heap params =
+  let open DR.Syntax in
+  match params with
+  | [ loc; ofs; size; Expr.Lit (String chunk_string) ] ->
+      let chunk = ValueTranslation.chunk_of_string chunk_string in
+      let** mem, loc_name, array, perm =
+        Mem.get_array heap.mem loc ofs size chunk
+      in
+      let loc_e = expr_of_loc_name loc_name in
+      let range = SHeapTree.Range.of_low_chunk_and_size ofs chunk size in
+      let* array_e = MonadicSVal.SVArray.to_gil_expr ~chunk ~range array in
+      let perm_string = ValueTranslation.string_of_permission_opt perm in
+      DR.ok
+        (make_branch ~heap:{ heap with mem }
+           ~rets:
+             [
+               loc_e;
+               ofs;
+               Expr.Lit (String chunk_string);
+               array_e;
+               Expr.Lit (String perm_string);
+             ]
+           ())
+  | _ -> fail_ungracefully "get_array" params
+
+let execute_set_array heap params =
+  let open DR.Syntax in
+  match params with
+  | [
+   loc;
+   ofs;
+   size;
+   Expr.Lit (String chunk_string);
+   arr_e;
+   Expr.Lit (String perm_string);
+  ] ->
+      let perm = ValueTranslation.permission_of_string perm_string in
+      let chunk = ValueTranslation.chunk_of_string chunk_string in
+      let arr = MonadicSVal.SVArray.of_gil_expr_exn arr_e in
+      let++ mem = Mem.set_array heap.mem loc ofs size chunk arr perm in
+      make_branch ~heap:{ heap with mem } ~rets:[] ()
+  | _ -> fail_ungracefully "set_single" params
+
+let execute_rem_array heap params =
+  let open DR.Syntax in
+  match params with
+  | [ loc; ofs; size; Expr.Lit (String chunk_string) ] ->
+      let chunk = ValueTranslation.chunk_of_string chunk_string in
+      let++ mem = Mem.rem_array heap.mem loc ofs size chunk in
+      make_branch ~heap:{ heap with mem } ~rets:[] ()
+  | _ -> fail_ungracefully "rem_single" params
+
 let execute_get_hole heap params =
   let open DR.Syntax in
   match params with
@@ -660,6 +743,9 @@ let execute_action ~action_name heap params =
     | AMem GetSingle  -> execute_get_single !heap params
     | AMem SetSingle  -> execute_set_single !heap params
     | AMem RemSingle  -> execute_rem_single !heap params
+    | AMem GetArray   -> execute_get_array !heap params
+    | AMem SetArray   -> execute_set_array !heap params
+    | AMem RemArray   -> execute_rem_array !heap params
     | AMem GetBounds  -> execute_get_bounds !heap params
     | AMem SetBounds  -> execute_set_bounds !heap params
     | AMem RemBounds  -> execute_rem_bounds !heap params
