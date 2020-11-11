@@ -76,6 +76,7 @@
     "@opam/shexp": "v0.14.0",
     "@opam/ocaml-lsp-server": "*",
     "@opam/odoc": "*",
-    "@opam/ocamlformat": "0.15.0"
+    "@opam/ocamlformat": "0.15.0",
+    "@opam/reanalyze": "*"
   }
 }
