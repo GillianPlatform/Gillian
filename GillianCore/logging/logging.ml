@@ -40,7 +40,12 @@ let end_phase = ReportBuilder.end_phase
 
 let with_phase level ?title ?severity f =
   let phase = ReportBuilder.start_phase level ?title ?severity () in
-  let result = try Ok (f ()) with e -> Error e in
+  let result =
+    try Ok (f ())
+    with e ->
+      Printf.printf "Original Backtrace:\n%s" (Printexc.get_backtrace ());
+      Error e
+  in
   ReportBuilder.end_phase phase;
   match result with
   | Ok ok   -> ok

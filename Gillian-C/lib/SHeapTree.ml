@@ -403,6 +403,9 @@ module Tree = struct
     let open Delayed.Syntax in
     let rl, rh = range in
     let sl, sh = t.span in
+    Logging.tmi (fun fmt ->
+        fmt "RANGE: (%a, %a); SPAN: (%a, %a)" Expr.pp rl Expr.pp rh Expr.pp sl
+          Expr.pp sh);
     let* t_with_left =
       if%sat rl #< sl then
         let new_left_tree = make ~node:(NotOwned Totally) ~span:(rl, sl) () in
@@ -411,13 +414,16 @@ module Tree = struct
           (make ~node:(NotOwned Partially) ~span:(rl, sh) ~children ())
       else Delayed.return t
     in
-    let new_sl, _ = t_with_left.span in
-    if%sat rh #> sh then
-      let new_right_tree = make ~node:(NotOwned Totally) ~span:(sh, rh) () in
-      let children = (t_with_left, new_right_tree) in
-      Delayed.return
-        (make ~node:(NotOwned Partially) ~span:(new_sl, rh) ~children ())
-    else Delayed.return t_with_left
+    let sl, _ = t_with_left.span in
+    let* result =
+      if%sat rh #> sh then
+        let new_right_tree = make ~node:(NotOwned Totally) ~span:(sh, rh) () in
+        let children = (t_with_left, new_right_tree) in
+        Delayed.return
+          (make ~node:(NotOwned Partially) ~span:(sl, rh) ~children ())
+      else Delayed.return t_with_left
+    in
+    Delayed.return result
 
   let frame_range (t : t) ~replace_node ~rebuild_parent (range : Range.t) :
       (Node.t * t, err) DR.t =
@@ -464,10 +470,6 @@ module Tree = struct
         match t.children with
         | Some (left, right) ->
             let _, mid = left.span in
-            let () =
-              let mid2, _ = right.span in
-              if mid != mid2 then failwith "Wrong split"
-            in
             if%sat Range.point_strictly_inside mid range then
               let _, h = range in
               let upper_range = (mid, h) in
@@ -503,6 +505,7 @@ module Tree = struct
             let open Delayed.Syntax in
             let* _, left, right = split ~range t in
             let* new_self = with_children t ~left ~right in
+            Logging.tmi (fun fmt -> fmt "AFTER SPLITING: %a" pp new_self);
             frame_inside ~replace_node ~rebuild_parent new_self range
     in
     let open Delayed.Syntax in

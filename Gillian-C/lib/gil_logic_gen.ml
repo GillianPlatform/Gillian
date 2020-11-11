@@ -14,7 +14,7 @@ let true_name = Camlcoq.extern_atom
 
 let loc_param_name = "loc"
 
-let offs_param_name = "offs"
+let ofs_param_name = "ofs"
 
 let pred_name_of_struct struct_name =
   Prefix.generated_preds ^ "struct_" ^ struct_name
@@ -81,14 +81,13 @@ let get_structs_not_annot struct_types =
 
 let assert_of_member cenv members id typ =
   let open Ctypes in
-  let mk t v = Expr.EList [ Lit (String t); v ] in
+  let mk t v = Expr.list [ Expr.string t; v ] in
   let field_name = true_name id in
   let pvmember = Expr.PVar field_name in
   let field_val_name = "#i__" ^ field_name ^ "_v" in
   let lvval = Expr.LVar field_val_name in
   let pvloc = Expr.PVar loc_param_name in
-  let pvoffs = Expr.Lit (Num 0.) in
-  (* let pvoffs = Expr.PVar offs_param_name in *)
+  let pvofs = Expr.PVar ofs_param_name in
   let e_to_use, getter_or_type_pred =
     let open Internal_Predicates in
     let open VTypes in
@@ -98,7 +97,7 @@ let assert_of_member cenv members id typ =
                       Asrt.Pred (long_get, [ pvmember; lvval ]) )
     | Tfloat _   ->
         (mk float_type lvval, Asrt.Pred (float_get, [ pvmember; lvval ]))
-    | Tpointer _ -> (pvmember, Asrt.Pred (is_ptr_to_0_opt, [ pvmember ]))
+    | Tpointer _ -> (pvmember, Asrt.Pred (is_ptr_opt, [ pvmember ]))
     | _          ->
         failwith
           (Printf.sprintf "unhandled struct field type for now : %s"
@@ -106,7 +105,7 @@ let assert_of_member cenv members id typ =
   in
   let fo =
     match field_offset cenv id members with
-    | Errors.OK f    -> Expr.Lit (Num (float_of_int (Camlcoq.Z.to_int f)))
+    | Errors.OK f    -> Expr.num (float_of_int (Camlcoq.Z.to_int f))
     | Errors.Error e ->
         failwith
           (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
@@ -118,15 +117,14 @@ let assert_of_member cenv members id typ =
     | _              -> failwith "Invalid access mode for some type"
   in
   let ga_asrt =
-    Constr.single ~loc:pvloc ~ofs:(pvoffs ++ fo) ~chunk ~sval:e_to_use
+    Constr.single ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~sval:e_to_use
       ~perm:(Some Freeable)
   in
   getter_or_type_pred ** ga_asrt
 
 let assert_of_hole (low, high) =
   let pvloc = Expr.PVar loc_param_name in
-  (* let pvoffs = Expr.PVar offs_param_name in *)
-  let pvoffs = Expr.Lit (Num 0.) in
+  let pvoffs = Expr.PVar ofs_param_name in
   let num k = Expr.Lit (Num (float_of_int k)) in
   Constr.hole ~loc:pvloc
     ~low:(pvoffs ++ num low)
@@ -135,7 +133,7 @@ let assert_of_hole (low, high) =
 
 let gen_pred_of_struct cenv ann struct_name =
   let pred_name = pred_name_of_struct struct_name in
-  let pred_ins = [ 0 ] in
+  let pred_ins = [ 0; 1 ] in
   let id = id_of_string struct_name in
   let comp_opt = Maps.PTree.get id cenv in
   let comp =
@@ -152,8 +150,7 @@ let gen_pred_of_struct cenv ann struct_name =
   let first_params =
     [
       (loc_param_name, Some Type.ObjectType);
-      (* (offs_param_name, Some Type.NumberType) *)
-      (* TODO: For now, offset HAS to be 0, that will change *)
+      (ofs_param_name, Some Type.NumberType);
     ]
   in
   let struct_params =
@@ -198,8 +195,7 @@ let gen_pred_of_struct cenv ann struct_name =
         pred_ins;
         pred_num_params;
         pred_params;
-        (* FIXME: ADD SUPPORT FOR PURE, ABSTRACT, NOUNFOLD, FACTS *)
-        pred_facts = [];
+        pred_facts = [ (* FIXME: there are probably some facts to get *) ];
         pred_pure = false;
         pred_abstract = false;
         pred_nounfold = false;
@@ -301,38 +297,40 @@ let rec trans_expr (e : CExpr.t) : Asrt.t * Expr.t =
       (asrt, Expr.NOp (gnop, elp))
 
 let rec trans_form (f : CFormula.t) : Asrt.t * Formula.t =
+  let open Formula.Infix in
   match f with
   | CFormula.True     -> (Emp, Formula.True)
   | False             -> (Emp, False)
   | Eq (ce1, ce2)     ->
       let f1, eg1 = trans_expr ce1 in
       let f2, eg2 = trans_expr ce2 in
-      (f1 ** f2, Eq (eg1, eg2))
+      (f1 ** f2, eg1 #== eg2)
   | LessEq (ce1, ce2) ->
       let f1, eg1 = trans_expr ce1 in
       let f2, eg2 = trans_expr ce2 in
-      (f1 ** f2, LessEq (eg1, eg2))
+      (f1 ** f2, eg1 #<= eg2)
   | Less (ce1, ce2)   ->
       let f1, eg1 = trans_expr ce1 in
       let f2, eg2 = trans_expr ce2 in
-      (f1 ** f2, Less (eg1, eg2))
+      (f1 ** f2, eg1 #< eg2)
   | SetMem (ce1, ce2) ->
       let f1, eg1 = trans_expr ce1 in
       let f2, eg2 = trans_expr ce2 in
       (f1 ** f2, SetMem (eg1, eg2))
   | Not fp            ->
       let a, fpp = trans_form fp in
-      (a, Not fpp)
+      (a, fnot fpp)
   | Implies (f1, f2)  ->
       let a1, fp1 = trans_form f1 in
       let a2, fp2 = trans_form f2 in
-      (a1 ** a2, Or (Not fp1, fp2))
+      (a1 ** a2, fp1 #=> fp2)
   | ForAll (lvts, f)  ->
       let a, fp = trans_form f in
       (a, ForAll (lvts, fp))
 
-let malloc_chunk_asrt loc struct_sz =
-  let num k = Expr.Lit (Num (float_of_int k)) in
+let malloc_chunk_asrt loc beg_ofs struct_sz =
+  let open Formula.Infix in
+  let num k = Expr.num (float_of_int k) in
   let mk_val i =
     if Archi.ptr64 then
       Expr.EList [ Lit (String CConstants.VTypes.long_type); num i ]
@@ -340,20 +338,23 @@ let malloc_chunk_asrt loc struct_sz =
   in
   let chunk = if Archi.ptr64 then Chunk.Mint64 else Chunk.Mint32 in
   let sz = Chunk.size chunk in
-  let ofs = num (-sz) in
-  Constr.single ~loc ~ofs ~chunk ~sval:(mk_val struct_sz) ~perm:(Some Freeable)
-  ** Constr.bounds ~loc ~low:(num (-sz)) ~high:(num struct_sz)
+  let min_ofs = beg_ofs ++ num (-sz) in
+  Constr.single ~loc ~ofs:min_ofs ~chunk ~sval:(mk_val struct_sz)
+    ~perm:(Some Freeable)
+  ** Constr.bounds ~loc ~low:min_ofs ~high:(num struct_sz)
+  ** Asrt.Pure beg_ofs #== (num 0)
 
 let trans_constr ?fname:_ ~malloc ann s c =
   let cenv = ann.cenv in
   let gen_loc_var () = Expr.LVar (Gillian.Utils.Generators.fresh_lvar ()) in
+  let gen_ofs_var () = Expr.LVar (Gillian.Utils.Generators.fresh_lvar ()) in
   let open CConstants.VTypes in
   let cse = trans_simpl_expr in
   let tnum = types NumberType in
   let tloc = types ObjectType in
   (* let mk_num n = Expr.Lit (Num (float_of_int n)) in *)
   (* let zero = mk_num 0 in *)
-  let ptr_call p l = Asrt.Pred (Internal_Predicates.ptr_to_0_get, [ p; l ]) in
+  let ptr_call p l o = Asrt.Pred (Internal_Predicates.ptr_get, [ p; l; o ]) in
   let sz = function
     | CSVal.Sint _       -> 4
     | Slong _            -> 8
@@ -363,12 +364,13 @@ let trans_constr ?fname:_ ~malloc ann s c =
   in
   let a_s, s_e = trans_expr s in
   let locv = gen_loc_var () in
-  let pc = ptr_call s_e locv in
+  let ofsv = gen_ofs_var () in
+  let pc = ptr_call s_e locv ofsv in
   let malloc_chunk siz =
-    if malloc then malloc_chunk_asrt locv siz else Asrt.Emp
+    if malloc then malloc_chunk_asrt locv ofsv siz else Asrt.Emp
   in
-  let mk str v = Expr.EList [ Expr.Lit (String str); v ] in
-  let mk_ptr l o = Expr.EList [ l; o ] in
+  let mk str v = Expr.list [ Expr.string str; v ] in
+  let mk_ptr l o = Expr.list [ l; o ] in
   match c with
   | CConstructor.ConsExpr (SVal (Sint se)) ->
       let e = cse se in
@@ -377,8 +379,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
       let siz = sz (Sint se) in
       (* FIXME: at some point this will not be 0 anymore *)
       let ga =
-        Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv
-          ~perm:(Some Freeable)
+        Constr.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Sfloat se)) ->
@@ -387,8 +388,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
       let siz = sz (Sfloat se) in
       let sv = mk float_type e in
       let ga =
-        Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv
-          ~perm:(Some Freeable)
+        Constr.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Ssingle se)) ->
@@ -398,8 +398,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
       let siz = sz (Ssingle se) in
       let sv = mk single_type e in
       let ga =
-        Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv
-          ~perm:(Some Freeable)
+        Constr.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Slong se)) ->
@@ -408,8 +407,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
       let siz = sz (Slong se) in
       let sv = mk long_type e in
       let ga =
-        Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv
-          ~perm:(Some Freeable)
+        Constr.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Sptr (sl, so))) ->
@@ -419,8 +417,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
       let siz = sz (Sptr (sl, so)) in
       let sv = mk_ptr l o in
       let ga =
-        Constr.single ~loc:locv ~ofs:(Expr.num 0.) ~chunk ~sval:sv
-          ~perm:(Some Freeable)
+        Constr.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tloc l ** tnum o ** malloc_chunk siz
   | CConstructor.ConsExpr _ ->
@@ -437,7 +434,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
       let siz = Camlcoq.Z.to_int comp.Ctypes.co_sizeof in
       let more_asrt, params_fields = List.split (List.map trans_expr el) in
       let pr =
-        Asrt.Pred (struct_pred, [ locv (*; zero *) ] @ params_fields)
+        Asrt.Pred (struct_pred, [ locv; ofsv ] @ params_fields)
         ** fold_star more_asrt
       in
       pr ** pc ** malloc_chunk siz
@@ -774,7 +771,8 @@ let gen_rec_pred_of_struct cenv ann struct_name =
   let holes = get_holes comp.co_members in
   let hole_assert = fold_star (List.map assert_of_hole holes) in
   let siz = Camlcoq.Z.to_int comp.Ctypes.co_sizeof in
-  let malloc = malloc_chunk_asrt (Expr.PVar loc_param_name) siz in
+  let zero = Expr.num 0. in
+  let malloc = malloc_chunk_asrt (Expr.PVar loc_param_name) zero siz in
   let pred_definitions =
     List.map
       (fun def -> (None, def ** hole_assert ** malloc))
@@ -789,7 +787,6 @@ let gen_rec_pred_of_struct cenv ann struct_name =
         pred_ins;
         pred_num_params;
         pred_params;
-        (* FIXME: ADD SUPPORT FOR PURE, ABSTRACT, NOUNFOLD *)
         pred_facts = [];
         pred_pure = false;
         pred_abstract = false;
@@ -809,7 +806,6 @@ let gen_rec_pred_of_struct cenv ann struct_name =
         pred_ins = [ 0 ];
         pred_num_params = 1;
         pred_params = [ (opt_param_name, Some Type.ListType) ];
-        (* FIXME: ADD SUPPORT FOR PURE, ABSTRACT, NOUNFOLD *)
         pred_facts = [];
         pred_pure = false;
         pred_abstract = false;

@@ -17,6 +17,10 @@ pred i__is_float (e: List):
 pred i__is_ptr_to_0 (e: List):
   (e == {{ #loc, 0. }}) *
   types(#loc : Obj);
+  
+pred i__is_ptr (e: List):
+  (e == {{ #loc, #ofs }}) *
+  types(#loc : Obj, #ofs : Num);
 
 (* Actual value getters *)
 
@@ -34,6 +38,9 @@ pred i__float (+e: List, k : Num):
 
 pred i__ptr_to_0 (+e : List, l : Obj):
   (e == {{ l, 0. }});
+  
+pred i__ptr (+e: List, l: Obj, o: Num):
+  (e == {{ l, o }});
 
 (* Global environment *)
 

@@ -336,13 +336,6 @@ type t = t' ref
 
 type action_ret = Success of (t * vt list) | Failure of err_t
 
-let lift_res res =
-  match res with
-  | Ok a    -> Success a
-  | Error e -> Failure e
-
-let lift_dr res = Delayed.map res lift_res
-
 let make_branch ~heap ?(rets = []) () = (ref heap, rets)
 
 (* Init *)
@@ -725,11 +718,27 @@ let get_print_info _ _ = (SS.empty, SS.empty)
 
 (* let str_noheap _ = "NO HEAP PRINTED" *)
 
+let lift_res res =
+  match res with
+  | Ok a    -> Success a
+  | Error e -> Failure e
+
+let pp_branch fmt branch =
+  let _, values = branch in
+  Fmt.pf fmt "Returns: %a@.(Ignoring heap)" (Fmt.Dump.list Expr.pp) values
+
+let lift_dr_and_log res =
+  let pp_res = Fmt.Dump.result ~ok:pp_branch ~error:pp_err in
+  Delayed.map res (fun res ->
+      Logging.tmi (fun fmt -> fmt "Resulting in: %a" pp_res res);
+      lift_res res)
+
 (* Actual action execution *)
 
 let execute_action ~action_name heap params =
   Logging.verbose (fun fmt ->
       fmt "Executing action %s with params %a" action_name pp_params params);
+  Logging.tmi (fun fmt -> fmt "Current heap : %a" pp heap);
   let open LActions in
   let a_ret =
     match ac_from_str action_name with
@@ -762,7 +771,7 @@ let execute_action ~action_name heap params =
     | AGEnv SetDef    -> execute_genvsetdef !heap params
     | AGEnv RemDef    -> execute_genvremdef !heap params
   in
-  lift_dr a_ret
+  lift_dr_and_log a_ret
 
 (* LActions static *)
 

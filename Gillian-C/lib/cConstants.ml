@@ -292,7 +292,11 @@ module Internal_Predicates = struct
 
   let is_ptr_to_0 = Prefix.internal_preds ^ "is_ptr_to_0"
 
+  let is_ptr = Prefix.internal_preds ^ "is_ptr"
+
   let is_ptr_to_0_opt = Prefix.internal_preds ^ "is_ptr_to_0_opt"
+
+  let is_ptr_opt = Prefix.internal_preds ^ "is_ptr_opt"
 
   let is_ptr_to_int_opt = Prefix.internal_preds ^ "is_ptr_to_int_opt"
 
@@ -310,6 +314,8 @@ module Internal_Predicates = struct
 
   (** Internal value getters *)
   let ptr_to_0_get = Prefix.internal_preds ^ "ptr_to_0"
+
+  let ptr_get = Prefix.internal_preds ^ "ptr"
 
   let int_get = Prefix.internal_preds ^ "int"
 

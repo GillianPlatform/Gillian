@@ -427,20 +427,20 @@ module Infix = struct
     | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x < y)
     | _ -> Less (a, b)
 
-  let ( #> ) a b =
-    match (a, b) with
-    | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x < y)
-    | _ -> Not (LessEq (a, b))
-
   let ( #<= ) a b =
     match (a, b) with
     | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x <= y)
     | _ -> LessEq (a, b)
 
+  let ( #> ) a b =
+    match (a, b) with
+    | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x > y)
+    | _ -> fnot a #<= b
+
   let ( #>= ) a b =
     match (a, b) with
     | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x >= y)
-    | _ -> Not (Less (a, b))
+    | _ -> fnot a #< b
 
   let ( #=> ) fa fb = (fnot fa) #|| fb
 end
