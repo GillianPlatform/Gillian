@@ -17,6 +17,9 @@ type mem_ac =
   | GetHole
   | SetHole
   | RemHole
+  | GetZeros
+  | SetZeros
+  | RemZeros
   | GetBounds
   | SetBounds
   | RemBounds
@@ -30,7 +33,7 @@ type ac =
   | AGEnv of genv_ac  (** Actions related to the memory *)
   | AMem  of mem_ac  (** Actions related to the global environment *)
 
-type mem_ga = Single | Array | Hole | Bounds | Freed
+type mem_ga = Single | Array | Hole | Zeros | Bounds | Freed
 
 type genv_ga = Symbol | Definition
 

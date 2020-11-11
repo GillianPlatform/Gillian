@@ -80,7 +80,14 @@ let to_gil_expr sval =
   Delayed.return ~learned:typing_pfs exp
 
 module SVArray = struct
-  type nonrec t = Conc of t list | Abst of Expr.t | AllUndef
+  type nonrec t = Conc of t list | Abst of Expr.t | AllUndef | AllZeros
+
+  let equal arr_a arr_b =
+    match (arr_a, arr_b) with
+    | Conc la, Conc lb -> List.for_all2 (fun a b -> SVal.equal a b) la lb
+    | Abst a, Abst b -> Expr.equal a b
+    | AllUndef, AllUndef | AllZeros, AllZeros -> true
+    | _ -> false
 
   let conc_to_abst_undelayed conc =
     let rev_l, gamma =
@@ -105,6 +112,7 @@ module SVArray = struct
   let rec array_sub arr o len : t Delayed.t =
     let open Delayed.Syntax in
     match arr with
+    | AllZeros -> Delayed.return AllZeros
     | AllUndef -> Delayed.return AllUndef
     | Abst e   -> Delayed.return (Abst (Expr.list_sub ~lst:e ~start:o ~size:len))
     | Conc l   -> (
@@ -122,15 +130,17 @@ module SVArray = struct
   let array_cat (arr_a : t) (arr_b : t) =
     let open Delayed.Syntax in
     match (arr_a, arr_b) with
-    | Abst a, Abst b            -> Delayed.return (Abst (Expr.list_cat a b))
-    | Conc a, Conc b            -> Delayed.return (Conc (a @ b))
-    | Abst a, Conc b            ->
+    | Abst a, Abst b -> Delayed.return (Abst (Expr.list_cat a b))
+    | Conc a, Conc b -> Delayed.return (Conc (a @ b))
+    | Abst a, Conc b ->
         let+ b = conc_to_abst b in
         Abst (Expr.list_cat a b)
-    | Conc a, Abst b            ->
+    | Conc a, Abst b ->
         let+ a = conc_to_abst a in
         Abst (Expr.list_cat a b)
-    | AllUndef, _ | _, AllUndef -> Delayed.return AllUndef
+    | AllZeros, AllZeros -> Delayed.return AllZeros
+    | AllZeros, _ | _, AllZeros | AllUndef, _ | _, AllUndef ->
+        Delayed.return AllUndef
 
   let array_cons (el : SVal.t) arr = array_cat (Conc [ el ]) arr
 
@@ -140,6 +150,7 @@ module SVArray = struct
     | Conc svl -> (Fmt.Dump.list SVal.pp) fmt svl
     | Abst e   -> Expr.pp fmt e
     | AllUndef -> Fmt.string fmt "AllUndef"
+    | AllZeros -> Fmt.string fmt "AllZeros"
 
   let undefined_pf arr_exp =
     let open Formula.Infix in
@@ -151,6 +162,30 @@ module SVArray = struct
       #&& (i_e #< (Expr.list_length arr_exp))
       #=> ((Expr.list_nth_e arr_exp i_e) #== (Lit Undefined))
 
+  let zeros_pf ~chunk arr_exp =
+    let open Formula.Infix in
+    let is_zero e =
+      let typ = Chunk.type_of chunk in
+      let typ_str =
+        match typ with
+        | Tlong   -> CConstants.VTypes.long_type
+        | Tfloat  -> CConstants.VTypes.float_type
+        | Tsingle -> CConstants.VTypes.single_type
+        | Tint    -> CConstants.VTypes.int_type
+        | _       -> failwith "invalid chunk"
+      in
+      (Expr.typeof e) #== (Expr.type_ ListType)
+      #&& ((Expr.list_nth e 0) #== (Expr.string typ_str))
+      #&& ((Expr.list_nth e 1) #== (Expr.num 0.))
+    in
+    let i = LVar.alloc () in
+    let i_e = Expr.LVar i in
+    let zero = Expr.num 0. in
+    forall [ (i, Some NumberType) ]
+      zero #<= i_e
+      #&& (i_e #< (Expr.list_length arr_exp))
+      #=> (is_zero (Expr.list_nth_e arr_exp i_e))
+
   let sval_to_gil_expr_undelayed = to_gil_expr_undelayed
 
   let rec to_gil_expr_undelayed ~chunk ~range svarr =
@@ -159,6 +194,27 @@ module SVArray = struct
       let open Expr.Infix in
       let high, low = range in
       (high -. low) /. chunk_size
+    in
+    let f_of_all_same ~describing_pf ~concrete_single =
+      match size with
+      | Lit (Num n) ->
+          let arr =
+            Conc (Utils.List_utils.make (int_of_float n) concrete_single)
+          in
+          to_gil_expr_undelayed ~chunk ~range arr
+      | _           ->
+          let open Formula.Infix in
+          let arr = LVar.alloc () in
+          let arr_e = Expr.LVar arr in
+          let learned =
+            let open Expr in
+            [
+              (typeof arr_e) #== (type_ ListType);
+              (list_length arr_e) #== size;
+              describing_pf arr_e;
+            ]
+          in
+          (arr_e, learned)
     in
     match svarr with
     | Abst e   ->
@@ -184,26 +240,11 @@ module SVArray = struct
             (List.concat typings)
         in
         (exp, learned)
-    | AllUndef -> (
-        match size with
-        | Lit (Num n) ->
-            let arr =
-              Conc (Utils.List_utils.make (int_of_float n) SVal.SUndefined)
-            in
-            to_gil_expr_undelayed ~chunk ~range arr
-        | _           ->
-            let open Formula.Infix in
-            let arr = LVar.alloc () in
-            let arr_e = Expr.LVar arr in
-            let learned =
-              let open Expr in
-              [
-                (typeof arr_e) #== (type_ ListType);
-                (list_length arr_e) #== size;
-                undefined_pf arr_e;
-              ]
-            in
-            (arr_e, learned) )
+    | AllZeros ->
+        f_of_all_same ~concrete_single:(zero_of_chunk chunk)
+          ~describing_pf:(zeros_pf ~chunk)
+    | AllUndef ->
+        f_of_all_same ~concrete_single:SUndefined ~describing_pf:undefined_pf
 
   let to_gil_expr ~chunk ~range (svarr : t) : Expr.t Delayed.t =
     let e, learned = to_gil_expr_undelayed ~chunk ~range svarr in

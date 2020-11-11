@@ -15,7 +15,7 @@ type err =
   | MissingResource
   | Unhandled              of string
   | RemovingNotOwned
-  | HoleNotUndefined
+  | WrongMemVal
   | MemoryNotFreed
 
 exception FatalErr of err
@@ -32,7 +32,7 @@ let pp_err fmt = function
   | MissingResource -> Fmt.pf fmt "MissingResource"
   | Unhandled e -> Fmt.pf fmt "Unhandled error with message : %s" e
   | RemovingNotOwned -> Fmt.pf fmt "Removing not owned"
-  | HoleNotUndefined -> Fmt.pf fmt "Hole not undefined"
+  | WrongMemVal -> Fmt.pf fmt "WrongMemVal"
   | MemoryNotFreed -> Fmt.pf fmt "MemoryNotFreed"
 
 let err_equal a b =
@@ -95,9 +95,23 @@ module Node = struct
     | Partially -> "PARTIALLY"
 
   type mem_val =
+    | Zeros
     | Undef  of qty
     | Single of { chunk : Compcert.AST.memory_chunk; value : SVal.t }
     | Array  of { chunk : Compcert.AST.memory_chunk; values : SVArr.t }
+
+  let eq_mem_val ma mb =
+    match (ma, mb) with
+    | Zeros, Zeros
+    | Undef Totally, Undef Totally
+    | Undef Partially, Undef Partially -> true
+    | ( Single { chunk = chunka; value = valuea },
+        Single { chunk = chunkb; value = valueb } )
+      when Chunk.equal chunka chunkb && SVal.equal valuea valueb -> true
+    | ( Array { chunk = chunka; values = valuesa },
+        Array { chunk = chunkb; values = valuesb } )
+      when Chunk.equal chunka chunkb && SVArr.equal valuesa valuesb -> true
+    | _ -> false
 
   type t =
     | NotOwned of qty
@@ -106,6 +120,9 @@ module Node = struct
         exact_perm : Perm.t option;
         mem_val : mem_val;
       }
+
+  let make_owned ~mem_val ~perm =
+    MemVal { mem_val; min_perm = perm; exact_perm = Some perm }
 
   let drop_perm_exn ~perm = function
     | NotOwned _            ->
@@ -127,8 +144,7 @@ module Node = struct
         MemVal { mem_val; exact_perm; min_perm }
     | _ -> t
 
-  let undefined ~perm =
-    MemVal { mem_val = Undef Totally; min_perm = perm; exact_perm = Some perm }
+  let undefined ~perm = make_owned ~perm ~mem_val:(Undef Totally)
 
   let not_owned = NotOwned Totally
 
@@ -136,6 +152,8 @@ module Node = struct
     | NotOwned qty -> Fmt.pf fmt "%s NOT OWNED" (str_qty qty)
     | MemVal { exact_perm; mem_val; _ } -> (
         match mem_val with
+        | Zeros                   -> Fmt.pf fmt "ZEROS (%a)"
+                                       (Fmt.Dump.option Perm.pp) exact_perm
         | Undef qty               ->
             Fmt.pf fmt "%s UNDEF (%a)" (str_qty qty) (Fmt.Dump.option Perm.pp)
               exact_perm
@@ -187,6 +205,7 @@ module Node = struct
     | MemVal { exact_perm; min_perm; mem_val } -> (
         let mk mem_val = MemVal { min_perm; exact_perm; mem_val } in
         match mem_val with
+        | Zeros                   -> return (mk Zeros, mk Zeros)
         | Undef Totally           -> return
                                        (mk (Undef Totally), mk (Undef Totally))
         | Single _                -> return
@@ -221,6 +240,7 @@ module Node = struct
         in
         let mk mem_val = MemVal { min_perm; mem_val; exact_perm } in
         match (vala, valb) with
+        | Zeros, Zeros -> ret (mk Zeros)
         | Undef Totally, Undef Totally -> ret (mk (Undef Totally))
         | ( Single { chunk = chunk_l; value = value_l },
             Single { chunk = chunk_r; value = value_r } )
@@ -244,6 +264,8 @@ module Node = struct
   let decode ~chunk t =
     match t with
     | NotOwned _ -> Error MissingResource
+    | MemVal { mem_val = Zeros; exact_perm; _ } ->
+        Ok (SVal.zero_of_chunk chunk, exact_perm)
     | MemVal { mem_val = Undef _; exact_perm; _ } ->
         Ok (SVal.SUndefined, exact_perm)
     | MemVal { mem_val = Single { chunk = m_chunk; value }; exact_perm; _ } ->
@@ -257,6 +279,8 @@ module Node = struct
   let decode_arr ~chunk t =
     match t with
     | NotOwned _ -> Error MissingResource
+    | MemVal { mem_val = Zeros; exact_perm; _ } ->
+        Ok (SVArr.AllZeros, exact_perm)
     | MemVal { mem_val = Undef _; exact_perm; _ } ->
         Ok (SVArr.AllUndef, exact_perm)
     | MemVal { mem_val = Single { chunk = m_chunk; value }; exact_perm; _ } ->
@@ -665,6 +689,8 @@ module Tree = struct
         assertions ~loc left @ assertions ~loc right
     | MemVal { mem_val = Undef Totally; exact_perm = perm; _ } ->
         [ Constr.hole ~loc ~low ~high ~perm ]
+    | MemVal { mem_val = Zeros; exact_perm = perm; _ } ->
+        [ Constr.zeros ~loc ~low ~high ~perm ]
     | MemVal { mem_val = Single { chunk; value }; exact_perm = perm; _ } ->
         let sval, types = NSVal.to_gil_expr value in
         let types =
@@ -682,6 +708,7 @@ module Tree = struct
         in
         match values with
         | AllUndef -> [ Constr.hole ~loc ~low ~high ~perm ]
+        | AllZeros -> [ Constr.zeros ~loc ~low ~high ~perm ]
         | array    ->
             let e, learned =
               SVArr.to_gil_expr_undelayed ~range:span array ~chunk
@@ -919,7 +946,7 @@ let rem_array t low size chunk =
   in
   DR.of_result ~learned (with_root_opt t root_set)
 
-let get_hole t low high =
+let get_simple_mem_val ~expected_mem_val t low high =
   let open DR.Syntax in
   let range = (low, high) in
   let** span = DR.of_result (get_bounds t) in
@@ -931,9 +958,10 @@ let get_hole t low high =
         let** node, root_framed = Tree.get_node root range in
         let res =
           match node with
-          | MemVal { mem_val = Undef Totally; exact_perm = perm; _ } -> Ok perm
+          | MemVal { mem_val; exact_perm = perm; _ }
+            when Node.eq_mem_val mem_val expected_mem_val -> Ok perm
           | NotOwned _ -> Error MissingResource
-          | _ -> Error HoleNotUndefined
+          | _ -> Error WrongMemVal
         in
         let++ wroot =
           DR.of_result
@@ -943,12 +971,12 @@ let get_hole t low high =
         wroot
   else DR.error BufferOverrun
 
-let set_hole t low high perm =
+let set_simple_mem_val ~mem_val t low high perm =
   let open DR.Syntax in
   let range = (low, high) in
   let** root = DR.of_result (get_root t) in
   let root = Option.value ~default:(Tree.create_root range) root in
-  let** root_set = Tree.set_node root range (Node.undefined ~perm) in
+  let** root_set = Tree.set_node root range (Node.make_owned ~perm ~mem_val) in
   let** bounds = DR.of_result (get_bounds t) in
   let learned =
     match bounds with
@@ -957,7 +985,7 @@ let set_hole t low high perm =
   in
   DR.of_result ~learned (with_root t root_set)
 
-let rem_hole t low high =
+let rem_simple_mem_val t low high =
   let open DR.Syntax in
   let range = (low, high) in
   let** root = DR.of_result (get_root t) in
@@ -975,6 +1003,18 @@ let rem_hole t low high =
     | Some bounds -> [ Range.is_inside range bounds ]
   in
   DR.of_result ~learned (with_root_opt t root_set)
+
+let get_hole = get_simple_mem_val ~expected_mem_val:(Undef Totally)
+
+let set_hole = set_simple_mem_val ~mem_val:(Undef Totally)
+
+let rem_hole = rem_simple_mem_val
+
+let get_zeros = get_simple_mem_val ~expected_mem_val:Zeros
+
+let set_zeros = set_simple_mem_val ~mem_val:Zeros
+
+let rem_zeros = rem_simple_mem_val
 
 let get_freed t =
   match t with

@@ -17,6 +17,9 @@ type mem_ac =
   | GetHole
   | SetHole
   | RemHole
+  | GetZeros
+  | SetZeros
+  | RemZeros
   | GetBounds
   | SetBounds
   | RemBounds
@@ -28,7 +31,7 @@ type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
 
 type ac = AGEnv of genv_ac | AMem of mem_ac
 
-type mem_ga = Single | Array | Hole | Bounds | Freed
+type mem_ga = Single | Array | Hole | Zeros | Bounds | Freed
 
 type genv_ga = Symbol | Definition
 
@@ -44,6 +47,7 @@ let mem_ga_to_setter = function
   | Single -> SetSingle
   | Array  -> SetArray
   | Hole   -> SetHole
+  | Zeros  -> SetZeros
   | Bounds -> SetBounds
   | Freed  -> SetFreed
 
@@ -51,6 +55,7 @@ let mem_ga_to_getter = function
   | Single -> GetSingle
   | Array  -> GetArray
   | Hole   -> GetHole
+  | Zeros  -> GetZeros
   | Bounds -> GetBounds
   | Freed  -> GetFreed
 
@@ -58,6 +63,7 @@ let mem_ga_to_deleter = function
   | Single -> RemSingle
   | Array  -> RemArray
   | Hole   -> RemHole
+  | Zeros  -> RemZeros
   | Bounds -> RemBounds
   | Freed  -> RemFreed
 
@@ -109,6 +115,9 @@ let str_mem_ac = function
   | GetHole    -> "getHole"
   | SetHole    -> "setHole"
   | RemHole    -> "remHole"
+  | GetZeros   -> "getZeros"
+  | SetZeros   -> "setZeros"
+  | RemZeros   -> "remZeros"
   | GetFreed   -> "getFreed"
   | SetFreed   -> "setFreed"
   | RemFreed   -> "remFreed"
@@ -133,6 +142,9 @@ let mem_ac_from_str = function
   | "getHole"    -> GetHole
   | "setHole"    -> SetHole
   | "remHole"    -> RemHole
+  | "getZeros"   -> GetZeros
+  | "setZeros"   -> SetZeros
+  | "remZeros"   -> RemZeros
   | "getFreed"   -> GetFreed
   | "setFreed"   -> SetFreed
   | "remFreed"   -> RemFreed
@@ -174,6 +186,7 @@ let str_mem_ga = function
   | Single -> "single"
   | Array  -> "array"
   | Hole   -> "hole"
+  | Zeros  -> "zeros"
   | Bounds -> "bounds"
   | Freed  -> "freed"
 
@@ -185,6 +198,7 @@ let mem_ga_from_str = function
   | "single" -> Single
   | "array"  -> Array
   | "bounds" -> Bounds
+  | "zeros"  -> Zeros
   | "hole"   -> Hole
   | "freed"  -> Freed
   | str      -> failwith ("Unkown memory assertion : " ^ str)
@@ -222,6 +236,7 @@ let ga_loc_indexes ga =
   | GMem Single      -> [ 0 ]
   | GMem Array       -> [ 0 ]
   | GMem Hole        -> [ 0 ]
+  | GMem Zeros       -> [ 0 ]
   | GMem Bounds      -> [ 0 ]
   | GMem Freed       -> [ 0 ]
   | GGenv Definition -> [ 0 ]

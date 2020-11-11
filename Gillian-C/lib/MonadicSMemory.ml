@@ -196,36 +196,42 @@ module Mem = struct
         in
         SMap.remove loc_name mem
 
-  let get_hole mem loc low high =
+  let get_simple ~sheap_getter mem loc low high =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
     let** tree = get_tree_res mem loc_name in
-    let++ new_tree, perm =
-      map_lift_err loc_name (SHeapTree.get_hole tree low high)
-    in
+    let++ new_tree, perm = map_lift_err loc_name (sheap_getter tree low high) in
     (SMap.add loc_name new_tree mem, loc_name, perm)
 
-  let set_hole mem loc low high perm =
+  let set_simple ~sheap_setter mem loc low high perm =
     let open DR.Syntax in
     let* loc_name = resolve_or_create_loc_name loc in
     let* tree = get_or_create_tree mem loc_name in
-    let++ new_tree =
-      map_lift_err loc_name (SHeapTree.set_hole tree low high perm)
-    in
+    let++ new_tree = map_lift_err loc_name (sheap_setter tree low high perm) in
     SMap.add loc_name new_tree mem
 
-  let rem_hole mem loc low high =
+  let rem_simple ~sheap_remover mem loc low high =
     let open DR.Syntax in
     let* loc_name = Delayed.resolve_loc loc in
     match Option.bind loc_name (fun l -> SMap.find_opt l mem) with
     | None      -> DR.ok mem
     | Some tree ->
         let loc_name = Option.get loc_name in
-        let++ new_tree =
-          map_lift_err loc_name (SHeapTree.rem_hole tree low high)
-        in
+        let++ new_tree = map_lift_err loc_name (sheap_remover tree low high) in
         if SHeapTree.is_empty new_tree then SMap.remove loc_name mem
         else SMap.add loc_name new_tree mem
+
+  let get_hole = get_simple ~sheap_getter:SHeapTree.get_hole
+
+  let set_hole = set_simple ~sheap_setter:SHeapTree.set_hole
+
+  let rem_hole = rem_simple ~sheap_remover:SHeapTree.rem_hole
+
+  let get_zeros = get_simple ~sheap_getter:SHeapTree.get_zeros
+
+  let set_zeros = set_simple ~sheap_setter:SHeapTree.set_zeros
+
+  let rem_zeros = rem_simple ~sheap_remover:SHeapTree.rem_zeros
 
   let get_bounds mem loc =
     let open DR.Syntax in
@@ -537,11 +543,11 @@ let execute_rem_array heap params =
       make_branch ~heap:{ heap with mem } ~rets:[] ()
   | _ -> fail_ungracefully "rem_single" params
 
-let execute_get_hole heap params =
+let execute_get_simple ~mem_getter ~name heap params =
   let open DR.Syntax in
   match params with
   | [ loc; low; high ] ->
-      let** mem, loc_name, perm = Mem.get_hole heap.mem loc low high in
+      let** mem, loc_name, perm = mem_getter heap.mem loc low high in
       let loc_e = expr_of_loc_name loc_name in
       let perm_e =
         Expr.string (ValueTranslation.string_of_permission_opt perm)
@@ -550,24 +556,42 @@ let execute_get_hole heap params =
         (make_branch ~heap:{ heap with mem }
            ~rets:[ loc_e; low; high; perm_e ]
            ())
-  | _                  -> fail_ungracefully "get_hole" params
+  | _                  -> fail_ungracefully name params
 
-let execute_set_hole heap params =
+let execute_set_simple ~mem_setter ~name heap params =
   let open DR.Syntax in
   match params with
   | [ loc; low; high; Expr.Lit (String perm_string) ] ->
       let perm = ValueTranslation.permission_of_string perm_string in
-      let++ mem = Mem.set_hole heap.mem loc low high perm in
+      let++ mem = mem_setter heap.mem loc low high perm in
       make_branch ~heap:{ heap with mem } ~rets:[] ()
-  | _ -> fail_ungracefully "set_hole" params
+  | _ -> fail_ungracefully name params
 
-let execute_rem_hole heap params =
+let execute_rem_simple ~mem_remover ~name heap params =
   let open DR.Syntax in
   match params with
   | [ loc; low; high ] ->
-      let++ mem = Mem.rem_hole heap.mem loc low high in
+      let++ mem = mem_remover heap.mem loc low high in
       make_branch ~heap:{ heap with mem } ~rets:[] ()
-  | _                  -> fail_ungracefully "rem_hole" params
+  | _                  -> fail_ungracefully name params
+
+let execute_get_hole =
+  execute_get_simple ~mem_getter:Mem.get_hole ~name:"get_hole"
+
+let execute_set_hole =
+  execute_set_simple ~mem_setter:Mem.set_hole ~name:"set_hole"
+
+let execute_rem_hole =
+  execute_rem_simple ~mem_remover:Mem.rem_hole ~name:"rem_hole"
+
+let execute_get_zeros =
+  execute_get_simple ~mem_getter:Mem.get_zeros ~name:"get_zeros"
+
+let execute_set_zeros =
+  execute_set_simple ~mem_setter:Mem.set_zeros ~name:"set_zeros"
+
+let execute_rem_zeros =
+  execute_rem_simple ~mem_remover:Mem.rem_zeros ~name:"rem_zeros"
 
 let execute_get_freed heap params =
   let open DR.Syntax in
@@ -761,6 +785,9 @@ let execute_action ~action_name heap params =
     | AMem GetHole    -> execute_get_hole !heap params
     | AMem SetHole    -> execute_set_hole !heap params
     | AMem RemHole    -> execute_rem_hole !heap params
+    | AMem GetZeros   -> execute_get_zeros !heap params
+    | AMem SetZeros   -> execute_set_zeros !heap params
+    | AMem RemZeros   -> execute_rem_zeros !heap params
     | AMem GetFreed   -> execute_get_freed !heap params
     | AMem SetFreed   -> execute_set_freed !heap params
     | AMem RemFreed   -> execute_rem_freed !heap params

@@ -10,7 +10,7 @@ type err =
   | MissingResource
   | Unhandled              of string
   | RemovingNotOwned
-  | HoleNotUndefined
+  | WrongMemVal
   | MemoryNotFreed
 
 val pp_err : err Fmt.t
@@ -75,6 +75,12 @@ val get_hole : t -> Expr.t -> Expr.t -> (t * Perm.t option) d_or_error
 val set_hole : t -> Expr.t -> Expr.t -> Perm.t -> t d_or_error
 
 val rem_hole : t -> Expr.t -> Expr.t -> t d_or_error
+
+val get_zeros : t -> Expr.t -> Expr.t -> (t * Perm.t option) d_or_error
+
+val set_zeros : t -> Expr.t -> Expr.t -> Perm.t -> t d_or_error
+
+val rem_zeros : t -> Expr.t -> Expr.t -> t d_or_error
 
 val get_freed : t -> unit or_error
 

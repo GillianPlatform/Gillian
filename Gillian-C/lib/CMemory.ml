@@ -188,6 +188,9 @@ let execute_action name heap params =
       | GetHole
       | SetHole
       | RemHole
+      | GetZeros
+      | SetZeros
+      | RemZeros
       | GetFreed
       | SetFreed
       | RemFreed )

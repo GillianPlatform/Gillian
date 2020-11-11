@@ -24,6 +24,10 @@ let hole ~loc ~low ~high ~perm =
   in
   pred (GMem Hole) [ loc; low; high ] [ perm ]
 
+let zeros ~loc ~low ~high ~perm =
+  let perm = Expr.string (ValueTranslation.string_of_permission_opt perm) in
+  pred (GMem Zeros) [ loc; low; high ] [ perm ]
+
 let bounds ~loc ~low ~high =
   let bounds = Expr.EList [ low; high ] in
   pred (GMem Bounds) [ loc ] [ bounds ]
