@@ -7,9 +7,10 @@
     "stdio.h": "c",
     "slist.h": "c",
     "algorithm": "c"
-},
-"ocaml.sandbox": {
+  },
+  "python.pythonPath": "/usr/bin/python3",
+  "ocaml.sandbox": {
     "kind": "esy",
-    "root": "/Users/PetarMax/Projects/Gillian"
-}
+    "root": "${workspaceFolder:Gillian}"
+  }
 }
