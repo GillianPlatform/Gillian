@@ -47,7 +47,10 @@
       "sh -c \"esy js:init:env && esy c:init:env && esy wisl:init:env\"",
     "test": "dune test -j 4",
     "install-githooks": "./githooks/install.ml",
-    "clean-githooks": "./githooks/clean.ml"
+    "clean-githooks": "./githooks/clean.ml",
+    "clean": "dune clean",
+    "check-exceptions": "reanalyze.exe -exception-cmt .",
+    "dce": "reanalyze.exe -dce-cmt ."
   },
   "dependencies": {
     "@opam/alcotest": "1.0.1",
