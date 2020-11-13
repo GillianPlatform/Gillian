@@ -7,6 +7,7 @@ open CompileState
 module Str_set = Gillian.Utils.Containers.SS
 open Asrt.Infix
 open Formula.Infix
+module CoreP = Constr.Core
 
 let id_of_string = Camlcoq.intern_string
 
@@ -24,6 +25,10 @@ let rec_pred_name_of_struct struct_name =
 
 let opt_rec_pred_name_of_struct struct_name =
   Prefix.generated_preds ^ "opt_rec_struct_" ^ struct_name
+
+let fresh_lvar ?(fname = "") () =
+  let pre = "#i_lvar_" in
+  Generators.gen_str pre fname
 
 let ( ++ ) = Expr.Infix.( +. )
 
@@ -117,7 +122,7 @@ let assert_of_member cenv members id typ =
     | _              -> failwith "Invalid access mode for some type"
   in
   let ga_asrt =
-    Constr.single ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~sval:e_to_use
+    CoreP.single ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~sval:e_to_use
       ~perm:(Some Freeable)
   in
   getter_or_type_pred ** ga_asrt
@@ -126,7 +131,7 @@ let assert_of_hole (low, high) =
   let pvloc = Expr.PVar loc_param_name in
   let pvoffs = Expr.PVar ofs_param_name in
   let num k = Expr.Lit (Num (float_of_int k)) in
-  Constr.hole ~loc:pvloc
+  CoreP.hole ~loc:pvloc
     ~low:(pvoffs ++ num low)
     ~high:(pvoffs ++ num high)
     ~perm:(Some Freeable)
@@ -209,7 +214,10 @@ let trans_binop b =
   match b with
   | CBinOp.LstCons -> failwith "LstCons shouldn't be compiled that way"
   | LstCat         -> failwith "LstCat shouldn't be compiled that way"
+  | PtrPlus        -> failwith "PtrPlus shouldn't be compiled that way"
   | Plus           -> BinOp.FPlus
+  | Times          -> BinOp.FTimes
+  | Minus          -> BinOp.FMinus
   | Equal          -> Equal
   | SetSub         -> BSetSub
   | SetDiff        -> SetDiff
@@ -255,7 +263,7 @@ let trans_sval (sv : CSVal.t) : Asrt.t * Expr.t =
       let eg1, eg2 = (tse se1, tse se2) in
       (tloc eg1 ** tnum eg2, Expr.EList [ tse se1; tse se2 ])
   | Sfunptr symb    ->
-      let lvar = Gillian.Utils.Generators.fresh_lvar () in
+      let lvar = fresh_lvar () in
       let pred =
         Asrt.Pred
           ( CConstants.Internal_Predicates.fun_ptr,
@@ -283,6 +291,11 @@ let rec trans_expr (e : CExpr.t) : Asrt.t * Expr.t =
       let a1, eg1 = trans_expr e1 in
       let a2, eg2 = trans_expr e2 in
       (a1 ** a2, NOp (LstCat, [ EList [ eg1 ]; eg2 ]))
+  | BinOp (e1, PtrPlus, e2) ->
+      let a1, ptr = trans_expr e1 in
+      let a2, to_add = trans_expr e2 in
+      let res = Expr.LVar (fresh_lvar ()) in
+      (a1 ** a2 ** Constr.Others.ptr_add ~ptr ~to_add ~res, res)
   | BinOp (e1, b, e2)       ->
       let a1, eg1 = trans_expr e1 in
       let a2, eg2 = trans_expr e2 in
@@ -329,25 +342,12 @@ let rec trans_form (f : CFormula.t) : Asrt.t * Formula.t =
       (a, ForAll (lvts, fp))
 
 let malloc_chunk_asrt loc beg_ofs struct_sz =
-  let open Formula.Infix in
-  let num k = Expr.num (float_of_int k) in
-  let mk_val i =
-    if Archi.ptr64 then
-      Expr.EList [ Lit (String CConstants.VTypes.long_type); num i ]
-    else Expr.EList [ Lit (String CConstants.VTypes.int_type); num i ]
-  in
-  let chunk = if Archi.ptr64 then Chunk.Mint64 else Chunk.Mint32 in
-  let sz = Chunk.size chunk in
-  let min_ofs = beg_ofs ++ num (-sz) in
-  Constr.single ~loc ~ofs:min_ofs ~chunk ~sval:(mk_val struct_sz)
-    ~perm:(Some Freeable)
-  ** Constr.bounds ~loc ~low:min_ofs ~high:(num struct_sz)
-  ** Asrt.Pure beg_ofs #== (num 0)
+  Constr.Others.malloced ~ptr:(loc, beg_ofs) ~total_size:struct_sz
 
 let trans_constr ?fname:_ ~malloc ann s c =
   let cenv = ann.cenv in
-  let gen_loc_var () = Expr.LVar (Gillian.Utils.Generators.fresh_lvar ()) in
-  let gen_ofs_var () = Expr.LVar (Gillian.Utils.Generators.fresh_lvar ()) in
+  let gen_loc_var () = Expr.LVar (fresh_lvar ()) in
+  let gen_ofs_var () = Expr.LVar (fresh_lvar ()) in
   let open CConstants.VTypes in
   let cse = trans_simpl_expr in
   let tnum = types NumberType in
@@ -379,7 +379,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
       let siz = sz (Sint se) in
       (* FIXME: at some point this will not be 0 anymore *)
       let ga =
-        Constr.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
+        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Sfloat se)) ->
@@ -388,7 +388,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
       let siz = sz (Sfloat se) in
       let sv = mk float_type e in
       let ga =
-        Constr.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
+        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Ssingle se)) ->
@@ -398,7 +398,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
       let siz = sz (Ssingle se) in
       let sv = mk single_type e in
       let ga =
-        Constr.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
+        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Slong se)) ->
@@ -407,7 +407,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
       let siz = sz (Slong se) in
       let sv = mk long_type e in
       let ga =
-        Constr.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
+        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
   | CConstructor.ConsExpr (SVal (Sptr (sl, so))) ->
@@ -417,7 +417,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
       let siz = sz (Sptr (sl, so)) in
       let sv = mk_ptr l o in
       let ga =
-        Constr.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
+        CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tloc l ** tnum o ** malloc_chunk siz
   | CConstructor.ConsExpr _ ->
@@ -442,14 +442,27 @@ let trans_constr ?fname:_ ~malloc ann s c =
 let rec trans_asrt ?(fname = "main") ?(ann = empty) asrt =
   match asrt with
   | CAssert.Star (a1, a2) -> trans_asrt ~ann a1 ** trans_asrt ~ann a2
-  | Pure f                ->
+  | Array { ptr; chunk; size; content } ->
+      let a1, ptr = trans_expr ptr in
+      let a2, size = trans_expr size in
+      let a3, content = trans_expr content in
+      a1 ** a2 ** a3 ** Constr.Others.array_ptr ~ptr ~chunk ~size ~content
+  | Malloced (e1, e2) ->
+      let a1, ce1 = trans_expr e1 in
+      let a2, ce2 = trans_expr e2 in
+      a1 ** a2 ** Constr.Others.malloced_abst ~ptr:ce1 ~total_size:ce2
+  | Zeros (e1, e2) ->
+      let a1, ce1 = trans_expr e1 in
+      let a2, ce2 = trans_expr e2 in
+      a1 ** a2 ** Constr.Others.zeros_ptr_size ~ptr:ce1 ~size:ce2
+  | Pure f ->
       let ma, fp = trans_form f in
       ma ** Pure fp
-  | Pred (p, cel)         ->
+  | Pred (p, cel) ->
       let ap, gel = List.split (List.map trans_expr cel) in
       fold_star ap ** Pred (p, gel)
-  | Emp                   -> Emp
-  | PointsTo (s, c)       -> trans_constr ~fname ~malloc:false ann s c
+  | Emp -> Emp
+  | PointsTo (s, c) -> trans_constr ~fname ~malloc:false ann s c
   | MallocPointsTo (s, c) -> trans_constr ~fname ~malloc:true ann s c
 
 let rec trans_lcmd ?(fname = "main") ?(ann = empty) lcmd =

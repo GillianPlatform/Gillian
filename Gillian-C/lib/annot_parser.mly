@@ -61,6 +61,9 @@
 %token CTRUE
 %token CFALSE
 %token FORALL
+%token MALLOCED
+%token ARRAY
+%token ZEROS
 
 (* BinOps *)
 %token MALLOCPOINTSTO
@@ -71,6 +74,8 @@
 %token LLT
 %token LLEQ
 %token PLUS
+%token MINUS
+%token PTRPLUS
 %token LSTCONS
 %token LSTCAT
 %token ENOT
@@ -215,7 +220,12 @@ pred_params_ins:
     { let isin = Option.is_some inp in
       ((x, typ), isin) }
 
-
+typ:
+  | INTT  { Chunk.Mint32 }
+  | LONGT { Chunk.Mint64 }
+  | FLOATT { Chunk.Mfloat64 }
+  | SINGLET { Chunk.Mfloat32 }
+  | PTRT { Chunk.ptr }
 
 assertion:
   | LBRACE; la = assertion; RBRACE { la }
@@ -228,6 +238,12 @@ assertion:
     CAssert.MallocPointsTo ( e, cs )
   }
   | f = formula { CAssert.Pure f }
+  | ZEROS; LBRACE; ptr = expression; COMMA; size = expression; RBRACE
+    { CAssert.Zeros(ptr, size) }
+  | ARRAY; LBRACE; ptr = expression; COMMA; chunk = typ; COMMA;  size = expression; COMMA; content = expression; RBRACE
+    { CAssert.Array { ptr; chunk; size; content} }
+  | MALLOCED; LBRACE; ptr = expression; COMMA; ofs = expression; RBRACE
+    { CAssert.Malloced(ptr, ofs) }
   | pname = IDENTIFIER; LBRACE; el = separated_list(COMMA, expression); RBRACE
     { CAssert.Pred (pname, el) }
 
@@ -318,6 +334,9 @@ binop:
   | LSTCONS { CBinOp.LstCons }
   | LSTCAT  { CBinOp.LstCat }
   | PLUS    { CBinOp.Plus }
+  | MINUS   { CBinOp.Minus }
+  | PTRPLUS { CBinOp.PtrPlus }
+  | STAR    { CBinOp.Times }
   | EQ      { CBinOp.Equal }
   | SETSUB  { CBinOp.SetSub }
   | SETDIFF { CBinOp.SetDiff }
@@ -395,4 +414,9 @@ any_C_token:
   | RBRACK
   | RDBRACK
   | LDBRACK
+  | MALLOCED
+  | ARRAY
+  | ZEROS
+  | PTRPLUS
+  | MINUS
   { () }

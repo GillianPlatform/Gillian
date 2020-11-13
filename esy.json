@@ -4,8 +4,7 @@
   "private": true,
   "description": "Gillian Core and maintained instantiations",
   "author": {
-    "name":
-      "Verified Trustworthy Software Specification Group at Imperial College",
+    "name": "Verified Trustworthy Software Specification Group at Imperial College",
     "url": "https://vtss.doc.ic.ac.uk"
   },
   "homepage": "GillianDev.github.io",
@@ -13,12 +12,22 @@
   "esy": {
     "build": "dune build @install --promote-install-files",
     "install": [
-      "esy-installer gillian.install", "esy-installer gillian-js.install",
-      "esy-installer gillian-c.install", "esy-installer wisl.install"
+      "esy-installer gillian.install",
+      "esy-installer gillian-js.install",
+      "esy-installer gillian-c.install",
+      "esy-installer wisl.install"
     ],
     "release": {
-      "bin": [ "gillian-js", "gillian-c", "wisl" ],
-      "includePackages": [ "root", "@opam/z3", "compcert" ]
+      "bin": [
+        "gillian-js",
+        "gillian-c",
+        "wisl"
+      ],
+      "includePackages": [
+        "root",
+        "@opam/z3",
+        "compcert"
+      ]
     },
     "buildsInSource": "_build",
     "exportedEnv": {
@@ -26,7 +35,10 @@
         "scope": "global",
         "val": "#{self.share}/gillian-js"
       },
-      "WISL_RUNTIME_PATH": { "val": "#{self.share}/wisl", "scope": "global" },
+      "WISL_RUNTIME_PATH": {
+        "val": "#{self.share}/wisl",
+        "scope": "global"
+      },
       "GILLIAN_C_RUNTIME_PATH": {
         "scope": "global",
         "val": "#{self.share}/gillian-c"
@@ -43,14 +55,14 @@
     "js:init:env": "Gillian-JS/scripts/setup_environment.sh",
     "c:init:env": "Gillian-C/scripts/setup_environment.sh",
     "wisl:init:env": "wisl/scripts/setup_environment.sh",
-    "init:env":
-      "sh -c \"esy js:init:env && esy c:init:env && esy wisl:init:env\"",
+    "init:env": "sh -c \"esy js:init:env && esy c:init:env && esy wisl:init:env\"",
     "test": "dune test -j 4",
     "install-githooks": "./githooks/install.ml",
     "clean-githooks": "./githooks/clean.ml",
     "clean": "dune clean",
     "check-exceptions": "reanalyze.exe -exception-cmt .",
-    "dce": "reanalyze.exe -dce-cmt ."
+    "dce": "reanalyze.exe -dce-cmt .",
+    "watch": "dune build @install --promote-install-files --watch"
   },
   "dependencies": {
     "@opam/alcotest": "1.0.1",

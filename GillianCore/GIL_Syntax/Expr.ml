@@ -14,6 +14,8 @@ type t = TypeDef__.expr =
   | EList  of t list  (** Lists of expressions    *)
   | ESet   of t list  (** Sets of expressions     *)
 
+let equal (e1 : t) (e2 : t) : bool = Stdlib.compare e1 e2 = 0
+
 (** {3 builders} *)
 
 let lit x = Lit x
@@ -117,10 +119,12 @@ module Infix = struct
 
   let ( -. ) a b =
     match (a, b) with
-    | x, Lit (Num 0.)          -> x
-    | Lit (Num 0.), x          -> UnOp (FUnaryMinus, x)
+    | x, Lit (Num 0.) -> x
+    | Lit (Num 0.), x -> UnOp (FUnaryMinus, x)
     | Lit (Num x), Lit (Num y) -> Lit (Num (x -. y))
-    | _                        -> BinOp (a, FMinus, b)
+    | BinOp (x, FPlus, y), z when equal y z -> x
+    | BinOp (x, FPlus, y), z when equal x z -> y
+    | _ -> BinOp (a, FMinus, b)
 
   let ( *. ) a b =
     match (a, b) with
@@ -172,8 +176,6 @@ end
 
 module Set = Set.Make (MyExpr)
 module Map = Map.Make (MyExpr)
-
-let equal (e1 : t) (e2 : t) : bool = Stdlib.compare e1 e2 = 0
 
 (** Map over expressions *)
 let rec map (f_before : t -> t * bool) (f_after : (t -> t) option) (expr : t) :

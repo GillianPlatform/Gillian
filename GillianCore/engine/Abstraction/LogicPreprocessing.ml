@@ -30,17 +30,19 @@ let rec auto_unfold
              logical expressions in the argument list *)
           let params, _ = List.split pred.pred_params in
           let subst = SVal.SSubst.init (List.combine params args) in
-
+          Logging.tmi (fun fmt ->
+              fmt "PREDICATE %s has %d definitions" pred.pred_name
+                (List.length pred.pred_definitions));
           let new_asrts =
             List.map
               (fun (_, a) ->
-                (* L.verbose (fun fmt -> fmt "Before: %a" Asrt.pp a); *)
+                L.tmi (fun fmt -> fmt "Before Auto Unfolding: %a" Asrt.pp a);
                 let facts =
                   List.map (fun fact -> Asrt.Pure fact) pred.pred_facts
                 in
                 let a = Asrt.star (a :: facts) in
                 let result = SVal.SSubst.substitute_asrt subst false a in
-                (* L.verbose (fun fmt -> fmt "After: %a" Asrt.pp result); *)
+                L.tmi (fun fmt -> fmt "After Auto Unfolding: %a" Asrt.pp result);
                 result)
               pred.pred_definitions
           in
@@ -192,8 +194,12 @@ let unfold_preds (preds : (string, Pred.t) Hashtbl.t) :
                List.map (fun a -> (os, a)) (auto_unfold preds recursion_info a))
              pred.pred_definitions)
       in
+      L.verbose (fun fmt ->
+          fmt "Definitions' has a length of %d" (List.length definitions'));
       let ret_pred = { pred with pred_definitions = definitions' } in
+      L.verbose (fun fmt -> fmt "Pruning.");
       let ret_pred = simplify_and_prune ret_pred in
+      L.verbose (fun fmt -> fmt "Done pruning.");
       Hashtbl.replace copy_preds ret_pred.pred_name ret_pred)
     preds;
   (copy_preds, recursion_info)
@@ -210,6 +216,9 @@ let unfold_spec
       List.concat (List.map (auto_unfold preds rec_info) sspec.ss_posts)
     in
     L.verbose (fun fmt -> fmt "Post admissibility: %s" spec_name);
+    L.tmi (fun fmt ->
+        fmt "@[<hov 2>Testing admissibility for assertions:@.%a@]"
+          (Fmt.list Asrt.pp) posts);
     let posts = List.filter Simplifications.admissible_assertion posts in
     if posts = [] then
       Fmt.failwith

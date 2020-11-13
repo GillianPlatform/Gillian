@@ -42,12 +42,30 @@ pred i__ptr_to_0 (+e : List, l : Obj):
 pred i__ptr (+e: List, l: Obj, o: Num):
   (e == {{ l, o }});
 
+(* arrays *)
+
+pred i__zeros_ptr_size(+ptr: List, +size: Num):
+  i__ptr(ptr, #l, #o) *
+  <mem_zeros>(#l, #o, #o + size; "Freeable");
+
+pred i__array_ptr(+ptr: List, +size: Num, +chk: Str, content: List):
+  i__ptr(ptr, #l, #o) *
+  <mem_array>(#l, #o, size, chk; content, "Freeable");
+
+(* Pointer arithmetic *)
+
+pred i__ptr_add(+ptr: List, +to_add:Num, res: List):
+  i__ptr(ptr, #l, #o) *
+  (res == {{ #l, #o + to_add }});
+
 (* Global environment *)
 
 pred i__function_ptr(+s: Str, p : List):
-  i__ptr_to_0(p, #l) * <genv_symb>(s; #l) * <genv_def>(#l; {{ "function" , _ }});
-
+  i__ptr_to_0(p, #l) * <genv_symb>(s; #l) *
+  <genv_def>(#l; {{ "function" , _ }});
+  
 pred i__glob_fun(+symb, +fname):
   <genv_symb>(symb; #l) *
   <genv_def>(#l; {{ "function", fname }}) *
   <mem_hole>(#l, 0, 1; "Nonempty");
+  

@@ -16,7 +16,7 @@ let outs_pp = Fmt.(list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp)))
     learned outs *)
 type step = Asrt.t * outs
 
-let step_pp = Fmt.(parens (pair ~sep:comma Asrt.pp outs_pp))
+let step_pp = Fmt.Dump.pair Asrt.pp outs_pp
 
 (** The [pt] type represents a pre-unification plan,
     consisting of a list of unification plan steps *)

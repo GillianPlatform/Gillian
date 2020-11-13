@@ -509,6 +509,7 @@ let execute_get_array heap params =
              [
                loc_e;
                ofs;
+               size;
                Expr.Lit (String chunk_string);
                array_e;
                Expr.Lit (String perm_string);

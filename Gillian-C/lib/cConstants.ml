@@ -331,6 +331,18 @@ module Internal_Predicates = struct
   let glob_fun = Prefix.internal_preds ^ "glob_fun"
 
   let fun_ptr = Prefix.internal_preds ^ "function_ptr"
+
+  (* Arrays *)
+
+  let malloced = Prefix.internal_preds ^ "malloced"
+
+  let zeros_ptr_size = Prefix.internal_preds ^ "zeros_ptr_size"
+
+  let array_ptr = Prefix.internal_preds ^ "array_ptr"
+
+  (* Pointer arithmetic *)
+
+  let ptr_add = Prefix.internal_preds ^ "ptr_add"
 end
 
 module Symbolic_Constr = struct

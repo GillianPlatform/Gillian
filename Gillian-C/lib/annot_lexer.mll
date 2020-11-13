@@ -41,6 +41,9 @@ rule read =
   | "if"       { IF }
   | "else"     { ELSE }
   | "OR"       { BIGOR }
+  | "ZEROS"    { ZEROS }
+  | "MALLOCED" { MALLOCED }
+  | "ARRAY"    { ARRAY }
   | "pred"     { PREDICATE }
   | "spec"     { SPECIFICATION }
   | "requires" { REQUIRES }
@@ -91,6 +94,8 @@ rule read =
   | "--e--"    { SETMEM }
   | "=>"       { IMPLIES }
   | '+'        { PLUS }
+  | '-'        { MINUS }
+  | "p+"       { PTRPLUS }
   | '*'        { STAR }
   | "::"       { LSTCONS }
   | "@"        { LSTCAT }

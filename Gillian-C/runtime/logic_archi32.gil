@@ -28,3 +28,7 @@ pred i__is_ptr_to_single_opt (+e: List):
   i__ptr_to_0(e, #l) *
   <mem_single>(#l, 0, "float64"; {{ "single", #i }}, "Freeable");
   
+  pred i__malloced(+p: List, +bytes: Num):
+  i__is_ptr_to_0(p) *
+  <mem_single>(#l, -4., "int32"; {{ "int", bytes }}, "Freeable") *
+  <mem_bounds>(#l; {{-4., bytes}});

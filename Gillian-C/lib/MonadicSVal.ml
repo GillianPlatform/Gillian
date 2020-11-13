@@ -79,8 +79,22 @@ let to_gil_expr sval =
   in
   Delayed.return ~learned:typing_pfs exp
 
+let sure_is_zero = function
+  | SVint (Lit (Num 0.))
+  | SVlong (Lit (Num 0.))
+  | SVfloat (Lit (Num 0.))
+  | SVsingle (Lit (Num 0.)) -> true
+  | _ -> false
+
 module SVArray = struct
   type nonrec t = Conc of t list | Abst of Expr.t | AllUndef | AllZeros
+
+  let empty = Conc []
+
+  let sure_is_all_zeros = function
+    | Conc l   -> List.for_all sure_is_zero l
+    | AllZeros -> true
+    | _        -> false
 
   let equal arr_a arr_b =
     match (arr_a, arr_b) with
@@ -130,6 +144,8 @@ module SVArray = struct
   let array_cat (arr_a : t) (arr_b : t) =
     let open Delayed.Syntax in
     match (arr_a, arr_b) with
+    | arr_a, arr_b when sure_is_all_zeros arr_a && sure_is_all_zeros arr_b ->
+        Delayed.return AllZeros
     | Abst a, Abst b -> Delayed.return (Abst (Expr.list_cat a b))
     | Conc a, Conc b -> Delayed.return (Conc (a @ b))
     | Abst a, Conc b ->
@@ -138,7 +154,6 @@ module SVArray = struct
     | Conc a, Abst b ->
         let+ a = conc_to_abst a in
         Abst (Expr.list_cat a b)
-    | AllZeros, AllZeros -> Delayed.return AllZeros
     | AllZeros, _ | _, AllZeros | AllUndef, _ | _, AllUndef ->
         Delayed.return AllUndef
 

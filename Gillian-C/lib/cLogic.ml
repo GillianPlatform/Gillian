@@ -20,12 +20,24 @@ let pp_assert_annot ?(post = format_of_string "") fmt { label; existentials } =
         post
 
 module CBinOp = struct
-  type t = LstCons | LstCat | Plus | Equal | SetSub | SetDiff
+  type t =
+    | LstCons
+    | LstCat
+    | Plus
+    | Minus
+    | Times
+    | PtrPlus
+    | Equal
+    | SetSub
+    | SetDiff
 
   let str = function
     | LstCons -> "::"
     | LstCat  -> "@"
     | Plus    -> "+"
+    | Minus   -> "-"
+    | Times   -> "*"
+    | PtrPlus -> "p+"
     | Equal   -> "="
     | SetSub  -> "-s-"
     | SetDiff -> "-d-"
@@ -157,6 +169,14 @@ end
 
 module CAssert = struct
   type t =
+    | Malloced       of (CExpr.t * CExpr.t)
+    | Array          of {
+        ptr : CExpr.t;
+        chunk : Chunk.t;
+        size : CExpr.t;
+        content : CExpr.t;
+      }
+    | Zeros          of (CExpr.t * CExpr.t)
     | Star           of t * t
     | Pure           of CFormula.t
     | MallocPointsTo of CExpr.t * CConstructor.t
@@ -166,15 +186,20 @@ module CAssert = struct
 
   let rec pp fmt a =
     match a with
-    | Star (a1, a2)         -> Format.fprintf fmt "%a@ * %a" pp a1 pp a2
-    | Pure f                -> CFormula.pp fmt f
-    | PointsTo (s, c)       ->
+    | Array { ptr; chunk; size; content } ->
+        Fmt.pf fmt "@[<h>ARRAY(%a, %a, %a, %a)@]" CExpr.pp ptr Chunk.pp chunk
+          CExpr.pp size CExpr.pp content
+    | Malloced (e1, e2) ->
+        Fmt.pf fmt "@[<h>MALLOCED(%a, %a)@]" CExpr.pp e1 CExpr.pp e2
+    | Zeros (e1, e2) -> Fmt.pf fmt "@[<h>ZEROS(%a, %a@]" CExpr.pp e1 CExpr.pp e2
+    | Star (a1, a2) -> Format.fprintf fmt "%a@ * %a" pp a1 pp a2
+    | Pure f -> CFormula.pp fmt f
+    | PointsTo (s, c) ->
         Format.fprintf fmt "(%a -> %a)" CExpr.pp s CConstructor.pp c
     | MallocPointsTo (s, c) ->
         Format.fprintf fmt "(%a -m> %a)" CExpr.pp s CConstructor.pp c
-    | Pred (s, el)          -> Format.fprintf fmt "%s(%a)" s (pp_list CExpr.pp)
-                                 el
-    | Emp                   -> Format.fprintf fmt "emp"
+    | Pred (s, el) -> Format.fprintf fmt "%s(%a)" s (pp_list CExpr.pp) el
+    | Emp -> Format.fprintf fmt "emp"
 end
 
 module CLCmd = struct
