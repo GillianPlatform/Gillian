@@ -575,13 +575,15 @@ module Tree = struct
       (perm : Perm.t) : (t, err) DR.t =
     let open DR.Syntax in
     let open Formula.Infix in
-    if%sat size #> (Expr.num 0.) then
+    if%sat size #<= (Expr.num 0.) #|| (SVArr.is_empty array) then
+      let () = Logging.verbose (fun fmt -> fmt "DOING NOTHING!") in
+      DR.ok t
+    else
       let replace_node _ = Ok (sarr_leaf ~low ~chunk ~array ~size ~perm) in
       let rebuild_parent = of_children in
       let range = Range.of_low_chunk_and_size low chunk size in
       let++ _, t = frame_range t ~replace_node ~rebuild_parent range in
       t
-    else DR.ok t
 
   let get_single (t : t) (low : Expr.t) (chunk : Chunk.t) :
       (SVal.t * Perm.t option * t, err) DR.t =
@@ -940,7 +942,7 @@ let set_array t low size chunk array perm =
 let rem_array t low size chunk =
   let open DR.Syntax in
   let open Formula.Infix in
-  if%sat size #== (Expr.num 0.) then DR.ok t
+  if%sat size #<= (Expr.num 0.) then DR.ok t
   else
     let range = Range.of_low_chunk_and_size low chunk size in
     let** root = DR.of_result (get_root t) in
@@ -962,7 +964,8 @@ let rem_array t low size chunk =
 let get_simple_mem_val ~expected_mem_val t low high =
   let open DR.Syntax in
   let open Formula.Infix in
-  if%sat low #== high then DR.ok (t, Some Perm.Freeable)
+  let open Expr.Infix in
+  if%sat (high -. low) #<= (Expr.num 0.) then DR.ok (t, Some Perm.Freeable)
   else
     let range = (low, high) in
     let** span = DR.of_result (get_bounds t) in

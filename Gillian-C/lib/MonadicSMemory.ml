@@ -19,8 +19,13 @@ let resolve_or_create_loc_name (lvar_loc : Expr.t) : string Delayed.t =
   | None   ->
       let new_loc_name = ALoc.alloc () in
       let learned = [ Formula.Eq (ALoc new_loc_name, lvar_loc) ] in
+      Logging.verbose (fun fmt ->
+          fmt "Couldn't resolve loc %a, created %s" Expr.pp lvar_loc
+            new_loc_name);
       Delayed.return ~learned new_loc_name
-  | Some l -> Delayed.return l
+  | Some l ->
+      Logging.verbose (fun fmt -> fmt "Resolved %a as %s" Expr.pp lvar_loc l);
+      Delayed.return l
 
 let expr_of_loc_name loc_name =
   if GUtils.Names.is_aloc_name loc_name then Expr.ALoc loc_name
@@ -159,6 +164,7 @@ module Mem = struct
     let++ new_tree =
       map_lift_err loc_name (SHeapTree.set_array tree ofs size chunk array perm)
     in
+    Logging.tmi (fun m -> m "created tree: %a" SHeapTree.pp new_tree);
     SMap.add loc_name new_tree mem
 
   let rem_array mem loc ofs size chunk =

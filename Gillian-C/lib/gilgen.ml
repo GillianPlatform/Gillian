@@ -58,7 +58,7 @@ let internal_proc_of_unop uop =
 
 let trans_binop_expr ?(fname = "main") binop te1 te2 =
   let call func =
-    let gvar = Generators.gen_str fname Prefix.gvar in
+    let gvar = Generators.gen_str ~fname Prefix.gvar in
     ( [
         Cmd.Call (gvar, Expr.Lit (Literal.String func), [ te1; te2 ], None, None);
       ],
@@ -131,7 +131,7 @@ let trans_binop_expr ?(fname = "main") binop te1 te2 =
 let rec trans_expr ?(fname = "main") ~local_env expr =
   let trans_expr = trans_expr ~fname ~local_env in
   let trans_binop_expr = trans_binop_expr ~fname in
-  let gen_str = Generators.gen_str fname in
+  let gen_str = Generators.gen_str ~fname in
   let open Expr in
   match expr with
   | Evar id -> ([], PVar (true_name id))
@@ -207,7 +207,7 @@ let make_free_cmd fname var_list =
     | x :: r -> Expr.EList [ nth x 0; zero; nth x 1 ] :: make_blocks r
   in
   let freelist = Expr.Lit (Literal.String Internal_Functions.free_list) in
-  let gvar = Generators.gen_str fname Prefix.gvar in
+  let gvar = Generators.gen_str ~fname Prefix.gvar in
   (* If there's nothing to free, we just don't create the command *)
   match make_blocks var_list with
   | []     -> None
@@ -215,7 +215,7 @@ let make_free_cmd fname var_list =
       Some (Cmd.Call (gvar, freelist, [ Expr.EList blocks ], None, None))
 
 let make_symb_gen ?(fname = "main") assigned_id x type_string =
-  let gen_str = Generators.gen_str fname in
+  let gen_str = Generators.gen_str ~fname in
   let assigned = true_name assigned_id in
   let str_x =
     match x with
@@ -259,7 +259,7 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
   let make_symb_gen = make_symb_gen ~fname in
   (* Default context is the given context *)
   let trans_expr = trans_expr ~fname ~local_env:context.local_env in
-  let gen_str = Generators.gen_str fname in
+  let gen_str = Generators.gen_str ~fname in
   match stmt with
   | Sskip -> [ (empty_annot, None, Cmd.Skip) ]
   | Sset (id, exp) ->
@@ -512,7 +512,7 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
            PrintCsharpminor.print_stmt s)
 
 let alloc_var fname (name, sz) =
-  let gvar = Generators.gen_str fname Prefix.gvar in
+  let gvar = Generators.gen_str ~fname Prefix.gvar in
   let ocaml_size = ValueTranslation.gil_size_of_compcert sz in
   let expr_size = Expr.Lit (Literal.Num ocaml_size) in
   let alloc = LActions.(str_ac (AMem Alloc)) in
@@ -544,7 +544,7 @@ let trans_function
   let register_vars = List.concat (List.map (alloc_var fname) fn_vars) in
   let init_genv =
     if String.equal fname "main" then
-      let gvar = Generators.gen_str fname Prefix.gvar in
+      let gvar = Generators.gen_str ~fname Prefix.gvar in
       let expr_fn =
         Expr.Lit (Literal.String CConstants.Internal_Functions.initialize_genv)
       in

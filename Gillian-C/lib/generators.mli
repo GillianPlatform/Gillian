@@ -6,6 +6,6 @@ val gen_id : unit -> int
     @param fname Function name, context in which you create labels and variables
     @param pre   Prefix for the variable/label name
 *)
-val gen_str : string -> string -> string
+val gen_str : fname:string -> string -> string
 
 val reset : unit -> unit

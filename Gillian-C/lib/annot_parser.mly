@@ -43,6 +43,7 @@
 %token GSETT
 
 (* Key words *)
+%token NOUNFOLD
 %token IF
 %token ELSE
 %token PREDICATE
@@ -178,7 +179,7 @@ spec_annot:
 
 
 predicate:
-  | PREDICATE; pname = IDENTIFIER; LBRACE;
+  | PREDICATE; no_unfold=option(NOUNFOLD); pname = IDENTIFIER; LBRACE;
     params_ins = separated_list(COMMA, pred_params_ins);
     RBRACE; LCBRACE;
     defs = separated_nonempty_list(SCOLON, pred_definition);
@@ -199,6 +200,7 @@ predicate:
         params = params;
         ins = pred_ins;
         definitions = defs;
+        no_unfold = Option.is_some(no_unfold);
       }
     }
 
@@ -419,4 +421,5 @@ any_C_token:
   | ZEROS
   | PTRPLUS
   | MINUS
+  | NOUNFOLD
   { () }

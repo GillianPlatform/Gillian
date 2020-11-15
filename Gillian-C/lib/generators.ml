@@ -10,7 +10,7 @@ let gen_id () =
 (* Maps label prefix and function name/gvar to current label/var id *)
 let idHash = Hashtbl.create 1
 
-let gen_str fname pre =
+let gen_str ~fname pre =
   let curr_id =
     Option.value ~default:0 (Hashtbl.find_opt idHash (fname, pre))
   in

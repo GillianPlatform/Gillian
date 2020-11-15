@@ -27,8 +27,8 @@ let opt_rec_pred_name_of_struct struct_name =
   Prefix.generated_preds ^ "opt_rec_struct_" ^ struct_name
 
 let fresh_lvar ?(fname = "") () =
-  let pre = "#i_lvar_" in
-  Generators.gen_str pre fname
+  let pre = "#i__lvar_" in
+  Generators.gen_str ~fname pre
 
 let ( ++ ) = Expr.Infix.( +. )
 
@@ -382,7 +382,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
         CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
-  | CConstructor.ConsExpr (SVal (Sfloat se)) ->
+  | ConsExpr (SVal (Sfloat se)) ->
       let e = cse se in
       let chunk = Chunk.Mfloat32 in
       let siz = sz (Sfloat se) in
@@ -391,7 +391,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
         CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
-  | CConstructor.ConsExpr (SVal (Ssingle se)) ->
+  | ConsExpr (SVal (Ssingle se)) ->
       let e = cse se in
       let chunk = Chunk.Mfloat32 in
       (* FIXME: this is probably wrong *)
@@ -401,7 +401,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
         CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
-  | CConstructor.ConsExpr (SVal (Slong se)) ->
+  | ConsExpr (SVal (Slong se)) ->
       let e = cse se in
       let chunk = Chunk.Mint64 in
       let siz = sz (Slong se) in
@@ -410,7 +410,7 @@ let trans_constr ?fname:_ ~malloc ann s c =
         CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tnum e ** malloc_chunk siz
-  | CConstructor.ConsExpr (SVal (Sptr (sl, so))) ->
+  | ConsExpr (SVal (Sptr (sl, so))) ->
       let l = cse sl in
       let o = cse so in
       let chunk = Chunk.ptr in
@@ -420,9 +420,9 @@ let trans_constr ?fname:_ ~malloc ann s c =
         CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:sv ~perm:(Some Freeable)
       in
       ga ** pc ** a_s ** tloc l ** tnum o ** malloc_chunk siz
-  | CConstructor.ConsExpr _ ->
+  | ConsExpr _ ->
       Fmt.failwith "Constructor %a is not handled yet" CConstructor.pp c
-  | CConstructor.ConsStruct (sname, el) ->
+  | ConsStruct (sname, el) ->
       let struct_pred = pred_name_of_struct sname in
       let id = id_of_string sname in
       let comp_opt = Maps.PTree.get id cenv in
@@ -504,8 +504,13 @@ let trans_asrt_annot da =
 
 let trans_pred ?(ann = empty) ~filepath cl_pred =
   let CPred.
-        { name = pred_name; params = pred_params; definitions; ins = pred_ins }
-      =
+        {
+          name = pred_name;
+          params = pred_params;
+          definitions;
+          ins = pred_ins;
+          no_unfold;
+        } =
     cl_pred
   in
   let pred_num_params = List.length pred_params in
@@ -532,7 +537,7 @@ let trans_pred ?(ann = empty) ~filepath cl_pred =
       pred_facts = [];
       pred_pure = false;
       pred_abstract = false;
-      pred_nounfold = false;
+      pred_nounfold = no_unfold;
       pred_normalised = false;
     }
 

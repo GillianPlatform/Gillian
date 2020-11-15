@@ -241,6 +241,7 @@ module CPred = struct
     params : (string * GilType.t option) list;
     definitions : (assert_annot option * CAssert.t) list;
     ins : int list;
+    no_unfold : bool;
   }
 
   let pp_params fmt (params, ins) =
@@ -264,8 +265,9 @@ module CPred = struct
       da CAssert.pp a
 
   let pp fmt pred =
-    Format.fprintf fmt "@[<v 2>pred %s(%a) {@\n%a@]@\n}" pred.name pp_params
-      (pred.params, pred.ins)
+    Format.fprintf fmt "@[<v 2>pred %s %s(%a) {@\n%a@]@\n}" pred.name
+      (if pred.no_unfold then "nounfold" else "")
+      pp_params (pred.params, pred.ins)
       (pp_list ~sep:(Fmt.any ";@\n") pp_def)
       pred.definitions
 end

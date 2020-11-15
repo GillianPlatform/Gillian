@@ -38,6 +38,7 @@ rule read =
   | '"'        { read_string (Buffer.create 17) lexbuf }
   | "-m>"      { MALLOCPOINTSTO }
   | "->"       { POINTSTO }
+  | "nounfold" { NOUNFOLD }
   | "if"       { IF }
   | "else"     { ELSE }
   | "OR"       { BIGOR }
@@ -103,7 +104,7 @@ rule read =
   | "=="       { LEQ }
   | "="        { EQ }
   | '!'        { ENOT }
-  | "<#"       { LLT }
+  | ""         { LLT }
   | "<=#"      { LLEQ }
   | newline    { next_line lexbuf; read lexbuf }
   | white      { read lexbuf }

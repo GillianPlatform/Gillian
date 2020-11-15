@@ -91,6 +91,13 @@ module SVArray = struct
 
   let empty = Conc []
 
+  let is_empty =
+    let open Formula.Infix in
+    function
+    | Conc [] -> Formula.True
+    | Abst e  -> (Expr.list_length e) #== (Expr.num 0.)
+    | _       -> False
+
   let sure_is_all_zeros = function
     | Conc l   -> List.for_all sure_is_zero l
     | AllZeros -> true
