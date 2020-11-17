@@ -360,14 +360,25 @@ let lexpr_is_set (gamma : TypEnv.t) (le : Expr.t) : bool =
   typable gamma le SetType
 
 let get_equal_expressions (pfs : PFS.t) nle =
-  List.rev
-    (PFS.fold_left
-       (fun ac a ->
-         match (a : Formula.t) with
-         | Eq (le1, le2) when le1 = nle -> le2 :: ac
-         | Eq (le2, le1) when le1 = nle -> le2 :: ac
-         | _ -> ac)
-       [] pfs)
+  let res =
+    List.rev
+      (PFS.fold_left
+         (fun ac a ->
+           match (a : Formula.t) with
+           | Eq (le1, le2) when le1 = nle -> le2 :: ac
+           | Eq (le2, le1) when le1 = nle -> le2 :: ac
+           | Eq (e, EList el) | Eq (EList el, e) -> (
+               L.tmi (fun m ->
+                   m "GOT IN HERE WITH ELEMENT: %a AND LIST: %a" Expr.pp e
+                     Expr.pp (EList el));
+               match List_utils.index_of nle el with
+               | None       -> ac
+               | Some index -> Expr.list_nth e index :: ac )
+           | _ -> ac)
+         [] pfs)
+  in
+  L.tmi (fun m -> m "ALL POTENTIAL EQUALS: %a" (Fmt.Dump.list Expr.pp) res);
+  res
 
 (***********************************)
 (* LIST REASONING HELPER FUNCTIONS *)
@@ -879,6 +890,8 @@ let rec reduce_lexpr_loop
 
   let result : Expr.t =
     match le with
+    | BinOp (BinOp (a, FTimes, b), FMod, c)
+      when Expr.equal a c || Expr.equal a c -> Expr.num 0.
     | BinOp (Lit (LList ll), Equal, Lit (LList lr)) -> Lit (Bool (ll = lr))
     | BinOp (EList le, Equal, Lit (LList ll))
     | BinOp (Lit (LList ll), Equal, EList le) ->
@@ -1849,8 +1862,6 @@ let rec reduce_lexpr_loop
                              (BinOp (flel, FMinus, fler), FLessThan, Lit (Num 0.))) *)
                 )
             | FLessThanEqual -> (
-                (* L.verbose (fun fmt ->
-                    fmt "Reducing <=: %a, %a" Expr.pp flel Expr.pp fler); *)
                 let success, el, er = cut flel fler in
                 match success with
                 | false -> (
@@ -1967,7 +1978,7 @@ and check_ge_zero ?(top_level = false) (pfs : PFS.t) (e : Expr.t) : bool option
       else if PFS.mem pfs (Formula.Less (e, Lit (Num 0.))) then Some false
       else None
   | LVar _ | PVar _ -> None
-  | UnOp (FUnaryMinus, e') -> Option.map (fun b -> not b) (f e')
+  | UnOp (FUnaryMinus, e') -> None
   | _ -> (
       let ce = expr_to_cnum e in
       match ce.conc >= 0. with
@@ -2094,7 +2105,9 @@ let resolve_expr_to_location (pfs : PFS.t) (gamma : TypEnv.t) (e : Expr.t) :
             | Lit (Loc loc) | ALoc loc -> Some loc
             | _                        -> (
                 let equal_e = get_equal_expressions pfs e in
-                let equal_e = List.map (reduce_lexpr ~pfs ~gamma) equal_e in
+                let equal_e =
+                  equal_e @ List.map (reduce_lexpr ~pfs ~gamma) equal_e
+                in
                 let ores =
                   List.find_opt
                     (fun x ->
