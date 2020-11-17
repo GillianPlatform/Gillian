@@ -836,14 +836,14 @@ struct
         (fun (a, ins, outs) -> (a, List.map f_subst ins, List.map f_subst outs))
         c_asrts'
     in
-
-    ( List.map (normalise_core_asrt store new_pfs pfs gamma subst) c_asrts'',
-      subst )
+    (* ( List.map (normalise_core_asrt store new_pfs pfs gamma subst) c_asrts'',
+       subst ) *)
+    (c_asrts'', subst)
 
   let produce_core_asrts
       (astate : SPState.t)
       (core_asrts : (string * Expr.t list * Expr.t list) list) :
-      SPState.t option =
+      (SPState.t list, string) result =
     let f_aux (es : Expr.t list) : SS.t * SS.t =
       List.fold_left
         (fun (ret1, ret2) e ->
@@ -879,20 +879,32 @@ struct
           SESubst.full_pp subst);
 
     let rec loop
-        (astate : SPState.t)
+        (astates : SPState.t list)
         (core_asrts : (string * Expr.t list * Expr.t list) list) :
-        SPState.t option =
+        (SPState.t list, string) result =
       match core_asrts with
-      | []                     -> Some astate
+      | []                     -> Ok astates
       | (a, ins, outs) :: rest -> (
           try
-            match SPState.produce astate subst (Asrt.GA (a, ins, outs)) with
-            | Some astate -> loop astate rest
-            | None        ->
-                L.verbose (fun m ->
-                    m "Produce GA failed for: %a!\n" Asrt.pp
-                      (Asrt.GA (a, ins, outs)));
-                None
+            let new_states =
+              List.fold_left
+                (fun acc astate ->
+                  match
+                    SPState.produce astate subst (Asrt.GA (a, ins, outs))
+                  with
+                  | Ok astates -> astates @ acc
+                  | Error msg  ->
+                      L.verbose (fun m ->
+                          m
+                            "Produce GA failed for: %a!\n\
+                             with Message: %s. Might have lost some paths ?"
+                            Asrt.pp
+                            (Asrt.GA (a, ins, outs))
+                            msg);
+                      acc)
+                [] astates
+            in
+            loop new_states rest
           with Failure msg ->
             L.verbose (fun m ->
                 m "Produce GA failed for: %a with error %s\n" Asrt.pp
@@ -900,8 +912,18 @@ struct
                   msg);
             raise (Failure msg) )
     in
-
-    loop astate core_asrts
+    L.verbose (fun m ->
+        m "CORE ASSERTIONS TO PRODUCE: %a"
+          (Fmt.Dump.list (fun fmt (a, b, c) ->
+               Fmt.pf fmt "(%s, %a, %a)" a (Fmt.Dump.list Expr.pp) b
+                 (Fmt.Dump.list Expr.pp) c))
+          core_asrts);
+    let result = loop [ astate ] core_asrts in
+    L.verbose (fun fmt ->
+        fmt "FINAL FINAL RESULT BITE: %a"
+          (Fmt.result ~ok:(Fmt.Dump.list SPState.pp) ~error:Fmt.string)
+          result);
+    result
 
   let subst_to_pfs ?(svars : SS.t option) (subst : SESubst.t) : Formula.t list =
     let subst_lvs = SESubst.to_list subst in
@@ -930,12 +952,12 @@ struct
       ?(gamma = TypEnv.init ())
       ?(subst = SESubst.init [])
       ?(pvars : SS.t option)
-      (a : Asrt.t) : (SPState.t * SESubst.t) option =
+      (a : Asrt.t) : ((SPState.t * SESubst.t) list, string) result =
     let falsePFs pfs = PFS.mem pfs False in
     let svars = SS.filter is_spec_var_name (Asrt.lvars a) in
 
     L.verbose (fun m ->
-        m "Normalising assertion:\n\t%a\nsvars: @[<h>%a]" Asrt.pp a
+        m "@[<v 2>Normalising assertion:@ %a@]@ svars: @[<h>%a@]" Asrt.pp a
           (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
           svars);
 
@@ -963,63 +985,63 @@ struct
        * 3.2 - pure assertions -> initialises store and pfs
     *)
     let success = normalise_types store gamma subst types in
-    match success with
-    | false ->
+    if not success then (
+      L.verbose (fun m ->
+          m
+            "WARNING: normalise_assertion: type assertions could not be \
+             normalised");
+      Error "normalise_assertion: type assertions could not be normalised" )
+    else
+      let pfs = normalise_pure_assertions store gamma subst pvars pfs in
+      if falsePFs pfs then (
         L.verbose (fun m ->
-            m
-              "WARNING: normalise_assertion: type assertions could not be \
-               normalised");
-        None
-    | true  -> (
-        let pfs = normalise_pure_assertions store gamma subst pvars pfs in
-        match falsePFs pfs with
-        | true  ->
+            m "WARNING: normalise_assertion: pure formulae false");
+        Error "normalise_assertion: pure formulae false" )
+      else (
+        L.verbose (fun m -> m "Here is the store: %a" SStore.pp store);
+        (* Step 4 -- Extend the typing environment using equalities in the pfs *)
+        extend_typing_env_using_assertion_info gamma (PFS.to_list pfs);
+
+        (* Step 5 -- normalise core assertions *)
+        let c_asrts', subst =
+          normalise_core_asrts store pfs gamma svars subst c_asrts
+        in
+
+        (* Step 6 -- Extend pfs with info on subst *)
+        List.iter (fun pf -> PFS.extend pfs pf) (subst_to_pfs subst);
+
+        (* Step 7 -- Construct the state *)
+        let preds' = normalise_preds pred_defs store pfs gamma subst preds in
+        let astate : SPState.t =
+          SPState.struct_init pred_defs store pfs gamma svars
+        in
+        let astate = SPState.set_preds astate preds' in
+        let astate = produce_core_asrts astate c_asrts' in
+
+        match astate with
+        | Error msg  ->
             L.verbose (fun m ->
-                m "WARNING: normalise_assertion: pure formulae false");
-            None
-        | false -> (
-            L.verbose (fun m -> m "Here is the store: %a" SStore.pp store);
-            (* Step 4 -- Extend the typing environment using equalities in the pfs *)
-            extend_typing_env_using_assertion_info gamma (PFS.to_list pfs);
-
-            (* Step 5 -- normalise core assertions *)
-            let c_asrts', subst =
-              normalise_core_asrts store pfs gamma svars subst c_asrts
-            in
-
-            (* Step 6 -- Extend pfs with info on subst *)
-            List.iter (fun pf -> PFS.extend pfs pf) (subst_to_pfs subst);
-
-            (* Step 7 -- Construct the state *)
-            let preds' =
-              normalise_preds pred_defs store pfs gamma subst preds
-            in
-            let astate : SPState.t =
-              SPState.struct_init pred_defs store pfs gamma svars
-            in
-            let astate = SPState.set_preds astate preds' in
-            let astate = produce_core_asrts astate c_asrts' in
-
-            match astate with
-            | None        ->
-                L.verbose (fun m ->
-                    m "WARNING: normalise_assertion: returning None");
-                None
-            | Some astate ->
-                (* Step 8 -- Check if the symbolic state makes sense *)
-                let mem_constraints = SPState.mem_constraints astate in
-                if
-                  FOSolver.check_satisfiability
-                    (mem_constraints @ PFS.to_list pfs)
-                    gamma
-                then (
-                  (* Step 9 -- Final simplifications - TO SIMPLIFY!!! *)
-                  let _ = SPState.simplify ~unification:true astate in
-                  L.verbose (fun m ->
-                      m "AFTER NORMALISATION:@\n%a" SPState.pp astate);
-                  Some (astate, subst) )
-                else (
-                  L.verbose (fun m ->
-                      m "WARNING: normalise_assertion: returning None");
-                  None ) ) )
+                m "WARNING: normalise_assertion: returning error");
+            Error msg
+        | Ok astates ->
+            Ok
+              (List.filter_map
+                 (fun astate ->
+                   (* Step 8 -- Check if the symbolic state makes sense *)
+                   let mem_constraints = SPState.mem_constraints astate in
+                   if
+                     FOSolver.check_satisfiability
+                       (mem_constraints @ PFS.to_list pfs)
+                       gamma
+                   then (
+                     (* Step 9 -- Final simplifications - TO SIMPLIFY!!! *)
+                     let _ = SPState.simplify ~unification:true astate in
+                     L.verbose (fun m ->
+                         m "AFTER NORMALISATION:@\n%a" SPState.pp astate);
+                     Some (astate, SESubst.copy subst) )
+                   else (
+                     L.verbose (fun m ->
+                         m "WARNING: normalise_assertion: returning None");
+                     None ))
+                 astates) )
 end

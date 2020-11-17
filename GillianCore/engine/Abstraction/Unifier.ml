@@ -23,9 +23,9 @@ module type S = sig
 
   type unfold_info_t = (string * string) list
 
-  val produce_assertion : t -> st -> Asrt.t -> t option
+  val produce_assertion : t -> st -> Asrt.t -> (t list, string) result
 
-  val produce : t -> st -> Asrt.t -> t option
+  val produce : t -> st -> Asrt.t -> (t list, string) result
 
   val produce_posts : t -> st -> Asrt.t list -> t list
 
@@ -279,7 +279,8 @@ module Make
     apply_strategies [ strategy_1; strategy_2; strategy_3; strategy_4 ]
 
   let rec produce_assertion (astate : t) (subst : ESubst.t) (a : Asrt.t) :
-      t option =
+      (t list, string) result =
+    let open Syntaxes.Result in
     let state, preds, pred_defs = astate in
 
     L.verbose (fun m ->
@@ -289,18 +290,26 @@ module Make
            -------------------------@\n"
           Asrt.pp a);
 
+    L.verbose (fun m -> m "STATE: %a" pp_astate astate);
+
     match a with
     | GA (a_id, ins, outs) -> (
         let setter = State.ga_to_setter a_id in
         let vs = List.map (subst_in_expr subst) (ins @ outs) in
         let failure = List.exists (fun x -> x = None) vs in
-        if failure then None
+        if failure then
+          Error "Produce Simple Assertion: Subst does not cover the action ins"
         else
           let vs = List.map Option.get vs in
           match State.execute_action setter state vs with
-          | ASucc [ (state', _) ] -> Some (state', preds, pred_defs)
-          | _                     -> None )
-    | Types les ->
+          | ASucc successes ->
+              Ok
+                (List.map
+                   (fun (state', _) -> (state', Preds.copy preds, pred_defs))
+                   successes)
+          | AFail e         -> Error (Printf.sprintf "Action %s Failure" setter)
+        )
+    | Types les -> (
         let state' =
           List.fold_left
             (fun state (le, t) ->
@@ -313,17 +322,20 @@ module Make
                   | Some v -> State.assume_t state v t ))
             (Some state) les
         in
-        Option.map (fun state -> (state, preds, pred_defs)) state'
-    | Pred (pname, les) -> (
+        match state' with
+        | None   -> Error "Produce Simple Assertion: Cannot produce types"
+        | Some s -> Ok [ (state, preds, pred_defs) ] )
+    | Pred (pname, les) ->
         let vs = List.map (subst_in_expr subst) les in
         let failure = List.exists (fun x -> x = None) vs in
-        if failure then None
+        if failure then
+          Error "Produce Simple Assertion: Subst does not cover the pred ins"
         else
           let vs = List.map Option.get vs in
           let pred_def = Hashtbl.find pred_defs pname in
-          let ostate =
+          let+ (ostate : t list) =
             match pred_def.pred.pred_facts with
-            | []    -> Some astate
+            | []    -> Ok [ astate ]
             | facts ->
                 (* let t = Sys.time () in *)
                 let params, _ = List.split pred_def.pred.pred_params in
@@ -345,37 +357,49 @@ module Make
                 result
           in
           let pure = pred_def.pred.pred_pure in
-          match ostate with
-          | None -> None
-          | Some (state, preds, pred_defs) ->
+          (* FIXME: We could copy only when more than one result, less expensive *)
+          List.map
+            (fun (state, preds, pred_defs) ->
+              let preds = Preds.copy preds in
+              let state = State.copy state in
               Preds.extend ~pure preds (pname, vs);
-              Some (state, preds, pred_defs) )
+              (state, preds, pred_defs))
+            ostate
     | Pure (Eq (PVar x, le)) | Pure (Eq (le, PVar x)) ->
         if ESubst.mem subst (PVar x) then
           let v_x = ESubst.get subst (PVar x) in
           let v_le = subst_in_expr subst le in
-          match (v_x, v_le) with
-          | Some v_x, Some v_le ->
-              Option.fold
-                ~some:(fun state -> Some (state, preds, pred_defs))
-                ~none:None
-                (State.assume_a ~unification:true
-                   ~production:!Config.delay_entailment state
-                   [ Eq (Val.to_expr v_x, Val.to_expr v_le) ])
-          | _                   -> None
+          let opt_res =
+            match (v_x, v_le) with
+            | Some v_x, Some v_le ->
+                Option.map
+                  (fun state -> [ (state, preds, pred_defs) ])
+                  (State.assume_a ~unification:true
+                     ~production:!Config.delay_entailment state
+                     [ Eq (Val.to_expr v_x, Val.to_expr v_le) ])
+            | _                   -> None
+          in
+          Option.to_result
+            ~none:
+              "Produce Simple Assertion: Subst does not cover the pure formula"
+            opt_res
         else
-          Option.fold
-            ~some:(fun v ->
-              L.(
-                verbose (fun m ->
-                    m
-                      "UNHAPPY. update_store inside produce assertions with \
-                       prog variable: %s!!!\n"
-                      x));
-              Some (update_store astate x v))
-            ~none:None (subst_in_expr subst le)
+          let+ v =
+            Option.to_result
+              ~none:
+                "Produce Simple Assertion: Subst does not cover the pure \
+                 formula"
+              (subst_in_expr subst le)
+          in
+          L.(
+            verbose (fun m ->
+                m
+                  "UNHAPPY. update_store inside produce assertions with prog \
+                   variable: %s!!!\n"
+                  x));
+          [ update_store astate x v ]
     | Pure f -> (
-        let f' = ESubst.substitute_formula subst false f in
+        let f' = ESubst.substitute_formula subst ~partial:false f in
         (* let pp_state =
              match !Config.pbn with
              | false -> State.pp
@@ -390,43 +414,64 @@ module Make
         match
           State.assume_a ~production:!Config.delay_entailment state [ f' ]
         with
-        | None        -> None
-        | Some state' -> Some (state', preds, pred_defs) )
+        | None        -> Error
+                           "Produce Simple Assertion: Cannot assume pure \
+                            formula."
+        | Some state' -> Ok [ (state', preds, pred_defs) ] )
     | _ -> L.fail "Produce simple assertion: unsupported assertion"
 
   and produce_asrt_list (astate : t) (subst : ESubst.t) (sas : Asrt.t list) :
-      t option =
+      (t list, string) result =
+    let open Syntaxes.Result in
     let state, preds, _ = astate in
     let _ =
       ESubst.iter subst (fun v value ->
           ESubst.put subst v (State.simplify_val state value))
     in
-    let rec loop (loop_state : Asrt.t list * t) : t option =
+    let collect l =
+      List.fold_left
+        (fun acc res ->
+          match (acc, res) with
+          | Ok old, Ok new_ -> Ok (new_ @ old)
+          | Error old, Error new_ -> Error (old ^ "\n" ^ new_)
+          | Error error, Ok _ | Ok _, Error error -> Error error)
+        (Ok []) l
+    in
+    let rec loop (loop_state : Asrt.t list * t list) : (t list, string) result =
       match loop_state with
-      | [], astate           -> Some astate
-      | a :: rest_as, astate -> (
-          let ret = produce_assertion astate subst a in
-          match ret with
-          | Some astate' -> loop (rest_as, astate')
-          | None         ->
-              L.verbose (fun fmt ->
-                  fmt "PRODUCE: couldn't produce assertion: %a" Asrt.pp a);
-              None )
+      | [], astates           -> Ok astates
+      | a :: rest_as, astates ->
+          let on_all_states =
+            List.map
+              (fun astate ->
+                let astate = copy_astate astate in
+                match produce_assertion astate subst a with
+                | Ok astates' -> loop (rest_as, astates')
+                | Error msg   ->
+                    L.verbose (fun fmt ->
+                        fmt "PRODUCE: couldn't produce assertion: %a" Asrt.pp a);
+                    Error msg)
+              astates
+          in
+          collect on_all_states
     in
 
-    let ret = loop (sas, astate) in
-    match ret with
-    | None -> None
-    | Some (state, preds, preds_tbl) -> (
+    let* astates = loop (sas, [ astate ]) in
+    List.map
+      (fun (state, preds, preds_tbl) ->
+        let state, preds = (State.copy state, Preds.copy preds) in
         let admissible =
           State.assume_a ~time:"Produce: final check" ~unification:true state
             [ True ]
         in
         match admissible with
-        | None       -> None
-        | Some state -> Some (state, preds, preds_tbl) )
+        | None       -> Error "final state non admissible"
+        | Some state -> Ok [ (state, preds, preds_tbl) ])
+      astates
+    |> collect
 
-  let produce (astate : t) (subst : ESubst.t) (a : Asrt.t) : t option =
+  let produce (astate : t) (subst : ESubst.t) (a : Asrt.t) :
+      (t list, string) result =
     L.(
       verbose (fun m ->
           m
@@ -434,26 +479,6 @@ module Make
              -----------------@\n\
              Produce assertion: @[%a@]" Asrt.pp a));
     let sas = UP.collect_simple_asrts a in
-    (* let pure, impure =
-         List.partition
-           (fun a ->
-             match a with
-             | Asrt.Pure (Eq (ALoc _, _)) -> false
-             | Asrt.Pure (Eq (_, ALoc _)) -> false
-             | Asrt.Pure _                -> true
-             | _                          -> false)
-           sas
-       in
-       let pure =
-         Asrt.Pure
-           (Formula.conjunct
-              (List.map
-                 (fun a ->
-                   match a with
-                   | Asrt.Pure pf -> pf
-                   | _            -> L.fail "Impossible")
-                 pure))
-       in *)
     produce_asrt_list astate subst sas
 
   let produce_posts (state : t) (subst : ESubst.t) (asrts : Asrt.t list) :
@@ -467,26 +492,24 @@ module Make
             (List.length asrts)
             Fmt.(list ~sep:(any "@\n") Asrt.pp)
             asrts));
-    let rets =
-      List.map
-        (fun a ->
-          let subst = ESubst.copy subst in
-          (produce (copy_astate state) subst a, subst))
-        asrts
-    in
-    let rets = List.filter (fun (x, _) -> x <> None) rets in
-    let rets =
-      List.map
-        (fun (x, subst) ->
-          let state = Option.get x in
-          ESubst.iter subst (fun e v ->
-              match e with
-              | PVar x -> ignore (update_store state x v)
-              | _      -> ());
-          state)
-        rets
-    in
-    rets
+    List.fold_left
+      (fun acc asrt ->
+        let subst = ESubst.copy subst in
+        let state = copy_astate state in
+        match produce state subst asrt with
+        | Error msg ->
+            L.verbose (fun m -> m "Warning: %s" msg);
+            acc
+        | Ok states ->
+            List.iter
+              (fun state ->
+                ESubst.iter subst (fun e v ->
+                    match e with
+                    | PVar x -> ignore (update_store state x v)
+                    | _      -> ()))
+              states;
+            states @ acc)
+      [] asrts
 
   let use_unfold_info
       (unfold_info : (string * string) list option)
@@ -540,36 +563,48 @@ module Make
       | None          -> SS.empty
       | Some bindings -> SS.of_list (snd (List.split bindings))
     in
-
     let rets =
       match use_unfold_info unfold_info pred.pred state subst_i with
-      | []               -> raise
-                              (Failure
-                                 "Cannot Unfold Predicate with No Definitions")
-      | def :: rest_defs ->
+      | []                     -> raise
+                                    (Failure
+                                       "Cannot Unfold Predicate with No \
+                                        Definitions")
+      | first_def :: rest_defs ->
           L.(
             verbose (fun m ->
                 m "Going to produce %d definitions with subst@\n%a"
-                  (List.length (def :: rest_defs))
+                  (List.length (first_def :: rest_defs))
                   ESubst.pp subst_i));
-          let state, preds, pred_defs = astate in
           let state' = State.add_spec_vars state new_spec_vars in
           let astate = (state', preds, pred_defs) in
-          let results =
+          let rest_results =
             List.map
               (fun def ->
                 produce (copy_astate astate) (ESubst.copy subst_i) def)
               rest_defs
           in
-          let first_result = produce astate subst_i def in
-          let results =
-            List.filter (fun x -> x <> None) (first_result :: results)
-          in
-          let results = List.map Option.get results in
-          let results =
-            List.map (fun x -> (simplify_astate ~unification:true x, x)) results
-          in
-          results
+          let first_results = produce astate subst_i first_def in
+          List.fold_left
+            (fun acc res ->
+              match res with
+              | Error msg  ->
+                  L.verbose (fun m -> m "Warning: %s" msg);
+                  acc
+              | Ok astates ->
+                  List.map
+                    (fun x -> (simplify_astate ~unification:true x, x))
+                    astates
+                  @ acc)
+            []
+            (first_results :: rest_results)
+      (* let results =
+           List.filter (fun x -> x <> None) (first_result :: results)
+         in *)
+      (* let results = List.map Option.get results in *)
+      (* let results =
+           List.map (fun x -> (simplify_astate ~unification:true x, x)) results
+         in
+         results *)
     in
 
     L.verbose (fun m ->

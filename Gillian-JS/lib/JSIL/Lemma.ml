@@ -1,5 +1,7 @@
 module Expr = Gillian.Gil_syntax.Expr
 
+type lemma_spec = { pre : Asrt.t; posts : Asrt.t list }
+
 type t = {
   name : string;
   (* Name of the lemma *)

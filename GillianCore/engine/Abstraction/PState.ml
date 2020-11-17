@@ -519,7 +519,8 @@ module Make
                   match
                     Unifier.produce invariant_state full_subst a_produce
                   with
-                  | Some new_astate ->
+                  (* FIXME: Should allow several new states ? *)
+                  | Ok [ new_astate ] ->
                       let new_state, new_preds, pred_defs = new_astate in
                       let new_state' =
                         State.add_spec_vars new_state (SS.of_list binders)
@@ -529,7 +530,7 @@ module Make
                       in
                       let _ = simplify ~kill_new_lvars:true invariant_state in
                       (frame_state, invariant_state)
-                  | _               ->
+                  | _ ->
                       let msg =
                         Fmt.str
                           "UNIFY INVARIANT FAILURE: %a. unable to produce \
@@ -581,10 +582,13 @@ module Make
                let frame_asrt = Asrt.star (to_assertions frame) in
                let full_subst = make_id_subst frame_asrt in
                match Unifier.produce astate full_subst frame_asrt with
-               | None        ->
+               | Error msg     ->
                    L.fail
-                     (Format.asprintf "Unable to produce frame for loop %s" id)
-               | Some astate -> astate
+                     (Format.asprintf
+                        "Unable to produce frame for loop %s, because of :\n%s"
+                        id msg)
+               | Ok [ astate ] -> astate
+               | Ok _          -> L.fail "Tried framing on more that one state"
              in
              let _ = simplify ~kill_new_lvars:true astate in
              (astate, (List.tl ids, List.tl frames)))
@@ -821,19 +825,26 @@ module Make
                       in
                       let a_produce = Asrt.star [ a_new_bindings; a_substed ] in
                       match Unifier.produce new_state full_subst a_produce with
-                      | Some new_astate ->
-                          let new_state, new_preds, pred_defs = new_astate in
-                          let new_state' =
-                            State.add_spec_vars new_state (SS.of_list binders)
-                          in
-                          let subst =
-                            State.simplify ~kill_new_lvars:true new_state'
-                          in
-                          let () =
-                            Preds.substitution_in_place subst new_preds
-                          in
-                          Ok [ (new_state', new_preds, pred_defs) ]
-                      | _               ->
+                      | Ok new_astates ->
+                          List.map
+                            (fun new_astate ->
+                              let new_state, new_preds, pred_defs =
+                                new_astate
+                              in
+                              let new_state' =
+                                State.add_spec_vars new_state
+                                  (SS.of_list binders)
+                              in
+                              let subst =
+                                State.simplify ~kill_new_lvars:true new_state'
+                              in
+                              let () =
+                                Preds.substitution_in_place subst new_preds
+                              in
+                              (new_state', new_preds, pred_defs))
+                            new_astates
+                          |> Result.ok
+                      | _              ->
                           let msg =
                             Fmt.str
                               "Assert failed with argument %a. unable to \
@@ -962,7 +973,7 @@ module Make
     let state, _, _ = astate in
     State.clean_up state
 
-  let produce (astate : t) (subst : st) (a : Asrt.t) : t option =
+  let produce (astate : t) (subst : st) (a : Asrt.t) : (t list, string) result =
     Unifier.produce astate subst a
 
   let unify_assertion (astate : t) (subst : st) (step : UP.step) : u_res =
@@ -1054,9 +1065,12 @@ module Make
           List.fold_left
             (fun os ga ->
               match os with
-              | Some os ->
+              | Some os -> (
                   let subst = make_id_subst ga in
-                  produce os subst ga
+                  match produce os subst ga with
+                  | Ok [ x ] -> Some x
+                  | Ok _     -> failwith "multiple shit"
+                  | Error _  -> None )
               | None    -> None)
             (Some state) asrts
         in

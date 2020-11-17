@@ -838,7 +838,11 @@ let init_lemmas (preds : (string, int list) Hashtbl.t) (lemmas : Lemma.t list) :
         let sspecs :
             (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option))
             list =
-          [ (lemma.lemma_hyp, (None, Some (Flag.Normal, lemma.lemma_concs))) ]
+          List.map
+            (fun spec ->
+              ( spec.Lemma.lemma_hyp,
+                (None, Some (Flag.Normal, spec.lemma_concs)) ))
+            lemma.lemma_specs
         in
         let up = init ~use_params:true KB.empty params preds sspecs in
         match up with

@@ -96,7 +96,7 @@ struct
       let af_asrt = Asrt.star (SPState.to_assertions state_af) in
       let af_subst = make_id_subst af_asrt in
       match SPState.produce state_i af_subst af_asrt with
-      | Some state_i' ->
+      | Ok [ state_i' ] ->
           let _ = SPState.simplify ~kill_new_lvars:true state_i' in
           let pre =
             Asrt.star
@@ -111,7 +111,8 @@ struct
                  (* let state_i'' = JSCleanUp.exec prog state_i'' name true in  *)
                  Asrt.star (List.sort Asrt.compare (SPState.to_assertions ~to_keep:pvars state_i''))) in *)
           (pre, pre)
-      | None          ->
+      | Ok _            -> failwith "Bi-abduction: anti-frame branched"
+      | Error _         ->
           raise
             (Failure "Bi-abduction: cannot produce anti-frame in initial state")
     in
@@ -177,23 +178,20 @@ struct
     in
     let make_test asrt =
       match normalise asrt with
-      | None             -> None
-      | Some (ss_pre, _) ->
-          Some
-            {
-              name = bi_spec.bispec_name;
-              params = bi_spec.bispec_params;
-              state =
-                SBAState.initialise (SS.of_list proc_names) ss_pre
-                  (Some prog.preds);
-            }
+      | Error _ -> []
+      | Ok l    ->
+          List.map
+            (fun (ss_pre, _) ->
+              {
+                name = bi_spec.bispec_name;
+                params = bi_spec.bispec_params;
+                state =
+                  SBAState.initialise (SS.of_list proc_names) ss_pre
+                    (Some prog.preds);
+              })
+            l
     in
-    let rec filter_none = function
-      | []          -> []
-      | Some a :: b -> a :: filter_none b
-      | None :: b   -> filter_none b
-    in
-    filter_none (List.map make_test bi_spec.bispec_pres)
+    List.concat_map make_test bi_spec.bispec_pres
 
   let run_test (ret_fun : result_t -> Spec.t * bool) (prog : UP.prog) (test : t)
       : (Spec.t * bool) list =

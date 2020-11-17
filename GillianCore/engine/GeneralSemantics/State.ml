@@ -164,7 +164,7 @@ module type S = sig
 
   val produce_posts : t -> st -> Asrt.t list -> t list
 
-  val produce : t -> st -> Asrt.t -> t option
+  val produce : t -> st -> Asrt.t -> (t list, string) result
 
   val update_subst : t -> st -> unit
 

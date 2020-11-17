@@ -101,8 +101,13 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
     lemma_internal = false;
     (* TODO (Alexis): Set depending on module of lemma *)
     lemma_params = lemma.params;
-    lemma_hyp = jsil2gil_asrt lemma.pre;
-    lemma_concs = List.map jsil2gil_asrt lemma.posts;
+    lemma_specs =
+      [
+        {
+          lemma_hyp = jsil2gil_asrt lemma.pre;
+          lemma_concs = List.map jsil2gil_asrt lemma.posts;
+        };
+      ];
     lemma_proof = Option.map (List.map jsil2gil_lcmd) lemma.proof;
     lemma_variant = lemma.variant;
     lemma_existentials = lemma.existentials;

@@ -239,25 +239,28 @@ let unfold_lemma
     (preds : (string, Pred.t) Hashtbl.t)
     (rec_info : (string, bool) Hashtbl.t)
     (lemma : Lemma.t) : Lemma.t =
-  L.verbose (fun fmt ->
-      fmt "Unfolding lemma: %s with pre-condition\n%a" lemma.lemma_name Asrt.pp
-        lemma.lemma_hyp);
-  let lemma_hyp : Asrt.t =
-    let unfolded_lemma = auto_unfold preds rec_info lemma.lemma_hyp in
-    let unfolded_lemma =
-      List.filter Simplifications.admissible_assertion unfolded_lemma
+  let unfold_lemma_spec (spec : Lemma.spec) =
+    L.verbose (fun fmt ->
+        fmt "Unfolding spec of lemma: %s with pre-condition\n%a"
+          lemma.lemma_name Asrt.pp spec.lemma_hyp);
+    let lemma_hyp : Asrt.t =
+      let unfolded_lemma = auto_unfold preds rec_info spec.lemma_hyp in
+      let unfolded_lemma =
+        List.filter Simplifications.admissible_assertion unfolded_lemma
+      in
+      match unfolded_lemma with
+      | [ pre ] -> pre
+      | other   ->
+          L.verbose (fun fmt ->
+              fmt "Lemma unfolded to %d preconditions" (List.length other));
+          spec.lemma_hyp
     in
-    match unfolded_lemma with
-    | [ pre ] -> pre
-    | other   ->
-        L.verbose (fun fmt ->
-            fmt "Lemma unfolded to %d preconditions" (List.length other));
-        lemma.lemma_hyp
+    let lemma_concs : Asrt.t list =
+      List.concat (List.map (auto_unfold preds rec_info) spec.lemma_concs)
+    in
+    Lemma.{ lemma_hyp; lemma_concs }
   in
-  let lemma_concs : Asrt.t list =
-    List.concat (List.map (auto_unfold preds rec_info) lemma.lemma_concs)
-  in
-  { lemma with lemma_hyp; lemma_concs }
+  { lemma with lemma_specs = List.map unfold_lemma_spec lemma.lemma_specs }
 
 let unfold_bispec
     (preds : (string, Pred.t) Hashtbl.t)

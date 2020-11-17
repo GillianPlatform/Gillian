@@ -499,6 +499,11 @@ struct
         manual
         incremental
         () =
+      if incremental then
+        failwith
+          "Incremental not working. Because normalization can yield several \
+           results, several verification tests can have the same id. This \
+           should be fixed first.";
       let () = Fmt_tty.setup_std_outputs () in
       let () = Config.current_exec_mode := Verification in
       let () = PC.initialize Verification in

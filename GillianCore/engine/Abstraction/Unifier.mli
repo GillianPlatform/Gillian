@@ -23,9 +23,9 @@ module type S = sig
 
   type unfold_info_t = (string * string) list
 
-  val produce_assertion : t -> st -> Asrt.t -> t option
+  val produce_assertion : t -> st -> Asrt.t -> (t list, string) result
 
-  val produce : t -> st -> Asrt.t -> t option
+  val produce : t -> st -> Asrt.t -> (t list, string) result
 
   val produce_posts : t -> st -> Asrt.t list -> t list
 

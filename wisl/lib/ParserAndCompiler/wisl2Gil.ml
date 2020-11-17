@@ -931,8 +931,7 @@ let compile_lemma
       lemma_params;
       lemma_proof;
       lemma_variant;
-      lemma_hyp;
-      lemma_concs = [ post ];
+      lemma_specs = [ { lemma_hyp; lemma_concs = [ post ] } ];
       lemma_existentials;
     }
 

@@ -588,7 +588,8 @@ struct
   let produce_posts (state : t) (subst : st) (asrts : Asrt.t list) : t list =
     raise (Failure "produce_posts from bi_state.")
 
-  let produce (state : t) (subst : st) (asrts : Asrt.t) : t option =
+  let produce (state : t) (subst : st) (asrts : Asrt.t) :
+      (t list, string) result =
     raise (Failure "produce_posts from bi_state.")
 
   let unify_assertion (state : t) (subst : st) (step : UP.step) : u_res =

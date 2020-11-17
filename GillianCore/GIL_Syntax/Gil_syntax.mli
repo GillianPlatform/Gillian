@@ -751,13 +751,18 @@ end
 
 module Lemma : sig
   (** {b GIL Lemmas} *)
+
+  type spec = {
+    lemma_hyp : Asrt.t;  (** Hypothesis *)
+    lemma_concs : Asrt.t list;  (** Conclusion *)
+  }
+
   type t = {
     lemma_name : string;  (** Name *)
     lemma_source_path : string option;
     lemma_internal : bool;
     lemma_params : string list;  (** Parameters *)
-    lemma_hyp : Asrt.t;  (** Hypothesis *)
-    lemma_concs : Asrt.t list;  (** Conclusion *)
+    lemma_specs : spec list;  (** Specs of the Lemma *)
     lemma_proof : LCmd.t list option;  (** (Optional) Proof *)
     lemma_variant : Expr.t option;  (** Variant *)
     lemma_existentials : string list; (* Existentials *)
@@ -1310,6 +1315,7 @@ module Visitors : sig
            ; visit_formula : 'd -> Formula.t -> Formula.t
            ; visit_lcmd : 'd -> LCmd.t -> LCmd.t
            ; visit_lemma : 'd -> Lemma.t -> Lemma.t
+           ; visit_lemma_spec : 'd -> Lemma.spec -> Lemma.spec
            ; visit_literal : 'd -> Literal.t -> Literal.t
            ; visit_macro : 'd -> Macro.t -> Macro.t
            ; visit_nop : 'd -> NOp.t -> NOp.t
@@ -1698,6 +1704,8 @@ module Visitors : sig
 
       method visit_lemma : 'd -> Lemma.t -> Lemma.t
 
+      method visit_lemma_spec : 'd -> Lemma.spec -> Lemma.spec
+
       method visit_literal : 'd -> Literal.t -> Literal.t
 
       method visit_macro : 'd -> Macro.t -> Macro.t
@@ -1918,6 +1926,7 @@ module Visitors : sig
            ; visit_formula : 'c -> Formula.t -> 'f
            ; visit_lcmd : 'c -> LCmd.t -> 'f
            ; visit_lemma : 'c -> Lemma.t -> 'f
+           ; visit_lemma_spec : 'c -> Lemma.spec -> 'f
            ; visit_literal : 'c -> Literal.t -> 'f
            ; visit_macro : 'c -> Macro.t -> 'f
            ; visit_nop : 'c -> NOp.t -> 'f
@@ -2303,6 +2312,8 @@ module Visitors : sig
       method visit_lcmd : 'c -> LCmd.t -> 'f
 
       method visit_lemma : 'c -> Lemma.t -> 'f
+
+      method visit_lemma_spec : 'c -> Lemma.spec -> 'f
 
       method visit_literal : 'c -> Literal.t -> 'f
 

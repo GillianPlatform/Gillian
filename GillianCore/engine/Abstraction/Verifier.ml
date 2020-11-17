@@ -49,138 +49,120 @@ struct
       (posts : Asrt.t list)
       (flag : Flag.t option)
       (label : (string * SS.t) option)
-      (to_verify : bool) : t option * (Asrt.t * Asrt.t list) option =
+      (to_verify : bool) : (t option * (Asrt.t * Asrt.t list) option) list =
+    let test_of_normalised_state (ss_pre, subst) =
+      (* Step 2 - spec_vars = lvars(pre)\dom(subst) -U- alocs(range(subst)) *)
+      let lvars =
+        SS.fold
+          (fun x acc ->
+            if Names.is_spec_var_name x then Expr.Set.add (Expr.LVar x) acc
+            else acc)
+          (Asrt.lvars pre) Expr.Set.empty
+      in
+      let subst_dom = SSubst.domain subst None in
+      let alocs =
+        SSubst.fold subst
+          (fun _ v_val acc ->
+            match v_val with
+            | ALoc _ -> Expr.Set.add v_val acc
+            | _      -> acc)
+          Expr.Set.empty
+      in
+      let spec_vars = Expr.Set.union (Expr.Set.diff lvars subst_dom) alocs in
+      (* Step 3 - postconditions to symbolic states *)
+      L.verbose (fun m ->
+          m
+            "Processing one postcondition of %s with label %a and spec_vars: \
+             @[<h>%a@].@\n\
+             Original Pre:@\n\
+             %a\n\
+             Symb State Pre:@\n\
+             %a@\n\
+             Subst:@\n\
+             %a@\n\
+             Posts (%d):@\n\
+             %a"
+            name
+            Fmt.(
+              option ~none:(any "None") (fun ft (s, e) ->
+                  Fmt.pf ft "[ %s; %a ]" s (iter ~sep:comma SS.iter string) e))
+            label
+            Fmt.(iter ~sep:comma Expr.Set.iter Expr.pp)
+            spec_vars Asrt.pp pre SPState.pp ss_pre SSubst.pp subst
+            (List.length posts)
+            Fmt.(list ~sep:(any "@\n") Asrt.pp)
+            posts);
+      let subst =
+        SSubst.filter subst (fun e v ->
+            match e with
+            | PVar _ -> false
+            | _      -> true)
+      in
+      let posts =
+        List.filter_map
+          (fun p ->
+            let substituted = SSubst.substitute_asrt subst true p in
+            let reduced = Reduction.reduce_assertion substituted in
+            if Simplifications.admissible_assertion reduced then Some reduced
+            else None)
+          posts
+      in
+      if not to_verify then
+        let pre' = Asrt.star (SPState.to_assertions ss_pre) in
+        (None, Some (pre', posts))
+      else
+        (* Step 4 - create a unification plan for the postconditions and s_test *)
+        let () =
+          L.verbose (fun fmt -> fmt "Creating UPs for posts of %s" name)
+        in
+        let pvar_params =
+          List.fold_left
+            (fun acc x -> Expr.Set.add (Expr.PVar x) acc)
+            Expr.Set.empty params
+        in
+        let known_unifiables =
+          Expr.Set.add (PVar Names.return_variable)
+            (Expr.Set.union pvar_params spec_vars)
+        in
+        let existentials =
+          Option.fold ~none:Expr.Set.empty
+            ~some:(fun (_, exs) ->
+              SS.fold
+                (fun x acc -> Expr.Set.add (LVar x) acc)
+                exs Expr.Set.empty)
+            label
+        in
+        let known_unifiables = Expr.Set.union known_unifiables existentials in
+        let simple_posts = List.map (fun post -> (post, (label, None))) posts in
+        let post_up =
+          UP.init known_unifiables Expr.Set.empty pred_ins simple_posts
+        in
+        L.verbose (fun m -> m "END of STEP 4@\n");
+        match post_up with
+        | Error errs ->
+            let msg =
+              Printf.sprintf "Warning: testify failed for %s. Cause: post_up \n"
+                name
+            in
+            Printf.printf "%s" msg;
+            L.verbose (fun m -> m "%s" msg);
+            (None, None)
+        | Ok post_up ->
+            let test =
+              { name; id; params; pre_state = ss_pre; post_up; flag; spec_vars }
+            in
+            let pre' = Asrt.star (SPState.to_assertions ss_pre) in
+            (Some test, Some (pre', posts))
+    in
     try
       (* Step 1 - normalise the precondition *)
       match
         Normaliser.normalise_assertion ~pred_defs:preds
           ~pvars:(SS.of_list params) pre
       with
-      | None                 -> (None, None)
-      | Some (ss_pre, subst) -> (
-          (* Step 2 - spec_vars = lvars(pre)\dom(subst) -U- alocs(range(subst)) *)
-          let lvars =
-            SS.filter (fun x -> Names.is_spec_var_name x) (Asrt.lvars pre)
-          in
-          let lvars =
-            Expr.Set.of_list
-              (List.map (fun x -> Expr.LVar x) (SS.elements lvars))
-          in
-          let subst_dom = SSubst.domain subst None in
-          let get_aloc e =
-            match (e : Expr.t) with
-            | ALoc loc -> Some e
-            | _        -> None
-          in
-          let alocs =
-            Expr.Set.of_list
-              (List_utils.get_list_somes
-                 (List.map get_aloc (SSubst.range subst)))
-          in
-          let spec_vars =
-            Expr.Set.union (Expr.Set.diff lvars subst_dom) alocs
-          in
-
-          let pre' = Asrt.star (SPState.to_assertions ss_pre) in
-
-          (* Step 3 - postconditions to symbolic states *)
-          L.verbose (fun m ->
-              m
-                "Processing one postcondition of %s with label %a and \
-                 spec_vars: @[<h>%a@].@\n\
-                 Original Pre:@\n\
-                 %a\n\
-                 Symb State Pre:@\n\
-                 %a@\n\
-                 Posts (%d):@\n\
-                 %a"
-                name
-                Fmt.(
-                  option ~none:(any "None") (fun ft (s, e) ->
-                      Fmt.pf ft "[ %s; %a ]" s
-                        (iter ~sep:comma SS.iter string)
-                        e))
-                label
-                Fmt.(iter ~sep:comma Expr.Set.iter Expr.pp)
-                spec_vars Asrt.pp pre SPState.pp ss_pre (List.length posts)
-                Fmt.(list ~sep:(any "@\n") Asrt.pp)
-                posts);
-
-          (* Do not substitute program variables in the postcondition *)
-          let subst =
-            SSubst.filter subst (fun e v ->
-                match e with
-                | PVar _ -> false
-                | _      -> true)
-          in
-          let posts =
-            List.map (fun p -> SSubst.substitute_asrt subst true p) posts
-          in
-          let posts = List.map Reduction.reduce_assertion posts in
-          let posts' =
-            List.filter (fun p -> Simplifications.admissible_assertion p) posts
-          in
-
-          (* the following line is horrific - and suggests bad design - mea culpa - JFS *)
-          (* let known_post_vars = match flag with | Some _ -> SS.singleton Names.return_variable | None -> SS.empty in
-             let ss_posts = List.map (Normaliser.normalise_assertion None None (Some known_post_vars)) posts in
-             let ss_posts = List.map (fun (ss, _) -> ss) (get_list_somes ss_posts) in
-             let posts'   = List.map (fun post -> Asrt.star (SPState.to_assertions post)) ss_posts in *)
-          match to_verify with
-          | false -> (None, Some (pre', posts'))
-          | true  -> (
-              (* Step 4 - create a unification plan for the postconditions and s_test *)
-              (* let known_vars    = SS.add Names.return_variable (SS.union (SS.of_list params) spec_vars) in *)
-              L.verbose (fun fmt -> fmt "Creating UPs for posts of %s" name);
-              let pvar_params =
-                Expr.Set.of_list (List.map (fun x -> Expr.PVar x) params)
-              in
-              let known_unifiables =
-                Expr.Set.add (PVar Names.return_variable)
-                  (Expr.Set.union pvar_params spec_vars)
-              in
-              let known_unifiables =
-                Expr.Set.union known_unifiables
-                  (Option.fold
-                     ~some:(fun (_, existentials) ->
-                       let existentials =
-                         List.map
-                           (fun x -> Expr.LVar x)
-                           (SS.elements existentials)
-                       in
-                       Expr.Set.of_list existentials)
-                     ~none:Expr.Set.empty label)
-              in
-              let simple_posts =
-                List.map (fun post -> (post, (label, None))) posts'
-              in
-              let post_up =
-                UP.init known_unifiables Expr.Set.empty pred_ins simple_posts
-              in
-              L.verbose (fun m -> m "END of STEP 4@\n");
-              match post_up with
-              | Error errs ->
-                  let msg =
-                    Printf.sprintf
-                      "WARNING: testify failed for %s. Cause: post_up.\n" name
-                  in
-                  Printf.printf "%s" msg;
-                  L.verbose (fun m -> m "%s" msg);
-                  (None, None)
-              | Ok post_up ->
-                  let test =
-                    {
-                      name;
-                      id;
-                      params;
-                      pre_state = ss_pre;
-                      post_up;
-                      flag;
-                      spec_vars;
-                    }
-                  in
-                  let pre' = Asrt.star (SPState.to_assertions ss_pre) in
-                  (Some test, Some (pre', posts')) ) )
+      | Error _                  -> [ (None, None) ]
+      | Ok normalised_assertions ->
+          List.map test_of_normalised_state normalised_assertions
     with Failure msg ->
       let new_msg =
         Printf.sprintf
@@ -189,7 +171,7 @@ struct
       in
       Printf.printf "%s" new_msg;
       L.normal (fun m -> m "%s" new_msg);
-      (None, None)
+      [ (None, None) ]
 
   let testify_sspec
       (preds : UP.preds_tbl_t)
@@ -197,72 +179,123 @@ struct
       (name : string)
       (params : string list)
       (id : int)
-      (sspec : Spec.st) : t option * Spec.st option =
-    let stest, sspec' =
+      (sspec : Spec.st) : (t option * Spec.st option) list =
+    let tests_and_specs =
       testify preds pred_ins name params id sspec.ss_pre sspec.ss_posts
         (Some sspec.ss_flag)
         (Spec.label_vars_to_set sspec.ss_label)
         sspec.ss_to_verify
     in
-    let sspec' =
-      Option.map
-        (fun (pre, posts) -> { sspec with ss_pre = pre; ss_posts = posts })
-        sspec'
-    in
-    (stest, sspec')
+    List.map
+      (fun (stest, sspec') ->
+        let sspec' =
+          Option.map
+            (fun (pre, posts) -> { sspec with ss_pre = pre; ss_posts = posts })
+            sspec'
+        in
+        (stest, sspec'))
+      tests_and_specs
 
   let testify_spec
       (preds : UP.preds_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (spec : Spec.t) : t list * Spec.t =
-    match spec.spec_to_verify with
-    | false -> ([], spec)
-    | true  ->
-        let () =
-          List.iter
-            (fun (sspec : Spec.st) ->
-              if sspec.ss_posts = [] then
-                failwith
-                  ( "Specification without post-condition for function "
-                  ^ spec.spec_name ))
-            spec.spec_sspecs
-        in
-        L.verbose (fun m ->
-            m
-              ( "-------------------------------------------------------------------------@\n"
-              ^^ "Creating symbolic tests for procedure %s: %d cases\n"
-              ^^ "-------------------------------------------------------------------------"
-              )
-              spec.spec_name
-              (List.length spec.spec_sspecs));
-        let tests, sspecs =
-          List.split
-            (List.mapi
-               (testify_sspec preds pred_ins spec.spec_name spec.spec_params)
-               spec.spec_sspecs)
-        in
-        let tests = List_utils.get_list_somes tests in
-        let spec_sspecs = List_utils.get_list_somes sspecs in
-        let new_spec = { spec with spec_sspecs } in
-        L.verbose (fun m -> m "Simplified SPECS:@\n@[%a@]@\n" Spec.pp new_spec);
-        (tests, new_spec)
+    if not spec.spec_to_verify then ([], spec)
+    else
+      let () =
+        List.iter
+          (fun (sspec : Spec.st) ->
+            if sspec.ss_posts = [] then
+              failwith
+                ( "Specification without post-condition for function "
+                ^ spec.spec_name ))
+          spec.spec_sspecs
+      in
+      L.verbose (fun m ->
+          m
+            ( "-------------------------------------------------------------------------@\n"
+            ^^ "Creating symbolic tests for procedure %s: %d cases\n"
+            ^^ "-------------------------------------------------------------------------"
+            )
+            spec.spec_name
+            (List.length spec.spec_sspecs));
+      let _, tests, spec_sspecs =
+        List.fold_left
+          (fun (id, tests, sspecs) sspec ->
+            let tests_and_specs =
+              testify_sspec preds pred_ins spec.spec_name spec.spec_params id
+                sspec
+            in
+            let new_tests, new_specs =
+              List.fold_left
+                (fun (nt, ns) (t, s) ->
+                  let nt =
+                    match t with
+                    | Some test -> test :: nt
+                    | None      -> nt
+                  in
+                  let ns =
+                    match s with
+                    | Some spec -> spec :: ns
+                    | None      -> ns
+                  in
+                  (nt, ns))
+                ([], []) tests_and_specs
+            in
+            (id + 1, new_tests @ tests, new_specs @ sspecs))
+          (0, [], []) spec.spec_sspecs
+      in
+      let new_spec = { spec with spec_sspecs } in
+      L.verbose (fun m -> m "Simplified SPECS:@\n@[%a@]@\n" Spec.pp new_spec);
+      (tests, new_spec)
 
   let testify_lemma
       (preds : UP.preds_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (lemma : Lemma.t) : t list * Lemma.t =
-    let test, sspec =
-      testify preds pred_ins lemma.lemma_name lemma.lemma_params 0
-        lemma.lemma_hyp lemma.lemma_concs None None true
+    let tests_and_specs =
+      List.concat_map
+        (fun Lemma.{ lemma_hyp; lemma_concs } ->
+          testify preds pred_ins lemma.lemma_name lemma.lemma_params 0 lemma_hyp
+            lemma_concs None None true)
+        lemma.lemma_specs
     in
-    let tests = Option.fold ~some:(fun test -> [ test ]) ~none:[] test in
-    match sspec with
-    | Some (lemma_hyp, lemma_concs) ->
-        (tests, { lemma with lemma_hyp; lemma_concs })
-    | None ->
-        raise
-          (Failure
-             (Printf.sprintf "Could not testify lemma %s" lemma.lemma_name))
+    let tests, specs =
+      List.fold_left
+        (fun (test_acc, spec_acc) (test_opt, spec_opt) ->
+          let test_acc =
+            match test_opt with
+            | Some t -> t :: test_acc
+            | None   -> test_acc
+          in
+          let spec_acc =
+            match spec_opt with
+            | Some (lemma_hyp, lemma_concs) ->
+                Lemma.{ lemma_hyp; lemma_concs } :: spec_acc
+            | None -> spec_acc
+          in
+          (test_acc, spec_acc))
+        ([], []) tests_and_specs
+    in
+    let () =
+      match specs with
+      | [] ->
+          raise
+            (Failure
+               (Printf.sprintf "Could not testify lemma %s" lemma.lemma_name))
+      | _  -> ()
+    in
+    (tests, { lemma with lemma_specs = specs })
+
+  (* let (tests, lemmas) = List.fold_left
+     let tests = Option.fold ~some:(fun test -> [ test ]) ~none:[] test in
+     match sspec with
+     | Some (lemma_hyp, lemma_concs) ->
+         (tests, { lemma with lemma_hyp; lemma_concs })
+     | None ->
+         raise
+           (Failure
+              (Printf.sprintf "Could not testify lemma %s" lemma.lemma_name)) *)
 
   let analyse_result (subst : SSubst.t) (test : t) (state : SPState.t) : bool =
     let _ = SPState.simplify state in

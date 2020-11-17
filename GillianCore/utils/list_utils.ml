@@ -41,8 +41,12 @@ let right_combine (lst1 : 'a list) (lst2 : 'b list) : ('a * 'b) list =
   loop lst1 lst2 []
 
 let get_list_somes (lst : 'a option list) : 'a list =
-  let lst = List.filter (fun x -> x <> None) lst in
-  List.map (fun x -> Option.get x) lst
+  let rec aux = function
+    | []          -> []
+    | Some x :: r -> x :: aux r
+    | None :: r   -> aux r
+  in
+  aux lst
 
 let divide_list_by_index (lst : 'a list) (len : int) : 'a list * 'a list =
   let rec f (i : int) (l_lst : 'a list) (r_list : 'a list) : 'a list * 'a list =
@@ -79,3 +83,12 @@ let list_sub l ofs len =
 let make n el =
   let rec aux acc i = if i <= 0 then acc else aux (el :: acc) (i - 1) in
   aux [] n
+
+let index_of element list =
+  let rec aux cursor l =
+    match l with
+    | [] -> None
+    | k :: _ when k = element -> Some cursor
+    | _ :: r -> aux (cursor + 1) r
+  in
+  aux 0 list

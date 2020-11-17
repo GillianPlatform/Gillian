@@ -484,7 +484,8 @@ module Make (SMemory : SMemory.S) :
   let produce_posts (state : t) (subst : st) (asrts : Asrt.t list) : t list =
     raise (Failure "produce_posts from non-abstract symbolic state.")
 
-  let produce (state : t) (subst : st) (asrt : Asrt.t) : t option =
+  let produce (state : t) (subst : st) (asrt : Asrt.t) : (t list, string) result
+      =
     raise (Failure "produce_post from non-abstract symbolic state.")
 
   let fresh_val (state : t) : vt = LVar (LVar.alloc ())

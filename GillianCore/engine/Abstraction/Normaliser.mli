@@ -14,5 +14,5 @@ module Make
     ?subst:SVal.SESubst.t ->
     ?pvars:Utils.Containers.SS.t ->
     Asrt.t ->
-    (SPState.t * SVal.SESubst.t) option
+    ((SPState.t * SVal.SESubst.t) list, string) result
 end

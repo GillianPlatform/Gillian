@@ -223,7 +223,8 @@ module Make
   let produce_posts (state : t) (subst : st) (asrts : Asrt.t list) : t list =
     raise (Failure "produce_posts from concrete state.")
 
-  let produce (state : t) (subst : st) (asrt : Asrt.t) : t option =
+  let produce (state : t) (subst : st) (asrt : Asrt.t) : (t list, string) result
+      =
     raise (Failure "produce_post from non-abstract symbolic state.")
 
   let update_subst (state : t) (subst : st) : unit = ()
