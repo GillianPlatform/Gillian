@@ -1,4 +1,4 @@
 (library
  (name monadic)
  (public_name gillian.monadic)
- (libraries gil_syntax engine utils fmt))
+ (libraries gil_syntax engine utils fmt logging))

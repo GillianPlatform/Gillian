@@ -15,6 +15,9 @@ let build_full_gamma (pc : Pc.t) =
   copied
 
 let sat ~(pc : Pc.t) formula =
+  Logging.verbose (fun m ->
+      m "Monadic about to check sat of this new formula:@[<hov>%a@]" Formula.pp
+        formula);
   let pfs = build_full_pfs pc in
   let gamma = build_full_gamma pc in
   match Engine.Reduction.reduce_formula ~pfs ~gamma formula with

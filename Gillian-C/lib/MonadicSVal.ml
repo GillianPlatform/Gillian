@@ -214,7 +214,7 @@ module SVArray = struct
     let chunk_size = Chunk.size_expr chunk in
     let size =
       let open Expr.Infix in
-      let high, low = range in
+      let low, high = range in
       (high -. low) /. chunk_size
     in
     let f_of_all_same ~describing_pf ~concrete_single =

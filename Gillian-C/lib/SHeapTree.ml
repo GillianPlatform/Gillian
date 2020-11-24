@@ -8,6 +8,8 @@ module SVal = MonadicSVal
 module SVArr = SVal.SVArray
 module CoreP = Constr.Core
 
+let log_string s = Logging.tmi (fun fmt -> fmt "SHEAPTREE CHECKING: %s" s)
+
 type err =
   | UseAfterFree
   | BufferOverrun
@@ -396,21 +398,27 @@ module Tree = struct
     let old_span = t.span in
     let ol, oh = old_span in
     let nl, nh = range in
-    if%sat ol #== nl then
+    if%sat
+      log_string "ol #== nl";
+      ol #== nl
+    then
       let at = nh in
       let* left_node, right_node = Node.split ~span:old_span ~at t.node in
-      let left_span, right_span = Range.split_at old_span nh in
+      let left_span, right_span = Range.split_at old_span at in
       let left = make ~node:left_node ~span:left_span () in
       let right = make ~node:right_node ~span:right_span () in
       Delayed.return (left_node, left, right)
     else
-      if%sat oh #== nh then
+      if%sat
+        log_string "oh #== nh";
+        oh #== nh
+      then
         let at = nl in
         let* left_node, right_node = Node.split ~span:old_span ~at t.node in
         let left_span, right_span = Range.split_at old_span nl in
         let left = make ~node:left_node ~span:left_span () in
         let right = make ~node:right_node ~span:right_span () in
-        Delayed.return (left_node, left, right)
+        Delayed.return (right_node, left, right)
       else
         (* We're first splitting on the left then splitting again on the right *)
         let* left_node, right_node = Node.split ~span:old_span ~at:nl t.node in
@@ -428,9 +436,6 @@ module Tree = struct
     let open Delayed.Syntax in
     let rl, rh = range in
     let sl, sh = t.span in
-    Logging.tmi (fun fmt ->
-        fmt "RANGE: (%a, %a); SPAN: (%a, %a)" Expr.pp rl Expr.pp rh Expr.pp sl
-          Expr.pp sh);
     let* t_with_left =
       if%sat rl #< sl then
         let new_left_tree = make ~node:(NotOwned Totally) ~span:(rl, sl) () in
@@ -458,10 +463,16 @@ module Tree = struct
       (* First result is the extracted tree, second is the remain *)
       let open Delayed in
       let open Syntax in
-      if%sat Range.is_equal range t.span then return (t, None)
+      if%sat
+        log_string "EXTRACT range is equal span";
+        Range.is_equal range t.span
+      then return (t, None)
       else
         let left, right = Option.get t.children in
-        if%sat Range.is_inside range left.span then
+        if%sat
+          log_string "EXTRACT range inside left";
+          Range.is_inside range left.span
+        then
           let* extracted, new_left = extract left range in
           let+ new_self =
             match new_left with
@@ -487,7 +498,11 @@ module Tree = struct
     in
     let rec frame_inside ~replace_node ~rebuild_parent (t : t) (range : Range.t)
         =
-      if%sat Range.is_equal range t.span then
+      Logging.verbose (fun fmt -> fmt "HERE: %a" pp t);
+      if%sat
+        log_string "range equals span";
+        Range.is_equal range t.span
+      then
         match replace_node t with
         | Ok new_tree -> DR.ok (t.node, new_tree)
         | Error err   -> DR.error err
@@ -495,7 +510,10 @@ module Tree = struct
         match t.children with
         | Some (left, right) ->
             let _, mid = left.span in
-            if%sat Range.point_strictly_inside mid range then
+            if%sat
+              log_string "mid stricly in range";
+              Range.point_strictly_inside mid range
+            then
               let _, h = range in
               let upper_range = (mid, h) in
               let dont_replace_node t = Ok t in
@@ -512,25 +530,39 @@ module Tree = struct
               in
               frame_inside ~replace_node ~rebuild_parent new_self range
             else
-              if%sat Range.is_inside range left.span then
+              if%sat
+                log_string "range inside left";
+                Range.is_inside range left.span
+              then
                 let** node, left =
                   frame_inside ~replace_node ~rebuild_parent left range
                 in
                 let+ new_parent = rebuild_parent t ~left ~right in
                 Ok (node, new_parent)
               else
-                if%sat Range.is_inside range right.span then
+                if%sat
+                  log_string "range inside right";
+                  Range.is_inside range right.span
+                then
                   let** node, right =
                     frame_inside ~replace_node ~rebuild_parent right range
                   in
                   let+ new_parent = rebuild_parent t ~left ~right in
                   Ok (node, new_parent)
-                else DR.error (Unhandled "wrong pre-cut")
+                else (
+                  Logging.verbose (fun fmt ->
+                      fmt
+                        "ABOUT TO SAY PRECUT SHIT:\n\
+                         LEFT: %a\n\
+                         RIGHT: %a\n\
+                        \ RANGE: %a" Range.pp left.span Range.pp right.span
+                        Range.pp range);
+                  DR.error (Unhandled "wrong pre-cut") )
         | None               ->
             let open Delayed.Syntax in
             let* _, left, right = split ~range t in
             let* new_self = with_children t ~left ~right in
-            Logging.tmi (fun fmt -> fmt "AFTER SPLITING: %a" pp new_self);
+            Logging.verbose (fun fmt -> fmt "AFTER SPLITTING: %a" pp new_self);
             frame_inside ~replace_node ~rebuild_parent new_self range
     in
     let open Delayed.Syntax in
@@ -555,16 +587,10 @@ module Tree = struct
     let replace_node x = Ok x in
     let rebuild_parent = with_children in
     let range = Range.of_low_chunk_and_size low chunk size in
-    let open Formula.Infix in
-    if%sat size #> (Expr.num 0.) then
-      let+* node, tree = frame_range t ~replace_node ~rebuild_parent range in
-      Result.map
-        (fun (arr, perm) -> (arr, perm, tree))
-        (Node.decode_arr ~chunk node)
-    else
-      let arbitrary_perm = Perm.Freeable in
-      (* FIXME: this is wrong, we need to find a solution for empty arrays that are overlapping *)
-      DR.ok (SVArr.empty, Some arbitrary_perm, t)
+    let+* node, tree = frame_range t ~replace_node ~rebuild_parent range in
+    Result.map
+      (fun (arr, perm) -> (arr, perm, tree))
+      (Node.decode_arr ~chunk node)
 
   let set_array
       (t : t)
@@ -574,16 +600,11 @@ module Tree = struct
       (array : SVArr.t)
       (perm : Perm.t) : (t, err) DR.t =
     let open DR.Syntax in
-    let open Formula.Infix in
-    if%sat size #<= (Expr.num 0.) #|| (SVArr.is_empty array) then
-      let () = Logging.verbose (fun fmt -> fmt "DOING NOTHING!") in
-      DR.ok t
-    else
-      let replace_node _ = Ok (sarr_leaf ~low ~chunk ~array ~size ~perm) in
-      let rebuild_parent = of_children in
-      let range = Range.of_low_chunk_and_size low chunk size in
-      let++ _, t = frame_range t ~replace_node ~rebuild_parent range in
-      t
+    let replace_node _ = Ok (sarr_leaf ~low ~chunk ~array ~size ~perm) in
+    let rebuild_parent = of_children in
+    let range = Range.of_low_chunk_and_size low chunk size in
+    let++ _, t = frame_range t ~replace_node ~rebuild_parent range in
+    t
 
   let get_single (t : t) (low : Expr.t) (chunk : Chunk.t) :
       (SVal.t * Perm.t option * t, err) DR.t =
@@ -941,95 +962,80 @@ let set_array t low size chunk array perm =
 
 let rem_array t low size chunk =
   let open DR.Syntax in
-  let open Formula.Infix in
-  if%sat size #<= (Expr.num 0.) then DR.ok t
-  else
-    let range = Range.of_low_chunk_and_size low chunk size in
-    let** root = DR.of_result (get_root t) in
-    let** root_set =
-      match root with
-      | None      -> DR.ok None
-      | Some root ->
-          let** root_set = Tree.set_node root range Node.not_owned in
-          DR.ok (Some root_set)
-    in
-    let** bounds = DR.of_result (get_bounds t) in
-    let learned =
-      match bounds with
-      | None        -> []
-      | Some bounds -> [ Range.is_inside range bounds ]
-    in
-    DR.of_result ~learned (with_root_opt t root_set)
+  let range = Range.of_low_chunk_and_size low chunk size in
+  let** root = DR.of_result (get_root t) in
+  let** root_set =
+    match root with
+    | None      -> DR.ok None
+    | Some root ->
+        let** root_set = Tree.set_node root range Node.not_owned in
+        DR.ok (Some root_set)
+  in
+  let** bounds = DR.of_result (get_bounds t) in
+  let learned =
+    match bounds with
+    | None        -> []
+    | Some bounds -> [ Range.is_inside range bounds ]
+  in
+  DR.of_result ~learned (with_root_opt t root_set)
 
 let get_simple_mem_val ~expected_mem_val t low high =
   let open DR.Syntax in
-  let open Formula.Infix in
-  let open Expr.Infix in
-  if%sat (high -. low) #<= (Expr.num 0.) then DR.ok (t, Some Perm.Freeable)
-  else
-    let range = (low, high) in
-    let** span = DR.of_result (get_bounds t) in
-    if%sat is_in_bounds range span then
-      let** root = DR.of_result (get_root t) in
-      match root with
-      | None      -> DR.error MissingResource
-      | Some root ->
-          let** node, root_framed = Tree.get_node root range in
-          let res =
-            match node with
-            | MemVal { mem_val; exact_perm = perm; _ }
-              when Node.eq_mem_val mem_val expected_mem_val -> Ok perm
-            | NotOwned _ -> Error MissingResource
-            | _ -> Error WrongMemVal
-          in
-          let++ wroot =
-            DR.of_result
-              (Result.bind res (fun perm ->
-                   Result.map (fun mem -> (mem, perm)) (with_root t root_framed)))
-          in
-          wroot
-    else DR.error BufferOverrun
+  let range = (low, high) in
+  let** span = DR.of_result (get_bounds t) in
+  if%sat is_in_bounds range span then
+    let** root = DR.of_result (get_root t) in
+    match root with
+    | None      -> DR.error MissingResource
+    | Some root ->
+        let** node, root_framed = Tree.get_node root range in
+        let res =
+          match node with
+          | MemVal { mem_val; exact_perm = perm; _ }
+            when Node.eq_mem_val mem_val expected_mem_val -> Ok perm
+          | NotOwned _ -> Error MissingResource
+          | _ -> Error WrongMemVal
+        in
+        let++ wroot =
+          DR.of_result
+            (Result.bind res (fun perm ->
+                 Result.map (fun mem -> (mem, perm)) (with_root t root_framed)))
+        in
+        wroot
+  else DR.error BufferOverrun
 
 let set_simple_mem_val ~mem_val t low high perm =
   let open DR.Syntax in
-  let open Formula.Infix in
-  if%sat low #== high then DR.ok t
-  else
-    let range = (low, high) in
-    let** root = DR.of_result (get_root t) in
-    let root = Option.value ~default:(Tree.create_root range) root in
-    let** root_set =
-      Tree.set_node root range (Node.make_owned ~perm ~mem_val)
-    in
-    let** bounds = DR.of_result (get_bounds t) in
-    let learned =
-      match bounds with
-      | None        -> []
-      | Some bounds -> [ Range.is_inside range bounds ]
-    in
-    DR.of_result ~learned (with_root t root_set)
+  let range = (low, high) in
+  let** root = DR.of_result (get_root t) in
+  let root = Option.value ~default:(Tree.create_root range) root in
+  let** root_set = Tree.set_node root range (Node.make_owned ~perm ~mem_val) in
+  let** bounds = DR.of_result (get_bounds t) in
+  let learned =
+    match bounds with
+    | None        -> []
+    | Some bounds -> [ Range.is_inside range bounds ]
+  in
+  DR.of_result ~learned (with_root t root_set)
 
 let rem_simple_mem_val t low high =
   let open DR.Syntax in
-  let open Formula.Infix in
-  if%sat low #== high then DR.ok t
-  else
-    let range = (low, high) in
-    let** root = DR.of_result (get_root t) in
-    let** root_set =
-      match root with
-      | None      -> DR.ok None
-      | Some root ->
-          let** root_set = Tree.set_node root range Node.not_owned in
-          DR.ok (Some root_set)
-    in
-    let** bounds = DR.of_result (get_bounds t) in
-    let learned =
-      match bounds with
-      | None        -> []
-      | Some bounds -> [ Range.is_inside range bounds ]
-    in
-    DR.of_result ~learned (with_root_opt t root_set)
+  let range = (low, high) in
+  let** root = DR.of_result (get_root t) in
+  let** root_set =
+    match root with
+    | None      -> DR.ok None
+    | Some root ->
+        let** root_set = Tree.set_node root range Node.not_owned in
+        DR.ok (Some root_set)
+  in
+  let** bounds = DR.of_result (get_bounds t) in
+  let learned =
+    match bounds with
+    | None        -> []
+    | Some bounds -> [ Range.is_inside range bounds ]
+  in
+  DR.of_result ~learned (with_root_opt t root_set)
 
 let get_hole = get_simple_mem_val ~expected_mem_val:(Undef Totally)
 

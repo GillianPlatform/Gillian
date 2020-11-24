@@ -104,7 +104,7 @@ rule read =
   | "=="       { LEQ }
   | "="        { EQ }
   | '!'        { ENOT }
-  | ""         { LLT }
+  | "<#"         { LLT }
   | "<=#"      { LLEQ }
   | newline    { next_line lexbuf; read lexbuf }
   | white      { read lexbuf }

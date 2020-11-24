@@ -69,7 +69,7 @@ let pp fmt genv =
                 in
                 not_printed
           with Not_found ->
-            let () = Format.fprintf fmt "Error unkown symbol %s@\n" s in
+            let () = Format.fprintf fmt "Error unknown symbol %s@\n" s in
             not_printed
         in
         aux new_not_printed r

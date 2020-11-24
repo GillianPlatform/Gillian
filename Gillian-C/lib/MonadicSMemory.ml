@@ -151,34 +151,46 @@ module Mem = struct
   let get_array mem loc ofs size chunk =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res mem loc_name in
-    let++ sarr, perm, new_tree =
-      map_lift_err loc_name (SHeapTree.get_array tree ofs size chunk)
-    in
-    (SMap.add loc_name new_tree mem, loc_name, sarr, perm)
+    let open Formula.Infix in
+    if%sat size #<= (Expr.num 0.) then
+      DR.ok (mem, loc_name, MonadicSVal.SVArray.empty, Some Perm.Freeable)
+    else
+      let** tree = get_tree_res mem loc_name in
+      let++ sarr, perm, new_tree =
+        map_lift_err loc_name (SHeapTree.get_array tree ofs size chunk)
+      in
+      (SMap.add loc_name new_tree mem, loc_name, sarr, perm)
 
   let set_array mem loc ofs size chunk array perm =
     let open DR.Syntax in
-    let* loc_name = resolve_or_create_loc_name loc in
-    let* tree = get_or_create_tree mem loc_name in
-    let++ new_tree =
-      map_lift_err loc_name (SHeapTree.set_array tree ofs size chunk array perm)
-    in
-    Logging.tmi (fun m -> m "created tree: %a" SHeapTree.pp new_tree);
-    SMap.add loc_name new_tree mem
+    let open Formula.Infix in
+    if%sat size #<= (Expr.num 0.) #&& (MonadicSVal.SVArray.is_empty array) then
+      DR.ok mem
+    else
+      let* loc_name = resolve_or_create_loc_name loc in
+      let* tree = get_or_create_tree mem loc_name in
+      let++ new_tree =
+        map_lift_err loc_name
+          (SHeapTree.set_array tree ofs size chunk array perm)
+      in
+      Logging.tmi (fun m -> m "created tree: %a" SHeapTree.pp new_tree);
+      SMap.add loc_name new_tree mem
 
   let rem_array mem loc ofs size chunk =
     let open DR.Syntax in
-    let* loc_name = Delayed.resolve_loc loc in
-    match Option.bind loc_name (fun l -> SMap.find_opt l mem) with
-    | None      -> DR.ok mem
-    | Some tree ->
-        let loc_name = Option.get loc_name in
-        let++ new_tree =
-          map_lift_err loc_name (SHeapTree.rem_array tree ofs size chunk)
-        in
-        if SHeapTree.is_empty new_tree then SMap.remove loc_name mem
-        else SMap.add loc_name new_tree mem
+    let open Formula.Infix in
+    if%sat size #<= (Expr.num 0.) then DR.ok mem
+    else
+      let* loc_name = Delayed.resolve_loc loc in
+      match Option.bind loc_name (fun l -> SMap.find_opt l mem) with
+      | None      -> DR.ok mem
+      | Some tree ->
+          let loc_name = Option.get loc_name in
+          let++ new_tree =
+            map_lift_err loc_name (SHeapTree.rem_array tree ofs size chunk)
+          in
+          if SHeapTree.is_empty new_tree then SMap.remove loc_name mem
+          else SMap.add loc_name new_tree mem
 
   let get_freed mem loc =
     let open DR.Syntax in
@@ -204,28 +216,43 @@ module Mem = struct
 
   let get_simple ~sheap_getter mem loc low high =
     let open DR.Syntax in
+    let open Formula.Infix in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res mem loc_name in
-    let++ new_tree, perm = map_lift_err loc_name (sheap_getter tree low high) in
-    (SMap.add loc_name new_tree mem, loc_name, perm)
+    if%sat high #== low then DR.ok (mem, loc_name, Some Perm.Freeable)
+    else
+      let** tree = get_tree_res mem loc_name in
+      let++ new_tree, perm =
+        map_lift_err loc_name (sheap_getter tree low high)
+      in
+      (SMap.add loc_name new_tree mem, loc_name, perm)
 
   let set_simple ~sheap_setter mem loc low high perm =
     let open DR.Syntax in
-    let* loc_name = resolve_or_create_loc_name loc in
-    let* tree = get_or_create_tree mem loc_name in
-    let++ new_tree = map_lift_err loc_name (sheap_setter tree low high perm) in
-    SMap.add loc_name new_tree mem
+    let open Formula.Infix in
+    if%sat high #== low then DR.ok mem
+    else
+      let* loc_name = resolve_or_create_loc_name loc in
+      let* tree = get_or_create_tree mem loc_name in
+      let++ new_tree =
+        map_lift_err loc_name (sheap_setter tree low high perm)
+      in
+      SMap.add loc_name new_tree mem
 
   let rem_simple ~sheap_remover mem loc low high =
     let open DR.Syntax in
-    let* loc_name = Delayed.resolve_loc loc in
-    match Option.bind loc_name (fun l -> SMap.find_opt l mem) with
-    | None      -> DR.ok mem
-    | Some tree ->
-        let loc_name = Option.get loc_name in
-        let++ new_tree = map_lift_err loc_name (sheap_remover tree low high) in
-        if SHeapTree.is_empty new_tree then SMap.remove loc_name mem
-        else SMap.add loc_name new_tree mem
+    let open Formula.Infix in
+    if%sat high #== low then DR.ok mem
+    else
+      let* loc_name = Delayed.resolve_loc loc in
+      match Option.bind loc_name (fun l -> SMap.find_opt l mem) with
+      | None      -> DR.ok mem
+      | Some tree ->
+          let loc_name = Option.get loc_name in
+          let++ new_tree =
+            map_lift_err loc_name (sheap_remover tree low high)
+          in
+          if SHeapTree.is_empty new_tree then SMap.remove loc_name mem
+          else SMap.add loc_name new_tree mem
 
   let get_hole = get_simple ~sheap_getter:SHeapTree.get_hole
 
