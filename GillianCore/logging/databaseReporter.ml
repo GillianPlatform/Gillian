@@ -32,7 +32,7 @@ class virtual ['a] t =
   object (self)
     method log (report : 'a Report.t) =
       if enabled () then
-        write (Report.yojson_of_t self#specific_serializer report)
+        write (Report.to_yojson self#specific_serializer report)
 
     method wrap_up = wrap_up ()
 

@@ -1,11 +1,14 @@
 type uuidm = Uuidm.t
 
-let yojson_of_uuidm uuidm = yojson_of_string (Uuidm.to_string uuidm)
+let uuidm_to_yojson uuidm = `String (Uuidm.to_string uuidm)
 
 let uuidm_of_yojson yojson =
-  Option.get (Uuidm.of_string (string_of_yojson yojson))
+  Option.to_result ~none:"uuidm should e a string"
+    ( match yojson with
+    | `String s -> Uuidm.of_string s
+    | _         -> None )
 
-type id = int * uuidm [@@deriving yojson]
+type id = int * uuidm [@@deriving yojson { exn = true }]
 
 module PackedPP : sig
   type t [@@deriving yojson]
@@ -31,9 +34,13 @@ end = struct
 
   let of_string s = PP (fun m -> m "%s" s)
 
-  let yojson_of_t t = to_string t |> yojson_of_string
+  let to_yojson t = to_string t |> fun s -> `String s
 
-  let t_of_yojson yojson = string_of_yojson yojson |> of_string
+  let of_yojson yojson =
+    Result.map of_string
+      ( match yojson with
+      | `String s -> Ok s
+      | _         -> Error "should be a string" )
 end
 
 type agnostic_content = Debug of PackedPP.t | Phase [@@deriving yojson]

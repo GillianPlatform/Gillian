@@ -1,6 +1,15 @@
 type ('a, 'b) hashtbl = ('a, 'b) Hashtbl.t
 
-type t = (string * int, bool) hashtbl [@@deriving yojson]
+type t = (string * int, bool) hashtbl
+
+let of_yojson yj =
+  let ( >| ) o f = Result.map f o in
+  yj |> [%of_yojson: ((string * int) * bool) list] >| List.to_seq
+  >| Hashtbl.of_seq
+
+let to_yojson s =
+  s |> Hashtbl.to_seq |> List.of_seq
+  |> [%to_yojson: ((string * int) * bool) list]
 
 let make () : t = Hashtbl.create Config.small_tbl_size
 

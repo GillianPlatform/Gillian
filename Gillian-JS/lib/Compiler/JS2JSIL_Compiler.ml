@@ -783,10 +783,11 @@ let rec translate_expr tr_ctx e :
   in
 
   (* All the other commands must get the offsets and nothing else *)
-  let js_char_offset = e.JS_Parser.Syntax.exp_offset in
-  let js_line_offset = tr_ctx.tr_offset_converter js_char_offset in
+  let js_loc = e.JS_Parser.Syntax.exp_loc in
   let metadata : Annot.t =
-    Annot.init ~line_offset:(Some js_line_offset) ~loop_info:tr_ctx.tr_loops ()
+    Annot.make
+      ~origin_loc:(JS_Utils.lift_flow_loc js_loc)
+      ~loop_info:tr_ctx.tr_loops ()
   in
   let annotate_cmds = annotate_cmds_top_level metadata in
   let annotate_cmd cmd lab = annotate_cmd_top_level metadata (lab, cmd) in
@@ -4126,10 +4127,9 @@ and translate_statement tr_ctx e =
   in
 
   (* All the other commands must get the offsets and nothing else *)
-  let js_char_offset = e.JS_Parser.Syntax.exp_offset in
-  let js_line_offset = tr_ctx.tr_offset_converter js_char_offset in
+  let origin_loc = JS_Utils.lift_flow_loc e.JS_Parser.Syntax.exp_loc in
   let metadata : Annot.t =
-    Annot.init ~line_offset:(Some js_line_offset) ~loop_info:tr_ctx.tr_loops ()
+    Annot.make ~origin_loc ~loop_info:tr_ctx.tr_loops ()
   in
   let annotate_cmds = annotate_cmds_top_level metadata in
   let annotate_cmd cmd lab = annotate_cmd_top_level metadata (lab, cmd) in
@@ -6652,7 +6652,7 @@ let make_final_cmd vars final_lab final_var =
         let vars = List.map (fun x_r -> PVar x_r) vars in
         LPhiAssignment [ (final_var, vars) ]
   in
-  (Annot.init (), Some final_lab, cmd_final)
+  (Annot.make (), Some final_lab, cmd_final)
 
 let translate_fun_decls (top_level : bool) (sc_var : string) (cur_index : int) e
     =
@@ -6676,8 +6676,8 @@ let translate_fun_decls (top_level : bool) (sc_var : string) (cur_index : int) e
   in
   hoisted_fdecls
 
-let generate_main offset_converter e strictness spec : EProc.t =
-  let annotate_cmd cmd lab = (Annot.init (), lab, cmd) in
+let generate_main e strictness spec : EProc.t =
+  let annotate_cmd cmd lab = (Annot.make (), lab, cmd) in
 
   let new_var = fresh_var () in
   let setup_heap_ass =
@@ -6738,13 +6738,10 @@ let generate_main offset_converter e strictness spec : EProc.t =
   let cmd_ass_re = make_var_ass_re () in
   let cmd_ass_re = annotate_cmd cmd_ass_re None in
 
-  let ctx =
-    make_translation_ctx offset_converter main_fid [ main_fid ] sc_var_main
-      strictness
-  in
+  let ctx = make_translation_ctx main_fid [ main_fid ] sc_var_main strictness in
   let cmds_hoist_fdecls = translate_fun_decls true sc_var_main 0 e in
   let cmds_hoist_fdecls =
-    annotate_cmds_top_level (Annot.init ()) cmds_hoist_fdecls
+    annotate_cmds_top_level (Annot.make ()) cmds_hoist_fdecls
   in
 
   let cmds_e, x_e, errs, _, _, _ = translate_statement ctx e in
@@ -6816,11 +6813,10 @@ let generate_main offset_converter e strictness spec : EProc.t =
   { name = main_fid; body = Array.of_list main_cmds; params = []; spec }
 
 let generate_proc_eval new_fid ?use_cc e strictness vis_fid : EProc.t =
-  let annotate_cmd cmd lab = (Annot.init (), lab, cmd) in
+  let annotate_cmd cmd lab = (Annot.make (), lab, cmd) in
   let annotate_cmds cmds =
-    List.map (fun (lab, cmd) -> (Annot.init (), lab, cmd)) cmds
+    List.map (fun (lab, cmd) -> (Annot.make (), lab, cmd)) cmds
   in
-  let offset_converter x = 0 in
   let var_sc_proc = JS2JSIL_Helpers.var_sc_first in
 
   (* x_er_m := new (null)   *)
@@ -6871,9 +6867,7 @@ let generate_proc_eval new_fid ?use_cc e strictness vis_fid : EProc.t =
   let cmd_ass_se = make_var_ass_se () in
   let cmd_ass_se = annotate_cmd cmd_ass_se None in
 
-  let ctx =
-    make_translation_ctx offset_converter new_fid vis_fid var_sc_proc strictness
-  in
+  let ctx = make_translation_ctx new_fid vis_fid var_sc_proc strictness in
   let ctx = update_tr_ctx ?use_cc ctx in
 
   let cmds_hoist_fdecls =
@@ -6950,15 +6944,12 @@ let generate_proc_eval new_fid ?use_cc e strictness vis_fid : EProc.t =
     spec = None;
   }
 
-let generate_proc ?use_cc offset_converter e fid params strictness vis_fid spec
-    : EProc.t =
-  let annotate_cmd cmd lab = (Annot.init (), lab, cmd) in
+let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
+  let annotate_cmd cmd lab = (Annot.make (), lab, cmd) in
 
   let var_sc_proc = JS2JSIL_Helpers.var_sc_first in
 
-  let ctx =
-    make_translation_ctx offset_converter fid vis_fid var_sc_proc strictness
-  in
+  let ctx = make_translation_ctx fid vis_fid var_sc_proc strictness in
   let ctx = update_tr_ctx ?use_cc ctx in
 
   let new_ctx =
@@ -6972,7 +6963,7 @@ let generate_proc ?use_cc offset_converter e fid params strictness vis_fid spec
     translate_fun_decls false var_sc_proc (List.length vis_fid - 1) e
   in
   let cmds_hoist_fdecls =
-    annotate_cmds_top_level (Annot.init ()) cmds_hoist_fdecls
+    annotate_cmds_top_level (Annot.make ()) cmds_hoist_fdecls
   in
 
   (* x_er_m := new (null)   *)
@@ -7026,13 +7017,13 @@ let generate_proc ?use_cc offset_converter e fid params strictness vis_fid spec
   let x_argList_act = fresh_var () in
   let cmds_arg_obj =
     [
-      (Annot.init (), None, LArguments x_argList_pre);
-      ( Annot.init (),
+      (Annot.make (), None, LArguments x_argList_pre);
+      ( Annot.make (),
         None,
         LBasic
           (Assignment (x_argList_act, UnOp (Cdr, UnOp (Cdr, PVar x_argList_pre))))
       );
-      ( Annot.init (),
+      ( Annot.make (),
         None,
         LCall
           ( var_args,
@@ -7040,7 +7031,7 @@ let generate_proc ?use_cc offset_converter e fid params strictness vis_fid spec
             [ PVar x_argList_act ],
             None,
             None ) );
-      ( Annot.init (),
+      ( Annot.make (),
         None,
         LBasic (Mutation (PVar var_er, Lit (String "arguments"), PVar var_args))
       );
@@ -7168,8 +7159,6 @@ let js2jsil_eval
     (prog : ('a, int) Gillian.Gil_syntax.Prog.t) fid_parent strictness e =
   let prog, which_pred = (prog.procs, prog.predecessors) in
 
-  let offset_converter x = 0 in
-
   let e, fid_eval, vislist_eval, eval_fun_tbl =
     JS2JSIL_Preprocessing.preprocess_eval cc_tbl vis_tbl strictness e fid_parent
       []
@@ -7199,8 +7188,7 @@ let js2jsil_eval
                 | "x__scope" :: rest -> rest
                 | _ -> f_params
               in
-              generate_proc offset_converter f_body f_id f_params f_strictness
-                vislist None
+              generate_proc f_body f_id f_params f_strictness vislist None
           in
           L.verbose (fun m -> m "Eval proc to execute:@\n%a@\n" EProc.pp proc);
           let proc' = JSIL2GIL.jsil2core_proc proc in
@@ -7221,8 +7209,6 @@ let js2jsil_eval
 let js2jsil_function_constructor_prop
     (prog : ('a, int) GProg.t) fid_parent params strictness e =
   let prog, which_pred = (prog.procs, prog.predecessors) in
-
-  let offset_converter x = 0 in
 
   let e, new_fid, vislist, new_fun_tbl =
     JS2JSIL_Preprocessing.preprocess_eval cc_tbl vis_tbl strictness e "main"
@@ -7250,8 +7236,7 @@ let js2jsil_function_constructor_prop
                   | "x__scope" :: rest -> rest
                   | _ -> f_params
                 in
-                generate_proc offset_converter f_body f_id f_params f_strictness
-                  vis_fid None
+                generate_proc f_body f_id f_params f_strictness vis_fid None
               in
               L.verbose (fun m ->
                   m "Function constructor proc to execute:@\n%a@\n" EProc.pp
@@ -7277,7 +7262,7 @@ let compute_imports (for_verification : bool) : string list =
     js2jsil_imports_cosette
   else js2jsil_imports
 
-let js2jsil e offset_converter for_verification =
+let js2jsil e for_verification =
   let e, only_specs, predicates, ids =
     JS2JSIL_Preprocessing.preprocess cc_tbl fun_tbl vis_tbl e
   in
@@ -7289,8 +7274,7 @@ let js2jsil e offset_converter for_verification =
         ~some:(fun f_body ->
           (* print_normal (Printf.sprintf "Procedure %s is recursive?! %b" f_id f_rec); *)
           let proc =
-            if f_id = main_fid then
-              generate_main offset_converter e f_strictness spec
+            if f_id = main_fid then generate_main e f_strictness spec
             else
               let vis_fid =
                 try Hashtbl.find vis_tbl f_id
@@ -7301,8 +7285,7 @@ let js2jsil e offset_converter for_verification =
                   in
                   raise (Failure msg)
               in
-              generate_proc offset_converter f_body f_id f_params f_strictness
-                vis_fid spec
+              generate_proc f_body f_id f_params f_strictness vis_fid spec
           in
           Hashtbl.add procedures f_id proc)
         ~none:() f_body)

@@ -71,15 +71,6 @@ let pp_labeled fmt c = pp ~show_labels:true ~pp_label:Fmt.string fmt c
 
 let pp_indexed fmt c = pp ~show_labels:false ~pp_label:Fmt.int fmt c
 
-let line_info (proc : (Annot.t, 'a) t) : (string * int * int) list =
-  let pname = proc.proc_name in
-  List.mapi
-    (fun i (annot, _, _) ->
-      match Annot.get_line_offset annot with
-      | None   -> (pname, i, -1)
-      | Some n -> (pname, i, n))
-    (Array.to_list proc.proc_body)
-
 let indexed_of_labeled (lproc : (Annot.t, string) t) : (Annot.t, int) t =
   let no_of_cmds = Array.length lproc.proc_body in
 

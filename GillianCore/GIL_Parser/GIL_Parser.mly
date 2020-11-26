@@ -509,7 +509,7 @@ gcmd_list_target:
     {
       List.map
         (fun (lab, gcmd) ->
-          let annot : Annot.t = Annot.init () in
+          let annot : Annot.t = Annot.make () in
           annot, lab, gcmd)
     gcmd_list
   }

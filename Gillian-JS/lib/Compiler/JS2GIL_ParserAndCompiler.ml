@@ -50,10 +50,9 @@ let parse_and_compile_js path =
         JS_PreParser.stringify_assume_and_assert e_str
       else e_str
     in
-    let offset_converter = JS_Utils.memoized_offsetchar_to_offsetline e_str in
     let js_prog = JS_Parser.parse_string_exn ~program_path:path e_str in
     let (ext_prog : Jsil_syntax.EProg.t), _, _ =
-      JS2JSIL_Compiler.js2jsil js_prog offset_converter
+      JS2JSIL_Compiler.js2jsil js_prog
         (ExecMode.verification_exec !Config.current_exec_mode)
     in
     let ext_prog =

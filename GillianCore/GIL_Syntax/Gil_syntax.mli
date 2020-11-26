@@ -1,5 +1,13 @@
 open Containers
 
+module Location : sig
+  type position = { pos_line : int; pos_column : int }
+
+  type t = { loc_start : position; loc_end : position; loc_source : string }
+
+  val none : t
+end
+
 module LVar : Allocators.S with type t = string
 
 module ALoc : Allocators.S with type t = string
@@ -862,9 +870,9 @@ module Spec : sig
 
   (** {3 Serialization} *)
 
-  val yojson_of_t : t -> Yojson.Safe.t
+  val to_yojson : t -> Yojson.Safe.t
 
-  val t_of_yojson : Yojson.Safe.t -> t
+  val of_yojson : Yojson.Safe.t -> (t, string) Result.t
 
   val hash_of_t : t -> string
 end
@@ -892,9 +900,9 @@ module Annot : sig
   (** {b GIL annot}. *)
   type t
 
-  (** Initialize an annotation *)
-  val init :
-    ?line_offset:int option ->
+  (** make an annotation *)
+  val make :
+    ?origin_loc:Location.t ->
     ?origin_id:int ->
     ?loop_info:string list ->
     unit ->
@@ -907,9 +915,7 @@ module Annot : sig
   val set_loop_info : t -> string list -> t
 
   (** get the line offset *)
-  val get_line_offset : t -> int option
-
-  val line_info_to_str : (string * int * int) list -> string
+  val get_origin_loc : t -> Location.t option
 end
 
 module Proc : sig
@@ -943,9 +949,6 @@ module Proc : sig
 
   (** Print indexed *)
   val pp_indexed : Format.formatter -> ('a, int) t -> unit
-
-  (** Line information *)
-  val line_info : (Annot.t, 'a) t -> (string * int * int) list
 
   (** Returns the indexed procedure for a labeled procedures where the labels can be of any type.
     Equality of labels is decided by structural equality *)
@@ -1106,9 +1109,6 @@ module Prog : sig
 
   (** Print indexed *)
   val pp_indexed : Format.formatter -> ('a, int) t -> unit
-
-  (** Line information *)
-  val line_info : (Annot.t, 'b) t -> (string * int * int) list
 end
 
 module Visitors : sig

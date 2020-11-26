@@ -195,9 +195,6 @@ let pp_labeled fmt x = pp ~show_labels:true ~pp_label:Fmt.string fmt x
 
 let pp_indexed fmt x = pp ~show_labels:false ~pp_label:Fmt.int fmt x
 
-let line_info (prog : ('a, 'b) t) : (string * int * int) list =
-  List.concat (List.map Proc.line_info (get_procs prog))
-
 (* let perform_syntax_checks (prog : t) : unit =
   if (!Config.perform_syntax_checks)
   then (

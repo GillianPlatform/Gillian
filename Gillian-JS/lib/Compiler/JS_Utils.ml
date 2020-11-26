@@ -651,12 +651,19 @@ let jsoffsetchar_to_jsoffsetline c_offset offset_list =
   in
   offsetchar_to_offsetline_aux offset_list 1
 
-let memoized_offsetchar_to_offsetline str =
-  let offset_list = generate_offset_lst str in
-  let ht = Hashtbl.create (String.length str) in
-  fun c_offset ->
-    try Hashtbl.find ht c_offset
-    with Not_found ->
-      let l_offset = jsoffsetchar_to_jsoffsetline c_offset offset_list in
-      Hashtbl.add ht c_offset l_offset;
-      l_offset
+let lift_flow_loc loc =
+  let open JS_Parser.Loc in
+  let open Gil_syntax.Location in
+  let lift_pos p =
+    let { line = pos_line; column = pos_column } = p in
+    { pos_line; pos_column }
+  in
+  let { source; start; _end } = loc in
+  let loc_source =
+    match source with
+    | None        -> "(none)"
+    | Some source -> file_key_to_string source
+  in
+  let loc_start = lift_pos start in
+  let loc_end = lift_pos _end in
+  { loc_source; loc_start; loc_end }

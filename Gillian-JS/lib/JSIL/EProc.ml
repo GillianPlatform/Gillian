@@ -39,15 +39,6 @@ let pp fmt labproc =
     Fmt.(array ~sep:(any ";@\n") pp_cmd_triple)
     body
 
-let line_info (proc : t) : (string * int * int) list =
-  let pname = proc.name in
-  List.mapi
-    (fun i (annot, _, _) ->
-      match Annot.get_line_offset annot with
-      | None   -> (pname, i, -1)
-      | Some n -> (pname, i, n))
-    (Array.to_list proc.body)
-
 let check_spec_pvars
     (allowed_variables : string list) (procedures : (string, t) Hashtbl.t) :
     unit =

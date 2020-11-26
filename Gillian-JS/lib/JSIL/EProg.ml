@@ -89,9 +89,6 @@ let pp fmt prog =
     (pp_list BiSpec.pp) (get_bispecs prog) (pp_list EProc.pp)
     (get_procs ~proc_names:prog.proc_names prog)
 
-let line_info (prog : t) : (string * int * int) list =
-  List.concat (List.map EProc.line_info (get_procs prog))
-
 let update_imports (prog : t) (imports : string list) : t =
   { prog with imports }
 

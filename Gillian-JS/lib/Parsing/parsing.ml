@@ -75,36 +75,3 @@ let parse_jsil_eprog_from_file (path : string) : Jsil_syntax.EProg.t =
   let prog = parse Javert_Parser.jsil_main_target lexbuf in
   close_in inx;
   prog
-
-(** ----------------------------------------------------
-    Parse a line_numbers file.
-    Proc: proc_name
-    (0, 0)
-    ...
-    -----------------------------------------------------
-*)
-let parse_line_numbers (ln_str : string) : (string * int, int * bool) Hashtbl.t
-    =
-  let module Config = Utils.Config in
-  let strs = Str.split (Str.regexp_string "Proc: ") ln_str in
-  let line_info = Hashtbl.create Config.big_tbl_size in
-  List.iter
-    (fun str ->
-      let memory = Hashtbl.create Config.small_tbl_size in
-      let index = String.index str '\n' in
-      let proc_name = String.sub str 0 index in
-      let proc_line_info =
-        String.sub str (index + 1) (String.length str - (index + 1))
-      in
-      let lines = Str.split (Str.regexp_string "\n") proc_line_info in
-      List.iter
-        (fun line ->
-          Scanf.sscanf line "(%d, %d)" (fun x y ->
-              if Hashtbl.mem memory y then
-                Hashtbl.replace line_info (proc_name, x) (y, false)
-              else (
-                Hashtbl.replace memory y true;
-                Hashtbl.replace line_info (proc_name, x) (y, true) )))
-        lines)
-    strs;
-  line_info

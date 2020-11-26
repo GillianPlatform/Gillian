@@ -179,7 +179,7 @@ let rec trans_expr ?(fname = "main") ~local_env expr =
       let res = EList [ nth gvar_val 0; Lit (Literal.Num 0.) ] in
       ([ cmd_act; cmd_assign ], res)
 
-let empty_annot = Annot.init ()
+let empty_annot = Annot.make ()
 
 let rec add_annots ?first l =
   match l with
@@ -571,8 +571,8 @@ let trans_function
     | [ (a, b, c) ] ->
         [
           (a, b, c);
-          (Annot.init (), None, Assignment ("ret", Lit (Num 0.)));
-          (Annot.init (), None, ReturnNormal);
+          (Annot.make (), None, Assignment ("ret", Lit (Num 0.)));
+          (Annot.make (), None, ReturnNormal);
         ]
     | a :: b -> a :: add_return b
   in

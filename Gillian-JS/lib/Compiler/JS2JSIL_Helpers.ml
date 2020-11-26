@@ -474,7 +474,6 @@ let fresh_ret_label, reset_ret_label = fresh_sth "ret_"
 type loop_list_type = (string option * string * string option * bool) list
 
 type translation_context = {
-  tr_offset_converter : int -> int;
   tr_fid : string;
   tr_er_fid : string;
   tr_sc_var : string;
@@ -494,13 +493,11 @@ let make_translation_ctx
     ?(loops = [])
     ?(previous = None)
     ?(js_lab = None)
-    offset_converter
     fid
     vis_list
     sc_var
     strictness =
   {
-    tr_offset_converter = offset_converter;
     tr_fid = fid;
     tr_er_fid = fid;
     tr_sc_var = sc_var;

@@ -18,7 +18,7 @@ build: [
 ]
 install: [make "install"]
 depends: [
-  "ocaml" {>= "4.00.0" & < "4.11.0"}
+  "ocaml" {>= "4.00.0" & < "4.13.0"}
   "ocamlfind" {build & >= "1.5.3"}
   "ocamlbuild" {build}
   "qtest" {with-test & >= "2.5"}
@@ -26,6 +26,6 @@ depends: [
   "num"
 ]
 url {
-  src: "https://github.com/ocaml-batteries-team/batteries-included/archive/v3.0.0.tar.gz"
-  checksum: "md5=b4b8e7ed94b5db86f3bbda809dd42bab"
+  src: "https://github.com/ocaml-batteries-team/batteries-included/archive/v3.2.0.tar.gz"
+  checksum: "md5=066051f9a210277710c54ad57c3b9568"
 }

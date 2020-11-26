@@ -655,7 +655,7 @@ cmd_with_label:
 cmd_list_target:
   cmd_list = separated_nonempty_list(SCOLON, cmd_with_label)
     { List.map
-        (fun (lab, cmd) -> (Annot.init (), lab, cmd))
+        (fun (lab, cmd) -> (Annot.make (), lab, cmd))
         cmd_list }
 
 /* SPECIFICATIONS */
