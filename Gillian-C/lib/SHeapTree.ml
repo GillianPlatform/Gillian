@@ -165,7 +165,7 @@ module Node = struct
               (Fmt.Dump.option Perm.pp) exact_perm
         | Array { chunk; values } ->
             Fmt.pf fmt "(%a : many %a) (%a)" SVArr.pp values Chunk.pp chunk
-              (Fmt.Dump.option Perm.pp) exact_perm )
+              (Fmt.Dump.option Perm.pp) exact_perm)
 
   let check_perm required node =
     match required with
@@ -176,7 +176,7 @@ module Node = struct
         | MemVal { min_perm = actual; _ } ->
             let open Perm.Infix in
             if actual >=% required then Ok ()
-            else Error (InsufficientPermission { actual; required }) )
+            else Error (InsufficientPermission { actual; required }))
 
   let exact_perm = function
     | NotOwned Partially -> `KeepLooking
@@ -223,7 +223,7 @@ module Node = struct
             ( mk (Array { chunk; values = left_arr }),
               mk (Array { chunk; values = right_arr }) )
         | Undef Partially         ->
-            failwith "Should never split a partially undef node" )
+            failwith "Should never split a partially undef node")
 
   let merge ~left:a ~right:b =
     let ret = Delayed.return in
@@ -262,7 +262,7 @@ module Node = struct
           when Chunk.equal chunk_l chunk_r ->
             let+ values = SVArr.array_append values_l value_r in
             mk (Array { chunk = chunk_l; values })
-        | _, _ -> ret (mk (Undef Partially)) )
+        | _, _ -> ret (mk (Undef Partially)))
 
   let decode ~chunk t =
     match t with
@@ -273,8 +273,8 @@ module Node = struct
         Ok (SVal.SUndefined, exact_perm)
     | MemVal { mem_val = Single { chunk = m_chunk; value }; exact_perm; _ } ->
         Ok
-          ( if Chunk.equal m_chunk chunk then (value, exact_perm)
-          else (SUndefined, exact_perm) )
+          (if Chunk.equal m_chunk chunk then (value, exact_perm)
+          else (SUndefined, exact_perm))
     | MemVal { mem_val = Array _; exact_perm; _ } ->
         (* FIXME: if the array is of size 1, we can be more precise*)
         Ok (SVal.SUndefined, exact_perm)
@@ -288,12 +288,12 @@ module Node = struct
         Ok (SVArr.AllUndef, exact_perm)
     | MemVal { mem_val = Single { chunk = m_chunk; value }; exact_perm; _ } ->
         Ok
-          ( if Chunk.equal m_chunk chunk then (Conc [ value ], exact_perm)
-          else (AllUndef, exact_perm) )
+          (if Chunk.equal m_chunk chunk then (Conc [ value ], exact_perm)
+          else (AllUndef, exact_perm))
     | MemVal { mem_val = Array { chunk = m_chunk; values }; exact_perm; _ } ->
         Ok
-          ( if Chunk.equal m_chunk chunk then (values, exact_perm)
-          else (AllUndef, exact_perm) )
+          (if Chunk.equal m_chunk chunk then (values, exact_perm)
+          else (AllUndef, exact_perm))
 
   let encode ~(perm : Perm.t) ~(chunk : Chunk.t) (sval : SVal.t) =
     let mem_val =
@@ -557,7 +557,7 @@ module Tree = struct
                          RIGHT: %a\n\
                         \ RANGE: %a" Range.pp left.span Range.pp right.span
                         Range.pp range);
-                  DR.error (Unhandled "wrong pre-cut") )
+                  DR.error (Unhandled "wrong pre-cut"))
         | None               ->
             let open Delayed.Syntax in
             let* _, left, right = split ~range t in
@@ -748,7 +748,7 @@ module Tree = struct
             in
             let learned = List.map (fun x -> Asrt.Pure x) learned in
             CoreP.array ~loc ~ofs:low ~perm ~chunk ~size:total_size ~sval_arr:e
-            :: learned )
+            :: learned)
 
   let rec substitution ~sval_subst ~le_subst { node; span; children } =
     let node = Node.substitution ~sval_subst node in
@@ -858,7 +858,7 @@ let drop_perm t low high new_perm =
       | None      -> DR.error MissingResource
       | Some tree ->
           let++ new_root = Tree.drop_perm tree low high new_perm in
-          Tree { bounds; root = Some new_root } )
+          Tree { bounds; root = Some new_root })
 
 let free t low high =
   let open DR.Syntax in
@@ -883,7 +883,7 @@ let free t low high =
             DR.error
               (Unhandled
                  "Freeing only part of an object (this might need fixing in \
-                  the MM)") )
+                  the MM)"))
 
 let get_single t low chunk =
   let open DR.Syntax in

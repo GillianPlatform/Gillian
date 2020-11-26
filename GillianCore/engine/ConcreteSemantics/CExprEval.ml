@@ -34,7 +34,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
           raise
             (TypeError
                (Fmt.str "Type Error: Negation: expected boolean, got %a"
-                  CVal.M.pp lit)) )
+                  CVal.M.pp lit)))
   | IUnaryMinus ->
       unary_int_thing lit
         (fun x -> -x)
@@ -81,12 +81,12 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
                   floor (t +. 0.49999999999999994)
                 else t
               in
-              Num (round_nearest n) )
+              Num (round_nearest n))
       | _     ->
           raise
             (TypeError
                (Fmt.str "Type Error: Round: expected number, got %a" CVal.M.pp
-                  lit)) )
+                  lit)))
   | M_sgn       ->
       unary_num_thing lit
         (fun x -> copysign 1.0 x)
@@ -104,7 +104,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
           raise
             (TypeError
                (Fmt.str "Type Error: Number to string: expected number, got %a"
-                  CVal.M.pp lit)) )
+                  CVal.M.pp lit)))
   | ToIntOp     ->
       unary_num_thing lit to_int
         "Type Error: Number to integer: expected number, got"
@@ -128,7 +128,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
           raise
             (TypeError
                (Fmt.str "Type Error: ToNumber: expected string, got %a"
-                  CVal.M.pp lit)) )
+                  CVal.M.pp lit)))
   | TypeOf      -> Type (Literal.type_of lit)
   | Car         -> (
       match lit with
@@ -137,12 +137,12 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
           | []       ->
               raise
                 (EvaluationError "Evaluation Error: List head of empty list")
-          | lit :: _ -> lit )
+          | lit :: _ -> lit)
       | _        ->
           raise
             (TypeError
                (Fmt.str "Type Error: List head: expected list, got %a" CVal.M.pp
-                  lit)) )
+                  lit)))
   | Cdr         -> (
       match lit with
       | LList ll -> (
@@ -150,12 +150,12 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
           | []      ->
               raise
                 (EvaluationError "Evaluation Error: List tail of empty list")
-          | _ :: ll -> LList ll )
+          | _ :: ll -> LList ll)
       | _        ->
           raise
             (TypeError
                (Fmt.str "Type Error: List tail: expected list, got %a" CVal.M.pp
-                  lit)) )
+                  lit)))
   | LstLen      -> (
       match lit with
       | LList l -> Num (float_of_int (List.length l))
@@ -163,7 +163,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
           raise
             (TypeError
                (Fmt.str "Type Error: List length: expected list, got: %a"
-                  CVal.M.pp lit)) )
+                  CVal.M.pp lit)))
   | LstRev      -> (
       match lit with
       | LList l -> LList (List.rev l)
@@ -171,7 +171,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
           raise
             (TypeError
                (Fmt.str "Type Error: List reverse: expected list, got: %a"
-                  CVal.M.pp lit)) )
+                  CVal.M.pp lit)))
   | StrLen      -> (
       match lit with
       | String s -> Num (float_of_int (String.length s))
@@ -179,7 +179,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
           raise
             (TypeError
                (Fmt.str "Type Error: String length: expected string, got: %a"
-                  CVal.M.pp lit)) )
+                  CVal.M.pp lit)))
   | M_isNaN     -> (
       match lit with
       | Num x when x == nan -> Bool true
@@ -188,7 +188,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
           raise
             (TypeError
                (Fmt.str "Type Error: M_isNan: expected number, got: %a"
-                  CVal.M.pp lit)) )
+                  CVal.M.pp lit)))
   | SetToList   ->
       raise (Exceptions.Unsupported "eval_unop concrete: set-to-list")
 
@@ -255,12 +255,12 @@ let rec evaluate_binop
               raise
                 (TypeError
                    (Fmt.str "Type Error: Conjunction: expected boolean, got: %a"
-                      CVal.M.pp lit2)) )
+                      CVal.M.pp lit2)))
       | _          ->
           raise
             (TypeError
                (Fmt.str "Type Error: Conjunction: expected boolean, got: %a"
-                  CVal.M.pp lit1)) )
+                  CVal.M.pp lit1)))
   | BOr  -> (
       match lit1 with
       | Bool true  -> Bool true
@@ -272,12 +272,12 @@ let rec evaluate_binop
               raise
                 (TypeError
                    (Fmt.str "Type Error: Disjunction: expected boolean, got: %a"
-                      CVal.M.pp lit2)) )
+                      CVal.M.pp lit2)))
       | _          ->
           raise
             (TypeError
                (Fmt.str "Type Error: Disjunction: expected boolean, got: %a"
-                  CVal.M.pp lit1)) )
+                  CVal.M.pp lit1)))
   | _    -> (
       let lit2 = ee e2 in
       match op with
@@ -299,7 +299,7 @@ let rec evaluate_binop
           | Type t1, Type t2         -> Bool (t1 = t2)
           | LList l1, LList l2       -> Bool (l1 = l2)
           | Nono, Nono               -> Bool true
-          | _, _                     -> Bool false )
+          | _, _                     -> Bool false)
       | LstNth -> (
           match (lit1, lit2) with
           | LList list, Int n -> List.nth list n
@@ -311,7 +311,7 @@ let rec evaluate_binop
                    (Fmt.str
                       "Type Error: List indexing: expected list and number, \
                        got %a and %a"
-                      CVal.M.pp lit1 CVal.M.pp lit2)) )
+                      CVal.M.pp lit1 CVal.M.pp lit2)))
       | StrNth -> (
           match (lit1, lit2) with
           | String s, Num n when is_int n ->
@@ -323,7 +323,7 @@ let rec evaluate_binop
                    (Fmt.str
                       "Type Error: List indexing: expected string and number, \
                        got %a and %a"
-                      CVal.M.pp lit1 CVal.M.pp lit2)) )
+                      CVal.M.pp lit1 CVal.M.pp lit2)))
       | ILessThan ->
           binary_int_bool_thing lit1 lit2
             (fun x y -> x < y)
@@ -439,7 +439,7 @@ let rec evaluate_binop
                    (Fmt.str
                       "Type Error: List concatenation: expected lists, got %a \
                        and %a"
-                      CVal.M.pp lit1 CVal.M.pp lit2)) ) )
+                      CVal.M.pp lit1 CVal.M.pp lit2))))
 
 and evaluate_nop (nop : NOp.t) (ll : Literal.t list) : CVal.M.t =
   match nop with
@@ -462,14 +462,14 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
     | Lit l                    -> (
         match l with
         | Constant c -> Literal.evaluate_constant c
-        | x          -> x )
+        | x          -> x)
     | PVar x                   -> (
         match CStore.get store x with
         | None   ->
             let err_msg = Fmt.str "Variable %s not found in the store" x in
             (* if (!verbose) then Fmt.printf "The current store is: \n%s" CStore.pp store; *)
             raise (Failure err_msg)
-        | Some v -> v )
+        | Some v -> v)
     | BinOp (e1, bop, e2)      -> evaluate_binop store bop e1 e2
     | UnOp (unop, e)           -> evaluate_unop unop (ee e)
     | NOp (nop, le)            -> evaluate_nop nop (List.map ee le)
@@ -484,7 +484,7 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
             | _         ->
                 raise
                   (Exceptions.Impossible
-                     "eval_expr concrete: list reduces to non-list") ) )
+                     "eval_expr concrete: list reduces to non-list")))
     | LstSub (e1, e2, e3)      -> (
         let ve1 = ee e1 in
         let ve2 = ee e1 in
@@ -495,7 +495,7 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
               List_utils.list_sub les (int_of_float start_) (int_of_float len)
             with
             | None   -> raise (Failure "Sublist out of bounds")
-            | Some l -> LList l )
+            | Some l -> LList l)
         | _ ->
             raise
               (Exceptions.Impossible "eval_expr concrete: lstsub type mismatch")

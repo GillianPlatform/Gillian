@@ -89,19 +89,19 @@ let create_tests source code =
           Option.is_some
             (search_forward_safe
                (Str.regexp {|phase:[ \t]*\(.*\)[ \t]*$|})
-               code) );
+               code));
         try
           Some
-            ( match Str.matched_group 1 code with
+            (match Str.matched_group 1 code with
             | "parse"      -> Parse
             | "early"      -> Early
             | "resolution" -> Resolution
             | "runtime"    -> Runtime
-            | _            -> raise Not_found )
+            | _            -> raise Not_found)
         with _ ->
           failwith
-            ( "Test262: Malformed test, negative test without error phase at : "
-            ^ source ) )
+            ("Test262: Malformed test, negative test without error phase at : "
+           ^ source))
   in
   let et =
     match tt with
@@ -109,30 +109,29 @@ let create_tests source code =
     | Negative -> (
         assert (
           Option.is_some
-            (search_forward_safe (Str.regexp {|type:[ \t]*\(.*\)[ \t]*$|}) code)
-        );
+            (search_forward_safe (Str.regexp {|type:[ \t]*\(.*\)[ \t]*$|}) code));
         try
           let et = Str.matched_group 1 code in
           Some
-            ( match et with
+            (match et with
             | "SyntaxError"    -> SyntaxError
             | "ReferenceError" -> ReferenceError
             | "Test262Error"   -> Test262Error
-            | _                -> raise Not_found )
+            | _                -> raise Not_found)
         with _ ->
-          failwith "Test262: Malformed test: Negative test without error type" )
+          failwith "Test262: Malformed test: Negative test without error type")
   in
   let no_strict_test : info =
     {
       tt;
       tm;
       ept =
-        ( match tt with
+        (match tt with
         | Positive -> None
         | Negative -> (
             match (ep, et) with
             | Some ep, Some et -> Some (ep, et)
-            | _, _             -> failwith "Test262: Impossible" ) );
+            | _, _             -> failwith "Test262: Impossible"));
       rm = NonStrict;
     }
   in

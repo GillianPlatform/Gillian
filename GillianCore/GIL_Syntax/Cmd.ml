@@ -96,7 +96,7 @@ let successors (cmd : int t) (i : int) : int list =
   | Call (_, _, _, j, _) | ECall (_, _, _, j) | Apply (_, _, j) -> (
       match j with
       | None   -> [ i + 1 ]
-      | Some j -> [ i + 1; j ] )
+      | Some j -> [ i + 1; j ])
   | ReturnNormal | ReturnError | Fail _ -> []
   | Skip | Assignment _ | LAction _ | Logic _ | Arguments _ | PhiAssignment _ ->
       [ i + 1 ]

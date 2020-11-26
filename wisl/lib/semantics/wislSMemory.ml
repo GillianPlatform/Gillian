@@ -50,10 +50,10 @@ let get_cell heap pfs gamma (loc : vt) (offset : vt) =
                   ASucc [ (heap, [ loc; o; v ], [], []) ]
               | None        ->
                   (* Couldn't find it, we can't do for now. *)
-                  AFail [] ) )
+                  AFail []))
       | None     ->
           (* Location does not exist in the heap *)
-          AFail [] )
+          AFail [])
   | None          ->
       (* loc does not evaluate to a location, or we can't find it. *)
       AFail []
@@ -97,7 +97,7 @@ let rem_cell heap pfs gamma (loc : vt) (offset : vt) =
           ASucc [ (heap, [], [], []) ]
       | None     ->
           (* Location does not exist in the heap *)
-          AFail [] )
+          AFail [])
   | None          ->
       (* loc does not evaluate to a location, or we can't find it. *)
       AFail []
@@ -121,7 +121,7 @@ let dispose heap pfs gamma loc_expr =
                  %s is not in the memory, can't dispose of it !!!@\n\
                  !!!!!!!!!!!"
                 loc_name);
-          AFail [] )
+          AFail [])
   | None          -> AFail []
 
 let execute_action name heap pfs gamma args =
@@ -136,7 +136,7 @@ let execute_action name heap pfs gamma args =
             (Format.asprintf
                "Invalid GetCell Call for WISL, with parameters : [ %a ]"
                (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args) )
+               args))
   | SetCell -> (
       match args with
       | [ loc_expr; offset_expr; value_expr ] ->
@@ -146,7 +146,7 @@ let execute_action name heap pfs gamma args =
             (Format.asprintf
                "Invalid SetCell Call for WISL, with parameters : [ %a ]"
                (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args) )
+               args))
   | RemCell -> (
       match args with
       | [ loc_expr; offset_expr ] ->
@@ -156,7 +156,7 @@ let execute_action name heap pfs gamma args =
             (Format.asprintf
                "Invalid RemCell Call for WISL, with parameters : [ %a ]"
                (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args) )
+               args))
   | Alloc   -> (
       match args with
       | [ Expr.Lit (Literal.Int size) ] when size >= 1 ->
@@ -166,7 +166,7 @@ let execute_action name heap pfs gamma args =
             (Format.asprintf
                "Invalid Alloc Call for WISL, with parameters : [ %a ]"
                (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args) )
+               args))
   | Dispose -> (
       match args with
       | [ loc_expr ] -> dispose heap pfs gamma loc_expr
@@ -175,7 +175,7 @@ let execute_action name heap pfs gamma args =
             (Format.asprintf
                "Invalid Dispose Call for WISL, with parameters : [ %a ]"
                (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args) )
+               args))
 
 let ga_to_setter = WislLActions.ga_to_setter_str
 

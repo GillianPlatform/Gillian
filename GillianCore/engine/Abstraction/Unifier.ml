@@ -319,12 +319,12 @@ module Make
                   let v = subst_in_expr subst le in
                   match v with
                   | None   -> None
-                  | Some v -> State.assume_t state v t ))
+                  | Some v -> State.assume_t state v t))
             (Some state) les
         in
         match state' with
         | None   -> Error "Produce Simple Assertion: Cannot produce types"
-        | Some s -> Ok [ (state, preds, pred_defs) ] )
+        | Some s -> Ok [ (state, preds, pred_defs) ])
     | Pred (pname, les) ->
         let vs = List.map (subst_in_expr subst) les in
         let failure = List.exists (fun x -> x = None) vs in
@@ -417,7 +417,7 @@ module Make
         | None        -> Error
                            "Produce Simple Assertion: Cannot assume pure \
                             formula."
-        | Some state' -> Ok [ (state', preds, pred_defs) ] )
+        | Some state' -> Ok [ (state', preds, pred_defs) ])
     | _ -> L.fail "Produce simple assertion: unsupported assertion"
 
   and produce_asrt_list (astate : t) (subst : ESubst.t) (sas : Asrt.t list) :
@@ -630,8 +630,8 @@ module Make
         | [ pred_asrt ] -> (
             match Preds.remove_by_name preds pname with
             | Some (pname, vs) -> rec_unfold astate pname vs
-            | None             -> raise (Failure "DEATH. rec_unfold") )
-        | _             -> astate )
+            | None             -> raise (Failure "DEATH. rec_unfold"))
+        | _             -> astate)
     | _               -> saved_state
 
   let unfold_all (astate : t) (pname : string) : t =
@@ -722,7 +722,7 @@ module Make
             raise
               (Failure
                  "Impossible: pred with concrete ins unfolded to multiple \
-                  states.") )
+                  states."))
     | None            -> Some (None, astate)
 
   let is_known (subst : ESubst.t) (le : Expr.t) : bool =
@@ -742,7 +742,7 @@ module Make
               | None     -> false
               | Some v_x ->
                   ESubst.put subst lvar_x v_x;
-                  true )
+                  true)
             else ac)
           true (SS.elements existentials)
 
@@ -836,7 +836,7 @@ module Make
                 rets
             in
             merge_gp_results rets
-        | UPUFail errs -> GPFail errs )
+        | UPUFail errs -> GPFail errs)
     | _ -> GPFail [ StateErr.EPure False ]
 
   and unify_assertion (astate : t) (subst : ESubst.t) (step : UP.step) : u_res =
@@ -977,7 +977,7 @@ module Make
              %a@]@\n\
              @[<v 2>STATE:@\n\
              %a@]"
-            UP.step_pp step subst_pp subst pp_astate astate) );
+            UP.step_pp step subst_pp subst pp_astate astate));
 
     let p, outs = step in
     match (p : Asrt.t) with
@@ -1014,18 +1014,18 @@ module Make
                   match success with
                   | true  -> USucc (state'', preds, pred_defs)
                   | false ->
-                      UFail [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ] )
+                      UFail [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ])
               | ASucc _                ->
                   raise
                     (Exceptions.Unsupported
                        "unify_assertion: action remover returns multiple \
                         results")
-              | AFail errs             -> UFail errs )
+              | AFail errs             -> UFail errs)
           | ASucc _                 ->
               raise
                 (Exceptions.Unsupported
                    "unify_assertion: action getter returns multiple results")
-          | AFail errs              -> UFail errs )
+          | AFail errs              -> UFail errs)
     | Pred (pname, les) -> (
         L.verbose (fun m -> m "Unifying predicate assertion");
         (* Perform substitution in all predicate parameters *)
@@ -1038,7 +1038,7 @@ module Make
         let failure = List.exists (fun x -> x = None) vs_ins in
         if failure then (
           L.verbose (fun m -> m "Cannot unify: not all in-parameters known");
-          make_resource_fail () )
+          make_resource_fail ())
         else
           let vs_ins = List.map Option.get vs_ins in
           L.verbose (fun m ->
@@ -1071,7 +1071,7 @@ module Make
               )
           | GPSucc _ ->
               raise (Failure "DEATH. BRANCHING GETPRED INSIDE UNIFICATION.")
-          | GPFail errs -> UFail errs )
+          | GPFail errs -> UFail errs)
     (* Conjunction should not be here *)
     | Pure (Formula.And (f1, f2)) ->
         raise (Failure "Unify assertion: And: should have been reduced")
@@ -1100,7 +1100,7 @@ module Make
                         | Some out' ->
                             ( true,
                               Formula.Eq (Val.to_expr out, Val.to_expr out')
-                              :: discharges ) ) ))
+                              :: discharges ))))
             (true, []) outs
         in
         match success with
@@ -1134,7 +1134,7 @@ module Make
                   USucc astate
                 else
                   let vs = State.unfolding_vals state [ pf ] in
-                  UFail [ EAsrt (vs, Not pf, [ [ Pure pf ] ]) ] ) )
+                  UFail [ EAsrt (vs, Not pf, [ [ Pure pf ] ]) ]))
     | Types les ->
         let corrections =
           List.fold_left
@@ -1191,7 +1191,7 @@ module Make
                 let bstate, _, _ = state in
                 let vs = State.unfolding_vals bstate [ pf ] in
                 UFail [ EAsrt (vs, Not pf, [ [ Pure pf ] ]) ]
-            | _       -> UFail [] )
+            | _       -> UFail [])
         in
         match ret with
         | UWTF         ->
@@ -1227,7 +1227,7 @@ module Make
                 f (next_states @ rest, errs_so_far)
             | Some []                  -> L.fail
                                             "ERROR: unify_up: empty \
-                                             unification plan" )
+                                             unification plan")
         | UFail errs   ->
             L.(
               verbose (fun m ->
@@ -1244,7 +1244,7 @@ module Make
                     cur_step ESubst.pp subst pp_astate state
                     Fmt.(list ~sep:(any "@\n") State.pp_err)
                     errs));
-            f (rest, errs @ errs_so_far) )
+            f (rest, errs @ errs_so_far))
 
   and unify
       ?(in_unification = false) (astate : t) (subst : ESubst.t) (up : UP.t) :
@@ -1305,7 +1305,7 @@ module Make
         let sp, worked = unfold_with_vals astate_i vals in
         if not worked then (
           L.normal (fun m -> m "Unify. No predicates found to unfold.");
-          UPUFail errs )
+          UPUFail errs)
         else (
           L.verbose (fun m -> m "Unfolding successful.");
           let rets =
@@ -1319,7 +1319,7 @@ module Make
                     unify_up ([ (astate, subst'', up) ], []))
               sp
           in
-          merge_upu_res rets )
+          merge_upu_res rets)
     | UPUFail errs ->
         L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
         ret

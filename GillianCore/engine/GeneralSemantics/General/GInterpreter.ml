@@ -98,7 +98,7 @@ struct
             let rest =
               Option.get (List_utils.list_sub previous (-n) (len_prev + n))
             in
-            if rest <> current then Malformed else FrameOn ids )
+            if rest <> current then Malformed else FrameOn ids)
 
   (* ******************* *
    * Auxiliary Functions *
@@ -236,14 +236,14 @@ struct
                      (Printf.sprintf
                         "ERROR: AssumeType: Cannot assume type %s for variable \
                          %s."
-                        (Type.str t) x)) )
+                        (Type.str t) x)))
         | _        ->
             raise
               (Failure
                  (Printf.sprintf
                     "ERROR: AssumeType: Variable %s cannot be turned into a \
                      value."
-                    x)) )
+                    x)))
     | Assume f ->
         let store_subst = Store.to_ssubst (State.get_store state) in
         let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
@@ -292,7 +292,7 @@ struct
             if not (ExecMode.biabduction_exec !Config.current_exec_mode) then
               Printf.printf "%s" msg;
             L.normal (fun m -> m "%s" msg);
-            raise (Interpreter_error ([ ESt err ], state)) )
+            raise (Interpreter_error ([ ESt err ], state)))
     | Macro (name, args) -> (
         let macro = Macro.get prog.prog.macros name in
         match macro with
@@ -322,7 +322,7 @@ struct
               List.map (SVal.SSubst.substitute_lcmd subst ~partial:true) lcmds
             in
             let lcmds = expand_macro macro args in
-            evaluate_lcmds prog lcmds state )
+            evaluate_lcmds prog lcmds state)
     (* We have to understand what is the intended semantics of the logic if *)
     | If (e, lcmds_t, lcmds_e) -> (
         let ve = eval_expr e in
@@ -348,7 +348,7 @@ struct
         | None               ->
             raise
               (Failure
-                 "Non-boolean expression in the condition of the logical if") )
+                 "Non-boolean expression in the condition of the logical if"))
     | Branch fof ->
         let state' = State.copy state in
         let state =
@@ -367,7 +367,7 @@ struct
     | SL sl_cmd -> (
         match State.evaluate_slcmd prog sl_cmd state with
         | Ok result -> result
-        | Error msg -> L.fail msg )
+        | Error msg -> L.fail msg)
 
   and evaluate_lcmds (prog : UP.prog) (lcmds : LCmd.t list) (state : State.t) :
       State.t list =
@@ -539,7 +539,7 @@ struct
                     L.fail
                       (Format.asprintf
                          "ERROR: Unable to use specification of function %s"
-                         spec.spec.spec_name) ) )
+                         spec.spec.spec_name)))
         | None      ->
             if Hashtbl.mem prog.prog.bi_specs pid then
               [
@@ -565,7 +565,7 @@ struct
                when List.length
                       (List.filter is_internal_proc (CallStack.get_cur_procs cs))
                     < !Config.bi_no_spec_depth -> symb_exec_proc () *)
-          | _ -> spec_exec_proc () )
+          | _ -> spec_exec_proc ())
       | _    -> spec_exec_proc ()
     in
 
@@ -617,12 +617,12 @@ struct
                     let pid = Unix.fork () in
                     match pid with
                     | 0 -> List.tl rest_confs
-                    | n -> [ List.hd rest_confs ] )
+                    | n -> [ List.hd rest_confs ])
                 | n ->
                     [
                       ConfCont
                         (state'', cs, iframes, i, loop_ids, i + 1, b_counter);
-                    ] )
+                    ])
             | false, true -> (
                 (* Can split into two threads *)
                 let b_counter = b_counter + 1 in
@@ -634,10 +634,10 @@ struct
                       ConfCont
                         (state'', cs, iframes, i, loop_ids, i + 1, b_counter);
                     ]
-                | n -> rest_confs )
+                | n -> rest_confs)
             | _           ->
                 ConfCont (state'', cs, iframes, i, loop_ids, i + 1, b_counter)
-                :: rest_confs )
+                :: rest_confs)
         | AFail errs ->
             if not (ExecMode.concrete_exec !Config.current_exec_mode) then (
               let recovery_vals = State.get_recovery_vals state errs in
@@ -657,9 +657,8 @@ struct
                         (Fmt.Dump.list State.pp_err)
                         errs);
                   raise
-                    (Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd)
-              )
-            else Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd )
+                    (Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd))
+            else Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd)
     (* Logic command *)
     | Logic lcmd -> (
         match lcmd with
@@ -688,7 +687,7 @@ struct
             List.map
               (fun state ->
                 ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter))
-              resulting_states )
+              resulting_states)
     (* Unconditional goto *)
     | Goto j -> [ ConfCont (state, cs, iframes, i, loop_ids, j, b_counter) ]
     (* Conditional goto *)
@@ -751,8 +750,8 @@ struct
             let pid = Unix.fork () in
             match pid with
             | 0 -> [ List.hd result ]
-            | n -> List.tl result )
-        | false -> result )
+            | n -> List.tl result)
+        | false -> result)
     | PhiAssignment lxarr ->
         let j = get_predecessor prog cs prev i in
         let state' =
@@ -799,7 +798,7 @@ struct
             raise
               (Failure
                  (Fmt.str "Apply not called with a list: @[<h>%a@]" Val.pp
-                    v_pid_args)) )
+                    v_pid_args)))
     (* Arguments *)
     | Arguments x ->
         let args = CallStack.get_cur_args cs in
@@ -843,7 +842,7 @@ struct
             let state' = State.set_store state old_store in
             let state'' = update_store state' x v_ret in
             [ ConfCont (state'', cs', iframes, prev', loop_ids, j, b_counter) ]
-        | _ -> raise (Failure "Malformed callstack") )
+        | _ -> raise (Failure "Malformed callstack"))
     (* Explicit failure *)
     | Fail (fname, exprs) ->
         let message =
@@ -898,7 +897,7 @@ struct
             List.filter (fun (_, pid) -> Hashtbl.mem prog.specs pid) on_hold
           in
           let hold_confs = List.map (fun (conf, _) -> conf) hold_confs in
-          evaluate_cmd_iter ret_fun false prog results [] hold_confs [] )
+          evaluate_cmd_iter ret_fun false prog results [] hold_confs [])
     | ConfCont (state, cs, iframes, prev, prev_loop_ids, i, b_counter)
       :: rest_confs
       when b_counter < max_branching ->
@@ -957,9 +956,9 @@ struct
     let () = CallGraph.add_proc call_graph name in
     L.normal (fun m ->
         m
-          ( "*******************************************@\n"
-          ^^ "*** Executing procedure: %s@\n"
-          ^^ "*******************************************@\n" )
+          ("*******************************************@\n"
+         ^^ "*** Executing procedure: %s@\n"
+         ^^ "*******************************************@\n")
           name);
 
     let store = State.get_store state in

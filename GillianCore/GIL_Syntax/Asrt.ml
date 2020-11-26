@@ -40,7 +40,7 @@ let prioritise (a1 : t) (a2 : t) =
         | true, true   -> 0
         | true, false  -> -1
         | false, true  -> 1
-        | false, false -> Stdlib.compare e1 e2 )
+        | false, false -> Stdlib.compare e1 e2)
     | _, _                     -> Stdlib.compare e1 e2
   in
 

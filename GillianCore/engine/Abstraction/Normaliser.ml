@@ -74,7 +74,7 @@ struct
               let vs = Hashtbl.find new_lists le' in
               let le'' = List.nth vs (int_of_float i) in
               (le'', false)
-            with _ -> (le, false) )
+            with _ -> (le, false))
         | _ -> (le, true)
       in
       Asrt.map None None (Some (Expr.map f_e None)) None a
@@ -131,7 +131,7 @@ struct
               let new_lvar = LVar.alloc () in
               SStore.put store pvar (LVar new_lvar);
               SESubst.put subst (PVar pvar) (LVar new_lvar);
-              LVar new_lvar )
+              LVar new_lvar)
       | BinOp (le1, bop, le2)  -> (
           let nle1 = f le1 in
           let nle2 = f le2 in
@@ -154,7 +154,7 @@ struct
                   f le_n
               | EList list, Lit (Num n) ->
                   raise (Failure "Non-integer list index")
-              | _, _ -> BinOp (nle1, LstNth, nle2) )
+              | _, _ -> BinOp (nle1, LstNth, nle2))
           | StrNth -> (
               match (nle1, nle2) with
               | Lit (String s), Lit (Num n) when Arith_Utils.is_int n ->
@@ -165,7 +165,7 @@ struct
                   Lit (String s)
               | Lit (String s), Lit (Num n) ->
                   raise (Failure "Non-integer string index")
-              | _, _ -> BinOp (nle1, LstNth, nle2) )
+              | _, _ -> BinOp (nle1, LstNth, nle2))
           | _      -> (
               match ((nle1 : Expr.t), (nle2 : Expr.t)) with
               | Lit lit1, Lit lit2 ->
@@ -174,7 +174,7 @@ struct
                       (Lit lit2)
                   in
                   Lit lit
-              | _, _               -> BinOp (nle1, bop, nle2) ) )
+              | _, _               -> BinOp (nle1, bop, nle2)))
       | UnOp (uop, le1)        -> (
           let nle1 = f le1 in
           match nle1 with
@@ -201,8 +201,8 @@ struct
                             expression")
                   | BinOp (_, _, _) | UnOp (_, _) -> UnOp (TypeOf, nle1)
                   | EList _ | LstSub _ | NOp (LstCat, _) -> Lit (Type ListType)
-                  | NOp (_, _) | ESet _ -> Lit (Type SetType) )
-              | _      -> UnOp (uop, nle1) ) )
+                  | NOp (_, _) | ESet _ -> Lit (Type SetType))
+              | _      -> UnOp (uop, nle1)))
       | EList le_list          ->
           let n_le_list = List.map (fun le -> f le) le_list in
           let all_literals, lit_list =
@@ -232,7 +232,7 @@ struct
                   (Array.to_list
                      (Array.sub (Array.of_list lst) (int_of_float _start)
                         (int_of_float _end)))
-              with _ -> raise (Failure "Sublist out of bounds") )
+              with _ -> raise (Failure "Sublist out of bounds"))
           | Lit (LList lst), Lit (Num _start), Lit (Num _end)
             when Arith_Utils.is_int _start && Arith_Utils.is_int _end -> (
               try
@@ -241,11 +241,11 @@ struct
                      (Array.to_list
                         (Array.sub (Array.of_list lst) (int_of_float _start)
                            (int_of_float _end))))
-              with _ -> raise (Failure "Sublist out of bounds") )
+              with _ -> raise (Failure "Sublist out of bounds"))
           | _, Lit (Num _start), Lit (Num _end)
             when (not (Arith_Utils.is_int _start)) && Arith_Utils.is_int _end ->
               raise (Failure "Sublist indexes non-integer")
-          | _, _, _ -> LstSub (nle1, nle2, nle3) )
+          | _, _, _ -> LstSub (nle1, nle2, nle3))
     in
 
     (*
@@ -280,7 +280,7 @@ struct
                 Option.fold
                   ~some:(fun x_type -> TypEnv.update gamma x x_type)
                   ~none:() le_type
-            | Some _ -> () )
+            | Some _ -> ())
         | _ -> ())
       a_list
 
@@ -508,7 +508,7 @@ struct
         (fun var ->
           if not (SStore.mem store var) then (
             SStore.put store var (LVar (new_lvar_name var));
-            () ))
+            ()))
         p_vars
     in
 
@@ -910,7 +910,7 @@ struct
                 m "Produce GA failed for: %a with error %s\n" Asrt.pp
                   (Asrt.GA (a, ins, outs))
                   msg);
-            raise (Failure msg) )
+            raise (Failure msg))
     in
     L.verbose (fun m ->
         m "CORE ASSERTIONS TO PRODUCE: %a"
@@ -990,13 +990,13 @@ struct
           m
             "WARNING: normalise_assertion: type assertions could not be \
              normalised");
-      Error "normalise_assertion: type assertions could not be normalised" )
+      Error "normalise_assertion: type assertions could not be normalised")
     else
       let pfs = normalise_pure_assertions store gamma subst pvars pfs in
       if falsePFs pfs then (
         L.verbose (fun m ->
             m "WARNING: normalise_assertion: pure formulae false");
-        Error "normalise_assertion: pure formulae false" )
+        Error "normalise_assertion: pure formulae false")
       else (
         L.verbose (fun m -> m "Here is the store: %a" SStore.pp store);
         (* Step 4 -- Extend the typing environment using equalities in the pfs *)
@@ -1038,10 +1038,10 @@ struct
                      let _ = SPState.simplify ~unification:true astate in
                      L.verbose (fun m ->
                          m "AFTER NORMALISATION:@\n%a" SPState.pp astate);
-                     Some (astate, SESubst.copy subst) )
+                     Some (astate, SESubst.copy subst))
                    else (
                      L.verbose (fun m ->
                          m "WARNING: normalise_assertion: returning None");
-                     None ))
-                 astates) )
+                     None))
+                 astates))
 end

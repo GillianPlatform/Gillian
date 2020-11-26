@@ -40,7 +40,7 @@ let pfs_to_pfs_and_gamma pfs =
         | None       ->
             ( Formula.Eq (Lit (Type t), UnOp (TypeOf, e)) :: other_pfs,
               other_gamma )
-        | Some gamma -> (other_pfs, gamma :: other_gamma) )
+        | Some gamma -> (other_pfs, gamma :: other_gamma))
     | f :: r ->
         let other_pfs, other_gamma = aux r in
         (f :: other_pfs, other_gamma)

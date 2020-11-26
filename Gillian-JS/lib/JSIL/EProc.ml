@@ -120,7 +120,7 @@ let check_proc_spec_correspondence (procedures : (string, t) Hashtbl.t) : unit =
           (* Check the arguments correspond
              * -----------------------------------------------------------------------------------
           *)
-          ( match List.length proc.params = List.length spec.params with
+          (match List.length proc.params = List.length spec.params with
           | true  -> ()
           | false ->
               raise
@@ -128,7 +128,7 @@ let check_proc_spec_correspondence (procedures : (string, t) Hashtbl.t) : unit =
                    (Printf.sprintf
                       "The spec and procedure definitions for %s have \
                        different number of arguments."
-                      proc.name)) );
+                      proc.name)));
           match proc.params = spec.params with
           | true  -> ()
           | false ->
@@ -137,5 +137,5 @@ let check_proc_spec_correspondence (procedures : (string, t) Hashtbl.t) : unit =
                    (Printf.sprintf
                       "The spec and procedure definitions for %s have \
                        different arguments."
-                      proc.name)) ))
+                      proc.name))))
     procedures

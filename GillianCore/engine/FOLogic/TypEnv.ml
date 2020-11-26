@@ -134,7 +134,7 @@ let rec substitution (x : t) (subst : SESubst.t) (partial : bool) : t =
           else if Names.is_lvar_name var then (
             let new_lvar = LVar.alloc () in
             SESubst.put subst evar (LVar new_lvar);
-            update new_gamma new_lvar v_type ));
+            update new_gamma new_lvar v_type));
   new_gamma
 
 let to_list_expr (x : t) : (Expr.t * Type.t) list =

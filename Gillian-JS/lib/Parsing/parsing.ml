@@ -16,8 +16,8 @@ let parse start lexbuf =
           "unexpected token : %s at loc %i:%i-%i:%i while reading %s"
           unexpected_token loc_start.pos_lnum (col loc_start) loc_end.pos_lnum
           (col loc_end)
-          ( if String.equal loc_start.pos_fname "" then "a string"
-          else loc_start.pos_fname )
+          (if String.equal loc_start.pos_fname "" then "a string"
+          else loc_start.pos_fname)
       in
       failwith ("Parser Error, " ^ message)
 
@@ -62,13 +62,13 @@ let parse_jsil_eprog_from_file (path : string) : Jsil_syntax.EProg.t =
   let file_previously_normalised = String.equal "njsil" extension in
   Utils.Config.previously_normalised := file_previously_normalised;
   (* Check that the file is of a valid type *)
-  ( match file_previously_normalised || String.equal "jsil" extension with
+  (match file_previously_normalised || String.equal "jsil" extension with
   | true  -> ()
   | false ->
       raise
         (Failure
            (Printf.sprintf "Failed to import %s: not a .jsil or .njsil file."
-              path)) );
+              path)));
   let inx = open_in path in
   let lexbuf = Lexing.from_channel inx in
   lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = path };

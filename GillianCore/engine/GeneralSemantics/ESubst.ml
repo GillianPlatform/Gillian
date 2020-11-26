@@ -352,7 +352,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
                 raise
                   (Failure
                      "DEATH: subst_in_expr: Cannot convert fresh expression to \
-                      a value") )
+                      a value"))
     in
 
     let f_before (le : Expr.t) =

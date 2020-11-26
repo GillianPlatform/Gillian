@@ -57,13 +57,13 @@ let list_sub ~lst ~start ~size =
         List_utils.list_sub el (int_of_float startf) (int_of_float sizef)
       with
       | None        -> LstSub (lst, start, size)
-      | Some sublst -> EList sublst )
+      | Some sublst -> EList sublst)
   | Lit (LList ll), Lit (Num startf), Lit (Num sizef) -> (
       match
         List_utils.list_sub ll (int_of_float startf) (int_of_float sizef)
       with
       | None        -> LstSub (lst, start, size)
-      | Some sublst -> Lit (LList sublst) )
+      | Some sublst -> Lit (LList sublst))
   | _ -> LstSub (lst, start, size)
 
 let list_cat la lb =
@@ -226,11 +226,11 @@ let rec map_opt
         | BinOp (e1, op, e2) -> (
             match (map_e e1, map_e e2) with
             | Some e1', Some e2' -> Some (BinOp (e1', op, e2'))
-            | _                  -> None )
+            | _                  -> None)
         | LstSub (e1, e2, e3) -> (
             match (map_e e1, map_e e2, map_e e3) with
             | Some e1', Some e2', Some e3' -> Some (LstSub (e1', e2', e3'))
-            | _ -> None )
+            | _ -> None)
         | NOp (op, les) -> aux les (fun les -> NOp (op, les))
         | EList les -> aux les (fun les -> EList les)
         | ESet les -> aux les (fun les -> ESet les)
@@ -245,7 +245,7 @@ let rec pp fmt e =
   | BinOp (e1, op, e2) -> (
       match op with
       | LstNth | StrNth -> Fmt.pf fmt "%s(%a, %a)" (BinOp.str op) pp e1 pp e2
-      | _               -> Fmt.pf fmt "(%a %s %a)" pp e1 (BinOp.str op) pp e2 )
+      | _               -> Fmt.pf fmt "(%a %s %a)" pp e1 (BinOp.str op) pp e2)
   | LstSub (e1, e2, e3) -> Fmt.pf fmt "l-sub(%a, %a, %a)" pp e1 pp e2 pp e3
   (* (uop e) *)
   | UnOp (op, e) -> Fmt.pf fmt "(%s %a)" (UnOp.str op) pp e
@@ -472,7 +472,7 @@ let var_to_expr (x : string) : t =
           match Names.is_pvar_name x with
           | true  -> PVar x
           | false -> raise (Failure ("var_to_expr: Impossible unifiable: " ^ x))
-          ) )
+          ))
 
 let is_unifiable (e : t) : bool =
   match e with

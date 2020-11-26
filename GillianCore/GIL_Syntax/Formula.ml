@@ -323,11 +323,11 @@ let rec lift_logic_expr (e : Expr.t) : (t * t) option =
   | BinOp (e1, BAnd, e2) -> (
       match (f e1, f e2) with
       | Some (a1, na1), Some (a2, na2) -> Some (And (a1, a2), Or (na1, na2))
-      | _ -> None )
+      | _ -> None)
   | BinOp (e1, BOr, e2) -> (
       match (f e1, f e2) with
       | Some (a1, na1), Some (a2, na2) -> Some (Or (a1, a2), And (na1, na2))
-      | _ -> None )
+      | _ -> None)
   | UnOp (UNot, e') -> Option.map (fun (a, na) -> (na, a)) (f e')
   | _ -> None
 
@@ -340,11 +340,11 @@ let rec to_expr (a : t) : Expr.t option =
   | And (a1, a2)       -> (
       match (f a1, f a2) with
       | Some le1, Some le2 -> Some (Expr.BinOp (le1, BinOp.BAnd, le2))
-      | _                  -> None )
+      | _                  -> None)
   | Or (a1, a2)        -> (
       match (f a1, f a2) with
       | Some le1, Some le2 -> Some (Expr.BinOp (le1, BinOp.BAnd, le2))
-      | _                  -> None )
+      | _                  -> None)
   | ForAll _           -> None
   | Eq (le1, le2)      -> Some (Expr.BinOp (le1, BinOp.Equal, le2))
   | Less (le1, le2)    -> Some (Expr.BinOp (le1, BinOp.FLessThan, le2))

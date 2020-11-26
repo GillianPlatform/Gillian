@@ -36,10 +36,10 @@ module M : Memory_S = struct
     match obj with
     | None          -> raise (Failure "C Heap Update: object not found")
     | Some (obj, _) ->
-        ( match v with
+        (match v with
         | None -> CObject.remove obj prop
         | Some v when Values.to_literal v = Some Nono -> CObject.remove obj prop
-        | Some v -> CObject.set obj prop v );
+        | Some v -> CObject.set obj prop v);
         ASucc (heap, [])
 
   let get_cell ?(remove : bool option) (heap : t) (loc : vt) (prop : vt) :

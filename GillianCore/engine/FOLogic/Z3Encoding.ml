@@ -1312,7 +1312,7 @@ let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
        @[%a@]@?"
       (Fmt.iter ~sep:(Fmt.any ", ") Formula.Set.iter Formula.pp)
       fs TypEnv.pp gamma;
-    exit 1 );
+    exit 1);
 
   (* Step 5: RETURN *)
   let ret = ret = Solver.SATISFIABLE in
@@ -1325,7 +1325,7 @@ let check_sat (fs : Formula.Set.t) (gamma : TypEnv.t) : bool =
     if cached then (
       let result = Hashtbl.find sat_cache fs in
       L.(verbose (fun m -> m "SAT check cached with result: %b" result));
-      result )
+      result)
     else (
       L.(verbose (fun m -> m "SAT check not found in cache."));
       let ret = check_sat_core fs gamma in
@@ -1341,7 +1341,7 @@ let check_sat (fs : Formula.Set.t) (gamma : TypEnv.t) : bool =
         | Some _ -> true
       in
       Hashtbl.replace sat_cache fs result;
-      result )
+      result)
   in
 
   ret
@@ -1354,7 +1354,7 @@ let lift_z3_model
   let recover_z3_number (n : ZExpr.expr) : float option =
     if ZExpr.is_numeral n then (
       L.(verbose (fun m -> m "Z3 number: %s" (ZExpr.to_string n)));
-      Some (float_of_string (Z3.Arithmetic.Real.to_decimal_string n 16)) )
+      Some (float_of_string (Z3.Arithmetic.Real.to_decimal_string n 16)))
     else None
   in
 
@@ -1387,7 +1387,7 @@ let lift_z3_model
           Option.fold ~some:(Hashtbl.find_opt str_codes_inv) ~none:None si
         with
         | Some s -> Some (Expr.Lit (String s))
-        | _      -> None )
+        | _      -> None)
     | _               -> None
   in
 

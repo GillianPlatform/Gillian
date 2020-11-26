@@ -30,8 +30,8 @@ let env_var_import_path = "GILLIAN_JS_RUNTIME_PATH"
 
 let import_paths =
   String.split_on_char ':'
-    ( match Sys.getenv_opt "GILLIAN_JS_RUNTIME_PATH" with
+    (match Sys.getenv_opt "GILLIAN_JS_RUNTIME_PATH" with
     | Some s ->
         print_endline s;
         s
-    | None   -> "" )
+    | None   -> "")

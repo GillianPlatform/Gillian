@@ -26,7 +26,7 @@ let rec equal a b =
   | String x, String y | Loc x, Loc y -> String.equal x y
   | Type x, Type y -> x = y
   | LList la, LList lb -> (
-      try List.for_all2 equal la lb with Invalid_argument _ -> false )
+      try List.for_all2 equal la lb with Invalid_argument _ -> false)
   | _ -> false
 
 (** Print *)

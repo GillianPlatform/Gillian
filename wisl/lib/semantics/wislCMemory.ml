@@ -42,7 +42,7 @@ let get_cell heap params =
     | [ Loc loc; Int offset ] -> (
         match WislCHeap.get heap loc offset with
         | Some value -> ASucc (heap, [ Loc loc; Int offset; value ])
-        | None       -> AFail [] )
+        | None       -> AFail [])
     | l                       ->
         failwith
           (Printf.sprintf

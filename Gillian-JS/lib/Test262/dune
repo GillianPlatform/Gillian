@@ -1,7 +1,7 @@
 (library
  (name test262)
  (libraries semantics javert_utils gillian js2jsil_lib ppx_deriving.runtime
-   str)
+   str gillian-bulk-alcotest)
  (preprocess
   (pps ppx_deriving.std))
  (flags -open Javert_utils))

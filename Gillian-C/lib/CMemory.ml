@@ -50,7 +50,7 @@ let execute_store heap params =
       let res = Mem.store chunk heap.mem block z_ofs compcert_val in
       match res with
       | Some mem -> ASucc ({ heap with mem }, [])
-      | None     -> AFail [] )
+      | None     -> AFail [])
   | _ -> failwith "wrong call to execute_store"
 
 let execute_load heap params =
@@ -64,7 +64,7 @@ let execute_load heap params =
       | Some ret ->
           let ocaml_ret = ValueTranslation.gil_of_compcert ret in
           ASucc (heap, [ ocaml_ret ])
-      | None     -> AFail [] )
+      | None     -> AFail [])
   | _ -> failwith "invalid call to load"
 
 let execute_move heap params =
@@ -82,7 +82,7 @@ let execute_move heap params =
       | Some lmemval -> (
           match Mem.storebytes heap.mem block_1 z_ofs_1 lmemval with
           | None     -> AFail []
-          | Some mem -> ASucc ({ heap with mem }, [ Loc loc_1; Num ofs_1 ]) ) )
+          | Some mem -> ASucc ({ heap with mem }, [ Loc loc_1; Num ofs_1 ])))
   | _ -> failwith "invalid call to move"
 
 let execute_free heap params =
@@ -93,7 +93,7 @@ let execute_free heap params =
       let res = Mem.free heap.mem block z_low z_high in
       match res with
       | Some mem -> ASucc ({ heap with mem }, [])
-      | None     -> AFail [] )
+      | None     -> AFail [])
   | _ -> failwith "invalid call to free"
 
 let execute_alloc heap params =
@@ -128,7 +128,7 @@ let execute_drop_perm heap params =
       let res = Mem.drop_perm heap.mem block z_low z_high compcert_perm in
       match res with
       | Some mem -> ASucc ({ heap with mem }, [])
-      | None     -> AFail [] )
+      | None     -> AFail [])
   | _ -> failwith "invalid call to drop_perm"
 
 let execute_genvgetsymbol heap params =

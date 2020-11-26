@@ -165,4 +165,4 @@ let substitution ~le_subst sv =
       | Expr.ALoc nloc | Lit (Loc nloc) -> Sptr (nloc, le_subst offs)
       | e ->
           failwith
-            (Format.asprintf "Heap substitution fail for loc: %a" Expr.pp e) )
+            (Format.asprintf "Heap substitution fail for loc: %a" Expr.pp e))

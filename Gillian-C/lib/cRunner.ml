@@ -21,7 +21,7 @@ module Suite = struct
 end
 
 module Expectations = struct
-  type matcher = Gillian_bulk_rely.OutcomeExt.Make(Outcome).ext Rely.matchers
+  type matcher = Gillian_bulk_alcotest.AlcotestCheckers.Make(Outcome).matcher
 
   type outcome = Outcome.t
 
@@ -36,8 +36,9 @@ module Expectations = struct
     | _ -> false
 
   let expectation (expect : matcher) _ outcome =
-    (expect.ext.outcome outcome).exactlyOneBranch.toFinishInNormalModeWith
-      ~constraint_name:"Returning 0" return_value_is_zero
+    expect.finish_in_normal_mode_with ExactlyOne ~constraint_name:"Returning 0"
+      return_value_is_zero outcome
 end
 
-include Gillian_bulk_rely.RelyRunner.Make (Outcome) (Suite) (Expectations)
+include
+  Gillian_bulk_alcotest.AlcotestRunner.Make (Outcome) (Suite) (Expectations)

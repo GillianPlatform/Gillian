@@ -25,9 +25,9 @@ type pre_fun_tbl_type =
     * string list
     * JS_Parser.Syntax.exp option
     * bool
-    * ( JS_Parser.Syntax.annotation list
+    * (JS_Parser.Syntax.annotation list
       * string list
-      * (string, string) Hashtbl.t ) )
+      * (string, string) Hashtbl.t) )
   Hashtbl.t
 
 type vis_tbl_type = (string, string list) Hashtbl.t

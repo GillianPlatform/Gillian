@@ -439,7 +439,7 @@ module Make
                 vars_to_forget ESubst.pp oblivion_subst);
           substitution_in_place oblivion_subst astate;
           L.verbose (fun m ->
-              m "State after substitution:@\n@[%a@]\n" pp astate) )
+              m "State after substitution:@\n@[%a@]\n" pp astate))
         else ();
         match up with
         | Error asrts -> raise (Preprocessing_Error [ UPAssert (a, asrts) ])
@@ -537,7 +537,7 @@ module Make
                            variable bindings."
                           Asrt.pp a
                       in
-                      L.fail msg )
+                      L.fail msg)
             | UPUSucc _ ->
                 raise
                   (Exceptions.Unsupported
@@ -567,7 +567,7 @@ module Make
                        Fmt.(option ~none:(any "CANNOT CREATE MODEL") ESubst.pp)
                        failing_model)
                 in
-                raise (Internal_State_Error (errs, old_astate)) ) )
+                raise (Internal_State_Error (errs, old_astate))))
 
   let frame_on (astate : t) (iframes : string list * t list) (ids : string list)
       : t =
@@ -668,7 +668,7 @@ module Make
                     Fmt.(list ~sep:comma Val.pp)
                     vs SLCmd.pp_folding_info folding_info
                 in
-                raise (Failure msg) ) )
+                raise (Failure msg)))
     | Unfold (pname, les, unfold_info, b) -> (
         let pred = UP.get_pred_def prog.preds pname in
         match pred.pred.pred_abstract with
@@ -699,8 +699,8 @@ module Make
                   Ok
                     (List.map
                        (fun (_, state) -> state)
-                       (Unifier.unfold astate pname vs unfold_info)) )
-            | _                   -> raise (Failure "IMPOSSIBLE UNFOLD") ) )
+                       (Unifier.unfold astate pname vs unfold_info)))
+            | _                   -> raise (Failure "IMPOSSIBLE UNFOLD")))
     | GUnfold pname -> Ok [ Unifier.unfold_all astate pname ]
     | SepAssert (a, binders) -> (
         let store = State.get_store state in
@@ -756,7 +756,7 @@ module Make
                     vars_to_forget ESubst.pp oblivion_subst);
               substitution_in_place oblivion_subst astate;
               L.verbose (fun m ->
-                  m "State after substitution:@\n@[%a@]\n" pp astate) )
+                  m "State after substitution:@\n@[%a@]\n" pp astate))
             else ();
             match up with
             | Error asrts -> raise (Preprocessing_Error [ UPAssert (a, asrts) ])
@@ -851,7 +851,7 @@ module Make
                                produce variable bindings."
                               Asrt.pp a
                           in
-                          Error msg )
+                          Error msg)
                 | UPUSucc _ ->
                     raise
                       (Exceptions.Unsupported
@@ -879,7 +879,7 @@ module Make
                         Fmt.(option ~none:(any "CANNOT CREATE MODEL") ESubst.pp)
                         failing_model
                     in
-                    raise (Internal_State_Error (errs, old_astate)) ) ) )
+                    raise (Internal_State_Error (errs, old_astate)))))
     | ApplyLem (lname, args, binders) -> (
         let lemma = UP.get_lemma prog lname in
         match lemma with
@@ -912,7 +912,7 @@ module Make
             | Error errs ->
                 Error
                   (Format.asprintf "Cannot apply lemma %s in state\n%a" lname pp
-                     astate) ) )
+                     astate)))
     | Invariant (a, binders) ->
         raise
           (Failure "Invariant must be treated by the unify_invariant function")
@@ -1070,7 +1070,7 @@ module Make
                   match produce os subst ga with
                   | Ok [ x ] -> Some x
                   | Ok _     -> failwith "multiple shit"
-                  | Error _  -> None )
+                  | Error _  -> None)
               | None    -> None)
             (Some state) asrts
         in

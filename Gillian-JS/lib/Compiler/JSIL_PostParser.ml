@@ -53,7 +53,7 @@ let post_parse_lcmd (cmd : Annot.t * string option * LabCmd.t) :
               None,
               LLogic (SL (GUnfold JS2JSIL_Helpers.pi_predicate_name)) );
           ]
-      | _ -> [ (annot, lab, cmd) ] )
+      | _ -> [ (annot, lab, cmd) ])
 
 let post_parse_eproc (eproc : EProc.t) : EProc.t =
   let new_body =

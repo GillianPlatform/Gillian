@@ -221,8 +221,7 @@ struct
           try UP.add_spec prog spec
           with _ ->
             L.fail
-              (Format.asprintf "When trying to build an UP for %s, I died!"
-                 name)
+              (Format.asprintf "When trying to build an UP for %s, I died!" name)
         in
         (sspec, true)
 
@@ -268,10 +267,10 @@ struct
 
     if !Config.specs_to_stdout then (
       L.print_to_all bug_specs_txt;
-      L.print_to_all normal_specs_txt )
+      L.print_to_all normal_specs_txt)
     else (
       L.normal (fun m -> m "%s" bug_specs_txt);
-      L.normal (fun m -> m "%s" normal_specs_txt) );
+      L.normal (fun m -> m "%s" normal_specs_txt));
 
     (* This is a hack to not count auxiliary functions that are bi-abduced *)
     let len_succ = List.length succ_specs in
@@ -360,10 +359,10 @@ struct
                 in
                 L.verbose (fun m ->
                     m "I will check its callers: %s" (str_concat callers));
-                List.sort Stdlib.compare (rest @ callers) )
+                List.sort Stdlib.compare (rest @ callers))
               else (
                 L.verbose (fun m -> m "The spec of %s is unchanged" proc_name);
-                rest )
+                rest)
             else rest
           in
           let new_succ_specs = succ_specs @ cur_succ_specs in
@@ -424,9 +423,10 @@ module From_scratch (SMemory : SMemory.S) (External : External.S) = struct
     module SState = SState.Make (SMemory)
   end
 
-  include Make
-            (INTERNAL__.SState)
-            (PState.Make (SVal.M) (SVal.SESubst) (SStore) (INTERNAL__.SState)
-               (Preds.SPreds))
-            (External)
+  include
+    Make
+      (INTERNAL__.SState)
+      (PState.Make (SVal.M) (SVal.SESubst) (SStore) (INTERNAL__.SState)
+         (Preds.SPreds))
+      (External)
 end

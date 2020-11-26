@@ -21,7 +21,7 @@ let substitution_in_place (subst : SESubst.t) (x : t) : unit =
         let s_le = SESubst.subst_in_expr store_subst true le in
         let s_le = if le <> s_le then Reduction.reduce_lexpr s_le else s_le in
         if le <> s_le then put x v s_le)
-      symbolics )
+      symbolics)
 
 (** Returns the set containing all the vars occurring in --x-- *)
 let vars (x : t) : SS.t =

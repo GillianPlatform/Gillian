@@ -77,7 +77,7 @@ let minimise_unifiables (kb : KB.t) : KB.t =
       | UnOp (LstLen, e) -> (
           match KB.mem e kb with
           | true  -> ac
-          | false -> KB.add u ac )
+          | false -> KB.add u ac)
       | _                -> KB.add u ac)
     kb KB.empty
 
@@ -120,7 +120,7 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
           match KB.mem e1 kb with
           | true -> [ KB.empty ]
           (* List lengths are unifiables *)
-          | false -> [ KB.singleton e1; KB.singleton e ] )
+          | false -> [ KB.singleton e1; KB.singleton e ])
       (* The remaining cases proceed recursively *)
       | UnOp (_, e) -> f e
       | BinOp (e1, _, e2) -> join [ e1; e2 ]
@@ -131,7 +131,7 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
               fmt "Missing for %a: %a" Expr.pp e
                 Fmt.(brackets (list ~sep:semi kb_pp))
                 result);
-          result )
+          result)
 
 (** [is_known kb e] returns true if the expression [e] is known
     under knowledge base [kb], and false otherwise *)
@@ -205,7 +205,7 @@ let rec learn_expr
               (base_expr, e_length, BinOp (overall_length, FMinus, e_length))
           in
           e_outs @ learn_expr kb' rest_base_expr rest
-      | false -> [] )
+      | false -> [])
   (* Floating-point plus is invertible *)
   | BinOp (e1, FPlus, e2) -> (
       (* If both operands are known or both are unknown, nothing can be done *)
@@ -219,7 +219,7 @@ let rec learn_expr
             | true  -> (e1, e2)
             | false -> (e2, e1)
           in
-          f (BinOp (base_expr, FMinus, ke)) ue )
+          f (BinOp (base_expr, FMinus, ke)) ue)
   (* Floating-point minus is invertible in two different ways *)
   | BinOp (e1, FMinus, e2) -> (
       (* If both operands are known or both are unknown, nothing can be done *)
@@ -227,7 +227,7 @@ let rec learn_expr
       match (ike1, ike2) with
       | true, true | false, false -> []
       | false, true               -> f (BinOp (base_expr, FPlus, e2)) e1
-      | true, false               -> f (BinOp (e1, FMinus, base_expr)) e2 )
+      | true, false               -> f (BinOp (e1, FMinus, base_expr)) e2)
   (* TODO: Finish the remaining invertible binary operators *)
   | BinOp _ -> []
 
@@ -409,7 +409,7 @@ let rec ins_outs_formula (kb : KB.t) (pf : Formula.t) : (KB.t * outs) list =
                   brackets
                     (list ~sep:semi (parens (pair ~sep:comma kb_pp outs_pp))))
                 result);
-          result )
+          result)
   | And (f1, f2) ->
       raise
         (Failure
@@ -458,7 +458,7 @@ let rec collect_simple_asrts (a : Asrt.t) : Asrt.t list =
       let a = Reduction.reduce_assertion a in
       match a with
       | Types les -> List.map (fun e -> Asrt.Types [ e ]) les
-      | _         -> f a )
+      | _         -> f a)
   | Star (a1, a2)          -> f a1 @ f a2
 
 let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
@@ -584,7 +584,7 @@ let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
               let unchecked =
                 List.map (fun i -> simple_asrts_io.(i)) (SI.elements unchecked)
               in
-              Error unchecked )
+              Error unchecked)
             else search rest
         | Some (new_unchecked, ret) ->
             (* L.log L.verbose (lazy "Successfully added more assertions to the UP.");
@@ -598,7 +598,7 @@ let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
                   ((a, outs) :: up, new_unchecked, kb'))
                 ret
             in
-            search (new_search_states @ rest) )
+            search (new_search_states @ rest))
   in
 
   let initial_indexes = SI.of_list (List.mapi (fun i _ -> i) simple_asrts) in
@@ -692,10 +692,10 @@ let init
       (lift_ups
          (List.map
             (fun (up, posts) ->
-              ( ( match up with
+              ( (match up with
                 | Ok up   -> up
                 | Error _ ->
-                    raise (Failure "UP: init: Impossible: ok, but error") ),
+                    raise (Failure "UP: init: Impossible: ok, but error")),
                 posts ))
             ups))
 
@@ -800,8 +800,7 @@ let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
                     Fmt.(
                       option
                         (brackets
-                           (pair ~sep:(any ": ") string
-                              (list ~sep:comma string))))
+                           (pair ~sep:(any ": ") string (list ~sep:comma string))))
                     sspec.ss_label);
               ( sspec.ss_pre,
                 ( Spec.label_vars_to_set sspec.ss_label,
@@ -948,7 +947,7 @@ let init_prog (prog : ('a, int) Prog.t) : (prog, up_err_t) result =
                   preds = preds_tbl;
                   lemmas = lemmas_tbl;
                   coverage;
-                } ) )
+                }))
 
 (** Substitution inverse *)
 let inverse (subst : SSubst.t) : SSubst.t =
@@ -1014,7 +1013,7 @@ let rec pp_asrt
             Fmt.pf fmt "%s(@[<h>%a@])" name
               (Pred.pp_ins_outs pred.pred Expr.pp pp_out_params_args)
               (in_args, out_params_args)
-          with _ -> Asrt.pp fmt a ) )
+          with _ -> Asrt.pp fmt a))
   | a                 -> Asrt.pp fmt a
 
 let pp_sspec

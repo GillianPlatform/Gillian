@@ -56,11 +56,11 @@ let rec replace_nle_with_lvars pfs nle =
       | None      ->
           let lhs = replace_nle_with_lvars pfs le in
           let rhs = replace_nle_with_lvars pfs le' in
-          BinOp (lhs, op, rhs) )
+          BinOp (lhs, op, rhs))
   | UnOp (op, le)            -> (
       match find_me_in_the_pi pfs nle with
       | Some lvar -> LVar lvar
-      | None      -> UnOp (op, replace_nle_with_lvars pfs le) )
+      | None      -> UnOp (op, replace_nle_with_lvars pfs le))
   | EList le                 -> (
       match find_me_in_the_pi pfs nle with
       | Some lvar -> LVar lvar
@@ -68,7 +68,7 @@ let rec replace_nle_with_lvars pfs nle =
           let le_list =
             List.map (fun le' -> replace_nle_with_lvars pfs le') le
           in
-          EList le_list )
+          EList le_list)
   | ESet le                  -> (
       match find_me_in_the_pi pfs nle with
       | Some lvar -> LVar lvar
@@ -76,7 +76,7 @@ let rec replace_nle_with_lvars pfs nle =
           let le_list =
             List.map (fun le' -> replace_nle_with_lvars pfs le') le
           in
-          ESet le_list )
+          ESet le_list)
   | NOp (op, le)             -> (
       match find_me_in_the_pi pfs nle with
       | Some lvar -> LVar lvar
@@ -84,7 +84,7 @@ let rec replace_nle_with_lvars pfs nle =
           let le_list =
             List.map (fun le' -> replace_nle_with_lvars pfs le') le
           in
-          NOp (op, le_list) )
+          NOp (op, le_list))
   | _                        -> nle
 
 let all_set_literals lset =
@@ -155,7 +155,7 @@ let clean_up_stuff exists (left : PFS.t) (right : PFS.t) =
       (function
         | Not (Eq ((EList _ | BinOp _ | UnOp _), Lit Empty)) -> false
         | _ -> true)
-      right )
+      right)
 
 (* Set intersections *)
 let get_set_intersections pfs =
@@ -239,7 +239,7 @@ let get_set_intersections pfs =
               intersections :=
                 Expr.Set.of_list [ ESet [ LVar v1 ]; ESet [ LVar v2 ] ]
                 :: !intersections
-          | _, _                      -> () )
+          | _, _                      -> ())
       | _                       -> ())
     pfs;
   let intersections = List.map (fun s -> Expr.Set.elements s) !intersections in
@@ -377,12 +377,12 @@ let resolve_set_existentials
                   done;
                   None
               | _ -> Some (Formula.Eq (lhs, rhs))
-            else Some formula_to_filter )
+            else Some formula_to_filter)
           else Some formula_to_filter
       | _ -> Some formula_to_filter
     in
     PFS.filter_map filter_map_fun rpfs;
-    (rpfs, !exists, gamma) )
+    (rpfs, !exists, gamma))
   else (rpfs, !exists, gamma)
 
 let find_impossible_unions
@@ -449,7 +449,7 @@ let find_impossible_unions
     in
     if PFS.exists test_formula rpfs then
       (PFS.of_list [ Formula.False ], SS.empty, TypEnv.init ())
-    else (rpfs, !exists, gamma) )
+    else (rpfs, !exists, gamma))
   else (rpfs, !exists, gamma)
 
 let trim_down (exists : SS.t) (lpfs : PFS.t) (rpfs : PFS.t) gamma =
@@ -527,7 +527,7 @@ let simplify_pfs_and_gamma
       (* Deal with rpfs *)
       if PFS.length lpfs > 0 && PFS.get_nth 0 lpfs == Some False then (
         PFS.clear rpfs;
-        PFS.extend rpfs True );
+        PFS.extend rpfs True);
 
       (SESubst.copy subst, simpl_existentials)
   | false ->
@@ -599,10 +599,10 @@ let simplify_pfs_and_gamma
             | Some te1, Some te2 when te1 <> te2 -> `Filter
             | Some te1, Some te2
               when te1 = te2
-                   && ( te1 = UndefinedType || te1 = NullType || te1 = EmptyType
-                      || te1 = NoneType ) ->
+                   && (te1 = UndefinedType || te1 = NullType || te1 = EmptyType
+                     || te1 = NoneType) ->
                 stop_explain "Inequality of two undefined/null/empty/none"
-            | _ -> `Replace whole )
+            | _ -> `Replace whole)
         | Eq (BinOp (lst, LstNth, idx), elem)
         | Eq (elem, BinOp (lst, LstNth, idx)) -> (
             match idx with
@@ -624,7 +624,7 @@ let simplify_pfs_and_gamma
                        NOp
                          ( LstCat,
                            [ EList (List.append prepend [ elem ]); append ] ) ))
-            | _ -> `Replace whole )
+            | _ -> `Replace whole)
         | Eq (UnOp (LstLen, le), Lit (Num 0.))
         | Eq (Lit (Num 0.), UnOp (LstLen, le)) -> rec_call (Eq (le, EList []))
         | Eq (UnOp (LstLen, le), Lit (Num len))
@@ -639,7 +639,7 @@ let simplify_pfs_and_gamma
                 in
                 vars_to_kill := SS.union !vars_to_kill (SS.of_list le_vars);
                 let le' = List.map (fun x -> Expr.LVar x) le_vars in
-                rec_call (Eq (le, EList le')) )
+                rec_call (Eq (le, EList le')))
         | Eq (NOp (LstCat, les), EList [])
         | Eq (NOp (LstCat, les), Lit (LList []))
         | Eq (EList [], NOp (LstCat, les))
@@ -654,7 +654,7 @@ let simplify_pfs_and_gamma
             | Some (pf, new_vars) ->
                 extend_with pf;
                 vars_to_kill := SS.union !vars_to_kill new_vars;
-                `Replace whole )
+                `Replace whole)
         (* Sublist *)
         | Eq (LstSub (lst, start, num), sl) | Eq (sl, LstSub (lst, start, num))
           ->
@@ -741,7 +741,7 @@ let simplify_pfs_and_gamma
                                 Names.is_spec_var_name v
                                 && not (Names.is_spec_var_name w)
                               then (w, LVar v)
-                              else (v, le) )
+                              else (v, le))
                       | _      -> (v, le)
                     in
 
@@ -761,17 +761,16 @@ let simplify_pfs_and_gamma
                               let temp_subst = SESubst.init [ (LVar v, le) ] in
                               PFS.substitution temp_subst lpfs;
 
-                              ( if SESubst.mem result (LVar v) then
-                                let le' =
-                                  Option.get (SESubst.get result (LVar v))
-                                in
-                                (* L.(
-                                   verbose (fun m ->
-                                       m "Multiples in subst: %s %s"
-                                         ((Fmt.to_to_string Expr.pp) le)
-                                         ((Fmt.to_to_string Expr.pp) le'))); *)
-                                if le <> le' then PFS.extend lpfs (Eq (le, le'))
-                              );
+                              (if SESubst.mem result (LVar v) then
+                               let le' =
+                                 Option.get (SESubst.get result (LVar v))
+                               in
+                               (* L.(
+                                  verbose (fun m ->
+                                      m "Multiples in subst: %s %s"
+                                        ((Fmt.to_to_string Expr.pp) le)
+                                        ((Fmt.to_to_string Expr.pp) le'))); *)
+                               if le <> le' then PFS.extend lpfs (Eq (le, le')));
                               SESubst.iter result (fun x le ->
                                   let sle =
                                     SESubst.subst_in_expr temp_subst true le
@@ -795,7 +794,7 @@ let simplify_pfs_and_gamma
                                         | Some t' ->
                                             if t <> t' then
                                               Error "Type mismatch"
-                                            else Ok () ) )
+                                            else Ok ()))
                                 | _       -> Ok ()
                               in
 
@@ -816,7 +815,7 @@ let simplify_pfs_and_gamma
                                         | Some tv ->
                                             if t <> tv then
                                               Error "Type mismatch"
-                                            else Ok () ) )
+                                            else Ok ()))
                                 | false ->
                                     TypEnv.remove gamma v;
                                     Ok ()
@@ -825,7 +824,7 @@ let simplify_pfs_and_gamma
                         in
                         match res with
                         | Error s -> stop_explain s
-                        | Ok ()   -> `Filter ) )
+                        | Ok ()   -> `Filter))
                 | UnOp (TypeOf, LVar v), Lit (Type t)
                 | Lit (Type t), UnOp (TypeOf, LVar v) -> (
                     match TypEnv.get gamma v with
@@ -834,8 +833,8 @@ let simplify_pfs_and_gamma
                         `Filter
                     | Some tv ->
                         if t <> tv then stop_explain "Type mismatch"
-                        else `Filter )
-                | _, _ -> `Replace whole ) )
+                        else `Filter)
+                | _, _ -> `Replace whole))
         (* All other cases *)
         | _ -> `Replace whole
       in
@@ -874,9 +873,9 @@ let simplify_pfs_and_gamma
               | LVar v ->
                   if
                     (not (SS.mem v !vars_to_kill))
-                    && ( save_all
+                    && (save_all
                        || (kill_new_lvars && SS.mem v vars_to_save)
-                       || ((not kill_new_lvars) && vars_to_save <> SS.empty) )
+                       || ((not kill_new_lvars) && vars_to_save <> SS.empty))
                     && not (Names.is_aloc_name v)
                   then PFS.extend lpfs (Eq (LVar v, le))
               | _      -> ());
@@ -894,7 +893,7 @@ let simplify_pfs_and_gamma
                   PFS.extend lpfs
                     (LessEq (Lit (Num 0.), UnOp (LstLen, Expr.from_var_name v)))
               | _             -> ());
-          PFS.sort lpfs )
+          PFS.sort lpfs)
       done;
 
       L.verbose (fun m -> m "PFS/Gamma simplification completed:\n");

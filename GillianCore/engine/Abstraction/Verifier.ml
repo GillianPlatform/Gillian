@@ -207,15 +207,15 @@ struct
           (fun (sspec : Spec.st) ->
             if sspec.ss_posts = [] then
               failwith
-                ( "Specification without post-condition for function "
-                ^ spec.spec_name ))
+                ("Specification without post-condition for function "
+               ^ spec.spec_name))
           spec.spec_sspecs
       in
       L.verbose (fun m ->
           m
-            ( "-------------------------------------------------------------------------@\n"
-            ^^ "Creating symbolic tests for procedure %s: %d cases\n"
-            ^^ "-------------------------------------------------------------------------"
+            ("-------------------------------------------------------------------------@\n"
+           ^^ "Creating symbolic tests for procedure %s: %d cases\n"
+           ^^ "-------------------------------------------------------------------------"
             )
             spec.spec_name
             (List.length spec.spec_sspecs));
@@ -366,7 +366,7 @@ struct
                          "VERIFICATION FAILURE: Spec %s %d terminated with \
                           flag %s instead of %s\n"
                          test.name test.id (Flag.str fl) (Flag.str flag));
-                   false )
+                   false)
                  else
                    let subst = make_post_subst test state in
                    if analyse_result subst test state then (
@@ -375,21 +375,21 @@ struct
                            "VERIFICATION SUCCESS: Spec %s %d terminated \
                             successfully\n"
                            test.name test.id);
-                     ac )
+                     ac)
                    else (
                      L.normal (fun m ->
                          m
                            "VERIFICATION FAILURE: Spec %s %d - post condition \
                             not unifiable\n"
                            test.name test.id);
-                     false ))
+                     false))
            true rets
     in
     if rets = [] then (
       L.(
         normal (fun m ->
             m "ERROR: Function %s evaluates to 0 results." test.name));
-      exit 1 );
+      exit 1);
     print_success_or_failure success;
     success
 
@@ -404,21 +404,21 @@ struct
                    m
                      "VERIFICATION SUCCESS: Spec %s %d terminated successfully\n"
                      test.name test.id);
-               ac )
+               ac)
              else (
                L.normal (fun m ->
                    m
                      "VERIFICATION FAILURE: Spec %s %d - post condition not \
                       unifiable\n"
                      test.name test.id);
-               false ))
+               false))
            true rets
     in
     if rets = [] then (
       L.(
         normal (fun m ->
             m "ERROR: Function %s evaluates to 0 results." test.name));
-      exit 1 );
+      exit 1);
     print_success_or_failure success;
     success
 
@@ -456,7 +456,7 @@ struct
             L.tmi (fun fmt -> fmt "%s" msg);
             Fmt.pr "%s" msg;
             let rets = SAInterpreter.evaluate_lcmds prog proof state in
-            analyse_lemma_results test rets )
+            analyse_lemma_results test rets)
 
   let pred_extracting_visitor =
     object
@@ -617,10 +617,10 @@ struct
 
         L.verbose (fun m ->
             m
-              ( "@[-------------------------------------------------------------------------@\n"
-              ^^ "UNFOLDED and SIMPLIFIED SPECS and LEMMAS@\n%a@\n%a"
-              ^^ "@\n\
-                  -------------------------------------------------------------------------@]"
+              ("@[-------------------------------------------------------------------------@\n"
+             ^^ "UNFOLDED and SIMPLIFIED SPECS and LEMMAS@\n%a@\n%a"
+             ^^ "@\n\
+                 -------------------------------------------------------------------------@]"
               )
               Fmt.(list ~sep:(any "@\n") Spec.pp)
               (Prog.get_specs prog)
@@ -663,7 +663,7 @@ struct
               Printf.sprintf "%s %f%!" msg (end_time -. start_time)
             in
             Printf.printf "%s\n" msg;
-            L.normal (fun m -> m "%s" msg) )
+            L.normal (fun m -> m "%s" msg))
 
   let verify_prog
       (prog : (Annot.t, int) Prog.t)
@@ -701,13 +701,13 @@ struct
         in
         let procs_to_verify =
           SS.of_list
-            ( proc_changes.changed_procs @ proc_changes.new_procs
-            @ proc_changes.dependent_procs )
+            (proc_changes.changed_procs @ proc_changes.new_procs
+           @ proc_changes.dependent_procs)
         in
         let lemmas_to_verify =
           SS.of_list
-            ( lemma_changes.changed_lemmas @ lemma_changes.new_lemmas
-            @ lemma_changes.dependent_lemmas )
+            (lemma_changes.changed_lemmas @ lemma_changes.new_lemmas
+           @ lemma_changes.dependent_lemmas)
         in
         let () =
           verify_procs ~prev_results:results prog procs_to_verify
@@ -743,9 +743,10 @@ module From_scratch (SMemory : SMemory.S) (External : External.S) = struct
     module SState = SState.Make (SMemory)
   end
 
-  include Make
-            (INTERNAL__.SState)
-            (PState.Make (SVal.M) (SVal.SESubst) (SStore) (INTERNAL__.SState)
-               (Preds.SPreds))
-            (External)
+  include
+    Make
+      (INTERNAL__.SState)
+      (PState.Make (SVal.M) (SVal.SESubst) (SStore) (INTERNAL__.SState)
+         (Preds.SPreds))
+      (External)
 end

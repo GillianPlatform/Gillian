@@ -128,13 +128,13 @@ struct
                              "Eval triggered an error, but no error label was \
                               provided")
                     | _, _           ->
-                        raise (Failure "JavaScript error object undefined") ) )
+                        raise (Failure "JavaScript error object undefined")))
             | _                  ->
                 let _ = update_store state x v_code in
-                [ (state, cs, i, i + 1) ] )
+                [ (state, cs, i, i + 1) ])
         | _                      -> raise
                                       (Failure
-                                         "Eval not given correct strictness") )
+                                         "Eval not given correct strictness"))
     | _ -> raise (Failure "Eval failed")
 
   (* Two arguments only, the parameters and the function body *)
@@ -193,8 +193,8 @@ struct
                       update_store state x (Val.from_literal return_value)
                     in
                     [ (state, cs, i, i + 1) ]
-                | _ -> throw "Body incorrectly parsed." )
-            | _                 -> throw "Not a script." ) )
+                | _ -> throw "Body incorrectly parsed.")
+            | _                 -> throw "Not a script."))
     | _, _                       -> throw "Body or parameters not a string."
 
   (**

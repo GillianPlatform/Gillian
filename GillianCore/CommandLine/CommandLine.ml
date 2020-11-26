@@ -168,7 +168,7 @@ struct
         | [] ->
             Fmt.pr "Error: expected at least one GIL program\n";
             exit 1
-        | _  -> progs )
+        | _  -> progs)
     | Error err ->
         Fmt.pr "Error during compilation to GIL:\n%a" PC.pp_err err;
         exit 1
@@ -291,7 +291,7 @@ struct
             (get_progs_or_fail (PC.parse_and_compile_files files)).gil_progs
           in
           Gil_parsing.cache_labelled_progs (List.tl e_progs);
-          snd (List.hd e_progs) )
+          snd (List.hd e_progs))
         else Gil_parsing.parse_eprog_from_file (List.hd files)
       in
       let prog =
@@ -350,8 +350,8 @@ struct
         in
         let changed_procs =
           SS.of_list
-            ( proc_changes.changed_procs @ proc_changes.new_procs
-            @ proc_changes.dependent_procs )
+            (proc_changes.changed_procs @ proc_changes.new_procs
+           @ proc_changes.dependent_procs)
         in
         if SS.mem "main" changed_procs then
           let () = run_main prog in

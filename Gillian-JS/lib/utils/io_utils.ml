@@ -9,7 +9,7 @@ let harness_path () =
             let complete_path = Filename.concat p fname in
             let _ = Unix.stat complete_path in
             complete_path
-          with Unix.Unix_error (Unix.ENOENT, "stat", _) -> find fn r )
+          with Unix.Unix_error (Unix.ENOENT, "stat", _) -> find fn r)
     in
     find fname list_paths
   in

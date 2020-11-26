@@ -102,7 +102,7 @@ module Lift (MSM : S) : SMemory.S = struct
             | Success s   ->
                 aux
                   ((Branch.learned br, Branch.learned_types br, s) :: acc_succ)
-                  acc_fail rest )
+                  acc_fail rest)
       in
       aux [] [] res
     in

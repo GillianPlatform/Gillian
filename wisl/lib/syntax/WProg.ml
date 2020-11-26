@@ -76,7 +76,7 @@ let get_by_id ?(fname = None) prog id =
     | Some f -> (
         match List.find_opt (fun ff -> ff.WFun.name = f) prog.context with
         | None    -> `None
-        | Some ff -> fun_getter ff )
+        | Some ff -> fun_getter ff)
 
 let get_function_name_of_element prog id =
   let is_in_function f =

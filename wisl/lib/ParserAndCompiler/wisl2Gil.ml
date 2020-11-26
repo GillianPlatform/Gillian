@@ -45,8 +45,7 @@ let compile_binop b =
     (* operators that do not exist in gil are compiled separately *)
     | _ ->
         failwith
-          (Format.asprintf "compile_binop should not be used to compile %a" pp
-             b))
+          (Format.asprintf "compile_binop should not be used to compile %a" pp b))
 
 let compile_unop u =
   WUnOp.(

@@ -58,8 +58,8 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (lemma : t) : t =
             with _ ->
               raise
                 (Failure
-                   ( "DEATH. parameter_types: predicate " ^ name
-                   ^ " does not exist." ))
+                   ("DEATH. parameter_types: predicate " ^ name
+                  ^ " does not exist."))
           in
           (* Printf.printf "Pred: %s\n\tParams1: %s\n\tParams2: %s\n" name
              (String.concat ", " (let x, _ = List.split pred.params in x)) (String.concat ", " (List.map (Fmt.to_to_string Expr.pp) les)); *)

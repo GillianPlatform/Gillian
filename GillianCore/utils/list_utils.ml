@@ -67,7 +67,7 @@ let rec flaky_map (f : 'a -> 'b option) (xs : 'a list) : 'b list option =
       | Some y -> (
           match flaky_map f xs' with
           | None     -> None
-          | Some ys' -> Some (y :: ys') ) )
+          | Some ys' -> Some (y :: ys')))
 
 let list_sub l ofs len =
   let rec aux l i acc =

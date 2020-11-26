@@ -77,9 +77,9 @@ let rec js_map f_m expr =
   let f = js_map f_m in
   let fo = Option.map f in
   let f_switch (sc, e2) =
-    ( ( match sc with
+    ( (match sc with
       | Case e1     -> Case (f e1)
-      | DefaultCase -> DefaultCase ),
+      | DefaultCase -> DefaultCase),
       f e2 )
   in
 
@@ -412,7 +412,7 @@ let get_all_assigned_declared_identifiers exp =
     | Unary_op (op, e) -> (
         match op with
         | Pre_Decr | Post_Decr | Pre_Incr | Post_Incr -> f true e
-        | _ -> [] )
+        | _ -> [])
     | Delete e -> f true e
     | Assign (e1, e2) | AssignOp (e1, _, e2) -> f true e1 @ f false e2
     | Try (e1, eo2, eo3) ->
@@ -455,9 +455,9 @@ let get_all_assigned_declared_identifiers exp =
         f false e1
         @ flat_map
             (fun (e2, e3) ->
-              ( match e2 with
+              (match e2 with
               | Case e2     -> f false e2
-              | DefaultCase -> [] )
+              | DefaultCase -> [])
               @ f false e3)
             e2s
     | Block es | Script (_, es) -> flat_map (f is_lhs) es
@@ -523,8 +523,8 @@ let get_all_vars_f f_body f_args =
         | _ ->
             raise
               (Failure
-                 ( "Must be function declaration "
-                 ^ JS_Parser.PrettyPrint.string_of_exp true f )))
+                 ("Must be function declaration "
+                 ^ JS_Parser.PrettyPrint.string_of_exp true f)))
       f_decls
   in
   let vars = List.concat [ f_args; var_decls f_body; fnames ] in

@@ -200,7 +200,7 @@ module Make
                 match (i > i', i' > i) with
                 | true, _ -> cnew
                 | _, true -> ccurrent
-                | _       -> if o > o' then cnew else ccurrent ))
+                | _       -> if o > o' then cnew else ccurrent))
         (false, 0, 0, []) candidates
     in
     (* Frame off found predicate *)
@@ -227,12 +227,12 @@ module Make
               if o >= o' then syntactic_result else semantic_result
             in
             frame_off name result
-        | false, _, _, _ -> frame_off name syntactic_result )
+        | false, _, _, _ -> frame_off name syntactic_result)
     | false, _, _, _ -> (
         let semantic_result = find_pred candidates args f_eq in
         match semantic_result with
         | true, _, o', semantic_result -> frame_off name semantic_result
-        | false, _, _, _ -> None )
+        | false, _, _, _ -> None)
 
   let subst_in_val (subst : st) (v : vt) : vt =
     let le' = ESubst.subst_in_expr subst true (Val.to_expr v) in

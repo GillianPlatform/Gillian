@@ -119,9 +119,9 @@ let indexed_of_labeled (lproc : (Annot.t, string) t) : (Annot.t, int) t =
                       ( x,
                         e,
                         le,
-                        ( match ol with
+                        (match ol with
                         | None     -> None
-                        | Some lab -> Some (find_with_error mapping lab) ),
+                        | Some lab -> Some (find_with_error mapping lab)),
                         subst )
                 | ECall (x, e, le, ol)       ->
                     Cmd.ECall
@@ -175,5 +175,5 @@ let check_proc_spec_correspondence
                        different arguments.\n\
                        @[<h>%a@] in procedure, @[<h>%a@] in params"
                       proc.proc_name (Fmt.Dump.list Fmt.string) proc.proc_params
-                      (Fmt.Dump.list Fmt.string) spec.spec_params)) ))
+                      (Fmt.Dump.list Fmt.string) spec.spec_params))))
     procedures

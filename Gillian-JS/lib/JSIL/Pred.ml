@@ -80,7 +80,7 @@ let out_args (pred : t) (args : 'a list) : 'a list =
   List.rev out_args
 
 let pp fmt pred =
-  let Pred.{ name; num_params; params; ins; definitions; _ } = pred in
+  let { name; num_params; params; ins; definitions; _ } = pred in
   let exist_ins = List.length pred.ins <> List.length pred.params in
   let params_with_info =
     if exist_ins then
@@ -181,8 +181,8 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
             with _ ->
               raise
                 (Failure
-                   ( "DEATH. parameter_types: predicate " ^ name
-                   ^ " does not exist." ))
+                   ("DEATH. parameter_types: predicate " ^ name
+                  ^ " does not exist."))
           in
           let ac_types =
             List.fold_left

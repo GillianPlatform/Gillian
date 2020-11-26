@@ -30,7 +30,7 @@ module Suite = struct
 end
 
 module Expectations = struct
-  type matcher = Gillian_bulk_rely.OutcomeExt.Make(Outcome).ext Rely.matchers
+  type matcher = Gillian_bulk_alcotest.AlcotestCheckers.Make(Outcome).matcher
 
   type outcome = Outcome.t
 
@@ -39,7 +39,8 @@ module Expectations = struct
   type info = Suite.info
 
   let expectation (expect : matcher) _ outcome =
-    (expect.ext.outcome outcome).allBranches.toFinishInNormalMode ()
+    expect.finish_in_normal_mode AllOfThem outcome
 end
 
-include Gillian_bulk_rely.RelyRunner.Make (Outcome) (Suite) (Expectations)
+include
+  Gillian_bulk_alcotest.AlcotestRunner.Make (Outcome) (Suite) (Expectations)

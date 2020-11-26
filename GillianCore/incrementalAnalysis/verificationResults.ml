@@ -42,6 +42,6 @@ let check_previously_verified ?(printer = fun _ -> ()) results cur_verified =
         Logging.tmi (fun fmt -> fmt "%s" msg);
         Fmt.pr "%s" msg;
         printer verified;
-        verified && acc )
+        verified && acc)
       else true && acc)
     results true

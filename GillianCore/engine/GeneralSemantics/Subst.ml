@@ -302,7 +302,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
             | Some sv ->
                 put subst x sv;
                 new_le_x
-            | None    -> raise (Failure "DEATH. subst_in_expr") )
+            | None    -> raise (Failure "DEATH. subst_in_expr"))
     in
 
     let f_before (le : Expr.t) =

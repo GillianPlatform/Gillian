@@ -88,7 +88,7 @@ let rec resolve : type a. curr_pc:Pc.t -> a t -> a Branch.t list =
                 if FOSolver.check_entailment ~pc:curr_pc guard then
                   let extended_pc = Pc.extend curr_pc [ guard ] in
                   resolve ~curr_pc:extended_pc (thunk ())
-                else resolve_list r )
+                else resolve_list r)
       in
 
       resolve_list branches

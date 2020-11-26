@@ -56,7 +56,7 @@ let rec auto_unfold
           in
           result
       with Not_found ->
-        raise (Failure ("Error: Can't auto_unfold predicate " ^ name)) )
+        raise (Failure ("Error: Can't auto_unfold predicate " ^ name)))
   | _                 -> [ asrt ]
 
 (*
@@ -115,10 +115,10 @@ let find_recursive_preds (preds : (string, Pred.t) Hashtbl.t) :
         if min_index <= index then (
           Hashtbl.replace visited pred_name min_index;
           Hashtbl.add is_recursive_pred pred_name true;
-          Some min_index )
+          Some min_index)
         else (
           Hashtbl.add is_recursive_pred pred_name false;
-          None )
+          None)
   in
   (* Launch the exploration from each predicate, unless it's already been visited in a previous one *)
   Hashtbl.iter
@@ -290,12 +290,12 @@ let unfold_cmd
       let asrts = auto_unfold preds rec_info a in
       match asrts with
       | [ a ] -> Logic (SL (SepAssert (a, binders)))
-      | _     -> Logic (SL (SepAssert (a, binders))) )
+      | _     -> Logic (SL (SepAssert (a, binders))))
   | Logic (SL (Invariant (a, existentials))) -> (
       let asrts = auto_unfold preds rec_info a in
       match asrts with
       | [ a ] -> Logic (SL (Invariant (a, existentials)))
-      | _     -> Logic (SL (Invariant (a, existentials))) )
+      | _     -> Logic (SL (Invariant (a, existentials))))
   | _ -> cmd
 
 let unfold_proc

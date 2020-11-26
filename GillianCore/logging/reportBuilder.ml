@@ -12,8 +12,8 @@ let make ?title ~(content : 'a Report.content) ?(severity = Report.Log) () =
         | Agnostic content -> (
             match content with
             | Debug _ -> "Debug message"
-            | Phase   -> "Phase" )
-        | Specific _       -> "Target language specific report" )
+            | Phase   -> "Phase")
+        | Specific _       -> "Target language specific report")
     | Some title -> title
   in
   let report : 'a Report.t =
@@ -36,7 +36,7 @@ let start_phase level ?title ?severity () =
     previous := None;
     Stack.push report.id parents;
     Default.log report;
-    Some report.id )
+    Some report.id)
   else None
 
 let end_phase = function

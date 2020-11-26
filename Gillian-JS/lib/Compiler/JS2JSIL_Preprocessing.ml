@@ -231,7 +231,7 @@ let closure_clarification
                   (visited_funs @ [ new_f_id_outer; new_f_id ]);
                 Hashtbl.replace vis_tbl new_f_id
                   (visited_funs @ [ new_f_id_outer; new_f_id ]);
-                Some (new_f_id, visited_funs @ [ new_f_id_outer; new_f_id ]) )
+                Some (new_f_id, visited_funs @ [ new_f_id_outer; new_f_id ]))
         | Function (strictness, f_name, args, fb) ->
             let new_f_id = get_codename e in
             let new_f_tbl =
@@ -243,7 +243,7 @@ let closure_clarification
             Hashtbl.replace vis_tbl new_f_id (visited_funs @ [ new_f_id ]);
             Some (new_f_id, visited_funs @ [ new_f_id ])
         | Try (_, Some (_, _), _) -> None
-        | _ -> state )
+        | _ -> state)
   in
 
   let rec f_ac e state prev_state ac =
@@ -258,7 +258,7 @@ let closure_clarification
             let new_f_id = get_codename e in
             let _ = update_cc_tbl_single_var_er cc_tbl f_id new_f_id x in
             f (Some (new_f_id, visited_funs @ [ new_f_id ])) e2
-        | _                          -> [] )
+        | _                          -> [])
   in
   js_fold f_ac f_state (Some (f_id, visited_funs)) exp
 
@@ -474,7 +474,7 @@ let translate_invariant_in_exp
             JSAsrt.js2jsil_tactic cc_tbl vis_tbl fun_tbl fid sc_var inv_a
           in
           Some (inv_a, inv_binders)
-      | _ -> L.fail "Impossible: invariant parsed incorrectly" )
+      | _ -> L.fail "Impossible: invariant parsed incorrectly")
 
 let translate_single_func_specs
     (cc_tbl : cc_tbl_type)
@@ -512,7 +512,7 @@ let translate_single_func_specs
     if List.length preconditions <> List.length postconditions then (
       Printf.printf
         "WARNING: In %s, preconditions do NOT match postconditions.\n" fid;
-      [] )
+      [])
     else
       List.map2
         (fun pre posts ->
@@ -744,7 +744,7 @@ let get_them_functions
                   (visited_funs @ [ new_f_id_outer; new_f_id ]);
                 Hashtbl.replace vis_tbl new_f_id
                   (visited_funs @ [ new_f_id_outer; new_f_id ]);
-                Some (new_f_id, visited_funs @ [ new_f_id_outer; new_f_id ]) )
+                Some (new_f_id, visited_funs @ [ new_f_id_outer; new_f_id ]))
         | Function (strictness, f_name, args, fb) ->
             let new_f_id = get_codename e in
             let new_f_tbl =
@@ -756,7 +756,7 @@ let get_them_functions
             Hashtbl.replace vis_tbl new_f_id (visited_funs @ [ new_f_id ]);
             Some (new_f_id, visited_funs @ [ new_f_id ])
         | Try (_, Some (_, _), _) -> None
-        | _ -> state )
+        | _ -> state)
   in
 
   let rec f_ac e state prev_state ac =
@@ -771,7 +771,7 @@ let get_them_functions
             let new_f_id = get_codename e in
             let _ = update_cc_tbl_single_var_er cc_tbl f_id new_f_id x in
             f (Some (new_f_id, visited_funs @ [ new_f_id ])) e2
-        | _                          -> [] )
+        | _                          -> [])
   in
   js_fold f_ac f_state (Some (f_id, visited_funs)) exp
 

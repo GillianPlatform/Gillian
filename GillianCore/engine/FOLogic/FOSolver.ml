@@ -237,7 +237,7 @@ let check_satisfiability_with_model (fs : Formula.t list) (gamma : TypEnv.t) :
       try
         Z3Encoding.lift_z3_model model gamma subst z3_vars;
         Some subst
-      with _ -> None )
+      with _ -> None)
 
 let check_satisfiability
     ?(unification = false)
@@ -395,7 +395,7 @@ let is_equal_on_lexprs e1 e2 pfs : bool option =
       | Lit (LList _), EList _ | EList _, Lit (LList _) -> None
       | Lit _, EList _ | EList _, Lit _ -> Some false
       (* other *)
-      | _, _ -> None )
+      | _, _ -> None)
 
 let is_equal ~pfs ~gamma e1 e2 =
   (* let t = Sys.time () in *)
@@ -410,8 +410,8 @@ let is_equal ~pfs ~gamma e1 e2 =
     | _            ->
         raise
           (Failure
-             ( "Equality reduced to something unexpected: "
-             ^ (Fmt.to_to_string Formula.pp) feq ))
+             ("Equality reduced to something unexpected: "
+             ^ (Fmt.to_to_string Formula.pp) feq))
   in
   (* Utils.Statistics.update_statistics "FOS: is_equal" (Sys.time () -. t); *)
   result
@@ -427,8 +427,8 @@ let is_different ~pfs ~gamma e1 e2 =
     | _     ->
         raise
           (Failure
-             ( "Inequality reduced to something unexpected: "
-             ^ (Fmt.to_to_string Formula.pp) feq ))
+             ("Inequality reduced to something unexpected: "
+             ^ (Fmt.to_to_string Formula.pp) feq))
   in
   (* Utils.Statistics.update_statistics "FOS: is different" (Sys.time () -. t); *)
   result
@@ -444,8 +444,8 @@ let is_less_or_equal ~pfs ~gamma e1 e2 =
     | _           ->
         raise
           (Failure
-             ( "Inequality reduced to something unexpected: "
-             ^ (Fmt.to_to_string Formula.pp) feq ))
+             ("Inequality reduced to something unexpected: "
+             ^ (Fmt.to_to_string Formula.pp) feq))
   in
   result
 
@@ -464,4 +464,4 @@ let resolve_loc_name ~pfs ~gamma loc =
               loc' PFS.pp pfs
           in
           Logging.verbose (fun fmt -> fmt "%s" msg);
-          raise (Failure msg) )
+          raise (Failure msg))

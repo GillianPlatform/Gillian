@@ -16,14 +16,14 @@ module type S = sig
     8) optional error continuation index in the calling procedure
   *)
   type t =
-    ( string
+    (string
     * vt list
     * store_t option
     * string list
     * Var.t
     * int
     * int
-    * int option )
+    * int option)
     list
 
   (**
@@ -74,14 +74,14 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
     7) optional error continuation index in the calling procedure
   *)
   type t =
-    ( string
+    (string
     * Val.t list
     * Store.t option
     * string list
     * Var.t
     * int
     * int
-    * int option )
+    * int option)
     list
 
   (**

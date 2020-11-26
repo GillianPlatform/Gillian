@@ -177,8 +177,8 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
             with _ ->
               raise
                 (Failure
-                   ( "DEATH. parameter_types: predicate " ^ name
-                   ^ " does not exist." ))
+                   ("DEATH. parameter_types: predicate " ^ name
+                  ^ " does not exist."))
           in
           Logging.tmi (fun fmt ->
               fmt "Gillian explicit param types: %s (%d, %d)" pred.pred_name
@@ -260,7 +260,7 @@ let iter_ins_outs
       | []       -> raise (Failure "DEATH. iter_ins_outs")
       | hd :: tl ->
           fins hd;
-          loop tl outs (cur_index + 1) )
+          loop tl outs (cur_index + 1))
     else
       match outs with
       | []       -> raise (Failure "DEATH. iter_ins_outs")

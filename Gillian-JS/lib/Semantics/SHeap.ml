@@ -328,7 +328,7 @@ let substitution_in_place (subst : SSubst.t) (heap : t) : unit =
                    (Printf.sprintf "Heap substitution fail for loc: %s"
                       ((Fmt.to_to_string Expr.pp) new_loc)))
         in
-        merge_loc heap new_loc aloc) )
+        merge_loc heap new_loc aloc))
 
 (** Returns the serialization of --heap-- as a list *)
 let to_list (heap : t) : (string * s_object) list =
@@ -495,8 +495,8 @@ let clean_up (heap : t) : unit =
               remove heap loc;
               match met with
               | Some (ALoc loc) | Some (Lit (Loc loc)) -> remove heap loc
-              | _ -> () )
-          | _, _       -> () ))
+              | _ -> ())
+          | _, _       -> ()))
     (domain heap)
 
 let lvars (heap : t) : Var.Set.t =

@@ -232,7 +232,7 @@ module CLCmd = struct
               (pp_list ~sep:(Fmt.any ";@\n") pp)
               cl1
               (pp_list ~sep:(Fmt.any ";@\n") pp)
-              cl2 )
+              cl2)
 end
 
 module CPred = struct

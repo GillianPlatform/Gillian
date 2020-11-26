@@ -31,7 +31,7 @@ let rec js2jsil (scope_le : Expr.t option) (le : t) : Expr.t =
   | Scope                  -> (
       match scope_le with
       | None          -> raise (Failure "DEATH: js2jsil_lexpr")
-      | Some scope_le -> scope_le )
+      | Some scope_le -> scope_le)
 
 module MyJSExpr = struct
   type nonrec t = t
@@ -52,7 +52,7 @@ let rec str (e : t) : string =
       | LstNth | StrNth ->
           Printf.sprintf "%s(%s, %s)" (BinOp.str op) (str e1) (str e2)
       | _               -> Printf.sprintf "(%s %s %s)" (str e1) (BinOp.str op)
-                             (str e2) )
+                             (str e2))
   (* (uop e) *)
   | UnOp (op, e) -> Printf.sprintf "(%s %s)" (UnOp.str op) (str e)
   (* l-sub (e1, e2, e3) *)

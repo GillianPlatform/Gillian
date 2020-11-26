@@ -26,7 +26,7 @@ let rec infer_types_to_gamma
       | None, None ->
           TypEnv.update new_gamma var tt;
           true
-      | Some t1, Some t2 -> t1 = t2 )
+      | Some t1, Some t2 -> t1 = t2)
   (* Abstract locations are reverse-typable if the target type is ObjectType *)
   | ALoc _ -> tt = ObjectType
   (* EList and ESet are not reverse typable because we lose type information *)
@@ -73,7 +73,7 @@ let rec infer_types_to_gamma
       | LstLen -> tt = NumberType && f le ListType
       | LstRev -> tt = ListType && f le ListType
       | StrLen -> tt = NumberType && f le StringType
-      | SetToList -> tt = ListType && f le SetType )
+      | SetToList -> tt = ListType && f le SetType)
   | BinOp (le1, op, le2) -> (
       let (rqt1 : Type.t option), (rqt2 : Type.t option), (rt : Type.t option) =
         match op with
@@ -103,7 +103,7 @@ let rec infer_types_to_gamma
       &&
       match rt with
       | None    -> true
-      | Some rt -> tt = rt )
+      | Some rt -> tt = rt)
 
 let reverse_type_lexpr
     (flag : bool) (gamma : TypEnv.t) (e_types : (Expr.t * Type.t) list) :
@@ -155,7 +155,7 @@ let rec infer_types_expr gamma le : unit =
           e le1 StringType;
           e le2 NumberType
       (* FIXME: Specify cases *)
-      | _ -> () )
+      | _ -> ())
   (* FIXME: Specify cases *)
   | _ -> ()
 
@@ -214,7 +214,7 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
             | None   -> (
                 match target_type with
                 | None    -> (t, ite, constraints)
-                | Some tt -> infer_type elem tt constraints )
+                | Some tt -> infer_type elem tt constraints)
           in
           let correct_type = target_type = None || t = target_type in
           (ac && correct_type && ite, constraints @ ac_constraints))
@@ -249,7 +249,7 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
               | LstRev         -> (ListType, [])
               | _              -> (NumberType, [])
             in
-            infer_type le tt (new_constraints @ constraints) )
+            infer_type le tt (new_constraints @ constraints))
     | BinOp (e1, op, e2) -> (
         let _, ite1, constraints1 = f e1 in
         let _, ite2, constraints2 = f e2 in
@@ -277,8 +277,7 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
                         in
                         ( None,
                           true,
-                          new_constraint1 :: new_constraint2 :: constraints ) )
-                )
+                          new_constraint1 :: new_constraint2 :: constraints )))
             (* String length is typable with constraints *)
             | StrNth -> (
                 let _, success, _ = infer_type e1 StringType constraints in
@@ -297,8 +296,7 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
                         in
                         ( None,
                           true,
-                          new_constraint1 :: new_constraint2 :: constraints ) )
-                )
+                          new_constraint1 :: new_constraint2 :: constraints )))
             | _ ->
                 let tt : Type.t =
                   match op with
@@ -319,8 +317,8 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
                   (* FIXME: Specify cases *)
                   | _ -> NumberType
                 in
-                infer_type le tt constraints )
-        | _, _       -> def_neg )
+                infer_type le tt constraints)
+        | _, _       -> def_neg)
     | NOp (SetUnion, les) | NOp (SetInter, les) ->
         let all_typable, constraints =
           typable_list ?target_type:(Some SetType) les
@@ -371,13 +369,13 @@ let te_of_list (vt : (Expr.t * Type.t) list) : TypEnv.t option =
         | LVar x | PVar x ->
             if TypEnv.mem result x then (
               let t' = TypEnv.get_unsafe result x in
-              if t <> t' then raise Break )
+              if t <> t' then raise Break)
             else TypEnv.update result x t
         | _               -> (
             let t', _, _ = type_lexpr result e in
             match t' with
             | Some t' when t = t' -> ()
-            | _ -> raise Break ))
+            | _ -> raise Break))
       vt;
     Some result
   with Break -> None

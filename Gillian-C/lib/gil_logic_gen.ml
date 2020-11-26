@@ -582,8 +582,8 @@ let trans_spec ?(ann = empty) cl_spec =
       (fun (sspec : Spec.st) ->
         if sspec.ss_posts = [] then
           failwith
-            ( "Gillian-C: Specification without post-condition for function "
-            ^ fname ))
+            ("Gillian-C: Specification without post-condition for function "
+           ^ fname))
       result.spec_sspecs
   in
   result

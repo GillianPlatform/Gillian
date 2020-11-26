@@ -157,8 +157,8 @@ let rec trans_expr ?(fname = "main") ~local_env expr =
         try trans_binop_expr binop te1 te2
         with Failure _ ->
           failwith
-            ( "Binop isn't handled yet, cannot translate : "
-            ^ PrintCminor.name_of_binop binop )
+            ("Binop isn't handled yet, cannot translate : "
+            ^ PrintCminor.name_of_binop binop)
       in
       (leading_e1 @ leading_e2 @ leading_binop, te)
   | Eaddrof id when List.mem (true_name id) local_env ->
@@ -330,7 +330,7 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
       | Some freecmd ->
           let annot_freecmd = (empty_annot, None, freecmd) in
           annotated_leading_cmds @ [ ret_assign; annot_freecmd; return ]
-      | None         -> annotated_leading_cmds @ [ ret_assign; return ] )
+      | None         -> annotated_leading_cmds @ [ ret_assign; return ])
   | Slabel (lab, s) ->
       (* If the translated thing already has a label, we add a skip before with the right label,
          otherwise, we put the label in the translated thing *)
@@ -660,8 +660,8 @@ let is_builtin_func func_name =
 
 let is_gil_func func_name exec_mode =
   ExecMode.symbolic_exec exec_mode
-  && ( String.equal func_name Builtin_Functions.assume_f
-     || String.equal func_name Builtin_Functions.assert_f )
+  && (String.equal func_name Builtin_Functions.assume_f
+     || String.equal func_name Builtin_Functions.assert_f)
 
 type symbol = { name : string; defined : bool }
 

@@ -146,7 +146,7 @@ module SVArray = struct
                        (int_of_float len))))
         | _                          ->
             let* abst = conc_to_abst l in
-            array_sub (Abst abst) o len )
+            array_sub (Abst abst) o len)
 
   let array_cat (arr_a : t) (arr_b : t) =
     let open Delayed.Syntax in

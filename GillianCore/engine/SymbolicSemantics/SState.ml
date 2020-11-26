@@ -196,7 +196,7 @@ module Make (SMemory : SMemory.S) :
         | PVar x -> (
             match SStore.get store x with
             | Some v -> v
-            | None   -> raise (Internal_State_Error ([ EVar x ], state)) )
+            | None   -> raise (Internal_State_Error ([ EVar x ], state)))
         | BinOp (e1, op, e2) -> BinOp (f e1, op, f e2)
         (* Unary operators *)
         | UnOp (op, e) -> UnOp (op, f e)
@@ -239,7 +239,7 @@ module Make (SMemory : SMemory.S) :
         if v_asrt = False then []
         else (
           PFS.extend pfs v_asrt;
-          [ state ] )
+          [ state ])
     in
     result
 
@@ -267,7 +267,7 @@ module Make (SMemory : SMemory.S) :
              gamma
       then (
         List.iter (PFS.extend pfs) ps;
-        Some state )
+        Some state)
       else None
     in
     result
@@ -378,8 +378,8 @@ module Make (SMemory : SMemory.S) :
             let p : Formula.t = Eq (LVar x, ALoc new_aloc) in
             if FOSolver.check_satisfiability (p :: PFS.to_list pfs) gamma then (
               PFS.extend pfs p;
-              Some (state, Expr.ALoc new_aloc) )
-            else None )
+              Some (state, Expr.ALoc new_aloc))
+            else None)
     | _ -> None
 
   let copy (state : t) : t =
@@ -510,8 +510,8 @@ module Make (SMemory : SMemory.S) :
                       if is_aloc_name loc_name then
                         (x, Expr.ALoc loc_name) :: ac
                       else ac
-                  | _             -> ac )
-              | _               -> ac )
+                  | _             -> ac)
+              | _               -> ac)
           | _      -> ac)
         []
     in
@@ -538,7 +538,7 @@ module Make (SMemory : SMemory.S) :
         | Some loc_name ->
             if is_aloc_name loc_name then Expr.ALoc loc_name
             else Expr.Lit (Loc loc_name)
-        | None          -> ALoc (ALoc.alloc ()) )
+        | None          -> ALoc (ALoc.alloc ()))
     | None     -> ALoc (ALoc.alloc ())
 
   let mem_constraints (state : t) : Formula.t list =
@@ -636,8 +636,8 @@ module Make (SMemory : SMemory.S) :
     | true  ->
         let pfixes = List.map (fun pfix -> FPure pfix) pfs' in
         Some
-          ( (if svars = SS.empty then [] else [ FSVars svars ])
-          @ pfixes @ mfixes @ asrts )
+          ((if svars = SS.empty then [] else [ FSVars svars ])
+          @ pfixes @ mfixes @ asrts)
     | false ->
         L.verbose (fun m -> m "Warning: invalid fix.");
         None

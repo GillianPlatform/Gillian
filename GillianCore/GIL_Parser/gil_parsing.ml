@@ -44,8 +44,8 @@ let parse start lexbuf =
           "unexpected token: %s at loc %i:%i-%i:%i while reading %s"
           unexpected_token loc_start.pos_lnum (col loc_start) loc_end.pos_lnum
           (col loc_end)
-          ( if String.equal loc_start.pos_fname "" then "a string"
-          else loc_start.pos_fname )
+          (if String.equal loc_start.pos_fname "" then "a string"
+          else loc_start.pos_fname)
       in
       failwith ("Parsing error: " ^ message)
 
@@ -188,7 +188,7 @@ let combine
       if not (Hashtbl.mem existing_components comp_name) then (
         L.verbose (fun m ->
             m "*** MESSAGE: Adding %s: %s.@\n" component_type comp_name);
-        Hashtbl.add existing_components comp_name (transform comp) )
+        Hashtbl.add existing_components comp_name (transform comp))
       else
         L.verbose (fun m ->
             m "*** WARNING: %s %s already exists.@\n"

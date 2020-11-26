@@ -82,7 +82,7 @@ let resInMode
                 fmtrcv (string_of_int (List.length res_l) ^ " branches");
               ]
           in
-          ((fun _ -> "Test " ^ failure_message), false) )
+          ((fun _ -> "Test " ^ failure_message), false))
   | AllOfThem  ->
       let list_failure_messages =
         List.fold_left

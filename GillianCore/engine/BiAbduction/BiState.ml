@@ -313,8 +313,8 @@ struct
          ) else *)
       Asrt.star
         (List.sort Asrt.compare
-           ( State.to_assertions ~to_keep:pvars state_i
-           @ State.to_assertions state_af ))
+           (State.to_assertions ~to_keep:pvars state_i
+           @ State.to_assertions state_af))
     in
 
     (* update_statistics "make_spec_Bi" (time() -. start_time); *)
@@ -390,7 +390,7 @@ struct
                          ups'
                   in
                   search (next_states @ rest, rets)
-              | Some []                  -> search (rest, rets) )
+              | Some []                  -> search (rest, rets))
           | UFail errs   ->
               let cur_asrt = Option.map fst cur_step in
               L.verbose (fun m ->
@@ -455,13 +455,13 @@ struct
                     fixed_states
                 in
 
-                ( if next_search_states = [] then
-                  L.(verbose (fun m -> m "TRIED TO FIX BUT CANNOT FIX!!!")) );
+                (if next_search_states = [] then
+                 L.(verbose (fun m -> m "TRIED TO FIX BUT CANNOT FIX!!!")));
 
-                search (next_search_states @ rest, rets) )
+                search (next_search_states @ rest, rets))
               else (
                 L.(verbose (fun m -> m "CANNOT FIX!!!"));
-                search (rest, rets) ) )
+                search (rest, rets)))
     in
     search search_state
 

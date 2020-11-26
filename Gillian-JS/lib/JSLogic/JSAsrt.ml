@@ -211,7 +211,7 @@ let rec js2jsil
       assert (
         let x0, _, _ = List.hd fsclens in
         let x1, _, _ = List.hd (List.tl fsclens) in
-        x0 < x1 );
+        x0 < x1);
 
       let fsclens =
         List.mapi

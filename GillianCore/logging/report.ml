@@ -4,9 +4,9 @@ let uuidm_to_yojson uuidm = `String (Uuidm.to_string uuidm)
 
 let uuidm_of_yojson yojson =
   Option.to_result ~none:"uuidm should e a string"
-    ( match yojson with
+    (match yojson with
     | `String s -> Uuidm.of_string s
-    | _         -> None )
+    | _         -> None)
 
 type id = int * uuidm [@@deriving yojson { exn = true }]
 
@@ -38,9 +38,9 @@ end = struct
 
   let of_yojson yojson =
     Result.map of_string
-      ( match yojson with
+      (match yojson with
       | `String s -> Ok s
-      | _         -> Error "should be a string" )
+      | _         -> Error "should be a string")
 end
 
 type agnostic_content = Debug of PackedPP.t | Phase [@@deriving yojson]
