@@ -33,35 +33,3 @@ let pp fmt lemma =
     lemma.params Asrt.pp lemma.pre
     (Fmt.list ~sep:(Fmt.any "@\n") Asrt.pp)
     lemma.posts (Fmt.option pp_proof) lemma.proof
-
-let parameter_types (preds : (string, Pred.t) Hashtbl.t) (lemma : t) : t =
-  let pt_asrt (a : Asrt.t) : Asrt.t =
-    let f_a_after a : Asrt.t =
-      match (a : Asrt.t) with
-      | Pred (name, les) ->
-          let pred =
-            try Hashtbl.find preds name
-            with _ ->
-              raise
-                (Failure
-                   ("DEATH. parameter_types: predicate " ^ name
-                  ^ " does not exist."))
-          in
-          (* Printf.printf "Pred: %s\n\tParams1: %s\n\tParams2: %s\n" name
-             (String.concat ", " (let x, _ = List.split pred.params in x)) (String.concat ", " (List.map (Fmt.to_to_string Expr.pp) les)); *)
-          let ac_types =
-            List.fold_left
-              (fun ac_types ((x, t_x), le) ->
-                match t_x with
-                | None     -> ac_types
-                | Some t_x -> (le, t_x) :: ac_types)
-              []
-              (List.combine pred.params les)
-          in
-          Star (Types ac_types, a)
-      | _                -> a
-    in
-    Asrt.map None (Some f_a_after) None None a
-  in
-
-  { lemma with pre = pt_asrt lemma.pre; posts = List.map pt_asrt lemma.posts }

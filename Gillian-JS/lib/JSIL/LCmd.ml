@@ -19,39 +19,6 @@ type t =
   | SpecVar    of string list  (** Spec Var         *)
   | SL         of SLCmd.t
 
-let rec map
-    (f_l : (t -> t) option)
-    (f_e : (Expr.t -> Expr.t) option)
-    (f_p : (Formula.t -> Formula.t) option)
-    (f_sl : (SLCmd.t -> SLCmd.t) option)
-    (lcmd : t) : t =
-  (* Functions to map over formulas, expressions, and sl-commands *)
-  let f = map f_l f_e f_p f_sl in
-  let map_e = Option.value ~default:(fun x -> x) f_e in
-  let map_p = Option.value ~default:(fun x -> x) f_p in
-  let map_sl = Option.value ~default:(fun x -> x) f_sl in
-
-  (* Apply the given function to the logical command *)
-  let mapped_lcmd = Option.fold ~some:(fun f -> f lcmd) ~none:lcmd f_l in
-
-  (* Map over the elements of the command *)
-  match mapped_lcmd with
-  | If (e, l1, l2) -> If (map_e e, List.map f l1, List.map f l2)
-  | Macro (s, l)   -> Macro (s, List.map map_e l)
-  | Assume a       -> Assume (map_p a)
-  | Assert a       -> Assert (map_p a)
-  | AssumeType _   -> mapped_lcmd
-  | SpecVar _      -> mapped_lcmd
-  | SL sl_cmd      -> SL (map_sl sl_cmd)
-  | Branch _       -> failwith "Cannot map branch"
-
-let substitution (subst : SSubst.t) (partial : bool) (lcmd : t) : t =
-  map None
-    (Some (SSubst.subst_in_expr subst ~partial))
-    (Some (SSubst.substitute_formula subst ~partial))
-    (Some (SLCmd.substitution subst partial))
-    lcmd
-
 let rec pp fmt lcmd =
   let pp_list = Fmt.list ~sep:Fmt.semi pp in
   let pp_params = Fmt.list ~sep:Fmt.comma Expr.pp in

@@ -21,38 +21,6 @@ type t =
   | SepAssert of Asrt.t * string list  (** Assert           *)
   | Invariant of Asrt.t * string list  (** Invariant        *)
 
-let map
-    (f_l : (t -> t) option)
-    (f_a : (Asrt.t -> Asrt.t) option)
-    (f_e : (Expr.t -> Expr.t) option)
-    (lcmd : t) : t =
-  (* Functions to map over assertions and expressions *)
-  let map_e = Option.value ~default:(fun x -> x) f_e in
-  let map_a = Option.value ~default:(fun x -> x) f_a in
-
-  let mapped_lcmd = Option.fold ~some:(fun f -> f lcmd) ~none:lcmd f_l in
-
-  (* Map over the elements of the command *)
-  match mapped_lcmd with
-  | Fold (name, les, None) -> Fold (name, List.map map_e les, None)
-  | Fold (name, les, Some (s, l)) ->
-      Fold
-        ( name,
-          List.map map_e les,
-          Some (s, List.map (fun (x, e) -> (x, map_e e)) l) )
-  | Unfold (name, les, unfold_info, b) ->
-      Unfold (name, List.map map_e les, unfold_info, b)
-  | GUnfold name -> GUnfold name
-  | ApplyLem (s, l, existentials) -> ApplyLem (s, List.map map_e l, existentials)
-  | SepAssert (a, binders) -> SepAssert (map_a a, binders)
-  | Invariant (a, existentials) -> Invariant (map_a a, existentials)
-
-let substitution (subst : SSubst.t) (partial : bool) (lcmd : t) : t =
-  map None
-    (Some (Asrt.substitution subst partial))
-    (Some (SSubst.subst_in_expr subst ~partial))
-    lcmd
-
 let pp_folding_info =
   let pp_ui f (v, le) = Fmt.pf f "(%s := %a)" v Expr.pp le in
   let pp_non_opt f (id, uil) =
