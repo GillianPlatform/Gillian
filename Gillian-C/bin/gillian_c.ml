@@ -8,4 +8,6 @@ module CLI =
         [ (module CRunner); (module SRunner) ]
     end)
 
-let () = CLI.main ()
+let () =
+  Memtrace.trace_if_requested ();
+  CLI.main ()

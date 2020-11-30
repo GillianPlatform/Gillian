@@ -7,4 +7,6 @@ module CLI =
         [ (module Test262.Test262_runner); (module CosetteRunner) ]
     end)
 
-let () = CLI.main ()
+let () =
+  Memtrace.trace_if_requested ();
+  CLI.main ()
