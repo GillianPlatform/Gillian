@@ -329,6 +329,80 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   let to_list (subst : t) : (Expr.t * vt) list =
     Hashtbl.fold (fun e e_val ac -> (e, e_val) :: ac) subst []
 
+  class substitutor ~(partial : bool) ~(subst : t) =
+    object (self)
+      inherit [_] Visitors.endo as super
+
+      method find_in_subst ~make_new_x e =
+        match get subst e with
+        | Some v -> Val.to_expr v
+        | None   -> (
+            if partial then e
+            else
+              let new_le_x = make_new_x () in
+              match Val.from_expr new_le_x with
+              | Some sv ->
+                  put subst e sv;
+                  new_le_x
+              | None    ->
+                  raise
+                    (Failure
+                       "DEATH: subst_in_expr: Cannot convert fresh expression \
+                        to a value"))
+
+      method visit_'annot () (this : Annot.t) = this
+
+      method visit_'label () (this : int) = this
+
+      method! visit_LVar () this x =
+        let res =
+          self#find_in_subst
+            ~make_new_x:(fun () -> Expr.LVar (LVar.alloc ()))
+            this
+        in
+        L.verbose (fun m ->
+            m "!!!REPLACING LVAR!!! %a with %a in partial? %b\nOBTAINED:%a"
+              Expr.full_pp this (Fmt.Dump.option Val.pp) (get subst this)
+              partial Expr.pp res);
+        res
+
+      method! visit_ALoc () this x =
+        self#find_in_subst
+          ~make_new_x:(fun () -> Expr.ALoc (ALoc.alloc ()))
+          this
+
+      method! visit_PVar () this x =
+        self#find_in_subst
+          ~make_new_x:(fun () ->
+            let lvar = LVar.alloc () in
+            L.(
+              verbose (fun m ->
+                  m
+                    "General: Subst in lexpr: PVar %s not in subst, generating \
+                     fresh: %s"
+                    x lvar));
+            Expr.LVar lvar)
+          this
+
+      method! visit_UnOp () this unop e =
+        match (unop, e) with
+        | (LstLen, PVar x | LstLen, LVar x) when mem subst this ->
+            Val.to_expr (Option.get (get subst this))
+        | _ -> super#visit_UnOp () this unop e
+
+      method! visit_ForAll () this bt form =
+        let binders, _ = List.split bt in
+        let binders_substs =
+          List.filter_map
+            (fun x -> Option.map (fun x_v -> (x, x_v)) (get subst (LVar x)))
+            binders
+        in
+        List.iter (fun x -> put subst (LVar x) (Val.from_lvar_name x)) binders;
+        let new_formula = self#visit_formula () form in
+        List.iter (fun (x, le_x) -> put subst (LVar x) le_x) binders_substs;
+        new_formula
+    end
+
   (**
     Substitution inside an expression
 
@@ -337,46 +411,8 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return Expression resulting from the substitution, with fresh locations created.
   *)
   let subst_in_expr (subst : t) ~(partial : bool) (le : Expr.t) : Expr.t =
-    let find_in_subst (e : Expr.t) (make_new_x : unit -> Expr.t) : Expr.t =
-      match get subst e with
-      | Some v -> Val.to_expr v
-      | None   -> (
-          if partial then e
-          else
-            let new_le_x = make_new_x () in
-            match Val.from_expr new_le_x with
-            | Some sv ->
-                put subst e sv;
-                new_le_x
-            | None    ->
-                raise
-                  (Failure
-                     "DEATH: subst_in_expr: Cannot convert fresh expression to \
-                      a value"))
-    in
-
-    let f_before (le : Expr.t) =
-      let open Generators in
-      match (le : Expr.t) with
-      | LVar x -> (find_in_subst le (fun () -> Expr.LVar (LVar.alloc ())), false)
-      | ALoc x -> (find_in_subst le (fun () -> Expr.ALoc (ALoc.alloc ())), false)
-      | PVar x ->
-          ( find_in_subst le (fun () ->
-                let lvar = LVar.alloc () in
-                L.(
-                  verbose (fun m ->
-                      m
-                        "General: Subst in lexpr: PVar %s not in subst, \
-                         generating fresh: %s"
-                        x lvar));
-                Expr.LVar lvar),
-            false )
-      (* List lengths can also be substituted directly *)
-      | (UnOp (LstLen, PVar x) | UnOp (LstLen, LVar x)) when mem subst le ->
-          (Val.to_expr (Option.get (get subst le)), false)
-      | _ -> (le, true)
-    in
-    Expr.map f_before None le
+    let mapper = new substitutor ~partial ~subst in
+    mapper#visit_expr () le
 
   (**
     Optional substitution inside an expression
@@ -401,37 +437,8 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   let substitute_formula (subst : t) ~(partial : bool) (a : Formula.t) :
       Formula.t =
     let open Formula in
-    let old_binders_substs = ref [] in
-    let f_before a =
-      match a with
-      | ForAll (bt, _) ->
-          let binders, _ = List.split bt in
-          let binders_substs =
-            List.map
-              (fun x -> Option.map (fun x_v -> (x, x_v)) (get subst (LVar x)))
-              binders
-          in
-          let binders_substs =
-            try
-              List.map Option.get
-                (List.filter (fun x -> x <> None) binders_substs)
-            with _ -> raise (Failure "DEATH. asrt_substitution")
-          in
-          old_binders_substs := binders_substs;
-          List.iter (fun x -> put subst (LVar x) (Val.from_lvar_name x)) binders;
-          (a, true)
-      | _              -> (a, true)
-    in
-    let f_after a =
-      match a with
-      | ForAll _ ->
-          List.iter
-            (fun (x, le_x) -> put subst (LVar x) le_x)
-            !old_binders_substs;
-          a
-      | _        -> a
-    in
-    map (Some f_before) (Some f_after) (Some (subst_in_expr subst ~partial)) a
+    let mapper = new substitutor ~partial ~subst in
+    mapper#visit_formula () a
 
   let substitute_in_formula_opt (subst : t) (a : Formula.t) : Formula.t option =
     let open Formula in

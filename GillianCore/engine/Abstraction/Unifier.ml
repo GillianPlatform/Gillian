@@ -287,14 +287,16 @@ module Make
         m
           "-------------------------@\n\
            Produce simple assertion: @[<h>%a@]@\n\
-           -------------------------@\n"
-          Asrt.pp a);
+           With subst: %a\n\
+          \           -------------------------@\n"
+          Asrt.pp a ESubst.pp subst);
 
     L.verbose (fun m -> m "STATE: %a" pp_astate astate);
 
     match a with
     | GA (a_id, ins, outs) -> (
         let setter = State.ga_to_setter a_id in
+
         let vs = List.map (subst_in_expr subst) (ins @ outs) in
         let failure = List.exists (fun x -> x = None) vs in
         if failure then

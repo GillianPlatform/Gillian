@@ -178,7 +178,8 @@ module Set = Set.Make (MyExpr)
 module Map = Map.Make (MyExpr)
 
 (** Map over expressions *)
-let rec map (f_before : t -> t * bool) (f_after : (t -> t) option) (expr : t) :
+
+(* let rec map (f_before : t -> t * bool) (f_after : (t -> t) option) (expr : t) :
     t =
   (* Apply the mapping *)
   let map_e = map f_before f_after in
@@ -198,9 +199,10 @@ let rec map (f_before : t -> t * bool) (f_after : (t -> t) option) (expr : t) :
       | EList es -> EList (List.map map_e es)
       | ESet es -> ESet (List.map map_e es)
     in
-    f_after mapped_expr
+    f_after mapped_expr *)
 
 (** Optional map over expressions *)
+
 let rec map_opt
     (f_before : t -> t option * bool) (f_after : (t -> t) option) (expr : t) :
     t option =
@@ -306,47 +308,20 @@ let rec fold
 
 (** Get all the logical variables in --e-- *)
 let lvars (le : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | LVar x -> [ x ]
-    | _      -> List.concat ac
-  in
-  SS.of_list (fold fe_ac None None le)
+  Visitors.Collectors.lvar_collector#visit_expr SS.empty le
 
 (** Get all the abstract locations in --e-- *)
-let alocs (le : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | ALoc x -> [ x ]
-    | _      -> List.concat ac
-  in
-  SS.of_list (fold fe_ac None None le)
+let alocs (le : t) : SS.t = Visitors.Collectors.aloc_collector#visit_expr () le
 
 (** Get all the concrete locations in --e-- *)
-let clocs (le : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | Lit (Loc l) -> l :: List.concat ac
-    | _           -> List.concat ac
-  in
-  SS.of_list (fold fe_ac None None le)
+let clocs (le : t) : SS.t = Visitors.Collectors.cloc_collector#visit_expr () le
 
 let locs (le : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | Lit (Loc l) | ALoc l -> l :: List.concat ac
-    | _                    -> List.concat ac
-  in
-  SS.of_list (fold fe_ac None None le)
+  Visitors.Collectors.loc_collector#visit_expr SS.empty le
 
 (** Get all substitutables in --e-- *)
 let substitutables (le : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | LVar x | ALoc x -> [ x ]
-    | _               -> List.concat ac
-  in
-  SS.of_list (fold fe_ac None None le)
+  Visitors.Collectors.substitutable_collector#visit_expr () le
 
 let rec is_concrete (le : t) : bool =
   let f = is_concrete in
@@ -366,13 +341,7 @@ let rec is_concrete (le : t) : bool =
   | NOp (_, les) | EList les | ESet les -> loop les
 
 (** Get all the variables in --e-- *)
-let vars (le : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | PVar x | LVar x | ALoc x | Lit (Loc x) -> [ x ]
-    | _ -> List.concat ac
-  in
-  SS.of_list (fold fe_ac None None le)
+let vars (le : t) : SS.t = Visitors.Collectors.var_collector#visit_expr () le
 
 (** Are all expressions in the list literals? *)
 let all_literals les =
@@ -392,23 +361,10 @@ let rec from_lit_list (lit : Literal.t) : t =
 
 (** Get all sub-expressions of --e-- of the form (Lit (LList lst)) and (EList lst)  *)
 let lists (le : t) : t list =
-  let fe_ac le _ _ ac =
-    match le with
-    | Lit (LList ls)    ->
-        [ EList (List.map (fun x -> Lit x) ls) ] @ List.concat ac
-    | EList _           -> le :: List.concat ac
-    | NOp (LstCat, les) -> les @ List.concat ac
-    | _                 -> List.concat ac
-  in
-  fold fe_ac None None le
+  Visitors.Collectors.list_collector#visit_expr () le
 
 let subst_clocs (subst : string -> t) (e : t) : t =
-  let f_before e =
-    match e with
-    | Lit (Loc loc) -> (subst loc, false)
-    | _             -> (e, true)
-  in
-  map f_before None e
+  (new Visitors.Substs.subst_clocs subst)#visit_expr () e
 
 let from_var_name (var_name : string) : t =
   if is_aloc_name var_name then ALoc var_name
@@ -424,7 +380,7 @@ let loc_from_loc_name (loc_name : string) : t =
 let subst_expr_for_expr ~to_subst ~subst_with expr =
   let v =
     object
-      inherit [_] Visitors.map as super
+      inherit [_] Visitors.endo as super
 
       method! visit_expr env e =
         if e = to_subst then subst_with else super#visit_expr env e
@@ -450,29 +406,13 @@ let base_elements (expr : t) : t list =
   in
   v#visit_expr () expr
 
-let pvars (e : t) : SS.t =
-  let v =
-    object
-      inherit [_] Visitors.reduce
-
-      inherit Visitors.Utils.ss_monoid
-
-      method! visit_PVar _ x = SS.singleton x
-    end
-  in
-  v#visit_expr () e
+let pvars (e : t) : SS.t = Visitors.Collectors.pvar_collector#visit_expr () e
 
 let var_to_expr (x : string) : t =
-  match Names.is_lvar_name x with
-  | true  -> LVar x
-  | false -> (
-      match Names.is_aloc_name x with
-      | true  -> ALoc x
-      | false -> (
-          match Names.is_pvar_name x with
-          | true  -> PVar x
-          | false -> raise (Failure ("var_to_expr: Impossible unifiable: " ^ x))
-          ))
+  if Names.is_lvar_name x then LVar x
+  else if Names.is_aloc_name x then ALoc x
+  else if Names.is_pvar_name x then PVar x
+  else raise (Failure ("var_to_expr: Impossible unifiable: " ^ x))
 
 let is_unifiable (e : t) : bool =
   match e with

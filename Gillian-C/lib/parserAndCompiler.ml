@@ -172,16 +172,16 @@ let mangle_proc proc mangled_syms =
   in
   let mangling_visitor =
     object
-      inherit [_] Gillian.Gil_syntax.Visitors.map as super
+      inherit [_] Gillian.Gil_syntax.Visitors.endo as super
 
       method! visit_proc env proc =
         let proc_params = List.map mangle_var proc.proc_params in
         let proc = super#visit_proc env proc in
         { proc with proc_params }
 
-      method! visit_PVar _ var = Gillian.Gil_syntax.Expr.PVar (mangle_var var)
+      method! visit_PVar _ _ var = Gillian.Gil_syntax.Expr.PVar (mangle_var var)
 
-      method! visit_String _ str =
+      method! visit_String _ _ str =
         Gillian.Gil_syntax.Literal.String (mangle_symbol str)
     end
   in

@@ -15,7 +15,7 @@ let build_full_gamma (pc : Pc.t) =
   copied
 
 let sat ~(pc : Pc.t) formula =
-  Logging.verbose (fun m ->
+  Logging.tmi (fun m ->
       m "Monadic about to check sat of this new formula:@[<hov>%a@]" Formula.pp
         formula);
   let pfs = build_full_pfs pc in

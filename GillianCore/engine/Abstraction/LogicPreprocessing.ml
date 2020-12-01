@@ -152,23 +152,13 @@ let find_pure_preds (preds : (string, Pred.t) Hashtbl.t) :
         is_pure
     | None         ->
         (* discovering new predicate *)
-        let is_pure_assertion (a : Asrt.t) =
-          let f_ac a _ _ ac =
-            match (a : Asrt.t) with
-            | Pred (pred_name, _) -> explore pred_name
-            | Emp | GA _          -> false
-            | _                   -> List.for_all (fun b -> b) ac
-          in
-          Asrt.fold None None f_ac None None a
-        in
-
         Hashtbl.add is_pure_pred pred_name true;
         (* assume predicates are pure until proven otherwise,
              for recursive calls *)
         let pred = Hashtbl.find preds pred_name in
         let is_pure =
           List.for_all
-            (fun (_, asrt) -> is_pure_assertion asrt)
+            (fun (_, asrt) -> Asrt.is_pure_asrt asrt)
             pred.pred_definitions
         in
 

@@ -304,28 +304,29 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
                 new_le_x
             | None    -> raise (Failure "DEATH. subst_in_expr"))
     in
+    let mapper =
+      object (self)
+        inherit [_] Gil_syntax.Visitors.endo
 
-    let f_before (le : Expr.t) =
-      let open Generators in
-      match (le : Expr.t) with
-      | LVar x ->
-          (find_in_subst x le (fun () -> Expr.LVar (LVar.alloc ())), false)
-      | ALoc x ->
-          (find_in_subst x le (fun () -> Expr.ALoc (LVar.alloc ())), false)
-      | PVar x ->
-          ( find_in_subst x le (fun () ->
-                let lvar = LVar.alloc () in
-                L.(
-                  verbose (fun m ->
-                      m
-                        "General: Subst in lexpr: PVar %s not in subst, \
-                         generating fresh: %s"
-                        x lvar));
-                Expr.LVar lvar),
-            false )
-      | _      -> (le, true)
+        method! visit_LVar () this x =
+          find_in_subst x this (fun () -> Expr.LVar (LVar.alloc ()))
+
+        method! visit_ALoc () this x =
+          find_in_subst x this (fun () -> Expr.ALoc (LVar.alloc ()))
+
+        method! visit_PVar () this x =
+          find_in_subst x this (fun () ->
+              let lvar = LVar.alloc () in
+              L.(
+                verbose (fun m ->
+                    m
+                      "General: Subst in lexpr: PVar %s not in subst, \
+                       generating fresh: %s"
+                      x lvar));
+              Expr.LVar lvar)
+      end
     in
-    Expr.map f_before None le
+    mapper#visit_expr () le
 
   (**
     Optional substitution inside an expression

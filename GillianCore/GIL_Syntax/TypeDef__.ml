@@ -251,4 +251,4 @@ and ('annot, 'label) proc = {
   proc_spec : spec option;
 }
 [@@deriving
-  visitors { variety = "reduce" }, visitors { variety = "map" }, yojson]
+  visitors { variety = "reduce" }, visitors { variety = "endo" }, yojson]

@@ -266,7 +266,8 @@ module Expr : sig
   val equal : t -> t -> bool
 
   (** Mapper *)
-  val map : (t -> t * bool) -> (t -> t) option -> t -> t
+
+  (* val map : (t -> t * bool) -> (t -> t) option -> t -> t *)
 
   (** Optional mapper *)
   val map_opt : (t -> t option * bool) -> (t -> t) option -> t -> t option
@@ -282,10 +283,6 @@ module Expr : sig
 
   (** [from_list] [EList] with the provided elements *)
   val from_list : t list -> t
-
-  (** Folder *)
-  val fold :
-    (t -> 'b -> 'b -> 'a list -> 'a) -> (t -> 'b -> 'b) option -> 'b -> t -> 'a
 
   (** [lvars e] returns all logical variables in [e] *)
   val lvars : t -> SS.t
@@ -366,7 +363,7 @@ module Formula : sig
   (** Sets of formulae *)
   module Set : Set.S with type elt := t
 
-  (** Deprecated. Use {!Visitors.map} instead *)
+  (** Deprecated. Use {!Visitors.endo} instead *)
   val map :
     (t -> t * bool) option ->
     (t -> t) option ->
@@ -380,15 +377,6 @@ module Formula : sig
     (Expr.t -> Expr.t option) option ->
     t ->
     t option
-
-  (** Deprecated. Use {!Visitors.reduce} instead *)
-  val fold :
-    (Expr.t -> 'a) option ->
-    (t -> 'b -> 'b -> 'a list -> 'a) ->
-    (t -> 'b -> 'b) option ->
-    'b ->
-    t ->
-    'a
 
   (** Get all the logical variables*)
   val lvars : t -> SS.t
@@ -412,7 +400,7 @@ module Formula : sig
   val lists : t -> Expr.t list
 
   (** Get all the list expressions *)
-  val list_lexprs : t -> Expr.t list
+  val list_lexprs : t -> Expr.Set.t
 
   (** [push_in_negations a] takes negations off the toplevel of [a] and pushes them in the leaves.
     For example [push_in_negations (Not (And (True, False)))] returns [Or (False, False)] *)
@@ -503,7 +491,7 @@ module Asrt : sig
   (** Sets of assertions *)
   module Set : Set.S with type elt := t
 
-  (** Deprecated, use {!Visitors.map} instead. *)
+  (** Deprecated, use {!Visitors.endo} instead. *)
   val map :
     (t -> t * bool) option ->
     (t -> t) option ->
@@ -512,21 +500,9 @@ module Asrt : sig
     t ->
     t
 
-  val fold :
-    (Expr.t -> 'a) option ->
-    (Formula.t -> 'a) option ->
-    (t -> 'b -> 'b -> 'a list -> 'a) ->
-    (t -> 'b -> 'b) option ->
-    'b ->
-    t ->
-    'a
-
-  (** Get all the logical expressions of [a] of the form (Lit (LList lst)) and (EList lst) *)
-  val lists : t -> Expr.t list
-
   (** Get all the logical expressions of [a] that denote a list
    and are not logical variables *)
-  val list_lexprs : t -> Expr.t list
+  val list_lexprs : t -> Expr.Set.t
 
   (** Get all the logical variables in [a] *)
   val lvars : t -> SS.t
@@ -599,7 +575,7 @@ module SLCmd : sig
     | SepAssert of Asrt.t * string list  (** Assert *)
     | Invariant of Asrt.t * string list  (** Invariant *)
 
-  (** Deprecated. Use {!Visitors.map} instead *)
+  (** Deprecated. Use {!Visitors.endo} instead *)
   val map :
     (t -> t) option ->
     (Asrt.t -> Asrt.t) option ->
@@ -1112,619 +1088,694 @@ module Prog : sig
 end
 
 module Visitors : sig
-  class ['c] map :
-    object ('c)
+  class ['b] endo :
+    object ('b)
       constraint
-      'c = < visit_'annot : 'd -> 'g -> 'g
-           ; visit_'label : 'd -> 'h -> 'h
-           ; visit_ALoc : 'd -> ALoc.t -> Expr.t
-           ; visit_And : 'd -> Formula.t -> Formula.t -> Formula.t
-           ; visit_Apply : 'd -> string -> Expr.t -> 'h option -> 'h Cmd.t
+      'b = < visit_'annot : 'c -> 'd -> 'd
+           ; visit_'label : 'c -> 'f -> 'f
+           ; visit_ALoc : 'c -> Expr.t -> string -> Expr.t
+           ; visit_And : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
+           ; visit_Apply :
+               'c -> 'f Cmd.t -> string -> Expr.t -> 'f option -> 'f Cmd.t
            ; visit_ApplyLem :
-               'd -> string -> Expr.t list -> string list -> SLCmd.t
-           ; visit_Arguments : 'd -> string -> 'h Cmd.t
-           ; visit_Assert : 'd -> Formula.t -> LCmd.t
-           ; visit_Assignment : 'd -> string -> Expr.t -> 'h Cmd.t
-           ; visit_Assume : 'd -> Formula.t -> LCmd.t
-           ; visit_AssumeType : 'd -> string -> Type.t -> LCmd.t
-           ; visit_BAnd : 'd -> BinOp.t
-           ; visit_BOr : 'd -> BinOp.t
-           ; visit_BSetMem : 'd -> BinOp.t
-           ; visit_BSetSub : 'd -> BinOp.t
-           ; visit_BinOp : 'd -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
-           ; visit_BitwiseAnd : 'd -> BinOp.t
-           ; visit_BitwiseAndL : 'd -> BinOp.t
-           ; visit_BitwiseNot : 'd -> UnOp.t
-           ; visit_BitwiseOr : 'd -> BinOp.t
-           ; visit_BitwiseOrL : 'd -> BinOp.t
-           ; visit_BitwiseXor : 'd -> BinOp.t
-           ; visit_BitwiseXorL : 'd -> BinOp.t
-           ; visit_Bool : 'd -> bool -> Literal.t
-           ; visit_BooleanType : 'd -> Type.t
-           ; visit_Branch : 'd -> Formula.t -> LCmd.t
+               'c -> SLCmd.t -> string -> Expr.t list -> string list -> SLCmd.t
+           ; visit_Arguments : 'c -> 'f Cmd.t -> string -> 'f Cmd.t
+           ; visit_Assert : 'c -> LCmd.t -> Formula.t -> LCmd.t
+           ; visit_Assignment : 'c -> 'f Cmd.t -> string -> Expr.t -> 'f Cmd.t
+           ; visit_Assume : 'c -> LCmd.t -> Formula.t -> LCmd.t
+           ; visit_AssumeType : 'c -> LCmd.t -> string -> Type.t -> LCmd.t
+           ; visit_BAnd : 'c -> BinOp.t -> BinOp.t
+           ; visit_BOr : 'c -> BinOp.t -> BinOp.t
+           ; visit_BSetMem : 'c -> BinOp.t -> BinOp.t
+           ; visit_BSetSub : 'c -> BinOp.t -> BinOp.t
+           ; visit_BinOp : 'c -> Expr.t -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
+           ; visit_BitwiseAnd : 'c -> BinOp.t -> BinOp.t
+           ; visit_BitwiseAndL : 'c -> BinOp.t -> BinOp.t
+           ; visit_BitwiseNot : 'c -> UnOp.t -> UnOp.t
+           ; visit_BitwiseOr : 'c -> BinOp.t -> BinOp.t
+           ; visit_BitwiseOrL : 'c -> BinOp.t -> BinOp.t
+           ; visit_BitwiseXor : 'c -> BinOp.t -> BinOp.t
+           ; visit_BitwiseXorL : 'c -> BinOp.t -> BinOp.t
+           ; visit_Bool : 'c -> Literal.t -> bool -> Literal.t
+           ; visit_BooleanType : 'c -> Type.t -> Type.t
+           ; visit_Branch : 'c -> LCmd.t -> Formula.t -> LCmd.t
            ; visit_Call :
-               'd ->
+               'c ->
+               'f Cmd.t ->
                string ->
                Expr.t ->
                Expr.t list ->
-               'h option ->
+               'f option ->
                (string * (string * Expr.t) list) option ->
-               'h Cmd.t
-           ; visit_Car : 'd -> UnOp.t
-           ; visit_Cdr : 'd -> UnOp.t
-           ; visit_Constant : 'd -> Constant.t -> Literal.t
-           ; visit_IDiv : 'd -> BinOp.t
-           ; visit_FDiv : 'd -> BinOp.t
+               'f Cmd.t
+           ; visit_Car : 'c -> UnOp.t -> UnOp.t
+           ; visit_Cdr : 'c -> UnOp.t -> UnOp.t
+           ; visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
            ; visit_ECall :
-               'd -> string -> Expr.t -> Expr.t list -> 'h option -> 'h Cmd.t
-           ; visit_EList : 'd -> Expr.t list -> Expr.t
-           ; visit_ESet : 'd -> Expr.t list -> Expr.t
-           ; visit_Emp : 'd -> Asrt.t
-           ; visit_Empty : 'd -> Literal.t
-           ; visit_EmptyType : 'd -> Type.t
-           ; visit_Epsilon : 'd -> Constant.t
-           ; visit_Eq : 'd -> Expr.t -> Expr.t -> Formula.t
-           ; visit_Equal : 'd -> BinOp.t
-           ; visit_Error : 'd -> Flag.t
-           ; visit_Fail : 'd -> string -> Expr.t list -> 'h Cmd.t
-           ; visit_False : 'd -> Formula.t
+               'c ->
+               'f Cmd.t ->
+               string ->
+               Expr.t ->
+               Expr.t list ->
+               'f option ->
+               'f Cmd.t
+           ; visit_EList : 'c -> Expr.t -> Expr.t list -> Expr.t
+           ; visit_ESet : 'c -> Expr.t -> Expr.t list -> Expr.t
+           ; visit_Emp : 'c -> Asrt.t -> Asrt.t
+           ; visit_Empty : 'c -> Literal.t -> Literal.t
+           ; visit_EmptyType : 'c -> Type.t -> Type.t
+           ; visit_Epsilon : 'c -> Constant.t -> Constant.t
+           ; visit_Eq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_Equal : 'c -> BinOp.t -> BinOp.t
+           ; visit_Error : 'c -> Flag.t -> Flag.t
+           ; visit_FDiv : 'c -> BinOp.t -> BinOp.t
+           ; visit_FLessThan : 'c -> BinOp.t -> BinOp.t
+           ; visit_FLessThanEqual : 'c -> BinOp.t -> BinOp.t
+           ; visit_FMinus : 'c -> BinOp.t -> BinOp.t
+           ; visit_FMod : 'c -> BinOp.t -> BinOp.t
+           ; visit_FPlus : 'c -> BinOp.t -> BinOp.t
+           ; visit_FTimes : 'c -> BinOp.t -> BinOp.t
+           ; visit_FUnaryMinus : 'c -> UnOp.t -> UnOp.t
+           ; visit_Fail : 'c -> 'f Cmd.t -> string -> Expr.t list -> 'f Cmd.t
+           ; visit_False : 'c -> Formula.t -> Formula.t
            ; visit_Fold :
-               'd ->
+               'c ->
+               SLCmd.t ->
                string ->
                Expr.t list ->
                (string * (string * Expr.t) list) option ->
                SLCmd.t
            ; visit_ForAll :
-               'd -> (string * Type.t option) list -> Formula.t -> Formula.t
-           ; visit_GA : 'd -> string -> Expr.t list -> Expr.t list -> Asrt.t
-           ; visit_GUnfold : 'd -> string -> SLCmd.t
-           ; visit_Goto : 'd -> 'h -> 'h Cmd.t
-           ; visit_GuardedGoto : 'd -> Expr.t -> 'h -> 'h -> 'h Cmd.t
-           ; visit_If : 'd -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
-           ; visit_Invariant : 'd -> Asrt.t -> string list -> SLCmd.t
-           ; visit_LAction : 'd -> string -> string -> Expr.t list -> 'h Cmd.t
-           ; visit_LList : 'd -> Literal.t list -> Literal.t
-           ; visit_LVar : 'd -> LVar.t -> Expr.t
-           ; visit_LeftShift : 'd -> BinOp.t
-           ; visit_LeftShiftL : 'd -> BinOp.t
-           ; visit_Less : 'd -> Expr.t -> Expr.t -> Formula.t
-           ; visit_LessEq : 'd -> Expr.t -> Expr.t -> Formula.t
-           ; visit_ILessThan : 'd -> BinOp.t
-           ; visit_ILessThanEqual : 'd -> BinOp.t
-           ; visit_FLessThan : 'd -> BinOp.t
-           ; visit_FLessThanEqual : 'd -> BinOp.t
-           ; visit_SLessThan : 'd -> BinOp.t
-           ; visit_ListType : 'd -> Type.t
-           ; visit_Lit : 'd -> Literal.t -> Expr.t
-           ; visit_Loc : 'd -> string -> Literal.t
-           ; visit_LocalTime : 'd -> Constant.t
-           ; visit_Logic : 'd -> LCmd.t -> 'h Cmd.t
-           ; visit_LstCat : 'd -> NOp.t
-           ; visit_LstLen : 'd -> UnOp.t
-           ; visit_LstNth : 'd -> BinOp.t
-           ; visit_LstRev : 'd -> UnOp.t
-           ; visit_LstSub : 'd -> Expr.t -> Expr.t -> Expr.t -> Expr.t
-           ; visit_M_abs : 'd -> UnOp.t
-           ; visit_M_acos : 'd -> UnOp.t
-           ; visit_M_asin : 'd -> UnOp.t
-           ; visit_M_atan : 'd -> UnOp.t
-           ; visit_M_atan2 : 'd -> BinOp.t
-           ; visit_M_ceil : 'd -> UnOp.t
-           ; visit_M_cos : 'd -> UnOp.t
-           ; visit_M_exp : 'd -> UnOp.t
-           ; visit_M_floor : 'd -> UnOp.t
-           ; visit_M_isNaN : 'd -> UnOp.t
-           ; visit_M_log : 'd -> UnOp.t
-           ; visit_M_pow : 'd -> BinOp.t
-           ; visit_M_round : 'd -> UnOp.t
-           ; visit_M_sgn : 'd -> UnOp.t
-           ; visit_M_sin : 'd -> UnOp.t
-           ; visit_M_sqrt : 'd -> UnOp.t
-           ; visit_M_tan : 'd -> UnOp.t
-           ; visit_Macro : 'd -> string -> Expr.t list -> LCmd.t
-           ; visit_Max_float : 'd -> Constant.t
-           ; visit_MaxSafeInteger : 'd -> Constant.t
-           ; visit_Min_float : 'd -> Constant.t
-           ; visit_IMinus : 'd -> BinOp.t
-           ; visit_FMinus : 'd -> BinOp.t
-           ; visit_IMod : 'd -> BinOp.t
-           ; visit_FMod : 'd -> BinOp.t
-           ; visit_NOp : 'd -> NOp.t -> Expr.t list -> Expr.t
-           ; visit_NoneType : 'd -> Type.t
-           ; visit_Nono : 'd -> Literal.t
-           ; visit_Normal : 'd -> Flag.t
-           ; visit_Not : 'd -> Formula.t -> Formula.t
-           ; visit_Null : 'd -> Literal.t
-           ; visit_NullType : 'd -> Type.t
-           ; visit_Int : 'd -> int -> Literal.t
-           ; visit_Num : 'd -> float -> Literal.t
-           ; visit_IntType : 'd -> Type.t
-           ; visit_NumberType : 'd -> Type.t
-           ; visit_ObjectType : 'd -> Type.t
-           ; visit_Or : 'd -> Formula.t -> Formula.t -> Formula.t
-           ; visit_PVar : 'd -> string -> Expr.t
-           ; visit_PhiAssignment : 'd -> (string * Expr.t list) list -> 'h Cmd.t
-           ; visit_Pi : 'd -> Constant.t
-           ; visit_IPlus : 'd -> BinOp.t
-           ; visit_FPlus : 'd -> BinOp.t
-           ; visit_Pred : 'd -> string -> Expr.t list -> Asrt.t
-           ; visit_Pure : 'd -> Formula.t -> Asrt.t
-           ; visit_Random : 'd -> Constant.t
-           ; visit_ReturnError : 'd -> 'h Cmd.t
-           ; visit_ReturnNormal : 'd -> 'h Cmd.t
-           ; visit_SL : 'd -> SLCmd.t -> LCmd.t
-           ; visit_SepAssert : 'd -> Asrt.t -> string list -> SLCmd.t
-           ; visit_SetDiff : 'd -> BinOp.t
-           ; visit_SetInter : 'd -> NOp.t
-           ; visit_SetMem : 'd -> Expr.t -> Expr.t -> Formula.t
-           ; visit_SetSub : 'd -> Expr.t -> Expr.t -> Formula.t
-           ; visit_SetToList : 'd -> UnOp.t
-           ; visit_SetType : 'd -> Type.t
-           ; visit_SetUnion : 'd -> NOp.t
-           ; visit_SignedRightShift : 'd -> BinOp.t
-           ; visit_SignedRightShiftL : 'd -> BinOp.t
-           ; visit_Skip : 'd -> 'h Cmd.t
-           ; visit_SpecVar : 'd -> string list -> LCmd.t
-           ; visit_Star : 'd -> Asrt.t -> Asrt.t -> Asrt.t
-           ; visit_StrCat : 'd -> BinOp.t
-           ; visit_StrLen : 'd -> UnOp.t
-           ; visit_StrLess : 'd -> Expr.t -> Expr.t -> Formula.t
-           ; visit_StrNth : 'd -> BinOp.t
-           ; visit_String : 'd -> string -> Literal.t
-           ; visit_StringType : 'd -> Type.t
-           ; visit_ITimes : 'd -> BinOp.t
-           ; visit_FTimes : 'd -> BinOp.t
-           ; visit_ToInt32Op : 'd -> UnOp.t
-           ; visit_ToIntOp : 'd -> UnOp.t
-           ; visit_ToNumberOp : 'd -> UnOp.t
-           ; visit_ToStringOp : 'd -> UnOp.t
-           ; visit_ToUint16Op : 'd -> UnOp.t
-           ; visit_ToUint32Op : 'd -> UnOp.t
-           ; visit_True : 'd -> Formula.t
-           ; visit_Type : 'd -> Type.t -> Literal.t
-           ; visit_TypeOf : 'd -> UnOp.t
-           ; visit_TypeType : 'd -> Type.t
-           ; visit_Types : 'd -> (Expr.t * Type.t) list -> Asrt.t
-           ; visit_UNot : 'd -> UnOp.t
-           ; visit_UTCTime : 'd -> Constant.t
-           ; visit_UnOp : 'd -> UnOp.t -> Expr.t -> Expr.t
-           ; visit_IUnaryMinus : 'd -> UnOp.t
-           ; visit_FUnaryMinus : 'd -> UnOp.t
-           ; visit_Undefined : 'd -> Literal.t
-           ; visit_UndefinedType : 'd -> Type.t
+               'c ->
+               Formula.t ->
+               (string * Type.t option) list ->
+               Formula.t ->
+               Formula.t
+           ; visit_GA :
+               'c -> Asrt.t -> string -> Expr.t list -> Expr.t list -> Asrt.t
+           ; visit_GUnfold : 'c -> SLCmd.t -> string -> SLCmd.t
+           ; visit_Goto : 'c -> 'f Cmd.t -> 'f -> 'f Cmd.t
+           ; visit_GuardedGoto :
+               'c -> 'f Cmd.t -> Expr.t -> 'f -> 'f -> 'f Cmd.t
+           ; visit_IDiv : 'c -> BinOp.t -> BinOp.t
+           ; visit_ILessThan : 'c -> BinOp.t -> BinOp.t
+           ; visit_ILessThanEqual : 'c -> BinOp.t -> BinOp.t
+           ; visit_IMinus : 'c -> BinOp.t -> BinOp.t
+           ; visit_IMod : 'c -> BinOp.t -> BinOp.t
+           ; visit_IPlus : 'c -> BinOp.t -> BinOp.t
+           ; visit_ITimes : 'c -> BinOp.t -> BinOp.t
+           ; visit_IUnaryMinus : 'c -> UnOp.t -> UnOp.t
+           ; visit_If :
+               'c -> LCmd.t -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
+           ; visit_Int : 'c -> Literal.t -> int -> Literal.t
+           ; visit_IntType : 'c -> Type.t -> Type.t
+           ; visit_Invariant : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
+           ; visit_LAction :
+               'c -> 'f Cmd.t -> string -> string -> Expr.t list -> 'f Cmd.t
+           ; visit_LList : 'c -> Literal.t -> Literal.t list -> Literal.t
+           ; visit_LVar : 'c -> Expr.t -> string -> Expr.t
+           ; visit_LeftShift : 'c -> BinOp.t -> BinOp.t
+           ; visit_LeftShiftL : 'c -> BinOp.t -> BinOp.t
+           ; visit_Less : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_LessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_ListType : 'c -> Type.t -> Type.t
+           ; visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
+           ; visit_Loc : 'c -> Literal.t -> string -> Literal.t
+           ; visit_LocalTime : 'c -> Constant.t -> Constant.t
+           ; visit_Logic : 'c -> 'f Cmd.t -> LCmd.t -> 'f Cmd.t
+           ; visit_LstCat : 'c -> NOp.t -> NOp.t
+           ; visit_LstLen : 'c -> UnOp.t -> UnOp.t
+           ; visit_LstNth : 'c -> BinOp.t -> BinOp.t
+           ; visit_LstRev : 'c -> UnOp.t -> UnOp.t
+           ; visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> Expr.t -> Expr.t
+           ; visit_M_abs : 'c -> UnOp.t -> UnOp.t
+           ; visit_M_acos : 'c -> UnOp.t -> UnOp.t
+           ; visit_M_asin : 'c -> UnOp.t -> UnOp.t
+           ; visit_M_atan : 'c -> UnOp.t -> UnOp.t
+           ; visit_M_atan2 : 'c -> BinOp.t -> BinOp.t
+           ; visit_M_ceil : 'c -> UnOp.t -> UnOp.t
+           ; visit_M_cos : 'c -> UnOp.t -> UnOp.t
+           ; visit_M_exp : 'c -> UnOp.t -> UnOp.t
+           ; visit_M_floor : 'c -> UnOp.t -> UnOp.t
+           ; visit_M_isNaN : 'c -> UnOp.t -> UnOp.t
+           ; visit_M_log : 'c -> UnOp.t -> UnOp.t
+           ; visit_M_pow : 'c -> BinOp.t -> BinOp.t
+           ; visit_M_round : 'c -> UnOp.t -> UnOp.t
+           ; visit_M_sgn : 'c -> UnOp.t -> UnOp.t
+           ; visit_M_sin : 'c -> UnOp.t -> UnOp.t
+           ; visit_M_sqrt : 'c -> UnOp.t -> UnOp.t
+           ; visit_M_tan : 'c -> UnOp.t -> UnOp.t
+           ; visit_Macro : 'c -> LCmd.t -> string -> Expr.t list -> LCmd.t
+           ; visit_MaxSafeInteger : 'c -> Constant.t -> Constant.t
+           ; visit_Max_float : 'c -> Constant.t -> Constant.t
+           ; visit_Min_float : 'c -> Constant.t -> Constant.t
+           ; visit_NOp : 'c -> Expr.t -> NOp.t -> Expr.t list -> Expr.t
+           ; visit_NoneType : 'c -> Type.t -> Type.t
+           ; visit_Nono : 'c -> Literal.t -> Literal.t
+           ; visit_Normal : 'c -> Flag.t -> Flag.t
+           ; visit_Not : 'c -> Formula.t -> Formula.t -> Formula.t
+           ; visit_Null : 'c -> Literal.t -> Literal.t
+           ; visit_NullType : 'c -> Type.t -> Type.t
+           ; visit_Num : 'c -> Literal.t -> float -> Literal.t
+           ; visit_NumberType : 'c -> Type.t -> Type.t
+           ; visit_ObjectType : 'c -> Type.t -> Type.t
+           ; visit_Or : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
+           ; visit_PVar : 'c -> Expr.t -> string -> Expr.t
+           ; visit_PhiAssignment :
+               'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
+           ; visit_Pi : 'c -> Constant.t -> Constant.t
+           ; visit_Pred : 'c -> Asrt.t -> string -> Expr.t list -> Asrt.t
+           ; visit_Pure : 'c -> Asrt.t -> Formula.t -> Asrt.t
+           ; visit_Random : 'c -> Constant.t -> Constant.t
+           ; visit_ReturnError : 'c -> 'f Cmd.t -> 'f Cmd.t
+           ; visit_ReturnNormal : 'c -> 'f Cmd.t -> 'f Cmd.t
+           ; visit_SL : 'c -> LCmd.t -> SLCmd.t -> LCmd.t
+           ; visit_SLessThan : 'c -> BinOp.t -> BinOp.t
+           ; visit_SepAssert : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
+           ; visit_SetDiff : 'c -> BinOp.t -> BinOp.t
+           ; visit_SetInter : 'c -> NOp.t -> NOp.t
+           ; visit_SetMem : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_SetSub : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_SetToList : 'c -> UnOp.t -> UnOp.t
+           ; visit_SetType : 'c -> Type.t -> Type.t
+           ; visit_SetUnion : 'c -> NOp.t -> NOp.t
+           ; visit_SignedRightShift : 'c -> BinOp.t -> BinOp.t
+           ; visit_SignedRightShiftL : 'c -> BinOp.t -> BinOp.t
+           ; visit_Skip : 'c -> 'f Cmd.t -> 'f Cmd.t
+           ; visit_SpecVar : 'c -> LCmd.t -> string list -> LCmd.t
+           ; visit_Star : 'c -> Asrt.t -> Asrt.t -> Asrt.t -> Asrt.t
+           ; visit_StrCat : 'c -> BinOp.t -> BinOp.t
+           ; visit_StrLen : 'c -> UnOp.t -> UnOp.t
+           ; visit_StrLess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_StrNth : 'c -> BinOp.t -> BinOp.t
+           ; visit_String : 'c -> Literal.t -> string -> Literal.t
+           ; visit_StringType : 'c -> Type.t -> Type.t
+           ; visit_ToInt32Op : 'c -> UnOp.t -> UnOp.t
+           ; visit_ToIntOp : 'c -> UnOp.t -> UnOp.t
+           ; visit_ToNumberOp : 'c -> UnOp.t -> UnOp.t
+           ; visit_ToStringOp : 'c -> UnOp.t -> UnOp.t
+           ; visit_ToUint16Op : 'c -> UnOp.t -> UnOp.t
+           ; visit_ToUint32Op : 'c -> UnOp.t -> UnOp.t
+           ; visit_True : 'c -> Formula.t -> Formula.t
+           ; visit_Type : 'c -> Literal.t -> Type.t -> Literal.t
+           ; visit_TypeOf : 'c -> UnOp.t -> UnOp.t
+           ; visit_TypeType : 'c -> Type.t -> Type.t
+           ; visit_Types : 'c -> Asrt.t -> (Expr.t * Type.t) list -> Asrt.t
+           ; visit_UNot : 'c -> UnOp.t -> UnOp.t
+           ; visit_UTCTime : 'c -> Constant.t -> Constant.t
+           ; visit_UnOp : 'c -> Expr.t -> UnOp.t -> Expr.t -> Expr.t
+           ; visit_Undefined : 'c -> Literal.t -> Literal.t
+           ; visit_UndefinedType : 'c -> Type.t -> Type.t
            ; visit_Unfold :
-               'd ->
+               'c ->
+               SLCmd.t ->
                string ->
                Expr.t list ->
                (string * string) list option ->
                bool ->
                SLCmd.t
-           ; visit_UnsignedRightShift : 'd -> BinOp.t
-           ; visit_UnsignedRightShiftL : 'd -> BinOp.t
-           ; visit_assertion : 'd -> Asrt.t -> Asrt.t
+           ; visit_UnsignedRightShift : 'c -> BinOp.t -> BinOp.t
+           ; visit_UnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
+           ; visit_assertion : 'c -> Asrt.t -> Asrt.t
            ; visit_bindings :
-               'd ->
+               'c ->
                string * (string * Expr.t) list ->
                string * (string * Expr.t) list
-           ; visit_binop : 'd -> BinOp.t -> BinOp.t
-           ; visit_bispec : 'd -> BiSpec.t -> BiSpec.t
-           ; visit_cmd : 'd -> 'h Cmd.t -> 'h Cmd.t
-           ; visit_constant : 'd -> Constant.t -> Constant.t
-           ; visit_expr : 'd -> Expr.t -> Expr.t
-           ; visit_flag : 'd -> Flag.t -> Flag.t
-           ; visit_formula : 'd -> Formula.t -> Formula.t
-           ; visit_lcmd : 'd -> LCmd.t -> LCmd.t
-           ; visit_lemma : 'd -> Lemma.t -> Lemma.t
-           ; visit_lemma_spec : 'd -> Lemma.spec -> Lemma.spec
-           ; visit_literal : 'd -> Literal.t -> Literal.t
-           ; visit_macro : 'd -> Macro.t -> Macro.t
-           ; visit_nop : 'd -> NOp.t -> NOp.t
-           ; visit_pred : 'd -> Pred.t -> Pred.t
-           ; visit_proc : 'd -> ('g, 'h) Proc.t -> ('g, 'h) Proc.t
-           ; visit_single_spec : 'd -> Spec.st -> Spec.st
-           ; visit_slcmd : 'd -> SLCmd.t -> SLCmd.t
-           ; visit_spec : 'd -> Spec.t -> Spec.t
-           ; visit_typ : 'd -> Type.t -> Type.t
-           ; visit_unop : 'd -> UnOp.t -> UnOp.t
+           ; visit_binop : 'c -> BinOp.t -> BinOp.t
+           ; visit_bispec : 'c -> BiSpec.t -> BiSpec.t
+           ; visit_cmd : 'c -> 'f Cmd.t -> 'f Cmd.t
+           ; visit_constant : 'c -> Constant.t -> Constant.t
+           ; visit_expr : 'c -> Expr.t -> Expr.t
+           ; visit_flag : 'c -> Flag.t -> Flag.t
+           ; visit_formula : 'c -> Formula.t -> Formula.t
+           ; visit_lcmd : 'c -> LCmd.t -> LCmd.t
+           ; visit_lemma : 'c -> Lemma.t -> Lemma.t
+           ; visit_lemma_spec : 'c -> Lemma.spec -> Lemma.spec
+           ; visit_literal : 'c -> Literal.t -> Literal.t
+           ; visit_macro : 'c -> Macro.t -> Macro.t
+           ; visit_nop : 'c -> NOp.t -> NOp.t
+           ; visit_pred : 'c -> Pred.t -> Pred.t
+           ; visit_proc : 'c -> ('d, 'f) Proc.t -> ('d, 'f) Proc.t
+           ; visit_single_spec : 'c -> Spec.st -> Spec.st
+           ; visit_slcmd : 'c -> SLCmd.t -> SLCmd.t
+           ; visit_spec : 'c -> Spec.t -> Spec.t
+           ; visit_typ : 'c -> Type.t -> Type.t
+           ; visit_unop : 'c -> UnOp.t -> UnOp.t
            ; .. >
 
-      method visit_'annot : 'd -> 'g -> 'g
+      method visit_'annot : 'c -> 'd -> 'd
 
-      method visit_'label : 'd -> 'h -> 'h
+      method visit_'label : 'c -> 'f -> 'f
 
-      method visit_ALoc : 'd -> ALoc.t -> Expr.t
+      method visit_ALoc : 'c -> Expr.t -> string -> Expr.t
 
-      method visit_And : 'd -> Formula.t -> Formula.t -> Formula.t
+      method visit_And : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
 
-      method visit_Apply : 'd -> string -> Expr.t -> 'h option -> 'h Cmd.t
+      method visit_Apply :
+        'c -> 'f Cmd.t -> string -> Expr.t -> 'f option -> 'f Cmd.t
 
       method visit_ApplyLem :
-        'd -> string -> Expr.t list -> string list -> SLCmd.t
+        'c -> SLCmd.t -> string -> Expr.t list -> string list -> SLCmd.t
 
-      method visit_Arguments : 'd -> string -> 'h Cmd.t
+      method visit_Arguments : 'c -> 'f Cmd.t -> string -> 'f Cmd.t
 
-      method visit_Assert : 'd -> Formula.t -> LCmd.t
+      method visit_Assert : 'c -> LCmd.t -> Formula.t -> LCmd.t
 
-      method visit_Assignment : 'd -> string -> Expr.t -> 'h Cmd.t
+      method visit_Assignment : 'c -> 'f Cmd.t -> string -> Expr.t -> 'f Cmd.t
 
-      method visit_Assume : 'd -> Formula.t -> LCmd.t
+      method visit_Assume : 'c -> LCmd.t -> Formula.t -> LCmd.t
 
-      method visit_AssumeType : 'd -> string -> Type.t -> LCmd.t
+      method visit_AssumeType : 'c -> LCmd.t -> string -> Type.t -> LCmd.t
 
-      method visit_BAnd : 'd -> BinOp.t
+      method visit_BAnd : 'c -> BinOp.t -> BinOp.t
 
-      method visit_BOr : 'd -> BinOp.t
+      method visit_BOr : 'c -> BinOp.t -> BinOp.t
 
-      method visit_BSetMem : 'd -> BinOp.t
+      method visit_BSetMem : 'c -> BinOp.t -> BinOp.t
 
-      method visit_BSetSub : 'd -> BinOp.t
+      method visit_BSetSub : 'c -> BinOp.t -> BinOp.t
 
-      method visit_BinOp : 'd -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
+      method visit_BinOp : 'c -> Expr.t -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
 
-      method visit_BitwiseAnd : 'd -> BinOp.t
+      method visit_BitwiseAnd : 'c -> BinOp.t -> BinOp.t
 
-      method visit_BitwiseAndL : 'd -> BinOp.t
+      method visit_BitwiseAndL : 'c -> BinOp.t -> BinOp.t
 
-      method visit_BitwiseNot : 'd -> UnOp.t
+      method visit_BitwiseNot : 'c -> UnOp.t -> UnOp.t
 
-      method visit_BitwiseOr : 'd -> BinOp.t
+      method visit_BitwiseOr : 'c -> BinOp.t -> BinOp.t
 
-      method visit_BitwiseOrL : 'd -> BinOp.t
+      method visit_BitwiseOrL : 'c -> BinOp.t -> BinOp.t
 
-      method visit_BitwiseXor : 'd -> BinOp.t
+      method visit_BitwiseXor : 'c -> BinOp.t -> BinOp.t
 
-      method visit_BitwiseXorL : 'd -> BinOp.t
+      method visit_BitwiseXorL : 'c -> BinOp.t -> BinOp.t
 
-      method visit_Bool : 'd -> bool -> Literal.t
+      method visit_Bool : 'c -> Literal.t -> bool -> Literal.t
 
-      method visit_BooleanType : 'd -> Type.t
+      method visit_BooleanType : 'c -> Type.t -> Type.t
 
-      method visit_Branch : 'd -> Formula.t -> LCmd.t
+      method visit_Branch : 'c -> LCmd.t -> Formula.t -> LCmd.t
 
       method visit_Call :
-        'd ->
+        'c ->
+        'f Cmd.t ->
         string ->
         Expr.t ->
         Expr.t list ->
-        'h option ->
+        'f option ->
         (string * (string * Expr.t) list) option ->
-        'h Cmd.t
+        'f Cmd.t
 
-      method visit_Car : 'd -> UnOp.t
+      method visit_Car : 'c -> UnOp.t -> UnOp.t
 
-      method visit_Cdr : 'd -> UnOp.t
+      method visit_Cdr : 'c -> UnOp.t -> UnOp.t
 
-      method visit_Constant : 'd -> Constant.t -> Literal.t
-
-      method visit_IDiv : 'd -> BinOp.t
-
-      method visit_FDiv : 'd -> BinOp.t
+      method visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
 
       method visit_ECall :
-        'd -> string -> Expr.t -> Expr.t list -> 'h option -> 'h Cmd.t
+        'c ->
+        'f Cmd.t ->
+        string ->
+        Expr.t ->
+        Expr.t list ->
+        'f option ->
+        'f Cmd.t
 
-      method visit_EList : 'd -> Expr.t list -> Expr.t
+      method visit_EList : 'c -> Expr.t -> Expr.t list -> Expr.t
 
-      method visit_Epsilon : 'd -> Constant.t
+      method visit_ESet : 'c -> Expr.t -> Expr.t list -> Expr.t
 
-      method visit_ESet : 'd -> Expr.t list -> Expr.t
+      method visit_Emp : 'c -> Asrt.t -> Asrt.t
 
-      method visit_Emp : 'd -> Asrt.t
+      method visit_Empty : 'c -> Literal.t -> Literal.t
 
-      method visit_Empty : 'd -> Literal.t
+      method visit_EmptyType : 'c -> Type.t -> Type.t
 
-      method visit_EmptyType : 'd -> Type.t
+      method visit_Epsilon : 'c -> Constant.t -> Constant.t
 
-      method visit_Epsilon : 'd -> Constant.t
+      method visit_Eq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
 
-      method visit_Eq : 'd -> Expr.t -> Expr.t -> Formula.t
+      method visit_Equal : 'c -> BinOp.t -> BinOp.t
 
-      method visit_Equal : 'd -> BinOp.t
+      method visit_Error : 'c -> Flag.t -> Flag.t
 
-      method visit_Error : 'd -> Flag.t
+      method visit_FDiv : 'c -> BinOp.t -> BinOp.t
 
-      method visit_Fail : 'd -> string -> Expr.t list -> 'h Cmd.t
+      method visit_FLessThan : 'c -> BinOp.t -> BinOp.t
 
-      method visit_False : 'd -> Formula.t
+      method visit_FLessThanEqual : 'c -> BinOp.t -> BinOp.t
+
+      method visit_FMinus : 'c -> BinOp.t -> BinOp.t
+
+      method visit_FMod : 'c -> BinOp.t -> BinOp.t
+
+      method visit_FPlus : 'c -> BinOp.t -> BinOp.t
+
+      method visit_FTimes : 'c -> BinOp.t -> BinOp.t
+
+      method visit_FUnaryMinus : 'c -> UnOp.t -> UnOp.t
+
+      method visit_Fail : 'c -> 'f Cmd.t -> string -> Expr.t list -> 'f Cmd.t
+
+      method visit_False : 'c -> Formula.t -> Formula.t
 
       method visit_Fold :
-        'd ->
+        'c ->
+        SLCmd.t ->
         string ->
         Expr.t list ->
         (string * (string * Expr.t) list) option ->
         SLCmd.t
 
       method visit_ForAll :
-        'd -> (string * Type.t option) list -> Formula.t -> Formula.t
+        'c ->
+        Formula.t ->
+        (string * Type.t option) list ->
+        Formula.t ->
+        Formula.t
 
-      method visit_GA : 'd -> string -> Expr.t list -> Expr.t list -> Asrt.t
+      method visit_GA :
+        'c -> Asrt.t -> string -> Expr.t list -> Expr.t list -> Asrt.t
 
-      method visit_GUnfold : 'd -> string -> SLCmd.t
+      method visit_GUnfold : 'c -> SLCmd.t -> string -> SLCmd.t
 
-      method visit_Goto : 'd -> 'h -> 'h Cmd.t
+      method visit_Goto : 'c -> 'f Cmd.t -> 'f -> 'f Cmd.t
 
-      method visit_GuardedGoto : 'd -> Expr.t -> 'h -> 'h -> 'h Cmd.t
+      method visit_GuardedGoto :
+        'c -> 'f Cmd.t -> Expr.t -> 'f -> 'f -> 'f Cmd.t
 
-      method visit_If : 'd -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
+      method visit_IDiv : 'c -> BinOp.t -> BinOp.t
 
-      method visit_Invariant : 'd -> Asrt.t -> string list -> SLCmd.t
+      method visit_ILessThan : 'c -> BinOp.t -> BinOp.t
 
-      method visit_LAction : 'd -> string -> string -> Expr.t list -> 'h Cmd.t
+      method visit_ILessThanEqual : 'c -> BinOp.t -> BinOp.t
 
-      method visit_LList : 'd -> Literal.t list -> Literal.t
+      method visit_IMinus : 'c -> BinOp.t -> BinOp.t
 
-      method visit_LVar : 'd -> LVar.t -> Expr.t
+      method visit_IMod : 'c -> BinOp.t -> BinOp.t
 
-      method visit_LeftShift : 'd -> BinOp.t
+      method visit_IPlus : 'c -> BinOp.t -> BinOp.t
 
-      method visit_LeftShiftL : 'd -> BinOp.t
+      method visit_ITimes : 'c -> BinOp.t -> BinOp.t
 
-      method visit_Less : 'd -> Expr.t -> Expr.t -> Formula.t
+      method visit_IUnaryMinus : 'c -> UnOp.t -> UnOp.t
 
-      method visit_LessEq : 'd -> Expr.t -> Expr.t -> Formula.t
+      method visit_If :
+        'c -> LCmd.t -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
 
-      method visit_ILessThan : 'd -> BinOp.t
+      method visit_Int : 'c -> Literal.t -> int -> Literal.t
 
-      method visit_ILessThanEqual : 'd -> BinOp.t
+      method visit_IntType : 'c -> Type.t -> Type.t
 
-      method visit_FLessThan : 'd -> BinOp.t
+      method visit_Invariant : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
 
-      method visit_FLessThanEqual : 'd -> BinOp.t
+      method visit_LAction :
+        'c -> 'f Cmd.t -> string -> string -> Expr.t list -> 'f Cmd.t
 
-      method visit_SLessThan : 'd -> BinOp.t
+      method visit_LList : 'c -> Literal.t -> Literal.t list -> Literal.t
 
-      method visit_ListType : 'd -> Type.t
+      method visit_LVar : 'c -> Expr.t -> string -> Expr.t
 
-      method visit_Lit : 'd -> Literal.t -> Expr.t
+      method visit_LeftShift : 'c -> BinOp.t -> BinOp.t
 
-      method visit_Loc : 'd -> string -> Literal.t
+      method visit_LeftShiftL : 'c -> BinOp.t -> BinOp.t
 
-      method visit_LocalTime : 'd -> Constant.t
+      method visit_Less : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
 
-      method visit_Logic : 'd -> LCmd.t -> 'h Cmd.t
+      method visit_LessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
 
-      method visit_LstCat : 'd -> NOp.t
+      method visit_ListType : 'c -> Type.t -> Type.t
 
-      method visit_LstLen : 'd -> UnOp.t
+      method visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
 
-      method visit_LstNth : 'd -> BinOp.t
+      method visit_Loc : 'c -> Literal.t -> string -> Literal.t
 
-      method visit_LstRev : 'd -> UnOp.t
+      method visit_LocalTime : 'c -> Constant.t -> Constant.t
 
-      method visit_LstSub : 'd -> Expr.t -> Expr.t -> Expr.t -> Expr.t
+      method visit_Logic : 'c -> 'f Cmd.t -> LCmd.t -> 'f Cmd.t
 
-      method visit_M_abs : 'd -> UnOp.t
+      method visit_LstCat : 'c -> NOp.t -> NOp.t
 
-      method visit_M_acos : 'd -> UnOp.t
+      method visit_LstLen : 'c -> UnOp.t -> UnOp.t
 
-      method visit_M_asin : 'd -> UnOp.t
+      method visit_LstNth : 'c -> BinOp.t -> BinOp.t
 
-      method visit_M_atan : 'd -> UnOp.t
+      method visit_LstRev : 'c -> UnOp.t -> UnOp.t
 
-      method visit_M_atan2 : 'd -> BinOp.t
+      method visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> Expr.t -> Expr.t
 
-      method visit_M_ceil : 'd -> UnOp.t
+      method visit_M_abs : 'c -> UnOp.t -> UnOp.t
 
-      method visit_M_cos : 'd -> UnOp.t
+      method visit_M_acos : 'c -> UnOp.t -> UnOp.t
 
-      method visit_M_exp : 'd -> UnOp.t
+      method visit_M_asin : 'c -> UnOp.t -> UnOp.t
 
-      method visit_M_floor : 'd -> UnOp.t
+      method visit_M_atan : 'c -> UnOp.t -> UnOp.t
 
-      method visit_M_isNaN : 'd -> UnOp.t
+      method visit_M_atan2 : 'c -> BinOp.t -> BinOp.t
 
-      method visit_M_log : 'd -> UnOp.t
+      method visit_M_ceil : 'c -> UnOp.t -> UnOp.t
 
-      method visit_M_pow : 'd -> BinOp.t
+      method visit_M_cos : 'c -> UnOp.t -> UnOp.t
 
-      method visit_M_round : 'd -> UnOp.t
+      method visit_M_exp : 'c -> UnOp.t -> UnOp.t
 
-      method visit_M_sgn : 'd -> UnOp.t
+      method visit_M_floor : 'c -> UnOp.t -> UnOp.t
 
-      method visit_M_sin : 'd -> UnOp.t
+      method visit_M_isNaN : 'c -> UnOp.t -> UnOp.t
 
-      method visit_M_sqrt : 'd -> UnOp.t
+      method visit_M_log : 'c -> UnOp.t -> UnOp.t
 
-      method visit_M_tan : 'd -> UnOp.t
+      method visit_M_pow : 'c -> BinOp.t -> BinOp.t
 
-      method visit_Macro : 'd -> string -> Expr.t list -> LCmd.t
+      method visit_M_round : 'c -> UnOp.t -> UnOp.t
 
-      method visit_Max_float : 'd -> Constant.t
+      method visit_M_sgn : 'c -> UnOp.t -> UnOp.t
 
-      method visit_MaxSafeInteger : 'd -> Constant.t
+      method visit_M_sin : 'c -> UnOp.t -> UnOp.t
 
-      method visit_Min_float : 'd -> Constant.t
+      method visit_M_sqrt : 'c -> UnOp.t -> UnOp.t
 
-      method visit_IMinus : 'd -> BinOp.t
+      method visit_M_tan : 'c -> UnOp.t -> UnOp.t
 
-      method visit_FMinus : 'd -> BinOp.t
+      method visit_Macro : 'c -> LCmd.t -> string -> Expr.t list -> LCmd.t
 
-      method visit_IMod : 'd -> BinOp.t
+      method visit_MaxSafeInteger : 'c -> Constant.t -> Constant.t
 
-      method visit_FMod : 'd -> BinOp.t
+      method visit_Max_float : 'c -> Constant.t -> Constant.t
 
-      method visit_NOp : 'd -> NOp.t -> Expr.t list -> Expr.t
+      method visit_Min_float : 'c -> Constant.t -> Constant.t
 
-      method visit_NoneType : 'd -> Type.t
+      method visit_NOp : 'c -> Expr.t -> NOp.t -> Expr.t list -> Expr.t
 
-      method visit_Nono : 'd -> Literal.t
+      method visit_NoneType : 'c -> Type.t -> Type.t
 
-      method visit_Normal : 'd -> Flag.t
+      method visit_Nono : 'c -> Literal.t -> Literal.t
 
-      method visit_Not : 'd -> Formula.t -> Formula.t
+      method visit_Normal : 'c -> Flag.t -> Flag.t
 
-      method visit_Null : 'd -> Literal.t
+      method visit_Not : 'c -> Formula.t -> Formula.t -> Formula.t
 
-      method visit_NullType : 'd -> Type.t
+      method visit_Null : 'c -> Literal.t -> Literal.t
 
-      method visit_Int : 'd -> int -> Literal.t
+      method visit_NullType : 'c -> Type.t -> Type.t
 
-      method visit_Num : 'd -> float -> Literal.t
+      method visit_Num : 'c -> Literal.t -> float -> Literal.t
 
-      method visit_IntType : 'd -> Type.t
+      method visit_NumberType : 'c -> Type.t -> Type.t
 
-      method visit_NumberType : 'd -> Type.t
+      method visit_ObjectType : 'c -> Type.t -> Type.t
 
-      method visit_ObjectType : 'd -> Type.t
+      method visit_Or : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
 
-      method visit_Or : 'd -> Formula.t -> Formula.t -> Formula.t
+      method visit_PVar : 'c -> Expr.t -> string -> Expr.t
 
-      method visit_PVar : 'd -> string -> Expr.t
+      method visit_PhiAssignment :
+        'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
 
-      method visit_PhiAssignment : 'd -> (string * Expr.t list) list -> 'h Cmd.t
+      method visit_Pi : 'c -> Constant.t -> Constant.t
 
-      method visit_Pi : 'd -> Constant.t
+      method visit_Pred : 'c -> Asrt.t -> string -> Expr.t list -> Asrt.t
 
-      method visit_IPlus : 'd -> BinOp.t
+      method visit_Pure : 'c -> Asrt.t -> Formula.t -> Asrt.t
 
-      method visit_FPlus : 'd -> BinOp.t
+      method visit_Random : 'c -> Constant.t -> Constant.t
 
-      method visit_Pred : 'd -> string -> Expr.t list -> Asrt.t
+      method visit_ReturnError : 'c -> 'f Cmd.t -> 'f Cmd.t
 
-      method visit_Pure : 'd -> Formula.t -> Asrt.t
+      method visit_ReturnNormal : 'c -> 'f Cmd.t -> 'f Cmd.t
 
-      method visit_Random : 'd -> Constant.t
+      method visit_SL : 'c -> LCmd.t -> SLCmd.t -> LCmd.t
 
-      method visit_ReturnError : 'd -> 'h Cmd.t
+      method visit_SLessThan : 'c -> BinOp.t -> BinOp.t
 
-      method visit_ReturnNormal : 'd -> 'h Cmd.t
+      method visit_SepAssert : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
 
-      method visit_SL : 'd -> SLCmd.t -> LCmd.t
+      method visit_SetDiff : 'c -> BinOp.t -> BinOp.t
 
-      method visit_SepAssert : 'd -> Asrt.t -> string list -> SLCmd.t
+      method visit_SetInter : 'c -> NOp.t -> NOp.t
 
-      method visit_SetDiff : 'd -> BinOp.t
+      method visit_SetMem : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
 
-      method visit_SetInter : 'd -> NOp.t
+      method visit_SetSub : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
 
-      method visit_SetMem : 'd -> Expr.t -> Expr.t -> Formula.t
+      method visit_SetToList : 'c -> UnOp.t -> UnOp.t
 
-      method visit_SetSub : 'd -> Expr.t -> Expr.t -> Formula.t
+      method visit_SetType : 'c -> Type.t -> Type.t
 
-      method visit_SetToList : 'd -> UnOp.t
+      method visit_SetUnion : 'c -> NOp.t -> NOp.t
 
-      method visit_SetType : 'd -> Type.t
+      method visit_SignedRightShift : 'c -> BinOp.t -> BinOp.t
 
-      method visit_SetUnion : 'd -> NOp.t
+      method visit_SignedRightShiftL : 'c -> BinOp.t -> BinOp.t
 
-      method visit_SignedRightShift : 'd -> BinOp.t
+      method visit_Skip : 'c -> 'f Cmd.t -> 'f Cmd.t
 
-      method visit_SignedRightShiftL : 'd -> BinOp.t
+      method visit_SpecVar : 'c -> LCmd.t -> string list -> LCmd.t
 
-      method visit_Skip : 'd -> 'h Cmd.t
+      method visit_Star : 'c -> Asrt.t -> Asrt.t -> Asrt.t -> Asrt.t
 
-      method visit_SpecVar : 'd -> string list -> LCmd.t
+      method visit_StrCat : 'c -> BinOp.t -> BinOp.t
 
-      method visit_Star : 'd -> Asrt.t -> Asrt.t -> Asrt.t
+      method visit_StrLen : 'c -> UnOp.t -> UnOp.t
 
-      method visit_StrCat : 'd -> BinOp.t
+      method visit_StrLess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
 
-      method visit_StrLen : 'd -> UnOp.t
+      method visit_StrNth : 'c -> BinOp.t -> BinOp.t
 
-      method visit_StrLess : 'd -> Expr.t -> Expr.t -> Formula.t
+      method visit_String : 'c -> Literal.t -> string -> Literal.t
 
-      method visit_StrNth : 'd -> BinOp.t
+      method visit_StringType : 'c -> Type.t -> Type.t
 
-      method visit_String : 'd -> string -> Literal.t
+      method visit_ToInt32Op : 'c -> UnOp.t -> UnOp.t
 
-      method visit_StringType : 'd -> Type.t
+      method visit_ToIntOp : 'c -> UnOp.t -> UnOp.t
 
-      method visit_ITimes : 'd -> BinOp.t
+      method visit_ToNumberOp : 'c -> UnOp.t -> UnOp.t
 
-      method visit_FTimes : 'd -> BinOp.t
+      method visit_ToStringOp : 'c -> UnOp.t -> UnOp.t
 
-      method visit_ToInt32Op : 'd -> UnOp.t
+      method visit_ToUint16Op : 'c -> UnOp.t -> UnOp.t
 
-      method visit_ToIntOp : 'd -> UnOp.t
+      method visit_ToUint32Op : 'c -> UnOp.t -> UnOp.t
 
-      method visit_ToNumberOp : 'd -> UnOp.t
+      method visit_True : 'c -> Formula.t -> Formula.t
 
-      method visit_ToStringOp : 'd -> UnOp.t
+      method visit_Type : 'c -> Literal.t -> Type.t -> Literal.t
 
-      method visit_ToUint16Op : 'd -> UnOp.t
+      method visit_TypeOf : 'c -> UnOp.t -> UnOp.t
 
-      method visit_ToUint32Op : 'd -> UnOp.t
+      method visit_TypeType : 'c -> Type.t -> Type.t
 
-      method visit_True : 'd -> Formula.t
+      method visit_Types : 'c -> Asrt.t -> (Expr.t * Type.t) list -> Asrt.t
 
-      method visit_Type : 'd -> Type.t -> Literal.t
+      method visit_UNot : 'c -> UnOp.t -> UnOp.t
 
-      method visit_TypeOf : 'd -> UnOp.t
+      method visit_UTCTime : 'c -> Constant.t -> Constant.t
 
-      method visit_TypeType : 'd -> Type.t
+      method visit_UnOp : 'c -> Expr.t -> UnOp.t -> Expr.t -> Expr.t
 
-      method visit_Types : 'd -> (Expr.t * Type.t) list -> Asrt.t
+      method visit_Undefined : 'c -> Literal.t -> Literal.t
 
-      method visit_UNot : 'd -> UnOp.t
-
-      method visit_UTCTime : 'd -> Constant.t
-
-      method visit_UnOp : 'd -> UnOp.t -> Expr.t -> Expr.t
-
-      method visit_IUnaryMinus : 'd -> UnOp.t
-
-      method visit_FUnaryMinus : 'd -> UnOp.t
-
-      method visit_Undefined : 'd -> Literal.t
-
-      method visit_UndefinedType : 'd -> Type.t
+      method visit_UndefinedType : 'c -> Type.t -> Type.t
 
       method visit_Unfold :
-        'd ->
+        'c ->
+        SLCmd.t ->
         string ->
         Expr.t list ->
         (string * string) list option ->
         bool ->
         SLCmd.t
 
-      method visit_UnsignedRightShift : 'd -> BinOp.t
+      method visit_UnsignedRightShift : 'c -> BinOp.t -> BinOp.t
 
-      method visit_UnsignedRightShiftL : 'd -> BinOp.t
+      method visit_UnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
 
-      method visit_assertion : 'd -> Asrt.t -> Asrt.t
+      method private visit_array :
+        'env 'a. ('env -> 'a -> 'a) -> 'env -> 'a array -> 'a array
+
+      method visit_assertion : 'c -> Asrt.t -> Asrt.t
 
       method visit_bindings :
-        'd -> string * (string * Expr.t) list -> string * (string * Expr.t) list
+        'c -> string * (string * Expr.t) list -> string * (string * Expr.t) list
 
-      method visit_binop : 'd -> BinOp.t -> BinOp.t
+      method visit_binop : 'c -> BinOp.t -> BinOp.t
 
-      method visit_bispec : 'd -> BiSpec.t -> BiSpec.t
+      method visit_bispec : 'c -> BiSpec.t -> BiSpec.t
 
-      method visit_cmd : 'd -> 'h Cmd.t -> 'h Cmd.t
+      method private visit_bool : 'env. 'env -> bool -> bool
 
-      method visit_constant : 'd -> Constant.t -> Constant.t
+      method private visit_bytes : 'env. 'env -> bytes -> bytes
 
-      method visit_expr : 'd -> Expr.t -> Expr.t
+      method private visit_char : 'env. 'env -> char -> char
 
-      method visit_flag : 'd -> Flag.t -> Flag.t
+      method visit_cmd : 'c -> 'f Cmd.t -> 'f Cmd.t
 
-      method visit_formula : 'd -> Formula.t -> Formula.t
+      method visit_constant : 'c -> Constant.t -> Constant.t
 
-      method visit_lcmd : 'd -> LCmd.t -> LCmd.t
+      method visit_expr : 'c -> Expr.t -> Expr.t
 
-      method visit_lemma : 'd -> Lemma.t -> Lemma.t
+      method visit_flag : 'c -> Flag.t -> Flag.t
 
-      method visit_lemma_spec : 'd -> Lemma.spec -> Lemma.spec
+      method private visit_float : 'env. 'env -> float -> float
 
-      method visit_literal : 'd -> Literal.t -> Literal.t
+      method visit_formula : 'c -> Formula.t -> Formula.t
 
-      method visit_macro : 'd -> Macro.t -> Macro.t
+      method private visit_int : 'env. 'env -> int -> int
 
-      method visit_nop : 'd -> NOp.t -> NOp.t
+      method private visit_int32 : 'env. 'env -> int32 -> int32
 
-      method visit_pred : 'd -> Pred.t -> Pred.t
+      method private visit_int64 : 'env. 'env -> int64 -> int64
 
-      method visit_proc : 'd -> ('g, 'h) Proc.t -> ('g, 'h) Proc.t
+      method private visit_lazy_t :
+        'env 'a. ('env -> 'a -> 'a) -> 'env -> 'a Lazy.t -> 'a Lazy.t
 
-      method visit_single_spec : 'd -> Spec.st -> Spec.st
+      method visit_lcmd : 'c -> LCmd.t -> LCmd.t
 
-      method visit_slcmd : 'd -> SLCmd.t -> SLCmd.t
+      method visit_lemma : 'c -> Lemma.t -> Lemma.t
 
-      method visit_spec : 'd -> Spec.t -> Spec.t
+      method visit_lemma_spec : 'c -> Lemma.spec -> Lemma.spec
 
-      method visit_typ : 'd -> Type.t -> Type.t
+      method private visit_list :
+        'env 'a. ('env -> 'a -> 'a) -> 'env -> 'a list -> 'a list
 
-      method visit_unop : 'd -> UnOp.t -> UnOp.t
+      method visit_literal : 'c -> Literal.t -> Literal.t
+
+      method visit_macro : 'c -> Macro.t -> Macro.t
+
+      method private visit_nativeint : 'env. 'env -> nativeint -> nativeint
+
+      method visit_nop : 'c -> NOp.t -> NOp.t
+
+      method private visit_option :
+        'env 'a. ('env -> 'a -> 'a) -> 'env -> 'a option -> 'a option
+
+      method visit_pred : 'c -> Pred.t -> Pred.t
+
+      method visit_proc : 'c -> ('d, 'f) Proc.t -> ('d, 'f) Proc.t
+
+      method private visit_ref :
+        'env 'a. ('env -> 'a -> 'a) -> 'env -> 'a ref -> 'a ref
+
+      method private visit_result :
+        'env 'a 'e. ('env -> 'a -> 'a) -> ('env -> 'e -> 'e) -> 'env ->
+        ('a, 'e) Result.result -> ('a, 'e) Result.result
+
+      method visit_single_spec : 'c -> Spec.st -> Spec.st
+
+      method visit_slcmd : 'c -> SLCmd.t -> SLCmd.t
+
+      method visit_spec : 'c -> Spec.t -> Spec.t
+
+      method private visit_string : 'env. 'env -> string -> string
+
+      method visit_typ : 'c -> Type.t -> Type.t
+
+      method private visit_unit : 'env. 'env -> unit -> unit
+
+      method visit_unop : 'c -> UnOp.t -> UnOp.t
     end
 
   class virtual ['b] reduce :
@@ -2342,6 +2393,14 @@ module Visitors : sig
     module SS = Containers.SS
 
     class list_monoid :
+      object
+        method private zero : 'b list
+
+        method private plus : 'a list -> 'a list -> 'a list
+      end
+
+    (** Same as list_monoid but uses [rev_append] as [plus]. Will break any order-conservation *)
+    class non_ordered_list_monoid :
       object
         method private zero : 'b list
 

@@ -25,33 +25,27 @@ struct
    *  to a and replace all the occurrences of l-nth(le, j) for #xj in a
    *  ------------------------------------------------------------------
 **)
+
   let preprocess_lists (a : Asrt.t) =
     (* 1 - Find the lists for which we know the length *)
     let find_list_exprs_to_concretize (a : Asrt.t) :
         (Expr.t, Expr.t list) Hashtbl.t =
-      let f_ac_1 a _ _ ac =
-        match (a : Asrt.t) with
-        | Pure (Eq (EList _, EList _)) -> List.concat ac
-        | Pure (Eq (le, EList les)) | Pure (Eq (EList les, le)) ->
-            (le, les) :: List.concat ac
-        | _ -> List.concat ac
-      in
-      let lists1 = Asrt.fold None None f_ac_1 None None a in
-
-      let f_ac_2 a _ _ ac =
-        match (a : Asrt.t) with
-        | Pure (Eq (UnOp (LstLen, le), Lit (Num i))) ->
-            let vars_le =
-              Array.to_list
-                (Array.init (int_of_float i) (fun j ->
-                     Expr.LVar (LVar.alloc ())))
+      let rec collect_concretizable_lists = function
+        | Asrt.Pure (Eq (EList _, EList _)) -> []
+        | Pure (Eq (le, EList les)) | Pure (Eq (EList les, le)) -> [ (le, les) ]
+        | Pure (Eq (UnOp (LstLen, le), Lit (Num i)))
+        | Pure (Eq (Lit (Num i), UnOp (LstLen, le))) ->
+            let les =
+              List.init (int_of_float i) (fun j -> Expr.LVar (LVar.alloc ()))
             in
-            (le, vars_le) :: List.concat ac
-        | _ -> List.concat ac
+            [ (le, les) ]
+        | Star (a1, a2) ->
+            List.rev_append
+              (collect_concretizable_lists a1)
+              (collect_concretizable_lists a2)
+        | _ -> []
       in
-      let lists2 = Asrt.fold None None f_ac_2 None None a in
-
-      let lst_exprs = lists2 @ lists1 in
+      let lst_exprs = collect_concretizable_lists a in
       let lists_tbl = Hashtbl.create 1 in
       List.iter
         (fun (le, les) ->
@@ -67,17 +61,21 @@ struct
               {{ V1, ..., Vi, ..., Vn}}, l-nth(le, i) is replaced with Vi *)
     let concretize_list_accesses
         (a : Asrt.t) (new_lists : (Expr.t, Expr.t list) Hashtbl.t) : Asrt.t =
-      let f_e le =
-        match (le : Expr.t) with
-        | BinOp (le', LstNth, Lit (Num i)) -> (
-            try
-              let vs = Hashtbl.find new_lists le' in
-              let le'' = List.nth vs (int_of_float i) in
-              (le'', false)
-            with _ -> (le, false))
-        | _ -> (le, true)
+      let mapper =
+        object
+          inherit [_] Visitors.endo as super
+
+          method visit_BinOp ctx this le' op n =
+            match (op, n) with
+            | LstNth, Lit (Num i) -> (
+                try
+                  let vs = Hashtbl.find new_lists le' in
+                  List.nth vs (int_of_float i)
+                with _ -> this)
+            | _                   -> super#visit_BinOp ctx this le' op n
+        end
       in
-      Asrt.map None None (Some (Expr.map f_e None)) None a
+      mapper#visit_assertion () a
     in
 
     (* 3 - Generate the equalities relating the expressions that denote lists whose

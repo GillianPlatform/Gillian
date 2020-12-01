@@ -26,6 +26,27 @@ end
 
 module Set = Set.Make (MyFormula)
 
+let list_lexprs_collector =
+  object (self)
+    inherit [_] Visitors.reduce as super
+
+    method private zero = Expr.Set.empty
+
+    method private plus = Expr.Set.union
+
+    method! visit_'label () (_ : int) = self#zero
+
+    method! visit_'annot () (_ : Annot.t) = self#zero
+
+    method! visit_expr () e =
+      match e with
+      | Lit (LList _)
+      | EList _
+      | NOp (LstCat, _)
+      | UnOp ((Car | Cdr | LstLen), _) -> Expr.Set.singleton e
+      | _ -> super#visit_expr () e
+  end
+
 (** Apply function f to the logic expressions in an assertion, recursively when f_a returns (new_asrt, true). *)
 let rec map
     (f_a_before : (t -> t * bool) option)
@@ -109,119 +130,31 @@ let rec map_opt
         in
         Option.map f_a_after a''
 
-let rec fold
-    (feo : (Expr.t -> 'a) option)
-    (f_ac : t -> 'b -> 'b -> 'a list -> 'a)
-    (f_state : (t -> 'b -> 'b) option)
-    (state : 'b)
-    (asrt : t) : 'a =
-  let new_state = (Option.value ~default:(fun _ x -> x) f_state) asrt state in
-  let fold_a = fold feo f_ac f_state new_state in
-  let f_ac = f_ac asrt new_state state in
-  let fes les = Option.fold ~none:[] ~some:(fun fe -> List.map fe les) feo in
-
-  match asrt with
-  | True | False -> f_ac []
-  | Eq (le1, le2)
-  | Less (le1, le2)
-  | LessEq (le1, le2)
-  | StrLess (le1, le2)
-  | SetMem (le1, le2)
-  | SetSub (le1, le2) -> f_ac (fes [ le1; le2 ])
-  | And (a1, a2) -> f_ac [ fold_a a1; fold_a a2 ]
-  | Or (a1, a2) -> f_ac [ fold_a a1; fold_a a2 ]
-  | Not a -> f_ac [ fold_a a ]
-  | ForAll (_, a) -> f_ac [ fold_a a ]
-
 (* Get all the logical variables in --a-- *)
-let lvars (a : t) : SS.t =
-  let fe_ac (le : Expr.t) _ _ (ac : string list list) : string list =
-    match le with
-    | Expr.LVar x -> [ x ]
-    | _           -> List.concat ac
-  in
-  let fe = Expr.fold fe_ac None None in
-  let fp_ac (a : t) _ _ (ac : string list list) : string list =
-    match (a : t) with
-    | ForAll (bt, _) ->
-        (* Quantified variables need to be excluded *)
-        let binders, _ = List.split bt in
-        let ac_vars = SS.of_list (List.concat ac) in
-        let binder_vars = SS.of_list binders in
-        SS.elements (SS.diff ac_vars binder_vars)
-    | _              -> List.concat ac
-  in
-  SS.of_list (fold (Some fe) fp_ac None None a)
+let lvars (f : t) : SS.t =
+  Visitors.Collectors.lvar_collector#visit_formula SS.empty f
 
 (* Get all the program variables in --a-- *)
-let pvars (a : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | Expr.PVar x -> [ x ]
-    | _           -> List.concat ac
-  in
-  let fe = Expr.fold fe_ac None None in
-  let f_ac _ _ _ ac = List.concat ac in
-  SS.of_list (fold (Some fe) f_ac None None a)
+let pvars (f : t) : SS.t = Visitors.Collectors.pvar_collector#visit_formula () f
 
 (* Get all the abstract locations in --a-- *)
-let alocs (a : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | Expr.ALoc l -> l :: List.concat ac
-    | _           -> List.concat ac
-  in
-  let fe = Expr.fold fe_ac None None in
-  let f_ac _ _ _ ac = List.concat ac in
-  SS.of_list (fold (Some fe) f_ac None None a)
+let alocs (f : t) : SS.t = Visitors.Collectors.aloc_collector#visit_formula () f
 
 (* Get all the concrete locations in [a] *)
-let clocs (a : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | Expr.Lit (Loc l) -> l :: List.concat ac
-    | _                -> List.concat ac
-  in
-  let fe = Expr.fold fe_ac None None in
-  let f_ac _ _ _ ac = List.concat ac in
-  SS.of_list (fold (Some fe) f_ac None None a)
+let clocs (f : t) : SS.t = Visitors.Collectors.cloc_collector#visit_formula () f
 
 (* Get all the locations in [a] *)
-let locs (a : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | Expr.ALoc l | Lit (Loc l) -> l :: List.concat ac
-    | _                         -> List.concat ac
-  in
-  let fe = Expr.fold fe_ac None None in
-  let f_ac _ _ _ ac = List.concat ac in
-  SS.of_list (fold (Some fe) f_ac None None a)
+let locs (f : t) : SS.t = Visitors.Collectors.cloc_collector#visit_formula () f
 
 let get_print_info (a : t) = (pvars a, lvars a, locs a)
 
 (* Get all the logical expressions of --a-- of the form (Lit (LList lst)) and (EList lst)  *)
-let lists (a : t) : Expr.t list =
-  let f_ac _ _ _ ac = List.concat ac in
-  let fe = Expr.lists in
-  fold (Some fe) f_ac None None a
+let lists (f : t) : Expr.t list =
+  Visitors.Collectors.list_collector#visit_formula () f
 
 (* Get all the logical expressions of --a-- that denote a list
    and are not logical variables *)
-let list_lexprs (a : t) : Expr.t list =
-  let fe_ac le _ _ ac =
-    match le with
-    | Expr.Lit (LList _)
-    | Expr.EList _
-    | Expr.NOp (LstCat, _)
-    | Expr.UnOp (Car, _)
-    | Expr.UnOp (Cdr, _)
-    | Expr.UnOp (LstLen, _) -> le :: List.concat ac
-    | _ -> List.concat ac
-  in
-
-  let fe = Expr.fold fe_ac None None in
-  let f_ac _ _ _ ac = List.concat ac in
-  fold (Some fe) f_ac None None a
+let list_lexprs (f : t) : Expr.Set.t = list_lexprs_collector#visit_formula () f
 
 let rec push_in_negations_off (a : t) : t =
   let f_off = push_in_negations_off in

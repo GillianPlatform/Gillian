@@ -168,10 +168,12 @@ let get_axioms assertions gamma =
       (fun x : Expr.t -> LVar x)
       (TypEnv.get_vars_of_type gamma StringType)
   in
-  (* Get list expressions *)
-  let list_exprs = List.concat (List.map Formula.list_lexprs assertions) in
-  (* Remove duplicates *)
-  let list_exprs = Expr.Set.elements (Expr.Set.of_list list_exprs) in
+  let list_exprs =
+    List.fold_left
+      (fun acc a -> Expr.Set.union acc (Formula.list_lexprs a))
+      Expr.Set.empty assertions
+  in
+  let list_exprs = Expr.Set.elements list_exprs in
   (* Put list-related expressions together *)
   let list_exprs = list_exprs @ list_vars in
   (* Get all axioms *)

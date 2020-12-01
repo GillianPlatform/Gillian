@@ -102,7 +102,7 @@ let base_elements (lit : t) : t list =
     object
       inherit [_] Visitors.reduce as super
 
-      inherit Visitors.Utils.list_monoid
+      inherit Visitors.Utils.non_ordered_list_monoid
 
       method! visit_literal = get_base_lits super#visit_literal (fun x -> x)
     end

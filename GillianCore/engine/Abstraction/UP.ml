@@ -260,30 +260,35 @@ and learn_expr_list (kb : KB.t) (le : (Expr.t * Expr.t) list) =
     for a given expression [e] *)
 let simple_ins_expr (e : Expr.t) : KB.t list =
   let open Expr in
-  let fe_ac e _ _ ac =
-    match e with
-    | LVar _ | PVar _ | ALoc _ -> ([], [ e ])
-    | UnOp (LstLen, PVar x)    -> ([ PVar x ], [])
-    | UnOp (LstLen, LVar x)    -> ([ LVar x ], [])
-    | _                        ->
-        let llens, others = List.split ac in
-        (List.concat llens, List.concat others)
+  let collector =
+    object
+      inherit [_] Visitors.reduce as super
+
+      method zero = (Set.empty, Set.empty)
+
+      method plus (a, c) (b, d) = (Set.union a b, Set.union c d)
+
+      method! visit_expr () e =
+        match e with
+        | LVar _ | PVar _ | ALoc _ -> (Set.empty, Set.singleton e)
+        | UnOp (LstLen, ((PVar x | LVar x) as v)) -> (Set.singleton v, Set.empty)
+        | _ -> super#visit_expr () e
+    end
   in
-  let llens, others = fold fe_ac None None e in
-  (* Remove duplicates *)
-  let llens, others = (Set.of_list llens, Set.of_list others) in
+  let llens, others = collector#visit_expr () e in
   (* List lengths whose variables do not appear elsewhere *)
   let llens = Set.elements (Set.diff llens others) in
   (* Those we can learn by knowing the variable or the list length *)
   let llens = List.map (fun le -> [ le; UnOp (LstLen, le) ]) llens in
   let llen_choices = List_utils.list_product llens in
   let simple_ins =
-    let others = Set.elements others in
     match llen_choices with
     | [] -> [ others ]
-    | _  -> List.map (fun llen_choice -> others @ llen_choice) llen_choices
+    | _  ->
+        List.map
+          (fun llen_choice -> KB.add_seq (List.to_seq llen_choice) others)
+          llen_choices
   in
-  let simple_ins = List.map Set.of_list simple_ins in
   simple_ins
 
 let outs_expr (kb : KB.t) (base_expr : Expr.t) (e : Expr.t) : outs =
