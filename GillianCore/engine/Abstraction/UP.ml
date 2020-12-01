@@ -256,26 +256,26 @@ and learn_expr_list (kb : KB.t) (le : (Expr.t * Expr.t) list) =
       (* and try to learn more *)
       learned @ learn_expr_list new_kb not_learned
 
+let simple_ins_expr_collector =
+  object
+    inherit [_] Visitors.reduce as super
+
+    method zero = (KB.empty, KB.empty)
+
+    method plus (a, c) (b, d) = (KB.union a b, KB.union c d)
+
+    method! visit_expr () e =
+      match e with
+      | LVar _ | PVar _ | ALoc _ -> (KB.empty, KB.singleton e)
+      | UnOp (LstLen, ((PVar x | LVar x) as v)) -> (KB.singleton v, KB.empty)
+      | _ -> super#visit_expr () e
+  end
+
 (** [simple_ins_expr e] returns the list of possible ins
     for a given expression [e] *)
 let simple_ins_expr (e : Expr.t) : KB.t list =
   let open Expr in
-  let collector =
-    object
-      inherit [_] Visitors.reduce as super
-
-      method zero = (Set.empty, Set.empty)
-
-      method plus (a, c) (b, d) = (Set.union a b, Set.union c d)
-
-      method! visit_expr () e =
-        match e with
-        | LVar _ | PVar _ | ALoc _ -> (Set.empty, Set.singleton e)
-        | UnOp (LstLen, ((PVar x | LVar x) as v)) -> (Set.singleton v, Set.empty)
-        | _ -> super#visit_expr () e
-    end
-  in
-  let llens, others = collector#visit_expr () e in
+  let llens, others = simple_ins_expr_collector#visit_expr () e in
   (* List lengths whose variables do not appear elsewhere *)
   let llens = Set.elements (Set.diff llens others) in
   (* Those we can learn by knowing the variable or the list length *)
