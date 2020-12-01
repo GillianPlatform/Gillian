@@ -355,16 +355,9 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
       method visit_'label () (this : int) = this
 
       method! visit_LVar () this x =
-        let res =
-          self#find_in_subst
-            ~make_new_x:(fun () -> Expr.LVar (LVar.alloc ()))
-            this
-        in
-        L.verbose (fun m ->
-            m "!!!REPLACING LVAR!!! %a with %a in partial? %b\nOBTAINED:%a"
-              Expr.full_pp this (Fmt.Dump.option Val.pp) (get subst this)
-              partial Expr.pp res);
-        res
+        self#find_in_subst
+          ~make_new_x:(fun () -> Expr.LVar (LVar.alloc ()))
+          this
 
       method! visit_ALoc () this x =
         self#find_in_subst
