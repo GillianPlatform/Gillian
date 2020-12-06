@@ -79,7 +79,10 @@
     "@opam/z3": "giltho/esy-z3#b0fdd9a",
     "JS_Parser": "GillianPlatform/JS_Parser#e282b6a",
     "compcert": "giltho/CompCert#6bdcc61",
-    "ocaml": "^4.10.0"
+    "ocaml": "^4.11.1000"
+  },
+  "resolutions": {
+    "ocaml": "esy-ocaml/ocaml#c72768d"
   },
   "devDependencies": {
     "ocaml": "4.11.1000",
