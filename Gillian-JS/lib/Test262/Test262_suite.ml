@@ -37,7 +37,16 @@ let pp_category fmt (r, c) =
 
 let init_suite = ByFolder.init_suite
 
-let harness = Io_utils.load_file (Io_utils.harness_path ()) ^ "\n\n"
+let harness =
+  (* Only load harness on first call *)
+  let loaded_harness = ref None in
+  fun () ->
+    match !loaded_harness with
+    | Some s -> s
+    | None   ->
+        let harness = Io_utils.load_file (Io_utils.harness_path ()) ^ "\n\n" in
+        loaded_harness := Some harness;
+        harness
 
 (* let parse_and_compile code =
     let ( let* ) = Stdlib.Result.bind in
