@@ -370,7 +370,9 @@ let rec simple_ins_formula (kb : KB.t) (pf : Formula.t) : KB.t list =
   (* Forall must exclude the binders *)
   | ForAll (binders, pf) ->
       let binders =
-        KB.of_list (List.map (fun (binder, _) -> Expr.LVar binder) binders)
+        List.fold_left
+          (fun acc (b, _) -> KB.add (Expr.LVar b) acc)
+          KB.empty binders
       in
       let ins_pf = f pf in
       let ins = List.map (fun ins -> KB.diff ins binders) ins_pf in

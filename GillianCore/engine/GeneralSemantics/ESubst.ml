@@ -446,9 +446,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
               binders
           in
           let binders_substs =
-            try
-              List.map Option.get
-                (List.filter (fun x -> x <> None) binders_substs)
+            try List.filter_map (fun x -> x) binders_substs
             with _ -> raise (Failure "DEATH. asrt_substitution")
           in
           old_binders_substs := binders_substs;
