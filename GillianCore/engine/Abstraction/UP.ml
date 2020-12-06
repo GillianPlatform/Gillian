@@ -486,7 +486,7 @@ let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
         | _                       -> false)
       simple_asrts
   in
-  let overlapping = Asrt.Set.elements (Asrt.Set.of_list overlapping) in
+  let overlapping = List.sort_uniq Asrt.compare overlapping in
   let simple_asrts = prioritise (separating @ overlapping) in
   let simple_asrts_io = Array.of_list simple_asrts in
 

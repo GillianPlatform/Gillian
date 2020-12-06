@@ -350,9 +350,9 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
                        "DEATH: subst_in_expr: Cannot convert fresh expression \
                         to a value"))
 
-      method visit_'annot () (this : Annot.t) = this
+      method visit_'annot _ (this : Annot.t) = this
 
-      method visit_'label () (this : int) = this
+      method visit_'label _ (this : int) = this
 
       method! visit_LVar () this x =
         self#find_in_subst
@@ -429,7 +429,6 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
 
   let substitute_formula (subst : t) ~(partial : bool) (a : Formula.t) :
       Formula.t =
-    let open Formula in
     let mapper = new substitutor ~partial ~subst in
     mapper#visit_formula () a
 
@@ -466,10 +465,8 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     map_opt (Some f_before) (Some f_after) (Some (subst_in_expr_opt subst)) a
 
   let substitute_asrt (subst : t) ~(partial : bool) (a : Asrt.t) : Asrt.t =
-    Asrt.map None None
-      (Some (subst_in_expr subst ~partial))
-      (Some (substitute_formula subst ~partial))
-      a
+    let mapper = new substitutor ~partial ~subst in
+    mapper#visit_assertion () a
 
   let substitute_slcmd (subst : t) ~(partial : bool) (lcmd : SLCmd.t) : SLCmd.t
       =
