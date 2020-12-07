@@ -329,20 +329,32 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   let to_list (subst : t) : (Expr.t * vt) list =
     Hashtbl.fold (fun e e_val ac -> (e, e_val) :: ac) subst []
 
-  class substitutor ~(partial : bool) ~(subst : t) =
+  let substitutor =
     object (self)
       inherit [_] Visitors.endo as super
 
+      val empty_subst = init []
+
+      val mutable self_subst = init []
+
+      val mutable self_partial = true
+
+      method init ~partial ~subst =
+        self_subst <- subst;
+        self_partial <- partial
+
+      method clear () = self_subst <- empty_subst
+
       method find_in_subst ~make_new_x e =
-        match get subst e with
+        match get self_subst e with
         | Some v -> Val.to_expr v
         | None   -> (
-            if partial then e
+            if self_partial then e
             else
               let new_le_x = make_new_x () in
               match Val.from_expr new_le_x with
               | Some sv ->
-                  put subst e sv;
+                  put self_subst e sv;
                   new_le_x
               | None    ->
                   raise
@@ -379,21 +391,24 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
 
       method! visit_UnOp () this unop e =
         match (unop, e) with
-        | (LstLen, PVar x | LstLen, LVar x) when mem subst this ->
-            Val.to_expr (Option.get (get subst this))
+        | (LstLen, PVar x | LstLen, LVar x) when mem self_subst this ->
+            Val.to_expr (Option.get (get self_subst this))
         | _ -> super#visit_UnOp () this unop e
 
       method! visit_ForAll () this bt form =
         let binders, _ = List.split bt in
         let binders_substs =
           List.filter_map
-            (fun x -> Option.map (fun x_v -> (x, x_v)) (get subst (LVar x)))
+            (fun x ->
+              Option.map (fun x_v -> (x, x_v)) (get self_subst (LVar x)))
             binders
         in
-        List.iter (fun x -> put subst (LVar x) (Val.from_lvar_name x)) binders;
+        List.iter
+          (fun x -> put self_subst (LVar x) (Val.from_lvar_name x))
+          binders;
         let new_formula = self#visit_formula () form in
-        List.iter (fun (x, le_x) -> put subst (LVar x) le_x) binders_substs;
-        new_formula
+        List.iter (fun (x, le_x) -> put self_subst (LVar x) le_x) binders_substs;
+        if new_formula == form then this else ForAll (bt, new_formula)
     end
 
   (**
@@ -404,8 +419,10 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return Expression resulting from the substitution, with fresh locations created.
   *)
   let subst_in_expr (subst : t) ~(partial : bool) (le : Expr.t) : Expr.t =
-    let mapper = new substitutor ~partial ~subst in
-    mapper#visit_expr () le
+    substitutor#init ~partial ~subst;
+    let res = substitutor#visit_expr () le in
+    substitutor#clear ();
+    res
 
   (**
     Optional substitution inside an expression
@@ -429,8 +446,10 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
 
   let substitute_formula (subst : t) ~(partial : bool) (a : Formula.t) :
       Formula.t =
-    let mapper = new substitutor ~partial ~subst in
-    mapper#visit_formula () a
+    substitutor#init ~partial ~subst;
+    let res = substitutor#visit_formula () a in
+    substitutor#clear ();
+    res
 
   let substitute_in_formula_opt (subst : t) (a : Formula.t) : Formula.t option =
     let open Formula in
@@ -465,20 +484,21 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     map_opt (Some f_before) (Some f_after) (Some (subst_in_expr_opt subst)) a
 
   let substitute_asrt (subst : t) ~(partial : bool) (a : Asrt.t) : Asrt.t =
-    let mapper = new substitutor ~partial ~subst in
-    mapper#visit_assertion () a
+    substitutor#init ~partial ~subst;
+    let res = substitutor#visit_assertion () a in
+    substitutor#clear ();
+    res
 
   let substitute_slcmd (subst : t) ~(partial : bool) (lcmd : SLCmd.t) : SLCmd.t
       =
-    SLCmd.map None
-      (Some (substitute_asrt subst ~partial))
-      (Some (subst_in_expr subst ~partial))
-      lcmd
+    substitutor#init ~partial ~subst;
+    let res = substitutor#visit_slcmd () lcmd in
+    substitutor#clear ();
+    res
 
   let substitute_lcmd (subst : t) ~(partial : bool) (lcmd : LCmd.t) : LCmd.t =
-    LCmd.map None
-      (Some (subst_in_expr subst ~partial))
-      (Some (substitute_formula subst ~partial))
-      (Some (substitute_slcmd subst ~partial))
-      lcmd
+    substitutor#init ~partial ~subst;
+    let res = substitutor#visit_lcmd () lcmd in
+    substitutor#clear ();
+    res
 end

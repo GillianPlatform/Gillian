@@ -2,6 +2,6 @@
   Gillian-Alcotest-Runner ppx_sat)
 
 (env
- (dev
+ (opt
   (ocamlopt_flags
    (:standard -O3))))
