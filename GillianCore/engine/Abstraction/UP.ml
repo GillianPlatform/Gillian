@@ -913,12 +913,14 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
     Ok u_preds
   with UPError e -> Error e
 
-let init_prog (prog : ('a, int) Prog.t) : (prog, up_err_t) result =
+let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : (prog, up_err_t) result =
   let all_specs : Spec.t list = Prog.get_specs prog in
 
   let lemmas : Lemma.t list = Prog.get_lemmas prog in
   let preds_tbl : ((string, pred) Hashtbl.t, up_err_t) result =
-    init_preds prog.preds
+    match preds_tbl with
+    | Some preds_tbl -> Ok preds_tbl
+    | None           -> init_preds prog.preds
   in
   match preds_tbl with
   | Error e      -> Error e

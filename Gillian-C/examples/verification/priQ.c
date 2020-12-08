@@ -20,7 +20,7 @@ typedef struct pqn {
   (x == NULL) * (max_pri == 0) * (length == 0) * (max_val == NULL);
 
   Node(x, max_pri, max_val, #next) * (0 <# max_pri) * (not (#next == NULL)) *
-  PriQ(#next, #next_pri, #next_val, #len_next) * #next_pri <=# max_pri *
+  PriQ(#next, #next_pri, #next_val, #len_next) * (#next_pri <=# max_pri) *
   (length == #len_next + 1);
 
   Node(x, max_pri, max_val, NULL) * (0 <# max_pri) * (length == 1)
@@ -59,7 +59,7 @@ PQN* makeNode (int pri, int val) {
   requires: (#node == node) * (#queue == queue) *
             PriQ(#queue, #qpri, #qval, #qlen) *
             Node(#node, #npri, #nval, NULL)
-            
+
   ensures:  PriQ(ret, #qpri, #qval, #qlen + 1) * (#npri <=# #qpri);
             PriQ(ret, #npri, #nval, #qlen + 1) * (#qpri <# #npri)
 } */

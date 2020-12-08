@@ -629,7 +629,7 @@ struct
 
         (* STEP 4: Create unification plans for specs and predicates *)
         (* Printf.printf "Creating unification plans: %f\n" (cur_time -. start_time); *)
-        match UP.init_prog prog with
+        match UP.init_prog ~preds_tbl:preds prog with
         | Error _  -> raise (Failure "Creation of unification plans failed.")
         | Ok prog' ->
             (* STEP 5: Determine static dependencies and add to call graph *)
