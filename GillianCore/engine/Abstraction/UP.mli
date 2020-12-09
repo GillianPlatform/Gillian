@@ -59,7 +59,10 @@ val head : t -> step option
 
 val posts : t -> (Flag.t * Asrt.t list) option
 
-val init_prog : (Annot.t, int) Prog.t -> (prog, up_err_t) result
+val init_prog :
+  ?preds_tbl:(string, pred) Stdlib__hashtbl.t ->
+  (Annot.t, int) Prog.t ->
+  (prog, up_err_t) result
 
 val init_preds :
   (string, Pred.t) Hashtbl.t -> ((string, pred) Hashtbl.t, up_err_t) result

@@ -344,6 +344,8 @@ module Make (SMemory : SMemory.S) :
           | LVar x | PVar x | ALoc x -> not (SS.mem x svars)
           | _                        -> true)
     in
+    Logging.verbose (fun fmt ->
+        fmt "Filtered subst, to be applied to memory:\n%a" SSubst.pp subst);
     SMemory.substitution_in_place subst heap;
     SStore.substitution_in_place subst store;
     if not kill_new_lvars then Typing.naively_infer_type_information pfs gamma;
