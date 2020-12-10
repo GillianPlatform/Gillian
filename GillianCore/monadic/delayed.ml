@@ -3,135 +3,81 @@ module Expr = Gil_syntax.Expr
 
 exception NonExhaustiveEntailment of Formula.t list
 
-type 'a guarded_thunk = { guard : Formula.t; thunk : unit -> 'a }
+type 'a t = curr_pc:Pc.t -> 'a Branch.t list
+
+let resolve ~curr_pc p = p ~curr_pc
 
 (** When using Branching, it should be certain that the paths are complete *)
-and _ t =
-  | Final            : {
-      final_value : 'a;
-      additional_knowledge : Formula.t list;
-      additional_type_knowledge : (string * Gil_syntax.Type.t) list;
-    }
-      -> 'a t
-  | BranchEntailment : 'a t guarded_thunk list -> 'a t
-  | BranchSat        : 'a t guarded_thunk list -> 'a t
-  | ResolveLoc       : Expr.t -> string option t
-  | Reduce           : Expr.t -> Expr.t t
-  | Bound            : ('a t * ('a -> 'b t)) -> 'b t
 
-(* Is this right ? *)
+let return ?(learned = []) ?(learned_types = []) final_value ~curr_pc =
+  let new_pc = Pc.extend (Pc.extend_types curr_pc learned_types) learned in
+  [ Branch.make ~pc:new_pc ~value:final_value ]
 
-let guarded_thunk_of_pair (guard, thunk) = { guard; thunk }
+let bind (x : 'a t) (f : 'a -> 'b t) ~curr_pc =
+  List.concat_map
+    (fun b -> f ~curr_pc:(Branch.pc b) (Branch.value b))
+    (x ~curr_pc)
 
-let rec resolve : type a. curr_pc:Pc.t -> a t -> a Branch.t list =
- fun ~curr_pc process ->
-  match process with
-  | Final { final_value; additional_knowledge; additional_type_knowledge } ->
-      [
-        {
-          pc =
-            Pc.extend
-              (Pc.extend_types curr_pc additional_type_knowledge)
-              additional_knowledge;
-          value = final_value;
-        };
-      ]
-  | BranchSat branches ->
-      let get_branches l =
-        let rec loop acc no_sat_path l =
-          match l with
-          | []                    -> acc
-          | [ { guard; thunk } ]  ->
-              let should_go_in =
-                if no_sat_path then
-                  (* No previoues path was SAT, so this one has to be *)
-                  true
-                else FOSolver.sat ~pc:curr_pc guard
-              in
-              if should_go_in then
-                let extended_pc = Pc.extend curr_pc [ guard ] in
-                let new_delayed = thunk () in
-                let follow_up = resolve ~curr_pc:extended_pc new_delayed in
-                loop (follow_up @ acc) false []
-              else loop acc false []
-          | { guard; thunk } :: r ->
-              if FOSolver.sat ~pc:curr_pc guard then
-                (* I don't think that I need to copy the PC, because extending doesn't modify the original
-                   mutable PFS and Gamma, but just in case let's put a comment here. *)
-                let extended_pc = Pc.extend curr_pc [ guard ] in
-                let new_delayed = thunk () in
-                let follow_up = resolve ~curr_pc:extended_pc new_delayed in
-                loop (follow_up @ acc) false r
-              else loop acc no_sat_path r
-        in
-        loop [] true l
-      in
-      get_branches branches
-  | Bound (x, f) ->
-      let branches_of_first_comp = resolve ~curr_pc x in
-      let continue =
-        List.map
-          (fun Branch.{ pc; value } -> resolve ~curr_pc:pc (f value))
-          branches_of_first_comp
-      in
-      List.concat continue
-  | BranchEntailment branches ->
-      let rec resolve_list l =
-        match l with
-        | []                    ->
-            raise
-              (NonExhaustiveEntailment (List.map (fun b -> b.guard) branches))
-        | { guard; thunk } :: r -> (
-            match guard with
-            | True ->
-                (* Quick speedup *)
-                let extended_pc = Pc.extend curr_pc [ guard ] in
-                resolve ~curr_pc:extended_pc (thunk ())
-            | _    ->
-                if FOSolver.check_entailment ~pc:curr_pc guard then
-                  let extended_pc = Pc.extend curr_pc [ guard ] in
-                  resolve ~curr_pc:extended_pc (thunk ())
-                else resolve_list r)
-      in
+let branch_on (guard : Formula.t) ~(then_ : 'a t) ~(else_ : 'a t) ~curr_pc =
+  match guard with
+  | True  -> then_ ~curr_pc
+  | False -> else_ ~curr_pc
+  | guard ->
+      let guard_sat = FOSolver.sat ~pc:curr_pc guard in
+      if not guard_sat then (* [Not guard)] has to be sat *)
+        else_ ~curr_pc
+      else
+        let then_branches = then_ ~curr_pc:(Pc.extend curr_pc [ guard ]) in
+        let not_guard = Formula.Infix.fnot guard in
+        if FOSolver.sat ~pc:curr_pc not_guard then
+          let else_branches =
+            else_ ~curr_pc:(Pc.extend curr_pc [ not_guard ])
+          in
+          then_branches @ else_branches
+        else then_branches
 
-      resolve_list branches
-  | ResolveLoc loc_expr ->
-      [
-        { pc = curr_pc; value = FOSolver.resolve_loc_name ~pc:curr_pc loc_expr };
-      ]
-  | Reduce expr ->
-      [ { pc = curr_pc; value = FOSolver.reduce_expr ~pc:curr_pc expr } ]
+let if_sure (guard : Formula.t) ~(then_ : 'a t) ~(else_ : 'a t) ~curr_pc =
+  match guard with
+  | True  -> then_ ~curr_pc
+  | False -> else_ ~curr_pc
+  | guard ->
+      if FOSolver.check_entailment ~pc:curr_pc guard then
+        let extended_pc = Pc.extend curr_pc [ guard ] in
+        then_ ~curr_pc:extended_pc
+      else
+        let not_guard = Formula.Infix.fnot guard in
+        if FOSolver.check_entailment ~pc:curr_pc not_guard then
+          let extended_pc = Pc.extend curr_pc [ not_guard ] in
+          else_ ~curr_pc:extended_pc
+        else raise (NonExhaustiveEntailment [ guard; not_guard ])
 
-let return ?(learned = []) ?(learned_types = []) final_value =
-  Final
-    {
-      final_value;
-      additional_knowledge = learned;
-      additional_type_knowledge = learned_types;
-    }
+let branch_entailment (branches : (Formula.t * 'a t) list) ~curr_pc =
+  let rec loop l =
+    match l with
+    | []                  -> raise
+                               (NonExhaustiveEntailment (List.map fst branches))
+    | (guard, thunk) :: r -> (
+        match guard with
+        | Formula.True -> thunk ~curr_pc
+        | False        -> loop r
+        | _            ->
+            if FOSolver.check_entailment ~pc:curr_pc guard then thunk ~curr_pc
+            else loop r)
+  in
+  loop branches
 
-let bind x f = Bound (x, f)
+let map x f ~curr_pc =
+  List.map
+    (fun b ->
+      let open Branch in
+      { b with value = f b.value })
+    (x ~curr_pc)
 
-let resolve_loc loc = ResolveLoc loc
+let reduce e ~curr_pc =
+  [ Branch.make ~pc:curr_pc ~value:(FOSolver.reduce_expr ~pc:curr_pc e) ]
 
-let reduce expr = Reduce expr
-
-let if_sure
-    (ent_guard : Formula.t) ~(then_ : unit -> 'a t) ~(else_ : unit -> 'a t) =
-  BranchEntailment
-    [ { guard = ent_guard; thunk = then_ }; { guard = True; thunk = else_ } ]
-
-let branch_on guard ~(then_ : unit -> 'a t) ~(else_ : unit -> 'a t) =
-  BranchSat
-    [
-      { guard; thunk = then_ };
-      { guard = Formula.Infix.fnot guard; thunk = else_ };
-    ]
-
-let branch_entailment branches =
-  BranchEntailment (List.map guarded_thunk_of_pair branches)
-
-let map x f = Bound (x, fun x -> return (f x))
+let resolve_loc l ~curr_pc =
+  [ Branch.make ~pc:curr_pc ~value:(FOSolver.resolve_loc_name ~pc:curr_pc l) ]
 
 module Syntax = struct
   let ( let* ) = bind

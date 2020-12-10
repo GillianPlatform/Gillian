@@ -1,5 +1,7 @@
 type 'a t = { pc : Pc.t; value : 'a }
 
+val make : pc:Pc.t -> value:'a -> 'a t
+
 val value : 'a t -> 'a
 
 val pc : 'a t -> Pc.t

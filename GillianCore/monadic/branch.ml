@@ -1,5 +1,7 @@
 type 'a t = { pc : Pc.t; value : 'a }
 
+let make ~pc ~value = { pc; value }
+
 let pp pp_value =
   Fmt.braces
     (Fmt.record ~sep:Fmt.semi

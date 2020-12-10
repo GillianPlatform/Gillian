@@ -15,12 +15,11 @@ val bind : 'a t -> ('a -> 'b t) -> 'b t
 
 val map : 'a t -> ('a -> 'b) -> 'b t
 
-val if_sure : Formula.t -> then_:(unit -> 'a t) -> else_:(unit -> 'a t) -> 'a t
+val if_sure : Formula.t -> then_:'a t -> else_:'a t -> 'a t
 
-val branch_entailment : (Formula.t * (unit -> 'a t)) list -> 'a t
+val branch_entailment : (Formula.t * 'a t) list -> 'a t
 
-val branch_on :
-  Formula.t -> then_:(unit -> 'a t) -> else_:(unit -> 'a t) -> 'a t
+val branch_on : Formula.t -> then_:'a t -> else_:'a t -> 'a t
 
 module Syntax : sig
   val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
