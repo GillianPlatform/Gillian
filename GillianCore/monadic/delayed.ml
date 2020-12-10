@@ -16,7 +16,10 @@ and _ t =
   | BranchEntailment : 'a t guarded_thunk list -> 'a t
   | BranchSat        : 'a t guarded_thunk list -> 'a t
   | ResolveLoc       : Expr.t -> string option t
+  | Reduce           : Expr.t -> Expr.t t
   | Bound            : ('a t * ('a -> 'b t)) -> 'b t
+
+(* Is this right ? *)
 
 let guarded_thunk_of_pair (guard, thunk) = { guard; thunk }
 
@@ -96,6 +99,8 @@ let rec resolve : type a. curr_pc:Pc.t -> a t -> a Branch.t list =
       [
         { pc = curr_pc; value = FOSolver.resolve_loc_name ~pc:curr_pc loc_expr };
       ]
+  | Reduce expr ->
+      [ { pc = curr_pc; value = FOSolver.reduce_expr ~pc:curr_pc expr } ]
 
 let return ?(learned = []) ?(learned_types = []) final_value =
   Final
@@ -108,6 +113,8 @@ let return ?(learned = []) ?(learned_types = []) final_value =
 let bind x f = Bound (x, f)
 
 let resolve_loc loc = ResolveLoc loc
+
+let reduce expr = Reduce expr
 
 let if_sure
     (ent_guard : Formula.t) ~(then_ : unit -> 'a t) ~(else_ : unit -> 'a t) =

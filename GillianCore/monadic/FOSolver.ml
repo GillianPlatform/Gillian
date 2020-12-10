@@ -1,6 +1,7 @@
 module FOSolver = Engine.FOSolver
 module PFS = Engine.PFS
 module TypEnv = Engine.TypEnv
+module Reduction = Engine.Reduction
 module Formula = Gil_syntax.Formula
 
 (** FIXME: optimization? *)
@@ -46,3 +47,7 @@ let is_less_or_equal = of_comp_fun FOSolver.is_less_or_equal
 let resolve_loc_name ~pc loc =
   FOSolver.resolve_loc_name ~pfs:(build_full_pfs pc)
     ~gamma:(build_full_gamma pc) loc
+
+let reduce_expr ~pc expr =
+  Reduction.reduce_lexpr ~pfs:(build_full_pfs pc) ~gamma:(build_full_gamma pc)
+    expr

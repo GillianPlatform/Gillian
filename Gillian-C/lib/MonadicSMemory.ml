@@ -336,7 +336,10 @@ module Mem = struct
       in
       let le_subst = Subst.subst_in_expr subst ~partial:true in
       let sval_subst = SVal.substitution ~le_subst in
-      let subst_tree = SHeapTree.substitution ~le_subst ~sval_subst in
+      let svarr_subst = SVal.SVArray.subst ~le_subst ~sval_subst in
+      let subst_tree =
+        SHeapTree.substitution ~le_subst ~sval_subst ~svarr_subst
+      in
       let substituted = SMap.map subst_tree mem in
       (* FIXME: need to merge locations at some point... *)
       (* Subst.fold aloc_subst

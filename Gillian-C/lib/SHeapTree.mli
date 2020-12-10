@@ -101,4 +101,8 @@ val get_perm_at : t -> Expr.t -> Perm.t option d_or_error
 val assertions : loc:string -> t -> Asrt.t list
 
 val substitution :
-  le_subst:(Expr.t -> Expr.t) -> sval_subst:(SVal.t -> SVal.t) -> t -> t
+  le_subst:(Expr.t -> Expr.t) ->
+  sval_subst:(SVal.t -> SVal.t) ->
+  svarr_subst:(MonadicSVal.SVArray.t -> MonadicSVal.SVArray.t) ->
+  t ->
+  t

@@ -273,4 +273,13 @@ module SVArray = struct
     Delayed.return ~learned e
 
   let of_gil_expr_exn expr = Abst expr
+
+  (* type nonrec t = Conc of t list | Abst of Expr.t | AllUndef | AllZeros *)
+
+  let subst ~le_subst ~sval_subst t =
+    match t with
+    | Conc l      -> Conc (List.map sval_subst l)
+    | Abst e as a -> if le_subst e == e then a else Abst (le_subst e)
+    | AllUndef    -> AllUndef
+    | AllZeros    -> AllZeros
 end

@@ -318,9 +318,10 @@ module Node = struct
     | MemVal { mem_val = Single { value = e; _ }; _ } -> SVal.lvars e
     | _ -> SS.empty
 
-  let substitution ~sval_subst n =
+  let substitution ~sval_subst ~svarr_subst n =
     let smv = function
       | Single s -> Single { s with value = sval_subst s.value }
+      | Array a  -> Array { a with values = svarr_subst a.values }
       | u        -> u
     in
     match n with
@@ -498,7 +499,7 @@ module Tree = struct
     in
     let rec frame_inside ~replace_node ~rebuild_parent (t : t) (range : Range.t)
         =
-      Logging.verbose (fun fmt -> fmt "HERE: %a" pp t);
+      Logging.tmi (fun fmt -> fmt "HERE: %a" pp t);
       if%sat
         log_string "range equals span";
         Range.is_equal range t.span
@@ -562,7 +563,7 @@ module Tree = struct
             let open Delayed.Syntax in
             let* _, left, right = split ~range t in
             let* new_self = with_children t ~left ~right in
-            Logging.verbose (fun fmt -> fmt "AFTER SPLITTING: %a" pp new_self);
+            Logging.tmi (fun fmt -> fmt "AFTER SPLITTING: %a" pp new_self);
             frame_inside ~replace_node ~rebuild_parent new_self range
     in
     let open Delayed.Syntax in
@@ -750,13 +751,14 @@ module Tree = struct
             CoreP.array ~loc ~ofs:low ~perm ~chunk ~size:total_size ~sval_arr:e
             :: learned)
 
-  let rec substitution ~sval_subst ~le_subst { node; span; children } =
-    let node = Node.substitution ~sval_subst node in
+  let rec substitution
+      ~svarr_subst ~sval_subst ~le_subst { node; span; children } =
+    let node = Node.substitution ~sval_subst ~svarr_subst node in
     let span = Range.substitution ~le_subst span in
     let children =
       Option.map
         (fun (left, right) ->
-          let f = substitution ~sval_subst ~le_subst in
+          let f = substitution ~sval_subst ~le_subst ~svarr_subst in
           (f left, f right))
         children
     in
@@ -1121,10 +1123,12 @@ let assertions ~loc t =
   | _ -> failwith "Incompatible trees to merge"
      *)
 
-let substitution ~le_subst ~sval_subst t =
+let substitution ~le_subst ~sval_subst ~svarr_subst t =
   match t with
   | Freed                 -> Freed
   | Tree { bounds; root } ->
       let bounds = Option.map (Range.substitution ~le_subst) bounds in
-      let root = Option.map (Tree.substitution ~sval_subst ~le_subst) root in
+      let root =
+        Option.map (Tree.substitution ~sval_subst ~le_subst ~svarr_subst) root
+      in
       Tree { bounds; root }
