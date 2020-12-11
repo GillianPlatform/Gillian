@@ -46,8 +46,8 @@ let expand_if ~ext ~loc expr then_ else_ =
   pexp_apply ~loc fexpr
     [
       (Nolabel, expr);
-      (Labelled "then_branch", then_);
-      (Labelled "else_branch", else_);
+      (Labelled "then_branch", to_thunk ~loc then_);
+      (Labelled "else_branch", to_thunk ~loc else_);
     ]
 
 let transform_case_ent ~expr (case : case) =
@@ -76,7 +76,7 @@ let transform_case_ent ~expr (case : case) =
            type Expr.t -> Formula.t as pattern which"
   in
   let applied = pexp_apply ~loc:lhs.ppat_loc formula_expr [ (Nolabel, expr) ] in
-  let rhs = case.pc_rhs in
+  let rhs = to_thunk ~loc:case.pc_rhs.pexp_loc case.pc_rhs in
   pexp_tuple ~loc:lhs.ppat_loc [ applied; rhs ]
 
 let expand_match ~ext ~loc (expr : expression) (cases : case list) =
