@@ -2,7 +2,7 @@
  (name gillian_js)
  (public_name gillian-js)
  (package gillian-js)
- (libraries gillian js2jsil_lib semantics test262 cosetteRunner memtrace))
+ (libraries gillian js2jsil_lib semantics test262 cosetteRunner))
 
 ; (executable
 ;   (name test262)

@@ -79,13 +79,10 @@
     "@opam/z3": "giltho/esy-z3#b0fdd9a",
     "JS_Parser": "GillianPlatform/JS_Parser#e282b6a",
     "compcert": "giltho/CompCert#6bdcc61",
-    "ocaml": "^4.11.1000"
-  },
-  "resolutions": {
-    "ocaml": "esy-ocaml/ocaml#c72768d"
+    "ocaml": "^4.10.x"
   },
   "devDependencies": {
-    "ocaml": "4.11.1000",
+    "ocaml": "4.10.x",
     "@opam/ocamlfind": "*",
     "@opam/cmitomli": "*",
     "@opam/fileutils": "*",
@@ -93,7 +90,6 @@
     "@opam/shexp": "v0.14.0",
     "@opam/ocaml-lsp-server": "*",
     "@opam/odoc": "*",
-    "@opam/ocamlformat": "0.16.0",
-    "@opam/memtrace": "*"
+    "@opam/ocamlformat": "0.16.0"
   }
 }
