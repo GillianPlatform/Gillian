@@ -86,7 +86,7 @@ struct
     in
     match list_string with
     | []     -> ""
-    | a :: r -> List.fold_left common_root2 a list_string
+    | a :: _ -> List.fold_left common_root2 a list_string
 
   let suffix i str = String.sub str i (String.length str - i)
 

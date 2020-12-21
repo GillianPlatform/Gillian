@@ -9,26 +9,28 @@ module Preprocess_GCmd = PreProcessing_Utils.M (struct
 end)
 
 (** Used to avoid redundant parsing. *)
-let cached_progs = Hashtbl.create Config.small_tbl_size
 
-let cache_gil_prog path prog = Hashtbl.add cached_progs path prog
+(* let cached_progs = Hashtbl.create Config.small_tbl_size *)
 
-let cache_labelled_progs (progs : (string * (Annot.t, string) Prog.t) list) =
+(* let cache_gil_prog path prog = Hashtbl.add cached_progs path prog *)
+
+(* let cache_labelled_progs (progs : (string * (Annot.t, string) Prog.t) list) =
   List.iter
     (fun (path, prog) ->
       if not (Hashtbl.mem cached_progs path) then cache_gil_prog path prog)
-    progs
+    progs *)
 
 (** Used to avoid redundant parsing. *)
-let cached_progs = Hashtbl.create Config.small_tbl_size
 
-let cache_gil_prog path prog = Hashtbl.add cached_progs path prog
+(* let cached_progs = Hashtbl.create Config.small_tbl_size *)
 
-let cache_labelled_progs (progs : (string * (Annot.t, string) Prog.t) list) =
+(* let cache_gil_prog path prog = Hashtbl.add cached_progs path prog *)
+
+(* let cache_labelled_progs (progs : (string * (Annot.t, string) Prog.t) list) =
   List.iter
     (fun (path, prog) ->
       if not (Hashtbl.mem cached_progs path) then cache_gil_prog path prog)
-    progs
+    progs *)
 
 let col pos = pos.pos_cnum - pos.pos_bol + 1
 
@@ -64,9 +66,6 @@ let parse_from_string start str =
 
 let parse_eprog_from_string : string -> (Annot.t, string) Prog.t =
   parse_from_string GIL_Parser.gmain_target
-
-let parse_expr_from_string : string -> Expr.t =
-  parse_from_string GIL_Parser.top_level_expr_target
 
 let trans_procs procs path internal_file =
   let procs' = Hashtbl.create Config.small_tbl_size in
@@ -244,9 +243,7 @@ let eprog_to_prog ~other_imports ext_program =
     (* Desugar labels *)
     let proc = Proc.indexed_of_labeled proc in
     (* Get the succ and pred tables *)
-    let succ_table, pred_table =
-      Preprocess_GCmd.get_succ_pred proc.Proc.proc_body
-    in
+    let _, pred_table = Preprocess_GCmd.get_succ_pred proc.Proc.proc_body in
     (* Compute the which_pred table *)
     let predecessors = Preprocess_GCmd.compute_which_preds pred_table in
     (* Update the global_which_pred table with the correct indexes *)
@@ -259,8 +256,7 @@ let eprog_to_prog ~other_imports ext_program =
   in
   let procs, predecessors =
     Hashtbl.fold
-      (fun (name : string) (proc : (Annot.t, string) Proc.t)
-           (procs, predecessors) ->
+      (fun (_ : string) (proc : (Annot.t, string) Proc.t) (procs, predecessors) ->
         let proc, new_predecessors = proc_of_ext_proc proc in
         (proc :: procs, new_predecessors @ predecessors))
       ext_program.procs ([], [])

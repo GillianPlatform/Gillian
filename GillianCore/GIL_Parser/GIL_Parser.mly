@@ -812,7 +812,7 @@ g_lemma_target:
   lemma_existentials = option(existentials_target);
   lemma_proof = option(g_lemma_proof_target);
   {
-    (** FIXME: can only read one spec right now *)
+    (* FIXME: can only read one spec right now *)
     let lemma_name, lemma_params = lemma_head in
     let () =
       if Option.is_some no_path then

@@ -1,5 +1,4 @@
 open Gillian.Gil_syntax
-open Jsil_syntax
 
 let small_tbl_size = 1
 
@@ -296,7 +295,7 @@ let field r = Expr.BinOp (r, LstNth, lit_num 2.)
  *)
 let fresh_sth (name : string) : (unit -> string) * (unit -> unit) =
   let counter = ref 0 in
-  let rec f () =
+  let f () =
     let v = name ^ string_of_int !counter in
     counter := !counter + 1;
     v
@@ -401,7 +400,7 @@ let fresh_tcf_vars () =
 
 let fresh_name =
   let counter = ref 0 in
-  let rec f name =
+  let f name =
     let v = name ^ string_of_int !counter in
     counter := !counter + 1;
     v
@@ -433,38 +432,38 @@ let is_get_value_var x =
 let val_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_v"
-  | Lit l       -> fresh_var () ^ "_v"
+  | Lit _       -> fresh_var () ^ "_v"
   | _           -> raise
                      (Failure "val_var_of_var expects a variable or a literal")
 
 let number_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_n"
-  | Lit l       -> fresh_var () ^ "_n"
+  | Lit _       -> fresh_var () ^ "_n"
   | _           -> raise (Failure "number_var_of_var expects a variable")
 
 let boolean_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_b"
-  | Lit l       -> fresh_var () ^ "_b"
+  | Lit _       -> fresh_var () ^ "_b"
   | _           -> raise (Failure "boolean_var_of_var expects a variable")
 
 let primitive_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_p"
-  | Lit l       -> fresh_var () ^ "_p"
+  | Lit _       -> fresh_var () ^ "_p"
   | _           -> raise (Failure "primitive_var_of_var expects a variable")
 
 let string_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_s"
-  | Lit l       -> fresh_var () ^ "_s"
+  | Lit _       -> fresh_var () ^ "_s"
   | _           -> raise (Failure "string_var_of_var expects a variable")
 
 let i32_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_i32"
-  | Lit l       -> fresh_var () ^ "_i32"
+  | Lit _       -> fresh_var () ^ "_i32"
   | _           -> raise (Failure "string_var_of_var expects a variable")
 
 let fresh_err_label, reset_err_label = fresh_sth "err_"

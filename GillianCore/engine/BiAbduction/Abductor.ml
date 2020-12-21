@@ -48,7 +48,7 @@ struct
     SSubst.init bindings'
 
   let make_spec
-      (prog : UP.prog)
+      (_ : UP.prog)
       (name : string)
       (params : string list)
       (bi_state_i : bi_state_t)
@@ -211,11 +211,11 @@ struct
     let process_spec = make_spec prog in
     let state_i = SBAState.copy state_i in
     match result with
-    | RFail (_, _, state_f, errs) ->
+    | RFail (_, _, state_f, _) ->
         let sspec, spec = process_spec name params state_i state_f Flag.Error in
         if !Config.bug_specs_propagation then UP.add_spec prog spec;
         (sspec, false)
-    | RSucc (fl, _, state_f) ->
+    | RSucc (fl, _, state_f)   ->
         let sspec, spec = process_spec name params state_i state_f fl in
         let () =
           try UP.add_spec prog spec

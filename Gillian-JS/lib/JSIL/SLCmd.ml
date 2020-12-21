@@ -35,7 +35,7 @@ let pp_unfold_info =
   in
   Fmt.option pp_non_opt
 
-let rec pp fmt (lcmd : t) : unit =
+let pp fmt (lcmd : t) : unit =
   let pp_args = Fmt.list ~sep:Fmt.comma Expr.pp in
   let pp_binders f b =
     match b with

@@ -1,5 +1,4 @@
 module SSubst = Gillian.Symbolic.Subst
-open Containers
 module L = Logging
 module Type = Gillian.Gil_syntax.Type
 module Expr = Gillian.Gil_syntax.Expr
@@ -29,7 +28,7 @@ let init (preds : t list) : (string, t) Hashtbl.t =
   pred_def_tbl
 
 let pp fmt pred =
-  let { name; num_params; params; ins; definitions; _ } = pred in
+  let { name; params; ins; definitions; _ } = pred in
   let exist_ins = List.length pred.ins <> List.length pred.params in
   let params_with_info =
     if exist_ins then

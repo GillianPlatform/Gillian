@@ -4,4 +4,4 @@
    str gillian-bulk-alcotest)
  (preprocess
   (pps ppx_deriving.std))
- (flags -open Javert_utils))
+ (flags :standard -open Javert_utils))

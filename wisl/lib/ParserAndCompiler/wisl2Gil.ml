@@ -421,7 +421,7 @@ let rec compile_lcmd ?(fname = "main") lcmd =
   | Assert (la, lb) ->
       let exs, comp_la = compile_lassert la in
       (None, LCmd.SL (SLCmd.SepAssert (comp_la, exs @ lb)))
-  | Invariant (la, lb) -> failwith "Invariant is not before a loop."
+  | Invariant _ -> failwith "Invariant is not before a loop."
 
 let compile_inv_and_while ~fname ~while_stmt ~invariant =
   let spec_name = "invariant_spec" in
@@ -576,7 +576,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let cmds, fct = compile_inv_and_while ~fname ~while_stmt ~invariant in
       let comp_rest, new_functions = compile_list rest in
       (cmds @ comp_rest, fct :: new_functions)
-  | { snode = While (e, sl); sid = sid_while; _ } :: rest
+  | { snode = While _; _ } :: _
     when !Gillian.Utils.Config.current_exec_mode = Verification ->
       failwith "While loop without invariant in Verification mode!"
   | { snode = While (e, sl); sid = sid_while; _ } :: rest ->
@@ -754,7 +754,8 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let comp_rest, new_functions = compile_list rest in
       (cmds_with_annot @ comp_rest, new_functions)
 
-let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials } =
+let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials; _ }
+    =
   let _, comp_pre = compile_lassert ~fname pre in
   let _, comp_post = compile_lassert ~fname post in
   let label_opt =

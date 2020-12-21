@@ -130,7 +130,7 @@ let get_children call_graph id = (get_node call_graph id).children
 
 let get_proc_names call_graph =
   Hashtbl.fold
-    (fun id (node : Node.t) acc ->
+    (fun _ (node : Node.t) acc ->
       match node.ntype with
       | Proc -> node.name :: acc
       | _    -> acc)
@@ -138,7 +138,7 @@ let get_proc_names call_graph =
 
 let get_pred_names call_graph =
   Hashtbl.fold
-    (fun id (node : Node.t) acc ->
+    (fun _ (node : Node.t) acc ->
       match node.ntype with
       | Pred -> node.name :: acc
       | _    -> acc)
@@ -146,7 +146,7 @@ let get_pred_names call_graph =
 
 let get_lemma_names call_graph =
   Hashtbl.fold
-    (fun id (node : Node.t) acc ->
+    (fun _ (node : Node.t) acc ->
       match node.ntype with
       | Lemma -> node.name :: acc
       | _     -> acc)
@@ -192,7 +192,7 @@ let to_reverse_graph call_graph =
   let reverse_graph = make () in
   let () =
     Hashtbl.iter
-      (fun id (node : Node.t) ->
+      (fun _ (node : Node.t) ->
         List.iter
           (fun child_id ->
             let child = get_node call_graph child_id in

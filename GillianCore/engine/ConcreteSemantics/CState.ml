@@ -36,10 +36,10 @@ module Make
   let lift_merrs (errs : m_err_t list) : err_t list =
     List.map (fun x -> StateErr.EMem x) errs
 
-  let init (pred_defs : UP.preds_tbl_t option) : t =
+  let init (_ : UP.preds_tbl_t option) : t =
     (CMemory.init (), CStore.init [], [])
 
-  let get_pred_defs (state : t) : UP.preds_tbl_t option = None
+  let get_pred_defs (_ : t) : UP.preds_tbl_t option = None
 
   let execute_action (action : string) (state : t) (args : vt list) : action_ret
       =
@@ -55,10 +55,6 @@ module Make
   let ga_to_deleter (a_id : string) = CMemory.ga_to_deleter a_id
 
   let is_overlapping_asrt (a : string) : bool = CMemory.is_overlapping_asrt a
-
-  let lift l = l
-
-  let unlift l = Some l
 
   let eval_expr state e =
     let _, store, _ = state in
@@ -77,22 +73,15 @@ module Make
     | Literal.Loc _ -> Some (state, loc)
     | _             -> None
 
-  let get_locs state =
-    let _, _, locs = state in
-    locs
-
-  let assume ?(unfold = false) (state : t) (l : Literal.t) : t list =
+  let assume ?unfold:_ (state : t) (l : Literal.t) : t list =
     match l with
     | Bool true  -> [ state ]
     | Bool false -> []
     | _          -> raise (Failure "assume. illegal argument to assume")
 
   let assume_a
-      ?(unification = false)
-      ?(production = false)
-      ?(time = "")
-      (state : t)
-      (ps : Formula.t list) : t option =
+      ?unification:_ ?production:_ ?time:_ (state : t) (ps : Formula.t list) :
+      t option =
     let les : Expr.t option list = List.map Formula.to_expr ps in
     let bs : CVal.M.t option list =
       List.map (Option.map (eval_expr state)) les
@@ -112,16 +101,16 @@ module Make
   let assert_a (state : t) (ps : Formula.t list) : bool =
     Option.fold ~some:(fun _ -> true) ~none:false (assume_a state ps)
 
-  let sat_check (state : t) (l : Literal.t) : bool =
+  let sat_check (_ : t) (l : Literal.t) : bool =
     match l with
     | Bool b -> b
     | _      -> raise (Failure "SAT Check: non-boolean argument")
 
   (* Implentation MISSING!!! *)
-  let sat_check_f (state : t) (f : Formula.t list) : st option = None
+  let sat_check_f (_ : t) (_ : Formula.t list) : st option = None
 
   let pp fmt state =
-    let heap, store, locs = state in
+    let heap, store, _ = state in
     let pp_heap fmt heap =
       if !Config.no_heap then Fmt.string fmt "HEAP NOT PRINTED"
       else CMemory.pp fmt heap
@@ -141,102 +130,87 @@ module Make
     let cheap, cstore, vts = state in
     (CMemory.copy cheap, CStore.copy cstore, vts)
 
-  let equals state v1 v2 = v1 = v2
+  let equals _ v1 v2 = v1 = v2
 
-  let get_type state v = Some (Literal.type_of v)
+  let get_type _ v = Some (Literal.type_of v)
 
-  let simplify
-      ?(save = false)
-      ?(kill_new_lvars : bool option)
-      ?(unification = false)
-      (state : t) : st =
+  let simplify ?save:_ ?kill_new_lvars:_ ?unification:_ (_ : t) : st =
     CVal.CESubst.init []
 
-  let simplify_val state v = v
+  let simplify_val _ v = v
 
   let struct_init
-      (pred_defs : UP.preds_tbl_t option)
-      (store : store_t)
-      (pfs : PFS.t)
-      (gamma : TypEnv.t)
-      (svars : SS.t) : t =
+      (_ : UP.preds_tbl_t option)
+      (_ : store_t)
+      (_ : PFS.t)
+      (_ : TypEnv.t)
+      (_ : SS.t) : t =
     raise (Failure "ERROR. struct_init not supported at the concrete level")
 
-  let add_spec_vars state xs =
+  let add_spec_vars _ _ =
     raise (Failure "ERROR: add_spec_var called for concrete executions")
 
-  let get_spec_vars state =
+  let get_spec_vars _ =
     raise (Failure "ERROR: get_spec_vars called for concrete executions")
 
-  let get_lvars state =
+  let get_lvars _ =
     raise (Failure "ERROR: get_lvars called for concrete executions")
 
-  let to_assertions ?(to_keep : SS.t option) (state : t) : Asrt.t list =
+  let to_assertions ?to_keep:_ (_ : t) : Asrt.t list =
     raise (Failure "ERROR: to_assertions called for concrete executions")
 
   let run_spec
-      (spec : UP.spec)
-      (state : t)
-      (x : string)
-      (args : vt list)
-      (subst : (string * (string * vt) list) option) : (t * Flag.t) list =
+      (_ : UP.spec)
+      (_ : t)
+      (_ : string)
+      (_ : vt list)
+      (_ : (string * (string * vt) list) option) : (t * Flag.t) list =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
 
-  let unify (state : t) (subst : st) (up : UP.t) : bool =
-    raise (Failure "ERROR: unify called for non-abstract execution")
-
-  let unfolding_vals (state : t) (fs : Formula.t list) : vt list =
+  let unfolding_vals (_ : t) (_ : Formula.t list) : vt list =
     raise (Failure "ERROR: unfolding_vals called for non-abstract execution")
 
-  let evaluate_slcmd (prog : UP.prog) (slcmd : SLCmd.t) (state : t) :
+  let evaluate_slcmd (_ : UP.prog) (_ : SLCmd.t) (_ : t) :
       (t list, string) result =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 
-  let unify_invariant prog revisited state a binders =
+  let unify_invariant _ _ _ _ _ =
     raise (Failure "ERROR: unify_invariant called for concrete execution")
 
-  let frame_on state iframes ids =
+  let frame_on _ _ _ =
     raise (Failure "ERROR: framing called for concrete execution")
 
-  let clear_resource state =
+  let clear_resource _ =
     raise (Failure "ERROR: clear_resource called for concrete execution")
 
-  let substitution_in_place (subst : st) (state : t) : unit = ()
+  let substitution_in_place (_ : st) (_ : t) : unit = ()
 
-  let fresh_val (state : t) =
+  let fresh_val (_ : t) =
     raise (Failure "fresh_val not implemented in concrete state")
 
-  let fresh_loc ?(loc : vt option) (state : t) =
+  let fresh_loc ?loc:_ (_ : t) =
     raise (Failure "fresh_loc not implemented in concrete state")
 
-  let get_locs (state : t) =
-    raise (Failure "Unsupported: get locs in a concrete state")
+  let clean_up (_ : t) = raise (Failure "Cleanup of concrete state.")
 
-  let get_locs_and_props (state : t) =
-    raise (Failure "Unsupported: get locs and props in a concrete state")
-
-  let clean_up (state : t) = raise (Failure "Cleanup of concrete state.")
-
-  let unify_assertion (state : t) (subst : st) (step : UP.step) : u_res =
+  let unify_assertion (_ : t) (_ : st) (_ : UP.step) : u_res =
     raise (Failure "Unify assertion from concrete state.")
 
-  let produce_posts (state : t) (subst : st) (asrts : Asrt.t list) : t list =
+  let produce_posts (_ : t) (_ : st) (_ : Asrt.t list) : t list =
     raise (Failure "produce_posts from concrete state.")
 
-  let produce (state : t) (subst : st) (asrt : Asrt.t) : (t list, string) result
-      =
+  let produce (_ : t) (_ : st) (_ : Asrt.t) : (t list, string) result =
     raise (Failure "produce_post from non-abstract symbolic state.")
 
-  let update_subst (state : t) (subst : st) : unit = ()
+  let update_subst (_ : t) (_ : st) : unit = ()
 
-  let mem_constraints (state : t) : Formula.t list =
+  let mem_constraints (_ : t) : Formula.t list =
     raise (Failure "DEATH. mem_constraints")
 
-  let split_ins (action : string) (ins : vt list) : vt list * vt list =
+  let split_ins (_ : string) (_ : vt list) : vt list * vt list =
     raise (Failure "DEATH. split_ins")
 
-  let merge_ins (action : string) (l_ins : vt list) (o_ins : vt list) : vt list
-      =
+  let merge_ins (_ : string) (_ : vt list) (_ : vt list) : vt list =
     raise (Failure "merge_ins. DEATH")
 
   let pp_fix _ _ = raise (Failure "str_of_fix from non-symbolic state.")
@@ -259,15 +233,14 @@ module Make
           (Exceptions.Unsupported
              "Concrete printer: non-memory and non-type error")
 
-  let can_fix (errs : err_t list) : bool = false
+  let can_fix (_ : err_t list) : bool = false
 
-  let get_failing_constraint (err : err_t) : Formula.t = True
+  let get_failing_constraint (_ : err_t) : Formula.t = True
 
-  let get_fixes ?simple_fix:(sf = true) (state : t) (errs : err_t list) :
-      fix_t list list =
+  let get_fixes ?simple_fix:_ (_ : t) (_ : err_t list) : fix_t list list =
     raise (Failure "Concrete: get_fixes not implemented in CState.Make")
 
-  let apply_fixes (state : t) (fixes : fix_t list) : t option * Asrt.t list =
+  let apply_fixes (_ : t) (_ : fix_t list) : t option * Asrt.t list =
     raise (Failure "Concrete: apply_fixes not implemented in CState.Make")
 
   let get_equal_values _ vs = vs

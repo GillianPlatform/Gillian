@@ -85,7 +85,6 @@ module type S = sig
 end
 
 module Make (Val : Val.S) : S with type vt = Val.t = struct
-  open Containers
   module L = Logging
 
   (** Type of GIL values *)
@@ -118,10 +117,10 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     let filter =
       match filter_out with
       | Some filter -> filter
-      | None        -> fun x -> false
+      | None        -> fun _ -> false
     in
     Hashtbl.fold
-      (fun k v ac -> if filter k then ac else Var.Set.add k ac)
+      (fun k _ ac -> if filter k then ac else Var.Set.add k ac)
       subst Var.Set.empty
 
   (**
@@ -131,7 +130,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return Range of the substitution
   *)
   let range (subst : t) : vt list =
-    Hashtbl.fold (fun v v_val ac -> v_val :: ac) subst []
+    Hashtbl.fold (fun _ v_val ac -> v_val :: ac) subst []
 
   (**
     Substitution lookup
@@ -305,7 +304,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
             | None    -> raise (Failure "DEATH. subst_in_expr"))
     in
     let mapper =
-      object (self)
+      object
         inherit [_] Gil_syntax.Visitors.endo
 
         method! visit_LVar () this x =

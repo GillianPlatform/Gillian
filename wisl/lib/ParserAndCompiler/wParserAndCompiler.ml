@@ -37,7 +37,9 @@ let create_compilation_result path prog =
 let parse_and_compile_files files =
   let f files =
     let path = List.hd files in
-    Ok (create_compilation_result path (compile path (parse_file path)))
+    Ok
+      (create_compilation_result path
+         (compile ~filepath:path (parse_file path)))
   in
   Logging.with_normal_phase ~title:"Program parsing and compilation" (fun () ->
       f files)

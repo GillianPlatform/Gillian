@@ -110,7 +110,7 @@ let filter (x : t) (f : string -> bool) : t =
 
 (* Filter using function on variables *)
 let filter_in_place (x : t) (f : string -> bool) : unit =
-  iter x (fun v v_type -> if not (f v) then remove x v)
+  iter x (fun v _ -> if not (f v) then remove x v)
 
 (* Filter for specific variables *)
 let filter_vars (gamma : t) (vars : SS.t) : t =
@@ -121,7 +121,7 @@ let filter_vars_in_place (gamma : t) (vars : SS.t) : unit =
   filter_in_place gamma (fun v -> SS.mem v vars)
 
 (* Perform substitution, return new typing environment *)
-let rec substitution (x : t) (subst : SESubst.t) (partial : bool) : t =
+let substitution (x : t) (subst : SESubst.t) (partial : bool) : t =
   let new_gamma = init () in
   iter x (fun var v_type ->
       let evar = Expr.from_var_name var in
@@ -159,7 +159,7 @@ let reset (x : t) (reset : (Var.t * Type.t) list) =
   Hashtbl.clear x;
   List.iter (fun (y, t) -> Hashtbl.replace x y t) reset
 
-let is_well_formed (x : t) : bool = true
+let is_well_formed (_ : t) : bool = true
 
 let filter_with_info relevant_info (x : t) =
   let pvars, lvars, locs = relevant_info in

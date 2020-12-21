@@ -111,10 +111,10 @@ let dispose heap pfs gamma loc_expr =
   match resolve_loc pfs gamma loc_expr with
   | Some loc_name -> (
       match WislSHeap.get_fvl heap loc_name with
-      | Some fvl ->
+      | Some _ ->
           let () = WislSHeap.remove heap loc_name in
           ASucc [ (heap, [], [], []) ]
-      | None     ->
+      | None   ->
           Logging.verbose (fun m ->
               m
                 "!!!!!!!!!!!!!!!@\n\
@@ -223,6 +223,6 @@ let is_overlapping_asrt _ = false
 
 let apply_fix m _ _ _ = m
 
-let get_fixes ?simple_fix _ _ _ _ = []
+let get_fixes ?simple_fix:_ _ _ _ _ = []
 
 let get_failing_constraint _ = Formula.True

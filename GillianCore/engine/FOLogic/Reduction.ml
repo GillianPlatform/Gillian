@@ -1,5 +1,3 @@
-open SVal
-
 (* When reduction fails *)
 exception ReductionException of Expr.t * string
 
@@ -12,9 +10,8 @@ let normalise_cat (f : Expr.t -> Expr.t) (les : Expr.t list) : Expr.t =
   (* Recursively process each catted list and destroy inner LstCats *)
   let nles =
     List.concat
-      (List.mapi
-         (fun i x ->
-           (* L.verbose (fun fmt -> fmt "Cat: %d: %a" i Expr.pp x); *)
+      (List.map
+         (fun x ->
            let fx = f x in
            match fx with
            | NOp (LstCat, les) -> les
@@ -186,111 +183,6 @@ let resolve_list (le : Expr.t) (pfs : Formula.t list) : Expr.t =
       | None    -> LVar x)
   | le     -> le
 
-let reshape_list (le_list : Expr.t) (len : int) : Expr.t list * Expr.t =
-  match le_list with
-  | EList lst ->
-      let lst_l = Array.to_list (Array.sub (Array.of_list lst) 0 len) in
-      let lst_r =
-        Array.to_list
-          (Array.sub (Array.of_list lst) len (List.length lst - len))
-      in
-      (lst_l, EList lst_r)
-  | NOp (LstCat, EList lst_l :: lst_r) ->
-      let lst_l' = Array.to_list (Array.sub (Array.of_list lst_l) 0 len) in
-      let lst_l'' =
-        Array.to_list
-          (Array.sub (Array.of_list lst_l) len (List.length lst_l - len))
-      in
-      if List.length lst_l'' > 0 then
-        (lst_l', NOp (LstCat, EList lst_l'' :: lst_r))
-      else (lst_l', NOp (LstCat, lst_r))
-  | _ -> raise (Failure "DEATH: List could not be reshaped")
-
-let resolve_var_to_location (lvar : string) (pfs : Formula.t list) :
-    (string * SSubst.t) option =
-  let original_pfs =
-    List.map
-      (fun (a : Formula.t) : Formula.t ->
-        match (a : Formula.t) with
-        | Eq (le1, le2) -> (
-            let le1' = normalise_list_expressions le1 in
-            match (le1' : Expr.t) with
-            | EList _ | NOp (LstCat, _) -> Eq (le1', le2)
-            | _                         ->
-                let le2' = normalise_list_expressions le2 in
-                Eq (le1', le2'))
-        | _             -> a)
-      pfs
-  in
-
-  let subst = SSubst.init [] in
-
-  let rec shallow_loop pfs traversed_pfs found_other_bindings =
-    match (pfs : Formula.t list) with
-    | [] -> (None, found_other_bindings)
-    | Eq (LVar cur_lvar, ALoc loc) :: rest
-    | Eq (ALoc loc, LVar cur_lvar) :: rest ->
-        if cur_lvar = lvar then (Some loc, found_other_bindings)
-        else
-          let found_other = SSubst.mem subst cur_lvar in
-          SSubst.put subst cur_lvar (ALoc loc);
-          shallow_loop rest (List.hd pfs :: traversed_pfs) found_other
-    | Eq (LVar cur_lvar, Lit (Loc loc)) :: rest
-    | Eq (Lit (Loc loc), LVar cur_lvar) :: rest ->
-        if cur_lvar = lvar then (Some loc, found_other_bindings)
-        else
-          let found_other = SSubst.mem subst cur_lvar in
-          SSubst.put subst cur_lvar (Lit (Loc loc));
-          shallow_loop rest (List.hd pfs :: traversed_pfs) found_other
-    | Eq (le1, le2) :: rest -> (
-        match le1 with
-        | EList le1_lst | NOp (LstCat, EList le1_lst :: _) -> (
-            let le2' = resolve_list le2 (traversed_pfs @ rest) in
-            match le2' with
-            | EList le2_lst | NOp (LstCat, EList le2_lst :: _) -> (
-                let min_len = min (List.length le2_lst) (List.length le1_lst) in
-                let le1_lst_l, le1_lst_r = reshape_list le1 min_len in
-                let le2_lst_l, le2_lst_r = reshape_list le2' min_len in
-                if List.length le1_lst_l <> List.length le2_lst_l then
-                  raise (Failure "DEATH")
-                else
-                  match
-                    shallow_loop_lists le1_lst_l le2_lst_l found_other_bindings
-                  with
-                  | None, new_found_other_bindings ->
-                      shallow_loop rest
-                        (List.hd pfs :: traversed_pfs)
-                        new_found_other_bindings
-                  | Some loc, new_found_other_bindings ->
-                      (Some loc, new_found_other_bindings))
-            | _ ->
-                shallow_loop rest
-                  (List.hd pfs :: traversed_pfs)
-                  found_other_bindings)
-        | _ ->
-            shallow_loop rest
-              (List.hd pfs :: traversed_pfs)
-              found_other_bindings)
-    | _ :: rest ->
-        shallow_loop rest (List.hd pfs :: traversed_pfs) found_other_bindings
-  and shallow_loop_lists lst_1 lst_2 found_other_bindings =
-    shallow_loop
-      (List.map2
-         (fun (le1 : Expr.t) (le2 : Expr.t) : Formula.t -> Eq (le1, le2))
-         lst_1 lst_2)
-      [] found_other_bindings
-  in
-
-  let rec loop pfs =
-    match shallow_loop pfs [] false with
-    | Some loc, _ -> Some (loc, subst)
-    | None, false -> None
-    | None, true  ->
-        loop (List.map (SSubst.substitute_formula subst ~partial:true) pfs)
-  in
-
-  loop original_pfs
-
 (**********************************)
 (* Pure formulae helper functions *)
 (**********************************)
@@ -429,7 +321,7 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
 
   match lst with
   (* Nothing can be done for variables *)
-  | PVar x | LVar x ->
+  | PVar _ | LVar _ ->
       let lst' = resolve_list lst (PFS.to_list pfs) in
       if lst = lst' then None else f lst' idx
   (* Base lists of literals and logical expressions *)
@@ -595,7 +487,7 @@ let is_different (pfs : Formula.t list) (li : Expr.t) (lj : Expr.t) :
 let rec set_member (pfs : Formula.t list) m s =
   let f = set_member pfs m in
   match s with
-  | Expr.LVar x              -> m = s
+  | Expr.LVar _              -> m = s
   | Expr.ESet s              -> List.mem m s
   | Expr.NOp (SetUnion, les) -> List.exists (fun x -> f x) les
   | Expr.NOp (SetInter, les) -> List.for_all (fun x -> f x) les
@@ -702,7 +594,7 @@ let rec list_prefix (pfs : PFS.t) (la : Expr.t) (lb : Expr.t) : bool * Expr.t =
         in
         let candidates =
           List.filter
-            (fun (x, lvars) ->
+            (fun (_, lvars) ->
               Containers.SS.inter lvars_lb lvars <> Containers.SS.empty)
             candidates
         in
@@ -716,7 +608,7 @@ let rec list_prefix (pfs : PFS.t) (la : Expr.t) (lb : Expr.t) : bool * Expr.t =
             in
             let candidates =
               List.filter
-                (fun (x, lvars) -> Containers.SS.mem a lvars)
+                (fun (_, lvars) -> Containers.SS.mem a lvars)
                 candidates
             in
             match candidates with
@@ -764,10 +656,6 @@ let cnum_minus (cn1 : cnum) (cn2 : cnum) = cnum_plus cn1 (cnum_uminus cn2)
 (* CNumber constant multiplication *)
 let cnum_cmult (c : float) (cn : cnum) =
   { conc = cn.conc *. c; symb = Expr.Map.map (fun v -> v *. c) cn.symb }
-
-let cnum_cdiv (c : float) (cn : cnum) =
-  assert (c <> 0.);
-  { conc = cn.conc /. c; symb = Expr.Map.map (fun v -> v /. c) cn.symb }
 
 let cnum_is_cposint (cn : cnum) : bool =
   Expr.Map.is_empty cn.symb && Float.is_integer cn.conc && cn.conc >= 0.
@@ -889,7 +777,7 @@ let rec reduce_lexpr_loop
 
   let result : Expr.t =
     match le with
-    | BinOp (BinOp (a, FTimes, b), FMod, c)
+    | BinOp (BinOp (a, FTimes, _), FMod, c)
       when Expr.equal a c || Expr.equal a c -> Expr.num 0.
     | BinOp (Lit (LList ll), Equal, Lit (LList lr)) -> Lit (Bool (ll = lr))
     | BinOp (EList le, Equal, Lit (LList ll))
@@ -1044,7 +932,7 @@ let rec reduce_lexpr_loop
                   (ReductionException (Expr.BinOp (fle, StrNth, fidx), err_msg))
             )
         (* Index is a number, but is either not an integer or is negative *)
-        | Lit (Num n) ->
+        | Lit (Num _) ->
             let err_msg =
               "StrNth(str, index): index is non-integer or smaller than zero."
             in
@@ -1335,7 +1223,8 @@ let rec reduce_lexpr_loop
             in
             let subst_expr = List.hd eqs in
             let att_exp =
-              Expr.subst_expr_for_expr (LVar x) subst_expr base_expr
+              Expr.subst_expr_for_expr ~to_subst:(LVar x) ~subst_with:subst_expr
+                base_expr
             in
             let reduced_att_exp = f att_exp in
             (* L.verbose (fun fmt ->
@@ -1363,7 +1252,8 @@ let rec reduce_lexpr_loop
             in
             let subst_expr = List.hd eqs in
             let att_exp =
-              Expr.subst_expr_for_expr (LVar x) subst_expr base_expr
+              Expr.subst_expr_for_expr ~to_subst:(LVar x) ~subst_with:subst_expr
+                base_expr
             in
             let reduced_att_exp = f att_exp in
             (* L.verbose (fun fmt ->
@@ -1506,7 +1396,7 @@ let rec reduce_lexpr_loop
                in
                let candidates =
                  List.filter
-                   (fun (x, lvars) -> Containers.SS.mem lx lvars)
+                   (fun (_, lvars) -> Containers.SS.mem lx lvars)
                    candidates
                in
                let candidates =
@@ -1528,7 +1418,7 @@ let rec reduce_lexpr_loop
             in
             let candidates =
               List.filter
-                (fun (x, lvars) -> Containers.SS.mem lx lvars)
+                (fun (_, lvars) -> Containers.SS.mem lx lvars)
                 candidates
             in
             let leading_candidate = fst (List.hd candidates) in
@@ -1842,7 +1732,7 @@ let rec reduce_lexpr_loop
                       (Bool
                          (Expr.Set.subset (Expr.Set.of_list left)
                             (Expr.Set.of_list right)))
-                | LVar v, NOp (SetUnion, les) ->
+                | LVar _, NOp (SetUnion, les) ->
                     if List.mem flel les then Lit (Bool true) else def
                 | _, _ -> def)
             | FLessThan -> (
@@ -1918,47 +1808,6 @@ and simplify_arithmetic_lexpr (pfs : PFS.t) (gamma : TypEnv.t) le =
       cnum_to_expr (cnum_plus cl cr)
   | _ -> le
 
-and collect_pluses_minuses (le : Expr.t) : Expr.t list * Expr.t list =
-  match le with
-  | BinOp (l, FPlus, r)   ->
-      let pl, ml = collect_pluses_minuses l in
-      let pr, mr = collect_pluses_minuses r in
-      (List.sort Stdlib.compare (pl @ pr), List.sort Stdlib.compare (ml @ mr))
-  | UnOp (FUnaryMinus, e) -> ([], [ e ])
-  | _                     -> ([ le ], [])
-
-and compose_pluses_minuses (pluses_and_minuses : Expr.t list * Expr.t list) :
-    Expr.t =
-  let pluses, minuses = pluses_and_minuses in
-  let nump, pluses = numbers_and_rest pluses in
-  let numm, minuses = numbers_and_rest minuses in
-  (* FIXME: THIS IS A DISASTER *)
-  let pluses_stay = List.filter (fun x -> not (List.mem x minuses)) pluses in
-  let minuses_stay =
-    List.map
-      (fun minus -> Expr.UnOp (FUnaryMinus, minus))
-      (List.filter (fun x -> not (List.mem x pluses)) minuses)
-  in
-  let result =
-    List.fold_right
-      (fun plus (ac : Expr.t) ->
-        if ac = Lit (Num 0.) then plus else BinOp (plus, FPlus, ac))
-      (pluses_stay @ minuses_stay)
-      (Lit (Num 0.))
-  in
-  let diff = nump -. numm in
-  if diff = 0. then result
-  else if result = Lit (Num 0.) then Lit (Num diff)
-  else BinOp (Lit (Num diff), FPlus, result)
-
-and numbers_and_rest (numbers : Expr.t list) =
-  List.fold_left
-    (fun (nump, restp) num ->
-      match num with
-      | Expr.Lit (Num x) -> (nump +. x, restp)
-      | _                -> (nump, num :: restp))
-    (0., []) numbers
-
 and check_ge_zero ?(top_level = false) (pfs : PFS.t) (e : Expr.t) : bool option
     =
   (* L.verbose (fun fmt -> fmt "Check >= 0: %a" Expr.pp e); *)
@@ -1975,7 +1824,7 @@ and check_ge_zero ?(top_level = false) (pfs : PFS.t) (e : Expr.t) : bool option
       else if PFS.mem pfs (Formula.Less (e, Lit (Num 0.))) then Some false
       else None
   | LVar _ | PVar _ -> None
-  | UnOp (FUnaryMinus, e') -> None
+  | UnOp (FUnaryMinus, _) -> None
   | _ -> (
       let ce = expr_to_cnum e in
       match ce.conc >= 0. with
@@ -2082,7 +1931,7 @@ and substitute_for_list_length (pfs : PFS.t) (le : Expr.t) : Expr.t =
       (PFS.to_list pfs)
   in
   List.fold_left
-    (fun le (len_expr, lex) -> substitute_for_specific_length pfs len_expr le)
+    (fun le (len_expr, _lex) -> substitute_for_specific_length pfs len_expr le)
     le len_eqs
 
 let resolve_expr_to_location (pfs : PFS.t) (gamma : TypEnv.t) (e : Expr.t) :
@@ -2096,8 +1945,8 @@ let resolve_expr_to_location (pfs : PFS.t) (gamma : TypEnv.t) (e : Expr.t) :
     | true  -> None
     | false -> (
         match to_try with
-        | []        -> None
-        | e :: rest -> (
+        | []         -> None
+        | e :: _rest -> (
             match e with
             | Lit (Loc loc) | ALoc loc -> Some loc
             | _                        -> (
@@ -2239,7 +2088,7 @@ let rec reduce_formula_loop
         let fa2 = f a2 in
         match (fa1, fa2) with
         | False, a | a, False -> a
-        | True, a | a, True   -> True
+        | True, _ | _, True   -> True
         | _, _                ->
             if PFS.mem pfs fa1 || PFS.mem pfs fa2 then True
             else if PFS.mem pfs (Not fa1) then f fa2
@@ -2320,7 +2169,7 @@ let rec reduce_formula_loop
                    f (Eq (full_list, BinOp (UnOp (LstRev, plist_right), LstCat, plist_left))) *)
             | LstSub (e1, Lit (Num 0.), el), e2 when e1 = e2 ->
                 f (Eq (UnOp (LstLen, e1), el))
-            | LstSub (lst, start, Lit (Num n)), EList decomposition
+            | LstSub (_lst, _start, Lit (Num n)), EList decomposition
               when let n = int_of_float n in
                    List.length decomposition = n
                    &&
@@ -2339,7 +2188,7 @@ let rec reduce_formula_loop
                      ( NOp (LstCat, List.rev (List.tl (List.rev (fl :: rl)))),
                        NOp (LstCat, List.rev (List.tl (List.rev (fr :: rr)))) ))
             | ( LVar lst,
-                NOp (LstCat, LstSub (LVar lst', Lit (Num 0.), split) :: rest) )
+                NOp (LstCat, LstSub (LVar lst', Lit (Num 0.), split) :: _rest) )
               when lst = lst'
                    && PFS.mem pfs (Less (UnOp (LstLen, LVar lst), split)) ->
                 False
@@ -2422,7 +2271,7 @@ let rec reduce_formula_loop
                 | EList _ | ESet _ -> False
                 | _ -> default e1 e2 re1 re2)
             | Lit l1, Lit l2 -> ite l1 l2
-            | Lit Nono, PVar x | PVar x, Lit Nono -> default e1 e2 re1 re2
+            | Lit Nono, PVar _ | PVar _, Lit Nono -> default e1 e2 re1 re2
             (* JOSE: Why are we considering the case of a logical variable being bound to None? *)
             | Lit Nono, LVar x | LVar x, Lit Nono -> (
                 let tx = TypEnv.get gamma x in
@@ -2430,7 +2279,7 @@ let rec reduce_formula_loop
                 | None    -> default e1 e2 re1 re2
                 | Some tx ->
                     if tx = NoneType then default e1 e2 re1 re2 else False)
-            | Lit Nono, e | e, Lit Nono -> False
+            | Lit Nono, _ | _, Lit Nono -> False
             | Lit (Bool true), BinOp (e1, FLessThan, e2) -> Less (e1, e2)
             | Lit (Bool false), BinOp (e1, FLessThan, e2) -> Not (Less (e1, e2))
             (* FPlus theory -> theory? I would not go that far *)
@@ -2562,7 +2411,7 @@ let rec reduce_formula_loop
 
 let reduce_formula
     ?(unification = false)
-    ?(time = "")
+    ?time:_
     ?(pfs : PFS.t = PFS.init ())
     ?(gamma = TypEnv.init ())
     (a : Formula.t) : Formula.t =
@@ -2620,7 +2469,7 @@ let relate_llen
             fmt "relate_llen_loop: %a consumed, %a left" Expr.pp e Expr.pp
               (cnum_to_expr new_llen));
         match e_llen with
-        | Lit (Num n) -> (
+        | Lit (Num _) -> (
             match new_llen.conc >= 0. with
             | true  -> relate_llen_loop new_llen (ac @ [ e ]) rest
             | false -> decide ())
@@ -2681,65 +2530,10 @@ let understand_lstcat
         (Failure
            "INTERNAL ERROR: understand_lstcat: empty or one-element \
             concatenation")
-  | el :: restl, er :: restr -> (
+  | el :: _, er :: _ -> (
       match relate_llen pfs gamma el rcat with
       | Some result -> Some result
       | None        -> relate_llen pfs gamma er lcat)
-
-let get_llen_difference
-    (pfs : PFS.t) (gamma : TypEnv.t) (el : Expr.t) (er : Expr.t) : int option =
-  match (get_length_of_list el, get_length_of_list er) with
-  (* Can find lengths, it's a Christmas miracle *)
-  | Some lx, Some ly -> Some (lx - ly)
-  | _ -> (
-      L.verbose (fun fmt ->
-          fmt "Searching for length diff: %a and %a" Expr.pp el Expr.pp er);
-      let lel = Expr.UnOp (LstLen, el) in
-      let ler = Expr.UnOp (LstLen, er) in
-      let candidates =
-        PFS.fold_left
-          (fun ac pf ->
-            match reduce_formula ~pfs ~gamma pf with
-            | Eq (e1, e2) when lexpr_is_number ~gamma e1 -> (
-                (* L.verbose (fun fmt -> fmt "Candidate pf: %a" Formula.pp pf); *)
-                let diff =
-                  expr_to_cnum (canonicalise (BinOp (e1, FMinus, e2)))
-                in
-                match
-                  ( Expr.Map.find_opt lel diff.symb,
-                    Expr.Map.find_opt ler diff.symb )
-                with
-                | Some cl, Some cr ->
-                    assert (cl <> 0. && cr <> 0.);
-                    (* L.verbose (fun fmt ->
-                        fmt "Got coefficients: %f and %f" cl cr); *)
-                    let ndiff = cl +. cr in
-                    if ndiff = 0. then
-                      let new_diff_rest =
-                        Expr.Map.remove ler (Expr.Map.remove lel diff.symb)
-                      in
-                      let diff = { conc = diff.conc; symb = new_diff_rest } in
-                      let diff = cnum_cdiv (-.cl) diff in
-                      cnum_to_expr diff :: ac
-                    else ac
-                | _                -> ac)
-            | _ -> ac)
-          [] pfs
-      in
-      let candidates =
-        List.filter_map
-          (fun e ->
-            match e with
-            | Expr.Lit (Num n) -> Some n
-            | _                -> None)
-          candidates
-      in
-      let candidates = List.sort_uniq Stdlib.compare candidates in
-      match candidates with
-      | [ n ] when Float.is_integer n ->
-          L.verbose (fun fmt -> fmt "Found answer: %d" (int_of_float n));
-          Some (int_of_float n)
-      | _ -> None)
 
 exception PFSFalse
 

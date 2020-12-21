@@ -13,7 +13,7 @@ type t =
   | GetFields  of string * Expr.t  (** All fields of an object *)
   | MetaData   of string * Expr.t  (** Object metadata *)
 
-let rec pp fmt bcmd =
+let pp fmt bcmd =
   match bcmd with
   | Skip                     -> Fmt.pf fmt "skip"
   | Assignment (var, e)      -> Fmt.pf fmt "%s := %a" var Expr.pp e

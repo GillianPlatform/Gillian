@@ -32,12 +32,12 @@ struct
 
   let from_list = Literal.from_list
 
-  let from_lvar_name x =
+  let from_lvar_name _ =
     failwith "Cannot create a concrete value from a logical variable"
 
   let to_list = Literal.to_list
 
-  let is_concrete (v : t) = true
+  let is_concrete (_ : t) = true
 end
 
 and CSubst : (Subst.S with type vt = M.t) = Subst.Make (M)

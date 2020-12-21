@@ -1,4 +1,3 @@
-open Containers
 open JS_Parser.Syntax
 open Jsil_syntax
 open Jslogic
@@ -30,7 +29,7 @@ let string_of_vtf_tbl (var_tbl : var_to_fid_tbl_type) =
   in
   "[ " ^ var_tbl_str ^ "]"
 
-let rec string_of_cc_tbl (cc_tbl : cc_tbl_type) =
+let string_of_cc_tbl (cc_tbl : cc_tbl_type) =
   Hashtbl.fold
     (fun f_id f_tbl ac ->
       let f_tbl_str : string = string_of_vtf_tbl f_tbl in
@@ -156,7 +155,7 @@ let get_codename exp =
   | [ codename ] -> codename.annot_formula
   | _            -> raise No_Codename
 
-let rec add_codenames exp =
+let add_codenames exp =
   let code_names = ref [] in
   let f_m e =
     match e.exp_stx with
@@ -166,7 +165,7 @@ let rec add_codenames exp =
         in
         code_names := id :: !code_names;
         { e with exp_stx = e.exp_stx; exp_annot = new_annot }
-    | Function (str, Some name, args, fb) ->
+    | Function (_, Some name, _, _) ->
         let name_generator : unit -> string =
          fun () -> fresh_named (sanitise name)
         in
@@ -198,7 +197,7 @@ let closure_clarification
     (f_id : string)
     (visited_funs : string list)
     (exp : JS_Parser.Syntax.exp) =
-  let rec f_state e state =
+  let f_state e state =
     match state with
     | None                      -> None
     | Some (f_id, visited_funs) -> (
@@ -232,7 +231,7 @@ let closure_clarification
                 Hashtbl.replace vis_tbl new_f_id
                   (visited_funs @ [ new_f_id_outer; new_f_id ]);
                 Some (new_f_id, visited_funs @ [ new_f_id_outer; new_f_id ]))
-        | Function (strictness, f_name, args, fb) ->
+        | Function (strictness, _, args, fb) ->
             let new_f_id = get_codename e in
             let new_f_tbl =
               update_cc_tbl cc_tbl f_id new_f_id (get_all_vars_f fb args)
@@ -246,7 +245,7 @@ let closure_clarification
         | _ -> state)
   in
 
-  let rec f_ac e state prev_state ac =
+  let rec f_ac e _ prev_state ac =
     match prev_state with
     | None                      -> ac
     | Some (f_id, visited_funs) -> (
@@ -268,7 +267,7 @@ let closure_clarification
 (********************************************)
 (********************************************)
 
-let rec propagate_annotations e =
+let propagate_annotations e =
   let f_state state exp =
     let _, prev_annots = state in
     match exp.exp_stx with
@@ -435,9 +434,9 @@ let translate_lannots_in_exp
 
     let rec fold_partition lcmds lcmds_so_far =
       match lcmds with
-      | []                       -> (List.rev lcmds_so_far, [])
-      | LCmd.SL (Fold _) :: rest -> (List.rev lcmds_so_far, lcmds)
-      | lcmd :: rest             -> fold_partition rest (lcmd :: lcmds_so_far)
+      | []                    -> (List.rev lcmds_so_far, [])
+      | LCmd.SL (Fold _) :: _ -> (List.rev lcmds_so_far, lcmds)
+      | lcmd :: rest          -> fold_partition rest (lcmd :: lcmds_so_far)
     in
 
     match e.exp_stx with
@@ -574,7 +573,7 @@ let translate_specs
   else ();
 
   Hashtbl.iter
-    (fun f_id (f_id, f_args, f_body, strictness, (annotations, _, _)) ->
+    (fun _ (f_id, f_args, f_body, strictness, (annotations, _, _)) ->
       let non_main_args =
         JS2JSIL_Helpers.var_scope :: JS2JSIL_Helpers.var_this :: f_args
       in
@@ -589,14 +588,14 @@ let translate_specs
       Hashtbl.add new_fun_tbl f_id (f_id, f_args, f_body, strictness, fun_specs))
     old_fun_tbl
 
-let rec get_predicate_definitions exp =
-  let f_ac exp state prev_state ac =
+let get_predicate_definitions exp =
+  let f_ac exp _ _ ac =
     let new_pred_defs : JSPred.t list =
       get_predicate_defs_from_annots exp.JS_Parser.Syntax.exp_annot
     in
     new_pred_defs @ ac
   in
-  js_fold f_ac (fun x y -> y) true exp
+  js_fold f_ac (fun _ y -> y) true exp
 
 let translate_only_specs cc_tbl old_fun_tbl fun_tbl vis_tbl js_only_specs =
   let only_specs = Hashtbl.create medium_tbl_size in
@@ -711,7 +710,7 @@ let get_them_functions
     (f_id : string)
     (visited_funs : string list)
     (exp : JS_Parser.Syntax.exp) =
-  let rec f_state e state =
+  let f_state e state =
     match state with
     | None                      -> None
     | Some (f_id, visited_funs) -> (
@@ -745,7 +744,7 @@ let get_them_functions
                 Hashtbl.replace vis_tbl new_f_id
                   (visited_funs @ [ new_f_id_outer; new_f_id ]);
                 Some (new_f_id, visited_funs @ [ new_f_id_outer; new_f_id ]))
-        | Function (strictness, f_name, args, fb) ->
+        | Function (strictness, _, args, fb) ->
             let new_f_id = get_codename e in
             let new_f_tbl =
               update_cc_tbl cc_tbl f_id new_f_id (get_all_vars_f fb args)
@@ -759,7 +758,7 @@ let get_them_functions
         | _ -> state)
   in
 
-  let rec f_ac e state prev_state ac =
+  let rec f_ac e _ prev_state ac =
     match prev_state with
     | None                      -> ac
     | Some (f_id, visited_funs) -> (

@@ -3,4 +3,4 @@
 ;  (name gillian_bulk_rely)
 ;  (public_name gillian-bulk-rely)
 ;  (libraries gillian.bulk rely.lib gillian.gil_syntax)
-;  (flags -open Bulk -open Gil_syntax))
+;  (flags :standard -open Bulk -open Gil_syntax))

@@ -1,7 +1,6 @@
 open Literal
 open Containers
 open Names
-open Generators
 module L = Logging
 module SSubst = SVal.SESubst
 
@@ -21,8 +20,6 @@ module Make (SMemory : SMemory.S) :
   type m_err_t = SMemory.err_t
 
   type t = heap_t * store_t * PFS.t * TypEnv.t * SS.t
-
-  type m_fix_t = SMemory.c_fix_t
 
   type fix_t =
     | MFix   of SMemory.c_fix_t
@@ -146,11 +143,11 @@ module Make (SMemory : SMemory.S) :
       (TypEnv.pp_by_need (List.fold_left SS.union SS.empty [ pvars; lvars ]))
       gamma
 
-  let init (pred_defs : UP.preds_tbl_t option) =
+  let init (_ : UP.preds_tbl_t option) =
     (SMemory.init (), SStore.init [], PFS.init (), TypEnv.init (), SS.empty)
 
   let struct_init
-      (pred_defs : UP.preds_tbl_t option)
+      (_ : UP.preds_tbl_t option)
       (store : SStore.t)
       (pfs : PFS.t)
       (gamma : TypEnv.t)
@@ -183,7 +180,7 @@ module Make (SMemory : SMemory.S) :
 
   let ga_to_deleter (a_id : string) = SMemory.ga_to_deleter a_id
 
-  let get_pred_defs (state : t) : UP.preds_tbl_t option = None
+  let get_pred_defs (_ : t) : UP.preds_tbl_t option = None
 
   let is_overlapping_asrt (a : string) : bool = SMemory.is_overlapping_asrt a
 
@@ -221,7 +218,7 @@ module Make (SMemory : SMemory.S) :
     let heap, _, pfs, gamma, svars = state in
     (heap, store, pfs, gamma, svars)
 
-  let assume ?(unfold = false) (state : t) (v : Expr.t) : t list =
+  let assume ?unfold:_ (state : t) (v : Expr.t) : t list =
     L.verbose (fun fmt -> fmt "Assuming expression: %a" Expr.pp v);
     let _, _, pfs, gamma, _ = state in
     let result =
@@ -273,7 +270,7 @@ module Make (SMemory : SMemory.S) :
     result
 
   let assume_t (state : t) (v : vt) (t : Type.t) : t option =
-    let _, _, pfs, gamma, _ = state in
+    let _, _, _, gamma, _ = state in
     match Typing.reverse_type_lexpr true gamma [ (v, t) ] with
     | None        -> None
     | Some gamma' ->
@@ -302,7 +299,7 @@ module Make (SMemory : SMemory.S) :
       result
 
   let sat_check_f (state : t) (fs : Formula.t list) : st option =
-    let _, store, pfs, gamma, _ = state in
+    let _, _, pfs, gamma, _ = state in
     FOSolver.check_satisfiability_with_model (fs @ PFS.to_list pfs) gamma
 
   let assert_a (state : t) (ps : Formula.t list) : bool =
@@ -369,8 +366,8 @@ module Make (SMemory : SMemory.S) :
     let _, _, pfs, gamma, _ = state in
     let loc = Reduction.reduce_lexpr ~gamma ~pfs loc in
     match loc with
-    | Lit (Loc loc_name) | ALoc loc_name -> Some (state, loc)
-    | LVar x -> (
+    | Lit (Loc _) | ALoc _ -> Some (state, loc)
+    | LVar x               -> (
         match Reduction.resolve_expr_to_location pfs gamma (LVar x) with
         | Some loc_name ->
             if is_aloc_name loc_name then Some (state, ALoc loc_name)
@@ -382,7 +379,7 @@ module Make (SMemory : SMemory.S) :
               PFS.extend pfs p;
               Some (state, Expr.ALoc new_aloc))
             else None)
-    | _ -> None
+    | _                    -> None
 
   let copy (state : t) : t =
     let heap, store, pfs, gamma, svars = state in
@@ -433,29 +430,29 @@ module Make (SMemory : SMemory.S) :
       asrts_store @ SMemory.assertions heap @ asrts_pfs
       @ [ Types (TypEnv.to_list_expr gamma) ]
 
-  let evaluate_slcmd (prog : UP.prog) (slcmd : SLCmd.t) (state : t) :
+  let evaluate_slcmd (_ : UP.prog) (_ : SLCmd.t) (_ : t) :
       (t list, string) result =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 
-  let unify_invariant prog revisited state a binders =
+  let unify_invariant _ _ _ _ _ =
     raise (Failure "ERROR: unify_invariant called for pure symbolic execution")
 
   let clear_resource (state : t) : t =
-    let heap, store, pfs, gamma, svars = state in
+    let _, store, pfs, gamma, svars = state in
     (SMemory.init (), store, pfs, gamma, svars)
 
-  let frame_on state iframes ids =
+  let frame_on _ _ _ =
     raise (Failure "ERROR: framing called for symbolic execution")
 
   let run_spec
-      (spec : UP.spec)
-      (state : t)
-      (x : string)
-      (args : vt list)
-      (subst : (string * (string * vt) list) option) : (t * Flag.t) list =
+      (_ : UP.spec)
+      (_ : t)
+      (_ : string)
+      (_ : vt list)
+      (_ : (string * (string * vt) list) option) : (t * Flag.t) list =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
 
-  let unfolding_vals (state : t) (fs : Formula.t list) : vt list =
+  let unfolding_vals (_ : t) (fs : Formula.t list) : vt list =
     let lvars =
       SS.of_list
         (List.concat (List.map (fun f -> SS.elements (Formula.lvars f)) fs))
@@ -474,23 +471,22 @@ module Make (SMemory : SMemory.S) :
     clocs @ alocs @ lvars
 
   let substitution_in_place (subst : st) (state : t) : unit =
-    let heap, store, pfs, gamma, svars = state in
+    let heap, store, pfs, gamma, _ = state in
     SMemory.substitution_in_place subst heap;
     SStore.substitution_in_place subst store;
     PFS.substitution subst pfs;
     Typing.substitution_in_place subst gamma
 
-  let unify_assertion (state : t) (subst : st) (step : UP.step) : u_res =
+  let unify_assertion (_ : t) (_ : st) (_ : UP.step) : u_res =
     raise (Failure "Unify assertion from non-abstract symbolic state.")
 
-  let produce_posts (state : t) (subst : st) (asrts : Asrt.t list) : t list =
+  let produce_posts (_ : t) (_ : st) (_ : Asrt.t list) : t list =
     raise (Failure "produce_posts from non-abstract symbolic state.")
 
-  let produce (state : t) (subst : st) (asrt : Asrt.t) : (t list, string) result
-      =
+  let produce (_ : t) (_ : st) (_ : Asrt.t) : (t list, string) result =
     raise (Failure "produce_post from non-abstract symbolic state.")
 
-  let fresh_val (state : t) : vt = LVar (LVar.alloc ())
+  let fresh_val (_ : t) : vt = LVar (LVar.alloc ())
 
   let clean_up (state : t) : unit =
     let heap, _, _, _, _ = state in
@@ -650,7 +646,7 @@ module Make (SMemory : SMemory.S) :
       Fmt.pf fmt "[[ %a ]]" (Fmt.list ~sep:(Fmt.any ", ") pp_fix) fixes
     in
     L.verbose (fun m -> m "SState: get_fixes");
-    let heap, store, pfs, gamma, svars = state in
+    let heap, _, pfs, gamma, _ = state in
     let one_step_fixes : fix_t list list list =
       List.map
         (fun (err : err_t) ->
@@ -753,11 +749,11 @@ module Make (SMemory : SMemory.S) :
           let heap', new_vars' = apply_fix heap new_vars fix in
           apply_fixes_rec heap' new_vars' rest
     in
-
-    let heap', new_vars = apply_fixes_rec heap SS.empty fixes in
+    (* FIXME: this unused heap' variable is suspicious *)
+    let _heap', new_vars = apply_fixes_rec heap SS.empty fixes in
     (Some (heap, store, pfs, gamma, SS.union svars new_vars), !gas)
 
   let get_equal_values state les =
-    let _, _, pfs, gamma, _ = state in
+    let _, _, pfs, _, _ = state in
     les @ List.concat_map (Reduction.get_equal_expressions pfs) les
 end

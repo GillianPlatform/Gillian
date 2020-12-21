@@ -60,8 +60,8 @@ let rec js_fold f_ac f_state state expr =
         (flat_map
            (fun ve ->
              match ve with
-             | v, None   -> []
-             | v, Some e -> f e)
+             | _, None   -> []
+             | _, Some e -> f e)
            ves)
   | For (e1, e2, e3, s) -> f_ac (fo e1 @ fo e2 @ fo e3 @ f s)
   | ForIn (e1, e2, s) -> f_ac (f e1 @ f e2 @ f s)
@@ -465,8 +465,8 @@ let get_all_assigned_declared_identifiers exp =
 
   f false exp
 
-let rec var_decls_inner exp =
-  let f_ac exp state prev_state ac =
+let var_decls_inner exp =
+  let f_ac exp state _ ac =
     if not state then ac
     else
       match exp.exp_stx with
@@ -483,32 +483,32 @@ let rec var_decls_inner exp =
 let var_decls exp =
   List.sort_uniq Stdlib.compare (var_decls_inner exp) @ [ "arguments" ]
 
-let rec get_fun_decls exp =
-  let f_ac exp state prev_state ac =
+let get_fun_decls exp =
+  let f_ac exp _ _ ac =
     match exp.exp_stx with
     | Function (_, _, _, _) -> exp :: ac
     | _                     -> ac
   in
-  js_fold f_ac (fun x y -> y) true exp
+  js_fold f_ac (fun _ y -> y) true exp
 
 let get_names_of_named_function_expressions exp : string list =
-  let f_ac exp state prev_state ac =
+  let f_ac exp _ _ ac =
     match exp.exp_stx with
     | FunctionExp (_, Some name, _, _) -> name :: ac
     | _ -> ac
   in
-  js_fold f_ac (fun x y -> y) true exp
+  js_fold f_ac (fun _ y -> y) true exp
 
 let get_all_annots exp : JS_Parser.Syntax.annotation list =
-  let f_ac exp state prev_state ac = exp.exp_annot @ ac in
-  js_fold f_ac (fun x y -> y) true exp
+  let f_ac exp _ _ ac = exp.exp_annot @ ac in
+  js_fold f_ac (fun _ y -> y) true exp
 
 let func_decls_in_elem exp : exp list =
   match exp.exp_stx with
-  | Function (s, name, args, body) -> [ exp ]
-  | _ -> []
+  | Function (_, _, _, _) -> [ exp ]
+  | _                     -> []
 
-let rec func_decls_in_exp exp : exp list =
+let func_decls_in_exp exp : exp list =
   match exp.exp_stx with
   | Script (_, es) | Block es -> List.flatten (List.map func_decls_in_elem es)
   | _                         -> func_decls_in_elem exp
@@ -519,7 +519,7 @@ let get_all_vars_f f_body f_args =
     List.map
       (fun f ->
         match f.exp_stx with
-        | Function (s, Some name, args, body) -> name
+        | Function (_, Some name, _, _) -> name
         | _ ->
             raise
               (Failure
@@ -571,7 +571,7 @@ let rec returns_empty_exp (e : JS_Parser.Syntax.exp) =
   | Return _
   | Debugger -> false
   | Label (_, e) | DoWhile (e, _) -> returns_empty_exp e
-  | If (e, et, ee) ->
+  | If (_, et, ee) ->
       let reeet = returns_empty_exp et in
       let reeee = get_some ee in
       if reeet then true else reeee
@@ -591,7 +591,7 @@ let rec returns_empty_exp (e : JS_Parser.Syntax.exp) =
   | For _ | ForIn _ | While _ | VarDec _ | Break _ | Continue _ | With _ | Skip
     -> true
 
-let rec is_stmt expr =
+let is_stmt expr =
   match expr.exp_stx with
   (* Non-supported constructs *)
   | RegExp _ -> raise (Failure "JS Construct Not Supported")

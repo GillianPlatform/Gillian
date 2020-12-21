@@ -101,7 +101,7 @@ module Make
     (state', preds, pred_defs)
 
   let simplify_astate ?(save = false) ?(unification = false) (astate : t) : st =
-    let state, preds, pred_defs = astate in
+    let state, preds, _ = astate in
     let subst = State.simplify ~save ~kill_new_lvars:false ~unification state in
     Preds.substitution_in_place subst preds;
     subst
@@ -129,22 +129,7 @@ module Make
     Option.map (State.simplify_val state) v
 
   let subst_in_expr (subst : ESubst.t) (le : Expr.t) : Val.t option =
-    Val.from_expr (ESubst.subst_in_expr subst false le)
-
-  let compose_substs
-      (subst_lst : (Expr.t * vt) list) (subst1 : st) (subst2 : st) : st =
-    let subst = ESubst.init [] in
-
-    let aux (v : vt) : vt =
-      let e1 = ESubst.subst_in_expr subst1 true (Val.to_expr v) in
-      let e2 = ESubst.subst_in_expr subst2 true e1 in
-      match Val.from_expr e2 with
-      | None    -> v
-      | Some v2 -> v2
-    in
-
-    List.iter (fun (x, v) -> ESubst.put subst x (aux v)) subst_lst;
-    subst
+    Val.from_expr (ESubst.subst_in_expr subst ~partial:false le)
 
   let get_pred_with_vs (astate : t) (vs : Val.t list) : abs_t option =
     let state, preds, pred_defs = astate in
@@ -309,7 +294,7 @@ module Make
                 (List.map
                    (fun (state', _) -> (state', Preds.copy preds, pred_defs))
                    successes)
-          | AFail e         -> Error (Printf.sprintf "Action %s Failure" setter)
+          | AFail _         -> Error (Printf.sprintf "Action %s Failure" setter)
         )
     | Types les -> (
         let state' =
@@ -326,7 +311,7 @@ module Make
         in
         match state' with
         | None   -> Error "Produce Simple Assertion: Cannot produce types"
-        | Some s -> Ok [ (state, preds, pred_defs) ])
+        | Some _ -> Ok [ (state, preds, pred_defs) ])
     | Pred (pname, les) ->
         let vs = List.map (subst_in_expr subst) les in
         let failure = List.exists (fun x -> x = None) vs in
@@ -346,7 +331,9 @@ module Make
                   List.fold_left
                     (fun facts (param, le) ->
                       List.map
-                        (fun fact -> Formula.subst_expr_for_expr param le fact)
+                        (fun fact ->
+                          Formula.subst_expr_for_expr ~to_subst:param
+                            ~subst_with:le fact)
                         facts)
                     facts (List.combine params les)
                 in
@@ -425,7 +412,7 @@ module Make
   and produce_asrt_list (astate : t) (subst : ESubst.t) (sas : Asrt.t list) :
       (t list, string) result =
     let open Syntaxes.Result in
-    let state, preds, _ = astate in
+    let state, _, _ = astate in
     let _ =
       ESubst.iter subst (fun v value ->
           ESubst.put subst v (State.simplify_val state value))
@@ -629,11 +616,11 @@ module Make
         let _, preds, _ = astate in
         let pred_asrts = Preds.find_pabs_by_name preds pname in
         match pred_asrts with
-        | [ pred_asrt ] -> (
+        | [ _ ] -> (
             match Preds.remove_by_name preds pname with
             | Some (pname, vs) -> rec_unfold astate pname vs
             | None             -> raise (Failure "DEATH. rec_unfold"))
-        | _             -> astate)
+        | _     -> astate)
     | _               -> saved_state
 
   let unfold_all (astate : t) (pname : string) : t =
@@ -686,7 +673,7 @@ module Make
           ([ (ESubst.init [], astate) ], false)
 
   let unfold_concrete_preds (astate : t) : (st option * t) option =
-    let state, preds, pred_defs = astate in
+    let _, preds, pred_defs = astate in
 
     let is_unfoldable_lit lit =
       match lit with
@@ -726,10 +713,6 @@ module Make
                  "Impossible: pred with concrete ins unfolded to multiple \
                   states."))
     | None            -> Some (None, astate)
-
-  let is_known (subst : ESubst.t) (le : Expr.t) : bool =
-    let s_le = ESubst.subst_in_expr_opt subst le in
-    not (s_le = None)
 
   let complete_subst (subst : ESubst.t) (lab : (string * SS.t) option) : bool =
     match lab with
@@ -795,7 +778,7 @@ module Make
     let pred_def = pred.pred in
     let pred_pure = pred_def.pred_pure in
     match
-      Preds.get_pred pred_pure preds pname vs
+      Preds.get_pred ~maintain:pred_pure preds pname vs
         (Containers.SI.of_list pred_def.pred_ins)
         (State.equals state)
     with
@@ -1075,7 +1058,7 @@ module Make
               raise (Failure "DEATH. BRANCHING GETPRED INSIDE UNIFICATION.")
           | GPFail errs -> UFail errs)
     (* Conjunction should not be here *)
-    | Pure (Formula.And (f1, f2)) ->
+    | Pure (Formula.And _) ->
         raise (Failure "Unify assertion: And: should have been reduced")
     (* Other pure assertions *)
     | Pure f -> (
@@ -1312,7 +1295,7 @@ module Make
           L.verbose (fun m -> m "Unfolding successful.");
           let rets =
             List.map
-              (fun (subst, astate) ->
+              (fun (_, astate) ->
                 match unfold_concrete_preds astate with
                 | None             -> UPUSucc []
                 | Some (_, astate) ->
@@ -1322,7 +1305,7 @@ module Make
               sp
           in
           merge_upu_res rets)
-    | UPUFail errs ->
+    | UPUFail _ ->
         L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
         ret
 end

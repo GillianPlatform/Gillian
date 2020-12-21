@@ -35,7 +35,7 @@ let rec not f =
   | LLessEq (e1, e2)    -> make (LGreater (e1, e2))
   | LGreater (e1, e2)   -> make (LLessEq (e1, e2))
   | LGreaterEq (e1, e2) -> make (LLess (e1, e2))
-  | LEq (e1, e2)        -> make (LNot f)
+  | LEq _               -> make (LNot f)
 
 let rec lexpr_is_true ?(codeloc = CodeLoc.dummy) lexpr =
   let f = lexpr_is_true ~codeloc in

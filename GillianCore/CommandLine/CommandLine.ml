@@ -294,6 +294,7 @@ struct
           snd (List.hd e_progs))
         else Gil_parsing.parse_eprog_from_file (List.hd files)
       in
+      let () = burn_gil e_prog outfile_opt in
       let prog =
         Gil_parsing.eprog_to_prog
           ~other_imports:(convert_other_imports PC.other_imports)
@@ -654,13 +655,13 @@ struct
         let docv = "PATH" in
         Arg.(required & pos 0 (some file) None & info [] ~docv ~doc)
       in
-      let run path npaf incremental () =
+      let run test_suite_path npaf incremental () =
         let () = Config.current_exec_mode := exec_mode in
         let () = PC.initialize exec_mode in
         let () = Config.bulk_print_all_failures := not npaf in
         let () = Logging.Mode.set_mode Disabled in
         let () = Printexc.record_backtrace false in
-        Runner.run_all runner path incremental
+        Runner.run_all runner ~test_suite_path ~incremental
       in
       let run_t = Term.(const run $ path_t $ no_print_failures $ incremental) in
       let run_info =

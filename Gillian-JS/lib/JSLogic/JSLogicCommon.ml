@@ -97,7 +97,7 @@ let fid_to_lvar_fresh =
     Hashtbl.replace fids_tbl fid (fid_count + 1);
     "#fid_" ^ string_of_int fid_count ^ "_" ^ fid
 
-let vislist_2_les (vis_list : string list) (i : int) : Expr.t list =
+let vislist_2_les (_ : string list) (i : int) : Expr.t list =
   Array.to_list
     (Array.init i (fun j ->
          if j = 0 then Expr.Lit (Loc locGlobName)

@@ -231,11 +231,11 @@ module Make
     | false, _, _, _ -> (
         let semantic_result = find_pred candidates args f_eq in
         match semantic_result with
-        | true, _, o', semantic_result -> frame_off name semantic_result
+        | true, _, _, semantic_result -> frame_off name semantic_result
         | false, _, _, _ -> None)
 
   let subst_in_val (subst : st) (v : vt) : vt =
-    let le' = ESubst.subst_in_expr subst true (Val.to_expr v) in
+    let le' = ESubst.subst_in_expr subst ~partial:true (Val.to_expr v) in
     Option.fold ~some:(fun v -> v) ~none:v (Val.from_expr le')
 
   (** Updates --preds-- to subst(preds) *)

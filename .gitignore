@@ -30,6 +30,7 @@ _build
 *.native
 *.byte
 *.merlin
+_opam
 
 # Mac rubbish
 .DS_Store

@@ -1,6 +1,9 @@
 (** Takes a path to a file and returns the parsed GIL program. *)
 val parse_eprog_from_file : string -> (Annot.t, string) Prog.t
 
+(** Takes a string containing a GIL program and parses it. *)
+val parse_eprog_from_string : string -> (Annot.t, string) Prog.t
+
 (** Converts a string-labelled [Prog.t] to an index-labelled [Prog.t],
     resolving the imports in the meantime. The parameter [other_imports] is an
     association list that maps extensions to a parser and compiler. For example,

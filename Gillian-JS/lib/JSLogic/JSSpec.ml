@@ -11,7 +11,7 @@ type st = {
 
 type t = { name : string; params : string list; sspecs : st list }
 
-let rec js2jsil_st
+let js2jsil_st
     (pre : JSAsrt.t)
     (post : JSAsrt.t list)
     (cc_tbl : cc_tbl_type)

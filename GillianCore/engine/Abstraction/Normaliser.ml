@@ -1,11 +1,8 @@
 open Names
-open Generators
 open Containers
 module L = Logging
 module SESubst = SVal.SESubst
 module SPreds = Preds.SPreds
-
-let new_aloc_name var = aloc_prefix ^ var
 
 let new_lvar_name var = lvar_prefix ^ var
 
@@ -36,7 +33,7 @@ struct
         | Pure (Eq (UnOp (LstLen, le), Lit (Num i)))
         | Pure (Eq (Lit (Num i), UnOp (LstLen, le))) ->
             let les =
-              List.init (int_of_float i) (fun j -> Expr.LVar (LVar.alloc ()))
+              List.init (int_of_float i) (fun _ -> Expr.LVar (LVar.alloc ()))
             in
             [ (le, les) ]
         | Star (a1, a2) ->
@@ -65,7 +62,7 @@ struct
         object
           inherit [_] Visitors.endo as super
 
-          method visit_BinOp ctx this le' op n =
+          method! visit_BinOp ctx this le' op n =
             match (op, n) with
             | LstNth, Lit (Num i) -> (
                 try
@@ -142,7 +139,7 @@ struct
                     with _ -> raise (Failure "List index out of bounds")
                   in
                   Lit lit_n
-              | Lit (LList list), Lit (Num n) ->
+              | Lit (LList _), Lit (Num _) ->
                   raise (Failure "Non-integer list index")
               | EList list, Lit (Num n) when Arith_Utils.is_int n ->
                   let le_n =
@@ -150,8 +147,7 @@ struct
                     with _ -> raise (Failure "List index out of bounds")
                   in
                   f le_n
-              | EList list, Lit (Num n) ->
-                  raise (Failure "Non-integer list index")
+              | EList _, Lit (Num _) -> raise (Failure "Non-integer list index")
               | _, _ -> BinOp (nle1, LstNth, nle2))
           | StrNth -> (
               match (nle1, nle2) with
@@ -161,7 +157,7 @@ struct
                     with _ -> raise (Failure "String index out of bounds")
                   in
                   Lit (String s)
-              | Lit (String s), Lit (Num n) ->
+              | Lit (String _), Lit (Num _) ->
                   raise (Failure "Non-integer string index")
               | _, _ -> BinOp (nle1, LstNth, nle2))
           | _      -> (
@@ -356,7 +352,7 @@ struct
      * or E = x, for a logical expression E and a variable x
      * -----------------------------------------------------------------------------------
      *)
-    let rec init_pvar_equalities (fs : Formula.t list) : unit =
+    let init_pvar_equalities (fs : Formula.t list) : unit =
       List.iter
         (fun (f : Formula.t) : unit ->
           match f with
@@ -423,9 +419,7 @@ struct
      * ------------------------------------------------------------------------
      *)
     let normalise_pvar_equalities
-        (graph : int list array)
-        (p_vars : SS.t)
-        (p_vars_tbl : (string, int) Hashtbl.t) =
+        (graph : int list array) (p_vars : SS.t) (_ : (string, int) Hashtbl.t) =
       let p_vars = Array.of_list (SS.elements p_vars) in
       let len = Array.length p_vars in
       let visited_tbl = Array.make len false in
@@ -546,7 +540,7 @@ struct
     (* 1 *)
     init_pvar_equalities fs;
     let p_vars =
-      Hashtbl.fold (fun var le ac -> SS.add var ac) pvar_equalities SS.empty
+      Hashtbl.fold (fun var _ ac -> SS.add var ac) pvar_equalities SS.empty
     in
 
     L.verbose (fun m ->
@@ -637,7 +631,7 @@ struct
             | LVar x  ->
                 TypEnv.update gamma x t;
                 true
-            | PVar x  -> raise (Failure "DEATH. normalise_type_assertions")
+            | PVar _  -> raise (Failure "DEATH. normalise_type_assertions")
             | le      -> type_check_lexpr le t)
         true type_list
     in
@@ -675,7 +669,9 @@ struct
               List.fold_left
                 (fun facts (param, le) ->
                   List.map
-                    (fun fact -> Formula.subst_expr_for_expr param le fact)
+                    (fun fact ->
+                      Formula.subst_expr_for_expr ~to_subst:param ~subst_with:le
+                        fact)
                     facts)
                 pred_def.pred.pred_facts (List.combine params les)
             in
@@ -734,8 +730,8 @@ struct
       in
 
       Hashtbl.fold
-        (fun (a : _) (a_asrts : (Expr.t list * Expr.t list) list)
-             (ac : Formula.t list) : Formula.t list ->
+        (fun (_ : _) (a_asrts : (Expr.t list * Expr.t list) list)
+             (_ : Formula.t list) : Formula.t list ->
           let pre_constraints =
             List_utils.cross_product a_asrts a_asrts f_aux
           in
@@ -748,50 +744,11 @@ struct
   let compose_substs (subst1 : SESubst.t) (subst2 : SESubst.t) : SESubst.t =
     let bnds = SESubst.to_list subst1 in
     let bnds' =
-      List.map (fun (x, e) -> (x, SESubst.subst_in_expr subst2 true e)) bnds
+      List.map
+        (fun (x, e) -> (x, SESubst.subst_in_expr subst2 ~partial:true e))
+        bnds
     in
     SESubst.init bnds'
-
-  let normalise_core_asrt
-      (store : SStore.t)
-      (new_pfs : PFS.t)
-      (pfs : PFS.t)
-      (gamma : TypEnv.t)
-      (subst : SESubst.t)
-      (core_asrt : string * Expr.t list * Expr.t list) :
-      string * Expr.t list * Expr.t list =
-    (* FIXME: Why is this here and what does it do? *)
-    (* let var_to_aloc (e : Expr.t) : Expr.t =
-       let e' = Reduction.reduce_lexpr ~gamma:gamma ~pfs:new_pfs e in
-       match (e' : Expr.t) with
-       | Lit (Loc _)
-       | ALoc _ -> e'
-       | PVar x ->
-         (match SStore.get store x with
-           | Some (ALoc al_name) -> ALoc al_name
-           | Some e'' ->
-               let aloc : Expr.t = ALoc (new_aloc_name x) in
-               PFS.extend pfs (Formula.Eq (aloc, e''));
-               PFS.extend new_pfs (Formula.Eq (aloc, e''));
-               aloc
-           | None ->
-               let aloc : Expr.t = ALoc (new_aloc_name x) in
-               SStore.put store x aloc; aloc)
-       | LVar x ->
-         (match SSubst.get subst x with
-           | Some e -> e
-           | None ->
-               let aloc : Expr.t = ALoc (new_aloc_name x) in
-               PFS.extend pfs (Formula.Eq (aloc, LVar x));
-               PFS.extend new_pfs (Formula.Eq (aloc, LVar x));
-               SSubst.put subst x aloc; aloc)
-
-       | _ ->
-           let aloc : Expr.t = ALoc (ALoc.alloc ()) in
-           PFS.extend new_pfs (Formula.Eq (aloc, e'));
-           PFS.extend pfs (Formula.Eq (aloc, e'));
-           aloc in *)
-    core_asrt
 
   let normalise_core_asrts
       (store : SStore.t)
@@ -938,7 +895,7 @@ struct
           List.filter
             (fun (e, _) ->
               match e with
-              | Expr.LVar x -> true
+              | Expr.LVar _ -> true
               | _           -> false)
             subst_lvs
     in

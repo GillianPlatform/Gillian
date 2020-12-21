@@ -5,7 +5,7 @@ module type S = sig
 
   type store_t
 
-  (** Type of call stacks: a call stack is a list of tuples, each of which contains
+  (** A call stack is a list records, each of which contains
     1) identifier of the current procedure (string)
     2) arguments of the current procedure (list of values)
     3) calling store
@@ -15,16 +15,34 @@ module type S = sig
     7) normal continuation index in the calling procedure
     8) optional error continuation index in the calling procedure
   *)
-  type t =
-    (string
-    * vt list
-    * store_t option
-    * string list
-    * Var.t
-    * int
-    * int
-    * int option)
-    list
+
+  type stack_element = {
+    pid : string;
+    arguments : vt list;
+    store : store_t option;
+    loop_ids : string list;
+    ret_var : Var.t;
+    call_index : int;
+    continue_index : int;
+    error_index : int option;
+  }
+
+  type t = stack_element list
+
+  val empty : t
+
+  val push :
+    t ->
+    pid:string ->
+    arguments:vt list ->
+    ?store:store_t ->
+    loop_ids:string list ->
+    ret_var:Var.t ->
+    call_index:int ->
+    continue_index:int ->
+    ?error_index:int ->
+    unit ->
+    t
 
   (**
     Get current procedure identifier
@@ -57,9 +75,25 @@ module type S = sig
     @return Copy of the given call stack
   *)
   val copy : t -> t
+
+  (**
+    @param cs Target call stack
+    @return All the procedure names in order in the callstack
+  *)
+  val get_cur_procs : t -> string list
+
+  (**
+  Call stack recursive depth
+
+  @param cs Target call stack
+  @param pid Identified of the target procedure
+  @return The number of times the pid been recursively called
+  *)
+  val recursive_depth : t -> string -> int
 end
 
-module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
+module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) :
+  S with type vt = Val.t and type store_t = Store.t = struct
   type vt = Val.t
 
   type store_t = Store.t
@@ -73,16 +107,43 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
     6) normal continuation index in the calling procedure
     7) optional error continuation index in the calling procedure
   *)
-  type t =
-    (string
-    * Val.t list
-    * Store.t option
-    * string list
-    * Var.t
-    * int
-    * int
-    * int option)
-    list
+  type stack_element = {
+    pid : string;
+    arguments : vt list;
+    store : store_t option;
+    loop_ids : string list;
+    ret_var : Var.t;
+    call_index : int;
+    continue_index : int;
+    error_index : int option;
+  }
+
+  type t = stack_element list
+
+  let empty = []
+
+  let push
+      cs
+      ~pid
+      ~arguments
+      ?store
+      ~loop_ids
+      ~ret_var
+      ~call_index
+      ~continue_index
+      ?error_index
+      () =
+    {
+      pid;
+      arguments;
+      store;
+      loop_ids;
+      ret_var;
+      call_index;
+      continue_index;
+      error_index;
+    }
+    :: cs
 
   (**
     Get current procedure identifier
@@ -93,8 +154,8 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
 
   let get_cur_proc_id (cs : t) : string =
     match cs with
-    | (pid, _, _, _, _, _, _, _) :: _ -> pid
-    | _ -> raise (Failure "Malformed configuration")
+    | { pid; _ } :: _ -> pid
+    | _               -> raise (Failure "Malformed configuration")
 
   (**
     Get current arguments
@@ -104,8 +165,8 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
   *)
   let get_cur_args (cs : t) : Val.t list =
     match cs with
-    | (_, args, _, _, _, _, _, _) :: _ -> args
-    | _ -> raise (Failure "Malformed configuration")
+    | { arguments; _ } :: _ -> arguments
+    | _                     -> raise (Failure "Malformed configuration")
 
   (**
     Get current arguments
@@ -114,8 +175,8 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
     @return List of current loop identifiers
   *)
   let get_loop_ids = function
-    | (_, _, _, loop_ids, _, _, _, _) :: _ -> loop_ids
-    | _ -> raise (Failure "Malformed configuration")
+    | { loop_ids; _ } :: _ -> loop_ids
+    | _                    -> raise (Failure "Malformed configuration")
 
   (**
     Call stack copy
@@ -124,10 +185,7 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
     @return Copy of the given call stack
   *)
   let copy (cs : t) : t =
-    List.map
-      (fun (a, b, c, d, e, f, g, h) ->
-        (a, b, Option.map Store.copy c, d, e, f, g, h))
-      cs
+    List.map (fun cs -> { cs with store = Option.map Store.copy cs.store }) cs
 
   (**
     Call stack recursive depth
@@ -138,10 +196,9 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) = struct
   *)
   let recursive_depth (cs : t) (pid : string) : int =
     List.fold_left
-      (fun ac (pid', b, c, d, e, f, g, h) -> if pid' = pid then ac + 1 else ac)
+      (fun ac { pid = pid'; _ } -> if String.equal pid' pid then ac + 1 else ac)
       (-1) cs
 
   let get_cur_procs (cs : t) : string list =
-    List.rev
-      (List.fold_left (fun ac (pid', b, c, d, e, f, g, h) -> pid' :: ac) [] cs)
+    List.rev (List.fold_left (fun ac { pid; _ } -> pid :: ac) [] cs)
 end

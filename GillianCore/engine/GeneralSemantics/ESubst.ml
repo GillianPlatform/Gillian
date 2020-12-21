@@ -127,10 +127,10 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     let filter =
       match filter_out with
       | Some filter -> filter
-      | None        -> fun x -> false
+      | None        -> fun _ -> false
     in
     Hashtbl.fold
-      (fun e v ac -> if filter e then ac else Expr.Set.add e ac)
+      (fun e _ ac -> if filter e then ac else Expr.Set.add e ac)
       subst Expr.Set.empty
 
   (**
@@ -140,7 +140,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return Range of the substitution
   *)
   let range (subst : t) : vt list =
-    Hashtbl.fold (fun v e_val ac -> e_val :: ac) subst []
+    Hashtbl.fold (fun _ e_val ac -> e_val :: ac) subst []
 
   (**
     Substitution lookup
@@ -362,16 +362,16 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
                        "DEATH: subst_in_expr: Cannot convert fresh expression \
                         to a value"))
 
-      method visit_'annot _ (this : Annot.t) = this
+      method! visit_'annot _ (this : Annot.t) = this
 
-      method visit_'label _ (this : int) = this
+      method! visit_'label _ (this : int) = this
 
-      method! visit_LVar () this x =
+      method! visit_LVar () this _ =
         self#find_in_subst
           ~make_new_x:(fun () -> Expr.LVar (LVar.alloc ()))
           this
 
-      method! visit_ALoc () this x =
+      method! visit_ALoc () this _ =
         self#find_in_subst
           ~make_new_x:(fun () -> Expr.ALoc (ALoc.alloc ()))
           this
@@ -391,7 +391,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
 
       method! visit_UnOp () this unop e =
         match (unop, e) with
-        | (LstLen, PVar x | LstLen, LVar x) when mem self_subst this ->
+        | (LstLen, PVar _ | LstLen, LVar _) when mem self_subst this ->
             Val.to_expr (Option.get (get self_subst this))
         | _ -> super#visit_UnOp () this unop e
 
@@ -434,9 +434,9 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   let subst_in_expr_opt (subst : t) (le : Expr.t) : Expr.t option =
     let f_before (le : Expr.t) =
       match (le : Expr.t) with
-      | LVar x | ALoc x | PVar x ->
+      | LVar _ | ALoc _ | PVar _ ->
           (Option.map Val.to_expr (get subst le), false)
-      | (UnOp (LstLen, PVar x) | UnOp (LstLen, LVar x)) when mem subst le ->
+      | (UnOp (LstLen, PVar _) | UnOp (LstLen, LVar _)) when mem subst le ->
           (Option.map Val.to_expr (get subst le), false)
       | _ -> (Some le, true)
     in

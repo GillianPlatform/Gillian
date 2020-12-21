@@ -11,14 +11,14 @@ let substitution_in_place (subst : SESubst.t) (x : t) : unit =
     let store_subst = SESubst.copy subst in
     SESubst.filter_in_place store_subst (fun u le ->
         match (u, le) with
-        | LVar x, LVar v when Names.is_spec_var_name x -> Some (LVar x)
+        | LVar x, LVar _ when Names.is_spec_var_name x -> Some (LVar x)
         | _ -> Some le);
 
     let symbolics = symbolics x in
     Var.Set.iter
       (fun v ->
         let le = Option.get (get x v) in
-        let s_le = SESubst.subst_in_expr store_subst true le in
+        let s_le = SESubst.subst_in_expr store_subst ~partial:true le in
         let s_le = if le <> s_le then Reduction.reduce_lexpr s_le else s_le in
         if le <> s_le then put x v s_le)
       symbolics)
@@ -41,4 +41,4 @@ let assertions (x : t) : Formula.t list =
     (fun x le (assertions : Formula.t list) -> Eq (PVar x, le) :: assertions)
     []
 
-let is_well_formed (x : t) : bool = true
+let is_well_formed (_ : t) : bool = true

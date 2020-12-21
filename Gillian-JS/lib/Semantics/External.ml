@@ -99,15 +99,9 @@ struct
                     let state' = State.set_store state new_store in
                     let loop_ids = CallStack.get_loop_ids cs in
                     let cs' =
-                      ( proc_eval,
-                        eval_v_args,
-                        Some old_store,
-                        loop_ids,
-                        x,
-                        i,
-                        i + 1,
-                        j )
-                      :: cs
+                      CallStack.push cs ~pid:proc_eval ~arguments:eval_v_args
+                        ~store:old_store ~loop_ids ~ret_var:x ~call_index:i
+                        ~continue_index:(i + 1) ?error_index:j ()
                     in
                     [ (state', cs', -1, 0) ]
                 | Error error_type -> (

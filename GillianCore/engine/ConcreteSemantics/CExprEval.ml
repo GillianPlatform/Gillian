@@ -183,7 +183,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
   | M_isNaN     -> (
       match lit with
       | Num x when x == nan -> Bool true
-      | Num x -> Bool false
+      | Num _ -> Bool false
       | _ ->
           raise
             (TypeError
@@ -487,8 +487,8 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
                      "eval_expr concrete: list reduces to non-list")))
     | LstSub (e1, e2, e3)      -> (
         let ve1 = ee e1 in
-        let ve2 = ee e1 in
-        let ve3 = ee e1 in
+        let ve2 = ee e2 in
+        let ve3 = ee e3 in
         match (ve1, ve2, ve3) with
         | LList les, Num start_, Num len -> (
             match

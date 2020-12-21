@@ -20,7 +20,7 @@ module Annot = Gillian.Gil_syntax.Annot
 let fresh_sth (name : string) : (unit -> string) * (unit -> unit) =
   let counter = ref 0 in
   let r () = counter := 0 in
-  let rec f () =
+  let f () =
     let v = name ^ string_of_int !counter in
     counter := !counter + 1;
     v

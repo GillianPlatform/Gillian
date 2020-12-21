@@ -305,7 +305,7 @@ struct
                  (Fmt.str "NO MACRO found when executing: @[<h>%a@]" LCmd.pp
                     lcmd))
         | Some macro ->
-            let rec expand_macro (macro : Macro.t) (args : Expr.t list) :
+            let expand_macro (macro : Macro.t) (args : Expr.t list) :
                 LCmd.t list =
               let params = macro.macro_params in
               let params_card = List.length params in
@@ -436,7 +436,7 @@ struct
       let pid =
         match Val.to_literal pid with
         | Some (String pid) -> pid
-        | Some other_thing  ->
+        | Some _            ->
             let err = [ ExecErr.EProc pid ] in
             raise (Interpreter_error (err, state))
         | None              ->
@@ -501,7 +501,8 @@ struct
         let state' = State.set_store state new_store in
         let cs' =
           (* Note the new loop identifiers *)
-          (pid, v_args, Some old_store, loop_ids, x, i, i + 1, j) :: cs
+          CallStack.push cs ~pid ~arguments:v_args ~store:old_store ~loop_ids
+            ~ret_var:x ~call_index:i ~continue_index:(i + 1) ?error_index:j ()
         in
         [ ConfCont (state', cs', iframes, -1, loop_ids, 0, b_counter) ]
       in
@@ -617,8 +618,8 @@ struct
                     let pid = Unix.fork () in
                     match pid with
                     | 0 -> List.tl rest_confs
-                    | n -> [ List.hd rest_confs ])
-                | n ->
+                    | _ -> [ List.hd rest_confs ])
+                | _ ->
                     [
                       ConfCont
                         (state'', cs, iframes, i, loop_ids, i + 1, b_counter);
@@ -634,7 +635,7 @@ struct
                       ConfCont
                         (state'', cs, iframes, i, loop_ids, i + 1, b_counter);
                     ]
-                | n -> rest_confs)
+                | _ -> rest_confs)
             | _           ->
                 ConfCont (state'', cs, iframes, i, loop_ids, i + 1, b_counter)
                 :: rest_confs)
@@ -750,7 +751,7 @@ struct
             let pid = Unix.fork () in
             match pid with
             | 0 -> [ List.hd result ]
-            | n -> List.tl result)
+            | _ -> List.tl result)
         | false -> result)
     | PhiAssignment lxarr ->
         let j = get_predecessor prog cs prev i in
@@ -811,11 +812,19 @@ struct
         let result =
           match (v_ret, cs) with
           | None, _ -> raise (Failure "nm_ret_var not in store (normal return)")
-          | Some v_ret, (_, _, None, start_loop_ids, _, _, _, _) :: _ ->
+          | Some v_ret, { store = None; loop_ids = start_loop_ids; _ } :: _ ->
               check_loop_ids loop_ids start_loop_ids;
               [ ConfFinish (Normal, v_ret, state) ]
           | ( Some v_ret,
-              (_, _, Some old_store, start_loop_ids, x, prev', j, _) :: cs' ) ->
+              {
+                store = Some old_store;
+                loop_ids = start_loop_ids;
+                ret_var = x;
+                call_index = prev';
+                continue_index = j;
+                _;
+              }
+              :: cs' ) ->
               check_loop_ids loop_ids start_loop_ids;
               let state' = State.set_store state old_store in
               let state'' = update_store state' x v_ret in
@@ -832,12 +841,19 @@ struct
         match (v_ret, cs) with
         | None, _ ->
             raise (Failure "Return variable not in store (error return) ")
-        | Some v_ret, (_, _, None, start_loop_ids, _, _, _, _) :: _ ->
+        | Some v_ret, { store = None; loop_ids = start_loop_ids; _ } :: _ ->
             check_loop_ids loop_ids start_loop_ids;
             [ ConfFinish (Error, v_ret, state) ]
         | ( Some v_ret,
-            (pid, _, Some old_store, start_loop_ids, x, prev', _, Some j) :: cs'
-          ) ->
+            {
+              store = Some old_store;
+              loop_ids = start_loop_ids;
+              ret_var = x;
+              call_index = prev';
+              error_index = Some j;
+              _;
+            }
+            :: cs' ) ->
             check_loop_ids loop_ids start_loop_ids;
             let state' = State.set_store state old_store in
             let state'' = update_store state' x v_ret in
@@ -906,8 +922,7 @@ struct
             b_counter
         in
         f (next_confs @ rest_confs) results
-    | ConfCont (state, cs, iframes, prev, prev_loop_ids, i, b_counter)
-      :: rest_confs ->
+    | ConfCont (state, cs, _, _, _, i, b_counter) :: rest_confs ->
         let _, annot_cmd = get_cmd prog cs i in
         Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
         L.(
@@ -962,7 +977,7 @@ struct
           name);
 
     let store = State.get_store state in
-    let args =
+    let arguments =
       List.map
         (fun x ->
           match Store.get store x with
@@ -973,7 +988,9 @@ struct
     in
 
     let cs : CallStack.t =
-      [ (name, args, None, [], "out", -1, -1, Some (-1)) ]
+      CallStack.push CallStack.empty ~pid:name ~arguments ~loop_ids:[]
+        ~ret_var:"out" ~call_index:(-1) ~continue_index:(-1) ~error_index:(-1)
+        ()
     in
     let conf : cconf_t = ConfCont (state, cs, ([], []), -1, [], 0, 0) in
     evaluate_cmd_iter ret_fun true prog [] [] [ conf ] []
@@ -987,7 +1004,11 @@ struct
   let evaluate_prog (prog : UP.prog) : result_t list =
     Random.self_init ();
     let ret_fun x = x in
-    let initial_cs = [ ("main", [], None, [], "out", -1, -1, Some (-1)) ] in
+    let initial_cs =
+      CallStack.push CallStack.empty ~pid:"main" ~arguments:[] ~loop_ids:[]
+        ~ret_var:"out" ~call_index:(-1) ~continue_index:(-1) ~error_index:(-1)
+        ()
+    in
     let initial_conf =
       ConfCont (State.init (Some prog.preds), initial_cs, ([], []), -1, [], 0, 0)
     in

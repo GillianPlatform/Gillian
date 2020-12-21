@@ -63,8 +63,8 @@ let sort (p_formulae : t) : unit =
     List.fold_left
       (fun (var_eqs, llen_eqs, others) (pf : Formula.t) ->
         match pf with
-        | Eq (LVar x, _) | Eq (_, LVar x) -> (pf :: var_eqs, llen_eqs, others)
-        | Eq (UnOp (LstLen, x), _) | Eq (_, UnOp (LstLen, x)) ->
+        | Eq (LVar _, _) | Eq (_, LVar _) -> (pf :: var_eqs, llen_eqs, others)
+        | Eq (UnOp (LstLen, _), _) | Eq (_, UnOp (LstLen, _)) ->
             (var_eqs, pf :: llen_eqs, others)
         | _ -> (var_eqs, llen_eqs, pf :: others))
       ([], [], []) pfl
@@ -94,8 +94,8 @@ let exists = ExtList.exists
 
 let get_nth = ExtList.nth
 
-let rec get_relevant_info (pvars : SS.t) (lvars : SS.t) (locs : SS.t) (pfs : t)
-    : SS.t * SS.t * SS.t =
+let rec get_relevant_info (_ : SS.t) (lvars : SS.t) (locs : SS.t) (pfs : t) :
+    SS.t * SS.t * SS.t =
   let relevant = SS.union lvars locs in
   let new_pvars, new_lvars, new_locs =
     fold_left
@@ -119,7 +119,7 @@ let rec get_relevant_info (pvars : SS.t) (lvars : SS.t) (locs : SS.t) (pfs : t)
 let filter_with_info relevant_info (pfs : t) : t =
   let pvars, lvars, locs = relevant_info in
 
-  let pvars, lvars, locs = get_relevant_info pvars lvars locs pfs in
+  let _, lvars, locs = get_relevant_info pvars lvars locs pfs in
 
   let relevant = List.fold_left SS.union SS.empty [ lvars; locs ] in
   let filtered_pfs = copy pfs in

@@ -1,13 +1,6 @@
 open Containers
-open Generators
 open SVal
 module L = Logging
-
-exception FoundIt of Expr.t
-
-exception UnionInUnion of Expr.t list
-
-let interactive = ref false
 
 type simpl_key_type = {
   kill_new_lvars : bool option;
@@ -29,75 +22,6 @@ type simpl_val_type = {
 let simplification_cache : (simpl_key_type, simpl_val_type) Hashtbl.t =
   Hashtbl.create 1
 
-let rec find_me_Im_a_loc pfs lvar =
-  match (pfs : Formula.t list) with
-  | [] -> None
-  | Eq (lvar', Expr.ALoc loc) :: rest
-  | Eq (lvar', Lit (Loc loc)) :: rest
-  | Eq (ALoc loc, lvar') :: rest
-  | Eq (Lit (Loc loc), lvar') :: rest ->
-      if lvar = lvar' then Some loc else find_me_Im_a_loc rest lvar
-  | _ :: rest -> find_me_Im_a_loc rest lvar
-
-let find_me_in_the_pi (pfs : PFS.t) nle =
-  PFS.fold_left
-    (fun ac a ->
-      match (a : Formula.t) with
-      | Eq (LVar lvar, le) | Eq (le, LVar lvar) ->
-          if le = nle then Some lvar else ac
-      | _ -> ac)
-    None pfs
-
-let rec replace_nle_with_lvars pfs nle =
-  match nle with
-  | Expr.BinOp (le, op, le') -> (
-      match find_me_in_the_pi pfs nle with
-      | Some lvar -> Expr.LVar lvar
-      | None      ->
-          let lhs = replace_nle_with_lvars pfs le in
-          let rhs = replace_nle_with_lvars pfs le' in
-          BinOp (lhs, op, rhs))
-  | UnOp (op, le)            -> (
-      match find_me_in_the_pi pfs nle with
-      | Some lvar -> LVar lvar
-      | None      -> UnOp (op, replace_nle_with_lvars pfs le))
-  | EList le                 -> (
-      match find_me_in_the_pi pfs nle with
-      | Some lvar -> LVar lvar
-      | None      ->
-          let le_list =
-            List.map (fun le' -> replace_nle_with_lvars pfs le') le
-          in
-          EList le_list)
-  | ESet le                  -> (
-      match find_me_in_the_pi pfs nle with
-      | Some lvar -> LVar lvar
-      | None      ->
-          let le_list =
-            List.map (fun le' -> replace_nle_with_lvars pfs le') le
-          in
-          ESet le_list)
-  | NOp (op, le)             -> (
-      match find_me_in_the_pi pfs nle with
-      | Some lvar -> LVar lvar
-      | None      ->
-          let le_list =
-            List.map (fun le' -> replace_nle_with_lvars pfs le') le
-          in
-          NOp (op, le_list))
-  | _                        -> nle
-
-let all_set_literals lset =
-  List.fold_left
-    (fun x le ->
-      let result =
-        match le with
-        | Expr.ESet _ -> true
-        | _           -> false
-      in
-      x && result)
-    true lset
-
 (* Reduction of assertions *)
 
 (*************************************)
@@ -105,7 +29,7 @@ let all_set_literals lset =
 
 (*************************************)
 
-let reduce_pfs_in_place ?(unification = false) store gamma (pfs : PFS.t) =
+let reduce_pfs_in_place ?(unification = false) _ gamma (pfs : PFS.t) =
   PFS.map_inplace (Reduction.reduce_formula ~unification ~gamma ~pfs) pfs
 
 let sanitise_pfs ?(unification = false) store gamma pfs =
@@ -116,21 +40,14 @@ let sanitise_pfs ?(unification = false) store gamma pfs =
   done;
   PFS.remove_duplicates pfs
 
-let sanitise_pfs_no_store_no_gamma ?(unification = false) =
-  sanitise_pfs ~unification (Hashtbl.create 1) (TypEnv.init ())
-
 let sanitise_pfs_no_store ?(unification = false) =
   sanitise_pfs ~unification (Hashtbl.create 1)
-
-let filter_gamma_pfs pfs gamma =
-  let pfs_vars = PFS.lvars pfs in
-  TypEnv.filter_vars_in_place gamma pfs_vars
 
 (* *********** *)
 (*   CLEANUP   *)
 (* *********** *)
 
-let clean_up_stuff exists (left : PFS.t) (right : PFS.t) =
+let clean_up_stuff (left : PFS.t) (right : PFS.t) =
   let sleft = PFS.to_set left in
   let pf_sym pfa pfb =
     match ((pfa, pfb) : Formula.t * Formula.t) with
@@ -245,7 +162,7 @@ let get_set_intersections pfs =
   let intersections = List.map (fun s -> Expr.Set.elements s) !intersections in
   List.sort compare intersections
 
-let resolve_set_existentials
+let _resolve_set_existentials
     (lpfs : PFS.t) (rpfs : PFS.t) exists (gamma : TypEnv.t) =
   let exists = ref exists in
 
@@ -384,104 +301,6 @@ let resolve_set_existentials
     PFS.filter_map filter_map_fun rpfs;
     (rpfs, !exists, gamma))
   else (rpfs, !exists, gamma)
-
-let find_impossible_unions
-    (lpfs : PFS.t) (rpfs : PFS.t) exists (gamma : TypEnv.t) =
-  let exists = ref exists in
-
-  let set_exists =
-    SS.filter (fun x -> TypEnv.get gamma x = Some SetType) !exists
-  in
-  if SS.cardinal set_exists > 0 then (
-    let intersections =
-      get_set_intersections (PFS.to_list lpfs @ PFS.to_list rpfs)
-    in
-    L.(
-      verbose (fun m ->
-          m "Intersections we have:\n%s"
-            (String.concat "\n"
-               (List.map
-                  (fun s ->
-                    String.concat ", "
-                      (List.map (fun e -> (Fmt.to_to_string Expr.pp) e) s))
-                  intersections))));
-    let test_formula = function
-      | Formula.Eq (NOp (SetUnion, ul), NOp (SetUnion, ur)) ->
-          let sul = Expr.Set.of_list ul in
-          let sur = Expr.Set.of_list ur in
-          L.verbose (fun m ->
-              m "Find impossible unions: I have found a union equality.");
-
-          (* Just for the left *)
-          Expr.Set.exists
-            (fun s1 ->
-              let must_not_intersect =
-                List.map
-                  (fun s -> List.sort compare [ s; s1 ])
-                  (Expr.Set.elements sur)
-              in
-              L.(
-                verbose (fun m ->
-                    m "Intersections we need:\n%s"
-                      (String.concat "\n"
-                         (List.map
-                            (fun s ->
-                              String.concat ", "
-                                (List.map
-                                   (fun e -> (Fmt.to_to_string Expr.pp) e)
-                                   s))
-                            must_not_intersect))));
-              let must_not_intersect =
-                List.map (fun s -> List.mem s intersections) must_not_intersect
-              in
-              L.(
-                verbose (fun m ->
-                    m "And we have: %s"
-                      (String.concat ", "
-                         (List.map
-                            (fun (x : bool) ->
-                              if x = true then "true" else "false")
-                            must_not_intersect))));
-              List.mem true must_not_intersect
-              && not (List.mem false must_not_intersect))
-            sul
-      | _ -> false
-    in
-    if PFS.exists test_formula rpfs then
-      (PFS.of_list [ Formula.False ], SS.empty, TypEnv.init ())
-    else (rpfs, !exists, gamma))
-  else (rpfs, !exists, gamma)
-
-let trim_down (exists : SS.t) (lpfs : PFS.t) (rpfs : PFS.t) gamma =
-  let lhs_lvars = PFS.lvars lpfs in
-  let rhs_lvars = PFS.lvars rpfs in
-  let diff = SS.diff (SS.diff rhs_lvars lhs_lvars) exists in
-
-  if
-    PFS.length rpfs = 1
-    &&
-    match PFS.get_nth 0 rpfs with
-    | Some
-        ( Eq (LVar v1, LVar v2)
-        | Less (LVar v1, LVar v2)
-        | LessEq (LVar v1, LVar v2)
-        | Not (Eq (LVar v1, LVar v2))
-        | Not (Less (LVar v1, LVar v2))
-        | Not (LessEq (LVar v1, LVar v2)) )
-      when v1 <> v2 && (SS.mem v1 diff || SS.mem v2 diff) -> true
-    | _ -> false
-  then (false, exists, lpfs, rpfs, gamma)
-  else
-    (* FIXME: THIS IS UNSOUND, FIX *)
-    let () =
-      PFS.filter
-        (fun pf ->
-          let pf_lvars = Formula.lvars pf in
-          let inter_empty = SS.inter rhs_lvars pf_lvars = SS.empty in
-          not inter_empty)
-        lpfs
-    in
-    (true, exists, lpfs, rpfs, gamma)
 
 (**
   Pure entailment: simplify pure formulae and typing environment
@@ -698,7 +517,7 @@ let simplify_pfs_and_gamma
                       (UnOp (LstLen, LVar x))
                       lpfs;
                     `Replace whole
-                | Lit (Loc lloc), ALoc aloc | ALoc aloc, Lit (Loc lloc) ->
+                | Lit (Loc _), ALoc _ | ALoc _, Lit (Loc _) ->
                     (* TODO: What should actually happen here... *)
                     stop_explain
                       "Abtract location never equal to a concrete location"
@@ -773,7 +592,8 @@ let simplify_pfs_and_gamma
                                if le <> le' then PFS.extend lpfs (Eq (le, le')));
                               SESubst.iter result (fun x le ->
                                   let sle =
-                                    SESubst.subst_in_expr temp_subst true le
+                                    SESubst.subst_in_expr temp_subst
+                                      ~partial:true le
                                   in
                                   SESubst.put result x sle);
                               SESubst.put result (LVar v) le;
@@ -940,7 +760,7 @@ let simplify_implication
   L.verbose (fun fmt -> fmt "REDUCED RPFS:\n%a" PFS.pp rpfs);
 
   sanitise_pfs_no_store gamma rpfs;
-  clean_up_stuff exists lpfs rpfs;
+  clean_up_stuff lpfs rpfs;
 
   L.(
     verbose (fun m ->

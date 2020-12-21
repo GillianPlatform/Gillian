@@ -176,7 +176,7 @@ let rec infer_types_formula (gamma : TypEnv.t) (a : Formula.t) : unit =
   | StrLess (e1, e2) ->
       e e1 StringType;
       e e2 StringType
-  | SetMem (e1, e2) -> e e2 SetType
+  | SetMem (_, e2) -> e e2 SetType
   | SetSub (e1, e2) ->
       e e1 SetType;
       e e2 SetType
@@ -230,9 +230,9 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
     (* Abstract locations are always typable, by construction *)
     | ALoc _ -> def_pos (Some ObjectType)
     (* Lists are always typable *)
-    | EList les -> (Some ListType, true, [])
+    | EList _ -> (Some ListType, true, [])
     (* Sets are always typable *)
-    | ESet les -> (Some SetType, true, [])
+    | ESet _ -> (Some SetType, true, [])
     | UnOp (unop, e) -> (
         let _, ite, constraints = f e in
 
@@ -395,7 +395,7 @@ let naively_infer_type_information (pfs : PFS.t) (gamma : TypEnv.t) : unit =
       | _ -> ())
     pfs
 
-let rec substitution_in_place (subst : SSubst.t) (gamma : TypEnv.t) : unit =
+let substitution_in_place (subst : SSubst.t) (gamma : TypEnv.t) : unit =
   let ve_pairs : (Expr.t * Expr.t) list = SSubst.to_list subst in
   let et_pairs : (Expr.t * Type.t) list =
     List.fold_left

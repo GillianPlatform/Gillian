@@ -1,5 +1,3 @@
-open Containers
-
 module Filenames = struct
   (* Common *)
 

@@ -262,7 +262,7 @@ let errors_assertion () =
     ( Pred (type_error_pred_name, [ PVar var_te ]),
       Pred (syntax_error_pred_name, [ PVar var_se ]) )
 
-let rec js2jsil_tactic
+let js2jsil_tactic
     (cc_tbl : cc_tbl_type)
     (vis_tbl : vis_tbl_type)
     (fun_tbl : pre_fun_tbl_type)

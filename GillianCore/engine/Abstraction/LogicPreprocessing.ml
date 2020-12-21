@@ -41,7 +41,9 @@ let rec auto_unfold
                   List.map (fun fact -> Asrt.Pure fact) pred.pred_facts
                 in
                 let a = Asrt.star (a :: facts) in
-                let result = SVal.SSubst.substitute_asrt subst false a in
+                let result =
+                  SVal.SSubst.substitute_asrt subst ~partial:false a
+                in
                 L.tmi (fun fmt -> fmt "After Auto Unfolding: %a" Asrt.pp result);
                 result)
               pred.pred_definitions
@@ -133,7 +135,7 @@ let simplify_and_prune (pred : Pred.t) : Pred.t =
       pred.pred_definitions
   in
   let new_defs =
-    List.filter (fun (oc, x) -> Simplifications.admissible_assertion x) new_defs
+    List.filter (fun (_, x) -> Simplifications.admissible_assertion x) new_defs
   in
   { pred with pred_definitions = new_defs }
 
@@ -145,7 +147,7 @@ let find_pure_preds (preds : (string, Pred.t) Hashtbl.t) :
     (string, bool) Hashtbl.t =
   let is_pure_pred = Hashtbl.create small_tbl_size in
   (* we mark visited predicates and remember their pureness at the same time *)
-  let rec explore pred_name =
+  let explore pred_name =
     match Hashtbl.find_opt is_pure_pred pred_name with
     | Some is_pure ->
         (* predicate already visited *)
@@ -175,7 +177,7 @@ let unfold_preds (preds : (string, Pred.t) Hashtbl.t) :
   let recursion_info = find_recursive_preds preds in
 
   Hashtbl.iter
-    (fun name (pred : Pred.t) ->
+    (fun _ (pred : Pred.t) ->
       L.verbose (fun fmt -> fmt "Unfolding predicate: %s" pred.pred_name);
       let definitions' : ((string * string list) option * Asrt.t) list =
         List.flatten
@@ -337,7 +339,8 @@ let explicit_param_types
       let defs =
         pred1.pred_definitions
         @ List.map
-            (fun (oid, a) -> (oid, SVal.SSubst.substitute_asrt subst true a))
+            (fun (oid, a) ->
+              (oid, SVal.SSubst.substitute_asrt subst ~partial:true a))
             pred2.pred_definitions
       in
       { pred1 with pred_definitions = defs }

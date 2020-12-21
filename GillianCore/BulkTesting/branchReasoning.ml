@@ -27,7 +27,7 @@ let oneResInMode
   let pp_rcv pp fmt x = (makeFormater fmtrcv) pp fmt x in
   let pp_exp pp fmt x = (makeFormater fmtexp) pp fmt x in
   match (res, const_opt) with
-  | Engine.ExecRes.RSucc (fl, v, state), None when fl = flag -> (true, "")
+  | Engine.ExecRes.RSucc (fl, _, _), None when fl = flag -> (true, "")
   | RSucc (fl, v, state), Some (cn, f) when fl = flag ->
       if f v state then (true, "")
       else

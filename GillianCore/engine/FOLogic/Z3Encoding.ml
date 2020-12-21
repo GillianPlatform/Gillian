@@ -1,6 +1,5 @@
 open SVal
 open Names
-open Containers
 module L = Logging
 module Arithmetic = Z3.Arithmetic
 module Boolean = Z3.Boolean
@@ -14,6 +13,8 @@ module Set = Z3.Set
 module Solver = Z3.Solver
 module Symbol = Z3.Symbol
 module ZExpr = Z3.Expr
+
+[@@@ocaml.warning "-A"]
 
 let encoding_cache : (Formula.Set.t, ZExpr.expr list) Hashtbl.t =
   Hashtbl.create Config.big_tbl_size

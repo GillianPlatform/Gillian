@@ -1,9 +1,6 @@
 open Containers
 open Names
-open SVal
 module L = Logging
-
-exception CompatFound of Asrt.t
 
 (** The [outs] type represents a list of learned outs, together
     with (optionally) the way of constructing them *)
@@ -28,7 +25,6 @@ type t =
   | Leaf            of step option * (Flag.t * Asrt.t list) option
       (** Final node and associated post-condition *)
   | Inner           of step * t list
-  | LabInner        of step * (t * (string * SS.t) option) list
   | PhantomInner    of t list
   | LabPhantomInner of (t * (string * SS.t) option) list
 
@@ -241,7 +237,7 @@ and learn_expr_list (kb : KB.t) (le : (Expr.t * Expr.t) list) =
   in
   (* Filter learned unifiables *)
   let learned, not_learned =
-    List.partition (fun (be, learned) -> learned <> []) learned_exprs
+    List.partition (fun (_, learned) -> learned <> []) learned_exprs
   in
   match learned with
   (* We have learned nothing, therefore we stop *)
@@ -267,7 +263,7 @@ let simple_ins_expr_collector =
     method! visit_expr () e =
       match e with
       | LVar _ | PVar _ | ALoc _ -> (KB.empty, KB.singleton e)
-      | UnOp (LstLen, ((PVar x | LVar x) as v)) -> (KB.singleton v, KB.empty)
+      | UnOp (LstLen, ((PVar _ | LVar _) as v)) -> (KB.singleton v, KB.empty)
       | _ -> super#visit_expr () e
   end
 
@@ -380,13 +376,13 @@ let rec simple_ins_formula (kb : KB.t) (pf : Formula.t) : KB.t list =
 
 (** [ins_outs_formula kb pf] returns a list of possible ins-outs pairs
     for a given formula [pf] under a given knowledge base [kb] *)
-let rec ins_outs_formula (kb : KB.t) (pf : Formula.t) : (KB.t * outs) list =
+let ins_outs_formula (kb : KB.t) (pf : Formula.t) : (KB.t * outs) list =
   let default_ins = simple_ins_formula kb pf in
   let default_result : (KB.t * outs) list =
     List.map (fun ins -> (ins, [])) default_ins
   in
   match pf with
-  | Eq (e1, e2)  -> (
+  | Eq (e1, e2) -> (
       L.verbose (fun fmt -> fmt "IO Equality: %a" Formula.pp pf);
       L.verbose (fun fmt ->
           fmt "Ins: %a" Fmt.(brackets (list ~sep:semi kb_pp)) default_ins);
@@ -417,12 +413,12 @@ let rec ins_outs_formula (kb : KB.t) (pf : Formula.t) : (KB.t * outs) list =
                     (list ~sep:semi (parens (pair ~sep:comma kb_pp outs_pp))))
                 result);
           result)
-  | And (f1, f2) ->
+  | And _       ->
       raise
         (Failure
            (Format.asprintf "ins_outs_formula: Should have been reduced: %a"
               Formula.pp pf))
-  | _            -> default_result
+  | _           -> default_result
 
 (** [ins_outs_assertion kb a] returns a list of possible ins-outs pairs
     for a given assertion [a] under a given knowledge base [kb] *)
@@ -437,7 +433,7 @@ let ins_outs_assertion
   in
   match (asrt : Asrt.t) with
   | Pure form -> ins_outs_formula kb form
-  | GA (x, lie, loe) -> ins_and_outs_from_lists kb lie loe
+  | GA (_, lie, loe) -> ins_and_outs_from_lists kb lie loe
   | Pred (p_name, args) ->
       let p_ins = get_pred_ins p_name in
       let _, lie, loe =
@@ -461,7 +457,7 @@ let rec collect_simple_asrts (a : Asrt.t) : Asrt.t list =
   | Pure True | Emp        -> []
   | Pure (And (f1, f2))    -> f (Pure f1) @ f (Pure f2)
   | Pure _ | Pred _ | GA _ -> [ a ]
-  | Types les              -> (
+  | Types _                -> (
       let a = Reduction.reduce_assertion a in
       match a with
       | Types les -> List.map (fun e -> Asrt.Types [ e ]) les
@@ -706,12 +702,10 @@ let init
                 posts ))
             ups))
 
-let next ?(lab : string option) (up : t) :
-    (t * (string * SS.t) option) list option =
+let next (up : t) : (t * (string * SS.t) option) list option =
   match up with
   | Leaf _ -> None
   | Inner (_, ups) -> Some (List.map (fun x -> (x, None)) ups)
-  | LabInner (_, lab_ups) when List.length lab_ups > 0 -> Some lab_ups
   | PhantomInner ups when List.length ups > 0 ->
       Some (List.map (fun x -> (x, None)) ups)
   | LabPhantomInner lab_ups when List.length lab_ups > 0 -> Some lab_ups
@@ -719,7 +713,7 @@ let next ?(lab : string option) (up : t) :
 
 let head (up : t) : step option =
   match up with
-  | Leaf (Some p, _) | Inner (p, _) | LabInner (p, _) -> Some p
+  | Leaf (Some p, _) | Inner (p, _) -> Some p
   | _ -> None
 
 let posts (up : t) : (Flag.t * Asrt.t list) option =
@@ -748,27 +742,12 @@ let rec pp ft up =
       let pp_children ft ch =
         if List.length ch = 1 then pp ft (List.hd ch)
         else
-          let pp_one_child ftp (i, up) = pf ft "Children %d@\n%a" i pp up in
+          let pp_one_child ftp (i, up) = pf ftp "Children %d@\n%a" i pp up in
           pf ft "@[<v 2>  %a@]"
             (iter_bindings ~sep:(any "@\n") List.iteri pp_one_child)
             ch
       in
       pf ft "Inner Node: @[%a@] with %d children@\n%a" step_pp step
-        (List.length next_ups) pp_children next_ups
-  | LabInner (step, next_ups) ->
-      let pp_children ft ch =
-        if List.length ch = 1 then
-          let up, lab = List.hd ch in
-          (pair (option pp_lab) pp) ft (lab, up)
-        else
-          let pp_one_child ftp (i, (up, lab)) =
-            pf ft "Children %d%a@\n%a" i (option pp_lab) lab pp up
-          in
-          pf ft "@[<v 2>  %a@]"
-            (iter_bindings ~sep:(any "@\n") List.iteri pp_one_child)
-            ch
-      in
-      pf ft "Inner Node: @[<h>%a@] with %d children@\n%a" step_pp step
         (List.length next_ups) pp_children next_ups
   | PhantomInner next_ups ->
       let pp_child ft (i, ch) = pf ft "Children %d@\n%a" i pp ch in
@@ -957,29 +936,6 @@ let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : (prog, up_err_t) result =
                   lemmas = lemmas_tbl;
                   coverage;
                 }))
-
-(** Substitution inverse *)
-let inverse (subst : SSubst.t) : SSubst.t =
-  let inv_subst = SSubst.init [] in
-  SSubst.iter subst (fun v le ->
-      (* Convert v to le *)
-      let v_le : Expr.t =
-        if is_spec_var_name v || is_lvar_name v then LVar v
-        else if is_aloc_name v then ALoc v
-        else raise (Failure ("Bizarre variable in subst: " ^ v))
-      in
-
-      (* Convert le to v *)
-      let le_v =
-        match (le : Expr.t) with
-        | LVar x | ALoc x -> Some x
-        | _               -> None
-      in
-
-      match le_v with
-      | None   -> ()
-      | Some v -> SSubst.add inv_subst v v_le);
-  inv_subst
 
 let get_pred_def (pred_defs : preds_tbl_t) (name : string) : pred =
   try

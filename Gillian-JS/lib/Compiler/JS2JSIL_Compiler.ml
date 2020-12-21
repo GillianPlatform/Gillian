@@ -1,5 +1,4 @@
 open Lexing
-open Containers
 open JS2JSIL_Helpers
 open Jslogic.JSLogicCommon
 open JS_Utils
@@ -11,7 +10,6 @@ module Preprocess_GCmd = PreProcessing_Utils.M (struct
   let successors = Gil_syntax.Cmd.successors
 end)
 
-open Gillian.Symbolic.Subst
 module SSubst = Gillian.Symbolic.Subst
 open Gil_syntax.Expr
 open Gil_syntax
@@ -60,7 +58,7 @@ let fresh_switch_labels () =
 let add_initial_label cmds lab metadata =
   match cmds with
   | [] -> [ (metadata, Some lab, LBasic Skip) ]
-  | (_, Some lab_s, _) :: rest -> (metadata, Some lab, LBasic Skip) :: cmds
+  | (_, Some _, _) :: _ -> (metadata, Some lab, LBasic Skip) :: cmds
   | (cmd_metadata, None, cmd) :: rest -> (cmd_metadata, Some lab, cmd) :: rest
 
 let prefix_lcmds
@@ -83,7 +81,7 @@ let prefix_lcmds
       (annot, Some lab, first_lcmd)
       :: (List.map (fun lcmd -> (annot, None, lcmd)) rest_lcmds
          @ ((annot, None, first_cmd) :: rest_cmds))
-  | lcmds, (annot, None, first_cmd) :: rest_cmds ->
+  | lcmds, (annot, None, _) :: _ ->
       List.map (fun lcmd -> (annot, None, lcmd)) lcmds @ cmds
 
 let is_list_type x = BinOp (UnOp (TypeOf, x), Equal, lit_typ ListType)
@@ -105,7 +103,7 @@ let rec get_break_lab loop_list lab =
               lab
       in
       raise (Failure msg)
-  | (lab_c, lab_b, js_lab, valid_unlabelled) :: rest -> (
+  | (_, lab_b, js_lab, valid_unlabelled) :: rest -> (
       match lab with
       | None         -> (
           match valid_unlabelled with
@@ -128,7 +126,7 @@ let rec get_continue_lab loop_list lab =
               "either continuing outside a loop or lab %s not found" lab
       in
       raise (Failure msg)
-  | (lab_c, lab_b, js_lab, valid_unlabelled) :: rest -> (
+  | (lab_c, _, js_lab, valid_unlabelled) :: rest -> (
       match lab with
       | None         -> (
           match lab_c with
@@ -358,7 +356,7 @@ let translate_inc_dec x is_plus err =
   let cmd_goto_legalass = LGuardedGoto (non_writable_ref_test x, err, next1) in
 
   (* next1:  x_v := getValue (x) with err *)
-  let x_v, cmd_gv_x, errs_x_v = make_get_value_call x err in
+  let x_v, cmd_gv_x, _ = make_get_value_call x err in
 
   (* x_n := i__toNumber (x_v) with err *)
   let x_n, cmd_tn_x = make_to_number_call x x_v err in
@@ -504,7 +502,7 @@ let translate_binop_plus x1 x2 x1_v x2_v err =
   (new_cmds, errs, x_r)
 
 let translate_binop_comparison
-    x1 x2 x1_v x2_v is_first_first flag_arg bool_undef err =
+    _ _ x1_v x2_v is_first_first flag_arg bool_undef err =
   (* x_ac := i__abstractComparison (x1_v, x2_v, flag_arg) with err  *)
   let x_ac = fresh_var () in
   let args =
@@ -548,8 +546,7 @@ let translate_binop_comparison
   let errs = [ x_ac ] in
   (new_cmds, errs, x_r)
 
-let translate_bitwise_shift x1 x2 x1_v x2_v left_fun_name right_fun_name op err
-    =
+let translate_bitwise_shift _ _ x1_v x2_v left_fun_name right_fun_name op err =
   (* x1_f := left_fun_name (x1_v) with err *)
   let x1_f = fresh_var () in
   let cmd_fc_x1 =
@@ -580,7 +577,7 @@ let translate_bitwise_shift x1 x2 x1_v x2_v left_fun_name right_fun_name op err
   let errs = [ x1_f; x2_f ] in
   (new_cmds, errs, x_r)
 
-let translate_binop_equality x1 x2 x1_v x2_v non_strict non_negated err =
+let translate_binop_equality _ _ x1_v x2_v non_strict non_negated err =
   (* x_r1 := i__strictEqualityComparison/i__abstractEqualityComparison (x1_v, x2_v) with err *)
   let x_r1 = fresh_var () in
   let f_name =
@@ -744,7 +741,7 @@ let is_hasProperty_call cmd =
 
 let get_args cmd =
   match cmd with
-  | LCall (_, Lit (String proc_name), args, _, _) -> Some args
+  | LCall (_, Lit (String _), args, _, _) -> Some args
   | _ -> None
 
 let annotate_cmd_top_level metadata lcmd =
@@ -1321,7 +1318,7 @@ let rec translate_expr tr_ctx e :
         (cmds, errs)
       in
 
-      let cmds, errs, num =
+      let cmds, errs, _ =
         List.fold_left
           (fun (cmds, errs, num) oe ->
             let new_cmds, new_errs =
@@ -2075,7 +2072,7 @@ let rec translate_expr tr_ctx e :
               ([], []) (SS.elements xs)
           in
 
-          let le = SSubst.subst_in_expr subst true e' in
+          let le = SSubst.subst_in_expr subst ~partial:true e' in
           let asrt =
             match Formula.lift_logic_expr le with
             | Some (asrt_b, _) -> asrt_b
@@ -2119,7 +2116,7 @@ let rec translate_expr tr_ctx e :
               ([], []) (SS.elements xs)
           in
 
-          let le = SSubst.subst_in_expr subst true e' in
+          let le = SSubst.subst_in_expr subst ~partial:true e' in
           let asrt =
             match Formula.lift_logic_expr le with
             | Some (asrt_b, _) -> asrt_b
@@ -2562,7 +2559,7 @@ let rec translate_expr tr_ctx e :
           x_pv := putValue (x, x_r) with err;
      *)
       let cmds, x, errs = f e in
-      let new_cmds, new_errs, x_v, x_r =
+      let new_cmds, new_errs, x_v, _ =
         translate_inc_dec x true tr_ctx.tr_err_lab
       in
       let new_cmds = annotate_cmds new_cmds in
@@ -2581,7 +2578,7 @@ let rec translate_expr tr_ctx e :
           x_pv := putValue (x, x_r) with err
      *)
       let cmds, x, errs = f e in
-      let new_cmds, new_errs, x_v, x_r =
+      let new_cmds, new_errs, x_v, _ =
         translate_inc_dec x false tr_ctx.tr_err_lab
       in
       let new_cmds = annotate_cmds new_cmds in
@@ -2685,7 +2682,7 @@ let rec translate_expr tr_ctx e :
       *)
       let cmds, x, errs = f e in
       (* x_v := getValue (x) with err *)
-      let x_v, cmd_gv_x, errs_x_v = make_get_value_call x tr_ctx.tr_err_lab in
+      let _, cmd_gv_x, errs_x_v = make_get_value_call x tr_ctx.tr_err_lab in
       let x_r = fresh_var () in
       let cmds =
         annotate_first_cmd
@@ -2792,7 +2789,7 @@ let rec translate_expr tr_ctx e :
                 x_pv := i__putValue (x, x_r) with err
      *)
       let cmds, x, errs = f e in
-      let new_cmds, new_errs, x_v, x_r =
+      let new_cmds, new_errs, _, x_r =
         translate_inc_dec x true tr_ctx.tr_err_lab
       in
       let new_cmds = annotate_cmds new_cmds in
@@ -2809,7 +2806,7 @@ let rec translate_expr tr_ctx e :
                         x_pv := i__putValue (x, x_r) with err
        *)
       let cmds, x, errs = f e in
-      let new_cmds, new_errs, x_v, x_r =
+      let new_cmds, new_errs, _, x_r =
         translate_inc_dec x false tr_ctx.tr_err_lab
       in
       let new_cmds = annotate_cmds new_cmds in
@@ -3928,9 +3925,7 @@ let rec translate_expr tr_ctx e :
       let cmds2, x2, errs2 = f e2 in
 
       (* x1_v := getValue (x1) with err *)
-      let x1_v, cmd_gv_x1, errs_x1_v =
-        make_get_value_call x1 tr_ctx.tr_err_lab
-      in
+      let _, cmd_gv_x1, errs_x1_v = make_get_value_call x1 tr_ctx.tr_err_lab in
 
       (* x2_v := getValue (x2) with err *)
       let x2_v, cmd_gv_x2, errs_x2_v =
@@ -3954,7 +3949,7 @@ let rec translate_expr tr_ctx e :
       in
       let errs = errs1 @ errs_x1_v @ errs2 @ errs_x2_v in
       (cmds, PVar x2_v, errs)
-  | JS_Parser.Syntax.FunctionExp (strictness, None, params, e_body) ->
+  | JS_Parser.Syntax.FunctionExp (strictness, None, params, _) ->
       (*
        Section 13
        x_f := create_function_object(x_sc, f_id, f_id, params)
@@ -4295,7 +4290,7 @@ and translate_statement tr_ctx e =
    *  We create a finally block for each break/continue that occurs inside
    *  the try and catch blocks of the try-catch-finally.
    *)
-  let make_finally_break_blocks jump_list jumps_mapping e tcf_lab end_label =
+  let make_finally_break_blocks jump_list jumps_mapping e tcf_lab _ =
     let rec make_finally_blocks_iter
         jump_list
         finally_blocks
@@ -4637,7 +4632,7 @@ and translate_statement tr_ctx e =
     let ( finally_cmds_breaks2,
           cur_break_vars_2,
           errs_b2,
-          rets_b2,
+          _,
           outer_breaks_b2,
           inner_breaks_b2,
           conts_b2 ) =
@@ -4646,7 +4641,7 @@ and translate_statement tr_ctx e =
     in
     let ( finally_cmds_conts2,
           errs_c2,
-          rets_c2,
+          _,
           outer_breaks_c2,
           inner_breaks_c2,
           conts_c2 ) =
@@ -4827,7 +4822,7 @@ and translate_statement tr_ctx e =
             break_cont_ret_finally_blocks_1
       end:      x_ret_3 := PHI(x_ret_1, breaks_finally)
     *)
-    let new_err1, new_err2, finally, end_label, abnormal_finally, tcf_ret =
+    let new_err1, _, finally, end_label, abnormal_finally, tcf_ret =
       fresh_tcf_vars ()
     in
     let new_loop_list, jumps_mapping =
@@ -5006,8 +5001,8 @@ and translate_statement tr_ctx e =
      *)
       let break_label, new_loop_list =
         match tr_ctx.tr_js_lab with
-        | None     -> (None, tr_ctx.tr_loop_list)
-        | Some lab ->
+        | None   -> (None, tr_ctx.tr_loop_list)
+        | Some _ ->
             let break_label = fresh_break_label () in
             ( Some break_label,
               (None, break_label, tr_ctx.tr_js_lab, false)
@@ -5161,8 +5156,8 @@ and translate_statement tr_ctx e =
        *)
       let break_label, new_loop_list =
         match tr_ctx.tr_js_lab with
-        | None     -> (None, tr_ctx.tr_loop_list)
-        | Some lab ->
+        | None   -> (None, tr_ctx.tr_loop_list)
+        | Some _ ->
             let break_label = fresh_break_label () in
             ( Some break_label,
               (None, break_label, tr_ctx.tr_js_lab, false)
@@ -5282,7 +5277,7 @@ and translate_statement tr_ctx e =
       next3:    skip
       next4:    x_ret_5 := PHI(x_ret_4, x_ret_1)
        *)
-      let head, guard, body, cont, end_loop = fresh_loop_vars () in
+      let head, guard, _, cont, end_loop = fresh_loop_vars () in
 
       let new_loop_list =
         (Some cont, end_loop, tr_ctx.tr_js_lab, true) :: tr_ctx.tr_loop_list
@@ -5414,7 +5409,7 @@ and translate_statement tr_ctx e =
       next3:    skip
       next4:    x_ret_5 := PHI(x_ret_4, x_ret_1)
        *)
-      let head, guard, body, cont, end_loop = fresh_loop_vars () in
+      let head, _, body, cont, end_loop = fresh_loop_vars () in
 
       let new_loop_list =
         (Some cont, end_loop, tr_ctx.tr_js_lab, true) :: tr_ctx.tr_loop_list
@@ -5585,7 +5580,7 @@ and translate_statement tr_ctx e =
        *)
       let cmds1, x1, errs1 = fe e1 in
       let cmds2, x2, errs2 = fe e2 in
-      let head, guard, body, cont, end_loop = fresh_loop_vars () in
+      let head, _, body, cont, end_loop = fresh_loop_vars () in
       let new_loop_list =
         (Some cont, end_loop, tr_ctx.tr_js_lab, true) :: tr_ctx.tr_loop_list
       in
@@ -5859,9 +5854,7 @@ and translate_statement tr_ctx e =
             ([ annotate_cmd cmd_ass_x1v None ], PVar x1_v, [])
       in
       (* x1_v := i__getValue (x1) with err *)
-      let x1_v, cmd_gv_x1, errs_x1_v =
-        make_get_value_call x1 tr_ctx.tr_err_lab
-      in
+      let x1_v, cmd_gv_x1, _ = make_get_value_call x1 tr_ctx.tr_err_lab in
 
       (* x_ret_0 := empty  *)
       let x_ret_0, cmd_ass_ret_0 = make_empty_ass () in
@@ -5872,7 +5865,7 @@ and translate_statement tr_ctx e =
           errs1 @ [ x1_v ] )
       in
 
-      let head, guard, body, cont, end_loop = fresh_loop_vars () in
+      let head, _, _, cont, end_loop = fresh_loop_vars () in
 
       let new_loop_list =
         (Some cont, end_loop, tr_ctx.tr_js_lab, true) :: tr_ctx.tr_loop_list
@@ -6303,7 +6296,7 @@ and translate_statement tr_ctx e =
           x_prev_case
           x_switch_guard
           end_switch
-          js_lab
+          _
           fresh_end_case_label =
         let x_found = fresh_found_var () in
         let next1 = fresh_next_label () in
@@ -6395,7 +6388,7 @@ and translate_statement tr_ctx e =
         let cmds_def, x_def = add_final_var cmds_def x_def metadata in
         let cmds_b, x_b, errs_b, rets_b, breaks_b, conts_b =
           List.fold_left
-            (fun (cmds_ac, x_ac, errs_ac, rets_ac, breaks_ac, conts_ac) b_stmt ->
+            (fun (cmds_ac, _, errs_ac, rets_ac, breaks_ac, conts_ac) b_stmt ->
               let ( cur_b_cmds,
                     x_b,
                     cur_b_errs,
@@ -6592,7 +6585,7 @@ and translate_statement tr_ctx e =
             outer_breaks_as @ outer_breaks_def,
             conts_as @ conts_def )
       | _, Some def  ->
-          let b_stmts = List.map (fun (a, b) -> b) b_cases in
+          let b_stmts = List.map fst b_cases in
           let cmds_bs = add_initial_label cmds_bs b_cases_lab metadata in
 
           (* goto [ x_found_a ] default b_cases *)
@@ -6635,8 +6628,7 @@ and translate_statement tr_ctx e =
             outer_breaks_as @ outer_breaks_bs @ outer_breaks_def,
             conts_as @ conts_bs @ conts_def )
       | _, _         -> raise (Failure "no b cases with no default"))
-  | JS_Parser.Syntax.Function (_, n, params, e_body) ->
-      ([], Lit Empty, [], [], [], [])
+  | JS_Parser.Syntax.Function _ -> ([], Lit Empty, [], [], [], [])
   | JS_Parser.Syntax.With (_, _) ->
       raise (Failure "Not implemented: with (this should not happen)")
   | JS_Parser.Syntax.RegExp (_, _) ->
@@ -6662,7 +6654,7 @@ let translate_fun_decls (top_level : bool) (sc_var : string) (cur_index : int) e
       (fun ac f_decl ->
         let f_name, f_params =
           match f_decl.JS_Parser.Syntax.exp_stx with
-          | JS_Parser.Syntax.Function (s, Some f_name, f_params, body) ->
+          | JS_Parser.Syntax.Function (_, Some f_name, f_params, _) ->
               (f_name, f_params)
           | _ -> raise (Failure "expected function declaration")
         in
@@ -6874,7 +6866,7 @@ let generate_proc_eval new_fid ?use_cc e strictness vis_fid : EProc.t =
     translate_fun_decls false var_sc_proc (List.length vis_fid - 1) e
   in
   let cmds_hoist_fdecls = annotate_cmds cmds_hoist_fdecls in
-  let cmds_e, x_e, errs, rets, _, _ = translate_statement ctx e in
+  let cmds_e, x_e, errs, _, _, _ = translate_statement ctx e in
 
   (* x__re := ReferenceError () *)
   let cmd_ass_re = make_var_ass_re () in
@@ -7058,7 +7050,7 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
   let cmd_ass_re = make_var_ass_re () in
   let cmd_ass_re = annotate_cmd cmd_ass_re None in
 
-  let cmds_e, x_e, errs, rets, _, _ = translate_statement new_ctx e in
+  let cmds_e, _, errs, rets, _, _ = translate_statement new_ctx e in
 
   (* List.iter (fun ({ line_offset; invariant; pre_logic_cmds; post_logic_cmds }, _, _) ->
      Printf.printf "Length: pre: %d \t post: %d\n" (List.length pre_logic_cmds) (List.length post_logic_cmds)) cmds_e; *)
@@ -7207,10 +7199,10 @@ let js2jsil_eval
 
 (* FUNCTION CONSTRUCTOR *)
 let js2jsil_function_constructor_prop
-    (prog : ('a, int) GProg.t) fid_parent params strictness e =
+    (prog : ('a, int) GProg.t) _ params strictness e =
   let prog, which_pred = (prog.procs, prog.predecessors) in
 
-  let e, new_fid, vislist, new_fun_tbl =
+  let _, new_fid, _, new_fun_tbl =
     JS2JSIL_Preprocessing.preprocess_eval cc_tbl vis_tbl strictness e "main"
       params
   in

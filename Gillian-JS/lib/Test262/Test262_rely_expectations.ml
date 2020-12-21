@@ -13,7 +13,7 @@ let expectation
     (expect : matcher)
     (test : (Test262_suite.info, Test262_suite.category) Bulk.Test.t)
     outcome =
-  let Test262_suite.{ tt; tm; rm; ept } = test.info in
+  let Test262_suite.{ tt; ept; _ } = test.info in
   match tt with
   | Positive -> expect.finish_in_normal_mode ExactlyOne outcome
   | Negative -> (
@@ -38,4 +38,4 @@ let expectation
               expect.finish_in_error_mode_with ExactlyOne
                 ~constraint_name:"to be a reference error" is_ref_error outcome
           | _              -> failwith "Test262: Unhandled runtime error")
-      | Some (Resolution, et) -> failwith "Unsuported phase 'Resolution'")
+      | Some (Resolution, _) -> failwith "Unsuported phase 'Resolution'")

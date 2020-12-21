@@ -62,8 +62,7 @@ let rec js2jsil
       ]
   | ApplyLemma (lname, lparams) ->
       [ LCmd.SL (ApplyLem (lname, List.map fe lparams, [])) ]
-  | UseSubst (lab, subst_lst) ->
-      raise (Failure "DEATH. USESUBST CANNOT BE TRANSLATED!!!")
+  | UseSubst _ -> raise (Failure "DEATH. USESUBST CANNOT BE TRANSLATED!!!")
   | Branch pf -> [ Branch (JSAsrt.js2jsil_pure None pf) ]
   | _ -> raise (Failure "Unsupported JS logic command")
 

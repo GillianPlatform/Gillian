@@ -1,5 +1,3 @@
-open Gillian.Symbolic.Values
-open Containers
 module SSubst = Gillian.Symbolic.Subst
 open Gillian.Gil_syntax
 
@@ -18,8 +16,8 @@ let compare x y =
   let cmp = Stdlib.compare in
   match (x, y) with
   | Pure (Eq (PVar x, _)), Pure (Eq (PVar y, _)) -> cmp x y
-  | Pure (Eq (PVar x, _)), _ -> -1
-  | _, Pure (Eq (PVar x, _)) -> 1
+  | Pure (Eq (PVar _, _)), _ -> -1
+  | _, Pure (Eq (PVar _, _)) -> 1
   | PointsTo _, PointsTo _ -> cmp x y
   | PointsTo _, _ -> -1
   | _, PointsTo _ -> 1
@@ -70,7 +68,7 @@ let rec pp fmt (a : t) : unit =
   (* Pure *)
   | Pure f -> Formula.pp fmt f
 
-let rec full_pp = pp
+let full_pp = pp
 
 let pp_list = Fmt.list ~sep:(Fmt.any "  ") pp
 

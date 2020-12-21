@@ -1,5 +1,3 @@
-open String
-
 let string_split (s : string) (len : int) : string option * string option =
   assert (len > 0);
   try

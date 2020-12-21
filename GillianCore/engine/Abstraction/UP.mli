@@ -53,7 +53,7 @@ val init :
   (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list ->
   (t, Asrt.t list list) result
 
-val next : ?lab:string -> t -> (t * (string * SS.t) option) list option
+val next : t -> (t * (string * SS.t) option) list option
 
 val head : t -> step option
 

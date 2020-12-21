@@ -114,7 +114,7 @@ module Make
   let eval_expr (astate : t) (e : Expr.t) =
     let state, _, _ = astate in
     try State.eval_expr state e
-    with State.Internal_State_Error (errs, s) ->
+    with State.Internal_State_Error (errs, _) ->
       raise (Internal_State_Error (errs, astate))
 
   let get_store (astate : t) : Store.t =
@@ -329,7 +329,7 @@ module Make
                       in
                       let final_state = update_store final_state x v_ret in
                       let _ = simplify ~unification:true final_state in
-                      let subst, final_state =
+                      let _, final_state =
                         Option.get (Unifier.unfold_concrete_preds final_state)
                       in
                       (final_state, fl))
@@ -391,7 +391,7 @@ module Make
       (astate : t)
       (a : Asrt.t)
       (binders : string list) : t * t =
-    let state, preds, pred_defs = astate in
+    let state, _, _ = astate in
     let store = State.get_store state in
     let pvars_store = Store.domain store in
     let pvars_a = Asrt.pvars a in
@@ -406,7 +406,7 @@ module Make
     | true  -> (
         (* TODO: I would like to not forget the store, but let's see... *)
         let store_subst = Store.to_ssubst store in
-        let a = SVal.SESubst.substitute_asrt store_subst true a in
+        let a = SVal.SESubst.substitute_asrt store_subst ~partial:true a in
         let state_lvars = State.get_lvars state in
         let known_lvars =
           SS.elements
@@ -449,7 +449,7 @@ module Make
                 (fun (e : Expr.t) ->
                   let id =
                     match e with
-                    | LVar x | ALoc x -> e
+                    | LVar _ | ALoc _ -> e
                     | _               ->
                         raise
                           (Failure
@@ -473,7 +473,7 @@ module Make
                   List.map (fun e -> (e, ESubst.get subst' e)) lbinders
                 in
                 let success =
-                  List.for_all (fun (x, x_v) -> x_v <> None) new_bindings
+                  List.for_all (fun (_, x_v) -> x_v <> None) new_bindings
                 in
                 if not success then
                   raise
@@ -510,7 +510,7 @@ module Make
                   let full_subst = make_id_subst a in
                   let _ = ESubst.merge_left full_subst subst_bindings in
                   let a_substed =
-                    ESubst.substitute_asrt subst_bindings true a
+                    ESubst.substitute_asrt subst_bindings ~partial:true a
                   in
                   let a_produce = Asrt.star [ a_bindings; a_substed ] in
                   (* Create empty state *)
@@ -603,13 +603,13 @@ module Make
     @param preds Current predicate set
     @return List of states/predicate sets resulting from the evaluation
   *)
-  let rec evaluate_slcmd (prog : UP.prog) (lcmd : SLCmd.t) (astate : t) :
+  let evaluate_slcmd (prog : UP.prog) (lcmd : SLCmd.t) (astate : t) :
       (t list, string) result =
-    let state, preds, pred_defs = astate in
+    let state, _, _ = astate in
 
     let eval_expr e =
       try State.eval_expr state e
-      with State.Internal_State_Error (errs, s) ->
+      with State.Internal_State_Error (errs, _) ->
         raise (Internal_State_Error (errs, astate))
     in
 
@@ -627,7 +627,7 @@ module Make
             let params = List.map (fun (x, _) -> x) pred.pred.pred_params in
             let i_bindings =
               Option.fold
-                ~some:(fun (def, bindings) ->
+                ~some:(fun (_, bindings) ->
                   List.map (fun (x, e) -> (Expr.LVar x, eval_expr e)) bindings)
                 ~none:[] folding_info
             in
@@ -717,7 +717,7 @@ module Make
             raise (Internal_State_Error (pvars_errs, astate))
         | true  -> (
             let store_subst = Store.to_ssubst store in
-            let a = SVal.SESubst.substitute_asrt store_subst true a in
+            let a = SVal.SESubst.substitute_asrt store_subst ~partial:true a in
             (* let known_vars   = SS.diff (SS.filter is_spec_var_name (Asrt.lvars a)) (SS.of_list binders) in *)
             let state_lvars = State.get_lvars state in
             let known_lvars =
@@ -766,7 +766,7 @@ module Make
                     (fun (e : Expr.t) ->
                       let id =
                         match e with
-                        | LVar x | ALoc x -> e
+                        | LVar _ | ALoc _ -> e
                         | _               ->
                             raise
                               (Failure
@@ -786,7 +786,7 @@ module Make
                       List.map (fun e -> (e, ESubst.get subst' e)) lbinders
                     in
                     let success =
-                      List.for_all (fun (x, x_v) -> x_v <> None) new_bindings
+                      List.for_all (fun (_, x_v) -> x_v <> None) new_bindings
                     in
                     if not success then
                       raise (Failure "Assert failed - binders not captured")
@@ -821,7 +821,7 @@ module Make
                       let full_subst = make_id_subst a in
                       let _ = ESubst.merge_left full_subst subst_bindings in
                       let a_substed =
-                        ESubst.substitute_asrt subst_bindings true a
+                        ESubst.substitute_asrt subst_bindings ~partial:true a
                       in
                       let a_produce = Asrt.star [ a_new_bindings; a_substed ] in
                       match Unifier.produce new_state full_subst a_produce with
@@ -899,7 +899,7 @@ module Make
                 lemma.up astate None v_args
             in
             match rets with
-            | Ok rets    ->
+            | Ok rets ->
                 Ok
                   (List.map
                      (fun (astate, _) ->
@@ -909,11 +909,11 @@ module Make
                        let _ = simplify ~unification:true astate in
                        astate)
                      rets)
-            | Error errs ->
+            | Error _ ->
                 Error
                   (Format.asprintf "Cannot apply lemma %s in state\n%a" lname pp
                      astate)))
-    | Invariant (a, binders) ->
+    | Invariant _ ->
         raise
           (Failure "Invariant must be treated by the unify_invariant function")
 
@@ -934,7 +934,7 @@ module Make
     in
     match results with
     | Ok results -> results
-    | Error msg  ->
+    | Error _    ->
         L.normal (fun fmt ->
             fmt "WARNING: Unable to use specification of function %s"
               spec.spec.spec_name);
@@ -1050,7 +1050,7 @@ module Make
   let get_fixes ?simple_fix:(sf = true) (state : t) (errs : err_t list) :
       fix_t list list =
     L.verbose (fun m -> m "AState: get_fixes");
-    let st, preds, pht = state in
+    let st, _, _ = state in
     State.get_fixes ~simple_fix:sf st errs
 
   let apply_fixes (state : t) (fixes : fix_t list) : t option * Asrt.t list =

@@ -1,4 +1,4 @@
 (library
  (name wSyntax)
  (libraries wUtils)
- (flags -open WUtils))
+ (flags :standard -open WUtils))

@@ -19,7 +19,7 @@ let pp fmt labproc =
     Array.fold_left (fun prev (_, curr, _) -> max (len_opt curr) prev) 0 body
   in
   let pp_white fmt k =
-    for i = 0 to k - 1 do
+    for _ = 0 to k - 1 do
       Fmt.pf fmt " "
     done
   in

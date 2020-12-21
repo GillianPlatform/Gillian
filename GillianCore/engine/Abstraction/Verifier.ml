@@ -93,7 +93,7 @@ struct
             Fmt.(list ~sep:(any "@\n") Asrt.pp)
             posts);
       let subst =
-        SSubst.filter subst (fun e v ->
+        SSubst.filter subst (fun e _ ->
             match e with
             | PVar _ -> false
             | _      -> true)
@@ -101,7 +101,7 @@ struct
       let posts =
         List.filter_map
           (fun p ->
-            let substituted = SSubst.substitute_asrt subst true p in
+            let substituted = SSubst.substitute_asrt subst ~partial:true p in
             let reduced = Reduction.reduce_assertion substituted in
             if Simplifications.admissible_assertion reduced then Some reduced
             else None)
@@ -139,7 +139,7 @@ struct
         in
         L.verbose (fun m -> m "END of STEP 4@\n");
         match post_up with
-        | Error errs ->
+        | Error _    ->
             let msg =
               Printf.sprintf "Warning: testify failed for %s. Cause: post_up \n"
                 name
@@ -359,7 +359,7 @@ struct
                        Fmt.(list ~sep:(any "@\n") SAInterpreter.pp_err)
                        errs);
                  false
-             | ExecRes.RSucc (fl, v, state) ->
+             | ExecRes.RSucc (fl, _, state) ->
                  if Some fl <> test.flag then (
                    L.normal (fun m ->
                        m
@@ -552,7 +552,7 @@ struct
 
     let ipreds = UP.init_preds prog.preds in
     match ipreds with
-    | Error e  ->
+    | Error _  ->
         raise (Failure "Creation of unification plans for predicates failed.")
     | Ok preds -> (
         let pred_ins =

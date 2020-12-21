@@ -24,14 +24,12 @@ module M : Gillian.Symbolic.Memory_S = struct
     | FLoc      of vt
     | FCell     of vt * vt
     | FMetadata of vt
-    | FDomain   of vt * vt
     | FPure     of Formula.t
 
   type c_fix_t =
     | CFLoc      of string
     | CFCell     of vt * vt * vt
     | CFMetadata of vt * vt
-    | CFDomain   of vt * vt
 
   type err_t = vt list * i_fix_t list list * Formula.t
 
@@ -46,7 +44,6 @@ module M : Gillian.Symbolic.Memory_S = struct
     | FCell (loc, prop) ->
         pf ft "@[<h>MIFCell(%a, %a)@]" SVal.pp loc SVal.pp prop
     | FMetadata loc     -> pf ft "@[<h>MIFMetadata(%a)@]" SVal.pp loc
-    | FDomain (loc, v)  -> pf ft "@[<h>MIFDomain(%a, %a)@]" SVal.pp loc SVal.pp v
     | FPure f           -> pf ft "@[<h>MIFPure(%a)@]" Formula.pp f
 
   let pp_c_fix ft (c_fix : c_fix_t) : unit =
@@ -57,8 +54,6 @@ module M : Gillian.Symbolic.Memory_S = struct
         pf ft "@[<h>MCFCell(%a, %a, %a)@]" SVal.pp loc SVal.pp prop SVal.pp v
     | CFMetadata (loc, v)   ->
         pf ft "@[<h>MCFMetadata(%a, %a)@]" SVal.pp loc SVal.pp v
-    | CFDomain (loc, v)     ->
-        pf ft "@[<h>MCFDomain(%a, %a)@]" SVal.pp loc SVal.pp v
 
   let get_failing_constraint (err : err_t) : Formula.t =
     let _, _, f = err in
@@ -100,14 +95,14 @@ module M : Gillian.Symbolic.Memory_S = struct
         in
         ufl_vs @ metadata_recovery_vals
 
-  let assertions ?(to_keep : Containers.SS.t option) (heap : t) : GAsrt.t list =
+  let assertions ?to_keep:_ (heap : t) : GAsrt.t list =
     List.map JSIL2GIL.jsil2gil_asrt (SHeap.assertions heap)
 
   let lvars (heap : t) : Containers.SS.t = SHeap.lvars heap
 
   let clean_up (heap : t) : unit = SHeap.clean_up heap
 
-  let fresh_val (heap : t) : vt = LVar (LVar.alloc ())
+  let fresh_val (_ : t) : vt = LVar (LVar.alloc ())
 
   let substitution_in_place (subst : st) (heap : t) : unit =
     SHeap.substitution_in_place subst heap
@@ -336,48 +331,10 @@ module M : Gillian.Symbolic.Memory_S = struct
     Option.fold ~some:f ~none:() (get_loc_name pfs gamma loc);
     ASucc [ (heap, [], [], []) ]
 
-  let get_full_domain (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) :
-      action_ret =
-    let loc_name = get_loc_name pfs gamma loc in
-    L.verbose (fun m -> m "%a" SHeap.pp heap);
-
-    let make_gd_error (loc_name : string) (props : vt list) (dom : vt option) :
-        err_t =
-      ([], [], False)
-    in
-
-    let f loc_name =
-      let loc = Expr.loc_from_loc_name loc_name in
-      match SHeap.get heap loc_name with
-      | None -> AFail [ ([ loc ], [], False) ]
-      | Some ((fv_list, None), _) ->
-          AFail [ make_gd_error loc_name (SFVL.field_names fv_list) None ]
-      | Some ((fv_list, Some dom), mtdt) ->
-          let none_fv_list, pos_fv_list =
-            SFVL.partition (fun _ fv -> fv = Lit Nono) fv_list
-          in
-          (* Called from the semantics -> we need full knowledge *)
-          let props = SFVL.field_names fv_list in
-          let a_set_equality : Formula.t = Eq (dom, ESet props) in
-          let solver_ret =
-            FOSolver.check_entailment Containers.SS.empty pfs [ a_set_equality ]
-              gamma
-          in
-          if solver_ret then
-            ASucc
-              [ (heap, [ loc; EList (SFVL.field_names pos_fv_list) ], [], []) ]
-          else AFail [ make_gd_error loc_name props (Some dom) ]
-    in
-
-    let result =
-      Option.fold ~some:f ~none:(AFail [ ([ loc ], [], False) ]) loc_name
-    in
-    result
-
   let set_domain
       (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) (dom : vt) :
       action_ret =
-    let loc_name, loc', new_pfs = fresh_loc ~loc pfs gamma in
+    let loc_name, _, new_pfs = fresh_loc ~loc pfs gamma in
 
     (match SHeap.get heap loc_name with
     | None                      -> SHeap.set heap loc_name SFVL.empty (Some dom)
@@ -402,8 +359,8 @@ module M : Gillian.Symbolic.Memory_S = struct
         else Expr.Lit (Loc loc_name)
       in
       match SHeap.get heap loc_name with
-      | None -> AFail [ make_gm_error loc_name ]
-      | Some ((fv_list, dom), mtdt) ->
+      | None                -> AFail [ make_gm_error loc_name ]
+      | Some ((_, _), mtdt) ->
           Option.fold
             ~some:(fun mtdt -> ASucc [ (heap, [ loc; mtdt ], [], []) ])
             ~none:(AFail [ make_gm_error loc_name ])
@@ -418,7 +375,7 @@ module M : Gillian.Symbolic.Memory_S = struct
       (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) (mtdt : vt) :
       action_ret =
     L.tmi (fun m -> m "Trying to set metadata.");
-    let loc_name, loc', new_pfs = fresh_loc ~loc pfs gamma in
+    let loc_name, _, new_pfs = fresh_loc ~loc pfs gamma in
 
     (match SHeap.get heap loc_name with
     | None -> SHeap.set heap loc_name SFVL.empty None (Some mtdt)
@@ -430,18 +387,6 @@ module M : Gillian.Symbolic.Memory_S = struct
         else SHeap.set heap loc_name fv_list dom (Some mtdt));
     L.tmi (fun m -> m "Done setting metadata.");
     ASucc [ (heap, [], new_pfs, []) ]
-
-  let remove_metadata (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) :
-      action_ret =
-    let f (loc_name : string) : unit =
-      Option.fold
-        ~some:(fun ((fv_list, dom), mtdt) ->
-          SHeap.set heap loc_name fv_list dom None;
-          ())
-        ~none:() (SHeap.get heap loc_name)
-    in
-    Option.fold ~some:f ~none:() (get_loc_name pfs gamma loc);
-    ASucc [ (heap, [], [], []) ]
 
   let delete_object (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) :
       action_ret =
@@ -467,7 +412,7 @@ module M : Gillian.Symbolic.Memory_S = struct
       let loc = Expr.loc_from_loc_name loc_name in
       match SHeap.get heap loc_name with
       | None -> raise (Failure "DEATH. get_partial_domain. illegal loc_name")
-      | Some ((fv_list, None), _) ->
+      | Some ((_, None), _) ->
           raise (Failure "DEATH. get_partial_domain. missing domain")
       | Some ((fv_list, Some dom), mtdt) -> (
           L.verbose (fun fmt -> fmt "Domain: %a" Expr.pp dom);
@@ -518,10 +463,10 @@ module M : Gillian.Symbolic.Memory_S = struct
       | None ->
           (* This should never happen *)
           raise (Failure "DEATH. get_full_domain. illegal loc_name")
-      | Some ((fv_list, None), _) ->
+      | Some ((_, None), _) ->
           (* This is not correct *)
           raise (Failure "DEATH. TODO. get_full_domain. missing domain")
-      | Some ((fv_list, Some dom), mtdt) ->
+      | Some ((fv_list, Some dom), _) ->
           let props = SFVL.field_names fv_list in
           let a_set_equality : Formula.t = Eq (dom, ESet props) in
           let solver_ret =
@@ -546,7 +491,7 @@ module M : Gillian.Symbolic.Memory_S = struct
       action_ret =
     let f (loc_name : string) : unit =
       Option.fold
-        ~some:(fun ((fv_list, dom), mtdt) ->
+        ~some:(fun ((fv_list, _), mtdt) ->
           SHeap.set heap loc_name fv_list None mtdt;
           ())
         ~none:() (SHeap.get heap loc_name)
@@ -601,8 +546,8 @@ module M : Gillian.Symbolic.Memory_S = struct
                                "Internal Error. execute_action. setMetadata")
     else if action = JSILNames.delMetadata then
       match args with
-      | [ loc ] -> ASucc [ (heap, [], [], []) ]
-      | _       -> raise (Failure "Internal Error. execute_action. delMetadata")
+      | [ _ ] -> ASucc [ (heap, [], [], []) ]
+      | _     -> raise (Failure "Internal Error. execute_action. delMetadata")
     else if action = JSILNames.getProps then
       match args with
       | [ loc; props ] -> get_partial_domain heap pfs gamma loc props
@@ -660,7 +605,7 @@ module M : Gillian.Symbolic.Memory_S = struct
     match i_fix with
     | FLoc v       ->
         (* Get a fresh location *)
-        let loc_name, loc', new_pfs = fresh_loc ~loc:v pfs gamma in
+        let loc_name, _, new_pfs = fresh_loc ~loc:v pfs gamma in
         (* TODO: If the initial value denoting the location was a variable, we may need to save it as a spec var *)
         [ ([ CFLoc loc_name ], new_pfs, Containers.SS.empty, []) ]
     | FCell (l, p) -> (
@@ -716,8 +661,6 @@ module M : Gillian.Symbolic.Memory_S = struct
             Containers.SS.empty,
             [] );
         ]
-    | FDomain _    ->
-        raise (Failure "Complete fix: domain fix currently unsupported ")
     | FPure f      -> [ ([], [ f ], Containers.SS.empty, []) ]
 
   (* Fix completion: simple *)
@@ -728,7 +671,7 @@ module M : Gillian.Symbolic.Memory_S = struct
       match i_fix with
       | FLoc v       ->
           (* Get a fresh location *)
-          let loc_name, loc', new_pfs = fresh_loc ~loc:v pfs gamma in
+          let loc_name, _, new_pfs = fresh_loc ~loc:v pfs gamma in
           (* TODO: If the initial value denoting the location was a variable, we may need to save it as a spec var *)
           [ ([ CFLoc loc_name ], new_pfs, Containers.SS.empty, []) ]
       | FCell (l, p) ->
@@ -754,8 +697,6 @@ module M : Gillian.Symbolic.Memory_S = struct
               Containers.SS.singleton vvar,
               [] );
           ]
-      | FDomain _    ->
-          raise (Failure "Complete fix: domain fix currently unsupported ")
       | FPure f      -> [ ([], [ f ], Containers.SS.empty, []) ]
 
   let complete_fix_full_js (pfs : PFS.t) (gamma : TypEnv.t) (i_fix : i_fix_t) :
@@ -770,7 +711,7 @@ module M : Gillian.Symbolic.Memory_S = struct
       match i_fix with
       | FLoc v       ->
           (* Get a fresh location *)
-          let loc_name, loc', new_pfs = fresh_loc ~loc:v pfs gamma in
+          let loc_name, _, new_pfs = fresh_loc ~loc:v pfs gamma in
           (* TODO: If the initial value denoting the location was a variable, we may need to save it as a spec var *)
           [ ([ CFLoc loc_name ], new_pfs, Containers.SS.empty, []) ]
       | FCell (l, p) ->
@@ -796,14 +737,12 @@ module M : Gillian.Symbolic.Memory_S = struct
               Containers.SS.singleton vvar,
               [] );
           ]
-      | FDomain _    ->
-          raise (Failure "Complete fix: domain fix currently unsupported ")
       | FPure f      -> [ ([], [ f ], Containers.SS.empty, []) ]
 
   (* An error can have multiple fixes *)
   let get_fixes
       ?simple_fix:(sf = true)
-      (mem : t)
+      (_ : t)
       (pfs : PFS.t)
       (gamma : TypEnv.t)
       (err : err_t) : fix_result list =
@@ -889,6 +828,4 @@ module M : Gillian.Symbolic.Memory_S = struct
             List.iter (fun f -> PFS.extend pfs f) new_pfs;
             mem
         | _ -> raise (Failure "Bi-abduction: cannot fix cell."))
-    | CFDomain _ ->
-        raise (Failure "Bi-abduction: domain fix currently unsupported")
 end

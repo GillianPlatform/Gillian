@@ -238,7 +238,7 @@ let merge_loc (heap : t) (new_loc : string) (old_loc : string) : unit =
           match (omet, nmet) with
           | None, None -> None
           | None, Some met | Some met, None -> Some met
-          | Some met1, Some met2 -> Some met1
+          | Some met1, Some _ -> Some met1
         in
 
         (cfvl, sfvl, dom, met)
@@ -341,7 +341,7 @@ let assertions (heap : t) : Asrt.t list =
     if Names.is_aloc_name loc then Expr.ALoc loc else Expr.Lit (Loc loc)
   in
 
-  let rec assertions_of_object (loc, ((fv_list, domain), metadata)) =
+  let assertions_of_object (loc, ((fv_list, domain), metadata)) =
     let le_loc = make_loc_lexpr loc in
     let fv_assertions = SFVL.assertions le_loc fv_list in
     let domain =
@@ -380,14 +380,14 @@ let wf_assertions (heap : t) : Formula.t list =
 let is_well_formed (heap : t) : unit =
   let cfvl =
     Hashtbl.fold
-      (fun loc fvl ac ->
+      (fun _ fvl ac ->
         SFVL.fold (fun prop value ac -> ac && is_c prop && is_c value) fvl ac)
       heap.cfvl true
   in
   if not cfvl then raise (Failure "Symbolicness in concrete part of the heap");
   let sfvl =
     Hashtbl.fold
-      (fun loc fvl ac ->
+      (fun _ fvl ac ->
         SFVL.fold
           (fun prop value ac -> ac && ((not (is_c prop)) || not (is_c value)))
           fvl ac)
