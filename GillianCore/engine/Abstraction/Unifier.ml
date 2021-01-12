@@ -163,7 +163,17 @@ module Make
       match pred_def.pred_abstract with
       | true  -> false
       | false ->
-          let in_args = Pred.in_args pred_def args in
+          let one_level_list_expander args =
+            List.concat_map
+              (fun (x : vt) ->
+                match Val.to_expr x with
+                | EList ls ->
+                    List.map (fun x -> Option.get (Val.from_expr x)) ls
+                | _        -> [ x ])
+              args
+          in
+          let in_args = one_level_list_expander (Pred.in_args pred_def args) in
+
           L.verbose (fun fmt ->
               fmt "Original values: %a"
                 Fmt.(brackets (list ~sep:comma Val.pp))

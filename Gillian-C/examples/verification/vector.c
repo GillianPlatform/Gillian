@@ -16,7 +16,7 @@ typedef struct vector_s Vector;
     pred nounfold vector(+p, cap, alpha) {
         p -m> struct vector_s { long(#size); long(cap); #buffer } *
         (#size == len(alpha)) *
-        (1 <=# cap) *
+        (1 <=# cap) * (#size <=# cap) *
         ARRAY(#buffer, int, #size, alpha) *
         ZEROS(#buffer p+ (4 * #size), (4 * cap) - (4 * #size)) *
         MALLOCED(#buffer, (4 * cap))
@@ -37,9 +37,11 @@ Vector *vector_new_capacity(size_t capacity) {
 
 /*@ spec vector_len(vec) {
     requires: (vec == #vec) * vector (#vec, #capacity, #content)
-    ensures: vector(#vec, #capacity, #content) * (ret == len(#content))
+    ensures: vector(#vec, #capacity, #content) * (#sz == len(#content)) * (ret == long(#sz))
 }*/
-size_t vector_len(Vector *vec) { return vec->size; }
+size_t vector_len(Vector *vec) {
+    return vec->size;
+    }
 
 /*@ spec vector_new() {
     requires: emp

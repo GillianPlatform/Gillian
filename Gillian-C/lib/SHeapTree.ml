@@ -563,7 +563,8 @@ module Tree = struct
             let open Delayed.Syntax in
             let* _, left, right = split ~range t in
             let* new_self = with_children t ~left ~right in
-            Logging.tmi (fun fmt -> fmt "AFTER SPLITTING: %a" pp new_self);
+            Logging.tmi (fun fmt ->
+                fmt "AFTER SPLITTING FOR %a: %a" Range.pp range pp new_self);
             frame_inside ~replace_node ~rebuild_parent new_self range
     in
     let open Delayed.Syntax in
