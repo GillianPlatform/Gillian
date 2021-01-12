@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
       - name: Installing esy
-        run: npm install -g esy@0.6.6 --unsafe-perm
+        run: npm install -g esy@0.6.6
       - name: Restore Cache
         id: restore-cache
         uses: actions/cache@v1
