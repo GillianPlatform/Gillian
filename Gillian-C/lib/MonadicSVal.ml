@@ -38,11 +38,13 @@ let of_gil_expr sval_e =
   let open Formula.Infix in
   let open Patterns in
   Logging.verbose (fun fmt -> fmt "OF_GIL_EXPR : %a" Expr.pp sval_e);
+  let* sval_e = Delayed.reduce sval_e in
   match%ent sval_e with
   | undefined  -> DO.some SUndefined
   | obj        ->
       let loc_expr = Expr.list_nth sval_e 0 in
       let ofs = Expr.list_nth sval_e 1 in
+      let* ofs = Delayed.reduce ofs in
       let* loc_opt = Delayed.resolve_loc loc_expr in
       let loc, learned =
         match loc_opt with

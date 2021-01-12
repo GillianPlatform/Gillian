@@ -23,11 +23,6 @@ time gillian-c verify verification/priQ.c -l disabled
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
-echo "--- verifying kvmap ---"
-time gillian-c verify verification/kvmap.c -l disabled
-rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
-printf "\n\n"
-
 echo "--- verifying sort ---"
 time gillian-c verify verification/sort.c -l disabled
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
