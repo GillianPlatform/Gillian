@@ -1,5 +1,12 @@
 open Containers
 
+module type S = sig
+  val reset : unit -> unit
+
+  val verify_prog :
+    (Annot.t, int) Prog.t -> bool -> SourceFiles.t option -> unit
+end
+
 module Make
     (SState : State.S
                 with type vt = SVal.M.t
