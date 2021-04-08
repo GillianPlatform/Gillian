@@ -1,0 +1,5 @@
+(library
+ (name debugger)
+ (public_name gillian.debugger)
+ (libraries log str fmt.tty engine gil_syntax logging parserAndCompiler utils)
+ (flags :standard -open Utils -open Engine -open Gil_syntax))

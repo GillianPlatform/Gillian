@@ -2,6 +2,6 @@
  (name commandLine)
  (public_name gillian.commandLine)
  (libraries cmdliner fmt.tty gil_syntax utils engine bulk logging
-   incrementalAnalysis debug_adapter)
+   incrementalAnalysis debugAdapter)
  (flags :standard -open Gil_syntax -open Utils -open Engine -open Bulk -open
    IncrementalAnalysis))
