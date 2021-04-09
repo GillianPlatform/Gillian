@@ -1,6 +1,8 @@
 open Literal
 module L = Logging
 
+type cont_func = ReachedEnd | Continue of (unit -> cont_func)
+
 (** General GIL Interpreter *)
 module Make
     (Val : Val.S)
@@ -1060,6 +1062,99 @@ struct
         evaluate_cmd_iter ret_fun retry prog hold_results
           ((conf, fid) :: on_hold) rest_confs results
     | _ :: rest_confs -> f rest_confs results
+
+  let rec evaluate_cmd_step
+      (ret_fun : result_t -> 'a)
+      (retry : bool)
+      (prog : UP.prog)
+      (hold_results : 'a list)
+      (on_hold : (cconf_t * string) list)
+      (confs : cconf_t list)
+      (results : result_t list) : cont_func =
+    let f = evaluate_cmd_step ret_fun retry prog hold_results on_hold in
+
+    match confs with
+    | [] ->
+        let results = List.map ret_fun results in
+        let results = hold_results @ results in
+        if not retry then ReachedEnd
+        else (
+          L.(verbose (fun m -> m "Relaunching suspended confs"));
+          let hold_confs =
+            List.filter (fun (_, pid) -> Hashtbl.mem prog.specs pid) on_hold
+          in
+          let hold_confs = List.map (fun (conf, _) -> conf) hold_confs in
+          evaluate_cmd_step ret_fun false prog results [] hold_confs [])
+    | ConfCont (state, cs, iframes, prev, prev_loop_ids, i, b_counter)
+      :: rest_confs
+      when b_counter < max_branching ->
+        let next_confs =
+          protected_evaluate_cmd prog state cs iframes prev prev_loop_ids i
+            b_counter
+        in
+        Continue (fun () -> f (next_confs @ rest_confs) results)
+    | ConfCont (state, cs, _, _, _, i, b_counter) :: rest_confs ->
+        let _, annot_cmd = get_cmd prog cs i in
+        Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
+        L.(
+          verbose (fun m ->
+              m
+                "Stopping Symbolic Execution due to MAX BRANCHING with %d. \
+                 STOPPING CONF:\n"
+                b_counter));
+        print_configuration annot_cmd state cs i b_counter;
+        f rest_confs results
+    | ConfErr (proc, i, state, errs) :: rest_confs ->
+        let result = ExecRes.RFail (proc, i, state, errs) in
+        f rest_confs (result :: results)
+    | ConfFinish (fl, v, state) :: rest_confs ->
+        let result = ExecRes.RSucc (fl, v, state) in
+        f rest_confs (result :: results)
+    | ConfSusp (fid, state, cs, iframes, prev, prev_loop_ids, i, b_counter)
+      :: rest_confs
+      when retry ->
+        let conf =
+          ConfCont (state, cs, iframes, prev, prev_loop_ids, i, b_counter)
+        in
+        L.(
+          verbose (fun m ->
+              m "Suspending a computation that was trying to call %s" fid));
+        evaluate_cmd_step ret_fun retry prog hold_results
+          ((conf, fid) :: on_hold) rest_confs results
+    | _ :: rest_confs -> f rest_confs results
+
+  let init_evaluate_proc
+      (ret_fun : result_t -> 'a)
+      (prog : UP.prog)
+      (name : string)
+      (params : string list)
+      (state : State.t) : cont_func =
+    let () = CallGraph.add_proc call_graph name in
+    L.normal (fun m ->
+        m
+          ("*******************************************@\n"
+         ^^ "*** Executing procedure: %s@\n"
+         ^^ "*******************************************@\n")
+          name);
+
+    let store = State.get_store state in
+    let arguments =
+      List.map
+        (fun x ->
+          match Store.get store x with
+          | Some v_x -> v_x
+          | None     ->
+              raise (Failure "Symbolic State does NOT contain formal parameter"))
+        params
+    in
+
+    let cs : CallStack.t =
+      CallStack.push CallStack.empty ~pid:name ~arguments ~loop_ids:[]
+        ~ret_var:"out" ~call_index:(-1) ~continue_index:(-1) ~error_index:(-1)
+        ()
+    in
+    let conf : cconf_t = ConfCont (state, cs, ([], []), -1, [], 0, 0) in
+    evaluate_cmd_step ret_fun true prog [] [] [ conf ] []
 
   (**
   Evaluation of procedures

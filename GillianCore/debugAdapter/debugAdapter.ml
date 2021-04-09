@@ -5,6 +5,9 @@ module type S = sig
 end
 
 module Make (Debugger : Debugger.S) = struct
+  module Lifecycle = Lifecycle.Make (Debugger)
+  module TimeTravel = TimeTravel.Make (Debugger)
+
   let initialize rpc =
     let promise, resolver = Lwt.task () in
     let prevent_reenter () =
@@ -17,9 +20,7 @@ module Make (Debugger : Debugger.S) = struct
         Log.info "Initialize request received";
         let caps =
           Capabilities.(
-            make ~supports_configuration_done_request:(Some true)
-              ~supports_breakpoint_locations_request:(Some true)
-              ~supports_step_back:(Some true) ())
+            make ~supports_configuration_done_request:(Some true) ())
         in
         Lwt.wakeup_later resolver (arg, caps);
         Lwt.return caps);
@@ -36,7 +37,15 @@ module Make (Debugger : Debugger.S) = struct
       (fun (launch_args : DebugProtocolEx.Launch_command.Arguments.t) ->
         Log.info "Launch request received";
         prevent_reenter ();
-        let () = Debugger.launch launch_args.Launch_command.Arguments.program in
+        let () =
+          match
+            Debugger.launch launch_args.Launch_command.Arguments.program
+          with
+          | Ok dbg    -> Lwt.wakeup_later resolver (launch_args, dbg)
+          | Error err ->
+              let () = Log.info err in
+              Lwt.wakeup_later_exn resolver Exit
+        in
         Lwt.return_unit);
     Debug_rpc.set_command_handler rpc
       (module Attach_command)
@@ -48,11 +57,13 @@ module Make (Debugger : Debugger.S) = struct
       (module Disconnect_command)
       (fun _ ->
         Log.info "Disconnect request received";
-        Debugger.terminate ();
         Debug_rpc.remove_command_handler rpc (module Disconnect_command);
         Lwt.wakeup_later_exn resolver Exit;
         Lwt.return_unit);
     promise
+
+  let setup_commands ~launch_args ~dbg rpc =
+    Lwt.join [ Lifecycle.run ~launch_args ~dbg rpc; TimeTravel.run ~dbg rpc ]
 
   let start in_ out =
     Log.reset ();
@@ -63,7 +74,8 @@ module Make (Debugger : Debugger.S) = struct
            Log.info "Initializing Debug Adapter...";
            let%lwt _, _ = initialize rpc in
            Log.info "Initialized Debug Adapter";
-           let%lwt _, _ = launch rpc in
+           let%lwt launch_args, dbg = launch rpc in
+           setup_commands ~launch_args ~dbg rpc;%lwt
            fst (Lwt.task ())
          with Exit -> Lwt.return_unit);%lwt
         !cancel ();

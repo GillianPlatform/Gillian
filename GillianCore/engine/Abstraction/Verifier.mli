@@ -1,8 +1,14 @@
 module type S = sig
+  type t
+
   val reset : unit -> unit
 
   val verify_prog :
     (Annot.t, int) Prog.t -> bool -> SourceFiles.t option -> unit
+
+  val verify_up_to_procs : (Annot.t, int) Prog.t -> GInterpreter.cont_func
+
+  val postprocess_files : SourceFiles.t option -> unit
 end
 
 module Make
