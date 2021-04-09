@@ -3,6 +3,18 @@ module L = Logging
 module type S = sig
   type stop_reason = Step | ReachedEnd
 
+  type frame = {
+    index : int;
+    name : string;
+    source_path : string;
+    line_num : int;
+    col_num : int;
+  }
+
+  type scope = { name : string; id : int }
+
+  type variable = { name : string; value : string; type_ : string option }
+
   type debugger_state
 
   val launch : string -> (debugger_state, string) result
@@ -12,16 +24,41 @@ module type S = sig
   val run : debugger_state -> stop_reason
 
   val terminate : debugger_state -> unit
+
+  val get_frames : debugger_state -> frame list
+
+  val get_scopes : debugger_state -> scope list
+
+  val get_variables : int -> debugger_state -> variable list
 end
 
 module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
   type stop_reason = Step | ReachedEnd
 
+  type frame = {
+    index : int;
+    name : string;
+    source_path : string;
+    line_num : int;
+    col_num : int;
+  }
+
+  type scope = { name : string; id : int }
+
+  type variable = { name : string; value : string; type_ : string option }
+
   type debugger_state = {
     source_file : string;
     source_files : SourceFiles.t option;
+    scopes : scope list;
     mutable step_func : unit -> GInterpreter.cont_func;
   }
+
+  let scopes_tbl = Hashtbl.create 0
+
+  let global_scope = ({ name = "Global"; id = 1 } : scope)
+
+  let local_scope = ({ name = "Local"; id = 2 } : scope)
 
   (* TODO: Find a common place to put the below three functions which are
      duplicated in CommandLine.ml *)
@@ -84,6 +121,10 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     (prog, source_files_opt)
 
   let launch file_name =
+    (* TODO: Remove these dummy scopes *)
+    Hashtbl.replace scopes_tbl global_scope.id global_scope.name;
+    Hashtbl.replace scopes_tbl local_scope.id local_scope.name;
+
     let () = Fmt_tty.setup_std_outputs () in
     let () = Config.current_exec_mode := Verification in
     let () = PC.initialize Verification in
@@ -106,6 +147,7 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
           ({
              source_file = file_name;
              source_files = source_files_opt;
+             scopes = [ global_scope; local_scope ];
              step_func;
            }
             : debugger_state)
@@ -128,4 +170,32 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     let () = Verification.postprocess_files dbg.source_files in
     let () = if !Config.stats then Statistics.print_statistics () in
     Logging.wrap_up ()
+
+  let get_frames dbg =
+    [
+      ({
+         index = 0;
+         name = "This is a test";
+         source_path = dbg.source_file;
+         line_num = 15;
+         col_num = 17;
+       }
+        : frame);
+    ]
+
+  let get_scopes dbg = dbg.scopes
+
+  let get_variables var_ref _ =
+    (* TODO: Display store and heap *)
+    match Hashtbl.find_opt scopes_tbl var_ref with
+    | None    -> []
+    | Some id ->
+        [
+          ({ name = id ^ "_i"; value = "21354"; type_ = Some "integer" }
+            : variable);
+          ({ name = id ^ "_f"; value = "4.52"; type_ = Some "float" }
+            : variable);
+          ({ name = id ^ "_s"; value = "hello world"; type_ = Some "string" }
+            : variable);
+        ]
 end

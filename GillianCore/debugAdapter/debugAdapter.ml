@@ -7,6 +7,7 @@ end
 module Make (Debugger : Debugger.S) = struct
   module Lifecycle = Lifecycle.Make (Debugger)
   module TimeTravel = TimeTravel.Make (Debugger)
+  module Inspect = Inspect.Make (Debugger)
 
   let initialize rpc =
     let promise, resolver = Lwt.task () in
@@ -63,7 +64,12 @@ module Make (Debugger : Debugger.S) = struct
     promise
 
   let setup_commands ~launch_args ~dbg rpc =
-    Lwt.join [ Lifecycle.run ~launch_args ~dbg rpc; TimeTravel.run ~dbg rpc ]
+    Lwt.join
+      [
+        Inspect.run ~dbg rpc;
+        Lifecycle.run ~launch_args ~dbg rpc;
+        TimeTravel.run ~dbg rpc;
+      ]
 
   let start in_ out =
     Log.reset ();
