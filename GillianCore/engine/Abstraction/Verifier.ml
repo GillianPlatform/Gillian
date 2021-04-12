@@ -3,12 +3,15 @@ open Containers
 module type S = sig
   type t
 
+  type result_t
+
   val reset : unit -> unit
 
   val verify_prog :
     (Annot.t, int) Prog.t -> bool -> SourceFiles.t option -> unit
 
-  val verify_up_to_procs : (Annot.t, int) Prog.t -> GInterpreter.cont_func
+  val verify_up_to_procs :
+    (Annot.t, int) Prog.t -> result_t GInterpreter.cont_func
 
   val postprocess_files : SourceFiles.t option -> unit
 end
@@ -45,6 +48,8 @@ struct
     flag : Flag.t option;
     spec_vars : Expr.Set.t;
   }
+
+  type result_t = SAInterpreter.result_t
 
   let global_results = VerificationResults.make ()
 
@@ -689,7 +694,8 @@ struct
             Fmt.pr "%s\n@?" msg;
             L.normal (fun m -> m "%s" msg))
 
-  let verify_up_to_procs3 (prog : UP.prog) (test : t) : GInterpreter.cont_func =
+  let verify_up_to_procs3 (prog : UP.prog) (test : t) :
+      result_t GInterpreter.cont_func =
     let state = test.pre_state in
 
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
@@ -713,7 +719,7 @@ struct
   let verify_up_to_procs2
       (prog : (Annot.t, int) Prog.t)
       (pnames_to_verify : SS.t)
-      (lnames_to_verify : SS.t) : GInterpreter.cont_func =
+      (lnames_to_verify : SS.t) : result_t GInterpreter.cont_func =
     let start_time = Sys.time () in
 
     let ipreds = UP.init_preds prog.preds in
@@ -839,8 +845,8 @@ struct
      Printf.printf "%s\n" msg;
      L.normal (fun m -> m "%s" msg)) *)
 
-  let verify_up_to_procs (prog : (Annot.t, int) Prog.t) : GInterpreter.cont_func
-      =
+  let verify_up_to_procs (prog : (Annot.t, int) Prog.t) :
+      result_t GInterpreter.cont_func =
     L.with_normal_phase ~title:"Program verification" (fun () ->
         (* Analyse all procedures and lemmas *)
         let procs_to_verify =
