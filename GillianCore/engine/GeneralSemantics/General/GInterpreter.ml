@@ -993,6 +993,17 @@ struct
             [ ConfErr (proc, i, state, List.map (fun x -> ExecErr.ESt x) errs) ])
       states
 
+  (**
+  Evaluates one step of a program
+
+  @param ret_fun Function to transform the results
+  @param prog GIL program
+  @param name Identifier of the procedure to be evaluated
+  @param params Parameters of the procedure to be evaluated
+  @state state Current state
+  @preds preds Current predicate set
+  @return Continuation function specifying the next step of evaluation
+  *)
   let rec evaluate_cmd_step
       (ret_fun : result_t -> 'a)
       (retry : bool)
@@ -1056,32 +1067,30 @@ struct
     | _ :: rest_confs -> f rest_confs results
 
   (**
-  Iterative evaluation of commands
+  Evaluates commands iteratively
 
-  @param prog GIL program
-  @param confs Current configurations
-  @param results Current evaluation outcomes
-  @return List of final configurations
+  @param init_func The initial continuation function which evaluates the first
+                   step of the program
 *)
-  let evaluate_cmd_iter
-      (ret_fun : result_t -> 'a)
-      (retry : bool)
-      (prog : UP.prog)
-      (hold_results : 'a list)
-      (on_hold : (cconf_t * string) list)
-      (confs : cconf_t list)
-      (results : result_t list) : 'a list =
-    let init_func () =
-      evaluate_cmd_step ret_fun retry prog hold_results on_hold confs results
-    in
-    let rec f cont_func =
-      let cont_func = cont_func () in
-      match cont_func with
-      | ReachedEnd results -> results
-      | Continue cont_func -> f cont_func
-    in
-    f init_func
+  let rec evaluate_cmd_iter (init_func : 'a cont_func) : 'a list =
+    match init_func with
+    | ReachedEnd results -> results
+    | Continue cont_func ->
+        let cont_func = cont_func () in
+        evaluate_cmd_iter cont_func
 
+  (**
+  Sets the initial values for evaluating a program, and returns a continuation
+  function which evaluates the first step of the program
+
+  @param ret_fun Function to transform the results
+  @param prog GIL program
+  @param name Identifier of the procedure to be evaluated
+  @param params Parameters of the procedure to be evaluated
+  @state state Current state
+  @preds preds Current predicate set
+  @return Continuation function which evaluates the first step of the program
+  *)
   let init_evaluate_proc
       (ret_fun : result_t -> 'a)
       (prog : UP.prog)
@@ -1112,8 +1121,8 @@ struct
         ~ret_var:"out" ~call_index:(-1) ~continue_index:(-1) ~error_index:(-1)
         ()
     in
-    let conf : cconf_t = ConfCont (state, cs, ([], []), -1, [], 0, 0) in
-    evaluate_cmd_step ret_fun true prog [] [] [ conf ] []
+    let conf : cconf_t = ConfCont (state, cs, [], -1, [], 0, 0) in
+    Continue (fun () -> evaluate_cmd_step ret_fun true prog [] [] [ conf ] [])
 
   (**
   Evaluation of procedures
@@ -1131,32 +1140,8 @@ struct
       (name : string)
       (params : string list)
       (state : State.t) : 'a list =
-    let () = CallGraph.add_proc call_graph name in
-    L.normal (fun m ->
-        m
-          ("*******************************************@\n"
-         ^^ "*** Executing procedure: %s@\n"
-         ^^ "*******************************************@\n")
-          name);
-
-    let store = State.get_store state in
-    let arguments =
-      List.map
-        (fun x ->
-          match Store.get store x with
-          | Some v_x -> v_x
-          | None     ->
-              raise (Failure "Symbolic State does NOT contain formal parameter"))
-        params
-    in
-
-    let cs : CallStack.t =
-      CallStack.push CallStack.empty ~pid:name ~arguments ~loop_ids:[]
-        ~ret_var:"out" ~call_index:(-1) ~continue_index:(-1) ~error_index:(-1)
-        ()
-    in
-    let conf : cconf_t = ConfCont (state, cs, [], -1, [], 0, 0) in
-    evaluate_cmd_iter ret_fun true prog [] [] [ conf ] []
+    let init_func = init_evaluate_proc ret_fun prog name params state in
+    evaluate_cmd_iter init_func
 
   (**
   Evaluation of programs
@@ -1175,7 +1160,12 @@ struct
     let initial_conf =
       ConfCont (State.init (Some prog.preds), initial_cs, [], -1, [], 0, 0)
     in
-    evaluate_cmd_iter ret_fun true prog [] [] [ initial_conf ] []
+    let init_func =
+      Continue
+        (fun () ->
+          evaluate_cmd_step ret_fun true prog [] [] [ initial_conf ] [])
+    in
+    evaluate_cmd_iter init_func
 
   (** Configuration pretty-printer *)
   let pp_result (ft : Format.formatter) (reslt : result_t list) : unit =
