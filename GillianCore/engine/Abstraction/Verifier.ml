@@ -5,6 +5,8 @@ module type S = sig
 
   type result_t
 
+  val start_time : float ref
+
   val reset : unit -> unit
 
   val verify_prog :
