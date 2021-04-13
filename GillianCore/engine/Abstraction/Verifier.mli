@@ -1,4 +1,6 @@
 module type S = sig
+  module SAInterpreter : GInterpreter.S
+
   type t
 
   type result_t
@@ -11,7 +13,7 @@ module type S = sig
     (Annot.t, int) Prog.t -> bool -> SourceFiles.t option -> unit
 
   val verify_up_to_procs :
-    (Annot.t, int) Prog.t -> result_t GInterpreter.cont_func
+    (Annot.t, int) Prog.t -> result_t SAInterpreter.cont_func
 
   val postprocess_files : SourceFiles.t option -> unit
 end

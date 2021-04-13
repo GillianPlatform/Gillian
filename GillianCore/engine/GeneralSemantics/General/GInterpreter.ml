@@ -1,7 +1,46 @@
 open Literal
 module L = Logging
 
-type 'a cont_func = ReachedEnd of 'a list | Continue of (unit -> 'a cont_func)
+module type S = sig
+  type vt
+  type st
+  type store_t
+  type state_t
+  type state_err_t
+  type state_vt
+
+  type err_t = (vt, state_err_t) ExecErr.t
+
+  type conf_t = BConfErr of err_t list | BConfCont of state_t
+
+  type result_t = (state_t, state_vt, err_t) ExecRes.t
+
+  type 'a cont_func = ReachedEnd of 'a list | Continue of (unit -> 'a cont_func)
+
+  val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
+
+  val pp_result : Format.formatter -> result_t list -> unit
+
+  val call_graph : CallGraph.t
+
+  val reset : unit -> unit
+
+  val evaluate_lcmds : UP.prog -> LCmd.t list -> state_t -> state_t list
+
+  val init_evaluate_proc :
+    (result_t -> 'a) ->
+    UP.prog ->
+    string ->
+    string list ->
+      state_t ->
+    'a cont_func
+
+  val evaluate_proc :
+    (result_t -> 'a) -> UP.prog -> string -> string list -> state_t -> 'a list
+
+  val evaluate_prog : UP.prog -> result_t list
+end
+
 
 (** General GIL Interpreter *)
 module Make
@@ -20,6 +59,13 @@ struct
 
   module CallStack = CallStack.Make (Val) (Store)
   module External = External (Val) (ESubst) (Store) (State) (CallStack)
+
+  type vt = Val.t
+  type st = ESubst.t
+  type store_t = Store.t
+  type state_t = State.t
+  type state_err_t = State.err_t
+  type state_vt = State.vt
 
   type state = State.t
 
@@ -51,6 +97,8 @@ struct
   type conf_t = BConfErr of err_t list | BConfCont of State.t
 
   type result_t = (State.t, State.vt, err_t) ExecRes.t
+
+  type 'a cont_func = ReachedEnd of 'a list | Continue of (unit -> 'a cont_func)
 
   let max_branching = 100
 

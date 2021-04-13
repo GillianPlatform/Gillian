@@ -51,7 +51,7 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     source_file : string;
     source_files : SourceFiles.t option;
     scopes : scope list;
-    mutable step_func : unit -> Verification.result_t GInterpreter.cont_func;
+    mutable step_func : unit -> Verification.result_t Verification.SAInterpreter.cont_func;
   }
 
   let scopes_tbl = Hashtbl.create 0
@@ -155,8 +155,8 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
   let step dbg =
     let cont_func = dbg.step_func () in
     match cont_func with
-    | GInterpreter.ReachedEnd _ -> ReachedEnd
-    | GInterpreter.Continue step_func ->
+    | ReachedEnd _ -> ReachedEnd
+    | Continue step_func ->
         let () = dbg.step_func <- step_func in
         Step
 
