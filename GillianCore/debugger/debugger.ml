@@ -51,7 +51,11 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     source_file : string;
     source_files : SourceFiles.t option;
     scopes : scope list;
-    mutable step_func : unit -> Verification.result_t Verification.SAInterpreter.cont_func;
+    mutable step_func :
+      unit ->
+      Verification.SAInterpreter.CallStack.t
+      * Verification.result_t Verification.SAInterpreter.cont_func;
+    mutable frames : frame list;
   }
 
   let scopes_tbl = Hashtbl.create 0
@@ -141,22 +145,42 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     in
     let step_func = Verification.verify_up_to_procs prog in
     match step_func with
-    | ReachedEnd _       -> Error "Nothing to run"
-    | Continue step_func ->
+    | Verification.SAInterpreter.Finished _ -> Error "Nothing to run"
+    | Verification.SAInterpreter.Continue step_func ->
         Ok
           ({
              source_file = file_name;
              source_files = source_files_opt;
              scopes = [ global_scope; local_scope ];
              step_func;
+             frames = [];
            }
             : debugger_state)
 
   let step dbg =
-    let cont_func = dbg.step_func () in
+    let cs, cont_func = dbg.step_func () in
+    (* TODO: Store location (col and line number) when parsing GIL so
+             we have the info to use here *)
+    let () =
+      dbg.frames <-
+        cs
+        |> List.map
+             (fun
+               (se : Verification.SAInterpreter.CallStack.stack_element)
+               :
+               frame
+             ->
+               {
+                 index = se.call_index;
+                 name = se.pid;
+                 source_path = dbg.source_file;
+                 line_num = 15;
+                 col_num = 17;
+               })
+    in
     match cont_func with
-    | ReachedEnd _ -> ReachedEnd
-    | Continue step_func ->
+    | Verification.SAInterpreter.Finished _ -> ReachedEnd
+    | Verification.SAInterpreter.Continue step_func ->
         let () = dbg.step_func <- step_func in
         Step
 
@@ -171,17 +195,7 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     let () = if !Config.stats then Statistics.print_statistics () in
     Logging.wrap_up ()
 
-  let get_frames dbg =
-    [
-      ({
-         index = 0;
-         name = "This is a test";
-         source_path = dbg.source_file;
-         line_num = 15;
-         col_num = 17;
-       }
-        : frame);
-    ]
+  let get_frames dbg = dbg.frames
 
   let get_scopes dbg = dbg.scopes
 

@@ -1,9 +1,16 @@
 module type S = sig
+  module CallStack : CallStack.S
+
   type vt
+
   type st
+
   type store_t
+
   type state_t
+
   type state_err_t
+
   type state_vt
 
   type err_t = (vt, state_err_t) ExecErr.t
@@ -12,7 +19,9 @@ module type S = sig
 
   type result_t = (state_t, state_vt, err_t) ExecRes.t
 
-  type 'a cont_func = ReachedEnd of 'a list | Continue of (unit -> 'a cont_func)
+  type 'a cont_func =
+    | Finished of 'a list
+    | Continue of (unit -> CallStack.t * 'a cont_func)
 
   val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
 
@@ -29,7 +38,7 @@ module type S = sig
     UP.prog ->
     string ->
     string list ->
-      state_t ->
+    state_t ->
     'a cont_func
 
   val evaluate_proc :
@@ -47,12 +56,11 @@ module Make
                with type vt = Val.t
                 and type st = ESubst.t
                 and type store_t = Store.t)
-    (External : External.S) : S
+    (External : External.S) :
+  S
     with type vt = Val.t
-    and type st = ESubst.t
-    and type store_t = Store.t
-    and type state_t = State.t
-    and type state_err_t = State.err_t
-    and type state_vt = State.vt
-
-
+     and type st = ESubst.t
+     and type store_t = Store.t
+     and type state_t = State.t
+     and type state_err_t = State.err_t
+     and type state_vt = State.vt

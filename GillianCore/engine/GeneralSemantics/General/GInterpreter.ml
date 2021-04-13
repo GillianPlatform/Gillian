@@ -2,11 +2,18 @@ open Literal
 module L = Logging
 
 module type S = sig
+  module CallStack : CallStack.S
+
   type vt
+
   type st
+
   type store_t
+
   type state_t
+
   type state_err_t
+
   type state_vt
 
   type err_t = (vt, state_err_t) ExecErr.t
@@ -15,7 +22,9 @@ module type S = sig
 
   type result_t = (state_t, state_vt, err_t) ExecRes.t
 
-  type 'a cont_func = ReachedEnd of 'a list | Continue of (unit -> 'a cont_func)
+  type 'a cont_func =
+    | Finished of 'a list
+    | Continue of (unit -> CallStack.t * 'a cont_func)
 
   val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
 
@@ -32,7 +41,7 @@ module type S = sig
     UP.prog ->
     string ->
     string list ->
-      state_t ->
+    state_t ->
     'a cont_func
 
   val evaluate_proc :
@@ -40,7 +49,6 @@ module type S = sig
 
   val evaluate_prog : UP.prog -> result_t list
 end
-
 
 (** General GIL Interpreter *)
 module Make
@@ -61,10 +69,15 @@ struct
   module External = External (Val) (ESubst) (Store) (State) (CallStack)
 
   type vt = Val.t
+
   type st = ESubst.t
+
   type store_t = Store.t
+
   type state_t = State.t
+
   type state_err_t = State.err_t
+
   type state_vt = State.vt
 
   type state = State.t
@@ -98,7 +111,9 @@ struct
 
   type result_t = (State.t, State.vt, err_t) ExecRes.t
 
-  type 'a cont_func = ReachedEnd of 'a list | Continue of (unit -> 'a cont_func)
+  type 'a cont_func =
+    | Finished of 'a list
+    | Continue of (unit -> CallStack.t * 'a cont_func)
 
   let max_branching = 100
 
@@ -1066,7 +1081,7 @@ struct
     | [] ->
         let results = List.map ret_fun results in
         let results = hold_results @ results in
-        if not retry then ReachedEnd results
+        if not retry then Finished results
         else (
           L.(verbose (fun m -> m "Relaunching suspended confs"));
           let hold_confs =
@@ -1083,7 +1098,7 @@ struct
           protected_evaluate_cmd prog state cs iframes prev prev_loop_ids i
             b_counter
         in
-        Continue (fun () -> f (next_confs @ rest_confs) results)
+        Continue (fun () -> (cs, f (next_confs @ rest_confs) results))
     | ConfCont (state, cs, _, _, _, i, b_counter) :: rest_confs ->
         let _, annot_cmd = get_cmd prog cs i in
         Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
@@ -1122,9 +1137,9 @@ struct
 *)
   let rec evaluate_cmd_iter (init_func : 'a cont_func) : 'a list =
     match init_func with
-    | ReachedEnd results -> results
+    | Finished results   -> results
     | Continue cont_func ->
-        let cont_func = cont_func () in
+        let _, cont_func = cont_func () in
         evaluate_cmd_iter cont_func
 
   (**
@@ -1170,7 +1185,8 @@ struct
         ()
     in
     let conf : cconf_t = ConfCont (state, cs, [], -1, [], 0, 0) in
-    Continue (fun () -> evaluate_cmd_step ret_fun true prog [] [] [ conf ] [])
+    Continue
+      (fun () -> (cs, evaluate_cmd_step ret_fun true prog [] [] [ conf ] []))
 
   (**
   Evaluation of procedures
@@ -1211,7 +1227,8 @@ struct
     let init_func =
       Continue
         (fun () ->
-          evaluate_cmd_step ret_fun true prog [] [] [ initial_conf ] [])
+          ( initial_cs,
+            evaluate_cmd_step ret_fun true prog [] [] [ initial_conf ] [] ))
     in
     evaluate_cmd_iter init_func
 
