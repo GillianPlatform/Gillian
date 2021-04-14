@@ -13,15 +13,26 @@ module type S = sig
 
   type state_vt
 
+  module Val : Val.S with type t = vt
+
+  module Store : Store.S with type t = store_t and type vt = vt
+
+  module State :
+    State.S
+      with type t = state_t
+       and type vt = vt
+       and type st = st
+       and type store_t = store_t
+
   type err_t = (vt, state_err_t) ExecErr.t
 
-  type conf_t = BConfErr of err_t list | BConfCont of state_t
+  type conf_t = BConfErr of err_t list | BConfCont of State.t
 
-  type result_t = (state_t, state_vt, err_t) ExecRes.t
+  type result_t = (State.t, state_vt, err_t) ExecRes.t
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (unit -> CallStack.t * 'a cont_func)
+    | Continue of (unit -> CallStack.t * State.t * 'a cont_func)
 
   val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
 
@@ -31,18 +42,18 @@ module type S = sig
 
   val reset : unit -> unit
 
-  val evaluate_lcmds : UP.prog -> LCmd.t list -> state_t -> state_t list
+  val evaluate_lcmds : UP.prog -> LCmd.t list -> State.t -> State.t list
 
   val init_evaluate_proc :
     (result_t -> 'a) ->
     UP.prog ->
     string ->
     string list ->
-    state_t ->
+    State.t ->
     'a cont_func
 
   val evaluate_proc :
-    (result_t -> 'a) -> UP.prog -> string -> string list -> state_t -> 'a list
+    (result_t -> 'a) -> UP.prog -> string -> string list -> State.t -> 'a list
 
   val evaluate_prog : UP.prog -> result_t list
 end

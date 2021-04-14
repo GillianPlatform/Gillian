@@ -16,15 +16,26 @@ module type S = sig
 
   type state_vt
 
+  module Val : Val.S with type t = vt
+
+  module Store : Store.S with type t = store_t and type vt = vt
+
+  module State :
+    State.S
+      with type t = state_t
+       and type vt = vt
+       and type st = st
+       and type store_t = store_t
+
   type err_t = (vt, state_err_t) ExecErr.t
 
-  type conf_t = BConfErr of err_t list | BConfCont of state_t
+  type conf_t = BConfErr of err_t list | BConfCont of State.t
 
-  type result_t = (state_t, state_vt, err_t) ExecRes.t
+  type result_t = (State.t, state_vt, err_t) ExecRes.t
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (unit -> CallStack.t * 'a cont_func)
+    | Continue of (unit -> CallStack.t * State.t * 'a cont_func)
 
   val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
 
@@ -34,18 +45,18 @@ module type S = sig
 
   val reset : unit -> unit
 
-  val evaluate_lcmds : UP.prog -> LCmd.t list -> state_t -> state_t list
+  val evaluate_lcmds : UP.prog -> LCmd.t list -> State.t -> State.t list
 
   val init_evaluate_proc :
     (result_t -> 'a) ->
     UP.prog ->
     string ->
     string list ->
-    state_t ->
+    State.t ->
     'a cont_func
 
   val evaluate_proc :
-    (result_t -> 'a) -> UP.prog -> string -> string list -> state_t -> 'a list
+    (result_t -> 'a) -> UP.prog -> string -> string list -> State.t -> 'a list
 
   val evaluate_prog : UP.prog -> result_t list
 end
@@ -67,6 +78,9 @@ struct
 
   module CallStack = CallStack.Make (Val) (Store)
   module External = External (Val) (ESubst) (Store) (State) (CallStack)
+  module Val = Val
+  module State = State
+  module Store = Store
 
   type vt = Val.t
 
@@ -80,9 +94,7 @@ struct
 
   type state_vt = State.vt
 
-  type state = State.t
-
-  type invariant_frames = (string * state) list
+  type invariant_frames = (string * State.t) list
 
   type err_t = (Val.t, State.err_t) ExecErr.t
 
@@ -113,7 +125,7 @@ struct
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (unit -> CallStack.t * 'a cont_func)
+    | Continue of (unit -> CallStack.t * State.t * 'a cont_func)
 
   let max_branching = 100
 
@@ -1098,7 +1110,7 @@ struct
           protected_evaluate_cmd prog state cs iframes prev prev_loop_ids i
             b_counter
         in
-        Continue (fun () -> (cs, f (next_confs @ rest_confs) results))
+        Continue (fun () -> (cs, state, f (next_confs @ rest_confs) results))
     | ConfCont (state, cs, _, _, _, i, b_counter) :: rest_confs ->
         let _, annot_cmd = get_cmd prog cs i in
         Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
@@ -1139,7 +1151,7 @@ struct
     match init_func with
     | Finished results   -> results
     | Continue cont_func ->
-        let _, cont_func = cont_func () in
+        let _, _, cont_func = cont_func () in
         evaluate_cmd_iter cont_func
 
   (**
@@ -1186,7 +1198,8 @@ struct
     in
     let conf : cconf_t = ConfCont (state, cs, [], -1, [], 0, 0) in
     Continue
-      (fun () -> (cs, evaluate_cmd_step ret_fun true prog [] [] [ conf ] []))
+      (fun () ->
+        (cs, state, evaluate_cmd_step ret_fun true prog [] [] [ conf ] []))
 
   (**
   Evaluation of procedures
@@ -1221,13 +1234,15 @@ struct
         ~ret_var:"out" ~call_index:(-1) ~continue_index:(-1) ~error_index:(-1)
         ()
     in
+    let initial_state = State.init (Some prog.preds) in
     let initial_conf =
-      ConfCont (State.init (Some prog.preds), initial_cs, [], -1, [], 0, 0)
+      ConfCont (initial_state, initial_cs, [], -1, [], 0, 0)
     in
     let init_func =
       Continue
         (fun () ->
           ( initial_cs,
+            initial_state,
             evaluate_cmd_step ret_fun true prog [] [] [ initial_conf ] [] ))
     in
     evaluate_cmd_iter init_func

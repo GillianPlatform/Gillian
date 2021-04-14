@@ -54,15 +54,17 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     mutable step_func :
       unit ->
       Verification.SAInterpreter.CallStack.t
+      * Verification.SAInterpreter.state_t
       * Verification.result_t Verification.SAInterpreter.cont_func;
     mutable frames : frame list;
+    mutable state : Verification.SAInterpreter.state_t option;
   }
 
   let scopes_tbl = Hashtbl.create 0
 
-  let global_scope = ({ name = "Global"; id = 1 } : scope)
+  let global_scope = ({ name = "Store"; id = 1 } : scope)
 
-  let local_scope = ({ name = "Local"; id = 2 } : scope)
+  let local_scope = ({ name = "Heap"; id = 2 } : scope)
 
   (* TODO: Find a common place to put the below three functions which are
      duplicated in CommandLine.ml *)
@@ -154,11 +156,12 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
              scopes = [ global_scope; local_scope ];
              step_func;
              frames = [];
+             state = None;
            }
             : debugger_state)
 
   let step dbg =
-    let cs, cont_func = dbg.step_func () in
+    let cs, state, cont_func = dbg.step_func () in
     (* TODO: Store location (col and line number) when parsing GIL so
              we have the info to use here *)
     let () =
@@ -178,6 +181,7 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
                  col_num = 17;
                })
     in
+    let () = dbg.state <- Some state in
     match cont_func with
     | Verification.SAInterpreter.Finished _ -> ReachedEnd
     | Verification.SAInterpreter.Continue step_func ->
@@ -199,17 +203,29 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
 
   let get_scopes dbg = dbg.scopes
 
-  let get_variables var_ref _ =
+  let get_variables var_ref dbg =
     (* TODO: Display store and heap *)
     match Hashtbl.find_opt scopes_tbl var_ref with
     | None    -> []
     | Some id ->
-        [
-          ({ name = id ^ "_i"; value = "21354"; type_ = Some "integer" }
-            : variable);
-          ({ name = id ^ "_f"; value = "4.52"; type_ = Some "float" }
-            : variable);
-          ({ name = id ^ "_s"; value = "hello world"; type_ = Some "string" }
-            : variable);
-        ]
+        if id = "Store" then
+          match dbg.state with
+          | None       -> []
+          | Some state ->
+              let store = Verification.SAInterpreter.State.get_store state in
+              Verification.SAInterpreter.Store.bindings store
+              |> List.map (fun (var, value) ->
+                     let value =
+                       Fmt.to_to_string Verification.SAInterpreter.Val.pp value
+                     in
+                     ({ name = var; value; type_ = None } : variable))
+        else
+          [
+            ({ name = id ^ "_i"; value = "21354"; type_ = Some "integer" }
+              : variable);
+            ({ name = id ^ "_f"; value = "4.52"; type_ = Some "float" }
+              : variable);
+            ({ name = id ^ "_s"; value = "hello world"; type_ = Some "string" }
+              : variable);
+          ]
 end
