@@ -216,7 +216,7 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
               Verification.SAInterpreter.Store.bindings store
               |> List.map (fun (var, value) ->
                      let value =
-                       Fmt.to_to_string Verification.SAInterpreter.Val.pp value
+                       Fmt.to_to_string Verification.SAInterpreter.Val.full_pp value
                      in
                      ({ name = var; value; type_ = None } : variable))
         else
