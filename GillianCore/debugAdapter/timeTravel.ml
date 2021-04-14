@@ -15,6 +15,13 @@ module Make (Debugger : Debugger.S) = struct
   let run ~dbg rpc =
     Lwt.pause ();%lwt
     Debug_rpc.set_command_handler rpc
+      (module Continue_command)
+      (fun _ ->
+        let () = Log.info "Continue request received" in
+        let stop_reason = Debugger.run dbg in
+        send_stopped_events stop_reason rpc;%lwt
+        Lwt.return (Continue_command.Result.make ()));
+    Debug_rpc.set_command_handler rpc
       (module Next_command)
       (fun _ ->
         let () = Log.info "Next request received" in
