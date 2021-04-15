@@ -73,9 +73,9 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
 
   let scopes_tbl = Hashtbl.create 0
 
-  let global_scope = ({ name = "Store"; id = 1 } : scope)
+  let store_scope = ({ name = "Store"; id = 1 } : scope)
 
-  let local_scope = ({ name = "Heap"; id = 2 } : scope)
+  let heap_scope = ({ name = "Heap"; id = 2 } : scope)
 
   (* TODO: Find a common place to put the below three functions which are
      duplicated in CommandLine.ml *)
@@ -149,9 +149,8 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
       false
 
   let launch file_name =
-    (* TODO: Remove these dummy scopes *)
-    Hashtbl.replace scopes_tbl global_scope.id global_scope.name;
-    Hashtbl.replace scopes_tbl local_scope.id local_scope.name;
+    Hashtbl.replace scopes_tbl store_scope.id store_scope.name;
+    Hashtbl.replace scopes_tbl heap_scope.id heap_scope.name;
 
     let () = Fmt_tty.setup_std_outputs () in
     let () = Config.current_exec_mode := Verification in
@@ -175,7 +174,7 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
           ({
              source_file = file_name;
              source_files = source_files_opt;
-             scopes = [ global_scope; local_scope ];
+             scopes = [ store_scope; heap_scope ];
              step_func;
              prog;
              frames = [];
