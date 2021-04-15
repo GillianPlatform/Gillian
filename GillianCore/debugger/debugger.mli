@@ -1,5 +1,5 @@
 module type S = sig
-  type stop_reason = Step | ReachedEnd
+  type stop_reason = Step | ReachedEnd | Breakpoint
 
   type frame = {
     index : int;
@@ -30,6 +30,8 @@ module type S = sig
   val get_scopes : debugger_state -> scope list
 
   val get_variables : int -> debugger_state -> variable list
+
+  val set_breakpoints : string option -> int list -> debugger_state -> unit
 end
 
 module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) : S

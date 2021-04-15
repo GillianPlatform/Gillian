@@ -8,6 +8,7 @@ module Make (Debugger : Debugger.S) = struct
   module Lifecycle = Lifecycle.Make (Debugger)
   module TimeTravel = TimeTravel.Make (Debugger)
   module Inspect = Inspect.Make (Debugger)
+  module Breakpoints = Breakpoints.Make (Debugger)
 
   let initialize rpc =
     let promise, resolver = Lwt.task () in
@@ -69,6 +70,7 @@ module Make (Debugger : Debugger.S) = struct
         Inspect.run ~dbg rpc;
         Lifecycle.run ~launch_args ~dbg rpc;
         TimeTravel.run ~dbg rpc;
+        Breakpoints.run ~dbg rpc;
       ]
 
   let start in_ out =

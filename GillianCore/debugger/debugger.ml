@@ -1,7 +1,7 @@
 module L = Logging
 
 module type S = sig
-  type stop_reason = Step | ReachedEnd
+  type stop_reason = Step | ReachedEnd | Breakpoint
 
   type frame = {
     index : int;
@@ -32,10 +32,14 @@ module type S = sig
   val get_scopes : debugger_state -> scope list
 
   val get_variables : int -> debugger_state -> variable list
+
+  val set_breakpoints : string option -> int list -> debugger_state -> unit
 end
 
 module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
-  type stop_reason = Step | ReachedEnd
+  module Breakpoints = Set.Make (Int)
+
+  type stop_reason = Step | ReachedEnd | Breakpoint
 
   type frame = {
     index : int;
@@ -51,6 +55,8 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
 
   type variable = { name : string; value : string; type_ : string option }
 
+  type breakpoints = (string, Breakpoints.t) Hashtbl.t
+
   type debugger_state = {
     source_file : string;
     source_files : SourceFiles.t option;
@@ -62,6 +68,7 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
       * Verification.result_t Verification.SAInterpreter.cont_func;
     mutable frames : frame list;
     mutable state : Verification.SAInterpreter.state_t option;
+    mutable breakpoints : breakpoints;
   }
 
   let scopes_tbl = Hashtbl.create 0
@@ -130,6 +137,17 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     in
     (prog, source_files_opt)
 
+  let has_hit_breakpoint dbg =
+    match dbg.frames with
+    | [] -> false
+    | frame :: _ ->
+    if Hashtbl.mem dbg.breakpoints frame.source_path then
+      let breakpoints = Hashtbl.find dbg.breakpoints frame.source_path in
+      (* Currently only one breakpoint per line is supported *)
+      Breakpoints.mem frame.start_line breakpoints
+    else
+      false
+
   let launch file_name =
     (* TODO: Remove these dummy scopes *)
     Hashtbl.replace scopes_tbl global_scope.id global_scope.name;
@@ -162,16 +180,17 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
              prog;
              frames = [];
              state = None;
+             breakpoints = Hashtbl.create 0;
            }
             : debugger_state)
 
   let step dbg =
     let next_confs, cont_func = dbg.step_func () in
     let open Verification.SAInterpreter in
-    let callstack, state, curr_proc_body_idx =
+    let callstack, state, next_proc_body_idx =
       match next_confs with
-      | ConfCont (state, callstack, _, _, _, curr_proc_body_idx, _) :: _ ->
-          (callstack, Some state, curr_proc_body_idx)
+      | ConfCont (state, callstack, _, _, _, next_proc_body_idx, _) :: _ ->
+          (callstack, Some state, next_proc_body_idx)
       (* TODO: Return "exception" as stop reason for ConfError case *)
       | _ -> ([], None, -1)
     in
@@ -190,7 +209,7 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
                  match proc with
                  | None      -> defaults
                  | Some proc -> (
-                     let annot, _, _ = proc.proc_body.(curr_proc_body_idx) in
+                     let annot, _, _ = proc.proc_body.(next_proc_body_idx) in
                      let loc_opt = Annot.get_origin_loc annot in
                      match loc_opt with
                      | None     -> defaults
@@ -215,16 +234,19 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     in
     let () = dbg.state <- state in
     match cont_func with
-    | Verification.SAInterpreter.Finished _ -> ReachedEnd
-    | Verification.SAInterpreter.Continue step_func ->
+    | Finished _ -> ReachedEnd
+    | Continue step_func ->
         let () = dbg.step_func <- step_func in
-        Step
+        if has_hit_breakpoint dbg then
+          Breakpoint
+        else
+          Step
 
   let rec run dbg =
     let stop_reason = step dbg in
     match stop_reason with
     | Step       -> run dbg
-    | ReachedEnd -> ReachedEnd
+    | other_stop_reason -> other_stop_reason
 
   let terminate dbg =
     let () = Verification.postprocess_files dbg.source_files in
@@ -261,4 +283,12 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
             ({ name = id ^ "_s"; value = "hello world"; type_ = Some "string" }
               : variable);
           ]
+
+  let set_breakpoints source bp_list dbg =
+    match source with
+    (* We can't set the breakpoints if we do not know the source file *)
+    | None -> ()
+    | Some source ->
+        let bp_set = Breakpoints.of_list bp_list in
+        Hashtbl.replace dbg.breakpoints source bp_set
 end
