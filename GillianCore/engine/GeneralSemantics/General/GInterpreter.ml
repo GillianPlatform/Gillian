@@ -27,7 +27,25 @@ module type S = sig
        and type st = st
        and type store_t = store_t
 
+  type invariant_frames = (string * State.t) list
+
   type err_t = (vt, state_err_t) ExecErr.t
+
+  type cconf_t =
+    | ConfErr    of string * int * State.t * err_t list
+    | ConfCont   of
+        State.t * CallStack.t * invariant_frames * int * string list * int * int
+    | ConfFinish of Flag.t * State.vt * State.t
+        (** Equal to Conf cont + the id of the required spec *)
+    | ConfSusp   of
+        string
+        * State.t
+        * CallStack.t
+        * invariant_frames
+        * int
+        * string list
+        * int
+        * int
 
   type conf_t = BConfErr of err_t list | BConfCont of State.t
 
@@ -35,7 +53,7 @@ module type S = sig
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (unit -> CallStack.t * State.t * 'a cont_func)
+    | Continue of (unit -> cconf_t list * 'a cont_func)
 
   val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
 
@@ -125,7 +143,7 @@ struct
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (unit -> CallStack.t * State.t * 'a cont_func)
+    | Continue of (unit -> cconf_t list * 'a cont_func)
 
   let max_branching = 100
 
@@ -1110,7 +1128,7 @@ struct
           protected_evaluate_cmd prog state cs iframes prev prev_loop_ids i
             b_counter
         in
-        Continue (fun () -> (cs, state, f (next_confs @ rest_confs) results))
+        Continue (fun () -> (next_confs, f (next_confs @ rest_confs) results))
     | ConfCont (state, cs, _, _, _, i, b_counter) :: rest_confs ->
         let _, annot_cmd = get_cmd prog cs i in
         Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
@@ -1151,7 +1169,7 @@ struct
     match init_func with
     | Finished results   -> results
     | Continue cont_func ->
-        let _, _, cont_func = cont_func () in
+        let _, cont_func = cont_func () in
         evaluate_cmd_iter cont_func
 
   (**
@@ -1199,7 +1217,7 @@ struct
     let conf : cconf_t = ConfCont (state, cs, [], -1, [], 0, 0) in
     Continue
       (fun () ->
-        (cs, state, evaluate_cmd_step ret_fun true prog [] [] [ conf ] []))
+        ([ conf ], evaluate_cmd_step ret_fun true prog [] [] [ conf ] []))
 
   (**
   Evaluation of procedures
@@ -1241,8 +1259,7 @@ struct
     let init_func =
       Continue
         (fun () ->
-          ( initial_cs,
-            initial_state,
+          ( [ initial_conf ],
             evaluate_cmd_step ret_fun true prog [] [] [ initial_conf ] [] ))
     in
     evaluate_cmd_iter init_func

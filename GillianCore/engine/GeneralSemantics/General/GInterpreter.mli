@@ -24,7 +24,25 @@ module type S = sig
        and type st = st
        and type store_t = store_t
 
+  type invariant_frames = (string * State.t) list
+
   type err_t = (vt, state_err_t) ExecErr.t
+
+  type cconf_t =
+    | ConfErr    of string * int * State.t * err_t list
+    | ConfCont   of
+        State.t * CallStack.t * invariant_frames * int * string list * int * int
+    | ConfFinish of Flag.t * State.vt * State.t
+        (** Equal to Conf cont + the id of the required spec *)
+    | ConfSusp   of
+        string
+        * State.t
+        * CallStack.t
+        * invariant_frames
+        * int
+        * string list
+        * int
+        * int
 
   type conf_t = BConfErr of err_t list | BConfCont of State.t
 
@@ -32,7 +50,7 @@ module type S = sig
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (unit -> CallStack.t * State.t * 'a cont_func)
+    | Continue of (unit -> cconf_t list * 'a cont_func)
 
   val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
 

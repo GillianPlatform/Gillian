@@ -5,8 +5,10 @@ module type S = sig
     index : int;
     name : string;
     source_path : string;
-    line_num : int;
-    col_num : int;
+    start_line : int;
+    start_column : int;
+    end_line : int;
+    end_column : int;
   }
 
   type scope = { name : string; id : int }

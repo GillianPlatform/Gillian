@@ -7,8 +7,10 @@ module type S = sig
     index : int;
     name : string;
     source_path : string;
-    line_num : int;
-    col_num : int;
+    start_line : int;
+    start_column : int;
+    end_line : int;
+    end_column : int;
   }
 
   type scope = { name : string; id : int }
@@ -39,8 +41,10 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     index : int;
     name : string;
     source_path : string;
-    line_num : int;
-    col_num : int;
+    start_line : int;
+    start_column : int;
+    end_line : int;
+    end_column : int;
   }
 
   type scope = { name : string; id : int }
@@ -51,10 +55,10 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     source_file : string;
     source_files : SourceFiles.t option;
     scopes : scope list;
+    prog : (Annot.t, int) Prog.t;
     mutable step_func :
       unit ->
-      Verification.SAInterpreter.CallStack.t
-      * Verification.SAInterpreter.state_t
+      Verification.SAInterpreter.cconf_t list
       * Verification.result_t Verification.SAInterpreter.cont_func;
     mutable frames : frame list;
     mutable state : Verification.SAInterpreter.state_t option;
@@ -155,33 +159,61 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
              source_files = source_files_opt;
              scopes = [ global_scope; local_scope ];
              step_func;
+             prog;
              frames = [];
              state = None;
            }
             : debugger_state)
 
   let step dbg =
-    let cs, state, cont_func = dbg.step_func () in
-    (* TODO: Store location (col and line number) when parsing GIL so
-             we have the info to use here *)
+    let next_confs, cont_func = dbg.step_func () in
+    let open Verification.SAInterpreter in
+    let callstack, state, curr_proc_body_idx =
+      match next_confs with
+      | ConfCont (state, callstack, _, _, _, curr_proc_body_idx, _) :: _ ->
+          (callstack, Some state, curr_proc_body_idx)
+      (* TODO: Return "exception" as stop reason for ConfError case *)
+      | _ -> ([], None, -1)
+    in
     let () =
       dbg.frames <-
-        cs
+        callstack
         |> List.map
              (fun
                (se : Verification.SAInterpreter.CallStack.stack_element)
                :
                frame
              ->
+               let defaults = (0, 0, 0, 0, "") in
+               let proc = Prog.get_proc dbg.prog se.pid in
+               let start_line, start_column, end_line, end_column, source_path =
+                 match proc with
+                 | None      -> defaults
+                 | Some proc -> (
+                     let annot, _, _ = proc.proc_body.(curr_proc_body_idx) in
+                     let loc_opt = Annot.get_origin_loc annot in
+                     match loc_opt with
+                     | None     -> defaults
+                     | Some loc ->
+                         ( loc.loc_start.pos_line,
+                           (* VSCode column number s start from 1 *)
+                           loc.loc_start.pos_column + 1,
+                           loc.loc_end.pos_line,
+                           loc.loc_end.pos_column + 1,
+                           loc.loc_source ))
+               in
                {
+                 (* TODO: make this a guaranteed unique index*)
                  index = se.call_index;
                  name = se.pid;
-                 source_path = dbg.source_file;
-                 line_num = 15;
-                 col_num = 17;
+                 source_path;
+                 start_line;
+                 start_column;
+                 end_line;
+                 end_column;
                })
     in
-    let () = dbg.state <- Some state in
+    let () = dbg.state <- state in
     match cont_func with
     | Verification.SAInterpreter.Finished _ -> ReachedEnd
     | Verification.SAInterpreter.Continue step_func ->

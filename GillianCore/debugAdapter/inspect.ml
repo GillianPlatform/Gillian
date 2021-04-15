@@ -20,10 +20,10 @@ module Make (Debugger : Debugger.S) = struct
                  let source_path =
                    Some (Source.make ~path:(Some frame.Debugger.source_path) ())
                  in
-                 Stack_frame.make ~id:frame.Debugger.index
-                   ~name:frame.Debugger.name ~source:source_path
-                   ~line:frame.Debugger.line_num ~column:frame.Debugger.col_num
-                   ())
+                 Stack_frame.make ~id:frame.Debugger.index ~name:frame.name
+                   ~source:source_path ~line:frame.start_line
+                   ~column:frame.start_column ~end_line:(Some frame.end_line)
+                   ~end_column:(Some frame.end_column) ())
         in
         Lwt.return Stack_trace_command.Result.(make ~stack_frames ()));
     Debug_rpc.set_command_handler rpc
