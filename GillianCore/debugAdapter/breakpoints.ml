@@ -1,7 +1,7 @@
 open DebugProtocolEx
 
 module Make (Debugger : Debugger.S) = struct
-  let run ~dbg rpc =
+  let run dbg rpc =
     Lwt.pause ();%lwt
     Debug_rpc.set_command_handler rpc
       (module Set_breakpoints_command)

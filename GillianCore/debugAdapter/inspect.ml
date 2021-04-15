@@ -1,7 +1,7 @@
 open DebugProtocolEx
 
 module Make (Debugger : Debugger.S) = struct
-  let run ~dbg rpc =
+  let run dbg rpc =
     let promise, _ = Lwt.task () in
     Debug_rpc.set_command_handler rpc
       (module Threads_command)

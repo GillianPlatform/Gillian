@@ -21,7 +21,7 @@ module Make (Debugger : Debugger.S) = struct
           ~thread_id:(Some 0)
           ())
 
-  let run ~dbg rpc =
+  let run dbg rpc =
     Lwt.pause ();%lwt
     Debug_rpc.set_command_handler rpc
       (module Continue_command)

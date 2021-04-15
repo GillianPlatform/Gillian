@@ -1,7 +1,7 @@
 open DebugProtocolEx
 
 module Make (Debugger : Debugger.S) = struct
-  let run ~launch_args ~dbg rpc =
+  let run launch_args dbg rpc =
     let promise, resolver = Lwt.task () in
     Lwt.pause ();%lwt
     let send_initialize_event () =
