@@ -139,14 +139,13 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
 
   let has_hit_breakpoint dbg =
     match dbg.frames with
-    | [] -> false
+    | []         -> false
     | frame :: _ ->
-    if Hashtbl.mem dbg.breakpoints frame.source_path then
-      let breakpoints = Hashtbl.find dbg.breakpoints frame.source_path in
-      (* Currently only one breakpoint per line is supported *)
-      Breakpoints.mem frame.start_line breakpoints
-    else
-      false
+        if Hashtbl.mem dbg.breakpoints frame.source_path then
+          let breakpoints = Hashtbl.find dbg.breakpoints frame.source_path in
+          (* Currently only one breakpoint per line is supported *)
+          Breakpoints.mem frame.start_line breakpoints
+        else false
 
   let launch file_name =
     Hashtbl.replace scopes_tbl store_scope.id store_scope.name;
@@ -233,18 +232,15 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     in
     let () = dbg.state <- state in
     match cont_func with
-    | Finished _ -> ReachedEnd
+    | Finished _         -> ReachedEnd
     | Continue step_func ->
         let () = dbg.step_func <- step_func in
-        if has_hit_breakpoint dbg then
-          Breakpoint
-        else
-          Step
+        if has_hit_breakpoint dbg then Breakpoint else Step
 
   let rec run dbg =
     let stop_reason = step dbg in
     match stop_reason with
-    | Step       -> run dbg
+    | Step              -> run dbg
     | other_stop_reason -> other_stop_reason
 
   let terminate dbg =

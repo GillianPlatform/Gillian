@@ -31,14 +31,11 @@ module Make (Debugger : Debugger.S) = struct
                   make ~reason:Stopped_event.Payload.Reason.Step
                     ~thread_id:(Some 0) ())
           | Debugger.Breakpoint ->
-          Debug_rpc.send_event
-            rpc
-            (module Stopped_event)
-            Stopped_event.Payload.(
-              make
-                ~reason:Stopped_event.Payload.Reason.Breakpoint
-                ~thread_id:(Some 0)
-                ()))
+              Debug_rpc.send_event rpc
+                (module Stopped_event)
+                Stopped_event.Payload.(
+                  make ~reason:Stopped_event.Payload.Reason.Breakpoint
+                    ~thread_id:(Some 0) ()))
         else (
           Log.info "Stop on entry";
           Debug_rpc.send_event rpc
