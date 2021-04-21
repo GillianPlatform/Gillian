@@ -15,6 +15,7 @@ type t = TypeDef__.literal =
   | Type      of Type.t  (** GIL types ({!type:Type.t}) *)
   | LList     of t list  (** Lists of GIL literals *)
   | Nono
+[@@deriving yojson]
 
 let rec equal a b =
   match (a, b) with

@@ -7,7 +7,7 @@
 module rec M :
   (Val.S with type t = Literal.t and type st = CSubst.t and type et = CESubst.t) =
 struct
-  type t = Literal.t
+  type t = Literal.t [@@deriving yojson]
 
   type st = CSubst.t
 

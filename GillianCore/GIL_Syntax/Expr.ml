@@ -13,6 +13,7 @@ type t = TypeDef__.expr =
   | NOp    of NOp.t * t list  (** n-ary operators         *)
   | EList  of t list  (** Lists of expressions    *)
   | ESet   of t list  (** Sets of expressions     *)
+[@@deriving yojson]
 
 let equal (e1 : t) (e2 : t) : bool = Stdlib.compare e1 e2 = 0
 

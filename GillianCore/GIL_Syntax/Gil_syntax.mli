@@ -76,6 +76,7 @@ module Literal : sig
     | Type      of Type.t  (** GIL types ({!type:Type.t}) *)
     | LList     of t list  (** Lists of GIL literals *)
     | Nono  (** Negative information *)
+  [@@deriving yojson]
 
   (** Pretty-printer *)
   val pp : t Fmt.t
@@ -206,6 +207,7 @@ module Expr : sig
     | NOp    of NOp.t * t list  (** n-ary operators ({!type:NOp.t}) *)
     | EList  of t list  (** Lists of expressions *)
     | ESet   of t list  (** Sets of expressions *)
+  [@@deriving yojson]
 
   val lit : Literal.t -> t
 

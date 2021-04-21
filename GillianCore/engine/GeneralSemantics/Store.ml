@@ -10,7 +10,7 @@ module type S = sig
   type vt
 
   (** Type of GIL stores *)
-  type t
+  type t [@@deriving yojson]
 
   (** Return the set of bindings in a given store *)
   val bindings : t -> (Var.t * vt) list
@@ -300,4 +300,44 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     Hashtbl.fold
       (fun _ v ac -> Var.Set.union ac (Expr.lvars (Val.to_expr v)))
       store.symb Var.Set.empty
+
+  (**
+    Converts JSON into a store
+
+    @param store Store represented as JSON
+    @return Store of type t
+  *)
+  let of_yojson (json : Yojson.Safe.t) : (t, string) result =
+    match json with
+    | `Assoc list ->
+        let bindings =
+          list
+          |> List.map (fun (id, value) ->
+                 let value = Val.of_yojson value in
+                 (id, value))
+        in
+        let errors =
+          List.filter (fun (_, value) -> Result.is_error value) bindings
+        in
+        if List.length errors > 0 then
+          Error (Result.get_error (snd (List.hd errors)))
+        else
+          Ok
+            (init
+               (bindings
+               |> List.map (fun (id, value) -> (id, Result.get_ok value))))
+    | _           -> Error "Cannot parse yojson into store"
+
+  (**
+    Converts JSON into a store
+
+    @param store Store to convert to JSON
+    @return Store represented as JSON
+  *)
+  let to_yojson (store : t) : Yojson.Safe.t =
+    `Assoc
+      (bindings store
+      |> List.map (fun (id, value) ->
+             let value = Val.to_yojson value in
+             (id, value)))
 end

@@ -8,7 +8,7 @@ module type S = sig
   type vt
 
   (** Type of GIL stores *)
-  type t
+  type t [@@deriving yojson]
 
   (** Return the set of bindings in a given store *)
   val bindings : t -> (Var.t * vt) list

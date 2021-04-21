@@ -1,7 +1,7 @@
 (** Interface for GIL Values *)
 module type S = sig
   (** Type of GIL values *)
-  type t
+  type t [@@deriving yojson]
 
   (** Type of substitutions for GIL values *)
   type st
