@@ -23,11 +23,13 @@ let get_formatter () =
 
 class virtual ['a] t =
   object (self)
-    method log (report : 'a Report.t) =
+    method log (report : 'a Report.t) : unit =
       if enabled () then
         match report.content with
         | Agnostic c -> self#log_agnostic c
-        | Specific c -> self#log_specific c
+        | Specific _ -> ()
+
+    method log_specific (_ : 'a Loggable.loggable) (_ : 'a Report.t) : unit = ()
 
     method wrap_up = wrap_up ()
 
@@ -38,8 +40,7 @@ class virtual ['a] t =
           Format.fprintf self#formatter "@,@?"
       | Phase      -> Format.fprintf self#formatter "*** Phase ***@,@?"
 
-    method virtual private log_specific : 'a -> unit
-
+    (* method virtual private log_specific : 'a -> unit *)
     method private formatter = get_formatter ()
   end
 
@@ -47,6 +48,4 @@ let default : type a. unit -> a t =
  fun () ->
   object
     inherit [a] t
-
-    method private log_specific _ = ()
   end

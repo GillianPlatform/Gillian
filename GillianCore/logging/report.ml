@@ -34,7 +34,7 @@ end = struct
 
   let of_string s = PP (fun m -> m "%s" s)
 
-  let to_yojson t = to_string t |> fun s -> `String s
+  let to_yojson t = `String (to_string t)
 
   let of_yojson yojson =
     Result.map of_string

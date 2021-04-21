@@ -1,14 +1,18 @@
 module Mode = Mode
-module Report = Report
+
+(* module Report = Report *)
 module Reporter = Reporter
 module FileReporter = FileReporter
 module DatabaseReporter = DatabaseReporter
+module Loggable = Loggable
 
 let () =
   Printexc.register_printer (function
     | Failure s ->
         Some (Format.asprintf "!!!!!!!!!!\nFAILURE:\n%s\n!!!!!!!!!!\n\n" s)
     | _         -> None)
+
+let () = DbReporter.reset ()
 
 let wrap_up = Default.wrap_up
 
@@ -20,6 +24,15 @@ let log lvl ?title ?severity msgf =
         ?severity ()
     in
     Default.log report
+
+let log_specific lvl ?title ?severity loggable content =
+  if Mode.should_log lvl then
+    let report =
+      ReportBuilder.make ?title ~content:(Specific content) ?severity ()
+    in
+
+    (* Default.log_specific loggable report *)
+    DbReporter.log_specific loggable report
 
 let normal ?title ?severity msgf = log Normal ?title ?severity msgf
 
@@ -64,7 +77,7 @@ let with_verbose_phase ?title ?severity f =
 
 let with_tmi_phase ?title ?severity f = with_phase TMI ?title ?severity f
 
-module Make (TargetLang : sig
+(* module Make (TargetLang : sig
   type t
 
   val file_reporter : t FileReporter.t option
@@ -97,4 +110,4 @@ struct
   let tmi = log TMI
 
   let wrap_up () = List.iter (fun reporter -> reporter#wrap_up) reporters
-end
+end *)

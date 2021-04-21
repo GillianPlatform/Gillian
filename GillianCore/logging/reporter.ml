@@ -1,4 +1,7 @@
-type 'a t = < log : 'a Report.t -> unit ; wrap_up : unit >
+type 'a t =
+  < log : 'a Report.t -> unit
+  ; log_specific : 'a Loggable.loggable -> 'a Report.t -> unit
+  ; wrap_up : unit >
 
 module Make (P : sig
   type conf

@@ -12,16 +12,20 @@ module Mode : sig
   val set_mode : t -> unit
 end
 
+(*
 module Report : sig
   type id
 
   type severity = Info | Log | Success | Error | Warning
 
   type 'a t
-end
+end *)
 
 module Reporter : sig
-  type 'a t = < log : 'a Report.t -> unit ; wrap_up : unit >
+  type 'a t =
+    < log : 'a Report.t -> unit
+    ; log_specific : 'a Loggable.loggable -> 'a Report.t -> unit
+    ; wrap_up : unit >
 end
 
 module FileReporter : sig
@@ -31,9 +35,9 @@ module FileReporter : sig
     object
       method log : 'a Report.t -> unit
 
-      method wrap_up : unit
+      method log_specific : 'a Loggable.loggable -> 'a Report.t -> unit
 
-      method virtual private log_specific : 'a -> unit
+      method wrap_up : unit
 
       method private formatter : Format.formatter
     end
@@ -46,10 +50,36 @@ module DatabaseReporter : sig
     object
       method log : 'a Report.t -> unit
 
+      method log_specific : 'a Loggable.loggable -> 'a Report.t -> unit
+
       method wrap_up : unit
 
       method virtual private specific_serializer : 'a -> Yojson.Safe.t
     end
+end
+
+module Loggable : sig
+  module type Loggable = sig
+    (* Type to be logged *)
+    type t [@@deriving yojson]
+
+    (* Pretty prints the value *)
+    val pp : Format.formatter -> t -> unit
+  end
+
+  type 'a loggable = (module Loggable with type t = 'a)
+
+  val pp : 'a loggable -> Format.formatter -> 'a -> unit
+
+  val of_yojson : 'a loggable -> Yojson.Safe.t -> ('a, string) result
+
+  val to_yojson : 'a loggable -> 'a -> Yojson.Safe.t
+
+  val loggable :
+    (Format.formatter -> 'a -> unit) ->
+    (Yojson.Safe.t -> ('a, string) result) ->
+    ('a -> Yojson.Safe.t) ->
+    'a loggable
 end
 
 (** Closes all the files *)
@@ -74,6 +104,14 @@ val tmi :
   ?title:string ->
   ?severity:Report.severity ->
   ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
+  unit
+
+val log_specific :
+  Mode.level ->
+  ?title:string ->
+  ?severity:Report.severity ->
+  'a Loggable.loggable ->
+  'a ->
   unit
 
 (** Writes the string and then raises a failure. *)
@@ -102,6 +140,7 @@ val with_verbose_phase :
 val with_tmi_phase :
   ?title:string -> ?severity:Report.severity -> (unit -> 'a) -> 'a
 
+(*
 module Make : functor
   (TargetLang : sig
      type t
@@ -120,4 +159,4 @@ module Make : functor
   val tmi : ?title:string -> ?severity:Report.severity -> TargetLang.t -> unit
 
   val wrap_up : unit -> unit
-end
+end *)

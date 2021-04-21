@@ -279,7 +279,10 @@ struct
           (Annot.get_loop_info annot)
           pp_str_list
           (CallStack.get_loop_ids cs)
-          b_counter state_printer state)
+          b_counter state_printer state);
+    L.log_specific L.Mode.Verbose
+      L.Loggable.(loggable Store.pp Store.of_yojson Store.to_yojson)
+      (State.get_store state)
 
   let print_lconfiguration (lcmd : LCmd.t) (state : State.t) : unit =
     L.normal (fun m ->

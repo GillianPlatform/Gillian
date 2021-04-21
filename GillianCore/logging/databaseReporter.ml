@@ -34,6 +34,11 @@ class virtual ['a] t =
       if enabled () then
         write (Report.to_yojson self#specific_serializer report)
 
+    method log_specific (loggable : 'a Loggable.loggable) (report : 'a Report.t)
+        : unit =
+      if enabled () then
+        write (Report.to_yojson (Loggable.to_yojson loggable) report)
+
     method wrap_up = wrap_up ()
 
     method virtual private specific_serializer : 'a -> Yojson.Safe.t

@@ -3,8 +3,6 @@ type t
 let file_reporter =
   object
     inherit [t] FileReporter.t
-
-    method private log_specific _ = ()
   end
 
 let database_reporter =
@@ -19,5 +17,10 @@ let reporters =
 
 let log report =
   List.iter (fun (reporter : t Reporter.t) -> reporter#log report) reporters
+
+let log_specific loggable report =
+  List.iter
+    (fun (reporter : t Reporter.t) -> reporter#log_specific loggable report)
+    reporters
 
 let wrap_up () = List.iter (fun reporter -> reporter#wrap_up) reporters
