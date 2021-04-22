@@ -1,6 +1,5 @@
 module Mode = Mode
-
-(* module Report = Report *)
+module Report = Report
 module Reporter = Reporter
 module FileReporter = FileReporter
 module DatabaseReporter = DatabaseReporter
@@ -12,29 +11,27 @@ let () =
         Some (Format.asprintf "!!!!!!!!!!\nFAILURE:\n%s\n!!!!!!!!!!\n\n" s)
     | _         -> None)
 
-let () = DbReporter.reset ()
-
 let wrap_up = Default.wrap_up
 
 let log lvl ?title ?severity msgf =
   if Mode.should_log lvl then
+    let s =
+      let str = ref "" in
+      (fun fmt -> Format.kasprintf (fun s -> str := s) fmt) |> msgf;
+      !str
+    in
     let report =
-      ReportBuilder.make ?title
-        ~content:(Agnostic (Debug (Report.PackedPP.make msgf)))
-        ?severity ()
+      ReportBuilder.make ?title ~content:(Loggable.make_string s)
+        ~type_:Report.Debug ?severity ()
     in
     Default.log report
 
-let log_specific lvl ?title ?severity loggable _ =
+let log_specific lvl ?title ?severity loggable type_ =
   if Mode.should_log lvl then
-    let _, _ = (title, severity) in
-
-    (* let report =
-         ReportBuilder.make ?title ~content:(Specific content) ?severity ()
-       in *)
-
-    (* Default.log_specific loggable report *)
-    DbReporter.log_specific loggable
+    let report =
+      ReportBuilder.make ?title ~content:loggable ~type_ ?severity ()
+    in
+    Default.log report
 
 let normal ?title ?severity msgf = log Normal ?title ?severity msgf
 
@@ -78,38 +75,3 @@ let with_verbose_phase ?title ?severity f =
   with_phase Verbose ?title ?severity f
 
 let with_tmi_phase ?title ?severity f = with_phase TMI ?title ?severity f
-
-(* module Make (TargetLang : sig
-  type t
-
-  val file_reporter : t FileReporter.t option
-
-  val database_reporter : t DatabaseReporter.t option
-end) =
-struct
-  let reporters =
-    List.map
-      (function
-        | None, default -> default ()
-        | Some r, _     -> r)
-      TargetLang.
-        [
-          ((file_reporter :> t Reporter.t option), FileReporter.default);
-          ((database_reporter :> t Reporter.t option), DatabaseReporter.default);
-        ]
-
-  let log lvl ?title ?severity content =
-    if Mode.should_log lvl then
-      let report =
-        ReportBuilder.make ?title ~content:(Specific content) ?severity ()
-      in
-      List.iter (fun reporter -> reporter#log report) reporters
-
-  let normal = log Normal
-
-  let verbose = log Verbose
-
-  let tmi = log TMI
-
-  let wrap_up () = List.iter (fun reporter -> reporter#wrap_up) reporters
-end *)

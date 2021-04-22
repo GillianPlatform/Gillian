@@ -10,31 +10,13 @@ type 'a t = (module t with type t = 'a)
 
 type loggable = L : ('a t * 'a) -> loggable
 
-(* let pp (type a) (t : a t) =
-  let (module T) = t in
-  T.pp
-
-let of_yojson (type a) (t : a t) =
-  let (module T) = t in
-  T.of_yojson
-
-let to_yojson (type a) (t : a t) =
-  let (module T) = t in
-  T.to_yojson *)
-
-(* let of_yojson (loggable : loggable) (yojson : Yojson.Safe.t) : ('a, string) result =
-  match loggable with
-  | L (t, _) ->
-    let (module T) = t in
-    T.of_yojson yojson *)
-
 let pp (loggable : loggable) (formatter : Format.formatter) =
   match loggable with
   | L (t, content) ->
-    let (module T) = t in
-    T.pp formatter content
+      let (module T) = t in
+      T.pp formatter content
 
-let to_yojson = function
+let loggable_to_yojson = function
   | L (t, content) ->
       let (module T) = t in
       T.to_yojson content
@@ -55,3 +37,13 @@ let make
     let to_yojson = to_yojson
   end in
   L ((module M), content)
+
+let make_string (s : string) : loggable =
+  let pp = Fmt.string in
+  let of_yojson yojson =
+    match yojson with
+    | `String s -> Ok s
+    | _         -> Error "Cannot parse yojson to a string"
+  in
+  let to_yojson s = `String s in
+  make pp of_yojson to_yojson s

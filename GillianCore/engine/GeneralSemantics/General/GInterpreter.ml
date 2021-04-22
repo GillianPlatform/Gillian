@@ -283,7 +283,7 @@ struct
     L.log_specific L.Mode.Verbose
       (L.Loggable.make Store.pp Store.of_yojson Store.to_yojson
          (State.get_store state))
-      (State.get_store state)
+      L.Report.Store
 
   let print_lconfiguration (lcmd : LCmd.t) (state : State.t) : unit =
     L.normal (fun m ->

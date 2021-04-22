@@ -4,19 +4,22 @@ let previous : Report.id option ref = ref Option.none
 
 let parents : Report.id Stack.t = Stack.create ()
 
-let make ?title ~(content : 'a Report.content) ?(severity = Report.Log) () =
+let make
+    ?title
+    ~(content : Loggable.loggable)
+    ~(type_ : Report.content_type)
+    ?(severity = Report.Log)
+    () =
   let title =
     match title with
     | None       -> (
-        match content with
-        | Agnostic content -> (
-            match content with
-            | Debug _ -> "Debug message"
-            | Phase   -> "Phase")
-        | Specific _       -> "Target language specific report")
+        match type_ with
+        | Debug -> "Debug"
+        | Phase -> "Phase"
+        | Store -> "Store")
     | Some title -> title
   in
-  let report : 'a Report.t =
+  let report : Report.t =
     {
       id = (Unix.getpid (), Uuidm.v4_gen seed ());
       title;
@@ -25,6 +28,7 @@ let make ?title ~(content : 'a Report.content) ?(severity = Report.Log) () =
       parent = Stack.top_opt parents;
       content;
       severity;
+      type_;
     }
   in
   previous := Some report.id;
@@ -32,7 +36,11 @@ let make ?title ~(content : 'a Report.content) ?(severity = Report.Log) () =
 
 let start_phase level ?title ?severity () =
   if Mode.should_log level then (
-    let report = make ?title ~content:(Agnostic Phase) ?severity () in
+    let report =
+      make ?title
+        ~content:(Loggable.make_string "*** Phase ***")
+        ~type_:Report.Phase ?severity ()
+    in
     previous := None;
     Stack.push report.id parents;
     Default.log report;

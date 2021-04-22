@@ -10,7 +10,7 @@ let uuidm_of_yojson yojson =
 
 type id = int * uuidm [@@deriving yojson { exn = true }]
 
-module PackedPP : sig
+(* module PackedPP : sig
   type t [@@deriving yojson]
 
   val make : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> t
@@ -46,17 +46,20 @@ end
 type agnostic_content = Debug of PackedPP.t | Phase [@@deriving yojson]
 
 type 'a content = Agnostic of agnostic_content | Specific of 'a
-[@@deriving yojson]
+[@@deriving yojson] *)
 
 type severity = Info | Log | Success | Error | Warning [@@deriving yojson]
 
-type 'a t = {
+type content_type = Debug | Phase | Store [@@deriving yojson]
+
+type t = {
   id : id;
   title : string;
   elapsed_time : float;
   previous : id option;
   parent : id option;
-  content : 'a content;
+  content : Loggable.loggable;
   severity : severity;
+  type_ : content_type;
 }
-[@@deriving yojson]
+[@@deriving to_yojson]

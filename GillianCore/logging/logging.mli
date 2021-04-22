@@ -12,30 +12,26 @@ module Mode : sig
   val set_mode : t -> unit
 end
 
-(*
 module Report : sig
   type id
 
   type severity = Info | Log | Success | Error | Warning
 
-  type 'a t
-end *)
+  type content_type = Debug | Phase | Store
+
+  type t
+end
 
 module Reporter : sig
-  type 'a t =
-    < log : 'a Report.t -> unit
-    ; log_specific : Loggable.loggable -> unit
-    ; wrap_up : unit >
+  type t = < log : Report.t -> unit ; wrap_up : unit >
 end
 
 module FileReporter : sig
   val enable : unit -> unit
 
-  class virtual ['a] t :
+  class virtual t :
     object
-      method log : 'a Report.t -> unit
-
-      method log_specific : Loggable.loggable -> unit
+      method log : Report.t -> unit
 
       method wrap_up : unit
 
@@ -46,15 +42,11 @@ end
 module DatabaseReporter : sig
   val enable : unit -> unit
 
-  class virtual ['a] t :
+  class virtual t :
     object
-      method log : 'a Report.t -> unit
-
-      method log_specific : Loggable.loggable -> unit
+      method log : Report.t -> unit
 
       method wrap_up : unit
-
-      method virtual private specific_serializer : 'a -> Yojson.Safe.t
     end
 end
 
@@ -71,19 +63,7 @@ module Loggable : sig
 
   type loggable = L : ('a t * 'a) -> loggable
 
-  (* val pp : 'a t -> Format.formatter -> 'a -> unit
-
-     val of_yojson : 'a t -> Yojson.Safe.t -> ('a, string) result
-
-     val to_yojson : 'a t -> 'a -> Yojson.Safe.t *)
-
-  val to_yojson : loggable -> Yojson.Safe.t
-
-  (* val make :
-     (Format.formatter -> 'a -> unit) ->
-     (Yojson.Safe.t -> ('a, string) result) ->
-     ('a -> Yojson.Safe.t) ->
-     'a t *)
+  val loggable_to_yojson : loggable -> Yojson.Safe.t
 
   val make :
     (Format.formatter -> 'a -> unit) ->
@@ -122,7 +102,7 @@ val log_specific :
   ?title:string ->
   ?severity:Report.severity ->
   Loggable.loggable ->
-  'a ->
+  Report.content_type ->
   unit
 
 (** Writes the string and then raises a failure. *)
@@ -150,24 +130,3 @@ val with_verbose_phase :
 
 val with_tmi_phase :
   ?title:string -> ?severity:Report.severity -> (unit -> 'a) -> 'a
-
-(*
-module Make : functor
-  (TargetLang : sig
-     type t
-
-     val file_reporter : t FileReporter.t option
-
-     val database_reporter : t DatabaseReporter.t option
-   end)
-  -> sig
-  val normal :
-    ?title:string -> ?severity:Report.severity -> TargetLang.t -> unit
-
-  val verbose :
-    ?title:string -> ?severity:Report.severity -> TargetLang.t -> unit
-
-  val tmi : ?title:string -> ?severity:Report.severity -> TargetLang.t -> unit
-
-  val wrap_up : unit -> unit
-end *)

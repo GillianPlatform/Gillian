@@ -46,31 +46,28 @@ let get_formatter () =
   let state = get_state () in
   state.formatter
 
-class virtual ['a] t =
+class virtual t =
   object (self)
-    method log (report : 'a Report.t) : unit =
-      if enabled () then
-        match report.content with
-        | Agnostic c -> self#log_agnostic c
-        | Specific _ -> ()
+    method log (report : Report.t) : unit =
+      if enabled () then Loggable.pp report.content self#formatter;
+      Format.fprintf self#formatter "@,@?"
 
-    method log_specific (loggable : Loggable.loggable) : unit = Loggable.pp loggable self#formatter
-
+    (* match report.content with
+       | Agnostic c -> self#log_agnostic c
+       | Specific _ -> () *)
     method wrap_up = wrap_up ()
 
-    method private log_agnostic =
-      function
-      | Debug msgf ->
-          Report.PackedPP.pf self#formatter msgf;
-          Format.fprintf self#formatter "@,@?"
-      | Phase      -> Format.fprintf self#formatter "*** Phase ***@,@?"
-
-    (* method virtual private log_specific : 'a -> unit *)
+    (* method private log_agnostic =
+       function
+       | Debug msgf ->
+           Report.PackedPP.pf self#formatter msgf;
+           Format.fprintf self#formatter "@,@?"
+       | Phase      -> Format.fprintf self#formatter "*** Phase ***@,@?" *)
     method private formatter = get_formatter ()
   end
 
-let default : type a. unit -> a t =
+let default : unit -> t =
  fun () ->
   object
-    inherit [a] t
+    inherit t
   end
