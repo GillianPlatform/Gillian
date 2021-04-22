@@ -28,10 +28,11 @@ let to_yojson (type a) (t : a t) =
     let (module T) = t in
     T.of_yojson yojson *)
 
-(* let pp = function
-| L (t, content) ->
-  let (module T) = t in
-  T.pp content *)
+let pp (loggable : loggable) (formatter : Format.formatter) =
+  match loggable with
+  | L (t, content) ->
+    let (module T) = t in
+    T.pp formatter content
 
 let to_yojson = function
   | L (t, content) ->

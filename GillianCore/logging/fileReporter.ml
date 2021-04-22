@@ -54,7 +54,7 @@ class virtual ['a] t =
         | Agnostic c -> self#log_agnostic c
         | Specific _ -> ()
 
-    method log_specific (_ : Loggable.loggable) : unit = ()
+    method log_specific (loggable : Loggable.loggable) : unit = Loggable.pp loggable self#formatter
 
     method wrap_up = wrap_up ()
 
