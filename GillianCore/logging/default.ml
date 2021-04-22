@@ -18,9 +18,9 @@ let reporters =
 let log report =
   List.iter (fun (reporter : t Reporter.t) -> reporter#log report) reporters
 
-let log_specific loggable report =
+let log_specific loggable =
   List.iter
-    (fun (reporter : t Reporter.t) -> reporter#log_specific loggable report)
+    (fun (reporter : t Reporter.t) -> reporter#log_specific loggable)
     reporters
 
 let wrap_up () = List.iter (fun reporter -> reporter#wrap_up) reporters

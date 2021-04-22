@@ -1,3 +1,28 @@
+(* let filename = "file.log"
+
+let out_channel = ref None
+
+let formatter = ref None
+
+let initialize () =
+  out_channel := Some (open_out filename);
+  formatter := Some (Format.formatter_of_out_channel (Option.get !out_channel))
+
+let log (report : 'a Report.t) : unit =
+  match report.content with
+  | Report.Agnostic c ->
+    (match !formatter with
+    | None -> ()
+    | Some formatter ->
+      match c with
+      | Debug msgf ->
+        Report.PackedPP.pf formatter msgf;
+        Format.fprintf formatter "@,@?"
+      | Phase      -> Format.fprintf formatter "*** Phase ***@,@?")
+  | Report.Specific _ -> ()
+
+let wrap_up () = () *)
+
 module Types = struct
   type conf = { filename : string }
 
@@ -29,7 +54,7 @@ class virtual ['a] t =
         | Agnostic c -> self#log_agnostic c
         | Specific _ -> ()
 
-    method log_specific (_ : 'a Loggable.loggable) (_ : 'a Report.t) : unit = ()
+    method log_specific (_ : Loggable.loggable) : unit = ()
 
     method wrap_up = wrap_up ()
 

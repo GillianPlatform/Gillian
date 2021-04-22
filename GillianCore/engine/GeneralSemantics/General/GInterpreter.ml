@@ -281,7 +281,8 @@ struct
           (CallStack.get_loop_ids cs)
           b_counter state_printer state);
     L.log_specific L.Mode.Verbose
-      L.Loggable.(loggable Store.pp Store.of_yojson Store.to_yojson)
+      (L.Loggable.make Store.pp Store.of_yojson Store.to_yojson
+         (State.get_store state))
       (State.get_store state)
 
   let print_lconfiguration (lcmd : LCmd.t) (state : State.t) : unit =

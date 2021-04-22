@@ -25,14 +25,16 @@ let log lvl ?title ?severity msgf =
     in
     Default.log report
 
-let log_specific lvl ?title ?severity loggable content =
+let log_specific lvl ?title ?severity loggable _ =
   if Mode.should_log lvl then
-    let report =
-      ReportBuilder.make ?title ~content:(Specific content) ?severity ()
-    in
+    let _, _ = (title, severity) in
+
+    (* let report =
+         ReportBuilder.make ?title ~content:(Specific content) ?severity ()
+       in *)
 
     (* Default.log_specific loggable report *)
-    DbReporter.log_specific loggable report
+    DbReporter.log_specific loggable
 
 let normal ?title ?severity msgf = log Normal ?title ?severity msgf
 

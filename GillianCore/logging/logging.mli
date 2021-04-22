@@ -24,7 +24,7 @@ end *)
 module Reporter : sig
   type 'a t =
     < log : 'a Report.t -> unit
-    ; log_specific : 'a Loggable.loggable -> 'a Report.t -> unit
+    ; log_specific : Loggable.loggable -> unit
     ; wrap_up : unit >
 end
 
@@ -35,7 +35,7 @@ module FileReporter : sig
     object
       method log : 'a Report.t -> unit
 
-      method log_specific : 'a Loggable.loggable -> 'a Report.t -> unit
+      method log_specific : Loggable.loggable -> unit
 
       method wrap_up : unit
 
@@ -50,7 +50,7 @@ module DatabaseReporter : sig
     object
       method log : 'a Report.t -> unit
 
-      method log_specific : 'a Loggable.loggable -> 'a Report.t -> unit
+      method log_specific : Loggable.loggable -> unit
 
       method wrap_up : unit
 
@@ -59,7 +59,7 @@ module DatabaseReporter : sig
 end
 
 module Loggable : sig
-  module type Loggable = sig
+  module type t = sig
     (* Type to be logged *)
     type t [@@deriving yojson]
 
@@ -67,19 +67,30 @@ module Loggable : sig
     val pp : Format.formatter -> t -> unit
   end
 
-  type 'a loggable = (module Loggable with type t = 'a)
+  type 'a t = (module t with type t = 'a)
 
-  val pp : 'a loggable -> Format.formatter -> 'a -> unit
+  type loggable = L : ('a t * 'a) -> loggable
 
-  val of_yojson : 'a loggable -> Yojson.Safe.t -> ('a, string) result
+  (* val pp : 'a t -> Format.formatter -> 'a -> unit
 
-  val to_yojson : 'a loggable -> 'a -> Yojson.Safe.t
+     val of_yojson : 'a t -> Yojson.Safe.t -> ('a, string) result
 
-  val loggable :
+     val to_yojson : 'a t -> 'a -> Yojson.Safe.t *)
+
+  val to_yojson : loggable -> Yojson.Safe.t
+
+  (* val make :
+     (Format.formatter -> 'a -> unit) ->
+     (Yojson.Safe.t -> ('a, string) result) ->
+     ('a -> Yojson.Safe.t) ->
+     'a t *)
+
+  val make :
     (Format.formatter -> 'a -> unit) ->
     (Yojson.Safe.t -> ('a, string) result) ->
     ('a -> Yojson.Safe.t) ->
-    'a loggable
+    'a ->
+    loggable
 end
 
 (** Closes all the files *)
@@ -110,7 +121,7 @@ val log_specific :
   Mode.level ->
   ?title:string ->
   ?severity:Report.severity ->
-  'a Loggable.loggable ->
+  Loggable.loggable ->
   'a ->
   unit
 

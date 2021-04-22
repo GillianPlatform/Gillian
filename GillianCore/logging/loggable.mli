@@ -1,4 +1,4 @@
-module type Loggable = sig
+module type t = sig
   (* Type to be logged *)
   type t [@@deriving yojson]
 
@@ -6,16 +6,25 @@ module type Loggable = sig
   val pp : Format.formatter -> t -> unit
 end
 
-type 'a loggable = (module Loggable with type t = 'a)
+type 'a t = (module t with type t = 'a)
 
-val pp : 'a loggable -> Format.formatter -> 'a -> unit
+type loggable = L : ('a t * 'a) -> loggable
 
-val of_yojson : 'a loggable -> Yojson.Safe.t -> ('a, string) result
+(* val pp : 'a t -> Format.formatter -> 'a -> unit
 
-val to_yojson : 'a loggable -> 'a -> Yojson.Safe.t
+val of_yojson : 'a t -> Yojson.Safe.t -> ('a, string) result
 
-val loggable :
+val to_yojson : 'a t -> 'a -> Yojson.Safe.t *)
+
+(* val pp : loggable -> unit *)
+
+(* val of_yojson : loggable -> Yojson.Safe.t -> ('a, string) result *)
+
+val to_yojson : loggable -> Yojson.Safe.t
+
+val make :
   (Format.formatter -> 'a -> unit) ->
   (Yojson.Safe.t -> ('a, string) result) ->
   ('a -> Yojson.Safe.t) ->
-  'a loggable
+  'a ->
+  loggable

@@ -1,6 +1,6 @@
 type 'a t =
   < log : 'a Report.t -> unit
-  ; log_specific : 'a Loggable.loggable -> 'a Report.t -> unit
+  ; log_specific : Loggable.loggable -> unit
   ; wrap_up : unit >
 
 module Make (P : sig

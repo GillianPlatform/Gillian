@@ -1,3 +1,3 @@
-val log_specific : 'a Loggable.loggable -> 'a Report.t -> unit
+val log_specific : Loggable.loggable -> unit
 
 val reset : unit -> unit
