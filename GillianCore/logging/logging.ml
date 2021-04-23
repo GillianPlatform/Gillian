@@ -1,3 +1,4 @@
+module LoggingConstants = LoggingConstants
 module Mode = Mode
 module Report = Report
 module Reporter = Reporter
@@ -16,8 +17,11 @@ let wrap_up = Default.wrap_up
 let log lvl ?title ?severity msgf =
   if Mode.should_log lvl then
     let report =
-      ReportBuilder.make ?title ~content:(Loggable.make PackedPP.pp PackedPP.of_yojson PackedPP.to_yojson (PP msgf))
-        ~type_:Report.Debug ?severity ()
+      ReportBuilder.make ?title
+        ~content:
+          (Loggable.make PackedPP.pp PackedPP.of_yojson PackedPP.to_yojson
+             (PP msgf))
+        ~type_:LoggingConstants.ContentType.debug ?severity ()
     in
     Default.log report
 

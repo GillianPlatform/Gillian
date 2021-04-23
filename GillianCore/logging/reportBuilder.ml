@@ -7,16 +7,12 @@ let parents : Report.id Stack.t = Stack.create ()
 let make
     ?title
     ~(content : Loggable.loggable)
-    ~(type_ : Report.content_type)
+    ~(type_ : string)
     ?(severity = Report.Log)
     () =
   let title =
     match title with
-    | None       -> (
-        match type_ with
-        | Debug -> "Debug"
-        | Phase -> "Phase"
-        | Store -> "Store")
+    | None       -> type_
     | Some title -> title
   in
   let report : Report.t =
@@ -39,7 +35,7 @@ let start_phase level ?title ?severity () =
     let report =
       make ?title
         ~content:(Loggable.make_string "*** Phase ***")
-        ~type_:Report.Phase ?severity ()
+        ~type_:LoggingConstants.ContentType.phase ?severity ()
     in
     previous := None;
     Stack.push report.id parents;

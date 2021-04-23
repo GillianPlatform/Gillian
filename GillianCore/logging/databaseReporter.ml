@@ -67,8 +67,9 @@ class virtual t =
     method log (report : Report.t) =
       if enabled () then
         match report.type_ with
-        | Store -> write (Report.to_yojson report)
-        | _     -> ()
+        | type_ when type_ = LoggingConstants.ContentType.store ->
+            write (Report.to_yojson report)
+        | _ -> ()
 
     method wrap_up = wrap_up ()
   end

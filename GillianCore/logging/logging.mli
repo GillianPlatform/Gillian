@@ -1,3 +1,13 @@
+module LoggingConstants : sig
+  module ContentType : sig
+    val debug : string
+
+    val phase : string
+
+    val store : string
+  end
+end
+
 module Mode : sig
   (** Logging levels *)
   type level =
@@ -16,8 +26,6 @@ module Report : sig
   type id
 
   type severity = Info | Log | Success | Error | Warning
-
-  type content_type = Debug | Phase | Store
 
   type t
 end
@@ -102,7 +110,7 @@ val log_specific :
   ?title:string ->
   ?severity:Report.severity ->
   Loggable.loggable ->
-  Report.content_type ->
+  string ->
   unit
 
 (** Writes the string and then raises a failure. *)

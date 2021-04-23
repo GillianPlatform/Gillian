@@ -51,10 +51,12 @@ class virtual t =
     method log (report : Report.t) : unit =
       if enabled () then
         match report.type_ with
-      | Debug | Phase ->
-        let () = Loggable.pp report.content self#formatter in
-        Format.fprintf self#formatter "@,@?"
-      | _ -> ()
+        | type_
+          when type_ = LoggingConstants.ContentType.debug
+               || type_ = LoggingConstants.ContentType.phase ->
+            let () = Loggable.pp report.content self#formatter in
+            Format.fprintf self#formatter "@,@?"
+        | _ -> ()
 
     method wrap_up = wrap_up ()
 

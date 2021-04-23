@@ -12,8 +12,6 @@ type id = int * uuidm [@@deriving yojson { exn = true }]
 
 type severity = Info | Log | Success | Error | Warning [@@deriving yojson]
 
-type content_type = Debug | Phase | Store [@@deriving yojson]
-
 type t = {
   id : id;
   title : string;
@@ -22,6 +20,6 @@ type t = {
   parent : id option;
   content : Loggable.loggable;
   severity : severity;
-  type_ : content_type;
+  type_ : string;
 }
 [@@deriving to_yojson]
