@@ -12,6 +12,8 @@ let () =
         Some (Format.asprintf "!!!!!!!!!!\nFAILURE:\n%s\n!!!!!!!!!!\n\n" s)
     | _         -> None)
 
+let initialize = Default.initialize
+
 let wrap_up = Default.wrap_up
 
 let log lvl ?title ?severity msgf =

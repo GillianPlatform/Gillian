@@ -22,41 +22,9 @@ module Mode : sig
   val set_mode : t -> unit
 end
 
-module Report : sig
-  type id
+module DatabaseReporter : Reporter.S
 
-  type severity = Info | Log | Success | Error | Warning
-
-  type t
-end
-
-module Reporter : sig
-  type t = < log : Report.t -> unit ; wrap_up : unit >
-end
-
-module FileReporter : sig
-  val enable : unit -> unit
-
-  class virtual t :
-    object
-      method log : Report.t -> unit
-
-      method wrap_up : unit
-
-      method private formatter : Format.formatter
-    end
-end
-
-module DatabaseReporter : sig
-  val enable : unit -> unit
-
-  class virtual t :
-    object
-      method log : Report.t -> unit
-
-      method wrap_up : unit
-    end
-end
+module FileReporter : Reporter.S
 
 module Loggable : sig
   module type t = sig
@@ -80,6 +48,8 @@ module Loggable : sig
     'a ->
     loggable
 end
+
+val initialize : unit -> unit
 
 (** Closes all the files *)
 val wrap_up : unit -> unit

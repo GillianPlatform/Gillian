@@ -1,17 +1,25 @@
-let file_reporter =
-  object
-    inherit FileReporter.t
-  end
+let reporters : (module Reporter.S) list =
+  let module DR = DatabaseReporter in
+  let module FR = FileReporter in
+  [ (module DR); (module FR) ]
 
-let database_reporter =
-  object
-    inherit DatabaseReporter.t
-  end
-
-let reporters =
-  [ (file_reporter :> Reporter.t); (database_reporter :> Reporter.t) ]
+let initialize () =
+  List.iter
+    (fun (reporter : (module Reporter.S)) ->
+      let (module R) = reporter in
+      R.initialize ())
+    reporters
 
 let log report =
-  List.iter (fun (reporter : Reporter.t) -> reporter#log report) reporters
+  List.iter
+    (fun (reporter : (module Reporter.S)) ->
+      let (module R) = reporter in
+      R.log report)
+    reporters
 
-let wrap_up () = List.iter (fun reporter -> reporter#wrap_up) reporters
+let wrap_up () =
+  List.iter
+    (fun (reporter : (module Reporter.S)) ->
+      let (module R) = reporter in
+      R.wrap_up ())
+    reporters

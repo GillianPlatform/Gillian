@@ -183,6 +183,7 @@ struct
       Logging.Mode.set_mode logging_mode;
       let reporters = List.flatten reporters in
       List.iter (fun reporter -> reporter.enable ()) reporters;
+      L.initialize ();
       Printexc.record_backtrace (Logging.Mode.enabled ());
       PC.TargetLangOptions.apply tl_opts;
       Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path;
