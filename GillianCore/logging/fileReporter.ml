@@ -49,20 +49,15 @@ let get_formatter () =
 class virtual t =
   object (self)
     method log (report : Report.t) : unit =
-      if enabled () then Loggable.pp report.content self#formatter;
-      Format.fprintf self#formatter "@,@?"
+      if enabled () then
+        match report.type_ with
+      | Debug | Phase ->
+        let () = Loggable.pp report.content self#formatter in
+        Format.fprintf self#formatter "@,@?"
+      | _ -> ()
 
-    (* match report.content with
-       | Agnostic c -> self#log_agnostic c
-       | Specific _ -> () *)
     method wrap_up = wrap_up ()
 
-    (* method private log_agnostic =
-       function
-       | Debug msgf ->
-           Report.PackedPP.pf self#formatter msgf;
-           Format.fprintf self#formatter "@,@?"
-       | Phase      -> Format.fprintf self#formatter "*** Phase ***@,@?" *)
     method private formatter = get_formatter ()
   end
 
