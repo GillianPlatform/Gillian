@@ -71,21 +71,25 @@ struct
     in
     Arg.(value & opt c v & info [ "l"; "logging" ] ~docv:"SETTING" ~doc)
 
-  type reporter_switch = { name : string; enable : unit -> unit }
+  type reporter_switch = { name : string; reporter : (module L.Reporter.S) }
 
   let reporters =
     let parse : string -> (reporter_switch, [> `Msg of string ]) Result.t =
       function
-      | "file"            -> Ok { name = "file"; enable = L.FileReporter.enable }
+      | "file"            -> Ok
+                               {
+                                 name = "file";
+                                 reporter = (module L.FileReporter);
+                               }
       | "database" | "db" ->
-          Ok { name = "database"; enable = L.DatabaseReporter.enable }
+          Ok { name = "database"; reporter = (module L.DatabaseReporter) }
       | other             -> Result.error
                              @@ `Msg ("unknown value \"" ^ other ^ "\"")
     in
     let print fmt (switch : reporter_switch) = Fmt.string fmt switch.name in
     let c = Arg.(list & conv (parse, print)) in
     let v : reporter_switch list list =
-      [ [ { name = "file"; enable = L.FileReporter.enable } ] ]
+      [ [ { name = "file"; reporter = (module L.FileReporter) } ] ]
     in
     let doc =
       "Controls which reporters are used when logging. The value REPORTERS \
@@ -181,9 +185,10 @@ struct
       Config.set_result_dir result_dir;
       Config.ci := ci;
       Logging.Mode.set_mode logging_mode;
-      let reporters = List.flatten reporters in
-      List.iter (fun reporter -> reporter.enable ()) reporters;
-      L.initialize ();
+      let reporters =
+        List.flatten reporters |> List.map (fun rs -> rs.reporter)
+      in
+      L.initialize reporters;
       Printexc.record_backtrace (Logging.Mode.enabled ());
       PC.TargetLangOptions.apply tl_opts;
       Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path;

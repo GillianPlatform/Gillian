@@ -22,6 +22,16 @@ module Mode : sig
   val set_mode : t -> unit
 end
 
+module Reporter : sig
+  module type S = sig
+    val initialize : unit -> unit
+
+    val log : Report.t -> unit
+
+    val wrap_up : unit -> unit
+  end
+end
+
 module DatabaseReporter : Reporter.S
 
 module FileReporter : Reporter.S
@@ -49,7 +59,7 @@ module Loggable : sig
     loggable
 end
 
-val initialize : unit -> unit
+val initialize : (module Reporter.S) list -> unit
 
 (** Closes all the files *)
 val wrap_up : unit -> unit

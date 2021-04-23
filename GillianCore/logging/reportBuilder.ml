@@ -39,8 +39,7 @@ let start_phase level ?title ?severity () =
     in
     previous := None;
     Stack.push report.id parents;
-    Default.log report;
-    Some report.id)
+    Some report)
   else None
 
 let end_phase = function
