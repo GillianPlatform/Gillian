@@ -64,17 +64,17 @@ struct
     in
 
     let c = Arg.conv (parse, print) in
-    let v = Enabled Verbose in
+    let default = Enabled Verbose in
     let doc =
       "Controls the verbosity level of logging. The value SETTING must be one \
        of `disabled', `normal', `verbose', `tmi'."
     in
-    Arg.(value & opt c v & info [ "l"; "logging" ] ~docv:"SETTING" ~doc)
+    Arg.(value & opt c default & info [ "l"; "logging" ] ~docv:"SETTING" ~doc)
 
-  type reporter_switch = { name : string; reporter : (module L.Reporter.S) }
+  type reporter_info = { name : string; reporter : (module L.Reporter.S) }
 
   let reporters =
-    let parse : string -> (reporter_switch, [> `Msg of string ]) Result.t =
+    let parse : string -> (reporter_info, [> `Msg of string ]) Result.t =
       function
       | "file"            -> Ok
                                {
@@ -83,20 +83,23 @@ struct
                                }
       | "database" | "db" ->
           Ok { name = "database"; reporter = (module L.DatabaseReporter) }
-      | other             -> Result.error
-                             @@ `Msg ("unknown value \"" ^ other ^ "\"")
+      | other             -> Error (`Msg ("unknown value \"" ^ other ^ "\""))
     in
-    let print fmt (switch : reporter_switch) = Fmt.string fmt switch.name in
+    let print fmt (reporter_info : reporter_info) =
+      Fmt.string fmt reporter_info.name
+    in
     let c = Arg.(list & conv (parse, print)) in
-    let v : reporter_switch list list =
-      [ [ { name = "file"; reporter = (module L.FileReporter) } ] ]
+    let default : reporter_info list =
+      [ { name = "file"; reporter = (module L.FileReporter) } ]
     in
     let doc =
       "Controls which reporters are used when logging. The value REPORTERS \
-       must be a comma separated list of REPORTER values. A REPORTER value \
-       must be one of `file`, `database`, `db`."
+       must be a comma separated list (with no spaces) of REPORTER values. A \
+       REPORTER value must be one of `file`, `database`, `db` (short for \
+       `database`)."
     in
-    Arg.(value & opt_all c v & info [ "r"; "reporters" ] ~docv:"REPORTERS" ~doc)
+    Arg.(
+      value & opt c default & info [ "r"; "reporters" ] ~docv:"REPORTERS" ~doc)
 
   let output_gil =
     let doc =
@@ -185,9 +188,7 @@ struct
       Config.set_result_dir result_dir;
       Config.ci := ci;
       Logging.Mode.set_mode logging_mode;
-      let reporters =
-        List.flatten reporters |> List.map (fun rs -> rs.reporter)
-      in
+      let reporters = List.map (fun r -> r.reporter) reporters in
       L.initialize reporters;
       Printexc.record_backtrace (Logging.Mode.enabled ());
       PC.TargetLangOptions.apply tl_opts;
