@@ -1,5 +1,5 @@
 {
-  "checksum": "33bae97d222516b18a9988eba3e400af",
+  "checksum": "2046e20bebbb6c0716a9e8541276ee65",
   "root": "gillian-platform@link-dev:./esy.json",
   "node": {
     "yarn-pkg-config@github:esy-ocaml/yarn-pkg-config#db3a0b63883606dd57c54a7158d560d6cba8cd79@d41d8cd9": {
@@ -46,6 +46,7 @@
         "@opam/yojson@opam:1.7.0@7056d985",
         "@opam/visitors@opam:20210127@f199e6f6",
         "@opam/uuidm@opam:0.9.7@bf725775",
+        "@opam/sqlite3@opam:5.0.2@b19d39cd",
         "@opam/printbox@opam:0.5@82f5d436",
         "@opam/ppxlib@opam:0.21.0@621dfd5e",
         "@opam/ppx_deriving_yojson@opam:3.6.1@faf11a7c",
@@ -624,6 +625,36 @@
       "devDependencies": [
         "ocaml@4.12.0@d41d8cd9", "@opam/dune@opam:2.8.5@83fb0224",
         "@opam/base@opam:v0.14.1@d14008e2"
+      ]
+    },
+    "@opam/sqlite3@opam:5.0.2@b19d39cd": {
+      "id": "@opam/sqlite3@opam:5.0.2@b19d39cd",
+      "name": "@opam/sqlite3",
+      "version": "opam:5.0.2",
+      "source": {
+        "type": "install",
+        "source": [
+          "archive:https://opam.ocaml.org/cache/sha256/02/02ddd45536ea432f4cc149ca140f77de0c1a99c67741caf28afd6f092c396a69#sha256:02ddd45536ea432f4cc149ca140f77de0c1a99c67741caf28afd6f092c396a69",
+          "archive:https://github.com/mmottl/sqlite3-ocaml/releases/download/5.0.2/sqlite3-5.0.2.tbz#sha256:02ddd45536ea432f4cc149ca140f77de0c1a99c67741caf28afd6f092c396a69"
+        ],
+        "opam": {
+          "name": "sqlite3",
+          "version": "5.0.2",
+          "path": "esy.lock/opam/sqlite3.5.0.2"
+        }
+      },
+      "overrides": [],
+      "dependencies": [
+        "ocaml@4.12.0@d41d8cd9",
+        "@opam/dune-configurator@opam:2.8.5@eae07e15",
+        "@opam/dune@opam:2.8.5@83fb0224",
+        "@opam/conf-sqlite3@opam:1@7f38a89f",
+        "@esy-ocaml/substs@0.0.1@d41d8cd9"
+      ],
+      "devDependencies": [
+        "ocaml@4.12.0@d41d8cd9",
+        "@opam/dune-configurator@opam:2.8.5@eae07e15",
+        "@opam/dune@opam:2.8.5@83fb0224"
       ]
     },
     "@opam/spawn@opam:v0.13.0@b3937806": {
@@ -2512,6 +2543,26 @@
         "ocaml@4.12.0@d41d8cd9", "@opam/dune@opam:2.8.5@83fb0224",
         "@opam/base-unix@opam:base@87d0b2eb"
       ]
+    },
+    "@opam/conf-sqlite3@opam:1@7f38a89f": {
+      "id": "@opam/conf-sqlite3@opam:1@7f38a89f",
+      "name": "@opam/conf-sqlite3",
+      "version": "opam:1",
+      "source": {
+        "type": "install",
+        "source": [ "no-source:" ],
+        "opam": {
+          "name": "conf-sqlite3",
+          "version": "1",
+          "path": "esy.lock/opam/conf-sqlite3.1"
+        }
+      },
+      "overrides": [],
+      "dependencies": [
+        "@opam/conf-pkg-config@opam:2@de102891",
+        "@esy-ocaml/substs@0.0.1@d41d8cd9"
+      ],
+      "devDependencies": []
     },
     "@opam/conf-python-2-7@opam:1.1@08200dba": {
       "id": "@opam/conf-python-2-7@opam:1.1@08200dba",
