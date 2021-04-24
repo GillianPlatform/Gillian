@@ -100,8 +100,30 @@ val tmi :
   ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
   unit
 
-val log_specific :
-  Mode.level ->
+(** Logs a type at the `Normal` logging level given a loggable and its content
+    type (which should be one of the predefined strings in the
+    `LoggingConstants.ContentType`) *)
+val normal_specific :
+  ?title:string ->
+  ?severity:Report.severity ->
+  Loggable.loggable ->
+  string ->
+  unit
+
+(** Logs a type at the `Verbose` logging level given a loggable and its content
+    type (which should be one of the predefined strings in the
+    `LoggingConstants.ContentType`) *)
+val verbose_specific :
+  ?title:string ->
+  ?severity:Report.severity ->
+  Loggable.loggable ->
+  string ->
+  unit
+
+(** Logs a type at the `TMI` logging level given a loggable and its content
+    type (which should be one of the predefined strings in the
+    `LoggingConstants.ContentType`) *)
+val tmi_specific :
   ?title:string ->
   ?severity:Report.severity ->
   Loggable.loggable ->

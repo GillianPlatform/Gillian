@@ -280,7 +280,7 @@ struct
           pp_str_list
           (CallStack.get_loop_ids cs)
           b_counter state_printer state);
-    L.log_specific L.Mode.Verbose
+    L.verbose_specific
       (L.Loggable.make Store.pp Store.of_yojson Store.to_yojson
          (State.get_store state))
       L.LoggingConstants.ContentType.store

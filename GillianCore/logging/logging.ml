@@ -48,6 +48,15 @@ let verbose ?title ?severity msgf = log Verbose ?title ?severity msgf
 
 let tmi ?title ?severity msgf = log TMI ?title ?severity msgf
 
+let normal_specific ?title ?severity loggable type_ =
+  log_specific Normal ?title ?severity loggable type_
+
+let verbose_specific ?title ?severity loggable type_ =
+  log_specific Verbose ?title ?severity loggable type_
+
+let tmi_specific ?title ?severity loggable type_ =
+  log_specific TMI ?title ?severity loggable type_
+
 let print_to_all (str : string) =
   normal (fun m -> m "%s" str);
   print_endline str
