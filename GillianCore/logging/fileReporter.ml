@@ -1,3 +1,7 @@
+(**
+    Reporter which logs to a file
+*)
+
 let filename = "file.log"
 
 let out_channel = ref None
@@ -12,6 +16,8 @@ let log (report : Report.t) : unit =
   match !formatter with
   | None           -> ()
   | Some formatter -> (
+      (* TODO: This should eventually log all types when all regular calls to
+               log of specific types are replaced *)
       match report.type_ with
       | type_
         when type_ = LoggingConstants.ContentType.debug

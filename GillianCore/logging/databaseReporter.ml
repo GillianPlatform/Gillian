@@ -1,3 +1,7 @@
+(**
+    Reporter which logs to a database
+*)
+
 let filename = "./database.log"
 
 let fd = ref None
@@ -13,6 +17,7 @@ let log (report : Report.t) =
   match !fd with
   | None    -> ()
   | Some fd -> (
+      (* TODO: This should eventually log all report types *)
       match report.type_ with
       | type_ when type_ = LoggingConstants.ContentType.store ->
           let yojson = Report.to_yojson report in

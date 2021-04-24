@@ -1,3 +1,7 @@
+(**
+    Module for building reports
+*)
+
 let seed = Random.State.make_self_init ()
 
 let previous : Report.id option ref = ref Option.none

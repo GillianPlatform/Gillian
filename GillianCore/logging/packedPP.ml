@@ -1,3 +1,7 @@
+(**
+    Module which wraps a message format to allow it to be a loggable type
+*)
+
 type t = PP : ((('a, Format.formatter, unit) format -> 'a) -> unit) -> t
 
 let make x = PP x
@@ -17,4 +21,4 @@ let of_yojson yojson =
   Result.map of_string
     (match yojson with
     | `String s -> Ok s
-    | _         -> Error "should be a string")
+    | _         -> Error "Cannot parse yojson to PackedPP: should be a string")
