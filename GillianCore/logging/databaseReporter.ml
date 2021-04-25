@@ -82,10 +82,12 @@ let store_report (report : Report.t) db =
     (Sqlite3.Data.opt_text
        (Some
           (Yojson.Safe.to_string (Loggable.loggable_to_yojson report.content))));
+          (* (Bi_io.string_of_tree (Yojson_biniou.biniou_of_json (Loggable.loggable_to_yojson report.content))))); *)
   (* TODO: Use plain string for severity *)
   bind_value stmt 7
     (Sqlite3.Data.opt_text
        (Some (Yojson.Safe.to_string (Report.severity_to_yojson report.severity))));
+       (* (Some (Bi_io.string_of_tree (Yojson_biniou.biniou_of_json (Report.severity_to_yojson report.severity))))); *)
   bind_value stmt 8 (Sqlite3.Data.opt_text (Some report.type_));
   let response = Sqlite3.step stmt in
   if not (Sqlite3.Rc.is_success response) then
