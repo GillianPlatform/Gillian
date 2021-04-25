@@ -83,11 +83,13 @@ let store_report (report : Report.t) db =
        (Some
           (Yojson.Safe.to_string (Loggable.loggable_to_yojson report.content))));
           (* (Bi_io.string_of_tree (Yojson_biniou.biniou_of_json (Loggable.loggable_to_yojson report.content))))); *)
+          (* "Testing if it's still slow with no JSON conversion")); *)
   (* TODO: Use plain string for severity *)
   bind_value stmt 7
     (Sqlite3.Data.opt_text
        (Some (Yojson.Safe.to_string (Report.severity_to_yojson report.severity))));
        (* (Some (Bi_io.string_of_tree (Yojson_biniou.biniou_of_json (Report.severity_to_yojson report.severity))))); *)
+       (* (Some "Testing if it's still slow with no JSON conversion")); *)
   bind_value stmt 8 (Sqlite3.Data.opt_text (Some report.type_));
   let response = Sqlite3.step stmt in
   if not (Sqlite3.Rc.is_success response) then
@@ -99,6 +101,13 @@ let initialize () =
   create ()
 
 let log (report : Report.t) =
+  (* match !db with
+  | None    -> print_endline "I got no db"
+  | Some db ->
+    match report.type_ with
+      | type_ when type_ = LoggingConstants.ContentType.store ->
+        store_report report db
+      | _ -> () *)
   match !db with
   | None    -> print_endline "I got no db"
   | Some db -> store_report report db
