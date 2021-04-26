@@ -18,14 +18,19 @@ let log (report : Report.t) =
   | None    -> ()
   | Some fd -> (
       (* TODO: This should eventually log all report types *)
-      match report.type_ with
+      let yojson = Report.to_yojson report in
+          let yojson = Yojson.Safe.to_string yojson ^ "\n" in
+          Unix.lockf fd F_LOCK 0;
+          ignore (Unix.write_substring fd yojson 0 (String.length yojson));
+          Unix.lockf fd F_ULOCK 0)
+      (* match report.type_ with
       | type_ when type_ = LoggingConstants.ContentType.store ->
           let yojson = Report.to_yojson report in
           let yojson = Yojson.Safe.to_string yojson ^ "\n" in
           Unix.lockf fd F_LOCK 0;
           ignore (Unix.write_substring fd yojson 0 (String.length yojson));
           Unix.lockf fd F_ULOCK 0
-      | _ -> ())
+      | _ -> ()) *)
 
 let wrap_up () =
   match !fd with
