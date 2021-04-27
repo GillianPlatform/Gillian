@@ -31,7 +31,7 @@ let create_report_table db =
     ~stmt:
       "CREATE TABLE report ( id TEXT PRIMARY KEY, title TEXT NOT NULL, \
        elapsed_time REAL NOT NULL, previous TEXT, parent TEXT, content TEXT \
-       NOT NULL, severity TEXT NOT NULL, type TEXT NOT NULL);"
+       NOT NULL, severity INT NOT NULL, type TEXT NOT NULL);"
 
 let create_db () =
   let new_db = Sqlite3.db_open db_name in
@@ -70,10 +70,9 @@ let store_report (report : Report.t) db =
     (Sqlite3.Data.TEXT
        (Yojson.Safe.to_string (Loggable.loggable_to_yojson report.content)))
   |> check_result_code db ~log:"report bind content";
-  (* TODO: Use enum for severity *)
   Sqlite3.bind stmt 7
-    (Sqlite3.Data.TEXT
-       (Yojson.Safe.to_string (Report.severity_to_yojson report.severity)))
+    (Sqlite3.Data.INT
+       (Int64.of_int (Report.severity_to_enum report.severity)))
   |> check_result_code db ~log:"report bind severity";
   Sqlite3.bind stmt 8 (Sqlite3.Data.TEXT report.type_)
   |> check_result_code db ~log:"report bind type";

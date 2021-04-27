@@ -10,7 +10,7 @@ let uuidm_of_yojson yojson =
 
 type id = int * uuidm [@@deriving yojson { exn = true }]
 
-type severity = Info | Log | Success | Error | Warning [@@deriving yojson]
+type severity = Info | Log | Success | Error | Warning [@@deriving enum, yojson]
 
 type t = {
   id : id;
