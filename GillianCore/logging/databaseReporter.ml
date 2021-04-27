@@ -2,140 +2,95 @@
     Reporter which logs to a database
 *)
 
-(* let filename = "./database.log"
-
-let fd = ref None
-
-let initialize () =
-  let () = if Sys.file_exists filename then Sys.remove filename else () in
-  (* rw-r--r-- *)
-  let permissions = 0o644 in
-  fd :=
-    Some (Unix.openfile filename [ O_WRONLY; O_APPEND; O_CREAT ] permissions)
-
-let log (report : Report.t) =
-  match !fd with
-  | None    -> ()
-  | Some fd -> (
-      (* TODO: This should eventually log all report types *)
-      let yojson = Report.to_yojson report in
-          let yojson = Yojson.Safe.to_string yojson ^ "\n" in
-          Unix.lockf fd F_LOCK 0;
-          ignore (Unix.write_substring fd yojson 0 (String.length yojson));
-          Unix.lockf fd F_ULOCK 0)
-      (* match report.type_ with
-      | type_ when type_ = LoggingConstants.ContentType.store ->
-          let yojson = Report.to_yojson report in
-          let yojson = Yojson.Safe.to_string yojson ^ "\n" in
-          Unix.lockf fd F_LOCK 0;
-          ignore (Unix.write_substring fd yojson 0 (String.length yojson));
-          Unix.lockf fd F_ULOCK 0
-      | _ -> ()) *)
-
-let wrap_up () =
-  match !fd with
-  | None    -> ()
-  | Some fd -> Unix.close fd *)
-
-let db_name = "gillian-debugger.db"
+let db_name = "log.db"
 
 let db = ref None
 
-let create () =
-  let new_db = Sqlite3.db_open db_name in
-  let stmt =
-    Sqlite3.prepare new_db
+exception Error of string
+
+let error fmt = Format.kasprintf (fun err -> raise (Error err)) fmt
+
+let get_db () =
+  match !db with
+  | None    -> error "No Database"
+  | Some db -> db
+
+let check_result_code db ~log rc =
+  match (rc : Sqlite3.Rc.t) with
+  | OK | DONE | ROW -> ()
+  | _ as err        ->
+      error "%s: %s (%s)" log (Sqlite3.Rc.to_string err) (Sqlite3.errmsg db)
+
+let exec db ~log ~stmt =
+  let rc = Sqlite3.exec db stmt in
+  try check_result_code db ~log rc
+  with Error err -> error "exec: %s (%s)" err (Sqlite3.errmsg db)
+
+let create_report_table db =
+  exec db ~log:"creating report table"
+    ~stmt:
       "CREATE TABLE report ( id TEXT PRIMARY KEY, title TEXT NOT NULL, \
        elapsed_time REAL NOT NULL, previous TEXT, parent TEXT, content TEXT \
        NOT NULL, severity TEXT NOT NULL, type TEXT NOT NULL);"
-  in
-  let response = Sqlite3.step stmt in
-  if Sqlite3.Rc.is_success response then db := Some new_db
-  else
-    failwith
-      (Printf.sprintf "Unable to create report table, error=%s"
-         (Sqlite3.Rc.to_string response))
 
-let reset () = if Sys.file_exists db_name then Sys.remove db_name else ()
+let create_db () =
+  let new_db = Sqlite3.db_open db_name in
+  (* Set synchronous to OFF for performance *)
+  exec new_db ~log:"synchronous=OFF" ~stmt:"PRAGMA synchronous=OFF";
+  create_report_table new_db;
+  db := Some new_db
 
-let bind_value stmt index value =
-  let response = Sqlite3.bind stmt index value in
-  if not (Sqlite3.Rc.is_success response) then
-    failwith (Sqlite3.Rc.to_string response)
+let reset_db () = if Sys.file_exists db_name then Sys.remove db_name else ()
 
 let store_report (report : Report.t) db =
   let stmt =
     Sqlite3.prepare db "INSERT INTO report VALUES (?, ?, ?, ?, ?, ?, ?, ?);"
   in
-  bind_value stmt 1
-    (Sqlite3.Data.opt_text (Some (Uuidm.to_string (snd report.id))));
-  bind_value stmt 2 (Sqlite3.Data.opt_text (Some report.title));
-  bind_value stmt 3 (Sqlite3.Data.opt_float (Some report.elapsed_time));
+  Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT (Uuidm.to_string (snd report.id)))
+  |> check_result_code db ~log:"report bind id";
+  Sqlite3.bind stmt 2 (Sqlite3.Data.TEXT report.title)
+  |> check_result_code db ~log:"report bind title";
+  Sqlite3.bind stmt 3 (Sqlite3.Data.FLOAT report.elapsed_time)
+  |> check_result_code db ~log:"report bind elapsed time";
   let previous_opt =
     match report.previous with
     | None          -> None
     | Some previous -> Some (Uuidm.to_string (snd previous))
   in
-  bind_value stmt 4 (Sqlite3.Data.opt_text previous_opt);
+  Sqlite3.bind stmt 4 (Sqlite3.Data.opt_text previous_opt)
+  |> check_result_code db ~log:"report bind previous";
   let parent_opt =
     match report.parent with
     | None        -> None
     | Some parent -> Some (Uuidm.to_string (snd parent))
   in
-  bind_value stmt 5 (Sqlite3.Data.opt_text parent_opt);
-  bind_value stmt 6
-    (Sqlite3.Data.opt_text
-       (Some
-          (Yojson.Safe.to_string (Loggable.loggable_to_yojson report.content))));
-          (* (Bi_io.string_of_tree (Yojson_biniou.biniou_of_json (Loggable.loggable_to_yojson report.content))))); *)
-          (* "Testing if it's still slow with no JSON conversion")); *)
-  (* TODO: Use plain string for severity *)
-  bind_value stmt 7
-    (Sqlite3.Data.opt_text
-       (Some (Yojson.Safe.to_string (Report.severity_to_yojson report.severity))));
-       (* (Some (Bi_io.string_of_tree (Yojson_biniou.biniou_of_json (Report.severity_to_yojson report.severity))))); *)
-       (* (Some "Testing if it's still slow with no JSON conversion")); *)
-  bind_value stmt 8 (Sqlite3.Data.opt_text (Some report.type_));
-  let response = Sqlite3.step stmt in
-  if not (Sqlite3.Rc.is_success response) then
-    failwith (Sqlite3.Rc.to_string response)
-
+  Sqlite3.bind stmt 5 (Sqlite3.Data.opt_text parent_opt)
+  |> check_result_code db ~log:"report bind parent";
+  Sqlite3.bind stmt 6
+    (Sqlite3.Data.TEXT
+       (Yojson.Safe.to_string (Loggable.loggable_to_yojson report.content)))
+  |> check_result_code db ~log:"report bind content";
+  (* TODO: Use enum for severity *)
+  Sqlite3.bind stmt 7
+    (Sqlite3.Data.TEXT
+       (Yojson.Safe.to_string (Report.severity_to_yojson report.severity)))
+  |> check_result_code db ~log:"report bind severity";
+  Sqlite3.bind stmt 8 (Sqlite3.Data.TEXT report.type_)
+  |> check_result_code db ~log:"report bind type";
+  Sqlite3.step stmt |> check_result_code db ~log:"step: store report";
+  Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: store report"
 
 let initialize () =
-  reset ();
-  create ()
+  reset_db ();
+  create_db ()
 
-let log (report : Report.t) =
-  (* match !db with
-  | None    -> print_endline "I got no db"
-  | Some db ->
-    match report.type_ with
-      | type_ when type_ = LoggingConstants.ContentType.store ->
-        store_report report db
-      | _ -> () *)
+let log (report : Report.t) = store_report report (get_db ())
+
+let wrap_up () =
   match !db with
-  | None    -> print_endline "I got no db"
-  | Some db -> store_report report db
-
-let wrap_up () = ()
-
-(* let get_line line_num db =
-  let stmt = Sqlite3.prepare db "SELECT content FROM log WHERE line_number=?;" in
-  let response = Sqlite3.bind stmt 1 (Sqlite3.Data.opt_int (Some line_num)) in
-  if not (Sqlite3.Rc.is_success response) then
-    Error
-      (Printf.sprintf
-         "Cannot bind line_num=%d, error=%s"
-         line_num
-         (Sqlite3.Rc.to_string response))
-  else
-    let response = Sqlite3.step stmt in
-    if response == Sqlite3.Rc.ROW then
-      let rows = Sqlite3.row_blobs stmt in
-      let content = rows.(0) in
-      Ok content
-    else
-      Error
-        (Printf.sprintf
-           "No execution log found, error=%s"
-           (Rc.to_string response)) *)
+  | None    -> ()
+  | Some db ->
+      if not (Sqlite3.db_close db) then
+        error "closing: %s (%s)"
+          (Sqlite3.errcode db |> Sqlite3.Rc.to_string)
+          (Sqlite3.errmsg db)
