@@ -138,18 +138,18 @@ val print_to_all : string -> unit
 
 (** Starts a phase with logging level set to `Normal` *)
 val normal_phase :
-  ?title:string -> ?severity:Report.severity -> unit -> Report.id option
+  ?title:string -> ?severity:Report.severity -> unit -> Report.uuidm option
 
 (** Starts a phase with logging level set to `Verbose` *)
 val verbose_phase :
-  ?title:string -> ?severity:Report.severity -> unit -> Report.id option
+  ?title:string -> ?severity:Report.severity -> unit -> Report.uuidm option
 
 (** Starts a phase with logging level set to `TMI` *)
 val tmi_phase :
-  ?title:string -> ?severity:Report.severity -> unit -> Report.id option
+  ?title:string -> ?severity:Report.severity -> unit -> Report.uuidm option
 
 (** Ends the phase corresponding to the specified report id *)
-val end_phase : Report.id option -> unit
+val end_phase : Report.uuidm option -> unit
 
 (** Runs the specified function within a phase with logging level set to
     `Normal` *)

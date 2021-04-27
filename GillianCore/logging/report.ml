@@ -8,16 +8,15 @@ let uuidm_of_yojson yojson =
     | `String s -> Uuidm.of_string s
     | _         -> None)
 
-type id = int * uuidm [@@deriving yojson { exn = true }]
-
-type severity = Info | Log | Success | Error | Warning [@@deriving enum, yojson]
+type severity = Info | Log | Success | Error | Warning
+[@@deriving enum, yojson]
 
 type t = {
-  id : id;
+  id : uuidm;
   title : string;
   elapsed_time : float;
-  previous : id option;
-  parent : id option;
+  previous : uuidm option;
+  parent : uuidm option;
   content : Loggable.loggable;
   severity : severity;
   type_ : string;

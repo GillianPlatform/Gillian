@@ -4,9 +4,9 @@
 
 let seed = Random.State.make_self_init ()
 
-let previous : Report.id option ref = ref Option.none
+let previous : Report.uuidm option ref = ref Option.none
 
-let parents : Report.id Stack.t = Stack.create ()
+let parents : Report.uuidm Stack.t = Stack.create ()
 
 let make
     ?title
@@ -21,7 +21,7 @@ let make
   in
   let report : Report.t =
     {
-      id = (Unix.getpid (), Uuidm.v4_gen seed ());
+      id = Uuidm.v4_gen seed ();
       title;
       elapsed_time = Sys.time ();
       previous = !previous;
@@ -47,8 +47,8 @@ let start_phase level ?title ?severity () =
   else None
 
 let end_phase = function
-  | None                   -> ()
-  | Some (pid, uuid) as id ->
-      let p, u = Stack.pop parents in
-      assert (Int.equal pid p && Uuidm.equal uuid u);
+  | None            -> ()
+  | Some uuid as id ->
+      let parent_uuid = Stack.pop parents in
+      assert (Uuidm.equal uuid parent_uuid);
       previous := id

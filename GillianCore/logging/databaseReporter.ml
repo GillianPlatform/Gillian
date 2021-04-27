@@ -46,33 +46,24 @@ let store_report (report : Report.t) db =
   let stmt =
     Sqlite3.prepare db "INSERT INTO report VALUES (?, ?, ?, ?, ?, ?, ?, ?);"
   in
-  Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT (Uuidm.to_string (snd report.id)))
+  Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT (Uuidm.to_string report.id))
   |> check_result_code db ~log:"report bind id";
   Sqlite3.bind stmt 2 (Sqlite3.Data.TEXT report.title)
   |> check_result_code db ~log:"report bind title";
   Sqlite3.bind stmt 3 (Sqlite3.Data.FLOAT report.elapsed_time)
   |> check_result_code db ~log:"report bind elapsed time";
-  let previous_opt =
-    match report.previous with
-    | None          -> None
-    | Some previous -> Some (Uuidm.to_string (snd previous))
-  in
-  Sqlite3.bind stmt 4 (Sqlite3.Data.opt_text previous_opt)
+  Sqlite3.bind stmt 4
+    (Sqlite3.Data.opt_text (Option.map Uuidm.to_string report.previous))
   |> check_result_code db ~log:"report bind previous";
-  let parent_opt =
-    match report.parent with
-    | None        -> None
-    | Some parent -> Some (Uuidm.to_string (snd parent))
-  in
-  Sqlite3.bind stmt 5 (Sqlite3.Data.opt_text parent_opt)
+  Sqlite3.bind stmt 5
+    (Sqlite3.Data.opt_text (Option.map Uuidm.to_string report.parent))
   |> check_result_code db ~log:"report bind parent";
   Sqlite3.bind stmt 6
     (Sqlite3.Data.TEXT
        (Yojson.Safe.to_string (Loggable.loggable_to_yojson report.content)))
   |> check_result_code db ~log:"report bind content";
   Sqlite3.bind stmt 7
-    (Sqlite3.Data.INT
-       (Int64.of_int (Report.severity_to_enum report.severity)))
+    (Sqlite3.Data.INT (Int64.of_int (Report.severity_to_enum report.severity)))
   |> check_result_code db ~log:"report bind severity";
   Sqlite3.bind stmt 8 (Sqlite3.Data.TEXT report.type_)
   |> check_result_code db ~log:"report bind type";
