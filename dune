@@ -1,2 +1,7 @@
 (dirs wisl GillianCore Gillian-Rely-Runner Gillian-JS Gillian-C
-  Gillian-Alcotest)
+  Gillian-Alcotest-Runner ppx_sat)
+
+(env
+ (opt
+  (ocamlopt_flags
+   (:standard -O3))))

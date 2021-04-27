@@ -20,9 +20,11 @@ module type S = sig
 
   val is_empty : t -> bool
 
-  val extend : t -> abs_t -> unit
+  val extend : ?pure:bool -> t -> abs_t -> unit
 
   val pop : t -> (abs_t -> bool) -> abs_t option
+
+  val strategic_choice : t -> (abs_t -> int) -> abs_t option
 
   val remove_by_name : t -> string -> abs_t option
 
@@ -36,8 +38,8 @@ module type S = sig
     maintain:bool ->
     t ->
     string ->
-    vt list ->
-    int list ->
+    vt option list ->
+    Containers.SI.t ->
     (vt -> vt -> bool) ->
     abs_t option
 
@@ -53,7 +55,7 @@ end
 
 module Make
     (Val : Val.S)
-    (Subst : Subst.S with type vt = Val.t and type t = Val.st) :
-  S with type vt = Val.t and type st = Subst.t
+    (ESubst : ESubst.S with type vt = Val.t and type t = Val.et) :
+  S with type vt = Val.t and type st = ESubst.t
 
-module SPreds : S with type vt = SVal.M.t and type st = SVal.SSubst.t
+module SPreds : S with type vt = SVal.M.t and type st = SVal.SESubst.t

@@ -3,20 +3,20 @@ open Ast_check
 
 let test_lit_base_elements () =
   let open Literal in
-  let list_literal = Alcotest.list literal in
+  let unordered_list_literal = Alcotest.slist literal compare in
   let simple_lit = Undefined in
-  Alcotest.check list_literal "Undefined's base element is itself"
+  Alcotest.check unordered_list_literal "Undefined's base element is itself"
     (base_elements simple_lit) [ Undefined ];
   let expected = [ Undefined; Null; Num 32.; Bool false ] in
   let lit_list = LList expected in
-  Alcotest.check list_literal
-    "The base elements of a list of undefined is that list"
+  Alcotest.check unordered_list_literal
+    "The base elements of a list of literals is that list"
     (base_elements lit_list) expected;
   let rec_lit_list =
     LList [ Undefined; LList [ Null; LList [ Bool false ] ] ]
   in
   let expected = [ Undefined; Null; Bool false ] in
-  Alcotest.check list_literal "Get base elements in recursive list"
+  Alcotest.check unordered_list_literal "Get base elements in recursive list"
     (base_elements rec_lit_list)
     expected;
   ()

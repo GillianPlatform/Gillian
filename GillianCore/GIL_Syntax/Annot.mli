@@ -2,9 +2,18 @@
 type t
 
 (** Initialize an annotation *)
-val init : ?line_offset:int option -> ?origin_id:int -> unit -> t
+val make :
+  ?origin_loc:Location.t ->
+  ?origin_id:int ->
+  ?loop_info:string list ->
+  unit ->
+  t
 
-(** get the line offset *)
-val get_line_offset : t -> int option
+(** Get the loop info *)
+val get_loop_info : t -> string list
 
-val line_info_to_str : (string * int * int) list -> string
+(** Set the loop info *)
+val set_loop_info : t -> string list -> t
+
+(** get the origin location *)
+val get_origin_loc : t -> Location.t option

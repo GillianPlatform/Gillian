@@ -17,14 +17,19 @@ val simplify_pfs_and_gamma :
   PFS.t ->
   ?rpfs:PFS.t ->
   TypEnv.t ->
-  SVal.SSubst.t * Utils.Containers.SS.t
+  SVal.SESubst.t * Utils.Containers.SS.t
 
 (** [simplify_implication existentials lpfs rpfs gamma]
     simplifies the entailment << ∃ [existentials]. [lpfs] => [rpfs] >>
     under the typing environment [gamma], attempting to instantiate the
     [existentials] and returning a (possibly smaller) new set of existentials *)
 val simplify_implication :
-  Utils.Containers.SS.t -> PFS.t -> PFS.t -> TypEnv.t -> Utils.Containers.SS.t
+  unification:bool ->
+  Utils.Containers.SS.t ->
+  PFS.t ->
+  PFS.t ->
+  TypEnv.t ->
+  Utils.Containers.SS.t
 
 (** [admissible_assertion a] checks whether or not the assertion [a] is
     a contradiction only using the reductions/simplifications *)

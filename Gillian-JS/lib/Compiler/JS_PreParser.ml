@@ -1,5 +1,3 @@
-open String
-
 let string_split (s : string) (len : int) : string option * string option =
   assert (len > 0);
   try
@@ -36,7 +34,7 @@ let rec stringify_assume_and_assert_aux
           raise
             (Unparseable
                "Reached EOF: a string literal inside assume or assert not \
-                terminated.") )
+                terminated."))
   | _  -> (
       let next_char, rest_of_string = string_head_and_tail s_in in
       assert (next_char <> None);
@@ -58,8 +56,8 @@ let rec stringify_assume_and_assert_aux
                   f new_rest_of_string
                     (s_out ^ "A" ^ next_five_chars)
                     (InAsmOrAsrt (0, ""))
-              | _, _ -> f rest_of_string (s_out ^ "A") TheUsual )
-          | _    -> f rest_of_string (s_out ^ next_char) TheUsual )
+              | _, _ -> f rest_of_string (s_out ^ "A") TheUsual)
+          | _    -> f rest_of_string (s_out ^ next_char) TheUsual)
       | InString -> (
           match next_char with
           | "\"" -> f rest_of_string (s_out ^ "\"") TheUsual
@@ -75,8 +73,8 @@ let rec stringify_assume_and_assert_aux
                   f rest_of_string (s_out ^ "\\" ^ nc) InString
               | _ ->
                   failwith
-                    "Unhandled case stringify_assume_and_assert_aux.InString" )
-          | _    -> f rest_of_string (s_out ^ next_char) InString )
+                    "Unhandled case stringify_assume_and_assert_aux.InString")
+          | _    -> f rest_of_string (s_out ^ next_char) InString)
       | InAsmOrAsrt (depth, str) -> (
           assert (depth >= 0);
           match next_char with
@@ -85,7 +83,7 @@ let rec stringify_assume_and_assert_aux
               | 0 -> f rest_of_string (s_out ^ "(") (InAsmOrAsrt (1, str))
               | _ ->
                   f rest_of_string s_out
-                    (InAsmOrAsrt (depth + 1, str ^ next_char)) )
+                    (InAsmOrAsrt (depth + 1, str ^ next_char)))
           | ")" -> (
               match depth with
               | 1 ->
@@ -102,7 +100,7 @@ let rec stringify_assume_and_assert_aux
                   f rest_of_string (s_out ^ "\"" ^ str ^ "\")") TheUsual
               | _ ->
                   f rest_of_string s_out
-                    (InAsmOrAsrt (depth - 1, str ^ next_char)) )
+                    (InAsmOrAsrt (depth - 1, str ^ next_char)))
           | (" " | "\t") when depth = 0 ->
               f rest_of_string (s_out ^ next_char) (InAsmOrAsrt (depth, str))
           | _ -> (
@@ -110,8 +108,8 @@ let rec stringify_assume_and_assert_aux
               | 0 ->
                   raise
                     (Unparseable
-                       ( "Parsing error: assume or assert not followed by an \
-                          open parenthesis but by " ^ next_char ^ "." ))
+                       ("Parsing error: assume or assert not followed by an \
+                         open parenthesis but by " ^ next_char ^ "."))
               | _ -> (
                   match next_char with
                   | "\"" ->
@@ -119,7 +117,7 @@ let rec stringify_assume_and_assert_aux
                         (InAsmOrAsrtAndInString (depth, str ^ next_char))
                   | _    ->
                       f rest_of_string s_out
-                        (InAsmOrAsrt (depth, str ^ next_char)) ) ) )
+                        (InAsmOrAsrt (depth, str ^ next_char)))))
       | InAsmOrAsrtAndInString (depth, str) -> (
           match next_char with
           | "\"" -> f rest_of_string s_out (InAsmOrAsrt (depth, str ^ "\""))
@@ -139,10 +137,10 @@ let rec stringify_assume_and_assert_aux
               | _ ->
                   failwith
                     "Unhandled case \
-                     stringify_assume_and_assert_aux.InAsmOrAsrtAndInString" )
+                     stringify_assume_and_assert_aux.InAsmOrAsrtAndInString")
           | _    ->
               f rest_of_string s_out
-                (InAsmOrAsrtAndInString (depth, str ^ next_char)) ) )
+                (InAsmOrAsrtAndInString (depth, str ^ next_char))))
 
 let stringify_assume_and_assert (s : string) =
   stringify_assume_and_assert_aux s "" TheUsual

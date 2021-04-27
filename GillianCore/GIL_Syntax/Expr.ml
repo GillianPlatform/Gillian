@@ -9,10 +9,12 @@ type t = TypeDef__.expr =
   | ALoc   of string  (** GIL abstract locations *)
   | UnOp   of UnOp.t * t  (** Unary operators         *)
   | BinOp  of t * BinOp.t * t  (** Binary operators        *)
-  | LstSub of t * t * t  (** Sublist                 *)
+  | LstSub of t * t * t  (** Sublist or (list, start, len) *)
   | NOp    of NOp.t * t list  (** n-ary operators         *)
   | EList  of t list  (** Lists of expressions    *)
   | ESet   of t list  (** Sets of expressions     *)
+
+let equal (e1 : t) (e2 : t) : bool = Stdlib.compare e1 e2 = 0
 
 (** {3 builders} *)
 
@@ -22,12 +24,157 @@ let num n = lit (Num n)
 
 let int n = lit (Int n)
 
-let typeof x = UnOp (TypeOf, x)
+let string s = lit (String s)
+
+let bool b = lit (Bool b)
+
+let typeof x =
+  match x with
+  | ALoc _ | Lit (Loc _)    -> Lit (Type ObjectType)
+  | EList _ | Lit (LList _) -> Lit (Type ListType)
+  | ESet _                  -> Lit (Type SetType)
+  | _                       -> UnOp (TypeOf, x)
+
+let list_nth x n =
+  match x with
+  | EList l when n < List.length l -> List.nth l n
+  | Lit (LList l) when n < List.length l -> Lit (List.nth l n)
+  | _ -> BinOp (x, LstNth, num (float_of_int n))
+
+let list_nth_e x n =
+  match n with
+  | Lit (Num n) -> list_nth x (int_of_float n)
+  | _           -> BinOp (x, LstNth, n)
+
+let list_length x =
+  match x with
+  | EList l       -> Lit (Num (float_of_int (List.length l)))
+  | Lit (LList l) -> Lit (Num (float_of_int (List.length l)))
+  | _             -> UnOp (LstLen, x)
+
+let list_sub ~lst ~start ~size =
+  match (lst, start, size) with
+  | EList el, Lit (Num startf), Lit (Num sizef) -> (
+      match
+        List_utils.list_sub el (int_of_float startf) (int_of_float sizef)
+      with
+      | None        -> LstSub (lst, start, size)
+      | Some sublst -> EList sublst)
+  | Lit (LList ll), Lit (Num startf), Lit (Num sizef) -> (
+      match
+        List_utils.list_sub ll (int_of_float startf) (int_of_float sizef)
+      with
+      | None        -> LstSub (lst, start, size)
+      | Some sublst -> Lit (LList sublst))
+  | _ -> LstSub (lst, start, size)
+
+let list_cat la lb =
+  let lift l = List.map (fun x -> Lit x) l in
+  match (la, lb) with
+  | Lit (LList la), Lit (LList lb) -> Lit (LList (la @ lb))
+  | Lit (LList la), EList lb -> EList (lift la @ lb)
+  | EList la, Lit (LList lb) -> EList (la @ lift lb)
+  | EList la, EList lb -> EList (la @ lb)
+  | NOp (LstCat, las), NOp (LstCat, lbs) -> NOp (LstCat, las @ lbs)
+  | NOp (LstCat, las), lb -> NOp (LstCat, las @ [ lb ])
+  | la, NOp (LstCat, lbs) -> NOp (LstCat, la :: lbs)
+  | la, lb -> NOp (LstCat, [ la; lb ])
+
+let list_cons el r =
+  let sgl =
+    match el with
+    | Lit x -> Lit (LList [ x ])
+    | e     -> EList [ e ]
+  in
+  list_cat sgl r
+
+let list el =
+  if
+    List.for_all
+      (function
+        | Lit _ -> true
+        | _     -> false)
+      el
+  then
+    Lit
+      (LList
+         (List.map
+            (function
+              | Lit l -> l
+              | _     -> assert false)
+            el))
+  else EList el
+
+let fmod a b =
+  match (a, b) with
+  | Lit (Num a), Lit (Num b) -> Lit (Num (mod_float a b))
+  | _                        -> BinOp (a, FMod, b)
+
+let type_ t = Lit (Type t)
 
 module Infix = struct
-  let ( +. ) a b = BinOp (a, FPlus, b)
+  let ( +. ) a b =
+    match (a, b) with
+    | Lit (Num 0.), x | x, Lit (Num 0.) -> x
+    | Lit (Num x), Lit (Num y) -> Lit (Num (x +. y))
+    | BinOp (x, FPlus, Lit (Num y)), Lit (Num z)
+    | BinOp (Lit (Num y), FPlus, x), Lit (Num z)
+    | Lit (Num z), BinOp (x, FPlus, Lit (Num y))
+    | Lit (Num z), BinOp (Lit (Num y), FPlus, x) ->
+        BinOp (x, FPlus, Lit (Num (y +. z)))
+    | _ -> BinOp (a, FPlus, b)
 
-  let ( + ) a b = BinOp (a, IPlus, b)
+  let ( -. ) a b =
+    match (a, b) with
+    | x, Lit (Num 0.) -> x
+    | Lit (Num 0.), x -> UnOp (FUnaryMinus, x)
+    | Lit (Num x), Lit (Num y) -> Lit (Num (x -. y))
+    | BinOp (x, FPlus, y), z when equal y z -> x
+    | BinOp (x, FPlus, y), z when equal x z -> y
+    | _ -> BinOp (a, FMinus, b)
+
+  let ( *. ) a b =
+    match (a, b) with
+    | Lit (Num 0.), _ | _, Lit (Num 0.) -> Lit (Num 0.)
+    | Lit (Num 1.), x | x, Lit (Num 1.) -> x
+    | Lit (Num x), Lit (Num y) -> Lit (Num (x *. y))
+    | _ -> BinOp (a, FTimes, b)
+
+  let ( /. ) a b =
+    match (a, b) with
+    | x, Lit (Num 1.) -> x
+    | BinOp (x, FTimes, y), z when equal y z -> x
+    | BinOp (x, FTimes, y), z when equal x z -> y
+    | Lit (Num x), Lit (Num y) -> Lit (Num (x /. y))
+    | _ -> BinOp (a, FDiv, b)
+
+  let ( + ) a b =
+    match (a, b) with
+    | Lit (Int 0), x | x, Lit (Int 0) -> x
+    | Lit (Int x), Lit (Int y) -> Lit (Int (x + y))
+    | _ -> BinOp (a, IPlus, b)
+
+  let ( - ) a b =
+    match (a, b) with
+    | x, Lit (Int 0)           -> x
+    | Lit (Num 0.), x          -> UnOp (IUnaryMinus, x)
+    | Lit (Int x), Lit (Int y) -> Lit (Int (x - y))
+    | _                        -> BinOp (a, IMinus, b)
+
+  let ( * ) a b =
+    match (a, b) with
+    | Lit (Int 0), _ | _, Lit (Int 0) -> Lit (Int 0)
+    | Lit (Int 1), x | x, Lit (Int 1) -> x
+    | Lit (Int x), Lit (Int y) -> Lit (Int (x * y))
+    | _ -> BinOp (a, ITimes, b)
+
+  let ( / ) a b =
+    match (a, b) with
+    | x, Lit (Int 1)           -> x
+    | Lit (Int x), Lit (Int y) -> Lit (Int (x / y))
+    | _                        -> BinOp (a, IDiv, b)
+
+  let ( @+ ) = list_cat
 end
 
 module MyExpr = struct
@@ -39,10 +186,9 @@ end
 module Set = Set.Make (MyExpr)
 module Map = Map.Make (MyExpr)
 
-let equal (e1 : t) (e2 : t) : bool = Stdlib.compare e1 e2 = 0
-
 (** Map over expressions *)
-let rec map (f_before : t -> t * bool) (f_after : (t -> t) option) (expr : t) :
+
+(* let rec map (f_before : t -> t * bool) (f_after : (t -> t) option) (expr : t) :
     t =
   (* Apply the mapping *)
   let map_e = map f_before f_after in
@@ -62,9 +208,10 @@ let rec map (f_before : t -> t * bool) (f_after : (t -> t) option) (expr : t) :
       | EList es -> EList (List.map map_e es)
       | ESet es -> ESet (List.map map_e es)
     in
-    f_after mapped_expr
+    f_after mapped_expr *)
 
 (** Optional map over expressions *)
+
 let rec map_opt
     (f_before : t -> t option * bool) (f_after : (t -> t) option) (expr : t) :
     t option =
@@ -90,11 +237,11 @@ let rec map_opt
         | BinOp (e1, op, e2) -> (
             match (map_e e1, map_e e2) with
             | Some e1', Some e2' -> Some (BinOp (e1', op, e2'))
-            | _                  -> None )
+            | _                  -> None)
         | LstSub (e1, e2, e3) -> (
             match (map_e e1, map_e e2, map_e e3) with
             | Some e1', Some e2', Some e3' -> Some (LstSub (e1', e2', e3'))
-            | _ -> None )
+            | _ -> None)
         | NOp (op, les) -> aux les (fun les -> NOp (op, les))
         | EList les -> aux les (fun les -> EList les)
         | ESet les -> aux les (fun les -> ESet les)
@@ -109,11 +256,11 @@ let rec pp fmt e =
   | BinOp (e1, op, e2) -> (
       match op with
       | LstNth | StrNth -> Fmt.pf fmt "%s(%a, %a)" (BinOp.str op) pp e1 pp e2
-      | _               -> Fmt.pf fmt "(%a %s %a)" pp e1 (BinOp.str op) pp e2 )
+      | _               -> Fmt.pf fmt "(%a %s %a)" pp e1 (BinOp.str op) pp e2)
   | LstSub (e1, e2, e3) -> Fmt.pf fmt "l-sub(%a, %a, %a)" pp e1 pp e2 pp e3
   (* (uop e) *)
   | UnOp (op, e) -> Fmt.pf fmt "(%s %a)" (UnOp.str op) pp e
-  | EList ll -> Fmt.pf fmt "{%a}" (Fmt.braces (Fmt.list ~sep:Fmt.comma pp)) ll
+  | EList ll -> Fmt.pf fmt "{{ %a }}" (Fmt.list ~sep:Fmt.comma pp) ll
   (* -{ e1, e2, ... }- *)
   | ESet ll -> Fmt.pf fmt "-{ %a }-" (Fmt.list ~sep:Fmt.comma pp) ll
   | NOp (op, le) ->
@@ -123,16 +270,20 @@ let rec pp fmt e =
 
 let rec full_pp fmt e =
   match e with
-  | Lit _    -> Fmt.pf fmt "(Lit %a)" pp e
-  | PVar _   -> Fmt.pf fmt "PVar %a" pp e
-  | LVar _   -> Fmt.pf fmt "LVar %a" pp e
-  | ALoc _   -> Fmt.pf fmt "ALoc %a" pp e
-  | BinOp _  -> Fmt.pf fmt "(BinOp: %a)" pp e
-  | UnOp _   -> Fmt.pf fmt "(UnOp %a)" pp e
-  | LstSub _ -> Fmt.pf fmt "(LstSub %a)" pp e
-  | NOp _    -> Fmt.pf fmt "(NOp %a)" pp e
-  | EList ll -> Fmt.pf fmt "{{ @[%a@] }}" (Fmt.list ~sep:Fmt.comma full_pp) ll
-  | _        -> pp fmt e
+  | Lit _               -> Fmt.pf fmt "Lit %a" pp e
+  | PVar _              -> Fmt.pf fmt "PVar %a" pp e
+  | LVar _              -> Fmt.pf fmt "LVar %a" pp e
+  | ALoc _              -> Fmt.pf fmt "ALoc %a" pp e
+  | BinOp (e1, op, e2)  ->
+      Fmt.pf fmt "(%a %s %a)" full_pp e1 (BinOp.str op) full_pp e2
+  | UnOp (op, e)        -> Fmt.pf fmt "(%s %a)" (UnOp.str op) pp e
+  | LstSub (e1, e2, e3) ->
+      Fmt.pf fmt "l-sub(%a, %a, %a)" full_pp e1 full_pp e2 full_pp e3
+  | NOp _               -> Fmt.pf fmt "(NOp %a)" pp e
+  | EList ll            -> Fmt.pf fmt "{{ @[%a@] }}"
+                             (Fmt.list ~sep:Fmt.comma full_pp)
+                             ll
+  | _                   -> pp fmt e
 
 (** From expression to expression *)
 let to_expr (le : t) : t = le
@@ -166,39 +317,20 @@ let rec fold
 
 (** Get all the logical variables in --e-- *)
 let lvars (le : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | LVar x -> [ x ]
-    | _      -> List.concat ac
-  in
-  SS.of_list (fold fe_ac None None le)
+  Visitors.Collectors.lvar_collector#visit_expr SS.empty le
 
 (** Get all the abstract locations in --e-- *)
-let alocs (le : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | ALoc x -> [ x ]
-    | _      -> List.concat ac
-  in
-  SS.of_list (fold fe_ac None None le)
+let alocs (le : t) : SS.t = Visitors.Collectors.aloc_collector#visit_expr () le
 
 (** Get all the concrete locations in --e-- *)
-let clocs (le : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | Lit (Loc l) -> l :: List.concat ac
-    | _           -> List.concat ac
-  in
-  SS.of_list (fold fe_ac None None le)
+let clocs (le : t) : SS.t = Visitors.Collectors.cloc_collector#visit_expr () le
+
+let locs (le : t) : SS.t =
+  Visitors.Collectors.loc_collector#visit_expr SS.empty le
 
 (** Get all substitutables in --e-- *)
 let substitutables (le : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | LVar x | ALoc x -> [ x ]
-    | _               -> List.concat ac
-  in
-  SS.of_list (fold fe_ac None None le)
+  Visitors.Collectors.substitutable_collector#visit_expr () le
 
 let rec is_concrete (le : t) : bool =
   let f = is_concrete in
@@ -218,13 +350,7 @@ let rec is_concrete (le : t) : bool =
   | NOp (_, les) | EList les | ESet les -> loop les
 
 (** Get all the variables in --e-- *)
-let vars (le : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | PVar x | LVar x | ALoc x | Lit (Loc x) -> [ x ]
-    | _ -> List.concat ac
-  in
-  SS.of_list (fold fe_ac None None le)
+let vars (le : t) : SS.t = Visitors.Collectors.var_collector#visit_expr () le
 
 (** Are all expressions in the list literals? *)
 let all_literals les =
@@ -244,29 +370,16 @@ let rec from_lit_list (lit : Literal.t) : t =
 
 (** Get all sub-expressions of --e-- of the form (Lit (LList lst)) and (EList lst)  *)
 let lists (le : t) : t list =
-  let fe_ac le _ _ ac =
-    match le with
-    | Lit (LList ls)    ->
-        [ EList (List.map (fun x -> Lit x) ls) ] @ List.concat ac
-    | EList _           -> le :: List.concat ac
-    | NOp (LstCat, les) -> les @ List.concat ac
-    | _                 -> List.concat ac
-  in
-  fold fe_ac None None le
+  Visitors.Collectors.list_collector#visit_expr () le
 
 let subst_clocs (subst : string -> t) (e : t) : t =
-  let f_before e =
-    match e with
-    | Lit (Loc loc) -> (subst loc, false)
-    | _             -> (e, true)
-  in
-  map f_before None e
+  (new Visitors.Substs.subst_clocs subst)#visit_expr () e
 
 let from_var_name (var_name : string) : t =
   if is_aloc_name var_name then ALoc var_name
   else if is_lvar_name var_name then LVar var_name
   else if is_pvar_name var_name then PVar var_name
-  else raise (Failure "DEATH")
+  else Fmt.failwith "Invalid var name : %s" var_name
 
 let loc_from_loc_name (loc_name : string) : t =
   if is_aloc_name loc_name then ALoc loc_name else Lit (Loc loc_name)
@@ -276,7 +389,7 @@ let loc_from_loc_name (loc_name : string) : t =
 let subst_expr_for_expr ~to_subst ~subst_with expr =
   let v =
     object
-      inherit [_] Visitors.map as super
+      inherit [_] Visitors.endo as super
 
       method! visit_expr env e =
         if e = to_subst then subst_with else super#visit_expr env e
@@ -302,14 +415,28 @@ let base_elements (expr : t) : t list =
   in
   v#visit_expr () expr
 
-let pvars (e : t) : SS.t =
-  let v =
-    object
-      inherit [_] Visitors.reduce
+let pvars (e : t) : SS.t = Visitors.Collectors.pvar_collector#visit_expr () e
 
-      inherit Visitors.Utils.ss_monoid
+let var_to_expr (x : string) : t =
+  if Names.is_lvar_name x then LVar x
+  else if Names.is_aloc_name x then ALoc x
+  else if Names.is_pvar_name x then PVar x
+  else raise (Failure ("var_to_expr: Impossible unifiable: " ^ x))
 
-      method! visit_PVar _ x = SS.singleton x
-    end
-  in
-  v#visit_expr () e
+let is_unifiable (e : t) : bool =
+  match e with
+  | PVar _ | LVar _ | ALoc _ | UnOp (LstLen, PVar _) | UnOp (LstLen, LVar _) ->
+      true
+  | _ -> false
+
+let rec pvars_to_lvars (e : t) : t =
+  let f = pvars_to_lvars in
+  match e with
+  | PVar x              -> LVar ("#__" ^ x)
+  | UnOp (op, e)        -> UnOp (op, f e)
+  | BinOp (e1, op, e2)  -> BinOp (f e1, op, f e2)
+  | LstSub (e1, e2, e3) -> LstSub (f e1, f e2, f e3)
+  | NOp (op, les)       -> NOp (op, List.map f les)
+  | EList les           -> EList (List.map f les)
+  | ESet les            -> ESet (List.map f les)
+  | _                   -> e

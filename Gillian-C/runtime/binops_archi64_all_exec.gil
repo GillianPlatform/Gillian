@@ -27,15 +27,15 @@ proc i__binop_addl(v1, v2) {
 
 proc i__binop_subl(v1, v2) {
         goto [ l-nth(v1, 0.) = "long" ] llon loth;
-  llon: goto [ l-nth(v2, 0.) = "long" ] blon llro;
+  llon: goto [ l-nth(v2, 0.) = "long" ] blon unde;
   blon: ret := {{ "long", l-nth(v1, 1.) - l-nth(v2, 1.) }};
         return;
-  llro: goto [ typeOf(l-nth(v2, 0.)) = Obj ] llrp unde;
-  llrp: ret := {{ l-nth(v2, 0.), l-nth(v1, 1.) - l-nth(v2, 1.) }};
-        return;
   loth: goto [ typeOf(l-nth(v1, 0.)) = Obj ] lptr unde;
-  lptr: goto [ l-nth(v2, 0.) = "long" ] lprl unde;
+  lptr: goto [ l-nth(v2, 0.) = "long" ] lprl lpro;
   lprl: ret := {{ l-nth(v1, 0.), l-nth(v1, 1.) - l-nth(v2, 1.) }};
+        return;
+  lpro: goto [ typeOf(l-nth(v2, 0.)) = Obj ] lprp unde;
+  lprp: ret := {{ "long", l-nth(v1, 1.) - l-nth(v2, 1.) }};
         return;
   unde: ret := undefined;
         return

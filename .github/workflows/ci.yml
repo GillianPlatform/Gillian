@@ -2,60 +2,60 @@ name: CI
 
 on:
   push:
-    branches: [ "**" ]
+    branches: ["**"]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        operating-system: [ macos-latest, ubuntu-latest ]
+        operating-system: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-node@v1
-    - name: Installing esy
-      run: npm install -g esy@0.6.6 --unsafe-perm
-    - name: Restore Cache
-      id: restore-cache
-      uses: actions/cache@v1
-      with:
-        path: _export
-        key:  ${{ runner.os }}-esy-0.6.6-${{ hashFiles('esy.lock/index.json') }}
-        restore-keys: |
-          ${{ runner.os }}-esy-0.6.6-
-    - name: Esy install
-      run: 'esy install'
-    - name: Import Cache
-      run: |
-        esy import-dependencies _export
-        rm -rf _export
-    - name: Esy build
-      run: 'esy build'
-      id: esy-build
-    - name: Basic checks
-      run: 'esy test'
-    - name: Format checking
-      run: 'esy format-check'
-    - name: Building release
-      run: 'esy release'
-    - name: Sending artifact for next jobs
-      uses: actions/upload-artifact@v1
-      with:
-        name: ${{ runner.os }}-release
-        path: _release
-    - name: Setting dependency cache
-      run: |
-        esy cleanup .
-        esy export-dependencies
-      if: steps.restore-cache.outputs.cache-hit != 'true'
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+      - name: Installing esy
+        run: sudo npm install -g esy@0.6.6 --unsafe-perm
+      - name: Restore Cache
+        id: restore-cache
+        uses: actions/cache@v1
+        with:
+          path: _export
+          key: ${{ runner.os }}-esy-0.6.6-${{ hashFiles('esy.lock/index.json') }}
+          restore-keys: |
+            ${{ runner.os }}-esy-0.6.6-
+      - name: Esy install
+        run: "esy install"
+      - name: Import Cache
+        run: |
+          esy import-dependencies _export
+          rm -rf _export
+      - name: Esy build
+        run: "esy build"
+        id: esy-build
+      - name: Basic checks
+        run: "esy test"
+      - name: Format checking
+        run: "esy format-check"
+      - name: Building release
+        run: "esy release"
+      - name: Sending artifact for next jobs
+        uses: actions/upload-artifact@v1
+        with:
+          name: ${{ runner.os }}-release
+          path: _release
+      - name: Setting dependency cache
+        run: |
+          esy cleanup .
+          esy export-dependencies
+        if: steps.restore-cache.outputs.cache-hit != 'true'
 
   gillian_c_tests:
     strategy:
       matrix:
-        operating-system: [ macos-latest, ubuntu-latest ]
+        operating-system: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
@@ -65,24 +65,24 @@ jobs:
           name: ${{ runner.os }}-release
           path: release
       - name: setting up node
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v2
       - name: install release
-        run: npm install -g ./release
+        run: sudo npm install -g ./release
       - name: checkout project
         uses: actions/checkout@v2
         with:
           path: Gillian
       - name: init env
-        run: 'Gillian-C/scripts/setup_environment.sh'
-        working-directory: 'Gillian'
+        run: "Gillian-C/scripts/setup_environment.sh"
+        working-directory: "Gillian"
       - name: Test All
-        run: './testAll.sh'
-        working-directory: 'Gillian/Gillian-C/environment/'
-  
+        run: "./testAll.sh"
+        working-directory: "Gillian/Gillian-C/environment/"
+
   gillian_js_tests:
     strategy:
       matrix:
-        operating-system: [ macos-latest, ubuntu-latest ]
+        operating-system: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
@@ -92,25 +92,28 @@ jobs:
           name: ${{ runner.os }}-release
           path: release
       - name: setting up node
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v2
       - name: install release
-        run: npm install -g ./release
+        run: sudo npm install -g ./release
       - name: checkout project
         uses: actions/checkout@v2
         with:
           path: Gillian
       - name: init env
-        run: 'Gillian-JS/scripts/setup_environment.sh'
-        working-directory: 'Gillian'
+        run: "Gillian-JS/scripts/setup_environment.sh"
+        working-directory: "Gillian"
       - name: Test JaVerT
-        run: './testJaVerT.sh'
-        working-directory: 'Gillian/Gillian-JS/environment/'
-  
+        run: "./testJaVerT.sh"
+        working-directory: "Gillian/Gillian-JS/environment/"
+      - name: Test Amazon
+        run: "gillian-js verify deserialize_factory.js --no-lemma-proof --amazon -l disabled"
+        working-directory: "Gillian/Gillian-JS/Examples/Amazon/"
+
   test262:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
     strategy:
       matrix:
-        operating-system: [ macos-latest ]
+        operating-system: [macos-latest]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
@@ -120,23 +123,23 @@ jobs:
           name: ${{ runner.os }}-release
           path: release
       - name: setting up node
-        uses: actions/setup-node@v1.1.0
+        uses: actions/setup-node@v2
       - name: install release
-        run: npm install -g ./release
+        run: sudo npm install -g ./release
       - name: checkout project
         uses: actions/checkout@v2.0.0
         with:
-          repository:  GillianPlatform/javert-test262
+          repository: GillianPlatform/javert-test262
           path: test262
           ref: 93e0d0b04093cabc3234a776eec5cc3e165f3b1a
       - name: Test262
-        run: 'gillian-js test262 test262/test --ci'
+        run: "gillian-js test262 test262/test --ci"
 
   collections-c:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
     strategy:
       matrix:
-        operating-system: [ macos-latest ]
+        operating-system: [macos-latest]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
@@ -146,24 +149,24 @@ jobs:
           name: ${{ runner.os }}-release
           path: release
       - name: setting up node
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v2
       - name: install release
-        run: npm install -g ./release
+        run: sudo npm install -g ./release
       - name: checkout project
         uses: actions/checkout@v2
         with:
-          repository:  GillianPlatform/collections-c-for-gillian
+          repository: GillianPlatform/collections-c-for-gillian
           path: collections-c
           ref: 82a8c3c24d4f182d773aa50cc8e90493dec778a3
       - name: Symbolic Testing Collections-C
-        run: './runGillianTests.sh'
+        run: "./runGillianTests.sh"
         working-directory: collections-c
 
   test-Buckets:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
     strategy:
       matrix:
-        operating-system: [ macos-latest ]
+        operating-system: [macos-latest]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
@@ -173,13 +176,12 @@ jobs:
           name: ${{ runner.os }}-release
           path: release
       - name: setting up node
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v2
       - name: install release
-        run: npm install -g ./release
+        run: sudo npm install -g ./release
       - name: checkout project
         uses: actions/checkout@v2
         with:
           path: Gillian
       - name: Symbolic Testing Buckets.js
-        run: 'gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci'
-      
+        run: "gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci"

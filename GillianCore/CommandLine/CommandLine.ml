@@ -20,12 +20,12 @@ module Make
 struct
   module CState = CState.Make (CMemory)
   module CInterpreter =
-    GInterpreter.Make (CVal.M) (CVal.CSubst) (CStore) (CState) (External)
+    GInterpreter.Make (CVal.M) (CVal.CESubst) (CStore) (CState) (External)
   module SState = SState.Make (SMemory)
   module SInterpreter =
-    GInterpreter.Make (SVal.M) (SVal.SSubst) (SStore) (SState) (External)
+    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (External)
   module SPState =
-    PState.Make (SVal.M) (SVal.SSubst) (SStore) (SState) (Preds.SPreds)
+    PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
   module Verification = Verifier.Make (SState) (SPState) (External)
   module Abductor = Abductor.Make (SState) (SPState) (External)
 
@@ -158,19 +158,24 @@ struct
     let docv = "OUT_DIR" in
     Arg.(value & opt string default & info [ "result-dir" ] ~doc ~docv)
 
+  let pbn =
+    let doc = "Print-by-need." in
+    Arg.(value & flag & info [ "pbn"; "print-by-need" ] ~doc)
+
   let get_progs_or_fail = function
     | Ok progs  -> (
         match progs.ParserAndCompiler.gil_progs with
         | [] ->
             Fmt.pr "Error: expected at least one GIL program\n";
             exit 1
-        | _  -> progs )
+        | _  -> progs)
     | Error err ->
         Fmt.pr "Error during compilation to GIL:\n%a" PC.pp_err err;
         exit 1
 
   let with_common (term : (unit -> unit) Term.t) : unit Term.t =
-    let apply_common logging_mode reporters runtime_path ci tl_opts result_dir =
+    let apply_common
+        logging_mode reporters runtime_path ci tl_opts result_dir pbn =
       Config.set_result_dir result_dir;
       Config.ci := ci;
       Logging.Mode.set_mode logging_mode;
@@ -178,12 +183,13 @@ struct
       List.iter (fun reporter -> reporter.enable ()) reporters;
       Printexc.record_backtrace (Logging.Mode.enabled ());
       PC.TargetLangOptions.apply tl_opts;
-      Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path
+      Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path;
+      Config.pbn := pbn
     in
     let common_term =
       Term.(
         const apply_common $ logging_mode $ reporters $ runtime_path $ ci
-        $ PC.TargetLangOptions.term $ result_directory)
+        $ PC.TargetLangOptions.term $ result_directory $ pbn)
     in
     Term.(term $ common_term)
 
@@ -285,9 +291,10 @@ struct
             (get_progs_or_fail (PC.parse_and_compile_files files)).gil_progs
           in
           Gil_parsing.cache_labelled_progs (List.tl e_progs);
-          snd (List.hd e_progs) )
+          snd (List.hd e_progs))
         else Gil_parsing.parse_eprog_from_file (List.hd files)
       in
+      let () = burn_gil e_prog outfile_opt in
       let prog =
         Gil_parsing.eprog_to_prog
           ~other_imports:(convert_other_imports PC.other_imports)
@@ -344,8 +351,8 @@ struct
         in
         let changed_procs =
           SS.of_list
-            ( proc_changes.changed_procs @ proc_changes.new_procs
-            @ proc_changes.dependent_procs )
+            (proc_changes.changed_procs @ proc_changes.new_procs
+           @ proc_changes.dependent_procs)
         in
         if SS.mem "main" changed_procs then
           let () = run_main prog in
@@ -443,6 +450,26 @@ struct
       let doc = "Do not verify the proofs of lemmas." in
       Arg.(value & flag & info [ "no-lemma-proof" ] ~doc)
 
+    let proc_arg =
+      let doc =
+        "Specifies a procedure or list of procedures that should be verified. \
+         By default, everything is verieid, but only if neither --proc nor \
+         --lemma is specified. A combination of --lemma and --proc can be \
+         used."
+      in
+      let docv = "PROC_NAME" in
+      Arg.(value & opt_all string [] & info [ "proc" ] ~doc ~docv)
+
+    let lemma_arg =
+      let doc =
+        "Specifies a procedure or list of lemmas that should be verified. By \
+         default, everything is verified, but only if neither --proc nor \
+         --lemma is specified. A combination of --lemma and --proc can be \
+         used."
+      in
+      let docv = "LEMMA_NAME" in
+      Arg.(value & opt_all string [] & info [ "lemma" ] ~doc ~docv)
+
     let no_unfold =
       let doc = "Disable automatic unfolding of non-recursive predicates." in
       Arg.(value & flag & info [ "no-unfold" ] ~doc)
@@ -452,6 +479,8 @@ struct
       Arg.(value & flag & info [ "m"; "manual" ] ~doc)
 
     let process_files files already_compiled outfile_opt no_unfold incremental =
+      Verification.start_time := Sys.time ();
+      Fmt.pr "Parsing and compiling...\n@?";
       let e_prog, source_files_opt =
         if not already_compiled then
           let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
@@ -466,6 +495,7 @@ struct
       in
       let () = burn_gil e_prog outfile_opt in
       (* Prog.perform_syntax_checks e_prog; *)
+      Fmt.pr "Preprocessing...\n@?";
       let prog =
         Gil_parsing.eprog_to_prog
           ~other_imports:(convert_other_imports PC.other_imports)
@@ -492,13 +522,22 @@ struct
         no_lemma_proof
         manual
         incremental
+        procs_to_verify
+        lemmas_to_verify
         () =
+      if incremental then
+        failwith
+          "Incremental not working. Because normalization can yield several \
+           results, several verification tests can have the same id. This \
+           should be fixed first.";
       let () = Fmt_tty.setup_std_outputs () in
       let () = Config.current_exec_mode := Verification in
       let () = PC.initialize Verification in
       let () = Config.stats := stats in
       let () = Config.lemma_proof := not no_lemma_proof in
       let () = Config.manual_proof := manual in
+      let () = Config.Verification.set_procs_to_verify procs_to_verify in
+      let () = Config.Verification.set_lemmas_to_verify lemmas_to_verify in
       let () =
         process_files files already_compiled outfile_opt no_unfold incremental
       in
@@ -508,7 +547,7 @@ struct
     let verify_t =
       Term.(
         const verify $ files $ already_compiled $ output_gil $ no_unfold $ stats
-        $ no_lemma_proof $ manual $ incremental)
+        $ no_lemma_proof $ manual $ incremental $ proc_arg $ lemma_arg)
 
     let verify_info =
       let doc = "Verifies a file of the target language" in
@@ -575,7 +614,7 @@ struct
       let () = Config.unfolding := false in
       let prog = LogicPreprocessing.preprocess prog true in
       match UP.init_prog prog with
-      | Error _  -> raise (Failure "Creation of unification plans failed.")
+      | Error _  -> failwith "Creation of unification plans failed."
       | Ok prog' ->
           let () = Abductor.test_prog prog' incremental source_files_opt in
           if emit_specs then
@@ -643,13 +682,13 @@ struct
         let docv = "PATH" in
         Arg.(required & pos 0 (some file) None & info [] ~docv ~doc)
       in
-      let run path npaf incremental () =
+      let run test_suite_path npaf incremental () =
         let () = Config.current_exec_mode := exec_mode in
         let () = PC.initialize exec_mode in
         let () = Config.bulk_print_all_failures := not npaf in
         let () = Logging.Mode.set_mode Disabled in
         let () = Printexc.record_backtrace false in
-        Runner.run_all runner path incremental
+        Runner.run_all runner ~test_suite_path ~incremental
       in
       let run_t = Term.(const run $ path_t $ no_print_failures $ incremental) in
       let run_info =

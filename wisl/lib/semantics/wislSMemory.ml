@@ -50,10 +50,10 @@ let get_cell heap pfs gamma (loc : vt) (offset : vt) =
                   ASucc [ (heap, [ loc; o; v ], [], []) ]
               | None        ->
                   (* Couldn't find it, we can't do for now. *)
-                  AFail [] ) )
+                  AFail []))
       | None     ->
           (* Location does not exist in the heap *)
-          AFail [] )
+          AFail [])
   | None          ->
       (* loc does not evaluate to a location, or we can't find it. *)
       AFail []
@@ -97,7 +97,7 @@ let rem_cell heap pfs gamma (loc : vt) (offset : vt) =
           ASucc [ (heap, [], [], []) ]
       | None     ->
           (* Location does not exist in the heap *)
-          AFail [] )
+          AFail [])
   | None          ->
       (* loc does not evaluate to a location, or we can't find it. *)
       AFail []
@@ -111,20 +111,20 @@ let dispose heap pfs gamma loc_expr =
   match resolve_loc pfs gamma loc_expr with
   | Some loc_name -> (
       match WislSHeap.get_fvl heap loc_name with
-      | Some fvl ->
+      | Some _ ->
           let () = WislSHeap.remove heap loc_name in
           ASucc [ (heap, [], [], []) ]
-      | None     ->
+      | None   ->
           Logging.verbose (fun m ->
               m
                 "!!!!!!!!!!!!!!!@\n\
                  %s is not in the memory, can't dispose of it !!!@\n\
                  !!!!!!!!!!!"
                 loc_name);
-          AFail [] )
+          AFail [])
   | None          -> AFail []
 
-let execute_action name heap pfs gamma args =
+let execute_action ?unification:_ name heap pfs gamma args =
   let action = WislLActions.ac_from_str name in
   match action with
   | GetCell -> (
@@ -136,7 +136,7 @@ let execute_action name heap pfs gamma args =
             (Format.asprintf
                "Invalid GetCell Call for WISL, with parameters : [ %a ]"
                (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args) )
+               args))
   | SetCell -> (
       match args with
       | [ loc_expr; offset_expr; value_expr ] ->
@@ -146,7 +146,7 @@ let execute_action name heap pfs gamma args =
             (Format.asprintf
                "Invalid SetCell Call for WISL, with parameters : [ %a ]"
                (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args) )
+               args))
   | RemCell -> (
       match args with
       | [ loc_expr; offset_expr ] ->
@@ -156,7 +156,7 @@ let execute_action name heap pfs gamma args =
             (Format.asprintf
                "Invalid RemCell Call for WISL, with parameters : [ %a ]"
                (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args) )
+               args))
   | Alloc   -> (
       match args with
       | [ Expr.Lit (Literal.Int size) ] when size >= 1 ->
@@ -166,7 +166,7 @@ let execute_action name heap pfs gamma args =
             (Format.asprintf
                "Invalid Alloc Call for WISL, with parameters : [ %a ]"
                (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args) )
+               args))
   | Dispose -> (
       match args with
       | [ loc_expr ] -> dispose heap pfs gamma loc_expr
@@ -175,7 +175,7 @@ let execute_action name heap pfs gamma args =
             (Format.asprintf
                "Invalid Dispose Call for WISL, with parameters : [ %a ]"
                (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args) )
+               args))
 
 let ga_to_setter = WislLActions.ga_to_setter_str
 
@@ -192,15 +192,21 @@ let copy = WislSHeap.copy
 
 let pp fmt h = Format.fprintf fmt "%s" (WislSHeap.str h)
 
+(* TODO: Implement properly *)
+let pp_by_need _ fmt h = pp fmt h
+
+(* TODO: Implement properly *)
+let get_print_info _ _ = (SS.empty, SS.empty)
+
 let pp_err _ _ = ()
 
-let get_recovery_vals _ = []
+let get_recovery_vals _ _ = []
 
 let pp_c_fix _ _ = ()
 
 let pp_i_fix _ _ = ()
 
-let substitution_in_place = WislSHeap.substitution_in_place
+let substitution_in_place ~pfs:_ ~gamma:_ = WislSHeap.substitution_in_place
 
 let fresh_val _ = Expr.LVar (LVar.alloc ())
 
@@ -217,6 +223,6 @@ let is_overlapping_asrt _ = false
 
 let apply_fix m _ _ _ = m
 
-let get_fixes ?simple_fix _ _ _ _ = []
+let get_fixes ?simple_fix:_ _ _ _ _ = []
 
 let get_failing_constraint _ = Formula.True

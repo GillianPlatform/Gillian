@@ -40,7 +40,7 @@ module type S = sig
     Containers.SS.t ->
     t
 
-  val execute_action : string -> t -> vt list -> action_ret
+  val execute_action : ?unification:bool -> string -> t -> vt list -> action_ret
 
   val ga_to_setter : string -> string
 
@@ -66,7 +66,12 @@ module type S = sig
 
   (** Assume assertion *)
   val assume_a :
-    ?unification:bool -> ?production:bool -> t -> Formula.t list -> t option
+    ?unification:bool ->
+    ?production:bool ->
+    ?time:string ->
+    t ->
+    Formula.t list ->
+    t option
 
   (** Assume type *)
   val assume_t : t -> vt -> Type.t -> t option
@@ -87,7 +92,7 @@ module type S = sig
 
   (** State simplification *)
   val simplify :
-    ?save:bool -> ?kill_new_lvars:bool -> ?unification:bool -> t -> st
+    ?save:bool -> ?kill_new_lvars:bool -> ?unification:bool -> t -> st * t list
 
   (** Value simplification *)
   val simplify_val : t -> vt -> vt
@@ -97,14 +102,22 @@ module type S = sig
 
   val fresh_loc : ?loc:vt -> t -> vt
 
-  (** Printer *)
+  (** Printers *)
   val pp : Format.formatter -> t -> unit
+
+  val pp_by_need :
+    Containers.SS.t ->
+    Containers.SS.t ->
+    Containers.SS.t ->
+    Format.formatter ->
+    t ->
+    unit
 
   val pp_err : Format.formatter -> err_t -> unit
 
   val pp_fix : Format.formatter -> fix_t -> unit
 
-  val get_recovery_vals : err_t list -> vt list
+  val get_recovery_vals : t -> err_t list -> vt list
 
   (** State Copy *)
   val copy : t -> t
@@ -121,7 +134,14 @@ module type S = sig
   (** Turns a state into a list of assertions *)
   val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
 
-  val evaluate_slcmd : UP.prog -> SLCmd.t -> t -> t list
+  val evaluate_slcmd : UP.prog -> SLCmd.t -> t -> (t list, string) result
+
+  val unify_invariant :
+    UP.prog -> bool -> t -> Asrt.t -> string list -> (t * t) list
+
+  val clear_resource : t -> t
+
+  val frame_on : t -> (string * t) list -> string list -> t list
 
   val run_spec :
     UP.spec ->
@@ -135,17 +155,17 @@ module type S = sig
 
   val automatic_unfold : t -> vt list -> (t list, string) result
 
-  val substitution_in_place : st -> t -> unit
+  val substitution_in_place : ?subst_all:bool -> st -> t -> t list
 
   val fresh_val : t -> vt
 
   val clean_up : t -> unit
 
-  val unify_assertion : t -> st -> Asrt.t -> u_res
+  val unify_assertion : t -> st -> UP.step -> u_res
 
   val produce_posts : t -> st -> Asrt.t list -> t list
 
-  val produce : t -> st -> Asrt.t -> t option
+  val produce : t -> st -> Asrt.t -> (t list, string) result
 
   val update_subst : t -> st -> unit
 
@@ -162,4 +182,6 @@ module type S = sig
   val get_fixes : ?simple_fix:bool -> t -> err_t list -> fix_t list list
 
   val apply_fixes : t -> fix_t list -> t option * Asrt.t list
+
+  val get_equal_values : t -> vt list -> vt list
 end

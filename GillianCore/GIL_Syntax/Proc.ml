@@ -71,15 +71,6 @@ let pp_labeled fmt c = pp ~show_labels:true ~pp_label:Fmt.string fmt c
 
 let pp_indexed fmt c = pp ~show_labels:false ~pp_label:Fmt.int fmt c
 
-let line_info (proc : (Annot.t, 'a) t) : (string * int * int) list =
-  let pname = proc.proc_name in
-  List.mapi
-    (fun i (annot, _, _) ->
-      match Annot.get_line_offset annot with
-      | None   -> (pname, i, -1)
-      | Some n -> (pname, i, n))
-    (Array.to_list proc.proc_body)
-
 let indexed_of_labeled (lproc : (Annot.t, string) t) : (Annot.t, int) t =
   let no_of_cmds = Array.length lproc.proc_body in
 
@@ -128,9 +119,9 @@ let indexed_of_labeled (lproc : (Annot.t, string) t) : (Annot.t, int) t =
                       ( x,
                         e,
                         le,
-                        ( match ol with
+                        (match ol with
                         | None     -> None
-                        | Some lab -> Some (find_with_error mapping lab) ),
+                        | Some lab -> Some (find_with_error mapping lab)),
                         subst )
                 | ECall (x, e, le, ol)       ->
                     Cmd.ECall
@@ -184,5 +175,5 @@ let check_proc_spec_correspondence
                        different arguments.\n\
                        @[<h>%a@] in procedure, @[<h>%a@] in params"
                       proc.proc_name (Fmt.Dump.list Fmt.string) proc.proc_params
-                      (Fmt.Dump.list Fmt.string) spec.spec_params)) ))
+                      (Fmt.Dump.list Fmt.string) spec.spec_params))))
     procedures

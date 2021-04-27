@@ -9,7 +9,7 @@ let harness_path () =
             let complete_path = Filename.concat p fname in
             let _ = Unix.stat complete_path in
             complete_path
-          with Unix.Unix_error (Unix.ENOENT, "stat", _) -> find fn r )
+          with Unix.Unix_error (Unix.ENOENT, "stat", _) -> find fn r)
     in
     find fname list_paths
   in
@@ -24,12 +24,21 @@ let load_file f : string =
   close_in ic;
   Bytes.to_string s
 
-let harness = load_file (harness_path ())
+let harness =
+  (* Only load harness on first call *)
+  let loaded_harness = ref None in
+  fun () ->
+    match !loaded_harness with
+    | Some s -> s
+    | None   ->
+        let harness = load_file (harness_path ()) ^ "\n\n" in
+        loaded_harness := Some harness;
+        harness
 
 (* Load a JavaScript file *)
 let load_js_file path =
   let use_strict =
     if !Js_config.use_strict then "\"use strict\";\n\n" else ""
   in
-  let harness = if !Js_config.js2jsil_harnessing then harness else "" in
+  let harness = if !Js_config.js2jsil_harnessing then harness () else "" in
   Printf.sprintf "%s%s%s" use_strict harness (load_file path)

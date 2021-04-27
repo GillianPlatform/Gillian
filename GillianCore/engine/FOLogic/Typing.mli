@@ -15,4 +15,4 @@ val te_of_list : (Expr.t * Type.t) list -> TypEnv.t option
 
 val naively_infer_type_information : PFS.t -> TypEnv.t -> unit
 
-val substitution_in_place : SVal.SSubst.t -> TypEnv.t -> unit
+val substitution_in_place : SVal.SESubst.t -> TypEnv.t -> unit

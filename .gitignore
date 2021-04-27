@@ -30,6 +30,7 @@ _build
 *.native
 *.byte
 *.merlin
+_opam
 
 # Mac rubbish
 .DS_Store
@@ -78,3 +79,6 @@ see_deps.py
 
 # Development container
 .devcontainer
+
+# VSCode
+.vscode/settings.json

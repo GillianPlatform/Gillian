@@ -18,7 +18,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
   module Backend = Backend (Outcome) (Suite)
   module PC = Outcome.ParserAndCompiler
   module Interpreter =
-    GInterpreter.Make (Outcome.Val) (Outcome.Subst) (Outcome.Store)
+    GInterpreter.Make (Outcome.Val) (Outcome.ESubst) (Outcome.Store)
       (Outcome.State)
       (Outcome.External)
 
@@ -99,15 +99,15 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
             in
             let changed_procs =
               SS.of_list
-                ( proc_changes.changed_procs @ proc_changes.new_procs
-                @ proc_changes.dependent_procs )
+                (proc_changes.changed_procs @ proc_changes.new_procs
+               @ proc_changes.dependent_procs)
             in
             if SS.mem "main" changed_procs then true
             else (
               (* Keep previous call graph *)
               Hashtbl.add cur_call_graphs filename prev_call_graph;
-              false )
-        | _ -> true )
+              false)
+        | _ -> true)
     | None -> true
 
   let execute_test

@@ -21,56 +21,55 @@ module type S = sig
 
   type u_res = UWTF | USucc of t | UFail of err_t list
 
-  type unfold_info_t = string * (string * Expr.t) list
+  type unfold_info_t = (string * string) list
 
-  val produce_assertion : t -> st -> Asrt.t -> t option
+  val produce_assertion : t -> st -> Asrt.t -> (t list, string) result
 
-  val produce : t -> st -> Asrt.t -> t option
+  val produce : t -> st -> Asrt.t -> (t list, string) result
 
   val produce_posts : t -> st -> Asrt.t list -> t list
 
   val unfold : t -> string -> vt list -> unfold_info_t option -> (st * t) list
 
-  val rec_unfold : t -> string -> vt list -> t
+  val rec_unfold : ?fuel:int -> t -> string -> vt list -> t list
 
-  val unfold_all : t -> string -> t
+  val unfold_all : t -> string -> t list
 
   val unfold_with_vals : t -> vt list -> (st * t) list * bool
 
   val unfold_concrete_preds : t -> (st option * t) option
 
-  val unify_assertion : t -> st -> Asrt.t -> u_res
+  val unify_assertion : t -> st -> UP.step -> u_res
 
   val unify_up : search_state -> up_u_res
 
   val unify : ?in_unification:bool -> t -> st -> UP.t -> up_u_res
 
-  val get_pred : ?in_unification:bool -> t -> string -> vt list -> gp_ret
+  val get_pred : ?in_unification:bool -> t -> string -> vt option list -> gp_ret
 end
 
 module Make
     (Val : Val.S)
-    (Subst : Subst.S with type vt = Val.t and type t = Val.st)
+    (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
     (State : State.S
                with type vt = Val.t
-                and type st = Subst.t
+                and type st = ESubst.t
                 and type store_t = Store.t)
-    (Preds : Preds.S with type vt = Val.t and type st = Subst.t) :
+    (Preds : Preds.S with type vt = Val.t and type st = ESubst.t) :
   S
     with type vt = Val.t
-     and type st = Subst.t
+     and type st = ESubst.t
      and type state_t = State.t
      and type preds_t = Preds.t
      and type err_t = State.err_t = struct
   open Literal
   open Containers
   module L = Logging
-  module SSubst = SVal.SSubst
 
   type vt = Val.t
 
-  type st = Subst.t
+  type st = ESubst.t
 
   type state_t = State.t
 
@@ -86,7 +85,7 @@ module Make
 
   type search_state = (t * st * UP.t) list * err_t list
 
-  type unfold_info_t = string * (string * Expr.t) list
+  type unfold_info_t = (string * string) list
 
   type gp_ret = GPSucc of (t * vt list) list | GPFail of err_t list
 
@@ -101,15 +100,29 @@ module Make
     let state' = State.set_store state store in
     (state', preds, pred_defs)
 
-  let simplify_astate ?(save = false) ?(unification = false) (astate : t) : st =
+  let simplify_astate ?(save = false) ?(unification = false) (astate : t) :
+      st * t list =
     let state, preds, pred_defs = astate in
-    let subst = State.simplify ~save ~kill_new_lvars:false ~unification state in
+    let subst, states =
+      State.simplify ~save ~kill_new_lvars:false ~unification state
+    in
     Preds.substitution_in_place subst preds;
-    subst
+    match states with
+    | []        -> failwith "Impossible: state substitution returned []"
+    | [ state ] -> (subst, [ (state, preds, pred_defs) ])
+    | states    ->
+        ( subst,
+          List.map (fun state -> (state, Preds.copy preds, pred_defs)) states )
 
   let pp_astate fmt astate =
     let state, preds, _ = astate in
     Fmt.pf fmt "%a@\nPREDS:@\n%a@\n" State.pp state Preds.pp preds
+
+  let pp_astate_by_need (pvars : SS.t) (lvars : SS.t) (locs : SS.t) fmt astate =
+    let state, preds, _ = astate in
+    Fmt.pf fmt "%a@\n@\nPREDS:@\n%a@\n"
+      (State.pp_by_need pvars lvars locs)
+      state Preds.pp preds
 
   let copy_astate (astate : t) : t =
     let state, preds, pred_defs = astate in
@@ -119,27 +132,12 @@ module Make
     let state, _, _ = astate in
     let v =
       Option.fold ~some:Val.from_expr ~none:None
-        (Subst.subst_in_expr_opt subst e)
+        (ESubst.subst_in_expr_opt subst e)
     in
     Option.map (State.simplify_val state) v
 
-  let subst_in_expr (subst : Subst.t) (le : Expr.t) : Val.t option =
-    Val.from_expr (Subst.subst_in_expr subst false le)
-
-  let compose_substs
-      (subst_lst : (string * vt) list) (subst1 : st) (subst2 : st) : st =
-    let subst = Subst.init [] in
-
-    let aux (v : vt) : vt =
-      let e1 = Subst.subst_in_expr subst1 true (Val.to_expr v) in
-      let e2 = Subst.subst_in_expr subst2 true e1 in
-      match Val.from_expr e2 with
-      | None    -> v
-      | Some v2 -> v2
-    in
-
-    List.iter (fun (x, v) -> Subst.put subst x (aux v)) subst_lst;
-    subst
+  let subst_in_expr (subst : ESubst.t) (le : Expr.t) : Val.t option =
+    Val.from_expr (ESubst.subst_in_expr subst ~partial:false le)
 
   let get_pred_with_vs (astate : t) (vs : Val.t list) : abs_t option =
     let state, preds, pred_defs = astate in
@@ -159,124 +157,175 @@ module Make
         raise (Failure "ERROR: get_pred_with_vs: Predicate doesn't exist.")
     in
 
-    let apply_strategies (strategies : (string * Val.t list -> bool) list) :
+    let apply_strategies (strategies : (string * Val.t list -> int) list) :
         (string * Val.t list) option =
       List.fold_left
-        (fun ac strategy -> if ac <> None then ac else Preds.pop preds strategy)
+        (fun ac strategy ->
+          if ac <> None then ac else Preds.strategic_choice preds strategy)
         None strategies
     in
 
     (* Strategy 1: The values that we are looking for are in the in-parameters *)
-    let strategy_1 ((name, args) : string * Val.t list) : bool =
+    let strategy_1 ((name, args) : string * Val.t list) : int =
       print_local_info 1 name args;
       let pred_def = get_pred_def name in
-      let in_args = Pred.in_args pred_def args in
-      let vs_inter = List_utils.list_inter vs in_args in
-      let es_inter =
-        List.fold_left
-          (fun ac e -> Expr.Set.add e ac)
-          Expr.Set.empty
-          (List.map Val.to_expr vs_inter)
-      in
-      let es_inter =
-        Expr.Set.filter
-          (fun e ->
-            match e with
-            | Lit _ -> false
-            | _     -> true)
-          es_inter
-      in
-      L.verbose (fun m ->
-          m "get_pred_with_vs. Strategy 1. Intersection: %s"
-            (String.concat ", "
-               (List.map (Fmt.to_to_string Expr.pp)
-                  (Expr.Set.elements es_inter))));
-      es_inter <> Expr.Set.empty
+      match pred_def.pred_abstract with
+      | true  -> 0
+      | false ->
+          let one_level_list_expander args =
+            List.concat_map
+              (fun (x : vt) ->
+                match Val.to_expr x with
+                | EList ls ->
+                    List.map (fun x -> Option.get (Val.from_expr x)) ls
+                | _        -> [ x ])
+              args
+          in
+          let in_args = one_level_list_expander (Pred.in_args pred_def args) in
+
+          L.verbose (fun fmt ->
+              fmt "Original values: %a"
+                Fmt.(brackets (list ~sep:comma Val.pp))
+                vs);
+          let vs = State.get_equal_values state vs in
+          let vs =
+            vs
+            @ List.map Option.get
+                (List.map Val.from_expr
+                   (List.concat_map Expr.base_elements (List.map Val.to_expr vs)))
+          in
+          let vs = List.sort_uniq compare vs in
+          L.verbose (fun fmt ->
+              fmt "Extended values: %a"
+                Fmt.(brackets (list ~sep:comma Val.pp))
+                vs);
+          let vs_inter = List_utils.list_inter vs in_args in
+          let es_inter =
+            List.fold_left
+              (fun ac e -> Expr.Set.add e ac)
+              Expr.Set.empty
+              (List.map Val.to_expr vs_inter)
+          in
+          let es_inter =
+            Expr.Set.filter
+              (fun e ->
+                match e with
+                | Lit _ -> false
+                | _     -> true)
+              es_inter
+          in
+          L.verbose (fun m ->
+              m "get_pred_with_vs. Strategy 1. Intersection of cardinal %i: %a"
+                (Expr.Set.cardinal es_inter)
+                (Fmt.Dump.list Expr.pp)
+                (Expr.Set.elements es_inter));
+
+          Expr.Set.cardinal es_inter
     in
 
     (* Strategy 2: Predicate has all literals as in-parameters *)
-    let strategy_2 ((name, args) : string * Val.t list) : bool =
+    let strategy_2 ((name, args) : string * Val.t list) : int =
       print_local_info 2 name args;
       let pred_def = get_pred_def name in
-      let in_args = Pred.in_args pred_def args in
-      let all_literals =
-        List.map
-          (fun (x : Expr.t) ->
-            match x with
-            | Lit _ -> true
-            | _     -> false)
-          (List.map Val.to_expr in_args)
-      in
-      List.for_all (fun x -> x = true) all_literals
+      match pred_def.pred_abstract with
+      | true  -> 0
+      | false ->
+          let in_args = Pred.in_args pred_def args in
+          let all_literals =
+            List.map
+              (fun (x : Expr.t) ->
+                match x with
+                | Lit _ -> true
+                | _     -> false)
+              (List.map Val.to_expr in_args)
+          in
+          if List.for_all (fun x -> x = true) all_literals then 1 else 0
     in
 
     (* Strategy 3: The values that we are looking for are in the out-parameters *)
-    let strategy_3 ((name, args) : string * Val.t list) : bool =
+    let strategy_3 ((name, args) : string * Val.t list) : int =
       print_local_info 3 name args;
       let pred_def = get_pred_def name in
-      let out_args = Pred.out_args pred_def args in
-      let vs_inter = List_utils.list_inter vs out_args in
-      let es_inter =
-        List.fold_left
-          (fun ac e -> Expr.Set.add e ac)
-          Expr.Set.empty
-          (List.map Val.to_expr vs_inter)
-      in
-      let es_inter =
-        Expr.Set.filter
-          (fun e ->
-            match e with
-            | Lit _ -> false
-            | _     -> true)
-          es_inter
-      in
-      L.verbose (fun m ->
-          m "get_pred_with_vs. Strategy 3. Intersection: %s"
-            (String.concat ", "
-               (List.map (Fmt.to_to_string Expr.pp)
-                  (Expr.Set.elements es_inter))));
-      es_inter <> Expr.Set.empty
+      match pred_def.pred_abstract with
+      | true  -> 0
+      | false ->
+          let out_args = Pred.out_args pred_def args in
+          let vs_inter = List_utils.list_inter vs out_args in
+          let es_inter =
+            List.fold_left
+              (fun ac e -> Expr.Set.add e ac)
+              Expr.Set.empty
+              (List.map Val.to_expr vs_inter)
+          in
+          let es_inter =
+            Expr.Set.filter
+              (fun e ->
+                match e with
+                | Lit _ -> false
+                | _     -> true)
+              es_inter
+          in
+          L.verbose (fun m ->
+              m "get_pred_with_vs. Strategy 3. Intersection: %s"
+                (String.concat ", "
+                   (List.map (Fmt.to_to_string Expr.pp)
+                      (Expr.Set.elements es_inter))));
+          Expr.Set.cardinal es_inter
     in
 
     (* Strategy 3: Predicate has non-literal parameters in pure formulae *)
-    let strategy_4 ((name, args) : string * Val.t list) : bool =
+    let strategy_4 ((name, args) : string * Val.t list) : int =
       print_local_info 4 name args;
-      let lvars_state = State.get_spec_vars state in
-      let lvars_args =
-        List.fold_left SS.union SS.empty
-          (List.map (fun x -> Expr.lvars (Val.to_expr x)) args)
-      in
-      let inter = SS.inter lvars_args lvars_state in
-      inter <> SS.empty
+      let pred_def = get_pred_def name in
+      match pred_def.pred_abstract with
+      | true  -> 0
+      | false ->
+          let lvars_state = State.get_spec_vars state in
+          let lvars_args =
+            List.fold_left SS.union SS.empty
+              (List.map (fun x -> Expr.lvars (Val.to_expr x)) args)
+          in
+          let inter = SS.inter lvars_args lvars_state in
+          SS.cardinal inter
     in
     apply_strategies [ strategy_1; strategy_2; strategy_3; strategy_4 ]
 
-  let produce_assertion (astate : t) (subst : Subst.t) (a : Asrt.t) : t option =
+  let rec produce_assertion (astate : t) (subst : ESubst.t) (a : Asrt.t) :
+      (t list, string) result =
+    let open Syntaxes.Result in
     let state, preds, pred_defs = astate in
 
     L.verbose (fun m ->
         m
-          "------------------------\n\
-           Produce simple assertion: %a@\n\
-           @[<v 2>Subst:%a@]@\n\
-           @[<v 2>STATE:@\n\
-           %a@]@\n\
-           @[<v 2>PREDS:@\n\
-           %a@]\n"
-          Asrt.pp a Subst.pp subst State.pp state Preds.pp preds);
+          "-------------------------@\n\
+           Produce simple assertion: @[<h>%a@]@\n\
+           With subst: %a\n\
+          \           -------------------------@\n"
+          Asrt.pp a ESubst.pp subst);
+
+    L.verbose (fun m -> m "STATE: %a" pp_astate astate);
 
     match a with
     | GA (a_id, ins, outs) -> (
+        L.verbose (fun fmt -> fmt "Memory action.");
         let setter = State.ga_to_setter a_id in
+
         let vs = List.map (subst_in_expr subst) (ins @ outs) in
         let failure = List.exists (fun x -> x = None) vs in
-        if failure then None
+        if failure then
+          Error "Produce Simple Assertion: Subst does not cover the action ins"
         else
           let vs = List.map Option.get vs in
-          match State.execute_action setter state vs with
-          | ASucc [ (state', _) ] -> Some (state', preds, pred_defs)
-          | _                     -> None )
-    | Types les ->
+          match State.execute_action ~unification:true setter state vs with
+          | ASucc successes ->
+              Ok
+                (List.map
+                   (fun (state', _) -> (state', Preds.copy preds, pred_defs))
+                   successes)
+          | AFail _         -> Error (Printf.sprintf "Action %s Failure" setter)
+        )
+    | Types les -> (
+        L.verbose (fun fmt -> fmt "Types assertion.");
         let state' =
           List.fold_left
             (fun state (le, t) ->
@@ -286,90 +335,184 @@ module Make
                   let v = subst_in_expr subst le in
                   match v with
                   | None   -> None
-                  | Some v -> State.assume_t state v t ))
+                  | Some v -> State.assume_t state v t))
             (Some state) les
         in
-        Option.map (fun state -> (state, preds, pred_defs)) state'
+        match state' with
+        | None   -> Error "Produce Simple Assertion: Cannot produce types"
+        | Some _ -> Ok [ (state, preds, pred_defs) ])
     | Pred (pname, les) ->
+        L.verbose (fun fmt -> fmt "Predicate assertion.");
         let vs = List.map (subst_in_expr subst) les in
         let failure = List.exists (fun x -> x = None) vs in
-        if failure then None
+        if failure then
+          Error "Produce Simple Assertion: Subst does not cover the pred ins"
         else
           let vs = List.map Option.get vs in
-          Preds.extend preds (pname, vs);
-          Some (state, preds, pred_defs)
+          let pred_def = Hashtbl.find pred_defs pname in
+          let+ (ostate : t list) =
+            match pred_def.pred.pred_facts with
+            | []    -> Ok [ astate ]
+            | facts ->
+                (* let t = Sys.time () in *)
+                let params, _ = List.split pred_def.pred.pred_params in
+                let params = List.map (fun x -> Expr.PVar x) params in
+                let facts =
+                  List.fold_left
+                    (fun facts (param, le) ->
+                      List.map
+                        (fun fact ->
+                          Formula.subst_expr_for_expr ~to_subst:param
+                            ~subst_with:le fact)
+                        facts)
+                    facts (List.combine params les)
+                in
+                let facts = Asrt.Pure (Formula.conjunct facts) in
+                let result =
+                  produce_assertion (state, preds, pred_defs) subst facts
+                in
+                (* Utils.Statistics.update_statistics "Produce facts"
+                   (Sys.time () -. t); *)
+                result
+          in
+          let pure = pred_def.pred.pred_pure in
+          (* FIXME: We could copy only when more than one result, less expensive *)
+          List.map
+            (fun (state, preds, pred_defs) ->
+              let preds = Preds.copy preds in
+              let state = State.copy state in
+              Preds.extend ~pure preds (pname, vs);
+              (state, preds, pred_defs))
+            ostate
     | Pure (Eq (PVar x, le)) | Pure (Eq (le, PVar x)) ->
-        if Subst.mem subst x then
-          let v_x = Subst.get subst x in
+        L.verbose (fun fmt -> fmt "Pure assertion.");
+        if ESubst.mem subst (PVar x) then
+          let v_x = ESubst.get subst (PVar x) in
           let v_le = subst_in_expr subst le in
-          match (v_x, v_le) with
-          | Some v_x, Some v_le ->
-              Option.fold
-                ~some:(fun state -> Some (state, preds, pred_defs))
-                ~none:None
-                (State.assume_a ~unification:true state
-                   [ Eq (Val.to_expr v_x, Val.to_expr v_le) ])
-          | _                   -> None
+          let opt_res =
+            match (v_x, v_le) with
+            | Some v_x, Some v_le ->
+                Option.map
+                  (fun state -> [ (state, preds, pred_defs) ])
+                  (State.assume_a ~unification:true
+                     ~production:!Config.delay_entailment state
+                     [ Eq (Val.to_expr v_x, Val.to_expr v_le) ])
+            | _                   -> None
+          in
+          Option.to_result
+            ~none:
+              "Produce Simple Assertion: Subst does not cover the pure formula"
+            opt_res
         else
-          Option.fold
-            ~some:(fun v ->
-              L.(
-                verbose (fun m ->
-                    m
-                      "UNHAPPY. update_store inside produce assertions with \
-                       prog variable: %s!!!\n"
-                      x));
-              Some (update_store astate x v))
-            ~none:None (subst_in_expr subst le)
+          let+ v =
+            Option.to_result
+              ~none:
+                "Produce Simple Assertion: Subst does not cover the pure \
+                 formula"
+              (subst_in_expr subst le)
+          in
+          L.(
+            verbose (fun m ->
+                m
+                  "UNHAPPY. update_store inside produce assertions with prog \
+                   variable: %s!!!\n"
+                  x));
+          [ update_store astate x v ]
     | Pure f -> (
-        let sbst_lst = Subst.to_ssubst subst in
-        let sbst = SSubst.init sbst_lst in
-        let f' = SSubst.substitute_formula sbst false f in
-        L.(
-          verbose (fun m ->
-              m "About to assume %a in state %a" Formula.pp f' State.pp state));
-        (* TODO: Understand why this causes a bug in Gillian-C *)
+        L.verbose (fun fmt -> fmt "Pure assertion.");
+        let f' = ESubst.substitute_formula subst ~partial:false f in
+        (* let pp_state =
+             match !Config.pbn with
+             | false -> State.pp
+             | true  ->
+                 let pvars, lvars, locs = Formula.get_print_info f' in
+                 State.pp_by_need pvars lvars locs
+           in
+           L.(
+             verbose (fun m ->
+                  m "About to assume %a in state:\n%a" Formula.pp f' pp_state state)); *)
+        (* FIXME: Understand why this causes a bug in Gillian-C *)
         match
-          State.assume_a ~production:!Config.delay_entailment state [ f' ]
+          State.assume_a ~unification:true ~production:!Config.delay_entailment
+            state [ f' ]
         with
-        | None        -> None
-        | Some state' ->
-            SSubst.iter sbst (fun x le ->
-                if not (Subst.mem subst x) then
-                  match Val.from_expr le with
-                  | Some v -> Subst.put subst x v
-                  | None   ->
-                      L.fail "Produce simple assertion: did not obtain a value.");
-            Some (state', preds, pred_defs) )
+        | None        ->
+            Fmt.error "Produce Simple Assertion: Cannot assume pure formula %a."
+              Formula.pp f'
+        | Some state' -> Ok [ (state', preds, pred_defs) ])
     | _ -> L.fail "Produce simple assertion: unsupported assertion"
 
-  let produce_asrt_list (astate : t) (subst : Subst.t) (sas : Asrt.t list) :
-      t option =
-    let state, preds, _ = astate in
+  and produce_asrt_list (astate : t) (subst : ESubst.t) (sas : Asrt.t list) :
+      (t list, string) result =
+    let open Syntaxes.Result in
+    let state, _, _ = astate in
     let _ =
-      Subst.iter subst (fun v value ->
-          Subst.put subst v (State.simplify_val state value))
+      ESubst.iter subst (fun v value ->
+          ESubst.put subst v (State.simplify_val state value))
     in
-    let rec loop (loop_state : Asrt.t list * t) : t option =
+    let collect l =
+      List.fold_left
+        (fun acc res ->
+          match (acc, res) with
+          | Ok old, Ok new_ -> Ok (new_ @ old)
+          | Error old, Error new_ -> Error (old ^ "\n" ^ new_)
+          | Error error, Ok _ | Ok _, Error error -> Error error)
+        (Ok []) l
+    in
+    let rec loop (loop_state : Asrt.t list * t list) : (t list, string) result =
       match loop_state with
-      | [], astate           -> Some astate
-      | a :: rest_as, astate -> (
-          let ret = produce_assertion astate subst a in
-          match ret with
-          | Some astate' -> loop (rest_as, astate')
-          | None         -> None )
+      | [], astates           -> Ok astates
+      | a :: rest_as, astates ->
+          let on_all_states =
+            List.map
+              (fun astate ->
+                let astate = copy_astate astate in
+                try
+                  match produce_assertion astate subst a with
+                  | Ok astates' -> loop (rest_as, astates')
+                  | Error msg   ->
+                      L.verbose (fun fmt ->
+                          fmt "PRODUCE: couldn't produce assertion: %a" Asrt.pp
+                            a);
+                      Error msg
+                with e ->
+                  let state, _, _ = astate in
+                  let admissible =
+                    State.assume_a ~time:"Produce: final check"
+                      ~unification:true state [ True ]
+                  in
+                  if !Config.delay_entailment && admissible = None then (
+                    L.verbose (fun fmt ->
+                        fmt
+                          "Production exception due to delayed entailment, \
+                           survived.");
+                    Error "Production Exception")
+                  else raise e)
+              astates
+          in
+          collect on_all_states
     in
 
-    let ret = loop (sas, astate) in
-    match ret with
-    | None -> None
-    | Some (state, preds, preds_tbl) -> (
-        let admissible = State.assume_a ~unification:true state [ True ] in
+    let* astates = loop (sas, [ astate ]) in
+    List.map
+      (fun (state, preds, preds_tbl) ->
+        let state, preds = (State.copy state, Preds.copy preds) in
+        let admissible =
+          L.verbose (fun fmt -> fmt "Produce: final check");
+          try
+            State.assume_a ~time:"Produce: final check" ~unification:true state
+              [ True ]
+          with _ -> None
+        in
+        L.verbose (fun fmt -> fmt "Concluded final check");
         match admissible with
-        | None       -> None
-        | Some state -> Some (state, preds, preds_tbl) )
+        | None       -> Error "final state non admissible"
+        | Some state -> Ok [ (state, preds, preds_tbl) ])
+      astates
+    |> collect
 
-  let produce (astate : t) (subst : Subst.t) (a : Asrt.t) : t option =
+  let produce (astate : t) (subst : ESubst.t) (a : Asrt.t) :
+      (t list, string) result =
     L.(
       verbose (fun m ->
           m
@@ -379,8 +522,8 @@ module Make
     let sas = UP.collect_simple_asrts a in
     produce_asrt_list astate subst sas
 
-  let produce_posts (state : t) (subst : Subst.t) (asrts : Asrt.t list) : t list
-      =
+  let produce_posts (state : t) (subst : ESubst.t) (asrts : Asrt.t list) :
+      t list =
     L.(
       verbose (fun m ->
           m
@@ -390,160 +533,154 @@ module Make
             (List.length asrts)
             Fmt.(list ~sep:(any "@\n") Asrt.pp)
             asrts));
-    let rets =
-      List.map
-        (fun a ->
-          let subst = Subst.copy subst in
-          (produce (copy_astate state) subst a, subst))
-        asrts
-    in
-    let rets = List.filter (fun (x, _) -> x <> None) rets in
-    let rets =
-      List.map
-        (fun (x, subst) ->
-          let state = Option.get x in
-          Subst.iter subst (fun x v ->
-              if Names.is_pvar_name x then
-                let _ = update_store state x v in
-                ());
-          state)
-        rets
-    in
-    rets
+    List.fold_left
+      (fun acc asrt ->
+        let subst = ESubst.copy subst in
+        let state = copy_astate state in
+        match produce state subst asrt with
+        | Error msg ->
+            L.verbose (fun m -> m "Warning: %s" msg);
+            acc
+        | Ok states ->
+            List.iter
+              (fun state ->
+                ESubst.iter subst (fun e v ->
+                    match e with
+                    | PVar x -> ignore (update_store state x v)
+                    | _      -> ()))
+              states;
+            states @ acc)
+      [] asrts
 
   let use_unfold_info
-      (unfold_info : (string * (string * Expr.t) list) option)
+      (unfold_info : (string * string) list option)
       (pred : Pred.t)
       (state : State.t)
-      (subst : Subst.t) : Asrt.t list =
-    match unfold_info with
-    | None                    -> List.map (fun (_, x) -> x) pred.pred_definitions
-    | Some (def_id, bindings) ->
-        let defs =
-          List.filter
-            (fun (os, a) ->
-              match os with
-              | None              -> false
-              | Some (def_id', _) -> def_id' = def_id)
-            pred.pred_definitions
-        in
-        let defs' = List.map (fun (os, a) -> a) defs in
-        let bindings =
-          List.map (fun (x, e) -> (x, State.eval_expr state e)) bindings
-        in
-        Subst.extend subst bindings;
-        L.(
-          verbose (fun m ->
-              m "@[<v 2>Using unfold info, obtained subst:@\n%a@\n" Subst.pp
-                subst));
-        defs'
+      (subst : ESubst.t) : Asrt.t list =
+    let result = List.map (fun (_, x) -> x) pred.pred_definitions in
+    let () =
+      match unfold_info with
+      | None          -> ()
+      | Some bindings ->
+          let bindings =
+            List.map
+              (fun (x, y) -> (Expr.LVar x, State.eval_expr state (Expr.LVar y)))
+              bindings
+          in
+          ESubst.extend subst bindings;
+          L.(
+            verbose (fun m ->
+                m "@[<v 2>Using unfold info, obtained subst:@\n%a@\n" ESubst.pp
+                  subst))
+    in
+    result
 
   let unfold
       (astate : t)
       (pname : string)
       (args : Val.t list)
-      (unfold_info : (string * (string * Expr.t) list) option) :
-      (Subst.t * t) list =
+      (unfold_info : (string * string) list option) : (ESubst.t * t) list =
     let state, preds, pred_defs = astate in
     let pred = UP.get_pred_def pred_defs pname in
-    let params = List.map (fun (x, _) -> x) pred.pred.pred_params in
+    let params = List.map (fun (x, _) -> Expr.PVar x) pred.pred.pred_params in
     L.verbose (fun m ->
         m
           "Combine going to explode. PredName: @[<h>%s@]. Params: @[<h>%a]. \
            Args: @[<h>%a@]"
           pname
-          Fmt.(list ~sep:comma string)
+          Fmt.(list ~sep:comma Expr.pp)
           params
           Fmt.(list ~sep:comma Val.pp)
           args);
-    let subst_i = Subst.init (List_utils.right_combine params args) in
+    let subst_i = ESubst.init (List_utils.right_combine params args) in
 
     L.(
       verbose (fun m ->
-          m "unfold with unfold_info with:@\n%a@\n" SLCmd.pp_folding_info
+          m "unfold with unfold_info with:@\n%a@\n" SLCmd.pp_unfold_info
             unfold_info));
 
+    let new_spec_vars =
+      match unfold_info with
+      | None          -> SS.empty
+      | Some bindings -> SS.of_list (snd (List.split bindings))
+    in
     let rets =
       match use_unfold_info unfold_info pred.pred state subst_i with
-      | []               -> raise
-                              (Failure
-                                 "Cannot Unfold Predicate with No Definitions")
-      | def :: rest_defs ->
+      | []                     ->
+          Fmt.failwith "Cannot Unfold Predicate %s with No Definitions"
+            pred.pred.pred_name
+      | first_def :: rest_defs ->
           L.(
             verbose (fun m ->
                 m "Going to produce %d definitions with subst@\n%a"
-                  (List.length (def :: rest_defs))
-                  Subst.pp subst_i));
-          let results =
+                  (List.length (first_def :: rest_defs))
+                  ESubst.pp subst_i));
+          let state' = State.add_spec_vars state new_spec_vars in
+          let astate = (state', preds, pred_defs) in
+          let rest_results =
             List.map
-              (fun def -> produce (copy_astate astate) (Subst.copy subst_i) def)
+              (fun def ->
+                produce (copy_astate astate) (ESubst.copy subst_i) def)
               rest_defs
           in
-          let first_result = produce astate subst_i def in
-          let results =
-            List.filter (fun x -> x <> None) (first_result :: results)
-          in
-          let results = List.map Option.get results in
-          let results =
-            List.map (fun x -> (simplify_astate ~unification:true x, x)) results
-          in
-          results
+          let first_results = produce astate subst_i first_def in
+          List.fold_left
+            (fun acc res ->
+              match res with
+              | Error msg  ->
+                  L.verbose (fun m -> m "Warning: %s" msg);
+                  acc
+              | Ok astates ->
+                  List.concat_map
+                    (fun x ->
+                      let subst, states = simplify_astate ~unification:true x in
+                      List.map (fun state -> (subst, state)) states)
+                    astates
+                  @ acc)
+            []
+            (first_results :: rest_results)
     in
 
     L.verbose (fun m ->
         m "Results of unfolding %s(@[<h>%a@]):@\n@[%a@]" pname
-          Fmt.(list ~sep:comma string)
+          Fmt.(list ~sep:comma Expr.pp)
           params
           Fmt.(
             iter_bindings ~sep:(any "@\n ") List.iteri
               (fun f' (i, (subst, astate)) ->
                 Fmt.pf f' "Result %d@\nSTATE:@\n  @[%a@]@\nSUBST:@[<h>%a@]@\n" i
-                  pp_astate astate Subst.pp subst))
+                  pp_astate astate ESubst.pp subst))
           rets);
     rets
 
-  let rec rec_unfold (astate : t) (pname : string) (args : Val.t list) : t =
-    let saved_state = copy_astate astate in
+  let rec rec_unfold
+      ?(fuel = 10) (astate : t) (pname : string) (args : Val.t list) : t list =
+    if fuel = 0 then failwith "RECURSIVE UNFOLD: OUT OF FUEL"
+    else
+      let _, astates = List.split (unfold astate pname args None) in
+      List.concat_map
+        (fun astate ->
+          let _, preds, _ = astate in
+          match Preds.remove_by_name preds pname with
+          | Some (pname, vs) -> rec_unfold ~fuel:(fuel - 1) astate pname vs
+          | None             -> [ astate ])
+        astates
 
-    match unfold astate pname args None with
-    | [ (_, astate) ] -> (
-        let _, preds, _ = astate in
-        let pred_asrts = Preds.find_pabs_by_name preds pname in
-        match pred_asrts with
-        | [ pred_asrt ] -> (
-            match Preds.remove_by_name preds pname with
-            | Some (pname, vs) -> rec_unfold astate pname vs
-            | None             -> raise (Failure "DEATH. rec_unfold") )
-        | _             -> astate )
-    | _               -> saved_state
-
-  let unfold_all (astate : t) (pname : string) : t =
-    L.verbose (fun m -> m "Starting UNFOLD ALL@\n");
-    let rec loop astate =
-      let _, preds, _ = astate in
-      match Preds.remove_by_name preds pname with
-      | None             ->
-          L.(
-            verbose (fun m ->
-                m "Finishing Unfond_all with state:@[%a@]@\n" pp_astate astate));
-          astate
-      | Some (pname, vs) ->
-          let astate = rec_unfold astate pname vs in
-          L.verbose (fun m ->
-              m "IN UNFOLD ALL - ONE SUCCESSFUL CALL TO REC UNFOLD@\n");
-          loop astate
-    in
-    loop astate
+  let unfold_all (astate : t) (pname : string) : t list =
+    let _, preds, _ = astate in
+    match Preds.remove_by_name preds pname with
+    | None             -> [ astate ]
+    | Some (pname, vs) -> rec_unfold astate pname vs
 
   let unfold_with_vals (astate : t) (vs : Val.t list) :
-      (Subst.t * t) list * bool =
+      (ESubst.t * t) list * bool =
     L.(
       verbose (fun m ->
           m "@[<v 2>Starting unfold_with_vals: @[<h>%a@]@\n%a.@\n"
             Fmt.(list ~sep:comma Val.pp)
             vs pp_astate astate));
 
-    if !Config.manual_proof then ([ (Subst.init [], astate) ], false)
+    if !Config.manual_proof then ([ (ESubst.init [], astate) ], false)
     else
       match get_pred_with_vs astate vs with
       | Some (pname, v_args) ->
@@ -551,23 +688,23 @@ module Make
           let rets = unfold (copy_astate astate) pname v_args None in
           L.(
             verbose (fun m ->
-                m "Unfold complete: %s(@[<h>%a@])" pname
+                m "Unfold complete: %s(@[<h>%a@]): %d" pname
                   Fmt.(list ~sep:comma Val.pp)
-                  v_args));
+                  v_args (List.length rets)));
           List.iteri
             (fun i (subst, astate) ->
               L.(
                 verbose (fun m ->
                     m "Result of UNFOLD %d:@\n  @[%a]@\nSubst:@\n  @[%a]@\n" i
-                      pp_astate astate Subst.pp subst)))
+                      pp_astate astate ESubst.pp subst)))
             rets;
           (rets, true)
       | None                 ->
           L.(verbose (fun m -> m "NOTHING TO UNFOLD!!!!\n"));
-          ([ (Subst.init [], astate) ], false)
+          ([ (ESubst.init [], astate) ], false)
 
   let unfold_concrete_preds (astate : t) : (st option * t) option =
-    let state, preds, pred_defs = astate in
+    let _, preds, pred_defs = astate in
 
     let is_unfoldable_lit lit =
       match lit with
@@ -577,15 +714,11 @@ module Make
 
     let should_unfold (pname, vs) =
       let pred = UP.get_pred_def pred_defs pname in
-      let vs_ins = Pred.in_args pred.pred vs in
-      let lit_ins =
-        List_utils.get_list_somes (List.map Val.to_literal vs_ins)
-      in
-      match List.length vs_ins = List.length lit_ins with
-      | true  ->
-          let flash_lits = List.map is_unfoldable_lit lit_ins in
-          List.exists (fun x -> x) flash_lits
-      | false -> false
+      Pred.in_args pred.pred vs
+      |> List.for_all (fun in_arg ->
+             match Val.to_literal in_arg with
+             | None     -> false
+             | Some lit -> is_unfoldable_lit lit)
     in
 
     let pred_to_unfold = Preds.pop preds should_unfold in
@@ -605,206 +738,23 @@ module Make
             raise
               (Failure
                  "Impossible: pred with concrete ins unfolded to multiple \
-                  states.") )
+                  states."))
     | None            -> Some (None, astate)
 
-  let is_known (subst : Subst.t) (le : Expr.t) : bool =
-    let s_le = Subst.subst_in_expr_opt subst le in
-    not (s_le = None)
-
-  (**
-    Unification of two logical expressions
-
-    @param subst  Substitution
-    @param le     Value
-    @param le_pat Logical expression
-
-    @return If the unification is possible: set of newly found variables, list of discharges
-            and updates the substitution destructively
-  *)
-  let rec unify_expr_core
-      (state : State.t) (subst : Subst.t) (v : Val.t) (le_pat : Expr.t) :
-      (SS.t * (Val.t * Expr.t) list) option =
-    L.(
-      tmi (fun m ->
-          m "unify_expr_core: val: %a. le_pat: %a. subst: %a" Val.pp v Expr.pp
-            le_pat Subst.pp subst));
-
-    let f = unify_expr_core state subst in
-
-    let eval_expr = State.eval_expr state in
-
-    let f2 v1 le_pat1 v2 le_pat2 =
-      Option.fold
-        ~some:(fun (new_vars1, discharges1) ->
-          Option.fold
-            ~some:(fun (new_vars2, discharges2) ->
-              Some (new_vars2, discharges1 @ discharges2))
-            ~none:None (f v2 le_pat2))
-        ~none:None (f v1 le_pat1)
-    in
-
-    match le_pat with
-    | Lit _ ->
-        let le = Val.to_expr v in
-        if le = le_pat then Some (SS.empty, [])
-        else Some (SS.empty, [ (v, le_pat) ])
-    | PVar x | LVar x -> (
-        match Subst.get subst x with
-        | Some v' -> Some (SS.empty, [ (v, Val.to_expr v') ])
-        | None    ->
-            let v' = State.simplify_val state v in
-            Subst.put subst x v';
-            Some (SS.singleton x, []) )
-    | ALoc x -> (
-        match Subst.get subst x with
-        | Some v' -> Some (SS.empty, [ (v, Val.to_expr v') ])
-        | None    -> (
-            let v' = State.simplify_val state v in
-            let tv = State.get_type state v' in
-            match tv with
-            | Some ObjectType | None ->
-                Subst.put subst x v';
-                Some (SS.singleton x, [])
-            | Some _                 -> None ) )
-    | BinOp (le_pat1, FPlus, Lit (Num i)) | BinOp (Lit (Num i), FPlus, le_pat1)
-      ->
-        let le : Expr.t = Val.to_expr v in
-        let le1 : Expr.t = BinOp (le, FMinus, Lit (Num i)) in
-        let v1 : Val.t = eval_expr le1 in
-        f v1 le_pat1
-    | NOp (LstCat, [ x ]) -> f v x
-    (* First concatted expr is an EList *)
-    | NOp (LstCat, EList les :: le_pat2) ->
-        let le : Expr.t = Val.to_expr v in
-        let len : Expr.t = Lit (Num (float_of_int (List.length les))) in
-        let le1 : Expr.t = LstSub (le, Lit (Num 0.), len) in
-        let le2 : Expr.t =
-          LstSub (le, len, BinOp (UnOp (LstLen, le), FMinus, len))
-        in
-        let v1 : Val.t = eval_expr le1 in
-        let v2 : Val.t = eval_expr le2 in
-        f2 v1 (EList les) v2 (NOp (LstCat, le_pat2))
-    (* First concatted expr is known, but is not an EList *)
-    | NOp (LstCat, le_pat1 :: le_pat2) when is_known subst le_pat1 ->
-        let le : Expr.t = Val.to_expr v in
-        let le1 : Expr.t = LstSub (le, Lit (Num 0.), UnOp (LstLen, le_pat1)) in
-        let le2 : Expr.t =
-          LstSub
-            ( le,
-              UnOp (LstLen, le_pat1),
-              BinOp (UnOp (LstLen, le), FMinus, UnOp (LstLen, le_pat1)) )
-        in
-        let v1 : Val.t = eval_expr le1 in
-        let v2 : Val.t = eval_expr le2 in
-        f2 v1 le_pat1 v2 (NOp (LstCat, le_pat2))
-    (* TODO: This one needs to be generalised, but not yet
-       | BinOp (le_pat1, LstCat, EList le_pat2)
-           when ((List.length le_pat2) > 0) && ((list_uvs (le_pat1 :: le_pat2)) <> SS.empty) ->
-           (match List.rev le_pat2 with
-             | le_pat2_last :: le_pat2_prefix ->
-               let le  : Expr.t = Val.to_expr v in
-               let le1 : Expr.t = UnOp (Car, UnOp (LstRev, le)) in
-               let le2 : Expr.t = UnOp (Cdr, UnOp (LstRev, le)) in
-               let v1  : Val.t  = eval_expr le1 in
-               let v2  : Val.t  = eval_expr le2 in
-               f2 v1 le_pat2_last v2 (BinOp (EList le_pat2_prefix, LstCat, UnOp (LstRev, le_pat1)))
-             | _ -> raise (Failure "DEATH. unify_expr_core")) *)
-
-    (* TODO: These two should not be relevant
-       | BinOp (EList [], LstCat, le_pat2) -> f v le_pat2
-       | BinOp (le_pat1, LstCat, EList []) -> f v le_pat1 *)
-    | UnOp (LstRev, le_pat) ->
-        let le : Expr.t = Val.to_expr v in
-        let le' : Expr.t = UnOp (LstRev, le) in
-        let v1 : Val.t = eval_expr le' in
-        f v1 le_pat
-    | EList (le_pat_hd :: le_pat_tl) ->
-        let le : Expr.t = Val.to_expr v in
-        let le1 : Expr.t = UnOp (Car, le) in
-        let le2 : Expr.t = UnOp (Cdr, le) in
-        let v1 : Val.t = eval_expr le1 in
-        let v2 : Val.t = eval_expr le2 in
-        f2 v1 le_pat_hd v2 (EList le_pat_tl)
-    | _ -> Some (SS.empty, [ (v, le_pat) ])
-
-  (* I don't know how much recovery information we can give when the unification of lexprs fails *)
-  let unify_lexpr (state : State.t) (subst : Subst.t) (v : Val.t) (le : Expr.t)
-      : (unit, (Expr.t * Expr.t) option) result =
-    let le = Reduction.reduce_lexpr le in
-    L.verbose (fun m -> m "Unify lexpr with v: %a, le: %a" Val.pp v Expr.pp le);
-
-    try
-      let ret = unify_expr_core state subst v le in
-      L.(
-        verbose (fun m ->
-            m "Unify lexpr: Entering stage 1 with %a"
-              Fmt.(
-                option ~none:(any "None") (fun f (vars, les) ->
-                    pf f "@[<h>Some { %a }, [ %a ]@]"
-                      (iter ~sep:comma SS.iter string)
-                      vars
-                      (list ~sep:comma (fun f' (a, b) ->
-                           pf f' "(%a, %a)" Val.pp a Expr.pp b))
-                      les))
-              ret));
-
-      match ret with
-      (* Error and we have no way of fixing *)
-      | None -> Error None
-      | Some (_, discharges) ->
-          let eqs : (Expr.t * Expr.t) list =
-            List.map
-              (fun (v1, e2) ->
-                (* TODO: experimental *)
-                (* let e2 = Subst.subst_in_expr subst true e2 in *)
-                L.(
-                  verbose (fun m ->
-                      m "Unify lexpr: Passed to stage 2: %a %a" Val.pp v1
-                        Expr.pp e2));
-                let v1' = State.simplify_val state v1 in
-                (Val.to_expr v1', e2))
-              discharges
-          in
-          (* Fold over here *)
-          let result =
-            List.fold_left
-              (fun res (e1, e2) ->
-                match res with
-                | Error x -> Error x
-                | Ok ()   -> (
-                    match State.assert_a state [ Eq (e1, e2) ] with
-                    | true  -> Ok ()
-                    | false -> Error (Some (e1, e2)) ))
-              (Ok ()) eqs
-          in
-          result
-    with Reduction.ReductionException _ -> Error None
-
-  let unify_lexprs
-      (state : State.t) (subst : Subst.t) (lst : (Val.t * Expr.t) list) :
-      (unit, (Expr.t * Expr.t) option) result =
-    List.fold_left
-      (fun res (v, le) ->
-        match res with
-        | Error x -> Error x
-        | Ok ()   -> unify_lexpr state subst v le)
-      (Ok ()) lst
-
-  let complete_subst (subst : Subst.t) (lab : (string * SS.t) option) : bool =
+  let complete_subst (subst : ESubst.t) (lab : (string * SS.t) option) : bool =
     match lab with
     | None                   -> true
     | Some (_, existentials) ->
         List.fold_left
           (fun ac x ->
-            if not (Subst.mem subst x) then (
-              let new_lvar = Expr.LVar x in
-              let v_x = Val.from_expr new_lvar in
+            let lvar_x = Expr.LVar x in
+            if not (ESubst.mem subst lvar_x) then (
+              let v_x = Val.from_expr lvar_x in
               match v_x with
               | None     -> false
               | Some v_x ->
-                  Subst.put subst x v_x;
-                  true )
+                  ESubst.put subst lvar_x v_x;
+                  true)
             else ac)
           true (SS.elements existentials)
 
@@ -812,7 +762,7 @@ module Make
       ?(in_unification : bool option)
       (astate : t)
       (pname : string)
-      (vs_ins : vt list) : gp_ret =
+      (vs : vt option list) : gp_ret =
     let merge_gp_results (rets : gp_ret list) : gp_ret =
       let ret_succs, ret_fails =
         List.partition
@@ -847,15 +797,16 @@ module Make
     L.(
       tmi (fun m ->
           m "get_pred %s. args: @[<h>%a@]" pname
-            Fmt.(list ~sep:comma Val.pp)
-            vs_ins));
+            Fmt.(list ~sep:comma (option ~none:(any "None") Val.pp))
+            vs));
 
     let state, preds, pred_defs = astate in
     let pred = UP.get_pred_def pred_defs pname in
     let pred_def = pred.pred in
-    let pred_pure = pred.pure in
+    let pred_pure = pred_def.pred_pure in
     match
-      Preds.get_pred pred_pure preds pname vs_ins pred_def.pred_ins
+      Preds.get_pred ~maintain:pred_pure preds pname vs
+        (Containers.SI.of_list pred_def.pred_ins)
         (State.equals state)
     with
     | Some (_, vs) ->
@@ -865,12 +816,15 @@ module Make
                 Fmt.(list ~sep:comma Val.pp)
                 vs));
         GPSucc [ (astate, Pred.out_args pred_def vs) ]
-    | _ when not !Config.manual_proof -> (
+    | _ when (not !Config.manual_proof) && not pred_def.pred_abstract -> (
         (* Recursive Case - Folding required *)
         L.verbose (fun m -> m "Recursive case - attempting to fold.");
         let up = pred.up in
         let param_ins = Pred.in_params pred.pred in
-        let subst = Subst.init (List.combine param_ins vs_ins) in
+        let param_ins = List.map (fun x -> Expr.PVar x) param_ins in
+        let vs_ins = Pred.in_args pred.pred vs in
+        let vs_ins = List.map Option.get vs_ins in
+        let subst = ESubst.init (List.combine param_ins vs_ins) in
         match unify ?in_unification astate subst up with
         | UPUSucc rets ->
             let rets =
@@ -878,7 +832,8 @@ module Make
                 (fun (astate', subst', _) ->
                   L.verbose (fun m -> m "Recursive fold success.");
                   let out_params = Pred.out_params pred_def in
-                  let vs_outs = List.map (Subst.get subst') out_params in
+                  let out_params = List.map (fun x -> Expr.PVar x) out_params in
+                  let vs_outs = List.map (ESubst.get subst') out_params in
                   L.(
                     verbose (fun m ->
                         m "Out parameters : @[<h>%a@]"
@@ -893,28 +848,154 @@ module Make
                 rets
             in
             merge_gp_results rets
-        | UPUFail errs -> GPFail errs )
+        | UPUFail errs -> GPFail errs)
     | _ -> GPFail [ StateErr.EPure False ]
 
-  and unify_assertion (astate : t) (subst : Subst.t) (p : Asrt.t) : u_res =
+  and unify_assertion (astate : t) (subst : ESubst.t) (step : UP.step) : u_res =
+    (* Auxiliary function for actions and predicates, with indexed outs *)
+    let unify_ins_outs_lists
+        (state : State.t)
+        (outs : UP.outs)
+        (vos : Val.t list)
+        (eos : Expr.t list) =
+      L.verbose (fun fmt ->
+          fmt "Outs: %a"
+            Fmt.(
+              brackets
+                (list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.full_pp))))
+            outs);
+      L.verbose (fun fmt ->
+          fmt "Obtained values: %a" Fmt.(brackets (list ~sep:semi Val.pp)) vos);
+      L.verbose (fun fmt ->
+          fmt "Obtained exprs: %a" Fmt.(brackets (list ~sep:semi Expr.pp)) eos);
+      (* Substitution of the program variables *)
+      let pvar_subst_bindings =
+        List.mapi (fun i v -> (Expr.PVar (string_of_int i), v)) vos
+      in
+      let pvar_subst = ESubst.init pvar_subst_bindings in
+      L.verbose (fun fmt -> fmt "Parameter subst\n%a" ESubst.pp pvar_subst);
+      let outs : UP.outs option =
+        try
+          Some
+            (List.map
+               (fun (u, e) ->
+                 let se = ESubst.subst_in_expr pvar_subst ~partial:true e in
+                 (* let se = ESubst.subst_in_expr subst ~partial:true se in *)
+                 ( u,
+                   try Reduction.reduce_lexpr ~unification:true se
+                   with _ -> se ))
+               outs)
+        with _ -> None
+      in
+      match outs with
+      | None      -> (false, Formula.True)
+      | Some outs ->
+          L.verbose (fun fmt ->
+              fmt "Substed outs: %a"
+                Fmt.(
+                  brackets
+                    (list ~sep:semi
+                       (parens (pair ~sep:comma Expr.pp Expr.full_pp))))
+                outs);
+          let outs = List.map (fun (u, e) -> (u, Val.from_expr e)) outs in
+          if List.exists (fun (_, e) -> e = None) outs then
+            L.fail "INTERNAL ERROR: Not all expressions convertible to values"
+          else
+            let outs = List.map (fun (u, ov) -> (u, Option.get ov)) outs in
+            let () = List.iter (fun (u, v) -> ESubst.put subst u v) outs in
+            let eos = List.map (ESubst.subst_in_expr_opt subst) eos in
+            if List.exists (fun x -> x = None) eos then
+              let msg = "INTERNAL ERROR: Not all ins known" in
+              L.fail msg
+            else
+              let eos = List.map Val.from_expr (List.map Option.get eos) in
+              if List.exists (fun x -> x = None) eos then
+                raise
+                  (Failure
+                     "INTERNAL ERROR: Not all expressions convertible to values")
+              else
+                let eos = List.map Option.get eos in
+                let success, fail_pf =
+                  try
+                    List.fold_left2
+                      (fun ac vd od ->
+                        let success, _ = ac in
+                        if not success then ac
+                        else
+                          let pf : Formula.t =
+                            Eq (Val.to_expr vd, Val.to_expr od)
+                          in
+                          let success = State.assert_a state [ pf ] in
+                          (success, pf))
+                      (true, True) vos eos
+                  with Invalid_argument _ ->
+                    Fmt.failwith
+                      "Invalid amount of args for the following UP step : %a"
+                      UP.step_pp step
+                in
+                (success, fail_pf)
+    in
+
     let state, preds, pred_defs = astate in
-    let subst_in_expr_opt = subst_in_expr_opt astate subst in
 
     let make_resource_fail () = UFail [ EAsrt ([], True, []) ] in
 
-    L.verbose (fun m ->
-        m
-          "Unify assertion: @[<h>%a@]@\n\
-           @[<v 2>Subst:@\n\
-           %a@]@\n\
-           @[<v 2>STATE:@\n\
-           %a@]"
-          Asrt.pp p Subst.pp subst pp_astate astate);
+    if Logging.Mode.enabled () then (
+      let a = fst step in
+      (* Get pvars, lvars, locs from the assertion *)
+      let a_pvars, a_lvars, a_locs =
+        (Asrt.pvars a, Asrt.lvars a, Asrt.locs a)
+      in
+      let filter_vars = SS.union a_pvars (SS.union a_lvars a_locs) in
 
+      (* From the subst, we take any pair that has any of those and collect
+         the pvars, lvars, and alocs, from their values *)
+      let s_pvars, s_lvars, s_locs =
+        ESubst.fold subst
+          (fun e v (s_pvars, s_lvars, s_locs) ->
+            let pvars, lvars, locs =
+              (Expr.pvars e, Expr.lvars e, Expr.locs e)
+            in
+            if
+              Containers.SS.inter
+                (List.fold_left SS.union SS.empty [ pvars; lvars; locs ])
+                filter_vars
+              <> SS.empty
+            then
+              ( SS.union s_pvars (Expr.pvars (Val.to_expr v)),
+                SS.union s_lvars (Expr.lvars (Val.to_expr v)),
+                SS.union s_locs (Expr.locs (Val.to_expr v)) )
+            else (s_pvars, s_lvars, s_locs))
+          (SS.empty, SS.empty, SS.empty)
+      in
+
+      let subst_pp =
+        match !Config.pbn with
+        | false -> ESubst.pp
+        | true  -> ESubst.pp_by_need (SS.union a_pvars (SS.union a_lvars a_locs))
+      in
+
+      let pp_str_list = Fmt.(brackets (list ~sep:comma string)) in
+
+      L.verbose (fun fmt ->
+          fmt "Substs:\n%a\n%a\n%a" pp_str_list (SS.elements s_pvars)
+            pp_str_list (SS.elements s_lvars) pp_str_list (SS.elements s_locs));
+
+      let pp_astate =
+        match !Config.pbn with
+        | false -> pp_astate
+        | true  -> pp_astate_by_need s_pvars s_lvars s_locs
+      in
+
+      L.verbose (fun m ->
+          m "Unify assertion: @[<h>%a@]@\nSubst:@\n%a@\n@[<v 2>STATE:@\n%a@]"
+            UP.step_pp step subst_pp subst pp_astate astate));
+
+    let p, outs = step in
     match (p : Asrt.t) with
     | GA (a_id, e_ins, e_outs) -> (
         let getter = State.ga_to_getter a_id in
-        let vs_ins = List.map subst_in_expr_opt e_ins in
+        let vs_ins = List.map (subst_in_expr_opt astate subst) e_ins in
         let failure = List.exists (fun x -> x = None) vs_ins in
         if failure then make_resource_fail ()
         else
@@ -926,97 +1007,59 @@ module Make
                   vs_ins));
           match State.execute_action getter state vs_ins with
           | ASucc [ (state', vs') ] -> (
-              L.(
-                verbose (fun m ->
-                    m "@[<v 2>Got state:@\n%a@] and values @[<h>%a@]" State.pp
-                      state'
-                      Fmt.(list ~sep:comma Val.pp)
-                      vs'));
+              (* L.(
+                 verbose (fun m ->
+                     m "@[<v 2>Got state:@\n%a@] and values @[<h>%a@]" State.pp
+                       state'
+                       Fmt.(list ~sep:comma Val.pp)
+                       vs')); *)
               let vs_ins', vs_outs =
                 List_utils.divide_list_by_index vs' (List.length vs_ins)
               in
               let remover = State.ga_to_deleter a_id in
               match State.execute_action remover state' vs_ins' with
               | ASucc [ (state'', _) ] -> (
-                  match
-                    unify_lexprs state' subst (List.combine vs_outs e_outs)
-                  with
-                  | Ok ()                 -> USucc (state'', preds, pred_defs)
-                  | Error (Some (e1, e2)) ->
-                      UFail
-                        [
-                          EAsrt
-                            ([], Not (Eq (e1, e2)), [ [ Pure (Eq (e1, e2)) ] ]);
-                        ]
-                  | Error None            -> make_resource_fail () )
+                  (* Separate outs into direct unifiables and others*)
+                  let success, fail_pf =
+                    unify_ins_outs_lists state'' outs vs_outs e_outs
+                  in
+                  match success with
+                  | true  -> USucc (state'', preds, pred_defs)
+                  | false ->
+                      UFail [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ])
               | ASucc _                ->
                   raise
                     (Exceptions.Unsupported
-                       "unify_assertion: action getter returns multiple results")
-              | AFail errs             -> UFail errs )
+                       "unify_assertion: action remover returns multiple \
+                        results")
+              | AFail errs             -> UFail errs)
           | ASucc _                 ->
               raise
                 (Exceptions.Unsupported
                    "unify_assertion: action getter returns multiple results")
-          | AFail errs              -> UFail errs )
-    | Pure (Formula.And (f1, f2)) -> (
-        match unify_assertion astate subst (Asrt.Pure f1) with
-        | USucc state -> unify_assertion astate subst (Asrt.Pure f2)
-        | res         -> res )
-    | Pure (Eq (le1, le2)) when UP.outs_expr le1 <> SS.empty ->
-        L.verbose (fun fmt -> fmt "Pure equality with non-empty outs");
-        let v2 = subst_in_expr_opt le2 in
-        Option.fold
-          ~some:(fun v2 ->
-            match unify_lexpr state subst v2 le1 with
-            | Ok ()                 -> USucc astate
-            | Error (Some (e1, e2)) ->
-                UFail
-                  [
-                    EAsrt ([ v2 ], Not (Eq (e1, e2)), [ [ Pure (Eq (e1, e2)) ] ]);
-                  ]
-            | Error None            -> make_resource_fail ())
-          ~none:(make_resource_fail ()) v2
-    | Types les ->
-        let corrections =
-          List.fold_left
-            (fun (ac : Formula.t list) (le, t) ->
-              let v_le = subst_in_expr_opt le in
-              let v_le : vt =
-                match v_le with
-                | Some v_le -> v_le
-                | None      -> raise (Failure "DEATH. unify assertion Types")
-              in
-              match State.get_type state v_le with
-              | Some t' -> if t <> t' then False :: ac else ac
-              | None    -> Eq (UnOp (TypeOf, Val.to_expr v_le), Lit (Type t))
-                           :: ac)
-            [] les
-        in
-
-        if corrections = [] then USucc astate
-        else
-          let les, _ = List.split les in
-          let les = List.map subst_in_expr_opt les in
-          UFail
-            [
-              EAsrt
-                ( List.map Option.get (List.filter (fun x -> x <> None) les),
-                  True,
-                  [ [ Pure (Formula.conjunct corrections) ] ] );
-            ]
+          | AFail errs              -> UFail errs)
     | Pred (pname, les) -> (
+        L.verbose (fun m -> m "Unifying predicate assertion");
+        (* Perform substitution in all predicate parameters *)
+        L.verbose (fun fmt -> fmt "ARGS: %a" Fmt.(list ~sep:comma Expr.pp) les);
+        L.verbose (fun fmt -> fmt "SUBST:\n%a" ESubst.pp subst);
+        let vs = List.map (subst_in_expr_opt astate subst) les in
+        (* Get the ins of the predicate *)
         let pred = UP.get_pred_def pred_defs pname in
         let pred_def = pred.pred in
-        let les_ins = Pred.in_args pred_def les in
-        let vs_ins = List.map subst_in_expr_opt les_ins in
+        let vs_ins = Pred.in_args pred_def vs in
+        (* All of which must have survived substitution *)
         let failure = List.exists (fun x -> x = None) vs_ins in
-
-        L.verbose (fun m -> m "Unifying predicate assertion");
-        if failure then make_resource_fail ()
+        if failure then (
+          L.verbose (fun m -> m "Cannot unify: not all in-parameters known");
+          make_resource_fail ())
         else
           let vs_ins = List.map Option.get vs_ins in
-          match get_pred ~in_unification:true astate pname vs_ins with
+          L.verbose (fun m ->
+              m "Looking for ins: %a"
+                Fmt.(brackets (list ~sep:comma Val.pp))
+                vs_ins);
+          match get_pred ~in_unification:true astate pname vs with
           | GPSucc [] ->
               L.verbose (fun m -> m "SUCCEEDED WITH NOTHING! MEDOOOOOO!!!!!");
               UWTF
@@ -1032,29 +1075,111 @@ module Make
                       Fmt.(list ~sep:comma Expr.pp)
                       les_outs));
               let state', _, _ = astate' in
-              match
-                unify_lexprs state' subst (List.combine vs_outs les_outs)
-              with
-              | Ok ()                 -> USucc astate'
-              | Error (Some (e1, e2)) ->
-                  UFail
-                    [
-                      EAsrt ([], Not (Eq (e1, e2)), [ [ Pure (Eq (e1, e2)) ] ]);
-                    ]
-              | Error None            -> make_resource_fail () )
+              let success, fail_pf =
+                unify_ins_outs_lists state' outs vs_outs les_outs
+              in
+              L.verbose (fun fmt -> fmt "Outs unification: %b" success);
+              match success with
+              | true  -> USucc astate'
+              | false -> UFail [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ]
+              )
           | GPSucc _ ->
               raise (Failure "DEATH. BRANCHING GETPRED INSIDE UNIFICATION.")
-          | GPFail errs -> make_resource_fail () )
-    | Pure f ->
-        L.verbose (fun fmt -> fmt "Pure formula");
-        let sbst_lst = Subst.to_ssubst subst in
-        let sbst = SSubst.init sbst_lst in
-        let f' = SSubst.substitute_formula sbst false f in
-        if State.assert_a state [ f' ] then USucc astate
+          | GPFail errs ->
+              L.verbose (fun m -> m "Failed to unify against predicate.");
+              UFail errs)
+    (* Conjunction should not be here *)
+    | Pure (Formula.And _) ->
+        raise (Failure "Unify assertion: And: should have been reduced")
+    (* Other pure assertions *)
+    | Pure f -> (
+        let success, discharges =
+          List.fold_left
+            (fun (success, discharges) (u, out) ->
+              (* We know how to create the out *)
+              if not success then (false, discharges)
+              else
+                (* Perform the substitution in the out *)
+                match ESubst.subst_in_expr_opt subst out with
+                | None     -> (false, discharges)
+                | Some out -> (
+                    (* Convert obtained out to value *)
+                    match Val.from_expr out with
+                    | None     -> (false, discharges)
+                    | Some out -> (
+                        (* And add to e-subst *)
+                        match ESubst.get subst u with
+                        | None ->
+                            ESubst.put subst u out;
+                            (true, discharges)
+                        | Some out' when out = out' -> (true, discharges)
+                        | Some out' ->
+                            ( true,
+                              Formula.Eq (Val.to_expr out, Val.to_expr out')
+                              :: discharges ))))
+            (true, []) outs
+        in
+        match success with
+        | false ->
+            raise
+              (Failure
+                 (Format.asprintf
+                    "INTERNAL ERROR: Unification failure: do not know all ins \
+                     for %a"
+                    Formula.pp f))
+        | true  -> (
+            (* To unify a pure formula we must know all ins *)
+            let opf = ESubst.substitute_in_formula_opt subst f in
+            match opf with
+            | None    ->
+                raise
+                  (Failure
+                     (Format.asprintf
+                        "Unification failure: do not know all ins for %a"
+                        Formula.pp f))
+            | Some pf ->
+                let discharges_pf =
+                  List.fold_left
+                    (fun ac x -> if ac = Formula.True then x else And (ac, x))
+                    True discharges
+                in
+                let discharges_pf =
+                  Reduction.reduce_formula ~unification:true discharges_pf
+                in
+                if State.assert_a state [ And (pf, discharges_pf) ] then
+                  USucc astate
+                else
+                  let vs = State.unfolding_vals state [ pf ] in
+                  UFail [ EAsrt (vs, Not pf, [ [ Pure pf ] ]) ]))
+    | Types les ->
+        let corrections =
+          List.fold_left
+            (fun (ac : Formula.t list) (le, t) ->
+              let v_le = (subst_in_expr_opt astate subst) le in
+              let v_le : vt =
+                match v_le with
+                | Some v_le -> v_le
+                | None      -> raise (Failure "DEATH. unify assertion Types")
+              in
+              match State.get_type state v_le with
+              | Some t' -> if t <> t' then False :: ac else ac
+              | None    -> Eq (UnOp (TypeOf, Val.to_expr v_le), Lit (Type t))
+                           :: ac)
+            [] les
+        in
+
+        if corrections = [] then USucc astate
         else
-          let vs = State.unfolding_vals state [ f' ] in
-          UFail [ EAsrt (vs, Not f, [ [ Pure f' ] ]) ]
-    (* LTrue, LFalse, LEmp, LStar*)
+          let les, _ = List.split les in
+          let les = List.map (subst_in_expr_opt astate subst) les in
+          UFail
+            [
+              EAsrt
+                ( List.map Option.get (List.filter (fun x -> x <> None) les),
+                  Not (Formula.conjunct corrections),
+                  [ [ Pure (Formula.conjunct corrections) ] ] );
+            ]
+    (* LTrue, LFalse, LEmp, LStar *)
     | _ -> raise (Failure "Illegal Assertion in Unification Plan")
 
   and unify_up (s_states : search_state) : up_u_res =
@@ -1067,18 +1192,38 @@ module Make
     match s_states with
     | []                         -> UPUFail errs_so_far
     | (state, subst, up) :: rest -> (
-        let cur_asrt : Asrt.t option = UP.head up in
+        let cur_step : UP.step option = UP.head up in
         let ret =
-          Option.fold
-            ~some:(unify_assertion state subst)
-            ~none:(USucc state) cur_asrt
+          try
+            Option.fold
+              ~some:(unify_assertion state subst)
+              ~none:(USucc state) cur_step
+          with err -> (
+            L.verbose (fun fmt ->
+                fmt
+                  "WARNING: UNCAUGHT EXCEPTION IN UNIFY-ASSERTION : %s@\n\
+                   Here's the backtrace: %s" (Printexc.to_string err)
+                  (Printexc.get_backtrace ()));
+            let a = fst (Option.get cur_step) in
+            match a with
+            | Pure pf ->
+                let bstate, _, _ = state in
+                let vs = State.unfolding_vals bstate [ pf ] in
+                UFail [ EAsrt (vs, Not pf, [ [ Pure pf ] ]) ]
+            | _       -> UFail [])
         in
         match ret with
-        | UWTF         -> UPUSucc []
+        | UWTF         ->
+            L.verbose (fun fmt -> fmt "Impossible. UWTF.");
+            UPUSucc []
         | USucc state' -> (
             match UP.next up with
-            | None                     -> UPUSucc
-                                            [ (state', subst, UP.posts up) ]
+            | None                     ->
+                L.verbose (fun fmt ->
+                    fmt
+                      "Unifier.unify_up: Unification successful: %d states left"
+                      (List.length s_states));
+                UPUSucc [ (state', subst, UP.posts up) ]
             | Some [ (up, lab) ]       ->
                 if complete_subst subst lab then
                   f ((state', subst, up) :: rest, errs_so_far)
@@ -1087,7 +1232,7 @@ module Make
                 let next_states =
                   List.map
                     (fun (up, lab) ->
-                      let new_subst = Subst.copy subst in
+                      let new_subst = ESubst.copy subst in
                       let new_state = copy_astate state' in
                       if complete_subst new_subst lab then
                         Some (new_state, new_subst, up)
@@ -1103,27 +1248,33 @@ module Make
                 f (next_states @ rest, errs_so_far)
             | Some []                  -> L.fail
                                             "ERROR: unify_up: empty \
-                                             unification plan" )
+                                             unification plan")
         | UFail errs   ->
             L.(
               verbose (fun m ->
                   m
                     "@[<v 2>WARNING: Unify Assertion Failed: @[<h>%a@] with \
-                     errors:@\n\
+                     subst @\n\
+                     %a in state @\n\
+                     %a with errors:@\n\
                      %a@]"
                     Fmt.(
-                      option ~none:(any "no assertion - phantom node") Asrt.pp)
-                    cur_asrt
+                      option
+                        ~none:(any "no assertion - phantom node")
+                        UP.step_pp)
+                    cur_step ESubst.pp subst pp_astate state
                     Fmt.(list ~sep:(any "@\n") State.pp_err)
                     errs));
-            f (rest, errs @ errs_so_far) )
+            f (rest, errs @ errs_so_far))
 
-  and unify ?(in_unification = false) (astate : t) (subst : Subst.t) (up : UP.t)
-      : up_u_res =
+  and unify
+      ?(in_unification = false) (astate : t) (subst : ESubst.t) (up : UP.t) :
+      up_u_res =
     let astate_i = copy_astate astate in
-    let subst_i = Subst.copy subst in
+    let subst_i = ESubst.copy subst in
 
     let merge_upu_res (rets : up_u_res list) : up_u_res =
+      L.verbose (fun fmt -> fmt "Inside merge_upu_res");
       let ret_succs, ret_fails =
         List.partition
           (fun ret ->
@@ -1154,12 +1305,17 @@ module Make
         UPUSucc (List.concat rets)
     in
 
+    L.verbose (fun fmt -> fmt "Unifier.unify: about to unify UP.");
     let ret = unify_up ([ (astate, subst, up) ], []) in
     match ret with
-    | UPUSucc _ -> ret
+    | UPUSucc _ ->
+        L.verbose (fun fmt -> fmt "Unifier.unify: Success");
+        ret
     | UPUFail errs
       when !Config.unfolding && State.can_fix errs && not in_unification ->
-        let vals = State.get_recovery_vals errs in
+        L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
+        let state, _, _ = astate_i in
+        let vals = State.get_recovery_vals state errs in
         L.(
           verbose (fun m ->
               m
@@ -1170,20 +1326,23 @@ module Make
         let sp, worked = unfold_with_vals astate_i vals in
         if not worked then (
           L.normal (fun m -> m "Unify. No predicates found to unfold.");
-          UPUFail errs )
+          UPUFail errs)
         else (
-          L.verbose (fun m -> m "Unfolding successful.");
+          L.verbose (fun m ->
+              m "Unfolding successful: %d results" (List.length sp));
           let rets =
             List.map
-              (fun (subst, astate) ->
+              (fun (_, astate) ->
                 match unfold_concrete_preds astate with
                 | None             -> UPUSucc []
                 | Some (_, astate) ->
                     (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
-                    let subst'' = Subst.copy subst_i in
+                    let subst'' = ESubst.copy subst_i in
                     unify_up ([ (astate, subst'', up) ], []))
               sp
           in
-          merge_upu_res rets )
-    | UPUFail errs -> ret
+          merge_upu_res rets)
+    | UPUFail _ ->
+        L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
+        ret
 end

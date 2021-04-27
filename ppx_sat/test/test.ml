@@ -1,0 +1,89 @@
+open Gil_syntax
+open Monadic.Delayed
+open Formula.Infix
+open Monadic.Delayed.Syntax
+
+let zero = Expr.num 0.
+
+let one = Expr.num 1.
+
+let two = Expr.num 2.
+
+let num_pat n x = x #== (Expr.num n)
+
+let zero_pat = num_pat 0.
+
+let one_pat = num_pat 1.
+
+let two_pat = num_pat 2.
+
+let three_pat = num_pat 3.
+
+let pp_branches =
+  let open Fmt in
+  brackets (list ~sep:comma (Monadic.Branch.pp int))
+
+module type S = sig
+  val run : unit -> unit
+end
+
+module Test_if_sat = struct
+  let computation t = if%sat t #>= one then return 10 else return 0
+
+  let process x =
+    let* z = computation x in
+    let* y =
+      if%sat x #<= zero then return (-1)
+      else
+        if%sat x #<= one then return 0
+        else if%sat x #>= two then return 2 else return 1
+    in
+    return (z + y)
+
+  let starting_pc x =
+    Monadic.Pc.make
+      ~pfs:(Engine.PFS.of_list [ Formula.Not x #== one ])
+      ~gamma:(Engine.TypEnv.init ()) ()
+
+  let results =
+    let x = Expr.LVar "x" in
+    let curr_pc = starting_pc x in
+    resolve ~curr_pc (process x)
+
+  let run () = Fmt.pr "%a@.@." pp_branches results
+end
+
+module Test_match_ent = struct
+  let process x =
+    match%ent x with
+    | zero_pat  -> return 0
+    | one_pat   -> return 1
+    | two_pat   -> return 2
+    | three_pat -> return 3
+    | _         -> return (-1)
+
+  let pc_with_no_info = Monadic.Pc.init ()
+
+  let pc_with_two x =
+    Monadic.Pc.make
+      ~pfs:(Engine.PFS.of_list [ x #== two ])
+      ~gamma:(Engine.TypEnv.init ()) ()
+
+  let results_no_info =
+    let x = Expr.LVar "x" in
+    let curr_pc = pc_with_no_info in
+    resolve ~curr_pc (process x)
+
+  let results_two =
+    let x = Expr.LVar "x" in
+    let curr_pc = pc_with_two x in
+    resolve ~curr_pc (process x)
+
+  let run () =
+    Fmt.pr "%a@.@.%a@.@." pp_branches results_no_info pp_branches results_two
+end
+
+let () =
+  List.iter
+    (fun (module M : S) -> M.run ())
+    [ (module Test_if_sat); (module Test_match_ent) ]

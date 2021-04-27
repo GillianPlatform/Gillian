@@ -1,6 +1,5 @@
 open SVal
 open Names
-open Containers
 module L = Logging
 module Arithmetic = Z3.Arithmetic
 module Boolean = Z3.Boolean
@@ -14,6 +13,8 @@ module Set = Z3.Set
 module Solver = Z3.Solver
 module Symbol = Z3.Symbol
 module ZExpr = Z3.Expr
+
+[@@@ocaml.warning "-A"]
 
 let encoding_cache : (Formula.Set.t, ZExpr.expr list) Hashtbl.t =
   Hashtbl.create Config.big_tbl_size
@@ -1051,19 +1052,27 @@ let encode_nop (op : NOp.t) les =
       let le = Set.mk_intersection ctx les in
       ZExpr.mk_app ctx extended_literal_operations.set_constructor [ le ]
   | LstCat   ->
-      let n_le =
-        List.fold_left
-          (fun ac next ->
-            (* Unpack ac *)
-            let ac = ZExpr.mk_app ctx lit_operations.list_accessor [ ac ] in
-            (* Unpack next one *)
-            let next = ZExpr.mk_app ctx lit_operations.list_accessor [ next ] in
-            ZExpr.mk_app ctx axiomatised_operations.lcat_fun [ ac; next ])
-          (List.hd les) (List.tl les)
-      in
-      (* Repack *)
-      mk_singleton_elem
-        (ZExpr.mk_app ctx lit_operations.list_constructor [ n_le ])
+      List.fold_left
+        (fun ac next ->
+          (* Unpack ac *)
+          let ac =
+            ZExpr.mk_app ctx lit_operations.list_accessor
+              [ mk_singleton_access ac ]
+          in
+          (* Unpack next one *)
+          let next =
+            ZExpr.mk_app ctx lit_operations.list_accessor
+              [ mk_singleton_access next ]
+          in
+          let new_ac =
+            ZExpr.mk_app ctx axiomatised_operations.lcat_fun [ ac; next ]
+          in
+          let new_ac =
+            mk_singleton_elem
+              (ZExpr.mk_app ctx lit_operations.list_constructor [ new_ac ])
+          in
+          new_ac)
+        (List.hd les) (List.tl les)
 
 let rec encode_logical_expression (le : Expr.t) : ZExpr.expr =
   let f = encode_logical_expression in
@@ -1087,9 +1096,7 @@ let rec encode_logical_expression (le : Expr.t) : ZExpr.expr =
                 ZExpr.mk_app ctx extended_literal_operations.set_accessor
                   [ f le ])
               les
-        | LstCat              -> List.map
-                                   (fun le -> mk_singleton_access (f le))
-                                   les
+        | LstCat              -> List.map f les
       in
       encode_nop op les
   | EList les            ->
@@ -1282,7 +1289,7 @@ let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
     =
   L.(
     verbose (fun m ->
-        m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma: @[%a@]\n"
+        m "@[<v 2>About to check SAT of:@\n%a@]@\nwith gamma:@\n@[%a@]\n"
           (Fmt.iter ~sep:(Fmt.any "@\n") Formula.Set.iter Formula.pp)
           fs TypEnv.pp gamma));
 
@@ -1292,14 +1299,13 @@ let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
   (* Step 2: Reset the solver and add the encoded formulae *)
   let masterSolver = Solver.mk_solver ctx None in
   Solver.add masterSolver encoded_assertions;
-  L.(
-    verbose (fun m ->
-        m "SAT: About to check the following:\n%s"
-          (string_of_solver masterSolver)));
-
+  (* L.(
+     verbose (fun m ->
+         m "SAT: About to check the following:\n%s"
+           (string_of_solver masterSolver))); *)
   (* Step 3: Check satisfiability *)
   (* let t = Sys.time () in *)
-  L.verbose (fun x -> x "Aqui!");
+  L.verbose (fun fmt -> fmt "Reached Z3.");
   let ret = Solver.check masterSolver [] in
   (* Utils.Statistics.update_statistics "Solver check" (Sys.time () -. t); *)
   L.(
@@ -1314,7 +1320,7 @@ let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
        @[%a@]@?"
       (Fmt.iter ~sep:(Fmt.any ", ") Formula.Set.iter Formula.pp)
       fs TypEnv.pp gamma;
-    exit 1 );
+    exit 1);
 
   (* Step 5: RETURN *)
   let ret = ret = Solver.SATISFIABLE in
@@ -1327,7 +1333,7 @@ let check_sat (fs : Formula.Set.t) (gamma : TypEnv.t) : bool =
     if cached then (
       let result = Hashtbl.find sat_cache fs in
       L.(verbose (fun m -> m "SAT check cached with result: %b" result));
-      result )
+      result)
     else (
       L.(verbose (fun m -> m "SAT check not found in cache."));
       let ret = check_sat_core fs gamma in
@@ -1343,7 +1349,7 @@ let check_sat (fs : Formula.Set.t) (gamma : TypEnv.t) : bool =
         | Some _ -> true
       in
       Hashtbl.replace sat_cache fs result;
-      result )
+      result)
   in
 
   ret
@@ -1351,12 +1357,12 @@ let check_sat (fs : Formula.Set.t) (gamma : TypEnv.t) : bool =
 let lift_z3_model
     (model : Model.model)
     (gamma : TypEnv.t)
-    (subst : SSubst.t)
-    (target_vars : SS.t) : unit =
+    (subst : SESubst.t)
+    (target_vars : Expr.Set.t) : unit =
   let recover_z3_number (n : ZExpr.expr) : float option =
     if ZExpr.is_numeral n then (
       L.(verbose (fun m -> m "Z3 number: %s" (ZExpr.to_string n)));
-      Some (float_of_string (Z3.Arithmetic.Real.to_decimal_string n 16)) )
+      Some (float_of_string (Z3.Arithmetic.Real.to_decimal_string n 16)))
     else None
   in
 
@@ -1389,18 +1395,25 @@ let lift_z3_model
           Option.fold ~some:(Hashtbl.find_opt str_codes_inv) ~none:None si
         with
         | Some s -> Some (Expr.Lit (String s))
-        | _      -> None )
+        | _      -> None)
     | _               -> None
   in
 
   L.(verbose (fun m -> m "Inside lift_z3_model"));
-  SS.iter
+  Expr.Set.iter
     (fun x ->
+      let x =
+        match x with
+        | LVar x -> x
+        | _      ->
+            raise
+              (Failure "INtERNAL ERROR: Z3 lifting of a non-logical variable")
+      in
       let v = lift_z3_val x in
       L.(
         verbose (fun m ->
             m "Z3 binding for %s: %s\n" x
               (Option.fold ~some:(Fmt.to_to_string Expr.pp) ~none:"NO BINDING!"
                  v)));
-      Option.fold ~some:(SSubst.put subst x) ~none:() v)
+      Option.fold ~some:(SESubst.put subst (LVar x)) ~none:() v)
     target_vars

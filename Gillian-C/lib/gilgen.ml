@@ -12,6 +12,7 @@ type context = {
   local_env : string list;
   gil_annot : Gil_logic_gen.gil_annots;
   exec_mode : ExecMode.t;
+  loop_stack : string list;
 }
 
 (* Useful litte function, such a big expression for such a small thing *)
@@ -32,33 +33,34 @@ let expr_of_chunk chunk =
 let internal_proc_of_unop uop =
   let open Cminor in
   match uop with
-  | Olongofint     -> UnOp_Functions.longofint
-  | Ointoflong     -> UnOp_Functions.intoflong
-  | Ointoffloat    -> UnOp_Functions.intoffloat
-  | Ointofsingle   -> UnOp_Functions.intofsingle
-  | Olongofintu    -> UnOp_Functions.longofintu
-  | Olongoffloat   -> UnOp_Functions.longoffloat
-  | Olongofsingle  -> UnOp_Functions.longofsingle
-  | Olonguofsingle -> UnOp_Functions.longuofsingle
-  | Ofloatofint    -> UnOp_Functions.floatofint
-  | Ofloatofintu   -> UnOp_Functions.floatofintu
-  | Ofloatofsingle -> UnOp_Functions.floatofsingle
-  | Osingleoflongu -> UnOp_Functions.singleoflongu
-  | Osingleofint   -> UnOp_Functions.singleofint
-  | Osingleoffloat -> UnOp_Functions.singleoffloat
-  | Onegl          -> UnOp_Functions.negl
-  | Onegint        -> UnOp_Functions.negint
-  | Ocast8signed   -> UnOp_Functions.cast8signed
-  | Ocast8unsigned -> UnOp_Functions.cast8unsigned
-  | Ocast16signed  -> UnOp_Functions.cast16signed
-  | _              ->
+  | Olongofint      -> UnOp_Functions.longofint
+  | Ointoflong      -> UnOp_Functions.intoflong
+  | Ointoffloat     -> UnOp_Functions.intoffloat
+  | Ointofsingle    -> UnOp_Functions.intofsingle
+  | Olongofintu     -> UnOp_Functions.longofintu
+  | Olongoffloat    -> UnOp_Functions.longoffloat
+  | Olongofsingle   -> UnOp_Functions.longofsingle
+  | Olonguofsingle  -> UnOp_Functions.longuofsingle
+  | Ofloatofint     -> UnOp_Functions.floatofint
+  | Ofloatofintu    -> UnOp_Functions.floatofintu
+  | Ofloatofsingle  -> UnOp_Functions.floatofsingle
+  | Osingleoflongu  -> UnOp_Functions.singleoflongu
+  | Osingleofint    -> UnOp_Functions.singleofint
+  | Osingleoffloat  -> UnOp_Functions.singleoffloat
+  | Onegl           -> UnOp_Functions.negl
+  | Onegint         -> UnOp_Functions.negint
+  | Ocast8signed    -> UnOp_Functions.cast8signed
+  | Ocast8unsigned  -> UnOp_Functions.cast8unsigned
+  | Ocast16signed   -> UnOp_Functions.cast16signed
+  | Ocast16unsigned -> UnOp_Functions.cast16unsigned
+  | _               ->
       failwith
         (Printf.sprintf "Unhandled unary operator : %s"
            (PrintCsharpminor.name_of_unop uop))
 
 let trans_binop_expr ?(fname = "main") binop te1 te2 =
   let call func =
-    let gvar = Generators.gen_str fname Prefix.gvar in
+    let gvar = Generators.gen_str ~fname Prefix.gvar in
     ( [
         Cmd.Call (gvar, Expr.Lit (Literal.String func), [ te1; te2 ], None, None);
       ],
@@ -131,7 +133,7 @@ let trans_binop_expr ?(fname = "main") binop te1 te2 =
 let rec trans_expr ?(fname = "main") ~local_env expr =
   let trans_expr = trans_expr ~fname ~local_env in
   let trans_binop_expr = trans_binop_expr ~fname in
-  let gen_str = Generators.gen_str fname in
+  let gen_str = Generators.gen_str ~fname in
   let open Expr in
   match expr with
   | Evar id -> ([], PVar (true_name id))
@@ -157,8 +159,8 @@ let rec trans_expr ?(fname = "main") ~local_env expr =
         try trans_binop_expr binop te1 te2
         with Failure _ ->
           failwith
-            ( "Binop isn't handled yet, cannot translate : "
-            ^ PrintCminor.name_of_binop binop )
+            ("Binop isn't handled yet, cannot translate : "
+            ^ PrintCminor.name_of_binop binop)
       in
       (leading_e1 @ leading_e2 @ leading_binop, te)
   | Eaddrof id when List.mem (true_name id) local_env ->
@@ -179,11 +181,14 @@ let rec trans_expr ?(fname = "main") ~local_env expr =
       let res = EList [ nth gvar_val 0; Lit (Literal.Num 0.) ] in
       ([ cmd_act; cmd_assign ], res)
 
-let empty_annot = Annot.init ()
+let annot_ctx ctx = Annot.make ~loop_info:ctx.loop_stack ()
 
-let rec add_annots ?first l =
+(* let empty_annot = Annot.make () *)
+
+let rec add_annots ~ctx ?first l =
+  let annot = annot_ctx ctx in
   match l with
-  | a :: r -> (empty_annot, first, a) :: add_annots r
+  | a :: r -> (annot, first, a) :: add_annots ~ctx r
   | []     -> []
 
 let change_first_lab first_lab l =
@@ -207,15 +212,15 @@ let make_free_cmd fname var_list =
     | x :: r -> Expr.EList [ nth x 0; zero; nth x 1 ] :: make_blocks r
   in
   let freelist = Expr.Lit (Literal.String Internal_Functions.free_list) in
-  let gvar = Generators.gen_str fname Prefix.gvar in
+  let gvar = Generators.gen_str ~fname Prefix.gvar in
   (* If there's nothing to free, we just don't create the command *)
   match make_blocks var_list with
   | []     -> None
   | blocks ->
       Some (Cmd.Call (gvar, freelist, [ Expr.EList blocks ], None, None))
 
-let make_symb_gen ?(fname = "main") assigned_id x type_string =
-  let gen_str = Generators.gen_str fname in
+let make_symb_gen ?(fname = "main") ~ctx assigned_id x type_string =
+  let gen_str = Generators.gen_str ~fname in
   let assigned = true_name assigned_id in
   let str_x =
     match x with
@@ -241,7 +246,7 @@ let make_symb_gen ?(fname = "main") assigned_id x type_string =
   let assume_val_t =
     Cmd.Logic (LCmd.AssumeType (lvar_val_string, Type.NumberType))
   in
-  add_annots [ assignment; specvar; assume_list; assume_val_t ]
+  add_annots ~ctx [ assignment; specvar; assume_list; assume_val_t ]
 
 let is_call name e =
   match e with
@@ -254,29 +259,46 @@ let is_assume_call = is_call Builtin_Functions.assume_f
 
 let is_printf_call = is_call "printf"
 
+let last_invariant = ref None (* Dirty hack *)
+
+let set_invariant l = last_invariant := Some l
+
+let get_invariant () =
+  let i =
+    match !last_invariant with
+    | None   -> []
+    | Some i -> [ i ]
+  in
+  last_invariant := None;
+  i
+
 let rec trans_stmt ?(fname = "main") ~context stmt =
   let trans_stmt ?(context = context) = trans_stmt ~fname ~context in
   let make_symb_gen = make_symb_gen ~fname in
   (* Default context is the given context *)
   let trans_expr = trans_expr ~fname ~local_env:context.local_env in
-  let gen_str = Generators.gen_str fname in
+  let gen_str = Generators.gen_str ~fname in
   match stmt with
-  | Sskip -> [ (empty_annot, None, Cmd.Skip) ]
+  | Sskip -> [ (annot_ctx context, None, Cmd.Skip) ]
   | Sset (id, exp) ->
       let cmds, te = trans_expr exp in
       let var_name = true_name id in
       let ncmd = Cmd.Assignment (var_name, te) in
-      let lab_ncmd = (empty_annot, None, ncmd) in
-      add_annots cmds @ [ lab_ncmd ]
+      let lab_ncmd = (annot_ctx context, None, ncmd) in
+      add_annots ~ctx:context cmds @ [ lab_ncmd ]
   | Sseq (s1, Sskip) -> trans_stmt s1
   | Sseq (Sskip, s2) -> trans_stmt s2
-  | Sseq (s1, s2) -> trans_stmt s1 @ trans_stmt s2
+  | Sseq (s1, s2) ->
+      (* Making sure it's compiled in that order for the invariant to make sense *)
+      let ts1 = trans_stmt s1 in
+      let ts2 = trans_stmt s2 in
+      ts1 @ ts2
   | Sifthenelse (exp, s1, s2) ->
       let then_lab = gen_str Prefix.then_lab in
       let else_lab = gen_str Prefix.else_lab in
       let endif_lab = gen_str Prefix.endif_lab in
       let leading_cmds, texp = trans_expr exp in
-      let annot_leading_cmds = add_annots leading_cmds in
+      let annot_leading_cmds = add_annots ~ctx:context leading_cmds in
       let then_lab, ts1 = change_first_lab then_lab (trans_stmt s1) in
       let else_lab, ts2 = change_first_lab else_lab (trans_stmt s2) in
       let bool_of_val =
@@ -284,19 +306,23 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
       in
       let texb = gen_str Prefix.gvar in
       let bov = Cmd.Call (texb, bool_of_val, [ texp ], None, None) in
-      let a_bov = (empty_annot, None, bov) in
+      let a_bov = (annot_ctx context, None, bov) in
       let guard = Cmd.GuardedGoto (PVar texb, then_lab, else_lab) in
       let goto_end = Cmd.Goto endif_lab in
       let end_cmd = Cmd.Skip in
-      let lab_guard = (empty_annot, None, guard) in
-      let lab_goto_end = (empty_annot, None, goto_end) in
-      let lab_end_cmd = (empty_annot, Some endif_lab, end_cmd) in
+      let lab_guard = (annot_ctx context, None, guard) in
+      let lab_goto_end = (annot_ctx context, None, goto_end) in
+      let lab_end_cmd = (annot_ctx context, Some endif_lab, end_cmd) in
       annot_leading_cmds @ [ a_bov; lab_guard ] @ ts1 @ [ lab_goto_end ] @ ts2
       @ [ lab_end_cmd ]
   | Sloop s ->
       let loop_lab = gen_str Prefix.loop_lab in
-      let loop_lab, ts = change_first_lab loop_lab (trans_stmt s) in
-      let goto_cmd = (empty_annot, None, Cmd.Goto loop_lab) in
+      let nctx = { context with loop_stack = loop_lab :: context.loop_stack } in
+      let invariant = add_annots ~ctx:nctx (get_invariant ()) in
+      let loop_lab, ts =
+        change_first_lab loop_lab (invariant @ trans_stmt ~context:nctx s)
+      in
+      let goto_cmd = (annot_ctx nctx, None, Cmd.Goto loop_lab) in
       ts @ [ goto_cmd ]
   | Sblock s ->
       let block_lab = gen_str Prefix.end_block_lab in
@@ -304,13 +330,13 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
         { context with block_stack = block_lab :: context.block_stack }
       in
       (* Add the new label to the stack *)
-      let skip_cmd = (empty_annot, Some block_lab, Cmd.Skip) in
+      let skip_cmd = (annot_ctx context, Some block_lab, Cmd.Skip) in
       let ts = trans_stmt ~context:nctx s in
       ts @ [ skip_cmd ]
   | Sexit n ->
       let n_ocaml = Camlcoq.Nat.to_int n in
       let lab = List.nth context.block_stack n_ocaml in
-      let goto_cmd = (empty_annot, None, Cmd.Goto lab) in
+      let goto_cmd = (annot_ctx context, None, Cmd.Goto lab) in
       [ goto_cmd ]
   | Sreturn rval_opt -> (
       let leading_cmds, rexpr =
@@ -318,19 +344,19 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
         | None   -> ([], Expr.Lit Literal.Null)
         | Some e -> trans_expr e
       in
-      let annotated_leading_cmds = add_annots leading_cmds in
+      let annotated_leading_cmds = add_annots ~ctx:context leading_cmds in
       let ret_assign =
-        ( empty_annot,
+        ( annot_ctx context,
           None,
           Cmd.Assignment (Gillian.Utils.Names.return_variable, rexpr) )
       in
       let freecmd_opt = make_free_cmd fname context.local_env in
-      let return = (empty_annot, None, Cmd.ReturnNormal) in
+      let return = (annot_ctx context, None, Cmd.ReturnNormal) in
       match freecmd_opt with
       | Some freecmd ->
-          let annot_freecmd = (empty_annot, None, freecmd) in
+          let annot_freecmd = (annot_ctx context, None, freecmd) in
           annotated_leading_cmds @ [ ret_assign; annot_freecmd; return ]
-      | None         -> annotated_leading_cmds @ [ ret_assign; return ] )
+      | None         -> annotated_leading_cmds @ [ ret_assign; return ])
   | Slabel (lab, s) ->
       (* If the translated thing already has a label, we add a skip before with the right label,
          otherwise, we put the label in the translated thing *)
@@ -339,36 +365,36 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
         change_first_lab gil_lab (trans_stmt s)
       in
       if not (String.equal gil_lab gil_lab_or_already_exists) then
-        (empty_annot, Some gil_lab, Cmd.Skip) :: ts
+        (annot_ctx context, Some gil_lab, Cmd.Skip) :: ts
       else ts
   | Sgoto lab ->
       let gil_lab = trans_label lab in
-      [ (empty_annot, None, Cmd.Goto gil_lab) ]
+      [ (annot_ctx context, None, Cmd.Goto gil_lab) ]
   | Sstore (chunk, vaddr, v) ->
       let addr_eval_cmds, eaddr = trans_expr vaddr in
       let v_eval_cmds, ev = trans_expr v in
       let chunk_string = ValueTranslation.string_of_chunk chunk in
       let chunk_expr = Expr.Lit (Literal.String chunk_string) in
-      let annot_addr_eval = add_annots addr_eval_cmds in
-      let annot_v_eval = add_annots v_eval_cmds in
+      let annot_addr_eval = add_annots ~ctx:context addr_eval_cmds in
+      let annot_v_eval = add_annots ~ctx:context v_eval_cmds in
       let storev = Expr.Lit (Literal.String Internal_Functions.storev) in
       let gvar = gen_str Prefix.gvar in
       let cmd =
         Cmd.Call (gvar, storev, [ chunk_expr; eaddr; ev ], None, None)
       in
-      annot_addr_eval @ annot_v_eval @ [ (empty_annot, None, cmd) ]
+      annot_addr_eval @ annot_v_eval @ [ (annot_ctx context, None, cmd) ]
   | Scall (None, _, ex, [ e ]) when is_assert_call ex ->
       let cmds, egil = trans_expr e in
       let one = Expr.EList [ Lit (String VTypes.int_type); Lit (Num 1.) ] in
       let form = Formula.Eq (egil, one) in
       let assert_cmd = Cmd.Logic (Assert form) in
-      add_annots (cmds @ [ assert_cmd ])
+      add_annots ~ctx:context (cmds @ [ assert_cmd ])
   | Scall (None, _, ex, [ e ]) when is_assume_call ex ->
       let cmds, egil = trans_expr e in
       let one = Expr.EList [ Lit (String VTypes.int_type); Lit (Num 1.) ] in
       let form = Formula.Eq (egil, one) in
       let assert_cmd = Cmd.Logic (Assume form) in
-      add_annots (cmds @ [ assert_cmd ])
+      add_annots ~ctx:context (cmds @ [ assert_cmd ])
   | Scall (None, _, ex, args) when is_printf_call ex ->
       let cmds, egil = List.split (List.map trans_expr args) in
       let leftvar = gen_str Prefix.gvar in
@@ -379,7 +405,8 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
             egil,
             None )
       in
-      (List.concat cmds |> add_annots) @ [ (empty_annot, None, cmd) ]
+      (List.concat cmds |> add_annots ~ctx:context)
+      @ [ (annot_ctx context, None, cmd) ]
   | Scall (optid, _, ex, lexp) ->
       let leftvar =
         match optid with
@@ -401,8 +428,12 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
       let call_cmd =
         Cmd.Call (leftvar, Expr.PVar fname_var, trans_params, None, None)
       in
-      add_annots leading_fn @ add_annots leading_params
-      @ [ (empty_annot, None, get_fname); (empty_annot, None, call_cmd) ]
+      add_annots ~ctx:context leading_fn
+      @ add_annots ~ctx:context leading_params
+      @ [
+          (annot_ctx context, None, get_fname);
+          (annot_ctx context, None, call_cmd);
+        ]
   | Sswitch (is_long, guard, lab_stmts) ->
       let leading_guard, guard_expr = trans_expr guard in
       let num =
@@ -425,10 +456,10 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
         match l_stmts with
         | LSnil when had_default ->
             let lab = gen_str Prefix.endswitch_lab in
-            ([], [ (empty_annot, Some lab, Cmd.Skip) ], lab, "")
+            ([], [ (annot_ctx context, Some lab, Cmd.Skip) ], lab, "")
         | LSnil ->
             let lab = gen_str Prefix.default_lab in
-            ([], [ (empty_annot, Some lab, Cmd.Skip) ], lab, lab)
+            ([], [ (annot_ctx context, Some lab, Cmd.Skip) ], lab, lab)
         | LScons (None, s, r) ->
             let switches, cases, next_lab, _ = make_switch true r in
             let default_lab, trans_case =
@@ -445,7 +476,7 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
             in
             let switch_lab = gen_str Prefix.switch_lab in
             let goto =
-              ( empty_annot,
+              ( annot_ctx context,
                 Some switch_lab,
                 Cmd.GuardedGoto (g, case_lab, next_lab) )
             in
@@ -460,23 +491,44 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
             def_lab,
             first_switch_lab )
       in
-      add_annots leading_guard
-      @ ((empty_annot, None, goto_default) :: switches)
+      add_annots ~ctx:context leading_guard
+      @ ((annot_ctx context, None, goto_default) :: switches)
       @ cases
-  | Sbuiltin (None, AST.EF_annot (_, s, _), []) ->
-      let string_lcmd = String.init (List.length s) (List.nth s) in
+  | Sbuiltin (None, AST.EF_annot (_, s, _), []) -> (
+      let string_lcmd =
+        let buffer = Buffer.create 1000 in
+        let () = List.iter (fun x -> Buffer.add_char buffer x) s in
+        Buffer.contents buffer
+      in
       let lexbuf = Lexing.from_string string_lcmd in
       let lcmd =
-        try Annot_parser.logic_command_entry Annot_lexer.read lexbuf
-        with _ -> failwith ("Syntax Error in annot : " ^ string_lcmd)
+        try Annot_parser.logic_command_entry Annot_lexer.read lexbuf with
+        | Annot_parser.Error ->
+            let curr = lexbuf.Lexing.lex_curr_p in
+            Fmt.failwith
+              "Syntax error in annot\n%s\n\nUnexpected token %s at loc (%i, %i)"
+              string_lcmd (Lexing.lexeme lexbuf) curr.pos_lnum
+              (curr.pos_cnum - curr.pos_bol + 1)
+        | exc                ->
+            Fmt.failwith "Syntax Error in annot (%s): \n%s"
+              (Printexc.to_string exc) string_lcmd
       in
-      let gil_lcmds =
-        List.map
-          (fun lc -> (empty_annot, None, Cmd.Logic lc))
-          (Gil_logic_gen.trans_lcmd ~fname ~ann:context.gil_annot lcmd)
+      let compiled =
+        Gil_logic_gen.trans_lcmd ~fname ~ann:context.gil_annot lcmd
       in
-      (* We should filter assert_s in verif, and assert_v in symb *)
-      if ExecMode.concrete_exec context.exec_mode then [] else gil_lcmds
+      match compiled with
+      | `Normal gil_lcmds ->
+          let gil_lcmds =
+            List.map
+              (fun lc -> (annot_ctx context, None, Cmd.Logic lc))
+              gil_lcmds
+          in
+          (* We should filter assert_s in verif, and assert_v in symb *)
+          if ExecMode.concrete_exec context.exec_mode then [] else gil_lcmds
+      | `Invariant (_loop_type, inv) ->
+          let inv = Cmd.Logic (SL inv) in
+          set_invariant inv;
+          [])
   | Sbuiltin (_, AST.EF_annot_val _, _)
     when not (ExecMode.symbolic_exec context.exec_mode) ->
       failwith
@@ -489,30 +541,49 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
     when String.equal
            (String.init (List.length s) (List.nth s))
            CConstants.Symbolic_Constr.symb_int ->
-      make_symb_gen id x CConstants.VTypes.int_type
+      make_symb_gen ~ctx:context id x CConstants.VTypes.int_type
   | Sbuiltin (Some id, AST.EF_annot_val (_, s, _), [ x ])
     when String.equal
            (String.init (List.length s) (List.nth s))
            CConstants.Symbolic_Constr.symb_long ->
-      make_symb_gen id x CConstants.VTypes.long_type
+      make_symb_gen ~ctx:context id x CConstants.VTypes.long_type
   | Sbuiltin (Some id, AST.EF_annot_val (_, s, _), [ x ])
     when String.equal
            (String.init (List.length s) (List.nth s))
            CConstants.Symbolic_Constr.symb_single ->
-      make_symb_gen id x CConstants.VTypes.single_type
+      make_symb_gen ~ctx:context id x CConstants.VTypes.single_type
   | Sbuiltin (Some id, AST.EF_annot_val (_, s, _), [ x ])
     when String.equal
            (String.init (List.length s) (List.nth s))
            CConstants.Symbolic_Constr.symb_float ->
-      make_symb_gen id x CConstants.VTypes.float_type
+      make_symb_gen ~ctx:context id x CConstants.VTypes.float_type
+  | Sbuiltin (None, AST.EF_memcpy (sz, al), [ dst; src ]) ->
+      let sz = ValueTranslation.float_of_z sz in
+      let al = ValueTranslation.float_of_z al in
+      let cmds_dst, dst = trans_expr dst in
+      let cmds_src, src = trans_expr src in
+      let temp = gen_str Prefix.gvar in
+      let call =
+        Cmd.Call
+          ( temp,
+            Expr.string Internal_Functions.ef_memcpy,
+            [ Expr.num sz; Expr.num al; dst; src ],
+            None,
+            None )
+      in
+      add_annots ~ctx:context (cmds_dst @ cmds_src @ [ call ])
   | Sbuiltin (_optid, _exf, _params) as s ->
       failwith
         (Format.asprintf
            "Cannot compile builtin function %a : Not implemented yet"
            PrintCsharpminor.print_stmt s)
 
+let empty_annot = Annot.make ()
+
+let add_empty_annots l = List.map (fun a -> (empty_annot, None, a)) l
+
 let alloc_var fname (name, sz) =
-  let gvar = Generators.gen_str fname Prefix.gvar in
+  let gvar = Generators.gen_str ~fname Prefix.gvar in
   let ocaml_size = ValueTranslation.gil_size_of_compcert sz in
   let expr_size = Expr.Lit (Literal.Num ocaml_size) in
   let alloc = LActions.(str_ac (AMem Alloc)) in
@@ -533,6 +604,15 @@ let trans_function
   let { fn_sig = _; fn_params; fn_vars; fn_temps; fn_body } = fdef in
   (* Getting rid of the ids immediately *)
   let fn_vars = List.map (fun (id, sz) -> (true_name id, sz)) fn_vars in
+  let context =
+    {
+      block_stack = [];
+      local_env = fst (List.split fn_vars);
+      gil_annot;
+      exec_mode;
+      loop_stack = [];
+    }
+  in
   let register_temps =
     List.map
       (fun temp ->
@@ -544,24 +624,14 @@ let trans_function
   let register_vars = List.concat (List.map (alloc_var fname) fn_vars) in
   let init_genv =
     if String.equal fname "main" then
-      let gvar = Generators.gen_str fname Prefix.gvar in
+      let gvar = Generators.gen_str ~fname Prefix.gvar in
       let expr_fn =
         Expr.Lit (Literal.String CConstants.Internal_Functions.initialize_genv)
       in
       [ (empty_annot, None, Cmd.Call (gvar, expr_fn, [], None, None)) ]
     else []
   in
-  let body =
-    trans_stmt ~fname
-      ~context:
-        {
-          block_stack = [];
-          local_env = fst (List.split fn_vars);
-          gil_annot;
-          exec_mode;
-        }
-      fn_body
-  in
+  let body = trans_stmt ~fname ~context fn_body in
   let body_with_registrations =
     init_genv @ register_vars @ register_temps @ body
   in
@@ -571,8 +641,8 @@ let trans_function
     | [ (a, b, c) ] ->
         [
           (a, b, c);
-          (Annot.init (), None, Assignment ("ret", Lit (Num 0.)));
-          (Annot.init (), None, ReturnNormal);
+          (Annot.make (), None, Assignment ("ret", Lit (Num 0.)));
+          (Annot.make (), None, ReturnNormal);
         ]
     | a :: b -> a :: add_return b
   in
@@ -627,6 +697,7 @@ let intern_impl_of_extern_function ext_f =
   match ext_f with
   | EF_malloc -> (CConstants.Internal_Functions.malloc, false)
   | EF_free -> (CConstants.Internal_Functions.free, false)
+  | EF_memcpy _ -> (CConstants.Internal_Functions.memcpy, false)
   | EF_external ([ 'c'; 'a'; 'l'; 'l'; 'o'; 'c' ], _) ->
       (CConstants.Internal_Functions.calloc, false)
   | EF_external ([ 'm'; 'e'; 'm'; 'c'; 'p'; 'y' ], _) ->
@@ -660,8 +731,8 @@ let is_builtin_func func_name =
 
 let is_gil_func func_name exec_mode =
   ExecMode.symbolic_exec exec_mode
-  && ( String.equal func_name Builtin_Functions.assume_f
-     || String.equal func_name Builtin_Functions.assert_f )
+  && (String.equal func_name Builtin_Functions.assume_f
+     || String.equal func_name Builtin_Functions.assert_f)
 
 type symbol = { name : string; defined : bool }
 
@@ -759,13 +830,17 @@ let rec trans_globdefs
         if has_global_scope then original_sym
         else mangle_symbol original_sym filepath mangled_syms
       in
+      let new_asrt =
+        Constr.Others.glob_var_unallocated ~symb:symbol
+          ~vname:(Expr.string original_sym)
+      in
       let target = symbol in
       let new_cmd = set_global_var symbol target v in
       let new_syms =
         if has_global_scope then { name = symbol; defined = true } :: syms
         else syms
       in
-      (init_asrts, new_cmd :: init_acts, bi_specs, fs, new_syms)
+      (new_asrt :: init_asrts, new_cmd :: init_acts, bi_specs, fs, new_syms)
 
 let make_init_proc init_cmds =
   let end_cmds =
@@ -777,7 +852,7 @@ let make_init_proc init_cmds =
       (empty_annot, None, Cmd.ReturnNormal);
     ]
   in
-  let annot_init_cmds = add_annots init_cmds in
+  let annot_init_cmds = add_empty_annots init_cmds in
   let all_cmds = annot_init_cmds @ end_cmds in
   Proc.
     {
@@ -832,6 +907,16 @@ let annotate prog gil_annots =
   in
   let () =
     List.iter
+      (fun s -> Hashtbl.add prog.Prog.only_specs s.Spec.spec_name s)
+      gil_annots.Gil_logic_gen.onlyspecs
+  in
+  let () =
+    List.iter
+      (fun l -> Hashtbl.add prog.Prog.lemmas l.Lemma.lemma_name l)
+      gil_annots.Gil_logic_gen.lemmas
+  in
+  let () =
+    List.iter
       (fun spec ->
         match Hashtbl.find_opt prog.procs spec.Spec.spec_name with
         | None      ->
@@ -842,7 +927,20 @@ let annotate prog gil_annots =
               { proc with proc_spec = Some spec })
       gil_annots.specs
   in
-  prog
+  { prog with imports = prog.imports @ gil_annots.imports }
+
+let get_compilation_data_from_only_specs ospecs =
+  let cdata_of_ospec_name sname =
+    let init_cmd = set_global_function sname sname in
+    let init_asrt = Gil_logic_gen.glob_fun_pred sname sname in
+    let symbol = { name = sname; defined = true } in
+    (init_asrt, init_cmd, symbol)
+  in
+  List.fold_left
+    (fun (iasrts, icmds, syms) Spec.{ spec_name; _ } ->
+      let a, c, s = cdata_of_ospec_name spec_name in
+      (a :: iasrts, c :: icmds, s :: syms))
+    ([], [], []) ospecs
 
 let trans_program_with_annots
     ~exec_mode ~clight_prog ~filepath ~mangled_syms prog annots =
@@ -856,6 +954,17 @@ let trans_program_with_annots
   let non_annotated_prog, compilation_data =
     trans_program ~exec_mode ~gil_annot ~clight_prog ~filepath ~mangled_syms
       prog
+  in
+  (* Onlyspecs are considered to be defined *)
+  let osa, osc, oss =
+    get_compilation_data_from_only_specs gil_annot.Gil_logic_gen.onlyspecs
+  in
+  let compilation_data =
+    {
+      symbols = oss @ compilation_data.symbols;
+      genv_pred_asrts = osa @ compilation_data.genv_pred_asrts;
+      genv_init_cmds = osc @ compilation_data.genv_init_cmds;
+    }
   in
   let annotated_prog = annotate non_annotated_prog gil_annot in
   (annotated_prog, compilation_data)

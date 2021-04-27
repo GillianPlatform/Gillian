@@ -1,9 +1,7 @@
-module L = Logging
-
 type ('annot, 'label) t = {
   imports : (string * bool) list;
       (** List of tuples consisting of the file path and a boolean indicating
-          whether the procedures in the file should be verified. The latter 
+          whether the procedures in the file should be verified. The latter
           should be [false] for runtime files. *)
   lemmas : (string, Lemma.t) Hashtbl.t;
   (* Lemmas *)
@@ -160,6 +158,7 @@ let get_lemma_exn (prog : ('a, 'b) t) (name : string) : Lemma.t =
   | None       -> failwith (Printf.sprintf "could not find lemma %s" name)
 
 let pp ~(show_labels : bool) ~(pp_label : 'b Fmt.t) fmt (prog : ('a, 'b) t) =
+  let proc_names = Hashtbl.to_seq_keys prog.procs in
   let pp_list ppp = Fmt.list ~sep:(Fmt.any "@\n") ppp in
   let npp pp =
     let open Fmt in
@@ -180,7 +179,7 @@ let pp ~(show_labels : bool) ~(pp_label : 'b Fmt.t) fmt (prog : ('a, 'b) t) =
     pp_import_paths fmt "import" reg_paths;
     pp_import_paths fmt "import verify" paths_to_verify
   in
-  let pp_only_spec fmt' spec = Fmt.pf fmt' "only %a" Spec.pp spec in
+  let pp_only_spec fmt' spec = Fmt.pf fmt' "axiomatic %a" Spec.pp spec in
   Fmt.pf fmt "%a@\n%a%a%a%a%a" pp_imports prog.imports
     (pp_list (npp Lemma.pp))
     (get_lemmas prog)
@@ -191,14 +190,11 @@ let pp ~(show_labels : bool) ~(pp_label : 'b Fmt.t) fmt (prog : ('a, 'b) t) =
     (pp_list (npp BiSpec.pp))
     (get_bispecs prog)
     (pp_list (npp (Proc.pp ~show_labels ~pp_label)))
-    (get_procs ~proc_names:prog.proc_names prog)
+    (get_procs ~proc_names:(List.of_seq proc_names) prog)
 
 let pp_labeled fmt x = pp ~show_labels:true ~pp_label:Fmt.string fmt x
 
 let pp_indexed fmt x = pp ~show_labels:false ~pp_label:Fmt.int fmt x
-
-let line_info (prog : ('a, 'b) t) : (string * int * int) list =
-  List.concat (List.map Proc.line_info (get_procs prog))
 
 (* let perform_syntax_checks (prog : t) : unit =
   if (!Config.perform_syntax_checks)

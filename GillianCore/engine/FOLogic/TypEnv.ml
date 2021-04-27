@@ -7,10 +7,6 @@ module L = Logging
 
 type t = (string, Type.t) Hashtbl.t
 
-let pp fmt tenv =
-  let pp_pair fmt (v, vt) = Fmt.pf fmt "(%s: %s)" v (Type.str vt) in
-  (Fmt.hashtbl ~sep:(Fmt.any "@\n") pp_pair) fmt tenv
-
 (*************************************)
 (** Typing Environment Functions    **)
 
@@ -68,8 +64,20 @@ let iter (x : t) (f : string -> Type.t -> unit) : unit = Hashtbl.iter f x
 let fold (x : t) (f : string -> Type.t -> 'a -> 'a) (init : 'a) : 'a =
   Hashtbl.fold f x init
 
+let pp fmt tenv =
+  let pp_pair fmt (v, vt) = Fmt.pf fmt "(%s: %s)" v (Type.str vt) in
+  let bindings = fold tenv (fun x t ac -> (x, t) :: ac) [] in
+  let bindings = List.sort (fun (v, _) (w, _) -> Stdlib.compare v w) bindings in
+  (Fmt.list ~sep:(Fmt.any "@\n") pp_pair) fmt bindings
+
+let pp_by_need vars fmt tenv =
+  let pp_pair fmt (v, vt) = Fmt.pf fmt "(%s: %s)" v (Type.str vt) in
+  let bindings = fold tenv (fun x t ac -> (x, t) :: ac) [] in
+  let bindings = List.sort (fun (v, _) (w, _) -> Stdlib.compare v w) bindings in
+  let bindings = List.filter (fun (v, _) -> SS.mem v vars) bindings in
+  (Fmt.list ~sep:(Fmt.any "@\n") pp_pair) fmt bindings
+
 (* Update with removal *)
-let update (te : t) (x : string) (t : Type.t) : unit = Hashtbl.replace te x t
 
 let update (te : t) (x : string) (t : Type.t) : unit =
   match get te x with
@@ -102,7 +110,7 @@ let filter (x : t) (f : string -> bool) : t =
 
 (* Filter using function on variables *)
 let filter_in_place (x : t) (f : string -> bool) : unit =
-  iter x (fun v v_type -> if not (f v) then remove x v)
+  iter x (fun v _ -> if not (f v) then remove x v)
 
 (* Filter for specific variables *)
 let filter_vars (gamma : t) (vars : SS.t) : t =
@@ -113,10 +121,11 @@ let filter_vars_in_place (gamma : t) (vars : SS.t) : unit =
   filter_in_place gamma (fun v -> SS.mem v vars)
 
 (* Perform substitution, return new typing environment *)
-let rec substitution (x : t) (subst : SSubst.t) (partial : bool) : t =
+let substitution (x : t) (subst : SESubst.t) (partial : bool) : t =
   let new_gamma = init () in
   iter x (fun var v_type ->
-      let new_var = SSubst.get subst var in
+      let evar = Expr.from_var_name var in
+      let new_var = SESubst.get subst evar in
       match new_var with
       | Some (LVar new_var) -> update new_gamma new_var v_type
       | Some _              -> if partial then update new_gamma var v_type
@@ -124,8 +133,8 @@ let rec substitution (x : t) (subst : SSubst.t) (partial : bool) : t =
           if partial then update new_gamma var v_type
           else if Names.is_lvar_name var then (
             let new_lvar = LVar.alloc () in
-            SSubst.put subst var (LVar new_lvar);
-            update new_gamma new_lvar v_type ));
+            SESubst.put subst evar (LVar new_lvar);
+            update new_gamma new_lvar v_type));
   new_gamma
 
 let to_list_expr (x : t) : (Expr.t * Type.t) list =
@@ -150,4 +159,9 @@ let reset (x : t) (reset : (Var.t * Type.t) list) =
   Hashtbl.clear x;
   List.iter (fun (y, t) -> Hashtbl.replace x y t) reset
 
-let is_well_formed (x : t) : bool = true
+let is_well_formed (_ : t) : bool = true
+
+let filter_with_info relevant_info (x : t) =
+  let pvars, lvars, locs = relevant_info in
+  let relevant = List.fold_left SS.union SS.empty [ pvars; lvars; locs ] in
+  filter x (fun x -> SS.mem x relevant)

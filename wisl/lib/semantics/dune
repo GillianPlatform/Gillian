@@ -1,4 +1,4 @@
 (library
  (name wSemantics)
  (libraries wSyntax wUtils gillian)
- (flags -open WUtils))
+ (flags :standard -open WUtils))

@@ -21,7 +21,7 @@ val mem : t -> Formula.t -> bool
 (** [extend pfs f] extends the pure formulae [pfs] with the formula [f] *)
 val extend : t -> Formula.t -> unit
 
-(* 
+(*
 (** [nth_get pfs n] returns the n-th pure formula of [pfs] *)
 val nth_get : t -> int -> Formula.t
 
@@ -56,7 +56,7 @@ val fold_left : ('a -> Formula.t -> 'a) -> 'a -> t -> 'a
 val map_inplace : (Formula.t -> Formula.t) -> t -> unit
 
 (** [substitution subst pfs] substitutes the substutition subst in the pure formulae [pfs] in-place *)
-val substitution : SVal.SSubst.t -> t -> unit
+val substitution : SVal.SESubst.t -> t -> unit
 
 (** [subst_expr_for_expr e_to_subst e_subst pfs] substitutes the expression [e_to_subst] with the expression [e_subst] in the pure formulae [pfs] in-place *)
 val subst_expr_for_expr : Expr.t -> Expr.t -> t -> unit
@@ -74,10 +74,28 @@ val clocs : t -> Containers.SS.t
 (** [pp fmt pfs] prints the pure formulae [pfs] *)
 val pp : Format.formatter -> t -> unit
 
+(** [pp pvars lvars locs fmt pfs] prints the pure formulae [pfs] relevnt to [pvars], [lvars] and [locs] *)
+val pp_by_need :
+  Containers.SS.t * Containers.SS.t * Containers.SS.t ->
+  Format.formatter ->
+  t ->
+  unit
+
+(** [filter_with_info pvars lvars locs pfs] returns only the pfs relevant to [pvars], [lvars], and [locs]*)
+val filter_with_info :
+  Containers.SS.t * Containers.SS.t * Containers.SS.t -> t -> t
+
 (** [sort pfs] sorts the pure formulae [pfs] *)
 val sort : t -> unit
 
 val remove_duplicates : t -> unit
+
+val get_relevant_info :
+  Containers.SS.t ->
+  Containers.SS.t ->
+  Containers.SS.t ->
+  t ->
+  Containers.SS.t * Containers.SS.t * Containers.SS.t
 
 val filter_map_stop :
   (Formula.t -> [ `Stop | `Filter | `Replace of Formula.t ]) -> t -> bool

@@ -89,9 +89,14 @@ proc i__valid_pointer(b, o) {
 };
 
 proc i__weak_valid_ptr(b, o) {
-      x := "i__valid_pointer"(b, o);
-      y := "i__valid_pointer"(b, o - 1);
-      ret := x or y;
+      res := [mem_weakvalidpointer](b, o);
+      ret := l-nth(res, 0.);
+      return
+};
+
+proc i__ef_memcpy(sz, al, bdst, bsrc) {
+      (* FIXME: It should also check alignment with respect to pointers *)
+      ret := [mem_move](l-nth(bdst, 0.), l-nth(bdst, 1.), l-nth(bsrc, 0.), l-nth(bsrc, 1.), sz);
       return
 };
 

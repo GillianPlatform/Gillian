@@ -45,7 +45,7 @@ let post_parse_lcmd (cmd : Annot.t * string option * LabCmd.t) :
             LCmd.Macro (JS2JSIL_Helpers.macro_GPVU_name, [ r_arg ])
           in
           [ (annot, lab, cmd); (annot, None, LLogic unfold_macro) ]
-      | LCall (_, Lit (String p_name), [ loc_arg; _ ], _, _)
+      | LCall (_, Lit (String p_name), [ _; _ ], _, _)
         when p_name = JS2JSIL_Helpers.hasPropertyName ->
           [
             (annot, lab, cmd);
@@ -53,7 +53,7 @@ let post_parse_lcmd (cmd : Annot.t * string option * LabCmd.t) :
               None,
               LLogic (SL (GUnfold JS2JSIL_Helpers.pi_predicate_name)) );
           ]
-      | _ -> [ (annot, lab, cmd) ] )
+      | _ -> [ (annot, lab, cmd) ])
 
 let post_parse_eproc (eproc : EProc.t) : EProc.t =
   let new_body =
@@ -86,7 +86,7 @@ let expr_from_fid (fid : string) : Expr.t =
 let make_sc (vis_list : string list) : Expr.t list =
   let chopped_vis_list =
     match List.rev vis_list with
-    | x :: xs -> List.rev xs
+    | _ :: xs -> List.rev xs
     | _       -> []
   in
   List.map expr_from_fid chopped_vis_list
@@ -144,7 +144,7 @@ let scope_info_to_assertion
   let vis_list = Jslogic.JSLogicCommon.get_vis_list vis_tbl fid in
   let sc_bindings =
     match List.rev (List.map expr_from_fid vis_list) with
-    | x :: les -> List.rev les
+    | _ :: les -> List.rev les
     | _        -> raise
                     (Failure "DEATH. EMPTY VIS LIST. scope_info_to_assertion")
   in
@@ -216,11 +216,11 @@ let create_pre_scope_pred
     (cc_tbl : Jslogic.JSLogicCommon.cc_tbl_type)
     (vis_tbl : Jslogic.JSLogicCommon.vis_tbl_type)
     (fid : string)
-    (args : SS.t) : Pred.t =
+    (_ : SS.t) : Pred.t =
   let vis_list = Jslogic.JSLogicCommon.get_vis_list vis_tbl fid in
   let sc_bindings =
     match List.rev (List.map expr_from_fid vis_list) with
-    | x :: les -> List.rev les
+    | _ :: les -> List.rev les
     | _        -> raise
                     (Failure "DEATH. EMPTY VIS LIST. scope_info_to_assertion")
   in
@@ -276,12 +276,15 @@ let create_pre_scope_pred
     params;
     ins = [ 0 ];
     definitions = [ (None, Asrt.star (a_schain :: a_vars)) ];
+    facts = [];
     pure = false;
+    abstract = false;
+    nounfold = false;
     normalised = false;
   }
 
 let create_function_predicate
-    (cc_tbl : Jslogic.JSLogicCommon.cc_tbl_type)
+    (_ : Jslogic.JSLogicCommon.cc_tbl_type)
     (vis_tbl : Jslogic.JSLogicCommon.vis_tbl_type)
     (fid : string)
     (fparams : string list) : Pred.t =
@@ -311,7 +314,10 @@ let create_function_predicate
     params = [ ("x", None) ];
     ins = [ 0 ];
     definitions = [ (None, Asrt.star [ fo_asrt; proto_asrt ]) ];
+    facts = [];
     pure = false;
+    abstract = false;
+    nounfold = false;
     normalised = false;
   }
 
@@ -328,11 +334,11 @@ let create_function_predicate
 *)
 
 let create_post_scope_pred
-    (eprog : EProg.t)
+    (_ : EProg.t)
     (cc_tbl : Jslogic.JSLogicCommon.cc_tbl_type)
-    (vis_tbl : Jslogic.JSLogicCommon.vis_tbl_type)
+    (_ : Jslogic.JSLogicCommon.vis_tbl_type)
     (fid : string)
-    (args : SS.t) : Pred.t =
+    (_ : SS.t) : Pred.t =
   (* let args = SS.diff args (SS.of_list [ JS2JSIL_Helpers.var_this; JS2JSIL_Helpers.var_scope ]) in  *)
   let vis_tbl = Jslogic.JSLogicCommon.get_scope_table cc_tbl fid in
   let all_params, out_params, in_params =
@@ -393,7 +399,10 @@ let create_post_scope_pred
     ins = [ 0; 1 ];
     definitions =
       [ (None, Asrt.star (pre_scope_asrt :: (args_asrts @ er_asrts))) ];
+    facts = [];
     pure = false;
+    abstract = false;
+    nounfold = false;
     normalised = false;
   }
 
@@ -435,9 +444,9 @@ let bi_post_parse_cmd (cmd : Annot.t * string option * LabCmd.t) :
   | _            -> [ (annot, lab, cmd) ]
 
 let bi_post_parse_eproc
-    (eprog : EProg.t)
-    (cc_tbl : Jslogic.JSLogicCommon.cc_tbl_type)
-    (vis_tbl : Jslogic.JSLogicCommon.vis_tbl_type)
+    (_ : EProg.t)
+    (_ : Jslogic.JSLogicCommon.cc_tbl_type)
+    (_ : Jslogic.JSLogicCommon.vis_tbl_type)
     (eproc : EProc.t) : EProc.t =
   let new_body =
     Array.of_list

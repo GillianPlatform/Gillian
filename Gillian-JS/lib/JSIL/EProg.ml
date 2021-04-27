@@ -1,7 +1,7 @@
 module L = Logging
 
 type t = {
-  imports : string list;
+  imports : (string * bool) list;
   (* Import statements = [Filename : String] *)
   lemmas : (string, Lemma.t) Hashtbl.t;
   (* Lemmas *)
@@ -19,7 +19,7 @@ type t = {
 }
 
 let init
-    (imports : string list)
+    (imports : (string * bool) list)
     (lemmas : (string, Lemma.t) Hashtbl.t)
     (preds : (string, Pred.t) Hashtbl.t)
     (only_specs : (string, Spec.t) Hashtbl.t)
@@ -84,16 +84,16 @@ let pp fmt prog =
   (* let _ = List.for_all (fun name -> Hashtbl.mem prog.procs name) (prog.proc_names) in *)
   let pp_only_spec fmt' spec = Fmt.pf fmt' "only %a" Spec.pp spec in
   Fmt.pf fmt "%a@\n@\n@\n%a@\n@\n@\n%a@\n@\n@\n%a@\n@\n@\n%a@\n@\n@\n%a"
-    pp_imports prog.imports (pp_list Lemma.pp) (get_lemmas prog)
-    (pp_list Pred.pp) (get_preds prog) (pp_list pp_only_spec) (get_ospecs prog)
-    (pp_list BiSpec.pp) (get_bispecs prog) (pp_list EProc.pp)
+    pp_imports
+    (let imports, _ = List.split prog.imports in
+     imports)
+    (pp_list Lemma.pp) (get_lemmas prog) (pp_list Pred.pp) (get_preds prog)
+    (pp_list pp_only_spec) (get_ospecs prog) (pp_list BiSpec.pp)
+    (get_bispecs prog) (pp_list EProc.pp)
     (get_procs ~proc_names:prog.proc_names prog)
 
-let line_info (prog : t) : (string * int * int) list =
-  List.concat (List.map EProc.line_info (get_procs prog))
-
 let update_imports (prog : t) (imports : string list) : t =
-  { prog with imports }
+  { prog with imports = List.map (fun i -> (i, false)) imports }
 
 let add_lemma (prog : t) (lemma : Lemma.t) : t =
   Hashtbl.add prog.lemmas lemma.name lemma;

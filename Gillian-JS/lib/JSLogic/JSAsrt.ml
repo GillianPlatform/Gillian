@@ -86,7 +86,8 @@ let rec js2jsil
   | PointsTo (le1, le2, le3) -> Asrt.PointsTo (fe le1, fe le2, fe le3)
   | MetaData (le1, le2) -> Asrt.MetaData (fe le1, fe le2)
   | Emp -> Asrt.Emp
-  | Types vts -> Asrt.Types (List.map (fun (v, t) -> (Expr.LVar v, t)) vts)
+  | Types vts ->
+      Asrt.Types (List.map (fun (v, t) -> (Expr.from_var_name v, t)) vts)
   | EmptyFields (e, domain) -> Asrt.EmptyFields (fe e, fe domain)
   | Pred (name, [ loc; Lit (String fid); sch; args_len; fproto ])
     when name = "JSFunctionObject" || name = "JSFunctionObjectStrong" ->
@@ -210,7 +211,7 @@ let rec js2jsil
       assert (
         let x0, _, _ = List.hd fsclens in
         let x1, _, _ = List.hd (List.tl fsclens) in
-        x0 < x1 );
+        x0 < x1);
 
       let fsclens =
         List.mapi
@@ -261,7 +262,7 @@ let errors_assertion () =
     ( Pred (type_error_pred_name, [ PVar var_te ]),
       Pred (syntax_error_pred_name, [ PVar var_se ]) )
 
-let rec js2jsil_tactic
+let js2jsil_tactic
     (cc_tbl : cc_tbl_type)
     (vis_tbl : vis_tbl_type)
     (fun_tbl : pre_fun_tbl_type)
@@ -271,7 +272,7 @@ let rec js2jsil_tactic
   let vis_list = get_vis_list vis_tbl fid in
   let scope_chain_list = vislist_2_les vis_list (List.length vis_list) in
   let a' =
-    js2jsil (Some fid) cc_tbl vis_tbl fun_tbl (Some (Expr.LVar scope_var)) a
+    js2jsil (Some fid) cc_tbl vis_tbl fun_tbl (Some (Expr.PVar scope_var)) a
   in
 
   (*  x__scope == {{ #x1, ..., #xn }} *)

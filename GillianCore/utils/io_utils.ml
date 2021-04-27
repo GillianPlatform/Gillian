@@ -6,7 +6,7 @@ let rec rm_r path =
   if Sys.is_directory path then (
     Sys.readdir path
     |> Array.iter (fun fname -> rm_r (Filename.concat path fname));
-    Unix.rmdir path )
+    Unix.rmdir path)
   else Sys.remove path
 
 let rm_rf path = if Sys.file_exists path then rm_r path
@@ -54,6 +54,6 @@ let get_files path =
             walk acc_files (rest @ content)
         | _     ->
             (* p is something else that we'll ignore *)
-            walk acc_files rest )
+            walk acc_files rest)
   in
   walk [] [ path ]

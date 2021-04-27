@@ -68,8 +68,8 @@ module Make_with_prefix
       A.of_string (String.sub str lp (l - lp))
     else
       failwith
-        ( "This allocated value doesn't start with prefix " ^ P.prefix
-        ^ " as expected" )
+        ("This allocated value doesn't start with prefix " ^ P.prefix
+       ^ " as expected")
 
   let alloc () = construct (A.alloc ())
 

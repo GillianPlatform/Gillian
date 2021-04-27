@@ -6,6 +6,16 @@
     "stdlib.h": "c",
     "stdio.h": "c",
     "slist.h": "c",
-    "algorithm": "c"
+    "algorithm": "c",
+    "__bit_reference": "cpp",
+    "__string": "cpp",
+    "cstring": "cpp",
+    "tuple": "c",
+    "string.h": "c"
+  },
+  "python.pythonPath": "/usr/bin/python3",
+  "ocaml.sandbox": {
+    "kind": "esy",
+    "root": "${workspaceFolder:Gillian}"
   }
 }

@@ -13,37 +13,26 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>
 *)
 
-module type EqType = sig
-  type t
+type 'a t
 
-  val equal : t -> t -> bool
+(** [init] initialises a new, empty union-find *)
+val init :
+  priority:('a -> 'a -> [ `Lower | `Greater | `Eq ]) ->
+  equal:('a -> 'a -> bool) ->
+  'a t
 
-  val priority : t -> t -> int
-end
+(** [copy uf] copies the given union-find *)
+val copy : 'a t -> 'a t
 
-module type S = sig
-  type elt
+(** [add uf e] creates a new element [e] in the union-find [uf] *)
+val add : 'a t -> 'a -> unit
 
-  type t
+(** [rep uf e] finds the representative of node [e] in the union-find [uf] *)
+val rep : 'a t -> 'a -> 'a
 
-  (** [init ()] initialises a new, empty union-find *)
-  val init : unit -> t
-
-  (** [copy uf] copies the given union-find *)
-  val copy : t -> t
-
-  (** [add uf e] creates a new element [e] in the union-find [uf] *)
-  val add : t -> elt -> unit
-
-  (** [rep uf e] finds the representative of node [e] in the union-find [uf] *)
-  val rep : t -> elt -> elt
-
-  (** [union uf e1 e2] merges elements [e1] and [e2] in the 
+(** [union uf e1 e2] merges elements [e1] and [e2] in the 
         union-find [uf], performing path compression along the way. *)
-  val union : t -> elt -> elt -> unit
+val union : 'a t -> 'a -> 'a -> unit
 
-  (** [fold f ac uf] folds over the union find uf *)
-  val fold : ('a -> elt * elt -> 'a) -> 'a -> t -> 'a
-end
-
-module Make (Eq : EqType) : S with type elt = Eq.t
+(** [fold f ac uf] folds over the union find uf *)
+val fold : ('acc -> 'a * 'a -> 'acc) -> 'acc -> 'a t -> 'acc

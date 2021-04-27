@@ -1,5 +1,7 @@
 (** {b GIL logic commands}. *)
 
+module SS = Containers.SS
+
 type t = TypeDef__.lcmd =
   | If         of Expr.t * t list * t list  (** If-then-else     *)
   | Branch     of Formula.t  (** branching on a FO formual *)
@@ -36,15 +38,54 @@ let rec map
   | SpecVar _      -> mapped_lcmd
   | SL sl_cmd      -> SL (map_sl sl_cmd)
 
+let fold = List.fold_left SS.union SS.empty
+
+let rec pvars (lcmd : t) : SS.t =
+  let pvars_es es = fold (List.map Expr.pvars es) in
+  let pvars_lcmds es = fold (List.map pvars es) in
+  match lcmd with
+  | If (e, lthen, lelse) ->
+      SS.union (Expr.pvars e) (SS.union (pvars_lcmds lthen) (pvars_lcmds lelse))
+  | Macro (_, es) -> pvars_es es
+  | Branch pf | Assert pf | Assume pf -> Formula.pvars pf
+  | AssumeType (x, _) ->
+      if Names.is_pvar_name x then SS.singleton x else SS.empty
+  | SpecVar _ -> SS.empty
+  | SL slcmd -> SLCmd.pvars slcmd
+
+let rec lvars (lcmd : t) : SS.t =
+  let lvars_es es = fold (List.map Expr.lvars es) in
+  let lvars_lcmds es = fold (List.map lvars es) in
+  match lcmd with
+  | If (e, lthen, lelse) ->
+      SS.union (Expr.lvars e) (SS.union (lvars_lcmds lthen) (lvars_lcmds lelse))
+  | Macro (_, es) -> lvars_es es
+  | Branch pf | Assert pf | Assume pf -> Formula.lvars pf
+  | AssumeType (x, _) ->
+      if Names.is_lvar_name x then SS.singleton x else SS.empty
+  | SpecVar svars -> SS.of_list svars
+  | SL slcmd -> SLCmd.lvars slcmd
+
+let rec locs (lcmd : t) : SS.t =
+  let locs_es es = fold (List.map Expr.locs es) in
+  let locs_lcmds es = fold (List.map locs es) in
+  match lcmd with
+  | If (e, lthen, lelse) ->
+      SS.union (Expr.locs e) (SS.union (locs_lcmds lthen) (locs_lcmds lelse))
+  | Macro (_, es) -> locs_es es
+  | Branch pf | Assert pf | Assume pf -> Formula.locs pf
+  | AssumeType _ -> SS.empty
+  | SpecVar svars -> SS.of_list svars
+  | SL slcmd -> SLCmd.locs slcmd
+
 let rec pp fmt lcmd =
   let pp_list = Fmt.list ~sep:Fmt.semi pp in
   let pp_params = Fmt.list ~sep:Fmt.comma Expr.pp in
   match lcmd with
   | If (le, then_lcmds, else_lcmds) ->
       if List.length else_lcmds > 0 then
-        Fmt.pf fmt
-          "@[<hov 2>if (@[<h>%a@]) then {@\n%a@]@\n@[<hov 2>} else {@\n%a@]@\n}"
-          Expr.pp le pp_list then_lcmds pp_list else_lcmds
+        Fmt.pf fmt "@[<hov 2>if (%a) then {@ %a@]@ @[<hov 2>} else {@ %a@]@ }"
+          (Fmt.hbox Expr.pp) le pp_list then_lcmds pp_list else_lcmds
       else
         Fmt.pf fmt "if (@[<h>%a@]) @[<hov 2>then {@\n%a@]@\n}" Expr.pp le
           pp_list then_lcmds

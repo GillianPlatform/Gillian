@@ -47,7 +47,11 @@
       "sh -c \"esy js:init:env && esy c:init:env && esy wisl:init:env\"",
     "test": "dune test -j 4",
     "install-githooks": "./githooks/install.ml",
-    "clean-githooks": "./githooks/clean.ml"
+    "clean-githooks": "./githooks/clean.ml",
+    "clean": "dune clean",
+    "check-exceptions": "reanalyze.exe -exception-cmt .",
+    "dce": "reanalyze.exe -dce-cmt .",
+    "watch": "dune build @install --promote-install-files --watch"
   },
   "dependencies": {
     "@opam/alcotest": "1.0.1",
@@ -55,27 +59,26 @@
     "@opam/cmdliner": "^1.0.4",
     "@opam/dune": "^2.0",
     "@opam/fmt": "^0.8.8",
-    "@opam/menhir": "*",
-    "@opam/oUnit": "*",
-    "@opam/ppx_yojson_conv": "v0.13.0",
+    "@opam/menhir": "20190924",
+    "@opam/ppx_deriving_yojson": "*",
+    "@opam/ppxlib": ">=0.18.0",
+    "@opam/printbox": "0.5",
     "@opam/uuidm": "0.9.7",
-    "@opam/visitors": "20190711",
+    "@opam/visitors": "git+https://gitlab.inria.fr/fpottier/visitors.git:visitors.opam#07caa558415e54ac1a9186e21bbf4014a3c5fcee",
     "@opam/yojson": "^1.7.0",
     "@opam/z3": "giltho/esy-z3#b0fdd9a",
-    "@reason-native/rely": "^3.1.0",
-    "JS_Parser": "GillianPlatform/JS_Parser#ba9b69",
+    "JS_Parser": "GillianPlatform/JS_Parser#ba757f2ee220101f59f371e83bcfbb55675f233a",
     "compcert": "giltho/CompCert#6bdcc61",
-    "ocaml": "^4.10.0"
+    "ocaml": "^4.12.x"
   },
   "devDependencies": {
-    "ocaml": "4.10.0",
-    "@opam/ocamlfind": "1.8.1",
-    "@opam/cmitomli": "1.0.0",
-    "@opam/fileutils": "0.6.2",
+    "ocaml": "4.12.x",
+    "@opam/cmitomli": "*",
+    "@opam/fileutils": "*",
     "@opam/utop": "*",
-    "@opam/shexp": "v0.13.0",
-    "@opam/merlin": "*",
+    "@opam/shexp": "v0.14.0",
+    "@opam/ocaml-lsp-server": "*",
     "@opam/odoc": "*",
-    "@opam/ocamlformat": "0.14.2"
+    "@opam/ocamlformat": "0.16.0"
   }
 }

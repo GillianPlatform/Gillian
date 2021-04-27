@@ -36,10 +36,10 @@ module M : Memory_S = struct
     match obj with
     | None          -> raise (Failure "C Heap Update: object not found")
     | Some (obj, _) ->
-        ( match v with
+        (match v with
         | None -> CObject.remove obj prop
         | Some v when Values.to_literal v = Some Nono -> CObject.remove obj prop
-        | Some v -> CObject.set obj prop v );
+        | Some v -> CObject.set obj prop v);
         ASucc (heap, [])
 
   let get_cell ?(remove : bool option) (heap : t) (loc : vt) (prop : vt) :
@@ -60,11 +60,8 @@ module M : Memory_S = struct
           let v = Option.value ~default:Literal.Nono (CObject.get obj prop) in
           ASucc (heap, [ Loc loc; String prop; v ])
 
-  let get_domain
-      ?(expected_props : vt option)
-      ?(remove : bool option)
-      (heap : t)
-      (loc : vt) : action_ret =
+  let get_domain ?expected_props:_ ?(remove : bool option) (heap : t) (loc : vt)
+      : action_ret =
     let loc =
       match loc with
       | Loc loc -> loc
@@ -100,23 +97,6 @@ module M : Memory_S = struct
       match CHeap.get heap loc with
       | None         -> AFail []
       | Some (_, vm) -> ASucc (heap, [ Loc loc; vm ])
-
-  let set_domain (heap : t) (loc : vt) (dom : vt) : action_ret =
-    raise (Failure "domain_update illegal in concrete semantics")
-
-  let set_metadata (heap : t) (loc : vt) (mtdt : vt) : action_ret =
-    let loc =
-      match loc with
-      | Loc loc -> loc
-      | _       -> raise (Failure "Illegal metadata_update")
-    in
-    let obj =
-      match CHeap.get heap loc with
-      | None          -> raise (Failure "Illegal metadata_update")
-      | Some (obj, _) -> obj
-    in
-    CHeap.set heap loc (obj, mtdt);
-    ASucc (heap, [])
 
   let delete_object (heap : t) (loc : vt) : action_ret =
     let loc =
@@ -200,18 +180,18 @@ module M : Memory_S = struct
     else raise (Failure "DEATH. ga_to_setter")
 
   (** Non-implemented functions *)
-  let assertions ?to_keep (heap : t) : Asrt.t list =
+  let assertions ?to_keep:_ (_ : t) : Asrt.t list =
     raise (Failure "ERROR: to_assertions called for concrete executions")
 
-  let lvars heap =
+  let lvars _ =
     raise (Failure "ERROR: get_lvars called for concrete executions")
 
-  let clean_up (heap : t) = raise (Failure "Cleanup of concrete state.")
+  let clean_up (_ : t) = raise (Failure "Cleanup of concrete state.")
 
-  let fresh_val (heap : t) =
+  let fresh_val (_ : t) =
     raise (Failure "fresh_val not implemented in concrete state")
 
-  let substitution_in_place (subst : st) (heap : t) : unit = ()
+  let substitution_in_place (_ : st) (_ : t) : unit = ()
 
   let is_overlapping_asrt (a : string) : bool =
     if a = JSILNames.aMetadata then true else false

@@ -25,9 +25,9 @@ type pre_fun_tbl_type =
     * string list
     * JS_Parser.Syntax.exp option
     * bool
-    * ( JS_Parser.Syntax.annotation list
+    * (JS_Parser.Syntax.annotation list
       * string list
-      * (string, string) Hashtbl.t ) )
+      * (string, string) Hashtbl.t) )
   Hashtbl.t
 
 type vis_tbl_type = (string, string list) Hashtbl.t
@@ -72,9 +72,15 @@ let var_te = "x__te"
 
 let var_se = "x__se"
 
+let var_er = "x__er"
+
 let var_this = "x__this"
 
 let var_scope = "x__scope"
+
+let logic_var_scope = "#x__scope"
+
+let var_scope_final = "x__scope_f"
 
 let funobj_pred_name = "JSFunctionObject"
 
@@ -91,7 +97,7 @@ let fid_to_lvar_fresh =
     Hashtbl.replace fids_tbl fid (fid_count + 1);
     "#fid_" ^ string_of_int fid_count ^ "_" ^ fid
 
-let vislist_2_les (vis_list : string list) (i : int) : Expr.t list =
+let vislist_2_les (_ : string list) (i : int) : Expr.t list =
   Array.to_list
     (Array.init i (fun j ->
          if j = 0 then Expr.Lit (Loc locGlobName)

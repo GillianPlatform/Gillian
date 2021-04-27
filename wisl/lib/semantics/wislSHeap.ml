@@ -47,7 +47,8 @@ let merge_loc heap new_loc old_loc =
   let () = set_fvl heap new_loc sfvl in
   remove heap old_loc
 
-let substitution_in_place subst heap =
+let substitution_in_place subst heap :
+    (t * Formula.Set.t * (string * Type.t) list) list =
   (* First we replace in the offset and values using fvl *)
   let () =
     Hashtbl.iter
@@ -56,9 +57,17 @@ let substitution_in_place subst heap =
   in
   (* Then we replace within the locations themselves *)
   let aloc_subst =
-    Subst.filter subst (fun var _ -> Gillian.Utils.Names.is_aloc_name var)
+    Subst.filter subst (fun var _ ->
+        match var with
+        | ALoc _ -> true
+        | _      -> false)
   in
   Subst.iter aloc_subst (fun aloc new_loc ->
+      let aloc =
+        match aloc with
+        | ALoc loc -> loc
+        | _        -> raise (Failure "Impossible by construction")
+      in
       let new_loc_str =
         match new_loc with
         | Expr.Lit (Literal.Loc loc) -> loc
@@ -69,7 +78,8 @@ let substitution_in_place subst heap =
                  (Printf.sprintf "Heap substitution fail for loc: %s"
                     ((WPrettyUtils.to_str Expr.pp) new_loc)))
       in
-      merge_loc heap new_loc_str aloc)
+      merge_loc heap new_loc_str aloc);
+  [ (heap, Formula.Set.empty, []) ]
 
 let assertions heap =
   let constr loc offset value =

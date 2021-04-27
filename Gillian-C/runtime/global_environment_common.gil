@@ -1,5 +1,13 @@
 #internal
 
+pred i__glob_var_unallocated(+symb, +vname):
+      <genv_symb>(symb; #l) *
+      <genv_def>(#l; {{ "variable", vname }});
+      
+pred i__glob_var_unallocated_loc(+symb, loc, +vname):
+      <genv_symb>(symb; loc) *
+      <genv_def>(loc; {{ "variable", vname }});
+
 proc i__get_function_name(v_ptr) {
          (* The value given should be a pointer *)
          goto [not (typeOf (l-nth (v_ptr, 0.)) = Obj)] fail1 ctn1;

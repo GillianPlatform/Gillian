@@ -40,7 +40,7 @@ let prioritise (a1 : t) (a2 : t) =
         | true, true   -> 0
         | true, false  -> -1
         | false, true  -> 1
-        | false, false -> Stdlib.compare e1 e2 )
+        | false, false -> Stdlib.compare e1 e2)
     | _, _                     -> Stdlib.compare e1 e2
   in
 
@@ -60,7 +60,7 @@ end
 
 module Set = Set.Make (MyAssertion)
 
-(** Deprecated, use {!Visitors.map} instead. *)
+(** Deprecated, use {!Visitors.endo} instead. *)
 let rec map
     (f_a_before : (t -> t * bool) option)
     (f_a_after : (t -> t) option)
@@ -89,147 +89,74 @@ let rec map
     in
     f_a_after a''
 
-let rec fold
-    (feo : (Expr.t -> 'a) option)
-    (fpo : (Formula.t -> 'a) option)
-    (f_ac : t -> 'b -> 'b -> 'a list -> 'a)
-    (f_state : (t -> 'b -> 'b) option)
-    (state : 'b)
-    (asrt : t) : 'a =
-  let new_state = (Option.value ~default:(fun _ x -> x) f_state) asrt state in
-  let fold_a = fold feo fpo f_ac f_state new_state in
-  let f_ac = f_ac asrt new_state state in
-  let fes les = Option.fold ~some:(fun fe -> List.map fe les) ~none:[] feo in
-  let fp form = Option.fold ~some:(fun fp -> [ fp form ]) ~none:[] fpo in
-
-  (* Not convinced these are correct *)
-  match asrt with
-  | Emp              -> f_ac []
-  | Pred (_, les)    -> f_ac (fes les)
-  | Star (a1, a2)    -> f_ac [ fold_a a1; fold_a a2 ]
-  | Pure form        -> f_ac (fp form)
-  | Types vts        ->
-      let les, _ = List.split vts in
-      f_ac (fes les)
-  | GA (_, es1, es2) -> f_ac (fes (es1 @ es2))
-
-(* Get all the logical expressions of --a-- of the form (Lit (LList lst)) and (EList lst)  *)
-let lists (a : t) : Expr.t list =
-  let f_ac _ _ _ ac = List.concat ac in
-  let fe = Expr.lists in
-  let fp = Formula.fold (Some fe) f_ac None None in
-  fold (Some fe) (Some fp) f_ac None None a
-
 (* Get all the logical expressions of --a-- that denote a list
    and are not logical variables *)
-let list_lexprs (a : t) : Expr.t list =
-  let fe_ac le _ _ ac =
-    match le with
-    | Expr.Lit (LList _)
-    | Expr.EList _
-    | Expr.NOp (LstCat, _)
-    | Expr.UnOp (Car, _)
-    | Expr.UnOp (Cdr, _)
-    | Expr.UnOp (LstLen, _) -> le :: List.concat ac
-    | _ -> List.concat ac
-  in
-
-  let fe = Expr.fold fe_ac None None in
-  let f_ac _ _ _ ac = List.concat ac in
-  let fp = Formula.fold (Some fe) f_ac None None in
-  fold (Some fe) (Some fp) f_ac None None a
+let list_lexprs (a : t) : Expr.Set.t =
+  Formula.list_lexprs_collector#visit_assertion () a
 
 (* Get all the logical variables in --a-- *)
 let lvars (a : t) : SS.t =
-  let fe_ac (le : Expr.t) _ _ (ac : string list list) : string list =
-    match le with
-    | Expr.LVar x -> [ x ]
-    | _           -> List.concat ac
-  in
-  let fe = Expr.fold fe_ac None None in
-  let fp f = SS.elements (Formula.lvars f) in
-  let f_ac _ _ _ ac = List.concat ac in
-  SS.of_list (fold (Some fe) (Some fp) f_ac None None a)
+  Visitors.Collectors.lvar_collector#visit_assertion SS.empty a
 
 (* Get all the program variables in --a-- *)
 let pvars (a : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | Expr.PVar x -> [ x ]
-    | _           -> List.concat ac
-  in
-  let fe = Expr.fold fe_ac None None in
-  let f_ac _ _ _ ac = List.concat ac in
-  let fp = Formula.fold (Some fe) f_ac None None in
-  SS.of_list (fold (Some fe) (Some fp) f_ac None None a)
+  Visitors.Collectors.pvar_collector#visit_assertion () a
 
 (* Get all the abstract locations in --a-- *)
 let alocs (a : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | Expr.ALoc l -> l :: List.concat ac
-    | _           -> List.concat ac
-  in
-  let fe = Expr.fold fe_ac None None in
-  let f_ac _ _ _ ac = List.concat ac in
-  let fp = Formula.fold (Some fe) f_ac None None in
-  SS.of_list (fold (Some fe) (Some fp) f_ac None None a)
+  Visitors.Collectors.aloc_collector#visit_assertion () a
 
 (* Get all the concrete locations in [a] *)
 let clocs (a : t) : SS.t =
-  let fe_ac le _ _ ac =
-    match le with
-    | Expr.Lit (Loc l) -> l :: List.concat ac
-    | _                -> List.concat ac
-  in
-  let fe = Expr.fold fe_ac None None in
-  let f_ac _ _ _ ac = List.concat ac in
-  let fp = Formula.fold (Some fe) f_ac None None in
-  SS.of_list (fold (Some fe) (Some fp) f_ac None None a)
+  Visitors.Collectors.cloc_collector#visit_assertion () a
+
+(* Get all the concrete locations in [a] *)
+let locs (a : t) : SS.t =
+  Visitors.Collectors.loc_collector#visit_assertion SS.empty a
 
 (* Get all the variables in [a] *)
 let vars (a : t) : SS.t =
-  let vars = [ alocs a; clocs a; lvars a; pvars a ] in
-  List.fold_left SS.union SS.empty vars
+  Visitors.Collectors.loc_collector#visit_assertion SS.empty a
 
 (* Returns a list with the names of the predicates that occur in --a-- *)
 let pred_names (a : t) : string list =
-  let f_ac a _ _ ac =
-    match a with
-    | Pred (s, _) -> s :: List.concat ac
-    | _           -> List.concat ac
+  let collector =
+    object
+      inherit [_] Visitors.reduce
+
+      inherit Visitors.Utils.non_ordered_list_monoid
+
+      method! visit_Pred () name _ = [ name ]
+    end
   in
-  fold None None f_ac None None a
+  collector#visit_assertion () a
 
 (* Returns a list with the pure assertions that occur in --a-- *)
 let pure_asrts (a : t) : Formula.t list =
-  let f_ac a _ _ ac =
-    match a with
-    | Pure form -> form :: List.concat ac
-    | _         -> List.concat ac
-  in
-  fold None None f_ac None None a
+  let collector =
+    object
+      inherit [_] Visitors.reduce
 
-(* Returns a list with the pure assertions that occur in --a-- *)
-let simple_asrts (a : t) : t list =
-  let f_ac a _ _ ac =
-    match a with
-    | Star _ -> List.concat ac
-    | Emp    -> []
-    | a      -> [ a ]
+      inherit Visitors.Utils.non_ordered_list_monoid
+
+      method! visit_Pure () f = [ f ]
+    end
   in
-  fold None None f_ac None None a
+  collector#visit_assertion () a
+
+(* Returns a list with the simple assertions that occur in --a-- *)
+let rec simple_asrts (a : t) : t list =
+  match a with
+  | Emp           -> []
+  | Star (a1, a2) -> simple_asrts a1 @ simple_asrts a2
+  | _             -> [ a ]
 
 (* Check if --a-- is a pure assertion *)
-let is_pure_asrt (a : t) : bool =
-  let f_ac a _ _ (ac : bool list) : bool =
-    match a with
-    | Pred _ | GA _ -> false
-    | _             -> List.for_all (fun b -> b) ac
-  in
-  let aux = fold None None f_ac None None in
-  let ret = aux a in
-  ret
+let rec is_pure_asrt (a : t) : bool =
+  match a with
+  | Pred _ | GA _ -> false
+  | Star (a1, a2) -> is_pure_asrt a1 && is_pure_asrt a2
+  | _             -> true
 
 (* Check if --a-- is a pure assertion & non-recursive assertion.
    It assumes that only pure assertions are universally quantified *)
@@ -255,6 +182,22 @@ let make_pure (a : t) : Formula.t =
     in
     Formula.conjunct fs
   else raise (Failure "DEATH. make_pure")
+
+let rec full_pp fmt a =
+  match a with
+  | Star (a1, a2)       -> Fmt.pf fmt "%a *@ %a" full_pp a1 full_pp a2
+  | Emp                 -> Fmt.string fmt "emp"
+  | Pred (name, params) ->
+      Fmt.pf fmt "@[<h>%s(%a)@]" name
+        (Fmt.list ~sep:Fmt.comma Expr.full_pp)
+        params
+  | Types tls           ->
+      let pp_tl f (e, t) = Fmt.pf f "%a : %s" Expr.full_pp e (Type.str t) in
+      Fmt.pf fmt "types(@[%a@])" (Fmt.list ~sep:Fmt.comma pp_tl) tls
+  | Pure f              -> Formula.full_pp fmt f
+  | GA (a, ins, outs)   ->
+      let pp_e_l = Fmt.list ~sep:Fmt.comma Expr.full_pp in
+      Fmt.pf fmt "@[<h><%s>(%a; %a)@]" a pp_e_l ins pp_e_l outs
 
 (** GIL logic assertions *)
 let rec pp fmt a =
@@ -282,3 +225,22 @@ let subst_clocs (subst : string -> Expr.t) (a : t) : t =
     (Some (Expr.subst_clocs subst))
     (Some (Formula.subst_clocs subst))
     a
+
+let subst_expr_for_expr ~(to_subst : Expr.t) ~(subst_with : Expr.t) (a : t) : t
+    =
+  map None None
+    (Some (Expr.subst_expr_for_expr ~to_subst ~subst_with))
+    (Some (Formula.subst_expr_for_expr ~to_subst ~subst_with))
+    a
+
+module Infix = struct
+  let ( ** ) a b =
+    match (a, b) with
+    | Pure True, x | x, Pure True | Emp, x | x, Emp -> x
+    | _ -> Star (a, b)
+end
+
+let pvars_to_lvars (a : t) : t =
+  let ff = Formula.pvars_to_lvars in
+  let fe = Expr.pvars_to_lvars in
+  map None None (Some fe) (Some ff) a

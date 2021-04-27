@@ -20,7 +20,7 @@ module Annot = Gillian.Gil_syntax.Annot
 let fresh_sth (name : string) : (unit -> string) * (unit -> unit) =
   let counter = ref 0 in
   let r () = counter := 0 in
-  let rec f () =
+  let f () =
     let v = name ^ string_of_int !counter in
     counter := !counter + 1;
     v
@@ -90,6 +90,7 @@ let jsil2gil_spec (spec : Spec.t) : GSpec.t =
     spec_params = spec.params;
     spec_sspecs = List.map jsil2gil_sspec spec.sspecs;
     spec_normalised = spec.normalised;
+    spec_incomplete = spec.incomplete;
     spec_to_verify = spec.to_verify;
   }
 
@@ -100,8 +101,13 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
     lemma_internal = false;
     (* TODO (Alexis): Set depending on module of lemma *)
     lemma_params = lemma.params;
-    lemma_hyp = jsil2gil_asrt lemma.pre;
-    lemma_concs = List.map jsil2gil_asrt lemma.posts;
+    lemma_specs =
+      [
+        {
+          lemma_hyp = jsil2gil_asrt lemma.pre;
+          lemma_concs = List.map jsil2gil_asrt lemma.posts;
+        };
+      ];
     lemma_proof = Option.map (List.map jsil2gil_lcmd) lemma.proof;
     lemma_variant = lemma.variant;
     lemma_existentials = lemma.existentials;
@@ -118,7 +124,10 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
     pred_ins = pred.ins;
     pred_definitions =
       List.map (fun (info, asrt) -> (info, jsil2gil_asrt asrt)) pred.definitions;
+    pred_facts = pred.facts;
     pred_pure = pred.pure;
+    pred_abstract = pred.abstract;
+    pred_nounfold = pred.nounfold;
     pred_normalised = pred.normalised;
   }
 
@@ -434,7 +443,7 @@ let jsil2core_prog (prog : EProg.t) : (Annot.t, string) GProg.t =
 
   let result : (Annot.t, string) GProg.t =
     {
-      imports = List.map (fun imp -> (imp, false)) prog.imports;
+      imports = prog.imports;
       preds = translate_tbl prog.preds jsil2gil_pred;
       lemmas = translate_tbl prog.lemmas jsil2gil_lemma;
       only_specs = translate_tbl prog.only_specs jsil2gil_spec;

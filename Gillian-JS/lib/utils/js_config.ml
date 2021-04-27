@@ -23,11 +23,15 @@ let cosette = ref false
 
 let js = ref true
 
+let amazon = ref false
+
 (** {2 Other config} *)
 let env_var_import_path = "GILLIAN_JS_RUNTIME_PATH"
 
 let import_paths =
   String.split_on_char ':'
-    ( match Sys.getenv_opt "GILLIAN_JS_RUNTIME_PATH" with
-    | Some s -> s
-    | None   -> "" )
+    (match Sys.getenv_opt "GILLIAN_JS_RUNTIME_PATH" with
+    | Some s ->
+        print_endline s;
+        s
+    | None   -> "")

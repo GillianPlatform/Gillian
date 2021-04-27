@@ -1,0 +1,37 @@
+[{pc:
+   {pfs: [(! (x == 1.))];
+    gamma: (x: Num);
+    learned: [(! (x <# 1.)); (! (x <# 2.))];
+    learned_types: []};
+  value: 12},
+ {pc:
+   {pfs: [(! (x == 1.))];
+    gamma: (x: Num);
+    learned: [(! (x <# 1.)); (x <# 2.)];
+    learned_types: []};
+  value: 11},
+ {pc:
+   {pfs: [(! (x == 1.))];
+    gamma: (x: Num);
+    learned: [(x <# 1.); (x <=# 0.)];
+    learned_types: []};
+  value: -1},
+ {pc:
+   {pfs: [(! (x == 1.))];
+    gamma: (x: Num);
+    learned: [(! (x <=# 0.)); (x <# 1.); (x <=# 1.)];
+    learned_types: []};
+  value: 0}]
+
+[{pc: {pfs: [];
+       gamma: ;
+       learned: [];
+       learned_types: []};
+  value: -1}]
+
+[{pc: {pfs: [(x == 2.)];
+       gamma: ;
+       learned: [];
+       learned_types: []};
+  value: 2}]
+

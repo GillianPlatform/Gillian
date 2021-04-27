@@ -1,0 +1,20 @@
+(executable
+ (name test)
+ (libraries gillian.gil_syntax gillian.monadic gillian.engine ppx_sat.runtime
+   fmt)
+ (preprocess
+  (pps ppx_sat)))
+
+(rule
+ (deps test.exe)
+ (target out)
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{deps}))))
+
+(rule
+ (alias runtest)
+ (deps out)
+ (action
+  (diff out.expected out)))

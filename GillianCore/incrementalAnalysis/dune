@@ -3,5 +3,5 @@
  (public_name gillian.incrementalAnalysis)
  (libraries utils gil_syntax fmt)
  (preprocess
-  (pps ppx_yojson_conv))
- (flags -open Utils -open Gil_syntax))
+  (pps ppx_deriving_yojson))
+ (flags :standard -open Utils -open Gil_syntax))

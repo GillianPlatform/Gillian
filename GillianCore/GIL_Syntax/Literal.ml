@@ -16,6 +16,19 @@ type t = TypeDef__.literal =
   | LList     of t list  (** Lists of GIL literals *)
   | Nono
 
+let rec equal a b =
+  match (a, b) with
+  | Undefined, Undefined | Null, Null | Nono, Nono | Empty, Empty -> true
+  | Constant x, Constant y -> x = y
+  | Bool x, Bool y -> x == y
+  | Int x, Int y -> Int.equal x y
+  | Num x, Num y -> Float.equal x y
+  | String x, String y | Loc x, Loc y -> String.equal x y
+  | Type x, Type y -> x = y
+  | LList la, LList lb -> (
+      try List.for_all2 equal la lb with Invalid_argument _ -> false)
+  | _ -> false
+
 (** Print *)
 let rec pp fmt x =
   match x with
@@ -25,7 +38,7 @@ let rec pp fmt x =
   | Nono       -> Fmt.string fmt "none"
   | Constant c -> Fmt.string fmt (Constant.str c)
   | Bool b     -> if b then Fmt.string fmt "true" else Fmt.string fmt "false"
-  | Int i      -> Fmt.int fmt i
+  | Int i      -> Fmt.pf fmt "%ai" Fmt.int i
   | Num n      -> Fmt.pf fmt "%F" n
   | String x   -> Fmt.pf fmt "\"%s\"" x
   | Loc loc    -> Fmt.string fmt loc
@@ -89,7 +102,7 @@ let base_elements (lit : t) : t list =
     object
       inherit [_] Visitors.reduce as super
 
-      inherit Visitors.Utils.list_monoid
+      inherit Visitors.Utils.non_ordered_list_monoid
 
       method! visit_literal = get_base_lits super#visit_literal (fun x -> x)
     end

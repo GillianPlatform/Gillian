@@ -5,6 +5,8 @@
 (**************************************************************)
 (**************************************************************)
 
+module SS = Containers.SS
+
 type logic_bindings_t = string * (string * Expr.t) list
 
 type 'label t = 'label TypeDef__.cmd =
@@ -27,6 +29,66 @@ type 'label t = 'label TypeDef__.cmd =
   | ReturnError  (** Error return        *)
   | Fail          of string * Expr.t list  (** Failure             *)
 
+let fold = List.fold_left SS.union SS.empty
+
+let pvars (cmd : 'label t) : SS.t =
+  let pvars_es es = fold (List.map Expr.pvars es) in
+  match cmd with
+  | Skip                       -> SS.empty
+  | Assignment (x, e)          -> SS.add x (Expr.pvars e)
+  | LAction (x, _, es)         -> SS.add x (pvars_es es)
+  | Logic lcmd                 -> LCmd.pvars lcmd
+  | Goto _                     -> SS.empty
+  | GuardedGoto (e, _, _)      -> Expr.pvars e
+  | Call (x, e, es, _, _)      -> SS.union
+                                    (SS.add x (Expr.pvars e))
+                                    (pvars_es es)
+  | ECall (x, e, es, _)        -> SS.union
+                                    (SS.add x (Expr.pvars e))
+                                    (pvars_es es)
+  | Apply (x, e, _)            -> SS.add x (Expr.pvars e)
+  | Arguments x                -> SS.singleton x
+  | PhiAssignment phis         -> fold
+                                    (List.map (fun (_, es) -> pvars_es es) phis)
+  | ReturnNormal | ReturnError -> SS.singleton "ret"
+  | Fail (_, es)               -> pvars_es es
+
+let lvars (cmd : 'label t) : SS.t =
+  let lvars_es es = fold (List.map Expr.lvars es) in
+  match cmd with
+  | Skip                       -> SS.empty
+  | Assignment (_, e)          -> Expr.lvars e
+  | LAction (_, _, es)         -> lvars_es es
+  | Logic lcmd                 -> LCmd.lvars lcmd
+  | Goto _                     -> SS.empty
+  | GuardedGoto (e, _, _)      -> Expr.lvars e
+  | Call (_, e, es, _, _)      -> SS.union (Expr.lvars e) (lvars_es es)
+  | ECall (_, e, es, _)        -> SS.union (Expr.lvars e) (lvars_es es)
+  | Apply (_, e, _)            -> Expr.lvars e
+  | Arguments _                -> SS.empty
+  | PhiAssignment phis         -> fold
+                                    (List.map (fun (_, es) -> lvars_es es) phis)
+  | ReturnNormal | ReturnError -> SS.empty
+  | Fail (_, es)               -> lvars_es es
+
+let locs (cmd : 'label t) : SS.t =
+  let locs_es es = fold (List.map Expr.locs es) in
+  match cmd with
+  | Skip                       -> SS.empty
+  | Assignment (_, e)          -> Expr.locs e
+  | LAction (_, _, es)         -> locs_es es
+  | Logic lcmd                 -> LCmd.lvars lcmd
+  | Goto _                     -> SS.empty
+  | GuardedGoto (e, _, _)      -> Expr.locs e
+  | Call (_, e, es, _, _)      -> SS.union (Expr.lvars e) (locs_es es)
+  | ECall (_, e, es, _)        -> SS.union (Expr.lvars e) (locs_es es)
+  | Apply (_, e, _)            -> Expr.locs e
+  | Arguments _                -> SS.empty
+  | PhiAssignment phis         -> fold
+                                    (List.map (fun (_, es) -> locs_es es) phis)
+  | ReturnNormal | ReturnError -> SS.empty
+  | Fail (_, es)               -> locs_es es
+
 let successors (cmd : int t) (i : int) : int list =
   match cmd with
   | Goto j -> [ j ]
@@ -34,7 +96,7 @@ let successors (cmd : int t) (i : int) : int list =
   | Call (_, _, _, j, _) | ECall (_, _, _, j) | Apply (_, _, j) -> (
       match j with
       | None   -> [ i + 1 ]
-      | Some j -> [ i + 1; j ] )
+      | Some j -> [ i + 1; j ])
   | ReturnNormal | ReturnError | Fail _ -> []
   | Skip | Assignment _ | LAction _ | Logic _ | Arguments _ | PhiAssignment _ ->
       [ i + 1 ]

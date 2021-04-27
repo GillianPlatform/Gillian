@@ -89,13 +89,17 @@
       "forall",       GIL_Parser.LFORALL;
 
       (* Logic predicates *)
+      "abstract", GIL_Parser.ABSTRACT;
       "pure", GIL_Parser.PURE;
       "pred", GIL_Parser.PRED;
+      "nounfold", GIL_Parser.NOUNFOLD;
+      "facts", GIL_Parser.FACTS;
 
       (* Logic commands *)
       "fold",         GIL_Parser.FOLD;
       "unfold",       GIL_Parser.UNFOLD;
       "unfold_all",   GIL_Parser.UNFOLDALL;
+      "symb_exec",    GIL_Parser.SYMBEXEC;
       "if",           GIL_Parser.LIF;
       "then",         GIL_Parser.LTHEN;
       "else",         GIL_Parser.LELSE;
@@ -108,19 +112,19 @@
       "bind",         GIL_Parser.BIND;
       "existentials", GIL_Parser.EXISTENTIALS;
       "sep_assert",   GIL_Parser.SEPASSERT;
-      "sep_apply",    GIL_Parser.SEPAPPLY;
       "branch",       GIL_Parser.BRANCH;
       "use_subst",    GIL_Parser.USESUBST;
 
       (* Procedure specification keywords *)
-      "only",    GIL_Parser.ONLY;
-      "lemma",   GIL_Parser.LEMMA;
-      "variant", GIL_Parser.VARIANT;
-      "spec",    GIL_Parser.SPEC;
-      "bispec",  GIL_Parser.BISPEC;
-      "normal",  GIL_Parser.NORMAL;
-      "error",   GIL_Parser.ERROR;
-      "fail",    GIL_Parser.FAIL;
+      "axiomatic",    GIL_Parser.AXIOMATIC;
+      "incomplete",   GIL_Parser.INCOMPLETE;
+      "lemma",        GIL_Parser.LEMMA;
+      "variant",      GIL_Parser.VARIANT;
+      "spec",         GIL_Parser.SPEC;
+      "bispec",       GIL_Parser.BISPEC;
+      "normal",       GIL_Parser.NORMAL;
+      "error",        GIL_Parser.ERROR;
+      "fail",         GIL_Parser.FAIL;
 
       (* Procedure definition keywords *)
       "proc", GIL_Parser.PROC;
@@ -136,6 +140,7 @@ let letter = ['a'-'z''A'-'Z']
 let identifier = letter(letter|digit|'_')*
 
 let float = '-'? digit+ ('.' digit*)?
+let int = '-'? digit+ 'i'
 
 let var2 = "_pvar_" (letter|digit|'_')*
 let lvar = '#' (letter|digit|'_'|'$')*
@@ -256,6 +261,10 @@ rule read = parse
   | '{'                  { GIL_Parser.CLBRACKET }
   | '}'                  { GIL_Parser.CRBRACKET }
 (* Literals (cont.) *)
+  | int                  { let s = Lexing.lexeme lexbuf in
+                           let s_n = String.sub s 0 ((String.length s) - 1) in
+                           let n = int_of_string s_n in
+                           GIL_Parser.INTEGER n }
   | float                { let n = float_of_string (Lexing.lexeme lexbuf) in
                            GIL_Parser.FLOAT n }
   | '"'                  { read_string (Buffer.create 17) lexbuf }
@@ -302,6 +311,7 @@ and
 (* Read comments *)
 read_comment =
   parse
+  | newline              { new_line lexbuf; read_comment lexbuf }
   | "*)"                 { read lexbuf }
   | eof                  { raise (Syntax_error ("Comment is not terminated")) }
   | _                    { read_comment lexbuf }

@@ -1,0 +1,83 @@
+(* **************************************************
+   ****************    Uint8Array    ****************
+   ************************************************** *)
+
+(*******************************
+ **** Uint8Array Instances  ****
+ *******************************)
+
+nounfold pred Uint8Array (+ar:Obj, buffer:Obj, byteOffset:Num, arrayLength:Num) :
+  ((ar, "buffer")     -> none) *                   (* Functions to be found in the prototype      *)
+  ((ar, "byteLength") -> none) *
+  ((ar, "byteOffset") -> none) *
+  ((ar, "slice")      -> none) *
+
+  MetaData(ar, #md) * MetaData(#md, null) *
+  ((#md, "@proto")             -> $lui8ar_proto) * (* Prototype is the Data View prototype          *)
+  ((#md, "@class")             -> "Uint8Array") *  (* Class is "Uint8Array" (doesn't exist in ES6+) *)
+  ((#md, "@extensible")        -> true) *          (* Uint8Arrays are extensible                    *)
+  ((#md, "@ArrayLength")       -> arrayLength) *   (* Length of the array                           *)
+  ((#md, "@ViewedArrayBuffer") -> buffer) *        (* Viewed array buffer                           *)
+  ((#md, "@ByteOffset")        -> byteOffset) *    (* Offset inside the array buffer                *)
+  ((#md, "@ByteLength")        -> arrayLength) *   (* Length of the underlying buffer               *)
+
+  (* No other internal properties *)
+  empty_fields (#md : -{ "@class", "@extensible", "@proto", "@ArrayLength", "@ViewedArrayBuffer", "@ByteOffset", "@ByteLength" }-) *
+
+  (* Well-formedness *)
+  (0 <=# byteOffset) * (0 <=# arrayLength);
+
+(*******************************
+ **** Uint8Array Prototype  ****
+ *******************************)
+
+nounfold pred Uint8ArrayPrototype (+proto) :
+  JSObjWithProto (proto, $lobj_proto) *
+  empty_fields (proto : -{ "buffer", "byteLength", "byteOffset", "constructor", "slice" }-) *
+
+  ((proto, "buffer")      -> {{ "a", $lui8ar_buffer,     undefined, false, true }}) * (* Uint8Array.prototype.buffer      *)
+  ((proto, "byteLength")  -> {{ "a", $lui8ar_byteLength, undefined, false, true }}) * (* Uint8Array.prototype.byteLength  *)
+  ((proto, "byteOffset")  -> {{ "a", $lui8ar_byteOffset, undefined, false, true }}) * (* Uint8Array.prototype.byteOffset  *)
+  ((proto, "constructor") -> {{ "d", $lui8ar, true, false, true }}) *                 (* Uint8Array.prototype.constructor *)
+  ((proto, "slice")       -> {{ "d", $lui8ar_slice, true, false, true }}) *           (* Uint8Array.prototype.slice       *)
+
+  JSBIFunction($lui8ar_buffer, "UI8ARP_buffer", 0) * (* Actual buffer function *)
+  empty_fields($lui8ar_buffer : -{ "length" }-) *
+
+  JSBIFunction($lui8ar_byteLength, "UI8ARP_byteLength", 0) * (* Actual byteLength function *)
+  empty_fields($lui8ar_byteLength : -{ "length" }-) *
+
+  JSBIFunction($lui8ar_byteOffset, "UI8ARP_byteOffset", 0) * (* Actual byteOffset function *)
+  empty_fields($lui8ar_byteOffset : -{ "length" }-) *
+
+  JSBIFunction($lui8ar_slice, "UI8ARP_slice", 2) * (* Actual slice function *)
+  empty_fields($lui8ar_slice : -{ "length" }-);
+
+(**********************************************************************
+ **** Axiomatic specifications of the Uint8Array-related functions ****
+ **********************************************************************)
+
+axiomatic spec UI8ARP_buffer (xsc, vthis)
+    [[ (vthis == #vthis) * Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) ]]
+    [[ Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) * (ret == #buffer) ]]
+    normal
+
+axiomatic spec UI8ARP_byteLength (xsc, vthis)
+    [[ (vthis == #vthis) * Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) ]]
+    [[ Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) * (ret == #arrayLength) ]]
+    normal
+
+axiomatic spec UI8ARP_byteOffset (xsc, vthis)
+    [[ (vthis == #vthis) * Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) ]]
+    [[ Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) * (ret == #byteOffset) ]]
+    normal
+
+axiomatic spec UI8ARP_slice (xsc, vthis, start, end)
+    [[ (vthis == #vthis) *
+       Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) * ArrayBuffer(#buffer, #data) *
+       (0 <=# start) * (0 <=# end) * (end <=# #arrayLength) *
+       (#view == l-sub(#data, #byteOffset, #arrayLength)) ]]
+    [[ Uint8Array(#vthis, #buffer, #byteOffset, #arrayLength) * ArrayBuffer(#buffer, #data) *
+       Uint8Array(ret, #sBuffer, #sByteOffset, #sArrayLength) * ArrayBuffer(#sBuffer, #sData) *
+       (#sByteOffset == 0) * (#sArrayLength == end - start) * (#sData == l-sub (#view, start, end - start)) ]]
+    normal

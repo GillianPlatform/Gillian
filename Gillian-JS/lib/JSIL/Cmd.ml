@@ -55,43 +55,10 @@ let pp fmt cmd =
   | PhiAssignment lva ->
       let vars, var_args = List.split lva in
       Fmt.pf fmt "PHI(%a: %a)"
-        (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
+        Fmt.(list ~sep:comma string)
         vars
-        (Fmt.list ~sep:(Fmt.any "; ") pp_params)
+        Fmt.(list ~sep:semi pp_params)
         var_args
   | ReturnNormal -> Fmt.string fmt "return"
   | ReturnError -> Fmt.string fmt "throw"
   | Logic lcmd -> LCmd.pp fmt lcmd
-
-let vars (cmd : t) : Containers.SS.t =
-  let open Containers in
-  let ve = Expr.vars in
-  let vb = BCmd.vars in
-  match cmd with
-  | Basic bcmd -> vb bcmd
-  | Goto _ -> SS.empty
-  | GuardedGoto (e, _, _) -> ve e
-  | Call (x, e, le, _, _) | ECall (x, e, le, _) ->
-      SS.add x
-        (SS.union (ve e) (List.fold_left SS.union SS.empty (List.map ve le)))
-  | Apply (x, e, _) -> SS.add x (ve e)
-  | Arguments x -> SS.singleton x
-  | PhiAssignment lele ->
-      List.fold_left SS.union SS.empty
-        (List.map
-           (fun (_, le) -> List.fold_left SS.union SS.empty (List.map ve le))
-           lele)
-  | ReturnNormal -> SS.empty
-  | ReturnError -> SS.empty
-  | Logic lcmd -> SS.empty
-
-let successors (cmd : t) (i : int) : int list =
-  match cmd with
-  | Basic _ | PhiAssignment _ | Logic _ | Arguments _ -> [ i + 1 ]
-  | Goto j -> [ j ]
-  | GuardedGoto (e, j, k) -> [ j; k ]
-  | Call (_, _, _, j, _) | ECall (_, _, _, j) | Apply (_, _, j) -> (
-      match j with
-      | None   -> [ i + 1 ]
-      | Some j -> [ i + 1; j ] )
-  | ReturnNormal | ReturnError -> []

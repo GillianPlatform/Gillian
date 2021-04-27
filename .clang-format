@@ -1,4 +1,6 @@
 ---
 BasedOnStyle: LLVM
 IndentWidth: 4
+ReflowComments: false
+BreakStringLiterals: false
 ---

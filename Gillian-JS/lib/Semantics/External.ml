@@ -9,11 +9,11 @@ module Annot = Gillian.Gil_syntax.Annot
 (** JSIL external procedure calls *)
 module M
     (Val : Val.S)
-    (Subst : Subst.S with type vt = Val.t and type t = Val.st)
+    (ESubst : Engine.ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
     (State : State.S
                with type vt = Val.t
-                and type st = Subst.t
+                and type st = ESubst.t
                 and type store_t = Store.t)
     (CallStack : CallStack.S with type vt = Val.t and type store_t = Store.t) =
 struct
@@ -97,9 +97,11 @@ struct
                     let new_store = Store.init (List.combine params args) in
                     let old_store = State.get_store state in
                     let state' = State.set_store state new_store in
+                    let loop_ids = CallStack.get_loop_ids cs in
                     let cs' =
-                      (proc_eval, eval_v_args, Some old_store, x, i, i + 1, j)
-                      :: cs
+                      CallStack.push cs ~pid:proc_eval ~arguments:eval_v_args
+                        ~store:old_store ~loop_ids ~ret_var:x ~call_index:i
+                        ~continue_index:(i + 1) ?error_index:j ()
                     in
                     [ (state', cs', -1, 0) ]
                 | Error error_type -> (
@@ -120,13 +122,13 @@ struct
                              "Eval triggered an error, but no error label was \
                               provided")
                     | _, _           ->
-                        raise (Failure "JavaScript error object undefined") ) )
+                        raise (Failure "JavaScript error object undefined")))
             | _                  ->
                 let _ = update_store state x v_code in
-                [ (state, cs, i, i + 1) ] )
+                [ (state, cs, i, i + 1) ])
         | _                      -> raise
                                       (Failure
-                                         "Eval not given correct strictness") )
+                                         "Eval not given correct strictness"))
     | _ -> raise (Failure "Eval failed")
 
   (* Two arguments only, the parameters and the function body *)
@@ -185,8 +187,8 @@ struct
                       update_store state x (Val.from_literal return_value)
                     in
                     [ (state, cs, i, i + 1) ]
-                | _ -> throw "Body incorrectly parsed." )
-            | _                 -> throw "Not a script." ) )
+                | _ -> throw "Body incorrectly parsed.")
+            | _                 -> throw "Not a script."))
     | _, _                       -> throw "Body or parameters not a string."
 
   (**

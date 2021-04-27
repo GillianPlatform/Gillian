@@ -1,6 +1,0 @@
-# dune ocaml-merlin --no-print-directory
-# OCAMLPARAM: unset
-# Workspace root:
-# /Users/PetarMax/Projects/Gillian/esy.lock/overrides/4824e9d746ab199eb16bab263c30aa42/test
-$ /usr/local/bin/nproc > /var/folders/28/0r96wsm54c77pcb_xmb9ns2m0000gn/T/dune8e6e49.output 2> /dev/null
-# Auto-detected concurrency: 8

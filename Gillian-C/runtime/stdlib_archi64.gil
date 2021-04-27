@@ -24,6 +24,17 @@ proc i__init_to_zero(b, curr, max) {
            return
 };
 
+
+spec i__calloc(vnelem, velsize)
+      [[ (vnelem == {{ "long", #n }}) *
+         (velsize == {{ "long", #sz }}) ]]
+      [[ (ret == {{ #loc, 0. }}) *
+         types(#loc: Obj) *
+         (#bytes == #n * #sz) *
+         <mem_zeros>(#loc, 0., #bytes; "Freeable") *
+         <mem_single>(#loc, -8., "int64"; {{ "long", #bytes }}, "Freeable" ) *
+         <mem_bounds>(#loc; {{ -8., #bytes }}) ]]
+      normal
 proc i__calloc(vnelem, velsiz) {
       nelem := "i__alloc_size"(vnelem);
       elsiz := "i__alloc_size"(velsiz);

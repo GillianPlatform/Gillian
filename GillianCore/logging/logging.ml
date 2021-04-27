@@ -4,6 +4,12 @@ module Reporter = Reporter
 module FileReporter = FileReporter
 module DatabaseReporter = DatabaseReporter
 
+let () =
+  Printexc.register_printer (function
+    | Failure s ->
+        Some (Format.asprintf "!!!!!!!!!!\nFAILURE:\n%s\n!!!!!!!!!!\n\n" s)
+    | _         -> None)
+
 let wrap_up = Default.wrap_up
 
 let log lvl ?title ?severity msgf =
@@ -40,7 +46,12 @@ let end_phase = ReportBuilder.end_phase
 
 let with_phase level ?title ?severity f =
   let phase = ReportBuilder.start_phase level ?title ?severity () in
-  let result = try Ok (f ()) with e -> Error e in
+  let result =
+    try Ok (f ())
+    with e ->
+      Printf.printf "Original Backtrace:\n%s" (Printexc.get_backtrace ());
+      Error e
+  in
   ReportBuilder.end_phase phase;
   match result with
   | Ok ok   -> ok

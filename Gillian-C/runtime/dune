@@ -5,6 +5,7 @@
    internals.gil logic_archi32.gil logic_archi64.gil logic_common.gil
    stdlib_archi32.gil stdlib_archi64.gil string.gil unops_common.gil
    global_environment_common.gil global_environment_archi64.gil
-   global_environment_archi32.gil)
+   global_environment_archi32.gil genv_allocated_functions.gil
+   genv_unallocated_functions.gil)
  (section share)
  (package gillian-c))

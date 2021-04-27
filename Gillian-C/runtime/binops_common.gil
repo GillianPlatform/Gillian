@@ -134,7 +134,10 @@ proc i__binop_divlu(v1, v2) {
         goto [ l-nth(v1, 0.) = "long" ] llon unde;
   llon: goto [ l-nth(v2, 0.) = "long" ] blon unde;
         assert (! (l-nth(v2, 1.) == 0.));
-  blon: ret := {{ "long", m_floor(l-nth(v1, 1.) / l-nth(v2, 1.)) }};
+  blon: goto [ l-nth(v2, 1.) = 1 ] blr1 divl;
+  blr1: ret := v1;
+        return;
+  divl: ret := {{ "long", m_floor(l-nth(v1, 1.) / l-nth(v2, 1.)) }};
         return;
   unde: fail[operator]("Using /lu operator for non-long elements")
 };
@@ -143,7 +146,10 @@ proc i__binop_divl(v1, v2) {
         goto [ l-nth(v1, 0.) = "long" ] llon unde;
   llon: goto [ l-nth(v2, 0.) = "long" ] blon unde;
         assert (! (l-nth(v2, 1.) == 0.));
-  blon: ret := {{ "long", m_floor(l-nth(v1, 1.) / l-nth(v2, 1.)) }};
+  blon: goto [ l-nth(v2, 1.) = 1 ] blr1 divl;
+  blr1: ret := v1;
+        return;
+  divl: ret := {{ "long", m_floor(l-nth(v1, 1.) / l-nth(v2, 1.)) }};
         return;
   unde: fail[operator]("Using /l operator for non-long elements")
 };
@@ -258,7 +264,10 @@ proc i__binop_shrlu(v1, v2) {
 proc i__binop_shll(v1, v2) {
         goto [ l-nth(v1, 0.) = "long" ] llon unde;
   llon: goto [ l-nth(v2, 0.) = "int" ] blon unde;
-  blon: ret := {{ "long", l-nth(v1, 1.) <<l l-nth(v2, 1.) }};
+  blon: goto [ (l-nth(v2, 1.) = 1.) and (l-nth(v1, 1.) < 4294967295) ] fast norm;
+  fast: ret := {{ "long", l-nth(v1, 1.) * 2. }};
+        return;
+  norm: ret := {{ "long", l-nth(v1, 1.) <<l l-nth(v2, 1.) }};
         return;
   unde: fail[operator]("Using <<l operator for non-long elements")
 };

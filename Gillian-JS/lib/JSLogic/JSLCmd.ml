@@ -1,18 +1,20 @@
 open JSLogicCommon
 open Jsil_syntax
+module Formula = Gillian.Gil_syntax.Formula
 
 type t =
   | Fold       of JSAsrt.t * (string * (string * JSExpr.t) list) option
       (** Fold          *)
-  | Unfold     of JSAsrt.t * (string * (string * JSExpr.t) list) option
-      (** Single Unfold *)
+  | Unfold     of JSAsrt.t * (string * string) list option  (** Single Unfold *)
   | GUnfold    of string  (** Global unfold *)
   | Flash      of JSAsrt.t  (** Unfold/fold   *)
   | If         of JSExpr.t * t list * t list  (** If-then-else  *)
+  | Branch     of JSAsrt.pt (* Branching *)
   | ApplyLemma of string * JSExpr.t list  (** Lemma         *)
   | Macro      of string * JSExpr.t list  (** Macro         *)
   | Assert     of (JSAsrt.t * string list)  (** Assert        *)
-  | Invariant  of JSAsrt.t  (** Assert        *)
+  | Assume     of JSAsrt.pt  (** Assume *)
+  | Invariant  of (JSAsrt.t * string list)  (** Invariant     *)
   | UseSubst   of string * (string * JSExpr.t) list
 
 let rec js2jsil
@@ -42,16 +44,14 @@ let rec js2jsil
         LCmd.SL (Fold (p_name, les', None));
       ]
   | Unfold (Pred (s, les), unfold_info) ->
-      [
-        LCmd.SL
-          (Unfold (s, List.map fe les, translate_folding_info unfold_info, false));
-      ]
+      [ LCmd.SL (Unfold (s, List.map fe les, unfold_info, false)) ]
   | GUnfold name -> [ LCmd.SL (GUnfold name) ]
   | Assert (assertion, binders) ->
       let a' =
         JSAsrt.js2jsil_tactic cc_tbl vis_tbl fun_tbl fid scope_var assertion
       in
       [ LCmd.SL (SepAssert (a', binders)) ]
+  | Assume pf -> [ LCmd.Assume (JSAsrt.js2jsil_pure None pf) ]
   | Macro (s, les) -> [ LCmd.Macro (s, List.map fe les) ]
   | If (le, lcthen, lcelse) ->
       [
@@ -62,19 +62,16 @@ let rec js2jsil
       ]
   | ApplyLemma (lname, lparams) ->
       [ LCmd.SL (ApplyLem (lname, List.map fe lparams, [])) ]
-  | UseSubst (lab, subst_lst) ->
-      raise (Failure "DEATH. USESUBST CANNOT BE TRANSLATED!!!")
+  | UseSubst _ -> raise (Failure "DEATH. USESUBST CANNOT BE TRANSLATED!!!")
+  | Branch pf -> [ Branch (JSAsrt.js2jsil_pure None pf) ]
   | _ -> raise (Failure "Unsupported JS logic command")
 
-let str_of_folding_info
-    (unfold_info : (string * (string * JSExpr.t) list) option) : string =
+let str_of_folding_info (unfold_info : (string * string) list option) : string =
   match unfold_info with
-  | None -> ""
-  | Some (id, unfold_info_list) ->
+  | None                  -> ""
+  | Some unfold_info_list ->
       let unfold_info_list =
-        List.map
-          (fun (v, le) -> "(" ^ v ^ " := " ^ JSExpr.str le ^ ")")
-          unfold_info_list
+        List.map (fun (v1, v2) -> "(" ^ v1 ^ " := " ^ v2 ^ ")") unfold_info_list
       in
       let unfold_info_list_str = String.concat " and " unfold_info_list in
-      " [ " ^ id ^ " with " ^ unfold_info_list_str ^ " ]"
+      " [bind: " ^ unfold_info_list_str ^ " ]"

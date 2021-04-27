@@ -17,6 +17,9 @@ module TargetLangOptions = struct
     hide_undef : bool;
     hide_mult_def : bool;
     verbose_compcert : bool;
+    fstruct_passing : bool;
+    pp_full_trees : bool;
+    allocated_functions : bool;
   }
 
   let term =
@@ -63,7 +66,30 @@ module TargetLangOptions = struct
     let verbose_compcert =
       Arg.(value & flag & info [ "verbose-compcert" ] ~docs ~doc)
     in
-
+    let doc =
+      "Enable CompCert's struct-passing feature, which lets one pass \
+       structures and unions as parameters and return values"
+    in
+    let fstruct_passing =
+      Arg.(value & flag & info [ "fstruct-passing" ] ~docs ~doc)
+    in
+    let doc =
+      "Show full symbolic heap trees in the log, otherwise, just shows a \
+       flattened version"
+    in
+    let pp_full_trees =
+      Arg.(value & flag & info [ "pp-full-trees" ] ~docs ~doc)
+    in
+    let doc =
+      "Allocate some memory for every function. This is the correct behaviour \
+       of C, but it is only relevant if the analysed program compares function \
+       pointers. If enabled, this has a significant impact on performances \
+       since a memory core predicate has to be consumed and then produced at \
+       every function call, for every function existing in the program."
+    in
+    let allocated_functions =
+      Arg.(value & flag & info [ "allocated-functions" ] ~docs ~doc)
+    in
     let opt
         include_dirs
         source_dirs
@@ -72,7 +98,10 @@ module TargetLangOptions = struct
         no_warnings
         hide_undef
         hide_mult_def
-        verbose_compcert =
+        verbose_compcert
+        fstruct_passing
+        pp_full_trees
+        allocated_functions =
       {
         include_dirs;
         source_dirs;
@@ -82,11 +111,15 @@ module TargetLangOptions = struct
         hide_undef;
         hide_mult_def;
         verbose_compcert;
+        fstruct_passing;
+        pp_full_trees;
+        allocated_functions;
       }
     in
     Term.(
       const opt $ include_dirs $ source_dirs $ bcsm $ hgenv $ no_warnings
-      $ hundef $ hmultdef $ verbose_compcert)
+      $ hundef $ hmultdef $ verbose_compcert $ fstruct_passing $ pp_full_trees
+      $ allocated_functions)
 
   let apply
       {
@@ -98,6 +131,9 @@ module TargetLangOptions = struct
         hide_undef;
         hide_mult_def;
         verbose_compcert;
+        fstruct_passing;
+        pp_full_trees;
+        allocated_functions;
       } =
     let rec get_c_paths dirs =
       match dirs with
@@ -116,7 +152,10 @@ module TargetLangOptions = struct
     Config.warnings := warnings;
     Config.hide_undef := hide_undef;
     Config.hide_mult_def := hide_mult_def;
-    Config.verbose_compcert := verbose_compcert
+    Config.verbose_compcert := verbose_compcert;
+    Config_compcert.Features.set_fstruct_passing fstruct_passing;
+    Config.pp_full_tree := pp_full_trees;
+    Config.allocated_functions := allocated_functions
 end
 
 (** Cache of compiled but unlinked GIL programs and their compilation data. *)
@@ -142,7 +181,9 @@ let get_or_print_and_die = function
 let parse_annots file =
   let parse_with_error token lexbuf =
     try token Annot_lexer.read lexbuf with
-    | Annot_lexer.SyntaxError message -> failwith ("SYNTAX ERROR : " ^ message)
+    | Annot_lexer.SyntaxError message ->
+        Fmt.failwith "SYNTAX ERROR in %s, line %i: %s" file
+          lexbuf.Lexing.lex_curr_p.pos_lnum message
     | Annot_parser.Error ->
         let curr = lexbuf.Lexing.lex_curr_p in
         let message =
@@ -150,7 +191,7 @@ let parse_annots file =
             (Lexing.lexeme lexbuf) curr.pos_lnum
             (curr.pos_cnum - curr.pos_bol + 1)
         in
-        failwith ("PARSER ERROR : " ^ message)
+        failwith ("PARSER ERROR in " ^ file ^ " : " ^ message)
   in
   let inx = open_in file in
   let lexbuf = Lexing.from_channel inx in
@@ -172,16 +213,16 @@ let mangle_proc proc mangled_syms =
   in
   let mangling_visitor =
     object
-      inherit [_] Gillian.Gil_syntax.Visitors.map as super
+      inherit [_] Gillian.Gil_syntax.Visitors.endo as super
 
       method! visit_proc env proc =
         let proc_params = List.map mangle_var proc.proc_params in
         let proc = super#visit_proc env proc in
         { proc with proc_params }
 
-      method! visit_PVar _ var = Gillian.Gil_syntax.Expr.PVar (mangle_var var)
+      method! visit_PVar _ _ var = Gillian.Gil_syntax.Expr.PVar (mangle_var var)
 
-      method! visit_String _ str =
+      method! visit_String _ _ str =
         Gillian.Gil_syntax.Literal.String (mangle_symbol str)
     end
   in
@@ -327,11 +368,34 @@ let parse_and_compile_files paths =
           (comb_init_cmds @ genv_init_cmds)
   in
   let imports, init_asrts, init_cmds = combine (List.tl paths) [] [] [] in
+  (* init_asrts and init_cmds can contain duplicated things
+      in the case of memcpy or equivalents. We need to remove those duplicates *)
+  let init_asrts =
+    List.sort_uniq
+      (fun a b ->
+        match (a, b) with
+        | Asrt.Pred (_, Lit (String a) :: _), Asrt.Pred (_, Lit (String b) :: _)
+          -> String.compare a b
+        | a, b -> compare a b)
+      init_asrts
+  in
+  let init_cmds =
+    List.sort_uniq
+      (fun a b ->
+        match (a, b) with
+        | ( Cmd.Call (_, _, Lit (String a) :: _, _, _),
+            Cmd.Call (_, _, Lit (String b) :: _, _, _) ) -> String.compare a b
+        | a, b -> compare a b)
+      init_cmds
+  in
   let main_path = List.hd paths in
   let main_prog, Gilgen.{ genv_pred_asrts; genv_init_cmds; _ } =
     Hashtbl.find compiled_progs (List.hd paths)
   in
-  let all_imports = Imports.imports current_arch exec_mode @ imports in
+  let current_genv_config = CConstants.GEnvConfig.current_genv_config () in
+  let all_imports =
+    Imports.imports current_arch exec_mode current_genv_config @ imports
+  in
   let init_proc = Gilgen.make_init_proc (genv_init_cmds @ init_cmds) in
   let init_proc_name = init_proc.Proc.proc_name in
   let all_proc_names = init_proc_name :: main_prog.proc_names in
@@ -344,7 +408,11 @@ let parse_and_compile_files paths =
       Hashtbl.add main_prog.preds init_pred.Pred.pred_name init_pred
   in
   let main_prog =
-    { main_prog with imports = all_imports; proc_names = all_proc_names }
+    {
+      main_prog with
+      imports = all_imports @ main_prog.imports;
+      proc_names = all_proc_names;
+    }
   in
   let paths_set = SS.of_list paths in
   let all_other_progs =
@@ -376,5 +444,5 @@ let initialize exec_mode =
   | Gillian.Utils.ExecMode.BiAbduction ->
       Gillian.Utils.Config.bi_unfold_depth := 2;
       Gillian.Utils.Config.delay_entailment := true
-  | Verification -> Gillian.Utils.Config.delay_entailment := false
+  | Verification -> Gillian.Utils.Config.delay_entailment := true
   | _ -> ()

@@ -19,7 +19,7 @@ let copy = WislCHeap.copy
 
 let pp fmt h = Format.fprintf fmt "%s" (WislCHeap.str h)
 
-let pp_err fmt () = ()
+let pp_err _fmt () = ()
 
 let ga_to_setter = WislLActions.ga_to_setter_str
 
@@ -42,7 +42,7 @@ let get_cell heap params =
     | [ Loc loc; Int offset ] -> (
         match WislCHeap.get heap loc offset with
         | Some value -> ASucc (heap, [ Loc loc; Int offset; value ])
-        | None       -> AFail [] )
+        | None       -> AFail [])
     | l                       ->
         failwith
           (Printf.sprintf

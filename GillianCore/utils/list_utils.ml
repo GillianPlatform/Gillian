@@ -7,11 +7,6 @@ let cross_product (l1 : 'a list) (l2 : 'b list) (f : 'a -> 'b -> 'c) : 'c list =
 
 let remove_duplicates l = List.sort_uniq Stdlib.compare l
 
-let list_sub (lst : 'a list) (i : int) (len : int) : 'a list =
-  let a = Array.of_list lst in
-  let a' = Array.sub a i len in
-  Array.to_list a'
-
 let list_inter (lst1 : 'a list) (lst2 : 'a list) : 'a list =
   let lst =
     cross_product lst1 lst2 (fun a b -> if a = b then Some a else None)
@@ -46,8 +41,12 @@ let right_combine (lst1 : 'a list) (lst2 : 'b list) : ('a * 'b) list =
   loop lst1 lst2 []
 
 let get_list_somes (lst : 'a option list) : 'a list =
-  let lst = List.filter (fun x -> x <> None) lst in
-  List.map (fun x -> Option.get x) lst
+  let rec aux = function
+    | []          -> []
+    | Some x :: r -> x :: aux r
+    | None :: r   -> aux r
+  in
+  aux lst
 
 let divide_list_by_index (lst : 'a list) (len : int) : 'a list * 'a list =
   let rec f (i : int) (l_lst : 'a list) (r_list : 'a list) : 'a list * 'a list =
@@ -68,4 +67,28 @@ let rec flaky_map (f : 'a -> 'b option) (xs : 'a list) : 'b list option =
       | Some y -> (
           match flaky_map f xs' with
           | None     -> None
-          | Some ys' -> Some (y :: ys') ) )
+          | Some ys' -> Some (y :: ys')))
+
+let list_sub l ofs len =
+  let rec aux l i acc =
+    if i >= ofs + len then Some (List.rev acc)
+    else
+      match l with
+      | [] -> None
+      | a :: r when i >= ofs -> aux r (i + 1) (a :: acc)
+      | _ :: r -> aux r (i + 1) acc
+  in
+  aux l 0 []
+
+let make n el =
+  let rec aux acc i = if i <= 0 then acc else aux (el :: acc) (i - 1) in
+  aux [] n
+
+let index_of element list =
+  let rec aux cursor l =
+    match l with
+    | [] -> None
+    | k :: _ when k = element -> Some cursor
+    | _ :: r -> aux (cursor + 1) r
+  in
+  aux 0 list

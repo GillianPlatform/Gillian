@@ -33,9 +33,18 @@ end = struct
     Fmt.pf fmt "<%s>@\n%a@\n" node.id (Fmt.list ~sep pp_succ) node.children
 end
 
-type ('a, 'b) hashtbl = ('a, 'b) Hashtbl.t
+let nodes_to_yojson tbl =
+  tbl |> Hashtbl.to_seq |> List.of_seq |> [%to_yojson: (string * Node.t) list]
 
-type t = { nodes : (string, Node.t) hashtbl } [@@deriving yojson]
+let nodes_of_yojson yj =
+  let ( >| ) o f = Result.map f o in
+  yj |> [%of_yojson: (string * Node.t) list] >| List.to_seq >| Hashtbl.of_seq
+
+type t = {
+  nodes : (string, Node.t) Hashtbl.t;
+      [@to_yojson nodes_to_yojson] [@of_yojson nodes_of_yojson]
+}
+[@@deriving yojson]
 
 type id = string
 
@@ -121,7 +130,7 @@ let get_children call_graph id = (get_node call_graph id).children
 
 let get_proc_names call_graph =
   Hashtbl.fold
-    (fun id (node : Node.t) acc ->
+    (fun _ (node : Node.t) acc ->
       match node.ntype with
       | Proc -> node.name :: acc
       | _    -> acc)
@@ -129,7 +138,7 @@ let get_proc_names call_graph =
 
 let get_pred_names call_graph =
   Hashtbl.fold
-    (fun id (node : Node.t) acc ->
+    (fun _ (node : Node.t) acc ->
       match node.ntype with
       | Pred -> node.name :: acc
       | _    -> acc)
@@ -137,7 +146,7 @@ let get_pred_names call_graph =
 
 let get_lemma_names call_graph =
   Hashtbl.fold
-    (fun id (node : Node.t) acc ->
+    (fun _ (node : Node.t) acc ->
       match node.ntype with
       | Lemma -> node.name :: acc
       | _     -> acc)
@@ -183,7 +192,7 @@ let to_reverse_graph call_graph =
   let reverse_graph = make () in
   let () =
     Hashtbl.iter
-      (fun id (node : Node.t) ->
+      (fun _ (node : Node.t) ->
         List.iter
           (fun child_id ->
             let child = get_node call_graph child_id in

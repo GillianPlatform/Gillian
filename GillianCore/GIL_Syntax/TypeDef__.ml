@@ -150,11 +150,12 @@ and bindings = string * (string * expr) list
 
 and slcmd =
   | Fold      of string * expr list * bindings option
-  | Unfold    of string * expr list * bindings option * bool
+  | Unfold    of string * expr list * (string * string) list option * bool
   | GUnfold   of string
   | ApplyLem  of string * expr list * string list
   | SepAssert of assertion * string list
   | Invariant of assertion * string list
+  | SymbExec
 
 and lcmd =
   | If         of expr * lcmd list * lcmd list
@@ -192,17 +193,21 @@ and pred = {
   pred_params : (string * typ option) list;
   pred_ins : int list;
   pred_definitions : ((string * string list) option * assertion) list;
+  pred_facts : formula list;
   pred_pure : bool;
+  pred_abstract : bool;
+  pred_nounfold : bool;
   pred_normalised : bool;
 }
+
+and lemma_spec = { lemma_hyp : assertion; lemma_concs : assertion list }
 
 and lemma = {
   lemma_name : string;
   lemma_source_path : string option;
   lemma_internal : bool;
   lemma_params : string list;
-  lemma_hyp : assertion;
-  lemma_concs : assertion list;
+  lemma_specs : lemma_spec list;
   lemma_proof : lcmd list option;
   lemma_variant : expr option;
   lemma_existentials : string list;
@@ -221,6 +226,7 @@ and spec = {
   spec_params : string list;
   spec_sspecs : single_spec list;
   spec_normalised : bool;
+  spec_incomplete : bool;
   spec_to_verify : bool;
 }
 
@@ -246,4 +252,7 @@ and ('annot, 'label) proc = {
   proc_spec : spec option;
 }
 [@@deriving
-  visitors { variety = "reduce" }, visitors { variety = "map" }, yojson]
+  visitors { variety = "reduce" },
+    visitors { variety = "endo" },
+    visitors { variety = "iter" },
+    yojson]

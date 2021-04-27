@@ -1,4 +1,4 @@
 (library
  (name js2jsil_lib)
- (flags -open Gillian.Utils)
+ (flags :standard -open Gillian.Utils)
  (libraries jsil_syntax jslogic parsing javert_utils str))

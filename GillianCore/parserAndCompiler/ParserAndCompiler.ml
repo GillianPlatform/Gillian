@@ -65,8 +65,6 @@ module Dummy : S = struct
 
   let other_imports = []
 
-  let import_paths = []
-
   let env_var_import_path = None
 
   let initialize _ = ()

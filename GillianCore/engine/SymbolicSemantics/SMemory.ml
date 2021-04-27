@@ -3,7 +3,7 @@ module type S = sig
   type vt = SVal.M.t
 
   (** Type of GIL substitutions *)
-  type st = SVal.SSubst.t
+  type st = SVal.SESubst.t
 
   type i_fix_t
 
@@ -22,7 +22,14 @@ module type S = sig
   val init : unit -> t
 
   (** Execute action *)
-  val execute_action : string -> t -> PFS.t -> TypEnv.t -> vt list -> action_ret
+  val execute_action :
+    ?unification:bool ->
+    string ->
+    t ->
+    PFS.t ->
+    TypEnv.t ->
+    vt list ->
+    action_ret
 
   val ga_to_setter : string -> string
 
@@ -40,7 +47,16 @@ module type S = sig
   (** Printer *)
   val pp : Format.formatter -> t -> unit
 
-  val substitution_in_place : st -> t -> unit
+  val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
+
+  val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
+
+  val substitution_in_place :
+    pfs:PFS.t ->
+    gamma:TypEnv.t ->
+    st ->
+    t ->
+    (t * Formula.Set.t * (string * Type.t) list) list
 
   val fresh_val : t -> vt
 
@@ -56,7 +72,7 @@ module type S = sig
 
   val pp_c_fix : Format.formatter -> c_fix_t -> unit
 
-  val get_recovery_vals : err_t -> vt list
+  val get_recovery_vals : t -> err_t -> vt list
 
   val pp_err : Format.formatter -> err_t -> unit
 

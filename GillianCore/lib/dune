@@ -1,5 +1,14 @@
 (library
  (name gillian)
  (public_name gillian)
- (libraries engine utils gil_syntax gil_parsing commandLine bulk
-   gillian_bulk_rely logging incrementalAnalysis))
+ (libraries
+  engine
+  utils
+  gil_syntax
+  gil_parsing
+  commandLine
+  bulk
+  ;gillian_bulk_rely
+  logging
+  incrementalAnalysis
+  monadic))

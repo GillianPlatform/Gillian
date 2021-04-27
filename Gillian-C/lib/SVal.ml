@@ -134,6 +134,13 @@ let to_gil_expr gexpr =
   | SVsingle n              ->
       (EList [ Lit (String single_type); n ], [ (n, Type.NumberType) ])
 
+let lvars =
+  let open Utils.Containers in
+  function
+  | SUndefined -> SS.empty
+  | Sptr (_, e) -> Expr.lvars e
+  | SVint e | SVfloat e | SVsingle e | SVlong e -> Expr.lvars e
+
 let pp fmt v =
   let se = Expr.pp in
   let f = Format.fprintf in
@@ -144,3 +151,18 @@ let pp fmt v =
   | SVlong i      -> f fmt "Long(%a)" se i
   | SVfloat i     -> f fmt "Float(%a)" se i
   | SVsingle i    -> f fmt "Single(%a)" se i
+
+let substitution ~le_subst sv =
+  match sv with
+  | SVint v          -> SVint (le_subst v)
+  | SVfloat v        -> SVfloat (le_subst v)
+  | SVlong v         -> SVlong (le_subst v)
+  | SVsingle v       -> SVsingle (le_subst v)
+  | SUndefined       -> SUndefined
+  | Sptr (loc, offs) -> (
+      let loc_e = Expr.loc_from_loc_name loc in
+      match le_subst loc_e with
+      | Expr.ALoc nloc | Lit (Loc nloc) -> Sptr (nloc, le_subst offs)
+      | e ->
+          failwith
+            (Format.asprintf "Heap substitution fail for loc: %a" Expr.pp e))

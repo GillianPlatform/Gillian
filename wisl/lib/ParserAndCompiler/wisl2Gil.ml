@@ -45,8 +45,7 @@ let compile_binop b =
     (* operators that do not exist in gil are compiled separately *)
     | _ ->
         failwith
-          (Format.asprintf "compile_binop should not be used to compile %a" pp
-             b))
+          (Format.asprintf "compile_binop should not be used to compile %a" pp b))
 
 let compile_unop u =
   WUnOp.(
@@ -124,7 +123,7 @@ let rec compile_expr ?(fname = "main") expr :
           (call_var, internal_func, [ comp_expr1; comp_expr2 ], None, None)
       in
       ( cmdl1 @ cmdl2
-        @ [ (Annot.init ~origin_id:(get_id expr) (), None, call_i_plus) ],
+        @ [ (Annot.make ~origin_id:(get_id expr) (), None, call_i_plus) ],
         Expr.PVar call_var )
   | BinOp (e1, b, e2) ->
       (* Operator cannot do pointer arithmetics *)
@@ -422,7 +421,7 @@ let rec compile_lcmd ?(fname = "main") lcmd =
   | Assert (la, lb) ->
       let exs, comp_la = compile_lassert la in
       (None, LCmd.SL (SLCmd.SepAssert (comp_la, exs @ lb)))
-  | Invariant (la, lb) -> failwith "Invariant is not before a loop."
+  | Invariant _ -> failwith "Invariant is not before a loop."
 
 let compile_inv_and_while ~fname ~while_stmt ~invariant =
   let spec_name = "invariant_spec" in
@@ -538,7 +537,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         Cmd.Assignment (vn, BinOp (PVar retv, BinOp.LstNth, Lit (Int i))))
       vars
   in
-  let annot_while = Annot.init ~origin_id:(WStmt.get_id while_stmt) () in
+  let annot_while = Annot.make ~origin_id:(WStmt.get_id while_stmt) () in
   let lab_cmds =
     List.map (fun cmd -> (annot_while, None, cmd)) (call_cmd :: reassign_vars)
   in
@@ -577,7 +576,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let cmds, fct = compile_inv_and_while ~fname ~while_stmt ~invariant in
       let comp_rest, new_functions = compile_list rest in
       (cmds @ comp_rest, fct :: new_functions)
-  | { snode = While (e, sl); sid = sid_while; _ } :: rest
+  | { snode = While _; _ } :: _
     when !Gillian.Utils.Config.current_exec_mode = Verification ->
       failwith "While loop without invariant in Verification mode!"
   | { snode = While (e, sl); sid = sid_while; _ } :: rest ->
@@ -586,7 +585,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let comp_body, new_functions = compile_list sl in
       let comp_body, bodlab = get_or_create_lab comp_body lbody_lab in
       let endlab = gen_str end_lab in
-      let annot_while = Annot.init ~origin_id:sid_while () in
+      let annot_while = Annot.make ~origin_id:sid_while () in
       let loopcmd = Cmd.GuardedGoto (guard, bodlab, endlab) in
       let headlabopt = Some looplab in
       let loopcmd_lab = (annot_while, headlabopt, loopcmd) in
@@ -602,20 +601,20 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
   (* Skip *)
   | { snode = Skip; sid; _ } :: rest ->
       let cmd = Cmd.Skip in
-      let annot = Annot.init ~origin_id:sid () in
+      let annot = Annot.make ~origin_id:sid () in
       let comp_rest, new_functions = compile_list rest in
       ((annot, None, cmd) :: comp_rest, new_functions)
   (* Variable assignment *)
   | { snode = VarAssign (v, e); sid; _ } :: rest ->
       let cmdle, comp_e = compile_expr e in
       let cmd = Cmd.Assignment (v, comp_e) in
-      let annot = Annot.init ~origin_id:sid () in
+      let annot = Annot.make ~origin_id:sid () in
       let comp_rest, new_functions = compile_list rest in
       (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
   (* Object Deletion *)
   | { snode = Dispose e; sid; _ } :: rest ->
       let cmdle, comp_e = compile_expr e in
-      let annot = Annot.init ~origin_id:sid () in
+      let annot = Annot.make ~origin_id:sid () in
       let v_get = gen_str gvar in
       let getcmd =
         Cmd.LAction (v_get, getcell, [ nth comp_e 0; nth comp_e 1 ])
@@ -653,7 +652,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
   (* Property Lookup *)
   | { snode = Lookup (x, e); sid; _ } :: rest ->
       let cmdle, comp_e = compile_expr e in
-      let annot = Annot.init ~origin_id:sid () in
+      let annot = Annot.make ~origin_id:sid () in
       let v_get = gen_str gvar in
       let getcmd =
         Cmd.LAction (v_get, getcell, [ nth comp_e 0; nth comp_e 1 ])
@@ -670,7 +669,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       *)
   (* Property Update *)
   | { snode = Update (e1, e2); sid; _ } :: rest ->
-      let annot = Annot.init ~origin_id:sid () in
+      let annot = Annot.make ~origin_id:sid () in
       let cmdle1, comp_e1 = compile_expr e1 in
       let cmdle2, comp_e2 = compile_expr e2 in
       let v_get = gen_str gvar in
@@ -698,7 +697,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
   *)
   (* Object Creation *)
   | { snode = New (x, k); sid; _ } :: rest ->
-      let annot = Annot.init ~origin_id:sid () in
+      let annot = Annot.make ~origin_id:sid () in
       let newcmd = Cmd.LAction (x, alloc, [ Expr.Lit (Literal.Int k) ]) in
       let comp_rest, new_functions = compile_list rest in
       ((annot, None, newcmd) :: comp_rest, new_functions)
@@ -716,12 +715,12 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
         | None                    -> None
       in
       let cmd = Cmd.Call (x, expr_fn, params, None, bindings) in
-      let annot = Annot.init ~origin_id:sid () in
+      let annot = Annot.make ~origin_id:sid () in
       let comp_rest, new_functions = compile_list rest in
       (List.concat cmdles @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
   (* If-Else bloc *)
   | { snode = If (e, sl1, sl2); sid; _ } :: rest ->
-      let annot = Annot.init ~origin_id:sid () in
+      let annot = Annot.make ~origin_id:sid () in
       let cmdle, guard = compile_expr e in
       let comp_sl1, new_functions1 = compile_list sl1 in
       let comp_sl2, new_functions2 = compile_list sl2 in
@@ -742,7 +741,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
         new_functions1 @ new_functions2 @ new_functions3 )
   (* Logic commands *)
   | { snode = Logic lcmd; sid; _ } :: rest ->
-      let annot = Annot.init ~origin_id:sid () in
+      let annot = Annot.make ~origin_id:sid () in
       let to_assert_opt, clcmd = compile_lcmd lcmd in
       let lcmds =
         match to_assert_opt with
@@ -755,7 +754,8 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let comp_rest, new_functions = compile_list rest in
       (cmds_with_annot @ comp_rest, new_functions)
 
-let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials } =
+let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials; _ }
+    =
   let _, comp_pre = compile_lassert ~fname pre in
   let _, comp_post = compile_lassert ~fname post in
   let label_opt =
@@ -769,7 +769,7 @@ let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials } =
     | Some ss_label ->
         Spec.s_init ~ss_label comp_pre [ comp_post ] Flag.Normal true
   in
-  Spec.init fname fparams [ single_spec ] false true
+  Spec.init fname fparams [ single_spec ] false false true
 
 let compile_pred filepath pred =
   let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; _ } = pred in
@@ -794,7 +794,11 @@ let compile_pred filepath pred =
       pred_ins;
       pred_definitions = List.map build_def pred_definitions;
       pred_normalised = false;
+      (* FIXME: ADD SUPPORT FOR ABSTRACT, PURE, NOUNFOLD *)
+      pred_facts = [];
+      pred_abstract = false;
       pred_pure = false;
+      pred_nounfold = false;
     }
 
 let rec compile_function
@@ -807,12 +811,12 @@ let rec compile_function
   let retassigncmds =
     cmdle
     @ [
-        ( Annot.init (),
+        ( Annot.make (),
           None,
           Cmd.Assignment (Gillian.Utils.Names.return_variable, comp_ret_expr) );
       ]
   in
-  let retcmd = (Annot.init (), None, Cmd.ReturnNormal) in
+  let retcmd = (Annot.make (), None, Cmd.ReturnNormal) in
   let lbody_withret = lbodylist @ retassigncmds @ [ retcmd ] in
   let gil_body = Array.of_list lbody_withret in
   let gil_spec = Option.map (compile_spec ~fname:name) spec in
@@ -927,8 +931,7 @@ let compile_lemma
       lemma_params;
       lemma_proof;
       lemma_variant;
-      lemma_hyp;
-      lemma_concs = [ post ];
+      lemma_specs = [ { lemma_hyp; lemma_concs = [ post ] } ];
       lemma_existentials;
     }
 

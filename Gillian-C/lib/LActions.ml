@@ -4,19 +4,35 @@ type mem_ac =
   | Alloc
   | DropPerm
   | GetCurPerm
+  | WeakValidPointer
   | Store
   | Load
   | Free
   | Move
-  | MGet
-  | MSet
-  | MRem
+  | GetSingle
+  | SetSingle
+  | RemSingle
+  | GetArray
+  | SetArray
+  | RemArray
+  | GetHole
+  | SetHole
+  | RemHole
+  | GetZeros
+  | SetZeros
+  | RemZeros
+  | GetBounds
+  | SetBounds
+  | RemBounds
+  | GetFreed
+  | SetFreed
+  | RemFreed
 
 type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
 
 type ac = AGEnv of genv_ac | AMem of mem_ac
 
-type mem_ga = SVal
+type mem_ga = Single | Array | Hole | Zeros | Bounds | Freed
 
 type genv_ga = Symbol | Definition
 
@@ -29,13 +45,28 @@ let is_overlapping_asrt = function
   | _       -> false
 
 let mem_ga_to_setter = function
-  | SVal -> MSet
+  | Single -> SetSingle
+  | Array  -> SetArray
+  | Hole   -> SetHole
+  | Zeros  -> SetZeros
+  | Bounds -> SetBounds
+  | Freed  -> SetFreed
 
 let mem_ga_to_getter = function
-  | SVal -> MGet
+  | Single -> GetSingle
+  | Array  -> GetArray
+  | Hole   -> GetHole
+  | Zeros  -> GetZeros
+  | Bounds -> GetBounds
+  | Freed  -> GetFreed
 
 let mem_ga_to_deleter = function
-  | SVal -> MRem
+  | Single -> RemSingle
+  | Array  -> RemArray
+  | Hole   -> RemHole
+  | Zeros  -> RemZeros
+  | Bounds -> RemBounds
+  | Freed  -> RemFreed
 
 let genv_ga_to_getter = function
   | Definition -> GetDef
@@ -66,29 +97,61 @@ let mem_prefix = "mem"
 let genv_prefix = "genv"
 
 let str_mem_ac = function
-  | Alloc      -> "alloc"
-  | DropPerm   -> "dropperm"
-  | GetCurPerm -> "getperm"
-  | Store      -> "store"
-  | Load       -> "load"
-  | Move       -> "move"
-  | Free       -> "free"
-  | MGet       -> "get"
-  | MSet       -> "set"
-  | MRem       -> "rem"
+  | Alloc            -> "alloc"
+  | DropPerm         -> "dropperm"
+  | WeakValidPointer -> "weakvalidpointer"
+  | GetCurPerm       -> "getperm"
+  | Store            -> "store"
+  | Load             -> "load"
+  | Move             -> "move"
+  | Free             -> "free"
+  | GetSingle        -> "getSingle"
+  | SetSingle        -> "setSingle"
+  | RemSingle        -> "remSingle"
+  | GetArray         -> "getArray"
+  | SetArray         -> "setArray"
+  | RemArray         -> "remArray"
+  | GetBounds        -> "getBounds"
+  | SetBounds        -> "setBounds"
+  | RemBounds        -> "remBounds"
+  | GetHole          -> "getHole"
+  | SetHole          -> "setHole"
+  | RemHole          -> "remHole"
+  | GetZeros         -> "getZeros"
+  | SetZeros         -> "setZeros"
+  | RemZeros         -> "remZeros"
+  | GetFreed         -> "getFreed"
+  | SetFreed         -> "setFreed"
+  | RemFreed         -> "remFreed"
 
 let mem_ac_from_str = function
-  | "alloc"      -> Alloc
-  | "dropperm"   -> DropPerm
-  | "getcurperm" -> GetCurPerm
-  | "store"      -> Store
-  | "load"       -> Load
-  | "free"       -> Free
-  | "move"       -> Move
-  | "get"        -> MGet
-  | "set"        -> MSet
-  | "rem"        -> MRem
-  | s            -> failwith ("Unkown Memory Action : " ^ s)
+  | "alloc"            -> Alloc
+  | "dropperm"         -> DropPerm
+  | "weakvalidpointer" -> WeakValidPointer
+  | "getcurperm"       -> GetCurPerm
+  | "store"            -> Store
+  | "load"             -> Load
+  | "free"             -> Free
+  | "move"             -> Move
+  | "getSingle"        -> GetSingle
+  | "setSingle"        -> SetSingle
+  | "remSingle"        -> RemSingle
+  | "getArray"         -> GetArray
+  | "setArray"         -> SetArray
+  | "remArray"         -> RemArray
+  | "getBounds"        -> GetBounds
+  | "setBounds"        -> SetBounds
+  | "remBounds"        -> RemBounds
+  | "getHole"          -> GetHole
+  | "setHole"          -> SetHole
+  | "remHole"          -> RemHole
+  | "getZeros"         -> GetZeros
+  | "setZeros"         -> SetZeros
+  | "remZeros"         -> RemZeros
+  | "getFreed"         -> GetFreed
+  | "setFreed"         -> SetFreed
+  | "remFreed"         -> RemFreed
+  | s                  -> failwith ("Unkown Memory Action : " ^ s)
 
 let str_genv_ac = function
   | GetSymbol -> "getsymbol"
@@ -123,20 +186,30 @@ let ac_from_str str =
   | _ -> failwith ("Unkown action : " ^ str)
 
 let str_mem_ga = function
-  | SVal -> "sval"
+  | Single -> "single"
+  | Array  -> "array"
+  | Hole   -> "hole"
+  | Zeros  -> "zeros"
+  | Bounds -> "bounds"
+  | Freed  -> "freed"
 
 let str_genv_ga = function
   | Definition -> "def"
   | Symbol     -> "symb"
 
 let mem_ga_from_str = function
-  | "sval" -> SVal
-  | str    -> failwith ("Unkown memory assertion : " ^ str)
+  | "single" -> Single
+  | "array"  -> Array
+  | "bounds" -> Bounds
+  | "zeros"  -> Zeros
+  | "hole"   -> Hole
+  | "freed"  -> Freed
+  | str      -> failwith ("Unkown memory assertion : " ^ str)
 
 let genv_ga_from_str = function
   | "symb" -> Symbol
   | "def"  -> Definition
-  | str    -> failwith ("Unkown global assertion : " ^ str)
+  | str    -> failwith ("Unknown global assertion : " ^ str)
 
 let str_ga = function
   | GMem mem_ga   -> mem_prefix ^ separator_string ^ str_mem_ga mem_ga
@@ -147,7 +220,7 @@ let ga_from_str str =
   | [ pref; ga ] when String.equal pref mem_prefix -> GMem (mem_ga_from_str ga)
   | [ pref; ga ] when String.equal pref genv_prefix ->
       GGenv (genv_ga_from_str ga)
-  | _ -> failwith ("Unkown GA : " ^ str)
+  | _ -> failwith ("Unknown GA : " ^ str)
 
 let ga_to_action_str action str = ga_from_str str |> action |> str_ac
 
@@ -163,8 +236,13 @@ let is_overlapping_asrt_str str = ga_from_str str |> is_overlapping_asrt
 
 let ga_loc_indexes ga =
   match ga with
-  | GMem SVal        -> [ 0 ]
+  | GMem Single      -> [ 0 ]
+  | GMem Array       -> [ 0 ]
+  | GMem Hole        -> [ 0 ]
+  | GMem Zeros       -> [ 0 ]
+  | GMem Bounds      -> [ 0 ]
+  | GMem Freed       -> [ 0 ]
   | GGenv Definition -> [ 0 ]
-  | GGenv Symbol     -> []
+  | GGenv Symbol     -> [ 1 ]
 
 let ga_loc_indexes_str ga_str = ga_from_str ga_str |> ga_loc_indexes

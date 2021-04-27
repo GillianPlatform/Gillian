@@ -35,21 +35,39 @@ rule read =
   | "/*@"      { ANNOT_OPEN }
   | "*/"       { ANNOT_CLOSE }
   | "//"       { read_comment lexbuf }
-  | '"'        { read_string (Buffer.create 17) lexbuf }
+  | '`'        { read_string (Buffer.create 17) lexbuf }
+  | "-g>"      { GLOBALPOINTSTO }
   | "-m>"      { MALLOCPOINTSTO }
   | "->"       { POINTSTO }
+  | "import"   { IMPORT }
+  | "verify"   { VERIFY }
+  | "nounfold" { NOUNFOLD }
   | "if"       { IF }
   | "else"     { ELSE }
   | "OR"       { BIGOR }
+  | "ZEROS"    { ZEROS }
+  | "MALLOCED" { MALLOCED }
+  | "MARRAY"   { MALLOCED_ARRAY }
+  | "ARRAY"    { ARRAY }
+  | "UNDEFS"   { UNDEFS }
+  | "abstract" { ABSTRACT }
   | "pred"     { PREDICATE }
+  | "pure"     { PURE }
+  | "lemma"    { LEMMA }
+  | "hypothesis" { HYPOTHESIS }
+  | "conclusions" { CONCLUSIONS }
+  | "proof"    { PROOF }
   | "spec"     { SPECIFICATION }
+  | "axiomatic" { AXIOMATIC }
   | "requires" { REQUIRES }
   | "ensures"  { ENSURES }
   | "struct"   { STRUCT }
+  | "int16"    { INT16T }
   | "int"      { INTT }
   | "float"    { FLOATT }
   | "long"     { LONGT }
   | "single"   { SINGLET }
+  | "char"     { CHART }
   | "ptr"      { PTRT }
   | "funptr"   { FUNPTRT }
   | "emp"      { EMP }
@@ -59,15 +77,25 @@ rule read =
   | "NULL"     { NULL }
   | "TRUE"     { CTRUE }
   | "FALSE"    { CFALSE }
-  | "exists"   { EXISTS }
+  | "bind"     { BIND }
+  | "unfold*" { REC_UNFOLD }
   | "unfold"   { UNFOLD }
+  | "unfold_all" { UNFOLD_ALL }
+  | "symb_exec" { SYMB_EXEC }
   | "fold"     { FOLD }
+  | "apply"    { APPLY }
+  | "invariant" { INVARIANT }
+  | "for_loop" { FOR_LOOP }
+  (* | "while_loop" { WHILE_LOOP }- *)
   | "assert"   { ASSERT }
+  | "branch"   { BRANCH }
   | "len"      { LEN }
+  | "lsub"     { LSUB }
   | "not"      { LNOT }
   | "forall"   { FORALL }
   | "Num"      { GNUMT }
   | "Set"      { GSETT }
+  | "List"     { GLISTT }
   | number     { NUMBER (float_of_string (Lexing.lexeme lexbuf)) }
   | lvar       { LVAR ( Lexing.lexeme lexbuf) }
   | loc        { LOC (Lexing.lexeme lexbuf) }
@@ -88,10 +116,14 @@ rule read =
   | "-u-"      { SETUNION }
   | "-s-"      { SETSUB }
   | "-d-"      { SETDIFF }
-  | "--e--"    { SETMEM }
+  | "-e-"      { SETMEM }
+  | "--e--"    { LSETMEM }
   | "=>"       { IMPLIES }
   | '+'        { PLUS }
+  | '-'        { MINUS }
+  | "p+"       { PTRPLUS }
   | '*'        { STAR }
+  | '/'        { DIV }
   | "::"       { LSTCONS }
   | "@"        { LSTCAT }
   | ':'        { COLON }
@@ -100,6 +132,11 @@ rule read =
   | '!'        { ENOT }
   | "<#"       { LLT }
   | "<=#"      { LLEQ }
+  | "<"        { LT }
+  | "||"       { LOR }
+  | "&&"       { LAND }
+  | "&"        { AND }
+  | "|"        { OR }
   | newline    { next_line lexbuf; read lexbuf }
   | white      { read lexbuf }
   | eof        { EOF }
@@ -114,9 +151,7 @@ and read_comment =
 
 and read_string buf =
   parse
-  | '"'       { if !in_annot then
-                failwith ("We do not handle strings such as \"" ^ (Buffer.contents buf) ^ "\" in the logic yet")
-                else read lexbuf }
+  | '`'       { STRING(Buffer.contents buf) }
   | '\\' '/'  { Buffer.add_char buf '/'; read_string buf lexbuf }
   | '\\' '\\' { Buffer.add_char buf '\\'; read_string buf lexbuf }
   | '\\' 'b'  { Buffer.add_char buf '\b'; read_string buf lexbuf }
@@ -124,7 +159,7 @@ and read_string buf =
   | '\\' 'n'  { Buffer.add_char buf '\n'; read_string buf lexbuf }
   | '\\' 'r'  { Buffer.add_char buf '\r'; read_string buf lexbuf }
   | '\\' 't'  { Buffer.add_char buf '\t'; read_string buf lexbuf }
-  | [^ '"' '\\']+
+  | [^ '`' '\\']+
     { Buffer.add_string buf (Lexing.lexeme lexbuf);
       read_string buf lexbuf
     }

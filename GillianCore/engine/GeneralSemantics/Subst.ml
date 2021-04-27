@@ -46,9 +46,6 @@ module type S = sig
   (** Substution merge into left *)
   val merge_left : t -> t -> unit
 
-  (** Compatible substitutions *)
-  val compatible : t -> t -> bool
-
   (** Substitution filter *)
   val filter : t -> (Var.t -> vt -> bool) -> t
 
@@ -64,6 +61,9 @@ module type S = sig
   (** Pretty Printer *)
   val pp : Format.formatter -> t -> unit
 
+  (** Full pretty Printer *)
+  val full_pp : Format.formatter -> t -> unit
+
   val filter_in_place : t -> (Var.t -> vt -> vt option) -> unit
 
   (** Convert substitution to list *)
@@ -75,13 +75,6 @@ module type S = sig
   (** Optional substitution inside a logical expression *)
   val subst_in_expr_opt : t -> Expr.t -> Expr.t option
 
-  (** Convert to a symbolic substitution *)
-  val to_ssubst : t -> (Var.t * Expr.t) list
-
-  (** creates a list of equalities from the substitution table
-    before substitution_to_list *)
-  val to_formulae : t -> Formula.t list
-
   val substitute_formula : t -> partial:bool -> Formula.t -> Formula.t
 
   val substitute_asrt : t -> partial:bool -> Asrt.t -> Asrt.t
@@ -92,7 +85,6 @@ module type S = sig
 end
 
 module Make (Val : Val.S) : S with type vt = Val.t = struct
-  open Containers
   module L = Logging
 
   (** Type of GIL values *)
@@ -125,10 +117,10 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     let filter =
       match filter_out with
       | Some filter -> filter
-      | None        -> fun x -> false
+      | None        -> fun _ -> false
     in
     Hashtbl.fold
-      (fun k v ac -> if filter k then ac else Var.Set.add k ac)
+      (fun k _ ac -> if filter k then ac else Var.Set.add k ac)
       subst Var.Set.empty
 
   (**
@@ -138,7 +130,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return Range of the substitution
   *)
   let range (subst : t) : vt list =
-    Hashtbl.fold (fun v v_val ac -> v_val :: ac) subst []
+    Hashtbl.fold (fun _ v_val ac -> v_val :: ac) subst []
 
   (**
     Substitution lookup
@@ -258,6 +250,19 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     Fmt.pf fmt "[ @[%a@] ]" (Fmt.hashtbl ~sep:Fmt.comma pp_pair) subst
 
   (**
+    Substitution full pretty_printer
+
+    @param fmt Formatter
+    @param subst Target substitution
+    @return unit
+  *)
+  let full_pp fmt (subst : t) =
+    let pp_pair fmt (v, v_val) =
+      Fmt.pf fmt "@[<h>(%s: %a)@]" v Val.full_pp v_val
+    in
+    Fmt.pf fmt "[ @[%a@] ]" (Fmt.hashtbl ~sep:Fmt.comma pp_pair) subst
+
+  (**
     Substitution in-place filter
 
     @param subst Target substitution
@@ -296,30 +301,31 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
             | Some sv ->
                 put subst x sv;
                 new_le_x
-            | None    -> raise (Failure "DEATH. subst_in_expr") )
+            | None    -> raise (Failure "DEATH. subst_in_expr"))
     in
+    let mapper =
+      object
+        inherit [_] Gil_syntax.Visitors.endo
 
-    let f_before (le : Expr.t) =
-      let open Generators in
-      match (le : Expr.t) with
-      | LVar x ->
-          (find_in_subst x le (fun () -> Expr.LVar (LVar.alloc ())), false)
-      | ALoc x ->
-          (find_in_subst x le (fun () -> Expr.ALoc (LVar.alloc ())), false)
-      | PVar x ->
-          ( find_in_subst x le (fun () ->
-                let lvar = LVar.alloc () in
-                L.(
-                  verbose (fun m ->
-                      m
-                        "General: Subst in lexpr: PVar %s not in subst, \
-                         generating fresh: %s"
-                        x lvar));
-                Expr.LVar lvar),
-            false )
-      | _      -> (le, true)
+        method! visit_LVar () this x =
+          find_in_subst x this (fun () -> Expr.LVar (LVar.alloc ()))
+
+        method! visit_ALoc () this x =
+          find_in_subst x this (fun () -> Expr.ALoc (LVar.alloc ()))
+
+        method! visit_PVar () this x =
+          find_in_subst x this (fun () ->
+              let lvar = LVar.alloc () in
+              L.(
+                verbose (fun m ->
+                    m
+                      "General: Subst in lexpr: PVar %s not in subst, \
+                       generating fresh: %s"
+                      x lvar));
+              Expr.LVar lvar)
+      end
     in
-    Expr.map f_before None le
+    mapper#visit_expr () le
 
   (**
     Optional substitution inside an expression
@@ -335,23 +341,6 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
       | _                        -> (Some le, true)
     in
     Expr.map_opt f_before None le
-
-  (**
-    Conversion to a symbolic substitution
-
-    @params subst Target substitution
-    @return List of bindings of the form (variable, logical expression)
-  *)
-  let to_ssubst (subst : t) : (Var.t * Expr.t) list =
-    List.map (fun (x, v_x) -> (x, Val.to_expr v_x)) (to_list subst)
-
-  let compatible (subst : t) (new_subst : t) : bool =
-    Hashtbl.fold
-      (fun x v ac ->
-        if not ac then false
-        else if Hashtbl.mem new_subst x then v = Hashtbl.find new_subst x
-        else true)
-      subst true
 
   let is_empty (subst : t) : bool = Hashtbl.length subst = 0
 
@@ -407,13 +396,4 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
       (Some (substitute_formula subst ~partial))
       (Some (substitute_slcmd subst ~partial))
       lcmd
-
-  (** creates a list of equalities from the substitution table
-    before substitution_to_list *)
-  let to_formulae (subst : t) : Formula.t list =
-    List.map
-      (fun (x, x_val) ->
-        let open Val in
-        Formula.Eq (to_expr (from_lvar_name x), to_expr x_val))
-      (to_list subst)
 end

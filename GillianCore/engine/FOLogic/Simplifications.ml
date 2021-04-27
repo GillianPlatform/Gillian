@@ -1,13 +1,6 @@
 open Containers
-open Generators
 open SVal
 module L = Logging
-
-exception FoundIt of Expr.t
-
-exception UnionInUnion of Expr.t list
-
-let interactive = ref false
 
 type simpl_key_type = {
   kill_new_lvars : bool option;
@@ -22,81 +15,12 @@ type simpl_val_type = {
   simpl_gamma : (Var.t * Type.t) list;
   simpl_pfs : Formula.t list;
   simpl_existentials : SS.t;
-  subst : SVal.SSubst.t;
+  subst : SVal.SESubst.t;
 }
 
 (* Simplification cache *)
 let simplification_cache : (simpl_key_type, simpl_val_type) Hashtbl.t =
   Hashtbl.create 1
-
-let rec find_me_Im_a_loc pfs lvar =
-  match (pfs : Formula.t list) with
-  | [] -> None
-  | Eq (lvar', Expr.ALoc loc) :: rest
-  | Eq (lvar', Lit (Loc loc)) :: rest
-  | Eq (ALoc loc, lvar') :: rest
-  | Eq (Lit (Loc loc), lvar') :: rest ->
-      if lvar = lvar' then Some loc else find_me_Im_a_loc rest lvar
-  | _ :: rest -> find_me_Im_a_loc rest lvar
-
-let find_me_in_the_pi (pfs : PFS.t) nle =
-  PFS.fold_left
-    (fun ac a ->
-      match (a : Formula.t) with
-      | Eq (LVar lvar, le) | Eq (le, LVar lvar) ->
-          if le = nle then Some lvar else ac
-      | _ -> ac)
-    None pfs
-
-let rec replace_nle_with_lvars pfs nle =
-  match nle with
-  | Expr.BinOp (le, op, le') -> (
-      match find_me_in_the_pi pfs nle with
-      | Some lvar -> Expr.LVar lvar
-      | None      ->
-          let lhs = replace_nle_with_lvars pfs le in
-          let rhs = replace_nle_with_lvars pfs le' in
-          BinOp (lhs, op, rhs) )
-  | UnOp (op, le)            -> (
-      match find_me_in_the_pi pfs nle with
-      | Some lvar -> LVar lvar
-      | None      -> UnOp (op, replace_nle_with_lvars pfs le) )
-  | EList le                 -> (
-      match find_me_in_the_pi pfs nle with
-      | Some lvar -> LVar lvar
-      | None      ->
-          let le_list =
-            List.map (fun le' -> replace_nle_with_lvars pfs le') le
-          in
-          EList le_list )
-  | ESet le                  -> (
-      match find_me_in_the_pi pfs nle with
-      | Some lvar -> LVar lvar
-      | None      ->
-          let le_list =
-            List.map (fun le' -> replace_nle_with_lvars pfs le') le
-          in
-          ESet le_list )
-  | NOp (op, le)             -> (
-      match find_me_in_the_pi pfs nle with
-      | Some lvar -> LVar lvar
-      | None      ->
-          let le_list =
-            List.map (fun le' -> replace_nle_with_lvars pfs le') le
-          in
-          NOp (op, le_list) )
-  | _                        -> nle
-
-let all_set_literals lset =
-  List.fold_left
-    (fun x le ->
-      let result =
-        match le with
-        | Expr.ESet _ -> true
-        | _           -> false
-      in
-      x && result)
-    true lset
 
 (* Reduction of assertions *)
 
@@ -105,7 +29,7 @@ let all_set_literals lset =
 
 (*************************************)
 
-let reduce_pfs_in_place ?(unification = false) store gamma (pfs : PFS.t) =
+let reduce_pfs_in_place ?(unification = false) _ gamma (pfs : PFS.t) =
   PFS.map_inplace (Reduction.reduce_formula ~unification ~gamma ~pfs) pfs
 
 let sanitise_pfs ?(unification = false) store gamma pfs =
@@ -116,21 +40,14 @@ let sanitise_pfs ?(unification = false) store gamma pfs =
   done;
   PFS.remove_duplicates pfs
 
-let sanitise_pfs_no_store_no_gamma ?(unification = false) =
-  sanitise_pfs ~unification (Hashtbl.create 1) (TypEnv.init ())
-
 let sanitise_pfs_no_store ?(unification = false) =
   sanitise_pfs ~unification (Hashtbl.create 1)
-
-let filter_gamma_pfs pfs gamma =
-  let pfs_vars = PFS.lvars pfs in
-  TypEnv.filter_vars_in_place gamma pfs_vars
 
 (* *********** *)
 (*   CLEANUP   *)
 (* *********** *)
 
-let clean_up_stuff exists (left : PFS.t) (right : PFS.t) =
+let clean_up_stuff (left : PFS.t) (right : PFS.t) =
   let sleft = PFS.to_set left in
   let pf_sym pfa pfb =
     match ((pfa, pfb) : Formula.t * Formula.t) with
@@ -155,7 +72,7 @@ let clean_up_stuff exists (left : PFS.t) (right : PFS.t) =
       (function
         | Not (Eq ((EList _ | BinOp _ | UnOp _), Lit Empty)) -> false
         | _ -> true)
-      right )
+      right)
 
 (* Set intersections *)
 let get_set_intersections pfs =
@@ -239,13 +156,13 @@ let get_set_intersections pfs =
               intersections :=
                 Expr.Set.of_list [ ESet [ LVar v1 ]; ESet [ LVar v2 ] ]
                 :: !intersections
-          | _, _                      -> () )
+          | _, _                      -> ())
       | _                       -> ())
     pfs;
   let intersections = List.map (fun s -> Expr.Set.elements s) !intersections in
   List.sort compare intersections
 
-let resolve_set_existentials
+let _resolve_set_existentials
     (lpfs : PFS.t) (rpfs : PFS.t) exists (gamma : TypEnv.t) =
   let exists = ref exists in
 
@@ -273,22 +190,20 @@ let resolve_set_existentials
           let ul =
             List.flatten
               (List.map
-                 (fun (u : Expr.t) ->
-                   ( match (u : Expr.t) with
-                     | ESet x ->
-                         List.map (fun (x : Expr.t) -> (ESet [ x ] : Expr.t)) x
-                     | _      -> [ u ]
-                     : Expr.t list ))
+                 (fun (u : Expr.t) : Expr.t list ->
+                   match (u : Expr.t) with
+                   | ESet x ->
+                       List.map (fun (x : Expr.t) : Expr.t -> ESet [ x ]) x
+                   | _      -> [ u ])
                  ul)
           in
           let ur =
             List.flatten
               (List.map
-                 (fun (u : Expr.t) ->
-                   ( match u with
-                     | ESet x -> List.map (fun x -> (ESet [ x ] : Expr.t)) x
-                     | _      -> [ u ]
-                     : Expr.t list ))
+                 (fun (u : Expr.t) : Expr.t list ->
+                   match u with
+                   | ESet x -> List.map (fun x : Expr.t -> ESet [ x ]) x
+                   | _      -> [ u ])
                  ur)
           in
 
@@ -370,8 +285,8 @@ let resolve_set_existentials
                   L.(
                     verbose (fun m ->
                         m "Managed to instantiate a set existential: %s" v));
-                  let temp_subst = SSubst.init [] in
-                  SSubst.put temp_subst v rhs;
+                  let temp_subst = SESubst.init [] in
+                  SESubst.put temp_subst (LVar v) rhs;
                   PFS.substitution temp_subst rpfs;
                   exists := SS.remove v !exists;
                   while TypEnv.mem gamma v do
@@ -379,111 +294,13 @@ let resolve_set_existentials
                   done;
                   None
               | _ -> Some (Formula.Eq (lhs, rhs))
-            else Some formula_to_filter )
+            else Some formula_to_filter)
           else Some formula_to_filter
       | _ -> Some formula_to_filter
     in
     PFS.filter_map filter_map_fun rpfs;
-    (rpfs, !exists, gamma) )
+    (rpfs, !exists, gamma))
   else (rpfs, !exists, gamma)
-
-let find_impossible_unions
-    (lpfs : PFS.t) (rpfs : PFS.t) exists (gamma : TypEnv.t) =
-  let exists = ref exists in
-
-  let set_exists =
-    SS.filter (fun x -> TypEnv.get gamma x = Some SetType) !exists
-  in
-  if SS.cardinal set_exists > 0 then (
-    let intersections =
-      get_set_intersections (PFS.to_list lpfs @ PFS.to_list rpfs)
-    in
-    L.(
-      verbose (fun m ->
-          m "Intersections we have:\n%s"
-            (String.concat "\n"
-               (List.map
-                  (fun s ->
-                    String.concat ", "
-                      (List.map (fun e -> (Fmt.to_to_string Expr.pp) e) s))
-                  intersections))));
-    let test_formula = function
-      | Formula.Eq (NOp (SetUnion, ul), NOp (SetUnion, ur)) ->
-          let sul = Expr.Set.of_list ul in
-          let sur = Expr.Set.of_list ur in
-          L.verbose (fun m ->
-              m "Find impossible unions: I have found a union equality.");
-
-          (* Just for the left *)
-          Expr.Set.exists
-            (fun s1 ->
-              let must_not_intersect =
-                List.map
-                  (fun s -> List.sort compare [ s; s1 ])
-                  (Expr.Set.elements sur)
-              in
-              L.(
-                verbose (fun m ->
-                    m "Intersections we need:\n%s"
-                      (String.concat "\n"
-                         (List.map
-                            (fun s ->
-                              String.concat ", "
-                                (List.map
-                                   (fun e -> (Fmt.to_to_string Expr.pp) e)
-                                   s))
-                            must_not_intersect))));
-              let must_not_intersect =
-                List.map (fun s -> List.mem s intersections) must_not_intersect
-              in
-              L.(
-                verbose (fun m ->
-                    m "And we have: %s"
-                      (String.concat ", "
-                         (List.map
-                            (fun (x : bool) ->
-                              if x = true then "true" else "false")
-                            must_not_intersect))));
-              List.mem true must_not_intersect
-              && not (List.mem false must_not_intersect))
-            sul
-      | _ -> false
-    in
-    if PFS.exists test_formula rpfs then
-      (PFS.of_list [ Formula.False ], SS.empty, TypEnv.init ())
-    else (rpfs, !exists, gamma) )
-  else (rpfs, !exists, gamma)
-
-let trim_down (exists : SS.t) (lpfs : PFS.t) (rpfs : PFS.t) gamma =
-  let lhs_lvars = PFS.lvars lpfs in
-  let rhs_lvars = PFS.lvars rpfs in
-  let diff = SS.diff (SS.diff rhs_lvars lhs_lvars) exists in
-
-  if
-    PFS.length rpfs = 1
-    &&
-    match PFS.get_nth 0 rpfs with
-    | Some
-        ( Eq (LVar v1, LVar v2)
-        | Less (LVar v1, LVar v2)
-        | LessEq (LVar v1, LVar v2)
-        | Not (Eq (LVar v1, LVar v2))
-        | Not (Less (LVar v1, LVar v2))
-        | Not (LessEq (LVar v1, LVar v2)) )
-      when v1 <> v2 && (SS.mem v1 diff || SS.mem v2 diff) -> true
-    | _ -> false
-  then (false, exists, lpfs, rpfs, gamma)
-  else
-    (* FIXME: THIS IS UNSOUND, FIX *)
-    let () =
-      PFS.filter
-        (fun pf ->
-          let pf_lvars = Formula.lvars pf in
-          let inter_empty = SS.inter rhs_lvars pf_lvars = SS.empty in
-          not inter_empty)
-        lpfs
-    in
-    (true, exists, lpfs, rpfs, gamma)
 
 (**
   Pure entailment: simplify pure formulae and typing environment
@@ -500,13 +317,8 @@ let simplify_pfs_and_gamma
     ?(existentials : SS.t option)
     (lpfs : PFS.t)
     ?(rpfs : PFS.t option)
-    (gamma : TypEnv.t) : SSubst.t * SS.t =
-  L.verbose (fun m -> m "Simplifications.simplify_pfs_and_gamma");
-  L.verbose (fun m ->
-      m "With unification: %s" (if unification then "Yes" else "No"));
-  L.verbose (fun m -> m "  @[%a@]" PFS.pp lpfs);
-  L.verbose (fun m -> m "  @[%a@]" TypEnv.pp gamma);
-
+    (gamma : TypEnv.t) : SESubst.t * SS.t =
+  (* let t = Sys.time () in *)
   let rpfs : PFS.t = Option.value ~default:(PFS.init ()) rpfs in
   let existentials : SS.t ref =
     ref (Option.value ~default:SS.empty existentials)
@@ -534,11 +346,17 @@ let simplify_pfs_and_gamma
       (* Deal with rpfs *)
       if PFS.length lpfs > 0 && PFS.get_nth 0 lpfs == Some False then (
         PFS.clear rpfs;
-        PFS.extend rpfs True );
+        PFS.extend rpfs True);
 
-      (SSubst.copy subst, simpl_existentials)
+      (SESubst.copy subst, simpl_existentials)
   | false ->
-      let result = SSubst.init [] in
+      L.verbose (fun m -> m "PFS/Gamma simplification:");
+      L.verbose (fun m ->
+          m "With unification: %s" (if unification then "Yes" else "No"));
+      L.verbose (fun m -> m "PFS:@\n@[%a@]\n" PFS.pp lpfs);
+      L.verbose (fun m -> m "Gamma:@\n@[%a@]\n" TypEnv.pp gamma);
+
+      let result = SESubst.init [] in
 
       let vars_to_save, save_all =
         Option.value ~default:(SS.empty, false) save_spec_vars
@@ -550,11 +368,12 @@ let simplify_pfs_and_gamma
       (* Unit types *)
       let simplify_unit_types () =
         TypEnv.iter gamma (fun x t ->
+            let e = Expr.from_var_name x in
             match t with
-            | UndefinedType -> SSubst.put result x (Lit Undefined)
-            | NullType      -> SSubst.put result x (Lit Null)
-            | EmptyType     -> SSubst.put result x (Lit Empty)
-            | NoneType      -> SSubst.put result x (Lit Nono)
+            | UndefinedType -> SESubst.put result e (Lit Undefined)
+            | NullType      -> SESubst.put result e (Lit Null)
+            | EmptyType     -> SESubst.put result e (Lit Empty)
+            | NoneType      -> SESubst.put result e (Lit Nono)
             | _             -> ())
       in
 
@@ -599,10 +418,10 @@ let simplify_pfs_and_gamma
             | Some te1, Some te2 when te1 <> te2 -> `Filter
             | Some te1, Some te2
               when te1 = te2
-                   && ( te1 = UndefinedType || te1 = NullType || te1 = EmptyType
-                      || te1 = NoneType ) ->
+                   && (te1 = UndefinedType || te1 = NullType || te1 = EmptyType
+                     || te1 = NoneType) ->
                 stop_explain "Inequality of two undefined/null/empty/none"
-            | _ -> `Replace whole )
+            | _ -> `Replace whole)
         | Eq (BinOp (lst, LstNth, idx), elem)
         | Eq (elem, BinOp (lst, LstNth, idx)) -> (
             match idx with
@@ -624,103 +443,77 @@ let simplify_pfs_and_gamma
                        NOp
                          ( LstCat,
                            [ EList (List.append prepend [ elem ]); append ] ) ))
-            | _ -> `Replace whole )
-        | (Eq (LstSub (lst, start, num), sl) | Eq (sl, LstSub (lst, start, num)))
-          when unification -> `Replace whole
+            | _ -> `Replace whole)
+        | Eq (UnOp (LstLen, le), Lit (Num 0.))
+        | Eq (Lit (Num 0.), UnOp (LstLen, le)) -> rec_call (Eq (le, EList []))
         | Eq (UnOp (LstLen, le), Lit (Num len))
-        | Eq (Lit (Num len), UnOp (LstLen, le)) -> (
+        | Eq (Lit (Num len), UnOp (LstLen, le))
+          when not unification -> (
             match Arith_Utils.is_int len with
             | false -> stop_explain "List length not an integer."
-            | true  ->
+            | true when len >= 0. ->
                 let len = int_of_float len in
-                let le_vars =
-                  Array.to_list (Array.init len (fun _ -> LVar.alloc ()))
-                in
+                let le_vars = List.init len (fun _ -> LVar.alloc ()) in
                 vars_to_kill := SS.union !vars_to_kill (SS.of_list le_vars);
                 let le' = List.map (fun x -> Expr.LVar x) le_vars in
-                rec_call (Eq (le, EList le')) )
+                rec_call (Eq (le, EList le'))
+            | _ -> stop_explain "List length an unexpected integer.")
         | Eq (NOp (LstCat, les), EList [])
-        | Eq (NOp (LstCat, les), Lit (LList [])) ->
+        | Eq (NOp (LstCat, les), Lit (LList []))
+        | Eq (EList [], NOp (LstCat, les))
+        | Eq (Lit (LList []), NOp (LstCat, les)) ->
             let eqs = List.map (fun le -> Formula.Eq (le, EList [])) les in
             List.iter (fun eq -> extend_with eq) eqs;
             `Filter
+        (* Two list concats, Satan save us *)
+        | Eq (NOp (LstCat, lcat), NOp (LstCat, rcat)) -> (
+            match Reduction.understand_lstcat lpfs gamma lcat rcat with
+            | None                -> `Replace whole
+            | Some (pf, new_vars) ->
+                extend_with pf;
+                vars_to_kill := SS.union !vars_to_kill new_vars;
+                `Replace whole)
+        (*  *)
+        | Eq (UnOp (LstLen, x), BinOp (Lit (Num n), FPlus, LVar z)) when n >= 0.
+          ->
+            let n = Float.to_int n in
+            let new_lvars =
+              Array.to_list (Array.init n (fun _ -> Expr.LVar (LVar.alloc ())))
+            in
+            let rest = LVar.alloc () in
+            let lst_eq =
+              Formula.Eq (x, NOp (LstCat, [ EList new_lvars; LVar rest ]))
+            in
+            let len_rest = Formula.Eq (UnOp (LstLen, LVar rest), LVar z) in
+            extend_with len_rest;
+            `Replace lst_eq
         (* Sublist *)
         | Eq (LstSub (lst, start, num), sl) | Eq (sl, LstSub (lst, start, num))
-          -> (
-            match (start, num) with
-            (* We know both the start and the length *)
-            | Lit (Num st), Lit (Num el)
-              when Arith_Utils.is_int st && Arith_Utils.is_int el ->
-                (* Prefix *)
-                let prefix_lvars =
-                  Array.to_list
-                    (Array.init (int_of_float st) (fun _ -> LVar.alloc ()))
-                in
-                vars_to_kill := SS.union !vars_to_kill (SS.of_list prefix_lvars);
-                let prefix = List.map (fun x -> Expr.LVar x) prefix_lvars in
-                (* Create sublist *)
-                let sublist_lvars =
-                  Array.to_list
-                    (Array.init (int_of_float el) (fun _ -> LVar.alloc ()))
-                in
-                vars_to_kill :=
-                  SS.union !vars_to_kill (SS.of_list sublist_lvars);
-                let sublist = List.map (fun x -> Expr.LVar x) sublist_lvars in
-                (* Suffix *)
-                let suffix = LVar.alloc () in
-                vars_to_kill := SS.add suffix !vars_to_kill;
-                extend_with (Eq (sl, EList sublist));
-                rec_call
-                  (Eq
-                     ( lst,
-                       NOp (LstCat, [ EList (prefix @ sublist); LVar suffix ])
-                     ))
-            (* We know just the start *)
-            | Lit (Num st), _ when Arith_Utils.is_int st ->
-                (* Prefix *)
-                let prefix_lvars =
-                  Array.to_list
-                    (Array.init (int_of_float st) (fun _ -> LVar.alloc ()))
-                in
-                vars_to_kill := SS.union !vars_to_kill (SS.of_list prefix_lvars);
-                let prefix = List.map (fun x -> Expr.LVar x) prefix_lvars in
-                (* Suffix *)
-                let suffix = LVar.alloc () in
-                let ns_var = LVar.alloc () in
-                let ns_len_var = LVar.alloc () in
-                vars_to_kill :=
-                  SS.add suffix
-                    (SS.add ns_var (SS.add ns_len_var !vars_to_kill));
-                extend_with
-                  (Eq (LVar ns_var, NOp (LstCat, [ sl; LVar suffix ])));
-                extend_with (Eq (UnOp (LstLen, sl), num));
-                extend_with
-                  (Eq
-                     ( LVar suffix,
-                       LstSub
-                         ( LVar ns_var,
-                           UnOp (LstLen, sl),
-                           BinOp
-                             ( UnOp (LstLen, LVar ns_var),
-                               FMinus,
-                               UnOp (LstLen, sl) ) ) ));
-                rec_call (Eq (lst, NOp (LstCat, [ EList prefix; LVar ns_var ])))
-            | _, _
-              when ( match sl with
-                   | Lit (LList _) | EList _ -> false
-                   | _                       -> true )
-                   && (not (num = UnOp (LstLen, sl)))
-                   &&
-                   match num with
-                   | Lit (Num _) | LVar _ -> true
-                   | _                    -> false ->
-                let new_pf = Formula.Eq (UnOp (LstLen, sl), num) in
-                L.(
-                  verbose (fun m ->
-                      m "LSTSUBADD: %s" ((Fmt.to_to_string Formula.pp) new_pf)));
-                PFS.extend lpfs new_pf;
-                `Replace whole
-            | _ -> `Replace whole )
+          ->
+            let prefix_lvar = LVar.alloc () in
+            let suffix_lvar = LVar.alloc () in
+            vars_to_kill :=
+              SS.add prefix_lvar (SS.add suffix_lvar !vars_to_kill);
+            let suffix_len =
+              Expr.BinOp (UnOp (LstLen, lst), FMinus, BinOp (start, FPlus, num))
+            in
+            let suffix_len =
+              Reduction.reduce_lexpr ~pfs:lpfs ~gamma suffix_len
+            in
+            L.verbose (fun fmt ->
+                fmt "Reduced suffix length: %a" Expr.pp suffix_len);
+            let lst_eq =
+              if suffix_len = Lit (Num 0.) then
+                Formula.Eq (lst, NOp (LstCat, [ LVar prefix_lvar; sl ]))
+              else
+                Formula.Eq
+                  (lst, NOp (LstCat, [ LVar prefix_lvar; sl; LVar suffix_lvar ]))
+            in
+            let len_pr = Formula.Eq (UnOp (LstLen, LVar prefix_lvar), start) in
+            let len_sl = Formula.Eq (UnOp (LstLen, sl), num) in
+            extend_with len_pr;
+            extend_with len_sl;
+            `Replace lst_eq
         | Eq (le1, le2) -> (
             let te1, _, _ = Typing.type_lexpr gamma le1 in
             let te2, _, _ = Typing.type_lexpr gamma le2 in
@@ -748,21 +541,23 @@ let simplify_pfs_and_gamma
                       (UnOp (LstLen, LVar x))
                       lpfs;
                     `Replace whole
-                | Lit (Loc lloc), ALoc aloc | ALoc aloc, Lit (Loc lloc) ->
+                | Lit (Loc _), ALoc _ | ALoc _, Lit (Loc _) ->
                     (* TODO: What should actually happen here... *)
                     stop_explain
                       "Abtract location never equal to a concrete location"
-                    (* SSubst.put result aloc (Lit (Loc lloc));
-                       let temp_subst = SSubst.init [ aloc, Lit (Loc lloc) ] in
+                    (* SESubst.put result aloc (Lit (Loc lloc));
+                       let temp_subst = SESubst.init [ aloc, Lit (Loc lloc) ] in
                          PFS.substitution_in_place temp_subst lpfs *)
                 | ALoc alocl, ALoc alocr when unification ->
                     L.verbose (fun fmt ->
                         fmt "Two equal alocs: %s and %s" alocl alocr);
-                    SSubst.put result alocr (ALoc alocl);
-                    let temp_subst = SSubst.init [ (alocr, ALoc alocl) ] in
+                    SESubst.put result (ALoc alocr) (ALoc alocl);
+                    let temp_subst =
+                      SESubst.init [ (ALoc alocr, ALoc alocl) ]
+                    in
                     PFS.substitution temp_subst lpfs;
                     let substituted =
-                      SSubst.substitute_formula ~partial:true temp_subst whole
+                      SESubst.substitute_formula ~partial:true temp_subst whole
                     in
                     rec_call substituted
                 | ALoc alocl, ALoc alocr when not unification ->
@@ -789,7 +584,7 @@ let simplify_pfs_and_gamma
                                 Names.is_spec_var_name v
                                 && not (Names.is_spec_var_name w)
                               then (w, LVar v)
-                              else (v, le) )
+                              else (v, le))
                       | _      -> (v, le)
                     in
 
@@ -806,25 +601,26 @@ let simplify_pfs_and_gamma
                           | Some tv, Some tle when tv <> tle ->
                               Error "Type mismatch"
                           | _ ->
-                              let temp_subst = SSubst.init [ (v, le) ] in
+                              let temp_subst = SESubst.init [ (LVar v, le) ] in
                               PFS.substitution temp_subst lpfs;
 
-                              if SSubst.mem result v then (
-                                let le' = Option.get (SSubst.get result v) in
-                                L.(
+                              (if SESubst.mem result (LVar v) then
+                               let le' =
+                                 Option.get (SESubst.get result (LVar v))
+                               in
+                               (* L.(
                                   verbose (fun m ->
                                       m "Multiples in subst: %s %s"
                                         ((Fmt.to_to_string Expr.pp) le)
-                                        ((Fmt.to_to_string Expr.pp) le')));
-                                if
-                                  le <> le' && not (PFS.mem lpfs (Eq (le, le')))
-                                then PFS.extend lpfs (Eq (le, le')) );
-                              SSubst.iter result (fun x le ->
+                                        ((Fmt.to_to_string Expr.pp) le'))); *)
+                               if le <> le' then PFS.extend lpfs (Eq (le, le')));
+                              SESubst.iter result (fun x le ->
                                   let sle =
-                                    SSubst.subst_in_expr temp_subst true le
+                                    SESubst.subst_in_expr temp_subst
+                                      ~partial:true le
                                   in
-                                  SSubst.put result x sle);
-                              SSubst.put result v le;
+                                  SESubst.put result x sle);
+                              SESubst.put result (LVar v) le;
 
                               existentials := SS.remove v !existentials;
 
@@ -842,7 +638,7 @@ let simplify_pfs_and_gamma
                                         | Some t' ->
                                             if t <> t' then
                                               Error "Type mismatch"
-                                            else Ok () ) )
+                                            else Ok ()))
                                 | _       -> Ok ()
                               in
 
@@ -863,7 +659,7 @@ let simplify_pfs_and_gamma
                                         | Some tv ->
                                             if t <> tv then
                                               Error "Type mismatch"
-                                            else Ok () ) )
+                                            else Ok ()))
                                 | false ->
                                     TypEnv.remove gamma v;
                                     Ok ()
@@ -872,7 +668,7 @@ let simplify_pfs_and_gamma
                         in
                         match res with
                         | Error s -> stop_explain s
-                        | Ok ()   -> `Filter ) )
+                        | Ok ()   -> `Filter))
                 | UnOp (TypeOf, LVar v), Lit (Type t)
                 | Lit (Type t), UnOp (TypeOf, LVar v) -> (
                     match TypEnv.get gamma v with
@@ -881,10 +677,160 @@ let simplify_pfs_and_gamma
                         `Filter
                     | Some tv ->
                         if t <> tv then stop_explain "Type mismatch"
-                        else `Filter )
-                | _, _ -> `Replace whole ) )
+                        else `Filter)
+                | _, _ -> `Replace whole))
         (* All other cases *)
         | _ -> `Replace whole
+      in
+
+      let analyse_list_structure pfs =
+        L.verbose (fun fmt -> fmt "Analysing list structure.");
+        let map_add k v map =
+          match Expr.Map.mem k map with
+          | true  -> Expr.Map.add k (Expr.Set.add v (Expr.Map.find k map)) map
+          | false -> Expr.Map.add k (Expr.Set.singleton v) map
+        in
+
+        let map_map_add k v x map =
+          let xmap =
+            match Expr.Map.mem k map with
+            | true  -> Expr.Map.find k map
+            | false -> Expr.Map.empty
+          in
+          Expr.Map.add k (map_add v x xmap) map
+        in
+
+        let lens, cats, xcats =
+          PFS.fold_left
+            (fun (lens, cats, xcats) pf ->
+              match pf with
+              (* List length direct equality *)
+              | Eq (UnOp (LstLen, LVar x), UnOp (LstLen, LVar y)) when x <> y ->
+                  let lens = map_add (UnOp (LstLen, LVar y)) (LVar x) lens in
+                  (map_add (UnOp (LstLen, LVar x)) (LVar y) lens, cats, xcats)
+              (* List length equals some other expression on the right *)
+              | Eq (UnOp (LstLen, LVar x), rhs)
+                when not (List.mem (Expr.LVar x) (Expr.base_elements rhs)) ->
+                  (map_add rhs (LVar x) lens, cats, xcats)
+              (* List length equals some other expression on the left *)
+              | Eq (lhs, UnOp (LstLen, LVar x))
+                when not (List.mem (Expr.LVar x) (Expr.base_elements lhs)) ->
+                  (map_add lhs (LVar x) lens, cats, xcats)
+              (*************** CATS **************)
+              (* Two cats *)
+              | Eq (NOp (LstCat, LVar a :: b), NOp (LstCat, LVar c :: d))
+                when a <> c ->
+                  let cats =
+                    map_map_add
+                      (NOp (LstCat, LVar c :: d))
+                      (Expr.LVar a)
+                      (NOp (LstCat, b))
+                      cats
+                  in
+                  let xcats =
+                    map_add
+                      (NOp (LstCat, LVar a :: b))
+                      (NOp (LstCat, LVar c :: d))
+                      xcats
+                  in
+                  ( lens,
+                    map_map_add
+                      (NOp (LstCat, LVar a :: b))
+                      (Expr.LVar c)
+                      (NOp (LstCat, d))
+                      cats,
+                    map_add
+                      (NOp (LstCat, LVar c :: d))
+                      (NOp (LstCat, LVar a :: b))
+                      xcats )
+              (* One cat on the left *)
+              | Eq (NOp (LstCat, LVar a :: b), rhs) ->
+                  ( lens,
+                    map_map_add rhs (Expr.LVar a) (NOp (LstCat, b)) cats,
+                    map_add (NOp (LstCat, LVar a :: b)) rhs xcats )
+              (* One cat on the right *)
+              | Eq (lhs, NOp (LstCat, LVar a :: b)) ->
+                  ( lens,
+                    map_map_add lhs (Expr.LVar a) (NOp (LstCat, b)) cats,
+                    map_add (NOp (LstCat, LVar a :: b)) lhs xcats )
+              | _ -> (lens, cats, xcats))
+            (Expr.Map.empty, Expr.Map.empty, Expr.Map.empty)
+            pfs
+        in
+        let lens =
+          Expr.Map.filter (fun _ eqlens -> Expr.Set.cardinal eqlens > 1) lens
+        in
+        Expr.Map.iter
+          (fun _ eqs ->
+            Expr.Map.iter
+              (fun _ eqs ->
+                let eqs = Expr.Set.elements eqs in
+                for i = 0 to List.length eqs - 1 do
+                  for j = i + 1 to List.length eqs - 1 do
+                    let x = List.nth eqs i in
+                    let y = List.nth eqs j in
+                    L.verbose (fun fmt ->
+                        fmt "ULTRA LSTCAT: cat equality: %a and %a" Expr.pp x
+                          Expr.pp y);
+                    PFS.extend pfs (Eq (x, y))
+                  done
+                done)
+              eqs)
+          cats;
+        Expr.Map.iter
+          (fun _ eqs ->
+            let eqs = Expr.Set.elements eqs in
+            for i = 0 to List.length eqs - 1 do
+              for j = i + 1 to List.length eqs - 1 do
+                let x = List.nth eqs i in
+                let y = List.nth eqs j in
+                L.verbose (fun fmt ->
+                    fmt "ULTRA LSTCAT: xcat equality: %a and %a" Expr.pp x
+                      Expr.pp y);
+                PFS.extend pfs (Eq (x, y))
+              done
+            done)
+          xcats;
+        let cats =
+          Expr.Map.filter (fun _ eqlens -> Expr.Map.cardinal eqlens > 1) cats
+        in
+        let cats =
+          Expr.Map.map
+            (fun eqlens ->
+              Expr.Map.map (fun eqs -> Expr.Set.min_elt eqs) eqlens)
+            cats
+        in
+        Expr.Map.iter
+          (fun _ eqlens ->
+            Expr.Map.iter
+              (fun _ (eqcats : Expr.t Expr.Map.t) ->
+                let domain, _ = List.split (Expr.Map.bindings eqcats) in
+                let domain = Expr.Set.of_list domain in
+                let inter = Expr.Set.elements (Expr.Set.inter eqlens domain) in
+                let len_inter = List.length inter in
+                if len_inter > 1 then
+                  L.verbose (fun fmt ->
+                      fmt "ULTRA LSTCAT: found equals: %a"
+                        Fmt.(brackets (list ~sep:comma Expr.pp))
+                        inter);
+                for i = 0 to len_inter - 1 do
+                  for j = i + 1 to len_inter - 1 do
+                    let x = List.nth inter i in
+                    let y = List.nth inter j in
+                    L.verbose (fun fmt ->
+                        fmt "ULTRA LSTCAT: head equality: %a and %a" Expr.pp x
+                          Expr.pp y);
+                    PFS.extend pfs (Eq (x, y));
+                    let x = Expr.Map.find x eqcats in
+                    let y = Expr.Map.find y eqcats in
+                    L.verbose (fun fmt ->
+                        fmt "ULTRA LSTCAT: tail equality: %a and %a" Expr.pp x
+                          Expr.pp y);
+                    PFS.extend pfs (Eq (x, y))
+                  done
+                done)
+              cats)
+          lens
       in
 
       (*****************************************
@@ -896,8 +842,8 @@ let simplify_pfs_and_gamma
 
       while not (PFS.equal lpfs !old_pfs) do
         iteration_count := !iteration_count + 1;
-        L.verbose (fun fmt -> fmt "Iteration: %d" !iteration_count);
-        L.verbose (fun fmt -> fmt "PFS:\n%a" PFS.pp lpfs);
+        L.tmi (fun fmt -> fmt "Iteration: %d" !iteration_count);
+        L.tmi (fun fmt -> fmt "PFS:\n%a" PFS.pp lpfs);
 
         old_pfs := PFS.copy lpfs;
 
@@ -916,92 +862,140 @@ let simplify_pfs_and_gamma
           || (PFS.length lpfs > 0 && not (PFS.get_nth 0 lpfs = Some False))
         then (
           (* Step 3 - Bring back my variables *)
-          SSubst.iter result (fun v le ->
-              if
-                (not (SS.mem v !vars_to_kill))
-                && ( save_all
-                   || (kill_new_lvars && SS.mem v vars_to_save)
-                   || ((not kill_new_lvars) && vars_to_save <> SS.empty) )
-                && not (Names.is_aloc_name v)
-              then PFS.extend lpfs (Eq (LVar v, le)));
+          SESubst.iter result (fun v le ->
+              match v with
+              | LVar v ->
+                  if
+                    (not (SS.mem v !vars_to_kill))
+                    && (save_all
+                       || (kill_new_lvars && SS.mem v vars_to_save)
+                       || ((not kill_new_lvars) && vars_to_save <> SS.empty))
+                    && not (Names.is_aloc_name v)
+                  then PFS.extend lpfs (Eq (LVar v, le))
+              | _      -> ());
 
           sanitise_pfs_no_store ~unification gamma lpfs;
-          PFS.sort lpfs;
 
           let current_lvars = SS.union (PFS.lvars lpfs) (PFS.lvars rpfs) in
           TypEnv.iter gamma (fun v _ ->
               if SS.mem v !vars_to_kill && not (SS.mem v current_lvars) then
-                TypEnv.remove gamma v) )
+                TypEnv.remove gamma v);
+
+          TypEnv.iter gamma (fun v t ->
+              match t with
+              | Type.ListType ->
+                  PFS.extend lpfs
+                    (LessEq (Lit (Num 0.), UnOp (LstLen, Expr.from_var_name v)))
+              | _             -> ());
+
+          analyse_list_structure lpfs;
+
+          PFS.sort lpfs)
       done;
 
-      L.verbose (fun m -> m "simplify_pfs_and_gamma completed");
-      L.(verbose (fun m -> m "PFS:%a" PFS.pp lpfs));
-      L.(verbose (fun m -> m "Gamma:\n%a" TypEnv.pp gamma));
+      L.verbose (fun m -> m "PFS/Gamma simplification completed:\n");
+      L.(verbose (fun m -> m "PFS:@\n%a@\n" PFS.pp lpfs));
+      L.(verbose (fun m -> m "Gamma:@\n%a@\n" TypEnv.pp gamma));
 
       let cached_simplification =
         {
           simpl_gamma = TypEnv.to_list gamma;
           simpl_pfs = PFS.to_list lpfs;
           simpl_existentials = !existentials;
-          subst = SSubst.copy result;
+          subst = SESubst.copy result;
         }
       in
       Hashtbl.replace simplification_cache key cached_simplification;
-      (* Step 5 - conclude *)
+
+      (* Utils.Statistics.update_statistics "FOS: SimplifyPFSandGamma"
+         (Sys.time () -. t); *)
+
+      (* Step 5 - Sort ALoc transitivity *)
+      let rec find_loc_all_the_way aloc res =
+        let f = find_loc_all_the_way in
+        match SESubst.get result aloc with
+        | None     -> res
+        | Some res -> f res res
+      in
+      let aloc_subst =
+        SESubst.fold result
+          (fun l _ acc ->
+            match l with
+            | ALoc aloc ->
+                (Expr.ALoc aloc, find_loc_all_the_way (ALoc aloc) (ALoc aloc))
+                :: acc
+            | _         -> acc)
+          []
+      in
+      let aloc_subst = SESubst.init aloc_subst in
+      let () =
+        SESubst.iter aloc_subst (fun old_aloc new_aloc ->
+            SESubst.put result old_aloc new_aloc;
+            PFS.substitution aloc_subst lpfs;
+            PFS.substitution aloc_subst rpfs)
+      in
+
+      (* Step 6 - Conclude *)
       (result, !existentials)
 
 let simplify_implication
-    (exists : SS.t) (lpfs : PFS.t) (rpfs : PFS.t) (gamma : TypEnv.t) =
+    ~unification
+    (exists : SS.t)
+    (lpfs : PFS.t)
+    (rpfs : PFS.t)
+    (gamma : TypEnv.t) =
+  (* let t = Sys.time () in *)
   List.iter
     (fun (pf : Formula.t) ->
       match pf with
       | Eq (NOp (LstCat, lex), NOp (LstCat, ley)) ->
-          L.verbose (fun fmt -> fmt "SI: LstLen equality: %a" Formula.pp pf);
           let flen_eq =
             Reduction.reduce_formula ~gamma ~pfs:lpfs
               (Eq
                  ( UnOp (LstLen, NOp (LstCat, lex)),
                    UnOp (LstLen, NOp (LstCat, ley)) ))
           in
-          L.verbose (fun fmt -> fmt "SI: Extending with: %a" Formula.pp flen_eq);
           PFS.extend lpfs flen_eq
       | _ -> ())
     (PFS.to_list lpfs);
   let subst, exists =
-    simplify_pfs_and_gamma lpfs gamma ~rpfs ~existentials:exists
+    simplify_pfs_and_gamma ~unification lpfs gamma ~rpfs ~existentials:exists
   in
   PFS.substitution subst rpfs;
 
   (* Additional *)
-  PFS.map_inplace (Reduction.reduce_formula ~gamma ~pfs:lpfs) rpfs;
+  PFS.map_inplace (Reduction.reduce_formula ~rpfs:true ~gamma ~pfs:lpfs) rpfs;
+  L.verbose (fun fmt -> fmt "REDUCED RPFS:\n%a" PFS.pp rpfs);
 
-  sanitise_pfs_no_store gamma rpfs;
-  clean_up_stuff exists lpfs rpfs;
+  sanitise_pfs_no_store ~unification gamma rpfs;
+  clean_up_stuff lpfs rpfs;
 
   L.(
     verbose (fun m ->
         m
-          "Finished existential simplification.\n\
-           Existentials:\n\
-           %a\n\
-           Left:\n\
-           %a\n\
-           Right:\n\
-           %a\n\
+          "Finished existential simplification.@\n\
+           Existentials:@\n\
+           %a@\n\
+           @[<hv 2>Left:@ %a@]@\n\
+           @[<hv 2>Right:@ %a@]\n\
            Gamma:\n\
            %a\n"
-          (Fmt.iter ~sep:(Fmt.any ", ") SS.iter Fmt.string)
+          (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
           exists PFS.pp lpfs PFS.pp rpfs TypEnv.pp gamma));
+  (* Utils.Statistics.update_statistics "FOS: SimplifyImplication"
+     (Sys.time () -. t); *)
   exists
 
 let admissible_assertion (a : Asrt.t) : bool =
   L.(
-    verbose (fun m ->
+    tmi (fun m ->
         m "-----------\nAdmissible?\n----------\n%s"
-          ((Fmt.to_to_string Asrt.pp) a)));
+          ((Fmt.to_to_string Asrt.full_pp) a)));
 
   let pfs = PFS.init () in
   let gamma = TypEnv.init () in
+
+  let a = Asrt.pvars_to_lvars a in
 
   let rec separate (a : Asrt.t) =
     match a with
@@ -1022,7 +1016,7 @@ let admissible_assertion (a : Asrt.t) : bool =
     separate a;
     let _ = simplify_pfs_and_gamma ~kill_new_lvars:true pfs gamma in
     let res = not (PFS.mem pfs Formula.False) in
-    if res then L.verbose (fun m -> m "Admissible !!")
-    else L.verbose (fun m -> m "Not admissible !!");
+    if res then L.tmi (fun m -> m "Admissible !!")
+    else L.tmi (fun m -> m "Not admissible !!");
     res
   with _ -> false

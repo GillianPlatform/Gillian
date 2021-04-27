@@ -82,10 +82,11 @@ module Make (Outcome : Outcome.S) (Suite : Suite.S) = struct
     let open Rely.MatcherTypes in
     let open Rely.MatcherUtils in
     createMatcher
-      (fun { formatReceived = fmtrcvstr; formatExpected = fmtexpstr }
-           actualThunk
-           expectedThunk
-           ->
+      (fun
+        { formatReceived = fmtrcvstr; formatExpected = fmtexpstr }
+        actualThunk
+        expectedThunk
+      ->
         let formatReceived pp fmt x = (makeFormater fmtrcvstr) pp fmt x in
         let formatExpected pp fmt x = (makeFormater fmtexpstr) pp fmt x in
         let (actual : Outcome.t) = actualThunk () in

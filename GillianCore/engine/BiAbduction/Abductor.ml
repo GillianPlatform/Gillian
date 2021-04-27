@@ -3,21 +3,21 @@ open Containers
 module Make
     (SState : State.S
                 with type vt = SVal.M.t
-                 and type st = SVal.SSubst.t
+                 and type st = SVal.SESubst.t
                  and type store_t = SStore.t)
     (SPState : PState.S
                  with type vt = SVal.M.t
-                  and type st = SVal.SSubst.t
+                  and type st = SVal.SESubst.t
                   and type store_t = SStore.t
                   and type preds_t = Preds.SPreds.t)
     (External : External.S) =
 struct
   module L = Logging
-  module SSubst = SVal.SSubst
+  module SSubst = SVal.SESubst
   module Normaliser = Normaliser.Make (SPState)
-  module SBAState = BiState.Make (SVal.M) (SVal.SSubst) (SStore) (SPState)
+  module SBAState = BiState.Make (SVal.M) (SVal.SESubst) (SStore) (SPState)
   module SBAInterpreter =
-    GInterpreter.Make (SVal.M) (SVal.SSubst) (SStore) (SBAState) (External)
+    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SBAState) (External)
 
   type bi_state_t = SBAState.t
 
@@ -31,10 +31,10 @@ struct
     let lvars = Asrt.lvars a in
     let alocs = Asrt.alocs a in
     let lvar_bindings =
-      List.map (fun x -> (x, Expr.LVar x)) (SS.elements lvars)
+      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (SS.elements lvars)
     in
     let aloc_bindings =
-      List.map (fun x -> (x, Expr.ALoc x)) (SS.elements alocs)
+      List.map (fun x -> (Expr.LVar x, Expr.ALoc x)) (SS.elements alocs)
     in
     let bindings = lvar_bindings @ aloc_bindings in
     let bindings' =
@@ -48,7 +48,7 @@ struct
     SSubst.init bindings'
 
   let make_spec
-      (prog : UP.prog)
+      (_ : UP.prog)
       (name : string)
       (params : string list)
       (bi_state_i : bi_state_t)
@@ -74,6 +74,7 @@ struct
           params SPState.pp state_af SPState.pp state_f);
 
     let post, spost =
+      (* FIXME: NOT WORKING DUE TO SIMPLIFICATION TYPE CHANGING *)
       let _ = SPState.simplify ~kill_new_lvars:true state_f in
       (* TODO: Come up with a generic cleaning mechanism *)
       (* if ((name <> "main") && !Config.js) then (
@@ -96,7 +97,8 @@ struct
       let af_asrt = Asrt.star (SPState.to_assertions state_af) in
       let af_subst = make_id_subst af_asrt in
       match SPState.produce state_i af_subst af_asrt with
-      | Some state_i' ->
+      | Ok [ state_i' ] ->
+          (* FIXME: NOT WORKING DUE TO SIMPLIFICATION TYPE CHANGING *)
           let _ = SPState.simplify ~kill_new_lvars:true state_i' in
           let pre =
             Asrt.star
@@ -111,7 +113,8 @@ struct
                  (* let state_i'' = JSCleanUp.exec prog state_i'' name true in  *)
                  Asrt.star (List.sort Asrt.compare (SPState.to_assertions ~to_keep:pvars state_i''))) in *)
           (pre, pre)
-      | None          ->
+      | Ok _            -> failwith "Bi-abduction: anti-frame branched"
+      | Error _         ->
           raise
             (Failure "Bi-abduction: cannot produce anti-frame in initial state")
     in
@@ -146,6 +149,7 @@ struct
               };
             ];
           spec_normalised = true;
+          spec_incomplete = true;
           spec_to_verify = false;
         }
       in
@@ -176,23 +180,20 @@ struct
     in
     let make_test asrt =
       match normalise asrt with
-      | None             -> None
-      | Some (ss_pre, _) ->
-          Some
-            {
-              name = bi_spec.bispec_name;
-              params = bi_spec.bispec_params;
-              state =
-                SBAState.initialise (SS.of_list proc_names) ss_pre
-                  (Some prog.preds);
-            }
+      | Error _ -> []
+      | Ok l    ->
+          List.map
+            (fun (ss_pre, _) ->
+              {
+                name = bi_spec.bispec_name;
+                params = bi_spec.bispec_params;
+                state =
+                  SBAState.initialise (SS.of_list proc_names) ss_pre
+                    (Some prog.preds);
+              })
+            l
     in
-    let rec filter_none = function
-      | []          -> []
-      | Some a :: b -> a :: filter_none b
-      | None :: b   -> filter_none b
-    in
-    filter_none (List.map make_test bi_spec.bispec_pres)
+    List.concat_map make_test bi_spec.bispec_pres
 
   let run_test (ret_fun : result_t -> Spec.t * bool) (prog : UP.prog) (test : t)
       : (Spec.t * bool) list =
@@ -212,16 +213,17 @@ struct
     let process_spec = make_spec prog in
     let state_i = SBAState.copy state_i in
     match result with
-    | RFail (_, _, state_f, errs) ->
+    | RFail (_, _, state_f, _) ->
         let sspec, spec = process_spec name params state_i state_f Flag.Error in
         if !Config.bug_specs_propagation then UP.add_spec prog spec;
         (sspec, false)
-    | RSucc (fl, _, state_f) ->
+    | RSucc (fl, _, state_f)   ->
         let sspec, spec = process_spec name params state_i state_f fl in
         let () =
           try UP.add_spec prog spec
           with _ ->
-            Printf.printf "when trying to build an UP for %s, I died!\n" name
+            L.fail
+              (Format.asprintf "When trying to build an UP for %s, I died!" name)
         in
         (sspec, true)
 
@@ -267,10 +269,10 @@ struct
 
     if !Config.specs_to_stdout then (
       L.print_to_all bug_specs_txt;
-      L.print_to_all normal_specs_txt )
+      L.print_to_all normal_specs_txt)
     else (
       L.normal (fun m -> m "%s" bug_specs_txt);
-      L.normal (fun m -> m "%s" normal_specs_txt) );
+      L.normal (fun m -> m "%s" normal_specs_txt));
 
     (* This is a hack to not count auxiliary functions that are bi-abduced *)
     let len_succ = List.length succ_specs in
@@ -359,10 +361,10 @@ struct
                 in
                 L.verbose (fun m ->
                     m "I will check its callers: %s" (str_concat callers));
-                List.sort Stdlib.compare (rest @ callers) )
+                List.sort Stdlib.compare (rest @ callers))
               else (
                 L.verbose (fun m -> m "The spec of %s is unchanged" proc_name);
-                rest )
+                rest)
             else rest
           in
           let new_succ_specs = succ_specs @ cur_succ_specs in
@@ -423,9 +425,10 @@ module From_scratch (SMemory : SMemory.S) (External : External.S) = struct
     module SState = SState.Make (SMemory)
   end
 
-  include Make
-            (INTERNAL__.SState)
-            (PState.Make (SVal.M) (SVal.SSubst) (SStore) (INTERNAL__.SState)
-               (Preds.SPreds))
-            (External)
+  include
+    Make
+      (INTERNAL__.SState)
+      (PState.Make (SVal.M) (SVal.SESubst) (SStore) (INTERNAL__.SState)
+         (Preds.SPreds))
+      (External)
 end

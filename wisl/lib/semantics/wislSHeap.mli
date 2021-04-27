@@ -14,6 +14,12 @@ val str : t -> string
 
 val copy : t -> t
 
-val substitution_in_place : Gillian.Symbolic.Subst.t -> t -> unit
+val substitution_in_place :
+  Gillian.Symbolic.Subst.t ->
+  t ->
+  (t
+  * Gillian.Gil_syntax.Formula.Set.t
+  * (string * Gillian.Gil_syntax.Type.t) list)
+  list
 
 val assertions : t -> Gillian.Gil_syntax.Asrt.t list

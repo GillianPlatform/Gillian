@@ -15,6 +15,7 @@ type t = TypeDef__.spec = {
   spec_params : string list;  (** Procedure/spec parameters *)
   spec_sspecs : st list;  (** List of single specifications *)
   spec_normalised : bool;  (** If the spec is already normalised *)
+  spec_incomplete : bool;  (** If the spec is incomplete *)
   spec_to_verify : bool;  (** Should the spec be verified? *)
 }
 
@@ -32,8 +33,16 @@ let init
     (spec_params : string list)
     (spec_sspecs : st list)
     (spec_normalised : bool)
+    (spec_incomplete : bool)
     (spec_to_verify : bool) : t =
-  { spec_name; spec_params; spec_sspecs; spec_normalised; spec_to_verify }
+  {
+    spec_name;
+    spec_params;
+    spec_sspecs;
+    spec_normalised;
+    spec_incomplete;
+    spec_to_verify;
+  }
 
 let extend (spec : t) (sspecs : st list) : t =
   { spec with spec_sspecs = sspecs @ spec.spec_sspecs }
@@ -52,7 +61,12 @@ let pp_sspec fmt sspec =
     sspec.ss_posts (Flag.str sspec.ss_flag)
 
 let pp fmt spec =
-  Fmt.pf fmt "@[<v 2>@[<h>spec %s(%a)@]@\n%a@]" spec.spec_name
+  let pp_incomplete fmt = function
+    | true  -> Fmt.string fmt "incomplete "
+    | false -> ()
+  in
+  Fmt.pf fmt "@[<v 2>@[<h>%aspec %s(%a)@]@\n%a@]" pp_incomplete
+    spec.spec_incomplete spec.spec_name
     Fmt.(list ~sep:comma string)
     spec.spec_params
     Fmt.(list ~sep:semi pp_sspec)
@@ -68,19 +82,30 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (spec : t) : t =
             with _ ->
               raise
                 (Failure
-                   ( "DEATH. parameter_types: predicate " ^ name
-                   ^ " does not exist." ))
+                   ("DEATH. parameter_types: predicate " ^ name
+                  ^ " does not exist."))
           in
           (* Printf.printf "Pred: %s\n\tParams1: %s\n\tParams2: %s\n" name
              (String.concat ", " (let x, _ = List.split pred.params in x)) (String.concat ", " (List.map (Fmt.to_to_string Expr.pp) les)); *)
+          let combined_params =
+            try List.combine pred.pred_params les
+            with Invalid_argument _ ->
+              let message =
+                Fmt.str
+                  "Predicate %s is expecting %i arguments but is used with the \
+                   following %i arguments : %a"
+                  pred.pred_name pred.pred_num_params (List.length les)
+                  (Fmt.Dump.list Expr.pp) les
+              in
+              raise (Invalid_argument message)
+          in
           let ac_types =
             List.fold_left
               (fun ac_types ((_, t_x), le) ->
                 match t_x with
                 | None     -> ac_types
                 | Some t_x -> (le, t_x) :: ac_types)
-              []
-              (List.combine pred.pred_params les)
+              [] combined_params
           in
           Star (Types ac_types, a)
       | _                -> a
@@ -100,9 +125,9 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (spec : t) : t =
 let label_vars_to_set lab =
   Option.map (fun (l, vl) -> (l, Containers.SS.of_list vl)) lab
 
-let yojson_of_t = TypeDef__.yojson_of_spec
+let to_yojson = TypeDef__.spec_to_yojson
 
-let t_of_yojson = TypeDef__.spec_of_yojson
+let of_yojson = TypeDef__.spec_of_yojson
 
 let hash_of_t (spec : t) =
   Fmt.str "%a" pp spec |> Digest.string |> Digest.to_hex

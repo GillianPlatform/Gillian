@@ -1,6 +1,7 @@
 open Gillian.Concrete
 module Mem = Compcert.Memory.Mem
 module Literal = Gillian.Gil_syntax.Literal
+module GEnv = GEnv.Concrete
 
 type vt = Values.t
 
@@ -50,7 +51,7 @@ let execute_store heap params =
       let res = Mem.store chunk heap.mem block z_ofs compcert_val in
       match res with
       | Some mem -> ASucc ({ heap with mem }, [])
-      | None     -> AFail [] )
+      | None     -> AFail [])
   | _ -> failwith "wrong call to execute_store"
 
 let execute_load heap params =
@@ -64,7 +65,7 @@ let execute_load heap params =
       | Some ret ->
           let ocaml_ret = ValueTranslation.gil_of_compcert ret in
           ASucc (heap, [ ocaml_ret ])
-      | None     -> AFail [] )
+      | None     -> AFail [])
   | _ -> failwith "invalid call to load"
 
 let execute_move heap params =
@@ -82,7 +83,7 @@ let execute_move heap params =
       | Some lmemval -> (
           match Mem.storebytes heap.mem block_1 z_ofs_1 lmemval with
           | None     -> AFail []
-          | Some mem -> ASucc ({ heap with mem }, [ Loc loc_1; Num ofs_1 ]) ) )
+          | Some mem -> ASucc ({ heap with mem }, [ Loc loc_1; Num ofs_1 ])))
   | _ -> failwith "invalid call to move"
 
 let execute_free heap params =
@@ -93,7 +94,7 @@ let execute_free heap params =
       let res = Mem.free heap.mem block z_low z_high in
       match res with
       | Some mem -> ASucc ({ heap with mem }, [])
-      | None     -> AFail [] )
+      | None     -> AFail [])
   | _ -> failwith "invalid call to free"
 
 let execute_alloc heap params =
@@ -105,6 +106,16 @@ let execute_alloc heap params =
       let ocaml_block = ValueTranslation.loc_name_of_block block in
       ASucc ({ heap with mem = memout }, [ Literal.Loc ocaml_block ])
   | _ -> failwith "invalid call to alloc"
+
+let execute_weak_valid_pointer heap params =
+  let open Gillian.Gil_syntax.Literal in
+  match params with
+  | [ Loc loc_name; Num offs ] ->
+      let z_offs = ValueTranslation.z_of_float offs in
+      let block = ValueTranslation.block_of_loc_name loc_name in
+      let res = Mem.weak_valid_pointer heap.mem block z_offs in
+      ASucc (heap, [ Bool res ])
+  | _                          -> failwith "invalid call to weak_valid_pointer"
 
 let execute_getcurperm heap params =
   let open Gillian.Gil_syntax.Literal in
@@ -128,13 +139,14 @@ let execute_drop_perm heap params =
       let res = Mem.drop_perm heap.mem block z_low z_high compcert_perm in
       match res with
       | Some mem -> ASucc ({ heap with mem }, [])
-      | None     -> AFail [] )
+      | None     -> AFail [])
   | _ -> failwith "invalid call to drop_perm"
 
 let execute_genvgetsymbol heap params =
   match params with
   | [ Literal.String symbol ] ->
-      ASucc (heap, [ String symbol; Loc (GEnv.find_symbol heap.genv symbol) ])
+      let loc = Result.get_ok (GEnv.find_symbol heap.genv symbol) in
+      ASucc (heap, [ String symbol; Loc loc ])
   | _                         -> failwith "invalid call to genvgetsymbol"
 
 let execute_genvsetsymbol heap params =
@@ -167,6 +179,7 @@ let execute_action name heap params =
   | AMem Alloc -> execute_alloc heap params
   | AMem DropPerm -> execute_drop_perm heap params
   | AMem GetCurPerm -> execute_getcurperm heap params
+  | AMem WeakValidPointer -> execute_weak_valid_pointer heap params
   | AMem Store -> execute_store heap params
   | AMem Load -> execute_load heap params
   | AMem Free -> execute_free heap params
@@ -175,7 +188,26 @@ let execute_action name heap params =
   | AGEnv SetSymbol -> execute_genvsetsymbol heap params
   | AGEnv SetDef -> execute_genvsetdef heap params
   | AGEnv GetDef -> execute_genvgetdef heap params
-  | AMem (MGet | MSet | MRem) | AGEnv (RemDef | RemSymbol) ->
+  | AMem
+      ( GetSingle
+      | SetSingle
+      | RemSingle
+      | GetArray
+      | SetArray
+      | RemArray
+      | GetBounds
+      | SetBounds
+      | RemBounds
+      | GetHole
+      | SetHole
+      | RemHole
+      | GetZeros
+      | SetZeros
+      | RemZeros
+      | GetFreed
+      | SetFreed
+      | RemFreed )
+  | AGEnv (RemDef | RemSymbol) ->
       failwith
         (Printf.sprintf
            "%s is an action related to a General Assertion, it should never be \

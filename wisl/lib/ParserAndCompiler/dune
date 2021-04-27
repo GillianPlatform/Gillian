@@ -8,4 +8,4 @@
 (library
  (name wParserAndCompiler)
  (libraries gillian wSyntax wUtils wSemantics)
- (flags -open WSyntax -open WUtils -open WSemantics))
+ (flags :standard -open WSyntax -open WUtils -open WSemantics))

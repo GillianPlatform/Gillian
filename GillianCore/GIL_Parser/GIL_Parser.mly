@@ -34,6 +34,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token TRUE
 %token FALSE
 %token <float> FLOAT
+%token <int> INTEGER
 %token NAN
 %token INFINITY
 %token <string> STRING
@@ -121,7 +122,6 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token ASSUME
 %token ASSERT
 %token SEPASSERT
-%token SEPAPPLY
 %token INVARIANT
 %token ASSUME_TYPE
 %token SPEC_VAR
@@ -165,8 +165,11 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LFORALL
 %token LTYPES
 (* Logic predicates *)
+%token ABSTRACT
 %token PURE
 %token PRED
+%token NOUNFOLD
+%token FACTS
 (* Logic commands *)
 %token OLCMD
 %token CLCMD
@@ -174,11 +177,13 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token UNFOLD
 %token UNFOLDALL
 %token RECUNFOLD
+%token SYMBEXEC
 %token LIF
 %token LTHEN
 %token LELSE
 (* Procedure specification keywords *)
-%token ONLY
+%token AXIOMATIC
+%token INCOMPLETE
 %token SPEC
 %token BISPEC
 %token LEMMA
@@ -408,6 +413,10 @@ var_and_le_target:
     { (lvar, le) }
 ;
 
+var_and_var_target:
+  | LBRACE; lvar1 = LVAR; DEFEQ; lvar2 = LVAR; RBRACE;
+    { (lvar1, lvar2) }
+;
 
 (***********************)
 (********* GIL *********)
@@ -502,7 +511,7 @@ gcmd_list_target:
     {
       List.map
         (fun (lab, gcmd) ->
-          let annot : Annot.t = Annot.init () in
+          let annot : Annot.t = Annot.make () in
           annot, lab, gcmd)
     gcmd_list
   }
@@ -570,18 +579,22 @@ gcmd_target:
 
 g_only_spec_target:
 (* only <spec> *)
-  ONLY; spec = g_spec_target
-  { spec }
+  AXIOMATIC; spec = g_spec_target
+  {
+    let new_sspecs = List.map (fun (sspec : Spec.st) -> { sspec with ss_to_verify = false }) spec.spec_sspecs in
+    { spec with spec_sspecs = new_sspecs; spec_to_verify = false }
+  }
 ;
 
 g_spec_target:
-(* spec xpto (x, y) [[ assertion ]] [[ post1; ...; postn ]] NORMAL|ERROR *)
-  SPEC; spec_head = spec_head_target;
+(* (incomplete) spec xpto (x, y) [[ assertion ]] [[ post1; ...; postn ]] NORMAL|ERROR *)
+  incomplete = option(INCOMPLETE); SPEC; spec_head = spec_head_target;
   spec_sspecs = separated_nonempty_list(SCOLON, g_sspec_target)
   { let (spec_name, spec_params) = spec_head in
     let spec_normalised = !Config.previously_normalised in
     let spec_to_verify = true in
-    let spec : Spec.t = { spec_name; spec_params; spec_sspecs; spec_normalised; spec_to_verify } in
+    let spec_incomplete = Option.is_some incomplete in
+    let spec : Spec.t = { spec_name; spec_params; spec_sspecs; spec_normalised; spec_incomplete; spec_to_verify } in
     spec
   }
 ;
@@ -651,10 +664,9 @@ g_named_assertion_target:
   { (id, a) }
 ;
 
-(* TODO: Check that the assertions are only predicates, or deal with full assertions in the execution *)
 g_logic_cmd_target:
 (* fold x(e1, ..., en) *)
-  | FOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(unfold_info_target)
+  | FOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(logic_bindings_target)
     { SL (Fold (name, les, fold_info)) }
 
 (* unfold x(e1, ..., en) [ def with #x := le1 and ... ] *)
@@ -669,20 +681,22 @@ g_logic_cmd_target:
   | UNFOLDALL; name = VAR
     { SL (GUnfold name) }
 
-(* invariant (a) [existentials: x, y, z] *)
-  | INVARIANT; LBRACE; a = g_assertion_target; RBRACE; existentials = option(existentials_target)
-    { SL (Invariant (a, Option.value ~default:[ ] existentials)) }
+  | SYMBEXEC { SL SymbExec }
 
-(* apply lemma_name(args) [bind: x, y ] *)
-   | SEPAPPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE; binders = option(binders_target)
-    {
-      let binders = Option.value ~default:[] binders in
-      SL (ApplyLem (lemma_name, params, binders))
-    }
+(* invariant (a) [existentials: x, y, z] *)
+  | INVARIANT; LBRACE; a = g_assertion_target; RBRACE; binders = option(binders_target)
+    { SL (Invariant (a, Option.value ~default:[ ] binders)) }
 
 (* assert_* (a) [bind: x, y, z] *)
   | SEPASSERT; LBRACE; a = g_assertion_target; RBRACE; binders = option(binders_target)
     { SL (SepAssert (a, Option.value ~default:[ ] binders)) }
+
+(* apply lemma_name(args) [bind: x, y ] *)
+   | APPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE; binders = option(binders_target)
+    {
+      let binders = Option.value ~default:[] binders in
+      SL (ApplyLem (lemma_name, params, binders))
+    }
 
 (* if(le) { lcmd* } else { lcmd* } *)
   | LIF; LBRACE; le=expr_target; RBRACE; LTHEN; CLBRACKET;
@@ -722,24 +736,41 @@ g_logic_cmd_target:
      { Branch fo }
 ;
 
+g_pred_def_target:
+  COLON; defs = separated_nonempty_list(COMMA, g_named_assertion_target)
+  { defs }
+
+g_pred_facts_target:
+  FACTS; COLON; facts = separated_nonempty_list(AND, pure_assertion_target); SCOLON
+  { facts }
+
 (* pred name (arg1, ..., argn) : def1, ..., defn ; *)
 g_pred_target:
   no_path = option(NO_PATH);
   internal = option(INTERNAL);
+  abstract = option(ABSTRACT);
   pure = option(PURE);
+  nounfold = option(NOUNFOLD);
   PRED;
   pred_head = pred_head_target;
-  COLON;
-  pred_definitions = separated_nonempty_list(COMMA, g_named_assertion_target);
+  pred_definitions = option(g_pred_def_target);
   SCOLON
+  pred_facts=option(g_pred_facts_target);
   {
+    let pred_abstract = Option.is_some abstract in
     let pred_pure = Option.is_some pure in
+    let pred_nounfold = pred_abstract || Option.is_some nounfold in
     let (pred_name, pred_num_params, pred_params, pred_ins) = pred_head in
+    let pred_definitions = Option.value ~default:[] pred_definitions in
+    let () = if (pred_abstract <> (pred_definitions = [])) then
+      raise (Failure (Format.asprintf "Malformed predicate %s: either abstract with definition or non-abstract without definition." pred_name))
+    in
     let () =
       if Option.is_some no_path then
         preds_with_no_paths := SS.add pred_name !preds_with_no_paths
     in
     let pred_normalised = !Config.previously_normalised in
+    let pred_facts = Option.value ~default:[] pred_facts in
     Pred.
       {
         pred_name;
@@ -749,7 +780,10 @@ g_pred_target:
         pred_params;
         pred_ins;
         pred_definitions;
+        pred_facts;
         pred_pure;
+        pred_abstract;
+        pred_nounfold;
         pred_normalised;
       }
   }
@@ -781,20 +815,24 @@ g_lemma_target:
   lemma_existentials = option(existentials_target);
   lemma_proof = option(g_lemma_proof_target);
   {
+    (* FIXME: can only read one spec right now *)
     let lemma_name, lemma_params = lemma_head in
     let () =
       if Option.is_some no_path then
         lemmas_with_no_paths := SS.add lemma_name !lemmas_with_no_paths
     in
     let lemma_existentials = Option.value ~default:[] lemma_existentials in
+    let spec = Lemma.{
+      lemma_hyp;
+      lemma_concs;
+    } in
     Lemma.
       {
         lemma_name;
         lemma_source_path = None;
         lemma_internal = Option.is_some internal;
         lemma_params;
-        lemma_hyp;
-        lemma_concs;
+        lemma_specs = [ spec ];
         lemma_variant;
         lemma_proof;
         lemma_existentials;
@@ -851,13 +889,23 @@ macro_head_def_target:
 ;
 
 (* [ def with #x := le1 and ... ] *)
-unfold_info_target:
+logic_bindings_target:
   | LBRACKET; id = VAR; WITH; var_les = separated_list(AND, var_and_le_target); RBRACKET
     { (id, var_les) }
 ;
 
+(* [bind: (#x := le1) and ... ] *)
+unfold_info_target:
+  | LBRACKET; BIND; COLON; var_les = separated_list(AND, var_and_var_target); RBRACKET
+    { var_les }
+;
+
+lvar_or_pvar:
+  | LVAR { $1 }
+  | VAR  { $1 }
+
 binders_target:
-  | LBRACKET; BIND; COLON; xs = separated_list(COMMA, LVAR); RBRACKET
+  | LBRACKET; BIND; COLON; xs = separated_list(COMMA, lvar_or_pvar); RBRACKET
     { xs }
 ;
 
@@ -952,6 +1000,7 @@ lit_target:
   | TRUE                      { Bool true }
   | FALSE                     { Bool false }
   | FLOAT                     { Num $1 }
+  | n = INTEGER               { Int n }   
   | NAN                       { Num nan }
   | INFINITY                  { Num infinity }
   | STRING                    { String $1 }

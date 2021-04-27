@@ -16,8 +16,8 @@ let parse start lexbuf =
           "unexpected token : %s at loc %i:%i-%i:%i while reading %s"
           unexpected_token loc_start.pos_lnum (col loc_start) loc_end.pos_lnum
           (col loc_end)
-          ( if String.equal loc_start.pos_fname "" then "a string"
-          else loc_start.pos_fname )
+          (if String.equal loc_start.pos_fname "" then "a string"
+          else loc_start.pos_fname)
       in
       failwith ("Parser Error, " ^ message)
 
@@ -62,49 +62,16 @@ let parse_jsil_eprog_from_file (path : string) : Jsil_syntax.EProg.t =
   let file_previously_normalised = String.equal "njsil" extension in
   Utils.Config.previously_normalised := file_previously_normalised;
   (* Check that the file is of a valid type *)
-  ( match file_previously_normalised || String.equal "jsil" extension with
+  (match file_previously_normalised || String.equal "jsil" extension with
   | true  -> ()
   | false ->
       raise
         (Failure
            (Printf.sprintf "Failed to import %s: not a .jsil or .njsil file."
-              path)) );
+              path)));
   let inx = open_in path in
   let lexbuf = Lexing.from_channel inx in
   lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = path };
   let prog = parse Javert_Parser.jsil_main_target lexbuf in
   close_in inx;
   prog
-
-(** ----------------------------------------------------
-    Parse a line_numbers file.
-    Proc: proc_name
-    (0, 0)
-    ...
-    -----------------------------------------------------
-*)
-let parse_line_numbers (ln_str : string) : (string * int, int * bool) Hashtbl.t
-    =
-  let module Config = Utils.Config in
-  let strs = Str.split (Str.regexp_string "Proc: ") ln_str in
-  let line_info = Hashtbl.create Config.big_tbl_size in
-  List.iter
-    (fun str ->
-      let memory = Hashtbl.create Config.small_tbl_size in
-      let index = String.index str '\n' in
-      let proc_name = String.sub str 0 index in
-      let proc_line_info =
-        String.sub str (index + 1) (String.length str - (index + 1))
-      in
-      let lines = Str.split (Str.regexp_string "\n") proc_line_info in
-      List.iter
-        (fun line ->
-          Scanf.sscanf line "(%d, %d)" (fun x y ->
-              if Hashtbl.mem memory y then
-                Hashtbl.replace line_info (proc_name, x) (y, false)
-              else (
-                Hashtbl.replace memory y true;
-                Hashtbl.replace line_info (proc_name, x) (y, true) )))
-        lines)
-    strs;
-  line_info

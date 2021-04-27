@@ -2,4 +2,4 @@
  (name gillian_bulk_alcotest)
  (public_name gillian-bulk-alcotest)
  (libraries gillian.bulk alcotest gillian.gil_syntax str)
- (flags -open Bulk -open Gil_syntax))
+ (flags :standard -open Bulk -open Gil_syntax))

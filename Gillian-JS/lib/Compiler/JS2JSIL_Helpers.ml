@@ -1,6 +1,4 @@
 open Gillian.Gil_syntax
-open Jsil_syntax
-module L = Logging
 
 let small_tbl_size = 1
 
@@ -61,8 +59,15 @@ let js2jsil_imports_cosette =
     "Errors.jsil";
   ]
 
-let js2jsil_logic_imports =
-  [ "javert_internal_functions.jsil"; "javert_logic_macros.jsil" ]
+let js2jsil_logic_imports () =
+  [
+    "javert_internal_functions.jsil";
+    "javert_logic_macros.jsil";
+    "ArrayBuffer.jsil";
+    "ArrayLogic.jsil";
+    "DataView.jsil";
+    "Uint8Array.jsil";
+  ]
 
 let js2jsil_imports_bi =
   [
@@ -287,7 +292,7 @@ let field r = Expr.BinOp (r, LstNth, lit_num 2.)
  *)
 let fresh_sth (name : string) : (unit -> string) * (unit -> unit) =
   let counter = ref 0 in
-  let rec f () =
+  let f () =
     let v = name ^ string_of_int !counter in
     counter := !counter + 1;
     v
@@ -355,6 +360,8 @@ let fresh_loop_body_label, reset_loop_body_label = fresh_sth "loop_b_"
 
 let fresh_loop_end_label, reset_loop_end_label = fresh_sth "loop_e_"
 
+let fresh_loop_identifier, reset_loop_identifier = fresh_sth "loop_id_"
+
 let fresh_tcf_finally_label, reset_tcf_finally_label = fresh_sth "finally_"
 
 let fresh_tcf_end_label, reset_tcf_end_label = fresh_sth "end_tcf_"
@@ -390,7 +397,7 @@ let fresh_tcf_vars () =
 
 let fresh_name =
   let counter = ref 0 in
-  let rec f name =
+  let f name =
     let v = name ^ string_of_int !counter in
     counter := !counter + 1;
     v
@@ -422,38 +429,38 @@ let is_get_value_var x =
 let val_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_v"
-  | Lit l       -> fresh_var () ^ "_v"
+  | Lit _       -> fresh_var () ^ "_v"
   | _           -> raise
                      (Failure "val_var_of_var expects a variable or a literal")
 
 let number_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_n"
-  | Lit l       -> fresh_var () ^ "_n"
+  | Lit _       -> fresh_var () ^ "_n"
   | _           -> raise (Failure "number_var_of_var expects a variable")
 
 let boolean_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_b"
-  | Lit l       -> fresh_var () ^ "_b"
+  | Lit _       -> fresh_var () ^ "_b"
   | _           -> raise (Failure "boolean_var_of_var expects a variable")
 
 let primitive_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_p"
-  | Lit l       -> fresh_var () ^ "_p"
+  | Lit _       -> fresh_var () ^ "_p"
   | _           -> raise (Failure "primitive_var_of_var expects a variable")
 
 let string_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_s"
-  | Lit l       -> fresh_var () ^ "_s"
+  | Lit _       -> fresh_var () ^ "_s"
   | _           -> raise (Failure "string_var_of_var expects a variable")
 
 let i32_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_i32"
-  | Lit l       -> fresh_var () ^ "_i32"
+  | Lit _       -> fresh_var () ^ "_i32"
   | _           -> raise (Failure "string_var_of_var expects a variable")
 
 let fresh_err_label, reset_err_label = fresh_sth "err_"
@@ -463,12 +470,12 @@ let fresh_ret_label, reset_ret_label = fresh_sth "ret_"
 type loop_list_type = (string option * string * string option * bool) list
 
 type translation_context = {
-  tr_offset_converter : int -> int;
   tr_fid : string;
   tr_er_fid : string;
   tr_sc_var : string;
   tr_vis_list : string list;
   tr_loop_list : loop_list_type;
+  tr_loops : string list;
   tr_previous : Expr.t option;
   tr_js_lab : string option;
   tr_ret_lab : string;
@@ -479,20 +486,20 @@ type translation_context = {
 
 let make_translation_ctx
     ?(loop_list = [])
+    ?(loops = [])
     ?(previous = None)
     ?(js_lab = None)
-    offset_converter
     fid
     vis_list
     sc_var
     strictness =
   {
-    tr_offset_converter = offset_converter;
     tr_fid = fid;
     tr_er_fid = fid;
     tr_sc_var = sc_var;
     tr_vis_list = vis_list;
     tr_loop_list = loop_list;
+    tr_loops = loops;
     tr_previous = previous;
     tr_js_lab = js_lab;
     tr_ret_lab = "rlab";
@@ -505,6 +512,7 @@ let update_tr_ctx
     ?ret_lab
     ?err
     ?loop_list
+    ?loops
     ?previous
     ?lab
     ?vis_list
@@ -522,6 +530,8 @@ let update_tr_ctx
   (* vis_list   *)
   let new_loop_list = Option.value ~default:tr_ctx.tr_loop_list loop_list in
   (* loop_list   *)
+  let new_loops = Option.value ~default:tr_ctx.tr_loops loops in
+  (* loops       *)
   let new_previous = Option.value ~default:tr_ctx.tr_previous previous in
   (* previous   *)
   let new_lab = Option.value ~default:tr_ctx.tr_js_lab lab in
@@ -540,6 +550,7 @@ let update_tr_ctx
     tr_err_lab = new_err_lab;
     tr_vis_list = new_vis_list;
     tr_loop_list = new_loop_list;
+    tr_loops = new_loops;
     tr_previous = new_previous;
     tr_js_lab = new_lab;
     tr_er_fid = new_er_fid;

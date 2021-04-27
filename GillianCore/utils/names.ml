@@ -25,8 +25,9 @@ let lvar_prefix_bi = "_lvar_bi_"
 (** {2 Name testers} *)
 let is_pvar_name (name : string) : bool =
   try
-    let first = String.sub name 0 1 in
-    first <> "_" && first <> "#" && first <> "$"
+    name.[0] <> '#'
+    && name.[0] <> '$'
+    && (String.length name < 6 || String.sub name 0 6 <> lvar_prefix)
   with _ -> false
 
 let is_aloc_name (name : string) : bool =

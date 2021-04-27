@@ -4,14 +4,29 @@ type mem_ac =
   | Alloc
   | DropPerm
   | GetCurPerm
+  | WeakValidPointer
   | Store
   | Load
   | Free
   | Move
-  | MGet
-      (** loc -> num (low) -> num (high) -> [ loc; num; num, sval; perm_opt ] *)
-  | MSet  (** loc -> num (low) -> num (high) ->  sval -> perm_opt -> [] *)
-  | MRem  (** loc -> num (low) -> num (high) -> [] *)
+  | GetSingle
+  | SetSingle
+  | RemSingle
+  | GetArray
+  | SetArray
+  | RemArray
+  | GetHole
+  | SetHole
+  | RemHole
+  | GetZeros
+  | SetZeros
+  | RemZeros
+  | GetBounds
+  | SetBounds
+  | RemBounds
+  | GetFreed
+  | SetFreed
+  | RemFreed
 
 type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
 
@@ -19,7 +34,7 @@ type ac =
   | AGEnv of genv_ac  (** Actions related to the memory *)
   | AMem  of mem_ac  (** Actions related to the global environment *)
 
-type mem_ga = SVal
+type mem_ga = Single | Array | Hole | Zeros | Bounds | Freed
 
 type genv_ga = Symbol | Definition
 

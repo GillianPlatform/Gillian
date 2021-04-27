@@ -2,4 +2,5 @@
  (name bulk)
  (public_name gillian.bulk)
  (libraries engine gil_syntax utils parserAndCompiler incrementalAnalysis)
- (flags -open Engine -open Gil_syntax -open Utils -open IncrementalAnalysis))
+ (flags :standard -open Engine -open Gil_syntax -open Utils -open
+   IncrementalAnalysis))

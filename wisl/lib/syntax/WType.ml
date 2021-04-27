@@ -148,7 +148,7 @@ let rec infer_single_assert_step asser known =
         let topt = same_type le1 le2 inferred in
         match topt with
         | Some t -> TypeMap.add bare_le1 t (TypeMap.add bare_le2 t inferred)
-        | None   -> inferred )
+        | None   -> inferred)
     | WLFormula.LLess (le1, le2)
     | WLFormula.LGreater (le1, le2)
     | WLFormula.LLessEq (le1, le2)

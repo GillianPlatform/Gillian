@@ -67,9 +67,9 @@ let copy =
         q_res
     | Cons { contents; next } ->
         let res = Cons { contents; next = Nil } in
-        ( match prev with
+        (match prev with
         | Nil    -> q_res.first <- res
-        | Cons p -> p.next <- res );
+        | Cons p -> p.next <- res);
         copy q_res res next
   in
   fun q -> copy { length = q.length; first = Nil; last = Nil } Nil q.first
@@ -135,7 +135,7 @@ let remove_duplicates ?(equal = ( = )) l =
               let () = l.length <- l.length - 1 in
               let () = if next = Nil then l.last <- whole in
               remove_in_rest x whole
-            else remove_in_rest x cell.next )
+            else remove_in_rest x cell.next)
   in
   let rec outer = function
     | Nil | Cons { next = Nil; _ } -> ()
@@ -175,7 +175,7 @@ let filter_map_stop f l =
             aux ~set_tail:(fun t -> cell.next <- t) ~last_kept:whole cell.next
         | `Stop      ->
             set_tail whole;
-            true )
+            true)
   in
   aux ~last_kept:Nil ~set_tail:(fun t -> l.first <- t) l.first
 

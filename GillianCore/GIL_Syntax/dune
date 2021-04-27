@@ -3,5 +3,5 @@
  (public_name gillian.gil_syntax)
  (libraries utils fmt visitors.runtime)
  (preprocess
-  (pps visitors.ppx ppx_yojson_conv))
- (flags -open Utils -w +A-40-42-41-4-66))
+  (pps visitors.ppx ppx_deriving_yojson))
+ (flags :standard -open Utils -w +A-40-42-41-4-66))

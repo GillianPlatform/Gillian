@@ -45,10 +45,9 @@ let parse_and_compile_js path =
         JS_PreParser.stringify_assume_and_assert e_str
       else e_str
     in
-    let offset_converter = JS_Utils.memoized_offsetchar_to_offsetline e_str in
     let js_prog = JS_Parser.parse_string_exn ~program_path:path e_str in
     let (ext_prog : Jsil_syntax.EProg.t), _, _ =
-      JS2JSIL_Compiler.js2jsil js_prog offset_converter
+      JS2JSIL_Compiler.js2jsil ~filename:path js_prog
         (ExecMode.verification_exec !Config.current_exec_mode)
     in
     let ext_prog =
@@ -76,10 +75,13 @@ let parse_and_compile_js path =
         (JS2GILErr
            (Printf.sprintf "\nParser post-processing threw an EarlyError: %s\n"
               e))
+
+(*
   | _ ->
       Error
         (JS2GILErr
            (Printf.sprintf "\nParsing problems with the file '%s'\n" path))
+  *)
 
 let parse_and_compile_jsil path =
   let jsil_prog = Parsing.parse_jsil_eprog_from_file path in

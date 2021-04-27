@@ -46,11 +46,15 @@ let unfolding = ref true
 let manual_proof = ref false
 
 (* let perform_syntax_checks = ref false *)
-let lemma_proof = ref true
+let lemma_proof = ref false
 
 (** {2 Parallel threading} *)
 
 let parallel = ref false
+
+(** {2 Limited printing} *)
+
+let pbn = ref false
 
 (** {2 Statistics} *)
 
@@ -91,3 +95,23 @@ let set_runtime_paths, get_runtime_paths =
   in
   let get () = !runtime_paths in
   (set, get)
+
+module Verification = struct
+  let procs_to_verify = ref ([] : string list)
+
+  let lemmas_to_verify = ref ([] : string list)
+
+  let verify_only_some_of_the_things = ref false
+
+  let set_procs_to_verify = function
+    | [] -> ()
+    | a  ->
+        procs_to_verify := a;
+        verify_only_some_of_the_things := true
+
+  let set_lemmas_to_verify = function
+    | [] -> ()
+    | a  ->
+        lemmas_to_verify := a;
+        verify_only_some_of_the_things := true
+end

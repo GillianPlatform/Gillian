@@ -14,8 +14,6 @@ type field_value = Expr.t
 (* Definition *)
 type t = field_value Expr.Map.t
 
-let gsbsts = Expr.substitutables
-
 (* Printing *)
 let pp ft sfvl =
   let open Fmt in
@@ -112,10 +110,10 @@ let selective_substitution (subst : SSubst.t) (partial : bool) (fv_list : t) : t
     fv_list Expr.Map.empty
 
 (* Correctness of field-value lists *)
-let is_well_formed (sfvl : t) : bool = true
+let is_well_formed (_ : t) : bool = true
 
 let wf_assertions (sfvl : t) : Formula.t list =
   let props = field_names sfvl in
   let props' = List_utils.cross_product props props (fun x y -> (x, y)) in
   let props' = List.filter (fun (x, y) -> x <> y) props' in
-  List.map (fun (x, y) -> (Not (Eq (x, y)) : Formula.t)) props'
+  List.map (fun (x, y) : Formula.t -> Not (Eq (x, y))) props'
