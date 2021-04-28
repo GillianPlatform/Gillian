@@ -217,7 +217,7 @@ int aws_array_list_ensure_capacity(struct aws_array_list *list, size_t index) {
             return AWS_OP_ERR;
         }
 
-        __builtin_annot(
+        GILLIAN(
             "if (! (#length = 0)) { "
             "   assert [[bind #x]] valid_aws_cryptosdk_edk_ptr(#data, #alloc, #x); "
             "   branch (#length == 1);"

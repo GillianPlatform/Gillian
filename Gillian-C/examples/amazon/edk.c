@@ -67,11 +67,11 @@ pred prefix_start_in_invariant(+data, +key_idx, prefix_start) {
 void aws_cryptosdk_edk_list_clear(struct aws_array_list *edk_list) {
     size_t num_keys = edk_list->length;
     // bind the data pointer to a logical variable
-    __builtin_annot(
+    GILLIAN(
         "assert [[bind #current_size, #num_keys, #data]] "
         "(#edk_list -> struct aws_array_list { #alloc; long(#current_size); long(#num_keys); long(96); #data }) * "
         "(num_keys == long(#num_keys))");
-    __builtin_annot(
+    GILLIAN(
         "invariant: [[bind key_idx, #key_idx, #rem_sz, #r, #edk, #trash, #prefix_start]] "
         "(key_idx == long(#key_idx)) * (0 <=# #key_idx) * "
         "(num_keys == long(#num_keys)) * "
@@ -87,14 +87,14 @@ void aws_cryptosdk_edk_list_clear(struct aws_array_list *edk_list) {
     for (size_t key_idx = 0; key_idx < num_keys; ++key_idx) {
         struct aws_cryptosdk_edk *edk;
         if (!aws_array_list_get_at_ptr(edk_list, (void **)&edk, key_idx)) {
-            __builtin_annot(
+            GILLIAN(
                 "unfold edk_array_list_content_pref(#prefix_start, #rem_sz, #alloc, #r)");
-            __builtin_annot("unfold default_allocator(#alloc)");
+            GILLIAN("unfold default_allocator(#alloc)");
             aws_cryptosdk_edk_clean_up(edk);
         }
-        __builtin_annot("unfold empty_aws_cryptosdk_edk_ptr(#prefix_start)");
-        __builtin_annot("unfold optPadding(#data, #key_idx * 96)");
+        GILLIAN("unfold empty_aws_cryptosdk_edk_ptr(#prefix_start)");
+        GILLIAN("unfold optPadding(#data, #key_idx * 96)");
     }
     aws_array_list_clear(edk_list);
-    __builtin_annot("unfold default_allocator(#alloc)");
+    GILLIAN("unfold default_allocator(#alloc)");
 }

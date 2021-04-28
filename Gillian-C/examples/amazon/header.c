@@ -19,6 +19,7 @@
 */
 
 #include "header.h"
+#include "base.h"
 
 // We assume a valid allocator
 /*@
@@ -231,9 +232,9 @@ void aws_cryptosdk_hdr_clear(struct aws_cryptosdk_hdr *hdr) {
 
     hdr->auth_len = 0;
 
-    __builtin_annot("unfold_all valid_aws_byte_buf_ptr");
-    __builtin_annot("unfold_all empty_aws_byte_buf_ptr");
-    __builtin_annot("unfold_all valid_hash_table_ptr");
+    GILLIAN("unfold_all valid_aws_byte_buf_ptr");
+    GILLIAN("unfold_all empty_aws_byte_buf_ptr");
+    GILLIAN("unfold_all valid_hash_table_ptr");
 }
 
 /*@
@@ -278,12 +279,12 @@ int parse_edk(struct aws_allocator *allocator, struct aws_cryptosdk_edk *edk,
 
     memset(edk, 0, sizeof(*edk));
 
-    __builtin_annot("apply valid_aws_byte_cursor_ptr_facts(#cur, "
+    GILLIAN("apply valid_aws_byte_cursor_ptr_facts(#cur, "
                     "#total_length, #buffer, #content)");
-    __builtin_annot(
+    GILLIAN(
         "unfold Element(#definition, #content, 0, 3, #edk_content, #element_length)");
 
-    __builtin_annot(
+    GILLIAN(
         "if (#definition = `Complete`) {"
         "   unfold CElement(#content, 0, 3, #edk_content, #element_length) "
         "   [[bind #field: #pid, #restFields: #rf1]]"
@@ -299,7 +300,7 @@ int parse_edk(struct aws_allocator *allocator, struct aws_cryptosdk_edk *edk,
     if (!aws_byte_cursor_read_and_fill_buffer(cur, &edk->provider_id))
         goto SHORT_BUF;
 
-    __builtin_annot(
+    GILLIAN(
         "if (#definition = `Complete`) { "
         "  unfold CElement(#content, 2 + len #pid, 2, #rf1, "
         "    #element_length - (2 + len #pid))"
@@ -316,15 +317,15 @@ int parse_edk(struct aws_allocator *allocator, struct aws_cryptosdk_edk *edk,
     if (!aws_byte_cursor_read_and_fill_buffer(cur, &edk->provider_info))
         goto SHORT_BUF;
 
-    __builtin_annot(
+    GILLIAN(
         "if (#definition = `Complete`) { "
         "  unfold CElement(#content, 2 + len #pid + 2 + len #pinfo, 1, #rf2, #element_length - (2 + len #pid + 2 + len #pinfo))"
         "  [[bind #field: #ctxt]] "
         "} else {"
         "  unfold IElement(#content, #l1 + #l2, 1, #rf2, #rel2)"
         "}");
-    __builtin_annot("unfold_all CElement");
-    __builtin_annot("unfold_all IElement");
+    GILLIAN("unfold_all CElement");
+    GILLIAN("unfold_all IElement");
 
     if (!aws_byte_cursor_read_be16(cur, &field_len))
         goto SHORT_BUF;
@@ -333,22 +334,22 @@ int parse_edk(struct aws_allocator *allocator, struct aws_cryptosdk_edk *edk,
     if (!aws_byte_cursor_read_and_fill_buffer(cur, &edk->ciphertext))
         goto SHORT_BUF;
 
-    __builtin_annot("unfold_all valid_aws_byte_buf_ptr");
-    __builtin_annot("if (#definition = `Incomplete`) {"
+    GILLIAN("unfold_all valid_aws_byte_buf_ptr");
+    GILLIAN("if (#definition = `Incomplete`) {"
                     "  unfold_all valid_aws_byte_cursor_ptr"
                     "}");
-    __builtin_annot(
+    GILLIAN(
         "fold valid_aws_cryptosdk_edk_ptr(#edk, #alloc, #edk_content)");
 
     return AWS_OP_SUCCESS;
 
 SHORT_BUF:
-    __builtin_annot("unfold_all valid_aws_byte_buf_ptr");
+    GILLIAN("unfold_all valid_aws_byte_buf_ptr");
     aws_cryptosdk_edk_clean_up(edk);
     return aws_raise_error(AWS_ERROR_SHORT_BUFFER);
 MEM_ERR:
     // We don't model OOM error, this path shouldn't be accessible
-    __builtin_annot("assert False");
+    GILLIAN("assert False");
     aws_cryptosdk_edk_clean_up(edk);
     // The _init function should have already raised an AWS_ERROR_OOM
     return AWS_OP_ERR;
@@ -397,14 +398,14 @@ MEM_ERR:
 int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
                             struct aws_byte_cursor *pcursor) {
 
-    __builtin_annot(
+    GILLIAN(
         "unfold Header(#definition, #data, #part_one, #version, #type, "
         "#suiteId, #messageId, #ECLength, #part_two, #ECKs, "
         "#part_three, #EDKs, #contentType, #headerIvLength, "
         "#frameLength, #headerLength, #headerIv, #headerAuthTag, #edkDef, #errorMessage)"
         "[[ bind #ECDef : #ECDef ]]");
 
-    __builtin_annot(
+    GILLIAN(
         "if (#definition = `Complete`) {"
         "  unfold CHeader(#data, #part_one, #version, #type, "
         "    #suiteId, #messageId, #ECLength, #part_two, #ECKs, "
@@ -431,8 +432,8 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
     struct aws_byte_cursor cur = *pcursor;
 
     aws_cryptosdk_hdr_clear(hdr);
-    __builtin_annot("unfold_all empty_aws_cryptosdk_hdr");
-    __builtin_annot("unfold_all valid_edk_array_list");
+    GILLIAN("unfold_all empty_aws_cryptosdk_hdr");
+    GILLIAN("unfold_all valid_edk_array_list");
 
     uint8_t bytefield;
 
@@ -471,9 +472,9 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
         goto SHORT_BUF;
     }
 
-    __builtin_annot("unfold_all Elements");
+    GILLIAN("unfold_all Elements");
     if (aad_len) {
-        __builtin_annot(
+        GILLIAN(
             "if (#definition = `Broken`) { if (#ECDef = `Broken`) { unfold BRawEncryptionContext(#errorMessage, #BEC, #ECKs) } }");
         struct aws_byte_cursor aad = aws_byte_cursor_advance(&cur, aad_len);
         if (!aad.ptr)
@@ -488,13 +489,13 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
             goto PARSE_ERR;
         }
     };
-    __builtin_annot(
+    GILLIAN(
         "if (#ECLength = 0) { unfold CRawEncryptionContext([], #ECKs) }");
 
-    __builtin_annot("unfold_all valid_hash_table_ptr");
-    __builtin_annot("unfold_all RawEncryptedDataKeys");
+    GILLIAN("unfold_all valid_hash_table_ptr");
+    GILLIAN("unfold_all RawEncryptedDataKeys");
 
-    __builtin_annot(
+    GILLIAN(
         "if (#edkDef = `Complete`) {"
         "  unfold CRawEncryptedDataKeys(#part_three, 0, #EDKs, #EDKsLength)"
         "} else {"
@@ -509,21 +510,21 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
         goto PARSE_ERR;
 
     // Csharpminor trickery for local addressable variable
-    __builtin_annot("assert [[bind #edk_count, #edkcptr]] "
+    GILLIAN("assert [[bind #edk_count, #edkcptr]] "
                     "(edk_count == [ #l, #n ]) * "
                     "(#edkcptr == ptr(#l, 0)) * "
                     "ARRAY(#edkcptr, int16, 1, [#edk_count])");
-    __builtin_annot("assert [[bind #cur]] "
+    GILLIAN("assert [[bind #cur]] "
                     "(cur == [#l, 16]) * "
                     "(#cur == ptr(#l, 0))");
 
-    __builtin_annot("assert [[bind #edktemp]] "
+    GILLIAN("assert [[bind #edktemp]] "
                     "(edk == [#l, 96]) * "
                     "(#edktemp == ptr(#l, 0))");
 
-    __builtin_annot("apply ElementsShift(#part_three, 2, #edk_count, 3, 2)");
-    __builtin_annot("unfold_all Elements");
-    __builtin_annot(
+    GILLIAN("apply ElementsShift(#part_three, 2, #edk_count, 3, 2)");
+    GILLIAN("unfold_all Elements");
+    GILLIAN(
         "if (#edkDef = `Complete`) {"
         "  assert [[bind #edk_al, #edkLenb0, #edkLenb1, #justEDKs, #EDKsAndRest, #restOfHeader, #totalEDKLength, #atEDKs, #bptr, #eList]] "
         "  (#edk_al == #hdr p+ 104) * "
@@ -547,9 +548,9 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
         "  }"
         "}");
 
-    __builtin_annot("assert [[bind #all, #alo]] #alloc == ptr(#all, #alo)");
+    GILLIAN("assert [[bind #all, #alo]] #alloc == ptr(#all, #alo)");
 
-    __builtin_annot(
+    GILLIAN(
         "invariant: [[bind i, #i, #cbptr, #readLength, #readEDKs, #leftEDKs, #restEDKsAndRest,"
         "                  #acc, #rest_count, #restEDKs, #restEDKLength, #restLength, #trash]]"
         "any_aws_last_error() *"
@@ -577,11 +578,11 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
     for (uint16_t i = 0; i < edk_count; ++i) {
         struct aws_cryptosdk_edk edk;
 
-        __builtin_annot("unfold_all i__ptr");
-        __builtin_annot("unfold_all i__ptr_add");
-        __builtin_annot(
+        GILLIAN("unfold_all i__ptr");
+        GILLIAN("unfold_all i__ptr_add");
+        GILLIAN(
             "unfold Elements(#edkDef, #restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength)");
-        __builtin_annot(
+        GILLIAN(
             "if (#edkDef = `Complete`) {"
             "  unfold CElements(#restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength) "
             "    [[bind #element : #e, #eLength : #el ]];"
@@ -600,37 +601,37 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
 
         if (parse_edk(hdr->alloc, &edk, &cur)) {
 
-            __builtin_annot(
+            GILLIAN(
                 "unfold valid_edk_array_list_ptr(#edk_al, #alloc, #EDKs)");
-            __builtin_annot(
+            GILLIAN(
                 "unfold valid_aws_byte_cursor_ptr(#cur, #ra, #rb, #rc)");
-            __builtin_annot(
+            GILLIAN(
                 "apply optBytesConcat(#bptr, #readLength, #cbptr, len #leftEDKs)");
-            __builtin_annot(
+            GILLIAN(
                 "unfold optBytes(#bptr, #readLength + (len #leftEDKs), #restOrSomething)");
             goto RETHROW;
         }
 
         aws_array_list_push_back(&hdr->edk_list, &edk);
 
-        __builtin_annot(
+        GILLIAN(
             "apply optBytesConcat(#bptr, #readLength, #bptr p+ (len #readEDKs), #el)");
     }
-    __builtin_annot("assert (len #acc == #edk_count) ");
-    __builtin_annot(
+    GILLIAN("assert (len #acc == #edk_count) ");
+    GILLIAN(
         "if (#edkDef = `Incomplete`) {"
         "  unfold Elements(#edkDef, #restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength);"
         "  unfold IElements(#restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength)"
         "}");
-    __builtin_annot("assert (len #restEDKs == 0) ");
-    __builtin_annot("assert (#rest_count == 0) * (#EDKs == #acc) ");
-    __builtin_annot(
+    GILLIAN("assert (len #restEDKs == 0) ");
+    GILLIAN("assert (#rest_count == 0) * (#EDKs == #acc) ");
+    GILLIAN(
         "unfold Elements(#edkDef, #restEDKsAndRest, 0., #rest_count, 3., #restEDKs, #restEDKLength)");
-    __builtin_annot(
+    GILLIAN(
         "unfold CElements(#restEDKsAndRest, 0., #rest_count, 3., #restEDKs, #restEDKLength)");
-    __builtin_annot("assert (len #leftEDKs == 0)");
+    GILLIAN("assert (len #leftEDKs == 0)");
 
-    __builtin_annot("unfold optBytes(#bptr, #readLength, #readEDKs)");
+    GILLIAN("unfold optBytes(#bptr, #readLength, #readEDKs)");
 
     uint8_t content_type;
     if (!aws_byte_cursor_read_u8(&cur, &content_type))
@@ -678,48 +679,48 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
     if (!aws_byte_cursor_read_and_fill_buffer(&cur, &hdr->auth_tag))
         goto SHORT_BUF;
 
-    __builtin_annot(
+    GILLIAN(
         "assert [[bind #iv_ptr, #auth_tag_ptr]] (#iv_ptr == (#hdr p+ 16)) * "
         "(#auth_tag_ptr == (#hdr p+ 48))");
-    __builtin_annot(
+    GILLIAN(
         "unfold valid_aws_byte_buf_ptr(#iv_ptr, "
         "#headerIvLength, #headerIvLength, #iv_buf, #alloc, #headerIv)");
-    __builtin_annot("unfold valid_aws_byte_buf_ptr(#auth_tag_ptr, "
+    GILLIAN("unfold valid_aws_byte_buf_ptr(#auth_tag_ptr, "
                     "16, 16, #auth_tag_buf, #alloc, #headerAuthTag)");
 
     *pcursor = cur;
 
-    __builtin_annot("unfold valid_edk_array_list_ptr(#edk_al, #alloc, #EDKs)");
+    GILLIAN("unfold valid_edk_array_list_ptr(#edk_al, #alloc, #EDKs)");
 
     return AWS_OP_SUCCESS;
 
 SHORT_BUF:
-    __builtin_annot("unfold_all BRawEncryptionContext");
-    __builtin_annot("unfold_all valid_aws_byte_buf_ptr");
-    __builtin_annot("unfold_all valid_edk_array_list_ptr");
-    __builtin_annot("unfold_all optBytes");
-    __builtin_annot("unfold_all valid_aws_byte_cursor_ptr");
+    GILLIAN("unfold_all BRawEncryptionContext");
+    GILLIAN("unfold_all valid_aws_byte_buf_ptr");
+    GILLIAN("unfold_all valid_edk_array_list_ptr");
+    GILLIAN("unfold_all optBytes");
+    GILLIAN("unfold_all valid_aws_byte_cursor_ptr");
 
     aws_cryptosdk_hdr_clear(hdr);
     return aws_raise_error(AWS_ERROR_SHORT_BUFFER);
 
 PARSE_ERR:
-    __builtin_annot("unfold_all CAlgorithmSuite");
-    __builtin_annot("unfold_all ECErrorCodeOfJSErrorMessage");
-    __builtin_annot("unfold_all valid_aws_byte_buf_ptr");
-    __builtin_annot("unfold_all valid_edk_array_list_ptr");
-    __builtin_annot("unfold_all optBytes");
-    __builtin_annot("unfold_all valid_aws_byte_cursor_ptr");
+    GILLIAN("unfold_all CAlgorithmSuite");
+    GILLIAN("unfold_all ECErrorCodeOfJSErrorMessage");
+    GILLIAN("unfold_all valid_aws_byte_buf_ptr");
+    GILLIAN("unfold_all valid_edk_array_list_ptr");
+    GILLIAN("unfold_all optBytes");
+    GILLIAN("unfold_all valid_aws_byte_cursor_ptr");
 
     aws_cryptosdk_hdr_clear(hdr);
     return aws_raise_error(AWS_CRYPTOSDK_ERR_BAD_CIPHERTEXT);
 
 MEM_ERR:
 RETHROW:
-    __builtin_annot("unfold_all valid_aws_byte_buf_ptr");
-    __builtin_annot("unfold_all valid_edk_array_list_ptr");
-    __builtin_annot("unfold_all optBytes");
-    __builtin_annot("unfold_all valid_aws_byte_cursor_ptr");
+    GILLIAN("unfold_all valid_aws_byte_buf_ptr");
+    GILLIAN("unfold_all valid_edk_array_list_ptr");
+    GILLIAN("unfold_all optBytes");
+    GILLIAN("unfold_all valid_aws_byte_cursor_ptr");
 
     aws_cryptosdk_hdr_clear(hdr);
     return AWS_OP_ERR;

@@ -20,6 +20,7 @@
 #include "edk.h"
 #include "error.h"
 #include "hash_table.h"
+#include "base.h"
 #include <stdint.h>
 #include <stdlib.h>
 

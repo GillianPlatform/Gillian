@@ -10,6 +10,8 @@
 #define true 1
 #define false 0
 
+#define GILLIAN(X) __builtin_annot(X)
+
 typedef int bool;
 typedef unsigned long size_t;
 

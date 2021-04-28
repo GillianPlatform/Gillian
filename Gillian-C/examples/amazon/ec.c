@@ -126,8 +126,8 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
     if (cursor->len == 0) {
         return AWS_OP_SUCCESS;
     }
-    __builtin_annot("unfold_all CRawEncryptionContext");
-    __builtin_annot("unfold_all BRawEncryptionContext");
+    GILLIAN("unfold_all CRawEncryptionContext");
+    GILLIAN("unfold_all BRawEncryptionContext");
 
     uint16_t elem_count;
     if (!aws_byte_cursor_read_be16(cursor, &elem_count))
@@ -135,24 +135,24 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
     if (!elem_count)
         return aws_raise_error(AWS_CRYPTOSDK_ERR_BAD_CIPHERTEXT);
 
-    __builtin_annot(
+    GILLIAN(
         "assert [[bind #l_ec, #elem_count]] "
         "(elem_count == [#l_ec, 2]) * ARRAY(ptr(#l_ec, 0), int16, 1, [ #elem_count ]) ");
 
-    __builtin_annot(
+    GILLIAN(
         "assert [[bind #elementsDef, #elements, #esLength]] Elements(#elementsDef, #buffer_content, 2, #elem_count, 2, #elements, #esLength)");
 
-    __builtin_annot(
+    GILLIAN(
         "unfold Elements(#elementsDef, #buffer_content, 2, #elem_count, 2, #ECKS, #esLength)");
-    __builtin_annot(
+    GILLIAN(
         "assert [[bind #lengthPtr]] (length == [#l, 2]) * (#lengthPtr == ptr(#l, 0))");
-    __builtin_annot(
+    GILLIAN(
         "assert [[bind #l_res_1, #l_res, #l_k_cursor, #l_v_cursor]] "
         "(_res__1 == [#l_res_1, 16]) * (_res == [#l_res, 16]) * "
         "(k_cursor == [#l_k_cursor, 16]) * (v_cursor == [#l_v_cursor, 16]) * "
         "(was_created == [#l_wc, 4])");
-    __builtin_annot("assert [[bind #keys]] FirstProj(#elements, #keys)");
-    __builtin_annot(
+    GILLIAN("assert [[bind #keys]] FirstProj(#elements, #keys)");
+    GILLIAN(
         "invariant: [[bind i, #i, #togo, #trash, #restBuffer, #restLength,"
         "                  #cbptr, #consumedLength, #consumedBuffer, #restEsLength,"
         "                  #consumedKeys, #consumedUtf8Keys, #restKeys, #consumedUtf8Elements,  "
@@ -207,9 +207,9 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
         "(was_created == [#l_wc, 4]) * ARRAY(ptr(#l_wc, 0), int, 1, [#wc_trash])");
     for (uint16_t i = 0; i < elem_count; i++) {
         uint16_t length;
-        __builtin_annot(
+        GILLIAN(
             "unfold Elements(#elementsDef, #buffer_content, 2 + #consumedLength, #togo, 2, #restElements, #restEsLength)");
-        __builtin_annot(
+        GILLIAN(
             "if (#elementsDef = `Complete`) {"
             "  unfold CElements(#buffer_content, 2 + #consumedLength, #togo, 2, #restElements, #restLength)"
             "    [[bind #element: #kvPair, #eLength: #this_length, #restElements: #newRestElements, #restLength: #newRestEsLength]];"
@@ -237,7 +237,7 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
         if (!k_cursor.ptr)
             goto SHORT_BUF;
 
-        __builtin_annot(
+        GILLIAN(
             "if (#elementsDef = `Complete`) {"
             "  unfold CElement(#buffer_content, 2 + #consumedLength + #key_length, 1, [ #this_value ], #value_length);"
             "  unfold_all CElement"
@@ -256,9 +256,9 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
         if (!v_cursor.ptr)
             goto SHORT_BUF;
 
-        __builtin_annot(
+        GILLIAN(
             "if (#restElements = []) { unfold_all valid_aws_byte_cursor_ptr }");
-        __builtin_annot(
+        GILLIAN(
             "unfold toUtf8PairMap(#restElements, #restUtf8Elements)");
 
         struct aws_string *k =
@@ -267,16 +267,16 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
         struct aws_string *v =
             aws_string_new_from_array(alloc, v_cursor.ptr, v_cursor.len);
 
-        __builtin_annot("apply ProduceListToSet(#consumedKeys)");
-        __builtin_annot(
+        GILLIAN("apply ProduceListToSet(#consumedKeys)");
+        GILLIAN(
             "assert [[bind #consumedKeySet]] ListToSet(#consumedKeys, #consumedKeySet)");
-        __builtin_annot(
+        GILLIAN(
             "apply FirstProjConcatSplit(#elements, #consumedElements, #restElements)");
-        __builtin_annot("unfold FirstProj(#restElements, #restKeys)");
-        __builtin_annot(
+        GILLIAN("unfold FirstProj(#restElements, #restKeys)");
+        GILLIAN(
             "apply FirstProjToUtf8MapPairCompat(#consumedElements)");
-        __builtin_annot("apply ProduceListToSet(#consumedUtf8Keys)");
-        __builtin_annot(
+        GILLIAN("apply ProduceListToSet(#consumedUtf8Keys)");
+        GILLIAN(
             "if (#errorMessage = `decodeEncryptionContext: Duplicate encryption context key value.`) {"
             "  unfold Duplicated(#consumedKeys, #restKeys) [[bind #preSet: #consumedKeySetAlias]];"
             "  apply ListToSetFunction(#consumedKeys, #consumedKeySet, #consumedKeys, #consumedKeySetAlias)"
@@ -284,21 +284,21 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
             "  apply ProduceListToSet(#restKeys);"
             "  apply UniqueConcatSplitNotInSuffix(#keys, #consumedKeys, #restKeys, #this_key)"
             "}");
-        __builtin_annot("if (#this_key -e- #consumedKeySet) {"
+        GILLIAN("if (#this_key -e- #consumedKeySet) {"
                         "  apply InListToUtf8(#this_key, #consumedKeys)"
                         "} else {"
                         "  apply NotInListToUtf8(#this_key, #consumedKeys)"
                         "}");
 
-        __builtin_annot(
+        GILLIAN(
             "apply optBytesConcat(#buffer p+ 2, #consumedLength, #buffer p+ (2 + #consumedLength), 2)");
-        __builtin_annot(
+        GILLIAN(
             "apply optBytesConcat(#buffer p+ 2, #consumedLength + 2, #buffer p+ (4 + #consumedLength), #key_length - 2)");
-        __builtin_annot(
+        GILLIAN(
             "apply optBytesConcat(#buffer p+ 2, #consumedLength + #key_length, #buffer p+ (2 + #consumedLength + #key_length), 2)");
-        __builtin_annot(
+        GILLIAN(
             "apply optBytesConcat(#buffer p+ 2, #consumedLength + #key_length, #buffer p+ (2 + #consumedLength + #key_length), 2)");
-        __builtin_annot(
+        GILLIAN(
             "apply optBytesConcat(#buffer p+ 2, #consumedLength + #key_length + 2, #buffer p+ (4 + #consumedLength + #key_length), #value_length - 2)");
         int was_created;
         if (!k || !v ||
@@ -315,40 +315,40 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
             aws_raise_error(AWS_CRYPTOSDK_ERR_BAD_CIPHERTEXT);
             goto RETHROW;
         }
-        __builtin_annot(
+        GILLIAN(
             "apply FirstProjAppendPair(#consumedElements, #consumedKeys, #this_key, #this_value)");
 
-        __builtin_annot(
+        GILLIAN(
             "apply toUtf8PairMapAppendPair(#consumedElements, #consumedUtf8Elements, #this_key, #this_value)");
-        __builtin_annot("assert [[bind #utf8Key, #utf8Value]] "
+        GILLIAN("assert [[bind #utf8Key, #utf8Value]] "
                         "toUtf8(#this_key, #utf8Key) * "
                         "toUtf8(#this_value, #utf8Value)");
-        __builtin_annot(
+        GILLIAN(
             "apply FirstProjAppendPair(#consumedUtf8Elements, #consumedUtf8Keys, #utf8Key, #utf8Value)");
-        __builtin_annot(
+        GILLIAN(
             "apply FirstProjToUtf8MapPairCompat(#consumedElements @ [ [#this_key, #this_value] ])");
     }
 
-    __builtin_annot("assert #togo == 0");
+    GILLIAN("assert #togo == 0");
 
-    __builtin_annot(
+    GILLIAN(
         "unfold Elements(#elementsDef, #buffer_content, (2. + #consumedLength), #togo, 2., #restElements, #restEsLength)");
-    __builtin_annot(
+    GILLIAN(
         "unfold CElements(#buffer_content, (2. + #consumedLength), #togo, 2., #restElements, #restEsLength)");
 
-    __builtin_annot(
+    GILLIAN(
         "if (#errorMessage = `decodeEncryptionContext: Duplicate encryption context key value.`) {"
         "  unfold FirstProj(#restElements, #restKeys);"
         "  assert #restKeys == [];"
         "  unfold Duplicated(#consumedKeys, #restKeys)"
         "}");
 
-    __builtin_annot("unfold_all optBytes");
+    GILLIAN("unfold_all optBytes");
 
     return AWS_OP_SUCCESS;
 
 SHORT_BUF:
-    __builtin_annot(
+    GILLIAN(
         "if (#errorMessage = `decodeEncryptionContext: Underflow, not enough data.`) {"
         "  apply optBytesConcat(#buffer, 2, #buffer p+ 2, #consumedLength)"
         "}");

@@ -97,8 +97,8 @@ int aws_byte_buf_init(struct aws_byte_buf *buf, struct aws_allocator *allocator,
     // AWS_PRECONDITION(buf);
     // AWS_PRECONDITION(allocator);
 
-    __builtin_annot("branch (#capacity == 0)");
-    __builtin_annot(
+    GILLIAN("branch (#capacity == 0)");
+    GILLIAN(
         "if (! (#capacity = 0)) { apply IntegerLtPlusOneLe(0, #capacity) } ");
 
     buf->buffer = (capacity == 0) ? NULL : aws_mem_acquire(allocator, capacity);
@@ -200,8 +200,8 @@ aws_byte_cursor_advance(struct aws_byte_cursor *const cursor,
 
         cursor->ptr += length;
         cursor->len -= length;
-        __builtin_annot("branch (#length == #cur_len)");
-        __builtin_annot("branch (#length == 0)");
+        GILLIAN("branch (#length == #cur_len)");
+        GILLIAN("branch (#length == 0)");
     }
     return rv;
 }
@@ -236,7 +236,7 @@ spec aws_byte_cursor_read(cur, dest, length) {
 */
 bool aws_byte_cursor_read(struct aws_byte_cursor *cur, void *dest,
                           const size_t length) {
-    __builtin_annot("apply valid_aws_byte_cursor_ptr_facts(#cur, #cur_length, "
+    GILLIAN("apply valid_aws_byte_cursor_ptr_facts(#cur, #cur_length, "
                     "#buffer, #content)");
     // AWS_PRECONDITION(aws_byte_cursor_is_valid(cur));
     // AWS_PRECONDITION(AWS_MEM_IS_WRITABLE(dest, len));

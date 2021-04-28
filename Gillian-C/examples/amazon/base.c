@@ -62,7 +62,7 @@ spec aws_add_size_checked(a, b, res) {
 // The result cannot overflow.
 int aws_add_size_checked(size_t a, size_t b, size_t *res) {
     if (a > 65535 || b > 65535) {
-        __builtin_annot("assert False");
+        GILLIAN("assert False");
         return 1;
     } else {
         *res = a + b;
@@ -81,7 +81,7 @@ spec aws_mul_size_checked(a, b, res) {
 */
 int aws_mul_size_checked(size_t a, size_t b, size_t *res) {
     if (a > 65535 || b > 65535) {
-        __builtin_annot("assert False");
+        GILLIAN("assert False");
         return 0;
     } else {
         *res = a * b;
