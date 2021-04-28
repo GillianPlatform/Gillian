@@ -413,14 +413,25 @@ pure nounfold pred RawEncryptionContext(definition:Str, +buffer:List, ECKs:List,
 (* Correctly formed algorithm suite *)
 @nopath
 nounfold pred CAlgorithmSuite(+numId, stringId, ivLength, tagLength) :
-  (numId == 20) * (stringId == "ALG_AES128_GCM_IV12_TAG16") *
-    (ivLength == 12) * (tagLength == 128);
-facts: (ivLength == 12) and (tagLength == 128);
+  (numId == 20)   * (stringId == "ALG_AES128_GCM_IV12_TAG16_NO_KDF")                 * (ivLength == 12) * (tagLength == 16),
+  (numId == 70)   * (stringId == "ALG_AES192_GCM_IV12_TAG16_NO_KDF")                 * (ivLength == 12) * (tagLength == 16),
+  (numId == 120)  * (stringId == "ALG_AES256_GCM_IV12_TAG16_NO_KDF")                 * (ivLength == 12) * (tagLength == 16),
+  (numId == 276)  * (stringId == "ALG_AES128_GCM_IV12_TAG16_HKDF_SHA256")            * (ivLength == 12) * (tagLength == 16),
+  (numId == 326)  * (stringId == "ALG_AES192_GCM_IV12_TAG16_HKDF_SHA256")            * (ivLength == 12) * (tagLength == 16),
+  (numId == 376)  * (stringId == "ALG_AES256_GCM_IV12_TAG16_HKDF_SHA256")            * (ivLength == 12) * (tagLength == 16),
+  (numId == 532)  * (stringId == "ALG_AES128_GCM_IV12_TAG16_HKDF_SHA256_ECDSA_P256") * (ivLength == 12) * (tagLength == 16),
+  (numId == 838)  * (stringId == "ALG_AES192_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384") * (ivLength == 12) * (tagLength == 16),
+  (numId == 888)  * (stringId == "ALG_AES256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384") * (ivLength == 12) * (tagLength == 16),
+  (numId == 1144) * (stringId == "ALG_AES256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384") * (ivLength == 12) * (tagLength == 16),
+  (numId == 1400) * (stringId == "ALG_AES256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384") * (ivLength == 12) * (tagLength == 16);
+
+facts: (ivLength == 12) and (tagLength == 16);
 
 (* Broken algorithm suite *)
 @nopath
 pred BAlgorithmSuite(+numId, errorMessage) :
-  (! (numId == 20)) *
+  (! (numId == 20)) * (! (numId == 70)) * (! (numId == 120)) * (! (numId == 276)) * (! (numId == 326)) * (! (numId == 376)) *
+  (! (numId == 532)) * (! (numId == 838)) * (! (numId == 888)) * (! (numId == 1144)) * (! (numId == 1400)) *
   (errorMessage == "Malformed Header: Unsupported algorithm suite.");
 
 (****************************
@@ -831,8 +842,8 @@ nounfold pred CHeader(+rawHeaderData, part_one, version, type, suiteId,
     CompatibleContentTypeAndFrameLength(contentType, frameLength) *
     (headerLength == ((((((22 + ECLength) + #EDKsLength) + 1) + 4) + 1) + 4)) *
     ((l-len headerIv) == headerIvLength) *
-    ((l-len headerAuthTag) == (#tagLength / 8)) *
-    (((headerLength + headerIvLength) + (#tagLength / 8)) <=# (l-len rawHeaderData));
+    ((l-len headerAuthTag) == #tagLength) *
+    (((headerLength + headerIvLength) + #tagLength) <=# (l-len rawHeaderData));
 
     facts: (0 <# l-len rawHeaderData);
 

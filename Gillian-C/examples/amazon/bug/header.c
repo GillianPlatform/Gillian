@@ -107,6 +107,8 @@ pred nounfold header_struct(+hdr, allocator, alg_id, message_id,
 }*/
 int aws_cryptosdk_algorithm_is_known(uint16_t alg_id) {
     switch (alg_id) {
+    // case ALG_AES256_GCM_HKDF_SHA512_COMMIT_KEY_ECDSA_P384:
+    // case ALG_AES256_GCM_HKDF_SHA512_COMMIT_KEY:
     // case ALG_AES256_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384:
     // case ALG_AES192_GCM_IV12_TAG16_HKDF_SHA384_ECDSA_P384:
     // case ALG_AES128_GCM_IV12_TAG16_HKDF_SHA256_ECDSA_P256:
@@ -357,7 +359,7 @@ MEM_ERR:
               default_allocator(#alloc) *
               any_aws_last_error() *
               (ret == int(0));
-              
+
               valid_aws_byte_cursor_ptr(#pcursor, #length, #buffer, #data) *
               empty_aws_cryptosdk_hdr(#hdr, #alloc) *
               default_allocator(#alloc) *

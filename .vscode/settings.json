@@ -11,8 +11,9 @@
     "__string": "cpp",
     "cstring": "cpp",
     "tuple": "c",
-    "string.h": "c"
-  },
+    "string.h": "c",
+    "random": "c"
+},
   "python.pythonPath": "/usr/bin/python3",
   "ocaml.sandbox": {
     "kind": "esy",
