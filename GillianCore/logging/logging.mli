@@ -5,7 +5,7 @@ module LoggingConstants : sig
 
     val phase : string
 
-    val store : string
+    val cmd_step : string
   end
 end
 
@@ -72,6 +72,11 @@ module Loggable : sig
     loggable
 end
 
+module LogQueryer : sig
+  (* Returns the content and the content type given the report id *)
+  val get_report : string -> string * string
+end
+
 (** Initializes the logging module with the specified reporters and initializes
     the reporters *)
 val initialize : (module Reporter.S) list -> unit
@@ -102,33 +107,36 @@ val tmi :
 
 (** Logs a type at the `Normal` logging level given a loggable and its content
     type (which should be one of the predefined strings in the
-    `LoggingConstants.ContentType`) *)
+    `LoggingConstants.ContentType`). Returns the logged report id if it has
+    been logged. *)
 val normal_specific :
   ?title:string ->
   ?severity:Report.severity ->
   Loggable.loggable ->
   string ->
-  unit
+  string option
 
 (** Logs a type at the `Verbose` logging level given a loggable and its content
     type (which should be one of the predefined strings in the
-    `LoggingConstants.ContentType`) *)
+    `LoggingConstants.ContentType`). Returns the logged report id if it has
+    been logged. *)
 val verbose_specific :
   ?title:string ->
   ?severity:Report.severity ->
   Loggable.loggable ->
   string ->
-  unit
+  string option
 
 (** Logs a type at the `TMI` logging level given a loggable and its content
     type (which should be one of the predefined strings in the
-    `LoggingConstants.ContentType`) *)
+    `LoggingConstants.ContentType`). Returns the logged report id if it has
+    been logged. *)
 val tmi_specific :
   ?title:string ->
   ?severity:Report.severity ->
   Loggable.loggable ->
   string ->
-  unit
+  string option
 
 (** Writes the string and then raises a failure. *)
 val fail : string -> 'a

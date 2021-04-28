@@ -10,8 +10,8 @@ let get_db () =
   match !db with
   | None    ->
       error
-        "Unable to get database. Ensure that DatabaseReporter.initialize has \
-         been called."
+        "Unable to get database. Ensure that LogDatabase.create_db has been \
+         called."
   | Some db -> db
 
 let check_result_code db ~log rc =
@@ -56,16 +56,37 @@ let store_report
   let stmt =
     Sqlite3.prepare db "INSERT INTO report VALUES (?, ?, ?, ?, ?, ?, ?, ?);"
   in
-  Sqlite3.bind stmt 1 id |> check_result_code db ~log:"report bind id";
-  Sqlite3.bind stmt 2 title |> check_result_code db ~log:"report bind title";
+  Sqlite3.bind stmt 1 id |> check_result_code db ~log:"store report bind id";
+  Sqlite3.bind stmt 2 title
+  |> check_result_code db ~log:"store report bind title";
   Sqlite3.bind stmt 3 elapsed_time
-  |> check_result_code db ~log:"report bind elapsed time";
+  |> check_result_code db ~log:"store report bind elapsed time";
   Sqlite3.bind stmt 4 previous
-  |> check_result_code db ~log:"report bind previous";
-  Sqlite3.bind stmt 5 parent |> check_result_code db ~log:"report bind parent";
-  Sqlite3.bind stmt 6 content |> check_result_code db ~log:"report bind content";
+  |> check_result_code db ~log:"store report bind previous";
+  Sqlite3.bind stmt 5 parent
+  |> check_result_code db ~log:"store report bind parent";
+  Sqlite3.bind stmt 6 content
+  |> check_result_code db ~log:"store report bind content";
   Sqlite3.bind stmt 7 severity
-  |> check_result_code db ~log:"report bind severity";
-  Sqlite3.bind stmt 8 type_ |> check_result_code db ~log:"report bind type";
+  |> check_result_code db ~log:"store report bind severity";
+  Sqlite3.bind stmt 8 type_
+  |> check_result_code db ~log:"store report bind type";
   Sqlite3.step stmt |> check_result_code db ~log:"step: store report";
   Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: store report"
+
+let get_report id =
+  let db = get_db () in
+  let stmt =
+    Sqlite3.prepare db "SELECT content, type FROM report WHERE id=?;"
+  in
+  Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT id)
+  |> check_result_code db ~log:"get report bind id";
+  let rc = Sqlite3.step stmt in
+  let report_fields =
+    if rc == Sqlite3.Rc.ROW then
+      let rows = Sqlite3.row_blobs stmt in
+      (rows.(0), rows.(1))
+    else error "step: (%s)" (Sqlite3.errcode db |> Sqlite3.Rc.to_string)
+  in
+  Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: get report";
+  report_fields

@@ -5,6 +5,7 @@ module Reporter = Reporter
 module FileReporter = FileReporter
 module DatabaseReporter = DatabaseReporter
 module Loggable = Loggable
+module LogQueryer = LogQueryer
 
 let () =
   Printexc.register_printer (function
@@ -36,11 +37,13 @@ let log lvl ?title ?severity msgf =
     log_on_all_reporters report
 
 let log_specific lvl ?title ?severity loggable type_ =
-  if Mode.should_log lvl then
+  if Mode.should_log lvl then (
     let report =
       ReportBuilder.make ?title ~content:loggable ~type_ ?severity ()
     in
-    log_on_all_reporters report
+    log_on_all_reporters report;
+    Some (Uuidm.to_string report.id))
+  else None
 
 let normal ?title ?severity msgf = log Normal ?title ?severity msgf
 

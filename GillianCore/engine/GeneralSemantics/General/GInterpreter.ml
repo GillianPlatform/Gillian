@@ -53,7 +53,14 @@ module type S = sig
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (unit -> cconf_t list * 'a cont_func)
+    | Continue of (unit -> string option * 'a cont_func)
+
+  type cmd_step = {
+    call_stack : CallStack.t;
+    proc_body_index : int;
+    store : store_t option;
+  }
+  [@@deriving yojson]
 
   val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
 
@@ -104,7 +111,7 @@ struct
 
   type st = ESubst.t
 
-  type store_t = Store.t
+  type store_t = Store.t [@@deriving yojson]
 
   type state_t = State.t
 
@@ -143,7 +150,14 @@ struct
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (unit -> cconf_t list * 'a cont_func)
+    | Continue of (unit -> string option * 'a cont_func)
+
+  type cmd_step = {
+    call_stack : CallStack.t;
+    proc_body_index : int;
+    store : store_t option;
+  }
+  [@@deriving yojson]
 
   let max_branching = 100
 
@@ -279,11 +293,12 @@ struct
           (Annot.get_loop_info annot)
           pp_str_list
           (CallStack.get_loop_ids cs)
-          b_counter state_printer state);
-    L.verbose_specific
-      (L.Loggable.make Store.pp Store.of_yojson Store.to_yojson
-         (State.get_store state))
-      L.LoggingConstants.ContentType.store
+          b_counter state_printer state)
+
+  let cmd_step_pp fmt cmd_step =
+    (* TODO: Cmd step should contain all things in a configuration
+             print the same contents as print_configuration *)
+    CallStack.pp fmt cmd_step.call_stack
 
   let print_lconfiguration (lcmd : LCmd.t) (state : State.t) : unit =
     L.normal (fun m ->
@@ -1132,7 +1147,24 @@ struct
           protected_evaluate_cmd prog state cs iframes prev prev_loop_ids i
             b_counter
         in
-        Continue (fun () -> (next_confs, f (next_confs @ rest_confs) results))
+        (* TODO: Store a command step type instead of just callstack *)
+        let next_store, next_cs, next_proc_body_index =
+          match next_confs with
+          | ConfCont (state, call_stack, _, _, _, next_proc_body_index, _) :: _
+            -> (Some (State.get_store state), call_stack, next_proc_body_index)
+          | _ -> (None, [], -1)
+        in
+        let report_id =
+          L.verbose_specific
+            (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
+               {
+                 call_stack = next_cs;
+                 proc_body_index = next_proc_body_index;
+                 store = next_store;
+               })
+            L.LoggingConstants.ContentType.cmd_step
+        in
+        Continue (fun () -> (report_id, f (next_confs @ rest_confs) results))
     | ConfCont (state, cs, _, _, _, i, b_counter) :: rest_confs ->
         let _, annot_cmd = get_cmd prog cs i in
         Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
@@ -1220,8 +1252,7 @@ struct
     in
     let conf : cconf_t = ConfCont (state, cs, [], -1, [], 0, 0) in
     Continue
-      (fun () ->
-        ([ conf ], evaluate_cmd_step ret_fun true prog [] [] [ conf ] []))
+      (fun () -> (None, evaluate_cmd_step ret_fun true prog [] [] [ conf ] []))
 
   (**
   Evaluation of procedures
@@ -1263,8 +1294,7 @@ struct
     let init_func =
       Continue
         (fun () ->
-          ( [ initial_conf ],
-            evaluate_cmd_step ret_fun true prog [] [] [ initial_conf ] [] ))
+          (None, evaluate_cmd_step ret_fun true prog [] [] [ initial_conf ] []))
     in
     evaluate_cmd_iter init_func
 

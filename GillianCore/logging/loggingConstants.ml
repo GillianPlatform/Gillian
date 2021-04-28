@@ -4,5 +4,5 @@ module ContentType = struct
 
   let phase = "phase"
 
-  let store = "store"
+  let cmd_step = "cmd_step"
 end

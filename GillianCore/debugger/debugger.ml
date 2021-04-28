@@ -64,10 +64,10 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     prog : (Annot.t, int) Prog.t;
     mutable step_func :
       unit ->
-      Verification.SAInterpreter.cconf_t list
-      * Verification.result_t Verification.SAInterpreter.cont_func;
+      string option * Verification.result_t Verification.SAInterpreter.cont_func;
     mutable frames : frame list;
-    mutable state : Verification.SAInterpreter.state_t option;
+    mutable store : Verification.SAInterpreter.store_t option;
+    mutable cur_report_id : string option;
     mutable breakpoints : breakpoints;
   }
 
@@ -177,60 +177,76 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
              step_func;
              prog;
              frames = [];
-             state = None;
+             store = None;
+             cur_report_id = None;
              breakpoints = Hashtbl.create 0;
            }
             : debugger_state)
 
+  let callstack_to_frames callstack next_proc_body_idx prog =
+    callstack
+    |> List.map
+         (fun (se : Verification.SAInterpreter.CallStack.stack_element) : frame
+         ->
+           let defaults = (0, 0, 0, 0, "") in
+           let proc = Prog.get_proc prog se.pid in
+           let start_line, start_column, end_line, end_column, source_path =
+             match proc with
+             | None      -> defaults
+             | Some proc -> (
+                 let annot, _, _ = proc.proc_body.(next_proc_body_idx) in
+                 let loc_opt = Annot.get_origin_loc annot in
+                 match loc_opt with
+                 | None     -> defaults
+                 | Some loc ->
+                     ( loc.loc_start.pos_line,
+                       (* VSCode column number s start from 1 *)
+                       loc.loc_start.pos_column + 1,
+                       loc.loc_end.pos_line,
+                       loc.loc_end.pos_column + 1,
+                       loc.loc_source ))
+           in
+           {
+             (* TODO: make this a guaranteed unique index*)
+             index = se.call_index;
+             name = se.pid;
+             source_path;
+             start_line;
+             start_column;
+             end_line;
+             end_column;
+           })
+
   let step dbg =
-    let next_confs, cont_func = dbg.step_func () in
+    let report_id, cont_func = dbg.step_func () in
+    dbg.cur_report_id <- report_id;
     let open Verification.SAInterpreter in
-    let callstack, state, next_proc_body_idx =
-      match next_confs with
-      | ConfCont (state, callstack, _, _, _, next_proc_body_idx, _) :: _ ->
-          (callstack, Some state, next_proc_body_idx)
-      (* TODO: Return "exception" as stop reason for ConfError case *)
-      | _ -> ([], None, -1)
-    in
     let () =
-      dbg.frames <-
-        callstack
-        |> List.map
-             (fun
-               (se : Verification.SAInterpreter.CallStack.stack_element)
-               :
-               frame
-             ->
-               let defaults = (0, 0, 0, 0, "") in
-               let proc = Prog.get_proc dbg.prog se.pid in
-               let start_line, start_column, end_line, end_column, source_path =
-                 match proc with
-                 | None      -> defaults
-                 | Some proc -> (
-                     let annot, _, _ = proc.proc_body.(next_proc_body_idx) in
-                     let loc_opt = Annot.get_origin_loc annot in
-                     match loc_opt with
-                     | None     -> defaults
-                     | Some loc ->
-                         ( loc.loc_start.pos_line,
-                           (* VSCode column number s start from 1 *)
-                           loc.loc_start.pos_column + 1,
-                           loc.loc_end.pos_line,
-                           loc.loc_end.pos_column + 1,
-                           loc.loc_source ))
-               in
-               {
-                 (* TODO: make this a guaranteed unique index*)
-                 index = se.call_index;
-                 name = se.pid;
-                 source_path;
-                 start_line;
-                 start_column;
-                 end_line;
-                 end_column;
-               })
+      match report_id with
+      | None           -> ()
+      | Some report_id -> (
+          let content, type_ = Logging.LogQueryer.get_report report_id in
+          match type_ with
+          | t when t = Logging.LoggingConstants.ContentType.cmd_step -> (
+              let cmd_step =
+                content |> Yojson.Safe.from_string |> cmd_step_of_yojson
+              in
+              match cmd_step with
+              | Ok cmd_step ->
+                  let () =
+                    dbg.frames <-
+                      callstack_to_frames cmd_step.call_stack
+                        cmd_step.proc_body_index dbg.prog
+                  in
+                  dbg.store <- cmd_step.store
+              | Error err   -> raise (Failure err))
+          | _ as t ->
+              raise
+                (Failure
+                   (Printf.sprintf
+                      "Cannot deserialize: type '%s' does not match callstack" t))
+          )
     in
-    let () = dbg.state <- state in
     match cont_func with
     | Finished _         -> ReachedEnd
     | Continue step_func ->
@@ -258,10 +274,10 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     | None    -> []
     | Some id ->
         if id = "Store" then
-          match dbg.state with
+          match dbg.store with
           | None       -> []
-          | Some state ->
-              let store = Verification.SAInterpreter.State.get_store state in
+          | Some store ->
+              (* let store = Verification.SAInterpreter.State.get_store state in *)
               Verification.SAInterpreter.Store.bindings store
               |> List.map (fun (var, value) ->
                      let value =

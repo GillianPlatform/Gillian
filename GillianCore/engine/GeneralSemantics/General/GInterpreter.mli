@@ -50,7 +50,14 @@ module type S = sig
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (unit -> cconf_t list * 'a cont_func)
+    | Continue of (unit -> string option * 'a cont_func)
+
+  type cmd_step = {
+    call_stack : CallStack.t;
+    proc_body_index : int;
+    store : store_t option;
+  }
+  [@@deriving yojson]
 
   val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
 

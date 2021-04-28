@@ -1,6 +1,7 @@
 (**
     Reporter which logs to a database
 *)
+
 let initialize () =
   LogDatabase.reset_db ();
   LogDatabase.create_db ()
