@@ -42,3 +42,9 @@ c-lemma:
 
 js:
 	esy x gillian-js verify Gillian-JS/Examples/Amazon/deserialize_factory.js --no-lemma-proof -l disabled
+
+js-pp-bug:
+	esy x gillian-js verify Gillian-JS/Examples/Amazon/bugs/pp/deserialize_factory.js --no-lemma-proof -l normal
+
+js-frozen-bug:
+	esy x gillian-js verify Gillian-JS/Examples/Amazon/bugs/frozen/deserialize_factory.js --no-lemma-proof
