@@ -26,8 +26,9 @@ module type S = sig
     continue_index : int;
     error_index : int option;
   }
+  [@@deriving yojson]
 
-  type t = stack_element list
+  type t = stack_element list [@@deriving yojson]
 
   val empty : t
 
@@ -90,13 +91,22 @@ module type S = sig
   @return The number of times the pid been recursively called
   *)
   val recursive_depth : t -> string -> int
+
+  (**
+    Call stack pretty printer
+
+  @param fmt Formatter
+  @param cs Call stack to pretty print
+  @return unit
+  *)
+  val pp : Format.formatter -> t -> unit
 end
 
 module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) :
   S with type vt = Val.t and type store_t = Store.t = struct
-  type vt = Val.t
+  type vt = Val.t [@@deriving yojson]
 
-  type store_t = Store.t
+  type store_t = Store.t [@@deriving yojson]
 
   (** Type of call stacks: a call stack is a list of tuples, each of which contains
     1) identifier of the current procedure (string)
@@ -117,8 +127,9 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) :
     continue_index : int;
     error_index : int option;
   }
+  [@@deriving yojson]
 
-  type t = stack_element list
+  type t = stack_element list [@@deriving yojson]
 
   let empty = []
 
@@ -201,4 +212,6 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) :
 
   let get_cur_procs (cs : t) : string list =
     List.rev (List.fold_left (fun ac { pid; _ } -> pid :: ac) [] cs)
+
+  let pp fmt cs = Fmt.(brackets (list ~sep:comma string)) fmt (get_cur_procs cs)
 end

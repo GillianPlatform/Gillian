@@ -15,7 +15,7 @@ module ALoc : Allocators.S with type t = string
 module Var : sig
   (** GIL Variables *)
 
-  type t = string
+  type t = string [@@deriving yojson]
 
   module Set : module type of Containers.SS
 
