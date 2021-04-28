@@ -12,7 +12,8 @@
     "cstring": "cpp",
     "tuple": "c",
     "string.h": "c",
-    "random": "c"
+    "random": "c",
+    "ranges": "c"
 },
   "python.pythonPath": "/usr/bin/python3",
   "ocaml.sandbox": {

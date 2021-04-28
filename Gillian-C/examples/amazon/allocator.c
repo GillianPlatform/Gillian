@@ -4,6 +4,7 @@
  */
 
 #include "allocator.h"
+#include "error.h"
 
 /*@ pred default_allocator(allocator) {
   (allocator -> struct aws_allocator {
@@ -32,12 +33,11 @@ void *s_default_calloc(struct aws_allocator *allocator, size_t num,
     return calloc(num, size);
 }
 
-/* This function is the only one we don't change from the original
- * implementation */
+/* This function is the only one unchanged from the original implementation */
 void *s_default_realloc(struct aws_allocator *allocator, void *ptr,
                         size_t oldsize, size_t newsize) {
-    (void)allocator;
-    (void)oldsize;
+    (void) allocator;
+    (void) oldsize;
 
     if (newsize == 0) {
         free(ptr);
@@ -54,14 +54,6 @@ void *s_default_realloc(struct aws_allocator *allocator, void *ptr,
     return new_mem;
 }
 
-/* The following spec passes */
-/*
-spec aws_mem_acquire (allocator, size) {
-  requires: (allocator == #allocator) * (size == long(#size)) *
-            default_allocator(#allocator) * (0 <# #size)
-  ensures:  UNDEFS(ret, #size)
-}
-*/
 void *aws_mem_acquire(struct aws_allocator *allocator, size_t size) {
     // AWS_FATAL_PRECONDITION(allocator != NULL);
     // AWS_FATAL_PRECONDITION(allocator->mem_acquire != NULL);
@@ -71,17 +63,13 @@ void *aws_mem_acquire(struct aws_allocator *allocator, size_t size) {
     // AWS_FATAL_PRECONDITION(size != 0);
 
     void *mem = allocator->mem_acquire(allocator, size);
-    // Gillian's allocation always works
-    // if (!mem) {
-    //     aws_raise_error(AWS_ERROR_OOM);
-    // }
+    if (!mem) {
+         aws_raise_error(AWS_ERROR_OOM);
+    }
     return mem;
 }
 
 void aws_mem_release(struct aws_allocator *allocator, void *ptr) {
-    // AWS_FATAL_PRECONDITION(allocator != NULL);
-    // AWS_FATAL_PRECONDITION(allocator->mem_release != NULL);
-
     if (ptr != NULL) {
         allocator->mem_release(allocator, ptr);
     }

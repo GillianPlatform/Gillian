@@ -15,7 +15,7 @@ import `../logic/StringStruct`;
     (#rawContent == lsub(#bytes_content, 0, #len)) *
     (#bytes_content == #rawContent @ [ 0 ]) *
     toUtf8(#rawContent, content)
-  } 
+  }
 */
 
 /*@ pred nounfold optBytes(+bytes, +length, content) {
@@ -67,9 +67,9 @@ struct aws_string *aws_string_new_from_array(struct aws_allocator *allocator,
     requires: valid_aws_string_ptr(str, #alloc, #strContent) *
               default_allocator(#alloc)
     ensures: default_allocator(#alloc)
-    
+
     OR
-    
+
     requires: (str == NULL)
     ensures: emp
 }*/

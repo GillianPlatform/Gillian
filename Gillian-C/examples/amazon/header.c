@@ -136,6 +136,7 @@ int is_known_type(uint8_t content_type) {
             (ret == TRUE)
 
     OR
+
         requires:
             (alg_id == int(#alg_id)) *
             BAlgorithmSuite(#alg_id, #errorMessage)
