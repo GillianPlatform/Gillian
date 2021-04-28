@@ -23,7 +23,7 @@ module Make (Debugger : Debugger.S) = struct
                    not happen"
               in
               Lwt.return_unit
-          | Debugger.ReachedEnd ->
+          | Debugger.ReachedEnd | Debugger.ReachedStart ->
               (* Send step stopped event to allow for stepping backwards *)
               Debug_rpc.send_event rpc
                 (module Stopped_event)

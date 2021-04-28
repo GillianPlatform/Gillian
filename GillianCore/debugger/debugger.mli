@@ -1,5 +1,5 @@
 module type S = sig
-  type stop_reason = Step | ReachedEnd | Breakpoint
+  type stop_reason = Step | ReachedStart | ReachedEnd | Breakpoint
 
   type frame = {
     index : int;
@@ -19,9 +19,9 @@ module type S = sig
 
   val launch : string -> (debugger_state, string) result
 
-  val step : debugger_state -> stop_reason
+  val step : ?reverse:bool -> debugger_state -> stop_reason
 
-  val run : debugger_state -> stop_reason
+  val run : ?reverse:bool -> debugger_state -> stop_reason
 
   val terminate : debugger_state -> unit
 

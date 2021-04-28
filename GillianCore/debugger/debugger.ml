@@ -1,7 +1,7 @@
 module L = Logging
 
 module type S = sig
-  type stop_reason = Step | ReachedEnd | Breakpoint
+  type stop_reason = Step | ReachedStart | ReachedEnd | Breakpoint
 
   type frame = {
     index : int;
@@ -21,9 +21,9 @@ module type S = sig
 
   val launch : string -> (debugger_state, string) result
 
-  val step : debugger_state -> stop_reason
+  val step : ?reverse:bool -> debugger_state -> stop_reason
 
-  val run : debugger_state -> stop_reason
+  val run : ?reverse:bool -> debugger_state -> stop_reason
 
   val terminate : debugger_state -> unit
 
@@ -39,7 +39,7 @@ end
 module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
   module Breakpoints = Set.Make (Int)
 
-  type stop_reason = Step | ReachedEnd | Breakpoint
+  type stop_reason = Step | ReachedStart | ReachedEnd | Breakpoint
 
   type frame = {
     index : int;
@@ -65,9 +65,10 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     mutable step_func :
       unit ->
       string option * Verification.result_t Verification.SAInterpreter.cont_func;
+    mutable cur_report_id : string option;
+    mutable next_report_id : string option;
     mutable frames : frame list;
     mutable store : Verification.SAInterpreter.store_t option;
-    mutable cur_report_id : string option;
     mutable breakpoints : breakpoints;
   }
 
@@ -179,6 +180,7 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
              frames = [];
              store = None;
              cur_report_id = None;
+             next_report_id = None;
              breakpoints = Hashtbl.create 0;
            }
             : debugger_state)
@@ -217,12 +219,10 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
              end_column;
            })
 
-  let step dbg =
-    let report_id, cont_func = dbg.step_func () in
-    dbg.cur_report_id <- report_id;
+  let update_debugger_state report_id dbg =
     let open Verification.SAInterpreter in
-    let () =
-      match report_id with
+    dbg.cur_report_id <- report_id;
+    match report_id with
       | None           -> ()
       | Some report_id -> (
           let content, type_ = Logging.LogQueryer.get_report report_id in
@@ -246,17 +246,35 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
                    (Printf.sprintf
                       "Cannot deserialize: type '%s' does not match callstack" t))
           )
-    in
-    match cont_func with
-    | Finished _         -> ReachedEnd
-    | Continue step_func ->
-        let () = dbg.step_func <- step_func in
-        if has_hit_breakpoint dbg then Breakpoint else Step
 
-  let rec run dbg =
-    let stop_reason = step dbg in
+  let step ?(reverse = false) dbg =
+    if reverse then
+      (match dbg.cur_report_id with
+      | None           -> ReachedStart
+      | Some report_id ->
+        let () = dbg.next_report_id <- (Some report_id) in
+        let prev_report_id = Logging.LogQueryer.get_previous_report_id report_id in
+        let () = update_debugger_state prev_report_id dbg in
+        Step)
+    else if Option.is_some dbg.next_report_id then
+      (* TODO: Get next report id *)
+      Step
+    else
+      let report_id, cont_func = dbg.step_func () in
+      let open Verification.SAInterpreter in
+      let () =
+        update_debugger_state report_id dbg
+      in
+      match cont_func with
+      | Finished _         -> ReachedEnd
+      | Continue step_func ->
+          let () = dbg.step_func <- step_func in
+          if has_hit_breakpoint dbg then Breakpoint else Step
+
+  let rec run ?(reverse = false) dbg =
+    let stop_reason = step ~reverse dbg in
     match stop_reason with
-    | Step              -> run dbg
+    | Step              -> run ~reverse dbg
     | other_stop_reason -> other_stop_reason
 
   let terminate dbg =

@@ -13,7 +13,8 @@ module Make (Debugger : Debugger.S) = struct
         Log.info "Initialize request received";
         let caps =
           Capabilities.(
-            make ~supports_configuration_done_request:(Some true) ())
+            make ~supports_configuration_done_request:(Some true)
+            ~supports_step_back:(Some true) ())
         in
         Lwt.wakeup_later resolver (arg, caps);
         Lwt.return caps);
