@@ -655,10 +655,10 @@ let rec trans_lcmd ?(fname = "main") ?(ann = empty) lcmd =
       let gcl1 = List.concat_map trans_normal_lcmd cl1 in
       let gcl2 = List.concat_map trans_normal_lcmd cl2 in
       `Normal (make_assert ~bindings:vs f @ [ If (ge, gcl1, gcl2) ])
-  | Invariant { bindings; assertion; loop_type } ->
+  | Invariant { bindings; assertion } ->
       let asrt = trans_asrt assertion in
       let genv = Asrt.Pred (CConstants.Internal_Predicates.global_env, []) in
-      `Invariant (loop_type, SLCmd.Invariant (genv ** asrt, bindings))
+      `Invariant (SLCmd.Invariant (genv ** asrt, bindings))
   | SymbExec -> `Normal [ SL SymbExec ]
 
 let trans_asrt_annot da =

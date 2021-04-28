@@ -172,7 +172,6 @@ logic_command:
   | INVARIANT; COLON; bindings = exists_opt; assertion = assertion;
     {CLCmd.Invariant {
       assertion = assertion;
-      loop_type = For_loop; (* Actually useless *)
       bindings
     }}
   | APPLY; lname = IDENTIFIER; LBRACE; el = separated_list(COMMA, expression); RBRACE;
@@ -194,9 +193,6 @@ logic_command:
   | IF; LBRACE; e = expression; RBRACE; LCBRACE; cl1 = separated_nonempty_list(SCOLON, logic_command); RCBRACE
     ELSE; LCBRACE; cl2 = separated_nonempty_list(SCOLON, logic_command); RCBRACE
     { CLCmd.If (e, cl1, cl2) }
-
-loop_type:
-  | FOR_LOOP { CLCmd.For_loop }
 
 fold_bindings:
   | LDBRACK; BIND; se = separated_list(COMMA, single_fold_binding); RDBRACK
