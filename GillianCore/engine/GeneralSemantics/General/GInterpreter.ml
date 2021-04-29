@@ -1244,15 +1244,24 @@ struct
               raise (Failure "Symbolic State does NOT contain formal parameter"))
         params
     in
-
     let cs : CallStack.t =
       CallStack.push CallStack.empty ~pid:name ~arguments ~loop_ids:[]
         ~ret_var:"out" ~call_index:(-1) ~continue_index:(-1) ~error_index:(-1)
         ()
     in
-    let conf : cconf_t = ConfCont (state, cs, [], -1, [], 0, 0) in
+    let proc_body_index = 0 in
+    let conf : cconf_t =
+      ConfCont (state, cs, [], -1, [], proc_body_index, 0)
+    in
+    let report_id =
+      L.normal_specific
+        (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
+           { call_stack = cs; proc_body_index; store = Some store })
+        L.LoggingConstants.ContentType.cmd_step
+    in
     Continue
-      (fun () -> (None, evaluate_cmd_step ret_fun true prog [] [] [ conf ] []))
+      (fun () ->
+        (report_id, evaluate_cmd_step ret_fun true prog [] [] [ conf ] []))
 
   (**
   Evaluation of procedures
@@ -1287,14 +1296,27 @@ struct
         ~ret_var:"out" ~call_index:(-1) ~continue_index:(-1) ~error_index:(-1)
         ()
     in
+    let initial_proc_body_index = 0 in
     let initial_state = State.init (Some prog.preds) in
     let initial_conf =
-      ConfCont (initial_state, initial_cs, [], -1, [], 0, 0)
+      ConfCont
+        (initial_state, initial_cs, [], -1, [], initial_proc_body_index, 0)
+    in
+    let report_id =
+      L.normal_specific
+        (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
+           {
+             call_stack = initial_cs;
+             proc_body_index = initial_proc_body_index;
+             store = Some (State.get_store initial_state);
+           })
+        L.LoggingConstants.ContentType.cmd_step
     in
     let init_func =
       Continue
         (fun () ->
-          (None, evaluate_cmd_step ret_fun true prog [] [] [ initial_conf ] []))
+          ( report_id,
+            evaluate_cmd_step ret_fun true prog [] [] [ initial_conf ] [] ))
     in
     evaluate_cmd_iter init_func
 
