@@ -236,6 +236,7 @@ module SVArray = struct
     let size = Engine.Reduction.reduce_lexpr size in
     match size with
     | Lit (Num x) when Float.is_integer x ->
+        Logging.verbose (fun fmt -> fmt "Zeros pf: Concrete: %a" Expr.pp size);
         let zeros =
           Expr.Lit
             (LList
@@ -243,6 +244,8 @@ module SVArray = struct
         in
         arr_exp #== zeros
     | _ ->
+        Logging.verbose (fun fmt ->
+            fmt "Zeros pf: not as concrete: %a" Expr.pp size);
         let is_zero e = e #== (Expr.num 0.) in
         let i = LVar.alloc () in
         let i_e = Expr.LVar i in
