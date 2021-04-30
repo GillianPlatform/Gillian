@@ -239,7 +239,7 @@ end
 module CLCmd = struct
   type t =
     | If         of CExpr.t * t list * t list
-        (** Conditional execution of logic command *)
+        (** Conditional execution of logic command *)$
     | Unfold     of {
         pred : string;
         params : CExpr.t list;
