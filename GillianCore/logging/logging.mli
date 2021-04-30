@@ -19,11 +19,16 @@ module Mode : sig
   (** Type specifying the logging mode *)
   type t = Disabled | Enabled of level
 
+  val logging_mode : t ref
+
   (** Returns whether logging is enabled or not *)
   val enabled : unit -> bool
 
   (** Sets the logging mode *)
   val set_mode : t -> unit
+
+  (** Pretty print function for logging mode type  *)
+  val pp : Format.formatter -> t -> unit
 end
 
 module Reporter : sig
@@ -79,6 +84,10 @@ module LogQueryer : sig
   (* Returns the previous report id which has type cmd_step given the current
      report id *)
   val get_previous_report_id : string -> string option
+
+  (* Returns the next report id which has type cmd_step given the current
+     report id *)
+  val get_next_report_id : string -> string option
 end
 
 (** Initializes the logging module with the specified reporters and initializes

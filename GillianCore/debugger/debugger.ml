@@ -66,7 +66,6 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
       unit ->
       string option * Verification.result_t Verification.SAInterpreter.cont_func;
     mutable cur_report_id : string option;
-    mutable next_report_id : string option;
     mutable frames : frame list;
     mutable store : Verification.SAInterpreter.store_t option;
     mutable breakpoints : breakpoints;
@@ -149,6 +148,7 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
         else false
 
   let launch file_name =
+    Log.reset ();
     Hashtbl.replace scopes_tbl store_scope.id store_scope.name;
     Hashtbl.replace scopes_tbl heap_scope.id heap_scope.name;
 
@@ -180,7 +180,6 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
              frames = [];
              store = None;
              cur_report_id = None;
-             next_report_id = None;
              breakpoints = Hashtbl.create 0;
            }
             : debugger_state)
@@ -223,7 +222,9 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     let open Verification.SAInterpreter in
     dbg.cur_report_id <- report_id;
     match report_id with
-      | None           -> ()
+      | None           ->
+        let () = dbg.frames <- [] in
+        dbg.store <- None
       | Some report_id -> (
           let content, type_ = Logging.LogQueryer.get_report report_id in
           match type_ with
@@ -247,20 +248,11 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
                       "Cannot deserialize: type '%s' does not match callstack" t))
           )
 
-  let step ?(reverse = false) dbg =
-    if reverse then
-      (match dbg.cur_report_id with
-      | None           -> ReachedStart
-      | Some report_id ->
-        let () = dbg.next_report_id <- (Some report_id) in
-        let prev_report_id = Logging.LogQueryer.get_previous_report_id report_id in
-        let () = update_debugger_state prev_report_id dbg in
-        Step)
-    else if Option.is_some dbg.next_report_id then
-      (* TODO: Get next report id *)
-      Step
-    else
-      let report_id, cont_func = dbg.step_func () in
+  let execute_step dbg =
+    let report_id, cont_func = dbg.step_func () in
+      let () = if Option.is_none report_id then
+        raise (Failure (Printf.sprintf "Failed to log. Ensure the correct logging level is set. logging level is '%s'"  (Fmt.to_to_string Logging.Mode.pp !Logging.Mode.logging_mode)))
+      in
       let open Verification.SAInterpreter in
       let () =
         update_debugger_state report_id dbg
@@ -270,6 +262,41 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
       | Continue step_func ->
           let () = dbg.step_func <- step_func in
           if has_hit_breakpoint dbg then Breakpoint else Step
+
+  let step ?(reverse = false) dbg =
+    let () = Log.info "Calling step stuff" in
+    if reverse then
+      let () = Log.info "Calling reverse step stuff" in
+      (match dbg.cur_report_id with
+      | None           -> ReachedStart
+      | Some report_id ->
+        let prev_report_id = Logging.LogQueryer.get_previous_report_id report_id in
+        let () = Log.info ("Got some prev report id: " ^ (Option.get prev_report_id)) in
+        let () = update_debugger_state prev_report_id dbg in
+        if has_hit_breakpoint dbg then Breakpoint else Step)
+    else
+      let () = Log.info "Calling normal step stuff" in
+      let stop_reason = (match dbg.cur_report_id with
+      | None           ->
+        let () = Log.info "cur report is none" in
+        execute_step dbg
+      | Some report_id ->
+        let () = Log.info ("Got some cur report id: " ^ report_id) in
+        let next_report_id = Logging.LogQueryer.get_next_report_id report_id in
+        let () = Log.info "Got some next report id response" in
+        match next_report_id with
+        | None ->
+          let () = Log.info "No next report found" in
+          execute_step dbg
+        | Some next_report_id ->
+          let () = Log.info ("I found next report: " ^ next_report_id ^ ", cur report id: " ^ report_id) in
+          let () = update_debugger_state (Some next_report_id) dbg in
+          if has_hit_breakpoint dbg then Breakpoint else Step) in
+      let () = match dbg.cur_report_id with
+      | None -> Log.info "I have no cur report id"
+      | Some report_id -> Log.info ("My cur report id " ^ report_id)
+      in
+      stop_reason
 
   let rec run ?(reverse = false) dbg =
     let stop_reason = step ~reverse dbg in

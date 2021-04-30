@@ -97,16 +97,42 @@ let get_previous_report_id id =
     Sqlite3.prepare db "SELECT id FROM report WHERE elapsed_time < (SELECT elapsed_time FROM report WHERE id=?) AND type='cmd_step' ORDER BY elapsed_time DESC LIMIT 1;"
   in
   Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT id)
-  |> check_result_code db ~log:"get report bind id";
-  let rc = Sqlite3.step stmt in
+  |> check_result_code db ~log:"get previous report bind id";
+  Sqlite3.step stmt |> check_result_code db ~log:"step: get previous report";
   let prev_report_id =
-    if rc == Sqlite3.Rc.ROW then
       let rows = Sqlite3.row_blobs stmt in
       if Array.length rows = 0 then
         None
       else
         Some rows.(0)
-    else error "step: (%s)" (Sqlite3.errcode db |> Sqlite3.Rc.to_string)
   in
-  Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: get report";
+  Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: get previous report";
   prev_report_id
+
+let get_next_report_id id =
+  let db = get_db () in
+  let stmt =
+    Sqlite3.prepare db "SELECT id FROM report WHERE elapsed_time > (SELECT elapsed_time FROM report WHERE id=?) AND type='cmd_step' ORDER BY elapsed_time LIMIT 2;"
+  in
+  Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT id)
+  |> check_result_code db ~log:"get next report bind id";
+  (* Sqlite3.step stmt |> check_result_code db ~log:"step: get next report"; *)
+  let rc = Sqlite3.step stmt in
+  let next_report_id =
+    if rc == Sqlite3.Rc.ROW then
+      let rows = Sqlite3.row_blobs stmt in
+      let () = Log.info (string_of_int (Array.length rows)) in
+      let () = Log.info (rows.(0)) in
+      let rc = Sqlite3.step stmt in
+      if rc == Sqlite3.Rc.ROW then
+        let rows2 = Sqlite3.row_blobs stmt in
+        let () = Log.info (string_of_int (Array.length rows2)) in
+        let () = Log.info (rows2.(0)) in
+        Some rows.(0)
+      else
+        None
+    else
+      None
+  in
+  Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: get next report";
+  next_report_id

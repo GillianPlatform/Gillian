@@ -15,6 +15,14 @@ let enabled () = !logging_mode <> Disabled
 (** Sets the logging mode *)
 let set_mode mode = logging_mode := mode
 
+(** Pretty print function for logging mode type  *)
+let pp fmt = function
+  | Disabled        -> Fmt.string fmt "disabled"
+  | Enabled Normal  -> Fmt.string fmt "normal"
+  | Enabled Verbose -> Fmt.string fmt "verbose"
+  | Enabled TMI     -> Fmt.string fmt "tmi"
+
+
 (** Returns whether a message of a given level should be logged *)
 let should_log msg_lvl =
   match !logging_mode with

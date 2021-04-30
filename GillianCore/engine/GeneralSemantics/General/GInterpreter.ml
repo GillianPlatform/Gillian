@@ -1150,12 +1150,12 @@ struct
         (* TODO: Store a command step type instead of just callstack *)
         let next_store, next_cs, next_proc_body_index =
           match next_confs with
-          | ConfCont (state, call_stack, _, _, _, next_proc_body_index, _) :: _
-            -> (Some (State.get_store state), call_stack, next_proc_body_index)
+          | ConfCont (state, call_stack, _, _, _, proc_body_index, _) :: _
+            -> (Some (State.get_store state), call_stack, proc_body_index)
           | _ -> (None, [], -1)
         in
         let report_id =
-          L.verbose_specific
+          L.normal_specific
             (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
                {
                  call_stack = next_cs;

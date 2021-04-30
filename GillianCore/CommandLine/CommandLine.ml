@@ -56,13 +56,7 @@ struct
       | "tmi"      -> Result.ok @@ Enabled TMI
       | other      -> Result.error @@ `Msg ("unknown value \"" ^ other ^ "\"")
     in
-    let print fmt = function
-      | Disabled        -> Fmt.string fmt "disabled"
-      | Enabled Normal  -> Fmt.string fmt "normal"
-      | Enabled Verbose -> Fmt.string fmt "verbose"
-      | Enabled TMI     -> Fmt.string fmt "tmi"
-    in
-
+    let print = L.Mode.pp in
     let c = Arg.conv (parse, print) in
     let default = Enabled Verbose in
     let doc =
