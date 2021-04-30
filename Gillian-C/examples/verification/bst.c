@@ -92,7 +92,7 @@ int find(int v, BST *t) {
 int find_min(BST *t) {
     __builtin_annot("unfold BST(#t, #K)");
     __builtin_annot(
-        "assert [[exists #left]] t -m> struct bstn { #a; #left; #right }");
+        "assert [[bind #left]] t -m> struct bstn { #a; #left; #right }");
     __builtin_annot("unfold BST(#left, #someSet)");
     if (t->left == NULL) {
         return t->value;
@@ -110,7 +110,7 @@ BST *remove(int v, BST *t) {
     if (t == NULL) {
         return NULL;
     } else if (v == t->value) {
-        __builtin_annot("assert [[exists #left, #right]] t -m> struct bstn { "
+        __builtin_annot("assert [[bind #left, #right]] t -m> struct bstn { "
                         "int(#v); #left; #right }");
         __builtin_annot("if (! (#left = NULL)) { unfold BST(#left, #KL) }");
         __builtin_annot("if (! (#right = NULL)) { unfold BST(#right, #KR) }");
