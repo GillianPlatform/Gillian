@@ -21,7 +21,7 @@ module type S = sig
 
   val step : ?reverse:bool -> debugger_state -> stop_reason
 
-  val run : ?reverse:bool -> debugger_state -> stop_reason
+  val run : ?reverse:bool -> ?launch:bool -> debugger_state -> stop_reason
 
   val terminate : debugger_state -> unit
 

@@ -23,7 +23,7 @@ module type S = sig
 
   val step : ?reverse:bool -> debugger_state -> stop_reason
 
-  val run : ?reverse:bool -> debugger_state -> stop_reason
+  val run : ?reverse:bool -> ?launch:bool -> debugger_state -> stop_reason
 
   val terminate : debugger_state -> unit
 
@@ -285,11 +285,16 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
           let () = update_report_id_and_inspection_fields next_report_id dbg in
           if has_hit_breakpoint dbg then Breakpoint else Step
 
-  let rec run ?(reverse = false) dbg =
-    let stop_reason = step ~reverse dbg in
-    match stop_reason with
-    | Step              -> run ~reverse dbg
-    | other_stop_reason -> other_stop_reason
+  let rec run ?(reverse = false) ?(launch = false) dbg =
+    (* We need to check if a breakpoint has been hit if run is called
+       immediately after launching to prevent missing a breakpoint on the first
+       line *)
+    if launch && has_hit_breakpoint dbg then Breakpoint
+    else
+      let stop_reason = step ~reverse dbg in
+      match stop_reason with
+      | Step              -> run ~reverse dbg
+      | other_stop_reason -> other_stop_reason
 
   let terminate dbg =
     let () = Verification.postprocess_files dbg.source_files in

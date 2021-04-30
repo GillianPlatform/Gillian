@@ -14,7 +14,7 @@ module Make (Debugger : Debugger.S) = struct
         let open Launch_command.Arguments in
         if not launch_args.stop_on_entry then (
           Log.info "Do not stop on entry";
-          let stop_reason = Debugger.run dbg in
+          let stop_reason = Debugger.run ~launch:true dbg in
           match stop_reason with
           | Debugger.Step ->
               let () =
