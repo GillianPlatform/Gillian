@@ -13,8 +13,6 @@ let () =
         Some (Format.asprintf "!!!!!!!!!!\nFAILURE:\n%s\n!!!!!!!!!!\n\n" s)
     | _         -> None)
 
-let () = Log.reset ()
-
 let reporters = ref []
 
 let initialize (reporters_to_initialize : (module Reporter.S) list) =
