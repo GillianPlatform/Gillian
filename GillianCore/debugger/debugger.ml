@@ -146,39 +146,41 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
           Breakpoints.mem frame.start_line breakpoints
         else false
 
-  let call_stack_to_frames call_stack next_proc_body_idx prog =
-    call_stack
-    |> List.map
-         (fun (se : Verification.SAInterpreter.CallStack.stack_element) : frame
-         ->
-           let defaults = (0, 0, 0, 0, "") in
-           let proc = Prog.get_proc prog se.pid in
-           let start_line, start_column, end_line, end_column, source_path =
-             match proc with
-             | None      -> defaults
-             | Some proc -> (
-                 let annot, _, _ = proc.proc_body.(next_proc_body_idx) in
-                 let loc_opt = Annot.get_origin_loc annot in
-                 match loc_opt with
-                 | None     -> defaults
-                 | Some loc ->
-                     ( loc.loc_start.pos_line,
-                       (* VSCode column numbers start from 1 *)
-                       loc.loc_start.pos_column + 1,
-                       loc.loc_end.pos_line,
-                       loc.loc_end.pos_column + 1,
-                       loc.loc_source ))
-           in
-           {
-             (* TODO: make this a guaranteed unique index*)
-             index = se.call_index;
-             name = se.pid;
-             source_path;
-             start_line;
-             start_column;
-             end_line;
-             end_column;
-           })
+  let rec call_stack_to_frames call_stack next_proc_body_idx prog =
+    match call_stack with
+    | [] -> []
+    | (se : Verification.SAInterpreter.CallStack.stack_element) :: rest ->
+        let defaults = (0, 0, 0, 0, "") in
+        let proc = Prog.get_proc prog se.pid in
+        let start_line, start_column, end_line, end_column, source_path =
+          match proc with
+          | None      -> defaults
+          | Some proc -> (
+              let annot, _, _ = proc.proc_body.(next_proc_body_idx) in
+              let loc_opt = Annot.get_origin_loc annot in
+              match loc_opt with
+              | None     -> defaults
+              | Some loc ->
+                  ( loc.loc_start.pos_line,
+                    (* VSCode column numbers start from 1 *)
+                    loc.loc_start.pos_column + 1,
+                    loc.loc_end.pos_line,
+                    loc.loc_end.pos_column + 1,
+                    loc.loc_source ))
+        in
+        let frame =
+          {
+            (* TODO: make this a guaranteed unique index*)
+            index = se.call_index;
+            name = se.pid;
+            source_path;
+            start_line;
+            start_column;
+            end_line;
+            end_column;
+          }
+        in
+        frame :: call_stack_to_frames rest se.call_index prog
 
   let update_report_id_and_inspection_fields report_id dbg =
     dbg.cur_report_id <- report_id;
