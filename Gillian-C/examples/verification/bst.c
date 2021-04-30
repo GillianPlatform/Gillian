@@ -101,7 +101,7 @@ int find_min(BST *t) {
     }
 }
 
-/*@ spec remove(v, t) {
+/* spec remove(v, t) {
   requires: (v == int(#v)) * (t == #t) * BST(#t, #K)
   ensures:  (ret == #t_new) * BST(#t_new, #K_new) * (#K_new == #K -d- -{ #v }-)
 } */

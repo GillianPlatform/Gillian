@@ -2,7 +2,6 @@
 
 /**
    @import AmazonLogic.jsil
-   @import ByteLogic.gil
    @import EncryptionHeaderLogic.gil
    @import ListLogic.gil
    @import Utf8Logic.gil

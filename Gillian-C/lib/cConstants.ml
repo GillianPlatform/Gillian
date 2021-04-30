@@ -86,6 +86,18 @@ module Imports = struct
         genv_config = any_genv_config;
       };
       {
+        file = "stdlib_archi64_verif.gil";
+        arch = a64;
+        exec = ver_exec;
+        genv_config = any_genv_config;
+      };
+      {
+        file = "stdlib_archi64_non_verif.gil";
+        arch = a64;
+        exec = non_ver_exec;
+        genv_config = any_genv_config;
+      };
+      {
         file = "global_environment_archi64.gil";
         arch = a64;
         exec = all_exec;
@@ -120,6 +132,18 @@ module Imports = struct
         file = "stdlib_archi32.gil";
         arch = a32;
         exec = all_exec;
+        genv_config = any_genv_config;
+      };
+      {
+        file = "stdlib_archi32_verif.gil";
+        arch = a32;
+        exec = ver_exec;
+        genv_config = any_genv_config;
+      };
+      {
+        file = "stdlib_archi32_non_verif.gil";
+        arch = a32;
+        exec = non_ver_exec;
         genv_config = any_genv_config;
       };
       {

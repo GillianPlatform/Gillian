@@ -104,6 +104,7 @@ let env_var_import_path = Some "GILLIAN_JS_RUNTIME_PATH"
 
 let initialize exec_mode =
   let open ExecMode in
+  Config.lemma_proof := false;
   Javert_utils.Js_config.cosette :=
     biabduction_exec exec_mode || symbolic_exec exec_mode;
   if concrete_exec exec_mode then Config.unfolding := false

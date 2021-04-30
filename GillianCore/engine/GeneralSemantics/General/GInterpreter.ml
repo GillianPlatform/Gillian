@@ -200,13 +200,21 @@ struct
   let check_loop_ids actual expected =
     match actual = expected with
     | false ->
-        raise
-          (Failure
-             (Format.asprintf
-                "Malformed loop structure: current loops: %a; expected loops: \
-                 %a"
-                pp_str_list actual pp_str_list expected))
+        Fmt.failwith
+          "Malformed loop structure: current loops: %a; expected loops: %a"
+          pp_str_list actual pp_str_list expected
     | true  -> ()
+
+  let rec loop_ids_to_frame_on_at_the_end end_ids start_ids =
+    if end_ids = start_ids then []
+    else
+      match end_ids with
+      | []     ->
+          Fmt.failwith
+            "Malformed loop structure (at return): current loops: %a; expected \
+             loops: %a"
+            pp_str_list end_ids pp_str_list start_ids
+      | x :: r -> x :: loop_ids_to_frame_on_at_the_end r start_ids
 
   (* ************** *
    * Main Functions *
@@ -899,12 +907,19 @@ struct
                   _;
                 }
                 :: cs' ) ->
-                check_loop_ids loop_ids start_loop_ids;
+                let to_frame_on =
+                  loop_ids_to_frame_on_at_the_end loop_ids start_loop_ids
+                in
+                let ( let+ ) x f = List.map f x in
+                let+ state =
+                  if ExecMode.verification_exec !Config.current_exec_mode then
+                    State.frame_on state iframes to_frame_on
+                  else [ state ]
+                in
                 let state' = State.set_store state old_store in
                 let state'' = update_store state' x v_ret in
-                [
-                  ConfCont (state'', cs', iframes, prev', loop_ids, j, b_counter);
-                ]
+                ConfCont
+                  (state'', cs', iframes, prev', start_loop_ids, j, b_counter)
             | _ -> raise (Failure "Malformed callstack")
           in
           L.verbose (fun m -> m "Returning.");
@@ -929,12 +944,19 @@ struct
                 _;
               }
               :: cs' ) ->
-              check_loop_ids loop_ids start_loop_ids;
+              let to_frame_on =
+                loop_ids_to_frame_on_at_the_end loop_ids start_loop_ids
+              in
+              let ( let+ ) x f = List.map f x in
+              let+ state =
+                if ExecMode.verification_exec !Config.current_exec_mode then
+                  State.frame_on state iframes to_frame_on
+                else [ state ]
+              in
               let state' = State.set_store state old_store in
               let state'' = update_store state' x v_ret in
-              [
-                ConfCont (state'', cs', iframes, prev', loop_ids, j, b_counter);
-              ]
+              ConfCont
+                (state'', cs', iframes, prev', start_loop_ids, j, b_counter)
           | _ -> raise (Failure "Malformed callstack"))
       (* Explicit failure *)
       | Fail (fname, exprs) ->

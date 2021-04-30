@@ -237,26 +237,27 @@ module CAssert = struct
 end
 
 module CLCmd = struct
-
   type t =
-    | If         of CExpr.t * t list * t list (** Conditional execution of logic command *)
+    | If         of CExpr.t * t list * t list
+        (** Conditional execution of logic command *)
     | Unfold     of {
         pred : string;
         params : CExpr.t list;
         bindings : (string * string) list option;
         recursive : bool;
-      } (** Unfolding of a specific predicate *)
-    | Unfold_all of string (** Recursively unfold all predicates with the given name (with a fuel). *)
-    | Fold       of string * CExpr.t list (** Fold a predicate *)
-    | Apply      of string * CExpr.t list (** Apply a lemma *)
+      }  (** Unfolding of a specific predicate *)
+    | Unfold_all of string
+        (** Recursively unfold all predicates with the given name (with a fuel). *)
+    | Fold       of string * CExpr.t list  (** Fold a predicate *)
+    | Apply      of string * CExpr.t list  (** Apply a lemma *)
     | Assert     of CAssert.t * string list
         (** Assert for verification, takes an assertion and binders *)
-    | Branch     of CFormula.t (** The symbolic engine should branch on the given formula *)
-    | Invariant  of {
-        assertion : CAssert.t;
-        bindings : string list;
-      } (** Loop invariant *)
-    | SymbExec (** Ignore the next function specification and symbolically execute instead *)
+    | Branch     of CFormula.t
+        (** The symbolic engine should branch on the given formula *)
+    | Invariant  of { assertion : CAssert.t; bindings : string list }
+        (** Loop invariant *)
+    | SymbExec
+        (** Ignore the next function specification and symbolically execute instead *)
 
   let rec pp fmt lcmd =
     let pp_unfold_bindings ft b =
@@ -284,8 +285,7 @@ module CLCmd = struct
     | Assert (a, ex) ->
         Format.fprintf fmt "assert%a @[%a@]" pp_bindings ex CAssert.pp a
     | Invariant { assertion; bindings } ->
-        Fmt.pf fmt "invariant %a %a" pp_bindings
-          bindings CAssert.pp assertion
+        Fmt.pf fmt "invariant %a %a" pp_bindings bindings CAssert.pp assertion
     | Branch f -> Format.fprintf fmt "branch %a" CFormula.pp f
     | If (e, cl1, cl2) -> (
         match cl2 with

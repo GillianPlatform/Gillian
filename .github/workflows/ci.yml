@@ -17,15 +17,15 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
       - name: Installing esy
-        run: sudo npm install -g esy@0.6.6 --unsafe-perm
+        run: sudo npm install -g esy@0.6.10 --unsafe-perm
       - name: Restore Cache
         id: restore-cache
         uses: actions/cache@v1
         with:
           path: _export
-          key: ${{ runner.os }}-esy-0.6.6-${{ hashFiles('esy.lock/index.json') }}
+          key: ${{ runner.os }}-esy-0.6.10-${{ hashFiles('esy.lock/index.json') }}
           restore-keys: |
-            ${{ runner.os }}-esy-0.6.6-
+            ${{ runner.os }}-esy-0.6.10-
       - name: Esy install
         run: "esy install"
       - name: Import Cache
@@ -78,6 +78,9 @@ jobs:
       - name: Test All
         run: "./testAll.sh"
         working-directory: "Gillian/Gillian-C/environment/"
+      - name: Test Amazon
+        run: "make"
+        working-directory: "Gillian/Gillian-C/examples/amazon/"
 
   gillian_js_tests:
     strategy:
@@ -106,7 +109,7 @@ jobs:
         run: "./testJaVerT.sh"
         working-directory: "Gillian/Gillian-JS/environment/"
       - name: Test Amazon
-        run: "gillian-js verify deserialize_factory.js --no-lemma-proof --amazon -l disabled"
+        run: "make"
         working-directory: "Gillian/Gillian-JS/Examples/Amazon/"
 
   test262:
