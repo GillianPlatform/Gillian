@@ -163,7 +163,7 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
                  | None     -> defaults
                  | Some loc ->
                      ( loc.loc_start.pos_line,
-                       (* VSCode column number s start from 1 *)
+                       (* VSCode column numbers start from 1 *)
                        loc.loc_start.pos_column + 1,
                        loc.loc_end.pos_line,
                        loc.loc_end.pos_column + 1,
@@ -183,26 +183,35 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
   let update_report_id_and_inspection_fields report_id dbg =
     dbg.cur_report_id <- report_id;
     let open Verification.SAInterpreter in
-    let content, type_ = Logging.LogQueryer.get_report report_id in
-    match type_ with
-    | t when t = Logging.LoggingConstants.ContentType.cmd_step -> (
-        let cmd_step =
-          content |> Yojson.Safe.from_string |> cmd_step_of_yojson
-        in
-        match cmd_step with
-        | Ok cmd_step ->
-            let () =
-              dbg.frames <-
-                call_stack_to_frames cmd_step.call_stack
-                  cmd_step.proc_body_index dbg.prog
-            in
-            dbg.store <- cmd_step.store
-        | Error err   -> raise (Failure err))
-    | _ as t ->
+    match Logging.LogQueryer.get_report report_id with
+    | None                  ->
         raise
           (Failure
              (Printf.sprintf
-                "Cannot deserialize: type '%s' does not match callstack" t))
+                "Unable to find report id '%s'. Check the logging level is set \
+                 correctly"
+                report_id))
+    | Some (content, type_) -> (
+        match type_ with
+        | t when t = Logging.LoggingConstants.ContentType.cmd_step -> (
+            let cmd_step =
+              content |> Yojson.Safe.from_string |> cmd_step_of_yojson
+            in
+            match cmd_step with
+            | Ok cmd_step ->
+                let () =
+                  dbg.frames <-
+                    call_stack_to_frames cmd_step.call_stack
+                      cmd_step.proc_body_index dbg.prog
+                in
+                dbg.store <- cmd_step.store
+            | Error err   -> raise (Failure err))
+        | _ as t ->
+            raise
+              (Failure
+                 (Printf.sprintf
+                    "Cannot deserialize: type '%s' does not match callstack" t))
+        )
 
   let launch file_name =
     Hashtbl.replace scopes_tbl store_scope.id store_scope.name;

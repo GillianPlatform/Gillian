@@ -77,7 +77,7 @@ end
 
 module LogQueryer : sig
   (* Returns the content and the content type given the report id *)
-  val get_report : string -> string * string
+  val get_report : string -> (string * string) option
 
   (* Returns the previous report id which has type cmd_step given the current
      report id *)

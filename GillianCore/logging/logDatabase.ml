@@ -26,9 +26,18 @@ let exec db ~log ~stmt =
   with Error err -> error "exec: %s (%s)" err (Sqlite3.errmsg db)
 
 let zero_or_one_row db ~log ~stmt =
-  Sqlite3.step stmt |> check_result_code db ~log;
-  let rows = Sqlite3.row_blobs stmt in
-  if Array.length rows = 0 then None else Some rows.(0)
+  match Sqlite3.step stmt with
+  | ROW  -> (
+      let row = Sqlite3.row_blobs stmt in
+      match Sqlite3.step stmt with
+      | DONE -> Some row
+      | ROW  -> error "%s: expected zero or one row, got more than one row" log
+      | err  ->
+          error "%s: %s (%s)" log (Sqlite3.Rc.to_string err) (Sqlite3.errmsg db)
+      )
+  | DONE -> None
+  | err  ->
+      error "%s: %s (%s)" log (Sqlite3.Rc.to_string err) (Sqlite3.errmsg db)
 
 let create_report_table db =
   exec db ~log:"creating report table"
@@ -86,13 +95,8 @@ let get_report id =
   in
   Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT id)
   |> check_result_code db ~log:"get report bind id";
-  let rc = Sqlite3.step stmt in
-  let report_fields =
-    if rc == Sqlite3.Rc.ROW then
-      let rows = Sqlite3.row_blobs stmt in
-      (rows.(0), rows.(1))
-    else error "step: (%s)" (Sqlite3.errcode db |> Sqlite3.Rc.to_string)
-  in
+  let row = zero_or_one_row db ~log:"step: get next report" ~stmt in
+  let report_fields = Option.map (fun row -> (row.(0), row.(1))) row in
   Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: get report";
   report_fields
 
@@ -106,9 +110,8 @@ let get_previous_report_id id =
   in
   Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT id)
   |> check_result_code db ~log:"get previous report bind id";
-  let prev_report_id =
-    zero_or_one_row db ~log:"step: get previous report" ~stmt
-  in
+  let row = zero_or_one_row db ~log:"step: get next report" ~stmt in
+  let prev_report_id = Option.map (fun row -> row.(0)) row in
   Sqlite3.finalize stmt
   |> check_result_code db ~log:"finalize: get previous report";
   prev_report_id
@@ -122,6 +125,7 @@ let get_next_report_id id =
   in
   Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT id)
   |> check_result_code db ~log:"get next report bind id";
-  let next_report_id = zero_or_one_row db ~log:"step: get next report" ~stmt in
+  let row = zero_or_one_row db ~log:"step: get next report" ~stmt in
+  let next_report_id = Option.map (fun row -> row.(0)) row in
   Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: get next report";
   next_report_id
