@@ -16,7 +16,7 @@ module Make (Debugger : Debugger.S) = struct
           Log.info "Do not stop on entry";
           let stop_reason = Debugger.run dbg in
           match stop_reason with
-          | Debugger.Step       ->
+          | Debugger.Step ->
               let () =
                 Log.info
                   "Debugger stopped because of step after running. This should \
