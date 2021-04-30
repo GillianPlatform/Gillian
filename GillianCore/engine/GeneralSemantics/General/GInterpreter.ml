@@ -53,7 +53,7 @@ module type S = sig
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (unit -> string option * 'a cont_func)
+    | Continue of (string option * (unit -> 'a cont_func))
 
   type cmd_step = {
     call_stack : CallStack.t;
@@ -150,7 +150,7 @@ struct
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (unit -> string option * 'a cont_func)
+    | Continue of (string option * (unit -> 'a cont_func))
 
   type cmd_step = {
     call_stack : CallStack.t;
@@ -1150,8 +1150,8 @@ struct
         (* TODO: Store a command step type instead of just callstack *)
         let next_store, next_cs, next_proc_body_index =
           match next_confs with
-          | ConfCont (state, call_stack, _, _, _, proc_body_index, _) :: _
-            -> (Some (State.get_store state), call_stack, proc_body_index)
+          | ConfCont (state, call_stack, _, _, _, proc_body_index, _) :: _ ->
+              (Some (State.get_store state), call_stack, proc_body_index)
           | _ -> (None, [], -1)
         in
         let report_id =
@@ -1164,7 +1164,8 @@ struct
                })
             L.LoggingConstants.ContentType.cmd_step
         in
-        Continue (fun () -> (report_id, f (next_confs @ rest_confs) results))
+        let () = L.normal (fun m -> m "abc: Logging step") in
+        Continue (report_id, fun () -> f (next_confs @ rest_confs) results)
     | ConfCont (state, cs, _, _, _, i, b_counter) :: rest_confs ->
         let _, annot_cmd = get_cmd prog cs i in
         Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
@@ -1203,10 +1204,8 @@ struct
 *)
   let rec evaluate_cmd_iter (init_func : 'a cont_func) : 'a list =
     match init_func with
-    | Finished results   -> results
-    | Continue cont_func ->
-        let _, cont_func = cont_func () in
-        evaluate_cmd_iter cont_func
+    | Finished results        -> results
+    | Continue (_, cont_func) -> evaluate_cmd_iter (cont_func ())
 
   (**
   Sets the initial values for evaluating a program, and returns a continuation
@@ -1259,9 +1258,10 @@ struct
            { call_stack = cs; proc_body_index; store = Some store })
         L.LoggingConstants.ContentType.cmd_step
     in
+    L.normal (fun m -> m "abc: Logging init");
     Continue
-      (fun () ->
-        (report_id, evaluate_cmd_step ret_fun true prog [] [] [ conf ] []))
+      ( report_id,
+        fun () -> evaluate_cmd_step ret_fun true prog [] [] [ conf ] [] )
 
   (**
   Evaluation of procedures
@@ -1314,9 +1314,9 @@ struct
     in
     let init_func =
       Continue
-        (fun () ->
-          ( report_id,
-            evaluate_cmd_step ret_fun true prog [] [] [ initial_conf ] [] ))
+        ( report_id,
+          fun () ->
+            evaluate_cmd_step ret_fun true prog [] [] [ initial_conf ] [] )
     in
     evaluate_cmd_iter init_func
 

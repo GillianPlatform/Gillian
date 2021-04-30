@@ -45,8 +45,7 @@ let log_specific lvl ?title ?severity loggable type_ =
     in
     let () = log_on_all_reporters report in
     Some (Uuidm.to_string report.id)
-  else
-    None
+  else None
 
 let normal ?title ?severity msgf = log Normal ?title ?severity msgf
 

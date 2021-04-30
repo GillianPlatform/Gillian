@@ -22,7 +22,6 @@ let pp fmt = function
   | Enabled Verbose -> Fmt.string fmt "verbose"
   | Enabled TMI     -> Fmt.string fmt "tmi"
 
-
 (** Returns whether a message of a given level should be logged *)
 let should_log msg_lvl =
   match !logging_mode with

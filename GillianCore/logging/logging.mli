@@ -19,8 +19,6 @@ module Mode : sig
   (** Type specifying the logging mode *)
   type t = Disabled | Enabled of level
 
-  val logging_mode : t ref
-
   (** Returns whether logging is enabled or not *)
   val enabled : unit -> bool
 

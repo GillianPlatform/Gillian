@@ -50,7 +50,7 @@ module type S = sig
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (unit -> string option * 'a cont_func)
+    | Continue of (string option * (unit -> 'a cont_func))
 
   type cmd_step = {
     call_stack : CallStack.t;
