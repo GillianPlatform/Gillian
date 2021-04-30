@@ -237,28 +237,26 @@ module CAssert = struct
 end
 
 module CLCmd = struct
-  type loop_type = For_loop
 
   type t =
-    | If         of CExpr.t * t list * t list
+    | If         of CExpr.t * t list * t list (** Conditional execution of logic command *)
     | Unfold     of {
         pred : string;
         params : CExpr.t list;
         bindings : (string * string) list option;
         recursive : bool;
-      }
-    | Unfold_all of string
-    | Fold       of string * CExpr.t list
-    | Apply      of string * CExpr.t list
+      } (** Unfolding of a specific predicate *)
+    | Unfold_all of string (** Recursively unfold all predicates with the given name (with a fuel). *)
+    | Fold       of string * CExpr.t list (** Fold a predicate *)
+    | Apply      of string * CExpr.t list (** Apply a lemma *)
     | Assert     of CAssert.t * string list
         (** Assert for verification, takes an assertion and binders *)
-    | Branch     of CFormula.t
+    | Branch     of CFormula.t (** The symbolic engine should branch on the given formula *)
     | Invariant  of {
         assertion : CAssert.t;
         bindings : string list;
-        loop_type : loop_type;
-      }
-    | SymbExec
+      } (** Loop invariant *)
+    | SymbExec (** Ignore the next function specification and symbolically execute instead *)
 
   let rec pp fmt lcmd =
     let pp_unfold_bindings ft b =
@@ -271,9 +269,6 @@ module CLCmd = struct
       match b with
       | [] -> ()
       | b  -> Fmt.pf ft " [[bind %a]]" (Fmt.list ~sep:Fmt.comma Fmt.string) b
-    in
-    let pp_loop_type ft = function
-      | For_loop -> Fmt.pf ft "for_loop"
     in
     match lcmd with
     | Apply (s, el) -> Fmt.pf fmt "apply @[%s(%a)@]" s (pp_list CExpr.pp) el
@@ -288,8 +283,8 @@ module CLCmd = struct
         Format.fprintf fmt "fold @[%s(%a)@]" s (pp_list CExpr.pp) el
     | Assert (a, ex) ->
         Format.fprintf fmt "assert%a @[%a@]" pp_bindings ex CAssert.pp a
-    | Invariant { assertion; bindings; loop_type } ->
-        Fmt.pf fmt "invariant %a%a %a" pp_loop_type loop_type pp_bindings
+    | Invariant { assertion; bindings } ->
+        Fmt.pf fmt "invariant %a %a" pp_bindings
           bindings CAssert.pp assertion
     | Branch f -> Format.fprintf fmt "branch %a" CFormula.pp f
     | If (e, cl1, cl2) -> (

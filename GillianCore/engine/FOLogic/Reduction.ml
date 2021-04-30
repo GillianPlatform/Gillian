@@ -2117,6 +2117,17 @@ let rec reduce_formula_loop
       (* DEDICATED SIMPLIFICATIONS *)
       | Eq (BinOp (Lit (Num x), FPlus, LVar y), LVar z) when x <> 0. && y = z ->
           False
+      | ForAll
+          ( [ (x, Some NumberType) ],
+            Or
+              ( Or (Less (LVar a, Lit (Num 0.)), LessEq (Lit (Num len), LVar b)),
+                Eq (BinOp (EList c, LstNth, LVar d), e) ) )
+        when x = a && a = b && b = d && Float.is_integer len
+             && List.length c = Float.to_int len ->
+          let rhs : Expr.t =
+            EList (Array.to_list (Array.make (Float.to_int len) e))
+          in
+          Eq (EList c, rhs)
       (* FIXME: INTEGER BYTE-BY-BYTE BREAKDOWN *)
       | Eq
           ( Lit (Num n),

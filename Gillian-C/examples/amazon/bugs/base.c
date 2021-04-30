@@ -1,11 +1,11 @@
-#include "base.h"
+#include "../base.h"
 #include <stdlib.h>
 
 /*@
-    import  `logic/EncryptionHeaderLogic`,
-            `logic/ListLogic`,
-            `logic/Utf8Logic`,
-            `logic/ByteLogic`;
+    import  `EncryptionHeaderLogic`,
+            `../logic/ListLogic`,
+            `../logic/Utf8Logic`,
+            `../logic/ByteLogic`;
 */
 
 /*

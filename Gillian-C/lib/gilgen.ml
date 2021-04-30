@@ -525,7 +525,7 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
           in
           (* We should filter assert_s in verif, and assert_v in symb *)
           if ExecMode.concrete_exec context.exec_mode then [] else gil_lcmds
-      | `Invariant (_loop_type, inv) ->
+      | `Invariant inv ->
           let inv = Cmd.Logic (SL inv) in
           set_invariant inv;
           [])

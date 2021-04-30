@@ -1,14 +1,20 @@
-(* Because of the weird layout of the aws_string structure,
-   we write a specific structure predicate that exposes a pointer to
-   the last part.
-   This is due to a specific size being give for the string at the end of 
-   the structure which confuses the compiler.
-   *)
-   
+(******************************
+ ******************************
+ *******                *******
+ *******   AWS Strings  *******
+ *******                *******
+ ******************************
+ ******************************)
+
+(*
+   Because of the unusual layout of the aws_string structure,
+   the compiler gets confused and we have to write a custom
+   structure predicate that exposes a pointer to the last part.
+*)
+
 @internal
 pred m_struct_aws_string_exposing_pointer(+ptr: List, allocator : List,
                           len : List, bytes : List) :
-  
   i__ptr_to_0(ptr, #loc) *
   i__is_ptr_opt(allocator) *
   <mem_single>(#loc, 0., "int64"; allocator, "Freeable") *

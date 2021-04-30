@@ -1,106 +1,108 @@
 #include "array_list.h"
 #include "edk.h"
 #include "error.h"
+
 /*  One can look at the following validity check to understand
     the following predicates :
     https://github.com/awslabs/aws-c-common/blob/bb797381f3468e6f076e53eddbb399a99f54f67b/include/aws/common/array_list.inl#L82
 
     The size of an edk is 96
 */
-/* Unfortunately, we can't go fully polymorphic here, because we don't have a
-   core predicate for arbitrary structs. It has to do with the lack of
-   structures in Csharpminor, but writing a compiler straight from C would let
-   us do that better.
+/*
+    Unfortunately, we cannot go fully polymorphic here, because we don't have a
+    core predicate for arbitrary structs. It has to do with the lack of
+    structures in Csharpminor, but writing a compiler straight from C would let
+    us do that better.
 */
+// Various predicates for dealing with array lists of edks
 /*@
 
-pred edk_array_list_content_pref(+data, +size, +alloc, content) {
-    (size == 0) * (content == []);
-    (0 <=# (size - 96)) *
-    valid_aws_cryptosdk_edk_ptr(data, alloc, #edk) *
-    (content == #edk :: #rest) *
-    (#next == data p+ 96) *
-    edk_array_list_content_pref(#next, size - 96, alloc, #rest)
-}
+    pred edk_array_list_content_pref(+data, +size, +alloc, content) {
+        (size == 0) * (content == []);
+        (0 <=# (size - 96)) *
+        valid_aws_cryptosdk_edk_ptr(data, alloc, #edk) *
+        (content == #edk :: #rest) *
+        (#next == data p+ 96) *
+        edk_array_list_content_pref(#next, size - 96, alloc, #rest)
+    }
 
-lemma array_list_content_pref_is_array(data, size, alloc) {
-    hypothesis: edk_array_list_content_pref(#data, #size, #alloc, #content) * (0 <# #size)
-    conclusions: ARRAY(#data, char, #size, #something)
-    proof: unfold edk_array_list_content_pref(#data, #size, #alloc, #content);
-           if (0 < (#size - 96)) {
-               apply array_list_content_pref_is_array(#data p+ 96, #size - 96, #alloc);
-               unfold_all i__ptr_add
-           } else {
-               unfold_all edk_array_list_content_pref
-           }
-}
+    lemma array_list_content_pref_is_array(data, size, alloc) {
+        hypothesis:
+            edk_array_list_content_pref(#data, #size, #alloc, #content) * (0 <# #size)
 
-pred nounfold optPadding(+p, +sz) {
-    (sz == 0);
+        conclusions:
+            ARRAY(#data, char, #size, #something)
 
-    (1 <=# sz) * ARRAY(p, char, sz, #fill)
- }
+        proof:
+            unfold edk_array_list_content_pref(#data, #size, #alloc, #content);
+            if (0 < (#size - 96)) {
+                apply array_list_content_pref_is_array(#data p+ 96, #size - 96, #alloc);
+                unfold_all i__ptr_add
+            } else {
+                unfold_all edk_array_list_content_pref
+            }
+    }
 
-pred edk_array_list_data_content(+data, +prefix_size,
-                                 +total_size, +alloc, content) {
-    (0 <# prefix_size) * (0 <# total_size) * MALLOCED(data, total_size) *
-    edk_array_list_content_pref(data, prefix_size, alloc, content) *
-    (prefix_size == (96 * (len content))) *
-    optPadding(data p+ prefix_size, #rest_size) *
-    (#rest_size == (total_size - prefix_size));
+    pred nounfold optPadding(+p, +sz) {
+        (sz == 0);
+        (1 <=# sz) * ARRAY(p, char, sz, #fill)
+    }
 
+    pred edk_array_list_data_content(+data, +prefix_size, +total_size, +alloc, content) {
+        (0 <# prefix_size) * (0 <# total_size) * MALLOCED(data, total_size) *
+        edk_array_list_content_pref(data, prefix_size, alloc, content) *
+        (prefix_size == (96 * (len content))) *
+        optPadding(data p+ prefix_size, #rest_size) *
+        (#rest_size == (total_size - prefix_size));
 
-    (0 == prefix_size) * (0 <# total_size) * MALLOCED(data, total_size) *
-    optPadding(data, total_size) * (content == [])
-}
+        (0 == prefix_size) * (0 <# total_size) * MALLOCED(data, total_size) *
+        optPadding(data, total_size) * (content == [])
+    }
 
-lemma edk_array_list_data_is_freeable(data, prefix_size, total_size, alloc) {
-    hypothesis: edk_array_list_data_content(#data, #prefix_size, #total_size, #alloc, #content)
-    conclusions: MARRAY(#data, char, #total_size, #whatever)
-    proof: unfold edk_array_list_data_content(#data, #prefix_size, #total_size, #alloc, #content);
-           if (0 < #prefix_size) {
-            apply array_list_content_pref_is_array(#data, #prefix_size, #alloc)
-           };
-           unfold optPadding(#data p+ #prefix_size, #total_size - #prefix_size)
-}
+    lemma edk_array_list_data_is_freeable(data, prefix_size, total_size, alloc) {
+        hypothesis:
+            edk_array_list_data_content(#data, #prefix_size, #total_size, #alloc, #content)
 
-pred nounfold valid_edk_array_list(+current_size, +length,
-                          +item_size, +data, +alloc, content) {
-  (current_size == 0) * (length == 0) * (item_size == 96) *
-  (data == NULL) * (content == []);
+        conclusions:
+            MARRAY(#data, char, #total_size, #whatever)
 
-  (item_size == 96) * (0 <=# length) * (0 <# current_size) *
-  aws_mul_u64_checked(item_size, length, #required_size) *
-  (#required_size <=# current_size) *
-  (not (data == NULL)) *
-  edk_array_list_data_content(data, #required_size,
-                              current_size, alloc, content) *
-  (length == len content)
-}
+        proof:
+            unfold edk_array_list_data_content(#data, #prefix_size, #total_size, #alloc, #content);
+            if (0 < #prefix_size) {
+                apply array_list_content_pref_is_array(#data, #prefix_size, #alloc)
+            };
+            unfold optPadding(#data p+ #prefix_size, #total_size - #prefix_size)
+    }
 
-pred valid_edk_array_list_fields(+fields, alloc, content) {
-  (fields == [ alloc, long(#current_size), long(#length),
-               long(#item_size), #data ]) *
-  valid_edk_array_list(#current_size, #length,
-                       #item_size, #data, alloc, content)
-}
+    pred nounfold valid_edk_array_list(+current_size, +length, +item_size, +data, +alloc, content) {
+        (current_size == 0) * (length == 0) * (item_size == 96) *
+        (data == NULL) * (content == []);
 
-pred empty_edk_array_list_fields(+fields, alloc) {
-    valid_edk_array_list_fields(fields, alloc, [])
-}
+        (item_size == 96) * (0 <=# length) * (0 <# current_size) *
+        aws_mul_u64_checked(item_size, length, #required_size) *
+        (#required_size <=# current_size) *
+        (not (data == NULL)) *
+        edk_array_list_data_content(data, #required_size, current_size, alloc, content) *
+        (length == len content)
+    }
 
-pred nounfold valid_edk_array_list_ptr(+list, alloc, content) {
-  (list -> struct aws_array_list {
-      alloc; long(#current_size); long(#length); long(#item_size); #data
-  }) *
-  valid_edk_array_list(#current_size, #length,
-                       #item_size, #data, alloc, content)
-}
+    pred valid_edk_array_list_fields(+fields, alloc, content) {
+        (fields == [ alloc, long(#current_size), long(#length), long(#item_size), #data ]) *
+        valid_edk_array_list(#current_size, #length, #item_size, #data, alloc, content)
+    }
 
-pred empty_edk_array_list_ptr(+list, alloc) {
-  valid_edk_array_list_ptr(list, alloc, [])
-}
+    pred empty_edk_array_list_fields(+fields, alloc) {
+        valid_edk_array_list_fields(fields, alloc, [])
+    }
 
+    pred nounfold valid_edk_array_list_ptr(+list, alloc, content) {
+        (list -> struct aws_array_list { alloc; long(#current_size); long(#length); long(#item_size); #data}) *
+        valid_edk_array_list(#current_size, #length, #item_size, #data, alloc, content)
+    }
+
+    pred empty_edk_array_list_ptr(+list, alloc) {
+        valid_edk_array_list_ptr(list, alloc, [])
+    }
 */
 
 /*
@@ -284,10 +286,6 @@ int aws_array_list_set_at(struct aws_array_list *list, const void *val,
     memcpy((void *)((uint8_t *)list->data + (list->item_size * index)), val,
            list->item_size);
 
-    /*
-     * This isn't perfect, but its the best I can come up with for detecting
-     * length changes.
-     */
     if (index >= aws_array_list_length(list)) {
         if (aws_add_size_checked(index, 1, &list->length)) {
             // AWS_POSTCONDITION(aws_array_list_is_valid(list));

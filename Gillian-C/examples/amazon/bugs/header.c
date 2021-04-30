@@ -18,8 +18,8 @@
  https://github.com/aws/aws-encryption-sdk-c/tree/22151f59f1a3128ecef877ddc491c20f6754af4e
 */
 
-#include "header.h"
-#include "base.h"
+#include "../header.h"
+#include "../base.h"
 
 // Optional value or null
 /*@
@@ -406,7 +406,8 @@ MEM_ERR:
             (#length <# 2147483647) *
             any_valid_aws_cryptosdk_hdr(#hdr, #alloc) *
             default_allocator(#alloc) *
-            any_aws_last_error()
+            any_aws_last_error() *
+            (#definition == `Incomplete`)
 
         ensures:
             (#definition == `Complete`) *
@@ -512,8 +513,6 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
     if (aad_len) {
         GILLIAN("if (#definition = `Broken`) { if (#ECDef = `Broken`) { unfold BRawEncryptionContext(#errorMessage, #BEC, #ECKs) } }");
         struct aws_byte_cursor aad = aws_byte_cursor_advance(&cur, aad_len);
-        if (!aad.ptr)
-            goto SHORT_BUF;
         // Note that, even if this fails with SHORT_BUF, we report a parse
         // error, since we know we have enough data (according to the aad
         // length field).

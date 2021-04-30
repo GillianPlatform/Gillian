@@ -205,12 +205,26 @@ module SVArray = struct
       | Some size -> size
     in
     let open Formula.Infix in
-    let i = LVar.alloc () in
-    let i_e = Expr.LVar i in
     let zero = Expr.num 0. in
-    forall [ (i, Some NumberType) ]
-      zero #<= i_e #&& (i_e #< size)
-      #=> ((Expr.list_nth_e arr_exp i_e) #== (Lit Undefined))
+    let size = Engine.Reduction.reduce_lexpr size in
+    match size with
+    | Lit (Num x) when Float.is_integer x ->
+        Logging.verbose (fun fmt ->
+            fmt "Undefined pf: Concrete: %a" Expr.pp size);
+        let undefs =
+          Expr.Lit
+            (LList
+               (Array.to_list (Array.make (Float.to_int x) Literal.Undefined)))
+        in
+        arr_exp #== undefs
+    | _ ->
+        Logging.verbose (fun fmt ->
+            fmt "Undefined pf: not as concrete: %a" Expr.pp size);
+        let i = LVar.alloc () in
+        let i_e = Expr.LVar i in
+        forall [ (i, Some NumberType) ]
+          zero #<= i_e #&& (i_e #< size)
+          #=> ((Expr.list_nth_e arr_exp i_e) #== (Lit Undefined))
 
   let zeros_pf ?size arr_exp =
     let size =
@@ -219,12 +233,26 @@ module SVArray = struct
       | Some size -> size
     in
     let open Formula.Infix in
-    let is_zero e = e #== (Expr.num 0.) in
-    let i = LVar.alloc () in
-    let i_e = Expr.LVar i in
-    let zero = Expr.num 0. in
-    forall [ (i, Some NumberType) ]
-      zero #<= i_e #&& (i_e #< size) #=> (is_zero (Expr.list_nth_e arr_exp i_e))
+    let size = Engine.Reduction.reduce_lexpr size in
+    match size with
+    | Lit (Num x) when Float.is_integer x ->
+        Logging.verbose (fun fmt -> fmt "Zeros pf: Concrete: %a" Expr.pp size);
+        let zeros =
+          Expr.Lit
+            (LList
+               (Array.to_list (Array.make (Float.to_int x) (Literal.Num 0.))))
+        in
+        arr_exp #== zeros
+    | _ ->
+        Logging.verbose (fun fmt ->
+            fmt "Zeros pf: not as concrete: %a" Expr.pp size);
+        let is_zero e = e #== (Expr.num 0.) in
+        let i = LVar.alloc () in
+        let i_e = Expr.LVar i in
+        let zero = Expr.num 0. in
+        forall [ (i, Some NumberType) ]
+          zero #<= i_e #&& (i_e #< size)
+          #=> (is_zero (Expr.list_nth_e arr_exp i_e))
 
   let to_arr_with_size arr s =
     let open Formula.Infix in

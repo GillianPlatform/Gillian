@@ -4,32 +4,41 @@
  */
 #include "string.h"
 /*@
-import `logic/StringStruct`;
+    import `logic/StringStruct`;
 */
 
+// valid pointer to an AWS string
 /*@
-  pred valid_aws_string_ptr(+str, alloc, rawContent, content) {
-    m_struct_aws_string_exposing_pointer(str, alloc, long(#len), #bytes) *
-    (0 <=# #len) *
-    ARRAY(#bytes, char, #len + 1, #bytes_content) *
-    (rawContent == lsub(#bytes_content, 0, #len)) *
-    (#bytes_content == rawContent @ [ 0 ]) *
-    toUtf8(rawContent, content)
-  } 
+    pred valid_aws_string_ptr(+str, alloc, rawContent, content) {
+        m_struct_aws_string_exposing_pointer(str, alloc, long(#len), #bytes) *
+        (0 <=# #len) *
+        ARRAY(#bytes, char, #len + 1, #bytes_content) *
+        (rawContent == lsub(#bytes_content, 0, #len)) *
+        (#bytes_content == rawContent @ [ 0 ]) *
+        toUtf8(rawContent, content)
+    }
 */
 
-// additional argument for how compcert handles struct passing
-/*@ spec aws_string_new_from_array(allocator, bytes, length) {
-  requires: (allocator == #alloc) *
+//
+// aws_string_new_from_array(allocator, bytes, length) creates an
+// AWS string from an array of bytes bytes of length length.
+// The additional argument for how compcert handles struct passing
+//
+/*@
+    spec aws_string_new_from_array(allocator, bytes, length) {
+        requires:
+            (allocator == #alloc) *
             (bytes == #bytes) * (length == long(#len)) *
             (#len <=# 65535) *
             optBytes(#bytes, #len, #rawContent) *
             toUtf8(#rawContent, #strContent) *
             default_allocator(#alloc)
-  ensures:  valid_aws_string_ptr(ret, #alloc, #rawContent, #strContent) *
+
+        ensures:
+            valid_aws_string_ptr(ret, #alloc, #rawContent, #strContent) *
             optBytes(#bytes, #len, #rawContent) *
             default_allocator(#alloc)
-}
+    }
 */
 struct aws_string *aws_string_new_from_array(struct aws_allocator *allocator,
                                              const uint8_t *bytes,
@@ -57,16 +66,25 @@ struct aws_string *aws_string_new_from_array(struct aws_allocator *allocator,
     return str;
 }
 
-/*@ spec aws_string_destroy(str) {
-    requires: valid_aws_string_ptr(str, #alloc, #rawContent, #strContent) *
-              default_allocator(#alloc)
-    ensures: default_allocator(#alloc)
-    
+// aws_string_destroy(str) releases the memory allocated by the AWS string str
+/*@
+    spec aws_string_destroy(str) {
+        requires:
+            valid_aws_string_ptr(str, #alloc, #rawContent, #strContent) *
+            default_allocator(#alloc)
+
+        ensures:
+            default_allocator(#alloc)
+
     OR
-    
-    requires: (str == NULL)
-    ensures: emp
-}*/
+
+        requires:
+            (str == NULL)
+
+        ensures:
+            emp
+    }
+*/
 void aws_string_destroy(struct aws_string *str) {
     if (str && str->allocator) {
         aws_mem_release(str->allocator, str);
