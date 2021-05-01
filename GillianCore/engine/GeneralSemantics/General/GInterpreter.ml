@@ -1164,7 +1164,6 @@ struct
                })
             L.LoggingConstants.ContentType.cmd_step
         in
-        let () = L.normal (fun m -> m "abc: Logging step") in
         Continue (report_id, fun () -> f (next_confs @ rest_confs) results)
     | ConfCont (state, cs, _, _, _, i, b_counter) :: rest_confs ->
         let _, annot_cmd = get_cmd prog cs i in
@@ -1258,7 +1257,6 @@ struct
            { call_stack = cs; proc_body_index; store = Some store })
         L.LoggingConstants.ContentType.cmd_step
     in
-    L.normal (fun m -> m "abc: Logging init");
     Continue
       ( report_id,
         fun () -> evaluate_cmd_step ret_fun true prog [] [] [ conf ] [] )
