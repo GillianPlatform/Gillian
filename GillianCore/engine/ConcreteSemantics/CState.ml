@@ -135,8 +135,9 @@ module Make
 
   let get_type _ v = Some (Literal.type_of v)
 
-  let simplify ?save:_ ?kill_new_lvars:_ ?unification:_ (_ : t) : st * t list =
-    (CVal.CESubst.init [], [])
+  let simplify ?save:_ ?kill_new_lvars:_ ?unification:_ (state : t) :
+      st * t list =
+    (CVal.CESubst.init [], [ state ])
 
   let simplify_val _ v = v
 

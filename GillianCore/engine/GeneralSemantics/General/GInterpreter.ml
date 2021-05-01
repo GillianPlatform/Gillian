@@ -611,336 +611,295 @@ struct
       | false -> spec_exec_proc ()
     in
 
-    let result =
-      match cmd with
-      (* Skip *)
-      | Skip -> [ ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter) ]
-      (* Assignment *)
-      | Assignment (x, e) ->
-          let v = eval_expr e in
-          let state' = update_store state x v in
-          [ ConfCont (state', cs, iframes, i, loop_ids, i + 1, b_counter) ]
-      (* Action *)
-      | LAction (x, a, es) -> (
-          let v_es = List.map eval_expr es in
-          match State.execute_action a state v_es with
-          | ASucc [] ->
-              raise (Failure "HORROR: Successful action resulted in no states")
-          | ASucc ((state', vs) :: rest_rets) -> (
-              let e' = Expr.EList (List.map Val.to_expr vs) in
-              let v' = eval_expr e' in
-              let state'' = update_store state' x v' in
-              let rest_confs =
-                List.map
-                  (fun (r_state, r_vs) ->
-                    let r_e = Expr.EList (List.map Val.to_expr r_vs) in
-                    let r_v = eval_expr r_e in
-                    let r_state' = update_store r_state x r_v in
-                    ConfCont
-                      ( r_state',
-                        CallStack.copy cs,
-                        iframes,
-                        i,
-                        loop_ids,
-                        i + 1,
-                        b_counter ))
-                  rest_rets
-              in
-              let ret_len = 1 + List.length rest_rets in
-              let b_counter = b_counter + if ret_len > 1 then 1 else 0 in
-              match
-                ( ret_len >= 3 && !Config.parallel,
-                  ret_len = 2 && !Config.parallel )
-                (* XXX: && !Config.act_threads < !Config.max_threads ) *)
-              with
-              | true, _     -> (
-                  (* print_endline (Printf.sprintf "Action returned >=3: %d" (!Config.act_threads + 2)); *)
-                  let pid = Unix.fork () in
-                  match pid with
-                  | 0 -> (
-                      let pid = Unix.fork () in
-                      match pid with
-                      | 0 -> List.tl rest_confs
-                      | _ -> [ List.hd rest_confs ])
-                  | _ ->
-                      [
-                        ConfCont
-                          (state'', cs, iframes, i, loop_ids, i + 1, b_counter);
-                      ])
-              | false, true -> (
-                  (* Can split into two threads *)
-                  let b_counter = b_counter + 1 in
-                  (* print_endline (Printf.sprintf "Action returned 2: %d" (!Config.act_threads + 1)); *)
-                  let pid = Unix.fork () in
-                  match pid with
-                  | 0 ->
-                      [
-                        ConfCont
-                          (state'', cs, iframes, i, loop_ids, i + 1, b_counter);
-                      ]
-                  | _ -> rest_confs)
-              | _           ->
-                  ConfCont (state'', cs, iframes, i, loop_ids, i + 1, b_counter)
-                  :: rest_confs)
-          | AFail errs ->
-              if not (ExecMode.concrete_exec !Config.current_exec_mode) then (
-                let expr_params = List.map Val.to_expr v_es in
-                let recovery_params =
-                  List.concat_map Expr.base_elements expr_params
-                in
-                let recovery_params =
-                  List.map Option.get (List.map Val.from_expr recovery_params)
-                in
-                let recovery_vals =
-                  State.get_recovery_vals state errs @ recovery_params
-                in
-                let recovery_states : (State.t list, string) result =
-                  State.automatic_unfold state recovery_vals
-                in
-                match recovery_states with
-                | Ok recovery_states ->
-                    let b_counter =
-                      b_counter
-                      + if List.length recovery_states = 1 then 0 else 1
-                    in
-                    List.map
-                      (fun state ->
-                        ConfCont
-                          (state, cs, iframes, prev, prev_loop_ids, i, b_counter))
-                      recovery_states
-                | _                  ->
-                    L.normal ~title:"failure" ~severity:Error (fun m ->
-                        m "Action call failed with:@.%a"
-                          (Fmt.Dump.list State.pp_err)
-                          errs);
-                    raise
-                      (Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd))
-              else Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd)
-      (* Logic command *)
-      | Logic lcmd -> (
-          match lcmd with
-          | SL SymbExec ->
-              symb_exec_next := true;
-              [ ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter) ]
-          (* Invariant being revisited *)
-          | SL (Invariant (a, binders)) when prev_loop_ids = loop_ids ->
-              (* let () = Fmt.pr "\nRe-establishing invariant... @?" in *)
-              let _ = State.unify_invariant prog true state a binders in
-              let () = L.verbose (fun fmt -> fmt "Invariant re-established.") in
-              (* let () = Fmt.pr "\nInvariant re-established. @?" in *)
-              []
-          | SL (Invariant (a, binders)) ->
-              assert (loop_action = FrameOff (List.hd loop_ids));
-              (* let () = Fmt.pr "\nEstablishing invariant... @?" in *)
-              let frames_and_states : (State.t * State.t) list =
-                State.unify_invariant prog false state a binders
-              in
-              (* let () = Fmt.pr "\nSuccessfully established invariant. @?" in *)
+    match cmd with
+    (* Skip *)
+    | Skip -> [ ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter) ]
+    (* Assignment *)
+    | Assignment (x, e) ->
+        let v = eval_expr e in
+        let state' = update_store state x v in
+        [ ConfCont (state', cs, iframes, i, loop_ids, i + 1, b_counter) ]
+    (* Action *)
+    | LAction (x, a, es) -> (
+        let v_es = List.map eval_expr es in
+        match State.execute_action a state v_es with
+        | ASucc [] ->
+            raise (Failure "HORROR: Successful action resulted in no states")
+        | ASucc ((state', vs) :: rest_rets) -> (
+            let e' = Expr.EList (List.map Val.to_expr vs) in
+            let v' = eval_expr e' in
+            let state'' = update_store state' x v' in
+            let rest_confs =
               List.map
-                (fun (frame, state) ->
-                  let iframes = (List.hd loop_ids, frame) :: iframes in
-                  ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter))
-                frames_and_states
-          | _ ->
-              let resulting_states : State.t list =
-                evaluate_lcmd prog lcmd state
+                (fun (r_state, r_vs) ->
+                  let r_e = Expr.EList (List.map Val.to_expr r_vs) in
+                  let r_v = eval_expr r_e in
+                  let r_state' = update_store r_state x r_v in
+                  ConfCont
+                    ( r_state',
+                      CallStack.copy cs,
+                      iframes,
+                      i,
+                      loop_ids,
+                      i + 1,
+                      b_counter ))
+                rest_rets
+            in
+            let ret_len = 1 + List.length rest_rets in
+            let b_counter = b_counter + if ret_len > 1 then 1 else 0 in
+            match
+              (ret_len >= 3 && !Config.parallel, ret_len = 2 && !Config.parallel)
+              (* XXX: && !Config.act_threads < !Config.max_threads ) *)
+            with
+            | true, _     -> (
+                (* print_endline (Printf.sprintf "Action returned >=3: %d" (!Config.act_threads + 2)); *)
+                let pid = Unix.fork () in
+                match pid with
+                | 0 -> (
+                    let pid = Unix.fork () in
+                    match pid with
+                    | 0 -> List.tl rest_confs
+                    | _ -> [ List.hd rest_confs ])
+                | _ ->
+                    [
+                      ConfCont
+                        (state'', cs, iframes, i, loop_ids, i + 1, b_counter);
+                    ])
+            | false, true -> (
+                (* Can split into two threads *)
+                let b_counter = b_counter + 1 in
+                (* print_endline (Printf.sprintf "Action returned 2: %d" (!Config.act_threads + 1)); *)
+                let pid = Unix.fork () in
+                match pid with
+                | 0 ->
+                    [
+                      ConfCont
+                        (state'', cs, iframes, i, loop_ids, i + 1, b_counter);
+                    ]
+                | _ -> rest_confs)
+            | _           ->
+                ConfCont (state'', cs, iframes, i, loop_ids, i + 1, b_counter)
+                :: rest_confs)
+        | AFail errs ->
+            if not (ExecMode.concrete_exec !Config.current_exec_mode) then (
+              let expr_params = List.map Val.to_expr v_es in
+              let recovery_params =
+                List.concat_map Expr.base_elements expr_params
               in
-              let b_counter =
-                if List.length resulting_states > 1 then b_counter + 1
-                else b_counter
+              let recovery_params =
+                List.map Option.get (List.map Val.from_expr recovery_params)
               in
-              List.map
-                (fun state ->
-                  ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter))
-                resulting_states)
-      (* Unconditional goto *)
-      | Goto j -> [ ConfCont (state, cs, iframes, i, loop_ids, j, b_counter) ]
-      (* Conditional goto *)
-      | GuardedGoto (e, j, k) -> (
-          let vt = eval_expr e in
-          let lvt = Val.to_literal vt in
-          let vf =
-            match lvt with
-            | Some (Bool true)  -> vfalse
-            | Some (Bool false) -> vtrue
-            | _                 -> eval_expr (UnOp (UNot, e))
-          in
-          L.verbose (fun fmt ->
-              fmt "Evaluated expressions: %a, %a" Val.pp vt Val.pp vf);
-          let can_put_t, can_put_f =
-            match lvt with
-            | Some (Bool true)  -> (true, false)
-            | Some (Bool false) -> (false, true)
-            | _                 ->
-                let vtx = State.sat_check state vt in
-                let vfx =
-                  match vtx with
-                  | false -> true
-                  | true  -> State.sat_check state vf
-                in
-                (vtx, vfx)
-          in
-          let sp_t, sp_f =
-            match (can_put_t, can_put_f) with
-            | false, false -> ([], [])
-            | true, false  ->
-                (List.map (fun x -> (x, j)) (State.assume state vt), [])
-            | false, true  ->
-                ([], List.map (fun x -> (x, k)) (State.assume state vf))
-            | true, true   ->
-                let state_t = State.copy state in
-                let unfolded_trues = State.assume ~unfold:true state_t vt in
-                let state_f = State.copy state in
-                let unfolded_falses = State.assume ~unfold:true state_f vf in
-                let utlen, uflen =
-                  (List.length unfolded_trues, List.length unfolded_falses)
-                in
-                if utlen = 0 || uflen = 0 || utlen + uflen = 2 then
-                  ( List.map (fun x -> (x, j)) unfolded_trues,
-                    List.map (fun x -> (x, k)) unfolded_falses )
-                else
-                  let state' = State.copy state in
-                  ( List.map (fun x -> (x, j)) (State.assume state vt),
-                    List.map (fun x -> (x, k)) (State.assume state' vf) )
-          in
-          let sp = sp_t @ sp_f in
+              let recovery_vals =
+                State.get_recovery_vals state errs @ recovery_params
+              in
+              let recovery_states : (State.t list, string) result =
+                State.automatic_unfold state recovery_vals
+              in
+              match recovery_states with
+              | Ok recovery_states ->
+                  let b_counter =
+                    b_counter + if List.length recovery_states = 1 then 0 else 1
+                  in
+                  List.map
+                    (fun state ->
+                      ConfCont
+                        (state, cs, iframes, prev, prev_loop_ids, i, b_counter))
+                    recovery_states
+              | _                  ->
+                  L.normal ~title:"failure" ~severity:Error (fun m ->
+                      m "Action call failed with:@.%a"
+                        (Fmt.Dump.list State.pp_err)
+                        errs);
+                  raise
+                    (Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd))
+            else Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd)
+    (* Logic command *)
+    | Logic lcmd -> (
+        match lcmd with
+        | SL SymbExec ->
+            symb_exec_next := true;
+            [ ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter) ]
+        (* Invariant being revisited *)
+        | SL (Invariant (a, binders)) when prev_loop_ids = loop_ids ->
+            (* let () = Fmt.pr "\nRe-establishing invariant... @?" in *)
+            let _ = State.unify_invariant prog true state a binders in
+            let () = L.verbose (fun fmt -> fmt "Invariant re-established.") in
+            (* let () = Fmt.pr "\nInvariant re-established. @?" in *)
+            []
+        | SL (Invariant (a, binders)) ->
+            assert (loop_action = FrameOff (List.hd loop_ids));
+            (* let () = Fmt.pr "\nEstablishing invariant... @?" in *)
+            let frames_and_states : (State.t * State.t) list =
+              State.unify_invariant prog false state a binders
+            in
+            (* let () = Fmt.pr "\nSuccessfully established invariant. @?" in *)
+            List.map
+              (fun (frame, state) ->
+                let iframes = (List.hd loop_ids, frame) :: iframes in
+                ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter))
+              frames_and_states
+        | _ ->
+            let resulting_states : State.t list =
+              evaluate_lcmd prog lcmd state
+            in
+            let b_counter =
+              if List.length resulting_states > 1 then b_counter + 1
+              else b_counter
+            in
+            List.map
+              (fun state ->
+                ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter))
+              resulting_states)
+    (* Unconditional goto *)
+    | Goto j -> [ ConfCont (state, cs, iframes, i, loop_ids, j, b_counter) ]
+    (* Conditional goto *)
+    | GuardedGoto (e, j, k) -> (
+        let vt = eval_expr e in
+        let lvt = Val.to_literal vt in
+        let vf =
+          match lvt with
+          | Some (Bool true)  -> vfalse
+          | Some (Bool false) -> vtrue
+          | _                 -> eval_expr (UnOp (UNot, e))
+        in
+        L.verbose (fun fmt ->
+            fmt "Evaluated expressions: %a, %a" Val.pp vt Val.pp vf);
+        let can_put_t, can_put_f =
+          match lvt with
+          | Some (Bool true)  -> (true, false)
+          | Some (Bool false) -> (false, true)
+          | _                 ->
+              let vtx = State.sat_check state vt in
+              let vfx =
+                match vtx with
+                | false -> true
+                | true  -> State.sat_check state vf
+              in
+              (vtx, vfx)
+        in
+        let sp_t, sp_f =
+          match (can_put_t, can_put_f) with
+          | false, false -> ([], [])
+          | true, false  ->
+              (List.map (fun x -> (x, j)) (State.assume state vt), [])
+          | false, true  ->
+              ([], List.map (fun x -> (x, k)) (State.assume state vf))
+          | true, true   ->
+              let state_t = State.copy state in
+              let unfolded_trues = State.assume ~unfold:true state_t vt in
+              let state_f = State.copy state in
+              let unfolded_falses = State.assume ~unfold:true state_f vf in
+              let utlen, uflen =
+                (List.length unfolded_trues, List.length unfolded_falses)
+              in
+              if utlen = 0 || uflen = 0 || utlen + uflen = 2 then
+                ( List.map (fun x -> (x, j)) unfolded_trues,
+                  List.map (fun x -> (x, k)) unfolded_falses )
+              else
+                let state' = State.copy state in
+                ( List.map (fun x -> (x, j)) (State.assume state vt),
+                  List.map (fun x -> (x, k)) (State.assume state' vf) )
+        in
+        let sp = sp_t @ sp_f in
 
-          let b_counter =
-            if can_put_t && can_put_f && List.length sp > 1 then b_counter + 1
-            else b_counter
-          in
-          let result =
-            List.mapi
-              (fun j (state, next) ->
-                ConfCont
-                  ( state,
-                    (if j = 0 then cs else CallStack.copy cs),
-                    iframes,
-                    i,
-                    loop_ids,
-                    next,
-                    b_counter ))
-              sp
-          in
-          match
-            List.length result = 2 && !Config.parallel
-            (* XXX: && !Config.act_threads < !Config.max_threads *)
-          with
-          | true  -> (
-              (* print_endline (Printf.sprintf "Conditional goto: %d" (!Config.act_threads + 1)); *)
-              let pid = Unix.fork () in
-              match pid with
-              | 0 -> [ List.hd result ]
-              | _ -> List.tl result)
-          | false -> result)
-      | PhiAssignment lxarr ->
-          let j = get_predecessor prog cs prev i in
-          let state' =
-            List.fold_left
-              (fun state (x, x_arr) ->
-                let e = List.nth x_arr j in
-                let v = eval_expr e in
-                update_store state x v)
-              state lxarr
-          in
-          [ ConfCont (state', cs, iframes, i, loop_ids, i + 1, b_counter) ]
-      (* Function call *)
-      | Call (x, e, args, j, subst) ->
-          let pid = eval_expr e in
-          let v_args = List.map eval_expr args in
-          let result = evaluate_procedure_call x pid v_args j subst in
-          result
-      (* External function call *)
-      | ECall (x, pid, args, j) ->
-          let pid =
+        let b_counter =
+          if can_put_t && can_put_f && List.length sp > 1 then b_counter + 1
+          else b_counter
+        in
+        let result =
+          List.mapi
+            (fun j (state, next) ->
+              ConfCont
+                ( state,
+                  (if j = 0 then cs else CallStack.copy cs),
+                  iframes,
+                  i,
+                  loop_ids,
+                  next,
+                  b_counter ))
+            sp
+        in
+        match
+          List.length result = 2 && !Config.parallel
+          (* XXX: && !Config.act_threads < !Config.max_threads *)
+        with
+        | true  -> (
+            (* print_endline (Printf.sprintf "Conditional goto: %d" (!Config.act_threads + 1)); *)
+            let pid = Unix.fork () in
             match pid with
-            | PVar pid         -> pid
-            | Lit (String pid) -> pid
-            | _                ->
-                raise
-                  (Exceptions.Impossible
-                     "Procedure identifier not a program variable")
-          in
-          let v_args = List.map eval_expr args in
-          List.map
-            (fun (state, cs, i, j) ->
-              ConfCont (state, cs, iframes, i, loop_ids, j, b_counter))
-            (External.execute prog.prog state cs i x pid v_args j)
-      (* Function application *)
-      | Apply (x, pid_args, j) -> (
-          let v_pid_args = eval_expr pid_args in
-          let v_pid_args_list = Val.to_list v_pid_args in
-          match v_pid_args_list with
-          | Some v_pid_args_list ->
-              let pid = List.hd v_pid_args_list in
-              let v_args = List.tl v_pid_args_list in
-              evaluate_procedure_call x pid v_args j None
-          | None                 ->
+            | 0 -> [ List.hd result ]
+            | _ -> List.tl result)
+        | false -> result)
+    | PhiAssignment lxarr ->
+        let j = get_predecessor prog cs prev i in
+        let state' =
+          List.fold_left
+            (fun state (x, x_arr) ->
+              let e = List.nth x_arr j in
+              let v = eval_expr e in
+              update_store state x v)
+            state lxarr
+        in
+        [ ConfCont (state', cs, iframes, i, loop_ids, i + 1, b_counter) ]
+    (* Function call *)
+    | Call (x, e, args, j, subst) ->
+        let pid = eval_expr e in
+        let v_args = List.map eval_expr args in
+        let result = evaluate_procedure_call x pid v_args j subst in
+        result
+    (* External function call *)
+    | ECall (x, pid, args, j) ->
+        let pid =
+          match pid with
+          | PVar pid         -> pid
+          | Lit (String pid) -> pid
+          | _                ->
               raise
-                (Failure
-                   (Fmt.str "Apply not called with a list: @[<h>%a@]" Val.pp
-                      v_pid_args)))
-      (* Arguments *)
-      | Arguments x ->
-          let args = CallStack.get_cur_args cs in
-          let args = Val.from_list args in
-          let state' = update_store state x args in
-          [ ConfCont (state', cs, iframes, i, loop_ids, i + 1, b_counter) ]
-      (* Normal-mode return *)
-      | ReturnNormal ->
-          let v_ret = Store.get store Names.return_variable in
-          let result =
-            match (v_ret, cs) with
-            | None, _ ->
-                raise (Failure "nm_ret_var not in store (normal return)")
-            | Some v_ret, { store = None; loop_ids = start_loop_ids; _ } :: _ ->
-                check_loop_ids loop_ids start_loop_ids;
-                Fmt.pr "n @?";
-                [ ConfFinish (Normal, v_ret, state) ]
-            | ( Some v_ret,
-                {
-                  store = Some old_store;
-                  loop_ids = start_loop_ids;
-                  ret_var = x;
-                  call_index = prev';
-                  continue_index = j;
-                  _;
-                }
-                :: cs' ) ->
-                let to_frame_on =
-                  loop_ids_to_frame_on_at_the_end loop_ids start_loop_ids
-                in
-                let ( let+ ) x f = List.map f x in
-                let+ state =
-                  if ExecMode.verification_exec !Config.current_exec_mode then
-                    State.frame_on state iframes to_frame_on
-                  else [ state ]
-                in
-                let state' = State.set_store state old_store in
-                let state'' = update_store state' x v_ret in
-                ConfCont
-                  (state'', cs', iframes, prev', start_loop_ids, j, b_counter)
-            | _ -> raise (Failure "Malformed callstack")
-          in
-          L.verbose (fun m -> m "Returning.");
-          result
-      (* Error-mode return *)
-      | ReturnError -> (
-          let v_ret = Store.get store Names.return_variable in
+                (Exceptions.Impossible
+                   "Procedure identifier not a program variable")
+        in
+        let v_args = List.map eval_expr args in
+        List.map
+          (fun (state, cs, i, j) ->
+            ConfCont (state, cs, iframes, i, loop_ids, j, b_counter))
+          (External.execute prog.prog state cs i x pid v_args j)
+    (* Function application *)
+    | Apply (x, pid_args, j) -> (
+        let v_pid_args = eval_expr pid_args in
+        let v_pid_args_list = Val.to_list v_pid_args in
+        match v_pid_args_list with
+        | Some v_pid_args_list ->
+            let pid = List.hd v_pid_args_list in
+            let v_args = List.tl v_pid_args_list in
+            evaluate_procedure_call x pid v_args j None
+        | None                 ->
+            raise
+              (Failure
+                 (Fmt.str "Apply not called with a list: @[<h>%a@]" Val.pp
+                    v_pid_args)))
+    (* Arguments *)
+    | Arguments x ->
+        let args = CallStack.get_cur_args cs in
+        let args = Val.from_list args in
+        let state' = update_store state x args in
+        [ ConfCont (state', cs, iframes, i, loop_ids, i + 1, b_counter) ]
+    (* Normal-mode return *)
+    | ReturnNormal ->
+        let v_ret = Store.get store Names.return_variable in
+        let result =
           match (v_ret, cs) with
-          | None, _ ->
-              raise (Failure "Return variable not in store (error return) ")
+          | None, _ -> raise (Failure "nm_ret_var not in store (normal return)")
           | Some v_ret, { store = None; loop_ids = start_loop_ids; _ } :: _ ->
               check_loop_ids loop_ids start_loop_ids;
-              Fmt.pr "e @?";
-              [ ConfFinish (Error, v_ret, state) ]
+              Fmt.pr "n @?";
+              [ ConfFinish (Normal, v_ret, state) ]
           | ( Some v_ret,
               {
                 store = Some old_store;
                 loop_ids = start_loop_ids;
                 ret_var = x;
                 call_index = prev';
-                error_index = Some j;
+                continue_index = j;
                 _;
               }
               :: cs' ) ->
@@ -957,16 +916,49 @@ struct
               let state'' = update_store state' x v_ret in
               ConfCont
                 (state'', cs', iframes, prev', start_loop_ids, j, b_counter)
-          | _ -> raise (Failure "Malformed callstack"))
-      (* Explicit failure *)
-      | Fail (fname, exprs) ->
-          let message =
-            Fmt.(
-              str "Fail : %s%a" fname (parens (list ~sep:comma Expr.pp)) exprs)
-          in
-          raise (Failure message)
-    in
-    result
+          | _ -> raise (Failure "Malformed callstack")
+        in
+        L.verbose (fun m -> m "Returning.");
+        result
+    (* Error-mode return *)
+    | ReturnError -> (
+        let v_ret = Store.get store Names.return_variable in
+        match (v_ret, cs) with
+        | None, _ ->
+            raise (Failure "Return variable not in store (error return) ")
+        | Some v_ret, { store = None; loop_ids = start_loop_ids; _ } :: _ ->
+            check_loop_ids loop_ids start_loop_ids;
+            Fmt.pr "e @?";
+            [ ConfFinish (Error, v_ret, state) ]
+        | ( Some v_ret,
+            {
+              store = Some old_store;
+              loop_ids = start_loop_ids;
+              ret_var = x;
+              call_index = prev';
+              error_index = Some j;
+              _;
+            }
+            :: cs' ) ->
+            let to_frame_on =
+              loop_ids_to_frame_on_at_the_end loop_ids start_loop_ids
+            in
+            let ( let+ ) x f = List.map f x in
+            let+ state =
+              if ExecMode.verification_exec !Config.current_exec_mode then
+                State.frame_on state iframes to_frame_on
+              else [ state ]
+            in
+            let state' = State.set_store state old_store in
+            let state'' = update_store state' x v_ret in
+            ConfCont (state'', cs', iframes, prev', start_loop_ids, j, b_counter)
+        | _ -> raise (Failure "Malformed callstack"))
+    (* Explicit failure *)
+    | Fail (fname, exprs) ->
+        let message =
+          Fmt.(str "Fail : %s%a" fname (parens (list ~sep:comma Expr.pp)) exprs)
+        in
+        raise (Failure message)
 
   let simplify state =
     snd (State.simplify ~save:true ~kill_new_lvars:true state)
@@ -980,16 +972,10 @@ struct
       (prev_loop_ids : string list)
       (i : int)
       (b_counter : int) : cconf_t list =
-    let simplification_time =
-      let _, (_, cmd) = get_cmd prog cs i in
-      match cmd with
-      | LAction _ -> true
-      | _         -> false
-    in
     let states =
-      match simplification_time with
-      | true  -> simplify state
-      | false -> [ state ]
+      match get_cmd prog cs i with
+      | _, (_, LAction _) -> simplify state
+      | _                 -> [ state ]
     in
     List.concat_map
       (fun state ->
@@ -1031,9 +1017,11 @@ struct
         else (
           L.(verbose (fun m -> m "Relaunching suspended confs"));
           let hold_confs =
-            List.filter (fun (_, pid) -> Hashtbl.mem prog.specs pid) on_hold
+            List.filter_map
+              (fun (conf, pid) ->
+                if Hashtbl.mem prog.specs pid then Some conf else None)
+              on_hold
           in
-          let hold_confs = List.map (fun (conf, _) -> conf) hold_confs in
           evaluate_cmd_iter ret_fun false prog results [] hold_confs [])
     | ConfCont (state, cs, iframes, prev, prev_loop_ids, i, b_counter)
       :: rest_confs
