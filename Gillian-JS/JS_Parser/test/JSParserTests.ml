@@ -78,9 +78,10 @@ and opt_exp_eq o o' =
 
 and list_exp_eq l l' = List.for_all2 exp_stx_eq l l'
 
-
 let assert_exp_eq =
-  let t = testable (Fmt.of_to_string (PrettyPrint.string_of_exp true)) exp_stx_eq in
+  let t =
+    testable (Fmt.of_to_string (PrettyPrint.string_of_exp true)) exp_stx_eq
+  in
   Alcotest.(check t) "same expression"
 
 let add_script e = mk_exp (Script (false, [ e ])) Loc.none
@@ -503,10 +504,7 @@ let test_do_while test_ctx =
   let assignment = mk_exp (Assign (a, one)) (on_first_line 0) in
   let body = mk_exp (Block [ assignment ]) (on_first_line 0) in
   let loop = mk_exp (DoWhile (body, condition)) (on_first_line 0) in
-  let () =
-    Printf.printf "%s"
-      (JS_Parser.PrettyPrint.string_of_exp true exp)
-  in
+  let () = Printf.printf "%s" (JS_Parser.PrettyPrint.string_of_exp true exp) in
   assert_exp_eq (add_script loop) exp
 
 let test_delete test_ctx =
@@ -812,88 +810,82 @@ let test_obj_init test_ctx =
 
 let suite =
   (* hack around oUnit *)
-  let (>::) a b = (a, b) in
+  let ( >:: ) a b = (a, b) in
   [
-         "test var" >:: test_var;
-         "test var with assignment" >:: test_var_value;
-         "test var list" >:: test_var_list;
-         "test regexp" >:: test_regexp;
-         "test regexp with flags" >:: test_regexp_with_flags;
-         "test not" >:: test_not;
-         "test_caccess" >:: test_caccess;
-         "test_and" >:: test_and;
-         "test_array_literal" >:: test_array_literal;
-         "test_ge" >:: test_ge;
-         "test_or" >:: test_or;
-         "test_not_triple_eq" >:: test_not_triple_eq;
-         "test_hook" >:: test_hook;
-         "test_instanceof" >:: test_instanceof;
-         "test_typeof" >:: test_typeof;
-         "test_pos" >:: test_pos;
-         "test_dec_pre" >:: test_dec_pre;
-         "test_dec_post" >:: test_dec_post;
-         "test_inc_pre" >:: test_inc_pre;
-         "test_inc_post" >:: test_inc_post;
-         "test_for" >:: test_for;
-         "test_forin" >:: test_forin;
-         "test_mod" >:: test_mod;
-         "test_ursh" >:: test_ursh;
-         "test_lsh" >:: test_lsh;
-         "test_rsh" >:: test_rsh;
-         "test_bitand" >:: test_bitand;
-         "test_bitor" >:: test_bitor;
-         "test_bitxor" >:: test_bitxor;
-         "test_notequal" >:: test_notequal;
-         "test_gt" >:: test_gt;
-         "test_in" >:: test_in;
-         "test_comma1" >:: test_comma1;
-         "test_comma2" >:: test_comma2;
-         "test_negative" >:: test_negative;
-         "test_bitnot" >:: test_bitnot;
-         "test_void" >:: test_void;
-         "test_assign_add" >:: test_assign_add;
-         "test_assign_sub" >:: test_assign_sub;
-         "test_assign_mul" >:: test_assign_mul;
-         "test_assign_div" >:: test_assign_div;
-         "test_assign_mod" >:: test_assign_mod;
-         "test_assign_ursh" >:: test_assign_ursh;
-         "test_assign_lsh" >:: test_assign_lsh;
-         "test_assign_rsh" >:: test_assign_rsh;
-         "test_assign_bitand" >:: test_assign_bitand;
-         "test_assign_bitor" >:: test_assign_bitor;
-         "test_assign_bitxor" >:: test_assign_bitxor;
-         "test_return" >:: test_return;
-         "test_return_exp" >:: test_return_exp;
-         "test_do_while" >:: test_do_while;
-         "test_delete" >:: test_delete;
-         "test_continue" >:: test_continue;
-         "test_continue_label" >:: test_continue_label;
-         "test_break" >:: test_break;
-         "test_break_label" >:: test_break_label;
-         "test_try_catch" >:: test_try_catch;
-         "test_try_catch_finally" >:: test_try_catch_finally;
-         "test_try_finally" >:: test_try_finally;
-         "test_switch" >:: test_switch;
-         "test_debugger" >:: test_debugger;
-         "test_script_strict" >:: test_script_strict;
-         "test_script_strict_break" >:: test_script_strict_break;
-         "test_script_not_strict" >:: test_script_not_strict;
-         "test_fun_strict" >:: test_fun_strict;
-         "test_fun_strict_nested" >:: test_fun_strict_nested;
-         "test_fun_strict_break" >:: test_fun_strict_break;
-         "test_getter" >:: test_getter;
-         "test_setter" >:: test_setter;
-         "test_obj_init" >:: test_obj_init;
-         (* "test_fun_annot" >:: test_fun_annot; *)
-       ]
+    "test var" >:: test_var;
+    "test var with assignment" >:: test_var_value;
+    "test var list" >:: test_var_list;
+    "test regexp" >:: test_regexp;
+    "test regexp with flags" >:: test_regexp_with_flags;
+    "test not" >:: test_not;
+    "test_caccess" >:: test_caccess;
+    "test_and" >:: test_and;
+    "test_array_literal" >:: test_array_literal;
+    "test_ge" >:: test_ge;
+    "test_or" >:: test_or;
+    "test_not_triple_eq" >:: test_not_triple_eq;
+    "test_hook" >:: test_hook;
+    "test_instanceof" >:: test_instanceof;
+    "test_typeof" >:: test_typeof;
+    "test_pos" >:: test_pos;
+    "test_dec_pre" >:: test_dec_pre;
+    "test_dec_post" >:: test_dec_post;
+    "test_inc_pre" >:: test_inc_pre;
+    "test_inc_post" >:: test_inc_post;
+    "test_for" >:: test_for;
+    "test_forin" >:: test_forin;
+    "test_mod" >:: test_mod;
+    "test_ursh" >:: test_ursh;
+    "test_lsh" >:: test_lsh;
+    "test_rsh" >:: test_rsh;
+    "test_bitand" >:: test_bitand;
+    "test_bitor" >:: test_bitor;
+    "test_bitxor" >:: test_bitxor;
+    "test_notequal" >:: test_notequal;
+    "test_gt" >:: test_gt;
+    "test_in" >:: test_in;
+    "test_comma1" >:: test_comma1;
+    "test_comma2" >:: test_comma2;
+    "test_negative" >:: test_negative;
+    "test_bitnot" >:: test_bitnot;
+    "test_void" >:: test_void;
+    "test_assign_add" >:: test_assign_add;
+    "test_assign_sub" >:: test_assign_sub;
+    "test_assign_mul" >:: test_assign_mul;
+    "test_assign_div" >:: test_assign_div;
+    "test_assign_mod" >:: test_assign_mod;
+    "test_assign_ursh" >:: test_assign_ursh;
+    "test_assign_lsh" >:: test_assign_lsh;
+    "test_assign_rsh" >:: test_assign_rsh;
+    "test_assign_bitand" >:: test_assign_bitand;
+    "test_assign_bitor" >:: test_assign_bitor;
+    "test_assign_bitxor" >:: test_assign_bitxor;
+    "test_return" >:: test_return;
+    "test_return_exp" >:: test_return_exp;
+    "test_do_while" >:: test_do_while;
+    "test_delete" >:: test_delete;
+    "test_continue" >:: test_continue;
+    "test_continue_label" >:: test_continue_label;
+    "test_break" >:: test_break;
+    "test_break_label" >:: test_break_label;
+    "test_try_catch" >:: test_try_catch;
+    "test_try_catch_finally" >:: test_try_catch_finally;
+    "test_try_finally" >:: test_try_finally;
+    "test_switch" >:: test_switch;
+    "test_debugger" >:: test_debugger;
+    "test_script_strict" >:: test_script_strict;
+    "test_script_strict_break" >:: test_script_strict_break;
+    "test_script_not_strict" >:: test_script_not_strict;
+    "test_fun_strict" >:: test_fun_strict;
+    "test_fun_strict_nested" >:: test_fun_strict_nested;
+    "test_fun_strict_break" >:: test_fun_strict_break;
+    "test_getter" >:: test_getter;
+    "test_setter" >:: test_setter;
+    "test_obj_init" >:: test_obj_init;
+    (* "test_fun_annot" >:: test_fun_annot; *)
+  ]
 
 let alco_suite =
-  let open Alcotest in
   List.map (fun (test_name, f) -> test_case test_name `Quick f) suite
-  
-  
-let () =
-  let open Alcotest in
-  run "JS_Parser" [
-    "Testing", alco_suite
-  ]
+
+let () = run "JS_Parser" [ ("Testing", alco_suite) ]

@@ -208,12 +208,6 @@ module Error : sig
   exception ParserError of t
 end
 
-val parse_string_exn :
-  ?parse_annotations:bool ->
-  ?force_strict:bool ->
-  ?program_path:string ->
-  string ->
-  Syntax.exp
 (** [parse_string_exn ~parse_annotations ~force_strict prog] parses the given 
     string as a program. The string given should be the entire program. If 
     [parse_annotations] is set to [false], any possible JS_Logic annotations
@@ -221,12 +215,18 @@ val parse_string_exn :
     [force_strict] is true, the program has to be strict. It is [false] by
     default. If there is an error during the parsing, an exception of type 
     {!Error.ParserError} is raised. *)
+val parse_string_exn :
+  ?parse_annotations:bool ->
+  ?force_strict:bool ->
+  ?program_path:string ->
+  string ->
+  Syntax.exp
 
+(** Same as [parse_string_exn] except that it returns a result instead of 
+    raising an error. *)
 val parse_string :
   ?parse_annotations:bool ->
   ?force_strict:bool ->
   ?program_path:string ->
   string ->
   (Syntax.exp, Error.t) result
-(** Same as [parse_string_exn] except that it returns a result instead of 
-    raising an error. *)

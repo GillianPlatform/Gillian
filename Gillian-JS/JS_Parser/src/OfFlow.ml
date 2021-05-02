@@ -592,9 +592,12 @@ and transform_expression
   | Expression.(Sequence Sequence.{ expressions; _ }) ->
       transform_expression_sequence ~parent_strict first_pos leading_annots
         inner_annots expressions
-  | Expression.(New New.{ callee; arguments; _ })
-    ->
-      let arguments = Option.fold ~none:[] ~some:(fun (_, al) -> al.Expression.ArgList.arguments) arguments in
+  | Expression.(New New.{ callee; arguments; _ }) ->
+      let arguments =
+        Option.fold ~none:[]
+          ~some:(fun (_, al) -> al.Expression.ArgList.arguments)
+          arguments
+      in
       let calleeloc, _ = callee in
       let callee_annots, arg_annots =
         partition_inner (Loc.btwn first_pos calleeloc) inner_annots
@@ -705,7 +708,10 @@ and transform_expression
   | Expression.Function fn | Expression.ArrowFunction fn ->
       transform_function ~parent_strict ~expression:true first_pos
         leading_annots inner_annots fn
-  | e -> let str = Expression.show_t' (fun _ _ -> ()) (fun _ _ -> ()) e in print_string str; raise (ParserError (Unhandled_Expression loc))
+  | e ->
+      let str = Expression.show_t' (fun _ _ -> ()) (fun _ _ -> ()) e in
+      print_string str;
+      raise (ParserError (Unhandled_Expression loc))
 
 and transform_expr_list ~parent_strict start_pos annots exprl =
   match exprl with
