@@ -834,14 +834,20 @@ module Make (SMemory : SMemory.S) :
 
   let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
     (* TODO: Deserialize other components of state *)
-    let init_state : t =
-      (SMemory.init (), SStore.init [], PFS.init (), TypEnv.init (), SS.empty)
-    in
-    match SStore.of_yojson yojson with
-    | Ok store  -> Ok (set_store init_state store)
-    | Error err -> Error err
+    match yojson with
+    | `Assoc [ ("heap", heap_yojson); ("store", store_yojson) ] -> (
+        match SMemory.of_yojson heap_yojson with
+        | Ok heap   -> (
+            match SStore.of_yojson store_yojson with
+            | Ok store  -> Ok
+                             (heap, store, PFS.init (), TypEnv.init (), SS.empty)
+            | Error err -> Error err)
+        | Error err -> Error err)
+    | _ -> Error "Cannot parse yojson into SState"
 
   let to_yojson (state : t) : Yojson.Safe.t =
     (* TODO: Serialize other components of state *)
-    SStore.to_yojson (get_store state)
+    let heap, store, _, _, _ = state in
+    `Assoc
+      [ ("heap", SMemory.to_yojson heap); ("store", SStore.to_yojson store) ]
 end
