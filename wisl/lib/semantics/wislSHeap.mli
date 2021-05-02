@@ -1,7 +1,7 @@
 open Gillian.Symbolic
 open Gil_syntax
 
-type t
+type t [@@deriving yojson]
 
 type err =
   | MissingRessource

@@ -15,7 +15,7 @@ type c_fix_t = unit
 
 type i_fix_t = unit
 
-type t = WislSHeap.t
+type t = WislSHeap.t [@@deriving yojson]
 
 type action_ret =
   | ASucc of (t * vt list * Formula.t list * (string * Type.t) list) list
@@ -320,11 +320,3 @@ let apply_fix m _ _ _ = m
 let get_fixes ?simple_fix:_ _ _ _ _ = []
 
 let get_failing_constraint _ = Formula.True
-
-let of_yojson _ =
-  failwith
-    "Please implement of_yojson to enable logging this type to a database"
-
-let to_yojson _ =
-  failwith
-    "Please implement to_yojson to enable logging this type to a database"

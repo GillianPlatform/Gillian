@@ -261,3 +261,7 @@ let pp fmt heap =
     ( Fmt.iter_bindings ~sep:(Fmt.any "@\n@\n") Hashtbl.iter @@ fun ft (l, b) ->
       Block.pp ~loc:l ft b )
     heap
+
+let of_yojson _ = failwith "Not implemented"
+
+let to_yojson _ = failwith "Not implemented"

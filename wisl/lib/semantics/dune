@@ -1,4 +1,6 @@
 (library
  (name wSemantics)
  (libraries wSyntax wUtils gillian fmt)
+ (preprocess
+  (pps ppx_deriving_yojson))
  (flags :standard -open WUtils))
