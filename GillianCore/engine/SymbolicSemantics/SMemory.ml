@@ -12,7 +12,7 @@ module type S = sig
   type err_t
 
   (** Type of GIL general states *)
-  type t
+  type t [@@deriving yojson]
 
   type action_ret =
     | ASucc of (t * vt list * Formula.t list * (string * Type.t) list) list

@@ -137,4 +137,12 @@ module Lift (MSM : S) : SMemory.S = struct
           (fun (bch : t Branch.t) ->
             (bch.value, bch.pc.learned, bch.pc.learned_types))
           leeloo_dallas_multibranch
+
+  let of_yojson _ =
+    failwith
+      "Please implement of_yojson to enable logging this type to a database"
+
+  let to_yojson _ =
+    failwith
+      "Please implement to_yojson to enable logging this type to a database"
 end
