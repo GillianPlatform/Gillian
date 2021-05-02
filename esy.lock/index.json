@@ -1,5 +1,5 @@
 {
-  "checksum": "519ea9f510198d5e9eaf48f238288e63",
+  "checksum": "75281611850126314a0da664d4d5bdee",
   "root": "gillian-platform@link-dev:./esy.json",
   "node": {
     "ocaml@4.12.0@d41d8cd9": {
@@ -34,7 +34,9 @@
         "@opam/ppxlib@opam:0.21.0@621dfd5e",
         "@opam/ppx_deriving_yojson@opam:3.6.1@faf11a7c",
         "@opam/menhir@opam:20190924@004407ff",
-        "@opam/fmt@opam:0.8.9@e0843a5b", "@opam/dune@opam:2.8.5@83fb0224",
+        "@opam/fmt@opam:0.8.9@e0843a5b",
+        "@opam/flow_parser@github:giltho/flow#ac42cb1@d41d8cd9",
+        "@opam/dune@opam:2.8.5@83fb0224",
         "@opam/cmdliner@opam:1.0.4@93208aac",
         "@opam/batteries@opam:3.3.0@9185e06f",
         "@opam/alcotest@opam:1.0.1@8ab09718"
