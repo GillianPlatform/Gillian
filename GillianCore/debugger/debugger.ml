@@ -66,7 +66,7 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
       unit -> Verification.result_t Verification.SAInterpreter.cont_func;
     mutable cur_report_id : string;
     mutable frames : frame list;
-    mutable store : Verification.SAInterpreter.store_t option;
+    mutable state : Verification.SAInterpreter.state_t option;
     mutable breakpoints : breakpoints;
   }
 
@@ -206,7 +206,7 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
                     call_stack_to_frames cmd_step.call_stack
                       cmd_step.proc_body_index dbg.prog
                 in
-                dbg.store <- cmd_step.store
+                dbg.state <- cmd_step.state
             | Error err   -> raise (Failure err))
         | _ as t ->
             raise
@@ -251,7 +251,7 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
                  cont_func;
                  prog;
                  frames = [];
-                 store = None;
+                 state = None;
                  cur_report_id;
                  breakpoints = Hashtbl.create 0;
                }
@@ -322,10 +322,12 @@ module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
     | None    -> []
     | Some id ->
         if id = "Store" then
-          match dbg.store with
+          match dbg.state with
           | None       -> []
-          | Some store ->
-              Verification.SAInterpreter.Store.bindings store
+          | Some state ->
+              let open Verification.SAInterpreter in
+              let store = State.get_store state in
+              Store.bindings store
               |> List.map (fun (var, value) ->
                      let value =
                        Fmt.to_to_string Verification.SAInterpreter.Val.full_pp

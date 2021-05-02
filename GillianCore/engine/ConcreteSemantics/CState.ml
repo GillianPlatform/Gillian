@@ -246,4 +246,12 @@ module Make
     raise (Failure "Concrete: apply_fixes not implemented in CState.Make")
 
   let get_equal_values _ vs = vs
+
+  let of_yojson _ =
+    failwith
+      "Please implement of_yojson to enable logging this type to a database"
+
+  let to_yojson _ =
+    failwith
+      "Please implement to_yojson to enable logging this type to a database"
 end

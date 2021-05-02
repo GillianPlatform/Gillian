@@ -58,7 +58,7 @@ module type S = sig
   type cmd_step = {
     call_stack : CallStack.t;
     proc_body_index : int;
-    store : store_t option;
+    state : state_t option;
   }
   [@@deriving yojson]
 
@@ -111,9 +111,9 @@ struct
 
   type st = ESubst.t
 
-  type store_t = Store.t [@@deriving yojson]
+  type store_t = Store.t
 
-  type state_t = State.t
+  type state_t = State.t [@@deriving yojson]
 
   type state_err_t = State.err_t
 
@@ -155,7 +155,7 @@ struct
   type cmd_step = {
     call_stack : CallStack.t;
     proc_body_index : int;
-    store : store_t option;
+    state : state_t option;
   }
   [@@deriving yojson]
 
@@ -1148,10 +1148,10 @@ struct
             b_counter
         in
         (* TODO: Store a command step type instead of just callstack *)
-        let next_store, next_cs, next_proc_body_index =
+        let next_state, next_cs, next_proc_body_index =
           match next_confs with
           | ConfCont (state, call_stack, _, _, _, proc_body_index, _) :: _ ->
-              (Some (State.get_store state), call_stack, proc_body_index)
+              (Some state, call_stack, proc_body_index)
           | _ -> (None, [], -1)
         in
         let report_id =
@@ -1160,7 +1160,7 @@ struct
                {
                  call_stack = next_cs;
                  proc_body_index = next_proc_body_index;
-                 store = next_store;
+                 state = next_state;
                })
             L.LoggingConstants.ContentType.cmd_step
         in
@@ -1248,13 +1248,11 @@ struct
         ()
     in
     let proc_body_index = 0 in
-    let conf : cconf_t =
-      ConfCont (state, cs, [], -1, [], proc_body_index, 0)
-    in
+    let conf : cconf_t = ConfCont (state, cs, [], -1, [], proc_body_index, 0) in
     let report_id =
       L.normal_specific
         (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
-           { call_stack = cs; proc_body_index; store = Some store })
+           { call_stack = cs; proc_body_index; state = Some state })
         L.LoggingConstants.ContentType.cmd_step
     in
     Continue
@@ -1306,7 +1304,7 @@ struct
            {
              call_stack = initial_cs;
              proc_body_index = initial_proc_body_index;
-             store = Some (State.get_store initial_state);
+             state = Some initial_state;
            })
         L.LoggingConstants.ContentType.cmd_step
     in

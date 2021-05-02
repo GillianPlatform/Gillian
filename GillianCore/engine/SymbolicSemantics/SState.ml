@@ -831,4 +831,17 @@ module Make (SMemory : SMemory.S) :
   let get_equal_values state les =
     let _, _, pfs, _, _ = state in
     les @ List.concat_map (Reduction.get_equal_expressions pfs) les
+
+  let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
+    (* TODO: Deserialize other components of state *)
+    let init_state : t =
+      (SMemory.init (), SStore.init [], PFS.init (), TypEnv.init (), SS.empty)
+    in
+    match SStore.of_yojson yojson with
+    | Ok store  -> Ok (set_store init_state store)
+    | Error err -> Error err
+
+  let to_yojson (state : t) : Yojson.Safe.t =
+    (* TODO: Serialize other components of state *)
+    SStore.to_yojson (get_store state)
 end

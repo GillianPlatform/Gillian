@@ -1252,4 +1252,15 @@ module Make
   let get_equal_values astate =
     let state, _, _ = astate in
     State.get_equal_values state
+
+  let of_yojson yojson =
+    (* TODO: Deserialize other components of pstate *)
+    match State.of_yojson yojson with
+    | Ok state  -> Ok (state, Preds.init [], UP.init_pred_defs ())
+    | Error err -> Error err
+
+  let to_yojson pstate =
+    (* TODO: Serialize other components of pstate *)
+    let state, _, _ = pstate in
+    State.to_yojson state
 end

@@ -609,4 +609,12 @@ struct
   let get_equal_values bi_state =
     let _, state, _ = bi_state in
     State.get_equal_values state
+
+  let of_yojson _ =
+    failwith
+      "Please implement of_yojson to enable logging this type to a database"
+
+  let to_yojson _ =
+    failwith
+      "Please implement to_yojson to enable logging this type to a database"
 end

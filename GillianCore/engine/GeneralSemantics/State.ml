@@ -8,7 +8,7 @@ module type S = sig
   type vt
 
   (** Type of GIL general states *)
-  type t
+  type t [@@deriving yojson]
 
   (** Type of GIL substitutions *)
   type st

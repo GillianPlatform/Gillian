@@ -55,7 +55,7 @@ module type S = sig
   type cmd_step = {
     call_stack : CallStack.t;
     proc_body_index : int;
-    store : store_t option;
+    state : state_t option;
   }
   [@@deriving yojson]
 
