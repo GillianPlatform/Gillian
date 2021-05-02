@@ -352,20 +352,23 @@ module Mem = struct
 
   let move { map; _ } dst_loc dst_ofs src_loc src_ofs sz =
     let open DR.Syntax in
-    let** dst_loc_name = resolve_loc_result dst_loc in
-    let** src_loc_name = resolve_loc_result src_loc in
-    let** dst_tree = get_tree_res map dst_loc_name in
-    let** src_tree = get_tree_res map src_loc_name in
-    let++ new_dst_tree =
-      DR.map_error (SHeapTree.move dst_tree dst_ofs src_tree src_ofs sz)
-        (fun err ->
-          SHeapTreeErr
-            {
-              at_locations = [ dst_loc_name; src_loc_name ];
-              sheaptree_err = err;
-            })
-    in
-    make_other @@ SMap.add dst_loc_name new_dst_tree map
+    let open Formula.Infix in
+    if%sat sz #== (Expr.num 0.) then DR.ok (make_other map)
+    else
+      let** dst_loc_name = resolve_loc_result dst_loc in
+      let** src_loc_name = resolve_loc_result src_loc in
+      let** dst_tree = get_tree_res map dst_loc_name in
+      let** src_tree = get_tree_res map src_loc_name in
+      let++ new_dst_tree =
+        DR.map_error (SHeapTree.move dst_tree dst_ofs src_tree src_ofs sz)
+          (fun err ->
+            SHeapTreeErr
+              {
+                at_locations = [ dst_loc_name; src_loc_name ];
+                sheaptree_err = err;
+              })
+      in
+      make_other @@ SMap.add dst_loc_name new_dst_tree map
 
   let lvars { map; _ } =
     let open Utils.Containers in

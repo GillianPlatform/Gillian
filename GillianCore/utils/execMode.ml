@@ -24,6 +24,10 @@ let exec_with_preds = [ Verification; BiAbduction ]
 
 let bi_exec = [ BiAbduction ]
 
+let ver_exec = [ Verification ]
+
+let non_ver_exec = [ Concrete; Symbolic; BiAbduction ]
+
 let to_string = function
   | Concrete     -> "concrete"
   | Verification -> "verif"

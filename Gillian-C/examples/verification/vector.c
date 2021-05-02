@@ -14,24 +14,34 @@ typedef struct vector_s Vector;
 
 /*@
     pred nounfold vector(+p, cap, alpha) {
+        p -m> struct vector_s { long(0); long(0); NULL } *
+        (cap == 0) * (alpha == nil);
+    
         p -m> struct vector_s { long(#size); long(cap); #buffer } *
-        (#size == len(alpha)) *
-        (1 <=# cap) * (#size <=# cap) *
-        ARRAY(#buffer, int, #size, alpha) *
-        ZEROS(#buffer p+ (4 * #size), (4 * cap) - (4 * #size)) *
-        MALLOCED(#buffer, (4 * cap))
+        (0 <# cap) * (#size <=# cap) *
+        MARRAY(#buffer, int, cap, #raw_content) *
+        (len #raw_content == cap) *
+        (#raw_content == (alpha @ #rest)) *
+        (len alpha == #size)
+        
     }
 */
 
 /*@ spec vector_new_capacity(capacity) {
-    requires: (capacity == long(#capacity)) * (1 <=# #capacity)
+    requires: (capacity == long(#capacity)) * (0 <=# #capacity)
     ensures: vector(ret, #capacity, nil)
 }*/
-Vector *vector_new_capacity(size_t capacity) {
-    Vector *vec = (Vector *)malloc(sizeof(Vector));
-    vec->size = 0;
-    vec->capacity = capacity;
-    vec->buffer = (int *)calloc(capacity, sizeof(int));
+Vector* vector_new_capacity(size_t capacity) {
+    Vector* vec = malloc(sizeof(Vector));
+    if (capacity) {
+        vec->buffer = malloc(sizeof(int) * capacity);
+        vec->size = 0;
+        vec->capacity = capacity;
+    } else {
+        vec->buffer = NULL;
+        vec->size = 0;
+        vec->capacity = 0;
+    }
     return vec;
 }
 
@@ -41,7 +51,7 @@ Vector *vector_new_capacity(size_t capacity) {
 }*/
 size_t vector_len(Vector *vec) {
     return vec->size;
-    }
+}
 
 /*@ spec vector_new() {
     requires: emp
@@ -49,31 +59,21 @@ size_t vector_len(Vector *vec) {
 }*/
 Vector *vector_new() { return vector_new_capacity(DEFAULT_CAPACITY); }
 
-/* spec vector_realloc_buffer(vec, new_capacity) {
+/*@ spec vector_realloc_buffer(vec, new_capacity) {
     requires: (vec == #vec) * (new_capacity == long(#nc)) *
-              vector(#vec, #cap, #alpha)
-    ensures: vector(#vec, #new_capacity, #alpha)
+              vector(#vec, #cap, #alpha) * (#cap <=# #nc)
+    ensures: vector(#vec, #nc, #alpha)
 }*/
 void vector_realloc_buffer(Vector *vec, size_t new_capacity) {
-    int *new_buffer = (int *)calloc(new_capacity, sizeof(int));
-    memcpy((void *)new_buffer, (void *)vec->buffer, (vec->size) * sizeof(int));
-    free(vec->buffer);
-    vec->buffer = new_buffer;
-}
-
-/*@ spec vector_append(vec, v) {
-    requires: (vec == #vec) *
-              (1 <=# #capacity) *
-              vector(#vec, #capacity, #alpha) *
-              (((len #alpha) + 1) <=# #capacity) *
-              (v == int(#v))
-    ensures: vector(#vec, #capacity, #alpha @ [#v])
-}*/
-void vector_append(Vector *vec, int v) {
-    size_t size = vec->size;
-    if (size == vec->capacity) {
-        vector_realloc_buffer(vec, 2 * vec->capacity);
-    };
-    vec->buffer[size] = v;
-    vec->size = size + 1;
+    if (new_capacity) {
+        int *new_buffer = (int *)calloc(new_capacity, sizeof(int));
+        if (vec->size) {
+            memcpy((void *)new_buffer, (void *)vec->buffer, (vec->size) * sizeof(int));
+        }
+        if (vec->capacity) {
+            free(vec->buffer);
+        }
+        vec->buffer = new_buffer;
+        vec->capacity = new_capacity;
+    }
 }

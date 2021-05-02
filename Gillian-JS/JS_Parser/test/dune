@@ -1,0 +1,4 @@
+(test
+ (name JSParserTests)
+ (flags -open JS_Parser)
+ (libraries JS_Parser alcotest))

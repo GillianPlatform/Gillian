@@ -43,7 +43,7 @@ DLL *listConcat(DLL *x, DLL *y) {
             return y;
         } else {
             __builtin_annot(
-                "assert [[exists #vx, #px, #nx, #gamma]] "
+                "assert [[bind #vx, #px, #nx, #gamma]] "
                 "(x -m> struct dln {#vx; #px; #nx}) * DLL(#nx, #gamma) * "
                 "(#alpha == #h :: #gamma)");
             __builtin_annot("unfold DLL(#nx, #gamma)");

@@ -90,27 +90,6 @@ int listLength(SLL *x) {
     };
 }
 
-/*@ spec listLengthIter(x) {
-  requires: list(#x, #alpha) * (x == #x)
-  ensures:  list(#x, #alpha) * (ret == int(#r)) * (#r == len #alpha)
-} */
-int listLengthIter(SLL *x) {
-    int res = 0;
-    __builtin_annot("invariant: [[bind x, res, #a, #b, #length]] "
-                    "listSeg(#x, x, #a) * list(x, #b) * "
-                    "(res == int(#length)) * "
-                    "(#length == (len #a)) * (#alpha == (#a @ #b))");
-    while (x != NULL) {
-        __builtin_annot("assert [[bind #y, #z, #t]] (x == #y) * (#y -m> struct "
-                        "ln { #z; #t })");
-        res++;
-        x = x->next;
-        __builtin_annot("apply listSegAppend(#x, #y, #a, #z, #t)");
-    }
-    __builtin_annot("apply lsegToList(#x, #alpha)");
-    return res;
-}
-
 /*@ spec listDispose(x) {
   requires: list(#x, #alpha) * (x == #x)
   ensures:  emp

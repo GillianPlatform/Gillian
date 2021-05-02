@@ -1,6 +1,6 @@
 {
-  "checksum": "1195bbac397bac0349ac32757d4f3f83",
-  "root": "gillian-ecosystem-dev@link-dev:./esy.json",
+  "checksum": "75281611850126314a0da664d4d5bdee",
+  "root": "gillian-platform@link-dev:./esy.json",
   "node": {
     "ocaml@4.12.0@d41d8cd9": {
       "id": "ocaml@4.12.0@d41d8cd9",
@@ -16,9 +16,9 @@
       "dependencies": [],
       "devDependencies": []
     },
-    "gillian-ecosystem-dev@link-dev:./esy.json": {
-      "id": "gillian-ecosystem-dev@link-dev:./esy.json",
-      "name": "gillian-ecosystem-dev",
+    "gillian-platform@link-dev:./esy.json": {
+      "id": "gillian-platform@link-dev:./esy.json",
+      "name": "gillian-platform",
       "version": "link-dev:./esy.json",
       "source": { "type": "link-dev", "path": ".", "manifest": "esy.json" },
       "overrides": [],
@@ -28,13 +28,15 @@
         "JS_Parser@github:GillianPlatform/JS_Parser#ba757f2ee220101f59f371e83bcfbb55675f233a@d41d8cd9",
         "@opam/z3@archive:https://github.com/Z3Prover/z3/archive/z3-4.8.7.tar.gz#md5:18e7332ab136c1d8686ea719ed7107ed@4824e9d7",
         "@opam/yojson@opam:1.7.0@7056d985",
-        "@opam/visitors@git:https://gitlab.inria.fr/fpottier/visitors.git:visitors.opam#07caa558415e54ac1a9186e21bbf4014a3c5fcee@d41d8cd9",
+        "@opam/visitors@opam:20210127@f199e6f6",
         "@opam/uuidm@opam:0.9.7@bf725775",
         "@opam/printbox@opam:0.5@82f5d436",
         "@opam/ppxlib@opam:0.21.0@621dfd5e",
         "@opam/ppx_deriving_yojson@opam:3.6.1@faf11a7c",
         "@opam/menhir@opam:20190924@004407ff",
-        "@opam/fmt@opam:0.8.9@e0843a5b", "@opam/dune@opam:2.8.5@83fb0224",
+        "@opam/fmt@opam:0.8.9@e0843a5b",
+        "@opam/flow_parser@github:giltho/flow#ac42cb1@d41d8cd9",
+        "@opam/dune@opam:2.8.5@83fb0224",
         "@opam/cmdliner@opam:1.0.4@93208aac",
         "@opam/batteries@opam:3.3.0@9185e06f",
         "@opam/alcotest@opam:1.0.1@8ab09718"
@@ -239,17 +241,21 @@
         "ocaml@4.12.0@d41d8cd9", "@opam/dune@opam:2.8.5@83fb0224"
       ]
     },
-    "@opam/visitors@git:https://gitlab.inria.fr/fpottier/visitors.git:visitors.opam#07caa558415e54ac1a9186e21bbf4014a3c5fcee@d41d8cd9": {
-      "id":
-        "@opam/visitors@git:https://gitlab.inria.fr/fpottier/visitors.git:visitors.opam#07caa558415e54ac1a9186e21bbf4014a3c5fcee@d41d8cd9",
+    "@opam/visitors@opam:20210127@f199e6f6": {
+      "id": "@opam/visitors@opam:20210127@f199e6f6",
       "name": "@opam/visitors",
-      "version":
-        "git:https://gitlab.inria.fr/fpottier/visitors.git:visitors.opam#07caa558415e54ac1a9186e21bbf4014a3c5fcee",
+      "version": "opam:20210127",
       "source": {
         "type": "install",
         "source": [
-          "git:https://gitlab.inria.fr/fpottier/visitors.git:visitors.opam#07caa558415e54ac1a9186e21bbf4014a3c5fcee"
-        ]
+          "archive:https://opam.ocaml.org/cache/md5/b9/b9e69f4f8f896a8c916e18551a4a4a95#md5:b9e69f4f8f896a8c916e18551a4a4a95",
+          "archive:https://gitlab.inria.fr/fpottier/visitors/repository/20210127/archive.tar.gz#md5:b9e69f4f8f896a8c916e18551a4a4a95"
+        ],
+        "opam": {
+          "name": "visitors",
+          "version": "20210127",
+          "path": "esy.lock/opam/visitors.20210127"
+        }
       },
       "overrides": [],
       "dependencies": [

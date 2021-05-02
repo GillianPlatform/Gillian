@@ -16,18 +16,6 @@ proc i__malloc(vsz) {
       return
 };
 
-proc i__calloc(vnelem, velsiz) {
-      nelem := "i__alloc_size"(vnelem);
-      elsiz := "i__alloc_size"(velsiz);
-      sz := nelem * elsiz;
-      bl := [mem_alloc](-4, sz);
-      b := l-nth(bl, 0.);
-      u := [mem_store]("int32", b, -4, vsz);
-      fail [NotImplemented]();
-      ret := {{ b, 0. }};
-      return
-};
-
 proc i__free(ptr) {
          vszl := [mem_load]("int32", l-nth(ptr, 0.), l-nth(ptr, 1.) - 4); (* 4 is size_chunk of "int32" *)
          sz := "i__alloc_size"(l-nth(vszl, 0.));

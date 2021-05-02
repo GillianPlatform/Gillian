@@ -553,6 +553,23 @@ module Tree = struct
 
   let make ~node ~span ?children () = { node; span; children; last_path = None }
 
+  (* Used to change the position of a tree. The start of the tree is going to be [start], but the spans don't change. *)
+  let rec realign t start =
+    let open Expr.Infix in
+    let reduce e = Engine.Reduction.reduce_lexpr e in
+    let l, h = t.span in
+    let span = (start, reduce (start +. h -. l)) in
+    let children =
+      Option.map
+        (fun (left, right) ->
+          let left = realign left start in
+          let _, m = left.span in
+          let right = realign right m in
+          (left, right))
+        t.children
+    in
+    make ~node:t.node ~span ?children ()
+
   let with_children t ~left ~right =
     Delayed.return { t with children = Some (left, right); last_path = None }
 
@@ -670,7 +687,7 @@ module Tree = struct
     Delayed.return result
 
   let frame_range (t : t) ~replace_node ~rebuild_parent (range : Range.t) :
-      (Node.t * t, err) DR.t =
+      (t * t, err) DR.t =
     let open DR.Syntax in
     let open Delayed.Syntax in
     let rec extract (t : t) (range : Range.t) : (t * t option) Delayed.t =
@@ -720,7 +737,7 @@ module Tree = struct
       then (
         log_string "Range does equal span, replacing.";
         match replace_node t with
-        | Ok new_tree -> DR.ok (t.node, { new_tree with last_path = Some Here })
+        | Ok new_tree -> DR.ok (t, { new_tree with last_path = Some Here })
         | Error err   -> DR.error err)
       else
         match t.children with
@@ -784,9 +801,11 @@ module Tree = struct
     frame_inside ~replace_node ~rebuild_parent root range
 
   let get_node (t : t) range : (Node.t * t, err) DR.t =
+    let open DR.Syntax in
     let replace_node x = Ok x in
     let rebuild_parent = with_children in
-    frame_range t ~replace_node ~rebuild_parent range
+    let++ framed, rest = frame_range t ~replace_node ~rebuild_parent range in
+    (framed.node, rest)
 
   let set_node (t : t) range node : (t, err) DR.t =
     let open DR.Syntax in
@@ -829,8 +848,8 @@ module Tree = struct
     let replace_node x = Ok x in
     let rebuild_parent = with_children in
     let range = Range.of_low_chunk_and_size low chunk size in
-    let** node, tree = frame_range t ~replace_node ~rebuild_parent range in
-    let+* arr, perm = Node.decode_arr ~size ~chunk node in
+    let** framed, tree = frame_range t ~replace_node ~rebuild_parent range in
+    let+* arr, perm = Node.decode_arr ~size ~chunk framed.node in
     Ok (arr, perm, tree)
 
   let set_array
@@ -855,7 +874,8 @@ module Tree = struct
     let replace_node x = Ok x in
     let rebuild_parent = with_children in
     let range = Range.of_low_and_chunk low chunk in
-    let** node, tree = frame_range t ~replace_node ~rebuild_parent range in
+    let** framed, tree = frame_range t ~replace_node ~rebuild_parent range in
+    let node = framed.node in
     Logging.tmi (fun m ->
         m "GET_SINGLE GOT THE FOLLOWING NODE: %a" Node.pp node);
     let++ sval, perm = Node.decode ~chunk node in
@@ -885,8 +905,8 @@ module Tree = struct
               (InsufficientPermission { required = Readable; actual = min_perm })
     in
     let rebuild_parent = with_children in
-    let** node, tree = frame_range t ~replace_node ~rebuild_parent range in
-    let++ sval, _ = Node.decode ~chunk node in
+    let** framed, tree = frame_range t ~replace_node ~rebuild_parent range in
+    let++ sval, _ = Node.decode ~chunk framed.node in
     (sval, tree)
 
   let store (t : t) (low : Expr.t) (chunk : Chunk.t) (sval : SVal.t) :
@@ -1347,14 +1367,14 @@ let move dst_tree dst_ofs src_tree src_ofs size =
     match src_root with
     | None          -> DR.error MissingResource
     | Some src_root ->
-        let** node, _ =
+        let** framed, _ =
           Tree.frame_range src_root
             ~replace_node:(fun x -> Ok x)
             ~rebuild_parent:(fun t ~left:_ ~right:_ -> Delayed.return t)
             src_range
         in
         let** () =
-          match node with
+          match framed.node with
           | NotOwned _ -> DR.error MissingResource
           | _          -> DR.ok ()
         in
@@ -1369,7 +1389,7 @@ let move dst_tree dst_ofs src_tree src_ofs size =
                   ~replace_node:(fun current ->
                     match current.node with
                     | NotOwned _ -> Error MissingResource
-                    | _          -> Ok (Tree.make ~node ~span:dst_range ()))
+                    | _          -> Ok (Tree.realign framed dst_ofs))
                   ~rebuild_parent:Tree.of_children dst_range
               in
               DR.of_result (with_root dst_tree new_dst_root)

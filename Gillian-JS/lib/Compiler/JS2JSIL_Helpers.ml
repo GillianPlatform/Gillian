@@ -59,13 +59,14 @@ let js2jsil_imports_cosette =
     "Errors.jsil";
   ]
 
-let js2jsil_logic_imports () =
+let js2jsil_logic_imports =
   [
     "javert_internal_functions.jsil";
     "javert_logic_macros.jsil";
     "ArrayBuffer.jsil";
     "ArrayLogic.jsil";
     "DataView.jsil";
+    "ByteLogic.gil";
     "Uint8Array.jsil";
   ]
 

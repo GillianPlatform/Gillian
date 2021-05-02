@@ -531,10 +531,10 @@ struct
            results, several verification tests can have the same id. This \
            should be fixed first.";
       let () = Fmt_tty.setup_std_outputs () in
-      let () = Config.current_exec_mode := Verification in
-      let () = PC.initialize Verification in
       let () = Config.stats := stats in
       let () = Config.lemma_proof := not no_lemma_proof in
+      let () = Config.current_exec_mode := Verification in
+      let () = PC.initialize Verification in
       let () = Config.manual_proof := manual in
       let () = Config.Verification.set_procs_to_verify procs_to_verify in
       let () = Config.Verification.set_lemmas_to_verify lemmas_to_verify in

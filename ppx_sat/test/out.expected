@@ -1,13 +1,13 @@
 [{pc:
    {pfs: [(! (x == 1.))];
     gamma: (x: Num);
-    learned: [(! (x <# 1.)); (! (x <# 2.))];
+    learned: [(1. <=# x); (2. <=# x)];
     learned_types: []};
   value: 12},
  {pc:
    {pfs: [(! (x == 1.))];
     gamma: (x: Num);
-    learned: [(! (x <# 1.)); (x <# 2.)];
+    learned: [(x <# 2.); (1. <=# x)];
     learned_types: []};
   value: 11},
  {pc:
@@ -19,7 +19,7 @@
  {pc:
    {pfs: [(! (x == 1.))];
     gamma: (x: Num);
-    learned: [(! (x <=# 0.)); (x <# 1.); (x <=# 1.)];
+    learned: [(0. <# x); (x <# 1.); (x <=# 1.)];
     learned_types: []};
   value: 0}]
 
