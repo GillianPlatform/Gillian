@@ -1,0 +1,3 @@
+(library
+ (name wDebugging)
+ (libraries gillian wSemantics))

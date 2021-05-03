@@ -1,4 +1,5 @@
 module L = Logging
+module Displayable = Displayable
 
 module type S = sig
   type stop_reason = Step | ReachedStart | ReachedEnd | Breakpoint
@@ -36,7 +37,12 @@ module type S = sig
   val set_breakpoints : string option -> int list -> debugger_state -> unit
 end
 
-module Make (PC : ParserAndCompiler.S) (Verification : Verifier.S) = struct
+module Make
+    (PC : ParserAndCompiler.S)
+    (Verification : Verifier.S)
+    (SMemory : SMemory.S)
+    (Displayable : Displayable.S with type t = SMemory.t) =
+struct
   module Breakpoints = Set.Make (Int)
 
   type stop_reason = Step | ReachedStart | ReachedEnd | Breakpoint

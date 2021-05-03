@@ -16,7 +16,8 @@ module Make
     (External : External.S)
     (PC : ParserAndCompiler.S) (Runners : sig
       val runners : Bulk.Runner.t list
-    end) =
+    end)
+    (SMemoryDisplayable : Debugger.Displayable.S with type t = SMemory.t) =
 struct
   module CState = CState.Make (CMemory)
   module CInterpreter =
@@ -28,7 +29,8 @@ struct
     PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
   module Verification = Verifier.Make (SState) (SPState) (External)
   module Abductor = Abductor.Make (SState) (SPState) (External)
-  module Debugger = Debugger.Make (PC) (Verification)
+  module Debugger =
+    Debugger.Make (PC) (Verification) (SMemory) (SMemoryDisplayable)
   module DebugAdapter = DebugAdapter.Make (Debugger)
 
   let files =
