@@ -15,7 +15,12 @@ module type S = sig
 
   type scope = { name : string; id : int }
 
-  type variable = { name : string; value : string; type_ : string option }
+  type variable = {
+    name : string;
+    value : string;
+    type_ : string option;
+    var_ref : int;
+  }
 
   type debugger_state
 

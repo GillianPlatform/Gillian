@@ -16,7 +16,12 @@ module type S = sig
 
   type scope = { name : string; id : int }
 
-  type variable = { name : string; value : string; type_ : string option }
+  type variable = {
+    name : string;
+    value : string;
+    type_ : string option;
+    var_ref : int;
+  }
 
   type debugger_state
 
@@ -41,9 +46,11 @@ module Make
     (PC : ParserAndCompiler.S)
     (Verification : Verifier.S)
     (SMemory : SMemory.S)
-    (Displayable : Displayable.S
-                     with type t = Verification.SAInterpreter.State.heap_t) =
+    (SMemoryDisplayable : Displayable.S
+                            with type t =
+                                  Verification.SAInterpreter.State.heap_t) =
 struct
+  open Verification.SAInterpreter
   module Breakpoints = Set.Make (Int)
 
   type stop_reason = Step | ReachedStart | ReachedEnd | Breakpoint
@@ -60,28 +67,86 @@ struct
 
   type scope = { name : string; id : int }
 
-  type variable = { name : string; value : string; type_ : string option }
+  type variable = {
+    name : string;
+    value : string;
+    type_ : string option;
+    var_ref : int;
+  }
 
   type breakpoints = (string, Breakpoints.t) Hashtbl.t
+
+  type scopes_to_vars = (int, variable list) Hashtbl.t
 
   type debugger_state = {
     source_file : string;
     source_files : SourceFiles.t option;
-    scopes : scope list;
+    top_level_scopes : scope list;
     prog : (Annot.t, int) Prog.t;
-    mutable cont_func :
-      unit -> Verification.result_t Verification.SAInterpreter.cont_func;
+    mutable cont_func : unit -> Verification.result_t cont_func;
     mutable cur_report_id : string;
     mutable frames : frame list;
-    mutable state : Verification.SAInterpreter.state_t option;
     mutable breakpoints : breakpoints;
+    mutable scopes_to_vars : scopes_to_vars;
   }
-
-  let scopes_tbl = Hashtbl.create 0
 
   let store_scope = ({ name = "Store"; id = 1 } : scope)
 
   let heap_scope = ({ name = "Heap"; id = 2 } : scope)
+
+  let get_store_vars (state : state_t) : variable list =
+    let store = State.get_store state in
+    Store.bindings store
+    |> List.map (fun (var, value) ->
+           let value = Fmt.to_to_string Val.full_pp value in
+           { name = var; value; type_ = None; var_ref = 0 })
+
+  let rec add_heap_vars
+      (dt_list : Displayable.debugger_tree list)
+      (scopes_to_vars : scopes_to_vars)
+      (get_new_scope_id : unit -> int) : variable list =
+    dt_list
+    |> List.map (fun tree ->
+           match tree with
+           | Displayable.Leaf (name, value) ->
+               (* Variable reference is set to 0 as there are no children variables *)
+               { name; value; type_ = None; var_ref = 0 }
+           | Displayable.Node (name, dt_list) ->
+               let new_scope_id = get_new_scope_id () in
+               let vars =
+                 add_heap_vars dt_list scopes_to_vars get_new_scope_id
+               in
+               let () = Hashtbl.replace scopes_to_vars new_scope_id vars in
+               {
+                 name;
+                 value = "";
+                 type_ = Some "object";
+                 var_ref = new_scope_id;
+               })
+
+  let create_scopes_to_vars (state : state_t option) : scopes_to_vars =
+    let scopes_to_vars = Hashtbl.create 0 in
+    (* Current scope id is 2 as store and heap scopes are the first two scopes *)
+    let scope_id = ref 2 in
+    let get_new_scope_id () =
+      let () = scope_id := !scope_id + 1 in
+      !scope_id
+    in
+    let store_vars, heap_vars =
+      match state with
+      | None       -> ([], [])
+      | Some state ->
+          let store_vars = get_store_vars state in
+          let heap = State.get_heap state in
+          let dt_list = SMemoryDisplayable.to_debugger_tree heap in
+          let heap_vars =
+            add_heap_vars dt_list scopes_to_vars get_new_scope_id
+          in
+          (store_vars, heap_vars)
+    in
+    let () = Hashtbl.replace scopes_to_vars store_scope.id store_vars in
+    let () = Hashtbl.replace scopes_to_vars heap_scope.id heap_vars in
+    scopes_to_vars
 
   (* TODO: Find a common place to put the below three functions which are
      duplicated in CommandLine.ml *)
@@ -156,7 +221,7 @@ struct
   let rec call_stack_to_frames call_stack next_proc_body_idx prog =
     match call_stack with
     | [] -> []
-    | (se : Verification.SAInterpreter.CallStack.stack_element) :: rest ->
+    | (se : CallStack.stack_element) :: rest ->
         let defaults = (0, 0, 0, 0, "") in
         let proc = Prog.get_proc prog se.pid in
         let start_line, start_column, end_line, end_column, source_path =
@@ -191,7 +256,6 @@ struct
 
   let update_report_id_and_inspection_fields report_id dbg =
     dbg.cur_report_id <- report_id;
-    let open Verification.SAInterpreter in
     match Logging.LogQueryer.get_report report_id with
     | None                  ->
         raise
@@ -213,7 +277,7 @@ struct
                     call_stack_to_frames cmd_step.call_stack
                       cmd_step.proc_body_index dbg.prog
                 in
-                dbg.state <- cmd_step.state
+                dbg.scopes_to_vars <- create_scopes_to_vars cmd_step.state
             | Error err   -> raise (Failure err))
         | _ as t ->
             raise
@@ -223,9 +287,6 @@ struct
         )
 
   let launch file_name =
-    Hashtbl.replace scopes_tbl store_scope.id store_scope.name;
-    Hashtbl.replace scopes_tbl heap_scope.id heap_scope.name;
-
     let () = Fmt_tty.setup_std_outputs () in
     let () = Config.current_exec_mode := Verification in
     let () = PC.initialize Verification in
@@ -254,13 +315,13 @@ struct
               ({
                  source_file = file_name;
                  source_files = source_files_opt;
-                 scopes = [ store_scope; heap_scope ];
+                 top_level_scopes = [ store_scope; heap_scope ];
                  cont_func;
                  prog;
                  frames = [];
-                 state = None;
                  cur_report_id;
                  breakpoints = Hashtbl.create 0;
+                 scopes_to_vars = Hashtbl.create 0;
                }
                 : debugger_state)
             in
@@ -321,41 +382,12 @@ struct
 
   let get_frames dbg = dbg.frames
 
-  let get_scopes dbg = dbg.scopes
+  let get_scopes dbg = dbg.top_level_scopes
 
   let get_variables (var_ref : int) (dbg : debugger_state) : variable list =
-    (* TODO: Display store and heap *)
-    let open Verification.SAInterpreter in
-    match Hashtbl.find_opt scopes_tbl var_ref with
-    | None    -> []
-    | Some id -> (
-        match dbg.state with
-        | None       -> []
-        | Some state ->
-            if id = "Store" then
-              let store = State.get_store state in
-              Store.bindings store
-              |> List.map (fun (var, value) ->
-                     let value =
-                       Fmt.to_to_string Verification.SAInterpreter.Val.full_pp
-                         value
-                     in
-                     ({ name = var; value; type_ = None } : variable))
-            else
-              let heap = State.get_heap state in
-              let _ = Displayable.to_debugger_tree heap in
-              [
-                ({ name = id ^ "_i"; value = "21354"; type_ = Some "integer" }
-                  : variable);
-                ({ name = id ^ "_f"; value = "4.52"; type_ = Some "float" }
-                  : variable);
-                ({
-                   name = id ^ "_s";
-                   value = "hello world";
-                   type_ = Some "string";
-                 }
-                  : variable);
-              ])
+    match Hashtbl.find_opt dbg.scopes_to_vars var_ref with
+    | None      -> []
+    | Some vars -> vars
 
   let set_breakpoints source bp_list dbg =
     match source with

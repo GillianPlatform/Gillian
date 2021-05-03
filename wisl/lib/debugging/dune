@@ -1,3 +1,4 @@
 (library
  (name wDebugging)
- (libraries gillian wSemantics))
+ (libraries gillian wSemantics wUtils)
+ (flags :standard -open WUtils))

@@ -61,3 +61,5 @@ val substitution_in_place :
   list
 
 val assertions : t -> Gillian.Gil_syntax.Asrt.t list
+
+val bindings : t -> (string * (SFVL.field_name * SFVL.field_value) list) list

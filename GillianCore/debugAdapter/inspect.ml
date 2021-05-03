@@ -50,7 +50,8 @@ module Make (Debugger : Debugger.S) = struct
                  let name = var.name in
                  let value = var.value in
                  let type_ = var.type_ in
-                 Variable.make ~name ~value ~type_ ~variables_reference:0 ())
+                 let variables_reference = var.var_ref in
+                 Variable.make ~name ~value ~type_ ~variables_reference ())
         in
         Lwt.return (Variables_command.Result.make ~variables ()));
     Lwt.join [ promise ]

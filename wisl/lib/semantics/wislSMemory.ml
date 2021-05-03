@@ -320,3 +320,5 @@ let apply_fix m _ _ _ = m
 let get_fixes ?simple_fix:_ _ _ _ _ = []
 
 let get_failing_constraint _ = Formula.True
+
+let bindings = WislSHeap.bindings

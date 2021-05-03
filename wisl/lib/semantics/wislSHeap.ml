@@ -265,3 +265,5 @@ let pp fmt heap =
 let of_yojson _ = failwith "Not implemented"
 
 let to_yojson _ = failwith "Not implemented"
+
+let bindings _ = []
