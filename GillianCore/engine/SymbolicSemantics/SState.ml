@@ -8,7 +8,8 @@ module Make (SMemory : SMemory.S) :
   State.S
     with type st = SVal.SESubst.t
      and type vt = SVal.M.t
-     and type store_t = SStore.t = struct
+     and type store_t = SStore.t
+     and type heap_t = SMemory.t = struct
   type vt = SVal.M.t
 
   type st = SVal.M.et
@@ -831,6 +832,10 @@ module Make (SMemory : SMemory.S) :
   let get_equal_values state les =
     let _, _, pfs, _, _ = state in
     les @ List.concat_map (Reduction.get_equal_expressions pfs) les
+
+  let get_heap state =
+    let heap, _, _, _, _ = state in
+    heap
 
   let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
     (* TODO: Deserialize other components of state *)

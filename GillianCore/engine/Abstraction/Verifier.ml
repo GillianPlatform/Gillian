@@ -1,7 +1,9 @@
 open Containers
 
 module type S = sig
-  module SAInterpreter : GInterpreter.S
+  type heap_t
+
+  module SAInterpreter : GInterpreter.S with type heap_t = heap_t
 
   type t
 
@@ -37,6 +39,8 @@ struct
   module SAInterpreter =
     GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SPState) (External)
   module Normaliser = Normaliser.Make (SPState)
+
+  type heap_t = SPState.heap_t
 
   let print_success_or_failure success =
     if success then Fmt.pr "%a" (Fmt.styled `Green Fmt.string) "Success\n"

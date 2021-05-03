@@ -41,7 +41,8 @@ module Make
     (PC : ParserAndCompiler.S)
     (Verification : Verifier.S)
     (SMemory : SMemory.S)
-    (Displayable : Displayable.S with type t = SMemory.t) =
+    (Displayable : Displayable.S
+                     with type t = Verification.SAInterpreter.State.heap_t) =
 struct
   module Breakpoints = Set.Make (Int)
 
@@ -322,16 +323,16 @@ struct
 
   let get_scopes dbg = dbg.scopes
 
-  let get_variables var_ref dbg =
+  let get_variables (var_ref : int) (dbg : debugger_state) : variable list =
     (* TODO: Display store and heap *)
+    let open Verification.SAInterpreter in
     match Hashtbl.find_opt scopes_tbl var_ref with
     | None    -> []
-    | Some id ->
-        if id = "Store" then
-          match dbg.state with
-          | None       -> []
-          | Some state ->
-              let open Verification.SAInterpreter in
+    | Some id -> (
+        match dbg.state with
+        | None       -> []
+        | Some state ->
+            if id = "Store" then
               let store = State.get_store state in
               Store.bindings store
               |> List.map (fun (var, value) ->
@@ -340,15 +341,21 @@ struct
                          value
                      in
                      ({ name = var; value; type_ = None } : variable))
-        else
-          [
-            ({ name = id ^ "_i"; value = "21354"; type_ = Some "integer" }
-              : variable);
-            ({ name = id ^ "_f"; value = "4.52"; type_ = Some "float" }
-              : variable);
-            ({ name = id ^ "_s"; value = "hello world"; type_ = Some "string" }
-              : variable);
-          ]
+            else
+              let heap = State.get_heap state in
+              let _ = Displayable.to_debugger_tree heap in
+              [
+                ({ name = id ^ "_i"; value = "21354"; type_ = Some "integer" }
+                  : variable);
+                ({ name = id ^ "_f"; value = "4.52"; type_ = Some "float" }
+                  : variable);
+                ({
+                   name = id ^ "_s";
+                   value = "hello world";
+                   type_ = Some "string";
+                 }
+                  : variable);
+              ])
 
   let set_breakpoints source bp_list dbg =
     match source with

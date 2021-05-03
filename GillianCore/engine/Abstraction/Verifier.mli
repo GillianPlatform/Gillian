@@ -1,5 +1,7 @@
 module type S = sig
-  module SAInterpreter : GInterpreter.S
+  type heap_t
+
+  module SAInterpreter : GInterpreter.S with type heap_t = heap_t
 
   type t
 
@@ -28,4 +30,4 @@ module Make
                   and type st = SVal.SESubst.t
                   and type store_t = SStore.t
                   and type preds_t = Preds.SPreds.t)
-    (External : External.S) : S
+    (External : External.S) : S with type heap_t = SPState.heap_t

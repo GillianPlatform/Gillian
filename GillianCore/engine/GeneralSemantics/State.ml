@@ -16,6 +16,8 @@ module type S = sig
   (** Type of GIL stores *)
   type store_t
 
+  type heap_t
+
   (** Errors *)
   type m_err_t
 
@@ -184,4 +186,6 @@ module type S = sig
   val apply_fixes : t -> fix_t list -> t option * Asrt.t list
 
   val get_equal_values : t -> vt list -> vt list
+
+  val get_heap : t -> heap_t
 end

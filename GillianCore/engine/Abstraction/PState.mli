@@ -47,3 +47,4 @@ module Make
      and type store_t = Store.t
      and type state_t = State.t
      and type preds_t = Preds.t
+     and type heap_t = State.heap_t

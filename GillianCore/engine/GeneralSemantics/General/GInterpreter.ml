@@ -16,6 +16,8 @@ module type S = sig
 
   type state_vt
 
+  type heap_t
+
   module Val : Val.S with type t = vt
 
   module Store : Store.S with type t = store_t and type vt = vt
@@ -26,6 +28,7 @@ module type S = sig
        and type vt = vt
        and type st = st
        and type store_t = store_t
+       and type heap_t = heap_t
 
   type invariant_frames = (string * State.t) list
 
@@ -118,6 +121,8 @@ struct
   type state_err_t = State.err_t
 
   type state_vt = State.vt
+
+  type heap_t = State.heap_t
 
   type invariant_frames = (string * State.t) list
 

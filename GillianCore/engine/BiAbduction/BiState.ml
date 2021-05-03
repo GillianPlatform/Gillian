@@ -20,6 +20,8 @@ struct
 
   type store_t = Store.t
 
+  type heap_t = State.heap_t
+
   type state_t = State.t
 
   type t = SS.t * state_t * state_t
@@ -609,6 +611,10 @@ struct
   let get_equal_values bi_state =
     let _, state, _ = bi_state in
     State.get_equal_values state
+
+  let get_heap bi_state =
+    let _, state, _ = bi_state in
+    State.get_heap state
 
   let of_yojson _ =
     failwith

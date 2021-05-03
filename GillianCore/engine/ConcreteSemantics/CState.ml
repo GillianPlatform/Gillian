@@ -19,6 +19,8 @@ module Make
 
   type store_t = CStore.t
 
+  type heap_t = CMemory.t
+
   type t = CMemory.t * CStore.t * vt list
 
   type fix_t
@@ -246,6 +248,10 @@ module Make
     raise (Failure "Concrete: apply_fixes not implemented in CState.Make")
 
   let get_equal_values _ vs = vs
+
+  let get_heap state =
+    let heap, _, _ = state in
+    heap
 
   let of_yojson _ =
     failwith

@@ -46,7 +46,8 @@ module Make
      and type st = ESubst.t
      and type store_t = Store.t
      and type state_t = State.t
-     and type preds_t = Preds.t = struct
+     and type preds_t = Preds.t
+     and type heap_t = State.heap_t = struct
   open Containers
   open Literal
   module L = Logging
@@ -58,6 +59,8 @@ module Make
   type st = ESubst.t
 
   type store_t = Store.t
+
+  type heap_t = State.heap_t
 
   type abs_t = Preds.abs_t
 
@@ -1252,6 +1255,10 @@ module Make
   let get_equal_values astate =
     let state, _, _ = astate in
     State.get_equal_values state
+
+  let get_heap pstate =
+    let state, _, _ = pstate in
+    State.get_heap state
 
   let of_yojson yojson =
     (* TODO: Deserialize other components of pstate *)
