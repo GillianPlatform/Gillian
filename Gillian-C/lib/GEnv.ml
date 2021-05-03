@@ -129,7 +129,7 @@ struct
                    CConstants.Internal_Functions.not_implemented f ->
             incr not_printed
         | _ -> Format.fprintf ft "'%s' -> %s -> %a@\n" s l pp_def d
-      with Not_found -> Format.fprintf ft "'%s' -> %s -> ERROR UNKOWN@\n" s l
+      with Not_found -> Format.fprintf ft "'%s' -> %s -> ERROR UNKNOWN@\n" s l
     in
     if !Config.hide_genv then Format.fprintf fmt "{@[<v 2>@\nHIDDEN@]@\n}"
     else
