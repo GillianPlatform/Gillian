@@ -1317,9 +1317,14 @@ let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
       "FATAL ERROR: Z3 returned UNKNOWN for SAT question:\n\
        %a\n\
        with gamma:\n\
-       @[%a@]@?"
+       @[%a@]\n\n\n\
+       Z3 EXPRS:\n\
+       %a\n\
+      \       @?"
       (Fmt.iter ~sep:(Fmt.any ", ") Formula.Set.iter Formula.pp)
-      fs TypEnv.pp gamma;
+      fs TypEnv.pp gamma
+      (Fmt.list ~sep:(Fmt.any "\n\n") Fmt.string)
+      (List.map Z3.Expr.to_string encoded_assertions);
     exit 1);
 
   (* Step 5: RETURN *)
