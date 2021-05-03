@@ -125,8 +125,8 @@ type extended_gil_value_constructor = {
 let cfg =
   [
     ("model", "true");
-    ("proof", "true");
-    ("unsat_core", "true");
+    ("proof", "false");
+    ("unsat_core", "false");
     ("auto_config", "true");
     ("timeout", "16384");
   ]

@@ -65,14 +65,9 @@ let clean_up_stuff (left : PFS.t) (right : PFS.t) =
     in
     Formula.Set.exists (eq_or_sym npf) sleft
   in
-  if PFS.filter_stop_cond ~keep ~cond right then (
+  if PFS.filter_stop_cond ~keep ~cond right then
     let () = PFS.clear right in
-    PFS.set left [ False ];
-    PFS.filter
-      (function
-        | Not (Eq ((EList _ | BinOp _ | UnOp _), Lit Empty)) -> false
-        | _ -> true)
-      right)
+    PFS.set left [ False ]
 
 (* Set intersections *)
 let get_set_intersections pfs =
