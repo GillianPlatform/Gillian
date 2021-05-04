@@ -1135,6 +1135,20 @@ struct
       (results : result_t list) : 'a cont_func =
     let f = evaluate_cmd_step ret_fun retry prog hold_results on_hold in
 
+    let continue_or_pause rest_confs cont_func =
+      match rest_confs with
+      | ConfCont (state, call_stack, _, _, _, proc_body_index, _) :: _ ->
+          let report_id =
+            L.normal_specific
+              (L.Loggable.make cmd_step_pp cmd_step_of_yojson yojson_of_cmd_step
+                 { call_stack; proc_body_index; state = Some state })
+              L.LoggingConstants.ContentType.cmd_step
+          in
+          Continue (report_id, cont_func)
+      (* TODO: Pause if error occurs *)
+      | _ -> cont_func ()
+    in
+
     match confs with
     | [] ->
         let results = List.map ret_fun results in
@@ -1148,7 +1162,8 @@ struct
                 if Hashtbl.mem prog.specs pid then Some conf else None)
               on_hold
           in
-          evaluate_cmd_step ret_fun false prog results [] hold_confs [])
+          continue_or_pause hold_confs (fun () ->
+              evaluate_cmd_step ret_fun false prog results [] hold_confs []))
     | ConfCont (state, cs, iframes, prev, prev_loop_ids, i, b_counter)
       :: rest_confs
       when b_counter < max_branching ->
@@ -1156,24 +1171,8 @@ struct
           protected_evaluate_cmd prog state cs iframes prev prev_loop_ids i
             b_counter
         in
-        (* TODO: Store a command step type instead of just callstack *)
-        let next_state, next_cs, next_proc_body_index =
-          match next_confs with
-          | ConfCont (state, call_stack, _, _, _, proc_body_index, _) :: _ ->
-              (Some state, call_stack, proc_body_index)
-          | _ -> (None, [], -1)
-        in
-        let report_id =
-          L.normal_specific
-            (L.Loggable.make cmd_step_pp cmd_step_of_yojson yojson_of_cmd_step
-               {
-                 call_stack = next_cs;
-                 proc_body_index = next_proc_body_index;
-                 state = next_state;
-               })
-            L.LoggingConstants.ContentType.cmd_step
-        in
-        Continue (report_id, fun () -> f (next_confs @ rest_confs) results)
+        continue_or_pause (next_confs @ rest_confs) (fun () ->
+            f (next_confs @ rest_confs) results)
     | ConfCont (state, cs, _, _, _, i, b_counter) :: rest_confs ->
         let _, annot_cmd = get_cmd prog cs i in
         Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
@@ -1184,13 +1183,15 @@ struct
                  STOPPING CONF:\n"
                 b_counter));
         print_configuration annot_cmd state cs i b_counter;
-        f rest_confs results
+        continue_or_pause rest_confs (fun () -> f rest_confs results)
     | ConfErr (proc, i, state, errs) :: rest_confs ->
         let result = ExecRes.RFail (proc, i, state, errs) in
-        f rest_confs (result :: results)
+        continue_or_pause rest_confs (fun () ->
+            f rest_confs (result :: results))
     | ConfFinish (fl, v, state) :: rest_confs ->
         let result = ExecRes.RSucc (fl, v, state) in
-        f rest_confs (result :: results)
+        continue_or_pause rest_confs (fun () ->
+            f rest_confs (result :: results))
     | ConfSusp (fid, state, cs, iframes, prev, prev_loop_ids, i, b_counter)
       :: rest_confs
       when retry ->
@@ -1200,9 +1201,11 @@ struct
         L.(
           verbose (fun m ->
               m "Suspending a computation that was trying to call %s" fid));
-        evaluate_cmd_step ret_fun retry prog hold_results
-          ((conf, fid) :: on_hold) rest_confs results
-    | _ :: rest_confs -> f rest_confs results
+        continue_or_pause rest_confs (fun () ->
+            evaluate_cmd_step ret_fun retry prog hold_results
+              ((conf, fid) :: on_hold) rest_confs results)
+    | _ :: rest_confs ->
+        continue_or_pause rest_confs (fun () -> f rest_confs results)
 
   (**
   Evaluates commands iteratively
