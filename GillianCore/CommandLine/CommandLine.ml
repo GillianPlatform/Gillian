@@ -29,8 +29,7 @@ struct
     PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
   module Verification = Verifier.Make (SState) (SPState) (External)
   module Abductor = Abductor.Make (SState) (SPState) (External)
-  module Debugger =
-    Debugger.Make (PC) (Verification) (SMemory) (SMemoryDisplayable)
+  module Debugger = Debugger.Make (PC) (Verification) (SMemoryDisplayable)
   module DebugAdapter = DebugAdapter.Make (Debugger)
 
   let files =

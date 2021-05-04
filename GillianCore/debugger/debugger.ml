@@ -45,7 +45,6 @@ end
 module Make
     (PC : ParserAndCompiler.S)
     (Verification : Verifier.S)
-    (SMemory : SMemory.S)
     (SMemoryDisplayable : Displayable.S
                             with type t =
                                   Verification.SAInterpreter.State.heap_t) =
@@ -95,6 +94,8 @@ struct
 
   let heap_scope = ({ name = "Heap"; id = 2 } : scope)
 
+  let typ_env_scope = ({ name = "Typing Env"; id = 3 } : scope)
+
   let get_store_vars (state : state_t) : variable list =
     let store = State.get_store state in
     Store.bindings store
@@ -125,17 +126,25 @@ struct
                  var_ref = new_scope_id;
                })
 
+  let get_typ_env_vars (state : state_t) : variable list =
+    let typ_env = Verification.SPState.get_typ_env state in
+    TypEnv.to_list typ_env
+    |> List.sort (fun (v, _) (w, _) -> Stdlib.compare v w)
+    |> List.map (fun (name, value) ->
+           let value = Type.str value in
+           { name; value; type_ = None; var_ref = 0 })
+
   let create_scopes_to_vars (state : state_t option) : scopes_to_vars =
     let scopes_to_vars = Hashtbl.create 0 in
-    (* Current scope id is 2 as store and heap scopes are the first two scopes *)
-    let scope_id = ref 2 in
+    (* Current scope id is 3 as store, heap, typ_env scopes are the first three scopes *)
+    let scope_id = ref 3 in
     let get_new_scope_id () =
       let () = scope_id := !scope_id + 1 in
       !scope_id
     in
-    let store_vars, heap_vars =
+    let store_vars, heap_vars, typ_env_vars =
       match state with
-      | None       -> ([], [])
+      | None       -> ([], [], [])
       | Some state ->
           let store_vars = get_store_vars state in
           let heap = State.get_heap state in
@@ -143,10 +152,12 @@ struct
           let heap_vars =
             add_heap_vars dt_list scopes_to_vars get_new_scope_id
           in
-          (store_vars, heap_vars)
+          let typ_env_vars = get_typ_env_vars state in
+          (store_vars, heap_vars, typ_env_vars)
     in
     let () = Hashtbl.replace scopes_to_vars store_scope.id store_vars in
     let () = Hashtbl.replace scopes_to_vars heap_scope.id heap_vars in
+    let () = Hashtbl.replace scopes_to_vars typ_env_scope.id typ_env_vars in
     scopes_to_vars
 
   (* TODO: Find a common place to put the below three functions which are
@@ -313,7 +324,7 @@ struct
               ({
                  source_file = file_name;
                  source_files = source_files_opt;
-                 top_level_scopes = [ store_scope; heap_scope ];
+                 top_level_scopes = [ store_scope; heap_scope; typ_env_scope ];
                  cont_func = Some cont_func;
                  prog;
                  frames = [];

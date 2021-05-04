@@ -53,6 +53,7 @@ module Type : sig
     | ListType  (** Type of lists *)
     | TypeType  (** Type of types *)
     | SetType  (** Type of sets *)
+  [@@deriving yojson]
 
   (** Printer *)
   val str : t -> string

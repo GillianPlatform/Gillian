@@ -3,7 +3,7 @@
     They are considered to be mutable.
 *)
 module type S = sig
-  include State.S
+  include SState.S
 
   type state_t
 
@@ -36,7 +36,7 @@ module Make
     (Val : Val.S)
     (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
-    (State : State.S
+    (State : SState.S
                with type vt = Val.t
                 and type st = ESubst.t
                 and type store_t = Store.t)
@@ -1259,6 +1259,10 @@ module Make
   let get_heap pstate =
     let state, _, _ = pstate in
     State.get_heap state
+
+  let get_typ_env pstate =
+    let state, _, _ = pstate in
+    State.get_typ_env state
 
   let t_of_yojson yojson =
     (* TODO: Deserialize other components of pstate *)

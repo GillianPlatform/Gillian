@@ -5,7 +5,7 @@ open Names
 open SVal
 module L = Logging
 
-type t = (string, Type.t) Hashtbl.t
+type t = (string, Type.t) YojsonableHashtbl.t [@@deriving yojson]
 
 (*************************************)
 (** Typing Environment Functions    **)

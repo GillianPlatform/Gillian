@@ -4,8 +4,14 @@ open Names
 module L = Logging
 module SSubst = SVal.SESubst
 
+module type S = sig
+  include State.S
+
+  val get_typ_env : t -> TypEnv.t
+end
+
 module Make (SMemory : SMemory.S) :
-  State.S
+  S
     with type st = SVal.SESubst.t
      and type vt = SVal.M.t
      and type store_t = SStore.t
@@ -837,20 +843,32 @@ module Make (SMemory : SMemory.S) :
     let heap, _, _, _, _ = state in
     heap
 
+  let get_typ_env state =
+    let _, _, _, typ_env, _ = state in
+    typ_env
+
   let t_of_yojson (yojson : Yojson.Safe.t) : t =
     (* TODO: Deserialize other components of state *)
     match yojson with
-    | `Assoc [ ("heap", heap_yojson); ("store", store_yojson) ] ->
+    | `Assoc
+        [
+          ("heap", heap_yojson);
+          ("store", store_yojson);
+          ("typ_env", typ_env_yojson);
+        ] ->
         let heap = SMemory.t_of_yojson heap_yojson in
         let store = SStore.t_of_yojson store_yojson in
-        (heap, store, PFS.init (), TypEnv.init (), SS.empty)
+        let typ_env = TypEnv.t_of_yojson typ_env_yojson in
+        (heap, store, PFS.init (), typ_env, SS.empty)
     | _ -> failwith "Cannot parse yojson into SState"
 
   let yojson_of_t (state : t) : Yojson.Safe.t =
     (* TODO: Serialize other components of state *)
-    let heap, store, _, _, _ = state in
+    let heap, store, _, typ_env, _ = state in
     `Assoc
       [
-        ("heap", SMemory.yojson_of_t heap); ("store", SStore.yojson_of_t store);
+        ("heap", SMemory.yojson_of_t heap);
+        ("store", SStore.yojson_of_t store);
+        ("typ_env", TypEnv.yojson_of_t typ_env);
       ]
 end

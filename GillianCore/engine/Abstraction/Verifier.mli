@@ -1,7 +1,29 @@
 module type S = sig
+  type vt
+
+  type st
+
   type heap_t
 
-  module SAInterpreter : GInterpreter.S with type heap_t = heap_t
+  type store
+
+  type state
+
+  module SPState :
+    PState.S
+      with type t = state
+       and type vt = vt
+       and type st = st
+       and type store_t = store
+       and type heap_t = heap_t
+
+  module SAInterpreter :
+    GInterpreter.S
+      with type vt = vt
+       and type st = st
+       and type store_t = store
+       and type state_t = state
+       and type heap_t = heap_t
 
   type t
 

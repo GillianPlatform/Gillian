@@ -44,6 +44,5 @@ end
 module Make
     (PC : ParserAndCompiler.S)
     (Verification : Verifier.S)
-    (SMemory : SMemory.S)
     (Displayable : Displayable.S
                      with type t = Verification.SAInterpreter.State.heap_t) : S
