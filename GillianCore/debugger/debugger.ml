@@ -83,7 +83,7 @@ struct
     source_files : SourceFiles.t option;
     top_level_scopes : scope list;
     prog : (Annot.t, int) Prog.t;
-    mutable cont_func : unit -> Verification.result_t cont_func;
+    mutable cont_func : unit -> Verification.SAInterpreter.result_t cont_func;
     mutable cur_report_id : string;
     mutable frames : frame list;
     mutable breakpoints : breakpoints;
