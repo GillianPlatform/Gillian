@@ -268,6 +268,9 @@ module Expr : sig
   (** Maps with expressions as keys *)
   module Map : Map.S with type key := t
 
+  (** YojsonableMap with expressions as keys *)
+  module YojsonableMap : YojsonableMap.S with type key := t
+
   (** Equality *)
   val equal : t -> t -> bool
 

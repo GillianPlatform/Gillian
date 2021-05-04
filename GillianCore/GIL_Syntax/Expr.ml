@@ -186,8 +186,15 @@ module MyExpr = struct
   let compare = Stdlib.compare
 end
 
+module YojsonableExpr = struct
+  type key = t [@@deriving yojson]
+
+  include MyExpr
+end
+
 module Set = Set.Make (MyExpr)
 module Map = Map.Make (MyExpr)
+module YojsonableMap = YojsonableMap.Make (YojsonableExpr)
 
 (** Map over expressions *)
 
