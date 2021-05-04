@@ -33,9 +33,7 @@ end = struct
     Fmt.pf fmt "<%s>@\n%a@\n" node.id (Fmt.list ~sep pp_succ) node.children
 end
 
-type ('a, 'b) hashtbl = ('a, 'b) Hashtbl.t
-
-type t = { nodes : (string, Node.t) hashtbl } [@@deriving yojson]
+type t = { nodes : (string, Node.t) YojsonableHashtbl.t } [@@deriving yojson]
 
 type id = string
 

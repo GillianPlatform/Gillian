@@ -78,7 +78,11 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   type vt = Val.t [@@deriving yojson]
 
   (** Actual type of GIL Stores *)
-  type t = { conc : (Var.t, vt) Hashtbl.t; symb : (Var.t, vt) Hashtbl.t }
+  type t = {
+    conc : (Var.t, vt) YojsonableHashtbl.t;
+    symb : (Var.t, vt) YojsonableHashtbl.t;
+  }
+  [@@deriving yojson]
 
   (**
     Store initialisation
@@ -300,34 +304,4 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     Hashtbl.fold
       (fun _ v ac -> Var.Set.union ac (Expr.lvars (Val.to_expr v)))
       store.symb Var.Set.empty
-
-  (* *
-     Converts JSON into a store
-
-     @param store Store represented as JSON
-     @return Store of type t
-  *)
-  let t_of_yojson (json : Yojson.Safe.t) : t =
-    match json with
-    | `Assoc list ->
-        init
-          (List.map
-             (fun (id, value) ->
-               let value = Val.t_of_yojson value in
-               (id, value))
-             list)
-    | _           -> failwith "Cannot parse yojson into store"
-
-  (**
-    Converts JSON into a store
-
-    @param store Store to convert to JSON
-    @return Store represented as JSON
-  *)
-  let yojson_of_t (store : t) : Yojson.Safe.t =
-    `Assoc
-      (bindings store
-      |> List.map (fun (id, value) ->
-             let value = Val.yojson_of_t value in
-             (id, value)))
 end

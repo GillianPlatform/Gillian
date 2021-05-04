@@ -1,6 +1,7 @@
 (***** This module defines a Wisl Symbolic Heap *******)
 open Gillian.Symbolic
 open Gillian.Gil_syntax
+open Gillian.Utils
 module Solver = Gillian.Logic.FOSolver
 module Reduction = Gillian.Logic.Reduction
 
@@ -13,7 +14,7 @@ type err =
   | InvalidLocation
 
 module Block = struct
-  type t = Freed | Allocated of { data : SFVL.t; bound : int option }
+  type t = Freed | Allocated of { data : SFVL.t; bound : int option } [@@ deriving yojson]
 
   let empty = Allocated { data = SFVL.empty; bound = None }
 
@@ -54,7 +55,7 @@ module Block = struct
           data
 end
 
-type t = (string, Block.t) Hashtbl.t
+type t = (string, Block.t) YojsonableHashtbl.t [@@deriving yojson]
 
 (* A symbolic heap is a map from location and offset to symbolic values *)
 
@@ -261,9 +262,5 @@ let pp fmt heap =
     ( Fmt.iter_bindings ~sep:(Fmt.any "@\n@\n") Hashtbl.iter @@ fun ft (l, b) ->
       Block.pp ~loc:l ft b )
     heap
-
-let t_of_yojson _ = failwith "Not implemented"
-
-let yojson_of_t _ = failwith "Not implemented"
 
 let bindings _ = []
