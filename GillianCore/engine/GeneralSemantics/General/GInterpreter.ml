@@ -1010,7 +1010,11 @@ struct
           | None, _ -> raise (Failure "nm_ret_var not in store (normal return)")
           | Some v_ret, { store = None; loop_ids = start_loop_ids; _ } :: _ ->
               check_loop_ids loop_ids start_loop_ids;
-              Fmt.pr "n @?";
+              (* TODO: Redirect stdout to a file in debugging mode, as
+                   the debug adapter communicates with VSCode via stdout. This
+                   particular print statement currently causes issues, but
+                   should be re-added once stdout has been redirected. *)
+              (* Fmt.pr "n @?"; *)
               [ ConfFinish (Normal, v_ret, state) ]
           | ( Some v_ret,
               {
