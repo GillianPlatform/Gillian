@@ -83,7 +83,8 @@ struct
     source_files : SourceFiles.t option;
     top_level_scopes : scope list;
     prog : (Annot.t, int) Prog.t;
-    mutable cont_func : (unit -> Verification.SAInterpreter.result_t cont_func) option;
+    mutable cont_func :
+      (unit -> Verification.SAInterpreter.result_t cont_func) option;
     mutable cur_report_id : string;
     mutable frames : frame list;
     mutable breakpoints : breakpoints;
@@ -328,23 +329,26 @@ struct
   let execute_step dbg =
     let open Verification.SAInterpreter in
     match dbg.cont_func with
-    | None -> ReachedEnd
-    | Some cont_func ->
-      (let cont_func = cont_func () in
-      match cont_func with
-      | Finished _ ->
-        let () = dbg.cont_func <- None in
-        ReachedEnd
-      | Continue (cur_report_id, cont_func) -> (
-          match cur_report_id with
-          | None               ->
-              raise
-                (Failure
-                  "Did not log report. Check the logging level is set correctly")
-          | Some cur_report_id ->
-              let () = dbg.cont_func <- Some cont_func in
-              let () = update_report_id_and_inspection_fields cur_report_id dbg in
-              if has_hit_breakpoint dbg then Breakpoint else Step))
+    | None           -> ReachedEnd
+    | Some cont_func -> (
+        let cont_func = cont_func () in
+        match cont_func with
+        | Finished _ ->
+            let () = dbg.cont_func <- None in
+            ReachedEnd
+        | Continue (cur_report_id, cont_func) -> (
+            match cur_report_id with
+            | None               ->
+                raise
+                  (Failure
+                     "Did not log report. Check the logging level is set \
+                      correctly")
+            | Some cur_report_id ->
+                let () = dbg.cont_func <- Some cont_func in
+                let () =
+                  update_report_id_and_inspection_fields cur_report_id dbg
+                in
+                if has_hit_breakpoint dbg then Breakpoint else Step))
 
   let step ?(reverse = false) dbg =
     if reverse then
