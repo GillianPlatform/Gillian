@@ -30,7 +30,7 @@ let log lvl ?title ?severity msgf =
     let report =
       ReportBuilder.make ?title
         ~content:
-          (Loggable.make PackedPP.pp PackedPP.of_yojson PackedPP.to_yojson
+          (Loggable.make PackedPP.pp PackedPP.t_of_yojson PackedPP.yojson_of_t
              (PP msgf))
         ~type_:LoggingConstants.ContentType.debug ?severity ()
     in

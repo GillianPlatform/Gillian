@@ -21,4 +21,3 @@ type t = {
   severity : severity;
   type_ : string;
 }
-[@@deriving to_yojson]

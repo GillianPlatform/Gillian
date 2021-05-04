@@ -253,11 +253,11 @@ module Make
     let heap, _, _ = state in
     heap
 
-  let of_yojson _ =
+  let t_of_yojson _ =
     failwith
       "Please implement of_yojson to enable logging this type to a database"
 
-  let to_yojson _ =
+  let yojson_of_t _ =
     failwith
       "Please implement to_yojson to enable logging this type to a database"
 end

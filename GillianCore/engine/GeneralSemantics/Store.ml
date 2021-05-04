@@ -75,7 +75,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   module L = Logging
 
   (** Type of GIL values *)
-  type vt = Val.t
+  type vt = Val.t [@@deriving yojson]
 
   (** Actual type of GIL Stores *)
   type t = { conc : (Var.t, vt) Hashtbl.t; symb : (Var.t, vt) Hashtbl.t }
@@ -301,32 +301,22 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
       (fun _ v ac -> Var.Set.union ac (Expr.lvars (Val.to_expr v)))
       store.symb Var.Set.empty
 
-  (**
-    Converts JSON into a store
+  (* *
+     Converts JSON into a store
 
-    @param store Store represented as JSON
-    @return Store of type t
+     @param store Store represented as JSON
+     @return Store of type t
   *)
-  let of_yojson (json : Yojson.Safe.t) : (t, string) result =
+  let t_of_yojson (json : Yojson.Safe.t) : t =
     match json with
     | `Assoc list ->
-        let bindings =
-          list
-          |> List.map (fun (id, value) ->
-                 let value = Val.of_yojson value in
-                 (id, value))
-        in
-        let errors =
-          List.filter (fun (_, value) -> Result.is_error value) bindings
-        in
-        if List.length errors > 0 then
-          Error (Result.get_error (snd (List.hd errors)))
-        else
-          Ok
-            (init
-               (bindings
-               |> List.map (fun (id, value) -> (id, Result.get_ok value))))
-    | _           -> Error "Cannot parse yojson into store"
+        init
+          (List.map
+             (fun (id, value) ->
+               let value = Val.t_of_yojson value in
+               (id, value))
+             list)
+    | _           -> failwith "Cannot parse yojson into store"
 
   (**
     Converts JSON into a store
@@ -334,10 +324,10 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param store Store to convert to JSON
     @return Store represented as JSON
   *)
-  let to_yojson (store : t) : Yojson.Safe.t =
+  let yojson_of_t (store : t) : Yojson.Safe.t =
     `Assoc
       (bindings store
       |> List.map (fun (id, value) ->
-             let value = Val.to_yojson value in
+             let value = Val.yojson_of_t value in
              (id, value)))
 end

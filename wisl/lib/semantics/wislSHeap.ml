@@ -262,8 +262,8 @@ let pp fmt heap =
       Block.pp ~loc:l ft b )
     heap
 
-let of_yojson _ = failwith "Not implemented"
+let t_of_yojson _ = failwith "Not implemented"
 
-let to_yojson _ = failwith "Not implemented"
+let yojson_of_t _ = failwith "Not implemented"
 
 let bindings _ = []

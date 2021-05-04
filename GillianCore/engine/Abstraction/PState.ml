@@ -1260,14 +1260,13 @@ module Make
     let state, _, _ = pstate in
     State.get_heap state
 
-  let of_yojson yojson =
+  let t_of_yojson yojson =
     (* TODO: Deserialize other components of pstate *)
-    match State.of_yojson yojson with
-    | Ok state  -> Ok (state, Preds.init [], UP.init_pred_defs ())
-    | Error err -> Error err
+    let state = State.t_of_yojson yojson in
+    (state, Preds.init [], UP.init_pred_defs ())
 
-  let to_yojson pstate =
+  let yojson_of_t pstate =
     (* TODO: Serialize other components of pstate *)
     let state, _, _ = pstate in
-    State.to_yojson state
+    State.yojson_of_t state
 end

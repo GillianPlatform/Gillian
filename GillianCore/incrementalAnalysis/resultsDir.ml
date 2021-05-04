@@ -50,23 +50,19 @@ let read_json filename =
   Yojson.Safe.from_file json_path
 
 let read_results_dir () =
-  let sources = SourceFiles.of_yojson (read_json Filenames.sources) in
-  let call_graph = CallGraph.of_yojson (read_json Filenames.call_graph) in
-  (Result.get_ok sources, Result.get_ok call_graph)
+  let sources = SourceFiles.t_of_yojson (read_json Filenames.sources) in
+  let call_graph = CallGraph.t_of_yojson (read_json Filenames.call_graph) in
+  (sources, call_graph)
 
 let read_verif_results () =
   let sources, call_graph = read_results_dir () in
   let results_json = read_json Filenames.verif_results in
-  ( sources,
-    call_graph,
-    Result.get_ok (VerificationResults.of_yojson results_json) )
+  (sources, call_graph, VerificationResults.t_of_yojson results_json)
 
 let read_biabduction_results () =
   let sources, call_graph = read_results_dir () in
   let results_json = read_json Filenames.biabduction_results in
-  ( sources,
-    call_graph,
-    Result.get_ok (BiAbductionResults.of_yojson results_json) )
+  (sources, call_graph, BiAbductionResults.t_of_yojson results_json)
 
 let read_symbolic_results = read_results_dir
 
@@ -86,12 +82,10 @@ let read_bulk_symbolic_results () =
     table
   in
   let source_files =
-    read_table Filenames.sources_dir (fun x ->
-        Result.get_ok (SourceFiles.of_yojson x))
+    read_table Filenames.sources_dir (fun x -> SourceFiles.t_of_yojson x)
   in
   let call_graphs =
-    read_table Filenames.call_graphs_dir (fun x ->
-        Result.get_ok (CallGraph.of_yojson x))
+    read_table Filenames.call_graphs_dir (fun x -> CallGraph.t_of_yojson x)
   in
   (source_files, call_graphs)
 
@@ -118,18 +112,18 @@ let write_str str filename =
 let write_results_dir sources call_graph ~diff =
   delete_results_dir ();
   create_results_dir ();
-  write_json (SourceFiles.to_yojson sources) Filenames.sources;
-  write_json (CallGraph.to_yojson call_graph) Filenames.call_graph;
+  write_json (SourceFiles.yojson_of_t sources) Filenames.sources;
+  write_json (CallGraph.yojson_of_t call_graph) Filenames.call_graph;
   write_str (ExecMode.to_string !Config.current_exec_mode) Filenames.exec_mode;
   write_str diff Filenames.diff
 
 let write_verif_results sources call_graph ~diff results =
-  let results_json = VerificationResults.to_yojson results in
+  let results_json = VerificationResults.yojson_of_t results in
   write_results_dir sources call_graph ~diff;
   write_json results_json Filenames.verif_results
 
 let write_biabduction_results sources call_graph ~diff results =
-  let results_json = BiAbductionResults.to_yojson results in
+  let results_json = BiAbductionResults.yojson_of_t results in
   write_results_dir sources call_graph ~diff;
   write_json results_json Filenames.biabduction_results
 
@@ -153,6 +147,6 @@ let write_bulk_symbolic_results ~tests_ran sources_table call_graph_table =
   delete_results_dir ();
   create_results_dir ();
   write_str_list tests_ran Filenames.tests_ran;
-  write_table sources_table Filenames.sources_dir SourceFiles.to_yojson;
-  write_table call_graph_table Filenames.call_graphs_dir CallGraph.to_yojson;
+  write_table sources_table Filenames.sources_dir SourceFiles.yojson_of_t;
+  write_table call_graph_table Filenames.call_graphs_dir CallGraph.yojson_of_t;
   write_str (ExecMode.to_string !Config.current_exec_mode) Filenames.exec_mode

@@ -25,33 +25,33 @@ let pp (loggable : loggable) (formatter : Format.formatter) =
 let loggable_to_yojson = function
   | L (t, content) ->
       let (module T) = t in
-      T.to_yojson content
+      T.yojson_of_t content
 
 (** Returns a loggable, given the required functions and content *)
 let make
     (type a)
     (pp : Format.formatter -> a -> unit)
-    (of_yojson : Yojson.Safe.t -> (a, string) result)
-    (to_yojson : a -> Yojson.Safe.t)
+    (t_of_yojson : Yojson.Safe.t -> a)
+    (yojson_of_t : a -> Yojson.Safe.t)
     (content : a) : loggable =
   let module M = struct
     type t = a
 
     let pp = pp
 
-    let of_yojson = of_yojson
+    let t_of_yojson = t_of_yojson
 
-    let to_yojson = to_yojson
+    let yojson_of_t = yojson_of_t
   end in
   L ((module M), content)
 
 (** Returns a loggable given a string to be logged *)
 let make_string (s : string) : loggable =
   let pp = Fmt.string in
-  let of_yojson yojson =
+  let t_of_yojson yojson =
     match yojson with
-    | `String s -> Ok s
-    | _         -> Error "Cannot parse yojson to a string"
+    | `String s -> s
+    | _         -> failwith "Cannot parse yojson to a string"
   in
-  let to_yojson s = `String s in
-  make pp of_yojson to_yojson s
+  let yojson_of_t s = `String s in
+  make pp t_of_yojson yojson_of_t s

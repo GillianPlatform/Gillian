@@ -1,5 +1,5 @@
 {
-  "checksum": "2046e20bebbb6c0716a9e8541276ee65",
+  "checksum": "7bcb65246f53e220c65dac1ffccc54d0",
   "root": "gillian-platform@link-dev:./esy.json",
   "node": {
     "yarn-pkg-config@github:esy-ocaml/yarn-pkg-config#db3a0b63883606dd57c54a7158d560d6cba8cd79@d41d8cd9": {
@@ -49,7 +49,7 @@
         "@opam/sqlite3@opam:5.0.2@b19d39cd",
         "@opam/printbox@opam:0.5@82f5d436",
         "@opam/ppxlib@opam:0.21.0@621dfd5e",
-        "@opam/ppx_deriving_yojson@opam:3.6.1@faf11a7c",
+        "@opam/ppx_yojson_conv@opam:v0.14.0@97845f62",
         "@opam/menhir@opam:20190924@004407ff",
         "@opam/fmt@opam:0.8.9@e0843a5b",
         "@opam/flow_parser@github:giltho/flow#ac42cb1@d41d8cd9",
@@ -950,6 +950,37 @@
       "devDependencies": [
         "ocaml@4.12.0@d41d8cd9", "@opam/yojson@opam:1.7.0@7056d985",
         "@opam/dune@opam:2.8.5@83fb0224"
+      ]
+    },
+    "@opam/ppx_yojson_conv@opam:v0.14.0@97845f62": {
+      "id": "@opam/ppx_yojson_conv@opam:v0.14.0@97845f62",
+      "name": "@opam/ppx_yojson_conv",
+      "version": "opam:v0.14.0",
+      "source": {
+        "type": "install",
+        "source": [
+          "archive:https://opam.ocaml.org/cache/md5/d5/d5e243a694a5d1b67e838bce10178718#md5:d5e243a694a5d1b67e838bce10178718",
+          "archive:https://ocaml.janestreet.com/ocaml-core/v0.14/files/ppx_yojson_conv-v0.14.0.tar.gz#md5:d5e243a694a5d1b67e838bce10178718"
+        ],
+        "opam": {
+          "name": "ppx_yojson_conv",
+          "version": "v0.14.0",
+          "path": "esy.lock/opam/ppx_yojson_conv.v0.14.0"
+        }
+      },
+      "overrides": [],
+      "dependencies": [
+        "ocaml@4.12.0@d41d8cd9", "@opam/ppxlib@opam:0.21.0@621dfd5e",
+        "@opam/ppx_yojson_conv_lib@opam:v0.14.0@116b53d6",
+        "@opam/ppx_js_style@opam:v0.14.0@10b020a8",
+        "@opam/dune@opam:2.8.5@83fb0224", "@opam/base@opam:v0.14.1@d14008e2",
+        "@esy-ocaml/substs@0.0.1@d41d8cd9"
+      ],
+      "devDependencies": [
+        "ocaml@4.12.0@d41d8cd9", "@opam/ppxlib@opam:0.21.0@621dfd5e",
+        "@opam/ppx_yojson_conv_lib@opam:v0.14.0@116b53d6",
+        "@opam/ppx_js_style@opam:v0.14.0@10b020a8",
+        "@opam/dune@opam:2.8.5@83fb0224", "@opam/base@opam:v0.14.1@d14008e2"
       ]
     },
     "@opam/ppx_sexp_conv@opam:v0.14.2@9d565197": {

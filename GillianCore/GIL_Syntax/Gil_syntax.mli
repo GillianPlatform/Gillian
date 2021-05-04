@@ -859,9 +859,9 @@ module Spec : sig
 
   (** {3 Serialization} *)
 
-  val to_yojson : t -> Yojson.Safe.t
+  val yojson_of_t : t -> Yojson.Safe.t
 
-  val of_yojson : Yojson.Safe.t -> (t, string) Result.t
+  val t_of_yojson : Yojson.Safe.t -> t
 
   val hash_of_t : t -> string
 end

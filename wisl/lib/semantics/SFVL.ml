@@ -112,47 +112,33 @@ let assertions_with_constructor ~constr loc sfvl =
   List.rev
     (Expr.Map.fold (fun field value ac -> constr loc field value :: ac) sfvl [])
 
-let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
+let t_of_yojson (yojson : Yojson.Safe.t) : t =
   let to_sfvl_list yojson_list =
     yojson_list
-    |> List.map
-         (fun
-           (element : Yojson.Safe.t)
-           :
-           (field_name * field_value, string) result
-         ->
+    |> List.map (fun (element : Yojson.Safe.t) ->
            match element with
-           | `Tuple tuple -> (
+           | `Tuple tuple ->
                if List.length tuple != 2 then
-                 Error
+                 failwith
                    "Cannot parse yojson into WislSHeap: tuple must have two \
                     elements"
                else
-                 let fn = Expr.of_yojson (List.hd tuple) in
-                 match fn with
-                 | Ok fn     -> (
-                     let fv = Expr.of_yojson (List.nth tuple 1) in
-                     match fv with
-                     | Ok fv     -> Ok (fn, fv)
-                     | Error err -> Error err)
-                 | Error err -> Error err)
+                 let fn = Expr.t_of_yojson (List.hd tuple) in
+                 let fv = Expr.t_of_yojson (List.nth tuple 1) in
+                 (fn, fv)
            | _            ->
-               Error
+               failwith
                  "Cannot parse yojson into WislSHeap: list elements must be \
                   tuples")
   in
   match yojson with
-  | `List list ->
-      let sfvl_list = to_sfvl_list list in
-      let errors = List.filter (fun tuple -> Result.is_error tuple) sfvl_list in
-      if List.length errors > 0 then Error (Result.get_error (List.hd errors))
-      else Ok (sfvl_list |> List.map Result.get_ok |> of_list)
-  | _          -> Error "Cannot parse yojson into WislSHeap: must be list"
+  | `List list -> of_list (to_sfvl_list list)
+  | _          -> failwith "Cannot parse yojson into WislSHeap: must be list"
 
-let to_yojson (sfvl : t) : Yojson.Safe.t =
+let yojson_of_t (sfvl : t) : Yojson.Safe.t =
   `List
     (to_list sfvl
     |> List.map (fun (fn, fv) ->
-           let fn = Expr.to_yojson fn in
-           let fv = Expr.to_yojson fv in
+           let fn = Expr.yojson_of_t fn in
+           let fv = Expr.yojson_of_t fv in
            `Tuple [ fn; fv ]))

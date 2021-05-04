@@ -69,7 +69,7 @@ module Loggable : sig
   (** Returns a loggable, given the required functions and content *)
   val make :
     (Format.formatter -> 'a -> unit) ->
-    (Yojson.Safe.t -> ('a, string) result) ->
+    (Yojson.Safe.t -> 'a) ->
     ('a -> Yojson.Safe.t) ->
     'a ->
     loggable

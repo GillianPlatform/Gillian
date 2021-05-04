@@ -266,19 +266,16 @@ struct
                 report_id))
     | Some (content, type_) -> (
         match type_ with
-        | t when t = Logging.LoggingConstants.ContentType.cmd_step -> (
+        | t when t = Logging.LoggingConstants.ContentType.cmd_step ->
             let cmd_step =
               content |> Yojson.Safe.from_string |> cmd_step_of_yojson
             in
-            match cmd_step with
-            | Ok cmd_step ->
-                let () =
-                  dbg.frames <-
-                    call_stack_to_frames cmd_step.call_stack
-                      cmd_step.proc_body_index dbg.prog
-                in
-                dbg.scopes_to_vars <- create_scopes_to_vars cmd_step.state
-            | Error err   -> raise (Failure err))
+            let () =
+              dbg.frames <-
+                call_stack_to_frames cmd_step.call_stack
+                  cmd_step.proc_body_index dbg.prog
+            in
+            dbg.scopes_to_vars <- create_scopes_to_vars cmd_step.state
         | _ as t ->
             raise
               (Failure
