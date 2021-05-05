@@ -4,7 +4,7 @@ open Containers
 open SVal
 module L = Logging
 
-type t = Formula.t ExtList.t
+type t = Formula.t ExtList.t [@@deriving yojson]
 
 (**************************************)
 (** Pure formulae functions          **)

@@ -1,4 +1,4 @@
-type 'a t
+type 'a t [@@deriving yojson]
 
 val make : unit -> 'a t
 
@@ -43,11 +43,11 @@ val remove_duplicates : ?equal:('a -> 'a -> bool) -> 'a t -> unit
     If the condition is true, then the filtering stops and the function returns true.
     If the condition is false, then the element is replaced.
     If the condition is never met, the function returns false
-    
+
     For example
     [let f = (fun x ->
       if x < 5 then `Filter else if x = 10 then `Stop else `Replace (x + 1))]
-    
+
     [filter_map_stop_cond f \[ 1; 2; 6;7; 4 \]] will modify the list into [\[ 7; 8 \]] and return false
     [filter_map_stop_cond f \[ 1; 2; 6; 7; 10; 8; 4 \]] will modify the list into [\[ 7; 8; 10; 8; 4 \]] and return true
 *)
@@ -57,7 +57,7 @@ val filter_map_stop :
 (** Works like [filter_map_stop], except it cannot replace elements.
     [keep] says if the element should be kept and [cond] if the filtering should stop.
     If an element is not kept, the stop condition is not checked.
-    
+
     [filter_stop_cond ~keep:(fun x -> x > 5) ~cond:(fun x -> x = 10) \[ 1; 2; 6; 10; 4 \]] will return
     [\[ 6; 10; 4 \]]
 *)

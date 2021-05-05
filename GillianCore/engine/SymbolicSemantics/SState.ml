@@ -8,6 +8,8 @@ module type S = sig
   include State.S
 
   val get_typ_env : t -> TypEnv.t
+
+  val get_pfs : t -> PFS.t
 end
 
 module Make (SMemory : SMemory.S) :
@@ -847,6 +849,10 @@ module Make (SMemory : SMemory.S) :
     let _, _, _, typ_env, _ = state in
     typ_env
 
+  let get_pfs state =
+    let _, _, pfs, _, _ = state in
+    pfs
+
   let t_of_yojson (yojson : Yojson.Safe.t) : t =
     (* TODO: Deserialize other components of state *)
     match yojson with
@@ -854,21 +860,24 @@ module Make (SMemory : SMemory.S) :
         [
           ("heap", heap_yojson);
           ("store", store_yojson);
+          ("pfs", pfs_yojson);
           ("typ_env", typ_env_yojson);
         ] ->
         let heap = SMemory.t_of_yojson heap_yojson in
         let store = SStore.t_of_yojson store_yojson in
+        let pfs = PFS.t_of_yojson pfs_yojson in
         let typ_env = TypEnv.t_of_yojson typ_env_yojson in
-        (heap, store, PFS.init (), typ_env, SS.empty)
+        (heap, store, pfs, typ_env, SS.empty)
     | _ -> failwith "Cannot parse yojson into SState"
 
   let yojson_of_t (state : t) : Yojson.Safe.t =
     (* TODO: Serialize other components of state *)
-    let heap, store, _, typ_env, _ = state in
+    let heap, store, pfs, typ_env, _ = state in
     `Assoc
       [
         ("heap", SMemory.yojson_of_t heap);
         ("store", SStore.yojson_of_t store);
+        ("pfs", PFS.yojson_of_t pfs);
         ("typ_env", TypEnv.yojson_of_t typ_env);
       ]
 end

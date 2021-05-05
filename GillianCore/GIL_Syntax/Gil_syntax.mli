@@ -367,6 +367,7 @@ module Formula : sig
     | SetMem  of Expr.t * Expr.t  (** Set membership *)
     | SetSub  of Expr.t * Expr.t  (** Set subsetness *)
     | ForAll  of (string * Type.t option) list * t  (** Forall *)
+  [@@deriving yojson]
 
   val of_bool : bool -> t
 

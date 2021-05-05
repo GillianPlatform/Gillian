@@ -1264,6 +1264,10 @@ module Make
     let state, _, _ = pstate in
     State.get_typ_env state
 
+  let get_pfs pstate =
+    let state, _, _ = pstate in
+    State.get_pfs state
+
   let t_of_yojson yojson =
     (* TODO: Deserialize other components of pstate *)
     let state = State.t_of_yojson yojson in

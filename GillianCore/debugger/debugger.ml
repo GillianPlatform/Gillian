@@ -90,7 +90,8 @@ struct
     mutable scopes_to_vars : scopes_to_vars;
   }
 
-  let top_level_scope_names = [ "Store"; "Heap"; "Typing Environment" ]
+  let top_level_scope_names =
+    [ "Store"; "Heap"; "Pure Formulae"; "Typing Environment" ]
 
   let top_level_scopes : scope list =
     List.map2
@@ -128,6 +129,13 @@ struct
                  var_ref = new_scope_id;
                })
 
+  let get_pure_formulae_vars (state : state_t) : variable list =
+    Verification.SPState.get_pfs state
+    |> PFS.to_list
+    |> List.map (fun formula ->
+           let value = Fmt.to_to_string Formula.pp formula in
+           { name = ""; value; type_ = None; var_ref = 0 })
+
   let get_typ_env_vars (state : state_t) : variable list =
     let typ_env = Verification.SPState.get_typ_env state in
     TypEnv.to_list typ_env
@@ -155,8 +163,9 @@ struct
           let heap_vars =
             add_heap_vars dt_list scopes_to_vars get_new_scope_id
           in
+          let pure_formulae_vars = get_pure_formulae_vars state in
           let typ_env_vars = get_typ_env_vars state in
-          [ store_vars; heap_vars; typ_env_vars ]
+          [ store_vars; heap_vars; pure_formulae_vars; typ_env_vars ]
     in
     let () =
       List.iter2
