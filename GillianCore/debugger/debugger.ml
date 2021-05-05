@@ -90,11 +90,13 @@ struct
     mutable scopes_to_vars : scopes_to_vars;
   }
 
-  let store_scope = ({ name = "Store"; id = 1 } : scope)
+  let top_level_scope_names = [ "Store"; "Heap"; "Typing Environment" ]
 
-  let heap_scope = ({ name = "Heap"; id = 2 } : scope)
-
-  let typ_env_scope = ({ name = "Typing Env"; id = 3 } : scope)
+  let top_level_scopes : scope list =
+    List.map2
+      (fun name id -> { name; id })
+      top_level_scope_names
+      (List_utils.range (List.length top_level_scope_names))
 
   let get_store_vars (state : state_t) : variable list =
     let store = State.get_store state in
@@ -136,15 +138,16 @@ struct
 
   let create_scopes_to_vars (state : state_t option) : scopes_to_vars =
     let scopes_to_vars = Hashtbl.create 0 in
-    (* Current scope id is 3 as store, heap, typ_env scopes are the first three scopes *)
-    let scope_id = ref 3 in
+    (* New scope ids must be higher than last top level scope id to prevent
+       duplicate scope ids *)
+    let scope_id = ref (List.length top_level_scopes) in
     let get_new_scope_id () =
       let () = scope_id := !scope_id + 1 in
       !scope_id
     in
-    let store_vars, heap_vars, typ_env_vars =
+    let vars_list =
       match state with
-      | None       -> ([], [], [])
+      | None       -> [ []; []; [] ]
       | Some state ->
           let store_vars = get_store_vars state in
           let heap = State.get_heap state in
@@ -153,11 +156,13 @@ struct
             add_heap_vars dt_list scopes_to_vars get_new_scope_id
           in
           let typ_env_vars = get_typ_env_vars state in
-          (store_vars, heap_vars, typ_env_vars)
+          [ store_vars; heap_vars; typ_env_vars ]
     in
-    let () = Hashtbl.replace scopes_to_vars store_scope.id store_vars in
-    let () = Hashtbl.replace scopes_to_vars heap_scope.id heap_vars in
-    let () = Hashtbl.replace scopes_to_vars typ_env_scope.id typ_env_vars in
+    let () =
+      List.iter2
+        (fun scope vars -> Hashtbl.replace scopes_to_vars scope.id vars)
+        top_level_scopes vars_list
+    in
     scopes_to_vars
 
   (* TODO: Find a common place to put the below three functions which are
@@ -324,7 +329,7 @@ struct
               ({
                  source_file = file_name;
                  source_files = source_files_opt;
-                 top_level_scopes = [ store_scope; heap_scope; typ_env_scope ];
+                 top_level_scopes;
                  cont_func = Some cont_func;
                  prog;
                  frames = [];
