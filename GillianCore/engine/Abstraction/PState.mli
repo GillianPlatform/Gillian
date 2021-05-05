@@ -30,6 +30,8 @@ module type S = sig
   val set_pred : t -> abs_t -> unit
 
   val automatic_unfold : t -> vt list -> (t list, string) result
+
+  val get_pp_preds : t -> string list
 end
 
 module Make

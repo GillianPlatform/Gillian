@@ -1,12 +1,12 @@
 module type S = sig
   (* value type *)
-  type vt
+  type vt [@@deriving yojson]
 
   (* substitution type for the value type *)
   type st
 
   (* preds *)
-  type t
+  type t [@@deriving yojson]
 
   type abs_t = string * vt list
 
@@ -59,13 +59,13 @@ module Make
   S with type vt = Val.t and type st = ESubst.t = struct
   module L = Logging
 
-  type vt = Val.t
+  type vt = Val.t [@@deriving yojson]
 
   type st = ESubst.t
 
   type abs_t = string * vt list
 
-  type t = (string * vt list) list ref
+  type t = (string * vt list) list ref [@@deriving yojson]
 
   (** Returns the number of predicate assertions *)
   let length x = List.length !x

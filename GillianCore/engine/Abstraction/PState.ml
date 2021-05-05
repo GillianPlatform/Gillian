@@ -30,6 +30,8 @@ module type S = sig
   val set_pred : t -> abs_t -> unit
 
   val automatic_unfold : t -> vt list -> (t list, string) result
+
+  val get_pp_preds : t -> string list
 end
 
 module Make
@@ -1268,13 +1270,22 @@ module Make
     let state, _, _ = pstate in
     State.get_pfs state
 
+  let get_pp_preds pstate =
+    get_preds pstate |> Preds.to_list
+    |> List.map (fun pred -> Fmt.to_to_string Preds.pp_pabs pred)
+
   let t_of_yojson yojson =
     (* TODO: Deserialize other components of pstate *)
-    let state = State.t_of_yojson yojson in
-    (state, Preds.init [], UP.init_pred_defs ())
+    match yojson with
+    | `Assoc [ ("state", state_yojson); ("preds", preds_yojson) ] ->
+        let state = State.t_of_yojson state_yojson in
+        let preds = Preds.t_of_yojson preds_yojson in
+        (state, preds, UP.init_pred_defs ())
+    | _ -> failwith "Cannot parse yojson into PState"
 
   let yojson_of_t pstate =
     (* TODO: Serialize other components of pstate *)
-    let state, _, _ = pstate in
-    State.yojson_of_t state
+    let state, preds, _ = pstate in
+    `Assoc
+      [ ("state", State.yojson_of_t state); ("preds", Preds.yojson_of_t preds) ]
 end

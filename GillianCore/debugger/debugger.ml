@@ -91,7 +91,7 @@ struct
   }
 
   let top_level_scope_names =
-    [ "Store"; "Heap"; "Pure Formulae"; "Typing Environment" ]
+    [ "Store"; "Heap"; "Pure Formulae"; "Typing Environment"; "Predicates" ]
 
   let top_level_scopes : scope list =
     List.map2
@@ -144,6 +144,11 @@ struct
            let value = Type.str value in
            { name; value; type_ = None; var_ref = 0 })
 
+  let get_pred_vars (state : state_t) : variable list =
+    Verification.SPState.get_pp_preds state
+    |> List.map (fun pred ->
+           { name = ""; value = pred; type_ = None; var_ref = 0 })
+
   let create_scopes_to_vars (state : state_t option) : scopes_to_vars =
     let scopes_to_vars = Hashtbl.create 0 in
     (* New scope ids must be higher than last top level scope id to prevent
@@ -155,7 +160,7 @@ struct
     in
     let vars_list =
       match state with
-      | None       -> [ []; []; [] ]
+      | None       -> [ []; []; []; []; [] ]
       | Some state ->
           let store_vars = get_store_vars state in
           let heap = State.get_heap state in
@@ -165,7 +170,8 @@ struct
           in
           let pure_formulae_vars = get_pure_formulae_vars state in
           let typ_env_vars = get_typ_env_vars state in
-          [ store_vars; heap_vars; pure_formulae_vars; typ_env_vars ]
+          let pred_vars = get_pred_vars state in
+          [ store_vars; heap_vars; pure_formulae_vars; typ_env_vars; pred_vars ]
     in
     let () =
       List.iter2
