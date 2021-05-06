@@ -32,7 +32,7 @@ module type S = sig
   type err_t = (vt, state_err_t) ExecErr.t
 
   type cconf_t =
-    | ConfErr    of string * int * State.t * err_t list
+    | ConfErr    of CallStack.t * int * State.t * err_t list
     | ConfCont   of
         State.t * CallStack.t * invariant_frames * int * string list * int * int
     | ConfFinish of Flag.t * State.vt * State.t

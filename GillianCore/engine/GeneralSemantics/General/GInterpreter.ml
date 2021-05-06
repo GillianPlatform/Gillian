@@ -35,7 +35,7 @@ module type S = sig
   type err_t = (vt, state_err_t) ExecErr.t
 
   type cconf_t =
-    | ConfErr    of string * int * State.t * err_t list
+    | ConfErr    of CallStack.t * int * State.t * err_t list
     | ConfCont   of
         State.t * CallStack.t * invariant_frames * int * string list * int * int
     | ConfFinish of Flag.t * State.vt * State.t
@@ -134,7 +134,7 @@ struct
 
   (** Type of configurations: state, call stack, previous index, previous loop ids, current index, branching *)
   type cconf_t =
-    | ConfErr    of string * int * State.t * err_t list
+    | ConfErr    of CallStack.t * int * State.t * err_t list
     | ConfCont   of
         State.t * CallStack.t * invariant_frames * int * string list * int * int
     | ConfFinish of Flag.t * State.vt * State.t
@@ -1106,12 +1106,10 @@ struct
           evaluate_cmd prog state cs iframes prev prev_loop_ids i b_counter
         with
         | Interpreter_error (errs, state) ->
-            let proc = CallStack.get_cur_proc_id cs in
-            [ ConfErr (proc, i, state, errs) ]
+            [ ConfErr (cs, i, state, errs) ]
         | State.Internal_State_Error (errs, state) ->
             (* Return: current procedure name, current command index, the state, and the associated errors *)
-            let proc = CallStack.get_cur_proc_id cs in
-            [ ConfErr (proc, i, state, List.map (fun x -> ExecErr.ESt x) errs) ])
+            [ ConfErr (cs, i, state, List.map (fun x -> ExecErr.ESt x) errs) ])
       states
 
   (**
@@ -1145,6 +1143,14 @@ struct
               L.LoggingConstants.ContentType.cmd_step
           in
           Continue (report_id, cont_func)
+      | ConfErr (call_stack, proc_body_index, state, _) :: _->
+        let report_id =
+          L.normal_specific
+            (L.Loggable.make cmd_step_pp cmd_step_of_yojson yojson_of_cmd_step
+               { call_stack; proc_body_index; state = Some state })
+            L.LoggingConstants.ContentType.cmd_step
+        in
+        Continue (report_id, cont_func)
       (* TODO: Pause if error occurs *)
       | _ -> cont_func ()
     in
@@ -1184,7 +1190,8 @@ struct
                 b_counter));
         print_configuration annot_cmd state cs i b_counter;
         continue_or_pause rest_confs (fun () -> f rest_confs results)
-    | ConfErr (proc, i, state, errs) :: rest_confs ->
+    | ConfErr (cs, i, state, errs) :: rest_confs ->
+        let proc = CallStack.get_cur_proc_id cs in
         let result = ExecRes.RFail (proc, i, state, errs) in
         continue_or_pause rest_confs (fun () ->
             f rest_confs (result :: results))
