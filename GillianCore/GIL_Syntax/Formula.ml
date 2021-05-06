@@ -276,7 +276,7 @@ let rec to_expr (a : t) : Expr.t option =
       | _                  -> None)
   | Or (a1, a2)        -> (
       match (f a1, f a2) with
-      | Some le1, Some le2 -> Some (Expr.BinOp (le1, BinOp.BAnd, le2))
+      | Some le1, Some le2 -> Some (Expr.BinOp (le1, BinOp.BOr, le2))
       | _                  -> None)
   | ForAll _           -> None
   | Eq (le1, le2)      -> Some (Expr.BinOp (le1, BinOp.Equal, le2))
