@@ -2,7 +2,12 @@ module L = Logging
 module Displayable = Displayable
 
 module type S = sig
-  type stop_reason = Step | ReachedStart | ReachedEnd | Breakpoint
+  type stop_reason =
+    | Step
+    | ReachedStart
+    | ReachedEnd
+    | Breakpoint
+    | ExecutionError
 
   type frame = {
     index : int;
@@ -52,7 +57,12 @@ struct
   open Verification.SAInterpreter
   module Breakpoints = Set.Make (Int)
 
-  type stop_reason = Step | ReachedStart | ReachedEnd | Breakpoint
+  type stop_reason =
+    | Step
+    | ReachedStart
+    | ReachedEnd
+    | Breakpoint
+    | ExecutionError
 
   type frame = {
     index : int;
@@ -307,7 +317,10 @@ struct
                 call_stack_to_frames cmd_step.call_stack
                   cmd_step.proc_body_index dbg.prog
             in
-            dbg.scopes_to_vars <- create_scopes_to_vars cmd_step.state
+            let () =
+              dbg.scopes_to_vars <- create_scopes_to_vars cmd_step.state
+            in
+            cmd_step.errors
         | _ as t ->
             raise
               (Failure
@@ -354,8 +367,13 @@ struct
                }
                 : debugger_state)
             in
-            let () = update_report_id_and_inspection_fields cur_report_id dbg in
+            let _ = update_report_id_and_inspection_fields cur_report_id dbg in
             Ok dbg)
+
+  let get_step_stop_reason dbg errors =
+    if has_hit_breakpoint dbg then Breakpoint
+    else if List.length errors > 0 then ExecutionError
+    else Step
 
   let execute_step dbg =
     let open Verification.SAInterpreter in
@@ -376,10 +394,10 @@ struct
                       correctly")
             | Some cur_report_id ->
                 let () = dbg.cont_func <- Some cont_func in
-                let () =
+                let errors =
                   update_report_id_and_inspection_fields cur_report_id dbg
                 in
-                if has_hit_breakpoint dbg then Breakpoint else Step))
+                get_step_stop_reason dbg errors))
 
   let step ?(reverse = false) dbg =
     if reverse then
@@ -389,8 +407,10 @@ struct
       match prev_report_id with
       | None                -> ReachedStart
       | Some prev_report_id ->
-          let () = update_report_id_and_inspection_fields prev_report_id dbg in
-          if has_hit_breakpoint dbg then Breakpoint else Step
+          let errors =
+            update_report_id_and_inspection_fields prev_report_id dbg
+          in
+          get_step_stop_reason dbg errors
     else
       let next_report_id =
         Logging.LogQueryer.get_next_report_id dbg.cur_report_id
@@ -398,8 +418,10 @@ struct
       match next_report_id with
       | None                -> execute_step dbg
       | Some next_report_id ->
-          let () = update_report_id_and_inspection_fields next_report_id dbg in
-          if has_hit_breakpoint dbg then Breakpoint else Step
+          let errors =
+            update_report_id_and_inspection_fields next_report_id dbg
+          in
+          get_step_stop_reason dbg errors
 
   let rec run ?(reverse = false) ?(launch = false) dbg =
     (* We need to check if a breakpoint has been hit if run is called

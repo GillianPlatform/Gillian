@@ -1,7 +1,12 @@
 module Displayable = Displayable
 
 module type S = sig
-  type stop_reason = Step | ReachedStart | ReachedEnd | Breakpoint
+  type stop_reason =
+    | Step
+    | ReachedStart
+    | ReachedEnd
+    | Breakpoint
+    | ExecutionError
 
   type frame = {
     index : int;

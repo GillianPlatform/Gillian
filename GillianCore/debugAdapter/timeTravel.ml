@@ -17,6 +17,12 @@ module Make (Debugger : Debugger.S) = struct
           Stopped_event.Payload.(
             make ~reason:Stopped_event.Payload.Reason.Breakpoint
               ~thread_id:(Some 0) ())
+    | Debugger.ExecutionError ->
+        Debug_rpc.send_event rpc
+          (module Stopped_event)
+          Stopped_event.Payload.(
+            make ~reason:Stopped_event.Payload.Reason.Exception
+              ~thread_id:(Some 0) ())
 
   let run dbg rpc =
     Lwt.pause ();%lwt
