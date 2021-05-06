@@ -28,6 +28,8 @@ module type S = sig
     var_ref : int;
   }
 
+  type exception_info = { id : string; description : string option }
+
   type debugger_state
 
   val launch : string -> (debugger_state, string) result
@@ -43,6 +45,8 @@ module type S = sig
   val get_scopes : debugger_state -> scope list
 
   val get_variables : int -> debugger_state -> variable list
+
+  val get_exception_info : debugger_state -> exception_info
 
   val set_breakpoints : string option -> int list -> debugger_state -> unit
 end
@@ -83,6 +87,8 @@ struct
     var_ref : int;
   }
 
+  type exception_info = { id : string; description : string option }
+
   type breakpoints = (string, Breakpoints.t) Hashtbl.t
 
   type scopes_to_vars = (int, variable list) Hashtbl.t
@@ -98,6 +104,7 @@ struct
     mutable frames : frame list;
     mutable breakpoints : breakpoints;
     mutable scopes_to_vars : scopes_to_vars;
+    mutable errors : string list;
   }
 
   let top_level_scope_names =
@@ -185,7 +192,8 @@ struct
     in
     let () =
       List.iter2
-        (fun scope vars -> Hashtbl.replace scopes_to_vars scope.id vars)
+        (fun (scope : scope) vars ->
+          Hashtbl.replace scopes_to_vars scope.id vars)
         top_level_scopes vars_list
     in
     scopes_to_vars
@@ -320,7 +328,7 @@ struct
             let () =
               dbg.scopes_to_vars <- create_scopes_to_vars cmd_step.state
             in
-            cmd_step.errors
+            dbg.errors <- cmd_step.errors
         | _ as t ->
             raise
               (Failure
@@ -364,16 +372,12 @@ struct
                  cur_report_id;
                  breakpoints = Hashtbl.create 0;
                  scopes_to_vars = Hashtbl.create 0;
+                 errors = [];
                }
                 : debugger_state)
             in
             let _ = update_report_id_and_inspection_fields cur_report_id dbg in
             Ok dbg)
-
-  let get_step_stop_reason dbg errors =
-    if has_hit_breakpoint dbg then Breakpoint
-    else if List.length errors > 0 then ExecutionError
-    else Step
 
   let execute_step dbg =
     let open Verification.SAInterpreter in
@@ -394,34 +398,41 @@ struct
                       correctly")
             | Some cur_report_id ->
                 let () = dbg.cont_func <- Some cont_func in
-                let errors =
+                let () =
                   update_report_id_and_inspection_fields cur_report_id dbg
                 in
-                get_step_stop_reason dbg errors))
+                Step))
 
   let step ?(reverse = false) dbg =
-    if reverse then
-      let prev_report_id =
-        Logging.LogQueryer.get_previous_report_id dbg.cur_report_id
-      in
-      match prev_report_id with
-      | None                -> ReachedStart
-      | Some prev_report_id ->
-          let errors =
-            update_report_id_and_inspection_fields prev_report_id dbg
-          in
-          get_step_stop_reason dbg errors
-    else
-      let next_report_id =
-        Logging.LogQueryer.get_next_report_id dbg.cur_report_id
-      in
-      match next_report_id with
-      | None                -> execute_step dbg
-      | Some next_report_id ->
-          let errors =
-            update_report_id_and_inspection_fields next_report_id dbg
-          in
-          get_step_stop_reason dbg errors
+    let stop_reason =
+      if reverse then
+        let prev_report_id =
+          Logging.LogQueryer.get_previous_report_id dbg.cur_report_id
+        in
+        match prev_report_id with
+        | None                -> ReachedStart
+        | Some prev_report_id ->
+            let () =
+              update_report_id_and_inspection_fields prev_report_id dbg
+            in
+            Step
+      else
+        let next_report_id =
+          Logging.LogQueryer.get_next_report_id dbg.cur_report_id
+        in
+        match next_report_id with
+        | None                -> execute_step dbg
+        | Some next_report_id ->
+            let () =
+              update_report_id_and_inspection_fields next_report_id dbg
+            in
+            Step
+    in
+    if has_hit_breakpoint dbg then Breakpoint
+    else if List.length dbg.errors > 0 then
+      let () = dbg.cont_func <- None in
+      ExecutionError
+    else stop_reason
 
   let rec run ?(reverse = false) ?(launch = false) dbg =
     (* We need to check if a breakpoint has been hit if run is called
@@ -447,6 +458,10 @@ struct
     match Hashtbl.find_opt dbg.scopes_to_vars var_ref with
     | None      -> []
     | Some vars -> vars
+
+  let get_exception_info (dbg : debugger_state) =
+    let id = List.hd dbg.errors in
+    { id; description = None }
 
   let set_breakpoints source bp_list dbg =
     match source with

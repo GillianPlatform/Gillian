@@ -27,6 +27,8 @@ module type S = sig
     var_ref : int;
   }
 
+  type exception_info = { id : string; description : string option }
+
   type debugger_state
 
   val launch : string -> (debugger_state, string) result
@@ -42,6 +44,8 @@ module type S = sig
   val get_scopes : debugger_state -> scope list
 
   val get_variables : int -> debugger_state -> variable list
+
+  val get_exception_info : debugger_state -> exception_info
 
   val set_breakpoints : string option -> int list -> debugger_state -> unit
 end

@@ -54,5 +54,16 @@ module Make (Debugger : Debugger.S) = struct
                  Variable.make ~name ~value ~type_ ~variables_reference ())
         in
         Lwt.return (Variables_command.Result.make ~variables ()));
+    Debug_rpc.set_command_handler rpc
+      (module Exception_info_command)
+      (fun _ ->
+        let () = Log.info "Exception info request received" in
+        let exception_info = Debugger.get_exception_info dbg in
+        let exception_id = exception_info.id in
+        let description = exception_info.description in
+        let break_mode = Exception_break_mode.Always in
+        Lwt.return
+          (Exception_info_command.Result.make ~exception_id ~description
+             ~break_mode ()));
     Lwt.join [ promise ]
 end

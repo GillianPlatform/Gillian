@@ -14,6 +14,7 @@ module Make (Debugger : Debugger.S) = struct
         let caps =
           Capabilities.(
             make ~supports_configuration_done_request:(Some true)
+              ~supports_exception_info_request:(Some true)
               ~supports_step_back:(Some true) ())
         in
         Lwt.wakeup_later resolver (arg, caps);
