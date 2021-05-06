@@ -59,6 +59,7 @@ module type S = sig
     call_stack : CallStack.t;
     proc_body_index : int;
     state : state_t option;
+    errors : string list;
   }
   [@@deriving yojson]
 

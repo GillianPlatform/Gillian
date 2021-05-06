@@ -62,6 +62,7 @@ module type S = sig
     call_stack : CallStack.t;
     proc_body_index : int;
     state : state_t option;
+    errors : string list;
   }
   [@@deriving yojson]
 
@@ -161,8 +162,11 @@ struct
     call_stack : CallStack.t;
     proc_body_index : int;
     state : state_t option;
+    errors : string list;
   }
   [@@deriving yojson]
+
+  exception LAction_Error of state_t
 
   let max_branching = 100
 
@@ -829,8 +833,7 @@ struct
                       m "Action call failed with:@.%a"
                         (Fmt.Dump.list State.pp_err)
                         errs);
-                  raise
-                    (Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd))
+                  raise (LAction_Error state))
             else Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd)
     (* Logic command *)
     | Logic lcmd -> (
@@ -1105,11 +1108,12 @@ struct
         try
           evaluate_cmd prog state cs iframes prev prev_loop_ids i b_counter
         with
-        | Interpreter_error (errs, state) ->
-            [ ConfErr (cs, i, state, errs) ]
+        | Interpreter_error (errs, state) -> [ ConfErr (cs, i, state, errs) ]
         | State.Internal_State_Error (errs, state) ->
             (* Return: current procedure name, current command index, the state, and the associated errors *)
-            [ ConfErr (cs, i, state, List.map (fun x -> ExecErr.ESt x) errs) ])
+            [ ConfErr (cs, i, state, List.map (fun x -> ExecErr.ESt x) errs) ]
+        | LAction_Error state ->
+            [ ConfErr (cs, i, state, [ ExecErr.ELAction ]) ])
       states
 
   (**
@@ -1139,19 +1143,28 @@ struct
           let report_id =
             L.normal_specific
               (L.Loggable.make cmd_step_pp cmd_step_of_yojson yojson_of_cmd_step
-                 { call_stack; proc_body_index; state = Some state })
+                 {
+                   call_stack;
+                   proc_body_index;
+                   state = Some state;
+                   errors = [];
+                 })
               L.LoggingConstants.ContentType.cmd_step
           in
           Continue (report_id, cont_func)
-      | ConfErr (call_stack, proc_body_index, state, _) :: _->
-        let report_id =
-          L.normal_specific
-            (L.Loggable.make cmd_step_pp cmd_step_of_yojson yojson_of_cmd_step
-               { call_stack; proc_body_index; state = Some state })
-            L.LoggingConstants.ContentType.cmd_step
-        in
-        Continue (report_id, cont_func)
-      (* TODO: Pause if error occurs *)
+      | ConfErr (call_stack, proc_body_index, state, errors) :: _ ->
+          let errors : string list =
+            List.map
+              (fun err -> Fmt.to_to_string (ExecErr.pp Val.pp State.pp_err) err)
+              errors
+          in
+          let report_id =
+            L.normal_specific
+              (L.Loggable.make cmd_step_pp cmd_step_of_yojson yojson_of_cmd_step
+                 { call_stack; proc_body_index; state = Some state; errors })
+              L.LoggingConstants.ContentType.cmd_step
+          in
+          Continue (report_id, cont_func)
       | _ -> cont_func ()
     in
 
@@ -1271,7 +1284,7 @@ struct
     let report_id =
       L.normal_specific
         (L.Loggable.make cmd_step_pp cmd_step_of_yojson yojson_of_cmd_step
-           { call_stack = cs; proc_body_index; state = Some state })
+           { call_stack = cs; proc_body_index; state = Some state; errors = [] })
         L.LoggingConstants.ContentType.cmd_step
     in
     Continue
@@ -1324,6 +1337,7 @@ struct
              call_stack = initial_cs;
              proc_body_index = initial_proc_body_index;
              state = Some initial_state;
+             errors = [];
            })
         L.LoggingConstants.ContentType.cmd_step
     in
