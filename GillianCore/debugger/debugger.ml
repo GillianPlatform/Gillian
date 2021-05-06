@@ -103,7 +103,7 @@ struct
     let store = State.get_store state in
     Store.bindings store
     |> List.map (fun (var, value) ->
-           let value = Fmt.to_to_string Val.full_pp value in
+           let value = Fmt.to_to_string (Fmt.hbox Val.pp) value in
            { name = var; value; type_ = None; var_ref = 0 })
 
   let rec add_heap_vars
