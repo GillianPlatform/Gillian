@@ -162,6 +162,8 @@ module Infix = struct
     | x, Lit (Int 0)           -> x
     | Lit (Num 0.), x          -> UnOp (IUnaryMinus, x)
     | Lit (Int x), Lit (Int y) -> Lit (Int (x - y))
+    | BinOp (x, IPlus, y), z when equal y z -> x
+    | BinOp (x, IPlus, y), z when equal x z -> y
     | _                        -> BinOp (a, IMinus, b)
 
   let ( * ) a b =
