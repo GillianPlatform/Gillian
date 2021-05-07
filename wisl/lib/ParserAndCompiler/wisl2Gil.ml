@@ -657,11 +657,9 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
             faillab )
       in
       let g_var = gen_str gvar in
-      let failcmd =
-        Cmd.Fail
-          ( "Invalid block pointer at " ^ CodeLoc.str (WExpr.get_loc e),
-            [ comp_e ] )
-      in
+      (* Use a string with no special characters in the fail command so that it
+         can be parsed by the GIL compiler *)
+      let failcmd = Cmd.Fail ("InvalidBlockPointer", [ comp_e ]) in
       let cmd = Cmd.LAction (g_var, dispose, [ nth comp_e 0 ]) in
       let comp_rest, new_functions = compile_list rest in
       ( cmdle
