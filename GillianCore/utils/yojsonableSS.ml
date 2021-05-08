@@ -4,18 +4,11 @@
 
 include Containers.SS
 
-let yojson_of_t (set : t) : Yojson.Safe.t =
+let to_yojson (set : t) : Yojson.Safe.t =
   `List (set |> to_seq |> List.of_seq |> List.map (fun e -> `String e))
 
-let t_of_yojson (yojson : Yojson.Safe.t) : t =
+let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
   let set = empty in
-  let str_list : string list =
-    list_of_yojson
-      (fun elem_yojson ->
-        match elem_yojson with
-        | `String e -> e
-        | _         -> failwith
-                         "Cannot parse yojson into SS: element must of a string")
-      yojson
-  in
-  List.fold_left (fun set e -> add e set) set str_list
+  match [%of_yojson: string list] yojson with
+  | Ok str_list -> Ok (List.fold_left (fun set e -> add e set) set str_list)
+  | Error err   -> Error err

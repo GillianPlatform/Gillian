@@ -15,9 +15,6 @@ let to_string (PP msgf) =
 
 let of_string s = PP (fun m -> m "%s" s)
 
-let yojson_of_t t = `String (to_string t)
+let to_yojson t = `String (to_string t)
 
-let t_of_yojson yojson =
-  match yojson with
-  | `String s -> of_string s
-  | _         -> failwith "Cannot parse yojson to PackedPP: should be a string"
+let of_yojson yojson = Result.map of_string ([%of_yojson: string] yojson)

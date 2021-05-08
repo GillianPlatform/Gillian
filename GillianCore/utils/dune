@@ -3,4 +3,4 @@
  (public_name gillian.utils)
  (libraries unix str logging fmt)
  (preprocess
-  (pps ppx_yojson_conv)))
+  (pps ppx_deriving_yojson)))

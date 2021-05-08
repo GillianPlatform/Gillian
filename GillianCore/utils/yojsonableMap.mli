@@ -7,17 +7,20 @@ module type YojsonableOrd = sig
 
   include Map.OrderedType with type t = key
 
-  val key_of_yojson : Yojson.Safe.t -> key
+  val key_of_yojson : Yojson.Safe.t -> (key, string) result
 
-  val yojson_of_key : key -> Yojson.Safe.t
+  val key_to_yojson : key -> Yojson.Safe.t
 end
 
 module type S = sig
   include Map.S
 
-  val t_of_yojson : (Yojson.Safe.t -> 'a) -> Yojson.Safe.t -> 'a t
+  val of_yojson :
+    (Yojson.Safe.t -> ('a, string) result) ->
+    Yojson.Safe.t ->
+    ('a t, string) result
 
-  val yojson_of_t : ('a -> Yojson.Safe.t) -> 'a t -> Yojson.Safe.t
+  val to_yojson : ('a -> Yojson.Safe.t) -> 'a t -> Yojson.Safe.t
 end
 
 module Make (YojsonableOrd : YojsonableOrd) :

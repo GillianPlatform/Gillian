@@ -6,5 +6,5 @@
  (libraries utils z3 menhirLib fmt cmdliner str gil_syntax gil_parsing
    logging incrementalAnalysis)
  (preprocess
-  (pps ppx_deriving.std ppx_yojson_conv))
+  (pps ppx_deriving.std ppx_deriving_yojson))
  (flags :standard -open Utils -open Gil_syntax -open IncrementalAnalysis))

@@ -1274,18 +1274,19 @@ module Make
     get_preds pstate |> Preds.to_list
     |> List.map (fun pred -> Fmt.to_to_string Preds.pp_pabs pred)
 
-  let t_of_yojson yojson =
+  let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
     (* TODO: Deserialize other components of pstate *)
     match yojson with
     | `Assoc [ ("state", state_yojson); ("preds", preds_yojson) ] ->
-        let state = State.t_of_yojson state_yojson in
-        let preds = Preds.t_of_yojson preds_yojson in
-        (state, preds, UP.init_pred_defs ())
-    | _ -> failwith "Cannot parse yojson into PState"
+        Result.bind (State.of_yojson state_yojson) (fun state ->
+            Preds.of_yojson preds_yojson
+            |> Result.map (fun (preds : Preds.t) : t ->
+                   (state, preds, UP.init_pred_defs ())))
+    | _ -> Error "Cannot parse yojson into PState"
 
-  let yojson_of_t pstate =
+  let to_yojson pstate =
     (* TODO: Serialize other components of pstate *)
     let state, preds, _ = pstate in
     `Assoc
-      [ ("state", State.yojson_of_t state); ("preds", Preds.yojson_of_t preds) ]
+      [ ("state", State.to_yojson state); ("preds", Preds.to_yojson preds) ]
 end

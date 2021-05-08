@@ -125,9 +125,9 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (spec : t) : t =
 let label_vars_to_set lab =
   Option.map (fun (l, vl) -> (l, Containers.SS.of_list vl)) lab
 
-let yojson_of_t = TypeDef__.yojson_of_spec
+let to_yojson = TypeDef__.spec_to_yojson
 
-let t_of_yojson = TypeDef__.spec_of_yojson
+let of_yojson = TypeDef__.spec_of_yojson
 
 let hash_of_t (spec : t) =
   Fmt.str "%a" pp spec |> Digest.string |> Digest.to_hex

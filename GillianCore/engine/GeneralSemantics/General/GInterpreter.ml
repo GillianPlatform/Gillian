@@ -1142,7 +1142,7 @@ struct
       | ConfCont (state, call_stack, _, _, _, proc_body_index, _) :: _ ->
           let report_id =
             L.normal_specific
-              (L.Loggable.make cmd_step_pp cmd_step_of_yojson yojson_of_cmd_step
+              (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
                  {
                    call_stack;
                    proc_body_index;
@@ -1160,7 +1160,7 @@ struct
           in
           let report_id =
             L.normal_specific
-              (L.Loggable.make cmd_step_pp cmd_step_of_yojson yojson_of_cmd_step
+              (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
                  { call_stack; proc_body_index; state = Some state; errors })
               L.LoggingConstants.ContentType.cmd_step
           in
@@ -1283,7 +1283,7 @@ struct
     let conf : cconf_t = ConfCont (state, cs, [], -1, [], proc_body_index, 0) in
     let report_id =
       L.normal_specific
-        (L.Loggable.make cmd_step_pp cmd_step_of_yojson yojson_of_cmd_step
+        (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
            { call_stack = cs; proc_body_index; state = Some state; errors = [] })
         L.LoggingConstants.ContentType.cmd_step
     in
@@ -1332,7 +1332,7 @@ struct
     in
     let report_id =
       L.normal_specific
-        (L.Loggable.make cmd_step_pp cmd_step_of_yojson yojson_of_cmd_step
+        (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
            {
              call_stack = initial_cs;
              proc_body_index = initial_proc_body_index;
