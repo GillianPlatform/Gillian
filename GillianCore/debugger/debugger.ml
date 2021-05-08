@@ -122,6 +122,7 @@ struct
     |> List.map (fun (var, value) ->
            let value = Fmt.to_to_string (Fmt.hbox Val.pp) value in
            { name = var; value; type_ = None; var_ref = 0 })
+    |> List.sort (fun v w -> Stdlib.compare v.name w.name)
 
   let rec add_heap_vars
       (dt_list : Displayable.debugger_tree list)
@@ -152,6 +153,7 @@ struct
     |> List.map (fun formula ->
            let value = Fmt.to_to_string Formula.pp formula in
            { name = ""; value; type_ = None; var_ref = 0 })
+    |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 
   let get_typ_env_vars (state : state_t) : variable list =
     let typ_env = Verification.SPState.get_typ_env state in
@@ -160,11 +162,13 @@ struct
     |> List.map (fun (name, value) ->
            let value = Type.str value in
            { name; value; type_ = None; var_ref = 0 })
+    |> List.sort (fun v w -> Stdlib.compare v.name w.name)
 
   let get_pred_vars (state : state_t) : variable list =
     Verification.SPState.get_pp_preds state
     |> List.map (fun pred ->
            { name = ""; value = pred; type_ = None; var_ref = 0 })
+    |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 
   let create_scopes_to_vars (state : state_t option) : scopes_to_vars =
     let scopes_to_vars = Hashtbl.create 0 in
