@@ -61,3 +61,13 @@ let json_with_uri loc =
   `Assoc [ ("uri", `String !WConfig.current_uri); ("range", json loc) ]
 
 let dummy = { loc_start = dummy_pos; loc_end = dummy_pos }
+
+let to_location (loc : t) : Gillian.Gil_syntax.Location.t =
+  let to_position loc : Gillian.Gil_syntax.Location.position =
+    { pos_line = loc.pos_lnum; pos_column = loc.pos_cnum - loc.pos_bol }
+  in
+  {
+    loc_start = to_position loc.loc_start;
+    loc_end = to_position loc.loc_end;
+    loc_source = loc.loc_start.pos_fname;
+  }
