@@ -303,11 +303,6 @@ struct
                     loc.loc_end.pos_column + 1,
                     loc.loc_source ))
         in
-        let () =
-          L.normal (fun m ->
-              m "path=%s sl=%i sc=%i el=%i ec=%i\n" source_path start_line
-                start_column end_line end_column)
-        in
         let frame =
           {
             (* TODO: make this a guaranteed unique index*)
