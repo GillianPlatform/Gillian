@@ -116,8 +116,16 @@ struct
       top_level_scope_names
       (List_utils.range (List.length top_level_scope_names))
 
-  let get_store_vars (state : state_t) : variable list =
+  let is_gil_file file_name = Filename.check_suffix file_name "gil"
+
+  let get_store_vars (state : state_t) (is_gil_file : bool) : variable list =
     let store = State.get_store state in
+    let () =
+      if not is_gil_file then
+        Store.filter store (fun var value ->
+            if Str.string_match (Str.regexp "gvar") var 0 then None
+            else Some value)
+    in
     Store.bindings store
     |> List.map (fun (var, value) ->
            let value = Fmt.to_to_string (Fmt.hbox Val.pp) value in
@@ -170,7 +178,8 @@ struct
            { name = ""; value = pred; type_ = None; var_ref = 0 })
     |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 
-  let create_scopes_to_vars (state : state_t option) : scopes_to_vars =
+  let create_scopes_to_vars (state : state_t option) (is_gil_file : bool) :
+      scopes_to_vars =
     let scopes_to_vars = Hashtbl.create 0 in
     (* New scope ids must be higher than last top level scope id to prevent
        duplicate scope ids *)
@@ -183,7 +192,7 @@ struct
       match state with
       | None       -> [ []; []; []; []; [] ]
       | Some state ->
-          let store_vars = get_store_vars state in
+          let store_vars = get_store_vars state is_gil_file in
           let heap = State.get_heap state in
           let dt_list = SMemoryDisplayable.to_debugger_tree heap in
           let heap_vars =
@@ -337,7 +346,9 @@ struct
                       cmd_step.proc_body_index dbg.prog
                 in
                 let () =
-                  dbg.scopes_to_vars <- create_scopes_to_vars cmd_step.state
+                  dbg.scopes_to_vars <-
+                    create_scopes_to_vars cmd_step.state
+                      (is_gil_file dbg.source_file)
                 in
                 dbg.errors <- cmd_step.errors
             | Error err   -> failwith err)
@@ -356,7 +367,7 @@ struct
     let () = Config.lemma_proof := true in
     let () = Config.manual_proof := false in
     (* If the file is a GIL file, assume it is already compiled *)
-    let already_compiled = Filename.check_suffix file_name "gil" in
+    let already_compiled = is_gil_file file_name in
     let outfile_opt = None in
     let no_unfold = false in
     (* TODO: Support debugging incremental mode *)
