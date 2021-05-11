@@ -17,6 +17,7 @@ module Make
     (PC : ParserAndCompiler.S) (Runners : sig
       val runners : Bulk.Runner.t list
     end)
+    (DebuggerDisplayFilterMap : Debugger.DisplayFilterMap.S)
     (SMemoryDisplayable : Debugger.Displayable.S with type t = SMemory.t) =
 struct
   module CState = CState.Make (CMemory)
@@ -29,7 +30,9 @@ struct
     PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
   module Verification = Verifier.Make (SState) (SPState) (External)
   module Abductor = Abductor.Make (SState) (SPState) (External)
-  module Debugger = Debugger.Make (PC) (Verification) (SMemoryDisplayable)
+  module Debugger =
+    Debugger.Make (PC) (Verification) (DebuggerDisplayFilterMap)
+      (SMemoryDisplayable)
   module DebugAdapter = DebugAdapter.Make (Debugger)
 
   let files =

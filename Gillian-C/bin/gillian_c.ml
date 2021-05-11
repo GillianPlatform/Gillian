@@ -8,6 +8,7 @@ module CLI =
       let runners : Gillian.Bulk.Runner.t list =
         [ (module CRunner); (module SRunner) ]
     end)
+    (Debugger.DisplayFilterMap.Default)
     (SMemoryDisplayable)
 
 let () = CLI.main ()

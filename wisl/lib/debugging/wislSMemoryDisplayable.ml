@@ -20,9 +20,17 @@ let to_debugger_tree (heap : t) =
   in
   let loc_nodes l : debugger_tree list =
     List.sort compare_offsets l
-    |> List.map (fun (offset, value) -> Leaf (vstr offset, vstr value))
+    |> List.map (fun (offset, value) ->
+           (* Display offset as a number to match the printing of WISL pointers *)
+           let offset_str =
+             match offset with
+             | Expr.Lit (Int i) -> string_of_int i
+             | other            -> vstr other
+           in
+           Leaf (offset_str, vstr value))
   in
   let all_loc_nodes =
     List.map (fun (loc, assocs) -> Node (loc, loc_nodes assocs)) bindings
+    |> List.sort Stdlib.compare
   in
   all_loc_nodes

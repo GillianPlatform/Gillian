@@ -1,29 +1,25 @@
 open Containers
 
 module type S = sig
-  type vt
-
   type st
 
   type heap_t
-
-  type store
 
   type state
 
   module SPState :
     PState.S
       with type t = state
-       and type vt = vt
+       and type vt = SVal.M.t
        and type st = st
-       and type store_t = store
+       and type store_t = SStore.t
        and type heap_t = heap_t
 
   module SAInterpreter :
     GInterpreter.S
-      with type vt = vt
+      with type vt = SVal.M.t
        and type st = st
-       and type store_t = store
+       and type store_t = SStore.t
        and type state_t = state
        and type heap_t = heap_t
 
@@ -61,11 +57,7 @@ struct
   module Normaliser = Normaliser.Make (SPState)
   module SPState = SPState
 
-  type vt = SVal.M.t
-
   type st = SPState.st
-
-  type store = SPState.store_t
 
   type state = SPState.t
 

@@ -1,4 +1,5 @@
 module Displayable = Displayable
+module DisplayFilterMap = DisplayFilterMap
 
 module type S = sig
   type stop_reason =
@@ -53,5 +54,6 @@ end
 module Make
     (PC : ParserAndCompiler.S)
     (Verification : Verifier.S)
+    (TLDisplayFilterMap : DisplayFilterMap.S)
     (Displayable : Displayable.S
                      with type t = Verification.SAInterpreter.State.heap_t) : S

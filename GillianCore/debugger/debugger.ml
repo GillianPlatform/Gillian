@@ -1,5 +1,6 @@
 module L = Logging
 module Displayable = Displayable
+module DisplayFilterMap = DisplayFilterMap
 
 module type S = sig
   type stop_reason =
@@ -54,6 +55,7 @@ end
 module Make
     (PC : ParserAndCompiler.S)
     (Verification : Verifier.S)
+    (TLDisplayFilterMap : DisplayFilterMap.S)
     (SMemoryDisplayable : Displayable.S
                             with type t =
                                   Verification.SAInterpreter.State.heap_t) =
@@ -120,15 +122,14 @@ struct
 
   let get_store_vars (state : state_t) (is_gil_file : bool) : variable list =
     let store = State.get_store state in
-    let () =
-      if not is_gil_file then
-        Store.filter store (fun var value ->
-            if Str.string_match (Str.regexp "gvar") var 0 then None
-            else Some value)
+    let store_bindings = Store.bindings store in
+    let store_bindings =
+      if is_gil_file then
+        DisplayFilterMap.Default.filter_map_store store_bindings
+      else TLDisplayFilterMap.filter_map_store store_bindings
     in
-    Store.bindings store
+    store_bindings
     |> List.map (fun (var, value) ->
-           let value = Fmt.to_to_string (Fmt.hbox Val.pp) value in
            { name = var; value; type_ = None; var_ref = 0 })
     |> List.sort (fun v w -> Stdlib.compare v.name w.name)
 
