@@ -39,6 +39,8 @@ module type S = sig
 
   val step : debugger_state -> stop_reason
 
+  val step_out : debugger_state -> stop_reason
+
   val run : ?reverse:bool -> ?launch:bool -> debugger_state -> stop_reason
 
   val terminate : debugger_state -> unit
@@ -479,6 +481,17 @@ struct
           | other_stop_reason -> other_stop_reason
         in
         step frame (List.length dbg.frames) dbg
+
+  let step_out dbg =
+    let rec step_out stack_depth dbg =
+      let stop_reason = step_in dbg in
+      match stop_reason with
+      | Step              ->
+          if List.length dbg.frames < stack_depth then stop_reason
+          else step_out stack_depth dbg
+      | other_stop_reason -> other_stop_reason
+    in
+    step_out (List.length dbg.frames) dbg
 
   let rec run ?(reverse = false) ?(launch = false) dbg =
     (* We need to check if a breakpoint has been hit if run is called

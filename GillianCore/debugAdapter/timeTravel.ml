@@ -57,5 +57,11 @@ module Make (Debugger : Debugger.S) = struct
         let () = Log.info "Step in request received" in
         let stop_reason = Debugger.step_in dbg in
         send_stopped_events stop_reason rpc);
+    Debug_rpc.set_command_handler rpc
+      (module Step_out_command)
+      (fun _ ->
+        let () = Log.info "Step out request received" in
+        let stop_reason = Debugger.step_out dbg in
+        send_stopped_events stop_reason rpc);
     Lwt.return ()
 end
