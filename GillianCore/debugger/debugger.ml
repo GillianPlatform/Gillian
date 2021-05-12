@@ -160,7 +160,7 @@ struct
     Verification.SPState.get_pfs state
     |> PFS.to_list
     |> List.map (fun formula ->
-           let value = Fmt.to_to_string Formula.pp formula in
+           let value = Fmt.to_to_string (Fmt.hbox Formula.pp) formula in
            { name = ""; value; type_ = None; var_ref = 0 })
     |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 

@@ -1272,7 +1272,7 @@ module Make
 
   let get_pp_preds pstate =
     get_preds pstate |> Preds.to_list
-    |> List.map (fun pred -> Fmt.to_to_string Preds.pp_pabs pred)
+    |> List.map (fun pred -> Fmt.to_to_string (Fmt.hbox Preds.pp_pabs) pred)
 
   let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
     (* TODO: Deserialize other components of pstate *)
