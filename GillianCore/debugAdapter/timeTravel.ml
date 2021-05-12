@@ -37,7 +37,7 @@ module Make (Debugger : Debugger.S) = struct
       (module Next_command)
       (fun _ ->
         let () = Log.info "Next request received" in
-        let stop_reason = Debugger.step_in dbg in
+        let stop_reason = Debugger.step dbg in
         send_stopped_events stop_reason rpc);
     Debug_rpc.set_command_handler rpc
       (module Reverse_continue_command)

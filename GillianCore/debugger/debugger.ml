@@ -37,6 +37,8 @@ module type S = sig
 
   val step_in : ?reverse:bool -> debugger_state -> stop_reason
 
+  val step : debugger_state -> stop_reason
+
   val run : ?reverse:bool -> ?launch:bool -> debugger_state -> stop_reason
 
   val terminate : debugger_state -> unit
@@ -453,6 +455,30 @@ struct
       let () = dbg.cont_func <- None in
       ExecutionError
     else stop_reason
+
+  let step dbg =
+    match dbg.frames with
+    | []         -> failwith "Nothing in call stack, cannot step"
+    | frame :: _ ->
+        let rec step prev_frame stack_depth dbg =
+          let stop_reason = step_in dbg in
+          match stop_reason with
+          | Step              -> (
+              match dbg.frames with
+              | []         -> failwith "Nothing in call stack, cannot step"
+              | frame :: _ ->
+                  (* TODO: If the frame index is consistent, we can use that to
+                           check if we are in the same frame as the previous
+                           frame *)
+                  if
+                    frame.source_path = prev_frame.source_path
+                    && frame.name = prev_frame.name
+                    || List.length dbg.frames < stack_depth
+                  then stop_reason
+                  else step prev_frame stack_depth dbg)
+          | other_stop_reason -> other_stop_reason
+        in
+        step frame (List.length dbg.frames) dbg
 
   let rec run ?(reverse = false) ?(launch = false) dbg =
     (* We need to check if a breakpoint has been hit if run is called
