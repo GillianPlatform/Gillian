@@ -37,7 +37,7 @@ module Make (Debugger : Debugger.S) = struct
       (module Next_command)
       (fun _ ->
         let () = Log.info "Next request received" in
-        let stop_reason = Debugger.step dbg in
+        let stop_reason = Debugger.step_in dbg in
         send_stopped_events stop_reason rpc);
     Debug_rpc.set_command_handler rpc
       (module Reverse_continue_command)
@@ -49,7 +49,13 @@ module Make (Debugger : Debugger.S) = struct
       (module Step_back_command)
       (fun _ ->
         let () = Log.info "Step back request received" in
-        let stop_reason = Debugger.step ~reverse:true dbg in
+        let stop_reason = Debugger.step_in ~reverse:true dbg in
+        send_stopped_events stop_reason rpc);
+    Debug_rpc.set_command_handler rpc
+      (module Step_in_command)
+      (fun _ ->
+        let () = Log.info "Step in request received" in
+        let stop_reason = Debugger.step_in dbg in
         send_stopped_events stop_reason rpc);
     Lwt.return ()
 end

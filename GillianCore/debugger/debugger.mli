@@ -34,7 +34,7 @@ module type S = sig
 
   val launch : string -> (debugger_state, string) result
 
-  val step : ?reverse:bool -> debugger_state -> stop_reason
+  val step_in : ?reverse:bool -> debugger_state -> stop_reason
 
   val run : ?reverse:bool -> ?launch:bool -> debugger_state -> stop_reason
 

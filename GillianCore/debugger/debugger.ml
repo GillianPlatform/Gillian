@@ -35,7 +35,7 @@ module type S = sig
 
   val launch : string -> (debugger_state, string) result
 
-  val step : ?reverse:bool -> debugger_state -> stop_reason
+  val step_in : ?reverse:bool -> debugger_state -> stop_reason
 
   val run : ?reverse:bool -> ?launch:bool -> debugger_state -> stop_reason
 
@@ -423,7 +423,7 @@ struct
                 in
                 Step))
 
-  let step ?(reverse = false) dbg =
+  let step_in ?(reverse = false) dbg =
     let stop_reason =
       if reverse then
         let prev_report_id =
@@ -460,7 +460,7 @@ struct
        line *)
     if launch && has_hit_breakpoint dbg then Breakpoint
     else
-      let stop_reason = step ~reverse dbg in
+      let stop_reason = step_in ~reverse dbg in
       match stop_reason with
       | Step              -> run ~reverse dbg
       | other_stop_reason -> other_stop_reason
