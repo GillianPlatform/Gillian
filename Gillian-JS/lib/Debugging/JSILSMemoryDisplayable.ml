@@ -1,6 +1,27 @@
+open Gillian.Debugger.Displayable
+open Gil_syntax
+open Semantics
+
 type t = Semantics.Symbolic.t
 
-let to_debugger_tree _ =
-  failwith
-    "Please implement to_debugger_tree to enable displaying of the symbolic \
-     memory in a debugger"
+let to_debugger_tree (smemory : t) : debugger_tree list =
+  let sorted_locs_with_vals = Symbolic.sorted_locs_with_vals smemory in
+  let to_str pp value = Fmt.to_to_string (Fmt.hbox pp) value in
+  let property_nodes fv_pairs : debugger_tree list =
+    fv_pairs |> Expr.YojsonableMap.to_seq
+    |> Seq.map (fun (name, value) ->
+           Leaf (to_str Expr.pp name, to_str Expr.pp value))
+    |> List.of_seq
+  in
+  let value_nodes ((fv_pairs, domain), metadata) : debugger_tree list =
+    [
+      Node ("properties", property_nodes fv_pairs);
+      Leaf ("domain", to_str (Fmt.option Expr.pp) domain);
+      Leaf
+        ( "metadata",
+          to_str (Fmt.option ~none:(Fmt.any "unknown") Expr.pp) metadata );
+    ]
+  in
+  List.map
+    (fun (loc, value) -> Node (loc, value_nodes value))
+    sorted_locs_with_vals
