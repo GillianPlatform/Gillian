@@ -14,7 +14,7 @@ module M : Gillian.Symbolic.Memory_S = struct
   type vt = SVal.t
 
   (** Type of JSIL general states *)
-  type t = SHeap.t
+  type t = SHeap.t [@@deriving yojson]
 
   (** Type of JSIL substitutions *)
   type st = SSubst.t
@@ -830,12 +830,4 @@ module M : Gillian.Symbolic.Memory_S = struct
             List.iter (fun f -> PFS.extend pfs f) new_pfs;
             mem
         | _ -> raise (Failure "Bi-abduction: cannot fix cell."))
-
-  let of_yojson _ =
-    failwith
-      "Please implement of_yojson to enable logging this type to a database"
-
-  let to_yojson _ =
-    failwith
-      "Please implement to_yojson to enable logging this type to a database"
 end

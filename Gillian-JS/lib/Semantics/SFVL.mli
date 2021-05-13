@@ -2,7 +2,7 @@
  * Interface for JSIL Symbolic FV-lists *
 *****************************************)
 
-type t
+type t [@@deriving yojson]
 
 type field_name = Gillian.Gil_syntax.Expr.t
 

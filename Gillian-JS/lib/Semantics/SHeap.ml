@@ -9,15 +9,16 @@ module L = Logging
 type s_object = (SFVL.t * Expr.t option) * Expr.t option
 
 type t = {
-  cfvl : (string, SFVL.t) Hashtbl.t;
-  cdom : (string, Expr.t option) Hashtbl.t;
-  cmet : (string, Expr.t option) Hashtbl.t;
-  sfvl : (string, SFVL.t) Hashtbl.t;
-  sdom : (string, Expr.t option) Hashtbl.t;
-  smet : (string, Expr.t option) Hashtbl.t;
-  cdmn : Var.Set.t ref;
-  sdmn : Var.Set.t ref;
+  cfvl : (string, SFVL.t) YojsonableHashtbl.t;
+  cdom : (string, Expr.t option) YojsonableHashtbl.t;
+  cmet : (string, Expr.t option) YojsonableHashtbl.t;
+  sfvl : (string, SFVL.t) YojsonableHashtbl.t;
+  sdom : (string, Expr.t option) YojsonableHashtbl.t;
+  smet : (string, Expr.t option) YojsonableHashtbl.t;
+  cdmn : YojsonableSS.t ref;
+  sdmn : YojsonableSS.t ref;
 }
+[@@deriving yojson]
 
 (* ************* *
  *  AUXILIARIES  *
