@@ -646,17 +646,41 @@ cmd_target:
   | lcmd = logic_cmd_target
     { LabCmd.LLogic lcmd }
 
-cmd_with_label:
+cmd_with_annot:
   | cmd = cmd_target
-    { None, cmd }
-  | lab = VAR; COLON; cmd = cmd_target
-    { Some lab, cmd }
+    {
+      let loc_start : Location.position =
+      {
+        pos_line = $startpos.pos_lnum;
+        pos_column = $startpos.pos_cnum - $startpos.pos_bol;
+      }
+      in
+      let loc_end : Location.position =
+      {
+        pos_line = $endpos.pos_lnum;
+        pos_column = $endpos.pos_cnum - $endpos.pos_bol;
+      }
+      in
+      let origin_loc : Location.t =
+      {
+        loc_start;
+        loc_end;
+        loc_source = $startpos.pos_fname;
+      }
+      in
+      let annot : Annot.t = Annot.make ~origin_loc () in
+      annot, cmd
+    }
+
+cmd_with_label:
+  | cmd = cmd_with_annot
+    { let annot, cmd = cmd in annot, None, cmd }
+  | lab = VAR; COLON; cmd = cmd_with_annot
+    { let annot, cmd = cmd in annot, Some lab, cmd }
 
 cmd_list_target:
   cmd_list = separated_nonempty_list(SCOLON, cmd_with_label)
-    { List.map
-        (fun (lab, cmd) -> (Annot.make (), lab, cmd))
-        cmd_list }
+    { cmd_list }
 
 /* SPECIFICATIONS */
 
