@@ -62,4 +62,4 @@ val substitution_in_place :
 
 val assertions : t -> Gillian.Gil_syntax.Asrt.t list
 
-val bindings : t -> (string * (SFVL.field_name * SFVL.field_value) list) list
+val to_debugger_tree : t -> Gillian.Debugger.Displayable.debugger_tree list

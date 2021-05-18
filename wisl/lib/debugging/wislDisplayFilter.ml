@@ -5,9 +5,9 @@ let filter_map_store store =
       else
         let value =
           match value with
-          | Gil_syntax.Expr.EList [ Lit (Loc loc); Lit (Int offset) ] ->
+          | Gil_syntax.Expr.EList [ Lit (Loc loc); Lit (Num offset) ] ->
               (* Displaying of a pointer in WISL *)
-              Fmt.str "-> (%a, %i)"
+              Fmt.str "-> (%a, %.0f)"
                 (Fmt.hbox Gil_syntax.Expr.pp)
                 (Gil_syntax.Expr.Lit (Loc loc)) offset
           | value -> Fmt.to_to_string (Fmt.hbox Gil_syntax.Expr.pp) value

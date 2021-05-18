@@ -14,7 +14,8 @@ type err =
   | InvalidLocation
 
 module Block = struct
-  type t = Freed | Allocated of { data : SFVL.t; bound : int option } [@@ deriving yojson]
+  type t = Freed | Allocated of { data : SFVL.t; bound : int option }
+  [@@deriving yojson]
 
   let empty = Allocated { data = SFVL.empty; bound = None }
 
@@ -263,4 +264,43 @@ let pp fmt heap =
       Block.pp ~loc:l ft b )
     heap
 
-let bindings _ = []
+let to_debugger_tree (heap : t) =
+  let open Gillian.Debugger.Displayable in
+  let vstr = Fmt.to_to_string (Fmt.hbox Expr.pp) in
+  let compare_offsets (v, _) (w, _) =
+    try
+      let open Expr.Infix in
+      let difference = v - w in
+      match difference with
+      | Expr.Lit (Int i) -> if i < 0 then -1 else if i > 0 then 1 else 0
+      | _                -> 0
+    with _ -> (* Do not sort the offsets if an exception has occurred *)
+              0
+  in
+  let loc_nodes l : debugger_tree list =
+    List.sort compare_offsets l
+    |> List.map (fun (offset, value) ->
+           (* Display offset as a number to match the printing of WISL pointers *)
+           let offset_str =
+             match offset with
+             | Expr.Lit (Num f) -> Fmt.str "%.0f" f
+             | other            -> vstr other
+           in
+           Leaf (offset_str, vstr value))
+  in
+  heap |> Hashtbl.to_seq
+  |> Seq.map (fun (loc, blocks) ->
+         match blocks with
+         | Block.Freed               -> Node (loc, [ Leaf ("status", "freed") ])
+         | Allocated { data; bound } ->
+             let status = Leaf ("status", "allocated") in
+             let bound =
+               match bound with
+               | None       -> "none"
+               | Some bound -> string_of_int bound
+             in
+             let bound = Leaf ("bound", bound) in
+
+             let blocks = Node ("blocks", loc_nodes (SFVL.to_list data)) in
+             Node (loc, [ status; bound; blocks ]))
+  |> List.of_seq
