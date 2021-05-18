@@ -419,11 +419,14 @@ logic_command:
       WLCmd.make bare_lcmd loc }
 
 bindings_with_loc:
-  | lstart = LCBRACE; EXIST; COLON; lvll = separated_list(COMMA, LVAR); lend = RCBRACE;
+  | lstart = LCBRACE; EXIST; COLON; lvll = separated_list(COMMA, lvar_or_pvar); lend = RCBRACE;
     { let (_, lvl) = List.split lvll in
       let loc = CodeLoc.merge lstart lend in
       (loc, lvl) }
 
+lvar_or_pvar:
+  | x = IDENTIFIER { x }
+  | lx = LVAR { lx }
 
 logic_assertion:
   | lstart = LBRACE; la = logic_assertion; lend = RBRACE;

@@ -7,23 +7,23 @@ import "wisl_core.gil";
 proc i__ptr_add (ptr, add_offset) {
   loc := l-nth(ptr, 0.);
   offset := l-nth(ptr, 1.);
-  ret := {{ loc, offset i+ add_offset }};
+  ret := {{ loc, offset + add_offset }};
   return
 };
 
 proc i__add (el, er) {
-        goto [((typeOf el) = List) and ((typeOf er) = Int)] lip linp;
+        goto [((typeOf el) = List) and ((typeOf er) = Num)] lip linp;
         (* Left is a pointer and right is a number *)
   lip:  ret := "i__ptr_add" (el, er);
         return;
         (* Left is not a pointer *)
-  linp: goto [((typeOf er) = List) and ((typeOf el) = Int)] rip rinp;
+  linp: goto [((typeOf er) = List) and ((typeOf el) = Num)] rip rinp;
         (* Right is a pointer and left is a number *)
   rip:  ret := "i__ptr_add" (er, el);
         return;
         (* Both left and right are numbers *)
-  rinp: goto [((typeOf el) = Int) and ((typeOf el) = Int)] nadd err;
-  nadd: ret := el i+ er;
+  rinp: goto [((typeOf el) = Num) and ((typeOf el) = Num)] nadd err;
+  nadd: ret := el + er;
         return;
         (* Incorrect types *)
   err:  err_msg := "Addition: Incorrect Types";
@@ -33,11 +33,11 @@ proc i__add (el, er) {
 proc i__minus (el, er) {
         goto [(typeOf el) = List] lip linp;
         (* Left is a pointer *)
-  lip:  mer := i- er;
+  lip:  mer := - er;
         ret := "i__ptr_add" (el, mer);
         goto end;
         (* Left is not a pointer *)
-  linp: ret := el i- er;
+  linp: ret := el - er;
   end:  return
 };
 

@@ -9,7 +9,7 @@ type vt = Values.t
 
 type st = Subst.t
 
-type err_t = unit
+type err_t = WislSHeap.err
 
 type c_fix_t = unit
 
@@ -27,36 +27,14 @@ let resolve_loc pfs gamma loc =
   Gillian.Logic.FOSolver.resolve_loc_name ~pfs ~gamma loc
 
 let get_cell heap pfs gamma (loc : vt) (offset : vt) =
-  match resolve_loc pfs gamma loc with
-  | Some loc_name -> (
-      (* This means loc evaluates to a location, let's look the available offset *)
-      match WislSHeap.get_fvl heap loc_name with
-      | Some fvl -> (
-          (* Location exists in the heap *)
-          match SFVL.get offset fvl with
-          | Some v ->
-              (* The offset is as-is in the heap, with the value, cool ! *)
-              ASucc [ (heap, [ loc; offset; v ], [], []) ]
-          | None   -> (
-              (* The offset is not easy to find in the fvl, we'll try finding a value that is equal
-                     according to the path condition and typing env *)
-              match
-                SFVL.get_first
-                  (fun name -> FOSolver.is_equal ~pfs ~gamma name offset)
-                  fvl
-              with
-              | Some (o, v) ->
-                  (* We found the offset in the heap, modulo some solving, hooray ! *)
-                  ASucc [ (heap, [ loc; o; v ], [], []) ]
-              | None        ->
-                  (* Couldn't find it, we can't do for now. *)
-                  AFail []))
-      | None     ->
-          (* Location does not exist in the heap *)
-          AFail [])
-  | None          ->
-      (* loc does not evaluate to a location, or we can't find it. *)
-      AFail []
+  match FOSolver.resolve_loc_name ~pfs ~gamma loc with
+  | None     -> AFail [ InvalidLocation ]
+  | Some loc -> (
+      match WislSHeap.get_cell ~pfs ~gamma heap loc offset with
+      | Error err            -> AFail [ err ]
+      | Ok (loc, ofs, value) ->
+          let loc = Expr.loc_from_loc_name loc in
+          ASucc [ (heap, [ loc; ofs; value ], [], []) ])
 
 let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) =
   let loc_name, new_pfs =
@@ -71,63 +49,113 @@ let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) =
         let al = ALoc.alloc () in
         (al, [ Formula.Eq (Expr.ALoc al, loc) ])
   in
-  (* We set the value in the heap.
-     If we can find a fvl for that heap, then we modify in the fvl, otherwise,
-     we create a new fvl from empty
-     This is supposedly correct because, since we got it before, we
-     suppose the offset to be correctly found. *)
-  let equality_test a b = FOSolver.is_equal ~pfs ~gamma a b in
-  let () =
-    WislSHeap.set_fvl heap loc_name
-      (SFVL.add_with_test ~equality_test offset value
-         (Option.value ~default:SFVL.empty (WislSHeap.get_fvl heap loc_name)))
-  in
-  ASucc [ (heap, [], new_pfs, []) ]
+  match WislSHeap.set_cell ~pfs ~gamma heap loc_name offset value with
+  | Error e -> AFail [ e ]
+  | Ok ()   -> ASucc [ (heap, [], new_pfs, []) ]
 
 let rem_cell heap pfs gamma (loc : vt) (offset : vt) =
-  match resolve_loc pfs gamma loc with
+  match FOSolver.resolve_loc_name ~pfs ~gamma loc with
   | Some loc_name -> (
-      (* This means loc evaluates to a location, let's look the available offset *)
-      match WislSHeap.get_fvl heap loc_name with
-      | Some fvl ->
-          (* Location exists in the heap *)
-          let new_fvl = SFVL.remove offset fvl in
-          let () = WislSHeap.set_fvl heap loc_name new_fvl in
-          let () = ALoc.dealloc loc_name in
-          ASucc [ (heap, [], [], []) ]
-      | None     ->
-          (* Location does not exist in the heap *)
-          AFail [])
+      match WislSHeap.rem_cell heap loc_name offset with
+      | Error e -> AFail [ e ]
+      | Ok ()   -> ASucc [ (heap, [], [], []) ])
   | None          ->
       (* loc does not evaluate to a location, or we can't find it. *)
-      AFail []
+      AFail [ InvalidLocation ]
+
+let get_bound heap pfs gamma loc =
+  match FOSolver.resolve_loc_name ~pfs ~gamma loc with
+  | Some loc_name -> (
+      match WislSHeap.get_bound heap loc_name with
+      | Error e -> AFail [ e ]
+      | Ok b    ->
+          let b = Expr.num_int b in
+          let loc = Expr.loc_from_loc_name loc_name in
+          ASucc [ (heap, [ loc; b ], [], []) ])
+  | None          -> AFail [ InvalidLocation ]
+
+let set_bound heap pfs gamma (loc : vt) (bound : int) =
+  let loc_name, new_pfs =
+    (* If we can't find the location, we create a new location and we
+         add to the path condition that it is equal to the given loc *)
+    let resolved_loc_opt = resolve_loc pfs gamma loc in
+    match resolved_loc_opt with
+    | Some loc_name ->
+        if Gillian.Utils.Names.is_aloc_name loc_name then (loc_name, [])
+        else (loc_name, [])
+    | None          ->
+        let al = ALoc.alloc () in
+        (al, [ Formula.Eq (Expr.ALoc al, loc) ])
+  in
+  match WislSHeap.set_bound heap loc_name bound with
+  | Error e -> AFail [ e ]
+  | Ok ()   -> ASucc [ (heap, [], new_pfs, []) ]
+
+let rem_bound heap pfs gamma loc =
+  match FOSolver.resolve_loc_name ~pfs ~gamma loc with
+  | Some loc_name -> (
+      match WislSHeap.rem_bound heap loc_name with
+      | Error e -> AFail [ e ]
+      | Ok ()   -> ASucc [ (heap, [], [], []) ])
+  | None          ->
+      (* loc does not evaluate to a location, or we can't find it. *)
+      AFail [ InvalidLocation ]
+
+let get_freed heap pfs gamma loc =
+  match FOSolver.resolve_loc_name ~pfs ~gamma loc with
+  | Some loc_name -> (
+      match WislSHeap.get_freed heap loc_name with
+      | Error e -> AFail [ e ]
+      | Ok ()   ->
+          let loc = Expr.loc_from_loc_name loc_name in
+          ASucc [ (heap, [ loc ], [], []) ])
+  | None          -> AFail [ InvalidLocation ]
+
+let set_freed heap pfs gamma (loc : vt) =
+  let loc_name, new_pfs =
+    (* If we can't find the location, we create a new location and we
+         add to the path condition that it is equal to the given loc *)
+    let resolved_loc_opt = resolve_loc pfs gamma loc in
+    match resolved_loc_opt with
+    | Some loc_name ->
+        if Gillian.Utils.Names.is_aloc_name loc_name then (loc_name, [])
+        else (loc_name, [])
+    | None          ->
+        let al = ALoc.alloc () in
+        (al, [ Formula.Eq (Expr.ALoc al, loc) ])
+  in
+  let () = WislSHeap.set_freed heap loc_name in
+  ASucc [ (heap, [], new_pfs, []) ]
+
+let rem_freed heap pfs gamma loc =
+  match FOSolver.resolve_loc_name ~pfs ~gamma loc with
+  | Some loc_name -> (
+      match WislSHeap.rem_freed heap loc_name with
+      | Error e -> AFail [ e ]
+      | Ok ()   -> ASucc [ (heap, [], [], []) ])
+  | None          ->
+      (* loc does not evaluate to a location, or we can't find it. *)
+      AFail [ InvalidLocation ]
 
 let alloc heap _pfs _gamma (size : int) =
   let loc = WislSHeap.alloc heap size in
   ASucc
-    [ (heap, [ Expr.Lit (Literal.Loc loc); Expr.Lit (Literal.Int 0) ], [], []) ]
+    [
+      (heap, [ Expr.Lit (Literal.Loc loc); Expr.Lit (Literal.Num 0.) ], [], []);
+    ]
 
 let dispose heap pfs gamma loc_expr =
   match resolve_loc pfs gamma loc_expr with
   | Some loc_name -> (
-      match WislSHeap.get_fvl heap loc_name with
-      | Some _ ->
-          let () = WislSHeap.remove heap loc_name in
-          ASucc [ (heap, [], [], []) ]
-      | None   ->
-          Logging.verbose (fun m ->
-              m
-                "!!!!!!!!!!!!!!!@\n\
-                 %s is not in the memory, can't dispose of it !!!@\n\
-                 !!!!!!!!!!!"
-                loc_name);
-          AFail [])
-  | None          -> AFail []
+      match WislSHeap.dispose heap loc_name with
+      | Ok ()   -> ASucc [ (heap, [], [], []) ]
+      | Error e -> AFail [ e ])
+  | None          -> AFail [ InvalidLocation ]
 
 let execute_action ?unification:_ name heap pfs gamma args =
   let action = WislLActions.ac_from_str name in
   match action with
-  | GetCell -> (
+  | GetCell  -> (
       match args with
       | [ loc_expr; offset_expr ] ->
           get_cell heap pfs gamma loc_expr offset_expr
@@ -137,7 +165,7 @@ let execute_action ?unification:_ name heap pfs gamma args =
                "Invalid GetCell Call for WISL, with parameters : [ %a ]"
                (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
                args))
-  | SetCell -> (
+  | SetCell  -> (
       match args with
       | [ loc_expr; offset_expr; value_expr ] ->
           set_cell heap pfs gamma loc_expr offset_expr value_expr
@@ -147,7 +175,7 @@ let execute_action ?unification:_ name heap pfs gamma args =
                "Invalid SetCell Call for WISL, with parameters : [ %a ]"
                (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
                args))
-  | RemCell -> (
+  | RemCell  -> (
       match args with
       | [ loc_expr; offset_expr ] ->
           rem_cell heap pfs gamma loc_expr offset_expr
@@ -157,17 +185,73 @@ let execute_action ?unification:_ name heap pfs gamma args =
                "Invalid RemCell Call for WISL, with parameters : [ %a ]"
                (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
                args))
-  | Alloc   -> (
+  | GetBound -> (
       match args with
-      | [ Expr.Lit (Literal.Int size) ] when size >= 1 ->
-          alloc heap pfs gamma size
+      | [ loc_expr ] -> get_bound heap pfs gamma loc_expr
+      | args         ->
+          failwith
+            (Format.asprintf
+               "Invalid GetBound Call for WISL, with parameters : [ %a ]"
+               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+               args))
+  | SetBound -> (
+      match args with
+      | [ loc_expr; Expr.Lit (Num f) ] ->
+          let b = int_of_float f in
+          set_bound heap pfs gamma loc_expr b
+      | args ->
+          failwith
+            (Format.asprintf
+               "Invalid SetBound Call for WISL, with parameters : [ %a ]"
+               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+               args))
+  | RemBound -> (
+      match args with
+      | [ loc_expr ] -> rem_bound heap pfs gamma loc_expr
+      | args         ->
+          failwith
+            (Format.asprintf
+               "Invalid RemBound Call for WISL, with parameters : [ %a ]"
+               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+               args))
+  | GetFreed -> (
+      match args with
+      | [ loc_expr ] -> get_freed heap pfs gamma loc_expr
+      | args         ->
+          failwith
+            (Format.asprintf
+               "Invalid GetFreed Call for WISL, with parameters : [ %a ]"
+               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+               args))
+  | SetFreed -> (
+      match args with
+      | [ loc_expr ] -> set_freed heap pfs gamma loc_expr
+      | args         ->
+          failwith
+            (Format.asprintf
+               "Invalid SetFreed Call for WISL, with parameters : [ %a ]"
+               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+               args))
+  | RemFreed -> (
+      match args with
+      | [ loc_expr ] -> rem_freed heap pfs gamma loc_expr
+      | args         ->
+          failwith
+            (Format.asprintf
+               "Invalid RemFreed Call for WISL, with parameters : [ %a ]"
+               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+               args))
+  | Alloc    -> (
+      match args with
+      | [ Expr.Lit (Literal.Num size) ] when size >= 1. ->
+          alloc heap pfs gamma (int_of_float size)
       | args ->
           failwith
             (Format.asprintf
                "Invalid Alloc Call for WISL, with parameters : [ %a ]"
                (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
                args))
-  | Dispose -> (
+  | Dispose  -> (
       match args with
       | [ loc_expr ] -> dispose heap pfs gamma loc_expr
       | args         ->
@@ -186,11 +270,13 @@ let ga_to_deleter = WislLActions.ga_to_deleter_str
 let ga_loc_indexes a_id =
   WislLActions.(
     match ga_from_str a_id with
-    | Cell -> [ 0 ])
+    | Cell  -> [ 0 ]
+    | Bound -> [ 0 ]
+    | Freed -> [ 0 ])
 
 let copy = WislSHeap.copy
 
-let pp fmt h = Format.fprintf fmt "%s" (WislSHeap.str h)
+let pp fmt h = Format.fprintf fmt "%a" WislSHeap.pp h
 
 (* TODO: Implement properly *)
 let pp_by_need _ fmt h = pp fmt h
@@ -198,7 +284,15 @@ let pp_by_need _ fmt h = pp fmt h
 (* TODO: Implement properly *)
 let get_print_info _ _ = (SS.empty, SS.empty)
 
-let pp_err _ _ = ()
+let pp_err fmt t =
+  Fmt.string fmt
+    (match t with
+    | WislSHeap.MissingRessource -> "MissingRessource"
+    | DoubleFree                 -> "Double Free"
+    | UseAfterFree               -> "Use After Free"
+    | MemoryLeak                 -> "Memory Leak"
+    | OutOfBound                 -> "Out of bound"
+    | InvalidLocation            -> "Invalid Location")
 
 let get_recovery_vals _ _ = []
 

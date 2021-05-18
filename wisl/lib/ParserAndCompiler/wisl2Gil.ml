@@ -25,7 +25,7 @@ let compile_type t =
     | WBool   -> Some Type.BooleanType
     | WString -> Some Type.StringType
     | WPtr    -> Some Type.ObjectType
-    | WInt    -> Some Type.IntType
+    | WInt    -> Some Type.NumberType
     | WSet    -> Some Type.SetType
     | WAny    -> None)
 
@@ -61,7 +61,7 @@ let rec compile_val v =
   match v with
   | Bool b  -> Literal.Bool b
   | Null    -> Literal.Null
-  | Int n   -> Literal.Int n
+  | Int n   -> Literal.Num (float_of_int n)
   | Str s   -> Literal.String s
   | VList l -> Literal.LList (List.map compile_val l)
 
@@ -281,30 +281,28 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
   let compile_lexpr = compile_lexpr ~fname in
   let compile_lformula = compile_lformula ~fname in
   let concat_star = List.fold_left (fun a1 a2 -> Asrt.Star (a1, a2)) in
-  let rec gil_add e k =
+  let gil_add e k =
     (* builds GIL expression that is e + k *)
-    if k = 0 then e
-    else
-      match e with
-      | Expr.Lit (Int n) -> Expr.Lit (Int (n + k))
-      | BinOp (e1, IPlus, Lit (Int b)) | BinOp (Lit (Int b), IPlus, e1) ->
-          gil_add (gil_add e1 k) b
-      | e -> BinOp (e, IPlus, Lit (Int k))
+    let k_e = Expr.num_int k in
+    let open Expr.Infix in
+    e +. k_e
   in
   (* compiles le1 -> lle, returns the assertion AND the list of existential variables generated *)
   let rec compile_pointsto
+      ?(start = true)
       ~(block : bool)
       ?(ptr_opt = None)
       ?(curr = 0)
       (le1 : WLExpr.t)
       (lle : WLExpr.t list) : string list * Asrt.t =
+    let compile_pointsto = compile_pointsto ~start:false in
     let exs1, la1, (loc, offset), expr_offset =
       match ptr_opt with
       | Some (l, bo) ->
           let expr_offset =
             match bo with
             | Some o when not block -> Expr.LVar o
-            | None when block -> Lit (Int 0)
+            | None when block -> Lit (Num 0.)
             | _ ->
                 failwith
                   "The algorithm to compile pointsto seems to be wrong, cannot \
@@ -318,11 +316,13 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
             if not block then
               let offset = gen_str lgvar in
               (Some offset, Expr.LVar offset)
-            else (None, Lit (Int 0))
+            else (None, Lit (Num 0.))
           in
           ( Option.fold ~some:(fun x -> [ x ]) ~none:[] offset @ (loc :: exs1),
             Asrt.Types
-              [ (Expr.LVar loc, Type.ObjectType); (expr_offset, Type.IntType) ]
+              [
+                (Expr.LVar loc, Type.ObjectType); (expr_offset, Type.NumberType);
+              ]
             :: Asrt.Pure
                  (Formula.Eq (e1, Expr.EList [ Expr.LVar loc; expr_offset ]))
             :: la1,
@@ -331,6 +331,9 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
     in
     let eloc, eoffs = (Expr.LVar loc, gil_add expr_offset curr) in
     let cell = WislLActions.(str_ga Cell) in
+    let bound =
+      if start then [ Constr.bound ~loc:eloc ~bound:(List.length lle) ] else []
+    in
     match lle with
     | []      ->
         failwith
@@ -341,7 +344,9 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
     | [ le ]  ->
         let exs2, la2, e2 = compile_lexpr le in
         ( exs1 @ exs2,
-          concat_star (Asrt.GA (cell, [ eloc; eoffs ], [ e2 ])) (la1 @ la2) )
+          concat_star
+            (Asrt.GA (cell, [ eloc; eoffs ], [ e2 ]))
+            (bound @ la1 @ la2) )
     | le :: r ->
         let exs2, la2, e2 = compile_lexpr le in
         let exs3, la3 =
@@ -352,7 +357,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
         ( exs1 @ exs2 @ exs3,
           concat_star
             (Asrt.GA (cell, [ eloc; eoffs ], [ e2 ]))
-            (la3 :: (la1 @ la2)) )
+            (bound @ (la3 :: (la1 @ la2))) )
   in
   WLAssert.(
     match get asser with
@@ -534,7 +539,8 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
   let reassign_vars =
     List.mapi
       (fun i vn ->
-        Cmd.Assignment (vn, BinOp (PVar retv, BinOp.LstNth, Lit (Int i))))
+        Cmd.Assignment
+          (vn, BinOp (PVar retv, BinOp.LstNth, Lit (Num (float_of_int i)))))
       vars
   in
   let annot_while = Annot.make ~origin_id:(WStmt.get_id while_stmt) () in
@@ -562,7 +568,9 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
                                   "Cannot call get_or_create_lab with en empty \
                                    list"
   in
-  let nth expr n = Expr.BinOp (expr, BinOp.LstNth, Expr.Lit (Literal.Int n)) in
+  let nth expr n =
+    Expr.BinOp (expr, BinOp.LstNth, Expr.Lit (Literal.Num (float_of_int n)))
+  in
   let setcell = WislLActions.str_ac WislLActions.SetCell in
   let dispose = WislLActions.str_ac WislLActions.Dispose in
   let getcell = WislLActions.str_ac WislLActions.GetCell in
@@ -623,7 +631,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let faillab, ctnlab = (gen_str fail_lab, gen_str ctn_lab) in
       let testcmd =
         Cmd.GuardedGoto
-          ( Expr.BinOp (nth e_v_get 1, BinOp.Equal, Expr.Lit (Literal.Int 0)),
+          ( Expr.BinOp (nth e_v_get 1, BinOp.Equal, Expr.Lit (Literal.Num 0.)),
             ctnlab,
             faillab )
       in
@@ -698,7 +706,9 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
   (* Object Creation *)
   | { snode = New (x, k); sid; _ } :: rest ->
       let annot = Annot.make ~origin_id:sid () in
-      let newcmd = Cmd.LAction (x, alloc, [ Expr.Lit (Literal.Int k) ]) in
+      let newcmd =
+        Cmd.LAction (x, alloc, [ Expr.Lit (Literal.Num (float_of_int k)) ])
+      in
       let comp_rest, new_functions = compile_list rest in
       ((annot, None, newcmd) :: comp_rest, new_functions)
   (* x := new(k) =>
