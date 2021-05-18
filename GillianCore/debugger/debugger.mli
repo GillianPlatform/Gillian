@@ -32,7 +32,7 @@ module type S = sig
 
   type debugger_state
 
-  val launch : string -> (debugger_state, string) result
+  val launch : string -> string option -> (debugger_state, string) result
 
   val step_in : ?reverse:bool -> debugger_state -> stop_reason
 

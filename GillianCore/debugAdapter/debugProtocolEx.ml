@@ -10,6 +10,7 @@ module Launch_command = struct
     type t = {
       program : string;
       stop_on_entry : bool; [@default false] [@key "stopOnEntry"]
+      procedure_name : string option; [@default None] [@key "procedureName"]
     }
     [@@deriving yojson { strict = false }]
   end

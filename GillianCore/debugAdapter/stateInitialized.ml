@@ -14,7 +14,7 @@ module Make (Debugger : Debugger.S) = struct
         prevent_reenter ();
         let () =
           match
-            Debugger.launch launch_args.Launch_command.Arguments.program
+            Debugger.launch launch_args.program launch_args.procedure_name
           with
           | Ok dbg    -> Lwt.wakeup_later resolver (launch_args, dbg)
           | Error err ->
