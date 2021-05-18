@@ -429,11 +429,12 @@ let rec compile_lcmd ?(fname = "main") lcmd =
   | Invariant _ -> failwith "Invariant is not before a loop."
 
 let compile_inv_and_while ~fname ~while_stmt ~invariant =
-  let spec_name = "invariant_spec" in
+  (* FIXME: Variables that are in the invariant but not existential might be wrong. *)
   let loopretvar = "loopretvar__" in
   let gen_str = Generators.gen_str fname in
   let loop_fname = gen_str (fname ^ "_loop") in
   let while_loc = WStmt.get_loc while_stmt in
+  let invariant_loc = WLCmd.get_loc invariant in
   let inv_asrt, inv_exs =
     match WLCmd.get invariant with
     | Invariant (la, lb) -> (la, lb)
@@ -444,12 +445,44 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
     | While (e, c) -> (e, c)
     | _            -> failwith "That can't happen, not a while command"
   in
+  let lvar_exs, var_exs = List.partition Utils.Names.is_lvar_name inv_exs in
   let vars, lvars = WLAssert.get_vars_and_lvars inv_asrt in
-  let vars, lvars =
-    (SS.elements vars, SS.elements (SS.diff lvars (SS.of_list inv_exs)))
+  let vars, lvars = (SS.elements vars, SS.elements lvars) in
+  let old_lv x = "#pvar_" ^ x in
+  let new_lv x = "#new_pvar_" ^ x in
+  let pre =
+    let var_subst = List.map (fun x -> (x, WLExpr.LVar (old_lv x))) vars in
+    let subst = Hashtbl.of_seq (List.to_seq var_subst) in
+    let pre_without_bind = WLAssert.substitution subst inv_asrt in
+    List.fold_left
+      (fun acc (x, lx) ->
+        let px = WLExpr.PVar x in
+        let px = WLExpr.make px invariant_loc in
+        let lx = WLExpr.make lx invariant_loc in
+        let f = WLFormula.make (LEq (px, lx)) invariant_loc in
+        let new_a = WLAssert.make (LPure f) invariant_loc in
+        match WLAssert.get acc with
+        | LEmp -> new_a
+        | _    -> WLAssert.make (LStar (new_a, acc)) invariant_loc)
+      pre_without_bind var_subst
   in
-  (* we remove existentials from the bindings *)
-  let evars = List.map (fun x -> Expr.PVar x) vars in
+  let post_subst =
+    let var_subst =
+      List.map
+        (fun x ->
+          let new_name = if List.mem x var_exs then new_lv x else old_lv x in
+          (x, WLExpr.LVar new_name))
+        vars
+    in
+    let lvar_subst =
+      List.filter_map
+        (fun x ->
+          if List.mem x lvar_exs then Some (x, WLExpr.LVar (x ^ "__new"))
+          else None)
+        lvars
+    in
+    Hashtbl.of_seq (List.to_seq (var_subst @ lvar_subst))
+  in
   let loop_funct =
     let guard_loc = WExpr.get_loc guard in
     let post_guard =
@@ -463,51 +496,41 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
     let post_ret =
       let make_lexpr tt = WLExpr.make tt while_loc in
       let make_var_lexpr x = make_lexpr (PVar x) in
+      let make_pvar_lexpr x =
+        let new_name = if List.mem x var_exs then new_lv x else old_lv x in
+        make_lexpr (LVar new_name)
+      in
       WLAssert.make
         (LPure
            (WLFormula.make
               (LEq
                  ( make_var_lexpr "ret",
-                   make_lexpr (LEList (List.map make_var_lexpr vars)) ))
+                   make_lexpr (LEList (List.map make_pvar_lexpr vars)) ))
               while_loc))
         while_loc
     in
     let post_add =
       WLAssert.make (LStar (post_ret, post_guard)) (WLAssert.get_loc inv_asrt)
     in
-    let subs_exs =
-      List.map (fun inv_ex -> (inv_ex, WLExpr.LVar ("#new_" ^ inv_ex))) inv_exs
-    in
-    let subs_pvars =
-      List.map (fun inv_pv -> (inv_pv, WLExpr.LVar ("#pvar_" ^ inv_pv))) vars
-    in
-    let subst = Hashtbl.create 1 in
-    let () =
-      List.iter
-        (fun (v, nv) -> Hashtbl.replace subst v nv)
-        (subs_exs @ subs_pvars)
-    in
     let post_without_subst =
       WLAssert.make (LStar (inv_asrt, post_add)) (WLAssert.get_loc inv_asrt)
     in
-    let post = WLAssert.substitution subst post_without_subst in
+    let post = WLAssert.substitution post_subst post_without_subst in
     let spec =
       WSpec.
         {
-          pre = inv_asrt;
+          pre;
           post;
           spid = Generators.gen_id ();
           fname = loop_fname;
           fparams = vars;
           sploc = while_loc;
-          existentials = Some (spec_name, lvars);
+          existentials = None;
         }
     in
     let pvars = List.map (fun x -> WExpr.make (Var x) while_loc) vars in
     let rec_call =
-      WStmt.make
-        (FunCall (loopretvar, loop_fname, pvars, Some (spec_name, lvars)))
-        while_loc
+      WStmt.make (FunCall (loopretvar, loop_fname, pvars, None)) while_loc
     in
     let allvars = WExpr.make (WExpr.List pvars) while_loc in
     let ret_not_rec = WStmt.make (VarAssign (loopretvar, allvars)) while_loc in
@@ -528,13 +551,13 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
       }
   in
   let retv = gen_str gvar in
-  let logical_bindings =
-    match lvars with
-    | []    -> None
-    | lvars -> Some (spec_name, List.map (fun x -> (x, Expr.LVar x)) lvars)
-  in
   let call_cmd =
-    Cmd.Call (retv, Lit (String loop_fname), evars, None, logical_bindings)
+    Cmd.Call
+      ( retv,
+        Lit (String loop_fname),
+        List.map (fun x -> Expr.PVar x) vars,
+        None,
+        None )
   in
   let reassign_vars =
     List.mapi
