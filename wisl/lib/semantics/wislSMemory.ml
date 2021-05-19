@@ -285,14 +285,16 @@ let pp_by_need _ fmt h = pp fmt h
 let get_print_info _ _ = (SS.empty, SS.empty)
 
 let pp_err fmt t =
-  Fmt.string fmt
-    (match t with
-    | WislSHeap.MissingResource -> "Missing Resource"
-    | DoubleFree                -> "Double Free"
-    | UseAfterFree              -> "Use After Free"
-    | MemoryLeak                -> "Memory Leak"
-    | OutOfBounds               -> "Out Of Bounds"
-    | InvalidLocation           -> "Invalid Location")
+  match t with
+  | WislSHeap.MissingResource -> Fmt.string fmt "Missing Resource"
+  | DoubleFree -> Fmt.string fmt "Double Free"
+  | UseAfterFree -> Fmt.string fmt "Use After Free"
+  | MemoryLeak -> Fmt.string fmt "Memory Leak"
+  | OutOfBounds (bound, loc, ofs) ->
+      Fmt.pf fmt "Out Of Bounds: (%s, %a) is not in bounds %a" loc Expr.pp ofs
+        (Fmt.option ~none:(Fmt.any "none") Fmt.int)
+        bound
+  | InvalidLocation -> Fmt.string fmt "Invalid Location"
 
 let get_recovery_vals _ _ = []
 

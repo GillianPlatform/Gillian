@@ -10,7 +10,7 @@ type err =
   | DoubleFree
   | UseAfterFree
   | MemoryLeak
-  | OutOfBounds
+  | OutOfBounds     of (int option * string * Expr.t)
   | InvalidLocation
 
 module Block = struct
@@ -114,7 +114,7 @@ let get_cell ~pfs ~gamma heap loc ofs =
             let open Formula.Infix in
             Solver.sat ~unification:false ~pfs ~gamma [ n #<= ofs ]
       in
-      if maybe_out_of_bound then Error OutOfBounds
+      if maybe_out_of_bound then Error (OutOfBounds (bound, loc, ofs))
       else
         match SFVL.get ofs data with
         | Some v -> Ok (loc, ofs, v)

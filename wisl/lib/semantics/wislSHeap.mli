@@ -8,7 +8,7 @@ type err =
   | DoubleFree
   | UseAfterFree
   | MemoryLeak
-  | OutOfBounds
+  | OutOfBounds     of (int option * string * Expr.t)
   | InvalidLocation
 
 val init : unit -> t
