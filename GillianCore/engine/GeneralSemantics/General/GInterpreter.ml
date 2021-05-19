@@ -166,8 +166,6 @@ struct
   }
   [@@deriving yojson]
 
-  exception LAction_Error of state_t
-
   let max_branching = 100
 
   exception Interpreter_error of err_t list * State.t
@@ -833,7 +831,7 @@ struct
                       m "Action call failed with:@.%a"
                         (Fmt.Dump.list State.pp_err)
                         errs);
-                  raise (LAction_Error state))
+                  raise (State.Internal_State_Error (errs, state)))
             else Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd)
     (* Logic command *)
     | Logic lcmd -> (
@@ -1111,9 +1109,7 @@ struct
         | Interpreter_error (errs, state) -> [ ConfErr (cs, i, state, errs) ]
         | State.Internal_State_Error (errs, state) ->
             (* Return: current procedure name, current command index, the state, and the associated errors *)
-            [ ConfErr (cs, i, state, List.map (fun x -> ExecErr.ESt x) errs) ]
-        | LAction_Error state ->
-            [ ConfErr (cs, i, state, [ ExecErr.ELAction ]) ])
+            [ ConfErr (cs, i, state, List.map (fun x -> ExecErr.ESt x) errs) ])
       states
 
   (**

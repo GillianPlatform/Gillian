@@ -2,7 +2,6 @@ type ('value, 'state_err) t =
   | EProc    of 'value  (** Incorrect procedure identifier *)
   | ESt      of 'state_err  (** Memory Error *)
   | ECleanUp
-  | ELAction
 
 let pp pp_val pp_state_err ft err =
   let open Fmt in
@@ -10,4 +9,3 @@ let pp pp_val pp_state_err ft err =
   | EProc pid -> pf ft "@[<h>EProc(%a)@]" pp_val pid
   | ESt err   -> (hbox pp_state_err) ft err
   | ECleanUp  -> string ft "ECleanUp()"
-  | ELAction  -> string ft "Basic Action Failed"
