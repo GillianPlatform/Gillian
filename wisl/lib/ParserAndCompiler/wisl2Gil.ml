@@ -1,5 +1,5 @@
 (* TODO: Before merging, this has to be entirely documented. Step by step, how does the compilation work.
-    More exactly, the compilation of logical expr and expr, as well a stmts should be detailed. *)
+   More exactly, the compilation of logical expr and expr, as well a stmts should be detailed. *)
 
 open WislConstants.Prefix
 open WislConstants.InternalProcs
@@ -320,9 +320,11 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
           in
           ( Option.fold ~some:(fun x -> [ x ]) ~none:[] offset @ (loc :: exs1),
             Asrt.Types
-              [
-                (Expr.LVar loc, Type.ObjectType); (expr_offset, Type.NumberType);
-              ]
+              ([ (Expr.LVar loc, Type.ObjectType) ]
+              @
+              match expr_offset with
+              | Lit (Num _) -> []
+              | _           -> [ (expr_offset, Type.NumberType) ])
             :: Asrt.Pure
                  (Formula.Eq (e1, Expr.EList [ Expr.LVar loc; expr_offset ]))
             :: la1,
@@ -332,7 +334,8 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
     let eloc, eoffs = (Expr.LVar loc, gil_add expr_offset curr) in
     let cell = WislLActions.(str_ga Cell) in
     let bound =
-      if start then [ Constr.bound ~loc:eloc ~bound:(List.length lle) ] else []
+      if start && block then [ Constr.bound ~loc:eloc ~bound:(List.length lle) ]
+      else []
     in
     match lle with
     | []      ->
@@ -646,15 +649,10 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
   | { snode = Dispose e; sid; _ } :: rest ->
       let cmdle, comp_e = compile_expr e in
       let annot = Annot.make ~origin_id:sid () in
-      let v_get = gen_str gvar in
-      let getcmd =
-        Cmd.LAction (v_get, getcell, [ nth comp_e 0; nth comp_e 1 ])
-      in
-      let e_v_get = Expr.PVar v_get in
       let faillab, ctnlab = (gen_str fail_lab, gen_str ctn_lab) in
       let testcmd =
         Cmd.GuardedGoto
-          ( Expr.BinOp (nth e_v_get 1, BinOp.Equal, Expr.Lit (Literal.Num 0.)),
+          ( Expr.BinOp (nth comp_e 1, BinOp.Equal, Expr.Lit (Literal.Num 0.)),
             ctnlab,
             faillab )
       in
@@ -664,11 +662,10 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
           ( "Invalid block pointer at " ^ CodeLoc.str (WExpr.get_loc e),
             [ comp_e ] )
       in
-      let cmd = Cmd.LAction (g_var, dispose, [ nth e_v_get 0 ]) in
+      let cmd = Cmd.LAction (g_var, dispose, [ nth comp_e 0 ]) in
       let comp_rest, new_functions = compile_list rest in
       ( cmdle
         @ [
-            (annot, None, getcmd);
             (annot, None, testcmd);
             (annot, Some faillab, failcmd);
             (annot, Some ctnlab, cmd);
