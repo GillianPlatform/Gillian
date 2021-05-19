@@ -6,11 +6,11 @@ module Solver = Gillian.Logic.FOSolver
 module Reduction = Gillian.Logic.Reduction
 
 type err =
-  | MissingRessource
+  | MissingResource
   | DoubleFree
   | UseAfterFree
   | MemoryLeak
-  | OutOfBound
+  | OutOfBounds
   | InvalidLocation
 
 module Block = struct
@@ -86,7 +86,7 @@ let alloc (heap : t) size =
 
 let dispose (heap : t) loc =
   match Hashtbl.find_opt heap loc with
-  | Some (Allocated { data = _; bound = None }) | None -> Error MissingRessource
+  | Some (Allocated { data = _; bound = None }) | None -> Error MissingResource
   | Some Freed -> Error DoubleFree
   | Some (Allocated { data; bound = Some i }) ->
       let has_all =
@@ -99,11 +99,11 @@ let dispose (heap : t) loc =
       if has_all then
         let () = Hashtbl.replace heap loc Freed in
         Ok ()
-      else Error MissingRessource
+      else Error MissingResource
 
 let get_cell ~pfs ~gamma heap loc ofs =
   match Hashtbl.find_opt heap loc with
-  | None -> Error MissingRessource
+  | None -> Error MissingResource
   | Some Block.Freed -> Error UseAfterFree
   | Some (Allocated { data; bound }) -> (
       let maybe_out_of_bound =
@@ -114,7 +114,7 @@ let get_cell ~pfs ~gamma heap loc ofs =
             let open Formula.Infix in
             Solver.sat ~unification:false ~pfs ~gamma [ n #<= ofs ]
       in
-      if maybe_out_of_bound then Error OutOfBound
+      if maybe_out_of_bound then Error OutOfBounds
       else
         match SFVL.get ofs data with
         | Some v -> Ok (loc, ofs, v)
@@ -125,7 +125,7 @@ let get_cell ~pfs ~gamma heap loc ofs =
                 data
             with
             | Some (o, v) -> Ok (loc, o, v)
-            | None        -> Error MissingRessource))
+            | None        -> Error MissingResource))
 
 let set_cell ~pfs ~gamma heap loc_name ofs v =
   match Hashtbl.find_opt heap loc_name with
@@ -153,7 +153,7 @@ let set_cell ~pfs ~gamma heap loc_name ofs v =
 
 let rem_cell heap loc offset =
   match Hashtbl.find_opt heap loc with
-  | None -> Error MissingRessource
+  | None -> Error MissingResource
   | Some Block.Freed -> Error UseAfterFree
   | Some (Allocated { bound; data }) ->
       let data = SFVL.remove offset data in
@@ -163,7 +163,7 @@ let rem_cell heap loc offset =
 let get_bound heap loc =
   match Hashtbl.find_opt heap loc with
   | Some Block.Freed -> Error UseAfterFree
-  | None | Some (Allocated { bound = None; _ }) -> Error MissingRessource
+  | None | Some (Allocated { bound = None; _ }) -> Error MissingResource
   | Some (Allocated { bound = Some bound; _ }) -> Ok bound
 
 let set_bound heap loc bound =
@@ -178,7 +178,7 @@ let set_bound heap loc bound =
 let rem_bound heap loc =
   match Hashtbl.find_opt heap loc with
   | Some Block.Freed -> Error UseAfterFree
-  | None | Some (Allocated { bound = None; _ }) -> Error MissingRessource
+  | None | Some (Allocated { bound = None; _ }) -> Error MissingResource
   | Some (Allocated { data; _ }) ->
       let () = Hashtbl.replace heap loc (Allocated { data; bound = None }) in
       Ok ()
@@ -187,7 +187,7 @@ let get_freed heap loc =
   match Hashtbl.find_opt heap loc with
   | Some Block.Freed -> Ok ()
   | Some _           -> Error MemoryLeak
-  | None             -> Error MissingRessource
+  | None             -> Error MissingResource
 
 let set_freed heap loc = Hashtbl.replace heap loc Block.Freed
 
@@ -196,7 +196,7 @@ let rem_freed heap loc =
   | Some Block.Freed ->
       Hashtbl.remove heap loc;
       Ok ()
-  | None             -> Error MissingRessource
+  | None             -> Error MissingResource
   | Some _           -> Error MemoryLeak
 
 (***** Some things specific to symbolic heaps ********)

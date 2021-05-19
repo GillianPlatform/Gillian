@@ -4,11 +4,11 @@ open Gil_syntax
 type t [@@deriving yojson]
 
 type err =
-  | MissingRessource
+  | MissingResource
   | DoubleFree
   | UseAfterFree
   | MemoryLeak
-  | OutOfBound
+  | OutOfBounds
   | InvalidLocation
 
 val init : unit -> t
