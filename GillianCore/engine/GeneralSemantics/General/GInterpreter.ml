@@ -166,6 +166,9 @@ struct
   }
   [@@deriving yojson]
 
+  type annotated_action = { annot : Annot.t; action_name : string }
+  [@@deriving yojson]
+
   let max_branching = 100
 
   exception Interpreter_error of err_t list * State.t
@@ -306,6 +309,12 @@ struct
     (* TODO: Cmd step should contain all things in a configuration
              print the same contents as print_configuration *)
     CallStack.pp fmt cmd_step.call_stack
+
+  let annotated_action_pp fmt annotated_action =
+    let origin_loc = Annot.get_origin_loc annotated_action.annot in
+    Fmt.pf fmt "Executing action '%s' at %a" annotated_action.action_name
+      (Fmt.option ~none:(Fmt.any "none") Location.pp)
+      origin_loc
 
   let print_lconfiguration (lcmd : LCmd.t) (state : State.t) : unit =
     L.normal (fun m ->
@@ -742,6 +751,12 @@ struct
         [ ConfCont (state', cs, iframes, i, loop_ids, i + 1, b_counter) ]
     (* Action *)
     | LAction (x, a, es) -> (
+        let _ =
+          L.normal_specific
+            (L.Loggable.make annotated_action_pp annotated_action_of_yojson
+               annotated_action_to_yojson { annot; action_name = a })
+            L.LoggingConstants.ContentType.annotated_action
+        in
         let v_es = List.map eval_expr es in
         match State.execute_action a state v_es with
         | ASucc [] ->

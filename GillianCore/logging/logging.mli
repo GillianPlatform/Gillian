@@ -1,13 +1,4 @@
-module LoggingConstants : sig
-  (** Allowed strings for the type_ field of a report *)
-  module ContentType : sig
-    val debug : string
-
-    val phase : string
-
-    val cmd_step : string
-  end
-end
+module LoggingConstants = LoggingConstants
 
 module Mode : sig
   (** Logging levels *)

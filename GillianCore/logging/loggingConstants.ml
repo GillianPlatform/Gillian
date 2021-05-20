@@ -5,4 +5,6 @@ module ContentType = struct
   let phase = "phase"
 
   let cmd_step = "cmd_step"
+
+  let annotated_action = "annotated_action"
 end

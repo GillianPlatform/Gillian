@@ -6,6 +6,8 @@ module Location : sig
   type t = { loc_start : position; loc_end : position; loc_source : string }
 
   val none : t
+
+  val pp : t Fmt.t
 end
 
 module LVar : Allocators.S with type t = string
@@ -892,7 +894,7 @@ end
 
 module Annot : sig
   (** {b GIL annot}. *)
-  type t
+  type t [@@deriving yojson]
 
   (** make an annotation *)
   val make :

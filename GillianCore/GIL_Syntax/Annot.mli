@@ -1,5 +1,5 @@
 (** {b GIL annot}. *)
-type t
+type t [@@deriving yojson]
 
 (** Initialize an annotation *)
 val make :
