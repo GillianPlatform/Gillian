@@ -7,4 +7,6 @@ module ContentType = struct
   let cmd_step = "cmd_step"
 
   let annotated_action = "annotated_action"
+
+  let annotated_set_freed = "annotated_set_freed"
 end

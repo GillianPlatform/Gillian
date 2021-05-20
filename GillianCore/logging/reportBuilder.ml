@@ -52,3 +52,5 @@ let end_phase = function
       let parent_uuid = Stack.pop parents in
       assert (Uuidm.equal uuid parent_uuid);
       previous := id
+
+let get_cur_parent_id () = Stack.top_opt parents

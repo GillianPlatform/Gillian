@@ -7,7 +7,7 @@ module Reduction = Gillian.Logic.Reduction
 
 type err =
   | MissingResource
-  | DoubleFree
+  | DoubleFree      of Annot.t option
   | UseAfterFree
   | MemoryLeak
   | OutOfBounds     of (int option * string * Expr.t)
@@ -68,6 +68,30 @@ let init () = Hashtbl.create 1
 
 let copy heap = Hashtbl.copy heap
 
+(****** Types and functions for logging when blocks have been freed ********)
+
+type annotated_set_freed = { annot : Annot.t option; loc : string }
+[@@deriving yojson]
+
+(* TODO: Implement this to print something useful *)
+let annotated_set_freed_pp _ _ = ()
+
+let set_freed_with_logging heap loc =
+  let annot = Logging.LogQueryer.get_previous_annot () in
+  let annot_opt =
+    Option.bind annot (fun (annot : string) ->
+        Yojson.Safe.from_string annot |> Annot.of_yojson |> Result.to_option)
+  in
+  let annotated_set_freed : annotated_set_freed = { annot = annot_opt; loc } in
+  let _ =
+    Logging.normal_specific
+      (Logging.Loggable.make annotated_set_freed_pp
+         annotated_set_freed_of_yojson annotated_set_freed_to_yojson
+         annotated_set_freed)
+      Logging.LoggingConstants.ContentType.annotated_set_freed
+  in
+  Hashtbl.replace heap loc Block.Freed
+
 (***** Implementation of local actions *****)
 
 let alloc (heap : t) size =
@@ -87,7 +111,16 @@ let alloc (heap : t) size =
 let dispose (heap : t) loc =
   match Hashtbl.find_opt heap loc with
   | Some (Allocated { data = _; bound = None }) | None -> Error MissingResource
-  | Some Freed -> Error DoubleFree
+  | Some Freed ->
+      let annot = Logging.LogQueryer.get_previous_freed_annot loc in
+      let annot : Annot.t option =
+        match annot with
+        | None       -> None
+        | Some annot ->
+            let yojson : Yojson.Safe.t = Yojson.Safe.from_string annot in
+            Some (Result.get_ok (Annot.of_yojson yojson))
+      in
+      Error (DoubleFree annot)
   | Some (Allocated { data; bound = Some i }) ->
       let has_all =
         let so_far = ref true in
@@ -97,7 +130,7 @@ let dispose (heap : t) loc =
         !so_far
       in
       if has_all then
-        let () = Hashtbl.replace heap loc Freed in
+        let () = set_freed_with_logging heap loc in
         Ok ()
       else Error MissingResource
 
@@ -189,7 +222,7 @@ let get_freed heap loc =
   | Some _           -> Error MemoryLeak
   | None             -> Error MissingResource
 
-let set_freed heap loc = Hashtbl.replace heap loc Block.Freed
+let set_freed heap loc = set_freed_with_logging heap loc
 
 let rem_freed heap loc =
   match Hashtbl.find_opt heap loc with
