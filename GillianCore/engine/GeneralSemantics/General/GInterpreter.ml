@@ -1162,7 +1162,7 @@ struct
                  })
               L.LoggingConstants.ContentType.cmd_step
           in
-          Continue (report_id, cont_func)
+          Continue (report_id, fun () -> L.with_normal_phase cont_func)
       | ConfErr (call_stack, proc_body_index, state, errors) :: _ ->
           let errors : string list =
             List.map
@@ -1175,7 +1175,7 @@ struct
                  { call_stack; proc_body_index; state = Some state; errors })
               L.LoggingConstants.ContentType.cmd_step
           in
-          Continue (report_id, cont_func)
+          Continue (report_id, fun () -> L.with_normal_phase cont_func)
       | _ -> cont_func ()
     in
 
