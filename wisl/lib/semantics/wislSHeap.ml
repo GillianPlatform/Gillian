@@ -8,7 +8,7 @@ module Reduction = Gillian.Logic.Reduction
 type err =
   | MissingResource
   | DoubleFree      of Annot.t option
-  | UseAfterFree
+  | UseAfterFree    of Annot.t option
   | MemoryLeak
   | OutOfBounds     of (int option * string * Expr.t)
   | InvalidLocation
@@ -92,6 +92,13 @@ let set_freed_with_logging heap loc =
   in
   Hashtbl.replace heap loc Block.Freed
 
+let get_previously_freed_annot loc =
+  let annot = Logging.LogQueryer.get_previous_freed_annot loc in
+  match annot with
+  | None       -> None
+  | Some annot ->
+      annot |> Yojson.Safe.from_string |> Annot.of_yojson |> Result.to_option
+
 (***** Implementation of local actions *****)
 
 let alloc (heap : t) size =
@@ -112,14 +119,7 @@ let dispose (heap : t) loc =
   match Hashtbl.find_opt heap loc with
   | Some (Allocated { data = _; bound = None }) | None -> Error MissingResource
   | Some Freed ->
-      let annot = Logging.LogQueryer.get_previous_freed_annot loc in
-      let annot : Annot.t option =
-        match annot with
-        | None       -> None
-        | Some annot ->
-            let yojson : Yojson.Safe.t = Yojson.Safe.from_string annot in
-            Some (Result.get_ok (Annot.of_yojson yojson))
-      in
+      let annot = get_previously_freed_annot loc in
       Error (DoubleFree annot)
   | Some (Allocated { data; bound = Some i }) ->
       let has_all =
@@ -137,7 +137,9 @@ let dispose (heap : t) loc =
 let get_cell ~pfs ~gamma heap loc ofs =
   match Hashtbl.find_opt heap loc with
   | None -> Error MissingResource
-  | Some Block.Freed -> Error UseAfterFree
+  | Some Block.Freed ->
+      let annot = get_previously_freed_annot loc in
+      Error (UseAfterFree annot)
   | Some (Allocated { data; bound }) -> (
       let maybe_out_of_bound =
         match bound with
@@ -167,7 +169,9 @@ let set_cell ~pfs ~gamma heap loc_name ofs v =
       let bound = None in
       let () = Hashtbl.replace heap loc_name (Allocated { data; bound }) in
       Ok ()
-  | Some Block.Freed -> Error UseAfterFree
+  | Some Block.Freed ->
+      let annot = get_previously_freed_annot loc_name in
+      Error (UseAfterFree annot)
   | Some (Allocated { data; bound }) ->
       let maybe_out_of_bound =
         match bound with
@@ -177,7 +181,9 @@ let set_cell ~pfs ~gamma heap loc_name ofs v =
             let open Formula.Infix in
             Solver.sat ~unification:false ~pfs ~gamma [ n #<= ofs ]
       in
-      if maybe_out_of_bound then Error UseAfterFree
+      if maybe_out_of_bound then
+        let annot = get_previously_freed_annot loc_name in
+        Error (UseAfterFree annot)
       else
         let equality_test = Solver.is_equal ~pfs ~gamma in
         let data = SFVL.add_with_test ~equality_test ofs v data in
@@ -187,7 +193,9 @@ let set_cell ~pfs ~gamma heap loc_name ofs v =
 let rem_cell heap loc offset =
   match Hashtbl.find_opt heap loc with
   | None -> Error MissingResource
-  | Some Block.Freed -> Error UseAfterFree
+  | Some Block.Freed ->
+      let annot = get_previously_freed_annot loc in
+      Error (UseAfterFree annot)
   | Some (Allocated { bound; data }) ->
       let data = SFVL.remove offset data in
       let () = Hashtbl.replace heap loc (Allocated { bound; data }) in
@@ -195,14 +203,18 @@ let rem_cell heap loc offset =
 
 let get_bound heap loc =
   match Hashtbl.find_opt heap loc with
-  | Some Block.Freed -> Error UseAfterFree
+  | Some Block.Freed ->
+      let annot = get_previously_freed_annot loc in
+      Error (UseAfterFree annot)
   | None | Some (Allocated { bound = None; _ }) -> Error MissingResource
   | Some (Allocated { bound = Some bound; _ }) -> Ok bound
 
 let set_bound heap loc bound =
   let prev = Option.value ~default:Block.empty (Hashtbl.find_opt heap loc) in
   match prev with
-  | Freed                 -> Error UseAfterFree
+  | Freed                 ->
+      let annot = get_previously_freed_annot loc in
+      Error (UseAfterFree annot)
   | Allocated { data; _ } ->
       let changed = Block.Allocated { data; bound = Some bound } in
       let () = Hashtbl.replace heap loc changed in
@@ -210,7 +222,9 @@ let set_bound heap loc bound =
 
 let rem_bound heap loc =
   match Hashtbl.find_opt heap loc with
-  | Some Block.Freed -> Error UseAfterFree
+  | Some Block.Freed ->
+      let annot = get_previously_freed_annot loc in
+      Error (UseAfterFree annot)
   | None | Some (Allocated { bound = None; _ }) -> Error MissingResource
   | Some (Allocated { data; _ }) ->
       let () = Hashtbl.replace heap loc (Allocated { data; bound = None }) in

@@ -6,7 +6,7 @@ type t [@@deriving yojson]
 type err =
   | MissingResource
   | DoubleFree      of Annot.t option
-  | UseAfterFree
+  | UseAfterFree    of Annot.t option
   | MemoryLeak
   | OutOfBounds     of (int option * string * Expr.t)
   | InvalidLocation

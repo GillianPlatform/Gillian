@@ -285,6 +285,12 @@ let pp_by_need _ fmt h = pp fmt h
 let get_print_info _ _ = (SS.empty, SS.empty)
 
 let pp_err fmt t =
+  let loc_pp fmt (loc : Location.t) =
+    Fmt.pf fmt "%i:%i-%i:%i" loc.loc_start.pos_line
+      (loc.loc_start.pos_column + 1)
+      loc.loc_end.pos_line
+      (loc.loc_end.pos_column + 1)
+  in
   match t with
   | WislSHeap.MissingResource -> Fmt.string fmt "Missing Resource"
   | DoubleFree annot -> (
@@ -295,14 +301,19 @@ let pp_err fmt t =
           let origin_loc = Annot.get_origin_loc annot in
           match origin_loc with
           | None            ->
-              Fmt.string fmt "Double Free: already freed at unkown location"
+              Fmt.string fmt "Double Free: already freed at unknown location"
           | Some origin_loc ->
-              Fmt.pf fmt "Double Free: already freed at %i:%i-%i:%i"
-                origin_loc.loc_start.pos_line
-                (origin_loc.loc_start.pos_column + 1)
-                origin_loc.loc_end.pos_line
-                (origin_loc.loc_end.pos_column + 1)))
-  | UseAfterFree -> Fmt.string fmt "Use After Free"
+              Fmt.pf fmt "Double Free: already freed at %a" loc_pp origin_loc))
+  | UseAfterFree annot -> (
+      match annot with
+      | None       -> Fmt.string fmt "Use After Free: freed in specification"
+      | Some annot -> (
+          let origin_loc = Annot.get_origin_loc annot in
+          match origin_loc with
+          | None            -> Fmt.string fmt
+                                 "Use After Free: freed at unknown location"
+          | Some origin_loc ->
+              Fmt.pf fmt "Use After Free: freed at  %a" loc_pp origin_loc))
   | MemoryLeak -> Fmt.string fmt "Memory Leak"
   | OutOfBounds (bound, loc, ofs) ->
       Fmt.pf fmt "Out Of Bounds: (%s, %a) is not in bounds %a" loc Expr.pp ofs
