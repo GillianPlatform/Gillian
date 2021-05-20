@@ -80,6 +80,7 @@ struct
                                  reporter = (module L.FileReporter);
                                }
       | "database" | "db" ->
+          let () = L.LogQueryer.enable () in
           Ok { name = "database"; reporter = (module L.DatabaseReporter) }
       | other             -> Error (`Msg ("unknown value \"" ^ other ^ "\""))
     in

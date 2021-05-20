@@ -67,6 +67,10 @@ module Loggable : sig
 end
 
 module LogQueryer : sig
+  (* Enables the LogQueryer. Should be called only if DatabaseReporter is
+     enabled *)
+  val enable : unit -> unit
+
   (* Returns the content and the content type given the report id *)
   val get_report : string -> (string * string) option
 
