@@ -26,7 +26,7 @@ struct
 
   type t = SS.t * state_t * state_t
 
-  type err_t = State.err_t
+  type err_t = State.err_t [@@deriving yojson]
 
   type fix_t = State.fix_t
 

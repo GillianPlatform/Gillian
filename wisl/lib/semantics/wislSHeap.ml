@@ -12,6 +12,7 @@ type err =
   | MemoryLeak
   | OutOfBounds     of (int option * string * Expr.t)
   | InvalidLocation
+[@@deriving yojson]
 
 module Block = struct
   type t = Freed | Allocated of { data : SFVL.t; bound : int option }

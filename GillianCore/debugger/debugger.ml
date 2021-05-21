@@ -110,7 +110,7 @@ struct
     mutable frames : frame list;
     mutable breakpoints : breakpoints;
     mutable scopes_to_vars : scopes_to_vars;
-    mutable errors : string list;
+    mutable errors : err_t list;
   }
 
   let top_level_scope_names =
@@ -524,7 +524,8 @@ struct
     | Some vars -> vars
 
   let get_exception_info (dbg : debugger_state) =
-    let id = List.hd dbg.errors in
+    let error = List.hd dbg.errors in
+    let id = Fmt.to_to_string pp_err error in
     { id; description = None }
 
   let set_breakpoints source bp_list dbg =

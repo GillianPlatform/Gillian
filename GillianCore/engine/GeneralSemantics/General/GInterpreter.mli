@@ -29,7 +29,7 @@ module type S = sig
 
   type invariant_frames = (string * State.t) list
 
-  type err_t = (vt, state_err_t) ExecErr.t
+  type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
 
   type cconf_t =
     | ConfErr    of CallStack.t * int * State.t * err_t list
@@ -59,7 +59,7 @@ module type S = sig
     call_stack : CallStack.t;
     proc_body_index : int;
     state : state_t option;
-    errors : string list;
+    errors : err_t list;
   }
   [@@deriving yojson]
 

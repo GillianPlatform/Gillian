@@ -145,4 +145,14 @@ module Lift (MSM : S) : SMemory.S = struct
   let to_yojson _ =
     failwith
       "Please implement to_yojson to enable logging this type to a database"
+
+  let err_t_of_yojson _ =
+    failwith
+      "Please implement err_t_of_yojson to enable logging this type to a \
+       database"
+
+  let err_t_to_yojson _ =
+    failwith
+      "Please implement err_t_to_yojson to enable logging this type to a \
+       database"
 end

@@ -9,7 +9,7 @@ type vt = Values.t
 
 type st = Subst.t
 
-type err_t = WislSHeap.err
+type err_t = WislSHeap.err [@@deriving yojson]
 
 type c_fix_t = unit
 

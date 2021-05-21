@@ -9,7 +9,7 @@ module type S = sig
 
   type c_fix_t
 
-  type err_t
+  type err_t [@@deriving yojson]
 
   (** Type of GIL general states *)
   type t [@@deriving yojson]

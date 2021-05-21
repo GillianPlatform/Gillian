@@ -494,6 +494,7 @@ module Asrt : sig
     | Pure  of Formula.t  (** Pure formula *)
     | Types of (Expr.t * Type.t) list  (** Typing assertion *)
     | GA    of string * Expr.t list * Expr.t list  (** Core assertion *)
+  [@@deriving yojson]
 
   (** Comparison of assertions *)
   val compare : t -> t -> int

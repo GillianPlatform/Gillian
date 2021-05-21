@@ -2,6 +2,7 @@ type ('value, 'state_err) t =
   | EProc    of 'value  (** Incorrect procedure identifier *)
   | ESt      of 'state_err  (** Memory Error *)
   | ECleanUp
+[@@deriving yojson]
 
 let pp pp_val pp_state_err ft err =
   let open Fmt in

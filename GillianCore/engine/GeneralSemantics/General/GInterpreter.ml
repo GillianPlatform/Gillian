@@ -32,7 +32,7 @@ module type S = sig
 
   type invariant_frames = (string * State.t) list
 
-  type err_t = (vt, state_err_t) ExecErr.t
+  type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
 
   type cconf_t =
     | ConfErr    of CallStack.t * int * State.t * err_t list
@@ -62,7 +62,7 @@ module type S = sig
     call_stack : CallStack.t;
     proc_body_index : int;
     state : state_t option;
-    errors : string list;
+    errors : err_t list;
   }
   [@@deriving yojson]
 
@@ -127,7 +127,7 @@ struct
 
   type invariant_frames = (string * State.t) list
 
-  type err_t = (Val.t, State.err_t) ExecErr.t
+  type err_t = (Val.t, State.err_t) ExecErr.t [@@deriving yojson]
 
   let pp_err = ExecErr.pp Val.pp State.pp_err
 
@@ -162,7 +162,7 @@ struct
     call_stack : CallStack.t;
     proc_body_index : int;
     state : state_t option;
-    errors : string list;
+    errors : err_t list;
   }
   [@@deriving yojson]
 
@@ -1164,11 +1164,6 @@ struct
           in
           Continue (report_id, fun () -> L.with_normal_phase cont_func)
       | ConfErr (call_stack, proc_body_index, state, errors) :: _ ->
-          let errors : string list =
-            List.map
-              (fun err -> Fmt.to_to_string (ExecErr.pp Val.pp State.pp_err) err)
-              errors
-          in
           let report_id =
             L.normal_specific
               (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson

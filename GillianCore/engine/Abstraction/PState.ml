@@ -70,7 +70,7 @@ module Make
 
   type preds_t = Preds.t
 
-  type err_t = State.err_t
+  type err_t = State.err_t [@@deriving yojson]
 
   type fix_t = State.fix_t
 

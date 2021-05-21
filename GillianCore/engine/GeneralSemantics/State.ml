@@ -21,7 +21,7 @@ module type S = sig
   (** Errors *)
   type m_err_t
 
-  type err_t = (m_err_t, vt) StateErr.err_t
+  type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson]
 
   type fix_t
 

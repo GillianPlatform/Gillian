@@ -834,4 +834,14 @@ module M = struct
   let sorted_locs_with_vals (smemory : t) =
     let sorted_locs = Containers.SS.elements (SHeap.domain smemory) in
     List.map (fun loc -> (loc, Option.get (SHeap.get smemory loc))) sorted_locs
+
+  let err_t_of_yojson _ =
+    failwith
+      "Please implement err_t_of_yojson to enable logging this type to a \
+       database"
+
+  let err_t_to_yojson _ =
+    failwith
+      "Please implement err_t_to_yojson to enable logging this type to a \
+       database"
 end

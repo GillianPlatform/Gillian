@@ -17,7 +17,7 @@ module Make (SMemory : SMemory.S) :
      and type vt = SVal.M.t
      and type store_t = SStore.t
      and type heap_t = SMemory.t = struct
-  type vt = SVal.M.t
+  type vt = SVal.M.t [@@deriving yojson]
 
   type st = SVal.M.et
 
@@ -25,7 +25,7 @@ module Make (SMemory : SMemory.S) :
 
   type store_t = SStore.t [@@deriving yojson]
 
-  type m_err_t = SMemory.err_t
+  type m_err_t = SMemory.err_t [@@deriving yojson]
 
   type t = heap_t * store_t * PFS.t * TypEnv.t * YojsonableSS.t
   [@@deriving yojson]
@@ -36,7 +36,7 @@ module Make (SMemory : SMemory.S) :
     | FSVars of YojsonableSS.t
     | FAsrt  of Asrt.t
 
-  type err_t = (m_err_t, vt) StateErr.err_t
+  type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson]
 
   type action_ret = ASucc of (t * vt list) list | AFail of err_t list
 
