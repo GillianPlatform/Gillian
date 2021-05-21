@@ -22,27 +22,19 @@ module type S = sig
 
   module Store : Store.S with type t = store_t and type vt = vt
 
-  module State :
-    State.S
-      with type t = state_t
-       and type vt = vt
-       and type st = st
-       and type store_t = store_t
-       and type heap_t = heap_t
-
-  type invariant_frames = (string * State.t) list
+  type invariant_frames = (string * state_t) list
 
   type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
 
   type cconf_t =
-    | ConfErr    of CallStack.t * int * State.t * err_t list
+    | ConfErr    of CallStack.t * int * state_t * err_t list
     | ConfCont   of
-        State.t * CallStack.t * invariant_frames * int * string list * int * int
-    | ConfFinish of Flag.t * State.vt * State.t
+        state_t * CallStack.t * invariant_frames * int * string list * int * int
+    | ConfFinish of Flag.t * state_vt * state_t
         (** Equal to Conf cont + the id of the required spec *)
     | ConfSusp   of
         string
-        * State.t
+        * state_t
         * CallStack.t
         * invariant_frames
         * int
@@ -50,9 +42,9 @@ module type S = sig
         * int
         * int
 
-  type conf_t = BConfErr of err_t list | BConfCont of State.t
+  type conf_t = BConfErr of err_t list | BConfCont of state_t
 
-  type result_t = (State.t, state_vt, err_t) ExecRes.t
+  type result_t = (state_t, state_vt, err_t) ExecRes.t
 
   type 'a cont_func =
     | Finished of 'a list
@@ -74,18 +66,18 @@ module type S = sig
 
   val reset : unit -> unit
 
-  val evaluate_lcmds : UP.prog -> LCmd.t list -> State.t -> State.t list
+  val evaluate_lcmds : UP.prog -> LCmd.t list -> state_t -> state_t list
 
   val init_evaluate_proc :
     (result_t -> 'a) ->
     UP.prog ->
     string ->
     string list ->
-    State.t ->
+    state_t ->
     'a cont_func
 
   val evaluate_proc :
-    (result_t -> 'a) -> UP.prog -> string -> string list -> State.t -> 'a list
+    (result_t -> 'a) -> UP.prog -> string -> string list -> state_t -> 'a list
 
   val evaluate_prog : UP.prog -> result_t list
 end

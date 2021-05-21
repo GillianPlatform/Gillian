@@ -20,6 +20,7 @@ module type S = sig
        and type store_t = SStore.t
        and type state_t = state
        and type heap_t = heap_t
+       and type state_err_t = SPState.err_t
 
   type t
 

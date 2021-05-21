@@ -61,8 +61,7 @@ module Make
     (Verification : Verifier.S)
     (TLDisplayFilterMap : DisplayFilterMap.S)
     (SMemoryDisplayable : Displayable.S
-                            with type t =
-                                  Verification.SAInterpreter.State.heap_t) =
+                            with type t = Verification.SAInterpreter.heap_t) =
 struct
   open Verification.SAInterpreter
   module Breakpoints = Set.Make (Int)
@@ -125,7 +124,7 @@ struct
   let is_gil_file file_name = Filename.check_suffix file_name "gil"
 
   let get_store_vars (state : state_t) (is_gil_file : bool) : variable list =
-    let store = State.get_store state in
+    let store = Verification.SPState.get_store state in
     let store_bindings = Store.bindings store in
     let store_bindings =
       if is_gil_file then
@@ -198,7 +197,7 @@ struct
       | None       -> [ []; []; []; []; [] ]
       | Some state ->
           let store_vars = get_store_vars state is_gil_file in
-          let heap = State.get_heap state in
+          let heap = Verification.SPState.get_heap state in
           let dt_list = SMemoryDisplayable.to_debugger_tree heap in
           let heap_vars =
             add_heap_vars dt_list scopes_to_vars get_new_scope_id
@@ -525,7 +524,14 @@ struct
 
   let get_exception_info (dbg : debugger_state) =
     let error = List.hd dbg.errors in
-    let id = Fmt.to_to_string pp_err error in
+    let id =
+      match error with
+      | ExecErr.ESt state_error -> (
+          match state_error with
+          | StateErr.EMem _ -> Fmt.to_to_string pp_err error
+          | _               -> Fmt.to_to_string pp_err error)
+      | error                   -> Fmt.to_to_string pp_err error
+    in
     { id; description = None }
 
   let set_breakpoints source bp_list dbg =
