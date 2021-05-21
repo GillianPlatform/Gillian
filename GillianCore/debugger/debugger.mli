@@ -1,5 +1,6 @@
 module Displayable = Displayable
 module DisplayFilterMap = DisplayFilterMap
+module MemoryErrorLifter = MemoryErrorLifter
 
 module type S = sig
   type stop_reason =
@@ -59,5 +60,6 @@ module Make
     (PC : ParserAndCompiler.S)
     (Verification : Verifier.S)
     (TLDisplayFilterMap : DisplayFilterMap.S)
-    (Displayable : Displayable.S with type t = Verification.SAInterpreter.heap_t) :
-  S
+    (Displayable : Displayable.S with type t = Verification.SAInterpreter.heap_t)
+    (MemoryErrorLifter : MemoryErrorLifter.S
+                           with type merr = Verification.SPState.m_err_t) : S

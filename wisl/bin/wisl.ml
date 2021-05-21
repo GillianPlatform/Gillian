@@ -5,5 +5,6 @@ module CLI =
     (Gillian.Bulk.Runner.DummyRunners)
     (WDebugging.WislDisplayFilter)
     (WDebugging.WislSMemoryDisplayable)
+    (Debugger.MemoryErrorLifter.Dummy (WSemantics.WislSMemory))
 
 let () = CLI.main ()

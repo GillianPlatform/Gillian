@@ -1,6 +1,7 @@
 module L = Logging
 module Displayable = Displayable
 module DisplayFilterMap = DisplayFilterMap
+module MemoryErrorLifter = MemoryErrorLifter
 
 module type S = sig
   type stop_reason =
@@ -61,7 +62,9 @@ module Make
     (Verification : Verifier.S)
     (TLDisplayFilterMap : DisplayFilterMap.S)
     (SMemoryDisplayable : Displayable.S
-                            with type t = Verification.SAInterpreter.heap_t) =
+                            with type t = Verification.SAInterpreter.heap_t)
+    (MemoryErrorLifter : MemoryErrorLifter.S
+                           with type merr = Verification.SPState.m_err_t) =
 struct
   open Verification.SAInterpreter
   module Breakpoints = Set.Make (Int)
@@ -528,8 +531,8 @@ struct
       match error with
       | ExecErr.ESt state_error -> (
           match state_error with
-          | StateErr.EMem _ -> Fmt.to_to_string pp_err error
-          | _               -> Fmt.to_to_string pp_err error)
+          | StateErr.EMem merr -> MemoryErrorLifter.error_to_string merr
+          | _                  -> Fmt.to_to_string pp_err error)
       | error                   -> Fmt.to_to_string pp_err error
     in
     { id; description = None }

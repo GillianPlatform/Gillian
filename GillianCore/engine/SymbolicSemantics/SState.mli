@@ -12,3 +12,4 @@ module Make (SMemory : SMemory.S) :
      and type vt = SVal.M.t
      and type store_t = SStore.t
      and type heap_t = SMemory.t
+     and type m_err_t = SMemory.err_t

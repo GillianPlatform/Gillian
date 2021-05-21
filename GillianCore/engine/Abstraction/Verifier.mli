@@ -5,6 +5,8 @@ module type S = sig
 
   type state
 
+  type m_err
+
   module SPState :
     PState.S
       with type t = state
@@ -12,6 +14,7 @@ module type S = sig
        and type st = st
        and type store_t = SStore.t
        and type heap_t = heap_t
+       and type m_err_t = m_err
 
   module SAInterpreter :
     GInterpreter.S
@@ -47,4 +50,5 @@ module Make
                   and type st = SVal.SESubst.t
                   and type store_t = SStore.t
                   and type preds_t = Preds.SPreds.t)
-    (External : External.S) : S with type heap_t = SPState.heap_t
+    (External : External.S) :
+  S with type heap_t = SPState.heap_t and type m_err = SPState.m_err_t

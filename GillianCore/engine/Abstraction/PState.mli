@@ -50,3 +50,4 @@ module Make
      and type state_t = State.t
      and type preds_t = Preds.t
      and type heap_t = State.heap_t
+     and type m_err_t = State.m_err_t

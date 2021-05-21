@@ -7,6 +7,8 @@ module type S = sig
 
   type state
 
+  type m_err
+
   module SPState :
     PState.S
       with type t = state
@@ -14,6 +16,7 @@ module type S = sig
        and type st = st
        and type store_t = SStore.t
        and type heap_t = heap_t
+       and type m_err_t = m_err
 
   module SAInterpreter :
     GInterpreter.S
@@ -63,6 +66,8 @@ struct
   type state = SPState.t
 
   type heap_t = SPState.heap_t
+
+  type m_err = SPState.m_err_t
 
   let print_success_or_failure success =
     if success then Fmt.pr "%a" (Fmt.styled `Green Fmt.string) "Success\n"

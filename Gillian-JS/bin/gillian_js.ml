@@ -8,5 +8,6 @@ module CLI =
     end)
     (Debugger.DisplayFilterMap.Default)
     (Debugging.JSILSMemoryDisplayable)
+    (Debugger.MemoryErrorLifter.Dummy (Semantics.Symbolic))
 
 let () = CLI.main ()

@@ -18,7 +18,9 @@ module Make
       val runners : Bulk.Runner.t list
     end)
     (DebuggerDisplayFilterMap : Debugger.DisplayFilterMap.S)
-    (SMemoryDisplayable : Debugger.Displayable.S with type t = SMemory.t) =
+    (SMemoryDisplayable : Debugger.Displayable.S with type t = SMemory.t)
+    (MemoryErrorLifter : Debugger.MemoryErrorLifter.S
+                           with type merr = SMemory.err_t) =
 struct
   module CState = CState.Make (CMemory)
   module CInterpreter =
@@ -33,6 +35,7 @@ struct
   module Debugger =
     Debugger.Make (PC) (Verification) (DebuggerDisplayFilterMap)
       (SMemoryDisplayable)
+      (MemoryErrorLifter)
   module DebugAdapter = DebugAdapter.Make (Debugger)
 
   let files =
