@@ -427,29 +427,47 @@ struct
       ExecutionError
     else stop_reason
 
+  let rec step_until_cond
+      (prev_frame : frame)
+      (prev_stack_depth : int)
+      (cond : frame -> frame -> int -> int -> bool)
+      (dbg : debugger_state) : stop_reason =
+    let stop_reason = step_in dbg in
+    match stop_reason with
+    | Step              -> (
+        match dbg.frames with
+        | []             -> failwith "Nothing in call stack, cannot step"
+        | cur_frame :: _ ->
+            let cur_stack_depth = List.length dbg.frames in
+            if cond prev_frame cur_frame prev_stack_depth cur_stack_depth then
+              stop_reason
+            else step_until_cond prev_frame prev_stack_depth cond dbg)
+    | other_stop_reason -> other_stop_reason
+
   let step dbg =
     match dbg.frames with
     | []         -> failwith "Nothing in call stack, cannot step"
     | frame :: _ ->
-        let rec step prev_frame stack_depth dbg =
-          let stop_reason = step_in dbg in
-          match stop_reason with
-          | Step              -> (
-              match dbg.frames with
-              | []         -> failwith "Nothing in call stack, cannot step"
-              | frame :: _ ->
-                  (* TODO: If the frame index is consistent, we can use that to
-                           check if we are in the same frame as the previous
-                           frame *)
-                  if
-                    frame.source_path = prev_frame.source_path
-                    && frame.name = prev_frame.name
-                    || List.length dbg.frames < stack_depth
-                  then stop_reason
-                  else step prev_frame stack_depth dbg)
-          | other_stop_reason -> other_stop_reason
-        in
-        step frame (List.length dbg.frames) dbg
+        if is_gil_file dbg.source_file then
+          (* If GIL file, step until next cmd in the same frame (like in regular
+             debuggers) *)
+          step_until_cond frame (List.length dbg.frames)
+            (fun prev_frame cur_frame prev_stack_depth cur_stack_depth ->
+              cur_frame.source_path = prev_frame.source_path
+              && cur_frame.name = prev_frame.name
+              || cur_stack_depth < prev_stack_depth)
+            dbg
+        else
+          (* If target language file, step until the code origin location is
+             different, indicating an actual step in the target language*)
+          step_until_cond frame (List.length dbg.frames)
+            (fun prev_frame cur_frame _ _ ->
+              cur_frame.source_path = prev_frame.source_path
+              && (cur_frame.start_line <> prev_frame.start_line
+                 || cur_frame.start_column <> prev_frame.start_column
+                 || cur_frame.end_line <> prev_frame.end_line
+                 || cur_frame.end_column <> prev_frame.end_column))
+            dbg
 
   let step_out dbg =
     let rec step_out stack_depth dbg =
