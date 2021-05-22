@@ -2,36 +2,10 @@ module L = Logging
 module Displayable = Displayable
 module DisplayFilterMap = DisplayFilterMap
 module MemoryErrorLifter = MemoryErrorLifter
+module DebuggerTypes = DebuggerTypes
+open DebuggerTypes
 
 module type S = sig
-  type stop_reason =
-    | Step
-    | ReachedStart
-    | ReachedEnd
-    | Breakpoint
-    | ExecutionError
-
-  type frame = {
-    index : int;
-    name : string;
-    source_path : string;
-    start_line : int;
-    start_column : int;
-    end_line : int;
-    end_column : int;
-  }
-
-  type scope = { name : string; id : int }
-
-  type variable = {
-    name : string;
-    value : string;
-    type_ : string option;
-    var_ref : int;
-  }
-
-  type exception_info = { id : string; description : string option }
-
   type debugger_state
 
   val launch : string -> string option -> (debugger_state, string) result
@@ -68,34 +42,6 @@ module Make
 struct
   open Verification.SAInterpreter
   module Breakpoints = Set.Make (Int)
-
-  type stop_reason =
-    | Step
-    | ReachedStart
-    | ReachedEnd
-    | Breakpoint
-    | ExecutionError
-
-  type frame = {
-    index : int;
-    name : string;
-    source_path : string;
-    start_line : int;
-    start_column : int;
-    end_line : int;
-    end_column : int;
-  }
-
-  type scope = { name : string; id : int }
-
-  type variable = {
-    name : string;
-    value : string;
-    type_ : string option;
-    var_ref : int;
-  }
-
-  type exception_info = { id : string; description : string option }
 
   type breakpoints = (string, Breakpoints.t) Hashtbl.t
 
@@ -543,16 +489,16 @@ struct
 
   let get_exception_info (dbg : debugger_state) =
     let error = List.hd dbg.errors in
-    let id =
-      match error with
-      | ExecErr.ESt state_error -> (
-          match state_error with
-          | StateErr.EMem merr ->
-              MemoryErrorLifter.error_to_string merr dbg.cur_cmd
-          | _                  -> Fmt.to_to_string pp_err error)
-      | error                   -> Fmt.to_to_string pp_err error
+    let non_mem_exception_info =
+      { id = Fmt.to_to_string pp_err error; description = None }
     in
-    { id; description = None }
+    match error with
+    | ExecErr.ESt state_error -> (
+        match state_error with
+        | StateErr.EMem merr ->
+            MemoryErrorLifter.error_to_exception_info merr dbg.cur_cmd
+        | _                  -> non_mem_exception_info)
+    | _                       -> non_mem_exception_info
 
   let set_breakpoints source bp_list dbg =
     match source with

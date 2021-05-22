@@ -1,4 +1,5 @@
 open DebugProtocolEx
+open Debugger.DebuggerTypes
 
 module Make (Debugger : Debugger.S) = struct
   let run launch_args dbg rpc =
@@ -16,27 +17,27 @@ module Make (Debugger : Debugger.S) = struct
           Log.info "Do not stop on entry";
           let stop_reason = Debugger.run ~launch:true dbg in
           match stop_reason with
-          | Debugger.Step ->
+          | Step                      ->
               let () =
                 Log.info
                   "Debugger stopped because of step after running. This should \
                    not happen"
               in
               Lwt.return_unit
-          | Debugger.ReachedEnd | Debugger.ReachedStart ->
+          | ReachedEnd | ReachedStart ->
               (* Send step stopped event to allow for stepping backwards *)
               Debug_rpc.send_event rpc
                 (module Stopped_event)
                 Stopped_event.Payload.(
                   make ~reason:Stopped_event.Payload.Reason.Step
                     ~thread_id:(Some 0) ())
-          | Debugger.Breakpoint ->
+          | Breakpoint                ->
               Debug_rpc.send_event rpc
                 (module Stopped_event)
                 Stopped_event.Payload.(
                   make ~reason:Stopped_event.Payload.Reason.Breakpoint
                     ~thread_id:(Some 0) ())
-          | Debugger.ExecutionError ->
+          | ExecutionError            ->
               Debug_rpc.send_event rpc
                 (module Stopped_event)
                 Stopped_event.Payload.(

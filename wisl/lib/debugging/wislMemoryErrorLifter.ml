@@ -51,19 +51,22 @@ let free_error_to_string msg_prefix prev_annot cmd =
       | None            -> Fmt.str "%s at unknown location" msg_prefix
       | Some origin_loc -> Fmt.str "%s at %a" msg_prefix loc_pp origin_loc)
 
-let error_to_string merr cmd =
-  match merr with
-  | WislSHeap.DoubleFree prev_annot ->
-      let msg_prefix var =
-        Fmt.str "%a: %s already freed" WislSMemory.pp_err merr var
-      in
-      free_error_to_string msg_prefix prev_annot cmd
-  | UseAfterFree prev_annot ->
-      let msg_prefix var = Fmt.str "%a: %s freed" WislSMemory.pp_err merr var in
-      free_error_to_string msg_prefix prev_annot cmd
-  | OutOfBounds (bound, _, _) ->
-      let var = get_cell_var_from_cmd cmd in
-      Fmt.str "Out Of Bounds: %s is not in bounds %a" var
-        (Fmt.option ~none:(Fmt.any "none") Fmt.int)
-        bound
-  | _ -> Fmt.to_to_string WislSMemory.pp_err merr
+let error_to_exception_info merr cmd : Debugger.DebuggerTypes.exception_info =
+  let id = Fmt.to_to_string WislSMemory.pp_err merr in
+  let description =
+    match merr with
+    | WislSHeap.DoubleFree prev_annot ->
+        let msg_prefix var = Fmt.str "%s already freed" var in
+        Some (free_error_to_string msg_prefix prev_annot cmd)
+    | UseAfterFree prev_annot ->
+        let msg_prefix var = Fmt.str "%s freed" var in
+        Some (free_error_to_string msg_prefix prev_annot cmd)
+    | OutOfBounds (bound, _, _) ->
+        let var = get_cell_var_from_cmd cmd in
+        Some
+          (Fmt.str "%s is not in bounds %a" var
+             (Fmt.option ~none:(Fmt.any "none") Fmt.int)
+             bound)
+    | _ -> None
+  in
+  { id; description }

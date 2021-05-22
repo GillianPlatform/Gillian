@@ -1,9 +1,10 @@
 open DebugProtocolEx
+open Debugger.DebuggerTypes
 
 module Make (Debugger : Debugger.S) = struct
   let send_stopped_events stop_reason rpc =
     match stop_reason with
-    | Debugger.Step | Debugger.ReachedEnd | Debugger.ReachedStart ->
+    | Step | ReachedEnd | ReachedStart ->
         (* Send step stopped event after reaching the end to allow for stepping
            backwards *)
         Debug_rpc.send_event rpc
@@ -11,13 +12,13 @@ module Make (Debugger : Debugger.S) = struct
           Stopped_event.Payload.(
             make ~reason:Stopped_event.Payload.Reason.Step ~thread_id:(Some 0)
               ())
-    | Debugger.Breakpoint ->
+    | Breakpoint ->
         Debug_rpc.send_event rpc
           (module Stopped_event)
           Stopped_event.Payload.(
             make ~reason:Stopped_event.Payload.Reason.Breakpoint
               ~thread_id:(Some 0) ())
-    | Debugger.ExecutionError ->
+    | ExecutionError ->
         Debug_rpc.send_event rpc
           (module Stopped_event)
           Stopped_event.Payload.(

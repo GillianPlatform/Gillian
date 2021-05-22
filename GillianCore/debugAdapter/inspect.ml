@@ -1,4 +1,5 @@
 open DebugProtocolEx
+open Debugger.DebuggerTypes
 
 module Make (Debugger : Debugger.S) = struct
   let run dbg rpc =
@@ -13,14 +14,14 @@ module Make (Debugger : Debugger.S) = struct
       (module Stack_trace_command)
       (fun _ ->
         let () = Log.info "Stack trace request received" in
-        let (frames : Debugger.frame list) = Debugger.get_frames dbg in
+        let (frames : frame list) = Debugger.get_frames dbg in
         let stack_frames =
           frames
-          |> Stdlib.List.map (fun (frame : Debugger.frame) ->
+          |> Stdlib.List.map (fun (frame : frame) ->
                  let source_path =
-                   Some (Source.make ~path:(Some frame.Debugger.source_path) ())
+                   Some (Source.make ~path:(Some frame.source_path) ())
                  in
-                 Stack_frame.make ~id:frame.Debugger.index ~name:frame.name
+                 Stack_frame.make ~id:frame.index ~name:frame.name
                    ~source:source_path ~line:frame.start_line
                    ~column:frame.start_column ~end_line:(Some frame.end_line)
                    ~end_column:(Some frame.end_column) ())
@@ -33,7 +34,7 @@ module Make (Debugger : Debugger.S) = struct
         let scopes = Debugger.get_scopes dbg in
         let scopes =
           scopes
-          |> List.map (fun (scope : Debugger.scope) ->
+          |> List.map (fun (scope : scope) ->
                  let name = scope.name in
                  let variables_reference = scope.id in
                  Scope.make ~name ~variables_reference ~expensive:false ())
@@ -46,7 +47,7 @@ module Make (Debugger : Debugger.S) = struct
         let variables = Debugger.get_variables args.variables_reference dbg in
         let variables =
           variables
-          |> List.map (fun (var : Debugger.variable) ->
+          |> List.map (fun (var : variable) ->
                  let name = var.name in
                  let value = var.value in
                  let type_ = var.type_ in
