@@ -82,13 +82,9 @@ module LogQueryer : sig
      report id *)
   val get_next_report_id : string -> string option
 
-  (* Returns the annotation corresponding to the previous executed action in
-     the current phase if it exists *)
-  val get_previous_annot : unit -> string option
-
   (* Returns the annotation corresponding to the previous set freed action
      for a given location in the current phase if it exists *)
-  val get_previous_freed_annot : string -> string option
+  val get_previously_freed_annot : string -> string option
 end
 
 (** Initializes the logging module with the specified reporters and initializes

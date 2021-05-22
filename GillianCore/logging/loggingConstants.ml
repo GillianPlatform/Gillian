@@ -8,5 +8,5 @@ module ContentType = struct
 
   let annotated_action = "annotated_action"
 
-  let annotated_set_freed = "annotated_set_freed"
+  let set_freed_info = "set_freed_info"
 end

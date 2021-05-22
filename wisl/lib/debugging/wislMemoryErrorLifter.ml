@@ -52,7 +52,7 @@ let free_error_to_string msg_prefix prev_annot cmd =
       | Some origin_loc -> Fmt.str "%s at %a" msg_prefix loc_pp origin_loc)
 
 let get_previously_freed_annot loc =
-  let annot = Logging.LogQueryer.get_previous_freed_annot loc in
+  let annot = Logging.LogQueryer.get_previously_freed_annot loc in
   match annot with
   | None       -> None
   | Some annot ->

@@ -130,30 +130,22 @@ let get_next_report_id id =
   Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: get next report";
   next_report_id
 
-let get_previous_annot cur_parent_id =
+let get_previously_freed_annot loc =
   let db = get_db () in
   let stmt =
     Sqlite3.prepare db
-      "SELECT json_extract(content, '$.annot') FROM report WHERE parent=? and \
-       type='annotated_action' ORDER BY elapsed_time DESC LIMIT 1;"
+      "SELECT json_extract(content, '$.annot') FROM report WHERE  type=? AND \
+       parent=(SELECT parent from report WHERE type=? AND \
+       json_extract(content, '$.loc')=? ORDER BY elapsed_time DESC LIMIT 1) \
+       ORDER BY elapsed_time DESC LIMIT 1;"
   in
-  Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT cur_parent_id)
-  |> check_result_code db ~log:"get previous annot bind cur_parent_id";
-  let row = zero_or_one_row db ~log:"step: get previous annot" ~stmt in
-  let annot = Option.map (fun row -> row.(0)) row in
-  Sqlite3.finalize stmt
-  |> check_result_code db ~log:"finalize: get previous annot";
-  annot
-
-let get_previous_freed_annot loc =
-  let db = get_db () in
-  let stmt =
-    Sqlite3.prepare db
-      "select json_extract(content, '$.annot') from report where \
-       type='annotated_set_freed' and json_extract(content, '$.loc')=? ORDER \
-       BY elapsed_time DESC LIMIT 1;"
-  in
-  Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT loc)
+  Sqlite3.bind stmt 1
+    (Sqlite3.Data.TEXT LoggingConstants.ContentType.annotated_action)
+  |> check_result_code db ~log:"get previous freed annot bind annotated_action";
+  Sqlite3.bind stmt 2
+    (Sqlite3.Data.TEXT LoggingConstants.ContentType.set_freed_info)
+  |> check_result_code db ~log:"get previous freed annot bind set_freed_info";
+  Sqlite3.bind stmt 3 (Sqlite3.Data.TEXT loc)
   |> check_result_code db ~log:"get previous freed annot bind loc";
   let row = zero_or_one_row db ~log:"step: get previous freed annot" ~stmt in
   let annot = Option.map (fun row -> row.(0)) row in

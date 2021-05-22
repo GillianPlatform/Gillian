@@ -71,25 +71,18 @@ let copy heap = Hashtbl.copy heap
 
 (****** Types and functions for logging when blocks have been freed ********)
 
-type annotated_set_freed = { annot : Annot.t option; loc : string }
-[@@deriving yojson]
+type set_freed_info = { loc : string } [@@deriving yojson]
 
-(* TODO: Implement this to print something useful *)
-let annotated_set_freed_pp _ _ = ()
+let set_freed_info_pp fmt set_freed =
+  Fmt.pf fmt "Set Freed at location %s" set_freed.loc
 
 let set_freed_with_logging heap loc =
-  let annot = Logging.LogQueryer.get_previous_annot () in
-  let annot_opt =
-    Option.bind annot (fun (annot : string) ->
-        Yojson.Safe.from_string annot |> Annot.of_yojson |> Result.to_option)
-  in
-  let annotated_set_freed : annotated_set_freed = { annot = annot_opt; loc } in
+  let set_freed_info = { loc } in
   let _ =
     Logging.normal_specific
-      (Logging.Loggable.make annotated_set_freed_pp
-         annotated_set_freed_of_yojson annotated_set_freed_to_yojson
-         annotated_set_freed)
-      Logging.LoggingConstants.ContentType.annotated_set_freed
+      (Logging.Loggable.make set_freed_info_pp set_freed_info_of_yojson
+         set_freed_info_to_yojson set_freed_info)
+      Logging.LoggingConstants.ContentType.set_freed_info
   in
   Hashtbl.replace heap loc Block.Freed
 
