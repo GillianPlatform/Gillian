@@ -293,17 +293,7 @@ let pp_err fmt t =
   in
   match t with
   | WislSHeap.MissingResource -> Fmt.string fmt "Missing Resource"
-  | DoubleFree annot -> (
-      match annot with
-      | None       -> Fmt.string fmt
-                        "Double Free: already freed in specification"
-      | Some annot -> (
-          let origin_loc = Annot.get_origin_loc annot in
-          match origin_loc with
-          | None            ->
-              Fmt.string fmt "Double Free: already freed at unknown location"
-          | Some origin_loc ->
-              Fmt.pf fmt "Double Free: already freed at %a" loc_pp origin_loc))
+  | DoubleFree _ -> Fmt.string fmt "Double Free"
   | UseAfterFree annot -> (
       match annot with
       | None       -> Fmt.string fmt "Use After Free: freed in specification"

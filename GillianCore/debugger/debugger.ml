@@ -113,6 +113,7 @@ struct
     mutable breakpoints : breakpoints;
     mutable scopes_to_vars : scopes_to_vars;
     mutable errors : err_t list;
+    mutable cur_cmd : int Cmd.t option;
   }
 
   let top_level_scope_names =
@@ -352,7 +353,21 @@ struct
                     create_scopes_to_vars cmd_step.state
                       (is_gil_file dbg.source_file)
                 in
-                dbg.errors <- cmd_step.errors
+                let () = dbg.errors <- cmd_step.errors in
+                let cur_cmd =
+                  match cmd_step.call_stack with
+                  | [] -> None
+                  | (se : CallStack.stack_element) :: _ -> (
+                      let proc = Prog.get_proc dbg.prog se.pid in
+                      match proc with
+                      | None      -> None
+                      | Some proc ->
+                          let _, _, cmd =
+                            proc.proc_body.(cmd_step.proc_body_index)
+                          in
+                          Some cmd)
+                in
+                dbg.cur_cmd <- cur_cmd
             | Error err   -> failwith err)
         | _ as t ->
             raise
@@ -404,6 +419,7 @@ struct
                  breakpoints = Hashtbl.create 0;
                  scopes_to_vars = Hashtbl.create 0;
                  errors = [];
+                 cur_cmd = None;
                }
                 : debugger_state)
             in
@@ -531,7 +547,8 @@ struct
       match error with
       | ExecErr.ESt state_error -> (
           match state_error with
-          | StateErr.EMem merr -> MemoryErrorLifter.error_to_string merr
+          | StateErr.EMem merr ->
+              MemoryErrorLifter.error_to_string merr dbg.cur_cmd
           | _                  -> Fmt.to_to_string pp_err error)
       | error                   -> Fmt.to_to_string pp_err error
     in
