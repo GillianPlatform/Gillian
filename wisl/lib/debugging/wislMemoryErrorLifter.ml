@@ -3,35 +3,50 @@ open Gil_syntax
 
 type merr = WislSHeap.err
 
-let error_to_string merr cmd =
+let free_error_to_string msg_prefix prev_annot cmd =
   let loc_pp fmt (loc : Location.t) =
     Fmt.pf fmt "%i:%i-%i:%i" loc.loc_start.pos_line
       (loc.loc_start.pos_column + 1)
       loc.loc_end.pos_line
       (loc.loc_end.pos_column + 1)
   in
-  match merr with
-  | WislSHeap.DoubleFree prev_annot -> (
-      let var =
+  (* TODO: Display difference variable names when debugging in GIL and WISL *)
+  (* TODO: Get correct variables when intermediate GIL variables are used (e.g. x + 1) *)
+  let var =
+    let open WislLActions in
+    match cmd with
+    | Some cmd -> (
         match cmd with
-        | Some cmd -> (
-            match cmd with
-            | Cmd.LAction (_, "dispose", args) -> (
-                match args with
-                | [ Expr.BinOp (PVar var, _, _) ] -> var
-                | _ -> "")
+        | Cmd.LAction (_, name, args) when name = str_ac Dispose -> (
+            match args with
+            | [ Expr.BinOp (PVar var, _, _) ] -> var
             | _ -> "")
-        | None     -> ""
+        (* TODO: Catch all the cases that use after free can happen to get the
+                 variable names *)
+        | Cmd.LAction (_, name, args) when name = str_ac GetCell -> (
+            match args with
+            | [ _; Expr.BinOp (PVar var, _, _) ] -> var
+            | _ -> "")
+        | _ -> "")
+    | None     -> ""
+  in
+  let msg_prefix = msg_prefix var in
+  match prev_annot with
+  | None       -> Fmt.str "%s in specification" msg_prefix
+  | Some annot -> (
+      let origin_loc = Annot.get_origin_loc annot in
+      match origin_loc with
+      | None            -> Fmt.str "%s at unknown location" msg_prefix
+      | Some origin_loc -> Fmt.str "%s at %a" msg_prefix loc_pp origin_loc)
+
+let error_to_string merr cmd =
+  match merr with
+  | WislSHeap.DoubleFree prev_annot ->
+      let msg_prefix var =
+        Fmt.str "%a: %s already freed" WislSMemory.pp_err merr var
       in
-      let msg_prefix = Fmt.str "%a: %s already freed" WislSMemory.pp_err merr var in
-      match prev_annot with
-      | None       -> Fmt.str "%s in specification" msg_prefix
-      | Some annot -> (
-          let origin_loc = Annot.get_origin_loc annot in
-          match origin_loc with
-          | None            ->
-              Fmt.str "%s at unknown location" msg_prefix
-          | Some origin_loc ->
-              Fmt.str "%s at %a" msg_prefix loc_pp origin_loc
-          ))
-  | _                          -> Fmt.to_to_string WislSMemory.pp_err merr
+      free_error_to_string msg_prefix prev_annot cmd
+  | UseAfterFree prev_annot ->
+      let msg_prefix var = Fmt.str "%a: %s freed" WislSMemory.pp_err merr var in
+      free_error_to_string msg_prefix prev_annot cmd
+  | _ -> Fmt.to_to_string WislSMemory.pp_err merr
