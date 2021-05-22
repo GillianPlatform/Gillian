@@ -3,6 +3,18 @@ open Gil_syntax
 
 type merr = WislSHeap.err
 
+let get_cell_var_from_cmd cmd =
+  let open WislLActions in
+  match cmd with
+  | Some cmd -> (
+      match cmd with
+      | Cmd.LAction (_, name, args) when name = str_ac GetCell -> (
+          match args with
+          | [ _; Expr.BinOp (PVar var, _, _) ] -> var
+          | _ -> "")
+      | _ -> "")
+  | None     -> ""
+
 let free_error_to_string msg_prefix prev_annot cmd =
   let loc_pp fmt (loc : Location.t) =
     Fmt.pf fmt "%i:%i-%i:%i" loc.loc_start.pos_line
@@ -49,4 +61,9 @@ let error_to_string merr cmd =
   | UseAfterFree prev_annot ->
       let msg_prefix var = Fmt.str "%a: %s freed" WislSMemory.pp_err merr var in
       free_error_to_string msg_prefix prev_annot cmd
+  | OutOfBounds (bound, _, _) ->
+      let var = get_cell_var_from_cmd cmd in
+      Fmt.str "Out Of Bounds: %s is not in bounds %a" var
+        (Fmt.option ~none:(Fmt.any "none") Fmt.int)
+        bound
   | _ -> Fmt.to_to_string WislSMemory.pp_err merr
