@@ -51,14 +51,23 @@ let free_error_to_string msg_prefix prev_annot cmd =
       | None            -> Fmt.str "%s at unknown location" msg_prefix
       | Some origin_loc -> Fmt.str "%s at %a" msg_prefix loc_pp origin_loc)
 
+let get_previously_freed_annot loc =
+  let annot = Logging.LogQueryer.get_previous_freed_annot loc in
+  match annot with
+  | None       -> None
+  | Some annot ->
+      annot |> Yojson.Safe.from_string |> Annot.of_yojson |> Result.to_option
+
 let error_to_exception_info merr cmd : Debugger.DebuggerTypes.exception_info =
   let id = Fmt.to_to_string WislSMemory.pp_err merr in
   let description =
     match merr with
-    | WislSHeap.DoubleFree prev_annot ->
+    | WislSHeap.DoubleFree loc  ->
+        let prev_annot = get_previously_freed_annot loc in
         let msg_prefix var = Fmt.str "%s already freed" var in
         Some (free_error_to_string msg_prefix prev_annot cmd)
-    | UseAfterFree prev_annot ->
+    | UseAfterFree loc          ->
+        let prev_annot = get_previously_freed_annot loc in
         let msg_prefix var = Fmt.str "%s freed" var in
         Some (free_error_to_string msg_prefix prev_annot cmd)
     | OutOfBounds (bound, _, _) ->
@@ -67,6 +76,6 @@ let error_to_exception_info merr cmd : Debugger.DebuggerTypes.exception_info =
           (Fmt.str "%s is not in bounds %a" var
              (Fmt.option ~none:(Fmt.any "none") Fmt.int)
              bound)
-    | _ -> None
+    | _                         -> None
   in
   { id; description }
