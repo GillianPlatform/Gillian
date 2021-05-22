@@ -3,6 +3,7 @@ module Displayable = Displayable
 module DisplayFilterMap = DisplayFilterMap
 module MemoryErrorLifter = MemoryErrorLifter
 module DebuggerTypes = DebuggerTypes
+module DebuggerUtils = DebuggerUtils
 open DebuggerTypes
 
 module type S = sig
@@ -250,11 +251,11 @@ struct
               match loc_opt with
               | None     -> defaults
               | Some loc ->
+                  let loc = DebuggerUtils.location_to_display_location loc in
                   ( loc.loc_start.pos_line,
-                    (* VSCode column numbers start from 1 *)
-                    loc.loc_start.pos_column + 1,
+                    loc.loc_start.pos_column,
                     loc.loc_end.pos_line,
-                    loc.loc_end.pos_column + 1,
+                    loc.loc_end.pos_column,
                     loc.loc_source ))
         in
         let frame =

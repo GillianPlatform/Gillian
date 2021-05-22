@@ -1,5 +1,6 @@
 open WSemantics
 open Gil_syntax
+open Debugger
 
 type merr = WislSHeap.err
 
@@ -16,12 +17,6 @@ let get_cell_var_from_cmd cmd =
   | None     -> ""
 
 let free_error_to_string msg_prefix prev_annot cmd =
-  let loc_pp fmt (loc : Location.t) =
-    Fmt.pf fmt "%i:%i-%i:%i" loc.loc_start.pos_line
-      (loc.loc_start.pos_column + 1)
-      loc.loc_end.pos_line
-      (loc.loc_end.pos_column + 1)
-  in
   (* TODO: Display difference variable names when debugging in GIL and WISL *)
   (* TODO: Get correct variables when intermediate GIL variables are used (e.g. x + 1) *)
   let var =
@@ -49,7 +44,11 @@ let free_error_to_string msg_prefix prev_annot cmd =
       let origin_loc = Annot.get_origin_loc annot in
       match origin_loc with
       | None            -> Fmt.str "%s at unknown location" msg_prefix
-      | Some origin_loc -> Fmt.str "%s at %a" msg_prefix loc_pp origin_loc)
+      | Some origin_loc ->
+          let origin_loc =
+            DebuggerUtils.location_to_display_location origin_loc
+          in
+          Fmt.str "%s at %a" msg_prefix Location.pp origin_loc)
 
 let get_previously_freed_annot loc =
   let annot = Logging.LogQueryer.get_previously_freed_annot loc in

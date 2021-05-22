@@ -2,6 +2,7 @@ module Displayable = Displayable
 module DisplayFilterMap = DisplayFilterMap
 module MemoryErrorLifter = MemoryErrorLifter
 module DebuggerTypes = DebuggerTypes
+module DebuggerUtils = DebuggerUtils
 open DebuggerTypes
 
 module type S = sig
