@@ -20,7 +20,8 @@ module Make
     (DebuggerDisplayFilterMap : Debugger.DisplayFilterMap.S)
     (SMemoryDisplayable : Debugger.Displayable.S with type t = SMemory.t)
     (MemoryErrorLifter : Debugger.MemoryErrorLifter.S
-                           with type merr = SMemory.err_t) =
+                           with type merr = SMemory.err_t
+                            and type tl_ast = PC.tl_ast) =
 struct
   module CState = CState.Make (CMemory)
   module CInterpreter =

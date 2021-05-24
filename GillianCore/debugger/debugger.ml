@@ -7,6 +7,8 @@ module DebuggerUtils = DebuggerUtils
 open DebuggerTypes
 
 module type S = sig
+  type tl_ast
+
   type debugger_state
 
   val launch : string -> string option -> (debugger_state, string) result
@@ -39,7 +41,8 @@ module Make
     (SMemoryDisplayable : Displayable.S
                             with type t = Verification.SAInterpreter.heap_t)
     (MemoryErrorLifter : MemoryErrorLifter.S
-                           with type merr = Verification.SPState.m_err_t) =
+                           with type merr = Verification.SPState.m_err_t
+                            and type tl_ast = PC.tl_ast) =
 struct
   open Verification.SAInterpreter
   module Breakpoints = Set.Make (Int)
@@ -48,19 +51,25 @@ struct
 
   type scopes_to_vars = (int, variable list) Hashtbl.t
 
+  type tl_ast = PC.tl_ast
+
   type debugger_state = {
     source_file : string;
     source_files : SourceFiles.t option;
     top_level_scopes : scope list;
     prog : (Annot.t, int) Prog.t;
+    tl_ast : tl_ast option;
     mutable cont_func :
       (unit -> Verification.SAInterpreter.result_t cont_func) option;
     mutable cur_report_id : string;
+    (* TODO: The below fields (except breakpoints) only depend on the
+             cur_report_id and could be refactored to use this *)
     mutable frames : frame list;
     mutable breakpoints : breakpoints;
     mutable scopes_to_vars : scopes_to_vars;
     mutable errors : err_t list;
     mutable cur_cmd : int Cmd.t option;
+    mutable cur_annot : Annot.t option;
   }
 
   let top_level_scope_names =
@@ -196,17 +205,17 @@ struct
     | None         -> ()
 
   let preprocess_files files already_compiled outfile_opt no_unfold =
-    let e_prog, source_files_opt =
+    let e_prog, source_files_opt, tl_ast =
       if not already_compiled then
         let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
         let e_progs = progs.gil_progs in
         let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
         let e_prog = snd (List.hd e_progs) in
         let source_files = progs.source_files in
-        (e_prog, Some source_files)
+        (e_prog, Some source_files, Some progs.tl_ast)
       else
         let e_prog = Gil_parsing.parse_eprog_from_file (List.hd files) in
-        (e_prog, None)
+        (e_prog, None, None)
     in
     let () = burn_gil e_prog outfile_opt in
     (* Prog.perform_syntax_checks e_prog; *)
@@ -224,7 +233,7 @@ struct
       L.verbose (fun m ->
           m "@\nProgram after logic preprocessing:@\n%a@\n" Prog.pp_indexed prog)
     in
-    (prog, source_files_opt)
+    (prog, source_files_opt, tl_ast)
 
   let has_hit_breakpoint dbg =
     match dbg.frames with
@@ -301,27 +310,27 @@ struct
                       (is_gil_file dbg.source_file)
                 in
                 let () = dbg.errors <- cmd_step.errors in
-                let cur_cmd =
+                let cur_cmd, cur_annot =
                   match cmd_step.call_stack with
-                  | [] -> None
+                  | [] -> (None, None)
                   | (se : CallStack.stack_element) :: _ -> (
                       let proc = Prog.get_proc dbg.prog se.pid in
                       match proc with
-                      | None      -> None
+                      | None      -> (None, None)
                       | Some proc ->
-                          let _, _, cmd =
+                          let annot, _, cmd =
                             proc.proc_body.(cmd_step.proc_body_index)
                           in
-                          Some cmd)
+                          (Some cmd, Some annot))
                 in
-                dbg.cur_cmd <- cur_cmd
+                let () = dbg.cur_cmd <- cur_cmd in
+                dbg.cur_annot <- cur_annot
             | Error err   -> failwith err)
         | _ as t ->
             raise
               (Failure
                  (Printf.sprintf
-                    "Cannot deserialize: type '%s' does not match callstack" t))
-        )
+                    "Cannot deserialize: type '%s' does not match cmd_step" t)))
 
   let launch file_name proc_name =
     let () = Fmt_tty.setup_std_outputs () in
@@ -341,7 +350,7 @@ struct
     let no_unfold = false in
     (* TODO: Support debugging incremental mode *)
     (* let incremental = false in *)
-    let prog, source_files_opt =
+    let prog, source_files_opt, tl_ast =
       preprocess_files [ file_name ] already_compiled outfile_opt no_unfold
     in
     let cont_func = Verification.verify_up_to_procs prog in
@@ -361,12 +370,14 @@ struct
                  top_level_scopes;
                  cont_func = Some cont_func;
                  prog;
+                 tl_ast;
                  frames = [];
                  cur_report_id;
                  breakpoints = Hashtbl.create 0;
                  scopes_to_vars = Hashtbl.create 0;
                  errors = [];
                  cur_cmd = None;
+                 cur_annot = None;
                }
                 : debugger_state)
             in
@@ -516,6 +527,7 @@ struct
         match state_error with
         | StateErr.EMem merr ->
             MemoryErrorLifter.error_to_exception_info merr dbg.cur_cmd
+              dbg.cur_annot dbg.tl_ast
         | _                  -> non_mem_exception_info)
     | _                       -> non_mem_exception_info
 

@@ -6,6 +6,8 @@ module DebuggerUtils = DebuggerUtils
 open DebuggerTypes
 
 module type S = sig
+  type tl_ast
+
   type debugger_state
 
   val launch : string -> string option -> (debugger_state, string) result
@@ -37,4 +39,5 @@ module Make
     (TLDisplayFilterMap : DisplayFilterMap.S)
     (Displayable : Displayable.S with type t = Verification.SAInterpreter.heap_t)
     (MemoryErrorLifter : MemoryErrorLifter.S
-                           with type merr = Verification.SPState.m_err_t) : S
+                           with type merr = Verification.SPState.m_err_t
+                            and type tl_ast = PC.tl_ast) : S

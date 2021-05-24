@@ -8,6 +8,8 @@ module CLI =
     end)
     (Debugger.DisplayFilterMap.Default)
     (Debugging.JSILSMemoryDisplayable)
-    (Debugger.MemoryErrorLifter.Dummy (Semantics.Symbolic))
+    (Debugger.MemoryErrorLifter.Dummy
+       (Semantics.Symbolic)
+       (Js2jsil_lib.JS2GIL_ParserAndCompiler))
 
 let () = CLI.main ()

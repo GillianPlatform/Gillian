@@ -17,3 +17,5 @@ let set_loop_info (annot : t) (loop_info : string list) =
   { annot with loop_info }
 
 let get_origin_loc annot = annot.origin_loc
+
+let get_origin_id annot = annot.origin_id

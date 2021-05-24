@@ -10,6 +10,6 @@ module CLI =
     end)
     (Debugger.DisplayFilterMap.Default)
     (SMemoryDisplayable)
-    (Debugger.MemoryErrorLifter.Dummy (SMemory))
+    (Debugger.MemoryErrorLifter.Dummy (SMemory) (ParserAndCompiler))
 
 let () = CLI.main ()

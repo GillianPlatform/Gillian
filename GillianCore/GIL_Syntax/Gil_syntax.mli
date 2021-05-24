@@ -911,8 +911,11 @@ module Annot : sig
   (** Set the loop info *)
   val set_loop_info : t -> string list -> t
 
-  (** get the line offset *)
+  (** Get the origin location *)
   val get_origin_loc : t -> Location.t option
+
+  (* Get the origin id *)
+  val get_origin_id : t -> int
 end
 
 module Proc : sig
