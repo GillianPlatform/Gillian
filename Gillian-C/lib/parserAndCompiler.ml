@@ -170,6 +170,9 @@ let get_deps_path c_path = Filename.chop_extension c_path ^ ".deps"
 
 type err = Errors.errmsg
 
+(* TODO: Include some form of the C AST *)
+type tl_ast = unit
+
 let pp_err fmt e = Driveraux.print_error fmt e
 
 let get_or_print_and_die = function
@@ -311,7 +314,7 @@ let create_compilation_result gil_progs =
         (get_gil_path path, prog))
       gil_progs
   in
-  { gil_progs; source_files }
+  { gil_progs; source_files; tl_ast = () }
 
 let parse_and_compile_files paths =
   let exec_mode = !Gillian.Utils.Config.current_exec_mode in
