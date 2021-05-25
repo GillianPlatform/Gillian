@@ -4,7 +4,7 @@ open Gil_syntax
 type t [@@deriving yojson]
 
 type err =
-  | MissingResource
+  | MissingResource of WislLActions.ga
   | DoubleFree      of string
   | UseAfterFree    of string
   | MemoryLeak
