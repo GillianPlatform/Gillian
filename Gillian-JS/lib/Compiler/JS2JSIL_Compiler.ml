@@ -5311,7 +5311,7 @@ and translate_statement tr_ctx e =
 
       (* x1_v := i__getValue (x1) with err *)
       let x1_v, cmd_gv_x1, errs_x1_v =
-        make_get_value_call x1 tr_ctx.tr_err_lab
+        make_get_value_call x1 new_ctx.tr_err_lab
       in
 
       (* x_ret_2 := PHI(cont_vars, x1_v) *)
@@ -5333,11 +5333,11 @@ and translate_statement tr_ctx e =
 
       (* x2_v := i__getValue (x2) with err *)
       let x2_v, cmd_gv_x2, errs_x2_v =
-        make_get_value_call x2 tr_ctx.tr_err_lab
+        make_get_value_call x2 new_ctx.tr_err_lab
       in
 
       (* x2_b := i__toBoolean (x2_v) with err *)
-      let x2_b, cmd_tb_x2 = make_to_boolean_call x2 x2_v tr_ctx.tr_err_lab in
+      let x2_b, cmd_tb_x2 = make_to_boolean_call x2 x2_v new_ctx.tr_err_lab in
 
       (* goto [x2_b] head end_loop *)
       let cmd_dowhile_goto = LGuardedGoto (PVar x2_b, head, end_loop) in
@@ -5411,17 +5411,19 @@ and translate_statement tr_ctx e =
        *)
       let head, _, body, cont, end_loop = fresh_loop_vars () in
 
+      let new_loop_id = fresh_loop_identifier () in
+      let new_loops = new_loop_id :: tr_ctx.tr_loops in
+      let new_ctx = update_tr_ctx ~loops:new_loops tr_ctx in
+
+      let cmds1, x1, errs1 = translate_expr new_ctx e1 in
+
       let new_loop_list =
         (Some cont, end_loop, tr_ctx.tr_js_lab, true) :: tr_ctx.tr_loop_list
       in
-      let new_loop_id = fresh_loop_identifier () in
-      let new_loops = new_loop_id :: tr_ctx.tr_loops in
       let new_ctx =
-        update_tr_ctx ~previous:None ~lab:None ~loop_list:new_loop_list
-          ~loops:new_loops tr_ctx
+        update_tr_ctx ~previous:None ~lab:None ~loop_list:new_loop_list new_ctx
       in
 
-      let cmds1, x1, errs1 = translate_expr new_ctx e1 in
       let cmds2, x2, errs2, rets2, breaks2, conts2 =
         translate_statement new_ctx e2
       in
@@ -5446,18 +5448,18 @@ and translate_statement tr_ctx e =
 
       (* x1_v := i__getValue (x1) with err *)
       let x1_v, cmd_gv_x1, errs_x1_v =
-        make_get_value_call x1 tr_ctx.tr_err_lab
+        make_get_value_call x1 new_ctx.tr_err_lab
       in
 
       (* x1_b := i__toBoolean (x1_v) with err *)
-      let x1_b, cmd_tb_x1 = make_to_boolean_call x1 x1_v tr_ctx.tr_err_lab in
+      let x1_b, cmd_tb_x1 = make_to_boolean_call x1 x1_v new_ctx.tr_err_lab in
 
       (* goto [x1_b] body endwhile  *)
       let cmd_goto_while = LGuardedGoto (PVar x1_b, body, end_loop) in
 
       (* x2_v := i__getValue (x2) with err *)
       let x2_v, cmd_gv_x2, errs_x2_v =
-        make_get_value_call x2 tr_ctx.tr_err_lab
+        make_get_value_call x2 new_ctx.tr_err_lab
       in
 
       (* x_ret_2 := PHI(cont_vars, x2_v) *)
@@ -5908,10 +5910,10 @@ and translate_statement tr_ctx e =
       in
 
       let cur_breaks, outer_breaks =
-        filter_cur_jumps breaks4 new_ctx.tr_js_lab true
+        filter_cur_jumps breaks4 tr_ctx.tr_js_lab true
       in
       let cur_conts, outer_conts =
-        filter_cur_jumps conts4 new_ctx.tr_js_lab true
+        filter_cur_jumps conts4 tr_ctx.tr_js_lab true
       in
 
       (* head:     x_ret_1 := PHI(x_ret_0, x_ret_3)  *)
@@ -5924,11 +5926,11 @@ and translate_statement tr_ctx e =
 
       (* x2_v := i__getValue (x2) with err *)
       let x2_v, cmd_gv_x2, errs_x2_v =
-        make_get_value_call x2 tr_ctx.tr_err_lab
+        make_get_value_call x2 new_ctx.tr_err_lab
       in
 
       (* x2_b := i__toBoolean (x2_v) with err2 *)
-      let x2_b, cmd_tb_x2 = make_to_boolean_call x2 x2_v tr_ctx.tr_err_lab in
+      let x2_b, cmd_tb_x2 = make_to_boolean_call x2 x2_v new_ctx.tr_err_lab in
 
       (* goto [x2_b] body end_loop *)
       let body = fresh_loop_body_label () in
@@ -5936,7 +5938,7 @@ and translate_statement tr_ctx e =
 
       (* x4_v := i__getValue (x4) with err *)
       let x4_v, cmd_gv_x4, errs_x4_v =
-        make_get_value_call x4 tr_ctx.tr_err_lab
+        make_get_value_call x4 new_ctx.tr_err_lab
       in
 
       (* cont:     x_ret_2 := PHI(cont_vars, x4_v)  *)
@@ -6566,10 +6568,10 @@ and translate_statement tr_ctx e =
           (*  end_switch: x_r := PHI(breaks_a, breaks_def, x_def) *)
           let x_r = fresh_var () in
           let cur_breaks_as, outer_breaks_as =
-            filter_cur_jumps breaks_as tr_ctx.tr_js_lab true
+            filter_cur_jumps breaks_as new_ctx.tr_js_lab true
           in
           let cur_breaks_def, outer_breaks_def =
-            filter_cur_jumps breaks_def tr_ctx.tr_js_lab true
+            filter_cur_jumps breaks_def new_ctx.tr_js_lab true
           in
           let phi_args = cur_breaks_as @ cur_breaks_def @ [ x_def ] in
           let phi_args = List.map (fun x -> PVar x) phi_args in
