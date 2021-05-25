@@ -1,16 +1,54 @@
+open Gillian.Symbolic
+open Gil_syntax
+
 type t
+
+type err =
+  | MissingRessource
+  | DoubleFree
+  | UseAfterFree
+  | MemoryLeak
+  | OutOfBound
+  | InvalidLocation
 
 val init : unit -> t
 
-val get_fvl : t -> string -> SFVL.t option
-
-val set_fvl : t -> string -> SFVL.t -> unit
-
 val alloc : t -> int -> string
 
-val remove : t -> string -> unit
+val dispose : t -> string -> (unit, err) Result.t
 
-val str : t -> string
+val get_cell :
+  pfs:PureContext.t ->
+  gamma:TypEnv.t ->
+  t ->
+  string ->
+  Expr.t ->
+  (string * Expr.t * Expr.t, err) result
+
+val set_cell :
+  pfs:PureContext.t ->
+  gamma:TypEnv.t ->
+  t ->
+  string ->
+  Expr.t ->
+  Expr.t ->
+  (unit, err) result
+
+val rem_cell : t -> string -> Expr.t -> (unit, err) result
+
+val get_bound : t -> string -> (int, err) result
+
+val set_bound : t -> string -> int -> (unit, err) result
+
+val rem_bound : t -> string -> (unit, err) result
+
+val get_freed : t -> string -> (unit, err) result
+
+val set_freed : t -> string -> unit
+
+val rem_freed : t -> string -> (unit, err) result
+
+val pp : t Fmt.t
 
 val copy : t -> t
 

@@ -1,37 +1,70 @@
-type ac = SetCell | GetCell | RemCell | Alloc | Dispose
+type ac =
+  | SetCell
+  | GetCell
+  | RemCell
+  | GetFreed
+  | SetFreed
+  | RemFreed
+  | GetBound
+  | SetBound
+  | RemBound
+  | Alloc
+  | Dispose
 
-type ga = Cell
+type ga = Cell | Bound | Freed
 
 let str_ac = function
-  | SetCell -> "setcell"
-  | GetCell -> "getcell"
-  | RemCell -> "remcell"
-  | Alloc   -> "alloc"
-  | Dispose -> "dispose"
+  | SetCell  -> "setcell"
+  | GetCell  -> "getcell"
+  | RemCell  -> "remcell"
+  | Alloc    -> "alloc"
+  | Dispose  -> "dispose"
+  | GetFreed -> "getfreed"
+  | SetFreed -> "setfreed"
+  | RemFreed -> "remfreed"
+  | GetBound -> "getbound"
+  | SetBound -> "setbound"
+  | RemBound -> "rembound"
 
 let ac_from_str = function
-  | "setcell" -> SetCell
-  | "getcell" -> GetCell
-  | "remcell" -> RemCell
-  | "alloc"   -> Alloc
-  | "dispose" -> Dispose
-  | ac        -> failwith ("Unknown local action for wisl : " ^ ac)
+  | "setcell"  -> SetCell
+  | "getcell"  -> GetCell
+  | "remcell"  -> RemCell
+  | "getfreed" -> GetFreed
+  | "setfreed" -> SetFreed
+  | "remfreed" -> RemFreed
+  | "getbound" -> GetBound
+  | "setbound" -> SetBound
+  | "rembound" -> RemBound
+  | "alloc"    -> Alloc
+  | "dispose"  -> Dispose
+  | ac         -> failwith ("Unknown local action for wisl : " ^ ac)
 
 let str_ga = function
-  | Cell -> "cell"
+  | Cell  -> "cell"
+  | Bound -> "bound"
+  | Freed -> "freed"
 
 let ga_from_str = function
-  | "cell" -> Cell
-  | ga     -> failwith ("Unkown general assertion for wisl : " ^ ga)
+  | "cell"  -> Cell
+  | "bound" -> Bound
+  | "freed" -> Freed
+  | ga      -> failwith ("Unkown general assertion for wisl : " ^ ga)
 
 let ga_to_setter = function
-  | Cell -> SetCell
+  | Cell  -> SetCell
+  | Bound -> SetBound
+  | Freed -> SetFreed
 
 let ga_to_getter = function
-  | Cell -> GetCell
+  | Cell  -> GetCell
+  | Bound -> GetBound
+  | Freed -> GetFreed
 
 let ga_to_deleter = function
-  | Cell -> RemCell
+  | Cell  -> RemCell
+  | Bound -> RemBound
+  | Freed -> RemFreed
 
 let ga_to_action_str action str = ga_from_str str |> action |> str_ac
 

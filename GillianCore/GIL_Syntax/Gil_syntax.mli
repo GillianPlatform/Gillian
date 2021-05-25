@@ -211,6 +211,8 @@ module Expr : sig
 
   val num : float -> t
 
+  val num_int : int -> t
+
   val int : int -> t
 
   val string : string -> t

@@ -24,7 +24,7 @@ lemma dlsegl_append_right {
       fold dlsegl(y, y, v, v, [], 0);
       fold dlsegl(x, y, v, w, a :: alpha, 1 + llen)
     } else {
-      assert {exists: #b, #l, #beta, #_llen} (alpha == #b :: #beta) * (x -> #b, #l, w) * dlsegl(#l, v, z, x, #beta, #_llen);
+      assert {bind: #b, #l, #beta, #_llen} (alpha == #b :: #beta) * (x -> #b, #l, w) * dlsegl(#l, v, z, x, #beta, #_llen);
       apply dlsegl_append_right(#l, v, z, x, #beta, #_llen, a, y);
       fold dlsegl(x, y, v, w, alpha @ [ a ], 1 + llen)
     }
@@ -44,7 +44,7 @@ lemma dlsegr_append_left {
       fold dlsegr(x, x, w, w, [], 0);
       fold dlsegr(x, y, v, w, a :: alpha, 1 + llen)
     } else {
-      assert {exists: #b, #l, #beta, #_llen} (alpha == #beta @ [#b]) * (v -> #b, y, #l) * dlsegr(z, v, #l, x, #beta, #_llen);
+      assert {bind: #b, #l, #beta, #_llen} (alpha == #beta @ [#b]) * (v -> #b, y, #l) * dlsegr(z, v, #l, x, #beta, #_llen);
       apply dlsegr_append_left(x, a, z, w, v, #l, #beta, #_llen);
       fold dlsegr(x, y, v, w, a :: alpha, 1 + llen)
     }
@@ -63,7 +63,7 @@ lemma dlseg_l_to_r {
     if (alpha = nil) {
       fold dlsegr(x, y, v, w, alpha, llen)
     } else {
-      assert {exists: #a, #z, #beta, #_llen} (x -> #a, #z, w) * dlsegl(#z, y, v, x, #beta, #_llen);
+      assert {bind: #a, #z, #beta, #_llen} (x -> #a, #z, w) * dlsegl(#z, y, v, x, #beta, #_llen);
       apply dlseg_l_to_r(#z, y, v, x, #beta, #_llen);
       apply dlsegr_append_left(x, #a, #z, w, y, v, #beta, #_llen)
     }
@@ -82,7 +82,7 @@ lemma dlseg_r_to_l {
     if (alpha = nil) {
       fold dlsegl(x, y, v, w, alpha, llen)
     } else {
-      assert {exists: #a, #z, #beta, #_llen} (v -> #a, y, #z) * dlsegr(x, v, #z, w, #beta, #_llen);
+      assert {bind: #a, #z, #beta, #_llen} (v -> #a, y, #z) * dlsegr(x, v, #z, w, #beta, #_llen);
       apply dlseg_r_to_l(x, v, #z, w, #beta, #_llen);
       apply dlsegl_append_right(x, v, #z, w, #beta, #_llen, #a, y)
     }
@@ -103,7 +103,7 @@ lemma dlseg_concat {
   proof:
     unfold dlsegl(x_a, x_b, v_a, w_a, alpha, llena);
     if (alpha != []) {
-      assert {exists: #a, #z_a, #gamma, #_llena} (x_a -> #a, #z_a, w_a) * dlsegl(#z_a, x_b, v_a, x_a, #gamma, #_llena);
+      assert {bind: #a, #z_a, #gamma, #_llena} (x_a -> #a, #z_a, w_a) * dlsegl(#z_a, x_b, v_a, x_a, #gamma, #_llena);
       apply dlseg_concat(#z_a, v_a, x_a, #gamma, #_llena, x_b, y_b, v_b, beta, llenb);
       fold dlsegl(x_a, y_b, v_b, w_a, (alpha @ beta), llena + llenb)
     }

@@ -78,7 +78,7 @@ let rec substitution (subst : (string, tt) Hashtbl.t) (e : t) : t =
   let f = substitution subst in
   let wlenode =
     match wlenode with
-    | LVal v                 -> LVal v
+    | LVal _                 -> wlenode
     | LVar x                 -> Option.value ~default:(LVar x)
                                   (Hashtbl.find_opt subst x)
     | PVar x                 -> Option.value ~default:(PVar x)
