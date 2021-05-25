@@ -22,6 +22,8 @@ let lit x = Lit x
 
 let num n = lit (Num n)
 
+let num_int n = lit (Num (float_of_int n))
+
 let int n = lit (Int n)
 
 let string s = lit (String s)

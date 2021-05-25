@@ -46,7 +46,7 @@ rule read =
   | "proof"  { PROOF (curr lexbuf) }
   | "lemma"  { LEMMA (curr lexbuf) }
   | "forall" { FORALL (curr lexbuf) }
-  | "exists" { EXIST (curr lexbuf) }
+  | "bind" { EXIST (curr lexbuf) }
   (* types *)
   | "List" { TLIST (curr lexbuf) }
   | "Int" { TINT (curr lexbuf) }
@@ -56,7 +56,7 @@ rule read =
   | "//"     { read_comment lexbuf }
   (* logical binary stuff *)
   | "->"     { ARROW }
-  | "-b->"   { BLOCK_ARROW }
+  | "-b>"   { BLOCK_ARROW }
   | "/\\"    { LAND }
   | "\\/"    { LOR }
   | "=="     { LEQ }

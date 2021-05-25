@@ -1,5 +1,5 @@
 (* TODO: Before merging, this has to be entirely documented. Step by step, how does the compilation work.
-    More exactly, the compilation of logical expr and expr, as well a stmts should be detailed. *)
+   More exactly, the compilation of logical expr and expr, as well a stmts should be detailed. *)
 
 open WislConstants.Prefix
 open WislConstants.InternalProcs
@@ -25,7 +25,7 @@ let compile_type t =
     | WBool   -> Some Type.BooleanType
     | WString -> Some Type.StringType
     | WPtr    -> Some Type.ObjectType
-    | WInt    -> Some Type.IntType
+    | WInt    -> Some Type.NumberType
     | WSet    -> Some Type.SetType
     | WAny    -> None)
 
@@ -61,7 +61,7 @@ let rec compile_val v =
   match v with
   | Bool b  -> Literal.Bool b
   | Null    -> Literal.Null
-  | Int n   -> Literal.Int n
+  | Int n   -> Literal.Num (float_of_int n)
   | Str s   -> Literal.String s
   | VList l -> Literal.LList (List.map compile_val l)
 
@@ -281,30 +281,28 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
   let compile_lexpr = compile_lexpr ~fname in
   let compile_lformula = compile_lformula ~fname in
   let concat_star = List.fold_left (fun a1 a2 -> Asrt.Star (a1, a2)) in
-  let rec gil_add e k =
+  let gil_add e k =
     (* builds GIL expression that is e + k *)
-    if k = 0 then e
-    else
-      match e with
-      | Expr.Lit (Int n) -> Expr.Lit (Int (n + k))
-      | BinOp (e1, IPlus, Lit (Int b)) | BinOp (Lit (Int b), IPlus, e1) ->
-          gil_add (gil_add e1 k) b
-      | e -> BinOp (e, IPlus, Lit (Int k))
+    let k_e = Expr.num_int k in
+    let open Expr.Infix in
+    e +. k_e
   in
   (* compiles le1 -> lle, returns the assertion AND the list of existential variables generated *)
   let rec compile_pointsto
+      ?(start = true)
       ~(block : bool)
       ?(ptr_opt = None)
       ?(curr = 0)
       (le1 : WLExpr.t)
       (lle : WLExpr.t list) : string list * Asrt.t =
+    let compile_pointsto = compile_pointsto ~start:false in
     let exs1, la1, (loc, offset), expr_offset =
       match ptr_opt with
       | Some (l, bo) ->
           let expr_offset =
             match bo with
             | Some o when not block -> Expr.LVar o
-            | None when block -> Lit (Int 0)
+            | None when block -> Lit (Num 0.)
             | _ ->
                 failwith
                   "The algorithm to compile pointsto seems to be wrong, cannot \
@@ -318,11 +316,15 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
             if not block then
               let offset = gen_str lgvar in
               (Some offset, Expr.LVar offset)
-            else (None, Lit (Int 0))
+            else (None, Lit (Num 0.))
           in
           ( Option.fold ~some:(fun x -> [ x ]) ~none:[] offset @ (loc :: exs1),
             Asrt.Types
-              [ (Expr.LVar loc, Type.ObjectType); (expr_offset, Type.IntType) ]
+              ([ (Expr.LVar loc, Type.ObjectType) ]
+              @
+              match expr_offset with
+              | Lit (Num _) -> []
+              | _           -> [ (expr_offset, Type.NumberType) ])
             :: Asrt.Pure
                  (Formula.Eq (e1, Expr.EList [ Expr.LVar loc; expr_offset ]))
             :: la1,
@@ -331,6 +333,10 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
     in
     let eloc, eoffs = (Expr.LVar loc, gil_add expr_offset curr) in
     let cell = WislLActions.(str_ga Cell) in
+    let bound =
+      if start && block then [ Constr.bound ~loc:eloc ~bound:(List.length lle) ]
+      else []
+    in
     match lle with
     | []      ->
         failwith
@@ -341,7 +347,9 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
     | [ le ]  ->
         let exs2, la2, e2 = compile_lexpr le in
         ( exs1 @ exs2,
-          concat_star (Asrt.GA (cell, [ eloc; eoffs ], [ e2 ])) (la1 @ la2) )
+          concat_star
+            (Asrt.GA (cell, [ eloc; eoffs ], [ e2 ]))
+            (bound @ la1 @ la2) )
     | le :: r ->
         let exs2, la2, e2 = compile_lexpr le in
         let exs3, la3 =
@@ -352,7 +360,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
         ( exs1 @ exs2 @ exs3,
           concat_star
             (Asrt.GA (cell, [ eloc; eoffs ], [ e2 ]))
-            (la3 :: (la1 @ la2)) )
+            (bound @ (la3 :: (la1 @ la2))) )
   in
   WLAssert.(
     match get asser with
@@ -424,11 +432,12 @@ let rec compile_lcmd ?(fname = "main") lcmd =
   | Invariant _ -> failwith "Invariant is not before a loop."
 
 let compile_inv_and_while ~fname ~while_stmt ~invariant =
-  let spec_name = "invariant_spec" in
+  (* FIXME: Variables that are in the invariant but not existential might be wrong. *)
   let loopretvar = "loopretvar__" in
   let gen_str = Generators.gen_str fname in
   let loop_fname = gen_str (fname ^ "_loop") in
   let while_loc = WStmt.get_loc while_stmt in
+  let invariant_loc = WLCmd.get_loc invariant in
   let inv_asrt, inv_exs =
     match WLCmd.get invariant with
     | Invariant (la, lb) -> (la, lb)
@@ -439,12 +448,44 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
     | While (e, c) -> (e, c)
     | _            -> failwith "That can't happen, not a while command"
   in
+  let lvar_exs, var_exs = List.partition Utils.Names.is_lvar_name inv_exs in
   let vars, lvars = WLAssert.get_vars_and_lvars inv_asrt in
-  let vars, lvars =
-    (SS.elements vars, SS.elements (SS.diff lvars (SS.of_list inv_exs)))
+  let vars, lvars = (SS.elements vars, SS.elements lvars) in
+  let old_lv x = "#pvar_" ^ x in
+  let new_lv x = "#new_pvar_" ^ x in
+  let pre =
+    let var_subst = List.map (fun x -> (x, WLExpr.LVar (old_lv x))) vars in
+    let subst = Hashtbl.of_seq (List.to_seq var_subst) in
+    let pre_without_bind = WLAssert.substitution subst inv_asrt in
+    List.fold_left
+      (fun acc (x, lx) ->
+        let px = WLExpr.PVar x in
+        let px = WLExpr.make px invariant_loc in
+        let lx = WLExpr.make lx invariant_loc in
+        let f = WLFormula.make (LEq (px, lx)) invariant_loc in
+        let new_a = WLAssert.make (LPure f) invariant_loc in
+        match WLAssert.get acc with
+        | LEmp -> new_a
+        | _    -> WLAssert.make (LStar (new_a, acc)) invariant_loc)
+      pre_without_bind var_subst
   in
-  (* we remove existentials from the bindings *)
-  let evars = List.map (fun x -> Expr.PVar x) vars in
+  let post_subst =
+    let var_subst =
+      List.map
+        (fun x ->
+          let new_name = if List.mem x var_exs then new_lv x else old_lv x in
+          (x, WLExpr.LVar new_name))
+        vars
+    in
+    let lvar_subst =
+      List.filter_map
+        (fun x ->
+          if List.mem x lvar_exs then Some (x, WLExpr.LVar (x ^ "__new"))
+          else None)
+        lvars
+    in
+    Hashtbl.of_seq (List.to_seq (var_subst @ lvar_subst))
+  in
   let loop_funct =
     let guard_loc = WExpr.get_loc guard in
     let post_guard =
@@ -458,51 +499,41 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
     let post_ret =
       let make_lexpr tt = WLExpr.make tt while_loc in
       let make_var_lexpr x = make_lexpr (PVar x) in
+      let make_pvar_lexpr x =
+        let new_name = if List.mem x var_exs then new_lv x else old_lv x in
+        make_lexpr (LVar new_name)
+      in
       WLAssert.make
         (LPure
            (WLFormula.make
               (LEq
                  ( make_var_lexpr "ret",
-                   make_lexpr (LEList (List.map make_var_lexpr vars)) ))
+                   make_lexpr (LEList (List.map make_pvar_lexpr vars)) ))
               while_loc))
         while_loc
     in
     let post_add =
       WLAssert.make (LStar (post_ret, post_guard)) (WLAssert.get_loc inv_asrt)
     in
-    let subs_exs =
-      List.map (fun inv_ex -> (inv_ex, WLExpr.LVar ("#new_" ^ inv_ex))) inv_exs
-    in
-    let subs_pvars =
-      List.map (fun inv_pv -> (inv_pv, WLExpr.LVar ("#pvar_" ^ inv_pv))) vars
-    in
-    let subst = Hashtbl.create 1 in
-    let () =
-      List.iter
-        (fun (v, nv) -> Hashtbl.replace subst v nv)
-        (subs_exs @ subs_pvars)
-    in
     let post_without_subst =
       WLAssert.make (LStar (inv_asrt, post_add)) (WLAssert.get_loc inv_asrt)
     in
-    let post = WLAssert.substitution subst post_without_subst in
+    let post = WLAssert.substitution post_subst post_without_subst in
     let spec =
       WSpec.
         {
-          pre = inv_asrt;
+          pre;
           post;
           spid = Generators.gen_id ();
           fname = loop_fname;
           fparams = vars;
           sploc = while_loc;
-          existentials = Some (spec_name, lvars);
+          existentials = None;
         }
     in
     let pvars = List.map (fun x -> WExpr.make (Var x) while_loc) vars in
     let rec_call =
-      WStmt.make
-        (FunCall (loopretvar, loop_fname, pvars, Some (spec_name, lvars)))
-        while_loc
+      WStmt.make (FunCall (loopretvar, loop_fname, pvars, None)) while_loc
     in
     let allvars = WExpr.make (WExpr.List pvars) while_loc in
     let ret_not_rec = WStmt.make (VarAssign (loopretvar, allvars)) while_loc in
@@ -523,18 +554,19 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
       }
   in
   let retv = gen_str gvar in
-  let logical_bindings =
-    match lvars with
-    | []    -> None
-    | lvars -> Some (spec_name, List.map (fun x -> (x, Expr.LVar x)) lvars)
-  in
   let call_cmd =
-    Cmd.Call (retv, Lit (String loop_fname), evars, None, logical_bindings)
+    Cmd.Call
+      ( retv,
+        Lit (String loop_fname),
+        List.map (fun x -> Expr.PVar x) vars,
+        None,
+        None )
   in
   let reassign_vars =
     List.mapi
       (fun i vn ->
-        Cmd.Assignment (vn, BinOp (PVar retv, BinOp.LstNth, Lit (Int i))))
+        Cmd.Assignment
+          (vn, BinOp (PVar retv, BinOp.LstNth, Lit (Num (float_of_int i)))))
       vars
   in
   let annot_while = Annot.make ~origin_id:(WStmt.get_id while_stmt) () in
@@ -562,7 +594,9 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
                                   "Cannot call get_or_create_lab with en empty \
                                    list"
   in
-  let nth expr n = Expr.BinOp (expr, BinOp.LstNth, Expr.Lit (Literal.Int n)) in
+  let nth expr n =
+    Expr.BinOp (expr, BinOp.LstNth, Expr.Lit (Literal.Num (float_of_int n)))
+  in
   let setcell = WislLActions.str_ac WislLActions.SetCell in
   let dispose = WislLActions.str_ac WislLActions.Dispose in
   let getcell = WislLActions.str_ac WislLActions.GetCell in
@@ -615,15 +649,10 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
   | { snode = Dispose e; sid; _ } :: rest ->
       let cmdle, comp_e = compile_expr e in
       let annot = Annot.make ~origin_id:sid () in
-      let v_get = gen_str gvar in
-      let getcmd =
-        Cmd.LAction (v_get, getcell, [ nth comp_e 0; nth comp_e 1 ])
-      in
-      let e_v_get = Expr.PVar v_get in
       let faillab, ctnlab = (gen_str fail_lab, gen_str ctn_lab) in
       let testcmd =
         Cmd.GuardedGoto
-          ( Expr.BinOp (nth e_v_get 1, BinOp.Equal, Expr.Lit (Literal.Int 0)),
+          ( Expr.BinOp (nth comp_e 1, BinOp.Equal, Expr.Lit (Literal.Num 0.)),
             ctnlab,
             faillab )
       in
@@ -633,11 +662,10 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
           ( "Invalid block pointer at " ^ CodeLoc.str (WExpr.get_loc e),
             [ comp_e ] )
       in
-      let cmd = Cmd.LAction (g_var, dispose, [ nth e_v_get 0 ]) in
+      let cmd = Cmd.LAction (g_var, dispose, [ nth comp_e 0 ]) in
       let comp_rest, new_functions = compile_list rest in
       ( cmdle
         @ [
-            (annot, None, getcmd);
             (annot, None, testcmd);
             (annot, Some faillab, failcmd);
             (annot, Some ctnlab, cmd);
@@ -698,7 +726,9 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
   (* Object Creation *)
   | { snode = New (x, k); sid; _ } :: rest ->
       let annot = Annot.make ~origin_id:sid () in
-      let newcmd = Cmd.LAction (x, alloc, [ Expr.Lit (Literal.Int k) ]) in
+      let newcmd =
+        Cmd.LAction (x, alloc, [ Expr.Lit (Literal.Num (float_of_int k)) ])
+      in
       let comp_rest, new_functions = compile_list rest in
       ((annot, None, newcmd) :: comp_rest, new_functions)
   (* x := new(k) =>

@@ -30,7 +30,9 @@ let ga_to_deleter = WislLActions.ga_to_deleter_str
 let ga_loc_indexes a_id =
   WislLActions.(
     match ga_from_str a_id with
-    | Cell -> [ 0 ])
+    | Cell  -> [ 0 ]
+    | Bound -> [ 0 ]
+    | Freed -> [ 0 ])
 
 (* Small util for retrocompat *)
 let vstr v = Format.asprintf "%a" Values.pp v
@@ -107,7 +109,9 @@ let execute_action name heap params =
     | SetCell -> set_cell heap params
     | RemCell -> rem_cell heap params
     | Alloc   -> alloc heap params
-    | Dispose -> dispose heap params)
+    | Dispose -> dispose heap params
+    | _       -> failwith
+                   "Can't use consumer and producers in concrete execution")
 
 (** Non-implemented functions *)
 let assertions ?to_keep:_ _ =
