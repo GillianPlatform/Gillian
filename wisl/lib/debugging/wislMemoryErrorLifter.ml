@@ -92,24 +92,34 @@ let get_missing_resource_var wstmt =
       | _ -> None)
   | None      -> None
 
-let get_missing_resource_msg core_pred cur_annot wisl_ast =
+let get_missing_resource_msg missing_resource_error_info cur_annot wisl_ast =
+  let core_pred, loc, offset = missing_resource_error_info in
+  let default_err_msg =
+    let prefix =
+      Fmt.str "Missing %s at location='%s'" (WislLActions.str_ga core_pred) loc
+    in
+    match offset with
+    | None        -> prefix
+    | Some offset -> Fmt.str "%s, offset='%a'" prefix Expr.pp offset
+  in
   match core_pred with
   | WislLActions.Cell -> (
       let wstmt = get_wisl_stmt cur_annot wisl_ast in
       let var = get_missing_resource_var wstmt in
       match var with
       | Some var -> Fmt.str "Try adding %s -> #new_var to the specification" var
-      (* TODO: Display the locations if no fix was found *)
-      | None -> "We could not find a fix")
-  | _                 -> WislLActions.str_ga core_pred
+      | None     -> default_err_msg)
+  | _                 -> default_err_msg
 
 let error_to_exception_info merr gil_cmd cur_annot wisl_ast :
     Debugger.DebuggerTypes.exception_info =
   let id = Fmt.to_to_string WislSMemory.pp_err merr in
   let description =
     match merr with
-    | WislSHeap.MissingResource core_pred ->
-        Some (get_missing_resource_msg core_pred cur_annot wisl_ast)
+    | WislSHeap.MissingResource missing_resource_error_info ->
+        Some
+          (get_missing_resource_msg missing_resource_error_info cur_annot
+             wisl_ast)
     | DoubleFree loc ->
         let prev_annot = get_previously_freed_annot loc in
         let msg_prefix var = Fmt.str "%s already freed" var in
