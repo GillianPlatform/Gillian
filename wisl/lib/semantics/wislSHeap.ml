@@ -294,9 +294,9 @@ let to_debugger_tree (heap : t) =
   let compare_offsets (v, _) (w, _) =
     try
       let open Expr.Infix in
-      let difference = v - w in
+      let difference = v -. w in
       match difference with
-      | Expr.Lit (Int i) -> if i < 0 then -1 else if i > 0 then 1 else 0
+      | Expr.Lit (Num f) -> if f < 0. then -1 else if f > 0. then 1 else 0
       | _                -> 0
     with _ -> (* Do not sort the offsets if an exception has occurred *)
               0
@@ -325,6 +325,6 @@ let to_debugger_tree (heap : t) =
              in
              let bound = Leaf ("bound", bound) in
 
-             let blocks = Node ("blocks", loc_nodes (SFVL.to_list data)) in
+             let blocks = Node ("cells", loc_nodes (SFVL.to_list data)) in
              Node (loc, [ status; bound; blocks ]))
   |> List.of_seq
