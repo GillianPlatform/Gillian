@@ -54,12 +54,15 @@ let free_error_to_string msg_prefix prev_annot gil_cmd cur_annot wisl_ast =
         match gil_cmd with
         | Some cmd -> (
             match cmd with
-            (* TODO: Catch all the cases that use after free can happen to get the
-                     variable names *)
-            | Cmd.LAction (_, name, args)
-              when name = str_ac Dispose || name = str_ac GetCell -> (
+            | Cmd.LAction (_, name, args) when name = str_ac Dispose -> (
                 match args with
                 | [ Expr.BinOp (PVar var, _, _) ] -> var
+                | _ -> "")
+            (* TODO: Catch all the cases that use after free can happen to get the
+                     variable names *)
+            | Cmd.LAction (_, name, args) when name = str_ac GetCell -> (
+                match args with
+                | [ _; Expr.BinOp (PVar var, _, _) ] -> var
                 | _ -> "")
             | _ -> "")
         | None     -> "")
