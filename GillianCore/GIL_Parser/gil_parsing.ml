@@ -148,15 +148,19 @@ let cache_labelled_progs (progs : (string * (Annot.t, string) Prog.t) list) =
   List.iter (fun (path, prog) -> cache_gil_prog path prog) progs
 
 let resolve_path path =
-  let lookup_paths = "." :: Config.get_runtime_paths () in
-  let rec find fname paths =
-    match paths with
-    | []           -> failwith (Printf.sprintf "Cannot resolve \"%s\"" fname)
-    | path :: rest ->
-        let complete_path = Filename.concat path fname in
-        if Sys.file_exists complete_path then complete_path else find fname rest
-  in
-  find path lookup_paths
+  if Filename.is_relative path then
+    let lookup_paths = "." :: Config.get_runtime_paths () in
+    let rec find fname paths =
+      match paths with
+      | []           -> failwith (Printf.sprintf "Cannot resolve \"%s\"" fname)
+      | path :: rest ->
+          let complete_path = Filename.concat path fname in
+          if Sys.file_exists complete_path then complete_path
+          else find fname rest
+    in
+    find path lookup_paths
+  else if Sys.file_exists path then path
+  else failwith (Printf.sprintf "Cannot resolve \"%s\"" path)
 
 let remove_dot file_ext = String.sub file_ext 1 (String.length file_ext - 1)
 
