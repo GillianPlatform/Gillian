@@ -19,6 +19,8 @@ module Make
     end)
     (DebuggerDisplayFilterMap : Debugger.DisplayFilterMap.S)
     (SMemoryDisplayable : Debugger.Displayable.S with type t = SMemory.t)
+    (StoreAndSMemoryLifter : Debugger.StoreAndSMemoryLifter.S
+                               with type smemory = SMemory.t)
     (MemoryErrorLifter : Debugger.MemoryErrorLifter.S
                            with type merr = SMemory.err_t
                             and type tl_ast = PC.tl_ast) =
@@ -36,6 +38,7 @@ struct
   module Debugger =
     Debugger.Make (PC) (Verification) (DebuggerDisplayFilterMap)
       (SMemoryDisplayable)
+      (StoreAndSMemoryLifter)
       (MemoryErrorLifter)
   module DebugAdapter = DebugAdapter.Make (Debugger)
 

@@ -128,7 +128,10 @@ let to_debugger_tree (smemory : t) : debugger_tree list =
   let global_scope =
     location_to_debugger_tree "Global scope" "$lg" smemory locs_to_debugger_tree
   in
-  let local_scope = location_to_debugger_tree "Local scope" "_$l_17" smemory locs_to_debugger_tree in
+  let local_scope =
+    location_to_debugger_tree "Local scope" "_$l_17" smemory
+      locs_to_debugger_tree
+  in
   let sorted_locs_with_vals = Symbolic.sorted_locs_with_vals smemory in
   let to_str pp = Fmt.to_to_string (Fmt.hbox pp) in
   let value_nodes ((properties, domain), metadata) : debugger_tree list =

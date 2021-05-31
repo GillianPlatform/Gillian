@@ -1,6 +1,7 @@
 module L = Logging
 module Displayable = Displayable
 module DisplayFilterMap = DisplayFilterMap
+module StoreAndSMemoryLifter = StoreAndSMemoryLifter
 module MemoryErrorLifter = MemoryErrorLifter
 module DebuggerTypes = DebuggerTypes
 module DebuggerUtils = DebuggerUtils
@@ -40,6 +41,9 @@ module Make
     (TLDisplayFilterMap : DisplayFilterMap.S)
     (SMemoryDisplayable : Displayable.S
                             with type t = Verification.SAInterpreter.heap_t)
+    (StoreAndSMemoryLifter : StoreAndSMemoryLifter.S
+                               with type smemory =
+                                     Verification.SAInterpreter.heap_t)
     (MemoryErrorLifter : MemoryErrorLifter.S
                            with type merr = Verification.SPState.m_err_t
                             and type tl_ast = PC.tl_ast) =
@@ -49,31 +53,30 @@ struct
 
   type breakpoints = (string, Breakpoints.t) Hashtbl.t
 
-  type scopes_to_vars = (int, variable list) Hashtbl.t
-
   type tl_ast = PC.tl_ast
 
   type debugger_state = {
     source_file : string;
     source_files : SourceFiles.t option;
-    top_level_scopes : scope list;
     prog : (Annot.t, int) Prog.t;
     tl_ast : tl_ast option;
     mutable cont_func :
       (unit -> Verification.SAInterpreter.result_t cont_func) option;
-    mutable cur_report_id : string;
-    (* TODO: The below fields (except breakpoints) only depend on the
-             cur_report_id and could be refactored to use this *)
-    mutable frames : frame list;
     mutable breakpoints : breakpoints;
-    mutable scopes_to_vars : scopes_to_vars;
+    mutable cur_report_id : string;
+    (* TODO: The below fields only depend on the
+             cur_report_id and could be refactored to use this *)
+    mutable top_level_scopes : scope list;
+    mutable frames : frame list;
+    mutable variables : variables;
     mutable errors : err_t list;
     mutable cur_cmd : int Cmd.t option;
     mutable cur_annot : Annot.t option;
   }
 
   let top_level_scope_names =
-    [ "Store"; "Heap"; "Pure Formulae"; "Typing Environment"; "Predicates" ]
+    (* [ "Store"; "Heap"; "Pure Formulae"; "Typing Environment"; "Predicates" ] *)
+    [ "Pure Formulae"; "Typing Environment"; "Predicates" ]
 
   let top_level_scopes : scope list =
     List.map2
@@ -83,41 +86,41 @@ struct
 
   let is_gil_file file_name = Filename.check_suffix file_name "gil"
 
-  let get_store_vars (state : state_t) (is_gil_file : bool) : variable list =
-    let store = Verification.SPState.get_store state in
-    let store_bindings = Store.bindings store in
-    let store_bindings =
-      if is_gil_file then
-        DisplayFilterMap.Default.filter_map_store store_bindings
-      else TLDisplayFilterMap.filter_map_store store_bindings
-    in
-    store_bindings
-    |> List.map (fun (var, value) ->
-           { name = var; value; type_ = None; var_ref = 0 })
-    |> List.sort (fun v w -> Stdlib.compare v.name w.name)
+  (* let get_store_vars (state : state_t) (is_gil_file : bool) : variable list =
+     let store = Verification.SPState.get_store state in
+     let store_bindings = Store.bindings store in
+     let store_bindings =
+       if is_gil_file then
+         DisplayFilterMap.Default.filter_map_store store_bindings
+       else TLDisplayFilterMap.filter_map_store store_bindings
+     in
+     store_bindings
+     |> List.map (fun (var, value) ->
+            { name = var; value; type_ = None; var_ref = 0 })
+     |> List.sort (fun v w -> Stdlib.compare v.name w.name) *)
 
-  let rec add_heap_vars
-      (dt_list : Displayable.debugger_tree list)
-      (scopes_to_vars : scopes_to_vars)
-      (get_new_scope_id : unit -> int) : variable list =
-    dt_list
-    |> List.map (fun tree ->
-           match tree with
-           | Displayable.Leaf (name, value) ->
-               (* Variable reference is set to 0 as there are no children variables *)
-               { name; value; type_ = None; var_ref = 0 }
-           | Displayable.Node (name, dt_list) ->
-               let new_scope_id = get_new_scope_id () in
-               let vars =
-                 add_heap_vars dt_list scopes_to_vars get_new_scope_id
-               in
-               let () = Hashtbl.replace scopes_to_vars new_scope_id vars in
-               {
-                 name;
-                 value = "";
-                 type_ = Some "object";
-                 var_ref = new_scope_id;
-               })
+  (* let rec add_heap_vars
+       (dt_list : Displayable.debugger_tree list)
+       (variables : variables)
+       (get_new_scope_id : unit -> int) : variable list =
+     dt_list
+     |> List.map (fun tree ->
+            match tree with
+            | Displayable.Leaf (name, value) ->
+                (* Variable reference is set to 0 as there are no children variables *)
+                { name; value; type_ = None; var_ref = 0 }
+            | Displayable.Node (name, dt_list) ->
+                let new_scope_id = get_new_scope_id () in
+                let vars =
+                  add_heap_vars dt_list variables get_new_scope_id
+                in
+                let () = Hashtbl.replace variables new_scope_id vars in
+                {
+                  name;
+                  value = "";
+                  type_ = Some "object";
+                  var_ref = new_scope_id;
+                }) *)
 
   let get_pure_formulae_vars (state : state_t) : variable list =
     Verification.SPState.get_pfs state
@@ -142,9 +145,42 @@ struct
            { name = ""; value = pred; type_ = None; var_ref = 0 })
     |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 
-  let create_scopes_to_vars (state : state_t option) (is_gil_file : bool) :
-      scopes_to_vars =
-    let scopes_to_vars = Hashtbl.create 0 in
+  (* let create_variables (state : state_t option) (is_gil_file : bool) :
+       variables =
+     let variables = Hashtbl.create 0 in
+     (* New scope ids must be higher than last top level scope id to prevent
+        duplicate scope ids *)
+     let scope_id = ref (List.length top_level_scopes) in
+     let get_new_scope_id () =
+       let () = scope_id := !scope_id + 1 in
+       !scope_id
+     in
+     let vars_list =
+       match state with
+       | None       -> [ []; []; []; []; [] ]
+       | Some state ->
+           let store_vars = get_store_vars state is_gil_file in
+           let heap = Verification.SPState.get_heap state in
+           let dt_list = SMemoryDisplayable.to_debugger_tree heap in
+           let heap_vars =
+             add_heap_vars dt_list variables get_new_scope_id
+           in
+           let pure_formulae_vars = get_pure_formulae_vars state in
+           let typ_env_vars = get_typ_env_vars state in
+           let pred_vars = get_pred_vars state in
+           [ store_vars; heap_vars; pure_formulae_vars; typ_env_vars; pred_vars ]
+     in
+     let () =
+       List.iter2
+         (fun (scope : scope) vars ->
+           Hashtbl.replace variables scope.id vars)
+         top_level_scopes vars_list
+     in
+     variables *)
+
+  let create_variables (state : state_t option) (is_gil_file : bool) :
+      scope list * variables =
+    let variables = Hashtbl.create 0 in
     (* New scope ids must be higher than last top level scope id to prevent
        duplicate scope ids *)
     let scope_id = ref (List.length top_level_scopes) in
@@ -152,28 +188,35 @@ struct
       let () = scope_id := !scope_id + 1 in
       !scope_id
     in
-    let vars_list =
+    let lifted_scopes =
       match state with
-      | None       -> [ []; []; []; []; [] ]
+      | None       -> []
       | Some state ->
-          let store_vars = get_store_vars state is_gil_file in
-          let heap = Verification.SPState.get_heap state in
-          let dt_list = SMemoryDisplayable.to_debugger_tree heap in
-          let heap_vars =
-            add_heap_vars dt_list scopes_to_vars get_new_scope_id
+          (* let store_vars = get_store_vars state is_gil_file in *)
+          (* let heap = Verification.SPState.get_heap state in
+             let dt_list = SMemoryDisplayable.to_debugger_tree heap in
+             let heap_vars =
+               add_heap_vars dt_list variables get_new_scope_id
+             in *)
+          let store = Verification.SPState.get_store state |> Store.bindings in
+          let smemory = Verification.SPState.get_heap state in
+          let lifted_scopes =
+            StoreAndSMemoryLifter.add_variables store smemory ~is_gil_file
+              ~get_new_var_id:get_new_scope_id variables
           in
           let pure_formulae_vars = get_pure_formulae_vars state in
           let typ_env_vars = get_typ_env_vars state in
           let pred_vars = get_pred_vars state in
-          [ store_vars; heap_vars; pure_formulae_vars; typ_env_vars; pred_vars ]
+          let vars_list = [ pure_formulae_vars; typ_env_vars; pred_vars ] in
+          let () =
+            List.iter2
+              (fun (scope : scope) vars ->
+                Hashtbl.replace variables scope.id vars)
+              top_level_scopes vars_list
+          in
+          lifted_scopes
     in
-    let () =
-      List.iter2
-        (fun (scope : scope) vars ->
-          Hashtbl.replace scopes_to_vars scope.id vars)
-        top_level_scopes vars_list
-    in
-    scopes_to_vars
+    (lifted_scopes, variables)
 
   (* TODO: Find a common place to put the below three functions which are
      duplicated in CommandLine.ml *)
@@ -304,10 +347,13 @@ struct
                     call_stack_to_frames cmd_step.call_stack
                       cmd_step.proc_body_index dbg.prog
                 in
+                let lifted_scopes, variables =
+                  create_variables cmd_step.state (is_gil_file dbg.source_file)
+                in
+                let () = dbg.variables <- variables in
                 let () =
-                  dbg.scopes_to_vars <-
-                    create_scopes_to_vars cmd_step.state
-                      (is_gil_file dbg.source_file)
+                  dbg.top_level_scopes <-
+                    List.concat [ lifted_scopes; top_level_scopes ]
                 in
                 let () = dbg.errors <- cmd_step.errors in
                 let cur_cmd, cur_annot =
@@ -374,7 +420,7 @@ struct
                  frames = [];
                  cur_report_id;
                  breakpoints = Hashtbl.create 0;
-                 scopes_to_vars = Hashtbl.create 0;
+                 variables = Hashtbl.create 0;
                  errors = [];
                  cur_cmd = None;
                  cur_annot = None;
@@ -513,7 +559,7 @@ struct
   let get_scopes dbg = dbg.top_level_scopes
 
   let get_variables (var_ref : int) (dbg : debugger_state) : variable list =
-    match Hashtbl.find_opt dbg.scopes_to_vars var_ref with
+    match Hashtbl.find_opt dbg.variables var_ref with
     | None      -> []
     | Some vars -> vars
 

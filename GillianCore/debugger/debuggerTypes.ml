@@ -24,4 +24,6 @@ type variable = {
   var_ref : int;
 }
 
+type variables = (int, variable list) Hashtbl.t
+
 type exception_info = { id : string; description : string option }
