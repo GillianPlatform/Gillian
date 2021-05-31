@@ -6,11 +6,13 @@ type t = Semantics.Symbolic.t
 
 let to_str pp = Fmt.to_to_string (Fmt.hbox pp)
 
-let rec location_to_debugger_tree (name : string) (loc : string) (smemory : t) :
+let rec location_to_debugger_tree
+    (name : string) (loc : string) (smemory : t) locs_to_debugger_tree :
     debugger_tree =
   let rec lit_to_debugger_tree name lit =
     match lit with
-    | Literal.Loc loc -> location_to_debugger_tree name loc smemory
+    | Literal.Loc loc ->
+        location_to_debugger_tree name loc smemory locs_to_debugger_tree
     | LList lst       ->
         let nodes =
           List.mapi
@@ -24,7 +26,8 @@ let rec location_to_debugger_tree (name : string) (loc : string) (smemory : t) :
   in
   let rec expr_to_debugger_tree name expr =
     match expr with
-    | Expr.ALoc loc  -> location_to_debugger_tree name loc smemory
+    | Expr.ALoc loc  ->
+        location_to_debugger_tree name loc smemory locs_to_debugger_tree
     | Expr.EList lst ->
         let nodes =
           List.mapi
@@ -60,7 +63,11 @@ let rec location_to_debugger_tree (name : string) (loc : string) (smemory : t) :
                  in
                  Node (name, nodes)
              | Expr.Lit (Literal.LList lst) ->
-                 let nodes = List.map2 lit_to_debugger_tree field_names lst in
+                 let nodes =
+                   List.map2
+                     (fun field_name lit -> lit_to_debugger_tree field_name lit)
+                     field_names lst
+                 in
                  Node (name, nodes)
              | _ -> expr_to_debugger_tree name value)
       |> List.of_seq
@@ -84,6 +91,7 @@ let rec location_to_debugger_tree (name : string) (loc : string) (smemory : t) :
             match metadata with
             | Expr.ALoc child_loc ->
                 location_to_debugger_tree name child_loc smemory
+                  locs_to_debugger_tree
             | _                   -> Leaf
                                        (name, Fmt.to_to_string Expr.pp metadata)
             )
@@ -98,6 +106,7 @@ let rec location_to_debugger_tree (name : string) (loc : string) (smemory : t) :
             ] )
       in
       let () = SHeap.set smemory loc properties domain metadata_opt in
+      let () = Hashtbl.add locs_to_debugger_tree loc node in
       node
 
 let properties_to_debugger_tree properties =
@@ -115,6 +124,11 @@ let properties_to_debugger_tree properties =
   Node ("properties", property_nodes)
 
 let to_debugger_tree (smemory : t) : debugger_tree list =
+  let locs_to_debugger_tree = Hashtbl.create 0 in
+  let global_scope =
+    location_to_debugger_tree "Global scope" "$lg" smemory locs_to_debugger_tree
+  in
+  let local_scope = location_to_debugger_tree "Local scope" "_$l_17" smemory locs_to_debugger_tree in
   let sorted_locs_with_vals = Symbolic.sorted_locs_with_vals smemory in
   let to_str pp = Fmt.to_to_string (Fmt.hbox pp) in
   let value_nodes ((properties, domain), metadata) : debugger_tree list =
@@ -126,7 +140,9 @@ let to_debugger_tree (smemory : t) : debugger_tree list =
           to_str (Fmt.option ~none:(Fmt.any "unknown") Expr.pp) metadata );
     ]
   in
-  List.map
-    (fun (loc, value) -> Node (loc, value_nodes value))
+  List.filter_map
+    (fun (loc, value) ->
+      if Hashtbl.mem locs_to_debugger_tree loc then None
+      else Some (Node (loc, value_nodes value)))
     sorted_locs_with_vals
-  @ [ location_to_debugger_tree "Global scope" "$lg" smemory ]
+  @ [ global_scope; local_scope ]
