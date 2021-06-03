@@ -86,42 +86,6 @@ struct
 
   let is_gil_file file_name = Filename.check_suffix file_name "gil"
 
-  (* let get_store_vars (state : state_t) (is_gil_file : bool) : variable list =
-     let store = Verification.SPState.get_store state in
-     let store_bindings = Store.bindings store in
-     let store_bindings =
-       if is_gil_file then
-         DisplayFilterMap.Default.filter_map_store store_bindings
-       else TLDisplayFilterMap.filter_map_store store_bindings
-     in
-     store_bindings
-     |> List.map (fun (var, value) ->
-            { name = var; value; type_ = None; var_ref = 0 })
-     |> List.sort (fun v w -> Stdlib.compare v.name w.name) *)
-
-  (* let rec add_heap_vars
-       (dt_list : Displayable.debugger_tree list)
-       (variables : variables)
-       (get_new_scope_id : unit -> int) : variable list =
-     dt_list
-     |> List.map (fun tree ->
-            match tree with
-            | Displayable.Leaf (name, value) ->
-                (* Variable reference is set to 0 as there are no children variables *)
-                { name; value; type_ = None; var_ref = 0 }
-            | Displayable.Node (name, dt_list) ->
-                let new_scope_id = get_new_scope_id () in
-                let vars =
-                  add_heap_vars dt_list variables get_new_scope_id
-                in
-                let () = Hashtbl.replace variables new_scope_id vars in
-                {
-                  name;
-                  value = "";
-                  type_ = Some "object";
-                  var_ref = new_scope_id;
-                }) *)
-
   let get_pure_formulae_vars (state : state_t) : variable list =
     Verification.SPState.get_pfs state
     |> PFS.to_list
@@ -145,39 +109,6 @@ struct
            { name = ""; value = pred; type_ = None; var_ref = 0 })
     |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 
-  (* let create_variables (state : state_t option) (is_gil_file : bool) :
-       variables =
-     let variables = Hashtbl.create 0 in
-     (* New scope ids must be higher than last top level scope id to prevent
-        duplicate scope ids *)
-     let scope_id = ref (List.length top_level_scopes) in
-     let get_new_scope_id () =
-       let () = scope_id := !scope_id + 1 in
-       !scope_id
-     in
-     let vars_list =
-       match state with
-       | None       -> [ []; []; []; []; [] ]
-       | Some state ->
-           let store_vars = get_store_vars state is_gil_file in
-           let heap = Verification.SPState.get_heap state in
-           let dt_list = SMemoryDisplayable.to_debugger_tree heap in
-           let heap_vars =
-             add_heap_vars dt_list variables get_new_scope_id
-           in
-           let pure_formulae_vars = get_pure_formulae_vars state in
-           let typ_env_vars = get_typ_env_vars state in
-           let pred_vars = get_pred_vars state in
-           [ store_vars; heap_vars; pure_formulae_vars; typ_env_vars; pred_vars ]
-     in
-     let () =
-       List.iter2
-         (fun (scope : scope) vars ->
-           Hashtbl.replace variables scope.id vars)
-         top_level_scopes vars_list
-     in
-     variables *)
-
   let create_variables (state : state_t option) (is_gil_file : bool) :
       scope list * variables =
     let variables = Hashtbl.create 0 in
@@ -192,17 +123,11 @@ struct
       match state with
       | None       -> []
       | Some state ->
-          (* let store_vars = get_store_vars state is_gil_file in *)
-          (* let heap = Verification.SPState.get_heap state in
-             let dt_list = SMemoryDisplayable.to_debugger_tree heap in
-             let heap_vars =
-               add_heap_vars dt_list variables get_new_scope_id
-             in *)
           let store = Verification.SPState.get_store state |> Store.bindings in
           let smemory = Verification.SPState.get_heap state in
           let lifted_scopes =
             StoreAndSMemoryLifter.add_variables store smemory ~is_gil_file
-              ~get_new_var_id:get_new_scope_id variables
+              ~get_new_scope_id variables
           in
           let pure_formulae_vars = get_pure_formulae_vars state in
           let typ_env_vars = get_typ_env_vars state in

@@ -328,3 +328,103 @@ let to_debugger_tree (heap : t) =
              let blocks = Node ("cells", loc_nodes (SFVL.to_list data)) in
              Node (loc, [ status; bound; blocks ]))
   |> List.of_seq
+
+let get_store_vars store is_gil_file =
+  List.filter_map
+    (fun (var, (value : Gil_syntax.Expr.t)) ->
+      if (not is_gil_file) && Str.string_match (Str.regexp "gvar") var 0 then
+        None
+      else
+        let match_offset lst loc loc_pp =
+          match lst with
+          | [ Expr.Lit (Num offset) ] ->
+              Fmt.str "-> (%a, %.0f)" (Fmt.hbox loc_pp) loc offset
+          | [ offset ]                ->
+              Fmt.str "-> (%a, %a)" (Fmt.hbox loc_pp) loc (Fmt.hbox Expr.pp)
+                offset
+          | _                         -> Fmt.to_to_string (Fmt.hbox Expr.pp)
+                                           value
+        in
+        let value =
+          match value with
+          | Expr.EList (Lit (Loc loc) :: rest) | Expr.EList (LVar loc :: rest)
+            -> match_offset rest loc Fmt.string
+          | _ -> Fmt.to_to_string (Fmt.hbox Expr.pp) value
+        in
+        Some
+          ({ name = var; value; type_ = None; var_ref = 0 }
+            : Debugger.DebuggerTypes.variable))
+    store
+
+let add_heap_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
+    Debugger.DebuggerTypes.variable list =
+  let open Debugger.DebuggerTypes in
+  let vstr = Fmt.to_to_string (Fmt.hbox Expr.pp) in
+  let compare_offsets (v, _) (w, _) =
+    try
+      let open Expr.Infix in
+      let difference = v -. w in
+      match difference with
+      | Expr.Lit (Num f) -> if f < 0. then -1 else if f > 0. then 1 else 0
+      | _                -> 0
+    with _ -> (* Do not sort the offsets if an exception has occurred *)
+              0
+  in
+  let cell_vars l : variable list =
+    List.sort compare_offsets l
+    |> List.map (fun (offset, value) : variable ->
+           (* Display offset as a number to match the printing of WISL pointers *)
+           let offset_str =
+             match offset with
+             | Expr.Lit (Num f) -> Fmt.str "%.0f" f
+             | other            -> vstr other
+           in
+           create_leaf_variable offset_str (vstr value) ())
+  in
+  smemory |> Hashtbl.to_seq
+  |> Seq.map (fun (loc, blocks) ->
+         let loc_id = get_new_scope_id () in
+         match blocks with
+         | Block.Freed               ->
+             let () =
+               Hashtbl.replace variables loc_id
+                 [ create_leaf_variable "status" "freed" () ]
+             in
+             create_node_variable loc loc_id ()
+         | Allocated { data; bound } ->
+             let status = create_leaf_variable "status" "allocated" () in
+             let bound =
+               match bound with
+               | None       -> "none"
+               | Some bound -> string_of_int bound
+             in
+             let bound = create_leaf_variable "bound" bound () in
+             let cells_id = get_new_scope_id () in
+             let () =
+               Hashtbl.replace variables cells_id
+                 (cell_vars (SFVL.to_list data))
+             in
+             let cells = create_node_variable "cells" cells_id () in
+             let () =
+               Hashtbl.replace variables loc_id [ status; bound; cells ]
+             in
+             create_node_variable loc loc_id ())
+  |> List.of_seq
+
+let add_debugger_variables
+    store smemory ~is_gil_file ~get_new_scope_id variables =
+  let open Debugger.DebuggerTypes in
+  let store_id = get_new_scope_id () in
+  let heap_id = get_new_scope_id () in
+  let scopes : scope list =
+    [ { id = store_id; name = "Store" }; { id = heap_id; name = "Heap" } ]
+  in
+  let store_vars = get_store_vars store is_gil_file in
+  let heap_vars = add_heap_vars smemory get_new_scope_id variables in
+  let vars = [ store_vars; heap_vars ] in
+  let () =
+    List.iter2
+      (fun (scope : scope) vars -> Hashtbl.replace variables scope.id vars)
+      scopes vars
+  in
+  scopes
