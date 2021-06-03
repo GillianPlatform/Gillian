@@ -1,5 +1,7 @@
 open DebuggerTypes
 
+(* TODO: Store should be Hashtbl rather than list *)
+
 (** Type of the store *)
 type store = (string * Expr.t) list
 

@@ -1,5 +1,3 @@
-module Displayable = Displayable
-module DisplayFilterMap = DisplayFilterMap
 module MemoryErrorLifter = MemoryErrorLifter
 module StoreAndSMemoryLifter = StoreAndSMemoryLifter
 module DebuggerTypes = DebuggerTypes
@@ -37,8 +35,6 @@ end
 module Make
     (PC : ParserAndCompiler.S)
     (Verification : Verifier.S)
-    (TLDisplayFilterMap : DisplayFilterMap.S)
-    (Displayable : Displayable.S with type t = Verification.SAInterpreter.heap_t)
     (StoreAndSMemoryLifter : StoreAndSMemoryLifter.S
                                with type smemory =
                                      Verification.SAInterpreter.heap_t)

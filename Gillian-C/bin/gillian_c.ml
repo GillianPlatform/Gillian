@@ -1,6 +1,5 @@
 open Cgil_lib
 module SMemory = Gillian.Monadic.MonadicSMemory.Lift (MonadicSMemory)
-module SMemoryDisplayable = SMemoryDisplayable.Make (SMemory)
 
 module CLI =
   Gillian.CommandLine.Make (CMemory) (SMemory) (External.M) (ParserAndCompiler)
@@ -8,8 +7,6 @@ module CLI =
       let runners : Gillian.Bulk.Runner.t list =
         [ (module CRunner); (module SRunner) ]
     end)
-    (Debugger.DisplayFilterMap.Default)
-    (SMemoryDisplayable)
     (Debugger.StoreAndSMemoryLifter.Default (SMemory))
     (Debugger.MemoryErrorLifter.Dummy (SMemory) (ParserAndCompiler))
 

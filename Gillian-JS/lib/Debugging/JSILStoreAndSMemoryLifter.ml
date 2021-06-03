@@ -1,4 +1,6 @@
-open Gillian.Debugger.Displayable
+(* TODO: This should implement StoreSMemoryLifter *)
+
+(* open Gillian.Debugger.Displayable
 open Gil_syntax
 open Semantics
 
@@ -148,4 +150,4 @@ let to_debugger_tree (smemory : t) : debugger_tree list =
       if Hashtbl.mem locs_to_debugger_tree loc then None
       else Some (Node (loc, value_nodes value)))
     sorted_locs_with_vals
-  @ [ global_scope; local_scope ]
+  @ [ global_scope; local_scope ] *)

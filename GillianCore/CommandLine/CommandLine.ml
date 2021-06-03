@@ -17,8 +17,6 @@ module Make
     (PC : ParserAndCompiler.S) (Runners : sig
       val runners : Bulk.Runner.t list
     end)
-    (DebuggerDisplayFilterMap : Debugger.DisplayFilterMap.S)
-    (SMemoryDisplayable : Debugger.Displayable.S with type t = SMemory.t)
     (StoreAndSMemoryLifter : Debugger.StoreAndSMemoryLifter.S
                                with type smemory = SMemory.t)
     (MemoryErrorLifter : Debugger.MemoryErrorLifter.S
@@ -36,9 +34,7 @@ struct
   module Verification = Verifier.Make (SState) (SPState) (External)
   module Abductor = Abductor.Make (SState) (SPState) (External)
   module Debugger =
-    Debugger.Make (PC) (Verification) (DebuggerDisplayFilterMap)
-      (SMemoryDisplayable)
-      (StoreAndSMemoryLifter)
+    Debugger.Make (PC) (Verification) (StoreAndSMemoryLifter)
       (MemoryErrorLifter)
   module DebugAdapter = DebugAdapter.Make (Debugger)
 

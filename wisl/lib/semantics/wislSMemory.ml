@@ -321,6 +321,4 @@ let get_fixes ?simple_fix:_ _ _ _ _ = []
 
 let get_failing_constraint _ = Formula.True
 
-let to_debugger_tree = WislSHeap.to_debugger_tree
-
 let add_debugger_variables = WislSHeap.add_debugger_variables

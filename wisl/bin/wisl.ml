@@ -3,8 +3,6 @@ module CLI =
     (Gillian.General.External.Dummy)
     (WParserAndCompiler)
     (Gillian.Bulk.Runner.DummyRunners)
-    (WDebugging.WislDisplayFilter)
-    (WDebugging.WislSMemoryDisplayable)
     (WDebugging.WislStoreAndSMemoryLifter)
     (WDebugging.WislMemoryErrorLifter)
 
