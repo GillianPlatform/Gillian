@@ -342,16 +342,9 @@ let add_heap_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
   in
   smemory |> Hashtbl.to_seq
   |> Seq.map (fun (loc, blocks) ->
-         let loc_id = get_new_scope_id () in
          match blocks with
-         | Block.Freed               ->
-             let () =
-               Hashtbl.replace variables loc_id
-                 [ create_leaf_variable "status" "freed" () ]
-             in
-             create_node_variable loc loc_id ()
+         | Block.Freed               -> create_leaf_variable loc "freed" ()
          | Allocated { data; bound } ->
-             let status = create_leaf_variable "status" "allocated" () in
              let bound =
                match bound with
                | None       -> "none"
@@ -364,10 +357,9 @@ let add_heap_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
                  (cell_vars (SFVL.to_list data))
              in
              let cells = create_node_variable "cells" cells_id () in
-             let () =
-               Hashtbl.replace variables loc_id [ status; bound; cells ]
-             in
-             create_node_variable loc loc_id ())
+             let loc_id = get_new_scope_id () in
+             let () = Hashtbl.replace variables loc_id [ bound; cells ] in
+             create_node_variable loc loc_id ~value:"allocated" ())
   |> List.of_seq
 
 let add_debugger_variables
