@@ -22,8 +22,8 @@ let get_cell_var_from_cmd cmd annot wisl_ast =
       match get_wisl_stmt annot (Some ast) with
       | Some stmt -> (
           match stmt with
-          | WStmt.Lookup (_, e) -> WExpr.str e
-          | _                   -> "")
+          | WStmt.Lookup (_, e) | WStmt.Update (e, _) -> WExpr.str e
+          | _ -> "")
       | None      -> "")
   | None     -> (
       let open WislLActions in
@@ -46,7 +46,8 @@ let free_error_to_string msg_prefix prev_annot gil_cmd cur_annot wisl_ast =
             match stmt with
             (* TODO: Catch all the cases that use after free can happen to get the
                        variable names *)
-            | WStmt.Dispose e | WStmt.Lookup (_, e) -> WExpr.str e
+            | WStmt.Dispose e | WStmt.Lookup (_, e) | WStmt.Update (e, _) ->
+                WExpr.str e
             | _ -> "")
         | None      -> "")
     | None     -> (
