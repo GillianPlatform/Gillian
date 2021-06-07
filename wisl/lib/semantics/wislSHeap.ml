@@ -315,7 +315,7 @@ let get_store_vars store is_gil_file =
             : Debugger.DebuggerTypes.variable))
     store
 
-let add_heap_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
+let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
     Debugger.DebuggerTypes.variable list =
   let open Debugger.DebuggerTypes in
   let vstr = Fmt.to_to_string (Fmt.hbox Expr.pp) in
@@ -366,13 +366,13 @@ let add_debugger_variables
     store smemory ~is_gil_file ~get_new_scope_id variables =
   let open Debugger.DebuggerTypes in
   let store_id = get_new_scope_id () in
-  let heap_id = get_new_scope_id () in
+  let memory_id = get_new_scope_id () in
   let scopes : scope list =
-    [ { id = store_id; name = "Store" }; { id = heap_id; name = "Heap" } ]
+    [ { id = store_id; name = "Store" }; { id = memory_id; name = "Memory" } ]
   in
   let store_vars = get_store_vars store is_gil_file in
-  let heap_vars = add_heap_vars smemory get_new_scope_id variables in
-  let vars = [ store_vars; heap_vars ] in
+  let memory_vars = add_memory_vars smemory get_new_scope_id variables in
+  let vars = [ store_vars; memory_vars ] in
   let () =
     List.iter2
       (fun (scope : scope) vars -> Hashtbl.replace variables scope.id vars)
