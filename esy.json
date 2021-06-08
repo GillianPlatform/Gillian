@@ -92,5 +92,9 @@
     "@opam/ocaml-lsp-server": "*",
     "@opam/odoc": "*",
     "@opam/ocamlformat": "0.16.0"
+  },
+  "resolutions": {
+    "@opam/conf-sqlite3":
+      "ManasJayanth/esy-sqlite:esy.json#28dfc73a8eda790213a8359ad708231069ed7079"
   }
 }
