@@ -314,6 +314,7 @@ let get_store_vars store is_gil_file =
           ({ name = var; value; type_ = None; var_ref = 0 }
             : Debugger.DebuggerTypes.variable))
     store
+  |> List.sort Stdlib.compare
 
 let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
     Debugger.DebuggerTypes.variable list =
