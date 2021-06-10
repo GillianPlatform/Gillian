@@ -28,18 +28,30 @@ module Default (SMemory : SMemory.S) : S with type smemory = SMemory.t = struct
   type smemory = SMemory.t
 
   (** Only display the store, by converting the store values to strings *)
-  let add_variables (store : store) _ ~is_gil_file ~get_new_scope_id variables :
+  let add_variables
+      (store : store) smemory ~is_gil_file ~get_new_scope_id variables :
       scope list =
     let () = ignore is_gil_file in
     let store_id = get_new_scope_id () in
-    let scopes : scope list = [ { id = store_id; name = "Store" } ] in
+    let memory_id = get_new_scope_id () in
+    let scopes : scope list =
+      [ { id = store_id; name = "Store" }; { id = memory_id; name = "Memory" } ]
+    in
     let store_vars =
       store
       |> List.map (fun (var, value) : variable ->
-             let value = Fmt.to_to_string Expr.pp value in
-             { name = var; value; type_ = None; var_ref = 0 })
+             let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
+             create_leaf_variable var value ())
       |> List.sort (fun v w -> Stdlib.compare v.name w.name)
     in
+    let memory_vars =
+      [
+        create_leaf_variable ""
+          (Fmt.to_to_string (Fmt.hbox SMemory.pp) smemory)
+          ();
+      ]
+    in
     let () = Hashtbl.replace variables store_id store_vars in
+    let () = Hashtbl.replace variables memory_id memory_vars in
     scopes
 end
