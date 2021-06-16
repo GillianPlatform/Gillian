@@ -3,7 +3,6 @@ open Debugger.DebuggerTypes
 
 module Make (Debugger : Debugger.S) = struct
   let run dbg rpc =
-    let promise, _ = Lwt.task () in
     Debug_rpc.set_command_handler rpc
       (module Threads_command)
       (fun () ->
@@ -66,5 +65,5 @@ module Make (Debugger : Debugger.S) = struct
         Lwt.return
           (Exception_info_command.Result.make ~exception_id ~description
              ~break_mode ()));
-    Lwt.join [ promise ]
+    Lwt.return ()
 end
