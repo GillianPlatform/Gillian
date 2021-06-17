@@ -6,7 +6,7 @@ module CLI =
       let runners : Gillian.Bulk.Runner.t list =
         [ (module Test262.Test262_runner); (module CosetteRunner) ]
     end)
-    (Debugger.StoreAndSMemoryLifter.Default (Semantics.Symbolic))
+    (Debugging.JSILStoreAndSMemoryLifter)
     (Debugger.MemoryErrorLifter.Dummy
        (Semantics.Symbolic)
        (Js2jsil_lib.JS2GIL_ParserAndCompiler))

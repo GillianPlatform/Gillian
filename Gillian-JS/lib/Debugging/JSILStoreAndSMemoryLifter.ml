@@ -1,3 +1,9 @@
+open Gil_syntax
+open Semantics
+open Debugger.DebuggerTypes
+
+type smemory = Symbolic.t
+
 (* TODO: This should implement StoreSMemoryLifter *)
 
 (* open Gillian.Debugger.Displayable
@@ -151,3 +157,84 @@ let to_debugger_tree (smemory : t) : debugger_tree list =
       else Some (Node (loc, value_nodes value)))
     sorted_locs_with_vals
   @ [ global_scope; local_scope ] *)
+
+let to_str pp = Fmt.to_to_string (Fmt.hbox pp)
+
+(* TODO: All oft his node stuff should be refactored to hide the scope id *)
+let create_node_var name nodes get_new_scope_id (variables : variables) =
+  let id = get_new_scope_id () in
+  let () = Hashtbl.replace variables id nodes in
+  create_node_variable name id ()
+
+let get_store_vars store =
+  store
+      |> List.map (fun (var, value) : variable ->
+             let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
+             create_leaf_variable var value ())
+      |> List.sort (fun v w -> Stdlib.compare v.name w.name)
+
+
+let add_properties_vars properties get_new_scope_id (variables : variables) =
+  (* let field_names =
+    [
+      "descriptor_type";
+      "value";
+      "enumerable";
+      "writable";
+      "configurable";
+    ]
+  in *)
+  (* let add_lst_vars name to_string lst get_new_scope_id (variables : variables) =
+    let list_nodes = List.map2 (fun field_name element -> create_leaf_variable field_name (to_string element) ()) field_names lst in
+    let id = get_new_scope_id () in
+    let () = Hashtbl.replace variables id list_nodes in
+    create_node_variable name id ()
+  in *)
+  let add_lst_vars name to_string lst get_new_scope_id (variables : variables) =
+    let list_nodes = List.mapi (fun index element -> create_leaf_variable (string_of_int index) (to_string element) ()) lst in
+    create_node_var name list_nodes get_new_scope_id variables
+  in
+  let property_nodes =
+    properties |> Expr.YojsonableMap.to_seq
+    |> Seq.map (fun (name, value) ->
+            let name = to_str Expr.pp name in
+            match value with
+            | Expr.EList lst -> add_lst_vars name (to_str Expr.pp) lst get_new_scope_id variables
+            | Expr.Lit (Literal.LList lst) ->
+              add_lst_vars name (to_str Literal.pp) lst get_new_scope_id variables
+            | _ -> create_leaf_variable name (to_str Expr.pp value) ())
+    |> List.of_seq
+  in
+  create_node_var "properties" property_nodes get_new_scope_id variables
+
+let add_memory_vars smemory get_new_scope_id (variables : variables) =
+  let sorted_locs_with_vals = Symbolic.sorted_locs_with_vals smemory in
+  let value_nodes (loc, ((properties, domain), metadata)) : variable =
+    let () = ignore properties in
+    let properties = add_properties_vars properties get_new_scope_id variables in
+    let domain = create_leaf_variable "domain" (to_str (Fmt.option Expr.pp) domain) () in
+    let metadata = create_leaf_variable "metadata"
+    (to_str (Fmt.option ~none:(Fmt.any "unknown") Expr.pp) metadata) () in
+    let loc_id = get_new_scope_id () in
+    let () = Hashtbl.replace variables loc_id [ properties; domain; metadata ] in
+    create_node_variable loc loc_id ()
+  in
+  List.map value_nodes sorted_locs_with_vals
+
+let add_variables
+  store smemory ~is_gil_file ~get_new_scope_id (variables : variables) =
+  let () = ignore is_gil_file in
+  let store_id = get_new_scope_id () in
+  let memory_id = get_new_scope_id () in
+  let scopes : scope list =
+    [ { id = store_id; name = "Store" }; { id = memory_id; name = "Memory" } ]
+  in
+  let store_vars = get_store_vars store in
+  let memory_vars = add_memory_vars smemory get_new_scope_id variables in
+  let vars = [ store_vars; memory_vars ] in
+  let () =
+    List.iter2
+      (fun (scope : scope) vars -> Hashtbl.replace variables scope.id vars)
+      scopes vars
+  in
+  scopes
