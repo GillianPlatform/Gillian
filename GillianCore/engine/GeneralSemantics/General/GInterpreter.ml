@@ -1085,11 +1085,10 @@ struct
             ConfCont (state'', cs', iframes, prev', start_loop_ids, j, b_counter)
         | _ -> raise (Failure "Malformed callstack"))
     (* Explicit failure *)
-    | Fail (fname, exprs) ->
-        let message =
-          Fmt.(str "Fail : %s%a" fname (parens (list ~sep:comma Expr.pp)) exprs)
-        in
-        raise (Failure message)
+    | Fail (fail_code, fail_params) ->
+        let fail_params = List.map (State.eval_expr state) fail_params in
+        let err = ExecErr.EFailReached { fail_code; fail_params } in
+        raise (Interpreter_error ([ err ], state))
 
   let simplify state =
     snd (State.simplify ~save:true ~kill_new_lvars:true state)
