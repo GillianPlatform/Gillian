@@ -3,16 +3,7 @@ predicate list(+x, alpha, ptrs) {
   (x -b> #v, #z) * list(#z, #beta, #rptrs) *
   (alpha == #v::#beta) * (ptrs == x::#rptrs)
 }
-predicate freed_ptrs(+ptrs) {
-  (ptrs == nil);
-  (ptrs == #x::#rest) * freed(#x) * freed_ptrs(#rest)
-}
-// Spec without block pointer
-// predicate list(+x, alpha) {
-//     (x == null) * (alpha == nil);
-//     (x -> #v, #z) * list(#z, #beta) *
-//     (alpha == #v::#beta)
-// }
+
 { (x == #x) * list(#x, #alpha, #ptrs) }
 function dispose(x) {
   [[ invariant {bind: x, #beta, #rest_ptrs} list(x, #beta, #rest_ptrs) ]];
@@ -23,7 +14,8 @@ function dispose(x) {
   };
   return null
 }
-{ freed_ptrs(#x) }
+{ emp }
+
 { (x == #x) * list(#x, #alpha, #ptrs) }
 function list_dispose_double_free(x) {
   if (not (x = null)) {
@@ -36,7 +28,8 @@ function list_dispose_double_free(x) {
   };
   return null
 }
-{ freed_ptrs(#ptrs) }
+{ emp }
+
 // Use commented out spec
 { (x == #x) * list(#x, #alpha, #ptrs) }
 function list_dispose_bad_spec(x) {
@@ -49,7 +42,8 @@ function list_dispose_bad_spec(x) {
   };
   return null
 }
-{ freed_ptrs(#ptrs) }
+{ emp }
+
 { (x == #x) * list(#x, #alpha, #ptrs) }
 function list_dispose_out_of_bounds(x) {
   if (not (x = null)) {
@@ -61,4 +55,4 @@ function list_dispose_out_of_bounds(x) {
   };
   return null
 }
-{ freed_ptrs(#ptrs) }
+{ emp }
