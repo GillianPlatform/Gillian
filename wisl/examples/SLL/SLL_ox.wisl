@@ -179,3 +179,66 @@ function SLL_dispose_iter(x) {
   return null
 }
 { (ret == null) }
+
+
+predicate SLLseg_ox(+x, +y, vs) {
+  (x == y) * (vs == []);
+  (x -b> #v, #next) * SLLseg_ox(#next, y, #vs) * (vs == #v :: #vs)
+}
+
+// Appending a given value to a given SLLseg
+lemma SSLseg_append {
+  statement:
+    forall x, y, vs, v, z.
+      SLLseg_ox(x, y, vs) * (y -b> v, z) |- SLLseg_ox(x, z, vs @ [ v ])
+
+  proof:
+    unfold SLLseg_ox(x, y, vs);
+    if (not (vs = [])) {
+      assert {bind: #nv, #nnext, #nvs} 
+        (x -b> #nv, #nnext) * SLLseg_ox(#nnext, y, #nvs) *
+        (vs == #nv :: #nvs);
+      apply SSLseg_append(#nnext, y, #nvs, v, z)
+    }
+}
+
+// Concatenation of a given SLLseg to a given SLL
+lemma SLLseg_concat_SLL {
+  statement:
+    forall x, y.
+      SLLseg_ox(x, y, #vx) * SLL_ox(y, #vy) |- SLL_ox (x, #vx @ #vy)
+
+  proof:
+    unfold SLLseg_ox(x, y, #vx);
+    if (not (#vx = [])){
+      assert {bind: #nv, #nnext} (x -b> #nv, #nnext);
+      apply SLLseg_concat_SLL(#nnext, y)
+    }
+}
+
+// Concatenating two lists
+{(x == #x) * (y == #y) * SLL_ox(#x, #vx) * SLL_ox(#y, #vy) }
+function SLL_concat_iter(x, y){
+  if (x = null) {
+    head := y
+  } else {
+    head := x; 
+    prev := head;
+    next := [x + 1];
+    [[ invariant {bind: prev, next, #vs1, #vs2, #v} 
+          SLLseg_ox(head, prev, #vs1) * (prev -b> #v, next) * SLL_ox(next,  #vs2) *
+           (#vx == #vs1 @ (#v :: #vs2)) ]];
+    while (not (next = null)) {
+        [[ assert {bind: #prev} prev == #prev ]];
+        prev := next;
+        next := [next + 1];
+        [[ apply SSLseg_append(head, #prev,  #vs1, #v, prev) ]]
+    };
+    [prev + 1] := y;
+    [[ assert {bind:#svs, #sv} SLLseg_ox(head, prev, #svs) * (prev -b> #sv, y) ]];
+    [[ apply SSLseg_append(head, prev, #svs, #sv, y) ]];
+    [[ apply SLLseg_concat_SLL(head, y) ]]
+  };
+  return head 
+}
+{ SLL_ox(ret, #vx @ #vy) }
