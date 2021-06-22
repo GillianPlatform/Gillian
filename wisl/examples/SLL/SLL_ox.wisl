@@ -69,6 +69,20 @@ function SLL_append(x, k){
 }
 { SLL_ox(ret,  #vs @ [#k]) }
 
+// Concatenating two lists
+{(x == #x) * (y == #y) * SLL_ox(#x, #vx) * SLL_ox(#y, #vy) }
+function SLL_concat(x, y) {
+  if (x = null){
+    x := y
+  } else {
+    t := [x + 1];
+    z := SLL_concat(t, y);
+    [x + 1] := z
+  };
+  return x
+}
+{SLL_ox(ret,  #vx @ #vy)}
+
 // Copying a given SLL
 { (x == #x) * SLL_ox(#x, #vs) }
 function SLL_copy(x){

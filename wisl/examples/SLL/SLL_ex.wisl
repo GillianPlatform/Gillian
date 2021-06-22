@@ -68,6 +68,20 @@ function SLL_append(x, k){
 }
 { SLL_ex(ret, #ps @ [#np], #vs @ [#k]) }
 
+// Concatenating two lists
+{(x == #x) * (y == #y) * SLL_ex(#x, #px, #vx) * SLL_ex(#y, #py, #vy) }
+function SLL_concat(x, y) {
+  if (x = null){
+    x := y
+  } else {
+    t := [x + 1];
+    z := SLL_concat(t, y);
+    [x + 1] := z
+  };
+  return x
+}
+{SLL_ex(ret, #px @ #py, #vx @ #vy)}
+
 // Copying a given SLL
 { (x == #x) * SLL_ex(#x, #ps, #vs) }
 function SLL_copy(x){
@@ -164,3 +178,68 @@ function SLL_dispose_iter(x) {
   return null
 }
 { (ret == null) }
+
+predicate SLLseg_ex(+x, +y, ps, vs) {
+  (x == y) * (ps == []) * (vs == []);
+  (x -b> #v, #next) * SLLseg_ex(#next, y, #ps, #vs) *
+  (ps == x :: #ps) * (vs == #v :: #vs)
+}
+
+// Appending a given value to a given SLLseg
+lemma SSLseg_append {
+  statement:
+    forall x, y, ps, vs, v, z.
+      SLLseg_ex(x, y, ps, vs) * (y -b> v, z) |- SLLseg_ex(x, z, ps @ [ y ], vs @ [ v ])
+
+  proof:
+    unfold SLLseg_ex(x, y, ps, vs);
+    if (not (vs = [])) {
+      assert {bind: #nv, #nnext, #nps, #nvs} 
+        (x -b> #nv, #nnext) * SLLseg_ex(#nnext, y, #nps, #nvs) *
+        (ps == x :: #nps) * (vs == #nv :: #nvs);
+      apply SSLseg_append(#nnext, y, #nps, #nvs, v, z)
+    }
+}
+
+// Concatenation of a given SLLseg to a given SLL
+lemma SLLseg_concat_SLL {
+  statement:
+    forall x, y.
+      SLLseg_ex(x, y, #px, #vx) * SLL_ex(y, #py, #vy) |- SLL_ex (x, #px @ #py, #vx @ #vy)
+
+  proof:
+    unfold SLLseg_ex(x, y, #px, #vx);
+    if (not (#vx = [])){
+      assert {bind: #nv, #nnext} (x -b> #nv, #nnext);
+      apply SLLseg_concat_SLL(#nnext, y)
+    }
+}
+
+// Concatenating two lists
+{(x == #x) * (y == #y) * SLL_ex(#x, #px, #vx) * SLL_ex(#y, #py, #vy) }
+function SLL_concat_iter(x, y){
+  if (x = null) {
+    head := y
+  } else {
+    head := x; 
+    prev := head;
+    next := [x + 1];
+    [[ invariant {bind: prev, next, #ps1, #ps2, #vs1, #vs2, #v} 
+          SLLseg_ex(head, prev, #ps1, #vs1) * (prev -b> #v, next) * SLL_ex(next, #ps2, #vs2) *
+          (#px == #ps1 @ (prev :: #ps2)) * (#vx == #vs1 @ (#v :: #vs2)) ]];
+    while (not (next = null)) {
+        [[ assert {bind: #prev} prev == #prev ]];
+        prev := next;
+        next := [next + 1];
+        [[ apply SSLseg_append(head, #prev, #ps1, #vs1, #v, prev) ]]
+    };
+    [prev + 1] := y;
+    [[ assert {bind: #sps, #svs, #sv} SLLseg_ex(head, prev, #sps, #svs) * (prev -b> #sv, y) ]];
+    [[ apply SSLseg_append(head, prev, #sps, #svs, #sv, y) ]];
+    [[ apply SLLseg_concat_SLL(head, y) ]]
+  };
+  return head 
+}
+{ SLL_ex(ret, #px @ #py, #vx @ #vy) }
+
+   
