@@ -1,4 +1,6 @@
+//
 // Exact SLL predicate with pointers and contents
+//
 predicate SLL_ex(+x, ps, vs) {
   // Empty SLL
   (x == null) * (ps == []) * (vs == []);
@@ -7,27 +9,29 @@ predicate SLL_ex(+x, ps, vs) {
   (ps == x :: #ps) * (vs == #v :: #vs)
 }
 
-{ k == #k }
-function SLL_allocate_node(k){
-  t := new(2);
-  [t] := k;
-  return t
+//
+// Pure predicate for list membership
+//
+predicate list_member(+vs, +k, r){
+  (vs == null) * (r == false);
+  (vs == k :: #rest) * (r == true);
+  (vs == #v :: #rest) * (! (#v == k)) * list_member(#rest, k, r)
 }
-{ SLL_ex(ret, [ret], [#k]) }
 
-// Iterative correct list disposal
-{ (x == #x) * SLL_ex(#x, #ps, #vs) }
-function SLL_dispose_iter(x) {
-  [[ invariant {bind: x, #rps, #rvs} SLL_ex(x, #rps, #rvs) ]];
-  while (not (x = null)) {
-    t := [x + 1];
-    delete(x);
-    x := t
-  };
-  return null
+// Allocating an SLL node with the given value
+{ v == #v }
+function SLL_allocate_node(v) {
+  x := new(2);
+  [x] := v;
+  return x
 }
-{ (ret == null) }
+{ SLL_ex(ret, [ret], [ #v ]) }
 
+//
+// RECURSIVE SLL MANIPULATION
+//
+
+// Disposing of an SLL
 { (x == #x) * SLL_ex(#x, #ps, #vs) }
 function SLL_dispose(x){
   if (x = null) {
@@ -41,6 +45,7 @@ function SLL_dispose(x){
 }
 { (ret == null) }
 
+// Prepending a given value to a given SLL
 { (x == #x) * (k == #k) * SLL_ex(#x, #ps, #vs) }
 function SLL_prepend(x, k){
     z := SLL_allocate_node(k);
@@ -49,6 +54,7 @@ function SLL_prepend(x, k){
 }
 { SLL_ex(ret, #z :: #ps, #k :: #vs) }
 
+// Appending a given value to a given SLL
 { (x == #x) * (k == #k) * SLL_ex(#x, #ps, #vs) }
 function SLL_append(x, k){
   if (x = null) {
@@ -62,7 +68,7 @@ function SLL_append(x, k){
 }
 { SLL_ex(ret, #ps @ [#np], #vs @ [#k]) }
 
-
+// Copying a given SLL
 { (x == #x) * SLL_ex(#x, #ps, #vs) }
 function SLL_copy(x){
   y := null;
@@ -79,6 +85,7 @@ function SLL_copy(x){
 }
 { SLL_ex(#x, #ps, #vs) * SLL_ex(ret, #nps, #vs) }
 
+// Appending a given SLL node to a given SLL
 { (x == #x) * (y == #y) * SLL_ex(#x, #ps, #vs) * SLL_ex(#y, [#y], [#vy]) }
 function SLL_append_node(x, y) {
   if (x = null) {
@@ -92,6 +99,7 @@ function SLL_append_node(x, y) {
 }
 { SLL_ex(ret, #ps @ [#y], #vs @ [#vy]) }
 
+// Reversing a given SLL
 { (x == #x) *  SLL_ex(#x, #ps, #vs) }
 function SLL_reverse(x){
   if (not (x = null)) {
@@ -106,6 +114,7 @@ function SLL_reverse(x){
 }
 { SLL_ex(ret, rev #ps, rev #vs) }
 
+// Calculating the length of a given SLL
 { (x == #x) *  SLL_ex(#x, #ps, #vs) }
 function SLL_length(x) {
   n := 0;
@@ -118,17 +127,11 @@ function SLL_length(x) {
   };
   return n
 }
-{ ret == len(#vs) }
+{ ret == len #vs }
 
-predicate list_member(+vs, +k, r){
-  (vs == null) * (r == false);
-  (vs == k :: #rest) * (r == true);
-  (vs == #v :: #rest) * (! (#v == k)) * list_member(#rest, k, r)
-}
-
-
+// Checking if a given value is in a given SLL
 { (x == #x) * (k == #k) * SLL_ex(#x, #ps, #vs) * list_member(#vs, #k, #r) }
-function SLL_membership(x, k){
+function SLL_member(x, k){
   found := false;
   if (x = null){
     skip
@@ -138,9 +141,26 @@ function SLL_membership(x, k){
       found := true
     } else {
       t := [x + 1];
-      found := SLL_membership(t, k)
+      found := SLL_member(t, k)
     }
   };
   return found
 }
 { SLL_ex(#x, #ps, #vs) * list_member(#vs, #k, #r) * (ret == #r) }
+
+//
+// ITERATIVE LIST MANIPULATION
+//
+
+// Disposing of a given SLL
+{ (x == #x) * SLL_ex(#x, #ps, #vs) }
+function SLL_dispose_iter(x) {
+  [[ invariant {bind: x, #rps, #rvs} SLL_ex(x, #rps, #rvs) ]];
+  while (not (x = null)) {
+    t := [x + 1];
+    delete(x);
+    x := t
+  };
+  return null
+}
+{ (ret == null) }
