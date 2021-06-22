@@ -1,12 +1,25 @@
-predicate list(+x, alpha, ptrs) {
-  (x == null) * (alpha == nil) * (ptrs == nil);
-  (x -b> #v, #z) * list(#z, #beta, #rptrs) *
-  (alpha == #v::#beta) * (ptrs == x::#rptrs)
+// Over-approximating SLL predicate with contents, but no pointers
+predicate SLL_ox(+x, vs) {
+  // Empty SLL
+  (x == null) * (vs == []);
+  // One SLL node and the rest
+  (x -b> #v, #next) * SLL_ox(#next, #vs) *
+  (vs == #v :: #vs)
 }
 
-{ (x == #x) * list(#x, #alpha, #ptrs) }
-function dispose(x) {
-  [[ invariant {bind: x, #beta, #rest_ptrs} list(x, #beta, #rest_ptrs) ]];
+// Exact SLL predicate with pointers and contents
+predicate SLL_ex(+x, ps, vs) {
+  // Empty SLL
+  (x == null) * (ps == []) * (vs == []);
+  // One SLL node and the rest
+  (x -b> #v, #next) * SLL_ex(#next, #ps, #vs) *
+  (ps == x :: #ps) * (vs == #v :: #vs)
+}
+
+// Iterative correct list disposal
+{ (x == #x) * SLL_ex(#x, #ps, #vs) }
+function SLL_dispose_iter(x) {
+  [[ invariant {bind: x, #rps, #rvs} SLL_ex(x, #rps, #rvs) ]];
   while (not (x = null)) {
     t := [x + 1];
     delete(x);
@@ -14,45 +27,5 @@ function dispose(x) {
   };
   return null
 }
-{ emp }
+{ (ret == null) }
 
-{ (x == #x) * list(#x, #alpha, #ptrs) }
-function list_dispose_double_free(x) {
-  if (not (x = null)) {
-    tail := [x + 1];
-    delete(x);
-    u := list_dispose_double_free(tail);
-    delete(x)
-  } else {
-    skip
-  };
-  return null
-}
-{ emp }
-
-// Use commented out spec
-{ (x == #x) * list(#x, #alpha, #ptrs) }
-function list_dispose_bad_spec(x) {
-  if (not (x = null)) {
-    tail := [x + 1];
-    u := list_dispose_bad_spec(tail);
-    delete(x)
-  } else {
-    skip
-  };
-  return null
-}
-{ emp }
-
-{ (x == #x) * list(#x, #alpha, #ptrs) }
-function list_dispose_out_of_bounds(x) {
-  if (not (x = null)) {
-    tail := [x + 2];
-    u := list_dispose_out_of_bounds(tail);
-    delete(x)
-  } else {
-    skip
-  };
-  return null
-}
-{ emp }
