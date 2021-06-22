@@ -7,6 +7,14 @@ predicate SLL_ex(+x, ps, vs) {
   (ps == x :: #ps) * (vs == #v :: #vs)
 }
 
+{ k == #k }
+function SLL_allocate_node(k){
+  t := new(2);
+  [t] := k;
+  return t
+}
+{ SLL_ex(ret, [ret], [#k]) }
+
 // Iterative correct list disposal
 { (x == #x) * SLL_ex(#x, #ps, #vs) }
 function SLL_dispose_iter(x) {
@@ -20,3 +28,119 @@ function SLL_dispose_iter(x) {
 }
 { (ret == null) }
 
+{ (x == #x) * SLL_ex(#x, #ps, #vs) }
+function SLL_dispose(x){
+  if (x = null) {
+    skip
+  } else {
+    t := [x + 1];
+    z := SLL_dispose(t);
+    delete(x)
+  };
+  return null
+}
+{ (ret == null) }
+
+{ (x == #x) * (k == #k) * SLL_ex(#x, #ps, #vs) }
+function SLL_prepend(x, k){
+    z := SLL_allocate_node(k);
+    [z + 1] := x;
+    return z
+}
+{ SLL_ex(ret, #z :: #ps, #k :: #vs) }
+
+{ (x == #x) * (k == #k) * SLL_ex(#x, #ps, #vs) }
+function SLL_append(x, k){
+  if (x = null) {
+    x := SLL_allocate_node(k)
+    } else {
+      t := [x + 1];
+      z := SLL_append(t, k);
+      [x + 1] := z
+  };
+  return x
+}
+{ SLL_ex(ret, #ps @ [#np], #vs @ [#k]) }
+
+
+{ (x == #x) * SLL_ex(#x, #ps, #vs) }
+function SLL_copy(x){
+  y := null;
+  if (not (x = null)) {
+    k := [x];
+    y := SLL_allocate_node(k);
+    t := [x + 1];
+    z := SLL_copy(t);
+    [y + 1] := z
+  } else {
+    skip
+  };
+  return y
+}
+{ SLL_ex(#x, #ps, #vs) * SLL_ex(ret, #nps, #vs) }
+
+{ (x == #x) * (y == #y) * SLL_ex(#x, #ps, #vs) * SLL_ex(#y, [#y], [#vy]) }
+function SLL_append_node(x, y) {
+  if (x = null) {
+    x := y
+  } else {
+    t := [x + 1];
+    z := SLL_append_node(t, y);
+    [x + 1] := z
+  };
+  return x
+}
+{ SLL_ex(ret, #ps @ [#y], #vs @ [#vy]) }
+
+{ (x == #x) *  SLL_ex(#x, #ps, #vs) }
+function SLL_reverse(x){
+  if (not (x = null)) {
+    t := [x + 1];
+    [x + 1] := null;
+    z := SLL_reverse(t);
+    y := SLL_append_node(z, x)
+  } else {
+    y := null
+  };
+  return y
+}
+{ SLL_ex(ret, rev #ps, rev #vs) }
+
+{ (x == #x) *  SLL_ex(#x, #ps, #vs) }
+function SLL_length(x) {
+  n := 0;
+  if (x = null){
+    n := 0
+  } else {
+    t := [x + 1];
+    n := SLL_length(t);
+    n := 1 + n
+  };
+  return n
+}
+{ ret == len(#vs) }
+
+predicate list_member(+vs, +k, r){
+  (vs == null) * (r == false);
+  (vs == k :: #rest) * (r == true);
+  (vs == #v :: #rest) * (! (#v == k)) * list_member(#rest, k, r)
+}
+
+
+{ (x == #x) * (k == #k) * SLL_ex(#x, #ps, #vs) * list_member(#vs, #k, #r) }
+function SLL_membership(x, k){
+  found := false;
+  if (x = null){
+    skip
+  } else {
+    v := [x];
+    if (v = k){
+      found := true
+    } else {
+      t := [x + 1];
+      found := SLL_membership(t, k)
+    }
+  };
+  return found
+}
+{ SLL_ex(#x, #ps, #vs) * list_member(#vs, #k, #r) * (ret == #r) }

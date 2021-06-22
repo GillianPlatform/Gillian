@@ -189,7 +189,7 @@ module Make
                else
                  List.concat_map
                    (fun (_, astate) ->
-                     let _, astates = simplify ~kill_new_lvars:true astate in
+                     let _, astates = simplify ~kill_new_lvars:false astate in
                      astates)
                    next_states)
          (State.assume ~unfold state v))
