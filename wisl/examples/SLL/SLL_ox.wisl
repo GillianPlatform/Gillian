@@ -1,0 +1,22 @@
+// Over-approximating SLL predicate with contents, but no pointers
+predicate SLL_ox(+x, vs) {
+  // Empty SLL
+  (x == null) * (vs == []);
+  // One SLL node and the rest
+  (x -b> #v, #next) * SLL_ox(#next, #vs) *
+  (vs == #v :: #vs)
+}
+
+// Iterative correct list disposal
+{ (x == #x) * SLL_ox(#x, #vs) }
+function SLL_dispose_iter(x) {
+  [[ invariant {bind: x, #rvs} SLL_ox(x, #rvs) ]];
+  while (not (x = null)) {
+    t := [x + 1];
+    delete(x);
+    x := t
+  };
+  return null
+}
+{ (ret == null) }
+

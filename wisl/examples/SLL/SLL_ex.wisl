@@ -1,12 +1,3 @@
-// Over-approximating SLL predicate with contents, but no pointers
-predicate SLL_ox(+x, vs) {
-  // Empty SLL
-  (x == null) * (vs == []);
-  // One SLL node and the rest
-  (x -b> #v, #next) * SLL_ox(#next, #vs) *
-  (vs == #v :: #vs)
-}
-
 // Exact SLL predicate with pointers and contents
 predicate SLL_ex(+x, ps, vs) {
   // Empty SLL
