@@ -1,7 +1,7 @@
 %token EOF
 
 (* key words *)
-%token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP NEW DELETE
+%token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP NEW DELETE THROW
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
 %token <CodeLoc.t> INVARIANT FOLD UNFOLD APPLY ASSERT EXIST FORALL
 %token <CodeLoc.t> STATEMENT VARIANT PROOF
@@ -202,6 +202,10 @@ statement:
       WStmt.make bare_stmt loc }
   | lstart = DELETE; LBRACE; e = expression; lend = RBRACE;
     { let bare_stmt = WStmt.Dispose e in
+      let loc = CodeLoc.merge lstart lend in
+      WStmt.make bare_stmt loc }
+  | lstart = THROW; LBRACE; e = expression; lend = RBRACE;
+    { let bare_stmt = WStmt.Throw e in
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc }
   | lx = IDENTIFIER; ASSIGN; LBRACK; e = expression; lend = RBRACK

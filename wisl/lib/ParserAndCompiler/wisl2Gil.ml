@@ -731,9 +731,19 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       in
       let comp_rest, new_functions = compile_list rest in
       ((annot, None, newcmd) :: comp_rest, new_functions)
-  (* x := new(k) =>
-          x := [alloc](k); // this is already a pointer
-  *)
+  (* Throw *)
+  | { snode = Throw e; sid; _ } :: rest ->
+      let cmdles, comp_e = compile_expr e in
+      let cmd_asgn_ret_var =
+        Cmd.Assignment (Gillian.Utils.Names.return_variable, comp_e)
+      in
+      let cmd_err = Cmd.ReturnError in
+      let annot = Annot.make ~origin_id:sid () in
+      let comp_rest, new_functions = compile_list rest in
+      ( cmdles
+        @ [ (annot, None, cmd_asgn_ret_var); (annot, None, cmd_err) ]
+        @ comp_rest,
+        new_functions )
   (* Function call *)
   | { snode = FunCall (x, fn, el, to_bind); sid; _ } :: rest ->
       let expr_fn = gil_expr_of_str fn in

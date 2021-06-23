@@ -2,9 +2,10 @@ type tt =
   | Skip
   | VarAssign of string * WExpr.t  (** x := e *)
   | New       of string * int  (** x := new(k) *)
-  | Dispose   of WExpr.t  (** dispose(e) *)
+  | Dispose   of WExpr.t  (** free(e) *)
   | Lookup    of string * WExpr.t  (** x := [e] *)
   | Update    of WExpr.t * WExpr.t  (** [e] := [e] *)
+  | Throw     of WExpr.t  (** throw(e) *)
   | FunCall   of string * string * WExpr.t list * (string * string list) option
       (** x := f(e1, ..., en), last bit should be ignored *)
   | While     of WExpr.t * t list  (** while (e) \{ s \} *)
