@@ -3,7 +3,7 @@
 (* key words *)
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP NEW DELETE THROW
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
-%token <CodeLoc.t> INVARIANT FOLD UNFOLD APPLY ASSERT EXIST FORALL
+%token <CodeLoc.t> INVARIANT FOLD UNFOLD APPLY ASSERT EXIST FORALL RNORM RERR
 %token <CodeLoc.t> STATEMENT VARIANT PROOF
 
 (* punctuation *)
@@ -137,11 +137,16 @@ definitions:
       (f::fs, ps, ls) }
 
 
+rmode:
+  | RNORM { WSpec.RNormal }
+  | RERR  { WSpec.RError }
+
 fct_with_specs:
   | lstart = LCBRACE; pre = logic_assertion; RCBRACE; f = fct; LCBRACE;
-    post = logic_assertion; lend = RCBRACE
+    post = logic_assertion; lend = RCBRACE; rmode = option(rmode)
     { let loc = CodeLoc.merge lstart lend in
-      WFun.add_spec f pre post loc }
+      let rmode = match rmode with | None -> WSpec.RNormal | Some rmode -> rmode in
+      WFun.add_spec f pre post rmode loc }
   | f = fct { f }
 
 fct:
