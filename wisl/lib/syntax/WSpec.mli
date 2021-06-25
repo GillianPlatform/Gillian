@@ -1,6 +1,9 @@
+type rt = RNormal | RError
+
 type t = {
   pre : WLAssert.t;  (** Precondition *)
   post : WLAssert.t;  (** Postcondition *)
+  return_mode : rt;  (** Return mode *)
   existentials : (string * string list) option;  (** Existentials in the spec *)
   spid : int;  (** Unique identifier of AST el *)
   fname : string;  (** Name of the function the spec is attached to *)
@@ -30,6 +33,7 @@ val make :
   ?existentials:string * string list ->
   WLAssert.t ->
   WLAssert.t ->
+  rt ->
   string ->
   string list ->
   CodeLoc.t ->

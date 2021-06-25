@@ -7,6 +7,7 @@ type tt =
   | Dispose   of WExpr.t
   | Lookup    of string * WExpr.t (* x := [e] *)
   | Update    of WExpr.t * WExpr.t (* [e] := [e] *)
+  | Throw     of WExpr.t
   | FunCall   of string * string * WExpr.t list * (string * string list) option (* The last bit is only for internal use *)
   | While     of WExpr.t * t list
   | If        of WExpr.t * t list * t list
@@ -32,10 +33,11 @@ and pp fmt stmt =
   | Skip                  -> Format.fprintf fmt "@[%s@]" "skip"
   | VarAssign (v, e)      -> Format.fprintf fmt "@[%s := %a@]" v WExpr.pp e
   | New (v, r)            -> Format.fprintf fmt "@[%s := new(%i)@]" v r
-  | Dispose e             -> Format.fprintf fmt "@[delete@ %a@]" WExpr.pp e
+  | Dispose e             -> Format.fprintf fmt "@[free@ %a@]" WExpr.pp e
   | Lookup (v, e)         -> Format.fprintf fmt "@[%s := [%a]@]" v WExpr.pp e
   | Update (e1, e2)       ->
       Format.fprintf fmt "@[[%a] := %a@]" WExpr.pp e1 WExpr.pp e2
+  | Throw e               -> Format.fprintf fmt "@[throw@ %a@]" WExpr.pp e
   | FunCall (v, f, el, _) ->
       Format.fprintf fmt "@[%s := %s(%a)@]" v f
         (WPrettyUtils.pp_list WExpr.pp)

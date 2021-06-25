@@ -32,7 +32,9 @@ rule read =
   | "else"   { ELSE (curr lexbuf) }
   | "skip"   { SKIP (curr lexbuf) }
   | "new"    { NEW (curr lexbuf) }
-  | "delete" { DELETE (curr lexbuf) }
+  | "free"   { DELETE (curr lexbuf) }
+  | "throw"  { THROW (curr lexbuf) }
+  | "error"  { RERR (curr lexbuf) }
   | "function" { FUNCTION (curr lexbuf) }
   | "predicate" { PREDICATE (curr lexbuf) }
   | "invariant" { INVARIANT (curr lexbuf) }

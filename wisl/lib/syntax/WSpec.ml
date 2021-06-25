@@ -1,8 +1,11 @@
 open VisitorUtils
 
+type rt = RNormal | RError
+
 type t = {
   pre : WLAssert.t;
   post : WLAssert.t;
+  return_mode : rt;
   existentials : (string * string list) option;
   spid : int;
   fname : string;
@@ -25,10 +28,11 @@ let get_by_id id spec =
   let self_or_none = if get_id spec = id then `WSpec spec else `None in
   self_or_none |>> (lassert_getter, spec.pre) |>> (lassert_getter, spec.post)
 
-let make ?existentials pre post fname fparams loc =
+let make ?existentials pre post return_mode fname fparams loc =
   {
     pre;
     post;
+    return_mode;
     spid = Generators.gen_id ();
     sploc = loc;
     fname;

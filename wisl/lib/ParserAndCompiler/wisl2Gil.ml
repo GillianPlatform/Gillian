@@ -524,6 +524,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         {
           pre;
           post;
+          return_mode = WSpec.RNormal;
           spid = Generators.gen_id ();
           fname = loop_fname;
           fparams = vars;
@@ -731,9 +732,19 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       in
       let comp_rest, new_functions = compile_list rest in
       ((annot, None, newcmd) :: comp_rest, new_functions)
-  (* x := new(k) =>
-          x := [alloc](k); // this is already a pointer
-  *)
+  (* Throw *)
+  | { snode = Throw e; sid; _ } :: rest ->
+      let cmdles, comp_e = compile_expr e in
+      let cmd_asgn_ret_var =
+        Cmd.Assignment (Gillian.Utils.Names.return_variable, comp_e)
+      in
+      let cmd_err = Cmd.ReturnError in
+      let annot = Annot.make ~origin_id:sid () in
+      let comp_rest, new_functions = compile_list rest in
+      ( cmdles
+        @ [ (annot, None, cmd_asgn_ret_var); (annot, None, cmd_err) ]
+        @ comp_rest,
+        new_functions )
   (* Function call *)
   | { snode = FunCall (x, fn, el, to_bind); sid; _ } :: rest ->
       let expr_fn = gil_expr_of_str fn in
@@ -784,7 +795,8 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let comp_rest, new_functions = compile_list rest in
       (cmds_with_annot @ comp_rest, new_functions)
 
-let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials; _ }
+let compile_spec
+    ?(fname = "main") WSpec.{ pre; post; return_mode; fparams; existentials; _ }
     =
   let _, comp_pre = compile_lassert ~fname pre in
   let _, comp_post = compile_lassert ~fname post in
@@ -793,11 +805,14 @@ let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials; _ }
     | None         -> None
     | Some (n, ss) -> Some (n, ss)
   in
+  let return_mode =
+    if return_mode = WSpec.RNormal then Flag.Normal else Flag.Error
+  in
   let single_spec =
     match label_opt with
-    | None          -> Spec.s_init comp_pre [ comp_post ] Flag.Normal true
+    | None          -> Spec.s_init comp_pre [ comp_post ] return_mode true
     | Some ss_label ->
-        Spec.s_init ~ss_label comp_pre [ comp_post ] Flag.Normal true
+        Spec.s_init ~ss_label comp_pre [ comp_post ] return_mode true
   in
   Spec.init fname fparams [ single_spec ] false false true
 

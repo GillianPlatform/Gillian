@@ -32,15 +32,15 @@ function SLL_allocate_node(k){
 // RECURSIVE SLL MANIPULATION
 //
 
-// Disposing of an SLL
+// Freeing a given SLL
 { (x == #x) * SLL_ox(#x, #vs) }
-function SLL_dispose(x){
+function SLL_free(x){
   if (x = null) {
     skip
   } else {
     t := [x + 1];
-    z := SLL_dispose(t);
-    delete(x)
+    z := SLL_free(t);
+    free(x)
   };
   return null
 }
@@ -78,7 +78,7 @@ function SLL_remove(x, k){
     v := [x];
     next := [x + 1];
     if (v = k){
-      delete(x);
+      free(x);
       x := next
     } else {
        z := SLL_remove(next, k);
@@ -187,13 +187,13 @@ function SLL_member(x, k){
 // ITERATIVE LIST MANIPULATION
 //
 
-// Disposing of a given SLL
+// Freeing a given SLL
 { (x == #x) * SLL_ox(#x, #vs) }
-function SLL_dispose_iter(x) {
+function SLL_free_iter(x) {
   [[ invariant {bind: x, #rvs} SLL_ox(x, #rvs) ]];
   while (not (x = null)) {
     t := [x + 1];
-    delete(x);
+    free(x);
     x := t
   };
   return null
@@ -215,7 +215,7 @@ lemma SSLseg_append {
   proof:
     unfold SLLseg_ox(x, y, vs);
     if (not (vs = [])) {
-      assert {bind: #nv, #nnext, #nvs} 
+      assert {bind: #nv, #nnext, #nvs}
         (x -b> #nv, #nnext) * SLLseg_ox(#nnext, y, #nvs) *
         (vs == #nv :: #nvs);
       apply SSLseg_append(#nnext, y, #nvs, v, z)
@@ -242,10 +242,10 @@ function SLL_concat_iter(x, y){
   if (x = null) {
     head := y
   } else {
-    head := x; 
+    head := x;
     prev := head;
     next := [x + 1];
-    [[ invariant {bind: prev, next, #vs1, #vs2, #v} 
+    [[ invariant {bind: prev, next, #vs1, #vs2, #v}
           SLLseg_ox(head, prev, #vs1) * (prev -b> #v, next) * SLL_ox(next,  #vs2) *
            (#vx == #vs1 @ (#v :: #vs2)) ]];
     while (not (next = null)) {
@@ -259,7 +259,7 @@ function SLL_concat_iter(x, y){
     [[ apply SSLseg_append(head, prev, #svs, #sv, y) ]];
     [[ apply SLLseg_concat_SLL(head, y) ]]
   };
-  return head 
+  return head
 }
 { SLL_ox(ret, #vx @ #vy) }
 
