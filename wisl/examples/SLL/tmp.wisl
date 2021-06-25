@@ -1,0 +1,106 @@
+{ (x == #x) *  SLL_ox(#x, #vx) }
+function SLL_reverse_iter(x){
+    y := null;
+    [[ invariant {bind: x, y, z, #nvx, #nvy} 
+        SLL_ox(x, #nvs) * SLL_ox(y, #nvy) * ((rev #vx) == ((rev #nvx) @ #nvy)) ]];
+    while (not (x = null)){
+      [[ assert {bind: #v, #z} x -b> #v, #z ]];
+        z := [x + 1];
+        [x + 1] := y;
+        y := x;
+        x := z
+    };
+    return y
+}
+{ SLL_ox(ret, rev #vx) }
+
+function SLL_copy_iter(x){
+    t := x;
+    y := null;
+    p := y;
+    while(t != null){
+        c := new(2);
+        v := [t];
+        [c] := v;
+        if(p != null){
+            [p + 1] := c
+        } else {
+            y := c
+        };
+        p := c; 
+        t :=  [t + 1]
+    }
+    return y
+}
+
+function SLL_copy_iter(x){
+    y := null
+    if (x = null){
+        skip
+    } else {
+        y := new(2);
+        v := [x];
+        [y] := v;
+        t := [x + 1];
+        p := y;
+        [[ invariant {bind: } SLLseg_ox(x, t, #alpha1) * SLL_ox(t, #alpha2) *
+            (#alpha == (#alpha1 @ #alpha2)) * SLLseg_ox(y, p, #alpha3) * (p -b> #a, null) *
+                (#alpha1 == (#alpha3 @ [#a]))]]
+        while(not (t = null)){
+            c := new(2);
+            v := [t];
+            [c] := v;
+            [p + 1] := c;
+            p := c;
+            t := [t + 1]
+        }
+    };
+    return y
+}
+
+
+// Removing a given value to a given SLL 
+{ (x == #x) * (k == #k) * SLL_ox(#x, #vs) }
+function SLL_remove(x, k){
+  if (x = null){
+    skip
+  } else {
+    v := [x]
+    if (v = k){
+      x := [x + 1]
+    } else {
+       next := [x + 1];
+       z := SLL_remove(next, k);
+       [x + 1] := z 
+    }
+  };
+  return x
+}
+
+{ (x == #x) * SLL_ox(#x, #alpha) }
+function SLL_copy_iter(x){
+    y := null;
+    if (x = null){
+        skip
+    } else {
+        y := new(2);
+        v := [x];
+        [y] := v;
+        t := [x + 1];
+        p := y;
+        [[ invariant {bind: c, v, t, p, #alpha1, #alpha2, #alpha3, #a} 
+          SLLseg_ox(x, t, #alpha1) * SLL_ox(t, #alpha2) *
+            (#alpha == (#alpha1 @ #alpha2)) * SLLseg_ox(y, p, #alpha3) * (p -b> #a, null) *
+                (#alpha1 == (#alpha3 @ [#a])) ]];
+        while(not (t = null)){
+            c := new(2);
+            v := [t];
+            [c] := v;
+            [p + 1] := c;
+            p := c;
+            t := [t + 1]
+        }
+    };
+    return y
+}
+{ SLL_ox(#x, #alpha) * SLL_ox(ret, #alpha) }

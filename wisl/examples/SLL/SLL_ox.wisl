@@ -69,6 +69,26 @@ function SLL_append(x, k){
 }
 { SLL_ox(ret,  #vs @ [#k]) }
 
+// Removing a given value to a given SLL 
+{ (x == #x) * (k == #k) * SLL_ox(#x, #vs) * list_member(#vs, #k, #r) }
+function SLL_remove(x, k){
+  if (x = null){
+    skip
+  } else {
+    v := [x];
+    next := [x + 1];
+    if (v = k){
+      delete(x);
+      x := next
+    } else {
+       z := SLL_remove(next, k);
+       [x + 1] := z 
+    }
+  };
+  return x
+}
+{ SLL_ox(ret, #nvs) * list_member(#nvs, #k, #r1) * (#r1 == false) }
+
 // Concatenating two lists
 {(x == #x) * (y == #y) * SLL_ox(#x, #vx) * SLL_ox(#y, #vy) }
 function SLL_concat(x, y) {
@@ -242,3 +262,92 @@ function SLL_concat_iter(x, y){
   return head 
 }
 { SLL_ox(ret, #vx @ #vy) }
+
+
+lemma SLLseg_to_SLL {
+  statement: 
+    forall x.
+      SLLseg_ox(x, null, #vx) |- SLL_ox(x, #vx)
+
+  proof:
+    unfold SLLseg_ox(x, null, #vx);
+    if (not (#vx = [])){
+      assert {bind: #nv, #nnext} (x -b> #nv, #nnext);
+      apply SLLseg_to_SLL(#nnext)
+    }
+}
+
+{ (x == #x) * SLL_ox(x, #vx) }
+function SLL_length_iter(x) {
+  y := x;
+  n := 0;
+  [[invariant {bind: n, y, #nvx,  #nvy} 
+      SLLseg_ox(x, y,  #nvx) * SLL_ox(y, #nvy) * 
+         (#vx == (#nvx@#nvy)) * (n == len #nvx) ]];
+  while (not (y = null)) {
+    [[ assert {bind: #y} y == #y ]];
+    [[ assert {bind: #v, #z} #y -b> #v, #z ]];
+    y := [y+1];
+    n := n+1;
+    [[ apply SSLseg_append(x, #y, #nvx, #v, y) ]]
+  };
+  [[ unfold SLL_ox(null, #nvy)]];
+  [[ apply SLLseg_to_SLL(x) ]];
+  return n
+}
+{ SLL_ox(#x, #vx) * (ret == len(#vx)) }
+
+{(x == #x) * (k == #k) * SLL_ox(#x, #vx) }
+function SLL_append_iter(x, k){
+  y := SLL_allocate_node(k);
+  if (x = null){
+    x := y
+  } else {
+    head := x; 
+    prev := head;
+    next := [x + 1];
+    [[ invariant {bind: prev, next, #vs1, #vs2, #v} 
+          SLLseg_ox(head, prev, #vs1) * (prev -b> #v, next) * SLL_ox(next,  #vs2) *
+           (#vx == #vs1 @ (#v :: #vs2)) ]];
+    while(not (next = null)){
+      [[ assert {bind: #prev} prev == #prev ]];
+      prev := next;
+      next := [next + 1];
+      [[ apply SSLseg_append(head, #prev,  #vs1, #v, prev) ]]
+    };
+    [prev + 1] := y;
+    [[ assert {bind:#svs, #sv} SLLseg_ox(head, prev, #svs) * (prev -b> #sv, y) ]];
+    [[ apply SSLseg_append(head, prev, #svs, #sv, y) ]];
+    [[ apply SLLseg_concat_SLL(head, y) ]]
+  };
+  return x
+}
+{ SLL_ox(ret,  #vs @ [#k]) }
+
+{ (x == #x) * SLL_ox(#x, #alpha) }
+function SLL_copy_iter(x){
+    y := null;
+    if (x = null){
+        skip
+    } else {
+        y := new(2);
+        v := [x];
+        [y] := v;
+        t := [x + 1];
+        p := y;
+        [[ invariant {bind: c, v, t, p, #alpha1, #alpha2, #alpha3, #a} 
+          SLLseg_ox(x, t, #alpha1) * SLL_ox(t, #alpha2) *
+            (#alpha == (#alpha1 @ #alpha2)) * SLLseg_ox(y, p, #alpha3) * (p -b> #a, null) *
+                (#alpha1 == (#alpha3 @ [#a])) ]];
+        while (not (t = null)){
+            c := new(2);
+            v := [t];
+            [c] := v;
+            [p + 1] := c;
+            p := c;
+            t := [t + 1]
+        }
+    };
+    return y
+}
+{ SLL_ox(#x, #alpha) * SLL_ox(ret, #alpha) }

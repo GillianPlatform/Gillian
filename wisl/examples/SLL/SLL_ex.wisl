@@ -242,4 +242,55 @@ function SLL_concat_iter(x, y){
 }
 { SLL_ex(ret, #px @ #py, #vx @ #vy) }
 
-   
+lemma SLLseg_to_SLL {
+  statement: 
+    forall x.
+      SLLseg_ex(x, null, #px, #vx) |- SLL_ex(x, #px, #vx)
+
+  proof:
+    unfold SLLseg_ex(x, null, #px, #vx);
+    if (not (#vx = [])){
+      assert {bind: #nv, #nnext} (x -b> #nv, #nnext);
+      apply SLLseg_to_SLL(#nnext)
+    }
+}
+
+{ (x == #x) * SLL_ex(x, #px, #vx) }
+function SLL_length_iter(x) {  
+  y := x;
+  n := 0;
+  [[invariant {bind: n, y, #npx, #nvx, #npy, #nvy} 
+      SLLseg_ex(x, y, #npx, #nvx) * SLL_ex(y, #npy, #nvy) * 
+         (#px == (#npx@#npy)) * (#vx == (#nvx@#nvy)) * (n == len #nvx) ]];
+  while (not (y = null)) {
+    [[ assert {bind: #y} y == #y ]];
+    [[ assert {bind: #v, #z} #y -b> #v, #z ]];
+    y := [y+1];
+    n := n+1;
+    [[ apply SSLseg_append(x, #y, #npx, #nvx, #v, y) ]]
+  };
+  [[ unfold SLL_ex(null, #npy, #nvy) ]];
+  [[ apply SLLseg_to_SLL(x) ]];
+  return n
+}
+{ SLL_ex(#x, #px, #vx) * (ret == len(#vx)) }
+
+{ (x == #x) * SLL_ex(x, #px, #vx) }
+function SLL_length_iter(x) {
+  y := x;
+  n := 0;
+  [[invariant {bind: n, y, #npx, #nvx, #npy, #nvy} 
+      SLLseg_ex(x, y, #npx, #nvx) * SLL_ex(y, #npy, #nvy) * 
+         (#px == (#npx@#npy)) * (#vx == (#nvx@#nvy)) * (n == len #nvx) ]];
+  while (not (y = null)) {
+    [[ assert {bind: #y} y == #y ]];
+    [[ assert {bind: #v, #z} #y -b> #v, #z ]];
+    y := [y+1];
+    n := n+1;
+    [[ apply SSLseg_append(x, #y, #npx, #nvx, #v, y) ]]
+  };
+  [[ unfold SLL_ex(null, #npx, #nvy)]];
+  [[ apply SLLseg_to_SLL(x) ]];
+  return n
+}
+{ SLL_ex(#x, #px, #vx) * (ret == len(#vx)) }
