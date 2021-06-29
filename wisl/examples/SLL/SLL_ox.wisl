@@ -303,7 +303,7 @@ function SLL_concat_iter(x, y){
 }
 { SLL_ox(ret, #vx @ #vy) }
 
-// TODO: 05. Copying a given SLL
+// 05. Copying a given SLL
 { (x == #x) * SLL_ox(#x, #alpha) }
 function SLL_copy_iter(x){
     y := null;
