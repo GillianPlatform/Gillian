@@ -274,7 +274,7 @@ function SLL_append_iter(x, k){
 }
 { SLL_ox(ret, #vx @ [ #k ]) }
 
-// TODO: 03.Appending a given node to a given SLL
+// TODO: 03. Appending a given node to a given SLL
 
 // 04. Concatenating two lists
 {(x == #x) * (y == #y) * SLL_ox(#x, #vx) * SLL_ox(#y, #vy) }
