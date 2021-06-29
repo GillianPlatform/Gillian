@@ -12,41 +12,27 @@ predicate SLL_ox(+x, vs) {
 //
 // Pure predicate for list membership
 //
-predicate list_member(+vs, +k, r){
+predicate list_member(+vs, +v, r){
   (vs == null) * (r == false);
-  (vs == k :: #rest) * (r == true);
-  (vs == #v :: #rest) * (! (#v == k)) * list_member(#rest, k, r)
+  (vs == v :: #rest) * (r == true) * list_member(#rest, v, #mem);
+  (vs == #v :: #rest) * (! (#v == v)) * list_member(#rest, v, r)
 }
 
-// Allocating an SLL node with the given value
-{ k == #k }
-function SLL_allocate_node(k){
+// 00. Allocating an SLL node with the given value
+{ v == #v }
+function SLL_allocate_node(v){
   t := new(2);
-  [t] := k;
+  [t] := v;
   return t
 }
-{ SLL_ox(ret, [#k]) }
+{ SLL_ox(ret, [ #v ]) }
 
 
 //
 // RECURSIVE SLL MANIPULATION
 //
 
-// Freeing a given SLL
-{ (x == #x) * SLL_ox(#x, #vs) }
-function SLL_free(x){
-  if (x = null) {
-    skip
-  } else {
-    t := [x + 1];
-    z := SLL_free(t);
-    free(x)
-  };
-  return null
-}
-{ (ret == null) }
-
-// Prepending a given value to a given SLL
+// 01. Prepending a given value to a given SLL
 { (x == #x) * (k == #k) * SLL_ox(#x, #vs) }
 function SLL_prepend(x, k){
     z := SLL_allocate_node(k);
@@ -55,7 +41,7 @@ function SLL_prepend(x, k){
 }
 { SLL_ox(ret, #k :: #vs) }
 
-// Appending a given value to a given SLL
+// 02. Appending a given value to a given SLL
 { (x == #x) * (k == #k) * SLL_ox(#x, #vs) }
 function SLL_append(x, k){
   if (x = null) {
@@ -69,27 +55,21 @@ function SLL_append(x, k){
 }
 { SLL_ox(ret,  #vs @ [#k]) }
 
-// Removing a given value to a given SLL 
-{ (x == #x) * (k == #k) * SLL_ox(#x, #vs) * list_member(#vs, #k, #r) }
-function SLL_remove(x, k){
-  if (x = null){
-    skip
+// 03. Appending a given SLL node to a given SLL
+{ (x == #x) * (y == #y) * SLL_ox(#x, #vs) * SLL_ox(#y, [#vy]) }
+function SLL_append_node(x, y) {
+  if (x = null) {
+    x := y
   } else {
-    v := [x];
-    next := [x + 1];
-    if (v = k){
-      free(x);
-      x := next
-    } else {
-       z := SLL_remove(next, k);
-       [x + 1] := z 
-    }
+    t := [x + 1];
+    z := SLL_append_node(t, y);
+    [x + 1] := z
   };
   return x
 }
-{ SLL_ox(ret, #nvs) * list_member(#nvs, #k, #r1) * (#r1 == false) }
+{ SLL_ox(ret, #vs @ [#vy]) }
 
-// Concatenating two lists
+// 04. Concatenating two lists
 {(x == #x) * (y == #y) * SLL_ox(#x, #vx) * SLL_ox(#y, #vy) }
 function SLL_concat(x, y) {
   if (x = null){
@@ -101,9 +81,9 @@ function SLL_concat(x, y) {
   };
   return x
 }
-{SLL_ox(ret,  #vx @ #vy)}
+{ SLL_ox(ret,  #vx @ #vy) }
 
-// Copying a given SLL
+// 05. Copying a given SLL
 { (x == #x) * SLL_ox(#x, #vs) }
 function SLL_copy(x){
   y := null;
@@ -120,36 +100,7 @@ function SLL_copy(x){
 }
 { SLL_ox(#x, #vs) * SLL_ox(ret, #vs) }
 
-// Appending a given SLL node to a given SLL
-{ (x == #x) * (y == #y) * SLL_ox(#x, #vs) * SLL_ox(#y, [#vy]) }
-function SLL_append_node(x, y) {
-  if (x = null) {
-    x := y
-  } else {
-    t := [x + 1];
-    z := SLL_append_node(t, y);
-    [x + 1] := z
-  };
-  return x
-}
-{ SLL_ox(ret, #vs @ [#vy]) }
-
-// Reversing a given SLL
-{ (x == #x) *  SLL_ox(#x, #vs) }
-function SLL_reverse(x){
-  if (not (x = null)) {
-    t := [x + 1];
-    [x + 1] := null;
-    z := SLL_reverse(t);
-    y := SLL_append_node(z, x)
-  } else {
-    y := null
-  };
-  return y
-}
-{ SLL_ox(ret,rev #vs) }
-
-// Calculating the length of a given SLL
+// 06. Calculating the length of a given SLL
 { (x == #x) *  SLL_ox(#x, #vs) }
 function SLL_length(x) {
   n := 0;
@@ -164,7 +115,22 @@ function SLL_length(x) {
 }
 { ret == len(#vs) }
 
-// Checking if a given value is in a given SLL
+// 07. Reversing a given SLL
+{ (x == #x) *  SLL_ox(#x, #vs) }
+function SLL_reverse(x){
+  if (not (x = null)) {
+    t := [x + 1];
+    [x + 1] := null;
+    z := SLL_reverse(t);
+    y := SLL_append_node(z, x)
+  } else {
+    y := null
+  };
+  return y
+}
+{ SLL_ox(ret,rev #vs) }
+
+// 08. Checking if a given value is in a given SLL
 { (x == #x) * (k == #k) * SLL_ox(#x, #vs) * list_member(#vs, #k, #r) }
 function SLL_member(x, k){
   found := false;
@@ -183,30 +149,55 @@ function SLL_member(x, k){
 }
 { SLL_ox(#x, #vs) * list_member(#vs, #k, #r) * (ret == #r) }
 
-//
-// ITERATIVE LIST MANIPULATION
-//
+// 09. Removing a given value from a given SLL
+{ (x == #x) * (k == #k) * SLL_ox(#x, #vs) * list_member(#vs, #k, #mem) }
+function SLL_remove(x, k) {
+  if (x = null) {
+    skip
+  } else {
+    v := [x];
+    next := [x + 1];
+    if (v = k){
+      free(x);
+      x := SLL_remove(next, k)
+    } else {
+       z := SLL_remove(next, k);
+       [x + 1] := z
+    }
+  };
+  return x
+}
+{ SLL_ox(ret, #nvs) * list_member(#nvs, #k, false) }
 
-// Freeing a given SLL
+// 10. Freeing a given SLL
 { (x == #x) * SLL_ox(#x, #vs) }
-function SLL_free_iter(x) {
-  [[ invariant {bind: x, #rvs} SLL_ox(x, #rvs) ]];
-  while (not (x = null)) {
+function SLL_free(x){
+  if (x = null) {
+    skip
+  } else {
     t := [x + 1];
-    free(x);
-    x := t
+    z := SLL_free(t);
+    free(x)
   };
   return null
 }
 { (ret == null) }
 
+//
+// ITERATIVE LIST MANIPULATION
+//
 
+//
+// Standard over-approximating SLL segment predicate with contents
+//
 predicate SLLseg_ox(+x, +y, vs) {
   (x == y) * (vs == []);
   (x -b> #v, #next) * SLLseg_ox(#next, y, #vs) * (vs == #v :: #vs)
 }
 
-// Appending a given value to a given SLLseg
+//
+// Lemma: appending a given value to a given SLLseg
+//
 lemma SSLseg_append {
   statement:
     forall x, y, vs, v, z.
@@ -222,7 +213,9 @@ lemma SSLseg_append {
     }
 }
 
-// Concatenation of a given SLLseg to a given SLL
+//
+// Lemma: an SLLseg followed by an SLL is an SLL
+//
 lemma SLLseg_concat_SLL {
   statement:
     forall x, y.
@@ -236,7 +229,54 @@ lemma SLLseg_concat_SLL {
     }
 }
 
-// Concatenating two lists
+//
+// Lemma: a null-terminating SLLseg is an SLL
+//
+lemma SLLseg_to_SLL {
+  statement:
+    forall x.
+      SLLseg_ox(x, null, #vx) |- SLL_ox(x, #vx)
+
+  proof:
+    unfold SLLseg_ox(x, null, #vx);
+    if (not (#vx = [])){
+      assert {bind: #nv, #nnext} (x -b> #nv, #nnext);
+      apply SLLseg_to_SLL(#nnext)
+    }
+}
+
+// 02. Appending a given value to a given SLL
+{ (x == #x) * (k == #k) * SLL_ox(#x, #vx) }
+function SLL_append_iter(x, k){
+  y := SLL_allocate_node(k);
+  if (x = null) {
+    x := y
+  } else {
+    head := x;
+    prev := head;
+    next := [x + 1];
+    [[ invariant {bind: prev, next, #vs1, #vs2, #v}
+          SLLseg_ox(head, prev, #vs1) * (prev -b> #v, next) * SLL_ox(next,  #vs2) *
+           (#vx == #vs1 @ (#v :: #vs2)) ]];
+    while(not (next = null)){
+      [[ assert {bind: #prev} prev == #prev ]];
+      prev := next;
+      next := [next + 1];
+      [[ apply SSLseg_append(head, #prev,  #vs1, #v, prev) ]]
+    };
+    [prev + 1] := y;
+    [[ assert {bind: #svs, #sv} SLLseg_ox(head, prev, #svs) * (prev -b> #sv, y) ]];
+    [[ apply SSLseg_append(head, prev, #svs, #sv, y) ]];
+    [[ assert (SLLseg_ox(head, y, #vx)) ]];
+    [[ apply SLLseg_concat_SLL(head, y) ]]
+  };
+  return x
+}
+{ SLL_ox(ret, #vx @ [ #k ]) }
+
+// TODO: 03.Appending a given node to a given SLL
+
+// 04. Concatenating two lists
 {(x == #x) * (y == #y) * SLL_ox(#x, #vx) * SLL_ox(#y, #vy) }
 function SLL_concat_iter(x, y){
   if (x = null) {
@@ -263,26 +303,49 @@ function SLL_concat_iter(x, y){
 }
 { SLL_ox(ret, #vx @ #vy) }
 
-
-lemma SLLseg_to_SLL {
-  statement: 
-    forall x.
-      SLLseg_ox(x, null, #vx) |- SLL_ox(x, #vx)
-
-  proof:
-    unfold SLLseg_ox(x, null, #vx);
-    if (not (#vx = [])){
-      assert {bind: #nv, #nnext} (x -b> #nv, #nnext);
-      apply SLLseg_to_SLL(#nnext)
-    }
+// TODO: 05. Copying a given SLL
+{ (x == #x) * SLL_ox(#x, #alpha) }
+function SLL_copy_iter(x){
+    y := null;
+    if (x = null){
+        skip
+    } else {
+        y := new(2);
+        v := [x];
+        [y] := v;
+        t := [x + 1];
+        p := y;
+        [[ invariant {bind: c, v, t, p, #alpha1, #alpha2, #alpha3, #a}
+          SLLseg_ox(x, t, #alpha1) * SLL_ox(t, #alpha2) * (v == #a) *
+            (#alpha == (#alpha1 @ #alpha2)) * SLLseg_ox(y, p, #alpha3) * (p -b> #a, null) *
+                (#alpha1 == (#alpha3 @ [#a])) ]];
+        while (not (t = null)){
+            [[ assert {bind: #t, #p} (t == #t) * (p == #p) ]];
+            v := [t];
+            c := new(2);
+            [c] := v;
+            [p + 1] := c;
+            p := c;
+            t := [t + 1];
+            [[ apply SSLseg_append(x, #t, #alpha1, v, t) ]];
+            [[ apply SSLseg_append(y, #p, #alpha3, #a, p) ]]
+        };
+        [[ assert {bind: #alpha3} SLLseg_ox(y, p, #alpha3) ]];
+        [[ apply SSLseg_append(y, p, #alpha3, v, null) ]];
+        [[ apply SLLseg_to_SLL(x) ]];
+        [[ apply SLLseg_to_SLL(y) ]]
+    };
+    return y
 }
+{ SLL_ox(#x, #alpha) * SLL_ox(ret, #alpha) }
 
+// 06. Calculating the length of a given SLL
 { (x == #x) * SLL_ox(x, #vx) }
 function SLL_length_iter(x) {
   y := x;
   n := 0;
-  [[invariant {bind: n, y, #nvx,  #nvy} 
-      SLLseg_ox(x, y,  #nvx) * SLL_ox(y, #nvy) * 
+  [[invariant {bind: n, y, #nvx,  #nvy}
+      SLLseg_ox(x, y,  #nvx) * SLL_ox(y, #nvy) *
          (#vx == (#nvx@#nvy)) * (n == len #nvx) ]];
   while (not (y = null)) {
     [[ assert {bind: #y} y == #y ]];
@@ -297,57 +360,33 @@ function SLL_length_iter(x) {
 }
 { SLL_ox(#x, #vx) * (ret == len(#vx)) }
 
-{(x == #x) * (k == #k) * SLL_ox(#x, #vx) }
-function SLL_append_iter(x, k){
-  y := SLL_allocate_node(k);
-  if (x = null){
-    x := y
-  } else {
-    head := x; 
-    prev := head;
-    next := [x + 1];
-    [[ invariant {bind: prev, next, #vs1, #vs2, #v} 
-          SLLseg_ox(head, prev, #vs1) * (prev -b> #v, next) * SLL_ox(next,  #vs2) *
-           (#vx == #vs1 @ (#v :: #vs2)) ]];
-    while(not (next = null)){
-      [[ assert {bind: #prev} prev == #prev ]];
-      prev := next;
-      next := [next + 1];
-      [[ apply SSLseg_append(head, #prev,  #vs1, #v, prev) ]]
-    };
-    [prev + 1] := y;
-    [[ assert {bind:#svs, #sv} SLLseg_ox(head, prev, #svs) * (prev -b> #sv, y) ]];
-    [[ apply SSLseg_append(head, prev, #svs, #sv, y) ]];
-    [[ apply SLLseg_concat_SLL(head, y) ]]
-  };
-  return x
-}
-{ SLL_ox(ret,  #vs @ [#k]) }
-
-{ (x == #x) * SLL_ox(#x, #alpha) }
-function SLL_copy_iter(x){
+// 07. Reversing a given SLL
+{ (x == #x) * SLL_ox(#x, #vx) }
+function SLL_reverse_iter(x) {
     y := null;
-    if (x = null){
-        skip
-    } else {
-        y := new(2);
-        v := [x];
-        [y] := v;
-        t := [x + 1];
-        p := y;
-        [[ invariant {bind: c, v, t, p, #alpha1, #alpha2, #alpha3, #a} 
-          SLLseg_ox(x, t, #alpha1) * SLL_ox(t, #alpha2) *
-            (#alpha == (#alpha1 @ #alpha2)) * SLLseg_ox(y, p, #alpha3) * (p -b> #a, null) *
-                (#alpha1 == (#alpha3 @ [#a])) ]];
-        while (not (t = null)){
-            c := new(2);
-            v := [t];
-            [c] := v;
-            [p + 1] := c;
-            p := c;
-            t := [t + 1]
-        }
+    [[ invariant {bind: x, y, z, #nvx, #nvy}
+        SLL_ox(x, #nvx) * SLL_ox(y, #nvy) * (#vx == ((rev #nvy) @ #nvx)) ]];
+    while (not (x = null)) {
+        z := [x + 1];
+        [x + 1] := y;
+        y := x;
+        x := z
     };
     return y
 }
-{ SLL_ox(#x, #alpha) * SLL_ox(ret, #alpha) }
+{ SLL_ox(ret, rev #vx) }
+
+// TODO: 08. Checking if a given value is in a given SLL
+
+// 10. Freeing a given SLL
+{ (x == #x) * SLL_ox(#x, #vs) }
+function SLL_free_iter(x) {
+  [[ invariant {bind: x, #rvs} SLL_ox(x, #rvs) ]];
+  while (not (x = null)) {
+    t := [x + 1];
+    free(x);
+    x := t
+  };
+  return null
+}
+{ (ret == null) }

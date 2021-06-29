@@ -111,12 +111,13 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
           | EList _ -> [ KB.empty ]
           | _       -> (
               let () =
-                if not (is_var e1) then
-                  raise
-                    (Failure
-                       (Format.asprintf
-                          "missing_expr: Should have been reduced: %a" Expr.pp
-                          e1))
+                if not (is_var e1) then (* TODO: WHAT SHOULD HAPPEN HERE?! *)
+                  ()
+                (* raise
+                   (Failure
+                      (Format.asprintf
+                         "missing_expr: Should have been reduced: %a" Expr.pp
+                         e1)) *)
               in
               match KB.mem e1 kb with
               | true -> [ KB.empty ]
