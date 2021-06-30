@@ -51,7 +51,8 @@ rule read =
   | "bind" { EXIST (curr lexbuf) }
   (* types *)
   | "List" { TLIST (curr lexbuf) }
-  | "Int" { TINT (curr lexbuf) }
+  | "Int"  { TINT (curr lexbuf) }
+  | "Bool" { TBOOL (curr lexbuf) }
   (* strings and comments *)
   | '"'      { let () = l_start_string := curr lexbuf in
                read_string (Buffer.create 17) lexbuf }

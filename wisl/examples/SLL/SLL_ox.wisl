@@ -12,10 +12,27 @@ predicate SLL_ox(+x, vs) {
 //
 // Pure predicate for list membership
 //
-predicate list_member(+vs, +v, r){
-  (vs == null) * (r == false);
+predicate list_member(+vs, +v, r : Bool){
+  (vs == []) * (r == false);
   (vs == v :: #rest) * (r == true) * list_member(#rest, v, #mem);
   (vs == #v :: #rest) * (! (#v == v)) * list_member(#rest, v, r)
+}
+
+//
+// Lemma: List membership extension from the right
+//
+lemma list_member_append {
+  statement:
+    forall vs, v, r, w.
+      list_member(vs, v, r) |- list_member(vs @ [ w ], v, (r || (w = v)))
+
+  proof:
+    if (w = v) {} else {}; // FIXME: THIS IS HORRIFIC
+    unfold list_member(vs, v, r);
+    if (not (vs = [])) {
+      assert {bind: #nv, #nvs, #nr} (vs == #nv :: #nvs) * list_member(#nvs, #v, #nr);
+      apply list_member_append(#nvs, v, #nr, w)
+    }
 }
 
 // 00. Allocating an SLL node with the given value
@@ -295,7 +312,7 @@ function SLL_append_node_iter(x, y){
     [prev + 1] := y;
     [[ assert {bind: #svs, #sv} SLLseg_ox(head, prev, #svs) * (prev -b> #sv, y) ]];
     [[ apply SSLseg_append(head, prev, #svs, #sv, y) ]];
-    [[ assert (SLLseg_ox(head, y, #vs)) ]]; // <-- add delibrate bug to #vx
+    [[ assert (SLLseg_ox(head, y, #vs)) ]]; // <-- add deliberate bug to #vx
     [[ apply SLLseg_concat_SLL(head, y) ]]
   };
   return x
@@ -404,14 +421,13 @@ function SLL_reverse_iter(x) {
 
 // 08. Checking if a given value is in a given SLL
 { (x == #x) * (k == #k) * SLL_ox(#x, #alpha) * list_member(#alpha, #k, #r) }
-function SLL_member_iter(x, k){
+function SLL_member_iter(x, k) {
   found := false;
   next := x;
-  [[invariant {bind: v, found, next, #beta, #gamma}
-      SLLseg_ox(x, next, #beta) * SLL_ox(next, #gamma) * 
-        (#alpha == (#beta @ #gamma)) * 
-          list_member(#alpha, #k, #r) * list_member(#beta, #k, #rmem)
-    ]];
+  [[ invariant {bind: found, next, #beta, #gamma, #rg}
+       SLLseg_ox(x, next, #beta) * SLL_ox(next, #gamma) *
+         (#alpha == (#beta @ #gamma)) * (#r == (found || #rg)) *
+           list_member(#beta, k, found) * list_member(#gamma, k, #rg) ]];
   while ((found = false) && (not (next = null))){
     [[ assert found == false ]];
     [[ assert {bind: #next} next == #next ]];
@@ -419,7 +435,9 @@ function SLL_member_iter(x, k){
     v := [next];
     found := (v = k);
     next := [next + 1];
-    [[ apply SSLseg_append(x, #next, #beta, #v, next) ]]
+    [[ apply SSLseg_append(x, #next, #beta, #v, next) ]];
+    [[ unfold list_member(#gamma, k, #rg) ]];
+    [[ apply list_member_append(#beta, k, false, #v) ]]
   };
   return found
 }

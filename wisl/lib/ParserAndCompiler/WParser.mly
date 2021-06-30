@@ -27,6 +27,7 @@
 (* types *)
 %token <CodeLoc.t> TLIST
 %token <CodeLoc.t> TINT
+%token <CodeLoc.t> TBOOL
 
 (* names *)
 %token <CodeLoc.t * string> IDENTIFIER
@@ -375,6 +376,7 @@ predicate:
 type_target:
   | TLIST { WType.WList }
   | TINT { WType.WInt }
+  | TBOOL { WType.WBool }
 
 pred_param_ins:
   | inp = option(PLUS); lx = IDENTIFIER; option(preceded(COLON, type_target))
