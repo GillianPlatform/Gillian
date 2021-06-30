@@ -864,6 +864,8 @@ let rec reduce_lexpr_loop
               (Exceptions.Impossible
                  "reduce_lexpr: LVar x when reducing lvars: guaranteed by \
                   match/filter"))
+    | EList [ BinOp (LstSub (lst, st1, Lit (Num 1.)), LstNth, st2) ]
+      when st1 = st2 -> f (LstSub (lst, st1, Lit (Num 1.)))
     (* Base lists *)
     | EList les -> (
         let fles = List.map f les in

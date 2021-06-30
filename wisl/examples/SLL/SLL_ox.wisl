@@ -19,7 +19,7 @@ predicate list_member(+vs, +v, r : Bool){
 }
 
 //
-// Lemma: List membership extension from the right
+// Lemma: List membership append
 //
 lemma list_member_append {
   statement:
@@ -32,6 +32,22 @@ lemma list_member_append {
     if (not (vs = [])) {
       assert {bind: #nv, #nvs, #nr} (vs == #nv :: #nvs) * list_member(#nvs, #v, #nr);
       apply list_member_append(#nvs, v, #nr, w)
+    }
+}
+
+//
+// Lemma: List membership concat
+//
+lemma list_member_concat {
+  statement:
+    forall vs1, vs2, v.
+      list_member(vs1, v, #r1) * list_member(vs2, v, #r2) |- list_member(vs1 @ vs2, v, (#r1 || #r2))
+
+  proof:
+    unfold list_member(vs1, v, #r1);
+    if (not (vs1 = [])) {
+      assert {bind: #nv1, #nvs1, #nr1} (vs1 == #nv1 :: #nvs1) * list_member(#nvs1, v, #nr1);
+      apply list_member_concat(#nvs1, vs2, v)
     }
 }
 
@@ -439,6 +455,11 @@ function SLL_member_iter(x, k) {
     [[ unfold list_member(#gamma, k, #rg) ]];
     [[ apply list_member_append(#beta, k, false, #v) ]]
   };
+  [[ if (found = false) { apply SLLseg_to_SLL(#x); unfold list_member([], #k) } else {
+      assert {bind: #beta, #gamma} SLLseg_ox(#x, next, #beta) * SLL_ox(next, #gamma);
+      apply list_member_concat(#beta, #gamma, #k);
+      apply SLLseg_concat_SLL(#x, next)
+     } ]];
   return found
 }
 { SLL_ox(#x, #alpha) * list_member(#alpha, #k, #r) * (ret == #r) }
