@@ -1,12 +1,12 @@
 opam-version: "2.0"
 maintainer: "jeremie@dimino.org"
 authors: "Jérémie Dimino"
-license: "BSD3"
+license: "BSD-3-Clause"
 homepage: "https://github.com/ocaml-community/utop"
 bug-reports: "https://github.com/ocaml-community/utop/issues"
 doc: "https://ocaml-community.github.io/utop/"
 depends: [
-  "ocaml" {>= "4.03.0" & < "4.13"}
+  "ocaml" {>= "4.03.0"}
   "base-unix"
   "base-threads"
   "ocamlfind" {>= "1.7.2"}
@@ -19,7 +19,7 @@ depends: [
   "dune" {>= "1.0"}
 ]
 build: [
-  ["dune" "subst"] {pinned}
+  ["dune" "subst"] {dev}
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
@@ -31,12 +31,12 @@ OCaml.  It can run in a terminal or in Emacs. It supports line
 edition, history, real-time and context sensitive completion, colors,
 and more.  It integrates with the Tuareg mode in Emacs.
 """
-x-commit-hash: "a5ff52bbf608e1112b5c0d41a36e3267f39f4084"
+x-commit-hash: "c87b8b2817eefd0cd53564618911386b89b587c5"
 url {
   src:
-    "https://github.com/ocaml-community/utop/releases/download/2.7.0/utop-2.7.0.tbz"
+    "https://github.com/ocaml-community/utop/releases/download/2.8.0/utop-2.8.0.tbz"
   checksum: [
-    "sha256=e068ac53df267c3cc0f2f69bbc204404f0362cc4e6472a1fc547e326a63c3fdd"
-    "sha512=fc6237ff3e80c509a698872e5571b58e914d24c308a634e45972b7f104d960f17eba507535f56fcec972ea8c71143a8036cd122618e63cdf77fb6034297924df"
+    "sha256=4d2cb88ce598122198726a74274395dd22eacf0a18d9ac24e3047fe962382556"
+    "sha512=22cdc75e14950eac28d6e0b7b2c6d686aea4e24d9955f140bfcbdef2de033e59f94ab3da0c5c95e1ce51211759694b55c82eec16776c3e0cfb80aa77e64a380b"
   ]
 }

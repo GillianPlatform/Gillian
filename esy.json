@@ -77,7 +77,6 @@
     "@opam/visitors": ">=2.3",
     "@opam/yojson": "^1.7.0",
     "@opam/z3": "giltho/esy-z3#b0fdd9a",
-    "JS_Parser": "GillianPlatform/JS_Parser#ba757f2ee220101f59f371e83bcfbb55675f233a",
     "compcert": "giltho/CompCert#6bdcc61",
     "ocaml": "^4.12.x"
   },
