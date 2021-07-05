@@ -10,6 +10,16 @@ predicate SLL_ex(+x, ps, vs) {
 }
 
 //
+// Exact freed list predicate with pointers
+//
+predicate SLL_freed(+ptrs) {
+  // Empty freed list
+  (ptrs == []);
+  // One pointer location and the rest
+  (ptrs == #l :: #nptrs) * freed(#l) * SLL_freed(#nptrs)
+}
+
+//
 // Pure predicate for list membership
 //
 predicate list_member(+vs, +v, r : Bool){
@@ -200,7 +210,7 @@ function SLL_remove(x, k) {
   };
   return x
 }
-{ SLL_ex(ret, #nps, #nvs) * list_member(#nvs, #k, false) }
+{ SLL_ex(ret, #nps, #nvs) * list_member(#nvs, #k, false) * SLL_freed(#p) * list_member(#ps, #p, true)}
 
 // 10. Freeing a given SLL
 { (x == #x) * SLL_ex(#x, #ps, #vs) }
@@ -214,7 +224,7 @@ function SLL_free(x){
   };
   return null
 }
-{ (ret == null) }
+{ (ret == null) * SLL_freed(#ps)}
 
 //
 // ITERATIVE LIST MANIPULATION
@@ -472,7 +482,7 @@ function SLL_member_iter(x, k) {
 // 10. Freeing a given SLL
 { (x == #x) * SLL_ex(#x, #ps, #vs) }
 function SLL_free_iter(x) {
-  [[ invariant {bind: x, #rps, #rvs} SLL_ex(x, #rps, #rvs) ]];
+  [[ invariant {bind: x, #rps, #rvs, #fps} SLL_ex(x, #rps, #rvs) * SLL_freed(#fps) * (#ps == (#fps @ #rps))]];
   while (not (x = null)) {
     t := [x + 1];
     free(x);
@@ -480,4 +490,4 @@ function SLL_free_iter(x) {
   };
   return null
 }
-{ (ret == null) }
+{ (ret == null) * SLL_freed(#ps)}
