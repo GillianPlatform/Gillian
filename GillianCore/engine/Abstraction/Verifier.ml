@@ -25,7 +25,7 @@ struct
 
   type t = {
     name : string;
-    id : int;
+    id : int * int;
     params : string list;
     pre_state : SPState.t;
     post_up : UP.t;
@@ -52,7 +52,7 @@ struct
       (flag : Flag.t option)
       (label : (string * SS.t) option)
       (to_verify : bool) : (t option * (Asrt.t * Asrt.t list) option) list =
-    let test_of_normalised_state (ss_pre, subst) =
+    let test_of_normalised_state id' (ss_pre, subst) =
       (* Step 2 - spec_vars = lvars(pre)\dom(subst) -U- alocs(range(subst)) *)
       let lvars =
         SS.fold
@@ -151,7 +151,15 @@ struct
             (None, None)
         | Ok post_up ->
             let test =
-              { name; id; params; pre_state = ss_pre; post_up; flag; spec_vars }
+              {
+                name;
+                id = (id, id');
+                params;
+                pre_state = ss_pre;
+                post_up;
+                flag;
+                spec_vars;
+              }
             in
             let pre' = Asrt.star (SPState.to_assertions ss_pre) in
             (Some test, Some (pre', posts))
@@ -164,7 +172,7 @@ struct
       with
       | Error _                  -> [ (None, None) ]
       | Ok normalised_assertions ->
-          List.map test_of_normalised_state normalised_assertions
+          List.mapi test_of_normalised_state normalised_assertions
     with Failure msg ->
       let new_msg =
         Printf.sprintf
@@ -182,21 +190,19 @@ struct
       (params : string list)
       (id : int)
       (sspec : Spec.st) : (t option * Spec.st option) list =
-    let tests_and_specs =
+    let ( let+ ) x f = List.map f x in
+    let+ stest, sspec' =
       testify preds pred_ins name params id sspec.ss_pre sspec.ss_posts
         (Some sspec.ss_flag)
         (Spec.label_vars_to_set sspec.ss_label)
         sspec.ss_to_verify
     in
-    List.map
-      (fun (stest, sspec') ->
-        let sspec' =
-          Option.map
-            (fun (pre, posts) -> { sspec with ss_pre = pre; ss_posts = posts })
-            sspec'
-        in
-        (stest, sspec'))
-      tests_and_specs
+    let sspec' =
+      Option.map
+        (fun (pre, posts) -> { sspec with ss_pre = pre; ss_posts = posts })
+        sspec'
+    in
+    (stest, sspec')
 
   let testify_spec
       (preds : UP.preds_tbl_t)
@@ -356,12 +362,14 @@ struct
                  L.verbose (fun m ->
                      m
                        "VERIFICATION FAILURE: Procedure %s, Command %d\n\
-                        Spec %s %d\n\
+                        Spec %s %a\n\
                         @[<v 2>State:@\n\
                         %a@]@\n\
                         @[<v 2>Errors:@\n\
                         %a@]@\n"
-                       proc i test.name test.id SPState.pp state
+                       proc i test.name
+                       (Fmt.Dump.pair Fmt.int Fmt.int)
+                       test.id SPState.pp state
                        Fmt.(list ~sep:(any "@\n") SAInterpreter.pp_err)
                        errs);
                  Fmt.pr "f @?";
@@ -370,9 +378,11 @@ struct
                  if Some fl <> test.flag then (
                    L.normal (fun m ->
                        m
-                         "VERIFICATION FAILURE: Spec %s %d terminated with \
+                         "VERIFICATION FAILURE: Spec %s %a terminated with \
                           flag %s instead of %s\n"
-                         test.name test.id (Flag.str fl) (Flag.str flag));
+                         test.name
+                         (Fmt.Dump.pair Fmt.int Fmt.int)
+                         test.id (Flag.str fl) (Flag.str flag));
                    Fmt.pr "f @?";
                    false)
                  else
@@ -380,17 +390,21 @@ struct
                    if analyse_result subst test state then (
                      L.normal (fun m ->
                          m
-                           "VERIFICATION SUCCESS: Spec %s %d terminated \
+                           "VERIFICATION SUCCESS: Spec %s %a terminated \
                             successfully\n"
-                           test.name test.id);
+                           test.name
+                           (Fmt.Dump.pair Fmt.int Fmt.int)
+                           test.id);
                      Fmt.pr "s @?";
                      ac)
                    else (
                      L.normal (fun m ->
                          m
-                           "VERIFICATION FAILURE: Spec %s %d - post condition \
+                           "VERIFICATION FAILURE: Spec %s %a - post condition \
                             not unifiable\n"
-                           test.name test.id);
+                           test.name
+                           (Fmt.Dump.pair Fmt.int Fmt.int)
+                           test.id);
                      Fmt.pr "f @?";
                      false))
            true rets
@@ -412,15 +426,19 @@ struct
              if analyse_result subst test final_state then (
                L.normal (fun m ->
                    m
-                     "VERIFICATION SUCCESS: Spec %s %d terminated successfully\n"
-                     test.name test.id);
+                     "VERIFICATION SUCCESS: Spec %s %a terminated successfully\n"
+                     test.name
+                     (Fmt.Dump.pair Fmt.int Fmt.int)
+                     test.id);
                ac)
              else (
                L.normal (fun m ->
                    m
-                     "VERIFICATION FAILURE: Spec %s %d - post condition not \
+                     "VERIFICATION FAILURE: Spec %s %a - post condition not \
                       unifiable\n"
-                     test.name test.id);
+                     test.name
+                     (Fmt.Dump.pair Fmt.int Fmt.int)
+                     test.id);
                false))
            true rets
     in
@@ -586,15 +604,14 @@ struct
         (* STEP 2: Convert specs to symbolic tests *)
         (* Printf.printf "Converting symbolic tests from specs: %f\n" (cur_time -. start_time); *)
         let tests : t list =
-          List.concat
-            (List.map
-               (fun spec ->
-                 let tests, new_spec = testify_spec preds pred_ins spec in
-                 let proc = Prog.get_proc_exn prog spec.spec_name in
-                 Hashtbl.replace prog.procs proc.proc_name
-                   { proc with proc_spec = Some new_spec };
-                 tests)
-               specs_to_verify)
+          List.concat_map
+            (fun spec ->
+              let tests, new_spec = testify_spec preds pred_ins spec in
+              let proc = Prog.get_proc_exn prog spec.spec_name in
+              Hashtbl.replace prog.procs proc.proc_name
+                { proc with proc_spec = Some new_spec };
+              tests)
+            specs_to_verify
         in
 
         (* STEP 3: Get the lemmas to verify *)
@@ -614,13 +631,12 @@ struct
             lemmas_to_verify
         in
         let tests' : t list =
-          List.concat
-            (List.map
-               (fun lemma ->
-                 let tests, new_lemma = testify_lemma preds pred_ins lemma in
-                 Hashtbl.replace prog.lemmas lemma.lemma_name new_lemma;
-                 tests)
-               lemmas_to_verify)
+          List.concat_map
+            (fun lemma ->
+              let tests, new_lemma = testify_lemma preds pred_ins lemma in
+              Hashtbl.replace prog.lemmas lemma.lemma_name new_lemma;
+              tests)
+            lemmas_to_verify
         in
 
         Fmt.pr "Obtained %d symbolic tests in total\n@?"
@@ -683,7 +699,7 @@ struct
     let f prog incremental source_files =
       let open ResultsDir in
       let open ChangeTracker in
-      if incremental && prev_results_exist () then
+      if incremental && prev_results_exist () then (
         (* Only verify changed procedures and lemmas *)
         let cur_source_files =
           match source_files with
@@ -720,14 +736,8 @@ struct
             (lemma_changes.changed_lemmas @ lemma_changes.new_lemmas
            @ lemma_changes.dependent_lemmas)
         in
-        let procs_to_verify, lemmas_to_verify =
-          if !Config.Verification.verify_only_some_of_the_things then
-            ( SS.inter procs_to_verify
-                (SS.of_list !Config.Verification.procs_to_verify),
-              SS.inter lemmas_to_verify
-                (SS.of_list !Config.Verification.lemmas_to_verify) )
-          else (procs_to_verify, lemmas_to_verify)
-        in
+        if !Config.Verification.verify_only_some_of_the_things then
+          failwith "Cannot use --incremental and --procs or --lemma together";
         let () =
           verify_procs ~prev_results:results prog procs_to_verify
             lemmas_to_verify
@@ -737,7 +747,7 @@ struct
         let call_graph = CallGraph.merge prev_call_graph cur_call_graph in
         let results = VerificationResults.merge results cur_results in
         let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
-        write_verif_results cur_source_files call_graph ~diff results
+        write_verif_results cur_source_files call_graph ~diff results)
       else
         (* Analyse all procedures and lemmas *)
         let cur_source_files =

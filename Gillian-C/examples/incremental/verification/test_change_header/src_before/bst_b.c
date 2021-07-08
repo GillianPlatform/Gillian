@@ -46,7 +46,7 @@ BST *make_node(int v) {
 int find_min(BST *t) {
     __builtin_annot("unfold BST(#t, #K)");
     __builtin_annot(
-        "assert [[exists #left]] t -m> struct bstn { #a; #left; #right }");
+        "assert [[bind #left]] t -m> struct bstn { #a; #left; #right }");
     __builtin_annot("unfold BST(#left, #someSet)");
     if (t->left == NULL) {
         return t->value;
