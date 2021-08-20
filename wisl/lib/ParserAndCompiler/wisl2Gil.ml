@@ -530,6 +530,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
           fparams = vars;
           sploc = while_loc;
           existentials = None;
+          kind = Correctness;
         }
     in
     let pvars = List.map (fun x -> WExpr.make (Var x) while_loc) vars in
@@ -796,8 +797,12 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       (cmds_with_annot @ comp_rest, new_functions)
 
 let compile_spec
-    ?(fname = "main") WSpec.{ pre; post; return_mode; fparams; existentials; _ }
-    =
+    ?(fname = "main")
+    WSpec.{ pre; post; return_mode; fparams; existentials; kind; _ } =
+  let compile_kind = function
+    | WSpec.Incorrectness -> Spec.Incorrectness
+    | Correctness         -> Correctness
+  in
   let _, comp_pre = compile_lassert ~fname pre in
   let _, comp_post = compile_lassert ~fname post in
   let label_opt =
@@ -814,7 +819,7 @@ let compile_spec
     | Some ss_label ->
         Spec.s_init ~ss_label comp_pre [ comp_post ] return_mode true
   in
-  Spec.init fname fparams [ single_spec ] false false true
+  Spec.init ~spec_kind:(compile_kind kind) fname fparams [ single_spec ] false false true
 
 let compile_pred filepath pred =
   let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; _ } = pred in

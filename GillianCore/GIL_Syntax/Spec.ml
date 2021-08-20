@@ -1,5 +1,7 @@
 module SS = Containers.SS
 
+type spec_kind = TypeDef__.spec_kind = Correctness | Incorrectness
+
 (** {b Single GIL specifications}. *)
 type st = TypeDef__.single_spec = {
   ss_pre : Asrt.t;  (** Precondition *)
@@ -17,6 +19,7 @@ type t = TypeDef__.spec = {
   spec_normalised : bool;  (** If the spec is already normalised *)
   spec_incomplete : bool;  (** If the spec is incomplete *)
   spec_to_verify : bool;  (** Should the spec be verified? *)
+  spec_kind : spec_kind;
 }
 
 (** Creates a GIL specification given its components *)
@@ -29,6 +32,7 @@ let s_init
   { ss_pre; ss_posts; ss_flag; ss_to_verify; ss_label }
 
 let init
+    ?(spec_kind = Correctness)
     (spec_name : string)
     (spec_params : string list)
     (spec_sspecs : st list)
@@ -42,6 +46,7 @@ let init
     spec_normalised;
     spec_incomplete;
     spec_to_verify;
+    spec_kind;
   }
 
 let extend (spec : t) (sspecs : st list) : t =

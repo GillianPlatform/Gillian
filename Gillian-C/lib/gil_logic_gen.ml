@@ -813,6 +813,7 @@ let trans_spec ?(ann = empty) ?(only_spec = false) cl_spec =
         spec_normalised = false;
         spec_incomplete = false;
         spec_to_verify = not only_spec;
+        spec_kind = Correctness;
       }
   in
   let _ =

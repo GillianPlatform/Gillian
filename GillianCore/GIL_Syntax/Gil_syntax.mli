@@ -805,6 +805,10 @@ end
 
 module Spec : sig
   (** {b GIL specifications}. *)
+
+  type spec_kind = Correctness | Incorrectness
+
+  (** Single GIL specifications. *)
   type st = {
     ss_pre : Asrt.t;  (** Precondition *)
     ss_posts : Asrt.t list;  (** Postcondition *)
@@ -812,7 +816,6 @@ module Spec : sig
     ss_to_verify : bool;  (** Should the spec be verified? *)
     ss_label : (string * string list) option;
   }
-  (** Single GIL specifications. *)
 
   (** {b Full GIL specifications}. *)
   type t = {
@@ -822,6 +825,7 @@ module Spec : sig
     spec_normalised : bool;  (** If the spec is already normalised *)
     spec_incomplete : bool;  (**  If the spec is incomplete *)
     spec_to_verify : bool;  (** Should the spec be verified? *)
+    spec_kind : spec_kind;
   }
 
   (** [s_init ~ss_label ss_pre ss_posts ss_flag ss_to_verify] creates a single specification with the given values *)
@@ -834,7 +838,15 @@ module Spec : sig
     st
 
   (** [init spec_name spec_params spec_sspecs spec_normalised spec_to_verify] creates a full specification with the given values *)
-  val init : string -> string list -> st list -> bool -> bool -> bool -> t
+  val init :
+    ?spec_kind:spec_kind ->
+    string ->
+    string list ->
+    st list ->
+    bool ->
+    bool ->
+    bool ->
+    t
 
   (** Extends a full specfiication with a single specification *)
   val extend : t -> st list -> t
@@ -1142,6 +1154,7 @@ module Visitors : sig
            ; visit_Car : 'c -> UnOp.t -> UnOp.t
            ; visit_Cdr : 'c -> UnOp.t -> UnOp.t
            ; visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
+           ; visit_Correctness : 'c -> Spec.spec_kind -> Spec.spec_kind
            ; visit_ECall :
                'c ->
                'f Cmd.t ->
@@ -1198,6 +1211,7 @@ module Visitors : sig
            ; visit_IUnaryMinus : 'c -> UnOp.t -> UnOp.t
            ; visit_If :
                'c -> LCmd.t -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
+           ; visit_Incorrectness : 'c -> Spec.spec_kind -> Spec.spec_kind
            ; visit_Int : 'c -> Literal.t -> int -> Literal.t
            ; visit_IntType : 'c -> Type.t -> Type.t
            ; visit_Invariant : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
@@ -1331,6 +1345,7 @@ module Visitors : sig
            ; visit_single_spec : 'c -> Spec.st -> Spec.st
            ; visit_slcmd : 'c -> SLCmd.t -> SLCmd.t
            ; visit_spec : 'c -> Spec.t -> Spec.t
+           ; visit_spec_kind : 'c -> Spec.spec_kind -> Spec.spec_kind
            ; visit_typ : 'c -> Type.t -> Type.t
            ; visit_unop : 'c -> UnOp.t -> UnOp.t
            ; .. >
@@ -1404,6 +1419,8 @@ module Visitors : sig
       method visit_Cdr : 'c -> UnOp.t -> UnOp.t
 
       method visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
+
+      method visit_Correctness : 'c -> Spec.spec_kind -> Spec.spec_kind
 
       method visit_ECall :
         'c ->
@@ -1495,6 +1512,8 @@ module Visitors : sig
 
       method visit_If :
         'c -> LCmd.t -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
+
+      method visit_Incorrectness : 'c -> Spec.spec_kind -> Spec.spec_kind
 
       method visit_Int : 'c -> Literal.t -> int -> Literal.t
 
@@ -1783,6 +1802,8 @@ module Visitors : sig
 
       method visit_spec : 'c -> Spec.t -> Spec.t
 
+      method visit_spec_kind : 'c -> Spec.spec_kind -> Spec.spec_kind
+
       method private visit_string : 'env. 'env -> string -> string
 
       method visit_typ : 'c -> Type.t -> Type.t
@@ -1832,6 +1853,7 @@ module Visitors : sig
            ; visit_Car : 'c -> 'f
            ; visit_Cdr : 'c -> 'f
            ; visit_Constant : 'c -> Constant.t -> 'f
+           ; visit_Correctness : 'c -> 'f
            ; visit_IDiv : 'c -> 'f
            ; visit_FDiv : 'c -> 'f
            ; visit_ECall :
@@ -1860,6 +1882,7 @@ module Visitors : sig
            ; visit_Goto : 'c -> 'g -> 'f
            ; visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
            ; visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> 'f
+           ; visit_Incorrectness : 'c -> 'f
            ; visit_Invariant : 'c -> Asrt.t -> string list -> 'f
            ; visit_LAction : 'c -> string -> string -> Expr.t list -> 'f
            ; visit_LList : 'c -> Literal.t list -> 'f
@@ -2001,6 +2024,7 @@ module Visitors : sig
            ; visit_single_spec : 'c -> Spec.st -> 'f
            ; visit_slcmd : 'c -> SLCmd.t -> 'f
            ; visit_spec : 'c -> Spec.t -> 'f
+           ; visit_spec_kind : 'c -> Spec.spec_kind -> 'f
            ; visit_typ : 'c -> Type.t -> 'f
            ; visit_unop : 'c -> UnOp.t -> 'f
            ; .. >
@@ -2074,6 +2098,8 @@ module Visitors : sig
 
       method visit_Constant : 'c -> Constant.t -> 'f
 
+      method visit_Correctness : 'c -> 'f
+
       method visit_IDiv : 'c -> 'f
 
       method visit_FDiv : 'c -> 'f
@@ -2122,6 +2148,8 @@ module Visitors : sig
       method visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
 
       method visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> 'f
+
+      method visit_Incorrectness : 'c -> 'f
 
       method visit_Invariant : 'c -> Asrt.t -> string list -> 'f
 
@@ -2399,6 +2427,8 @@ module Visitors : sig
 
       method visit_spec : 'c -> Spec.t -> 'f
 
+      method visit_spec_kind : 'c -> Spec.spec_kind -> 'f
+
       method visit_typ : 'c -> Type.t -> 'f
 
       method visit_unop : 'c -> UnOp.t -> 'f
@@ -2446,6 +2476,7 @@ module Visitors : sig
            ; visit_Car : 'c -> unit
            ; visit_Cdr : 'c -> unit
            ; visit_Constant : 'c -> Constant.t -> unit
+           ; visit_Correctness : 'c -> unit
            ; visit_ECall :
                'c -> string -> Expr.t -> Expr.t list -> 'f option -> unit
            ; visit_EList : 'c -> Expr.t list -> unit
@@ -2488,6 +2519,7 @@ module Visitors : sig
            ; visit_ITimes : 'c -> unit
            ; visit_IUnaryMinus : 'c -> unit
            ; visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> unit
+           ; visit_Incorrectness : 'c -> unit
            ; visit_Int : 'c -> int -> unit
            ; visit_IntType : 'c -> unit
            ; visit_Invariant : 'c -> Asrt.t -> string list -> unit
@@ -2615,6 +2647,7 @@ module Visitors : sig
            ; visit_single_spec : 'c -> Spec.st -> unit
            ; visit_slcmd : 'c -> SLCmd.t -> unit
            ; visit_spec : 'c -> Spec.t -> unit
+           ; visit_spec_kind : 'c -> Spec.spec_kind -> unit
            ; visit_typ : 'c -> Type.t -> unit
            ; visit_unop : 'c -> UnOp.t -> unit
            ; .. >
@@ -2685,6 +2718,8 @@ module Visitors : sig
       method visit_Cdr : 'c -> unit
 
       method visit_Constant : 'c -> Constant.t -> unit
+
+      method visit_Correctness : 'c -> unit
 
       method visit_ECall :
         'c -> string -> Expr.t -> Expr.t list -> 'f option -> unit
@@ -2762,6 +2797,8 @@ module Visitors : sig
       method visit_IUnaryMinus : 'c -> unit
 
       method visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> unit
+
+      method visit_Incorrectness : 'c -> unit
 
       method visit_Int : 'c -> int -> unit
 
@@ -3045,6 +3082,8 @@ module Visitors : sig
       method visit_slcmd : 'c -> SLCmd.t -> unit
 
       method visit_spec : 'c -> Spec.t -> unit
+
+      method visit_spec_kind : 'c -> Spec.spec_kind -> unit
 
       method private visit_string : 'env. 'env -> string -> unit
 

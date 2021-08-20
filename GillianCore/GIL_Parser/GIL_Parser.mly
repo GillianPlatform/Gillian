@@ -594,7 +594,15 @@ g_spec_target:
     let spec_normalised = !Config.previously_normalised in
     let spec_to_verify = true in
     let spec_incomplete = Option.is_some incomplete in
-    let spec : Spec.t = { spec_name; spec_params; spec_sspecs; spec_normalised; spec_incomplete; spec_to_verify } in
+    let spec : Spec.t = {
+        spec_name;
+        spec_params;
+        spec_sspecs;
+        spec_normalised;
+        spec_incomplete;
+        spec_to_verify;
+        spec_kind = Correctness
+      } in
     spec
   }
 ;
@@ -1000,7 +1008,7 @@ lit_target:
   | TRUE                      { Bool true }
   | FALSE                     { Bool false }
   | FLOAT                     { Num $1 }
-  | n = INTEGER               { Int n }   
+  | n = INTEGER               { Int n }
   | NAN                       { Num nan }
   | INFINITY                  { Num infinity }
   | STRING                    { String $1 }

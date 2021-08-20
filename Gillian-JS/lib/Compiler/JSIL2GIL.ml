@@ -92,6 +92,7 @@ let jsil2gil_spec (spec : Spec.t) : GSpec.t =
     spec_normalised = spec.normalised;
     spec_incomplete = spec.incomplete;
     spec_to_verify = spec.to_verify;
+    spec_kind = Correctness;
   }
 
 let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
