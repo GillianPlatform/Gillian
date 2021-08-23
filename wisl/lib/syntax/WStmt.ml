@@ -6,7 +6,7 @@ type tt =
   | New       of string * int
   | Dispose   of WExpr.t
   | Lookup    of string * WExpr.t (* x := [e] *)
-  | Update    of WExpr.t * WExpr.t (* [e] := [e] *)
+  | Update    of WExpr.t * WExpr.t (* [e] := e *)
   | Throw     of WExpr.t
   | FunCall   of string * string * WExpr.t list * (string * string list) option (* The last bit is only for internal use *)
   | While     of WExpr.t * t list

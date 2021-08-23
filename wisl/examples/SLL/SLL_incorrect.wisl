@@ -16,7 +16,7 @@ function list_dispose_err(x){
         free(x);
         x := z;
     }
-{er: freed(#x) * SLL_ex(#z, #xss, #vss)}
+{ er: freed(#x) * SLL_ex(#z, #xss, #vss) }
 
 {x = #x * SLL_ex(#y, #ys, #vys)  * #x = null}
 // Wrongly implemented concat
@@ -30,7 +30,7 @@ function list_concat(x, y){
 }
 {er: x = #x * SLL_ex(#y, #ys, #vys)  * #x = null}
 
-// Copy list without allocation 
+// Copy list without allocation
 function list_copy(x){
     t := x;
     y := null;
@@ -43,7 +43,7 @@ function list_copy(x){
         } else {
             y := c
         }
-        p := c; 
+        p := c;
         t :=  [t + 1]
     }
     return y

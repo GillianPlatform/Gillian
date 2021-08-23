@@ -388,7 +388,7 @@ function SLL_copy_iter(x){
         p := y;
         [[ invariant {bind: c, v, t, p, #alpha1, #alpha2, #alpha3, #px1, #px2, #py, #a, #z}
           SLLseg_ex(x, t, #px1, #alpha1) * SLL_ex(t, #px2, #alpha2) * (v == #a) *
-            (#px == (#px1 @ #px2)) * (#alpha == (#alpha1 @ #alpha2)) * 
+            (#px == (#px1 @ #px2)) * (#alpha == (#alpha1 @ #alpha2)) *
                 SLLseg_ex(y, p, #py, #alpha3) * (p -b> #a, null) *
                     (#alpha1 == (#alpha3 @ [#a])) ]];
         while (not (t = null)){
@@ -437,7 +437,7 @@ function SLL_length_iter(x) {
 function SLL_reverse_iter(x) {
     y := null;
     [[ invariant {bind: x, y, z, #nvx, #nvy, #npx, #npy}
-        SLL_ex(x, #npx, #nvx) * SLL_ex(y, #npy, #nvy) * 
+        SLL_ex(x, #npx, #nvx) * SLL_ex(y, #npy, #nvy) *
             (#px == ((rev #npy) @ #npx)) *(#vx == ((rev #nvy) @ #nvx)) ]];
     while (not (x = null)) {
         z := [x + 1];
@@ -456,8 +456,8 @@ function SLL_member_iter(x, k) {
   next := x;
   [[ invariant {bind: found, next, #beta, #gamma, #rg, #ps1, #ps2}
        SLLseg_ex(x, next, #ps1, #beta) * SLL_ex(next, #ps2, #gamma) *
-            (#ps == (#ps1 @ #ps2)) * (#alpha == (#beta @ #gamma)) * 
-                (#r == (found || #rg)) * list_member(#beta, k, found) * 
+            (#ps == (#ps1 @ #ps2)) * (#alpha == (#beta @ #gamma)) *
+                (#r == (found || #rg)) * list_member(#beta, k, found) *
                     list_member(#gamma, k, #rg) ]];
   while ((found = false) && (not (next = null))){
     [[ assert found == false ]];
@@ -490,4 +490,4 @@ function SLL_free_iter(x) {
   };
   return null
 }
-{ (ret == null) * SLL_freed(#ps)}
+{ (ret == null) * SLL_freed(#ps) }
