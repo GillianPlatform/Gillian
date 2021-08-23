@@ -1,4 +1,4 @@
-type t = Concrete | Verification | Symbolic | BiAbduction
+type t = Concrete | Verification | Symbolic | BiAbduction | UnderApprox
 
 let concrete_exec = function
   | Concrete -> true
@@ -16,11 +16,15 @@ let biabduction_exec = function
   | BiAbduction -> true
   | _           -> false
 
-let all_exec = [ Concrete; Verification; Symbolic; BiAbduction ]
+let under_approx_exec = function
+  | UnderApprox -> true
+  | _ -> false
 
-let non_bi_exec = [ Concrete; Verification; Symbolic ]
+let all_exec = [ Concrete; Verification; Symbolic; BiAbduction; UnderApprox ]
 
-let exec_with_preds = [ Verification; BiAbduction ]
+let non_bi_exec = [ Concrete; Verification; Symbolic; UnderApprox ]
+
+let exec_with_preds = [ Verification; BiAbduction; UnderApprox ]
 
 let bi_exec = [ BiAbduction ]
 
@@ -33,10 +37,12 @@ let to_string = function
   | Verification -> "verif"
   | Symbolic     -> "wpst"
   | BiAbduction  -> "act"
+  | UnderApprox -> "under_approx"
 
 let of_string = function
   | "concrete" -> Concrete
   | "verif"    -> Verification
   | "wpst"     -> Symbolic
   | "act"      -> BiAbduction
+  | "under_approx" -> UnderApprox
   | other      -> failwith (Printf.sprintf "unknown exec mode \"%s\"" other)

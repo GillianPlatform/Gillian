@@ -1012,6 +1012,14 @@ module Prog : sig
   (** Creates an empty program *)
   val create : unit -> ('a, string) t
 
+  (** {3 Filters} *)
+
+  (** Removes every correctness spec from the program, in place *)
+  val strip_correctness_specs : ('a, 'b) t -> unit
+
+  (** Removes every incorrectness spec from the program, in place *)
+  val strip_incorrectness_specs : ('a, 'b) t -> unit
+
   (** {3 Getters} *)
   val get_lemmas : ('a, 'b) t -> Lemma.t list
   (** Get all lemmas *)

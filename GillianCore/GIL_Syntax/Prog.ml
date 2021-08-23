@@ -246,3 +246,24 @@ let add_macro (prog : ('a, 'b) t) (macro : Macro.t) : ('a, 'b) t =
 let add_bispec (prog : ('a, 'b) t) (bi_spec : BiSpec.t) : ('a, 'b) t =
   Hashtbl.add prog.bi_specs bi_spec.bispec_name bi_spec;
   prog
+
+let strip_specs_with_kind ~kind prog =
+  let spec_is_kind Spec.{ spec_kind; _ } = spec_kind = kind in
+  let strip_spec proc = Proc.{ proc with proc_spec = None } in
+  let () =
+    Hashtbl.filter_map_inplace
+      (fun _ proc ->
+        match proc.Proc.proc_spec with
+        | Some spec when spec_is_kind spec -> Some (strip_spec proc)
+        | _ -> Some proc)
+      prog.procs
+  in
+  let () =
+    Hashtbl.filter_map_inplace
+      (fun _ spec -> if spec_is_kind spec then None else Some spec)
+      prog.only_specs
+  in
+  ()
+
+let strip_correctness_specs prog = strip_specs_with_kind ~kind:Correctness prog
+let strip_incorrectness_specs prog = strip_specs_with_kind ~kind:Incorrectness prog

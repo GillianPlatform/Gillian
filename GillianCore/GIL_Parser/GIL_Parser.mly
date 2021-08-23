@@ -184,6 +184,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 (* Procedure specification keywords *)
 %token AXIOMATIC
 %token INCOMPLETE
+%token UNDERAPPROX
 %token SPEC
 %token BISPEC
 %token LEMMA
@@ -587,10 +588,15 @@ g_only_spec_target:
 ;
 
 g_spec_target:
-(* (incomplete) spec xpto (x, y) [[ assertion ]] [[ post1; ...; postn ]] NORMAL|ERROR *)
-  incomplete = option(INCOMPLETE); SPEC; spec_head = spec_head_target;
+(* (underapprox) (incomplete) spec xpto (x, y) [[ assertion ]] [[ post1; ...; postn ]] NORMAL|ERROR *)
+  underapprox = option(UNDERAPPROX); incomplete = option(INCOMPLETE);
+  SPEC; spec_head = spec_head_target;
   spec_sspecs = separated_nonempty_list(SCOLON, g_sspec_target)
   { let (spec_name, spec_params) = spec_head in
+    let spec_kind = match underapprox with
+      | Some _ -> Spec.Incorrectness
+      | None -> Correctness
+    in
     let spec_normalised = !Config.previously_normalised in
     let spec_to_verify = true in
     let spec_incomplete = Option.is_some incomplete in
@@ -601,7 +607,7 @@ g_spec_target:
         spec_normalised;
         spec_incomplete;
         spec_to_verify;
-        spec_kind = Correctness
+        spec_kind;
       } in
     spec
   }
