@@ -819,7 +819,8 @@ let compile_spec
     | Some ss_label ->
         Spec.s_init ~ss_label comp_pre [ comp_post ] return_mode true
   in
-  Spec.init ~spec_kind:(compile_kind kind) fname fparams [ single_spec ] false false true
+  Spec.init ~spec_kind:(compile_kind kind) fname fparams [ single_spec ] false
+    false true
 
 let compile_pred filepath pred =
   let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; _ } = pred in

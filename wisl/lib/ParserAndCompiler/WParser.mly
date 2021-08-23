@@ -136,18 +136,29 @@ definitions:
   | fpdcl = definitions; f = fct_with_specs
     { let (fs, ps, ls) = fpdcl in
       (f::fs, ps, ls) }
+  | fpdcl = definitions; f = fct_with_ux_specs
+    { let (fs, ps, ls) = fpdcl in
+      (f::fs, ps, ls) }
 
 
 rmode:
   | RNORM { WSpec.RNormal }
   | RERR  { WSpec.RError }
 
+fct_with_ux_specs:
+  | lstart = LBRACK; pre = logic_assertion; RBRACK; f = fct; LBRACK;
+    post = logic_assertion; lend = RBRACK; rmode = option(rmode)
+    { let loc = CodeLoc.merge lstart lend in
+      let rmode = match rmode with | None -> WSpec.RNormal | Some rmode -> rmode in
+      WFun.add_spec ~kind:Incorrectness f pre post rmode loc }
+  | f = fct { f }
+
 fct_with_specs:
   | lstart = LCBRACE; pre = logic_assertion; RCBRACE; f = fct; LCBRACE;
     post = logic_assertion; lend = RCBRACE; rmode = option(rmode)
     { let loc = CodeLoc.merge lstart lend in
       let rmode = match rmode with | None -> WSpec.RNormal | Some rmode -> rmode in
-      WFun.add_spec f pre post rmode loc }
+      WFun.add_spec ~kind:Correctness f pre post rmode loc }
   | f = fct { f }
 
 fct:

@@ -18,7 +18,7 @@ let biabduction_exec = function
 
 let under_approx_exec = function
   | UnderApprox -> true
-  | _ -> false
+  | _           -> false
 
 let all_exec = [ Concrete; Verification; Symbolic; BiAbduction; UnderApprox ]
 
@@ -37,12 +37,12 @@ let to_string = function
   | Verification -> "verif"
   | Symbolic     -> "wpst"
   | BiAbduction  -> "act"
-  | UnderApprox -> "under_approx"
+  | UnderApprox  -> "under_approx"
 
 let of_string = function
-  | "concrete" -> Concrete
-  | "verif"    -> Verification
-  | "wpst"     -> Symbolic
-  | "act"      -> BiAbduction
+  | "concrete"     -> Concrete
+  | "verif"        -> Verification
+  | "wpst"         -> Symbolic
+  | "act"          -> BiAbduction
   | "under_approx" -> UnderApprox
-  | other      -> failwith (Printf.sprintf "unknown exec mode \"%s\"" other)
+  | other          -> failwith (Printf.sprintf "unknown exec mode \"%s\"" other)

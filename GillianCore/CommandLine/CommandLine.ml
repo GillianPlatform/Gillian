@@ -566,10 +566,11 @@ struct
 
   module UnderApproxConsole = struct
     let process_files _ _ _ =
-        let e_prog = Prog.create () in (* From parsing or whatever *)
-        L.normal (fun m -> m "Stripping all correctness specs");
-        let () = Prog.strip_correctness_specs e_prog in
-        failwith "Not implemented yet!"
+      let e_prog = Prog.create () in
+      (* From parsing or whatever *)
+      L.normal (fun m -> m "Stripping all correctness specs");
+      let () = Prog.strip_correctness_specs e_prog in
+      failwith "Not implemented yet!"
 
     let under_approx_verify files already_compiled outfile_opt () =
       let () = Fmt_tty.setup_std_outputs () in

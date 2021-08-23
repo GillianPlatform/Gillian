@@ -31,8 +31,7 @@ let get_by_id id spec =
   let self_or_none = if get_id spec = id then `WSpec spec else `None in
   self_or_none |>> (lassert_getter, spec.pre) |>> (lassert_getter, spec.post)
 
-let make
-    ?(kind = Correctness) ?existentials pre post return_mode fname fparams loc =
+let make ~kind ?existentials pre post return_mode fname fparams loc =
   {
     pre;
     post;

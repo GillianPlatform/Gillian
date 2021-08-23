@@ -16,7 +16,8 @@ val get_name : t -> string
 
 val get_spec : t -> WSpec.t option
 
-val add_spec : t -> WLAssert.t -> WLAssert.t -> WSpec.rt -> CodeLoc.t -> t
+val add_spec :
+  t -> kind:WSpec.kind -> WLAssert.t -> WLAssert.t -> WSpec.rt -> CodeLoc.t -> t
 
 val functions_called : t -> string list
 

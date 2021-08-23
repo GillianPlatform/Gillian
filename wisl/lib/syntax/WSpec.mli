@@ -33,7 +33,7 @@ val get_by_id :
   | `WSpec     of t ]
 
 val make :
-  ?kind:kind ->
+  kind:kind ->
   ?existentials:string * string list ->
   WLAssert.t ->
   WLAssert.t ->

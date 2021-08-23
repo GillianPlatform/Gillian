@@ -266,4 +266,6 @@ let strip_specs_with_kind ~kind prog =
   ()
 
 let strip_correctness_specs prog = strip_specs_with_kind ~kind:Correctness prog
-let strip_incorrectness_specs prog = strip_specs_with_kind ~kind:Incorrectness prog
+
+let strip_incorrectness_specs prog =
+  strip_specs_with_kind ~kind:Incorrectness prog
