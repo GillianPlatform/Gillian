@@ -20,5 +20,30 @@
   "ocaml.sandbox": {
     "kind": "esy",
     "root": "${workspaceFolder:Gillian}"
+  },
+  "editor.tokenColorCustomizations": {
+    "textMateRules": [
+     { 
+       "scope": [
+				"entity.name.function",
+				"entity.name.lemma",
+				"support.function",
+				"support.constant.handlebars",
+				"source.powershell variable.other.member",
+				"entity.name.operator.custom-literal"
+			],
+			"settings": {
+				"foreground": "#DCDCAA"
+			  }
+      },
+      {
+        "scope": [
+          "variable.logical"
+        ],
+        "settings": {
+          "foreground": "#0077ff",
+        }
+      }
+    ]
   }
 }

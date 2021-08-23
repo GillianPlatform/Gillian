@@ -1,0 +1,50 @@
+predicate SLL_ex(+x, ps, vs) {
+  // Empty SLL
+  (x == null) * (ps == []) * (vs == []);
+  // One SLL node and the rest
+  (x -b> #v, #next) * SLL_ex(#next, #ps, #vs) *
+  (ps == x :: #ps) * (vs == #v :: #vs)
+}
+
+
+// function with errors
+{x = #x * SLL_ex(#x, #xs, #vs) * #x != null}
+function list_dispose_err(x){
+    while(x != null){
+        z := [x + 1];
+        free(x);
+        free(x);
+        x := z;
+    }
+{er: freed(#x) * SLL_ex(#z, #xss, #vss)}
+
+{x = #x * SLL_ex(#y, #ys, #vys)  * #x = null}
+// Wrongly implemented concat
+function list_concat(x, y){
+    head := x
+    while (x != null){
+        x := [x + 1]
+    }
+    [x] := y
+    return head
+}
+{er: x = #x * SLL_ex(#y, #ys, #vys)  * #x = null}
+
+// Copy list without allocation 
+function list_copy(x){
+    t := x;
+    y := null;
+    p := y
+    while(t != null){
+        v := [t]
+        [c] := v
+        if(p != null){
+            [p + 1] := c
+        } else {
+            y := c
+        }
+        p := c; 
+        t :=  [t + 1]
+    }
+    return y
+}
