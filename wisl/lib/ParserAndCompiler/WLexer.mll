@@ -107,6 +107,7 @@ rule read =
   | "hd"     { HEAD (curr lexbuf) }
   | "tl"     { TAIL (curr lexbuf) }
   | "rev"    { REV (curr lexbuf) }
+  | "sub"    { SUB (curr lexbuf) }
   | '!'      { LNOT (curr lexbuf) }
   (* identifiers *)
   | white    { read lexbuf }

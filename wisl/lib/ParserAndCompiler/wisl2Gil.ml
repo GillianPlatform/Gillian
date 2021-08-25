@@ -210,6 +210,13 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
     | LUnOp (u, e) ->
         let gvars, asrt, comp_expr = compile_lexpr e in
         (gvars, asrt, Expr.UnOp (compile_unop u, comp_expr))
+    | LLSub (e1, e2, e3) ->
+        let gvars1, asrt1, comp_e1 = compile_lexpr e1 in
+        let gvars2, asrt2, comp_e2 = compile_lexpr e2 in
+        let gvars3, asrt3, comp_e3 = compile_lexpr e3 in
+        ( gvars1 @ gvars2 @ gvars3,
+          asrt1 @ asrt2 @ asrt3,
+          Expr.LstSub (comp_e1, comp_e2, comp_e3) )
     | LEList l ->
         let gvars, asrtsl, comp_exprs =
           list_split_3 (List.map compile_lexpr l)

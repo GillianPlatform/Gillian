@@ -54,7 +54,7 @@
 %token LSTCAT          /* @ */
 
 (* Unary operators *)
-%token <CodeLoc.t> NOT HEAD TAIL REV LEN
+%token <CodeLoc.t> NOT HEAD TAIL REV LEN SUB
 
 (* Logic Binary *)
 %token ARROW          /* -> */
@@ -572,6 +572,10 @@ logic_expression:
       let lstart, lend = WLExpr.get_loc e1, WLExpr.get_loc e2 in
       let loc = CodeLoc.merge lstart lend in
       WLExpr.make bare_lexpr loc } %prec binop_prec
+  | lstart = SUB; LBRACE; e1 = logic_expression; COMMA; e2 = logic_expression; COMMA; e3 = logic_expression; lend = RBRACE {
+      let loc = CodeLoc.merge lstart lend in
+      let bare_lexpr = WLExpr.LLSub(e1, e2, e3) in
+      WLExpr.make bare_lexpr loc }
   | lu = unop_with_loc; e = logic_expression
     { let (lstart, u) = lu in
       let lend = WLExpr.get_loc e in
