@@ -482,7 +482,7 @@ function SLL_member_iter(x, k) {
 // 10. Freeing a given SLL
 { (x == #x) * SLL_ex(#x, #ps, #vs) }
 function SLL_free_iter(x) {
-  [[ invariant {bind: x, #rps, #rvs, #fps} SLL_ex(x, #rps, #rvs) * SLL_freed(#fps) * (#ps == (#fps @ #rps))]];
+  [[ invariant {bind: x, #rps, #rvs, #fps} SLL_ex(x, #rps, #rvs) * SLL_freed(#fps) * (rev #ps == (rev #fps @ rev #rps))]];
   while (not (x = null)) {
     t := [x + 1];
     free(x);
