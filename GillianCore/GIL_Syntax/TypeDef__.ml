@@ -213,6 +213,8 @@ and lemma = {
   lemma_existentials : string list;
 }
 
+and spec_kind = Correctness | Incorrectness
+
 and single_spec = {
   ss_pre : assertion;
   ss_posts : assertion list;
@@ -228,6 +230,7 @@ and spec = {
   spec_normalised : bool;
   spec_incomplete : bool;
   spec_to_verify : bool;
+  spec_kind : spec_kind;
 }
 
 and bispec = {

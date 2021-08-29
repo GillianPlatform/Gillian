@@ -1,5 +1,7 @@
 type rt = RNormal | RError
 
+type kind = Correctness | Incorrectness
+
 type t = {
   pre : WLAssert.t;  (** Precondition *)
   post : WLAssert.t;  (** Postcondition *)
@@ -10,6 +12,7 @@ type t = {
   fparams : string list;
       (** Parameters of the function the spec is attached to *)
   sploc : CodeLoc.t;  (** Code location of the spec *)
+  kind : kind;
 }
 
 val get_id : t -> int
@@ -30,6 +33,7 @@ val get_by_id :
   | `WSpec     of t ]
 
 val make :
+  kind:kind ->
   ?existentials:string * string list ->
   WLAssert.t ->
   WLAssert.t ->

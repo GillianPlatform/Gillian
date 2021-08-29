@@ -118,6 +118,7 @@
       (* Procedure specification keywords *)
       "axiomatic",    GIL_Parser.AXIOMATIC;
       "incomplete",   GIL_Parser.INCOMPLETE;
+      "underapprox",  GIL_Parser.UNDERAPPROX;
       "lemma",        GIL_Parser.LEMMA;
       "variant",      GIL_Parser.VARIANT;
       "spec",         GIL_Parser.SPEC;

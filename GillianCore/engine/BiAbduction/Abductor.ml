@@ -151,6 +151,7 @@ struct
           spec_normalised = true;
           spec_incomplete = true;
           spec_to_verify = false;
+          spec_kind = Correctness;
         }
       in
       spec

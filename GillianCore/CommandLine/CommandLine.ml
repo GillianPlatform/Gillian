@@ -493,6 +493,8 @@ struct
           let e_prog = Gil_parsing.parse_eprog_from_file (List.hd files) in
           (e_prog, None)
       in
+      L.normal (fun m -> m "Stripping all incorrectness specs");
+      let () = Prog.strip_incorrectness_specs e_prog in
       let () = burn_gil e_prog outfile_opt in
       (* Prog.perform_syntax_checks e_prog; *)
       Fmt.pr "Preprocessing...\n@?";
@@ -560,6 +562,39 @@ struct
       Term.info "verify" ~doc ~exits:Term.default_exits ~man
 
     let verify_cmd = (with_common verify_t, verify_info)
+  end
+
+  module UnderApproxConsole = struct
+    let process_files _ _ _ =
+      let e_prog = Prog.create () in
+      (* From parsing or whatever *)
+      L.normal (fun m -> m "Stripping all correctness specs");
+      let () = Prog.strip_correctness_specs e_prog in
+      failwith "Not implemented yet!"
+
+    let under_approx_verify files already_compiled outfile_opt () =
+      let () = Fmt_tty.setup_std_outputs () in
+      let () = Config.current_exec_mode := UnderApprox in
+      let () = PC.initialize UnderApprox in
+      let () = process_files files already_compiled outfile_opt in
+      Logging.wrap_up ()
+
+    let under_approx_t =
+      Term.(const under_approx_verify $ files $ already_compiled $ output_gil)
+
+    let under_approx_info =
+      let doc = "Verifies the under-approx specs in a program" in
+      let man =
+        [
+          `S Manpage.s_description;
+          `P
+            "Verifies the under-approx specs in a given file, after compiling \
+             it to GIL";
+        ]
+      in
+      Term.info "ux" ~doc ~exits:Term.default_exits ~man
+
+    let ux_cmd = (with_common under_approx_t, under_approx_info)
   end
 
   module ACTConsole = struct

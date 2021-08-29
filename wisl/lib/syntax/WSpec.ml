@@ -2,6 +2,8 @@ open VisitorUtils
 
 type rt = RNormal | RError
 
+type kind = Correctness | Incorrectness
+
 type t = {
   pre : WLAssert.t;
   post : WLAssert.t;
@@ -13,6 +15,7 @@ type t = {
   fparams : string list;
   (* parameters of the function *)
   sploc : CodeLoc.t;
+  kind : kind;
 }
 
 let get_id spec = spec.spid
@@ -28,7 +31,7 @@ let get_by_id id spec =
   let self_or_none = if get_id spec = id then `WSpec spec else `None in
   self_or_none |>> (lassert_getter, spec.pre) |>> (lassert_getter, spec.post)
 
-let make ?existentials pre post return_mode fname fparams loc =
+let make ~kind ?existentials pre post return_mode fname fparams loc =
   {
     pre;
     post;
@@ -38,4 +41,5 @@ let make ?existentials pre post return_mode fname fparams loc =
     fname;
     fparams;
     existentials;
+    kind;
   }
