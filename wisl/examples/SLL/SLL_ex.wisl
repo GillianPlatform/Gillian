@@ -63,7 +63,7 @@ lemma list_member_concat {
 
 // 00. Allocating an SLL node with the given value
 { v == #v }
-function SLL_allocate_node(v){
+function SLL_allocate_node(v) {
   t := new(2);
   [t] := v;
   return t
@@ -76,27 +76,27 @@ function SLL_allocate_node(v){
 //
 
 // 01. Prepending a given value to a given SLL
-{ (x == #x) * (k == #k) * SLL_ex(#x, #ps, #vs) }
-function SLL_prepend(x, k){
-    z := SLL_allocate_node(k);
+{ (x == #x) * (v == #v) * SLL_ex(#x, #ps, #vs) }
+function SLL_prepend(x, v){
+    z := SLL_allocate_node(v);
     [z + 1] := x;
     return z
 }
-{ SLL_ex(ret, #z :: #ps, #k :: #vs) }
+{ SLL_ex(ret, #z :: #ps, #v :: #vs) }
 
 // 02. Appending a given value to a given SLL
-{ (x == #x) * (k == #k) * SLL_ex(#x, #ps, #vs) }
-function SLL_append(x, k){
+{ (x == #x) * (v == #v) * SLL_ex(#x, #ps, #vs) }
+function SLL_append(x, v){
   if (x = null) {
-    x := SLL_allocate_node(k)
+    x := SLL_allocate_node(v)
     } else {
       t := [x + 1];
-      z := SLL_append(t, k);
+      z := SLL_append(t, v);
       [x + 1] := z
   };
   return x
 }
-{ SLL_ex(ret,  #ps @ [#z], #vs @ [#k]) }
+{ SLL_ex(ret,  #ps @ [#z], #vs @ [#v]) }
 
 // 03. Appending a given SLL node to a given SLL
 { (x == #x) * (y == #y) * SLL_ex(#x, #px, #vx) * SLL_ex(#y, [#py] ,[#vy]) }
@@ -174,23 +174,23 @@ function SLL_reverse(x){
 { SLL_ex(ret, rev #ps, rev #vs) }
 
 // 08. Checking if a given value is in a given SLL
-{ (x == #x) * (k == #k) * SLL_ex(#x, #ps, #vs) * list_member(#vs, #k, #r) }
-function SLL_member(x, k){
+{ (x == #x) * (v == #v) * SLL_ex(#x, #ps, #vs) * list_member(#vs, #v, #r) }
+function SLL_member(x, v) {
   found := false;
   if (x = null){
     skip
   } else {
-    v := [x];
-    if (v = k){
+    vx := [x];
+    if (vx = v){
       found := true
     } else {
       t := [x + 1];
-      found := SLL_member(t, k)
+      found := SLL_member(t, v)
     }
   };
   return found
 }
-{ SLL_ex(#x, #ps, #vs) * list_member(#vs, #k, #r) * (ret == #r) }
+{ SLL_ex(#x, #ps, #vs) * list_member(#vs, #v, #r) * (ret == #r) }
 
 // 09. Removing a given value from a given SLL
 { (x == #x) * (k == #k) * SLL_ex(#x, #ps, #vs) * list_member(#vs, #k, #mem) }
@@ -482,7 +482,7 @@ function SLL_member_iter(x, k) {
 // 10. Freeing a given SLL
 { (x == #x) * SLL_ex(#x, #ps, #vs) }
 function SLL_free_iter(x) {
-  [[ invariant {bind: x, #rps, #rvs, #fps} SLL_ex(x, #rps, #rvs) * SLL_freed(#fps) * (rev #ps == (rev #fps @ rev #rps))]];
+  [[ invariant {bind: x, #rps, #rvs, #fps} SLL_ex(x, #rps, #rvs) * SLL_freed(#fps) * (#ps == (#fps @ #rps))]];
   while (not (x = null)) {
     t := [x + 1];
     free(x);
