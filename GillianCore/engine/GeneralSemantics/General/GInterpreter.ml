@@ -705,14 +705,21 @@ struct
                       ConfCont
                         (state, cs, iframes, prev, prev_loop_ids, i, b_counter))
                     recovery_states
-              | _                  ->
+              | Error _            ->
                   L.normal ~title:"failure" ~severity:Error (fun m ->
                       m "Action call failed with:@.%a"
                         (Fmt.Dump.list State.pp_err)
                         errs);
-                  raise
-                    (Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd))
-            else Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd)
+                  let proc = CallStack.get_cur_proc_id cs in
+                  [
+                    ConfErr
+                      (proc, i, state, List.map (fun x -> ExecErr.ESt x) errs);
+                  ])
+            else
+              let proc = CallStack.get_cur_proc_id cs in
+              [
+                ConfErr (proc, i, state, List.map (fun x -> ExecErr.ESt x) errs);
+              ])
     (* Logic command *)
     | Logic lcmd -> (
         match lcmd with
@@ -954,11 +961,9 @@ struct
             ConfCont (state'', cs', iframes, prev', start_loop_ids, j, b_counter)
         | _ -> raise (Failure "Malformed callstack"))
     (* Explicit failure *)
-    | Fail (fname, exprs) ->
-        let message =
-          Fmt.(str "Fail : %s%a" fname (parens (list ~sep:comma Expr.pp)) exprs)
-        in
-        raise (Failure message)
+    | Fail (_, __FILE__) ->
+        let proc = CallStack.get_cur_proc_id cs in
+        [ ConfErr (proc, i, state, []) ]
 
   let simplify state =
     snd (State.simplify ~save:true ~kill_new_lvars:true state)

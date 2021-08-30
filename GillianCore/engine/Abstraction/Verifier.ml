@@ -351,48 +351,36 @@ struct
       rets <> []
       && List.fold_left
            (fun ac result ->
-             match (result : SAInterpreter.result_t) with
-             | ExecRes.RFail (proc, i, state, errs) ->
-                 L.verbose (fun m ->
+             let fl, state =
+               match (result : SAInterpreter.result_t) with
+               | ExecRes.RFail (_, _, state, _) -> (Flag.Error, state)
+               | ExecRes.RSucc (fl, _, state) -> (fl, state)
+             in
+             if Some fl <> test.flag then (
+               L.normal (fun m ->
+                   m
+                     "VERIFICATION FAILURE: Spec %s %d terminated with flag %s \
+                      instead of %s\n"
+                     test.name test.id (Flag.str fl) (Flag.str flag));
+               Fmt.pr "f @?";
+               false)
+             else
+               let subst = make_post_subst test state in
+               if analyse_result subst test state then (
+                 L.normal (fun m ->
                      m
-                       "VERIFICATION FAILURE: Procedure %s, Command %d\n\
-                        Spec %s %d\n\
-                        @[<v 2>State:@\n\
-                        %a@]@\n\
-                        @[<v 2>Errors:@\n\
-                        %a@]@\n"
-                       proc i test.name test.id SPState.pp state
-                       Fmt.(list ~sep:(any "@\n") SAInterpreter.pp_err)
-                       errs);
+                       "VERIFICATION SUCCESS: Spec %s %d terminated successfully\n"
+                       test.name test.id);
+                 Fmt.pr "s @?";
+                 ac)
+               else (
+                 L.normal (fun m ->
+                     m
+                       "VERIFICATION FAILURE: Spec %s %d - post condition not \
+                        unifiable\n"
+                       test.name test.id);
                  Fmt.pr "f @?";
-                 false
-             | ExecRes.RSucc (fl, _, state) ->
-                 if Some fl <> test.flag then (
-                   L.normal (fun m ->
-                       m
-                         "VERIFICATION FAILURE: Spec %s %d terminated with \
-                          flag %s instead of %s\n"
-                         test.name test.id (Flag.str fl) (Flag.str flag));
-                   Fmt.pr "f @?";
-                   false)
-                 else
-                   let subst = make_post_subst test state in
-                   if analyse_result subst test state then (
-                     L.normal (fun m ->
-                         m
-                           "VERIFICATION SUCCESS: Spec %s %d terminated \
-                            successfully\n"
-                           test.name test.id);
-                     Fmt.pr "s @?";
-                     ac)
-                   else (
-                     L.normal (fun m ->
-                         m
-                           "VERIFICATION FAILURE: Spec %s %d - post condition \
-                            not unifiable\n"
-                           test.name test.id);
-                     Fmt.pr "f @?";
-                     false))
+                 false))
            true rets
     in
     if rets = [] then (
