@@ -5,10 +5,17 @@ predicate SLL_ex(+x, ps, vs) {
   (x -b> #v, #next) * SLL_ex(#next, #ps, #vs) *
   (ps == x :: #ps) * (vs == #v :: #vs)
 }
+// mutation error 
+{ v == #v }
+function SLL_allocate_node_err(v){
+  t := new(2);
+  [true] := v;
+  return t
+}
+{ error: (v == #v)  * (t -b> null, null)}
 
-
-// function with errors
-{x = #x * SLL_ex(#x, #xs, #vs) * #x != null}
+// double-free error
+{ (x == #x) * SLL_ex(#x, #xs, #vs) * (#x != null)}
 function list_dispose_err(x){
     while(x != null){
         z := [x + 1];
@@ -16,10 +23,10 @@ function list_dispose_err(x){
         free(x);
         x := z;
     }
-{ er: freed(#x) * SLL_ex(#z, #xss, #vss) }
+{ error: freed(#x) * SLL_ex(#z, #xss, #vss) * (z == #next)}
 
-{x = #x * SLL_ex(#y, #ys, #vys)  * #x = null}
-// Wrongly implemented concat
+// null dereferencing error
+{ (x = #x) * SLL_ex(#y, #ys, #vys)  * (#x == null)}
 function list_concat(x, y){
     head := x
     while (x != null){
@@ -28,23 +35,16 @@ function list_concat(x, y){
     [x] := y
     return head
 }
-{er: x = #x * SLL_ex(#y, #ys, #vys)  * #x = null}
+{ error: (x == #x) * SLL_ex(#y, #ys, #vys)  * (#x == null) * (head == #x)}
 
-// Copy list without allocation
-function list_copy(x){
-    t := x;
-    y := null;
-    p := y
-    while(t != null){
-        v := [t]
-        [c] := v
-        if(p != null){
-            [p + 1] := c
-        } else {
-            y := c
-        }
-        p := c;
-        t :=  [t + 1]
-    }
-    return y
+// self raise error
+{ (x = #x) * SLL_ex(#x, #xs, #vs) * (#x == null)}
+function list_copy_err(x){
+  if (x = null) {
+      error
+  } else {
+      skip
+  };
+  return x
 }
+{ error: (x = #x) * SLL_ex(#x, #xs, #vs) * (#x == null)}
