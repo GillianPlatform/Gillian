@@ -1,0 +1,40 @@
+predicate SLL_ex(+x, ps, vs) {
+  // Empty SLL
+  (x == null) * (ps == []) * (vs == []);
+  // One SLL node and the rest
+  (x -b> #v, #next) * SLL_ex(#next, #ps, #vs) *
+  (ps == x :: #ps) * (vs == #v :: #vs)
+}
+
+// double-free error, version 1
+{ (x == #x) * SLL_ex(#x, #xs, #vs) }
+function SLL_free_first_err_1(x) {
+    z := [x + 1];
+    free(x);
+    free(x);
+    return z
+}
+{ (#x == null) }
+error
+
+// double-free error, version 2
+{ (x == #x) * SLL_ex(#x, #xs, #vs) }
+function SLL_free_first_err_2(x) {
+    z := [x + 1];
+    free(x);
+    free(x);
+    return z
+}
+{ (! (#x == null)) }
+error
+
+// double-free error, version 3
+{ (x == #x) * SLL_ex(#x, #xs, #vs) }
+function SLL_free_first_err_3(x) {
+    z := [x + 1];
+    free(x);
+    free(x);
+    return z
+}
+{ True }
+error
