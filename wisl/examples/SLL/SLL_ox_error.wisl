@@ -58,5 +58,5 @@ function SLL_free_first_err_5(x) {
     free(x);
     return z
 }
-{ SLL_ex(#y, #xs, #vs) }
+{ freed(#x) * SLL_ex(#y, #xs, #vs) }
 error

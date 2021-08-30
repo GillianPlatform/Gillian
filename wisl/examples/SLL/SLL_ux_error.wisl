@@ -25,7 +25,7 @@ function SLL_free_first_err_2(x) {
     free(x);
     return z
 }
-[ (! (#x == null)) ]
+[ (! (#x == null)) * (z == #z) * SLL_ex(#z, #xss, #vss) ]
 error
 
 // Errors: version 3: both branches
@@ -47,7 +47,7 @@ function SLL_free_first_err_4(x) {
     free(x);
     return z
 }
-[ SLL_ex(#x, #xs, #vs) ]
+[ (#x == null) * SLL_ex(#x, #xs, #vs) * (x == #x) ]
 error
 
 // Errors: version 5: Isolated double-free
@@ -58,5 +58,5 @@ function SLL_free_first_err_5(x) {
     free(x);
     return z
 }
-[ SLL_ex(#y, #xs, #vs) ]
+[ freed(#x) * SLL_ex(#y, #xs, #vs) * (x == #x) * (z == #y) ]
 error
