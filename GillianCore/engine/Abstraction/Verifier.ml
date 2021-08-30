@@ -134,7 +134,19 @@ struct
                 exs Expr.Set.empty)
             label
         in
-        let known_unifiables = Expr.Set.union known_unifiables existentials in
+        let post_pvars =
+          List.fold_left
+            (fun ac post -> SS.union ac (Asrt.pvars post))
+            SS.empty posts
+        in
+        let post_pvars =
+          Expr.Set.of_list
+            (List.map (fun x -> Expr.PVar x) (SS.elements post_pvars))
+        in
+        let known_unifiables =
+          List.fold_left Expr.Set.union Expr.Set.empty
+            [ known_unifiables; existentials; post_pvars ]
+        in
         let simple_posts = List.map (fun post -> (post, (label, None))) posts in
         let post_up =
           UP.init known_unifiables Expr.Set.empty pred_ins simple_posts

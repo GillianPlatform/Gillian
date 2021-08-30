@@ -18,8 +18,8 @@ let get_name f = f.name
 
 let get_spec f = f.spec
 
-let add_spec f ~kind pre post rmode loc =
-  let spec = WSpec.make ~kind pre post rmode f.name f.params loc in
+let add_spec f ~kind pre posts rmode loc =
+  let spec = WSpec.make ~kind pre posts rmode f.name f.params loc in
   { f with spec = Some spec; floc = loc }
 
 let functions_called f = WStmt.functions_called_by_list f.body
@@ -53,5 +53,6 @@ let pp fmt f =
          }@\n\
          @[{ %a }@]" WLAssert.pp (WSpec.get_pre spec) f.name
         (WPrettyUtils.pp_list Format.pp_print_string)
-        f.params pp_list_stmt f.body WExpr.pp f.return_expr WLAssert.pp
-        (WSpec.get_post spec)
+        f.params pp_list_stmt f.body WExpr.pp f.return_expr
+        (WPrettyUtils.pp_list ~sep:";" WLAssert.pp)
+        (WSpec.get_posts spec)

@@ -150,15 +150,17 @@ fct_with_ux_specs:
     post = logic_assertion; lend = RBRACK; rmode = option(rmode)
     { let loc = CodeLoc.merge lstart lend in
       let rmode = match rmode with | None -> WSpec.RNormal | Some rmode -> rmode in
-      WFun.add_spec ~kind:Incorrectness f pre post rmode loc }
+      WFun.add_spec ~kind:Incorrectness f pre [ post ] rmode loc }
   | f = fct { f }
 
+single_post: RCBRACE; post = logic_assertion; RCBRACE { post }
+
 fct_with_specs:
-  | lstart = LCBRACE; pre = logic_assertion; RCBRACE; f = fct; LCBRACE;
-    post = logic_assertion; lend = RCBRACE; rmode = option(rmode)
+  | lstart = LCBRACE; pre = logic_assertion; RCBRACE; f = fct;
+    LCBRACE; posts = separated_list(SEMICOLON, logic_assertion); lend = RCBRACE; rmode = option(rmode)
     { let loc = CodeLoc.merge lstart lend in
       let rmode = match rmode with | None -> WSpec.RNormal | Some rmode -> rmode in
-      WFun.add_spec ~kind:Correctness f pre post rmode loc }
+      WFun.add_spec ~kind:Correctness f pre posts rmode loc }
   | f = fct { f }
 
 fct:

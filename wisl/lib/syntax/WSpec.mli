@@ -4,7 +4,7 @@ type kind = Correctness | Incorrectness
 
 type t = {
   pre : WLAssert.t;  (** Precondition *)
-  post : WLAssert.t;  (** Postcondition *)
+  posts : WLAssert.t list;  (** Postcondition *)
   return_mode : rt;  (** Return mode *)
   existentials : (string * string list) option;  (** Existentials in the spec *)
   spid : int;  (** Unique identifier of AST el *)
@@ -19,7 +19,7 @@ val get_id : t -> int
 
 val get_pre : t -> WLAssert.t
 
-val get_post : t -> WLAssert.t
+val get_posts : t -> WLAssert.t list
 
 val get_loc : t -> CodeLoc.t
 
@@ -36,7 +36,7 @@ val make :
   kind:kind ->
   ?existentials:string * string list ->
   WLAssert.t ->
-  WLAssert.t ->
+  WLAssert.t list ->
   rt ->
   string ->
   string list ->

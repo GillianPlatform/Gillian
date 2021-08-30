@@ -37,14 +37,16 @@ error
 // Errors: version 3: both branches
 // This works because it captures both branches (using multi-posts instead of spati)
 { (x == #x) * SLL_ex(#x, #xs, #vs) }
-function SLL_free_first_err_3b(x) {
+function SLL_free_first_err_3(x) {
     z := [x + 1];
     free(x);
     free(x);
     return z
 }
-{ (x == null) * SLL_ex(#x, #xs, #vs) }
-{ (! (#x == null)) * freed(#x) * (z == #z) * SLL_ex(#z, #xxs, #vvs) }
+{
+    (#x == null) * SLL_ex(#x, #xs, #vs);
+    (! (#x == null)) * freed(#x) * (z == #z) * SLL_ex(#z, #xxs, #vvs)
+}
 error
 
 // Errors: version 4: Isolated null-pointer dereference
@@ -61,7 +63,7 @@ error
 
 // Errors: version 5: Isolated double-free
 // This isolates a single branch in the pre-condition, it also works
-{ (x == #x) * SLL_ex(#y, #xs, #vs) * (! (#x == null)) }
+{ (x == #x) * SLL_ex(#x, #xs, #vs) * (! (#x == null)) }
 function SLL_free_first_err_5(x) {
     z := [x + 1];
     free(x);

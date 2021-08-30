@@ -530,7 +530,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
       WSpec.
         {
           pre;
-          post;
+          posts = [ post ];
           return_mode = WSpec.RNormal;
           spid = Generators.gen_id ();
           fname = loop_fname;
@@ -805,13 +805,13 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
 
 let compile_spec
     ?(fname = "main")
-    WSpec.{ pre; post; return_mode; fparams; existentials; kind; _ } =
+    WSpec.{ pre; posts; return_mode; fparams; existentials; kind; _ } =
   let compile_kind = function
     | WSpec.Incorrectness -> Spec.Incorrectness
     | Correctness         -> Correctness
   in
   let _, comp_pre = compile_lassert ~fname pre in
-  let _, comp_post = compile_lassert ~fname post in
+  let _, comp_posts = List.split (List.map (compile_lassert ~fname) posts) in
   let label_opt =
     match existentials with
     | None         -> None
@@ -822,9 +822,9 @@ let compile_spec
   in
   let single_spec =
     match label_opt with
-    | None          -> Spec.s_init comp_pre [ comp_post ] return_mode true
+    | None          -> Spec.s_init comp_pre comp_posts return_mode true
     | Some ss_label ->
-        Spec.s_init ~ss_label comp_pre [ comp_post ] return_mode true
+        Spec.s_init ~ss_label comp_pre comp_posts return_mode true
   in
   Spec.init ~spec_kind:(compile_kind kind) fname fparams [ single_spec ] false
     false true
