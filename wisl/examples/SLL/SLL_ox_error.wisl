@@ -7,8 +7,8 @@ predicate SLL_ex(+x, ps, vs) {
 }
 
 // Notes:
-// 1. Gillian can forget resource in post-conditions of functions
-// 2. We don't have a way of saying which error specifically happens in specifications
+// 1. We don't have a way of saying which error specifically happens in specifications
+// 2. There is no spatial disjunction, one can use abstractions or multiple post-conditions
 
 // Errors, version 1: just one branch in post-condition
 // This doesn't work because over-approximation is about both branches, post-condition explains only one
@@ -19,7 +19,7 @@ function SLL_free_first_err_1(x) {
     free(x);
     return z
 }
-{ (#x == null) }
+{ (#x == null) * SLL_ex(#x, #xs, #vs) }
 error
 
 // Errors, version 2: just one branch in post-condition
@@ -31,23 +31,11 @@ function SLL_free_first_err_2(x) {
     free(x);
     return z
 }
-{ (! (#x == null)) }
+{ (! (#x == null)) * freed(#x) * (z == #z) * SLL_ex(#z, #xxs, #vvs) }
 error
 
-// Errors: version 3a: both branches
-// This works because it captures both branches and forgets everything
-{ (x == #x) * SLL_ex(#x, #xs, #vs) }
-function SLL_free_first_err_3a(x) {
-    z := [x + 1];
-    free(x);
-    free(x);
-    return z
-}
-{ True }
-error
-
-// Errors: version 3b: both branches
-// This works because it captures both branches, but this time we give the full specification
+// Errors: version 3: both branches
+// This works because it captures both branches (using multi-posts instead of spati)
 { (x == #x) * SLL_ex(#x, #xs, #vs) }
 function SLL_free_first_err_3b(x) {
     z := [x + 1];
@@ -55,12 +43,12 @@ function SLL_free_first_err_3b(x) {
     free(x);
     return z
 }
-{ x == null * SLL_ex(#x, #xs, #vs) }
-{ freed(#x) * (z == #z) * SLL_ex(#z, #xxs, #vvs) }
+{ (x == null) * SLL_ex(#x, #xs, #vs) }
+{ (! (#x == null)) * freed(#x) * (z == #z) * SLL_ex(#z, #xxs, #vvs) }
 error
 
 // Errors: version 4: Isolated null-pointer dereference
-// This isolates a single branch, it works
+// This isolates a single branch in the pre-condition, it works
 { (x == #x) * SLL_ex(#x, #xs, #vs) * (#x == null) }
 function SLL_free_first_err_4(x) {
     z := [x + 1];
@@ -72,7 +60,7 @@ function SLL_free_first_err_4(x) {
 error
 
 // Errors: version 5: Isolated double-free
-// This isolates a single branch, it also works, and we give the full resource
+// This isolates a single branch in the pre-condition, it also works
 { (x == #x) * SLL_ex(#y, #xs, #vs) * (! (#x == null)) }
 function SLL_free_first_err_5(x) {
     z := [x + 1];
@@ -80,5 +68,5 @@ function SLL_free_first_err_5(x) {
     free(x);
     return z
 }
-{ freed(#x) * (z == #z) * SLL_ex(#z, #xxs, #vvs) }
+{ (! (#x == null)) * freed(#x) * (z == #z) * SLL_ex(#z, #xxs, #vvs) }
 error
