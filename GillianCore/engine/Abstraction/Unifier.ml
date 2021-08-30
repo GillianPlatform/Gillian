@@ -273,22 +273,24 @@ module Make
           Expr.Set.cardinal es_inter
     in
 
-    (* Strategy 3: Predicate has non-literal parameters in pure formulae *)
-    let strategy_4 ((name, args) : string * Val.t list) : int =
-      print_local_info 4 name args;
-      let pred_def = get_pred_def name in
-      match pred_def.pred_abstract with
-      | true  -> 0
-      | false ->
-          let lvars_state = State.get_spec_vars state in
-          let lvars_args =
-            List.fold_left SS.union SS.empty
-              (List.map (fun x -> Expr.lvars (Val.to_expr x)) args)
-          in
-          let inter = SS.inter lvars_args lvars_state in
-          SS.cardinal inter
-    in
-    apply_strategies [ strategy_1; strategy_2; strategy_3; strategy_4 ]
+    (* Strategy 4: Predicate has non-literal parameters in pure formulae
+       let strategy_4 ((name, args) : string * Val.t list) : int =
+         print_local_info 4 name args;
+         let pred_def = get_pred_def name in
+         match pred_def.pred_abstract with
+         | true  -> 0
+         | false ->
+             let lvars_state = State.get_spec_vars state in
+             let lvars_args =
+               List.fold_left SS.union SS.empty
+                 (List.map (fun x -> Expr.lvars (Val.to_expr x)) args)
+             in
+             let inter = SS.inter lvars_args lvars_state in
+             SS.cardinal inter
+       in *)
+    apply_strategies [ strategy_1; strategy_2; strategy_3 ]
+
+  (* ; strategy_4 ] *)
 
   let rec produce_assertion (astate : t) (subst : ESubst.t) (a : Asrt.t) :
       (t list, string) result =

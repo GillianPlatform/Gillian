@@ -7,56 +7,56 @@ predicate SLL_ex(+x, ps, vs) {
 }
 
 // Errors, version 1: just one branch in post-condition
-{ (x == #x) * SLL_ex(#x, #xs, #vs) }
+[ (x == #x) * SLL_ex(#x, #xs, #vs) ]
 function SLL_free_first_err_1(x) {
     z := [x + 1];
     free(x);
     free(x);
     return z
 }
-{ (#x == null) }
+[ (#x == null) ]
 error
 
 // Errors, version 2: just one branch in post-condition
-{ (x == #x) * SLL_ex(#x, #xs, #vs) }
+[ (x == #x) * SLL_ex(#x, #xs, #vs) ]
 function SLL_free_first_err_2(x) {
     z := [x + 1];
     free(x);
     free(x);
     return z
 }
-{ (! (#x == null)) }
+[ (! (#x == null)) ]
 error
 
 // Errors: version 3: both branches
-{ (x == #x) * SLL_ex(#x, #xs, #vs) }
+[ (x == #x) * SLL_ex(#x, #xs, #vs) ]
 function SLL_free_first_err_3(x) {
     z := [x + 1];
     free(x);
     free(x);
     return z
 }
-{ True }
+[ True ]
 error
 
 // Errors: version 4: Isolated null-pointer dereference
-{ (x == #x) * SLL_ex(#x, #xs, #vs) * (#x == null) }
+[ (x == #x) * SLL_ex(#x, #xs, #vs) * (#x == null) ]
 function SLL_free_first_err_4(x) {
     z := [x + 1];
     free(x);
     free(x);
     return z
 }
-{ SLL_ex(#x, #xs, #vs) }
+[ SLL_ex(#x, #xs, #vs) ]
 error
 
 // Errors: version 5: Isolated double-free
-{ (x == #x) * (#x -b> #v, #y) * SLL_ex(#y, #xs, #vs) }
+[ (x == #x) * (#x -b> #v, #y) * SLL_ex(#y, #xs, #vs) ]
 function SLL_free_first_err_5(x) {
     z := [x + 1];
     free(x);
     free(x);
     return z
 }
-{ SLL_ex(#y, #xs, #vs) }
+[ SLL_ex(#y, #xs, #vs) ]
 error
