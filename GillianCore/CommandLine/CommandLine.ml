@@ -758,6 +758,7 @@ struct
       CInterpreterConsole.exec_cmd;
       SInterpreterConsole.wpst_cmd;
       VerificationConsole.verify_cmd;
+      UnderApproxConsole.ux_cmd;
       ACTConsole.act_cmd;
     ]
     @ BulkConsole.bulk_cmds
