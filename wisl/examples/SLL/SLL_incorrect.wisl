@@ -5,7 +5,8 @@ predicate SLL_ex(+x, ps, vs) {
   (x -b> #v, #next) * SLL_ex(#next, #ps, #vs) *
   (ps == x :: #ps) * (vs == #v :: #vs)
 }
-// mutation error 
+
+// mutation error 1
 { v == #v }
 function SLL_allocate_node_err(v){
   t := new(2);
@@ -14,9 +15,26 @@ function SLL_allocate_node_err(v){
 }
 { error: (v == #v)  * (t -b> null, null)}
 
+// new error val
+{ v == #v }
+function SLL_allocate_node_err(v){
+  t := new(true);
+  [true] := v;
+  return t
+}
+{ error: (v == #v) }
+
+// look up free error
+{ (x == #x) * freed(#x) }
+function SLL_head_err(x){
+    y := [x];
+    return y
+}
+{ error: (x == #x) * freed(#x) }
+
 // double-free error
 { (x == #x) * SLL_ex(#x, #xs, #vs) * (#x != null)}
-function list_dispose_err(x){
+function SLL_free_err(x){
     while(x != null){
         z := [x + 1];
         free(x);
