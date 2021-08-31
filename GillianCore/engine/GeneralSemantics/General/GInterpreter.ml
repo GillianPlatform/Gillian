@@ -706,14 +706,23 @@ struct
                         (state, cs, iframes, prev, prev_loop_ids, i, b_counter))
                     recovery_states
               | Error _            ->
+                  let err_msg =
+                    Fmt.str "%a" (Fmt.Dump.list State.pp_err) errs
+                  in
                   L.normal ~title:"failure" ~severity:Error (fun m ->
                       m "Action call failed with:@.%a"
                         (Fmt.Dump.list State.pp_err)
                         errs);
+                  let err_msg =
+                    Option.get (Val.from_expr (Lit (String err_msg)))
+                  in
+                  let state' =
+                    update_store state Names.return_variable err_msg
+                  in
                   let proc = CallStack.get_cur_proc_id cs in
                   [
                     ConfErr
-                      (proc, i, state, List.map (fun x -> ExecErr.ESt x) errs);
+                      (proc, i, state', List.map (fun x -> ExecErr.ESt x) errs);
                   ])
             else
               let proc = CallStack.get_cur_proc_id cs in
@@ -961,9 +970,12 @@ struct
             ConfCont (state'', cs', iframes, prev', start_loop_ids, j, b_counter)
         | _ -> raise (Failure "Malformed callstack"))
     (* Explicit failure *)
-    | Fail (_, __FILE__) ->
+    | Fail (err_var, exprs) ->
+        let err_msg = Val.to_expr (Store.get_unsafe store err_var) in
+        let v_ret = eval_expr (EList (err_msg :: exprs)) in
+        let state' = update_store state Names.return_variable v_ret in
         let proc = CallStack.get_cur_proc_id cs in
-        [ ConfErr (proc, i, state, []) ]
+        [ ConfErr (proc, i, state', []) ]
 
   let simplify state =
     snd (State.simplify ~save:true ~kill_new_lvars:true state)
