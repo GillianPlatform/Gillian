@@ -570,7 +570,26 @@ struct
       (* From parsing or whatever *)
       L.normal (fun m -> m "Stripping all correctness specs");
       let () = Prog.strip_correctness_specs e_prog in
-      failwith "Not implemented yet!"
+      L.normal (fun m -> m "Stripping all incorrectness specs");
+      let () = Prog.strip_incorrectness_specs e_prog in
+      (* Prog.perform_syntax_checks e_prog; *)
+      Fmt.pr "Preprocessing...\n@?";
+      let prog =
+        Gil_parsing.eprog_to_prog
+          ~other_imports:(convert_other_imports PC.other_imports)
+          e_prog
+      in
+      let () =
+        L.verbose (fun m ->
+            m "@\nProgram as parsed:@\n%a@\n" Prog.pp_indexed prog)
+      in
+      let prog = LogicPreprocessing.preprocess prog true in
+      let () =
+        L.verbose (fun m ->
+            m "@\nProgram after logic preprocessing:@\n%a@\n" Prog.pp_indexed
+              prog)
+      in
+      Verification.verify_prog prog false None
 
     let under_approx_verify files already_compiled outfile_opt () =
       let () = Fmt_tty.setup_std_outputs () in

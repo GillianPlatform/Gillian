@@ -11,7 +11,7 @@ predicate SLL_ex(+x, ps, vs) {
 // 2. There is no spatial disjunction, one can use abstractions or multiple post-conditions
 
 // Errors, version 1: just one branch in post-condition
-// This works because one branch in post
+// This doesn't work because over-approximation is about both branches, post-condition explains only one
 [ (x == #x) * SLL_ex(#x, #xs, #vs) ]
 function SLL_free_first_err_1(x) {
     z := [x + 1];
@@ -31,21 +31,21 @@ function SLL_free_first_err_2(x) {
     free(x);
     return z
 }
-[ (! (#x == null)) * freed(#x) * (z == #z) * SLL_ex(#z, #xxs, #vvs) * (ret == "[Double Free]") ]
+[ (! (#x == null)) * freed(#x) * SLL_ex(z, #xxs, #vvs) * (ret == "[Double Free]") ]
 error
 
 // Errors: version 3: both branches
-// This does not work because it branches
+// This works because it captures both branches (using multi-posts instead of spati)
 [ (x == #x) * SLL_ex(#x, #xs, #vs) ]
-function SLL_free_first_err_3b(x) {
+function SLL_free_first_err_3(x) {
     z := [x + 1];
     free(x);
     free(x);
     return z
 }
 [
-    (x == null) * SLL_ex(#x, #xs, #vs) * (ret == [ "Addition: Incorrect Types", #x, 1 ]);
-    (! (#x == null)) * freed(#x) * (z == #z) * SLL_ex(#z, #xxs, #vvs) * (ret == "[Double Free]")
+    (#x == null) * SLL_ex(#x, #xs, #vs) * (ret == [ "Addition: Incorrect Types", #x, 1 ]);
+    (! (#x == null)) * freed(#x) * SLL_ex(z, #xxs, #vvs) * (ret == "[Double Free]")
 ]
 error
 
@@ -63,12 +63,12 @@ error
 
 // Errors: version 5: Isolated double-free
 // This isolates a single branch in the pre-condition, it also works
-[ (x == #x) * SLL_ex(#y, #xs, #vs) * (! (#x == null)) ]
+[ (x == #x) * SLL_ex(#x, #xs, #vs) * (! (#x == null)) ]
 function SLL_free_first_err_5(x) {
     z := [x + 1];
     free(x);
     free(x);
     return z
 }
-[ (! (#x == null)) * freed(#x) * (z == #z) * SLL_ex(#z, #xxs, #vvs) * (ret == "[Double Free]") ]
+[ (! (#x == null)) * freed(#x) * SLL_ex(z, #xxs, #vvs) * (ret == "[Double Free]") ]
 error
