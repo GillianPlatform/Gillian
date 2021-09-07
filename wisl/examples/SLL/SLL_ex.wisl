@@ -192,25 +192,7 @@ function SLL_member(x, v) {
 }
 { SLL_ex(#x, #ps, #vs) * list_member(#vs, #v, #r) * (ret == #r) }
 
-// 09. Removing a given value from a given SLL
-{ (x == #x) * (k == #k) * SLL_ex(#x, #ps, #vs) * list_member(#vs, #k, #mem) }
-function SLL_remove(x, k) {
-  if (x = null) {
-    skip
-  } else {
-    v := [x];
-    next := [x + 1];
-    if (v = k){
-      free(x);
-      x := SLL_remove(next, k)
-    } else {
-       z := SLL_remove(next, k);
-       [x + 1] := z
-    }
-  };
-  return x
-}
-{ SLL_ex(ret, #nps, #nvs) * list_member(#nvs, #k, false) * SLL_freed(#p) * list_member(#ps, #p, true)}
+// 09. Removing a given value from a given SLL: Impossible to spec precisely
 
 // 10. Freeing a given SLL
 { (x == #x) * SLL_ex(#x, #ps, #vs) }
@@ -319,8 +301,8 @@ function SLL_append_iter(x, k){
 { SLL_ex(ret, #npx, #vx @ [ #k ]) }
 
 // 03. Appending a given node to a given SLL
-{ (x == #x) * (y == #y) * SLL_ex(#x, #ps, #vs) * SLL_ex(#y, [#py], [#vy]) }
-function SLL_append_node_iter(x, y){
+{ (x == #x) * (y == #y) * SLL_ex(#x, #px, #vs) * SLL_ex(#y, [#py], [#vy]) }
+function SLL_append_node_iter(x, y) {
   if (x = null) {
     x := y
   } else {
@@ -329,7 +311,7 @@ function SLL_append_node_iter(x, y){
     next := [x + 1];
     [[ invariant {bind: prev, next, #ps1, #ps2, #vs1, #vs2, #v}
           SLLseg_ex(head, prev, #ps1, #vs1) * (prev -b> #v, next) * SLL_ex(next, #ps2, #vs2) *
-           (#px == #ps1 @ (prev :: #ps2)) * (#vx == #vs1 @ (#v :: #vs2)) ]];
+           (#p == #ps1 @ (prev :: #ps2)) * (#vx == #vs1 @ (#v :: #vs2)) ]];
     while(not (next = null)){
       [[ assert {bind: #prev} prev == #prev ]];
       prev := next;
@@ -344,7 +326,7 @@ function SLL_append_node_iter(x, y){
   };
   return x
 }
-{ SLL_ex(ret, #ps @ [py], #vs @ [#vy]) }
+{ SLL_ex(ret, #px @ [#py], #vs @ [#vy]) }
 
 // 04. Concatenating two lists
 {(x == #x) * (y == #y) * SLL_ex(#x, #px, #vx) * SLL_ex(#y, #py, #vy) }
@@ -453,25 +435,26 @@ function SLL_reverse_iter(x) {
 { (x == #x) * (v == #v) * SLL_ex(#x, #ps, #vs) * list_member(#vs, #v, #r) }
 function SLL_member_iter(x, v) {
   found := false;
-  [[ invariant {bind: found, x, #vs1, #vs2, #rg, #ps1, #ps2}
-       SLLseg_ex(#x, x, #ps1, #vs1) * SLL_ex(x, #ps2, #vs2) *
+  next := x;
+  [[ invariant {bind: x, found, next, #vs1, #vs2, #rg, #ps1, #ps2}
+       (x == #x) * SLLseg_ex(x, next, #ps1, #vs1) * SLL_ex(next, #ps2, #vs2) *
             (#ps == (#ps1 @ #ps2)) * (#vs == (#vs1 @ #vs2)) *
                 (#r == (found || #rg)) * list_member(#vs1, v, found) *
                     list_member(#vs2, v, #rg) ]];
-  while ((found = false) && (not (x = null))) {
-    [[ assert {bind: #ox} x == #ox ]];
+  while ((found = false) && (not (next = null))) {
+    [[ assert {bind: #ox} next == #ox ]];
     [[ assert {bind: #vx, #z} #ox -b> #vx, #z ]];
-    vx := [x];
+    vx := [next];
     found := (vx = v);
-    x := [x + 1];
-    [[ apply SLLseg_append(#x, #ox, #ps1, #vs1, #vx, x) ]];
+    next := [next + 1];
+    [[ apply SLLseg_append(x, #ox, #ps1, #vs1, #vx, next) ]];
     [[ unfold list_member(#vs2, v, #rg) ]];
     [[ apply list_member_append(#vs1, v, false, #vx) ]]
   };
-  [[ if (found = false) { apply SLLseg_to_SLL(#x); unfold list_member([], #v) } else {
-      assert {bind: #vs1, #vs2, #ps1, #ps2} SLLseg_ex(#x, x, #ps1, #vs1) * SLL_ex(x, #ps2, #vs2);
+  [[ if (found = false) { apply SLLseg_to_SLL(x); unfold list_member([], #v) } else {
+      assert {bind: #vs1, #vs2, #ps1, #ps2} SLLseg_ex(x, next, #ps1, #vs1) * SLL_ex(next, #ps2, #vs2);
       apply list_member_concat(#vs1, #vs2, #v);
-      apply SLLseg_concat_SLL(#x, nxext)
+      apply SLLseg_concat_SLL(x, next)
      } ]];
   return found
 }

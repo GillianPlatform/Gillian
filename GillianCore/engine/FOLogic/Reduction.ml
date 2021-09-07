@@ -368,6 +368,17 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
            (Printf.sprintf "get_nth_of_list: list equals %s, impossible"
               ((Fmt.to_to_string Expr.pp) lst)))
 
+(* *)
+let get_last_and_rest_of_list (lst : Expr.t list) =
+  let rlst = List.rev lst in
+  let last, rest = (List.hd rlst, List.tl rlst) in
+  match last with
+  | EList lst ->
+      let rlst = List.rev lst in
+      let rlast, rrest = (List.hd rlst, List.tl rlst) in
+      (rlast, Expr.NOp (LstCat, List.rev rest @ [ EList (List.rev rrest) ]))
+  | _         -> (last, NOp (LstCat, List.rev rest))
+
 (* Finding the nth element of a list *)
 let get_head_and_tail_of_list ~pfs lst =
   let rec loop (pfs : PFS.t) (unacceptable : Expr.Set.t) (lst : Expr.t) :
@@ -2319,6 +2330,18 @@ let rec reduce_formula_loop
                        (fun d i ->
                          d = Expr.BinOp (re1, LstNth, Lit (Num (float_of_int i))))
                        decomposition indices -> True
+              | NOp (LstCat, el), NOp (LstCat, er)
+                when let (l1, _), (l2, _) =
+                       ( get_last_and_rest_of_list el,
+                         get_last_and_rest_of_list er )
+                     in
+                     L.verbose (fun m ->
+                         m "last 1: %a last 2: %a" Expr.pp l1 Expr.pp l2);
+                     l1 = l2 ->
+                  let (_, r1), (_, r2) =
+                    (get_last_and_rest_of_list el, get_last_and_rest_of_list er)
+                  in
+                  f (Eq (r1, r2))
               | NOp (LstCat, fl :: rl), NOp (LstCat, fr :: rr) when fl = fr ->
                   Eq (NOp (LstCat, rl), NOp (LstCat, rr))
               | NOp (LstCat, fl :: rl), NOp (LstCat, fr :: rr)
