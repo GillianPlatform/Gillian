@@ -194,6 +194,7 @@ let rec learn_expr
 
       let overall_length : Expr.t = list_length base_expr in
       let e_length : Expr.t = list_length e in
+      L.verbose (fun m -> m "e length: %a" Expr.pp e_length);
       match is_known_expr kb e_length with
       | true  ->
           let e_base_expr = Expr.LstSub (base_expr, Lit (Num 0.), e_length) in
@@ -207,7 +208,33 @@ let rec learn_expr
               (base_expr, e_length, BinOp (overall_length, FMinus, e_length))
           in
           e_outs @ learn_expr kb' rest_base_expr rest
-      | false -> [])
+      | false -> (
+          match rest with
+          | [ re ] -> (
+              let re_length : Expr.t = list_length re in
+              L.verbose (fun m -> m "re length: %a" Expr.pp re_length);
+              match is_known_expr kb re_length with
+              | true  ->
+                  let re_base_expr =
+                    Expr.LstSub
+                      ( base_expr,
+                        BinOp (overall_length, FMinus, re_length),
+                        re_length )
+                  in
+                  let re_outs = f re_base_expr re in
+                  let kb' : KB.t =
+                    List.fold_left (fun kb (u, _) -> KB.add u kb) kb re_outs
+                  in
+                  let rest = e in
+                  let rest_base_expr =
+                    Expr.LstSub
+                      ( base_expr,
+                        Lit (Num 0.),
+                        BinOp (overall_length, FMinus, re_length) )
+                  in
+                  re_outs @ learn_expr kb' rest_base_expr rest
+              | false -> [])
+          | _      -> []))
   (* Floating-point plus is invertible *)
   | BinOp (e1, FPlus, e2) -> (
       (* If both operands are known or both are unknown, nothing can be done *)
@@ -506,18 +533,36 @@ let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
     List.map (fun (_, outs) -> (a, outs)) act_ios
   in
 
+  let prioritise_up_asrt a b =
+    let _, lsta = a in
+    let _, lstb = b in
+    let aa, _ = List.hd lsta in
+    let ab, _ = List.hd lstb in
+    match ((aa : Asrt.t), (ab : Asrt.t)) with
+    | Types _, _ -> -1
+    | _, Types _ -> 1
+    | Pred _, _  -> -1
+    | _, Pred _  -> 1
+    | GA _, _    -> -1
+    | _, GA _    -> 1
+    | Pure _, _  -> 1
+    | _, Pure _  -> -1
+    | _, _       -> 0
+  in
+
   (* Attempt to find an assertion in a given list that can be added
      to the unification plan *)
-  let rec visit_asrt_lst
-      (kb : KB.t) (indexes : SI.t) (visited_indexes : int list) :
-      (SI.t * step list) option =
-    if indexes = SI.empty then None
-    else
-      let i = SI.min_elt indexes in
-      let rest_indexes = SI.remove i indexes in
-      match visit_asrt kb i with
-      | []  -> visit_asrt_lst kb rest_indexes (i :: visited_indexes)
-      | ret -> Some (SI.union (SI.of_list visited_indexes) rest_indexes, ret)
+  let visit_asrt_lst (kb : KB.t) (indexes : SI.t) : (SI.t * step list) option =
+    let lindexes = SI.elements indexes in
+    let visit_result = List.map (fun i -> (i, visit_asrt kb i)) lindexes in
+    let visit_result = List.filter (fun (_, outs) -> outs <> []) visit_result in
+    let visit_result = List.sort prioritise_up_asrt visit_result in
+    match visit_result with
+    | [] -> None
+    | _  ->
+        let i, ret = List.hd visit_result in
+        let rest_indexes = SI.remove i indexes in
+        Some (rest_indexes, ret)
   in
 
   let rec search (up_search_states : up_search_state list) :
@@ -547,7 +592,7 @@ let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
                     Asrt.full_pp f simple_asrts_io.(i)))
               unchecked);
 
-        match visit_asrt_lst kb unchecked [] with
+        match visit_asrt_lst kb unchecked with
         | None                      ->
             L.verbose (fun m -> m "No assertions left to visit.");
             if rest = [] then (

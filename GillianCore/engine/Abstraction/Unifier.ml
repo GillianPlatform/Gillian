@@ -1161,7 +1161,10 @@ module Make
               let v_le : vt =
                 match v_le with
                 | Some v_le -> v_le
-                | None      -> raise (Failure "DEATH. unify assertion Types")
+                | None      ->
+                    L.verbose (fun m ->
+                        m "Horror: cannot substitute %a" Expr.pp le);
+                    raise (Failure "DEATH. unify assertion Types")
               in
               match State.get_type state v_le with
               | Some t' -> if t <> t' then False :: ac else ac

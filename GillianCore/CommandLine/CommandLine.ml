@@ -565,13 +565,23 @@ struct
   end
 
   module UnderApproxConsole = struct
-    let process_files _ _ _ =
-      let e_prog = Prog.create () in
+    let process_files files already_compiled _ =
+      Fmt.pr "Parsing and compiling...\n@?";
+      let e_prog, _ =
+        if not already_compiled then
+          let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
+          let e_progs = progs.gil_progs in
+          let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
+          let e_prog = snd (List.hd e_progs) in
+          let source_files = progs.source_files in
+          (e_prog, Some source_files)
+        else
+          let e_prog = Gil_parsing.parse_eprog_from_file (List.hd files) in
+          (e_prog, None)
+      in
       (* From parsing or whatever *)
       L.normal (fun m -> m "Stripping all correctness specs");
       let () = Prog.strip_correctness_specs e_prog in
-      L.normal (fun m -> m "Stripping all incorrectness specs");
-      let () = Prog.strip_incorrectness_specs e_prog in
       (* Prog.perform_syntax_checks e_prog; *)
       Fmt.pr "Preprocessing...\n@?";
       let prog =

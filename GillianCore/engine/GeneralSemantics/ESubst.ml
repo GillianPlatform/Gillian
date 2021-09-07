@@ -159,6 +159,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param v Target value
   *)
   let add (subst : t) (e : Expr.t) (v : vt) =
+    L.verbose (fun m -> m "Adding to subst: %a" Expr.pp e);
     let () = assert (Expr.is_unifiable e) in
     Hashtbl.add subst e v
 

@@ -146,14 +146,12 @@ rmode:
   | RERR  { WSpec.RError }
 
 fct_with_ux_specs:
-  | lstart = LBRACK; pre = logic_assertion; RBRACK; f = fct; LBRACK;
-    post = logic_assertion; lend = RBRACK; rmode = option(rmode)
-    { let loc = CodeLoc.merge lstart lend in
+  | lstart = LBRACK; pre = logic_assertion; RBRACK; f = fct;
+    LBRACK; posts = separated_list(SEMICOLON, logic_assertion); lend = RBRACK; rmode = option(rmode)
+    {
+      let loc = CodeLoc.merge lstart lend in
       let rmode = match rmode with | None -> WSpec.RNormal | Some rmode -> rmode in
-      WFun.add_spec ~kind:Incorrectness f pre [ post ] rmode loc }
-  | f = fct { f }
-
-single_post: RCBRACE; post = logic_assertion; RCBRACE { post }
+      WFun.add_spec ~kind:Incorrectness f pre posts rmode loc }
 
 fct_with_specs:
   | lstart = LCBRACE; pre = logic_assertion; RCBRACE; f = fct;

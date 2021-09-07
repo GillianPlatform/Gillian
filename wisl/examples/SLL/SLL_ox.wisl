@@ -198,6 +198,7 @@ function SLL_remove(x, k) {
        [x + 1] := z
     }
   };
+  [[ fold list_member([], #k, false) ]];
   return x
 }
 { SLL_ox(ret, #nvs) * list_member(#nvs, #k, false) }
@@ -460,7 +461,7 @@ function SLL_member_iter(x, k) {
     [[ unfold list_member(#gamma, k, #rg) ]];
     [[ apply list_member_append(#beta, k, false, #v) ]]
   };
-  [[ if (found = false) { apply SLLseg_to_SLL(#x); unfold list_member([], #k) } else {
+  [[ if (found = false) { apply SLLseg_to_SLL(#x); unfold list_member([], #k, false) } else {
       assert {bind: #beta, #gamma} SLLseg_ox(#x, next, #beta) * SLL_ox(next, #gamma);
       apply list_member_concat(#beta, #gamma, #k);
       apply SLLseg_concat_SLL(#x, next)

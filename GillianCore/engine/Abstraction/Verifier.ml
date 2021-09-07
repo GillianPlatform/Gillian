@@ -28,6 +28,7 @@ struct
     id : int;
     params : string list;
     pre_state : SPState.t;
+    posts : Asrt.t list;
     post_up : UP.t;
     flag : Flag.t option;
     spec_vars : Expr.Set.t;
@@ -112,6 +113,14 @@ struct
       if not to_verify then
         let pre' = Asrt.star (SPState.to_assertions ss_pre) in
         (None, Some (pre', posts))
+      else if !Config.current_exec_mode = UnderApprox && List.length posts > 1
+      then
+        let _ =
+          L.normal (fun m ->
+              m "Unsupported: multi-posts in under-approximating verification")
+        in
+        let pre' = Asrt.star (SPState.to_assertions ss_pre) in
+        (None, Some (pre', posts))
       else
         (* Step 4 - create a unification plan for the postconditions and s_test *)
         let () =
@@ -163,7 +172,16 @@ struct
             (None, None)
         | Ok post_up ->
             let test =
-              { name; id; params; pre_state = ss_pre; post_up; flag; spec_vars }
+              {
+                name;
+                id;
+                params;
+                pre_state = ss_pre;
+                posts;
+                post_up;
+                flag;
+                spec_vars;
+              }
             in
             let pre' = Asrt.star (SPState.to_assertions ss_pre) in
             (Some test, Some (pre', posts))
@@ -311,40 +329,164 @@ struct
            (Failure
               (Printf.sprintf "Could not testify lemma %s" lemma.lemma_name)) *)
 
-  let analyse_result (subst : SSubst.t) (test : t) (state : SPState.t) : bool =
+  let analyse_result
+      preds pred_ins (subst : SSubst.t) (test : t) (state : SPState.t) : bool =
     (* TODO: ASSUMING SIMPLIFICATION DOES NOT BRANCH HERE *)
     let _, states = SPState.simplify state in
     assert (List.length states = 1);
     let state = List.hd states in
 
-    let subst = SSubst.copy subst in
+    match !Config.current_exec_mode with
+    (* OVER-APPROXIMATING VERIFICATION *)
+    | Verification -> (
+        let subst = SSubst.copy subst in
 
-    (* Adding spec vars in the post to the subst - these are effectively the existentials of the post *)
-    List.iter
-      (fun x ->
-        if not (SSubst.mem subst (LVar x)) then
-          SSubst.add subst (LVar x) (LVar x))
-      (SS.elements (SPState.get_spec_vars state));
+        (* Adding spec vars in the post to the subst - these are effectively the existentials of the post *)
+        List.iter
+          (fun x ->
+            if not (SSubst.mem subst (LVar x)) then
+              SSubst.add subst (LVar x) (LVar x))
+          (SS.elements (SPState.get_spec_vars state));
 
-    (* TODO: Understand if this should be done: setup all program variables in the subst *)
-    SStore.iter (SPState.get_store state) (fun v value ->
-        if not (SSubst.mem subst (PVar v)) then SSubst.put subst (PVar v) value);
+        (* TODO: Understand if this should be done: setup all program variables in the subst *)
+        SStore.iter (SPState.get_store state) (fun v value ->
+            if not (SSubst.mem subst (PVar v)) then
+              SSubst.put subst (PVar v) value);
 
-    (* Option.may (fun v_ret -> SSubst.put subst Names.return_variable v_ret)
-       (SStore.get (SState.get_store state) Names.return_variable); *)
-    L.verbose (fun m ->
-        m "Analyse result: About to unify one postcondition of %s. post: %a"
-          test.name UP.pp test.post_up);
-    match SPState.unify state subst test.post_up with
-    | true  ->
+        (* Option.may (fun v_ret -> SSubst.put subst Names.return_variable v_ret)
+           (SStore.get (SState.get_store state) Names.return_variable); *)
         L.verbose (fun m ->
-            m "Analyse result: Postcondition unified successfully");
-        VerificationResults.set_result global_results test.name test.id true;
-        true
-    | false ->
-        L.normal (fun m -> m "Analyse result: Postcondition not unifiable.");
-        VerificationResults.set_result global_results test.name test.id false;
-        false
+            m "Analyse result: About to unify one postcondition of %s. post: %a"
+              test.name UP.pp test.post_up);
+        match SPState.unify state subst test.post_up with
+        | true  ->
+            L.verbose (fun m ->
+                m "Analyse result: Postcondition unified successfully");
+            VerificationResults.set_result global_results test.name test.id true;
+            true
+        | false ->
+            L.normal (fun m -> m "Analyse result: Postcondition not unifiable.");
+            VerificationResults.set_result global_results test.name test.id
+              false;
+            false)
+    (* UNDER-APPROXIMATING VERIFICATION *)
+    | UnderApprox -> (
+        let subst = SSubst.copy subst in
+
+        (* Get the post-condition, which must be a single post-condition *)
+        let post = List.hd test.posts in
+        (* Get the program variables of the post-condition *)
+        let pvars_post = Asrt.pvars post in
+        (* All program variables of the post must be in the current store *)
+        let store = SPState.get_store state in
+        match SS.subset pvars_post (SStore.vars store) with
+        (* Otherwise, the current state is not applicable *)
+        | false ->
+            L.verbose (fun m ->
+                m "Program variables of the post-condition not in store.");
+            false
+        | true -> (
+            (* Filter store and subst to keep only these program variables *)
+            let _ =
+              SStore.filter store (fun x v ->
+                  if SS.mem x pvars_post then Some v else None)
+            in
+            let _ =
+              SSubst.filter_in_place subst (fun x v ->
+                  match x with
+                  | PVar x -> if SS.mem x pvars_post then Some v else None
+                  | _      -> Some v)
+            in
+
+            L.verbose (fun m ->
+                m "UNDER-APPROX DETAILS:\n---------------------\n");
+            L.verbose (fun m -> m "Post substitution:\n%a\n" SSubst.pp subst);
+
+            let state_as_asrt = Asrt.star (SPState.to_assertions state) in
+            L.verbose (fun m ->
+                m "Assertion from final symbolic state:\n%a\n" Asrt.pp
+                  state_as_asrt);
+
+            let () =
+              L.verbose (fun fmt ->
+                  fmt "Creating UPs for current symbolic state")
+            in
+            let pvar_params =
+              List.fold_left
+                (fun acc x -> Expr.Set.add (Expr.PVar x) acc)
+                Expr.Set.empty (SS.elements pvars_post)
+            in
+            let known_unifiables =
+              Expr.Set.add (PVar Names.return_variable)
+                (Expr.Set.union pvar_params test.spec_vars)
+            in
+            let state_up =
+              UP.init known_unifiables Expr.Set.empty pred_ins
+                [ (state_as_asrt, (None, None)) ]
+            in
+            match state_up with
+            | Error _     ->
+                L.verbose (fun m ->
+                    m "Cannot create UP for the current symbolic state.");
+                false
+            | Ok state_up -> (
+                let post_state =
+                  Normaliser.normalise_assertion ~pred_defs:preds
+                    ~pvars:pvars_post post
+                in
+                match post_state with
+                | Error _                ->
+                    L.verbose (fun m -> m "Cannot normalise post-condition.");
+                    false
+                | Ok [ (post_state, _) ] -> (
+                    let post_store = SPState.get_store post_state in
+                    let store_subst = SSubst.init [] in
+                    SS.iter
+                      (fun x ->
+                        let psv = SStore.get_unsafe post_store x in
+                        match psv with
+                        | LVar lx when not (Names.is_spec_var_name lx) ->
+                            SSubst.add store_subst psv
+                              (Option.get (SSubst.get subst (PVar x)))
+                        | _ -> ())
+                      pvars_post;
+                    L.verbose (fun m ->
+                        m "Program variable subst after normalisation:\n%a"
+                          SSubst.pp store_subst);
+                    let post_state =
+                      List.hd
+                        (SPState.substitution_in_place store_subst post_state)
+                    in
+                    L.verbose (fun m ->
+                        m
+                          "Analyse result: About to unify one postcondition of \
+                           %s in under-approximation. post: %a"
+                          test.name UP.pp test.post_up);
+                    match SPState.unify post_state subst state_up with
+                    | true  ->
+                        L.verbose (fun m ->
+                            m
+                              "Analyse result: Postcondition unified \
+                               successfully");
+                        VerificationResults.set_result global_results test.name
+                          test.id true;
+                        true
+                    | false ->
+                        L.normal (fun m ->
+                            m "Analyse result: Postcondition not unifiable.");
+                        VerificationResults.set_result global_results test.name
+                          test.id false;
+                        false)
+                | _                      ->
+                    L.verbose (fun m ->
+                        m
+                          "Unsupported: more than one state resulting from \
+                           normalisation.");
+                    false)))
+    | _ ->
+        failwith
+          "Impossible: execution mode not under- or over-approximating \
+           verification."
 
   let make_post_subst (test : t) (post_state : SPState.t) : SSubst.t =
     let subst_lst =
@@ -358,7 +500,12 @@ struct
     subst
 
   let analyse_proc_results
-      (test : t) (flag : Flag.t) (rets : SAInterpreter.result_t list) : bool =
+      preds
+      pred_ins
+      (test : t)
+      (flag : Flag.t)
+      (rets : SAInterpreter.result_t list) : bool =
+    let success_count = ref 0 in
     let success : bool =
       rets <> []
       && List.fold_left
@@ -378,12 +525,13 @@ struct
                false)
              else
                let subst = make_post_subst test state in
-               if analyse_result subst test state then (
+               if analyse_result preds pred_ins subst test state then (
                  L.normal (fun m ->
                      m
                        "VERIFICATION SUCCESS: Spec %s %d terminated successfully\n"
                        test.name test.id);
                  Fmt.pr "s @?";
+                 success_count := !success_count + 1;
                  ac)
                else (
                  L.normal (fun m ->
@@ -400,16 +548,21 @@ struct
         normal (fun m ->
             m "ERROR: Function %s evaluates to 0 results." test.name));
       exit 1);
+    let success =
+      if !Config.current_exec_mode = UnderApprox then !success_count = 1
+      else success
+    in
     print_success_or_failure success;
     success
 
-  let analyse_lemma_results (test : t) (rets : SPState.t list) : bool =
+  let analyse_lemma_results preds pred_ins (test : t) (rets : SPState.t list) :
+      bool =
     let success : bool =
       rets <> []
       && List.fold_left
            (fun ac final_state ->
              let subst = make_post_subst test final_state in
-             if analyse_result subst test final_state then (
+             if analyse_result preds pred_ins subst test final_state then (
                L.normal (fun m ->
                    m
                      "VERIFICATION SUCCESS: Spec %s %d terminated successfully\n"
@@ -432,7 +585,7 @@ struct
     print_success_or_failure success;
     success
 
-  let verify (prog : UP.prog) (test : t) : bool =
+  let verify preds pred_ins (prog : UP.prog) (test : t) : bool =
     let state = test.pre_state in
 
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
@@ -452,7 +605,7 @@ struct
         L.verbose (fun m ->
             m "Verification: Concluded evaluation: %d obtained results.%a@\n"
               (List.length rets) SAInterpreter.pp_result rets);
-        analyse_proc_results test flag rets
+        analyse_proc_results preds pred_ins test flag rets
     | None      -> (
         let lemma = Prog.get_lemma_exn prog.prog test.name in
         match lemma.lemma_proof with
@@ -466,7 +619,7 @@ struct
             L.tmi (fun fmt -> fmt "%s" msg);
             Fmt.pr "%s@?" msg;
             let rets = SAInterpreter.evaluate_lcmds prog proof state in
-            analyse_lemma_results test rets)
+            analyse_lemma_results preds pred_ins test rets)
 
   let pred_extracting_visitor =
     object
@@ -659,7 +812,8 @@ struct
             Fmt.pr "Running symbolic tests: %f\n@?" (cur_time -. !start_time);
             let success : bool =
               List.fold_left
-                (fun ac test -> if verify prog' test then ac else false)
+                (fun ac test ->
+                  if verify preds pred_ins prog' test then ac else false)
                 true (tests' @ tests)
             in
             let end_time = Sys.time () in
