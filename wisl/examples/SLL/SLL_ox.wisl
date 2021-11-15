@@ -475,9 +475,9 @@ function SLL_member_iter(x, k) {
 function SLL_free_iter(x) {
   [[ invariant {bind: x, #rvs} SLL_ox(x, #rvs) ]];
   while (not (x = null)) {
-    t := [x + 1];
-    free(x);
-    x := t
+    y := x;
+    x := [x + 1];
+    free(y)
   };
   return null
 }

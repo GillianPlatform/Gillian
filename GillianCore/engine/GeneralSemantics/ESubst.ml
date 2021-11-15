@@ -109,7 +109,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     let subst = Hashtbl.create Config.big_tbl_size in
     List.iter
       (fun (e, e_val) ->
-        let () = assert (Expr.is_unifiable e) in
+        (* let () = assert (Expr.is_unifiable e) in *)
         Hashtbl.replace subst e e_val)
       exprs_les;
     subst
@@ -160,7 +160,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   *)
   let add (subst : t) (e : Expr.t) (v : vt) =
     L.verbose (fun m -> m "Adding to subst: %a" Expr.pp e);
-    let () = assert (Expr.is_unifiable e) in
+    (* let () = assert (Expr.is_unifiable e) in *)
     Hashtbl.add subst e v
 
   (**
@@ -171,7 +171,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param v Target value
   *)
   let put (subst : t) (e : Expr.t) (v : vt) =
-    let () = assert (Expr.is_unifiable e) in
+    (* let () = assert (Expr.is_unifiable e) in *)
     Hashtbl.replace subst e v
 
   (**

@@ -33,6 +33,7 @@ rule read =
   | "skip"   { SKIP (curr lexbuf) }
   | "new"    { NEW (curr lexbuf) }
   | "free"   { DELETE (curr lexbuf) }
+  | "dispose"{ DELETE (curr lexbuf) }
   | "throw"  { THROW (curr lexbuf) }
   | "error"  { RERR (curr lexbuf) }
   | "function" { FUNCTION (curr lexbuf) }
