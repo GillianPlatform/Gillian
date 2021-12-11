@@ -1,0 +1,42 @@
+name: Build and test the esy package
+
+on:
+  - pull_request
+  - push
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
+          - windows-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Use Node.js 14.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - name: Install esy
+        run: npm install -g @esy-nightly/esy verdaccio
+
+      - name: Run end-to-end tests on the package 
+        run: bash ./.ci/steps.sh
+        if: runner.os != 'Windows'
+
+      - name: Run end-to-end tests on the package 
+        run: ./.ci/steps.ps1
+        if: runner.os == 'Windows'
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: release
+          path: package.tar.gz

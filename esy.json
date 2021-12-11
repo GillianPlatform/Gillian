@@ -66,6 +66,7 @@
     "@opam/alcotest": "1.0.1",
     "@opam/batteries": "^3.0.0",
     "@opam/cmdliner": "^1.0.4",
+    "@opam/dap": "1.0.6",
     "@opam/dune": "^2.0",
     "@opam/fmt": "^0.8.8",
     "@opam/flow_parser": "giltho/flow#ac42cb1",
@@ -73,6 +74,7 @@
     "@opam/ppx_deriving_yojson": "*",
     "@opam/ppxlib": ">=0.18.0",
     "@opam/printbox": "0.5",
+    "@opam/sqlite3": "5.0.2",
     "@opam/uuidm": "0.9.7",
     "@opam/visitors": ">=2.3",
     "@opam/yojson": "^1.7.0",
@@ -89,5 +91,9 @@
     "@opam/ocaml-lsp-server": "*",
     "@opam/odoc": "*",
     "@opam/ocamlformat": "0.16.0"
+  },
+  "resolutions": {
+    "@opam/conf-sqlite3":
+      "ManasJayanth/esy-sqlite:esy.json#28dfc73a8eda790213a8359ad708231069ed7079"
   }
 }

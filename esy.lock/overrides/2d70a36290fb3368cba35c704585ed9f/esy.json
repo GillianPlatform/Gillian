@@ -1,0 +1,37 @@
+{
+  "name": "esy-sqlite",
+  "version": "3.35.5000",
+  "description": "hello packaged for esy",
+  "source": "https://sqlite.org/2021/sqlite-autoconf-3350500.tar.gz#sha256:f52b72a5c319c3e516ed7a92e123139a6e87af08a2dc43d7757724f6132e6db0",
+  "override": {
+    "buildEnv": {
+      "CPPFLAGS": "-DSQLITE_ENABLE_COLUMN_METADATA=1 -DSQLITE_MAX_VARIABLE_NUMBER=250000 -DSQLITE_ENABLE_RTREE=1 -DSQLITE_ENABLE_FTS3=1 -DSQLITE_ENABLE_FTS3_PARENTHESIS=1 -DSQLITE_ENABLE_JSON1=1"
+    },
+    "build": [
+      [
+        "./configure",
+        "#{os == 'windows' ? '--host x86_64-w64-mingw32': ''}",
+        "--prefix=#{self.install}",
+        "--disable-dependency-tracking",
+        "--enable-dynamic-extensions",
+        "--enable-readline",
+        "--disable-editline",
+        "--enable-session"
+      ],
+      ["make"]
+    ],
+    "install": "make install",
+    "buildsInSource": true,
+    "exportedEnv": {
+      "PKG_CONFIG_PATH": {
+        "val": "#{self.lib / 'pkgconfig'}",
+        "scope": "global"
+      },
+      "LD_LIBRARY_PATH": {
+        "val": "#{self.lib : $LD_LIBRARY_PATH}",
+        "scope": "global"
+      }
+    },
+    "dependencies": {}
+  }
+}
