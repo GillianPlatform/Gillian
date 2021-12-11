@@ -140,7 +140,7 @@ rule read =
   | newline    { next_line lexbuf; read lexbuf }
   | white      { read lexbuf }
   | eof        { EOF }
-  | _          { UNKOWN }
+  | _          { read lexbuf }
 
 
 and read_comment =
