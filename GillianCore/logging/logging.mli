@@ -102,15 +102,13 @@ val with_verbose_phase :
 val with_tmi_phase :
   ?title:string -> ?severity:Report.severity -> (unit -> 'a) -> 'a
 
-module Make : functor
-  (TargetLang : sig
-     type t
+module Make (TargetLang : sig
+  type t
 
-     val file_reporter : t FileReporter.t option
+  val file_reporter : t FileReporter.t option
 
-     val database_reporter : t DatabaseReporter.t option
-   end)
-  -> sig
+  val database_reporter : t DatabaseReporter.t option
+end) : sig
   val normal :
     ?title:string -> ?severity:Report.severity -> TargetLang.t -> unit
 
