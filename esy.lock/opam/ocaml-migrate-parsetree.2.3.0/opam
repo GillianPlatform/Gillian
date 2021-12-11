@@ -14,7 +14,7 @@ build: ["dune" "build" "-p" name "-j" jobs]
 run-test: ["dune" "runtest" "-p" name "-j" jobs]
 depends: [
   "dune" {>= "2.3"}
-  "ocaml" {>= "4.02.3" & < "4.14"}
+  "ocaml" {>= "4.02.3" & < "4.15"}
   "cinaps" {with-test & >= "v0.13.0"}
 ]
 conflicts: [
@@ -30,10 +30,10 @@ rewriters independent of a compiler version.
 """
 url {
   src:
-    "https://github.com/ocaml-ppx/ocaml-migrate-parsetree/releases/download/v2.2.0/ocaml-migrate-parsetree-v2.2.0.tbz"
+    "https://github.com/ocaml-ppx/ocaml-migrate-parsetree/releases/download/v2.3.0/ocaml-migrate-parsetree-2.3.0.tbz"
   checksum: [
-    "sha256=b2a68f3d3899cec3a50a99b05738295cc8a18672680406d0f68fbc95c01f1ba1"
-    "sha512=d1a6e2a639f77d297690f9ed79318b7a403444585b062d2add9f370320f735ba54bca191a34401f15c576c7ee55b5ed232f20d9599aa67821c747d7e684fc5a7"
+    "sha256=108126b247f190e04c8afd3d72ced0b63ffdf73c3f801f09be5db0cd7280bf0a"
+    "sha512=cccd766d33e2c70015735e050c2b7cdacf9f046e2874b563ef64b77706f56d004aa9b9df7d5cc201e5f3ba6e3267f95f654e1e3de58891b91f9c28a61988a9ee"
   ]
 }
-x-commit-hash: "aeeb9317936937d360aa6cdb0cab953d11ff2c5d"
+x-commit-hash: "7ef6ff49bfd7d6d816be61d3acea460af25d7d99"

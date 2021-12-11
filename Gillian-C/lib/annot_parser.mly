@@ -34,7 +34,6 @@
 %token BIGOR
 %token EOF
 
-%token UNKOWN (* Ignored if not in an annotation *)
 %token ANNOT_OPEN
 %token ANNOT_CLOSE
 
@@ -497,7 +496,6 @@ any_C_token:
   | LEN
   | FOLD
   | BIND
-  | UNKOWN
   | IF
   | ELSE
   | ANNOT_CLOSE (* I can close a comment *)

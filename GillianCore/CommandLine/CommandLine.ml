@@ -536,11 +536,6 @@ struct
         procs_to_verify
         lemmas_to_verify
         () =
-      if incremental then
-        failwith
-          "Incremental not working. Because normalization can yield several \
-           results, several verification tests can have the same id. This \
-           should be fixed first.";
       let () = Fmt_tty.setup_std_outputs () in
       let () = Config.stats := stats in
       let () = Config.lemma_proof := not no_lemma_proof in

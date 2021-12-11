@@ -20,11 +20,11 @@ depends: [
   "cppo" {build & >= "1.1.0"}
   "dune" {>= "1.8.0"}
   "dune-configurator"
-  "mmap" {>= "1.1.0"} # mmap is needed as long as Lwt supports OCaml < 4.06.0.
-  "ocaml" {>= "4.02.0"}
+  "mmap" {>= "1.1.0" & "os" != "win32"} # mmap is needed as long as Lwt supports OCaml < 4.06.0.
+  "ocaml" {>= "4.02.0" & "os" != "win32 " | >= "4.06.0"}
   ("ocaml" {>= "4.08.0"} | "ocaml-syntax-shims")
   "ocplib-endian"
-  "result" # result is needed as long as Lwt supports OCaml 4.02.
+  "result" {os != "win32"} # result is needed as long as Lwt supports OCaml 4.02.
   "seq" # seq is needed as long as Lwt supports OCaml < 4.07.0.
 
   # Until https://github.com/aantron/bisect_ppx/pull/327.
@@ -57,9 +57,9 @@ Meanwhile, OCaml code, including code creating and waiting on promises, runs in
 a single thread by default. This reduces the need for locks or other
 synchronization primitives. Code can be run in parallel on an opt-in basis."
 url {
-  src: "https://github.com/ocsigen/lwt/archive/refs/tags/5.4.2.tar.gz"
+  src: "https://github.com/ocsigen/lwt/archive/refs/tags/5.5.0.tar.gz"
   checksum: [
-    "md5=ba3659a8918d8e7cb0f4ef9a83945f90"
-    "sha512=9f46fb2e56dc7bd57a12d5ab4dc68719947a1462f336087a95e991d087bb9b5b8dee2592d0f7d35abc507d9a641dd221c44c949c81d00e26c673a067d94ba3f4"
+    "md5=94272fac89c5bf21a89c102b8a8f35a5"
+    "sha512=8951b94555e930634375816d71815b9d85daad6ffb7dab24864661504d11be26575ab0b237196c54693efa372a9b69cdc1d5068a20a250dc0bbb4a3c03c5fda1"
   ]
 }
