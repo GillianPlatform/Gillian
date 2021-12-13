@@ -1,5 +1,3 @@
-open Containers
-
 module Location : sig
   type position = { pos_line : int; pos_column : int }
 
@@ -35,6 +33,7 @@ module Constant : sig
     | Pi  (** The number pi *)
     | UTCTime  (** Current UTC time *)
     | LocalTime  (** Current local time *)
+  [@@deriving yojson]
 
   (** Printer *)
   val str : t -> string
@@ -135,6 +134,7 @@ module UnOp : sig
     | LstRev  (** List reverse *)
     | SetToList  (** From set to list *)
     | StrLen  (** String length *)
+  [@@deriving yojson]
 
   (** Printer *)
   val str : t -> string
@@ -181,6 +181,7 @@ module BinOp : sig
     | SetDiff  (** Set difference *)
     | BSetMem  (** Set membership *)
     | BSetSub  (** Subset *)
+  [@@deriving yojson]
 
   (** Printer *)
   val str : t -> string
@@ -192,6 +193,7 @@ module NOp : sig
     | LstCat  (** List concatenation *)
     | SetUnion  (** Set union *)
     | SetInter  (** Set intersection *)
+  [@@deriving yojson]
 
   (** Printer *)
   val str : t -> string

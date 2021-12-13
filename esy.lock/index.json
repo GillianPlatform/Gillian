@@ -1,5 +1,5 @@
 {
-  "checksum": "cee9ca4ea5376441b38da8d12721f2d5",
+  "checksum": "dc05f4a5b4924beb39c6e291aca33e41",
   "root": "gillian-platform@link-dev:./esy.json",
   "node": {
     "yarn-pkg-config@github:esy-ocaml/yarn-pkg-config#db3a0b63883606dd57c54a7158d560d6cba8cd79@d41d8cd9": {
@@ -62,6 +62,7 @@
         "@opam/shexp@opam:v0.14.0@f803f1bd",
         "@opam/odoc@opam:1.5.3@122d8c31",
         "@opam/ocamlformat@opam:0.16.0@b1345cae",
+        "@opam/ocamlfind@opam:1.9.1@b748edf6",
         "@opam/ocaml-lsp-server@opam:1.9.0@671f2077",
         "@opam/fileutils@opam:0.6.3@43d0135c",
         "@opam/cmitomli@opam:1.0.0@faef7c76"

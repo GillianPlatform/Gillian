@@ -1,4 +1,3 @@
-open Containers
 open Names
 
 (** GIL Expressions *)
@@ -184,6 +183,10 @@ end
 
 module MyExpr = struct
   type nonrec t = t
+
+  let of_yojson = of_yojson
+
+  let to_yojson = to_yojson
 
   let compare = Stdlib.compare
 end

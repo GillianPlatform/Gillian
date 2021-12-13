@@ -2,6 +2,6 @@
 
 type t = string [@@deriving yojson]
 
-module Set = Set.Make (String)
+module Set = Containers.SS
 
 let str t = t

@@ -1,5 +1,3 @@
-open Containers
-
 type t = TypeDef__.pred = {
   pred_name : string;  (** Name of the predicate  *)
   pred_source_path : string option;

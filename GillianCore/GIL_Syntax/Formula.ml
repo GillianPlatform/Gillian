@@ -1,5 +1,3 @@
-open Containers
-
 type t = TypeDef__.formula =
   | True  (** Logical true *)
   | False  (** Logical false *)
