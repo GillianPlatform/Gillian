@@ -1,5 +1,3 @@
-open Containers
-
 (** {b GIL logic assertions}. *)
 type t = TypeDef__.assertion =
   | Emp  (** Empty heap             *)

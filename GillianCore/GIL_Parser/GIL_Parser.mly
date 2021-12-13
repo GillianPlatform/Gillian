@@ -1,5 +1,4 @@
 %{
-open Containers
 open Parser_state
 
 let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"

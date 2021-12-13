@@ -1,5 +1,3 @@
-open Containers
-
 module Location : sig
   type position = { pos_line : int; pos_column : int }
 

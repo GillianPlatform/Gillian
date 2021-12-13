@@ -5,7 +5,7 @@ let register_resetter f = resetters := f :: !resetters
 let reset_all () = List.iter (fun f -> f ()) !resetters
 
 module type S = sig
-  type t
+  type t [@@deriving yojson]
 
   val alloc : unit -> t
 
@@ -27,7 +27,7 @@ end
 module Basic () = struct
   open Containers
 
-  type t = int
+  type t = int [@@deriving yojson]
 
   let counter = ref 0
 
@@ -57,7 +57,7 @@ module Make_with_prefix
     (A : S_with_stringify) (P : sig
       val prefix : string
     end) : S with type t = string = struct
-  type t = string
+  type t = string [@@deriving yojson]
 
   let construct x = P.prefix ^ A.to_string x
 
