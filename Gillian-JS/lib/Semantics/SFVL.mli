@@ -6,7 +6,7 @@ type field_name = Gillian.Gil_syntax.Expr.t
 
 type field_value = Gillian.Gil_syntax.Expr.t
 
-type t = field_value Gillian.Gil_syntax.Expr.YojsonableMap.t [@@deriving yojson]
+type t = field_value Gillian.Gil_syntax.Expr.Map.t [@@deriving yojson]
 
 val add : field_name -> field_value -> t -> t
 

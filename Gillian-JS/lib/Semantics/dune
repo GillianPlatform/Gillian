@@ -3,4 +3,4 @@
  (libraries gillian jsil_syntax javert_utils js2jsil_lib str)
  (preprocess
   (pps ppx_deriving_yojson))
- (flags :standard -open Utils -open Gillian.Utils))
+ (flags :standard -open Utils -open Gillian.Utils -open Utils.Prelude))

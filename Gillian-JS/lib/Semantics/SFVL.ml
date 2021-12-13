@@ -12,12 +12,12 @@ type field_name = Expr.t
 type field_value = Expr.t [@@deriving yojson]
 
 (* Definition *)
-type t = field_value Expr.YojsonableMap.t [@@deriving yojson]
+type t = field_value Expr.Map.t [@@deriving yojson]
 
 (* Printing *)
 let pp ft sfvl =
   let open Fmt in
-  (iter_bindings ~sep:comma Expr.YojsonableMap.iter
+  (iter_bindings ~sep:comma Expr.Map.iter
      (hbox (parens (pair ~sep:(any " :") Expr.pp Expr.pp))))
     ft sfvl
 
@@ -28,30 +28,29 @@ let pp ft sfvl =
 
 (* Map functions to be reused *)
 
-let add fn fv = Expr.YojsonableMap.add fn fv
+let add fn fv = Expr.Map.add fn fv
 
-let empty = Expr.YojsonableMap.empty
+let empty = Expr.Map.empty
 
 let field_names sfvl =
-  let result, _ = List.split (Expr.YojsonableMap.bindings sfvl) in
+  let result, _ = List.split (Expr.Map.bindings sfvl) in
   result
 
-let fold f sfvl ac = Expr.YojsonableMap.fold f sfvl ac
+let fold f sfvl ac = Expr.Map.fold f sfvl ac
 
-let get fn sfvl =
-  Option.map (fun fv -> fv) (Expr.YojsonableMap.find_opt fn sfvl)
+let get fn sfvl = Option.map (fun fv -> fv) (Expr.Map.find_opt fn sfvl)
 
 let is_empty sfvl = sfvl = empty
 
-let iter f sfvl = Expr.YojsonableMap.iter f sfvl
+let iter f sfvl = Expr.Map.iter f sfvl
 
-let partition f sfvl = Expr.YojsonableMap.partition f sfvl
+let partition f sfvl = Expr.Map.partition f sfvl
 
-let remove = Expr.YojsonableMap.remove
+let remove = Expr.Map.remove
 
 (* WHAT IS THIS? *)
 let union =
-  Expr.YojsonableMap.union (fun k fvl fvr ->
+  Expr.Map.union (fun k fvl fvr ->
       L.(
         verbose (fun m ->
             m
@@ -67,25 +66,25 @@ let to_list fv_list = fold (fun f v ac -> (f, v) :: ac) fv_list []
 (** Gets a first key-value pair that satisfies a predicate *)
 let get_first (f : field_name -> bool) (sfvl : t) :
     (field_name * field_value) option =
-  Expr.YojsonableMap.find_first_opt f sfvl
+  Expr.Map.find_first_opt f sfvl
 
 (** Returns the logical variables occuring in --sfvl-- *)
 let lvars (sfvl : t) : SS.t =
   let gllv = Expr.lvars in
-  Expr.YojsonableMap.fold
+  Expr.Map.fold
     (fun e_field e_val ac -> SS.union ac (SS.union (gllv e_field) (gllv e_val)))
     sfvl SS.empty
 
 (** Returns the abstract locations occuring in --sfvl-- *)
 let alocs (sfvl : t) : SS.t =
-  Expr.YojsonableMap.fold
+  Expr.Map.fold
     (fun e_field e_val ac ->
       SS.union ac (SS.union (Expr.alocs e_field) (Expr.alocs e_val)))
     sfvl SS.empty
 
 let assertions (loc : Expr.t) (sfvl : t) : Asrt.t list =
   List.rev
-    (Expr.YojsonableMap.fold
+    (Expr.Map.fold
        (fun field value (ac : Asrt.t list) ->
          PointsTo (loc, field, value) :: ac)
        sfvl [])
@@ -93,22 +92,22 @@ let assertions (loc : Expr.t) (sfvl : t) : Asrt.t list =
 (* Substitution *)
 let substitution (subst : SSubst.t) (partial : bool) (fv_list : t) : t =
   let f_subst = SSubst.subst_in_expr subst ~partial in
-  Expr.YojsonableMap.fold
+  Expr.Map.fold
     (fun le_field le_val ac ->
       let sf = f_subst le_field in
       let sv = f_subst le_val in
-      Expr.YojsonableMap.add sf sv ac)
-    fv_list Expr.YojsonableMap.empty
+      Expr.Map.add sf sv ac)
+    fv_list Expr.Map.empty
 
 (* Selective substitution *)
 let selective_substitution (subst : SSubst.t) (partial : bool) (fv_list : t) : t
     =
   let f_subst = SSubst.subst_in_expr subst ~partial in
-  Expr.YojsonableMap.fold
+  Expr.Map.fold
     (fun le_field le_val ac ->
       let sv = f_subst le_val in
-      Expr.YojsonableMap.add le_field sv ac)
-    fv_list Expr.YojsonableMap.empty
+      Expr.Map.add le_field sv ac)
+    fv_list Expr.Map.empty
 
 (* Correctness of field-value lists *)
 let is_well_formed (_ : t) : bool = true

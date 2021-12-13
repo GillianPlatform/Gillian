@@ -31,7 +31,7 @@ let add_properties_vars properties get_new_scope_id (variables : variables) =
     node
   in
   let property_nodes =
-    properties |> Expr.YojsonableMap.to_seq
+    properties |> Expr.Map.to_seq
     |> Seq.map (fun (name, value) ->
            let name = to_str Expr.pp name in
            match value with
@@ -123,7 +123,7 @@ let rec add_loc_vars
   in
   let add_properties_vars properties =
     let property_nodes =
-      properties |> Expr.YojsonableMap.to_seq
+      properties |> Expr.Map.to_seq
       |> Seq.map (fun (name, value) ->
              let name = to_str Expr.pp name in
              let field_names =

@@ -7,4 +7,5 @@
    logging incrementalAnalysis)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson))
- (flags :standard -open Utils -open Gil_syntax -open IncrementalAnalysis))
+ (flags :standard -open Utils -open Gil_syntax -open Utils.Prelude -open
+   IncrementalAnalysis))

@@ -1,5 +1,4 @@
 open SVal
-open Containers
 module L = Logging
 
 (** ****************

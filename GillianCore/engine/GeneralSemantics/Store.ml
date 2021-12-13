@@ -78,10 +78,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   type vt = Val.t [@@deriving yojson]
 
   (** Actual type of GIL Stores *)
-  type t = {
-    conc : (Var.t, vt) YojsonableHashtbl.t;
-    symb : (Var.t, vt) YojsonableHashtbl.t;
-  }
+  type t = { conc : (Var.t, vt) Hashtbl.t; symb : (Var.t, vt) Hashtbl.t }
   [@@deriving yojson]
 
   (**

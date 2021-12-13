@@ -1,11 +1,10 @@
 (** GIL Typing Environment *)
 
-open Containers
 open Names
 open SVal
 module L = Logging
 
-type t = (string, Type.t) YojsonableHashtbl.t [@@deriving yojson]
+type t = (string, Type.t) Hashtbl.t [@@deriving yojson]
 
 (*************************************)
 (** Typing Environment Functions    **)

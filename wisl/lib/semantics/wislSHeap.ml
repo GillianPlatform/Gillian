@@ -1,7 +1,6 @@
 (***** This module defines a Wisl Symbolic Heap *******)
 open Gillian.Symbolic
 open Gillian.Gil_syntax
-open Gillian.Utils
 module Solver = Gillian.Logic.FOSolver
 module Reduction = Gillian.Logic.Reduction
 
@@ -57,7 +56,7 @@ module Block = struct
           data
 end
 
-type t = (string, Block.t) YojsonableHashtbl.t [@@deriving yojson]
+type t = (string, Block.t) Hashtbl.t [@@deriving yojson]
 
 (* A symbolic heap is a map from location and offset to symbolic values *)
 

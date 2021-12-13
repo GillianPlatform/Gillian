@@ -28,13 +28,12 @@ module Make (SMemory : SMemory.S) :
 
   type m_err_t = SMemory.err_t [@@deriving yojson]
 
-  type t = heap_t * store_t * PFS.t * TypEnv.t * YojsonableSS.t
-  [@@deriving yojson]
+  type t = heap_t * store_t * PFS.t * TypEnv.t * SS.t [@@deriving yojson]
 
   type fix_t =
     | MFix   of SMemory.c_fix_t
     | FPure  of Formula.t
-    | FSVars of YojsonableSS.t
+    | FSVars of SS.t
     | FAsrt  of Asrt.t
 
   type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson]
@@ -67,68 +66,64 @@ module Make (SMemory : SMemory.S) :
        @\n\
        @[<v 2>TYPING ENVIRONMENT:@\n\
        %a@]"
-      (Fmt.iter ~sep:Fmt.comma YojsonableSS.iter Fmt.string)
+      (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
       svars SStore.pp store pp_heap heap PFS.pp pfs TypEnv.pp gamma
 
   let pp_by_need pvars cmd_lvars cmd_locs fmt state =
     let memory, store, pfs, gamma, svars = state in
 
-    let rec get_print_info (lvars : YojsonableSS.t) (locs : YojsonableSS.t) :
-        YojsonableSS.t * YojsonableSS.t =
+    let rec get_print_info (lvars : SS.t) (locs : SS.t) : SS.t * SS.t =
       (* let pp_str_list = Fmt.(brackets (list ~sep:comma string)) in
          let () =
            L.verbose (fun fmt ->
                fmt "get_print_info:@\nLVars: %a@\nLocs:%a\n" pp_str_list
-                 (YojsonableSS.elements lvars) pp_str_list (YojsonableSS.elements locs))
+                 (SS.elements lvars) pp_str_list (SS.elements locs))
          in *)
       (* Get locs from lvars... *)
       let pfs_locs =
-        YojsonableSS.fold
+        SS.fold
           (fun x ac ->
             match Reduction.resolve_expr_to_location pfs gamma (LVar x) with
-            | Some loc -> YojsonableSS.add loc ac
+            | Some loc -> SS.add loc ac
             | None     -> ac)
-          lvars YojsonableSS.empty
+          lvars SS.empty
       in
       (* ...and add them to the current locs *)
-      let new_locs = YojsonableSS.union locs pfs_locs in
+      let new_locs = SS.union locs pfs_locs in
       (* Get relevant lvars and locs from the memory... *)
       let mem_lvars, mem_locs = SMemory.get_print_info new_locs memory in
       (* ...and add them accordingly *)
-      let new_lvars = YojsonableSS.union lvars mem_lvars in
-      let new_locs = YojsonableSS.union new_locs mem_locs in
+      let new_lvars = SS.union lvars mem_lvars in
+      let new_locs = SS.union new_locs mem_locs in
       (* Learn more from the pfs... *)
       let _, more_lvars, more_locs =
         PFS.get_relevant_info pvars new_lvars new_locs pfs
       in
       (* ...and add that accordingly *)
-      let new_lvars = YojsonableSS.union new_lvars more_lvars in
-      let new_locs = YojsonableSS.union new_locs more_locs in
+      let new_lvars = SS.union new_lvars more_lvars in
+      let new_locs = SS.union new_locs more_locs in
       (* If nothing has been learned, stop; otherwise, retry *)
-      if YojsonableSS.equal lvars new_lvars && YojsonableSS.equal locs new_locs
-      then (lvars, locs)
+      if SS.equal lvars new_lvars && SS.equal locs new_locs then (lvars, locs)
       else get_print_info new_lvars new_locs
     in
 
     (* Logical variables and locations from the store *)
     let store_lvars, store_locs =
-      YojsonableSS.fold
+      SS.fold
         (fun pvar ac ->
           match SStore.get store pvar with
           | None   -> ac
           | Some e ->
-              ( YojsonableSS.union (fst ac) (Expr.lvars e),
-                YojsonableSS.union (snd ac) (Expr.locs e) ))
-        pvars
-        (YojsonableSS.empty, YojsonableSS.empty)
+              (SS.union (fst ac) (Expr.lvars e), SS.union (snd ac) (Expr.locs e)))
+        pvars (SS.empty, SS.empty)
     in
     (* LVars: commands + store *)
-    let lvars = YojsonableSS.union cmd_lvars store_lvars in
-    let locs = YojsonableSS.union cmd_locs store_locs in
+    let lvars = SS.union cmd_lvars store_lvars in
+    let locs = SS.union cmd_locs store_locs in
     (* Locations found in the pfs *)
     let lvars, locs = get_print_info lvars locs in
     (* Filter spec vars *)
-    let svars = YojsonableSS.filter (fun x -> YojsonableSS.mem x lvars) svars in
+    let svars = SS.filter (fun x -> SS.mem x lvars) svars in
 
     (* TODO: Locations for the heap *)
     (* TODO: Logical variables for the pfs and gamma *)
@@ -150,27 +145,22 @@ module Make (SMemory : SMemory.S) :
        @\n\
        @[<v 2>TYPING ENVIRONMENT:@\n\
        %a@]"
-      (Fmt.iter ~sep:Fmt.comma YojsonableSS.iter Fmt.string)
+      (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
       svars (SStore.pp_by_need pvars) store pp_memory memory
       (PFS.pp_by_need (pvars, lvars, locs))
       pfs
-      (TypEnv.pp_by_need
-         (List.fold_left YojsonableSS.union YojsonableSS.empty [ pvars; lvars ]))
+      (TypEnv.pp_by_need (List.fold_left SS.union SS.empty [ pvars; lvars ]))
       gamma
 
   let init (_ : UP.preds_tbl_t option) =
-    ( SMemory.init (),
-      SStore.init [],
-      PFS.init (),
-      TypEnv.init (),
-      YojsonableSS.empty )
+    (SMemory.init (), SStore.init [], PFS.init (), TypEnv.init (), SS.empty)
 
   let struct_init
       (_ : UP.preds_tbl_t option)
       (store : SStore.t)
       (pfs : PFS.t)
       (gamma : TypEnv.t)
-      (svars : YojsonableSS.t) : t =
+      (svars : SS.t) : t =
     (SMemory.init (), store, pfs, gamma, svars)
 
   let execute_action
@@ -327,7 +317,7 @@ module Make (SMemory : SMemory.S) :
 
   let assert_a (state : t) (ps : Formula.t list) : bool =
     let _, _, pfs, gamma, _ = state in
-    FOSolver.check_entailment YojsonableSS.empty pfs ps gamma
+    FOSolver.check_entailment SS.empty pfs ps gamma
 
   let equals (state : t) (le1 : vt) (le2 : vt) : bool =
     let _, _, pfs, gamma, _ = state in
@@ -346,9 +336,7 @@ module Make (SMemory : SMemory.S) :
       ?(unification = false)
       (state : t) : st * t list =
     let heap, store, pfs, gamma, svars = state in
-    let save_spec_vars =
-      if save then (YojsonableSS.empty, true) else (svars, false)
-    in
+    let save_spec_vars = if save then (SS.empty, true) else (svars, false) in
     L.verbose (fun m ->
         m
           "-----------------------------------\n\
@@ -363,7 +351,7 @@ module Make (SMemory : SMemory.S) :
     let subst =
       SSubst.filter subst (fun x _ ->
           match x with
-          | LVar x | PVar x | ALoc x -> not (YojsonableSS.mem x svars)
+          | LVar x | PVar x | ALoc x -> not (SS.mem x svars)
           | _                        -> true)
     in
     SSubst.iter subst (fun k v ->
@@ -456,15 +444,15 @@ module Make (SMemory : SMemory.S) :
 
   let add_spec_vars (state : t) (xs : Var.Set.t) : t =
     let heap, store, pfs, gamma, svars = state in
-    (heap, store, pfs, gamma, YojsonableSS.union xs svars)
+    (heap, store, pfs, gamma, SS.union xs svars)
 
-  let get_spec_vars (state : t) : YojsonableSS.t =
+  let get_spec_vars (state : t) : SS.t =
     let _, _, _, _, svars = state in
     svars
 
   let get_lvars (state : t) : Var.Set.t =
     let heap, store, pfs, gamma, svars = state in
-    List.fold_left YojsonableSS.union YojsonableSS.empty
+    List.fold_left SS.union SS.empty
       [
         SMemory.lvars heap;
         SStore.lvars store;
@@ -473,13 +461,11 @@ module Make (SMemory : SMemory.S) :
         svars;
       ]
 
-  let to_assertions ?(to_keep : YojsonableSS.t option) (state : t) : Asrt.t list
-      =
+  let to_assertions ?(to_keep : SS.t option) (state : t) : Asrt.t list =
     let heap, store, pfs, gamma, _ = state in
     let store' =
       Option.fold
-        ~some:(fun store_dom ->
-          SStore.projection store (YojsonableSS.elements store_dom))
+        ~some:(fun store_dom -> SStore.projection store (SS.elements store_dom))
         ~none:store to_keep
     in
     let asrts_pfs =
@@ -518,25 +504,20 @@ module Make (SMemory : SMemory.S) :
 
   let unfolding_vals (_ : t) (fs : Formula.t list) : vt list =
     let lvars =
-      YojsonableSS.of_list
-        (List.concat
-           (List.map (fun f -> YojsonableSS.elements (Formula.lvars f)) fs))
+      SS.of_list
+        (List.concat (List.map (fun f -> SS.elements (Formula.lvars f)) fs))
     in
     let alocs =
-      YojsonableSS.of_list
-        (List.concat
-           (List.map (fun f -> YojsonableSS.elements (Formula.alocs f)) fs))
+      SS.of_list
+        (List.concat (List.map (fun f -> SS.elements (Formula.alocs f)) fs))
     in
     let clocs =
-      YojsonableSS.of_list
-        (List.concat
-           (List.map (fun f -> YojsonableSS.elements (Formula.clocs f)) fs))
+      SS.of_list
+        (List.concat (List.map (fun f -> SS.elements (Formula.clocs f)) fs))
     in
-    let lvars = List.map (fun x -> Expr.LVar x) (YojsonableSS.elements lvars) in
-    let alocs = List.map (fun x -> Expr.ALoc x) (YojsonableSS.elements alocs) in
-    let clocs =
-      List.map (fun x -> Expr.Lit (Loc x)) (YojsonableSS.elements clocs)
-    in
+    let lvars = List.map (fun x -> Expr.LVar x) (SS.elements lvars) in
+    let alocs = List.map (fun x -> Expr.ALoc x) (SS.elements alocs) in
+    let clocs = List.map (fun x -> Expr.Lit (Loc x)) (SS.elements clocs) in
     clocs @ alocs @ lvars
 
   let substitution_in_place ?(subst_all = false) (subst : st) (state : t) :
@@ -683,7 +664,7 @@ module Make (SMemory : SMemory.S) :
     | FPure f   -> Fmt.pf fmt "SFPure(%a)" Formula.pp f
     | FSVars vs ->
         Fmt.pf fmt "SFSVar(@[<h>%a@])"
-          (Fmt.iter ~sep:Fmt.comma YojsonableSS.iter Fmt.string)
+          (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
           vs
     | FAsrt ga  -> Fmt.pf fmt "SFSVar(@[<h>%a@])" Asrt.pp ga
 
@@ -725,10 +706,9 @@ module Make (SMemory : SMemory.S) :
           | MFix mfix'    -> (mfix' :: mfix, pfs, svars, asrts)
           | FPure pf'     ->
               (mfix, (if pf' = True then pfs else pf' :: pfs), svars, asrts)
-          | FSVars svars' -> (mfix, pfs, YojsonableSS.union svars' svars, asrts)
+          | FSVars svars' -> (mfix, pfs, SS.union svars' svars, asrts)
           | FAsrt ga      -> (mfix, pfs, svars, ga :: asrts))
-        fix
-        ([], [], YojsonableSS.empty, [])
+        fix ([], [], SS.empty, [])
     in
     (* Check SAT for some notion of checking SAT *)
     let mfixes = List.map (fun fix -> MFix fix) fixes in
@@ -738,7 +718,7 @@ module Make (SMemory : SMemory.S) :
     | true  ->
         let pfixes = List.map (fun pfix -> FPure pfix) pfs' in
         Some
-          ((if svars = YojsonableSS.empty then [] else [ FSVars svars ])
+          ((if svars = SS.empty then [] else [ FSVars svars ])
           @ pfixes @ mfixes @ asrts)
     | false ->
         L.verbose (fun m -> m "Warning: invalid fix.");
@@ -761,7 +741,7 @@ module Make (SMemory : SMemory.S) :
                   List.map (fun l -> MFix l) mfixes
                   @ List.map (fun pf -> FPure pf) pfixes
                   @
-                  if svars == YojsonableSS.empty then []
+                  if svars == SS.empty then []
                   else
                     [ FSVars svars ] @ List.map (fun asrt -> FAsrt asrt) asrts)
                 (SMemory.get_fixes ~simple_fix:sf heap pfs gamma err)
@@ -825,8 +805,8 @@ module Make (SMemory : SMemory.S) :
 
     let gas = ref [] in
 
-    let apply_fix (heap : heap_t) (new_vars : YojsonableSS.t) (fix : fix_t) :
-        heap_t * YojsonableSS.t =
+    let apply_fix (heap : heap_t) (new_vars : SS.t) (fix : fix_t) :
+        heap_t * SS.t =
       match fix with
       (* Apply fix in memory - this may change the pfs and gamma *)
       | MFix fix ->
@@ -835,7 +815,7 @@ module Make (SMemory : SMemory.S) :
       | FPure f ->
           PFS.extend pfs f;
           (heap, new_vars)
-      | FSVars vars -> (heap, YojsonableSS.union new_vars vars)
+      | FSVars vars -> (heap, SS.union new_vars vars)
       | FAsrt ga ->
           L.verbose (fun m ->
               m
@@ -846,8 +826,7 @@ module Make (SMemory : SMemory.S) :
     in
 
     let rec apply_fixes_rec
-        (heap : heap_t) (new_vars : YojsonableSS.t) (fixes : fix_t list) :
-        heap_t * YojsonableSS.t =
+        (heap : heap_t) (new_vars : SS.t) (fixes : fix_t list) : heap_t * SS.t =
       match fixes with
       | []          -> (heap, new_vars)
       | fix :: rest ->
@@ -855,8 +834,8 @@ module Make (SMemory : SMemory.S) :
           apply_fixes_rec heap' new_vars' rest
     in
     (* FIXME: this unused heap' variable is suspicious *)
-    let _heap', new_vars = apply_fixes_rec heap YojsonableSS.empty fixes in
-    (Some (heap, store, pfs, gamma, YojsonableSS.union svars new_vars), !gas)
+    let _heap', new_vars = apply_fixes_rec heap SS.empty fixes in
+    (Some (heap, store, pfs, gamma, SS.union svars new_vars), !gas)
 
   let get_equal_values state les =
     let _, _, pfs, _, _ = state in

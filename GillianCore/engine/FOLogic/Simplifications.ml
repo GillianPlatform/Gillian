@@ -1,6 +1,6 @@
-open Containers
 open SVal
 module L = Logging
+module SB = Containers.SB
 
 type simpl_key_type = {
   kill_new_lvars : bool option;
