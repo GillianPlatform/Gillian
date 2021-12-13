@@ -11,7 +11,7 @@ type t = TypeDef__.constant =
   | Pi  (** The number {% \pi %} *)
   | UTCTime  (** Current UTC time *)
   | LocalTime  (** Current local time *)
-  [@@deriving yojson]
+[@@deriving yojson]
 
 (** Print *)
 let str (x : t) =

@@ -15,7 +15,7 @@ type t = TypeDef__.typ =
   | ListType  (** Type of lists          *)
   | TypeType  (** Type of types          *)
   | SetType  (** Type of sets           *)
-  [@@deriving yojson]
+[@@deriving yojson]
 
 (** Print *)
 let str (x : t) =

@@ -4,6 +4,7 @@ type t = {
   origin_id : int;  (** Origin Id, that should be abstracted away *)
   loop_info : string list;
 }
+[@@deriving yojson]
 
 (**/**)
 
