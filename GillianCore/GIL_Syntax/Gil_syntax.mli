@@ -13,7 +13,7 @@ module ALoc : Allocators.S with type t = string
 module Var : sig
   (** GIL Variables *)
 
-  type t = string
+  type t = string [@@deriving yojson]
 
   module Set : module type of Containers.SS
 
@@ -31,6 +31,7 @@ module Constant : sig
     | Pi  (** The number pi *)
     | UTCTime  (** Current UTC time *)
     | LocalTime  (** Current local time *)
+  [@@deriving yojson]
 
   (** Printer *)
   val str : t -> string
@@ -51,6 +52,7 @@ module Type : sig
     | ListType  (** Type of lists *)
     | TypeType  (** Type of types *)
     | SetType  (** Type of sets *)
+  [@@deriving yojson]
 
   (** Printer *)
   val str : t -> string
@@ -74,6 +76,7 @@ module Literal : sig
     | Type      of Type.t  (** GIL types ({!type:Type.t}) *)
     | LList     of t list  (** Lists of GIL literals *)
     | Nono  (** Negative information *)
+  [@@deriving yojson]
 
   (** Pretty-printer *)
   val pp : t Fmt.t
@@ -129,6 +132,7 @@ module UnOp : sig
     | LstRev  (** List reverse *)
     | SetToList  (** From set to list *)
     | StrLen  (** String length *)
+  [@@deriving yojson]
 
   (** Printer *)
   val str : t -> string
@@ -175,6 +179,7 @@ module BinOp : sig
     | SetDiff  (** Set difference *)
     | BSetMem  (** Set membership *)
     | BSetSub  (** Subset *)
+  [@@deriving yojson]
 
   (** Printer *)
   val str : t -> string
@@ -186,6 +191,7 @@ module NOp : sig
     | LstCat  (** List concatenation *)
     | SetUnion  (** Set union *)
     | SetInter  (** Set intersection *)
+  [@@deriving yojson]
 
   (** Printer *)
   val str : t -> string
@@ -204,6 +210,7 @@ module Expr : sig
     | NOp    of NOp.t * t list  (** n-ary operators ({!type:NOp.t}) *)
     | EList  of t list  (** Lists of expressions *)
     | ESet   of t list  (** Sets of expressions *)
+  [@@deriving yojson]
 
   val lit : Literal.t -> t
 
@@ -359,6 +366,7 @@ module Formula : sig
     | SetMem  of Expr.t * Expr.t  (** Set membership *)
     | SetSub  of Expr.t * Expr.t  (** Set subsetness *)
     | ForAll  of (string * Type.t option) list * t  (** Forall *)
+  [@@deriving yojson]
 
   val of_bool : bool -> t
 
@@ -483,6 +491,7 @@ module Asrt : sig
     | Pure  of Formula.t  (** Pure formula *)
     | Types of (Expr.t * Type.t) list  (** Typing assertion *)
     | GA    of string * Expr.t list * Expr.t list  (** Core assertion *)
+  [@@deriving yojson]
 
   (** Comparison of assertions *)
   val compare : t -> t -> int
@@ -883,7 +892,7 @@ end
 
 module Annot : sig
   (** {b GIL annot}. *)
-  type t
+  type t [@@deriving yojson]
 
   (** make an annotation *)
   val make :
