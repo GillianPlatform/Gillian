@@ -1,5 +1,3 @@
-open Containers
-
 (** {b GIL logic assertions}. *)
 type t = TypeDef__.assertion =
   | Emp  (** Empty heap             *)
@@ -8,6 +6,7 @@ type t = TypeDef__.assertion =
   | Pure  of Formula.t  (** Pure formula           *)
   | Types of (Expr.t * Type.t) list  (** Typing assertion       *)
   | GA    of string * Expr.t list * Expr.t list  (** Core assertion         *)
+[@@deriving yojson]
 
 let compare x y =
   let cmp = Stdlib.compare in

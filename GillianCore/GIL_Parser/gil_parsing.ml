@@ -1,6 +1,5 @@
 open Lexing
 module L = Logging
-module SS = Containers.SS
 
 module Preprocess_GCmd = PreProcessing_Utils.M (struct
   type t = int Cmd.t

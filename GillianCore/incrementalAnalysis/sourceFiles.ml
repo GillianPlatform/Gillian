@@ -1,5 +1,3 @@
-open Containers
-
 module SourceFile : sig
   type t = private {
     path : string;

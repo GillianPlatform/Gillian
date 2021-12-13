@@ -4,4 +4,4 @@
  (libraries utils gil_syntax fmt)
  (preprocess
   (pps ppx_deriving_yojson))
- (flags :standard -open Utils -open Gil_syntax))
+ (flags :standard -open Utils -open Utils.Prelude -open Gil_syntax))

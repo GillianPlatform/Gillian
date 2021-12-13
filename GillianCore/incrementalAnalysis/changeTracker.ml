@@ -1,5 +1,3 @@
-open Containers
-
 type proc_changes = {
   changed_procs : string list;
   new_procs : string list;

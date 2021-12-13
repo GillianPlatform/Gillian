@@ -90,7 +90,8 @@
     "@opam/shexp": "v0.14.0",
     "@opam/ocaml-lsp-server": "*",
     "@opam/odoc": "*",
-    "@opam/ocamlformat": "0.16.0"
+    "@opam/ocamlformat": "0.16.0",
+    "@opam/ocamlfind": "*"
   },
   "resolutions": {
     "@opam/conf-sqlite3":

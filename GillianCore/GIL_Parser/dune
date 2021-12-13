@@ -2,7 +2,7 @@
  (name gil_parsing)
  (public_name gillian.gil_parsing)
  (libraries utils gil_syntax str)
- (flags :standard -open Utils -open Gil_syntax))
+ (flags :standard -open Utils -open Utils.Prelude -open Gil_syntax))
 
 (menhir
  (modules GIL_Parser)

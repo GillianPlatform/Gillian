@@ -1,5 +1,3 @@
-open Containers
-
 type t = TypeDef__.formula =
   | True  (** Logical true *)
   | False  (** Logical false *)
@@ -13,6 +11,7 @@ type t = TypeDef__.formula =
   | SetMem  of Expr.t * Expr.t  (** Set membership *)
   | SetSub  of Expr.t * Expr.t  (** Set subsetness *)
   | ForAll  of (string * Type.t option) list * t  (** Forall *)
+[@@deriving yojson]
 
 let compare = Stdlib.compare
 
