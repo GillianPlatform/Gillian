@@ -1,4 +1,4 @@
-type 'a t
+type 'a t [@@deriving yojson]
 
 val make : unit -> 'a t
 

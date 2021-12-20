@@ -4,7 +4,7 @@
 
 type vt = SVal.M.t
 
-type t
+type t [@@deriving yojson]
 
 val copy : t -> t
 

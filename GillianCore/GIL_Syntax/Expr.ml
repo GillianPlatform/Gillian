@@ -158,10 +158,12 @@ module Infix = struct
 
   let ( - ) a b =
     match (a, b) with
-    | x, Lit (Int 0)           -> x
-    | Lit (Num 0.), x          -> UnOp (IUnaryMinus, x)
+    | x, Lit (Int 0) -> x
+    | Lit (Num 0.), x -> UnOp (IUnaryMinus, x)
     | Lit (Int x), Lit (Int y) -> Lit (Int (x - y))
-    | _                        -> BinOp (a, IMinus, b)
+    | BinOp (x, IPlus, y), z when equal y z -> x
+    | BinOp (x, IPlus, y), z when equal x z -> y
+    | _ -> BinOp (a, IMinus, b)
 
   let ( * ) a b =
     match (a, b) with

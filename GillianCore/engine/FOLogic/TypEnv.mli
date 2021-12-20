@@ -4,7 +4,7 @@ open SVal
  * Interface for Typing Environments *
 **************************************)
 
-type t
+type t [@@deriving yojson]
 
 val copy : t -> t
 

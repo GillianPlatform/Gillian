@@ -11,9 +11,11 @@ type err =
   | MemoryLeak
   | OutOfBound
   | InvalidLocation
+[@@deriving yojson]
 
 module Block = struct
   type t = Freed | Allocated of { data : SFVL.t; bound : int option }
+  [@@deriving yojson]
 
   let empty = Allocated { data = SFVL.empty; bound = None }
 
@@ -54,7 +56,7 @@ module Block = struct
           data
 end
 
-type t = (string, Block.t) Hashtbl.t
+type t = (string, Block.t) Hashtbl.t [@@deriving yojson]
 
 (* A symbolic heap is a map from location and offset to symbolic values *)
 

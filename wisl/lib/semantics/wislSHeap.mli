@@ -1,7 +1,7 @@
 open Gillian.Symbolic
 open Gil_syntax
 
-type t
+type t [@@deriving yojson]
 
 type err =
   | MissingRessource
@@ -10,6 +10,7 @@ type err =
   | MemoryLeak
   | OutOfBound
   | InvalidLocation
+[@@deriving yojson]
 
 val init : unit -> t
 

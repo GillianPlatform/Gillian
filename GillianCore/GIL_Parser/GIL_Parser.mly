@@ -507,22 +507,41 @@ gproc_target:
 
 gcmd_list_target:
   gcmd_list = separated_nonempty_list(SCOLON, gcmd_with_label)
-    {
-      List.map
-        (fun (lab, gcmd) ->
-          let annot : Annot.t = Annot.make () in
-          annot, lab, gcmd)
-    gcmd_list
-  }
+    { gcmd_list }
 ;
 
 gcmd_with_label:
-  | cmd = gcmd_target
-    { None, cmd }
-  | lab = VAR; COLON; cmd = gcmd_target
-  { Some lab, cmd }
+  | cmd = gcmd_with_annot
+    { let annot, cmd = cmd in annot, None, cmd }
+  | lab = VAR; COLON; cmd = gcmd_with_annot
+    { let annot, cmd = cmd in  annot, Some lab, cmd }
 ;
 
+gcmd_with_annot:
+  | cmd = gcmd_target
+    {
+      let loc_start : Location.position =
+        {
+          pos_line = $startpos.pos_lnum;
+          pos_column = $startpos.pos_cnum - $startpos.pos_bol;
+        }
+      in
+      let loc_end : Location.position =
+        {
+          pos_line = $endpos.pos_lnum;
+          pos_column = $endpos.pos_cnum - $endpos.pos_bol;
+        }
+      in
+      let origin_loc : Location.t =
+        {
+          loc_start;
+          loc_end;
+          loc_source = $startpos.pos_fname;
+        }
+      in
+      let annot : Annot.t = Annot.make ~origin_loc ()
+      in annot, cmd
+    };
 (*** GIL commands ***)
 gcmd_target:
 (* skip *)

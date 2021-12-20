@@ -34,10 +34,20 @@ let add = append
 
 let length t = t.length
 
+(* ?map:('a -> 'b) -> 'a t -> 'b list*)
+
 let to_list t =
   let rec aux = function
     | Nil                     -> []
     | Cons { contents; next } -> contents :: aux next
+  in
+  aux t.first
+
+let to_seq t =
+  let rec aux t () =
+    match t with
+    | Nil                     -> Seq.Nil
+    | Cons { contents; next } -> Seq.Cons (contents, aux next)
   in
   aux t.first
 
@@ -212,3 +222,19 @@ let nth n l =
     aux n l.first
 
 let pp ~sep pp_el = Fmt.iter ~sep iter pp_el
+
+let of_yojson v_of_yojson = function
+  | `List l ->
+      let open Syntaxes.Result in
+      List.fold_left
+        (fun acc el ->
+          let* acc = acc in
+          let* el = v_of_yojson el in
+          let () = append el acc in
+          Ok acc)
+        (Ok (make ()))
+        l
+  | _       -> Error "Invalid yojson Extlist"
+
+let to_yojson v_to_yojson l =
+  `List (to_seq l |> Seq.map v_to_yojson |> List.of_seq)

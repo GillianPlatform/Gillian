@@ -10,7 +10,7 @@ module type S = sig
   type vt
 
   (** Type of GIL stores *)
-  type t
+  type t [@@deriving yojson]
 
   (** Return the set of bindings in a given store *)
   val bindings : t -> (Var.t * vt) list
@@ -75,10 +75,11 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   module L = Logging
 
   (** Type of GIL values *)
-  type vt = Val.t
+  type vt = Val.t [@@deriving yojson]
 
   (** Actual type of GIL Stores *)
   type t = { conc : (Var.t, vt) Hashtbl.t; symb : (Var.t, vt) Hashtbl.t }
+  [@@deriving yojson]
 
   (**
     Store initialisation

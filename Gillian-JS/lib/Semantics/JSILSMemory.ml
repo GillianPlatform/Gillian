@@ -11,10 +11,10 @@ module TypEnv = Gillian.Symbolic.TypEnv
 open Gillian.Logic
 
 module M : Gillian.Symbolic.Memory_S = struct
-  type vt = SVal.t
+  type vt = SVal.t [@@deriving yojson]
 
   (** Type of JSIL general states *)
-  type t = SHeap.t
+  type t = SHeap.t [@@deriving yojson]
 
   (** Type of JSIL substitutions *)
   type st = SSubst.t
@@ -25,13 +25,14 @@ module M : Gillian.Symbolic.Memory_S = struct
     | FCell     of vt * vt
     | FMetadata of vt
     | FPure     of Formula.t
+  [@@deriving yojson]
 
   type c_fix_t =
     | CFLoc      of string
     | CFCell     of vt * vt * vt
     | CFMetadata of vt * vt
 
-  type err_t = vt list * i_fix_t list list * Formula.t
+  type err_t = vt list * i_fix_t list list * Formula.t [@@deriving yojson]
 
   type action_ret =
     | ASucc of (t * vt list * Formula.t list * (string * Type.t) list) list

@@ -9,13 +9,13 @@ type vt = Values.t
 
 type st = Subst.t
 
-type err_t = WislSHeap.err
+type err_t = WislSHeap.err [@@deriving yojson]
 
 type c_fix_t = unit
 
 type i_fix_t = unit
 
-type t = WislSHeap.t
+type t = WislSHeap.t [@@deriving yojson]
 
 type action_ret =
   | ASucc of (t * vt list * Formula.t list * (string * Type.t) list) list

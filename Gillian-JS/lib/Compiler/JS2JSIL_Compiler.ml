@@ -6637,7 +6637,7 @@ and translate_statement tr_ctx e =
       raise (Failure "Not implemented: RegExp literal")
   | Try (_, None, None) -> raise (Failure "Try with missing parts")
 
-let make_final_cmd vars final_lab final_var =
+let make_final_cmd vars final_lab final_var origin_loc =
   let cmd_final =
     match vars with
     | []    -> LBasic Skip
@@ -6646,7 +6646,7 @@ let make_final_cmd vars final_lab final_var =
         let vars = List.map (fun x_r -> PVar x_r) vars in
         LPhiAssignment [ (final_var, vars) ]
   in
-  (Annot.make (), Some final_lab, cmd_final)
+  (Annot.make ~origin_loc (), Some final_lab, cmd_final)
 
 let translate_fun_decls (top_level : bool) (sc_var : string) (cur_index : int) e
     =
@@ -6671,7 +6671,8 @@ let translate_fun_decls (top_level : bool) (sc_var : string) (cur_index : int) e
   hoisted_fdecls
 
 let generate_main e strictness spec : EProc.t =
-  let annotate_cmd cmd lab = (Annot.make (), lab, cmd) in
+  let origin_loc = JS_Utils.lift_flow_loc e.JS_Parser.Syntax.exp_loc in
+  let annotate_cmd cmd lab = (Annot.make ~origin_loc (), lab, cmd) in
 
   let new_var = fresh_var () in
   let setup_heap_ass =
@@ -6735,7 +6736,7 @@ let generate_main e strictness spec : EProc.t =
   let ctx = make_translation_ctx main_fid [ main_fid ] sc_var_main strictness in
   let cmds_hoist_fdecls = translate_fun_decls true sc_var_main 0 e in
   let cmds_hoist_fdecls =
-    annotate_cmds_top_level (Annot.make ()) cmds_hoist_fdecls
+    annotate_cmds_top_level (Annot.make ~origin_loc ()) cmds_hoist_fdecls
   in
 
   let cmds_e, x_e, errs, _, _, _ = translate_statement ctx e in
@@ -6784,7 +6785,7 @@ let generate_main e strictness spec : EProc.t =
   let lab_ret_cmd = annotate_cmd LReturnNormal (Some ctx.tr_ret_lab) in
 
   let cmd_err_phi_node =
-    make_final_cmd errs ctx.tr_err_lab Names.return_variable
+    make_final_cmd errs ctx.tr_err_lab Names.return_variable origin_loc
   in
   let lab_err_cmd = annotate_cmd LReturnError None in
   let global_err_asrt = annotate_cmd (LLogic (LCmd.Assert False)) None in
@@ -6807,9 +6808,10 @@ let generate_main e strictness spec : EProc.t =
   { name = main_fid; body = Array.of_list main_cmds; params = []; spec }
 
 let generate_proc_eval new_fid ?use_cc e strictness vis_fid : EProc.t =
-  let annotate_cmd cmd lab = (Annot.make (), lab, cmd) in
+  let origin_loc = JS_Utils.lift_flow_loc e.JS_Parser.Syntax.exp_loc in
+  let annotate_cmd cmd lab = (Annot.make ~origin_loc (), lab, cmd) in
   let annotate_cmds cmds =
-    List.map (fun (lab, cmd) -> (Annot.make (), lab, cmd)) cmds
+    List.map (fun (lab, cmd) -> (Annot.make ~origin_loc (), lab, cmd)) cmds
   in
   let var_sc_proc = JS2JSIL_Helpers.var_sc_first in
 
@@ -6912,6 +6914,7 @@ let generate_proc_eval new_fid ?use_cc e strictness vis_fid : EProc.t =
   (* lab_err: x_error := PHI(errs, x_fake_ret) *)
   let cmd_error_phi =
     make_final_cmd (errs @ errs_xe_v) ctx.tr_err_lab Names.return_variable
+      origin_loc
   in
   let lab_err_cmd = annotate_cmd LReturnError None in
 
@@ -6939,7 +6942,8 @@ let generate_proc_eval new_fid ?use_cc e strictness vis_fid : EProc.t =
   }
 
 let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
-  let annotate_cmd cmd lab = (Annot.make (), lab, cmd) in
+  let origin_loc = JS_Utils.lift_flow_loc e.JS_Parser.Syntax.exp_loc in
+  let annotate_cmd cmd lab = (Annot.make ~origin_loc (), lab, cmd) in
 
   let var_sc_proc = JS2JSIL_Helpers.var_sc_first in
 
@@ -6957,7 +6961,7 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
     translate_fun_decls false var_sc_proc (List.length vis_fid - 1) e
   in
   let cmds_hoist_fdecls =
-    annotate_cmds_top_level (Annot.make ()) cmds_hoist_fdecls
+    annotate_cmds_top_level (Annot.make ~origin_loc ()) cmds_hoist_fdecls
   in
 
   (* x_er_m := new (null)   *)
@@ -7011,13 +7015,13 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
   let x_argList_act = fresh_var () in
   let cmds_arg_obj =
     [
-      (Annot.make (), None, LArguments x_argList_pre);
-      ( Annot.make (),
+      (Annot.make ~origin_loc (), None, LArguments x_argList_pre);
+      ( Annot.make ~origin_loc (),
         None,
         LBasic
           (Assignment (x_argList_act, UnOp (Cdr, UnOp (Cdr, PVar x_argList_pre))))
       );
-      ( Annot.make (),
+      ( Annot.make ~origin_loc (),
         None,
         LCall
           ( var_args,
@@ -7025,7 +7029,7 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
             [ PVar x_argList_act ],
             None,
             None ) );
-      ( Annot.make (),
+      ( Annot.make ~origin_loc (),
         None,
         LBasic (Mutation (PVar var_er, Lit (String "arguments"), PVar var_args))
       );
@@ -7073,7 +7077,7 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
 
   (* pre_lab_ret: x_return := PHI(...) *)
   let cmd_return_phi =
-    make_final_cmd rets new_ctx.tr_ret_lab Names.return_variable
+    make_final_cmd rets new_ctx.tr_ret_lab Names.return_variable origin_loc
   in
 
   let x_ignore = fresh_var () in
@@ -7125,7 +7129,7 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
   let cmds_restore_er_ret = annotate_cmds cmds_restore_er_ret in *)
   let errs = errs in
   let cmd_error_phi =
-    make_final_cmd errs new_ctx.tr_err_lab Names.return_variable
+    make_final_cmd errs new_ctx.tr_err_lab Names.return_variable origin_loc
   in
   let cmd_err_final = annotate_cmd LReturnError None in
 
