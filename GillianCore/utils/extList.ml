@@ -34,8 +34,6 @@ let add = append
 
 let length t = t.length
 
-(* ?map:('a -> 'b) -> 'a t -> 'b list*)
-
 let to_list t =
   let rec aux = function
     | Nil                     -> []
