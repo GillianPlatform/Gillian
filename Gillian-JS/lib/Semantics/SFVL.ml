@@ -9,10 +9,10 @@ module L = Logging
 
 type field_name = Expr.t
 
-type field_value = Expr.t
+type field_value = Expr.t [@@deriving yojson]
 
 (* Definition *)
-type t = field_value Expr.Map.t
+type t = field_value Expr.Map.t [@@deriving yojson]
 
 (* Printing *)
 let pp ft sfvl =

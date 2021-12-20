@@ -1,17 +1,16 @@
 (** GIL symbolic field-value list *)
 
-open Gillian.Utils.Containers
 module Expr = Gillian.Gil_syntax.Expr
 module SSubst = Gillian.Symbolic.Subst
 open Gillian.Gil_syntax
 module L = Gillian.Logging
 
-type field_name = Expr.t
+type field_name = Expr.t [@@deriving yojson]
 
-type field_value = Expr.t
+type field_value = Expr.t [@@deriving yojson]
 
 (* Definition *)
-type t = field_value Expr.Map.t
+type t = field_value Expr.Map.t [@@deriving yojson]
 
 let gsbsts = Expr.substitutables
 

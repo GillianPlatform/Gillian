@@ -6,3 +6,7 @@
 pred i__pred_cell (+ptr: List, value):
       (ptr == {{ #loc, #offset }}) *
       <cell>(#loc, #offset; value);
+      
+pred freed(+ptr: List):
+      (ptr == {{ #l, 0. }}) * types(#l: Obj) *
+      <freed>(#l;); 

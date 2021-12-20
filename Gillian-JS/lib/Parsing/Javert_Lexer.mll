@@ -313,6 +313,7 @@ and
 (* Read comments *)
 read_comment =
   parse
+  | newline              { new_line lexbuf; read_comment lexbuf }
   | "*)"                 { read lexbuf }
   | eof                  { raise (Syntax_error ("Comment is not terminated")) }
   | _                    { read_comment lexbuf }

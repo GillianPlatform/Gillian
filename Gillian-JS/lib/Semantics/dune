@@ -1,4 +1,6 @@
 (library
  (name semantics)
  (libraries gillian jsil_syntax javert_utils js2jsil_lib str)
- (flags :standard -open Utils -open Gillian.Utils))
+ (flags :standard -open Utils -open Gillian.Utils -open Gillian.Utils.Prelude)
+ (preprocess
+  (pps ppx_deriving_yojson)))

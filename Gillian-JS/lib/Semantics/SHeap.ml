@@ -1,6 +1,5 @@
 (** JSIL Symbolic Heap *)
 
-open Containers
 open Gillian.Gil_syntax
 open Jsil_syntax
 module SSubst = Gillian.Symbolic.Subst
@@ -18,6 +17,7 @@ type t = {
   cdmn : Var.Set.t ref;
   sdmn : Var.Set.t ref;
 }
+[@@deriving yojson]
 
 (* ************* *
  *  AUXILIARIES  *

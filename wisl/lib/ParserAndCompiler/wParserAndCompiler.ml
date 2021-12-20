@@ -5,6 +5,8 @@ type err = unit
 
 let pp_err _ () = ()
 
+type tl_ast = WProg.t
+
 let parse_with_error token lexbuf =
   try token read lexbuf with
   | SyntaxError message -> failwith ("SYNTAX ERROR" ^ message)
@@ -26,20 +28,19 @@ let parse_file file =
 
 let compile = Wisl2Gil.compile
 
-let create_compilation_result path prog =
+let create_compilation_result path prog wprog =
   let open CommandLine.ParserAndCompiler in
   let open IncrementalAnalysis in
   let source_files = SourceFiles.make () in
   let () = SourceFiles.add_source_file source_files ~path in
   let gil_path = Filename.chop_extension path ^ ".gil" in
-  { gil_progs = [ (gil_path, prog) ]; source_files }
+  { gil_progs = [ (gil_path, prog) ]; source_files; tl_ast = wprog }
 
 let parse_and_compile_files files =
   let f files =
     let path = List.hd files in
-    Ok
-      (create_compilation_result path
-         (compile ~filepath:path (parse_file path)))
+    let wprog = parse_file path in
+    Ok (create_compilation_result path (compile ~filepath:path wprog) wprog)
   in
   Logging.with_normal_phase ~title:"Program parsing and compilation" (fun () ->
       f files)

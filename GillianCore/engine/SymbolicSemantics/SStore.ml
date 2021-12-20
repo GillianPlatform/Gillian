@@ -1,6 +1,5 @@
 (** GIL Symbolic Store *)
 
-open Containers
 open SVal
 include Store.Make (SVal.M)
 

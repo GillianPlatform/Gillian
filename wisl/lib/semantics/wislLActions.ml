@@ -73,3 +73,10 @@ let ga_to_setter_str = ga_to_action_str ga_to_setter
 let ga_to_getter_str = ga_to_action_str ga_to_getter
 
 let ga_to_deleter_str = ga_to_action_str ga_to_deleter
+
+let ga_to_yojson x = `String (str_ga x)
+
+let ga_of_yojson x =
+  match x with
+  | `String s -> Ok (ga_from_str s)
+  | _         -> Error "Invalid json representing wisl core predicate"

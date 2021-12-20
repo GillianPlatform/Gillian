@@ -123,7 +123,13 @@ let rec compile_expr ?(fname = "main") expr :
           (call_var, internal_func, [ comp_expr1; comp_expr2 ], None, None)
       in
       ( cmdl1 @ cmdl2
-        @ [ (Annot.make ~origin_id:(get_id expr) (), None, call_i_plus) ],
+        @ [
+            ( Annot.make ~origin_id:(get_id expr)
+                ~origin_loc:(CodeLoc.to_location (get_loc expr))
+                (),
+              None,
+              call_i_plus );
+          ],
         Expr.PVar call_var )
   | BinOp (e1, b, e2) ->
       (* Operator cannot do pointer arithmetics *)
@@ -569,7 +575,11 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
           (vn, BinOp (PVar retv, BinOp.LstNth, Lit (Num (float_of_int i)))))
       vars
   in
-  let annot_while = Annot.make ~origin_id:(WStmt.get_id while_stmt) () in
+  let annot_while =
+    Annot.make ~origin_id:(WStmt.get_id while_stmt)
+      ~origin_loc:(CodeLoc.to_location while_loc)
+      ()
+  in
   let lab_cmds =
     List.map (fun cmd -> (annot_while, None, cmd)) (call_cmd :: reassign_vars)
   in
@@ -613,13 +623,16 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
   | { snode = While _; _ } :: _
     when !Gillian.Utils.Config.current_exec_mode = Verification ->
       failwith "While loop without invariant in Verification mode!"
-  | { snode = While (e, sl); sid = sid_while; _ } :: rest ->
+  | { snode = While (e, sl); sid = sid_while; sloc } :: rest ->
       let looplab = gen_str loop_lab in
       let cmdle, guard = compile_expr e in
       let comp_body, new_functions = compile_list sl in
       let comp_body, bodlab = get_or_create_lab comp_body lbody_lab in
       let endlab = gen_str end_lab in
-      let annot_while = Annot.make ~origin_id:sid_while () in
+      let annot_while =
+        Annot.make ~origin_id:sid_while ~origin_loc:(CodeLoc.to_location sloc)
+          ()
+      in
       let loopcmd = Cmd.GuardedGoto (guard, bodlab, endlab) in
       let headlabopt = Some looplab in
       let loopcmd_lab = (annot_while, headlabopt, loopcmd) in
@@ -633,22 +646,28 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
         @ comp_rest,
         new_functions @ new_functions_2 )
   (* Skip *)
-  | { snode = Skip; sid; _ } :: rest ->
+  | { snode = Skip; sid; sloc } :: rest ->
       let cmd = Cmd.Skip in
-      let annot = Annot.make ~origin_id:sid () in
+      let annot =
+        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
       let comp_rest, new_functions = compile_list rest in
       ((annot, None, cmd) :: comp_rest, new_functions)
   (* Variable assignment *)
-  | { snode = VarAssign (v, e); sid; _ } :: rest ->
+  | { snode = VarAssign (v, e); sid; sloc } :: rest ->
       let cmdle, comp_e = compile_expr e in
       let cmd = Cmd.Assignment (v, comp_e) in
-      let annot = Annot.make ~origin_id:sid () in
+      let annot =
+        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
       let comp_rest, new_functions = compile_list rest in
       (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
   (* Object Deletion *)
-  | { snode = Dispose e; sid; _ } :: rest ->
+  | { snode = Dispose e; sid; sloc } :: rest ->
       let cmdle, comp_e = compile_expr e in
-      let annot = Annot.make ~origin_id:sid () in
+      let annot =
+        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
       let faillab, ctnlab = (gen_str fail_lab, gen_str ctn_lab) in
       let testcmd =
         Cmd.GuardedGoto
@@ -657,11 +676,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
             faillab )
       in
       let g_var = gen_str gvar in
-      let failcmd =
-        Cmd.Fail
-          ( "Invalid block pointer at " ^ CodeLoc.str (WExpr.get_loc e),
-            [ comp_e ] )
-      in
+      let failcmd = Cmd.Fail ("InvalidBlockPointer", [ comp_e ]) in
       let cmd = Cmd.LAction (g_var, dispose, [ nth comp_e 0 ]) in
       let comp_rest, new_functions = compile_list rest in
       ( cmdle
@@ -678,9 +693,11 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
           u := [remcell](v_get[0], v_get[1]);
   *)
   (* Property Lookup *)
-  | { snode = Lookup (x, e); sid; _ } :: rest ->
+  | { snode = Lookup (x, e); sid; sloc } :: rest ->
       let cmdle, comp_e = compile_expr e in
-      let annot = Annot.make ~origin_id:sid () in
+      let annot =
+        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
       let v_get = gen_str gvar in
       let getcmd =
         Cmd.LAction (v_get, getcell, [ nth comp_e 0; nth comp_e 1 ])
@@ -696,8 +713,10 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
           x := v_get[2];
       *)
   (* Property Update *)
-  | { snode = Update (e1, e2); sid; _ } :: rest ->
-      let annot = Annot.make ~origin_id:sid () in
+  | { snode = Update (e1, e2); sid; sloc } :: rest ->
+      let annot =
+        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
       let cmdle1, comp_e1 = compile_expr e1 in
       let cmdle2, comp_e2 = compile_expr e2 in
       let v_get = gen_str gvar in
@@ -724,8 +743,10 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
           u := [setcell](l2, o2, ce2);
   *)
   (* Object Creation *)
-  | { snode = New (x, k); sid; _ } :: rest ->
-      let annot = Annot.make ~origin_id:sid () in
+  | { snode = New (x, k); sid; sloc } :: rest ->
+      let annot =
+        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
       let newcmd =
         Cmd.LAction (x, alloc, [ Expr.Lit (Literal.Num (float_of_int k)) ])
       in
@@ -735,7 +756,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
           x := [alloc](k); // this is already a pointer
   *)
   (* Function call *)
-  | { snode = FunCall (x, fn, el, to_bind); sid; _ } :: rest ->
+  | { snode = FunCall (x, fn, el, to_bind); sid; sloc } :: rest ->
       let expr_fn = gil_expr_of_str fn in
       let cmdles, params = List.split (List.map compile_expr el) in
       let bindings =
@@ -745,12 +766,16 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
         | None                    -> None
       in
       let cmd = Cmd.Call (x, expr_fn, params, None, bindings) in
-      let annot = Annot.make ~origin_id:sid () in
+      let annot =
+        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
       let comp_rest, new_functions = compile_list rest in
       (List.concat cmdles @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
   (* If-Else bloc *)
-  | { snode = If (e, sl1, sl2); sid; _ } :: rest ->
-      let annot = Annot.make ~origin_id:sid () in
+  | { snode = If (e, sl1, sl2); sid; sloc } :: rest ->
+      let annot =
+        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
       let cmdle, guard = compile_expr e in
       let comp_sl1, new_functions1 = compile_list sl1 in
       let comp_sl2, new_functions2 = compile_list sl2 in
@@ -770,8 +795,10 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
         @ [ endcmd_lab ] @ comp_rest,
         new_functions1 @ new_functions2 @ new_functions3 )
   (* Logic commands *)
-  | { snode = Logic lcmd; sid; _ } :: rest ->
-      let annot = Annot.make ~origin_id:sid () in
+  | { snode = Logic lcmd; sid; sloc } :: rest ->
+      let annot =
+        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
       let to_assert_opt, clcmd = compile_lcmd lcmd in
       let lcmds =
         match to_assert_opt with
@@ -841,12 +868,18 @@ let rec compile_function
   let retassigncmds =
     cmdle
     @ [
-        ( Annot.make (),
+        ( Annot.make
+            ~origin_loc:(CodeLoc.to_location (WExpr.get_loc return_expr))
+            (),
           None,
           Cmd.Assignment (Gillian.Utils.Names.return_variable, comp_ret_expr) );
       ]
   in
-  let retcmd = (Annot.make (), None, Cmd.ReturnNormal) in
+  let retcmd =
+    ( Annot.make ~origin_loc:(CodeLoc.to_location (WExpr.get_loc return_expr)) (),
+      None,
+      Cmd.ReturnNormal )
+  in
   let lbody_withret = lbodylist @ retassigncmds @ [ retcmd ] in
   let gil_body = Array.of_list lbody_withret in
   let gil_spec = Option.map (compile_spec ~fname:name) spec in

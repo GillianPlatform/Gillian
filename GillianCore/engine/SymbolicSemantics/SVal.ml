@@ -9,7 +9,7 @@ module L = Logging
 module rec M :
   (Val.S with type t = Expr.t and type st = SSubst.t and type et = SESubst.t) =
 struct
-  type t = Expr.t
+  type t = Expr.t [@@deriving yojson]
 
   type st = SSubst.t
 
