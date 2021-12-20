@@ -1,48 +1,28 @@
-module Types = struct
-  type conf = { filename : string }
+(**
+    Reporter which logs to a database
+*)
 
-  type state = { fd : Unix.file_descr }
-end
+let initialize () =
+  LogDatabase.reset_db ();
+  LogDatabase.create_db ()
 
-include Reporter.Make (struct
-  include Types
+let log (report : Report.t) =
+  if report.type_ <> LoggingConstants.ContentType.debug then
+    let id = Sqlite3.Data.INT report.id in
+    let title = Sqlite3.Data.TEXT report.title in
+    let elapsed_time = Sqlite3.Data.FLOAT report.elapsed_time in
+    let previous = Sqlite3.Data.opt_int64 report.previous in
+    let parent = Sqlite3.Data.opt_int64 report.parent in
+    let content =
+      Sqlite3.Data.TEXT
+        (Yojson.Safe.to_string (Loggable.loggable_to_yojson report.content))
+    in
+    let severity =
+      Sqlite3.Data.INT (Int64.of_int (Report.severity_to_enum report.severity))
+    in
+    let type_ = Sqlite3.Data.TEXT report.type_ in
 
-  let conf =
-    let filename = "database.log" in
-    if Sys.file_exists filename then Sys.remove filename;
-    { filename }
+    LogDatabase.store_report ~id ~title ~elapsed_time ~previous ~parent ~content
+      ~severity ~type_
 
-  let initialize { filename } =
-    (* rw-r--r-- *)
-    let perm = 0o644 in
-    { fd = Unix.openfile filename [ O_WRONLY; O_APPEND; O_CREAT ] perm }
-
-  let wrap_up { fd } = Unix.close fd
-end)
-
-let get_fd () = (get_state ()).fd
-
-let write yojson =
-  let yojson = Yojson.Safe.to_string yojson ^ "\n" in
-  Unix.lockf (get_fd ()) F_LOCK 0;
-  ignore (Unix.write_substring (get_fd ()) yojson 0 (String.length yojson));
-  Unix.lockf (get_fd ()) F_ULOCK 0
-
-class virtual ['a] t =
-  object (self)
-    method log (report : 'a Report.t) =
-      if enabled () then
-        write (Report.to_yojson self#specific_serializer report)
-
-    method wrap_up = wrap_up ()
-
-    method virtual private specific_serializer : 'a -> Yojson.Safe.t
-  end
-
-let default : type a. unit -> a t =
- fun () ->
-  object
-    inherit [a] t
-
-    method private specific_serializer _ = `Null
-  end
+let wrap_up () = LogDatabase.close_db ()

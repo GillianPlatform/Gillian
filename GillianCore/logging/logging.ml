@@ -1,8 +1,12 @@
+module LoggingConstants = LoggingConstants
 module Mode = Mode
 module Report = Report
 module Reporter = Reporter
 module FileReporter = FileReporter
 module DatabaseReporter = DatabaseReporter
+module Loggable = Loggable
+module LogQueryer = LogQueryer
+module ReportId = ReportId
 
 let () =
   Printexc.register_printer (function
@@ -10,22 +14,52 @@ let () =
         Some (Format.asprintf "!!!!!!!!!!\nFAILURE:\n%s\n!!!!!!!!!!\n\n" s)
     | _         -> None)
 
-let wrap_up = Default.wrap_up
+let reporters = ref []
+
+let initialize (reporters_to_initialize : (module Reporter.S) list) =
+  reporters := reporters_to_initialize;
+  List.iter (fun reporter -> Reporter.initialize reporter) !reporters
+
+let wrap_up () =
+  List.iter (fun reporter -> Reporter.wrap_up reporter) !reporters
+
+let log_on_all_reporters (report : Report.t) =
+  List.iter (fun reporter -> Reporter.log reporter report) !reporters
 
 let log lvl ?title ?severity msgf =
   if Mode.should_log lvl then
     let report =
       ReportBuilder.make ?title
-        ~content:(Agnostic (Debug (Report.PackedPP.make msgf)))
-        ?severity ()
+        ~content:
+          (Loggable.make PackedPP.pp PackedPP.of_yojson PackedPP.to_yojson
+             (PP msgf))
+        ~type_:LoggingConstants.ContentType.debug ?severity ()
     in
-    Default.log report
+    log_on_all_reporters report
+
+let log_specific lvl ?title ?severity loggable type_ =
+  if Mode.should_log lvl then
+    let report =
+      ReportBuilder.make ?title ~content:loggable ~type_ ?severity ()
+    in
+    let () = log_on_all_reporters report in
+    Some report.id
+  else None
 
 let normal ?title ?severity msgf = log Normal ?title ?severity msgf
 
 let verbose ?title ?severity msgf = log Verbose ?title ?severity msgf
 
 let tmi ?title ?severity msgf = log TMI ?title ?severity msgf
+
+let normal_specific ?title ?severity loggable type_ =
+  log_specific Normal ?title ?severity loggable type_
+
+let verbose_specific ?title ?severity loggable type_ =
+  log_specific Verbose ?title ?severity loggable type_
+
+let tmi_specific ?title ?severity loggable type_ =
+  log_specific TMI ?title ?severity loggable type_
 
 let print_to_all (str : string) =
   normal (fun m -> m "%s" str);
@@ -36,16 +70,24 @@ let fail msg =
   normal ~severity:Error (fun m -> m "%a" Format.pp_print_string msg);
   raise (Failure msg)
 
-let normal_phase = ReportBuilder.start_phase Normal
+let start_phase level ?title ?severity () =
+  let phase_report = ReportBuilder.start_phase level ?title ?severity () in
+  match phase_report with
+  | Some phase_report ->
+      let () = log_on_all_reporters phase_report in
+      Some phase_report.id
+  | None              -> None
 
-let verbose_phase = ReportBuilder.start_phase Verbose
+let normal_phase = start_phase Normal
 
-let tmi_phase = ReportBuilder.start_phase TMI
+let verbose_phase = start_phase Verbose
+
+let tmi_phase = start_phase TMI
 
 let end_phase = ReportBuilder.end_phase
 
 let with_phase level ?title ?severity f =
-  let phase = ReportBuilder.start_phase level ?title ?severity () in
+  let phase = start_phase level ?title ?severity () in
   let result =
     try Ok (f ())
     with e ->
@@ -63,38 +105,3 @@ let with_verbose_phase ?title ?severity f =
   with_phase Verbose ?title ?severity f
 
 let with_tmi_phase ?title ?severity f = with_phase TMI ?title ?severity f
-
-module Make (TargetLang : sig
-  type t
-
-  val file_reporter : t FileReporter.t option
-
-  val database_reporter : t DatabaseReporter.t option
-end) =
-struct
-  let reporters =
-    List.map
-      (function
-        | None, default -> default ()
-        | Some r, _     -> r)
-      TargetLang.
-        [
-          ((file_reporter :> t Reporter.t option), FileReporter.default);
-          ((database_reporter :> t Reporter.t option), DatabaseReporter.default);
-        ]
-
-  let log lvl ?title ?severity content =
-    if Mode.should_log lvl then
-      let report =
-        ReportBuilder.make ?title ~content:(Specific content) ?severity ()
-      in
-      List.iter (fun reporter -> reporter#log report) reporters
-
-  let normal = log Normal
-
-  let verbose = log Verbose
-
-  let tmi = log TMI
-
-  let wrap_up () = List.iter (fun reporter -> reporter#wrap_up) reporters
-end
