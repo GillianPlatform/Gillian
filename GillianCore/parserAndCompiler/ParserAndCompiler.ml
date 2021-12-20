@@ -56,9 +56,9 @@ module Dummy : S = struct
     let apply () = ()
   end
 
-  type err = unit
-
   type tl_ast = unit
+
+  type err = unit
 
   let pp_err _ _ =
     failwith

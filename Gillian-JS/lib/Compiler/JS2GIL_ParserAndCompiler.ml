@@ -24,20 +24,20 @@ end
 
 type err = JSParserErr of JS_Parser.Error.t | JS2GILErr of string
 
-type tl_ast = JS_Parser.Syntax.exp option
+type tl_ast = JavaScriptSource of JS_Parser.Syntax.exp | JsilSource
 
 let pp_err fmt = function
   | JS2GILErr s   -> Fmt.pf fmt "%s" s
   | JSParserErr s -> Fmt.pf fmt "Parsing error: %s\n" (JS_Parser.Error.str s)
 
-let create_compilation_result path prog js_prog =
+let create_compilation_result path prog tl_prog =
   let open CommandLine.ParserAndCompiler in
   let open IncrementalAnalysis in
   let source_files = SourceFiles.make () in
   (* TODO (Alexis): Track any require()'d modules *)
   let () = SourceFiles.add_source_file source_files ~path in
   let gil_path = Filename.chop_extension path ^ ".gil" in
-  { gil_progs = [ (gil_path, prog) ]; source_files; tl_ast = js_prog }
+  { gil_progs = [ (gil_path, prog) ]; source_files; tl_ast = tl_prog }
 
 let parse_and_compile_js path =
   try
@@ -69,7 +69,7 @@ let parse_and_compile_js path =
         Io_utils.save_file_pp jsil_file_name Jsil_syntax.EProg.pp ext_prog
     in
     let core_prog = JSIL2GIL.jsil2core_prog ext_prog in
-    Ok (core_prog, Some js_prog)
+    Ok (core_prog, JavaScriptSource js_prog)
   with
   | JS_Parser.Error.ParserError e -> Error (JSParserErr e)
   | JS2JSIL_Preprocessing.EarlyError e ->
@@ -94,14 +94,11 @@ let parse_and_compile_files paths =
   let path = List.hd paths in
   let progs =
     if !Javert_utils.Js_config.js then parse_and_compile_js path
-    else
-      Result.map
-        (fun core_prog -> (core_prog, None))
-        (parse_and_compile_jsil path)
+    else Result.map (fun cp -> (cp, JsilSource)) (parse_and_compile_jsil path)
   in
   Result.map
-    (fun (core_prog, js_prog) ->
-      create_compilation_result path core_prog js_prog)
+    (fun (core_prog, tl_prog) ->
+      create_compilation_result path core_prog tl_prog)
     progs
 
 let other_imports = [ ("jsil", parse_and_compile_jsil) ]

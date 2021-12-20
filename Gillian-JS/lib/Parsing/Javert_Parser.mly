@@ -650,23 +650,23 @@ cmd_with_annot:
   | cmd = cmd_target
     {
       let loc_start : Location.position =
-      {
-        pos_line = $startpos.pos_lnum;
-        pos_column = $startpos.pos_cnum - $startpos.pos_bol;
-      }
+        {
+          pos_line = $startpos.pos_lnum;
+          pos_column = $startpos.pos_cnum - $startpos.pos_bol;
+        }
       in
       let loc_end : Location.position =
-      {
-        pos_line = $endpos.pos_lnum;
-        pos_column = $endpos.pos_cnum - $endpos.pos_bol;
-      }
+        {
+          pos_line = $endpos.pos_lnum;
+          pos_column = $endpos.pos_cnum - $endpos.pos_bol;
+        }
       in
       let origin_loc : Location.t =
-      {
-        loc_start;
-        loc_end;
-        loc_source = $startpos.pos_fname;
-      }
+        {
+          loc_start;
+          loc_end;
+          loc_source = $startpos.pos_fname;
+        }
       in
       let annot : Annot.t = Annot.make ~origin_loc () in
       annot, cmd
