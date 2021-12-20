@@ -1,37 +1,31 @@
-type 'a t = < log : 'a Report.t -> unit ; wrap_up : unit >
+(**
+    Interface for a reporter
+*)
 
-module Make (P : sig
-  type conf
+module type S = sig
+  (** Initializes the reporter *)
+  val initialize : unit -> unit
 
-  val conf : conf
+  (** Logs a report *)
+  val log : Report.t -> unit
 
-  type state
-
-  val initialize : conf -> state
-
-  val wrap_up : state -> unit
-end) =
-struct
-  let enabled, enable =
-    let enabled = ref false in
-    ((fun () -> !enabled), fun () -> enabled := true)
-
-  type conf = P.conf
-
-  type state = P.state
-
-  let state = ref None
-
-  let get_state () =
-    match !state with
-    | None   ->
-        let s = P.initialize P.conf in
-        state := Some s;
-        s
-    | Some s -> s
-
-  let wrap_up () =
-    match !state with
-    | None   -> ()
-    | Some s -> P.wrap_up s
+  (** Runs any clean up code *)
+  val wrap_up : unit -> unit
 end
+
+type t = (module S)
+
+(** Calls a given reporter module's `initialize` function *)
+let initialize (reporter : t) : unit =
+  let (module R) = reporter in
+  R.initialize ()
+
+(** Calls a given reporter module's `log` function *)
+let log (reporter : t) (report : Report.t) : unit =
+  let (module R) = reporter in
+  R.log report
+
+(** Calls a given reporter module's `wrap_up` function *)
+let wrap_up (reporter : t) : unit =
+  let (module R) = reporter in
+  R.wrap_up ()

@@ -85,3 +85,6 @@ see_deps.py
 
 # test-262
 javert-test262
+
+# Temporary databases for logs
+*.db
