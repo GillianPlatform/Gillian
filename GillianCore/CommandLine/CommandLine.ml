@@ -63,8 +63,7 @@ struct
       | "tmi"      -> Result.ok @@ Enabled TMI
       | other      -> Result.error @@ `Msg ("unknown value \"" ^ other ^ "\"")
     in
-    let print = L.Mode.pp in
-    let c = Arg.conv (parse, print) in
+    let c = Arg.conv (parse, L.Mode.pp) in
     let default = Enabled Verbose in
     let doc =
       "Controls the verbosity level of logging. The value SETTING must be one \
@@ -72,19 +71,14 @@ struct
     in
     Arg.(value & opt c default & info [ "l"; "logging" ] ~docv:"SETTING" ~doc)
 
-  type reporter_info = { name : string; reporter : (module L.Reporter.S) }
+  type reporter_info = { name : string; reporter : L.Reporter.t }
 
   let reporters =
     let parse : string -> (reporter_info, [> `Msg of string ]) Result.t =
       function
-      | "file"            -> Ok
-                               {
-                                 name = "file";
-                                 reporter = (module L.FileReporter);
-                               }
+      | "file"            -> Ok { name = "file"; reporter = L.file_reporter }
       | "database" | "db" ->
-          let () = L.LogQueryer.enable () in
-          Ok { name = "database"; reporter = (module L.DatabaseReporter) }
+          Ok { name = "database"; reporter = L.database_reporter }
       | other             -> Error (`Msg ("unknown value \"" ^ other ^ "\""))
     in
     let print fmt (reporter_info : reporter_info) =
@@ -92,7 +86,7 @@ struct
     in
     let c = Arg.(list & conv (parse, print)) in
     let default : reporter_info list =
-      [ { name = "file"; reporter = (module L.FileReporter) } ]
+      [ { name = "file"; reporter = L.file_reporter } ]
     in
     let doc =
       "Controls which reporters are used when logging. The value REPORTERS \

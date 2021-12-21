@@ -13,17 +13,19 @@ module type S = sig
   val wrap_up : unit -> unit
 end
 
+type t = (module S)
+
 (** Calls a given reporter module's `initialize` function *)
-let initialize (reporter : (module S)) : unit =
+let initialize (reporter : t) : unit =
   let (module R) = reporter in
   R.initialize ()
 
 (** Calls a given reporter module's `log` function *)
-let log (reporter : (module S)) (report : Report.t) : unit =
+let log (reporter : t) (report : Report.t) : unit =
   let (module R) = reporter in
   R.log report
 
 (** Calls a given reporter module's `wrap_up` function *)
-let wrap_up (reporter : (module S)) : unit =
+let wrap_up (reporter : t) : unit =
   let (module R) = reporter in
   R.wrap_up ()

@@ -2,16 +2,19 @@ module LoggingConstants = LoggingConstants
 module Mode = Mode
 module Report = Report
 module Reporter = Reporter
-module FileReporter = FileReporter
-module DatabaseReporter = DatabaseReporter
 module Loggable = Loggable
 module LogQueryer = LogQueryer
+module ReportId = ReportId
 
 let () =
   Printexc.register_printer (function
     | Failure s ->
         Some (Format.asprintf "!!!!!!!!!!\nFAILURE:\n%s\n!!!!!!!!!!\n\n" s)
     | _         -> None)
+
+let file_reporter : Reporter.t = (module FileReporter)
+
+let database_reporter : Reporter.t = (module DatabaseReporter)
 
 let reporters = ref []
 
@@ -42,7 +45,7 @@ let log_specific lvl ?title ?severity loggable type_ =
       ReportBuilder.make ?title ~content:loggable ~type_ ?severity ()
     in
     let () = log_on_all_reporters report in
-    Some (Uuidm.to_string report.id)
+    Some report.id
   else None
 
 let normal ?title ?severity msgf = log Normal ?title ?severity msgf

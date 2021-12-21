@@ -1,19 +1,10 @@
-(**
-    Module for building reports
-*)
+let previous : ReportId.t option ref = ref None
 
-let seed = Random.State.make_self_init ()
-
-let previous : Report.uuidm option ref = ref Option.none
-
-let parents : Report.uuidm Stack.t = Stack.create ()
+let parents : ReportId.t Stack.t = Stack.create ()
 
 let make
-    ?title
-    ~(content : Loggable.loggable)
-    ~(type_ : string)
-    ?(severity = Report.Log)
-    () =
+    ?title ~(content : Loggable.t) ~(type_ : string) ?(severity = Report.Log) ()
+    =
   let title =
     match title with
     | None       -> type_
@@ -21,7 +12,7 @@ let make
   in
   let report : Report.t =
     {
-      id = Uuidm.v4_gen seed ();
+      id = ReportId.next ();
       title;
       elapsed_time = Sys.time ();
       previous = !previous;
@@ -47,10 +38,10 @@ let start_phase level ?title ?severity () =
   else None
 
 let end_phase = function
-  | None            -> ()
-  | Some uuid as id ->
-      let parent_uuid = Stack.pop parents in
-      assert (Uuidm.equal uuid parent_uuid);
-      previous := id
+  | None               -> ()
+  | Some rid as id_opt ->
+      let parent_id = Stack.pop parents in
+      assert (ReportId.equal rid parent_id);
+      previous := id_opt
 
 let get_cur_parent_id () = Stack.top_opt parents

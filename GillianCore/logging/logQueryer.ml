@@ -3,11 +3,7 @@
     Queries will return None if the LogQueryer is not enabled.
 *)
 
-let is_enabled = ref false
-
-let enable () = is_enabled := true
-
-let with_enabled func = if !is_enabled then func () else None
+let with_enabled func = if LogDatabase.is_enabled () then func () else None
 
 let get_report report_id =
   with_enabled (fun () -> LogDatabase.get_report report_id)

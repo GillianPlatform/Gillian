@@ -1,5 +1,5 @@
 (** Module specifying functions required for a type to be loggable *)
-module type t = sig
+module type S = sig
   (** Type to be logged *)
   type t [@@deriving yojson]
 
@@ -8,14 +8,14 @@ module type t = sig
 end
 
 (* Type for a module which specifies functions required for a type to be loggable *)
-type 'a t = (module t with type t = 'a)
+type 'a unpacked = (module S with type t = 'a)
 
 (** Type storing the functions required to log the specified type and the
     actual content to be logged *)
-type loggable = L : ('a t * 'a) -> loggable
+type t = L : ('a unpacked * 'a) -> t
 
 (** Calls the pretty print function of a loggable on its content *)
-let pp (loggable : loggable) (formatter : Format.formatter) =
+let pp (loggable : t) (formatter : Format.formatter) =
   match loggable with
   | L (t, content) ->
       let (module T) = t in
@@ -33,7 +33,7 @@ let make
     (pp : Format.formatter -> a -> unit)
     (of_yojson : Yojson.Safe.t -> (a, string) result)
     (to_yojson : a -> Yojson.Safe.t)
-    (content : a) : loggable =
+    (content : a) : t =
   let module M = struct
     type t = a
 
@@ -46,7 +46,7 @@ let make
   L ((module M), content)
 
 (** Returns a loggable given a string to be logged *)
-let make_string (s : string) : loggable =
+let make_string (s : string) : t =
   let pp = Fmt.string in
   let of_yojson yojson =
     match yojson with

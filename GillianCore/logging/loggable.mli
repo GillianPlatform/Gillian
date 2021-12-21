@@ -1,5 +1,5 @@
 (** Module specifying functions required for a type to be loggable *)
-module type t = sig
+module type S = sig
   (** Type to be logged *)
   type t [@@deriving yojson]
 
@@ -8,17 +8,17 @@ module type t = sig
 end
 
 (** Type for a module which specifies functions required for a type to be loggable *)
-type 'a t = (module t with type t = 'a)
+type 'a unpacked = (module S with type t = 'a)
 
 (** Type storing the functions required to log the specified type and the
     actual content to be logged *)
-type loggable = L : ('a t * 'a) -> loggable
+type t = L : ('a unpacked * 'a) -> t
 
 (** Pretty prints the contents of a loggable *)
-val pp : loggable -> Format.formatter -> unit
+val pp : t -> Format.formatter -> unit
 
 (** Converts a loggable to Yojson *)
-val loggable_to_yojson : loggable -> Yojson.Safe.t
+val loggable_to_yojson : t -> Yojson.Safe.t
 
 (** Returns a loggable, given the required functions and content *)
 val make :
@@ -26,7 +26,7 @@ val make :
   (Yojson.Safe.t -> ('a, string) result) ->
   ('a -> Yojson.Safe.t) ->
   'a ->
-  loggable
+  t
 
 (** Returns a loggable given a string to be logged *)
-val make_string : string -> loggable
+val make_string : string -> t

@@ -58,7 +58,7 @@ struct
     mutable cont_func :
       (unit -> Verification.SAInterpreter.result_t cont_func) option;
     mutable breakpoints : breakpoints;
-    mutable cur_report_id : string;
+    mutable cur_report_id : L.ReportId.t;
     (* TODO: The below fields only depend on the
              cur_report_id and could be refactored to use this *)
     mutable top_level_scopes : scope list;
@@ -248,12 +248,10 @@ struct
     dbg.cur_report_id <- report_id;
     match Logging.LogQueryer.get_report report_id with
     | None                  ->
-        raise
-          (Failure
-             (Printf.sprintf
-                "Unable to find report id '%s'. Check the logging level is set \
-                 correctly"
-                report_id))
+        Fmt.failwith
+          "Unable to find report id '%a'. Check the logging level is set \
+           correctly"
+          L.ReportId.pp report_id
     | Some (content, type_) -> (
         match type_ with
         | t when t = Logging.LoggingConstants.ContentType.cmd_step -> (

@@ -20,42 +20,35 @@ module Mode : sig
   val pp : Format.formatter -> t -> unit
 end
 
-module Reporter : sig
-  module type S = sig
-    (** Initializes the reporter *)
-    val initialize : unit -> unit
+module ReportId : sig
+  type t
 
-    (** Logs a report *)
-    val log : Report.t -> unit
+  val equal : t -> t -> bool
 
-    (** Runs any clean up code *)
-    val wrap_up : unit -> unit
-  end
+  val pp : Format.formatter -> t -> unit
 end
 
-module DatabaseReporter : Reporter.S
+module Reporter : sig
+  type t
 
-module FileReporter : Reporter.S
+  (** Calls a given reporter module's `initialize` function *)
+  val initialize : t -> unit
+
+  (** Calls a given reporter module's `log` function *)
+  val log : t -> Report.t -> unit
+
+  (** Calls a given reporter module's `wrap_up` function *)
+  val wrap_up : t -> unit
+end
+
+val database_reporter : Reporter.t
+
+val file_reporter : Reporter.t
 
 module Loggable : sig
-  (** Module specifying functions required for a type to be loggable *)
-  module type t = sig
-    (** Type to be logged *)
-    type t [@@deriving yojson]
-
-    (** Pretty printer for the type *)
-    val pp : Format.formatter -> t -> unit
-  end
-
-  (** Type for a module which specifies functions required for a type to be loggable *)
-  type 'a t = (module t with type t = 'a)
-
   (** Type storing the functions required to log the specified type and the
       actual content to be logged *)
-  type loggable = L : ('a t * 'a) -> loggable
-
-  (** Converts a loggable to Yojson *)
-  val loggable_to_yojson : loggable -> Yojson.Safe.t
+  type t
 
   (** Returns a loggable, given the required functions and content *)
   val make :
@@ -63,24 +56,20 @@ module Loggable : sig
     (Yojson.Safe.t -> ('a, string) result) ->
     ('a -> Yojson.Safe.t) ->
     'a ->
-    loggable
+    t
 end
 
 module LogQueryer : sig
-  (* Enables the LogQueryer. Should be called only if DatabaseReporter is
-     enabled *)
-  val enable : unit -> unit
-
   (* Returns the content and the content type given the report id *)
-  val get_report : string -> (string * string) option
+  val get_report : ReportId.t -> (string * string) option
 
   (* Returns the previous report id which has type cmd_step given the current
      report id *)
-  val get_previous_report_id : string -> string option
+  val get_previous_report_id : ReportId.t -> ReportId.t option
 
   (* Returns the next report id which has type cmd_step given the current
      report id *)
-  val get_next_report_id : string -> string option
+  val get_next_report_id : ReportId.t -> ReportId.t option
 
   (* Returns the annotation corresponding to the previous set freed action
      for a given location in the current phase if it exists *)
@@ -89,7 +78,7 @@ end
 
 (** Initializes the logging module with the specified reporters and initializes
     the reporters *)
-val initialize : (module Reporter.S) list -> unit
+val initialize : Reporter.t list -> unit
 
 (** Runs any clean up code *)
 val wrap_up : unit -> unit
@@ -122,9 +111,9 @@ val tmi :
 val normal_specific :
   ?title:string ->
   ?severity:Report.severity ->
-  Loggable.loggable ->
+  Loggable.t ->
   string ->
-  string option
+  ReportId.t option
 
 (** Logs a type at the `Verbose` logging level given a loggable and its content
     type (which should be one of the predefined strings in the
@@ -133,9 +122,9 @@ val normal_specific :
 val verbose_specific :
   ?title:string ->
   ?severity:Report.severity ->
-  Loggable.loggable ->
+  Loggable.t ->
   string ->
-  string option
+  ReportId.t option
 
 (** Logs a type at the `TMI` logging level given a loggable and its content
     type (which should be one of the predefined strings in the
@@ -144,9 +133,9 @@ val verbose_specific :
 val tmi_specific :
   ?title:string ->
   ?severity:Report.severity ->
-  Loggable.loggable ->
+  Loggable.t ->
   string ->
-  string option
+  ReportId.t option
 
 (** Writes the string and then raises a failure. *)
 val fail : string -> 'a
@@ -156,18 +145,18 @@ val print_to_all : string -> unit
 
 (** Starts a phase with logging level set to `Normal` *)
 val normal_phase :
-  ?title:string -> ?severity:Report.severity -> unit -> Report.uuidm option
+  ?title:string -> ?severity:Report.severity -> unit -> ReportId.t option
 
 (** Starts a phase with logging level set to `Verbose` *)
 val verbose_phase :
-  ?title:string -> ?severity:Report.severity -> unit -> Report.uuidm option
+  ?title:string -> ?severity:Report.severity -> unit -> ReportId.t option
 
 (** Starts a phase with logging level set to `TMI` *)
 val tmi_phase :
-  ?title:string -> ?severity:Report.severity -> unit -> Report.uuidm option
+  ?title:string -> ?severity:Report.severity -> unit -> ReportId.t option
 
 (** Ends the phase corresponding to the specified report id *)
-val end_phase : Report.uuidm option -> unit
+val end_phase : ReportId.t option -> unit
 
 (** Runs the specified function within a phase with logging level set to
     `Normal` *)
