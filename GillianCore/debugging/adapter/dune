@@ -1,0 +1,8 @@
+(library
+ (name debugAdapter)
+ (public_name gillian.debugging.adapter)
+ ; This has to use ppx_deriving_yojson
+ ; to work with ocaml-dap
+ (preprocess
+  (pps lwt_ppx ppx_deriving_yojson))
+ (libraries debugger log dap.rpc_lwt dap.types))
