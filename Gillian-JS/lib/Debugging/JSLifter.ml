@@ -1,8 +1,10 @@
 open Gil_syntax
 open Semantics
 open Debugger.DebuggerTypes
-
-type smemory = Symbolic.t
+include
+  Debugger.Gil_to_tl_lifter.Default
+    (Semantics.Symbolic)
+    (Js2jsil_lib.JS2GIL_ParserAndCompiler)
 
 let to_str pp = Fmt.to_to_string (Fmt.hbox pp)
 
@@ -73,7 +75,7 @@ let add_memory_vars smemory get_new_scope_id (variables : variables) =
 
 let rec add_loc_vars
     (loc : string)
-    (smemory : smemory)
+    smemory
     get_new_scope_id
     (variables : variables)
     (loc_to_scope_id : (string, int) Hashtbl.t) : unit =
@@ -220,7 +222,7 @@ let rec add_loc_vars
   | Some _ -> ()
 
 let add_variables
-    store smemory ~is_gil_file ~get_new_scope_id (variables : variables) =
+    ~store ~memory ~is_gil_file ~get_new_scope_id (variables : variables) =
   if is_gil_file then
     let store_id = get_new_scope_id () in
     let memory_id = get_new_scope_id () in
@@ -228,7 +230,7 @@ let add_variables
       [ { id = store_id; name = "Store" }; { id = memory_id; name = "Memory" } ]
     in
     let store_vars = get_store_vars store in
-    let memory_vars = add_memory_vars smemory get_new_scope_id variables in
+    let memory_vars = add_memory_vars memory get_new_scope_id variables in
     let vars = [ store_vars; memory_vars ] in
     let () =
       List.iter2
@@ -237,12 +239,12 @@ let add_variables
     in
     scopes
   else
-    let sorted_locs_with_vals = Symbolic.sorted_locs_with_vals smemory in
+    let sorted_locs_with_vals = Symbolic.sorted_locs_with_vals memory in
     let loc_to_scope_id = Hashtbl.create 0 in
     let () =
       List.iter
         (fun (loc, _) ->
-          add_loc_vars loc smemory get_new_scope_id variables loc_to_scope_id)
+          add_loc_vars loc memory get_new_scope_id variables loc_to_scope_id)
         sorted_locs_with_vals
     in
     (* TODO: probably better if we got a hash map of the store *)

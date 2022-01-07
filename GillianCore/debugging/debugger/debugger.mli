@@ -1,7 +1,6 @@
-module MemoryErrorLifter = MemoryErrorLifter
-module StoreAndSMemoryLifter = StoreAndSMemoryLifter
 module DebuggerTypes = DebuggerTypes
 module DebuggerUtils = DebuggerUtils
+module Gil_to_tl_lifter = Gil_to_tl_lifter
 open DebuggerTypes
 
 module type S = sig
@@ -35,9 +34,7 @@ end
 module Make
     (PC : ParserAndCompiler.S)
     (Verification : Verifier.S)
-    (StoreAndSMemoryLifter : StoreAndSMemoryLifter.S
-                               with type smemory =
-                                     Verification.SAInterpreter.heap_t)
-    (MemoryErrorLifter : MemoryErrorLifter.S
-                           with type merr = Verification.SPState.m_err_t
-                            and type tl_ast = PC.tl_ast) : S
+    (Lifter : Gil_to_tl_lifter.S
+                with type memory = Verification.SAInterpreter.heap_t
+                 and type memory_error = Verification.SPState.m_err_t
+                 and type tl_ast = PC.tl_ast) : S

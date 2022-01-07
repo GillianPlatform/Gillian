@@ -363,7 +363,7 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
   |> List.of_seq
 
 let add_debugger_variables
-    store smemory ~is_gil_file ~get_new_scope_id variables =
+    ~store ~memory ~is_gil_file ~get_new_scope_id variables =
   let open Debugger.DebuggerTypes in
   let store_id = get_new_scope_id () in
   let memory_id = get_new_scope_id () in
@@ -371,7 +371,7 @@ let add_debugger_variables
     [ { id = store_id; name = "Store" }; { id = memory_id; name = "Memory" } ]
   in
   let store_vars = get_store_vars store is_gil_file in
-  let memory_vars = add_memory_vars smemory get_new_scope_id variables in
+  let memory_vars = add_memory_vars memory get_new_scope_id variables in
   let vars = [ store_vars; memory_vars ] in
   let () =
     List.iter2

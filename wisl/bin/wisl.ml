@@ -3,7 +3,6 @@ module CLI =
     (Gillian.General.External.Dummy)
     (WParserAndCompiler)
     (Gillian.Bulk.Runner.DummyRunners)
-    (WDebugging.WislStoreAndSMemoryLifter)
-    (WDebugging.WislMemoryErrorLifter)
+    (WDebugging.WislLifter)
 
 let () = CLI.main ()

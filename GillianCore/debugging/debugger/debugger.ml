@@ -1,6 +1,5 @@
 module L = Logging
-module StoreAndSMemoryLifter = StoreAndSMemoryLifter
-module MemoryErrorLifter = MemoryErrorLifter
+module Gil_to_tl_lifter = Gil_to_tl_lifter
 module DebuggerTypes = DebuggerTypes
 module DebuggerUtils = DebuggerUtils
 open DebuggerTypes
@@ -36,12 +35,10 @@ end
 module Make
     (PC : ParserAndCompiler.S)
     (Verification : Verifier.S)
-    (StoreAndSMemoryLifter : StoreAndSMemoryLifter.S
-                               with type smemory =
-                                     Verification.SAInterpreter.heap_t)
-    (MemoryErrorLifter : MemoryErrorLifter.S
-                           with type merr = Verification.SPState.m_err_t
-                            and type tl_ast = PC.tl_ast) =
+    (Lifter : Gil_to_tl_lifter.S
+                with type memory = Verification.SAInterpreter.heap_t
+                 and type memory_error = Verification.SPState.m_err_t
+                 and type tl_ast = PC.tl_ast) =
 struct
   open Verification.SAInterpreter
   module Breakpoints = Set.Make (Int)
@@ -65,8 +62,7 @@ struct
     mutable frames : frame list;
     mutable variables : variables;
     mutable errors : err_t list;
-    mutable cur_cmd : int Cmd.t option;
-    mutable cur_annot : Annot.t option;
+    mutable cur_cmd : (int Cmd.t * Annot.t) option;
   }
 
   let top_level_scope_names =
@@ -119,10 +115,10 @@ struct
       | None       -> []
       | Some state ->
           let store = Verification.SPState.get_store state |> Store.bindings in
-          let smemory = Verification.SPState.get_heap state in
+          let memory = Verification.SPState.get_heap state in
           let lifted_scopes =
-            StoreAndSMemoryLifter.add_variables store smemory ~is_gil_file
-              ~get_new_scope_id variables
+            Lifter.add_variables ~store ~memory ~is_gil_file ~get_new_scope_id
+              variables
           in
           let pure_formulae_vars = get_pure_formulae_vars state in
           let typ_env_vars = get_typ_env_vars state in
@@ -274,21 +270,20 @@ struct
                     List.concat [ lifted_scopes; top_level_scopes ]
                 in
                 let () = dbg.errors <- cmd_step.errors in
-                let cur_cmd, cur_annot =
+                let cur_cmd =
                   match cmd_step.call_stack with
-                  | [] -> (None, None)
+                  | [] -> None
                   | (se : CallStack.stack_element) :: _ -> (
                       let proc = Prog.get_proc dbg.prog se.pid in
                       match proc with
-                      | None      -> (None, None)
+                      | None      -> None
                       | Some proc ->
                           let annot, _, cmd =
                             proc.proc_body.(cmd_step.proc_body_index)
                           in
-                          (Some cmd, Some annot))
+                          Some (cmd, annot))
                 in
-                let () = dbg.cur_cmd <- cur_cmd in
-                dbg.cur_annot <- cur_annot
+                dbg.cur_cmd <- cur_cmd
             | Error err   -> failwith err)
         | _ as t ->
             raise
@@ -341,7 +336,6 @@ struct
                  variables = Hashtbl.create 0;
                  errors = [];
                  cur_cmd = None;
-                 cur_annot = None;
                }
                 : debugger_state)
             in
@@ -490,8 +484,8 @@ struct
     | ExecErr.ESt state_error -> (
         match state_error with
         | StateErr.EMem merr ->
-            MemoryErrorLifter.error_to_exception_info merr dbg.cur_cmd
-              dbg.cur_annot dbg.tl_ast
+            Lifter.memory_error_to_exception_info
+              { error = merr; command = dbg.cur_cmd; tl_ast = dbg.tl_ast }
         | _                  -> non_mem_exception_info)
     | _                       -> non_mem_exception_info
 

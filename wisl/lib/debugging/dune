@@ -1,4 +1,4 @@
 (library
  (name wDebugging)
  (libraries gillian str wParserAndCompiler wSemantics wSyntax wUtils)
- (flags :standard -open WUtils))
+ (flags :standard -open WUtils -open Gillian.Utils.Prelude))

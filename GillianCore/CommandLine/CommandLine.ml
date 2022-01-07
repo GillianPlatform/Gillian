@@ -17,11 +17,10 @@ module Make
     (PC : ParserAndCompiler.S) (Runners : sig
       val runners : Bulk.Runner.t list
     end)
-    (StoreAndSMemoryLifter : Debugger.StoreAndSMemoryLifter.S
-                               with type smemory = SMemory.t)
-    (MemoryErrorLifter : Debugger.MemoryErrorLifter.S
-                           with type merr = SMemory.err_t
-                            and type tl_ast = PC.tl_ast) =
+    (Gil_to_tl_lifter : Debugger.Gil_to_tl_lifter.S
+                          with type memory = SMemory.t
+                           and type memory_error = SMemory.err_t
+                           and type tl_ast = PC.tl_ast) =
 struct
   module CState = CState.Make (CMemory)
   module CInterpreter =
@@ -33,9 +32,7 @@ struct
     PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
   module Verification = Verifier.Make (SState) (SPState) (External)
   module Abductor = Abductor.Make (SState) (SPState) (External)
-  module Debugger =
-    Debugger.Make (PC) (Verification) (StoreAndSMemoryLifter)
-      (MemoryErrorLifter)
+  module Debugger = Debugger.Make (PC) (Verification) (Gil_to_tl_lifter)
   module DebugAdapter = DebugAdapter.Make (Debugger)
 
   let files =
