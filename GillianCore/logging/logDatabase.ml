@@ -90,8 +90,6 @@ let store_report
   Sqlite3.step stmt |> check_result_code db ~log:"step: store report";
   Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: store report"
 
-(* FIXME NOW: get_previous_report_id etc should return ReportId.t and not a string! Then finish merging! *)
-
 let get_report id =
   let db = get_db () in
   let stmt =

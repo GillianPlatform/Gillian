@@ -65,15 +65,12 @@ struct
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
   }
 
-  let top_level_scope_names =
-    (* [ "Store"; "Heap"; "Pure Formulae"; "Typing Environment"; "Predicates" ] *)
-    [ "Pure Formulae"; "Typing Environment"; "Predicates" ]
-
   let top_level_scopes : scope list =
-    List.map2
-      (fun name id -> { name; id })
-      top_level_scope_names
-      (List_utils.range (List.length top_level_scope_names))
+    let top_level_scope_names =
+      (* [ "Store"; "Heap"; "Pure Formulae"; "Typing Environment"; "Predicates" ] *)
+      [ "Pure Formulae"; "Typing Environment"; "Predicates" ]
+    in
+    List.mapi (fun i name -> { name; id = i + 1 }) top_level_scope_names
 
   let is_gil_file file_name = Filename.check_suffix file_name "gil"
 

@@ -92,10 +92,3 @@ let index_of element list =
     | _ :: r -> aux (cursor + 1) r
   in
   aux 0 list
-
-(** Returns a list of integers from 1 to n (inclusive) in ascending order  *)
-let range n =
-  let rec aux acc high low =
-    if high >= low then aux (high :: acc) (high - 1) low else acc
-  in
-  aux [] n 1
