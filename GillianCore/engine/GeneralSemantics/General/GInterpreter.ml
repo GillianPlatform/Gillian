@@ -27,20 +27,33 @@ module type S = sig
   type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
 
   type cconf_t =
-    | ConfErr    of CallStack.t * int * state_t * err_t list
-    | ConfCont   of
-        state_t * CallStack.t * invariant_frames * int * string list * int * int
-    | ConfFinish of Flag.t * state_vt * state_t
+    | ConfErr    of {
+        callstack : CallStack.t;
+        proc_idx : int;
+        error_state : state_t;
+        errors : err_t list;
+      }
+    | ConfCont   of {
+        state : state_t;
+        callstack : CallStack.t;
+        invariant_frames : invariant_frames;
+        prev_idx : int;
+        next_idx : int;
+        loop_ids : string list;
+        branch_count : int;
+      }
+    | ConfFinish of { flag : Flag.t; ret_val : state_vt; final_state : state_t }
         (** Equal to Conf cont + the id of the required spec *)
-    | ConfSusp   of
-        string
-        * state_t
-        * CallStack.t
-        * invariant_frames
-        * int
-        * string list
-        * int
-        * int
+    | ConfSusp   of {
+        spec_id : string;
+        state : state_t;
+        callstack : CallStack.t;
+        invariant_frames : invariant_frames;
+        prev_idx : int;
+        next_idx : int;
+        loop_ids : string list;
+        branch_count : int;
+      }
 
   type conf_t = BConfErr of err_t list | BConfCont of state_t
 
@@ -51,7 +64,7 @@ module type S = sig
     | Continue of (Logging.ReportId.t option * (unit -> 'a cont_func))
 
   type cmd_step = {
-    call_stack : CallStack.t;
+    callstack : CallStack.t;
     proc_body_index : int;
     state : state_t option;
     errors : err_t list;
@@ -127,20 +140,33 @@ struct
 
   (** Type of configurations: state, call stack, previous index, previous loop ids, current index, branching *)
   type cconf_t =
-    | ConfErr    of CallStack.t * int * State.t * err_t list
-    | ConfCont   of
-        State.t * CallStack.t * invariant_frames * int * string list * int * int
-    | ConfFinish of Flag.t * State.vt * State.t
+    | ConfErr    of {
+        callstack : CallStack.t;
+        proc_idx : int;
+        error_state : state_t;
+        errors : err_t list;
+      }
+    | ConfCont   of {
+        state : State.t;
+        callstack : CallStack.t;
+        invariant_frames : invariant_frames;
+        prev_idx : int;
+        next_idx : int;
+        loop_ids : string list;
+        branch_count : int;
+      }
+    | ConfFinish of { flag : Flag.t; ret_val : State.vt; final_state : State.t }
         (** Equal to Conf cont + the id of the required spec *)
-    | ConfSusp   of
-        string
-        * State.t
-        * CallStack.t
-        * invariant_frames
-        * int
-        * string list
-        * int
-        * int
+    | ConfSusp   of {
+        spec_id : string;
+        state : state_t;
+        callstack : CallStack.t;
+        invariant_frames : invariant_frames;
+        prev_idx : int;
+        next_idx : int;
+        loop_ids : string list;
+        branch_count : int;
+      }
 
   type conf_t = BConfErr of err_t list | BConfCont of State.t
 
@@ -151,7 +177,7 @@ struct
     | Continue of (Logging.ReportId.t option * (unit -> 'a cont_func))
 
   type cmd_step = {
-    call_stack : CallStack.t;
+    callstack : CallStack.t;
     proc_body_index : int;
     state : state_t option;
     errors : err_t list;
@@ -300,7 +326,7 @@ struct
   let cmd_step_pp fmt cmd_step =
     (* TODO: Cmd step should contain all things in a configuration
              print the same contents as print_configuration *)
-    CallStack.pp fmt cmd_step.call_stack
+    CallStack.pp fmt cmd_step.callstack
 
   let annotated_action_pp fmt annotated_action =
     let origin_loc = Annot.get_origin_loc annotated_action.annot in
@@ -646,7 +672,16 @@ struct
               raise (Syntax_error msg)
         in
 
-        ConfCont (ret_state, new_cs, iframes, i, loop_ids, new_j, b_counter)
+        ConfCont
+          {
+            state = ret_state;
+            callstack = new_cs;
+            invariant_frames = iframes;
+            prev_idx = i;
+            loop_ids;
+            next_idx = new_j;
+            branch_count = b_counter;
+          }
       in
 
       let is_internal_proc proc_name =
@@ -662,7 +697,18 @@ struct
           CallStack.push cs ~pid ~arguments:v_args ~store:old_store ~loop_ids
             ~ret_var:x ~call_index:i ~continue_index:(i + 1) ?error_index:j ()
         in
-        [ ConfCont (state', cs', iframes, -1, loop_ids, 0, b_counter) ]
+        [
+          ConfCont
+            {
+              state = state';
+              callstack = cs';
+              invariant_frames = iframes;
+              prev_idx = -1;
+              loop_ids;
+              next_idx = 0;
+              branch_count = b_counter;
+            };
+        ]
       in
 
       let spec_exec_proc () =
@@ -708,7 +754,16 @@ struct
             if Hashtbl.mem prog.prog.bi_specs pid then
               [
                 ConfSusp
-                  (pid, state, cs, iframes, prev, prev_loop_ids, i, b_counter);
+                  {
+                    spec_id = pid;
+                    state;
+                    callstack = cs;
+                    invariant_frames = iframes;
+                    prev_idx = prev;
+                    loop_ids = prev_loop_ids;
+                    next_idx = i;
+                    branch_count = b_counter;
+                  };
               ]
             else symb_exec_proc ()
       in
@@ -735,12 +790,35 @@ struct
 
     match cmd with
     (* Skip *)
-    | Skip -> [ ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter) ]
+    | Skip ->
+        [
+          ConfCont
+            {
+              state;
+              callstack = cs;
+              invariant_frames = iframes;
+              prev_idx = i;
+              loop_ids;
+              next_idx = i + 1;
+              branch_count = b_counter;
+            };
+        ]
     (* Assignment *)
     | Assignment (x, e) ->
         let v = eval_expr e in
         let state' = update_store state x v in
-        [ ConfCont (state', cs, iframes, i, loop_ids, i + 1, b_counter) ]
+        [
+          ConfCont
+            {
+              state = state';
+              callstack = cs;
+              invariant_frames = iframes;
+              prev_idx = i;
+              loop_ids;
+              next_idx = i + 1;
+              branch_count = b_counter;
+            };
+        ]
     (* Action *)
     | LAction (x, a, es) -> (
         let _ =
@@ -764,13 +842,15 @@ struct
                   let r_v = eval_expr r_e in
                   let r_state' = update_store r_state x r_v in
                   ConfCont
-                    ( r_state',
-                      CallStack.copy cs,
-                      iframes,
-                      i,
-                      loop_ids,
-                      i + 1,
-                      b_counter ))
+                    {
+                      state = r_state';
+                      callstack = CallStack.copy cs;
+                      invariant_frames = iframes;
+                      prev_idx = i;
+                      loop_ids;
+                      next_idx = i + 1;
+                      branch_count = b_counter;
+                    })
                 rest_rets
             in
             let ret_len = 1 + List.length rest_rets in
@@ -791,7 +871,15 @@ struct
                 | _ ->
                     [
                       ConfCont
-                        (state'', cs, iframes, i, loop_ids, i + 1, b_counter);
+                        {
+                          state = state'';
+                          callstack = cs;
+                          invariant_frames = iframes;
+                          prev_idx = i;
+                          loop_ids;
+                          next_idx = i + 1;
+                          branch_count = b_counter;
+                        };
                     ])
             | false, true -> (
                 (* Can split into two threads *)
@@ -802,11 +890,28 @@ struct
                 | 0 ->
                     [
                       ConfCont
-                        (state'', cs, iframes, i, loop_ids, i + 1, b_counter);
+                        {
+                          state = state'';
+                          callstack = cs;
+                          invariant_frames = iframes;
+                          prev_idx = i;
+                          loop_ids;
+                          next_idx = i + 1;
+                          branch_count = b_counter;
+                        };
                     ]
                 | _ -> rest_confs)
             | _           ->
-                ConfCont (state'', cs, iframes, i, loop_ids, i + 1, b_counter)
+                ConfCont
+                  {
+                    state = state'';
+                    callstack = cs;
+                    invariant_frames = iframes;
+                    prev_idx = i;
+                    loop_ids;
+                    next_idx = i + 1;
+                    branch_count = b_counter;
+                  }
                 :: rest_confs)
         | AFail errs ->
             if not (ExecMode.concrete_exec !Config.current_exec_mode) then (
@@ -831,7 +936,15 @@ struct
                   List.map
                     (fun state ->
                       ConfCont
-                        (state, cs, iframes, prev, prev_loop_ids, i, b_counter))
+                        {
+                          state;
+                          callstack = cs;
+                          invariant_frames = iframes;
+                          prev_idx = prev;
+                          loop_ids = prev_loop_ids;
+                          next_idx = i;
+                          branch_count = b_counter;
+                        })
                     recovery_states
               | _                  ->
                   L.normal ~title:"failure" ~severity:Error (fun m ->
@@ -845,7 +958,18 @@ struct
         match lcmd with
         | SL SymbExec ->
             symb_exec_next := true;
-            [ ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter) ]
+            [
+              ConfCont
+                {
+                  state;
+                  callstack = cs;
+                  invariant_frames = iframes;
+                  prev_idx = i;
+                  loop_ids;
+                  next_idx = i + 1;
+                  branch_count = b_counter;
+                };
+            ]
         (* Invariant being revisited *)
         | SL (Invariant (a, binders)) when prev_loop_ids = loop_ids ->
             (* let () = Fmt.pr "\nRe-establishing invariant... @?" in *)
@@ -863,7 +987,16 @@ struct
             List.map
               (fun (frame, state) ->
                 let iframes = (List.hd loop_ids, frame) :: iframes in
-                ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter))
+                ConfCont
+                  {
+                    state;
+                    callstack = cs;
+                    invariant_frames = iframes;
+                    prev_idx = i;
+                    loop_ids;
+                    next_idx = i + 1;
+                    branch_count = b_counter;
+                  })
               frames_and_states
         | _ ->
             let resulting_states : State.t list =
@@ -875,10 +1008,31 @@ struct
             in
             List.map
               (fun state ->
-                ConfCont (state, cs, iframes, i, loop_ids, i + 1, b_counter))
+                ConfCont
+                  {
+                    state;
+                    callstack = cs;
+                    invariant_frames = iframes;
+                    prev_idx = i;
+                    loop_ids;
+                    next_idx = i + 1;
+                    branch_count = b_counter;
+                  })
               resulting_states)
     (* Unconditional goto *)
-    | Goto j -> [ ConfCont (state, cs, iframes, i, loop_ids, j, b_counter) ]
+    | Goto j ->
+        [
+          ConfCont
+            {
+              state;
+              callstack = cs;
+              invariant_frames = iframes;
+              prev_idx = i;
+              loop_ids;
+              next_idx = j;
+              branch_count = b_counter;
+            };
+        ]
     (* Conditional goto *)
     | GuardedGoto (e, j, k) -> (
         let vt = eval_expr e in
@@ -937,13 +1091,15 @@ struct
           List.mapi
             (fun j (state, next) ->
               ConfCont
-                ( state,
-                  (if j = 0 then cs else CallStack.copy cs),
-                  iframes,
-                  i,
-                  loop_ids,
-                  next,
-                  b_counter ))
+                {
+                  state;
+                  callstack = (if j = 0 then cs else CallStack.copy cs);
+                  invariant_frames = iframes;
+                  prev_idx = i;
+                  loop_ids;
+                  next_idx = next;
+                  branch_count = b_counter;
+                })
             sp
         in
         match
@@ -967,7 +1123,18 @@ struct
               update_store state x v)
             state lxarr
         in
-        [ ConfCont (state', cs, iframes, i, loop_ids, i + 1, b_counter) ]
+        [
+          ConfCont
+            {
+              state = state';
+              callstack = cs;
+              invariant_frames = iframes;
+              prev_idx = i;
+              loop_ids;
+              next_idx = i + 1;
+              branch_count = b_counter;
+            };
+        ]
     (* Function call *)
     | Call (x, e, args, j, subst) ->
         let pid = eval_expr e in
@@ -988,7 +1155,16 @@ struct
         let v_args = List.map eval_expr args in
         List.map
           (fun (state, cs, i, j) ->
-            ConfCont (state, cs, iframes, i, loop_ids, j, b_counter))
+            ConfCont
+              {
+                state;
+                callstack = cs;
+                invariant_frames = iframes;
+                prev_idx = i;
+                loop_ids;
+                next_idx = j;
+                branch_count = b_counter;
+              })
           (External.execute prog.prog state cs i x pid v_args j)
     (* Function application *)
     | Apply (x, pid_args, j) -> (
@@ -1009,7 +1185,18 @@ struct
         let args = CallStack.get_cur_args cs in
         let args = Val.from_list args in
         let state' = update_store state x args in
-        [ ConfCont (state', cs, iframes, i, loop_ids, i + 1, b_counter) ]
+        [
+          ConfCont
+            {
+              state = state';
+              callstack = cs;
+              invariant_frames = iframes;
+              prev_idx = i;
+              loop_ids;
+              next_idx = i + 1;
+              branch_count = b_counter;
+            };
+        ]
     (* Normal-mode return *)
     | ReturnNormal ->
         let v_ret = Store.get store Names.return_variable in
@@ -1023,7 +1210,10 @@ struct
                    particular print statement currently causes issues, but
                    should be re-added once stdout has been redirected. *)
               (* Fmt.pr "n @?"; *)
-              [ ConfFinish (Normal, v_ret, state) ]
+              [
+                ConfFinish
+                  { flag = Normal; ret_val = v_ret; final_state = state };
+              ]
           | ( Some v_ret,
               {
                 store = Some old_store;
@@ -1046,7 +1236,15 @@ struct
               let state' = State.set_store state old_store in
               let state'' = update_store state' x v_ret in
               ConfCont
-                (state'', cs', iframes, prev', start_loop_ids, j, b_counter)
+                {
+                  state = state'';
+                  callstack = cs';
+                  invariant_frames = iframes;
+                  prev_idx = prev';
+                  loop_ids = start_loop_ids;
+                  next_idx = j;
+                  branch_count = b_counter;
+                }
           | _ -> raise (Failure "Malformed callstack")
         in
         L.verbose (fun m -> m "Returning.");
@@ -1060,7 +1258,9 @@ struct
         | Some v_ret, { store = None; loop_ids = start_loop_ids; _ } :: _ ->
             check_loop_ids loop_ids start_loop_ids;
             Fmt.pr "e @?";
-            [ ConfFinish (Error, v_ret, state) ]
+            [
+              ConfFinish { flag = Error; ret_val = v_ret; final_state = state };
+            ]
         | ( Some v_ret,
             {
               store = Some old_store;
@@ -1082,7 +1282,16 @@ struct
             in
             let state' = State.set_store state old_store in
             let state'' = update_store state' x v_ret in
-            ConfCont (state'', cs', iframes, prev', start_loop_ids, j, b_counter)
+            ConfCont
+              {
+                state = state'';
+                callstack = cs';
+                invariant_frames = iframes;
+                prev_idx = prev';
+                loop_ids = start_loop_ids;
+                next_idx = j;
+                branch_count = b_counter;
+              }
         | _ -> raise (Failure "Malformed callstack"))
     (* Explicit failure *)
     | Fail (fail_code, fail_params) ->
@@ -1112,10 +1321,19 @@ struct
         try
           evaluate_cmd prog state cs iframes prev prev_loop_ids i b_counter
         with
-        | Interpreter_error (errs, state) -> [ ConfErr (cs, i, state, errs) ]
-        | State.Internal_State_Error (errs, state) ->
+        | Interpreter_error (errors, error_state) ->
+            [ ConfErr { callstack = cs; proc_idx = i; error_state; errors } ]
+        | State.Internal_State_Error (errs, error_state) ->
             (* Return: current procedure name, current command index, the state, and the associated errors *)
-            [ ConfErr (cs, i, state, List.map (fun x -> ExecErr.ESt x) errs) ])
+            [
+              ConfErr
+                {
+                  callstack = cs;
+                  proc_idx = i;
+                  error_state;
+                  errors = List.map (fun x -> ExecErr.ESt x) errs;
+                };
+            ])
       states
 
   (**
@@ -1141,24 +1359,21 @@ struct
 
     let continue_or_pause rest_confs cont_func =
       match rest_confs with
-      | ConfCont (state, call_stack, _, _, _, proc_body_index, _) :: _ ->
+      | ConfCont { state; callstack; next_idx = proc_body_index; _ } :: _ ->
           let report_id =
             L.normal_specific
               (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
-                 {
-                   call_stack;
-                   proc_body_index;
-                   state = Some state;
-                   errors = [];
-                 })
+                 { callstack; proc_body_index; state = Some state; errors = [] })
               L.LoggingConstants.ContentType.cmd_step
           in
           Continue (report_id, fun () -> L.with_normal_phase cont_func)
-      | ConfErr (call_stack, proc_body_index, state, errors) :: _ ->
+      | ConfErr
+          { callstack; proc_idx = proc_body_index; error_state = state; errors }
+        :: _ ->
           let report_id =
             L.normal_specific
               (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
-                 { call_stack; proc_body_index; state = Some state; errors })
+                 { callstack; proc_body_index; state = Some state; errors })
               L.LoggingConstants.ContentType.cmd_step
           in
           Continue (report_id, fun () -> L.with_normal_phase cont_func)
@@ -1180,7 +1395,16 @@ struct
           in
           continue_or_pause hold_confs (fun () ->
               evaluate_cmd_step ret_fun false prog results [] hold_confs []))
-    | ConfCont (state, cs, iframes, prev, prev_loop_ids, i, b_counter)
+    | ConfCont
+        {
+          state;
+          callstack = cs;
+          invariant_frames = iframes;
+          prev_idx = prev;
+          loop_ids = prev_loop_ids;
+          next_idx = i;
+          branch_count = b_counter;
+        }
       :: rest_confs
       when b_counter < max_branching ->
         let next_confs =
@@ -1189,7 +1413,9 @@ struct
         in
         continue_or_pause (next_confs @ rest_confs) (fun () ->
             f (next_confs @ rest_confs) results)
-    | ConfCont (state, cs, _, _, _, i, b_counter) :: rest_confs ->
+    | ConfCont
+        { state; callstack = cs; next_idx = i; branch_count = b_counter; _ }
+      :: rest_confs ->
         let _, annot_cmd = get_cmd prog cs i in
         Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
         L.(
@@ -1200,20 +1426,40 @@ struct
                 b_counter));
         print_configuration annot_cmd state cs i b_counter;
         continue_or_pause rest_confs (fun () -> f rest_confs results)
-    | ConfErr (cs, i, state, errs) :: rest_confs ->
-        let proc = CallStack.get_cur_proc_id cs in
-        let result = ExecRes.RFail (proc, i, state, errs) in
+    | ConfErr { callstack; proc_idx; error_state; errors } :: rest_confs ->
+        let proc = CallStack.get_cur_proc_id callstack in
+        let result = ExecRes.RFail (proc, proc_idx, error_state, errors) in
         continue_or_pause rest_confs (fun () ->
             f rest_confs (result :: results))
-    | ConfFinish (fl, v, state) :: rest_confs ->
+    | ConfFinish { flag = fl; ret_val = v; final_state = state } :: rest_confs
+      ->
         let result = ExecRes.RSucc (fl, v, state) in
         continue_or_pause rest_confs (fun () ->
             f rest_confs (result :: results))
-    | ConfSusp (fid, state, cs, iframes, prev, prev_loop_ids, i, b_counter)
+    | ConfSusp
+        {
+          spec_id = fid;
+          state;
+          callstack;
+          invariant_frames;
+          prev_idx;
+          loop_ids;
+          next_idx;
+          branch_count;
+        }
       :: rest_confs
       when retry ->
         let conf =
-          ConfCont (state, cs, iframes, prev, prev_loop_ids, i, b_counter)
+          ConfCont
+            {
+              state;
+              callstack;
+              invariant_frames;
+              prev_idx;
+              loop_ids;
+              next_idx;
+              branch_count;
+            }
         in
         L.(
           verbose (fun m ->
@@ -1277,11 +1523,22 @@ struct
         ()
     in
     let proc_body_index = 0 in
-    let conf : cconf_t = ConfCont (state, cs, [], -1, [], proc_body_index, 0) in
+    let conf : cconf_t =
+      ConfCont
+        {
+          state;
+          callstack = cs;
+          invariant_frames = [];
+          prev_idx = -1;
+          loop_ids = [];
+          next_idx = proc_body_index;
+          branch_count = 0;
+        }
+    in
     let report_id =
       L.normal_specific
         (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
-           { call_stack = cs; proc_body_index; state = Some state; errors = [] })
+           { callstack = cs; proc_body_index; state = Some state; errors = [] })
         L.LoggingConstants.ContentType.cmd_step
     in
     Continue
@@ -1325,13 +1582,21 @@ struct
     let initial_state = State.init (Some prog.preds) in
     let initial_conf =
       ConfCont
-        (initial_state, initial_cs, [], -1, [], initial_proc_body_index, 0)
+        {
+          state = initial_state;
+          callstack = initial_cs;
+          invariant_frames = [];
+          prev_idx = -1;
+          loop_ids = [];
+          next_idx = initial_proc_body_index;
+          branch_count = 0;
+        }
     in
     let report_id =
       L.normal_specific
         (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
            {
-             call_stack = initial_cs;
+             callstack = initial_cs;
              proc_body_index = initial_proc_body_index;
              state = Some initial_state;
              errors = [];

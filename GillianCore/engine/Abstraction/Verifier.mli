@@ -15,6 +15,7 @@ module type S = sig
        and type store_t = SStore.t
        and type heap_t = heap_t
        and type m_err_t = m_err
+       and type preds_t = Preds.SPreds.t
 
   module SAInterpreter :
     GInterpreter.S

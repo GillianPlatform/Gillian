@@ -92,9 +92,11 @@ struct
     |> List.sort (fun v w -> Stdlib.compare v.name w.name)
 
   let get_pred_vars (state : state_t) : variable list =
-    Verification.SPState.get_pp_preds state
+    Verification.SPState.get_preds state
+    |> Preds.SPreds.to_list
     |> List.map (fun pred ->
-           { name = ""; value = pred; type_ = None; var_ref = 0 })
+           let value = Fmt.to_to_string (Fmt.hbox Preds.SPreds.pp_pabs) pred in
+           { name = ""; value; type_ = None; var_ref = 0 })
     |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 
   let create_variables (state : state_t option) (is_gil_file : bool) :
@@ -255,7 +257,7 @@ struct
             | Ok cmd_step ->
                 let () =
                   dbg.frames <-
-                    call_stack_to_frames cmd_step.call_stack
+                    call_stack_to_frames cmd_step.callstack
                       cmd_step.proc_body_index dbg.prog
                 in
                 let lifted_scopes, variables =
@@ -268,7 +270,7 @@ struct
                 in
                 let () = dbg.errors <- cmd_step.errors in
                 let cur_cmd =
-                  match cmd_step.call_stack with
+                  match cmd_step.callstack with
                   | [] -> None
                   | (se : CallStack.stack_element) :: _ -> (
                       let proc = Prog.get_proc dbg.prog se.pid in

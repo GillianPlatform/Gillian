@@ -24,20 +24,33 @@ module type S = sig
   type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
 
   type cconf_t =
-    | ConfErr    of CallStack.t * int * state_t * err_t list
-    | ConfCont   of
-        state_t * CallStack.t * invariant_frames * int * string list * int * int
-    | ConfFinish of Flag.t * state_vt * state_t
+    | ConfErr    of {
+        callstack : CallStack.t;
+        proc_idx : int;
+        error_state : state_t;
+        errors : err_t list;
+      }
+    | ConfCont   of {
+        state : state_t;
+        callstack : CallStack.t;
+        invariant_frames : invariant_frames;
+        prev_idx : int;
+        next_idx : int;
+        loop_ids : string list;
+        branch_count : int;
+      }
+    | ConfFinish of { flag : Flag.t; ret_val : state_vt; final_state : state_t }
         (** Equal to Conf cont + the id of the required spec *)
-    | ConfSusp   of
-        string
-        * state_t
-        * CallStack.t
-        * invariant_frames
-        * int
-        * string list
-        * int
-        * int
+    | ConfSusp   of {
+        spec_id : string;
+        state : state_t;
+        callstack : CallStack.t;
+        invariant_frames : invariant_frames;
+        prev_idx : int;
+        next_idx : int;
+        loop_ids : string list;
+        branch_count : int;
+      }
 
   type conf_t = BConfErr of err_t list | BConfCont of state_t
 
@@ -48,7 +61,7 @@ module type S = sig
     | Continue of (Logging.ReportId.t option * (unit -> 'a cont_func))
 
   type cmd_step = {
-    call_stack : CallStack.t;
+    callstack : CallStack.t;
     proc_body_index : int;
     state : state_t option;
     errors : err_t list;

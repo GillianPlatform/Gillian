@@ -30,8 +30,6 @@ module type S = sig
   val set_pred : t -> abs_t -> unit
 
   val automatic_unfold : t -> vt list -> (t list, string) result
-
-  val get_pp_preds : t -> string list
 end
 
 module Make
@@ -1270,10 +1268,6 @@ module Make
   let get_pfs pstate =
     let state, _, _ = pstate in
     State.get_pfs state
-
-  let get_pp_preds pstate =
-    get_preds pstate |> Preds.to_list
-    |> List.map (fun pred -> Fmt.to_to_string (Fmt.hbox Preds.pp_pabs) pred)
 
   let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
     (* TODO: Deserialize other components of pstate *)
