@@ -1,5 +1,48 @@
 open Containers
 
+module type S = sig
+  type st
+
+  type heap_t
+
+  type state
+
+  type m_err
+
+  module SPState :
+    PState.S
+      with type t = state
+       and type vt = SVal.M.t
+       and type st = st
+       and type store_t = SStore.t
+       and type heap_t = heap_t
+       and type m_err_t = m_err
+       and type preds_t = Preds.SPreds.t
+
+  module SAInterpreter :
+    GInterpreter.S
+      with type vt = SVal.M.t
+       and type st = st
+       and type store_t = SStore.t
+       and type state_t = state
+       and type heap_t = heap_t
+       and type state_err_t = SPState.err_t
+
+  type t
+
+  val start_time : float ref
+
+  val reset : unit -> unit
+
+  val verify_prog :
+    (Annot.t, int) Prog.t -> bool -> SourceFiles.t option -> unit
+
+  val verify_up_to_procs :
+    (Annot.t, int) Prog.t -> SAInterpreter.result_t SAInterpreter.cont_func
+
+  val postprocess_files : SourceFiles.t option -> unit
+end
+
 module Make
     (SState : State.S
                 with type vt = SVal.M.t
@@ -17,6 +60,15 @@ struct
   module SAInterpreter =
     GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SPState) (External)
   module Normaliser = Normaliser.Make (SPState)
+  module SPState = SPState
+
+  type st = SPState.st
+
+  type state = SPState.t
+
+  type heap_t = SPState.heap_t
+
+  type m_err = SPState.m_err_t
 
   let print_success_or_failure success =
     if success then Fmt.pr "%a" (Fmt.styled `Green Fmt.string) "Success\n"
@@ -450,18 +502,24 @@ struct
     print_success_or_failure success;
     success
 
+  let verify_up_to_procs (prog : UP.prog) (test : t) : UP.prog =
+    (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
+    match test.flag with
+    | Some _ ->
+        let msg = "Verifying one spec of procedure " ^ test.name ^ "... " in
+        L.tmi (fun fmt -> fmt "%s" msg);
+        Fmt.pr "%s@?" msg;
+        (* Reset coverage for every procedure in verification *)
+        { prog with coverage = Hashtbl.create 1 }
+    | None   -> raise (Failure "Debugging lemmas unsupported!")
+
   let verify (prog : UP.prog) (test : t) : bool =
     let state = test.pre_state in
 
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
     match test.flag with
     | Some flag ->
-        let msg = "Verifying one spec of procedure " ^ test.name ^ "... " in
-        L.tmi (fun fmt -> fmt "%s" msg);
-        Fmt.pr "%s@?" msg;
-        (* Reset coverage for every procedure in verification *)
-        let prog = { prog with coverage = Hashtbl.create 1 } in
-        (* TEST for procedure *)
+        let prog = verify_up_to_procs prog test in
         let rets =
           SAInterpreter.evaluate_proc
             (fun x -> x)
@@ -571,11 +629,10 @@ struct
           ~printer:print_success_or_failure res cur_verified)
       prev_results
 
-  let verify_procs
-      ?(prev_results : VerificationResults.t option)
+  let get_tests_to_verify
       (prog : (Annot.t, int) Prog.t)
       (pnames_to_verify : SS.t)
-      (lnames_to_verify : SS.t) : unit =
+      (lnames_to_verify : SS.t) : UP.prog * t list * t list =
     let ipreds = UP.init_preds prog.preds in
     match ipreds with
     | Error e  ->
@@ -669,28 +726,71 @@ struct
             Hashtbl.iter
               (fun pred_name _ -> record_preds_used_by_pred pred_name prog')
               prog'.preds;
+            (prog', tests', tests))
 
-            (* STEP 6: Run the symbolic tests *)
-            let cur_time = Sys.time () in
-            Fmt.pr "Running symbolic tests: %f\n@?" (cur_time -. !start_time);
-            let success : bool =
-              List.fold_left
-                (fun ac test -> if verify prog' test then ac else false)
-                true (tests' @ tests)
-            in
-            let end_time = Sys.time () in
-            let cur_verified = SS.union pnames_to_verify lnames_to_verify in
-            let success =
-              success && check_previously_verified prev_results cur_verified
-            in
-            let msg : string =
-              if success then "All specs succeeded:" else "There were failures:"
-            in
-            let msg : string =
-              Printf.sprintf "%s %f%!" msg (end_time -. !start_time)
-            in
-            Fmt.pr "%s\n@?" msg;
-            L.normal (fun m -> m "%s" msg))
+  let verify_procs
+      ?(prev_results : VerificationResults.t option)
+      (prog : (Annot.t, int) Prog.t)
+      (pnames_to_verify : SS.t)
+      (lnames_to_verify : SS.t) : unit =
+    let prog', tests', tests =
+      get_tests_to_verify prog pnames_to_verify lnames_to_verify
+    in
+    (* STEP 6: Run the symbolic tests *)
+    let cur_time = Sys.time () in
+    Printf.printf "Running symbolic tests: %f\n" (cur_time -. !start_time);
+    let success : bool =
+      List.fold_left
+        (fun ac test -> if verify prog' test then ac else false)
+        true (tests' @ tests)
+    in
+    let end_time = Sys.time () in
+    let cur_verified = SS.union pnames_to_verify lnames_to_verify in
+    let success =
+      success && check_previously_verified prev_results cur_verified
+    in
+    let msg : string =
+      if success then "All specs succeeded:" else "There were failures:"
+    in
+    let msg : string = Printf.sprintf "%s %f%!" msg (end_time -. !start_time) in
+    Printf.printf "%s\n" msg;
+    L.normal (fun m -> m "%s" msg)
+
+  let verify_up_to_procs (prog : (Annot.t, int) Prog.t) :
+      SAInterpreter.result_t SAInterpreter.cont_func =
+    L.with_normal_phase ~title:"Program verification" (fun () ->
+        (* Analyse all procedures and lemmas *)
+        let procs_to_verify =
+          SS.of_list (Prog.get_noninternal_proc_names prog)
+        in
+        let lemmas_to_verify =
+          SS.of_list (Prog.get_noninternal_lemma_names prog)
+        in
+        let procs_to_verify, lemmas_to_verify =
+          if !Config.Verification.verify_only_some_of_the_things then
+            ( SS.inter procs_to_verify
+                (SS.of_list !Config.Verification.procs_to_verify),
+              SS.inter lemmas_to_verify
+                (SS.of_list !Config.Verification.lemmas_to_verify) )
+          else (procs_to_verify, lemmas_to_verify)
+        in
+        let prog, _, proc_tests =
+          get_tests_to_verify prog procs_to_verify lemmas_to_verify
+        in
+        (* TODO: Verify All procedures. Currently we only verify the first
+               procedure. Assume there is at least one procedure*)
+        let test = List.hd proc_tests in
+        SAInterpreter.init_evaluate_proc
+          (fun x -> x)
+          prog test.name test.params test.pre_state)
+
+  let postprocess_files source_files =
+    let cur_source_files =
+      Option.value ~default:(SourceFiles.make ()) source_files
+    in
+    let call_graph = SAInterpreter.call_graph in
+    ResultsDir.write_verif_results cur_source_files call_graph ~diff:""
+      global_results
 
   let verify_prog
       (prog : (Annot.t, int) Prog.t)

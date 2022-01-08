@@ -6,7 +6,7 @@ module Make
     (Val : Val.S)
     (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
-    (State : State.S
+    (State : SState.S
                with type vt = Val.t
                 and type st = ESubst.t
                 and type store_t = Store.t) =
@@ -20,11 +20,13 @@ struct
 
   type store_t = Store.t
 
+  type heap_t = State.heap_t
+
   type state_t = State.t
 
   type t = SS.t * state_t * state_t
 
-  type err_t = State.err_t
+  type err_t = State.err_t [@@deriving yojson]
 
   type fix_t = State.fix_t
 
@@ -609,4 +611,16 @@ struct
   let get_equal_values bi_state =
     let _, state, _ = bi_state in
     State.get_equal_values state
+
+  let get_heap bi_state =
+    let _, state, _ = bi_state in
+    State.get_heap state
+
+  let of_yojson _ =
+    failwith
+      "Please implement of_yojson to enable logging this type to a database"
+
+  let to_yojson _ =
+    failwith
+      "Please implement to_yojson to enable logging this type to a database"
 end

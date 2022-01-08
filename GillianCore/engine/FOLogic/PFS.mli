@@ -1,5 +1,5 @@
 (** Type of Gillian pure formulae *)
-type t
+type t [@@deriving yojson]
 
 (** [init ()] returns a fresh empty collection of pure formulae *)
 val init : unit -> t

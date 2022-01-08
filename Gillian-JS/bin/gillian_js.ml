@@ -6,5 +6,6 @@ module CLI =
       let runners : Gillian.Bulk.Runner.t list =
         [ (module Test262.Test262_runner); (module CosetteRunner) ]
     end)
+    (Debugging.JSLifter)
 
 let () = CLI.main ()

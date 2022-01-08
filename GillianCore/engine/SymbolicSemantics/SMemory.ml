@@ -9,10 +9,10 @@ module type S = sig
 
   type c_fix_t
 
-  type err_t
+  type err_t [@@deriving yojson]
 
   (** Type of GIL general states *)
-  type t
+  type t [@@deriving yojson]
 
   type action_ret =
     | ASucc of (t * vt list * Formula.t list * (string * Type.t) list) list

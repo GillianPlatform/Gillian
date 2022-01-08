@@ -99,3 +99,4 @@ end
 module SS = Containers.SS
 module SI = Containers.SI
 module SN = Containers.SN
+module Syntaxes = Syntaxes

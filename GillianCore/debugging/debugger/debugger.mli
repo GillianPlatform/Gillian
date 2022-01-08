@@ -1,4 +1,6 @@
 module DebuggerTypes = DebuggerTypes
+module DebuggerUtils = DebuggerUtils
+module Gil_to_tl_lifter = Gil_to_tl_lifter
 open DebuggerTypes
 
 module type S = sig
@@ -28,3 +30,11 @@ module type S = sig
 
   val set_breakpoints : string option -> int list -> debugger_state -> unit
 end
+
+module Make
+    (PC : ParserAndCompiler.S)
+    (Verification : Verifier.S)
+    (Lifter : Gil_to_tl_lifter.S
+                with type memory = Verification.SAInterpreter.heap_t
+                 and type memory_error = Verification.SPState.m_err_t
+                 and type tl_ast = PC.tl_ast) : S

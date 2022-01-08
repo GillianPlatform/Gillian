@@ -5,11 +5,11 @@ module Solver = Gillian.Logic.FOSolver
 module Reduction = Gillian.Logic.Reduction
 
 type err =
-  | MissingRessource
-  | DoubleFree
-  | UseAfterFree
+  | MissingResource of (WislLActions.ga * string * Expr.t option)
+  | DoubleFree      of string
+  | UseAfterFree    of string
   | MemoryLeak
-  | OutOfBound
+  | OutOfBounds     of (int option * string * Expr.t)
   | InvalidLocation
 [@@deriving yojson]
 
@@ -68,6 +68,23 @@ let init () = Hashtbl.create 1
 
 let copy heap = Hashtbl.copy heap
 
+(****** Types and functions for logging when blocks have been freed ********)
+
+type set_freed_info = { loc : string } [@@deriving yojson]
+
+let set_freed_info_pp fmt set_freed =
+  Fmt.pf fmt "Set Freed at location %s" set_freed.loc
+
+let set_freed_with_logging heap loc =
+  let set_freed_info = { loc } in
+  let _ =
+    Logging.normal_specific
+      (Logging.Loggable.make set_freed_info_pp set_freed_info_of_yojson
+         set_freed_info_to_yojson set_freed_info)
+      Logging.LoggingConstants.ContentType.set_freed_info
+  in
+  Hashtbl.replace heap loc Block.Freed
+
 (***** Implementation of local actions *****)
 
 let alloc (heap : t) size =
@@ -86,8 +103,10 @@ let alloc (heap : t) size =
 
 let dispose (heap : t) loc =
   match Hashtbl.find_opt heap loc with
-  | Some (Allocated { data = _; bound = None }) | None -> Error MissingRessource
-  | Some Freed -> Error DoubleFree
+  | None -> Error (MissingResource (Cell, loc, None))
+  | Some (Allocated { data = _; bound = None }) ->
+      Error (MissingResource (Bound, loc, None))
+  | Some Freed -> Error (DoubleFree loc)
   | Some (Allocated { data; bound = Some i }) ->
       let has_all =
         let so_far = ref true in
@@ -97,14 +116,14 @@ let dispose (heap : t) loc =
         !so_far
       in
       if has_all then
-        let () = Hashtbl.replace heap loc Freed in
+        let () = set_freed_with_logging heap loc in
         Ok ()
-      else Error MissingRessource
+      else Error (MissingResource (Bound, loc, None))
 
 let get_cell ~pfs ~gamma heap loc ofs =
   match Hashtbl.find_opt heap loc with
-  | None -> Error MissingRessource
-  | Some Block.Freed -> Error UseAfterFree
+  | None -> Error (MissingResource (Cell, loc, Some ofs))
+  | Some Block.Freed -> Error (UseAfterFree loc)
   | Some (Allocated { data; bound }) -> (
       let maybe_out_of_bound =
         match bound with
@@ -114,7 +133,7 @@ let get_cell ~pfs ~gamma heap loc ofs =
             let open Formula.Infix in
             Solver.sat ~unification:false ~pfs ~gamma [ n #<= ofs ]
       in
-      if maybe_out_of_bound then Error OutOfBound
+      if maybe_out_of_bound then Error (OutOfBounds (bound, loc, ofs))
       else
         match SFVL.get ofs data with
         | Some v -> Ok (loc, ofs, v)
@@ -125,7 +144,7 @@ let get_cell ~pfs ~gamma heap loc ofs =
                 data
             with
             | Some (o, v) -> Ok (loc, o, v)
-            | None        -> Error MissingRessource))
+            | None        -> Error (MissingResource (Cell, loc, Some ofs))))
 
 let set_cell ~pfs ~gamma heap loc_name ofs v =
   match Hashtbl.find_opt heap loc_name with
@@ -134,7 +153,7 @@ let set_cell ~pfs ~gamma heap loc_name ofs v =
       let bound = None in
       let () = Hashtbl.replace heap loc_name (Allocated { data; bound }) in
       Ok ()
-  | Some Block.Freed -> Error UseAfterFree
+  | Some Block.Freed -> Error (UseAfterFree loc_name)
   | Some (Allocated { data; bound }) ->
       let maybe_out_of_bound =
         match bound with
@@ -144,7 +163,7 @@ let set_cell ~pfs ~gamma heap loc_name ofs v =
             let open Formula.Infix in
             Solver.sat ~unification:false ~pfs ~gamma [ n #<= ofs ]
       in
-      if maybe_out_of_bound then Error UseAfterFree
+      if maybe_out_of_bound then Error (UseAfterFree loc_name)
       else
         let equality_test = Solver.is_equal ~pfs ~gamma in
         let data = SFVL.add_with_test ~equality_test ofs v data in
@@ -153,8 +172,8 @@ let set_cell ~pfs ~gamma heap loc_name ofs v =
 
 let rem_cell heap loc offset =
   match Hashtbl.find_opt heap loc with
-  | None -> Error MissingRessource
-  | Some Block.Freed -> Error UseAfterFree
+  | None -> Error (MissingResource (Cell, loc, Some offset))
+  | Some Block.Freed -> Error (UseAfterFree loc)
   | Some (Allocated { bound; data }) ->
       let data = SFVL.remove offset data in
       let () = Hashtbl.replace heap loc (Allocated { bound; data }) in
@@ -162,14 +181,16 @@ let rem_cell heap loc offset =
 
 let get_bound heap loc =
   match Hashtbl.find_opt heap loc with
-  | Some Block.Freed -> Error UseAfterFree
-  | None | Some (Allocated { bound = None; _ }) -> Error MissingRessource
+  | Some Block.Freed -> Error (UseAfterFree loc)
+  | None -> Error (MissingResource (Cell, loc, None))
+  | Some (Allocated { bound = None; _ }) ->
+      Error (MissingResource (Bound, loc, None))
   | Some (Allocated { bound = Some bound; _ }) -> Ok bound
 
 let set_bound heap loc bound =
   let prev = Option.value ~default:Block.empty (Hashtbl.find_opt heap loc) in
   match prev with
-  | Freed                 -> Error UseAfterFree
+  | Freed                 -> Error (UseAfterFree loc)
   | Allocated { data; _ } ->
       let changed = Block.Allocated { data; bound = Some bound } in
       let () = Hashtbl.replace heap loc changed in
@@ -177,8 +198,10 @@ let set_bound heap loc bound =
 
 let rem_bound heap loc =
   match Hashtbl.find_opt heap loc with
-  | Some Block.Freed -> Error UseAfterFree
-  | None | Some (Allocated { bound = None; _ }) -> Error MissingRessource
+  | Some Block.Freed -> Error (UseAfterFree loc)
+  | None -> Error (MissingResource (Cell, loc, None))
+  | Some (Allocated { bound = None; _ }) ->
+      Error (MissingResource (Bound, loc, None))
   | Some (Allocated { data; _ }) ->
       let () = Hashtbl.replace heap loc (Allocated { data; bound = None }) in
       Ok ()
@@ -187,16 +210,16 @@ let get_freed heap loc =
   match Hashtbl.find_opt heap loc with
   | Some Block.Freed -> Ok ()
   | Some _           -> Error MemoryLeak
-  | None             -> Error MissingRessource
+  | None             -> Error (MissingResource (Freed, loc, None))
 
-let set_freed heap loc = Hashtbl.replace heap loc Block.Freed
+let set_freed heap loc = set_freed_with_logging heap loc
 
 let rem_freed heap loc =
   match Hashtbl.find_opt heap loc with
   | Some Block.Freed ->
       Hashtbl.remove heap loc;
       Ok ()
-  | None             -> Error MissingRessource
+  | None             -> Error (MissingResource (Freed, loc, None))
   | Some _           -> Error MemoryLeak
 
 (***** Some things specific to symbolic heaps ********)
@@ -263,3 +286,96 @@ let pp fmt heap =
     ( Fmt.iter_bindings ~sep:(Fmt.any "@\n@\n") Hashtbl.iter @@ fun ft (l, b) ->
       Block.pp ~loc:l ft b )
     heap
+
+let get_store_vars store is_gil_file =
+  List.filter_map
+    (fun (var, (value : Gil_syntax.Expr.t)) ->
+      if (not is_gil_file) && Str.string_match (Str.regexp "gvar") var 0 then
+        None
+      else
+        let match_offset lst loc loc_pp =
+          match lst with
+          | [ Expr.Lit (Num offset) ] ->
+              Fmt.str "-> (%a, %.0f)" (Fmt.hbox loc_pp) loc offset
+          | [ offset ]                ->
+              Fmt.str "-> (%a, %a)" (Fmt.hbox loc_pp) loc (Fmt.hbox Expr.pp)
+                offset
+          | _                         -> Fmt.to_to_string (Fmt.hbox Expr.pp)
+                                           value
+        in
+        let value =
+          match value with
+          | Expr.EList (Lit (Loc loc) :: rest) | Expr.EList (LVar loc :: rest)
+            -> match_offset rest loc Fmt.string
+          | _ -> Fmt.to_to_string (Fmt.hbox Expr.pp) value
+        in
+        Some
+          ({ name = var; value; type_ = None; var_ref = 0 }
+            : Debugger.DebuggerTypes.variable))
+    store
+  |> List.sort Stdlib.compare
+
+let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
+    Debugger.DebuggerTypes.variable list =
+  let open Debugger.DebuggerTypes in
+  let vstr = Fmt.to_to_string (Fmt.hbox Expr.pp) in
+  let compare_offsets (v, _) (w, _) =
+    try
+      let open Expr.Infix in
+      let difference = v -. w in
+      match difference with
+      | Expr.Lit (Num f) -> if f < 0. then -1 else if f > 0. then 1 else 0
+      | _                -> 0
+    with _ -> (* Do not sort the offsets if an exception has occurred *)
+              0
+  in
+  let cell_vars l : variable list =
+    List.sort compare_offsets l
+    |> List.map (fun (offset, value) : variable ->
+           (* Display offset as a number to match the printing of WISL pointers *)
+           let offset_str =
+             match offset with
+             | Expr.Lit (Num f) -> Fmt.str "%.0f" f
+             | other            -> vstr other
+           in
+           create_leaf_variable offset_str (vstr value) ())
+  in
+  smemory |> Hashtbl.to_seq
+  |> Seq.map (fun (loc, blocks) ->
+         match blocks with
+         | Block.Freed               -> create_leaf_variable loc "freed" ()
+         | Allocated { data; bound } ->
+             let bound =
+               match bound with
+               | None       -> "none"
+               | Some bound -> string_of_int bound
+             in
+             let bound = create_leaf_variable "bound" bound () in
+             let cells_id = get_new_scope_id () in
+             let () =
+               Hashtbl.replace variables cells_id
+                 (cell_vars (SFVL.to_list data))
+             in
+             let cells = create_node_variable "cells" cells_id () in
+             let loc_id = get_new_scope_id () in
+             let () = Hashtbl.replace variables loc_id [ bound; cells ] in
+             create_node_variable loc loc_id ~value:"allocated" ())
+  |> List.of_seq
+
+let add_debugger_variables
+    ~store ~memory ~is_gil_file ~get_new_scope_id variables =
+  let open Debugger.DebuggerTypes in
+  let store_id = get_new_scope_id () in
+  let memory_id = get_new_scope_id () in
+  let scopes : scope list =
+    [ { id = store_id; name = "Store" }; { id = memory_id; name = "Memory" } ]
+  in
+  let store_vars = get_store_vars store is_gil_file in
+  let memory_vars = add_memory_vars memory get_new_scope_id variables in
+  let vars = [ store_vars; memory_vars ] in
+  let () =
+    List.iter2
+      (fun (scope : scope) vars -> Hashtbl.replace variables scope.id vars)
+      scopes vars
+  in
+  scopes

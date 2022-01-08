@@ -14,8 +14,8 @@ type t = {
   sfvl : (string, SFVL.t) Hashtbl.t;
   sdom : (string, Expr.t option) Hashtbl.t;
   smet : (string, Expr.t option) Hashtbl.t;
-  cdmn : Var.Set.t ref;
-  sdmn : Var.Set.t ref;
+  cdmn : SS.t ref;
+  sdmn : SS.t ref;
 }
 [@@deriving yojson]
 

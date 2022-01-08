@@ -1018,7 +1018,7 @@ lit_target:
   | TRUE                      { Bool true }
   | FALSE                     { Bool false }
   | FLOAT                     { Num $1 }
-  | n = INTEGER               { Int n }   
+  | n = INTEGER               { Int n }
   | NAN                       { Num nan }
   | INFINITY                  { Num infinity }
   | STRING                    { String $1 }

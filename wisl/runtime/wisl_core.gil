@@ -9,4 +9,4 @@ pred i__pred_cell (+ptr: List, value):
       
 pred freed(+ptr: List):
       (ptr == {{ #l, 0. }}) * types(#l: Obj) *
-      <freed>(#l;); 
+      <freed>(#l;);

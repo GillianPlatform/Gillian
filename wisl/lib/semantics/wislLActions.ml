@@ -11,7 +11,7 @@ type ac =
   | Alloc
   | Dispose
 
-type ga = Cell | Bound | Freed
+type ga = Cell | Bound | Freed [@@deriving yojson]
 
 let str_ac = function
   | SetCell  -> "setcell"

@@ -3,9 +3,9 @@ open WLexer
 
 type err = unit
 
-let pp_err _ () = ()
-
 type tl_ast = WProg.t
+
+let pp_err _ () = ()
 
 let parse_with_error token lexbuf =
   try token read lexbuf with

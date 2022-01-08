@@ -6,6 +6,7 @@ module Concrete = Engine.Concrete
 module General = Engine.General
 module Bulk = Bulk
 module Monadic = Monadic
+module Debugger = Debugger
 
 module Logic = struct
   module Reduction = Engine.Reduction

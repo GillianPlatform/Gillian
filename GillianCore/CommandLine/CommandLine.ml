@@ -16,7 +16,11 @@ module Make
     (External : External.S)
     (PC : ParserAndCompiler.S) (Runners : sig
       val runners : Bulk.Runner.t list
-    end) =
+    end)
+    (Gil_to_tl_lifter : Debugger.Gil_to_tl_lifter.S
+                          with type memory = SMemory.t
+                           and type memory_error = SMemory.err_t
+                           and type tl_ast = PC.tl_ast) =
 struct
   module CState = CState.Make (CMemory)
   module CInterpreter =
@@ -28,6 +32,8 @@ struct
     PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
   module Verification = Verifier.Make (SState) (SPState) (External)
   module Abductor = Abductor.Make (SState) (SPState) (External)
+  module Debugger = Debugger.Make (PC) (Verification) (Gil_to_tl_lifter)
+  module DebugAdapter = DebugAdapter.Make (Debugger)
 
   let files =
     let doc = "Input file." in
@@ -62,18 +68,14 @@ struct
     in
     Arg.(value & opt c default & info [ "l"; "logging" ] ~docv:"SETTING" ~doc)
 
-  type reporter_info = { name : string; reporter : (module L.Reporter.S) }
+  type reporter_info = { name : string; reporter : L.Reporter.t }
 
   let reporters =
     let parse : string -> (reporter_info, [> `Msg of string ]) Result.t =
       function
-      | "file"            -> Ok
-                               {
-                                 name = "file";
-                                 reporter = (module L.FileReporter);
-                               }
+      | "file"            -> Ok { name = "file"; reporter = L.file_reporter }
       | "database" | "db" ->
-          Ok { name = "database"; reporter = (module L.DatabaseReporter) }
+          Ok { name = "database"; reporter = L.database_reporter }
       | other             -> Error (`Msg ("unknown value \"" ^ other ^ "\""))
     in
     let print fmt (reporter_info : reporter_info) =
@@ -81,12 +83,13 @@ struct
     in
     let c = Arg.(list & conv (parse, print)) in
     let default : reporter_info list =
-      [ { name = "file"; reporter = (module L.FileReporter) } ]
+      [ { name = "file"; reporter = L.file_reporter } ]
     in
     let doc =
       "Controls which reporters are used when logging. The value REPORTERS \
-       must be a comma separated list of REPORTER values. A REPORTER value \
-       must be one of `file`, `database`, `db`."
+       must be a comma separated list (with no spaces) of REPORTER values. A \
+       REPORTER value must be one of `file`, `database`, `db` (short for \
+       `database`)."
     in
     Arg.(
       value & opt c default & info [ "r"; "reporters" ] ~docv:"REPORTERS" ~doc)
@@ -697,6 +700,27 @@ struct
     let bulk_cmds = List.map make_bulk_console Runners.runners
   end
 
+  module DebugVerificationConsole = struct
+    let debug_verify_info =
+      let doc = "Starts Gillian in debugging mode for verification" in
+      let man =
+        [
+          `S Manpage.s_description;
+          `P
+            "Starts Gillian in debugging mode for verification, which \
+             communicates via the Debug Adapter Protocol";
+        ]
+      in
+      Term.info "debugverify" ~doc ~exits:Term.default_exits ~man
+
+    let start_debug_adapter () =
+      Lwt_main.run (DebugAdapter.start Lwt_io.stdin Lwt_io.stdout)
+
+    let debug_verify_t = with_common Term.(const start_debug_adapter)
+
+    let debug_verify_cmd = (debug_verify_t, debug_verify_info)
+  end
+
   let default_cmd =
     let doc = "An analysis toolchain" in
     let sdocs = Manpage.s_common_options in
@@ -718,6 +742,7 @@ struct
       SInterpreterConsole.wpst_cmd;
       VerificationConsole.verify_cmd;
       ACTConsole.act_cmd;
+      DebugVerificationConsole.debug_verify_cmd;
     ]
     @ BulkConsole.bulk_cmds
 

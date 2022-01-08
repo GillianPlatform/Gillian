@@ -10,7 +10,7 @@ module PFS = Gillian.Symbolic.PureContext
 module TypEnv = Gillian.Symbolic.TypEnv
 open Gillian.Logic
 
-module M : Gillian.Symbolic.Memory_S = struct
+module M = struct
   type vt = SVal.t [@@deriving yojson]
 
   (** Type of JSIL general states *)
@@ -831,4 +831,8 @@ module M : Gillian.Symbolic.Memory_S = struct
             List.iter (fun f -> PFS.extend pfs f) new_pfs;
             mem
         | _ -> raise (Failure "Bi-abduction: cannot fix cell."))
+
+  let sorted_locs_with_vals (smemory : t) =
+    let sorted_locs = Containers.SS.elements (SHeap.domain smemory) in
+    List.map (fun loc -> (loc, Option.get (SHeap.get smemory loc))) sorted_locs
 end

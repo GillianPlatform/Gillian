@@ -3,7 +3,7 @@
     They are considered to be mutable.
 *)
 module type S = sig
-  include State.S
+  include SState.S
 
   type state_t
 
@@ -36,7 +36,7 @@ module Make
     (Val : Val.S)
     (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
-    (State : State.S
+    (State : SState.S
                with type vt = Val.t
                 and type st = ESubst.t
                 and type store_t = Store.t)
@@ -46,7 +46,9 @@ module Make
      and type st = ESubst.t
      and type store_t = Store.t
      and type state_t = State.t
-     and type preds_t = Preds.t = struct
+     and type preds_t = Preds.t
+     and type heap_t = State.heap_t
+     and type m_err_t = State.m_err_t = struct
   open Containers
   open Literal
   module L = Logging
@@ -59,13 +61,15 @@ module Make
 
   type store_t = Store.t
 
+  type heap_t = State.heap_t
+
   type abs_t = Preds.abs_t
 
   type state_t = State.t
 
   type preds_t = Preds.t
 
-  type err_t = State.err_t
+  type err_t = State.err_t [@@deriving yojson]
 
   type fix_t = State.fix_t
 
@@ -1252,4 +1256,32 @@ module Make
   let get_equal_values astate =
     let state, _, _ = astate in
     State.get_equal_values state
+
+  let get_heap pstate =
+    let state, _, _ = pstate in
+    State.get_heap state
+
+  let get_typ_env pstate =
+    let state, _, _ = pstate in
+    State.get_typ_env state
+
+  let get_pfs pstate =
+    let state, _, _ = pstate in
+    State.get_pfs state
+
+  let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
+    (* TODO: Deserialize other components of pstate *)
+    match yojson with
+    | `Assoc [ ("state", state_yojson); ("preds", preds_yojson) ] ->
+        Result.bind (State.of_yojson state_yojson) (fun state ->
+            Preds.of_yojson preds_yojson
+            |> Result.map (fun (preds : Preds.t) : t ->
+                   (state, preds, UP.init_pred_defs ())))
+    | _ -> Error "Cannot parse yojson into PState"
+
+  let to_yojson pstate =
+    (* TODO: Serialize other components of pstate *)
+    let state, preds, _ = pstate in
+    `Assoc
+      [ ("state", State.to_yojson state); ("preds", Preds.to_yojson preds) ]
 end

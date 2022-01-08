@@ -30,7 +30,7 @@ let exec db ~log ~stmt =
 let zero_or_one_row db ~log ~stmt =
   match Sqlite3.step stmt with
   | ROW  -> (
-      let row = Sqlite3.row_blobs stmt in
+      let row = Sqlite3.row_data stmt in
       match Sqlite3.step stmt with
       | DONE -> Some row
       | ROW  -> error "%s: expected zero or one row, got more than one row" log
@@ -95,10 +95,15 @@ let get_report id =
   let stmt =
     Sqlite3.prepare db "SELECT content, type FROM report WHERE id=?;"
   in
-  Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT id)
+  Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
   |> check_result_code db ~log:"get report bind id";
   let row = zero_or_one_row db ~log:"step: get next report" ~stmt in
-  let report_fields = Option.map (fun row -> (row.(0), row.(1))) row in
+  let report_fields =
+    Option.map
+      (fun row ->
+        (Sqlite3.Data.to_string_exn row.(0), Sqlite3.Data.to_string_exn row.(1)))
+      row
+  in
   Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: get report";
   report_fields
 
@@ -110,10 +115,12 @@ let get_previous_report_id id =
        report WHERE id=?) AND type='cmd_step' ORDER BY elapsed_time DESC LIMIT \
        1;"
   in
-  Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT id)
+  Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
   |> check_result_code db ~log:"get previous report bind id";
   let row = zero_or_one_row db ~log:"step: get next report" ~stmt in
-  let prev_report_id = Option.map (fun row -> row.(0)) row in
+  let prev_report_id =
+    Option.map (fun row -> Sqlite3.Data.to_int64_exn row.(0)) row
+  in
   Sqlite3.finalize stmt
   |> check_result_code db ~log:"finalize: get previous report";
   prev_report_id
@@ -125,10 +132,12 @@ let get_next_report_id id =
       "SELECT id FROM report WHERE elapsed_time > (SELECT elapsed_time FROM \
        report WHERE id=?) AND type='cmd_step' ORDER BY elapsed_time LIMIT 1;"
   in
-  Sqlite3.bind stmt 1 (Sqlite3.Data.TEXT id)
+  Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
   |> check_result_code db ~log:"get next report bind id";
   let row = zero_or_one_row db ~log:"step: get next report" ~stmt in
-  let next_report_id = Option.map (fun row -> row.(0)) row in
+  let next_report_id =
+    Option.map (fun row -> Sqlite3.Data.to_int64_exn row.(0)) row
+  in
   Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: get next report";
   next_report_id
 
@@ -150,7 +159,7 @@ let get_previously_freed_annot loc =
   Sqlite3.bind stmt 3 (Sqlite3.Data.TEXT loc)
   |> check_result_code db ~log:"get previous freed annot bind loc";
   let row = zero_or_one_row db ~log:"step: get previous freed annot" ~stmt in
-  let annot = Option.map (fun row -> row.(0)) row in
+  let annot = Option.map (fun row -> Sqlite3.Data.to_string_exn row.(0)) row in
   Sqlite3.finalize stmt
   |> check_result_code db ~log:"finalize: get previous freed annot";
   annot

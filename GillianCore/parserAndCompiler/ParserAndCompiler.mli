@@ -1,5 +1,6 @@
 (** This defines an interface that allows a user to indicate how to parse their own programming language,
     preprocess the obtained language and compile it to GIL (type [Prog.t]) *)
+
 type 'tl_ast compiled_progs = {
   gil_progs : (string * (Annot.t, string) Prog.t) list;
   source_files : SourceFiles.t;
@@ -8,9 +9,6 @@ type 'tl_ast compiled_progs = {
 
 module type S = sig
   module TargetLangOptions : sig
-    (** {2 Target-language specific options}
-        For more help, see Cmdliner documentation *)
-
     (** Command line options specific to the target language. *)
     type t
 

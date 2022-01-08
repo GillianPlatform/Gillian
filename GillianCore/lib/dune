@@ -11,4 +11,5 @@
   ;gillian_bulk_rely
   logging
   incrementalAnalysis
-  monadic))
+  monadic
+  debugger))

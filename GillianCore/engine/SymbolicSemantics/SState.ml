@@ -1,25 +1,34 @@
 open Literal
-open Containers
 open Names
 module L = Logging
 module SSubst = SVal.SESubst
 
+module type S = sig
+  include State.S
+
+  val get_typ_env : t -> TypEnv.t
+
+  val get_pfs : t -> PFS.t
+end
+
 module Make (SMemory : SMemory.S) :
-  State.S
+  S
     with type st = SVal.SESubst.t
      and type vt = SVal.M.t
-     and type store_t = SStore.t = struct
-  type vt = SVal.M.t
+     and type store_t = SStore.t
+     and type heap_t = SMemory.t
+     and type m_err_t = SMemory.err_t = struct
+  type vt = SVal.M.t [@@deriving yojson]
 
   type st = SVal.M.et
 
-  type heap_t = SMemory.t
+  type heap_t = SMemory.t [@@deriving yojson]
 
-  type store_t = SStore.t
+  type store_t = SStore.t [@@deriving yojson]
 
-  type m_err_t = SMemory.err_t
+  type m_err_t = SMemory.err_t [@@deriving yojson]
 
-  type t = heap_t * store_t * PFS.t * TypEnv.t * SS.t
+  type t = heap_t * store_t * PFS.t * TypEnv.t * SS.t [@@deriving yojson]
 
   type fix_t =
     | MFix   of SMemory.c_fix_t
@@ -27,7 +36,7 @@ module Make (SMemory : SMemory.S) :
     | FSVars of SS.t
     | FAsrt  of Asrt.t
 
-  type err_t = (m_err_t, vt) StateErr.err_t
+  type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson]
 
   type action_ret = ASucc of (t * vt list) list | AFail of err_t list
 
@@ -831,4 +840,16 @@ module Make (SMemory : SMemory.S) :
   let get_equal_values state les =
     let _, _, pfs, _, _ = state in
     les @ List.concat_map (Reduction.get_equal_expressions pfs) les
+
+  let get_heap state =
+    let heap, _, _, _, _ = state in
+    heap
+
+  let get_typ_env state =
+    let _, _, _, typ_env, _ = state in
+    typ_env
+
+  let get_pfs state =
+    let _, _, pfs, _, _ = state in
+    pfs
 end

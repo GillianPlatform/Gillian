@@ -1,10 +1,12 @@
 type 'a cell = Nil | Cons of { mutable contents : 'a; mutable next : 'a cell }
+[@@deriving yojson]
 
 type 'a t = {
   mutable length : int;
   mutable first : 'a cell;
   mutable last : 'a cell;
 }
+[@@deriving yojson]
 
 let make () = { length = 0; first = Nil; last = Nil }
 
@@ -158,11 +160,11 @@ let remove_duplicates ?(equal = ( = )) l =
     If the condition is true, then the filtering stops and the function returns true.
     If the condition is false, then the element is replaced.
     If the condition is never met, the function returns false
-    
+
     For example
     [let f = (fun x ->
       if x < 5 then `Filter else if x = 10 then `Stop else `Replace (x + 1))]
-    
+
     [filter_map_stop_cond f \[ 1; 2; 6;7; 4 \]] will modify the list into [\[ 7; 8 \]] and return false
     [filter_map_stop_cond f \[ 1; 2; 6; 7; 10; 8; 4 \]] will modify the list into [\[ 7; 8; 10; 8; 4 \]] and return true
 *)

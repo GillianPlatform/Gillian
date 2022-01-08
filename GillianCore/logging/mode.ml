@@ -4,12 +4,15 @@ type level =
   | Verbose  (** Verbose output *)
   | TMI  (** Too much information *)
 
+(** Type specifying the logging mode *)
 type t = Disabled | Enabled of level
 
 let logging_mode = ref @@ Enabled Verbose
 
+(** Returns whether logging is enabled or not *)
 let enabled () = !logging_mode <> Disabled
 
+(** Sets the logging mode *)
 let set_mode mode = logging_mode := mode
 
 (** Pretty print function for logging mode type  *)

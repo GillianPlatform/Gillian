@@ -2,8 +2,6 @@ module LoggingConstants = LoggingConstants
 module Mode = Mode
 module Report = Report
 module Reporter = Reporter
-module FileReporter = FileReporter
-module DatabaseReporter = DatabaseReporter
 module Loggable = Loggable
 module LogQueryer = LogQueryer
 module ReportId = ReportId
@@ -13,6 +11,10 @@ let () =
     | Failure s ->
         Some (Format.asprintf "!!!!!!!!!!\nFAILURE:\n%s\n!!!!!!!!!!\n\n" s)
     | _         -> None)
+
+let file_reporter : Reporter.t = (module FileReporter)
+
+let database_reporter : Reporter.t = (module DatabaseReporter)
 
 let reporters = ref []
 

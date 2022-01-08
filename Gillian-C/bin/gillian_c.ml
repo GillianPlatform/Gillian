@@ -7,5 +7,6 @@ module CLI =
       let runners : Gillian.Bulk.Runner.t list =
         [ (module CRunner); (module SRunner) ]
     end)
+    (Debugger.Gil_to_tl_lifter.Default (SMemory) (ParserAndCompiler))
 
 let () = CLI.main ()

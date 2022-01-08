@@ -4,11 +4,11 @@ open Gil_syntax
 type t [@@deriving yojson]
 
 type err =
-  | MissingRessource
-  | DoubleFree
-  | UseAfterFree
+  | MissingResource of (WislLActions.ga * string * Expr.t option)
+  | DoubleFree      of string
+  | UseAfterFree    of string
   | MemoryLeak
-  | OutOfBound
+  | OutOfBounds     of (int option * string * Expr.t)
   | InvalidLocation
 [@@deriving yojson]
 
@@ -62,3 +62,11 @@ val substitution_in_place :
   list
 
 val assertions : t -> Gillian.Gil_syntax.Asrt.t list
+
+val add_debugger_variables :
+  store:(string * Gillian.Gil_syntax.Expr.t) list ->
+  memory:t ->
+  is_gil_file:bool ->
+  get_new_scope_id:(unit -> int) ->
+  Debugger.DebuggerTypes.variables ->
+  Debugger.DebuggerTypes.scope list

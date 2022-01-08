@@ -1,12 +1,12 @@
 module type S = sig
   (* value type *)
-  type vt
+  type vt [@@deriving yojson]
 
   (* substitution type for the value type *)
   type st
 
   (* preds *)
-  type t
+  type t [@@deriving yojson]
 
   type abs_t = string * vt list
 
