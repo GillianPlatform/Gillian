@@ -10,9 +10,7 @@ module Node : sig
   [@@deriving yojson]
 
   val make : string -> ntype -> string -> string list -> t
-
   val add_child : t -> string -> unit
-
   val pp : Format.formatter -> t -> unit
 end = struct
   type t = {
@@ -24,7 +22,6 @@ end = struct
   [@@deriving yojson]
 
   let make id ntype name children = { id; ntype; name; children }
-
   let add_child node child_id = node.children <- child_id :: node.children
 
   let pp fmt node =
@@ -62,14 +59,12 @@ let pp fmt call_graph =
   Fmt.pf fmt "%a" (Fmt.list ~sep:(Fmt.any "@\n") Node.pp) node_list
 
 let id_of_proc_name proc_name = "proc_" ^ proc_name
-
 let id_of_pred_name pred_name = "pred_" ^ pred_name
-
 let id_of_lemma_name lemma_name = "lemma_" ^ lemma_name
 
 let id_of_name name = function
-  | Proc  -> id_of_proc_name name
-  | Pred  -> id_of_pred_name name
+  | Proc -> id_of_proc_name name
+  | Pred -> id_of_pred_name name
   | Lemma -> id_of_lemma_name name
 
 let get_node_opt call_graph id = Hashtbl.find_opt call_graph.nodes id
@@ -77,12 +72,12 @@ let get_node_opt call_graph id = Hashtbl.find_opt call_graph.nodes id
 let get_node call_graph id =
   match get_node_opt call_graph id with
   | Some node -> node
-  | None      -> failwith (Printf.sprintf "could not find node with id '%s'" id)
+  | None -> failwith (Printf.sprintf "could not find node with id '%s'" id)
 
 let get_or_make_node call_graph id ntype name =
   match get_node_opt call_graph id with
   | Some node -> node
-  | None      ->
+  | None ->
       let node = Node.make id ntype name [] in
       Hashtbl.add call_graph.nodes id node;
       node
@@ -125,7 +120,6 @@ let add_lemma_pred_use calL_graph lemma_name pred_name =
   add_edge calL_graph Lemma lemma_name Pred pred_name
 
 let get_name call_graph id = (get_node call_graph id).name
-
 let get_children call_graph id = (get_node call_graph id).children
 
 let get_proc_names call_graph =
@@ -133,7 +127,7 @@ let get_proc_names call_graph =
     (fun _ (node : Node.t) acc ->
       match node.ntype with
       | Proc -> node.name :: acc
-      | _    -> acc)
+      | _ -> acc)
     call_graph.nodes []
 
 let get_pred_names call_graph =
@@ -141,7 +135,7 @@ let get_pred_names call_graph =
     (fun _ (node : Node.t) acc ->
       match node.ntype with
       | Pred -> node.name :: acc
-      | _    -> acc)
+      | _ -> acc)
     call_graph.nodes []
 
 let get_lemma_names call_graph =
@@ -149,7 +143,7 @@ let get_lemma_names call_graph =
     (fun _ (node : Node.t) acc ->
       match node.ntype with
       | Lemma -> node.name :: acc
-      | _     -> acc)
+      | _ -> acc)
     call_graph.nodes []
 
 let contains_id call_graph id = Option.is_some (get_node_opt call_graph id)
@@ -166,17 +160,17 @@ let contains_lemma call_graph lemma_name =
 let is_proc call_graph id =
   match (get_node call_graph id).ntype with
   | Proc -> true
-  | _    -> false
+  | _ -> false
 
 let is_pred call_graph id =
   match (get_node call_graph id).ntype with
   | Pred -> true
-  | _    -> false
+  | _ -> false
 
 let is_lemma call_graph id =
   match (get_node call_graph id).ntype with
   | Lemma -> true
-  | _     -> false
+  | _ -> false
 
 let remove call_graph id = Hashtbl.remove call_graph.nodes id
 
@@ -200,8 +194,8 @@ let to_reverse_graph call_graph =
           node.children;
         (* Include entry for node (in case it did not have any children) *)
         match node.ntype with
-        | Proc  -> add_proc reverse_graph node.name
-        | Pred  -> add_pred reverse_graph node.name
+        | Proc -> add_proc reverse_graph node.name
+        | Pred -> add_pred reverse_graph node.name
         | Lemma -> add_lemma reverse_graph node.name)
       call_graph.nodes
   in

@@ -4,11 +4,9 @@ module Concrete : sig
   open Gil_syntax
 
   type nonrec err_t = err_t
-
   type def = FunDef of string | GlobVar of string
 
   val serialize_def : def -> Literal.t
-
   val deserialize_def : Literal.t -> def
 
   type t = {
@@ -39,7 +37,6 @@ module Concrete : sig
   (** {3 Symbolic things} *)
 
   val substitution : Gillian.Symbolic.Subst.t -> t -> t
-
   val assertions : t -> string list * Gillian.Gil_syntax.Asrt.t list
 end
 
@@ -47,11 +44,9 @@ module Symbolic : sig
   open Gil_syntax
 
   type nonrec err_t = err_t
-
   type def = FunDef of Expr.t | GlobVar of Expr.t
 
   val serialize_def : def -> Expr.t
-
   val deserialize_def : Expr.t -> def
 
   type t = {
@@ -82,6 +77,5 @@ module Symbolic : sig
   (** {3 Symbolic things} *)
 
   val substitution : Gillian.Symbolic.Subst.t -> t -> t
-
   val assertions : t -> string list * Gillian.Gil_syntax.Asrt.t list
 end

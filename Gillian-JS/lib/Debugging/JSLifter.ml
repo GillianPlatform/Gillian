@@ -1,6 +1,7 @@
 open Gil_syntax
 open Semantics
 open Debugger.DebuggerTypes
+
 include
   Debugger.Gil_to_tl_lifter.Default
     (Semantics.Symbolic)
@@ -87,7 +88,7 @@ let rec add_loc_vars
         in
         let id = Hashtbl.find loc_to_scope_id loc in
         create_node_variable name id ()
-    | LList lst       ->
+    | LList lst ->
         let nodes =
           List.mapi
             (fun index element ->
@@ -97,7 +98,7 @@ let rec add_loc_vars
         in
         let _, node = create_node_var name nodes get_new_scope_id variables in
         node
-    | _               -> create_leaf_variable name (to_str Literal.pp lit) ()
+    | _ -> create_leaf_variable name (to_str Literal.pp lit) ()
   in
   let add_expr_vars name expr =
     match expr with
@@ -183,7 +184,7 @@ let rec add_loc_vars
     node
   in
   match Hashtbl.find_opt loc_to_scope_id loc with
-  | None   ->
+  | None ->
       let loc_id = get_new_scope_id () in
       let vars =
         match SHeap.get smemory loc with
@@ -192,7 +193,7 @@ let rec add_loc_vars
             let metadata_node metadata_opt : variable =
               let name = "metadata" in
               match metadata_opt with
-              | None          -> create_leaf_variable name "unknown" ()
+              | None -> create_leaf_variable name "unknown" ()
               | Some metadata -> (
                   match metadata with
                   | Expr.ALoc child_loc ->
@@ -202,8 +203,7 @@ let rec add_loc_vars
                       in
                       let id = Hashtbl.find loc_to_scope_id child_loc in
                       create_node_variable name id ()
-                  | _                   -> create_leaf_variable name
-                                             (to_str Expr.pp metadata) ())
+                  | _ -> create_leaf_variable name (to_str Expr.pp metadata) ())
             in
             let properties = add_properties_vars properties in
             (* let properties =
@@ -222,7 +222,11 @@ let rec add_loc_vars
   | Some _ -> ()
 
 let add_variables
-    ~store ~memory ~is_gil_file ~get_new_scope_id (variables : variables) =
+    ~store
+    ~memory
+    ~is_gil_file
+    ~get_new_scope_id
+    (variables : variables) =
   if is_gil_file then
     let store_id = get_new_scope_id () in
     let memory_id = get_new_scope_id () in
@@ -265,7 +269,7 @@ let add_variables
     in
     let local_id : int =
       match Hashtbl.find_opt loc_to_scope_id local_scope_loc with
-      | None          ->
+      | None ->
           let local_id = get_new_scope_id () in
           let () = Hashtbl.replace variables local_id [] in
           local_id
@@ -273,7 +277,7 @@ let add_variables
     in
     let global_id : int =
       match Hashtbl.find_opt loc_to_scope_id "$lg" with
-      | None           ->
+      | None ->
           let global_id = get_new_scope_id () in
           let () = Hashtbl.replace variables global_id [] in
           global_id

@@ -5,9 +5,7 @@
 open Containers
 
 let active () = !Config.stats || Logging.Mode.enabled ()
-
 let time () = if not (active ()) then 0. else Sys.time ()
-
 let exec_cmds = ref 0
 
 (* Performance statistics *)

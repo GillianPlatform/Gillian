@@ -8,18 +8,15 @@ type t = {
 }
 
 val get_id : t -> int
-
 val get_loc : t -> CodeLoc.t
-
 val get_name : t -> string
-
 val get_ins : t -> int list
 
 val get_by_id :
   int ->
   t ->
   [> `None
-  | `WLAssert  of WLAssert.t
-  | `WLExpr    of WLExpr.t
+  | `WLAssert of WLAssert.t
+  | `WLExpr of WLExpr.t
   | `WLFormula of WLFormula.t
-  | `WPred     of t ]
+  | `WPred of t ]

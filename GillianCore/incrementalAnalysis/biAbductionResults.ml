@@ -1,5 +1,4 @@
 type ('a, 'b) hashtbl = ('a, 'b) Hashtbl.t
-
 type t = (string, Spec.t) hashtbl
 
 let to_yojson t =
@@ -10,13 +9,9 @@ let of_yojson yj =
   [%of_yojson: (string * Spec.t) list] yj >| List.to_seq >| Hashtbl.of_seq
 
 let make () : t = Hashtbl.create Config.small_tbl_size
-
 let reset = Hashtbl.reset
-
 let set_spec = Hashtbl.replace
-
 let contains_spec = Hashtbl.mem
-
 let get_spec_exn = Hashtbl.find
 
 let get_all_specs ?(filter = fun _ -> true) results =
@@ -25,7 +20,6 @@ let get_all_specs ?(filter = fun _ -> true) results =
     results []
 
 let remove results proc_name = Hashtbl.remove results proc_name
-
 let prune results proc_names = List.iter (remove results) proc_names
 
 let merge results other_results =

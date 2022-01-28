@@ -1,20 +1,19 @@
 type t = TypeDef__.formula =
   | True  (** Logical true *)
   | False  (** Logical false *)
-  | Not     of t  (** Logical negation *)
-  | And     of t * t  (** Logical conjunction *)
-  | Or      of t * t  (** Logical disjunction *)
-  | Eq      of Expr.t * Expr.t  (** Expression equality *)
-  | Less    of Expr.t * Expr.t  (** Expression less-than for numbers *)
-  | LessEq  of Expr.t * Expr.t  (** Expression less-than-or-equal for numbers *)
+  | Not of t  (** Logical negation *)
+  | And of t * t  (** Logical conjunction *)
+  | Or of t * t  (** Logical disjunction *)
+  | Eq of Expr.t * Expr.t  (** Expression equality *)
+  | Less of Expr.t * Expr.t  (** Expression less-than for numbers *)
+  | LessEq of Expr.t * Expr.t  (** Expression less-than-or-equal for numbers *)
   | StrLess of Expr.t * Expr.t  (** Expression less-than for strings *)
-  | SetMem  of Expr.t * Expr.t  (** Set membership *)
-  | SetSub  of Expr.t * Expr.t  (** Set subsetness *)
-  | ForAll  of (string * Type.t option) list * t  (** Forall *)
+  | SetMem of Expr.t * Expr.t  (** Set membership *)
+  | SetSub of Expr.t * Expr.t  (** Set subsetness *)
+  | ForAll of (string * Type.t option) list * t  (** Forall *)
 [@@deriving yojson]
 
 let compare = Stdlib.compare
-
 let of_bool b = if b then True else False
 
 module MyFormula = struct
@@ -28,13 +27,9 @@ module Set = Set.Make (MyFormula)
 let list_lexprs_collector =
   object (self)
     inherit [_] Visitors.reduce as super
-
     method private zero = Expr.Set.empty
-
     method private plus = Expr.Set.union
-
     method! visit_'label () (_ : int) = self#zero
-
     method! visit_'annot () (_ : Annot.t) = self#zero
 
     method! visit_expr () e =
@@ -63,18 +58,18 @@ let rec map
   else
     let a'' =
       match a' with
-      | And (a1, a2)     -> And (map_a a1, map_a a2)
-      | Or (a1, a2)      -> Or (map_a a1, map_a a2)
-      | Not a            -> Not (map_a a)
-      | True             -> True
-      | False            -> False
-      | Eq (e1, e2)      -> Eq (map_e e1, map_e e2)
-      | Less (e1, e2)    -> Less (map_e e1, map_e e2)
-      | LessEq (e1, e2)  -> LessEq (map_e e1, map_e e2)
+      | And (a1, a2) -> And (map_a a1, map_a a2)
+      | Or (a1, a2) -> Or (map_a a1, map_a a2)
+      | Not a -> Not (map_a a)
+      | True -> True
+      | False -> False
+      | Eq (e1, e2) -> Eq (map_e e1, map_e e2)
+      | Less (e1, e2) -> Less (map_e e1, map_e e2)
+      | LessEq (e1, e2) -> LessEq (map_e e1, map_e e2)
       | StrLess (e1, e2) -> StrLess (map_e e1, map_e e2)
-      | SetMem (e1, e2)  -> SetMem (map_e e1, map_e e2)
-      | SetSub (e1, e2)  -> SetSub (map_e e1, map_e e2)
-      | ForAll (bt, a)   -> ForAll (bt, map_a a)
+      | SetMem (e1, e2) -> SetMem (map_e e1, map_e e2)
+      | SetSub (e1, e2) -> SetSub (map_e e1, map_e e2)
+      | ForAll (bt, a) -> ForAll (bt, map_a a)
     in
     f_a_after a''
 
@@ -108,24 +103,24 @@ let rec map_opt
   in
 
   match a' with
-  | None    -> None
+  | None -> None
   | Some a' ->
       if not recurse then Some a'
       else
         let a'' =
           match a' with
-          | And (a1, a2)     -> aux_a_double a1 a2 (fun a1 a2 -> And (a1, a2))
-          | Or (a1, a2)      -> aux_a_double a1 a2 (fun a1 a2 -> Or (a1, a2))
-          | Not a            -> aux_a_single a (fun a -> Not a)
-          | True             -> Some True
-          | False            -> Some False
-          | Eq (e1, e2)      -> aux_e e1 e2 (fun e1 e2 -> Eq (e1, e2))
-          | Less (e1, e2)    -> aux_e e1 e2 (fun e1 e2 -> Less (e1, e2))
-          | LessEq (e1, e2)  -> aux_e e1 e2 (fun e1 e2 -> LessEq (e1, e2))
+          | And (a1, a2) -> aux_a_double a1 a2 (fun a1 a2 -> And (a1, a2))
+          | Or (a1, a2) -> aux_a_double a1 a2 (fun a1 a2 -> Or (a1, a2))
+          | Not a -> aux_a_single a (fun a -> Not a)
+          | True -> Some True
+          | False -> Some False
+          | Eq (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> Eq (e1, e2))
+          | Less (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> Less (e1, e2))
+          | LessEq (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> LessEq (e1, e2))
           | StrLess (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> StrLess (e1, e2))
-          | SetMem (e1, e2)  -> aux_e e1 e2 (fun e1 e2 -> SetMem (e1, e2))
-          | SetSub (e1, e2)  -> aux_e e1 e2 (fun e1 e2 -> SetSub (e1, e2))
-          | ForAll (bt, a)   -> aux_a_single a (fun a -> ForAll (bt, a))
+          | SetMem (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> SetMem (e1, e2))
+          | SetSub (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> SetSub (e1, e2))
+          | ForAll (bt, a) -> aux_a_single a (fun a -> ForAll (bt, a))
         in
         Option.map f_a_after a''
 
@@ -144,7 +139,6 @@ let clocs (f : t) : SS.t = Visitors.Collectors.cloc_collector#visit_formula () f
 
 (* Get all the locations in [a] *)
 let locs (f : t) : SS.t = Visitors.Collectors.cloc_collector#visit_formula () f
-
 let get_print_info (a : t) = (pvars a, lvars a, locs a)
 
 (* Get all the logical expressions of --a-- of the form (Lit (LList lst)) and (EList lst)  *)
@@ -159,30 +153,30 @@ let rec push_in_negations_off (a : t) : t =
   let f_off = push_in_negations_off in
   let f_on = push_in_negations_on in
   match a with
-  | And (a1, a2)   -> And (f_off a1, f_off a2)
-  | Or (a1, a2)    -> Or (f_off a1, f_off a2)
-  | Not a1         -> f_on a1
+  | And (a1, a2) -> And (f_off a1, f_off a2)
+  | Or (a1, a2) -> Or (f_off a1, f_off a2)
+  | Not a1 -> f_on a1
   | ForAll (bt, a) -> ForAll (bt, f_off a)
-  | _              -> a
+  | _ -> a
 
 and push_in_negations_on (a : t) : t =
   let f_off = push_in_negations_off in
   let f_on = push_in_negations_on in
   match a with
   | And (a1, a2) -> Or (f_on a1, f_on a2)
-  | Or (a1, a2)  -> And (f_on a1, f_on a2)
-  | True         -> False
-  | False        -> True
-  | Not a        -> f_off a
-  | _            -> Not a
+  | Or (a1, a2) -> And (f_on a1, f_on a2)
+  | True -> False
+  | False -> True
+  | Not a -> f_off a
+  | _ -> Not a
 
 and push_in_negations (a : t) : t = push_in_negations_off a
 
 let rec split_conjunct_formulae (f : t) : t list =
   match f with
-  | And (f1, f2)      -> split_conjunct_formulae f1 @ split_conjunct_formulae f2
+  | And (f1, f2) -> split_conjunct_formulae f1 @ split_conjunct_formulae f2
   | Not (Or (f1, f2)) -> split_conjunct_formulae (And (Not f1, Not f2))
-  | f                 -> [ f ]
+  | f -> [ f ]
 
 (****** Pretty Printing *********)
 
@@ -225,7 +219,6 @@ let rec pp_parametric pp_expr fmt f =
   | SetSub (e1, e2) -> Fmt.pf fmt "(%a --s-- %a)" pp_expr e1 pp_expr e2
 
 let pp = pp_parametric Expr.pp
-
 let full_pp = pp_parametric Expr.full_pp
 
 let rec lift_logic_expr (e : Expr.t) : (t * t) option =
@@ -266,35 +259,35 @@ let rec lift_logic_expr (e : Expr.t) : (t * t) option =
 let rec to_expr (a : t) : Expr.t option =
   let f = to_expr in
   match a with
-  | True               -> Some (Expr.Lit (Bool true))
-  | False              -> Some (Expr.Lit (Bool false))
-  | Not a'             -> Option.map (fun a -> Expr.UnOp (UnOp.UNot, a)) (f a')
-  | And (a1, a2)       -> (
+  | True -> Some (Expr.Lit (Bool true))
+  | False -> Some (Expr.Lit (Bool false))
+  | Not a' -> Option.map (fun a -> Expr.UnOp (UnOp.UNot, a)) (f a')
+  | And (a1, a2) -> (
       match (f a1, f a2) with
       | Some le1, Some le2 -> Some (Expr.BinOp (le1, BinOp.BAnd, le2))
-      | _                  -> None)
-  | Or (a1, a2)        -> (
+      | _ -> None)
+  | Or (a1, a2) -> (
       match (f a1, f a2) with
       | Some le1, Some le2 -> Some (Expr.BinOp (le1, BinOp.BOr, le2))
-      | _                  -> None)
-  | ForAll _           -> None
-  | Eq (le1, le2)      -> Some (Expr.BinOp (le1, BinOp.Equal, le2))
-  | Less (le1, le2)    -> Some (Expr.BinOp (le1, BinOp.FLessThan, le2))
-  | LessEq (le1, le2)  -> Some (Expr.BinOp (le1, BinOp.FLessThanEqual, le2))
+      | _ -> None)
+  | ForAll _ -> None
+  | Eq (le1, le2) -> Some (Expr.BinOp (le1, BinOp.Equal, le2))
+  | Less (le1, le2) -> Some (Expr.BinOp (le1, BinOp.FLessThan, le2))
+  | LessEq (le1, le2) -> Some (Expr.BinOp (le1, BinOp.FLessThanEqual, le2))
   | StrLess (le1, le2) -> Some (Expr.BinOp (le1, BinOp.SLessThan, le2))
-  | SetMem (le1, le2)  -> Some (Expr.BinOp (le1, BinOp.BSetMem, le2))
-  | SetSub (le1, le2)  -> Some (Expr.BinOp (le1, BinOp.BSetSub, le2))
+  | SetMem (le1, le2) -> Some (Expr.BinOp (le1, BinOp.BSetMem, le2))
+  | SetSub (le1, le2) -> Some (Expr.BinOp (le1, BinOp.BSetSub, le2))
 
 let rec conjunct (asrts : t list) : t =
   match asrts with
-  | []           -> True
-  | [ a ]        -> a
+  | [] -> True
+  | [ a ] -> a
   | a :: r_asrts -> And (a, conjunct r_asrts)
 
 let rec disjunct (asrts : t list) : t =
   match asrts with
-  | []           -> True
-  | [ a ]        -> a
+  | [] -> True
+  | [ a ] -> a
   | a :: r_asrts -> Or (a, disjunct r_asrts)
 
 let subst_expr_for_expr ~(to_subst : Expr.t) ~(subst_with : Expr.t) (a : t) : t
@@ -310,17 +303,14 @@ let rec get_disjuncts (fo : t) : t list =
   | Or (fo1, fo2) ->
       (* Printf.printf "More than one disjunct!\n"; *)
       get_disjuncts fo1 @ get_disjuncts fo2
-  | _             -> [ fo ]
+  | _ -> [ fo ]
 
 let strings_and_numbers =
   let v =
     object
       inherit [_] Visitors.reduce
-
       inherit Visitors.Utils.two_list_monoid
-
       method! visit_Num _ n = ([], [ n ])
-
       method! visit_String _ s = ([ s ], [])
     end
   in
@@ -329,10 +319,10 @@ let strings_and_numbers =
 module Infix = struct
   let fnot a =
     match a with
-    | True  -> False
+    | True -> False
     | False -> True
     | Not x -> x
-    | _     -> Not a
+    | _ -> Not a
 
   let forall params f = ForAll (params, f)
 
@@ -344,15 +334,15 @@ module Infix = struct
 
   let ( #|| ) a b =
     match (a, b) with
-    | True, _ | _, True   -> True
+    | True, _ | _, True -> True
     | False, f | f, False -> f
-    | _                   -> Or (a, b)
+    | _ -> Or (a, b)
 
   let ( #&& ) a b =
     match (a, b) with
-    | True, f | f, True   -> f
+    | True, f | f, True -> f
     | False, _ | _, False -> False
-    | _                   -> And (a, b)
+    | _ -> And (a, b)
 
   let ( #< ) a b =
     match (a, b) with

@@ -19,11 +19,8 @@ module GProc = Gil_syntax.Proc
 module GProg = Gil_syntax.Prog
 
 let cc_tbl : cc_tbl_type = Hashtbl.create medium_tbl_size
-
 let fun_tbl : fun_tbl_type = Hashtbl.create medium_tbl_size
-
 let old_fun_tbl : pre_fun_tbl_type = Hashtbl.create medium_tbl_size
-
 let vis_tbl : vis_tbl_type = Hashtbl.create medium_tbl_size
 
 let if_verification a b =
@@ -85,11 +82,8 @@ let prefix_lcmds
       List.map (fun lcmd -> (annot, None, lcmd)) lcmds @ cmds
 
 let is_list_type x = BinOp (UnOp (TypeOf, x), Equal, lit_typ ListType)
-
 let is_vref x = BinOp (rtype x, Equal, lit_refv)
-
 let is_oref x = BinOp (rtype x, Equal, lit_refo)
-
 let is_ref x = BinOp (is_vref x, BOr, is_oref x)
 
 let rec get_break_lab loop_list lab =
@@ -97,7 +91,7 @@ let rec get_break_lab loop_list lab =
   | [] ->
       let msg =
         match lab with
-        | None     -> "breaking outside a loop"
+        | None -> "breaking outside a loop"
         | Some lab ->
             Printf.sprintf "either breaking outside a loop or lab %s not found"
               lab
@@ -105,13 +99,13 @@ let rec get_break_lab loop_list lab =
       raise (Failure msg)
   | (_, lab_b, js_lab, valid_unlabelled) :: rest -> (
       match lab with
-      | None         -> (
+      | None -> (
           match valid_unlabelled with
-          | true  -> lab_b
+          | true -> lab_b
           | false -> get_break_lab rest lab)
       | Some lab_str -> (
           match js_lab with
-          | None            -> get_break_lab rest lab
+          | None -> get_break_lab rest lab
           | Some js_lab_str ->
               if lab_str = js_lab_str then lab_b else get_break_lab rest lab))
 
@@ -120,7 +114,7 @@ let rec get_continue_lab loop_list lab =
   | [] ->
       let msg =
         match lab with
-        | None     -> "continuing outside a loop"
+        | None -> "continuing outside a loop"
         | Some lab ->
             Printf.sprintf
               "either continuing outside a loop or lab %s not found" lab
@@ -128,38 +122,40 @@ let rec get_continue_lab loop_list lab =
       raise (Failure msg)
   | (lab_c, _, js_lab, valid_unlabelled) :: rest -> (
       match lab with
-      | None         -> (
+      | None -> (
           match lab_c with
           | Some lab_c -> (
               match valid_unlabelled with
-              | true  -> lab_c
+              | true -> lab_c
               | false -> get_continue_lab rest lab)
-          | None       -> get_continue_lab rest lab)
+          | None -> get_continue_lab rest lab)
       | Some lab_str -> (
           match js_lab with
-          | None            -> get_continue_lab rest lab
+          | None -> get_continue_lab rest lab
           | Some js_lab_str ->
               if lab_str = js_lab_str then
                 match lab_c with
-                | None       -> get_continue_lab rest lab
+                | None -> get_continue_lab rest lab
                 | Some lab_c -> lab_c
               else get_continue_lab rest lab))
 
 let filter_cur_jumps
-    (jumps : (string option * string * string) list) loop_lab include_no_lab =
+    (jumps : (string option * string * string) list)
+    loop_lab
+    include_no_lab =
   let rec filter_cur_jumps_iter jumps inner_jumps outer_jumps =
     match jumps with
     | [] -> (List.rev inner_jumps, List.rev outer_jumps)
     | (None, x, jump_lab) :: rest_jumps -> (
         match include_no_lab with
-        | true  ->
+        | true ->
             filter_cur_jumps_iter rest_jumps (x :: inner_jumps) outer_jumps
         | false ->
             filter_cur_jumps_iter rest_jumps inner_jumps
               ((None, x, jump_lab) :: outer_jumps))
     | (Some lab, x, jump_lab) :: rest_jumps -> (
         match loop_lab with
-        | None          ->
+        | None ->
             filter_cur_jumps_iter rest_jumps inner_jumps
               ((Some lab, x, jump_lab) :: outer_jumps)
         | Some loop_lab ->
@@ -175,17 +171,16 @@ let add_none_labs cmds = List.map (fun cmd -> (None, cmd)) cmds
 
 let add_skip_if_empty cmds x metadata =
   match x with
-  | PVar _  -> (cmds, x)
+  | PVar _ -> (cmds, x)
   | Lit lit ->
       let x_r = fresh_var () in
       let cmd_ass_xr = LBasic (Assignment (x_r, Lit lit)) in
       (cmds @ [ (metadata, None, cmd_ass_xr) ], PVar x_r)
-  | _       ->
+  | _ ->
       raise
         (Failure "The compiler must always generate a variable or a literal")
 
 let make_var_ass_se () = LCall (var_se, lit_str syntaxErrorName, [], None, None)
-
 let make_var_ass_te () = LCall (var_te, lit_str typeErrorName, [], None, None)
 
 let make_var_ass_re () =
@@ -194,15 +189,13 @@ let make_var_ass_re () =
 let add_final_var cmds x metadata =
   match x with
   | PVar x_name -> (cmds, x_name)
-  | Lit lit     ->
+  | Lit lit ->
       let x_new = fresh_var () in
       let cmd_ass_new =
         (metadata, None, LBasic (Assignment (x_new, Lit lit)))
       in
       (cmds @ [ cmd_ass_new ], x_new)
-  | _           -> raise
-                     (Failure
-                        "add_final_var: x needs to be a variable or a literal")
+  | _ -> raise (Failure "add_final_var: x needs to be a variable or a literal")
 
 (*
 Auxiliary Compilers
@@ -225,7 +218,7 @@ let make_unresolvable_ref_test x =
 let make_get_value_call x err =
   (* x_v := getValue (x) with err *)
   match is_get_value_var x with
-  | None     ->
+  | None ->
       let x_v = val_var_of_var x in
       ( x_v,
         LCall (x_v, Lit (String getValueName), [ x ], Some err, None),
@@ -303,7 +296,12 @@ let make_create_function_object_call x_sc fun_id params =
   (x_f, cmd)
 
 let translate_named_function_literal
-    (top_level : bool) x_sc f_name f_id params index =
+    (top_level : bool)
+    x_sc
+    f_name
+    f_id
+    params
+    index =
   (* x_f := create_function_object(x_sc, f_id, f_id, params) *)
   let x_f, cmd_cfoc = make_create_function_object_call x_sc f_id params in
   let cmd_cfoc = (None, cmd_cfoc) in
@@ -394,12 +392,10 @@ let translate_multiplicative_binop x1 x2 x1_v x2_v aop err =
   let jsil_aop : BinOp.t =
     match aop with
     | JS_Parser.Syntax.Times -> FTimes
-    | JS_Parser.Syntax.Div   -> FDiv
-    | JS_Parser.Syntax.Mod   -> FMod
+    | JS_Parser.Syntax.Div -> FDiv
+    | JS_Parser.Syntax.Mod -> FMod
     | JS_Parser.Syntax.Minus -> FMinus
-    | _                      -> raise
-                                  (Failure
-                                     "Illegal binary operator - Impossible case")
+    | _ -> raise (Failure "Illegal binary operator - Impossible case")
   in
 
   (* x1_n := i__toNumber (x1_v) with err *)
@@ -502,12 +498,19 @@ let translate_binop_plus x1 x2 x1_v x2_v err =
   (new_cmds, errs, x_r)
 
 let translate_binop_comparison
-    _ _ x1_v x2_v is_first_first flag_arg bool_undef err =
+    _
+    _
+    x1_v
+    x2_v
+    is_first_first
+    flag_arg
+    bool_undef
+    err =
   (* x_ac := i__abstractComparison (x1_v, x2_v, flag_arg) with err  *)
   let x_ac = fresh_var () in
   let args =
     match is_first_first with
-    | true  -> [ PVar x1_v; PVar x2_v ]
+    | true -> [ PVar x1_v; PVar x2_v ]
     | false -> [ PVar x2_v; PVar x1_v ]
   in
   let cmd_ac =
@@ -582,7 +585,7 @@ let translate_binop_equality _ _ x1_v x2_v non_strict non_negated err =
   let x_r1 = fresh_var () in
   let f_name =
     match non_strict with
-    | true  -> abstractEqualityComparisonName
+    | true -> abstractEqualityComparisonName
     | false -> strictEqualityComparisonName
   in
   let cmd_ass_xr1 =
@@ -591,7 +594,7 @@ let translate_binop_equality _ _ x1_v x2_v non_strict non_negated err =
 
   let cmd_ass_xr2, ret =
     match non_negated with
-    | true  -> ([], x_r1)
+    | true -> ([], x_r1)
     | false ->
         let x_r2 = fresh_var () in
         (* x_r2 := (not x_r1) *)
@@ -605,9 +608,9 @@ let translate_bitwise_bin_op x1 x2 x1_v x2_v bbop err =
   let bbop : BinOp.t =
     match bbop with
     | JS_Parser.Syntax.Bitand -> BitwiseAnd
-    | JS_Parser.Syntax.Bitor  -> BitwiseOr
+    | JS_Parser.Syntax.Bitor -> BitwiseOr
     | JS_Parser.Syntax.Bitxor -> BitwiseXor
-    | _                       -> raise (Failure "Illegal bitwise operator")
+    | _ -> raise (Failure "Illegal bitwise operator")
   in
 
   (* x1_i32 := i__toInt32 (x1_v) with err3 *)
@@ -636,11 +639,11 @@ let make_check_empty_test x_prev x_new =
   let x_prev, cmd_ass_xprev =
     match x_prev with
     | PVar x_prev -> (x_prev, [])
-    | Lit lit     ->
+    | Lit lit ->
         let x_prev_var = fresh_var () in
         let cmd_ass_prev = (None, LBasic (Assignment (x_prev_var, Lit lit))) in
         (x_prev_var, [ cmd_ass_prev ])
-    | _           ->
+    | _ ->
         raise
           (Failure
              "make_check_empty_test: x_prev needs to be either a literal or a \
@@ -650,11 +653,11 @@ let make_check_empty_test x_prev x_new =
   let x_new, cmd_ass_new =
     match x_new with
     | PVar x_new -> (x_new, [])
-    | Lit lit    ->
+    | Lit lit ->
         let x_new_var = fresh_var () in
         let cmd_ass_new = (None, LBasic (Assignment (x_new_var, Lit lit))) in
         (x_new_var, [ cmd_ass_new ])
-    | _          ->
+    | _ ->
         raise
           (Failure
              "make_check_empty_test: x_new needs to be either a literal or a \
@@ -694,7 +697,7 @@ let make_loop_end cur_val_var prev_val_var break_vars end_lab cur_first =
   (* x_ret_4 := PHI(cur_val_var, break_vars) *)
   let break_vars =
     match cur_first with
-    | true  -> cur_val_var :: break_vars
+    | true -> cur_val_var :: break_vars
     | false -> break_vars @ [ cur_val_var ]
   in
   let phi_args = List.map (fun x -> PVar x) break_vars in
@@ -767,7 +770,7 @@ let rec translate_expr tr_ctx e :
   let find_var_er_index v : int option =
     match tr_ctx.tr_use_cc with
     | false -> None
-    | true  ->
+    | true ->
         let cur_var_tbl = get_scope_table cc_tbl tr_ctx.tr_er_fid in
         let fid_v = Hashtbl.find_opt cur_var_tbl v in
         Option.map
@@ -823,7 +826,7 @@ let rec translate_expr tr_ctx e :
                  BinOp
                    (PVar tr_ctx.tr_sc_var, LstNth, lit_num (float_of_int index))
                ))
-      | None       ->
+      | None ->
           LCall
             ( x_sf,
               lit_str dynamicScoper,
@@ -915,7 +918,7 @@ let rec translate_expr tr_ctx e :
                  BinOp
                    (PVar tr_ctx.tr_sc_var, LstNth, lit_num (float_of_int index))
                ))
-      | None       ->
+      | None ->
           LCall
             ( x_sf,
               lit_str dynamicScoper,
@@ -947,8 +950,7 @@ let rec translate_expr tr_ctx e :
              (* x_sf := [x__scope, v_fid]                          *)
              cmd_xref_ass;
              (* x_ref := ref_v(x_sf, "x")                          *)
-             cmd_cae;
-             (* x_cae := i__checkAssignmentErrors (x_ref) with err *)
+             cmd_cae (* x_cae := i__checkAssignmentErrors (x_ref) with err *);
            ])
     in
     (x_ref, cmds, [ x_cae ])
@@ -968,7 +970,7 @@ let rec translate_expr tr_ctx e :
     let cmd_goto =
       match lbop with
       | JS_Parser.Syntax.And -> LGuardedGoto (PVar x1_b, next, end_lab)
-      | JS_Parser.Syntax.Or  -> LGuardedGoto (PVar x1_b, end_lab, next)
+      | JS_Parser.Syntax.Or -> LGuardedGoto (PVar x1_b, end_lab, next)
     in
     (* x2_v := i__getValue (x2) with err *)
     let x2_v, cmd_gv_x2, errs_x2_v = make_get_value_call x2 err in
@@ -1103,7 +1105,7 @@ let rec translate_expr tr_ctx e :
       | (Some _ | None)
         when match index with
              | Some _ -> true
-             | _      -> tr_ctx.tr_use_cc = false ->
+             | _ -> tr_ctx.tr_use_cc = false ->
           let x_1 = fresh_var () in
           let cmd_ass_x1 =
             match index with
@@ -1115,7 +1117,7 @@ let rec translate_expr tr_ctx e :
                          ( PVar tr_ctx.tr_sc_var,
                            LstNth,
                            lit_num (float_of_int index) ) ))
-            | None       ->
+            | None ->
                 LCall
                   ( x_1,
                     lit_str dynamicScoper,
@@ -1142,8 +1144,7 @@ let rec translate_expr tr_ctx e :
             [
               (None, cmd_ass_x1);
               (*   x_1 := l-nth(x_sc, index)    *)
-              (None, cmd_ass_xret);
-              (*   x_r := v-ref(x_1, "x")       *)
+              (None, cmd_ass_xret) (*   x_r := v-ref(x_1, "x")       *);
             ]
           in
           let cmds = annotate_cmds cmds in
@@ -1323,7 +1324,7 @@ let rec translate_expr tr_ctx e :
           (fun (cmds, errs, num) oe ->
             let new_cmds, new_errs =
               match oe with
-              | None   -> ([ cmd_set_len (num + 1) ], [])
+              | None -> ([ cmd_set_len (num + 1) ], [])
               | Some e ->
                   translate_array_property_definition x_cdo e tr_ctx.tr_err_lab
                     num
@@ -1455,7 +1456,7 @@ let rec translate_expr tr_ctx e :
         let x_desc = fresh_desc_var () in
         let desc_params =
           match is_getter with
-          | true  ->
+          | true ->
               [
                 Lit (String "g");
                 Lit (Bool true);
@@ -1956,8 +1957,8 @@ let rec translate_expr tr_ctx e :
                     (*        xfvm := metadata(x_f_val)                                               *)
                     (None, cmd_hf_construct);
                     (* next1: x_hp := [xfvm, "@construct"];                                           *)
-                    (None, cmd_goto_xhp);
-                    (*        goto [ x_hp = empty ] err next2                                         *)
+                    (None, cmd_goto_xhp)
+                    (*        goto [ x_hp = empty ] err next2                                         *);
                   ]
               @ if_verification []
                   (annotate_cmds
@@ -2001,8 +2002,8 @@ let rec translate_expr tr_ctx e :
                        (* next3: skip                                                                   *)
                        (Some bnext4, cmd_bphi_final);
                        (* next4: x_rcall := PHI(x_r1, x_this)                                           *)
-                       (None, cmd_sync);
-                       (*        goto join                                                              *)
+                       (None, cmd_sync)
+                       (*        goto join                                                              *);
                      ])
               @ annotate_cmds
                   [
@@ -2028,14 +2029,14 @@ let rec translate_expr tr_ctx e :
                     (*        goto [typeOf(x_r1) = Obj ] next4 next3;                                *)
                     (Some next3, cmd_ret_this);
                     (* next3: skip                                                                   *)
-                    (Some next4, cmd_phi_final);
-                    (* next4: x_rcall := PHI(x_r1, x_this)                                           *)
+                    (Some next4, cmd_phi_final)
+                    (* next4: x_rcall := PHI(x_r1, x_this)                                           *);
                   ]
               @ if_verification []
                   (annotate_cmds
                      [
-                       (Some join, cmd_phi_join);
-                       (*        x_final := PHI (x_rbind, x_rcall);                                       *)
+                       (Some join, cmd_phi_join)
+                       (*        x_final := PHI (x_rbind, x_rcall);                                       *);
                      ])))
       in
       let errs =
@@ -2076,7 +2077,7 @@ let rec translate_expr tr_ctx e :
           let asrt =
             match Formula.lift_logic_expr le with
             | Some (asrt_b, _) -> asrt_b
-            | _                ->
+            | _ ->
                 raise
                   (Failure
                      (Printf.sprintf "Invalid assert. Could not lift\n%s"
@@ -2120,7 +2121,7 @@ let rec translate_expr tr_ctx e :
           let asrt =
             match Formula.lift_logic_expr le with
             | Some (asrt_b, _) -> asrt_b
-            | _                ->
+            | _ ->
                 raise
                   (Failure
                      (Printf.sprintf "Invalid assume. Could not lift\n%s"
@@ -2136,7 +2137,7 @@ let rec translate_expr tr_ctx e :
       let x =
         match List.map (fun xe -> xe.JS_Parser.Syntax.exp_stx) xes with
         | [ JS_Parser.Syntax.Var x ] -> "#" ^ x
-        | _                          -> raise (Failure "Invalid symbolic")
+        | _ -> raise (Failure "Invalid symbolic")
       in
       let x_v = fresh_var () ^ "_v" in
       let cmd1 = (metadata, None, LBasic (BCmd.Assignment (x_v, LVar x))) in
@@ -2161,7 +2162,7 @@ let rec translate_expr tr_ctx e :
       let x =
         match List.map (fun xe -> xe.JS_Parser.Syntax.exp_stx) xes with
         | [ JS_Parser.Syntax.Var x ] -> "#" ^ x
-        | _                          -> raise (Failure "Invalid symb_number")
+        | _ -> raise (Failure "Invalid symb_number")
       in
       let x_v = fresh_var () ^ "_v" in
       let cmd1 = (metadata, None, LBasic (BCmd.Assignment (x_v, LVar x))) in
@@ -2176,7 +2177,7 @@ let rec translate_expr tr_ctx e :
       let x =
         match List.map (fun xe -> xe.JS_Parser.Syntax.exp_stx) xes with
         | [ JS_Parser.Syntax.Var x ] -> "#" ^ x
-        | _                          -> raise (Failure "Invalid symb_number")
+        | _ -> raise (Failure "Invalid symb_number")
       in
       let x_v = fresh_var () ^ "_v" in
       let cmd1 = (metadata, None, LBasic (BCmd.Assignment (x_v, LVar x))) in
@@ -2191,7 +2192,7 @@ let rec translate_expr tr_ctx e :
       let x =
         match List.map (fun xe -> xe.JS_Parser.Syntax.exp_stx) xes with
         | [ JS_Parser.Syntax.Var x ] -> "#" ^ x
-        | _                          -> raise (Failure "Invalid symb_bool")
+        | _ -> raise (Failure "Invalid symb_bool")
       in
       let x_v = fresh_var () ^ "_v" in
       let cmd1 = (metadata, None, LBasic (BCmd.Assignment (x_v, LVar x))) in
@@ -2467,8 +2468,8 @@ let rec translate_expr tr_ctx e :
                     (* next1: xfvm := metadata(x_f_val)                                               *)
                     (None, cmd_ic);
                     (*        x_ic := isCallable(x_f_val)                                               *)
-                    (None, cmd_goto_is_callable);
-                    (*        goto [ x_ic ] getbt err; -> typeerror                                     *)
+                    (None, cmd_goto_is_callable)
+                    (*        goto [ x_ic ] getbt err; -> typeerror                                     *);
                   ]
               @ if_verification []
                   (annotate_cmds
@@ -2496,8 +2497,8 @@ let rec translate_expr tr_ctx e :
                        (*        SOMETHING ABOUT PARAMETERS                                                *)
                        (None, cmd_bind);
                        (*        MAGICAL FLATTENING CALL                                                   *)
-                       (None, cmd_sync);
-                       (*        goto join                                                                 *)
+                       (None, cmd_sync)
+                       (*        goto join                                                                 *);
                      ])
               (* CALL *)
               @ annotate_cmds [ (Some call, cmd_body) ]
@@ -2523,15 +2524,15 @@ let rec translate_expr tr_ctx e :
                     (* else:  x_else_this := undefined                                                  *)
                     (Some end_lab, cmd_ass_xthis);
                     (* end:   x_this := PHI(x_then_this, x_else_this)                                   *)
-                    (None, cmd_proc_call);
-                    (*        x_rcall := x_body (x_scope, x_this, x_arg0_val, ..., x_argn_val) with err *)
+                    (None, cmd_proc_call)
+                    (*        x_rcall := x_body (x_scope, x_this, x_arg0_val, ..., x_argn_val) with err *);
                   ]
               @ if_verification []
                   (annotate_cmds
                      [
                        (* JOIN *)
-                       (Some join, cmd_phi_join);
-                       (*        x_r1 := PHI (x_rbind, x_rcall);                                           *)
+                       (Some join, cmd_phi_join)
+                       (*        x_r1 := PHI (x_rbind, x_rcall);                                           *);
                      ])
                 (* @ annotate_cmds [
                      (None,           cmd_goto_test_empty);  (*        goto [ x_r1 = empty ] next3 next4                                       *)
@@ -2692,8 +2693,8 @@ let rec translate_expr tr_ctx e :
                 (*  cmds                                *)
                 (None, cmd_gv_x);
                 (*  x_v := getValue (x) with err        *)
-                (None, LBasic (Assignment (x_r, Lit Undefined)));
-                (*  x_r := undefined                  *)
+                (None, LBasic (Assignment (x_r, Lit Undefined)))
+                (*  x_r := undefined                  *);
               ])
       in
       let errs = errs @ errs_x_v in
@@ -2835,8 +2836,7 @@ let rec translate_expr tr_ctx e :
                 (*  cmds                                *)
                 (None, cmd_gv_x);
                 (*  x_v := i__getValue (x) with err     *)
-                (None, cmd_tn_x);
-                (*  x_n := i__toNumber (x_v) with err   *)
+                (None, cmd_tn_x) (*  x_n := i__toNumber (x_v) with err   *);
               ])
       in
       let errs = errs @ errs_x_v @ [ x_n ] in
@@ -2874,8 +2874,7 @@ let rec translate_expr tr_ctx e :
                 (* x_v := i__getValue (x) with err    *)
                 (None, cmd_tn_x);
                 (* x_n := i__toNumber (x_v) with err  *)
-                (None, cmd_ass_xr);
-                (* x_r := (negative x_n)              *)
+                (None, cmd_ass_xr) (* x_r := (negative x_n)              *);
               ])
       in
       let errs = errs @ errs_x_v @ [ x_n ] in
@@ -2949,8 +2948,7 @@ let rec translate_expr tr_ctx e :
                 (* x_v := i__getValue (x) with err    *)
                 (None, cmd_tb_x);
                 (* x_b := i__toBoolean (x_v) with err *)
-                (None, cmd_xr_ass);
-                (* x_r := (not x_b)                   *)
+                (None, cmd_xr_ass) (* x_r := (not x_b)                   *);
               ])
       in
       let errs = errs @ errs_x_v @ [ x_b ] in
@@ -3492,8 +3490,8 @@ let rec translate_expr tr_ctx e :
                 (*         goto [ (typeOf x2_v) = Obj ] next1 err  *)
                 (Some next1, cmd_ts_x1);
                 (* next1:  x1_s := i__toString (x1_v) with err               *)
-                (None, cmd_ass_xr);
-                (*         x_r := o__hasProperty (x2_v, x1_s) with err       *)
+                (None, cmd_ass_xr)
+                (*         x_r := o__hasProperty (x2_v, x1_s) with err       *);
               ])
       in
       let errs =
@@ -4057,8 +4055,8 @@ let rec translate_expr tr_ctx e :
           (*  x_f := create_function_object(x_sc_f, f_id, params)                   *)
           (None, cmd_fname_updt);
           (*  [x_f_outer_er, f] := x_f                                              *)
-          (None, cmd_cae);
-          (*  x_cae := i__checkAssignmentErrors (ref-v(x_f_outer_er, "f")) with err *)
+          (None, cmd_cae)
+          (*  x_cae := i__checkAssignmentErrors (ref-v(x_f_outer_er, "f")) with err *);
         ]
       in
 
@@ -4067,13 +4065,13 @@ let rec translate_expr tr_ctx e :
   | JS_Parser.Syntax.VarDec decs ->
       let rec loop decs cmds errs =
         match decs with
-        | []                   ->
+        | [] ->
             raise
               (Failure
                  "no empty variable declaration lists in expression contexts")
-        | [ (v, eo) ]          -> (
+        | [ (v, eo) ] -> (
             match eo with
-            | None   ->
+            | None ->
                 let x, new_cmds, new_errs = compile_var_dec_without_exp v in
                 (x, cmds @ new_cmds, errs @ new_errs)
             | Some e ->
@@ -4081,7 +4079,7 @@ let rec translate_expr tr_ctx e :
                 (x, cmds @ new_cmds, errs @ new_errs))
         | (v, eo) :: rest_decs -> (
             match eo with
-            | None   -> loop rest_decs cmds errs
+            | None -> loop rest_decs cmds errs
             | Some e ->
                 let new_cmds, _, new_errs = compile_var_dec v e in
                 loop rest_decs (cmds @ new_cmds) (errs @ new_errs))
@@ -4109,7 +4107,7 @@ and translate_statement tr_ctx e =
   let find_var_er_index v =
     match tr_ctx.tr_use_cc with
     | false -> None
-    | true  ->
+    | true ->
         let cur_var_tbl = get_scope_table cc_tbl tr_ctx.tr_er_fid in
         let fid_v = Hashtbl.find_opt cur_var_tbl v in
         Option.map
@@ -4158,7 +4156,7 @@ and translate_statement tr_ctx e =
                  BinOp
                    (PVar tr_ctx.tr_sc_var, LstNth, lit_num (float_of_int index))
                ))
-      | None       ->
+      | None ->
           LCall
             ( x_sf,
               lit_str dynamicScoper,
@@ -4216,17 +4214,17 @@ and translate_statement tr_ctx e =
     let cur_breaks, outer_breaks = filter_cur_jumps breaks js_lab false in
     match cur_breaks with
     | [] -> (cmds, x, errs, rets, breaks, conts)
-    | _  ->
+    | _ ->
         let x_name, cmd_new_x =
           match x with
           | PVar x_name -> (x_name, [])
-          | Lit lit     ->
+          | Lit lit ->
               let x_name = fresh_var () in
               let cmd_new_x =
                 annotate_cmd (LBasic (Assignment (x_name, Lit lit))) None
               in
               (x_name, [ cmd_new_x ])
-          | _           ->
+          | _ ->
               raise
                 (Failure
                    "translate. Block: the result of the compilation must be a \
@@ -4351,7 +4349,13 @@ and translate_statement tr_ctx e =
 
   let make_finally_cont_blocks jump_list jumps_mapping e tcf_lab end_label =
     let rec make_finally_blocks_iter
-        jump_list finally_blocks errs rets outer_breaks inner_breaks conts =
+        jump_list
+        finally_blocks
+        errs
+        rets
+        outer_breaks
+        inner_breaks
+        conts =
       match jump_list with
       | [] -> (finally_blocks, errs, rets, outer_breaks, inner_breaks, conts)
       | (js_lab, var, jump) :: rest -> (
@@ -4765,8 +4769,8 @@ and translate_statement tr_ctx e =
             (*            cmds2                                                            *)
             (None, LGoto finally);
             (*            goto finally                                                     *)
-            (Some new_err2, cmd_ass_xret1);
-            (*  err2:     x_ret_1 := PHI(x_cae, errs2)                                     *)
+            (Some new_err2, cmd_ass_xret1)
+            (*  err2:     x_ret_1 := PHI(x_cae, errs2)                                     *);
           ]
       @ cmds3_1
       @ annotate_cmds
@@ -4928,8 +4932,8 @@ and translate_statement tr_ctx e =
             (*            cmds1                                                       *)
             (None, LGoto finally);
             (*            goto finally                                                *)
-            (Some new_err1, cmd_ass_xerr);
-            (*  err1:     x_err := PHI(errs1)                                         *)
+            (Some new_err1, cmd_ass_xerr)
+            (*  err1:     x_err := PHI(errs1)                                         *);
           ]
       @ cmds3_1
       @ annotate_cmds
@@ -5001,7 +5005,7 @@ and translate_statement tr_ctx e =
      *)
       let break_label, new_loop_list =
         match tr_ctx.tr_js_lab with
-        | None   -> (None, tr_ctx.tr_loop_list)
+        | None -> (None, tr_ctx.tr_loop_list)
         | Some _ ->
             let break_label = fresh_break_label () in
             ( Some break_label,
@@ -5011,8 +5015,8 @@ and translate_statement tr_ctx e =
 
       let rec loop es bprevious cmds_ac errs_ac rets_ac breaks_ac conts_ac =
         match es with
-        | []           -> ([], Lit Empty, [], [], [], [])
-        | [ e ]        -> (
+        | [] -> ([], Lit Empty, [], [], [], [])
+        | [ e ] -> (
             let cmds_e, x_e, errs_e, rets_e, breaks_e, conts_e =
               f_previous new_loop_list bprevious None e
             in
@@ -5026,7 +5030,7 @@ and translate_statement tr_ctx e =
                   rets_ac @ rets_e,
                   breaks_ac @ breaks_e,
                   conts_ac @ conts_e )
-            | _, _                  ->
+            | _, _ ->
                 ( cmds_ac @ cmds_e,
                   x_e,
                   errs_ac @ errs_e,
@@ -5045,7 +5049,7 @@ and translate_statement tr_ctx e =
                   (cmds_ac @ cmds_e @ new_cmds)
                   (errs_ac @ errs_e) (rets_ac @ rets_e) (breaks_ac @ breaks_e)
                   (conts_ac @ conts_e)
-            | _, _                  ->
+            | _, _ ->
                 loop rest_es (Some x_e) (cmds_ac @ cmds_e) (errs_ac @ errs_e)
                   (rets_ac @ rets_e) (breaks_ac @ breaks_e) (conts_ac @ conts_e)
             )
@@ -5090,13 +5094,13 @@ and translate_statement tr_ctx e =
      *)
       let rec loop decs cmds errs =
         match decs with
-        | []                   ->
+        | [] ->
             let x, empty_ass = make_empty_ass () in
 
             (x, cmds @ [ annotate_cmd empty_ass None ], errs)
         | (v, eo) :: rest_decs -> (
             match eo with
-            | None   -> loop rest_decs cmds errs
+            | None -> loop rest_decs cmds errs
             | Some e ->
                 let new_cmds, _, new_errs = compile_var_dec v e in
                 loop rest_decs (cmds @ new_cmds) (errs @ new_errs))
@@ -5156,7 +5160,7 @@ and translate_statement tr_ctx e =
        *)
       let break_label, new_loop_list =
         match tr_ctx.tr_js_lab with
-        | None   -> (None, tr_ctx.tr_loop_list)
+        | None -> (None, tr_ctx.tr_loop_list)
         | Some _ ->
             let break_label = fresh_break_label () in
             ( Some break_label,
@@ -5170,7 +5174,7 @@ and translate_statement tr_ctx e =
       in
       let cmds3, x3, errs3, rets3, breaks3, conts3 =
         match e3 with
-        | None    ->
+        | None ->
             let x3, cmd3 = make_empty_ass () in
             ([ annotate_cmd cmd3 None ], PVar x3, [], [], [], [])
         | Some e3 -> f_previous new_loop_list None None e3
@@ -5203,7 +5207,7 @@ and translate_statement tr_ctx e =
       let x2_name, x3_name =
         match (x2, x3) with
         | PVar x2_name, PVar x3_name -> (x2_name, x3_name)
-        | _, _                       ->
+        | _, _ ->
             raise
               (Failure
                  "the compilation of the then and else parts of the an if \
@@ -5351,8 +5355,8 @@ and translate_statement tr_ctx e =
           [
             (None, cmd_ass_ret_0);
             (*              x_ret_0 := empty                           *)
-            (Some head, cmd_ass_ret_1);
-            (* head:        x_ret_1 := PHI(x_ret_0, x_ret_3)             *)
+            (Some head, cmd_ass_ret_1)
+            (* head:        x_ret_1 := PHI(x_ret_0, x_ret_3)             *);
           ]
         @ cmds1
         @ annotate_cmds
@@ -5366,8 +5370,8 @@ and translate_statement tr_ctx e =
               (*              goto [ not (x_ret_2 = empty) ] next1 next2 *)
               (Some next1, LBasic Skip);
               (* next1:       skip                                         *)
-              (Some next2, cmd_ass_ret_3);
-              (* next2:       x_ret_3 := PHI(x_ret_1, x_ret_2)             *)
+              (Some next2, cmd_ass_ret_3)
+              (* next2:       x_ret_3 := PHI(x_ret_1, x_ret_2)             *);
             ]
         @ cmds2
         @ annotate_cmds
@@ -5377,8 +5381,8 @@ and translate_statement tr_ctx e =
               (*              x2_v := i__getValue (x2) with err            *)
               (None, cmd_tb_x2);
               (*              x2_b := i__toBoolean (x2_v) with err         *)
-              (None, cmd_dowhile_goto);
-              (*              goto [x2_b] head end                         *)
+              (None, cmd_dowhile_goto)
+              (*              goto [x2_b] head end                         *);
             ]
         @ annotate_cmds cmds_end_loop
       in
@@ -5491,7 +5495,7 @@ and translate_statement tr_ctx e =
               (Some head, LabCmd.LLogic (LCmd.SL (Invariant (a, binders))));
               (None, cmd_ass_ret_1);
             ]
-        | None              -> [ (Some head, cmd_ass_ret_1) ]
+        | None -> [ (Some head, cmd_ass_ret_1) ]
       in
 
       let cmds2 = add_initial_label cmds2 body metadata in
@@ -5530,8 +5534,8 @@ and translate_statement tr_ctx e =
               (* next1:    skip                                       *)
               (Some next2, cmd_ass_ret_3);
               (* next2:    x_ret_3 := PHI(x_ret_1, x_ret_2)           *)
-              (None, LGoto head);
-              (*           goto head                                  *)
+              (None, LGoto head)
+              (*           goto head                                  *);
             ]
         (* These commands are out of the loop *)
         @ annotate_cmds cmds_end_loop
@@ -5851,7 +5855,7 @@ and translate_statement tr_ctx e =
       let cmds1, x1, errs1 =
         match e1 with
         | Some e1 -> fe e1
-        | None    ->
+        | None ->
             let x1_v, cmd_ass_x1v = make_empty_ass () in
             ([ annotate_cmd cmd_ass_x1v None ], PVar x1_v, [])
       in
@@ -5889,7 +5893,7 @@ and translate_statement tr_ctx e =
       let cmds2, x2, errs2 =
         match e2 with
         | Some e2 -> fe e2
-        | None    ->
+        | None ->
             let x2 = fresh_var () in
             let cmd_ass_x2 =
               annotate_cmd (None, LBasic (Assignment (x2, Lit (Bool true))))
@@ -5900,7 +5904,7 @@ and translate_statement tr_ctx e =
       let cmds3, _, errs3 =
         match e3 with
         | Some e3 -> fe e3
-        | None    ->
+        | None ->
             let x3_v, cmd_ass_x3v = make_empty_ass () in
             ([ annotate_cmd (None, cmd_ass_x3v) ], PVar x3_v, [])
       in
@@ -5972,7 +5976,7 @@ and translate_statement tr_ctx e =
               (Some head, LabCmd.LLogic (LCmd.SL (Invariant (a, binders))));
               (None, cmd_ass_ret_1);
             ]
-        | None              -> [ (Some head, cmd_ass_ret_1) ]
+        | None -> [ (Some head, cmd_ass_ret_1) ]
       in
 
       let cmds =
@@ -5984,8 +5988,8 @@ and translate_statement tr_ctx e =
               (*              x2_v := i__getValue (x2) with err            *)
               (None, cmd_tb_x2);
               (*              x2_b := i__toBoolean (x2_v) with err         *)
-              (None, cmd_for_goto);
-              (*              goto [x2_b] body end                         *)
+              (None, cmd_for_goto)
+              (*              goto [x2_b] body end                         *);
             ]
         @ cmds4
         @ annotate_cmds
@@ -5999,15 +6003,15 @@ and translate_statement tr_ctx e =
               (*              goto [ not (x_ret_2 = empty) ] next1 next2 *)
               (Some next1, LBasic Skip);
               (* next1:       skip                                         *)
-              (Some next2, cmd_ass_ret_3);
-              (* next2:       x_ret_3 := PHI(x_ret_1, x_ret_2)             *)
+              (Some next2, cmd_ass_ret_3)
+              (* next2:       x_ret_3 := PHI(x_ret_1, x_ret_2)             *);
             ]
         @ cmds3
         @ annotate_cmds
             [
               (*              cmds3                                        *)
-              (None, LGoto head);
-              (*              goto head                                    *)
+              (None, LGoto head)
+              (*              goto head                                    *);
             ]
         @ annotate_cmds cmds_end_loop
       in
@@ -6036,7 +6040,7 @@ and translate_statement tr_ctx e =
       let metadata = Annot.set_loop_info metadata [] in
       let annotate_cmd cmd lab = annotate_cmd_top_level metadata (lab, cmd) in
       match e with
-      | None   ->
+      | None ->
           let x_r = fresh_var () in
           (* x_r := undefined *)
           let cmd_xr_ass =
@@ -6077,15 +6081,15 @@ and translate_statement tr_ctx e =
     *)
       let x_r, cmd_ret =
         match tr_ctx.tr_previous with
-        | None           ->
+        | None ->
             let x_r, cmd = make_empty_ass () in
             (x_r, [ annotate_cmd cmd None ])
         | Some (Lit lit) ->
             let x_r = fresh_var () in
             let cmd = LBasic (Assignment (x_r, Lit lit)) in
             (x_r, [ annotate_cmd cmd None ])
-        | Some (PVar x)  -> (x, [])
-        | Some _         ->
+        | Some (PVar x) -> (x, [])
+        | Some _ ->
             raise
               (Failure
                  "Continue: The return of the compilation must be either a \
@@ -6107,15 +6111,15 @@ and translate_statement tr_ctx e =
     *)
       let x_r, cmd_ret =
         match tr_ctx.tr_previous with
-        | None           ->
+        | None ->
             let x_r, cmd = make_empty_ass () in
             (x_r, [ annotate_cmd cmd None ])
         | Some (Lit lit) ->
             let x_r = fresh_var () in
             let cmd = LBasic (Assignment (x_r, Lit lit)) in
             (x_r, [ annotate_cmd cmd None ])
-        | Some (PVar x)  -> (x, [])
-        | Some _         ->
+        | Some (PVar x) -> (x, [])
+        | Some _ ->
             raise
               (Failure
                  "Continue: The return of the compilation must be either a \
@@ -6359,15 +6363,15 @@ and translate_statement tr_ctx e =
                 (* next1:    cmds1                                          *)
                 (None, cmd_gv_x1);
                 (*           x1_v := getValue (x1) with err                 *)
-                (None, cmd_goto_2);
-                (*           goto [ x1_v = x_switch_guard ] next2 end_case  *)
+                (None, cmd_goto_2)
+                (*           goto [ x1_v = x_switch_guard ] next2 end_case  *);
               ]
           @ cmds2
           @ annotate_cmds
               [
                 (* next2:    cmds2                                          *)
-                (Some end_case, cmd_ass_xfound);
-                (* end_case: x_found := PHI(x_false, x_true)                *)
+                (Some end_case, cmd_ass_xfound)
+                (* end_case: x_found := PHI(x_false, x_true)                *);
               ]
         in
         let errs = errs1 @ errs_x1_v @ errs2 in
@@ -6375,7 +6379,13 @@ and translate_statement tr_ctx e =
       in
 
       let compile_default
-          s b_stmts x_old_b x_found_b end_switch js_lab cur_breaks_ab =
+          s
+          b_stmts
+          x_old_b
+          x_found_b
+          end_switch
+          js_lab
+          cur_breaks_ab =
         let new_loop_list =
           (None, end_switch, js_lab, true) :: tr_ctx.tr_loop_list
         in
@@ -6537,7 +6547,7 @@ and translate_statement tr_ctx e =
       in
 
       match (b_cases, def) with
-      | [], None     ->
+      | [], None ->
           (*  end_switch: x_r := PHI(breaks_a, x_a) *)
           let x_r = fresh_var () in
           let cur_breaks_as, outer_breaks_as =
@@ -6586,7 +6596,7 @@ and translate_statement tr_ctx e =
             rets_as @ rets_def,
             outer_breaks_as @ outer_breaks_def,
             conts_as @ conts_def )
-      | _, Some def  ->
+      | _, Some def ->
           let b_stmts = List.map fst b_cases in
           let cmds_bs = add_initial_label cmds_bs b_cases_lab metadata in
 
@@ -6629,7 +6639,7 @@ and translate_statement tr_ctx e =
             rets_as @ rets_bs @ rets_def,
             outer_breaks_as @ outer_breaks_bs @ outer_breaks_def,
             conts_as @ conts_bs @ conts_def )
-      | _, _         -> raise (Failure "no b cases with no default"))
+      | _, _ -> raise (Failure "no b cases with no default"))
   | JS_Parser.Syntax.Function _ -> ([], Lit Empty, [], [], [], [])
   | JS_Parser.Syntax.With (_, _) ->
       raise (Failure "Not implemented: with (this should not happen)")
@@ -6640,9 +6650,9 @@ and translate_statement tr_ctx e =
 let make_final_cmd vars final_lab final_var origin_loc =
   let cmd_final =
     match vars with
-    | []    -> LBasic Skip
+    | [] -> LBasic Skip
     | [ x ] -> LBasic (Assignment (final_var, PVar x))
-    | _     ->
+    | _ ->
         let vars = List.map (fun x_r -> PVar x_r) vars in
         LPhiAssignment [ (final_var, vars) ]
   in
@@ -7154,7 +7164,10 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
 
 (**** EVAL ****)
 let js2jsil_eval
-    (prog : ('a, int) Gillian.Gil_syntax.Prog.t) fid_parent strictness e =
+    (prog : ('a, int) Gillian.Gil_syntax.Prog.t)
+    fid_parent
+    strictness
+    e =
   let prog, which_pred = (prog.procs, prog.predecessors) in
 
   let e, fid_eval, vislist_eval, eval_fun_tbl =
@@ -7205,7 +7218,11 @@ let js2jsil_eval
 
 (* FUNCTION CONSTRUCTOR *)
 let js2jsil_function_constructor_prop
-    (prog : ('a, int) GProg.t) _ params strictness e =
+    (prog : ('a, int) GProg.t)
+    _
+    params
+    strictness
+    e =
   let prog, which_pred = (prog.procs, prog.predecessors) in
 
   let _, new_fid, _, new_fun_tbl =

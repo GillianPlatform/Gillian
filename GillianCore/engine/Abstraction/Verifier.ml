@@ -2,11 +2,8 @@ open Containers
 
 module type S = sig
   type st
-
   type heap_t
-
   type state
-
   type m_err
 
   module SPState :
@@ -31,7 +28,6 @@ module type S = sig
   type t
 
   val start_time : float ref
-
   val reset : unit -> unit
 
   val verify_prog :
@@ -57,17 +53,16 @@ module Make
 struct
   module L = Logging
   module SSubst = SVal.SESubst
+
   module SAInterpreter =
     GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SPState) (External)
+
   module Normaliser = Normaliser.Make (SPState)
   module SPState = SPState
 
   type st = SPState.st
-
   type state = SPState.t
-
   type heap_t = SPState.heap_t
-
   type m_err = SPState.m_err_t
 
   let print_success_or_failure success =
@@ -86,7 +81,6 @@ struct
   }
 
   let global_results = VerificationResults.make ()
-
   let start_time = ref 0.
 
   let reset () =
@@ -119,7 +113,7 @@ struct
           (fun _ v_val acc ->
             match v_val with
             | ALoc _ -> Expr.Set.add v_val acc
-            | _      -> acc)
+            | _ -> acc)
           Expr.Set.empty
       in
       let spec_vars = Expr.Set.union (Expr.Set.diff lvars subst_dom) alocs in
@@ -150,7 +144,7 @@ struct
         SSubst.filter subst (fun e _ ->
             match e with
             | PVar _ -> false
-            | _      -> true)
+            | _ -> true)
       in
       let posts =
         List.filter_map
@@ -193,7 +187,7 @@ struct
         in
         L.verbose (fun m -> m "END of STEP 4@\n");
         match post_up with
-        | Error _    ->
+        | Error _ ->
             let msg =
               Printf.sprintf "Warning: testify failed for %s. Cause: post_up \n"
                 name
@@ -222,7 +216,7 @@ struct
         Normaliser.normalise_assertion ~pred_defs:preds
           ~pvars:(SS.of_list params) pre
       with
-      | Error _                  -> [ (None, None) ]
+      | Error _ -> [ (None, None) ]
       | Ok normalised_assertions ->
           List.mapi test_of_normalised_state normalised_assertions
     with Failure msg ->
@@ -292,12 +286,12 @@ struct
                   let nt =
                     match t with
                     | Some test -> test :: nt
-                    | None      -> nt
+                    | None -> nt
                   in
                   let ns =
                     match s with
                     | Some spec -> spec :: ns
-                    | None      -> ns
+                    | None -> ns
                   in
                   (nt, ns))
                 ([], []) tests_and_specs
@@ -326,7 +320,7 @@ struct
           let test_acc =
             match test_opt with
             | Some t -> t :: test_acc
-            | None   -> test_acc
+            | None -> test_acc
           in
           let spec_acc =
             match spec_opt with
@@ -343,7 +337,7 @@ struct
           raise
             (Failure
                (Printf.sprintf "Could not testify lemma %s" lemma.lemma_name))
-      | _  -> ()
+      | _ -> ()
     in
     (tests, { lemma with lemma_specs = specs })
 
@@ -382,7 +376,7 @@ struct
         m "Analyse result: About to unify one postcondition of %s. post: %a"
           test.name UP.pp test.post_up);
     match SPState.unify state subst test.post_up with
-    | true  ->
+    | true ->
         L.verbose (fun m ->
             m "Analyse result: Postcondition unified successfully");
         VerificationResults.set_result global_results test.name test.id true;
@@ -404,7 +398,9 @@ struct
     subst
 
   let analyse_proc_results
-      (test : t) (flag : Flag.t) (rets : SAInterpreter.result_t list) : bool =
+      (test : t)
+      (flag : Flag.t)
+      (rets : SAInterpreter.result_t list) : bool =
     let success : bool =
       rets <> []
       && List.fold_left
@@ -511,7 +507,7 @@ struct
         Fmt.pr "%s@?" msg;
         (* Reset coverage for every procedure in verification *)
         { prog with coverage = Hashtbl.create 1 }
-    | None   -> raise (Failure "Debugging lemmas unsupported!")
+    | None -> raise (Failure "Debugging lemmas unsupported!")
 
   let verify (prog : UP.prog) (test : t) : bool =
     let state = test.pre_state in
@@ -529,10 +525,10 @@ struct
             m "Verification: Concluded evaluation: %d obtained results.%a@\n"
               (List.length rets) SAInterpreter.pp_result rets);
         analyse_proc_results test flag rets
-    | None      -> (
+    | None -> (
         let lemma = Prog.get_lemma_exn prog.prog test.name in
         match lemma.lemma_proof with
-        | None       ->
+        | None ->
             if !Config.lemma_proof then
               raise
                 (Failure (Printf.sprintf "Lemma %s WITHOUT proof" test.name))
@@ -547,15 +543,10 @@ struct
   let pred_extracting_visitor =
     object
       inherit [_] Visitors.reduce
-
       inherit Visitors.Utils.ss_monoid
-
       method! visit_Pred _ pred_name _ = SS.singleton pred_name
-
       method! visit_Fold _ pred_name _ _ = SS.singleton pred_name
-
       method! visit_Unfold _ pred_name _ _ _ = SS.singleton pred_name
-
       method! visit_GUnfold _ pred_name = SS.singleton pred_name
     end
 
@@ -569,9 +560,7 @@ struct
   let lemma_extracting_visitor =
     object
       inherit [_] Visitors.reduce
-
       inherit Visitors.Utils.ss_monoid
-
       method! visit_ApplyLem _ lemma_name _ _ = SS.singleton lemma_name
     end
 
@@ -635,7 +624,7 @@ struct
       (lnames_to_verify : SS.t) : UP.prog * t list * t list =
     let ipreds = UP.init_preds prog.preds in
     match ipreds with
-    | Error e  ->
+    | Error e ->
         Fmt.pr
           "Creation of unification plans for predicates failed with:\n%a\n@?"
           UP.pp_up_err_t e;
@@ -714,7 +703,7 @@ struct
         (* STEP 4: Create unification plans for specs and predicates *)
         (* Printf.printf "Creating unification plans: %f\n" (cur_time -. start_time); *)
         match UP.init_prog ~preds_tbl:preds prog with
-        | Error _  -> failwith "Creation of unification plans failed."
+        | Error _ -> failwith "Creation of unification plans failed."
         | Ok prog' ->
             (* STEP 5: Determine static dependencies and add to call graph *)
             List.iter
@@ -804,7 +793,7 @@ struct
         let cur_source_files =
           match source_files with
           | Some files -> files
-          | None       -> failwith "Cannot use -a in incremental mode"
+          | None -> failwith "Cannot use -a in incremental mode"
         in
         let prev_source_files, prev_call_graph, results =
           read_verif_results ()

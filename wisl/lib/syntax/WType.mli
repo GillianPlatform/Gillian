@@ -1,16 +1,13 @@
 type t = WList | WNull | WBool | WString | WPtr | WInt | WAny | WSet
 
 val compatible : t -> t -> bool
-
 val strongest : t -> t -> t
-
 val pp : Format.formatter -> t -> unit
 
 exception Unmatching_types
 
 module TypeMap : sig
   type key = WLExpr.tt
-
   type +'a t
 end
 

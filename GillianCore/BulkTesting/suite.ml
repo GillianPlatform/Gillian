@@ -6,27 +6,18 @@ module type S = sig
   type category
 
   val pp_category : Format.formatter -> category -> unit
-
   val skip_category : category -> bool
-
   val filter_source : string -> bool
-
   val create_tests : string -> string -> (string * info * category) list
-
   val beforeTest : info -> string -> unit
-
   val beforeEach : unit -> unit
-
   val init_suite : string list -> unit
-
   val cmd_name : string
-
   val exec_mode : ExecMode.t
 end
 
 module Dummy = struct
   let fail () = failwith "Test Suite non implemented"
-
   let cmd_name = ""
 
   type info = unit
@@ -36,27 +27,18 @@ module Dummy = struct
   type category = unit
 
   let pp_category _ _ = fail ()
-
   let skip_category _ = fail ()
-
   let create_tests _ _ = fail ()
-
   let beforeEach _ = fail ()
-
   let init_suite _ = fail ()
-
   let filter_source _ = fail ()
-
   let beforeTest _ _ = fail ()
-
   let exec_mode = ExecMode.Concrete
 end
 
 module ByFolder (P : sig
   val max_depth : int
-
   val cmd_name : string
-
   val exec_mode : ExecMode.t
 end) =
 struct
@@ -85,7 +67,7 @@ struct
       String.sub a 0 !curr
     in
     match list_string with
-    | []     -> ""
+    | [] -> ""
     | a :: _ -> List.fold_left common_root2 a list_string
 
   let suffix i str = String.sub str i (String.length str - i)
@@ -97,11 +79,8 @@ struct
   type category = string
 
   let pp_category fmt s = Fmt.string fmt s
-
   let skip_category _ = false
-
   let max_depth = P.max_depth
-
   let common_root_length = ref 0
 
   let init_suite file_list =
@@ -134,12 +113,8 @@ struct
     [ (cut_source, (), cat) ]
 
   let filter_source _ = true
-
   let beforeEach _ = ()
-
   let beforeTest _ _ = ()
-
   let cmd_name = P.cmd_name
-
   let exec_mode = P.exec_mode
 end

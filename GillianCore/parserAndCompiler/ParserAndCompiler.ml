@@ -52,12 +52,10 @@ module Dummy : S = struct
     type t = unit
 
     let term = Cmdliner.Term.(const ())
-
     let apply () = ()
   end
 
   type tl_ast = unit
-
   type err = unit
 
   let pp_err _ _ =
@@ -71,8 +69,6 @@ module Dummy : S = struct
        flag or test suites"
 
   let other_imports = []
-
   let env_var_import_path = None
-
   let initialize _ = ()
 end

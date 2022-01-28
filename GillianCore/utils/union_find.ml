@@ -8,14 +8,13 @@ type 'a t = {
 }
 
 let init ~priority ~equal = { table = Hashtbl.create 1; priority; equal }
-
 let copy (uf : 'a t) : 'a t = { uf with table = Hashtbl.copy uf.table }
 
 (* Creates a new union_find node, referencing
    itself as its parent. *)
 let add (uf : 'a t) (elm : 'a) : unit =
   match Hashtbl.find_opt uf.table elm with
-  | None   -> Hashtbl.replace uf.table elm elm
+  | None -> Hashtbl.replace uf.table elm elm
   | Some _ -> ()
 
 (* Do a find() on a given node, searching
@@ -38,7 +37,7 @@ let union (uf : 'a t) (ela : 'a) (elb : 'a) : unit =
   let repb = rep uf elb in
   match uf.priority repa repb with
   | `Eq | `Greater -> Hashtbl.replace uf.table repb repa
-  | `Lower         -> Hashtbl.replace uf.table repa repb
+  | `Lower -> Hashtbl.replace uf.table repa repb
 
 (* Fold function *)
 let fold (f : 'acc -> 'a * 'a -> 'acc) (ac : 'acc) (uf : 'a t) : 'acc =

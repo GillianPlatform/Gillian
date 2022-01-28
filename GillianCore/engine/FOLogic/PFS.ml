@@ -11,11 +11,8 @@ type t = Formula.t ExtList.t [@@deriving yojson]
 (**************************************)
 
 let init () : t = ExtList.make ()
-
 let equal (pfs1 : t) (pfs2 : t) : bool = ExtList.for_all2 ( = ) pfs1 pfs2
-
 let to_list : t -> Formula.t list = ExtList.to_list
-
 let of_list : Formula.t list -> t = ExtList.of_list
 
 let to_set pfs =
@@ -27,11 +24,8 @@ let extend (pfs : t) (a : Formula.t) : unit =
   if not (mem pfs a) then ExtList.add a pfs
 
 let clear (pfs : t) : unit = ExtList.clear pfs
-
 let length (pfs : t) = ExtList.length pfs
-
 let copy (pfs : t) : t = ExtList.copy pfs
-
 let merge_into_left (pfs_l : t) (pfs_r : t) : unit = ExtList.concat pfs_l pfs_r
 
 let set (pfs : t) (reset : Formula.t list) : unit =
@@ -74,23 +68,14 @@ let sort (p_formulae : t) : unit =
   set p_formulae (var_eqs @ llen_eqs @ others)
 
 let iter = ExtList.iter
-
 let fold_left = ExtList.fold_left
-
 let map_inplace = ExtList.map_inplace
-
 let remove_duplicates pfs = ExtList.remove_duplicates pfs
-
 let filter_map_stop = ExtList.filter_map_stop
-
 let filter_stop_cond = ExtList.filter_stop_cond
-
 let filter = ExtList.filter
-
 let filter_map = ExtList.filter_map
-
 let exists = ExtList.exists
-
 let get_nth = ExtList.nth
 
 let rec get_relevant_info (_ : SS.t) (lvars : SS.t) (locs : SS.t) (pfs : t) :

@@ -3,17 +3,11 @@ open Gillian.Gil_syntax
 open Jsil_syntax
 
 let heap_asrt_name = "initialHeapPostWeak"
-
 let pre_scope_prefix = "PreScope_"
-
 let post_scope_prefix = "PostScope_"
-
 let reserved_methods = Hashtbl.create Config.small_tbl_size
-
 let reserved_properties = Hashtbl.create Config.small_tbl_size
-
 let counter = ref 0
-
 let pvar_counter = ref 0
 
 let fresh_bi_lvar () =
@@ -30,7 +24,7 @@ let post_parse_lcmd (cmd : Annot.t * string option * LabCmd.t) :
     (Annot.t * string option * LabCmd.t) list =
   let annot, lab, cmd = cmd in
   match !Javert_utils.Js_config.cosette with
-  | true  -> [ (annot, lab, cmd) ]
+  | true -> [ (annot, lab, cmd) ]
   | false -> (
       match cmd with
       | LCall (_, Lit (String p_name), [ r_arg ], _, _)
@@ -87,7 +81,7 @@ let make_sc (vis_list : string list) : Expr.t list =
   let chopped_vis_list =
     match List.rev vis_list with
     | _ :: xs -> List.rev xs
-    | _       -> []
+    | _ -> []
   in
   List.map expr_from_fid chopped_vis_list
 
@@ -145,8 +139,7 @@ let scope_info_to_assertion
   let sc_bindings =
     match List.rev (List.map expr_from_fid vis_list) with
     | _ :: les -> List.rev les
-    | _        -> raise
-                    (Failure "DEATH. EMPTY VIS LIST. scope_info_to_assertion")
+    | _ -> raise (Failure "DEATH. EMPTY VIS LIST. scope_info_to_assertion")
   in
 
   let a_schain =
@@ -160,7 +153,7 @@ let scope_info_to_assertion
           (fun le ->
             Asrt.Pure (Not (Eq (le, Lit (Loc JS2JSIL_Helpers.locGlobName)))))
           les
-    | _        -> []
+    | _ -> []
   in
 
   let fid_vis_tbl = Jslogic.JSLogicCommon.get_scope_table cc_tbl fid in
@@ -173,7 +166,7 @@ let scope_info_to_assertion
             let a_xval = var_assertion fid' x x_val in
             let proc_x = EProg.get_proc eprog x in
             match proc_x with
-            | None        -> [ a_xval ]
+            | None -> [ a_xval ]
             | Some proc_x ->
                 let proc_x_prototype = Expr.LVar (fresh_bi_lvar ()) in
                 let proc_x_vis_list =
@@ -221,8 +214,7 @@ let create_pre_scope_pred
   let sc_bindings =
     match List.rev (List.map expr_from_fid vis_list) with
     | _ :: les -> List.rev les
-    | _        -> raise
-                    (Failure "DEATH. EMPTY VIS LIST. scope_info_to_assertion")
+    | _ -> raise (Failure "DEATH. EMPTY VIS LIST. scope_info_to_assertion")
   in
 
   let a_schain =
@@ -238,7 +230,7 @@ let create_pre_scope_pred
             let a_x = var_assertion fid' x (PVar x) in
             let proc_x = EProg.get_proc eprog x in
             match proc_x with
-            | None        -> ([ x ], [ a_x ])
+            | None -> ([ x ], [ a_x ])
             | Some proc_x ->
                 let proc_x_prototype =
                   Expr.LVar (Javert_utils.Js_generators.fresh_lvar ())
@@ -441,7 +433,7 @@ let bi_post_parse_cmd (cmd : Annot.t * string option * LabCmd.t) :
         (annot, Some lab_t, t_cmd);
         (annot, Some lab_f, f_cmd);
       ]
-  | _            -> [ (annot, lab, cmd) ]
+  | _ -> [ (annot, lab, cmd) ]
 
 let bi_post_parse_eproc
     (_ : EProg.t)
@@ -467,7 +459,7 @@ let create_new_bispec
     (eproc : EProc.t) : unit =
   match eproc.spec with
   | Some _ -> ()
-  | None   ->
+  | None ->
       if eproc.name = "main" then ()
       else
         let pre =

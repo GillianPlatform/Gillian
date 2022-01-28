@@ -2,23 +2,15 @@ type err_t = Symbol_not_found of string
 
 module Make (Def_value : sig
   type t
-
   type vt
-
   type lt
 
   val pp : Format.formatter -> t -> unit
-
   val to_expr : t -> Gil_syntax.Expr.t
-
   val of_expr : Gil_syntax.Expr.t -> t
-
   val expr_to_vt : Gil_syntax.Expr.t -> vt
-
   val vt_to_expr : vt -> Gil_syntax.Expr.t
-
   val is_not_implemented_fname : not_implemented_name:string -> t -> bool
-
   val of_lt : lt -> t
 end) (Delayed_hack : sig
   type 'a t
@@ -32,14 +24,12 @@ end) (Delayed_hack : sig
     'a t
 
   val resolve_or_create_lt : Def_value.lt -> string t
-
   val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
 end) =
 struct
   module GUtils = Gillian.Utils
 
   type nonrec err_t = err_t
-
   type def = FunDef of Def_value.t | GlobVar of Def_value.t
 
   type t = {
@@ -90,7 +80,7 @@ struct
     let open Gil_syntax in
     let expr =
       match def with
-      | FunDef fname  ->
+      | FunDef fname ->
           Expr.EList [ Lit (String "function"); Def_value.to_expr fname ]
       | GlobVar vname ->
           EList [ Lit (String "variable"); Def_value.to_expr vname ]
@@ -114,7 +104,7 @@ struct
 
   let pp_def fmt def =
     match def with
-    | FunDef f  -> Format.fprintf fmt "(Function %a)" Def_value.pp f
+    | FunDef f -> Format.fprintf fmt "(Function %a)" Def_value.pp f
     | GlobVar v -> Format.fprintf fmt "(Variable %a)" Def_value.pp v
 
   let pp fmt genv =
@@ -144,7 +134,7 @@ struct
     let open Gillian.Symbolic in
     let substitute_in_def def =
       match def with
-      | FunDef f  ->
+      | FunDef f ->
           let f_e = Def_value.to_expr f in
           let substituted = Subst.subst_in_expr subst ~partial:true f_e in
           let substituted = Def_value.of_expr substituted in
@@ -162,14 +152,14 @@ struct
       Subst.filter subst (fun var _ ->
           match var with
           | ALoc _ -> true
-          | _      -> false)
+          | _ -> false)
     in
     let rename_val old_loc new_loc pmap =
       PMap.map (fun k -> if String.equal old_loc k then new_loc else k) pmap
     in
     let rename_key old_loc new_loc pmap =
       match find_opt old_loc pmap with
-      | None   -> pmap
+      | None -> pmap
       | Some d -> PMap.add new_loc d (PMap.remove old_loc pmap)
     in
     (* Then we substitute the locations *)
@@ -178,12 +168,12 @@ struct
         let old_loc =
           match old_loc with
           | ALoc loc -> loc
-          | _        -> raise (Failure "Impossible by construction")
+          | _ -> raise (Failure "Impossible by construction")
         in
         let new_loc =
           match new_loc with
           | Lit (Loc loc) | ALoc loc -> loc
-          | _                        ->
+          | _ ->
               failwith
                 (Format.asprintf "Heap substitution failed for loc : %a" Expr.pp
                    new_loc)
@@ -200,7 +190,7 @@ struct
   let assertions genv =
     let build_asrt s loc def =
       match def with
-      | FunDef fname  ->
+      | FunDef fname ->
           let f_ser = Def_value.to_expr fname in
           (true, Constr.Others.glob_fun ~symb:s ~fname:f_ser)
       | GlobVar vname ->
@@ -227,29 +217,24 @@ module Concrete =
       open Gil_syntax
 
       type t = string
-
       type vt = Literal.t
-
       type lt = string
 
       let pp = Fmt.string
-
       let to_expr s = Expr.Lit (String s)
 
       let of_expr = function
         | Expr.Lit (String s) -> s
-        | e                   -> Fmt.failwith "Invalid function name: %a"
-                                   Expr.pp e
+        | e -> Fmt.failwith "Invalid function name: %a" Expr.pp e
 
       let rec expr_to_vt = function
         | Expr.EList l -> Literal.LList (List.map expr_to_vt l)
-        | Lit l        -> l
-        | e            -> Fmt.failwith "The following should be concrete : %a"
-                            Expr.pp e
+        | Lit l -> l
+        | e -> Fmt.failwith "The following should be concrete : %a" Expr.pp e
 
       let rec vt_to_expr = function
         | Literal.LList ll -> Expr.EList (List.map vt_to_expr ll)
-        | l                -> Lit l
+        | l -> Lit l
 
       let is_not_implemented_fname ~not_implemented_name s =
         String.equal not_implemented_name s
@@ -260,11 +245,8 @@ module Concrete =
       type 'a t = 'a
 
       let ( let+ ) a f = f a
-
       let resolve_or_create_lt x = x
-
       let return ?learned:_ ?learned_types:_ x = x
-
       let ( #== ) _ _ = []
     end)
 
@@ -274,27 +256,22 @@ module Symbolic =
       open Gil_syntax
 
       type t = Expr.t
-
       type vt = Expr.t
-
       type lt = Expr.t
 
       let pp = Expr.pp
-
       let to_expr e = e
-
       let of_expr e = e
-
       let expr_to_vt e = e
 
       let vt_to_expr =
         let rec lift_lit = function
           | Literal.LList ll -> Expr.EList (List.map lift_lit ll)
-          | l                -> Lit l
+          | l -> Lit l
         in
         function
         | Expr.Lit l -> lift_lit l
-        | e          -> e
+        | e -> e
 
       let is_not_implemented_fname ~not_implemented_name = function
         | Expr.Lit (String s) when String.equal s not_implemented_name -> true
@@ -315,7 +292,7 @@ module Symbolic =
         let open Syntax in
         let* loc_name = resolve_loc lvar_loc in
         match loc_name with
-        | None   ->
+        | None ->
             let new_loc_name = Gil_syntax.ALoc.alloc () in
             let learned = lvar_loc #== (ALoc new_loc_name) in
             Logging.verbose (fun fmt ->

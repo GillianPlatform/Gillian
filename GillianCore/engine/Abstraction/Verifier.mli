@@ -1,10 +1,7 @@
 module type S = sig
   type st
-
   type heap_t
-
   type state
-
   type m_err
 
   module SPState :
@@ -29,7 +26,6 @@ module type S = sig
   type t
 
   val start_time : float ref
-
   val reset : unit -> unit
 
   val verify_prog :

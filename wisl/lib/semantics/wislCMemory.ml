@@ -2,35 +2,24 @@ open Gillian.Concrete
 module Literal = Gillian.Gil_syntax.Literal
 
 type vt = Values.t
-
 type st = Subst.t
-
 type err_t = unit
-
 type fix_t = unit
-
 type t = WislCHeap.t
-
 type action_ret = ASucc of (t * vt list) | AFail of err_t list
 
 let init = WislCHeap.init
-
 let copy = WislCHeap.copy
-
 let pp fmt h = Format.fprintf fmt "%s" (WislCHeap.str h)
-
 let pp_err _fmt () = ()
-
 let ga_to_setter = WislLActions.ga_to_setter_str
-
 let ga_to_getter = WislLActions.ga_to_getter_str
-
 let ga_to_deleter = WislLActions.ga_to_deleter_str
 
 let ga_loc_indexes a_id =
   WislLActions.(
     match ga_from_str a_id with
-    | Cell  -> [ 0 ]
+    | Cell -> [ 0 ]
     | Bound -> [ 0 ]
     | Freed -> [ 0 ])
 
@@ -44,8 +33,8 @@ let get_cell heap params =
     | [ Loc loc; Int offset ] -> (
         match WislCHeap.get heap loc offset with
         | Some value -> ASucc (heap, [ Loc loc; Int offset; value ])
-        | None       -> AFail [])
-    | l                       ->
+        | None -> AFail [])
+    | l ->
         failwith
           (Printf.sprintf
              "Invalid parameters for Wisl GetCell Local Action : [ %s ] "
@@ -69,7 +58,7 @@ let rem_cell heap params =
     | [ Loc loc; Int offset ] ->
         let () = WislCHeap.remove heap loc offset in
         ASucc (heap, [])
-    | l                       ->
+    | l ->
         failwith
           (Printf.sprintf
              "Invalid parameters for Wisl SetCell Local Action : [ %s ] "
@@ -95,7 +84,7 @@ let dispose heap params =
   | [ Loc obj ] ->
       let () = WislCHeap.dispose heap obj in
       ASucc (heap, [])
-  | l           ->
+  | l ->
       failwith
         (Printf.sprintf
            "Invalid parameters for Wisl Dispose Local Action : [ %s ] "
@@ -108,19 +97,16 @@ let execute_action name heap params =
     | GetCell -> get_cell heap params
     | SetCell -> set_cell heap params
     | RemCell -> rem_cell heap params
-    | Alloc   -> alloc heap params
+    | Alloc -> alloc heap params
     | Dispose -> dispose heap params
-    | _       -> failwith
-                   "Can't use consumer and producers in concrete execution")
+    | _ -> failwith "Can't use consumer and producers in concrete execution")
 
 (** Non-implemented functions *)
 let assertions ?to_keep:_ _ =
   raise (Failure "ERROR: to_assertions called for concrete executions")
 
 let lvars _ = raise (Failure "ERROR: get_lvars called for concrete executions")
-
 let clean_up _ = raise (Failure "Cleanup of concrete state.")
-
 let fresh_val _ = raise (Failure "fresh_val not implemented in concrete state")
 
 let substitution_in_place _ _ =

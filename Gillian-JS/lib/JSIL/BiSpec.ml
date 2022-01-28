@@ -9,8 +9,10 @@ type t = {
 type t_tbl = (string, t) Hashtbl.t
 
 let init
-    (name : string) (params : string list) (pre : Asrt.t) (normalised : bool) :
-    t =
+    (name : string)
+    (params : string list)
+    (pre : Asrt.t)
+    (normalised : bool) : t =
   { name; params; pre; normalised }
 
 let init_tbl () : t_tbl = Hashtbl.create Config.medium_tbl_size

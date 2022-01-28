@@ -1,8 +1,6 @@
 module type S = sig
   val cmd_name : string
-
   val exec_mode : ExecMode.t
-
   val run_all : test_suite_path:string -> incremental:bool -> unit
 end
 
@@ -17,13 +15,13 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
                    and type outcome = Outcome.t) : S = struct
   module Backend = Backend (Outcome) (Suite)
   module PC = Outcome.ParserAndCompiler
+
   module Interpreter =
     GInterpreter.Make (Outcome.Val) (Outcome.ESubst) (Outcome.Store)
       (Outcome.State)
       (Outcome.External)
 
   let cmd_name = Suite.cmd_name
-
   let exec_mode = Suite.exec_mode
 
   type prev_results = {
@@ -32,9 +30,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
   }
 
   let cur_source_files = Hashtbl.create Config.small_tbl_size
-
   let cur_call_graphs = Hashtbl.create Config.small_tbl_size
-
   let tests_ran = ref ([] : string list)
 
   (** The [test_table] maps categories to category tables. A category table maps
@@ -50,7 +46,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
     let cat_tbl =
       match cat_tbl_opt with
       | Some c -> c
-      | None   ->
+      | None ->
           let new_cat_tbl = Hashtbl.create Config.small_tbl_size in
           let () = Hashtbl.replace test_table test.category new_cat_tbl in
           new_cat_tbl
@@ -111,7 +107,9 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
     | None -> true
 
   let execute_test
-      prev_results_opt expect (test : (Suite.info, Suite.category) Test.t) =
+      prev_results_opt
+      expect
+      (test : (Suite.info, Suite.category) Test.t) =
     let open Outcome in
     let result = ref (FailedExec "Execution failure") in
     let execute () =
@@ -120,7 +118,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
       let res =
         match PC.parse_and_compile_files [ test.path ] with
         | Error err -> ParseAndCompileError err
-        | Ok progs  ->
+        | Ok progs ->
             let e_progs = progs.gil_progs in
             let () = Hashtbl.add cur_source_files filename progs.source_files in
             let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in

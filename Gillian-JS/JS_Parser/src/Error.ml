@@ -1,11 +1,11 @@
 type t =
   | Overlapping_Syntax
-  | Unhandled_Statement  of Loc.t
+  | Unhandled_Statement of Loc.t
   | Unhandled_Expression of Loc.t
-  | NotEcmaScript5       of string * Loc.t
-  | UnusedAnnotations    of string list * Loc.t
-  | FlowParser           of string * string
-  | LoaderError          of string * int * string * string
+  | NotEcmaScript5 of string * Loc.t
+  | UnusedAnnotations of string list * Loc.t
+  | FlowParser of string * string
+  | LoaderError of string * int * string * string
 
 let str = function
   | Overlapping_Syntax ->

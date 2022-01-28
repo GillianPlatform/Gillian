@@ -1,9 +1,7 @@
 open Gillian.Gil_syntax
 
 let small_tbl_size = 1
-
 let medium_tbl_size = 1
-
 let line_numbers_extension = "_line_numbers.txt"
 
 type js_symbolic_constructs_type = {
@@ -100,37 +98,21 @@ let reserved_biannots =
   ]
 
 let setupHeapName = "setupInitialHeap"
-
 let _callPropName = "@call"
-
 let _constructPropName = "@construct"
-
 let _scopePropName = "@scope"
-
 let _classPropName = "@class"
-
 let _extensiblePropName = "@extensible"
-
 let _internalProtoFieldName = "@proto"
-
 let _erFlagPropName = "@er"
-
 let locGlobName = Jslogic.JSLogicCommon.locGlobName
-
 let locObjPrototype = "$lobj_proto"
-
 let locFunObjPrototype = "$lfun_proto"
-
 let locArrPrototype = "$larr_proto"
-
 let locTErrPrototype = "$lterr_proto"
-
 let locSErrPrototype = "$lserr_proto"
-
 let locRErrPrototype = "$lrerr_proto"
-
 let locErrPrototype = "$lerr_proto"
-
 let toBooleanName = "i__toBoolean"
 
 (* 9.2               *)
@@ -140,7 +122,6 @@ let getValueName = "i__getValue"
 (* 8.7.1             *)
 
 let isReservedName = "i__isReserved"
-
 let putValueName = "i__putValue"
 
 (* 8.7.2             *)
@@ -168,13 +149,9 @@ let typeErrorName = "TypeError"
 (* 15.1.4.14         *)
 
 let referenceErrorName = "ReferenceError"
-
 let createFunctionObjectName = "create_function_object"
-
 let isCallableName = "i__isCallable"
-
 let checkObjectCoercibleName = "i__checkObjectCoercible"
-
 let jsTypeOfName = "i__typeOf"
 
 (* 11.4.3 - Table 20 *)
@@ -208,41 +185,25 @@ let strictEqualityComparisonName = "i__strictEquality" (* 11.9.6            *)
 let defineOwnPropertyName = "defineOwnProperty" (* 8.12.9            *)
 
 let checkAssignmentErrorsName = "i__checkAssignmentErrors"
-
 let checkParametersName = "i__checkParameters"
-
 let getEnumFieldsName = "i__getAllEnumerableFields"
-
 let createArgsName = "create_arguments_object"
-
 let dynamicScoper = "resolveVariable"
-
 let isNativeErrorName = "isNativeError"
-
 let deleteObjAndMetadata = "i__purge"
-
 let deleteErrorObjects = "i__deleteErrors"
 
 (* N.B. Keep the list updated when adding new special spec vars: *)
 
 let var_this = Jslogic.JSLogicCommon.var_this
-
 let var_scope = Jslogic.JSLogicCommon.var_scope
-
 let var_scope_final = "x__scope_f"
-
 let var_se = Jslogic.JSLogicCommon.var_se
-
 let var_te = Jslogic.JSLogicCommon.var_te
-
 let var_re = "x__re"
-
 let var_args = "x__args"
-
 let var_er = "x__er"
-
 let var_er_metadata = "x__er_m"
-
 let var_sc_first = "x__sc_fst"
 
 let js2jsil_spec_vars =
@@ -262,30 +223,20 @@ let reserved_vars =
   ]
 
 let main_fid = "main"
-
 let macro_GPVF_name = "GPVFold"
-
 let macro_GPVU_name = "GPVUnfold"
-
 let pi_predicate_name = "Pi"
 
 (** Various abbreviations *)
 let lit_num n = Expr.Lit (Num n)
 
 let lit_str s = Expr.Lit (String s)
-
 let lit_loc l = Expr.Lit (Loc l)
-
 let lit_typ t = Expr.Lit (Type t)
-
 let lit_refv = lit_str "v"
-
 let lit_refo = lit_str "o"
-
 let rtype r = Expr.BinOp (r, LstNth, lit_num 0.)
-
 let base r = Expr.BinOp (r, LstNth, lit_num 1.)
-
 let field r = Expr.BinOp (r, LstNth, lit_num 2.)
 
 (**
@@ -302,71 +253,38 @@ let fresh_sth (name : string) : (unit -> string) * (unit -> unit) =
   (f, r)
 
 let fresh_var, reset_var = fresh_sth "x_"
-
 let fresh_scope_chain_var, reset_scope_chain_var = fresh_sth "x_sc_"
-
 let fresh_found_var, reset_found_var = fresh_sth "x_found_"
-
 let fresh_fun_var, reset_fun_var = fresh_sth "x_f_"
-
 let fresh_obj_var, reset_obj_var = fresh_sth "x_o_"
-
 let fresh_er_var, reset_er_var = fresh_sth "x_er_"
-
 let fresh_err_var, reset_err_var = fresh_sth "x_error_"
-
 let fresh_this_var, reset_this_var = fresh_sth "x_this_"
-
 let fresh_case_var, reset_case_var = fresh_sth "x_case_"
-
 let fresh_desc_var, reset_desc_var = fresh_sth "x_desc_"
-
 let fresh_body_var, reset_body_var = fresh_sth "x_body_"
-
 let fresh_fscope_var, reset_fscope_var = fresh_sth "x_fscope_"
-
 let fresh_xfoundb_var, reset_xfoundb_var = fresh_sth "x_found_b_"
-
 let fresh_label, reset_label = fresh_sth "lab_"
-
 let fresh_next_label, reset_next_label = fresh_sth "next_"
-
 let fresh_then_label, reset_then_label = fresh_sth "then_"
-
 let fresh_else_label, reset_else_label = fresh_sth "else_"
-
 let fresh_endif_label, reset_endif_label = fresh_sth "fi_"
-
 let fresh_end_label, reset_end_label = fresh_sth "end_"
-
 let fresh_end_switch_label, reset_end_switch_label = fresh_sth "end_switch_"
-
 let fresh_end_case_label, reset_end_case_label = fresh_sth "end_case_"
-
 let fresh_default_label, reset_default_label = fresh_sth "default_"
-
 let fresh_b_cases_label, reset_b_cases_label = fresh_sth "b_cases_"
-
 let fresh_logical_variable, reset_logical_variable = fresh_sth "#x"
-
 let fresh_break_label, reset_break_label = fresh_sth "break_"
-
 let fresh_loop_head_label, reset_loop_head_label = fresh_sth "loop_h_"
-
 let fresh_loop_cont_label, reset_loop_cont_label = fresh_sth "loop_c_"
-
 let fresh_loop_guard_label, reset_loop_guard_label = fresh_sth "loop_g_"
-
 let fresh_loop_body_label, reset_loop_body_label = fresh_sth "loop_b_"
-
 let fresh_loop_end_label, reset_loop_end_label = fresh_sth "loop_e_"
-
 let fresh_loop_identifier, reset_loop_identifier = fresh_sth "loop_id_"
-
 let fresh_tcf_finally_label, reset_tcf_finally_label = fresh_sth "finally_"
-
 let fresh_tcf_end_label, reset_tcf_end_label = fresh_sth "end_tcf_"
-
 let fresh_tcf_err_try_label, reset_tcf_err_try_label = fresh_sth "err_tcf_t_"
 
 let fresh_tcf_err_catch_label, reset_tcf_err_catch_label =
@@ -406,11 +324,8 @@ let fresh_name =
   f
 
 let fresh_anonymous () : string = fresh_name "anonymous"
-
 let fresh_catch_anonymous () : string = fresh_name "catch_anonymous"
-
 let fresh_named n : string = fresh_name n
-
 let fresh_anonymous_eval () : string = fresh_name "___$eval___"
 
 let fresh_catch_anonymous_eval () : string =
@@ -425,47 +340,45 @@ let is_get_value_var x =
       if x_name_len > 2 && String.sub x_name (x_name_len - 2) 2 = "_v" then
         Some x_name
       else None
-  | _           -> None
+  | _ -> None
 
 let val_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_v"
-  | Lit _       -> fresh_var () ^ "_v"
-  | _           -> raise
-                     (Failure "val_var_of_var expects a variable or a literal")
+  | Lit _ -> fresh_var () ^ "_v"
+  | _ -> raise (Failure "val_var_of_var expects a variable or a literal")
 
 let number_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_n"
-  | Lit _       -> fresh_var () ^ "_n"
-  | _           -> raise (Failure "number_var_of_var expects a variable")
+  | Lit _ -> fresh_var () ^ "_n"
+  | _ -> raise (Failure "number_var_of_var expects a variable")
 
 let boolean_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_b"
-  | Lit _       -> fresh_var () ^ "_b"
-  | _           -> raise (Failure "boolean_var_of_var expects a variable")
+  | Lit _ -> fresh_var () ^ "_b"
+  | _ -> raise (Failure "boolean_var_of_var expects a variable")
 
 let primitive_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_p"
-  | Lit _       -> fresh_var () ^ "_p"
-  | _           -> raise (Failure "primitive_var_of_var expects a variable")
+  | Lit _ -> fresh_var () ^ "_p"
+  | _ -> raise (Failure "primitive_var_of_var expects a variable")
 
 let string_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_s"
-  | Lit _       -> fresh_var () ^ "_s"
-  | _           -> raise (Failure "string_var_of_var expects a variable")
+  | Lit _ -> fresh_var () ^ "_s"
+  | _ -> raise (Failure "string_var_of_var expects a variable")
 
 let i32_var_of_var x =
   match (x : Expr.t) with
   | PVar x_name -> x_name ^ "_i32"
-  | Lit _       -> fresh_var () ^ "_i32"
-  | _           -> raise (Failure "string_var_of_var expects a variable")
+  | Lit _ -> fresh_var () ^ "_i32"
+  | _ -> raise (Failure "string_var_of_var expects a variable")
 
 let fresh_err_label, reset_err_label = fresh_sth "err_"
-
 let fresh_ret_label, reset_ret_label = fresh_sth "ret_"
 
 type loop_list_type = (string option * string * string option * bool) list

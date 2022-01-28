@@ -26,14 +26,14 @@ and literal =
   | Undefined
   | Null
   | Empty
-  | Constant  of constant
-  | Bool      of bool
-  | Int       of int
-  | Num       of float
-  | String    of string
-  | Loc       of string
-  | Type      of typ
-  | LList     of literal list
+  | Constant of constant
+  | Bool of bool
+  | Int of int
+  | Num of float
+  | String of string
+  | Loc of string
+  | Type of typ
+  | LList of literal list
   | Nono
 
 and binop =
@@ -113,75 +113,75 @@ and unop =
 and nop = LstCat | SetUnion | SetInter
 
 and expr =
-  | Lit    of literal
-  | PVar   of string
-  | LVar   of string
-  | ALoc   of string
-  | UnOp   of unop * expr
-  | BinOp  of expr * binop * expr
+  | Lit of literal
+  | PVar of string
+  | LVar of string
+  | ALoc of string
+  | UnOp of unop * expr
+  | BinOp of expr * binop * expr
   | LstSub of expr * expr * expr
-  | NOp    of nop * expr list
-  | EList  of expr list
-  | ESet   of expr list
+  | NOp of nop * expr list
+  | EList of expr list
+  | ESet of expr list
 
 and formula =
   | True
   | False
-  | Not     of formula
-  | And     of formula * formula
-  | Or      of formula * formula
-  | Eq      of expr * expr
-  | Less    of expr * expr
-  | LessEq  of expr * expr
+  | Not of formula
+  | And of formula * formula
+  | Or of formula * formula
+  | Eq of expr * expr
+  | Less of expr * expr
+  | LessEq of expr * expr
   | StrLess of expr * expr
-  | SetMem  of expr * expr
-  | SetSub  of expr * expr
-  | ForAll  of (string * typ option) list * formula
+  | SetMem of expr * expr
+  | SetSub of expr * expr
+  | ForAll of (string * typ option) list * formula
 
 and assertion =
   | Emp
-  | Star  of assertion * assertion
-  | Pred  of string * expr list
-  | Pure  of formula
+  | Star of assertion * assertion
+  | Pred of string * expr list
+  | Pure of formula
   | Types of (expr * typ) list
-  | GA    of string * expr list * expr list
+  | GA of string * expr list * expr list
 
 and bindings = string * (string * expr) list
 
 and slcmd =
-  | Fold      of string * expr list * bindings option
-  | Unfold    of string * expr list * (string * string) list option * bool
-  | GUnfold   of string
-  | ApplyLem  of string * expr list * string list
+  | Fold of string * expr list * bindings option
+  | Unfold of string * expr list * (string * string) list option * bool
+  | GUnfold of string
+  | ApplyLem of string * expr list * string list
   | SepAssert of assertion * string list
   | Invariant of assertion * string list
   | SymbExec
 
 and lcmd =
-  | If         of expr * lcmd list * lcmd list
-  | Branch     of formula
-  | Macro      of string * expr list
-  | Assert     of formula
-  | Assume     of formula
+  | If of expr * lcmd list * lcmd list
+  | Branch of formula
+  | Macro of string * expr list
+  | Assert of formula
+  | Assume of formula
   | AssumeType of string * typ
-  | SpecVar    of string list
-  | SL         of slcmd
+  | SpecVar of string list
+  | SL of slcmd
 
 and 'label cmd =
   | Skip
-  | Assignment    of string * expr
-  | LAction       of string * string * expr list
-  | Logic         of lcmd
-  | Goto          of 'label
-  | GuardedGoto   of expr * 'label * 'label
-  | Call          of string * expr * expr list * 'label option * bindings option
-  | ECall         of string * expr * expr list * 'label option
-  | Apply         of string * expr * 'label option
-  | Arguments     of string
+  | Assignment of string * expr
+  | LAction of string * string * expr list
+  | Logic of lcmd
+  | Goto of 'label
+  | GuardedGoto of expr * 'label * 'label
+  | Call of string * expr * expr list * 'label option * bindings option
+  | ECall of string * expr * expr list * 'label option
+  | Apply of string * expr * 'label option
+  | Arguments of string
   | PhiAssignment of (string * expr list) list
   | ReturnNormal
   | ReturnError
-  | Fail          of string * expr list
+  | Fail of string * expr list
 
 and flag = Normal | Error
 

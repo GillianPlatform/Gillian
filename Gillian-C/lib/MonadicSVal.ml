@@ -44,25 +44,25 @@ let of_chunk_and_expr chunk e =
   let* e = Delayed.reduce e in
   match e with
   | Expr.Lit Undefined -> return SUndefined
-  | _                  -> (
+  | _ -> (
       match Chunk.type_of chunk with
       | Tlong when Compcert.Archi.ptr64 -> (
           match%ent e with
           | number -> return (SVlong e)
-          | obj    -> (
+          | obj -> (
               match e with
               | EList [ ALoc l; o ] -> return (Sptr (l, o))
-              | _                   ->
+              | _ ->
                   Fmt.failwith
                     "of_chunk_and_expr: Not a location, but should be: %a"
                     Expr.pp e))
       | Tint when not Compcert.Archi.ptr64 -> (
           match%ent e with
           | number -> return (SVint e)
-          | obj    -> (
+          | obj -> (
               match e with
               | EList [ ALoc l; o ] -> return (Sptr (l, o))
-              | _                   ->
+              | _ ->
                   Fmt.failwith
                     "of_chunk_and_expr: Not a location, but should be: %a"
                     Expr.pp e))
@@ -73,7 +73,7 @@ let of_chunk_and_expr chunk e =
           let learned =
             match chunk with
             | Mint8unsigned -> [ (i 0) #<= e; e #<= (i 255) ]
-            | _             -> []
+            | _ -> []
           in
           return ~learned (SVint e)
       | Tfloat -> return (SVfloat e)
@@ -86,8 +86,8 @@ let of_gil_expr sval_e =
   Logging.verbose (fun fmt -> fmt "OF_GIL_EXPR : %a" Expr.pp sval_e);
   let* sval_e = Delayed.reduce sval_e in
   match%ent sval_e with
-  | undefined  -> DO.some SUndefined
-  | obj        ->
+  | undefined -> DO.some SUndefined
+  | obj ->
       let loc_expr = Expr.list_nth sval_e 0 in
       let ofs = Expr.list_nth sval_e 1 in
       let* ofs = Delayed.reduce ofs in
@@ -95,22 +95,22 @@ let of_gil_expr sval_e =
       let loc, learned =
         match loc_opt with
         | Some l -> (l, [])
-        | None   ->
+        | None ->
             let aloc = ALoc.alloc () in
             let learned = [ loc_expr #== (ALoc aloc) ] in
             (aloc, learned)
       in
       DO.some ~learned (Sptr (loc, ofs))
-  | int_typ    -> DO.some (SVint (Expr.list_nth sval_e 1))
-  | float_typ  -> DO.some (SVfloat (Expr.list_nth sval_e 1))
-  | long_typ   -> DO.some (SVlong (Expr.list_nth sval_e 1))
+  | int_typ -> DO.some (SVint (Expr.list_nth sval_e 1))
+  | float_typ -> DO.some (SVfloat (Expr.list_nth sval_e 1))
+  | long_typ -> DO.some (SVlong (Expr.list_nth sval_e 1))
   | single_typ -> DO.some (SVsingle (Expr.list_nth sval_e 1))
-  | _          -> DO.none ()
+  | _ -> DO.none ()
 
 let of_gil_expr_exn sval_e =
   let* value_opt = of_gil_expr sval_e in
   match value_opt with
-  | None       -> raise (NotACompCertValue sval_e)
+  | None -> raise (NotACompCertValue sval_e)
   | Some value -> Delayed.return value
 
 let to_gil_expr_undelayed = to_gil_expr
@@ -136,7 +136,7 @@ let sure_is_zero = function
 
 module SVArray = struct
   type nonrec t =
-    | Arr      of Expr.t
+    | Arr of Expr.t
         (** the parameter should be a list representing a *NON-EMPTY* list *)
     | AllUndef
     | AllZeros
@@ -147,10 +147,10 @@ module SVArray = struct
     | Arr e ->
         let+ reduced = Delayed.reduce e in
         Arr reduced
-    | _     -> Delayed.return t
+    | _ -> Delayed.return t
 
   let pp fmt = function
-    | Arr e    -> Expr.pp fmt e
+    | Arr e -> Expr.pp fmt e
     | AllUndef -> Fmt.string fmt "AllUndef"
     | AllZeros -> Fmt.string fmt "AllZeros"
 
@@ -160,17 +160,17 @@ module SVArray = struct
     let open Formula.Infix in
     function
     | Arr e -> (Expr.list_length e) #== (Expr.num 0.)
-    | _     -> False
+    | _ -> False
 
   let sure_is_all_zeros = function
     | Arr (EList l) ->
         List.for_all
           (function
             | Expr.Lit (Num 0.) -> true
-            | _                 -> false)
+            | _ -> false)
           l
-    | AllZeros      -> true
-    | _             -> false
+    | AllZeros -> true
+    | _ -> false
 
   let equal arr_a arr_b =
     match (arr_a, arr_b) with
@@ -201,7 +201,7 @@ module SVArray = struct
   let undefined_pf ?size arr_exp =
     let size =
       match size with
-      | None      -> Expr.list_length arr_exp
+      | None -> Expr.list_length arr_exp
       | Some size -> size
     in
     let open Formula.Infix in
@@ -222,14 +222,15 @@ module SVArray = struct
             fmt "Undefined pf: not as concrete: %a" Expr.pp size);
         let i = LVar.alloc () in
         let i_e = Expr.LVar i in
-        forall [ (i, Some NumberType) ]
+        forall
+          [ (i, Some NumberType) ]
           zero #<= i_e #&& (i_e #< size)
           #=> ((Expr.list_nth_e arr_exp i_e) #== (Lit Undefined))
 
   let zeros_pf ?size arr_exp =
     let size =
       match size with
-      | None      -> Expr.list_length arr_exp
+      | None -> Expr.list_length arr_exp
       | Some size -> size
     in
     let open Formula.Infix in
@@ -250,7 +251,8 @@ module SVArray = struct
         let i = LVar.alloc () in
         let i_e = Expr.LVar i in
         let zero = Expr.num 0. in
-        forall [ (i, Some NumberType) ]
+        forall
+          [ (i, Some NumberType) ]
           zero #<= i_e #&& (i_e #< size)
           #=> (is_zero (Expr.list_nth_e arr_exp i_e))
 
@@ -264,7 +266,7 @@ module SVArray = struct
       Delayed.return ~learned ~learned_types x
     in
     match arr with
-    | Arr e    -> Delayed.return e
+    | Arr e -> Delayed.return e
     | AllUndef -> allocate_array_lvar undefined_pf
     | AllZeros -> allocate_array_lvar zeros_pf
 
@@ -272,29 +274,29 @@ module SVArray = struct
     let open Delayed in
     let open Delayed.Syntax in
     match (left, right) with
-    | Arr a, Arr b       -> return (Arr (Expr.list_cat a b))
+    | Arr a, Arr b -> return (Arr (Expr.list_cat a b))
     | AllUndef, AllUndef -> return AllUndef
     | AllZeros, AllZeros -> return AllZeros
-    | left, right        ->
+    | left, right ->
         let* left = to_arr_with_size left left_size in
         let+ right = to_arr_with_size right right_size in
         Arr (Expr.list_cat left right)
 
   let concat left right =
     match (left, right) with
-    | Arr a, Arr b       -> Some (Arr (Expr.list_cat a b))
+    | Arr a, Arr b -> Some (Arr (Expr.list_cat a b))
     | AllUndef, AllUndef -> Some AllUndef
     | AllZeros, AllZeros -> Some AllZeros
-    | _                  -> None
+    | _ -> None
 
   (** This already assumes the value is a number and not a pointer *)
   let to_single_value ~chunk = function
     | Arr (EList [ a ]) ->
         let+ v = of_chunk_and_expr chunk a in
         Some v
-    | AllZeros          -> DO.some (zero_of_chunk chunk)
-    | AllUndef          -> DO.some SUndefined
-    | _                 -> DO.none ()
+    | AllZeros -> DO.some (zero_of_chunk chunk)
+    | AllUndef -> DO.some SUndefined
+    | _ -> DO.none ()
 
   let singleton = function
     (* Assuming that the chunk is correct already *)
@@ -308,7 +310,7 @@ module SVArray = struct
     match arr with
     | AllZeros -> AllZeros
     | AllUndef -> AllUndef
-    | Arr e    -> Arr (Expr.list_sub ~lst:e ~start:o ~size:len)
+    | Arr e -> Arr (Expr.list_sub ~lst:e ~start:o ~size:len)
 
   (** This assumes chunks are properly respected outside of the call of this function *)
   let array_cons (el : SVal.t) arr = concat (singleton el) arr
@@ -327,7 +329,7 @@ module SVArray = struct
       | Lit (Num n) ->
           ( Expr.EList (Utils.List_utils.make (int_of_float n) concrete_single),
             [] )
-      | _           ->
+      | _ ->
           let open Formula.Infix in
           let arr = LVar.alloc () in
           let arr_e = Expr.LVar arr in
@@ -342,7 +344,7 @@ module SVArray = struct
           (arr_e, learned)
     in
     match svarr with
-    | Arr e    ->
+    | Arr e ->
         let open Formula.Infix in
         let learned =
           [
@@ -369,12 +371,12 @@ module SVArray = struct
     let bounds =
       match chunk with
       | Chunk.Mint8unsigned -> Some (0, 255)
-      | _                   -> None
+      | _ -> None
       (* Should be completed later *)
     in
     let* size = Delayed.reduce size in
     match bounds with
-    | None             -> Delayed.return ()
+    | None -> Delayed.return ()
     | Some (low, high) -> (
         match arr with
         | Arr (EList e) ->
@@ -383,13 +385,13 @@ module SVArray = struct
               List.concat_map
                 (function
                   | Expr.Lit Undefined -> []
-                  | x                  ->
+                  | x ->
                       let open Formula.Infix in
                       [ (i low) #<= x; x #<= (i high) ])
                 e
             in
             Delayed.return ~learned ()
-        | Arr e         -> (
+        | Arr e -> (
             match size with
             | Expr.Lit (Num n) ->
                 let i k = Expr.num (float_of_int k) in
@@ -402,14 +404,14 @@ module SVArray = struct
                          [ (i low) #<= x; x #<= (i high) ]))
                 in
                 Delayed.return ~learned ()
-            | _                -> Delayed.return ())
-        | _             -> Delayed.return ())
+            | _ -> Delayed.return ())
+        | _ -> Delayed.return ())
 
   (* type nonrec t = Conc of t list | Abst of Expr.t | AllUndef | AllZeros *)
 
   let subst ~le_subst t =
     match t with
-    | Arr e    ->
+    | Arr e ->
         let s = le_subst e in
         if s == e then t else Arr s
     | AllUndef -> AllUndef
@@ -418,8 +420,6 @@ end
 
 module Infix = struct
   let ( @: ) = SVArray.concat
-
   let ( ^: ) = SVArray.array_cons
-
   let ( ^:? ) a b = Option.bind b (fun b -> a ^: b)
 end

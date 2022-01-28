@@ -6,11 +6,9 @@ open Jsil_syntax
 module SS = Containers.SS
 
 let small_tbl_size = 1
-
 let medium_tbl_size = 1
 
 type var_to_fid_tbl_type = (string, string) Hashtbl.t
-
 type cc_tbl_type = (string, var_to_fid_tbl_type) Hashtbl.t
 
 type fun_tbl_type =
@@ -47,43 +45,24 @@ let get_scope_table (cc_tbl : cc_tbl_type) (fid : string) =
     L.fail msg
 
 let main_fid = "main"
-
 let pi_pred_name = "Pi"
-
 let object_class = "Object"
-
 let syntax_error_pred_name = "SyntaxError"
-
 let type_error_pred_name = "TypeError"
-
 let initial_heap_pre_pred_name = "initialHeapPre"
-
 let initial_heap_post_pred_name = "initialHeapPost"
-
 let function_object_pred_name = "function_object"
-
 let standard_object_pred_name = "standardObject"
-
 let this_logic_var_name = "#this"
-
 let locGlobName = "$lg"
-
 let var_te = "x__te"
-
 let var_se = "x__se"
-
 let var_er = "x__er"
-
 let var_this = "x__this"
-
 let var_scope = "x__scope"
-
 let logic_var_scope = "#x__scope"
-
 let var_scope_final = "x__scope_f"
-
 let funobj_pred_name = "JSFunctionObject"
-
 let js_obj_internal_fields = [ "@proto"; "@class"; "@extensible" ]
 
 (** Fresh Names *)
@@ -108,7 +87,7 @@ let vislist_2_les (_ : string list) (i : int) : Expr.t list =
 let find_in_list (lst : string list) (x : string) =
   let rec loop lst i =
     match lst with
-    | []        -> raise (Failure "DEATH: string not found in list")
+    | [] -> raise (Failure "DEATH: string not found in list")
     | y :: rest -> if x = y then i else loop rest (i + 1)
   in
   loop lst 0
@@ -119,7 +98,7 @@ let list_overlap (lst_1 : string list) (lst_2 : string list) =
         (String.concat ", " lst_2)); *)
   let rec loop lst_1 lst_2 i =
     match (lst_1, lst_2) with
-    | [], _ | _, []              -> i
+    | [], _ | _, [] -> i
     | x1 :: rest_1, x2 :: rest_2 ->
         if x1 = x2 then loop rest_1 rest_2 (i + 1) else i
   in
@@ -128,8 +107,10 @@ let list_overlap (lst_1 : string list) (lst_2 : string list) =
 (** Scope Clarification *)
 
 let psi
-    (cc_tbl : cc_tbl_type) (vis_tbl : vis_tbl_type) (fid : string) (x : string)
-    =
+    (cc_tbl : cc_tbl_type)
+    (vis_tbl : vis_tbl_type)
+    (fid : string)
+    (x : string) =
   let var_to_fid_tbl = get_scope_table cc_tbl fid in
   try
     let fid' = Hashtbl.find var_to_fid_tbl x in

@@ -3,9 +3,7 @@
 *)
 
 let filename = "file.log"
-
 let out_channel = ref None
-
 let formatter = ref None
 
 let initialize () =
@@ -14,7 +12,7 @@ let initialize () =
 
 let log (report : Report.t) : unit =
   match !formatter with
-  | None           -> ()
+  | None -> ()
   | Some formatter -> (
       (* TODO: This should eventually log all types when all regular calls to
                log of specific types are replaced *)
@@ -28,5 +26,5 @@ let log (report : Report.t) : unit =
 
 let wrap_up () =
   match !out_channel with
-  | None             -> ()
+  | None -> ()
   | Some out_channel -> close_out out_channel

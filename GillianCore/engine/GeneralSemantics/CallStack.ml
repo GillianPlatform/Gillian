@@ -2,7 +2,6 @@
 
 module type S = sig
   type vt
-
   type store_t
 
   (** A call stack is a list records, each of which contains
@@ -105,7 +104,6 @@ end
 module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) :
   S with type vt = Val.t and type store_t = Store.t = struct
   type vt = Val.t [@@deriving yojson]
-
   type store_t = Store.t [@@deriving yojson]
 
   (** Type of call stacks: a call stack is a list of tuples, each of which contains
@@ -166,7 +164,7 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) :
   let get_cur_proc_id (cs : t) : string =
     match cs with
     | { pid; _ } :: _ -> pid
-    | _               -> raise (Failure "Malformed configuration")
+    | _ -> raise (Failure "Malformed configuration")
 
   (**
     Get current arguments
@@ -177,7 +175,7 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) :
   let get_cur_args (cs : t) : Val.t list =
     match cs with
     | { arguments; _ } :: _ -> arguments
-    | _                     -> raise (Failure "Malformed configuration")
+    | _ -> raise (Failure "Malformed configuration")
 
   (**
     Get current arguments
@@ -187,7 +185,7 @@ module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) :
   *)
   let get_loop_ids = function
     | { loop_ids; _ } :: _ -> loop_ids
-    | _                    -> raise (Failure "Malformed configuration")
+    | _ -> raise (Failure "Malformed configuration")
 
   (**
     Call stack copy

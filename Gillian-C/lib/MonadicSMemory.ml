@@ -17,7 +17,7 @@ let resolve_or_create_loc_name (lvar_loc : Expr.t) : string Delayed.t =
   let open Delayed.Syntax in
   let* loc_name = Delayed.resolve_loc lvar_loc in
   match loc_name with
-  | None   ->
+  | None ->
       let new_loc_name = ALoc.alloc () in
       let learned = [ Formula.Eq (ALoc new_loc_name, lvar_loc) ] in
       Logging.verbose (fun fmt ->
@@ -33,19 +33,17 @@ let expr_of_loc_name loc_name =
   else Lit (Loc loc_name)
 
 type vt = Values.t
-
 type st = Subst.t
-
 type i_fix_t
 
 type err_t =
-  | InvalidLocation    of Expr.t
+  | InvalidLocation of Expr.t
   | MissingLocResource of string
-  | SHeapTreeErr       of {
+  | SHeapTreeErr of {
       at_locations : string list;
       sheaptree_err : SHeapTree.err;
     }
-  | GEnvErr            of GEnv.err_t
+  | GEnvErr of GEnv.err_t
 
 let lift_sheaptree_err loc err =
   SHeapTreeErr { at_locations = [ loc ]; sheaptree_err = err }
@@ -56,7 +54,7 @@ let resolve_loc_result loc =
   Delayed_result.of_do ~none:(InvalidLocation loc) (Delayed.resolve_loc loc)
 
 (* let make_err ~fixes ?(fc = Formula.False) ?(rvs = []) () =
-  { failing_constraint = fc; recovery_values = rvs; fixes } *)
+   { failing_constraint = fc; recovery_values = rvs; fixes } *)
 
 module Mem = struct
   open Delayed.Syntax
@@ -70,22 +68,18 @@ module Mem = struct
     *)
     type t =
       | GetSingle of string * Expr.t * Chunk.t
-      | GetArray  of string * Expr.t * Expr.t * Chunk.t
-      | GetHole   of string * Expr.t * Expr.t
-      | GetZeros  of string * Expr.t * Expr.t
+      | GetArray of string * Expr.t * Expr.t * Chunk.t
+      | GetHole of string * Expr.t * Expr.t
+      | GetZeros of string * Expr.t * Expr.t
       | Other
   end
 
   type t = { map : SHeapTree.t SMap.t; last_op : LastOp.t }
 
   let make ~last_op map = { last_op; map }
-
   let make_other = make ~last_op:Other
-
   let map_lift_err loc res = DR.map_error res (lift_sheaptree_err loc)
-
   let empty = { map = SMap.empty; last_op = Other }
-
   let copy x = x
 
   let get_tree_res map loc_name =
@@ -95,7 +89,7 @@ module Mem = struct
   let get_or_create_tree map loc_name =
     match SMap.find_opt loc_name map with
     | Some t -> Delayed.return t
-    | None   -> Delayed.return SHeapTree.empty
+    | None -> Delayed.return SHeapTree.empty
 
   let alloc ({ map; _ } : t) low high : t * string =
     let loc = ALoc.alloc () in
@@ -170,7 +164,7 @@ module Mem = struct
   let rem_single { map; last_op } loc ofs chunk =
     let+ loc_name = Delayed.resolve_loc loc in
     match loc_name with
-    | None          -> failwith "Executing rem_single with an unkown loc name"
+    | None -> failwith "Executing rem_single with an unkown loc name"
     | Some loc_name ->
         let () =
           match last_op with
@@ -220,7 +214,7 @@ module Mem = struct
   let rem_array { map; last_op } loc ofs size chunk =
     let+ loc_name = Delayed.resolve_loc loc in
     match loc_name with
-    | None          -> failwith "Executing rem_array with an unkown loc name"
+    | None -> failwith "Executing rem_array with an unkown loc name"
     | Some loc_name ->
         let () =
           match last_op with
@@ -249,7 +243,7 @@ module Mem = struct
     let open DR.Syntax in
     let* loc_name = Delayed.resolve_loc loc in
     match Option.bind loc_name (fun l -> SMap.find_opt l map) with
-    | None      -> DR.ok (make_other map)
+    | None -> DR.ok (make_other map)
     | Some tree ->
         let loc_name = Option.get loc_name in
         let++ () =
@@ -286,7 +280,7 @@ module Mem = struct
   let rem_simple ~check { map; last_op } loc low high =
     let+ loc_name = Delayed.resolve_loc loc in
     match loc_name with
-    | None          -> failwith "Executing rem_simple with an unkown loc name"
+    | None -> failwith "Executing rem_simple with an unkown loc name"
     | Some loc_name ->
         let () =
           if not (check last_op loc_name low high) then
@@ -309,7 +303,7 @@ module Mem = struct
     rem_simple ~check:(fun last_op loc low high ->
         match last_op with
         | LastOp.GetHole (l, b, h) -> l = loc && b = low && h = high
-        | _                        -> false)
+        | _ -> false)
 
   let get_zeros =
     get_simple ~sheap_getter:SHeapTree.get_zeros ~constr_last_op:(fun a b c ->
@@ -321,7 +315,7 @@ module Mem = struct
     rem_simple ~check:(fun last_op loc low high ->
         match last_op with
         | LastOp.GetZeros (l, b, h) -> l = loc && b = low && h = high
-        | _                         -> false)
+        | _ -> false)
 
   let get_bounds { map; _ } loc =
     let open DR.Syntax in
@@ -388,7 +382,7 @@ module Mem = struct
       try
         match GEnv.find_def genv loc with
         | FunDef _ -> true
-        | _        -> false
+        | _ -> false
       with Not_found -> false
     in
     let iter_exclude f map =
@@ -409,7 +403,7 @@ module Mem = struct
           (fun l r acc ->
             match l with
             | ALoc aloc -> (aloc, r) :: acc
-            | _         -> acc)
+            | _ -> acc)
           []
       in
       let le_subst = Subst.subst_in_expr subst ~partial:true in
@@ -422,14 +416,14 @@ module Mem = struct
       let++ map =
         List.fold_left
           (fun acc (old_loc, new_loc) ->
-            let** acc = acc in
+            let** acc in
             Logging.verbose (fun fmt ->
                 fmt "SHOULD Merge locs: %s --> %a" old_loc Expr.pp new_loc);
             Logging.tmi (fun fmt -> fmt "IN MEMORY: %a" (pp_full ~genv) acc);
             let new_loc =
               match new_loc with
               | Lit (Loc loc) | ALoc loc -> loc
-              | _                        ->
+              | _ ->
                   Fmt.failwith "Heap substitution failed for loc : %a" Expr.pp
                     new_loc
             in
@@ -443,7 +437,7 @@ module Mem = struct
                   Logging.verbose (fun fmt -> fmt "Done merging.");
                   SMap.add new_loc merged without_old
                 with Not_found -> DR.ok acc)
-            | None          -> (
+            | None -> (
                 try
                   let tree = SMap.find old_loc acc in
                   DR.ok (SMap.add new_loc tree (SMap.remove old_loc acc))
@@ -457,7 +451,7 @@ module Mem = struct
       try
         match GEnv.find_def genv loc with
         | FunDef _ -> true
-        | _        -> false
+        | _ -> false
       with Not_found -> false
     in
     let is_first = ref true in
@@ -473,9 +467,7 @@ module Mem = struct
 end
 
 type t' = { genv : GEnv.t; mem : Mem.t }
-
 type t = t' ref
-
 type action_ret = Success of (t * vt list) | Failure of err_t
 
 let make_branch ~heap ?(rets = []) () = (ref heap, rets)
@@ -483,7 +475,6 @@ let make_branch ~heap ?(rets = []) () = (ref heap, rets)
 (* Init *)
 
 let init () = ref { genv = GEnv.empty; mem = Mem.empty }
-
 let copy h = ref { genv = !h.genv; mem = Mem.copy !h.mem }
 
 (* let subst_spec_vars _ _ = () *)
@@ -492,8 +483,8 @@ let copy h = ref { genv = !h.genv; mem = Mem.copy !h.mem }
 
 let pp_params fmt params =
   let rec aux fmtp = function
-    | []     -> ()
-    | [ a ]  -> Format.fprintf fmt "%a" Expr.pp a
+    | [] -> ()
+    | [ a ] -> Format.fprintf fmt "%a" Expr.pp a
     | a :: r ->
         Format.fprintf fmt "%a, " Expr.pp a;
         aux fmtp r
@@ -513,7 +504,7 @@ let execute_alloc heap params =
         make_branch ~heap:{ heap with mem } ~rets:[ Expr.ALoc loc ] ()
       in
       DR.ok result
-  | _             -> fail_ungracefully "alloc" params
+  | _ -> fail_ungracefully "alloc" params
 
 let execute_getcurperm heap params =
   let open DR.Syntax in
@@ -525,7 +516,7 @@ let execute_getcurperm heap params =
       in
       let branch = make_branch ~heap ~rets:[ perm_string ] () in
       DR.ok branch
-  | _            -> fail_ungracefully "getcurperm" params
+  | _ -> fail_ungracefully "getcurperm" params
 
 let execute_weak_valid_pointer heap params =
   let open DR.Syntax in
@@ -535,7 +526,7 @@ let execute_weak_valid_pointer heap params =
       let res = Expr.bool bool in
       let branch = make_branch ~heap ~rets:[ res ] () in
       DR.ok branch
-  | _            -> fail_ungracefully "weakvalidpointer" params
+  | _ -> fail_ungracefully "weakvalidpointer" params
 
 let execute_drop_perm heap params =
   let open DR.Syntax in
@@ -572,7 +563,7 @@ let execute_free heap params =
   | [ loc; low; high ] ->
       let++ mem = Mem.free heap.mem loc low high in
       make_branch ~heap:{ heap with mem } ~rets:[] ()
-  | _                  -> fail_ungracefully "free" params
+  | _ -> fail_ungracefully "free" params
 
 let execute_move heap params =
   let open DR.Syntax in
@@ -696,7 +687,7 @@ let execute_get_simple ~mem_getter ~name heap params =
         (make_branch ~heap:{ heap with mem }
            ~rets:[ loc_e; low; high; perm_e ]
            ())
-  | _                  -> fail_ungracefully name params
+  | _ -> fail_ungracefully name params
 
 let execute_set_simple ~mem_setter ~name heap params =
   let open DR.Syntax in
@@ -712,7 +703,7 @@ let execute_rem_simple ~mem_remover ~name heap params =
   | [ loc; low; high ] ->
       let+ mem = mem_remover heap.mem loc low high in
       Ok (make_branch ~heap:{ heap with mem } ~rets:[] ())
-  | _                  -> fail_ungracefully name params
+  | _ -> fail_ungracefully name params
 
 let execute_get_hole =
   execute_get_simple ~mem_getter:Mem.get_hole ~name:"get_hole"
@@ -738,14 +729,14 @@ let execute_get_freed heap params =
   | [ loc ] ->
       let++ () = Mem.get_freed heap.mem loc in
       make_branch ~heap ~rets:[] ()
-  | _       -> fail_ungracefully "get_freed" params
+  | _ -> fail_ungracefully "get_freed" params
 
 let execute_set_freed heap params =
   match params with
   | [ loc ] ->
       let+ mem = Mem.set_freed heap.mem loc in
       Ok (make_branch ~heap:{ heap with mem } ~rets:[] ())
-  | _       -> fail_ungracefully "set_freed" params
+  | _ -> fail_ungracefully "set_freed" params
 
 let execute_rem_freed heap params =
   let open DR.Syntax in
@@ -753,7 +744,7 @@ let execute_rem_freed heap params =
   | [ loc ] ->
       let++ mem = Mem.rem_freed heap.mem loc in
       make_branch ~heap:{ heap with mem } ~rets:[] ()
-  | _       -> fail_ungracefully "rem_freed" params
+  | _ -> fail_ungracefully "rem_freed" params
 
 let execute_get_bounds heap params =
   let open DR.Syntax in
@@ -762,12 +753,12 @@ let execute_get_bounds heap params =
       let++ loc_name, bounds = Mem.get_bounds heap.mem loc in
       let bounds_e =
         match bounds with
-        | None             -> Expr.Lit Null
+        | None -> Expr.Lit Null
         | Some (low, high) -> Expr.EList [ low; high ]
       in
       let loc_e = expr_of_loc_name loc_name in
       make_branch ~heap ~rets:[ loc_e; bounds_e ] ()
-  | _       -> fail_ungracefully "get_bounds" params
+  | _ -> fail_ungracefully "get_bounds" params
 
 let execute_set_bounds heap params =
   let open DR.Syntax in
@@ -775,14 +766,14 @@ let execute_set_bounds heap params =
   | [ loc; bounds_e ] ->
       let bounds =
         match bounds_e with
-        | Expr.EList [ low; high ]  -> Some (low, high)
+        | Expr.EList [ low; high ] -> Some (low, high)
         | Lit (LList [ low; high ]) -> Some (Lit low, Lit high)
-        | Lit Null                  -> None
-        | _                         -> fail_ungracefully "set_bounds" params
+        | Lit Null -> None
+        | _ -> fail_ungracefully "set_bounds" params
       in
       let++ mem = Mem.set_bounds heap.mem loc bounds in
       make_branch ~heap:{ heap with mem } ~rets:[] ()
-  | _                 -> fail_ungracefully "set_bounds" params
+  | _ -> fail_ungracefully "set_bounds" params
 
 let execute_rem_bounds heap params =
   let open DR.Syntax in
@@ -790,7 +781,7 @@ let execute_rem_bounds heap params =
   | [ loc ] ->
       let++ mem = Mem.rem_bounds heap.mem loc in
       make_branch ~heap:{ heap with mem } ~rets:[] ()
-  | _       -> fail_ungracefully "rem_bounds" params
+  | _ -> fail_ungracefully "rem_bounds" params
 
 let execute_genvgetsymbol heap params =
   let ( let- ) x f = Result.map f (lift_genv_res x) in
@@ -802,7 +793,7 @@ let execute_genvgetsymbol heap params =
          make_branch ~heap
            ~rets:[ Lit (String symbol); loc_from_loc_name sym ]
            ()
-  | _                       -> fail_ungracefully "genv_getsymbol" params
+  | _ -> fail_ungracefully "genv_getsymbol" params
 
 let execute_genvsetsymbol heap params =
   match params with
@@ -814,7 +805,7 @@ let execute_genvsetsymbol heap params =
 let execute_genvremsymbol heap params =
   match params with
   | [ _symbolc ] -> DR.ok (make_branch ~heap ())
-  | _            -> fail_ungracefully "genv_remsymbol" params
+  | _ -> fail_ungracefully "genv_remsymbol" params
 
 let execute_genvgetdef heap params =
   let open DR.Syntax in
@@ -824,7 +815,7 @@ let execute_genvgetdef heap params =
       let def = GEnv.find_def heap.genv loc_name in
       let v = GEnv.serialize_def def in
       DR.ok (make_branch ~heap ~rets:[ Expr.loc_from_loc_name loc_name; v ] ())
-  | _       -> fail_ungracefully "genv_getdef" params
+  | _ -> fail_ungracefully "genv_getdef" params
 
 let execute_genvsetdef heap params =
   match params with
@@ -833,12 +824,12 @@ let execute_genvsetdef heap params =
       let def = GEnv.deserialize_def v_def in
       let* genv = GEnv.set_def heap.genv loc_name def in
       DR.ok (make_branch ~heap:{ heap with genv } ())
-  | _                   -> fail_ungracefully "genv_setdef" params
+  | _ -> fail_ungracefully "genv_setdef" params
 
 let execute_genvremdef heap params =
   match params with
   | [ _loc ] -> DR.ok (make_branch ~heap ())
-  | _        -> fail_ungracefully "genv_remdef" params
+  | _ -> fail_ungracefully "genv_remdef" params
 
 (* Complete fixes  *)
 
@@ -865,7 +856,7 @@ let pp_err fmt (e : err_t) =
         (fun fmt l ->
           match l with
           | [ s ] -> Fmt.pf fmt " '%s'" s
-          | l     -> Fmt.pf fmt "s %a" (Fmt.Dump.list Fmt.string) l)
+          | l -> Fmt.pf fmt "s %a" (Fmt.Dump.list Fmt.string) l)
         at_locations SHeapTree.pp_err sheaptree_err
   | GEnvErr (Symbol_not_found s) -> Fmt.pf fmt "Symbol not found: %s" s
 
@@ -876,14 +867,13 @@ let pp fmt h =
     (Mem.pp ~genv:!h.genv) !h.mem
 
 let pp_by_need (_ : SS.t) fmt h = pp fmt h
-
 let get_print_info _ _ = (SS.empty, SS.empty)
 
 (* let str_noheap _ = "NO HEAP PRINTED" *)
 
 let lift_res res =
   match res with
-  | Ok a    -> Success a
+  | Ok a -> Success a
   | Error e -> Failure e
 
 let pp_branch fmt branch =
@@ -905,47 +895,45 @@ let execute_action ~action_name heap params =
   let open LActions in
   let a_ret =
     match ac_from_str action_name with
-    | AMem Alloc            -> execute_alloc !heap params
-    | AMem GetCurPerm       -> execute_getcurperm !heap params
+    | AMem Alloc -> execute_alloc !heap params
+    | AMem GetCurPerm -> execute_getcurperm !heap params
     | AMem WeakValidPointer -> execute_weak_valid_pointer !heap params
-    | AMem DropPerm         -> execute_drop_perm !heap params
-    | AMem Store            -> execute_store !heap params
-    | AMem Load             -> execute_load !heap params
-    | AMem Free             -> execute_free !heap params
-    | AMem Move             -> execute_move !heap params
-    | AMem GetSingle        -> execute_get_single !heap params
-    | AMem SetSingle        -> execute_set_single !heap params
-    | AMem RemSingle        -> execute_rem_single !heap params
-    | AMem GetArray         -> execute_get_array !heap params
-    | AMem SetArray         -> execute_set_array !heap params
-    | AMem RemArray         -> execute_rem_array !heap params
-    | AMem GetBounds        -> execute_get_bounds !heap params
-    | AMem SetBounds        -> execute_set_bounds !heap params
-    | AMem RemBounds        -> execute_rem_bounds !heap params
-    | AMem GetHole          -> execute_get_hole !heap params
-    | AMem SetHole          -> execute_set_hole !heap params
-    | AMem RemHole          -> execute_rem_hole !heap params
-    | AMem GetZeros         -> execute_get_zeros !heap params
-    | AMem SetZeros         -> execute_set_zeros !heap params
-    | AMem RemZeros         -> execute_rem_zeros !heap params
-    | AMem GetFreed         -> execute_get_freed !heap params
-    | AMem SetFreed         -> execute_set_freed !heap params
-    | AMem RemFreed         -> execute_rem_freed !heap params
-    | AGEnv GetSymbol       -> execute_genvgetsymbol !heap params
-    | AGEnv SetSymbol       -> execute_genvsetsymbol !heap params
-    | AGEnv RemSymbol       -> execute_genvremsymbol !heap params
-    | AGEnv GetDef          -> execute_genvgetdef !heap params
-    | AGEnv SetDef          -> execute_genvsetdef !heap params
-    | AGEnv RemDef          -> execute_genvremdef !heap params
+    | AMem DropPerm -> execute_drop_perm !heap params
+    | AMem Store -> execute_store !heap params
+    | AMem Load -> execute_load !heap params
+    | AMem Free -> execute_free !heap params
+    | AMem Move -> execute_move !heap params
+    | AMem GetSingle -> execute_get_single !heap params
+    | AMem SetSingle -> execute_set_single !heap params
+    | AMem RemSingle -> execute_rem_single !heap params
+    | AMem GetArray -> execute_get_array !heap params
+    | AMem SetArray -> execute_set_array !heap params
+    | AMem RemArray -> execute_rem_array !heap params
+    | AMem GetBounds -> execute_get_bounds !heap params
+    | AMem SetBounds -> execute_set_bounds !heap params
+    | AMem RemBounds -> execute_rem_bounds !heap params
+    | AMem GetHole -> execute_get_hole !heap params
+    | AMem SetHole -> execute_set_hole !heap params
+    | AMem RemHole -> execute_rem_hole !heap params
+    | AMem GetZeros -> execute_get_zeros !heap params
+    | AMem SetZeros -> execute_set_zeros !heap params
+    | AMem RemZeros -> execute_rem_zeros !heap params
+    | AMem GetFreed -> execute_get_freed !heap params
+    | AMem SetFreed -> execute_set_freed !heap params
+    | AMem RemFreed -> execute_rem_freed !heap params
+    | AGEnv GetSymbol -> execute_genvgetsymbol !heap params
+    | AGEnv SetSymbol -> execute_genvsetsymbol !heap params
+    | AGEnv RemSymbol -> execute_genvremsymbol !heap params
+    | AGEnv GetDef -> execute_genvgetdef !heap params
+    | AGEnv SetDef -> execute_genvsetdef !heap params
+    | AGEnv RemDef -> execute_genvremdef !heap params
   in
   lift_dr_and_log a_ret
 
 (* LActions static *)
 
 let ga_to_setter = LActions.ga_to_setter_str
-
 let ga_to_getter = LActions.ga_to_getter_str
-
 let ga_to_deleter = LActions.ga_to_deleter_str
 
 (* Serialization and operations *)
@@ -955,7 +943,7 @@ let substitution_in_place subst heap =
   let genv = GEnv.substitution subst genv in
   let+ mem = Mem.substitution ~genv subst mem in
   match mem with
-  | Ok mem  -> ref { mem; genv }
+  | Ok mem -> ref { mem; genv }
   | Error e -> Fmt.failwith "Error in substitution: %a" SHeapTree.pp_err e
 
 (* let { mem; genv } = !heap in
@@ -964,9 +952,7 @@ let substitution_in_place subst heap =
    heap := { mem = nmem; genv = ngenv } *)
 
 let fresh_val _ = Expr.LVar (LVar.alloc ())
-
 let clean_up _ = ()
-
 let lvars heap = Mem.lvars !heap.mem
 
 let assertions ?to_keep:_ heap =
@@ -979,9 +965,7 @@ let assertions ?to_keep:_ heap =
    genv_asrts @ mem_asrts *)
 
 let mem_constraints _heap = []
-
 let is_overlapping_asrt = LActions.is_overlapping_asrt_str
-
 let ga_loc_indexes = LActions.ga_loc_indexes_str
 
 (** Things defined for BiAbduction *)

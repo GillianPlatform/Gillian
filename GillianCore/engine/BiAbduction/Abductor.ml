@@ -16,15 +16,13 @@ struct
   module SSubst = SVal.SESubst
   module Normaliser = Normaliser.Make (SPState)
   module SBAState = BiState.Make (SVal.M) (SVal.SESubst) (SStore) (SPState)
+
   module SBAInterpreter =
     GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SBAState) (External)
 
   type bi_state_t = SBAState.t
-
   type abs_state = SPState.t
-
   type result_t = SBAInterpreter.result_t
-
   type t = { name : string; params : string list; state : bi_state_t }
 
   let make_id_subst (a : Asrt.t) : SSubst.t =
@@ -42,7 +40,7 @@ struct
         (fun (x, e) ->
           match SVal.M.from_expr e with
           | Some v -> (x, v)
-          | _      -> raise (Failure "DEATH. make_id_subst"))
+          | _ -> raise (Failure "DEATH. make_id_subst"))
         bindings
     in
     SSubst.init bindings'
@@ -113,8 +111,8 @@ struct
                  (* let state_i'' = JSCleanUp.exec prog state_i'' name true in  *)
                  Asrt.star (List.sort Asrt.compare (SPState.to_assertions ~to_keep:pvars state_i''))) in *)
           (pre, pre)
-      | Ok _            -> failwith "Bi-abduction: anti-frame branched"
-      | Error _         ->
+      | Ok _ -> failwith "Bi-abduction: anti-frame branched"
+      | Error _ ->
           raise
             (Failure "Bi-abduction: cannot produce anti-frame in initial state")
     in
@@ -130,7 +128,7 @@ struct
       let subst_fun cloc =
         match Hashtbl.find_opt subst cloc with
         | Some e -> e
-        | None   -> Lit (Loc cloc)
+        | None -> Lit (Loc cloc)
       in
       let new_post = Asrt.subst_clocs subst_fun post in
 
@@ -181,7 +179,7 @@ struct
     let make_test asrt =
       match normalise asrt with
       | Error _ -> []
-      | Ok l    ->
+      | Ok l ->
           List.map
             (fun (ss_pre, _) ->
               {
@@ -217,7 +215,7 @@ struct
         let sspec, spec = process_spec name params state_i state_f Flag.Error in
         if !Config.bug_specs_propagation then UP.add_spec prog spec;
         (sspec, false)
-    | RSucc (fl, _, state_f)   ->
+    | RSucc (fl, _, state_f) ->
         let sspec, spec = process_spec name params state_i state_f fl in
         let () =
           try UP.add_spec prog spec
@@ -230,7 +228,7 @@ struct
   let run_tests (prog : UP.prog) (tests : t list) =
     let rec run_tests_aux tests succ_specs bug_specs =
       match tests with
-      | []           -> (succ_specs, bug_specs)
+      | [] -> (succ_specs, bug_specs)
       | test :: rest ->
           L.verbose (fun m -> m "Running bi-abduction on %s\n" test.name);
           let rets =
@@ -246,13 +244,15 @@ struct
     run_tests_aux tests [] []
 
   let get_test_results
-      (prog : UP.prog) (succ_specs : Spec.t list) (bug_specs : Spec.t list) =
+      (prog : UP.prog)
+      (succ_specs : Spec.t list)
+      (bug_specs : Spec.t list) =
     let succ_specs, error_specs =
       List.partition
         (fun (spec : Spec.t) ->
           match spec.spec_sspecs with
           | [ sspec ] -> sspec.ss_flag = Flag.Normal
-          | _         -> false)
+          | _ -> false)
         succ_specs
     in
 
@@ -337,7 +337,7 @@ struct
     let rec test_procs_aux to_test checked succ_specs bug_specs =
       (* FIXME: Keep tests in a heap/priority queue *)
       match to_test with
-      | []                -> (succ_specs, bug_specs)
+      | [] -> (succ_specs, bug_specs)
       | proc_name :: rest ->
           let () = UP.remove_spec prog proc_name in
           let tests = testify prog (Prog.get_bispec_exn prog.prog proc_name) in
@@ -388,7 +388,7 @@ struct
       let cur_source_files =
         match source_files with
         | Some files -> files
-        | None       -> failwith "Cannot use -a in incremental mode"
+        | None -> failwith "Cannot use -a in incremental mode"
       in
       let prev_source_files, prev_call_graph, prev_results =
         read_biabduction_results ()

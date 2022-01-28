@@ -20,7 +20,5 @@ type t =
 (* list concatenation, only for logic *)
 
 val pp : Format.formatter -> t -> unit
-
 val str : t -> string
-
 val is_logic_only : t -> bool

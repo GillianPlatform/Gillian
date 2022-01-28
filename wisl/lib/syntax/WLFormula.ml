@@ -3,21 +3,19 @@ open VisitorUtils
 type tt =
   | LTrue
   | LFalse
-  | LNot       of t
-  | LAnd       of t * t
-  | LOr        of t * t
-  | LEq        of WLExpr.t * WLExpr.t
-  | LLess      of WLExpr.t * WLExpr.t
-  | LGreater   of WLExpr.t * WLExpr.t
-  | LLessEq    of WLExpr.t * WLExpr.t
+  | LNot of t
+  | LAnd of t * t
+  | LOr of t * t
+  | LEq of WLExpr.t * WLExpr.t
+  | LLess of WLExpr.t * WLExpr.t
+  | LGreater of WLExpr.t * WLExpr.t
+  | LLessEq of WLExpr.t * WLExpr.t
   | LGreaterEq of WLExpr.t * WLExpr.t
 
 and t = { wlfid : int; wlfloc : CodeLoc.t; wlfnode : tt }
 
 let get lf = lf.wlfnode
-
 let get_loc e = e.wlfloc
-
 let get_id e = e.wlfid
 
 let make bare_form loc =
@@ -26,16 +24,16 @@ let make bare_form loc =
 let rec not f =
   let make fp = make fp (get_loc f) in
   match get f with
-  | LTrue               -> make LFalse
-  | LFalse              -> make LTrue
-  | LNot fp             -> fp
-  | LAnd (f1, f2)       -> make (LOr (not f1, not f2))
-  | LOr (f1, f2)        -> make (LAnd (not f1, not f2))
-  | LLess (e1, e2)      -> make (LGreaterEq (e1, e2))
-  | LLessEq (e1, e2)    -> make (LGreater (e1, e2))
-  | LGreater (e1, e2)   -> make (LLessEq (e1, e2))
+  | LTrue -> make LFalse
+  | LFalse -> make LTrue
+  | LNot fp -> fp
+  | LAnd (f1, f2) -> make (LOr (not f1, not f2))
+  | LOr (f1, f2) -> make (LAnd (not f1, not f2))
+  | LLess (e1, e2) -> make (LGreaterEq (e1, e2))
+  | LLessEq (e1, e2) -> make (LGreater (e1, e2))
+  | LGreater (e1, e2) -> make (LLessEq (e1, e2))
   | LGreaterEq (e1, e2) -> make (LLess (e1, e2))
-  | LEq _               -> make (LNot f)
+  | LEq _ -> make (LNot f)
 
 let rec lexpr_is_true ?(codeloc = CodeLoc.dummy) lexpr =
   let f = lexpr_is_true ~codeloc in
@@ -97,18 +95,18 @@ let rec get_by_id id lf =
 
 let rec pp fmt formula =
   match get formula with
-  | LTrue                 -> Format.pp_print_string fmt "True"
-  | LFalse                -> Format.pp_print_string fmt "False"
-  | LNot f                -> Format.fprintf fmt "@[!(%a)@]" pp f
-  | LAnd (f1, f2)         -> Format.fprintf fmt "@[(%a) /\\ (%a)@]" pp f1 pp f2
-  | LOr (f1, f2)          -> Format.fprintf fmt "@[(%a) \\/ (%a)@]" pp f1 pp f2
-  | LEq (le1, le2)        ->
+  | LTrue -> Format.pp_print_string fmt "True"
+  | LFalse -> Format.pp_print_string fmt "False"
+  | LNot f -> Format.fprintf fmt "@[!(%a)@]" pp f
+  | LAnd (f1, f2) -> Format.fprintf fmt "@[(%a) /\\ (%a)@]" pp f1 pp f2
+  | LOr (f1, f2) -> Format.fprintf fmt "@[(%a) \\/ (%a)@]" pp f1 pp f2
+  | LEq (le1, le2) ->
       Format.fprintf fmt "@[(%a) == (%a)@]" WLExpr.pp le1 WLExpr.pp le2
-  | LLess (le1, le2)      ->
+  | LLess (le1, le2) ->
       Format.fprintf fmt "@[(%a) <# (%a)@]" WLExpr.pp le1 WLExpr.pp le2
-  | LGreater (le1, le2)   ->
+  | LGreater (le1, le2) ->
       Format.fprintf fmt "@[(%a) ># (%a)@]" WLExpr.pp le1 WLExpr.pp le2
-  | LLessEq (le1, le2)    ->
+  | LLessEq (le1, le2) ->
       Format.fprintf fmt "@[(%a) <=# (%a)@]" WLExpr.pp le1 WLExpr.pp le2
   | LGreaterEq (le1, le2) ->
       Format.fprintf fmt "@[(%a) >=# (%a)@]" WLExpr.pp le1 WLExpr.pp le2
@@ -121,15 +119,15 @@ let rec substitution (subst : (string, WLExpr.tt) Hashtbl.t) (frm : t) : t =
   let fe = WLExpr.substitution subst in
   let wlfnode =
     match wlfnode with
-    | LTrue               -> LTrue
-    | LFalse              -> LFalse
-    | LNot frm            -> LNot (f frm)
-    | LAnd (frm1, frm2)   -> LAnd (f frm1, f frm2)
-    | LOr (frm1, frm2)    -> LOr (f frm1, f frm2)
-    | LEq (e1, e2)        -> LEq (fe e1, fe e2)
-    | LLess (e1, e2)      -> LLess (fe e1, fe e2)
-    | LGreater (e1, e2)   -> LGreater (fe e1, fe e2)
-    | LLessEq (e1, e2)    -> LLessEq (fe e1, fe e2)
+    | LTrue -> LTrue
+    | LFalse -> LFalse
+    | LNot frm -> LNot (f frm)
+    | LAnd (frm1, frm2) -> LAnd (f frm1, f frm2)
+    | LOr (frm1, frm2) -> LOr (f frm1, f frm2)
+    | LEq (e1, e2) -> LEq (fe e1, fe e2)
+    | LLess (e1, e2) -> LLess (fe e1, fe e2)
+    | LGreater (e1, e2) -> LGreater (fe e1, fe e2)
+    | LLessEq (e1, e2) -> LLessEq (fe e1, fe e2)
     | LGreaterEq (e1, e2) -> LGreaterEq (fe e1, fe e2)
   in
   { wlfid; wlfloc; wlfnode }

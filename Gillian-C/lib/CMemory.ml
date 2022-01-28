@@ -4,11 +4,8 @@ module Literal = Gillian.Gil_syntax.Literal
 module GEnv = GEnv.Concrete
 
 type vt = Values.t
-
 type st = Subst.t
-
 type fix_t = unit
-
 type err_t = unit
 
 let pp_err _ () = ()
@@ -33,11 +30,8 @@ let pp fmt h =
   Format.fprintf fmt "GEnv : @[%a@]@\nMem: @[%a@]" GEnv.pp h.genv pp_mem h.mem
 
 let ga_to_setter = LActions.ga_to_setter_str
-
 let ga_to_getter = LActions.ga_to_getter_str
-
 let ga_to_deleter = LActions.ga_to_deleter_str
-
 let ga_loc_indexes _ = [ 0 ]
 
 let execute_store heap params =
@@ -51,7 +45,7 @@ let execute_store heap params =
       let res = Mem.store chunk heap.mem block z_ofs compcert_val in
       match res with
       | Some mem -> ASucc ({ heap with mem }, [])
-      | None     -> AFail [])
+      | None -> AFail [])
   | _ -> failwith "wrong call to execute_store"
 
 let execute_load heap params =
@@ -65,7 +59,7 @@ let execute_load heap params =
       | Some ret ->
           let ocaml_ret = ValueTranslation.gil_of_compcert ret in
           ASucc (heap, [ ocaml_ret ])
-      | None     -> AFail [])
+      | None -> AFail [])
   | _ -> failwith "invalid call to load"
 
 let execute_move heap params =
@@ -79,10 +73,10 @@ let execute_move heap params =
       in
       let z_size = ValueTranslation.z_of_float size in
       match Mem.loadbytes heap.mem block_2 z_ofs_2 z_size with
-      | None         -> AFail []
+      | None -> AFail []
       | Some lmemval -> (
           match Mem.storebytes heap.mem block_1 z_ofs_1 lmemval with
-          | None     -> AFail []
+          | None -> AFail []
           | Some mem -> ASucc ({ heap with mem }, [ Loc loc_1; Num ofs_1 ])))
   | _ -> failwith "invalid call to move"
 
@@ -94,7 +88,7 @@ let execute_free heap params =
       let res = Mem.free heap.mem block z_low z_high in
       match res with
       | Some mem -> ASucc ({ heap with mem }, [])
-      | None     -> AFail [])
+      | None -> AFail [])
   | _ -> failwith "invalid call to free"
 
 let execute_alloc heap params =
@@ -115,7 +109,7 @@ let execute_weak_valid_pointer heap params =
       let block = ValueTranslation.block_of_loc_name loc_name in
       let res = Mem.weak_valid_pointer heap.mem block z_offs in
       ASucc (heap, [ Bool res ])
-  | _                          -> failwith "invalid call to weak_valid_pointer"
+  | _ -> failwith "invalid call to weak_valid_pointer"
 
 let execute_getcurperm heap params =
   let open Gillian.Gil_syntax.Literal in
@@ -127,7 +121,7 @@ let execute_getcurperm heap params =
       let perm_opt = perm_f z_offs Compcert.Memtype.Cur in
       let res_ocaml = ValueTranslation.string_of_permission_opt perm_opt in
       ASucc (heap, [ String res_ocaml ])
-  | _                          -> failwith "invalid call to getcurperm"
+  | _ -> failwith "invalid call to getcurperm"
 
 let execute_drop_perm heap params =
   let open Gillian.Gil_syntax.Literal in
@@ -139,7 +133,7 @@ let execute_drop_perm heap params =
       let res = Mem.drop_perm heap.mem block z_low z_high compcert_perm in
       match res with
       | Some mem -> ASucc ({ heap with mem }, [])
-      | None     -> AFail [])
+      | None -> AFail [])
   | _ -> failwith "invalid call to drop_perm"
 
 let execute_genvgetsymbol heap params =
@@ -147,7 +141,7 @@ let execute_genvgetsymbol heap params =
   | [ Literal.String symbol ] ->
       let loc = Result.get_ok (GEnv.find_symbol heap.genv symbol) in
       ASucc (heap, [ String symbol; Loc loc ])
-  | _                         -> failwith "invalid call to genvgetsymbol"
+  | _ -> failwith "invalid call to genvgetsymbol"
 
 let execute_genvsetsymbol heap params =
   match params with
@@ -162,7 +156,7 @@ let execute_genvsetdef heap params =
       let def = GEnv.deserialize_def v_def in
       let genv = GEnv.set_def heap.genv loc def in
       ASucc ({ heap with genv }, [])
-  | _                          -> failwith "invalid call to genvsetdef"
+  | _ -> failwith "invalid call to genvsetdef"
 
 let execute_genvgetdef heap params =
   match params with
@@ -170,7 +164,7 @@ let execute_genvgetdef heap params =
       let def = GEnv.find_def heap.genv loc in
       let v = GEnv.serialize_def def in
       ASucc (heap, [ Loc loc; v ])
-  | _                   -> failwith "invalid call to genvgetdef"
+  | _ -> failwith "invalid call to genvgetdef"
 
 let execute_action name heap params =
   let open LActions in
@@ -219,9 +213,7 @@ let assertions ?to_keep:_ _ =
   raise (Failure "ERROR: to_assertions called for concrete executions")
 
 let lvars _ = raise (Failure "ERROR: get_lvars called for concrete executions")
-
 let clean_up _ = raise (Failure "Cleanup of concrete state.")
-
 let fresh_val _ = raise (Failure "fresh_val not implemented in concrete state")
 
 let substitution_in_place _ _ =

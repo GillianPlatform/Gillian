@@ -22,13 +22,11 @@ module type S = sig
   type m_err_t
 
   type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson]
-
   type fix_t
 
   exception Internal_State_Error of err_t list * t
 
   type action_ret = ASucc of (t * vt list) list | AFail of err_t list
-
   type u_res = UWTF | USucc of t | UFail of err_t list
 
   (** Initialisation *)
@@ -43,15 +41,10 @@ module type S = sig
     t
 
   val execute_action : ?unification:bool -> string -> t -> vt list -> action_ret
-
   val ga_to_setter : string -> string
-
   val ga_to_getter : string -> string
-
   val ga_to_deleter : string -> string
-
   val get_pred_defs : t -> UP.preds_tbl_t option
-
   val is_overlapping_asrt : string -> bool
 
   (** Expression Evaluation *)
@@ -116,9 +109,7 @@ module type S = sig
     unit
 
   val pp_err : Format.formatter -> err_t -> unit
-
   val pp_fix : Format.formatter -> fix_t -> unit
-
   val get_recovery_vals : t -> err_t list -> vt list
 
   (** State Copy *)
@@ -142,7 +133,6 @@ module type S = sig
     UP.prog -> bool -> t -> Asrt.t -> string list -> (t * t) list
 
   val clear_resource : t -> t
-
   val frame_on : t -> (string * t) list -> string list -> t list
 
   val run_spec :
@@ -154,38 +144,21 @@ module type S = sig
     (t * Flag.t) list
 
   val unfolding_vals : t -> Formula.t list -> vt list
-
   val automatic_unfold : t -> vt list -> (t list, string) result
-
   val substitution_in_place : ?subst_all:bool -> st -> t -> t list
-
   val fresh_val : t -> vt
-
   val clean_up : t -> unit
-
   val unify_assertion : t -> st -> UP.step -> u_res
-
   val produce_posts : t -> st -> Asrt.t list -> t list
-
   val produce : t -> st -> Asrt.t -> (t list, string) result
-
   val update_subst : t -> st -> unit
-
   val split_ins : string -> vt list -> vt list * vt list
-
   val merge_ins : string -> vt list -> vt list -> vt list
-
   val mem_constraints : t -> Formula.t list
-
   val can_fix : err_t list -> bool
-
   val get_failing_constraint : err_t -> Formula.t
-
   val get_fixes : ?simple_fix:bool -> t -> err_t list -> fix_t list list
-
   val apply_fixes : t -> fix_t list -> t option * Asrt.t list
-
   val get_equal_values : t -> vt list -> vt list
-
   val get_heap : t -> heap_t
 end

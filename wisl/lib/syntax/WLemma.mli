@@ -10,16 +10,15 @@ type t = {
 }
 
 val get_id : t -> int
-
 val get_loc : t -> CodeLoc.t
 
 val get_by_id :
   int ->
   t ->
   [> `None
-  | `WExpr     of WExpr.t
-  | `WLAssert  of WLAssert.t
-  | `WLCmd     of WLCmd.t
-  | `WLExpr    of WLExpr.t
+  | `WExpr of WExpr.t
+  | `WLAssert of WLAssert.t
+  | `WLCmd of WLCmd.t
+  | `WLExpr of WLExpr.t
   | `WLFormula of WLFormula.t
-  | `WLemma    of t ]
+  | `WLemma of t ]

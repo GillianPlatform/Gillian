@@ -21,8 +21,12 @@ let copy { pfs; gamma; learned; learned_types; unification } =
   }
 
 let make
-    ~pfs ~gamma ?(unification = false) ?(learned = []) ?(learned_types = []) ()
-    =
+    ~pfs
+    ~gamma
+    ?(unification = false)
+    ?(learned = [])
+    ?(learned_types = [])
+    () =
   {
     pfs;
     gamma;
@@ -48,7 +52,7 @@ let pfs_to_pfs_and_gamma pfs =
     | Eq (Lit (Type t), UnOp (TypeOf, e)) :: r -> (
         let other_pfs, other_gamma = aux r in
         match expr_type_binding_to_gamma (e, t) with
-        | None       ->
+        | None ->
             ( Formula.Eq (Lit (Type t), UnOp (TypeOf, e)) :: other_pfs,
               other_gamma )
         | Some gamma -> (other_pfs, gamma :: other_gamma))
@@ -69,7 +73,7 @@ let extend pc fs =
             ~gamma f
         with
         | Formula.True -> None
-        | f            -> Some f)
+        | f -> Some f)
       fs
   in
   let new_pfs, new_gamma = pfs_to_pfs_and_gamma fs in

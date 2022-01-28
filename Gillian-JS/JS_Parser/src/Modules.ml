@@ -6,9 +6,7 @@ open Error
    and reduce this hole file to almost a single function using Flow_ast_mapper *)
 
 type loc = Flow_parser.Loc.t
-
 type file = Flow_parser.File_key.t
-
 type error = Flow_parser.Parse_error.t
 
 type parse_f =
@@ -18,7 +16,6 @@ type transform_f = (loc, loc) Program.t -> GJS_syntax.exp
 
 module Config = struct
   let runtime_path = "GILLIAN_JS_RUNTIME_PATH"
-
   let preamble_file = "preamble.js"
 end
 
@@ -45,7 +42,7 @@ let loader_error path (loc : loc) msg =
 
 let get_or_raise_exn path loc (result : ('a, string) result) =
   match result with
-  | Ok value      -> value
+  | Ok value -> value
   | Error err_msg -> loader_error path loc err_msg
 
 let resolve_require_args
@@ -78,7 +75,7 @@ let resolve_require_args
     | _ -> Error "the 'id' argument must be a string"
   in
   let resolve_args = function
-    | []                     -> Error "the 'id' argument must be provided"
+    | [] -> Error "the 'id' argument must be provided"
     | expr_or_spread :: rest -> (
         match expr_or_spread with
         | Expression (loc, expr) ->
@@ -86,7 +83,7 @@ let resolve_require_args
               get_or_raise_exn prog_path loc (resolve_path_expr expr)
             in
             Ok (Expression (loc, resolved_expr) :: rest, resolved_path)
-        | Spread _               -> Error "a spread expression cannot be used")
+        | Spread _ -> Error "a spread expression cannot be used")
   in
   get_or_raise_exn prog_path loc (resolve_args args)
 
@@ -265,22 +262,24 @@ and resolve_expression prog_path (expression : (loc, loc) Expression.t) =
   ((loc, resolved_expr), req_paths)
 
 and resolve_array_element
-    prog_path (element : (loc, loc) Expression.Array.element) =
+    prog_path
+    (element : (loc, loc) Expression.Array.element) =
   let open Expression.Array in
   match element with
   | Expression expr ->
       let expr, req_paths = resolve_expression prog_path expr in
       (Expression expr, req_paths)
-  | Spread spr      -> (Spread spr, [])
-  | Hole h          -> (Hole h, [])
+  | Spread spr -> (Spread spr, [])
+  | Hole h -> (Hole h, [])
 
 and resolve_expression_or_spread
-    prog_path (expr_or_spr : (loc, loc) Expression.expression_or_spread) =
+    prog_path
+    (expr_or_spr : (loc, loc) Expression.expression_or_spread) =
   match expr_or_spr with
   | Expression.Expression expr ->
       let expr, req_paths = resolve_expression prog_path expr in
       (Expression expr, req_paths)
-  | Spread spr                 -> (Spread spr, [])
+  | Spread spr -> (Spread spr, [])
 
 and resolve_pattern prog_path (pattern : (loc, loc) Pattern.t) =
   let open Pattern in
@@ -290,14 +289,14 @@ and resolve_pattern prog_path (pattern : (loc, loc) Pattern.t) =
     | Expression expr ->
         let expr, req_paths = resolve_expression prog_path expr in
         (Expression expr, req_paths)
-    | _               -> (ptrn, [])
+    | _ -> (ptrn, [])
   in
   ((loc, resolved_pattern), req_paths)
 
 and resolve_function prog_path (func : (loc, loc) Function.t) =
   let open Function in
   let resolve_func_body = function
-    | BodyBlock block     ->
+    | BodyBlock block ->
         let block, req_paths = resolve_block prog_path block in
         (BodyBlock block, req_paths)
     | BodyExpression expr ->
@@ -308,7 +307,8 @@ and resolve_function prog_path (func : (loc, loc) Function.t) =
   ({ func with body }, req_paths)
 
 and resolve_variable_dec
-    prog_path (dec : (loc, loc) Statement.VariableDeclaration.t) =
+    prog_path
+    (dec : (loc, loc) Statement.VariableDeclaration.t) =
   let open Statement.VariableDeclaration in
   let resolve_dec dec =
     let loc, Declarator.{ id; init } = dec in
@@ -350,7 +350,8 @@ and resolve_switch_case prog_path (case : (loc, loc) Statement.Switch.Case.t) =
   ((loc, { test; consequent; comments = case.comments }), test_rps @ con_rps)
 
 and resolve_catch_clause
-    prog_path (catch_clause : (loc, loc) Statement.Try.CatchClause.t) =
+    prog_path
+    (catch_clause : (loc, loc) Statement.Try.CatchClause.t) =
   let open Statement.Try.CatchClause in
   let loc, { param; body; comments } = catch_clause in
   let body, req_paths = resolve_block prog_path body in
@@ -363,20 +364,22 @@ and resolve_block prog_path (block : loc * (loc, loc) Statement.Block.t) =
   ((loc, { body; comments }), req_paths)
 
 and resolve_member_prop
-    prog_path (property : (loc, loc) Expression.Member.property) =
+    prog_path
+    (property : (loc, loc) Expression.Member.property) =
   let open Expression.Member in
   let resolve = function
     | PropertyExpression expr ->
         let expr, req_paths = resolve_expression prog_path expr in
         (PropertyExpression expr, req_paths)
-    | other                   -> (other, [])
+    | other -> (other, [])
   in
   resolve property
 
 and resolve_object_prop
-    prog_path (property : (loc, loc) Expression.Object.property) =
+    prog_path
+    (property : (loc, loc) Expression.Object.property) =
   match property with
-  | Property (loc, prop)  ->
+  | Property (loc, prop) ->
       let open Expression.Object.Property in
       let resolved_prop, req_paths =
         match prop with
@@ -429,7 +432,7 @@ let add_preamble exp_list : GJS_syntax.exp =
 let parse_commonjs parse transform program_path program_string =
   let rec resolve_modules required_paths added_paths combined_prog =
     match required_paths with
-    | []           -> combined_prog
+    | [] -> combined_prog
     | path :: rest ->
         if not (Str_set.mem path added_paths) then
           let prog, errors = parse (load_file path) (file_of_path path) in

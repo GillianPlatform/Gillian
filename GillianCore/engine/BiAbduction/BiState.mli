@@ -13,6 +13,5 @@ module Make
        and type store_t = Store.t
 
   val initialise : Containers.SS.t -> BaseState.t -> UP.preds_tbl_t option -> t
-
   val get_components : t -> BaseState.t * BaseState.t
 end

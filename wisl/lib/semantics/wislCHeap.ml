@@ -4,9 +4,7 @@ module Literal = Gillian.Gil_syntax.Literal
 type t = (string * int, Values.t) Hashtbl.t
 
 let init () = Hashtbl.create 1
-
 let get heap loc offset = Hashtbl.find_opt heap (loc, offset)
-
 let set heap loc offset value = Hashtbl.replace heap (loc, offset) value
 
 let alloc heap size =

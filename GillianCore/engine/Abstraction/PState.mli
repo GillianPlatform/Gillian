@@ -6,9 +6,7 @@ module type S = sig
   include SState.S
 
   type state_t
-
   type preds_t
-
   type abs_t = string * vt list
 
   val initialise : state_t -> preds_t -> UP.preds_tbl_t option -> t
@@ -20,15 +18,10 @@ module type S = sig
   val set_preds : t -> preds_t -> t
 
   val unify : t -> st -> UP.t -> bool
-
   val add_pred_defs : UP.preds_tbl_t -> t -> t
-
   val deabstract : t -> state_t * bool
-
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
-
   val set_pred : t -> abs_t -> unit
-
   val automatic_unfold : t -> vt list -> (t list, string) result
 end
 

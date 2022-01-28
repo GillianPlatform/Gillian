@@ -2,35 +2,27 @@ module type S = sig
   module CallStack : CallStack.S
 
   type vt
-
   type st
-
   type store_t
-
   type state_t
-
   type state_err_t
-
   type state_vt
-
   type heap_t
 
   module Val : Val.S with type t = vt
-
   module Store : Store.S with type t = store_t and type vt = vt
 
   type invariant_frames = (string * state_t) list
-
   type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
 
   type cconf_t =
-    | ConfErr    of {
+    | ConfErr of {
         callstack : CallStack.t;
         proc_idx : int;
         error_state : state_t;
         errors : err_t list;
       }
-    | ConfCont   of {
+    | ConfCont of {
         state : state_t;
         callstack : CallStack.t;
         invariant_frames : invariant_frames;
@@ -41,7 +33,7 @@ module type S = sig
       }
     | ConfFinish of { flag : Flag.t; ret_val : state_vt; final_state : state_t }
         (** Equal to Conf cont + the id of the required spec *)
-    | ConfSusp   of {
+    | ConfSusp of {
         spec_id : string;
         state : state_t;
         callstack : CallStack.t;
@@ -53,7 +45,6 @@ module type S = sig
       }
 
   type conf_t = BConfErr of err_t list | BConfCont of state_t
-
   type result_t = (state_t, state_vt, err_t) ExecRes.t
 
   type 'a cont_func =
@@ -69,13 +60,9 @@ module type S = sig
   [@@deriving yojson]
 
   val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
-
   val pp_result : Format.formatter -> result_t list -> unit
-
   val call_graph : CallGraph.t
-
   val reset : unit -> unit
-
   val evaluate_lcmds : UP.prog -> LCmd.t list -> state_t -> state_t list
 
   val init_evaluate_proc :

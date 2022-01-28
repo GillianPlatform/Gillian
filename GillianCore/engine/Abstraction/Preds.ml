@@ -7,31 +7,19 @@ module type S = sig
 
   (* preds *)
   type t [@@deriving yojson]
-
   type abs_t = string * vt list
 
   val length : t -> int
-
   val init : abs_t list -> t
-
   val to_list : t -> abs_t list
-
   val copy : t -> t
-
   val is_empty : t -> bool
-
   val extend : ?pure:bool -> t -> abs_t -> unit
-
   val pop : t -> (abs_t -> bool) -> abs_t option
-
   val strategic_choice : t -> (abs_t -> int) -> abs_t option
-
   val remove_by_name : t -> string -> abs_t option
-
   val find_pabs_by_name : t -> string -> abs_t list
-
   val pp : Format.formatter -> t -> unit
-
   val pp_pabs : Format.formatter -> abs_t -> unit
 
   val get_pred :
@@ -44,9 +32,7 @@ module type S = sig
     abs_t option
 
   val find : t -> (abs_t -> bool) -> abs_t option
-
   val get_all : maintain:bool -> (abs_t -> bool) -> t -> abs_t list
-
   val substitution_in_place : st -> t -> unit
 
   (** Turns a predicate set into a list of assertions *)
@@ -60,11 +46,8 @@ module Make
   module L = Logging
 
   type vt = Val.t [@@deriving yojson]
-
   type st = ESubst.t
-
   type abs_t = string * vt list
-
   type t = (string * vt list) list ref [@@deriving yojson]
 
   (** Returns the number of predicate assertions *)
@@ -110,7 +93,7 @@ module Make
       match (idx, lst) with
       | 0, hd :: tl -> (List.rev passed @ tl, hd)
       | n, hd :: tl -> val_and_remove (hd :: passed) (n - 1) tl
-      | _           -> failwith "Impossible: Strategic Choice"
+      | _ -> failwith "Impossible: Strategic Choice"
     in
     let results = List.map f !preds in
     let _, (idx, max) =
@@ -225,17 +208,17 @@ module Make
             match (b', b) with
             | false, true -> cnew
             | true, false -> ccurrent
-            | _           -> (
+            | _ -> (
                 match (i > i', i' > i) with
                 | true, _ -> cnew
                 | _, true -> ccurrent
-                | _       -> if o > o' then cnew else ccurrent))
+                | _ -> if o > o' then cnew else ccurrent))
         (false, 0, 0, []) candidates
     in
     (* Frame off found predicate *)
     let frame_off name args =
       match maintain with
-      | true  -> Some (name, args)
+      | true -> Some (name, args)
       | false -> pop preds (fun pred -> pred = (name, args))
     in
     let candidates = find_all preds (fun (pname, _) -> name = pname) in

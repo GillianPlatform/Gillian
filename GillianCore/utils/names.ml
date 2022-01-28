@@ -46,5 +46,4 @@ let is_lloc_name (name : string) : bool =
 (** {2 name builders} *)
 
 let lvar_from_str (name : string) : string = lvar_prefix ^ name
-
 let svar_from_str (name : string) : string = "#" ^ name

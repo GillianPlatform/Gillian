@@ -11,11 +11,8 @@ type t = {
 }
 
 let get_id f = f.fid
-
 let get_loc f = f.floc
-
 let get_name f = f.name
-
 let get_spec f = f.spec
 
 let add_spec f pre post loc =
@@ -23,7 +20,6 @@ let add_spec f pre post loc =
   { f with spec = Some spec; floc = loc }
 
 let functions_called f = WStmt.functions_called_by_list f.body
-
 let has_spec f = Option.is_some f.spec
 
 let get_by_id id f =
@@ -39,7 +35,7 @@ let get_by_id id f =
 let pp fmt f =
   let pp_list_stmt = WStmt.pp_list in
   match f.spec with
-  | None      ->
+  | None ->
       Format.fprintf fmt
         "@[<v 2>@[<h 0>function %s(%a)@] {@,%a;@,@[<h 0>return@ %a@]@]@\n}"
         f.name

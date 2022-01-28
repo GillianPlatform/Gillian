@@ -48,7 +48,7 @@ struct
         | Some (Bool strictness) -> (
             let opt_lit_code = Val.to_literal v_code in
             match opt_lit_code with
-            | None               ->
+            | None ->
                 raise (Failure "Eval statement argument not a literal string")
             | Some (String code) -> (
                 let code =
@@ -74,13 +74,13 @@ struct
                   | _ -> Error "SyntaxError"
                 in
                 match opt_proc_eval with
-                | Ok proc_eval     ->
+                | Ok proc_eval ->
                     let eval_v_args = [ x_scope; x_this ] in
                     let proc = GProg.get_proc prog proc_eval in
                     let proc =
                       match proc with
                       | Some proc -> proc
-                      | None      ->
+                      | None ->
                           raise (Failure "The eval procedure does not exist.")
                     in
                     let params = GProc.get_params proc in
@@ -107,28 +107,25 @@ struct
                 | Error error_type -> (
                     let error_variable =
                       match error_type with
-                      | "SyntaxError"    -> JS2JSIL_Helpers.var_se
+                      | "SyntaxError" -> JS2JSIL_Helpers.var_se
                       | "ReferenceError" -> JS2JSIL_Helpers.var_re
-                      | _                -> raise
-                                              (Failure "Impossible error type")
+                      | _ -> raise (Failure "Impossible error type")
                     in
                     match (Store.get store error_variable, j) with
                     | Some v, Some j ->
                         let _ = update_store state x v in
                         [ (state, cs, i, j) ]
-                    | _, None        ->
+                    | _, None ->
                         raise
                           (Failure
                              "Eval triggered an error, but no error label was \
                               provided")
-                    | _, _           ->
+                    | _, _ ->
                         raise (Failure "JavaScript error object undefined")))
-            | _                  ->
+            | _ ->
                 let _ = update_store state x v_code in
                 [ (state, cs, i, i + 1) ])
-        | _                      -> raise
-                                      (Failure
-                                         "Eval not given correct strictness"))
+        | _ -> raise (Failure "Eval not given correct strictness"))
     | _ -> raise (Failure "Eval failed")
 
   (* Two arguments only, the parameters and the function body *)
@@ -168,7 +165,7 @@ struct
           try Some (JS_Parser.parse_string_exn code) with _ -> None
         in
         match e_js with
-        | None      -> throw "Body not parsable."
+        | None -> throw "Body not parsable."
         | Some e_js -> (
             match e_js.JS_Parser.Syntax.exp_stx with
             | Script (_, [ e ]) -> (
@@ -188,8 +185,8 @@ struct
                     in
                     [ (state, cs, i, i + 1) ]
                 | _ -> throw "Body incorrectly parsed.")
-            | _                 -> throw "Not a script."))
-    | _, _                       -> throw "Body or parameters not a string."
+            | _ -> throw "Not a script."))
+    | _, _ -> throw "Body or parameters not a string."
 
   (**
     General External Procedure Treatment

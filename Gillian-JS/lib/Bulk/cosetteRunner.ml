@@ -1,4 +1,5 @@
 open Gillian
+
 module Outcome =
   Bulk.Outcome.Make_Symbolic
     (Semantics.Symbolic)
@@ -8,9 +9,7 @@ module Outcome =
 module Suite = struct
   include Bulk.Suite.ByFolder (struct
     let max_depth = 1
-
     let cmd_name = "cosette-bulk"
-
     let exec_mode = Gillian.Utils.ExecMode.Symbolic
   end)
 
@@ -27,11 +26,8 @@ end
 
 module Expectations = struct
   type matcher = Gillian_bulk_alcotest.AlcotestCheckers.Make(Outcome).matcher
-
   type outcome = Outcome.t
-
   type category = Suite.category
-
   type info = Suite.info
 
   let expectation (expect : matcher) _ outcome =

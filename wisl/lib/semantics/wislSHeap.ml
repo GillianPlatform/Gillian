@@ -6,10 +6,10 @@ module Reduction = Gillian.Logic.Reduction
 
 type err =
   | MissingResource of (WislLActions.ga * string * Expr.t option)
-  | DoubleFree      of string
-  | UseAfterFree    of string
+  | DoubleFree of string
+  | UseAfterFree of string
   | MemoryLeak
-  | OutOfBounds     of (int option * string * Expr.t)
+  | OutOfBounds of (int option * string * Expr.t)
   | InvalidLocation
 [@@deriving yojson]
 
@@ -21,7 +21,7 @@ module Block = struct
 
   let substitution ~partial subst block =
     match block with
-    | Freed                     -> Freed
+    | Freed -> Freed
     | Allocated { data; bound } ->
         let data = SFVL.substitution subst partial data in
         Allocated { data; bound }
@@ -29,7 +29,7 @@ module Block = struct
   let assertions ~loc block =
     let eloc = Expr.loc_from_loc_name loc in
     match block with
-    | Freed                     -> [ Constr.freed ~loc:eloc ]
+    | Freed -> [ Constr.freed ~loc:eloc ]
     | Allocated { data; bound } ->
         let data_asrts =
           SFVL.assertions_with_constructor
@@ -38,14 +38,14 @@ module Block = struct
         in
         let bound_asrt =
           match bound with
-          | None       -> []
+          | None -> []
           | Some bound -> [ Constr.bound ~loc:eloc ~bound ]
         in
         bound_asrt @ data_asrts
 
   let pp ~loc fmt block =
     match block with
-    | Freed                     -> Fmt.pf fmt "%s -> FREED" loc
+    | Freed -> Fmt.pf fmt "%s -> FREED" loc
     | Allocated { data; bound } ->
         Fmt.pf fmt "%s -> @[<v>BOUND: %a@ %a@]" loc
           (Fmt.option ~none:(Fmt.any "NONE") Fmt.int)
@@ -127,7 +127,7 @@ let get_cell ~pfs ~gamma heap loc ofs =
   | Some (Allocated { data; bound }) -> (
       let maybe_out_of_bound =
         match bound with
-        | None   -> false
+        | None -> false
         | Some n ->
             let n = Expr.num_int n in
             let open Formula.Infix in
@@ -137,14 +137,14 @@ let get_cell ~pfs ~gamma heap loc ofs =
       else
         match SFVL.get ofs data with
         | Some v -> Ok (loc, ofs, v)
-        | None   -> (
+        | None -> (
             match
               SFVL.get_first
                 (fun name -> Solver.is_equal ~pfs ~gamma name ofs)
                 data
             with
             | Some (o, v) -> Ok (loc, o, v)
-            | None        -> Error (MissingResource (Cell, loc, Some ofs))))
+            | None -> Error (MissingResource (Cell, loc, Some ofs))))
 
 let set_cell ~pfs ~gamma heap loc_name ofs v =
   match Hashtbl.find_opt heap loc_name with
@@ -157,7 +157,7 @@ let set_cell ~pfs ~gamma heap loc_name ofs v =
   | Some (Allocated { data; bound }) ->
       let maybe_out_of_bound =
         match bound with
-        | None   -> false
+        | None -> false
         | Some n ->
             let n = Expr.num_int n in
             let open Formula.Infix in
@@ -190,7 +190,7 @@ let get_bound heap loc =
 let set_bound heap loc bound =
   let prev = Option.value ~default:Block.empty (Hashtbl.find_opt heap loc) in
   match prev with
-  | Freed                 -> Error (UseAfterFree loc)
+  | Freed -> Error (UseAfterFree loc)
   | Allocated { data; _ } ->
       let changed = Block.Allocated { data; bound = Some bound } in
       let () = Hashtbl.replace heap loc changed in
@@ -209,8 +209,8 @@ let rem_bound heap loc =
 let get_freed heap loc =
   match Hashtbl.find_opt heap loc with
   | Some Block.Freed -> Ok ()
-  | Some _           -> Error MemoryLeak
-  | None             -> Error (MissingResource (Freed, loc, None))
+  | Some _ -> Error MemoryLeak
+  | None -> Error (MissingResource (Freed, loc, None))
 
 let set_freed heap loc = set_freed_with_logging heap loc
 
@@ -219,8 +219,8 @@ let rem_freed heap loc =
   | Some Block.Freed ->
       Hashtbl.remove heap loc;
       Ok ()
-  | None             -> Error (MissingResource (Freed, loc, None))
-  | Some _           -> Error MemoryLeak
+  | None -> Error (MissingResource (Freed, loc, None))
+  | Some _ -> Error MemoryLeak
 
 (***** Some things specific to symbolic heaps ********)
 
@@ -255,19 +255,19 @@ let substitution_in_place subst heap :
     Subst.filter subst (fun var _ ->
         match var with
         | ALoc _ -> true
-        | _      -> false)
+        | _ -> false)
   in
   Subst.iter aloc_subst (fun aloc new_loc ->
       let aloc =
         match aloc with
         | ALoc loc -> loc
-        | _        -> raise (Failure "Impossible by construction")
+        | _ -> raise (Failure "Impossible by construction")
       in
       let new_loc_str =
         match new_loc with
         | Expr.Lit (Literal.Loc loc) -> loc
-        | Expr.ALoc loc              -> loc
-        | _                          ->
+        | Expr.ALoc loc -> loc
+        | _ ->
             raise
               (Failure
                  (Printf.sprintf "Heap substitution fail for loc: %s"
@@ -297,11 +297,10 @@ let get_store_vars store is_gil_file =
           match lst with
           | [ Expr.Lit (Num offset) ] ->
               Fmt.str "-> (%a, %.0f)" (Fmt.hbox loc_pp) loc offset
-          | [ offset ]                ->
+          | [ offset ] ->
               Fmt.str "-> (%a, %a)" (Fmt.hbox loc_pp) loc (Fmt.hbox Expr.pp)
                 offset
-          | _                         -> Fmt.to_to_string (Fmt.hbox Expr.pp)
-                                           value
+          | _ -> Fmt.to_to_string (Fmt.hbox Expr.pp) value
         in
         let value =
           match value with
@@ -325,7 +324,7 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
       let difference = v -. w in
       match difference with
       | Expr.Lit (Num f) -> if f < 0. then -1 else if f > 0. then 1 else 0
-      | _                -> 0
+      | _ -> 0
     with _ -> (* Do not sort the offsets if an exception has occurred *)
               0
   in
@@ -336,18 +335,18 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
            let offset_str =
              match offset with
              | Expr.Lit (Num f) -> Fmt.str "%.0f" f
-             | other            -> vstr other
+             | other -> vstr other
            in
            create_leaf_variable offset_str (vstr value) ())
   in
   smemory |> Hashtbl.to_seq
   |> Seq.map (fun (loc, blocks) ->
          match blocks with
-         | Block.Freed               -> create_leaf_variable loc "freed" ()
+         | Block.Freed -> create_leaf_variable loc "freed" ()
          | Allocated { data; bound } ->
              let bound =
                match bound with
-               | None       -> "none"
+               | None -> "none"
                | Some bound -> string_of_int bound
              in
              let bound = create_leaf_variable "bound" bound () in
@@ -363,7 +362,11 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
   |> List.of_seq
 
 let add_debugger_variables
-    ~store ~memory ~is_gil_file ~get_new_scope_id variables =
+    ~store
+    ~memory
+    ~is_gil_file
+    ~get_new_scope_id
+    variables =
   let open Debugger.DebuggerTypes in
   let store_id = get_new_scope_id () in
   let memory_id = get_new_scope_id () in

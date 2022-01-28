@@ -28,7 +28,6 @@ type variable = {
 }
 
 type variables = (int, variable list) Hashtbl.t
-
 type exception_info = { id : string; description : string option }
 
 let create_leaf_variable (name : string) (value : string) ?(type_ = None) () :

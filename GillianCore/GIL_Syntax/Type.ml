@@ -21,17 +21,17 @@ type t = TypeDef__.typ =
 let str (x : t) =
   match x with
   | UndefinedType -> "Undefined"
-  | NullType      -> "Null"
-  | EmptyType     -> "Empty"
-  | NoneType      -> "None"
-  | BooleanType   -> "Bool"
-  | IntType       -> "Int"
-  | NumberType    -> "Num"
-  | StringType    -> "Str"
-  | ObjectType    -> "Obj"
-  | ListType      -> "List"
-  | TypeType      -> "Type"
-  | SetType       -> "Set"
+  | NullType -> "Null"
+  | EmptyType -> "Empty"
+  | NoneType -> "None"
+  | BooleanType -> "Bool"
+  | IntType -> "Int"
+  | NumberType -> "Num"
+  | StringType -> "Str"
+  | ObjectType -> "Obj"
+  | ListType -> "List"
+  | TypeType -> "Type"
+  | SetType -> "Set"
 
 module Set = Set.Make (struct
   type nonrec t = t

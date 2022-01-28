@@ -8,13 +8,9 @@ let curr lexbuf =
   { loc_start; loc_end }
 
 let fname loc = loc.loc_start.pos_fname
-
 let merge lstart lend = { loc_start = lstart.loc_start; loc_end = lend.loc_end }
-
 let get_start l = l.loc_start
-
 let get_end l = l.loc_end
-
 let col pos = pos.pos_cnum - pos.pos_bol + 1
 
 let[@warning "-8"] from_str str =

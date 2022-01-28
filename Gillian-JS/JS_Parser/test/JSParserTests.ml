@@ -7,7 +7,6 @@ let on_first_line n =
   Loc.{ start = pos; _end = pos; source = None }
 
 let mk_exp s o = JS_Parser.Syntax.mk_exp s o []
-
 let mk_exp_with_annot = JS_Parser.Syntax.mk_exp
 
 (* Equality testing function for expressions, ignoring the character offsets *)
@@ -54,9 +53,9 @@ let rec exp_stx_eq e1 e2 =
   | Try (e, o, oe), Try (e', o', oe') ->
       exp_stx_eq e e'
       && (match (o, o') with
-         | None, None                 -> true
+         | None, None -> true
          | Some (s, e), Some (s', e') -> s = s' && exp_stx_eq e e'
-         | _, _                       -> false)
+         | _, _ -> false)
       && opt_exp_eq oe oe'
   | Switch (e, l), Switch (e', l') ->
       exp_stx_eq e e'
@@ -68,13 +67,13 @@ let rec exp_stx_eq e1 e2 =
 and switch_case_eq c c' =
   match (c, c') with
   | Case e, Case e' -> exp_stx_eq e e'
-  | c, c'           -> c = c'
+  | c, c' -> c = c'
 
 and opt_exp_eq o o' =
   match (o, o') with
-  | None, None      -> true
+  | None, None -> true
   | Some o, Some o' -> exp_stx_eq o o'
-  | _, _            -> false
+  | _, _ -> false
 
 and list_exp_eq l l' = List.for_all2 exp_stx_eq l l'
 
@@ -794,17 +793,17 @@ let test_obj_init test_ctx =
   assert_exp_eq script exp
 
 (* TODO: Find why this test is not used anymore
- 
-  let test_fun_annot test_ctx =
-  let exp = exp_from_file "test.js" in
-  let string_exp = mk_exp (String "use strict") 52 in
-  let r = mk_exp (Return None) 66 in
-  let block = mk_exp (Block [string_exp; r]) 51 in
-  let f = mk_exp_with_annot (Function (true, Some "f", [], block)) 38
-    [{annot_type = EnsuresErr; annot_formula = "B"}] in
-  let script = mk_exp_with_annot (Script (false, [f])) 0
-    [{annot_type = TopEnsuresErr; annot_formula = "A"}] in
-  assert_equal' script exp  *)
+
+   let test_fun_annot test_ctx =
+   let exp = exp_from_file "test.js" in
+   let string_exp = mk_exp (String "use strict") 52 in
+   let r = mk_exp (Return None) 66 in
+   let block = mk_exp (Block [string_exp; r]) 51 in
+   let f = mk_exp_with_annot (Function (true, Some "f", [], block)) 38
+     [{annot_type = EnsuresErr; annot_formula = "B"}] in
+   let script = mk_exp_with_annot (Script (false, [f])) 0
+     [{annot_type = TopEnsuresErr; annot_formula = "A"}] in
+   assert_equal' script exp *)
 
 (* TODO: tests for object initializer, unnamed function expression *)
 
@@ -881,8 +880,7 @@ let suite =
     "test_fun_strict_break" >:: test_fun_strict_break;
     "test_getter" >:: test_getter;
     "test_setter" >:: test_setter;
-    "test_obj_init" >:: test_obj_init;
-    (* "test_fun_annot" >:: test_fun_annot; *)
+    "test_obj_init" >:: test_obj_init (* "test_fun_annot" >:: test_fun_annot; *);
   ]
 
 let alco_suite =

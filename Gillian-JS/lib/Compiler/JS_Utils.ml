@@ -15,7 +15,7 @@ let rec js_fold f_ac f_state state expr =
   let fo e =
     match e with
     | Some e -> f e
-    | None   -> []
+    | None -> []
   in
 
   let analyse_cases cases =
@@ -23,7 +23,7 @@ let rec js_fold f_ac f_state state expr =
       (fun (e_case, s_case) ->
         let f_e_case =
           match e_case with
-          | Case e      -> f e
+          | Case e -> f e
           | DefaultCase -> []
         in
         let f_s_case = f s_case in
@@ -60,7 +60,7 @@ let rec js_fold f_ac f_state state expr =
         (flat_map
            (fun ve ->
              match ve with
-             | _, None   -> []
+             | _, None -> []
              | _, Some e -> f e)
            ves)
   | For (e1, e2, e3, s) -> f_ac (fo e1 @ fo e2 @ fo e3 @ f s)
@@ -78,7 +78,7 @@ let rec js_map f_m expr =
   let fo = Option.map f in
   let f_switch (sc, e2) =
     ( (match sc with
-      | Case e1     -> Case (f e1)
+      | Case e1 -> Case (f e1)
       | DefaultCase -> DefaultCase),
       f e2 )
   in
@@ -131,7 +131,7 @@ let rec js_map_with_state f_transform f_state init_state state exp =
   let f = js_map_with_state f_transform f_state init_state in
   let fo state e =
     match e with
-    | None   -> (None, state)
+    | None -> (None, state)
     | Some e ->
         let e', state' = f state e in
         (Some e', state')
@@ -309,7 +309,7 @@ let rec js_map_with_state f_transform f_state init_state state exp =
               let e' =
                 match e with
                 | DefaultCase -> DefaultCase
-                | Case e      ->
+                | Case e ->
                     let e', _ = f init_state e in
                     Case e'
               in
@@ -342,7 +342,7 @@ let test_func_decl_in_block exp =
   let rec f in_block exp =
     let fo f e =
       match e with
-      | None   -> false
+      | None -> false
       | Some e -> f e
     in
     match exp.exp_stx with
@@ -396,7 +396,7 @@ let test_func_decl_in_block exp =
 let get_all_assigned_declared_identifiers exp =
   let rec fo is_lhs e =
     match e with
-    | None   -> []
+    | None -> []
     | Some e -> f is_lhs e
   and f is_lhs exp =
     match exp.exp_stx with
@@ -406,7 +406,7 @@ let get_all_assigned_declared_identifiers exp =
         flat_map
           (fun ve ->
             match ve with
-            | v, None   -> [ v ]
+            | v, None -> [ v ]
             | v, Some e -> v :: f false e)
           vars
     | Unary_op (op, e) -> (
@@ -456,7 +456,7 @@ let get_all_assigned_declared_identifiers exp =
         @ flat_map
             (fun (e2, e3) ->
               (match e2 with
-              | Case e2     -> f false e2
+              | Case e2 -> f false e2
               | DefaultCase -> [])
               @ f false e3)
             e2s
@@ -471,12 +471,12 @@ let var_decls_inner exp =
     else
       match exp.exp_stx with
       | VarDec vars -> List.map (fun (v, _) -> v) vars @ ac
-      | _           -> ac
+      | _ -> ac
   in
   let f_state exp state =
     match exp.exp_stx with
     | FunctionExp _ | Function _ -> false
-    | _                          -> state
+    | _ -> state
   in
   js_fold f_ac f_state true exp
 
@@ -487,7 +487,7 @@ let get_fun_decls exp =
   let f_ac exp _ _ ac =
     match exp.exp_stx with
     | Function (_, _, _, _) -> exp :: ac
-    | _                     -> ac
+    | _ -> ac
   in
   js_fold f_ac (fun _ y -> y) true exp
 
@@ -506,12 +506,12 @@ let get_all_annots exp : JS_Parser.Syntax.annotation list =
 let func_decls_in_elem exp : exp list =
   match exp.exp_stx with
   | Function (_, _, _, _) -> [ exp ]
-  | _                     -> []
+  | _ -> []
 
 let func_decls_in_exp exp : exp list =
   match exp.exp_stx with
   | Script (_, es) | Block es -> List.flatten (List.map func_decls_in_elem es)
-  | _                         -> func_decls_in_elem exp
+  | _ -> func_decls_in_elem exp
 
 let get_all_vars_f f_body f_args =
   let f_decls = func_decls_in_exp f_body in
@@ -533,12 +533,12 @@ let get_all_vars_f f_body f_args =
 let rec returns_empty_exp (e : JS_Parser.Syntax.exp) =
   let get_some e =
     match e with
-    | None   -> false
+    | None -> false
     | Some e -> returns_empty_exp e
   in
   let rec returns_empty_exp_list (el : JS_Parser.Syntax.exp list) =
     match el with
-    | []      -> true
+    | [] -> true
     | e :: el ->
         let reeel = returns_empty_exp_list el in
         if returns_empty_exp e then true else reeel
@@ -579,7 +579,7 @@ let rec returns_empty_exp (e : JS_Parser.Syntax.exp) =
       let reeet = returns_empty_exp et in
       let reeec =
         match ec with
-        | None         -> false
+        | None -> false
         | Some (_, ec) -> returns_empty_exp ec
       in
       let reeef = get_some ef in
@@ -644,7 +644,7 @@ let generate_offset_lst str =
 let jsoffsetchar_to_jsoffsetline c_offset offset_list =
   let rec offsetchar_to_offsetline_aux offset_list cur_line =
     match offset_list with
-    | []         -> cur_line
+    | [] -> cur_line
     | hd :: rest ->
         if c_offset < hd then cur_line
         else offsetchar_to_offsetline_aux rest (cur_line + 1)
@@ -661,7 +661,7 @@ let lift_flow_loc loc =
   let { source; start; _end } = loc in
   let loc_source =
     match source with
-    | None        -> "(none)"
+    | None -> "(none)"
     | Some source -> file_key_to_string source
   in
   let loc_start = lift_pos start in

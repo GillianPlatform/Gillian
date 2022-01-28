@@ -1,21 +1,17 @@
 module ByFolder = Bulk.Suite.ByFolder (struct
   let max_depth = 2
-
   let cmd_name = "test262"
-
   let exec_mode = Utils.ExecMode.Concrete
 end)
 
 type test_type = Positive | Negative [@@deriving show]
-
 type test_mode = NoStrict | OnlyStrict | Both | Raw [@@deriving show]
-
 type run_mode = NonStrict | Strict | Raw
 
 let pp_run_mode fmt = function
   | NonStrict -> Fmt.pf fmt "NonStrict"
-  | Strict    -> Fmt.pf fmt "Strict"
-  | Raw       -> Fmt.pf fmt "Raw"
+  | Strict -> Fmt.pf fmt "Strict"
+  | Raw -> Fmt.pf fmt "Raw"
 
 type error_phase = Parse | Early | Resolution | Runtime [@@deriving show]
 
@@ -43,7 +39,7 @@ let harness =
   fun () ->
     match !loaded_harness with
     | Some s -> s
-    | None   ->
+    | None ->
         let harness = Io_utils.load_file (Io_utils.harness_path ()) ^ "\n\n" in
         loaded_harness := Some harness;
         harness
@@ -102,11 +98,11 @@ let create_tests source code =
         try
           Some
             (match Str.matched_group 1 code with
-            | "parse"      -> Parse
-            | "early"      -> Early
+            | "parse" -> Parse
+            | "early" -> Early
             | "resolution" -> Resolution
-            | "runtime"    -> Runtime
-            | _            -> raise Not_found)
+            | "runtime" -> Runtime
+            | _ -> raise Not_found)
         with _ ->
           failwith
             ("Test262: Malformed test, negative test without error phase at : "
@@ -123,10 +119,10 @@ let create_tests source code =
           let et = Str.matched_group 1 code in
           Some
             (match et with
-            | "SyntaxError"    -> SyntaxError
+            | "SyntaxError" -> SyntaxError
             | "ReferenceError" -> ReferenceError
-            | "Test262Error"   -> Test262Error
-            | _                -> raise Not_found)
+            | "Test262Error" -> Test262Error
+            | _ -> raise Not_found)
         with _ ->
           failwith "Test262: Malformed test: Negative test without error type")
   in
@@ -140,7 +136,7 @@ let create_tests source code =
         | Negative -> (
             match (ep, et) with
             | Some ep, Some et -> Some (ep, et)
-            | _, _             -> failwith "Test262: Impossible"));
+            | _, _ -> failwith "Test262: Impossible"));
       rm = NonStrict;
     }
   in
@@ -148,20 +144,20 @@ let create_tests source code =
   let raw_test = { no_strict_test with rm = Raw } in
   let infos =
     match tm with
-    | NoStrict   -> [ no_strict_test ]
+    | NoStrict -> [ no_strict_test ]
     | OnlyStrict -> [ strict_test ]
-    | Both       -> [ no_strict_test; strict_test ]
-    | Raw        -> [ raw_test ]
+    | Both -> [ no_strict_test; strict_test ]
+    | Raw -> [ raw_test ]
   in
   let fold_cat = ByFolder.create_tests source code in
   match fold_cat with
   | [ (_, _, fold) ] -> List.map (fun x -> (source, x, (x.rm, fold))) infos
-  | _                -> failwith "Impossible"
+  | _ -> failwith "Impossible"
 
 let skip_category = function
   | NonStrict, _ -> true
-  | Raw, _       -> false
-  | Strict, _    -> false
+  | Raw, _ -> false
+  | Strict, _ -> false
 
 let beforeTest info _ =
   Js_config.use_strict := info.rm = Strict;
@@ -181,5 +177,4 @@ let filter_source fp =
        (Test262_filtering.tests_to_filter_out ())
 
 let cmd_name = ByFolder.cmd_name
-
 let exec_mode = ByFolder.exec_mode

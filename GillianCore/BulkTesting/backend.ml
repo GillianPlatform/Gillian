@@ -1,6 +1,5 @@
 module type S = sig
   type category
-
   type matcher
 
   val check_not_throw : matcher -> (unit -> unit) -> unit

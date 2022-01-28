@@ -38,9 +38,7 @@ let make
     type t = a
 
     let pp = pp
-
     let of_yojson = of_yojson
-
     let to_yojson = to_yojson
   end in
   L ((module M), content)
@@ -51,7 +49,7 @@ let make_string (s : string) : t =
   let of_yojson yojson =
     match yojson with
     | `String s -> Ok s
-    | _         -> Error "Cannot parse yojson to a string"
+    | _ -> Error "Cannot parse yojson to a string"
   in
   let to_yojson s = `String s in
   make pp of_yojson to_yojson s

@@ -94,7 +94,7 @@ let get_procs ?(proc_names : string list option) (prog : ('a, 'b) t) :
     | Some proc_names ->
         (* Printf.printf "GET PROCS with proc_names: %s\n" (String.concat ", " proc_names); *)
         proc_names
-    | None            ->
+    | None ->
         Hashtbl.fold
           (fun proc_name _ proc_names -> proc_name :: proc_names)
           prog.procs []
@@ -131,7 +131,7 @@ let get_proc (prog : ('a, 'b) t) (name : string) : ('a, 'b) Proc.t option =
 let get_proc_exn (prog : ('a, 'b) t) (name : string) : ('a, 'b) Proc.t =
   match get_proc prog name with
   | Some proc -> proc
-  | None      -> failwith (Printf.sprintf "could not find proc %s" name)
+  | None -> failwith (Printf.sprintf "could not find proc %s" name)
 
 let get_pred (prog : ('a, 'b) t) (name : string) : Pred.t option =
   Hashtbl.find_opt prog.preds name
@@ -139,7 +139,7 @@ let get_pred (prog : ('a, 'b) t) (name : string) : Pred.t option =
 let get_pred_exn (prog : ('a, 'b) t) (name : string) : Pred.t =
   match get_pred prog name with
   | Some pred -> pred
-  | None      -> failwith (Printf.sprintf "could not find pred %s" name)
+  | None -> failwith (Printf.sprintf "could not find pred %s" name)
 
 let get_bispec (prog : ('a, 'b) t) (name : string) : BiSpec.t option =
   Hashtbl.find_opt prog.bi_specs name
@@ -147,7 +147,7 @@ let get_bispec (prog : ('a, 'b) t) (name : string) : BiSpec.t option =
 let get_bispec_exn (prog : ('a, 'b) t) (name : string) : BiSpec.t =
   match get_bispec prog name with
   | Some bispec -> bispec
-  | None        -> failwith (Printf.sprintf "could not find bispec %s" name)
+  | None -> failwith (Printf.sprintf "could not find bispec %s" name)
 
 let get_lemma (prog : ('a, 'b) t) (name : string) : Lemma.t option =
   Hashtbl.find_opt prog.lemmas name
@@ -155,7 +155,7 @@ let get_lemma (prog : ('a, 'b) t) (name : string) : Lemma.t option =
 let get_lemma_exn (prog : ('a, 'b) t) (name : string) : Lemma.t =
   match get_lemma prog name with
   | Some lemma -> lemma
-  | None       -> failwith (Printf.sprintf "could not find lemma %s" name)
+  | None -> failwith (Printf.sprintf "could not find lemma %s" name)
 
 let pp ~(show_labels : bool) ~(pp_label : 'b Fmt.t) fmt (prog : ('a, 'b) t) =
   let proc_names = Hashtbl.to_seq_keys prog.procs in
@@ -165,7 +165,7 @@ let pp ~(show_labels : bool) ~(pp_label : 'b Fmt.t) fmt (prog : ('a, 'b) t) =
     any "@\n" ++ pp
   in
   let pp_import_paths fmt prefix = function
-    | []    -> ()
+    | [] -> ()
     | paths ->
         let pp_str fmt = Fmt.pf fmt "\"%a\"" Fmt.string in
         Fmt.pf fmt "%s @[%a@];@\n" prefix (Fmt.list ~sep:Fmt.comma pp_str) paths
@@ -193,20 +193,19 @@ let pp ~(show_labels : bool) ~(pp_label : 'b Fmt.t) fmt (prog : ('a, 'b) t) =
     (get_procs ~proc_names:(List.of_seq proc_names) prog)
 
 let pp_labeled fmt x = pp ~show_labels:true ~pp_label:Fmt.string fmt x
-
 let pp_indexed fmt x = pp ~show_labels:false ~pp_label:Fmt.int fmt x
 
 (* let perform_syntax_checks (prog : t) : unit =
-  if (!Config.perform_syntax_checks)
-  then (
-    L.(normal (fun m -> m "Running syntax checks:"));
-    L.(normal (fun m -> m "Checking predicate definitions only use program variables they are allowed to."));
-    Pred.check_pvars prog.preds;
-    L.(normal (fun m -> m "Checking spec definitions only use program variables they're allowed to."));
-    LabProc.check_spec_pvars prog.procs;
-    L.(normal (fun m -> m "Checking specs correspond directly to procedures"));
-    LabProc.check_proc_spec_correspondence prog.procs;
-  ) *)
+   if (!Config.perform_syntax_checks)
+   then (
+     L.(normal (fun m -> m "Running syntax checks:"));
+     L.(normal (fun m -> m "Checking predicate definitions only use program variables they are allowed to."));
+     Pred.check_pvars prog.preds;
+     L.(normal (fun m -> m "Checking spec definitions only use program variables they're allowed to."));
+     LabProc.check_spec_pvars prog.procs;
+     L.(normal (fun m -> m "Checking specs correspond directly to procedures"));
+     LabProc.check_proc_spec_correspondence prog.procs;
+   ) *)
 
 let update_specs (to_update : ('a, 'b) t) (update_with : ('c, 'd) t) : unit =
   Hashtbl.iter
@@ -215,7 +214,7 @@ let update_specs (to_update : ('a, 'b) t) (update_with : ('c, 'd) t) : unit =
       | Some spec, Some eproc ->
           Hashtbl.replace to_update.procs proc_name
             { eproc with proc_spec = Some spec }
-      | _                     -> ())
+      | _ -> ())
     update_with.procs;
   Hashtbl.clear to_update.bi_specs
 

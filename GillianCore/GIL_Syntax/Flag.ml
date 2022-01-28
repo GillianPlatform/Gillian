@@ -7,10 +7,9 @@ type t = TypeDef__.flag =
 let str (flag : t) : string =
   match flag with
   | Normal -> "normal"
-  | Error  -> "error"
+  | Error -> "error"
 
 let pp = Fmt.of_to_string str
-
 let compare = Stdlib.compare
 
 module MyFlag = struct

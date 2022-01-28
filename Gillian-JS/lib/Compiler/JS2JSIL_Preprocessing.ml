@@ -8,9 +8,7 @@ open Parsing
 module Flag = Gillian.Gil_syntax.Flag
 
 exception CannotHappen
-
 exception No_Codename
-
 exception EarlyError of string
 
 (********************************************)
@@ -65,7 +63,10 @@ let update_cc_tbl
   new_f_tbl
 
 let update_cc_tbl_single_var_er
-    (cc_tbl : cc_tbl_type) (f_parent_id : string) (f_id : string) (x : string) =
+    (cc_tbl : cc_tbl_type)
+    (f_parent_id : string)
+    (f_id : string)
+    (x : string) =
   let f_parent_var_table =
     try Hashtbl.find cc_tbl f_parent_id
     with _ ->
@@ -87,7 +88,7 @@ let update_cc_tbl_single_var_er
 let get_vis_list_index vis_list fid =
   let rec loop cur vis_list =
     match vis_list with
-    | []              -> raise (Failure "get_vis_list_index: DEATH")
+    | [] -> raise (Failure "get_vis_list_index: DEATH")
     | cur_fid :: rest -> if cur_fid = fid then cur else loop (cur + 1) rest
   in
   loop 0 vis_list
@@ -121,7 +122,7 @@ let get_top_level_annot e =
       let first_le = List.nth les 0 in
       let annot = first_le.JS_Parser.Syntax.exp_annot in
       annot
-  | _               -> []
+  | _ -> []
 
 (********************************************)
 (********************************************)
@@ -139,7 +140,7 @@ let update_codename_annotation annots fresh_name_generator :
     JS_Parser.Syntax.annotation list * string =
   let ids = List.filter (fun annot -> annot.annot_type = Id) annots in
   match ids with
-  | []     ->
+  | [] ->
       let new_id = fresh_name_generator () in
       (update_annotation annots Codename new_id, new_id)
   | [ id ] ->
@@ -153,7 +154,7 @@ let get_codename exp =
   in
   match codenames with
   | [ codename ] -> codename.annot_formula
-  | _            -> raise No_Codename
+  | _ -> raise No_Codename
 
 let add_codenames exp =
   let code_names = ref [] in
@@ -199,13 +200,13 @@ let closure_clarification
     (exp : JS_Parser.Syntax.exp) =
   let f_state e state =
     match state with
-    | None                      -> None
+    | None -> None
     | Some (f_id, visited_funs) -> (
         let cur_annot = e.JS_Parser.Syntax.exp_annot in
         match e.exp_stx with
         | FunctionExp (strictness, f_name, args, fb) -> (
             match f_name with
-            | None        ->
+            | None ->
                 let new_f_id = get_codename e in
                 let new_f_tbl =
                   update_cc_tbl cc_tbl f_id new_f_id (get_all_vars_f fb args)
@@ -247,7 +248,7 @@ let closure_clarification
 
   let rec f_ac e _ prev_state ac =
     match prev_state with
-    | None                      -> ac
+    | None -> ac
     | Some (f_id, visited_funs) -> (
         match e.exp_stx with
         | Try (e1, Some (x, e2), e3) ->
@@ -257,7 +258,7 @@ let closure_clarification
             let new_f_id = get_codename e in
             let _ = update_cc_tbl_single_var_er cc_tbl f_id new_f_id x in
             f (Some (new_f_id, visited_funs @ [ new_f_id ])) e2
-        | _                          -> [])
+        | _ -> [])
   in
   js_fold f_ac f_state (Some (f_id, visited_funs)) exp
 
@@ -408,7 +409,7 @@ let translate_lannots_in_exp
         (fun lcmd ->
           match (lcmd : JSLCmd.t) with
           | UseSubst _ -> false
-          | _          -> true)
+          | _ -> true)
         lcmds
     in
 
@@ -434,16 +435,16 @@ let translate_lannots_in_exp
 
     let rec fold_partition lcmds lcmds_so_far =
       match lcmds with
-      | []                    -> (List.rev lcmds_so_far, [])
+      | [] -> (List.rev lcmds_so_far, [])
       | LCmd.SL (Fold _) :: _ -> (List.rev lcmds_so_far, lcmds)
-      | lcmd :: rest          -> fold_partition rest (lcmd :: lcmds_so_far)
+      | lcmd :: rest -> fold_partition rest (lcmd :: lcmds_so_far)
     in
 
     match e.exp_stx with
     | Call _ | New _ ->
         let lcmds, lcmds' = fold_partition t_lcmds [] in
         (lcmds, lcmds', use_subst_lcmd)
-    | _              -> (t_lcmds, [], None)
+    | _ -> (t_lcmds, [], None)
 
 let translate_invariant_in_exp
     (cc_tbl : cc_tbl_type)
@@ -458,9 +459,9 @@ let translate_invariant_in_exp
       e.exp_annot
   in
   match invariant with
-  | _ :: _ :: _   ->
+  | _ :: _ :: _ ->
       raise (Failure "DEATH: No more than one invariant per command")
-  | []            -> None
+  | [] -> None
   | [ invariant ] -> (
       let inv =
         List.hd
@@ -637,7 +638,7 @@ let get_imports annots =
     (fun acc { annot_type; annot_formula } ->
       match annot_type with
       | Import -> (annot_formula, true) :: acc
-      | _      -> acc)
+      | _ -> acc)
     [] annots
 
 (********************************************)
@@ -721,13 +722,13 @@ let get_them_functions
     (exp : JS_Parser.Syntax.exp) =
   let f_state e state =
     match state with
-    | None                      -> None
+    | None -> None
     | Some (f_id, visited_funs) -> (
         let cur_annot = e.JS_Parser.Syntax.exp_annot in
         match e.exp_stx with
         | FunctionExp (strictness, f_name, args, fb) -> (
             match f_name with
-            | None        ->
+            | None ->
                 let new_f_id = get_codename e in
                 let new_f_tbl =
                   update_cc_tbl cc_tbl f_id new_f_id (get_all_vars_f fb args)
@@ -769,7 +770,7 @@ let get_them_functions
 
   let rec f_ac e _ prev_state ac =
     match prev_state with
-    | None                      -> ac
+    | None -> ac
     | Some (f_id, visited_funs) -> (
         match e.exp_stx with
         | Try (e1, Some (x, e2), e3) ->
@@ -779,7 +780,7 @@ let get_them_functions
             let new_f_id = get_codename e in
             let _ = update_cc_tbl_single_var_er cc_tbl f_id new_f_id x in
             f (Some (new_f_id, visited_funs @ [ new_f_id ])) e2
-        | _                          -> [])
+        | _ -> [])
   in
   js_fold f_ac f_state (Some (f_id, visited_funs)) exp
 

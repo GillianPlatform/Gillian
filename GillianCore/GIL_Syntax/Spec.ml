@@ -52,7 +52,7 @@ let get_params (spec : t) : string list = spec.spec_params
 let pp_sspec fmt sspec =
   let pp_lab fmt' (lab, exs) =
     match exs with
-    | []  -> Fmt.pf fmt' "<%s>@\n" lab
+    | [] -> Fmt.pf fmt' "<%s>@\n" lab
     | exs -> Fmt.pf fmt' "<%s: %a>@\n" lab Fmt.(list ~sep:comma string) exs
   in
   Fmt.pf fmt "%a[[  @[<hv 0>%a@]  ]]@\n[[  @[<hv 0>%a@]  ]]@\n%s"
@@ -62,7 +62,7 @@ let pp_sspec fmt sspec =
 
 let pp fmt spec =
   let pp_incomplete fmt = function
-    | true  -> Fmt.string fmt "incomplete "
+    | true -> Fmt.string fmt "incomplete "
     | false -> ()
   in
   Fmt.pf fmt "@[<v 2>@[<h>%aspec %s(%a)@]@\n%a@]" pp_incomplete
@@ -103,12 +103,12 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (spec : t) : t =
             List.fold_left
               (fun ac_types ((_, t_x), le) ->
                 match t_x with
-                | None     -> ac_types
+                | None -> ac_types
                 | Some t_x -> (le, t_x) :: ac_types)
               [] combined_params
           in
           Star (Types ac_types, a)
-      | _                -> a
+      | _ -> a
     in
     Asrt.map None (Some f_a_after) None None a
   in
@@ -126,7 +126,6 @@ let label_vars_to_set lab =
   Option.map (fun (l, vl) -> (l, Containers.SS.of_list vl)) lab
 
 let to_yojson = TypeDef__.spec_to_yojson
-
 let of_yojson = TypeDef__.spec_of_yojson
 
 let hash_of_t (spec : t) =

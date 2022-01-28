@@ -12,7 +12,6 @@ let pp fmt (loc, obj, metadata) =
     obj Values.pp metadata
 
 let init () : t = Hashtbl.create Config.medium_tbl_size
-
 let get (obj : t) (prop : string) = Hashtbl.find_opt obj prop
 
 let set (obj : t) (prop : string) (value : Values.t) =

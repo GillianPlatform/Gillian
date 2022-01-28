@@ -57,7 +57,8 @@ struct
          E.g. if we associated in 2) le with a the list of logical variables
               {{ V1, ..., Vi, ..., Vn}}, l-nth(le, i) is replaced with Vi *)
     let concretize_list_accesses
-        (a : Asrt.t) (new_lists : (Expr.t, Expr.t list) Hashtbl.t) : Asrt.t =
+        (a : Asrt.t)
+        (new_lists : (Expr.t, Expr.t list) Hashtbl.t) : Asrt.t =
       let mapper =
         object
           inherit [_] Visitors.endo as super
@@ -69,7 +70,7 @@ struct
                   let vs = Hashtbl.find new_lists le' in
                   List.nth vs (int_of_float i)
                 with _ -> this)
-            | _                   -> super#visit_BinOp ctx this le' op n
+            | _ -> super#visit_BinOp ctx this le' op n
         end
       in
       mapper#visit_assertion () a
@@ -78,7 +79,8 @@ struct
     (* 3 - Generate the equalities relating the expressions that denote lists whose
          length is statically known with the lists of the newly created logical variables *)
     let make_new_list_as
-        (a : Asrt.t) (new_lists : (Expr.t, Expr.t list) Hashtbl.t) : Asrt.t =
+        (a : Asrt.t)
+        (new_lists : (Expr.t, Expr.t list) Hashtbl.t) : Asrt.t =
       let new_list_as =
         Hashtbl.fold
           (fun le les (ac : Asrt.t list) -> Pure (Eq (le, EList les)) :: ac)
@@ -112,22 +114,22 @@ struct
 
     let result : Expr.t =
       match (le : Expr.t) with
-      | Lit _                  -> le
-      | LVar lvar              ->
+      | Lit _ -> le
+      | LVar lvar ->
           Option.value ~default:(Expr.LVar lvar) (SESubst.get subst le)
-      | ALoc aloc              ->
+      | ALoc aloc ->
           ALoc aloc
           (* raise (Failure "Unsupported expression during normalization: ALoc") Why not ALoc aloc? *)
-      | PVar pvar              -> (
+      | PVar pvar -> (
           let value = SStore.get store pvar in
           match value with
           | Some value -> value
-          | None       ->
+          | None ->
               let new_lvar = LVar.alloc () in
               SStore.put store pvar (LVar new_lvar);
               SESubst.put subst (PVar pvar) (LVar new_lvar);
               LVar new_lvar)
-      | BinOp (le1, bop, le2)  -> (
+      | BinOp (le1, bop, le2) -> (
           let nle1 = f le1 in
           let nle2 = f le2 in
           match bop with
@@ -160,7 +162,7 @@ struct
               | Lit (String _), Lit (Num _) ->
                   raise (Failure "Non-integer string index")
               | _, _ -> BinOp (nle1, LstNth, nle2))
-          | _      -> (
+          | _ -> (
               match ((nle1 : Expr.t), (nle2 : Expr.t)) with
               | Lit lit1, Lit lit2 ->
                   let lit =
@@ -168,14 +170,14 @@ struct
                       (Lit lit2)
                   in
                   Lit lit
-              | _, _               -> BinOp (nle1, bop, nle2)))
-      | UnOp (uop, le1)        -> (
+              | _, _ -> BinOp (nle1, bop, nle2)))
+      | UnOp (uop, le1) -> (
           let nle1 = f le1 in
           match nle1 with
           | Lit lit1 ->
               let lit = CExprEval.evaluate_unop uop lit1 in
               Lit lit
-          | _        -> (
+          | _ -> (
               match uop with
               | TypeOf -> (
                   let nle1 = f le1 in
@@ -196,22 +198,22 @@ struct
                   | BinOp (_, _, _) | UnOp (_, _) -> UnOp (TypeOf, nle1)
                   | EList _ | LstSub _ | NOp (LstCat, _) -> Lit (Type ListType)
                   | NOp (_, _) | ESet _ -> Lit (Type SetType))
-              | _      -> UnOp (uop, nle1)))
-      | EList le_list          ->
+              | _ -> UnOp (uop, nle1)))
+      | EList le_list ->
           let n_le_list = List.map (fun le -> f le) le_list in
           let all_literals, lit_list =
             List.fold_left
               (fun (ac, list) le ->
                 match (le : Expr.t) with
                 | Lit lit -> (ac, list @ [ lit ])
-                | _       -> (false, list))
+                | _ -> (false, list))
               (true, []) n_le_list
           in
           if all_literals then Lit (LList lit_list) else EList n_le_list
-      | ESet le_list           ->
+      | ESet le_list ->
           let n_le_list = List.map (fun le -> f le) le_list in
           ESet n_le_list
-      | NOp (op, le_list)      ->
+      | NOp (op, le_list) ->
           let n_le_list = List.map (fun le -> f le) le_list in
           NOp (op, n_le_list)
       | LstSub (le1, le2, le3) -> (
@@ -261,7 +263,8 @@ struct
     result
 
   let extend_typing_env_using_assertion_info
-      (gamma : TypEnv.t) (a_list : Formula.t list) : unit =
+      (gamma : TypEnv.t)
+      (a_list : Formula.t list) : unit =
     List.iter
       (fun a ->
         match (a : Formula.t) with
@@ -269,7 +272,7 @@ struct
           -> (
             let x_type = TypEnv.get gamma x in
             match x_type with
-            | None   ->
+            | None ->
                 let le_type, _, _ = Typing.type_lexpr gamma le in
                 Option.fold
                   ~some:(fun x_type -> TypEnv.update gamma x x_type)
@@ -310,22 +313,22 @@ struct
     let fe = normalise_logic_expression ?no_types store gamma subst in
     let result : Formula.t =
       match (assertion : Formula.t) with
-      | Eq (le1, le2)           -> Eq (fe le1, fe le2)
-      | Less (le1, le2)         -> Less (fe le1, fe le2)
-      | LessEq (le1, le2)       -> LessEq (fe le1, fe le2)
-      | Not (Eq (le1, le2))     -> Not (Eq (fe le1, fe le2))
+      | Eq (le1, le2) -> Eq (fe le1, fe le2)
+      | Less (le1, le2) -> Less (fe le1, fe le2)
+      | LessEq (le1, le2) -> LessEq (fe le1, fe le2)
+      | Not (Eq (le1, le2)) -> Not (Eq (fe le1, fe le2))
       | Not (LessEq (le1, le2)) -> Not (LessEq (fe le1, fe le2))
-      | Not (Less (le1, le2))   -> Not (Less (fe le1, fe le2))
+      | Not (Less (le1, le2)) -> Not (Less (fe le1, fe le2))
       | Not (SetSub (le1, le2)) -> Not (SetSub (fe le1, fe le2))
       | Not (SetMem (le1, le2)) -> Not (SetMem (fe le1, fe le2))
-      | And (a1, a2)            -> And (fa a1, fa a2)
-      | Or (a1, a2)             -> Or (fa a1, fa a2)
-      | False                   -> False
-      | True                    -> True
-      | SetSub (le1, le2)       -> SetSub (fe le1, fe le2)
-      | SetMem (le1, le2)       -> SetMem (fe le1, fe le2)
-      | ForAll (bt, a)          -> ForAll (bt, fant a)
-      | _                       ->
+      | And (a1, a2) -> And (fa a1, fa a2)
+      | Or (a1, a2) -> Or (fa a1, fa a2)
+      | False -> False
+      | True -> True
+      | SetSub (le1, le2) -> SetSub (fe le1, fe le2)
+      | SetMem (le1, le2) -> SetMem (fe le1, fe le2)
+      | ForAll (bt, a) -> ForAll (bt, fant a)
+      | _ ->
           let msg =
             Fmt.str
               "normalise_pure_assertion can only process pure assertions: %a"
@@ -419,7 +422,9 @@ struct
      * ------------------------------------------------------------------------
      *)
     let normalise_pvar_equalities
-        (graph : int list array) (p_vars : SS.t) (_ : (string, int) Hashtbl.t) =
+        (graph : int list array)
+        (p_vars : SS.t)
+        (_ : (string, int) Hashtbl.t) =
       let p_vars = Array.of_list (SS.elements p_vars) in
       let len = Array.length p_vars in
       let visited_tbl = Array.make len false in
@@ -470,7 +475,7 @@ struct
         visited_tbl.(u) <- true;
         match is_searchable u with
         | false -> remove_assignment u_var
-        | true  ->
+        | true ->
             List.iter
               (fun v ->
                 (* Given that u is searchable this if is very strange *)
@@ -570,18 +575,18 @@ struct
     let f = separate_assertion in
 
     match a with
-    | Star (al, ar)       ->
+    | Star (al, ar) ->
         let core_asrts_l, pure_l, types_l, preds_l = f al in
         let core_asrts_r, pure_r, types_r, preds_r = f ar in
         ( core_asrts_l @ core_asrts_r,
           pure_l @ pure_r,
           types_l @ types_r,
           preds_l @ preds_r )
-    | GA (a, es1, es2)    -> ([ (a, es1, es2) ], [], [], [])
-    | Emp                 -> ([], [], [], [])
-    | Types lst           -> ([], [], lst, [])
+    | GA (a, es1, es2) -> ([ (a, es1, es2) ], [], [], [])
+    | Emp -> ([], [], [], [])
+    | Types lst -> ([], [], lst, [])
     | Pred (name, params) -> ([], [], [], [ (name, params) ])
-    | Pure f              -> ([], [ f ], [], [])
+    | Pure f -> ([], [ f ], [], [])
 
   (** Normalise type assertions (Intialise type environment *)
   let normalise_types
@@ -628,11 +633,11 @@ struct
           else
             match fe le with
             | Lit lit -> Literal.type_of lit = t
-            | LVar x  ->
+            | LVar x ->
                 TypEnv.update gamma x t;
                 true
-            | PVar _  -> raise (Failure "DEATH. normalise_type_assertions")
-            | le      -> type_check_lexpr le t)
+            | PVar _ -> raise (Failure "DEATH. normalise_type_assertions")
+            | le -> type_check_lexpr le t)
         true type_list
     in
 
@@ -656,7 +661,7 @@ struct
       (fun (pn, les) ->
         let pred_def = Hashtbl.find_opt pred_defs pn in
         match pred_def with
-        | None          ->
+        | None ->
             L.fail
               (Format.asprintf
                  "Impossible: Predicate %s not found in predicate table during \
@@ -838,7 +843,7 @@ struct
         (core_asrts : (string * Expr.t list * Expr.t list) list) :
         (SPState.t list, string) result =
       match core_asrts with
-      | []                     -> Ok astates
+      | [] -> Ok astates
       | (a, ins, outs) :: rest -> (
           try
             let new_states =
@@ -848,7 +853,7 @@ struct
                     SPState.produce astate subst (Asrt.GA (a, ins, outs))
                   with
                   | Ok astates -> astates @ acc
-                  | Error msg  ->
+                  | Error msg ->
                       L.verbose (fun m ->
                           m
                             "Produce GA failed for: %a!\n\
@@ -885,14 +890,14 @@ struct
             (fun (e, _) ->
               match e with
               | Expr.LVar x -> SS.mem x svars
-              | _           -> false)
+              | _ -> false)
             subst_lvs
-      | None       ->
+      | None ->
           List.filter
             (fun (e, _) ->
               match e with
               | Expr.LVar _ -> true
-              | _           -> false)
+              | _ -> false)
             subst_lvs
     in
     List.map (fun (e, le) -> Formula.Eq (e, le)) subst_lvs'
@@ -993,7 +998,7 @@ struct
         let astate = produce_core_asrts astate c_asrts' in
 
         match astate with
-        | Error msg  ->
+        | Error msg ->
             L.verbose (fun m ->
                 m "WARNING: normalise_assertion: returning error");
             Error msg

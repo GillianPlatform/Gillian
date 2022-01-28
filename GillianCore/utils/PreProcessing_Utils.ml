@@ -5,7 +5,6 @@ module M (GraphNode : sig
 end) =
 struct
   type predecessors = (string * int * int, int) Hashtbl.t
-
   type t = GraphNode.t
 
   let get_succ_pred (cmds : ('a * 'b * t) array) =

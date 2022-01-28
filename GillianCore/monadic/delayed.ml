@@ -10,7 +10,7 @@ let () =
           Fmt.str "NonExhaustiveEntailment(%a)" (Fmt.Dump.list Formula.pp) fs
         in
         Some s
-    | _                          -> None)
+    | _ -> None)
 
 type 'a t = curr_pc:Pc.t -> 'a Branch.t list
 
@@ -28,10 +28,12 @@ let bind (x : 'a t) (f : 'a -> 'b t) ~curr_pc =
     (x ~curr_pc)
 
 let branch_on
-    (guard : Formula.t) ~(then_ : unit -> 'a t) ~(else_ : unit -> 'a t) ~curr_pc
-    =
+    (guard : Formula.t)
+    ~(then_ : unit -> 'a t)
+    ~(else_ : unit -> 'a t)
+    ~curr_pc =
   match guard with
-  | True  -> then_ () ~curr_pc
+  | True -> then_ () ~curr_pc
   | False -> else_ () ~curr_pc
   | guard ->
       let guard_sat = FOSolver.sat ~pc:curr_pc guard in
@@ -48,10 +50,12 @@ let branch_on
         else then_branches
 
 let if_sure
-    (guard : Formula.t) ~(then_ : unit -> 'a t) ~(else_ : unit -> 'a t) ~curr_pc
-    =
+    (guard : Formula.t)
+    ~(then_ : unit -> 'a t)
+    ~(else_ : unit -> 'a t)
+    ~curr_pc =
   match guard with
-  | True  -> then_ () ~curr_pc
+  | True -> then_ () ~curr_pc
   | False -> else_ () ~curr_pc
   | guard ->
       if FOSolver.check_entailment ~pc:curr_pc guard then
@@ -62,13 +66,12 @@ let if_sure
 let branch_entailment (branches : (Formula.t * (unit -> 'a t)) list) ~curr_pc =
   let rec loop l =
     match l with
-    | []                  -> raise
-                               (NonExhaustiveEntailment (List.map fst branches))
+    | [] -> raise (NonExhaustiveEntailment (List.map fst branches))
     | (guard, thunk) :: r -> (
         match guard with
         | Formula.True -> thunk () ~curr_pc
-        | False        -> loop r
-        | _            ->
+        | False -> loop r
+        | _ ->
             if FOSolver.check_entailment ~pc:curr_pc guard then
               thunk () ~curr_pc
             else loop r)
@@ -90,6 +93,5 @@ let resolve_loc l ~curr_pc =
 
 module Syntax = struct
   let ( let* ) = bind
-
   let ( let+ ) = map
 end

@@ -6,9 +6,7 @@ module type S = sig
   include SState.S
 
   type state_t
-
   type preds_t
-
   type abs_t = string * vt list
 
   val initialise : state_t -> preds_t -> UP.preds_tbl_t option -> t
@@ -20,15 +18,10 @@ module type S = sig
   val set_preds : t -> preds_t -> t
 
   val unify : t -> st -> UP.t -> bool
-
   val add_pred_defs : UP.preds_tbl_t -> t -> t
-
   val deabstract : t -> state_t * bool
-
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
-
   val set_pred : t -> abs_t -> unit
-
   val automatic_unfold : t -> vt list -> (t list, string) result
 end
 
@@ -54,29 +47,18 @@ module Make
   module L = Logging
 
   type t = State.t * Preds.t * UP.preds_tbl_t
-
   type vt = Val.t
-
   type st = ESubst.t
-
   type store_t = Store.t
-
   type heap_t = State.heap_t
-
   type abs_t = Preds.abs_t
-
   type state_t = State.t
-
   type preds_t = Preds.t
-
   type err_t = State.err_t [@@deriving yojson]
-
   type fix_t = State.fix_t
-
   type m_err_t = State.m_err_t
 
   exception Internal_State_Error of err_t list * t
-
   exception Preprocessing_Error of UP.up_err_t list
 
   let () =
@@ -86,12 +68,11 @@ module Make
             (Fmt.str "Preprocessing Error: %a"
                (Fmt.Dump.list UP.pp_up_err_t)
                upu)
-      | _                       -> None)
+      | _ -> None)
 
   module Unifier = Unifier.Make (Val) (ESubst) (Store) (State) (Preds)
 
   type action_ret = ASucc of (t * vt list) list | AFail of err_t list
-
   type u_res = UWTF | USucc of t | UFail of err_t list
 
   let init (pred_defs : UP.preds_tbl_t option) : t =
@@ -115,8 +96,9 @@ module Make
     (state, Preds.init [], new_pred_defs)
 
   let initialise
-      (state : State.t) (preds : Preds.t) (pred_defs : UP.preds_tbl_t option) :
-      t =
+      (state : State.t)
+      (preds : Preds.t)
+      (pred_defs : UP.preds_tbl_t option) : t =
     let pred_defs = Option.value ~default:(UP.init_pred_defs ()) pred_defs in
     (state, preds, pred_defs)
 
@@ -131,9 +113,9 @@ module Make
     in
     Preds.substitution_in_place subst preds;
     match states with
-    | []        -> failwith "Impossible: state substitution returned []"
+    | [] -> failwith "Impossible: state substitution returned []"
     | [ state ] -> (subst, [ (state, preds, pred_defs) ])
-    | states    ->
+    | states ->
         ( subst,
           List.map (fun state -> (state, Preds.copy preds, pred_defs)) states )
 
@@ -168,7 +150,7 @@ module Make
     let state, preds, pred_defs = astate in
     match State.to_loc state v with
     | Some (state', loc) -> Some ((state', preds, pred_defs), loc)
-    | None               -> None
+    | None -> None
 
   let assume ?(unfold = false) (astate : t) (v : Val.t) : t list =
     let state, preds, pred_defs = astate in
@@ -178,8 +160,8 @@ module Make
            let astate' = (state, preds, pred_defs) in
            match (!Config.unfolding && unfold, Val.to_expr v) with
            | _, Lit (Bool true) -> [ astate' ]
-           | false, _           -> [ astate' ]
-           | true, _            ->
+           | false, _ -> [ astate' ]
+           | true, _ ->
                let unfold_vals = Expr.base_elements (Val.to_expr v) in
                let unfold_vals = List.map Val.from_expr unfold_vals in
                let unfold_vals =
@@ -207,13 +189,13 @@ module Make
     let state, preds, pred_defs = astate in
     match State.assume_a ~unification ~production ~time state fs with
     | Some state -> Some (state, preds, pred_defs)
-    | None       -> None
+    | None -> None
 
   let assume_t (astate : t) (v : Val.t) (t : Type.t) : t option =
     let state, preds, pred_defs = astate in
     match State.assume_t state v t with
     | Some state -> Some (state, preds, pred_defs)
-    | None       -> None
+    | None -> None
 
   let sat_check (astate : t) (v : Val.t) : bool =
     let state, _, _ = astate in
@@ -283,7 +265,7 @@ module Make
 
   let update_store (state : t) (x : string option) (v : Val.t) : t =
     match x with
-    | None   -> state
+    | None -> state
     | Some x ->
         let store = get_store state in
         let _ = Store.put store x v in
@@ -340,7 +322,7 @@ module Make
            let fl, posts =
              match posts with
              | Some (fl, posts) -> (fl, posts)
-             | _                ->
+             | _ ->
                  let msg =
                    Printf.sprintf
                      "SYNTAX ERROR: Spec of %s does not have a postcondition"
@@ -433,7 +415,7 @@ module Make
           List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
         in
         raise (Internal_State_Error (pvars_errs, astate))
-    | true  -> (
+    | true -> (
         let lvar_binders, pvar_binders =
           List.partition Names.is_lvar_name binders
         in
@@ -485,15 +467,15 @@ module Make
         else ();
         match up with
         | Error asrts -> raise (Preprocessing_Error [ UPAssert (a, asrts) ])
-        | Ok up       -> (
+        | Ok up -> (
             let bindings =
               List.map
                 (fun (e : Expr.t) ->
                   let binding =
                     match e with
-                    | PVar x          -> Store.get (State.get_store state) x
+                    | PVar x -> Store.get (State.get_store state) x
                     | LVar _ | ALoc _ -> Val.from_expr e
-                    | _               ->
+                    | _ ->
                         raise
                           (Failure
                              "Impossible: unifiable not a pvar or an lvar or \
@@ -551,7 +533,7 @@ module Make
                       let bindings =
                         match revisited with
                         | false -> bindings
-                        | true  -> new_bindings @ bindings
+                        | true -> new_bindings @ bindings
                       in
                       let bindings =
                         List.filter
@@ -615,7 +597,7 @@ module Make
                             let x =
                               match x with
                               | Expr.PVar x -> x
-                              | _           -> failwith "Impossible"
+                              | _ -> failwith "Impossible"
                             in
                             Store.put store x v)
                           pvar_subst_list
@@ -662,7 +644,7 @@ module Make
                           in
                           L.fail msg)
                   states
-            | UPUFail errs   ->
+            | UPUFail errs ->
                 let fail_pfs : Formula.t list =
                   List.map State.get_failing_constraint errs
                 in
@@ -692,7 +674,7 @@ module Make
       t list =
     let rec fl2 f acc la lb =
       match (la, lb) with
-      | [], _ | _, []  -> acc
+      | [], _ | _, [] -> acc
       | a :: r, b :: q -> fl2 f (f acc a b) r q
     in
     fl2
@@ -710,7 +692,7 @@ module Make
                   (Format.asprintf
                      "Unable to produce frame for loop %s, because of :\n%s" id
                      msg)
-            | Ok l      -> l
+            | Ok l -> l
           in
           (* TODO: FIX THIS FOR MULTI-STATES *)
           let _, states = simplify ~kill_new_lvars:true astate in
@@ -742,7 +724,7 @@ module Make
       | Fold (pname, les, folding_info) -> (
           let pred = UP.get_pred_def prog.preds pname in
           match pred.pred.pred_abstract with
-          | true  ->
+          | true ->
               raise
                 (Failure
                    (Format.asprintf "Impossible: Fold of abstract predicate %s"
@@ -778,7 +760,7 @@ module Make
                             let v_x = ESubst.get subst' (PVar x) in
                             match v_x with
                             | Some v_x -> v_x
-                            | None     ->
+                            | None ->
                                 raise (Failure "DEATH. evaluate_slcmd. fold"))
                           out_params
                       in
@@ -798,7 +780,7 @@ module Make
       | Unfold (pname, les, unfold_info, b) -> (
           let pred = UP.get_pred_def prog.preds pname in
           match pred.pred.pred_abstract with
-          | true  ->
+          | true ->
               raise
                 (Failure
                    (Format.asprintf
@@ -833,8 +815,7 @@ module Make
                            in
                            states)
                          (Unifier.unfold astate pname vs unfold_info)))
-              | _                   -> Fmt.failwith "IMPOSSIBLE UNFOLD: %a"
-                                         SLCmd.pp lcmd))
+              | _ -> Fmt.failwith "IMPOSSIBLE UNFOLD: %a" SLCmd.pp lcmd))
       | GUnfold pname ->
           let astates = Unifier.unfold_all astate pname in
           let astates =
@@ -860,7 +841,7 @@ module Make
                   (SS.elements pvars_diff)
               in
               raise (Internal_State_Error (pvars_errs, astate))
-          | true  -> (
+          | true -> (
               let store_subst = Store.to_ssubst store in
               let a =
                 SVal.SESubst.substitute_asrt store_subst ~partial:true a
@@ -915,14 +896,14 @@ module Make
               match up with
               | Error asrts ->
                   raise (Preprocessing_Error [ UPAssert (a, asrts) ])
-              | Ok up       -> (
+              | Ok up -> (
                   let bindings =
                     List.map
                       (fun (e : Expr.t) ->
                         let id =
                           match e with
                           | LVar _ | ALoc _ -> e
-                          | _               ->
+                          | _ ->
                               raise
                                 (Failure
                                    "Impossible: unifiable not an lvar or an \
@@ -1007,7 +988,7 @@ module Make
                                   new_states)
                               new_astates
                             |> Result.ok
-                        | _              ->
+                        | _ ->
                             let msg =
                               Fmt.str
                                 "Assert failed with argument %a. unable to \
@@ -1052,7 +1033,7 @@ module Make
             failwith "Binding of pure variables in lemma application.";
           let lemma = UP.get_lemma prog lname in
           match lemma with
-          | Error _  ->
+          | Error _ ->
               raise (Failure (Printf.sprintf "Lemma %s does not exist" lname))
           | Ok lemma -> (
               let v_args : vt list = List.map eval_expr args in
@@ -1089,7 +1070,7 @@ module Make
     match result with
     | Ok results ->
         Ok (List.concat_map (fun result -> snd (simplify result)) results)
-    | _          -> result
+    | _ -> result
 
   let run_spec
       (spec : UP.spec)
@@ -1099,7 +1080,7 @@ module Make
       (subst : (string * (string * vt) list) option) : (t * Flag.t) list =
     let results =
       match subst with
-      | None                ->
+      | None ->
           run_spec_aux spec.spec.spec_name spec.spec.spec_params spec.up astate
             (Some x) args
       | Some (_, subst_lst) ->
@@ -1108,7 +1089,7 @@ module Make
     in
     match results with
     | Ok results -> results
-    | Error _    ->
+    | Error _ ->
         L.normal (fun fmt ->
             fmt "WARNING: Unable to use specification of function %s"
               spec.spec.spec_name);
@@ -1118,7 +1099,7 @@ module Make
     let result =
       match Unifier.unify astate subst up with
       | Unifier.UPUSucc _ -> true
-      | _                 -> false
+      | _ -> false
     in
     L.verbose (fun fmt -> fmt "PSTATE.unify: Success: %b" result);
     result
@@ -1152,9 +1133,9 @@ module Make
 
   let unify_assertion (astate : t) (subst : st) (step : UP.step) : u_res =
     match Unifier.unify_assertion astate subst step with
-    | UWTF          -> UWTF
+    | UWTF -> UWTF
     | USucc astate' -> USucc astate'
-    | UFail errs    -> UFail errs
+    | UFail errs -> UFail errs
 
   let produce_posts (astate : t) (subst : st) (asrts : Asrt.t list) : t list =
     Unifier.produce_posts astate subst asrts
@@ -1175,14 +1156,14 @@ module Make
     State.update_subst state subst
 
   let ga_to_setter (a : string) : string = State.ga_to_setter a
-
   let ga_to_getter (a : string) : string = State.ga_to_getter a
-
   let ga_to_deleter (a : string) : string = State.ga_to_deleter a
 
   let execute_action
-      ?(unification = false) (action : string) (astate : t) (args : vt list) :
-      action_ret =
+      ?(unification = false)
+      (action : string)
+      (astate : t)
+      (args : vt list) : action_ret =
     let state, preds, pred_defs = astate in
     match State.execute_action ~unification action state args with
     | State.ASucc rets ->
@@ -1206,9 +1187,7 @@ module Make
     State.split_ins action ins
 
   let is_overlapping_asrt (a : string) : bool = State.is_overlapping_asrt a
-
   let pp_err = State.pp_err
-
   let pp_fix = State.pp_fix
 
   let get_recovery_vals astate vs =
@@ -1221,7 +1200,6 @@ module Make
     else Ok (List.map (fun (_, astate) -> astate) next_states)
 
   let get_failing_constraint = State.get_failing_constraint
-
   let can_fix = State.can_fix
 
   let get_fixes ?simple_fix:(sf = true) (state : t) (errs : err_t list) :
@@ -1235,7 +1213,7 @@ module Make
     let st, preds, pht = state in
     let ost, asrts = State.apply_fixes st fixes in
     match ost with
-    | None    -> (None, [])
+    | None -> (None, [])
     | Some st ->
         let state = (st, preds, pht) in
         let ost =
@@ -1246,9 +1224,9 @@ module Make
                   let subst = make_id_subst ga in
                   match produce os subst ga with
                   | Ok [ x ] -> Some x
-                  | Ok _     -> failwith "multiple productions in bi-abduction"
-                  | Error _  -> None)
-              | None    -> None)
+                  | Ok _ -> failwith "multiple productions in bi-abduction"
+                  | Error _ -> None)
+              | None -> None)
             (Some state) asrts
         in
         (ost, [])

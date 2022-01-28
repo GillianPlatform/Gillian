@@ -15,26 +15,22 @@ module M : Memory_S = struct
   type err_t = unit
 
   type fix_t = unit
-
   type action_ret = ASucc of (t * vt list) | AFail of err_t list
 
   let pp = CHeap.pp
-
   let copy = CHeap.copy
-
   let init = CHeap.init
 
   let set_cell (heap : t) (loc : vt) (prop : vt) (v : vt option) : action_ret =
     let loc, prop =
       match (loc, prop) with
       | Loc loc, String prop -> (loc, prop)
-      | _                    -> raise
-                                  (Failure "C Heap Update: illegal heap update")
+      | _ -> raise (Failure "C Heap Update: illegal heap update")
     in
 
     let obj = CHeap.get heap loc in
     match obj with
-    | None          -> raise (Failure "C Heap Update: object not found")
+    | None -> raise (Failure "C Heap Update: object not found")
     | Some (obj, _) ->
         (match v with
         | None -> CObject.remove obj prop
@@ -47,7 +43,7 @@ module M : Memory_S = struct
     let loc, prop =
       match (loc, prop) with
       | Loc loc, String prop -> (loc, prop)
-      | _                    -> raise (Failure "Illegal get_cell")
+      | _ -> raise (Failure "Illegal get_cell")
     in
 
     let remove = Option.value ~default:false remove in
@@ -55,7 +51,7 @@ module M : Memory_S = struct
       raise (Failure "Concrete get_cell. Remove Option must be implemented!")
     else
       match CHeap.get heap loc with
-      | None          -> AFail []
+      | None -> AFail []
       | Some (obj, _) ->
           let v = Option.value ~default:Literal.Nono (CObject.get obj prop) in
           ASucc (heap, [ Loc loc; String prop; v ])
@@ -65,7 +61,7 @@ module M : Memory_S = struct
     let loc =
       match loc with
       | Loc loc -> loc
-      | _       -> raise (Failure "Illegal get_domain")
+      | _ -> raise (Failure "Illegal get_domain")
     in
 
     let remove = Option.value ~default:false remove in
@@ -73,7 +69,7 @@ module M : Memory_S = struct
       raise (Failure "Concrete get_domain. Remove Option must be implemented!")
     else
       match CHeap.get heap loc with
-      | None          -> AFail []
+      | None -> AFail []
       | Some (obj, _) ->
           let props = CObject.properties obj in
           ASucc
@@ -87,7 +83,7 @@ module M : Memory_S = struct
     let loc =
       match loc with
       | Loc loc -> loc
-      | _       -> raise (Failure "Illegal get_metadata")
+      | _ -> raise (Failure "Illegal get_metadata")
     in
 
     if remove then
@@ -95,17 +91,17 @@ module M : Memory_S = struct
         (Failure "Concrete get_metadata. Remove Option must be implemented!")
     else
       match CHeap.get heap loc with
-      | None         -> AFail []
+      | None -> AFail []
       | Some (_, vm) -> ASucc (heap, [ Loc loc; vm ])
 
   let delete_object (heap : t) (loc : vt) : action_ret =
     let loc =
       match loc with
       | Loc loc -> loc
-      | _       -> raise (Failure "Illegal get_domain")
+      | _ -> raise (Failure "Illegal get_domain")
     in
     match CHeap.get heap loc with
-    | None   -> raise (Failure "delete_obj. location does NOT exist in the heap")
+    | None -> raise (Failure "delete_obj. location does NOT exist in the heap")
     | Some _ ->
         CHeap.remove heap loc;
         ASucc (heap, [])
@@ -113,9 +109,9 @@ module M : Memory_S = struct
   let alloc (heap : t) (loc : vt option) (mv : vt) : action_ret =
     let new_loc =
       match loc with
-      | None           -> Generators.fresh_loc ()
+      | None -> Generators.fresh_loc ()
       | Some (Loc loc) -> loc
-      | _              -> raise (Failure "C Allocation: non-loc loc argument")
+      | _ -> raise (Failure "C Allocation: non-loc loc argument")
     in
     CHeap.set heap new_loc (CObject.init (), mv);
     let new_loc_lit : Literal.t = Loc new_loc in
@@ -127,32 +123,32 @@ module M : Memory_S = struct
     if action = JSILNames.getCell then
       match args with
       | [ loc; prop ] -> get_cell heap loc prop
-      | _             -> raise (Failure "Internal Error. execute_action")
+      | _ -> raise (Failure "Internal Error. execute_action")
     else if action = JSILNames.setCell then
       match args with
       | [ loc; prop; v ] -> set_cell heap loc prop (Some v)
-      | _                -> raise (Failure "Internal Error. execute_action")
+      | _ -> raise (Failure "Internal Error. execute_action")
     else if action = JSILNames.delCell then
       match args with
       | [ loc; prop ] -> set_cell heap loc prop None
-      | _             -> raise (Failure "Internal Error. execute_action")
+      | _ -> raise (Failure "Internal Error. execute_action")
     else if action = JSILNames.alloc then
       match args with
       | [ Empty; m_loc ] -> alloc heap None m_loc
-      | [ loc; m_loc ]   -> alloc heap (Some loc) m_loc
-      | _                -> raise (Failure "Internal Error. execute_action")
+      | [ loc; m_loc ] -> alloc heap (Some loc) m_loc
+      | _ -> raise (Failure "Internal Error. execute_action")
     else if action = JSILNames.delObj then
       match args with
       | [ loc ] -> delete_object heap loc
-      | _       -> raise (Failure "Internal Error. execute_action")
+      | _ -> raise (Failure "Internal Error. execute_action")
     else if action = JSILNames.getAllProps then
       match args with
       | [ loc ] -> get_domain heap loc
-      | _       -> raise (Failure "Internal Error. execute_action")
+      | _ -> raise (Failure "Internal Error. execute_action")
     else if action = JSILNames.getMetadata then
       match args with
       | [ loc ] -> get_metadata heap loc
-      | _       -> raise (Failure "Internal Error. execute_action")
+      | _ -> raise (Failure "Internal Error. execute_action")
     else raise (Failure "Internal Error. execute_action")
 
   let ga_to_setter (a_id : string) =

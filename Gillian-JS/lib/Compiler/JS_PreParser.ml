@@ -14,28 +14,30 @@ let surprise_substitute_string =
 type state =
   | TheUsual
   | InString
-  | InAsmOrAsrt            of int * string
+  | InAsmOrAsrt of int * string
   | InAsmOrAsrtAndInString of int * string
 
 exception Unparseable of string
 
 let rec stringify_assume_and_assert_aux
-    (s_in : string) (s_out : string) (s : state) : string =
+    (s_in : string)
+    (s_out : string)
+    (s : state) : string =
   let f = stringify_assume_and_assert_aux in
   match s_in with
   | "" -> (
       match s with
-      | TheUsual                 -> s_out
-      | InString                 ->
+      | TheUsual -> s_out
+      | InString ->
           raise (Unparseable "Reached EOF: non-terminated string literal.")
-      | InAsmOrAsrt _            ->
+      | InAsmOrAsrt _ ->
           raise (Unparseable "Reached EOF: assume or assert not terminated.")
       | InAsmOrAsrtAndInString _ ->
           raise
             (Unparseable
                "Reached EOF: a string literal inside assume or assert not \
                 terminated."))
-  | _  -> (
+  | _ -> (
       let next_char, rest_of_string = string_head_and_tail s_in in
       assert (next_char <> None);
       assert (rest_of_string <> None);
@@ -46,7 +48,7 @@ let rec stringify_assume_and_assert_aux
       | TheUsual -> (
           match next_char with
           | "\"" -> f rest_of_string (s_out ^ "\"") InString
-          | "A"  -> (
+          | "A" -> (
               let next_five_chars, new_rest_of_string =
                 string_split rest_of_string 5
               in
@@ -57,7 +59,7 @@ let rec stringify_assume_and_assert_aux
                     (s_out ^ "A" ^ next_five_chars)
                     (InAsmOrAsrt (0, ""))
               | _, _ -> f rest_of_string (s_out ^ "A") TheUsual)
-          | _    -> f rest_of_string (s_out ^ next_char) TheUsual)
+          | _ -> f rest_of_string (s_out ^ next_char) TheUsual)
       | InString -> (
           match next_char with
           | "\"" -> f rest_of_string (s_out ^ "\"") TheUsual
@@ -74,7 +76,7 @@ let rec stringify_assume_and_assert_aux
               | _ ->
                   failwith
                     "Unhandled case stringify_assume_and_assert_aux.InString")
-          | _    -> f rest_of_string (s_out ^ next_char) InString)
+          | _ -> f rest_of_string (s_out ^ next_char) InString)
       | InAsmOrAsrt (depth, str) -> (
           assert (depth >= 0);
           match next_char with
@@ -115,7 +117,7 @@ let rec stringify_assume_and_assert_aux
                   | "\"" ->
                       f rest_of_string s_out
                         (InAsmOrAsrtAndInString (depth, str ^ next_char))
-                  | _    ->
+                  | _ ->
                       f rest_of_string s_out
                         (InAsmOrAsrt (depth, str ^ next_char)))))
       | InAsmOrAsrtAndInString (depth, str) -> (
@@ -138,7 +140,7 @@ let rec stringify_assume_and_assert_aux
                   failwith
                     "Unhandled case \
                      stringify_assume_and_assert_aux.InAsmOrAsrtAndInString")
-          | _    ->
+          | _ ->
               f rest_of_string s_out
                 (InAsmOrAsrtAndInString (depth, str ^ next_char))))
 

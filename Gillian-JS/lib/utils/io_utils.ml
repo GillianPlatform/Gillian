@@ -3,7 +3,7 @@ let harness_path () =
     let list_paths = "." :: Js_config.import_paths in
     let rec find fn l =
       match l with
-      | []     -> failwith ("Cannot resolve \"" ^ fname ^ "\"")
+      | [] -> failwith ("Cannot resolve \"" ^ fname ^ "\"")
       | p :: r -> (
           try
             let complete_path = Filename.concat p fname in
@@ -30,7 +30,7 @@ let harness =
   fun () ->
     match !loaded_harness with
     | Some s -> s
-    | None   ->
+    | None ->
         let harness = load_file (harness_path ()) ^ "\n\n" in
         loaded_harness := Some harness;
         harness

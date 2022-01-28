@@ -10,12 +10,10 @@ let () =
   Printexc.register_printer (function
     | Failure s ->
         Some (Format.asprintf "!!!!!!!!!!\nFAILURE:\n%s\n!!!!!!!!!!\n\n" s)
-    | _         -> None)
+    | _ -> None)
 
 let file_reporter : Reporter.t = (module FileReporter)
-
 let database_reporter : Reporter.t = (module DatabaseReporter)
-
 let reporters = ref []
 
 let initialize (reporters_to_initialize : (module Reporter.S) list) =
@@ -49,9 +47,7 @@ let log_specific lvl ?title ?severity loggable type_ =
   else None
 
 let normal ?title ?severity msgf = log Normal ?title ?severity msgf
-
 let verbose ?title ?severity msgf = log Verbose ?title ?severity msgf
-
 let tmi ?title ?severity msgf = log TMI ?title ?severity msgf
 
 let normal_specific ?title ?severity loggable type_ =
@@ -78,14 +74,11 @@ let start_phase level ?title ?severity () =
   | Some phase_report ->
       let () = log_on_all_reporters phase_report in
       Some phase_report.id
-  | None              -> None
+  | None -> None
 
 let normal_phase = start_phase Normal
-
 let verbose_phase = start_phase Verbose
-
 let tmi_phase = start_phase TMI
-
 let end_phase = ReportBuilder.end_phase
 
 let with_phase level ?title ?severity f =
@@ -98,7 +91,7 @@ let with_phase level ?title ?severity f =
   in
   ReportBuilder.end_phase phase;
   match result with
-  | Ok ok   -> ok
+  | Ok ok -> ok
   | Error e -> raise e
 
 let with_normal_phase ?title ?severity f = with_phase Normal ?title ?severity f

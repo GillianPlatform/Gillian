@@ -1,7 +1,6 @@
 open Lexing
 
 let log_verbose = Gillian.Logging.verbose
-
 let col pos = pos.pos_cnum - pos.pos_bol + 1
 
 let parse start lexbuf =
@@ -29,7 +28,7 @@ let parse_from_string start str =
       failwith
         (Printf.sprintf "Failed while trying to parse the string :@\n%s@\n%s"
            str msg)
-  | _           ->
+  | _ ->
       failwith
         (Printf.sprintf "Unkown parsing error while parsing the string :@\n%s"
            str)
@@ -63,7 +62,7 @@ let parse_jsil_eprog_from_file (path : string) : Jsil_syntax.EProg.t =
   Utils.Config.previously_normalised := file_previously_normalised;
   (* Check that the file is of a valid type *)
   (match file_previously_normalised || String.equal "jsil" extension with
-  | true  -> ()
+  | true -> ()
   | false ->
       raise
         (Failure

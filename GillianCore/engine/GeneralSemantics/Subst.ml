@@ -76,11 +76,8 @@ module type S = sig
   val subst_in_expr_opt : t -> Expr.t -> Expr.t option
 
   val substitute_formula : t -> partial:bool -> Formula.t -> Formula.t
-
   val substitute_asrt : t -> partial:bool -> Asrt.t -> Asrt.t
-
   val substitute_slcmd : t -> partial:bool -> SLCmd.t -> SLCmd.t
-
   val substitute_lcmd : t -> partial:bool -> LCmd.t -> LCmd.t
 end
 
@@ -117,7 +114,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     let filter =
       match filter_out with
       | Some filter -> filter
-      | None        -> fun _ -> false
+      | None -> fun _ -> false
     in
     Hashtbl.fold
       (fun k _ ac -> if filter k then ac else Var.Set.add k ac)
@@ -223,7 +220,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     Hashtbl.filter_map_inplace
       (fun v v_val ->
         match filter v v_val with
-        | true  -> Some v_val
+        | true -> Some v_val
         | false -> None)
       new_subst;
     new_subst
@@ -290,10 +287,12 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   *)
   let subst_in_expr (subst : t) ~(partial : bool) (le : Expr.t) : Expr.t =
     let find_in_subst
-        (x : Var.t) (le_x_old : Expr.t) (make_new_x : unit -> Expr.t) : Expr.t =
+        (x : Var.t)
+        (le_x_old : Expr.t)
+        (make_new_x : unit -> Expr.t) : Expr.t =
       match get subst x with
       | Some v -> Val.to_expr v
-      | None   -> (
+      | None -> (
           if partial then le_x_old
           else
             let new_le_x = make_new_x () in
@@ -301,7 +300,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
             | Some sv ->
                 put subst x sv;
                 new_le_x
-            | None    -> raise (Failure "DEATH. subst_in_expr"))
+            | None -> raise (Failure "DEATH. subst_in_expr"))
     in
     let mapper =
       object
@@ -338,7 +337,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     let f_before (le : Expr.t) =
       match (le : Expr.t) with
       | LVar x | ALoc x | PVar x -> (Option.map Val.to_expr (get subst x), false)
-      | _                        -> (Some le, true)
+      | _ -> (Some le, true)
     in
     Expr.map_opt f_before None le
 
@@ -366,14 +365,14 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
           old_binders_substs := binders_substs;
           List.iter (fun x -> put subst x (Val.from_lvar_name x)) binders;
           (a, true)
-      | _              -> (a, true)
+      | _ -> (a, true)
     in
     let f_after a =
       match a with
       | ForAll _ ->
           List.iter (fun (x, le_x) -> put subst x le_x) !old_binders_substs;
           a
-      | _        -> a
+      | _ -> a
     in
     map (Some f_before) (Some f_after) (Some (subst_in_expr subst ~partial)) a
 

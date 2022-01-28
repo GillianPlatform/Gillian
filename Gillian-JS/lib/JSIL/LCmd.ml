@@ -10,14 +10,14 @@ module Type = Gillian.Gil_syntax.Type
 
 (** {b JSIL logic commands}. *)
 type t =
-  | If         of Expr.t * t list * t list  (** If-then-else     *)
-  | Branch     of Formula.t  (** branching on a FO formual *)
-  | Macro      of string * Expr.t list  (** Macro            *)
-  | Assert     of Formula.t  (** Assert           *)
-  | Assume     of Formula.t  (** Assume           *)
+  | If of Expr.t * t list * t list  (** If-then-else     *)
+  | Branch of Formula.t  (** branching on a FO formual *)
+  | Macro of string * Expr.t list  (** Macro            *)
+  | Assert of Formula.t  (** Assert           *)
+  | Assume of Formula.t  (** Assume           *)
   | AssumeType of string * Type.t  (** Assume Type      *)
-  | SpecVar    of string list  (** Spec Var         *)
-  | SL         of SLCmd.t
+  | SpecVar of string list  (** Spec Var         *)
+  | SL of SLCmd.t
 
 let rec pp fmt lcmd =
   let pp_list = Fmt.list ~sep:Fmt.semi pp in

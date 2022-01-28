@@ -24,6 +24,6 @@ let pp_what_exec_did pp_value pp_err ft res =
         "finished its execution with failure in proc %s at command %i with \
          errors %a"
         proc i (Dump.list pp_err) errs
-  | RSucc (fl, v, _)         ->
+  | RSucc (fl, v, _) ->
       pf ft "finished its execution successfully in %s mode and returned %a"
         (Flag.str fl) pp_value v

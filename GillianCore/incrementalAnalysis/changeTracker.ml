@@ -14,7 +14,7 @@ type lemma_changes = {
 
 let pp_proc_changes fmt changes =
   let pp_elem_list sec fmt = function
-    | []    -> Fmt.pf fmt "%s:@\n<none>@\n" sec
+    | [] -> Fmt.pf fmt "%s:@\n<none>@\n" sec
     | procs ->
         let newline = Fmt.any "@\n" in
         Fmt.pf fmt "%s:@\n%a@\n" sec (Fmt.list ~sep:newline Fmt.string) procs
@@ -34,7 +34,7 @@ let to_list (set : SS.t) : string list =
 let get_changed_files prev_files new_files =
   let rec get_changed paths changed =
     match paths with
-    | []           -> changed
+    | [] -> changed
     | path :: rest ->
         (* Check if file contents have changed *)
         let prev_hash = SourceFiles.get_contents_hash prev_files ~path in
@@ -118,12 +118,16 @@ let get_lemma_changes prog =
 let map_to_names call_graph = List.map (CallGraph.get_name call_graph)
 
 let get_proc_callers
-    reverse_graph start_ids ?(stop_search = fun _ -> false) ~filter_id () =
+    reverse_graph
+    start_ids
+    ?(stop_search = fun _ -> false)
+    ~filter_id
+    () =
   (* Perform a breadth-first traversal of the reverse call graph *)
   let open CallGraph in
   let rec get_callers visited to_visit dep_procs =
     match to_visit with
-    | []         -> dep_procs
+    | [] -> dep_procs
     | id :: rest ->
         if not (IdSet.mem id visited) then
           let new_visited = IdSet.add id visited in
@@ -146,7 +150,7 @@ let get_dependent_procs_and_lemmas reverse_graph start_ids ~filter_id =
   let open CallGraph in
   let rec get_dependents visited to_visit dep_procs dep_lemmas =
     match to_visit with
-    | []         -> (dep_procs, dep_lemmas)
+    | [] -> (dep_procs, dep_lemmas)
     | id :: rest ->
         if not (IdSet.mem id visited) then
           let children =

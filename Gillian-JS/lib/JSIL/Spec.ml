@@ -61,7 +61,7 @@ let pp_sspec fmt sspec =
 
 let pp fmt spec =
   let pp_incomplete fmt = function
-    | true  -> Fmt.string fmt "incomplete "
+    | true -> Fmt.string fmt "incomplete "
     | false -> ()
   in
   Fmt.pf fmt "@[<hov 2>@[<h>%a spec %s(%a)@]@\n%a@]" pp_incomplete

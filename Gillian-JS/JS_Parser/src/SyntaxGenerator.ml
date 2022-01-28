@@ -2,30 +2,19 @@ open GJS_syntax
 
 module Constants = struct
   let module_obj = "Module"
-
   let module_var = "_module"
-
   let cache_var = "_cache"
-
   let require_f = "require"
-
   let module_params = [ "exports"; "module"; "__filename"; "__dirname" ]
-
   let not_loaded = "NOT_LOADED"
-
   let loading = "LOADING"
-
   let loaded = "LOADED"
 end
 
 let mk_exp syntax : exp = mk_exp syntax Flow_parser.Loc.none []
-
 let expr_of_ident_str (str : string) : exp = mk_exp (Var str)
-
 let expr_of_lit_str str : exp = mk_exp (String str)
-
 let assign_expr left right : exp = mk_exp (Assign (left, right))
-
 let access_expr obj prop : exp = mk_exp (Access (expr_of_ident_str obj, prop))
 
 (** Generates: _module = new Module(<filename>, <dirname>) *)
@@ -49,7 +38,6 @@ let module_status_assign status : exp =
   assign_expr (access_expr "module" "status") (expr_of_lit_str status)
 
 let set_start_load_status : exp = module_status_assign Constants.loading
-
 let set_end_load_satus : exp = module_status_assign Constants.loaded
 
 let make_func_expr use_strict expr_list param_list : exp =

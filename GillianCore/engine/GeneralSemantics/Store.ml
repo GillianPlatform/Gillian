@@ -132,7 +132,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   let get_unsafe (store : t) (v : Var.t) : vt =
     match get store v with
     | Some result -> result
-    | None        ->
+    | None ->
         raise
           (Failure
              (Printf.sprintf "Store.get_unsafe: variable %s not found in store"

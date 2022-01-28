@@ -23,11 +23,10 @@ module TargetLangOptions = struct
 end
 
 type err = JSParserErr of JS_Parser.Error.t | JS2GILErr of string
-
 type tl_ast = JavaScriptSource of JS_Parser.Syntax.exp | JsilSource
 
 let pp_err fmt = function
-  | JS2GILErr s   -> Fmt.pf fmt "%s" s
+  | JS2GILErr s -> Fmt.pf fmt "%s" s
   | JSParserErr s -> Fmt.pf fmt "Parsing error: %s\n" (JS_Parser.Error.str s)
 
 let create_compilation_result path prog tl_prog =
@@ -102,9 +101,7 @@ let parse_and_compile_files paths =
     progs
 
 let other_imports = [ ("jsil", parse_and_compile_jsil) ]
-
 let import_paths = Javert_utils.Js_config.import_paths
-
 let env_var_import_path = Some "GILLIAN_JS_RUNTIME_PATH"
 
 let initialize exec_mode =

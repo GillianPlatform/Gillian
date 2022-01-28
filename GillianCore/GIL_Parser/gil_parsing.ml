@@ -14,10 +14,10 @@ end)
 (* let cache_gil_prog path prog = Hashtbl.add cached_progs path prog *)
 
 (* let cache_labelled_progs (progs : (string * (Annot.t, string) Prog.t) list) =
-  List.iter
-    (fun (path, prog) ->
-      if not (Hashtbl.mem cached_progs path) then cache_gil_prog path prog)
-    progs *)
+   List.iter
+     (fun (path, prog) ->
+       if not (Hashtbl.mem cached_progs path) then cache_gil_prog path prog)
+     progs *)
 
 (** Used to avoid redundant parsing. *)
 
@@ -26,10 +26,10 @@ end)
 (* let cache_gil_prog path prog = Hashtbl.add cached_progs path prog *)
 
 (* let cache_labelled_progs (progs : (string * (Annot.t, string) Prog.t) list) =
-  List.iter
-    (fun (path, prog) ->
-      if not (Hashtbl.mem cached_progs path) then cache_gil_prog path prog)
-    progs *)
+   List.iter
+     (fun (path, prog) ->
+       if not (Hashtbl.mem cached_progs path) then cache_gil_prog path prog)
+     progs *)
 
 let col pos = pos.pos_cnum - pos.pos_bol + 1
 
@@ -58,7 +58,7 @@ let parse_from_string start str =
       failwith
         (Printf.sprintf "Failed while trying to parse the string:@\n%s@\n%s" str
            msg)
-  | _           ->
+  | _ ->
       failwith
         (Printf.sprintf "Unkown parsing error while parsing the string:@\n%s"
            str)
@@ -140,7 +140,6 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
   L.with_normal_phase ~title:"Program parsing" (fun () -> f path)
 
 let cached_progs = Hashtbl.create Config.small_tbl_size
-
 let cache_gil_prog path prog = Hashtbl.add cached_progs path prog
 
 let cache_labelled_progs (progs : (string * (Annot.t, string) Prog.t) list) =
@@ -151,7 +150,7 @@ let resolve_path path =
     let lookup_paths = "." :: Config.get_runtime_paths () in
     let rec find fname paths =
       match paths with
-      | []           -> failwith (Printf.sprintf "Cannot resolve \"%s\"" fname)
+      | [] -> failwith (Printf.sprintf "Cannot resolve \"%s\"" fname)
       | path :: rest ->
           let complete_path = Filename.concat path fname in
           if Sys.file_exists complete_path then complete_path
@@ -172,9 +171,7 @@ let fetch_imported_prog path other_imports : (Annot.t, string) Prog.t =
       if String.equal extension ".gil" then parse_eprog_from_file file
       else
         match List.assoc_opt (remove_dot extension) other_imports with
-        | None                   -> failwith
-                                      (Printf.sprintf
-                                         "Cannot import file \"%s\"" file)
+        | None -> failwith (Printf.sprintf "Cannot import file \"%s\"" file)
         | Some parse_and_compile -> parse_and_compile file
     in
     cache_gil_prog path prog;

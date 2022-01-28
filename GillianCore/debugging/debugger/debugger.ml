@@ -6,29 +6,18 @@ open DebuggerTypes
 
 module type S = sig
   type tl_ast
-
   type debugger_state
 
   val launch : string -> string option -> (debugger_state, string) result
-
   val step_in : ?reverse:bool -> debugger_state -> stop_reason
-
   val step : debugger_state -> stop_reason
-
   val step_out : debugger_state -> stop_reason
-
   val run : ?reverse:bool -> ?launch:bool -> debugger_state -> stop_reason
-
   val terminate : debugger_state -> unit
-
   val get_frames : debugger_state -> frame list
-
   val get_scopes : debugger_state -> scope list
-
   val get_variables : int -> debugger_state -> variable list
-
   val get_exception_info : debugger_state -> exception_info
-
   val set_breakpoints : string option -> int list -> debugger_state -> unit
 end
 
@@ -44,7 +33,6 @@ struct
   module Breakpoints = Set.Make (Int)
 
   type breakpoints = (string, Breakpoints.t) Hashtbl.t
-
   type tl_ast = PC.tl_ast
 
   type debugger_state = {
@@ -111,7 +99,7 @@ struct
     in
     let lifted_scopes =
       match state with
-      | None       -> []
+      | None -> []
       | Some state ->
           let store = Verification.SPState.get_store state |> Store.bindings in
           let memory = Verification.SPState.get_heap state in
@@ -143,12 +131,12 @@ struct
       oi
 
   let get_progs_or_fail = function
-    | Ok progs  -> (
+    | Ok progs -> (
         match progs.ParserAndCompiler.gil_progs with
         | [] ->
             Fmt.pr "Error: expected at least one GIL program\n";
             exit 1
-        | _  -> progs)
+        | _ -> progs)
     | Error err ->
         Fmt.pr "Error during compilation to GIL:\n%a" PC.pp_err err;
         exit 1
@@ -160,7 +148,7 @@ struct
         let fmt = Format.formatter_of_out_channel outc in
         let () = Prog.pp_labeled fmt prog in
         close_out outc
-    | None         -> ()
+    | None -> ()
 
   let preprocess_files files already_compiled outfile_opt no_unfold =
     let e_prog, source_files_opt, tl_ast =
@@ -195,7 +183,7 @@ struct
 
   let has_hit_breakpoint dbg =
     match dbg.frames with
-    | []         -> false
+    | [] -> false
     | frame :: _ ->
         if Hashtbl.mem dbg.breakpoints frame.source_path then
           let breakpoints = Hashtbl.find dbg.breakpoints frame.source_path in
@@ -211,12 +199,12 @@ struct
         let proc = Prog.get_proc prog se.pid in
         let start_line, start_column, end_line, end_column, source_path =
           match proc with
-          | None      -> defaults
+          | None -> defaults
           | Some proc -> (
               let annot, _, _ = proc.proc_body.(next_proc_body_idx) in
               let loc_opt = Annot.get_origin_loc annot in
               match loc_opt with
-              | None     -> defaults
+              | None -> defaults
               | Some loc ->
                   let loc = DebuggerUtils.location_to_display_location loc in
                   ( loc.loc_start.pos_line,
@@ -242,7 +230,7 @@ struct
   let update_report_id_and_inspection_fields report_id dbg =
     dbg.cur_report_id <- report_id;
     match Logging.LogQueryer.get_report report_id with
-    | None                  ->
+    | None ->
         Fmt.failwith
           "Unable to find report id '%a'. Check the logging level is set \
            correctly"
@@ -275,7 +263,7 @@ struct
                   | (se : CallStack.stack_element) :: _ -> (
                       let proc = Prog.get_proc dbg.prog se.pid in
                       match proc with
-                      | None      -> None
+                      | None -> None
                       | Some proc ->
                           let annot, _, cmd =
                             proc.proc_body.(cmd_step.proc_body_index)
@@ -283,7 +271,7 @@ struct
                           Some (cmd, annot))
                 in
                 dbg.cur_cmd <- cur_cmd
-            | Error err   -> failwith err)
+            | Error err -> failwith err)
         | _ as t ->
             raise
               (Failure
@@ -299,7 +287,7 @@ struct
     let () = Config.manual_proof := false in
     let () =
       match proc_name with
-      | None           -> ()
+      | None -> ()
       | Some proc_name -> Config.Verification.set_procs_to_verify [ proc_name ]
     in
     (* If the file is a GIL file, assume it is already compiled *)
@@ -316,7 +304,7 @@ struct
     | Verification.SAInterpreter.Finished _ -> Error "Nothing to run"
     | Verification.SAInterpreter.Continue (cur_report_id, cont_func) -> (
         match cur_report_id with
-        | None               ->
+        | None ->
             raise
               (Failure
                  "Did not log report. Check the logging level is set correctly")
@@ -344,7 +332,7 @@ struct
   let execute_step dbg =
     let open Verification.SAInterpreter in
     match dbg.cont_func with
-    | None           -> ReachedEnd
+    | None -> ReachedEnd
     | Some cont_func -> (
         let cont_func = cont_func () in
         match cont_func with
@@ -353,7 +341,7 @@ struct
             ReachedEnd
         | Continue (cur_report_id, cont_func) -> (
             match cur_report_id with
-            | None               ->
+            | None ->
                 raise
                   (Failure
                      "Did not log report. Check the logging level is set \
@@ -372,7 +360,7 @@ struct
           Logging.LogQueryer.get_previous_report_id dbg.cur_report_id
         in
         match prev_report_id with
-        | None                -> ReachedStart
+        | None -> ReachedStart
         | Some prev_report_id ->
             let () =
               update_report_id_and_inspection_fields prev_report_id dbg
@@ -383,7 +371,7 @@ struct
           Logging.LogQueryer.get_next_report_id dbg.cur_report_id
         in
         match next_report_id with
-        | None                -> execute_step dbg
+        | None -> execute_step dbg
         | Some next_report_id ->
             let () =
               update_report_id_and_inspection_fields next_report_id dbg
@@ -403,9 +391,9 @@ struct
       (dbg : debugger_state) : stop_reason =
     let stop_reason = step_in dbg in
     match stop_reason with
-    | Step              -> (
+    | Step -> (
         match dbg.frames with
-        | []             -> failwith "Nothing in call stack, cannot step"
+        | [] -> failwith "Nothing in call stack, cannot step"
         | cur_frame :: _ ->
             let cur_stack_depth = List.length dbg.frames in
             if cond prev_frame cur_frame prev_stack_depth cur_stack_depth then
@@ -415,7 +403,7 @@ struct
 
   let step dbg =
     match dbg.frames with
-    | []         -> failwith "Nothing in call stack, cannot step"
+    | [] -> failwith "Nothing in call stack, cannot step"
     | frame :: _ ->
         if is_gil_file dbg.source_file then
           (* If GIL file, step until next cmd in the same frame (like in regular
@@ -442,7 +430,7 @@ struct
     let rec step_out stack_depth dbg =
       let stop_reason = step_in dbg in
       match stop_reason with
-      | Step              ->
+      | Step ->
           if List.length dbg.frames < stack_depth then stop_reason
           else step_out stack_depth dbg
       | other_stop_reason -> other_stop_reason
@@ -457,7 +445,7 @@ struct
     else
       let stop_reason = step_in ~reverse dbg in
       match stop_reason with
-      | Step              -> run ~reverse dbg
+      | Step -> run ~reverse dbg
       | other_stop_reason -> other_stop_reason
 
   let terminate dbg =
@@ -466,12 +454,11 @@ struct
     Logging.wrap_up ()
 
   let get_frames dbg = dbg.frames
-
   let get_scopes dbg = dbg.top_level_scopes
 
   let get_variables (var_ref : int) (dbg : debugger_state) : variable list =
     match Hashtbl.find_opt dbg.variables var_ref with
-    | None      -> []
+    | None -> []
     | Some vars -> vars
 
   let get_exception_info (dbg : debugger_state) =
@@ -485,8 +472,8 @@ struct
         | StateErr.EMem merr ->
             Lifter.memory_error_to_exception_info
               { error = merr; command = dbg.cur_cmd; tl_ast = dbg.tl_ast }
-        | _                  -> non_mem_exception_info)
-    | _                       -> non_mem_exception_info
+        | _ -> non_mem_exception_info)
+    | _ -> non_mem_exception_info
 
   let set_breakpoints source bp_list dbg =
     match source with

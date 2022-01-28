@@ -51,14 +51,14 @@ let never_called_during_symb prog =
 
 let get_pred prog name =
   let rec aux = function
-    | []     -> None
+    | [] -> None
     | p :: r -> if String.equal (WPred.get_name p) name then Some p else aux r
   in
   aux prog.predicates
 
 let get_fun prog name =
   let rec aux = function
-    | []     -> None
+    | [] -> None
     | p :: r -> if String.equal (WFun.get_name p) name then Some p else aux r
   in
   aux prog.context
@@ -71,22 +71,22 @@ let get_by_id ?(fname = None) prog id =
   if id = -1 then `None
   else
     match fname with
-    | None   ->
+    | None ->
         aux_f prog.context |>> (aux_p, prog.predicates) |>> (aux_l, prog.lemmas)
     | Some f -> (
         match List.find_opt (fun ff -> ff.WFun.name = f) prog.context with
-        | None    -> `None
+        | None -> `None
         | Some ff -> fun_getter ff)
 
 let get_function_name_of_element prog id =
   let is_in_function f =
     match WFun.get_by_id id f with
     | `None -> false
-    | _     -> true
+    | _ -> true
   in
   let rec find_f l =
     match l with
     | f :: r -> if is_in_function f then WFun.get_name f else find_f r
-    | _      -> ""
+    | _ -> ""
   in
   find_f prog.context

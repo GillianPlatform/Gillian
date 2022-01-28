@@ -12,7 +12,7 @@ type t = {
 let pp fmt labproc =
   let { name; body; params; spec } = labproc in
   let len_opt = function
-    | None   -> 0
+    | None -> 0
     | Some s -> String.length s
   in
   let max_size_lab =
@@ -25,7 +25,7 @@ let pp fmt labproc =
   in
   let pp_cmd_triple fmt (_, lab, cmd) =
     match lab with
-    | None   -> Fmt.pf fmt "%a%a" pp_white (max_size_lab + 1) LabCmd.pp cmd
+    | None -> Fmt.pf fmt "%a%a" pp_white (max_size_lab + 1) LabCmd.pp cmd
     | Some l ->
         Fmt.pf fmt "%s:%a%a" l pp_white
           (max_size_lab - String.length l)

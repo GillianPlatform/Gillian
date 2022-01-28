@@ -1,9 +1,6 @@
 let procs_with_no_paths = ref SS.empty
-
 let preds_with_no_paths = ref SS.empty
-
 let lemmas_with_no_paths = ref SS.empty
-
 let internal_file = ref false
 
 let reset () =

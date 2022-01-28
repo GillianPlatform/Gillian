@@ -45,7 +45,5 @@ struct
       (j : int option) =
     match pid with
     | "EXTERN_printf" -> execute_printf prog state cs i x v_args j
-    | _               -> raise
-                           (Failure
-                              ("Unsupported external procedure call: " ^ pid))
+    | _ -> raise (Failure ("Unsupported external procedure call: " ^ pid))
 end

@@ -6,16 +6,15 @@
 module SS = Containers.SS
 
 type folding_info = string * (string * Expr.t) list
-
 type unfold_info = (string * string) list
 
 (** {b GIL Separation Logic commands}. *)
 type t = TypeDef__.slcmd =
-  | Fold      of string * Expr.t list * folding_info option  (** Fold             *)
-  | Unfold    of string * Expr.t list * unfold_info option * bool
+  | Fold of string * Expr.t list * folding_info option  (** Fold             *)
+  | Unfold of string * Expr.t list * unfold_info option * bool
       (** Unfold           *)
-  | GUnfold   of string  (** Global Unfold    *)
-  | ApplyLem  of string * Expr.t list * string list  (** Apply lemma      *)
+  | GUnfold of string  (** Global Unfold    *)
+  | ApplyLem of string * Expr.t list * string list  (** Apply lemma      *)
   | SepAssert of Asrt.t * string list  (** Assert           *)
   | Invariant of Asrt.t * string list  (** Invariant        *)
   | SymbExec
@@ -60,21 +59,21 @@ let pvars (slcmd : t) : SS.t =
 let lvars (slcmd : t) : SS.t =
   let lvars_es es = fold (List.map Expr.lvars es) in
   match slcmd with
-  | Fold (_, es, finfo)    ->
+  | Fold (_, es, finfo) ->
       let lvars_finfo =
         match finfo with
-        | None          -> SS.empty
+        | None -> SS.empty
         | Some (_, les) ->
             let _, es = List.split les in
             fold (List.map Expr.lvars es)
       in
       SS.union lvars_finfo (lvars_es es)
-  | Unfold (_, es, _, _)   -> lvars_es es
-  | ApplyLem (_, es, _)    -> lvars_es es
-  | GUnfold _              -> SS.empty
+  | Unfold (_, es, _, _) -> lvars_es es
+  | ApplyLem (_, es, _) -> lvars_es es
+  | GUnfold _ -> SS.empty
   | SepAssert (a, binders) -> SS.union (Asrt.lvars a) (SS.of_list binders)
-  | Invariant (a, _)       -> Asrt.lvars a
-  | SymbExec               -> SS.empty
+  | Invariant (a, _) -> Asrt.lvars a
+  | SymbExec -> SS.empty
 
 let locs (slcmd : t) : SS.t =
   let locs_es es = fold (List.map Expr.locs es) in
@@ -82,7 +81,7 @@ let locs (slcmd : t) : SS.t =
   | Fold (_, es, finfo) ->
       let lvars_finfo =
         match finfo with
-        | None          -> SS.empty
+        | None -> SS.empty
         | Some (_, les) ->
             let _, es = List.split les in
             fold (List.map Expr.locs es)
@@ -113,7 +112,7 @@ let pp fmt lcmd =
   let pp_binders f b =
     match b with
     | [] -> ()
-    | _  -> Fmt.pf f "[bind: %a]" (Fmt.list ~sep:Fmt.comma Fmt.string) b
+    | _ -> Fmt.pf f "[bind: %a]" (Fmt.list ~sep:Fmt.comma Fmt.string) b
   in
   match lcmd with
   | Fold (name, les, fold_info) ->
@@ -133,7 +132,7 @@ let pp fmt lcmd =
       let pp_exs f exs =
         match exs with
         | [] -> ()
-        | _  ->
+        | _ ->
             Fmt.pf f "[existentials: %a]"
               (Fmt.list ~sep:Fmt.comma Fmt.string)
               exs

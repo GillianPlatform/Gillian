@@ -5,7 +5,6 @@ open Gillian.Gil_syntax
 type symbol
 
 val is_def_sym : symbol -> bool
-
 val sym_name : symbol -> string
 
 (** Data exported during compilation and used during linking. *)

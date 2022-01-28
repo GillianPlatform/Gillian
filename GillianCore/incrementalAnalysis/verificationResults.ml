@@ -1,5 +1,4 @@
 type ('a, 'b) hashtbl = ('a, 'b) Hashtbl.t
-
 type t = (string * (int * int), bool) hashtbl
 
 let of_yojson yj =
@@ -12,7 +11,6 @@ let to_yojson s =
   |> [%to_yojson: ((string * (int * int)) * bool) list]
 
 let make () : t = Hashtbl.create Config.small_tbl_size
-
 let reset = Hashtbl.reset
 
 let set_result results test_name test_id verified =

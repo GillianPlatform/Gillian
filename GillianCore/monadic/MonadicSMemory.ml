@@ -10,9 +10,7 @@ module type S = sig
   type st = SVal.SESubst.t
 
   type i_fix_t
-
   type c_fix_t
-
   type err_t
 
   (** Type of GIL general states *)
@@ -28,13 +26,9 @@ module type S = sig
     action_name:string -> t -> vt list -> action_ret Delayed.t
 
   val ga_to_setter : string -> string
-
   val ga_to_getter : string -> string
-
   val ga_to_deleter : string -> string
-
   val ga_loc_indexes : string -> int list
-
   val is_overlapping_asrt : string -> bool
 
   (** State Copy *)
@@ -44,25 +38,15 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
 
   val substitution_in_place : st -> t -> t Delayed.t
-
   val fresh_val : t -> vt
-
   val clean_up : t -> unit
-
   val lvars : t -> Containers.SS.t
-
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
-
   val mem_constraints : t -> Formula.t list
-
   val pp_i_fix : Format.formatter -> i_fix_t -> unit
-
   val pp_c_fix : Format.formatter -> c_fix_t -> unit
-
   val get_recovery_vals : t -> err_t -> vt list
-
   val pp_err : Format.formatter -> err_t -> unit
-
   val get_failing_constraint : err_t -> Formula.t
 
   (* FIXME: This is not working *)
@@ -75,9 +59,7 @@ module type S = sig
     (c_fix_t list * Formula.t list * Containers.SS.t * Asrt.t list) list
 
   val apply_fix : t -> PFS.t -> TypEnv.t -> c_fix_t -> t
-
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
-
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
 end
 
@@ -101,11 +83,11 @@ module Lift (MSM : S) : SMemory.S = struct
     let split res =
       let rec aux acc_succ acc_fail res =
         match res with
-        | []         -> (acc_succ, acc_fail)
+        | [] -> (acc_succ, acc_fail)
         | br :: rest -> (
             match Branch.value br with
             | Failure err -> aux acc_succ (err :: acc_fail) rest
-            | Success s   ->
+            | Success s ->
                 aux
                   ((Branch.learned br, Branch.learned_types br, s) :: acc_succ)
                   acc_fail rest)
@@ -129,9 +111,7 @@ module Lift (MSM : S) : SMemory.S = struct
     let process = substitution_in_place subst mem in
     let curr_pc = Pc.make ~pfs ~gamma () in
     match Delayed.resolve ~curr_pc process with
-    | []                        -> failwith
-                                     "substitution killed every branch, that \
-                                      cannot happen"
+    | [] -> failwith "substitution killed every branch, that cannot happen"
     | leeloo_dallas_multibranch ->
         List.map
           (fun (bch : t Branch.t) ->

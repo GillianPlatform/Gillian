@@ -29,7 +29,7 @@ let empty (x : t) : bool = Hashtbl.length x == 0
 (* Type of a variable *)
 let get_unsafe (x : t) (var : string) : Type.t =
   match Hashtbl.mem x var with
-  | true  -> Hashtbl.find x var
+  | true -> Hashtbl.find x var
   | false ->
       raise (Failure ("TypEnv.get_unsafe: variable " ^ var ^ " not found."))
 
@@ -96,7 +96,7 @@ let remove (te : t) (x : string) : unit = Hashtbl.remove te x
 let extend (x : t) (y : t) : unit =
   iter y (fun v t ->
       match Hashtbl.find_opt x v with
-      | None    -> Hashtbl.replace x v t
+      | None -> Hashtbl.replace x v t
       | Some t' ->
           if t <> t' then
             raise (Failure "Typing environment cannot be extended."))
@@ -127,8 +127,8 @@ let substitution (x : t) (subst : SESubst.t) (partial : bool) : t =
       let new_var = SESubst.get subst evar in
       match new_var with
       | Some (LVar new_var) -> update new_gamma new_var v_type
-      | Some _              -> if partial then update new_gamma var v_type
-      | None                ->
+      | Some _ -> if partial then update new_gamma var v_type
+      | None ->
           if partial then update new_gamma var v_type
           else if Names.is_lvar_name var then (
             let new_lvar = LVar.alloc () in

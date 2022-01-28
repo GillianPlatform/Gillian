@@ -13,7 +13,6 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
 
   val full_pp : Format.formatter -> t -> unit
-
   val full_pp_list : Format.formatter -> t list -> unit
 
   (** Convert a value to a literal, if possible *)

@@ -8,7 +8,6 @@ open Jsil_syntax
 module L = Logging
 
 type field_name = Expr.t
-
 type field_value = Expr.t [@@deriving yojson]
 
 (* Definition *)
@@ -29,7 +28,6 @@ let pp ft sfvl =
 (* Map functions to be reused *)
 
 let add fn fv = Expr.Map.add fn fv
-
 let empty = Expr.Map.empty
 
 let field_names sfvl =
@@ -37,15 +35,10 @@ let field_names sfvl =
   result
 
 let fold f sfvl ac = Expr.Map.fold f sfvl ac
-
 let get fn sfvl = Option.map (fun fv -> fv) (Expr.Map.find_opt fn sfvl)
-
 let is_empty sfvl = sfvl = empty
-
 let iter f sfvl = Expr.Map.iter f sfvl
-
 let partition f sfvl = Expr.Map.partition f sfvl
-
 let remove = Expr.Map.remove
 
 (* WHAT IS THIS? *)

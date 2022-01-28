@@ -3,32 +3,32 @@ open Jsil_syntax
 open JSLogicCommon
 
 type pt =
-  | And     of pt * pt
-  | Or      of pt * pt
-  | Not     of pt
+  | And of pt * pt
+  | Or of pt * pt
+  | Not of pt
   | True
   | False
-  | Eq      of JSExpr.t * JSExpr.t
-  | Less    of JSExpr.t * JSExpr.t
-  | LessEq  of JSExpr.t * JSExpr.t
+  | Eq of JSExpr.t * JSExpr.t
+  | Less of JSExpr.t * JSExpr.t
+  | LessEq of JSExpr.t * JSExpr.t
   | StrLess of JSExpr.t * JSExpr.t
-  | ForAll  of (string * Type.t) list * pt
-  | SetMem  of JSExpr.t * JSExpr.t
-  | SetSub  of JSExpr.t * JSExpr.t
+  | ForAll of (string * Type.t) list * pt
+  | SetMem of JSExpr.t * JSExpr.t
+  | SetSub of JSExpr.t * JSExpr.t
 
 type t =
-  | Pure        of pt
-  | Star        of t * t
-  | PointsTo    of JSExpr.t * JSExpr.t * JSExpr.t
-  | MetaData    of JSExpr.t * JSExpr.t
+  | Pure of pt
+  | Star of t * t
+  | PointsTo of JSExpr.t * JSExpr.t * JSExpr.t
+  | MetaData of JSExpr.t * JSExpr.t
   | Emp
-  | Pred        of string * JSExpr.t list
-  | Types       of (string * Type.t) list
-  | Scope       of string * JSExpr.t
-  | VarSChain   of string * string * JSExpr.t * JSExpr.t
-  | OSChains    of string * JSExpr.t * string * JSExpr.t
-  | Closure     of (string * JSExpr.t) list * (string * JSExpr.t) list
-  | SChain      of string * JSExpr.t
+  | Pred of string * JSExpr.t list
+  | Types of (string * Type.t) list
+  | Scope of string * JSExpr.t
+  | VarSChain of string * string * JSExpr.t * JSExpr.t
+  | OSChains of string * JSExpr.t * string * JSExpr.t
+  | Closure of (string * JSExpr.t) list * (string * JSExpr.t) list
+  | SChain of string * JSExpr.t
   | EmptyFields of JSExpr.t * JSExpr.t
 
 let star (asrts : t list) : t =
@@ -43,20 +43,20 @@ let rec js2jsil_pure (scope_le : Expr.t option) (a : pt) : Formula.t =
 
   (* What about metadata here? Or extensibility *)
   match a with
-  | And (a1, a2)       -> Formula.And (f a1, f a2)
-  | Or (a1, a2)        -> Formula.Or (f a1, f a2)
-  | Not a              -> Formula.Not (f a)
-  | True               -> Formula.True
-  | False              -> Formula.False
-  | Eq (le1, le2)      -> Formula.Eq (fe le1, fe le2)
-  | Less (le1, le2)    -> Formula.Less (fe le1, fe le2)
-  | LessEq (le1, le2)  -> Formula.LessEq (fe le1, fe le2)
+  | And (a1, a2) -> Formula.And (f a1, f a2)
+  | Or (a1, a2) -> Formula.Or (f a1, f a2)
+  | Not a -> Formula.Not (f a)
+  | True -> Formula.True
+  | False -> Formula.False
+  | Eq (le1, le2) -> Formula.Eq (fe le1, fe le2)
+  | Less (le1, le2) -> Formula.Less (fe le1, fe le2)
+  | LessEq (le1, le2) -> Formula.LessEq (fe le1, fe le2)
   | StrLess (le1, le2) -> Formula.StrLess (fe le1, fe le2)
-  | ForAll (s, a)      ->
+  | ForAll (s, a) ->
       let new_binders = List.map (fun (x, t) -> (x, Some t)) s in
       Formula.ForAll (new_binders, f a)
-  | SetMem (le1, le2)  -> Formula.SetMem (fe le1, fe le2)
-  | SetSub (le1, le2)  -> Formula.SetSub (fe le1, fe le2)
+  | SetMem (le1, le2) -> Formula.SetMem (fe le1, fe le2)
+  | SetSub (le1, le2) -> Formula.SetSub (fe le1, fe le2)
 
 let rec js2jsil
     (cur_fid : string option)
@@ -130,7 +130,7 @@ let rec js2jsil
                 ]
             in
             Asrt.PointsTo (Expr.Lit (Loc locGlobName), Expr.Lit (String x), desc)
-        | Some i        ->
+        | Some i ->
             let le_x = fe le_x in
             let le_er =
               Expr.BinOp (fe le_sc, LstNth, Expr.Lit (Num (float_of_int i)))
@@ -242,7 +242,6 @@ let rec js2jsil
 
     let len_fid1 = LEq (UnOp(LstLen, le_sc1'), Lit (Num (float_of_int len_fid1))) in
     let len_fid2 = LEq (UnOp(LstLen, le_sc2'), Lit (Num (float_of_int len_fid2))) in  *)
-
   (*
     le_fid = "fid"
     vis_tbl(fid) = {{ fid_1, ..., fid_n }}

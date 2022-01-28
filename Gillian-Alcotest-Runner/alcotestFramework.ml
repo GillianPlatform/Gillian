@@ -36,7 +36,7 @@ module Make (Outcome : Outcome.S) = struct
             expected res
         in
         if pass then () else Alcotest.fail (msg ())
-    | other            ->
+    | other ->
         Alcotest.failf
           "Expected test to finish successfully in normal mode\n\
            But test actually %a" Outcome.pp_what_test_did other
@@ -48,7 +48,7 @@ module Make (Outcome : Outcome.S) = struct
 
   let fail_at_exec = function
     | Outcome.FailedExec _ -> ()
-    | actual               ->
+    | actual ->
         Alcotest.failf
           "Expected the test to fail at execution \nBut the test %a"
           Outcome.pp_what_test_did actual

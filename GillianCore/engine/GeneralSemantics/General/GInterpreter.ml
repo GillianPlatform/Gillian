@@ -5,35 +5,27 @@ module type S = sig
   module CallStack : CallStack.S
 
   type vt
-
   type st
-
   type store_t
-
   type state_t
-
   type state_err_t
-
   type state_vt
-
   type heap_t
 
   module Val : Val.S with type t = vt
-
   module Store : Store.S with type t = store_t and type vt = vt
 
   type invariant_frames = (string * state_t) list
-
   type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
 
   type cconf_t =
-    | ConfErr    of {
+    | ConfErr of {
         callstack : CallStack.t;
         proc_idx : int;
         error_state : state_t;
         errors : err_t list;
       }
-    | ConfCont   of {
+    | ConfCont of {
         state : state_t;
         callstack : CallStack.t;
         invariant_frames : invariant_frames;
@@ -44,7 +36,7 @@ module type S = sig
       }
     | ConfFinish of { flag : Flag.t; ret_val : state_vt; final_state : state_t }
         (** Equal to Conf cont + the id of the required spec *)
-    | ConfSusp   of {
+    | ConfSusp of {
         spec_id : string;
         state : state_t;
         callstack : CallStack.t;
@@ -56,7 +48,6 @@ module type S = sig
       }
 
   type conf_t = BConfErr of err_t list | BConfCont of state_t
-
   type result_t = (state_t, state_vt, err_t) ExecRes.t
 
   type 'a cont_func =
@@ -72,13 +63,9 @@ module type S = sig
   [@@deriving yojson]
 
   val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
-
   val pp_result : Format.formatter -> result_t list -> unit
-
   val call_graph : CallGraph.t
-
   val reset : unit -> unit
-
   val evaluate_lcmds : UP.prog -> LCmd.t list -> state_t -> state_t list
 
   val init_evaluate_proc :
@@ -117,36 +104,27 @@ struct
   module Store = Store
 
   type vt = Val.t
-
   type st = ESubst.t
-
   type store_t = Store.t
-
   type state_t = State.t [@@deriving yojson]
-
   type state_err_t = State.err_t
-
   type state_vt = State.vt
-
   type heap_t = State.heap_t
-
   type invariant_frames = (string * State.t) list
-
   type err_t = (Val.t, State.err_t) ExecErr.t [@@deriving yojson]
 
   let pp_err = ExecErr.pp Val.pp State.pp_err
-
   let pp_str_list = Fmt.(brackets (list ~sep:comma string))
 
   (** Type of configurations: state, call stack, previous index, previous loop ids, current index, branching *)
   type cconf_t =
-    | ConfErr    of {
+    | ConfErr of {
         callstack : CallStack.t;
         proc_idx : int;
         error_state : state_t;
         errors : err_t list;
       }
-    | ConfCont   of {
+    | ConfCont of {
         state : State.t;
         callstack : CallStack.t;
         invariant_frames : invariant_frames;
@@ -157,7 +135,7 @@ struct
       }
     | ConfFinish of { flag : Flag.t; ret_val : State.vt; final_state : State.t }
         (** Equal to Conf cont + the id of the required spec *)
-    | ConfSusp   of {
+    | ConfSusp of {
         spec_id : string;
         state : state_t;
         callstack : CallStack.t;
@@ -169,7 +147,6 @@ struct
       }
 
   type conf_t = BConfErr of err_t list | BConfCont of State.t
-
   type result_t = (State.t, State.vt, err_t) ExecRes.t
 
   type 'a cont_func =
@@ -198,22 +175,18 @@ struct
   exception Syntax_error of string
 
   let pp_single_result ft res = ExecRes.pp State.pp Val.pp pp_err ft res
-
   let call_graph = CallGraph.make ~init_capacity:128 ()
-
   let reset () = CallGraph.reset call_graph
 
   (* Often-used values *)
   let vtrue = Val.from_literal (Bool true)
-
   let vfalse = Val.from_literal (Bool false)
-
   let symb_exec_next = ref false
 
   type loop_action =
     | Nothing
-    | FrameOff  of string
-    | FrameOn   of string list
+    | FrameOff of string
+    | FrameOn of string list
     | Malformed
 
   let understand_loop_action current previous : loop_action =
@@ -250,7 +223,7 @@ struct
     let proc =
       match proc with
       | Some proc -> proc
-      | None      -> raise (Failure ("Procedure " ^ pid ^ " does not exist."))
+      | None -> raise (Failure ("Procedure " ^ pid ^ " does not exist."))
     in
     let annot, _, cmd = proc.proc_body.(i) in
     (pid, (annot, cmd))
@@ -270,10 +243,11 @@ struct
     state'
 
   let eval_subst_list
-      (state : State.t) (subst_lst : (string * (string * Expr.t) list) option) :
+      (state : State.t)
+      (subst_lst : (string * (string * Expr.t) list) option) :
       (string * (string * Val.t) list) option =
     match subst_lst with
-    | None                  -> None
+    | None -> None
     | Some (lab, subst_lst) ->
         let subst_lst' : (string * Val.t) list =
           List.map (fun (x, e) -> (x, State.eval_expr state e)) subst_lst
@@ -296,7 +270,7 @@ struct
     let state_printer =
       match !Config.pbn with
       | false -> State.pp
-      | true  ->
+      | true ->
           let pvars, lvars, locs =
             (Cmd.pvars cmd, Cmd.lvars cmd, Cmd.locs cmd)
           in
@@ -351,13 +325,13 @@ struct
         Fmt.failwith
           "Malformed loop structure: current loops: %a; expected loops: %a"
           pp_str_list actual pp_str_list expected
-    | true  -> ()
+    | true -> ()
 
   let rec loop_ids_to_frame_on_at_the_end end_ids start_ids =
     if end_ids = start_ids then []
     else
       match end_ids with
-      | []     ->
+      | [] ->
           Fmt.failwith
             "Malformed loop structure (at return): current loops: %a; expected \
              loops: %a"
@@ -388,14 +362,14 @@ struct
         | Some v_x -> (
             match State.assume_t state v_x t with
             | Some state' -> [ state' ]
-            | _           ->
+            | _ ->
                 raise
                   (Failure
                      (Printf.sprintf
                         "ERROR: AssumeType: Cannot assume type %s for variable \
                          %s."
                         (Type.str t) x)))
-        | _        ->
+        | _ ->
             raise
               (Failure
                  (Printf.sprintf
@@ -410,8 +384,8 @@ struct
           if ExecMode.biabduction_exec !Config.current_exec_mode then
             let fos = Formula.get_disjuncts f' in
             match fos with
-            | []              -> []
-            | [ f' ]          -> [ (f', state) ]
+            | [] -> []
+            | [ f' ] -> [ (f', state) ]
             | f' :: other_fos ->
                 let new_fos_states =
                   List.map (fun f'' -> (f'', State.copy state)) other_fos
@@ -427,14 +401,14 @@ struct
              (fun (f'', state) ->
                match State.assume_a state [ f'' ] with
                | Some state' -> [ state' ]
-               | _           -> [])
+               | _ -> [])
              fos)
     | SpecVar xs -> [ State.add_spec_vars state (Var.Set.of_list xs) ]
     | Assert f -> (
         let store_subst = Store.to_ssubst (State.get_store state) in
         let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
         match State.assert_a state [ f' ] with
-        | true  -> [ state ]
+        | true -> [ state ]
         | false ->
             let err = StateErr.EPure f' in
             let failing_model = State.sat_check_f state [ Not f' ] in
@@ -454,7 +428,7 @@ struct
     | Macro (name, args) -> (
         let macro = Macro.get prog.prog.macros name in
         match macro with
-        | None       ->
+        | None ->
             L.verbose (fun m ->
                 m "@[<v 2>Current MACRO TABLE:\n%a\n@]" Macro.pp_tbl
                   prog.prog.macros);
@@ -488,7 +462,7 @@ struct
         match Formula.lift_logic_expr e with
         | Some (True, False) -> evaluate_lcmds prog lcmds_t state
         | Some (False, True) -> evaluate_lcmds prog lcmds_e state
-        | Some (foe, nfoe)   ->
+        | Some (foe, nfoe) ->
             let state' = State.copy state in
             let then_states =
               Option.fold
@@ -503,7 +477,7 @@ struct
                 (State.assume_a state' [ nfoe ])
             in
             then_states @ else_states
-        | None               ->
+        | None ->
             raise
               (Failure
                  "Non-boolean expression in the condition of the logical if"))
@@ -530,7 +504,7 @@ struct
   and evaluate_lcmds (prog : UP.prog) (lcmds : LCmd.t list) (state : State.t) :
       State.t list =
     match lcmds with
-    | []                 -> [ state ]
+    | [] -> [ state ]
     | lcmd :: rest_lcmds ->
         let rets = evaluate_lcmd prog lcmd state in
         List.concat
@@ -574,11 +548,11 @@ struct
         i b_counter
     in
     match loop_action with
-    | Nothing     -> eval_in_state state
+    | Nothing -> eval_in_state state
     | FrameOff id ->
         L.verbose (fun fmt -> fmt "INFO: Expecting to frame off %s" id);
         eval_in_state state
-    | Malformed   -> L.fail "Malformed loop identifiers"
+    | Malformed -> L.fail "Malformed loop identifiers"
     | FrameOn ids ->
         L.verbose (fun fmt -> fmt "INFO: Going to frame on %a" pp_str_list ids);
         let states = State.frame_on state iframes ids in
@@ -620,10 +594,10 @@ struct
       let pid =
         match Val.to_literal pid with
         | Some (String pid) -> pid
-        | Some _            ->
+        | Some _ ->
             let err = [ ExecErr.EProc pid ] in
             raise (Interpreter_error (err, state))
-        | None              ->
+        | None ->
             raise
               (Internal_error
                  "Procedure Call Error - unlifting procedure ID failed")
@@ -633,9 +607,9 @@ struct
       let spec = Hashtbl.find_opt prog.specs pid in
       let params =
         match (proc, spec) with
-        | Some proc, _    -> Proc.get_params proc
+        | Some proc, _ -> Proc.get_params proc
         | None, Some spec -> Spec.get_params spec.spec
-        | _               ->
+        | _ ->
             raise
               (Interpreter_error
                  ([ EProc (Val.from_literal (String pid)) ], state))
@@ -653,15 +627,15 @@ struct
       let process_ret copy_cs ret_state fl b_counter : cconf_t =
         let new_cs =
           match copy_cs with
-          | true  -> CallStack.copy cs
+          | true -> CallStack.copy cs
           | false -> cs
         in
 
         let new_j =
           match (fl, j) with
-          | Flag.Normal, _     -> i + 1
+          | Flag.Normal, _ -> i + 1
           | Flag.Error, Some j -> j
-          | Flag.Error, None   ->
+          | Flag.Error, None ->
               let msg =
                 Printf.sprintf
                   "SYNTAX ERROR: No error label provided when calling \
@@ -715,7 +689,7 @@ struct
         match spec with
         | Some spec -> (
             match !symb_exec_next with
-            | true  ->
+            | true ->
                 symb_exec_next := false;
                 symb_exec_proc ()
             | false -> (
@@ -741,7 +715,7 @@ struct
                 (* Run spec returned no results *)
                 | _ -> (
                     match spec.spec.spec_incomplete with
-                    | true  ->
+                    | true ->
                         L.normal (fun fmt ->
                             fmt "Proceeding with symbolic execution.");
                         symb_exec_proc ()
@@ -750,7 +724,7 @@ struct
                           (Format.asprintf
                              "ERROR: Unable to use specification of function %s"
                              spec.spec.spec_name))))
-        | None      ->
+        | None ->
             if Hashtbl.mem prog.prog.bi_specs pid then
               [
                 ConfSusp
@@ -769,7 +743,7 @@ struct
       in
 
       match ExecMode.biabduction_exec !Config.current_exec_mode with
-      | true  -> (
+      | true -> (
           match
             ( pid = caller,
               is_internal_proc pid,
@@ -859,7 +833,7 @@ struct
               (ret_len >= 3 && !Config.parallel, ret_len = 2 && !Config.parallel)
               (* XXX: && !Config.act_threads < !Config.max_threads ) *)
             with
-            | true, _     -> (
+            | true, _ -> (
                 (* print_endline (Printf.sprintf "Action returned >=3: %d" (!Config.act_threads + 2)); *)
                 let pid = Unix.fork () in
                 match pid with
@@ -901,7 +875,7 @@ struct
                         };
                     ]
                 | _ -> rest_confs)
-            | _           ->
+            | _ ->
                 ConfCont
                   {
                     state = state'';
@@ -946,7 +920,7 @@ struct
                           branch_count = b_counter;
                         })
                     recovery_states
-              | _                  ->
+              | _ ->
                   L.normal ~title:"failure" ~severity:Error (fun m ->
                       m "Action call failed with:@.%a"
                         (Fmt.Dump.list State.pp_err)
@@ -1039,33 +1013,33 @@ struct
         let lvt = Val.to_literal vt in
         let vf =
           match lvt with
-          | Some (Bool true)  -> vfalse
+          | Some (Bool true) -> vfalse
           | Some (Bool false) -> vtrue
-          | _                 -> eval_expr (UnOp (UNot, e))
+          | _ -> eval_expr (UnOp (UNot, e))
         in
         L.verbose (fun fmt ->
             fmt "Evaluated expressions: %a, %a" Val.pp vt Val.pp vf);
         let can_put_t, can_put_f =
           match lvt with
-          | Some (Bool true)  -> (true, false)
+          | Some (Bool true) -> (true, false)
           | Some (Bool false) -> (false, true)
-          | _                 ->
+          | _ ->
               let vtx = State.sat_check state vt in
               let vfx =
                 match vtx with
                 | false -> true
-                | true  -> State.sat_check state vf
+                | true -> State.sat_check state vf
               in
               (vtx, vfx)
         in
         let sp_t, sp_f =
           match (can_put_t, can_put_f) with
           | false, false -> ([], [])
-          | true, false  ->
+          | true, false ->
               (List.map (fun x -> (x, j)) (State.assume state vt), [])
-          | false, true  ->
+          | false, true ->
               ([], List.map (fun x -> (x, k)) (State.assume state vf))
-          | true, true   ->
+          | true, true ->
               let state_t = State.copy state in
               let unfolded_trues = State.assume ~unfold:true state_t vt in
               let state_f = State.copy state in
@@ -1106,7 +1080,7 @@ struct
           List.length result = 2 && !Config.parallel
           (* XXX: && !Config.act_threads < !Config.max_threads *)
         with
-        | true  -> (
+        | true -> (
             (* print_endline (Printf.sprintf "Conditional goto: %d" (!Config.act_threads + 1)); *)
             let pid = Unix.fork () in
             match pid with
@@ -1145,9 +1119,9 @@ struct
     | ECall (x, pid, args, j) ->
         let pid =
           match pid with
-          | PVar pid         -> pid
+          | PVar pid -> pid
           | Lit (String pid) -> pid
-          | _                ->
+          | _ ->
               raise
                 (Exceptions.Impossible
                    "Procedure identifier not a program variable")
@@ -1175,7 +1149,7 @@ struct
             let pid = List.hd v_pid_args_list in
             let v_args = List.tl v_pid_args_list in
             evaluate_procedure_call x pid v_args j None
-        | None                 ->
+        | None ->
             raise
               (Failure
                  (Fmt.str "Apply not called with a list: @[<h>%a@]" Val.pp
@@ -1314,7 +1288,7 @@ struct
     let states =
       match get_cmd prog cs i with
       | _, (_, LAction _) -> simplify state
-      | _                 -> [ state ]
+      | _ -> [ state ]
     in
     List.concat_map
       (fun state ->
@@ -1478,7 +1452,7 @@ struct
 *)
   let rec evaluate_cmd_iter (init_func : 'a cont_func) : 'a list =
     match init_func with
-    | Finished results        -> results
+    | Finished results -> results
     | Continue (_, cont_func) -> evaluate_cmd_iter (cont_func ())
 
   (**
@@ -1513,7 +1487,7 @@ struct
         (fun x ->
           match Store.get store x with
           | Some v_x -> v_x
-          | None     ->
+          | None ->
               raise (Failure "Symbolic State does NOT contain formal parameter"))
         params
     in

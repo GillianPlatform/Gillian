@@ -21,15 +21,15 @@ module M = struct
 
   (** Errors *)
   type i_fix_t =
-    | FLoc      of vt
-    | FCell     of vt * vt
+    | FLoc of vt
+    | FCell of vt * vt
     | FMetadata of vt
-    | FPure     of Formula.t
+    | FPure of Formula.t
   [@@deriving yojson]
 
   type c_fix_t =
-    | CFLoc      of string
-    | CFCell     of vt * vt * vt
+    | CFLoc of string
+    | CFCell of vt * vt * vt
     | CFMetadata of vt * vt
 
   type err_t = vt list * i_fix_t list list * Formula.t [@@deriving yojson]
@@ -41,19 +41,19 @@ module M = struct
   let pp_i_fix ft (i_fix : i_fix_t) : unit =
     let open Fmt in
     match i_fix with
-    | FLoc loc          -> pf ft "@[<h>MIFLoc(%a)@]" SVal.pp loc
+    | FLoc loc -> pf ft "@[<h>MIFLoc(%a)@]" SVal.pp loc
     | FCell (loc, prop) ->
         pf ft "@[<h>MIFCell(%a, %a)@]" SVal.pp loc SVal.pp prop
-    | FMetadata loc     -> pf ft "@[<h>MIFMetadata(%a)@]" SVal.pp loc
-    | FPure f           -> pf ft "@[<h>MIFPure(%a)@]" Formula.pp f
+    | FMetadata loc -> pf ft "@[<h>MIFMetadata(%a)@]" SVal.pp loc
+    | FPure f -> pf ft "@[<h>MIFPure(%a)@]" Formula.pp f
 
   let pp_c_fix ft (c_fix : c_fix_t) : unit =
     let open Fmt in
     match c_fix with
-    | CFLoc loc_name        -> pf ft "@[<h>MCFLoc(%s)@]" loc_name
+    | CFLoc loc_name -> pf ft "@[<h>MCFLoc(%s)@]" loc_name
     | CFCell (loc, prop, v) ->
         pf ft "@[<h>MCFCell(%a, %a, %a)@]" SVal.pp loc SVal.pp prop SVal.pp v
-    | CFMetadata (loc, v)   ->
+    | CFMetadata (loc, v) ->
         pf ft "@[<h>MCFMetadata(%a, %a)@]" SVal.pp loc SVal.pp v
 
   let get_failing_constraint (err : err_t) : Formula.t =
@@ -78,11 +78,11 @@ module M = struct
         (fun e ->
           match e with
           | Expr.ALoc _ | Lit (Loc _) -> true
-          | _                         -> false)
+          | _ -> false)
         ufl_vs
     in
     match ufl_alocs with
-    | []    -> ufl_vs
+    | [] -> ufl_vs
     | alocs ->
         let imeta = SHeap.get_inv_metadata heap in
         (* Perhaps we are looking for metadata? *)
@@ -91,7 +91,7 @@ module M = struct
             (fun mrvs aloc ->
               match Hashtbl.find_opt imeta aloc with
               | Some md -> md :: mrvs
-              | _       -> mrvs)
+              | _ -> mrvs)
             [] alocs
         in
         ufl_vs @ metadata_recovery_vals
@@ -100,9 +100,7 @@ module M = struct
     List.map JSIL2GIL.jsil2gil_asrt (SHeap.assertions heap)
 
   let lvars (heap : t) : Containers.SS.t = SHeap.lvars heap
-
   let clean_up (heap : t) : unit = SHeap.clean_up heap
-
   let fresh_val (_ : t) : vt = LVar (LVar.alloc ())
 
   let substitution_in_place ~pfs:_ ~gamma:_ (subst : st) (heap : t) =
@@ -110,13 +108,9 @@ module M = struct
     [ (heap, Formula.Set.empty, []) ]
 
   let pp fmt (heap : t) : unit = SHeap.pp fmt heap
-
   let pp_by_need locs fmt heap = SHeap.pp_by_need locs fmt heap
-
   let get_print_info = SHeap.get_print_info
-
   let copy (heap : t) : t = SHeap.copy heap
-
   let init () : t = SHeap.init ()
 
   let get_loc_name pfs gamma =
@@ -132,10 +126,10 @@ module M = struct
             if Names.is_aloc_name loc_name then
               (loc_name, Expr.ALoc loc_name, [])
             else (loc_name, Expr.Lit (Loc loc_name), [])
-        | None          ->
+        | None ->
             let al = ALoc.alloc () in
             (al, ALoc al, [ Formula.Eq (ALoc al, loc) ]))
-    | None     ->
+    | None ->
         let al = ALoc.alloc () in
         (al, ALoc al, [])
 
@@ -147,16 +141,16 @@ module M = struct
       (mv : vt option) : action_ret =
     let (loc_name : string), (loc : Expr.t) =
       match (loc : Expr.t option) with
-      | None                 ->
+      | None ->
           let loc_name = ALoc.alloc () in
           (loc_name, ALoc loc_name)
       | Some (Lit (Loc loc)) -> (loc, Lit (Loc loc))
-      | Some (ALoc loc)      -> (loc, ALoc loc)
-      | Some (LVar v)        ->
+      | Some (ALoc loc) -> (loc, ALoc loc)
+      | Some (LVar v) ->
           let loc_name = ALoc.alloc () in
           PFS.extend pfs (Eq (LVar v, ALoc loc_name));
           (loc_name, ALoc loc_name)
-      | Some le              ->
+      | Some le ->
           raise
             (Failure
                (Printf.sprintf "Alloc with a non-loc loc argument: %s"
@@ -177,8 +171,11 @@ module M = struct
     ASucc [ (heap, [], new_pfs, []) ]
 
   let get_cell
-      (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) (prop : vt) :
-      action_ret =
+      (heap : t)
+      (pfs : PFS.t)
+      (gamma : TypEnv.t)
+      (loc : vt)
+      (prop : vt) : action_ret =
     let loc_name = get_loc_name pfs gamma loc in
 
     L.tmi (fun m ->
@@ -187,8 +184,10 @@ module M = struct
           loc_name);
 
     let make_gc_error
-        (loc_name : string) (prop : vt) (props : vt list) (dom : vt option) :
-        err_t =
+        (loc_name : string)
+        (prop : vt)
+        (props : vt list)
+        (dom : vt option) : err_t =
       let loc = Expr.loc_from_loc_name loc_name in
       (*  failing_constraint *)
       let ff =
@@ -209,7 +208,7 @@ module M = struct
             FPure ff' :: fix_new_property
           in
           ([ loc ], fix_new_property' :: fixes_exist_props, ff'')
-      | None     -> ([ loc; prop ], fix_new_property :: fixes_exist_props, ff)
+      | None -> ([ loc; prop ], fix_new_property :: fixes_exist_props, ff)
     in
 
     let get_cell_from_loc loc_name =
@@ -222,14 +221,14 @@ module M = struct
               m "metadata: %a" Fmt.(option ~none:(any "None") Expr.pp) mtdt);
           match SFVL.get prop fv_list with
           | Some ffv -> ASucc [ (heap, [ loc; prop; ffv ], [], []) ]
-          | None     -> (
+          | None -> (
               match
                 ( dom,
                   SFVL.get_first
                     (fun name -> FOSolver.is_equal ~pfs ~gamma name prop)
                     fv_list )
               with
-              | None, None         ->
+              | None, None ->
                   AFail
                     [
                       make_gc_error loc_name prop (SFVL.field_names fv_list)
@@ -237,7 +236,7 @@ module M = struct
                     ]
               | _, Some (ffn, ffv) ->
                   ASucc [ (heap, [ loc; ffn; ffv ], [], []) ]
-              | Some dom, None     ->
+              | Some dom, None ->
                   let a_set_inclusion : Formula.t = Not (SetMem (prop, dom)) in
                   if
                     FOSolver.check_entailment Containers.SS.empty pfs
@@ -273,7 +272,7 @@ module M = struct
                             in
                             match sat with
                             | false -> None
-                            | true  ->
+                            | true ->
                                 (* Cases in which the prop exists *)
                                 let heap' = SHeap.copy heap in
                                 Some
@@ -298,7 +297,7 @@ module M = struct
                       let dom_ret =
                         match sat with
                         | false -> []
-                        | true  ->
+                        | true ->
                             [ (heap, [ loc; prop; Lit Nono ], [ new_f ], []) ]
                       in
                       ASucc (rets @ dom_ret))
@@ -320,8 +319,11 @@ module M = struct
     result
 
   let remove_cell
-      (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) (prop : vt) :
-      action_ret =
+      (heap : t)
+      (pfs : PFS.t)
+      (gamma : TypEnv.t)
+      (loc : vt)
+      (prop : vt) : action_ret =
     let heap = SHeap.copy heap in
     let f (loc_name : string) : unit =
       Option.fold
@@ -334,13 +336,15 @@ module M = struct
     ASucc [ (heap, [], [], []) ]
 
   let set_domain
-      (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) (dom : vt) :
-      action_ret =
+      (heap : t)
+      (pfs : PFS.t)
+      (gamma : TypEnv.t)
+      (loc : vt)
+      (dom : vt) : action_ret =
     let loc_name, _, new_pfs = fresh_loc ~loc pfs gamma in
 
     (match SHeap.get heap loc_name with
-    | None                      -> SHeap.set heap loc_name SFVL.empty (Some dom)
-                                     None
+    | None -> SHeap.set heap loc_name SFVL.empty (Some dom) None
     | Some ((fv_list, _), mtdt) ->
         (* TODO: This probably needs to be a bit more sophisticated *)
         SHeap.set heap loc_name fv_list (Some dom) mtdt);
@@ -361,7 +365,7 @@ module M = struct
         else Expr.Lit (Loc loc_name)
       in
       match SHeap.get heap loc_name with
-      | None                -> AFail [ make_gm_error loc_name ]
+      | None -> AFail [ make_gm_error loc_name ]
       | Some ((_, _), mtdt) ->
           Option.fold
             ~some:(fun mtdt -> ASucc [ (heap, [ loc; mtdt ], [], []) ])
@@ -374,8 +378,11 @@ module M = struct
       loc_name
 
   let set_metadata
-      (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) (mtdt : vt) :
-      action_ret =
+      (heap : t)
+      (pfs : PFS.t)
+      (gamma : TypEnv.t)
+      (loc : vt)
+      (mtdt : vt) : action_ret =
     L.tmi (fun m -> m "Trying to set metadata.");
     let loc_name, _, new_pfs = fresh_loc ~loc pfs gamma in
 
@@ -400,11 +407,14 @@ module M = struct
           SHeap.remove heap loc_name;
           ASucc [ (heap, [], [], []) ])
         else raise (Failure "delete_obj. Unknown Location")
-    | None          -> raise (Failure "delete_obj. Unknown Location")
+    | None -> raise (Failure "delete_obj. Unknown Location")
 
   let get_partial_domain
-      (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) (e_dom : vt) :
-      action_ret =
+      (heap : t)
+      (pfs : PFS.t)
+      (gamma : TypEnv.t)
+      (loc : vt)
+      (e_dom : vt) : action_ret =
     let loc_name = get_loc_name pfs gamma loc in
 
     L.verbose (fun fmt -> fmt "Get partial domain");
@@ -449,7 +459,7 @@ module M = struct
               in
               SHeap.set heap loc_name new_fv_list (Some e_dom) mtdt;
               ASucc [ (heap, [ loc; e_dom ], [], []) ]
-          | _          -> raise (Failure "DEATH. get_partial_domain. dom_diff"))
+          | _ -> raise (Failure "DEATH. get_partial_domain. dom_diff"))
     in
     let result =
       Option.fold ~some:f ~none:(AFail [ ([ loc ], [], False) ]) loc_name
@@ -511,60 +521,52 @@ module M = struct
     if action = JSILNames.getCell then
       match args with
       | [ loc; prop ] -> get_cell heap pfs gamma loc prop
-      | _             -> raise (Failure "Internal Error. execute_action")
+      | _ -> raise (Failure "Internal Error. execute_action")
     else if action = JSILNames.setCell then
       match args with
       | [ loc; prop; v ] -> set_cell heap pfs gamma loc prop v
-      | _                -> raise
-                              (Failure "Internal Error. execute_action. setCell")
+      | _ -> raise (Failure "Internal Error. execute_action. setCell")
     else if action = JSILNames.delCell then
       match args with
       | [ loc; prop ] -> remove_cell heap pfs gamma loc prop
-      | _             -> raise
-                           (Failure "Internal Error. execute_action. delCell")
+      | _ -> raise (Failure "Internal Error. execute_action. delCell")
     else if action = JSILNames.alloc then
       match args with
       | [ Lit Empty; m_loc ] -> alloc heap pfs None (Some m_loc)
-      | [ loc; m_loc ]       -> alloc heap pfs (Some loc) (Some m_loc)
-      | _                    -> raise
-                                  (Failure
-                                     "Internal Error. execute_action. alloc")
+      | [ loc; m_loc ] -> alloc heap pfs (Some loc) (Some m_loc)
+      | _ -> raise (Failure "Internal Error. execute_action. alloc")
     else if action = JSILNames.delObj then
       match args with
       | [ loc ] -> delete_object heap pfs gamma loc
-      | _       -> raise (Failure "Internal Error. execute_action. delObj")
+      | _ -> raise (Failure "Internal Error. execute_action. delObj")
     else if action = JSILNames.getAllProps then
       match args with
       | [ loc ] -> get_full_domain heap pfs gamma loc
-      | _       -> raise (Failure "Internal Error. execute_action. getAllProps")
+      | _ -> raise (Failure "Internal Error. execute_action. getAllProps")
     else if action = JSILNames.getMetadata then
       match args with
       | [ loc ] -> get_metadata heap pfs gamma loc
-      | _       -> raise (Failure "Internal Error. execute_action. getMetadata")
+      | _ -> raise (Failure "Internal Error. execute_action. getMetadata")
     else if action = JSILNames.setMetadata then
       match args with
       | [ loc; loc_m ] -> set_metadata heap pfs gamma loc loc_m
-      | _              -> raise
-                            (Failure
-                               "Internal Error. execute_action. setMetadata")
+      | _ -> raise (Failure "Internal Error. execute_action. setMetadata")
     else if action = JSILNames.delMetadata then
       match args with
       | [ _ ] -> ASucc [ (heap, [], [], []) ]
-      | _     -> raise (Failure "Internal Error. execute_action. delMetadata")
+      | _ -> raise (Failure "Internal Error. execute_action. delMetadata")
     else if action = JSILNames.getProps then
       match args with
       | [ loc; props ] -> get_partial_domain heap pfs gamma loc props
-      | _              -> raise
-                            (Failure "Internal Error. execute_action. getProps")
+      | _ -> raise (Failure "Internal Error. execute_action. getProps")
     else if action = JSILNames.setProps then
       match args with
       | [ loc; props ] -> set_domain heap pfs gamma loc props
-      | _              -> raise (Failure "Internal Error. execute_action")
+      | _ -> raise (Failure "Internal Error. execute_action")
     else if action = JSILNames.delProps then
       match args with
       | [ loc; _ ] -> remove_domain heap pfs gamma loc
-      | _          -> raise
-                        (Failure "Internal Error. execute_action. remove_domain")
+      | _ -> raise (Failure "Internal Error. execute_action. remove_domain")
     else raise (Failure "Internal Error. execute_action")
 
   let ga_to_setter (a_id : string) : string =
@@ -597,7 +599,6 @@ module M = struct
     if a = JSILNames.aMetadata then true else false
 
   let prop_abduce_none_in_js = [ "@call" ]
-
   let prop_abduce_both_in_js = [ "hasOwnProperty" ]
 
   type fix_result =
@@ -606,7 +607,7 @@ module M = struct
   let complete_fix_simple_js (pfs : PFS.t) (gamma : TypEnv.t) (i_fix : i_fix_t)
       : fix_result list =
     match i_fix with
-    | FLoc v       ->
+    | FLoc v ->
         (* Get a fresh location *)
         let loc_name, _, new_pfs = fresh_loc ~loc:v pfs gamma in
         (* TODO: If the initial value denoting the location was a variable, we may need to save it as a spec var *)
@@ -646,7 +647,7 @@ module M = struct
         | Lit (String x) when List.mem x prop_abduce_both_in_js ->
             [ none_fix (); some_fix () ]
         | _ -> [ some_fix () ])
-    | FMetadata l  ->
+    | FMetadata l ->
         let mloc_name, mloc, _ = fresh_loc pfs gamma in
         [
           ( [
@@ -664,15 +665,17 @@ module M = struct
             Containers.SS.empty,
             [] );
         ]
-    | FPure f      -> [ ([], [ f ], Containers.SS.empty, []) ]
+    | FPure f -> [ ([], [ f ], Containers.SS.empty, []) ]
 
   (* Fix completion: simple *)
   let complete_fix_simple_jsil
-      (pfs : PFS.t) (gamma : TypEnv.t) (i_fix : i_fix_t) : fix_result list =
+      (pfs : PFS.t)
+      (gamma : TypEnv.t)
+      (i_fix : i_fix_t) : fix_result list =
     if !Js_config.js then complete_fix_simple_js pfs gamma i_fix
     else
       match i_fix with
-      | FLoc v       ->
+      | FLoc v ->
           (* Get a fresh location *)
           let loc_name, _, new_pfs = fresh_loc ~loc:v pfs gamma in
           (* TODO: If the initial value denoting the location was a variable, we may need to save it as a spec var *)
@@ -689,7 +692,7 @@ module M = struct
               Containers.SS.singleton vvar,
               [] );
           ]
-      | FMetadata l  ->
+      | FMetadata l ->
           (* Fresh variable to denote the property value *)
           let vvar = LVar.alloc () in
           let v : vt = LVar vvar in
@@ -700,7 +703,7 @@ module M = struct
               Containers.SS.singleton vvar,
               [] );
           ]
-      | FPure f      -> [ ([], [ f ], Containers.SS.empty, []) ]
+      | FPure f -> [ ([], [ f ], Containers.SS.empty, []) ]
 
   let complete_fix_full_js (pfs : PFS.t) (gamma : TypEnv.t) (i_fix : i_fix_t) :
       fix_result list =
@@ -712,7 +715,7 @@ module M = struct
     if !Js_config.js then complete_fix_full_js pfs gamma i_fix
     else
       match i_fix with
-      | FLoc v       ->
+      | FLoc v ->
           (* Get a fresh location *)
           let loc_name, _, new_pfs = fresh_loc ~loc:v pfs gamma in
           (* TODO: If the initial value denoting the location was a variable, we may need to save it as a spec var *)
@@ -729,7 +732,7 @@ module M = struct
               Containers.SS.singleton vvar,
               [] );
           ]
-      | FMetadata l  ->
+      | FMetadata l ->
           (* Fresh variable to denote the property value *)
           let vvar = LVar.alloc () in
           let v : vt = LVar vvar in
@@ -740,7 +743,7 @@ module M = struct
               Containers.SS.singleton vvar,
               [] );
           ]
-      | FPure f      -> [ ([], [ f ], Containers.SS.empty, []) ]
+      | FPure f -> [ ([], [ f ], Containers.SS.empty, []) ]
 
   (* An error can have multiple fixes *)
   let get_fixes

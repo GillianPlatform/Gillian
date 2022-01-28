@@ -6,19 +6,14 @@ module Filenames = struct
   (* Used in verification, bi-abduction and individual symbolic testing *)
 
   let sources = "sources.json"
-
   let call_graph = "call_graph.json"
-
   let verif_results = "verif_results.json"
-
   let biabduction_results = "specs.json"
 
   (* Used in bulk symbolic testing *)
 
   let sources_dir = "sources"
-
   let call_graphs_dir = "call-graphs"
-
   let tests_ran = "tests_ran.txt"
 
   (* Used in tests and for debugging *)
@@ -42,7 +37,6 @@ let prev_results_exist () =
     prev_exec_mode = !Config.current_exec_mode
 
 let delete_results_dir () = Io_utils.rm_rf (results_dir ())
-
 let create_results_dir () = Io_utils.safe_mkdir (results_dir ())
 
 let read_json filename =

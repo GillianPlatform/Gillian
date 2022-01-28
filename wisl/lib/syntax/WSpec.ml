@@ -13,11 +13,8 @@ type t = {
 }
 
 let get_id spec = spec.spid
-
 let get_pre spec = spec.pre
-
 let get_post spec = spec.post
-
 let get_loc spec = spec.sploc
 
 let get_by_id id spec =
