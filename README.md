@@ -24,4 +24,4 @@ The project contains:
 
 
 # License
-Gillian is licensed under the [BSD-3 License](https://choosealicense.com/licenses/bsd-3-clause/) since the PLDI'20 publication.
+Gillian has been licensed under the [BSD-3 License](https://choosealicense.com/licenses/bsd-3-clause/) since the PLDI'20 publication.
