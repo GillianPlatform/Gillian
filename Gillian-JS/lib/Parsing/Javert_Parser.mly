@@ -293,103 +293,103 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 
 
 constant_target:
-  | MIN_FLOAT { Min_float }
-  | MAX_FLOAT { Max_float }
-  | MAX_SAFE_INTEGER { MaxSafeInteger }
-  | EPSILON   { Epsilon }
-  | RANDOM    { Random }
-  | PI        { Pi }
-  | UTCTIME   { UTCTime }
-  | LOCALTIME { LocalTime }
+  | MIN_FLOAT { Constant.Min_float }
+  | MAX_FLOAT { Constant.Max_float }
+  | MAX_SAFE_INTEGER { Constant.MaxSafeInteger }
+  | EPSILON   { Constant.Epsilon }
+  | RANDOM    { Constant.Random }
+  | PI        { Constant.Pi }
+  | UTCTIME   { Constant.UTCTime }
+  | LOCALTIME { Constant.LocalTime }
 
 
 type_target:
-  | UNDEFTYPELIT { UndefinedType }
-  | NULLTYPELIT  { NullType }
-  | EMPTYTYPELIT { EmptyType }
-  | NONETYPELIT  { NoneType }
-  | BOOLTYPELIT  { BooleanType }
-  | NUMTYPELIT   { NumberType }
-  | STRTYPELIT   { StringType }
-  | OBJTYPELIT   { ObjectType }
-  | LISTTYPELIT  { ListType }
-  | TYPETYPELIT  { TypeType }
-  | SETTYPELIT   { SetType }
+  | UNDEFTYPELIT { Type.UndefinedType }
+  | NULLTYPELIT  { Type.NullType }
+  | EMPTYTYPELIT { Type.EmptyType }
+  | NONETYPELIT  { Type.NoneType }
+  | BOOLTYPELIT  { Type.BooleanType }
+  | NUMTYPELIT   { Type.NumberType }
+  | STRTYPELIT   { Type.StringType }
+  | OBJTYPELIT   { Type.ObjectType }
+  | LISTTYPELIT  { Type.ListType }
+  | TYPETYPELIT  { Type.TypeType }
+  | SETTYPELIT   { Type.SetType }
 
 lit_target:
-  | UNDEFINED                 { Undefined }
-  | NULL                      { Null }
-  | EMPTY                     { Empty }
-  | constant_target           { Constant $1 }
-  | TRUE                      { Bool true }
-  | FALSE                     { Bool false }
-  | FLOAT                     { Num $1 }
-  | NAN                       { Num nan }
-  | INFINITY                  { Num infinity }
-  | STRING                    { String $1 }
-  | LOC                       { Loc $1 }
-  | type_target               { Type $1 }
-  | LSTNIL                    { LList [] }
-  | LSTOPEN LSTCLOSE          { LList [] }
-  | LNONE                     { Nono }
+  | UNDEFINED                 { Literal.Undefined }
+  | NULL                      { Literal.Null }
+  | EMPTY                     { Literal.Empty }
+  | constant_target           { Literal.Constant $1 }
+  | TRUE                      { Literal.Bool true }
+  | FALSE                     { Literal.Bool false }
+  | FLOAT                     { Literal.Num $1 }
+  | NAN                       { Literal.Num nan }
+  | INFINITY                  { Literal.Num infinity }
+  | STRING                    { Literal.String $1 }
+  | LOC                       { Literal.Loc $1 }
+  | type_target               { Literal.Type $1 }
+  | LSTNIL                    { Literal.LList [] }
+  | LSTOPEN LSTCLOSE          { Literal.LList [] }
+  | LNONE                     { Literal.Nono }
 
 
 unop_target:
-  | NOT         { UNot }
-  | BITWISENOT  { BitwiseNot }
-  | M_ISNAN     { M_isNaN }
-  | M_ABS       { M_abs }
-  | M_ACOS      { M_acos }
-  | M_ASIN      { M_asin }
-  | M_ATAN      { M_atan }
-  | M_CEIL      { M_ceil }
-  | M_COS       { M_cos }
-  | M_EXP       { M_exp }
-  | M_FLOOR     { M_floor }
-  | M_LOG       { M_log }
-  | M_ROUND     { M_round }
-  | M_SGN       { M_sgn }
-  | M_SIN       { M_sin }
-  | M_SQRT      { M_sqrt }
-  | M_TAN       { M_tan }
-  | TOSTRING    { ToStringOp }
-  | TOINT       { ToIntOp }
-  | TOUINT16    { ToUint16Op }
-  | TOINT32     { ToInt32Op }
-  | TOUINT32    { ToUint32Op }
-  | TONUMBER    { ToNumberOp }
-  | TYPEOF      { TypeOf }
-  | CAR         { Car }
-  | CDR         { Cdr }
-  | LSTLEN      { LstLen }
-  | LSTREV      { LstRev }
-  | STRLEN      { StrLen }
-  | SETTOLIST   { SetToList }
+  | NOT         { UnOp.UNot }
+  | BITWISENOT  { UnOp.BitwiseNot }
+  | M_ISNAN     { UnOp.M_isNaN }
+  | M_ABS       { UnOp.M_abs }
+  | M_ACOS      { UnOp.M_acos }
+  | M_ASIN      { UnOp.M_asin }
+  | M_ATAN      { UnOp.M_atan }
+  | M_CEIL      { UnOp.M_ceil }
+  | M_COS       { UnOp.M_cos }
+  | M_EXP       { UnOp.M_exp }
+  | M_FLOOR     { UnOp.M_floor }
+  | M_LOG       { UnOp.M_log }
+  | M_ROUND     { UnOp.M_round }
+  | M_SGN       { UnOp.M_sgn }
+  | M_SIN       { UnOp.M_sin }
+  | M_SQRT      { UnOp.M_sqrt }
+  | M_TAN       { UnOp.M_tan }
+  | TOSTRING    { UnOp.ToStringOp }
+  | TOINT       { UnOp.ToIntOp }
+  | TOUINT16    { UnOp.ToUint16Op }
+  | TOINT32     { UnOp.ToInt32Op }
+  | TOUINT32    { UnOp.ToUint32Op }
+  | TONUMBER    { UnOp.ToNumberOp }
+  | TYPEOF      { UnOp.TypeOf }
+  | CAR         { UnOp.Car }
+  | CDR         { UnOp.Cdr }
+  | LSTLEN      { UnOp.LstLen }
+  | LSTREV      { UnOp.LstRev }
+  | STRLEN      { UnOp.StrLen }
+  | SETTOLIST   { UnOp.SetToList }
 
 binop_target:
-  | EQUAL              { Equal }
-  | LESSTHAN           { FLessThan }
-  | LESSTHANEQUAL      { FLessThanEqual }
-  | LESSTHANSTRING     { SLessThan }
-  | PLUS               { FPlus }
-  | MINUS              { FMinus }
-  | TIMES              { FTimes }
-  | DIV                { FDiv }
-  | MOD                { FMod }
-  | AND                { BAnd }
-  | OR                 { BOr }
-  | BITWISEAND         { BitwiseAnd }
-  | BITWISEOR          { BitwiseOr}
-  | BITWISEXOR         { BitwiseXor }
-  | LEFTSHIFT          { LeftShift }
-  | SIGNEDRIGHTSHIFT   { SignedRightShift }
-  | UNSIGNEDRIGHTSHIFT { UnsignedRightShift }
-  | M_ATAN2            { M_atan2 }
-  | M_POW              { M_pow }
-  | STRCAT             { StrCat }
-  | SETDIFF            { SetDiff }
-  | SETMEM             { BSetMem }
-  | SETSUB             { BSetSub }
+  | EQUAL              { BinOp.Equal }
+  | LESSTHAN           { BinOp.FLessThan }
+  | LESSTHANEQUAL      { BinOp.FLessThanEqual }
+  | LESSTHANSTRING     { BinOp.SLessThan }
+  | PLUS               { BinOp.FPlus }
+  | MINUS              { BinOp.FMinus }
+  | TIMES              { BinOp.FTimes }
+  | DIV                { BinOp.FDiv }
+  | MOD                { BinOp.FMod }
+  | AND                { BinOp.BAnd }
+  | OR                 { BinOp.BOr }
+  | BITWISEAND         { BinOp.BitwiseAnd }
+  | BITWISEOR          { BinOp.BitwiseOr}
+  | BITWISEXOR         { BinOp.BitwiseXor }
+  | LEFTSHIFT          { BinOp.LeftShift }
+  | SIGNEDRIGHTSHIFT   { BinOp.SignedRightShift }
+  | UNSIGNEDRIGHTSHIFT { BinOp.UnsignedRightShift }
+  | M_ATAN2            { BinOp.M_atan2 }
+  | M_POW              { BinOp.M_pow }
+  | STRCAT             { BinOp.StrCat }
+  | SETDIFF            { BinOp.SetDiff }
+  | SETMEM             { BinOp.BSetMem }
+  | SETSUB             { BinOp.BSetSub }
 
 nop_target:
   | SETUNION { NOp.SetUnion }
@@ -398,26 +398,26 @@ nop_target:
 
 
 expr_target:
-  | lit=lit_target { Lit lit }
+  | lit=lit_target { Expr.Lit lit }
   | v = LVAR {
     let v_imported = Str.replace_first normalised_lvar_r "_lvar_n" v in
-    LVar v_imported
+    Expr.LVar v_imported
   }
-  | ALOC { ALoc $1 }
+  | ALOC { Expr.ALoc $1 }
   | v = VAR { Expr.PVar v }
-  | e1=expr_target; bop=binop_target; e2=expr_target { BinOp (e1, bop, e2) } %prec binop_prec
-  | e1=expr_target; LSTCONS; e2=expr_target { NOp (LstCat, [ EList [ e1 ]; e2 ]) }
-  | e1=expr_target; GREATERTHAN;  e2=expr_target { BinOp (e2, FLessThan, e1) }
-  | e1=expr_target; GREATERTHANEQUAL; e2=expr_target { BinOp (e2, FLessThanEqual, e1) }
-  | uop=unop_target; e=expr_target { UnOp (uop, e) } %prec unop_prec
-  | MINUS; e=expr_target { UnOp (FUnaryMinus, e) } %prec unop_prec
-  | LSTOPEN; exprlist = separated_nonempty_list(COMMA, expr_target); LSTCLOSE { EList exprlist }
+  | e1=expr_target; bop=binop_target; e2=expr_target { Expr.BinOp (e1, bop, e2) } %prec binop_prec
+  | e1=expr_target; LSTCONS; e2=expr_target { Expr.NOp (LstCat, [ EList [ e1 ]; e2 ]) }
+  | e1=expr_target; GREATERTHAN;  e2=expr_target { Expr.BinOp (e2, FLessThan, e1) }
+  | e1=expr_target; GREATERTHANEQUAL; e2=expr_target { Expr.BinOp (e2, FLessThanEqual, e1) }
+  | uop=unop_target; e=expr_target { Expr.UnOp (uop, e) } %prec unop_prec
+  | MINUS; e=expr_target { Expr.UnOp (FUnaryMinus, e) } %prec unop_prec
+  | LSTOPEN; exprlist = separated_nonempty_list(COMMA, expr_target); LSTCLOSE { Expr.EList exprlist }
   | SETOPEN; exprlist = separated_list(COMMA, expr_target); SETCLOSE
-     { ESet (Expr.Set.elements (Expr.Set.of_list exprlist)) }
+     { Expr.ESet (Expr.Set.elements (Expr.Set.of_list exprlist)) }
   | LSTNTH; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE
-     { BinOp (e1, LstNth, e2) }
+     { Expr.BinOp (e1, LstNth, e2) }
   | LSTSUB; LBRACE; e1=expr_target; COMMA; e2=expr_target; COMMA; e3 = expr_target; RBRACE
-    { LstSub (e1, e2, e3) }
+    { Expr.LstSub (e1, e2, e3) }
   | nop=nop_target; LBRACE; les=separated_list(COMMA, expr_target); RBRACE
      {
         let les =
@@ -426,12 +426,12 @@ expr_target:
           | SetUnion -> Expr.Set.elements (Expr.Set.of_list les)
           | LstCat -> les
         in
-        NOp (nop, les)
+        Expr.NOp (nop, les)
      }
   | STRNTH; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE
-     { BinOp (e1, StrNth, e2) }
+     { Expr.BinOp (e1, StrNth, e2) }
   | LBRACE; e=expr_target; RBRACE { e }
-  | UNDERSCORE { LVar (Javert_utils.Js_generators.fresh_lvar ()) }
+  | UNDERSCORE { Expr.LVar (Javert_utils.Js_generators.fresh_lvar ()) }
 
 
 lvar_type_target:
@@ -443,26 +443,26 @@ lvar_type_target:
 
 pure_assertion_target:
   | left_ass=pure_assertion_target; LAND; right_ass=pure_assertion_target
-    { And (left_ass, right_ass) }
+    { Formula.And (left_ass, right_ass) }
   | left_ass=pure_assertion_target; LOR; right_ass=pure_assertion_target
-    { Or (left_ass, right_ass) }
-  | LNOT; ass=pure_assertion_target { Not (ass) }
-  | LTRUE { True }
-  | LFALSE { False }
+    { Formula.Or (left_ass, right_ass) }
+  | LNOT; ass=pure_assertion_target { Formula.Not (ass) }
+  | LTRUE { Formula.True }
+  | LFALSE { Formula.False }
   | left_expr=expr_target; LEQUAL; right_expr=expr_target
-    { Eq (left_expr, right_expr) }
+    { Formula.Eq (left_expr, right_expr) }
   | left_expr=expr_target; LLESSTHAN; right_expr=expr_target
-    { Less (left_expr, right_expr) }
+    { Formula.Less (left_expr, right_expr) }
   | left_expr=expr_target; LLESSTHANEQUAL; right_expr=expr_target
-    { LessEq (left_expr, right_expr) }
+    { Formula.LessEq (left_expr, right_expr) }
   | left_expr=expr_target; LLESSTHANSTRING; right_expr=expr_target
-    { StrLess (left_expr, right_expr) }
+    { Formula.StrLess (left_expr, right_expr) }
   | left_expr=expr_target; LSETMEM; right_expr=expr_target
-    { SetMem (left_expr, right_expr) }
+    { Formula.SetMem (left_expr, right_expr) }
   | left_expr=expr_target; LSETSUB; right_expr=expr_target
-    { SetSub (left_expr, right_expr) }
+    { Formula.SetSub (left_expr, right_expr) }
   | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; ass = pure_assertion_target
-    { ForAll (vars, ass) }
+    { Formula.ForAll (vars, ass) }
   | delimited(LBRACE, pure_assertion_target, RBRACE)
     { $1 }
 
@@ -474,7 +474,7 @@ logic_variable_target:
   {
     let v_imported = Str.replace_first normalised_lvar_r "_lvar_n" v in
     (* Prefixed with _n_ to avoid clashes *)
-    LVar v_imported }
+    Expr.LVar v_imported }
 
 type_env_pair_target:
   | lvar = logic_variable_target; COLON; the_type=type_target
@@ -484,23 +484,23 @@ type_env_pair_target:
 
 assertion_target:
   | left_ass=assertion_target; TIMES; right_ass=assertion_target
-    { Star (left_ass, right_ass) } %prec separating_conjunction
+    { Asrt.Star (left_ass, right_ass) } %prec separating_conjunction
   | LBRACE; obj_expr=expr_target; COMMA; prop_expr=expr_target; RBRACE; LARROW; val_expr=expr_target
-    { PointsTo (obj_expr, prop_expr, val_expr) }
+    { Asrt.PointsTo (obj_expr, prop_expr, val_expr) }
   | LMETADATA; LBRACE; eo = expr_target; COMMA; em = expr_target; RBRACE
-    { MetaData (eo, em) }
-  | LEMP; { Emp }
+    { Asrt.MetaData (eo, em) }
+  | LEMP; { Asrt.Emp }
   | name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE
     { (* validate_pred_assertion (name, params); *)
-      Pred (name, params) }
+      Asrt.Pred (name, params) }
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, type_env_pair_target); RBRACE
-    { Types type_pairs }
+    { Asrt.Types type_pairs }
   | EMPTYFIELDS; LBRACE; le=expr_target; COLON; domain=expr_target; RBRACE
-    { EmptyFields (le, domain) }
+    { Asrt.EmptyFields (le, domain) }
   | LBRACE; ass=assertion_target; RBRACE
     { ass }
   | f = pure_assertion_target
-    { Pure f }
+    { Asrt.Pure f }
 
 /* COMMANDS */
 
@@ -537,40 +537,40 @@ unfold_info_target:
 
 logic_cmd_target:
   | FOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(logic_bindings_target)
-    { SL (Fold (name, les, fold_info)) }
+    { LCmd.SL (Fold (name, les, fold_info)) }
   | UNFOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
-    { SL (Unfold (name, les, unfold_info, false)) }
+    { LCmd.SL (Unfold (name, les, unfold_info, false)) }
   | RECUNFOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
-    { SL (Unfold (name, les, unfold_info, true)) }
+    { LCmd.SL (Unfold (name, les, unfold_info, true)) }
   | UNFOLDALL; name = VAR
-    { SL (GUnfold name) }
+    { LCmd.SL (GUnfold name) }
   | INVARIANT; LBRACE; a = assertion_target; RBRACE; binders = option(binders_target)
-    { SL (Invariant (a, Option.value ~default:[ ] binders)) }
+    { LCmd.SL (Invariant (a, Option.value ~default:[ ] binders)) }
   | SEPASSERT; LBRACE; a = assertion_target; RBRACE; binders = option(binders_target)
-    { SL (SepAssert (a, Option.value ~default:[ ] binders)) }
+    { LCmd.SL (SepAssert (a, Option.value ~default:[ ] binders)) }
   | APPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE; binders = option(binders_target)
     { let binders = Option.value ~default:[] binders in
-      SL (ApplyLem (lemma_name, params, binders)) }
+      LCmd.SL (ApplyLem (lemma_name, params, binders)) }
   | LIF; LBRACE; le=expr_target; RBRACE; LTHEN; CLBRACKET;
       then_lcmds = separated_list(SCOLON, logic_cmd_target);
       CRBRACKET; LELSE; CLBRACKET;
       else_lcmds = separated_list(SCOLON, logic_cmd_target);
        CRBRACKET;
-    { If (le, then_lcmds, else_lcmds)}
+    { LCmd.If (le, then_lcmds, else_lcmds)}
   | LIF; LBRACE; le=expr_target; RBRACE; LTHEN; CLBRACKET;
       then_lcmds = separated_list(SCOLON, logic_cmd_target);
       CRBRACKET;
-    { If (le, then_lcmds, [])}
+    { LCmd.If (le, then_lcmds, [])}
   | macro = macro_head_target;
-    { let (name, params) = macro in Macro (name, params) }
+    { let (name, params) = macro in LCmd.Macro (name, params) }
   | ASSUME; LBRACE; a = pure_assertion_target; RBRACE
-    { Assume a }
+    { LCmd.Assume a }
   | ASSUME_TYPE; LBRACE; x=LVAR; COMMA; t=type_target; RBRACE
-    { AssumeType (x, t) }
+    { LCmd.AssumeType (x, t) }
   | SPEC_VAR; LBRACE; xs = separated_list(COMMA, LVAR); RBRACE
-    { SpecVar xs }
+    { LCmd.SpecVar xs }
   | BRANCH; LBRACE; fo = pure_assertion_target; RBRACE
-     { Branch fo }
+     { LCmd.Branch fo }
 
 phi_target:
   v = VAR; COLON; args = separated_list(COMMA, expr_target)
@@ -596,9 +596,9 @@ new_target:
 
 cmd_target:
   | SKIP
-    { LBasic (Skip) }
+    { LabCmd.LBasic (Skip) }
   | v=VAR; DEFEQ; e=expr_target
-    { LBasic (Assignment (v, e)) }
+    { LabCmd.LBasic (Assignment (v, e)) }
   | VAR; DEFEQ; NEW; LBRACE; option(new_target); RBRACE
     {
       let loc, metadata = (match $5 with
@@ -607,48 +607,49 @@ cmd_target:
       | Some (None, Some _) -> raise (Failure "Parser: Impossible")
       | _ -> None, None
       ) in
-        LBasic (New ($1, loc, metadata)) }
+        LabCmd.LBasic (New ($1, loc, metadata)) }
   | v=VAR; DEFEQ; LBRACKET; e1=expr_target; COMMA; e2=expr_target; RBRACKET
-    { LBasic (Lookup (v, e1, e2)) }
+    { LabCmd.LBasic (Lookup (v, e1, e2)) }
   | LBRACKET; e1=expr_target; COMMA; e2=expr_target; RBRACKET; DEFEQ; e3=expr_target
-    { LBasic (Mutation (e1, e2, e3)) }
+    { LabCmd.LBasic (Mutation (e1, e2, e3)) }
   | DELETE; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE
-    { LBasic (Delete (e1, e2)) }
+    { LabCmd.LBasic (Delete (e1, e2)) }
   | DELETEOBJ; LBRACE; e1=expr_target; RBRACE
-    { LBasic (DeleteObj (e1)) }
+    { LabCmd.LBasic (DeleteObj (e1)) }
   | v=VAR; DEFEQ; HASFIELD; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE
-    { LBasic (HasField (v, e1, e2)) }
+    { LabCmd.LBasic (HasField (v, e1, e2)) }
   | v = VAR; DEFEQ; GETFIELDS; LBRACE; e=expr_target; RBRACE
-    { LBasic (GetFields (v, e)) }
+    { LabCmd.LBasic (GetFields (v, e)) }
   | v = VAR; DEFEQ; METADATA; LBRACE; e=expr_target; RBRACE
-    { LBasic (MetaData (v, e)) }
+    { LabCmd.LBasic (MetaData (v, e)) }
   | GOTO; i=VAR
-    { LGoto i }
+    { LabCmd.LGoto i }
   | GOTO LBRACKET; e=expr_target; RBRACKET; i=VAR; j=VAR
-    { LGuardedGoto (e, i, j) }
+    { LabCmd.LGuardedGoto (e, i, j) }
   | v=VAR; DEFEQ; e=expr_target;
     LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target); subst = option(use_subst_target)
-    { LCall (v, e, es, oi, subst) }
+    { LabCmd.LCall (v, e, es, oi, subst) }
   | v=VAR; DEFEQ; EXTERN; pname=VAR;
     LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target)
-    { LECall (v, PVar pname, es, oi) }
+    { LabCmd.LECall (v, PVar pname, es, oi) }
   | v=VAR; DEFEQ; APPLY;
     LBRACE; es=expr_target; RBRACE; oi = option(call_with_target)
-    { LApply (v, es, oi) }
+    { LabCmd.LApply (v, es, oi) }
   | v = VAR; DEFEQ; ARGUMENTS
-    { (LArguments v) }
+    { (LabCmd.LArguments v) }
   | PHI; LBRACE; phi_args =separated_list(SCOLON, phi_target); RBRACE
     { match phi_args with
       | [] -> raise (Failure "EMPTY PHI")
-      | _  -> LPhiAssignment phi_args }
-  | RETURN { LReturnNormal }
-  | THROW  { LReturnError  }
+      | _  -> LabCmd.LPhiAssignment phi_args }
+  | RETURN { LabCmd.LReturnNormal }
+  | THROW  { LabCmd.LReturnError  }
   | lcmd = logic_cmd_target
     { LabCmd.LLogic lcmd }
 
 cmd_with_annot:
   | cmd = cmd_target
     {
+      let open Lexing in
       let loc_start : Location.position =
         {
           pos_line = $startpos.pos_lnum;
@@ -698,7 +699,7 @@ lab_spec_target:
 
 pre_post_target:
   | lab_spec = option(lab_spec_target); pre = spec_line; posts = mult_spec_line; NORMAL
-    { { pre; posts; flag = Normal; to_verify = true; label = lab_spec } }
+    { Spec.{ pre; posts; flag = Normal; to_verify = true; label = lab_spec } }
   | lab_spec = option(lab_spec_target); pre = spec_line; posts = mult_spec_line; ERROR
   { Spec.{ pre; posts; flag = Error; to_verify = true; label = lab_spec} }
 
@@ -931,21 +932,21 @@ js_lvar_type_target:
 js_lexpr_target:
 (* Logic literal *)
   | lit = lit_target
-    { Lit lit }
+    { JSExpr.Lit lit }
 (* program variable *)
   | pvar = js_program_variable_target
-    { PVar pvar }
+    { JSExpr.PVar pvar }
 (* Logic variable *)
   | lvar = LVAR
-    { LVar lvar }
+    { JSExpr.LVar lvar }
 (* e binop e *)
   | e1=js_lexpr_target; bop=binop_target; e2=js_lexpr_target
-    { BinOp (e1, bop, e2) } %prec binop_prec
+    { JSExpr.BinOp (e1, bop, e2) } %prec binop_prec
 (* List cons *)
-  | e1=js_lexpr_target; LSTCONS; e2=js_lexpr_target { NOp (LstCat, [ EList [ e1 ]; e2 ]) }
+  | e1=js_lexpr_target; LSTCONS; e2=js_lexpr_target { JSExpr.NOp (LstCat, [ EList [ e1 ]; e2 ]) }
 (* unop e *)
   | uop=unop_target; e=js_lexpr_target
-    { UnOp (uop, e) } %prec unop_prec
+    { JSExpr.UnOp (uop, e) } %prec unop_prec
 (* nop (le1, ..., len) *)
   | nop=nop_target; LBRACE; les=separated_list(COMMA, js_lexpr_target); RBRACE
     {
@@ -954,37 +955,37 @@ js_lexpr_target:
         | SetUnion -> JSExpr.SJSExpr.elements (JSExpr.SJSExpr.of_list les)
         | LstCat -> les
       in
-      NOp (nop, les)
+      JSExpr.NOp (nop, les)
     }
 (* - e *)
 (* Unary negation has the same precedence as logical not, not as binary negation. *)
   | MINUS; e=js_lexpr_target
-    { UnOp (FUnaryMinus, e) } %prec unop_prec
+    { JSExpr.UnOp (FUnaryMinus, e) } %prec unop_prec
 (* {{ e, ..., e }} *)
   | LSTOPEN; exprlist = separated_nonempty_list(COMMA, js_lexpr_target); LSTCLOSE
-    { EList exprlist }
+    { JSExpr.EList exprlist }
 (* -{- e, ..., e -}- *)
   | SETOPEN; exprlist = separated_list(COMMA, js_lexpr_target); SETCLOSE
-    { ESet (JSExpr.SJSExpr.elements (JSExpr.SJSExpr.of_list exprlist)) }
+    { JSExpr.ESet (JSExpr.SJSExpr.elements (JSExpr.SJSExpr.of_list exprlist)) }
 (* l-nth(e1, e2) *)
   | LSTNTH; LBRACE; e1=js_lexpr_target; COMMA; e2=js_lexpr_target; RBRACE
-    { BinOp (e1, LstNth, e2) }
+    { JSExpr.BinOp (e1, LstNth, e2) }
 (* s-nth(e1, e2) *)
   | STRNTH; LBRACE; e1=js_lexpr_target; COMMA; e2=js_lexpr_target; RBRACE
-    { BinOp (e1, StrNth, e2) }
+    { JSExpr.BinOp (e1, StrNth, e2) }
 (* l-sub(e1, e2, e3) *)
 | LSTSUB; LBRACE; e1=js_lexpr_target; COMMA; e2=js_lexpr_target; COMMA; e3 = js_lexpr_target; RBRACE
-    { LstSub (e1, e2, e3) }
+    { JSExpr.LstSub (e1, e2, e3) }
 (* this *)
-  | THIS { This }
+  | THIS { JSExpr.This }
 (* (e) *)
   | LBRACE; e=js_lexpr_target; RBRACE
     { e }
 (* _ *)
   | UNDERSCORE
-    { LVar (Javert_utils.Js_generators.fresh_lvar ()) }
+    { JSExpr.LVar (Javert_utils.Js_generators.fresh_lvar ()) }
 (* $$scope *)
-  | SCOPELEXPR { Scope }
+  | SCOPELEXPR { JSExpr.Scope }
 
 
 (* Assertions *)
@@ -1003,40 +1004,40 @@ js_type_env_pair_target:
 js_pure_assertion_target:
 (* P /\ Q *)
   | left_ass=js_pure_assertion_target; LAND; right_ass=js_pure_assertion_target
-    { And (left_ass, right_ass) }
+    { JSAsrt.And (left_ass, right_ass) }
 (* P \/ Q *)
   | left_ass=js_pure_assertion_target; LOR; right_ass=js_pure_assertion_target
-    { Or (left_ass, right_ass) }
+    { JSAsrt.Or (left_ass, right_ass) }
 (* ! Q *)
   | LNOT; ass=js_pure_assertion_target
-    { Not (ass) }
+    { JSAsrt.Not (ass) }
 (* true *)
   | LTRUE
-    { True }
+    { JSAsrt.True }
 (* false *)
   | LFALSE
-    { False }
+    { JSAsrt.False }
 (* E == E *)
   | left_expr=js_lexpr_target; LEQUAL; right_expr=js_lexpr_target
-    { Eq (left_expr, right_expr) }
+    { JSAsrt.Eq (left_expr, right_expr) }
 (* E <# E *)
   | left_expr=js_lexpr_target; LLESSTHAN; right_expr=js_lexpr_target
-    { Less (left_expr, right_expr) }
+    { JSAsrt.Less (left_expr, right_expr) }
 (* E <=# E *)
   | left_expr=js_lexpr_target; LLESSTHANEQUAL; right_expr=js_lexpr_target
-    { LessEq (left_expr, right_expr) }
+    { JSAsrt.LessEq (left_expr, right_expr) }
 (* E s<# E *)
   | left_expr=js_lexpr_target; LLESSTHANSTRING; right_expr=js_lexpr_target
-    { StrLess (left_expr, right_expr) }
+    { JSAsrt.StrLess (left_expr, right_expr) }
 (* E --e-- E *)
   | left_expr=js_lexpr_target; LSETMEM; right_expr=js_lexpr_target
-    { SetMem (left_expr, right_expr) }
+    { JSAsrt.SetMem (left_expr, right_expr) }
 (* E --s-- E *)
   | left_expr=js_lexpr_target; LSETSUB; right_expr=js_lexpr_target
-    { SetSub (left_expr, right_expr) }
+    { JSAsrt.SetSub (left_expr, right_expr) }
 (* forall X, Y, Z . P *)
   | LFORALL; vars = separated_nonempty_list(COMMA, js_lvar_type_target); DOT; ass = js_pure_assertion_target
-    { ForAll (vars, ass) }
+    { JSAsrt.ForAll (vars, ass) }
 (* (P) *)
   | delimited(LBRACE, js_pure_assertion_target, RBRACE)
     { $1 }
@@ -1044,48 +1045,48 @@ js_pure_assertion_target:
 js_assertion_target:
 (* Pure *)
   | f = js_pure_assertion_target
-    { Pure f }
+    { JSAsrt.Pure f }
 (* P * Q *)
 (* The precedence of the separating conjunction is not the same as the arithmetic product *)
   | left_ass=js_assertion_target; TIMES; right_ass=js_assertion_target
-    { Star (left_ass, right_ass) } %prec separating_conjunction
+    { JSAsrt.Star (left_ass, right_ass) } %prec separating_conjunction
 (* (E, E) -> E *)
   | LBRACE; obj_expr=js_lexpr_target; COMMA; prop_expr=js_lexpr_target; RBRACE; LARROW; val_expr=js_lexpr_target
-    { PointsTo (obj_expr, prop_expr, val_expr) }
+    { JSAsrt.PointsTo (obj_expr, prop_expr, val_expr) }
 (* emp *)
   | LEMP;
-    { Emp }
+    { JSAsrt.Emp }
 (* schain(fid: le) *)
   | SCHAIN; LBRACE; fid=VAR; COLON; le=js_lexpr_target; RBRACE
-    { SChain (fid, le) }
+    { JSAsrt.SChain (fid, le) }
 (* x(e1, ..., en) *)
   | name = VAR; LBRACE; params = separated_list(COMMA, js_lexpr_target); RBRACE
     {
       (* validate_pred_assertion (name, params); *)
-      Pred (name, params)
+      JSAsrt.Pred (name, params)
     }
 (* types (type_pairs) *)
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, js_type_env_pair_target); RBRACE
-    { Types type_pairs }
+    { JSAsrt.Types type_pairs }
 (* scope(x: le) *)
   | SCOPE; LBRACE; v=VAR; COLON; le=js_lexpr_target; RBRACE
-    { Scope (v, le) }
+    { JSAsrt.Scope (v, le) }
 (* closure(x_0: le_0, ..., x_n: le_n; fid_0: le_0', ..., fid_n: le_n') *)
   | CLOSURE; LBRACE; var_les=separated_list(COMMA, var_js_le_pair_target); SCOLON; fid_scs=separated_list(COMMA, var_js_le_pair_target); RBRACE
-    { Closure (var_les, fid_scs)  }
+    { JSAsrt.Closure (var_les, fid_scs)  }
 (* sc_scope(pid, x: le1, le2) *)
   | SCSCOPE; LBRACE; pid=VAR; COMMA; x=VAR; COLON; le1=js_lexpr_target; COMMA; le2=js_lexpr_target; RBRACE
-    { VarSChain (pid, x, le1, le2) }
+    { JSAsrt.VarSChain (pid, x, le1, le2) }
 (* o_chains(pid1: le1, pid2: le2) *)
   | OCHAINS; LBRACE; pid1=VAR; COLON; le1=js_lexpr_target; COMMA; pid2=VAR; COLON; le2=js_lexpr_target; RBRACE
-    { OSChains (pid1, le1, pid2, le2) }
+    { JSAsrt.OSChains (pid1, le1, pid2, le2) }
 (* empty_fields (le : le_domain) *)
   | EMPTYFIELDS; LBRACE; le=js_lexpr_target; COLON; domain=js_lexpr_target; RBRACE
-    { EmptyFields (le, domain) }
+    { JSAsrt.EmptyFields (le, domain) }
 (* Metadata (eo, em) *)
   | LMETADATA; LBRACE; eo = js_lexpr_target; COMMA; em = js_lexpr_target; RBRACE
     { (* validate_pred_assertion (name, params); *)
-      MetaData (eo, em)
+      JSAsrt.MetaData (eo, em)
     }
 (* (P) *)
   | delimited(LBRACE, js_assertion_target, RBRACE)
@@ -1145,7 +1146,7 @@ js_only_spec_target:
   sspecs = separated_nonempty_list(SCOLON, js_pre_post_target); EOF
   {
     let (name, params) = spec_head in
-    { name; params; sspecs }
+    Jslogic.JSSpec.{ name; params; sspecs }
   }
 
 
@@ -1173,24 +1174,24 @@ js_logic_cmd_target:
 (* fold x(e1, ..., en) *)
   | FOLD; assertion = js_assertion_target; fold_info = option(js_logic_bindings_target)
     {
-      Fold (assertion, fold_info)
+      JSLCmd.Fold (assertion, fold_info)
     }
 
 
 (* unfold x(e1, ..., en) [ def1 with x1 := le1, ..., xn := len ] *)
   | UNFOLD; assertion = js_assertion_target; unfold_info = option(js_unfold_info_target)
-    { Unfold (assertion, unfold_info) }
+    { JSLCmd.Unfold (assertion, unfold_info) }
 
 (* unfold_all x *)
   | UNFOLDALL; name = VAR;
-    { GUnfold name }
+    { JSLCmd.GUnfold name }
 
   | BRANCH; LBRACE; pf = js_pure_assertion_target; RBRACE
-    { Branch pf }
+    { JSLCmd.Branch pf }
 
 (* flash x(e1, ..., en) *)
   | FLASH; assertion = js_assertion_target;
-    { Flash (assertion) }
+    { JSLCmd.Flash (assertion) }
 
 (* if(le) { lcmds } else { lcmds } *)
   | LIF; LBRACE; le=js_lexpr_target; RBRACE; LTHEN; CLBRACKET;
@@ -1198,39 +1199,39 @@ js_logic_cmd_target:
       CRBRACKET; LELSE; CLBRACKET;
       else_lcmds = separated_list(SCOLON, js_logic_cmd_target);
        CRBRACKET;
-    { If (le, then_lcmds, else_lcmds) }
+    { JSLCmd.If (le, then_lcmds, else_lcmds) }
 
 (* if(e) { lcmd* } *)
   | LIF; LBRACE; le=js_lexpr_target; RBRACE; LTHEN; CLBRACKET;
       then_lcmds = separated_list(SCOLON, js_logic_cmd_target);
       CRBRACKET;
-    { If (le, then_lcmds, []) }
+    { JSLCmd.If (le, then_lcmds, []) }
 
   | macro = js_macro_head_target;
-    { let (name, params) = macro in Macro (name, params) }
+    { let (name, params) = macro in JSLCmd.Macro (name, params) }
 
 (* assert a *)
   | ASSERT; a = js_assertion_target; binders = option(binders_target);
-    { Assert (a, Option.value ~default:[ ] binders) }
+    { JSLCmd.Assert (a, Option.value ~default:[ ] binders) }
 
 (* assume a *)
   | ASSUME; a = js_pure_assertion_target;
-    { Assume a }
+    { JSLCmd.Assume a }
 
 (* invariant a *)
   | INVARIANT; a = js_assertion_target; binders = option(binders_target);
-    { Invariant (a, Option.value ~default:[ ] binders)  }
+    { JSLCmd.Invariant (a, Option.value ~default:[ ] binders)  }
 
 (* apply lemma_name(args) *)
    | APPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, js_lexpr_target); RBRACE
      {
-      ApplyLemma (lemma_name, params)
+      JSLCmd.ApplyLemma (lemma_name, params)
     }
 
 (* use_subst [ spec_lab : #x: bla, #y: ble] *)
   | USESUBST; LBRACKET; spec_lab=VAR; COLON; subst_lst = separated_nonempty_list(COMMA, js_lvar_le_pair_target); RBRACKET
      {
-        UseSubst(spec_lab, subst_lst)
+        JSLCmd.UseSubst(spec_lab, subst_lst)
      }
 
 (* (lcmd) *)

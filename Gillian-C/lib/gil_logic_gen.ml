@@ -110,11 +110,11 @@ let assert_of_member cenv members id typ =
   let pvmember = Expr.PVar field_name in
   let fo =
     match field_offset cenv id members with
-    | Errors.OK f    -> Expr.num (float_of_int (Camlcoq.Z.to_int f))
+    | Errors.OK (f, Full)    -> Expr.num (float_of_int (Camlcoq.Z.to_int f))
+    | Errors.OK _ -> Fmt.failwith "Unsupported: bitfield members"
     | Errors.Error e ->
-        failwith
-          (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
-             e)
+        Fmt.failwith"Invalid member offset : %a@?" Driveraux.print_error
+             e
   in
   (* The following bit of code should be refactored to be made cleaner ... *)
   if
@@ -229,19 +229,23 @@ let gen_pred_of_struct cenv ann struct_name =
     ]
   in
   let struct_params =
-    List.map (fun (i, _) -> (true_name i, Some Type.ListType)) comp.co_members
+    List.map (function Member_plain (i, _) -> (true_name i, Some Type.ListType) | Member_bitfield _ -> failwith "Unsupported bitfield members") comp.co_members
   in
   let pred_params = first_params @ struct_params in
   let pred_num_params = List.length pred_params in
   let def_without_holes =
     List.fold_left
-      (fun asrt (id, typ) ->
-        asrt ** assert_of_member cenv comp.co_members id typ)
+      (fun asrt member ->
+        match member with
+        | Member_plain (id, typ) ->
+        asrt ** assert_of_member cenv comp.co_members id typ
+        | Member_bitfield _ -> failwith "Unsupported bitfield members")
       Asrt.Emp comp.co_members
   in
   let fo idp =
     match field_offset cenv idp comp.co_members with
-    | Errors.OK f    -> Camlcoq.Z.to_int f
+    | Errors.OK (f, Full)    -> Camlcoq.Z.to_int f
+    | Errors.OK _ -> failwith "Unsupported bitfield members"
     | Errors.Error e ->
         failwith
           (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
@@ -252,10 +256,11 @@ let gen_pred_of_struct cenv ann struct_name =
     match memb with
     | [] -> []
     | [ _a ] -> []
-    | (ida, t) :: ((idb, _) :: _ as r) ->
+    | Member_plain (ida, t) :: (Member_plain (idb, _) :: _ as r) ->
         let end_a = fo ida + sz t in
         let start_b = fo idb in
         if end_a < start_b then (end_a, start_b) :: get_holes r else get_holes r
+    | _ -> failwith "Unsupported bitfield members"
   in
 
   let holes = get_holes comp.co_members in
@@ -956,7 +961,7 @@ let asserts_of_rec_member cenv members id typ =
         in
         let struct_params =
           List.map
-            (fun (i, _) -> Expr.LVar ("#" ^ field_name ^ "__" ^ true_name i))
+            (function Member_plain (i, _) -> Expr.LVar ("#" ^ field_name ^ "__" ^ true_name i) | Member_bitfield _ -> failwith "Unsupported bitfield members")
             comp.co_members
         in
         [
@@ -973,7 +978,8 @@ let asserts_of_rec_member cenv members id typ =
   in
   let fo =
     match field_offset cenv id members with
-    | Errors.OK f    -> Expr.Lit (Num (float_of_int (Camlcoq.Z.to_int f)))
+    | Errors.OK (f, Full)    -> Expr.Lit (Num (float_of_int (Camlcoq.Z.to_int f)))
+    | Errors.OK _ -> failwith "Unsupported bitfield members"
     | Errors.Error e ->
         failwith
           (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
@@ -1016,13 +1022,16 @@ let gen_rec_pred_of_struct cenv ann struct_name =
     ]
   in
   let struct_params =
-    List.map (fun (i, _) -> (true_name i, Some Type.ListType)) comp.co_members
+    List.map (function Member_plain (i, _) -> (true_name i, Some Type.ListType) | _ -> failwith "Unsupported bitfield members") comp.co_members
   in
   let pred_params = first_params @ struct_params in
   let pred_num_params = List.length pred_params in
   let defs_without_holes =
     List.fold_left
-      (fun al (id, typ) ->
+      (fun al member ->
+        match member with
+        | Member_bitfield _ -> failwith "Unsupported bitfield members"
+        | Member_plain (id, typ) ->
         let new_al = asserts_of_rec_member cenv comp.co_members id typ in
         let list_of_list =
           List.map (fun a -> List.map (fun na -> a ** na) new_al) al
@@ -1032,7 +1041,8 @@ let gen_rec_pred_of_struct cenv ann struct_name =
   in
   let fo idp =
     match field_offset cenv idp comp.co_members with
-    | Errors.OK f    -> Camlcoq.Z.to_int f
+    | Errors.OK (f, Full)    -> Camlcoq.Z.to_int f
+    | Errors.OK _ -> failwith "Unsupported bitfield members"
     | Errors.Error e ->
         failwith
           (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
@@ -1043,10 +1053,11 @@ let gen_rec_pred_of_struct cenv ann struct_name =
     match memb with
     | []                        -> []
     | [ _a ]                    -> []
-    | (ida, t) :: (idb, _) :: r ->
+    | Member_plain (ida, t) :: Member_plain (idb, _) :: r ->
         let end_a = fo ida + sz t in
         let start_b = fo idb in
         if end_a < start_b then (end_a, start_b) :: get_holes r else get_holes r
+    | _ -> failwith "Unsupported bitfield members"
   in
   let holes = get_holes comp.co_members in
   let hole_assert = fold_star (List.map assert_of_hole holes) in

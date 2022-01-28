@@ -345,43 +345,43 @@ pred_head_target:
 
 expr_target:
 (* literal *)
-  | lit=lit_target { Lit lit }
+  | lit=lit_target { Expr.Lit lit }
 (* Logic variable *)
   | lvar = logic_variable_target
     { lvar }
 (* Abstract locations are *normally* computed on normalisation *)
   | ALOC
-    { ALoc $1 }
+    { Expr.ALoc $1 }
 (* Program variable (including the special variable "ret") *)
   | pvar = program_variable_target
     { pvar }
 (* e binop e *)
   | e1=expr_target; bop=binop_target; e2=expr_target
-      { BinOp (e1, bop, e2) } %prec binop_prec
+      { Expr.BinOp (e1, bop, e2) } %prec binop_prec
   | e1=expr_target; FGT; e2=expr_target
-      { BinOp (e2, FLessThan, e1) }
+      { Expr.BinOp (e2, FLessThan, e1) }
   | e1=expr_target; FGE; e2=expr_target
-      { BinOp (e2, FLessThanEqual, e1) }
+      { Expr.BinOp (e2, FLessThanEqual, e1) }
 (* unop e *)
     | uop=unop_target; e=expr_target
-     { UnOp (uop, e) } %prec unop_prec
+     { Expr.UnOp (uop, e) } %prec unop_prec
 (* - e *)
 (* Unary negation has the same precedence as logical not, not as binary negation. *)
   | IMINUS; e=expr_target
-     { UnOp (IUnaryMinus, e) } %prec unop_prec
+     { Expr.UnOp (IUnaryMinus, e) } %prec unop_prec
   | FMINUS; e=expr_target
-     { UnOp (FUnaryMinus, e) } %prec unop_prec
+     { Expr.UnOp (FUnaryMinus, e) } %prec unop_prec
 (* {{ e, ..., e }} *)
   | LSTOPEN; exprlist = separated_nonempty_list(COMMA, expr_target); LSTCLOSE
-     { EList exprlist }
+     { Expr.EList exprlist }
 (* -{- e, ..., e -}- *)
   | SETOPEN; exprlist = separated_list(COMMA, expr_target); SETCLOSE
-     { ESet (Expr.Set.elements (Expr.Set.of_list exprlist)) }
+     { Expr.ESet (Expr.Set.elements (Expr.Set.of_list exprlist)) }
 (* l-nth (list, n) *)
   | LSTNTH; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE
-     { BinOp (e1, LstNth, e2) }
+     { Expr.BinOp (e1, LstNth, e2) }
   | LSTSUB; LBRACE; e1=expr_target; COMMA; e2=expr_target; COMMA; e3 = expr_target; RBRACE
-    { LstSub (e1, e2, e3) }
+    { Expr.LstSub (e1, e2, e3) }
 (* nop le *)
   | nop=nop_target; LBRACE; les=separated_list(COMMA, expr_target); RBRACE
      {
@@ -390,17 +390,17 @@ expr_target:
           | SetInter
           | SetUnion -> Expr.Set.elements (Expr.Set.of_list les)
           | _ -> les in
-        NOp (nop, les)
+        Expr.NOp (nop, les)
      }
 (* s-nth (string, n) *)
   | STRNTH; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE
-     { BinOp (e1, StrNth, e2) }
+     { Expr.BinOp (e1, StrNth, e2) }
 (* (e) *)
     | LBRACE; e=expr_target; RBRACE
     { e }
 (* Ignore variable *)
   | UNDERSCORE
-    { LVar (LVar.alloc ()) }
+    { Expr.LVar (LVar.alloc ()) }
 ;
 
 top_level_expr_target:
@@ -520,6 +520,8 @@ gcmd_with_label:
 gcmd_with_annot:
   | cmd = gcmd_target
     {
+      let open Location in
+      let open Lexing in
       let loc_start : Location.position =
         {
           pos_line = $startpos.pos_lnum;
@@ -545,47 +547,47 @@ gcmd_with_annot:
 (*** GIL commands ***)
 gcmd_target:
 (* skip *)
-  | SKIP { Skip }
+  | SKIP { Cmd.Skip }
 (* x := [laction](e1, ..., en) *)
   | v=VAR; DEFEQ; LBRACKET; laction=VAR; RBRACKET; LBRACE; es=separated_list(COMMA, expr_target); RBRACE
-    { LAction(v, laction, es) }
+    { Cmd.LAction(v, laction, es) }
 (* x := e *)
   | v=VAR; DEFEQ; e=expr_target
-    { Assignment (v, e) }
+    { Cmd.Assignment (v, e) }
 (* goto i *)
   | GOTO; i=VAR
-    { Goto i }
+    { Cmd.Goto i }
 (* goto [e] i j *)
   | GOTO LBRACKET; e=expr_target; RBRACKET; i=VAR; j=VAR
-    { GuardedGoto (e, i, j) }
+    { Cmd.GuardedGoto (e, i, j) }
 (* x := e(e1, ..., en) with j use_subst [bla - #x: bla, #y: ble] *)
   | v=VAR; DEFEQ; e=expr_target;
     LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target); subst = option(use_subst_target)
     {
-      Call (v, e, es, oi, subst)
+      Cmd.Call (v, e, es, oi, subst)
     }
 (* x := e(e1, ..., en) with j *)
   | v=VAR; DEFEQ; EXTERN; pname=VAR;
     LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target)
     {
-      ECall (v, PVar pname, es, oi) }
+      Cmd.ECall (v, PVar pname, es, oi) }
 (* x := apply (e1, ..., en) with j *)
   | v=VAR; DEFEQ; APPLY;
     LBRACE; es=expr_target; RBRACE; oi = option(call_with_target)
-    { Apply (v, es, oi) }
+    { Cmd.Apply (v, es, oi) }
 (* x := args *)
   | v = VAR; DEFEQ; ARGUMENTS
-    { Arguments v }
+    { Cmd.Arguments v }
 (* x := PHI(e1, e2, ... en); *)
   | PHI; LBRACE; phi_args =separated_list(SCOLON, phi_target); RBRACE
     {
       match phi_args with
       | [] -> raise (Failure "EMPTY PHI")
-      | _  -> PhiAssignment phi_args
+      | _  -> Cmd.PhiAssignment phi_args
     }
 (* return *)
-  | RETURN { ReturnNormal }
-  | THROW  { ReturnError  }
+  | RETURN { Cmd.ReturnNormal }
+  | THROW  { Cmd.ReturnError  }
 (* Logic command *)
   | lcmd = g_logic_cmd_target
     { Cmd.Logic lcmd }
@@ -599,7 +601,8 @@ g_only_spec_target:
 (* only <spec> *)
   AXIOMATIC; spec = g_spec_target
   {
-    let new_sspecs = List.map (fun (sspec : Spec.st) -> { sspec with ss_to_verify = false }) spec.spec_sspecs in
+    let open Spec in
+    let new_sspecs = List.map (fun (sspec : st) -> { sspec with ss_to_verify = false }) spec.spec_sspecs in
     { spec with spec_sspecs = new_sspecs; spec_to_verify = false }
   }
 ;
@@ -629,7 +632,7 @@ g_mult_spec_line:
 g_sspec_target:
 (* [spec_name: #bla, #ble, #bli] [[ .... ]] [[ .... ]] Normal *)
   | option(lab_spec_target) g_spec_line g_mult_spec_line NORMAL
-    { { ss_pre = $2; ss_posts = $3; ss_flag = Normal; ss_to_verify = true; ss_label = $1 } }
+    { Spec.{ ss_pre = $2; ss_posts = $3; ss_flag = Normal; ss_to_verify = true; ss_label = $1 } }
 (* [[ .... ]] [[ .... ]] Error *)
   | lab_spec = option(lab_spec_target); ss_pre = g_spec_line; ss_posts = g_mult_spec_line; ERROR
   {
@@ -685,35 +688,35 @@ g_named_assertion_target:
 g_logic_cmd_target:
 (* fold x(e1, ..., en) *)
   | FOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(logic_bindings_target)
-    { SL (Fold (name, les, fold_info)) }
+    { LCmd.SL (Fold (name, les, fold_info)) }
 
 (* unfold x(e1, ..., en) [ def with #x := le1 and ... ] *)
   | UNFOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
-    { SL (Unfold (name, les, unfold_info, false)) }
+    { LCmd.SL (Unfold (name, les, unfold_info, false)) }
 
 (* unfold* x(e1, ..., en) [ def with #x := le1 and ... ] *)
   | RECUNFOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
-    { SL (Unfold (name, les, unfold_info, true)) }
+    { LCmd.SL (Unfold (name, les, unfold_info, true)) }
 
 (* unfold_all x *)
   | UNFOLDALL; name = VAR
-    { SL (GUnfold name) }
+    { LCmd.SL (GUnfold name) }
 
-  | SYMBEXEC { SL SymbExec }
+  | SYMBEXEC { LCmd.SL SymbExec }
 
 (* invariant (a) [existentials: x, y, z] *)
   | INVARIANT; LBRACE; a = g_assertion_target; RBRACE; binders = option(binders_target)
-    { SL (Invariant (a, Option.value ~default:[ ] binders)) }
+    { LCmd.SL (Invariant (a, Option.value ~default:[ ] binders)) }
 
 (* assert_* (a) [bind: x, y, z] *)
   | SEPASSERT; LBRACE; a = g_assertion_target; RBRACE; binders = option(binders_target)
-    { SL (SepAssert (a, Option.value ~default:[ ] binders)) }
+    { LCmd.SL (SepAssert (a, Option.value ~default:[ ] binders)) }
 
 (* apply lemma_name(args) [bind: x, y ] *)
    | APPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE; binders = option(binders_target)
     {
       let binders = Option.value ~default:[] binders in
-      SL (ApplyLem (lemma_name, params, binders))
+      LCmd.SL (ApplyLem (lemma_name, params, binders))
     }
 
 (* if(le) { lcmd* } else { lcmd* } *)
@@ -722,36 +725,36 @@ g_logic_cmd_target:
       CRBRACKET; LELSE; CLBRACKET;
       else_lcmds = separated_list(SCOLON, g_logic_cmd_target);
        CRBRACKET;
-    { If (le, then_lcmds, else_lcmds)}
+    { LCmd.If (le, then_lcmds, else_lcmds)}
 
 (* if(e) { lcmd* } *)
   | LIF; LBRACE; le=expr_target; RBRACE; LTHEN; CLBRACKET;
       then_lcmds = separated_list(SCOLON, g_logic_cmd_target);
       CRBRACKET;
-    { If (le, then_lcmds, [])}
+    { LCmd.If (le, then_lcmds, [])}
 
   | macro = macro_head_target;
-    { let (name, params) = macro in Macro (name, params) }
+    { let (name, params) = macro in LCmd.Macro (name, params) }
 
 (* assert (a) *)
   | ASSERT; LBRACE; a = pure_assertion_target; RBRACE
-    { Assert a }
+    { LCmd.Assert a }
 
 (* assume (a) *)
   | ASSUME; LBRACE; a = pure_assertion_target; RBRACE
-    { Assume a }
+    { LCmd.Assume a }
 
 (* assume_type (x, t) *)
   | ASSUME_TYPE; LBRACE; x=LVAR; COMMA; t=type_target; RBRACE
-    { AssumeType (x, t) }
+    { LCmd.AssumeType (x, t) }
 
 (* spec_var (x, t) *)
   | SPEC_VAR; LBRACE; xs = separated_list(COMMA, LVAR); RBRACE
-    { SpecVar xs }
+    { LCmd.SpecVar xs }
 
 (* branch (fo) *)
   | BRANCH; LBRACE; fo = pure_assertion_target; RBRACE
-     { Branch fo }
+     { LCmd.Branch fo }
 ;
 
 g_pred_def_target:
@@ -935,40 +938,40 @@ existentials_target:
 pure_assertion_target:
 (* P /\ Q *)
   | left_ass=pure_assertion_target; LAND; right_ass=pure_assertion_target
-    { And (left_ass, right_ass) }
+    { Formula.And (left_ass, right_ass) }
 (* P \/ Q *)
   | left_ass=pure_assertion_target; LOR; right_ass=pure_assertion_target
-    { Or (left_ass, right_ass) }
+    { Formula.Or (left_ass, right_ass) }
 (* ! Q *)
   | LNOT; ass=pure_assertion_target
-    { Not (ass) }
+    { Formula.Not (ass) }
 (* true *)
   | LTRUE
-    { True }
+    { Formula.True }
 (* false *)
   | LFALSE
-    { False }
+    { Formula.False }
 (* E == E *)
   | left_expr=expr_target; LEQUAL; right_expr=expr_target
-    { Eq (left_expr, right_expr) }
+    { Formula.Eq (left_expr, right_expr) }
 (* E <# E *)
   | left_expr=expr_target; LLESSTHAN; right_expr=expr_target
-    { Less (left_expr, right_expr) }
+    { Formula.Less (left_expr, right_expr) }
 (* E <=# E *)
   | left_expr=expr_target; LLESSTHANEQUAL; right_expr=expr_target
-    { LessEq (left_expr, right_expr) }
+    { Formula.LessEq (left_expr, right_expr) }
 (* E s<# E *)
   | left_expr=expr_target; LSLESSTHAN; right_expr=expr_target
-    { StrLess (left_expr, right_expr) }
+    { Formula.StrLess (left_expr, right_expr) }
 (* E --e-- E *)
   | left_expr=expr_target; LSETMEM; right_expr=expr_target
-    { SetMem (left_expr, right_expr) }
+    { Formula.SetMem (left_expr, right_expr) }
 (* E --s-- E *)
   | left_expr=expr_target; LSETSUB; right_expr=expr_target
-    { SetSub (left_expr, right_expr) }
+    { Formula.SetSub (left_expr, right_expr) }
 (* forall X, Y, Z . P *)
   | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; ass = pure_assertion_target
-    { ForAll (vars, ass) }
+    { Formula.ForAll (vars, ass) }
 (* (P) *)
   | LBRACE; f=pure_assertion_target; RBRACE
     { f }
@@ -996,7 +999,7 @@ logic_variable_target:
   {
     let v_imported = Str.replace_first normalised_lvar_r "_lvar_n" v in
     (* Prefixed with _n_ to avoid clashes *)
-    LVar v_imported }
+    Expr.LVar v_imported }
 ;
 
 just_logic_variable_target:
@@ -1011,22 +1014,22 @@ program_variable_target:
 (********* COMMON *********)
 
 lit_target:
-  | UNDEFINED                 { Undefined }
-  | NULL                      { Null }
-  | EMPTY                     { Empty }
-  | constant_target           { Constant $1 }
-  | TRUE                      { Bool true }
-  | FALSE                     { Bool false }
-  | FLOAT                     { Num $1 }
-  | n = INTEGER               { Int n }
-  | NAN                       { Num nan }
-  | INFINITY                  { Num infinity }
-  | STRING                    { String $1 }
-  | LOC                       { Loc $1 }
-  | type_target               { Type $1 }
-  | LSTNIL                    { LList [] }
-  | LSTOPEN LSTCLOSE          { LList [] }
-  | LNONE                     { Nono }
+  | UNDEFINED                 { Literal.Undefined }
+  | NULL                      { Literal.Null }
+  | EMPTY                     { Literal.Empty }
+  | constant_target           { Literal.Constant $1 }
+  | TRUE                      { Literal.Bool true }
+  | FALSE                     { Literal.Bool false }
+  | FLOAT                     { Literal.Num $1 }
+  | n = INTEGER               { Literal.Int n }
+  | NAN                       { Literal.Num nan }
+  | INFINITY                  { Literal.Num infinity }
+  | STRING                    { Literal.String $1 }
+  | LOC                       { Literal.Loc $1 }
+  | type_target               { Literal.Type $1 }
+  | LSTNIL                    { Literal.LList [] }
+  | LSTOPEN LSTCLOSE          { Literal.LList [] }
+  | LNONE                     { Literal.Nono }
 ;
 
 nop_target:
@@ -1036,99 +1039,99 @@ nop_target:
 ;
 
 binop_target:
-  | EQ                  { Equal }
-  | ILT                 { ILessThan }
-  | ILE                 { ILessThanEqual }
-  | IPLUS               { IPlus }
-  | IMINUS              { IMinus }
-  | ITIMES              { ITimes }
-  | IDIV                { IDiv }
-  | IMOD                { IMod }
-  | FLT                 { FLessThan }
-  | FLE                 { FLessThanEqual }
-  | FPLUS               { FPlus }
-  | FMINUS              { FMinus }
-  | FTIMES              { FTimes }
-  | FDIV                { FDiv }
-  | FMOD                { FMod }
-  | SLT                 { SLessThan }
-  | AND                 { BAnd }
-  | OR                  { BOr }
-  | BITWISEAND          { BitwiseAnd }
-  | BITWISEOR           { BitwiseOr}
-  | BITWISEXOR          { BitwiseXor }
-  | LEFTSHIFT           { LeftShift }
-  | SIGNEDRIGHTSHIFT    { SignedRightShift }
-  | UNSIGNEDRIGHTSHIFT  { UnsignedRightShift }
-  | BITWISEANDL         { BitwiseAndL }
-  | BITWISEORL          { BitwiseOrL }
-  | BITWISEXORL         { BitwiseXorL }
-  | LEFTSHIFTL          { LeftShiftL }
-  | SIGNEDRIGHTSHIFTL   { SignedRightShiftL }
-  | UNSIGNEDRIGHTSHIFTL { UnsignedRightShiftL }
-  | M_ATAN2             { M_atan2 }
-  | M_POW               { M_pow }
-  | STRCAT              { StrCat }
-  | SETDIFF             { SetDiff }
-  | SETMEM              { BSetMem }
-  | SETSUB              { BSetSub }
+  | EQ                  { BinOp.Equal }
+  | ILT                 { BinOp.ILessThan }
+  | ILE                 { BinOp.ILessThanEqual }
+  | IPLUS               { BinOp.IPlus }
+  | IMINUS              { BinOp.IMinus }
+  | ITIMES              { BinOp.ITimes }
+  | IDIV                { BinOp.IDiv }
+  | IMOD                { BinOp.IMod }
+  | FLT                 { BinOp.FLessThan }
+  | FLE                 { BinOp.FLessThanEqual }
+  | FPLUS               { BinOp.FPlus }
+  | FMINUS              { BinOp.FMinus }
+  | FTIMES              { BinOp.FTimes }
+  | FDIV                { BinOp.FDiv }
+  | FMOD                { BinOp.FMod }
+  | SLT                 { BinOp.SLessThan }
+  | AND                 { BinOp.BAnd }
+  | OR                  { BinOp.BOr }
+  | BITWISEAND          { BinOp.BitwiseAnd }
+  | BITWISEOR           { BinOp.BitwiseOr}
+  | BITWISEXOR          { BinOp.BitwiseXor }
+  | LEFTSHIFT           { BinOp.LeftShift }
+  | SIGNEDRIGHTSHIFT    { BinOp.SignedRightShift }
+  | UNSIGNEDRIGHTSHIFT  { BinOp.UnsignedRightShift }
+  | BITWISEANDL         { BinOp.BitwiseAndL }
+  | BITWISEORL          { BinOp.BitwiseOrL }
+  | BITWISEXORL         { BinOp.BitwiseXorL }
+  | LEFTSHIFTL          { BinOp.LeftShiftL }
+  | SIGNEDRIGHTSHIFTL   { BinOp.SignedRightShiftL }
+  | UNSIGNEDRIGHTSHIFTL { BinOp.UnsignedRightShiftL }
+  | M_ATAN2             { BinOp.M_atan2 }
+  | M_POW               { BinOp.M_pow }
+  | STRCAT              { BinOp.StrCat }
+  | SETDIFF             { BinOp.SetDiff }
+  | SETMEM              { BinOp.BSetMem }
+  | SETSUB              { BinOp.BSetSub }
 ;
 
 unop_target:
   (* Unary minus defined in (l)expr_target *)
-  | NOT         { UNot }
-  | BITWISENOT  { BitwiseNot }
-  | M_ISNAN     { M_isNaN }
-  | M_ABS       { M_abs }
-  | M_ACOS      { M_acos }
-  | M_ASIN      { M_asin }
-  | M_ATAN      { M_atan }
-  | M_CEIL      { M_ceil }
-  | M_COS       { M_cos }
-  | M_EXP       { M_exp }
-  | M_FLOOR     { M_floor }
-  | M_LOG       { M_log }
-  | M_ROUND     { M_round }
-  | M_SGN       { M_sgn }
-  | M_SIN       { M_sin }
-  | M_SQRT      { M_sqrt }
-  | M_TAN       { M_tan }
-  | TOSTRING    { ToStringOp }
-  | TOINT       { ToIntOp }
-  | TOUINT16    { ToUint16Op }
-  | TOINT32     { ToInt32Op }
-  | TOUINT32    { ToUint32Op }
-  | TONUMBER    { ToNumberOp }
-  | TYPEOF      { TypeOf }
-  | CAR         { Car }
-  | CDR         { Cdr }
-  | LSTLEN      { LstLen }
-  | LSTREV      { LstRev }
-  | STRLEN      { StrLen }
-  | SETTOLIST   { SetToList }
+  | NOT         { UnOp.UNot }
+  | BITWISENOT  { UnOp.BitwiseNot }
+  | M_ISNAN     { UnOp.M_isNaN }
+  | M_ABS       { UnOp.M_abs }
+  | M_ACOS      { UnOp.M_acos }
+  | M_ASIN      { UnOp.M_asin }
+  | M_ATAN      { UnOp.M_atan }
+  | M_CEIL      { UnOp.M_ceil }
+  | M_COS       { UnOp.M_cos }
+  | M_EXP       { UnOp.M_exp }
+  | M_FLOOR     { UnOp.M_floor }
+  | M_LOG       { UnOp.M_log }
+  | M_ROUND     { UnOp.M_round }
+  | M_SGN       { UnOp.M_sgn }
+  | M_SIN       { UnOp.M_sin }
+  | M_SQRT      { UnOp.M_sqrt }
+  | M_TAN       { UnOp.M_tan }
+  | TOSTRING    { UnOp.ToStringOp }
+  | TOINT       { UnOp.ToIntOp }
+  | TOUINT16    { UnOp.ToUint16Op }
+  | TOINT32     { UnOp.ToInt32Op }
+  | TOUINT32    { UnOp.ToUint32Op }
+  | TONUMBER    { UnOp.ToNumberOp }
+  | TYPEOF      { UnOp.TypeOf }
+  | CAR         { UnOp.Car }
+  | CDR         { UnOp.Cdr }
+  | LSTLEN      { UnOp.LstLen }
+  | LSTREV      { UnOp.LstRev }
+  | STRLEN      { UnOp.StrLen }
+  | SETTOLIST   { UnOp.SetToList }
 ;
 
 constant_target:
-  | MIN_FLOAT { Min_float }
-  | MAX_FLOAT { Max_float }
-  | RANDOM    { Random }
-  | PI        { Pi }
-  | UTCTIME   { UTCTime }
-  | LOCALTIME { LocalTime }
+  | MIN_FLOAT { Constant.Min_float }
+  | MAX_FLOAT { Constant.Max_float }
+  | RANDOM    { Constant.Random }
+  | PI        { Constant.Pi }
+  | UTCTIME   { Constant.UTCTime }
+  | LOCALTIME { Constant.LocalTime }
 ;
 
 type_target:
-  | UNDEFTYPELIT { UndefinedType }
-  | NULLTYPELIT  { NullType }
-  | EMPTYTYPELIT { EmptyType }
-  | NONETYPELIT  { NoneType }
-  | BOOLTYPELIT  { BooleanType }
-  | INTTYPELIT   { IntType }
-  | NUMTYPELIT   { NumberType }
-  | STRTYPELIT   { StringType }
-  | OBJTYPELIT   { ObjectType }
-  | LISTTYPELIT  { ListType }
-  | TYPETYPELIT  { TypeType }
-  | SETTYPELIT   { SetType }
+  | UNDEFTYPELIT { Type.UndefinedType }
+  | NULLTYPELIT  { Type.NullType }
+  | EMPTYTYPELIT { Type.EmptyType }
+  | NONETYPELIT  { Type.NoneType }
+  | BOOLTYPELIT  { Type.BooleanType }
+  | INTTYPELIT   { Type.IntType }
+  | NUMTYPELIT   { Type.NumberType }
+  | STRTYPELIT   { Type.StringType }
+  | OBJTYPELIT   { Type.ObjectType }
+  | LISTTYPELIT  { Type.ListType }
+  | TYPETYPELIT  { Type.TypeType }
+  | SETTYPELIT   { Type.SetType }
 ;
 

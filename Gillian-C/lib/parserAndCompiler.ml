@@ -351,6 +351,8 @@ let parse_and_compile_files paths =
         link rest new_unresolved new_defined
   in
   let unresolved_syms = link paths SS.empty SS.empty in
+  let to_ignore = Config_compcert.references_to_ignore |> SS.of_list in
+  let unresolved_syms = SS.diff unresolved_syms to_ignore in 
   let () =
     if (not (SS.is_empty unresolved_syms)) && not hide_undef then
       linker_error "undefined reference to" unresolved_syms
