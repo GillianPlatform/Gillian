@@ -24,4 +24,4 @@ The project contains:
 
 
 # License
-Until further notice, Gillian is [NO LICENSE](https://choosealicense.com/no-permission/). Contact us directly if you want to use it.
+Gillian is licensed under the [BSD-3 License](https://choosealicense.com/licenses/bsd-3-clause/).
