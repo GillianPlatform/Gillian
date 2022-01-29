@@ -2,7 +2,6 @@ module type S = sig
   include State.S
 
   val get_typ_env : t -> TypEnv.t
-
   val get_pfs : t -> PFS.t
 end
 

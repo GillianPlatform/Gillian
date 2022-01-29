@@ -1,14 +1,10 @@
 module Loc : sig
   type file_key
-
   type position = { line : int; column : int }
-
   type t = { source : file_key option; start : position; _end : position }
 
   val none : t
-
   val file_key_to_string : file_key -> string
-
   val pp : Format.formatter -> t -> unit
 end
 
@@ -44,8 +40,8 @@ module Syntax : sig
 
   type bin_op =
     | Comparison of comparison_op
-    | Arith      of arith_op
-    | Boolean    of bool_op
+    | Arith of arith_op
+    | Boolean of bool_op
 
   type unary_op =
     | Not
@@ -84,9 +80,9 @@ module Syntax : sig
   type annotation = { annot_type : annotation_type; annot_formula : string }
 
   type propname =
-    | PropnameId     of string
+    | PropnameId of string
     | PropnameString of string
-    | PropnameNum    of float
+    | PropnameNum of float
 
   type proptype = PropbodyVal | PropbodyGet | PropbodySet
 
@@ -97,77 +93,65 @@ module Syntax : sig
   }
 
   and exp_syntax =
-    | Num           of float
-    | String        of string
-    | Label         of string * exp
+    | Num of float
+    | String of string
+    | Label of string * exp
     | Null
-    | Bool          of bool
-    | Var           of var
-    | If            of exp * exp * exp option
-    | While         of exp * exp
-    | DoWhile       of exp * exp
-    | VarDec        of (var * exp option) list
+    | Bool of bool
+    | Var of var
+    | If of exp * exp * exp option
+    | While of exp * exp
+    | DoWhile of exp * exp
+    | VarDec of (var * exp option) list
     | This
-    | Delete        of exp
-    | Comma         of exp * exp
-    | Unary_op      of unary_op * exp
-    | BinOp         of exp * bin_op * exp
-    | Access        of exp * string
-    | Call          of exp * exp list
-    | Assign        of exp * exp
-    | AssignOp      of exp * arith_op * exp
-    | FunctionExp   of bool * string option * var list * exp
-    | Function      of bool * string option * var list * exp
-    | New           of exp * exp list
-    | Obj           of (propname * proptype * exp) list
-    | Array         of exp option list
-    | CAccess       of exp * exp
-    | With          of exp * exp
+    | Delete of exp
+    | Comma of exp * exp
+    | Unary_op of unary_op * exp
+    | BinOp of exp * bin_op * exp
+    | Access of exp * string
+    | Call of exp * exp list
+    | Assign of exp * exp
+    | AssignOp of exp * arith_op * exp
+    | FunctionExp of bool * string option * var list * exp
+    | Function of bool * string option * var list * exp
+    | New of exp * exp list
+    | Obj of (propname * proptype * exp) list
+    | Array of exp option list
+    | CAccess of exp * exp
+    | With of exp * exp
     | Skip
-    | Throw         of exp
-    | Return        of exp option
-    | RegExp        of string * string
-    | For           of exp option * exp option * exp option * exp
-    | ForIn         of exp * exp * exp
-    | Break         of string option
-    | Continue      of string option
-    | Try           of exp * (string * exp) option * exp option
-    | Switch        of exp * (switch_case * exp) list
+    | Throw of exp
+    | Return of exp option
+    | RegExp of string * string
+    | For of exp option * exp option * exp option * exp
+    | ForIn of exp * exp * exp
+    | Break of string option
+    | Continue of string option
+    | Try of exp * (string * exp) option * exp option
+    | Switch of exp * (switch_case * exp) list
     | Debugger
     | ConditionalOp of exp * exp * exp
-    | Block         of exp list
-    | Script        of bool * exp list
+    | Block of exp list
+    | Script of bool * exp list
 
   and switch_case = Case of exp | DefaultCase
 
   val mk_exp : exp_syntax -> Loc.t -> annotation list -> exp
-
   val script_and_strict : exp_syntax -> bool
 end
 
 module PrettyPrint : sig
   val string_of_comparison_op : Syntax.comparison_op -> string
-
   val string_of_bool_op : Syntax.bool_op -> string
-
   val string_of_arith_op : Syntax.arith_op -> string
-
   val string_of_bin_op : Syntax.bin_op -> string
-
   val string_of_unary_op : Syntax.unary_op -> string
-
   val string_of_var : 'a -> 'a
-
   val string_of_vars : string list -> string
-
   val string_of_annot_type : Syntax.annotation_type -> string
-
   val string_of_annot : Syntax.annotation -> string
-
   val string_of_annots : Syntax.annotation list -> string
-
   val string_of_propname : Syntax.propname -> string
-
   val string_of_exp : bool -> Syntax.exp -> string
 
   val string_of_var_in_dec :
@@ -179,7 +163,6 @@ module PrettyPrint : sig
     bool -> (string * Syntax.exp) option -> Syntax.exp option -> string
 
   val string_of_case : bool -> Syntax.switch_case * Syntax.exp -> string
-
   val string_of_exp_syntax : Syntax.exp_syntax -> Syntax.var
 end
 
@@ -187,19 +170,19 @@ module Error : sig
   type t =
     | Overlapping_Syntax
         (** Something went wrong with the parser, some syntax is overlapping. *)
-    | Unhandled_Statement  of Loc.t
+    | Unhandled_Statement of Loc.t
         (** The statement at the given offset is not handled. Maybe because it 
             is not part of ES5. *)
     | Unhandled_Expression of Loc.t
         (** The expression at the given offset is not handled. Maybe because it 
             is not part of ES5. *)
-    | NotEcmaScript5       of string * Loc.t
+    | NotEcmaScript5 of string * Loc.t
         (** Something used in the script is not part of ES5. *)
-    | UnusedAnnotations    of string list * Loc.t
+    | UnusedAnnotations of string list * Loc.t
         (** Some JS_Logic annotations were in the wrong place. *)
-    | FlowParser           of string * string
+    | FlowParser of string * string
         (** Some error happened at the [flow_parser] level. *)
-    | LoaderError          of string * int * string * string
+    | LoaderError of string * int * string * string
         (** Some error happened when trying to process CommonJS constructs such
             as [require]. *)
 

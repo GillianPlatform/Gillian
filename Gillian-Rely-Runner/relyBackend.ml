@@ -2,11 +2,14 @@ module Make (Outcome : Outcome.S) (Suite : Suite.S) = struct
   module TestFramework = RelyFramework.Make (Outcome) (Suite)
 
   type matcher = OutcomeExt.Make(Outcome).ext Rely.matchers
-
   type category = Suite.category
 
   let register_expectation_for_one_test
-      expectation test_executor testFn source test =
+      expectation
+      test_executor
+      testFn
+      source
+      test =
     testFn source (fun { Rely.expect } ->
         let result = test_executor expect test in
         expectation expect test result)
@@ -26,6 +29,5 @@ module Make (Outcome : Outcome.S) (Suite : Suite.S) = struct
             tbl)
 
   let check_not_throw (expect : matcher) func = (expect.fn func).not.toThrow ()
-
   let run = TestFramework.run
 end

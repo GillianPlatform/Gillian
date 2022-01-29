@@ -6,9 +6,7 @@ type ('err, 'ast) memory_error_info = {
 
 module type S = sig
   type memory_error
-
   type tl_ast
-
   type memory
 
   val memory_error_to_exception_info :
@@ -29,9 +27,7 @@ module Default (SMemory : SMemory.S) (PC : ParserAndCompiler.S) :
      and type tl_ast = PC.tl_ast
      and type memory_error = SMemory.err_t = struct
   type memory = SMemory.t
-
   type tl_ast = PC.tl_ast
-
   type memory_error = SMemory.err_t
 
   let memory_error_to_exception_info { error; _ } : DebuggerTypes.exception_info

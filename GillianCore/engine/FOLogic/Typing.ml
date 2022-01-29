@@ -102,12 +102,13 @@ let rec infer_types_to_gamma
       && Option.fold ~some:(fun t -> f le2 t) ~none:true rqt2
       &&
       match rt with
-      | None    -> true
+      | None -> true
       | Some rt -> tt = rt)
 
 let reverse_type_lexpr
-    (flag : bool) (gamma : TypEnv.t) (e_types : (Expr.t * Type.t) list) :
-    TypEnv.t option =
+    (flag : bool)
+    (gamma : TypEnv.t)
+    (e_types : (Expr.t * Type.t) list) : TypEnv.t option =
   let new_gamma = TypEnv.init () in
   let ret =
     List.fold_left
@@ -120,7 +121,7 @@ let safe_extend_gamma (gamma : TypEnv.t) (le : Expr.t) (t : Type.t) : unit =
   let new_gamma = reverse_type_lexpr true gamma [ (le, t) ] in
   match new_gamma with
   | Some new_gamma -> TypEnv.extend gamma new_gamma
-  | None           ->
+  | None ->
       let msg =
         Fmt.str "ERROR: Safe Extend Gamma: Untypable expression: %a in @[%a@]"
           Expr.pp le TypEnv.pp gamma
@@ -211,9 +212,9 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
             let t, ite, constraints = f elem in
             match t with
             | Some _ -> (t, ite, constraints)
-            | None   -> (
+            | None -> (
                 match target_type with
-                | None    -> (t, ite, constraints)
+                | None -> (t, ite, constraints)
                 | Some tt -> infer_type elem tt constraints)
           in
           let correct_type = target_type = None || t = target_type in
@@ -238,16 +239,16 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
 
         match ite with
         | false -> def_neg
-        | true  ->
+        | true ->
             let (tt : Type.t), new_constraints =
               match unop with
-              | TypeOf         -> (TypeType, [])
+              | TypeOf -> (TypeType, [])
               | UNot | M_isNaN -> (BooleanType, [])
-              | ToStringOp     -> (StringType, [])
-              | Car | Cdr      ->
+              | ToStringOp -> (StringType, [])
+              | Car | Cdr ->
                   (ListType, [ Formula.LessEq (Lit (Num 1.), UnOp (LstLen, e)) ])
-              | LstRev         -> (ListType, [])
-              | _              -> (NumberType, [])
+              | LstRev -> (ListType, [])
+              | _ -> (NumberType, [])
             in
             infer_type le tt (new_constraints @ constraints))
     | BinOp (e1, op, e2) -> (
@@ -264,11 +265,11 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
                 let _, success, _ = infer_type e1 ListType constraints in
                 match success with
                 | false -> def_neg
-                | true  -> (
+                | true -> (
                     let _, success, _ = infer_type e2 NumberType constraints in
                     match success with
                     | false -> def_neg
-                    | true  ->
+                    | true ->
                         let new_constraint1 : Formula.t =
                           LessEq (Lit (Num 0.), e2)
                         in
@@ -283,11 +284,11 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
                 let _, success, _ = infer_type e1 StringType constraints in
                 match success with
                 | false -> def_neg
-                | true  -> (
+                | true -> (
                     let _, success, _ = infer_type e2 NumberType constraints in
                     match success with
                     | false -> def_neg
-                    | true  ->
+                    | true ->
                         let new_constraint1 : Formula.t =
                           LessEq (Lit (Num 0.), e2)
                         in
@@ -318,7 +319,7 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
                   | _ -> NumberType
                 in
                 infer_type le tt constraints)
-        | _, _       -> def_neg)
+        | _, _ -> def_neg)
     | NOp (SetUnion, les) | NOp (SetInter, les) ->
         let all_typable, constraints =
           typable_list ?target_type:(Some SetType) les
@@ -363,7 +364,7 @@ let te_of_list (vt : (Expr.t * Type.t) list) : TypEnv.t option =
     List.iter
       (fun (e, t) ->
         match (e : Expr.t) with
-        | Lit l           ->
+        | Lit l ->
             let t' = Literal.type_of l in
             if t <> t' then raise Break
         | LVar x | PVar x ->
@@ -371,7 +372,7 @@ let te_of_list (vt : (Expr.t * Type.t) list) : TypEnv.t option =
               let t' = TypEnv.get_unsafe result x in
               if t <> t' then raise Break)
             else TypEnv.update result x t
-        | _               -> (
+        | _ -> (
             let t', _, _ = type_lexpr result e in
             match t' with
             | Some t' when t = t' -> ()
@@ -407,7 +408,7 @@ let substitution_in_place (subst : SSubst.t) (gamma : TypEnv.t) : unit =
                 TypEnv.remove gamma x;
                 (e, x_type) :: ac)
               ~none:ac (TypEnv.get gamma x)
-        | _                    -> ac)
+        | _ -> ac)
       [] ve_pairs
   in
   let gamma' = reverse_type_lexpr true gamma et_pairs in

@@ -15,27 +15,18 @@ struct
   module AState = PState.Make (Val) (ESubst) (Store) (State) (Preds)
 
   type vt = Val.t
-
   type st = ESubst.t
-
   type store_t = Store.t
-
   type heap_t = State.heap_t
-
   type state_t = State.t
-
   type t = SS.t * state_t * state_t
-
   type err_t = State.err_t [@@deriving yojson]
-
   type fix_t = State.fix_t
-
   type m_err_t = State.m_err_t
 
   exception Internal_State_Error of err_t list * t
 
   type action_ret = ASucc of (t * vt list) list | AFail of err_t list
-
   type u_res = UWTF | USucc of t | UFail of err_t list
 
   let merge_action_results (rets : action_ret list) : action_ret =
@@ -44,7 +35,7 @@ struct
         (fun ret ->
           match ret with
           | ASucc _ -> true
-          | _       -> false)
+          | _ -> false)
         rets
     in
     if ret_fails <> [] then
@@ -53,7 +44,7 @@ struct
           (fun ret ->
             match ret with
             | AFail errs -> errs
-            | _          -> [])
+            | _ -> [])
           ret_fails
       in
       AFail (List.concat errs)
@@ -63,7 +54,7 @@ struct
           (fun ret ->
             match ret with
             | ASucc rets -> rets
-            | _          -> [])
+            | _ -> [])
           ret_succs
       in
       ASucc (List.concat rets)
@@ -76,7 +67,9 @@ struct
     State.get_pred_defs state
 
   let initialise
-      (procs : SS.t) (state : State.t) (pred_defs : UP.preds_tbl_t option) : t =
+      (procs : SS.t)
+      (state : State.t)
+      (pred_defs : UP.preds_tbl_t option) : t =
     (procs, state, State.init pred_defs)
 
   let eval_expr (bi_state : t) (e : Expr.t) =
@@ -98,7 +91,7 @@ struct
     let procs, state, af_state = bi_state in
     match State.to_loc state v with
     | Some (state', loc) -> Some ((procs, state', af_state), loc)
-    | None               ->
+    | None ->
         (* BIABDUCTION TODO: CREATE A NEW OBJECT *)
         None
 
@@ -113,7 +106,7 @@ struct
         if bi_abduce then
           match State.assume ~unfold state_af v with
           | [ state_af' ] -> (procs, state', state_af')
-          | _             -> raise (Failure "DEATH. ASSUME BI-ABDUCTION")
+          | _ -> raise (Failure "DEATH. ASSUME BI-ABDUCTION")
         else (procs, state', state_af))
       (State.assume ~unfold state v)
 
@@ -126,13 +119,13 @@ struct
     let procs, state, state_af = bi_state in
     match State.assume_a ~unification ~production state fs with
     | Some state -> Some (procs, state, state_af)
-    | None       -> None
+    | None -> None
 
   let assume_t (bi_state : t) (v : vt) (t : Type.t) : t option =
     let procs, state, state_af = bi_state in
     match State.assume_t state v t with
     | Some state -> Some (procs, state, state_af)
-    | None       -> None
+    | None -> None
 
   let sat_check (bi_state : t) (v : vt) : bool =
     let _, state, _ = bi_state in
@@ -175,7 +168,7 @@ struct
           ESubst.filter_in_place subst_af (fun x x_v ->
               match x with
               | LVar x -> if SS.mem x svars then None else Some x_v
-              | _      -> Some x_v);
+              | _ -> Some x_v);
           List.map
             (fun state_af -> (procs, state, state_af))
             (State.substitution_in_place subst_af state_af))
@@ -254,7 +247,7 @@ struct
       Val.from_expr (ESubst.subst_in_expr subst ~partial:true (Val.to_expr v))
     with
     | Some v -> v
-    | None   -> v
+    | None -> v
 
   let compose_substs (subst1 : st) (subst2 : st) : st =
     let bindings =
@@ -285,13 +278,13 @@ struct
               ~none:(State.USucc state) cur_step
           in
           match ret with
-          | UWTF         -> search (rest, rets)
+          | UWTF -> search (rest, rets)
           | USucc state' -> (
               match UP.next up with
-              | None                   ->
+              | None ->
                   L.verbose (fun m -> m "ONE SPEC IS DONE!!!@\n");
                   search (rest, (state', state_af, subst, UP.posts up) :: rets)
-              | Some [ (up, _) ]       ->
+              | Some [ (up, _) ] ->
                   search ((state', state_af, subst, up) :: rest, rets)
               | Some ((up, _) :: ups') ->
                   let next_states =
@@ -305,8 +298,8 @@ struct
                          ups'
                   in
                   search (next_states @ rest, rets)
-              | Some []                -> search (rest, rets))
-          | UFail errs   ->
+              | Some [] -> search (rest, rets))
+          | UFail errs ->
               let cur_asrt = Option.map fst cur_step in
               L.verbose (fun m ->
                   m
@@ -355,7 +348,7 @@ struct
                               match x with
                               | LVar x ->
                                   if SS.mem x svars then None else Some x_v
-                              | _      -> Some x_v);
+                              | _ -> Some x_v);
 
                           (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
                           let subst_in_place =
@@ -391,7 +384,7 @@ struct
 
   let update_store (state : State.t) (x : string option) (v : Val.t) : State.t =
     match x with
-    | None   -> state
+    | None -> state
     | Some x ->
         let store = State.get_store state in
         let _ = Store.put store x v in
@@ -451,7 +444,7 @@ struct
              let fl, posts =
                match posts with
                | Some (fl, posts) -> (fl, posts)
-               | _                ->
+               | _ ->
                    let msg =
                      Printf.sprintf
                        "SYNTAX ERROR: Spec of %s does not have a postcondition"
@@ -561,24 +554,19 @@ struct
     State.split_ins action ins
 
   let is_overlapping_asrt (a : string) : bool = State.is_overlapping_asrt a
-
   let pp_err = State.pp_err
-
   let pp_fix = State.pp_fix
-
   let get_failing_constraint = State.get_failing_constraint
-
   let can_fix = State.can_fix
-
   let ga_to_setter (a : string) : string = State.ga_to_setter a
-
   let ga_to_getter (a : string) : string = State.ga_to_getter a
-
   let ga_to_deleter (a : string) : string = State.ga_to_deleter a
 
   let rec execute_action
-      ?(unification = false) (action : string) (astate : t) (args : vt list) :
-      action_ret =
+      ?(unification = false)
+      (action : string)
+      (astate : t)
+      (args : vt list) : action_ret =
     let procs, state, state_af = astate in
     match State.execute_action ~unification action state args with
     | State.ASucc rets ->

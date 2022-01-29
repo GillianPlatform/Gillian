@@ -27,7 +27,7 @@ module Hashtbl = struct
                        let () = add hashtbl k v in
                        hashtbl)))
           (Ok hashtbl) lst
-    | _         -> Error "hashtbl_of_yojson: list needed"
+    | _ -> Error "hashtbl_of_yojson: list needed"
 
   let to_yojson
       (key_to_yojson : 'a -> Yojson.Safe.t)
@@ -84,7 +84,7 @@ key-value pair is list of two elements. *)
                   kv_of_yojson kv_yojson
                   |> Result.map (fun (k, v) -> add k v map)))
             (Ok empty) lst
-      | _         -> Error "map_of_yojson: list needed"
+      | _ -> Error "map_of_yojson: list needed"
 
     let to_yojson (val_to_yojson : 'a -> Yojson.Safe.t) (map : 'a t) :
         Yojson.Safe.t =

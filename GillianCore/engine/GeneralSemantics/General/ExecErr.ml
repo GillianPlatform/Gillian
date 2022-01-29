@@ -1,6 +1,6 @@
 type ('value, 'state_err) t =
-  | EProc        of 'value  (** Incorrect procedure identifier *)
-  | ESt          of 'state_err  (** Memory Error *)
+  | EProc of 'value  (** Incorrect procedure identifier *)
+  | ESt of 'state_err  (** Memory Error *)
   | ECleanUp
   | EFailReached of { fail_code : string; fail_params : 'value list }
 [@@deriving yojson]

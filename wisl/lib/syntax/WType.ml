@@ -21,21 +21,21 @@ let strongest t1 t2 =
   match (t1, t2) with
   | WAny, t -> t
   | t, WAny -> t
-  | _       -> t1
+  | _ -> t1
 
 (* careful there is no strongest for two different types *)
 
 let pp fmt t =
   let s = Format.fprintf fmt "@[%s@]" in
   match t with
-  | WList   -> s "List"
-  | WNull   -> s "NullType"
-  | WBool   -> s "Bool"
+  | WList -> s "List"
+  | WNull -> s "NullType"
+  | WBool -> s "Bool"
   | WString -> s "String"
-  | WPtr    -> s "Pointer"
-  | WInt    -> s "Int"
-  | WAny    -> s "Any"
-  | WSet    -> s "Set"
+  | WPtr -> s "Pointer"
+  | WInt -> s "Int"
+  | WAny -> s "Any"
+  | WSet -> s "Set"
 
 exception Unmatching_types
 
@@ -51,18 +51,18 @@ let of_variable (var : string) (type_context : t TypeMap.t) : t option =
 let of_val v =
   let open WVal in
   match v with
-  | Bool _  -> WBool
-  | Int _   -> WInt
-  | Str _   -> WString
-  | Null    -> WNull
+  | Bool _ -> WBool
+  | Int _ -> WInt
+  | Str _ -> WString
+  | Null -> WNull
   | VList _ -> WList
 
 (** returns (x, y) when unop takes type x and returns type y *)
 let of_unop u =
   match u with
-  | WUnOp.NOT  -> (WBool, WBool)
-  | WUnOp.LEN  -> (WList, WInt)
-  | WUnOp.REV  -> (WList, WList)
+  | WUnOp.NOT -> (WBool, WBool)
+  | WUnOp.LEN -> (WList, WInt)
+  | WUnOp.REV -> (WList, WList)
   | WUnOp.HEAD -> (WList, WAny)
   | WUnOp.TAIL -> (WList, WList)
 
@@ -100,21 +100,21 @@ let rec infer_logic_expr knownp lexpr =
   let open WLExpr in
   let bare_lexpr = get lexpr in
   match bare_lexpr with
-  | LVal v               -> TypeMap.add bare_lexpr (of_val v) knownp
+  | LVal v -> TypeMap.add bare_lexpr (of_val v) knownp
   | LBinOp (le1, b, le2) ->
       let inferred = infer_logic_expr (infer_logic_expr knownp le1) le2 in
       let t1, t2, t3 = of_binop b in
       TypeMap.add bare_lexpr t3
         (needs_to_be le1 t1 (needs_to_be le2 t2 inferred))
-  | LUnOp (u, le)        ->
+  | LUnOp (u, le) ->
       let inferred = infer_logic_expr knownp le in
       let t1, t2 = of_unop u in
       TypeMap.add bare_lexpr t2 (needs_to_be le t1 inferred)
-  | LVar _               -> knownp
-  | PVar _               -> knownp
-  | LEList lel           ->
+  | LVar _ -> knownp
+  | PVar _ -> knownp
+  | LEList lel ->
       TypeMap.add bare_lexpr WList (List.fold_left infer_logic_expr knownp lel)
-  | LESet lel            ->
+  | LESet lel ->
       TypeMap.add bare_lexpr WSet (List.fold_left infer_logic_expr knownp lel)
 
 (** Single step of inference for that gets a TypeMap from a single assertion *)
@@ -148,7 +148,7 @@ let rec infer_single_assert_step asser known =
         let topt = same_type le1 le2 inferred in
         match topt with
         | Some t -> TypeMap.add bare_le1 t (TypeMap.add bare_le2 t inferred)
-        | None   -> inferred)
+        | None -> inferred)
     | WLFormula.LLess (le1, le2)
     | WLFormula.LGreater (le1, le2)
     | WLFormula.LLessEq (le1, le2)
@@ -199,7 +199,7 @@ let infer_types_pred (params : (string * t option) list) assert_list =
     List.fold_left
       (fun (map : 'a TypeMap.t) (x, ot) ->
         match ot with
-        | None   -> map
+        | None -> map
         | Some t -> TypeMap.add (PVar x) t map)
       TypeMap.empty params
   in

@@ -39,34 +39,34 @@ let pp fmt pred =
   in
   let pp_param fmt (v, t) =
     match t with
-    | None     -> Fmt.pf fmt "%s" v
+    | None -> Fmt.pf fmt "%s" v
     | Some typ -> Fmt.pf fmt "%s : %s" v (Type.str typ)
   in
   let pp_id_ex fmt id_ex =
     match id_ex with
-    | None           -> ()
+    | None -> ()
     | Some (id, exs) ->
         if List.length exs > 0 then
           Fmt.pf fmt "[%s: %a]" id Fmt.(list ~sep:(any ", ") string) exs
         else Fmt.pf fmt "[%s]" id
   in
   let pp_abstract fmt = function
-    | true  -> Fmt.pf fmt "abstract "
+    | true -> Fmt.pf fmt "abstract "
     | false -> ()
   in
   let pp_pure fmt = function
-    | true  -> Fmt.pf fmt "pure "
+    | true -> Fmt.pf fmt "pure "
     | false -> ()
   in
   let pp_nounfold fmt = function
-    | true  -> Fmt.pf fmt "nounfold "
+    | true -> Fmt.pf fmt "nounfold "
     | false -> ()
   in
   let pp_def fmt (id_ex, asrt) =
     Fmt.pf fmt "%a%a" pp_id_ex id_ex Asrt.pp asrt
   in
   let pp_facts fmt = function
-    | []    -> ()
+    | [] -> ()
     | facts ->
         Fmt.pf fmt "@\nfacts: %a;"
           Fmt.(list ~sep:(any " and ") Formula.pp)

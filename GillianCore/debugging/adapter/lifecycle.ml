@@ -17,14 +17,14 @@ module Make (Debugger : Debugger.S) = struct
           Log.info "Do not stop on entry";
           let stop_reason = Debugger.run ~launch:true dbg in
           match stop_reason with
-          | Step           ->
+          | Step ->
               let () =
                 Log.info
                   "Debugger stopped because of step after running. This should \
                    not happen"
               in
               Lwt.return_unit
-          | ReachedEnd     ->
+          | ReachedEnd ->
               let () = Log.info "ReachedEnd: exiting" in
               Debug_rpc.send_event rpc
                 (module Exited_event)
@@ -35,14 +35,14 @@ module Make (Debugger : Debugger.S) = struct
               Debugger.terminate dbg;
               Lwt.wakeup_later_exn resolver Exit;
               Lwt.return_unit
-          | ReachedStart   ->
+          | ReachedStart ->
               (* Send step stopped event to allow for stepping backwards *)
               Debug_rpc.send_event rpc
                 (module Stopped_event)
                 Stopped_event.Payload.(
                   make ~reason:Stopped_event.Payload.Reason.Step
                     ~thread_id:(Some 0) ())
-          | Breakpoint     ->
+          | Breakpoint ->
               Debug_rpc.send_event rpc
                 (module Stopped_event)
                 Stopped_event.Payload.(

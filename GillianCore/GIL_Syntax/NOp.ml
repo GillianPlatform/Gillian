@@ -10,6 +10,6 @@ type t = TypeDef__.nop =
 
 let str (x : t) =
   match x with
-  | LstCat   -> "l+"
+  | LstCat -> "l+"
   | SetUnion -> "-u-"
   | SetInter -> "-i-"

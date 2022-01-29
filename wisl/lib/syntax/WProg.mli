@@ -11,25 +11,20 @@ val get_by_id :
   t ->
   int ->
   [> `None
-  | `WExpr     of WExpr.t
-  | `WFun      of WFun.t
-  | `WLAssert  of WLAssert.t
-  | `WLCmd     of WLCmd.t
-  | `WLExpr    of WLExpr.t
+  | `WExpr of WExpr.t
+  | `WFun of WFun.t
+  | `WLAssert of WLAssert.t
+  | `WLCmd of WLCmd.t
+  | `WLExpr of WLExpr.t
   | `WLFormula of WLFormula.t
-  | `WLemma    of WLemma.t
-  | `WPred     of WPred.t
-  | `WSpec     of WSpec.t
-  | `WStmt     of WStmt.t ]
+  | `WLemma of WLemma.t
+  | `WPred of WPred.t
+  | `WSpec of WSpec.t
+  | `WStmt of WStmt.t ]
 
 val get_pred : t -> string -> WPred.t option
-
 val get_fun : t -> string -> WFun.t option
-
 val never_called_during_symb : t -> WFun.t list
-
 val pp_context : Format.formatter -> WFun.t list -> unit
-
 val pp : Format.formatter -> t -> unit
-
 val get_function_name_of_element : t -> int -> string

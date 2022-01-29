@@ -1,9 +1,7 @@
 (** This is stupid, outcome is actually the interpreter. Doesn't really make sense, this should be changed. *)
 module type S = sig
   module Val : Val.S
-
   module ESubst : ESubst.S with type vt = Val.t and type t = Val.et
-
   module Store : Store.S with type vt = Val.t
 
   module State :
@@ -13,13 +11,12 @@ module type S = sig
        and type store_t = Store.t
 
   module ParserAndCompiler : ParserAndCompiler.S
-
   module External : External.S
 
   type t =
     | ParseAndCompileError of ParserAndCompiler.err
-    | FailedExec           of string
-    | FinishedExec         of
+    | FailedExec of string
+    | FinishedExec of
         (State.t, Val.t, (Val.t, State.err_t) ExecErr.t) ExecRes.t list
 
   val pp_what_test_did : Format.formatter -> t -> unit
@@ -56,8 +53,8 @@ module Make
 
   type t =
     | ParseAndCompileError of ParserAndCompiler.err
-    | FailedExec           of string
-    | FinishedExec         of
+    | FailedExec of string
+    | FinishedExec of
         (State.t, Val.t, (Val.t, State.err_t) ExecErr.t) ExecRes.t list
 
   let pp_what_test_did fmt = function
@@ -84,5 +81,6 @@ end
 
 module Make_Concrete (CMemory : CMemory.S) =
   Make (CVal.M) (CVal.CESubst) (CStore) (CState.Make (CMemory))
+
 module Make_Symbolic (SMemory : SMemory.S) =
   Make (SVal.M) (SVal.SESubst) (SStore) (SState.Make (SMemory))

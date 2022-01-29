@@ -69,8 +69,8 @@
     "@opam/dap": "1.0.6",
     "@opam/dune": "^2.0",
     "@opam/fmt": "^0.8.8",
-    "@opam/flow_parser": "giltho/flow#ac42cb1",
-    "@opam/menhir": "20190924",
+    "@opam/flow_parser": "giltho/flow#544677c0306668679172807bec95b134f5d249f3",
+    "@opam/menhir": "20211230",
     "@opam/ppx_deriving_yojson": "*",
     "@opam/ppxlib": ">=0.18.0",
     "@opam/printbox": "0.5",
@@ -79,18 +79,18 @@
     "@opam/visitors": ">=2.3",
     "@opam/yojson": "^1.7.0",
     "@opam/z3": "giltho/esy-z3#b0fdd9a",
-    "compcert": "giltho/CompCert#6bdcc61",
-    "ocaml": "^4.12.x"
+    "compcert": "giltho/CompCert#c318992c8d3be9edf4bf323d146d1bb68627339c",
+    "ocaml": "^4.13.x"
   },
   "devDependencies": {
-    "ocaml": "4.12.x",
+    "ocaml": "4.13.x",
     "@opam/cmitomli": "*",
     "@opam/fileutils": "*",
     "@opam/utop": "*",
     "@opam/shexp": "v0.14.0",
     "@opam/ocaml-lsp-server": "*",
     "@opam/odoc": "*",
-    "@opam/ocamlformat": "0.16.0",
+    "@opam/ocamlformat": "0.20.1",
     "@opam/ocamlfind": "*"
   },
   "resolutions": {

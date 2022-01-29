@@ -2,16 +2,15 @@ open Gil_syntax
 open Gillian.Symbolic
 
 let ( let* ) = Option.bind
-
 let ( let+ ) o f = Option.map f o
 
 type t =
   | SUndefined
-  | Sptr       of string * Expr.t
-  | SVint      of Expr.t
-  | SVlong     of Expr.t
-  | SVsingle   of Expr.t
-  | SVfloat    of Expr.t
+  | Sptr of string * Expr.t
+  | SVint of Expr.t
+  | SVlong of Expr.t
+  | SVsingle of Expr.t
+  | SVfloat of Expr.t
 
 let equal a b =
   match (a, b) with
@@ -39,7 +38,7 @@ let is_loc gamma loc =
     let* loc_t = TypEnv.get gamma loc in
     match loc_t with
     | Type.ObjectType -> Some true
-    | _               -> Some false
+    | _ -> Some false
   in
   Option.value ~default:false r_opt
 
@@ -52,10 +51,10 @@ let is_zero = function
 
 let zero_of_chunk chunk =
   match Compcert.AST.type_of_chunk chunk with
-  | Tany32 | Tint  -> SVint (Lit (Num 0.))
+  | Tany32 | Tint -> SVint (Lit (Num 0.))
   | Tany64 | Tlong -> SVlong (Lit (Num 0.))
-  | Tsingle        -> SVsingle (Lit (Num 0.))
-  | Tfloat         -> SVfloat (Lit (Num 0.))
+  | Tsingle -> SVsingle (Lit (Num 0.))
+  | Tfloat -> SVfloat (Lit (Num 0.))
 
 let is_loc_ofs gamma loc ofs =
   let r_opt =
@@ -102,14 +101,14 @@ let of_gil_expr ?(pfs = PureContext.init ()) ?(gamma = TypEnv.init ()) sval_e =
       Logging.verbose (fun fmt -> fmt "TRYING SUBSTITUTE EXPR : %a" Expr.pp exp);
       match ac with
       | None -> of_gil_expr_almost_concrete ~gamma exp
-      | _    -> ac)
+      | _ -> ac)
     None possible_exprs
 
 let of_gil_expr_exn ?(pfs = PureContext.init ()) ?(gamma = TypEnv.init ()) gexp
     =
   match of_gil_expr ~pfs ~gamma gexp with
   | Some s -> s
-  | None   ->
+  | None ->
       failwith
         (Format.asprintf
            "The following expression does not seem to correspond to any \
@@ -120,18 +119,15 @@ let to_gil_expr gexpr =
   let open Expr in
   let open CConstants.VTypes in
   match gexpr with
-  | SUndefined              -> (Lit Undefined, [])
+  | SUndefined -> (Lit Undefined, [])
   | Sptr (loc_name, offset) ->
       let loc = loc_from_loc_name loc_name in
       ( EList [ loc; offset ],
         [ (loc, Type.ObjectType); (offset, Type.NumberType) ] )
-  | SVint n                 -> ( EList [ Lit (String int_type); n ],
-                                 [ (n, Type.NumberType) ] )
-  | SVlong n                -> ( EList [ Lit (String long_type); n ],
-                                 [ (n, Type.NumberType) ] )
-  | SVfloat n               -> ( EList [ Lit (String float_type); n ],
-                                 [ (n, Type.NumberType) ] )
-  | SVsingle n              ->
+  | SVint n -> (EList [ Lit (String int_type); n ], [ (n, Type.NumberType) ])
+  | SVlong n -> (EList [ Lit (String long_type); n ], [ (n, Type.NumberType) ])
+  | SVfloat n -> (EList [ Lit (String float_type); n ], [ (n, Type.NumberType) ])
+  | SVsingle n ->
       (EList [ Lit (String single_type); n ], [ (n, Type.NumberType) ])
 
 let lvars =
@@ -145,20 +141,20 @@ let pp fmt v =
   let se = Expr.pp in
   let f = Format.fprintf in
   match v with
-  | SUndefined    -> f fmt "undefined"
+  | SUndefined -> f fmt "undefined"
   | Sptr (l, ofs) -> f fmt "Ptr(%s, %a)" l se ofs
-  | SVint i       -> f fmt "Int(%a)" se i
-  | SVlong i      -> f fmt "Long(%a)" se i
-  | SVfloat i     -> f fmt "Float(%a)" se i
-  | SVsingle i    -> f fmt "Single(%a)" se i
+  | SVint i -> f fmt "Int(%a)" se i
+  | SVlong i -> f fmt "Long(%a)" se i
+  | SVfloat i -> f fmt "Float(%a)" se i
+  | SVsingle i -> f fmt "Single(%a)" se i
 
 let substitution ~le_subst sv =
   match sv with
-  | SVint v          -> SVint (le_subst v)
-  | SVfloat v        -> SVfloat (le_subst v)
-  | SVlong v         -> SVlong (le_subst v)
-  | SVsingle v       -> SVsingle (le_subst v)
-  | SUndefined       -> SUndefined
+  | SVint v -> SVint (le_subst v)
+  | SVfloat v -> SVfloat (le_subst v)
+  | SVlong v -> SVlong (le_subst v)
+  | SVsingle v -> SVsingle (le_subst v)
+  | SUndefined -> SUndefined
   | Sptr (loc, offs) -> (
       let loc_e = Expr.loc_from_loc_name loc in
       match le_subst loc_e with

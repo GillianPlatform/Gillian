@@ -11,7 +11,7 @@ module SS = Gillian.Utils.Containers.SS
 
 let rec list_split_3 l =
   match l with
-  | []             -> ([], [], [])
+  | [] -> ([], [], [])
   | (a, b, c) :: r ->
       let la, lb, lc = list_split_3 r in
       (a :: la, b :: lb, c :: lc)
@@ -20,14 +20,14 @@ let rec list_split_3 l =
 let compile_type t =
   WType.(
     match t with
-    | WList   -> Some Type.ListType
-    | WNull   -> Some Type.NullType
-    | WBool   -> Some Type.BooleanType
+    | WList -> Some Type.ListType
+    | WNull -> Some Type.NullType
+    | WBool -> Some Type.BooleanType
     | WString -> Some Type.StringType
-    | WPtr    -> Some Type.ObjectType
-    | WInt    -> Some Type.NumberType
-    | WSet    -> Some Type.SetType
-    | WAny    -> None)
+    | WPtr -> Some Type.ObjectType
+    | WInt -> Some Type.NumberType
+    | WSet -> Some Type.SetType
+    | WAny -> None)
 
 let compile_binop b =
   WBinOp.(
@@ -50,19 +50,19 @@ let compile_binop b =
 let compile_unop u =
   WUnOp.(
     match u with
-    | NOT  -> UnOp.UNot
-    | LEN  -> UnOp.LstLen
+    | NOT -> UnOp.UNot
+    | LEN -> UnOp.LstLen
     | HEAD -> UnOp.Car
     | TAIL -> UnOp.Cdr
-    | REV  -> UnOp.LstRev)
+    | REV -> UnOp.LstRev)
 
 let rec compile_val v =
   let open WVal in
   match v with
-  | Bool b  -> Literal.Bool b
-  | Null    -> Literal.Null
-  | Int n   -> Literal.Num (float_of_int n)
-  | Str s   -> Literal.String s
+  | Bool b -> Literal.Bool b
+  | Null -> Literal.Null
+  | Int n -> Literal.Num (float_of_int n)
+  | Str s -> Literal.String s
   | VList l -> Literal.LList (List.map compile_val l)
 
 let rec compile_expr ?(fname = "main") expr :
@@ -73,13 +73,13 @@ let rec compile_expr ?(fname = "main") expr :
   let expr_fname_of_binop b =
     WBinOp.(
       match b with
-      | PLUS         -> expr_of_string internal_add
-      | MINUS        -> expr_of_string internal_minus
-      | LESSEQUAL    -> expr_of_string internal_leq
-      | LESSTHAN     -> expr_of_string internal_lt
+      | PLUS -> expr_of_string internal_add
+      | MINUS -> expr_of_string internal_minus
+      | LESSEQUAL -> expr_of_string internal_leq
+      | LESSTHAN -> expr_of_string internal_lt
       | GREATEREQUAL -> expr_of_string internal_geq
-      | GREATERTHAN  -> expr_of_string internal_gt
-      | _            ->
+      | GREATERTHAN -> expr_of_string internal_gt
+      | _ ->
           failwith
             (Format.asprintf
                "Binop %a does not correspond to an internal function" WBinOp.pp
@@ -154,13 +154,13 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
   let expr_pname_of_binop b =
     WBinOp.(
       match b with
-      | PLUS         -> internal_pred_add
-      | MINUS        -> internal_pred_minus
-      | LESSEQUAL    -> internal_pred_leq
-      | LESSTHAN     -> internal_pred_lt
+      | PLUS -> internal_pred_add
+      | MINUS -> internal_pred_minus
+      | LESSEQUAL -> internal_pred_leq
+      | LESSTHAN -> internal_pred_lt
       | GREATEREQUAL -> internal_pred_geq
-      | GREATERTHAN  -> internal_pred_gt
-      | _            ->
+      | GREATERTHAN -> internal_pred_gt
+      | _ ->
           failwith
             (Format.asprintf
                "Binop %a does not correspond to an internal function" WBinOp.pp
@@ -234,38 +234,38 @@ let rec compile_lformula ?(fname = "main") formula : Asrt.t list * Formula.t =
   let compile_lexpr = compile_lexpr ~fname in
   WLFormula.(
     match get formula with
-    | LTrue                 -> ([], Formula.True)
-    | LFalse                -> ([], Formula.False)
-    | LNot lf               ->
+    | LTrue -> ([], Formula.True)
+    | LFalse -> ([], Formula.False)
+    | LNot lf ->
         let a1, c1 = compile_lformula lf in
         (a1, Formula.Not c1)
-    | LAnd (lf1, lf2)       ->
+    | LAnd (lf1, lf2) ->
         let a1, c1 = compile_lformula lf1 in
         let a2, c2 = compile_lformula lf2 in
         (a1 @ a2, Formula.And (c1, c2))
-    | LOr (lf1, lf2)        ->
+    | LOr (lf1, lf2) ->
         let a1, c1 = compile_lformula lf1 in
         let a2, c2 = compile_lformula lf2 in
         (a1 @ a2, Formula.Or (c1, c2))
-    | LEq (le1, le2)        ->
+    | LEq (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
         (a1 @ a2, Formula.Eq (c1, c2))
-    | LLess (le1, le2)      ->
+    | LLess (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
         let expr_l_var_out = Expr.LVar (gen_str lgvar) in
         let pred = Asrt.Pred (internal_pred_lt, [ c1; c2; expr_l_var_out ]) in
         ( a1 @ a2 @ [ pred ],
           Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
-    | LGreater (le1, le2)   ->
+    | LGreater (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
         let expr_l_var_out = Expr.LVar (gen_str lgvar) in
         let pred = Asrt.Pred (internal_pred_gt, [ c1; c2; expr_l_var_out ]) in
         ( a1 @ a2 @ [ pred ],
           Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
-    | LLessEq (le1, le2)    ->
+    | LLessEq (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
         let expr_l_var_out = Expr.LVar (gen_str lgvar) in
@@ -315,7 +315,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
                    create an offset variable for a block assertion"
           in
           ([], [], (l, bo), expr_offset)
-      | None         ->
+      | None ->
           let exs1, la1, e1 = compile_lexpr le1 in
           let loc = gen_str lgvar in
           let offset, expr_offset =
@@ -330,7 +330,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
               @
               match expr_offset with
               | Lit (Num _) -> []
-              | _           -> [ (expr_offset, Type.NumberType) ])
+              | _ -> [ (expr_offset, Type.NumberType) ])
             :: Asrt.Pure
                  (Formula.Eq (e1, Expr.EList [ Expr.LVar loc; expr_offset ]))
             :: la1,
@@ -344,13 +344,13 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
       else []
     in
     match lle with
-    | []      ->
+    | [] ->
         failwith
           (Format.asprintf
              "In LPointsTo assertions, a location should always point to at \
               least one value\n\
               It is not the case in : %a" WLAssert.pp asser)
-    | [ le ]  ->
+    | [ le ] ->
         let exs2, la2, e2 = compile_lexpr le in
         ( exs1 @ exs2,
           concat_star
@@ -370,19 +370,19 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
   in
   WLAssert.(
     match get asser with
-    | LEmp                      -> ([], Asrt.Emp)
-    | LStar (la1, la2)          ->
+    | LEmp -> ([], Asrt.Emp)
+    | LStar (la1, la2) ->
         let exs1, cla1 = compile_lassert la1 in
         let exs2, cla2 = compile_lassert la2 in
         (exs1 @ exs2, Asrt.Star (cla1, cla2))
-    | LPointsTo (le1, lle)      -> compile_pointsto ~block:false le1 lle
+    | LPointsTo (le1, lle) -> compile_pointsto ~block:false le1 lle
     | LBlockPointsTo (le1, lle) -> compile_pointsto ~block:true le1 lle
-    | LPred (pr, lel)           ->
+    | LPred (pr, lel) ->
         let exsl, all, el = list_split_3 (List.map compile_lexpr lel) in
         let exs = List.concat exsl in
         let al = List.concat all in
         (exs, concat_star (Asrt.Pred (pr, el)) al)
-    | LPure lf                  ->
+    | LPure lf ->
         let al, f = compile_lformula lf in
         ([], concat_star (Asrt.Pure f) al))
 
@@ -393,7 +393,7 @@ let rec compile_lcmd ?(fname = "main") lcmd =
   let concat_star = List.fold_left (fun a1 a2 -> Asrt.Star (a1, a2)) in
   let build_assert existentials lasrts =
     match lasrts with
-    | []     -> None
+    | [] -> None
     | a :: r ->
         let to_assert = concat_star a r in
         let cmd = LCmd.SL (SLCmd.SepAssert (to_assert, existentials)) in
@@ -424,7 +424,7 @@ let rec compile_lcmd ?(fname = "main") lcmd =
       let compile_and_agregate c =
         let assert_opt, clcmd = compile_lcmd c in
         match assert_opt with
-        | None       -> [ clcmd ]
+        | None -> [ clcmd ]
         | Some asser -> [ asser; clcmd ]
       in
       let existentials, to_assert, comp_guard = compile_lexpr guard in
@@ -447,12 +447,12 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
   let inv_asrt, inv_exs =
     match WLCmd.get invariant with
     | Invariant (la, lb) -> (la, lb)
-    | _                  -> failwith "That can't happen, it's not an invariant"
+    | _ -> failwith "That can't happen, it's not an invariant"
   in
   let guard, wcmds =
     match WStmt.get while_stmt with
     | While (e, c) -> (e, c)
-    | _            -> failwith "That can't happen, not a while command"
+    | _ -> failwith "That can't happen, not a while command"
   in
   let lvar_exs, var_exs = List.partition Utils.Names.is_lvar_name inv_exs in
   let vars, lvars = WLAssert.get_vars_and_lvars inv_asrt in
@@ -472,7 +472,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         let new_a = WLAssert.make (LPure f) invariant_loc in
         match WLAssert.get acc with
         | LEmp -> new_a
-        | _    -> WLAssert.make (LStar (new_a, acc)) invariant_loc)
+        | _ -> WLAssert.make (LStar (new_a, acc)) invariant_loc)
       pre_without_bind var_subst
   in
   let post_subst =
@@ -596,13 +596,11 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
     match cmdl with
     | (_, Some lab, _) :: _r ->
         (cmdl, lab) (* there is already a label on the first command *)
-    | (a, None, c) :: r      ->
+    | (a, None, c) :: r ->
         let lab = gen_str pre in
         ((a, Some lab, c) :: r, lab)
         (* There is no label on the first command *)
-    | _                      -> failwith
-                                  "Cannot call get_or_create_lab with en empty \
-                                   list"
+    | _ -> failwith "Cannot call get_or_create_lab with en empty list"
   in
   let nth expr n =
     Expr.BinOp (expr, BinOp.LstNth, Expr.Lit (Literal.Num (float_of_int n)))
@@ -763,7 +761,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
         match to_bind with
         | Some (spec_name, lvars) ->
             Some (spec_name, List.map (fun x -> (x, Expr.LVar x)) lvars)
-        | None                    -> None
+        | None -> None
       in
       let cmd = Cmd.Call (x, expr_fn, params, None, bindings) in
       let annot =
@@ -802,7 +800,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let to_assert_opt, clcmd = compile_lcmd lcmd in
       let lcmds =
         match to_assert_opt with
-        | None           -> [ clcmd ]
+        | None -> [ clcmd ]
         | Some to_assert -> [ to_assert; clcmd ]
       in
       let cmds_with_annot =
@@ -817,12 +815,12 @@ let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials; _ }
   let _, comp_post = compile_lassert ~fname post in
   let label_opt =
     match existentials with
-    | None         -> None
+    | None -> None
     | Some (n, ss) -> Some (n, ss)
   in
   let single_spec =
     match label_opt with
-    | None          -> Spec.s_init comp_pre [ comp_post ] Flag.Normal true
+    | None -> Spec.s_init comp_pre [ comp_post ] Flag.Normal true
     | Some ss_label ->
         Spec.s_init ~ss_label comp_pre [ comp_post ] Flag.Normal true
   in
@@ -859,7 +857,8 @@ let compile_pred filepath pred =
     }
 
 let rec compile_function
-    filepath WFun.{ name; params; body; spec; return_expr; _ } =
+    filepath
+    WFun.{ name; params; body; spec; return_expr; _ } =
   let lbodylist, new_functions = compile_stmt_list ~fname:name body in
   let other_procs =
     List.concat (List.map (compile_function filepath) new_functions)
@@ -970,7 +969,7 @@ let compile_lemma
   let compile_and_agregate_lcmd lcmd =
     let a_opt, clcmd = compile_lcmd lcmd in
     match a_opt with
-    | None   -> [ clcmd ]
+    | None -> [ clcmd ]
     | Some a -> [ a; clcmd ]
   in
   let lemma_proof =

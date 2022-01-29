@@ -16,7 +16,6 @@ module Warnings = struct
     | _ :: r -> find_unit_cmd pat r
 
   let wnothing = find_unit_cmd "-w" options
-
   let silence_preprocessor () = prepro_options := "-w" :: !prepro_options
 
   let silence_all () =
@@ -64,6 +63,28 @@ module Preprocessor = struct
     prepro_options := output_file_opt @ target_opt @ ("-MM" :: !prepro_options)
 
   let get_options () = !prepro_options
-
   let restore_options options = prepro_options := options
 end
+
+let references_to_ignore =
+  [
+    "__compcert_i64_dtos";
+    "__compcert_i64_dtou";
+    "__compcert_i64_sar";
+    "__compcert_i64_sdiv";
+    "__compcert_i64_shl";
+    "__compcert_i64_shr";
+    "__compcert_i64_smod";
+    "__compcert_i64_smulh";
+    "__compcert_i64_stod";
+    "__compcert_i64_stof";
+    "__compcert_i64_udiv";
+    "__compcert_i64_umod";
+    "__compcert_i64_umulh";
+    "__compcert_i64_utod";
+    "__compcert_i64_utof";
+    "__compcert_va_composite";
+    "__compcert_va_float64";
+    "__compcert_va_int32";
+    "__compcert_va_int64";
+  ]

@@ -1,6 +1,5 @@
 module Make (Outcome : Outcome.S) (Suite : Suite.S) = struct
   type category = Suite.category
-
   type matcher = AlcotestCheckers.Make(Outcome).matcher
 
   let sanitize_string s =
@@ -15,7 +14,6 @@ module Make (Outcome : Outcome.S) (Suite : Suite.S) = struct
 
   (* Alcotest assumes that the code isn't supposed to raise errors *)
   let check_not_throw _ f = f ()
-
   let test_table = Hashtbl.create 1
 
   let expectation_for_one_test expectation test_executor name test =

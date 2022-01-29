@@ -8,21 +8,21 @@ module Expr = Gillian.Gil_syntax.Expr
 (**************************************************************)
 
 type t =
-  | Basic         of BCmd.t  (** JSIL basic commands *)
-  | Logic         of LCmd.t  (** JSIL Logic commands *)
-  | Goto          of int  (** Unconditional goto *)
-  | GuardedGoto   of Expr.t * int * int  (** Conditional goto *)
-  | Call          of
+  | Basic of BCmd.t  (** JSIL basic commands *)
+  | Logic of LCmd.t  (** JSIL Logic commands *)
+  | Goto of int  (** Unconditional goto *)
+  | GuardedGoto of Expr.t * int * int  (** Conditional goto *)
+  | Call of
       string
       * Expr.t
       * Expr.t list
       * int option
       * (string * (string * Expr.t) list) option  (** Procedure call *)
-  | ECall         of string * Expr.t * Expr.t list * int option
+  | ECall of string * Expr.t * Expr.t list * int option
       (** External Procedure call *)
-  | Apply         of string * Expr.t * int option
+  | Apply of string * Expr.t * int option
       (** Application-style procedure call *)
-  | Arguments     of string  (** Arguments of the current function *)
+  | Arguments of string  (** Arguments of the current function *)
   | PhiAssignment of (string * Expr.t list) list  (** PHI assignment *)
   | ReturnNormal  (** Normal return *)
   | ReturnError  (** Error return *)

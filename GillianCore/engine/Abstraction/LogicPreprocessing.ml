@@ -102,7 +102,7 @@ let find_recursive_preds (preds : (string, Pred.t) Hashtbl.t) :
           Some min_index
         else (* A previously explored component *)
           None
-    | None           ->
+    | None ->
         (* Exploring for the first time *)
         let index = !count in
         incr count;
@@ -123,7 +123,7 @@ let find_recursive_preds (preds : (string, Pred.t) Hashtbl.t) :
           List.fold_left
             (fun min_so_far neighbour_name ->
               match explore neighbour_name with
-              | None       -> min_so_far
+              | None -> min_so_far
               | Some index -> min min_so_far index)
             max_index neighbours
         in
@@ -173,7 +173,7 @@ let find_pure_preds (preds : (string, Pred.t) Hashtbl.t) :
     | Some is_pure ->
         (* predicate already visited *)
         is_pure
-    | None         ->
+    | None ->
         (* discovering new predicate *)
         Hashtbl.add is_pure_pred pred_name true;
         (* assume predicates are pure until proven otherwise,
@@ -213,9 +213,9 @@ let unfold_preds (preds : (string, Pred.t) Hashtbl.t) :
     List.sort
       (fun (a, x) (b, y) ->
         match (List.mem b x, List.mem a y) with
-        | true, true   -> 0
-        | true, false  -> -1
-        | false, true  -> 1
+        | true, true -> 0
+        | true, false -> -1
+        | false, true -> 1
         | false, false -> compare (List.length x) (List.length y))
       pred_dependency_info
   in
@@ -323,8 +323,8 @@ let remove_equalities_between_binders_and_lvars binders assertion =
   let priority x y =
     match (is_binder x, is_binder y) with
     | true, true | false, false -> `Eq
-    | true, false               -> `Greater
-    | false, true               -> `Lower
+    | true, false -> `Greater
+    | false, true -> `Lower
   in
   let equal = String.equal in
   let uf = Union_find.init ~priority ~equal in
@@ -340,11 +340,8 @@ let remove_equalities_between_binders_and_lvars binders assertion =
   let uf_maker =
     object
       inherit [_] Visitors.iter
-
       method! visit_Not _ _ = ()
-
       method! visit_Or _ _ _ = ()
-
       method! visit_Eq _ e1 e2 = union_expr e1 e2
     end
   in
@@ -358,7 +355,7 @@ let remove_equalities_between_binders_and_lvars binders assertion =
         | LVar x | PVar x ->
             let rep = Union_find.rep uf x in
             if String.equal x rep then e else Expr.var_to_expr rep
-        | _               -> super#visit_expr () e
+        | _ -> super#visit_expr () e
     end
   in
   substitutor#visit_assertion () assertion
@@ -372,12 +369,12 @@ let unfold_cmd
       let asrts = auto_unfold preds rec_info a in
       match asrts with
       | [ a ] -> Logic (SL (SepAssert (a, binders)))
-      | _     -> Logic (SL (SepAssert (a, binders))))
+      | _ -> Logic (SL (SepAssert (a, binders))))
   | Logic (SL (Invariant (a, binders))) ->
       let a =
         match auto_unfold preds rec_info a with
         | [ a ] -> a
-        | _     -> a
+        | _ -> a
       in
       let a = remove_equalities_between_binders_and_lvars binders a in
       Logic (SL (Invariant (a, binders)))
@@ -449,7 +446,7 @@ let explicit_param_types
         let current_pred = Hashtbl.find copy_preds name in
         Hashtbl.replace copy_preds name (join_preds current_pred pred)
       with
-      | Not_found      -> Hashtbl.replace copy_preds name pred
+      | Not_found -> Hashtbl.replace copy_preds name pred
       | Failure reason ->
           raise (Failure ("Error in predicate " ^ name ^ ": " ^ reason)))
     preds;
@@ -457,7 +454,7 @@ let explicit_param_types
   Hashtbl.iter
     (fun name (proc : ('a, int) Proc.t) ->
       match proc.proc_spec with
-      | None      -> Hashtbl.replace copy_procs name proc
+      | None -> Hashtbl.replace copy_procs name proc
       | Some spec ->
           let spec' = Spec.parameter_types preds spec in
           let proc' = { proc with proc_spec = Some spec' } in
@@ -530,18 +527,18 @@ let unfold_bispecs
   copy_bispecs
 
 (* let create_partial_matches
-    (procs    : (string, Proc.t) Hashtbl.t) : unit =
+     (procs    : (string, Proc.t) Hashtbl.t) : unit =
 
-  Hashtbl.iter
-    (fun name (proc : Proc.t) ->
-      match proc.spec with
-        | None -> ()
-        | Some spec ->
-            match UP.create_partial_match_spec spec with
-            | None -> ()
-            | Some sspec ->
-                Hashtbl.replace procs name { proc with Proc.spec = Some { spec with sspecs = spec.sspecs @ [ sspec ] } }
-    ) procs *)
+   Hashtbl.iter
+     (fun name (proc : Proc.t) ->
+       match proc.spec with
+         | None -> ()
+         | Some spec ->
+             match UP.create_partial_match_spec spec with
+             | None -> ()
+             | Some sspec ->
+                 Hashtbl.replace procs name { proc with Proc.spec = Some { spec with sspecs = spec.sspecs @ [ sspec ] } }
+     ) procs *)
 
 let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
   let f (prog : ('a, int) Prog.t) unfold =
@@ -563,7 +560,7 @@ let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
     let preds'', procs'', bi_specs, lemmas'', onlyspecs' =
       match unfold with
       | false -> (preds', procs', prog.bi_specs, lemmas', onlyspecs)
-      | true  ->
+      | true ->
           let preds'', rec_info = unfold_preds preds' in
           let procs'' = unfold_procs preds'' rec_info procs' in
           let bi_specs = unfold_bispecs preds'' rec_info prog.bi_specs in

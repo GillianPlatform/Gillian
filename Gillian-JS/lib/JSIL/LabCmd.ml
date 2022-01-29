@@ -8,19 +8,19 @@ module Expr = Gillian.Gil_syntax.Expr
 (***************************************************************)
 
 type t =
-  | LBasic         of BCmd.t
-  | LLogic         of LCmd.t
-  | LGoto          of string
-  | LGuardedGoto   of Expr.t * string * string
-  | LCall          of
+  | LBasic of BCmd.t
+  | LLogic of LCmd.t
+  | LGoto of string
+  | LGuardedGoto of Expr.t * string * string
+  | LCall of
       string
       * Expr.t
       * Expr.t list
       * string option
       * (string * (string * Expr.t) list) option
-  | LECall         of string * Expr.t * Expr.t list * string option
-  | LApply         of string * Expr.t * string option
-  | LArguments     of string
+  | LECall of string * Expr.t * Expr.t list * string option
+  | LApply of string * Expr.t * string option
+  | LArguments of string
   | LPhiAssignment of (string * Expr.t list) list
   | LReturnNormal
   | LReturnError

@@ -8,21 +8,15 @@ let syntax_js = ref false
 (** {2 JS2JSIL} *)
 
 let use_strict = ref false
-
 let js2jsil_harnessing = ref false
-
 let js2jsil_line_numbers = ref false
-
 let js2jsil_sep_procs = ref false
-
 let unfolding = ref true
 
 (** {2 Legacy config that is still used} *)
 
 let cosette = ref false
-
 let js = ref true
-
 let amazon = ref false
 
 (** {2 Other config} *)
@@ -34,4 +28,4 @@ let import_paths =
     | Some s ->
         print_endline s;
         s
-    | None   -> "")
+    | None -> "")

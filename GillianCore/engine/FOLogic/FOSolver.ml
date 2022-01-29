@@ -26,7 +26,7 @@ let simplify_pfs_and_gamma
     (gamma : TypEnv.t) : Formula.Set.t * TypEnv.t * SESubst.t =
   let pfs, gamma =
     match relevant_info with
-    | None               -> (PFS.of_list fs, TypEnv.copy gamma)
+    | None -> (PFS.of_list fs, TypEnv.copy gamma)
     | Some relevant_info ->
         ( PFS.filter_with_info relevant_info (PFS.of_list fs),
           TypEnv.filter_with_info relevant_info gamma )
@@ -61,7 +61,7 @@ let check_satisfiability_with_model (fs : Formula.t list) (gamma : TypEnv.t) :
                 (fun e -> Format.asprintf "%a" Expr.pp e)
                 (Expr.Set.elements z3_vars)))));
   match model with
-  | None       -> None
+  | None -> None
   | Some model -> (
       try
         Z3Encoding.lift_z3_model model gamma subst z3_vars;
@@ -197,10 +197,10 @@ let is_equal ~pfs ~gamma e1 e2 =
   in
   let result =
     match feq with
-    | True         -> true
-    | False        -> false
+    | True -> true
+    | False -> false
     | Eq _ | And _ -> check_entailment SS.empty pfs [ feq ] gamma
-    | _            ->
+    | _ ->
         raise
           (Failure
              ("Equality reduced to something unexpected: "
@@ -214,10 +214,10 @@ let is_different ~pfs ~gamma e1 e2 =
   let feq = Reduction.reduce_formula ~gamma ~pfs (Not (Eq (e1, e2))) in
   let result =
     match feq with
-    | True  -> true
+    | True -> true
     | False -> false
     | Not _ -> check_entailment SS.empty pfs [ feq ] gamma
-    | _     ->
+    | _ ->
         raise
           (Failure
              ("Inequality reduced to something unexpected: "
@@ -230,11 +230,11 @@ let is_less_or_equal ~pfs ~gamma e1 e2 =
   let feq = Reduction.reduce_formula ~gamma ~pfs (LessEq (e1, e2)) in
   let result =
     match feq with
-    | True        -> true
-    | False       -> false
+    | True -> true
+    | False -> false
     | Eq (ra, rb) -> is_equal ~pfs ~gamma ra rb
-    | LessEq _    -> check_entailment SS.empty pfs [ feq ] gamma
-    | _           ->
+    | LessEq _ -> check_entailment SS.empty pfs [ feq ] gamma
+    | _ ->
         raise
           (Failure
              ("Inequality reduced to something unexpected: "
@@ -246,4 +246,4 @@ let resolve_loc_name ~pfs ~gamma loc =
   Logging.tmi (fun fmt -> fmt "get_loc_name: %a" Expr.pp loc);
   match Reduction.reduce_lexpr ~pfs ~gamma loc with
   | Lit (Loc loc) | ALoc loc -> Some loc
-  | loc'                     -> Reduction.resolve_expr_to_location pfs gamma loc'
+  | loc' -> Reduction.resolve_expr_to_location pfs gamma loc'

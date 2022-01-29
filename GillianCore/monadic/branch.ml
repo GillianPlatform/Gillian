@@ -11,9 +11,6 @@ let pp pp_value =
        ])
 
 let value t = t.value
-
 let learned t = t.pc.learned
-
 let learned_types t = t.pc.learned_types
-
 let pc t = t.pc

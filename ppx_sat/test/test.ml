@@ -4,19 +4,12 @@ open Formula.Infix
 open Monadic.Delayed.Syntax
 
 let zero = Expr.num 0.
-
 let one = Expr.num 1.
-
 let two = Expr.num 2.
-
 let num_pat n x = x #== (Expr.num n)
-
 let zero_pat = num_pat 0.
-
 let one_pat = num_pat 1.
-
 let two_pat = num_pat 2.
-
 let three_pat = num_pat 3.
 
 let pp_branches =
@@ -56,11 +49,11 @@ end
 module Test_match_ent = struct
   let process x =
     match%ent x with
-    | zero_pat  -> return 0
-    | one_pat   -> return 1
-    | two_pat   -> return 2
+    | zero_pat -> return 0
+    | one_pat -> return 1
+    | two_pat -> return 2
     | three_pat -> return 3
-    | _         -> return (-1)
+    | _ -> return (-1)
 
   let pc_with_no_info = Monadic.Pc.init ()
 

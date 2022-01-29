@@ -10,22 +10,17 @@ module Extension_name = struct
 end
 
 let ppx_sat_runtime = Lident "Ppx_sat_runtime"
-
 let if_then_else = Ldot (ppx_sat_runtime, "if_then_else")
-
 let if_sure_then_else = Ldot (ppx_sat_runtime, "if_sure_then_else")
-
 let branch_entailment = Ldot (ppx_sat_runtime, "branch_entailment")
 
 let if_fun_fexpr_of_ext = function
   | Extension_name.Sat -> if_then_else
-  | Ent                -> if_sure_then_else
+  | Ent -> if_sure_then_else
 
 let match_fun_fexpr_of_ext = function
   | Extension_name.Ent -> branch_entailment
-  | Sat                -> failwith
-                            "Should not get here, match should not be used \
-                             with 'sat'"
+  | Sat -> failwith "Should not get here, match should not be used with 'sat'"
 
 let formula_true_ident = Ldot (ppx_sat_runtime, "true_formula")
 
@@ -56,7 +51,7 @@ let transform_case_ent ~expr (case : case) =
     | Some guard ->
         Location.raise_errorf ~loc:guard.pexp_loc
           "pattern guards are not authorized with the 'ent' extension"
-    | None       -> ()
+    | None -> ()
   in
   let lhs = case.pc_lhs in
   let formula_expr =
@@ -64,13 +59,13 @@ let transform_case_ent ~expr (case : case) =
     | Ppat_var str_loc ->
         pexp_ident ~loc:str_loc.loc
           (Located.mk ~loc:str_loc.loc (lident str_loc.txt))
-    | Ppat_any         ->
+    | Ppat_any ->
         let true_expr =
           pexp_ident ~loc:lhs.ppat_loc
             (Located.mk ~loc:lhs.ppat_loc formula_true_ident)
         in
         to_thunk ~loc:lhs.ppat_loc true_expr
-    | _                ->
+    | _ ->
         Location.raise_errorf ~loc:lhs.ppat_loc
           "the 'ent' extension only works if you provide function name have \
            type Expr.t -> Formula.t as pattern which"
@@ -84,7 +79,7 @@ let expand_match ~ext ~loc (expr : expression) (cases : case list) =
   | Extension_name.Sat ->
       Location.raise_errorf ~loc "%%%s cannot be used with 'match'"
         (Extension_name.to_string ext)
-  | Ent                ->
+  | Ent ->
       let cases = List.map (transform_case_ent ~expr) cases in
       let list_cases = elist ~loc cases in
       pexp_apply ~loc (match_fexpr ~ext:Ent loc) [ (Nolabel, list_cases) ]
@@ -98,7 +93,7 @@ let expand ~ext expr =
         let else_ =
           match else_ with
           | Some else_ -> else_
-          | None       ->
+          | None ->
               Location.raise_errorf ~loc "'if%%%s' must include an else branch"
                 (Extension_name.to_string ext)
         in

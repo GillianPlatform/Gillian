@@ -67,7 +67,7 @@ module Make (Outcome : Outcome.S) (Suite : Suite.S) = struct
         let (actual : Outcome.t) = actualThunk () in
         match actual with
         | Outcome.FailedExec _ -> ((fun () -> ""), true)
-        | _                    ->
+        | _ ->
             let failure_message =
               Fmt.str "Expected the test %a\nBut the test %a"
                 (formatExpected (fun f () -> Fmt.pf f "to fail at execution"))
@@ -78,7 +78,9 @@ module Make (Outcome : Outcome.S) (Suite : Suite.S) = struct
             ((fun () -> failure_message), false))
 
   let createToFinishInMode
-      branches flag (createMatcher : ('a, 'b) Rely.MatcherTypes.createMatcher) =
+      branches
+      flag
+      (createMatcher : ('a, 'b) Rely.MatcherTypes.createMatcher) =
     let open Rely.MatcherTypes in
     let open Rely.MatcherUtils in
     createMatcher
@@ -99,7 +101,7 @@ module Make (Outcome : Outcome.S) (Suite : Suite.S) = struct
             resInMode ~fmtexp:fmtexpstr ~fmtrcv:fmtrcvstr
               ~pp_what_branch_did:Outcome.pp_what_branch_did branches flag
               expected res
-        | other            ->
+        | other ->
             let failure_message =
               Fmt.str "Expected test %a\nBut test actually %a"
                 (formatExpected (fun f () ->
@@ -190,7 +192,7 @@ module Make (Outcome : Outcome.S) (Suite : Suite.S) = struct
                 let open RelyInternal.TestResult in
                 match rp.testStatus with
                 | Passed _ | Skipped _ -> accp
-                | _                    -> rp.title :: accp)
+                | _ -> rp.title :: accp)
               [] r.testResults
             :: acc
           else acc)
@@ -202,7 +204,7 @@ module Make (Outcome : Outcome.S) (Suite : Suite.S) = struct
           .RelyInternal.TestResult.AggregatedResult.testSuiteResults
     in
     match failures with
-    | []       -> ()
+    | [] -> ()
     | failures ->
         Fmt.pr "ALL FAILURES:\n%a\n"
           Fmt.(vbox ~indent:0 (list ~sep:(any "\n") string))

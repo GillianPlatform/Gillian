@@ -9,9 +9,9 @@ let is_normal (f : float) =
 
 let to_int n =
   match classify_float n with
-  | FP_nan                   -> 0.
-  | FP_infinite              -> n
-  | FP_zero                  -> n
+  | FP_nan -> 0.
+  | FP_infinite -> n
+  | FP_zero -> n
   | FP_normal | FP_subnormal ->
       (if n < 0. then -1. else 1.) *. floor (abs_float n)
 
@@ -26,7 +26,7 @@ let to_int32 n =
         if smod < 0. then smod +. i32 else smod
       in
       if int32bit >= i31 then int32bit -. i32 else int32bit
-  | _                        -> 0.
+  | _ -> 0.
 
 let to_uint32 n =
   match classify_float n with
@@ -38,7 +38,7 @@ let to_uint32 n =
         if smod < 0. then smod +. i32 else smod
       in
       int32bit
-  | _                        -> 0.
+  | _ -> 0.
 
 let to_uint16 n =
   match classify_float n with
@@ -50,7 +50,7 @@ let to_uint16 n =
         if smod < 0. then smod +. i16 else smod
       in
       int16bit
-  | _                        -> 0.
+  | _ -> 0.
 
 let modulo_32 x =
   let r = mod_float x 32. in

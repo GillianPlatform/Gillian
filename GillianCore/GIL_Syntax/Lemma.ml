@@ -31,11 +31,11 @@ let pp fmt lemma =
     Fmt.pf fmt' "[*  @[<hov 0>%a@]  *]" (Fmt.list ~sep:Fmt.semi LCmd.pp) proof
   in
   let pp_path_opt fmt = function
-    | None   -> Fmt.pf fmt "@nopath@\n"
+    | None -> Fmt.pf fmt "@nopath@\n"
     | Some _ -> ()
   in
   let pp_internal fmt = function
-    | true  -> Fmt.pf fmt "@internal@\n"
+    | true -> Fmt.pf fmt "@internal@\n"
     | false -> ()
   in
   Fmt.pf fmt "%a%a@[<v 2>lemma %s(%a)@ %a@ %a@]" pp_path_opt
@@ -65,13 +65,13 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (lemma : t) : t =
             List.fold_left
               (fun ac_types ((_, t_x), le) ->
                 match t_x with
-                | None     -> ac_types
+                | None -> ac_types
                 | Some t_x -> (le, t_x) :: ac_types)
               []
               (List.combine pred.pred_params les)
           in
           Star (Types ac_types, a)
-      | _                -> a
+      | _ -> a
     in
     Asrt.map None (Some f_a_after) None None a
   in

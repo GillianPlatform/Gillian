@@ -10,11 +10,8 @@ open Formula.Infix
 module CoreP = Constr.Core
 
 let id_of_string = Camlcoq.intern_string
-
 let true_name = Camlcoq.extern_atom
-
 let loc_param_name = "loc"
-
 let ofs_param_name = "ofs"
 
 let pred_name_of_struct struct_name =
@@ -31,7 +28,7 @@ let fresh_lvar ?(fname = "") () =
   Generators.gen_str ~fname pre
 
 let rec split3_expr_comp = function
-  | []             -> ([], [], [])
+  | [] -> ([], [], [])
   | (x, y, z) :: l ->
       let rx, ry, rz = split3_expr_comp l in
       (x :: rx, y @ ry, z :: rz)
@@ -41,7 +38,7 @@ let ( ++ ) = Expr.Infix.( +. )
 let ( == ) e1 e2 =
   match e1 #== e2 with
   | True -> Asrt.Emp
-  | f    -> Pure f
+  | f -> Pure f
 
 let types t e =
   let static_error () =
@@ -60,13 +57,12 @@ let types t e =
   | _ -> Emp
 
 let fold_star l = List.fold_left ( ** ) Emp l
-
 let fold_and l = List.fold_left (fun a b -> a #&& b) Formula.True l
 
 let to_assrt_of_gen_form f =
   match f with
   | Formula.True -> Asrt.Emp
-  | _            -> Pure f
+  | _ -> Pure f
 
 type gil_annots = {
   preds : Pred.t list;
@@ -110,22 +106,21 @@ let assert_of_member cenv members id typ =
   let pvmember = Expr.PVar field_name in
   let fo =
     match field_offset cenv id members with
-    | Errors.OK f    -> Expr.num (float_of_int (Camlcoq.Z.to_int f))
+    | Errors.OK (f, Full) -> Expr.num (float_of_int (Camlcoq.Z.to_int f))
+    | Errors.OK _ -> Fmt.failwith "Unsupported: bitfield members"
     | Errors.Error e ->
-        failwith
-          (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
-             e)
+        Fmt.failwith "Invalid member offset : %a@?" Driveraux.print_error e
   in
   (* The following bit of code should be refactored to be made cleaner ... *)
   if
     match typ with
     | Tstruct _ -> true
-    | _         -> false
+    | _ -> false
   then
     let struct_name, struct_id =
       match typ with
       | Tstruct (id, _) -> (true_name id, id)
-      | _               -> failwith "impossible"
+      | _ -> failwith "impossible"
     in
     let pred_name = pred_name_of_struct struct_name in
     let arg_number =
@@ -149,20 +144,19 @@ let assert_of_member cenv members id typ =
   else if
     match typ with
     | Tarray _ -> true
-    | _        -> false
+    | _ -> false
   then
     let ty, n =
       match typ with
       | Tarray (ty, n, _) -> (ty, n)
-      | _                 -> failwith "impossible"
+      | _ -> failwith "impossible"
     in
     let n = ValueTranslation.float_of_z n in
     let n_e = Expr.num n in
     let chunk =
       match Ctypes.access_mode ty with
       | By_value chunk -> chunk
-      | _              -> failwith
-                            "Array in a structure containing complicated types"
+      | _ -> failwith "Array in a structure containing complicated types"
     in
     Constr.Core.array ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~size:n_e
       ~sval_arr:pvmember ~perm:(Some Freeable)
@@ -174,14 +168,13 @@ let assert_of_member cenv members id typ =
       let open Internal_Predicates in
       let open VTypes in
       match typ with
-      | Tint _     -> ( mk int_type lvval,
-                        Asrt.Pred (int_get, [ pvmember; lvval ]) )
-      | Tlong _    ->
+      | Tint _ -> (mk int_type lvval, Asrt.Pred (int_get, [ pvmember; lvval ]))
+      | Tlong _ ->
           (mk long_type lvval, Asrt.Pred (long_get, [ pvmember; lvval ]))
-      | Tfloat _   ->
+      | Tfloat _ ->
           (mk float_type lvval, Asrt.Pred (float_get, [ pvmember; lvval ]))
       | Tpointer _ -> (pvmember, Asrt.Pred (is_ptr_opt, [ pvmember ]))
-      | _          ->
+      | _ ->
           failwith
             (Printf.sprintf "unhandled struct field type for now : %s"
                (PrintCsyntax.name_cdecl field_name typ))
@@ -189,7 +182,7 @@ let assert_of_member cenv members id typ =
     let chunk =
       match Ctypes.access_mode typ with
       | By_value chunk -> chunk
-      | _              -> failwith "Invalid access mode for some type"
+      | _ -> failwith "Invalid access mode for some type"
     in
     let ga_asrt =
       CoreP.single ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~sval:e_to_use
@@ -213,13 +206,13 @@ let gen_pred_of_struct cenv ann struct_name =
   let comp_opt = Maps.PTree.get id cenv in
   let comp =
     match comp_opt with
-    | None   -> Fmt.failwith "Structure %s is undefined !" struct_name
+    | None -> Fmt.failwith "Structure %s is undefined !" struct_name
     | Some c -> c
   in
   let open Ctypes in
   let () =
     match comp.co_su with
-    | Union  -> failwith "union shouldn't be handled by this function"
+    | Union -> failwith "union shouldn't be handled by this function"
     | Struct -> ()
   in
   let first_params =
@@ -229,19 +222,27 @@ let gen_pred_of_struct cenv ann struct_name =
     ]
   in
   let struct_params =
-    List.map (fun (i, _) -> (true_name i, Some Type.ListType)) comp.co_members
+    List.map
+      (function
+        | Member_plain (i, _) -> (true_name i, Some Type.ListType)
+        | Member_bitfield _ -> failwith "Unsupported bitfield members")
+      comp.co_members
   in
   let pred_params = first_params @ struct_params in
   let pred_num_params = List.length pred_params in
   let def_without_holes =
     List.fold_left
-      (fun asrt (id, typ) ->
-        asrt ** assert_of_member cenv comp.co_members id typ)
+      (fun asrt member ->
+        match member with
+        | Member_plain (id, typ) ->
+            asrt ** assert_of_member cenv comp.co_members id typ
+        | Member_bitfield _ -> failwith "Unsupported bitfield members")
       Asrt.Emp comp.co_members
   in
   let fo idp =
     match field_offset cenv idp comp.co_members with
-    | Errors.OK f    -> Camlcoq.Z.to_int f
+    | Errors.OK (f, Full) -> Camlcoq.Z.to_int f
+    | Errors.OK _ -> failwith "Unsupported bitfield members"
     | Errors.Error e ->
         failwith
           (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
@@ -252,10 +253,11 @@ let gen_pred_of_struct cenv ann struct_name =
     match memb with
     | [] -> []
     | [ _a ] -> []
-    | (ida, t) :: ((idb, _) :: _ as r) ->
+    | Member_plain (ida, t) :: (Member_plain (idb, _) :: _ as r) ->
         let end_a = fo ida + sz t in
         let start_b = fo idb in
         if end_a < start_b then (end_a, start_b) :: get_holes r else get_holes r
+    | _ -> failwith "Unsupported bitfield members"
   in
 
   let holes = get_holes comp.co_members in
@@ -284,24 +286,24 @@ let gen_pred_of_struct cenv ann struct_name =
 let trans_binop b =
   match b with
   | CBinOp.LstCons -> failwith "LstCons shouldn't be compiled that way"
-  | LstCat         -> failwith "LstCat shouldn't be compiled that way"
-  | PtrPlus        -> failwith "PtrPlus shouldn't be compiled that way"
-  | Plus           -> BinOp.FPlus
-  | Times          -> BinOp.FTimes
-  | Minus          -> BinOp.FMinus
-  | Div            -> BinOp.FDiv
-  | Equal          -> Equal
-  | SetSub         -> BSetSub
-  | SetDiff        -> SetDiff
-  | SetMem         -> BSetMem
-  | LessThan       -> FLessThan
-  | And            -> BAnd
-  | Or             -> BOr
+  | LstCat -> failwith "LstCat shouldn't be compiled that way"
+  | PtrPlus -> failwith "PtrPlus shouldn't be compiled that way"
+  | Plus -> BinOp.FPlus
+  | Times -> BinOp.FTimes
+  | Minus -> BinOp.FMinus
+  | Div -> BinOp.FDiv
+  | Equal -> Equal
+  | SetSub -> BSetSub
+  | SetDiff -> SetDiff
+  | SetMem -> BSetMem
+  | LessThan -> FLessThan
+  | And -> BAnd
+  | Or -> BOr
 
 let trans_unop u =
   match u with
   | CUnOp.LstLen -> UnOp.LstLen
-  | Not          -> UNot
+  | Not -> UNot
 
 let trans_nop n =
   match n with
@@ -310,11 +312,11 @@ let trans_nop n =
 let trans_simpl_expr se =
   match se with
   | CSimplExpr.PVar s -> Expr.PVar s
-  | LVar s            -> LVar s
-  | Loc s             -> Lit (Loc s)
-  | Num f             -> Lit (Num f)
-  | Bool b            -> Lit (Bool b)
-  | String s          -> Lit (String s)
+  | LVar s -> LVar s
+  | Loc s -> Lit (Loc s)
+  | Num f -> Lit (Num f)
+  | Bool b -> Lit (Bool b)
+  | String s -> Lit (String s)
 
 (* The first element of the result should be a pure assertion : either a formula, or overlapping assertions,
    The second element is the list of created variables, the third is the expression to be used
@@ -326,22 +328,22 @@ let trans_sval (sv : CSVal.t) : Asrt.t * Var.t list * Expr.t =
   let tloc = types Type.ObjectType in
   let tse = trans_simpl_expr in
   match sv with
-  | CSVal.Sint se   ->
+  | CSVal.Sint se ->
       let eg = tse se in
       (tnum eg, [], mk int_type (tse se))
-  | Slong se        ->
+  | Slong se ->
       let eg = tse se in
       (tnum eg, [], mk long_type (tse se))
-  | Ssingle se      ->
+  | Ssingle se ->
       let eg = tse se in
       (tnum eg, [], mk single_type (tse se))
-  | Sfloat se       ->
+  | Sfloat se ->
       let eg = tse se in
       (tnum eg, [], mk float_type (tse se))
   | Sptr (se1, se2) ->
       let eg1, eg2 = (tse se1, tse se2) in
       (tloc eg1 ** tnum eg2, [], Expr.EList [ tse se1; tse se2 ])
-  | Sfunptr symb    ->
+  | Sfunptr symb ->
       let lvar = fresh_lvar () in
       let ptr = Expr.LVar lvar in
       let pred = Constr.Others.fun_ptr ~ptr ~symb in
@@ -351,44 +353,44 @@ let trans_sval (sv : CSVal.t) : Asrt.t * Var.t list * Expr.t =
       the created variable for binding when necessary, and the used expression *)
 let rec trans_expr (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
   match e with
-  | CExpr.SExpr se           -> (Asrt.Emp, [], trans_simpl_expr se)
-  | SVal sv                  -> trans_sval sv
-  | EList el                 ->
+  | CExpr.SExpr se -> (Asrt.Emp, [], trans_simpl_expr se)
+  | SVal sv -> trans_sval sv
+  | EList el ->
       let asrts, vars, elp = split3_expr_comp (List.map trans_expr el) in
       let asrt = Asrt.star asrts in
       (asrt, vars, Expr.EList elp)
-  | ESet es                  ->
+  | ESet es ->
       let asrts, vars, elp = split3_expr_comp (List.map trans_expr es) in
       let asrt = Asrt.star asrts in
       (asrt, vars, Expr.ESet elp)
-  | BinOp (e1, LstCat, e2)   ->
+  | BinOp (e1, LstCat, e2) ->
       let a1, v1, eg1 = trans_expr e1 in
       let a2, v2, eg2 = trans_expr e2 in
       (a1 ** a2, v1 @ v2, Expr.list_cat eg1 eg2)
-  | BinOp (e1, LstCons, e2)  ->
+  | BinOp (e1, LstCons, e2) ->
       let a1, v1, eg1 = trans_expr e1 in
       let a2, v2, eg2 = trans_expr e2 in
       (a1 ** a2, v1 @ v2, Expr.list_cat (EList [ eg1 ]) eg2)
-  | BinOp (e1, PtrPlus, e2)  -> (
+  | BinOp (e1, PtrPlus, e2) -> (
       let a1, v1, ptr = trans_expr e1 in
       let a2, v2, to_add = trans_expr e2 in
       match ptr with
       | Expr.EList [ loc; ofs ] ->
           (a1 ** a2, v1 @ v2, Expr.EList [ loc; Expr.Infix.( +. ) ofs to_add ])
-      | ptr                     ->
+      | ptr ->
           let res_lvar = fresh_lvar () in
           let res = Expr.LVar res_lvar in
           ( a1 ** a2 ** Constr.Others.ptr_add ~ptr ~to_add ~res,
             res_lvar :: (v1 @ v2),
             res ))
-  | BinOp (e1, b, e2)        ->
+  | BinOp (e1, b, e2) ->
       let a1, v1, eg1 = trans_expr e1 in
       let a2, v2, eg2 = trans_expr e2 in
       (a1 ** a2, v1 @ v2, BinOp (eg1, trans_binop b, eg2))
-  | UnOp (u, e)              ->
+  | UnOp (u, e) ->
       let a, v, eg = trans_expr e in
       (a, v, UnOp (trans_unop u, eg))
-  | NOp (nop, el)            ->
+  | NOp (nop, el) ->
       let asrts, vs, elp = split3_expr_comp (List.map trans_expr el) in
       let asrt = Asrt.star asrts in
       let gnop = trans_nop nop in
@@ -402,9 +404,9 @@ let rec trans_expr (e : CExpr.t) : Asrt.t * Var.t list * Expr.t =
 let rec trans_form (f : CFormula.t) : Asrt.t * Var.t list * Formula.t =
   let open Formula.Infix in
   match f with
-  | CFormula.True     -> (Emp, [], Formula.True)
-  | False             -> (Emp, [], False)
-  | Eq (ce1, ce2)     ->
+  | CFormula.True -> (Emp, [], Formula.True)
+  | False -> (Emp, [], False)
+  | Eq (ce1, ce2) ->
       let f1, v1, eg1 = trans_expr ce1 in
       let f2, v2, eg2 = trans_expr ce2 in
       (f1 ** f2, v1 @ v2, eg1 #== eg2)
@@ -412,7 +414,7 @@ let rec trans_form (f : CFormula.t) : Asrt.t * Var.t list * Formula.t =
       let f1, v1, eg1 = trans_expr ce1 in
       let f2, v2, eg2 = trans_expr ce2 in
       (f1 ** f2, v1 @ v2, eg1 #<= eg2)
-  | Less (ce1, ce2)   ->
+  | Less (ce1, ce2) ->
       let f1, v1, eg1 = trans_expr ce1 in
       let f2, v2, eg2 = trans_expr ce2 in
       (f1 ** f2, v1 @ v2, eg1 #< eg2)
@@ -420,22 +422,22 @@ let rec trans_form (f : CFormula.t) : Asrt.t * Var.t list * Formula.t =
       let f1, v1, eg1 = trans_expr ce1 in
       let f2, v2, eg2 = trans_expr ce2 in
       (f1 ** f2, v1 @ v2, SetMem (eg1, eg2))
-  | Not fp            ->
+  | Not fp ->
       let a, v, fpp = trans_form fp in
       (a, v, fnot fpp)
-  | Or (f1, f2)       ->
+  | Or (f1, f2) ->
       let a1, v1, fp1 = trans_form f1 in
       let a2, v2, fp2 = trans_form f2 in
       (a1 ** a2, v1 @ v2, fp1 #|| fp2)
-  | And (f1, f2)      ->
+  | And (f1, f2) ->
       let a1, v1, fp1 = trans_form f1 in
       let a2, v2, fp2 = trans_form f2 in
       (a1 ** a2, v1 @ v2, fp1 #&& fp2)
-  | Implies (f1, f2)  ->
+  | Implies (f1, f2) ->
       let a1, v1, fp1 = trans_form f1 in
       let a2, v2, fp2 = trans_form f2 in
       (a1 ** a2, v1 @ v2, fp1 #=> fp2)
-  | ForAll (lvts, f)  ->
+  | ForAll (lvts, f) ->
       let a, v, fp = trans_form f in
       (a, v, ForAll (lvts, fp))
 
@@ -446,7 +448,7 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
   let malloc =
     match typ with
     | Malloced -> true
-    | _        -> false
+    | _ -> false
   in
   let cenv = ann.cenv in
   let gen_loc_var () = Expr.LVar (fresh_lvar ()) in
@@ -459,10 +461,10 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
   (* let zero = mk_num 0 in *)
   let ptr_call p l o = Asrt.Pred (Internal_Predicates.ptr_get, [ p; l; o ]) in
   let sz = function
-    | CSVal.Sint _       -> 4
-    | Slong _            -> 8
-    | Ssingle _          -> 4
-    | Sfloat _           -> 4
+    | CSVal.Sint _ -> 4
+    | Slong _ -> 8
+    | Ssingle _ -> 4
+    | Sfloat _ -> 4
     | Sptr _ | Sfunptr _ -> if Archi.ptr64 then 8 else 4
   in
   let interpret_s ~typ s =
@@ -474,18 +476,18 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
           match c with
           | CConstructor.ConsStruct _ ->
               failwith "global structures not handled yet"
-          | _                         -> ()
+          | _ -> ()
         in
         let symb =
           match s with
           | CExpr.SExpr (String symb) -> symb
-          | _                         -> failwith "Impossible by parser"
+          | _ -> failwith "Impossible by parser"
         in
         let locv = gen_loc_var () in
         let ofsv = Expr.num 0. in
         let p = Constr.Core.symbol ~symb ~loc:locv in
         (p, locv, ofsv)
-    | _              ->
+    | _ ->
         let a_s, _, s_e = trans_expr s in
         let locv = gen_loc_var () in
         let ofsv = gen_ofs_var () in
@@ -565,7 +567,7 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
       let comp_opt = Maps.PTree.get id cenv in
       let comp =
         match comp_opt with
-        | None   -> failwith (Printf.sprintf "Structure %s is undefined !" sname)
+        | None -> failwith (Printf.sprintf "Structure %s is undefined !" sname)
         | Some c -> c
       in
       let siz = Camlcoq.Z.to_int comp.Ctypes.co_sizeof in
@@ -622,7 +624,7 @@ let rec trans_lcmd ?(fname = "main") ?(ann = empty) lcmd =
   let trans_asrt = trans_asrt ~fname ~ann in
   let make_assert ~bindings = function
     | Asrt.Emp -> []
-    | a        -> [ LCmd.SL (SepAssert (a, bindings)) ]
+    | a -> [ LCmd.SL (SepAssert (a, bindings)) ]
   in
   match lcmd with
   | CLCmd.Apply (pn, el) ->
@@ -647,7 +649,7 @@ let rec trans_lcmd ?(fname = "main") ?(ann = empty) lcmd =
   | If (e, cl1, cl2) ->
       let trans_normal_lcmd lcmd =
         match trans_lcmd lcmd with
-        | `Normal x    -> x
+        | `Normal x -> x
         | `Invariant _ ->
             Fmt.failwith "Invariant inside if/else in logic command"
       in
@@ -668,7 +670,7 @@ let trans_asrt_annot da =
       (List.map
          (fun (ex, topt) ->
            match topt with
-           | None   -> (ex, Asrt.Emp)
+           | None -> (ex, Asrt.Emp)
            | Some t -> (ex, types t (Expr.LVar ex)))
          existentials)
   in
@@ -719,7 +721,7 @@ let trans_pred ?(ann = empty) ~filepath cl_pred =
     List.map
       (fun (d, a) ->
         match d with
-        | None    -> (None, trans_asrt ~fname:pred_name ~ann a)
+        | None -> (None, trans_asrt ~fname:pred_name ~ann a)
         | Some da ->
             let ada, gda = trans_asrt_annot da in
             (Some gda, ada ** trans_asrt ~fname:pred_name ~ann a))
@@ -752,7 +754,7 @@ let trans_sspec ?(ann = empty) fname sspecs =
   let CSpec.{ pre; posts; spec_annot } = sspecs in
   let tap, spa =
     match spec_annot with
-    | None     -> (Asrt.Emp, None)
+    | None -> (Asrt.Emp, None)
     | Some spa ->
         let a, (label, exs) = trans_asrt_annot spa in
         (a, Some (label, exs))
@@ -785,7 +787,7 @@ let trans_lemma ~ann ~filepath lemma =
     Option.map
       (List.concat_map (fun lcmd ->
            match trans_lcmd lcmd with
-           | `Normal x    -> x
+           | `Normal x -> x
            | `Invariant _ -> failwith "Invariant in lemma proof"))
       proof
   in
@@ -898,7 +900,7 @@ let get_clight_fun clight_prog ident =
   let act_f =
     match f with
     | Gfun (Internal fp) -> fp
-    | _                  ->
+    | _ ->
         failwith
           (Printf.sprintf "This is not a function it seems : %s"
              (true_name ident))
@@ -949,14 +951,17 @@ let asserts_of_rec_member cenv members id typ =
         let comp_opt = Maps.PTree.get id cenv in
         let comp =
           match comp_opt with
-          | None   ->
+          | None ->
               failwith
                 (Printf.sprintf "Structure %s is undefined !" struct_name)
           | Some c -> c
         in
         let struct_params =
           List.map
-            (fun (i, _) -> Expr.LVar ("#" ^ field_name ^ "__" ^ true_name i))
+            (function
+              | Member_plain (i, _) ->
+                  Expr.LVar ("#" ^ field_name ^ "__" ^ true_name i)
+              | Member_bitfield _ -> failwith "Unsupported bitfield members")
             comp.co_members
         in
         [
@@ -973,7 +978,8 @@ let asserts_of_rec_member cenv members id typ =
   in
   let fo =
     match field_offset cenv id members with
-    | Errors.OK f    -> Expr.Lit (Num (float_of_int (Camlcoq.Z.to_int f)))
+    | Errors.OK (f, Full) -> Expr.Lit (Num (float_of_int (Camlcoq.Z.to_int f)))
+    | Errors.OK _ -> failwith "Unsupported bitfield members"
     | Errors.Error e ->
         failwith
           (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
@@ -998,41 +1004,49 @@ let gen_rec_pred_of_struct cenv ann struct_name =
   let comp_opt = Maps.PTree.get id cenv in
   let comp =
     match comp_opt with
-    | None   ->
+    | None ->
         failwith (Printf.sprintf "Structure %s is undefined !" struct_name)
     | Some c -> c
   in
   let open Ctypes in
   let () =
     match comp.co_su with
-    | Union  -> failwith "union shouldn't be handled by this function"
+    | Union -> failwith "union shouldn't be handled by this function"
     | Struct -> ()
   in
   let first_params =
     [
-      (loc_param_name, Some Type.ObjectType);
+      (loc_param_name, Some Type.ObjectType)
       (* (offs_param_name, Some Type.NumberType) *)
-      (* TODO: For now, offset HAS to be 0, that will change *)
+      (* TODO: For now, offset HAS to be 0, that will change *);
     ]
   in
   let struct_params =
-    List.map (fun (i, _) -> (true_name i, Some Type.ListType)) comp.co_members
+    List.map
+      (function
+        | Member_plain (i, _) -> (true_name i, Some Type.ListType)
+        | _ -> failwith "Unsupported bitfield members")
+      comp.co_members
   in
   let pred_params = first_params @ struct_params in
   let pred_num_params = List.length pred_params in
   let defs_without_holes =
     List.fold_left
-      (fun al (id, typ) ->
-        let new_al = asserts_of_rec_member cenv comp.co_members id typ in
-        let list_of_list =
-          List.map (fun a -> List.map (fun na -> a ** na) new_al) al
-        in
-        List.concat list_of_list)
+      (fun al member ->
+        match member with
+        | Member_bitfield _ -> failwith "Unsupported bitfield members"
+        | Member_plain (id, typ) ->
+            let new_al = asserts_of_rec_member cenv comp.co_members id typ in
+            let list_of_list =
+              List.map (fun a -> List.map (fun na -> a ** na) new_al) al
+            in
+            List.concat list_of_list)
       [ Asrt.Emp ] comp.co_members
   in
   let fo idp =
     match field_offset cenv idp comp.co_members with
-    | Errors.OK f    -> Camlcoq.Z.to_int f
+    | Errors.OK (f, Full) -> Camlcoq.Z.to_int f
+    | Errors.OK _ -> failwith "Unsupported bitfield members"
     | Errors.Error e ->
         failwith
           (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
@@ -1041,12 +1055,13 @@ let gen_rec_pred_of_struct cenv ann struct_name =
   let sz t = Camlcoq.Z.to_int (sizeof cenv t) in
   let rec get_holes memb =
     match memb with
-    | []                        -> []
-    | [ _a ]                    -> []
-    | (ida, t) :: (idb, _) :: r ->
+    | [] -> []
+    | [ _a ] -> []
+    | Member_plain (ida, t) :: Member_plain (idb, _) :: r ->
         let end_a = fo ida + sz t in
         let start_b = fo idb in
         if end_a < start_b then (end_a, start_b) :: get_holes r else get_holes r
+    | _ -> failwith "Unsupported bitfield members"
   in
   let holes = get_holes comp.co_members in
   let hole_assert = fold_star (List.map assert_of_hole holes) in

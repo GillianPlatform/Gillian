@@ -8,7 +8,7 @@ let get_metadata cstate cval =
   try
     match act_ret with
     | ASucc [ (_, [ _; e ]) ] -> Some e
-    | _                       -> None
+    | _ -> None
   with _ -> None
 
 let get_cell cstate loc prop =
@@ -58,7 +58,6 @@ let error_has_proto str ret_val ret_state =
   | _ -> false
 
 let is_syntax_error = error_has_proto "$lserr_proto"
-
 let is_ref_error = error_has_proto "$lrferr"
 
 let parsing_failure_is_jsparser = function

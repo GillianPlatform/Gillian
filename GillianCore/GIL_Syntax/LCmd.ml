@@ -3,14 +3,14 @@
 module SS = Containers.SS
 
 type t = TypeDef__.lcmd =
-  | If         of Expr.t * t list * t list  (** If-then-else     *)
-  | Branch     of Formula.t  (** branching on a FO formual *)
-  | Macro      of string * Expr.t list  (** Macro            *)
-  | Assert     of Formula.t  (** Assert           *)
-  | Assume     of Formula.t  (** Assume           *)
+  | If of Expr.t * t list * t list  (** If-then-else     *)
+  | Branch of Formula.t  (** branching on a FO formual *)
+  | Macro of string * Expr.t list  (** Macro            *)
+  | Assert of Formula.t  (** Assert           *)
+  | Assume of Formula.t  (** Assume           *)
   | AssumeType of string * Type.t  (** Assume Type      *)
-  | SpecVar    of string list  (** Spec Var         *)
-  | SL         of SLCmd.t
+  | SpecVar of string list  (** Spec Var         *)
+  | SL of SLCmd.t
 
 let rec map
     (f_l : (t -> t) option)
@@ -29,14 +29,14 @@ let rec map
 
   (* Map over the elements of the command *)
   match mapped_lcmd with
-  | Branch a       -> Branch (map_p a)
+  | Branch a -> Branch (map_p a)
   | If (e, l1, l2) -> If (map_e e, List.map f l1, List.map f l2)
-  | Macro (s, l)   -> Macro (s, List.map map_e l)
-  | Assume a       -> Assume (map_p a)
-  | Assert a       -> Assert (map_p a)
-  | AssumeType _   -> mapped_lcmd
-  | SpecVar _      -> mapped_lcmd
-  | SL sl_cmd      -> SL (map_sl sl_cmd)
+  | Macro (s, l) -> Macro (s, List.map map_e l)
+  | Assume a -> Assume (map_p a)
+  | Assert a -> Assert (map_p a)
+  | AssumeType _ -> mapped_lcmd
+  | SpecVar _ -> mapped_lcmd
+  | SL sl_cmd -> SL (map_sl sl_cmd)
 
 let fold = List.fold_left SS.union SS.empty
 

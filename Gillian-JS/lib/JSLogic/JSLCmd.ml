@@ -3,19 +3,19 @@ open Jsil_syntax
 module Formula = Gillian.Gil_syntax.Formula
 
 type t =
-  | Fold       of JSAsrt.t * (string * (string * JSExpr.t) list) option
+  | Fold of JSAsrt.t * (string * (string * JSExpr.t) list) option
       (** Fold          *)
-  | Unfold     of JSAsrt.t * (string * string) list option  (** Single Unfold *)
-  | GUnfold    of string  (** Global unfold *)
-  | Flash      of JSAsrt.t  (** Unfold/fold   *)
-  | If         of JSExpr.t * t list * t list  (** If-then-else  *)
-  | Branch     of JSAsrt.pt (* Branching *)
+  | Unfold of JSAsrt.t * (string * string) list option  (** Single Unfold *)
+  | GUnfold of string  (** Global unfold *)
+  | Flash of JSAsrt.t  (** Unfold/fold   *)
+  | If of JSExpr.t * t list * t list  (** If-then-else  *)
+  | Branch of JSAsrt.pt (* Branching *)
   | ApplyLemma of string * JSExpr.t list  (** Lemma         *)
-  | Macro      of string * JSExpr.t list  (** Macro         *)
-  | Assert     of (JSAsrt.t * string list)  (** Assert        *)
-  | Assume     of JSAsrt.pt  (** Assume *)
-  | Invariant  of (JSAsrt.t * string list)  (** Invariant     *)
-  | UseSubst   of string * (string * JSExpr.t) list
+  | Macro of string * JSExpr.t list  (** Macro         *)
+  | Assert of (JSAsrt.t * string list)  (** Assert        *)
+  | Assume of JSAsrt.pt  (** Assume *)
+  | Invariant of (JSAsrt.t * string list)  (** Invariant     *)
+  | UseSubst of string * (string * JSExpr.t) list
 
 let rec js2jsil
     (cc_tbl : cc_tbl_type)
@@ -29,7 +29,7 @@ let rec js2jsil
 
   let translate_folding_info folding_info =
     match folding_info with
-    | None                       -> None
+    | None -> None
     | Some (def_id, var_le_list) ->
         Some (def_id, List.map (fun (x, le) -> (x, fe le)) var_le_list)
   in
@@ -68,7 +68,7 @@ let rec js2jsil
 
 let str_of_folding_info (unfold_info : (string * string) list option) : string =
   match unfold_info with
-  | None                  -> ""
+  | None -> ""
   | Some unfold_info_list ->
       let unfold_info_list =
         List.map (fun (v1, v2) -> "(" ^ v1 ^ " := " ^ v2 ^ ")") unfold_info_list

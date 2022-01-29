@@ -1,23 +1,14 @@
 type 'a t [@@deriving yojson]
 
 val make : unit -> 'a t
-
 val clear : 'a t -> unit
-
 val prepend : 'a -> 'a t -> unit
-
 val append : 'a -> 'a t -> unit
-
 val add : 'a -> 'a t -> unit
-
 val length : 'a t -> int
-
 val to_list : 'a t -> 'a list
-
 val of_list : 'a list -> 'a t
-
 val mem : ?equal:('a -> 'a -> bool) -> 'a -> 'a t -> bool
-
 val copy : 'a t -> 'a t
 
 (** [concat dest src] takes the element in [src] and moves them to [dst].
@@ -25,9 +16,7 @@ val copy : 'a t -> 'a t
 val concat : 'a t -> 'a t -> unit
 
 val map_inplace : ('a -> 'a) -> 'a t -> unit
-
 val fold_left : ('b -> 'a -> 'b) -> 'b -> 'a t -> 'b
-
 val iter : ('a -> unit) -> 'a t -> unit
 
 (** Unlike [List.for_all2], if the two lists given in parameters are not
@@ -35,7 +24,6 @@ val iter : ('a -> unit) -> 'a t -> unit
 val for_all2 : ('a -> 'b -> bool) -> 'a t -> 'b t -> bool
 
 val exists : ('a -> bool) -> 'a t -> bool
-
 val remove_duplicates : ?equal:('a -> 'a -> bool) -> 'a t -> unit
 
 (** Filters-maps the list in place according to fmap.

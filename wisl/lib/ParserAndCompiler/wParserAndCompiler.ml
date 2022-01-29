@@ -2,7 +2,6 @@ open Lexing
 open WLexer
 
 type err = unit
-
 type tl_ast = WProg.t
 
 let pp_err _ () = ()
@@ -10,7 +9,7 @@ let pp_err _ () = ()
 let parse_with_error token lexbuf =
   try token read lexbuf with
   | SyntaxError message -> failwith ("SYNTAX ERROR" ^ message)
-  | WParser.Error       ->
+  | WParser.Error ->
       let range = CodeLoc.curr lexbuf in
       let message =
         Printf.sprintf "unexpected token : %s at loc %s" (Lexing.lexeme lexbuf)
@@ -46,9 +45,7 @@ let parse_and_compile_files files =
       f files)
 
 let other_imports = []
-
 let initialize _ = ()
-
 let env_var_import_path = Some WConfig.import_env_var
 
 module TargetLangOptions =

@@ -44,3 +44,6 @@ byte-cursor-ub:
 		--fstruct-passing --no-lemma-proof --proc aws_byte_cursor_advance -l disabled
 		
 bugs: string-bug header-bug byte-cursor-ub
+
+clean:
+	rm -rf *.i *.deps

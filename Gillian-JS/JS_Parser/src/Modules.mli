@@ -2,9 +2,7 @@ open Flow_parser.Flow_ast
 open Flow_parser
 
 type loc = Loc.t
-
 type file = Flow_parser.File_key.t
-
 type error = Flow_parser.Parse_error.t
 
 type parse_f =

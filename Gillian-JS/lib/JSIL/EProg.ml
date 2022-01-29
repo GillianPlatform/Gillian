@@ -62,7 +62,7 @@ let get_procs ?(proc_names : string list option) (prog : t) : EProc.t list =
     | Some proc_names ->
         (* Printf.printf "GET PROCS with proc_names: %s\n" (String.concat ", " proc_names); *)
         proc_names
-    | None            ->
+    | None ->
         Hashtbl.fold
           (fun proc_name _ proc_names -> proc_name :: proc_names)
           prog.procs []
@@ -78,7 +78,7 @@ let get_bispecs (prog : t) : BiSpec.t list =
 let pp fmt prog =
   let pp_list ppp = Fmt.list ~sep:(Fmt.any "@\n@\n") ppp in
   let pp_imports fmt = function
-    | []   -> ()
+    | [] -> ()
     | imps -> Fmt.pf fmt "import %a;" (Fmt.list ~sep:Fmt.comma Fmt.string) imps
   in
   (* let _ = List.for_all (fun name -> Hashtbl.mem prog.procs name) (prog.proc_names) in *)

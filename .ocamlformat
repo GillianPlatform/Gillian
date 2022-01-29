@@ -1,11 +1,6 @@
-version=0.16.0
-align-cases=true
-align-constructors-decl=true
-align-variants-decl=true
+version=0.20.1
 assignment-operator=end-line
-break-before-in=fit-or-vertical
 break-cases=fit-or-vertical
-break-collection-expressions=fit-or-vertical
-break-fun-decl=smart
-break-fun-sig=smart
+break-fun-decl=fit-or-vertical
+break-fun-sig=fit-or-vertical
 doc-comments=before

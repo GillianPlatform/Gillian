@@ -10,11 +10,8 @@ type t = {
 }
 
 let get_id p = p.pred_id
-
 let get_loc p = p.pred_loc
-
 let get_name p = p.pred_name
-
 let get_ins p = p.pred_ins
 
 let get_by_id id pred =

@@ -1,16 +1,14 @@
 let db_name = "log.db"
-
 let db = ref None
 
 exception Error of string
 
 let error fmt = Format.kasprintf (fun err -> raise (Error err)) fmt
-
 let is_enabled () = Option.is_some !db
 
 let get_db () =
   match !db with
-  | None    ->
+  | None ->
       error
         "Unable to get database. Ensure that LogDatabase.create_db has been \
          called."
@@ -19,7 +17,7 @@ let get_db () =
 let check_result_code db ~log rc =
   match (rc : Sqlite3.Rc.t) with
   | OK | DONE | ROW -> ()
-  | _ as err        ->
+  | _ as err ->
       error "%s: %s (%s)" log (Sqlite3.Rc.to_string err) (Sqlite3.errmsg db)
 
 let exec db ~log ~stmt =
@@ -29,16 +27,16 @@ let exec db ~log ~stmt =
 
 let zero_or_one_row db ~log ~stmt =
   match Sqlite3.step stmt with
-  | ROW  -> (
+  | ROW -> (
       let row = Sqlite3.row_data stmt in
       match Sqlite3.step stmt with
       | DONE -> Some row
-      | ROW  -> error "%s: expected zero or one row, got more than one row" log
-      | err  ->
+      | ROW -> error "%s: expected zero or one row, got more than one row" log
+      | err ->
           error "%s: %s (%s)" log (Sqlite3.Rc.to_string err) (Sqlite3.errmsg db)
       )
   | DONE -> None
-  | err  ->
+  | err ->
       error "%s: %s (%s)" log (Sqlite3.Rc.to_string err) (Sqlite3.errmsg db)
 
 let create_report_table db =
@@ -59,7 +57,7 @@ let reset_db () = if Sys.file_exists db_name then Sys.remove db_name else ()
 
 let close_db () =
   match !db with
-  | None    -> ()
+  | None -> ()
   | Some db ->
       if not (Sqlite3.db_close db) then
         error "closing: %s (%s)"
@@ -67,7 +65,14 @@ let close_db () =
           (Sqlite3.errmsg db)
 
 let store_report
-    ~id ~title ~elapsed_time ~previous ~parent ~content ~severity ~type_ =
+    ~id
+    ~title
+    ~elapsed_time
+    ~previous
+    ~parent
+    ~content
+    ~severity
+    ~type_ =
   let db = get_db () in
   let stmt =
     Sqlite3.prepare db "INSERT INTO report VALUES (?, ?, ?, ?, ?, ?, ?, ?);"

@@ -7,9 +7,7 @@ type ('err, 'ast) memory_error_info = {
 
 module type S = sig
   type memory_error
-
   type tl_ast
-
   type memory
 
   val memory_error_to_exception_info :

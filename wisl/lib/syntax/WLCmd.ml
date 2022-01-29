@@ -1,19 +1,17 @@
 open VisitorUtils
 
 type tt =
-  | Fold      of string * WLExpr.t list
-  | Unfold    of string * WLExpr.t list
-  | ApplyLem  of string * WLExpr.t list * string list
-  | LogicIf   of WLExpr.t * t list * t list
-  | Assert    of WLAssert.t * string list
+  | Fold of string * WLExpr.t list
+  | Unfold of string * WLExpr.t list
+  | ApplyLem of string * WLExpr.t list * string list
+  | LogicIf of WLExpr.t * t list * t list
+  | Assert of WLAssert.t * string list
   | Invariant of WLAssert.t * string list
 
 and t = { wlcnode : tt; wlcid : int; wlcloc : CodeLoc.t }
 
 let get lcmd = lcmd.wlcnode
-
 let get_id lcmd = lcmd.wlcid
-
 let get_loc lcmd = lcmd.wlcloc
 
 let make bare_lcmd loc =
@@ -22,17 +20,17 @@ let make bare_lcmd loc =
 let is_inv lcmd =
   match get lcmd with
   | Invariant _ -> true
-  | _           -> false
+  | _ -> false
 
 let is_fold lcmd =
   match get lcmd with
   | Fold _ -> true
-  | _      -> false
+  | _ -> false
 
 let is_unfold lcmd =
   match get lcmd with
   | Unfold _ -> true
-  | _        -> false
+  | _ -> false
 
 let rec get_by_id id lcmd =
   let lexpr_getter = WLExpr.get_by_id id in

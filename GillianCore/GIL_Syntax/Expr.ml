@@ -2,16 +2,16 @@ open Names
 
 (** GIL Expressions *)
 type t = TypeDef__.expr =
-  | Lit    of Literal.t  (** GIL literals           *)
-  | PVar   of string  (** GIL program variables  *)
-  | LVar   of LVar.t  (** GIL logical variables  *)
-  | ALoc   of string  (** GIL abstract locations *)
-  | UnOp   of UnOp.t * t  (** Unary operators         *)
-  | BinOp  of t * BinOp.t * t  (** Binary operators        *)
+  | Lit of Literal.t  (** GIL literals           *)
+  | PVar of string  (** GIL program variables  *)
+  | LVar of LVar.t  (** GIL logical variables  *)
+  | ALoc of string  (** GIL abstract locations *)
+  | UnOp of UnOp.t * t  (** Unary operators         *)
+  | BinOp of t * BinOp.t * t  (** Binary operators        *)
   | LstSub of t * t * t  (** Sublist or (list, start, len) *)
-  | NOp    of NOp.t * t list  (** n-ary operators         *)
-  | EList  of t list  (** Lists of expressions    *)
-  | ESet   of t list  (** Sets of expressions     *)
+  | NOp of NOp.t * t list  (** n-ary operators         *)
+  | EList of t list  (** Lists of expressions    *)
+  | ESet of t list  (** Sets of expressions     *)
 [@@deriving yojson]
 
 let equal (e1 : t) (e2 : t) : bool = Stdlib.compare e1 e2 = 0
@@ -19,23 +19,18 @@ let equal (e1 : t) (e2 : t) : bool = Stdlib.compare e1 e2 = 0
 (** {3 builders} *)
 
 let lit x = Lit x
-
 let num n = lit (Num n)
-
 let num_int n = lit (Num (float_of_int n))
-
 let int n = lit (Int n)
-
 let string s = lit (String s)
-
 let bool b = lit (Bool b)
 
 let typeof x =
   match x with
-  | ALoc _ | Lit (Loc _)    -> Lit (Type ObjectType)
+  | ALoc _ | Lit (Loc _) -> Lit (Type ObjectType)
   | EList _ | Lit (LList _) -> Lit (Type ListType)
-  | ESet _                  -> Lit (Type SetType)
-  | _                       -> UnOp (TypeOf, x)
+  | ESet _ -> Lit (Type SetType)
+  | _ -> UnOp (TypeOf, x)
 
 let list_nth x n =
   match x with
@@ -46,13 +41,13 @@ let list_nth x n =
 let list_nth_e x n =
   match n with
   | Lit (Num n) -> list_nth x (int_of_float n)
-  | _           -> BinOp (x, LstNth, n)
+  | _ -> BinOp (x, LstNth, n)
 
 let list_length x =
   match x with
-  | EList l       -> Lit (Num (float_of_int (List.length l)))
+  | EList l -> Lit (Num (float_of_int (List.length l)))
   | Lit (LList l) -> Lit (Num (float_of_int (List.length l)))
-  | _             -> UnOp (LstLen, x)
+  | _ -> UnOp (LstLen, x)
 
 let list_sub ~lst ~start ~size =
   match (lst, start, size) with
@@ -60,13 +55,13 @@ let list_sub ~lst ~start ~size =
       match
         List_utils.list_sub el (int_of_float startf) (int_of_float sizef)
       with
-      | None        -> LstSub (lst, start, size)
+      | None -> LstSub (lst, start, size)
       | Some sublst -> EList sublst)
   | Lit (LList ll), Lit (Num startf), Lit (Num sizef) -> (
       match
         List_utils.list_sub ll (int_of_float startf) (int_of_float sizef)
       with
-      | None        -> LstSub (lst, start, size)
+      | None -> LstSub (lst, start, size)
       | Some sublst -> Lit (LList sublst))
   | _ -> LstSub (lst, start, size)
 
@@ -86,7 +81,7 @@ let list_cons el r =
   let sgl =
     match el with
     | Lit x -> Lit (LList [ x ])
-    | e     -> EList [ e ]
+    | e -> EList [ e ]
   in
   list_cat sgl r
 
@@ -95,7 +90,7 @@ let list el =
     List.for_all
       (function
         | Lit _ -> true
-        | _     -> false)
+        | _ -> false)
       el
   then
     Lit
@@ -103,14 +98,14 @@ let list el =
          (List.map
             (function
               | Lit l -> l
-              | _     -> assert false)
+              | _ -> assert false)
             el))
   else EList el
 
 let fmod a b =
   match (a, b) with
   | Lit (Num a), Lit (Num b) -> Lit (Num (mod_float a b))
-  | _                        -> BinOp (a, FMod, b)
+  | _ -> BinOp (a, FMod, b)
 
 let type_ t = Lit (Type t)
 
@@ -174,9 +169,9 @@ module Infix = struct
 
   let ( / ) a b =
     match (a, b) with
-    | x, Lit (Int 1)           -> x
+    | x, Lit (Int 1) -> x
     | Lit (Int x), Lit (Int y) -> Lit (Int (x / y))
-    | _                        -> BinOp (a, IDiv, b)
+    | _ -> BinOp (a, IDiv, b)
 
   let ( @+ ) = list_cat
 end
@@ -185,9 +180,7 @@ module MyExpr = struct
   type nonrec t = t
 
   let of_yojson = of_yojson
-
   let to_yojson = to_yojson
-
   let compare = Stdlib.compare
 end
 
@@ -197,32 +190,33 @@ module Map = Map.Make (MyExpr)
 (** Map over expressions *)
 
 (* let rec map (f_before : t -> t * bool) (f_after : (t -> t) option) (expr : t) :
-    t =
-  (* Apply the mapping *)
-  let map_e = map f_before f_after in
-  let f_after = Option.value ~default:(fun x -> x) f_after in
+     t =
+   (* Apply the mapping *)
+   let map_e = map f_before f_after in
+   let f_after = Option.value ~default:(fun x -> x) f_after in
 
-  let mapped_expr, recurse = f_before expr in
-  if not recurse then mapped_expr
-  else
-    (* Map recursively to expressions *)
-    let mapped_expr =
-      match mapped_expr with
-      | Lit _ | PVar _ | LVar _ | ALoc _ -> mapped_expr
-      | UnOp (op, e) -> UnOp (op, map_e e)
-      | BinOp (e1, op, e2) -> BinOp (map_e e1, op, map_e e2)
-      | LstSub (e1, e2, e3) -> LstSub (map_e e1, map_e e2, map_e e3)
-      | NOp (op, es) -> NOp (op, List.map map_e es)
-      | EList es -> EList (List.map map_e es)
-      | ESet es -> ESet (List.map map_e es)
-    in
-    f_after mapped_expr *)
+   let mapped_expr, recurse = f_before expr in
+   if not recurse then mapped_expr
+   else
+     (* Map recursively to expressions *)
+     let mapped_expr =
+       match mapped_expr with
+       | Lit _ | PVar _ | LVar _ | ALoc _ -> mapped_expr
+       | UnOp (op, e) -> UnOp (op, map_e e)
+       | BinOp (e1, op, e2) -> BinOp (map_e e1, op, map_e e2)
+       | LstSub (e1, e2, e3) -> LstSub (map_e e1, map_e e2, map_e e3)
+       | NOp (op, es) -> NOp (op, List.map map_e es)
+       | EList es -> EList (List.map map_e es)
+       | ESet es -> ESet (List.map map_e es)
+     in
+     f_after mapped_expr *)
 
 (** Optional map over expressions *)
 
 let rec map_opt
-    (f_before : t -> t option * bool) (f_after : (t -> t) option) (expr : t) :
-    t option =
+    (f_before : t -> t option * bool)
+    (f_after : (t -> t) option)
+    (expr : t) : t option =
   (* Apply the mapping *)
   let map_e = map_opt f_before f_after in
   let f_after = Option.value ~default:(fun x -> x) f_after in
@@ -234,8 +228,8 @@ let rec map_opt
   in
 
   match f_before expr with
-  | None, _                -> None
-  | mapped_expr, false     -> mapped_expr
+  | None, _ -> None
+  | mapped_expr, false -> mapped_expr
   | Some mapped_expr, true ->
       (* Map recursively to expressions *)
       let mapped_expr =
@@ -245,7 +239,7 @@ let rec map_opt
         | BinOp (e1, op, e2) -> (
             match (map_e e1, map_e e2) with
             | Some e1', Some e2' -> Some (BinOp (e1', op, e2'))
-            | _                  -> None)
+            | _ -> None)
         | LstSub (e1, e2, e3) -> (
             match (map_e e1, map_e e2, map_e e3) with
             | Some e1', Some e2', Some e3' -> Some (LstSub (e1', e2', e3'))
@@ -264,7 +258,7 @@ let rec pp fmt e =
   | BinOp (e1, op, e2) -> (
       match op with
       | LstNth | StrNth -> Fmt.pf fmt "%s(%a, %a)" (BinOp.str op) pp e1 pp e2
-      | _               -> Fmt.pf fmt "(%a %s %a)" pp e1 (BinOp.str op) pp e2)
+      | _ -> Fmt.pf fmt "(%a %s %a)" pp e1 (BinOp.str op) pp e2)
   | LstSub (e1, e2, e3) -> Fmt.pf fmt "l-sub(%a, %a, %a)" pp e1 pp e2 pp e3
   (* (uop e) *)
   | UnOp (op, e) -> Fmt.pf fmt "(%s %a)" (UnOp.str op) pp e
@@ -278,20 +272,18 @@ let rec pp fmt e =
 
 let rec full_pp fmt e =
   match e with
-  | Lit _               -> Fmt.pf fmt "Lit %a" pp e
-  | PVar _              -> Fmt.pf fmt "PVar %a" pp e
-  | LVar _              -> Fmt.pf fmt "LVar %a" pp e
-  | ALoc _              -> Fmt.pf fmt "ALoc %a" pp e
-  | BinOp (e1, op, e2)  ->
+  | Lit _ -> Fmt.pf fmt "Lit %a" pp e
+  | PVar _ -> Fmt.pf fmt "PVar %a" pp e
+  | LVar _ -> Fmt.pf fmt "LVar %a" pp e
+  | ALoc _ -> Fmt.pf fmt "ALoc %a" pp e
+  | BinOp (e1, op, e2) ->
       Fmt.pf fmt "(%a %s %a)" full_pp e1 (BinOp.str op) full_pp e2
-  | UnOp (op, e)        -> Fmt.pf fmt "(%s %a)" (UnOp.str op) pp e
+  | UnOp (op, e) -> Fmt.pf fmt "(%s %a)" (UnOp.str op) pp e
   | LstSub (e1, e2, e3) ->
       Fmt.pf fmt "l-sub(%a, %a, %a)" full_pp e1 full_pp e2 full_pp e3
-  | NOp _               -> Fmt.pf fmt "(NOp %a)" pp e
-  | EList ll            -> Fmt.pf fmt "{{ @[%a@] }}"
-                             (Fmt.list ~sep:Fmt.comma full_pp)
-                             ll
-  | _                   -> pp fmt e
+  | NOp _ -> Fmt.pf fmt "(NOp %a)" pp e
+  | EList ll -> Fmt.pf fmt "{{ @[%a@] }}" (Fmt.list ~sep:Fmt.comma full_pp) ll
+  | _ -> pp fmt e
 
 (** From expression to expression *)
 let to_expr (le : t) : t = le
@@ -299,9 +291,9 @@ let to_expr (le : t) : t = le
 (** From expression to list, if possible *)
 let to_list (le : t) : t list option =
   match le with
-  | EList les       -> Some les
+  | EList les -> Some les
   | Lit (LList les) -> Some (List.map (fun x -> Lit x) les)
-  | _               -> None
+  | _ -> None
 
 (** From list to expression *)
 let from_list les = EList les
@@ -345,7 +337,7 @@ let rec is_concrete (le : t) : bool =
 
   let rec loop les =
     match les with
-    | []         -> true
+    | [] -> true
     | le :: rest -> if f le then loop rest else false
   in
 
@@ -366,7 +358,7 @@ let all_literals les =
     (fun x ->
       match x with
       | Lit _ -> true
-      | _     -> false)
+      | _ -> false)
     les
 
 (** Lifting literal lists to lists of expressions *)
@@ -374,7 +366,7 @@ let rec from_lit_list (lit : Literal.t) : t =
   let f = from_lit_list in
   match lit with
   | LList lst -> EList (List.map f lst)
-  | _         -> Lit lit
+  | _ -> Lit lit
 
 (** Get all sub-expressions of --e-- of the form (Lit (LList lst)) and (EList lst)  *)
 let lists (le : t) : t list =
@@ -409,7 +401,6 @@ let base_elements (expr : t) : t list =
   let v =
     object
       inherit [_] Visitors.reduce as super
-
       inherit Visitors.Utils.list_monoid
 
       method! visit_literal =
@@ -418,7 +409,7 @@ let base_elements (expr : t) : t list =
       method! visit_expr env =
         function
         | (LVar _ | ALoc _) as e -> [ e ]
-        | e                      -> super#visit_expr env e
+        | e -> super#visit_expr env e
     end
   in
   v#visit_expr () expr
@@ -440,11 +431,11 @@ let is_unifiable (e : t) : bool =
 let rec pvars_to_lvars (e : t) : t =
   let f = pvars_to_lvars in
   match e with
-  | PVar x              -> LVar ("#__" ^ x)
-  | UnOp (op, e)        -> UnOp (op, f e)
-  | BinOp (e1, op, e2)  -> BinOp (f e1, op, f e2)
+  | PVar x -> LVar ("#__" ^ x)
+  | UnOp (op, e) -> UnOp (op, f e)
+  | BinOp (e1, op, e2) -> BinOp (f e1, op, f e2)
   | LstSub (e1, e2, e3) -> LstSub (f e1, f e2, f e3)
-  | NOp (op, les)       -> NOp (op, List.map f les)
-  | EList les           -> EList (List.map f les)
-  | ESet les            -> ESet (List.map f les)
-  | _                   -> e
+  | NOp (op, les) -> NOp (op, List.map f les)
+  | EList les -> EList (List.map f les)
+  | ESet les -> ESet (List.map f les)
+  | _ -> e

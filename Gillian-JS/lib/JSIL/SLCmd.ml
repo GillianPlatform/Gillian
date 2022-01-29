@@ -8,16 +8,15 @@ module SS = Containers.SS
 (***************************************************************)
 
 type folding_info = string * (string * Expr.t) list
-
 type unfold_info = (string * string) list
 
 (** {b JSIL Separation Logic commands}. *)
 type t =
-  | Fold      of string * Expr.t list * folding_info option  (** Fold             *)
-  | Unfold    of string * Expr.t list * unfold_info option * bool
+  | Fold of string * Expr.t list * folding_info option  (** Fold             *)
+  | Unfold of string * Expr.t list * unfold_info option * bool
       (** Unfold           *)
-  | GUnfold   of string  (** Global Unfold    *)
-  | ApplyLem  of string * Expr.t list * string list  (** Apply lemma      *)
+  | GUnfold of string  (** Global Unfold    *)
+  | ApplyLem of string * Expr.t list * string list  (** Apply lemma      *)
   | SepAssert of Asrt.t * string list  (** Assert           *)
   | Invariant of Asrt.t * string list  (** Invariant        *)
 
@@ -40,7 +39,7 @@ let pp fmt (lcmd : t) : unit =
   let pp_binders f b =
     match b with
     | [] -> ()
-    | _  -> Fmt.pf f "[bind: %a]" (Fmt.list ~sep:Fmt.comma Fmt.string) b
+    | _ -> Fmt.pf f "[bind: %a]" (Fmt.list ~sep:Fmt.comma Fmt.string) b
   in
   match lcmd with
   | Fold (name, les, fold_info) ->

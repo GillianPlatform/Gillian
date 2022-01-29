@@ -11,7 +11,7 @@ let to_int = function
   | Nonempty -> 1
 
 let opt_to_int = function
-  | None   -> 0
+  | None -> 0
   | Some x -> to_int x
 
 let pp fmt = function

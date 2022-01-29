@@ -4,14 +4,13 @@ module CStore = Store.Make (CVal.M)
 (* Expression Evaluation *)
 
 exception TypeError of string
-
 exception EvaluationError of string
 
 let unary_int_thing (lit : CVal.M.t) (f : int -> int) emsg : CVal.M.t =
   let num =
     match lit with
     | Int n -> n
-    | _     -> raise (TypeError (Fmt.str "%s %a" emsg CVal.M.pp lit))
+    | _ -> raise (TypeError (Fmt.str "%s %a" emsg CVal.M.pp lit))
   in
   let res = f num in
   Int res
@@ -20,17 +19,17 @@ let unary_num_thing (lit : CVal.M.t) (f : float -> float) emsg : CVal.M.t =
   let num =
     match lit with
     | Num n -> n
-    | _     -> raise (TypeError (Fmt.str "%s %a" emsg CVal.M.pp lit))
+    | _ -> raise (TypeError (Fmt.str "%s %a" emsg CVal.M.pp lit))
   in
   let res = f num in
   Num res
 
 let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
   match op with
-  | UNot        -> (
+  | UNot -> (
       match (lit : CVal.M.t) with
       | Bool b -> Bool (not b)
-      | _      ->
+      | _ ->
           raise
             (TypeError
                (Fmt.str "Type Error: Negation: expected boolean, got %a"
@@ -43,35 +42,34 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
       unary_num_thing lit
         (fun x -> -.x)
         "Type Error: Float unary minus: expected float, got "
-  | BitwiseNot  ->
+  | BitwiseNot ->
       unary_num_thing lit int32_bitwise_not
         "Type Error: Bitwise not: expected number, got"
-  | M_abs       ->
+  | M_abs ->
       unary_num_thing lit abs_float
         "Type Error: Absolute value: expected number, got"
-  | M_acos      ->
+  | M_acos ->
       unary_num_thing lit acos "Type Error: Arc cosine: expected number, got"
-  | M_asin      ->
+  | M_asin ->
       unary_num_thing lit asin "Type Error: Arc sine: expected number, got"
-  | M_atan      ->
+  | M_atan ->
       unary_num_thing lit atan "Type Error: Arc tangent: expected number, got"
-  | M_ceil      ->
+  | M_ceil ->
       unary_num_thing lit ceil "Type Error: Ceiling: expected number, got"
-  | M_cos       -> unary_num_thing lit cos
-                     "Type Error: Cosine: expected number, got"
-  | M_exp       ->
+  | M_cos -> unary_num_thing lit cos "Type Error: Cosine: expected number, got"
+  | M_exp ->
       unary_num_thing lit exp "Type Error: Exponentiation: expected number, got"
-  | M_floor     ->
+  | M_floor ->
       unary_num_thing lit floor "Type Error: Floor: expected number, got"
-  | M_log       ->
+  | M_log ->
       unary_num_thing lit log "Type Error: Unary minus: expected number, got"
-  | M_round     -> (
+  | M_round -> (
       match lit with
       | Num n -> (
           let sign = copysign 1.0 n in
           match sign < 0.0 && n >= -0.5 with
           | true -> Num (-0.0)
-          | _    ->
+          | _ ->
               (* This complex rounding is needed for edge case in OCaml: 0.49999999999999994 *)
               let round_nearest_lb = -.(2. ** 52.) in
               let round_nearest_ub = 2. ** 52. in
@@ -82,105 +80,103 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
                 else t
               in
               Num (round_nearest n))
-      | _     ->
+      | _ ->
           raise
             (TypeError
                (Fmt.str "Type Error: Round: expected number, got %a" CVal.M.pp
                   lit)))
-  | M_sgn       ->
+  | M_sgn ->
       unary_num_thing lit
         (fun x -> copysign 1.0 x)
         "Type Error: Sign: expected number, got"
-  | M_sin       -> unary_num_thing lit sin
-                     "Type Error: Sine: expected number, got"
-  | M_sqrt      ->
+  | M_sin -> unary_num_thing lit sin "Type Error: Sine: expected number, got"
+  | M_sqrt ->
       unary_num_thing lit sqrt "Type Error: Square root: expected number, got"
-  | M_tan       -> unary_num_thing lit tan
-                     "Type Error: Tangent: expected number, got"
-  | ToStringOp  -> (
+  | M_tan -> unary_num_thing lit tan "Type Error: Tangent: expected number, got"
+  | ToStringOp -> (
       match lit with
       | Num n -> String (float_to_string_inner n)
-      | _     ->
+      | _ ->
           raise
             (TypeError
                (Fmt.str "Type Error: Number to string: expected number, got %a"
                   CVal.M.pp lit)))
-  | ToIntOp     ->
+  | ToIntOp ->
       unary_num_thing lit to_int
         "Type Error: Number to integer: expected number, got"
-  | ToUint16Op  ->
+  | ToUint16Op ->
       unary_num_thing lit to_uint16
         "Type Error: Number to unsigned 16-bit integer: expected number, got"
-  | ToInt32Op   ->
+  | ToInt32Op ->
       unary_num_thing lit to_int32
         "Type Error: Number to 32-bit integer: expected number, got"
-  | ToUint32Op  ->
+  | ToUint32Op ->
       unary_num_thing lit to_uint32
         "Type Error: Number to unsigned 32-bit integer: expected number, got"
-  | ToNumberOp  -> (
+  | ToNumberOp -> (
       match lit with
       | String s ->
           if s = "" then Num 0.
           else
             let num = try Float.of_string s with Failure _ -> nan in
             Num num
-      | _        ->
+      | _ ->
           raise
             (TypeError
                (Fmt.str "Type Error: ToNumber: expected string, got %a"
                   CVal.M.pp lit)))
-  | TypeOf      -> Type (Literal.type_of lit)
-  | Car         -> (
+  | TypeOf -> Type (Literal.type_of lit)
+  | Car -> (
       match lit with
       | LList ll -> (
           match ll with
-          | []       ->
+          | [] ->
               raise
                 (EvaluationError "Evaluation Error: List head of empty list")
           | lit :: _ -> lit)
-      | _        ->
+      | _ ->
           raise
             (TypeError
                (Fmt.str "Type Error: List head: expected list, got %a" CVal.M.pp
                   lit)))
-  | Cdr         -> (
+  | Cdr -> (
       match lit with
       | LList ll -> (
           match ll with
-          | []      ->
+          | [] ->
               raise
                 (EvaluationError "Evaluation Error: List tail of empty list")
           | _ :: ll -> LList ll)
-      | _        ->
+      | _ ->
           raise
             (TypeError
                (Fmt.str "Type Error: List tail: expected list, got %a" CVal.M.pp
                   lit)))
-  | LstLen      -> (
+  | LstLen -> (
       match lit with
       | LList l -> Num (float_of_int (List.length l))
-      | _       ->
+      | _ ->
           raise
             (TypeError
                (Fmt.str "Type Error: List length: expected list, got: %a"
                   CVal.M.pp lit)))
-  | LstRev      -> (
+  | LstRev -> (
       match lit with
       | LList l -> LList (List.rev l)
-      | _       ->
+      | _ ->
           raise
             (TypeError
                (Fmt.str "Type Error: List reverse: expected list, got: %a"
                   CVal.M.pp lit)))
-  | StrLen      -> (
+  | StrLen -> (
       match lit with
       | String s -> Num (float_of_int (String.length s))
-      | _        ->
+      | _ ->
           raise
             (TypeError
                (Fmt.str "Type Error: String length: expected string, got: %a"
                   CVal.M.pp lit)))
-  | M_isNaN     -> (
+  | M_isNaN -> (
       match lit with
       | Num x when x == nan -> Bool true
       | Num _ -> Bool false
@@ -189,96 +185,107 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: M_isNan: expected number, got: %a"
                   CVal.M.pp lit)))
-  | SetToList   ->
+  | SetToList ->
       raise (Exceptions.Unsupported "eval_unop concrete: set-to-list")
 
 let binary_num_thing
-    (lit1 : CVal.M.t) (lit2 : CVal.M.t) (f : float -> float -> float) emsg :
-    CVal.M.t =
+    (lit1 : CVal.M.t)
+    (lit2 : CVal.M.t)
+    (f : float -> float -> float)
+    emsg : CVal.M.t =
   let num1, num2 =
     match (lit1, lit2) with
     | Num n1, Num n2 -> (n1, n2)
-    | _              ->
+    | _ ->
         raise
           (TypeError (Fmt.str "%s %a and %a" emsg CVal.M.pp lit1 CVal.M.pp lit2))
   in
   Num (f num1 num2)
 
 let binary_int_thing
-    (lit1 : CVal.M.t) (lit2 : CVal.M.t) (f : int -> int -> int) emsg : CVal.M.t
-    =
+    (lit1 : CVal.M.t)
+    (lit2 : CVal.M.t)
+    (f : int -> int -> int)
+    emsg : CVal.M.t =
   let num1, num2 =
     match (lit1, lit2) with
     | Int n1, Int n2 -> (n1, n2)
-    | _              ->
+    | _ ->
         raise
           (TypeError (Fmt.str "%s %a and %a" emsg CVal.M.pp lit1 CVal.M.pp lit2))
   in
   Int (f num1 num2)
 
 let binary_int_bool_thing
-    (lit1 : CVal.M.t) (lit2 : CVal.M.t) (f : int -> int -> bool) emsg : CVal.M.t
-    =
+    (lit1 : CVal.M.t)
+    (lit2 : CVal.M.t)
+    (f : int -> int -> bool)
+    emsg : CVal.M.t =
   let num1, num2 =
     match (lit1, lit2) with
     | Int n1, Int n2 -> (n1, n2)
-    | _              ->
+    | _ ->
         raise
           (TypeError (Fmt.str "%s %a and %a" emsg CVal.M.pp lit1 CVal.M.pp lit2))
   in
   Bool (f num1 num2)
 
 let binary_num_bool_thing
-    (lit1 : CVal.M.t) (lit2 : CVal.M.t) (f : float -> float -> bool) emsg :
-    CVal.M.t =
+    (lit1 : CVal.M.t)
+    (lit2 : CVal.M.t)
+    (f : float -> float -> bool)
+    emsg : CVal.M.t =
   let num1, num2 =
     match (lit1, lit2) with
     | Num n1, Num n2 -> (n1, n2)
-    | _              ->
+    | _ ->
         raise
           (TypeError (Fmt.str "%s %a and %a" emsg CVal.M.pp lit1 CVal.M.pp lit2))
   in
   Bool (f num1 num2)
 
 let rec evaluate_binop
-    (store : CStore.t) (op : BinOp.t) (e1 : Expr.t) (e2 : Expr.t) : CVal.M.t =
+    (store : CStore.t)
+    (op : BinOp.t)
+    (e1 : Expr.t)
+    (e2 : Expr.t) : CVal.M.t =
   let ee = evaluate_expr store in
   let lit1 = ee e1 in
   match op with
   | BAnd -> (
       match lit1 with
       | Bool false -> Bool false
-      | Bool true  -> (
+      | Bool true -> (
           match ee e2 with
           | Bool b2 -> Bool b2
-          | lit2    ->
+          | lit2 ->
               raise
                 (TypeError
                    (Fmt.str "Type Error: Conjunction: expected boolean, got: %a"
                       CVal.M.pp lit2)))
-      | _          ->
+      | _ ->
           raise
             (TypeError
                (Fmt.str "Type Error: Conjunction: expected boolean, got: %a"
                   CVal.M.pp lit1)))
-  | BOr  -> (
+  | BOr -> (
       match lit1 with
-      | Bool true  -> Bool true
+      | Bool true -> Bool true
       | Bool false -> (
           let lit2 = ee e2 in
           match lit2 with
           | Bool b2 -> Bool b2
-          | _       ->
+          | _ ->
               raise
                 (TypeError
                    (Fmt.str "Type Error: Disjunction: expected boolean, got: %a"
                       CVal.M.pp lit2)))
-      | _          ->
+      | _ ->
           raise
             (TypeError
                (Fmt.str "Type Error: Disjunction: expected boolean, got: %a"
                   CVal.M.pp lit1)))
-  | _    -> (
+  | _ -> (
       let lit2 = ee e2 in
       match op with
       | SetDiff | BSetMem | BSetSub ->
@@ -287,19 +294,19 @@ let rec evaluate_binop
           raise (Exceptions.Impossible "eval_binop concrete: by construction")
       | Equal -> (
           match (lit1, lit2) with
-          | Undefined, Undefined     -> Bool true
-          | Null, Null               -> Bool true
-          | Empty, Empty             -> Bool true
+          | Undefined, Undefined -> Bool true
+          | Null, Null -> Bool true
+          | Empty, Empty -> Bool true
           | Constant c1, Constant c2 -> Bool (c1 = c2)
-          | Bool b1, Bool b2         -> Bool (b1 = b2)
-          | Int n1, Int n2           -> Bool (n1 = n2)
-          | Num n1, Num n2           -> Bool (n1 = n2)
-          | String s1, String s2     -> Bool (s1 = s2)
-          | Loc l1, Loc l2           -> Bool (l1 = l2)
-          | Type t1, Type t2         -> Bool (t1 = t2)
-          | LList l1, LList l2       -> Bool (l1 = l2)
-          | Nono, Nono               -> Bool true
-          | _, _                     -> Bool false)
+          | Bool b1, Bool b2 -> Bool (b1 = b2)
+          | Int n1, Int n2 -> Bool (n1 = n2)
+          | Num n1, Num n2 -> Bool (n1 = n2)
+          | String s1, String s2 -> Bool (s1 = s2)
+          | Loc l1, Loc l2 -> Bool (l1 = l2)
+          | Type t1, Type t2 -> Bool (t1 = t2)
+          | LList l1, LList l2 -> Bool (l1 = l2)
+          | Nono, Nono -> Bool true
+          | _, _ -> Bool false)
       | LstNth -> (
           match (lit1, lit2) with
           | LList list, Int n -> List.nth list n
@@ -335,10 +342,7 @@ let rec evaluate_binop
       | SLessThan -> (
           match (lit1, lit2) with
           | String s1, String s2 -> Bool (s1 < s2)
-          | _, _                 -> raise
-                                      (Failure
-                                         "Non-string arguments to LessThanString")
-          )
+          | _, _ -> raise (Failure "Non-string arguments to LessThanString"))
       | ILessThanEqual ->
           binary_int_bool_thing lit1 lit2
             (fun x y -> x <= y)
@@ -433,7 +437,7 @@ let rec evaluate_binop
       | StrCat -> (
           match (lit1, lit2) with
           | String s1, String s2 -> String (s1 ^ s2)
-          | _, _                 ->
+          | _, _ ->
               raise
                 (Failure
                    (Fmt.str
@@ -449,43 +453,42 @@ and evaluate_nop (nop : NOp.t) (ll : Literal.t list) : CVal.M.t =
            (fun ac (l : Literal.t) ->
              match l with
              | LList l -> List.append ac l
-             | _       ->
+             | _ ->
                  raise (Failure "List concat: supplied expression not a list."))
            [] ll)
-  | _      -> raise
-                (Exceptions.Unsupported "Concrete evaluate_nop: set operators")
+  | _ -> raise (Exceptions.Unsupported "Concrete evaluate_nop: set operators")
 
 and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
   try
     let ee = evaluate_expr store in
     match e with
-    | Lit l                    -> (
+    | Lit l -> (
         match l with
         | Constant c -> Literal.evaluate_constant c
-        | x          -> x)
-    | PVar x                   -> (
+        | x -> x)
+    | PVar x -> (
         match CStore.get store x with
-        | None   ->
+        | None ->
             let err_msg = Fmt.str "Variable %s not found in the store" x in
             (* if (!verbose) then Fmt.printf "The current store is: \n%s" CStore.pp store; *)
             raise (Failure err_msg)
         | Some v -> v)
-    | BinOp (e1, bop, e2)      -> evaluate_binop store bop e1 e2
-    | UnOp (unop, e)           -> evaluate_unop unop (ee e)
-    | NOp (nop, le)            -> evaluate_nop nop (List.map ee le)
-    | EList ll                 -> (
+    | BinOp (e1, bop, e2) -> evaluate_binop store bop e1 e2
+    | UnOp (unop, e) -> evaluate_unop unop (ee e)
+    | NOp (nop, le) -> evaluate_nop nop (List.map ee le)
+    | EList ll -> (
         match ll with
-        | []      -> LList []
+        | [] -> LList []
         | e :: ll -> (
             let ve = ee e in
             let vll = ee (EList ll) in
             match vll with
             | LList vll -> LList (ve :: vll)
-            | _         ->
+            | _ ->
                 raise
                   (Exceptions.Impossible
                      "eval_expr concrete: list reduces to non-list")))
-    | LstSub (e1, e2, e3)      -> (
+    | LstSub (e1, e2, e3) -> (
         let ve1 = ee e1 in
         let ve2 = ee e2 in
         let ve3 = ee e3 in
@@ -494,7 +497,7 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
             match
               List_utils.list_sub les (int_of_float start_) (int_of_float len)
             with
-            | None   -> raise (Failure "Sublist out of bounds")
+            | None -> raise (Failure "Sublist out of bounds")
             | Some l -> LList l)
         | _ ->
             raise
@@ -503,10 +506,10 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
     | ALoc _ | LVar _ | ESet _ ->
         raise (Exceptions.Impossible "eval_expr concrete: aloc, lvar, or set")
   with
-  | TypeError msg       -> raise (TypeError msg)
+  | TypeError msg -> raise (TypeError msg)
   | EvaluationError msg -> raise (EvaluationError msg)
-  | Division_by_zero    -> raise (EvaluationError "Division by zero")
-  | e                   ->
+  | Division_by_zero -> raise (EvaluationError "Division by zero")
+  | e ->
       let msg = Printexc.to_string e in
       let stack = Printexc.get_backtrace () in
       failwith

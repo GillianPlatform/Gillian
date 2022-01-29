@@ -23,13 +23,18 @@ module Make
                            and type tl_ast = PC.tl_ast) =
 struct
   module CState = CState.Make (CMemory)
+
   module CInterpreter =
     GInterpreter.Make (CVal.M) (CVal.CESubst) (CStore) (CState) (External)
+
   module SState = SState.Make (SMemory)
+
   module SInterpreter =
     GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (External)
+
   module SPState =
     PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
+
   module Verification = Verifier.Make (SState) (SPState) (External)
   module Abductor = Abductor.Make (SState) (SPState) (External)
   module Debugger = Debugger.Make (PC) (Verification) (Gil_to_tl_lifter)
@@ -55,10 +60,10 @@ struct
     let open L.Mode in
     let parse = function
       | "disabled" -> Result.ok @@ Disabled
-      | "normal"   -> Result.ok @@ Enabled Normal
-      | "verbose"  -> Result.ok @@ Enabled Verbose
-      | "tmi"      -> Result.ok @@ Enabled TMI
-      | other      -> Result.error @@ `Msg ("unknown value \"" ^ other ^ "\"")
+      | "normal" -> Result.ok @@ Enabled Normal
+      | "verbose" -> Result.ok @@ Enabled Verbose
+      | "tmi" -> Result.ok @@ Enabled TMI
+      | other -> Result.error @@ `Msg ("unknown value \"" ^ other ^ "\"")
     in
     let c = Arg.conv (parse, L.Mode.pp) in
     let default = Enabled Verbose in
@@ -73,10 +78,10 @@ struct
   let reporters =
     let parse : string -> (reporter_info, [> `Msg of string ]) Result.t =
       function
-      | "file"            -> Ok { name = "file"; reporter = L.file_reporter }
+      | "file" -> Ok { name = "file"; reporter = L.file_reporter }
       | "database" | "db" ->
           Ok { name = "database"; reporter = L.database_reporter }
-      | other             -> Error (`Msg ("unknown value \"" ^ other ^ "\""))
+      | other -> Error (`Msg ("unknown value \"" ^ other ^ "\""))
     in
     let print fmt (reporter_info : reporter_info) =
       Fmt.string fmt reporter_info.name
@@ -165,19 +170,25 @@ struct
     Arg.(value & flag & info [ "pbn"; "print-by-need" ] ~doc)
 
   let get_progs_or_fail = function
-    | Ok progs  -> (
+    | Ok progs -> (
         match progs.ParserAndCompiler.gil_progs with
         | [] ->
             Fmt.pr "Error: expected at least one GIL program\n";
             exit 1
-        | _  -> progs)
+        | _ -> progs)
     | Error err ->
         Fmt.pr "Error during compilation to GIL:\n%a" PC.pp_err err;
         exit 1
 
   let with_common (term : (unit -> unit) Term.t) : unit Term.t =
     let apply_common
-        logging_mode reporters runtime_path ci tl_opts result_dir pbn =
+        logging_mode
+        reporters
+        runtime_path
+        ci
+        tl_opts
+        result_dir
+        pbn =
       Config.set_result_dir result_dir;
       Config.ci := ci;
       Logging.Mode.set_mode logging_mode;
@@ -202,7 +213,7 @@ struct
         let fmt = Format.formatter_of_out_channel outc in
         let () = Prog.pp_labeled fmt prog in
         close_out outc
-    | None         -> ()
+    | None -> ()
 
   module CompilerConsole = struct
     let mode =
@@ -261,7 +272,7 @@ struct
     let return_to_exit (ret_ok : bool) : unit =
       match ret_ok with
       | false -> exit 1
-      | true  -> ()
+      | true -> ()
 
     let valid_concrete_result (ret : CInterpreter.result_t list) : bool =
       assert (List.length ret = 1);
@@ -274,7 +285,7 @@ struct
       let prog =
         match UP.init_prog prog with
         | Ok prog -> prog
-        | _       -> failwith "Program could not be initialised"
+        | _ -> failwith "Program could not be initialised"
       in
       let ret = CInterpreter.evaluate_prog prog in
       let () =
@@ -344,7 +355,7 @@ struct
         let cur_source_files =
           match source_files with
           | Some files -> files
-          | None       -> failwith "Cannot use -a in incremental mode"
+          | None -> failwith "Cannot use -a in incremental mode"
         in
         let prev_source_files, prev_call_graph = read_symbolic_results () in
         let proc_changes =
@@ -407,12 +418,18 @@ struct
       in
       let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.\n") in
       match UP.init_prog prog with
-      | Error _  -> failwith "Creation of unification plans failed"
+      | Error _ -> failwith "Creation of unification plans failed"
       | Ok prog' -> run prog' incremental source_files_opt
 
     let wpst
-        files already_compiled outfile_opt no_heap stats parallel incremental ()
-        =
+        files
+        already_compiled
+        outfile_opt
+        no_heap
+        stats
+        parallel
+        incremental
+        () =
       let () = Config.current_exec_mode := Symbolic in
       let () = PC.initialize Symbolic in
       let () = Printexc.record_backtrace @@ L.Mode.enabled () in
@@ -611,7 +628,7 @@ struct
       let () = Config.unfolding := false in
       let prog = LogicPreprocessing.preprocess prog true in
       match UP.init_prog prog with
-      | Error _  -> failwith "Creation of unification plans failed."
+      | Error _ -> failwith "Creation of unification plans failed."
       | Ok prog' ->
           let () = Abductor.test_prog prog' incremental source_files_opt in
           if emit_specs then
@@ -717,7 +734,6 @@ struct
       Lwt_main.run (DebugAdapter.start Lwt_io.stdin Lwt_io.stdout)
 
     let debug_verify_t = with_common Term.(const start_debug_adapter)
-
     let debug_verify_cmd = (debug_verify_t, debug_verify_info)
   end
 

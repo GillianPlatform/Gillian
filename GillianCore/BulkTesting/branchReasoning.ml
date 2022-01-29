@@ -72,7 +72,7 @@ let resInMode
             oneResInMode ~fmtexp ~fmtrcv ~pp_what_branch_did flag const_opt res
           in
           if pass then ((fun _ -> ""), true) else ((fun _ -> "Test " ^ m), false)
-      | _       ->
+      | _ ->
           let failure_message =
             String.concat ""
               [
@@ -83,7 +83,7 @@ let resInMode
               ]
           in
           ((fun _ -> "Test " ^ failure_message), false))
-  | AllOfThem  ->
+  | AllOfThem ->
       let list_failure_messages =
         List.fold_left
           (fun acc res ->
@@ -101,7 +101,7 @@ let resInMode
           false )
   | AtLeastOne ->
       let rec go_through acc = function
-        | []       ->
+        | [] ->
             let failure_message =
               Fmt.str
                 "Expected at least one branch to finish successfuly in %s \

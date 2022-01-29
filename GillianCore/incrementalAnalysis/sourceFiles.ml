@@ -7,7 +7,6 @@ module SourceFile : sig
   [@@deriving yojson]
 
   val make : path:string -> dependents:string list -> t
-
   val add_dependent : t -> string -> unit
 end = struct
   type t = {
@@ -33,7 +32,6 @@ end = struct
 end
 
 type ('a, 'b) hashtbl = ('a, 'b) Hashtbl.t
-
 type t = (string, SourceFile.t) hashtbl
 
 let to_yojson t =
@@ -45,13 +43,12 @@ let of_yojson yj =
   >| Hashtbl.of_seq
 
 let make () : t = Hashtbl.create Config.small_tbl_size
-
 let reset = Hashtbl.reset
 
 let get_or_make_file files path =
   match Hashtbl.find_opt files path with
   | Some file -> file
-  | None      ->
+  | None ->
       let file = SourceFile.make ~path ~dependents:[] in
       Hashtbl.add files path file;
       file
@@ -64,11 +61,10 @@ let add_dependency files ~path ~dependent_path =
 let get_file files path : SourceFile.t =
   match Hashtbl.find_opt files path with
   | Some file -> file
-  | None      ->
+  | None ->
       failwith (Printf.sprintf "could not find file entry with path '%s'" path)
 
 let get_contents_hash files ~path = (get_file files path).contents
-
 let get_dependents files ~path = (get_file files path).dependents
 
 let to_key_set (table : (string, 'b) Hashtbl.t) : SS.t =

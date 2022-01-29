@@ -22,10 +22,10 @@ let nth x n =
 let trans_const =
   let tr = ValueTranslation.gil_of_compcert in
   function
-  | Ointconst i      -> tr (Values.Vint i)
-  | Ofloatconst f    -> tr (Values.Vfloat f)
+  | Ointconst i -> tr (Values.Vint i)
+  | Ofloatconst f -> tr (Values.Vfloat f)
   | Osingleconst f32 -> tr (Values.Vsingle f32)
-  | Olongconst i64   -> tr (Values.Vlong i64)
+  | Olongconst i64 -> tr (Values.Vlong i64)
 
 let expr_of_chunk chunk =
   Expr.Lit (Literal.String (ValueTranslation.string_of_chunk chunk))
@@ -33,27 +33,27 @@ let expr_of_chunk chunk =
 let internal_proc_of_unop uop =
   let open Cminor in
   match uop with
-  | Olongofint      -> UnOp_Functions.longofint
-  | Ointoflong      -> UnOp_Functions.intoflong
-  | Ointoffloat     -> UnOp_Functions.intoffloat
-  | Ointofsingle    -> UnOp_Functions.intofsingle
-  | Olongofintu     -> UnOp_Functions.longofintu
-  | Olongoffloat    -> UnOp_Functions.longoffloat
-  | Olongofsingle   -> UnOp_Functions.longofsingle
-  | Olonguofsingle  -> UnOp_Functions.longuofsingle
-  | Ofloatofint     -> UnOp_Functions.floatofint
-  | Ofloatofintu    -> UnOp_Functions.floatofintu
-  | Ofloatofsingle  -> UnOp_Functions.floatofsingle
-  | Osingleoflongu  -> UnOp_Functions.singleoflongu
-  | Osingleofint    -> UnOp_Functions.singleofint
-  | Osingleoffloat  -> UnOp_Functions.singleoffloat
-  | Onegl           -> UnOp_Functions.negl
-  | Onegint         -> UnOp_Functions.negint
-  | Ocast8signed    -> UnOp_Functions.cast8signed
-  | Ocast8unsigned  -> UnOp_Functions.cast8unsigned
-  | Ocast16signed   -> UnOp_Functions.cast16signed
+  | Olongofint -> UnOp_Functions.longofint
+  | Ointoflong -> UnOp_Functions.intoflong
+  | Ointoffloat -> UnOp_Functions.intoffloat
+  | Ointofsingle -> UnOp_Functions.intofsingle
+  | Olongofintu -> UnOp_Functions.longofintu
+  | Olongoffloat -> UnOp_Functions.longoffloat
+  | Olongofsingle -> UnOp_Functions.longofsingle
+  | Olonguofsingle -> UnOp_Functions.longuofsingle
+  | Ofloatofint -> UnOp_Functions.floatofint
+  | Ofloatofintu -> UnOp_Functions.floatofintu
+  | Ofloatofsingle -> UnOp_Functions.floatofsingle
+  | Osingleoflongu -> UnOp_Functions.singleoflongu
+  | Osingleofint -> UnOp_Functions.singleofint
+  | Osingleoffloat -> UnOp_Functions.singleoffloat
+  | Onegl -> UnOp_Functions.negl
+  | Onegint -> UnOp_Functions.negint
+  | Ocast8signed -> UnOp_Functions.cast8signed
+  | Ocast8unsigned -> UnOp_Functions.cast8unsigned
+  | Ocast16signed -> UnOp_Functions.cast16signed
   | Ocast16unsigned -> UnOp_Functions.cast16unsigned
-  | _               ->
+  | _ ->
       failwith
         (Printf.sprintf "Unhandled unary operator : %s"
            (PrintCsharpminor.name_of_unop uop))
@@ -189,16 +189,14 @@ let rec add_annots ~ctx ?first l =
   let annot = annot_ctx ctx in
   match l with
   | a :: r -> (annot, first, a) :: add_annots ~ctx r
-  | []     -> []
+  | [] -> []
 
 let change_first_lab first_lab l =
   (* Changes the first lab, only if it is not already set *)
   match l with
   | (a, Some l, c) :: r -> (l, (a, Some l, c) :: r)
-  | (a, None, c) :: r   -> (first_lab, (a, Some first_lab, c) :: r)
-  | []                  -> failwith
-                             "Cannot change first label of an empty list of \
-                              commands"
+  | (a, None, c) :: r -> (first_lab, (a, Some first_lab, c) :: r)
+  | [] -> failwith "Cannot change first label of an empty list of commands"
 
 let trans_label lab =
   let id_ocaml = Camlcoq.P.to_int lab in
@@ -208,14 +206,14 @@ let trans_label lab =
 let make_free_cmd fname var_list =
   let zero = Expr.Lit (Literal.Num 0.) in
   let rec make_blocks = function
-    | []     -> []
+    | [] -> []
     | x :: r -> Expr.EList [ nth x 0; zero; nth x 1 ] :: make_blocks r
   in
   let freelist = Expr.Lit (Literal.String Internal_Functions.free_list) in
   let gvar = Generators.gen_str ~fname Prefix.gvar in
   (* If there's nothing to free, we just don't create the command *)
   match make_blocks var_list with
-  | []     -> None
+  | [] -> None
   | blocks ->
       Some (Cmd.Call (gvar, freelist, [ Expr.EList blocks ], None, None))
 
@@ -254,11 +252,8 @@ let is_call name e =
   | _ -> false
 
 let is_assert_call = is_call Builtin_Functions.assert_f
-
 let is_assume_call = is_call Builtin_Functions.assume_f
-
 let is_printf_call = is_call "printf"
-
 let last_invariant = ref None (* Dirty hack *)
 
 let set_invariant l = last_invariant := Some l
@@ -266,7 +261,7 @@ let set_invariant l = last_invariant := Some l
 let get_invariant () =
   let i =
     match !last_invariant with
-    | None   -> []
+    | None -> []
     | Some i -> [ i ]
   in
   last_invariant := None;
@@ -341,7 +336,7 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
   | Sreturn rval_opt -> (
       let leading_cmds, rexpr =
         match rval_opt with
-        | None   -> ([], Expr.Lit Literal.Null)
+        | None -> ([], Expr.Lit Literal.Null)
         | Some e -> trans_expr e
       in
       let annotated_leading_cmds = add_annots ~ctx:context leading_cmds in
@@ -356,7 +351,7 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
       | Some freecmd ->
           let annot_freecmd = (annot_ctx context, None, freecmd) in
           annotated_leading_cmds @ [ ret_assign; annot_freecmd; return ]
-      | None         -> annotated_leading_cmds @ [ ret_assign; return ])
+      | None -> annotated_leading_cmds @ [ ret_assign; return ])
   | Slabel (lab, s) ->
       (* If the translated thing already has a label, we add a skip before with the right label,
          otherwise, we put the label in the translated thing *)
@@ -410,7 +405,7 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
   | Scall (optid, _, ex, lexp) ->
       let leftvar =
         match optid with
-        | None    -> gen_str Prefix.gvar
+        | None -> gen_str Prefix.gvar
         | Some id -> true_name id
       in
       let leading_fn, fn_expr = trans_expr ex in
@@ -444,8 +439,8 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
       in
       let rec build_isdefault curr lbl =
         match lbl with
-        | LSnil                 -> curr
-        | LScons (None, _, r)   -> build_isdefault curr r
+        | LSnil -> curr
+        | LScons (None, _, r) -> build_isdefault curr r
         | LScons (Some l, _, r) ->
             let ne =
               Expr.UnOp (UnOp.UNot, Expr.BinOp (guard_expr, BinOp.Equal, num l))
@@ -509,7 +504,7 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
               "Syntax error in annot\n%s\n\nUnexpected token %s at loc (%i, %i)"
               string_lcmd (Lexing.lexeme lexbuf) curr.pos_lnum
               (curr.pos_cnum - curr.pos_bol + 1)
-        | exc                ->
+        | exc ->
             Fmt.failwith "Syntax Error in annot (%s): \n%s"
               (Printexc.to_string exc) string_lcmd
       in
@@ -525,7 +520,7 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
           in
           (* We should filter assert_s in verif, and assert_v in symb *)
           if ExecMode.concrete_exec context.exec_mode then [] else gil_lcmds
-      | `Invariant inv    ->
+      | `Invariant inv ->
           let inv = Cmd.Logic (SL inv) in
           set_invariant inv;
           [])
@@ -579,7 +574,6 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
            PrintCsharpminor.print_stmt s)
 
 let empty_annot = Annot.make ()
-
 let add_empty_annots l = List.map (fun a -> (empty_annot, None, a)) l
 
 let alloc_var fname (name, sz) =
@@ -737,7 +731,6 @@ let is_gil_func func_name exec_mode =
 type symbol = { name : string; defined : bool }
 
 let is_def_sym symbol = symbol.defined
-
 let sym_name symbol = symbol.name
 
 let mangle_symbol symbol filepath mangled_syms =
@@ -919,7 +912,7 @@ let annotate prog gil_annots =
     List.iter
       (fun spec ->
         match Hashtbl.find_opt prog.procs spec.Spec.spec_name with
-        | None      ->
+        | None ->
             Logging.verbose (fun fmt ->
                 fmt "Found spec but no declaration for '%s'" spec.spec_name)
         | Some proc ->
@@ -943,7 +936,12 @@ let get_compilation_data_from_only_specs ospecs =
     ([], [], []) ospecs
 
 let trans_program_with_annots
-    ~exec_mode ~clight_prog ~filepath ~mangled_syms prog annots =
+    ~exec_mode
+    ~clight_prog
+    ~filepath
+    ~mangled_syms
+    prog
+    annots =
   let gil_annot =
     if ExecMode.verification_exec exec_mode then
       Gil_logic_gen.trans_annots clight_prog annots filepath

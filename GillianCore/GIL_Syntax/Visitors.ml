@@ -1,27 +1,21 @@
 class ['s] endo =
   object
     inherit ['s] TypeDef__.endo
-
     method visit_'annot _ x = x
-
     method visit_'label _ x = x
   end
 
 class virtual ['s] reduce =
   object (self)
     inherit ['s] TypeDef__.reduce
-
     method visit_'annot _ _ = self#zero
-
     method visit_'label _ _ = self#zero
   end
 
 class ['s] iter =
   object
     inherit ['s] TypeDef__.iter
-
     method visit_'annot _ _ = ()
-
     method visit_'label _ _ = ()
   end
 
@@ -31,7 +25,6 @@ module Utils = struct
   class list_monoid =
     object
       method private zero = []
-
       method private plus = ( @ )
     end
 
@@ -39,21 +32,18 @@ module Utils = struct
   class non_ordered_list_monoid =
     object
       method private zero = []
-
       method private plus = List.rev_append
     end
 
   class ss_monoid =
     object
       method private zero = SS.empty
-
       method private plus = SS.union
     end
 
   class two_list_monoid =
     object
       method private zero = ([], [])
-
       method private plus (a, b) (c, d) = (a @ c, b @ d)
     end
 end
@@ -62,39 +52,27 @@ module Collectors = struct
   let var_collector =
     object (self)
       inherit [_] reduce
-
       inherit Utils.ss_monoid
-
       method! visit_PVar () x = Containers.SS.singleton x
-
       method! visit_LVar () x = Containers.SS.singleton x
-
       method! visit_ALoc () x = Containers.SS.singleton x
-
       method! visit_Loc () x = Containers.SS.singleton x
-
       method! visit_'label () (_ : int) = self#zero
-
       method! visit_'annot () (_ : Annot.t) = self#zero
     end
 
   let pvar_collector =
     object (self)
       inherit [_] reduce
-
       inherit Utils.ss_monoid
-
       method! visit_PVar () x = Containers.SS.singleton x
-
       method! visit_'label () (_ : int) = self#zero
-
       method! visit_'annot () (_ : Annot.t) = self#zero
     end
 
   let lvar_collector =
     object (self)
       inherit [_] reduce
-
       inherit Utils.ss_monoid
 
       method! visit_ForAll exclude binders f =
@@ -108,46 +86,33 @@ module Collectors = struct
         else Containers.SS.empty
 
       method! visit_'label _ (_ : int) = self#zero
-
       method! visit_'annot _ (_ : Annot.t) = self#zero
     end
 
   let cloc_collector =
     object (self)
       inherit [_] reduce
-
       inherit Utils.ss_monoid
-
       method! visit_Loc () x = Containers.SS.singleton x
-
       method! visit_'label () (_ : int) = self#zero
-
       method! visit_'annot () (_ : Annot.t) = self#zero
     end
 
   let aloc_collector =
     object (self)
       inherit [_] reduce
-
       inherit Utils.ss_monoid
-
       method! visit_ALoc () x = Containers.SS.singleton x
-
       method! visit_'label () (_ : int) = self#zero
-
       method! visit_'annot () (_ : Annot.t) = self#zero
     end
 
   let loc_collector =
     object (self)
       inherit [_] reduce
-
       inherit Utils.ss_monoid
-
       method! visit_ALoc _ x = Containers.SS.singleton x
-
       method! visit_Loc _ x = Containers.SS.singleton x
-
       method! visit_PVar _ x = Containers.SS.singleton x
 
       method! visit_ForAll exclude binders f =
@@ -161,33 +126,24 @@ module Collectors = struct
         else Containers.SS.empty
 
       method! visit_'label _ (_ : int) = self#zero
-
       method! visit_'annot _ (_ : Annot.t) = self#zero
     end
 
   let substitutable_collector =
     object (self)
       inherit [_] reduce
-
       inherit Utils.ss_monoid
-
       method! visit_ALoc () x = Containers.SS.singleton x
-
       method! visit_LVar () x = Containers.SS.singleton x
-
       method! visit_'label () (_ : int) = self#zero
-
       method! visit_'annot () (_ : Annot.t) = self#zero
     end
 
   let list_collector =
     object (self)
       inherit [_] reduce
-
       inherit Utils.non_ordered_list_monoid
-
       method! visit_'label () (_ : int) = self#zero
-
       method! visit_'annot () (_ : Annot.t) = self#zero
 
       method! visit_LList () ls =
@@ -198,7 +154,7 @@ module Collectors = struct
       method! visit_NOp () nop les =
         match nop with
         | LstCat -> les
-        | _      -> []
+        | _ -> []
     end
 end
 
@@ -210,10 +166,9 @@ module Substs = struct
       method! visit_expr () e =
         match e with
         | Lit (Loc loc) -> subst loc
-        | _             -> super#visit_expr () e
+        | _ -> super#visit_expr () e
 
       method! visit_'annot () (x : Annot.t) = x
-
       method! visit_'label () (x : int) = x
     end
 end

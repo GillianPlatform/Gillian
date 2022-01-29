@@ -5,7 +5,7 @@ let search_string_forward regex str : int option =
 
 let check_parsing_errors errors =
   match errors with
-  | []     -> ()
+  | [] -> ()
   | errors ->
       let pretty_messages =
         List.map
@@ -23,7 +23,7 @@ let check_parsing_errors errors =
             (List.hd pretty_messages)
         with
         | Some _ -> "ReferenceError"
-        | None   -> "SyntaxError"
+        | None -> "SyntaxError"
       in
       raise (Error.ParserError (Error.FlowParser (messages, error_type)))
 
@@ -49,7 +49,7 @@ let load_file path : string =
 
 let opt_map f (x : 'a option) =
   match x with
-  | None   -> (None, [])
+  | None -> (None, [])
   | Some v ->
       let a, bs = f v in
       (Some a, bs)

@@ -1,7 +1,6 @@
 module GilType = Gillian.Gil_syntax.Type
 
 let pp_option pp = Fmt.option ~none:(Fmt.any "None") pp
-
 let pp_list ?(sep = Fmt.any ", ") = Fmt.list ~sep
 
 type assert_annot = {
@@ -15,7 +14,7 @@ let pp_assert_annot ?(post = format_of_string "") fmt { label; existentials } =
   let pp_lv_type f (lv, t) = Format.fprintf f "%s%a" lv (pp_option pp_typ) t in
   match existentials with
   | [] -> Format.fprintf fmt "[%s]%(%)" label post
-  | _  ->
+  | _ ->
       Format.fprintf fmt "[%s: %a]%(%)" label (pp_list pp_lv_type) existentials
         post
 
@@ -37,20 +36,20 @@ module CBinOp = struct
     | Or
 
   let str = function
-    | LstCons  -> "::"
-    | LstCat   -> "@"
-    | Plus     -> "+"
-    | Minus    -> "-"
-    | Times    -> "*"
-    | Div      -> "/"
-    | PtrPlus  -> "p+"
-    | Equal    -> "="
-    | SetSub   -> "-s-"
-    | SetDiff  -> "-d-"
-    | SetMem   -> "-e-"
+    | LstCons -> "::"
+    | LstCat -> "@"
+    | Plus -> "+"
+    | Minus -> "-"
+    | Times -> "*"
+    | Div -> "/"
+    | PtrPlus -> "p+"
+    | Equal -> "="
+    | SetSub -> "-s-"
+    | SetDiff -> "-d-"
+    | SetMem -> "-e-"
     | LessThan -> "<"
-    | And      -> "&"
-    | Or       -> "|"
+    | And -> "&"
+    | Or -> "|"
 end
 
 module CUnOp = struct
@@ -58,7 +57,7 @@ module CUnOp = struct
 
   let str = function
     | LstLen -> "len"
-    | Not    -> "!"
+    | Not -> "!"
 end
 
 module CNOp = struct
@@ -70,28 +69,28 @@ end
 
 module CSimplExpr = struct
   type t =
-    | PVar   of string
-    | LVar   of string
-    | Loc    of string
-    | Num    of float
-    | Bool   of bool
+    | PVar of string
+    | LVar of string
+    | Loc of string
+    | Num of float
+    | Bool of bool
     | String of string
 
   let pp fmt = function
     | PVar s | LVar s | Loc s -> Fmt.string fmt s
-    | Num f                   -> Fmt.float fmt f
-    | Bool true               -> Fmt.string fmt "true"
-    | Bool false              -> Fmt.string fmt "false"
-    | String s                -> Fmt.pf fmt "`%s`" s
+    | Num f -> Fmt.float fmt f
+    | Bool true -> Fmt.string fmt "true"
+    | Bool false -> Fmt.string fmt "false"
+    | String s -> Fmt.pf fmt "`%s`" s
 end
 
 module CSVal = struct
   type t =
-    | Sint    of CSimplExpr.t
-    | Sfloat  of CSimplExpr.t
+    | Sint of CSimplExpr.t
+    | Sfloat of CSimplExpr.t
     | Ssingle of CSimplExpr.t
-    | Slong   of CSimplExpr.t
-    | Sptr    of CSimplExpr.t * CSimplExpr.t
+    | Slong of CSimplExpr.t
+    | Sptr of CSimplExpr.t * CSimplExpr.t
     | Sfunptr of string
 
   (* Symbol *)
@@ -99,35 +98,33 @@ module CSVal = struct
   let pp fmt sval =
     let ppse = CSimplExpr.pp in
     match sval with
-    | Sint se         -> Format.fprintf fmt "int(%a)" ppse se
-    | Slong se        -> Format.fprintf fmt "long(%a)" ppse se
-    | Sfloat se       -> Format.fprintf fmt "float(%a)" ppse se
-    | Ssingle se      -> Format.fprintf fmt "single(%a)" ppse se
+    | Sint se -> Format.fprintf fmt "int(%a)" ppse se
+    | Slong se -> Format.fprintf fmt "long(%a)" ppse se
+    | Sfloat se -> Format.fprintf fmt "float(%a)" ppse se
+    | Ssingle se -> Format.fprintf fmt "single(%a)" ppse se
     | Sptr (se1, se2) -> Format.fprintf fmt "ptr(%a, %a)" ppse se1 ppse se2
-    | Sfunptr s       -> Format.fprintf fmt "funptr(%s)" s
+    | Sfunptr s -> Format.fprintf fmt "funptr(%s)" s
 end
 
 module CExpr = struct
   type t =
-    | SExpr  of CSimplExpr.t
-    | SVal   of CSVal.t
-    | EList  of t list
+    | SExpr of CSimplExpr.t
+    | SVal of CSVal.t
+    | EList of t list
     | LstSub of t * t * t
-    | ESet   of t list
-    | BinOp  of t * CBinOp.t * t
-    | NOp    of CNOp.t * t list
-    | UnOp   of CUnOp.t * t
+    | ESet of t list
+    | BinOp of t * CBinOp.t * t
+    | NOp of CNOp.t * t list
+    | UnOp of CUnOp.t * t
 
   let rec pp fmt = function
-    | SExpr se                 -> CSimplExpr.pp fmt se
-    | SVal sv                  -> CSVal.pp fmt sv
-    | BinOp (e1, b, e2)        -> Fmt.pf fmt "(%a %s %a)" pp e1 (CBinOp.str b)
-                                    pp e2
-    | UnOp (u, e)              -> Fmt.pf fmt "(%s %a)" (CUnOp.str u) pp e
-    | EList el                 -> Fmt.pf fmt "[ %a ]" (pp_list pp) el
-    | ESet es                  -> Fmt.pf fmt "-{ %a }-" (pp_list pp) es
-    | NOp (n, el)              -> Fmt.pf fmt "%s (%a)" (CNOp.str n) (pp_list pp)
-                                    el
+    | SExpr se -> CSimplExpr.pp fmt se
+    | SVal sv -> CSVal.pp fmt sv
+    | BinOp (e1, b, e2) -> Fmt.pf fmt "(%a %s %a)" pp e1 (CBinOp.str b) pp e2
+    | UnOp (u, e) -> Fmt.pf fmt "(%s %a)" (CUnOp.str u) pp e
+    | EList el -> Fmt.pf fmt "[ %a ]" (pp_list pp) el
+    | ESet es -> Fmt.pf fmt "-{ %a }-" (pp_list pp) es
+    | NOp (n, el) -> Fmt.pf fmt "%s (%a)" (CNOp.str n) (pp_list pp) el
     | LstSub (lst, start, len) ->
         Fmt.pf fmt "lsub(%a, %a, %a)" pp lst pp start pp len
 end
@@ -139,7 +136,7 @@ module CConstructor = struct
   (* It seems that the CSyntax already handles removing typedef aliasing *)
 
   let pp fmt = function
-    | ConsExpr e         -> CExpr.pp fmt e
+    | ConsExpr e -> CExpr.pp fmt e
     | ConsStruct (s, el) ->
         Format.fprintf fmt "@[<v 2>struct %s {@ %a@]@ }" s
           (pp_list ~sep:(Fmt.any ";@ ") CExpr.pp)
@@ -155,33 +152,33 @@ module CFormula = struct
   type t =
     | True
     | False
-    | Eq      of CExpr.t * CExpr.t
-    | Less    of CExpr.t * CExpr.t
-    | LessEq  of CExpr.t * CExpr.t
-    | SetMem  of CExpr.t * CExpr.t
-    | And     of t * t
-    | Or      of t * t
-    | Not     of t
+    | Eq of CExpr.t * CExpr.t
+    | Less of CExpr.t * CExpr.t
+    | LessEq of CExpr.t * CExpr.t
+    | SetMem of CExpr.t * CExpr.t
+    | And of t * t
+    | Or of t * t
+    | Not of t
     | Implies of t * t
-    | ForAll  of (string * GilType.t option) list * t
+    | ForAll of (string * GilType.t option) list * t
 
   let rec pp fmt f =
     let ppe = CExpr.pp in
     let pp_lvt fmt = function
-      | s, None     -> Format.pp_print_string fmt s
+      | s, None -> Format.pp_print_string fmt s
       | s, Some typ -> Format.fprintf fmt "%s : %s" s (GilType.str typ)
     in
     match f with
-    | True             -> Format.pp_print_string fmt "True"
-    | False            -> Format.pp_print_string fmt "False"
-    | Eq (e1, e2)      -> Format.fprintf fmt "(%a == %a)" ppe e1 ppe e2
-    | Less (e1, e2)    -> Format.fprintf fmt "(%a <# %a)" ppe e1 ppe e2
-    | LessEq (e1, e2)  -> Format.fprintf fmt "(%a <=# %a)" ppe e1 ppe e2
-    | Not f            -> Format.fprintf fmt "(not %a)" pp f
-    | Or (f1, f2)      -> Format.fprintf fmt "(%a || %a)" pp f1 pp f2
-    | And (f1, f2)     -> Format.fprintf fmt "(%a && %a)" pp f1 pp f2
+    | True -> Format.pp_print_string fmt "True"
+    | False -> Format.pp_print_string fmt "False"
+    | Eq (e1, e2) -> Format.fprintf fmt "(%a == %a)" ppe e1 ppe e2
+    | Less (e1, e2) -> Format.fprintf fmt "(%a <# %a)" ppe e1 ppe e2
+    | LessEq (e1, e2) -> Format.fprintf fmt "(%a <=# %a)" ppe e1 ppe e2
+    | Not f -> Format.fprintf fmt "(not %a)" pp f
+    | Or (f1, f2) -> Format.fprintf fmt "(%a || %a)" pp f1 pp f2
+    | And (f1, f2) -> Format.fprintf fmt "(%a && %a)" pp f1 pp f2
     | Implies (f1, f2) -> Format.fprintf fmt "(%a => %a)" pp f1 pp f2
-    | SetMem (e1, e2)  -> Format.fprintf fmt "(%a --e-- %a)" ppe e1 ppe e2
+    | SetMem (e1, e2) -> Format.fprintf fmt "(%a --e-- %a)" ppe e1 ppe e2
     | ForAll (lvts, f) ->
         Format.fprintf fmt "(forall %a. %a)" (pp_list pp_lvt) lvts pp f
 end
@@ -191,23 +188,23 @@ module CAssert = struct
 
   type t =
     | Malloced of (CExpr.t * CExpr.t)
-    | Array    of {
+    | Array of {
         ptr : CExpr.t;
         chunk : Chunk.t;
         size : CExpr.t;
         content : CExpr.t;
         malloced : bool;
       }
-    | Undefs   of (CExpr.t * CExpr.t)
-    | Zeros    of (CExpr.t * CExpr.t)
-    | Star     of t * t
-    | Pure     of CFormula.t
+    | Undefs of (CExpr.t * CExpr.t)
+    | Zeros of (CExpr.t * CExpr.t)
+    | Star of t * t
+    | Pure of CFormula.t
     | PointsTo of {
         ptr : CExpr.t;
         constr : CConstructor.t;
         typ : points_to_type;
       }
-    | Pred     of string * CExpr.t list
+    | Pred of string * CExpr.t list
     | Emp
 
   let rec pp fmt a =
@@ -226,9 +223,9 @@ module CAssert = struct
     | Pure f -> CFormula.pp fmt f
     | PointsTo { ptr; constr; typ } ->
         let string_of_typ = function
-          | Normal   -> ""
+          | Normal -> ""
           | Malloced -> "m"
-          | Global   -> "s"
+          | Global -> "s"
         in
         Format.fprintf fmt "(%a -%s> %a)" CExpr.pp ptr (string_of_typ typ)
           CConstructor.pp constr
@@ -238,9 +235,9 @@ end
 
 module CLCmd = struct
   type t =
-    | If         of CExpr.t * t list * t list
+    | If of CExpr.t * t list * t list
         (** Conditional execution of logic command *)
-    | Unfold     of {
+    | Unfold of {
         pred : string;
         params : CExpr.t list;
         bindings : (string * string) list option;
@@ -248,13 +245,13 @@ module CLCmd = struct
       }  (** Unfolding of a specific predicate *)
     | Unfold_all of string
         (** Recursively unfold all predicates with the given name (with a fuel). *)
-    | Fold       of string * CExpr.t list  (** Fold a predicate *)
-    | Apply      of string * CExpr.t list  (** Apply a lemma *)
-    | Assert     of CAssert.t * string list
+    | Fold of string * CExpr.t list  (** Fold a predicate *)
+    | Apply of string * CExpr.t list  (** Apply a lemma *)
+    | Assert of CAssert.t * string list
         (** Assert for verification, takes an assertion and binders *)
-    | Branch     of CFormula.t
+    | Branch of CFormula.t
         (** The symbolic engine should branch on the given formula *)
-    | Invariant  of { assertion : CAssert.t; bindings : string list }
+    | Invariant of { assertion : CAssert.t; bindings : string list }
         (** Loop invariant *)
     | SymbExec
         (** Ignore the next function specification and symbolically execute instead *)
@@ -269,7 +266,7 @@ module CLCmd = struct
     let pp_bindings ft b =
       match b with
       | [] -> ()
-      | b  -> Fmt.pf ft " [[bind %a]]" (Fmt.list ~sep:Fmt.comma Fmt.string) b
+      | b -> Fmt.pf ft " [[bind %a]]" (Fmt.list ~sep:Fmt.comma Fmt.string) b
     in
     match lcmd with
     | Apply (s, el) -> Fmt.pf fmt "apply @[%s(%a)@]" s (pp_list CExpr.pp) el
@@ -293,7 +290,7 @@ module CLCmd = struct
             Format.fprintf fmt "@[<v 2>if (%a) {@\n%a@]@\n}" CExpr.pp e
               (pp_list ~sep:(Fmt.any ";@\n") pp)
               cl1
-        | _  ->
+        | _ ->
             Format.fprintf fmt
               "@[<v 2>if (%a) {@\n%a@]@\n@[<v 2>} else {@\n%a@]@\n}" CExpr.pp e
               (pp_list ~sep:(Fmt.any ";@\n") pp)
@@ -313,13 +310,13 @@ module CAbsPred = struct
 
   let pp_params fmt (params, ins) =
     let pp_typ_opt f = function
-      | None   -> ()
+      | None -> ()
       | Some t -> Format.fprintf f ": %s" (GilType.str t)
     in
     let plus f k = if List.mem k ins then Format.fprintf f "+" else () in
     let rec aux k = function
-      | []            -> ()
-      | [ (a, typ) ]  -> Format.fprintf fmt "%a%s%a" plus k a pp_typ_opt typ
+      | [] -> ()
+      | [ (a, typ) ] -> Format.fprintf fmt "%a%s%a" plus k a pp_typ_opt typ
       | (a, typ) :: r ->
           Format.fprintf fmt "%a%s%a, " plus k a pp_typ_opt typ;
           aux (k + 1) r
@@ -328,7 +325,7 @@ module CAbsPred = struct
 
   let pp fmt pred =
     let pp_pure f = function
-      | true  -> Fmt.pf f "pure "
+      | true -> Fmt.pf f "pure "
       | false -> ()
     in
     Fmt.pf fmt "abstract %apred %s(%a)" pp_pure pred.pure pred.name pp_params
@@ -347,13 +344,13 @@ module CPred = struct
 
   let pp_params fmt (params, ins) =
     let pp_typ_opt f = function
-      | None   -> ()
+      | None -> ()
       | Some t -> Format.fprintf f ": %s" (GilType.str t)
     in
     let plus f k = if List.mem k ins then Format.fprintf f "+" else () in
     let rec aux k = function
-      | []            -> ()
-      | [ (a, typ) ]  -> Format.fprintf fmt "%a%s%a" plus k a pp_typ_opt typ
+      | [] -> ()
+      | [ (a, typ) ] -> Format.fprintf fmt "%a%s%a" plus k a pp_typ_opt typ
       | (a, typ) :: r ->
           Format.fprintf fmt "%a%s%a, " plus k a pp_typ_opt typ;
           aux (k + 1) r
@@ -367,7 +364,7 @@ module CPred = struct
 
   let pp fmt pred =
     let pp_pure f = function
-      | true  -> Fmt.pf f "pure "
+      | true -> Fmt.pf f "pure "
       | false -> ()
     in
     Format.fprintf fmt "@[<v 2>%apred %s %s(%a) {@\n%a@]@\n}" pp_pure pred.pure
@@ -439,13 +436,9 @@ module CProg = struct
     { prog with only_specs = spec :: prog.only_specs }
 
   let add_imports imports prog = { prog with imports = imports @ prog.imports }
-
   let add_pred pred prog = { prog with preds = pred :: prog.preds }
-
   let add_abs_pred pred prog = { prog with abs_preds = pred :: prog.abs_preds }
-
   let add_spec spec prog = { prog with specs = spec :: prog.specs }
-
   let add_lemma lemma prog = { prog with lemmas = lemma :: prog.lemmas }
 
   let merge p1 p2 =

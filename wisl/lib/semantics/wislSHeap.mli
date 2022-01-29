@@ -5,17 +5,15 @@ type t [@@deriving yojson]
 
 type err =
   | MissingResource of (WislLActions.ga * string * Expr.t option)
-  | DoubleFree      of string
-  | UseAfterFree    of string
+  | DoubleFree of string
+  | UseAfterFree of string
   | MemoryLeak
-  | OutOfBounds     of (int option * string * Expr.t)
+  | OutOfBounds of (int option * string * Expr.t)
   | InvalidLocation
 [@@deriving yojson]
 
 val init : unit -> t
-
 val alloc : t -> int -> string
-
 val dispose : t -> string -> (unit, err) Result.t
 
 val get_cell :
@@ -36,21 +34,13 @@ val set_cell :
   (unit, err) result
 
 val rem_cell : t -> string -> Expr.t -> (unit, err) result
-
 val get_bound : t -> string -> (int, err) result
-
 val set_bound : t -> string -> int -> (unit, err) result
-
 val rem_bound : t -> string -> (unit, err) result
-
 val get_freed : t -> string -> (unit, err) result
-
 val set_freed : t -> string -> unit
-
 val rem_freed : t -> string -> (unit, err) result
-
 val pp : t Fmt.t
-
 val copy : t -> t
 
 val substitution_in_place :

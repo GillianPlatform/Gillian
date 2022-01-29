@@ -10,21 +10,18 @@ type t = {
 }
 
 val get_id : t -> int
-
 val get_pre : t -> WLAssert.t
-
 val get_post : t -> WLAssert.t
-
 val get_loc : t -> CodeLoc.t
 
 val get_by_id :
   int ->
   t ->
   [> `None
-  | `WLAssert  of WLAssert.t
-  | `WLExpr    of WLExpr.t
+  | `WLAssert of WLAssert.t
+  | `WLExpr of WLExpr.t
   | `WLFormula of WLFormula.t
-  | `WSpec     of t ]
+  | `WSpec of t ]
 
 val make :
   ?existentials:string * string list ->

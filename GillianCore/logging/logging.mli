@@ -24,7 +24,6 @@ module ReportId : sig
   type t
 
   val equal : t -> t -> bool
-
   val pp : Format.formatter -> t -> unit
 end
 
@@ -42,7 +41,6 @@ module Reporter : sig
 end
 
 val database_reporter : Reporter.t
-
 val file_reporter : Reporter.t
 
 module Loggable : sig

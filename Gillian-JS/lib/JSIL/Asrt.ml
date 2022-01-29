@@ -4,13 +4,13 @@ open Gillian.Gil_syntax
 (** {b JSIL logic assertions}. *)
 type t =
   | Emp  (** Empty heap             *)
-  | Star        of t * t  (** Separating conjunction *)
-  | PointsTo    of Expr.t * Expr.t * Expr.t  (** Heap cell assertion    *)
-  | MetaData    of Expr.t * Expr.t  (** MetaData               *)
-  | Pred        of string * Expr.t list  (** Predicates             *)
+  | Star of t * t  (** Separating conjunction *)
+  | PointsTo of Expr.t * Expr.t * Expr.t  (** Heap cell assertion    *)
+  | MetaData of Expr.t * Expr.t  (** MetaData               *)
+  | Pred of string * Expr.t list  (** Predicates             *)
   | EmptyFields of Expr.t * Expr.t  (** emptyFields assertion  *)
-  | Pure        of Formula.t  (** Pure formula           *)
-  | Types       of (Expr.t * Type.t) list  (** Typing assertion       *)
+  | Pure of Formula.t  (** Pure formula           *)
+  | Types of (Expr.t * Type.t) list  (** Typing assertion       *)
 
 let compare x y =
   let cmp = Stdlib.compare in
@@ -69,7 +69,6 @@ let rec pp fmt (a : t) : unit =
   | Pure f -> Formula.pp fmt f
 
 let full_pp = pp
-
 let pp_list = Fmt.list ~sep:(Fmt.any "  ") pp
 
 let star (asses : t list) : t =

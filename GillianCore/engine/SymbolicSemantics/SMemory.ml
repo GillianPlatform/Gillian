@@ -6,9 +6,7 @@ module type S = sig
   type st = SVal.SESubst.t
 
   type i_fix_t
-
   type c_fix_t
-
   type err_t [@@deriving yojson]
 
   (** Type of GIL general states *)
@@ -32,13 +30,9 @@ module type S = sig
     action_ret
 
   val ga_to_setter : string -> string
-
   val ga_to_getter : string -> string
-
   val ga_to_deleter : string -> string
-
   val ga_loc_indexes : string -> int list
-
   val is_overlapping_asrt : string -> bool
 
   (** State Copy *)
@@ -48,7 +42,6 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
 
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
-
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
 
   val substitution_in_place :
@@ -59,23 +52,14 @@ module type S = sig
     (t * Formula.Set.t * (string * Type.t) list) list
 
   val fresh_val : t -> vt
-
   val clean_up : t -> unit
-
   val lvars : t -> Containers.SS.t
-
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
-
   val mem_constraints : t -> Formula.t list
-
   val pp_i_fix : Format.formatter -> i_fix_t -> unit
-
   val pp_c_fix : Format.formatter -> c_fix_t -> unit
-
   val get_recovery_vals : t -> err_t -> vt list
-
   val pp_err : Format.formatter -> err_t -> unit
-
   val get_failing_constraint : err_t -> Formula.t
 
   val get_fixes :

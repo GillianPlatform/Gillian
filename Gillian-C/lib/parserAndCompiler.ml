@@ -137,7 +137,7 @@ module TargetLangOptions = struct
       } =
     let rec get_c_paths dirs =
       match dirs with
-      | []          -> []
+      | [] -> []
       | dir :: rest ->
           let files = Gillian.Utils.Io_utils.get_files dir in
           let c_files =
@@ -165,7 +165,6 @@ let compiled_progs = Hashtbl.create small_tbl_size
 let included_headers_cache = Hashtbl.create small_tbl_size
 
 let get_gil_path c_path = Filename.chop_extension c_path ^ ".gil"
-
 let get_deps_path c_path = Filename.chop_extension c_path ^ ".deps"
 
 type err = Errors.errmsg
@@ -176,7 +175,7 @@ type tl_ast = unit
 let pp_err fmt e = Driveraux.print_error fmt e
 
 let get_or_print_and_die = function
-  | Errors.OK e    -> e
+  | Errors.OK e -> e
   | Errors.Error e ->
       Format.printf "%a\n@?" Driveraux.print_error e;
       exit 1
@@ -212,7 +211,7 @@ let mangle_proc proc mangled_syms =
   let mangle_symbol sym =
     match Hashtbl.find_opt mangled_syms sym with
     | Some mangled_sym -> mangled_sym
-    | None             -> sym
+    | None -> sym
   in
   let mangling_visitor =
     object
@@ -334,7 +333,7 @@ let parse_and_compile_files paths =
   let hide_mult_def = !Config.hide_mult_def in
   let rec link paths unresolved_syms defined_syms =
     match paths with
-    | []           -> unresolved_syms
+    | [] -> unresolved_syms
     | path :: rest ->
         let _, Gilgen.{ symbols; _ } = Hashtbl.find compiled_progs path in
         let def, undef = List.partition Gilgen.is_def_sym symbols in
@@ -351,6 +350,8 @@ let parse_and_compile_files paths =
         link rest new_unresolved new_defined
   in
   let unresolved_syms = link paths SS.empty SS.empty in
+  let to_ignore = Config_compcert.references_to_ignore |> SS.of_list in
+  let unresolved_syms = SS.diff unresolved_syms to_ignore in
   let () =
     if (not (SS.is_empty unresolved_syms)) && not hide_undef then
       linker_error "undefined reference to" unresolved_syms
@@ -360,7 +361,7 @@ let parse_and_compile_files paths =
   let open Gillian.Gil_syntax in
   let rec combine paths comb_imports comb_init_asrts comb_init_cmds =
     match paths with
-    | []           -> (comb_imports, comb_init_asrts, comb_init_cmds)
+    | [] -> (comb_imports, comb_init_asrts, comb_init_cmds)
     | path :: rest ->
         let _, Gilgen.{ genv_pred_asrts; genv_init_cmds; _ } =
           Hashtbl.find compiled_progs path
@@ -430,7 +431,6 @@ let parse_and_compile_files paths =
   Ok (create_compilation_result all_progs)
 
 let other_imports = []
-
 let env_var_import_path = Some CConstants.Imports.env_path_var
 
 let init_compcert () =

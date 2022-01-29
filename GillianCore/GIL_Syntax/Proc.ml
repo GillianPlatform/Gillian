@@ -40,7 +40,7 @@ let pp ~(show_labels : bool) ~(pp_label : 'a Fmt.t) fmt labproc =
   let pp_cmd_triple fmt (_, lab, cmd) =
     if show_labels then
       match lab with
-      | None   ->
+      | None ->
           Fmt.pf fmt "%a%a" pp_white (max_size_lab + 2) (Cmd.pp ~pp_label) cmd
       | Some l ->
           Fmt.pf fmt "%a:%a%a" pp_label l pp_white
@@ -49,15 +49,15 @@ let pp ~(show_labels : bool) ~(pp_label : 'a Fmt.t) fmt labproc =
     else Fmt.pf fmt "%a" (Cmd.pp ~pp_label) cmd
   in
   let pp_spec_opt fmt = function
-    | None      -> ()
+    | None -> ()
     | Some spec -> Fmt.pf fmt "%a@\n" Spec.pp spec
   in
   let pp_path_opt fmt = function
-    | None   -> Fmt.pf fmt "@nopath@\n"
+    | None -> Fmt.pf fmt "@nopath@\n"
     | Some _ -> ()
   in
   let pp_internal fmt = function
-    | true  -> Fmt.pf fmt "@internal@\n"
+    | true -> Fmt.pf fmt "@internal@\n"
     | false -> ()
   in
   Fmt.pf fmt "@[%a%a%a@[<v 2>proc %s(%a) {@\n%a@]@\n};@\n@]" pp_path_opt path
@@ -68,7 +68,6 @@ let pp ~(show_labels : bool) ~(pp_label : 'a Fmt.t) fmt labproc =
     body
 
 let pp_labeled fmt c = pp ~show_labels:true ~pp_label:Fmt.string fmt c
-
 let pp_indexed fmt c = pp ~show_labels:false ~pp_label:Fmt.int fmt c
 
 let indexed_of_labeled (lproc : (Annot.t, string) t) : (Annot.t, int) t =
@@ -80,7 +79,7 @@ let indexed_of_labeled (lproc : (Annot.t, string) t) : (Annot.t, int) t =
     for i = 0 to no_of_cmds - 1 do
       match lproc.proc_body.(i) with
       | _, Some str, _ -> Hashtbl.add mapping str i
-      | _              -> ()
+      | _ -> ()
     done;
     mapping
   in
@@ -88,7 +87,7 @@ let indexed_of_labeled (lproc : (Annot.t, string) t) : (Annot.t, int) t =
   let find_with_error hash lab =
     match Hashtbl.find_opt hash lab with
     | Some result -> result
-    | None        -> raise (Failure ("Could not find label: " ^ lab))
+    | None -> raise (Failure ("Could not find label: " ^ lab))
   in
 
   (* Replace labels with numbers in the procedure commands *)
@@ -106,12 +105,11 @@ let indexed_of_labeled (lproc : (Annot.t, string) t) : (Annot.t, int) t =
           | spec, l, labeled_cmd ->
               let indexed_cmd : int Cmd.t =
                 match (labeled_cmd : string Cmd.t) with
-                | Skip                       -> Cmd.Skip
-                | Assignment (x, e)          -> Cmd.Assignment (x, e)
-                | LAction (x, la_name, es)   -> Cmd.LAction (x, la_name, es)
-                | Goto lab                   -> Cmd.Goto
-                                                  (find_with_error mapping lab)
-                | GuardedGoto (e, lt, lf)    ->
+                | Skip -> Cmd.Skip
+                | Assignment (x, e) -> Cmd.Assignment (x, e)
+                | LAction (x, la_name, es) -> Cmd.LAction (x, la_name, es)
+                | Goto lab -> Cmd.Goto (find_with_error mapping lab)
+                | GuardedGoto (e, lt, lf) ->
                     Cmd.GuardedGoto
                       (e, find_with_error mapping lt, find_with_error mapping lf)
                 | Call (x, e, le, ol, subst) ->
@@ -120,30 +118,30 @@ let indexed_of_labeled (lproc : (Annot.t, string) t) : (Annot.t, int) t =
                         e,
                         le,
                         (match ol with
-                        | None     -> None
+                        | None -> None
                         | Some lab -> Some (find_with_error mapping lab)),
                         subst )
-                | ECall (x, e, le, ol)       ->
+                | ECall (x, e, le, ol) ->
                     Cmd.ECall
                       ( x,
                         e,
                         le,
                         match ol with
-                        | None     -> None
+                        | None -> None
                         | Some lab -> Some (find_with_error mapping lab) )
-                | Apply (x, le, ol)          ->
+                | Apply (x, le, ol) ->
                     Cmd.Apply
                       ( x,
                         le,
                         match ol with
-                        | None     -> None
+                        | None -> None
                         | Some lab -> Some (find_with_error mapping lab) )
-                | Arguments var              -> Cmd.Arguments var
-                | PhiAssignment xargs        -> Cmd.PhiAssignment xargs
-                | ReturnNormal               -> Cmd.ReturnNormal
-                | ReturnError                -> Cmd.ReturnError
-                | Fail (et, es)              -> Cmd.Fail (et, es)
-                | Logic lcmd                 -> Cmd.Logic lcmd
+                | Arguments var -> Cmd.Arguments var
+                | PhiAssignment xargs -> Cmd.PhiAssignment xargs
+                | ReturnNormal -> Cmd.ReturnNormal
+                | ReturnError -> Cmd.ReturnError
+                | Fail (et, es) -> Cmd.Fail (et, es)
+                | Logic lcmd -> Cmd.Logic lcmd
               in
               (spec, l, indexed_cmd))
         cmds_nolab
@@ -160,13 +158,13 @@ let check_proc_spec_correspondence
   Hashtbl.iter
     (fun _ (proc : (Annot.t, 'a) t) ->
       match proc.proc_spec with
-      | None      -> ()
+      | None -> ()
       | Some spec -> (
           (* Check the arguments correspond
            * -----------------------------------------------------------------------------------
            *)
           match proc.proc_params = spec.spec_params with
-          | true  -> ()
+          | true -> ()
           | false ->
               raise
                 (Failure

@@ -90,34 +90,34 @@ let pp fmt pred =
     Fmt.pf fmt' "%a%a" (Fmt.option pp_id_exs) id_exs Asrt.pp asser
   in
   let pp_path_opt fmt = function
-    | None   -> Fmt.pf fmt "@nopath@\n"
+    | None -> Fmt.pf fmt "@nopath@\n"
     | Some _ -> ()
   in
   let pp_internal fmt = function
-    | true  -> Fmt.pf fmt "@internal@\n"
+    | true -> Fmt.pf fmt "@internal@\n"
     | false -> ()
   in
   let pp_abstract fmt = function
-    | true  -> Fmt.pf fmt "abstract "
+    | true -> Fmt.pf fmt "abstract "
     | false -> ()
   in
   let pp_pure fmt = function
-    | true  -> Fmt.pf fmt "pure "
+    | true -> Fmt.pf fmt "pure "
     | false -> ()
   in
   let pp_nounfold fmt = function
-    | true  -> Fmt.pf fmt "nounfold "
+    | true -> Fmt.pf fmt "nounfold "
     | false -> ()
   in
   let pp_facts fmt = function
-    | []    -> ()
+    | [] -> ()
     | facts ->
         Fmt.pf fmt "facts: %a;@\n"
           Fmt.(list ~sep:(any " and ") Formula.pp)
           facts
   in
   let pp_defs fmt = function
-    | []   -> ()
+    | [] -> ()
     | defs -> Fmt.pf fmt ":@ %a" (Fmt.list ~sep:Fmt.comma pp_def) defs
   in
   Fmt.pf fmt "%a%a@[<hov 2>%a%a%apred %s%a %a@];@\n%a" pp_path_opt
@@ -157,7 +157,7 @@ let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
         (fun (pvar : string) ->
           let valid_pvar = List.mem pvar string_of_params in
           match valid_pvar || predicate.pred_normalised with
-          | true  -> ()
+          | true -> ()
           | false ->
               raise
                 (Failure
@@ -209,12 +209,12 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
             List.fold_left
               (fun ac_types ((_, t_x), le) ->
                 match t_x with
-                | None     -> ac_types
+                | None -> ac_types
                 | Some t_x -> (le, t_x) :: ac_types)
               [] combined
           in
           Star (Types ac_types, a)
-      | _                -> a
+      | _ -> a
     in
     Asrt.map None (Some f_a_after) None None a
   in
@@ -223,7 +223,7 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
     List.fold_right
       (fun (x, t_x) new_asrts ->
         match t_x with
-        | None     -> new_asrts
+        | None -> new_asrts
         | Some t_x -> Asrt.Types [ (PVar x, t_x) ] :: new_asrts)
       pred.pred_params []
   in
@@ -237,7 +237,7 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
     List.fold_right
       (fun (x, t_x) new_facts ->
         match t_x with
-        | None     -> new_facts
+        | None -> new_facts
         | Some t_x ->
             Gil_syntax__.Formula.Eq (UnOp (TypeOf, PVar x), Lit (Type t_x))
             :: new_facts)
@@ -257,11 +257,11 @@ let combine_ins_outs (pred : t) (ins : 'a list) (outs : 'a list) : 'a list =
     if cur_index = max_index then all
     else if SI.mem cur_index in_indexes then
       match ins with
-      | []       -> raise (Failure "DEATH. combine_ins_outs")
+      | [] -> raise (Failure "DEATH. combine_ins_outs")
       | hd :: tl -> loop tl outs (hd :: all) (cur_index + 1)
     else
       match outs with
-      | []       -> raise (Failure "DEATH. combine_ins_outs")
+      | [] -> raise (Failure "DEATH. combine_ins_outs")
       | hd :: tl -> loop ins tl (hd :: all) (cur_index + 1)
   in
   List.rev (loop ins outs [] 0)
@@ -277,13 +277,13 @@ let iter_ins_outs
     if cur_index = max_index then ()
     else if SI.mem cur_index in_indexes then (
       match ins with
-      | []       -> raise (Failure "DEATH. iter_ins_outs")
+      | [] -> raise (Failure "DEATH. iter_ins_outs")
       | hd :: tl ->
           fins hd;
           loop tl outs (cur_index + 1))
     else
       match outs with
-      | []       -> raise (Failure "DEATH. iter_ins_outs")
+      | [] -> raise (Failure "DEATH. iter_ins_outs")
       | hd :: tl ->
           fouts hd;
           loop ins tl (cur_index + 1)

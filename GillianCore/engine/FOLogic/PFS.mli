@@ -105,9 +105,7 @@ val filter_stop_cond :
   keep:(Formula.t -> bool) -> cond:(Formula.t -> bool) -> t -> bool
 
 val filter : (Formula.t -> bool) -> t -> unit
-
 val filter_map : (Formula.t -> Formula.t option) -> t -> unit
-
 val exists : (Formula.t -> bool) -> t -> bool
 
 (** Gets the nths formula. There are very few good use cases for this function, and uses should generaly use iterators instead.

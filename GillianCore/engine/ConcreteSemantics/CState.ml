@@ -14,25 +14,17 @@ module Make
      and type vt = Literal.t
      and type store_t = CStore.t = struct
   type vt = CVal.M.t
-
   type st = CVal.CESubst.t
-
   type store_t = CStore.t
-
   type heap_t = CMemory.t
-
   type t = CMemory.t * CStore.t * vt list
-
   type fix_t
-
   type m_err_t = CMemory.err_t
-
   type err_t = (m_err_t, vt) StateErr.err_t
 
   exception Internal_State_Error of err_t list * t
 
   type action_ret = ASucc of (t * vt list) list | AFail of err_t list
-
   type u_res = UWTF | USucc of t | UFail of err_t list
 
   let lift_merrs (errs : m_err_t list) : err_t list =
@@ -44,19 +36,18 @@ module Make
   let get_pred_defs (_ : t) : UP.preds_tbl_t option = None
 
   let execute_action
-      ?unification:_ (action : string) (state : t) (args : vt list) : action_ret
-      =
+      ?unification:_
+      (action : string)
+      (state : t)
+      (args : vt list) : action_ret =
     let heap, store, locs = state in
     match CMemory.execute_action action heap args with
     | CMemory.ASucc (heap, vs) -> ASucc [ ((heap, store, locs), vs) ]
-    | CMemory.AFail errs       -> AFail (lift_merrs errs)
+    | CMemory.AFail errs -> AFail (lift_merrs errs)
 
   let ga_to_setter (a_id : string) = CMemory.ga_to_setter a_id
-
   let ga_to_getter (a_id : string) = CMemory.ga_to_getter a_id
-
   let ga_to_deleter (a_id : string) = CMemory.ga_to_deleter a_id
-
   let is_overlapping_asrt (a : string) : bool = CMemory.is_overlapping_asrt a
 
   let eval_expr state e =
@@ -74,17 +65,20 @@ module Make
   let to_loc (state : t) (loc : vt) : (t * vt) option =
     match loc with
     | Literal.Loc _ -> Some (state, loc)
-    | _             -> None
+    | _ -> None
 
   let assume ?unfold:_ (state : t) (l : Literal.t) : t list =
     match l with
-    | Bool true  -> [ state ]
+    | Bool true -> [ state ]
     | Bool false -> []
-    | _          -> raise (Failure "assume. illegal argument to assume")
+    | _ -> raise (Failure "assume. illegal argument to assume")
 
   let assume_a
-      ?unification:_ ?production:_ ?time:_ (state : t) (ps : Formula.t list) :
-      t option =
+      ?unification:_
+      ?production:_
+      ?time:_
+      (state : t)
+      (ps : Formula.t list) : t option =
     let les : Expr.t option list = List.map Formula.to_expr ps in
     let bs : CVal.M.t option list =
       List.map (Option.map (eval_expr state)) les
@@ -93,7 +87,7 @@ module Make
       List.for_all
         (function
           | Some (Bool true) -> true
-          | _                -> false)
+          | _ -> false)
         bs
     then Some state
     else None
@@ -107,7 +101,7 @@ module Make
   let sat_check (_ : t) (l : Literal.t) : bool =
     match l with
     | Bool b -> b
-    | _      -> raise (Failure "SAT Check: non-boolean argument")
+    | _ -> raise (Failure "SAT Check: non-boolean argument")
 
   (* Implentation MISSING!!! *)
   let sat_check_f (_ : t) (_ : Formula.t list) : st option = None
@@ -134,7 +128,6 @@ module Make
     (CMemory.copy cheap, CStore.copy cstore, vts)
 
   let equals _ v1 v2 = v1 = v2
-
   let get_type _ v = Some (Literal.type_of v)
 
   let simplify ?save:_ ?kill_new_lvars:_ ?unification:_ (state : t) :
@@ -227,18 +220,17 @@ module Make
 
   let pp_err fmt (err : err_t) : unit =
     match err with
-    | EMem m_err        -> CMemory.pp_err fmt m_err
+    | EMem m_err -> CMemory.pp_err fmt m_err
     | EType (v, t1, t2) ->
         Fmt.pf fmt "EType(%a, %a, %s)" CVal.M.pp v
           (Fmt.option ~none:(Fmt.any "None") (Fmt.of_to_string Type.str))
           t1 (Type.str t2)
-    | _                 ->
+    | _ ->
         raise
           (Exceptions.Unsupported
              "Concrete printer: non-memory and non-type error")
 
   let can_fix (_ : err_t list) : bool = false
-
   let get_failing_constraint (_ : err_t) : Formula.t = True
 
   let get_fixes ?simple_fix:_ (_ : t) (_ : err_t list) : fix_t list list =

@@ -8,11 +8,8 @@ let true_name id =
   else str
 
 let float_of_z z = float_of_int (Camlcoq.Z.to_int z)
-
 let z_of_float z = Camlcoq.Z.of_sint (int_of_float z)
-
 let string_of_chunk = Chunk.to_string
-
 let chunk_of_string = Chunk.of_string
 
 let loc_name_of_block block =
@@ -27,7 +24,6 @@ let block_of_loc_name loc_name =
   Camlcoq.P.of_int int_block
 
 let compcert_size_of_gil = z_of_float
-
 let gil_size_of_compcert = float_of_z
 
 let compcert_of_gil gil_value =
@@ -63,17 +59,17 @@ let gil_of_compcert compcert_value =
   let open Literal in
   let open Values in
   match compcert_value with
-  | Vundef               -> Undefined
-  | Vint i               ->
+  | Vundef -> Undefined
+  | Vint i ->
       let ocaml_float = float_of_z i in
       LList [ String VTypes.int_type; Num ocaml_float ]
-  | Vfloat f             ->
+  | Vfloat f ->
       let ocaml_float = Camlcoq.camlfloat_of_coqfloat f in
       LList [ String VTypes.float_type; Num ocaml_float ]
-  | Vsingle f32          ->
+  | Vsingle f32 ->
       let ocaml_float = Camlcoq.camlfloat_of_coqfloat32 f32 in
       LList [ String VTypes.single_type; Num ocaml_float ]
-  | Vlong i64            ->
+  | Vlong i64 ->
       let ocaml_float = float_of_z i64 in
       LList [ String VTypes.long_type; Num ocaml_float ]
   | Vptr (block, ptrofs) ->
@@ -96,7 +92,7 @@ let permission_of_string str =
   | "Writable" -> Writable
   | "Readable" -> Readable
   | "Nonempty" -> Nonempty
-  | _          -> failwith ("Unkown permission : " ^ str)
+  | _ -> failwith ("Unkown permission : " ^ str)
 
 let permission_opt_of_string str =
   try Some (permission_of_string str)
@@ -106,7 +102,7 @@ let permission_opt_of_string str =
 
 let string_of_permission_opt p_opt =
   match p_opt with
-  | None   -> "None"
+  | None -> "None"
   | Some p -> string_of_permission p
 
 let compcert_block_of_gil gil_block =
@@ -121,14 +117,14 @@ let gil_init_data init_data =
   let num_i n = Num (float_of_z n) in
   let open Compcert.AST in
   match init_data with
-  | Init_int8 n            -> LList [ String "int8"; num_i n ]
-  | Init_int16 n           -> LList [ String "int16"; num_i n ]
-  | Init_int32 n           -> LList [ String "int32"; num_i n ]
-  | Init_int64 n           -> LList [ String "int64"; num_i n ]
-  | Init_float32 n         ->
+  | Init_int8 n -> LList [ String "int8"; num_i n ]
+  | Init_int16 n -> LList [ String "int16"; num_i n ]
+  | Init_int32 n -> LList [ String "int32"; num_i n ]
+  | Init_int64 n -> LList [ String "int64"; num_i n ]
+  | Init_float32 n ->
       LList [ String "float32"; Num (Camlcoq.camlfloat_of_coqfloat32 n) ]
-  | Init_float64 n         ->
+  | Init_float64 n ->
       LList [ String "float64"; Num (Camlcoq.camlfloat_of_coqfloat n) ]
-  | Init_space n           -> LList [ String "space"; num_i n ]
+  | Init_space n -> LList [ String "space"; num_i n ]
   | Init_addrof (sym, ofs) ->
       LList [ String "addrof"; String (true_name sym); num_i ofs ]

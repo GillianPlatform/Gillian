@@ -16,11 +16,11 @@ type t = TypeDef__.constant =
 (** Print *)
 let str (x : t) =
   match x with
-  | Min_float      -> "$$min_value"
-  | Max_float      -> "$$max_value"
+  | Min_float -> "$$min_value"
+  | Max_float -> "$$max_value"
   | MaxSafeInteger -> "$$max_safe_integer"
-  | Epsilon        -> "$$epsilon"
-  | Random         -> "$$random"
-  | Pi             -> "$$pi"
-  | UTCTime        -> "$$utctime"
-  | LocalTime      -> "$$localtime"
+  | Epsilon -> "$$epsilon"
+  | Random -> "$$random"
+  | Pi -> "$$pi"
+  | UTCTime -> "$$utctime"
+  | LocalTime -> "$$localtime"

@@ -28,9 +28,7 @@ let fresh_sth (name : string) : (unit -> string) * (unit -> unit) =
   (f, r)
 
 let fresh_then, reset_then = fresh_sth "glab_then_"
-
 let fresh_else, reset_else = fresh_sth "glab_else_"
-
 let fresh_var, reset_var = fresh_sth "gvar_aux_"
 
 let reset_generators () =
@@ -41,36 +39,36 @@ let reset_generators () =
 let rec jsil2gil_asrt (a : Asrt.t) : GAsrt.t =
   let f = jsil2gil_asrt in
   match a with
-  | Emp                   -> Emp
-  | Star (a1, a2)         -> Star (f a1, f a2)
+  | Emp -> Emp
+  | Star (a1, a2) -> Star (f a1, f a2)
   | PointsTo (e1, e2, e3) -> GA (JSILNames.aCell, [ e1; e2 ], [ e3 ])
-  | MetaData (e1, e2)     -> GA (JSILNames.aMetadata, [ e1 ], [ e2 ])
-  | EmptyFields (e1, e2)  -> GA (JSILNames.aProps, [ e1; e2 ], [])
-  | Pred (pn, es)         -> Pred (pn, es)
-  | Pure f                -> Pure f
-  | Types vts             -> Types vts
+  | MetaData (e1, e2) -> GA (JSILNames.aMetadata, [ e1 ], [ e2 ])
+  | EmptyFields (e1, e2) -> GA (JSILNames.aProps, [ e1; e2 ], [])
+  | Pred (pn, es) -> Pred (pn, es)
+  | Pure f -> Pure f
+  | Types vts -> Types vts
 
 let jsil2gil_slcmd (slcmd : SLCmd.t) : GSLCmd.t =
   match slcmd with
-  | Fold (pn, es, info)      -> Fold (pn, es, info)
+  | Fold (pn, es, info) -> Fold (pn, es, info)
   | Unfold (pn, es, info, b) -> Unfold (pn, es, info, b)
-  | GUnfold pn               -> GUnfold pn
-  | ApplyLem (x, es, xs)     -> ApplyLem (x, es, xs)
-  | SepAssert (a, xs)        -> SepAssert (jsil2gil_asrt a, xs)
-  | Invariant (a, xs)        -> Invariant (jsil2gil_asrt a, xs)
+  | GUnfold pn -> GUnfold pn
+  | ApplyLem (x, es, xs) -> ApplyLem (x, es, xs)
+  | SepAssert (a, xs) -> SepAssert (jsil2gil_asrt a, xs)
+  | Invariant (a, xs) -> Invariant (jsil2gil_asrt a, xs)
 
 let rec jsil2gil_lcmd (lcmd : LCmd.t) : GLCmd.t =
   let f = jsil2gil_lcmd in
   let fs = List.map f in
   match lcmd with
   | If (e, lcmds1, lcmds2) -> If (e, fs lcmds1, fs lcmds2)
-  | Branch f               -> Branch f
-  | Macro (x, es)          -> Macro (x, es)
-  | Assert f               -> Assert f
-  | Assume f               -> Assume f
-  | AssumeType (x, t)      -> AssumeType (x, t)
-  | SpecVar xs             -> SpecVar xs
-  | SL slcmd               -> SL (jsil2gil_slcmd slcmd)
+  | Branch f -> Branch f
+  | Macro (x, es) -> Macro (x, es)
+  | Assert f -> Assert f
+  | Assume f -> Assume f
+  | AssumeType (x, t) -> AssumeType (x, t)
+  | SpecVar xs -> SpecVar xs
+  | SL slcmd -> SL (jsil2gil_slcmd slcmd)
 
 let jsil2gil_sspec (sspec : Spec.st) : GSpec.st =
   let ss_label =

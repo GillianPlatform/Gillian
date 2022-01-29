@@ -12,7 +12,6 @@ type t = {
 }
 
 let get_id l = l.lemma_id
-
 let get_loc l = l.lemma_loc
 
 let get_by_id id lemma =

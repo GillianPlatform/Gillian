@@ -22,16 +22,14 @@ type pt = step list
 let pt_pp = Fmt.(brackets (list ~sep:semi step_pp))
 
 type t =
-  | Leaf            of step option * (Flag.t * Asrt.t list) option
+  | Leaf of step option * (Flag.t * Asrt.t list) option
       (** Final node and associated post-condition *)
-  | Inner           of step * t list
-  | PhantomInner    of t list
+  | Inner of step * t list
+  | PhantomInner of t list
   | LabPhantomInner of (t * (string * SS.t) option) list
 
 type pred = { pred : Pred.t; up : t }
-
 type spec = { spec : Spec.t; up : t }
-
 type lemma = { lemma : Lemma.t; up : t }
 
 type prog = {
@@ -48,14 +46,13 @@ module KB = Expr.Set
 let kb_pp = Fmt.(braces (iter ~sep:comma KB.iter Expr.full_pp))
 
 type up_search_state = pt * SI.t * KB.t
-
 type preds_tbl_t = (string, pred) Hashtbl.t
 
 type up_err_t =
-  | UPSpec      of string * Asrt.t list list
-  | UPPred      of string * Asrt.t list list
-  | UPLemma     of string * Asrt.t list list
-  | UPAssert    of Asrt.t * Asrt.t list list
+  | UPSpec of string * Asrt.t list list
+  | UPPred of string * Asrt.t list list
+  | UPLemma of string * Asrt.t list list
+  | UPAssert of Asrt.t * Asrt.t list list
   | UPInvariant of Asrt.t * Asrt.t list list
 [@@deriving show]
 
@@ -64,7 +61,7 @@ exception UPError of up_err_t
 let is_var (e : Expr.t) : bool =
   match e with
   | PVar _ | LVar _ -> true
-  | _               -> false
+  | _ -> false
 
 (** List lengths are not required if their variables are *)
 let minimise_unifiables (kb : KB.t) : KB.t =
@@ -73,9 +70,9 @@ let minimise_unifiables (kb : KB.t) : KB.t =
       match u with
       | UnOp (LstLen, e) -> (
           match KB.mem e kb with
-          | true  -> ac
+          | true -> ac
           | false -> KB.add u ac)
-      | _                -> KB.add u ac)
+      | _ -> KB.add u ac)
     kb KB.empty
 
 (** [missing kb e] returns a list of unifiables that are missing
@@ -95,7 +92,7 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
     if umle = [] || List.mem KB.empty umle then [ KB.empty ] else umle
   in
   match KB.mem e kb with
-  | true  -> [ KB.empty ]
+  | true -> [ KB.empty ]
   | false -> (
       match e with
       (* Literals are always known *)
@@ -109,7 +106,7 @@ let rec missing_expr (kb : KB.t) (e : Expr.t) : KB.t list =
              must have been taken care of by reduction *)
           match e1 with
           | EList _ -> [ KB.empty ]
-          | _       -> (
+          | _ -> (
               let () =
                 if not (is_var e1) then
                   raise
@@ -144,7 +141,10 @@ let is_known_expr (kb : KB.t) (e : Expr.t) : bool =
     pairs, each of which contains the learned unifiable and the
     method of its construction. *)
 let rec learn_expr
-    ?(top_level = false) (kb : KB.t) (base_expr : Expr.t) (e : Expr.t) : outs =
+    ?(top_level = false)
+    (kb : KB.t)
+    (base_expr : Expr.t)
+    (e : Expr.t) : outs =
   let f = learn_expr kb in
   match e with
   (* Literals, abstract locations, sublists, and sets are never invertible *)
@@ -185,16 +185,16 @@ let rec learn_expr
   | NOp (LstCat, e :: rest) -> (
       let list_length (lst : Expr.t) : Expr.t =
         match lst with
-        | Lit (LList l)      -> Lit (Num (float_of_int (List.length l)))
-        | EList l            -> Lit (Num (float_of_int (List.length l)))
+        | Lit (LList l) -> Lit (Num (float_of_int (List.length l)))
+        | EList l -> Lit (Num (float_of_int (List.length l)))
         | LstSub (_, _, len) -> len
-        | _                  -> UnOp (LstLen, lst)
+        | _ -> UnOp (LstLen, lst)
       in
 
       let overall_length : Expr.t = list_length base_expr in
       let e_length : Expr.t = list_length e in
       match is_known_expr kb e_length with
-      | true  ->
+      | true ->
           let e_base_expr = Expr.LstSub (base_expr, Lit (Num 0.), e_length) in
           let e_outs = f e_base_expr e in
           let kb' : KB.t =
@@ -213,11 +213,11 @@ let rec learn_expr
       let ike1, ike2 = (is_known_expr kb e1, is_known_expr kb e2) in
       match (ike1, ike2) with
       | true, true | false, false -> []
-      | _                         ->
+      | _ ->
           (* Get the known and the unknown operand *)
           let ke, ue =
             match ike1 with
-            | true  -> (e1, e2)
+            | true -> (e1, e2)
             | false -> (e2, e1)
           in
           f (BinOp (base_expr, FMinus, ke)) ue)
@@ -227,8 +227,8 @@ let rec learn_expr
       let ike1, ike2 = (is_known_expr kb e1, is_known_expr kb e2) in
       match (ike1, ike2) with
       | true, true | false, false -> []
-      | false, true               -> f (BinOp (base_expr, FPlus, e2)) e1
-      | true, false               -> f (BinOp (e1, FMinus, base_expr)) e2)
+      | false, true -> f (BinOp (base_expr, FPlus, e2)) e1
+      | true, false -> f (BinOp (e1, FMinus, base_expr)) e2)
   (* TODO: Finish the remaining invertible binary operators *)
   | BinOp _ -> []
 
@@ -260,9 +260,7 @@ and learn_expr_list (kb : KB.t) (le : (Expr.t * Expr.t) list) =
 let simple_ins_expr_collector =
   object
     inherit [_] Visitors.reduce as super
-
     method zero = (KB.empty, KB.empty)
-
     method plus (a, c) (b, d) = (KB.union a b, KB.union c d)
 
     method! visit_expr () e =
@@ -285,7 +283,7 @@ let simple_ins_expr (e : Expr.t) : KB.t list =
   let simple_ins =
     match llen_choices with
     | [] -> [ others ]
-    | _  ->
+    | _ ->
         List.map
           (fun llen_choice -> KB.add_seq (List.to_seq llen_choice) others)
           llen_choices
@@ -336,7 +334,7 @@ let ins_and_outs_from_lists (kb : KB.t) (lei : Expr.t list) (leo : Expr.t list)
   in
   match ins with
   | [] -> [ (KB.empty, []) ]
-  | _  -> List.map (fun ins -> (ins, outs)) ins
+  | _ -> List.map (fun ins -> (ins, outs)) ins
 
 (** [simple_ins_formula pf] returns the list of possible ins
     for a given formula [pf] *)
@@ -404,7 +402,7 @@ let ins_outs_formula (kb : KB.t) (pf : Formula.t) : (KB.t * outs) list =
           (* Understand which side is known and which is unknown *)
           let ke, ue =
             match ike1 with
-            | true  -> (e1, e2)
+            | true -> (e1, e2)
             | false -> (e2, e1)
           in
           (* Try to learn outs from the other side *)
@@ -420,22 +418,22 @@ let ins_outs_formula (kb : KB.t) (pf : Formula.t) : (KB.t * outs) list =
                     (list ~sep:semi (parens (pair ~sep:comma kb_pp outs_pp))))
                 result);
           result)
-  | And _       ->
+  | And _ ->
       raise
         (Failure
            (Format.asprintf "ins_outs_formula: Should have been reduced: %a"
               Formula.pp pf))
-  | _           -> default_result
+  | _ -> default_result
 
 (** [ins_outs_assertion kb a] returns a list of possible ins-outs pairs
     for a given assertion [a] under a given knowledge base [kb] *)
 let ins_outs_assertion
-    (pred_ins : (string, int list) Hashtbl.t) (kb : KB.t) (asrt : Asrt.t) :
-    (KB.t * outs) list =
+    (pred_ins : (string, int list) Hashtbl.t)
+    (kb : KB.t)
+    (asrt : Asrt.t) : (KB.t * outs) list =
   let get_pred_ins name =
     match Hashtbl.find_opt pred_ins name with
-    | None     -> raise
-                    (Failure ("ins_outs_assertion. Unknown Predicate: " ^ name))
+    | None -> raise (Failure ("ins_outs_assertion. Unknown Predicate: " ^ name))
     | Some ins -> ins
   in
   match (asrt : Asrt.t) with
@@ -461,15 +459,15 @@ let ins_outs_assertion
 let rec collect_simple_asrts (a : Asrt.t) : Asrt.t list =
   let f = collect_simple_asrts in
   match a with
-  | Pure True | Emp        -> []
-  | Pure (And (f1, f2))    -> f (Pure f1) @ f (Pure f2)
+  | Pure True | Emp -> []
+  | Pure (And (f1, f2)) -> f (Pure f1) @ f (Pure f2)
   | Pure _ | Pred _ | GA _ -> [ a ]
-  | Types _                -> (
+  | Types _ -> (
       let a = Reduction.reduce_assertion a in
       match a with
       | Types les -> List.map (fun e -> Asrt.Types [ e ]) les
-      | _         -> f a)
-  | Star (a1, a2)          -> f a1 @ f a2
+      | _ -> f a)
+  | Star (a1, a2) -> f a1 @ f a2
 
 let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
     (pt, Asrt.t list) result =
@@ -486,7 +484,7 @@ let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
     List.partition
       (function
         | Asrt.Pred _ | Asrt.GA _ -> true
-        | _                       -> false)
+        | _ -> false)
       simple_asrts
   in
   let overlapping = List.sort_uniq Stdlib.compare overlapping in
@@ -508,14 +506,15 @@ let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
   (* Attempt to find an assertion in a given list that can be added
      to the unification plan *)
   let rec visit_asrt_lst
-      (kb : KB.t) (indexes : SI.t) (visited_indexes : int list) :
-      (SI.t * step list) option =
+      (kb : KB.t)
+      (indexes : SI.t)
+      (visited_indexes : int list) : (SI.t * step list) option =
     if indexes = SI.empty then None
     else
       let i = SI.min_elt indexes in
       let rest_indexes = SI.remove i indexes in
       match visit_asrt kb i with
-      | []  -> visit_asrt_lst kb rest_indexes (i :: visited_indexes)
+      | [] -> visit_asrt_lst kb rest_indexes (i :: visited_indexes)
       | ret -> Some (SI.union (SI.of_list visited_indexes) rest_indexes, ret)
   in
 
@@ -547,7 +546,7 @@ let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
               unchecked);
 
         match visit_asrt_lst kb unchecked [] with
-        | None                      ->
+        | None ->
             L.verbose (fun m -> m "No assertions left to visit.");
             if rest = [] then (
               L.verbose (fun m ->
@@ -560,7 +559,7 @@ let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
                   (fun i ->
                     match ins_outs_assertion preds kb simple_asrts_io.(i) with
                     | (ins, _) :: _ -> ins
-                    | _             ->
+                    | _ ->
                         let message =
                           Fmt.str
                             "s_init: guaranteed by construction. While \
@@ -579,7 +578,7 @@ let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
                          (fun x ->
                            match x with
                            | LVar x -> is_spec_var_name x
-                           | _      -> false)
+                           | _ -> false)
                          u)
                       kb)
                   unchckd
@@ -622,8 +621,8 @@ let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
 
 let rec lift_up (up : pt) (posts : (Flag.t * Asrt.t list) option) : t =
   match up with
-  | []       -> Leaf (None, posts)
-  | [ p ]    -> Leaf (Some p, posts)
+  | [] -> Leaf (None, posts)
+  | [ p ] -> Leaf (Some p, posts)
   | p :: up' -> Inner (p, [ lift_up up' posts ])
 
 let add_up (g_up : t) (up_post : pt * (Flag.t * Asrt.t list) option) : t =
@@ -639,7 +638,7 @@ let lift_ups
       (fun (_, (lab, _)) ->
         match lab with
         | Some _ -> true
-        | _      -> false)
+        | _ -> false)
       ups
   in
   let ups' = List.map (fun (up, (_, posts)) -> (up, posts)) ups in
@@ -661,7 +660,7 @@ let init
     : (t, Asrt.t list list) result =
   let known_unifiables =
     match use_params with
-    | None   -> known_unifiables
+    | None -> known_unifiables
     | Some _ -> KB.union known_unifiables params
   in
 
@@ -688,7 +687,7 @@ let init
       (fun (up, _) ->
         match up with
         | Error _ -> true
-        | Ok _    -> false)
+        | Ok _ -> false)
       ups
   in
   let errors, _ = List.split errors in
@@ -697,7 +696,7 @@ let init
       (fun x ->
         match x with
         | Error e -> e
-        | _       -> raise (Failure "UP: init: Impossible: non-error error"))
+        | _ -> raise (Failure "UP: init: Impossible: non-error error"))
       errors
   in
 
@@ -708,7 +707,7 @@ let init
          (List.map
             (fun (up, posts) ->
               ( (match up with
-                | Ok up   -> up
+                | Ok up -> up
                 | Error _ ->
                     raise (Failure "UP: init: Impossible: ok, but error")),
                 posts ))
@@ -731,7 +730,7 @@ let head (up : t) : step option =
 let posts (up : t) : (Flag.t * Asrt.t list) option =
   match up with
   | Leaf (_, posts) -> posts
-  | _               -> None
+  | _ -> None
 
 let rec pp ft up =
   let open Fmt in
@@ -813,7 +812,7 @@ let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
             (* let msg = Printf.sprintf "Specification of %s cannot be turned into UP. %s"
                  spec.name (Spec.str spec) in
                L.fail msg *)
-        | Ok up     ->
+        | Ok up ->
             L.(
               verbose (fun m ->
                   m "Successfully created UP of specification of %s"
@@ -847,7 +846,7 @@ let init_lemmas (preds : (string, int list) Hashtbl.t) (lemmas : Lemma.t list) :
             raise (UPError (UPLemma (lemma.lemma_name, err)))
             (* let msg = Printf.sprintf "Lemma %s cannot be turned into UP" lemma.name in
                L.fail msg *)
-        | Ok up     ->
+        | Ok up ->
             L.(
               verbose (fun m ->
                   m "Successfully created UP of Lemma %s" lemma.lemma_name));
@@ -911,10 +910,10 @@ let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : (prog, up_err_t) result =
   let preds_tbl : ((string, pred) Hashtbl.t, up_err_t) result =
     match preds_tbl with
     | Some preds_tbl -> Ok preds_tbl
-    | None           -> init_preds prog.preds
+    | None -> init_preds prog.preds
   in
   match preds_tbl with
-  | Error e      -> Error e
+  | Error e -> Error e
   | Ok preds_tbl -> (
       let pred_ins =
         Hashtbl.fold
@@ -930,13 +929,13 @@ let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : (prog, up_err_t) result =
         init_lemmas pred_ins lemmas
       in
       match lemmas_tbl with
-      | Error e       -> Error e
+      | Error e -> Error e
       | Ok lemmas_tbl -> (
           let specs_tbl : ((string, spec) Hashtbl.t, up_err_t) result =
             init_specs pred_ins all_specs
           in
           match specs_tbl with
-          | Error e      -> Error e
+          | Error e -> Error e
           | Ok specs_tbl ->
               let coverage : (string * int, int) Hashtbl.t =
                 Hashtbl.create Config.big_tbl_size
@@ -957,15 +956,13 @@ let get_pred_def (pred_defs : preds_tbl_t) (name : string) : pred =
   with _ -> raise (Failure (Printf.sprintf "DEATH. PRED %s NOT DEFINED" name))
 
 let init_pred_defs () : preds_tbl_t = Hashtbl.create Config.medium_tbl_size
-
 let get_procs (prog : prog) : ('a, int) Proc.t list = Prog.get_procs prog.prog
-
 let get_bispecs (prog : prog) : BiSpec.t list = Prog.get_bispecs prog.prog
 
 let get_lemma (prog : prog) (name : string) : (lemma, unit) result =
   match Hashtbl.find_opt prog.lemmas name with
   | Some lemma -> Ok lemma
-  | None       -> Error ()
+  | None -> Error ()
 
 let rec pp_asrt
     ?(preds_printer : (Format.formatter -> string * Expr.t list -> unit) option)
@@ -974,11 +971,11 @@ let rec pp_asrt
     (a : Asrt.t) =
   let pp_asrt = pp_asrt ?preds_printer ~preds in
   match a with
-  | Star (a1, a2)     -> Fmt.pf fmt "%a *@ %a" pp_asrt a1 pp_asrt a2
+  | Star (a1, a2) -> Fmt.pf fmt "%a *@ %a" pp_asrt a1 pp_asrt a2
   | Pred (name, args) -> (
       match preds_printer with
       | Some pp_pred -> (Fmt.hbox pp_pred) fmt (name, args)
-      | None         -> (
+      | None -> (
           try
             let pred = get_pred_def preds name in
             let out_params = Pred.out_params pred.pred in
@@ -992,7 +989,7 @@ let rec pp_asrt
               (Pred.pp_ins_outs pred.pred Expr.pp pp_out_params_args)
               (in_args, out_params_args)
           with _ -> Asrt.pp fmt a))
-  | a                 -> Asrt.pp fmt a
+  | a -> Asrt.pp fmt a
 
 let pp_sspec
     ?(preds_printer : (Format.formatter -> string * Expr.t list -> unit) option)
@@ -1044,7 +1041,7 @@ let add_spec (prog : prog) (spec : Spec.t) : unit =
   let params = KB.of_list (List.map (fun x -> Expr.PVar x) spec.spec_params) in
   let proc =
     match Prog.get_proc prog.prog spec.spec_name with
-    | None      -> raise (Failure "DEATH. ADDING SPEC TO UNKNOWN PROC!")
+    | None -> raise (Failure "DEATH. ADDING SPEC TO UNKNOWN PROC!")
     | Some proc -> proc
   in
 
@@ -1078,7 +1075,7 @@ let add_spec (prog : prog) (spec : Spec.t) : unit =
             spec.spec_name
         in
         L.fail msg
-    | Ok up   ->
+    | Ok up ->
         L.(
           verbose (fun m ->
               m "Successfully created UP of specification of %s" spec.spec_name));
@@ -1097,7 +1094,7 @@ let add_spec (prog : prog) (spec : Spec.t) : unit =
       List.fold_left
         (fun g_up (pre, pre_up, posts) ->
           match pre_up with
-          | Error _   ->
+          | Error _ ->
               L.verbose (fun m ->
                   m
                     "WARNING!!! IT IS NOT POSSIBLE TO BUILD UP FOR INFERRED \
@@ -1115,7 +1112,7 @@ let add_spec (prog : prog) (spec : Spec.t) : unit =
 
   let new_uspec =
     match Hashtbl.find_opt prog.specs spec.spec_name with
-    | None       -> new_uspec spec
+    | None -> new_uspec spec
     | Some uspec -> extend_spec uspec spec.spec_sspecs
   in
 

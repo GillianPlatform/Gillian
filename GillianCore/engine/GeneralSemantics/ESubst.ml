@@ -79,13 +79,9 @@ module type S = sig
   val subst_in_expr_opt : t -> Expr.t -> Expr.t option
 
   val substitute_formula : t -> partial:bool -> Formula.t -> Formula.t
-
   val substitute_in_formula_opt : t -> Formula.t -> Formula.t option
-
   val substitute_asrt : t -> partial:bool -> Asrt.t -> Asrt.t
-
   val substitute_slcmd : t -> partial:bool -> SLCmd.t -> SLCmd.t
-
   val substitute_lcmd : t -> partial:bool -> LCmd.t -> LCmd.t
 end
 
@@ -127,7 +123,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     let filter =
       match filter_out with
       | Some filter -> filter
-      | None        -> fun _ -> false
+      | None -> fun _ -> false
     in
     Hashtbl.fold
       (fun e _ ac -> if filter e then ac else Expr.Set.add e ac)
@@ -243,7 +239,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     Hashtbl.filter_map_inplace
       (fun e e_val ->
         match filter e e_val with
-        | true  -> Some e_val
+        | true -> Some e_val
         | false -> None)
       new_subst;
     new_subst
@@ -332,11 +328,8 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   let substitutor =
     object (self)
       inherit [_] Visitors.endo as super
-
       val empty_subst = init []
-
       val mutable self_subst = init []
-
       val mutable self_partial = true
 
       method init ~partial ~subst =
@@ -348,7 +341,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
       method find_in_subst ~make_new_x e =
         match get self_subst e with
         | Some v -> Val.to_expr v
-        | None   -> (
+        | None -> (
             if self_partial then e
             else
               let new_le_x = make_new_x () in
@@ -356,14 +349,13 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
               | Some sv ->
                   put self_subst e sv;
                   new_le_x
-              | None    ->
+              | None ->
                   raise
                     (Failure
                        "DEATH: subst_in_expr: Cannot convert fresh expression \
                         to a value"))
 
       method! visit_'annot _ (this : Annot.t) = this
-
       method! visit_'label _ (this : int) = this
 
       method! visit_LVar () this _ =
@@ -470,7 +462,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
           old_binders_substs := binders_substs;
           List.iter (fun x -> put subst (LVar x) (Val.from_lvar_name x)) binders;
           (Some a, true)
-      | _              -> (Some a, true)
+      | _ -> (Some a, true)
     in
     let f_after a =
       match a with
@@ -479,7 +471,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
             (fun (x, le_x) -> put subst (LVar x) le_x)
             !old_binders_substs;
           a
-      | _        -> a
+      | _ -> a
     in
     map_opt (Some f_before) (Some f_after) (Some (subst_in_expr_opt subst)) a
 

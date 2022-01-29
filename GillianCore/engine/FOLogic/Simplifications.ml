@@ -61,7 +61,7 @@ let clean_up_stuff (left : PFS.t) (right : PFS.t) =
     let npf =
       match pf with
       | Formula.Not pf -> pf
-      | _              -> Not pf
+      | _ -> Not pf
     in
     Formula.Set.exists (eq_or_sym npf) sleft
   in
@@ -136,7 +136,7 @@ let get_set_intersections pfs =
       match (a : Formula.t) with
       | Less (LVar v1, LVar v2) -> (
           match (Hashtbl.mem lvars v1, Hashtbl.mem lvars v2) with
-          | true, true                ->
+          | true, true ->
               intersections :=
                 Expr.Set.of_list [ ESet [ LVar v1 ]; ESet [ LVar v2 ] ]
                 :: !intersections;
@@ -151,14 +151,17 @@ let get_set_intersections pfs =
               intersections :=
                 Expr.Set.of_list [ ESet [ LVar v1 ]; ESet [ LVar v2 ] ]
                 :: !intersections
-          | _, _                      -> ())
-      | _                       -> ())
+          | _, _ -> ())
+      | _ -> ())
     pfs;
   let intersections = List.map (fun s -> Expr.Set.elements s) !intersections in
   List.sort compare intersections
 
 let _resolve_set_existentials
-    (lpfs : PFS.t) (rpfs : PFS.t) exists (gamma : TypEnv.t) =
+    (lpfs : PFS.t)
+    (rpfs : PFS.t)
+    exists
+    (gamma : TypEnv.t) =
   let exists = ref exists in
 
   let set_exists =
@@ -189,7 +192,7 @@ let _resolve_set_existentials
                    match (u : Expr.t) with
                    | ESet x ->
                        List.map (fun (x : Expr.t) : Expr.t -> ESet [ x ]) x
-                   | _      -> [ u ])
+                   | _ -> [ u ])
                  ul)
           in
           let ur =
@@ -198,7 +201,7 @@ let _resolve_set_existentials
                  (fun (u : Expr.t) : Expr.t list ->
                    match u with
                    | ESet x -> List.map (fun x : Expr.t -> ESet [ x ]) x
-                   | _      -> [ u ])
+                   | _ -> [ u ])
                  ur)
           in
 
@@ -330,7 +333,7 @@ let simplify_pfs_and_gamma
     }
   in
   match Hashtbl.mem simplification_cache key with
-  | true  ->
+  | true ->
       (* update_statistics "Simpl: cached" 0.; *)
       let { simpl_gamma; simpl_pfs; simpl_existentials; subst } =
         Hashtbl.find simplification_cache key
@@ -366,10 +369,10 @@ let simplify_pfs_and_gamma
             let e = Expr.from_var_name x in
             match t with
             | UndefinedType -> SESubst.put result e (Lit Undefined)
-            | NullType      -> SESubst.put result e (Lit Null)
-            | EmptyType     -> SESubst.put result e (Lit Empty)
-            | NoneType      -> SESubst.put result e (Lit Nono)
-            | _             -> ())
+            | NullType -> SESubst.put result e (Lit Null)
+            | EmptyType -> SESubst.put result e (Lit Empty)
+            | NoneType -> SESubst.put result e (Lit Nono)
+            | _ -> ())
       in
 
       (* Pure formulae false *)
@@ -463,7 +466,7 @@ let simplify_pfs_and_gamma
         (* Two list concats, Satan save us *)
         | Eq (NOp (LstCat, lcat), NOp (LstCat, rcat)) -> (
             match Reduction.understand_lstcat lpfs gamma lcat rcat with
-            | None                -> `Replace whole
+            | None -> `Replace whole
             | Some (pf, new_vars) ->
                 extend_with pf;
                 vars_to_kill := SS.union !vars_to_kill new_vars;
@@ -529,7 +532,7 @@ let simplify_pfs_and_gamma
                       with
                       | true, false -> (x, y)
                       | false, true -> (y, x)
-                      | _           -> (x, y)
+                      | _ -> (x, y)
                     in
                     PFS.subst_expr_for_expr
                       (UnOp (LstLen, LVar y))
@@ -571,16 +574,16 @@ let simplify_pfs_and_gamma
                           let save_v = save_all || SS.mem v vars_to_save in
                           let save_w = save_all || SS.mem w vars_to_save in
                           match (save_v, save_w) with
-                          | true, false  -> (w, LVar v)
-                          | true, true   -> (v, le)
-                          | false, true  -> (v, le)
+                          | true, false -> (w, LVar v)
+                          | true, true -> (v, le)
+                          | false, true -> (v, le)
                           | false, false ->
                               if
                                 Names.is_spec_var_name v
                                 && not (Names.is_spec_var_name w)
                               then (w, LVar v)
                               else (v, le))
-                      | _      -> (v, le)
+                      | _ -> (v, le)
                     in
 
                     let lvars_le = Expr.lvars le in
@@ -624,31 +627,31 @@ let simplify_pfs_and_gamma
                                 match le with
                                 | LVar v' -> (
                                     match TypEnv.get gamma v with
-                                    | None   -> Ok ()
+                                    | None -> Ok ()
                                     | Some t -> (
                                         match TypEnv.get gamma v' with
-                                        | None    ->
+                                        | None ->
                                             TypEnv.update gamma v' t;
                                             Ok ()
                                         | Some t' ->
                                             if t <> t' then
                                               Error "Type mismatch"
                                             else Ok ()))
-                                | _       -> Ok ()
+                                | _ -> Ok ()
                               in
 
                               (* Remove (or add) from (or to) gamma *)
                               let* () =
                                 match save_all || SS.mem v vars_to_save with
-                                | true  -> (
+                                | true -> (
                                     let le_type, _, _ =
                                       Typing.type_lexpr gamma le
                                     in
                                     match le_type with
-                                    | None   -> Ok ()
+                                    | None -> Ok ()
                                     | Some t -> (
                                         match TypEnv.get gamma v with
-                                        | None    ->
+                                        | None ->
                                             TypEnv.update gamma v t;
                                             Ok ()
                                         | Some tv ->
@@ -663,11 +666,11 @@ let simplify_pfs_and_gamma
                         in
                         match res with
                         | Error s -> stop_explain s
-                        | Ok ()   -> `Filter))
+                        | Ok () -> `Filter))
                 | UnOp (TypeOf, LVar v), Lit (Type t)
                 | Lit (Type t), UnOp (TypeOf, LVar v) -> (
                     match TypEnv.get gamma v with
-                    | None    ->
+                    | None ->
                         TypEnv.update gamma v t;
                         `Filter
                     | Some tv ->
@@ -682,14 +685,14 @@ let simplify_pfs_and_gamma
         L.verbose (fun fmt -> fmt "Analysing list structure.");
         let map_add k v map =
           match Expr.Map.mem k map with
-          | true  -> Expr.Map.add k (Expr.Set.add v (Expr.Map.find k map)) map
+          | true -> Expr.Map.add k (Expr.Set.add v (Expr.Map.find k map)) map
           | false -> Expr.Map.add k (Expr.Set.singleton v) map
         in
 
         let map_map_add k v x map =
           let xmap =
             match Expr.Map.mem k map with
-            | true  -> Expr.Map.find k map
+            | true -> Expr.Map.find k map
             | false -> Expr.Map.empty
           in
           Expr.Map.add k (map_add v x xmap) map
@@ -867,7 +870,7 @@ let simplify_pfs_and_gamma
                        || ((not kill_new_lvars) && vars_to_save <> SS.empty))
                     && not (Names.is_aloc_name v)
                   then PFS.extend lpfs (Eq (LVar v, le))
-              | _      -> ());
+              | _ -> ());
 
           sanitise_pfs_no_store ~unification gamma lpfs;
 
@@ -881,7 +884,7 @@ let simplify_pfs_and_gamma
               | Type.ListType ->
                   PFS.extend lpfs
                     (LessEq (Lit (Num 0.), UnOp (LstLen, Expr.from_var_name v)))
-              | _             -> ());
+              | _ -> ());
 
           analyse_list_structure lpfs;
 
@@ -909,7 +912,7 @@ let simplify_pfs_and_gamma
       let rec find_loc_all_the_way aloc res =
         let f = find_loc_all_the_way in
         match SESubst.get result aloc with
-        | None     -> res
+        | None -> res
         | Some res -> f res res
       in
       let aloc_subst =
@@ -919,7 +922,7 @@ let simplify_pfs_and_gamma
             | ALoc aloc ->
                 (Expr.ALoc aloc, find_loc_all_the_way (ALoc aloc) (ALoc aloc))
                 :: acc
-            | _         -> acc)
+            | _ -> acc)
           []
       in
       let aloc_subst = SESubst.init aloc_subst in
@@ -997,15 +1000,15 @@ let admissible_assertion (a : Asrt.t) : bool =
     | Star (a1, a2) ->
         separate a1;
         separate a2
-    | Pure f        -> PFS.extend pfs f
-    | Types ets     ->
+    | Pure f -> PFS.extend pfs f
+    | Types ets ->
         List.iter
           (fun (le, t) ->
             match (le : Expr.t) with
             | LVar x | PVar x -> TypEnv.update gamma x t
-            | _               -> ())
+            | _ -> ())
           ets
-    | _             -> ()
+    | _ -> ()
   in
   try
     separate a;

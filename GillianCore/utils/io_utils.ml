@@ -41,7 +41,7 @@ let get_files path =
   let open Unix in
   let rec walk acc_files paths_left =
     match paths_left with
-    | []        -> acc_files
+    | [] -> acc_files
     | p :: rest -> (
         match (stat p).st_kind with
         | S_REG -> (* p is a file *) walk (p :: acc_files) rest
@@ -52,7 +52,7 @@ let get_files path =
             in
             (* Content is the list of paths contained in the directory *)
             walk acc_files (rest @ content)
-        | _     ->
+        | _ ->
             (* p is something else that we'll ignore *)
             walk acc_files rest)
   in

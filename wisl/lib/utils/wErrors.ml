@@ -3,10 +3,10 @@ let consistency_errors = ref false
 type severity = SevError | SevWarning | SevInformation | SevHint
 
 let int_of_severity = function
-  | SevError       -> 1
-  | SevWarning     -> 2
+  | SevError -> 1
+  | SevWarning -> 2
   | SevInformation -> 3
-  | SevHint        -> 4
+  | SevHint -> 4
 
 type related_info_t = { rel_range : CodeLoc.t; rel_msg : string }
 
@@ -34,21 +34,21 @@ type error_code_t =
   | MissingInvariant
 
 let str_error_code = function
-  | UndefinedProp        -> "UndefinedProp"
-  | ExtensibilityError   -> "ExtensibilityError"
-  | UndefinedVar         -> "UndefinedVar"
-  | SyntaxError          -> "SyntaxError"
-  | MissingResource      -> "MissingResource"
+  | UndefinedProp -> "UndefinedProp"
+  | ExtensibilityError -> "ExtensibilityError"
+  | UndefinedVar -> "UndefinedVar"
+  | SyntaxError -> "SyntaxError"
+  | MissingResource -> "MissingResource"
   | UnconsistentStmtBloc -> "UnconsistentStmtBloc"
-  | FunctionNotVerified  -> "FunctionNotVerified"
-  | UndefinedFunction    -> "UndefinedFonction"
-  | UndefinedLemma       -> "UndefinedLemma"
-  | MissingInvariant     -> "MissingInvariant"
+  | FunctionNotVerified -> "FunctionNotVerified"
+  | UndefinedFunction -> "UndefinedFonction"
+  | UndefinedLemma -> "UndefinedLemma"
+  | MissingInvariant -> "MissingInvariant"
 
 let get_errors results =
   let rec get_errors' errs = function
-    | []           -> errs
-    | Ok _ :: r    -> get_errors' errs r
+    | [] -> errs
+    | Ok _ :: r -> get_errors' errs r
     | Error e :: r -> get_errors' (e :: errs) r
   in
   get_errors' [] results

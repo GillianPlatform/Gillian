@@ -16,7 +16,7 @@ let list_inter (lst1 : 'a list) (lst2 : 'a list) : 'a list =
 let rec list_product l =
   let rec aux ~acc l1 l2 =
     match (l1, l2) with
-    | [], _ | _, []      -> acc
+    | [], _ | _, [] -> acc
     | h1 :: t1, h2 :: t2 ->
         let acc = (h1 :: h2) :: acc in
         let acc = aux ~acc t1 l2 in
@@ -24,8 +24,8 @@ let rec list_product l =
     (* now we can do the actual computation *)
   in
   match l with
-  | []       -> []
-  | [ l1 ]   -> List.map (fun x -> [ x ]) l1
+  | [] -> []
+  | [ l1 ] -> List.map (fun x -> [ x ]) l1
   | l1 :: tl ->
       let tail_product = list_product tl in
       aux ~acc:[] l1 tail_product
@@ -33,18 +33,17 @@ let rec list_product l =
 let right_combine (lst1 : 'a list) (lst2 : 'b list) : ('a * 'b) list =
   let rec loop lst1 lst2 comb_lst =
     match (lst1, lst2) with
-    | _, []                    -> List.rev comb_lst
+    | _, [] -> List.rev comb_lst
     | a :: r_lst1, b :: r_lst2 -> loop r_lst1 r_lst2 ((a, b) :: comb_lst)
-    | _, _                     -> raise
-                                    (Failure "Unsupported list right-combine.")
+    | _, _ -> raise (Failure "Unsupported list right-combine.")
   in
   loop lst1 lst2 []
 
 let get_list_somes (lst : 'a option list) : 'a list =
   let rec aux = function
-    | []          -> []
+    | [] -> []
     | Some x :: r -> x :: aux r
-    | None :: r   -> aux r
+    | None :: r -> aux r
   in
   aux lst
 
@@ -53,20 +52,20 @@ let divide_list_by_index (lst : 'a list) (len : int) : 'a list * 'a list =
     if i >= len then (List.rev l_lst, r_list)
     else
       match r_list with
-      | []            -> raise (Failure "DEATH. divide_by_index")
+      | [] -> raise (Failure "DEATH. divide_by_index")
       | hd :: r_list' -> f (i + 1) (hd :: l_lst) r_list'
   in
   f 0 [] lst
 
 let rec flaky_map (f : 'a -> 'b option) (xs : 'a list) : 'b list option =
   match xs with
-  | []       -> Some []
+  | [] -> Some []
   | x :: xs' -> (
       match f x with
-      | None   -> None
+      | None -> None
       | Some y -> (
           match flaky_map f xs' with
-          | None     -> None
+          | None -> None
           | Some ys' -> Some (y :: ys')))
 
 let list_sub l ofs len =

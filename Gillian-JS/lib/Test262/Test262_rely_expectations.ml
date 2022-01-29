@@ -2,9 +2,7 @@ type matcher =
   Gillian_bulk_alcotest.AlcotestCheckers.Make(Test262_outcome).matcher
 
 type outcome = Test262_outcome.t
-
 type category = Test262_suite.category
-
 type info = Test262_suite.info
 
 open Test262_expectations_helper
@@ -27,15 +25,15 @@ let expectation
             parsing_failure_is_jsparser outcome
       | Some (Runtime, et) -> (
           match et with
-          | Test262Error   ->
+          | Test262Error ->
               expect.finish_in_error_mode_with ExactlyOne
                 ~constraint_name:"to be a Test262 error" is_test262_error
                 outcome
-          | SyntaxError    ->
+          | SyntaxError ->
               expect.finish_in_error_mode_with ExactlyOne
                 ~constraint_name:"to be a syntax error" is_syntax_error outcome
           | ReferenceError ->
               expect.finish_in_error_mode_with ExactlyOne
                 ~constraint_name:"to be a reference error" is_ref_error outcome
-          | _              -> failwith "Test262: Unhandled runtime error")
+          | _ -> failwith "Test262: Unhandled runtime error")
       | Some (Resolution, _) -> failwith "Unsuported phase 'Resolution'")

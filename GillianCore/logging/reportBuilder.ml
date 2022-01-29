@@ -1,13 +1,15 @@
 let previous : ReportId.t option ref = ref None
-
 let parents : ReportId.t Stack.t = Stack.create ()
 
 let make
-    ?title ~(content : Loggable.t) ~(type_ : string) ?(severity = Report.Log) ()
-    =
+    ?title
+    ~(content : Loggable.t)
+    ~(type_ : string)
+    ?(severity = Report.Log)
+    () =
   let title =
     match title with
-    | None       -> type_
+    | None -> type_
     | Some title -> title
   in
   let report : Report.t =
@@ -38,7 +40,7 @@ let start_phase level ?title ?severity () =
   else None
 
 let end_phase = function
-  | None               -> ()
+  | None -> ()
   | Some rid as id_opt ->
       let parent_id = Stack.pop parents in
       assert (ReportId.equal rid parent_id);

@@ -16,7 +16,7 @@ module Make (Debugger : Debugger.S) = struct
           match
             Debugger.launch launch_args.program launch_args.procedure_name
           with
-          | Ok dbg    -> Lwt.wakeup_later resolver (launch_args, dbg)
+          | Ok dbg -> Lwt.wakeup_later resolver (launch_args, dbg)
           | Error err ->
               let () = Log.info err in
               Lwt.wakeup_later_exn resolver Exit

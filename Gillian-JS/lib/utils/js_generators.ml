@@ -9,7 +9,6 @@ let fresh_sth (name : string) : (unit -> string) * (unit -> unit) =
   (f, r)
 
 let fresh_lvar, reset_lvar = fresh_sth "_lvar_js_"
-
 let fresh_pvar, reset_pvar = fresh_sth "pvar_js_"
 
 let reset () =

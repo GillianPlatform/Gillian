@@ -27,8 +27,8 @@ let is_c = Expr.is_concrete
 
 let merge (a : 't option) (b : 't option) (f : 't -> 't -> 't) : 't option =
   match (a, b) with
-  | a, None        -> a
-  | None, b        -> b
+  | a, None -> a
+  | None, b -> b
   | Some a, Some b -> Some (f a b)
 
 let get_fvl (heap : t) (loc : string) : SFVL.t option =
@@ -60,15 +60,15 @@ let set_fvl (heap : t) (loc : string) (fvl : SFVL.t) : unit =
     SFVL.partition (fun prop value -> is_c value && is_c prop) fvl
   in
   match (cfvl = SFVL.empty, sfvl = SFVL.empty) with
-  | true, true   ->
+  | true, true ->
       Hashtbl.replace heap.cfvl loc SFVL.empty;
       Hashtbl.remove heap.sfvl loc;
       heap.cdmn := Var.Set.add loc !(heap.cdmn)
-  | true, false  ->
+  | true, false ->
       Hashtbl.remove heap.cfvl loc;
       Hashtbl.replace heap.sfvl loc sfvl;
       heap.cdmn := Var.Set.add loc !(heap.cdmn)
-  | false, true  ->
+  | false, true ->
       Hashtbl.replace heap.cfvl loc cfvl;
       Hashtbl.remove heap.sfvl loc;
       heap.sdmn := Var.Set.add loc !(heap.sdmn)
@@ -163,8 +163,10 @@ let set_fv_pair (heap : t) (loc : string) (field : Expr.t) (value : Expr.t) :
   else Hashtbl.replace rem loc fvrem
 
 let init_object
-    (heap : t) (loc : string) ?is_empty:(ie = false) (mtdt : Expr.t option) :
-    unit =
+    (heap : t)
+    (loc : string)
+    ?is_empty:(ie = false)
+    (mtdt : Expr.t option) : unit =
   if Hashtbl.mem heap.cfvl loc || Hashtbl.mem heap.sfvl loc then
     raise (Failure "Illegal init_object")
   else
@@ -207,7 +209,7 @@ let merge_loc (heap : t) (new_loc : string) (old_loc : string) : unit =
   let domain = domain heap in
   let cfvl, sfvl, dom, met =
     match SS.mem new_loc domain with
-    | true  ->
+    | true ->
         (* Merge field-value lists *)
         let ocvfl, osfvl =
           ( Option.value ~default:SFVL.empty (Hashtbl.find_opt heap.cfvl old_loc),
@@ -310,19 +312,19 @@ let substitution_in_place (subst : SSubst.t) (heap : t) : unit =
       SSubst.filter subst (fun var _ ->
           match var with
           | ALoc _ -> true
-          | _      -> false)
+          | _ -> false)
     in
     SSubst.iter aloc_subst (fun aloc new_loc ->
         let aloc =
           match aloc with
           | ALoc loc -> loc
-          | _        -> raise (Failure "Impossible by construction")
+          | _ -> raise (Failure "Impossible by construction")
         in
         let new_loc =
           match (new_loc : Expr.t) with
           | Lit (Loc loc) -> loc
-          | ALoc loc      -> loc
-          | _             ->
+          | ALoc loc -> loc
+          | _ ->
               raise
                 (Failure
                    (Printf.sprintf "Heap substitution fail for loc: %s"
@@ -352,7 +354,7 @@ let assertions (heap : t) : Asrt.t list =
     let metadata =
       match metadata with
       | Some metadata -> [ Asrt.MetaData (le_loc, metadata) ]
-      | None          -> []
+      | None -> []
     in
     fv_assertions @ domain @ metadata
   in
@@ -471,7 +473,7 @@ let get_inv_metadata (heap : t) : (Expr.t, Expr.t) Hashtbl.t =
     Hashtbl.iter
       (fun loc e_metadata ->
         match e_metadata with
-        | None            -> ()
+        | None -> ()
         | Some e_metadata ->
             let loc_e =
               if Names.is_lloc_name loc then Expr.Lit (Loc loc) else ALoc loc
@@ -488,7 +490,7 @@ let clean_up (heap : t) : unit =
     (fun loc ->
       match has_loc heap loc with
       | false -> ()
-      | true  -> (
+      | true -> (
           let (fvl, dom), met = get_with_default heap loc in
           match (fvl = SFVL.empty, dom) with
           | true, None -> (
@@ -496,7 +498,7 @@ let clean_up (heap : t) : unit =
               match met with
               | Some (ALoc loc) | Some (Lit (Loc loc)) -> remove heap loc
               | _ -> ())
-          | _, _       -> ()))
+          | _, _ -> ()))
     (domain heap)
 
 let lvars (heap : t) : Var.Set.t =

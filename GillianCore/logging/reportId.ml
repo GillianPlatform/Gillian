@@ -8,5 +8,4 @@ let next =
     c
 
 let equal = Int64.equal
-
 let pp = Fmt.int64

@@ -30,10 +30,10 @@ let sat ~(pc : Pc.t) formula =
     Engine.Reduction.reduce_formula ~unification:pc.unification ~pfs ~gamma
       formula
   with
-  | True    ->
+  | True ->
       Logging.verbose (fun fmt -> fmt "Discharged sat before Z3");
       true
-  | False   ->
+  | False ->
       Logging.verbose (fun fmt -> fmt "Discharged sat before Z3");
       false
   | formula -> FOSolver.sat ~unification:pc.unification ~pfs ~gamma [ formula ]
@@ -45,9 +45,9 @@ let check_entailment ~(pc : Pc.t) formula =
       formula
   in
   match f with
-  | True  -> true
+  | True -> true
   | False -> false
-  | _     ->
+  | _ ->
       FOSolver.check_entailment ~unification:pc.unification
         Utils.Containers.SS.empty pfs [ f ] gamma
 
@@ -55,9 +55,7 @@ let of_comp_fun comp ~(pc : Pc.t) e1 e2 =
   comp ~pfs:(build_full_pfs pc) ~gamma:(build_full_gamma pc) e1 e2
 
 let is_equal = of_comp_fun FOSolver.is_equal
-
 let is_different = of_comp_fun FOSolver.is_different
-
 let is_less_or_equal = of_comp_fun FOSolver.is_less_or_equal
 
 let resolve_loc_name ~pc loc =
