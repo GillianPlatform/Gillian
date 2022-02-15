@@ -169,12 +169,6 @@ module M : Memory_S = struct
     else if a_id = JSILNames.aProps then JSILNames.delProps
     else raise (Failure "DEATH. ga_to_setter")
 
-  let ga_loc_indexes (a_id : string) : int list =
-    if a_id = JSILNames.aCell then [ 0 ]
-    else if a_id = JSILNames.aMetadata then [ 0 ]
-    else if a_id = JSILNames.aProps then [ 0 ]
-    else raise (Failure "DEATH. ga_to_setter")
-
   (** Non-implemented functions *)
   let assertions ?to_keep:_ (_ : t) : Asrt.t list =
     raise (Failure "ERROR: to_assertions called for concrete executions")

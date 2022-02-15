@@ -63,4 +63,3 @@ val ga_to_deleter_str : string -> string
 (** {3 Gillian-related things} *)
 
 val is_overlapping_asrt_str : string -> bool
-val ga_loc_indexes_str : string -> int list

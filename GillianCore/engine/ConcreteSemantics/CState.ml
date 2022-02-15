@@ -204,12 +204,6 @@ module Make
   let mem_constraints (_ : t) : Formula.t list =
     raise (Failure "DEATH. mem_constraints")
 
-  let split_ins (_ : string) (_ : vt list) : vt list * vt list =
-    raise (Failure "DEATH. split_ins")
-
-  let merge_ins (_ : string) (_ : vt list) (_ : vt list) : vt list =
-    raise (Failure "merge_ins. DEATH")
-
   let pp_fix _ _ = raise (Failure "str_of_fix from non-symbolic state.")
 
   let get_recovery_vals _ =

@@ -28,7 +28,6 @@ module type S = sig
   val ga_to_setter : string -> string
   val ga_to_getter : string -> string
   val ga_to_deleter : string -> string
-  val ga_loc_indexes : string -> int list
   val is_overlapping_asrt : string -> bool
 
   (** State Copy *)
