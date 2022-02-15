@@ -222,16 +222,3 @@ let ga_to_deleter_str = ga_to_action_str ga_to_deleter
 (** Additional stuff *)
 
 let is_overlapping_asrt_str str = ga_from_str str |> is_overlapping_asrt
-
-let ga_loc_indexes ga =
-  match ga with
-  | GMem Single -> [ 0 ]
-  | GMem Array -> [ 0 ]
-  | GMem Hole -> [ 0 ]
-  | GMem Zeros -> [ 0 ]
-  | GMem Bounds -> [ 0 ]
-  | GMem Freed -> [ 0 ]
-  | GGenv Definition -> [ 0 ]
-  | GGenv Symbol -> [ 1 ]
-
-let ga_loc_indexes_str ga_str = ga_from_str ga_str |> ga_loc_indexes

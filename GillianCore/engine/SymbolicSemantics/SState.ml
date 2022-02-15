@@ -597,53 +597,6 @@ module Make (SMemory : SMemory.S) :
     let heap, _, _, _, _ = state in
     SMemory.mem_constraints heap
 
-  let split_ins (action : string) (ins : vt list) : vt list * vt list =
-    let l_indexes = SMemory.ga_loc_indexes action in
-    let ins' : (vt * int) list = List.mapi (fun i x -> (x, i)) ins in
-    let l_ins, o_ins =
-      List.partition (fun (_, i) -> List.mem i l_indexes) ins'
-    in
-    let l_ins = List.map (fun (v, _) -> v) l_ins in
-    let o_ins = List.map (fun (v, _) -> v) o_ins in
-    (l_ins, o_ins)
-
-  let merge_ins (action : string) (l_ins : vt list) (o_ins : vt list) : vt list
-      =
-    let l_indexes = SMemory.ga_loc_indexes action in
-
-    let rec loop
-        (cur_index : int)
-        (l_ins : vt list)
-        (o_ins : vt list)
-        (l_indexes : int list)
-        (lst : vt list) : vt list =
-      match (l_ins, o_ins, l_indexes) with
-      | [], [], [] -> lst
-      | lv :: l_ins', o_ins, l_index :: l_indexes' when cur_index = l_index ->
-          loop (cur_index + 1) l_ins' o_ins l_indexes' (lv :: lst)
-      | l_ins, ov :: o_ins', l_index :: _ when cur_index <> l_index ->
-          loop (cur_index + 1) l_ins o_ins' l_indexes (ov :: lst)
-      | [], ov :: o_ins', [] -> loop (cur_index + 1) [] o_ins' [] (ov :: lst)
-      | lst1, lst2, lst3 ->
-          let comma = Fmt.any ", " in
-          let msg =
-            Fmt.str
-              "DEATH inside merge_ins with:@\n\
-               l_ins: %a\n\
-               o_ins:%a@\n\
-               l_indexes:%a@\n"
-              (Fmt.list ~sep:comma SVal.M.pp)
-              lst1
-              (Fmt.list ~sep:comma SVal.M.pp)
-              lst2
-              (Fmt.list ~sep:comma Fmt.int)
-              lst3
-          in
-          raise (Failure msg)
-    in
-    let lst = loop 0 l_ins o_ins l_indexes [] in
-    List.rev lst
-
   let pp_fix fmt = function
     | MFix mf -> SMemory.pp_c_fix fmt mf
     | FPure f -> Fmt.pf fmt "SFPure(%a)" Formula.pp f

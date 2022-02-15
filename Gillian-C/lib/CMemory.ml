@@ -32,7 +32,6 @@ let pp fmt h =
 let ga_to_setter = LActions.ga_to_setter_str
 let ga_to_getter = LActions.ga_to_getter_str
 let ga_to_deleter = LActions.ga_to_deleter_str
-let ga_loc_indexes _ = [ 0 ]
 
 let execute_store heap params =
   let open Gillian.Gil_syntax.Literal in

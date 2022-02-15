@@ -152,8 +152,6 @@ module type S = sig
   val produce_posts : t -> st -> Asrt.t list -> t list
   val produce : t -> st -> Asrt.t -> (t list, string) result
   val update_subst : t -> st -> unit
-  val split_ins : string -> vt list -> vt list * vt list
-  val merge_ins : string -> vt list -> vt list -> vt list
   val mem_constraints : t -> Formula.t list
   val can_fix : err_t list -> bool
   val get_failing_constraint : err_t -> Formula.t

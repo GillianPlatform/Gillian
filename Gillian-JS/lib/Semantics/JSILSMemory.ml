@@ -587,12 +587,6 @@ module M = struct
     else if a_id = JSILNames.aProps then JSILNames.delProps
     else raise (Failure "DEATH. ga_to_setter")
 
-  let ga_loc_indexes (a_id : string) : int list =
-    if a_id = JSILNames.aCell then [ 0 ]
-    else if a_id = JSILNames.aMetadata then [ 0 ]
-    else if a_id = JSILNames.aProps then [ 0 ]
-    else raise (Failure "DEATH. ga_to_setter")
-
   let mem_constraints (state : t) : Formula.t list = SHeap.wf_assertions state
 
   let is_overlapping_asrt (a : string) : bool =

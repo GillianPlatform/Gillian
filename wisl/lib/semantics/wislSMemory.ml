@@ -259,14 +259,6 @@ let execute_action ?unification:_ name heap pfs gamma args =
 let ga_to_setter = WislLActions.ga_to_setter_str
 let ga_to_getter = WislLActions.ga_to_getter_str
 let ga_to_deleter = WislLActions.ga_to_deleter_str
-
-let ga_loc_indexes a_id =
-  WislLActions.(
-    match ga_from_str a_id with
-    | Cell -> [ 0 ]
-    | Bound -> [ 0 ]
-    | Freed -> [ 0 ])
-
 let copy = WislSHeap.copy
 let pp fmt h = Format.fprintf fmt "%a" WislSHeap.pp h
 

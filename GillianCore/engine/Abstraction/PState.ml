@@ -1179,13 +1179,6 @@ module Make
     let state, _, _ = astate in
     State.mem_constraints state
 
-  let merge_ins (action : string) (l_ins : vt list) (o_ins : vt list) : vt list
-      =
-    State.merge_ins action l_ins o_ins
-
-  let split_ins (action : string) (ins : vt list) : vt list * vt list =
-    State.split_ins action ins
-
   let is_overlapping_asrt (a : string) : bool = State.is_overlapping_asrt a
   let pp_err = State.pp_err
   let pp_fix = State.pp_fix

@@ -966,7 +966,6 @@ let assertions ?to_keep:_ heap =
 
 let mem_constraints _heap = []
 let is_overlapping_asrt = LActions.is_overlapping_asrt_str
-let ga_loc_indexes = LActions.ga_loc_indexes_str
 
 (** Things defined for BiAbduction *)
 
