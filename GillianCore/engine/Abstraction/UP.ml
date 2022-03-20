@@ -4,14 +4,14 @@ module L = Logging
 
 (** The [outs] type represents a list of learned outs, together
     with (optionally) the way of constructing them *)
-type outs = (Expr.t * Expr.t) list
+type outs = (Expr.t * Expr.t) list [@@deriving yojson]
 
 let outs_pp = Fmt.(list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp)))
 
 (** The [up_step] type represents a unification plan step,
     consisting of an assertion together with the possible
     learned outs *)
-type step = Asrt.t * outs
+type step = Asrt.t * outs [@@deriving yojson]
 
 let step_pp = Fmt.Dump.pair Asrt.pp outs_pp
 

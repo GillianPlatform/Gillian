@@ -47,8 +47,8 @@ module Make
 
   type vt = Val.t
   type st = ESubst.t
-  type state_t = State.t
-  type preds_t = Preds.t
+  type state_t = State.t [@@deriving yojson]
+  type preds_t = Preds.t [@@deriving yojson]
   type abs_t = string * vt list
   type err_t = State.err_t
   type t = state_t * preds_t * UP.preds_tbl_t
@@ -58,6 +58,15 @@ module Make
   type gp_ret = GPSucc of (t * vt list) list | GPFail of err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
   type up_u_res = UPUSucc of (t * st * post_res) list | UPUFail of err_t list
+  type astate_log_t = {
+    state: state_t;
+    preds: preds_t
+  } [@@deriving make, yojson]
+  type u_assert_log_t = {
+    step: UP.step;
+    subst: ESubst.t;
+    astate: astate_log_t
+  } [@@deriving make, yojson]
 
   let update_store (astate : t) (x : string) (v : Val.t) : t =
     let state, preds, pred_defs = astate in
@@ -955,9 +964,21 @@ module Make
         | true -> pp_astate_by_need s_pvars s_lvars s_locs
       in
 
-      L.verbose (fun m ->
-          m "Unify assertion: @[<h>%a@]@\nSubst:@\n%a@\n@[<v 2>STATE:@\n%a@]"
-            UP.step_pp step subst_pp subst pp_astate astate));
+      let pp_astate_log fmt astate_log =
+        pp_astate fmt (astate_log.state, astate_log.preds, ())
+      in
+
+      let pp_u_assert_log fmt u_assert_log =
+        Fmt.pf fmt "Unify assertion: @[<h>%a@]@\nSubst:@\n%a@\n@[<v 2>STATE:@\n%a@]"
+          UP.step_pp u_assert_log.step subst_pp u_assert_log.subst pp_astate_log u_assert_log.astate
+      in
+
+      let state, preds, _ = astate in
+      let astate_log = make_astate_log_t ~state:state ~preds:preds in
+      let u_assert_log = make_u_assert_log_t ~step:step ~subst:subst ~astate:astate_log in
+      ignore (L.normal_specific
+        (L.Loggable.make pp_u_assert_log u_assert_log_t_of_yojson u_assert_log_t_to_yojson u_assert_log)
+        L.LoggingConstants.ContentType.unify_step));
 
     let p, outs = step in
     match (p : Asrt.t) with

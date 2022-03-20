@@ -7,7 +7,7 @@ val outs_pp : outs Fmt.t
 (** The [up_step] type represents a unification plan step,
     consisting of an assertion together with the possible
     learned outs *)
-type step = Asrt.t * outs
+type step = Asrt.t * outs [@@deriving yojson]
 
 val step_pp : step Fmt.t
 
