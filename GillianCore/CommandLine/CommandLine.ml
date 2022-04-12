@@ -263,9 +263,9 @@ struct
              defaults to Verification.";
         ]
       in
-      Term.info "compile" ~doc ~exits:Term.default_exits ~man
+      Cmd.info "compile" ~doc ~man
 
-    let compile_cmd = (compile_t, compile_info)
+    let compile_cmd = Cmd.v compile_info compile_t
   end
 
   module CInterpreterConsole = struct
@@ -335,9 +335,9 @@ struct
           `P "Concretely executes a given file, after compiling it to GIL";
         ]
       in
-      Term.info "exec" ~doc ~exits:Term.default_exits ~man
+      Cmd.info "exec" ~doc ~man
 
-    let exec_cmd = (with_common exec_t, exec_info)
+    let exec_cmd = Cmd.v exec_info (with_common exec_t)
   end
 
   module SInterpreterConsole = struct
@@ -459,9 +459,9 @@ struct
           `P "Symbolically executes a given file, after compiling it to GIL";
         ]
       in
-      Term.info "wpst" ~doc ~exits:Term.default_exits ~man
+      Cmd.info "wpst" ~doc ~man
 
-    let wpst_cmd = (with_common wpst_t, wpst_info)
+    let wpst_cmd = Cmd.v wpst_info (with_common wpst_t)
   end
 
   module VerificationConsole = struct
@@ -571,9 +571,9 @@ struct
           `P "Verifies a given file, after compiling it to GIL";
         ]
       in
-      Term.info "verify" ~doc ~exits:Term.default_exits ~man
+      Cmd.info "verify" ~doc ~man
 
-    let verify_cmd = (with_common verify_t, verify_info)
+    let verify_cmd = Cmd.v verify_info (with_common verify_t)
   end
 
   module ACTConsole = struct
@@ -683,9 +683,9 @@ struct
              compiling it to GIL";
         ]
       in
-      Term.info "act" ~doc ~exits:Term.default_exits ~man
+      Cmd.info "act" ~doc ~man
 
-    let act_cmd = (with_common act_t, act_info)
+    let act_cmd = Cmd.v act_info (with_common act_t)
   end
 
   module BulkConsole = struct
@@ -696,7 +696,7 @@ struct
         let docv = "PATH" in
         Arg.(required & pos 0 (some file) None & info [] ~docv ~doc)
       in
-      let run test_suite_path npaf incremental () =
+      let run test_suite_path npaf incremental =
         let () = Config.current_exec_mode := exec_mode in
         let () = PC.initialize exec_mode in
         let () = Config.bulk_print_all_failures := not npaf in
@@ -710,9 +710,9 @@ struct
         let man =
           [ `S Manpage.s_description; `P "Execute a predefined test-suite" ]
         in
-        Term.info (Runner.cmd_name runner) ~doc ~exits:Term.default_exits ~man
+        Cmd.info (Runner.cmd_name runner) ~doc ~man
       in
-      (with_common run_t, run_info)
+      Cmd.v run_info run_t
 
     let bulk_cmds = List.map make_bulk_console Runners.runners
   end
@@ -728,39 +728,36 @@ struct
              communicates via the Debug Adapter Protocol";
         ]
       in
-      Term.info "debugverify" ~doc ~exits:Term.default_exits ~man
+      Cmd.info "debugverify" ~doc ~man
 
     let start_debug_adapter () =
       Lwt_main.run (DebugAdapter.start Lwt_io.stdin Lwt_io.stdout)
 
     let debug_verify_t = with_common Term.(const start_debug_adapter)
-    let debug_verify_cmd = (debug_verify_t, debug_verify_info)
+    let debug_verify_cmd = Cmd.v debug_verify_info debug_verify_t
   end
 
-  let default_cmd =
+  let main () =
     let doc = "An analysis toolchain" in
-    let sdocs = Manpage.s_common_options in
-    let exits = Term.default_exits in
+
     let man =
       [
         `S Manpage.s_description;
         `P "Analysis toolchain for a given language, based on Gillian";
       ]
     in
-    ( Term.(ret (const (fun _ -> `Help (`Pager, None)) $ const ())),
-      Term.info (Filename.basename Sys.executable_name) ~doc ~sdocs ~exits ~man
-    )
+    let info = Cmd.info (Filename.basename Sys.executable_name) ~doc ~man in
 
-  let cmds =
-    [
-      CompilerConsole.compile_cmd;
-      CInterpreterConsole.exec_cmd;
-      SInterpreterConsole.wpst_cmd;
-      VerificationConsole.verify_cmd;
-      ACTConsole.act_cmd;
-      DebugVerificationConsole.debug_verify_cmd;
-    ]
-    @ BulkConsole.bulk_cmds
-
-  let main () = Term.(exit @@ eval_choice default_cmd cmds)
+    let cmds =
+      [
+        CompilerConsole.compile_cmd;
+        CInterpreterConsole.exec_cmd;
+        SInterpreterConsole.wpst_cmd;
+        VerificationConsole.verify_cmd;
+        ACTConsole.act_cmd;
+        DebugVerificationConsole.debug_verify_cmd;
+      ]
+      @ BulkConsole.bulk_cmds
+    in
+    exit (Cmd.eval (Cmd.group info cmds))
 end
