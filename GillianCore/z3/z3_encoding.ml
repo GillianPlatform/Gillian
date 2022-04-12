@@ -1012,13 +1012,11 @@ let encode_assertions
   | None ->
       (* Encode assertions *)
       let encoded_assertions =
-        List.map encode_assertion_top_level (Formula.Set.elements assertions)
+        Seq.map encode_assertion_top_level (Formula.Set.to_seq assertions)
       in
       (* Encode gamma *)
       let encoded_assertions =
-        Seq.fold_left
-          (fun acc e -> e :: acc)
-          encoded_assertions (encode_gamma gamma)
+        Seq.append encoded_assertions (encode_gamma gamma) |> List.of_seq
       in
       (* Cache *)
       Hashtbl.replace encoding_cache assertions encoded_assertions;
