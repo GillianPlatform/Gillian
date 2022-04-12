@@ -3,7 +3,7 @@
 (library
  (name engine)
  (public_name gillian.engine)
- (libraries utils z3 menhirLib fmt cmdliner str gil_syntax gil_parsing
+ (libraries utils z3_encoding menhirLib fmt cmdliner str gil_syntax gil_parsing
    logging incrementalAnalysis)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson))

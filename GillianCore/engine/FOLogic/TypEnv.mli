@@ -6,6 +6,7 @@ open SVal
 
 type t [@@deriving yojson]
 
+val as_hashtbl : t -> (string, Type.t) Hashtbl.t
 val copy : t -> t
 val extend : t -> t -> unit
 val filter : t -> (string -> bool) -> t
@@ -14,7 +15,7 @@ val filter_vars : t -> Containers.SS.t -> t
 val filter_vars_in_place : t -> Containers.SS.t -> unit
 val get : t -> string -> Type.t option
 val get_unsafe : t -> string -> Type.t
-val get_var_type_pairs : t -> (string * Type.t) list
+val get_var_type_pairs : t -> (string * Type.t) Seq.t
 val get_vars_of_type : t -> Type.t -> string list
 val init : unit -> t
 val mem : t -> string -> bool
