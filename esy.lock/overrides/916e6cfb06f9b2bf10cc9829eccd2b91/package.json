@@ -1,8 +1,8 @@
 {
   "name": "esy-z3",
-  "version": "4.8.7000",
+  "version": "4.8.12000",
   "description": "z3 packaged for esy",
-  "source": "https://github.com/Z3Prover/z3/archive/z3-4.8.7.tar.gz#md5:18e7332ab136c1d8686ea719ed7107ed",
+  "source": "https://github.com/Z3Prover/z3/archive/z3-4.8.12.tar.gz#md5:73fd07d094685039b03aed9e38040d13",
   "override": {
     "exportedEnv": {
       "DYLD_LIBRARY_PATH": {
@@ -16,12 +16,31 @@
     },
     "buildsInSource": true,
     "build": [
-      ["python2.7", "scripts/mk_make.py", "--prefix=#{self.install}", "--ml" ],
-      ["make", "-C", "build", "-j", "4"],
-      ["sh", "-c", "cp build/libz3* build/api/ml/"]
+      [
+        "python2.7",
+        "scripts/mk_make.py",
+        "--prefix=#{self.install}",
+        "--ml"
+      ],
+      [
+        "make",
+        "-C",
+        "build",
+        "-j",
+        "4"
+      ],
+      [
+        "sh",
+        "-c",
+        "cp build/libz3* build/api/ml/"
+      ]
     ],
     "install": [
-      ["sh", "-c", "ocamlfind install z3 build/api/ml/META -nodll build/api/ml/*"]
+      [
+        "sh",
+        "-c",
+        "ocamlfind install z3 build/api/ml/META -nodll build/api/ml/*"
+      ]
     ],
     "dependencies": {
       "@opam/zarith": "*",
@@ -30,5 +49,5 @@
       "@opam/conf-gmp": "*",
       "ocaml": ">=4.3.0"
     }
-    }
+  }
 }

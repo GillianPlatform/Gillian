@@ -78,7 +78,7 @@
     "@opam/uuidm": "0.9.7",
     "@opam/visitors": ">=2.3",
     "@opam/yojson": "^1.7.0",
-    "@opam/z3": "giltho/esy-z3#b0fdd9ae19d880e646bc3a580eea81a0e934a5a7",
+    "@opam/z3": "giltho/esy-z3#0738c9254e9720396309f991cded8fa64d20ce1a",
     "compcert": "giltho/CompCert#c318992c8d3be9edf4bf323d146d1bb68627339c",
     "ocaml": "^4.13.x"
   },

@@ -1,5 +1,5 @@
 {
-  "checksum": "53fac6f9179c435aef45612effc75b5d",
+  "checksum": "46a23ae49fe8465ca52a435163a8ecfd",
   "root": "gillian-platform@link-dev:./esy.json",
   "node": {
     "yarn-pkg-config@github:esy-ocaml/yarn-pkg-config#db3a0b63883606dd57c54a7158d560d6cba8cd79@d41d8cd9": {
@@ -41,7 +41,7 @@
       "dependencies": [
         "ocaml@4.13.1000@d41d8cd9",
         "compcert@github:giltho/CompCert#c318992c8d3be9edf4bf323d146d1bb68627339c@d41d8cd9",
-        "@opam/z3@archive:https://github.com/Z3Prover/z3/archive/z3-4.8.7.tar.gz#md5:18e7332ab136c1d8686ea719ed7107ed@474caa29",
+        "@opam/z3@archive:https://github.com/Z3Prover/z3/archive/z3-4.8.12.tar.gz#md5:73fd07d094685039b03aed9e38040d13@916e6cfb",
         "@opam/yojson@opam:1.7.0@69d87312",
         "@opam/visitors@opam:20210608@7b4a1100",
         "@opam/uuidm@opam:0.9.7@bf725775",
@@ -167,19 +167,19 @@
         "@opam/conf-gmp@opam:4@c394e8f1"
       ]
     },
-    "@opam/z3@archive:https://github.com/Z3Prover/z3/archive/z3-4.8.7.tar.gz#md5:18e7332ab136c1d8686ea719ed7107ed@474caa29": {
+    "@opam/z3@archive:https://github.com/Z3Prover/z3/archive/z3-4.8.12.tar.gz#md5:73fd07d094685039b03aed9e38040d13@916e6cfb": {
       "id":
-        "@opam/z3@archive:https://github.com/Z3Prover/z3/archive/z3-4.8.7.tar.gz#md5:18e7332ab136c1d8686ea719ed7107ed@474caa29",
+        "@opam/z3@archive:https://github.com/Z3Prover/z3/archive/z3-4.8.12.tar.gz#md5:73fd07d094685039b03aed9e38040d13@916e6cfb",
       "name": "@opam/z3",
       "version":
-        "archive:https://github.com/Z3Prover/z3/archive/z3-4.8.7.tar.gz#md5:18e7332ab136c1d8686ea719ed7107ed",
+        "archive:https://github.com/Z3Prover/z3/archive/z3-4.8.12.tar.gz#md5:73fd07d094685039b03aed9e38040d13",
       "source": {
         "type": "install",
         "source": [
-          "archive:https://github.com/Z3Prover/z3/archive/z3-4.8.7.tar.gz#md5:18e7332ab136c1d8686ea719ed7107ed"
+          "archive:https://github.com/Z3Prover/z3/archive/z3-4.8.12.tar.gz#md5:73fd07d094685039b03aed9e38040d13"
         ]
       },
-      "overrides": [ "esy.lock/overrides/474caa2921031f5f463842828a9fb319" ],
+      "overrides": [ "esy.lock/overrides/916e6cfb06f9b2bf10cc9829eccd2b91" ],
       "dependencies": [
         "ocaml@4.13.1000@d41d8cd9", "@opam/zarith@opam:1.12@232cc7f2",
         "@opam/ocamlfind@opam:1.9.3@781b30f3",
