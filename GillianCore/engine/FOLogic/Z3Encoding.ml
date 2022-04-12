@@ -29,12 +29,15 @@ let string_of_enc enc =
   | WithReals -> "REAL"
   | WithFPA -> "FPA"
 
-let encoding = ref WithReals
+(* This should be changed manually in the code if
+   we want to change encodings. *)
+let encoding = WithReals
 
-let match_enc msg x y =
-  match !encoding with
+let match_enc x y =
+  match encoding with
   | WithReals -> x
   | WithFPA -> y
+  [@@inline]
 
 type gil_axiomatized_operations = {
   llen_fun : FuncDecl.func_decl;
@@ -136,7 +139,7 @@ let booleans_sort = Boolean.mk_sort ctx
 let ints_sort = Arithmetic.Integer.mk_sort ctx
 let reals_sort = Arithmetic.Real.mk_sort ctx
 let fp_sort = FloatingPoint.mk_sort_64 ctx
-let numbers_sort = match_enc "mk_sort" reals_sort fp_sort
+let numbers_sort = match_enc reals_sort fp_sort
 
 let rm =
   FloatingPoint.mk_const ctx
@@ -147,38 +150,38 @@ let mk_string_symb s = Symbol.mk_string ctx s
 let mk_int_i = Arithmetic.Integer.mk_numeral_i ctx
 
 let mk_const =
-  match_enc "mk_const" (Arithmetic.Real.mk_const ctx)
-    (fun (s : Symbol.symbol) -> FloatingPoint.mk_const ctx s fp_sort)
+  match_enc (Arithmetic.Real.mk_const ctx) (fun (s : Symbol.symbol) ->
+      FloatingPoint.mk_const ctx s fp_sort)
 
 let mk_num_i =
-  match_enc "mk_num_i" (Arithmetic.Real.mk_numeral_i ctx) (fun i ->
+  match_enc (Arithmetic.Real.mk_numeral_i ctx) (fun i ->
       FloatingPoint.mk_numeral_i ctx i fp_sort)
 
 let mk_num_s =
-  match_enc "mk_num_s" (Arithmetic.Real.mk_numeral_s ctx) (fun s ->
+  match_enc (Arithmetic.Real.mk_numeral_s ctx) (fun s ->
       FloatingPoint.mk_numeral_s ctx s fp_sort)
 
-let mk_lt = match_enc "mk_lt" Arithmetic.mk_lt FloatingPoint.mk_lt
-let mk_le = match_enc "mk_le" Arithmetic.mk_le FloatingPoint.mk_leq
-let mk_ge = match_enc "mk_ge" Arithmetic.mk_ge FloatingPoint.mk_geq
+let mk_lt = match_enc Arithmetic.mk_lt FloatingPoint.mk_lt
+let mk_le = match_enc Arithmetic.mk_le FloatingPoint.mk_leq
+let mk_ge = match_enc Arithmetic.mk_ge FloatingPoint.mk_geq
 
 let mk_add =
-  match_enc "mk_add"
+  match_enc
     (fun e1 e2 -> Arithmetic.mk_add ctx [ e1; e2 ])
     (fun e1 e2 -> FloatingPoint.mk_add ctx rm e1 e2)
 
 let mk_sub =
-  match_enc "mk_sub"
+  match_enc
     (fun e1 e2 -> Arithmetic.mk_sub ctx [ e1; e2 ])
     (fun e1 e2 -> FloatingPoint.mk_sub ctx rm e1 e2)
 
 let mk_mul =
-  match_enc "mk_mul"
+  match_enc
     (fun e1 e2 -> Arithmetic.mk_mul ctx [ e1; e2 ])
     (fun e1 e2 -> FloatingPoint.mk_mul ctx rm e1 e2)
 
 let mk_div =
-  match_enc "mk_div"
+  match_enc
     (fun e1 e2 -> Arithmetic.mk_div ctx e1 e2)
     (fun e1 e2 -> FloatingPoint.mk_div ctx rm e1 e2)
 
@@ -1193,8 +1196,8 @@ let rec encode_assertion (a : Formula.t) : ZExpr.expr =
       in
       Set.mk_subset ctx le1' le2'
   | ForAll (bt, a) ->
-      let z3_sorts = List.map (fun x -> extended_literal_sort) bt in
-      let bt_with_some = List.filter (fun (x, t_x) -> t_x <> None) bt in
+      let z3_sorts = List.map (fun _ -> extended_literal_sort) bt in
+      let bt_with_some = List.filter (fun (_, t_x) -> t_x <> None) bt in
       let z3_types_assertions =
         List.map
           (fun (x, t_x) -> make_recognizer_assertion x (Option.get t_x))
@@ -1211,25 +1214,6 @@ let rec encode_assertion (a : Formula.t) : ZExpr.expr =
 
 let encode_assertion_top_level (a : Formula.t) : ZExpr.expr =
   encode_assertion (Formula.push_in_negations a)
-
-let string_of_z3_expr_list exprs =
-  List.fold_left
-    (fun ac e ->
-      let e_str = ZExpr.to_string e in
-      if ac = "" then e_str else ac ^ ",\n" ^ e_str)
-    "" exprs
-
-let print_model solver =
-  let model = Solver.get_model solver in
-  match model with
-  | Some model ->
-      let str_model = Model.to_string model in
-      L.(verbose (fun m -> m "I found the model: \n\n%s" str_model))
-  | None -> L.(verbose (fun m -> m "No model found."))
-
-let string_of_solver solver =
-  let exprs = Solver.get_assertions solver in
-  string_of_z3_expr_list exprs
 
 let encode_gamma gamma =
   let gamma_var_type_pairs = TypEnv.get_var_type_pairs gamma in
@@ -1269,6 +1253,15 @@ let encode_assertions (assertions : Formula.Set.t) (gamma : TypEnv.t) :
   (* Return *)
   result
 
+let master_solver =
+  let solver = Solver.mk_solver ctx None in
+  Solver.push solver;
+  solver
+
+let reset_solver () =
+  Solver.pop master_solver 1;
+  Solver.push master_solver
+
 let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
     =
   L.(
@@ -1281,8 +1274,7 @@ let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
   let encoded_assertions = encode_assertions fs gamma in
 
   (* Step 2: Reset the solver and add the encoded formulae *)
-  let masterSolver = Solver.mk_solver ctx None in
-  Solver.add masterSolver encoded_assertions;
+  Solver.add master_solver encoded_assertions;
   (* L.(
      verbose (fun m ->
          m "SAT: About to check the following:\n%s"
@@ -1290,58 +1282,48 @@ let check_sat_core (fs : Formula.Set.t) (gamma : TypEnv.t) : Model.model option
   (* Step 3: Check satisfiability *)
   (* let t = Sys.time () in *)
   L.verbose (fun fmt -> fmt "Reached Z3.");
-  let ret = Solver.check masterSolver [] in
+  let ret = Solver.check master_solver [] in
   (* Utils.Statistics.update_statistics "Solver check" (Sys.time () -. t); *)
   L.(
     verbose (fun m -> m "The solver returned: %s" (Solver.string_of_status ret)));
 
-  (* Step 4: BREAK if ret = UNKNOWN *)
-  if ret = Solver.UNKNOWN then (
-    Format.printf
-      "FATAL ERROR: Z3 returned UNKNOWN for SAT question:\n\
-       %a\n\
-       with gamma:\n\
-       @[%a@]\n\n\n\
-       Z3 EXPRS:\n\
-       %a\n\
-      \       @?"
-      (Fmt.iter ~sep:(Fmt.any ", ") Formula.Set.iter Formula.pp)
-      fs TypEnv.pp gamma
-      (Fmt.list ~sep:(Fmt.any "\n\n") Fmt.string)
-      (List.map Z3.Expr.to_string encoded_assertions);
-    exit 1);
-
-  (* Step 5: RETURN *)
-  let ret = ret = Solver.SATISFIABLE in
-
-  if ret then Solver.get_model masterSolver else None
+  let ret_value =
+    match ret with
+    | Solver.UNKNOWN ->
+        Format.printf
+          "FATAL ERROR: Z3 returned UNKNOWN for SAT question:\n\
+           %a\n\
+           with gamma:\n\
+           @[%a@]\n\n\n\
+           Z3 EXPRS:\n\
+           %a\n\
+          \       @?"
+          (Fmt.iter ~sep:(Fmt.any ", ") Formula.Set.iter Formula.pp)
+          fs TypEnv.pp gamma
+          (Fmt.list ~sep:(Fmt.any "\n\n") Fmt.string)
+          (List.map Z3.Expr.to_string encoded_assertions);
+        exit 1
+    | SATISFIABLE -> Solver.get_model master_solver
+    | UNSATISFIABLE -> None
+  in
+  reset_solver ();
+  ret_value
 
 let check_sat (fs : Formula.Set.t) (gamma : TypEnv.t) : bool =
-  let cached = Hashtbl.mem sat_cache fs in
-  let ret =
-    if cached then (
-      let result = Hashtbl.find sat_cache fs in
+  match Hashtbl.find_opt sat_cache fs with
+  | Some result ->
       L.(verbose (fun m -> m "SAT check cached with result: %b" result));
-      result)
-    else (
+      result
+  | None ->
       L.(verbose (fun m -> m "SAT check not found in cache."));
       let ret = check_sat_core fs gamma in
-
       L.(
         verbose (fun m ->
             m "Adding to cache : @[%a@]" Formula.pp
               (Formula.conjunct (Formula.Set.elements fs))));
-
-      let result =
-        match ret with
-        | None -> false
-        | Some _ -> true
-      in
-      Hashtbl.replace sat_cache fs result;
-      result)
-  in
-
-  ret
+      let result = Option.is_some ret in
+      Hashtbl.replace sat_cache fs (Option.is_some ret);
+      result
 
 let lift_z3_model
     (model : Model.model)
@@ -1396,7 +1378,7 @@ let lift_z3_model
         | LVar x -> x
         | _ ->
             raise
-              (Failure "INtERNAL ERROR: Z3 lifting of a non-logical variable")
+              (Failure "INTERNAL ERROR: Z3 lifting of a non-logical variable")
       in
       let v = lift_z3_val x in
       L.(
