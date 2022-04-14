@@ -13,7 +13,7 @@
     "@opam/batteries": "^3.0.0",
     "@opam/fmt": "^0.8.8",
     "@opam/menhir": "20211230",
-    "@opam/z3": "giltho/esy-z3#b0fdd9a",
+    "@opam/z3": "giltho/esy-z3#0738c9254e9720396309f991cded8fa64d20ce1a",
     "@opam/ppx_deriving_yojson": "*",
     "@opam/ppxlib": ">=0.18.0",
     "@opam/uuidm": "0.9.7",
@@ -22,8 +22,6 @@
     "ocaml": "^4.13.x"
   },
   "devDependencies": {
-    "@opam/merlin": "*",
-    "@opam/odoc": "*",
     "ocaml": "4.13.x"
   }
 }
