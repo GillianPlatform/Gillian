@@ -67,7 +67,7 @@
     "@opam/batteries": "^3.0.0",
     "@opam/cmdliner": "^1.1.1",
     "@opam/dap": "1.0.6",
-    "@opam/dune": "^2.0",
+    "@opam/dune": "^3.0",
     "@opam/fmt": "^0.8.8",
     "@opam/flow_parser": "giltho/flow#544677c0306668679172807bec95b134f5d249f3",
     "@opam/menhir": "20211230",
