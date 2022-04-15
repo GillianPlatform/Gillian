@@ -119,10 +119,15 @@ module UnOp : sig
     | M_sqrt  (** Square root *)
     | M_tan  (** Tangent *)
     | ToStringOp  (** Converts a number (integer or float) to a string *)
-    | ToIntOp  (** Converts a float to an integer *)
-    | ToUint16Op  (** Converts an integer to a 16-bit unsigned integer *)
-    | ToUint32Op  (** Converts an integer to a 32-bit unsigned integer *)
-    | ToInt32Op  (** Converts an integer to a 32-bit signed integer *)
+    | ToIntOp  (** Converts a float to an integer, Num -> Num !!  *)
+    | ToUint16Op
+        (** Converts an integer to a 16-bit unsigned integer, Num -> Num !! *)
+    | ToUint32Op
+        (** Converts an integer to a 32-bit unsigned integer, Num -> Num !! *)
+    | ToInt32Op
+        (** Converts an integer to a 32-bit signed integer, Num -> Num !! *)
+    (* | IntToNum Converts a Gil Int to a Gil Num
+       | NumToInt Converts a Gil Num to a Gil Int *)
     | ToNumberOp  (** Converts a string to a number *)
     | TypeOf
     | Car  (** Head of a list *)
@@ -131,7 +136,7 @@ module UnOp : sig
     | LstRev  (** List reverse *)
     | SetToList  (** From set to list *)
     | StrLen  (** String length *)
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   (** Printer *)
   val str : t -> string
@@ -178,7 +183,7 @@ module BinOp : sig
     | SetDiff  (** Set difference *)
     | BSetMem  (** Set membership *)
     | BSetSub  (** Subset *)
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   (** Printer *)
   val str : t -> string

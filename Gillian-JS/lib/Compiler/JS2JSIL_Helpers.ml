@@ -1,4 +1,4 @@
-open Gillian.Gil_syntax
+open Gil_syntax
 
 let small_tbl_size = 1
 let medium_tbl_size = 1

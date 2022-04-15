@@ -16,8 +16,7 @@ type context = {
 }
 
 (* Useful litte function, such a big expression for such a small thing *)
-let nth x n =
-  Expr.BinOp (Expr.PVar x, BinOp.LstNth, Expr.Lit (Literal.Num (float_of_int n)))
+let nth x n = Expr.BinOp (Expr.PVar x, BinOp.LstNth, Expr.int n)
 
 let trans_const =
   let tr = ValueTranslation.gil_of_compcert in

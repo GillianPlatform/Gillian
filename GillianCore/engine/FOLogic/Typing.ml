@@ -89,7 +89,7 @@ let rec infer_types_to_gamma
         | BSetMem -> (None, Some SetType, Some BooleanType)
         | SetDiff -> (Some SetType, Some SetType, Some SetType)
         | BSetSub -> (Some SetType, Some SetType, Some BooleanType)
-        | LstNth -> (Some ListType, Some NumberType, None)
+        | LstNth -> (Some ListType, Some IntType, None)
         | StrNth -> (Some ListType, Some NumberType, None)
         | IPlus | IMinus | ITimes | IMod | IDiv ->
             (Some IntType, Some IntType, Some IntType)
@@ -151,7 +151,7 @@ let rec infer_types_expr gamma le : unit =
           e le2 NumberType
       | LstNth ->
           e le1 ListType;
-          e le2 NumberType
+          e le2 IntType
       | StrNth ->
           e le1 StringType;
           e le2 NumberType
@@ -261,24 +261,22 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
         | true, true -> (
             match op with
             (* List length is typable with constraints *)
-            | LstNth -> (
+            | LstNth ->
                 let _, success, _ = infer_type e1 ListType constraints in
-                match success with
-                | false -> def_neg
-                | true -> (
-                    let _, success, _ = infer_type e2 NumberType constraints in
-                    match success with
-                    | false -> def_neg
-                    | true ->
-                        let new_constraint1 : Formula.t =
-                          LessEq (Lit (Num 0.), e2)
-                        in
-                        let new_constraint2 : Formula.t =
-                          Less (e2, UnOp (LstLen, e1))
-                        in
-                        ( None,
-                          true,
-                          new_constraint1 :: new_constraint2 :: constraints )))
+                if not success then def_neg
+                else
+                  let _, success, _ = infer_type e2 IntType constraints in
+                  if not success then def_neg
+                  else
+                    let new_constraint1 : Formula.t =
+                      LessEq (Lit (Int 0), e2)
+                    in
+                    let new_constraint2 : Formula.t =
+                      Less (e2, UnOp (LstLen, e1))
+                    in
+                    ( None,
+                      true,
+                      new_constraint1 :: new_constraint2 :: constraints )
             (* String length is typable with constraints *)
             | StrNth -> (
                 let _, success, _ = infer_type e1 StringType constraints in
@@ -298,27 +296,42 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
                         ( None,
                           true,
                           new_constraint1 :: new_constraint2 :: constraints )))
-            | _ ->
-                let tt : Type.t =
-                  match op with
-                  | Equal
-                  | ILessThan
-                  | ILessThanEqual
-                  | FLessThan
-                  | FLessThanEqual
-                  | SLessThan
-                  | BAnd
-                  | BOr
-                  | BSetMem
-                  | BSetSub -> BooleanType
-                  | SetDiff -> SetType
-                  | StrCat -> StringType
-                  | IPlus | IMinus | ITimes | IDiv | IMod -> IntType
-                  | LstNth | StrNth -> raise (Failure "Impossible match case")
-                  (* FIXME: Specify cases *)
-                  | _ -> NumberType
-                in
-                infer_type le tt constraints)
+            | Equal
+            | ILessThan
+            | ILessThanEqual
+            | FLessThan
+            | FLessThanEqual
+            | SLessThan
+            | BAnd
+            | BOr
+            | BSetMem
+            | BSetSub -> infer_type le BooleanType constraints
+            | SetDiff -> infer_type le SetType constraints
+            | StrCat -> infer_type le StringType constraints
+            | IPlus | IMinus | ITimes | IDiv | IMod ->
+                infer_type le IntType constraints
+            | FPlus
+            | FMinus
+            | FTimes
+            | FDiv
+            | FMod
+            | BitwiseAnd
+            | BitwiseOr
+            | BitwiseXor
+            | LeftShift
+            | SignedRightShift
+            | UnsignedRightShift
+            | BitwiseAndL
+            | BitwiseOrL
+            | BitwiseXorL
+            | LeftShiftL
+            | SignedRightShiftL
+            | UnsignedRightShiftL
+            | M_atan2
+            | M_pow ->
+                infer_type le NumberType constraints
+                (* FIXME: Specify cases *)
+                (* | _ -> infer_type le NumberType constraints *))
         | _, _ -> def_neg)
     | NOp (SetUnion, les) | NOp (SetInter, les) ->
         let all_typable, constraints =

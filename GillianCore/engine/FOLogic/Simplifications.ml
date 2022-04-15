@@ -423,16 +423,13 @@ let simplify_pfs_and_gamma
         | Eq (BinOp (lst, LstNth, idx), elem)
         | Eq (elem, BinOp (lst, LstNth, idx)) -> (
             match idx with
-            | Lit (Num nx) when Arith_Utils.is_int nx ->
-                let prepend_lvars =
-                  Array.to_list
-                    (Array.init (int_of_float nx) (fun _ -> LVar.alloc ()))
-                in
+            | Lit (Int nx) ->
+                let prepend_lvars = List.init nx (fun _ -> LVar.alloc ()) in
                 let append_lvar = LVar.alloc () in
                 (* Fresh variables can be removed *)
                 vars_to_kill :=
                   SS.add append_lvar
-                    (SS.union !vars_to_kill (SS.of_list prepend_lvars));
+                    (SS.add_seq (List.to_seq prepend_lvars) !vars_to_kill);
                 let prepend = List.map (fun x -> Expr.LVar x) prepend_lvars in
                 let append = Expr.LVar append_lvar in
                 rec_call
@@ -441,6 +438,7 @@ let simplify_pfs_and_gamma
                        NOp
                          ( LstCat,
                            [ EList (List.append prepend [ elem ]); append ] ) ))
+            | Lit (Num _) -> failwith "l-nth(l, f) where f is Num and not Int!"
             | _ -> `Replace whole)
         | Eq (UnOp (LstLen, le), Lit (Num 0.))
         | Eq (Lit (Num 0.), UnOp (LstLen, le)) -> rec_call (Eq (le, EList []))

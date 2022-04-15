@@ -40,7 +40,7 @@ type t = TypeDef__.unop =
   | SetToList  (** From set to list *)
   (* Strings *)
   | StrLen  (** String length *)
-[@@deriving yojson]
+[@@deriving yojson, eq]
 
 let str (x : t) =
   match x with

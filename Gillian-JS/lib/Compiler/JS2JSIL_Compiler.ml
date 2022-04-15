@@ -2,7 +2,7 @@ open Lexing
 open JS2JSIL_Helpers
 open Jslogic.JSLogicCommon
 open JS_Utils
-module Gil_syntax = Gillian.Gil_syntax
+(* module Gil_syntax = Gillian.Gil_syntax *)
 
 module Preprocess_GCmd = PreProcessing_Utils.M (struct
   type t = int Gil_syntax.Cmd.t

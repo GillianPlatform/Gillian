@@ -33,34 +33,37 @@ let typeof x =
   | _ -> UnOp (TypeOf, x)
 
 let list_nth x n =
-  match x with
-  | EList l when n < List.length l -> List.nth l n
-  | Lit (LList l) when n < List.length l -> Lit (List.nth l n)
-  | _ -> BinOp (x, LstNth, num (float_of_int n))
+  let short_circuit =
+    match x with
+    | EList l -> List.nth_opt l n
+    | Lit (LList l) -> List.nth_opt l n |> Option.map lit
+    | _ -> None
+  in
+  match short_circuit with
+  | None -> BinOp (x, LstNth, int n)
+  | Some x -> x
 
 let list_nth_e x n =
   match n with
-  | Lit (Num n) -> list_nth x (int_of_float n)
+  | Lit (Int n) -> list_nth x n
+  | Lit (Num _) -> failwith "l-nth of list and Num!"
   | _ -> BinOp (x, LstNth, n)
 
 let list_length x =
   match x with
-  | EList l -> Lit (Num (float_of_int (List.length l)))
-  | Lit (LList l) -> Lit (Num (float_of_int (List.length l)))
+  | EList l -> int (List.length l)
+  | Lit (LList l) -> int (List.length l)
+  | LstSub (_, _, len) -> len
   | _ -> UnOp (LstLen, x)
 
 let list_sub ~lst ~start ~size =
   match (lst, start, size) with
-  | EList el, Lit (Num startf), Lit (Num sizef) -> (
-      match
-        List_utils.list_sub el (int_of_float startf) (int_of_float sizef)
-      with
+  | EList el, Lit (Int starti), Lit (Int sizei) -> (
+      match List_utils.list_sub el starti sizei with
       | None -> LstSub (lst, start, size)
       | Some sublst -> EList sublst)
-  | Lit (LList ll), Lit (Num startf), Lit (Num sizef) -> (
-      match
-        List_utils.list_sub ll (int_of_float startf) (int_of_float sizef)
-      with
+  | Lit (LList ll), Lit (Int starti), Lit (Int sizei) -> (
+      match List_utils.list_sub ll starti sizei with
       | None -> LstSub (lst, start, size)
       | Some sublst -> Lit (LList sublst))
   | _ -> LstSub (lst, start, size)

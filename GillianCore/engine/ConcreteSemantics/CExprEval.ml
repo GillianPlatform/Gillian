@@ -154,7 +154,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
                   lit)))
   | LstLen -> (
       match lit with
-      | LList l -> Num (float_of_int (List.length l))
+      | LList l -> Int (List.length l)
       | _ ->
           raise
             (TypeError

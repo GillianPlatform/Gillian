@@ -91,3 +91,14 @@ let index_of element list =
     | _ :: r -> aux (cursor + 1) r
   in
   aux 0 list
+
+(** [nth_or_size lst n] returns [Left v] if [v] is the nth element of [lst] or [Right sz] if
+    the list is too short and is of size [sz]. Fails if provided a negative [n]. *)
+let nth_or_size list n =
+  if n < 0 then Fmt.failwith "Invalid nth : %d" n;
+  let rec aux sz list n =
+    match list with
+    | [] -> Either.Right sz
+    | k :: r -> if Int.equal sz n then Either.Left k else aux (sz + 1) r n
+  in
+  aux 0 list n
