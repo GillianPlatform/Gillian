@@ -186,9 +186,12 @@ let rec infer_types_formula (gamma : TypEnv.t) (a : Formula.t) : unit =
   | And (a1, a2) | Or (a1, a2) ->
       f a1;
       f a2
-  | Less (e1, e2) | LessEq (e1, e2) ->
+  | FLess (e1, e2) | FLessEq (e1, e2) ->
       e e1 NumberType;
       e e2 NumberType
+  | ILess (e1, e2) | ILessEq (e1, e2) ->
+      e e1 IntType;
+      e e2 IntType
   | StrLess (e1, e2) ->
       e e1 StringType;
       e e2 StringType
@@ -261,9 +264,30 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
               | UNot | M_isNaN -> (BooleanType, [])
               | ToStringOp -> (StringType, [])
               | Car | Cdr ->
-                  (ListType, [ Formula.LessEq (Lit (Int 1), UnOp (LstLen, e)) ])
-              | LstRev -> (ListType, [])
-              | _ -> (NumberType, [])
+                  (ListType, [ Formula.ILessEq (Lit (Int 1), UnOp (LstLen, e)) ])
+              | LstRev | SetToList -> (ListType, [])
+              | IUnaryMinus | FUnaryMinus | LstLen -> (IntType, [])
+              | BitwiseNot
+              | M_abs
+              | M_acos
+              | M_asin
+              | M_atan
+              | M_ceil
+              | M_cos
+              | M_exp
+              | M_floor
+              | M_log
+              | M_round
+              | M_sgn
+              | M_sin
+              | M_sqrt
+              | M_tan
+              | ToIntOp
+              | ToUint16Op
+              | ToUint32Op
+              | ToInt32Op
+              | ToNumberOp
+              | StrLen -> (NumberType, [])
             in
             infer_type le tt (new_constraints @ constraints))
     | BinOp (e1, op, e2) -> (
@@ -284,10 +308,10 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
                   if not success then def_neg
                   else
                     let new_constraint1 : Formula.t =
-                      LessEq (Lit (Int 0), e2)
+                      ILessEq (Lit (Int 0), e2)
                     in
                     let new_constraint2 : Formula.t =
-                      Less (e2, UnOp (LstLen, e1))
+                      ILess (e2, UnOp (LstLen, e1))
                     in
                     ( None,
                       true,
@@ -303,10 +327,10 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
                     | false -> def_neg
                     | true ->
                         let new_constraint1 : Formula.t =
-                          LessEq (Lit (Num 0.), e2)
+                          FLessEq (Lit (Num 0.), e2)
                         in
                         let new_constraint2 : Formula.t =
-                          Less (e2, UnOp (StrLen, e1))
+                          FLess (e2, UnOp (StrLen, e1))
                         in
                         ( None,
                           true,

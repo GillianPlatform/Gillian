@@ -56,7 +56,7 @@ let of_comp_fun comp ~(pc : Pc.t) e1 e2 =
 
 let is_equal = of_comp_fun FOSolver.is_equal
 let is_different = of_comp_fun FOSolver.is_different
-let is_less_or_equal = of_comp_fun FOSolver.is_less_or_equal
+let num_is_less_or_equal = of_comp_fun FOSolver.num_is_less_or_equal
 
 let resolve_loc_name ~pc loc =
   FOSolver.resolve_loc_name ~pfs:(build_full_pfs pc)

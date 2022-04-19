@@ -70,7 +70,7 @@ let clean_up_stuff (left : PFS.t) (right : PFS.t) =
     PFS.set left [ False ]
 
 (* Set intersections *)
-let get_set_intersections pfs =
+let get_num_set_intersections pfs =
   let lvars = Hashtbl.create 1 in
   let rvars = Hashtbl.create 1 in
 
@@ -79,13 +79,13 @@ let get_set_intersections pfs =
       match (pf : Formula.t) with
       | ForAll
           ( [ (x, Some NumberType) ],
-            Or (Not (SetMem (LVar y, LVar set)), Less (LVar elem, LVar z)) )
+            Or (Not (SetMem (LVar y, LVar set)), FLess (LVar elem, LVar z)) )
         when x = y && x = z ->
           L.(verbose (fun m -> m "Got left: %s, %s" elem set));
           Hashtbl.add lvars elem set
       | ForAll
           ( [ (x, Some NumberType) ],
-            Or (Not (SetMem (LVar y, LVar set)), Less (LVar z, LVar elem)) )
+            Or (Not (SetMem (LVar y, LVar set)), FLess (LVar z, LVar elem)) )
         when x = y && x = z ->
           L.(verbose (fun m -> m "Got right: %s, %s" elem set));
           Hashtbl.add rvars elem set
@@ -134,7 +134,7 @@ let get_set_intersections pfs =
   List.iter
     (fun a ->
       match (a : Formula.t) with
-      | Less (LVar v1, LVar v2) -> (
+      | FLess (LVar v1, LVar v2) -> (
           match (Hashtbl.mem lvars v1, Hashtbl.mem lvars v2) with
           | true, true ->
               intersections :=
@@ -169,7 +169,7 @@ let _resolve_set_existentials
   in
   if SS.cardinal set_exists > 0 then (
     let intersections =
-      get_set_intersections (PFS.to_list lpfs @ PFS.to_list rpfs)
+      get_num_set_intersections (PFS.to_list lpfs @ PFS.to_list rpfs)
     in
     L.(
       verbose (fun m ->
@@ -877,7 +877,7 @@ let simplify_pfs_and_gamma
               match t with
               | Type.ListType ->
                   PFS.extend lpfs
-                    (LessEq (Lit (Int 0), UnOp (LstLen, Expr.from_var_name v)))
+                    (ILessEq (Lit (Int 0), UnOp (LstLen, Expr.from_var_name v)))
               | _ -> ());
 
           analyse_list_structure lpfs;

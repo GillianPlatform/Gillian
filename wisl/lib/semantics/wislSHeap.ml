@@ -92,7 +92,7 @@ let alloc (heap : t) size =
   let rec get_list current_offset =
     if current_offset < 0 then []
     else
-      (Expr.num_int current_offset, Expr.Lit Literal.Null)
+      (Expr.int current_offset, Expr.Lit Literal.Null)
       :: get_list (current_offset - 1)
   in
   let l = get_list (size - 1) in
@@ -111,7 +111,7 @@ let dispose (heap : t) loc =
       let has_all =
         let so_far = ref true in
         for i = 0 to i - 1 do
-          so_far := !so_far && (Option.is_some @@ SFVL.get (Expr.num_int i) data)
+          so_far := !so_far && (Option.is_some @@ SFVL.get (Expr.int i) data)
         done;
         !so_far
       in
@@ -129,7 +129,7 @@ let get_cell ~pfs ~gamma heap loc ofs =
         match bound with
         | None -> false
         | Some n ->
-            let n = Expr.num_int n in
+            let n = Expr.int n in
             let open Formula.Infix in
             Solver.sat ~unification:false ~pfs ~gamma [ n #<= ofs ]
       in
@@ -159,7 +159,7 @@ let set_cell ~pfs ~gamma heap loc_name ofs v =
         match bound with
         | None -> false
         | Some n ->
-            let n = Expr.num_int n in
+            let n = Expr.int n in
             let open Formula.Infix in
             Solver.sat ~unification:false ~pfs ~gamma [ n #<= ofs ]
       in
@@ -295,8 +295,8 @@ let get_store_vars store is_gil_file =
       else
         let match_offset lst loc loc_pp =
           match lst with
-          | [ Expr.Lit (Num offset) ] ->
-              Fmt.str "-> (%a, %.0f)" (Fmt.hbox loc_pp) loc offset
+          | [ Expr.Lit (Int offset) ] ->
+              Fmt.str "-> (%a, %d)" (Fmt.hbox loc_pp) loc offset
           | [ offset ] ->
               Fmt.str "-> (%a, %a)" (Fmt.hbox loc_pp) loc (Fmt.hbox Expr.pp)
                 offset
@@ -323,7 +323,7 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
       let open Expr.Infix in
       let difference = v -. w in
       match difference with
-      | Expr.Lit (Num f) -> if f < 0. then -1 else if f > 0. then 1 else 0
+      | Expr.Lit (Int f) -> if f < 0 then -1 else if f > 0 then 1 else 0
       | _ -> 0
     with _ -> (* Do not sort the offsets if an exception has occurred *)
               0
@@ -334,7 +334,7 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
            (* Display offset as a number to match the printing of WISL pointers *)
            let offset_str =
              match offset with
-             | Expr.Lit (Num f) -> Fmt.str "%.0f" f
+             | Expr.Lit (Int o) -> Fmt.str "%d" o
              | other -> vstr other
            in
            create_leaf_variable offset_str (vstr value) ())

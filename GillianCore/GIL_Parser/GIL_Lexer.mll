@@ -237,8 +237,10 @@ rule read = parse
   | "\\/"                { GIL_Parser.LOR }
   | "!"                  { GIL_Parser.LNOT }
   | "=="                 { GIL_Parser.LEQUAL }
-  | "<#"                 { GIL_Parser.LLESSTHAN       }
-  | "<=#"                { GIL_Parser.LLESSTHANEQUAL  }
+  | "i<#"                { GIL_Parser.ILLESSTHAN }
+  | "i<=#"               { GIL_Parser.ILLESSTHANEQUAL }
+  | "<#"                 { GIL_Parser.FLLESSTHAN       }
+  | "<=#"                { GIL_Parser.FLLESSTHANEQUAL  }
   | "s<#"                { GIL_Parser.LSLESSTHAN }
   (* Separating conjunction uses the same symbol as product, token TIMES *)
 (* Logic commands *)

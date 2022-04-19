@@ -934,7 +934,7 @@ let rec encode_assertion (a : Formula.t) : ZExpr.expr =
   match a with
   | Not a -> Boolean.mk_not ctx (f a)
   | Eq (le1, le2) -> Boolean.mk_eq ctx (fe le1) (fe le2)
-  | Less (le1, le2) ->
+  | FLess (le1, le2) ->
       let le1' =
         ZExpr.mk_app ctx Lit_operations.number_accessor
           [ mk_singleton_access (fe le1) ]
@@ -944,13 +944,33 @@ let rec encode_assertion (a : Formula.t) : ZExpr.expr =
           [ mk_singleton_access (fe le2) ]
       in
       mk_lt le1' le2'
-  | LessEq (le1, le2) ->
+  | FLessEq (le1, le2) ->
       let le1' =
         ZExpr.mk_app ctx Lit_operations.number_accessor
           [ mk_singleton_access (fe le1) ]
       in
       let le2' =
         ZExpr.mk_app ctx Lit_operations.number_accessor
+          [ mk_singleton_access (fe le2) ]
+      in
+      mk_le le1' le2'
+  | ILess (le1, le2) ->
+      let le1' =
+        ZExpr.mk_app ctx Lit_operations.int_accessor
+          [ mk_singleton_access (fe le1) ]
+      in
+      let le2' =
+        ZExpr.mk_app ctx Lit_operations.int_accessor
+          [ mk_singleton_access (fe le2) ]
+      in
+      mk_lt le1' le2'
+  | ILessEq (le1, le2) ->
+      let le1' =
+        ZExpr.mk_app ctx Lit_operations.int_accessor
+          [ mk_singleton_access (fe le1) ]
+      in
+      let le2' =
+        ZExpr.mk_app ctx Lit_operations.int_accessor
           [ mk_singleton_access (fe le2) ]
       in
       mk_le le1' le2'

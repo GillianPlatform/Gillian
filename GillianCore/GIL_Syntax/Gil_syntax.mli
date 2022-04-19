@@ -341,9 +341,12 @@ module Formula : sig
     | And of t * t  (** Logical conjunction *)
     | Or of t * t  (** Logical disjunction *)
     | Eq of Expr.t * Expr.t  (** Expression equality *)
-    | Less of Expr.t * Expr.t  (** Expression less-than for numbers *)
-    | LessEq of Expr.t * Expr.t
+    | FLess of Expr.t * Expr.t  (** Expression less-than for numbers *)
+    | FLessEq of Expr.t * Expr.t
         (** Expression less-than-or-equal for numbers *)
+    | ILess of Expr.t * Expr.t  (** Expression less-than for integers *)
+    | ILessEq of Expr.t * Expr.t
+        (** Expression less-than-or-equal for integeres *)
     | StrLess of Expr.t * Expr.t  (** Expression less-than for strings *)
     | SetMem of Expr.t * Expr.t  (** Set membership *)
     | SetSub of Expr.t * Expr.t  (** Set subsetness *)
@@ -447,17 +450,29 @@ module Formula : sig
     (** Same as Eq *)
     val ( #== ) : Expr.t -> Expr.t -> t
 
-    (** Same as Less *)
+    (** Same as ILess *)
     val ( #< ) : Expr.t -> Expr.t -> t
 
-    (** [a #> b] if [Not Less (b, a)]*)
+    (** [a #> b] if [Not ILess (b, a)]*)
     val ( #> ) : Expr.t -> Expr.t -> t
 
-    (** Same as LessEq *)
+    (** Same as ILessEq *)
     val ( #<= ) : Expr.t -> Expr.t -> t
 
-    (** [a #>= b] is [Not Less (b, a)] *)
+    (** [a #>= b] is [Not ILess (b, a)] *)
     val ( #>= ) : Expr.t -> Expr.t -> t
+
+    (** Same as FLess *)
+    val ( #<. ) : Expr.t -> Expr.t -> t
+
+    (** [a #>. b] if [Not FLess (b, a)]*)
+    val ( #>. ) : Expr.t -> Expr.t -> t
+
+    (** Same as FLessEq *)
+    val ( #<=. ) : Expr.t -> Expr.t -> t
+
+    (** [a #>=. b] is [Not FLess (b, a)] *)
+    val ( #>=. ) : Expr.t -> Expr.t -> t
 
     (** [fa #=> fb] is [(fnot fa) #|| fb] *)
     val ( #=> ) : t -> t -> t
@@ -1192,8 +1207,10 @@ module Visitors : sig
            ; visit_LVar : 'c -> Expr.t -> string -> Expr.t
            ; visit_LeftShift : 'c -> BinOp.t -> BinOp.t
            ; visit_LeftShiftL : 'c -> BinOp.t -> BinOp.t
-           ; visit_Less : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
-           ; visit_LessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_FLess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_FLessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_ILess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_ILessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
            ; visit_ListType : 'c -> Type.t -> Type.t
            ; visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
            ; visit_Loc : 'c -> Literal.t -> string -> Literal.t
@@ -1442,8 +1459,10 @@ module Visitors : sig
       method visit_LVar : 'c -> Expr.t -> string -> Expr.t
       method visit_LeftShift : 'c -> BinOp.t -> BinOp.t
       method visit_LeftShiftL : 'c -> BinOp.t -> BinOp.t
-      method visit_Less : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
-      method visit_LessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+      method visit_FLess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+      method visit_FLessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+      method visit_ILess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+      method visit_ILessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
       method visit_ListType : 'c -> Type.t -> Type.t
       method visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
       method visit_Loc : 'c -> Literal.t -> string -> Literal.t
@@ -1686,8 +1705,10 @@ module Visitors : sig
            ; visit_LVar : 'c -> LVar.t -> 'f
            ; visit_LeftShift : 'c -> 'f
            ; visit_LeftShiftL : 'c -> 'f
-           ; visit_Less : 'c -> Expr.t -> Expr.t -> 'f
-           ; visit_LessEq : 'c -> Expr.t -> Expr.t -> 'f
+           ; visit_FLess : 'c -> Expr.t -> Expr.t -> 'f
+           ; visit_FLessEq : 'c -> Expr.t -> Expr.t -> 'f
+           ; visit_ILess : 'c -> Expr.t -> Expr.t -> 'f
+           ; visit_ILessEq : 'c -> Expr.t -> Expr.t -> 'f
            ; visit_ILessThan : 'c -> 'f
            ; visit_ILessThanEqual : 'c -> 'f
            ; visit_FLessThan : 'c -> 'f
@@ -1904,8 +1925,10 @@ module Visitors : sig
       method visit_LVar : 'c -> LVar.t -> 'f
       method visit_LeftShift : 'c -> 'f
       method visit_LeftShiftL : 'c -> 'f
-      method visit_Less : 'c -> Expr.t -> Expr.t -> 'f
-      method visit_LessEq : 'c -> Expr.t -> Expr.t -> 'f
+      method visit_FLess : 'c -> Expr.t -> Expr.t -> 'f
+      method visit_FLessEq : 'c -> Expr.t -> Expr.t -> 'f
+      method visit_ILess : 'c -> Expr.t -> Expr.t -> 'f
+      method visit_ILessEq : 'c -> Expr.t -> Expr.t -> 'f
       method visit_ILessThan : 'c -> 'f
       method visit_ILessThanEqual : 'c -> 'f
       method visit_FLessThan : 'c -> 'f
@@ -2136,8 +2159,10 @@ module Visitors : sig
            ; visit_LVar : 'c -> string -> unit
            ; visit_LeftShift : 'c -> unit
            ; visit_LeftShiftL : 'c -> unit
-           ; visit_Less : 'c -> Expr.t -> Expr.t -> unit
-           ; visit_LessEq : 'c -> Expr.t -> Expr.t -> unit
+           ; visit_FLess : 'c -> Expr.t -> Expr.t -> unit
+           ; visit_FLessEq : 'c -> Expr.t -> Expr.t -> unit
+           ; visit_ILess : 'c -> Expr.t -> Expr.t -> unit
+           ; visit_ILessEq : 'c -> Expr.t -> Expr.t -> unit
            ; visit_ListType : 'c -> unit
            ; visit_Lit : 'c -> Literal.t -> unit
            ; visit_Loc : 'c -> string -> unit
@@ -2353,8 +2378,10 @@ module Visitors : sig
       method visit_LVar : 'c -> string -> unit
       method visit_LeftShift : 'c -> unit
       method visit_LeftShiftL : 'c -> unit
-      method visit_Less : 'c -> Expr.t -> Expr.t -> unit
-      method visit_LessEq : 'c -> Expr.t -> Expr.t -> unit
+      method visit_FLess : 'c -> Expr.t -> Expr.t -> unit
+      method visit_FLessEq : 'c -> Expr.t -> Expr.t -> unit
+      method visit_ILess : 'c -> Expr.t -> Expr.t -> unit
+      method visit_ILessEq : 'c -> Expr.t -> Expr.t -> unit
       method visit_ListType : 'c -> unit
       method visit_Lit : 'c -> Literal.t -> unit
       method visit_Loc : 'c -> string -> unit

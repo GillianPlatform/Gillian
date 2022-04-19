@@ -355,8 +355,10 @@ let rec simple_ins_formula (kb : KB.t) (pf : Formula.t) : KB.t list =
       List.map minimise_unifiables ins
   (* Relational formulae are all treated the same *)
   | Eq (e1, e2)
-  | Less (e1, e2)
-  | LessEq (e1, e2)
+  | ILess (e1, e2)
+  | ILessEq (e1, e2)
+  | FLess (e1, e2)
+  | FLessEq (e1, e2)
   | StrLess (e1, e2)
   | SetMem (e1, e2)
   | SetSub (e1, e2) ->

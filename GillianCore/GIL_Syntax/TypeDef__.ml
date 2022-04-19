@@ -131,8 +131,10 @@ and formula =
   | And of formula * formula
   | Or of formula * formula
   | Eq of expr * expr
-  | Less of expr * expr
-  | LessEq of expr * expr
+  | FLess of expr * expr
+  | FLessEq of expr * expr
+  | ILess of expr * expr
+  | ILessEq of expr * expr
   | StrLess of expr * expr
   | SetMem of expr * expr
   | SetSub of expr * expr

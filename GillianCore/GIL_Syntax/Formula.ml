@@ -5,8 +5,11 @@ type t = TypeDef__.formula =
   | And of t * t  (** Logical conjunction *)
   | Or of t * t  (** Logical disjunction *)
   | Eq of Expr.t * Expr.t  (** Expression equality *)
-  | Less of Expr.t * Expr.t  (** Expression less-than for numbers *)
-  | LessEq of Expr.t * Expr.t  (** Expression less-than-or-equal for numbers *)
+  | FLess of Expr.t * Expr.t  (** Expression less-than for numbers *)
+  | FLessEq of Expr.t * Expr.t  (** Expression less-than-or-equal for numbers *)
+  | ILess of Expr.t * Expr.t  (** Expression less-than for integers *)
+  | ILessEq of Expr.t * Expr.t
+      (** Expression less-than-or-equal for integeres *)
   | StrLess of Expr.t * Expr.t  (** Expression less-than for strings *)
   | SetMem of Expr.t * Expr.t  (** Set membership *)
   | SetSub of Expr.t * Expr.t  (** Set subsetness *)
@@ -64,8 +67,10 @@ let rec map
       | True -> True
       | False -> False
       | Eq (e1, e2) -> Eq (map_e e1, map_e e2)
-      | Less (e1, e2) -> Less (map_e e1, map_e e2)
-      | LessEq (e1, e2) -> LessEq (map_e e1, map_e e2)
+      | FLess (e1, e2) -> FLess (map_e e1, map_e e2)
+      | FLessEq (e1, e2) -> FLessEq (map_e e1, map_e e2)
+      | ILess (e1, e2) -> ILess (map_e e1, map_e e2)
+      | ILessEq (e1, e2) -> ILessEq (map_e e1, map_e e2)
       | StrLess (e1, e2) -> StrLess (map_e e1, map_e e2)
       | SetMem (e1, e2) -> SetMem (map_e e1, map_e e2)
       | SetSub (e1, e2) -> SetSub (map_e e1, map_e e2)
@@ -115,8 +120,10 @@ let rec map_opt
           | True -> Some True
           | False -> Some False
           | Eq (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> Eq (e1, e2))
-          | Less (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> Less (e1, e2))
-          | LessEq (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> LessEq (e1, e2))
+          | ILess (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> ILess (e1, e2))
+          | ILessEq (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> ILessEq (e1, e2))
+          | FLess (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> FLess (e1, e2))
+          | FLessEq (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> FLessEq (e1, e2))
           | StrLess (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> StrLess (e1, e2))
           | SetMem (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> SetMem (e1, e2))
           | SetSub (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> SetSub (e1, e2))
@@ -202,10 +209,14 @@ let rec pp_parametric pp_expr fmt f =
   | False -> Fmt.string fmt "False"
   (* e1 == e2 *)
   | Eq (e1, e2) -> Fmt.pf fmt "@[(%a ==@ %a)@]" pp_expr e1 pp_expr e2
-  (* e1 << e2 *)
-  | Less (e1, e2) -> Fmt.pf fmt "(%a <# %a)" pp_expr e1 pp_expr e2
-  (* e1 <<= e2 *)
-  | LessEq (e1, e2) -> Fmt.pf fmt "(%a <=# %a)" pp_expr e1 pp_expr e2
+  (* e1 <#e2 *)
+  | FLess (e1, e2) -> Fmt.pf fmt "(%a <# %a)" pp_expr e1 pp_expr e2
+  (* e1 <=# e2 *)
+  | FLessEq (e1, e2) -> Fmt.pf fmt "(%a <=# %a)" pp_expr e1 pp_expr e2
+  (* e1 i<# e2 *)
+  | ILess (e1, e2) -> Fmt.pf fmt "(%a i<# %a)" pp_expr e1 pp_expr e2
+  (* e1 i<=# e2 *)
+  | ILessEq (e1, e2) -> Fmt.pf fmt "(%a i<=# %a)" pp_expr e1 pp_expr e2
   (* e1 <s< e2 *)
   | StrLess (e1, e2) -> Fmt.pf fmt "(%a s<# %a)" pp_expr e1 pp_expr e2
   (* forall vars . a *)
@@ -231,13 +242,19 @@ let rec lift_logic_expr (e : Expr.t) : (t * t) option =
       let a = Eq (e1, e2) in
       Some (a, Not a)
   | BinOp (e1, FLessThan, e2) ->
-      let a = Less (e1, e2) in
+      let a = FLess (e1, e2) in
+      Some (a, Not a)
+  | BinOp (e1, ILessThan, e2) ->
+      let a = ILess (e1, e2) in
       Some (a, Not a)
   | BinOp (e1, SLessThan, e2) ->
       let a = StrLess (e1, e2) in
       Some (a, Not a)
   | BinOp (e1, FLessThanEqual, e2) ->
-      let a = LessEq (e1, e2) in
+      let a = FLessEq (e1, e2) in
+      Some (a, Not a)
+  | BinOp (e1, ILessThanEqual, e2) ->
+      let a = ILessEq (e1, e2) in
       Some (a, Not a)
   | BinOp (e1, BSetMem, e2) ->
       let a = SetMem (e1, e2) in
@@ -272,8 +289,10 @@ let rec to_expr (a : t) : Expr.t option =
       | _ -> None)
   | ForAll _ -> None
   | Eq (le1, le2) -> Some (Expr.BinOp (le1, BinOp.Equal, le2))
-  | Less (le1, le2) -> Some (Expr.BinOp (le1, BinOp.FLessThan, le2))
-  | LessEq (le1, le2) -> Some (Expr.BinOp (le1, BinOp.FLessThanEqual, le2))
+  | FLess (le1, le2) -> Some (Expr.BinOp (le1, BinOp.FLessThan, le2))
+  | FLessEq (le1, le2) -> Some (Expr.BinOp (le1, BinOp.FLessThanEqual, le2))
+  | ILess (le1, le2) -> Some (Expr.BinOp (le1, BinOp.ILessThan, le2))
+  | ILessEq (le1, le2) -> Some (Expr.BinOp (le1, BinOp.ILessThanEqual, le2))
   | StrLess (le1, le2) -> Some (Expr.BinOp (le1, BinOp.SLessThan, le2))
   | SetMem (le1, le2) -> Some (Expr.BinOp (le1, BinOp.BSetMem, le2))
   | SetSub (le1, le2) -> Some (Expr.BinOp (le1, BinOp.BSetSub, le2))
@@ -346,20 +365,40 @@ module Infix = struct
 
   let ( #< ) a b =
     match (a, b) with
-    | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x < y)
-    | _ -> Less (a, b)
+    | Expr.Lit (Int x), Expr.Lit (Int y) -> of_bool (x < y)
+    | _ -> ILess (a, b)
 
   let ( #<= ) a b =
     match (a, b) with
-    | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x <= y)
-    | _ -> LessEq (a, b)
+    | Expr.Lit (Int x), Expr.Lit (Int y) -> of_bool (x <= y)
+    | _ -> ILessEq (a, b)
 
   let ( #> ) a b =
+    match (a, b) with
+    | Expr.Lit (Int x), Expr.Lit (Int y) -> of_bool (x > y)
+    | _ -> fnot a #<= b
+
+  let ( #>= ) a b =
+    match (a, b) with
+    | Expr.Lit (Int x), Expr.Lit (Int y) -> of_bool (x >= y)
+    | _ -> fnot a #< b
+
+  let ( #<. ) a b =
+    match (a, b) with
+    | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x < y)
+    | _ -> FLess (a, b)
+
+  let ( #<=. ) a b =
+    match (a, b) with
+    | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x <= y)
+    | _ -> FLessEq (a, b)
+
+  let ( #>. ) a b =
     match (a, b) with
     | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x > y)
     | _ -> fnot a #<= b
 
-  let ( #>= ) a b =
+  let ( #>=. ) a b =
     match (a, b) with
     | Expr.Lit (Num x), Expr.Lit (Num y) -> of_bool (x >= y)
     | _ -> fnot a #< b

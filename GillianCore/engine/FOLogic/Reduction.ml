@@ -1951,9 +1951,9 @@ and check_ge_zero_int ?(top_level = false) (pfs : PFS.t) (e : Expr.t) :
       if
         List.exists
           (fun pf -> PFS.mem pfs pf)
-          [ Formula.LessEq (Lit (Int 0), e); Formula.Less (Lit (Int 0), e) ]
+          [ Formula.ILessEq (Lit (Int 0), e); Formula.ILess (Lit (Int 0), e) ]
       then Some true
-      else if PFS.mem pfs (Formula.Less (e, Lit (Int 0))) then Some false
+      else if PFS.mem pfs (Formula.ILess (e, Lit (Int 0))) then Some false
       else None
   | LVar _ | PVar _ -> None
   | UnOp (IUnaryMinus, _) -> None
@@ -1982,9 +1982,9 @@ and check_ge_zero_num ?(top_level = false) (pfs : PFS.t) (e : Expr.t) :
       if
         List.exists
           (fun pf -> PFS.mem pfs pf)
-          [ Formula.LessEq (Lit (Num 0.), e); Formula.Less (Lit (Num 0.), e) ]
+          [ Formula.FLessEq (Lit (Num 0.), e); Formula.FLess (Lit (Num 0.), e) ]
       then Some true
-      else if PFS.mem pfs (Formula.Less (e, Lit (Num 0.))) then Some false
+      else if PFS.mem pfs (Formula.FLess (e, Lit (Num 0.))) then Some false
       else None
   | LVar _ | PVar _ -> None
   | UnOp (FUnaryMinus, _) -> None
@@ -2273,9 +2273,9 @@ let rec reduce_formula_loop
       | Eq (BinOp (Lit (Int x), IPlus, LVar y), LVar z) when x <> 0 && y = z ->
           False
       | ForAll
-          ( [ (x, Some NumberType) ],
+          ( [ (x, Some IntType) ],
             Or
-              ( Or (Less (LVar a, Lit (Int 0)), LessEq (Lit (Int len), LVar b)),
+              ( Or (ILess (LVar a, Lit (Int 0)), ILessEq (Lit (Int len), LVar b)),
                 Eq (BinOp (EList c, LstNth, LVar d), e) ) )
         when x = a && a = b && b = d && Int.equal (List.length c) len ->
           let rhs = Expr.EList (List_utils.make len e) in
@@ -2285,10 +2285,10 @@ let rec reduce_formula_loop
           ( Lit (Num n),
             BinOp (BinOp (Lit (Num 256.), FTimes, LVar b1), FPlus, LVar b0) )
         when top_level
-             && PFS.mem pfs (LessEq (Lit (Num 0.), LVar b0))
-             && PFS.mem pfs (LessEq (Lit (Num 0.), LVar b1))
-             && PFS.mem pfs (Less (LVar b0, Lit (Num 256.)))
-             && PFS.mem pfs (Less (LVar b1, Lit (Num 256.))) ->
+             && PFS.mem pfs (FLessEq (Lit (Num 0.), LVar b0))
+             && PFS.mem pfs (FLessEq (Lit (Num 0.), LVar b1))
+             && PFS.mem pfs (FLess (LVar b0, Lit (Num 256.)))
+             && PFS.mem pfs (FLess (LVar b1, Lit (Num 256.))) ->
           if n > 65535. then False
           else
             let vb1 = floor (n /. 256.) in
@@ -2299,10 +2299,10 @@ let rec reduce_formula_loop
           ( BinOp (BinOp (Lit (Num 256.), FTimes, LVar b1), FPlus, LVar b0),
             Lit (Num n) )
         when top_level
-             && PFS.mem pfs (LessEq (Lit (Num 0.), LVar b0))
-             && PFS.mem pfs (LessEq (Lit (Num 0.), LVar b1))
-             && PFS.mem pfs (Less (LVar b0, Lit (Num 256.)))
-             && PFS.mem pfs (Less (LVar b1, Lit (Num 256.))) ->
+             && PFS.mem pfs (FLessEq (Lit (Num 0.), LVar b0))
+             && PFS.mem pfs (FLessEq (Lit (Num 0.), LVar b1))
+             && PFS.mem pfs (FLess (LVar b0, Lit (Num 256.)))
+             && PFS.mem pfs (FLess (LVar b1, Lit (Num 256.))) ->
           if n > 65535. then False
           else
             let vb1 = floor (n /. 256.) in
@@ -2371,8 +2371,10 @@ let rec reduce_formula_loop
           | Not a -> a
           | Or (a1, a2) -> And (Not a1, Not a2)
           | And (a1, a2) -> Or (Not a1, Not a2)
-          | Less (e1, e2) -> LessEq (e2, e1)
-          | LessEq (e1, e2) -> Less (e2, e1)
+          | FLess (e1, e2) -> FLessEq (e2, e1)
+          | FLessEq (e1, e2) -> FLess (e2, e1)
+          | ILess (e1, e2) -> ILessEq (e2, e1)
+          | ILessEq (e1, e2) -> ILess (e2, e1)
           | _ -> Not fa)
       | Eq (e1, e2) -> (
           let re1 = fe e1 in
@@ -2472,7 +2474,7 @@ let rec reduce_formula_loop
                   NOp (LstCat, LstSub (LVar lst', Lit (Int 0), split) :: _rest)
                 )
                 when lst = lst'
-                     && PFS.mem pfs (Less (UnOp (LstLen, LVar lst), split)) ->
+                     && PFS.mem pfs (ILess (UnOp (LstLen, LVar lst), split)) ->
                   False
               | le1, le2
                 when (match le1 with
@@ -2555,9 +2557,12 @@ let rec reduce_formula_loop
                   | None -> default re1 re2
                   | Some tx -> if tx = NoneType then default re1 re2 else False)
               | Lit Nono, _ | _, Lit Nono -> False
-              | Lit (Bool true), BinOp (e1, FLessThan, e2) -> Less (e1, e2)
+              | Lit (Bool true), BinOp (e1, FLessThan, e2) -> FLess (e1, e2)
               | Lit (Bool false), BinOp (e1, FLessThan, e2) ->
-                  Not (Less (e1, e2))
+                  Not (FLess (e1, e2))
+              | Lit (Bool true), BinOp (e1, ILessThan, e2) -> ILess (e1, e2)
+              | Lit (Bool false), BinOp (e1, ILessThan, e2) ->
+                  Not (ILess (e1, e2))
               (* FPlus theory -> theory? I would not go that far *)
               | le1, le2 when lexpr_is_number le1 && lexpr_is_number le2 ->
                   let success, le1', le2' = Cnum.cut le1 le2 in
@@ -2580,21 +2585,38 @@ let rec reduce_formula_loop
                   then Eq (ls, rs)
                   else default re1 re2
               | _, _ -> default re1 re2)
-      | Less (e1, e2) ->
-          if PFS.mem pfs (LessEq (e2, e1)) then False
-          else if PFS.mem pfs (Less (e2, e1)) then False
+      | FLess (e1, e2) ->
+          if PFS.mem pfs (FLessEq (e2, e1)) then False
+          else if PFS.mem pfs (FLess (e2, e1)) then False
           else
-            let le = Option.get (Formula.to_expr (Less (e1, e2))) in
+            let le = Option.get (Formula.to_expr (FLess (e1, e2))) in
             let re = fe le in
             let result, _ = Option.get (Formula.lift_logic_expr re) in
             result
-      | LessEq (Lit (Int 0), UnOp (LstLen, _)) -> True
-      | LessEq (e1, e2) ->
-          if PFS.mem pfs (LessEq (e2, e1)) then Eq (e1, e2)
-          else if PFS.mem pfs (Less (e1, e2)) then True
-          else if PFS.mem pfs (Less (e2, e1)) then False
+      | ILess (e1, e2) ->
+          if PFS.mem pfs (ILessEq (e2, e1)) then False
+          else if PFS.mem pfs (ILess (e2, e1)) then False
           else
-            let le = Option.get (Formula.to_expr (LessEq (e1, e2))) in
+            let le = Option.get (Formula.to_expr (ILess (e1, e2))) in
+            let re = fe le in
+            let result, _ = Option.get (Formula.lift_logic_expr re) in
+            result
+      | ILessEq (Lit (Int 0), UnOp (LstLen, _)) -> True
+      | FLessEq (e1, e2) ->
+          if PFS.mem pfs (FLessEq (e2, e1)) then Eq (e1, e2)
+          else if PFS.mem pfs (FLess (e1, e2)) then True
+          else if PFS.mem pfs (FLess (e2, e1)) then False
+          else
+            let le = Option.get (Formula.to_expr (FLessEq (e1, e2))) in
+            let re = fe le in
+            let result, _ = Option.get (Formula.lift_logic_expr re) in
+            result
+      | ILessEq (e1, e2) ->
+          if PFS.mem pfs (ILessEq (e2, e1)) then Eq (e1, e2)
+          else if PFS.mem pfs (ILess (e1, e2)) then True
+          else if PFS.mem pfs (ILess (e2, e1)) then False
+          else
+            let le = Option.get (Formula.to_expr (ILessEq (e1, e2))) in
             let re = fe le in
             let result, _ = Option.get (Formula.lift_logic_expr re) in
             result

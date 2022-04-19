@@ -156,8 +156,10 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LTRUE
 %token LFALSE
 %token LEQUAL
-%token LLESSTHAN
-%token LLESSTHANEQUAL
+%token ILLESSTHAN
+%token ILLESSTHANEQUAL
+%token FLLESSTHAN
+%token FLLESSTHANEQUAL
 %token LSLESSTHAN
 %token LEMP
 (*%token LEXISTS *)
@@ -232,7 +234,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %left LAND
 %left separating_conjunction
 %right LNOT
-%nonassoc LEQUAL LLESSTHAN LLESSTHANEQUAL LSLESSTHAN
+%nonassoc LEQUAL ILLESSTHAN ILLESSTHANEQUAL FLLESSTHAN FLLESSTHANEQUAL LSLESSTHAN
 %nonassoc SETMEM SETSUB LSETMEM LSETSUB
 (* Program operators have higher precedence.*)
 (* Based on JavaScript:
@@ -954,12 +956,18 @@ pure_assertion_target:
 (* E == E *)
   | left_expr=expr_target; LEQUAL; right_expr=expr_target
     { Formula.Eq (left_expr, right_expr) }
+(* E i<# E *)
+  | left_expr=expr_target; ILLESSTHAN; right_expr=expr_target
+    { Formula.ILess (left_expr, right_expr) }
 (* E <# E *)
-  | left_expr=expr_target; LLESSTHAN; right_expr=expr_target
-    { Formula.Less (left_expr, right_expr) }
+  | left_expr=expr_target; FLLESSTHAN; right_expr=expr_target
+    { Formula.FLess (left_expr, right_expr) }
+(* E i<=# E *)
+  | left_expr=expr_target; ILLESSTHANEQUAL; right_expr=expr_target
+    { Formula.ILessEq (left_expr, right_expr) }
 (* E <=# E *)
-  | left_expr=expr_target; LLESSTHANEQUAL; right_expr=expr_target
-    { Formula.LessEq (left_expr, right_expr) }
+  | left_expr=expr_target; FLLESSTHANEQUAL; right_expr=expr_target
+    { Formula.FLessEq (left_expr, right_expr) }
 (* E s<# E *)
   | left_expr=expr_target; LSLESSTHAN; right_expr=expr_target
     { Formula.StrLess (left_expr, right_expr) }
