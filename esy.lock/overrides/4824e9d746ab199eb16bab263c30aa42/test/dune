@@ -1,3 +1,0 @@
-(test
-  (name ml_example)
-  (libraries z3))

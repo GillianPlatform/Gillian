@@ -6,6 +6,8 @@ module L = Logging
 
 type t = (string, Type.t) Hashtbl.t [@@deriving yojson]
 
+let as_hashtbl x = x
+
 (*************************************)
 (** Typing Environment Functions    **)
 
@@ -54,8 +56,7 @@ let get_vars_of_type (x : t) (tt : Type.t) : string list =
     x []
 
 (* Get all var-type pairs as a list *)
-let get_var_type_pairs (x : t) : (string * Type.t) list =
-  Hashtbl.fold (fun var t ac_vars -> (var, t) :: ac_vars) x []
+let get_var_type_pairs (x : t) : (string * Type.t) Seq.t = Hashtbl.to_seq x
 
 (* Iteration *)
 let iter (x : t) (f : string -> Type.t -> unit) : unit = Hashtbl.iter f x
