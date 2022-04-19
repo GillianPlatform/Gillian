@@ -2,32 +2,32 @@
 
 proc i__strcmp(str1, str2) {
           goto [((typeOf str1) = List) and ((typeOf str2) = List) and
-                ((typeOf (l-nth(str1, 0.))) = Obj) and ((typeOf (l-nth(str2, 0.))) = Obj)]
+                ((typeOf (l-nth(str1, 0i))) = Obj) and ((typeOf (l-nth(str2, 0i))) = Obj)]
                 ctn die; (* Check that we have pointers *)
-    ctn:  i := 0;
-    loop: char1_ar := [mem_load]("int8signed", l-nth(str1, 0.), l-nth(str1, 1.) + i);
-          char2_ar := [mem_load]("int8signed", l-nth(str2, 0.), l-nth(str2, 1.) + i);
-          char1 := l-nth(char1_ar, 0.);
-          char2 := l-nth(char2_ar, 0.);
-          goto [ (char1 = {{ "int", 0. }}) and (char2 = {{ "int", 0. }}) ] end ctnl;
-    ctnl: goto [ l-nth(char1, 1.) = l-nth(char2, 1.) ] eq neq;
-    neq:  ret := {{ "int", l-nth(char1, 1.) - l-nth(char2, 1.) }};
+    ctn:  i := 0i;
+    loop: char1_ar := [mem_load]("int8signed", l-nth(str1, 0i), l-nth(str1, 1i) + i);
+          char2_ar := [mem_load]("int8signed", l-nth(str2, 0i), l-nth(str2, 1i) + i);
+          char1 := l-nth(char1_ar, 0i);
+          char2 := l-nth(char2_ar, 0i);
+          goto [ (char1 = {{ "int", 0i }}) and (char2 = {{ "int", 0i }}) ] end ctnl;
+    ctnl: goto [ l-nth(char1, 1i) = l-nth(char2, 1i) ] eq neq;
+    neq:  ret := {{ "int", l-nth(char1, 1i) - l-nth(char2, 1i) }};
           return;
-    eq:   i := i + 1;
+    eq:   i := i i+ 1i;
           goto loop;
-    end:  ret := {{ "int", 0. }};
+    end:  ret := {{ "int", 0i }};
           return;
     die:  fail[TypeError](str1, str2)
 };
 
 proc i__strlen(str) {
-          goto [((typeOf str) = List) and ((typeOf (l-nth(str, 0.))) = Obj)]
+          goto [((typeOf str) = List) and ((typeOf (l-nth(str, 0i))) = Obj)]
                 ctn die; (* Check that we have pointers *)
-    ctn:  i := 0;
-    loop: char_v := [mem_load]("int8signed", l-nth(str, 0.), l-nth(str, 1.) + i);
-          char := l-nth(char_v, 0.);
-          goto [ (char = {{ "int", 0. }}) ] end ctnl;
-    ctnl: i := i + 1;
+    ctn:  i := 0i;
+    loop: char_v := [mem_load]("int8signed", l-nth(str, 0i), l-nth(str, 1i) i+ i);
+          char := l-nth(char_v, 0i);
+          goto [ (char = {{ "int", 0i }}) ] end ctnl;
+    ctnl: i := i i+ 1;
           goto loop;
     end:  ret := {{ "long", i }};
           return;
@@ -36,14 +36,14 @@ proc i__strlen(str) {
 
 proc i__strcpy(str1, str2) {
           goto [((typeOf str1) = List) and ((typeOf str2) = List) and
-                ((typeOf (l-nth(str1, 0.))) = Obj) and ((typeOf (l-nth(str2, 0.))) = Obj)]
+                ((typeOf (l-nth(str1, 0i))) = Obj) and ((typeOf (l-nth(str2, 0i))) = Obj)]
                 ctn die; (* Check that we have pointers *)
-    ctn:  i := 0;
-    loop: char2_ar := [mem_load]("int8signed", l-nth(str2, 0.), l-nth(str2, 1.) + i);
-          char2 := l-nth(char2_ar, 0.);
-          u := [mem_store]("int8signed", l-nth(str1, 0.), l-nth(str1, 1.) + i, char2);
-          goto [ (char2 = {{ "int", 0. }}) ] end ctnl;
-    ctnl: i := i + 1;
+    ctn:  i := 0i;
+    loop: char2_ar := [mem_load]("int8signed", l-nth(str2, 0i), l-nth(str2, 1i) + i);
+          char2 := l-nth(char2_ar, 0i);
+          u := [mem_store]("int8signed", l-nth(str1, 0i), l-nth(str1, 1i) + i, char2);
+          goto [ (char2 = {{ "int", 0i }}) ] end ctnl;
+    ctnl: i := i i+ 1i;
           goto loop;
     end:  ret := str1;
           return;

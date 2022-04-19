@@ -4,8 +4,8 @@ val true_name : Compcert.Camlcoq.P.t -> string
 
 (** {3 Z and floats} *)
 
-val z_of_float : float -> Compcert.Camlcoq.Z.t
-val float_of_z : Compcert.Camlcoq.Z.t -> float
+val z_of_int : int -> Compcert.Camlcoq.Z.t
+val int_of_z : Compcert.Camlcoq.Z.t -> int
 
 (** {3 Memory chunk serialization} *)
 
@@ -19,8 +19,8 @@ val gil_of_compcert : Compcert.Values.coq_val -> Gillian.Gil_syntax.Literal.t
 
 (** {3 Size serialization} *)
 
-val compcert_size_of_gil : float -> Compcert.Camlcoq.Z.t
-val gil_size_of_compcert : Compcert.Camlcoq.Z.t -> float
+val compcert_size_of_gil : int -> Compcert.Camlcoq.Z.t
+val gil_size_of_compcert : Compcert.Camlcoq.Z.t -> int
 
 (** {3 Block serialization} *)
 

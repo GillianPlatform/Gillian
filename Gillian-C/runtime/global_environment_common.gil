@@ -10,14 +10,14 @@ pred i__glob_var_unallocated_loc(+symb, loc, +vname):
 
 proc i__get_function_name(v_ptr) {
          (* The value given should be a pointer *)
-         goto [not (typeOf (l-nth (v_ptr, 0.)) = Obj)] fail1 ctn1;
+         goto [not (typeOf (l-nth (v_ptr, 0i)) = Obj)] fail1 ctn1;
   fail1: fail[functionCall]();
-         (* The offset for a pointer to a function should always be 0 *)
-  ctn1:  goto [not ((l-nth (v_ptr, 1.)) = 0.)] fail2 ctn2;
+         (* The offset for a pointer to a function should always be 0i *)
+  ctn1:  goto [not ((l-nth (v_ptr, 1i)) = 0i)] fail2 ctn2;
   fail2: fail[functionCall]();
-  ctn2:  defl := [genv_getdef](l-nth(v_ptr, 0.));
-         typ := l-nth(l-nth(defl, 1.), 0.);
-         val := l-nth(l-nth(defl, 1.), 1.);
+  ctn2:  defl := [genv_getdef](l-nth(v_ptr, 0i));
+         typ := l-nth(l-nth(defl, 1i), 0i);
+         val := l-nth(l-nth(defl, 1i), 1i);
          goto [not (typ = "function")] fail3 ctn3;
   fail3: fail[functionCall]();
   ctn3:  ret := val;
@@ -25,9 +25,9 @@ proc i__get_function_name(v_ptr) {
 };
 
 proc i__glob_set_fun(symb, fname) {
-      ll := [mem_alloc](0, 1);
-      l := l-nth(ll, 0.);
-      u := [mem_dropperm](l, 0, 1, "Nonempty");
+      ll := [mem_alloc](0i, 1i);
+      l := l-nth(ll, 0i);
+      u := [mem_dropperm](l, 0i, 1i, "Nonempty");
       u := [genv_setsymbol](symb, l);
       u := [genv_setdef](l, {{ "function", fname }});
       ret := null;
@@ -35,11 +35,11 @@ proc i__glob_set_fun(symb, fname) {
 };
 
 proc i__glob_set_var(symb, vname, size, init_data_list, permission) {
-      ll := [mem_alloc](0, size);
-      l := l-nth(ll, 0);
+      ll := [mem_alloc](0i, size);
+      l := l-nth(ll, 0i);
       u := "i__store_zeros"(l, size);
       u := "i__store_init_data_list"(l, init_data_list);
-      u := [mem_dropperm](l, 0, size, permission);
+      u := [mem_dropperm](l, 0i, size, permission);
       u := [genv_setsymbol](symb, l);
       u := [genv_setdef](l, {{ "variable", vname }});
       ret := null;
@@ -47,81 +47,81 @@ proc i__glob_set_var(symb, vname, size, init_data_list, permission) {
 };
 
 proc i__store_zeros(b, sz) {
-  u := "i__store_zeros_aux"(b, 0, sz);
+  u := "i__store_zeros_aux"(b, 0i, sz);
   ret := null;
   return
 };
 
 proc i__store_zeros_aux(b, curr, sz) {
-  loop: goto [curr < sz] ctn end;
-  ctn:  u := [mem_store]("int8unsigned", b, curr, {{ "int", 0 }});
-        curr := curr + 1;
+  loop: goto [curr i< sz] ctn end;
+  ctn:  u := [mem_store]("int8unsigned", b, curr, {{ "int", 0i }});
+        curr := curr i+ 1i;
         goto loop;
   end:  ret := null;
         return
 };
 
 proc i__store_init_data_list(b, init_data_list) {
-        curr_ofs := 0;
+        curr_ofs := 0i;
   loop: goto [init_data_list = nil] end ctn;
   ctn:  curr := car init_data_list;
         init_data_list := cdr init_data_list;
         u := "i__store_init_data"(b, curr_ofs, curr);
         sz := "i__init_data_size"(curr);
-        curr_ofs := curr_ofs + sz;
+        curr_ofs := curr_ofs i+ sz;
         goto loop;
   end:  ret := null;
         return
 };
 
 proc i__store_init_data(b, ofs, init_data) {
-            constr := l-nth(init_data, 0);
+            constr := l-nth(init_data, 0i);
             goto [ constr = "space" ] end not_spc;
    not_spc: goto [ constr = "addrof" ] addrof numb;
-   addrof:  u := "i__store_init_addrof"(l-nth(init_data, 1), l-nth(init_data, 2));
+   addrof:  u := "i__store_init_addrof"(l-nth(init_data, 1i), l-nth(init_data, 2i));
    numb:    chk_val := "i__chunk_and_value_of_num_init_data"(init_data);
-            u := [mem_store](l-nth(chk_val, 0), b, ofs, l-nth(chk_val, 1));
+            u := [mem_store](l-nth(chk_val, 0i), b, ofs, l-nth(chk_val, 1i));
    end:     ret := null;
             return
 };
 
 proc i__init_data_size(init_data) {
-            constr := l-nth(init_data, 0);
+            constr := l-nth(init_data, 0i);
             goto [ constr = "int8" ] int8 next_0;
-   int8:    ret := 1;
+   int8:    ret := 1i;
             return;
    next_0:  goto [ constr = "int16" ] int16 next_1;
-   int16:   ret := 2;
+   int16:   ret := 2i;
             return;
    next_1:  goto [ constr = "int32" ] int32 next_2;
-   int32:   ret := 4;
+   int32:   ret := 4i;
             return;
    next_2:  goto [ constr = "int64" ] int64 next_3;
-   int64:   ret := 8;
+   int64:   ret := 8i;
             return;
    next_3:  goto [ constr = "float32" ] fl32 next_4;
-   fl32:    ret := 4;
+   fl32:    ret := 4i;
             return;
    next_4:  goto [ constr = "float64" ] fl64 next_5;
-   fl64:    ret := 8;
+   fl64:    ret := 8i;
             return;
    next_5:  goto [ constr = "addrof" ] adof next_6;
    adof:    ret := i__size_ptr();
             return;
    next_6:  goto [ constr = "space" ] spce end_f;
-   spce:    n := l-nth(init_data, 1);
-            goto [ n > 0 ] retn ret0;
+   spce:    n := l-nth(init_data, 1i);
+            goto [ 0i i< n ] retn ret0;
    retn:    ret := n;
             return;
-   ret0:    ret := 0;
+   ret0:    ret := 0i;
             return;
    end_f:   ret := "Invalid init_data";
             fail[Init_data](ret)
 };
 
 proc i__chunk_and_value_of_num_init_data(init_data) {
-            constr := l-nth(init_data, 0);
-            value := l-nth(init_data, 1);
+            constr := l-nth(init_data, 0i);
+            value := l-nth(init_data, 1i);
             goto [ constr = "int8" ] int8 next_0;
    int8:    ret := {{ "int8unsigned", {{ "int", value }} }};
             return;
@@ -147,7 +147,7 @@ proc i__chunk_and_value_of_num_init_data(init_data) {
 proc i__store_init_addrof(sym, o_to_store, b, ofs) {
   chk := "i__ptr_chunk"();
   ll := [genv_getsymbol](sym);
-  l := l-nth(ll, 1);
+  l := l-nth(ll, 1i);
   ptr := {{ l, o_to_store }};
   u := [mem_store](chk, b, ofs, ptr);
   ret := null;

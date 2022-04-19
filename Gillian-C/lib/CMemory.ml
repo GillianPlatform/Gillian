@@ -36,11 +36,11 @@ let ga_to_deleter = LActions.ga_to_deleter_str
 let execute_store heap params =
   let open Gillian.Gil_syntax.Literal in
   match params with
-  | [ String chunk_name; Loc loc; Num ofs; value ] -> (
+  | [ String chunk_name; Loc loc; Int ofs; value ] -> (
       let compcert_val = ValueTranslation.compcert_of_gil value in
       let chunk = ValueTranslation.chunk_of_string chunk_name in
       let block = ValueTranslation.block_of_loc_name loc in
-      let z_ofs = Compcert.Camlcoq.Z.of_sint (int_of_float ofs) in
+      let z_ofs = Compcert.Camlcoq.Z.of_sint ofs in
       let res = Mem.store chunk heap.mem block z_ofs compcert_val in
       match res with
       | Some mem -> ASucc ({ heap with mem }, [])
@@ -49,9 +49,9 @@ let execute_store heap params =
 
 let execute_load heap params =
   match params with
-  | [ Literal.String chunk_name; Loc loc_name; Num offset ] -> (
+  | [ Literal.String chunk_name; Loc loc_name; Int offset ] -> (
       let compcert_chunk = ValueTranslation.chunk_of_string chunk_name in
-      let z_offset = ValueTranslation.z_of_float offset in
+      let z_offset = ValueTranslation.z_of_int offset in
       let block = ValueTranslation.block_of_loc_name loc_name in
       let res = Mem.load compcert_chunk heap.mem block z_offset in
       match res with
@@ -63,26 +63,26 @@ let execute_load heap params =
 
 let execute_move heap params =
   match params with
-  | [ Literal.Loc loc_1; Num ofs_1; Loc loc_2; Num ofs_2; Num size ] -> (
+  | [ Literal.Loc loc_1; Int ofs_1; Loc loc_2; Int ofs_2; Int size ] -> (
       let block_1, block_2 =
         ValueTranslation.(block_of_loc_name loc_1, block_of_loc_name loc_2)
       in
       let z_ofs_1, z_ofs_2 =
-        ValueTranslation.(z_of_float ofs_1, z_of_float ofs_2)
+        ValueTranslation.(z_of_int ofs_1, z_of_int ofs_2)
       in
-      let z_size = ValueTranslation.z_of_float size in
+      let z_size = ValueTranslation.z_of_int size in
       match Mem.loadbytes heap.mem block_2 z_ofs_2 z_size with
       | None -> AFail []
       | Some lmemval -> (
           match Mem.storebytes heap.mem block_1 z_ofs_1 lmemval with
           | None -> AFail []
-          | Some mem -> ASucc ({ heap with mem }, [ Loc loc_1; Num ofs_1 ])))
+          | Some mem -> ASucc ({ heap with mem }, [ Loc loc_1; Int ofs_1 ])))
   | _ -> failwith "invalid call to move"
 
 let execute_free heap params =
   match params with
-  | [ Literal.Loc loc_name; Num low; Num high ] -> (
-      let z_low, z_high = ValueTranslation.(z_of_float low, z_of_float high) in
+  | [ Literal.Loc loc_name; Int low; Int high ] -> (
+      let z_low, z_high = ValueTranslation.(z_of_int low, z_of_int high) in
       let block = ValueTranslation.block_of_loc_name loc_name in
       let res = Mem.free heap.mem block z_low z_high in
       match res with
@@ -93,8 +93,8 @@ let execute_free heap params =
 let execute_alloc heap params =
   let mem = heap.mem in
   match params with
-  | [ Literal.Num low; Literal.Num high ] ->
-      let z_low, z_high = ValueTranslation.(z_of_float low, z_of_float high) in
+  | [ Literal.Int low; Literal.Int high ] ->
+      let z_low, z_high = ValueTranslation.(z_of_int low, z_of_int high) in
       let memout, block = Mem.alloc mem z_low z_high in
       let ocaml_block = ValueTranslation.loc_name_of_block block in
       ASucc ({ heap with mem = memout }, [ Literal.Loc ocaml_block ])
@@ -103,8 +103,8 @@ let execute_alloc heap params =
 let execute_weak_valid_pointer heap params =
   let open Gillian.Gil_syntax.Literal in
   match params with
-  | [ Loc loc_name; Num offs ] ->
-      let z_offs = ValueTranslation.z_of_float offs in
+  | [ Loc loc_name; Int offs ] ->
+      let z_offs = ValueTranslation.z_of_int offs in
       let block = ValueTranslation.block_of_loc_name loc_name in
       let res = Mem.weak_valid_pointer heap.mem block z_offs in
       ASucc (heap, [ Bool res ])
@@ -113,8 +113,8 @@ let execute_weak_valid_pointer heap params =
 let execute_getcurperm heap params =
   let open Gillian.Gil_syntax.Literal in
   match params with
-  | [ Loc loc_name; Num offs ] ->
-      let z_offs = ValueTranslation.z_of_float offs in
+  | [ Loc loc_name; Int offs ] ->
+      let z_offs = ValueTranslation.z_of_int offs in
       let block = ValueTranslation.block_of_loc_name loc_name in
       let perm_f = Compcert.Maps.PMap.get block heap.mem.mem_access in
       let perm_opt = perm_f z_offs Compcert.Memtype.Cur in
@@ -125,8 +125,8 @@ let execute_getcurperm heap params =
 let execute_drop_perm heap params =
   let open Gillian.Gil_syntax.Literal in
   match params with
-  | [ Loc loc_name; Num low; Num high; String perm ] -> (
-      let z_low, z_high = ValueTranslation.(z_of_float low, z_of_float high) in
+  | [ Loc loc_name; Int low; Int high; String perm ] -> (
+      let z_low, z_high = ValueTranslation.(z_of_int low, z_of_int high) in
       let compcert_perm = ValueTranslation.permission_of_string perm in
       let block = ValueTranslation.block_of_loc_name loc_name in
       let res = Mem.drop_perm heap.mem block z_low z_high compcert_perm in

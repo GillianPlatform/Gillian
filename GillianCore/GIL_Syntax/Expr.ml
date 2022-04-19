@@ -110,6 +110,11 @@ let fmod a b =
   | Lit (Num a), Lit (Num b) -> Lit (Num (mod_float a b))
   | _ -> BinOp (a, FMod, b)
 
+let imod a b =
+  match (a, b) with
+  | Lit (Int a), Lit (Int b) -> Lit (Int (a mod b))
+  | _ -> BinOp (a, IMod, b)
+
 let type_ t = Lit (Type t)
 
 module Infix = struct

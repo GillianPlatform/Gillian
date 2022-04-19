@@ -232,6 +232,7 @@ module Expr : sig
   val list_cat : t -> t -> t
   val typeof : t -> t
   val fmod : t -> t -> t
+  val imod : t -> t -> t
 
   module Infix : sig
     val ( +. ) : t -> t -> t

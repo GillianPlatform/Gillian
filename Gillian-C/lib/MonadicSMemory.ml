@@ -184,7 +184,7 @@ module Mem = struct
     let** loc_name = resolve_loc_result loc in
     let last_op = LastOp.GetArray (loc_name, ofs, size, chunk) in
     let open Formula.Infix in
-    if%sat size #<= (Expr.num 0.) then
+    if%sat size #<= (Expr.int 0) then
       DR.ok
         ( make ~last_op map,
           loc_name,
@@ -200,7 +200,7 @@ module Mem = struct
   let set_array { map; _ } loc ofs size chunk array perm =
     let open DR.Syntax in
     let open Formula.Infix in
-    if%sat size #<= (Expr.num 0.) then DR.ok (make_other map)
+    if%sat size #<= (Expr.int 0) then DR.ok (make_other map)
     else
       let* loc_name = resolve_or_create_loc_name loc in
       let* tree = get_or_create_tree map loc_name in
@@ -347,7 +347,7 @@ module Mem = struct
   let move { map; _ } dst_loc dst_ofs src_loc src_ofs sz =
     let open DR.Syntax in
     let open Formula.Infix in
-    if%sat sz #== (Expr.num 0.) then DR.ok (make_other map)
+    if%sat sz #== (Expr.int 0) then DR.ok (make_other map)
     else
       let** dst_loc_name = resolve_loc_result dst_loc in
       let** src_loc_name = resolve_loc_result src_loc in

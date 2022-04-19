@@ -28,7 +28,7 @@ module Expectations = struct
   let return_value_is_zero ret _ =
     let open Gillian.Gil_syntax.Literal in
     match ret with
-    | LList [ String "int"; Num 0. ] -> true
+    | LList [ String "int"; Int 0 ] -> true
     | _ -> false
 
   let expectation (expect : matcher) _ outcome =

@@ -3,10 +3,10 @@
 (* Type testers *)
 
 pred i__is_int (e: List):
-  (e == {{ "int", #k }}) * types(#k : Num);
+  (e == {{ "int", #k }}) * types(#k : Int);
 
 pred i__is_long (e: List):
-  (e == {{ "long", #k }}) * types(#k : Num);
+  (e == {{ "long", #k }}) * types(#k : Int);
 
 pred i__is_single (e: List):
   (e == {{ "single", #k }}) * types(#k : Num);
@@ -15,19 +15,19 @@ pred i__is_float (e: List):
   (e == {{ "float", #k }}) * types(#k : Num);
 
 pred i__is_ptr_to_0 (e: List):
-  (e == {{ #loc, 0. }}) *
+  (e == {{ #loc, 0i }}) *
   types(#loc : Obj);
 
 pred i__is_ptr (e: List):
   (e == {{ #loc, #ofs }}) *
-  types(#loc : Obj, #ofs : Num);
+  types(#loc : Obj, #ofs : Int);
 
 (* Actual value getters *)
 
-pred i__int (+e: List, k : Num):
+pred i__int (+e: List, k : Int):
   (e == {{ "int", k }});
 
-pred i__long (+e: List, k : Num):
+pred i__long (+e: List, k : Int):
   (e == {{ "long", k }});
 
 pred i__single (+e: List, k : Num):
@@ -37,30 +37,30 @@ pred i__float (+e: List, k : Num):
   (e == {{ "float", k }});
 
 pred i__ptr_to_0 (+e : List, l : Obj):
-  (e == {{ l, 0. }});
+  (e == {{ l, 0i }});
 
-pred i__ptr (+e: List, l: Obj, o: Num):
+pred i__ptr (+e: List, l: Obj, o: Int):
   (e == {{ l, o }});
 
 (* arrays *)
 
-pred i__zeros_ptr_size(+ptr: List, +size: Num):
+pred i__zeros_ptr_size(+ptr: List, +size: Int):
   i__ptr(ptr, #l, #o) *
-  <mem_zeros>(#l, #o, #o + size; "Freeable");
+  <mem_zeros>(#l, #o, #o i+ size; "Freeable");
 
-pred i__undefs_ptr_size(+ptr: List, +size: Num):
+pred i__undefs_ptr_size(+ptr: List, +size: Int):
   i__ptr(ptr, #l, #o) *
-  <mem_hole>(#l, #o, #o + size; "Freeable");
+  <mem_hole>(#l, #o, #o i+ size; "Freeable");
 
-pred i__array_ptr(+ptr: List, +size: Num, +chk: Str, content: List):
-  i__ptr(ptr, #l, #o) * (size == l-len content) * (0 <=# size) *
+pred i__array_ptr(+ptr: List, +size: Int, +chk: Str, content: List):
+  i__ptr(ptr, #l, #o) * (size == l-len content) * (0i i<=# size) *
   <mem_array>(#l, #o, size, chk; content, "Freeable");
 
 (* Pointer arithmetic *)
 
-pred i__ptr_add(+ptr: List, +to_add:Num, res: List):
+pred i__ptr_add(+ptr: List, +to_add:Int, res: List):
   i__ptr(ptr, #l, #o) *
-  (res == {{ #l, #o + to_add }});
+  (res == {{ #l, #o i+ to_add }});
 
 (* Global environment *)
 

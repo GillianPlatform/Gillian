@@ -364,6 +364,10 @@ expr_target:
       { Expr.BinOp (e2, FLessThan, e1) }
   | e1=expr_target; FGE; e2=expr_target
       { Expr.BinOp (e2, FLessThanEqual, e1) }
+  | e1=expr_target; IGT; e2=expr_target
+      { Expr.BinOp (e2, ILessThan, e1) }
+  | e1=expr_target; IGE; e2=expr_target
+      { Expr.BinOp (e2, ILessThanEqual, e1) }
 (* unop e *)
     | uop=unop_target; e=expr_target
      { Expr.UnOp (uop, e) } %prec unop_prec

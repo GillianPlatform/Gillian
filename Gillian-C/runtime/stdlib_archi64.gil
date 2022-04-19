@@ -1,57 +1,57 @@
 #internal
 
 proc i__alloc_size(vsz) {
-          goto [ l-nth(vsz, 0.) = "long" ] long oth;
-    long: ret := l-nth(vsz, 1.);
+          goto [ l-nth(vsz, 0i) = "long" ] long oth;
+    long: ret := l-nth(vsz, 1i);
           return;
     oth:  fail[architecture]("This is a 32bits pointer in a 64bits architecture")
 };
 
 proc i__malloc(vsz) {
       sz := "i__alloc_size"(vsz);
-      bl := [mem_alloc](-8, sz);
-      b := l-nth(bl, 0.);
-      u := [mem_store]("int64", b, -8, vsz);
-      ret := {{ b, 0. }};
+      bl := [mem_alloc](-8i, sz);
+      b := l-nth(bl, 0i);
+      u := [mem_store]("int64", b, -8i, vsz);
+      ret := {{ b, 0i }};
       return
 };
 
 proc i__init_to_zero(b, curr, max) {
            goto [curr = max] end ctn;
-      ctn: u := [mem_store] ("int8unsigned", b, curr, {{ "int", 0. }});
-           u := "i__init_to_zero"(b, curr + 1., max);
+      ctn: u := [mem_store] ("int8unsigned", b, curr, {{ "int", 0i }});
+           u := "i__init_to_zero"(b, curr i+ 1i, max);
       end: ret := undefined;
            return
 };
 
 proc i__free(ptr) {
-         vszl := [mem_load]("int64", l-nth(ptr, 0.), l-nth(ptr, 1.) - 8); (* 8 is size_chunk of "int64" *)
-         sz := "i__alloc_size"(l-nth(vszl, 0.));
-         goto [ sz < 0 ] die ctn;
+         vszl := [mem_load]("int64", l-nth(ptr, 0i), l-nth(ptr, 1i) i- 8i); (* 8 is size_chunk of "int64" *)
+         sz := "i__alloc_size"(l-nth(vszl, 0i));
+         goto [ sz i< 0i ] die ctn;
    die:  fail[free]("Deallocating a pointer of negative size");
-   ctn:  u := [mem_free](l-nth(ptr, 0.), l-nth(ptr, 1.) - 8, l-nth(ptr, 1.) + sz);
+   ctn:  u := [mem_free](l-nth(ptr, 0i), l-nth(ptr, 1i) i- 8i, l-nth(ptr, 1i) i+ sz);
          ret := undefined;
          return
 };
 
 proc i__memmove(ptr1, ptr2, vsz) {
       n := "i__alloc_size"(vsz);
-      ret := [mem_move](l-nth(ptr1, 0.), l-nth(ptr1, 1.), l-nth(ptr2, 0.), l-nth(ptr2, 1.), n);
+      ret := [mem_move](l-nth(ptr1, 0i), l-nth(ptr1, 1i), l-nth(ptr2, 0i), l-nth(ptr2, 1i), n);
       return
 };
 
 proc i__memcpy(ptr1, ptr2, vsz) {
       n := "i__alloc_size"(vsz);
-      ret := [mem_move](l-nth(ptr1, 0.), l-nth(ptr1, 1.), l-nth(ptr2, 0.), l-nth(ptr2, 1.), n);
+      ret := [mem_move](l-nth(ptr1, 0i), l-nth(ptr1, 1i), l-nth(ptr2, 0i), l-nth(ptr2, 1i), n);
       return
 };
 
 proc i__memset(ptr, vc, vsz) {
             n := "i__alloc_size"(vsz);
-            n := n - 1;
-      loop: goto [not (n < 0)] ctn end;
-      ctn:  u := [mem_store]("int8unsigned", l-nth(ptr, 0.), l-nth(ptr, 1.) + n, vc);
-            n := n - 1;
+            n := n i- 1i;
+      loop: goto [not (n i< 0i)] ctn end;
+      ctn:  u := [mem_store]("int8unsigned", l-nth(ptr, 0i), l-nth(ptr, 1i) + n, vc);
+            n := n i- 1i;
             goto loop;
       end:  ret := ptr;
             return

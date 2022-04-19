@@ -68,13 +68,13 @@ module Range = struct
 
   let of_low_and_chunk low chunk =
     let open Expr.Infix in
-    let len = Expr.num (float_of_int (Chunk.size chunk)) in
-    (low, low +. len)
+    let len = Expr.int (Chunk.size chunk) in
+    (low, low + len)
 
   let of_low_chunk_and_size low chunk size =
     let open Expr.Infix in
-    let sz_chunk = Expr.num (float_of_int (Chunk.size chunk)) in
-    (low, low +. (sz_chunk *. size))
+    let sz_chunk = Expr.int (Chunk.size chunk) in
+    (low, low + (sz_chunk * size))
 
   let is_equal (la, ha) (lb, hb) =
     let open Formula.Infix in
@@ -84,7 +84,7 @@ module Range = struct
     let open Formula.Infix in
     lb #<= la #&& (ha #<= hb)
 
-  let size (a, b) = Expr.Infix.( -. ) b a
+  let size (a, b) = Expr.Infix.( - ) b a
 
   let point_strictly_inside x (l, h) =
     let open Formula.Infix in
@@ -225,10 +225,10 @@ module Node = struct
               | Some value -> mk (Single { chunk; value })
               | None -> mk (Array { chunk; values })
             in
-            let sz = Expr.num (float_of_int (Chunk.size chunk)) in
-            let len_left = (at -. low) /. sz in
-            let len_right = (high -. at) /. sz in
-            let left_arr = SVArr.array_sub values (Expr.num 0.) len_left in
+            let sz = Expr.int (Chunk.size chunk) in
+            let len_left = (at - low) / sz in
+            let len_right = (high - at) / sz in
+            let left_arr = SVArr.array_sub values (Expr.int 0) len_left in
             let right_arr = SVArr.array_sub values len_left len_right in
             let* left = mk_arr ~chunk left_arr in
             let+ right = mk_arr ~chunk right_arr in
@@ -281,7 +281,7 @@ module Node = struct
             let size_l, size_r =
               let open Expr.Infix in
               let size_chunk = Chunk.size_expr chunk_l in
-              (size_a /. size_chunk, size_b /. size_chunk)
+              (size_a / size_chunk, size_b / size_chunk)
             in
             Delayed.map
               (SVArr.concat_knowing_size (values_l, size_l) (values_r, size_r))
@@ -290,7 +290,7 @@ module Node = struct
             let size_l, size_r =
               let open Expr.Infix in
               let size_chunk = Chunk.size_expr chunk in
-              (size_a /. size_chunk, size_b /. size_chunk)
+              (size_a / size_chunk, size_b / size_chunk)
             in
             Delayed.map
               (SVArr.concat_knowing_size (values, size_l) (AllUndef, size_r))
@@ -299,7 +299,7 @@ module Node = struct
             let size_l, size_r =
               let open Expr.Infix in
               let size_chunk = Chunk.size_expr chunk in
-              (size_a /. size_chunk, size_b /. size_chunk)
+              (size_a / size_chunk, size_b / size_chunk)
             in
             Delayed.map
               (SVArr.concat_knowing_size (values, size_l) (AllZeros, size_r))
@@ -308,7 +308,7 @@ module Node = struct
             let size_l, size_r =
               let open Expr.Infix in
               let size_chunk = Chunk.size_expr chunk in
-              (size_a /. size_chunk, size_b /. size_chunk)
+              (size_a / size_chunk, size_b / size_chunk)
             in
             Delayed.map
               (SVArr.concat_knowing_size (AllUndef, size_r) (values, size_l))
@@ -317,7 +317,7 @@ module Node = struct
             let size_l, size_r =
               let open Expr.Infix in
               let size_chunk = Chunk.size_expr chunk in
-              (size_a /. size_chunk, size_b /. size_chunk)
+              (size_a / size_chunk, size_b / size_chunk)
             in
             Delayed.map
               (SVArr.concat_knowing_size (AllZeros, size_r) (values, size_l))
@@ -330,18 +330,17 @@ module Node = struct
     match values with
     | AllZeros -> Delayed.return (SVal.zero_of_chunk chunk)
     | Arr e ->
-        let two_pow_8 i = Float.pow 2. (8. *. float_of_int i) in
-        let size_float = float_of_int size in
+        let two_pow_8 i = Int.shift_left 1 (8 * i) in
         let open Expr.Infix in
         let open Formula.Infix in
         (* FIXME: This assumes big endian *)
-        if%sat (Expr.list_length e) #== (Expr.num size_float) then
+        if%sat (Expr.list_length e) #== (Expr.int size) then
           let bytes = List.init size (fun i -> Expr.list_nth e i) in
           let _, v =
             List.fold_left
               (fun (i, acc) v ->
-                (Int.pred i, (v *. Expr.num (two_pow_8 i)) +. acc))
-              (Int.pred size, Expr.num 0.)
+                (Int.pred i, (v * Expr.int (two_pow_8 i)) + acc))
+              (Int.pred size, Expr.int 0)
               bytes
           in
           let learned =
@@ -349,7 +348,7 @@ module Node = struct
               (function
                 | Expr.Lit Undefined -> None
                 | byte ->
-                    Some byte #>= (Expr.num 0.) #&& (byte #<= (Expr.num 255.)))
+                    Some byte #>= (Expr.int 0) #&& (byte #<= (Expr.int 255)))
               bytes
           in
           let* v = SVal.of_chunk_and_expr chunk v in
@@ -392,9 +391,9 @@ module Node = struct
           | AllZeros -> DR.ok (SVal.zero_of_chunk chunk, exact_perm)
           | Arr (EList [ a ]) -> (
               let obj = SVal.Patterns.obj in
-              let number = SVal.Patterns.number in
+              let integer = SVal.Patterns.integer in
               match%ent a with
-              | number ->
+              | integer ->
                   let v =
                     if Compcert.Archi.ptr64 then SVal.SVlong a else SVal.SVint a
                   in
@@ -422,7 +421,7 @@ module Node = struct
       | SVArr.AllUndef -> List.init amount (fun _ -> SVArr.AllUndef)
       | AllZeros -> List.init amount (fun _ -> SVArr.AllZeros)
       | Arr e ->
-          let i f = Expr.num (float_of_int f) in
+          let i f = Expr.int f in
           List.init amount (fun k ->
               let values =
                 Expr.list_sub ~lst:e ~start:(i (k * size)) ~size:(i size)
@@ -460,8 +459,7 @@ module Node = struct
         { mem_val = Array { chunk = Mint8unsigned; values }; exact_perm; _ }
       when Chunk.equal chunk Mint64 -> (
         match size with
-        | Expr.Lit (Num n) ->
-            let amount = int_of_float n in
+        | Expr.Lit (Int amount) ->
             let+ arr =
               decode_several_unsigned_ints_of_bytes ~amount ~chunk values
             in
@@ -552,7 +550,7 @@ module Tree = struct
     let open Expr.Infix in
     let reduce e = Engine.Reduction.reduce_lexpr e in
     let l, h = t.span in
-    let span = (start, reduce (start +. h -. l)) in
+    let span = (start, reduce (start + h - l)) in
     let children =
       Option.map
         (fun (left, right) ->
@@ -927,7 +925,7 @@ module Tree = struct
   let get_perm_at (tree : t) (ofs : Expr.t) : (Perm.t, err) DR.t =
     let range =
       let open Expr.Infix in
-      (ofs, ofs +. Expr.num 1.)
+      (ofs, ofs + Expr.int 1)
     in
     let { span; _ } = tree in
     let rec rec_call treep =
@@ -949,7 +947,7 @@ module Tree = struct
     match at_ofs with
     | Ok p when p >=% Nonempty -> DR.ok true
     | _ ->
-        let+ at_ofs_minus_one = get_perm_at tree (ofs -. Expr.num 1.) in
+        let+ at_ofs_minus_one = get_perm_at tree (ofs - Expr.int 1) in
         at_ofs_minus_one |> Result.map (fun p -> p >=% Nonempty)
 
   let drop_perm (t : t) (low : Expr.t) (high : Expr.t) (perm : Perm.t) :
@@ -1009,7 +1007,7 @@ module Tree = struct
         let chksize = Chunk.size_expr chunk in
         let total_size =
           let open Expr.Infix in
-          (high -. low) /. chksize
+          (high - low) / chksize
         in
         match values with
         | AllUndef -> [ CoreP.hole ~loc ~low ~high ~perm ]
@@ -1113,7 +1111,7 @@ let get_perm_at t ofs =
   | Tree { bounds; root } ->
       let is_in_bounds =
         let open Expr.Infix in
-        is_in_bounds (ofs, ofs +. Expr.num 1.) bounds
+        is_in_bounds (ofs, ofs + Expr.int 1) bounds
       in
       if%sat is_in_bounds then
         match root with
@@ -1313,10 +1311,10 @@ let get_freed t =
 
 let _check_valid_alignment chunk ofs =
   let al = Chunk.align chunk in
-  let al_expr = Expr.num (float_of_int al) in
+  let al_expr = Expr.int al in
   let divides x y =
     let open Formula.Infix in
-    Expr.(y #== (num 0.)) #|| ((Expr.fmod y x) #== (Expr.num 0.))
+    Expr.(y #== (int 0)) #|| ((Expr.imod y x) #== (Expr.int 0))
   in
   if%sat divides al_expr ofs then DR.ok ()
   else DR.error (InvalidAlignment { offset = ofs; alignment = al })
@@ -1355,7 +1353,7 @@ let move dst_tree dst_ofs src_tree src_ofs size =
   let open DR.Syntax in
   let dst_range, src_range =
     let open Expr.Infix in
-    ((dst_ofs, dst_ofs +. size), (src_ofs, src_ofs +. size))
+    ((dst_ofs, dst_ofs + size), (src_ofs, src_ofs + size))
   in
   let** src_span = DR.of_result (get_bounds src_tree) in
   if%sat is_in_bounds src_range src_span then

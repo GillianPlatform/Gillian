@@ -1828,7 +1828,7 @@ let rec reduce_lexpr_loop
             | FLessThan ->
                 let success, el, er = Cnum.cut flel fler in
                 let nexpr = Expr.BinOp (el, FLessThan, er) in
-                if success then nexpr else f nexpr
+                if success then f nexpr else nexpr
             | ILessThan -> (
                 match (flel, fler) with
                 | x, fler
@@ -1844,7 +1844,7 @@ let rec reduce_lexpr_loop
                 | _ ->
                     let success, el, er = Cint.cut flel fler in
                     let nexpr = Expr.BinOp (el, ILessThan, er) in
-                    if success then nexpr else f nexpr
+                    if success then f nexpr else nexpr
                     (* | _, _ ->
                         f
                           (BinOp
