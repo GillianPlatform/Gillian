@@ -210,25 +210,12 @@ struct
           let nle2 = f le2 in
           let nle3 = f le3 in
           match (nle1, nle2, nle3) with
-          | EList lst, Lit (Num _start), Lit (Num _end)
-            when Arith_Utils.is_int _start && Arith_Utils.is_int _end -> (
-              try
-                EList
-                  (Array.to_list
-                     (Array.sub (Array.of_list lst) (int_of_float _start)
-                        (int_of_float _end)))
-              with _ -> raise (Failure "Sublist out of bounds"))
-          | Lit (LList lst), Lit (Num _start), Lit (Num _end)
-            when Arith_Utils.is_int _start && Arith_Utils.is_int _end -> (
-              try
-                Lit
-                  (LList
-                     (Array.to_list
-                        (Array.sub (Array.of_list lst) (int_of_float _start)
-                           (int_of_float _end))))
-              with _ -> raise (Failure "Sublist out of bounds"))
-          | _, Lit (Num _start), Lit (Num _end)
-            when (not (Arith_Utils.is_int _start)) && Arith_Utils.is_int _end ->
+          | EList lst, Lit (Int start), Lit (Int len) ->
+              List_utils.list_sub lst start len |> Option.get |> Expr.list
+          | Lit (LList lst), Lit (Int start), Lit (Int len) ->
+              List_utils.list_sub lst start len |> Option.get |> fun x ->
+              Expr.Lit (LList x)
+          | _, Lit (Num _), Lit (Num _) ->
               raise (Failure "Sublist indexes non-integer")
           | _, _, _ -> LstSub (nle1, nle2, nle3))
     in

@@ -212,6 +212,12 @@ let rec learn_expr
             | false -> (e2, e1)
           in
           f (BinOp (base_expr, FMinus, ke)) ue)
+  | BinOp (e1, IPlus, e2) -> (
+      let ike1, ike2 = (is_known_expr kb e1, is_known_expr kb e2) in
+      match (ike1, ike2) with
+      | true, true | false, false -> []
+      | true, false -> f (BinOp (base_expr, IMinus, e1)) e2
+      | false, true -> f (BinOp (base_expr, IMinus, e2)) e1)
   (* Floating-point minus is invertible in two different ways *)
   | BinOp (e1, FMinus, e2) -> (
       (* If both operands are known or both are unknown, nothing can be done *)
@@ -220,6 +226,12 @@ let rec learn_expr
       | true, true | false, false -> []
       | false, true -> f (BinOp (base_expr, FPlus, e2)) e1
       | true, false -> f (BinOp (e1, FMinus, base_expr)) e2)
+  | BinOp (e1, IMinus, e2) -> (
+      let ike1, ike2 = (is_known_expr kb e1, is_known_expr kb e2) in
+      match (ike1, ike2) with
+      | true, true | false, false -> []
+      | false, true -> f (BinOp (base_expr, IPlus, e2)) e1
+      | true, false -> f (BinOp (e1, IMinus, base_expr)) e2)
   (* TODO: Finish the remaining invertible binary operators *)
   | BinOp _ -> []
 

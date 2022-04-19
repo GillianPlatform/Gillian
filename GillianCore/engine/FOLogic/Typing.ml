@@ -39,7 +39,7 @@ let rec infer_types_to_gamma
   | NOp (LstCat, les) ->
       tt = ListType && List.for_all (fun x -> f x ListType) les
   | LstSub (le1, le2, le3) ->
-      tt = ListType && f le1 ListType && f le2 NumberType && f le3 NumberType
+      tt = ListType && f le1 ListType && f le2 IntType && f le3 IntType
   | UnOp (unop, le) -> (
       match unop with
       | UNot -> tt = BooleanType && f le BooleanType
@@ -70,7 +70,7 @@ let rec infer_types_to_gamma
       | TypeOf -> tt = TypeType
       | Cdr -> tt = ListType && f le ListType
       | Car -> f le ListType
-      | LstLen -> tt = NumberType && f le ListType
+      | LstLen -> tt = IntType && f le ListType
       | LstRev -> tt = ListType && f le ListType
       | StrLen -> tt = NumberType && f le StringType
       | SetToList -> tt = ListType && f le SetType)
@@ -95,8 +95,20 @@ let rec infer_types_to_gamma
             (Some IntType, Some IntType, Some IntType)
         | FPlus | FMinus | FTimes | FMod | FDiv ->
             (Some NumberType, Some NumberType, Some NumberType)
-        (* FIXME: Specify cases *)
-        | _ -> (Some NumberType, Some NumberType, Some NumberType)
+        | BitwiseAnd
+        | BitwiseOr
+        | BitwiseXor
+        | LeftShift
+        | SignedRightShift
+        | UnsignedRightShift
+        | BitwiseAndL
+        | BitwiseOrL
+        | BitwiseXorL
+        | LeftShiftL
+        | SignedRightShiftL
+        | UnsignedRightShiftL
+        | M_atan2
+        | M_pow -> (Some NumberType, Some NumberType, Some NumberType)
       in
       Option.fold ~some:(fun t -> f le1 t) ~none:true rqt1
       && Option.fold ~some:(fun t -> f le2 t) ~none:true rqt2
@@ -149,6 +161,9 @@ let rec infer_types_expr gamma le : unit =
       | FPlus | FMinus | FTimes | FDiv | FMod ->
           e le1 NumberType;
           e le2 NumberType
+      | IPlus | IMinus | ITimes | IDiv | IMod ->
+          e le1 IntType;
+          e le2 IntType
       | LstNth ->
           e le1 ListType;
           e le2 IntType
@@ -246,7 +261,7 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
               | UNot | M_isNaN -> (BooleanType, [])
               | ToStringOp -> (StringType, [])
               | Car | Cdr ->
-                  (ListType, [ Formula.LessEq (Lit (Num 1.), UnOp (LstLen, e)) ])
+                  (ListType, [ Formula.LessEq (Lit (Int 1), UnOp (LstLen, e)) ])
               | LstRev -> (ListType, [])
               | _ -> (NumberType, [])
             in
@@ -350,8 +365,8 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
         let constraints = constraints1 @ constraints2 @ constraints3 in
         if ite1 && ite2 && ite3 then
           let _, success1, _ = infer_type le1 ListType constraints in
-          let _, success2, _ = infer_type le2 NumberType constraints in
-          let _, success3, _ = infer_type le3 NumberType constraints in
+          let _, success2, _ = infer_type le2 IntType constraints in
+          let _, success3, _ = infer_type le3 IntType constraints in
           if success1 && success2 && success3 (* TODO: there are constraints *)
           then (Some ListType, true, constraints)
           else def_neg

@@ -119,7 +119,7 @@ let rec normalise_list_expressions (le : Expr.t) : Expr.t =
         | NOp (LstCat, EList lst :: tl) ->
             BinOp
               ( Expr.int (List.length lst),
-                FPlus,
+                IPlus,
                 f (UnOp (LstLen, NOp (LstCat, tl))) )
         | le -> UnOp (LstLen, le))
     | UnOp (op, le) -> UnOp (op, f le)
@@ -281,7 +281,7 @@ let rec get_length_of_list (lst : Expr.t) : int option =
   | EList l -> Some (List.length l)
   | LstSub (_, _, len) -> (
       match len with
-      | Lit (Num len) when Float.is_integer len -> Some (int_of_float len)
+      | Lit (Int len) -> Some len
       | _ -> None)
   | NOp (LstCat, les) -> (
       let lens = List.map f les in
@@ -325,10 +325,7 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
   | EList l ->
       assert (idx < List.length l);
       Some (List.nth l idx)
-  | LstSub (lst, Lit (Num start), Lit (Num len))
-    when Float.is_integer start && Float.is_integer len -> (
-      let start = int_of_float start in
-      let len = int_of_float len in
+  | LstSub (lst, Lit (Int start), Lit (Int len)) -> (
       match lst with
       | EList l ->
           assert (idx < len);
@@ -338,24 +335,17 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
           assert (idx < len);
           assert (start + idx < List.length l);
           Some (Lit (List.nth l (start + idx)))
-      | LVar x -> (
+      | LVar x ->
           let eqs = find_equalities pfs (LVar x) in
-          let candidates = List.map (fun e -> f e (start + idx)) eqs in
-          let candidates = List.filter (fun x -> x <> None) candidates in
-          match candidates with
-          | [] -> None
-          | x :: _ -> Some (Option.get x))
+          List.find_map (fun e -> f e (start + idx)) eqs
       | _ -> None)
   | LstSub _ -> None
   | NOp (LstCat, lel :: ler) ->
-      Option.value ~default:None
-        (Option.map
-           (fun llen ->
-             let lst, idx =
-               if idx < llen then (lel, idx) else (NOp (LstCat, ler), idx - llen)
-             in
-             f lst idx)
-           (get_length_of_list lel))
+      Option.bind (get_length_of_list lel) (fun llen ->
+          let lst, idx =
+            if idx < llen then (lel, idx) else (NOp (LstCat, ler), idx - llen)
+          in
+          f lst idx)
   | _ ->
       raise
         (Failure
@@ -897,6 +887,7 @@ let rec reduce_lexpr_loop
 
   let result : Expr.t =
     match le with
+    | Lit _ -> le
     | BinOp (BinOp (a, FTimes, _), FMod, c)
       when Expr.equal a c || Expr.equal a c -> Expr.num 0.
     | BinOp (x, FTimes, BinOp (y, FDiv, z)) when x = z -> f y
@@ -992,6 +983,9 @@ let rec reduce_lexpr_loop
     (* Special equality *)
     | BinOp
         (BinOp (LVar x, FPlus, UnOp (FUnaryMinus, LVar y)), Equal, Lit (Num 0.))
+      -> BinOp (LVar x, Equal, LVar y)
+    | BinOp
+        (BinOp (LVar x, IPlus, UnOp (IUnaryMinus, LVar y)), Equal, Lit (Int 0))
       -> BinOp (LVar x, Equal, LVar y)
     (* List indexing *)
     | BinOp (le, LstNth, idx) -> (
@@ -1100,17 +1094,17 @@ let rec reduce_lexpr_loop
         | [] -> ESet []
         | [ x ] -> x
         | _ -> NOp (SetUnion, fles))
-    | NOp (LstCat, LstSub (x1, Lit (Num 0.), z1) :: LstSub (x2, y2, z3) :: rest)
+    | NOp (LstCat, LstSub (x1, Lit (Int 0), z1) :: LstSub (x2, y2, z3) :: rest)
       when x1 = x2 && z1 = y2 ->
         f
-          (NOp (LstCat, LstSub (x1, Lit (Num 0.), BinOp (z1, FPlus, z3)) :: rest))
+          (NOp (LstCat, LstSub (x1, Lit (Int 0), BinOp (z1, IPlus, z3)) :: rest))
     | NOp (LstCat, fst :: rest) when PFS.mem pfs (Eq (fst, EList [])) ->
         f (NOp (LstCat, rest))
     | NOp (LstCat, [ x; LstSub (LVar y, UnOp (LstLen, x'), len) ])
       when x = x'
            && Cint.canonicalise len
               = Cint.canonicalise
-                  (BinOp (UnOp (LstLen, LVar y), FMinus, UnOp (LstLen, x)))
+                  (BinOp (UnOp (LstLen, LVar y), IMinus, UnOp (LstLen, x)))
            && prefix_catch pfs x y -> LVar y
     | NOp (LstCat, les) -> normalise_cat f les
     | NOp (SetInter, [ BinOp (le1, SetDiff, le2); ESet le3 ]) ->
@@ -1228,17 +1222,13 @@ let rec reduce_lexpr_loop
                 match lexpr_is_list gamma fle with
                 | true -> (
                     match fle with
-                    | Lit (LList le) ->
-                        Lit (Num (float_of_int (List.length le)))
-                    | EList le -> Lit (Num (float_of_int (List.length le)))
+                    | Lit (LList le) -> Expr.int (List.length le)
+                    | EList le -> Expr.int (List.length le)
                     | NOp (LstCat, les) ->
-                        let les =
-                          List.map (fun x -> Expr.UnOp (LstLen, x)) les
-                        in
+                        let les = List.map Expr.list_length les in
                         let le =
-                          List.fold_left
-                            (fun ac x -> Expr.BinOp (ac, FPlus, x))
-                            (List.hd les) (List.tl les)
+                          List.fold_left Expr.Infix.( + ) (List.hd les)
+                            (List.tl les)
                         in
                         f le
                     | LstSub (_, _, len) -> len
@@ -1371,29 +1361,29 @@ let rec reduce_lexpr_loop
             if att_exp = reduced_att_exp then LstSub (fle1, fle2, fle3)
             else reduced_att_exp
         | _, _ -> LstSub (fle1, fle2, fle3))
-    | LstSub (l, Lit (Num n), BinOp (UnOp (LstLen, l'), FMinus, Lit (Num n')))
-      when l = l' && n = n'
+    | LstSub (l, Lit (Int n), BinOp (UnOp (LstLen, l'), IMinus, Lit (Int n')))
+      when l = l' && n == n'
            &&
            let eqs = get_equal_expressions pfs l in
            List.exists
-             (fun e ->
-               match e with
+             (function
                | Expr.NOp (LstCat, EList les :: _) ->
-                   List.length les = int_of_float n
+                   Int.equal (List.compare_length_with les n) 0
+               (* return (List.length les == n), but efficiently *)
                | NOp (LstCat, Lit (LList les) :: _) ->
-                   List.length les = int_of_float n
+                   (* return (List.length les == n), but efficiently *)
+                   Int.equal (List.compare_length_with les n) 0
                | _ -> false)
              eqs ->
         let eqs = get_equal_expressions pfs l in
         let cat =
           List.filter_map
-            (fun e ->
-              match e with
+            (function
               | Expr.NOp (LstCat, EList les :: rest)
-                when List.length les = int_of_float n ->
+                when Int.equal (List.compare_length_with les n) 0 ->
                   Some (Expr.NOp (LstCat, rest))
               | NOp (LstCat, Lit (LList les) :: rest)
-                when List.length les = int_of_float n ->
+                when Int.equal (List.compare_length_with les n) 0 ->
                   Some (NOp (LstCat, rest))
               | _ -> None)
             eqs
@@ -1409,52 +1399,55 @@ let rec reduce_lexpr_loop
             fmt "REDUCTION: LstSub(%a, %a, %a)" Expr.pp fle1 Expr.pp fle2
               Expr.pp fle3);
         match (fle1, fle2, fle3) with
-        | _, _, Lit (Num 0.) ->
+        | _, _, Lit (Int 0) ->
             L.tmi (fun fmt -> fmt "Case 1");
             EList []
-        | flx, Lit (Num 0.), UnOp (LstLen, fle1) when flx = fle1 ->
+        | flx, Lit (Int 0), UnOp (LstLen, fle1) when flx = fle1 ->
             L.tmi (fun fmt -> fmt "Case 2");
             fle1
         | NOp (LstCat, [ x ]), fle2, fle3 ->
             L.tmi (fun fmt -> fmt "Case 3");
             f (LstSub (x, fle2, fle3))
-        | NOp (LstCat, flx :: _), Lit (Num 0.), UnOp (LstLen, fle1)
+        | NOp (LstCat, flx :: _), Lit (Int 0), UnOp (LstLen, fle1)
           when flx = fle1 ->
             L.tmi (fun fmt -> fmt "Case 4");
             fle1
-        | NOp (LstCat, flx :: _), Lit (Num 0.), Lit (Num n)
+        | NOp (LstCat, flx :: _), Lit (Int 0), Lit (Int n)
           when let eqs = get_equal_expressions pfs flx in
                List.exists
-                 (fun e ->
-                   match e with
-                   | Expr.EList les -> List.length les >= int_of_float n
-                   | Lit (LList les) -> List.length les >= int_of_float n
+                 (function
+                   (* Length of the list is greater than n, but efficiently computed *)
+                   | Expr.EList les -> List.compare_length_with les n >= 0
+                   | Lit (LList les) -> List.compare_length_with les n >= 0
                    | NOp (LstCat, EList les :: _) ->
-                       List.length les >= int_of_float n
+                       List.compare_length_with les n >= 0
                    | NOp (LstCat, Lit (LList les) :: _) ->
-                       List.length les >= int_of_float n
+                       List.compare_length_with les n >= 0
                    | _ -> false)
                  eqs ->
             L.tmi (fun fmt -> fmt "Case 5");
             let eqs = get_equal_expressions pfs flx in
-            let eqs =
-              List.filter_map
+            let first =
+              List.find_map
                 (fun e ->
+                  (* Returns a list of which the length is greater than n, but
+                     computation is made slightly more efficient *)
                   match e with
-                  | Expr.EList les when List.length les >= int_of_float n ->
-                      Some (Expr.EList les)
-                  | Lit (LList les) when List.length les >= int_of_float n ->
-                      Some (Lit (LList les))
-                  | NOp (LstCat, EList les :: _)
-                    when List.length les >= int_of_float n -> Some (EList les)
-                  | NOp (LstCat, Lit (LList les) :: _)
-                    when List.length les >= int_of_float n ->
-                      Some (Lit (LList les))
+                  | Expr.EList les when List.compare_length_with les n >= 0 ->
+                      Some e
+                  | Lit (LList les) when List.compare_length_with les n >= 0 ->
+                      Some e
+                  | NOp (LstCat, (EList les as e) :: _)
+                    when List.compare_length_with les n >= 0 -> Some e
+                  | NOp (LstCat, (Lit (LList les) as e) :: _)
+                    when List.compare_length_with les n >= 0 -> Some e
                   | _ -> None)
                 eqs
             in
-            f (LstSub (List.hd eqs, Lit (Num 0.), Lit (Num n)))
-        | le, Lit (Num 0.), Lit (Num n)
+            f
+              (Expr.list_sub ~lst:(Option.get first) ~start:(Expr.int 0)
+                 ~size:(Expr.int n))
+        | le, Lit (Int 0), Lit (Int n)
           when (match le with
                | EList _ | Lit (LList _) -> false
                | _ -> true)
@@ -1474,126 +1467,100 @@ let rec reduce_lexpr_loop
                  | _ -> eqs
                in
                List.exists
-                 (fun e ->
-                   match e with
-                   | Expr.EList les -> List.length les >= int_of_float n
-                   | Lit (LList les) -> List.length les >= int_of_float n
+                 (function
+                   (* Returns true if length les >= n, but efficiently *)
+                   | Expr.EList les -> List.compare_length_with les n >= 0
+                   | Lit (LList les) -> List.compare_length_with les n >= 0
                    | NOp (LstCat, EList les :: _) ->
-                       List.length les >= int_of_float n
+                       List.compare_length_with les n >= 0
                    | NOp (LstCat, Lit (LList les) :: _) ->
-                       List.length les >= int_of_float n
+                       List.compare_length_with les n >= 0
                    | _ -> false)
                  eqs ->
             L.tmi (fun fmt -> fmt "Case 6");
             let eqs = get_equal_expressions pfs le in
-            let eqs =
-              List.filter_map
+            let first =
+              List.find_map
                 (fun e ->
                   match e with
-                  | Expr.EList les when List.length les >= int_of_float n ->
-                      Some (Expr.EList les)
-                  | Lit (LList les) when List.length les >= int_of_float n ->
-                      Some (Lit (LList les))
-                  | NOp (LstCat, EList les :: _)
-                    when List.length les >= int_of_float n -> Some (EList les)
-                  | NOp (LstCat, Lit (LList les) :: _)
-                    when List.length les >= int_of_float n ->
-                      Some (Lit (LList les))
+                  | Expr.EList les when List.compare_length_with les n >= 0 ->
+                      Some e
+                  | Lit (LList les) when List.compare_length_with les n >= 0 ->
+                      Some e
+                  | NOp (LstCat, (EList les as e) :: _)
+                    when List.compare_length_with les n >= 0 -> Some e
+                  | NOp (LstCat, (Lit (LList les) as e) :: _)
+                    when List.compare_length_with les n >= 0 -> Some e
                   | _ -> None)
                 eqs
             in
-            L.tmi (fun fmt ->
-                fmt "EQs: %a" Fmt.(brackets (list ~sep:comma Expr.pp)) eqs);
-            f (LstSub (List.hd eqs, Lit (Num 0.), Lit (Num n)))
+            (* L.tmi (fun fmt ->
+                fmt "EQs: %a" Fmt.(brackets (list ~sep:comma Expr.pp)) eqs); *)
+            f
+              (Expr.list_sub ~lst:(Option.get first) ~start:(Expr.int 0)
+                 ~size:(Expr.int n))
         | fle1, UnOp (LstLen, lx), fle3 when fst (list_prefix pfs lx fle1) ->
             L.tmi (fun fmt -> fmt "Case 7");
             let _, suffix = list_prefix pfs lx fle1 in
-            f (LstSub (suffix, Lit (Num 0.), fle3))
-        | fle1, Lit (Num 0.), UnOp (LstLen, LVar lx)
-          when let candidates = get_equal_expressions pfs fle1 in
-               let candidates =
-                 List.map (fun (x : Expr.t) -> (x, Expr.lvars x)) candidates
-               in
-               let candidates =
-                 List.filter
-                   (fun (_, lvars) -> Containers.SS.mem lx lvars)
-                   candidates
-               in
-               let candidates =
-                 List.filter
-                   (fun (x, _) ->
-                     x = Expr.LVar lx
-                     ||
-                     match x with
-                     | NOp (LstCat, [ x ]) when x = LVar lx -> true
-                     | NOp (LstCat, x :: _) when x = LVar lx -> true
-                     | _ -> false)
-                   candidates
-               in
-               candidates <> [] -> (
+            f (LstSub (suffix, Lit (Int 0), fle3))
+        | fle1, Lit (Int 0), UnOp (LstLen, LVar lx)
+          when List.exists
+                 (function
+                   | (Expr.LVar lx' | NOp (LstCat, LVar lx' :: _))
+                     when String.equal lx lx' -> true
+                   | _ -> false)
+                 (get_equal_expressions pfs fle1) ->
             L.tmi (fun fmt -> fmt "Case 8");
-            let candidates = get_equal_expressions pfs fle1 in
-            let candidates =
-              List.map (fun (x : Expr.t) -> (x, Expr.lvars x)) candidates
+            let choice =
+              List.find_map
+                (fun e ->
+                  match e with
+                  | Expr.LVar ly when String.equal ly lx -> Some e
+                  | NOp (LstCat, (LVar ly as e) :: _) when String.equal ly lx ->
+                      Some e
+                  | _ -> None)
+                (get_equal_expressions pfs fle1)
             in
-            let candidates =
-              List.filter
-                (fun (_, lvars) -> Containers.SS.mem lx lvars)
-                candidates
-            in
-            let leading_candidate = fst (List.hd candidates) in
-            match leading_candidate with
-            | LVar ly when ly = lx -> LVar lx
-            | NOp (LstCat, flx :: _) when flx = LVar lx -> LVar lx
-            | _ ->
-                raise
-                  (Exceptions.Impossible
-                     "reduce_lexpr: candidates: guaranteed by match/filter"))
-        | NOp (LstCat, EList les :: _), Lit (Num s), Lit (Num f)
-          when List.length les >= int_of_float (s +. f) ->
+            (* Guaranteed to work because of the 'when' close *)
+            Option.get choice
+        | NOp (LstCat, EList les :: _), Lit (Int s), Lit (Int f)
+          when List.compare_length_with les (s + f) >= 0 ->
             L.tmi (fun fmt -> fmt "Case 9");
             let result = Expr.LstSub (EList les, fle2, fle3) in
             L.verbose (fun fmt -> fmt "Very simple case: %a" Expr.pp result);
             result
-        | EList lst, Lit (Num _start), Lit (Num _end) -> (
+        | EList lst, Lit (Int start), Lit (Int len) -> (
             L.tmi (fun fmt -> fmt "Case 10");
             L.verbose (fun fmt ->
-                fmt "EList LSub: %a" Expr.pp
-                  (LstSub (EList lst, Lit (Num _start), Lit (Num _end))));
-            try
-              let result =
-                Expr.EList
-                  (Array.to_list
-                     (Array.sub (Array.of_list lst) (int_of_float _start)
-                        (int_of_float _end)))
-              in
-              L.verbose (fun fmt -> fmt "Resulting LSub: %a" Expr.pp result);
-              result
-            with _ ->
-              L.verbose (fun fmt ->
-                  fmt "ILE: %a" Expr.pp (LstSub (fle1, fle2, fle3)));
-              raise
-                (ReductionException
-                   (LstSub (fle1, fle2, fle3), "Invalid List Expression")))
-        | Lit (LList lst), Lit (Num _start), Lit (Num _end) -> (
+                fmt "EList LSub: %a" Expr.pp (LstSub (fle1, fle2, fle3)));
+            match List_utils.list_sub lst start len with
+            | Some result ->
+                let result = Expr.EList result in
+                L.verbose (fun fmt -> fmt "Resulting LSub: %a" Expr.pp result);
+                result
+            | None ->
+                L.verbose (fun fmt ->
+                    fmt "ILE: %a" Expr.pp (LstSub (fle1, fle2, fle3)));
+                raise
+                  (ReductionException
+                     (LstSub (fle1, fle2, fle3), "Invalid List Expression")))
+        | Lit (LList lst), Lit (Int start), Lit (Int len) -> (
             L.tmi (fun fmt -> fmt "Case 11");
             L.verbose (fun fmt ->
-                fmt "LList LSub: %a" Expr.pp
-                  (LstSub (Lit (LList lst), Lit (Num _start), Lit (Num _end))));
-            try
-              Lit
-                (LList
-                   (Array.to_list
-                      (Array.sub (Array.of_list lst) (int_of_float _start)
-                         (int_of_float _end))))
-            with _ ->
-              L.verbose (fun fmt ->
-                  fmt "ILE: %a" Expr.pp (LstSub (fle1, fle2, fle3)));
-              raise
-                (ReductionException
-                   (LstSub (fle1, fle2, fle3), "Invalid List Expression")))
-        (* COMPLEX: LSTSUB AND LSTCAT *)
+                fmt "LList LSub: %a" Expr.pp (LstSub (fle1, fle2, fle3)));
+            match List_utils.list_sub lst start len with
+            | Some result ->
+                let result = Expr.Lit (LList result) in
+                L.verbose (fun fmt -> fmt "Resulting LSub: %a" Expr.pp result);
+                result
+            | None ->
+                L.verbose (fun fmt ->
+                    fmt "ILE: %a" Expr.pp (LstSub (fle1, fle2, fle3)));
+                raise
+                  (ReductionException
+                     (LstSub (fle1, fle2, fle3), "Invalid List Expression")))
         | NOp (LstCat, lel :: ler), fle2, fle3
+        (* COMPLEX: LSTSUB AND LSTCAT *)
           when (* Sub starts after first cat *)
                let lel_len = Expr.UnOp (LstLen, lel) in
                let diff = f (BinOp (fle2, IMinus, lel_len)) in
@@ -1693,31 +1660,6 @@ let rec reduce_lexpr_loop
                 simplify_num_arithmetic_lexpr pfs gamma def
             | (IPlus | IMinus) when lexpr_is_int ~gamma def ->
                 simplify_int_arithmetic_lexpr pfs gamma def
-            (* | FPlus when (lexpr_is_number ~gamma def) ->
-                 (match flel, fler with
-                 (* 0 is the neutral *)
-                 | Lit (Num 0.), x
-                 | x, Lit (Num 0.) -> x
-                 | Lit (Num x), _ when (x == nan) -> Lit (Num nan)
-                 | _, Lit (Num x) when (x == nan) -> Lit (Num nan)
-                 (* This can be more general *)
-                 | BinOp (Lit (Num x), FPlus, y), Lit (Num z) -> BinOp (Lit (Num (x +. z)), FPlus, y)
-                 | Lit (Num z), BinOp (Lit (Num x), FPlus, y) -> BinOp (Lit (Num (z +. x)), FPlus, y)
-                 (* Associate to the right *)
-                 | BinOp (flell, FPlus, flelr), fler -> BinOp (flell, FPlus, BinOp (flelr, FPlus, fler))
-                 (* Rest *)
-                 | _, _ -> def
-                 )
-               | FMinus when (lexpr_is_number ~gamma def) ->
-                 (match flel, fler with
-                 (* 0 is the neutral *)
-                 | Lit (Num 0.), x -> UnOp (FUnaryMinus, x)
-                 | x, Lit (Num 0.) -> x
-                 | Lit (Num x), _ when (x == nan) -> Lit (Num nan)
-                 | _, Lit (Num x) when (x == nan) -> Lit (Num nan)
-                 (* Transform to unary minus *)
-                 | _, _ -> BinOp (flel, FPlus, (UnOp (FUnaryMinus, fler)))
-                 ) *)
             | FTimes when lexpr_is_number ~gamma def -> (
                 match (flel, fler) with
                 (* 1 is the neutral *)
@@ -1741,7 +1683,6 @@ let rec reduce_lexpr_loop
                 match (flel, fler) with
                 (* 1 is the neutral *)
                 | x, Lit (Num 1.) -> x
-                (* Rest *)
                 | _, _ -> def)
             | IDiv when lexpr_is_int ~gamma def -> (
                 match (flel, fler) with
@@ -1992,7 +1933,7 @@ and simplify_int_arithmetic_lexpr (pfs : PFS.t) (gamma : TypEnv.t) (le : Expr.t)
       | BinOp (l, IPlus, r) ->
           f (BinOp (UnOp (IUnaryMinus, l), IPlus, UnOp (IUnaryMinus, r)))
       | _ -> le)
-  (* FPlus - we collect the positives and the negatives, see what we have and deal with them *)
+  (* IPlus - we collect the positives and the negatives, see what we have and deal with them *)
   | BinOp (l, IPlus, r) ->
       let cl = Cint.of_expr l in
       let cr = Cint.of_expr r in
@@ -2200,11 +2141,13 @@ and substitute_for_specific_length
   let len_expr = Expr.UnOp (LstLen, len_to_subst) in
   let eqs = find_equalities pfs len_expr in
   let results =
-    List.map (fun eq -> substitute_in_int_expr eq len_expr le) eqs
+    List.filter_map
+      (fun eq ->
+        let subst = substitute_in_int_expr eq len_expr le in
+        if subst <> le then Some subst else None)
+      eqs
   in
-  let results =
-    List.sort_uniq compare (List.filter (fun x -> x <> le) results)
-  in
+  let results = List.sort_uniq Stdlib.compare results in
   match results with
   | [] -> le
   | [ result ] -> result
@@ -2326,6 +2269,8 @@ let rec reduce_formula_loop
           True (* Why only lists? *)
       (* DEDICATED SIMPLIFICATIONS - this should probably be handled properly by Z3... *)
       | Eq (BinOp (Lit (Num x), FPlus, LVar y), LVar z) when x <> 0. && y = z ->
+          False
+      | Eq (BinOp (Lit (Int x), IPlus, LVar y), LVar z) when x <> 0 && y = z ->
           False
       | ForAll
           ( [ (x, Some NumberType) ],
@@ -2501,14 +2446,14 @@ let rec reduce_formula_loop
                  | BinOp (UnOp (LstRev, plist_left), LstCat, plist_right), UnOp (LstRev, full_list)
                      ->
                      f (Eq (full_list, BinOp (UnOp (LstRev, plist_right), LstCat, plist_left))) *)
-              | LstSub (e1, Lit (Num 0.), el), e2 when e1 = e2 ->
+              | LstSub (e1, Lit (Int 0), el), e2 when e1 = e2 ->
                   Eq (UnOp (LstLen, e1), el)
-              | e2, LstSub (e1, Lit (Num 0.), el) when e1 = e2 ->
+              | e2, LstSub (e1, Lit (Int 0), el) when e1 = e2 ->
                   Eq (UnOp (LstLen, e1), el)
-              | e2, LstSub (NOp (LstCat, e1 :: _), Lit (Num 0.), el)
-                when e1 = e2 -> Eq (UnOp (LstLen, e1), el)
-              | LstSub (NOp (LstCat, e1 :: _), Lit (Num 0.), el), e2
-                when e1 = e2 -> Eq (UnOp (LstLen, e1), el)
+              | e2, LstSub (NOp (LstCat, e1 :: _), Lit (Int 0), el) when e1 = e2
+                -> Eq (UnOp (LstLen, e1), el)
+              | LstSub (NOp (LstCat, e1 :: _), Lit (Int 0), el), e2 when e1 = e2
+                -> Eq (UnOp (LstLen, e1), el)
               | e2, LstSub (NOp (LstCat, e3 :: e1 :: _), ex, ey) when e1 = e2 ->
                   And (Eq (UnOp (LstLen, e3), ex), Eq (UnOp (LstLen, e1), ey))
               | LstSub (NOp (LstCat, e3 :: e1 :: _), ex, ey), e2 when e1 = e2 ->
@@ -2524,7 +2469,7 @@ let rec reduce_formula_loop
                          NOp (LstCat, List.rev (List.tl (List.rev (fr :: rr))))
                        ))
               | ( LVar lst,
-                  NOp (LstCat, LstSub (LVar lst', Lit (Num 0.), split) :: _rest)
+                  NOp (LstCat, LstSub (LVar lst', Lit (Int 0), split) :: _rest)
                 )
                 when lst = lst'
                      && PFS.mem pfs (Less (UnOp (LstLen, LVar lst), split)) ->

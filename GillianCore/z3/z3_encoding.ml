@@ -297,7 +297,7 @@ module Axiomatised_operations = struct
   let llen_fun =
     FuncDecl.mk_func_decl ctx (mk_string_symb "l-len")
       [ Lit_operations.z3_gil_list_sort ]
-      numbers_sort
+      ints_sort
 
   let num2str_fun =
     FuncDecl.mk_func_decl ctx (mk_string_symb "num2str") [ numbers_sort ]
@@ -318,7 +318,7 @@ module Axiomatised_operations = struct
 
   let lnth_fun =
     FuncDecl.mk_func_decl ctx (mk_string_symb "l-nth")
-      [ z3_gil_list_sort; numbers_sort ]
+      [ z3_gil_list_sort; ints_sort ]
       z3_gil_literal_sort
 
   let lcat_fun =
@@ -667,8 +667,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
           [ mk_singleton_access le1 ]
       in
       let index' =
-        ZExpr.mk_app ctx Lit_operations.number_accessor
-          [ mk_singleton_access le2 ]
+        ZExpr.mk_app ctx Lit_operations.int_accessor [ mk_singleton_access le2 ]
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx Axiomatised_operations.lnth_fun [ lst'; index' ])
@@ -719,7 +718,7 @@ let encode_unop (op : UnOp.t) le =
         ZExpr.mk_app ctx Axiomatised_operations.llen_fun [ le_lst ]
       in
       mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.number_constructor [ op_le_lst ])
+        (ZExpr.mk_app ctx Lit_operations.int_constructor [ op_le_lst ])
   | StrLen ->
       let le_s =
         ZExpr.mk_app ctx Lit_operations.string_accessor
