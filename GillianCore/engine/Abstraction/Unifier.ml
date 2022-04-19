@@ -54,8 +54,6 @@ module Make
   type t = state_t * preds_t * UP.preds_tbl_t
   type post_res = (Flag.t * Asrt.t list) option
   type search_state = (t * st * UP.t) list * err_t list
-  type search_state_d = ((t * st * UP.t) * int) list * err_t list
-  type report_path_t = L.ReportId.t list
   type unfold_info_t = (string * string) list
   type gp_ret = GPSucc of (t * vt list) list | GPFail of err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
@@ -980,7 +978,7 @@ module Make
       let u_assert_log = make_u_assert_log_t ~step:step ~subst:subst ~astate:astate_log in
       ignore (L.normal_specific
         (L.Loggable.make pp_u_assert_log u_assert_log_t_of_yojson u_assert_log_t_to_yojson u_assert_log)
-        L.LoggingConstants.ContentType.unify_step));
+        L.LoggingConstants.ContentType.assertion));
 
     let p, outs = step in
     match (p : Asrt.t) with
@@ -1173,108 +1171,87 @@ module Make
     | _ -> raise (Failure "Illegal Assertion in Unification Plan")
 
   and unify_up (s_states : search_state) : up_u_res =
-    let rec set_phase_depth (target_depth : int) (report_path : report_path_t) : report_path_t option =
-      match Compare.cmp (List.length report_path) target_depth with
-      | Eq -> Some report_path
-      | Lt -> Option.bind (
-          L.verbose_phase ()
-        ) (fun report_id -> set_phase_depth target_depth (report_id :: report_path))
-      | Gt -> match report_path with
-        | [] -> raise (Failure "Trying to exit log phase that doesn't exist!")
-        | (report_id :: rest) -> (
-          L.end_phase (Some report_id);
-          set_phase_depth target_depth rest
-        )
-    in
-    let rec aux (s_states_d : search_state_d) (report_path : report_path_t option) : (up_u_res * report_path_t option) = (
-      let s_states, errs_so_far = s_states_d in
-      L.(
-        verbose (fun m ->
-            m "Unify UP: There are %d states left to consider."
-              (List.length s_states)));
-      match s_states with
-      | [] -> UPUFail errs_so_far, report_path
-      | ((state, subst, up), state_depth) :: rest -> (
-          let report_path = Option.bind report_path (set_phase_depth state_depth) in
-          let cur_step : UP.step option = UP.head up in
-          let ret =
-            try
-              Option.fold
-                ~some:(unify_assertion state subst)
-                ~none:(USucc state) cur_step
-            with err -> (
-              L.verbose (fun fmt ->
-                  fmt
-                    "WARNING: UNCAUGHT EXCEPTION IN UNIFY-ASSERTION : %s@\n\
-                    Here's the backtrace: %s" (Printexc.to_string err)
-                    (Printexc.get_backtrace ()));
-              let a = fst (Option.get cur_step) in
-              match a with
-              | Pure pf ->
-                  let bstate, _, _ = state in
-                  let vs = State.unfolding_vals bstate [ pf ] in
-                  UFail [ EAsrt (vs, Not pf, [ [ Pure pf ] ]) ]
-              | _ -> UFail [])
-          in
-          match ret with
-          | UWTF ->
-              L.verbose (fun fmt -> fmt "Impossible. UWTF.");
-              UPUSucc [], report_path
-          | USucc state' -> (
-              match UP.next up with
-              | None ->
-                  L.verbose (fun fmt ->
-                      fmt
-                        "Unifier.unify_up: Unification successful: %d states left"
-                        (List.length s_states));
-                  UPUSucc [ (state', subst, UP.posts up) ], report_path
-              | Some [ (up, lab) ] ->
+    let s_states, errs_so_far = s_states in
+    L.(
+      verbose (fun m ->
+          m "Unify UP: There are %d states left to consider."
+            (List.length s_states)));
+    let f = unify_up in
+    match s_states with
+    | [] -> UPUFail errs_so_far
+    | (state, subst, up) :: rest -> (
+        let cur_step : UP.step option = UP.head up in
+        let ret =
+          try
+            Option.fold
+              ~some:(unify_assertion state subst)
+              ~none:(USucc state) cur_step
+          with err -> (
+            L.verbose (fun fmt ->
+                fmt
+                  "WARNING: UNCAUGHT EXCEPTION IN UNIFY-ASSERTION : %s@\n\
+                  Here's the backtrace: %s" (Printexc.to_string err)
+                  (Printexc.get_backtrace ()));
+            let a = fst (Option.get cur_step) in
+            match a with
+            | Pure pf ->
+                let bstate, _, _ = state in
+                let vs = State.unfolding_vals bstate [ pf ] in
+                UFail [ EAsrt (vs, Not pf, [ [ Pure pf ] ]) ]
+            | _ -> UFail [])
+        in
+        match ret with
+        | UWTF ->
+            L.verbose (fun fmt -> fmt "Impossible. UWTF.");
+            UPUSucc []
+        | USucc state' -> (
+            match UP.next up with
+            | None ->
+                L.verbose (fun fmt ->
+                    fmt
+                      "Unifier.unify_up: Unification successful: %d states left"
+                      (List.length s_states));
+                UPUSucc [ (state', subst, UP.posts up) ]
+            | Some [ (up, lab) ] ->
+                if complete_subst subst lab then
+                  f ((state', subst, up) :: rest, errs_so_far)
+                else f (rest, errs_so_far)
+            | Some ((up, lab) :: ups') ->
+                let next_states =
+                  List.map
+                    (fun (up, lab) ->
+                      let new_subst = ESubst.copy subst in
+                      let new_state = copy_astate state' in
+                      if complete_subst new_subst lab then
+                        Some (new_state, new_subst, up)
+                      else None)
+                    ups'
+                in
+                let next_states = List_utils.get_list_somes next_states in
+                let next_states =
                   if complete_subst subst lab then
-                    aux (((state', subst, up), (state_depth + 1)) :: rest, errs_so_far) report_path
-                  else aux (rest, errs_so_far) report_path
-              | Some ((up, lab) :: ups') ->
-                  let next_states =
-                    List.map
-                      (fun (up, lab) ->
-                        let new_subst = ESubst.copy subst in
-                        let new_state = copy_astate state' in
-                        if complete_subst new_subst lab then
-                          Some ((new_state, new_subst, up), (state_depth + 1))
-                        else None)
-                      ups'
-                  in
-                  let next_states = List_utils.get_list_somes next_states in
-                  let next_states =
-                    if complete_subst subst lab then
-                      ((state', subst, up), (state_depth + 1)) :: next_states
-                    else next_states
-                  in
-                  aux (next_states @ rest, errs_so_far) report_path
-              | Some [] -> L.fail "ERROR: unify_up: empty unification plan")
-          | UFail errs ->
-              L.(
-                verbose (fun m ->
-                    m
-                      "@[<v 2>WARNING: Unify Assertion Failed: @[<h>%a@] with \
-                      subst @\n\
-                      %a in state @\n\
-                      %a with errors:@\n\
-                      %a@]"
-                      Fmt.(
-                        option
-                          ~none:(any "no assertion - phantom node")
-                          UP.step_pp)
-                      cur_step ESubst.pp subst pp_astate state
-                      Fmt.(list ~sep:(any "@\n") State.pp_err)
-                      errs));
-              aux (rest, errs @ errs_so_far) report_path)
-    ) in
-    let (states, e) = s_states in
-    let states_d = states |> List.map (fun s -> (s, 0)) in
-    let (res, report_path) = aux (states_d, e) (Some []) in (
-      Option.bind report_path (set_phase_depth 0) |> ignore;
-      res
-    )
+                    (state', subst, up) :: next_states
+                  else next_states
+                in
+                f (next_states @ rest, errs_so_far)
+            | Some [] -> L.fail "ERROR: unify_up: empty unification plan")
+        | UFail errs ->
+            L.(
+              verbose (fun m ->
+                  m
+                    "@[<v 2>WARNING: Unify Assertion Failed: @[<h>%a@] with \
+                    subst @\n\
+                    %a in state @\n\
+                    %a with errors:@\n\
+                    %a@]"
+                    Fmt.(
+                      option
+                        ~none:(any "no assertion - phantom node")
+                        UP.step_pp)
+                    cur_step ESubst.pp subst pp_astate state
+                    Fmt.(list ~sep:(any "@\n") State.pp_err)
+                    errs));
+            f (rest, errs @ errs_so_far))
 
   and unify
       ?(in_unification = false)
