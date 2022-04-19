@@ -696,7 +696,7 @@ struct
         let docv = "PATH" in
         Arg.(required & pos 0 (some file) None & info [] ~docv ~doc)
       in
-      let run test_suite_path npaf incremental =
+      let run test_suite_path npaf incremental () =
         let () = Config.current_exec_mode := exec_mode in
         let () = PC.initialize exec_mode in
         let () = Config.bulk_print_all_failures := not npaf in
@@ -712,7 +712,7 @@ struct
         in
         Cmd.info (Runner.cmd_name runner) ~doc ~man
       in
-      Cmd.v run_info run_t
+      Cmd.v run_info (with_common run_t)
 
     let bulk_cmds = List.map make_bulk_console Runners.runners
   end
