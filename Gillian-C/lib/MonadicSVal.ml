@@ -320,7 +320,7 @@ module SVArray = struct
     let size =
       let open Expr.Infix in
       let low, high = range in
-      (high -. low) /. chunk_size
+      (high - low) / chunk_size
     in
     let f_of_all_same ~describing_pf ~concrete_single =
       match size with

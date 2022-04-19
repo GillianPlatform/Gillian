@@ -995,11 +995,13 @@ let rec encode_assertion (a : Formula.t) : ZExpr.expr =
       Set.mk_subset ctx le1' le2'
   | ForAll (bt, a) ->
       let z3_sorts = List.map (fun _ -> extended_literal_sort) bt in
-      let bt_with_some = List.filter (fun (_, t_x) -> t_x <> None) bt in
       let z3_types_assertions =
-        List.map
-          (fun (x, t_x) -> make_recognizer_assertion x (Option.get t_x))
-          bt_with_some
+        List.filter_map
+          (fun (x, t_x) ->
+            match t_x with
+            | Some t_x -> Some (make_recognizer_assertion x t_x)
+            | None -> None)
+          bt
       in
       let binders, _ = List.split bt in
       let z3_types_assertion = Boolean.mk_and ctx z3_types_assertions in
