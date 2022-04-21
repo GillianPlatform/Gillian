@@ -95,7 +95,9 @@ rule read =
   | "Int"      { GINTT }
   | "Set"      { GSETT }
   | "List"     { GLISTT }
-  | number     { INTEGER (int_of_string (Lexing.lexeme lexbuf)) }
+  | number     { let lexeme = Lexing.lexeme lexbuf in
+                 try INTEGER (int_of_string lexeme) with
+                 | _ -> raise (SyntaxError ("invalid number: " ^ lexeme)) }
   | lvar       { LVAR ( Lexing.lexeme lexbuf) }
   | loc        { LOC (Lexing.lexeme lexbuf) }
   | id         { IDENTIFIER (Lexing.lexeme lexbuf) }

@@ -290,7 +290,7 @@ bool aws_byte_cursor_read(struct aws_byte_cursor *cur, void *dest,
             writable_memory(#var, 1, #trash)
 
         ensures:
-            invalid_read(1., #cur_length) *
+            invalid_read(1, #cur_length) *
             valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
             writable_memory(#var, 1, #trash) *
             (ret == FALSE);
@@ -328,7 +328,7 @@ bool aws_byte_cursor_read_u8(struct aws_byte_cursor *cur, uint8_t *var) {
             writable_memory(#var, 2, #trash)
 
         ensures:
-            invalid_read(2., #cur_length) *
+            invalid_read(2, #cur_length) *
             valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
             writable_memory(#var, 2, #trash) *
             (ret == FALSE);
@@ -372,7 +372,7 @@ bool aws_byte_cursor_read_be16(struct aws_byte_cursor *cur, uint16_t *var) {
             writable_memory(#var, 4, #trash)
 
         ensures:
-            invalid_read(4., #cur_length) *
+            invalid_read(4, #cur_length) *
             valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
             writable_memory(#var, 4, #trash) *
             (ret == FALSE);

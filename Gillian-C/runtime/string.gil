@@ -5,13 +5,13 @@ proc i__strcmp(str1, str2) {
                 ((typeOf (l-nth(str1, 0i))) = Obj) and ((typeOf (l-nth(str2, 0i))) = Obj)]
                 ctn die; (* Check that we have pointers *)
     ctn:  i := 0i;
-    loop: char1_ar := [mem_load]("int8signed", l-nth(str1, 0i), l-nth(str1, 1i) + i);
-          char2_ar := [mem_load]("int8signed", l-nth(str2, 0i), l-nth(str2, 1i) + i);
+    loop: char1_ar := [mem_load]("int8signed", l-nth(str1, 0i), l-nth(str1, 1i) i+ i);
+          char2_ar := [mem_load]("int8signed", l-nth(str2, 0i), l-nth(str2, 1i) i+ i);
           char1 := l-nth(char1_ar, 0i);
           char2 := l-nth(char2_ar, 0i);
           goto [ (char1 = {{ "int", 0i }}) and (char2 = {{ "int", 0i }}) ] end ctnl;
     ctnl: goto [ l-nth(char1, 1i) = l-nth(char2, 1i) ] eq neq;
-    neq:  ret := {{ "int", l-nth(char1, 1i) - l-nth(char2, 1i) }};
+    neq:  ret := {{ "int", l-nth(char1, 1i) i- l-nth(char2, 1i) }};
           return;
     eq:   i := i i+ 1i;
           goto loop;
@@ -39,9 +39,9 @@ proc i__strcpy(str1, str2) {
                 ((typeOf (l-nth(str1, 0i))) = Obj) and ((typeOf (l-nth(str2, 0i))) = Obj)]
                 ctn die; (* Check that we have pointers *)
     ctn:  i := 0i;
-    loop: char2_ar := [mem_load]("int8signed", l-nth(str2, 0i), l-nth(str2, 1i) + i);
+    loop: char2_ar := [mem_load]("int8signed", l-nth(str2, 0i), l-nth(str2, 1i) i+ i);
           char2 := l-nth(char2_ar, 0i);
-          u := [mem_store]("int8signed", l-nth(str1, 0i), l-nth(str1, 1i) + i, char2);
+          u := [mem_store]("int8signed", l-nth(str1, 0i), l-nth(str1, 1i) i+ i, char2);
           goto [ (char2 = {{ "int", 0i }}) ] end ctnl;
     ctnl: i := i i+ 1i;
           goto loop;

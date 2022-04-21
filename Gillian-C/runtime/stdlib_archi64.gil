@@ -50,7 +50,7 @@ proc i__memset(ptr, vc, vsz) {
             n := "i__alloc_size"(vsz);
             n := n i- 1i;
       loop: goto [not (n i< 0i)] ctn end;
-      ctn:  u := [mem_store]("int8unsigned", l-nth(ptr, 0i), l-nth(ptr, 1i) + n, vc);
+      ctn:  u := [mem_store]("int8unsigned", l-nth(ptr, 0i), l-nth(ptr, 1i) i+ n, vc);
             n := n i- 1i;
             goto loop;
       end:  ret := ptr;

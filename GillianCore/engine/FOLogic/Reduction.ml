@@ -374,7 +374,7 @@ let get_head_and_tail_of_list ~pfs lst =
     (* Base lists of literals and logical expressions *)
     | Lit (LList l) ->
         if l = [] then None else Some (Lit (List.hd l), Lit (LList (List.tl l)))
-    | EList l -> if l = [] then None else Some (List.nth l 0, EList (List.tl l))
+    | EList l -> if l = [] then None else Some (List.hd l, EList (List.tl l))
     | NOp (LstCat, lel :: ler) ->
         Option.value ~default:None
           (Option.map
@@ -939,29 +939,36 @@ let rec reduce_lexpr_loop
     | EList les -> (
         let fles = List.map f les in
         let all_literals =
-          List.for_all
-            (fun x ->
-              match x with
-              | Expr.Lit _ -> true
-              | _ -> false)
-            fles
+          let rec loop l =
+            match l with
+            | [] -> Some []
+            | Expr.Lit l :: r -> Option.map (fun x -> l :: x) (loop r)
+            | _ -> None
+          in
+          loop fles
         in
         match all_literals with
-        | false -> Expr.EList fles
-        | true ->
-            let lits =
-              List.map
-                (fun x ->
-                  match x with
-                  | Expr.Lit x -> x
-                  | _ ->
-                      raise
-                        (Exceptions.Impossible
-                           "reduce_lexpr: all literals: guaranteed by \
-                            match/filter"))
-                fles
+        | Some lits -> Expr.Lit (LList lits)
+        | None -> (
+            (* See if the list as form {{ lnth(e, k), lnth(e, k+1), ..., lnth(e, k+n) }},
+               transform it into sublist *)
+            let sublist_and_indexes =
+              let rec loop ~acc l =
+                match l with
+                | Expr.BinOp (o, LstNth, Lit (Int k)) :: r -> (
+                    match acc with
+                    | None -> loop ~acc:(Some (o, k, k)) r
+                    | Some (o', s, k') when o = o' && Int.equal (k + 1) k' ->
+                        loop ~acc:(Some (o, s, k')) r
+                    | _ -> None)
+                | [] -> acc
+                | _ -> None
+              in
+              loop ~acc:None fles
             in
-            Lit (LList lits))
+            match sublist_and_indexes with
+            | None -> EList fles
+            | Some (l, s, e) -> LstSub (l, Lit (Int s), Lit (Int (e - s + 1)))))
     (* Base sets *)
     | ESet les -> ESet (Expr.Set.elements (Expr.Set.of_list (List.map f les)))
     (* Number-to-string-to-number-to-string-to... *)

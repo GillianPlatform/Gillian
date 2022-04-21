@@ -22,12 +22,12 @@ pure pred rawToUInt16(+bytes:List, +littleEndian:Bool, num:Int) :
       (bytes == {{ #b0, #b1 }}) *
       (0i i<=# #b0) * (#b0 i<# 256i) *
       (0i i<=# #b1) * (#b1 i<# 256i) *
-      (num == (#b0 * 256i) + #b1),
+      (num == (#b0 i* 256i) i+ #b1),
     (littleEndian == true) *
       (bytes == {{ #b0, #b1 }}) *
       (0i i<=# #b0) * (#b0 i<# 256i) *
       (0i i<=# #b1) * (#b1 i<# 256i) *
-      (num == (#b1 * 256i) + #b0);
+      (num == (#b1 i* 256i) i+ #b0);
 
 
 (* Interpretation: four bytes as an unsigned 32i-bit integer *)
@@ -39,11 +39,11 @@ pure pred rawToUInt32(+bytes:List, +littleEndian:Bool, num:Int) :
       (0i i<=# #b1) * (#b1 i<# 256i) *
       (0i i<=# #b2) * (#b2 i<# 256i) *
       (0i i<=# #b3) * (#b3 i<# 256i) *
-      (num == (#b0 * 16777216i) + (#b1 * 65536i) + (#b2 * 256i) + #b3),
+      (num == (#b0 i* 16777216i) i+ (#b1 i* 65536i) i+ (#b2 i* 256i) i+ #b3),
     (littleEndian == true) *
       (bytes == {{ #b0, #b1, #b2, #b3 }}) *
       (0i i<=# #b0) * (#b0 i<# 256i) *
       (0i i<=# #b1) * (#b1 i<# 256i) *
       (0i i<=# #b2) * (#b2 i<# 256i) *
       (0i i<=# #b3) * (#b3 i<# 256i) *
-      (num == (#b3 * 16777216i) + (#b2 * 65536i) + (#b1 * 256i) + #b0);    
+      (num == (#b3 i* 16777216i) i+ (#b2 i* 65536i) i+ (#b1 i* 256i) i+ #b0);    

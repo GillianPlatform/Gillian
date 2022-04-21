@@ -14,7 +14,7 @@ type t = TypeDef__.expr =
   | ESet of t list  (** Sets of expressions     *)
 [@@deriving yojson]
 
-let equal (e1 : t) (e2 : t) : bool = Stdlib.compare e1 e2 = 0
+let equal (e1 : t) (e2 : t) : bool = Stdlib.compare e1 e2 == 0
 
 (** {3 builders} *)
 
@@ -157,6 +157,12 @@ module Infix = struct
     match (a, b) with
     | Lit (Int 0), x | x, Lit (Int 0) -> x
     | Lit (Int x), Lit (Int y) -> Lit (Int (x + y))
+    | BinOp (Lit (Int x), IPlus, y), Lit (Int z)
+    | Lit (Int z), BinOp (Lit (Int x), IPlus, y) ->
+        BinOp (Lit (Int (x + z)), IPlus, y)
+    | BinOp (y, IPlus, Lit (Int x)), Lit (Int z)
+    | Lit (Int z), BinOp (y, IPlus, Lit (Int x)) ->
+        BinOp (y, IPlus, Lit (Int (x + z)))
     | _ -> BinOp (a, IPlus, b)
 
   let ( - ) a b =

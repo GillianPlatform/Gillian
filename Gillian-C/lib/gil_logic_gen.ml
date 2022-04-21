@@ -295,7 +295,7 @@ let trans_binop b =
   | SetSub -> BSetSub
   | SetDiff -> SetDiff
   | SetMem -> BSetMem
-  | LessThan -> FLessThan
+  | LessThan -> ILessThan
   | And -> BAnd
   | Or -> BOr
 

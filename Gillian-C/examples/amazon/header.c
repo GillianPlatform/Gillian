@@ -1,11 +1,11 @@
 /*
  * Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
- * Licensed under the Apache License, Version 2.0 (the "License"). You may not
+ * Licensed under the Apache License, Version 20 (the "License"). You may not
  * use this file except in compliance with the License. A copy of the License is
  * located at
  *
- *     http://aws.amazon.com/apache2.0/
+ *     http://aws.amazon.com/apache20/
  *
  * or in the "license" file accompanying this file. This file is distributed on
  * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
@@ -651,8 +651,8 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
         }");
     GILLIAN("assert (len #restEDKs == 0) ");
     GILLIAN("assert (#rest_count == 0) * (#EDKs == #acc) ");
-    GILLIAN("unfold Elements(#edkDef, #restEDKsAndRest, 0., #rest_count, 3., #restEDKs, #restEDKLength)");
-    GILLIAN("unfold CElements(#restEDKsAndRest, 0., #rest_count, 3., #restEDKs, #restEDKLength)");
+    GILLIAN("unfold Elements(#edkDef, #restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength)");
+    GILLIAN("unfold CElements(#restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength)");
     GILLIAN("assert (len #leftEDKs == 0)");
 
     GILLIAN("unfold optBytes(#bptr, #readLength, #readEDKs)");
