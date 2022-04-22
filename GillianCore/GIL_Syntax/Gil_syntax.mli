@@ -174,7 +174,8 @@ module BinOp : sig
     | BitwiseXorL  (** Bitwise exclusive disjunction 64bit *)
     | LeftShiftL  (** Left bitshift 64bit *)
     | SignedRightShiftL  (** Signed right bitshift 64bit *)
-    | UnsignedRightShiftL  (** Unsigned right bitshift 64bit *)
+    | FUnsignedRightShiftL  (** Float Unsigned right bitshift 64bit *)
+    | IUnsignedRightShiftL  (** Int Unsigned right bitshift 64bit *)
     | M_atan2  (** Arctangent y/x *)
     | M_pow  (** Power *)
     | LstNth  (** Nth element of a string *)
@@ -1310,7 +1311,8 @@ module Visitors : sig
                bool ->
                SLCmd.t
            ; visit_UnsignedRightShift : 'c -> BinOp.t -> BinOp.t
-           ; visit_UnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
+           ; visit_FUnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
+           ; visit_IUnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
            ; visit_assertion : 'c -> Asrt.t -> Asrt.t
            ; visit_bindings :
                'c ->
@@ -1566,7 +1568,8 @@ module Visitors : sig
         SLCmd.t
 
       method visit_UnsignedRightShift : 'c -> BinOp.t -> BinOp.t
-      method visit_UnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
+      method visit_FUnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
+      method visit_IUnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
 
       method private visit_array :
         'env 'a. ('env -> 'a -> 'a) -> 'env -> 'a array -> 'a array
@@ -1822,7 +1825,8 @@ module Visitors : sig
                bool ->
                'f
            ; visit_UnsignedRightShift : 'c -> 'f
-           ; visit_UnsignedRightShiftL : 'c -> 'f
+           ; visit_FUnsignedRightShiftL : 'c -> 'f
+           ; visit_IUnsignedRightShiftL : 'c -> 'f
            ; visit_assertion : 'c -> Asrt.t -> 'f
            ; visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
            ; visit_binop : 'c -> BinOp.t -> 'f
@@ -2044,7 +2048,8 @@ module Visitors : sig
         'f
 
       method visit_UnsignedRightShift : 'c -> 'f
-      method visit_UnsignedRightShiftL : 'c -> 'f
+      method visit_FUnsignedRightShiftL : 'c -> 'f
+      method visit_IUnsignedRightShiftL : 'c -> 'f
       method visit_assertion : 'c -> Asrt.t -> 'f
       method visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
       method visit_binop : 'c -> BinOp.t -> 'f
@@ -2260,7 +2265,8 @@ module Visitors : sig
                bool ->
                unit
            ; visit_UnsignedRightShift : 'c -> unit
-           ; visit_UnsignedRightShiftL : 'c -> unit
+           ; visit_FUnsignedRightShiftL : 'c -> unit
+           ; visit_IUnsignedRightShiftL : 'c -> unit
            ; visit_assertion : 'c -> Asrt.t -> unit
            ; visit_bindings : 'c -> string * (string * Expr.t) list -> unit
            ; visit_binop : 'c -> BinOp.t -> unit
@@ -2481,7 +2487,8 @@ module Visitors : sig
         unit
 
       method visit_UnsignedRightShift : 'c -> unit
-      method visit_UnsignedRightShiftL : 'c -> unit
+      method visit_FUnsignedRightShiftL : 'c -> unit
+      method visit_IUnsignedRightShiftL : 'c -> unit
 
       method private visit_array :
         'env 'a. ('env -> 'a -> unit) -> 'env -> 'a array -> unit

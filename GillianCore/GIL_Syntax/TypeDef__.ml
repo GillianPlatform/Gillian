@@ -66,7 +66,8 @@ and binop =
   | BitwiseXorL
   | LeftShiftL
   | SignedRightShiftL
-  | UnsignedRightShiftL
+  | FUnsignedRightShiftL
+  | IUnsignedRightShiftL
   | M_atan2
   | M_pow
   | LstNth

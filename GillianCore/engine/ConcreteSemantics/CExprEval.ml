@@ -424,8 +424,11 @@ let rec evaluate_binop
       | SignedRightShiftL ->
           binary_num_thing lit1 lit2 int64_right_shift
             "Type Error: 64bit Signed right shift: expected numbers, got "
-      | UnsignedRightShiftL ->
+      | FUnsignedRightShiftL ->
           binary_num_thing lit1 lit2 uint32_right_shift
+            "Type Error: 64bit Unsigned right shift: expected numbers, got "
+      | IUnsignedRightShiftL ->
+          binary_int_thing lit1 lit2 uint64_int_right_shift
             "Type Error: 64bit Unsigned right shift: expected numbers, got "
       | M_atan2 ->
           binary_num_thing lit1 lit2 atan2

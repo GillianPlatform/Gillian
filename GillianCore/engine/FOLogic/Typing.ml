@@ -91,10 +91,13 @@ let rec infer_types_to_gamma
         | BSetSub -> (Some SetType, Some SetType, Some BooleanType)
         | LstNth -> (Some ListType, Some IntType, None)
         | StrNth -> (Some ListType, Some NumberType, None)
-        | IPlus | IMinus | ITimes | IMod | IDiv ->
+        | IPlus | IMinus | ITimes | IMod | IDiv | IUnsignedRightShiftL ->
             (Some IntType, Some IntType, Some IntType)
-        | FPlus | FMinus | FTimes | FMod | FDiv ->
-            (Some NumberType, Some NumberType, Some NumberType)
+        | FPlus
+        | FMinus
+        | FTimes
+        | FMod
+        | FDiv
         | BitwiseAnd
         | BitwiseOr
         | BitwiseXor
@@ -106,7 +109,7 @@ let rec infer_types_to_gamma
         | BitwiseXorL
         | LeftShiftL
         | SignedRightShiftL
-        | UnsignedRightShiftL
+        | FUnsignedRightShiftL
         | M_atan2
         | M_pow -> (Some NumberType, Some NumberType, Some NumberType)
       in
@@ -347,7 +350,7 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
             | BSetSub -> infer_type le BooleanType constraints
             | SetDiff -> infer_type le SetType constraints
             | StrCat -> infer_type le StringType constraints
-            | IPlus | IMinus | ITimes | IDiv | IMod ->
+            | IPlus | IMinus | ITimes | IDiv | IMod | IUnsignedRightShiftL ->
                 infer_type le IntType constraints
             | FPlus
             | FMinus
@@ -365,7 +368,7 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
             | BitwiseXorL
             | LeftShiftL
             | SignedRightShiftL
-            | UnsignedRightShiftL
+            | FUnsignedRightShiftL
             | M_atan2
             | M_pow ->
                 infer_type le NumberType constraints

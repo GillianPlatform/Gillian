@@ -34,7 +34,8 @@ type t = TypeDef__.binop =
   | BitwiseXorL  (** Bitwise exclusive disjunction 64bit *)
   | LeftShiftL  (** Left bitshift 64bit *)
   | SignedRightShiftL  (** Signed right bitshift 64bit *)
-  | UnsignedRightShiftL  (** Unsigned right bitshift 64bit *)
+  | FUnsignedRightShiftL  (** Unsigned right bitshift 64bit *)
+  | IUnsignedRightShiftL  (** Int Unsigned right bitshift 64bit *)
   (* Mathematics *)
   | M_atan2  (** Arctangent y/x *)
   | M_pow  (** Power *)
@@ -80,7 +81,8 @@ let str (x : t) =
   | BitwiseXorL -> "^l"
   | LeftShiftL -> "<<l"
   | SignedRightShiftL -> ">>l"
-  | UnsignedRightShiftL -> ">>>l"
+  | FUnsignedRightShiftL -> ">>>l"
+  | IUnsignedRightShiftL -> "i>>>l"
   | M_atan2 -> "m_atan2"
   | M_pow -> "**"
   | LstNth -> "l-nth"

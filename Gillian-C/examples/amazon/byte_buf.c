@@ -183,8 +183,8 @@ void aws_byte_buf_clean_up(struct aws_byte_buf *buf) {
 // that is how CompCert handles struct passing
 /*@
     spec aws_byte_cursor_advance(_res, cursor, length) {
-        requires: (
-            _res == #res) * (cursor == #cursor) * (length == long(#length)) *
+        requires:
+            (_res == #res) * (cursor == #cursor) * (length == long(#length)) *
             (0 <=# #length) * ARRAY(#res, long, 2, #trash) *
             valid_aws_byte_cursor_ptr(#cursor, #cur_len, #buffer, #content) *
             ((0 <# #length) || (not (#buffer == NULL)))
@@ -206,7 +206,7 @@ struct aws_byte_cursor
 aws_byte_cursor_advance(struct aws_byte_cursor *const cursor,
                         const size_t length) {
     struct aws_byte_cursor rv;
-    if (cursor->len > (SIZE_MAX >> 1) || length > (SIZE_MAX >> 1) ||
+    if (cursor->len > 2147483647 || length > 2147483647||
         length > cursor->len) {
         rv.ptr = NULL;
         rv.len = 0;
