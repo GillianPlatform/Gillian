@@ -45,6 +45,7 @@ let reals_sort = Arithmetic.Real.mk_sort ctx
 let numbers_sort = reals_sort
 let mk_string_symb s = Symbol.mk_string ctx s
 let mk_int_i = Arithmetic.Integer.mk_numeral_i ctx
+let mk_int_s = Arithmetic.Integer.mk_numeral_s ctx
 let mk_const = Arithmetic.Real.mk_const ctx
 let mk_num_i = Arithmetic.Real.mk_numeral_i ctx
 let mk_num_s = Arithmetic.Real.mk_numeral_s ctx
@@ -297,7 +298,7 @@ module Axiomatised_operations = struct
   let llen_fun =
     FuncDecl.mk_func_decl ctx (mk_string_symb "l-len")
       [ Lit_operations.z3_gil_list_sort ]
-      numbers_sort
+      ints_sort
 
   let num2str_fun =
     FuncDecl.mk_func_decl ctx (mk_string_symb "num2str") [ numbers_sort ]
@@ -318,7 +319,7 @@ module Axiomatised_operations = struct
 
   let lnth_fun =
     FuncDecl.mk_func_decl ctx (mk_string_symb "l-nth")
-      [ z3_gil_list_sort; numbers_sort ]
+      [ z3_gil_list_sort; ints_sort ]
       z3_gil_literal_sort
 
   let lcat_fun =
@@ -499,7 +500,7 @@ let rec encode_lit (lit : Literal.t) =
         mk_singleton_elem
           (ZExpr.mk_app ctx Lit_operations.boolean_constructor [ b_arg ])
     | Int i ->
-        let i_arg = mk_int_i i in
+        let i_arg = mk_int_s (Z.to_string i) in
         mk_singleton_elem
           (ZExpr.mk_app ctx Lit_operations.int_constructor [ i_arg ])
     | Num n ->
@@ -667,8 +668,7 @@ let encode_binop (op : BinOp.t) le1 le2 =
           [ mk_singleton_access le1 ]
       in
       let index' =
-        ZExpr.mk_app ctx Lit_operations.number_accessor
-          [ mk_singleton_access le2 ]
+        ZExpr.mk_app ctx Lit_operations.int_accessor [ mk_singleton_access le2 ]
       in
       mk_singleton_elem
         (ZExpr.mk_app ctx Axiomatised_operations.lnth_fun [ lst'; index' ])
@@ -719,7 +719,7 @@ let encode_unop (op : UnOp.t) le =
         ZExpr.mk_app ctx Axiomatised_operations.llen_fun [ le_lst ]
       in
       mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.number_constructor [ op_le_lst ])
+        (ZExpr.mk_app ctx Lit_operations.int_constructor [ op_le_lst ])
   | StrLen ->
       let le_s =
         ZExpr.mk_app ctx Lit_operations.string_accessor
@@ -803,6 +803,21 @@ let encode_unop (op : UnOp.t) le =
       let n_le = ZExpr.mk_app ctx Axiomatised_operations.lrev_fun [ le_lst ] in
       mk_singleton_elem
         (ZExpr.mk_app ctx Lit_operations.list_constructor [ n_le ])
+  | NumToInt ->
+      let le_n =
+        ZExpr.mk_app ctx Lit_operations.number_accessor
+          [ mk_singleton_access le ]
+      in
+      let op_le_n = Arithmetic.Real.mk_real2int ctx le_n in
+      mk_singleton_elem
+        (ZExpr.mk_app ctx Lit_operations.int_constructor [ op_le_n ])
+  | IntToNum ->
+      let le_n =
+        ZExpr.mk_app ctx Lit_operations.int_accessor [ mk_singleton_access le ]
+      in
+      let op_le_n = Arithmetic.Integer.mk_int2real ctx le_n in
+      mk_singleton_elem
+        (ZExpr.mk_app ctx Lit_operations.number_constructor [ op_le_n ])
   | _ ->
       Printf.printf "SMT encoding: Construct not supported yet - unop - %s!\n"
         (UnOp.str op);
@@ -935,7 +950,7 @@ let rec encode_assertion (a : Formula.t) : ZExpr.expr =
   match a with
   | Not a -> Boolean.mk_not ctx (f a)
   | Eq (le1, le2) -> Boolean.mk_eq ctx (fe le1) (fe le2)
-  | Less (le1, le2) ->
+  | FLess (le1, le2) ->
       let le1' =
         ZExpr.mk_app ctx Lit_operations.number_accessor
           [ mk_singleton_access (fe le1) ]
@@ -945,13 +960,33 @@ let rec encode_assertion (a : Formula.t) : ZExpr.expr =
           [ mk_singleton_access (fe le2) ]
       in
       mk_lt le1' le2'
-  | LessEq (le1, le2) ->
+  | FLessEq (le1, le2) ->
       let le1' =
         ZExpr.mk_app ctx Lit_operations.number_accessor
           [ mk_singleton_access (fe le1) ]
       in
       let le2' =
         ZExpr.mk_app ctx Lit_operations.number_accessor
+          [ mk_singleton_access (fe le2) ]
+      in
+      mk_le le1' le2'
+  | ILess (le1, le2) ->
+      let le1' =
+        ZExpr.mk_app ctx Lit_operations.int_accessor
+          [ mk_singleton_access (fe le1) ]
+      in
+      let le2' =
+        ZExpr.mk_app ctx Lit_operations.int_accessor
+          [ mk_singleton_access (fe le2) ]
+      in
+      mk_lt le1' le2'
+  | ILessEq (le1, le2) ->
+      let le1' =
+        ZExpr.mk_app ctx Lit_operations.int_accessor
+          [ mk_singleton_access (fe le1) ]
+      in
+      let le2' =
+        ZExpr.mk_app ctx Lit_operations.int_accessor
           [ mk_singleton_access (fe le2) ]
       in
       mk_le le1' le2'
@@ -976,11 +1011,13 @@ let rec encode_assertion (a : Formula.t) : ZExpr.expr =
       Set.mk_subset ctx le1' le2'
   | ForAll (bt, a) ->
       let z3_sorts = List.map (fun _ -> extended_literal_sort) bt in
-      let bt_with_some = List.filter (fun (_, t_x) -> t_x <> None) bt in
       let z3_types_assertions =
-        List.map
-          (fun (x, t_x) -> make_recognizer_assertion x (Option.get t_x))
-          bt_with_some
+        List.filter_map
+          (fun (x, t_x) ->
+            match t_x with
+            | Some t_x -> Some (make_recognizer_assertion x t_x)
+            | None -> None)
+          bt
       in
       let binders, _ = List.split bt in
       let z3_types_assertion = Boolean.mk_and ctx z3_types_assertions in

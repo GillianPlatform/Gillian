@@ -6,6 +6,6 @@ proc i__ptr_chunk() {
 };
 
 proc i__ptr_size() {
-  ret := 8;
+  ret := 8i;
   return
 };

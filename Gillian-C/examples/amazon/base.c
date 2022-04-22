@@ -16,12 +16,12 @@
 /*@
     pred aws_add_u64_checked(+a, +b, out) {
         (out == (a + b)) *
-        (out <# 18446744073709551615)
+        (out <# 4611686018427387903)
     }
 
     pred aws_mul_u64_checked(+a, +b, out) {
         (out == (a * b)) *
-        (out <# 18446744073709551615)
+        (out <# 4611686018427387903)
     }
 
     pred nounfold writable_memory(+pointer, +length, content) {

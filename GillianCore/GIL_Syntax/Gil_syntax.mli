@@ -51,7 +51,7 @@ module Type : sig
     | ListType  (** Type of lists *)
     | TypeType  (** Type of types *)
     | SetType  (** Type of sets *)
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   (** Printer *)
   val str : t -> string
@@ -68,14 +68,14 @@ module Literal : sig
     | Empty  (** The literal [empty] *)
     | Constant of Constant.t  (** GIL constants ({!type:Constant.t}) *)
     | Bool of bool  (** GIL booleans: [true] and [false] *)
-    | Int of int  (** GIL integers: TODO: understand size *)
+    | Int of Z.t  (** GIL integers: TODO: understand size *)
     | Num of float  (** GIL floats - double-precision 64-bit IEEE 754 *)
     | String of string  (** GIL strings *)
     | Loc of string  (** GIL locations (uninterpreted symbols) *)
     | Type of Type.t  (** GIL types ({!type:Type.t}) *)
     | LList of t list  (** Lists of GIL literals *)
     | Nono  (** Negative information *)
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   (** Pretty-printer *)
   val pp : t Fmt.t
@@ -119,10 +119,15 @@ module UnOp : sig
     | M_sqrt  (** Square root *)
     | M_tan  (** Tangent *)
     | ToStringOp  (** Converts a number (integer or float) to a string *)
-    | ToIntOp  (** Converts a float to an integer *)
-    | ToUint16Op  (** Converts an integer to a 16-bit unsigned integer *)
-    | ToUint32Op  (** Converts an integer to a 32-bit unsigned integer *)
-    | ToInt32Op  (** Converts an integer to a 32-bit signed integer *)
+    | ToIntOp  (** Converts a float to an integer, Num -> Num !!  *)
+    | ToUint16Op
+        (** Converts an integer to a 16-bit unsigned integer, Num -> Num !! *)
+    | ToUint32Op
+        (** Converts an integer to a 32-bit unsigned integer, Num -> Num !! *)
+    | ToInt32Op
+        (** Converts an integer to a 32-bit signed integer, Num -> Num !! *)
+    (* | IntToNum Converts a Gil Int to a Gil Num
+       | NumToInt Converts a Gil Num to a Gil Int *)
     | ToNumberOp  (** Converts a string to a number *)
     | TypeOf
     | Car  (** Head of a list *)
@@ -131,7 +136,10 @@ module UnOp : sig
     | LstRev  (** List reverse *)
     | SetToList  (** From set to list *)
     | StrLen  (** String length *)
-  [@@deriving yojson]
+    (* Integer vs Number *)
+    | NumToInt  (** Number to Integer - actual cast *)
+    | IntToNum  (** Integer to Number - actual cast *)
+  [@@deriving yojson, eq]
 
   (** Printer *)
   val str : t -> string
@@ -178,7 +186,7 @@ module BinOp : sig
     | SetDiff  (** Set difference *)
     | BSetMem  (** Set membership *)
     | BSetSub  (** Subset *)
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   (** Printer *)
   val str : t -> string
@@ -215,8 +223,16 @@ module Expr : sig
   val num : float -> t
   val num_int : int -> t
   val int : int -> t
+  val int_z : Z.t -> t
   val string : string -> t
   val bool : bool -> t
+
+  (** Lit (Int Z.zero) *)
+  val zero_i : t
+
+  (** Lit (Int Z.one) *)
+  val one_i : t
+
   val type_ : Type.t -> t
   val list : t list -> t
   val list_length : t -> t
@@ -227,6 +243,7 @@ module Expr : sig
   val list_cat : t -> t -> t
   val typeof : t -> t
   val fmod : t -> t -> t
+  val imod : t -> t -> t
 
   module Infix : sig
     val ( +. ) : t -> t -> t
@@ -336,14 +353,17 @@ module Formula : sig
     | And of t * t  (** Logical conjunction *)
     | Or of t * t  (** Logical disjunction *)
     | Eq of Expr.t * Expr.t  (** Expression equality *)
-    | Less of Expr.t * Expr.t  (** Expression less-than for numbers *)
-    | LessEq of Expr.t * Expr.t
+    | FLess of Expr.t * Expr.t  (** Expression less-than for numbers *)
+    | FLessEq of Expr.t * Expr.t
         (** Expression less-than-or-equal for numbers *)
+    | ILess of Expr.t * Expr.t  (** Expression less-than for integers *)
+    | ILessEq of Expr.t * Expr.t
+        (** Expression less-than-or-equal for integeres *)
     | StrLess of Expr.t * Expr.t  (** Expression less-than for strings *)
     | SetMem of Expr.t * Expr.t  (** Set membership *)
     | SetSub of Expr.t * Expr.t  (** Set subsetness *)
     | ForAll of (string * Type.t option) list * t  (** Forall *)
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   val of_bool : bool -> t
 
@@ -442,17 +462,29 @@ module Formula : sig
     (** Same as Eq *)
     val ( #== ) : Expr.t -> Expr.t -> t
 
-    (** Same as Less *)
+    (** Same as ILess *)
     val ( #< ) : Expr.t -> Expr.t -> t
 
-    (** [a #> b] if [Not Less (b, a)]*)
+    (** [a #> b] if [Not ILess (b, a)]*)
     val ( #> ) : Expr.t -> Expr.t -> t
 
-    (** Same as LessEq *)
+    (** Same as ILessEq *)
     val ( #<= ) : Expr.t -> Expr.t -> t
 
-    (** [a #>= b] is [Not Less (b, a)] *)
+    (** [a #>= b] is [Not ILess (b, a)] *)
     val ( #>= ) : Expr.t -> Expr.t -> t
+
+    (** Same as FLess *)
+    val ( #<. ) : Expr.t -> Expr.t -> t
+
+    (** [a #>. b] if [Not FLess (b, a)]*)
+    val ( #>. ) : Expr.t -> Expr.t -> t
+
+    (** Same as FLessEq *)
+    val ( #<=. ) : Expr.t -> Expr.t -> t
+
+    (** [a #>=. b] is [Not FLess (b, a)] *)
+    val ( #>=. ) : Expr.t -> Expr.t -> t
 
     (** [fa #=> fb] is [(fnot fa) #|| fb] *)
     val ( #=> ) : t -> t -> t
@@ -1178,7 +1210,7 @@ module Visitors : sig
            ; visit_IUnaryMinus : 'c -> UnOp.t -> UnOp.t
            ; visit_If :
                'c -> LCmd.t -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
-           ; visit_Int : 'c -> Literal.t -> int -> Literal.t
+           ; visit_Int : 'c -> Literal.t -> Z.t -> Literal.t
            ; visit_IntType : 'c -> Type.t -> Type.t
            ; visit_Invariant : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
            ; visit_LAction :
@@ -1187,8 +1219,10 @@ module Visitors : sig
            ; visit_LVar : 'c -> Expr.t -> string -> Expr.t
            ; visit_LeftShift : 'c -> BinOp.t -> BinOp.t
            ; visit_LeftShiftL : 'c -> BinOp.t -> BinOp.t
-           ; visit_Less : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
-           ; visit_LessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_FLess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_FLessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_ILess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_ILessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
            ; visit_ListType : 'c -> Type.t -> Type.t
            ; visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
            ; visit_Loc : 'c -> Literal.t -> string -> Literal.t
@@ -1257,6 +1291,8 @@ module Visitors : sig
            ; visit_Star : 'c -> Asrt.t -> Asrt.t -> Asrt.t -> Asrt.t
            ; visit_StrCat : 'c -> BinOp.t -> BinOp.t
            ; visit_StrLen : 'c -> UnOp.t -> UnOp.t
+           ; visit_NumToInt : 'c -> UnOp.t -> UnOp.t
+           ; visit_IntToNum : 'c -> UnOp.t -> UnOp.t
            ; visit_StrLess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
            ; visit_StrNth : 'c -> BinOp.t -> BinOp.t
            ; visit_String : 'c -> Literal.t -> string -> Literal.t
@@ -1426,7 +1462,7 @@ module Visitors : sig
       method visit_If :
         'c -> LCmd.t -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
 
-      method visit_Int : 'c -> Literal.t -> int -> Literal.t
+      method visit_Int : 'c -> Literal.t -> Z.t -> Literal.t
       method visit_IntType : 'c -> Type.t -> Type.t
       method visit_Invariant : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
 
@@ -1437,8 +1473,10 @@ module Visitors : sig
       method visit_LVar : 'c -> Expr.t -> string -> Expr.t
       method visit_LeftShift : 'c -> BinOp.t -> BinOp.t
       method visit_LeftShiftL : 'c -> BinOp.t -> BinOp.t
-      method visit_Less : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
-      method visit_LessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+      method visit_FLess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+      method visit_FLessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+      method visit_ILess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+      method visit_ILessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
       method visit_ListType : 'c -> Type.t -> Type.t
       method visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
       method visit_Loc : 'c -> Literal.t -> string -> Literal.t
@@ -1509,6 +1547,8 @@ module Visitors : sig
       method visit_Star : 'c -> Asrt.t -> Asrt.t -> Asrt.t -> Asrt.t
       method visit_StrCat : 'c -> BinOp.t -> BinOp.t
       method visit_StrLen : 'c -> UnOp.t -> UnOp.t
+      method visit_IntToNum : 'c -> UnOp.t -> UnOp.t
+      method visit_NumToInt : 'c -> UnOp.t -> UnOp.t
       method visit_StrLess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
       method visit_StrNth : 'c -> BinOp.t -> BinOp.t
       method visit_String : 'c -> Literal.t -> string -> Literal.t
@@ -1681,8 +1721,10 @@ module Visitors : sig
            ; visit_LVar : 'c -> LVar.t -> 'f
            ; visit_LeftShift : 'c -> 'f
            ; visit_LeftShiftL : 'c -> 'f
-           ; visit_Less : 'c -> Expr.t -> Expr.t -> 'f
-           ; visit_LessEq : 'c -> Expr.t -> Expr.t -> 'f
+           ; visit_FLess : 'c -> Expr.t -> Expr.t -> 'f
+           ; visit_FLessEq : 'c -> Expr.t -> Expr.t -> 'f
+           ; visit_ILess : 'c -> Expr.t -> Expr.t -> 'f
+           ; visit_ILessEq : 'c -> Expr.t -> Expr.t -> 'f
            ; visit_ILessThan : 'c -> 'f
            ; visit_ILessThanEqual : 'c -> 'f
            ; visit_FLessThan : 'c -> 'f
@@ -1730,7 +1772,7 @@ module Visitors : sig
            ; visit_Not : 'c -> Formula.t -> 'f
            ; visit_Null : 'c -> 'f
            ; visit_NullType : 'c -> 'f
-           ; visit_Int : 'c -> int -> 'f
+           ; visit_Int : 'c -> Z.t -> 'f
            ; visit_Num : 'c -> float -> 'f
            ; visit_IntType : 'c -> 'f
            ; visit_NumberType : 'c -> 'f
@@ -1762,6 +1804,8 @@ module Visitors : sig
            ; visit_Star : 'c -> Asrt.t -> Asrt.t -> 'f
            ; visit_StrCat : 'c -> 'f
            ; visit_StrLen : 'c -> 'f
+           ; visit_IntToNum : 'c -> 'f
+           ; visit_NumToInt : 'c -> 'f
            ; visit_StrLess : 'c -> Expr.t -> Expr.t -> 'f
            ; visit_StrNth : 'c -> 'f
            ; visit_String : 'c -> string -> 'f
@@ -1899,8 +1943,10 @@ module Visitors : sig
       method visit_LVar : 'c -> LVar.t -> 'f
       method visit_LeftShift : 'c -> 'f
       method visit_LeftShiftL : 'c -> 'f
-      method visit_Less : 'c -> Expr.t -> Expr.t -> 'f
-      method visit_LessEq : 'c -> Expr.t -> Expr.t -> 'f
+      method visit_FLess : 'c -> Expr.t -> Expr.t -> 'f
+      method visit_FLessEq : 'c -> Expr.t -> Expr.t -> 'f
+      method visit_ILess : 'c -> Expr.t -> Expr.t -> 'f
+      method visit_ILessEq : 'c -> Expr.t -> Expr.t -> 'f
       method visit_ILessThan : 'c -> 'f
       method visit_ILessThanEqual : 'c -> 'f
       method visit_FLessThan : 'c -> 'f
@@ -1948,7 +1994,7 @@ module Visitors : sig
       method visit_Not : 'c -> Formula.t -> 'f
       method visit_Null : 'c -> 'f
       method visit_NullType : 'c -> 'f
-      method visit_Int : 'c -> int -> 'f
+      method visit_Int : 'c -> Z.t -> 'f
       method visit_Num : 'c -> float -> 'f
       method visit_IntType : 'c -> 'f
       method visit_NumberType : 'c -> 'f
@@ -1980,6 +2026,8 @@ module Visitors : sig
       method visit_Star : 'c -> Asrt.t -> Asrt.t -> 'f
       method visit_StrCat : 'c -> 'f
       method visit_StrLen : 'c -> 'f
+      method visit_IntToNum : 'c -> 'f
+      method visit_NumToInt : 'c -> 'f
       method visit_StrLess : 'c -> Expr.t -> Expr.t -> 'f
       method visit_StrNth : 'c -> 'f
       method visit_String : 'c -> string -> 'f
@@ -2123,7 +2171,7 @@ module Visitors : sig
            ; visit_ITimes : 'c -> unit
            ; visit_IUnaryMinus : 'c -> unit
            ; visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> unit
-           ; visit_Int : 'c -> int -> unit
+           ; visit_Int : 'c -> Z.t -> unit
            ; visit_IntType : 'c -> unit
            ; visit_Invariant : 'c -> Asrt.t -> string list -> unit
            ; visit_LAction : 'c -> string -> string -> Expr.t list -> unit
@@ -2131,8 +2179,10 @@ module Visitors : sig
            ; visit_LVar : 'c -> string -> unit
            ; visit_LeftShift : 'c -> unit
            ; visit_LeftShiftL : 'c -> unit
-           ; visit_Less : 'c -> Expr.t -> Expr.t -> unit
-           ; visit_LessEq : 'c -> Expr.t -> Expr.t -> unit
+           ; visit_FLess : 'c -> Expr.t -> Expr.t -> unit
+           ; visit_FLessEq : 'c -> Expr.t -> Expr.t -> unit
+           ; visit_ILess : 'c -> Expr.t -> Expr.t -> unit
+           ; visit_ILessEq : 'c -> Expr.t -> Expr.t -> unit
            ; visit_ListType : 'c -> unit
            ; visit_Lit : 'c -> Literal.t -> unit
            ; visit_Loc : 'c -> string -> unit
@@ -2200,6 +2250,8 @@ module Visitors : sig
            ; visit_Star : 'c -> Asrt.t -> Asrt.t -> unit
            ; visit_StrCat : 'c -> unit
            ; visit_StrLen : 'c -> unit
+           ; visit_IntToNum : 'c -> unit
+           ; visit_NumToInt : 'c -> unit
            ; visit_StrLess : 'c -> Expr.t -> Expr.t -> unit
            ; visit_StrNth : 'c -> unit
            ; visit_String : 'c -> string -> unit
@@ -2340,7 +2392,7 @@ module Visitors : sig
       method visit_ITimes : 'c -> unit
       method visit_IUnaryMinus : 'c -> unit
       method visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> unit
-      method visit_Int : 'c -> int -> unit
+      method visit_Int : 'c -> Z.t -> unit
       method visit_IntType : 'c -> unit
       method visit_Invariant : 'c -> Asrt.t -> string list -> unit
       method visit_LAction : 'c -> string -> string -> Expr.t list -> unit
@@ -2348,8 +2400,10 @@ module Visitors : sig
       method visit_LVar : 'c -> string -> unit
       method visit_LeftShift : 'c -> unit
       method visit_LeftShiftL : 'c -> unit
-      method visit_Less : 'c -> Expr.t -> Expr.t -> unit
-      method visit_LessEq : 'c -> Expr.t -> Expr.t -> unit
+      method visit_FLess : 'c -> Expr.t -> Expr.t -> unit
+      method visit_FLessEq : 'c -> Expr.t -> Expr.t -> unit
+      method visit_ILess : 'c -> Expr.t -> Expr.t -> unit
+      method visit_ILessEq : 'c -> Expr.t -> Expr.t -> unit
       method visit_ListType : 'c -> unit
       method visit_Lit : 'c -> Literal.t -> unit
       method visit_Loc : 'c -> string -> unit
@@ -2417,6 +2471,8 @@ module Visitors : sig
       method visit_Star : 'c -> Asrt.t -> Asrt.t -> unit
       method visit_StrCat : 'c -> unit
       method visit_StrLen : 'c -> unit
+      method visit_IntToNum : 'c -> unit
+      method visit_NumToInt : 'c -> unit
       method visit_StrLess : 'c -> Expr.t -> Expr.t -> unit
       method visit_StrNth : 'c -> unit
       method visit_String : 'c -> string -> unit

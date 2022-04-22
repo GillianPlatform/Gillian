@@ -183,8 +183,8 @@ void aws_byte_buf_clean_up(struct aws_byte_buf *buf) {
 // that is how CompCert handles struct passing
 /*@
     spec aws_byte_cursor_advance(_res, cursor, length) {
-        requires: (
-            _res == #res) * (cursor == #cursor) * (length == long(#length)) *
+        requires:
+            (_res == #res) * (cursor == #cursor) * (length == long(#length)) *
             (0 <=# #length) * ARRAY(#res, long, 2, #trash) *
             valid_aws_byte_cursor_ptr(#cursor, #cur_len, #buffer, #content) *
             ((0 <# #length) || (not (#buffer == NULL)))
@@ -206,7 +206,7 @@ struct aws_byte_cursor
 aws_byte_cursor_advance(struct aws_byte_cursor *const cursor,
                         const size_t length) {
     struct aws_byte_cursor rv;
-    if (cursor->len > (SIZE_MAX >> 1) || length > (SIZE_MAX >> 1) ||
+    if (cursor->len > 2147483647 || length > 2147483647||
         length > cursor->len) {
         rv.ptr = NULL;
         rv.len = 0;
@@ -290,7 +290,7 @@ bool aws_byte_cursor_read(struct aws_byte_cursor *cur, void *dest,
             writable_memory(#var, 1, #trash)
 
         ensures:
-            invalid_read(1., #cur_length) *
+            invalid_read(1, #cur_length) *
             valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
             writable_memory(#var, 1, #trash) *
             (ret == FALSE);
@@ -328,7 +328,7 @@ bool aws_byte_cursor_read_u8(struct aws_byte_cursor *cur, uint8_t *var) {
             writable_memory(#var, 2, #trash)
 
         ensures:
-            invalid_read(2., #cur_length) *
+            invalid_read(2, #cur_length) *
             valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
             writable_memory(#var, 2, #trash) *
             (ret == FALSE);
@@ -372,7 +372,7 @@ bool aws_byte_cursor_read_be16(struct aws_byte_cursor *cur, uint16_t *var) {
             writable_memory(#var, 4, #trash)
 
         ensures:
-            invalid_read(4., #cur_length) *
+            invalid_read(4, #cur_length) *
             valid_aws_byte_cursor_ptr(#cur, #cur_length, #buffer, #content) *
             writable_memory(#var, 4, #trash) *
             (ret == FALSE);

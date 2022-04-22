@@ -164,8 +164,7 @@ let rec learn_expr
   | EList le ->
       let le_with_base_exprs =
         List.mapi
-          (fun i e ->
-            (e, Expr.BinOp (base_expr, LstNth, Lit (Num (float_of_int i)))))
+          (fun i e -> (e, Expr.BinOp (base_expr, LstNth, Expr.int i)))
           le
       in
       L.(
@@ -183,19 +182,11 @@ let rec learn_expr
   | NOp (LstCat, []) -> f base_expr (EList [])
   | NOp (LstCat, [ x ]) -> f base_expr x
   | NOp (LstCat, e :: rest) -> (
-      let list_length (lst : Expr.t) : Expr.t =
-        match lst with
-        | Lit (LList l) -> Lit (Num (float_of_int (List.length l)))
-        | EList l -> Lit (Num (float_of_int (List.length l)))
-        | LstSub (_, _, len) -> len
-        | _ -> UnOp (LstLen, lst)
-      in
-
-      let overall_length : Expr.t = list_length base_expr in
-      let e_length : Expr.t = list_length e in
+      let overall_length = Expr.list_length base_expr in
+      let e_length = Expr.list_length e in
       match is_known_expr kb e_length with
       | true ->
-          let e_base_expr = Expr.LstSub (base_expr, Lit (Num 0.), e_length) in
+          let e_base_expr = Expr.LstSub (base_expr, Expr.zero_i, e_length) in
           let e_outs = f e_base_expr e in
           let kb' : KB.t =
             List.fold_left (fun kb (u, _) -> KB.add u kb) kb e_outs
@@ -203,7 +194,7 @@ let rec learn_expr
           let rest = Expr.NOp (LstCat, rest) in
           let rest_base_expr =
             Expr.LstSub
-              (base_expr, e_length, BinOp (overall_length, FMinus, e_length))
+              (base_expr, e_length, BinOp (overall_length, IMinus, e_length))
           in
           e_outs @ learn_expr kb' rest_base_expr rest
       | false -> [])
@@ -221,6 +212,12 @@ let rec learn_expr
             | false -> (e2, e1)
           in
           f (BinOp (base_expr, FMinus, ke)) ue)
+  | BinOp (e1, IPlus, e2) -> (
+      let ike1, ike2 = (is_known_expr kb e1, is_known_expr kb e2) in
+      match (ike1, ike2) with
+      | true, true | false, false -> []
+      | true, false -> f (BinOp (base_expr, IMinus, e1)) e2
+      | false, true -> f (BinOp (base_expr, IMinus, e2)) e1)
   (* Floating-point minus is invertible in two different ways *)
   | BinOp (e1, FMinus, e2) -> (
       (* If both operands are known or both are unknown, nothing can be done *)
@@ -229,6 +226,12 @@ let rec learn_expr
       | true, true | false, false -> []
       | false, true -> f (BinOp (base_expr, FPlus, e2)) e1
       | true, false -> f (BinOp (e1, FMinus, base_expr)) e2)
+  | BinOp (e1, IMinus, e2) -> (
+      let ike1, ike2 = (is_known_expr kb e1, is_known_expr kb e2) in
+      match (ike1, ike2) with
+      | true, true | false, false -> []
+      | false, true -> f (BinOp (base_expr, IPlus, e2)) e1
+      | true, false -> f (BinOp (e1, IMinus, base_expr)) e2)
   (* TODO: Finish the remaining invertible binary operators *)
   | BinOp _ -> []
 
@@ -352,8 +355,10 @@ let rec simple_ins_formula (kb : KB.t) (pf : Formula.t) : KB.t list =
       List.map minimise_unifiables ins
   (* Relational formulae are all treated the same *)
   | Eq (e1, e2)
-  | Less (e1, e2)
-  | LessEq (e1, e2)
+  | ILess (e1, e2)
+  | ILessEq (e1, e2)
+  | FLess (e1, e2)
+  | FLessEq (e1, e2)
   | StrLess (e1, e2)
   | SetMem (e1, e2)
   | SetSub (e1, e2) ->

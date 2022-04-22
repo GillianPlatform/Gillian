@@ -227,14 +227,14 @@ let is_different ~pfs ~gamma e1 e2 =
   (* Utils.Statistics.update_statistics "FOS: is different" (Sys.time () -. t); *)
   result
 
-let is_less_or_equal ~pfs ~gamma e1 e2 =
-  let feq = Reduction.reduce_formula ~gamma ~pfs (LessEq (e1, e2)) in
+let num_is_less_or_equal ~pfs ~gamma e1 e2 =
+  let feq = Reduction.reduce_formula ~gamma ~pfs (FLessEq (e1, e2)) in
   let result =
     match feq with
     | True -> true
     | False -> false
     | Eq (ra, rb) -> is_equal ~pfs ~gamma ra rb
-    | LessEq _ -> check_entailment SS.empty pfs [ feq ] gamma
+    | FLessEq _ -> check_entailment SS.empty pfs [ feq ] gamma
     | _ ->
         raise
           (Failure

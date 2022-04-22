@@ -33,7 +33,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token TRUE
 %token FALSE
 %token <float> FLOAT
-%token <int> INTEGER
+%token <Z.t> INTEGER
 %token NAN
 %token INFINITY
 %token <string> STRING
@@ -116,6 +116,8 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token SETTOLIST
 %token LSTLEN
 %token STRLEN
+%token INTTONUM
+%token NUMTOINT
 (* Expression keywords *)
 %token TYPEOF
 %token ASSUME
@@ -156,8 +158,10 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LTRUE
 %token LFALSE
 %token LEQUAL
-%token LLESSTHAN
-%token LLESSTHANEQUAL
+%token ILLESSTHAN
+%token ILLESSTHANEQUAL
+%token FLLESSTHAN
+%token FLLESSTHANEQUAL
 %token LSLESSTHAN
 %token LEMP
 (*%token LEXISTS *)
@@ -232,7 +236,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %left LAND
 %left separating_conjunction
 %right LNOT
-%nonassoc LEQUAL LLESSTHAN LLESSTHANEQUAL LSLESSTHAN
+%nonassoc LEQUAL ILLESSTHAN ILLESSTHANEQUAL FLLESSTHAN FLLESSTHANEQUAL LSLESSTHAN
 %nonassoc SETMEM SETSUB LSETMEM LSETSUB
 (* Program operators have higher precedence.*)
 (* Based on JavaScript:
@@ -362,6 +366,10 @@ expr_target:
       { Expr.BinOp (e2, FLessThan, e1) }
   | e1=expr_target; FGE; e2=expr_target
       { Expr.BinOp (e2, FLessThanEqual, e1) }
+  | e1=expr_target; IGT; e2=expr_target
+      { Expr.BinOp (e2, ILessThan, e1) }
+  | e1=expr_target; IGE; e2=expr_target
+      { Expr.BinOp (e2, ILessThanEqual, e1) }
 (* unop e *)
     | uop=unop_target; e=expr_target
      { Expr.UnOp (uop, e) } %prec unop_prec
@@ -954,12 +962,18 @@ pure_assertion_target:
 (* E == E *)
   | left_expr=expr_target; LEQUAL; right_expr=expr_target
     { Formula.Eq (left_expr, right_expr) }
+(* E i<# E *)
+  | left_expr=expr_target; ILLESSTHAN; right_expr=expr_target
+    { Formula.ILess (left_expr, right_expr) }
 (* E <# E *)
-  | left_expr=expr_target; LLESSTHAN; right_expr=expr_target
-    { Formula.Less (left_expr, right_expr) }
+  | left_expr=expr_target; FLLESSTHAN; right_expr=expr_target
+    { Formula.FLess (left_expr, right_expr) }
+(* E i<=# E *)
+  | left_expr=expr_target; ILLESSTHANEQUAL; right_expr=expr_target
+    { Formula.ILessEq (left_expr, right_expr) }
 (* E <=# E *)
-  | left_expr=expr_target; LLESSTHANEQUAL; right_expr=expr_target
-    { Formula.LessEq (left_expr, right_expr) }
+  | left_expr=expr_target; FLLESSTHANEQUAL; right_expr=expr_target
+    { Formula.FLessEq (left_expr, right_expr) }
 (* E s<# E *)
   | left_expr=expr_target; LSLESSTHAN; right_expr=expr_target
     { Formula.StrLess (left_expr, right_expr) }
@@ -1109,6 +1123,8 @@ unop_target:
   | LSTREV      { UnOp.LstRev }
   | STRLEN      { UnOp.StrLen }
   | SETTOLIST   { UnOp.SetToList }
+  | INTTONUM { UnOp.IntToNum }
+  | NUMTOINT { UnOp.NumToInt }
 ;
 
 constant_target:

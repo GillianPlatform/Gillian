@@ -30,10 +30,10 @@ struct
       let rec collect_concretizable_lists = function
         | Asrt.Pure (Eq (EList _, EList _)) -> []
         | Pure (Eq (le, EList les)) | Pure (Eq (EList les, le)) -> [ (le, les) ]
-        | Pure (Eq (UnOp (LstLen, le), Lit (Num i)))
-        | Pure (Eq (Lit (Num i), UnOp (LstLen, le))) ->
+        | Pure (Eq (UnOp (LstLen, le), Lit (Int i)))
+        | Pure (Eq (Lit (Int i), UnOp (LstLen, le))) ->
             let les =
-              List.init (int_of_float i) (fun _ -> Expr.LVar (LVar.alloc ()))
+              List.init (Z.to_int i) (fun _ -> Expr.LVar (LVar.alloc ()))
             in
             [ (le, les) ]
         | Star (a1, a2) ->
@@ -65,11 +65,13 @@ struct
 
           method! visit_BinOp ctx this le' op n =
             match (op, n) with
-            | LstNth, Lit (Num i) -> (
-                try
+            | LstNth, Lit (Int i) -> (
+                match
                   let vs = Hashtbl.find new_lists le' in
-                  List.nth vs (int_of_float i)
-                with _ -> this)
+                  List.nth_opt vs (Z.to_int i)
+                with
+                | Some v -> v
+                | None -> this)
             | _ -> super#visit_BinOp ctx this le' op n
         end
       in
@@ -102,15 +104,12 @@ struct
   the store is assumed to contain all the program variables in le
 *)
   let rec normalise_lexpr
-      ?(no_types : unit option)
-      ?(store : SStore.t option)
-      ?(subst : SESubst.t option)
+      ?(no_types = false)
+      ?(store = SStore.init [])
+      ?(subst = SESubst.init [])
       (gamma : TypEnv.t)
       (le : Expr.t) =
-    let store = Option.value ~default:(SStore.init []) store in
-    let subst = Option.value ~default:(SESubst.init []) subst in
-
-    let f = normalise_lexpr ?no_types ~store ~subst gamma in
+    let f = normalise_lexpr ~no_types ~store ~subst gamma in
 
     let result : Expr.t =
       match (le : Expr.t) with
@@ -135,19 +134,11 @@ struct
           match bop with
           | LstNth -> (
               match ((nle1 : Expr.t), (nle2 : Expr.t)) with
-              | Lit (LList list), Lit (Num n) when Arith_Utils.is_int n ->
-                  let lit_n =
-                    try List.nth list (int_of_float n)
-                    with _ -> raise (Failure "List index out of bounds")
-                  in
+              | Lit (LList list), Lit (Int n) ->
+                  let lit_n = List.nth list (Z.to_int n) in
                   Lit lit_n
-              | Lit (LList _), Lit (Num _) ->
-                  raise (Failure "Non-integer list index")
-              | EList list, Lit (Num n) when Arith_Utils.is_int n ->
-                  let le_n =
-                    try List.nth list (int_of_float n)
-                    with _ -> raise (Failure "List index out of bounds")
-                  in
+              | EList list, Lit (Int n) ->
+                  let le_n = List.nth list (Z.to_int n) in
                   f le_n
               | EList _, Lit (Num _) -> raise (Failure "Non-integer list index")
               | _, _ -> BinOp (nle1, LstNth, nle2))
@@ -161,7 +152,7 @@ struct
                   Lit (String s)
               | Lit (String _), Lit (Num _) ->
                   raise (Failure "Non-integer string index")
-              | _, _ -> BinOp (nle1, LstNth, nle2))
+              | _, _ -> BinOp (nle1, StrNth, nle2))
           | _ -> (
               match ((nle1 : Expr.t), (nle2 : Expr.t)) with
               | Lit lit1, Lit lit2 ->
@@ -221,45 +212,18 @@ struct
           let nle2 = f le2 in
           let nle3 = f le3 in
           match (nle1, nle2, nle3) with
-          | EList lst, Lit (Num _start), Lit (Num _end)
-            when Arith_Utils.is_int _start && Arith_Utils.is_int _end -> (
-              try
-                EList
-                  (Array.to_list
-                     (Array.sub (Array.of_list lst) (int_of_float _start)
-                        (int_of_float _end)))
-              with _ -> raise (Failure "Sublist out of bounds"))
-          | Lit (LList lst), Lit (Num _start), Lit (Num _end)
-            when Arith_Utils.is_int _start && Arith_Utils.is_int _end -> (
-              try
-                Lit
-                  (LList
-                     (Array.to_list
-                        (Array.sub (Array.of_list lst) (int_of_float _start)
-                           (int_of_float _end))))
-              with _ -> raise (Failure "Sublist out of bounds"))
-          | _, Lit (Num _start), Lit (Num _end)
-            when (not (Arith_Utils.is_int _start)) && Arith_Utils.is_int _end ->
+          | EList lst, Lit (Int start), Lit (Int len) ->
+              List_utils.list_sub lst (Z.to_int start) (Z.to_int len)
+              |> Option.get |> Expr.list
+          | Lit (LList lst), Lit (Int start), Lit (Int len) ->
+              List_utils.list_sub lst (Z.to_int start) (Z.to_int len)
+              |> Option.get
+              |> fun x -> Expr.Lit (LList x)
+          | _, Lit (Num _), Lit (Num _) ->
               raise (Failure "Sublist indexes non-integer")
           | _, _, _ -> LstSub (nle1, nle2, nle3))
     in
-
-    (*
-    | LstNth  ->
-      (match (nle1 : Expr.t), (nle2 : Expr.t) with
-        | Lit (LList list), Lit (Num n) when (Arith_Utils.is_int n) ->
-          let lit_n = (try List.nth list (int_of_float n) with _ ->
-            raise (Failure "List index out of bounds")) in
-          Lit lit_n
-        | Lit (LList list), Lit (Num n) -> raise (Failure "Non-integer list index")
-        | EList list, Lit (Num n) when (Arith_Utils.is_int n) ->
-          let le_n = (try List.nth list (int_of_float n) with _ ->
-            raise (Failure "List index out of bounds")) in
-          f le_n
-        | EList list, Lit (Num n) -> raise (Failure "Non-integer list index")
-        | _, _ -> BinOp (nle1, LstNth, nle2))
-*)
-    if no_types = None then Typing.infer_types_expr gamma result;
+    if not no_types then Typing.infer_types_expr gamma result;
     result
 
   let extend_typing_env_using_assertion_info
@@ -287,12 +251,12 @@ struct
      _____________________________________________________
   *)
   let normalise_logic_expression
-      ?(no_types : unit option)
+      ?(no_types = false)
       (store : SStore.t)
       (gamma : TypEnv.t)
       (subst : SESubst.t)
       (le : Expr.t) : Expr.t =
-    let le' = normalise_lexpr ?no_types ~store ~subst gamma le in
+    let le' = normalise_lexpr ~no_types ~store ~subst gamma le in
     le'
 
   (* -----------------------------------------------------
@@ -303,22 +267,26 @@ struct
      _____________________________________________________
   *)
   let rec normalise_pure_assertion
-      ?(no_types : unit option)
+      ?(no_types = false)
       (store : SStore.t)
       (gamma : TypEnv.t)
       (subst : SESubst.t)
       (assertion : Formula.t) : Formula.t =
-    let fa = normalise_pure_assertion ?no_types store gamma subst in
-    let fant = normalise_pure_assertion ~no_types:() store gamma subst in
-    let fe = normalise_logic_expression ?no_types store gamma subst in
+    let fa = normalise_pure_assertion ~no_types store gamma subst in
+    let fant = normalise_pure_assertion ~no_types:true store gamma subst in
+    let fe = normalise_logic_expression ~no_types store gamma subst in
     let result : Formula.t =
       match (assertion : Formula.t) with
       | Eq (le1, le2) -> Eq (fe le1, fe le2)
-      | Less (le1, le2) -> Less (fe le1, fe le2)
-      | LessEq (le1, le2) -> LessEq (fe le1, fe le2)
+      | ILess (le1, le2) -> ILess (fe le1, fe le2)
+      | ILessEq (le1, le2) -> ILessEq (fe le1, fe le2)
+      | FLess (le1, le2) -> FLess (fe le1, fe le2)
+      | FLessEq (le1, le2) -> FLessEq (fe le1, fe le2)
       | Not (Eq (le1, le2)) -> Not (Eq (fe le1, fe le2))
-      | Not (LessEq (le1, le2)) -> Not (LessEq (fe le1, fe le2))
-      | Not (Less (le1, le2)) -> Not (Less (fe le1, fe le2))
+      | Not (FLessEq (le1, le2)) -> Not (FLessEq (fe le1, fe le2))
+      | Not (FLess (le1, le2)) -> Not (FLess (fe le1, fe le2))
+      | Not (ILessEq (le1, le2)) -> Not (ILessEq (fe le1, fe le2))
+      | Not (ILess (le1, le2)) -> Not (ILess (fe le1, fe le2))
       | Not (SetSub (le1, le2)) -> Not (SetSub (fe le1, fe le2))
       | Not (SetMem (le1, le2)) -> Not (SetMem (fe le1, fe le2))
       | And (a1, a2) -> And (fa a1, fa a2)
@@ -336,7 +304,7 @@ struct
           in
           raise (Failure msg)
     in
-    if no_types = None then Typing.infer_types_formula gamma result;
+    if not no_types then Typing.infer_types_formula gamma result;
     result
 
   let normalise_pure_assertions

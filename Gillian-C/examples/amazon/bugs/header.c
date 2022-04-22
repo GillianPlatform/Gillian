@@ -650,8 +650,8 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
         }");
     GILLIAN("assert (len #restEDKs == 0) ");
     GILLIAN("assert (#rest_count == 0) * (#EDKs == #acc) ");
-    GILLIAN("unfold Elements(#edkDef, #restEDKsAndRest, 0., #rest_count, 3., #restEDKs, #restEDKLength)");
-    GILLIAN("unfold CElements(#restEDKsAndRest, 0., #rest_count, 3., #restEDKs, #restEDKLength)");
+    GILLIAN("unfold Elements(#edkDef, #restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength)");
+    GILLIAN("unfold CElements(#restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength)");
     GILLIAN("assert (len #leftEDKs == 0)");
 
     GILLIAN("unfold optBytes(#bptr, #readLength, #readEDKs)");

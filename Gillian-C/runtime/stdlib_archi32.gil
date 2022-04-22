@@ -1,27 +1,27 @@
 #internal
 
 proc i__alloc_size(vsz) {
-          goto [ l-nth(vsz, 0.) = "int" ] int oth;
-    int:  ret := l-nth(vsz, 1.);
+          goto [ l-nth(vsz, 0i) = "int" ] int oth;
+    int:  ret := l-nth(vsz, 1i);
           return;
     oth:  fail[architecture]("This is a 64bits pointer in a 32bits architecture")
 };
 
 proc i__malloc(vsz) {
       sz := "i__alloc_size"(vsz);
-      bl := [mem_alloc](-4, sz);
-      b := l-nth(bl, 0.);
-      u := [mem_store]("int32", b, -4, vsz);
-      ret := {{ b, 0. }};
+      bl := [mem_alloc](-4i, sz);
+      b := l-nth(bl, 0i);
+      u := [mem_store]("int32", b, -4i, vsz);
+      ret := {{ b, 0i }};
       return
 };
 
 proc i__free(ptr) {
-         vszl := [mem_load]("int32", l-nth(ptr, 0.), l-nth(ptr, 1.) - 4); (* 4 is size_chunk of "int32" *)
-         sz := "i__alloc_size"(l-nth(vszl, 0.));
-         goto [ sz < 0 ] die ctn;
+         vszl := [mem_load]("int32", l-nth(ptr, 0i), l-nth(ptr, 1i) i- 4i); (* 4 is size_chunk of "int32" *)
+         sz := "i__alloc_size"(l-nth(vszl, 0i));
+         goto [ sz i< 0i ] die ctn;
    die:  fail[free]("Deallocating a pointer of negative size");
-   ctn:  u := [mem_free](l-nth(ptr, 0.), l-nth(ptr, 1.) - 4, l-nth(ptr, 1.) + sz);
+   ctn:  u := [mem_free](l-nth(ptr, 0i), l-nth(ptr, 1i) i- 4i, l-nth(ptr, 1i) i+ sz);
          ret := undefined;
          return
 };

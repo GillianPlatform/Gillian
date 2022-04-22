@@ -7,7 +7,7 @@ let cell ~loc ~offset ~value =
 
 let bound ~loc ~bound =
   let bound_ga = str_ga Bound in
-  let bound = Expr.num (float_of_int bound) in
+  let bound = Expr.int bound in
   Asrt.GA (bound_ga, [ loc ], [ bound ])
 
 let freed ~loc =

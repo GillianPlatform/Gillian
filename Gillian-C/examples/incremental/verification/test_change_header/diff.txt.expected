@@ -1,7 +1,11 @@
 Changed procs:
-find_min
-insert
-make_node
+listAppend
+listConcat
+listCopy
+listDispose
+listLength
+listPrepend
+listPrependV
 New procs:
 <none>
 Deleted procs:

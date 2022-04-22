@@ -281,7 +281,6 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
         GILLIAN("apply optBytesConcat(#buffer p+ 2, #consumedLength, #buffer p+ (2 + #consumedLength), 2)");
         GILLIAN("apply optBytesConcat(#buffer p+ 2, #consumedLength + 2, #buffer p+ (4 + #consumedLength), #key_length - 2)");
         GILLIAN("apply optBytesConcat(#buffer p+ 2, #consumedLength + #key_length, #buffer p+ (2 + #consumedLength + #key_length), 2)");
-        GILLIAN("apply optBytesConcat(#buffer p+ 2, #consumedLength + #key_length, #buffer p+ (2 + #consumedLength + #key_length), 2)");
         GILLIAN("apply optBytesConcat(#buffer p+ 2, #consumedLength + #key_length + 2, #buffer p+ (4 + #consumedLength + #key_length), #value_length - 2)");
         int was_created;
         if (!k || !v ||
@@ -308,8 +307,8 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
     }
 
     GILLIAN("assert #togo == 0");
-    GILLIAN("unfold Elements(#elementsDef, #buffer_content, (2. + #consumedLength), #togo, 2., #restElements, #restEsLength)");
-    GILLIAN("unfold CElements(#buffer_content, (2. + #consumedLength), #togo, 2., #restElements, #restEsLength)");
+    GILLIAN("unfold Elements(#elementsDef, #buffer_content, (2 + #consumedLength), #togo, 2, #restElements, #restEsLength)");
+    GILLIAN("unfold CElements(#buffer_content, (2 + #consumedLength), #togo, 2, #restElements, #restEsLength)");
 
     GILLIAN(
         "if (#errorMessage = `decodeEncryptionContext: Duplicate encryption context key value.`) { \

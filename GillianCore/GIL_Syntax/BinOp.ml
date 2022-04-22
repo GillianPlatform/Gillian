@@ -34,7 +34,7 @@ type t = TypeDef__.binop =
   | BitwiseXorL  (** Bitwise exclusive disjunction 64bit *)
   | LeftShiftL  (** Left bitshift 64bit *)
   | SignedRightShiftL  (** Signed right bitshift 64bit *)
-  | UnsignedRightShiftL  (** Unsigned right bitshift 64bit *)
+  | UnsignedRightShiftL  (** Right bitshift 64bit *)
   (* Mathematics *)
   | M_atan2  (** Arctangent y/x *)
   | M_pow  (** Power *)
@@ -47,7 +47,10 @@ type t = TypeDef__.binop =
   | SetDiff  (** Set difference *)
   | BSetMem  (** Set membership *)
   | BSetSub  (** Subset *)
-[@@deriving yojson]
+[@@deriving eq, ord]
+
+let to_yojson = TypeDef__.binop_to_yojson
+let of_yojson = TypeDef__.binop_of_yojson
 
 let str (x : t) =
   match x with

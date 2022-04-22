@@ -38,7 +38,7 @@
 %token ANNOT_CLOSE
 
 %token <string> STRING
-%token <float> NUMBER
+%token <Z.t> INTEGER
 %token <string> IDENTIFIER
 %token <string> LVAR
 %token <string> LOC
@@ -55,7 +55,7 @@
 %token STRUCT
 
 (* Gil Type things *)
-%token GNUMT
+%token GINTT
 %token GSETT
 %token GLISTT
 
@@ -406,7 +406,7 @@ with_gil_type:
   | COLON; g = gil_type { g }
 
 gil_type:
-  | GNUMT { GilType.NumberType }
+  | GINTT { GilType.IntType }
   | GSETT { GilType.SetType }
   | GLISTT { GilType.ListType }
 
@@ -441,11 +441,11 @@ expression:
 
 sval:
   | NULL
-    { if Compcert.Archi.ptr64 then CSVal.Slong (Num 0.) else CSVal.Sint (Num 0.) }
+    { if Compcert.Archi.ptr64 then CSVal.Slong (Int Z.zero) else CSVal.Sint (Int Z.zero) }
   | CTRUE
-    { CSVal.Sint (Num 1.) }
+    { CSVal.Sint (Int Z.one) }
   | CFALSE
-    { CSVal.Sint (Num 0.) }
+    { CSVal.Sint (Int Z.zero) }
   | INTT; LBRACE; se = simple_expr; RBRACE
     { CSVal.Sint se }
   | FLOATT; LBRACE; se = simple_expr; RBRACE
@@ -462,7 +462,7 @@ sval:
 
 simple_expr:
   | pvar = IDENTIFIER { CSimplExpr.PVar pvar }
-  | n = NUMBER { CSimplExpr.Num n }
+  | n = INTEGER { CSimplExpr.Int n }
   | lvar = LVAR { CSimplExpr.LVar lvar }
   | loc = LOC { CSimplExpr.Loc loc }
   | str = STRING { CSimplExpr.String str}
@@ -500,7 +500,7 @@ any_C_token:
   | ELSE
   | ANNOT_CLOSE (* I can close a comment *)
   | ASSERT
-  | NUMBER
+  | INTEGER
   | IDENTIFIER
   | LVAR
   | LOC
@@ -512,7 +512,7 @@ any_C_token:
   | PTRT
   | CHART
   | FUNPTRT
-  | GNUMT
+  | GINTT
   | GSETT
   | FORALL
   | IMPLIES

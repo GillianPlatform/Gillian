@@ -1,11 +1,11 @@
 proc i__calloc(vnelem, velsiz) {
       nelem := "i__alloc_size"(vnelem);
       elsiz := "i__alloc_size"(velsiz);
-      sz := nelem * elsiz;
-      bl := [mem_alloc](-8, sz);
-      b := l-nth(bl, 0.);
-      u := [mem_store]("int64", b, -8, {{ "long", sz }});
-      i := "i__init_to_zero"(b, 0, sz);
-      ret := {{ b, 0. }};
+      sz := nelem i* elsiz;
+      bl := [mem_alloc](-8i, sz);
+      b := l-nth(bl, 0i);
+      u := [mem_store]("int64", b, -8i, {{ "long", sz }});
+      i := "i__init_to_zero"(b, 0i, sz);
+      ret := {{ b, 0i }};
       return
 };

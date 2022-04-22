@@ -6,7 +6,7 @@ module CStore = Store.Make (CVal.M)
 exception TypeError of string
 exception EvaluationError of string
 
-let unary_int_thing (lit : CVal.M.t) (f : int -> int) emsg : CVal.M.t =
+let unary_int_thing (lit : CVal.M.t) (f : Z.t -> Z.t) emsg : CVal.M.t =
   let num =
     match lit with
     | Int n -> n
@@ -36,7 +36,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
                   CVal.M.pp lit)))
   | IUnaryMinus ->
       unary_int_thing lit
-        (fun x -> -x)
+        (fun x -> Z.neg x)
         "Type Error: Integer unary minus: expected integer, got "
   | FUnaryMinus ->
       unary_num_thing lit
@@ -125,6 +125,22 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: ToNumber: expected string, got %a"
                   CVal.M.pp lit)))
+  | IntToNum -> (
+      match lit with
+      | Int x -> Num (Z.to_float x)
+      | _ ->
+          raise
+            (TypeError
+               (Fmt.str "Type Error: IntToNum: expected integer, got %a"
+                  CVal.M.pp lit)))
+  | NumToInt -> (
+      match lit with
+      | Num x -> Int (Z.of_float x)
+      | _ ->
+          raise
+            (TypeError
+               (Fmt.str "Type Error: NumToInt: expected number, got %a"
+                  CVal.M.pp lit)))
   | TypeOf -> Type (Literal.type_of lit)
   | Car -> (
       match lit with
@@ -154,7 +170,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
                   lit)))
   | LstLen -> (
       match lit with
-      | LList l -> Num (float_of_int (List.length l))
+      | LList l -> Int (Z.of_int (List.length l))
       | _ ->
           raise
             (TypeError
@@ -205,7 +221,7 @@ let binary_num_thing
 let binary_int_thing
     (lit1 : CVal.M.t)
     (lit2 : CVal.M.t)
-    (f : int -> int -> int)
+    (f : Z.t -> Z.t -> Z.t)
     emsg : CVal.M.t =
   let num1, num2 =
     match (lit1, lit2) with
@@ -219,7 +235,7 @@ let binary_int_thing
 let binary_int_bool_thing
     (lit1 : CVal.M.t)
     (lit2 : CVal.M.t)
-    (f : int -> int -> bool)
+    (f : Z.t -> Z.t -> bool)
     emsg : CVal.M.t =
   let num1, num2 =
     match (lit1, lit2) with
@@ -309,7 +325,7 @@ let rec evaluate_binop
           | _, _ -> Bool false)
       | LstNth -> (
           match (lit1, lit2) with
-          | LList list, Int n -> List.nth list n
+          | LList list, Int n -> List.nth list (Z.to_int n)
           | LList list, Num n when is_int n -> List.nth list (int_of_float n)
           | LList list, Num -0. -> List.nth list 0
           | _, _ ->
@@ -352,25 +368,20 @@ let rec evaluate_binop
             (fun x y -> x <= y)
             "Type Error: Less than or equal: expected numbers, got "
       | IPlus ->
-          binary_int_thing lit1 lit2
-            (fun x y -> x + y)
+          binary_int_thing lit1 lit2 Z.add
             "Type Error: Integer Addition: expected integers, got "
       | IMinus ->
-          binary_int_thing lit1 lit2
-            (fun x y -> x - y)
+          binary_int_thing lit1 lit2 Z.sub
             "Type Error: Subtraction: expected numbers, got "
       | ITimes ->
-          binary_int_thing lit1 lit2
-            (fun x y -> x * y)
+          binary_int_thing lit1 lit2 Z.mul
             "Type Error: Multiplication: expected numbers, got "
       | IDiv ->
-          binary_int_thing lit1 lit2
-            (fun x y -> x / y)
+          binary_int_thing lit1 lit2 Z.div
             "Type Error: Division: expected numbers, got "
       | IMod ->
-          binary_int_thing lit1 lit2
-            (fun x y -> x mod y)
-            "Type Error: Modulus: expected numbers, got "
+          binary_int_thing lit1 lit2 Z.( mod )
+            "Type Error: IModulus: expected ints, got "
       | FPlus ->
           binary_num_thing lit1 lit2
             (fun x y -> x +. y)
@@ -389,7 +400,7 @@ let rec evaluate_binop
             "Type Error: Division: expected numbers, got "
       | FMod ->
           binary_num_thing lit1 lit2 mod_float
-            "Type Error: Modulus: expected numbers, got "
+            "Type Error: FModulus: expected numbers, got "
       | BitwiseAnd ->
           binary_num_thing lit1 lit2 int32_bitwise_and
             "Type Error: Bitwise conjunction: expected numbers, got "
@@ -406,26 +417,26 @@ let rec evaluate_binop
           binary_num_thing lit1 lit2 int32_right_shift
             "Type Error: Signed right shift: expected numbers, got "
       | UnsignedRightShift ->
-          binary_num_thing lit1 lit2 uint32_right_shift
+          binary_int_thing lit1 lit2 uint32_right_shift
             "Type Error: Unsigned right shift: expected numbers, got "
       | BitwiseAndL ->
-          binary_num_thing lit1 lit2 int64_bitwise_and
+          binary_int_thing lit1 lit2 int64_bitwise_and
             "Type Error: Bitwise 64bit conjunction: expected numbers, got "
       | BitwiseOrL ->
-          binary_num_thing lit1 lit2 int64_bitwise_or
+          binary_int_thing lit1 lit2 int64_bitwise_or
             "Type Error: Bitwise 64bit disjunction: expected numbers, got "
       | BitwiseXorL ->
-          binary_num_thing lit1 lit2 int64_bitwise_xor
+          binary_int_thing lit1 lit2 int64_bitwise_xor
             "Type Error: Bitwise 64bit exclusive disjunction: expected \
              numbers, got "
       | LeftShiftL ->
-          binary_num_thing lit1 lit2 int64_left_shift
+          binary_int_thing lit1 lit2 int64_left_shift
             "Type Error: 64bit Left shift: expected numbers, got "
       | SignedRightShiftL ->
           binary_num_thing lit1 lit2 int64_right_shift
             "Type Error: 64bit Signed right shift: expected numbers, got "
       | UnsignedRightShiftL ->
-          binary_num_thing lit1 lit2 uint32_right_shift
+          binary_int_thing lit1 lit2 uint32_right_shift
             "Type Error: 64bit Unsigned right shift: expected numbers, got "
       | M_atan2 ->
           binary_num_thing lit1 lit2 atan2
@@ -493,12 +504,12 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
         let ve2 = ee e2 in
         let ve3 = ee e3 in
         match (ve1, ve2, ve3) with
-        | LList les, Num start_, Num len -> (
-            match
-              List_utils.list_sub les (int_of_float start_) (int_of_float len)
-            with
-            | None -> raise (Failure "Sublist out of bounds")
-            | Some l -> LList l)
+        | LList les, Int start, Int len ->
+            let sub_list =
+              List_utils.list_sub les (Z.to_int start) (Z.to_int len)
+              |> Option.get
+            in
+            LList sub_list
         | _ ->
             raise
               (Exceptions.Impossible "eval_expr concrete: lstsub type mismatch")

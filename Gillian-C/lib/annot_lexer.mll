@@ -19,8 +19,7 @@ let in_annot = ref false
 let digit = ['0'-'9']
 let int = '-'? digit digit*
 let letter = ['a'-'z''A'-'Z']
-let frac = '.' digit*
-let number = int frac?
+let number = int
 
 let white = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
@@ -93,10 +92,12 @@ rule read =
   | "lsub"     { LSUB }
   | "not"      { LNOT }
   | "forall"   { FORALL }
-  | "Num"      { GNUMT }
+  | "Int"      { GINTT }
   | "Set"      { GSETT }
   | "List"     { GLISTT }
-  | number     { NUMBER (float_of_string (Lexing.lexeme lexbuf)) }
+  | number     { let lexeme = Lexing.lexeme lexbuf in
+                 try INTEGER (Z.of_string lexeme) with
+                 | _ -> raise (SyntaxError ("invalid number: " ^ lexeme)) }
   | lvar       { LVAR ( Lexing.lexeme lexbuf) }
   | loc        { LOC (Lexing.lexeme lexbuf) }
   | id         { IDENTIFIER (Lexing.lexeme lexbuf) }

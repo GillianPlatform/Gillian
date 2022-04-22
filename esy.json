@@ -56,7 +56,7 @@
     "c:init:env": "Gillian-C/scripts/setup_environment.sh",
     "wisl:init:env": "wisl/scripts/setup_environment.sh",
     "init:env": "sh -c \"esy js:init:env && esy c:init:env && esy wisl:init:env\"",
-    "test": "dune test -j 4",
+    "test": "dune test",
     "install-githooks": "./githooks/install.ml",
     "clean-githooks": "./githooks/clean.ml",
     "clean": "dune clean",
@@ -78,6 +78,7 @@
     "@opam/uuidm": "0.9.7",
     "@opam/visitors": ">=2.3",
     "@opam/yojson": "^1.7.0",
+    "@opam/zarith": ">=1.12",
     "@opam/z3": "giltho/esy-z3#0738c9254e9720396309f991cded8fa64d20ce1a",
     "compcert": "giltho/CompCert#c318992c8d3be9edf4bf323d146d1bb68627339c",
     "ocaml": "^4.13.x"

@@ -1,8 +1,15 @@
 Changed procs:
-insert
+listPrependV
 New procs:
 <none>
 Deleted procs:
-find
+listAppend
+listLength
+listPrepend
 Transitive dependents:
-<none>
+listAppend
+listConcat
+listCopy
+listDispose
+listLength
+listPrepend

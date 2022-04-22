@@ -6,7 +6,10 @@ type t = TypeDef__.nop =
   (* Set management *)
   | SetUnion
   | SetInter
-[@@deriving yojson]
+[@@deriving eq, ord]
+
+let to_yojson = TypeDef__.nop_to_yojson
+let of_yojson = TypeDef__.nop_of_yojson
 
 let str (x : t) =
   match x with

@@ -14,28 +14,32 @@ module Patterns = struct
     let open Expr in
     (typeof e) #== (type_ NumberType)
 
+  let integer e =
+    let open Expr in
+    (typeof e) #== (type_ IntType)
+
   let int_typ, float_typ, single_typ, long_typ =
     let open Expr in
     let open CConstants.VTypes in
-    let num_typ typ_str x =
+    let num_typ int_t typ_str x =
       (typeof x) #== (type_ ListType)
-      #&& ((list_length x) #== (num 2.))
+      #&& ((list_length x) #== (int 2))
       #&& ((list_nth x 0) #== (string typ_str))
-      #&& ((typeof (list_nth x 1)) #== (type_ NumberType))
+      #&& ((typeof (list_nth x 1)) #== (type_ int_t))
     in
-    ( num_typ int_type,
-      num_typ float_type,
-      num_typ single_type,
-      num_typ long_type )
+    ( num_typ IntType int_type,
+      num_typ NumberType float_type,
+      num_typ NumberType single_type,
+      num_typ IntType long_type )
 
   let undefined x = x #== (Expr.Lit Undefined)
 
   let obj x =
     let open Expr in
     (typeof x) #== (type_ ListType)
-    #&& ((list_length x) #== (num 2.))
+    #&& ((list_length x) #== (int 2))
     #&& ((typeof (list_nth x 0)) #== (type_ ObjectType))
-    #&& ((typeof (list_nth x 1)) #== (type_ NumberType))
+    #&& ((typeof (list_nth x 1)) #== (type_ IntType))
 end
 
 let of_chunk_and_expr chunk e =
@@ -48,7 +52,7 @@ let of_chunk_and_expr chunk e =
       match Chunk.type_of chunk with
       | Tlong when Compcert.Archi.ptr64 -> (
           match%ent e with
-          | number -> return (SVlong e)
+          | integer -> return (SVlong e)
           | obj -> (
               match e with
               | EList [ ALoc l; o ] -> return (Sptr (l, o))
@@ -58,7 +62,7 @@ let of_chunk_and_expr chunk e =
                     Expr.pp e))
       | Tint when not Compcert.Archi.ptr64 -> (
           match%ent e with
-          | number -> return (SVint e)
+          | integer -> return (SVint e)
           | obj -> (
               match e with
               | EList [ ALoc l; o ] -> return (Sptr (l, o))
@@ -69,7 +73,7 @@ let of_chunk_and_expr chunk e =
       | Tlong -> return (SVlong e)
       | Tint ->
           let open Formula.Infix in
-          let i k = Expr.num (float_of_int k) in
+          let i k = Expr.int k in
           let learned =
             match chunk with
             | Mint8unsigned -> [ (i 0) #<= e; e #<= (i 255) ]
@@ -128,10 +132,9 @@ let to_gil_expr sval =
   Delayed.return ~learned:typing_pfs exp
 
 let sure_is_zero = function
-  | SVint (Lit (Num 0.))
-  | SVlong (Lit (Num 0.))
-  | SVfloat (Lit (Num 0.))
-  | SVsingle (Lit (Num 0.)) -> true
+  | SVint (Lit (Int z)) when Z.equal z Z.zero -> true
+  | SVlong (Lit (Int z)) when Z.equal z Z.zero -> true
+  | SVfloat (Lit (Num 0.)) | SVsingle (Lit (Num 0.)) -> true
   | _ -> false
 
 module SVArray = struct
@@ -159,14 +162,14 @@ module SVArray = struct
   let is_empty =
     let open Formula.Infix in
     function
-    | Arr e -> (Expr.list_length e) #== (Expr.num 0.)
+    | Arr e -> (Expr.list_length e) #== (Expr.int 0)
     | _ -> False
 
   let sure_is_all_zeros = function
     | Arr (EList l) ->
         List.for_all
           (function
-            | Expr.Lit (Num 0.) -> true
+            | Expr.Lit (Int z) when Z.equal z Z.zero -> true
             | _ -> false)
           l
     | AllZeros -> true
@@ -205,16 +208,14 @@ module SVArray = struct
       | Some size -> size
     in
     let open Formula.Infix in
-    let zero = Expr.num 0. in
+    let zero = Expr.int 0 in
     let size = Engine.Reduction.reduce_lexpr size in
     match size with
-    | Lit (Num x) when Float.is_integer x ->
+    | Lit (Int x) ->
         Logging.verbose (fun fmt ->
             fmt "Undefined pf: Concrete: %a" Expr.pp size);
         let undefs =
-          Expr.Lit
-            (LList
-               (Array.to_list (Array.make (Float.to_int x) Literal.Undefined)))
+          Expr.Lit (LList (List.init (Z.to_int x) (fun _ -> Literal.Undefined)))
         in
         arr_exp #== undefs
     | _ ->
@@ -223,7 +224,7 @@ module SVArray = struct
         let i = LVar.alloc () in
         let i_e = Expr.LVar i in
         forall
-          [ (i, Some NumberType) ]
+          [ (i, Some IntType) ]
           zero #<= i_e #&& (i_e #< size)
           #=> ((Expr.list_nth_e arr_exp i_e) #== (Lit Undefined))
 
@@ -236,23 +237,22 @@ module SVArray = struct
     let open Formula.Infix in
     let size = Engine.Reduction.reduce_lexpr size in
     match size with
-    | Lit (Num x) when Float.is_integer x ->
+    | Lit (Int x) ->
         Logging.verbose (fun fmt -> fmt "Zeros pf: Concrete: %a" Expr.pp size);
         let zeros =
           Expr.Lit
-            (LList
-               (Array.to_list (Array.make (Float.to_int x) (Literal.Num 0.))))
+            (LList (List.init (Z.to_int x) (fun _ -> Literal.Int Z.zero)))
         in
         arr_exp #== zeros
     | _ ->
         Logging.verbose (fun fmt ->
             fmt "Zeros pf: not as concrete: %a" Expr.pp size);
-        let is_zero e = e #== (Expr.num 0.) in
+        let is_zero e = e #== (Expr.int 0) in
         let i = LVar.alloc () in
         let i_e = Expr.LVar i in
-        let zero = Expr.num 0. in
+        let zero = Expr.int 0 in
         forall
-          [ (i, Some NumberType) ]
+          [ (i, Some IntType) ]
           zero #<= i_e #&& (i_e #< size)
           #=> (is_zero (Expr.list_nth_e arr_exp i_e))
 
@@ -322,13 +322,12 @@ module SVArray = struct
     let size =
       let open Expr.Infix in
       let low, high = range in
-      (high -. low) /. chunk_size
+      (high - low) / chunk_size
     in
     let f_of_all_same ~describing_pf ~concrete_single =
       match size with
-      | Lit (Num n) ->
-          ( Expr.EList (Utils.List_utils.make (int_of_float n) concrete_single),
-            [] )
+      | Lit (Int n) ->
+          (Expr.EList (Utils.List_utils.make (Z.to_int n) concrete_single), [])
       | _ ->
           let open Formula.Infix in
           let arr = LVar.alloc () in
@@ -354,8 +353,7 @@ module SVArray = struct
         in
         (e, learned)
     | AllZeros ->
-        f_of_all_same ~concrete_single:(Expr.Lit (Num 0.))
-          ~describing_pf:zeros_pf
+        f_of_all_same ~concrete_single:Expr.zero_i ~describing_pf:zeros_pf
     | AllUndef ->
         f_of_all_same ~concrete_single:(Expr.Lit Undefined)
           ~describing_pf:undefined_pf
@@ -380,7 +378,7 @@ module SVArray = struct
     | Some (low, high) -> (
         match arr with
         | Arr (EList e) ->
-            let i k = Expr.num (float_of_int k) in
+            let i k = Expr.int k in
             let learned =
               List.concat_map
                 (function
@@ -393,12 +391,11 @@ module SVArray = struct
             Delayed.return ~learned ()
         | Arr e -> (
             match size with
-            | Expr.Lit (Num n) ->
-                let i k = Expr.num (float_of_int k) in
-                let n = int_of_float n in
+            | Expr.Lit (Int n) ->
+                let i k = Expr.int k in
                 let learned =
                   List.concat
-                    (List.init n (fun k ->
+                    (List.init (Z.to_int n) (fun k ->
                          let x = Expr.list_nth e k in
                          let open Formula.Infix in
                          [ (i low) #<= x; x #<= (i high) ]))

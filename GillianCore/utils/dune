@@ -1,6 +1,6 @@
 (library
  (name utils)
  (public_name gillian.utils)
- (libraries unix str logging fmt yojson)
+ (libraries unix str logging fmt yojson zarith)
  (preprocess
-  (pps ppx_deriving_yojson)))
+  (pps ppx_deriving_yojson ppx_deriving.std)))

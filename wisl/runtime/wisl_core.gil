@@ -8,5 +8,5 @@ pred i__pred_cell (+ptr: List, value):
       <cell>(#loc, #offset; value);
       
 pred freed(+ptr: List):
-      (ptr == {{ #l, 0. }}) * types(#l: Obj) *
+      (ptr == {{ #l, 0i }}) * types(#l: Obj) *
       <freed>(#l;);

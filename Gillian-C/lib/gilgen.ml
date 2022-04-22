@@ -16,8 +16,7 @@ type context = {
 }
 
 (* Useful litte function, such a big expression for such a small thing *)
-let nth x n =
-  Expr.BinOp (Expr.PVar x, BinOp.LstNth, Expr.Lit (Literal.Num (float_of_int n)))
+let nth x n = Expr.BinOp (Expr.PVar x, BinOp.LstNth, Expr.int n)
 
 let trans_const =
   let tr = ValueTranslation.gil_of_compcert in
@@ -164,7 +163,7 @@ let rec trans_expr ?(fname = "main") ~local_env expr =
       in
       (leading_e1 @ leading_e2 @ leading_binop, te)
   | Eaddrof id when List.mem (true_name id) local_env ->
-      let res = EList [ nth (true_name id) 0; Lit (Literal.Num 0.) ] in
+      let res = EList [ nth (true_name id) 0; Lit (Literal.Int Z.zero) ] in
       ([], res)
   | Eaddrof id ->
       let name = true_name id in
@@ -174,11 +173,11 @@ let rec trans_expr ?(fname = "main") ~local_env expr =
       let cmd_act =
         Cmd.LAction (gvar_act, genvlookup, [ Expr.Lit (Literal.String name) ])
       in
-      let zero = Expr.Lit (Literal.Num 0.) in
+      let zero = Expr.Lit (Literal.Int Z.zero) in
       let cmd_assign =
         Cmd.Assignment (gvar_val, Expr.EList [ nth gvar_act 1; zero ])
       in
-      let res = EList [ nth gvar_val 0; Lit (Literal.Num 0.) ] in
+      let res = EList [ nth gvar_val 0; Expr.zero_i ] in
       ([ cmd_act; cmd_assign ], res)
 
 let annot_ctx ctx = Annot.make ~loop_info:ctx.loop_stack ()
@@ -204,7 +203,7 @@ let trans_label lab =
   Prefix.user_lab ^ str_int
 
 let make_free_cmd fname var_list =
-  let zero = Expr.Lit (Literal.Num 0.) in
+  let zero = Expr.zero_i in
   let rec make_blocks = function
     | [] -> []
     | x :: r -> Expr.EList [ nth x 0; zero; nth x 1 ] :: make_blocks r
@@ -242,7 +241,7 @@ let make_symb_gen ?(fname = "main") ~ctx assigned_id x type_string =
          (Eq (lvar_x, Expr.EList [ Lit (String type_string); lvar_val ])))
   in
   let assume_val_t =
-    Cmd.Logic (LCmd.AssumeType (lvar_val_string, Type.NumberType))
+    Cmd.Logic (LCmd.AssumeType (lvar_val_string, Type.IntType))
   in
   add_annots ~ctx [ assignment; specvar; assume_list; assume_val_t ]
 
@@ -380,13 +379,13 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
       annot_addr_eval @ annot_v_eval @ [ (annot_ctx context, None, cmd) ]
   | Scall (None, _, ex, [ e ]) when is_assert_call ex ->
       let cmds, egil = trans_expr e in
-      let one = Expr.EList [ Lit (String VTypes.int_type); Lit (Num 1.) ] in
+      let one = Expr.EList [ Lit (String VTypes.int_type); Expr.one_i ] in
       let form = Formula.Eq (egil, one) in
       let assert_cmd = Cmd.Logic (Assert form) in
       add_annots ~ctx:context (cmds @ [ assert_cmd ])
   | Scall (None, _, ex, [ e ]) when is_assume_call ex ->
       let cmds, egil = trans_expr e in
-      let one = Expr.EList [ Lit (String VTypes.int_type); Lit (Num 1.) ] in
+      let one = Expr.EList [ Lit (String VTypes.int_type); Expr.one_i ] in
       let form = Formula.Eq (egil, one) in
       let assert_cmd = Cmd.Logic (Assume form) in
       add_annots ~ctx:context (cmds @ [ assert_cmd ])
@@ -553,8 +552,8 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
            CConstants.Symbolic_Constr.symb_float ->
       make_symb_gen ~ctx:context id x CConstants.VTypes.float_type
   | Sbuiltin (None, AST.EF_memcpy (sz, al), [ dst; src ]) ->
-      let sz = ValueTranslation.float_of_z sz in
-      let al = ValueTranslation.float_of_z al in
+      let sz = ValueTranslation.int_of_z sz in
+      let al = ValueTranslation.int_of_z al in
       let cmds_dst, dst = trans_expr dst in
       let cmds_src, src = trans_expr src in
       let temp = gen_str Prefix.gvar in
@@ -562,7 +561,7 @@ let rec trans_stmt ?(fname = "main") ~context stmt =
         Cmd.Call
           ( temp,
             Expr.string Internal_Functions.ef_memcpy,
-            [ Expr.num sz; Expr.num al; dst; src ],
+            [ Expr.int_z sz; Expr.int_z al; dst; src ],
             None,
             None )
       in
@@ -579,11 +578,9 @@ let add_empty_annots l = List.map (fun a -> (empty_annot, None, a)) l
 let alloc_var fname (name, sz) =
   let gvar = Generators.gen_str ~fname Prefix.gvar in
   let ocaml_size = ValueTranslation.gil_size_of_compcert sz in
-  let expr_size = Expr.Lit (Literal.Num ocaml_size) in
+  let expr_size = Expr.Lit (Int ocaml_size) in
   let alloc = LActions.(str_ac (AMem Alloc)) in
-  let action_cmd =
-    Cmd.LAction (gvar, alloc, [ Expr.Lit (Literal.Num 0.); expr_size ])
-  in
+  let action_cmd = Cmd.LAction (gvar, alloc, [ Expr.zero_i; expr_size ]) in
   let assign_env =
     Cmd.Assignment (name, Expr.EList [ nth gvar 0; expr_size ])
   in
@@ -635,7 +632,7 @@ let trans_function
     | [ (a, b, c) ] ->
         [
           (a, b, c);
-          (Annot.make (), None, Assignment ("ret", Lit (Num 0.)));
+          (Annot.make (), None, Assignment ("ret", Expr.zero_i));
           (Annot.make (), None, ReturnNormal);
         ]
     | a :: b -> a :: add_return b
@@ -663,8 +660,7 @@ let set_global_var symbol target v =
   let target_expr = Expr.Lit (String target) in
   let sz =
     Expr.Lit
-      (Literal.Num
-         (float_of_int (Camlcoq.Z.to_int AST.(init_data_list_size v.gvar_init))))
+      (Int (ValueTranslation.int_of_z AST.(init_data_list_size v.gvar_init)))
   in
   let perm = Globalenvs.Genv.perm_globvar v in
   let perm_string =

@@ -452,9 +452,9 @@ pure_assertion_target:
   | left_expr=expr_target; LEQUAL; right_expr=expr_target
     { Formula.Eq (left_expr, right_expr) }
   | left_expr=expr_target; LLESSTHAN; right_expr=expr_target
-    { Formula.Less (left_expr, right_expr) }
+    { Formula.FLess (left_expr, right_expr) }
   | left_expr=expr_target; LLESSTHANEQUAL; right_expr=expr_target
-    { Formula.LessEq (left_expr, right_expr) }
+    { Formula.FLessEq (left_expr, right_expr) }
   | left_expr=expr_target; LLESSTHANSTRING; right_expr=expr_target
     { Formula.StrLess (left_expr, right_expr) }
   | left_expr=expr_target; LSETMEM; right_expr=expr_target

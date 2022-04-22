@@ -70,7 +70,7 @@ let clean_up_stuff (left : PFS.t) (right : PFS.t) =
     PFS.set left [ False ]
 
 (* Set intersections *)
-let get_set_intersections pfs =
+let get_num_set_intersections pfs =
   let lvars = Hashtbl.create 1 in
   let rvars = Hashtbl.create 1 in
 
@@ -79,13 +79,13 @@ let get_set_intersections pfs =
       match (pf : Formula.t) with
       | ForAll
           ( [ (x, Some NumberType) ],
-            Or (Not (SetMem (LVar y, LVar set)), Less (LVar elem, LVar z)) )
+            Or (Not (SetMem (LVar y, LVar set)), FLess (LVar elem, LVar z)) )
         when x = y && x = z ->
           L.(verbose (fun m -> m "Got left: %s, %s" elem set));
           Hashtbl.add lvars elem set
       | ForAll
           ( [ (x, Some NumberType) ],
-            Or (Not (SetMem (LVar y, LVar set)), Less (LVar z, LVar elem)) )
+            Or (Not (SetMem (LVar y, LVar set)), FLess (LVar z, LVar elem)) )
         when x = y && x = z ->
           L.(verbose (fun m -> m "Got right: %s, %s" elem set));
           Hashtbl.add rvars elem set
@@ -134,7 +134,7 @@ let get_set_intersections pfs =
   List.iter
     (fun a ->
       match (a : Formula.t) with
-      | Less (LVar v1, LVar v2) -> (
+      | FLess (LVar v1, LVar v2) -> (
           match (Hashtbl.mem lvars v1, Hashtbl.mem lvars v2) with
           | true, true ->
               intersections :=
@@ -169,7 +169,7 @@ let _resolve_set_existentials
   in
   if SS.cardinal set_exists > 0 then (
     let intersections =
-      get_set_intersections (PFS.to_list lpfs @ PFS.to_list rpfs)
+      get_num_set_intersections (PFS.to_list lpfs @ PFS.to_list rpfs)
     in
     L.(
       verbose (fun m ->
@@ -423,16 +423,15 @@ let simplify_pfs_and_gamma
         | Eq (BinOp (lst, LstNth, idx), elem)
         | Eq (elem, BinOp (lst, LstNth, idx)) -> (
             match idx with
-            | Lit (Num nx) when Arith_Utils.is_int nx ->
+            | Lit (Int nx) ->
                 let prepend_lvars =
-                  Array.to_list
-                    (Array.init (int_of_float nx) (fun _ -> LVar.alloc ()))
+                  List.init (Z.to_int nx) (fun _ -> LVar.alloc ())
                 in
                 let append_lvar = LVar.alloc () in
                 (* Fresh variables can be removed *)
                 vars_to_kill :=
                   SS.add append_lvar
-                    (SS.union !vars_to_kill (SS.of_list prepend_lvars));
+                    (SS.add_seq (List.to_seq prepend_lvars) !vars_to_kill);
                 let prepend = List.map (fun x -> Expr.LVar x) prepend_lvars in
                 let append = Expr.LVar append_lvar in
                 rec_call
@@ -441,21 +440,22 @@ let simplify_pfs_and_gamma
                        NOp
                          ( LstCat,
                            [ EList (List.append prepend [ elem ]); append ] ) ))
+            | Lit (Num _) -> failwith "l-nth(l, f) where f is Num and not Int!"
             | _ -> `Replace whole)
-        | Eq (UnOp (LstLen, le), Lit (Num 0.))
-        | Eq (Lit (Num 0.), UnOp (LstLen, le)) -> rec_call (Eq (le, EList []))
-        | Eq (UnOp (LstLen, le), Lit (Num len))
-        | Eq (Lit (Num len), UnOp (LstLen, le))
-          when not unification -> (
-            match Arith_Utils.is_int len with
-            | false -> stop_explain "List length not an integer."
-            | true when len >= 0. ->
-                let len = int_of_float len in
-                let le_vars = List.init len (fun _ -> LVar.alloc ()) in
-                vars_to_kill := SS.union !vars_to_kill (SS.of_list le_vars);
-                let le' = List.map (fun x -> Expr.LVar x) le_vars in
-                rec_call (Eq (le, EList le'))
-            | _ -> stop_explain "List length an unexpected integer.")
+        | Eq (UnOp (LstLen, le), Lit (Int z)) when Z.equal z Z.zero ->
+            rec_call (Eq (le, EList []))
+        | Eq (Lit (Int z), UnOp (LstLen, le)) when Z.equal z Z.zero ->
+            rec_call (Eq (le, EList []))
+        | Eq (UnOp (LstLen, le), Lit (Int len))
+        | Eq (Lit (Int len), UnOp (LstLen, le))
+          when not unification ->
+            let len = Z.to_int len in
+            if len >= 0 then (
+              let le_vars = List.init len (fun _ -> LVar.alloc ()) in
+              vars_to_kill := SS.union !vars_to_kill (SS.of_list le_vars);
+              let le' = List.map (fun x -> Expr.LVar x) le_vars in
+              rec_call (Eq (le, EList le')))
+            else stop_explain "List length an unexpected integer."
         | Eq (NOp (LstCat, les), EList [])
         | Eq (NOp (LstCat, les), Lit (LList []))
         | Eq (EList [], NOp (LstCat, les))
@@ -472,11 +472,10 @@ let simplify_pfs_and_gamma
                 vars_to_kill := SS.union !vars_to_kill new_vars;
                 `Replace whole)
         (*  *)
-        | Eq (UnOp (LstLen, x), BinOp (Lit (Num n), FPlus, LVar z)) when n >= 0.
-          ->
-            let n = Float.to_int n in
+        | Eq (UnOp (LstLen, x), BinOp (Lit (Int n), IPlus, LVar z))
+          when Z.geq n Z.zero ->
             let new_lvars =
-              Array.to_list (Array.init n (fun _ -> Expr.LVar (LVar.alloc ())))
+              List.init (Z.to_int n) (fun _ -> Expr.LVar (LVar.alloc ()))
             in
             let rest = LVar.alloc () in
             let lst_eq =
@@ -493,7 +492,8 @@ let simplify_pfs_and_gamma
             vars_to_kill :=
               SS.add prefix_lvar (SS.add suffix_lvar !vars_to_kill);
             let suffix_len =
-              Expr.BinOp (UnOp (LstLen, lst), FMinus, BinOp (start, FPlus, num))
+              let open Expr.Infix in
+              Expr.list_length lst - (start + num)
             in
             let suffix_len =
               Reduction.reduce_lexpr ~pfs:lpfs ~gamma suffix_len
@@ -501,7 +501,7 @@ let simplify_pfs_and_gamma
             L.verbose (fun fmt ->
                 fmt "Reduced suffix length: %a" Expr.pp suffix_len);
             let lst_eq =
-              if suffix_len = Lit (Num 0.) then
+              if suffix_len = Expr.zero_i then
                 Formula.Eq (lst, NOp (LstCat, [ LVar prefix_lvar; sl ]))
               else
                 Formula.Eq
@@ -703,7 +703,8 @@ let simplify_pfs_and_gamma
             (fun (lens, cats, xcats) pf ->
               match pf with
               (* List length direct equality *)
-              | Eq (UnOp (LstLen, LVar x), UnOp (LstLen, LVar y)) when x <> y ->
+              | Eq (UnOp (LstLen, LVar x), UnOp (LstLen, LVar y))
+                when not (String.equal x y) ->
                   let lens = map_add (UnOp (LstLen, LVar y)) (LVar x) lens in
                   (map_add (UnOp (LstLen, LVar x)) (LVar y) lens, cats, xcats)
               (* List length equals some other expression on the right *)
@@ -883,7 +884,7 @@ let simplify_pfs_and_gamma
               match t with
               | Type.ListType ->
                   PFS.extend lpfs
-                    (LessEq (Lit (Num 0.), UnOp (LstLen, Expr.from_var_name v)))
+                    (ILessEq (Expr.zero_i, UnOp (LstLen, Expr.from_var_name v)))
               | _ -> ());
 
           analyse_list_structure lpfs;

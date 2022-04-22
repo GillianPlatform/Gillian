@@ -14,20 +14,20 @@ typedef struct bstn {
   x -m> struct bstn { int(#val); #left; #right } *
   (not (#left == NULL)) * (not (#right == NULL)) *
   BST(#right, #KR) * BST(#left, #KL) *
-  (forall #z : Num. (#z --e-- #KL) => (#z <# #val)) *
-  (forall #z : Num. (#z --e-- #KR) => (#val <# #z)) *
+  (forall #z : Int. (#z --e-- #KL) => (#z <# #val)) *
+  (forall #z : Int. (#z --e-- #KR) => (#val <# #z)) *
   (K == -u- (#KL, -{ #val }-, #KR));
 
   x -m> struct bstn { int(#val); NULL; #right } *
   (not (#right == NULL)) *
   BST(#right, #KR) *
-  (forall #z : Num. #z --e-- #KR => #val <# #z) *
+  (forall #z : Int. #z --e-- #KR => #val <# #z) *
   (K == -u- (-{ #val }-, #KR));
 
   x -m> struct bstn { int(#val); #left; NULL } *
   (not (#left == NULL)) *
   BST(#left, #KL) *
-  (forall #z : Num. #z --e-- #KL => #z <# #val) *
+  (forall #z : Int. #z --e-- #KL => #z <# #val) *
   (K == -u- (-{ #val }-, #KL));
 
   x -m> struct bstn { int(#val); NULL; NULL } *
@@ -87,7 +87,7 @@ int find(int v, BST *t) {
 /*@ spec find_min(t) {
   requires: (t == #t) * BST(#t, #K) * (not (#t == NULL))
   ensures:  BST(#t, #K) * (ret == int(#r)) * (#r --e-- #K) *
-            (forall #x : Num. (#x --e-- #K) => (#r <=# #x))
+            (forall #x : Int. (#x --e-- #K) => (#r <=# #x))
 } */
 int find_min(BST *t) {
     __builtin_annot("unfold BST(#t, #K)");

@@ -1,34 +1,34 @@
 #internal
 
 pred i__is_ptr_to_0_opt (e: List):
-  e == {{ "int", 0. }},
+  e == {{ "int", 0i }},
   i__is_ptr_to_0(e);
   
 pred i__is_ptr_opt (e: List):
-  e == {{ "int", 0. }},
+  e == {{ "int", 0i }},
   i__is_ptr(e);
   
 pred i__is_ptr_to_int_opt (+e: List):
-  e == {{ "int", 0. }},
+  e == {{ "int", 0i }},
   i__ptr_to_0(e, #l) *
   <mem_single>(#l, 0, "int32"; {{ "int", #i }}, "Freeable");
   
 pred i__is_ptr_to_float_opt (+e: List):
-  e == {{ "int", 0. }},
+  e == {{ "int", 0i }},
   i__ptr_to_0(e, #l) *
   <mem_single>(#l, 0, "float32"; {{ "float", #i }}, "Freeable");
   
 pred i__is_ptr_to_long_opt (+e: List):
-  e == {{ "int", 0. }},
+  e == {{ "int", 0i }},
   i__ptr_to_0(e, #l) *
   <mem_single>(#l, 0, "int64"; {{ "long", #i }}, "Freeable");
   
 pred i__is_ptr_to_single_opt (+e: List):
-  e == {{ "int", 0. }},
+  e == {{ "int", 0i }},
   i__ptr_to_0(e, #l) *
   <mem_single>(#l, 0, "float64"; {{ "single", #i }}, "Freeable");
   
-  pred i__malloced(+p: List, +bytes: Num):
+  pred i__malloced(+p: List, +bytes: Int):
   i__is_ptr_to_0(p) *
-  <mem_single>(#l, -4., "int32"; {{ "int", bytes }}, "Freeable") *
-  <mem_bounds>(#l; {{-4., bytes}});
+  <mem_single>(#l, -4i, "int32"; {{ "int", bytes }}, "Freeable") *
+  <mem_bounds>(#l; {{-4i, bytes}});
