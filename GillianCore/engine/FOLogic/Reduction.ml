@@ -2289,37 +2289,41 @@ let rec reduce_formula_loop
           Eq (EList c, rhs)
       (* FIXME: INTEGER BYTE-BY-BYTE BREAKDOWN *)
       | Eq
-          ( Lit (Num n),
-            BinOp (BinOp (Lit (Num 256.), FTimes, LVar b1), FPlus, LVar b0) )
+          ( Lit (Int n),
+            BinOp (BinOp (Lit (Int 256), ITimes, LVar b1), IPlus, LVar b0) )
         when top_level
-             && PFS.mem pfs (FLessEq (Lit (Num 0.), LVar b0))
-             && PFS.mem pfs (FLessEq (Lit (Num 0.), LVar b1))
-             && PFS.mem pfs (FLess (LVar b0, Lit (Num 256.)))
-             && PFS.mem pfs (FLess (LVar b1, Lit (Num 256.))) ->
-          if n > 65535. then False
+             && PFS.mem pfs (ILessEq (Lit (Int 0), LVar b0))
+             && PFS.mem pfs (ILessEq (Lit (Int 0), LVar b1))
+             && PFS.mem pfs (ILess (LVar b0, Lit (Int 256)))
+             && PFS.mem pfs (ILess (LVar b1, Lit (Int 256))) ->
+          if n > 65535 then False
           else
-            let vb1 = floor (n /. 256.) in
-            let vb0 = n -. vb1 in
+            let vb1 = n / 256 in
+            let vb0 = n - vb1 in
             Formula.And
-              (Eq (LVar b1, Lit (Num vb1)), Eq (LVar b0, Lit (Num vb0)))
+              (Eq (LVar b1, Lit (Int vb1)), Eq (LVar b0, Lit (Int vb0)))
       | Eq
-          ( BinOp (BinOp (Lit (Num 256.), FTimes, LVar b1), FPlus, LVar b0),
-            Lit (Num n) )
+          ( BinOp (BinOp (Lit (Int 256), ITimes, LVar b1), IPlus, LVar b0),
+            Lit (Int n) )
         when top_level
-             && PFS.mem pfs (FLessEq (Lit (Num 0.), LVar b0))
-             && PFS.mem pfs (FLessEq (Lit (Num 0.), LVar b1))
-             && PFS.mem pfs (FLess (LVar b0, Lit (Num 256.)))
-             && PFS.mem pfs (FLess (LVar b1, Lit (Num 256.))) ->
-          if n > 65535. then False
+             && PFS.mem pfs (ILessEq (Lit (Int 0), LVar b0))
+             && PFS.mem pfs (ILessEq (Lit (Int 0), LVar b1))
+             && PFS.mem pfs (ILess (LVar b0, Lit (Int 256)))
+             && PFS.mem pfs (ILess (LVar b1, Lit (Int 256))) ->
+          if n > 65535 then False
           else
-            let vb1 = floor (n /. 256.) in
-            let vb0 = n -. vb1 in
+            let vb1 = n / 256 in
+            let vb0 = n - vb1 in
             Formula.And
-              (Eq (LVar b1, Lit (Num vb1)), Eq (LVar b0, Lit (Num vb0)))
+              (Eq (LVar b1, Lit (Int vb1)), Eq (LVar b0, Lit (Int vb0)))
       | Eq (BinOp (e, FTimes, Lit (Num x)), Lit (Num 0.)) when x <> 0. ->
           Eq (e, Lit (Num 0.))
+      | Eq (BinOp (e, ITimes, Lit (Int x)), Lit (Int 0)) when x <> 0 ->
+          Eq (e, Lit (Int 0))
       | Eq (BinOp (Lit (Num x), FTimes, e), Lit (Num 0.)) when x <> 0. ->
           Eq (e, Lit (Num 0.))
+      | Eq (BinOp (Lit (Int x), ITimes, e), Lit (Int 0)) when x <> 0 ->
+          Eq (e, Lit (Int 0))
       | Eq (Lit (LList ll), Lit (LList lr)) -> if ll = lr then True else False
       | Eq (EList le, Lit (LList ll)) | Eq (Lit (LList ll), EList le) ->
           if List.length ll <> List.length le then False

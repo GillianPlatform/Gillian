@@ -352,7 +352,7 @@ nounfold pred RawEncryptedDataKeys(definition : Str, +buffer : List, +readPos : 
 (* Complete serialised encryption context *)
 @nopath
 nounfold pred CRawEncryptionContext(+buffer : List, ECKs : List) :
-  ((l-len buffer) == 0i) * (ECKs == {{  }}),
+  (* ((l-len buffer) == 0i) * (ECKs == {{  }}), *)
   (0i i<# l-len buffer) * (#rawKC == l-sub(buffer, 0i, 2i)) *
     rawToUInt16(#rawKC, false, #keyCount) * (0i i<# #keyCount) *
     Elements("Complete", buffer, 2i, #keyCount, 2i, ECKs, #ECKsLength) *
