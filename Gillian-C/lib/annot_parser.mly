@@ -38,7 +38,7 @@
 %token ANNOT_CLOSE
 
 %token <string> STRING
-%token <int> INTEGER
+%token <Z.t> INTEGER
 %token <string> IDENTIFIER
 %token <string> LVAR
 %token <string> LOC
@@ -441,11 +441,11 @@ expression:
 
 sval:
   | NULL
-    { if Compcert.Archi.ptr64 then CSVal.Slong (Int 0) else CSVal.Sint (Int 0) }
+    { if Compcert.Archi.ptr64 then CSVal.Slong (Int Z.zero) else CSVal.Sint (Int Z.zero) }
   | CTRUE
-    { CSVal.Sint (Int 1) }
+    { CSVal.Sint (Int Z.one) }
   | CFALSE
-    { CSVal.Sint (Int 0) }
+    { CSVal.Sint (Int Z.zero) }
   | INTT; LBRACE; se = simple_expr; RBRACE
     { CSVal.Sint se }
   | FLOATT; LBRACE; se = simple_expr; RBRACE

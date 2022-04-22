@@ -40,7 +40,7 @@ let execute_store heap params =
       let compcert_val = ValueTranslation.compcert_of_gil value in
       let chunk = ValueTranslation.chunk_of_string chunk_name in
       let block = ValueTranslation.block_of_loc_name loc in
-      let z_ofs = Compcert.Camlcoq.Z.of_sint ofs in
+      let z_ofs = Compcert.Camlcoq.Z.of_sint (Z.to_int ofs) in
       let res = Mem.store chunk heap.mem block z_ofs compcert_val in
       match res with
       | Some mem -> ASucc ({ heap with mem }, [])

@@ -32,7 +32,9 @@ struct
         | Pure (Eq (le, EList les)) | Pure (Eq (EList les, le)) -> [ (le, les) ]
         | Pure (Eq (UnOp (LstLen, le), Lit (Int i)))
         | Pure (Eq (Lit (Int i), UnOp (LstLen, le))) ->
-            let les = List.init i (fun _ -> Expr.LVar (LVar.alloc ())) in
+            let les =
+              List.init (Z.to_int i) (fun _ -> Expr.LVar (LVar.alloc ()))
+            in
             [ (le, les) ]
         | Star (a1, a2) ->
             List.rev_append
@@ -66,7 +68,7 @@ struct
             | LstNth, Lit (Int i) -> (
                 match
                   let vs = Hashtbl.find new_lists le' in
-                  List.nth_opt vs i
+                  List.nth_opt vs (Z.to_int i)
                 with
                 | Some v -> v
                 | None -> this)
@@ -133,10 +135,10 @@ struct
           | LstNth -> (
               match ((nle1 : Expr.t), (nle2 : Expr.t)) with
               | Lit (LList list), Lit (Int n) ->
-                  let lit_n = List.nth list n in
+                  let lit_n = List.nth list (Z.to_int n) in
                   Lit lit_n
               | EList list, Lit (Int n) ->
-                  let le_n = List.nth list n in
+                  let le_n = List.nth list (Z.to_int n) in
                   f le_n
               | EList _, Lit (Num _) -> raise (Failure "Non-integer list index")
               | _, _ -> BinOp (nle1, LstNth, nle2))
@@ -211,10 +213,12 @@ struct
           let nle3 = f le3 in
           match (nle1, nle2, nle3) with
           | EList lst, Lit (Int start), Lit (Int len) ->
-              List_utils.list_sub lst start len |> Option.get |> Expr.list
+              List_utils.list_sub lst (Z.to_int start) (Z.to_int len)
+              |> Option.get |> Expr.list
           | Lit (LList lst), Lit (Int start), Lit (Int len) ->
-              List_utils.list_sub lst start len |> Option.get |> fun x ->
-              Expr.Lit (LList x)
+              List_utils.list_sub lst (Z.to_int start) (Z.to_int len)
+              |> Option.get
+              |> fun x -> Expr.Lit (LList x)
           | _, Lit (Num _), Lit (Num _) ->
               raise (Failure "Sublist indexes non-integer")
           | _, _, _ -> LstSub (nle1, nle2, nle3))

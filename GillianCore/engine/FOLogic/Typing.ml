@@ -269,7 +269,7 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
               | UNot | M_isNaN -> (BooleanType, [])
               | ToStringOp -> (StringType, [])
               | Car | Cdr ->
-                  (ListType, [ Formula.ILessEq (Lit (Int 1), UnOp (LstLen, e)) ])
+                  (ListType, [ Formula.ILessEq (Expr.one_i, UnOp (LstLen, e)) ])
               | LstRev | SetToList -> (ListType, [])
               | IUnaryMinus | FUnaryMinus | LstLen | IntToNum -> (IntType, [])
               | BitwiseNot
@@ -314,7 +314,7 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
                   if not success then def_neg
                   else
                     let new_constraint1 : Formula.t =
-                      ILessEq (Lit (Int 0), e2)
+                      ILessEq (Expr.zero_i, e2)
                     in
                     let new_constraint2 : Formula.t =
                       ILess (e2, UnOp (LstLen, e1))

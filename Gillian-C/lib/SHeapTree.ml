@@ -460,6 +460,7 @@ module Node = struct
       when Chunk.equal chunk Mint64 -> (
         match size with
         | Expr.Lit (Int amount) ->
+            let amount = Z.to_int amount in
             let+ arr =
               decode_several_unsigned_ints_of_bytes ~amount ~chunk values
             in

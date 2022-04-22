@@ -268,7 +268,7 @@ rule read = parse
 (* Literals (cont.) *)
   | int                  { let s = Lexing.lexeme lexbuf in
                            let s_n = String.sub s 0 ((String.length s) - 1) in
-                           let n = int_of_string s_n in
+                           let n = Z.of_string s_n in
                            GIL_Parser.INTEGER n }
   | float                { let n = float_of_string (Lexing.lexeme lexbuf) in
                            GIL_Parser.FLOAT n }

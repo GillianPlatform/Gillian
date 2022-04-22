@@ -24,7 +24,7 @@ let get_cell heap params =
   Literal.(
     match params with
     | [ Loc loc; Int offset ] -> (
-        match WislCHeap.get heap loc offset with
+        match WislCHeap.get heap loc (Z.to_int offset) with
         | Some value -> ASucc (heap, [ Loc loc; Int offset; value ])
         | None -> AFail [])
     | l ->
@@ -37,7 +37,7 @@ let set_cell heap params =
   Literal.(
     match params with
     | [ Loc loc; Int offset; value ] ->
-        let () = WislCHeap.set heap loc offset value in
+        let () = WislCHeap.set heap loc (Z.to_int offset) value in
         ASucc (heap, [])
     | l ->
         failwith
@@ -49,7 +49,7 @@ let rem_cell heap params =
   Literal.(
     match params with
     | [ Loc loc; Int offset ] ->
-        let () = WislCHeap.remove heap loc offset in
+        let () = WislCHeap.remove heap loc (Z.to_int offset) in
         ASucc (heap, [])
     | l ->
         failwith
@@ -60,10 +60,10 @@ let rem_cell heap params =
 let alloc heap params =
   Literal.(
     match params with
-    | [ Int size ] when size >= 1 ->
-        let loc = WislCHeap.alloc heap size in
+    | [ Int size ] when Z.geq size Z.one ->
+        let loc = WislCHeap.alloc heap (Z.to_int size) in
         let litloc = Loc loc in
-        ASucc (heap, [ litloc; Int 0 ])
+        ASucc (heap, [ litloc; Int Z.zero ])
         (* returns a pointer to the first element *)
     | l ->
         failwith

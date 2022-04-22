@@ -11,14 +11,17 @@ type t = Formula.t ExtList.t [@@deriving yojson]
 (**************************************)
 
 let init () : t = ExtList.make ()
-let equal (pfs1 : t) (pfs2 : t) : bool = ExtList.for_all2 ( = ) pfs1 pfs2
+
+let equal (pfs1 : t) (pfs2 : t) : bool =
+  ExtList.for_all2 Formula.equal pfs1 pfs2
+
 let to_list : t -> Formula.t list = ExtList.to_list
 let of_list : Formula.t list -> t = ExtList.of_list
 
 let to_set pfs =
   ExtList.fold_left (fun acc el -> Formula.Set.add el acc) Formula.Set.empty pfs
 
-let mem (pfs : t) (f : Formula.t) = ExtList.mem f pfs
+let mem (pfs : t) (f : Formula.t) = ExtList.mem ~equal:Formula.equal f pfs
 
 let extend (pfs : t) (a : Formula.t) : unit =
   if not (mem pfs a) then ExtList.add a pfs

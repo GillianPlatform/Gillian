@@ -48,7 +48,10 @@ type t = TypeDef__.binop =
   | SetDiff  (** Set difference *)
   | BSetMem  (** Set membership *)
   | BSetSub  (** Subset *)
-[@@deriving yojson, eq]
+[@@deriving eq, ord]
+
+let to_yojson = TypeDef__.binop_to_yojson
+let of_yojson = TypeDef__.binop_of_yojson
 
 let str (x : t) =
   match x with

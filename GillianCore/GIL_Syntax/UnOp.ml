@@ -47,7 +47,7 @@ type t = TypeDef__.unop =
   (* Integer vs Number *)
   | NumToInt  (** Number to Integer - actual cast *)
   | IntToNum  (** Integer to Number - actual cast *)
-[@@deriving yojson, eq]
+[@@deriving yojson, ord, eq]
 
 let str (x : t) =
   match x with

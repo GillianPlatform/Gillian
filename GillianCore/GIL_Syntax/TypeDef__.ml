@@ -28,7 +28,15 @@ and literal =
   | Empty
   | Constant of constant
   | Bool of bool
-  | Int of int
+  | Int of
+      (Z.t
+      [@opaque]
+      [@to_yojson fun z -> `String (Z.to_string z)]
+      [@of_yojson
+        function
+        | `String s -> (
+            try Ok (Z.of_string s) with Invalid_argument m -> Error m)
+        | _ -> Error "Invalid yojson for Z"])
   | Num of float
   | String of string
   | Loc of string

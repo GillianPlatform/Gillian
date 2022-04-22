@@ -186,7 +186,7 @@ let rec learn_expr
       let e_length = Expr.list_length e in
       match is_known_expr kb e_length with
       | true ->
-          let e_base_expr = Expr.LstSub (base_expr, Lit (Int 0), e_length) in
+          let e_base_expr = Expr.LstSub (base_expr, Expr.zero_i, e_length) in
           let e_outs = f e_base_expr e in
           let kb' : KB.t =
             List.fold_left (fun kb (u, _) -> KB.add u kb) kb e_outs

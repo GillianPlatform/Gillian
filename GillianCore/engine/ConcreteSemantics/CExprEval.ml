@@ -6,7 +6,7 @@ module CStore = Store.Make (CVal.M)
 exception TypeError of string
 exception EvaluationError of string
 
-let unary_int_thing (lit : CVal.M.t) (f : int -> int) emsg : CVal.M.t =
+let unary_int_thing (lit : CVal.M.t) (f : Z.t -> Z.t) emsg : CVal.M.t =
   let num =
     match lit with
     | Int n -> n
@@ -36,7 +36,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
                   CVal.M.pp lit)))
   | IUnaryMinus ->
       unary_int_thing lit
-        (fun x -> -x)
+        (fun x -> Z.neg x)
         "Type Error: Integer unary minus: expected integer, got "
   | FUnaryMinus ->
       unary_num_thing lit
@@ -127,7 +127,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
                   CVal.M.pp lit)))
   | IntToNum -> (
       match lit with
-      | Int x -> Num (float_of_int x)
+      | Int x -> Num (Z.to_float x)
       | _ ->
           raise
             (TypeError
@@ -135,7 +135,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
                   CVal.M.pp lit)))
   | NumToInt -> (
       match lit with
-      | Num x -> Int (int_of_float x)
+      | Num x -> Int (Z.of_float x)
       | _ ->
           raise
             (TypeError
@@ -170,7 +170,7 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
                   lit)))
   | LstLen -> (
       match lit with
-      | LList l -> Int (List.length l)
+      | LList l -> Int (Z.of_int (List.length l))
       | _ ->
           raise
             (TypeError
@@ -221,7 +221,7 @@ let binary_num_thing
 let binary_int_thing
     (lit1 : CVal.M.t)
     (lit2 : CVal.M.t)
-    (f : int -> int -> int)
+    (f : Z.t -> Z.t -> Z.t)
     emsg : CVal.M.t =
   let num1, num2 =
     match (lit1, lit2) with
@@ -235,7 +235,7 @@ let binary_int_thing
 let binary_int_bool_thing
     (lit1 : CVal.M.t)
     (lit2 : CVal.M.t)
-    (f : int -> int -> bool)
+    (f : Z.t -> Z.t -> bool)
     emsg : CVal.M.t =
   let num1, num2 =
     match (lit1, lit2) with
@@ -325,7 +325,7 @@ let rec evaluate_binop
           | _, _ -> Bool false)
       | LstNth -> (
           match (lit1, lit2) with
-          | LList list, Int n -> List.nth list n
+          | LList list, Int n -> List.nth list (Z.to_int n)
           | LList list, Num n when is_int n -> List.nth list (int_of_float n)
           | LList list, Num -0. -> List.nth list 0
           | _, _ ->
@@ -368,24 +368,19 @@ let rec evaluate_binop
             (fun x y -> x <= y)
             "Type Error: Less than or equal: expected numbers, got "
       | IPlus ->
-          binary_int_thing lit1 lit2
-            (fun x y -> x + y)
+          binary_int_thing lit1 lit2 Z.add
             "Type Error: Integer Addition: expected integers, got "
       | IMinus ->
-          binary_int_thing lit1 lit2
-            (fun x y -> x - y)
+          binary_int_thing lit1 lit2 Z.sub
             "Type Error: Subtraction: expected numbers, got "
       | ITimes ->
-          binary_int_thing lit1 lit2
-            (fun x y -> x * y)
+          binary_int_thing lit1 lit2 Z.mul
             "Type Error: Multiplication: expected numbers, got "
       | IDiv ->
-          binary_int_thing lit1 lit2
-            (fun x y -> x / y)
+          binary_int_thing lit1 lit2 Z.div
             "Type Error: Division: expected numbers, got "
       | IMod ->
-          binary_int_thing lit1 lit2
-            (fun x y -> x mod y)
+          binary_int_thing lit1 lit2 Z.( mod )
             "Type Error: IModulus: expected ints, got "
       | FPlus ->
           binary_num_thing lit1 lit2
@@ -513,7 +508,10 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
         let ve3 = ee e3 in
         match (ve1, ve2, ve3) with
         | LList les, Int start, Int len ->
-            let sub_list = List_utils.list_sub les start len |> Option.get in
+            let sub_list =
+              List_utils.list_sub les (Z.to_int start) (Z.to_int len)
+              |> Option.get
+            in
             LList sub_list
         | _ ->
             raise

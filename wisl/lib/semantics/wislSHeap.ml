@@ -296,7 +296,7 @@ let get_store_vars store is_gil_file =
         let match_offset lst loc loc_pp =
           match lst with
           | [ Expr.Lit (Int offset) ] ->
-              Fmt.str "-> (%a, %d)" (Fmt.hbox loc_pp) loc offset
+              Fmt.str "-> (%a, %d)" (Fmt.hbox loc_pp) loc (Z.to_int offset)
           | [ offset ] ->
               Fmt.str "-> (%a, %a)" (Fmt.hbox loc_pp) loc (Fmt.hbox Expr.pp)
                 offset
@@ -321,9 +321,10 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
   let compare_offsets (v, _) (w, _) =
     try
       let open Expr.Infix in
-      let difference = v -. w in
+      let difference = v - w in
       match difference with
-      | Expr.Lit (Int f) -> if f < 0 then -1 else if f > 0 then 1 else 0
+      | Expr.Lit (Int f) ->
+          if Z.lt f Z.zero then -1 else if Z.gt f Z.zero then 1 else 0
       | _ -> 0
     with _ -> (* Do not sort the offsets if an exception has occurred *)
               0
@@ -334,7 +335,7 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
            (* Display offset as a number to match the printing of WISL pointers *)
            let offset_str =
              match offset with
-             | Expr.Lit (Int o) -> Fmt.str "%d" o
+             | Expr.Lit (Int o) -> Z.to_string o
              | other -> vstr other
            in
            create_leaf_variable offset_str (vstr value) ())

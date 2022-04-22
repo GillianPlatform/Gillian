@@ -112,8 +112,7 @@ let uint32_right_shift x y =
   let r = Int32.to_float (Int32.shift_right_logical left right) in
   if r < 0. then r +. i32 else r
 
-let uint64_int_right_shift x y =
-  Int64.shift_right (Int64.of_int x) y |> Int64.to_int
+let uint64_int_right_shift x y = Z.shift_right x (Z.to_int y)
 
 (* This is intended to work on positive floats! *)
 let string_of_pos_float num =

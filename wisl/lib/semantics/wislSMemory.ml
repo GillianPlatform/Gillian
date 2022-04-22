@@ -135,7 +135,12 @@ let rem_freed heap pfs gamma loc =
 let alloc heap _pfs _gamma (size : int) =
   let loc = WislSHeap.alloc heap size in
   ASucc
-    [ (heap, [ Expr.Lit (Literal.Loc loc); Expr.Lit (Literal.Int 0) ], [], []) ]
+    [
+      ( heap,
+        [ Expr.Lit (Literal.Loc loc); Expr.Lit (Literal.Int Z.zero) ],
+        [],
+        [] );
+    ]
 
 let dispose heap pfs gamma loc_expr =
   match resolve_loc pfs gamma loc_expr with
@@ -189,7 +194,8 @@ let execute_action ?unification:_ name heap pfs gamma args =
                args))
   | SetBound -> (
       match args with
-      | [ loc_expr; Expr.Lit (Int b) ] -> set_bound heap pfs gamma loc_expr b
+      | [ loc_expr; Expr.Lit (Int b) ] ->
+          set_bound heap pfs gamma loc_expr (Z.to_int b)
       | args ->
           failwith
             (Format.asprintf
@@ -234,8 +240,8 @@ let execute_action ?unification:_ name heap pfs gamma args =
                args))
   | Alloc -> (
       match args with
-      | [ Expr.Lit (Literal.Int size) ] when size >= 1 ->
-          alloc heap pfs gamma size
+      | [ Expr.Lit (Literal.Int size) ] when Z.geq size Z.one ->
+          alloc heap pfs gamma (Z.to_int size)
       | args ->
           failwith
             (Format.asprintf

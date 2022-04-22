@@ -72,13 +72,13 @@ module CSimplExpr = struct
     | PVar of string
     | LVar of string
     | Loc of string
-    | Int of int
+    | Int of Z.t
     | Bool of bool
     | String of string
 
   let pp fmt = function
     | PVar s | LVar s | Loc s -> Fmt.string fmt s
-    | Int i -> Fmt.int fmt i
+    | Int i -> Z.pp_print fmt i
     | Bool true -> Fmt.string fmt "true"
     | Bool false -> Fmt.string fmt "false"
     | String s -> Fmt.pf fmt "`%s`" s

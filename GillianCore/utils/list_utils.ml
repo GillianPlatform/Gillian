@@ -102,3 +102,12 @@ let nth_or_size list n =
     | k :: r -> if Int.equal sz n then Either.Left k else aux (sz + 1) r n
   in
   aux 0 list n
+
+let rec map_option f =
+  let ( let* ) = Option.bind in
+  function
+  | [] -> Some []
+  | a :: r ->
+      let* a = f a in
+      let* r = map_option f r in
+      Some (a :: r)

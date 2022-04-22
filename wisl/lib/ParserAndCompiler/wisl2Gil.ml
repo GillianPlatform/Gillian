@@ -61,7 +61,7 @@ let rec compile_val v =
   match v with
   | Bool b -> Literal.Bool b
   | Null -> Literal.Null
-  | Int n -> Literal.Int n
+  | Int n -> Literal.Int (Z.of_int n)
   | Str s -> Literal.String s
   | VList l -> Literal.LList (List.map compile_val l)
 
@@ -308,7 +308,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
           let expr_offset =
             match bo with
             | Some o when not block -> Expr.LVar o
-            | None when block -> Lit (Int 0)
+            | None when block -> Expr.zero_i
             | _ ->
                 failwith
                   "The algorithm to compile pointsto seems to be wrong, cannot \
@@ -322,7 +322,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
             if not block then
               let offset = gen_str lgvar in
               (Some offset, Expr.LVar offset)
-            else (None, Lit (Int 0))
+            else (None, Expr.zero_i)
           in
           ( Option.fold ~some:(fun x -> [ x ]) ~none:[] offset @ (loc :: exs1),
             Asrt.Types
@@ -571,7 +571,8 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
   let reassign_vars =
     List.mapi
       (fun i vn ->
-        Cmd.Assignment (vn, BinOp (PVar retv, BinOp.LstNth, Lit (Int i))))
+        Cmd.Assignment
+          (vn, BinOp (PVar retv, BinOp.LstNth, Lit (Int (Z.of_int i)))))
       vars
   in
   let annot_while =
@@ -666,7 +667,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let faillab, ctnlab = (gen_str fail_lab, gen_str ctn_lab) in
       let testcmd =
         Cmd.GuardedGoto
-          ( Expr.BinOp (nth comp_e 1, BinOp.Equal, Expr.Lit (Literal.Int 0)),
+          ( Expr.BinOp (nth comp_e 1, BinOp.Equal, Expr.Lit (Literal.Int Z.zero)),
             ctnlab,
             faillab )
       in
@@ -742,7 +743,9 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let annot =
         Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
-      let newcmd = Cmd.LAction (x, alloc, [ Expr.Lit (Literal.Int k) ]) in
+      let newcmd =
+        Cmd.LAction (x, alloc, [ Expr.Lit (Literal.Int (Z.of_int k)) ])
+      in
       let comp_rest, new_functions = compile_list rest in
       ((annot, None, newcmd) :: comp_rest, new_functions)
   (* x := new(k) =>

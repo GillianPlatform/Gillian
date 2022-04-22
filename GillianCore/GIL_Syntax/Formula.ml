@@ -14,8 +14,10 @@ type t = TypeDef__.formula =
   | SetMem of Expr.t * Expr.t  (** Set membership *)
   | SetSub of Expr.t * Expr.t  (** Set subsetness *)
   | ForAll of (string * Type.t option) list * t  (** Forall *)
-[@@deriving yojson]
+[@@deriving eq]
 
+let to_yojson = TypeDef__.formula_to_yojson
+let of_yojson = TypeDef__.formula_of_yojson
 let compare = Stdlib.compare
 let of_bool b = if b then True else False
 

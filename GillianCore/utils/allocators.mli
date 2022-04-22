@@ -6,7 +6,7 @@ val register_resetter : (unit -> unit) -> unit
 val reset_all : unit -> unit
 
 module type S = sig
-  type t [@@deriving yojson]
+  type t [@@deriving yojson, eq, ord]
 
   val alloc : unit -> t
   val dealloc : t -> unit

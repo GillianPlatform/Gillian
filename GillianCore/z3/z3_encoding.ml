@@ -45,6 +45,7 @@ let reals_sort = Arithmetic.Real.mk_sort ctx
 let numbers_sort = reals_sort
 let mk_string_symb s = Symbol.mk_string ctx s
 let mk_int_i = Arithmetic.Integer.mk_numeral_i ctx
+let mk_int_s = Arithmetic.Integer.mk_numeral_s ctx
 let mk_const = Arithmetic.Real.mk_const ctx
 let mk_num_i = Arithmetic.Real.mk_numeral_i ctx
 let mk_num_s = Arithmetic.Real.mk_numeral_s ctx
@@ -499,7 +500,7 @@ let rec encode_lit (lit : Literal.t) =
         mk_singleton_elem
           (ZExpr.mk_app ctx Lit_operations.boolean_constructor [ b_arg ])
     | Int i ->
-        let i_arg = mk_int_i i in
+        let i_arg = mk_int_s (Z.to_string i) in
         mk_singleton_elem
           (ZExpr.mk_app ctx Lit_operations.int_constructor [ i_arg ])
     | Num n ->

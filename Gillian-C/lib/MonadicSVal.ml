@@ -132,10 +132,9 @@ let to_gil_expr sval =
   Delayed.return ~learned:typing_pfs exp
 
 let sure_is_zero = function
-  | SVint (Lit (Int 0))
-  | SVlong (Lit (Int 0))
-  | SVfloat (Lit (Num 0.))
-  | SVsingle (Lit (Num 0.)) -> true
+  | SVint (Lit (Int z)) when Z.equal z Z.zero -> true
+  | SVlong (Lit (Int z)) when Z.equal z Z.zero -> true
+  | SVfloat (Lit (Num 0.)) | SVsingle (Lit (Num 0.)) -> true
   | _ -> false
 
 module SVArray = struct
@@ -170,7 +169,7 @@ module SVArray = struct
     | Arr (EList l) ->
         List.for_all
           (function
-            | Expr.Lit (Int 0) -> true
+            | Expr.Lit (Int z) when Z.equal z Z.zero -> true
             | _ -> false)
           l
     | AllZeros -> true
@@ -216,7 +215,7 @@ module SVArray = struct
         Logging.verbose (fun fmt ->
             fmt "Undefined pf: Concrete: %a" Expr.pp size);
         let undefs =
-          Expr.Lit (LList (List.init x (fun _ -> Literal.Undefined)))
+          Expr.Lit (LList (List.init (Z.to_int x) (fun _ -> Literal.Undefined)))
         in
         arr_exp #== undefs
     | _ ->
@@ -240,7 +239,10 @@ module SVArray = struct
     match size with
     | Lit (Int x) ->
         Logging.verbose (fun fmt -> fmt "Zeros pf: Concrete: %a" Expr.pp size);
-        let zeros = Expr.Lit (LList (List.init x (fun _ -> Literal.Int 0))) in
+        let zeros =
+          Expr.Lit
+            (LList (List.init (Z.to_int x) (fun _ -> Literal.Int Z.zero)))
+        in
         arr_exp #== zeros
     | _ ->
         Logging.verbose (fun fmt ->
@@ -324,7 +326,8 @@ module SVArray = struct
     in
     let f_of_all_same ~describing_pf ~concrete_single =
       match size with
-      | Lit (Int n) -> (Expr.EList (Utils.List_utils.make n concrete_single), [])
+      | Lit (Int n) ->
+          (Expr.EList (Utils.List_utils.make (Z.to_int n) concrete_single), [])
       | _ ->
           let open Formula.Infix in
           let arr = LVar.alloc () in
@@ -350,8 +353,7 @@ module SVArray = struct
         in
         (e, learned)
     | AllZeros ->
-        f_of_all_same ~concrete_single:(Expr.Lit (Int 0))
-          ~describing_pf:zeros_pf
+        f_of_all_same ~concrete_single:Expr.zero_i ~describing_pf:zeros_pf
     | AllUndef ->
         f_of_all_same ~concrete_single:(Expr.Lit Undefined)
           ~describing_pf:undefined_pf
@@ -393,7 +395,7 @@ module SVArray = struct
                 let i k = Expr.int k in
                 let learned =
                   List.concat
-                    (List.init n (fun k ->
+                    (List.init (Z.to_int n) (fun k ->
                          let x = Expr.list_nth e k in
                          let open Formula.Infix in
                          [ (i low) #<= x; x #<= (i high) ]))

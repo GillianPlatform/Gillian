@@ -43,16 +43,15 @@ let is_loc gamma loc =
   Option.value ~default:false r_opt
 
 let is_zero = function
-  | SVint (Lit (Int 0))
-  | SVlong (Lit (Int 0))
-  | SVsingle (Lit (Num 0.))
-  | SVfloat (Lit (Num 0.)) -> true
+  | SVint (Lit (Int z)) when Z.equal z Z.zero -> true
+  | SVlong (Lit (Int z)) when Z.equal z Z.zero -> true
+  | SVsingle (Lit (Num 0.)) | SVfloat (Lit (Num 0.)) -> true
   | _ -> false
 
 let zero_of_chunk chunk =
   match Compcert.AST.type_of_chunk chunk with
-  | Tany32 | Tint -> SVint (Lit (Int 0))
-  | Tany64 | Tlong -> SVlong (Lit (Int 0))
+  | Tany32 | Tint -> SVint Expr.zero_i
+  | Tany64 | Tlong -> SVlong Expr.zero_i
   | Tsingle -> SVsingle (Lit (Num 0.))
   | Tfloat -> SVfloat (Lit (Num 0.))
 

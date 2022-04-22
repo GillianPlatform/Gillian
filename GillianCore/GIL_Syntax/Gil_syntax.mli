@@ -51,7 +51,7 @@ module Type : sig
     | ListType  (** Type of lists *)
     | TypeType  (** Type of types *)
     | SetType  (** Type of sets *)
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   (** Printer *)
   val str : t -> string
@@ -68,14 +68,14 @@ module Literal : sig
     | Empty  (** The literal [empty] *)
     | Constant of Constant.t  (** GIL constants ({!type:Constant.t}) *)
     | Bool of bool  (** GIL booleans: [true] and [false] *)
-    | Int of int  (** GIL integers: TODO: understand size *)
+    | Int of Z.t  (** GIL integers: TODO: understand size *)
     | Num of float  (** GIL floats - double-precision 64-bit IEEE 754 *)
     | String of string  (** GIL strings *)
     | Loc of string  (** GIL locations (uninterpreted symbols) *)
     | Type of Type.t  (** GIL types ({!type:Type.t}) *)
     | LList of t list  (** Lists of GIL literals *)
     | Nono  (** Negative information *)
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   (** Pretty-printer *)
   val pp : t Fmt.t
@@ -224,8 +224,16 @@ module Expr : sig
   val num : float -> t
   val num_int : int -> t
   val int : int -> t
+  val int_z : Z.t -> t
   val string : string -> t
   val bool : bool -> t
+
+  (** Lit (Int Z.zero) *)
+  val zero_i : t
+
+  (** Lit (Int Z.one) *)
+  val one_i : t
+
   val type_ : Type.t -> t
   val list : t list -> t
   val list_length : t -> t
@@ -356,7 +364,7 @@ module Formula : sig
     | SetMem of Expr.t * Expr.t  (** Set membership *)
     | SetSub of Expr.t * Expr.t  (** Set subsetness *)
     | ForAll of (string * Type.t option) list * t  (** Forall *)
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   val of_bool : bool -> t
 
@@ -1203,7 +1211,7 @@ module Visitors : sig
            ; visit_IUnaryMinus : 'c -> UnOp.t -> UnOp.t
            ; visit_If :
                'c -> LCmd.t -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
-           ; visit_Int : 'c -> Literal.t -> int -> Literal.t
+           ; visit_Int : 'c -> Literal.t -> Z.t -> Literal.t
            ; visit_IntType : 'c -> Type.t -> Type.t
            ; visit_Invariant : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
            ; visit_LAction :
@@ -1456,7 +1464,7 @@ module Visitors : sig
       method visit_If :
         'c -> LCmd.t -> Expr.t -> LCmd.t list -> LCmd.t list -> LCmd.t
 
-      method visit_Int : 'c -> Literal.t -> int -> Literal.t
+      method visit_Int : 'c -> Literal.t -> Z.t -> Literal.t
       method visit_IntType : 'c -> Type.t -> Type.t
       method visit_Invariant : 'c -> SLCmd.t -> Asrt.t -> string list -> SLCmd.t
 
@@ -1767,7 +1775,7 @@ module Visitors : sig
            ; visit_Not : 'c -> Formula.t -> 'f
            ; visit_Null : 'c -> 'f
            ; visit_NullType : 'c -> 'f
-           ; visit_Int : 'c -> int -> 'f
+           ; visit_Int : 'c -> Z.t -> 'f
            ; visit_Num : 'c -> float -> 'f
            ; visit_IntType : 'c -> 'f
            ; visit_NumberType : 'c -> 'f
@@ -1990,7 +1998,7 @@ module Visitors : sig
       method visit_Not : 'c -> Formula.t -> 'f
       method visit_Null : 'c -> 'f
       method visit_NullType : 'c -> 'f
-      method visit_Int : 'c -> int -> 'f
+      method visit_Int : 'c -> Z.t -> 'f
       method visit_Num : 'c -> float -> 'f
       method visit_IntType : 'c -> 'f
       method visit_NumberType : 'c -> 'f
@@ -2168,7 +2176,7 @@ module Visitors : sig
            ; visit_ITimes : 'c -> unit
            ; visit_IUnaryMinus : 'c -> unit
            ; visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> unit
-           ; visit_Int : 'c -> int -> unit
+           ; visit_Int : 'c -> Z.t -> unit
            ; visit_IntType : 'c -> unit
            ; visit_Invariant : 'c -> Asrt.t -> string list -> unit
            ; visit_LAction : 'c -> string -> string -> Expr.t list -> unit
@@ -2390,7 +2398,7 @@ module Visitors : sig
       method visit_ITimes : 'c -> unit
       method visit_IUnaryMinus : 'c -> unit
       method visit_If : 'c -> Expr.t -> LCmd.t list -> LCmd.t list -> unit
-      method visit_Int : 'c -> int -> unit
+      method visit_Int : 'c -> Z.t -> unit
       method visit_IntType : 'c -> unit
       method visit_Invariant : 'c -> Asrt.t -> string list -> unit
       method visit_LAction : 'c -> string -> string -> Expr.t list -> unit

@@ -106,7 +106,7 @@ let assert_of_member cenv members id typ =
   let pvmember = Expr.PVar field_name in
   let fo =
     match field_offset cenv id members with
-    | Errors.OK (f, Full) -> Expr.int (Camlcoq.Z.to_int f)
+    | Errors.OK (f, Full) -> Expr.int_z (ValueTranslation.int_of_z f)
     | Errors.OK _ -> Fmt.failwith "Unsupported: bitfield members"
     | Errors.Error e ->
         Fmt.failwith "Invalid member offset : %a@?" Driveraux.print_error e
@@ -152,7 +152,7 @@ let assert_of_member cenv members id typ =
       | _ -> failwith "impossible"
     in
     let n = ValueTranslation.int_of_z n in
-    let n_e = Expr.int n in
+    let n_e = Expr.int_z n in
     let chunk =
       match Ctypes.access_mode ty with
       | By_value chunk -> chunk
@@ -240,20 +240,20 @@ let gen_pred_of_struct cenv ann struct_name =
   in
   let fo idp =
     match field_offset cenv idp comp.co_members with
-    | Errors.OK (f, Full) -> Camlcoq.Z.to_int f
+    | Errors.OK (f, Full) -> ValueTranslation.int_of_z f
     | Errors.OK _ -> failwith "Unsupported bitfield members"
     | Errors.Error e ->
         failwith
           (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
              e)
   in
-  let sz t = Camlcoq.Z.to_int (sizeof cenv t) in
+  let sz t = ValueTranslation.int_of_z (sizeof cenv t) in
   let rec get_holes memb =
     match memb with
     | [] -> []
     | [ _a ] -> []
     | Member_plain (ida, t) :: (Member_plain (idb, _) :: _ as r) ->
-        let end_a = fo ida + sz t in
+        let end_a = Z.add (fo ida) (sz t) in
         let start_b = fo idb in
         if end_a < start_b then (end_a, start_b) :: get_holes r else get_holes r
     | _ -> failwith "Unsupported bitfield members"
@@ -468,6 +468,7 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
     | Sfloat _ -> 4
     | Sptr _ | Sfunptr _ -> if Archi.ptr64 then 8 else 4
   in
+  let sz x = sz x |> Z.of_int in
   let interpret_s ~typ s =
     match typ with
     | CAssert.Global ->
@@ -571,7 +572,7 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
         | None -> failwith (Printf.sprintf "Structure %s is undefined !" sname)
         | Some c -> c
       in
-      let siz = Camlcoq.Z.to_int comp.Ctypes.co_sizeof in
+      let siz = ValueTranslation.int_of_z comp.Ctypes.co_sizeof in
       let more_asrt, _, params_fields =
         split3_expr_comp (List.map trans_expr el)
       in
@@ -911,9 +912,9 @@ let get_clight_fun clight_prog ident =
 let opt_gen param_name pred_name struct_params =
   let lv_params = List.map (fun (s, _) -> Expr.LVar ("#" ^ s)) struct_params in
   let loc = Expr.LVar "#loc" in
-  let null = Expr.Lit (LList [ String VTypes.long_type; Int 0 ]) in
+  let null = Expr.Lit (LList [ String VTypes.long_type; Int Z.zero ]) in
   let pvar = Expr.PVar param_name in
-  let loc_list = Expr.EList [ loc; Lit (Int 0) ] in
+  let loc_list = Expr.EList [ loc; Expr.zero_i ] in
   let def_null = pvar == null in
   let def_rec =
     (pvar == loc_list) ** types ObjectType loc
@@ -929,7 +930,7 @@ let asserts_of_rec_member cenv members id typ =
   let field_val_name = "#i__" ^ field_name ^ "_v" in
   let lvval = Expr.LVar field_val_name in
   let pvloc = Expr.PVar loc_param_name in
-  let pvoffs = Expr.Lit (Int 0) in
+  let pvoffs = Expr.zero_i in
   (* let pvoffs = Expr.PVar offs_param_name in *)
   let res_to_map =
     let open VTypes in
@@ -947,8 +948,8 @@ let asserts_of_rec_member cenv members id typ =
     | Tpointer (Tstruct (id, _), _) ->
         let struct_name = true_name id in
         let p_name = rec_pred_name_of_struct struct_name in
-        let null = Expr.Lit (LList [ String long_type; Int 0 ]) in
-        let obj = Expr.EList [ lvval; Lit (Int 0) ] in
+        let null = Expr.Lit (LList [ String long_type; Int Z.zero ]) in
+        let obj = Expr.EList [ lvval; Expr.zero_i ] in
         let comp_opt = Maps.PTree.get id cenv in
         let comp =
           match comp_opt with
@@ -979,14 +980,14 @@ let asserts_of_rec_member cenv members id typ =
   in
   let fo =
     match field_offset cenv id members with
-    | Errors.OK (f, Full) -> Expr.Lit (Int (Camlcoq.Z.to_int f))
+    | Errors.OK (f, Full) -> Expr.Lit (Int (ValueTranslation.int_of_z f))
     | Errors.OK _ -> failwith "Unsupported bitfield members"
     | Errors.Error e ->
         failwith
           (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
              e)
   in
-  let sz = Expr.Lit (Int (Camlcoq.Z.to_int (sizeof cenv typ))) in
+  let sz = Expr.Lit (Int (ValueTranslation.int_of_z (sizeof cenv typ))) in
   let perm_exp =
     Expr.Lit (String (ValueTranslation.string_of_permission Memtype.Freeable))
   in
@@ -1046,27 +1047,27 @@ let gen_rec_pred_of_struct cenv ann struct_name =
   in
   let fo idp =
     match field_offset cenv idp comp.co_members with
-    | Errors.OK (f, Full) -> Camlcoq.Z.to_int f
+    | Errors.OK (f, Full) -> ValueTranslation.int_of_z f
     | Errors.OK _ -> failwith "Unsupported bitfield members"
     | Errors.Error e ->
         failwith
           (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
              e)
   in
-  let sz t = Camlcoq.Z.to_int (sizeof cenv t) in
+  let sz t = ValueTranslation.int_of_z (sizeof cenv t) in
   let rec get_holes memb =
     match memb with
     | [] -> []
     | [ _a ] -> []
     | Member_plain (ida, t) :: Member_plain (idb, _) :: r ->
-        let end_a = fo ida + sz t in
+        let end_a = Z.add (fo ida) (sz t) in
         let start_b = fo idb in
         if end_a < start_b then (end_a, start_b) :: get_holes r else get_holes r
     | _ -> failwith "Unsupported bitfield members"
   in
   let holes = get_holes comp.co_members in
   let hole_assert = fold_star (List.map assert_of_hole holes) in
-  let siz = Camlcoq.Z.to_int comp.Ctypes.co_sizeof in
+  let siz = ValueTranslation.int_of_z comp.Ctypes.co_sizeof in
   let zero = Expr.int 0 in
   let malloc = malloc_chunk_asrt (Expr.PVar loc_param_name) zero siz in
   let pred_definitions =

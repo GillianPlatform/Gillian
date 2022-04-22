@@ -7,8 +7,8 @@ let true_name id =
   if str.[0] = '$' then Prefix.uvar ^ String.sub str 1 (String.length str - 1)
   else str
 
-let z_of_int = Camlcoq.Z.of_sint
-let int_of_z = Camlcoq.Z.to_int
+let z_of_int z = Camlcoq.Z.of_sint (Z.to_int z)
+let int_of_z z = Z.of_int (Camlcoq.Z.to_int z)
 let string_of_chunk = Chunk.to_string
 let chunk_of_string = Chunk.of_string
 
@@ -23,8 +23,8 @@ let block_of_loc_name loc_name =
   let int_block = int_of_string string_block in
   Camlcoq.P.of_int int_block
 
-let compcert_size_of_gil = Camlcoq.Z.of_sint
-let gil_size_of_compcert = Camlcoq.Z.to_int
+let compcert_size_of_gil = z_of_int
+let gil_size_of_compcert = int_of_z
 
 let compcert_of_gil gil_value =
   let open Literal in
@@ -32,7 +32,7 @@ let compcert_of_gil gil_value =
   match gil_value with
   | Undefined -> Vundef
   | LList [ String typ; Int ocaml_int ] when String.equal typ VTypes.int_type ->
-      let coq_int = Camlcoq.Z.of_sint ocaml_int in
+      let coq_int = z_of_int ocaml_int in
       Vint coq_int
   | LList [ String typ; Num ocaml_float ]
     when String.equal typ VTypes.float_type ->
@@ -44,11 +44,11 @@ let compcert_of_gil gil_value =
       Vsingle coq_float
   | LList [ String typ; Int ocaml_int ] when String.equal typ VTypes.long_type
     ->
-      let coq_int = Camlcoq.Z.of_sint ocaml_int in
+      let coq_int = z_of_int ocaml_int in
       Vlong coq_int
   | LList [ Loc loc; Int ocaml_ofs ] ->
       let block = block_of_loc_name loc in
-      let ptrofs = Camlcoq.Z.of_sint ocaml_ofs in
+      let ptrofs = z_of_int ocaml_ofs in
       Vptr (block, ptrofs)
   | _ ->
       failwith
@@ -60,7 +60,7 @@ let gil_of_compcert compcert_value =
   match compcert_value with
   | Vundef -> Undefined
   | Vint i ->
-      let ocaml_int = Camlcoq.Z.to_int i in
+      let ocaml_int = int_of_z i in
       LList [ String VTypes.int_type; Int ocaml_int ]
   | Vfloat f ->
       let ocaml_float = Camlcoq.camlfloat_of_coqfloat f in
@@ -69,11 +69,11 @@ let gil_of_compcert compcert_value =
       let ocaml_float = Camlcoq.camlfloat_of_coqfloat32 f32 in
       LList [ String VTypes.single_type; Num ocaml_float ]
   | Vlong i64 ->
-      let ocaml_int = Camlcoq.Z.to_int i64 in
+      let ocaml_int = int_of_z i64 in
       LList [ String VTypes.long_type; Int ocaml_int ]
   | Vptr (block, ptrofs) ->
       let loc = loc_name_of_block block in
-      let ocaml_ofs = Camlcoq.Z.to_int ptrofs in
+      let ocaml_ofs = int_of_z ptrofs in
       LList [ Loc loc; Int ocaml_ofs ]
 
 let string_of_permission perm =
@@ -113,7 +113,7 @@ let compcert_block_of_gil gil_block =
 
 let gil_init_data init_data =
   let open Literal in
-  let oint n = Int (Camlcoq.Z.to_int n) in
+  let oint n = Int (int_of_z n) in
   let open Compcert.AST in
   match init_data with
   | Init_int8 n -> LList [ String "int8"; oint n ]

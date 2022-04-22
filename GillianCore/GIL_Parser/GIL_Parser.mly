@@ -33,7 +33,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token TRUE
 %token FALSE
 %token <float> FLOAT
-%token <int> INTEGER
+%token <Z.t> INTEGER
 %token NAN
 %token INFINITY
 %token <string> STRING
