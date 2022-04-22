@@ -2269,9 +2269,9 @@ let rec reduce_formula_loop
   else
     let f = reduce_formula_loop ~rpfs unification pfs gamma in
     let fe = reduce_lexpr_loop ~unification pfs gamma in
-    (* L.verbose (fun fmt -> fmt "Reducing Formula: %a" Formula.pp a); *)
     let result : Formula.t =
       match a with
+      | Eq (x, NOp (LstCat, [ y; z ])) when x = z -> Eq (y, EList [])
       | Eq (e1, e2) when e1 = e2 && lexpr_is_list gamma e1 ->
           True (* Why only lists? *)
       (* DEDICATED SIMPLIFICATIONS - this should probably be handled properly by Z3... *)

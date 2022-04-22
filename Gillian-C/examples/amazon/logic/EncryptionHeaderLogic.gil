@@ -376,7 +376,7 @@ pure nounfold pred BRawEncryptionContext(errorMessage:Str, +buffer:List, ECKs:Li
 
     (* keyCount is 0i *)
     (buffer == l+ ({{ 0i, 0i }}, #rest)) * (ECKs == {{ }}) *
-    (errorMessage == "decodeEncryptionContext: Key Count is 0i."),
+    (errorMessage == "decodeEncryptionContext: Key Count is 0."),
 
     (* Too much data provided *)
     (buffer == l+ ({{ #kc0, #kc1 }}, #rest)) *

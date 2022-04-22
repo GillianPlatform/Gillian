@@ -11,7 +11,7 @@ void aws_cryptosdk_enc_ctx_clear(struct aws_hash_table *enc_ctx) {
     pred nounfold ECErrorCodeOfJSErrorMessage(errorMessage) {
         (errorMessage == `decodeEncryptionContext: Underflow, not enough data.`) * aws_last_error_is_SHORT_BUF();
         (errorMessage == `decodeEncryptionContext: Not enough data to read key count.`) * aws_last_error_is_SHORT_BUF();
-        (errorMessage == `decodeEncryptionContext: Key Count is 0`) * aws_last_error_is_BAD_CIPHERTEXT();
+        (errorMessage == `decodeEncryptionContext: Key Count is 0.`) * aws_last_error_is_BAD_CIPHERTEXT();
         (errorMessage == `decodeEncryptionContext: Duplicate encryption context key value.`) * aws_last_error_is_BAD_CIPHERTEXT()
     }
 */
@@ -280,7 +280,6 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
 
         GILLIAN("apply optBytesConcat(#buffer p+ 2, #consumedLength, #buffer p+ (2 + #consumedLength), 2)");
         GILLIAN("apply optBytesConcat(#buffer p+ 2, #consumedLength + 2, #buffer p+ (4 + #consumedLength), #key_length - 2)");
-        GILLIAN("apply optBytesConcat(#buffer p+ 2, #consumedLength + #key_length, #buffer p+ (2 + #consumedLength + #key_length), 2)");
         GILLIAN("apply optBytesConcat(#buffer p+ 2, #consumedLength + #key_length, #buffer p+ (2 + #consumedLength + #key_length), 2)");
         GILLIAN("apply optBytesConcat(#buffer p+ 2, #consumedLength + #key_length + 2, #buffer p+ (4 + #consumedLength + #key_length), #value_length - 2)");
         int was_created;
