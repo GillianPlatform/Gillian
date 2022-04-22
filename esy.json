@@ -56,7 +56,7 @@
     "c:init:env": "Gillian-C/scripts/setup_environment.sh",
     "wisl:init:env": "wisl/scripts/setup_environment.sh",
     "init:env": "sh -c \"esy js:init:env && esy c:init:env && esy wisl:init:env\"",
-    "test": "dune test -j 4",
+    "test": "dune test",
     "install-githooks": "./githooks/install.ml",
     "clean-githooks": "./githooks/clean.ml",
     "clean": "dune clean",
