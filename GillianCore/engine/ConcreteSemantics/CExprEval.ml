@@ -417,29 +417,26 @@ let rec evaluate_binop
           binary_num_thing lit1 lit2 int32_right_shift
             "Type Error: Signed right shift: expected numbers, got "
       | UnsignedRightShift ->
-          binary_num_thing lit1 lit2 uint32_right_shift
+          binary_int_thing lit1 lit2 uint32_right_shift
             "Type Error: Unsigned right shift: expected numbers, got "
       | BitwiseAndL ->
-          binary_num_thing lit1 lit2 int64_bitwise_and
+          binary_int_thing lit1 lit2 int64_bitwise_and
             "Type Error: Bitwise 64bit conjunction: expected numbers, got "
       | BitwiseOrL ->
-          binary_num_thing lit1 lit2 int64_bitwise_or
+          binary_int_thing lit1 lit2 int64_bitwise_or
             "Type Error: Bitwise 64bit disjunction: expected numbers, got "
       | BitwiseXorL ->
-          binary_num_thing lit1 lit2 int64_bitwise_xor
+          binary_int_thing lit1 lit2 int64_bitwise_xor
             "Type Error: Bitwise 64bit exclusive disjunction: expected \
              numbers, got "
       | LeftShiftL ->
-          binary_num_thing lit1 lit2 int64_left_shift
+          binary_int_thing lit1 lit2 int64_left_shift
             "Type Error: 64bit Left shift: expected numbers, got "
       | SignedRightShiftL ->
           binary_num_thing lit1 lit2 int64_right_shift
             "Type Error: 64bit Signed right shift: expected numbers, got "
-      | FUnsignedRightShiftL ->
-          binary_num_thing lit1 lit2 uint32_right_shift
-            "Type Error: 64bit Unsigned right shift: expected numbers, got "
-      | IUnsignedRightShiftL ->
-          binary_int_thing lit1 lit2 uint64_int_right_shift
+      | UnsignedRightShiftL ->
+          binary_int_thing lit1 lit2 uint32_right_shift
             "Type Error: 64bit Unsigned right shift: expected numbers, got "
       | M_atan2 ->
           binary_num_thing lit1 lit2 atan2

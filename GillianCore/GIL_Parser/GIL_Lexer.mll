@@ -199,7 +199,6 @@ rule read = parse
   | "&"                  { GIL_Parser.BITWISEAND    }
   | "|"                  { GIL_Parser.BITWISEOR     }
   | "^"                  { GIL_Parser.BITWISEXOR    }
-  | "i>>>l"               { GIL_Parser.IUNSIGNEDRIGHTSHIFTL }
   | "<<"                 { GIL_Parser.LEFTSHIFT     }
   | ">>"                 { GIL_Parser.SIGNEDRIGHTSHIFT }
   | ">>>"                { GIL_Parser.UNSIGNEDRIGHTSHIFT }
@@ -208,7 +207,7 @@ rule read = parse
   | "^l"                 { GIL_Parser.BITWISEXORL   }
   | "<<l"                { GIL_Parser.LEFTSHIFTL    }
   | ">>l"                { GIL_Parser.SIGNEDRIGHTSHIFTL }
-  | ">>>l"               { GIL_Parser.FUNSIGNEDRIGHTSHIFTL }
+  | ">>>l"               { GIL_Parser.UNSIGNEDRIGHTSHIFTL }
   | "**"                 { GIL_Parser.M_POW         }
   | "l+"                 { GIL_Parser.LSTCAT        }
   | "++"                 { GIL_Parser.STRCAT        }

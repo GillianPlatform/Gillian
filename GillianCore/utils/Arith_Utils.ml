@@ -52,25 +52,11 @@ let to_uint16 n =
       int16bit
   | _ -> 0.
 
-let modulo_32 x =
-  let r = mod_float x 32. in
-  if x < 0. then r +. 32. else r
-
-let int64_bitwise_not x = Int64.to_float (Int64.lognot (Int64.of_float x))
-
-let int64_bitwise_and x y =
-  Int64.to_float (Int64.logand (Int64.of_float x) (Int64.of_float y))
-
-let int64_bitwise_or x y =
-  Int64.to_float (Int64.logor (Int64.of_float x) (Int64.of_float y))
-
-let int64_bitwise_xor x y =
-  Int64.to_float (Int64.logxor (Int64.of_float x) (Int64.of_float y))
-
-let int64_left_shift x y =
-  let l = Int64.of_float x in
-  let r = int_of_float y in
-  Int64.to_float (Int64.shift_left l r)
+let int64_bitwise_not = Z.lognot
+let int64_bitwise_and = Z.logand
+let int64_bitwise_or = Z.logor
+let int64_bitwise_xor = Z.logxor
+let int64_left_shift x y = Z.shift_left x (Z.to_int y)
 
 let int64_right_shift x y =
   let l = Int64.of_float x in
@@ -103,15 +89,7 @@ let int32_right_shift x y =
   let r = int_of_float y mod 32 in
   Int32.to_float (Int32.shift_right l r)
 
-let uint32_right_shift x y =
-  let i31 = 2. ** 31. in
-  let i32 = 2. ** 32. in
-  let signedx = if x >= i31 then x -. i32 else x in
-  let left = Int32.of_float signedx in
-  let right = int_of_float y mod 32 in
-  let r = Int32.to_float (Int32.shift_right_logical left right) in
-  if r < 0. then r +. i32 else r
-
+let uint32_right_shift x y = Z.shift_right x (Z.to_int y)
 let uint64_int_right_shift x y = Z.shift_right x (Z.to_int y)
 
 (* This is intended to work on positive floats! *)
