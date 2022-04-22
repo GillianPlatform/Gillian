@@ -41,7 +41,7 @@ proc i__binop_cmpu_gt(v1, v2) {
 proc i__binop_cmpfs_ge(v1, v2) {
         goto [ l-nth(v1, 0i) = "single" ] llon unde;
   llon: goto [ l-nth(v2, 0i) = "single" ] blon unde;
-  blon: ret := "i__value_of_bool"(not (l-nth(v1, 1i) i< l-nth(v2, 1i)));
+  blon: ret := "i__value_of_bool"(not (l-nth(v1, 1i) < l-nth(v2, 1i)));
         return;
   unde: fail[comparison]("Using single comparison operator for non-single elements")
 };
@@ -49,7 +49,7 @@ proc i__binop_cmpfs_ge(v1, v2) {
 proc i__binop_cmpfs_le(v1, v2) {
         goto [ l-nth(v1, 0i) = "single" ] llon unde;
   llon: goto [ l-nth(v2, 0i) = "single" ] blon unde;
-  blon: ret := "i__value_of_bool"(l-nth(v1, 1i) i<= l-nth(v2, 1i));
+  blon: ret := "i__value_of_bool"(l-nth(v1, 1i) <= l-nth(v2, 1i));
         return;
   unde: fail[comparison]("Using single comparison operator for non-single elements")
 };
@@ -148,7 +148,7 @@ proc i__binop_modlu(v1, v2) {
         goto [ l-nth(v1, 0i) = "long" ] llon unde;
   llon: goto [ l-nth(v2, 0i) = "long" ] blon unde;
         assert (! (l-nth(v2, 1i) == 0i));
-  blon: ret := {{ "long", m_floor(l-nth(v1, 1i) % l-nth(v2, 1i)) }};
+  blon: ret := {{ "long", l-nth(v1, 1i) i% l-nth(v2, 1i) }};
         return;
   unde: fail[operator]("Using %lu operator for non-long elements")
 };
@@ -157,9 +157,9 @@ proc i__binop_mod(v1, v2) {
         goto [ l-nth(v1, 0i) = "int" ] llon unde;
   llon: goto [ l-nth(v2, 0i) = "int" ] blon unde;
         assert (! (l-nth(v2, 1i) == 0i));
-  blon: ret := {{ "int", m_floor(l-nth(v1, 1i) % l-nth(v2, 1i)) }};
+  blon: ret := {{ "int", l-nth(v1, 1i) i% l-nth(v2, 1i) }};
         return;
-  unde: fail[operator]("Using % operator for non-int elements")
+  unde: fail[operator]("Using i% operator for non-int elements")
 };
 
 proc i__binop_mulfs(v1, v2) {
@@ -243,7 +243,7 @@ proc i__binop_andl(v1, v2) {
   unde: fail[operator]("Using &l operator for non-long elements")
 };
 
-proc i__binop_shrlu(v1, v2) {
+proc i__binop_shrlu(v1, v2) { 
         goto [ l-nth(v1, 0i) = "long" ] llon unde;
   llon: goto [ l-nth(v2, 0i) = "int" ] blon unde;
   blon: ret := {{ "long", l-nth(v1, 1i) i>>>l l-nth(v2, 1i) }};
@@ -254,7 +254,7 @@ proc i__binop_shrlu(v1, v2) {
 proc i__binop_shll(v1, v2) {
         goto [ l-nth(v1, 0i) = "long" ] llon unde;
   llon: goto [ l-nth(v2, 0i) = "int" ] blon unde;
-  blon: goto [ (l-nth(v2, 1i) = 1i) and (l-nth(v1, 1i) i< 4294967295) ] fast norm;
+  blon: goto [ (l-nth(v2, 1i) = 1i) and (l-nth(v1, 1i) i< 4294967295i) ] fast norm;
   fast: ret := {{ "long", l-nth(v1, 1i) i* 2i }};
         return;
   norm: ret := {{ "long", l-nth(v1, 1i) <<l l-nth(v2, 1i) }};

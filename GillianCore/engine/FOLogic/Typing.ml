@@ -72,6 +72,8 @@ let rec infer_types_to_gamma
       | Car -> f le ListType
       | LstLen -> tt = IntType && f le ListType
       | LstRev -> tt = ListType && f le ListType
+      | IntToNum -> tt = NumberType && f le IntType
+      | NumToInt -> tt = IntType && f le NumberType
       | StrLen -> tt = NumberType && f le StringType
       | SetToList -> tt = ListType && f le SetType)
   | BinOp (le1, op, le2) -> (
@@ -269,7 +271,7 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
               | Car | Cdr ->
                   (ListType, [ Formula.ILessEq (Lit (Int 1), UnOp (LstLen, e)) ])
               | LstRev | SetToList -> (ListType, [])
-              | IUnaryMinus | FUnaryMinus | LstLen -> (IntType, [])
+              | IUnaryMinus | FUnaryMinus | LstLen | IntToNum -> (IntType, [])
               | BitwiseNot
               | M_abs
               | M_acos
@@ -290,6 +292,7 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
               | ToUint32Op
               | ToInt32Op
               | ToNumberOp
+              | NumToInt
               | StrLen -> (NumberType, [])
             in
             infer_type le tt (new_constraints @ constraints))

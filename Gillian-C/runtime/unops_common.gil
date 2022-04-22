@@ -21,7 +21,7 @@ proc i__unop_intoflong (i) {
 proc i__unop_intoffloat (i) {
        goto [ i = undefined ] und nm;
   nm:  goto [ l-nth(i, 0i) = "float" ] ctn und;
-  ctn: ret := {{ "int", num_to_int l-nth(i, 1i) }};
+  ctn: ret := {{ "int", as_int l-nth(i, 1i) }};
        return;
   und: ret := undefined;
        return
@@ -30,7 +30,7 @@ proc i__unop_intoffloat (i) {
 proc i__unop_intofsingle (i) {
        goto [ i = undefined ] und nm;
   nm:  goto [ l-nth(i, 0i) = "single" ] ctn und;
-  ctn: ret := {{ "int", num_to_int l-nth(i, 1i) }};
+  ctn: ret := {{ "int", as_int l-nth(i, 1i) }};
        return;
   und: ret := undefined;
        return
@@ -46,7 +46,7 @@ proc i__unop_longofintu (i) {
 
 proc i__unop_singleoflongu (i) {
        goto [ l-nth(i, 0i) = "long" ] ctn und;
-  ctn: ret := {{ "single", l-nth(i, 1i) }};
+  ctn: ret := {{ "single", as_num l-nth(i, 1i) }};
        return;
   und: ret := undefined;
        return
@@ -54,7 +54,7 @@ proc i__unop_singleoflongu (i) {
 
 proc i__unop_singleofint (i) {
        goto [ l-nth(i, 0i) = "int" ] ctn und;
-  ctn: ret := {{ "single", l-nth(i, 1i) }};
+  ctn: ret := {{ "single", as_num l-nth(i, 1i) }};
        return;
   und: ret := undefined;
        return
@@ -78,35 +78,35 @@ proc i__unop_floatofsingle (i) {
 
 proc i__unop_longoffloat (i) {
        goto [ l-nth(i, 0i) = "float" ] ctn und;
-  ctn: ret := {{ "long", l-nth(i, 1i) }};
+  ctn: ret := {{ "long", as_int l-nth(i, 1i) }};
        return;
   und: fail[cast]("Cannot use longoffloat on something that is not a float")
 };
 
 proc i__unop_longofsingle (i) {
        goto [ l-nth(i, 0i) = "single" ] ctn und;
-  ctn: ret := {{ "long", l-nth(i, 1i) }};
+  ctn: ret := {{ "long", as_int l-nth(i, 1i) }};
        return;
   und: fail[cast]("Cannot use longofsingle on something that is not a single")
 };
 
 proc i__unop_longuofsingle (i) {
        goto [ l-nth(i, 0i) = "single" ] ctn und;
-  ctn: ret := {{ "long", l-nth(i, 1i) }};
+  ctn: ret := {{ "long", as_int l-nth(i, 1i) }};
        return;
   und: fail[cast]("Cannot use longuofsingle on something that is not a single")
 };
 
 proc i__unop_floatofint (i) {
        goto [ l-nth(i, 0i) = "int" ] ctn und;
-  ctn: ret := {{ "float", l-nth(i, 1i) }};
+  ctn: ret := {{ "float", as_num l-nth(i, 1i) }};
        return;
   und: fail[cast]("Cannot use floatofint on something that is not an int")
 };
 
 proc i__unop_floatofintu (i) {
        goto [ l-nth(i, 0i) = "int" ] ctn und;
-  ctn: ret := {{ "float", l-nth(i, 1i) }};
+  ctn: ret := {{ "float", as_num l-nth(i, 1i) }};
        return;
   und: fail[cast]("Cannot use floatofint on something that is not an int")
 };

@@ -117,6 +117,8 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token SETTOLIST
 %token LSTLEN
 %token STRLEN
+%token INTTONUM
+%token NUMTOINT
 (* Expression keywords *)
 %token TYPEOF
 %token ASSUME
@@ -1123,6 +1125,8 @@ unop_target:
   | LSTREV      { UnOp.LstRev }
   | STRLEN      { UnOp.StrLen }
   | SETTOLIST   { UnOp.SetToList }
+  | INTTONUM { UnOp.IntToNum }
+  | NUMTOINT { UnOp.NumToInt }
 ;
 
 constant_target:

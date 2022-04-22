@@ -125,6 +125,22 @@ let evaluate_unop (op : UnOp.t) (lit : CVal.M.t) : CVal.M.t =
             (TypeError
                (Fmt.str "Type Error: ToNumber: expected string, got %a"
                   CVal.M.pp lit)))
+  | IntToNum -> (
+      match lit with
+      | Int x -> Num (float_of_int x)
+      | _ ->
+          raise
+            (TypeError
+               (Fmt.str "Type Error: IntToNum: expected integer, got %a"
+                  CVal.M.pp lit)))
+  | NumToInt -> (
+      match lit with
+      | Num x -> Int (int_of_float x)
+      | _ ->
+          raise
+            (TypeError
+               (Fmt.str "Type Error: NumToInt: expected number, got %a"
+                  CVal.M.pp lit)))
   | TypeOf -> Type (Literal.type_of lit)
   | Car -> (
       match lit with
@@ -370,7 +386,7 @@ let rec evaluate_binop
       | IMod ->
           binary_int_thing lit1 lit2
             (fun x y -> x mod y)
-            "Type Error: Modulus: expected numbers, got "
+            "Type Error: IModulus: expected ints, got "
       | FPlus ->
           binary_num_thing lit1 lit2
             (fun x y -> x +. y)
@@ -389,7 +405,7 @@ let rec evaluate_binop
             "Type Error: Division: expected numbers, got "
       | FMod ->
           binary_num_thing lit1 lit2 mod_float
-            "Type Error: Modulus: expected numbers, got "
+            "Type Error: FModulus: expected numbers, got "
       | BitwiseAnd ->
           binary_num_thing lit1 lit2 int32_bitwise_and
             "Type Error: Bitwise conjunction: expected numbers, got "

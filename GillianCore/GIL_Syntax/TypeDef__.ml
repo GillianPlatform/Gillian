@@ -110,6 +110,8 @@ and unop =
   | LstRev
   | SetToList
   | StrLen
+  | NumToInt
+  | IntToNum
 
 and nop = LstCat | SetUnion | SetInter
 

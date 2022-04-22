@@ -802,6 +802,21 @@ let encode_unop (op : UnOp.t) le =
       let n_le = ZExpr.mk_app ctx Axiomatised_operations.lrev_fun [ le_lst ] in
       mk_singleton_elem
         (ZExpr.mk_app ctx Lit_operations.list_constructor [ n_le ])
+  | NumToInt ->
+      let le_n =
+        ZExpr.mk_app ctx Lit_operations.number_accessor
+          [ mk_singleton_access le ]
+      in
+      let op_le_n = Arithmetic.Real.mk_real2int ctx le_n in
+      mk_singleton_elem
+        (ZExpr.mk_app ctx Lit_operations.int_constructor [ op_le_n ])
+  | IntToNum ->
+      let le_n =
+        ZExpr.mk_app ctx Lit_operations.int_accessor [ mk_singleton_access le ]
+      in
+      let op_le_n = Arithmetic.Integer.mk_int2real ctx le_n in
+      mk_singleton_elem
+        (ZExpr.mk_app ctx Lit_operations.number_constructor [ op_le_n ])
   | _ ->
       Printf.printf "SMT encoding: Construct not supported yet - unop - %s!\n"
         (UnOp.str op);

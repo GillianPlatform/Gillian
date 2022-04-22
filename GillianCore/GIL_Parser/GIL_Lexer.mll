@@ -53,6 +53,8 @@
       "m_sin",         GIL_Parser.M_SIN;
       "m_sqrt",        GIL_Parser.M_SQRT;
       "m_tan",         GIL_Parser.M_TAN;
+      "as_int",        GIL_Parser.NUMTOINT;
+      "as_num",        GIL_Parser.INTTONUM;
       "num_to_string", GIL_Parser.TOSTRING;
       "num_to_int",    GIL_Parser.TOINT;
       "num_to_uint16", GIL_Parser.TOUINT16;
