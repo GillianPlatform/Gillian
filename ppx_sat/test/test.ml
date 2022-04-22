@@ -3,14 +3,14 @@ open Monadic.Delayed
 open Formula.Infix
 open Monadic.Delayed.Syntax
 
-let zero = Expr.num 0.
-let one = Expr.num 1.
-let two = Expr.num 2.
-let num_pat n x = x #== (Expr.num n)
-let zero_pat = num_pat 0.
-let one_pat = num_pat 1.
-let two_pat = num_pat 2.
-let three_pat = num_pat 3.
+let zero = Expr.int 0
+let one = Expr.int 1
+let two = Expr.int 2
+let int_pat n x = x #== (Expr.int n)
+let zero_pat = int_pat 0
+let one_pat = int_pat 1
+let two_pat = int_pat 2
+let three_pat = int_pat 3
 
 let pp_branches =
   let open Fmt in
