@@ -8,11 +8,14 @@
     "buildsInSource": "_build"
   },
   "dependencies": {
+    "@opam/alcotest": "1.0.1",
     "@opam/cmdliner": "^1.1.1",
     "@opam/dune": "^3.0",
+    "@opam/dap": "1.0.6",
     "@opam/batteries": "^3.0.0",
     "@opam/fmt": "^0.8.8",
-    "@opam/menhir": "20211230",
+    "@opam/menhir": "20220210",
+    "@opam/sqlite3": "5.0.2",
     "@opam/z3": "giltho/esy-z3#0738c9254e9720396309f991cded8fa64d20ce1a",
     "@opam/ppx_deriving_yojson": "*",
     "@opam/ppxlib": ">=0.18.0",
