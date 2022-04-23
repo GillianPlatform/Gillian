@@ -8,8 +8,8 @@
     "buildsInSource": "_build"
   },
   "dependencies": {
-    "@opam/cmdliner": "1.0.4",
-    "@opam/dune": "^2.0",
+    "@opam/cmdliner": "^1.1.1",
+    "@opam/dune": "^3.0",
     "@opam/batteries": "^3.0.0",
     "@opam/fmt": "^0.8.8",
     "@opam/menhir": "20211230",
@@ -19,9 +19,10 @@
     "@opam/uuidm": "0.9.7",
     "@opam/visitors": ">=2.3",
     "@opam/yojson": "^1.7.0",
-    "ocaml": "^4.13.x"
+    "@opam/zarith": ">=1.12",
+    "ocaml": "^4.14.x"
   },
   "devDependencies": {
-    "ocaml": "4.13.x"
+    "ocaml": "4.14.x"
   }
 }
