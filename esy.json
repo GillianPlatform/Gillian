@@ -70,7 +70,7 @@
     "@opam/dune": "^3.0",
     "@opam/fmt": "^0.8.8",
     "@opam/flow_parser": "giltho/flow#544677c0306668679172807bec95b134f5d249f3",
-    "@opam/menhir": "20211230",
+    "@opam/menhir": "20220210",
     "@opam/ppx_deriving_yojson": "*",
     "@opam/ppxlib": ">=0.18.0",
     "@opam/printbox": "0.5",
@@ -80,11 +80,11 @@
     "@opam/yojson": "^1.7.0",
     "@opam/zarith": ">=1.12",
     "@opam/z3": "giltho/esy-z3#0738c9254e9720396309f991cded8fa64d20ce1a",
-    "compcert": "giltho/CompCert#c318992c8d3be9edf4bf323d146d1bb68627339c",
-    "ocaml": "^4.13.x"
+    "compcert": "giltho/CompCert#3a6f14016f0c9aaab2ddcdd61492e5fe54f12259",
+    "ocaml": "4.14.x"
   },
   "devDependencies": {
-    "ocaml": "4.13.x",
+    "ocaml": "4.14.x",
     "@opam/cmitomli": "*",
     "@opam/fileutils": "*",
     "@opam/utop": "*",
