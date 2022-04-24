@@ -976,9 +976,10 @@ module Make
       let state, preds, _ = astate in
       let astate_log = make_astate_log_t ~state:state ~preds:preds in
       let u_assert_log = make_u_assert_log_t ~step:step ~subst:subst ~astate:astate_log in
-      ignore (L.normal_specific
+      L.normal_specific
         (L.Loggable.make pp_u_assert_log u_assert_log_t_of_yojson u_assert_log_t_to_yojson u_assert_log)
-        L.LoggingConstants.ContentType.assertion));
+        L.LoggingConstants.ContentType.assertion
+        |> ignore);
 
     let p, outs = step in
     match (p : Asrt.t) with
