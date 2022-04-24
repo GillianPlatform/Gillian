@@ -2,6 +2,7 @@
 module ContentType = struct
   let debug = "debug"
   let phase = "phase"
+  let cmd = "cmd"
   let cmd_step = "cmd_step"
   let assertion = "assertion"
   let annotated_action = "annotated_action"
