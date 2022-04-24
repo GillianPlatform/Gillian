@@ -6,6 +6,8 @@ let filename = "file.log"
 let out_channel = ref None
 let formatter = ref None
 
+let accepted_types = LoggingConstants.ContentType.([debug; assertion; phase; cmd])
+
 let initialize () =
   let () = out_channel := Some (open_out filename) in
   formatter := Some (Format.formatter_of_out_channel (Option.get !out_channel))
@@ -18,9 +20,7 @@ let log (report : Report.t) : unit =
                log of specific types are replaced *)
       match report.type_ with
       | type_
-        when type_ = LoggingConstants.ContentType.debug
-             || type_ = LoggingConstants.ContentType.assertion
-             || type_ = LoggingConstants.ContentType.phase ->
+        when List.mem type_ accepted_types ->
           let () = Loggable.pp report.content formatter in
           Format.fprintf formatter "@,@?"
       | _ -> ())
