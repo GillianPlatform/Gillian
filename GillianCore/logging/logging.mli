@@ -55,6 +55,8 @@ module Loggable : sig
     ('a -> Yojson.Safe.t) ->
     'a ->
     t
+
+  val make_string : string -> t
 end
 
 module LogQueryer : sig
