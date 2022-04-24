@@ -27,6 +27,17 @@ let make
   previous := Some report.id;
   report
 
+let set_parent id =
+  previous := None;
+  Stack.push id parents
+
+let release_parent = function
+  | None -> ()
+  | Some rid as id_opt ->
+      let parent_id = Stack.pop parents in
+      assert (ReportId.equal rid parent_id);
+      previous := id_opt
+
 let start_phase level ?title ?severity () =
   if Mode.should_log level then (
     let report =
@@ -34,16 +45,10 @@ let start_phase level ?title ?severity () =
         ~content:(Loggable.make_string "*** Phase ***")
         ~type_:LoggingConstants.ContentType.phase ?severity ()
     in
-    previous := None;
-    Stack.push report.id parents;
+    set_parent report.id;
     Some report)
   else None
 
-let end_phase = function
-  | None -> ()
-  | Some rid as id_opt ->
-      let parent_id = Stack.pop parents in
-      assert (ReportId.equal rid parent_id);
-      previous := id_opt
+let end_phase = release_parent
 
 let get_cur_parent_id () = Stack.top_opt parents

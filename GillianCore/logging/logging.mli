@@ -172,3 +172,7 @@ val with_verbose_phase :
     `TMI` *)
 val with_tmi_phase :
   ?title:string -> ?severity:Report.severity -> (unit -> 'a) -> 'a
+
+val set_parent : ReportId.t -> unit
+
+val release_parent : ReportId.t option -> unit

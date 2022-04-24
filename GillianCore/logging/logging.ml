@@ -68,6 +68,10 @@ let fail msg =
   normal ~severity:Error (fun m -> m "%a" Format.pp_print_string msg);
   raise (Failure msg)
 
+let set_parent = ReportBuilder.set_parent
+
+let release_parent = ReportBuilder.release_parent
+
 let start_phase level ?title ?severity () =
   let phase_report = ReportBuilder.start_phase level ?title ?severity () in
   match phase_report with
