@@ -12,6 +12,8 @@ let initialize () =
   let () = out_channel := Some (open_out filename) in
   formatter := Some (Format.formatter_of_out_channel (Option.get !out_channel))
 
+let will_log (type_ : string) = List.mem type_ accepted_types
+
 let log (report : Report.t) : unit =
   match !formatter with
   | None -> ()
@@ -20,7 +22,7 @@ let log (report : Report.t) : unit =
                log of specific types are replaced *)
       match report.type_ with
       | type_
-        when List.mem type_ accepted_types ->
+        when will_log type_ ->
           let () = Loggable.pp report.content formatter in
           Format.fprintf formatter "@,@?"
       | _ -> ())

@@ -6,8 +6,10 @@ let initialize () =
   LogDatabase.reset_db ();
   LogDatabase.create_db ()
 
+let will_log (type_ : string) = type_ <> LoggingConstants.ContentType.debug
+
 let log (report : Report.t) =
-  if report.type_ <> LoggingConstants.ContentType.debug then
+  if will_log report.type_ then
     let id = Sqlite3.Data.INT report.id in
     let title = Sqlite3.Data.TEXT report.title in
     let elapsed_time = Sqlite3.Data.FLOAT report.elapsed_time in
