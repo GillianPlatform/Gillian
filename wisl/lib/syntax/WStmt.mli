@@ -2,7 +2,7 @@ type tt =
   | Skip
   | VarAssign of string * WExpr.t  (** x := e *)
   | New of string * int  (** x := new(k) *)
-  | Dispose of WExpr.t  (** dispose(e) *)
+  | Dispose of WExpr.t  (** free(e) *)
   | Lookup of string * WExpr.t  (** x := [e] *)
   | Update of WExpr.t * WExpr.t  (** [e] := [e] *)
   | FunCall of string * string * WExpr.t list * (string * string list) option

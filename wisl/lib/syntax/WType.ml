@@ -110,6 +110,15 @@ let rec infer_logic_expr knownp lexpr =
       let inferred = infer_logic_expr knownp le in
       let t1, t2 = of_unop u in
       TypeMap.add bare_lexpr t2 (needs_to_be le t1 inferred)
+  | LLSub (le1, le2, le3) ->
+      let inferred =
+        infer_logic_expr
+          (infer_logic_expr (infer_logic_expr knownp le1) le2)
+          le3
+      in
+      let t0, t1, t2, t3 = (WList, WList, WInt, WInt) in
+      TypeMap.add bare_lexpr t0
+        (needs_to_be le1 t1 (needs_to_be le2 t2 (needs_to_be le3 t3 inferred)))
   | LVar _ -> knownp
   | PVar _ -> knownp
   | LEList lel ->

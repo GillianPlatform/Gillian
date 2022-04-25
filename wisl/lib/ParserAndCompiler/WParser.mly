@@ -27,6 +27,7 @@
 (* types *)
 %token <CodeLoc.t> TLIST
 %token <CodeLoc.t> TINT
+%token <CodeLoc.t> TBOOL
 
 (* names *)
 %token <CodeLoc.t * string> IDENTIFIER
@@ -53,7 +54,7 @@
 %token LSTCAT          /* @ */
 
 (* Unary operators *)
-%token <CodeLoc.t> NOT HEAD TAIL REV LEN
+%token <CodeLoc.t> NOT HEAD TAIL REV LEN SUB
 
 (* Logic Binary *)
 %token ARROW          /* -> */
@@ -135,7 +136,6 @@ definitions:
   | fpdcl = definitions; f = fct_with_specs
     { let (fs, ps, ls) = fpdcl in
       (f::fs, ps, ls) }
-
 
 fct_with_specs:
   | lstart = LCBRACE; pre = logic_assertion; RCBRACE; f = fct; LCBRACE;
@@ -366,6 +366,7 @@ predicate:
 type_target:
   | TLIST { WType.WList }
   | TINT { WType.WInt }
+  | TBOOL { WType.WBool }
 
 pred_param_ins:
   | inp = option(PLUS); lx = IDENTIFIER; option(preceded(COLON, type_target))
@@ -550,6 +551,10 @@ logic_expression:
       let lstart, lend = WLExpr.get_loc e1, WLExpr.get_loc e2 in
       let loc = CodeLoc.merge lstart lend in
       WLExpr.make bare_lexpr loc } %prec binop_prec
+  | lstart = SUB; LBRACE; e1 = logic_expression; COMMA; e2 = logic_expression; COMMA; e3 = logic_expression; lend = RBRACE {
+      let loc = CodeLoc.merge lstart lend in
+      let bare_lexpr = WLExpr.LLSub(e1, e2, e3) in
+      WLExpr.make bare_lexpr loc }
   | lu = unop_with_loc; e = logic_expression
     { let (lstart, u) = lu in
       let lend = WLExpr.get_loc e in
