@@ -722,6 +722,7 @@ module Make
       match lcmd with
       | SymbExec -> failwith "Impossible: Untreated SymbExec"
       | Fold (pname, les, folding_info) -> (
+          let () = Fmt.pr "Folding predicate: %s\n" pname in
           let pred = UP.get_pred_def prog.preds pname in
           match pred.pred.pred_abstract with
           | true ->

@@ -502,7 +502,7 @@ struct
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
     match test.flag with
     | Some _ ->
-        let msg = "Verifying one spec of procedure " ^ test.name ^ "... " in
+        let msg = "Verifying one spec of procedure " ^ test.name ^ "... \n" in
         L.tmi (fun fmt -> fmt "%s" msg);
         Fmt.pr "%s@?" msg;
         (* Reset coverage for every procedure in verification *)
@@ -534,7 +534,7 @@ struct
                 (Failure (Printf.sprintf "Lemma %s WITHOUT proof" test.name))
             else true (* It's already correct *)
         | Some proof ->
-            let msg = "Verifying lemma " ^ test.name ^ "... " in
+            let msg = "Verifying lemma " ^ test.name ^ "... \n" in
             L.tmi (fun fmt -> fmt "%s" msg);
             Fmt.pr "%s@?" msg;
             let rets = SAInterpreter.evaluate_lcmds prog proof state in

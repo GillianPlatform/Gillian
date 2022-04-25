@@ -1,0 +1,85 @@
+//
+// SLL predicate with length
+//
+predicate SLL_len(+x, n : Int) {
+  // Empty SLL
+  (x == null) * (n == 0);
+  // One SLL node and the rest
+  (x -b> #v, #y) * SLL_len(#y, n - 1) * (0 <# n)
+}
+
+// List length (recursive)
+{ (x == #x) * SLL_len(#x, #n) }
+function SLL_length(x) {
+  if (x = null){
+    n := 0
+  } else {
+    t := [x + 1];
+    n := SLL_length(t);
+    n := 1 + n
+  };
+  return n
+}
+{ SLL_len(#x, #n) * ret == #n }
+
+//
+// SLL segment predicate with length
+//
+predicate SLLseg_len(+x, y, n : Int) {
+  (x == y) * (n == 0);
+  (x -b> #v, #z) * SLLseg_len(#z, y, n - 1) * (0 <# n)
+}
+
+//
+// Lemma: appending a given value to a given SLLseg
+//
+lemma SSLseg_append {
+  statement:
+    forall x, z.
+      SLLseg_len(x, #y, #n) * (#y -b> #v, z) |- SLLseg_len(x, z, #n + 1)
+
+  proof:
+    unfold SLLseg_len(x, #y, #n);
+    if (not (x = #y)) {
+      assert {bind: #nv, #nnext}
+        (x -b> #nv, #nnext) * SLLseg_len(#nnext, #y, #n - 1);
+      apply SSLseg_append(#nnext, z)
+    };
+    fold SLLseg_len(x, z, #n + 1)
+}
+
+//
+// Lemma: a null-terminating SLLseg is an SLL
+//
+lemma SLLseg_to_SLL {
+  statement:
+    forall x.
+      SLLseg_len(x, null, #n) |- SLL_len(x, #n)
+
+  proof:
+    unfold SLLseg_len(x, null, #n);
+    if (not (#n = 0)) {
+      assert {bind: #nv, #nnext} (x -b> #nv, #nnext);
+      apply SLLseg_to_SLL(#nnext)
+    }
+}
+
+// 06. Calculating the length of a given SLL
+{ (x == #x) * SLL_len(x, #n) }
+function SLL_length_iter(x) {
+  y := x;
+  n := 0;
+  [[ invariant {bind: n, y, #ny}
+        SLLseg_len(x, y, n) * SLL_len(y, #ny) * (#n == n + #ny) ]];
+  while (not (y = null)) {
+    [[ assert {bind: #y} y == #y ]];
+    [[ assert {bind: #v, #z} #y -b> #v, #z ]];
+    y := [y + 1];
+    n := n + 1;
+    [[ apply SSLseg_append(x, y) ]]
+  };
+  [[ unfold SLL_len(null, 0) ]];
+  [[ apply SLLseg_to_SLL(x) ]];
+  return n
+}
+{ SLL_len(#x, #n) * (ret == n) }
