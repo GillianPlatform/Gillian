@@ -18,6 +18,7 @@ function SLL_length(x) {
     n := SLL_length(t);
     n := 1 + n
   };
+  [[ fold SLL_len(#x, #n) ]];
   return n
 }
 { SLL_len(#x, #n) * ret == #n }

@@ -414,7 +414,7 @@ struct
                        test.id SPState.pp state
                        Fmt.(list ~sep:(any "@\n") SAInterpreter.pp_err)
                        errs);
-                 Fmt.pr "f @?";
+                 (* Fmt.pr "f @?"; *)
                  false
              | ExecRes.RSucc (fl, _, state) ->
                  if Some fl <> test.flag then (
@@ -442,7 +442,7 @@ struct
                            test.name
                            (Fmt.Dump.pair Fmt.int Fmt.int)
                            test.id);
-                     Fmt.pr "s @?";
+                     (* Fmt.pr "s @?"; *)
                      ac)
                    else (
                      L.normal (fun m ->

@@ -786,6 +786,7 @@ module Make
         GPSucc [ (astate, Pred.out_args pred_def vs) ]
     | _ when (not !Config.manual_proof) && not pred_def.pred_abstract -> (
         (* Recursive Case - Folding required *)
+        let () = Fmt.pr "Auto-folding predicate: %s\n" pred.pred.pred_name in
         L.verbose (fun m -> m "Recursive case - attempting to fold.");
         let up = pred.up in
         let param_ins = Pred.in_params pred.pred in
