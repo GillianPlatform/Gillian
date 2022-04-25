@@ -26,19 +26,23 @@ let wrap_up () =
 let log_on_all_reporters (report : Report.t) =
   List.iter (fun reporter -> Reporter.log reporter report) !reporters
 
+let will_log_on_any_reporter (type_ : string) =
+  List.exists (fun reporter -> Reporter.will_log reporter type_) !reporters
+
 let log lvl ?title ?severity msgf =
-  if Mode.should_log lvl then
+  let type_ = LoggingConstants.ContentType.debug in
+  if Mode.should_log lvl && will_log_on_any_reporter type_ then
     let report =
       ReportBuilder.make ?title
         ~content:
           (Loggable.make PackedPP.pp PackedPP.of_yojson PackedPP.to_yojson
              (PP msgf))
-        ~type_:LoggingConstants.ContentType.debug ?severity ()
+        ~type_ ?severity ()
     in
     log_on_all_reporters report
 
 let log_specific lvl ?title ?severity loggable type_ =
-  if Mode.should_log lvl then
+  if Mode.should_log lvl && will_log_on_any_reporter type_ then
     let report =
       ReportBuilder.make ?title ~content:loggable ~type_ ?severity ()
     in
