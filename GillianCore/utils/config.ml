@@ -88,6 +88,7 @@ let set_runtime_paths, get_runtime_paths =
   (set, get)
 
 module Verification = struct
+  let exact = ref false
   let procs_to_verify = ref ([] : string list)
   let lemmas_to_verify = ref ([] : string list)
   let verify_only_some_of_the_things = ref false
