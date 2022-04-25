@@ -5,7 +5,7 @@ predicate SLL_len(+x, n : Int) {
   // Empty SLL
   (x == null) * (n == 0);
   // One SLL node and the rest
-  (x -b> #v, #y) * SLL_len(#y, n - 1) * (0 <# n)
+  (x -b> #v, #y) * SLL_len(#y, n - 1) * (0 <# n) [hides: #v, #y]
 }
 
 // List length (recursive)
