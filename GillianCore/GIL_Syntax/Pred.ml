@@ -5,7 +5,8 @@ type t = TypeDef__.pred = {
   pred_num_params : int;  (** Number of parameters   *)
   pred_params : (string * Type.t option) list;  (** Actual parameters      *)
   pred_ins : int list;  (** Ins                    *)
-  pred_definitions : ((string * string list) option * Asrt.t) list;
+  pred_definitions :
+    ((string * string list) option * Asrt.t * string list) list;
       (** Predicate definitions  *)
   pred_facts : Formula.t list;  (** Facts that hold for every definition *)
   pred_pure : bool;  (** Is the predicate pure  *)
@@ -86,8 +87,14 @@ let pp fmt pred =
       Fmt.pf fmt' "[%s: %a] " id (Fmt.list ~sep:(Fmt.any ", ") Fmt.string) exs
     else Fmt.pf fmt' "[%s] " id
   in
-  let pp_def fmt' (id_exs, asser) =
-    Fmt.pf fmt' "%a%a" (Fmt.option pp_id_exs) id_exs Asrt.pp asser
+  let pp_hides fmt' hides =
+    if List.length hides > 0 then
+      Fmt.pf fmt' " [hides: %a]" (Fmt.list ~sep:(Fmt.any ", ") Fmt.string) hides
+    else Fmt.pf fmt' ""
+  in
+  let pp_def fmt' (id_exs, asser, hides) =
+    Fmt.pf fmt' "%a%a%a" (Fmt.option pp_id_exs) id_exs Asrt.pp asser pp_hides
+      hides
   in
   let pp_path_opt fmt = function
     | None -> Fmt.pf fmt "@nopath@\n"
@@ -142,7 +149,7 @@ let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
     let all_pred_pvars : string list =
       List.concat
         (List.map
-           (fun (_, ass) -> SS.elements (Asrt.pvars ass))
+           (fun (_, ass, _) -> SS.elements (Asrt.pvars ass))
            predicate.pred_definitions)
     in
 
@@ -229,10 +236,12 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
   in
   let new_defs =
     List.map
-      (fun (oid, a) -> (oid, Asrt.star (a :: new_asrts)))
+      (fun (oid, a, hides) -> (oid, Asrt.star (a :: new_asrts), hides))
       pred.pred_definitions
   in
-  let new_defs = List.map (fun (oid, a) -> (oid, pt_asrt a)) new_defs in
+  let new_defs =
+    List.map (fun (oid, a, hides) -> (oid, pt_asrt a, hides)) new_defs
+  in
   let new_facts =
     List.fold_right
       (fun (x, t_x) new_facts ->

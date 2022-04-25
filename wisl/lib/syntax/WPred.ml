@@ -17,8 +17,8 @@ let get_ins p = p.pred_ins
 let get_by_id id pred =
   let lassert_list_visitor = list_visitor_builder WLAssert.get_by_id id in
   let self_or_none = if get_id pred = id then `WPred pred else `None in
-  let pred_definitions = fst (List.split pred.pred_definitions) in
-  self_or_none |>> (lassert_list_visitor, pred_definitions)
+  let just_pred_definitions = fst (List.split pred.pred_definitions) in
+  self_or_none |>> (lassert_list_visitor, just_pred_definitions)
 
 (* TODO: write pretty_print function *)
 

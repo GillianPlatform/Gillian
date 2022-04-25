@@ -700,7 +700,8 @@ module Pred : sig
     pred_params : (string * Type.t option) list;
         (** Parameter names and (optional) types *)
     pred_ins : int list;  (** Ins *)
-    pred_definitions : ((string * string list) option * Asrt.t) list;
+    pred_definitions :
+      ((string * string list) option * Asrt.t * string list) list;
         (** Predicate definitions *)
     pred_facts : Formula.t list;  (** Facts that hold for every definition *)
     pred_pure : bool;  (** Is the predicate pure? *)

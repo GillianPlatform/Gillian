@@ -888,7 +888,7 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
 
         let defs =
           List.map
-            (fun (lab, def) ->
+            (fun (lab, def, _) ->
               let lab' =
                 Option.map (fun (s, vars) -> (s, SS.of_list vars)) lab
               in

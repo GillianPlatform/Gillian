@@ -48,7 +48,7 @@ rule read =
   | "lemma"  { LEMMA (curr lexbuf) }
   | "forall" { FORALL (curr lexbuf) }
   | "bind" { EXIST (curr lexbuf) }
-  | "hides:" { HIDES (curr lexbuf) }
+  | "hides" { HIDES (curr lexbuf) }
   (* types *)
   | "List" { TLIST (curr lexbuf) }
   | "Int" { TINT (curr lexbuf) }

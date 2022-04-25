@@ -833,17 +833,18 @@ let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials; _ }
 
 let compile_pred filepath pred =
   let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; _ } = pred in
-  let pred_definitions = fst (List.split pred_definitions) in
-  let types = WType.infer_types_pred pred_params pred_definitions in
+  let just_pred_definitions = fst (List.split pred_definitions) in
+  let types = WType.infer_types_pred pred_params just_pred_definitions in
   let getWISLTypes str = (str, WType.of_variable str types) in
   let paramsWISLType = List.map (fun (x, _) -> getWISLTypes x) pred_params in
   let getGILTypes (str, t) =
     (str, Option.fold ~some:compile_type ~none:None t)
   in
   let pred_params = List.map getGILTypes paramsWISLType in
-  let build_def asrt =
+  let build_def pred_def =
+    let asrt, hides = pred_def in
     let _, casrt = compile_lassert asrt in
-    (None, casrt)
+    (None, casrt, hides)
   in
   Pred.
     {

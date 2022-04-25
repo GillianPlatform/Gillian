@@ -133,6 +133,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token EXISTENTIALS
 %token BRANCH
 %token USESUBST
+%token HIDES
 (* Command keywords  *)
 %token SKIP
 %token DEFEQ
@@ -688,9 +689,13 @@ g_macro_target:
   }
 ;
 
+hidden_vars:
+  | LBRACKET; HIDES; COLON; hides = separated_list(COMMA, LVAR); RBRACKET;
+    { hides }
+
 g_named_assertion_target:
-  id = option(assertion_id_target); a = g_assertion_target
-  { (id, a) }
+  id = option(assertion_id_target); a = g_assertion_target; hides = option(hidden_vars)
+  { (id, a, Option.value hides ~default:[]) }
 ;
 
 g_logic_cmd_target:

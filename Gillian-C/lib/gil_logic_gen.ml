@@ -277,7 +277,7 @@ let gen_pred_of_struct cenv ann struct_name =
         pred_abstract = false;
         pred_nounfold = false;
         pred_normalised = false;
-        pred_definitions = [ (None, def) ];
+        pred_definitions = [ (None, def, []) ];
       }
   in
   { ann with preds = n_pred :: ann.preds }
@@ -723,10 +723,10 @@ let trans_pred ?(ann = empty) ~filepath cl_pred =
     List.map
       (fun (d, a) ->
         match d with
-        | None -> (None, trans_asrt ~fname:pred_name ~ann a)
+        | None -> (None, trans_asrt ~fname:pred_name ~ann a, [])
         | Some da ->
             let ada, gda = trans_asrt_annot da in
-            (Some gda, ada ** trans_asrt ~fname:pred_name ~ann a))
+            (Some gda, ada ** trans_asrt ~fname:pred_name ~ann a, []))
       definitions
   in
   Pred.
@@ -886,7 +886,7 @@ let make_global_env_pred init_asrts =
       pred_num_params = 0;
       pred_params = [];
       pred_ins = [];
-      pred_definitions = [ (None, def) ];
+      pred_definitions = [ (None, def, []) ];
       (* FIXME: ADD SUPPORT FOR PURE, ABSTRACT, NOUNFOLD *)
       pred_facts = [];
       pred_pure = false;
@@ -1072,7 +1072,7 @@ let gen_rec_pred_of_struct cenv ann struct_name =
   let malloc = malloc_chunk_asrt (Expr.PVar loc_param_name) zero siz in
   let pred_definitions =
     List.map
-      (fun def -> (None, def ** hole_assert ** malloc))
+      (fun def -> (None, def ** hole_assert ** malloc, []))
       defs_without_holes
   in
   let rec_pred =
@@ -1108,7 +1108,7 @@ let gen_rec_pred_of_struct cenv ann struct_name =
         pred_abstract = false;
         pred_nounfold = false;
         pred_normalised = false;
-        pred_definitions = List.map (fun x -> (None, x)) opt_defs;
+        pred_definitions = List.map (fun x -> (None, x, [])) opt_defs;
       }
   in
   { ann with preds = opt_pred :: rec_pred :: ann.preds }

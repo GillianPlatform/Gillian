@@ -204,7 +204,8 @@ and pred = {
   pred_num_params : int;
   pred_params : (string * typ option) list;
   pred_ins : int list;
-  pred_definitions : ((string * string list) option * assertion) list;
+  pred_definitions :
+    ((string * string list) option * assertion * string list) list;
   pred_facts : formula list;
   pred_pure : bool;
   pred_abstract : bool;

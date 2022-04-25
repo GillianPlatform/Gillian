@@ -522,7 +522,7 @@ module Make
       (pred : Pred.t)
       (state : State.t)
       (subst : ESubst.t) : Asrt.t list =
-    let result = List.map (fun (_, x) -> x) pred.pred_definitions in
+    let result = List.map (fun (_, x, _) -> x) pred.pred_definitions in
     let () =
       match unfold_info with
       | None -> ()

@@ -338,7 +338,7 @@ proof_def:
     { pr }
 
 hidden_vars:
-  | LBRACK; HIDES; hides = separated_list(COMMA, LVAR); RBRACK;
+  | LBRACK; HIDES; COLON; hides = separated_list(COMMA, LVAR); RBRACK;
     { snd(List.split hides) }
 
 pred_def:
