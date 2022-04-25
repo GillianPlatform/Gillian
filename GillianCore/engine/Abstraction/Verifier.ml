@@ -366,12 +366,6 @@ struct
           SSubst.add subst (LVar x) (LVar x))
       (SS.elements (SPState.get_spec_vars state));
 
-    (* TODO: Understand if this should be done: setup all program variables in the subst *)
-    SStore.iter (SPState.get_store state) (fun v value ->
-        if not (SSubst.mem subst (PVar v)) then SSubst.put subst (PVar v) value);
-
-    (* Option.may (fun v_ret -> SSubst.put subst Names.return_variable v_ret)
-       (SStore.get (SState.get_store state) Names.return_variable); *)
     L.verbose (fun m ->
         m "Analyse result: About to unify one postcondition of %s. post: %a"
           test.name UP.pp test.post_up);
@@ -434,6 +428,11 @@ struct
                    Fmt.pr "f @?";
                    false)
                  else
+                   let store = SPState.get_store state in
+                   let () =
+                     SStore.filter store (fun x v ->
+                         if x = Names.return_variable then Some v else None)
+                   in
                    let subst = make_post_subst test state in
                    if analyse_result subst test state then (
                      L.normal (fun m ->
