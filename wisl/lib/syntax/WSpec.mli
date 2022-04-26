@@ -1,6 +1,7 @@
 type t = {
   pre : WLAssert.t;  (** Precondition *)
   post : WLAssert.t;  (** Postcondition *)
+  variant : WLExpr.t option;  (** Variant *)
   existentials : (string * string list) option;  (** Existentials in the spec *)
   spid : int;  (** Unique identifier of AST el *)
   fname : string;  (** Name of the function the spec is attached to *)
@@ -27,6 +28,7 @@ val make :
   ?existentials:string * string list ->
   WLAssert.t ->
   WLAssert.t ->
+  WLExpr.t option ->
   string ->
   string list ->
   CodeLoc.t ->

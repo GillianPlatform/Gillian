@@ -42,6 +42,7 @@ rule read =
   | "unfold" { UNFOLD (curr lexbuf) }
   | "apply"  { APPLY (curr lexbuf) }
   | "assert" { ASSERT (curr lexbuf) }
+  | "with" { WITH (curr lexbuf) }
   | "variant" { VARIANT (curr lexbuf) }
   | "statement" { STATEMENT (curr lexbuf) }
   | "proof"  { PROOF (curr lexbuf) }

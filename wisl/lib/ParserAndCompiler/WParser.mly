@@ -4,7 +4,7 @@
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP NEW DELETE
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
 %token <CodeLoc.t> INVARIANT FOLD UNFOLD APPLY ASSERT EXIST HIDES FORALL
-%token <CodeLoc.t> STATEMENT VARIANT PROOF
+%token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
 
 (* punctuation *)
 %token <CodeLoc.t> COLON            /* : */
@@ -107,7 +107,8 @@
 %type <CodeLoc.t * WVal.t>                         value_with_loc
 %type <CodeLoc.t * WUnOp.t>                        unop_with_loc
 %type <WBinOp.t>                                   binop
-%type <WExpr.t>                                    variant_def
+%type <WLExpr.t>                                   variant_def
+%type <WLExpr.t>                                   spec_variant_def
 %type <WLCmd.t list>                               proof_def
 %type <(string * WType.t option) * bool>           pred_param_ins
 %type <CodeLoc.t * string list>                    bindings_with_loc
@@ -138,10 +139,10 @@ definitions:
       (f::fs, ps, ls) }
 
 fct_with_specs:
-  | lstart = LCBRACE; pre = logic_assertion; RCBRACE; f = fct; LCBRACE;
+  | lstart = LCBRACE; pre = logic_assertion; RCBRACE; variant = option(spec_variant_def); f = fct; LCBRACE;
     post = logic_assertion; lend = RCBRACE
     { let loc = CodeLoc.merge lstart lend in
-      WFun.add_spec f pre post loc }
+      WFun.add_spec f pre post variant loc }
   | f = fct { f }
 
 fct:
@@ -331,7 +332,10 @@ lemma:
           } }
 
 variant_def:
-  | VARIANT; COLON; e = expression { e }
+  | VARIANT; COLON; e = logic_expression { e }
+
+spec_variant_def:
+  | WITH; variant = variant_def { variant }
 
 proof_def:
   | PROOF; COLON; pr = separated_nonempty_list(SEMICOLON, logic_command)

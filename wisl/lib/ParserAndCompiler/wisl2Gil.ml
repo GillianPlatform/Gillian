@@ -537,6 +537,8 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         {
           pre;
           post;
+          (* FIGURE OUT VARIANT *)
+          variant = None;
           spid = Generators.gen_id ();
           fname = loop_fname;
           fparams = vars;
@@ -971,7 +973,7 @@ let compile_lemma
         _;
       } =
   let compile_lcmd = compile_lcmd ~fname:lemma_name in
-  let compile_expr = compile_expr ~fname:lemma_name in
+  let compile_lexpr = compile_lexpr ~fname:lemma_name in
   let compile_lassert = compile_lassert ~fname:lemma_name in
   let compile_and_agregate_lcmd lcmd =
     let a_opt, clcmd = compile_lcmd lcmd in
@@ -985,8 +987,13 @@ let compile_lemma
       lemma_proof
   in
   (* FIXME: compilation can get wrong here if we compile stuff with pointer arith in the variant *)
+  (* FIXME: not sure where the global assertions should go *)
   let lemma_variant =
-    Option.map (fun x -> snd (compile_expr x)) lemma_variant
+    Option.map
+      (fun x ->
+        let _, _, comp_lexpr = compile_lexpr x in
+        comp_lexpr)
+      lemma_variant
   in
   let _, lemma_hyp = compile_lassert lemma_hypothesis in
   let _, post = compile_lassert lemma_conclusion in
