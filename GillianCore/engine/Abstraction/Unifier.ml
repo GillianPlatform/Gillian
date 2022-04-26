@@ -810,7 +810,7 @@ module Make
         let vs_ins = Pred.in_args pred.pred vs in
         let vs_ins = List.map Option.get vs_ins in
         let subst = ESubst.init (List.combine param_ins vs_ins) in
-        match unify ?in_unification astate subst up LogicCommand with
+        match unify ?in_unification astate subst up Fold with
         | UPUSucc rets ->
             let rets =
               List.map
