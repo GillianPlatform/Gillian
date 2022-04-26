@@ -176,3 +176,12 @@ val with_tmi_phase :
 val set_parent : ReportId.t -> unit
 
 val release_parent : ReportId.t option -> unit
+
+val with_parent :
+  ?title:string ->
+  ?lvl:Mode.level ->
+  ?severity:Report.severity ->
+  Loggable.t ->
+  string ->
+  (unit -> 'a) ->
+  'a

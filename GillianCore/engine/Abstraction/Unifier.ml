@@ -47,8 +47,8 @@ module Make
 
   type vt = Val.t
   type st = ESubst.t
-  type state_t = State.t [@@deriving yojson]
-  type preds_t = Preds.t [@@deriving yojson]
+  type state_t = State.t [@@deriving yojson, show]
+  type preds_t = Preds.t [@@deriving yojson, show]
   type abs_t = string * vt list
   type err_t = State.err_t
   type t = state_t * preds_t * UP.preds_tbl_t
@@ -58,15 +58,20 @@ module Make
   type gp_ret = GPSucc of (t * vt list) list | GPFail of err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
   type up_u_res = UPUSucc of (t * st * post_res) list | UPUFail of err_t list
-  type astate_log_t = {
-    state: state_t;
-    preds: preds_t
-  } [@@deriving make, yojson]
-  type u_assert_log_t = {
-    step: UP.step;
-    subst: ESubst.t;
-    astate: astate_log_t
-  } [@@deriving make, yojson]
+  type astate_rec_t = {
+    state : state_t;
+    preds : preds_t;
+  } [@@deriving yojson, show]
+  type assertion_report_t = {
+    step : UP.step;
+    subst : ESubst.t;
+    astate : astate_rec_t;
+  } [@@deriving yojson]
+  type unify_report_t = {
+    astate : astate_rec_t;
+    subst : ESubst.t;
+    up : UP.t;
+  } [@@deriving yojson, show]
 
   let update_store (astate : t) (x : string) (v : Val.t) : t =
     let state, preds, pred_defs = astate in
@@ -974,10 +979,9 @@ module Make
       in
 
       let state, preds, _ = astate in
-      let astate_log = make_astate_log_t ~state:state ~preds:preds in
-      let u_assert_log = make_u_assert_log_t ~step:step ~subst:subst ~astate:astate_log in
+      let assertion_report = { step; subst; astate={ state; preds } } in
       L.normal_specific
-        (L.Loggable.make pp_u_assert_log u_assert_log_t_of_yojson u_assert_log_t_to_yojson u_assert_log)
+        (L.Loggable.make pp_u_assert_log assertion_report_t_of_yojson assertion_report_t_to_yojson assertion_report)
         L.LoggingConstants.ContentType.assertion
         |> ignore);
 
@@ -1295,43 +1299,50 @@ module Make
     in
 
     L.verbose (fun fmt -> fmt "Unifier.unify: about to unify UP.");
-    let ret = unify_up ([ (astate, subst, up) ], []) in
-    match ret with
-    | UPUSucc _ ->
-        L.verbose (fun fmt -> fmt "Unifier.unify: Success");
-        ret
-    | UPUFail errs
-      when !Config.unfolding && State.can_fix errs && not in_unification ->
-        L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
-        let state, _, _ = astate_i in
-        let vals = State.get_recovery_vals state errs in
-        L.(
-          verbose (fun m ->
-              m
-                "Unify. Unable to unify. Checking if there are predicates to \
-                 unfold. Looking for: @[<h>%a@]"
-                Fmt.(list ~sep:comma Val.pp)
-                vals));
-        let sp, worked = unfold_with_vals astate_i vals in
-        if not worked then (
-          L.normal (fun m -> m "Unify. No predicates found to unfold.");
-          UPUFail errs)
-        else (
-          L.verbose (fun m ->
-              m "Unfolding successful: %d results" (List.length sp));
-          let rets =
-            List.map
-              (fun (_, astate) ->
-                match unfold_concrete_preds astate with
-                | None -> UPUSucc []
-                | Some (_, astate) ->
-                    (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
-                    let subst'' = ESubst.copy subst_i in
-                    unify_up ([ (astate, subst'', up) ], []))
-              sp
-          in
-          merge_upu_res rets)
-    | UPUFail _ ->
-        L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
-        ret
+    let state, preds, _ = astate in
+    let unify_report = { astate={ state; preds }; subst; up } in
+    L.with_parent 
+      (L.Loggable.make pp_unify_report_t unify_report_t_of_yojson unify_report_t_to_yojson unify_report)
+      L.LoggingConstants.ContentType.unify
+      (fun () ->
+        let ret = unify_up ([ (astate, subst, up) ], []) in
+        match ret with
+        | UPUSucc _ ->
+            L.verbose (fun fmt -> fmt "Unifier.unify: Success");
+            ret
+        | UPUFail errs
+          when !Config.unfolding && State.can_fix errs && not in_unification ->
+            L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
+            let state, _, _ = astate_i in
+            let vals = State.get_recovery_vals state errs in
+            L.(
+              verbose (fun m ->
+                  m
+                    "Unify. Unable to unify. Checking if there are predicates to \
+                     unfold. Looking for: @[<h>%a@]"
+                    Fmt.(list ~sep:comma Val.pp)
+                    vals));
+            let sp, worked = unfold_with_vals astate_i vals in
+            if not worked then (
+              L.normal (fun m -> m "Unify. No predicates found to unfold.");
+              UPUFail errs)
+            else (
+              L.verbose (fun m ->
+                  m "Unfolding successful: %d results" (List.length sp));
+              let rets =
+                List.map
+                  (fun (_, astate) ->
+                    match unfold_concrete_preds astate with
+                    | None -> UPUSucc []
+                    | Some (_, astate) ->
+                        (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
+                        let subst'' = ESubst.copy subst_i in
+                        unify_up ([ (astate, subst'', up) ], []))
+                  sp
+              in
+              merge_upu_res rets)
+        | UPUFail _ ->
+            L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
+            ret
+      )
 end

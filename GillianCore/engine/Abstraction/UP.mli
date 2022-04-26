@@ -11,7 +11,7 @@ type step = Asrt.t * outs [@@deriving yojson]
 
 val step_pp : step Fmt.t
 
-type t
+type t [@@deriving yojson]
 type pred = { pred : Pred.t; up : t }
 type spec = { spec : Spec.t; up : t }
 type lemma = { lemma : Lemma.t; up : t }

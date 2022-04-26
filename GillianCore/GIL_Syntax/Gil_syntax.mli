@@ -776,7 +776,7 @@ end
 module Flag : sig
   (** {b Return flags for GIL specifications}. *)
 
-  type t = Normal  (** Normal return *) | Error  (** Error return *)
+  type t = Normal  (** Normal return *) | Error  (** Error return *) [@@deriving yojson]
 
   val str : t -> string
   val pp : t Fmt.t

@@ -27,6 +27,7 @@ type t =
   | Inner of step * t list
   | PhantomInner of t list
   | LabPhantomInner of (t * (string * SS.t) option) list
+[@@deriving yojson]
 
 type pred = { pred : Pred.t; up : t }
 type spec = { spec : Spec.t; up : t }
