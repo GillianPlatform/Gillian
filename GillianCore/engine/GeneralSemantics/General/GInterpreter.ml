@@ -1368,9 +1368,9 @@ struct
             L.normal_specific
               (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
                  { callstack; proc_body_index; state = Some state; errors = [] })
-              L.LoggingConstants.ContentType.cmd_step
+              L.LoggingConstants.ContentType.cmd_result
           in
-          Continue (report_id, fun () -> L.with_normal_phase cont_func)
+          Continue (report_id, cont_func)
       | ConfErr
           { callstack; proc_idx = proc_body_index; error_state = state; errors }
         :: _ ->
@@ -1378,9 +1378,9 @@ struct
             L.normal_specific
               (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
                  { callstack; proc_body_index; state = Some state; errors })
-              L.LoggingConstants.ContentType.cmd_step
+              L.LoggingConstants.ContentType.cmd_result
           in
-          Continue (report_id, fun () -> L.with_normal_phase cont_func)
+          Continue (report_id, cont_func)
       | _ -> cont_func ()
     in
 

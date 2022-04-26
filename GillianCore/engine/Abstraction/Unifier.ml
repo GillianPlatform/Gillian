@@ -1,3 +1,5 @@
+type unify_kind = Postcondition | Fold | FunctionCall | Invariant | LogicCommand [@@deriving yojson, show]
+
 module type S = sig
   type vt
   type st
@@ -22,7 +24,7 @@ module type S = sig
   val unfold_concrete_preds : t -> (st option * t) option
   val unify_assertion : t -> st -> UP.step -> u_res
   val unify_up : search_state -> up_u_res
-  val unify : ?in_unification:bool -> t -> st -> UP.t -> up_u_res
+  val unify : ?in_unification:bool -> t -> st -> UP.t -> unify_kind -> up_u_res
   val get_pred : ?in_unification:bool -> t -> string -> vt option list -> gp_ret
 end
 
@@ -71,6 +73,7 @@ module Make
     astate : astate_rec_t;
     subst : ESubst.t;
     up : UP.t;
+    unify_kind : unify_kind;
   } [@@deriving yojson, show]
 
   let update_store (astate : t) (x : string) (v : Val.t) : t =
@@ -807,7 +810,7 @@ module Make
         let vs_ins = Pred.in_args pred.pred vs in
         let vs_ins = List.map Option.get vs_ins in
         let subst = ESubst.init (List.combine param_ins vs_ins) in
-        match unify ?in_unification astate subst up with
+        match unify ?in_unification astate subst up LogicCommand with
         | UPUSucc rets ->
             let rets =
               List.map
@@ -1262,7 +1265,8 @@ module Make
       ?(in_unification = false)
       (astate : t)
       (subst : ESubst.t)
-      (up : UP.t) : up_u_res =
+      (up : UP.t)
+      (unify_kind : unify_kind) : up_u_res =
     let astate_i = copy_astate astate in
     let subst_i = ESubst.copy subst in
 
@@ -1298,9 +1302,10 @@ module Make
         UPUSucc (List.concat rets)
     in
 
+    
     L.verbose (fun fmt -> fmt "Unifier.unify: about to unify UP.");
     let state, preds, _ = astate in
-    let unify_report = { astate={ state; preds }; subst; up } in
+    let unify_report = { astate={ state; preds }; subst; up; unify_kind } in
     L.with_parent 
       (L.Loggable.make pp_unify_report_t unify_report_t_of_yojson unify_report_t_to_yojson unify_report)
       L.LoggingConstants.ContentType.unify
@@ -1319,7 +1324,7 @@ module Make
               verbose (fun m ->
                   m
                     "Unify. Unable to unify. Checking if there are predicates to \
-                     unfold. Looking for: @[<h>%a@]"
+                    unfold. Looking for: @[<h>%a@]"
                     Fmt.(list ~sep:comma Val.pp)
                     vals));
             let sp, worked = unfold_with_vals astate_i vals in
