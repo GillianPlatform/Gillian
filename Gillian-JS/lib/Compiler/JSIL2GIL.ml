@@ -77,6 +77,8 @@ let jsil2gil_sspec (sspec : Spec.st) : GSpec.st =
   {
     ss_pre = jsil2gil_asrt sspec.pre;
     ss_posts = List.map jsil2gil_asrt sspec.posts;
+    (* FIXME: bring in variant *)
+    ss_variant = None;
     ss_flag = sspec.flag;
     ss_to_verify = sspec.to_verify;
     ss_label;
@@ -104,6 +106,7 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
         {
           lemma_hyp = jsil2gil_asrt lemma.pre;
           lemma_concs = List.map jsil2gil_asrt lemma.posts;
+          lemma_spec_variant = lemma.variant;
         };
       ];
     lemma_proof = Option.map (List.map jsil2gil_lcmd) lemma.proof;

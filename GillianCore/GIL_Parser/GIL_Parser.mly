@@ -640,12 +640,12 @@ g_mult_spec_line:
 
 g_sspec_target:
 (* [spec_name: #bla, #ble, #bli] [[ .... ]] [[ .... ]] Normal *)
-  | option(lab_spec_target) g_spec_line g_mult_spec_line NORMAL
-    { Spec.{ ss_pre = $2; ss_posts = $3; ss_flag = Normal; ss_to_verify = true; ss_label = $1 } }
+  | option(lab_spec_target) g_spec_line g_mult_spec_line option(variant_target) NORMAL
+    { Spec.{ ss_pre = $2; ss_posts = $3; ss_variant = $4; ss_flag = Normal; ss_to_verify = true; ss_label = $1 } }
 (* [[ .... ]] [[ .... ]] Error *)
-  | lab_spec = option(lab_spec_target); ss_pre = g_spec_line; ss_posts = g_mult_spec_line; ERROR
+  | lab_spec = option(lab_spec_target); ss_pre = g_spec_line; ss_posts = g_mult_spec_line; ss_variant = option(variant_target); ERROR
   {
-    let spec : Spec.st = { ss_pre; ss_posts; ss_flag = Error; ss_to_verify = true; ss_label = lab_spec} in
+    let spec : Spec.st = { ss_pre; ss_posts; ss_variant; ss_flag = Error; ss_to_verify = true; ss_label = lab_spec} in
     spec
   }
 ;
@@ -859,6 +859,7 @@ g_lemma_target:
     let spec = Lemma.{
       lemma_hyp;
       lemma_concs;
+      lemma_spec_variant = lemma_variant
     } in
     Lemma.
       {

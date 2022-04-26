@@ -816,10 +816,19 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let comp_rest, new_functions = compile_list rest in
       (cmds_with_annot @ comp_rest, new_functions)
 
-let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials; _ }
-    =
+let compile_spec
+    ?(fname = "main")
+    WSpec.{ pre; post; variant; fparams; existentials; _ } =
   let _, comp_pre = compile_lassert ~fname pre in
   let _, comp_post = compile_lassert ~fname post in
+  let comp_variant =
+    Option.map
+      (fun variant ->
+        (* FIXME: what happens with the global assertions? *)
+        let _, _, comp_variant = compile_lexpr variant in
+        comp_variant)
+      variant
+  in
   let label_opt =
     match existentials with
     | None -> None
@@ -827,9 +836,10 @@ let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials; _ }
   in
   let single_spec =
     match label_opt with
-    | None -> Spec.s_init comp_pre [ comp_post ] Flag.Normal true
+    | None -> Spec.s_init comp_pre [ comp_post ] comp_variant Flag.Normal true
     | Some ss_label ->
-        Spec.s_init ~ss_label comp_pre [ comp_post ] Flag.Normal true
+        Spec.s_init ~ss_label comp_pre [ comp_post ] comp_variant Flag.Normal
+          true
   in
   Spec.init fname fparams [ single_spec ] false false true
 
@@ -1007,7 +1017,14 @@ let compile_lemma
       lemma_params;
       lemma_proof;
       lemma_variant;
-      lemma_specs = [ { lemma_hyp; lemma_concs = [ post ] } ];
+      lemma_specs =
+        [
+          {
+            lemma_hyp;
+            lemma_concs = [ post ];
+            lemma_spec_variant = lemma_variant;
+          };
+        ];
       lemma_existentials;
     }
 

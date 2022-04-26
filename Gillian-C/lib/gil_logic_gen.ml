@@ -770,6 +770,8 @@ let trans_sspec ?(ann = empty) fname sspecs =
     {
       ss_pre = tap ** ta pre ** genv;
       ss_posts = List.map make_post posts;
+      (* FIXME: bring in variant *)
+      ss_variant = None;
       ss_flag = Flag.Normal;
       ss_to_verify = true;
       ss_label = spa;
@@ -793,7 +795,9 @@ let trans_lemma ~ann ~filepath lemma =
            | `Invariant _ -> failwith "Invariant in lemma proof"))
       proof
   in
-  let lemma_specs = [ Lemma.{ lemma_hyp; lemma_concs } ] in
+  let lemma_specs =
+    [ Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant = None } ]
+  in
   Lemma.
     {
       lemma_name = name;

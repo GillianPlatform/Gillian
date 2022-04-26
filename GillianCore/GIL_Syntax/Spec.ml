@@ -4,6 +4,7 @@ module SS = Containers.SS
 type st = TypeDef__.single_spec = {
   ss_pre : Asrt.t;  (** Precondition *)
   ss_posts : Asrt.t list;  (** Postcondition *)
+  ss_variant : Expr.t option;  (** Variant *)
   ss_flag : Flag.t;  (** Return flag *)
   ss_to_verify : bool;  (** Should the spec be verified? *)
   ss_label : (string * string list) option;
@@ -24,9 +25,10 @@ let s_init
     ?(ss_label : (string * string list) option)
     (ss_pre : Asrt.t)
     (ss_posts : Asrt.t list)
+    (ss_variant : Expr.t option)
     (ss_flag : Flag.t)
     (ss_to_verify : bool) : st =
-  { ss_pre; ss_posts; ss_flag; ss_to_verify; ss_label }
+  { ss_pre; ss_posts; ss_variant; ss_flag; ss_to_verify; ss_label }
 
 let init
     (spec_name : string)

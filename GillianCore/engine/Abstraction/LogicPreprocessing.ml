@@ -297,7 +297,11 @@ let unfold_lemma
     let lemma_concs : Asrt.t list =
       List.concat (List.map (auto_unfold preds rec_info) spec.lemma_concs)
     in
-    List.map (fun lemma_hyp -> Lemma.{ lemma_hyp; lemma_concs }) lemma_hyps
+    List.map
+      (fun lemma_hyp ->
+        Lemma.
+          { lemma_hyp; lemma_concs; lemma_spec_variant = lemma.lemma_variant })
+      lemma_hyps
   in
   {
     lemma with

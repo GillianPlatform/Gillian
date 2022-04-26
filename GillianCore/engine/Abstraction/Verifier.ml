@@ -76,6 +76,7 @@ struct
     params : string list;
     pre_state : SPState.t;
     post_up : UP.t;
+    variant : Expr.t option;
     flag : Flag.t option;
     spec_vars : Expr.Set.t;
   }
@@ -95,6 +96,7 @@ struct
       (id : int)
       (pre : Asrt.t)
       (posts : Asrt.t list)
+      (variant : Expr.t option)
       (flag : Flag.t option)
       (label : (string * SS.t) option)
       (to_verify : bool) : (t option * (Asrt.t * Asrt.t list) option) list =
@@ -205,6 +207,7 @@ struct
                 params;
                 pre_state = ss_pre;
                 post_up;
+                variant;
                 flag;
                 spec_vars;
               }
@@ -241,7 +244,7 @@ struct
     let ( let+ ) x f = List.map f x in
     let+ stest, sspec' =
       testify preds pred_ins name params id sspec.ss_pre sspec.ss_posts
-        (Some sspec.ss_flag)
+        sspec.ss_variant (Some sspec.ss_flag)
         (Spec.label_vars_to_set sspec.ss_label)
         sspec.ss_to_verify
     in
@@ -311,9 +314,9 @@ struct
       (lemma : Lemma.t) : t list * Lemma.t =
     let tests_and_specs =
       List.concat_map
-        (fun Lemma.{ lemma_hyp; lemma_concs } ->
+        (fun Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant } ->
           testify preds pred_ins lemma.lemma_name lemma.lemma_params 0 lemma_hyp
-            lemma_concs None None true)
+            lemma_concs lemma_spec_variant None None true)
         lemma.lemma_specs
     in
     let tests, specs =
@@ -327,7 +330,13 @@ struct
           let spec_acc =
             match spec_opt with
             | Some (lemma_hyp, lemma_concs) ->
-                Lemma.{ lemma_hyp; lemma_concs } :: spec_acc
+                Lemma.
+                  {
+                    lemma_hyp;
+                    lemma_concs;
+                    lemma_spec_variant = lemma.lemma_variant;
+                  }
+                :: spec_acc
             | None -> spec_acc
           in
           (test_acc, spec_acc))

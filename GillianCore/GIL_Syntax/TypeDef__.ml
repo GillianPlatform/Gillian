@@ -213,7 +213,11 @@ and pred = {
   pred_normalised : bool;
 }
 
-and lemma_spec = { lemma_hyp : assertion; lemma_concs : assertion list }
+and lemma_spec = {
+  lemma_hyp : assertion;
+  lemma_concs : assertion list;
+  lemma_spec_variant : expr option;
+}
 
 and lemma = {
   lemma_name : string;
@@ -229,6 +233,7 @@ and lemma = {
 and single_spec = {
   ss_pre : assertion;
   ss_posts : assertion list;
+  ss_variant : expr option;
   ss_flag : flag;
   ss_to_verify : bool;
   ss_label : (string * string list) option;
