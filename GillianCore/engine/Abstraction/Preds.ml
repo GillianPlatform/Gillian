@@ -19,6 +19,7 @@ module type S = sig
   val strategic_choice : t -> (abs_t -> int) -> abs_t option
   val remove_by_name : t -> string -> abs_t option
   val find_pabs_by_name : t -> string -> abs_t list
+  val get_lvars : t -> SS.t
   val pp : Format.formatter -> t -> unit
   val pp_pabs : Format.formatter -> abs_t -> unit
 
@@ -126,6 +127,14 @@ module Make
   (** Find predicate_assertion via pname. Returns a list with all the pabs with name pname *)
   let find_pabs_by_name (preds : t) (pname : string) : abs_t list =
     List.filter (fun (pn, _) -> pn = pname) !preds
+
+  let get_lvars (preds : t) : SS.t =
+    let pred_params =
+      List.concat_map
+        (fun (_, vs) -> List.map Expr.lvars (List.map Val.to_expr vs))
+        !preds
+    in
+    List.fold_left SS.union SS.empty pred_params
 
   (** Printing function *)
   let pp_pabs fmt pa =

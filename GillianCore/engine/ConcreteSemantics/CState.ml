@@ -153,6 +153,9 @@ module Make
   let get_lvars _ =
     raise (Failure "ERROR: get_lvars called for concrete executions")
 
+  let get_lvars_for_exact _ =
+    raise (Failure "ERROR: get_lvars_for_exact called for concrete executions")
+
   let to_assertions ?to_keep:_ (_ : t) : Asrt.t list =
     raise (Failure "ERROR: to_assertions called for concrete executions")
 

@@ -449,6 +449,11 @@ module Make (SMemory : SMemory.S) :
         svars;
       ]
 
+  let get_lvars_for_exact (state : t) : Var.Set.t =
+    let heap, store, pfs, _, _ = state in
+    List.fold_left SS.union SS.empty
+      [ SMemory.lvars heap; SStore.lvars store; PFS.lvars pfs ]
+
   let to_assertions ?(to_keep : SS.t option) (state : t) : Asrt.t list =
     let heap, store, pfs, gamma, _ = state in
     let store' =

@@ -1161,14 +1161,64 @@ module Make
       (* LTrue, LFalse, LEmp, LStar *)
       | _ -> raise (Failure "Illegal Assertion in Unification Plan")
     in
-    match (!Config.Verification.exact, hides) with
-    | false, _ | true, None | true, Some [] -> result
-    | true, Some hides ->
+    (* TODO: Exact fold *)
+    match (!Config.Verification.exact, hides, result) with
+    | false, _, _
+    | true, None, _
+    | true, Some [], _
+    | true, _, UWTF
+    | true, _, UFail _ -> result
+    | true, Some hides, USucc (state, preds, _) ->
         L.verbose (fun fmt ->
             fmt "Exact fold hiding: %a\n"
               (Fmt.list ~sep:Fmt.comma Fmt.string)
               hides);
-        result
+        let hides_subst =
+          List.map
+            (fun x ->
+              match ESubst.get subst (LVar x) with
+              | Some v ->
+                  let ev = Val.to_expr v in
+                  let () =
+                    match ev with
+                    | LVar _ | Lit _ -> ()
+                    | _ ->
+                        L.verbose (fun fmt ->
+                            fmt
+                              "EXACT: WARNING: hidden parameter not an LVar or \
+                               a concrete value")
+                  in
+                  let () =
+                    L.verbose (fun fmt -> fmt "Binding for %s: %a" x Val.pp v)
+                  in
+                  Val.to_expr v
+              | None -> failwith ("Exact fold: no binding in subst for " ^ x))
+            hides
+        in
+        (* FIXME: For now, filter for LVars only *)
+        let hides_subst =
+          List.filter_map
+            (fun x ->
+              match x with
+              | Expr.LVar x -> Some x
+              | _ -> None)
+            hides_subst
+        in
+        let hides_subst = SS.of_list hides_subst in
+        let lvars =
+          SS.union (State.get_lvars_for_exact state) (Preds.get_lvars preds)
+        in
+        let () =
+          L.verbose (fun fmt ->
+              fmt "Relevant state lvars: %a"
+                (Fmt.list ~sep:Fmt.comma Fmt.string)
+                (SS.elements lvars))
+        in
+        let intersection = SS.inter hides_subst lvars in
+        if intersection <> SS.empty then
+          let () = L.verbose (fun fmt -> fmt "Fold not exact.") in
+          make_resource_fail ()
+        else result
 
   and unify_up (s_states : search_state) : up_u_res =
     let s_states, errs_so_far = s_states in

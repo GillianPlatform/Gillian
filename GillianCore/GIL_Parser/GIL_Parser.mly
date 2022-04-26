@@ -823,7 +823,7 @@ g_pred_target:
   }
 ;
 
-lemma_variant_target:
+variant_target:
   VARIANT LBRACE; variant = expr_target; RBRACE
   { variant }
 
@@ -843,7 +843,7 @@ g_lemma_target:
   internal = option(INTERNAL);
   LEMMA;
   lemma_head = lemma_head_target;
-  lemma_variant = option(lemma_variant_target);
+  lemma_variant = option(variant_target);
   lemma_hyp = g_spec_line;
   lemma_concs = g_mult_spec_line;
   lemma_existentials = option(existentials_target);

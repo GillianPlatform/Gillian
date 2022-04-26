@@ -246,8 +246,12 @@ module Make
     State.get_spec_vars state
 
   let get_lvars (astate : t) : Var.Set.t =
-    let state, _, _ = astate in
-    State.get_lvars state
+    let state, preds, _ = astate in
+    SS.union (State.get_lvars state) (Preds.get_lvars preds)
+
+  let get_lvars_for_exact (astate : t) : Var.Set.t =
+    let state, preds, _ = astate in
+    SS.union (State.get_lvars_for_exact state) (Preds.get_lvars preds)
 
   let to_assertions ?(to_keep : SS.t option) (astate : t) : Asrt.t list =
     let state, preds, _ = astate in

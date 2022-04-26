@@ -9,7 +9,7 @@ predicate SLL_len(+x, n : Int) {
 }
 
 // List length (recursive)
-{ (x == #x) * SLL_len(#x, #n) }
+{ (x == #x) * SLL_len(#x, #n) } with variant: x
 function SLL_length(x) {
   if (x = null){
     n := 0
@@ -18,7 +18,8 @@ function SLL_length(x) {
     n := SLL_length(t);
     n := 1 + n
   };
-  [[ fold SLL_len(#x, #n) ]];
+  // THIS FAILS DUE TO EXACT
+  // [[ fold SLL_len(#x, #n) ]];
   return n
 }
 { SLL_len(#x, #n) * ret == #n }

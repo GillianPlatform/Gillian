@@ -124,6 +124,9 @@ module type S = sig
   (** Get all logical variables *)
   val get_lvars : t -> Var.Set.t
 
+  (** Get all logical variables relevant for exact reasoning *)
+  val get_lvars_for_exact : t -> Var.Set.t
+
   (** Turns a state into a list of assertions *)
   val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
 
