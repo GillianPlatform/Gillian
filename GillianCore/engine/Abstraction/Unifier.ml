@@ -52,7 +52,7 @@ module Make
   type state_t = State.t [@@deriving yojson]
   type preds_t = Preds.t [@@deriving yojson]
   type abs_t = string * vt list
-  type err_t = State.err_t
+  type err_t = State.err_t [@@deriving yojson]
   type t = state_t * preds_t * UP.preds_tbl_t
   type post_res = (Flag.t * Asrt.t list) option
   type s_state = t * st * UP.t
@@ -81,20 +81,20 @@ module Make
     subst : st;
     up : UP.t;
   } [@@deriving yojson]
-  type unify_result_report_data = {
-    astate : astate_rec;
-    subst : st;
-    posts : (Flag.t * Asrt.t list) option;
-    remaining_states : unify_result_report_state list;
-  } [@@deriving yojson]
-  type unify_result_report = {
-    success : bool;
-    data : unify_result_report_data option;
-  } [@@deriving yojson]
-
-  let pp_unify_result_report fmt report =
-    Fmt.pf fmt "Unifier.unify_up: Unification successful: %d states left"
-      (1 + (List.length (Option.get report.data).remaining_states))
+  type unify_result_report =
+    Success of {
+      astate : astate_rec;
+      subst : st;
+      posts : (Flag.t * Asrt.t list) option;
+      remaining_states : unify_result_report_state list;
+    } 
+    | Failure of {
+      cur_step : UP.step option;
+      subst : st;
+      astate : astate_rec;
+      errors : err_t list;
+    }
+  [@@deriving yojson]
 
   let astate_rec_of (astate : t) =
     let state, preds, _ = astate in { state; preds }
@@ -129,6 +129,29 @@ module Make
     Fmt.pf fmt "%a@\n@\nPREDS:@\n%a@\n"
       (State.pp_by_need pvars lvars locs)
       state Preds.pp preds
+
+  let pp_astate_rec fmt astate =
+    let { state; preds } = astate in pp_astate fmt (state, preds, ())
+
+  let pp_unify_result_report fmt report =
+    match report with
+    | Success data ->
+      Fmt.pf fmt "Unifier.unify_up: Unification successful: %d states left"
+        (1 + (List.length data.remaining_states))
+    | Failure { cur_step; subst; astate; errors } ->
+      Fmt.pf fmt 
+        "@[<v 2>WARNING: Unify Assertion Failed: @[<h>%a@] with \
+        subst @\n\
+        %a in state @\n\
+        %a with errors:@\n\
+        %a@]"
+        Fmt.(
+          option
+            ~none:(any "no assertion - phantom node")
+            UP.step_pp)
+        cur_step ESubst.pp subst pp_astate_rec astate
+        Fmt.(list ~sep:(any "@\n") State.pp_err)
+        errors
 
   let copy_astate (astate : t) : t =
     let state, preds, pred_defs = astate in
@@ -1239,18 +1262,16 @@ module Make
             match UP.next up with
             | None ->
               let posts = UP.posts up in (
-                let unify_result_report = {
-                  success = true;
-                  data = Some ({
-                    remaining_states = List.map (fun ((astate, subst, up)) -> {
-                      astate = astate_rec_of astate;
-                      subst; up
-                    }) rest;
-                    astate = astate_rec_of state';
-                    subst; posts })
+                let unify_result_report = Success {
+                  remaining_states = List.map (fun ((astate, subst, up)) -> {
+                    astate = astate_rec_of astate;
+                    subst; up
+                  }) rest;
+                  astate = astate_rec_of state';
+                  subst; posts
                 } in
                 L.normal_specific (L.Loggable.make pp_unify_result_report unify_result_report_of_yojson unify_result_report_to_yojson unify_result_report)
-                L.LoggingConstants.ContentType.unify_result
+                  L.LoggingConstants.ContentType.unify_result
                   |> ignore;
                 UPUSucc [ (state', subst, posts) ]
               )
@@ -1277,23 +1298,15 @@ module Make
                 in
                 f (next_states @ rest, errs_so_far)
             | Some [] -> L.fail "ERROR: unify_up: empty unification plan")
-        | UFail errs ->
-            L.(
-              verbose (fun m ->
-                  m
-                    "@[<v 2>WARNING: Unify Assertion Failed: @[<h>%a@] with \
-                    subst @\n\
-                    %a in state @\n\
-                    %a with errors:@\n\
-                    %a@]"
-                    Fmt.(
-                      option
-                        ~none:(any "no assertion - phantom node")
-                        UP.step_pp)
-                    cur_step ESubst.pp subst pp_astate state
-                    Fmt.(list ~sep:(any "@\n") State.pp_err)
-                    errs));
-            f (rest, errs @ errs_so_far))
+        | UFail errors ->
+          let unify_result_report = Failure {
+            astate = astate_rec_of state;
+            cur_step; subst; errors
+          } in
+          L.normal_specific (L.Loggable.make pp_unify_result_report unify_result_report_of_yojson unify_result_report_to_yojson unify_result_report)
+            L.LoggingConstants.ContentType.unify_result
+            |> ignore;
+          f (rest, errors @ errs_so_far))
 
   and unify
       ?(in_unification = false)
