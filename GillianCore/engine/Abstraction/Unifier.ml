@@ -1307,7 +1307,7 @@ module Make
     let state, preds, _ = astate in
     let unify_report = { astate={ state; preds }; subst; up; unify_kind } in
     L.with_parent 
-      (L.Loggable.make pp_unify_report_t unify_report_t_of_yojson unify_report_t_to_yojson unify_report)
+      (Some (L.Loggable.make pp_unify_report_t unify_report_t_of_yojson unify_report_t_to_yojson unify_report))
       L.LoggingConstants.ContentType.unify
       (fun () ->
         let ret = unify_up ([ (astate, subst, up) ], []) in

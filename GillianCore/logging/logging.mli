@@ -181,7 +181,7 @@ val with_parent :
   ?title:string ->
   ?lvl:Mode.level ->
   ?severity:Report.severity ->
-  Loggable.t ->
+  Loggable.t option ->
   string ->
   (unit -> 'a) ->
   'a

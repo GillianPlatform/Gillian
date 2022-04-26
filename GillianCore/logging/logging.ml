@@ -77,7 +77,7 @@ let set_parent = ReportBuilder.set_parent
 let release_parent = ReportBuilder.release_parent
 
 let with_parent ?title ?(lvl=Mode.Normal) ?severity loggable type_ f =
-  match log_specific lvl ?title ?severity loggable type_ with
+  match Option.bind loggable (fun loggable -> log_specific lvl ?title ?severity loggable type_) with
   | None -> f ()
   | Some parent_id -> (
     set_parent parent_id;
