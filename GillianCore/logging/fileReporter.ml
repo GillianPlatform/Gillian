@@ -6,7 +6,7 @@ let filename = "file.log"
 let out_channel = ref None
 let formatter = ref None
 
-let accepted_types = LoggingConstants.ContentType.([debug; assertion; phase; cmd])
+let accepted_types = LoggingConstants.ContentType.([debug; assertion; phase; cmd; unify; unify_result])
 
 let initialize () =
   let () = out_channel := Some (open_out filename) in

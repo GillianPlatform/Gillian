@@ -1,4 +1,4 @@
-type unify_kind = Postcondition | Fold | FunctionCall | Invariant | LogicCommand [@@deriving yojson, show]
+type unify_kind = Postcondition | Fold | FunctionCall | Invariant | LogicCommand [@@deriving yojson]
 
 module type S = sig
   type vt
@@ -48,33 +48,56 @@ module Make
   module L = Logging
 
   type vt = Val.t
-  type st = ESubst.t
-  type state_t = State.t [@@deriving yojson, show]
-  type preds_t = Preds.t [@@deriving yojson, show]
+  type st = ESubst.t [@@deriving yojson]
+  type state_t = State.t [@@deriving yojson]
+  type preds_t = Preds.t [@@deriving yojson]
   type abs_t = string * vt list
   type err_t = State.err_t
   type t = state_t * preds_t * UP.preds_tbl_t
   type post_res = (Flag.t * Asrt.t list) option
-  type search_state = (t * st * UP.t) list * err_t list
+  type s_state = t * st * UP.t
+  type search_state = s_state list * err_t list
   type unfold_info_t = (string * string) list
   type gp_ret = GPSucc of (t * vt list) list | GPFail of err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
   type up_u_res = UPUSucc of (t * st * post_res) list | UPUFail of err_t list
-  type astate_rec_t = {
+  type astate_rec = {
     state : state_t;
     preds : preds_t;
-  } [@@deriving yojson, show]
-  type assertion_report_t = {
+  } [@@deriving yojson]
+  type assertion_report = {
     step : UP.step;
     subst : ESubst.t;
-    astate : astate_rec_t;
+    astate : astate_rec;
   } [@@deriving yojson]
-  type unify_report_t = {
-    astate : astate_rec_t;
+  type unify_report = {
+    astate : astate_rec;
     subst : ESubst.t;
     up : UP.t;
     unify_kind : unify_kind;
-  } [@@deriving yojson, show]
+  } [@@deriving yojson]
+  type unify_result_report_state = {
+    astate : astate_rec;
+    subst : st;
+    up : UP.t;
+  } [@@deriving yojson]
+  type unify_result_report_data = {
+    astate : astate_rec;
+    subst : st;
+    posts : (Flag.t * Asrt.t list) option;
+    remaining_states : unify_result_report_state list;
+  } [@@deriving yojson]
+  type unify_result_report = {
+    success : bool;
+    data : unify_result_report_data option;
+  } [@@deriving yojson]
+
+  let pp_unify_result_report fmt report =
+    Fmt.pf fmt "Unifier.unify_up: Unification successful: %d states left"
+      (1 + (List.length (Option.get report.data).remaining_states))
+
+  let astate_rec_of (astate : t) =
+    let state, preds, _ = astate in { state; preds }
 
   let update_store (astate : t) (x : string) (v : Val.t) : t =
     let state, preds, pred_defs = astate in
@@ -976,14 +999,14 @@ module Make
         pp_astate fmt (astate_log.state, astate_log.preds, ())
       in
 
-      let pp_u_assert_log fmt u_assert_log =
+      let pp_assertion_report fmt u_assert_log =
         Fmt.pf fmt "Unify assertion: @[<h>%a@]@\nSubst:@\n%a@\n@[<v 2>STATE:@\n%a@]"
           UP.step_pp u_assert_log.step subst_pp u_assert_log.subst pp_astate_log u_assert_log.astate
       in
 
       let state, preds, _ = astate in
       let assertion_report = { step; subst; astate={ state; preds } } in
-      L.Loggable.make pp_u_assert_log assertion_report_t_of_yojson assertion_report_t_to_yojson assertion_report
+      L.Loggable.make pp_assertion_report assertion_report_of_yojson assertion_report_to_yojson assertion_report
     ) else None in
 
     L.with_parent assertion_loggable L.LoggingConstants.ContentType.assertion (fun () ->
@@ -1215,11 +1238,22 @@ module Make
         | USucc state' -> (
             match UP.next up with
             | None ->
-                L.verbose (fun fmt ->
-                    fmt
-                      "Unifier.unify_up: Unification successful: %d states left"
-                      (List.length s_states));
-                UPUSucc [ (state', subst, UP.posts up) ]
+              let posts = UP.posts up in (
+                let unify_result_report = {
+                  success = true;
+                  data = Some ({
+                    remaining_states = List.map (fun ((astate, subst, up)) -> {
+                      astate = astate_rec_of astate;
+                      subst; up
+                    }) rest;
+                    astate = astate_rec_of state';
+                    subst; posts })
+                } in
+                L.normal_specific (L.Loggable.make pp_unify_result_report unify_result_report_of_yojson unify_result_report_to_yojson unify_result_report)
+                L.LoggingConstants.ContentType.unify_result
+                  |> ignore;
+                UPUSucc [ (state', subst, posts) ]
+              )
             | Some [ (up, lab) ] ->
                 if complete_subst subst lab then
                   f ((state', subst, up) :: rest, errs_so_far)
@@ -1303,11 +1337,10 @@ module Make
     in
 
     
-    L.verbose (fun fmt -> fmt "Unifier.unify: about to unify UP.");
     let state, preds, _ = astate in
     let unify_report = { astate={ state; preds }; subst; up; unify_kind } in
     L.with_parent 
-      (Some (L.Loggable.make pp_unify_report_t unify_report_t_of_yojson unify_report_t_to_yojson unify_report))
+      (Some (L.Loggable.make (fun fmt _ -> Fmt.pf fmt "Unifier.unify: about to unify UP.") unify_report_of_yojson unify_report_to_yojson unify_report))
       L.LoggingConstants.ContentType.unify
       (fun () ->
         let ret = unify_up ([ (astate, subst, up) ], []) in
