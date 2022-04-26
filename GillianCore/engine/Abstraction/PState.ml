@@ -443,7 +443,9 @@ module Make
             (Hashtbl.create Config.medium_tbl_size)
         in
         let up =
-          UP.init known_unifiables Expr.Set.empty pred_ins [ (a, (None, None)) ]
+          (* FIXME: UNDERSTAND IF THE HIDES SHOULD BE [] *)
+          UP.init known_unifiables Expr.Set.empty pred_ins
+            [ (a, (None, None, [])) ]
         in
         (* This will not do anything in the original pass,
            but will do precisely what is needed in the re-establishment *)
@@ -722,7 +724,7 @@ module Make
       match lcmd with
       | SymbExec -> failwith "Impossible: Untreated SymbExec"
       | Fold (pname, les, folding_info) -> (
-          let () = Fmt.pr "Folding predicate: %s\n" pname in
+          let () = L.verbose (fun fmt -> fmt "Folding predicate: %s\n" pname) in
           let pred = UP.get_pred_def prog.preds pname in
           match pred.pred.pred_abstract with
           | true ->
@@ -874,7 +876,7 @@ module Make
 
               let up =
                 UP.init known_unifiables Expr.Set.empty pred_ins
-                  [ (a, (None, None)) ]
+                  [ (a, (None, None, [])) ]
               in
               let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
               if vars_to_forget <> SS.empty then (
@@ -1133,7 +1135,7 @@ module Make
     Unifier.produce astate subst a
 
   let unify_assertion (astate : t) (subst : st) (step : UP.step) : u_res =
-    match Unifier.unify_assertion astate subst step with
+    match Unifier.unify_assertion astate subst None step with
     | UWTF -> UWTF
     | USucc astate' -> USucc astate'
     | UFail errs -> UFail errs

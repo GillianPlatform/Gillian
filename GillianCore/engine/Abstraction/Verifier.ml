@@ -181,7 +181,9 @@ struct
             label
         in
         let known_unifiables = Expr.Set.union known_unifiables existentials in
-        let simple_posts = List.map (fun post -> (post, (label, None))) posts in
+        let simple_posts =
+          List.map (fun post -> (post, (label, None, []))) posts
+        in
         let post_up =
           UP.init known_unifiables Expr.Set.empty pred_ins simple_posts
         in
@@ -414,7 +416,7 @@ struct
                        test.id SPState.pp state
                        Fmt.(list ~sep:(any "@\n") SAInterpreter.pp_err)
                        errs);
-                 (* Fmt.pr "f @?"; *)
+                 Fmt.pr "f @?";
                  false
              | ExecRes.RSucc (fl, _, state) ->
                  if Some fl <> test.flag then (
@@ -442,7 +444,7 @@ struct
                            test.name
                            (Fmt.Dump.pair Fmt.int Fmt.int)
                            test.id);
-                     (* Fmt.pr "s @?"; *)
+                     Fmt.pr "s @?";
                      ac)
                    else (
                      L.normal (fun m ->
@@ -501,7 +503,7 @@ struct
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
     match test.flag with
     | Some _ ->
-        let msg = "Verifying one spec of procedure " ^ test.name ^ "... \n" in
+        let msg = "Verifying one spec of procedure " ^ test.name ^ "... " in
         L.tmi (fun fmt -> fmt "%s" msg);
         Fmt.pr "%s@?" msg;
         (* Reset coverage for every procedure in verification *)

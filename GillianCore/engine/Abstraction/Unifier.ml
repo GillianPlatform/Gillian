@@ -20,7 +20,7 @@ module type S = sig
   val unfold_all : t -> string -> t list
   val unfold_with_vals : t -> vt list -> (st * t) list * bool
   val unfold_concrete_preds : t -> (st option * t) option
-  val unify_assertion : t -> st -> UP.step -> u_res
+  val unify_assertion : t -> st -> string list option -> UP.step -> u_res
   val unify_up : search_state -> up_u_res
   val unify : ?in_unification:bool -> t -> st -> UP.t -> up_u_res
   val get_pred : ?in_unification:bool -> t -> string -> vt option list -> gp_ret
@@ -786,9 +786,13 @@ module Make
         GPSucc [ (astate, Pred.out_args pred_def vs) ]
     | _ when (not !Config.manual_proof) && not pred_def.pred_abstract -> (
         (* Recursive Case - Folding required *)
-        let () = Fmt.pr "Auto-folding predicate: %s\n" pred.pred.pred_name in
+        let () =
+          L.verbose (fun fmt ->
+              fmt "Auto-folding predicate: %s\n" pred.pred.pred_name)
+        in
         L.verbose (fun m -> m "Recursive case - attempting to fold.");
         let up = pred.up in
+        L.verbose (fun m -> m "Predicate unification plan: %a" UP.pp up);
         let param_ins = Pred.in_params pred.pred in
         let param_ins = List.map (fun x -> Expr.PVar x) param_ins in
         let vs_ins = Pred.in_args pred.pred vs in
@@ -820,7 +824,11 @@ module Make
         | UPUFail errs -> GPFail errs)
     | _ -> GPFail [ StateErr.EPure False ]
 
-  and unify_assertion (astate : t) (subst : ESubst.t) (step : UP.step) : u_res =
+  and unify_assertion
+      (astate : t)
+      (subst : ESubst.t)
+      (hides : string list option)
+      (step : UP.step) : u_res =
     (* Auxiliary function for actions and predicates, with indexed outs *)
     let unify_ins_outs_lists
         (state : State.t)
@@ -961,194 +969,206 @@ module Make
             UP.step_pp step subst_pp subst pp_astate astate));
 
     let p, outs = step in
-    match (p : Asrt.t) with
-    | GA (a_id, e_ins, e_outs) -> (
-        let getter = State.ga_to_getter a_id in
-        let vs_ins = List.map (subst_in_expr_opt astate subst) e_ins in
-        let failure = List.exists (fun x -> x = None) vs_ins in
-        if failure then make_resource_fail ()
-        else
-          let vs_ins = List.map Option.get vs_ins in
-          L.(
-            verbose (fun m ->
-                m "Executing action: %s with ins: @[<h>%a@]" getter
-                  Fmt.(list ~sep:comma Val.pp)
-                  vs_ins));
-          match State.execute_action getter state vs_ins with
-          | ASucc [ (state', vs') ] -> (
-              (* L.(
-                 verbose (fun m ->
-                     m "@[<v 2>Got state:@\n%a@] and values @[<h>%a@]" State.pp
-                       state'
-                       Fmt.(list ~sep:comma Val.pp)
-                       vs')); *)
-              let vs_ins', vs_outs =
-                List_utils.divide_list_by_index vs' (List.length vs_ins)
-              in
-              let remover = State.ga_to_deleter a_id in
-              match State.execute_action remover state' vs_ins' with
-              | ASucc [ (state'', _) ] -> (
-                  (* Separate outs into direct unifiables and others*)
-                  let success, fail_pf =
-                    unify_ins_outs_lists state'' outs vs_outs e_outs
-                  in
-                  match success with
-                  | true -> USucc (state'', preds, pred_defs)
-                  | false ->
-                      UFail [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ])
-              | ASucc _ ->
-                  raise
-                    (Exceptions.Unsupported
-                       "unify_assertion: action remover returns multiple \
-                        results")
-              | AFail errs -> UFail errs)
-          | ASucc _ ->
-              raise
-                (Exceptions.Unsupported
-                   "unify_assertion: action getter returns multiple results")
-          | AFail errs -> UFail errs)
-    | Pred (pname, les) -> (
-        L.verbose (fun m -> m "Unifying predicate assertion");
-        (* Perform substitution in all predicate parameters *)
-        L.verbose (fun fmt -> fmt "ARGS: %a" Fmt.(list ~sep:comma Expr.pp) les);
-        L.verbose (fun fmt -> fmt "SUBST:\n%a" ESubst.pp subst);
-        let vs = List.map (subst_in_expr_opt astate subst) les in
-        (* Get the ins of the predicate *)
-        let pred = UP.get_pred_def pred_defs pname in
-        let pred_def = pred.pred in
-        let vs_ins = Pred.in_args pred_def vs in
-        (* All of which must have survived substitution *)
-        let failure = List.exists (fun x -> x = None) vs_ins in
-        if failure then (
-          L.verbose (fun m -> m "Cannot unify: not all in-parameters known");
-          make_resource_fail ())
-        else
-          let vs_ins = List.map Option.get vs_ins in
-          L.verbose (fun m ->
-              m "Looking for ins: %a"
-                Fmt.(brackets (list ~sep:comma Val.pp))
-                vs_ins);
-          match get_pred ~in_unification:true astate pname vs with
-          | GPSucc [] ->
-              L.verbose (fun m -> m "SUCCEEDED WITH NOTHING! MEDOOOOOO!!!!!");
-              UWTF
-          | GPSucc [ (astate', vs_outs) ] -> (
-              let les_outs = Pred.out_args pred_def les in
-              L.(
-                verbose (fun m ->
-                    m
-                      "learned the outs of a predicate. going to unify \
-                       (@[<h>%a@]) against (@[<h>%a@])!!!@\n"
-                      Fmt.(list ~sep:comma Val.pp)
-                      vs_outs
-                      Fmt.(list ~sep:comma Expr.pp)
-                      les_outs));
-              let state', _, _ = astate' in
-              let success, fail_pf =
-                unify_ins_outs_lists state' outs vs_outs les_outs
-              in
-              L.verbose (fun fmt -> fmt "Outs unification: %b" success);
-              match success with
-              | true -> USucc astate'
-              | false -> UFail [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ]
-              )
-          | GPSucc _ ->
-              raise (Failure "DEATH. BRANCHING GETPRED INSIDE UNIFICATION.")
-          | GPFail errs ->
-              L.verbose (fun m -> m "Failed to unify against predicate.");
-              UFail errs)
-    (* Conjunction should not be here *)
-    | Pure (Formula.And _) ->
-        raise (Failure "Unify assertion: And: should have been reduced")
-    (* Other pure assertions *)
-    | Pure f -> (
-        let success, discharges =
-          List.fold_left
-            (fun (success, discharges) (u, out) ->
-              (* We know how to create the out *)
-              if not success then (false, discharges)
-              else
-                (* Perform the substitution in the out *)
-                match ESubst.subst_in_expr_opt subst out with
-                | None -> (false, discharges)
-                | Some out -> (
-                    (* Convert obtained out to value *)
-                    match Val.from_expr out with
-                    | None -> (false, discharges)
-                    | Some out -> (
-                        (* And add to e-subst *)
-                        match ESubst.get subst u with
-                        | None ->
-                            ESubst.put subst u out;
-                            (true, discharges)
-                        | Some out' when out = out' -> (true, discharges)
-                        | Some out' ->
-                            ( true,
-                              Formula.Eq (Val.to_expr out, Val.to_expr out')
-                              :: discharges ))))
-            (true, []) outs
-        in
-        match success with
-        | false ->
-            raise
-              (Failure
-                 (Format.asprintf
-                    "INTERNAL ERROR: Unification failure: do not know all ins \
-                     for %a"
-                    Formula.pp f))
-        | true -> (
-            (* To unify a pure formula we must know all ins *)
-            let opf = ESubst.substitute_in_formula_opt subst f in
-            match opf with
-            | None ->
+    let result =
+      match (p : Asrt.t) with
+      | GA (a_id, e_ins, e_outs) -> (
+          let getter = State.ga_to_getter a_id in
+          let vs_ins = List.map (subst_in_expr_opt astate subst) e_ins in
+          let failure = List.exists (fun x -> x = None) vs_ins in
+          if failure then make_resource_fail ()
+          else
+            let vs_ins = List.map Option.get vs_ins in
+            L.(
+              verbose (fun m ->
+                  m "Executing action: %s with ins: @[<h>%a@]" getter
+                    Fmt.(list ~sep:comma Val.pp)
+                    vs_ins));
+            match State.execute_action getter state vs_ins with
+            | ASucc [ (state', vs') ] -> (
+                (* L.(
+                   verbose (fun m ->
+                       m "@[<v 2>Got state:@\n%a@] and values @[<h>%a@]" State.pp
+                         state'
+                         Fmt.(list ~sep:comma Val.pp)
+                         vs')); *)
+                let vs_ins', vs_outs =
+                  List_utils.divide_list_by_index vs' (List.length vs_ins)
+                in
+                let remover = State.ga_to_deleter a_id in
+                match State.execute_action remover state' vs_ins' with
+                | ASucc [ (state'', _) ] -> (
+                    (* Separate outs into direct unifiables and others*)
+                    let success, fail_pf =
+                      unify_ins_outs_lists state'' outs vs_outs e_outs
+                    in
+                    match success with
+                    | true -> USucc (state'', preds, pred_defs)
+                    | false ->
+                        UFail [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ])
+                | ASucc _ ->
+                    raise
+                      (Exceptions.Unsupported
+                         "unify_assertion: action remover returns multiple \
+                          results")
+                | AFail errs -> UFail errs)
+            | ASucc _ ->
                 raise
-                  (Failure
-                     (Format.asprintf
-                        "Unification failure: do not know all ins for %a"
-                        Formula.pp f))
-            | Some pf ->
-                let discharges_pf =
-                  List.fold_left
-                    (fun ac x -> if ac = Formula.True then x else And (ac, x))
-                    True discharges
+                  (Exceptions.Unsupported
+                     "unify_assertion: action getter returns multiple results")
+            | AFail errs -> UFail errs)
+      | Pred (pname, les) -> (
+          L.verbose (fun m -> m "Unifying predicate assertion");
+          (* Perform substitution in all predicate parameters *)
+          L.verbose (fun fmt ->
+              fmt "ARGS: %a" Fmt.(list ~sep:comma Expr.pp) les);
+          L.verbose (fun fmt -> fmt "SUBST:\n%a" ESubst.pp subst);
+          let vs = List.map (subst_in_expr_opt astate subst) les in
+          (* Get the ins of the predicate *)
+          let pred = UP.get_pred_def pred_defs pname in
+          let pred_def = pred.pred in
+          let vs_ins = Pred.in_args pred_def vs in
+          (* All of which must have survived substitution *)
+          let failure = List.exists (fun x -> x = None) vs_ins in
+          if failure then (
+            L.verbose (fun m -> m "Cannot unify: not all in-parameters known");
+            make_resource_fail ())
+          else
+            let vs_ins = List.map Option.get vs_ins in
+            L.verbose (fun m ->
+                m "Looking for ins: %a"
+                  Fmt.(brackets (list ~sep:comma Val.pp))
+                  vs_ins);
+            match get_pred ~in_unification:true astate pname vs with
+            | GPSucc [] ->
+                L.verbose (fun m -> m "SUCCEEDED WITH NOTHING! MEDOOOOOO!!!!!");
+                UWTF
+            | GPSucc [ (astate', vs_outs) ] -> (
+                let les_outs = Pred.out_args pred_def les in
+                L.(
+                  verbose (fun m ->
+                      m
+                        "learned the outs of a predicate. going to unify \
+                         (@[<h>%a@]) against (@[<h>%a@])!!!@\n"
+                        Fmt.(list ~sep:comma Val.pp)
+                        vs_outs
+                        Fmt.(list ~sep:comma Expr.pp)
+                        les_outs));
+                let state', _, _ = astate' in
+                let success, fail_pf =
+                  unify_ins_outs_lists state' outs vs_outs les_outs
                 in
-                let discharges_pf =
-                  Reduction.reduce_formula ~unification:true discharges_pf
-                in
-                if State.assert_a state [ And (pf, discharges_pf) ] then
-                  USucc astate
+                L.verbose (fun fmt -> fmt "Outs unification: %b" success);
+                match success with
+                | true -> USucc astate'
+                | false ->
+                    UFail [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ])
+            | GPSucc _ ->
+                raise (Failure "DEATH. BRANCHING GETPRED INSIDE UNIFICATION.")
+            | GPFail errs ->
+                L.verbose (fun m -> m "Failed to unify against predicate.");
+                UFail errs)
+      (* Conjunction should not be here *)
+      | Pure (Formula.And _) ->
+          raise (Failure "Unify assertion: And: should have been reduced")
+      (* Other pure assertions *)
+      | Pure f -> (
+          let success, discharges =
+            List.fold_left
+              (fun (success, discharges) (u, out) ->
+                (* We know how to create the out *)
+                if not success then (false, discharges)
                 else
-                  let vs = State.unfolding_vals state [ pf ] in
-                  UFail [ EAsrt (vs, Not pf, [ [ Pure pf ] ]) ]))
-    | Types les ->
-        let corrections =
-          List.fold_left
-            (fun (ac : Formula.t list) (le, t) ->
-              let v_le = (subst_in_expr_opt astate subst) le in
-              let v_le : vt =
-                match v_le with
-                | Some v_le -> v_le
-                | None -> raise (Failure "DEATH. unify assertion Types")
-              in
-              match State.get_type state v_le with
-              | Some t' -> if t <> t' then False :: ac else ac
-              | None -> Eq (UnOp (TypeOf, Val.to_expr v_le), Lit (Type t)) :: ac)
-            [] les
-        in
+                  (* Perform the substitution in the out *)
+                  match ESubst.subst_in_expr_opt subst out with
+                  | None -> (false, discharges)
+                  | Some out -> (
+                      (* Convert obtained out to value *)
+                      match Val.from_expr out with
+                      | None -> (false, discharges)
+                      | Some out -> (
+                          (* And add to e-subst *)
+                          match ESubst.get subst u with
+                          | None ->
+                              ESubst.put subst u out;
+                              (true, discharges)
+                          | Some out' when out = out' -> (true, discharges)
+                          | Some out' ->
+                              ( true,
+                                Formula.Eq (Val.to_expr out, Val.to_expr out')
+                                :: discharges ))))
+              (true, []) outs
+          in
+          match success with
+          | false ->
+              raise
+                (Failure
+                   (Format.asprintf
+                      "INTERNAL ERROR: Unification failure: do not know all \
+                       ins for %a"
+                      Formula.pp f))
+          | true -> (
+              (* To unify a pure formula we must know all ins *)
+              let opf = ESubst.substitute_in_formula_opt subst f in
+              match opf with
+              | None ->
+                  raise
+                    (Failure
+                       (Format.asprintf
+                          "Unification failure: do not know all ins for %a"
+                          Formula.pp f))
+              | Some pf ->
+                  let discharges_pf =
+                    List.fold_left
+                      (fun ac x -> if ac = Formula.True then x else And (ac, x))
+                      True discharges
+                  in
+                  let discharges_pf =
+                    Reduction.reduce_formula ~unification:true discharges_pf
+                  in
+                  if State.assert_a state [ And (pf, discharges_pf) ] then
+                    USucc astate
+                  else
+                    let vs = State.unfolding_vals state [ pf ] in
+                    UFail [ EAsrt (vs, Not pf, [ [ Pure pf ] ]) ]))
+      | Types les ->
+          let corrections =
+            List.fold_left
+              (fun (ac : Formula.t list) (le, t) ->
+                let v_le = (subst_in_expr_opt astate subst) le in
+                let v_le : vt =
+                  match v_le with
+                  | Some v_le -> v_le
+                  | None -> raise (Failure "DEATH. unify assertion Types")
+                in
+                match State.get_type state v_le with
+                | Some t' -> if t <> t' then False :: ac else ac
+                | None ->
+                    Eq (UnOp (TypeOf, Val.to_expr v_le), Lit (Type t)) :: ac)
+              [] les
+          in
 
-        if corrections = [] then USucc astate
-        else
-          let les, _ = List.split les in
-          let les = List.map (subst_in_expr_opt astate subst) les in
-          UFail
-            [
-              EAsrt
-                ( List.map Option.get (List.filter (fun x -> x <> None) les),
-                  Not (Formula.conjunct corrections),
-                  [ [ Pure (Formula.conjunct corrections) ] ] );
-            ]
-    (* LTrue, LFalse, LEmp, LStar *)
-    | _ -> raise (Failure "Illegal Assertion in Unification Plan")
+          if corrections = [] then USucc astate
+          else
+            let les, _ = List.split les in
+            let les = List.map (subst_in_expr_opt astate subst) les in
+            UFail
+              [
+                EAsrt
+                  ( List.map Option.get (List.filter (fun x -> x <> None) les),
+                    Not (Formula.conjunct corrections),
+                    [ [ Pure (Formula.conjunct corrections) ] ] );
+              ]
+      (* LTrue, LFalse, LEmp, LStar *)
+      | _ -> raise (Failure "Illegal Assertion in Unification Plan")
+    in
+    match (!Config.Verification.exact, hides) with
+    | false, _ | true, None | true, Some [] -> result
+    | true, Some hides ->
+        L.verbose (fun fmt ->
+            fmt "Exact fold hiding: %a\n"
+              (Fmt.list ~sep:Fmt.comma Fmt.string)
+              hides);
+        result
 
   and unify_up (s_states : search_state) : up_u_res =
     let s_states, errs_so_far = s_states in
@@ -1161,10 +1181,11 @@ module Make
     | [] -> UPUFail errs_so_far
     | (state, subst, up) :: rest -> (
         let cur_step : UP.step option = UP.head up in
+        let hides = UP.hides up in
         let ret =
           try
             Option.fold
-              ~some:(unify_assertion state subst)
+              ~some:(unify_assertion state subst hides)
               ~none:(USucc state) cur_step
           with err -> (
             L.verbose (fun fmt ->

@@ -47,12 +47,15 @@ val init :
   KB.t ->
   KB.t ->
   (string, int list) Hashtbl.t ->
-  (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list ->
+  (Asrt.t
+  * ((string * SS.t) option * (Flag.t * Asrt.t list) option * string list))
+  list ->
   (t, Asrt.t list list) result
 
 val next : t -> (t * (string * SS.t) option) list option
 val head : t -> step option
 val posts : t -> (Flag.t * Asrt.t list) option
+val hides : t -> string list option
 
 val init_prog :
   ?preds_tbl:(string, pred) Hashtbl.t ->

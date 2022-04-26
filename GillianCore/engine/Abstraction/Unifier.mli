@@ -20,7 +20,7 @@ module type S = sig
   val unfold_all : t -> string -> t list
   val unfold_with_vals : t -> vt list -> (st * t) list * bool
   val unfold_concrete_preds : t -> (st option * t) option
-  val unify_assertion : t -> st -> UP.step -> u_res
+  val unify_assertion : t -> st -> string list option -> UP.step -> u_res
   val unify_up : search_state -> up_u_res
   val unify : ?in_unification:bool -> t -> st -> UP.t -> up_u_res
   val get_pred : ?in_unification:bool -> t -> string -> vt option list -> gp_ret
