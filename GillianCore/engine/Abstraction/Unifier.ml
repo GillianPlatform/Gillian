@@ -153,6 +153,8 @@ module Make
         Fmt.(list ~sep:(any "@\n") State.pp_err)
         errors
 
+  let loggable_of_unify_result_report = L.Loggable.make pp_unify_result_report unify_result_report_of_yojson unify_result_report_to_yojson
+
   let copy_astate (astate : t) : t =
     let state, preds, pred_defs = astate in
     (State.copy state, Preds.copy preds, pred_defs)
@@ -1262,7 +1264,7 @@ module Make
             match UP.next up with
             | None ->
               let posts = UP.posts up in (
-                let unify_result_report = Success {
+                let unify_result_report = loggable_of_unify_result_report @@ Success {
                   remaining_states = List.map (fun ((astate, subst, up)) -> {
                     astate = astate_rec_of astate;
                     subst; up
@@ -1270,7 +1272,7 @@ module Make
                   astate = astate_rec_of state';
                   subst; posts
                 } in
-                L.normal_specific (L.Loggable.make pp_unify_result_report unify_result_report_of_yojson unify_result_report_to_yojson unify_result_report)
+                L.normal_specific unify_result_report
                   L.LoggingConstants.ContentType.unify_result
                   |> ignore;
                 UPUSucc [ (state', subst, posts) ]
@@ -1299,11 +1301,11 @@ module Make
                 f (next_states @ rest, errs_so_far)
             | Some [] -> L.fail "ERROR: unify_up: empty unification plan")
         | UFail errors ->
-          let unify_result_report = Failure {
+          let unify_result_report = loggable_of_unify_result_report @@ Failure {
             astate = astate_rec_of state;
             cur_step; subst; errors
           } in
-          L.normal_specific (L.Loggable.make pp_unify_result_report unify_result_report_of_yojson unify_result_report_to_yojson unify_result_report)
+          L.normal_specific unify_result_report
             L.LoggingConstants.ContentType.unify_result
             |> ignore;
           f (rest, errors @ errs_so_far))
