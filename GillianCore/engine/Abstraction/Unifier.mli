@@ -24,7 +24,14 @@ module type S = sig
   val unify_assertion : t -> st -> string list option -> UP.step -> u_res
   val unify_up : search_state -> up_u_res
   val unify : ?in_unification:bool -> t -> st -> UP.t -> up_u_res
-  val get_pred : ?in_unification:bool -> t -> string -> vt option list -> gp_ret
+
+  val get_pred :
+    ?in_unification:bool ->
+    t ->
+    string ->
+    vt option list ->
+    (st * UP.step * UP.outs * Expr.t list) option ->
+    gp_ret
 end
 
 module Make

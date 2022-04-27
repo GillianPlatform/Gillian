@@ -884,7 +884,7 @@ module Make
               let vs_ins = Pred.in_args pred.pred vs in
               let vs = List.map (fun x -> Some x) vs in
               (* FIXME: make sure correct number of params *)
-              match Unifier.get_pred astate pname vs with
+              match Unifier.get_pred astate pname vs None with
               | GPSucc [ (_, vs') ] ->
                   L.verbose (fun m ->
                       m "@[<h>Returned values: %a@]"

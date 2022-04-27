@@ -5,6 +5,7 @@ type t = {
   pred_params : (string * WType.t option) list;
   pred_definitions : (WLAssert.t * string list) list;
   pred_ins : int list;
+  pred_nounfold : bool;
   pred_loc : CodeLoc.t;
   pred_id : int;
 }

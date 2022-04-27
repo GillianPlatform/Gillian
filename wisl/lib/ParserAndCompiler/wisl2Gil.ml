@@ -872,7 +872,7 @@ let compile_pred filepath pred =
       pred_facts = [];
       pred_abstract = false;
       pred_pure = false;
-      pred_nounfold = false;
+      pred_nounfold = pred.pred_nounfold;
     }
 
 let rec compile_function

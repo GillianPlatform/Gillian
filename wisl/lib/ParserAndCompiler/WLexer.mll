@@ -40,6 +40,7 @@ rule read =
   | "return" { RETURN (curr lexbuf) }
   | "fold"   { FOLD (curr lexbuf) }
   | "unfold" { UNFOLD (curr lexbuf) }
+  | "nounfold" { NOUNFOLD (curr lexbuf) }
   | "apply"  { APPLY (curr lexbuf) }
   | "assert" { ASSERT (curr lexbuf) }
   | "with" { WITH (curr lexbuf) }

@@ -3,7 +3,7 @@
 (* key words *)
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP NEW DELETE
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
-%token <CodeLoc.t> INVARIANT FOLD UNFOLD APPLY ASSERT EXIST HIDES FORALL
+%token <CodeLoc.t> INVARIANT FOLD UNFOLD NOUNFOLD APPLY ASSERT EXIST HIDES FORALL
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
 
 (* punctuation *)
@@ -351,7 +351,7 @@ pred_def:
         (def, hides) }
 
 predicate:
-  | lstart = PREDICATE; lpname = IDENTIFIER; LBRACE; params_ins = separated_list(COMMA, pred_param_ins); RBRACE; LCBRACE;
+  | lstart = PREDICATE; pred_nounfold = option(NOUNFOLD); lpname = IDENTIFIER; LBRACE; params_ins = separated_list(COMMA, pred_param_ins); RBRACE; LCBRACE;
     pred_definitions = separated_nonempty_list(SEMICOLON, pred_def);
     lend = RCBRACE;
     { let (_, pred_name) = lpname in
@@ -365,6 +365,7 @@ predicate:
       (* ins looks like [0, 2] *)
   		let pred_ins = if (List.length ins) > 0 then ins else (List.mapi (fun i _ -> i) pred_params) in
       (* if ins is empty then everything is an in *)
+      let pred_nounfold = (pred_nounfold <> None) in
       let pred_loc = CodeLoc.merge lstart lend in
       let pred_id = Generators.gen_id () in
       WPred.{
@@ -372,6 +373,7 @@ predicate:
         pred_params;
         pred_definitions;
         pred_ins;
+        pred_nounfold;
         pred_loc;
         pred_id;
       } }

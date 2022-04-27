@@ -1,6 +1,24 @@
 //
-// SLL predicate with length
+//  SLL predicates
 //
+
+// With addresses
+predicate SLL_addrs(+x, xs : List) {
+  // Empty SLL
+  (x == null) * (xs == [ ]);
+  // One SLL node and the rest
+  (x -b> #v, #y) * SLL_addrs(#y, #xs) * (xs == #y :: #xs) [hides: #v]
+}
+
+// With values
+predicate SLL_vals(+x, vs : List) {
+  // Empty SLL
+  (x == null) * (vs == []);
+  // One SLL node and the rest
+  (x -b> #v, #y) * SLL_vals(#y, #vs) * (vs == #v :: #vs) [hides: #y]
+}
+
+// With length
 predicate SLL_len(+x, n : Int) {
   // Empty SLL
   (x == null) * (n == 0);
@@ -8,8 +26,28 @@ predicate SLL_len(+x, n : Int) {
   (x -b> #v, #y) * SLL_len(#y, n - 1) * (0 <# n) [hides: #v, #y]
 }
 
+//
+//
+//  Examples
+//
+//
+
+// General pre-condition of list length
+predicate SLL_length_pre(+x, def, var : Int) {
+    (def == 0) * (x == #x) * SLL_addrs(#x, #xs) * (var == len #xs);
+    (def == 1) * (x == #x) * SLL_vals(#x, #vs) * (var == len #vs);
+    (def == 2) * (x == #x) * SLL_len(#x, #n) * (0 <=# #n) * (var == #n)
+}
+
+// General post for SLL length
+predicate nounfold SLL_length_post(+def, +x, retval) {
+    (def == 0) * SLL_addrs(x, #xs) * (retval == len #xs);
+    (def == 1) * SLL_vals(x, #vs) * (retval == len #vs);
+    (def == 2) * SLL_len(x, retval) * (0 <=# retval)
+}
+
 // List length (recursive)
-{ (x == #x) * SLL_len(#x, #n) } with variant: #n
+{ (x == #x) * SLL_length_pre(#x, #def, #var) } with variant: #var
 function SLL_length(x) {
   if (x = null){
     n := 0
@@ -18,11 +56,9 @@ function SLL_length(x) {
     n := SLL_length(t);
     n := 1 + n
   };
-  // THIS FAILS DUE TO EXACT
-  // [[ fold SLL_len(#x, #n) ]];
   return n
 }
-{ SLL_len(#x, #n) * ret == #n }
+{ SLL_length_post(#def, #x, ret) }
 
 //
 // SLL segment predicate with length

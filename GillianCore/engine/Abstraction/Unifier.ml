@@ -24,7 +24,14 @@ module type S = sig
   val unify_assertion : t -> st -> string list option -> UP.step -> u_res
   val unify_up : search_state -> up_u_res
   val unify : ?in_unification:bool -> t -> st -> UP.t -> up_u_res
-  val get_pred : ?in_unification:bool -> t -> string -> vt option list -> gp_ret
+
+  val get_pred :
+    ?in_unification:bool ->
+    t ->
+    string ->
+    vt option list ->
+    (st * UP.step * UP.outs * Expr.t list) option ->
+    gp_ret
 end
 
 module Make
@@ -747,7 +754,9 @@ module Make
       ?(in_unification : bool option)
       (astate : t)
       (pname : string)
-      (vs : vt option list) : gp_ret =
+      (vs : vt option list)
+      (fold_outs_info : (st * UP.step * UP.outs * Expr.t list) option) : gp_ret
+      =
     let merge_gp_results (rets : gp_ret list) : gp_ret =
       let ret_succs, ret_fails =
         List.partition
@@ -794,13 +803,32 @@ module Make
         (Containers.SI.of_list pred_def.pred_ins)
         (State.equals state)
     with
-    | Some (_, vs) ->
+    | Some (_, vs) -> (
         L.(
           verbose (fun m ->
               m "Returning the following vs: @[<h>%a@]"
                 Fmt.(list ~sep:comma Val.pp)
                 vs));
-        GPSucc [ (astate, Pred.out_args pred_def vs) ]
+        let vs = Pred.out_args pred_def vs in
+        match fold_outs_info with
+        | None -> GPSucc [ (astate, vs) ]
+        | Some (subst, step, outs, les_outs) -> (
+            L.(
+              verbose (fun m ->
+                  m
+                    "learned the outs of a predicate. going to unify \
+                     (@[<h>%a@]) against (@[<h>%a@])!!!@\n"
+                    Fmt.(list ~sep:comma Val.pp)
+                    vs
+                    Fmt.(list ~sep:comma Expr.pp)
+                    les_outs));
+            let success, fail_pf =
+              unify_ins_outs_lists state subst step outs vs les_outs
+            in
+            match success with
+            | true -> GPSucc [ (astate, vs) ]
+            | false -> GPFail [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ])
+        )
     | _ when (not !Config.manual_proof) && not pred_def.pred_abstract -> (
         (* Recursive Case - Folding required *)
         let () =
@@ -833,13 +861,116 @@ module Make
                   let failure = List.exists (fun x -> x = None) vs_outs in
                   if failure then GPFail [ EAsrt (vs_ins, True, []) ]
                   else
-                    let vs_outs = List.map Option.get vs_outs in
-                    GPSucc [ (astate', vs_outs) ])
+                    let vs = List.map Option.get vs_outs in
+
+                    match fold_outs_info with
+                    | None -> GPSucc [ (astate', vs) ]
+                    | Some (subst, step, outs, les_outs) -> (
+                        L.(
+                          verbose (fun m ->
+                              m
+                                "learned the outs of a predicate. going to \
+                                 unify (@[<h>%a@]) against (@[<h>%a@])!!!@\n"
+                                Fmt.(list ~sep:comma Val.pp)
+                                vs
+                                Fmt.(list ~sep:comma Expr.pp)
+                                les_outs));
+                        let success, fail_pf =
+                          unify_ins_outs_lists state subst step outs vs les_outs
+                        in
+                        match success with
+                        | true -> GPSucc [ (astate', vs) ]
+                        | false ->
+                            GPFail
+                              [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ]))
                 rets
             in
             merge_gp_results rets
         | UPUFail errs -> GPFail errs)
     | _ -> GPFail [ StateErr.EPure False ]
+
+  and unify_ins_outs_lists
+      (state : State.t)
+      (subst : st)
+      (step : UP.step)
+      (outs : UP.outs)
+      (vos : Val.t list)
+      (eos : Expr.t list) =
+    L.verbose (fun fmt ->
+        fmt "Outs: %a"
+          Fmt.(
+            brackets
+              (list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.full_pp))))
+          outs);
+    L.verbose (fun fmt ->
+        fmt "Obtained values: %a" Fmt.(brackets (list ~sep:semi Val.pp)) vos);
+    L.verbose (fun fmt ->
+        fmt "Obtained exprs: %a" Fmt.(brackets (list ~sep:semi Expr.pp)) eos);
+    (* Substitution of the program variables *)
+    let pvar_subst_bindings =
+      List.mapi (fun i v -> (Expr.PVar (string_of_int i), v)) vos
+    in
+    let pvar_subst = ESubst.init pvar_subst_bindings in
+    L.verbose (fun fmt -> fmt "Parameter subst\n%a" ESubst.pp pvar_subst);
+    let outs : UP.outs option =
+      try
+        Some
+          (List.map
+             (fun (u, e) ->
+               let se = ESubst.subst_in_expr pvar_subst ~partial:true e in
+               (* let se = ESubst.subst_in_expr subst ~partial:true se in *)
+               ( u,
+                 try Reduction.reduce_lexpr ~unification:true se with _ -> se ))
+             outs)
+      with _ -> None
+    in
+    match outs with
+    | None -> (false, Formula.True)
+    | Some outs ->
+        L.verbose (fun fmt ->
+            fmt "Substed outs: %a"
+              Fmt.(
+                brackets
+                  (list ~sep:semi
+                     (parens (pair ~sep:comma Expr.pp Expr.full_pp))))
+              outs);
+        let outs = List.map (fun (u, e) -> (u, Val.from_expr e)) outs in
+        if List.exists (fun (_, e) -> e = None) outs then
+          L.fail "INTERNAL ERROR: Not all expressions convertible to values"
+        else
+          let outs = List.map (fun (u, ov) -> (u, Option.get ov)) outs in
+          let () = List.iter (fun (u, v) -> ESubst.put subst u v) outs in
+          let eos = List.map (ESubst.subst_in_expr_opt subst) eos in
+          if List.exists (fun x -> x = None) eos then
+            let msg = "INTERNAL ERROR: Not all ins known" in
+            L.fail msg
+          else
+            let eos = List.map Val.from_expr (List.map Option.get eos) in
+            if List.exists (fun x -> x = None) eos then
+              raise
+                (Failure
+                   "INTERNAL ERROR: Not all expressions convertible to values")
+            else
+              let eos = List.map Option.get eos in
+              let success, fail_pf =
+                try
+                  List.fold_left2
+                    (fun ac vd od ->
+                      let success, _ = ac in
+                      if not success then ac
+                      else
+                        let pf : Formula.t =
+                          Eq (Val.to_expr vd, Val.to_expr od)
+                        in
+                        let success = State.assert_a state [ pf ] in
+                        (success, pf))
+                    (true, True) vos eos
+                with Invalid_argument _ ->
+                  Fmt.failwith
+                    "Invalid amount of args for the following UP step : %a"
+                    UP.step_pp step
+              in
+              (success, fail_pf)
 
   and unify_assertion
       (astate : t)
@@ -847,89 +978,6 @@ module Make
       (hides : string list option)
       (step : UP.step) : u_res =
     (* Auxiliary function for actions and predicates, with indexed outs *)
-    let unify_ins_outs_lists
-        (state : State.t)
-        (outs : UP.outs)
-        (vos : Val.t list)
-        (eos : Expr.t list) =
-      L.verbose (fun fmt ->
-          fmt "Outs: %a"
-            Fmt.(
-              brackets
-                (list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.full_pp))))
-            outs);
-      L.verbose (fun fmt ->
-          fmt "Obtained values: %a" Fmt.(brackets (list ~sep:semi Val.pp)) vos);
-      L.verbose (fun fmt ->
-          fmt "Obtained exprs: %a" Fmt.(brackets (list ~sep:semi Expr.pp)) eos);
-      (* Substitution of the program variables *)
-      let pvar_subst_bindings =
-        List.mapi (fun i v -> (Expr.PVar (string_of_int i), v)) vos
-      in
-      let pvar_subst = ESubst.init pvar_subst_bindings in
-      L.verbose (fun fmt -> fmt "Parameter subst\n%a" ESubst.pp pvar_subst);
-      let outs : UP.outs option =
-        try
-          Some
-            (List.map
-               (fun (u, e) ->
-                 let se = ESubst.subst_in_expr pvar_subst ~partial:true e in
-                 (* let se = ESubst.subst_in_expr subst ~partial:true se in *)
-                 ( u,
-                   try Reduction.reduce_lexpr ~unification:true se
-                   with _ -> se ))
-               outs)
-        with _ -> None
-      in
-      match outs with
-      | None -> (false, Formula.True)
-      | Some outs ->
-          L.verbose (fun fmt ->
-              fmt "Substed outs: %a"
-                Fmt.(
-                  brackets
-                    (list ~sep:semi
-                       (parens (pair ~sep:comma Expr.pp Expr.full_pp))))
-                outs);
-          let outs = List.map (fun (u, e) -> (u, Val.from_expr e)) outs in
-          if List.exists (fun (_, e) -> e = None) outs then
-            L.fail "INTERNAL ERROR: Not all expressions convertible to values"
-          else
-            let outs = List.map (fun (u, ov) -> (u, Option.get ov)) outs in
-            let () = List.iter (fun (u, v) -> ESubst.put subst u v) outs in
-            let eos = List.map (ESubst.subst_in_expr_opt subst) eos in
-            if List.exists (fun x -> x = None) eos then
-              let msg = "INTERNAL ERROR: Not all ins known" in
-              L.fail msg
-            else
-              let eos = List.map Val.from_expr (List.map Option.get eos) in
-              if List.exists (fun x -> x = None) eos then
-                raise
-                  (Failure
-                     "INTERNAL ERROR: Not all expressions convertible to values")
-              else
-                let eos = List.map Option.get eos in
-                let success, fail_pf =
-                  try
-                    List.fold_left2
-                      (fun ac vd od ->
-                        let success, _ = ac in
-                        if not success then ac
-                        else
-                          let pf : Formula.t =
-                            Eq (Val.to_expr vd, Val.to_expr od)
-                          in
-                          let success = State.assert_a state [ pf ] in
-                          (success, pf))
-                      (true, True) vos eos
-                  with Invalid_argument _ ->
-                    Fmt.failwith
-                      "Invalid amount of args for the following UP step : %a"
-                      UP.step_pp step
-                in
-                (success, fail_pf)
-    in
-
     let state, preds, pred_defs, variants = astate in
 
     let make_resource_fail () = UFail [ EAsrt ([], True, []) ] in
@@ -1016,7 +1064,8 @@ module Make
                 | ASucc [ (state'', _) ] -> (
                     (* Separate outs into direct unifiables and others*)
                     let success, fail_pf =
-                      unify_ins_outs_lists state'' outs vs_outs e_outs
+                      unify_ins_outs_lists state'' subst step outs vs_outs
+                        e_outs
                     in
                     match success with
                     | true -> USucc (state'', preds, pred_defs, variants)
@@ -1044,6 +1093,7 @@ module Make
           let pred = UP.get_pred_def pred_defs pname in
           let pred_def = pred.pred in
           let vs_ins = Pred.in_args pred_def vs in
+          let les_outs = Pred.out_args pred_def les in
           (* All of which must have survived substitution *)
           let failure = List.exists (fun x -> x = None) vs_ins in
           if failure then (
@@ -1055,30 +1105,14 @@ module Make
                 m "Looking for ins: %a"
                   Fmt.(brackets (list ~sep:comma Val.pp))
                   vs_ins);
-            match get_pred ~in_unification:true astate pname vs with
+            match
+              get_pred ~in_unification:true astate pname vs
+                (Some (subst, step, outs, les_outs))
+            with
             | GPSucc [] ->
                 L.verbose (fun m -> m "SUCCEEDED WITH NOTHING! MEDOOOOOO!!!!!");
                 UWTF
-            | GPSucc [ (astate', vs_outs) ] -> (
-                let les_outs = Pred.out_args pred_def les in
-                L.(
-                  verbose (fun m ->
-                      m
-                        "learned the outs of a predicate. going to unify \
-                         (@[<h>%a@]) against (@[<h>%a@])!!!@\n"
-                        Fmt.(list ~sep:comma Val.pp)
-                        vs_outs
-                        Fmt.(list ~sep:comma Expr.pp)
-                        les_outs));
-                let state', _, _, _ = astate' in
-                let success, fail_pf =
-                  unify_ins_outs_lists state' outs vs_outs les_outs
-                in
-                L.verbose (fun fmt -> fmt "Outs unification: %b" success);
-                match success with
-                | true -> USucc astate'
-                | false ->
-                    UFail [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ])
+            | GPSucc [ (astate', _) ] -> USucc astate'
             | GPSucc _ ->
                 raise (Failure "DEATH. BRANCHING GETPRED INSIDE UNIFICATION.")
             | GPFail errs ->
