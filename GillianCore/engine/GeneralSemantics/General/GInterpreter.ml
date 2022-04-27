@@ -34,6 +34,7 @@ module type S = sig
         loop_ids : string list;
         branch_count : int;
         prev_report_id : L.ReportId.t option;
+        should_log_result : bool;
       }
     | ConfFinish of { flag : Flag.t; ret_val : state_vt; final_state : state_t }
         (** Equal to Conf cont + the id of the required spec *)
@@ -143,6 +144,7 @@ struct
         loop_ids : string list;
         branch_count : int;
         prev_report_id : L.ReportId.t option;
+        should_log_result : bool;
       }
     | ConfFinish of { flag : Flag.t; ret_val : State.vt; final_state : State.t }
         (** Equal to Conf cont + the id of the required spec *)
@@ -686,6 +688,7 @@ struct
             next_idx = new_j;
             branch_count = b_counter;
             prev_report_id = None;
+            should_log_result = true;
           }
       in
 
@@ -713,6 +716,7 @@ struct
               next_idx = 0;
               branch_count = b_counter;
               prev_report_id = None;
+              should_log_result = true;
             };
         ]
       in
@@ -808,6 +812,7 @@ struct
               next_idx = i + 1;
               branch_count = b_counter;
               prev_report_id = None;
+              should_log_result = true;
             };
         ]
     (* Assignment *)
@@ -825,6 +830,7 @@ struct
               next_idx = i + 1;
               branch_count = b_counter;
               prev_report_id = None;
+              should_log_result = true;
             };
         ]
     (* Action *)
@@ -859,6 +865,7 @@ struct
                       next_idx = i + 1;
                       branch_count = b_counter;
                       prev_report_id = None;
+                      should_log_result = true;
                     })
                 rest_rets
             in
@@ -889,6 +896,7 @@ struct
                           next_idx = i + 1;
                           branch_count = b_counter;
                           prev_report_id = None;
+                          should_log_result = true;
                         };
                     ])
             | false, true -> (
@@ -909,6 +917,7 @@ struct
                           next_idx = i + 1;
                           branch_count = b_counter;
                           prev_report_id = None;
+                          should_log_result = true;
                         };
                     ]
                 | _ -> rest_confs)
@@ -923,6 +932,7 @@ struct
                     next_idx = i + 1;
                     branch_count = b_counter;
                     prev_report_id = None;
+                    should_log_result = true;
                   }
                 :: rest_confs)
         | AFail errs ->
@@ -957,6 +967,7 @@ struct
                           next_idx = i;
                           branch_count = b_counter;
                           prev_report_id = None;
+                          should_log_result = true;
                         })
                     recovery_states
               | _ ->
@@ -982,6 +993,7 @@ struct
                   next_idx = i + 1;
                   branch_count = b_counter;
                   prev_report_id = None;
+                  should_log_result = true;
                 };
             ]
         (* Invariant being revisited *)
@@ -1011,6 +1023,7 @@ struct
                     next_idx = i + 1;
                     branch_count = b_counter;
                     prev_report_id = None;
+                    should_log_result = true;
                   })
               frames_and_states
         | _ ->
@@ -1033,6 +1046,7 @@ struct
                     next_idx = i + 1;
                     branch_count = b_counter;
                     prev_report_id = None;
+                    should_log_result = true;
                   })
               resulting_states)
     (* Unconditional goto *)
@@ -1048,6 +1062,7 @@ struct
               next_idx = j;
               branch_count = b_counter;
               prev_report_id = None;
+              should_log_result = true;
             };
         ]
     (* Conditional goto *)
@@ -1100,9 +1115,9 @@ struct
         in
         let sp = sp_t @ sp_f in
 
-        let b_counter =
-          if can_put_t && can_put_f && List.length sp > 1 then b_counter + 1
-          else b_counter
+        let b_counter, should_log_result =
+          if can_put_t && can_put_f && List.length sp > 1 then b_counter + 1, false
+          else b_counter, true
         in
         let result =
           List.mapi
@@ -1117,6 +1132,7 @@ struct
                   next_idx = next;
                   branch_count = b_counter;
                   prev_report_id = !report_id_ref;
+                  should_log_result;
                 })
             sp
         in
@@ -1152,6 +1168,7 @@ struct
               next_idx = i + 1;
               branch_count = b_counter;
               prev_report_id = None;
+              should_log_result = true;
             };
         ]
     (* Function call *)
@@ -1184,6 +1201,7 @@ struct
                 next_idx = j;
                 branch_count = b_counter;
                 prev_report_id = None;
+                should_log_result = true;
               })
           (External.execute prog.prog state cs i x pid v_args j)
     (* Function application *)
@@ -1216,6 +1234,7 @@ struct
               next_idx = i + 1;
               branch_count = b_counter;
               prev_report_id = None;
+              should_log_result = true;
             };
         ]
     (* Normal-mode return *)
@@ -1266,6 +1285,7 @@ struct
                   next_idx = j;
                   branch_count = b_counter;
                   prev_report_id = None;
+                  should_log_result = true;
                 }
           | _ -> raise (Failure "Malformed callstack")
         in
@@ -1314,6 +1334,7 @@ struct
                 next_idx = j;
                 branch_count = b_counter;
                 prev_report_id = None;
+                should_log_result = true;
               }
         | _ -> raise (Failure "Malformed callstack"))
     (* Explicit failure *)
@@ -1384,13 +1405,13 @@ struct
 
     let continue_or_pause rest_confs cont_func =
       match rest_confs with
-      | ConfCont { state; callstack; next_idx = proc_body_index; _ } :: _ ->
-          let report_id =
+      | ConfCont { state; callstack; next_idx = proc_body_index; should_log_result; _ } :: _ ->
+          let report_id = if should_log_result then
             L.normal_specific
               (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
                  { callstack; proc_body_index; state = Some state; errors = [] })
               L.LoggingConstants.ContentType.cmd_result
-          in
+          else None in
           Continue (report_id, cont_func)
       | ConfErr
           { callstack; proc_idx = proc_body_index; error_state = state; errors }
@@ -1431,6 +1452,7 @@ struct
             next_idx = i;
             branch_count = b_counter;
             prev_report_id;
+            _
           }
         :: rest_confs
         when b_counter < max_branching ->
@@ -1493,6 +1515,7 @@ struct
                 next_idx;
                 branch_count;
                 prev_report_id = None;
+                should_log_result = true;
               }
           in
           L.(
@@ -1569,6 +1592,7 @@ struct
           next_idx = proc_body_index;
           branch_count = 0;
           prev_report_id = None;
+          should_log_result = true;
         }
     in
     let report_id =
@@ -1627,6 +1651,7 @@ struct
           next_idx = initial_proc_body_index;
           branch_count = 0;
           prev_report_id = None;
+          should_log_result = true;
         }
     in
     let report_id =
