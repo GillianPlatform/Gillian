@@ -28,12 +28,14 @@ module type S = sig
 
   type action_ret = ASucc of (t * vt list) list | AFail of err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
+  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
   (** Initialisation *)
-  val init : UP.preds_tbl_t option -> t
+  val init : ?preds:UP.preds_tbl_t -> ?variants:variants_t -> unit -> t
 
   val struct_init :
-    UP.preds_tbl_t option ->
+    ?preds:UP.preds_tbl_t ->
+    ?variants:variants_t ->
     store_t ->
     PFS.t ->
     TypEnv.t ->

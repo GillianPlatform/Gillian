@@ -4,7 +4,8 @@ module type S = sig
   type err_t
   type state_t
   type preds_t
-  type t = state_t * preds_t * UP.preds_tbl_t
+  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
+  type t = state_t * preds_t * UP.preds_tbl_t * variants_t
   type post_res = (Flag.t * Asrt.t list) option
   type search_state = (t * st * UP.t) list * err_t list
   type up_u_res = UPUSucc of (t * st * post_res) list | UPUFail of err_t list

@@ -76,7 +76,6 @@ struct
     params : string list;
     pre_state : SPState.t;
     post_up : UP.t;
-    variant : Expr.t option;
     flag : Flag.t option;
     spec_vars : Expr.Set.t;
   }
@@ -89,6 +88,7 @@ struct
     SAInterpreter.reset ()
 
   let testify
+      (func_or_lemma_name : string)
       (preds : (string, UP.pred) Hashtbl.t)
       (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
@@ -207,7 +207,6 @@ struct
                 params;
                 pre_state = ss_pre;
                 post_up;
-                variant;
                 flag;
                 spec_vars;
               }
@@ -223,7 +222,18 @@ struct
       with
       | Error _ -> [ (None, None) ]
       | Ok normalised_assertions ->
-          List.mapi test_of_normalised_state normalised_assertions
+          let variants = Hashtbl.create 1 in
+          let () = Hashtbl.add variants func_or_lemma_name variant in
+          let normalised_assertions =
+            List.map
+              (fun (state, subst) ->
+                (SPState.set_variants state (Hashtbl.copy variants), subst))
+              normalised_assertions
+          in
+          let result =
+            List.mapi test_of_normalised_state normalised_assertions
+          in
+          result
     with Failure msg ->
       let new_msg =
         Printf.sprintf
@@ -235,6 +245,7 @@ struct
       [ (None, None) ]
 
   let testify_sspec
+      (spec_name : string)
       (preds : UP.preds_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
@@ -243,8 +254,8 @@ struct
       (sspec : Spec.st) : (t option * Spec.st option) list =
     let ( let+ ) x f = List.map f x in
     let+ stest, sspec' =
-      testify preds pred_ins name params id sspec.ss_pre sspec.ss_posts
-        sspec.ss_variant (Some sspec.ss_flag)
+      testify spec_name preds pred_ins name params id sspec.ss_pre
+        sspec.ss_posts sspec.ss_variant (Some sspec.ss_flag)
         (Spec.label_vars_to_set sspec.ss_label)
         sspec.ss_to_verify
     in
@@ -256,6 +267,7 @@ struct
     (stest, sspec')
 
   let testify_spec
+      (spec_name : string)
       (preds : UP.preds_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (spec : Spec.t) : t list * Spec.t =
@@ -282,8 +294,8 @@ struct
         List.fold_left
           (fun (id, tests, sspecs) sspec ->
             let tests_and_specs =
-              testify_sspec preds pred_ins spec.spec_name spec.spec_params id
-                sspec
+              testify_sspec spec_name preds pred_ins spec.spec_name
+                spec.spec_params id sspec
             in
             let new_tests, new_specs =
               List.fold_left
@@ -315,8 +327,9 @@ struct
     let tests_and_specs =
       List.concat_map
         (fun Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant } ->
-          testify preds pred_ins lemma.lemma_name lemma.lemma_params 0 lemma_hyp
-            lemma_concs lemma_spec_variant None None true)
+          testify lemma.lemma_name preds pred_ins lemma.lemma_name
+            lemma.lemma_params 0 lemma_hyp lemma_concs lemma_spec_variant None
+            None true)
         lemma.lemma_specs
     in
     let tests, specs =
@@ -661,8 +674,10 @@ struct
         (* Printf.printf "Converting symbolic tests from specs: %f\n" (cur_time -. start_time); *)
         let tests : t list =
           List.concat_map
-            (fun spec ->
-              let tests, new_spec = testify_spec preds pred_ins spec in
+            (fun (spec : Spec.t) ->
+              let tests, new_spec =
+                testify_spec spec.spec_name preds pred_ins spec
+              in
               let proc = Prog.get_proc_exn prog spec.spec_name in
               Hashtbl.replace prog.procs proc.proc_name
                 { proc with proc_spec = Some new_spec };

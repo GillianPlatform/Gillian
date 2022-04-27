@@ -23,6 +23,7 @@ module Make (SMemory : SMemory.S) :
   type store_t = SStore.t [@@deriving yojson]
   type m_err_t = SMemory.err_t [@@deriving yojson]
   type t = heap_t * store_t * PFS.t * TypEnv.t * SS.t [@@deriving yojson]
+  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
   type fix_t =
     | MFix of SMemory.c_fix_t
@@ -144,15 +145,18 @@ module Make (SMemory : SMemory.S) :
       (TypEnv.pp_by_need (List.fold_left SS.union SS.empty [ pvars; lvars ]))
       gamma
 
-  let init (_ : UP.preds_tbl_t option) =
+  let init ?(preds : UP.preds_tbl_t option) ?(variants : variants_t option) () =
+    let _, _ = (preds, variants) in
     (SMemory.init (), SStore.init [], PFS.init (), TypEnv.init (), SS.empty)
 
   let struct_init
-      (_ : UP.preds_tbl_t option)
+      ?(preds : UP.preds_tbl_t option)
+      ?(variants : variants_t option)
       (store : SStore.t)
       (pfs : PFS.t)
       (gamma : TypEnv.t)
       (svars : SS.t) : t =
+    let _, _ = (preds, variants) in
     (SMemory.init (), store, pfs, gamma, svars)
 
   let execute_action

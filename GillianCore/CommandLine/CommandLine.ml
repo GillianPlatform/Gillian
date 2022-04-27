@@ -348,7 +348,7 @@ struct
         ignore
           (SInterpreter.evaluate_proc
              (fun x -> x)
-             prog "main" [] (SState.init None))
+             prog "main" [] (SState.init ()))
       in
       if incremental && prev_results_exist () then
         (* Only re-run program if transitive callees of main proc have changed *)
