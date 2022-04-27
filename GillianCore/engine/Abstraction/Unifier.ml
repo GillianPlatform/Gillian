@@ -57,6 +57,7 @@ module Make
   type post_res = (Flag.t * Asrt.t list) option
   type s_state = t * st * UP.t
   type search_state = s_state list * err_t list
+  type search_state' = (s_state * bool) list * err_t list
   type unfold_info_t = (string * string) list
   type gp_ret = GPSucc of (t * vt list) list | GPFail of err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
@@ -95,6 +96,7 @@ module Make
       errors : err_t list;
     }
   [@@deriving yojson]
+  type unify_case_report = unify_result_report_state [@@deriving yojson]
 
   let astate_rec_of (astate : t) =
     let state, preds, _ = astate in { state; preds }
@@ -1226,16 +1228,29 @@ module Make
       | _ -> raise (Failure "Illegal Assertion in Unification Plan")
     )
 
-  and unify_up (s_states : search_state) : up_u_res =
+  and unify_up' (parent_id : L.ReportId.t option ref) (s_states : search_state') : up_u_res =
     let s_states, errs_so_far = s_states in
     L.(
       verbose (fun m ->
           m "Unify UP: There are %d states left to consider."
             (List.length s_states)));
-    let f = unify_up in
+    let f = unify_up' parent_id in
     match s_states with
     | [] -> UPUFail errs_so_far
-    | (state, subst, up) :: rest -> (
+    | ((state, subst, up), is_new_case) :: rest -> (
+        if is_new_case then (
+          let unify_case_report = {
+            astate = astate_rec_of state;
+            subst; up
+          } in
+          L.release_parent !parent_id;
+          (L.normal_specific (L.Loggable.make L.dummy_pp unify_case_report_of_yojson unify_case_report_to_yojson unify_case_report)
+            L.LoggingConstants.ContentType.unify_case)
+            |> Option.iter (fun new_parent_id -> 
+              L.set_parent new_parent_id;
+              parent_id := Some new_parent_id
+            )
+        );
         let cur_step : UP.step option = UP.head up in
         let ret =
           try
@@ -1265,7 +1280,7 @@ module Make
             | None ->
               let posts = UP.posts up in (
                 let unify_result_report = loggable_of_unify_result_report @@ Success {
-                  remaining_states = List.map (fun ((astate, subst, up)) -> {
+                  remaining_states = List.map (fun ((astate, subst, up), _) -> {
                     astate = astate_rec_of astate;
                     subst; up
                   }) rest;
@@ -1279,7 +1294,7 @@ module Make
               )
             | Some [ (up, lab) ] ->
                 if complete_subst subst lab then
-                  f ((state', subst, up) :: rest, errs_so_far)
+                  f (((state', subst, up), false) :: rest, errs_so_far)
                 else f (rest, errs_so_far)
             | Some ((up, lab) :: ups') ->
                 let next_states =
@@ -1298,6 +1313,7 @@ module Make
                     (state', subst, up) :: next_states
                   else next_states
                 in
+                let next_states = next_states |> List.map (fun state -> state, true) in
                 f (next_states @ rest, errs_so_far)
             | Some [] -> L.fail "ERROR: unify_up: empty unification plan")
         | UFail errors ->
@@ -1309,6 +1325,17 @@ module Make
             L.LoggingConstants.ContentType.unify_result
             |> ignore;
           f (rest, errors @ errs_so_far))
+
+  and unify_up (s_states : search_state) : up_u_res =
+    let parent_id = ref None in
+    let s_states = (
+      let (states, errs) = s_states in
+      let states = states |> List.map (fun state -> state, false) in
+      states, errs
+    ) in
+    let res = unify_up' parent_id s_states in
+    L.release_parent !parent_id;
+    res
 
   and unify
       ?(in_unification = false)
