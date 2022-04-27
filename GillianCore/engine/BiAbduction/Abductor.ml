@@ -215,7 +215,7 @@ struct
         let sspec, spec = process_spec name params state_i state_f Flag.Error in
         if !Config.bug_specs_propagation then UP.add_spec prog spec;
         (sspec, false)
-    | RSucc (fl, _, state_f) ->
+    | RSucc (fl, _, state_f, _) ->
         let sspec, spec = process_spec name params state_i state_f fl in
         let () =
           try UP.add_spec prog spec

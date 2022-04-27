@@ -27,6 +27,13 @@ let make
   previous := Some report.id;
   report
 
+
+let set_previous = function
+  | None -> ()
+  | Some _ as id -> previous := id
+
+let get_parent () = Stack.top_opt parents
+
 let set_parent id =
   previous := None;
   Stack.push id parents

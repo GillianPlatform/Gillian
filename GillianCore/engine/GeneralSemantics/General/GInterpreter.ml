@@ -1443,7 +1443,7 @@ struct
               f rest_confs (result :: results))
       | ConfFinish { flag = fl; ret_val = v; final_state = state } :: rest_confs
         ->
-          let result = ExecRes.RSucc (fl, v, state) in
+          let result = ExecRes.RSucc (fl, v, state, L.get_parent ()) in
           continue_or_pause rest_confs (fun () ->
               f rest_confs (result :: results))
       | ConfSusp

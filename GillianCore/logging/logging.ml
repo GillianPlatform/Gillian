@@ -72,6 +72,10 @@ let fail msg =
   normal ~severity:Error (fun m -> m "%a" Format.pp_print_string msg);
   raise (Failure msg)
 
+let set_previous = ReportBuilder.set_previous
+
+let get_parent = ReportBuilder.get_parent
+
 let set_parent = ReportBuilder.set_parent
 
 let release_parent = ReportBuilder.release_parent

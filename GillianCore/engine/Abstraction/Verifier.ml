@@ -422,7 +422,7 @@ struct
                        errs);
                  Fmt.pr "f @?";
                  false
-             | ExecRes.RSucc (fl, _, state) ->
+             | ExecRes.RSucc (fl, _, state, prev_report_id) ->
                  if Some fl <> test.flag then (
                    L.normal (fun m ->
                        m
@@ -433,7 +433,8 @@ struct
                          test.id (Flag.str fl) (Flag.str flag));
                    Fmt.pr "f @?";
                    false)
-                 else
+                 else (
+                   L.set_previous prev_report_id;
                    let subst = make_post_subst test state in
                    if analyse_result subst test state then (
                      L.normal (fun m ->
@@ -454,7 +455,7 @@ struct
                            (Fmt.Dump.pair Fmt.int Fmt.int)
                            test.id);
                      Fmt.pr "f @?";
-                     false))
+                     false)))
            true rets
     in
     if rets = [] then (

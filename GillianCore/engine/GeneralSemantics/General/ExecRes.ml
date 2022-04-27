@@ -1,6 +1,6 @@
 type ('state, 'value, 'err) t =
   | RFail of string * int * 'state * 'err list
-  | RSucc of Flag.t * 'value * 'state
+  | RSucc of Flag.t * 'value * 'state * Logging.ReportId.t option
 
 let pp pp_state pp_value pp_err ft res =
   let open Fmt in
@@ -12,7 +12,7 @@ let pp pp_state pp_value pp_err ft res =
          @[<v 2>FINAL STATE:@\n\
          %a@]@]"
         proc i (list ~sep:comma pp_err) errs pp_state state
-  | RSucc (fl, v, state) ->
+  | RSucc (fl, v, state, _) ->
       pf ft "@[SUCCESSFUL TERMINATION: (%s, %a)@\n@[<v 2>FINAL STATE:@\n%a@]@]"
         (Flag.str fl) pp_value v pp_state state
 
@@ -24,6 +24,6 @@ let pp_what_exec_did pp_value pp_err ft res =
         "finished its execution with failure in proc %s at command %i with \
          errors %a"
         proc i (Dump.list pp_err) errs
-  | RSucc (fl, v, _) ->
+  | RSucc (fl, v, _, _) ->
       pf ft "finished its execution successfully in %s mode and returned %a"
         (Flag.str fl) pp_value v
