@@ -6,7 +6,7 @@ type tt =
   | ApplyLem of string * WLExpr.t list * string list
   | LogicIf of WLExpr.t * t list * t list
   | Assert of WLAssert.t * string list
-  | Invariant of WLAssert.t * string list
+  | Invariant of WLAssert.t * string list * WLExpr.t option
 
 and t = { wlcnode : tt; wlcid : int; wlcloc : CodeLoc.t }
 
@@ -43,7 +43,7 @@ let rec get_by_id id lcmd =
         lexpr_list_visitor lel
     | LogicIf (le, lcmdl1, lcmdl2) ->
         lexpr_getter le |>> (list_visitor, lcmdl1) |>> (list_visitor, lcmdl2)
-    | Assert (la, _) | Invariant (la, _) -> lassert_getter la
+    | Assert (la, _) | Invariant (la, _, _) -> lassert_getter la
   in
   let self_or_none = if get_id lcmd = id then `WLCmd lcmd else `None in
   self_or_none |>> (aux, lcmd)
@@ -82,6 +82,7 @@ let rec substitution subst { wlcnode; wlcid; wlcloc } =
     | LogicIf (le, cmds_t, cmds_e) ->
         LogicIf (fe le, List.map f cmds_t, List.map f cmds_e)
     | Assert (la, binders) -> Assert (fa la, binders)
-    | Invariant (la, binders) -> Invariant (fa la, binders)
+    | Invariant (la, binders, variant) ->
+        Invariant (fa la, binders, Option.map fe variant)
   in
   { wlcnode; wlcid; wlcloc }

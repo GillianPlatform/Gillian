@@ -451,9 +451,9 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
   let loop_fname = gen_str (fname ^ "_loop") in
   let while_loc = WStmt.get_loc while_stmt in
   let invariant_loc = WLCmd.get_loc invariant in
-  let inv_asrt, inv_exs =
+  let inv_asrt, inv_exs, inv_variant =
     match WLCmd.get invariant with
-    | Invariant (la, lb) -> (la, lb)
+    | Invariant (la, lb, lv) -> (la, lb, lv)
     | _ -> failwith "That can't happen, it's not an invariant"
   in
   let guard, wcmds =
@@ -538,7 +538,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
           pre;
           post;
           (* FIGURE OUT VARIANT *)
-          variant = None;
+          variant = inv_variant;
           spid = Generators.gen_id ();
           fname = loop_fname;
           fparams = vars;

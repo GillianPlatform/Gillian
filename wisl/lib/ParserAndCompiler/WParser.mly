@@ -108,7 +108,7 @@
 %type <CodeLoc.t * WUnOp.t>                        unop_with_loc
 %type <WBinOp.t>                                   binop
 %type <WLExpr.t>                                   variant_def
-%type <WLExpr.t>                                   spec_variant_def
+%type <WLExpr.t>                                   with_variant_def
 %type <WLCmd.t list>                               proof_def
 %type <(string * WType.t option) * bool>           pred_param_ins
 %type <CodeLoc.t * string list>                    bindings_with_loc
@@ -139,7 +139,7 @@ definitions:
       (f::fs, ps, ls) }
 
 fct_with_specs:
-  | lstart = LCBRACE; pre = logic_assertion; RCBRACE; variant = option(spec_variant_def); f = fct; LCBRACE;
+  | lstart = LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
     post = logic_assertion; lend = RCBRACE
     { let loc = CodeLoc.merge lstart lend in
       WFun.add_spec f pre post variant loc }
@@ -334,7 +334,7 @@ lemma:
 variant_def:
   | VARIANT; COLON; e = logic_expression { e }
 
-spec_variant_def:
+with_variant_def:
   | WITH; variant = variant_def { variant }
 
 proof_def:
@@ -425,11 +425,11 @@ logic_command:
       let loc = CodeLoc.merge lstart lend in
       let bare_lcmd = WLCmd.Assert (a, b) in
       WLCmd.make bare_lcmd loc }
-  | lstart = INVARIANT; lbopt = option(bindings_with_loc); a = logic_assertion;
+  | lstart = INVARIANT; lbopt = option(bindings_with_loc); a = logic_assertion; variant = option(with_variant_def);
     { let lend = WLAssert.get_loc a in
       let (_, b) = Option.value ~default:(lstart, []) lbopt in
       let loc = CodeLoc.merge lstart lend in
-      let bare_lcmd = WLCmd.Invariant (a, b) in
+      let bare_lcmd = WLCmd.Invariant (a, b, variant) in
       WLCmd.make bare_lcmd loc }
 
 bindings_with_loc:

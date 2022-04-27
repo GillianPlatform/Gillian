@@ -365,12 +365,10 @@ module Make
                 | None -> true
                 | Some None ->
                     (* FIXME: This should be an error *)
-                    L.verbose (fun fmt ->
-                        fmt
-                          "WARNING: %s: Recursive call in exact verification \
-                           without a variant"
-                          name);
-                    true
+                    failwith
+                      ("Error: " ^ name
+                     ^ ": Recursive call in exact verification without a \
+                        variant")
                 | Some (Some variant) -> (
                     let new_variant = ESubst.subst_in_expr_opt subst variant in
                     let () =

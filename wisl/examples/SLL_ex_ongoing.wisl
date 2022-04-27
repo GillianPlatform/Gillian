@@ -76,7 +76,8 @@ function SLL_length_iter(x) {
   y := x;
   n := 0;
   [[ invariant {bind: n, y, #ny}
-        SLLseg_len(x, y, n) * SLL_len(y, #ny) * (#n == n + #ny) ]];
+        SLLseg_len(x, y, n) * SLL_len(y, #ny) * (#n == n + #ny)
+        with variant: #ny ]];
   while (not (y = null)) {
     [[ assert {bind: #y} y == #y ]];
     [[ assert {bind: #v, #z} #y -b> #v, #z ]];
