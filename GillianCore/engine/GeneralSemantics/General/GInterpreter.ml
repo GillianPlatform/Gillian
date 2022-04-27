@@ -33,6 +33,7 @@ module type S = sig
         next_idx : int;
         loop_ids : string list;
         branch_count : int;
+        prev_report_id : L.ReportId.t option;
       }
     | ConfFinish of { flag : Flag.t; ret_val : state_vt; final_state : state_t }
         (** Equal to Conf cont + the id of the required spec *)
@@ -141,6 +142,7 @@ struct
         next_idx : int;
         loop_ids : string list;
         branch_count : int;
+        prev_report_id : L.ReportId.t option;
       }
     | ConfFinish of { flag : Flag.t; ret_val : State.vt; final_state : State.t }
         (** Equal to Conf cont + the id of the required spec *)
@@ -683,6 +685,7 @@ struct
             loop_ids;
             next_idx = new_j;
             branch_count = b_counter;
+            prev_report_id = None;
           }
       in
 
@@ -709,6 +712,7 @@ struct
               loop_ids;
               next_idx = 0;
               branch_count = b_counter;
+              prev_report_id = None;
             };
         ]
       in
@@ -803,6 +807,7 @@ struct
               loop_ids;
               next_idx = i + 1;
               branch_count = b_counter;
+              prev_report_id = None;
             };
         ]
     (* Assignment *)
@@ -819,6 +824,7 @@ struct
               loop_ids;
               next_idx = i + 1;
               branch_count = b_counter;
+              prev_report_id = None;
             };
         ]
     (* Action *)
@@ -852,6 +858,7 @@ struct
                       loop_ids;
                       next_idx = i + 1;
                       branch_count = b_counter;
+                      prev_report_id = None;
                     })
                 rest_rets
             in
@@ -881,6 +888,7 @@ struct
                           loop_ids;
                           next_idx = i + 1;
                           branch_count = b_counter;
+                          prev_report_id = None;
                         };
                     ])
             | false, true -> (
@@ -900,6 +908,7 @@ struct
                           loop_ids;
                           next_idx = i + 1;
                           branch_count = b_counter;
+                          prev_report_id = None;
                         };
                     ]
                 | _ -> rest_confs)
@@ -913,6 +922,7 @@ struct
                     loop_ids;
                     next_idx = i + 1;
                     branch_count = b_counter;
+                    prev_report_id = None;
                   }
                 :: rest_confs)
         | AFail errs ->
@@ -946,6 +956,7 @@ struct
                           loop_ids = prev_loop_ids;
                           next_idx = i;
                           branch_count = b_counter;
+                          prev_report_id = None;
                         })
                     recovery_states
               | _ ->
@@ -970,6 +981,7 @@ struct
                   loop_ids;
                   next_idx = i + 1;
                   branch_count = b_counter;
+                  prev_report_id = None;
                 };
             ]
         (* Invariant being revisited *)
@@ -998,6 +1010,7 @@ struct
                     loop_ids;
                     next_idx = i + 1;
                     branch_count = b_counter;
+                    prev_report_id = None;
                   })
               frames_and_states
         | _ ->
@@ -1019,6 +1032,7 @@ struct
                     loop_ids;
                     next_idx = i + 1;
                     branch_count = b_counter;
+                    prev_report_id = None;
                   })
               resulting_states)
     (* Unconditional goto *)
@@ -1033,6 +1047,7 @@ struct
               loop_ids;
               next_idx = j;
               branch_count = b_counter;
+              prev_report_id = None;
             };
         ]
     (* Conditional goto *)
@@ -1101,6 +1116,7 @@ struct
                   loop_ids;
                   next_idx = next;
                   branch_count = b_counter;
+                  prev_report_id = !report_id_ref;
                 })
             sp
         in
@@ -1135,6 +1151,7 @@ struct
               loop_ids;
               next_idx = i + 1;
               branch_count = b_counter;
+              prev_report_id = None;
             };
         ]
     (* Function call *)
@@ -1166,6 +1183,7 @@ struct
                 loop_ids;
                 next_idx = j;
                 branch_count = b_counter;
+                prev_report_id = None;
               })
           (External.execute prog.prog state cs i x pid v_args j)
     (* Function application *)
@@ -1197,6 +1215,7 @@ struct
               loop_ids;
               next_idx = i + 1;
               branch_count = b_counter;
+              prev_report_id = None;
             };
         ]
     (* Normal-mode return *)
@@ -1246,6 +1265,7 @@ struct
                   loop_ids = start_loop_ids;
                   next_idx = j;
                   branch_count = b_counter;
+                  prev_report_id = None;
                 }
           | _ -> raise (Failure "Malformed callstack")
         in
@@ -1293,6 +1313,7 @@ struct
                 loop_ids = start_loop_ids;
                 next_idx = j;
                 branch_count = b_counter;
+                prev_report_id = None;
               }
         | _ -> raise (Failure "Malformed callstack"))
     (* Explicit failure *)
@@ -1313,7 +1334,7 @@ struct
       (prev_loop_ids : string list)
       (i : int)
       (b_counter : int) 
-      (report_id_ref : L.ReportId.t option ref): cconf_t list =
+      (report_id_ref : L.ReportId.t option ref) : cconf_t list =
     let states =
       match get_cmd prog cs i with
       | _, (_, LAction _) -> simplify state
@@ -1409,32 +1430,34 @@ struct
             loop_ids = prev_loop_ids;
             next_idx = i;
             branch_count = b_counter;
+            prev_report_id;
           }
         :: rest_confs
         when b_counter < max_branching ->
+          L.set_previous prev_report_id;
           let next_confs =
             protected_evaluate_cmd prog state cs iframes prev prev_loop_ids i
-              b_counter
-              report_id_ref
+              b_counter report_id_ref
           in
           continue_or_pause (next_confs @ rest_confs) (fun () ->
               f (next_confs @ rest_confs) results)
       | ConfCont
-          { state; callstack = cs; next_idx = i; branch_count = b_counter; _ }
+          { state; callstack = cs; next_idx = i; branch_count = b_counter; prev_report_id; _ }
         :: rest_confs ->
           let _, annot_cmd = get_cmd prog cs i in
           Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
+          L.set_previous prev_report_id;
           L.(
             verbose (fun m ->
                 m
                   "Stopping Symbolic Execution due to MAX BRANCHING with %d. \
                    STOPPING CONF:\n"
                   b_counter));
-        log_configuration annot_cmd state cs i b_counter
-          |> Option.iter (fun report_id ->
-            report_id_ref := Some report_id;
-            L.set_parent report_id
-          );
+          log_configuration annot_cmd state cs i b_counter
+            |> Option.iter (fun report_id ->
+              report_id_ref := Some report_id;
+              L.set_parent report_id
+            );
           continue_or_pause rest_confs (fun () -> f rest_confs results)
       | ConfErr { callstack; proc_idx; error_state; errors } :: rest_confs ->
           let proc = CallStack.get_cur_proc_id callstack in
@@ -1469,6 +1492,7 @@ struct
                 loop_ids;
                 next_idx;
                 branch_count;
+                prev_report_id = None;
               }
           in
           L.(
@@ -1544,6 +1568,7 @@ struct
           loop_ids = [];
           next_idx = proc_body_index;
           branch_count = 0;
+          prev_report_id = None;
         }
     in
     let report_id =
@@ -1601,6 +1626,7 @@ struct
           loop_ids = [];
           next_idx = initial_proc_body_index;
           branch_count = 0;
+          prev_report_id = None;
         }
     in
     let report_id =

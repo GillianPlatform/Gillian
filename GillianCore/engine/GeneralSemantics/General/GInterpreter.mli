@@ -30,6 +30,7 @@ module type S = sig
         next_idx : int;
         loop_ids : string list;
         branch_count : int;
+        prev_report_id : Logging.ReportId.t option;
       }
     | ConfFinish of { flag : Flag.t; ret_val : state_vt; final_state : state_t }
         (** Equal to Conf cont + the id of the required spec *)
