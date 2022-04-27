@@ -185,3 +185,5 @@ val with_parent :
   string ->
   (unit -> 'a) ->
   'a
+
+val dummy_pp : Format.formatter -> 'a -> unit

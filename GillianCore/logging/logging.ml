@@ -125,3 +125,5 @@ let with_verbose_phase ?title ?severity f =
   with_phase Verbose ?title ?severity f
 
 let with_tmi_phase ?title ?severity f = with_phase TMI ?title ?severity f
+
+let dummy_pp fmt _ = Fmt.pf fmt "!!! YOU SHOULDN'T BE SEEING THIS PRETTY PRINT !!!"
