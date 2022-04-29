@@ -31,7 +31,7 @@ predicate SLL_len(+x, n : Int) {
   // Empty SLL
   (x == null) * (n == 0);
   // One SLL node and the rest
-  (x -b> #v, #y) * SLL_len(#y, n - 1) [hides: #v, #y]
+  (x -b> #v, #y) * (0 <# n) * SLL_len(#y, n - 1) [hides: #v, #y]
 }
 
 //
@@ -49,7 +49,7 @@ predicate SLL_length_pre(+x, def, var : Int) {
 }
 
 // General post for SLL length
-predicate nounfold SLL_length_post(+def, +x, retval) {
+predicate SLL_length_post(+def, +x, retval) {
     (def == 0) * SLL_addrs(x, #xs) * (retval == len #xs);
     (def == 1) * SLL_vals(x, #vs) * (retval == len #vs);
     (def == 2) * SLL(x, #xs, #vs) * (retval == len #xs);
@@ -81,10 +81,10 @@ predicate SLLseg_len(+x, y, n : Int) {
 //
 // Lemma: appending a given value to a given SLLseg
 //
-lemma SSLseg_len_append {
+lemma SSLseg_len_append_lr {
   statement:
     forall x, z.
-      SLLseg_len(x, #y, #n) * (#y -b> #v, z) |- SLLseg_len(x, z, #n + 1)
+      SLLseg_len(x, #y, #n) * (#y -b> #v, z) |- SLLseg_len(x, z, #n + 1) * (0 <=# #n)
 
   variant: #n
 
@@ -93,9 +93,28 @@ lemma SSLseg_len_append {
     if (not (x = #y)) {
       assert {bind: #nv, #nnext}
         (x -b> #nv, #nnext) * SLLseg_len(#nnext, #y, #n - 1);
-      apply SSLseg_len_append(#nnext, z)
+      apply SSLseg_len_append_lr(#nnext, z)
     };
     fold SLLseg_len(x, z, #n + 1)
+}
+
+lemma SSLseg_len_append_rl {
+  statement:
+    forall x, z.
+      SLLseg_len(x, z, #n + 1) * (0 <=# #n) |- SLLseg_len(x, #y, #n) * (#y -b> #v, z)
+
+  variant: #n
+
+  proof:
+    unfold SLLseg_len(x, z, #n + 1);
+    assert {bind: #vx, #wx}
+        (x -b> #vx, #wx) * SLLseg_len(#wx, z, #n);
+    if (not (#n = 0)) {
+        apply SSLseg_len_append_rl(#wx, z);
+        assert {bind: #y, #vy}
+            (SLLseg_len(#wx, #y, #n - 1) * (#y -b> #vy, z));
+        fold SLLseg_len(x, #y, #n)
+    }
 }
 
 //
@@ -129,7 +148,7 @@ function SLL_length_iter(x) {
     [[ assert {bind: #v, #z} #y -b> #v, #z ]];
     y := [y + 1];
     n := n + 1;
-    [[ apply SSLseg_len_append(x, y) ]]
+    [[ apply SSLseg_len_append_lr(x, y) ]]
   };
   [[ unfold SLL_len(null, 0) ]];
   [[ apply SLLseg_len_to_SLL_len(x) ]];

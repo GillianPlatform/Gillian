@@ -34,6 +34,6 @@ module InternalPreds = struct
   let internal_pred_minus = i "minus"
   let internal_pred_gt = i "gt"
   let internal_pred_lt = i "lt"
-  let internal_pred_geq = i "leq"
-  let internal_pred_leq = i "geq"
+  let internal_pred_geq = i "geq"
+  let internal_pred_leq = i "leq"
 end
