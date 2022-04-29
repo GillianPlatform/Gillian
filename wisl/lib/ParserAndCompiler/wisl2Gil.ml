@@ -836,10 +836,11 @@ let compile_spec
   in
   let single_spec =
     match label_opt with
-    | None -> Spec.s_init comp_pre [ comp_post ] comp_variant Flag.Normal true
+    | None ->
+        Spec.s_init comp_pre [ comp_post ] comp_variant None Flag.Normal true
     | Some ss_label ->
-        Spec.s_init ~ss_label comp_pre [ comp_post ] comp_variant Flag.Normal
-          true
+        Spec.s_init ~ss_label comp_pre [ comp_post ] comp_variant None
+          Flag.Normal true
   in
   Spec.init fname fparams [ single_spec ] false false true
 
@@ -854,9 +855,9 @@ let compile_pred filepath pred =
   in
   let pred_params = List.map getGILTypes paramsWISLType in
   let build_def pred_def =
-    let asrt, hides = pred_def in
+    let asrt, ox = pred_def in
     let _, casrt = compile_lassert asrt in
-    (None, casrt, hides)
+    (None, casrt, ox)
   in
   Pred.
     {

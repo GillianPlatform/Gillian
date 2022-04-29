@@ -149,7 +149,7 @@ let simplify_and_prune (pred : Pred.t) : Pred.t =
         (List.length pred.pred_definitions));
   let new_defs =
     List.map
-      (fun (oc, x, hides) -> (oc, Reduction.reduce_assertion x, hides))
+      (fun (oc, x, ox) -> (oc, Reduction.reduce_assertion x, ox))
       pred.pred_definitions
   in
   let new_defs =
@@ -233,9 +233,9 @@ let unfold_preds (preds : (string, Pred.t) Hashtbl.t) :
           ((string * string list) option * Asrt.t * string list) list =
         List.flatten
           (List.map
-             (fun (os, a, hides) ->
+             (fun (os, a, ox) ->
                List.map
-                 (fun a -> (os, a, hides))
+                 (fun a -> (os, a, ox))
                  (auto_unfold preds recursion_info a))
              pred.pred_definitions)
       in
@@ -438,8 +438,8 @@ let explicit_param_types
       let defs =
         pred1.pred_definitions
         @ List.map
-            (fun (oid, a, hides) ->
-              (oid, SVal.SSubst.substitute_asrt subst ~partial:true a, hides))
+            (fun (oid, a, ox) ->
+              (oid, SVal.SSubst.substitute_asrt subst ~partial:true a, ox))
             pred2.pred_definitions
       in
       { pred1 with pred_definitions = defs }

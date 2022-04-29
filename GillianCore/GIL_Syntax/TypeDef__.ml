@@ -234,6 +234,7 @@ and single_spec = {
   ss_pre : assertion;
   ss_posts : assertion list;
   ss_variant : expr option;
+  ss_ox : string list option;
   ss_flag : flag;
   ss_to_verify : bool;
   ss_label : (string * string list) option;

@@ -770,8 +770,9 @@ let trans_sspec ?(ann = empty) fname sspecs =
     {
       ss_pre = tap ** ta pre ** genv;
       ss_posts = List.map make_post posts;
-      (* FIXME: bring in variant *)
+      (* FIXME: bring in variant and ox *)
       ss_variant = None;
+      ss_ox = None;
       ss_flag = Flag.Normal;
       ss_to_verify = true;
       ss_label = spa;

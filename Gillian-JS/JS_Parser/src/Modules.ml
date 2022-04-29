@@ -398,7 +398,7 @@ and resolve_expressions prog_path (expressions : (loc, loc) Expression.t list) =
   map (resolve_expression prog_path) expressions
 
 (** Resolves the paths used in any require() calls within the program, returning
-    the modified AST (with all the paths having been checked to exist and 
+    the modified AST (with all the paths having been checked to exist and
     normalised) as well as the paths themselves. *)
 let resolve_imports prog_path (prog : (loc, loc) Program.t) =
   let loc, Program.{ statements; comments; all_comments } = prog in
@@ -407,7 +407,7 @@ let resolve_imports prog_path (prog : (loc, loc) Program.t) =
     req_paths )
 
 (** Wraps the module code inside special syntax that hides its variables from
-    the global scope and exposes it to the CommonJS [module] and [exports] 
+    the global scope and exposes it to the CommonJS [module] and [exports]
     objects. *)
 let augment exp_list use_strict filename is_main : GJS_syntax.exp list =
   let open SyntaxGenerator in
@@ -423,7 +423,7 @@ let augment exp_list use_strict filename is_main : GJS_syntax.exp list =
   in
   [ module_init; cache_init; load ]
 
-(** Add the code which, among other things, provides the definiton of the 
+(** Add the code which, among other things, provides the definiton of the
     global [require] function. *)
 let add_preamble exp_list : GJS_syntax.exp =
   let _, preamble_exp_list = unfold_prog (get_preamble ()) in

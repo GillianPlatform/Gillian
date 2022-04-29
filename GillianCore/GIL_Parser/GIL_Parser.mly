@@ -133,7 +133,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token EXISTENTIALS
 %token BRANCH
 %token USESUBST
-%token HIDES
+%token OX
 (* Command keywords  *)
 %token SKIP
 %token DEFEQ
@@ -640,12 +640,13 @@ g_mult_spec_line:
 
 g_sspec_target:
 (* [spec_name: #bla, #ble, #bli] [[ .... ]] [[ .... ]] Normal *)
+(* Function specifications do not over-approximate existentials *)
   | option(lab_spec_target) g_spec_line g_mult_spec_line option(variant_target) NORMAL
-    { Spec.{ ss_pre = $2; ss_posts = $3; ss_variant = $4; ss_flag = Normal; ss_to_verify = true; ss_label = $1 } }
+    { Spec.{ ss_pre = $2; ss_posts = $3; ss_variant = $4; ss_ox = None; ss_flag = Normal; ss_to_verify = true; ss_label = $1 } }
 (* [[ .... ]] [[ .... ]] Error *)
   | lab_spec = option(lab_spec_target); ss_pre = g_spec_line; ss_posts = g_mult_spec_line; ss_variant = option(variant_target); ERROR
   {
-    let spec : Spec.st = { ss_pre; ss_posts; ss_variant; ss_flag = Error; ss_to_verify = true; ss_label = lab_spec} in
+    let spec : Spec.st = { ss_pre; ss_posts; ss_variant; ss_ox = None; ss_flag = Error; ss_to_verify = true; ss_label = lab_spec} in
     spec
   }
 ;
@@ -689,13 +690,13 @@ g_macro_target:
   }
 ;
 
-hidden_vars:
-  | LBRACKET; HIDES; COLON; hides = separated_list(COMMA, LVAR); RBRACKET;
-    { hides }
+ox_vars:
+  | LBRACKET; OX; COLON; ox = separated_list(COMMA, LVAR); RBRACKET;
+    { ox }
 
 g_named_assertion_target:
-  id = option(assertion_id_target); a = g_assertion_target; hides = option(hidden_vars)
-  { (id, a, Option.value hides ~default:[]) }
+  id = option(assertion_id_target); a = g_assertion_target; ox = option(ox_vars)
+  { (id, a, Option.value ox ~default:[]) }
 ;
 
 g_logic_cmd_target:

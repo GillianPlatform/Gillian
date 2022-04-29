@@ -87,14 +87,13 @@ let pp fmt pred =
       Fmt.pf fmt' "[%s: %a] " id (Fmt.list ~sep:(Fmt.any ", ") Fmt.string) exs
     else Fmt.pf fmt' "[%s] " id
   in
-  let pp_hides fmt' hides =
-    if List.length hides > 0 then
-      Fmt.pf fmt' " [hides: %a]" (Fmt.list ~sep:(Fmt.any ", ") Fmt.string) hides
+  let pp_ox fmt' ox =
+    if List.length ox > 0 then
+      Fmt.pf fmt' " [ox: %a]" (Fmt.list ~sep:(Fmt.any ", ") Fmt.string) ox
     else Fmt.pf fmt' ""
   in
-  let pp_def fmt' (id_exs, asser, hides) =
-    Fmt.pf fmt' "%a%a%a" (Fmt.option pp_id_exs) id_exs Asrt.pp asser pp_hides
-      hides
+  let pp_def fmt' (id_exs, asser, ox) =
+    Fmt.pf fmt' "%a%a%a" (Fmt.option pp_id_exs) id_exs Asrt.pp asser pp_ox ox
   in
   let pp_path_opt fmt = function
     | None -> Fmt.pf fmt "@nopath@\n"
@@ -236,12 +235,10 @@ let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
   in
   let new_defs =
     List.map
-      (fun (oid, a, hides) -> (oid, Asrt.star (a :: new_asrts), hides))
+      (fun (oid, a, ox) -> (oid, Asrt.star (a :: new_asrts), ox))
       pred.pred_definitions
   in
-  let new_defs =
-    List.map (fun (oid, a, hides) -> (oid, pt_asrt a, hides)) new_defs
-  in
+  let new_defs = List.map (fun (oid, a, ox) -> (oid, pt_asrt a, ox)) new_defs in
   let new_facts =
     List.fold_right
       (fun (x, t_x) new_facts ->

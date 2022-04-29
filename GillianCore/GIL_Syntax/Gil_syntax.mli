@@ -824,6 +824,7 @@ module Spec : sig
     ss_pre : Asrt.t;  (** Precondition *)
     ss_posts : Asrt.t list;  (** Postcondition *)
     ss_variant : Expr.t option;  (** Variant *)
+    ss_ox : string list option;  (** Over-approximated logicals *)
     ss_flag : Flag.t;  (** Return flag *)
     ss_to_verify : bool;  (** Should the spec be verified? *)
     ss_label : (string * string list) option;
@@ -846,6 +847,7 @@ module Spec : sig
     Asrt.t ->
     Asrt.t list ->
     Expr.t option ->
+    string list option ->
     Flag.t ->
     bool ->
     st

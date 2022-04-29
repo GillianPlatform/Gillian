@@ -3,7 +3,7 @@
 (* key words *)
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP NEW DELETE
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
-%token <CodeLoc.t> INVARIANT FOLD UNFOLD NOUNFOLD APPLY ASSERT EXIST HIDES FORALL
+%token <CodeLoc.t> INVARIANT FOLD UNFOLD NOUNFOLD APPLY ASSERT EXIST OX FORALL
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
 
 (* punctuation *)
@@ -341,14 +341,14 @@ proof_def:
   | PROOF; COLON; pr = separated_nonempty_list(SEMICOLON, logic_command)
     { pr }
 
-hidden_vars:
-  | LBRACK; HIDES; COLON; hides = separated_list(COMMA, LVAR); RBRACK;
-    { snd(List.split hides) }
+ox_vars:
+  | LBRACK; OX; COLON; ox = separated_list(COMMA, LVAR); RBRACK;
+    { snd(List.split ox) }
 
 pred_def:
-  | def = logic_assertion; hides = option(hidden_vars);
-    { let hides = Option.value hides ~default:[] in
-        (def, hides) }
+  | def = logic_assertion; ox = option(ox_vars);
+    { let ox = Option.value ox ~default:[] in
+        (def, ox) }
 
 predicate:
   | lstart = PREDICATE; pred_nounfold = option(NOUNFOLD); lpname = IDENTIFIER; LBRACE; params_ins = separated_list(COMMA, pred_param_ins); RBRACE; LCBRACE;

@@ -534,7 +534,7 @@ module Make
             (Hashtbl.create Config.medium_tbl_size)
         in
         let up =
-          (* FIXME: UNDERSTAND IF THE HIDES SHOULD BE [] *)
+          (* FIXME: UNDERSTAND IF THE OX SHOULD BE [] *)
           UP.init known_unifiables Expr.Set.empty pred_ins
             [ (a, (None, None, [])) ]
         in

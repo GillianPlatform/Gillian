@@ -975,7 +975,7 @@ module Make
   and unify_assertion
       (astate : t)
       (subst : ESubst.t)
-      (hides : string list option)
+      (ox : string list option)
       (step : UP.step) : u_res =
     (* Auxiliary function for actions and predicates, with indexed outs *)
     let state, preds, pred_defs, variants = astate in
@@ -1213,18 +1213,18 @@ module Make
       | _ -> raise (Failure "Illegal Assertion in Unification Plan")
     in
     (* TODO: Exact fold *)
-    match (!Config.Verification.exact, hides, result) with
+    match (!Config.Verification.exact, ox, result) with
     | false, _, _
     | true, None, _
     | true, Some [], _
     | true, _, UWTF
     | true, _, UFail _ -> result
-    | true, Some hides, USucc (state, preds, _, _) ->
+    | true, Some ox, USucc (state, preds, _, _) ->
         L.verbose (fun fmt ->
             fmt "Exact fold hiding: %a\n"
               (Fmt.list ~sep:Fmt.comma Fmt.string)
-              hides);
-        let hides_subst =
+              ox);
+        let ox_subst =
           List.map
             (fun x ->
               match ESubst.get subst (LVar x) with
@@ -1236,26 +1236,26 @@ module Make
                     | _ ->
                         L.verbose (fun fmt ->
                             fmt
-                              "EXACT: WARNING: hidden parameter not an LVar or \
-                               a concrete value")
+                              "EXACT: WARNING: OX parameter not an LVar or a \
+                               concrete value")
                   in
                   let () =
                     L.verbose (fun fmt -> fmt "Binding for %s: %a" x Val.pp v)
                   in
                   Val.to_expr v
               | None -> failwith ("Exact fold: no binding in subst for " ^ x))
-            hides
+            ox
         in
         (* FIXME: For now, filter for LVars only *)
-        let hides_subst =
+        let ox_subst =
           List.filter_map
             (fun x ->
               match x with
               | Expr.LVar x -> Some x
               | _ -> None)
-            hides_subst
+            ox_subst
         in
-        let hides_subst = SS.of_list hides_subst in
+        let ox_subst = SS.of_list ox_subst in
         let lvars =
           SS.union (State.get_lvars_for_exact state) (Preds.get_lvars preds)
         in
@@ -1265,7 +1265,7 @@ module Make
                 (Fmt.list ~sep:Fmt.comma Fmt.string)
                 (SS.elements lvars))
         in
-        let intersection = SS.inter hides_subst lvars in
+        let intersection = SS.inter ox_subst lvars in
         if intersection <> SS.empty then
           let () = L.verbose (fun fmt -> fmt "Fold not exact.") in
           make_resource_fail ()
@@ -1282,11 +1282,11 @@ module Make
     | [] -> UPUFail errs_so_far
     | (state, subst, up) :: rest -> (
         let cur_step : UP.step option = UP.head up in
-        let hides = UP.hides up in
+        let ox = UP.ox up in
         let ret =
           try
             Option.fold
-              ~some:(unify_assertion state subst hides)
+              ~some:(unify_assertion state subst ox)
               ~none:(USucc state) cur_step
           with err -> (
             L.verbose (fun fmt ->

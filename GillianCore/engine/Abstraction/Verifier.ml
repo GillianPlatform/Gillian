@@ -200,6 +200,15 @@ struct
             L.verbose (fun m -> m "%s" msg);
             (None, None)
         | Ok post_up ->
+            let pre' = Asrt.star (SPState.to_assertions ss_pre) in
+            let ss_pre =
+              match flag with
+              (* Lemmas should not have stores when being proven *)
+              | None ->
+                  let empty_store = SStore.init [] in
+                  SPState.set_store ss_pre empty_store
+              | Some _ -> ss_pre
+            in
             let test =
               {
                 name;
@@ -211,7 +220,6 @@ struct
                 spec_vars;
               }
             in
-            let pre' = Asrt.star (SPState.to_assertions ss_pre) in
             (Some test, Some (pre', posts))
     in
     try
@@ -493,6 +501,8 @@ struct
       rets <> []
       && List.fold_left
            (fun ac final_state ->
+             let empty_store = SStore.init [] in
+             let final_state = SPState.set_store final_state empty_store in
              let subst = make_post_subst test final_state in
              if analyse_result subst test final_state then (
                L.normal (fun m ->
