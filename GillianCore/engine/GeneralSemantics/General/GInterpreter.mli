@@ -1,3 +1,7 @@
+type branch_case =
+  | GuardedGoto of bool
+[@@deriving yojson]
+
 module type S = sig
   module CallStack : CallStack.S
 
@@ -31,7 +35,8 @@ module type S = sig
         loop_ids : string list;
         branch_count : int;
         prev_report_id : Logging.ReportId.t option;
-        should_log_result : bool;
+        branch_case : branch_case option;
+        new_branches : (state_t * int * branch_case) list;
       }
     | ConfFinish of { flag : Flag.t; ret_val : state_vt; final_state : state_t }
         (** Equal to Conf cont + the id of the required spec *)
@@ -58,6 +63,7 @@ module type S = sig
     proc_body_index : int;
     state : state_t option;
     errors : err_t list;
+    branch_case : branch_case option;
   }
   [@@deriving yojson]
 
