@@ -152,7 +152,7 @@ module type S = sig
   val automatic_unfold : t -> vt list -> (t list, string) result
   val substitution_in_place : ?subst_all:bool -> st -> t -> t list
   val fresh_val : t -> vt
-  val clean_up : t -> unit
+  val clean_up : ?keep:Expr.Set.t -> t -> unit
   val unify_assertion : t -> st -> UP.step -> u_res
   val produce_posts : t -> st -> Asrt.t list -> t list
   val produce : t -> st -> Asrt.t -> (t list, string) result

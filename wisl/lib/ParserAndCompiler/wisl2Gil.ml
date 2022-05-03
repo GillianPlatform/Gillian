@@ -836,11 +836,10 @@ let compile_spec
   in
   let single_spec =
     match label_opt with
-    | None ->
-        Spec.s_init comp_pre [ comp_post ] comp_variant None Flag.Normal true
+    | None -> Spec.s_init comp_pre [ comp_post ] comp_variant Flag.Normal true
     | Some ss_label ->
-        Spec.s_init ~ss_label comp_pre [ comp_post ] comp_variant None
-          Flag.Normal true
+        Spec.s_init ~ss_label comp_pre [ comp_post ] comp_variant Flag.Normal
+          true
   in
   Spec.init fname fparams [ single_spec ] false false true
 
@@ -920,6 +919,7 @@ let preprocess_lemma
         lemma_params;
         lemma_proof;
         lemma_variant;
+        lemma_ox;
         lemma_hypothesis;
         lemma_conclusion;
         lemma_id;
@@ -965,6 +965,7 @@ let preprocess_lemma
       lemma_params;
       lemma_proof = new_lemma_proof;
       lemma_variant;
+      lemma_ox;
       lemma_hypothesis = new_lemma_hypothesis;
       lemma_conclusion = new_lemma_conclusion;
       lemma_id;
@@ -979,6 +980,7 @@ let compile_lemma
         lemma_params;
         lemma_proof;
         lemma_variant;
+        lemma_ox;
         lemma_hypothesis;
         lemma_conclusion;
         _;
@@ -1018,12 +1020,14 @@ let compile_lemma
       lemma_params;
       lemma_proof;
       lemma_variant;
+      lemma_ox;
       lemma_specs =
         [
           {
             lemma_hyp;
             lemma_concs = [ post ];
             lemma_spec_variant = lemma_variant;
+            lemma_spec_ox = lemma_ox;
           };
         ];
       lemma_existentials;

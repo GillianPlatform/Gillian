@@ -241,7 +241,8 @@ struct
   let fresh_loc ?loc:_ (_ : t) : vt =
     raise (Failure "fresh_loc inside BI STATE")
 
-  let clean_up (bi_state : t) : unit =
+  let clean_up ?(keep = Expr.Set.empty) (bi_state : t) : unit =
+    let _ = keep in
     let _, state, _ = bi_state in
     State.clean_up state
 

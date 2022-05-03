@@ -383,3 +383,46 @@ let add_debugger_variables
       scopes vars
   in
   scopes
+
+(***** Clean-up *****)
+
+let clean_up ?(keep = Expr.Set.empty) (heap : t) : Expr.Set.t * Expr.Set.t =
+  let forgettables =
+    Hashtbl.fold
+      (fun (aloc : string) (block : Block.t) forgettables ->
+        match block with
+        | Freed -> forgettables
+        | Allocated { data; bound } -> (
+            match
+              (SFVL.is_empty data, bound, Expr.Set.mem (ALoc aloc) keep)
+            with
+            | true, None, false ->
+                let () = Hashtbl.remove heap aloc in
+                Expr.Set.add (Expr.ALoc aloc) forgettables
+            | _ -> forgettables))
+      heap Expr.Set.empty
+  in
+  let keep =
+    Hashtbl.fold
+      (fun (aloc : string) (block : Block.t) keep ->
+        let keep = Expr.Set.add (ALoc aloc) keep in
+        match block with
+        | Freed -> keep
+        | Allocated { data; _ } ->
+            let data_alocs =
+              Expr.Set.of_list
+                (List.map
+                   (fun x -> Expr.ALoc x)
+                   (SS.elements (SFVL.alocs data)))
+            in
+            let data_lvars =
+              Expr.Set.of_list
+                (List.map
+                   (fun x -> Expr.LVar x)
+                   (SS.elements (SFVL.lvars data)))
+            in
+            Expr.Set.union keep (Expr.Set.union data_alocs data_lvars))
+      heap keep
+  in
+  let forgettables = Expr.Set.diff forgettables keep in
+  (forgettables, keep)

@@ -51,7 +51,7 @@ module type S = sig
     (t * Formula.Set.t * (string * Type.t) list) list
 
   val fresh_val : t -> vt
-  val clean_up : t -> unit
+  val clean_up : ?keep:Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
   val lvars : t -> Containers.SS.t
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
   val mem_constraints : t -> Formula.t list

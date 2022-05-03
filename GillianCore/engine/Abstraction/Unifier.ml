@@ -1221,9 +1221,7 @@ module Make
     | true, _, UFail _ -> result
     | true, Some ox, USucc (state, preds, _, _) ->
         L.verbose (fun fmt ->
-            fmt "Exact fold hiding: %a\n"
-              (Fmt.list ~sep:Fmt.comma Fmt.string)
-              ox);
+            fmt "OX hiding: %a\n" (Fmt.list ~sep:Fmt.comma Fmt.string) ox);
         let ox_subst =
           List.map
             (fun x ->
@@ -1243,7 +1241,7 @@ module Make
                     L.verbose (fun fmt -> fmt "Binding for %s: %a" x Val.pp v)
                   in
                   Val.to_expr v
-              | None -> failwith ("Exact fold: no binding in subst for " ^ x))
+              | None -> failwith ("OX: no binding in subst for " ^ x))
             ox
         in
         (* FIXME: For now, filter for LVars only *)
@@ -1256,6 +1254,20 @@ module Make
             ox_subst
         in
         let ox_subst = SS.of_list ox_subst in
+        let used_unifiables =
+          let pred_alocs = SS.elements (Preds.get_alocs preds) in
+          let pred_lvars = SS.elements (Preds.get_lvars preds) in
+          Expr.Set.union
+            (Expr.Set.of_list
+               (List.map (fun (x : string) -> Expr.ALoc x) pred_alocs))
+            (Expr.Set.of_list
+               (List.map (fun (x : string) -> Expr.LVar x) pred_lvars))
+        in
+        let state = State.copy state in
+        let () = State.clean_up ~keep:used_unifiables state in
+        let () =
+          L.verbose (fun fmt -> fmt "Cleaned-up state: \n%a" State.pp state)
+        in
         let lvars =
           SS.union (State.get_lvars_for_exact state) (Preds.get_lvars preds)
         in
@@ -1267,7 +1279,9 @@ module Make
         in
         let intersection = SS.inter ox_subst lvars in
         if intersection <> SS.empty then
-          let () = L.verbose (fun fmt -> fmt "Fold not exact.") in
+          let () =
+            L.verbose (fun fmt -> fmt "OX: hidden variables still in state.")
+          in
           make_resource_fail ()
         else result
 

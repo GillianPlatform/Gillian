@@ -15,6 +15,7 @@ type err =
 val init : unit -> t
 val alloc : t -> int -> string
 val dispose : t -> string -> (unit, err) Result.t
+val clean_up : ?keep:Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
 
 val get_cell :
   pfs:PureContext.t ->

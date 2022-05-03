@@ -1221,7 +1221,8 @@ module Make
     let state, preds, _, _ = astate in
     (state, Preds.is_empty preds)
 
-  let clean_up (astate : t) : unit =
+  let clean_up ?(keep = Expr.Set.empty) (astate : t) : unit =
+    let _ = keep in
     let state, _, _, _ = astate in
     State.clean_up state
 

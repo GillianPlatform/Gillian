@@ -2,6 +2,7 @@ type spec = TypeDef__.lemma_spec = {
   lemma_hyp : Asrt.t;
   lemma_concs : Asrt.t list;
   lemma_spec_variant : Expr.t option;
+  lemma_spec_ox : string list option;
 }
 
 type t = TypeDef__.lemma = {
@@ -15,6 +16,7 @@ type t = TypeDef__.lemma = {
   lemma_proof : LCmd.t list option;
   (* (Optional) Proof body *)
   lemma_variant : Expr.t option;
+  lemma_ox : string list option;
   (* The paramater to treat as the variant. Will trigger termination checks *)
   lemma_existentials : string list;
 }
@@ -76,11 +78,12 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (lemma : t) : t =
     in
     Asrt.map None (Some f_a_after) None None a
   in
-  let pt_spec { lemma_hyp; lemma_concs; lemma_spec_variant } =
+  let pt_spec { lemma_hyp; lemma_concs; lemma_spec_variant; lemma_spec_ox } =
     {
       lemma_hyp = pt_asrt lemma_hyp;
       lemma_concs = List.map pt_asrt lemma_concs;
       lemma_spec_variant;
+      lemma_spec_ox;
     }
   in
 

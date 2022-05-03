@@ -97,6 +97,7 @@ struct
       (pre : Asrt.t)
       (posts : Asrt.t list)
       (variant : Expr.t option)
+      (ox : string list option)
       (flag : Flag.t option)
       (label : (string * SS.t) option)
       (to_verify : bool) : (t option * (Asrt.t * Asrt.t list) option) list =
@@ -183,8 +184,15 @@ struct
             label
         in
         let known_unifiables = Expr.Set.union known_unifiables existentials in
+        let ox =
+          match (flag, ox) with
+          | None, Some ox -> ox
+          | None, None when !Config.Verification.exact ->
+              failwith "Lemma must declare ox logicals in exact verification"
+          | _, _ -> []
+        in
         let simple_posts =
-          List.map (fun post -> (post, (label, None, []))) posts
+          List.map (fun post -> (post, (label, None, ox))) posts
         in
         let post_up =
           UP.init known_unifiables Expr.Set.empty pred_ins simple_posts
@@ -263,7 +271,7 @@ struct
     let ( let+ ) x f = List.map f x in
     let+ stest, sspec' =
       testify spec_name preds pred_ins name params id sspec.ss_pre
-        sspec.ss_posts sspec.ss_variant (Some sspec.ss_flag)
+        sspec.ss_posts sspec.ss_variant None (Some sspec.ss_flag)
         (Spec.label_vars_to_set sspec.ss_label)
         sspec.ss_to_verify
     in
@@ -334,10 +342,10 @@ struct
       (lemma : Lemma.t) : t list * Lemma.t =
     let tests_and_specs =
       List.concat_map
-        (fun Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant } ->
+        (fun Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant; lemma_spec_ox } ->
           testify lemma.lemma_name preds pred_ins lemma.lemma_name
-            lemma.lemma_params 0 lemma_hyp lemma_concs lemma_spec_variant None
-            None true)
+            lemma.lemma_params 0 lemma_hyp lemma_concs lemma_spec_variant
+            lemma_spec_ox None None true)
         lemma.lemma_specs
     in
     let tests, specs =
@@ -356,6 +364,7 @@ struct
                     lemma_hyp;
                     lemma_concs;
                     lemma_spec_variant = lemma.lemma_variant;
+                    lemma_spec_ox = lemma.lemma_ox;
                   }
                 :: spec_acc
             | None -> spec_acc

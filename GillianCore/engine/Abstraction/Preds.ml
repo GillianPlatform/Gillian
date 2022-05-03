@@ -20,6 +20,7 @@ module type S = sig
   val remove_by_name : t -> string -> abs_t option
   val find_pabs_by_name : t -> string -> abs_t list
   val get_lvars : t -> SS.t
+  val get_alocs : t -> SS.t
   val pp : Format.formatter -> t -> unit
   val pp_pabs : Format.formatter -> abs_t -> unit
 
@@ -132,6 +133,14 @@ module Make
     let pred_params =
       List.concat_map
         (fun (_, vs) -> List.map Expr.lvars (List.map Val.to_expr vs))
+        !preds
+    in
+    List.fold_left SS.union SS.empty pred_params
+
+  let get_alocs (preds : t) : SS.t =
+    let pred_params =
+      List.concat_map
+        (fun (_, vs) -> List.map Expr.alocs (List.map Val.to_expr vs))
         !preds
     in
     List.fold_left SS.union SS.empty pred_params

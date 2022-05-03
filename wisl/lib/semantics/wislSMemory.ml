@@ -285,7 +285,9 @@ let pp_c_fix _ _ = ()
 let pp_i_fix _ _ = ()
 let substitution_in_place ~pfs:_ ~gamma:_ = WislSHeap.substitution_in_place
 let fresh_val _ = Expr.LVar (LVar.alloc ())
-let clean_up _ = ()
+
+let clean_up ?(keep = Expr.Set.empty) (mem : t) : Expr.Set.t * Expr.Set.t =
+  WislSHeap.clean_up ~keep mem
 
 (** FIXME: that's not normal ? *)
 let lvars _heap = SS.empty

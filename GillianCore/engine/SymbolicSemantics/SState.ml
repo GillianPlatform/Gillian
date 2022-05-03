@@ -552,9 +552,29 @@ module Make (SMemory : SMemory.S) :
 
   let fresh_val (_ : t) : vt = LVar (LVar.alloc ())
 
-  let clean_up (state : t) : unit =
-    let heap, _, _, _, _ = state in
-    SMemory.clean_up heap
+  let clean_up ?(keep = Expr.Set.empty) (state : t) : unit =
+    let heap, store, _, _, _ = state in
+    let store_alocs = SS.elements (SStore.alocs store) in
+    let store_lvars = SS.elements (SStore.lvars store) in
+    let keep =
+      List.fold_left Expr.Set.union Expr.Set.empty
+        [
+          keep;
+          Expr.Set.of_list
+            (List.map (fun (x : string) -> Expr.ALoc x) store_alocs);
+          Expr.Set.of_list
+            (List.map (fun (x : string) -> Expr.LVar x) store_lvars);
+        ]
+    in
+    let forgettables, keep = SMemory.clean_up ~keep heap in
+    L.verbose (fun fmt ->
+        fmt "Forgettables: %a"
+          (Fmt.list ~sep:Fmt.comma Expr.pp)
+          (Expr.Set.elements forgettables));
+    L.verbose (fun fmt ->
+        fmt "Keep: %a"
+          (Fmt.list ~sep:Fmt.comma Expr.pp)
+          (Expr.Set.elements keep))
 
   let update_subst (state : t) (subst : st) : unit =
     let _, _, pfs, gamma, _ = state in

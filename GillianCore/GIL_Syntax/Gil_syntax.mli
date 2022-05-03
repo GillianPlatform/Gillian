@@ -766,6 +766,7 @@ module Lemma : sig
     lemma_hyp : Asrt.t;  (** Hypothesis *)
     lemma_concs : Asrt.t list;  (** Conclusion *)
     lemma_spec_variant : Expr.t option;  (** Variant *)
+    lemma_spec_ox : string list option;  (** Over-approximating logicals *)
   }
 
   type t = {
@@ -776,6 +777,7 @@ module Lemma : sig
     lemma_specs : spec list;  (** Specs of the Lemma *)
     lemma_proof : LCmd.t list option;  (** (Optional) Proof *)
     lemma_variant : Expr.t option;  (** Variant *)
+    lemma_ox : string list option;  (** Over-approximating logicals *)
     lemma_existentials : string list; (* Existentials *)
   }
 
@@ -824,7 +826,6 @@ module Spec : sig
     ss_pre : Asrt.t;  (** Precondition *)
     ss_posts : Asrt.t list;  (** Postcondition *)
     ss_variant : Expr.t option;  (** Variant *)
-    ss_ox : string list option;  (** Over-approximated logicals *)
     ss_flag : Flag.t;  (** Return flag *)
     ss_to_verify : bool;  (** Should the spec be verified? *)
     ss_label : (string * string list) option;
@@ -847,7 +848,6 @@ module Spec : sig
     Asrt.t ->
     Asrt.t list ->
     Expr.t option ->
-    string list option ->
     Flag.t ->
     bool ->
     st

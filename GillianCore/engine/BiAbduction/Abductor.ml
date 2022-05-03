@@ -141,9 +141,8 @@ struct
               {
                 ss_pre = pre;
                 ss_posts = [ new_post ];
-                (* FIXME: Understand the next two, but probably nothing can be done automatically *)
+                (* FIXME: Understand variant, but probably nothing can be done automatically *)
                 ss_variant = None;
-                ss_ox = None;
                 ss_flag = fl;
                 ss_to_verify = false;
                 ss_label = None;

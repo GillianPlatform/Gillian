@@ -87,6 +87,7 @@ lemma SSLseg_len_append_lr {
       SLLseg_len(x, #y, n) * (#y -b> #v, z) |- SLLseg_len(x, z, n + 1) * (0 <=# n)
 
   variant: #n
+  ox: #y
 
   proof:
     unfold SLLseg_len(x, #y, n);
@@ -104,6 +105,7 @@ lemma SSLseg_len_append_rl {
       SLLseg_len(#x, #z, #n + 1) * (0 <=# #n) |- SLLseg_len(#x, #y, #n) * (#y -b> #v, #z)
 
   variant: #n
+  ox:
 
   proof:
     unfold SLLseg_len(#x, #z, #n + 1);
@@ -126,6 +128,7 @@ lemma SLLseg_len_to_SLL_len {
       SLLseg_len(x, null, #n) |- SLL_len(x, #n)
 
   variant: #n
+  ox:
 
   proof:
     unfold SLLseg_len(x, null, #n);

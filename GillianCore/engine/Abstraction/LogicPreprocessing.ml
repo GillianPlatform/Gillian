@@ -300,7 +300,12 @@ let unfold_lemma
     List.map
       (fun lemma_hyp ->
         Lemma.
-          { lemma_hyp; lemma_concs; lemma_spec_variant = lemma.lemma_variant })
+          {
+            lemma_hyp;
+            lemma_concs;
+            lemma_spec_variant = lemma.lemma_variant;
+            lemma_spec_ox = lemma.lemma_ox;
+          })
       lemma_hyps
   in
   {

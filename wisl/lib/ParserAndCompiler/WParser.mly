@@ -315,6 +315,7 @@ lemma:
       FORALL lemma_params = var_list; DOT;
       lemma_hypothesis = logic_assertion; VDASH; lemma_conclusion = logic_assertion;
       lemma_variant = option(variant_def);
+      lemma_ox = option(ox_def);
       lemma_proof = option(proof_def);
       lend = RCBRACE
       { let (_, lemma_name) = lname in
@@ -325,6 +326,7 @@ lemma:
           lemma_params;
           lemma_proof;
           lemma_variant;
+          lemma_ox;
           lemma_hypothesis;
           lemma_conclusion;
           lemma_loc;
@@ -333,6 +335,10 @@ lemma:
 
 variant_def:
   | VARIANT; COLON; e = logic_expression { e }
+
+ox_def:
+  | OX; COLON; ox = separated_list(COMMA, LVAR);
+    { snd(List.split ox) }
 
 with_variant_def:
   | WITH; variant = variant_def { variant }

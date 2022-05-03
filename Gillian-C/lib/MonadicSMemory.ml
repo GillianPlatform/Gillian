@@ -952,7 +952,10 @@ let substitution_in_place subst heap =
    heap := { mem = nmem; genv = ngenv } *)
 
 let fresh_val _ = Expr.LVar (LVar.alloc ())
-let clean_up _ = ()
+
+let clean_up ?(keep = Expr.Set.empty) _ : Expr.Set.t * Expr.Set.t =
+  (Expr.Set.empty, keep)
+
 let lvars heap = Mem.lvars !heap.mem
 
 let assertions ?to_keep:_ heap =

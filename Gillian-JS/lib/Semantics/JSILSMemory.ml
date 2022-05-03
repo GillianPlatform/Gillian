@@ -100,7 +100,11 @@ module M = struct
     List.map JSIL2GIL.jsil2gil_asrt (SHeap.assertions heap)
 
   let lvars (heap : t) : Containers.SS.t = SHeap.lvars heap
-  let clean_up (heap : t) : unit = SHeap.clean_up heap
+
+  let clean_up ?(keep = Expr.Set.empty) (heap : t) : Expr.Set.t * Expr.Set.t =
+    SHeap.clean_up heap;
+    (Expr.Set.empty, keep)
+
   let fresh_val (_ : t) : vt = LVar (LVar.alloc ())
 
   let substitution_in_place ~pfs:_ ~gamma:_ (subst : st) (heap : t) =
