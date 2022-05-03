@@ -4,11 +4,11 @@
     the function returns the appropriate z3 model. *)
 val check_sat_core :
   Gil_syntax.Formula.Set.t ->
-  (string * Gil_syntax.Type.t) Seq.t ->
+  (string, Gil_syntax.Type.t) Hashtbl.t ->
   Z3.Model.model option
 
 val check_sat :
-  Gil_syntax.Formula.Set.t -> (string * Gil_syntax.Type.t) Seq.t -> bool
+  Gil_syntax.Formula.Set.t -> (string, Gil_syntax.Type.t) Hashtbl.t -> bool
 
 (** [lift_z3_model model gamma update_subst target_vars]
     attempts to lift the variables [target_vars] from the

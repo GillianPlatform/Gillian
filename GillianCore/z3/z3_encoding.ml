@@ -1,6 +1,7 @@
 open Gil_syntax
 open Utils
-open Names
+
+(* open Names *)
 module L = Logging
 module Arithmetic = Z3.Arithmetic
 module Boolean = Z3.Boolean
@@ -15,13 +16,16 @@ module Solver = Z3.Solver
 module Symbol = Z3.Symbol
 module ZExpr = Z3.Expr
 
+(* Note: I could probably have some static check instead of dynamic check
+   using GADTs that my z3 exprs are correctly typed. *)
+
 [@@@ocaml.warning "-A"]
 
-type tyenv = (string * Type.t) Seq.t
+type tyenv = (string, Type.t) Hashtbl.t
 
 let pp_tyenv =
   let open Fmt in
-  Dump.seq (Dump.pair string (Fmt.of_to_string Type.str))
+  Dump.hashtbl string (Fmt.of_to_string Type.str)
 
 let encoding_cache : (Formula.Set.t, ZExpr.expr list) Hashtbl.t =
   Hashtbl.create Config.big_tbl_size
@@ -39,6 +43,8 @@ let cfg =
   ]
 
 let ctx : Z3.context = Z3.mk_context cfg
+let ( <| ) constr e = ZExpr.mk_app ctx constr [ e ]
+let ( $$ ) const l = ZExpr.mk_app ctx const l
 let booleans_sort = Boolean.mk_sort ctx
 let ints_sort = Arithmetic.Integer.mk_sort ctx
 let reals_sort = Arithmetic.Real.mk_sort ctx
@@ -46,17 +52,17 @@ let numbers_sort = reals_sort
 let mk_string_symb s = Symbol.mk_string ctx s
 let mk_int_i = Arithmetic.Integer.mk_numeral_i ctx
 let mk_int_s = Arithmetic.Integer.mk_numeral_s ctx
-let mk_const = Arithmetic.Real.mk_const ctx
-let mk_num_i = Arithmetic.Real.mk_numeral_i ctx
 let mk_num_s = Arithmetic.Real.mk_numeral_s ctx
 let mk_lt = Arithmetic.mk_lt ctx
 let mk_le = Arithmetic.mk_le ctx
-let mk_ge = Arithmetic.mk_ge ctx
 let mk_add e1 e2 = Arithmetic.mk_add ctx [ e1; e2 ]
 let mk_sub e1 e2 = Arithmetic.mk_sub ctx [ e1; e2 ]
 let mk_mul e1 e2 = Arithmetic.mk_mul ctx [ e1; e2 ]
 let mk_div e1 e2 = Arithmetic.mk_div ctx e1 e2
 let mk_mod = Arithmetic.Integer.mk_mod ctx
+let mk_or e1 e2 = Boolean.mk_or ctx [ e1; e2 ]
+let mk_and e1 e2 = Boolean.mk_and ctx [ e1; e2 ]
+let mk_eq = Boolean.mk_eq ctx
 
 let z3_gil_type_sort =
   Enumeration.mk_sort ctx
@@ -210,8 +216,9 @@ module Lit_operations = struct
   let int_accessor = List.nth (List.nth gil_literal_accessors 4) 0
   let number_accessor = List.nth (List.nth gil_literal_accessors 5) 0
   let string_accessor = List.nth (List.nth gil_literal_accessors 6) 0
-  let loc_accessor = List.nth (List.nth gil_literal_accessors 7) 0
-  let type_accessor = List.nth (List.nth gil_literal_accessors 8) 0
+
+  (* let loc_accessor = List.nth (List.nth gil_literal_accessors 7) 0 *)
+  (* let type_accessor = List.nth (List.nth gil_literal_accessors 8) 0 *)
   let list_accessor = List.nth (List.nth gil_literal_accessors 9) 0
   let gil_literal_recognizers = Datatype.get_recognizers z3_gil_literal_sort
   let undefined_recognizer = List.nth gil_literal_recognizers 0
@@ -292,7 +299,7 @@ let mk_singleton_access ele =
 
 module Axiomatised_operations = struct
   let slen_fun =
-    FuncDecl.mk_func_decl ctx (mk_string_symb "s-len") [ numbers_sort ]
+    FuncDecl.mk_func_decl ctx (mk_string_symb "s-len") [ ints_sort ]
       numbers_sort
 
   let llen_fun =
@@ -302,10 +309,10 @@ module Axiomatised_operations = struct
 
   let num2str_fun =
     FuncDecl.mk_func_decl ctx (mk_string_symb "num2str") [ numbers_sort ]
-      numbers_sort
+      ints_sort
 
   let str2num_fun =
-    FuncDecl.mk_func_decl ctx (mk_string_symb "str2num") [ numbers_sort ]
+    FuncDecl.mk_func_decl ctx (mk_string_symb "str2num") [ ints_sort ]
       numbers_sort
 
   let num2int_fun =
@@ -314,8 +321,8 @@ module Axiomatised_operations = struct
 
   let snth_fun =
     FuncDecl.mk_func_decl ctx (mk_string_symb "s-nth")
-      [ numbers_sort; numbers_sort ]
-      numbers_sort
+      [ ints_sort; numbers_sort ]
+      ints_sort
 
   let lnth_fun =
     FuncDecl.mk_func_decl ctx (mk_string_symb "l-nth")
@@ -332,18 +339,6 @@ module Axiomatised_operations = struct
       z3_gil_list_sort
 end
 
-let mk_z3_list_core les list_nil list_cons =
-  let empty_list = ZExpr.mk_app ctx list_nil [] in
-  let rec loop les cur_list =
-    match les with
-    | [] -> cur_list
-    | le :: rest_les ->
-        let new_cur_list = ZExpr.mk_app ctx list_cons [ le; cur_list ] in
-        loop rest_les new_cur_list
-  in
-  let result = loop les empty_list in
-  result
-
 let mk_z3_set les =
   let empty_set = Set.mk_empty ctx z3_gil_literal_sort in
   let rec loop les cur_set =
@@ -356,8 +351,22 @@ let mk_z3_set les =
   let result = loop les empty_set in
   result
 
-let mk_z3_list les nil_constructor cons_constructor =
-  try mk_z3_list_core (List.rev les) nil_constructor cons_constructor
+let mk_z3_list les =
+  let empty_list = Lit_operations.nil_constructor $$ [] in
+  let mk_z3_list_core les =
+    let rec loop les cur_list =
+      match les with
+      | [] -> cur_list
+      | le :: rest_les ->
+          let new_cur_list =
+            Lit_operations.cons_constructor $$ [ le; cur_list ]
+          in
+          loop rest_les new_cur_list
+    in
+    let result = loop les empty_list in
+    result
+  in
+  try mk_z3_list_core (List.rev les)
   with _ -> raise (Failure "DEATH: mk_z3_list")
 
 let str_codes = Hashtbl.create 1000
@@ -398,140 +407,191 @@ let encode_type (t : Type.t) =
     raise
       (Failure (Printf.sprintf "DEATH: encode_type with arg: %s" (Type.str t)))
 
-let typeof_expression x =
-  let set_guard =
-    ZExpr.mk_app ctx Extended_literal_operations.set_recognizer [ x ]
-  in
-  let sing_elem_guard =
-    ZExpr.mk_app ctx Extended_literal_operations.singular_elem_recognizer [ x ]
-  in
+module Encoding = struct
+  type kind = Native of Type.t | Simple_wrapped | Extended_wrapped
 
-  let elem_x = mk_singleton_access x in
-  let undefined_guard =
-    ZExpr.mk_app ctx Lit_operations.undefined_recognizer [ elem_x ]
-  in
-  let null_guard = ZExpr.mk_app ctx Lit_operations.null_recognizer [ elem_x ] in
-  let empty_guard =
-    ZExpr.mk_app ctx Lit_operations.empty_recognizer [ elem_x ]
-  in
-  let boolean_guard =
-    ZExpr.mk_app ctx Lit_operations.boolean_recognizer [ elem_x ]
-  in
-  let number_guard =
-    ZExpr.mk_app ctx Lit_operations.number_recognizer [ elem_x ]
-  in
-  let string_guard =
-    ZExpr.mk_app ctx Lit_operations.string_recognizer [ elem_x ]
-  in
-  let loc_guard = ZExpr.mk_app ctx Lit_operations.loc_recognizer [ elem_x ] in
-  let type_guard = ZExpr.mk_app ctx Lit_operations.type_recognizer [ elem_x ] in
-  let list_guard = ZExpr.mk_app ctx Lit_operations.list_recognizer [ elem_x ] in
-  let none_guard = ZExpr.mk_app ctx Lit_operations.none_recognizer [ elem_x ] in
+  let native_sort_of_type = function
+    | Type.IntType | StringType | ObjectType -> ints_sort
+    | ListType -> Lit_operations.z3_gil_list_sort
+    | BooleanType -> booleans_sort
+    | NumberType -> reals_sort
+    | UndefinedType | NoneType | EmptyType | NullType -> z3_gil_literal_sort
+    | SetType -> z3_gil_set_sort
+    | TypeType -> z3_gil_type_sort
 
-  let sing_elem_types_guards =
+  type t = { kind : kind; expr : ZExpr.expr }
+
+  let undefined_encoding =
+    { kind = Simple_wrapped; expr = Lit_operations.undefined_constructor $$ [] }
+
+  let null_encoding =
+    { kind = Simple_wrapped; expr = Lit_operations.null_constructor $$ [] }
+
+  let empty_encoding =
+    { kind = Simple_wrapped; expr = Lit_operations.empty_constructor $$ [] }
+
+  let none_encoding =
+    { kind = Simple_wrapped; expr = Lit_operations.none_constructor $$ [] }
+
+  let native ~ty expr = { kind = Native ty; expr }
+
+  let unwrap_extended expr =
+    {
+      kind = Simple_wrapped;
+      expr = Extended_literal_operations.singular_elem_accessor <| expr;
+    }
+
+  let get_native ~accessor { expr; kind } =
+    (* Not additional check is performed on native type,
+       it should be already type checked *)
+    match kind with
+    | Native _ -> expr
+    | Simple_wrapped -> accessor <| expr
+    | Extended_wrapped ->
+        accessor <| (Extended_literal_operations.singular_elem_accessor <| expr)
+
+  let simply_wrapped expr = { kind = Simple_wrapped; expr }
+  let extended_wrapped expr = { kind = Extended_wrapped; expr }
+
+  (** Takes a value either natively encoded or simply wrapped
+    and returns a value simply wrapped.
+    Careful: do not use wrap with a a set, as they cannot be simply wrapped *)
+  let simple_wrap ({ expr; kind } as e) =
+    let open Lit_operations in
+    match kind with
+    | Simple_wrapped -> e
+    | Native ty -> (
+        let use constr = native ~ty (constr <| expr) in
+        match ty with
+        | IntType -> use int_constructor
+        | NumberType -> use number_constructor
+        | StringType -> use string_constructor
+        | ObjectType -> use loc_constructor
+        | TypeType -> use type_constructor
+        | BooleanType -> use boolean_constructor
+        | ListType -> use list_constructor
+        | _ -> Fmt.failwith "Cannot simple-wrap value of type %s" (Type.str ty))
+    | Extended_wrapped -> unwrap_extended expr
+
+  let extend_wrap e =
+    let open Lit_operations in
+    match e.kind with
+    | Extended_wrapped -> e
+    | _ ->
+        let simple = simple_wrap e in
+        {
+          kind = Extended_wrapped;
+          expr = Extended_literal_operations.singular_constructor <| simple.expr;
+        }
+
+  let get_num = get_native ~accessor:Lit_operations.number_accessor
+  let get_int = get_native ~accessor:Lit_operations.int_accessor
+  let get_bool = get_native ~accessor:Lit_operations.boolean_accessor
+  let ( >- ) expr ty = native ~ty expr
+  let get_list = get_native ~accessor:Lit_operations.list_accessor
+
+  let get_set { kind; expr } =
+    match kind with
+    | Native SetType -> expr
+    | Extended_wrapped -> Extended_literal_operations.set_accessor <| expr
+    | _ -> failwith "wrong encoding of set"
+
+  let get_string = get_native ~accessor:Lit_operations.string_accessor
+end
+
+let placeholder_sw =
+  ZExpr.mk_fresh_const ctx "placeholder" Lit_operations.z3_gil_literal_sort
+
+let placeholder_ew =
+  ZExpr.mk_fresh_const ctx "placeholder"
+    Extended_literal_operations.extended_literal_sort
+
+let else_branch_placeholder =
+  ZExpr.mk_fresh_const ctx "placeholder" z3_gil_type_sort
+
+let ready_to_subst_expr_for_simply_wrapped_typeof =
+  let guards =
     [
-      undefined_guard;
-      null_guard;
-      empty_guard;
-      boolean_guard;
-      number_guard;
-      string_guard;
-      loc_guard;
-      type_guard;
-      list_guard;
-      none_guard;
+      (Lit_operations.null_recognizer <| placeholder_sw, Type.NullType);
+      (Lit_operations.empty_recognizer <| placeholder_sw, Type.EmptyType);
+      (Lit_operations.boolean_recognizer <| placeholder_sw, Type.BooleanType);
+      (Lit_operations.number_recognizer <| placeholder_sw, Type.NumberType);
+      (Lit_operations.string_recognizer <| placeholder_sw, Type.StringType);
+      (Lit_operations.loc_recognizer <| placeholder_sw, Type.ObjectType);
+      (Lit_operations.type_recognizer <| placeholder_sw, Type.TypeType);
+      (Lit_operations.list_recognizer <| placeholder_sw, Type.ListType);
+      (Lit_operations.none_recognizer <| placeholder_sw, Type.NoneType);
     ]
   in
+  List.fold_left
+    (fun acc (guard, ty) -> Boolean.mk_ite ctx guard (encode_type ty) acc)
+    (encode_type UndefinedType)
+    guards
 
-  let sing_elem_types_guards =
-    List.map
-      (fun a -> Boolean.mk_and ctx [ sing_elem_guard; a ])
-      sing_elem_types_guards
+let ready_to_subst_expr_for_extended_wrapped_typeof =
+  let set_guard =
+    Extended_literal_operations.set_recognizer <| placeholder_ew
   in
+  Boolean.mk_ite ctx set_guard (encode_type SetType) else_branch_placeholder
 
-  let guards = set_guard :: sing_elem_types_guards in
-  let results =
-    List.map encode_type
-      [
-        SetType;
-        UndefinedType;
-        NullType;
-        EmptyType;
-        BooleanType;
-        NumberType;
-        StringType;
-        ObjectType;
-        TypeType;
-        ListType;
-        NoneType;
-      ]
-  in
+let typeof_expression (x : Encoding.t) =
+  (* let placeholder_sw =
 
-  let rec loop guards results =
-    match (guards, results) with
-    | [], _ | _, [] -> raise (Failure "DEATH: typeof_expression")
-    | [ _ ], res :: _ -> res
-    | guard :: rest_guards, res :: rest_results ->
-        Boolean.mk_ite ctx guard res (loop rest_guards rest_results)
-  in
+     let typeof_sw e =
+  *)
+  match x.kind with
+  | Native ty -> encode_type ty
+  | Simple_wrapped ->
+      ZExpr.substitute_one ready_to_subst_expr_for_simply_wrapped_typeof
+        placeholder_sw x.expr
+  | Extended_wrapped ->
+      ZExpr.substitute ready_to_subst_expr_for_extended_wrapped_typeof
+        [ placeholder_ew; else_branch_placeholder ]
+        [
+          x.expr;
+          ZExpr.substitute_one ready_to_subst_expr_for_simply_wrapped_typeof
+            placeholder_sw
+            (Extended_literal_operations.singular_elem_accessor <| x.expr);
+        ]
 
-  loop guards results
-
-let rec encode_lit (lit : Literal.t) =
-  let mk_singleton_elem ele =
-    ZExpr.mk_app ctx Extended_literal_operations.singular_constructor [ ele ]
-  in
-
+(* Return a native Z3 expr, or a simply_wrapped expr.
+   The information is given by the type. *)
+let rec encode_lit (lit : Literal.t) : Encoding.t =
+  let open Encoding in
   try
     match lit with
-    | Undefined ->
-        mk_singleton_elem
-          (ZExpr.mk_app ctx Lit_operations.undefined_constructor [])
-    | Null ->
-        mk_singleton_elem (ZExpr.mk_app ctx Lit_operations.null_constructor [])
-    | Empty ->
-        mk_singleton_elem (ZExpr.mk_app ctx Lit_operations.empty_constructor [])
+    | Undefined -> undefined_encoding
+    | Null -> null_encoding
+    | Empty -> empty_encoding
+    | Nono -> none_encoding
     | Bool b ->
         let b_arg =
           match b with
           | true -> Boolean.mk_true ctx
           | false -> Boolean.mk_false ctx
         in
-        mk_singleton_elem
-          (ZExpr.mk_app ctx Lit_operations.boolean_constructor [ b_arg ])
+        native ~ty:BooleanType b_arg
     | Int i ->
         let i_arg = mk_int_s (Z.to_string i) in
-        mk_singleton_elem
-          (ZExpr.mk_app ctx Lit_operations.int_constructor [ i_arg ])
+        native ~ty:IntType i_arg
     | Num n ->
         let sfn = Float.to_string n in
         let n_arg = mk_num_s sfn in
-        mk_singleton_elem
-          (ZExpr.mk_app ctx Lit_operations.number_constructor [ n_arg ])
+        native ~ty:NumberType n_arg
     | String s ->
         let s_arg = encode_string s in
-        mk_singleton_elem
-          (ZExpr.mk_app ctx Lit_operations.string_constructor [ s_arg ])
+        native ~ty:StringType s_arg
     | Loc l ->
         let l_arg = encode_string l in
-        mk_singleton_elem
-          (ZExpr.mk_app ctx Lit_operations.loc_constructor [ l_arg ])
+        native ~ty:ObjectType l_arg
     | Type t ->
         let t_arg = encode_type t in
-        mk_singleton_elem
-          (ZExpr.mk_app ctx Lit_operations.type_constructor [ t_arg ])
+        native ~ty:TypeType t_arg
     | LList lits ->
         let args =
-          List.map (fun lit -> mk_singleton_access (encode_lit lit)) lits
+          List.map (fun lit -> (simple_wrap (encode_lit lit)).expr) lits
         in
-        let arg_list =
-          mk_z3_list args List_operations.nil_constructor
-            List_operations.cons_constructor
-        in
-        mk_singleton_elem
-          (ZExpr.mk_app ctx Lit_operations.list_constructor [ arg_list ])
-    | Nono ->
-        mk_singleton_elem (ZExpr.mk_app ctx Lit_operations.none_constructor [])
+        mk_z3_list args >- ListType
     | Constant _ -> raise (Exceptions.Unsupported "Z3 encoding: constants")
   with Failure msg ->
     raise
@@ -540,154 +600,78 @@ let rec encode_lit (lit : Literal.t) =
             ((Fmt.to_to_string Literal.pp) lit)
             msg))
 
+let encode_equality (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t =
+  let open Encoding in
+  let res =
+    match (p1.kind, p2.kind) with
+    | Native t1, Native t2 when Type.equal t1 t2 -> mk_eq p1.expr p2.expr
+    | Simple_wrapped, Simple_wrapped | Extended_wrapped, Extended_wrapped ->
+        mk_eq p1.expr p2.expr
+    | Native _, Native _ -> failwith "incompatible equality!"
+    | Simple_wrapped, Native _ | Native _, Simple_wrapped ->
+        mk_eq (simple_wrap p1).expr (simple_wrap p2).expr
+    | Extended_wrapped, _ | _, Extended_wrapped ->
+        mk_eq (extend_wrap p1).expr (extend_wrap p2).expr
+  in
+  res >- BooleanType
+
 (** Encode GIL binary operators *)
-let encode_binop (op : BinOp.t) le1 le2 =
-  let binop_numbers_to_numbers mk_op le1 le2 =
-    let n_le1 =
-      ZExpr.mk_app ctx Lit_operations.number_accessor
-        [ mk_singleton_access le1 ]
-    in
-    let n_le2 =
-      ZExpr.mk_app ctx Lit_operations.number_accessor
-        [ mk_singleton_access le2 ]
-    in
-    let nle1_op_nle2 = mk_op n_le1 n_le2 in
-    mk_singleton_elem
-      (ZExpr.mk_app ctx Lit_operations.number_constructor [ nle1_op_nle2 ])
-  in
-
-  let binop_ints_to_ints mk_op le1 le2 =
-    let n_le1 =
-      ZExpr.mk_app ctx Lit_operations.int_accessor [ mk_singleton_access le1 ]
-    in
-    let n_le2 =
-      ZExpr.mk_app ctx Lit_operations.int_accessor [ mk_singleton_access le2 ]
-    in
-    let nle1_op_nle2 = mk_op n_le1 n_le2 in
-    mk_singleton_elem
-      (ZExpr.mk_app ctx Lit_operations.int_constructor [ nle1_op_nle2 ])
-  in
-
-  let binop_ints_to_booleans mk_op le1 le2 =
-    let n_le1 =
-      ZExpr.mk_app ctx Lit_operations.int_accessor [ mk_singleton_access le1 ]
-    in
-    let n_le2 =
-      ZExpr.mk_app ctx Lit_operations.int_accessor [ mk_singleton_access le2 ]
-    in
-    let nle1_op_nle2 = mk_op n_le1 n_le2 in
-    mk_singleton_elem
-      (ZExpr.mk_app ctx Lit_operations.boolean_constructor [ nle1_op_nle2 ])
-  in
-
-  let binop_numbers_to_booleans mk_op le1 le2 =
-    let n_le1 =
-      ZExpr.mk_app ctx Lit_operations.number_accessor
-        [ mk_singleton_access le1 ]
-    in
-    let n_le2 =
-      ZExpr.mk_app ctx Lit_operations.number_accessor
-        [ mk_singleton_access le2 ]
-    in
-    let nle1_op_nle2 = mk_op n_le1 n_le2 in
-    mk_singleton_elem
-      (ZExpr.mk_app ctx Lit_operations.boolean_constructor [ nle1_op_nle2 ])
-  in
-
+let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
+    =
+  let open Encoding in
+  (* In the case of strongly typed operations, we do not perform any check.
+     Type checking has happened before reaching z3, and therefore, isn't required here again.
+     An unknown type is represented by the [None] variant of the option type.
+     It is expected that values of unknown type are already wrapped into their constructors.
+  *)
   match op with
-  | IPlus -> binop_ints_to_ints mk_add le1 le2
-  | IMinus -> binop_ints_to_ints mk_sub le1 le2
-  | ITimes -> binop_ints_to_ints mk_mul le1 le2
-  | IDiv -> binop_ints_to_ints mk_div le1 le2
-  | IMod -> binop_ints_to_ints mk_mod le1 le2
-  | ILessThan -> binop_ints_to_booleans mk_lt le1 le2
-  | ILessThanEqual -> binop_ints_to_booleans mk_le le1 le2
-  | FPlus -> binop_numbers_to_numbers mk_add le1 le2
-  | FMinus -> binop_numbers_to_numbers mk_sub le1 le2
-  | FTimes -> binop_numbers_to_numbers mk_mul le1 le2
-  | FDiv -> binop_numbers_to_numbers mk_div le1 le2
-  | FLessThan -> binop_numbers_to_booleans mk_lt le1 le2
-  | FLessThanEqual -> binop_numbers_to_booleans mk_le le1 le2
-  | Equal ->
-      ZExpr.mk_app ctx Lit_operations.boolean_constructor
-        [ Boolean.mk_eq ctx le1 le2 ]
-  | BOr ->
-      let le1_b =
-        ZExpr.mk_app ctx Lit_operations.boolean_accessor
-          [ mk_singleton_access le1 ]
-      in
-      let le2_b =
-        ZExpr.mk_app ctx Lit_operations.boolean_accessor
-          [ mk_singleton_access le2 ]
-      in
-      let le = Boolean.mk_or ctx [ le1_b; le2_b ] in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.boolean_constructor [ le ])
-  | BAnd ->
-      let le1_b =
-        ZExpr.mk_app ctx Lit_operations.boolean_accessor
-          [ mk_singleton_access le1 ]
-      in
-      let le2_b =
-        ZExpr.mk_app ctx Lit_operations.boolean_accessor
-          [ mk_singleton_access le2 ]
-      in
-      let le = Boolean.mk_and ctx [ le1_b; le2_b ] in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.boolean_constructor [ le ])
+  | IPlus -> mk_add (get_int p1) (get_int p2) >- IntType
+  | IMinus -> mk_sub (get_int p1) (get_int p2) >- IntType
+  | ITimes -> mk_mul (get_int p1) (get_int p2) >- IntType
+  | IDiv -> mk_div (get_int p1) (get_int p2) >- IntType
+  | IMod -> mk_mod (get_int p1) (get_int p2) >- IntType
+  | ILessThan -> mk_lt (get_int p1) (get_int p2) >- BooleanType
+  | ILessThanEqual -> mk_le (get_int p1) (get_int p2) >- BooleanType
+  | FPlus -> mk_add (get_num p1) (get_num p2) >- NumberType
+  | FMinus -> mk_sub (get_num p1) (get_num p2) >- NumberType
+  | FTimes -> mk_mul (get_num p1) (get_num p2) >- NumberType
+  | FDiv -> mk_div (get_num p1) (get_num p2) >- NumberType
+  | FLessThan -> mk_lt (get_num p1) (get_num p2) >- BooleanType
+  | FLessThanEqual -> mk_le (get_num p1) (get_num p2) >- BooleanType
+  | Equal -> encode_equality p1 p2
+  | BOr -> mk_or (get_bool p1) (get_bool p2) >- BooleanType
+  | BAnd -> mk_and (get_bool p1) (get_bool p2) >- BooleanType
   | BSetMem ->
-      let le1_mem = mk_singleton_access le1 in
-      let le2_set =
-        ZExpr.mk_app ctx Extended_literal_operations.set_accessor [ le2 ]
-      in
-      let le = Set.mk_membership ctx le1_mem le2_set in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.boolean_constructor [ le ])
-  | SetDiff ->
-      let le1_set =
-        ZExpr.mk_app ctx Extended_literal_operations.set_accessor [ le1 ]
-      in
-      let le2_set =
-        ZExpr.mk_app ctx Extended_literal_operations.set_accessor [ le2 ]
-      in
-      let le = Set.mk_difference ctx le1_set le2_set in
-      ZExpr.mk_app ctx Extended_literal_operations.set_constructor [ le ]
-  | BSetSub ->
-      let le1_set =
-        ZExpr.mk_app ctx Extended_literal_operations.set_accessor [ le1 ]
-      in
-      let le2_set =
-        ZExpr.mk_app ctx Extended_literal_operations.set_accessor [ le2 ]
-      in
-      let le = Set.mk_subset ctx le1_set le2_set in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.boolean_constructor [ le ])
+      (* p2 has to be already wrapped *)
+      Set.mk_membership ctx (simple_wrap p1).expr (get_set p2) >- BooleanType
+  | SetDiff -> Set.mk_difference ctx (get_set p1) (get_set p2) >- SetType
+  | BSetSub -> Set.mk_subset ctx (get_set p1) (get_set p2) >- BooleanType
   | LstNth ->
-      let lst' =
-        ZExpr.mk_app ctx Lit_operations.list_accessor
-          [ mk_singleton_access le1 ]
-      in
-      let index' =
-        ZExpr.mk_app ctx Lit_operations.int_accessor [ mk_singleton_access le2 ]
-      in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Axiomatised_operations.lnth_fun [ lst'; index' ])
+      let lst' = get_list p1 in
+      let index' = get_int p2 in
+      Axiomatised_operations.lnth_fun $$ [ lst'; index' ] |> simply_wrapped
   | StrNth ->
-      let str' =
-        ZExpr.mk_app ctx Lit_operations.string_accessor
-          [ mk_singleton_access le1 ]
-      in
-      let index' =
-        ZExpr.mk_app ctx Lit_operations.number_accessor
-          [ mk_singleton_access le2 ]
-      in
-      let res =
-        ZExpr.mk_app ctx Axiomatised_operations.snth_fun [ str'; index' ]
-      in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.string_constructor [ res ])
-  (* FIXME: Specify which *)
-  | _ ->
+      let str' = get_string p1 in
+      let index' = get_num p2 in
+      let res = Axiomatised_operations.snth_fun $$ [ str'; index' ] in
+      res >- StringType
+  | FMod
+  | SLessThan
+  | BitwiseAnd
+  | BitwiseOr
+  | BitwiseXor
+  | LeftShift
+  | SignedRightShift
+  | UnsignedRightShift
+  | BitwiseAndL
+  | BitwiseOrL
+  | BitwiseXorL
+  | LeftShiftL
+  | SignedRightShiftL
+  | UnsignedRightShiftL
+  | M_atan2
+  | M_pow
+  | StrCat ->
       raise
         (Failure
            (Printf.sprintf
@@ -695,210 +679,100 @@ let encode_binop (op : BinOp.t) le1 le2 =
               (BinOp.str op)))
 
 let encode_unop (op : UnOp.t) le =
+  let open Encoding in
   match op with
-  | IUnaryMinus ->
-      let le_n =
-        ZExpr.mk_app ctx Lit_operations.int_accessor [ mk_singleton_access le ]
-      in
-      let op_le_n = Arithmetic.mk_unary_minus ctx le_n in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.int_constructor [ op_le_n ])
-  | FUnaryMinus ->
-      let le_n =
-        ZExpr.mk_app ctx Lit_operations.number_accessor
-          [ mk_singleton_access le ]
-      in
-      let op_le_n = Arithmetic.mk_unary_minus ctx le_n in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.number_constructor [ op_le_n ])
-  | LstLen ->
-      let le_lst =
-        ZExpr.mk_app ctx Lit_operations.list_accessor [ mk_singleton_access le ]
-      in
-      let op_le_lst =
-        ZExpr.mk_app ctx Axiomatised_operations.llen_fun [ le_lst ]
-      in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.int_constructor [ op_le_lst ])
-  | StrLen ->
-      let le_s =
-        ZExpr.mk_app ctx Lit_operations.string_accessor
-          [ mk_singleton_access le ]
-      in
-      let op_le_s = ZExpr.mk_app ctx Axiomatised_operations.slen_fun [ le_s ] in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.number_constructor [ op_le_s ])
-  | ToStringOp ->
-      let le_n =
-        ZExpr.mk_app ctx Lit_operations.number_accessor
-          [ mk_singleton_access le ]
-      in
-      let op_le_n =
-        ZExpr.mk_app ctx Axiomatised_operations.num2str_fun [ le_n ]
-      in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.string_constructor [ op_le_n ])
+  | IUnaryMinus -> Arithmetic.mk_unary_minus ctx (get_int le) >- IntType
+  | FUnaryMinus -> Arithmetic.mk_unary_minus ctx (get_num le) >- NumberType
+  | LstLen -> Axiomatised_operations.llen_fun <| get_list le >- IntType
+  | StrLen -> Axiomatised_operations.slen_fun <| get_string le >- NumberType
+  | ToStringOp -> Axiomatised_operations.num2str_fun <| get_num le >- StringType
   | ToNumberOp ->
-      let le_s =
-        ZExpr.mk_app ctx Lit_operations.string_accessor
-          [ mk_singleton_access le ]
-      in
-      let op_le_s =
-        ZExpr.mk_app ctx Axiomatised_operations.str2num_fun [ le_s ]
-      in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.number_constructor [ op_le_s ])
-  | ToIntOp ->
-      let le_n =
-        ZExpr.mk_app ctx Lit_operations.number_accessor
-          [ mk_singleton_access le ]
-      in
-      let op_le_n =
-        ZExpr.mk_app ctx Axiomatised_operations.num2int_fun [ le_n ]
-      in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.number_constructor [ op_le_n ])
-  | UNot ->
-      let le_b =
-        ZExpr.mk_app ctx Lit_operations.boolean_accessor
-          [ mk_singleton_access le ]
-      in
-      let op_le_b = Boolean.mk_not ctx le_b in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.boolean_constructor [ op_le_b ])
-  | Cdr ->
-      let le_lst =
-        ZExpr.mk_app ctx Lit_operations.list_accessor [ mk_singleton_access le ]
-      in
-      let op_le_lst =
-        ZExpr.mk_app ctx List_operations.tail_accessor [ le_lst ]
-      in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.list_constructor [ op_le_lst ])
-  | Car ->
-      let le_lst =
-        ZExpr.mk_app ctx Lit_operations.list_accessor [ mk_singleton_access le ]
-      in
-      let op_le = ZExpr.mk_app ctx List_operations.head_accessor [ le_lst ] in
-      mk_singleton_elem op_le
-  | TypeOf ->
-      let res = typeof_expression le in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.type_constructor [ res ])
+      Axiomatised_operations.str2num_fun <| get_string le >- NumberType
+  | ToIntOp -> Axiomatised_operations.num2int_fun <| get_num le >- NumberType
+  | UNot -> Boolean.mk_not ctx (get_bool le) >- BooleanType
+  | Cdr -> List_operations.tail_accessor <| get_list le >- ListType
+  | Car -> List_operations.head_accessor <| get_list le |> simply_wrapped
+  | TypeOf -> typeof_expression le >- TypeType
   | ToUint32Op ->
-      let le_n =
-        ZExpr.mk_app ctx Lit_operations.number_accessor
-          [ mk_singleton_access le ]
-      in
       let op_le_n =
         Arithmetic.Integer.mk_int2real ctx
-          (Arithmetic.Real.mk_real2int ctx le_n)
+          (Arithmetic.Real.mk_real2int ctx (get_num le))
       in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.number_constructor [ op_le_n ])
+      op_le_n >- NumberType
   | LstRev ->
-      let le_lst =
-        ZExpr.mk_app ctx Lit_operations.list_accessor [ mk_singleton_access le ]
-      in
-      let n_le = ZExpr.mk_app ctx Axiomatised_operations.lrev_fun [ le_lst ] in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.list_constructor [ n_le ])
-  | NumToInt ->
-      let le_n =
-        ZExpr.mk_app ctx Lit_operations.number_accessor
-          [ mk_singleton_access le ]
-      in
-      let op_le_n = Arithmetic.Real.mk_real2int ctx le_n in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.int_constructor [ op_le_n ])
-  | IntToNum ->
-      let le_n =
-        ZExpr.mk_app ctx Lit_operations.int_accessor [ mk_singleton_access le ]
-      in
-      let op_le_n = Arithmetic.Integer.mk_int2real ctx le_n in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.number_constructor [ op_le_n ])
-  | _ ->
-      Printf.printf "SMT encoding: Construct not supported yet - unop - %s!\n"
-        (UnOp.str op);
+      let le_lst = get_list le in
+      let n_le = Axiomatised_operations.lrev_fun <| le_lst in
+      n_le >- ListType
+  | NumToInt -> Arithmetic.Real.mk_real2int ctx (get_num le) >- IntType
+  | IntToNum -> Arithmetic.Integer.mk_int2real ctx (get_int le) >- NumberType
+  | BitwiseNot
+  | M_isNaN
+  | M_abs
+  | M_acos
+  | M_asin
+  | M_atan
+  | M_ceil
+  | M_cos
+  | M_exp
+  | M_floor
+  | M_log
+  | M_round
+  | M_sgn
+  | M_sin
+  | M_sqrt
+  | M_tan
+  | ToUint16Op
+  | ToInt32Op
+  | SetToList ->
       let msg =
         Printf.sprintf "SMT encoding: Construct not supported yet - unop - %s!"
           (UnOp.str op)
       in
+      print_string msg;
+      flush stdout;
       raise (Failure msg)
 
-let encode_nop (op : NOp.t) les =
-  match op with
-  | SetUnion ->
-      let le = Set.mk_union ctx les in
-      ZExpr.mk_app ctx Extended_literal_operations.set_constructor [ le ]
-  | SetInter ->
-      let le = Set.mk_intersection ctx les in
-      ZExpr.mk_app ctx Extended_literal_operations.set_constructor [ le ]
-  | LstCat ->
-      List.fold_left
-        (fun ac next ->
-          (* Unpack ac *)
-          let ac =
-            ZExpr.mk_app ctx Lit_operations.list_accessor
-              [ mk_singleton_access ac ]
-          in
-          (* Unpack next one *)
-          let next =
-            ZExpr.mk_app ctx Lit_operations.list_accessor
-              [ mk_singleton_access next ]
-          in
-          let new_ac =
-            ZExpr.mk_app ctx Axiomatised_operations.lcat_fun [ ac; next ]
-          in
-          let new_ac =
-            mk_singleton_elem
-              (ZExpr.mk_app ctx Lit_operations.list_constructor [ new_ac ])
-          in
-          new_ac)
-        (List.hd les) (List.tl les)
-
-let rec encode_logical_expression (le : Expr.t) : ZExpr.expr =
-  let f = encode_logical_expression in
+let rec encode_logical_expression ~(gamma : tyenv) (le : Expr.t) : Encoding.t =
+  let open Encoding in
+  let f = encode_logical_expression ~gamma in
 
   match le with
   | Lit lit -> encode_lit lit
-  | LVar var -> ZExpr.mk_const ctx (mk_string_symb var) extended_literal_sort
-  | ALoc var -> ZExpr.mk_const ctx (mk_string_symb var) extended_literal_sort
+  | LVar var -> (
+      match Hashtbl.find_opt gamma var with
+      | None ->
+          ZExpr.mk_const ctx (mk_string_symb var) extended_literal_sort
+          |> extended_wrapped
+      | Some ty ->
+          let sort = native_sort_of_type ty in
+          ZExpr.mk_const ctx (mk_string_symb var) sort >- ty)
+  | ALoc var -> ZExpr.mk_const ctx (mk_string_symb var) ints_sort >- ObjectType
   | PVar _ -> raise (Failure "Program variable in pure formula: FIRE")
   | UnOp (op, le) -> encode_unop op (f le)
   | BinOp (le1, op, le2) -> encode_binop op (f le1) (f le2)
-  | NOp (op, les) ->
-      let les =
-        match op with
-        | SetInter | SetUnion ->
-            List.map
-              (fun le ->
-                ZExpr.mk_app ctx Extended_literal_operations.set_accessor
-                  [ f le ])
-              les
-        | LstCat -> List.map f les
-      in
-      encode_nop op les
+  | NOp (SetUnion, les) ->
+      let les = List.map (fun le -> get_set (f le)) les in
+      Set.mk_union ctx les >- SetType
+  | NOp (SetInter, les) ->
+      let les = List.map (fun le -> get_set (f le)) les in
+      Set.mk_intersection ctx les >- SetType
+  | NOp (LstCat, les) ->
+      List.fold_left
+        (fun ac next ->
+          (* Unpack ac *)
+          let ac = get_list ac in
+          (* Unpack next one *)
+          let next = get_list (f next) in
+          Axiomatised_operations.lcat_fun $$ [ ac; next ] >- ListType)
+        (f (List.hd les))
+        (List.tl les)
   | EList les ->
-      let args = List.map (fun le -> mk_singleton_access (f le)) les in
-      let arg_list =
-        mk_z3_list args List_operations.nil_constructor
-          List_operations.cons_constructor
-      in
-      mk_singleton_elem
-        (ZExpr.mk_app ctx Lit_operations.list_constructor [ arg_list ])
+      let args = List.map (fun le -> (simple_wrap (f le)).expr) les in
+      mk_z3_list args >- ListType
   | ESet les ->
-      let args = List.map (fun le -> mk_singleton_access (f le)) les in
-      let arg_list = mk_z3_set args in
-      ZExpr.mk_app ctx Extended_literal_operations.set_constructor [ arg_list ]
-  | _ ->
-      let msg =
-        Printf.sprintf
-          "Failure - z3 encoding: Unsupported logical expression: %s"
-          ((Fmt.to_to_string Expr.pp) le)
-      in
-      raise (Failure msg)
+      let args = List.map (fun le -> (simple_wrap (f le)).expr) les in
+      mk_z3_set args >- SetType
+  | LstSub _ -> Fmt.failwith "Unsupported LstSub: %a" Expr.pp le
 
 let encode_quantifier quantifier_type ctx quantified_vars var_sorts assertion =
   if List.length quantified_vars > 0 then
@@ -943,117 +817,75 @@ let make_recognizer_assertion x (t_x : Type.t) =
   | SetType ->
       ZExpr.mk_app ctx Extended_literal_operations.set_recognizer [ le_x ]
 
-let rec encode_assertion (a : Formula.t) : ZExpr.expr =
-  let f = encode_assertion in
-  let fe = encode_logical_expression in
-
+let rec encode_assertion ~(gamma : tyenv) (a : Formula.t) : Encoding.t =
+  let f = encode_assertion ~gamma in
+  let fe = encode_logical_expression ~gamma in
+  let open Encoding in
   match a with
-  | Not a -> Boolean.mk_not ctx (f a)
-  | Eq (le1, le2) -> Boolean.mk_eq ctx (fe le1) (fe le2)
+  | Not a -> Boolean.mk_not ctx (get_bool (f a)) >- BooleanType
+  | Eq (le1, le2) -> encode_equality (fe le1) (fe le2)
   | FLess (le1, le2) ->
-      let le1' =
-        ZExpr.mk_app ctx Lit_operations.number_accessor
-          [ mk_singleton_access (fe le1) ]
-      in
-      let le2' =
-        ZExpr.mk_app ctx Lit_operations.number_accessor
-          [ mk_singleton_access (fe le2) ]
-      in
-      mk_lt le1' le2'
+      mk_lt (get_num (fe le1)) (get_num (fe le2)) >- BooleanType
   | FLessEq (le1, le2) ->
-      let le1' =
-        ZExpr.mk_app ctx Lit_operations.number_accessor
-          [ mk_singleton_access (fe le1) ]
-      in
-      let le2' =
-        ZExpr.mk_app ctx Lit_operations.number_accessor
-          [ mk_singleton_access (fe le2) ]
-      in
-      mk_le le1' le2'
+      mk_le (get_num (fe le1)) (get_num (fe le2)) >- BooleanType
   | ILess (le1, le2) ->
-      let le1' =
-        ZExpr.mk_app ctx Lit_operations.int_accessor
-          [ mk_singleton_access (fe le1) ]
-      in
-      let le2' =
-        ZExpr.mk_app ctx Lit_operations.int_accessor
-          [ mk_singleton_access (fe le2) ]
-      in
-      mk_lt le1' le2'
+      mk_lt (get_int (fe le1)) (get_int (fe le2)) >- BooleanType
   | ILessEq (le1, le2) ->
-      let le1' =
-        ZExpr.mk_app ctx Lit_operations.int_accessor
-          [ mk_singleton_access (fe le1) ]
-      in
-      let le2' =
-        ZExpr.mk_app ctx Lit_operations.int_accessor
-          [ mk_singleton_access (fe le2) ]
-      in
-      mk_le le1' le2'
+      mk_le (get_int (fe le1)) (get_int (fe le2)) >- BooleanType
   | StrLess (_, _) -> raise (Failure "Z3 encoding does not support STRLESS")
-  | True -> Boolean.mk_true ctx
-  | False -> Boolean.mk_false ctx
-  | Or (a1, a2) -> Boolean.mk_or ctx [ f a1; f a2 ]
-  | And (a1, a2) -> Boolean.mk_and ctx [ f a1; f a2 ]
+  | True -> Boolean.mk_true ctx >- BooleanType
+  | False -> Boolean.mk_false ctx >- BooleanType
+  | Or (a1, a2) ->
+      Boolean.mk_or ctx [ get_bool (f a1); get_bool (f a2) ] >- BooleanType
+  | And (a1, a2) ->
+      Boolean.mk_and ctx [ get_bool (f a1); get_bool (f a2) ] >- BooleanType
   | SetMem (le1, le2) ->
-      let le1' = mk_singleton_access (fe le1) in
-      let le2' =
-        ZExpr.mk_app ctx Extended_literal_operations.set_accessor [ fe le2 ]
-      in
-      Set.mk_membership ctx le1' le2'
+      let le1' = (simple_wrap (fe le1)).expr in
+      let le2' = get_set (fe le2) in
+      Set.mk_membership ctx le1' le2' >- SetType
   | SetSub (le1, le2) ->
-      let le1' =
-        ZExpr.mk_app ctx Extended_literal_operations.set_accessor [ fe le1 ]
-      in
-      let le2' =
-        ZExpr.mk_app ctx Extended_literal_operations.set_accessor [ fe le2 ]
-      in
-      Set.mk_subset ctx le1' le2'
-  | ForAll (bt, a) ->
-      let z3_sorts = List.map (fun _ -> extended_literal_sort) bt in
-      let z3_types_assertions =
-        List.filter_map
-          (fun (x, t_x) ->
-            match t_x with
-            | Some t_x -> Some (make_recognizer_assertion x t_x)
-            | None -> None)
-          bt
-      in
-      let binders, _ = List.split bt in
-      let z3_types_assertion = Boolean.mk_and ctx z3_types_assertions in
-      let z3_a = Boolean.mk_implies ctx z3_types_assertion (f a) in
-      encode_quantifier true ctx binders z3_sorts z3_a
+      Set.mk_subset ctx (get_set (fe le1)) (get_set (fe le2)) >- SetType
+  | ForAll (bt, a) -> failwith "encode_forall"
+(* let z3_sorts = List.map (fun _ -> extended_literal_sort) bt in
+   let z3_types_assertions =
+     List.filter_map
+       (fun (x, t_x) ->
+         match t_x with
+         | Some t_x -> Some (es_assertion x t_x)
+         | None -> None)
+       bt
+   in
+   let binders, _ = List.split bt in
+   let z3_types_assertion = Boolean.mk_and ctx z3_types_assertions in
+   let z3_a = Boolean.mk_implies ctx z3_types_assertion (f a) in
+   encode_quantifier true ctx binders z3_sorts z3_a *)
 
 (* ****************
    * SATISFIABILITY *
    * **************** *)
 
-let encode_assertion_top_level (a : Formula.t) : ZExpr.expr =
-  encode_assertion (Formula.push_in_negations a)
-
-let encode_gamma (gamma : tyenv) =
-  Seq.filter_map
-    (fun (x, t_x) ->
-      if is_lvar_name x || is_aloc_name x then
-        Some (make_recognizer_assertion x t_x)
-      else None)
-    gamma
+let encode_assertion_top_level ~(gamma : tyenv) (a : Formula.t) : ZExpr.expr =
+  try (encode_assertion ~gamma (Formula.push_in_negations a)).expr
+  with Z3.Error s as exn ->
+    let msg =
+      Fmt.str "Failed to encode %a in gamma %a with error %s\n" Formula.pp a
+        pp_tyenv gamma s
+    in
+    Logging.print_to_all msg;
+    raise exn
 
 (** For a given set of pure formulae and its associated gamma, return the corresponding encoding *)
-let encode_assertions
-    (assertions : Formula.Set.t)
-    (gamma : (string * Gil_syntax.Type.t) Seq.t) : ZExpr.expr list =
+let encode_assertions (assertions : Formula.Set.t) (gamma : tyenv) :
+    ZExpr.expr list =
   (* Check if the assertions have previously been cached *)
   match Hashtbl.find_opt encoding_cache assertions with
   | Some encoding -> encoding
   | None ->
       (* Encode assertions *)
       let encoded_assertions =
-        Seq.map encode_assertion_top_level (Formula.Set.to_seq assertions)
-      in
-      (* Encode gamma *)
-      let encoded_assertions =
-        Seq.append encoded_assertions (encode_gamma gamma) |> List.of_seq
+        List.map
+          (encode_assertion_top_level ~gamma)
+          (Formula.Set.elements assertions)
       in
       (* Cache *)
       Hashtbl.replace encoding_cache assertions encoded_assertions;
@@ -1099,11 +931,13 @@ let check_sat_core (fs : Formula.Set.t) (gamma : tyenv) : Model.model option =
            %a\n\
            with gamma:\n\
            @[%a@]\n\n\n\
-           Z3 EXPRS:\n\
+           Reason: %s\n\n\
+           Solver:\n\
            %a\n\
-          \       @?"
+           @?"
           (Fmt.iter ~sep:(Fmt.any ", ") Formula.Set.iter Formula.pp)
           fs pp_tyenv gamma
+          (Z3.Solver.get_reason_unknown master_solver)
           (Fmt.list ~sep:(Fmt.any "\n\n") Fmt.string)
           (List.map Z3.Expr.to_string encoded_assertions);
         exit 1
@@ -1134,60 +968,61 @@ let lift_z3_model
     (gamma : (string, Type.t) Hashtbl.t)
     (subst_update : string -> Expr.t -> unit)
     (target_vars : Expr.Set.t) : unit =
-  let ( let* ) = Option.bind in
-  let ( let+ ) x f = Option.map f x in
-  let recover_z3_number (n : ZExpr.expr) : float option =
-    if ZExpr.is_numeral n then (
-      L.(verbose (fun m -> m "Z3 number: %s" (ZExpr.to_string n)));
-      Some (float_of_string (Z3.Arithmetic.Real.to_decimal_string n 16)))
-    else None
-  in
+  failwith "Lift z3 model"
+(* let ( let* ) = Option.bind in
+   let ( let+ ) x f = Option.map f x in
+   let recover_z3_number (n : ZExpr.expr) : float option =
+     if ZExpr.is_numeral n then (
+       L.(verbose (fun m -> m "Z3 number: %s" (ZExpr.to_string n)));
+       Some (float_of_string (Z3.Arithmetic.Real.to_decimal_string n 16)))
+     else None
+   in
 
-  let recover_z3_int (zn : ZExpr.expr) : int option =
-    let+ n = recover_z3_number zn in
-    int_of_float n
-  in
+   let recover_z3_int (zn : ZExpr.expr) : int option =
+     let+ n = recover_z3_number zn in
+     int_of_float n
+   in
 
-  let lift_z3_val (x : string) : Expr.t option =
-    let* gil_type = Hashtbl.find_opt gamma x in
-    match gil_type with
-    | NumberType ->
-        let x' = encode_logical_expression (LVar x) in
-        let x'' =
-          ZExpr.mk_app ctx Lit_operations.number_accessor
-            [ mk_singleton_access x' ]
-        in
-        let* v = Model.eval model x'' true in
-        let+ n = recover_z3_number v in
-        Expr.num n
-    | StringType ->
-        let x' = encode_logical_expression (LVar x) in
-        let x'' =
-          ZExpr.mk_app ctx Lit_operations.string_accessor
-            [ mk_singleton_access x' ]
-        in
-        let* v = Model.eval model x'' true in
-        let* si = recover_z3_int v in
-        let+ str_code = Hashtbl.find_opt str_codes_inv si in
-        Expr.string str_code
-    | _ -> None
-  in
+   let lift_z3_val (x : string) : Expr.t option =
+     let* gil_type = Hashtbl.find_opt gamma x in
+     match gil_type with
+     | NumberType ->
+         let x' = encode_logical_expression (LVar x) in
+         let x'' =
+           ZExpr.mk_app ctx Lit_operations.number_accessor
+             [ mk_singleton_access x' ]
+         in
+         let* v = Model.eval model x'' true in
+         let+ n = recover_z3_number v in
+         Expr.num n
+     | StringType ->
+         let x' = encode_logical_expression (LVar x) in
+         let x'' =
+           ZExpr.mk_app ctx Lit_operations.string_accessor
+             [ mk_singleton_access x' ]
+         in
+         let* v = Model.eval model x'' true in
+         let* si = recover_z3_int v in
+         let+ str_code = Hashtbl.find_opt str_codes_inv si in
+         Expr.string str_code
+     | _ -> None
+   in
 
-  L.(verbose (fun m -> m "Inside lift_z3_model"));
-  Expr.Set.iter
-    (fun x ->
-      let x =
-        match x with
-        | LVar x -> x
-        | _ ->
-            raise
-              (Failure "INTERNAL ERROR: Z3 lifting of a non-logical variable")
-      in
-      let v = lift_z3_val x in
-      L.(
-        verbose (fun m ->
-            m "Z3 binding for %s: %s\n" x
-              (Option.fold ~some:(Fmt.to_to_string Expr.pp) ~none:"NO BINDING!"
-                 v)));
-      Option.fold ~some:(subst_update x) ~none:() v)
-    target_vars
+   L.(verbose (fun m -> m "Inside lift_z3_model"));
+   Expr.Set.iter
+     (fun x ->
+       let x =
+         match x with
+         | LVar x -> x
+         | _ ->
+             raise
+               (Failure "INTERNAL ERROR: Z3 lifting of a non-logical variable")
+       in
+       let v = lift_z3_val x in
+       L.(
+         verbose (fun m ->
+             m "Z3 binding for %s: %s\n" x
+               (Option.fold ~some:(Fmt.to_to_string Expr.pp) ~none:"NO BINDING!"
+                  v)));
+       Option.fold ~some:(subst_update x) ~none:() v)
+     target_vars *)
