@@ -459,30 +459,25 @@ module Encoding = struct
   let simple_wrap ({ expr; kind } as e) =
     let open Lit_operations in
     match kind with
-    | Simple_wrapped -> e
+    | Simple_wrapped -> e.expr
     | Native ty -> (
-        let use constr = native ~ty (constr <| expr) in
         match ty with
-        | IntType -> use int_constructor
-        | NumberType -> use number_constructor
-        | StringType -> use string_constructor
-        | ObjectType -> use loc_constructor
-        | TypeType -> use type_constructor
-        | BooleanType -> use boolean_constructor
-        | ListType -> use list_constructor
+        | IntType -> int_constructor <| expr
+        | NumberType -> number_constructor <| expr
+        | StringType -> string_constructor <| expr
+        | ObjectType -> loc_constructor <| expr
+        | TypeType -> type_constructor <| expr
+        | BooleanType -> boolean_constructor <| expr
+        | ListType -> list_constructor <| expr
         | _ -> Fmt.failwith "Cannot simple-wrap value of type %s" (Type.str ty))
-    | Extended_wrapped -> unwrap_extended expr
+    | Extended_wrapped ->
+        Extended_literal_operations.singular_elem_accessor <| expr
 
   let extend_wrap e =
     let open Lit_operations in
     match e.kind with
-    | Extended_wrapped -> e
-    | _ ->
-        let simple = simple_wrap e in
-        {
-          kind = Extended_wrapped;
-          expr = Extended_literal_operations.singular_constructor <| simple.expr;
-        }
+    | Extended_wrapped -> e.expr
+    | _ -> Extended_literal_operations.singular_constructor <| simple_wrap e
 
   let get_num = get_native ~accessor:Lit_operations.number_accessor
   let get_int = get_native ~accessor:Lit_operations.int_accessor
@@ -588,9 +583,7 @@ let rec encode_lit (lit : Literal.t) : Encoding.t =
         let t_arg = encode_type t in
         native ~ty:TypeType t_arg
     | LList lits ->
-        let args =
-          List.map (fun lit -> (simple_wrap (encode_lit lit)).expr) lits
-        in
+        let args = List.map (fun lit -> simple_wrap (encode_lit lit)) lits in
         mk_z3_list args >- ListType
     | Constant _ -> raise (Exceptions.Unsupported "Z3 encoding: constants")
   with Failure msg ->
@@ -609,9 +602,9 @@ let encode_equality (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t =
         mk_eq p1.expr p2.expr
     | Native _, Native _ -> failwith "incompatible equality!"
     | Simple_wrapped, Native _ | Native _, Simple_wrapped ->
-        mk_eq (simple_wrap p1).expr (simple_wrap p2).expr
+        mk_eq (simple_wrap p1) (simple_wrap p2)
     | Extended_wrapped, _ | _, Extended_wrapped ->
-        mk_eq (extend_wrap p1).expr (extend_wrap p2).expr
+        mk_eq (extend_wrap p1) (extend_wrap p2)
   in
   res >- BooleanType
 
@@ -643,7 +636,7 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
   | BAnd -> mk_and (get_bool p1) (get_bool p2) >- BooleanType
   | BSetMem ->
       (* p2 has to be already wrapped *)
-      Set.mk_membership ctx (simple_wrap p1).expr (get_set p2) >- BooleanType
+      Set.mk_membership ctx (simple_wrap p1) (get_set p2) >- BooleanType
   | SetDiff -> Set.mk_difference ctx (get_set p1) (get_set p2) >- SetType
   | BSetSub -> Set.mk_subset ctx (get_set p1) (get_set p2) >- BooleanType
   | LstNth ->
@@ -767,10 +760,10 @@ let rec encode_logical_expression ~(gamma : tyenv) (le : Expr.t) : Encoding.t =
         (f (List.hd les))
         (List.tl les)
   | EList les ->
-      let args = List.map (fun le -> (simple_wrap (f le)).expr) les in
+      let args = List.map (fun le -> simple_wrap (f le)) les in
       mk_z3_list args >- ListType
   | ESet les ->
-      let args = List.map (fun le -> (simple_wrap (f le)).expr) les in
+      let args = List.map (fun le -> simple_wrap (f le)) les in
       mk_z3_set args >- SetType
   | LstSub _ -> Fmt.failwith "Unsupported LstSub: %a" Expr.pp le
 
@@ -840,7 +833,7 @@ let rec encode_assertion ~(gamma : tyenv) (a : Formula.t) : Encoding.t =
   | And (a1, a2) ->
       Boolean.mk_and ctx [ get_bool (f a1); get_bool (f a2) ] >- BooleanType
   | SetMem (le1, le2) ->
-      let le1' = (simple_wrap (fe le1)).expr in
+      let le1' = simple_wrap (fe le1) in
       let le2' = get_set (fe le2) in
       Set.mk_membership ctx le1' le2' >- SetType
   | SetSub (le1, le2) ->
