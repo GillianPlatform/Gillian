@@ -82,11 +82,14 @@ let check_satisfiability
   in
   let axioms = get_axioms fs gamma in
   let fs = Formula.Set.union fs axioms in
-  let result = Z3_encoding.check_sat fs (TypEnv.as_hashtbl gamma) in
-  (* if time <> "" then
-     Utils.Statistics.update_statistics ("FOS: CheckSat: " ^ time)
-       (Sys.time () -. t); *)
-  result
+  if Formula.Set.is_empty fs then true
+  else if Formula.Set.mem False fs then false
+  else
+    let result = Z3_encoding.check_sat fs (TypEnv.as_hashtbl gamma) in
+    (* if time <> "" then
+       Utils.Statistics.update_statistics ("FOS: CheckSat: " ^ time)
+         (Sys.time () -. t); *)
+    result
 
 let sat ~unification ~pfs ~gamma formulae : bool =
   check_satisfiability ~unification (formulae @ PFS.to_list pfs) gamma

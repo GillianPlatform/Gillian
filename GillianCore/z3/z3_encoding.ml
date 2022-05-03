@@ -19,7 +19,7 @@ module ZExpr = Z3.Expr
 (* Note: I could probably have some static check instead of dynamic check
    using GADTs that my z3 exprs are correctly typed. *)
 
-[@@@ocaml.warning "-A"]
+(* [@@@ocaml.warning "-A"] *)
 
 type tyenv = (string, Type.t) Hashtbl.t
 
@@ -196,9 +196,10 @@ module Lit_operations = struct
   let gil_list_accessors = Datatype.get_accessors z3_gil_list_sort
   let head_accessor = List.nth (List.nth gil_list_accessors 1) 0
   let tail_accessor = List.nth (List.nth gil_list_accessors 1) 1
-  let gil_list_recognizers = Datatype.get_recognizers z3_gil_list_sort
-  let nil_recognizer = List.nth gil_list_recognizers 0
-  let cons_recognizer = List.nth gil_list_recognizers 1
+  (* let gil_list_recognizers = Datatype.get_recognizers z3_gil_list_sort *)
+
+  (* let nil_recognizer = List.nth gil_list_recognizers 0 *)
+  (* let cons_recognizer = List.nth gil_list_recognizers 1 *)
   let z3_literal_constructors = Datatype.get_constructors z3_gil_literal_sort
   let undefined_constructor = List.nth z3_literal_constructors 0
   let null_constructor = List.nth z3_literal_constructors 1
@@ -244,8 +245,8 @@ module List_operations = struct
   let cons_constructor = cons_constructor
   let head_accessor = head_accessor
   let tail_accessor = tail_accessor
-  let nil_recognizer = nil_recognizer
-  let cons_recognizer = cons_recognizer
+  (* let nil_recognizer = nil_recognizer *)
+  (* let cons_recognizer = cons_recognizer *)
 end
 
 let z3_gil_set_sort = Set.mk_sort ctx z3_gil_literal_sort
@@ -285,17 +286,11 @@ module Extended_literal_operations = struct
   let gil_extended_literal_recognizers =
     Datatype.get_recognizers extended_literal_sort
 
-  let singular_elem_recognizer = List.nth gil_extended_literal_recognizers 0
+  (* let singular_elem_recognizer = List.nth gil_extended_literal_recognizers 0 *)
   let set_recognizer = List.nth gil_extended_literal_recognizers 1
 end
 
 let extended_literal_sort = Extended_literal_operations.extended_literal_sort
-
-let mk_singleton_elem ele =
-  ZExpr.mk_app ctx Extended_literal_operations.singular_constructor [ ele ]
-
-let mk_singleton_access ele =
-  ZExpr.mk_app ctx Extended_literal_operations.singular_elem_accessor [ ele ]
 
 module Axiomatised_operations = struct
   let slen_fun =
@@ -352,14 +347,14 @@ let mk_z3_set les =
   result
 
 let mk_z3_list les =
-  let empty_list = Lit_operations.nil_constructor $$ [] in
+  let empty_list = List_operations.nil_constructor $$ [] in
   let mk_z3_list_core les =
     let rec loop les cur_list =
       match les with
       | [] -> cur_list
       | le :: rest_les ->
           let new_cur_list =
-            Lit_operations.cons_constructor $$ [ le; cur_list ]
+            List_operations.cons_constructor $$ [ le; cur_list ]
           in
           loop rest_les new_cur_list
     in
@@ -435,12 +430,6 @@ module Encoding = struct
 
   let native ~ty expr = { kind = Native ty; expr }
 
-  let unwrap_extended expr =
-    {
-      kind = Simple_wrapped;
-      expr = Extended_literal_operations.singular_elem_accessor <| expr;
-    }
-
   let get_native ~accessor { expr; kind } =
     (* Not additional check is performed on native type,
        it should be already type checked *)
@@ -469,14 +458,16 @@ module Encoding = struct
         | TypeType -> type_constructor <| expr
         | BooleanType -> boolean_constructor <| expr
         | ListType -> list_constructor <| expr
-        | _ -> Fmt.failwith "Cannot simple-wrap value of type %s" (Type.str ty))
+        | UndefinedType | NullType | EmptyType | NoneType | SetType ->
+            Fmt.failwith "Cannot simple-wrap value of type %s" (Type.str ty))
     | Extended_wrapped ->
         Extended_literal_operations.singular_elem_accessor <| expr
 
   let extend_wrap e =
-    let open Lit_operations in
     match e.kind with
     | Extended_wrapped -> e.expr
+    | Native SetType ->
+        Extended_literal_operations.set_constructor <| simple_wrap e
     | _ -> Extended_literal_operations.singular_constructor <| simple_wrap e
 
   let get_num = get_native ~accessor:Lit_operations.number_accessor
@@ -510,12 +501,14 @@ let ready_to_subst_expr_for_simply_wrapped_typeof =
       (Lit_operations.null_recognizer <| placeholder_sw, Type.NullType);
       (Lit_operations.empty_recognizer <| placeholder_sw, Type.EmptyType);
       (Lit_operations.boolean_recognizer <| placeholder_sw, Type.BooleanType);
-      (Lit_operations.number_recognizer <| placeholder_sw, Type.NumberType);
       (Lit_operations.string_recognizer <| placeholder_sw, Type.StringType);
-      (Lit_operations.loc_recognizer <| placeholder_sw, Type.ObjectType);
       (Lit_operations.type_recognizer <| placeholder_sw, Type.TypeType);
-      (Lit_operations.list_recognizer <| placeholder_sw, Type.ListType);
       (Lit_operations.none_recognizer <| placeholder_sw, Type.NoneType);
+      (Lit_operations.undefined_recognizer <| placeholder_sw, Type.UndefinedType);
+      (Lit_operations.loc_recognizer <| placeholder_sw, Type.ObjectType);
+      (Lit_operations.list_recognizer <| placeholder_sw, Type.ListType);
+      (Lit_operations.int_recognizer <| placeholder_sw, Type.IntType);
+      (Lit_operations.number_recognizer <| placeholder_sw, Type.NumberType);
     ]
   in
   List.fold_left
@@ -530,10 +523,6 @@ let ready_to_subst_expr_for_extended_wrapped_typeof =
   Boolean.mk_ite ctx set_guard (encode_type SetType) else_branch_placeholder
 
 let typeof_expression (x : Encoding.t) =
-  (* let placeholder_sw =
-
-     let typeof_sw e =
-  *)
   match x.kind with
   | Native ty -> encode_type ty
   | Simple_wrapped ->
@@ -734,12 +723,11 @@ let rec encode_logical_expression ~(gamma : tyenv) (le : Expr.t) : Encoding.t =
   | LVar var -> (
       match Hashtbl.find_opt gamma var with
       | None ->
-          ZExpr.mk_const ctx (mk_string_symb var) extended_literal_sort
-          |> extended_wrapped
+          ZExpr.mk_const_s ctx var extended_literal_sort |> extended_wrapped
       | Some ty ->
           let sort = native_sort_of_type ty in
-          ZExpr.mk_const ctx (mk_string_symb var) sort >- ty)
-  | ALoc var -> ZExpr.mk_const ctx (mk_string_symb var) ints_sort >- ObjectType
+          ZExpr.mk_const_s ctx var sort >- ty)
+  | ALoc var -> ZExpr.mk_const_s ctx var ints_sort >- ObjectType
   | PVar _ -> raise (Failure "Program variable in pure formula: FIRE")
   | UnOp (op, le) -> encode_unop op (f le)
   | BinOp (le1, op, le2) -> encode_binop op (f le1) (f le2)
@@ -767,50 +755,47 @@ let rec encode_logical_expression ~(gamma : tyenv) (le : Expr.t) : Encoding.t =
       mk_z3_set args >- SetType
   | LstSub _ -> Fmt.failwith "Unsupported LstSub: %a" Expr.pp le
 
-let encode_quantifier quantifier_type ctx quantified_vars var_sorts assertion =
-  if List.length quantified_vars > 0 then
-    let quantified_assertion =
-      Quantifier.mk_quantifier_const ctx quantifier_type
-        (List.map2
-           (fun v s -> ZExpr.mk_const_s ctx v s)
-           quantified_vars var_sorts)
-        assertion None [] [] None None
-    in
-    let quantified_assertion =
-      Quantifier.expr_of_quantifier quantified_assertion
-    in
-    let quantified_assertion = ZExpr.simplify quantified_assertion None in
-    quantified_assertion
-  else assertion
+let rec encode_forall ~gamma quantified_vars assertion =
+  let open Encoding in
+  match quantified_vars with
+  | [] ->
+      (* A quantified assertion with no quantified variables is just the assertion *)
+      encode_assertion ~gamma assertion
+  | _ ->
+      (* Start by updating gamma with the information provided by quantifier types.
+         There's very few foralls, so it's ok to copy the gamma entirely *)
+      let gamma = Hashtbl.copy gamma in
+      List.iter
+        (fun (x, ty) ->
+          match ty with
+          | None -> Hashtbl.remove gamma x
+          | Some ty -> Hashtbl.replace gamma x ty)
+        quantified_vars;
+      (* Not the same gamma now!*)
+      let encoded_assertion =
+        match encode_assertion ~gamma assertion with
+        | { kind = Native BooleanType; expr } -> expr
+        | _ -> failwith "the thing inside forall is not boolean!"
+      in
+      let quantified_vars =
+        List.map
+          (fun (x, t) ->
+            let sort =
+              match t with
+              | None -> extended_literal_sort
+              | Some ty -> Encoding.native_sort_of_type ty
+            in
+            ZExpr.mk_const_s ctx x sort)
+          quantified_vars
+      in
+      let quantifier =
+        Quantifier.mk_forall_const ctx quantified_vars encoded_assertion None []
+          [] None None
+      in
+      let quantifier_expr = Quantifier.expr_of_quantifier quantifier in
+      ZExpr.simplify quantifier_expr None >- BooleanType
 
-let make_recognizer_assertion x (t_x : Type.t) =
-  let le_x = ZExpr.mk_const ctx (mk_string_symb x) extended_literal_sort in
-
-  let non_set_type_recognizer f =
-    let a1 =
-      ZExpr.mk_app ctx Extended_literal_operations.singular_elem_recognizer
-        [ le_x ]
-    in
-    let a2 = ZExpr.mk_app ctx f [ mk_singleton_access le_x ] in
-    Boolean.mk_and ctx [ a1; a2 ]
-  in
-
-  match t_x with
-  | UndefinedType -> non_set_type_recognizer Lit_operations.undefined_recognizer
-  | NullType -> non_set_type_recognizer Lit_operations.null_recognizer
-  | EmptyType -> non_set_type_recognizer Lit_operations.empty_recognizer
-  | NoneType -> non_set_type_recognizer Lit_operations.none_recognizer
-  | BooleanType -> non_set_type_recognizer Lit_operations.boolean_recognizer
-  | IntType -> non_set_type_recognizer Lit_operations.int_recognizer
-  | NumberType -> non_set_type_recognizer Lit_operations.number_recognizer
-  | StringType -> non_set_type_recognizer Lit_operations.string_recognizer
-  | ObjectType -> non_set_type_recognizer Lit_operations.loc_recognizer
-  | ListType -> non_set_type_recognizer Lit_operations.list_recognizer
-  | TypeType -> non_set_type_recognizer Lit_operations.type_recognizer
-  | SetType ->
-      ZExpr.mk_app ctx Extended_literal_operations.set_recognizer [ le_x ]
-
-let rec encode_assertion ~(gamma : tyenv) (a : Formula.t) : Encoding.t =
+and encode_assertion ~(gamma : tyenv) (a : Formula.t) : Encoding.t =
   let f = encode_assertion ~gamma in
   let fe = encode_logical_expression ~gamma in
   let open Encoding in
@@ -838,20 +823,7 @@ let rec encode_assertion ~(gamma : tyenv) (a : Formula.t) : Encoding.t =
       Set.mk_membership ctx le1' le2' >- SetType
   | SetSub (le1, le2) ->
       Set.mk_subset ctx (get_set (fe le1)) (get_set (fe le2)) >- SetType
-  | ForAll (bt, a) -> failwith "encode_forall"
-(* let z3_sorts = List.map (fun _ -> extended_literal_sort) bt in
-   let z3_types_assertions =
-     List.filter_map
-       (fun (x, t_x) ->
-         match t_x with
-         | Some t_x -> Some (es_assertion x t_x)
-         | None -> None)
-       bt
-   in
-   let binders, _ = List.split bt in
-   let z3_types_assertion = Boolean.mk_and ctx z3_types_assertions in
-   let z3_a = Boolean.mk_implies ctx z3_types_assertion (f a) in
-   encode_quantifier true ctx binders z3_sorts z3_a *)
+  | ForAll (bt, a) -> encode_forall ~gamma bt a
 
 (* ****************
    * SATISFIABILITY *
@@ -889,6 +861,40 @@ let master_solver =
   Solver.push solver;
   solver
 
+let dump_smt =
+  let counter = ref 0 in
+  let folder =
+    let folder_name = "gillian_smt_queries" in
+    let created = ref false in
+    let create () =
+      created := true;
+      Unix.mkdir folder_name 0o755
+    in
+    fun () ->
+      let () = if not !created then create () in
+      folder_name
+  in
+  let file () =
+    let ret = Printf.sprintf "query_%d.smt2" !counter in
+    let () = incr counter in
+    ret
+  in
+  fun fs gamma status ->
+    let path = Filename.concat (folder ()) (file ()) in
+    let c = open_out path in
+    Fmt.pf
+      (Format.formatter_of_out_channel c)
+      "GIL query:\n\
+       FS: %a\n\
+       GAMMA: %a\n\
+       Resulted in Status: %s\n\n\
+       Encoded as Z3 Query:\n\
+       %s"
+      (Fmt.iter ~sep:Fmt.comma Formula.Set.iter Formula.pp)
+      fs pp_tyenv gamma
+      (Solver.string_of_status status)
+      (Solver.to_string master_solver)
+
 let reset_solver () =
   Solver.pop master_solver 1;
   Solver.push master_solver
@@ -915,6 +921,8 @@ let check_sat_core (fs : Formula.Set.t) (gamma : tyenv) : Model.model option =
   (* Utils.Statistics.update_statistics "Solver check" (Sys.time () -. t); *)
   L.(
     verbose (fun m -> m "The solver returned: %s" (Solver.string_of_status ret)));
+
+  if !Utils.Config.dump_smt then dump_smt fs gamma ret;
 
   let ret_value =
     match ret with
@@ -961,61 +969,59 @@ let lift_z3_model
     (gamma : (string, Type.t) Hashtbl.t)
     (subst_update : string -> Expr.t -> unit)
     (target_vars : Expr.Set.t) : unit =
-  failwith "Lift z3 model"
-(* let ( let* ) = Option.bind in
-   let ( let+ ) x f = Option.map f x in
-   let recover_z3_number (n : ZExpr.expr) : float option =
-     if ZExpr.is_numeral n then (
-       L.(verbose (fun m -> m "Z3 number: %s" (ZExpr.to_string n)));
-       Some (float_of_string (Z3.Arithmetic.Real.to_decimal_string n 16)))
-     else None
-   in
+  let ( let* ) = Option.bind in
+  let ( let+ ) x f = Option.map f x in
+  let z3lv ~ty x =
+    let sort = Encoding.native_sort_of_type ty in
+    ZExpr.mk_const_s ctx x sort
+  in
+  let recover_z3_number (n : ZExpr.expr) : float option =
+    if ZExpr.is_numeral n then (
+      L.(verbose (fun m -> m "Z3 number: %s" (ZExpr.to_string n)));
+      Some (float_of_string (Z3.Arithmetic.Real.to_decimal_string n 16)))
+    else None
+  in
 
-   let recover_z3_int (zn : ZExpr.expr) : int option =
-     let+ n = recover_z3_number zn in
-     int_of_float n
-   in
+  let recover_z3_int (n : ZExpr.expr) : Z.t option =
+    if ZExpr.is_numeral n then (
+      L.(verbose (fun m -> m "Z3 integer: %s" (ZExpr.to_string n)));
+      Some (Z.of_string (Z3.Arithmetic.Integer.numeral_to_string n)))
+    else None
+  in
 
-   let lift_z3_val (x : string) : Expr.t option =
-     let* gil_type = Hashtbl.find_opt gamma x in
-     match gil_type with
-     | NumberType ->
-         let x' = encode_logical_expression (LVar x) in
-         let x'' =
-           ZExpr.mk_app ctx Lit_operations.number_accessor
-             [ mk_singleton_access x' ]
-         in
-         let* v = Model.eval model x'' true in
-         let+ n = recover_z3_number v in
-         Expr.num n
-     | StringType ->
-         let x' = encode_logical_expression (LVar x) in
-         let x'' =
-           ZExpr.mk_app ctx Lit_operations.string_accessor
-             [ mk_singleton_access x' ]
-         in
-         let* v = Model.eval model x'' true in
-         let* si = recover_z3_int v in
-         let+ str_code = Hashtbl.find_opt str_codes_inv si in
-         Expr.string str_code
-     | _ -> None
-   in
+  let lift_z3_val (x : string) : Literal.t option =
+    let* gil_type = Hashtbl.find_opt gamma x in
+    let* v = Model.eval model (z3lv ~ty:gil_type x) true in
+    match gil_type with
+    | NumberType ->
+        let+ n = recover_z3_number v in
+        Literal.Num n
+    | IntType ->
+        let+ n = recover_z3_int v in
+        Literal.Int n
+    | StringType ->
+        let* si = recover_z3_int v in
+        let+ str_code = Hashtbl.find_opt str_codes_inv (Z.to_int si) in
+        Literal.String str_code
+    | _ -> None
+  in
 
-   L.(verbose (fun m -> m "Inside lift_z3_model"));
-   Expr.Set.iter
-     (fun x ->
-       let x =
-         match x with
-         | LVar x -> x
-         | _ ->
-             raise
-               (Failure "INTERNAL ERROR: Z3 lifting of a non-logical variable")
-       in
-       let v = lift_z3_val x in
-       L.(
-         verbose (fun m ->
-             m "Z3 binding for %s: %s\n" x
-               (Option.fold ~some:(Fmt.to_to_string Expr.pp) ~none:"NO BINDING!"
-                  v)));
-       Option.fold ~some:(subst_update x) ~none:() v)
-     target_vars *)
+  L.(verbose (fun m -> m "Inside lift_z3_model"));
+  Expr.Set.iter
+    (fun x ->
+      let x =
+        match x with
+        | LVar x -> x
+        | _ ->
+            raise
+              (Failure "INTERNAL ERROR: Z3 lifting of a non-logical variable")
+      in
+      let v = lift_z3_val x in
+      L.(
+        verbose (fun m ->
+            m "Z3 binding for %s: %s\n" x
+              (Option.fold
+                 ~some:(Fmt.to_to_string Literal.pp)
+                 ~none:"NO BINDING!" v)));
+      Option.fold ~some:(fun v -> subst_update x (Expr.Lit v)) ~none:() v)
+    target_vars
