@@ -169,6 +169,10 @@ struct
     let doc = "Print-by-need." in
     Arg.(value & flag & info [ "pbn"; "print-by-need" ] ~doc)
 
+  let dump_smt =
+    let doc = "Dump every smt query sent to z3" in
+    Arg.(value & flag & info [ "dump-smt" ] ~doc)
+
   let get_progs_or_fail = function
     | Ok progs -> (
         match progs.ParserAndCompiler.gil_progs with
@@ -188,7 +192,8 @@ struct
         ci
         tl_opts
         result_dir
-        pbn =
+        pbn
+        dump_smt =
       Config.set_result_dir result_dir;
       Config.ci := ci;
       Logging.Mode.set_mode logging_mode;
@@ -197,12 +202,13 @@ struct
       Printexc.record_backtrace (Logging.Mode.enabled ());
       PC.TargetLangOptions.apply tl_opts;
       Config.set_runtime_paths ?env_var:PC.env_var_import_path runtime_path;
-      Config.pbn := pbn
+      Config.pbn := pbn;
+      Config.dump_smt := dump_smt
     in
     let common_term =
       Term.(
         const apply_common $ logging_mode $ reporters $ runtime_path $ ci
-        $ PC.TargetLangOptions.term $ result_directory $ pbn)
+        $ PC.TargetLangOptions.term $ result_directory $ pbn $ dump_smt)
     in
     Term.(term $ common_term)
 

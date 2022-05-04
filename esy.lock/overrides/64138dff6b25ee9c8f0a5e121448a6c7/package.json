@@ -17,7 +17,7 @@
     "buildsInSource": true,
     "build": [
       [
-        "python2.7",
+        "python3",
         "scripts/mk_make.py",
         "--prefix=#{self.install}",
         "--ml"
@@ -44,7 +44,7 @@
     ],
     "dependencies": {
       "@opam/zarith": "*",
-      "@opam/conf-python-2-7": "*",
+      "@opam/conf-python-3-7": "*",
       "@opam/ocamlfind": "*",
       "@opam/conf-gmp": "*",
       "ocaml": ">=4.3.0"

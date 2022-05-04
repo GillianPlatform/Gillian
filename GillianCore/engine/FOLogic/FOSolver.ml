@@ -41,7 +41,7 @@ let simplify_pfs_and_gamma
 let check_satisfiability_with_model (fs : Formula.t list) (gamma : TypEnv.t) :
     SESubst.t option =
   let fs, gamma, subst = simplify_pfs_and_gamma fs gamma in
-  let model = Z3_encoding.check_sat_core fs (TypEnv.get_var_type_pairs gamma) in
+  let model = Z3_encoding.check_sat_core fs (TypEnv.as_hashtbl gamma) in
   let lvars =
     List.fold_left
       (fun ac vs ->
@@ -82,11 +82,14 @@ let check_satisfiability
   in
   let axioms = get_axioms fs gamma in
   let fs = Formula.Set.union fs axioms in
-  let result = Z3_encoding.check_sat fs (TypEnv.get_var_type_pairs gamma) in
-  (* if time <> "" then
-     Utils.Statistics.update_statistics ("FOS: CheckSat: " ^ time)
-       (Sys.time () -. t); *)
-  result
+  if Formula.Set.is_empty fs then true
+  else if Formula.Set.mem False fs then false
+  else
+    let result = Z3_encoding.check_sat fs (TypEnv.as_hashtbl gamma) in
+    (* if time <> "" then
+       Utils.Statistics.update_statistics ("FOS: CheckSat: " ^ time)
+         (Sys.time () -. t); *)
+    result
 
 let sat ~unification ~pfs ~gamma formulae : bool =
   check_satisfiability ~unification (formulae @ PFS.to_list pfs) gamma
@@ -184,7 +187,7 @@ let check_entailment
       let ret =
         Z3_encoding.check_sat
           (Formula.Set.of_list (PFS.to_list formulae))
-          (TypEnv.get_var_type_pairs gamma_left)
+          (TypEnv.as_hashtbl gamma_left)
       in
       L.(verbose (fun m -> m "Entailment returned %b" (not ret)));
       (* Utils.Statistics.update_statistics "FOS: CheckEntailment"

@@ -12,7 +12,7 @@ default:
 		--fstruct-passing --no-lemma-proof -l disabled
 
 proc:
-	${VERIFY) \
+	${VERIFY} \
 		header.c edk.c array_list.c ec.c byte_buf.c \
 		hash_table.c string.c allocator.c \
 		error.c base.c \
