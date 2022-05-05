@@ -39,6 +39,8 @@ module type S = sig
 
   (** Turns a predicate set into a list of assertions *)
   val to_assertions : t -> Asrt.t list
+
+  val is_in : t -> Expr.t -> bool
 end
 
 module Make
@@ -282,6 +284,12 @@ module Make
       Asrt.Pred (n, args)
     in
     List.sort Asrt.compare (List.map pred_to_assert preds)
+
+  let is_in (preds : t) (ue : Expr.t) : bool =
+    let all_pred_params =
+      List.map Val.to_expr (List.concat (snd (List.split (to_list preds))))
+    in
+    List.for_all (fun pe -> Expr.sub_expr ue pe) all_pred_params
 end
 
 module SPreds = Make (SVal.M) (SVal.SESubst)

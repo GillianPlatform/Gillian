@@ -39,6 +39,8 @@ module type S = sig
 
   (** Turns a predicate set into a list of assertions *)
   val to_assertions : t -> Asrt.t list
+
+  val is_in : t -> Expr.t -> bool
 end
 
 module Make

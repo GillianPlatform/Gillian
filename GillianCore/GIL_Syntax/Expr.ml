@@ -461,3 +461,5 @@ let rec pvars_to_lvars (e : t) : t =
   | EList les -> EList (List.map f les)
   | ESet les -> ESet (List.map f les)
   | _ -> e
+
+let sub_expr _ _ = false

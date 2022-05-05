@@ -8,6 +8,7 @@ module type S = sig
 
   val get_typ_env : t -> TypEnv.t
   val get_pfs : t -> PFS.t
+  val hides : Expr.Set.t -> t -> Expr.t list -> (unit, Expr.t) result
 end
 
 module Make (SMemory : SMemory.S) :
@@ -817,4 +818,6 @@ module Make (SMemory : SMemory.S) :
   let get_pfs state =
     let _, _, pfs, _, _ = state in
     pfs
+
+  let hides _ _ _ = Ok ()
 end

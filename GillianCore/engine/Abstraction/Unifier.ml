@@ -38,7 +38,7 @@ module Make
     (Val : Val.S)
     (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
-    (State : State.S
+    (State : SState.S
                with type vt = Val.t
                 and type st = ESubst.t
                 and type store_t = Store.t)
@@ -1219,10 +1219,10 @@ module Make
     | true, Some [], _
     | true, _, UWTF
     | true, _, UFail _ -> result
-    | true, Some ox, USucc (state, preds, _, _) ->
+    | true, Some ox, USucc (state, preds, _, _) -> (
         L.verbose (fun fmt ->
             fmt "OX hiding: %a\n" (Fmt.list ~sep:Fmt.comma Fmt.string) ox);
-        let ox_subst =
+        let ox_bindings =
           List.map
             (fun x ->
               match ESubst.get subst (LVar x) with
@@ -1244,16 +1244,7 @@ module Make
               | None -> failwith ("OX: no binding in subst for " ^ x))
             ox
         in
-        (* FIXME: For now, filter for LVars only *)
-        let ox_subst =
-          List.filter_map
-            (fun x ->
-              match x with
-              | Expr.LVar x -> Some x
-              | _ -> None)
-            ox_subst
-        in
-        let ox_subst = SS.of_list ox_subst in
+        (* TODO: Some setup using preds *)
         let used_unifiables =
           let pred_alocs = SS.elements (Preds.get_alocs preds) in
           let pred_lvars = SS.elements (Preds.get_lvars preds) in
@@ -1263,27 +1254,29 @@ module Make
             (Expr.Set.of_list
                (List.map (fun (x : string) -> Expr.LVar x) pred_lvars))
         in
-        let state = State.copy state in
-        let () = State.clean_up ~keep:used_unifiables state in
-        let () =
-          L.verbose (fun fmt -> fmt "Cleaned-up state: \n%a" State.pp state)
+        (* FIXME: implement correctly *)
+        let no_hides_in_preds =
+          List.for_all
+            (fun ue -> not (Preds.is_in preds ue))
+            (Expr.Set.elements used_unifiables)
         in
-        let lvars =
-          SS.union (State.get_lvars_for_exact state) (Preds.get_lvars preds)
-        in
-        let () =
-          L.verbose (fun fmt ->
-              fmt "Relevant state lvars: %a"
-                (Fmt.list ~sep:Fmt.comma Fmt.string)
-                (SS.elements lvars))
-        in
-        let intersection = SS.inter ox_subst lvars in
-        if intersection <> SS.empty then
-          let () =
-            L.verbose (fun fmt -> fmt "OX: hidden variables still in state.")
-          in
-          make_resource_fail ()
-        else result
+        match no_hides_in_preds with
+        | false ->
+            let () =
+              L.verbose (fun fmt ->
+                  fmt "OX: expressions to be hidden in predicates.")
+            in
+            make_resource_fail ()
+        | true -> (
+            match State.hides used_unifiables state ox_bindings with
+            | Ok () -> result
+            | Error nhe ->
+                let () =
+                  L.verbose (fun fmt ->
+                      fmt "OX: expressions to be hidden still in state: %a"
+                        Expr.pp nhe)
+                in
+                make_resource_fail ()))
 
   and unify_up (s_states : search_state) : up_u_res =
     let s_states, errs_so_far = s_states in

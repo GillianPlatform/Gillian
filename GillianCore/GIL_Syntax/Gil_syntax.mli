@@ -342,6 +342,9 @@ module Expr : sig
 
   (** [is_unifiable x] returns whether or not the expression [e] is unifiable *)
   val is_unifiable : t -> bool
+
+  (** Sub-expression check *)
+  val sub_expr : t -> t -> bool
 end
 
 module Formula : sig
