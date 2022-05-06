@@ -286,10 +286,10 @@ module Make
     List.sort Asrt.compare (List.map pred_to_assert preds)
 
   let is_in (preds : t) (ue : Expr.t) : bool =
-    let all_pred_params =
-      List.map Val.to_expr (List.concat (snd (List.split (to_list preds))))
-    in
-    List.exists (Expr.sub_expr ue) all_pred_params
+    List.exists
+      (fun (_, vs) ->
+        List.exists (fun v -> Expr.sub_expr ue (Val.to_expr v)) vs)
+      !preds
 end
 
 module SPreds = Make (SVal.M) (SVal.SESubst)
