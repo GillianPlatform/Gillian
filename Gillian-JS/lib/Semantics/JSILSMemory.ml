@@ -100,6 +100,7 @@ module M = struct
     List.map JSIL2GIL.jsil2gil_asrt (SHeap.assertions heap)
 
   let lvars (heap : t) : Containers.SS.t = SHeap.lvars heap
+  let alocs (heap : t) : Containers.SS.t = SHeap.alocs heap
 
   let clean_up ?(keep = Expr.Set.empty) (heap : t) : Expr.Set.t * Expr.Set.t =
     SHeap.clean_up heap;

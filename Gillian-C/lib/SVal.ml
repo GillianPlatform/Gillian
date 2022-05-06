@@ -135,6 +135,13 @@ let lvars =
   | Sptr (_, e) -> Expr.lvars e
   | SVint e | SVfloat e | SVsingle e | SVlong e -> Expr.lvars e
 
+let alocs =
+  let open Utils.Containers in
+  function
+  | SUndefined -> SS.empty
+  | Sptr (_, e) -> Expr.alocs e
+  | SVint e | SVfloat e | SVsingle e | SVlong e -> Expr.alocs e
+
 let pp fmt v =
   let se = Expr.pp in
   let f = Format.fprintf in

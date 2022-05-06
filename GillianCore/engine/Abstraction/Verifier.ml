@@ -192,7 +192,23 @@ struct
           | _, _ -> []
         in
         let simple_posts =
-          List.map (fun post -> (post, (label, None, ox))) posts
+          List.map
+            (fun post ->
+              let post_lvars = Asrt.lvars post in
+              let lstr_pp = Fmt.(list ~sep:comma string) in
+              let () =
+                L.verbose (fun fmt ->
+                    fmt "OX hiding: %a\nPost lvars: %a" lstr_pp ox lstr_pp
+                      (SS.elements post_lvars))
+              in
+              let inter = SS.inter post_lvars (SS.of_list ox) in
+              match SS.is_empty inter with
+              | true -> (post, (label, None, ox))
+              | false ->
+                  failwith
+                    ("Error: Exact lemma with impossible hiding: "
+                   ^ SS.min_elt inter))
+            posts
         in
         let post_up =
           UP.init known_unifiables Expr.Set.empty pred_ins simple_posts
@@ -382,16 +398,6 @@ struct
     in
     (tests, { lemma with lemma_specs = specs })
 
-  (* let (tests, lemmas) = List.fold_left
-     let tests = Option.fold ~some:(fun test -> [ test ]) ~none:[] test in
-     match sspec with
-     | Some (lemma_hyp, lemma_concs) ->
-         (tests, { lemma with lemma_hyp; lemma_concs })
-     | None ->
-         raise
-           (Failure
-              (Printf.sprintf "Could not testify lemma %s" lemma.lemma_name)) *)
-
   let analyse_result (subst : SSubst.t) (test : t) (state : SPState.t) : bool =
     (* TODO: ASSUMING SIMPLIFICATION DOES NOT BRANCH HERE *)
     let _, states = SPState.simplify state in
@@ -576,7 +582,7 @@ struct
                 (Failure (Printf.sprintf "Lemma %s WITHOUT proof" test.name))
             else true (* It's already correct *)
         | Some proof ->
-            let msg = "Verifying lemma " ^ test.name ^ "... \n" in
+            let msg = "Verifying lemma " ^ test.name ^ "... " in
             L.tmi (fun fmt -> fmt "%s" msg);
             Fmt.pr "%s@?" msg;
             let rets = SAInterpreter.evaluate_lcmds prog proof state in

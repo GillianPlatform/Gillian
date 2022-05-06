@@ -38,6 +38,8 @@ module Make (SMemory : SMemory.S) :
 
   exception Internal_State_Error of err_t list * t
 
+  module ES = Expr.Set
+
   let lift_merrs (errs : m_err_t list) : err_t list =
     List.map (fun x -> StateErr.EMem x) errs
 
@@ -455,9 +457,19 @@ module Make (SMemory : SMemory.S) :
       ]
 
   let get_lvars_for_exact (state : t) : Var.Set.t =
+    let heap, store, pfs, gamma, _ = state in
+    List.fold_left SS.union SS.empty
+      [
+        SMemory.lvars heap;
+        SStore.lvars store;
+        PFS.lvars pfs;
+        TypEnv.lvars gamma;
+      ]
+
+  let get_alocs_for_exact (state : t) : Var.Set.t =
     let heap, store, pfs, _, _ = state in
     List.fold_left SS.union SS.empty
-      [ SMemory.lvars heap; SStore.lvars store; PFS.lvars pfs ]
+      [ SMemory.alocs heap; SStore.alocs store; PFS.alocs pfs ]
 
   let to_assertions ?(to_keep : SS.t option) (state : t) : Asrt.t list =
     let heap, store, pfs, gamma, _ = state in
@@ -553,29 +565,25 @@ module Make (SMemory : SMemory.S) :
 
   let fresh_val (_ : t) : vt = LVar (LVar.alloc ())
 
-  let clean_up ?(keep = Expr.Set.empty) (state : t) : unit =
+  let clean_up ?(keep = ES.empty) (state : t) : unit =
     let heap, store, _, _, _ = state in
     let store_alocs = SS.elements (SStore.alocs store) in
     let store_lvars = SS.elements (SStore.lvars store) in
     let keep =
-      List.fold_left Expr.Set.union Expr.Set.empty
+      List.fold_left ES.union ES.empty
         [
           keep;
-          Expr.Set.of_list
-            (List.map (fun (x : string) -> Expr.ALoc x) store_alocs);
-          Expr.Set.of_list
-            (List.map (fun (x : string) -> Expr.LVar x) store_lvars);
+          ES.of_list (List.map (fun (x : string) -> Expr.ALoc x) store_alocs);
+          ES.of_list (List.map (fun (x : string) -> Expr.LVar x) store_lvars);
         ]
     in
     let forgettables, keep = SMemory.clean_up ~keep heap in
     L.verbose (fun fmt ->
         fmt "Forgettables: %a"
           (Fmt.list ~sep:Fmt.comma Expr.pp)
-          (Expr.Set.elements forgettables));
+          (ES.elements forgettables));
     L.verbose (fun fmt ->
-        fmt "Keep: %a"
-          (Fmt.list ~sep:Fmt.comma Expr.pp)
-          (Expr.Set.elements keep))
+        fmt "Keep: %a" (Fmt.list ~sep:Fmt.comma Expr.pp) (ES.elements keep))
 
   let update_subst (state : t) (subst : st) : unit =
     let _, _, pfs, gamma, _ = state in
@@ -639,21 +647,21 @@ module Make (SMemory : SMemory.S) :
   let get_recovery_vals (state : t) (errs : err_t list) : vt list =
     let heap, _, pfs, _, _ = state in
     let vs = StateErr.get_recovery_vals errs (SMemory.get_recovery_vals heap) in
-    let svs = Expr.Set.of_list vs in
+    let svs = ES.of_list vs in
     let extras =
       PFS.fold_left
         (fun exs pf ->
           match pf with
           | Eq (ALoc loc, LVar x)
-            when Expr.Set.mem (ALoc loc) svs && Names.is_spec_var_name x ->
+            when ES.mem (ALoc loc) svs && Names.is_spec_var_name x ->
               Expr.LVar x :: exs
           | Eq (LVar x, ALoc loc)
-            when Expr.Set.mem (ALoc loc) svs && Names.is_spec_var_name x ->
+            when ES.mem (ALoc loc) svs && Names.is_spec_var_name x ->
               Expr.LVar x :: exs
           | _ -> exs)
         [] pfs
     in
-    Expr.Set.elements (Expr.Set.of_list (vs @ extras))
+    ES.elements (ES.of_list (vs @ extras))
 
   let automatic_unfold _ _ : (t list, string) result =
     Error "Automatic unfold not supported in symbolic execution"
@@ -819,5 +827,73 @@ module Make (SMemory : SMemory.S) :
     let _, _, pfs, _, _ = state in
     pfs
 
-  let hides _ _ _ = Ok ()
+  let hides (used_unifiables : ES.t) (state : t) (exprs_to_hide : vt list) =
+    let elist_pp = Fmt.list ~sep:Fmt.comma Expr.pp in
+    let () =
+      L.verbose (fun fmt ->
+          fmt "\nEXACT: HIDES: \nUsed: %a\nTo hide: %a\n\nSTATE:\n%a\n" elist_pp
+            (ES.elements used_unifiables)
+            elist_pp exprs_to_hide pp state)
+    in
+    let heap, store, pfs, gamma, _ = copy state in
+    let state = (heap, store, pfs, gamma, SS.empty) in
+    let subst, states = simplify ~kill_new_lvars:true state in
+    List.fold_left
+      (fun outcome state ->
+        let heap, _, _, _, _ = state in
+        let used_unifiables =
+          ES.map (SSubst.subst_in_expr ~partial:true subst) used_unifiables
+        in
+        let exprs_to_hide =
+          List.map (SSubst.subst_in_expr ~partial:true subst) exprs_to_hide
+        in
+        let () =
+          L.verbose (fun fmt ->
+              fmt "EXACT: Hides after subst: %a" elist_pp exprs_to_hide)
+        in
+        match outcome with
+        | Error _ -> outcome
+        | Ok () -> (
+            let _, keep = SMemory.clean_up ~keep:used_unifiables heap in
+            let used_unifiables = ES.union used_unifiables keep in
+            let () =
+              L.verbose (fun fmt ->
+                  fmt "STATE after memory clean-up:\n%a\n" pp state)
+            in
+            let () =
+              L.verbose (fun fmt ->
+                  fmt "Used unifiables: %a" elist_pp
+                    (Expr.Set.elements used_unifiables))
+            in
+            let hides_lvars =
+              List.fold_left SS.union SS.empty
+                (List.map Expr.lvars exprs_to_hide)
+            in
+            let hides_alocs =
+              List.fold_left SS.union SS.empty
+                (List.map Expr.alocs exprs_to_hide)
+            in
+            let state_lvars = get_lvars_for_exact state in
+            let state_alocs = get_alocs_for_exact state in
+            let inter =
+              SS.inter
+                (SS.union hides_lvars hides_alocs)
+                (SS.union state_lvars state_alocs)
+            in
+            match SS.is_empty inter with
+            | true -> Ok ()
+            | false ->
+                let non_hidable_expr = SS.min_elt inter in
+                let non_hidable_expr =
+                  match Names.is_lvar_name non_hidable_expr with
+                  | true -> Expr.LVar non_hidable_expr
+                  | false -> ALoc non_hidable_expr
+                in
+                let () =
+                  L.verbose (fun fmt ->
+                      fmt "EXACT: ERROR: hidden expression in store: %a" Expr.pp
+                        non_hidable_expr)
+                in
+                Error non_hidable_expr))
+      (Ok ()) states
 end

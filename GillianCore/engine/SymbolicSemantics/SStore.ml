@@ -43,3 +43,7 @@ let assertions (x : t) : Formula.t list =
     []
 
 let is_well_formed (_ : t) : bool = true
+
+let is_in (store : t) (e : Expr.t) =
+  let store_values = snd (List.split (bindings store)) in
+  List.exists (Expr.sub_expr e) store_values

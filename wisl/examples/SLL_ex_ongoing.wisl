@@ -75,7 +75,7 @@ function SLL_length(x) {
 //
 predicate SLLseg_len(+x, y, n : Int) {
   (x == y) * (n == 0);
-  (x -b> #v, #z) * SLLseg_len(#z, y, n - 1) * (0 <# n) [ox: #z]
+  (x -b> #v, #z) * SLLseg_len(#z, y, n - 1) * (0 <# n) [ox: #v, #z]
 }
 
 //
@@ -87,7 +87,7 @@ lemma SSLseg_len_append_lr {
       SLLseg_len(x, #y, n) * (#y -b> #v, z) |- SLLseg_len(x, z, n + 1) * (0 <=# n)
 
   variant: #n
-  ox: #y
+  ox: #y, #v
 
   proof:
     unfold SLLseg_len(x, #y, n);

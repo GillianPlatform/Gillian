@@ -1212,7 +1212,7 @@ module Make
       (* LTrue, LFalse, LEmp, LStar *)
       | _ -> raise (Failure "Illegal Assertion in Unification Plan")
     in
-    (* TODO: Exact fold *)
+    (* TODO: Exact unification *)
     match (!Config.Verification.exact, ox, result) with
     | false, _, _
     | true, None, _
@@ -1221,27 +1221,25 @@ module Make
     | true, _, UFail _ -> result
     | true, Some ox, USucc (state, preds, _, _) -> (
         L.verbose (fun fmt ->
-            fmt "OX hiding: %a\n" (Fmt.list ~sep:Fmt.comma Fmt.string) ox);
+            fmt "EXACT: Hiding: %a\n" (Fmt.list ~sep:Fmt.comma Fmt.string) ox);
         let ox_bindings =
-          List.map
+          List.filter_map
             (fun x ->
               match ESubst.get subst (LVar x) with
-              | Some v ->
-                  let ev = Val.to_expr v in
+              | Some v -> (
                   let () =
-                    match ev with
-                    | LVar _ | Lit _ -> ()
-                    | _ ->
-                        L.verbose (fun fmt ->
-                            fmt
-                              "EXACT: WARNING: OX parameter not an LVar or a \
-                               concrete value")
+                    L.verbose (fun fmt ->
+                        fmt "EXACT: Binding for %s: %a" x Val.pp v)
                   in
-                  let () =
-                    L.verbose (fun fmt -> fmt "Binding for %s: %a" x Val.pp v)
-                  in
-                  Val.to_expr v
-              | None -> failwith ("OX: no binding in subst for " ^ x))
+                  (* Filter for literals *)
+                  match Val.to_expr v with
+                  | Lit _ -> None
+                  | EList les when Expr.all_literals les -> None
+                  | PVar x ->
+                      failwith
+                        ("EXACT: ERROR: Program variable in bindings: " ^ x)
+                  | e -> Some e)
+              | None -> failwith ("EXACT: ERROR: no binding in subst for " ^ x))
             ox
         in
         (* TODO: Some setup using preds *)
@@ -1254,12 +1252,10 @@ module Make
             (Expr.Set.of_list
                (List.map (fun (x : string) -> Expr.LVar x) pred_lvars))
         in
-        (* FIXME: implement correctly *)
         let no_hides_in_preds =
-          List.for_all
-            (fun ue -> not (Preds.is_in preds ue))
-            (Expr.Set.elements used_unifiables)
+          List.for_all (fun ue -> not (Preds.is_in preds ue)) ox_bindings
         in
+        let () = L.verbose (fun fmt -> fmt ": ") in
         match no_hides_in_preds with
         | false ->
             let () =

@@ -289,7 +289,7 @@ module Make
     let all_pred_params =
       List.map Val.to_expr (List.concat (snd (List.split (to_list preds))))
     in
-    List.for_all (fun pe -> Expr.sub_expr ue pe) all_pred_params
+    List.exists (Expr.sub_expr ue) all_pred_params
 end
 
 module SPreds = Make (SVal.M) (SVal.SESubst)

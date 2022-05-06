@@ -370,6 +370,12 @@ module Mem = struct
       (fun _ tree acc -> SS.union (SHeapTree.lvars tree) acc)
       map SS.empty
 
+  let alocs { map; _ } =
+    let open Utils.Containers in
+    SMap.fold
+      (fun _ tree acc -> SS.union (SHeapTree.alocs tree) acc)
+      map SS.empty
+
   let assertions ~exclude { map; _ } =
     SMap.fold
       (fun loc tree acc ->
@@ -957,6 +963,7 @@ let clean_up ?(keep = Expr.Set.empty) _ : Expr.Set.t * Expr.Set.t =
   (Expr.Set.empty, keep)
 
 let lvars heap = Mem.lvars !heap.mem
+let alocs heap = Mem.alocs !heap.mem
 
 let assertions ?to_keep:_ heap =
   let genv_locs, genv_asrts = GEnv.assertions !heap.genv in
