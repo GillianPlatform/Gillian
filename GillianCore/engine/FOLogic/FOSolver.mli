@@ -46,7 +46,7 @@ val is_equal :
 val is_different :
   pfs:PFS.t -> gamma:TypEnv.t -> Gil_syntax.Expr.t -> Gil_syntax.Expr.t -> bool
 
-val is_less_or_equal :
+val num_is_less_or_equal :
   pfs:PFS.t -> gamma:TypEnv.t -> Gil_syntax.Expr.t -> Gil_syntax.Expr.t -> bool
 
 val resolve_loc_name :

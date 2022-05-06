@@ -45,7 +45,7 @@ struct aws_byte_cursor
 aws_byte_cursor_advance(struct aws_byte_cursor *const cursor,
                         const size_t length) {
     struct aws_byte_cursor rv;
-    if (cursor->len > (SIZE_MAX >> 1) || length > (SIZE_MAX >> 1) ||
+    if (cursor->len > 2147483647 || length > 2147483647 ||
         length > cursor->len) {
         rv.ptr = NULL;
         rv.len = 0;

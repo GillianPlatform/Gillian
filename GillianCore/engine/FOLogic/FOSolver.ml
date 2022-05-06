@@ -41,7 +41,7 @@ let simplify_pfs_and_gamma
 let check_satisfiability_with_model (fs : Formula.t list) (gamma : TypEnv.t) :
     SESubst.t option =
   let fs, gamma, subst = simplify_pfs_and_gamma fs gamma in
-  let model = Z3Encoding.check_sat_core fs gamma in
+  let model = Z3_encoding.check_sat_core fs (TypEnv.as_hashtbl gamma) in
   let lvars =
     List.fold_left
       (fun ac vs ->
@@ -60,11 +60,12 @@ let check_satisfiability_with_model (fs : Formula.t list) (gamma : TypEnv.t) :
              (List.map
                 (fun e -> Format.asprintf "%a" Expr.pp e)
                 (Expr.Set.elements z3_vars)))));
+  let update x e = SESubst.put subst (LVar x) e in
   match model with
   | None -> None
   | Some model -> (
       try
-        Z3Encoding.lift_z3_model model gamma subst z3_vars;
+        Z3_encoding.lift_z3_model model (TypEnv.as_hashtbl gamma) update z3_vars;
         Some subst
       with _ -> None)
 
@@ -81,11 +82,14 @@ let check_satisfiability
   in
   let axioms = get_axioms fs gamma in
   let fs = Formula.Set.union fs axioms in
-  let result = Z3Encoding.check_sat fs gamma in
-  (* if time <> "" then
-     Utils.Statistics.update_statistics ("FOS: CheckSat: " ^ time)
-       (Sys.time () -. t); *)
-  result
+  if Formula.Set.is_empty fs then true
+  else if Formula.Set.mem False fs then false
+  else
+    let result = Z3_encoding.check_sat fs (TypEnv.as_hashtbl gamma) in
+    (* if time <> "" then
+       Utils.Statistics.update_statistics ("FOS: CheckSat: " ^ time)
+         (Sys.time () -. t); *)
+    result
 
 let sat ~unification ~pfs ~gamma formulae : bool =
   check_satisfiability ~unification (formulae @ PFS.to_list pfs) gamma
@@ -181,9 +185,9 @@ let check_entailment
       let _ = Simplifications.simplify_pfs_and_gamma formulae gamma_left in
 
       let ret =
-        Z3Encoding.check_sat
+        Z3_encoding.check_sat
           (Formula.Set.of_list (PFS.to_list formulae))
-          gamma_left
+          (TypEnv.as_hashtbl gamma_left)
       in
       L.(verbose (fun m -> m "Entailment returned %b" (not ret)));
       (* Utils.Statistics.update_statistics "FOS: CheckEntailment"
@@ -226,14 +230,14 @@ let is_different ~pfs ~gamma e1 e2 =
   (* Utils.Statistics.update_statistics "FOS: is different" (Sys.time () -. t); *)
   result
 
-let is_less_or_equal ~pfs ~gamma e1 e2 =
-  let feq = Reduction.reduce_formula ~gamma ~pfs (LessEq (e1, e2)) in
+let num_is_less_or_equal ~pfs ~gamma e1 e2 =
+  let feq = Reduction.reduce_formula ~gamma ~pfs (FLessEq (e1, e2)) in
   let result =
     match feq with
     | True -> true
     | False -> false
     | Eq (ra, rb) -> is_equal ~pfs ~gamma ra rb
-    | LessEq _ -> check_entailment SS.empty pfs [ feq ] gamma
+    | FLessEq _ -> check_entailment SS.empty pfs [ feq ] gamma
     | _ ->
         raise
           (Failure

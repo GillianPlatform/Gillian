@@ -23,14 +23,14 @@ SUCCESSFUL SPECS:
   spec deref (x)
     [[ (x == {{_$l_7, 0.}}) *
        <mem_sval>(_$l_7, 0., 4.; {{"int", _lvar_6}}, "Freeable") *
-       types(_lvar_6 : Num) *
+       types(_lvar_6 : Int) *
        i__glob_fun("deref""deref") *
        i__glob_fun("deref_bug""deref_bug") ]]
     [[ (ret == {{"int", _lvar_6}}) *
        (x == {{_$l_7, 0.}}) *
-       types(_lvar_6 : Num) *
+       types(_lvar_6 : Int) *
        <mem_sval>(_$l_7, 0., 4.; {{"int", _lvar_6}}, "Freeable") *
-       types(_lvar_6 : Num) *
+       types(_lvar_6 : Int) *
        i__glob_fun("deref""deref") *
        i__glob_fun("deref_bug""deref_bug") ]]
     normal;
@@ -38,14 +38,14 @@ SUCCESSFUL SPECS:
   spec deref_bug (x)
     [[ (x == {{_$l_2, 0.}}) *
        <mem_sval>(_$l_2, 0., 4.; {{"single", _lvar_10}}, "Freeable") *
-       types(_lvar_10 : Num) *
+       types(_lvar_10 : Int) *
        i__glob_fun("deref""deref") *
        i__glob_fun("deref_bug""deref_bug") ]]
     [[ (ret == {{"single", _lvar_10}}) *
        (x == {{_$l_2, 0.}}) *
-       types(_lvar_10 : Num) *
+       types(_lvar_10 : Int) *
        <mem_sval>(_$l_2, 0., 4.; {{"single", _lvar_10}}, "Freeable") *
-       types(_lvar_10 : Num) *
+       types(_lvar_10 : Int) *
        i__glob_fun("deref""deref") *
        i__glob_fun("deref_bug""deref_bug") ]]
     normal;

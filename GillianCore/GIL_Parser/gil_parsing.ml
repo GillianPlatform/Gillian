@@ -126,7 +126,12 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
     let in_channel = open_in path in
     let lexbuf = Lexing.from_channel in_channel in
     let () = lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = path } in
-    let prog = parse GIL_Parser.gmain_target lexbuf in
+    let prog =
+      try parse GIL_Parser.gmain_target lexbuf
+      with exn ->
+        Fmt.epr "In file at path: %s\n" path;
+        raise exn
+    in
     let () = close_in in_channel in
 
     (* Correctly label components that have @internal and/or @nopath directives *)

@@ -24,7 +24,7 @@ let deps = runtime @ src_before @ src_after
 let copy f =
   Printf.sprintf {|(copy %s %s)|} f (Filename.basename f)
 
-let src_files = ["bst_a.c"; "bst_b.c"];;
+let src_files = ["sll_a.c"; "sll_b.c"];;
 
 Printf.ksprintf J.send {|
 

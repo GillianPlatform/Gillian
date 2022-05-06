@@ -43,16 +43,15 @@ let is_loc gamma loc =
   Option.value ~default:false r_opt
 
 let is_zero = function
-  | SVint (Lit (Num 0.))
-  | SVlong (Lit (Num 0.))
-  | SVsingle (Lit (Num 0.))
-  | SVfloat (Lit (Num 0.)) -> true
+  | SVint (Lit (Int z)) when Z.equal z Z.zero -> true
+  | SVlong (Lit (Int z)) when Z.equal z Z.zero -> true
+  | SVsingle (Lit (Num 0.)) | SVfloat (Lit (Num 0.)) -> true
   | _ -> false
 
 let zero_of_chunk chunk =
   match Compcert.AST.type_of_chunk chunk with
-  | Tany32 | Tint -> SVint (Lit (Num 0.))
-  | Tany64 | Tlong -> SVlong (Lit (Num 0.))
+  | Tany32 | Tint -> SVint Expr.zero_i
+  | Tany64 | Tlong -> SVlong Expr.zero_i
   | Tsingle -> SVsingle (Lit (Num 0.))
   | Tfloat -> SVfloat (Lit (Num 0.))
 
@@ -61,7 +60,7 @@ let is_loc_ofs gamma loc ofs =
     let* loc_t = TypEnv.get gamma loc in
     let* ofs_t = TypEnv.get gamma ofs in
     match (loc_t, ofs_t) with
-    | Type.ObjectType, Type.NumberType -> Some true
+    | Type.ObjectType, Type.IntType -> Some true
     | _ -> Some false
   in
   Option.value ~default:false r_opt
@@ -73,10 +72,10 @@ let of_gil_expr_almost_concrete ?(gamma = TypEnv.init ()) gexpr =
   | Lit Undefined -> Some (SUndefined, [])
   | EList [ ALoc loc; offset ] | EList [ Lit (Loc loc); offset ] ->
       Some (Sptr (loc, offset), [])
-  | EList [ LVar loc; Lit (Num k) ] when is_loc gamma loc ->
+  | EList [ LVar loc; Lit (Int k) ] ->
       let aloc = ALoc.alloc () in
       let new_pf = Formula.Eq (LVar loc, Expr.ALoc aloc) in
-      Some (Sptr (aloc, Lit (Num k)), [ new_pf ])
+      Some (Sptr (aloc, Lit (Int k)), [ new_pf ])
   | EList [ LVar loc; LVar ofs ] when is_loc_ofs gamma loc ofs ->
       let aloc = ALoc.alloc () in
       let new_pf = Formula.Eq (LVar loc, Expr.ALoc aloc) in
@@ -122,10 +121,9 @@ let to_gil_expr gexpr =
   | SUndefined -> (Lit Undefined, [])
   | Sptr (loc_name, offset) ->
       let loc = loc_from_loc_name loc_name in
-      ( EList [ loc; offset ],
-        [ (loc, Type.ObjectType); (offset, Type.NumberType) ] )
-  | SVint n -> (EList [ Lit (String int_type); n ], [ (n, Type.NumberType) ])
-  | SVlong n -> (EList [ Lit (String long_type); n ], [ (n, Type.NumberType) ])
+      (EList [ loc; offset ], [ (loc, Type.ObjectType); (offset, Type.IntType) ])
+  | SVint n -> (EList [ Lit (String int_type); n ], [ (n, Type.IntType) ])
+  | SVlong n -> (EList [ Lit (String long_type); n ], [ (n, Type.IntType) ])
   | SVfloat n -> (EList [ Lit (String float_type); n ], [ (n, Type.NumberType) ])
   | SVsingle n ->
       (EList [ Lit (String single_type); n ], [ (n, Type.NumberType) ])

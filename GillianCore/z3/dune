@@ -1,0 +1,4 @@
+(library
+ (name z3_encoding)
+ (public_name gillian.z3)
+ (libraries z3 gil_syntax logging utils))

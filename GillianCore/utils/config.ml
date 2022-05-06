@@ -65,6 +65,9 @@ let bi_unroll_depth = ref 1
 let bi_no_spec_depth = ref 0
 let delay_entailment = ref true
 
+(* If true, will dump a folder containing all the smt queries made to z3 *)
+let dump_smt = ref false
+
 (** {2 Bulk testing} *)
 
 (** If activated, at the end of bulk execution or bulk wpst, and only with the Rely runner,

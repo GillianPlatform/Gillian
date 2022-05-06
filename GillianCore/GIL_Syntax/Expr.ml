@@ -12,18 +12,22 @@ type t = TypeDef__.expr =
   | NOp of NOp.t * t list  (** n-ary operators         *)
   | EList of t list  (** Lists of expressions    *)
   | ESet of t list  (** Sets of expressions     *)
-[@@deriving yojson]
+[@@deriving eq, ord]
 
-let equal (e1 : t) (e2 : t) : bool = Stdlib.compare e1 e2 = 0
+let to_yojson = TypeDef__.expr_to_yojson
+let of_yojson = TypeDef__.expr_of_yojson
 
 (** {3 builders} *)
 
 let lit x = Lit x
 let num n = lit (Num n)
 let num_int n = lit (Num (float_of_int n))
-let int n = lit (Int n)
+let int n = lit (Int (Z.of_int n))
+let int_z z = lit (Int z)
 let string s = lit (String s)
 let bool b = lit (Bool b)
+let zero_i = int_z Z.zero
+let one_i = int_z Z.one
 
 let typeof x =
   match x with
@@ -33,34 +37,39 @@ let typeof x =
   | _ -> UnOp (TypeOf, x)
 
 let list_nth x n =
-  match x with
-  | EList l when n < List.length l -> List.nth l n
-  | Lit (LList l) when n < List.length l -> Lit (List.nth l n)
-  | _ -> BinOp (x, LstNth, num (float_of_int n))
+  let short_circuit =
+    match x with
+    | EList l -> List.nth_opt l n
+    | Lit (LList l) -> List.nth_opt l n |> Option.map lit
+    | _ -> None
+  in
+  match short_circuit with
+  | None -> BinOp (x, LstNth, int n)
+  | Some x -> x
+
+let list_nth_z x n = list_nth x (Z.to_int n)
 
 let list_nth_e x n =
   match n with
-  | Lit (Num n) -> list_nth x (int_of_float n)
+  | Lit (Int n) -> list_nth_z x n
+  | Lit (Num _) -> failwith "l-nth of list and Num!"
   | _ -> BinOp (x, LstNth, n)
 
 let list_length x =
   match x with
-  | EList l -> Lit (Num (float_of_int (List.length l)))
-  | Lit (LList l) -> Lit (Num (float_of_int (List.length l)))
+  | EList l -> int (List.length l)
+  | Lit (LList l) -> int (List.length l)
+  | LstSub (_, _, len) -> len
   | _ -> UnOp (LstLen, x)
 
 let list_sub ~lst ~start ~size =
   match (lst, start, size) with
-  | EList el, Lit (Num startf), Lit (Num sizef) -> (
-      match
-        List_utils.list_sub el (int_of_float startf) (int_of_float sizef)
-      with
+  | EList el, Lit (Int starti), Lit (Int sizei) -> (
+      match List_utils.list_sub el (Z.to_int starti) (Z.to_int sizei) with
       | None -> LstSub (lst, start, size)
       | Some sublst -> EList sublst)
-  | Lit (LList ll), Lit (Num startf), Lit (Num sizef) -> (
-      match
-        List_utils.list_sub ll (int_of_float startf) (int_of_float sizef)
-      with
+  | Lit (LList ll), Lit (Int starti), Lit (Int sizei) -> (
+      match List_utils.list_sub ll (Z.to_int starti) (Z.to_int sizei) with
       | None -> LstSub (lst, start, size)
       | Some sublst -> Lit (LList sublst))
   | _ -> LstSub (lst, start, size)
@@ -107,6 +116,11 @@ let fmod a b =
   | Lit (Num a), Lit (Num b) -> Lit (Num (mod_float a b))
   | _ -> BinOp (a, FMod, b)
 
+let imod a b =
+  match (a, b) with
+  | Lit (Int a), Lit (Int b) -> Lit (Int (Z.( mod ) a b))
+  | _ -> BinOp (a, IMod, b)
+
 let type_ t = Lit (Type t)
 
 module Infix = struct
@@ -146,30 +160,42 @@ module Infix = struct
     | _ -> BinOp (a, FDiv, b)
 
   let ( + ) a b =
+    let open! Z in
     match (a, b) with
-    | Lit (Int 0), x | x, Lit (Int 0) -> x
+    | Lit (Int z), x when equal z zero -> x
+    | x, Lit (Int z) when equal z zero -> x
     | Lit (Int x), Lit (Int y) -> Lit (Int (x + y))
+    | BinOp (Lit (Int x), IPlus, y), Lit (Int z)
+    | Lit (Int z), BinOp (Lit (Int x), IPlus, y) ->
+        BinOp (Lit (Int (x + z)), IPlus, y)
+    | BinOp (y, IPlus, Lit (Int x)), Lit (Int z)
+    | Lit (Int z), BinOp (y, IPlus, Lit (Int x)) ->
+        BinOp (y, IPlus, Lit (Int (x + z)))
     | _ -> BinOp (a, IPlus, b)
 
   let ( - ) a b =
     match (a, b) with
-    | x, Lit (Int 0) -> x
+    | x, Lit (Int z) when Z.equal Z.zero z -> x
     | Lit (Num 0.), x -> UnOp (IUnaryMinus, x)
-    | Lit (Int x), Lit (Int y) -> Lit (Int (x - y))
+    | Lit (Int x), Lit (Int y) -> Lit (Int (Z.sub x y))
     | BinOp (x, IPlus, y), z when equal y z -> x
     | BinOp (x, IPlus, y), z when equal x z -> y
     | _ -> BinOp (a, IMinus, b)
 
   let ( * ) a b =
+    let open! Z in
     match (a, b) with
-    | Lit (Int 0), _ | _, Lit (Int 0) -> Lit (Int 0)
-    | Lit (Int 1), x | x, Lit (Int 1) -> x
     | Lit (Int x), Lit (Int y) -> Lit (Int (x * y))
+    | Lit (Int z), _ when equal zero z -> zero_i
+    | _, Lit (Int z) when equal zero z -> zero_i
+    | Lit (Int z), x when equal one z -> x
+    | x, Lit (Int z) when equal one z -> x
     | _ -> BinOp (a, ITimes, b)
 
   let ( / ) a b =
+    let open! Z in
     match (a, b) with
-    | x, Lit (Int 1) -> x
+    | x, Lit (Int z) when equal z one -> x
     | Lit (Int x), Lit (Int y) -> Lit (Int (x / y))
     | _ -> BinOp (a, IDiv, b)
 
@@ -181,7 +207,7 @@ module MyExpr = struct
 
   let of_yojson = of_yojson
   let to_yojson = to_yojson
-  let compare = Stdlib.compare
+  let compare = compare
 end
 
 module Set = Set.Make (MyExpr)
@@ -221,11 +247,7 @@ let rec map_opt
   let map_e = map_opt f_before f_after in
   let f_after = Option.value ~default:(fun x -> x) f_after in
 
-  let aux args f =
-    let args' = List.map map_e args in
-    if List.exists (fun arg -> arg = None) args' then None
-    else Some (f (List.map Option.get args'))
-  in
+  let aux args f = List_utils.map_option map_e args |> Option.map f in
 
   match f_before expr with
   | None, _ -> None
@@ -392,7 +414,7 @@ let subst_expr_for_expr ~to_subst ~subst_with expr =
       inherit [_] Visitors.endo as super
 
       method! visit_expr env e =
-        if e = to_subst then subst_with else super#visit_expr env e
+        if equal e to_subst then subst_with else super#visit_expr env e
     end
   in
   v#visit_expr () expr

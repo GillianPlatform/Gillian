@@ -48,7 +48,7 @@ module Others = struct
 
   let malloced ~ptr ~total_size =
     let loc, ofs = ptr in
-    let size = Expr.num (float_of_int total_size) in
+    let size = Expr.int_z total_size in
     pred Internal_Predicates.malloced [ Expr.list [ loc; ofs ]; size ]
 
   let zeros_ptr_size ~ptr ~size =

@@ -25,12 +25,16 @@ type t = TypeDef__.unop =
   | M_sqrt  (** Square root *)
   | M_tan  (** Tangent *)
   (* Types *)
-  | ToStringOp  (** Converts a number (integer or float) to a string *)
-  | ToIntOp  (** Converts a float to an integer *)
-  | ToUint16Op  (** Converts an integer to a 16-bit unsigned integer *)
-  | ToUint32Op  (** Converts an integer to a 32-bit unsigned integer *)
-  | ToInt32Op  (** Converts an integer to a 32-bit signed integer *)
-  | ToNumberOp  (** Converts a string to a number *)
+  | ToStringOp
+      (** Converts a number (integer or float) to a string - JS legacy operation *)
+  | ToIntOp  (** Converts a float to an integer - JS legacy operation *)
+  | ToUint16Op
+      (** Converts an integer to a 16-bit unsigned integer - JS legacy operation *)
+  | ToUint32Op
+      (** Converts an integer to a 32-bit unsigned integer - JS legacy operation *)
+  | ToInt32Op
+      (** Converts an integer to a 32-bit signed integer - JS legacy operation *)
+  | ToNumberOp  (** Converts a string to a number - JS legacy operation *)
   | TypeOf
   (* Lists *)
   | Car  (** Head of a list *)
@@ -40,7 +44,10 @@ type t = TypeDef__.unop =
   | SetToList  (** From set to list *)
   (* Strings *)
   | StrLen  (** String length *)
-[@@deriving yojson]
+  (* Integer vs Number *)
+  | NumToInt  (** Number to Integer - actual cast *)
+  | IntToNum  (** Integer to Number - actual cast *)
+[@@deriving yojson, ord, eq]
 
 let str (x : t) =
   match x with
@@ -76,3 +83,5 @@ let str (x : t) =
   | LstRev -> "l-rev"
   | StrLen -> "s-len"
   | SetToList -> "set_to_list"
+  | NumToInt -> "as_int"
+  | IntToNum -> "as_num"

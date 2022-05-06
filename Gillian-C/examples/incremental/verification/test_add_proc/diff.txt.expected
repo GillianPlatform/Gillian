@@ -1,8 +1,8 @@
 Changed procs:
-make_node
+listDispose
 New procs:
-find_min
+listCopy
 Deleted procs:
 <none>
 Transitive dependents:
-insert
+<none>

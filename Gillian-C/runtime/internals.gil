@@ -1,8 +1,8 @@
 #internal
 
 proc i__storev(chunk, vptr, v) {
-       goto [((typeOf vptr) = List) and (l-len vptr = 2) and ((typeOf (l-nth(vptr, 0.))) = Obj) and ((typeOf (l-nth(vptr, 1.))) = Num)] ctn sgf;
-  ctn: u := [mem_store](chunk, l-nth(vptr, 0.), l-nth(vptr, 1.), v);
+       goto [((typeOf vptr) = List) and (l-len vptr = 2i) and ((typeOf (l-nth(vptr, 0i))) = Obj) and ((typeOf (l-nth(vptr, 1i))) = Int)] ctn sgf;
+  ctn: u := [mem_store](chunk, l-nth(vptr, 0i), l-nth(vptr, 1i), v);
        ret := undefined;
        return;
   sgf: ret := "segmentation fault";
@@ -10,25 +10,25 @@ proc i__storev(chunk, vptr, v) {
 };
 
 proc i__loadv(chunk, vptr) {
-       goto [((typeOf vptr) = List) and (l-len vptr = 2) and ((typeOf (l-nth(vptr, 0.))) = Obj) and ((typeOf (l-nth(vptr, 1.))) = Num)] ctn sgf;
-  ctn: vload := [mem_load](chunk, l-nth(vptr, 0.), l-nth(vptr, 1.));
-       ret := l-nth(vload, 0.);
+       goto [((typeOf vptr) = List) and (l-len vptr = 2i) and ((typeOf (l-nth(vptr, 0i))) = Obj) and ((typeOf (l-nth(vptr, 1i))) = Int)] ctn sgf;
+  ctn: vload := [mem_load](chunk, l-nth(vptr, 0i), l-nth(vptr, 1i));
+       ret := l-nth(vload, 0i);
        return;
   sgf: ret := "segmentation fault";
        assert (False)
 };
 
 proc i__free_list_aux(l, n) {
-           goto [ n < l-len l ] ctn end;
+           goto [ n i< l-len l ] ctn end;
       ctn: curr := l-nth(l, n);
-           u := [mem_free](l-nth(curr, 0.), l-nth(curr, 1.), l-nth(curr, 2.));
-           u := "i__free_list_aux"(l, n + 1);
+           u := [mem_free](l-nth(curr, 0i), l-nth(curr, 1i), l-nth(curr, 2i));
+           u := "i__free_list_aux"(l, n i+ 1i);
       end: ret := null;
            return
 };
 
 proc i__free_list(l) {
-      u := "i__free_list_aux"(l, 0.);
+      u := "i__free_list_aux"(l, 0i);
       ret := undefined;
       return
 };
@@ -36,15 +36,15 @@ proc i__free_list(l) {
 
 proc i__value_of_bool(v) {
           goto [v] tr fl;
-      tr: ret := {{ "int", 1 }};
+      tr: ret := {{ "int", 1i }};
           return;
-      fl: ret := {{ "int", 0 }};
+      fl: ret := {{ "int", 0i }};
           return
 };
 
 proc i__bool_of_value(v) {
-            goto [ l-nth(v, 0.) = "int" ] int unde;
-      int:  goto [ l-nth(v, 1.) = 0. ] fl tr;
+            goto [ l-nth(v, 0i) = "int" ] int unde;
+      int:  goto [ l-nth(v, 1i) = 0i ] fl tr;
       fl:   ret := false;
             return;
       tr:   ret := true;
@@ -53,11 +53,11 @@ proc i__bool_of_value(v) {
 };
 
 proc i__neg_bool_value(v) {
-            goto [ l-nth(v, 0.) = "int" ] int unde;
-      int:  goto [ l-nth(v, 1.) = 0. ] fl tr;
-      fl:   ret := {{ "int", 1. }};
+            goto [ l-nth(v, 0i) = "int" ] int unde;
+      int:  goto [ l-nth(v, 1i) = 0i ] fl tr;
+      fl:   ret := {{ "int", 1i }};
             return;
-      tr:   ret := {{ "int", 0. }};
+      tr:   ret := {{ "int", 0i }};
             return;
       unde: fail[operator]("Cannot neg a non-boolean")
 };
@@ -79,7 +79,7 @@ proc i__greater_perm(perma, permb) {
 
 proc i__has_cur_perm(b, o, perm) {
       perml := [mem_getcurperm](b, o);
-      ret := "i__greater_perm"(l-nth(perml, 0.), perm);
+      ret := "i__greater_perm"(l-nth(perml, 0i), perm);
       return
 };
 
@@ -90,13 +90,13 @@ proc i__valid_pointer(b, o) {
 
 proc i__weak_valid_ptr(b, o) {
       res := [mem_weakvalidpointer](b, o);
-      ret := l-nth(res, 0.);
+      ret := l-nth(res, 0i);
       return
 };
 
 proc i__ef_memcpy(sz, al, bdst, bsrc) {
       (* FIXME: It should also check alignment with respect to pointers *)
-      ret := [mem_move](l-nth(bdst, 0.), l-nth(bdst, 1.), l-nth(bsrc, 0.), l-nth(bsrc, 1.), sz);
+      ret := [mem_move](l-nth(bdst, 0i), l-nth(bdst, 1i), l-nth(bsrc, 0i), l-nth(bsrc, 1i), sz);
       return
 };
 

@@ -8,22 +8,24 @@
     "buildsInSource": "_build"
   },
   "dependencies": {
-    "@opam/cmdliner": "1.0.4",
-    "@opam/dune": "^2.0",
+    "@opam/alcotest": "1.0.1",
+    "@opam/cmdliner": "^1.1.1",
+    "@opam/dune": "^3.0",
+    "@opam/dap": "1.0.6",
     "@opam/batteries": "^3.0.0",
     "@opam/fmt": "^0.8.8",
-    "@opam/menhir": "20190924",
-    "@opam/z3": "giltho/esy-z3#b0fdd9a",
+    "@opam/menhir": "20220210",
+    "@opam/sqlite3": "5.0.2",
+    "@opam/z3": "giltho/esy-z3#af5e964fa357594105f27b5fd5f7df4611ea8b04",
     "@opam/ppx_deriving_yojson": "*",
     "@opam/ppxlib": ">=0.18.0",
     "@opam/uuidm": "0.9.7",
     "@opam/visitors": ">=2.3",
     "@opam/yojson": "^1.7.0",
-    "ocaml": "^4.12.x"
+    "@opam/zarith": ">=1.12",
+    "ocaml": "^4.14.x"
   },
   "devDependencies": {
-    "@opam/merlin": "*",
-    "@opam/odoc": "*",
-    "ocaml": "4.8.1000"
+    "ocaml": "4.14.x"
   }
 }

@@ -6,7 +6,10 @@ type t = TypeDef__.assertion =
   | Pure of Formula.t  (** Pure formula           *)
   | Types of (Expr.t * Type.t) list  (** Typing assertion       *)
   | GA of string * Expr.t list * Expr.t list  (** Core assertion         *)
-[@@deriving yojson]
+[@@deriving eq]
+
+let to_yojson = TypeDef__.assertion_to_yojson
+let of_yojson = TypeDef__.assertion_of_yojson
 
 let compare x y =
   let cmp = Stdlib.compare in

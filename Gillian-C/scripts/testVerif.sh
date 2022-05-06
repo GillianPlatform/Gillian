@@ -28,9 +28,9 @@ time gillian-c verify verification/sort.c -l disabled
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
-echo "--- verifying BST ---"
-time gillian-c verify verification/bst.c -l disabled
-rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
-printf "\n\n"
+# echo "--- verifying BST ---"
+# time gillian-c verify verification/bst.c -l disabled
+# rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
+# printf "\n\n"
 
 exit $FINAL_RETURN

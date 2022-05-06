@@ -23,7 +23,7 @@ typedef struct ln {
   (x -m> struct ln { int(#val); #next }) * (not (#next == NULL)) *
   OUList(#next, #Ep) *
   (E == -u-(-{ #val }-, #Ep)) *
-  (forall #z : Num. (#z --e-- #Ep => #val <# #z))
+  (forall #z : Int. (#z --e-- #Ep => #val <# #z))
 } */
 
 /*@ spec makeNode(v) {
@@ -39,7 +39,7 @@ SLL* makeNode(int v) {
 
 /*@ spec listPrepend(x, v) {
   requires: (v == int(#v)) * (x == #x) *
-            OUList(#x, #E) * (forall #z : Num. (#z --e-- #E => #v <# #z))
+            OUList(#x, #E) * (forall #z : Int. (#z --e-- #E => #v <# #z))
   ensures: OUList(ret, -u-(-{#v}-, #E))
 } */
 SLL* listPrepend(SLL* x, int v) {

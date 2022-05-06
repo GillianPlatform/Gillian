@@ -8,27 +8,17 @@ type t = TypeDef__.literal =
   | Empty  (** The literal [empty] *)
   | Constant of Constant.t  (** GIL constants ({!type:GIL_constant}) *)
   | Bool of bool  (** GIL booleans: [true] and [false] *)
-  | Int of int  (** GIL integers: TODO: understand size *)
+  | Int of Z.t  (** GIL integers: TODO: understand size *)
   | Num of float  (** GIL floats - double-precision 64-bit IEEE 754 *)
   | String of string  (** GIL strings *)
   | Loc of string  (** GIL object locations *)
   | Type of Type.t  (** GIL types ({!type:Type.t}) *)
   | LList of t list  (** Lists of GIL literals *)
   | Nono
-[@@deriving yojson]
+[@@deriving eq, ord]
 
-let rec equal a b =
-  match (a, b) with
-  | Undefined, Undefined | Null, Null | Nono, Nono | Empty, Empty -> true
-  | Constant x, Constant y -> x = y
-  | Bool x, Bool y -> x == y
-  | Int x, Int y -> Int.equal x y
-  | Num x, Num y -> Float.equal x y
-  | String x, String y | Loc x, Loc y -> String.equal x y
-  | Type x, Type y -> x = y
-  | LList la, LList lb -> (
-      try List.for_all2 equal la lb with Invalid_argument _ -> false)
-  | _ -> false
+let to_yojson = TypeDef__.literal_to_yojson
+let of_yojson = TypeDef__.literal_of_yojson
 
 (** Print *)
 let rec pp fmt x =
@@ -39,7 +29,7 @@ let rec pp fmt x =
   | Nono -> Fmt.string fmt "none"
   | Constant c -> Fmt.string fmt (Constant.str c)
   | Bool b -> if b then Fmt.string fmt "true" else Fmt.string fmt "false"
-  | Int i -> Fmt.pf fmt "%ai" Fmt.int i
+  | Int i -> Fmt.pf fmt "%ai" Z.pp_print i
   | Num n -> Fmt.pf fmt "%F" n
   | String x -> Fmt.pf fmt "\"%s\"" x
   | Loc loc -> Fmt.string fmt loc

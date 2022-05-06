@@ -28,7 +28,15 @@ and literal =
   | Empty
   | Constant of constant
   | Bool of bool
-  | Int of int
+  | Int of
+      (Z.t
+      [@opaque]
+      [@to_yojson fun z -> `String (Z.to_string z)]
+      [@of_yojson
+        function
+        | `String s -> (
+            try Ok (Z.of_string s) with Invalid_argument m -> Error m)
+        | _ -> Error "Invalid yojson for Z"])
   | Num of float
   | String of string
   | Loc of string
@@ -109,6 +117,8 @@ and unop =
   | LstRev
   | SetToList
   | StrLen
+  | NumToInt
+  | IntToNum
 
 and nop = LstCat | SetUnion | SetInter
 
@@ -131,8 +141,10 @@ and formula =
   | And of formula * formula
   | Or of formula * formula
   | Eq of expr * expr
-  | Less of expr * expr
-  | LessEq of expr * expr
+  | FLess of expr * expr
+  | FLessEq of expr * expr
+  | ILess of expr * expr
+  | ILessEq of expr * expr
   | StrLess of expr * expr
   | SetMem of expr * expr
   | SetSub of expr * expr

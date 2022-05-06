@@ -3,15 +3,15 @@
 (* In bi-abduction, we're giving meaning to comparing freed pointers in the same block,
    and killing other branches. *)
 proc i__binop_cmpu_le(v1, v2) {
-        goto [ (l-nth(v1, 0.) = "int") and (l-nth(v2, 0.) = "int") ] blon els;
-  blon: ret := "i__value_of_bool"(l-nth(v1, 1.) <= l-nth(v2, 1.));
+        goto [ (l-nth(v1, 0i) = "int") and (l-nth(v2, 0i) = "int") ] blon els;
+  blon: ret := "i__value_of_bool"(l-nth(v1, 1i) i<= l-nth(v2, 1i));
         return;
   els:  goto [
-            (typeOf(l-nth(v1, 0.)) = Obj)
-        and (typeOf(l-nth(v2, 0.)) = Obj)
-        and (l-nth(v1, 0.) = l-nth(v2, 0.))
+            (typeOf(l-nth(v1, 0i)) = Obj)
+        and (typeOf(l-nth(v2, 0i)) = Obj)
+        and (l-nth(v1, 0i) = l-nth(v2, 0i))
         ] smbl unde; (* tests if both are pointers withing the same block *)
-  smbl: ret := "i__value_of_bool"(l-nth(v1, 1.) <= l-nth(v2, 1.));
+  smbl: ret := "i__value_of_bool"(l-nth(v1, 1i) i<= l-nth(v2, 1i));
         return;
   unde: fail[comparison]("Undefined behavior : comparing pointers in different blocks")
 };
@@ -20,14 +20,14 @@ proc i__binop_cmpu_le(v1, v2) {
 (* In bi-abduction, either the pointers/numbers are really equal, or we return false,
    we're giving behaviour to other stuff *)
 proc i__binop_cmpu_eq(v1, v2) {
-        goto [ (l-nth(v1, 0.) = "int") and (l-nth(v2, 0.) = "int") ] blon els1;
-  blon: ret := "i__value_of_bool"(l-nth(v1, 1.) = l-nth(v2, 1.));
+        goto [ (l-nth(v1, 0i) = "int") and (l-nth(v2, 0i) = "int") ] blon els1;
+  blon: ret := "i__value_of_bool"(l-nth(v1, 1i) = l-nth(v2, 1i));
         return;
   els1: goto [
-            (typeOf(l-nth(v1, 0.)) = Obj)
-        and (typeOf(l-nth(v2, 0.)) = Obj)
+            (typeOf(l-nth(v1, 0i)) = Obj)
+        and (typeOf(l-nth(v2, 0i)) = Obj)
         ] bobj refl; (* tests if both are pointers withing the same block *)
-  bobj: ret := "i__value_of_bool"((l-nth(v1, 0.) = l-nth(v2, 0.)) and (l-nth(v1, 1.) = l-nth(v2, 1.)));
+  bobj: ret := "i__value_of_bool"((l-nth(v1, 0i) = l-nth(v2, 0i)) and (l-nth(v1, 1i) = l-nth(v2, 1i)));
   refl: ret := {{ "int", 0 }};
         return;     
 };

@@ -49,8 +49,8 @@ let rec js2jsil_pure (scope_le : Expr.t option) (a : pt) : Formula.t =
   | True -> Formula.True
   | False -> Formula.False
   | Eq (le1, le2) -> Formula.Eq (fe le1, fe le2)
-  | Less (le1, le2) -> Formula.Less (fe le1, fe le2)
-  | LessEq (le1, le2) -> Formula.LessEq (fe le1, fe le2)
+  | Less (le1, le2) -> Formula.FLess (fe le1, fe le2)
+  | LessEq (le1, le2) -> Formula.FLessEq (fe le1, fe le2)
   | StrLess (le1, le2) -> Formula.StrLess (fe le1, fe le2)
   | ForAll (s, a) ->
       let new_binders = List.map (fun (x, t) -> (x, Some t)) s in

@@ -1,27 +1,15 @@
 [{pc:
-   {pfs: [(! (x == 1.))];
-    gamma: (x: Num);
-    learned: [(1. <=# x); (2. <=# x)];
+   {pfs: [(! (x == 1i))];
+    gamma: (x: Int);
+    learned: [(1i i<=# x); (2i i<=# x)];
     learned_types: []};
   value: 12},
  {pc:
-   {pfs: [(! (x == 1.))];
-    gamma: (x: Num);
-    learned: [(x <# 2.); (1. <=# x)];
+   {pfs: [(! (x == 1i))];
+    gamma: (x: Int);
+    learned: [(x i<# 1i); (x i<=# 0i)];
     learned_types: []};
-  value: 11},
- {pc:
-   {pfs: [(! (x == 1.))];
-    gamma: (x: Num);
-    learned: [(x <# 1.); (x <=# 0.)];
-    learned_types: []};
-  value: -1},
- {pc:
-   {pfs: [(! (x == 1.))];
-    gamma: (x: Num);
-    learned: [(0. <# x); (x <# 1.); (x <=# 1.)];
-    learned_types: []};
-  value: 0}]
+  value: -1}]
 
 [{pc: {pfs: [];
        gamma: ;
@@ -29,7 +17,7 @@
        learned_types: []};
   value: -1}]
 
-[{pc: {pfs: [(x == 2.)];
+[{pc: {pfs: [(x == 2i)];
        gamma: ;
        learned: [];
        learned_types: []};

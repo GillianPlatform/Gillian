@@ -53,6 +53,8 @@
       "m_sin",         GIL_Parser.M_SIN;
       "m_sqrt",        GIL_Parser.M_SQRT;
       "m_tan",         GIL_Parser.M_TAN;
+      "as_int",        GIL_Parser.NUMTOINT;
+      "as_num",        GIL_Parser.INTTONUM;
       "num_to_string", GIL_Parser.TOSTRING;
       "num_to_int",    GIL_Parser.TOINT;
       "num_to_uint16", GIL_Parser.TOUINT16;
@@ -237,8 +239,10 @@ rule read = parse
   | "\\/"                { GIL_Parser.LOR }
   | "!"                  { GIL_Parser.LNOT }
   | "=="                 { GIL_Parser.LEQUAL }
-  | "<#"                 { GIL_Parser.LLESSTHAN       }
-  | "<=#"                { GIL_Parser.LLESSTHANEQUAL  }
+  | "i<#"                { GIL_Parser.ILLESSTHAN }
+  | "i<=#"               { GIL_Parser.ILLESSTHANEQUAL }
+  | "<#"                 { GIL_Parser.FLLESSTHAN       }
+  | "<=#"                { GIL_Parser.FLLESSTHANEQUAL  }
   | "s<#"                { GIL_Parser.LSLESSTHAN }
   (* Separating conjunction uses the same symbol as product, token TIMES *)
 (* Logic commands *)
@@ -263,7 +267,7 @@ rule read = parse
 (* Literals (cont.) *)
   | int                  { let s = Lexing.lexeme lexbuf in
                            let s_n = String.sub s 0 ((String.length s) - 1) in
-                           let n = int_of_string s_n in
+                           let n = Z.of_string s_n in
                            GIL_Parser.INTEGER n }
   | float                { let n = float_of_string (Lexing.lexeme lexbuf) in
                            GIL_Parser.FLOAT n }
