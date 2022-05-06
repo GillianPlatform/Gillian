@@ -139,7 +139,9 @@ let alocs =
   let open Utils.Containers in
   function
   | SUndefined -> SS.empty
-  | Sptr (_, e) -> Expr.alocs e
+  | Sptr (l, e) ->
+      let alocs_e = Expr.alocs e in
+      if Utils.Names.is_aloc_name l then SS.add l alocs_e else alocs_e
   | SVint e | SVfloat e | SVsingle e | SVlong e -> Expr.alocs e
 
 let pp fmt v =
