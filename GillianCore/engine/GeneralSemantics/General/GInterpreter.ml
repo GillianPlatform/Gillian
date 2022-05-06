@@ -1,8 +1,12 @@
 open Literal
 module L = Logging
 
-type branch_case =
+type 'state_vt branch_case' =
   | GuardedGoto of bool
+  | LCmd of int
+  | SpecExec of Flag.t
+  | LAction of 'state_vt list
+  | LActionFail of int
 [@@deriving yojson]
 
 module type S = sig
@@ -21,6 +25,8 @@ module type S = sig
 
   type invariant_frames = (string * state_t) list
   type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
+
+  type branch_case = state_vt branch_case'
 
   type cconf_t =
     | ConfErr of {
@@ -116,10 +122,11 @@ struct
   type store_t = Store.t
   type state_t = State.t [@@deriving yojson]
   type state_err_t = State.err_t
-  type state_vt = State.vt
+  type state_vt = State.vt [@@deriving yojson]
   type heap_t = State.heap_t
   type invariant_frames = (string * State.t) list
   type err_t = (Val.t, State.err_t) ExecErr.t [@@deriving yojson]
+  type branch_case = state_vt branch_case' [@@deriving yojson]
   type config_log = {
     proc_line : int;
     time : float;
@@ -181,7 +188,6 @@ struct
     () = ConfCont {
       state; callstack; invariant_frames; prev_idx; next_idx; loop_ids; branch_count; prev_report_id; branch_case; new_branches
     }
-
 
   type conf_t = BConfErr of err_t list | BConfCont of State.t
   type result_t = (State.t, State.vt, err_t) ExecRes.t
@@ -686,9 +692,9 @@ struct
       in
       let args = Array.to_list args in
 
-      let process_ret copy_cs ret_state fl b_counter : cconf_t =
+      let process_ret is_first ret_state fl b_counter others : cconf_t =
         let new_cs =
-          match copy_cs with
+          match is_first with
           | true -> CallStack.copy cs
           | false -> cs
         in
@@ -708,6 +714,20 @@ struct
               raise (Syntax_error msg)
         in
 
+        let branch_case = SpecExec fl in
+        let branch_case, new_branches =
+          match is_first, others with
+          | _, Some ((_ :: _) as others) ->
+            let new_branches = Some (List_utils.get_list_somes @@ List.map (fun conf ->
+              match conf with
+              | ConfCont { state; next_idx; _ } -> Some (state, next_idx, branch_case)
+              | _ -> None
+            ) others) in
+            Some branch_case, new_branches
+          | false, _ -> Some branch_case, None
+          | _ -> None, None
+        in
+
         make_confcont
           ~state:ret_state
           ~callstack:new_cs
@@ -716,6 +736,8 @@ struct
           ~loop_ids
           ~next_idx:new_j
           ~branch_count:b_counter
+          ?branch_case
+          ?new_branches
           ()
       in
 
@@ -767,11 +789,11 @@ struct
                 in
                 match rets with
                 | (ret_state, fl) :: rest_rets ->
-                    process_ret false ret_state fl b_counter
-                    :: List.map
-                         (fun (ret_state, fl) ->
-                           process_ret true ret_state fl b_counter)
-                         rest_rets
+                    let others = List.map (fun (ret_state, fl) ->
+                      process_ret true ret_state fl b_counter None
+                    ) rest_rets in
+                    process_ret false ret_state fl b_counter (Some others)
+                      :: others
                 (* Run spec returned no results *)
                 | _ -> (
                     match spec.spec.spec_incomplete with
@@ -867,12 +889,13 @@ struct
             let e' = Expr.EList (List.map Val.to_expr vs) in
             let v' = eval_expr e' in
             let state'' = update_store state' x v' in
-            let rest_confs =
-              List.map
+            let rest_confs, new_branches =
+              List.split @@ List.map
                 (fun (r_state, r_vs) ->
                   let r_e = Expr.EList (List.map Val.to_expr r_vs) in
                   let r_v = eval_expr r_e in
                   let r_state' = update_store r_state x r_v in
+                  let branch_case = LAction r_vs in
                   make_confcont
                     ~state:r_state'
                     ~callstack:(CallStack.copy cs)
@@ -881,11 +904,14 @@ struct
                     ~loop_ids
                     ~next_idx:(i+1)
                     ~branch_count:b_counter
-                    ())
+                    ~branch_case
+                    (),
+                  (r_state', i+1, branch_case))
                 rest_rets
             in
             let ret_len = 1 + List.length rest_rets in
             let b_counter = b_counter + if ret_len > 1 then 1 else 0 in
+            let branch_case = LAction vs in
             match
               (ret_len >= 3 && !Config.parallel, ret_len = 2 && !Config.parallel)
               (* XXX: && !Config.act_threads < !Config.max_threads ) *)
@@ -909,6 +935,8 @@ struct
                         ~loop_ids
                         ~next_idx:(i+1)
                         ~branch_count:b_counter
+                        ~branch_case
+                        ~new_branches
                         ()
                     ])
             | false, true -> (
@@ -927,6 +955,8 @@ struct
                         ~loop_ids
                         ~next_idx:(i+1)
                         ~branch_count:b_counter
+                        ~branch_case
+                        ~new_branches
                         ()
                     ]
                 | _ -> rest_confs)
@@ -961,8 +991,19 @@ struct
                   let b_counter =
                     b_counter + if List.length recovery_states = 1 then 0 else 1
                   in
-                  List.map
-                    (fun state ->
+                  List.mapi
+                    (fun ix state ->
+                      let branch_case = if List.length recovery_states > 1
+                        then Some (LActionFail ix)
+                        else None
+                      in
+                      let new_branches = match ix, recovery_states with
+                        | 0, (_ :: rest) ->
+                          Some (List.mapi (fun ix state ->
+                            state, i, LActionFail (ix+1)
+                          ) rest)
+                        | _ -> None
+                      in
                       make_confcont
                         ~state
                         ~callstack:cs
@@ -971,6 +1012,8 @@ struct
                         ~loop_ids:prev_loop_ids
                         ~next_idx:i
                         ~branch_count:b_counter
+                        ?branch_case
+                        ?new_branches
                         ())
                     recovery_states
               | _ ->
@@ -1031,8 +1074,19 @@ struct
               if List.length resulting_states > 1 then b_counter + 1
               else b_counter
             in
-            List.map
-              (fun state ->
+            List.mapi
+              (fun ix state ->
+                let branch_case = if List.length resulting_states > 1
+                  then Some (LCmd ix)
+                  else None
+                in
+                let new_branches = match ix, resulting_states with
+                  | 0, (_ :: rest) ->
+                    Some (List.mapi (fun ix state ->
+                      state, i, LCmd (ix+1)
+                    ) rest)
+                  | _ -> None
+                in
                 make_confcont
                   ~state:state
                   ~callstack:cs
@@ -1041,6 +1095,8 @@ struct
                   ~loop_ids
                   ~next_idx:(i+1)
                   ~branch_count:b_counter
+                  ?branch_case
+                  ?new_branches
                   ())
               resulting_states)
     (* Unconditional goto *)

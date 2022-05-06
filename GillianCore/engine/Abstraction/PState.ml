@@ -47,7 +47,7 @@ module Make
   module L = Logging
 
   type t = State.t * Preds.t * UP.preds_tbl_t
-  type vt = Val.t
+  type vt = Val.t [@@deriving yojson]
   type st = ESubst.t
   type store_t = Store.t
   type heap_t = State.heap_t

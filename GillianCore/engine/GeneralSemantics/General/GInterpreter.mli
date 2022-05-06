@@ -1,5 +1,9 @@
-type branch_case =
+type 'state_vt branch_case' =
   | GuardedGoto of bool
+  | LCmd of int
+  | SpecExec of Flag.t
+  | LAction of 'state_vt list
+  | LActionFail of int
 [@@deriving yojson]
 
 module type S = sig
@@ -18,6 +22,8 @@ module type S = sig
 
   type invariant_frames = (string * state_t) list
   type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
+
+  type branch_case = state_vt branch_case'
 
   type cconf_t =
     | ConfErr of {
