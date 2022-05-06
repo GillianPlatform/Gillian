@@ -214,8 +214,7 @@ let assertions ?to_keep:_ _ =
 
 let lvars _ = raise (Failure "ERROR: get_lvars called for concrete executions")
 
-let clean_up ?(keep = Expr.Set.empty) _ =
-  let _ = keep in
+let clean_up ?(keep : _ = Expr.Set.empty) _ =
   raise (Failure "Cleanup of concrete state.")
 
 let fresh_val _ = raise (Failure "fresh_val not implemented in concrete state")
