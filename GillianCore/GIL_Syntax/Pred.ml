@@ -88,9 +88,10 @@ let pp fmt pred =
     else Fmt.pf fmt' "[%s] " id
   in
   let pp_ox fmt' ox =
-    if List.length ox > 0 then
-      Fmt.pf fmt' " [ox: %a]" (Fmt.list ~sep:(Fmt.any ", ") Fmt.string) ox
-    else Fmt.pf fmt' ""
+  let pp_ox fmt' ox =
+    match ox with
+    | [] -> Fmt.pf fmt' ""
+    | _ -> Fmt.pf fmt' " [ox: %a]" (Fmt.list ~sep:(Fmt.any ", ") Fmt.string) ox
   in
   let pp_def fmt' (id_exs, asser, ox) =
     Fmt.pf fmt' "%a%a%a" (Fmt.option pp_id_exs) id_exs Asrt.pp asser pp_ox ox
