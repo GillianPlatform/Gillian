@@ -139,13 +139,14 @@ module Make
           ac vs)
       SS.empty !preds
 
-  let get_alocs (preds : t) : SS.t =
-    let pred_params =
-      List.concat_map
-        (fun (_, vs) -> List.map Expr.alocs (List.map Val.to_expr vs))
-        !preds
-    in
-    List.fold_left SS.union SS.empty pred_params
+
+  let get_lvars (preds : t) : SS.t =
+    List.fold_left
+      (fun ac (_, vs) ->
+        List.fold_left
+          (fun ac e -> SS.union ac (Expr.alocs (Val.to_expr e)))
+          ac vs)
+      SS.empty !preds
 
   (** Printing function *)
   let pp_pabs fmt pa =
