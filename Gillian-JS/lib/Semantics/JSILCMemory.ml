@@ -176,8 +176,7 @@ module M : Memory_S = struct
   let lvars _ =
     raise (Failure "ERROR: get_lvars called for concrete executions")
 
-  let clean_up ?(keep = Gillian.Gil_syntax.Expr.Set.empty) (_ : t) =
-    let _ = keep in
+  let clean_up ?(keep : _ = Gil_syntax.Expr.Set.empty) (_ : t) =
     raise (Failure "Cleanup of concrete state.")
 
   let fresh_val (_ : t) =
