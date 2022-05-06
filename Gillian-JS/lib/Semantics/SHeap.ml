@@ -524,23 +524,14 @@ let lvars (heap : t) : Var.Set.t =
   List.fold_left SS.union Var.Set.empty [ lvars_fvl; lvars_met; lvars_dom ]
 
 let alocs (heap : t) : Var.Set.t =
-  let alocs_fvl =
-    Hashtbl.fold
-      (fun _ fvl ac -> Var.Set.union (SFVL.alocs fvl) ac)
-      heap.sfvl Var.Set.empty
-  in
-  let alocs_dom =
-    Hashtbl.fold
-      (fun _ oe ac ->
-        let voe = Option.fold ~some:Expr.alocs ~none:Var.Set.empty oe in
-        Var.Set.union voe ac)
-      heap.sdom Var.Set.empty
-  in
-  let alocs_met =
-    Hashtbl.fold
-      (fun _ oe ac ->
-        let voe = Option.fold ~some:Expr.alocs ~none:Var.Set.empty oe in
-        Var.Set.union voe ac)
-      heap.smet Var.Set.empty
-  in
-  List.fold_left SS.union Var.Set.empty [ alocs_fvl; alocs_dom; alocs_met ]
+  let union = Var.Set.union in
+  Var.Set.empty
+  |> Hashtbl.fold (fun _ fvl ac -> Var.Set.union (SFVL.alocs fvl) ac) heap.sfvl
+  |> Hashtbl.fold
+       (fun _ oe ac ->
+         Option.fold ~some:(fun oe -> union (Expr.alocs oe) ac) ~none:ac oe)
+       heap.sdom
+  |> Hashtbl.fold
+       (fun _ oe ac ->
+         Option.fold ~some:(fun oe -> union (Expr.alocs oe) ac) ~none:ac oe)
+       heap.smet
