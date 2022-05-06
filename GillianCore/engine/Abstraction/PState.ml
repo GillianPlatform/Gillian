@@ -249,7 +249,6 @@ module Make
     Fmt.pair ~sep:Fmt.comma Fmt.string (Fmt.option Expr.pp)
 
   let pp fmt (astate : t) : unit =
-    (* FIXME: Print variants *)
     let state, preds, _, variants = astate in
     Fmt.pf fmt "%a@\n@[<v 2>PREDICATES:@\n%a@]@\n@[<v 2>VARIANTS:@\n%a@]@\n"
       State.pp state Preds.pp preds
