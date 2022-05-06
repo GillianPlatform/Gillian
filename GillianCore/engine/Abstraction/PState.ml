@@ -373,7 +373,7 @@ module Make
                     let new_variant = ESubst.subst_in_expr_opt subst variant in
                     let () =
                       L.verbose (fun fmt ->
-                          fmt "New variant: %a" (Fmt.option Expr.pp) new_variant)
+                          fmt "New variant: %a" (Fmt.Dump.option Expr.pp) new_variant)
                     in
                     match new_variant with
                     | None ->
