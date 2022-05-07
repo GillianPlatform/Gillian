@@ -1264,7 +1264,9 @@ module Make
             in
             make_resource_fail ()
         | true -> (
-            match State.hides used_unifiables state ox_bindings with
+            match
+              State.hides ~used_unifiables state ~exprs_to_hide:ox_bindings
+            with
             | Ok () -> result
             | Error nhe ->
                 let () =

@@ -3,7 +3,12 @@ module type S = sig
 
   val get_typ_env : t -> TypEnv.t
   val get_pfs : t -> PFS.t
-  val hides : Expr.Set.t -> t -> Expr.t list -> (unit, Expr.t) result
+
+  val hides :
+    used_unifiables:Expr.Set.t ->
+    t ->
+    exprs_to_hide:Expr.t list ->
+    (unit, Expr.t) result
 end
 
 module Make (SMemory : SMemory.S) :

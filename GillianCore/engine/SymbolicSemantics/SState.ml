@@ -8,7 +8,12 @@ module type S = sig
 
   val get_typ_env : t -> TypEnv.t
   val get_pfs : t -> PFS.t
-  val hides : Expr.Set.t -> t -> Expr.t list -> (unit, Expr.t) result
+
+  val hides :
+    used_unifiables:Expr.Set.t ->
+    t ->
+    exprs_to_hide:Expr.t list ->
+    (unit, Expr.t) result
 end
 
 module Make (SMemory : SMemory.S) :
@@ -816,7 +821,7 @@ module Make (SMemory : SMemory.S) :
     let _, _, pfs, _, _ = state in
     pfs
 
-  let hides (used_unifiables : ES.t) (state : t) (exprs_to_hide : vt list) =
+  let hides ~(used_unifiables : ES.t) (state : t) ~(exprs_to_hide : vt list) =
     let elist_pp = Fmt.list ~sep:Fmt.comma Expr.pp in
     let () =
       L.verbose (fun fmt ->
