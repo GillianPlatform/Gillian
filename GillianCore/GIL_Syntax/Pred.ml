@@ -88,7 +88,6 @@ let pp fmt pred =
     else Fmt.pf fmt' "[%s] " id
   in
   let pp_ox fmt' ox =
-  let pp_ox fmt' ox =
     match ox with
     | [] -> Fmt.pf fmt' ""
     | _ -> Fmt.pf fmt' " [ox: %a]" (Fmt.list ~sep:(Fmt.any ", ") Fmt.string) ox

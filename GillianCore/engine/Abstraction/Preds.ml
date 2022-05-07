@@ -139,8 +139,7 @@ module Make
           ac vs)
       SS.empty !preds
 
-
-  let get_lvars (preds : t) : SS.t =
+  let get_alocs (preds : t) : SS.t =
     List.fold_left
       (fun ac (_, vs) ->
         List.fold_left

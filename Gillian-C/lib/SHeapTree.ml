@@ -498,8 +498,8 @@ module Node = struct
     | _ -> SS.empty
 
   let alocs = function
-    | MemVal { mem_val = Single { value = e; _ }; _ } 
-    | MemVal { mem_val = SVarr { values = Arr e; _}; _ } -> SVal.alocs e
+    | MemVal { mem_val = Single { value = e; _ }; _ } -> SVal.alocs e
+    | MemVal { mem_val = Array { values = Arr e; _ }; _ } -> Expr.alocs e
     | _ -> SS.empty
 
   let substitution ~sval_subst ~svarr_subst n =

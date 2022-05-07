@@ -196,9 +196,7 @@ module Make
   let fresh_loc ?loc:_ (_ : t) =
     raise (Failure "fresh_loc not implemented in concrete state")
 
-  let clean_up ?(keep = Expr.Set.empty) (_ : t) =
-    let _ = keep in
-    raise (Failure "Cleanup of concrete state.")
+  let clean_up ?keep:_ _ = raise (Failure "Cleanup of concrete state.")
 
   let unify_assertion (_ : t) (_ : st) (_ : UP.step) : u_res =
     raise (Failure "Unify assertion from concrete state.")

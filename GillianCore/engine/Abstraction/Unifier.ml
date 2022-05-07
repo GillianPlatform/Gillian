@@ -945,7 +945,7 @@ module Make
             let msg = "INTERNAL ERROR: Not all ins known" in
             L.fail msg
           else
-            let eos = List.map (fun eo -> Val.from_expr (Option.get eo)) in
+            let eos = List.map (fun eo -> Val.from_expr (Option.get eo)) eos in
             if List.exists (fun x -> x = None) eos then
               raise
                 (Failure

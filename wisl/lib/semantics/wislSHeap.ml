@@ -411,7 +411,7 @@ let add_debugger_variables
 
 (***** Clean-up *****)
 
-let clean_up ?(keep = Expr.Set.empty) (heap : t) : Expr.Set.t * Expr.Set.t =
+let clean_up (keep : Expr.Set.t) (heap : t) : Expr.Set.t * Expr.Set.t =
   let forgettables =
     Hashtbl.fold
       (fun (aloc : string) (block : Block.t) forgettables ->

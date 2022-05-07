@@ -372,7 +372,8 @@ module Make
                     let new_variant = ESubst.subst_in_expr_opt subst variant in
                     let () =
                       L.verbose (fun fmt ->
-                          fmt "New variant: %a" (Fmt.Dump.option Expr.pp) new_variant)
+                          fmt "New variant: %a" (Fmt.Dump.option Expr.pp)
+                            new_variant)
                     in
                     match new_variant with
                     | None ->
@@ -1220,8 +1221,7 @@ module Make
     let state, preds, _, _ = astate in
     (state, Preds.is_empty preds)
 
-  let clean_up ?(keep = Expr.Set.empty) (astate : t) : unit =
-    let _ = keep in
+  let clean_up ?keep:_ (astate : t) : unit =
     let state, _, _, _ = astate in
     State.clean_up state
 

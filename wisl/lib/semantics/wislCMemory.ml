@@ -99,11 +99,7 @@ let assertions ?to_keep:_ _ =
   raise (Failure "ERROR: to_assertions called for concrete executions")
 
 let lvars _ = raise (Failure "ERROR: get_lvars called for concrete executions")
-
-let clean_up ?(keep = Gillian.Gil_syntax.Expr.Set.empty) _ =
-  let _ = keep in
-  raise (Failure "Cleanup of concrete state.")
-
+let clean_up ?keep:_ _ = raise (Failure "Cleanup of concrete state.")
 let fresh_val _ = raise (Failure "fresh_val not implemented in concrete state")
 
 let substitution_in_place _ _ =

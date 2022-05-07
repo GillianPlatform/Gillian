@@ -447,24 +447,18 @@ module Make (SMemory : SMemory.S) :
 
   let get_lvars (state : t) : Var.Set.t =
     let heap, store, pfs, gamma, svars = state in
-    List.fold_left SS.union SS.empty
-      [
-        SMemory.lvars heap;
-        SStore.lvars store;
-        PFS.lvars pfs;
-        TypEnv.lvars gamma;
-        svars;
-      ]
+    SMemory.lvars heap
+    |> SS.union (SStore.lvars store)
+    |> SS.union (PFS.lvars pfs)
+    |> SS.union (TypEnv.lvars gamma)
+    |> SS.union svars
 
   let get_lvars_for_exact (state : t) : Var.Set.t =
     let heap, store, pfs, gamma, _ = state in
-    List.fold_left SS.union SS.empty
-      [
-        SMemory.lvars heap;
-        SStore.lvars store;
-        PFS.lvars pfs;
-        TypEnv.lvars gamma;
-      ]
+    SMemory.lvars heap
+    |> SS.union (SStore.lvars store)
+    |> SS.union (PFS.lvars pfs)
+    |> SS.union (TypEnv.lvars gamma)
 
   let get_alocs_for_exact (state : t) : Var.Set.t =
     let heap, store, pfs, _, _ = state in
@@ -567,15 +561,10 @@ module Make (SMemory : SMemory.S) :
 
   let clean_up ?(keep = ES.empty) (state : t) : unit =
     let heap, store, _, _, _ = state in
-    let store_alocs = SS.elements (SStore.alocs store) in
-    let store_lvars = SS.elements (SStore.lvars store) in
     let keep =
-      List.fold_left ES.union ES.empty
-        [
-          keep;
-          ES.of_list (List.map (fun (x : string) -> Expr.ALoc x) store_alocs);
-          ES.of_list (List.map (fun (x : string) -> Expr.LVar x) store_lvars);
-        ]
+      keep
+      |> SS.fold (fun x ac -> ES.add (Expr.ALoc x) ac) (SStore.alocs store)
+      |> SS.fold (fun x ac -> ES.add (Expr.LVar x) ac) (SStore.lvars store)
     in
     let forgettables, keep = SMemory.clean_up ~keep heap in
     L.verbose (fun fmt ->

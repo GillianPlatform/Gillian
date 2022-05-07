@@ -241,8 +241,7 @@ struct
   let fresh_loc ?loc:_ (_ : t) : vt =
     raise (Failure "fresh_loc inside BI STATE")
 
-  let clean_up ?(keep = Expr.Set.empty) (bi_state : t) : unit =
-    let _ = keep in
+  let clean_up ?keep:_ (bi_state : t) : unit =
     let _, state, _ = bi_state in
     State.clean_up state
 
@@ -541,13 +540,12 @@ struct
     Error "Automatic unfold not supported in bi-abduction yet"
 
   let struct_init
-      ?(preds : UP.preds_tbl_t option)
-      ?(variants : variants_t option)
+      ?preds:_
+      ?variants:_
       (_ : Store.t)
       (_ : PFS.t)
       (_ : TypEnv.t)
       (_ : SS.t) : t =
-    let _, _ = (preds, variants) in
     raise (Failure "struct_init not implemented in MakeBiState")
 
   (** new functions *)
