@@ -54,6 +54,16 @@ module Block = struct
           @@ Fmt.iter_bindings ~sep:Fmt.sp SFVL.iter
           @@ fun ft (o, v) -> Fmt.pf ft "%a: %a" Expr.pp o Expr.pp v)
           data
+
+  let lvars block =
+    match block with
+    | Freed -> SS.empty
+    | Allocated { data; _ } -> SFVL.lvars data
+
+  let alocs block =
+    match block with
+    | Freed -> SS.empty
+    | Allocated { data; _ } -> SFVL.alocs data
 end
 
 type t = (string, Block.t) Hashtbl.t [@@deriving yojson]
@@ -279,6 +289,21 @@ let substitution_in_place subst heap :
 let assertions heap =
   Hashtbl.fold (fun loc block acc -> Block.assertions ~loc block @ acc) heap []
 
+let lvars heap : SS.t =
+  Hashtbl.fold
+    (fun _ block acc -> SS.union (Block.lvars block) acc)
+    heap SS.empty
+
+let alocs heap : SS.t =
+  Hashtbl.fold
+    (fun loc block acc ->
+      SS.union
+        (SS.union (Block.alocs block) acc)
+        (match Gillian.Utils.Names.is_aloc_name loc with
+        | true -> SS.singleton loc
+        | false -> SS.empty))
+    heap SS.empty
+
 (***** small things useful for printing ******)
 
 let pp fmt heap =
@@ -383,3 +408,46 @@ let add_debugger_variables
       scopes vars
   in
   scopes
+
+(***** Clean-up *****)
+
+let clean_up (keep : Expr.Set.t) (heap : t) : Expr.Set.t * Expr.Set.t =
+  let forgettables =
+    Hashtbl.fold
+      (fun (aloc : string) (block : Block.t) forgettables ->
+        match block with
+        | Freed -> forgettables
+        | Allocated { data; bound } -> (
+            match
+              (SFVL.is_empty data, bound, Expr.Set.mem (ALoc aloc) keep)
+            with
+            | true, None, false ->
+                let () = Hashtbl.remove heap aloc in
+                Expr.Set.add (Expr.ALoc aloc) forgettables
+            | _ -> forgettables))
+      heap Expr.Set.empty
+  in
+  let keep =
+    Hashtbl.fold
+      (fun (aloc : string) (block : Block.t) keep ->
+        let keep = Expr.Set.add (ALoc aloc) keep in
+        match block with
+        | Freed -> keep
+        | Allocated { data; _ } ->
+            let data_alocs =
+              Expr.Set.of_list
+                (List.map
+                   (fun x -> Expr.ALoc x)
+                   (SS.elements (SFVL.alocs data)))
+            in
+            let data_lvars =
+              Expr.Set.of_list
+                (List.map
+                   (fun x -> Expr.LVar x)
+                   (SS.elements (SFVL.lvars data)))
+            in
+            Expr.Set.union keep (Expr.Set.union data_alocs data_lvars))
+      heap keep
+  in
+  let forgettables = Expr.Set.diff forgettables keep in
+  (forgettables, keep)

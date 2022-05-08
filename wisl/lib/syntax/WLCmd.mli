@@ -5,7 +5,8 @@ type tt =
       (** apply \{exists: ...\} ... *)
   | LogicIf of WLExpr.t * t list * t list
   | Assert of WLAssert.t * string list  (**  assert \{exists: ...\} ... *)
-  | Invariant of WLAssert.t * string list  (** invariant \{exists: ... \} ...*)
+  | Invariant of WLAssert.t * string list * WLExpr.t option
+      (** invariant \{exists: ... \} ...*)
 
 and t
 

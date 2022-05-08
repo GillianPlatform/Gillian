@@ -204,7 +204,8 @@ and pred = {
   pred_num_params : int;
   pred_params : (string * typ option) list;
   pred_ins : int list;
-  pred_definitions : ((string * string list) option * assertion) list;
+  pred_definitions :
+    ((string * string list) option * assertion * string list) list;
   pred_facts : formula list;
   pred_pure : bool;
   pred_abstract : bool;
@@ -212,7 +213,12 @@ and pred = {
   pred_normalised : bool;
 }
 
-and lemma_spec = { lemma_hyp : assertion; lemma_concs : assertion list }
+and lemma_spec = {
+  lemma_hyp : assertion;
+  lemma_concs : assertion list;
+  lemma_spec_variant : expr option;
+  lemma_spec_ox : string list option;
+}
 
 and lemma = {
   lemma_name : string;
@@ -222,12 +228,14 @@ and lemma = {
   lemma_specs : lemma_spec list;
   lemma_proof : lcmd list option;
   lemma_variant : expr option;
+  lemma_ox : string list option;
   lemma_existentials : string list;
 }
 
 and single_spec = {
   ss_pre : assertion;
   ss_posts : assertion list;
+  ss_variant : expr option;
   ss_flag : flag;
   ss_to_verify : bool;
   ss_label : (string * string list) option;

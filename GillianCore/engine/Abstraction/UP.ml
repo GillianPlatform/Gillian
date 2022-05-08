@@ -22,7 +22,7 @@ type pt = step list
 let pt_pp = Fmt.(brackets (list ~sep:semi step_pp))
 
 type t =
-  | Leaf of step option * (Flag.t * Asrt.t list) option
+  | Leaf of step option * (Flag.t * Asrt.t list) option * string list
       (** Final node and associated post-condition *)
   | Inner of step * t list
   | PhantomInner of t list
@@ -624,36 +624,48 @@ let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
   let initial_search_state = ([], initial_indexes, kb) in
   search [ initial_search_state ]
 
-let rec lift_up (up : pt) (posts : (Flag.t * Asrt.t list) option) : t =
+let rec lift_up
+    (up : pt)
+    (posts : (Flag.t * Asrt.t list) option)
+    (ox : string list) : t =
   match up with
-  | [] -> Leaf (None, posts)
-  | [ p ] -> Leaf (Some p, posts)
-  | p :: up' -> Inner (p, [ lift_up up' posts ])
+  | [] -> Leaf (None, posts, ox)
+  | [ p ] -> Leaf (Some p, posts, ox)
+  | p :: up' -> Inner (p, [ lift_up up' posts ox ])
 
-let add_up (g_up : t) (up_post : pt * (Flag.t * Asrt.t list) option) : t =
+let add_up
+    (g_up : t)
+    (up_post : pt * (Flag.t * Asrt.t list) option)
+    (ox : string list) : t =
   match (g_up, up_post) with
-  | PhantomInner ups, (up, posts) -> PhantomInner (ups @ [ lift_up up posts ])
-  | _, (up, posts) -> PhantomInner [ g_up; lift_up up posts ]
+  | PhantomInner ups, (up, posts) -> PhantomInner (ups @ [ lift_up up posts ox ])
+  | _, (up, posts) -> PhantomInner [ g_up; lift_up up posts ox ]
 
 let lift_ups
-    (ups : (pt * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list)
-    : t =
+    (ups :
+      (pt
+      * ((string * SS.t) option * (Flag.t * Asrt.t list) option)
+      * string list)
+      list) : t =
   let b =
     List.exists
-      (fun (_, (lab, _)) ->
+      (fun (_, (lab, _), _) ->
         match lab with
         | Some _ -> true
         | _ -> false)
       ups
   in
-  let ups' = List.map (fun (up, (_, posts)) -> (up, posts)) ups in
+  let ups' = List.map (fun (up, (_, posts), ox) -> (up, posts, ox)) ups in
   if b then
     (* Printf.printf "BUILDING GUP FOR SPEC WITH EXISTENTIALS\n"; *)
     let gups =
-      List.map (fun (up, (lab, posts)) -> (lift_up up posts, lab)) ups
+      List.map (fun (up, (lab, posts), ox) -> (lift_up up posts ox, lab)) ups
     in
     LabPhantomInner gups
-  else List.fold_left add_up (PhantomInner []) ups'
+  else
+    List.fold_left
+      (fun ac (up, posts, ox) -> add_up ac (up, posts) ox)
+      (PhantomInner []) ups'
 
 let init
     ?(use_params : bool option)
@@ -661,8 +673,9 @@ let init
     (params : KB.t)
     (preds : (string, int list) Hashtbl.t)
     (asrts_posts :
-      (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option)) list)
-    : (t, Asrt.t list list) result =
+      (Asrt.t
+      * ((string * SS.t) option * (Flag.t * Asrt.t list) option * string list))
+      list) : (t, Asrt.t list list) result =
   let known_unifiables =
     match use_params with
     | None -> known_unifiables
@@ -671,7 +684,7 @@ let init
 
   let ups =
     List.map
-      (fun (asrt, (lab, posts)) ->
+      (fun (asrt, (lab, posts, ox)) ->
         let existentials =
           Option.fold
             ~some:(fun (_, existentials) ->
@@ -684,7 +697,7 @@ let init
         L.verbose (fun m -> m "Known unifiables: %a\n" kb_pp known_unifiables);
         L.verbose (fun m -> m "Existentials: %a\n" kb_pp existentials);
         let known_unifiables = KB.union known_unifiables existentials in
-        (s_init known_unifiables preds asrt, (lab, posts)))
+        (s_init known_unifiables preds asrt, (lab, posts, ox)))
       asrts_posts
   in
   let errors, _ =
@@ -710,31 +723,39 @@ let init
     Ok
       (lift_ups
          (List.map
-            (fun (up, posts) ->
+            (fun (up, (lab, posts, ox)) ->
               ( (match up with
                 | Ok up -> up
                 | Error _ ->
                     raise (Failure "UP: init: Impossible: ok, but error")),
-                posts ))
+                (lab, posts),
+                ox ))
             ups))
 
 let next (up : t) : (t * (string * SS.t) option) list option =
   match up with
   | Leaf _ -> None
   | Inner (_, ups) -> Some (List.map (fun x -> (x, None)) ups)
-  | PhantomInner ups when List.length ups > 0 ->
+  | PhantomInner ups ->
+      assert (List.length ups > 0);
       Some (List.map (fun x -> (x, None)) ups)
-  | LabPhantomInner lab_ups when List.length lab_ups > 0 -> Some lab_ups
-  | _ -> None
+  | LabPhantomInner lab_ups ->
+      assert (List.length lab_ups > 0);
+      Some lab_ups
 
 let head (up : t) : step option =
   match up with
-  | Leaf (Some p, _) | Inner (p, _) -> Some p
+  | Leaf (Some p, _, _) | Inner (p, _) -> Some p
   | _ -> None
 
 let posts (up : t) : (Flag.t * Asrt.t list) option =
   match up with
-  | Leaf (_, posts) -> posts
+  | Leaf (_, posts, _) -> posts
+  | _ -> None
+
+let ox (up : t) : string list option =
+  match up with
+  | Leaf (_, _, ox) -> Some ox
   | _ -> None
 
 let rec pp ft up =
@@ -744,16 +765,20 @@ let rec pp ft up =
     pf ft " [%s: @[<h>%a@]]" lab (iter ~sep:comma SS.iter string) vars
   in
   match up with
-  | Leaf (ostep, None) ->
-      pf ft "Leaf: @[%a@] with Posts = NONE"
+  | Leaf (ostep, None, ox) ->
+      pf ft "Leaf: @[%a@], Posts = NONE, hiding [%a]"
         (option ~none:(any "none") step_pp)
         ostep
-  | Leaf (ostep, Some (flag, posts)) ->
-      pf ft "Leaf: @[%a@] with Flag %a and Posts:@\n  @[%a@]"
+        (Fmt.list ~sep:comma Fmt.string)
+        ox
+  | Leaf (ostep, Some (flag, posts), ox) ->
+      pf ft "Leaf: @[%a@] with Flag %a, Posts:@\n  @[%a@], hiding [%a]"
         (option ~none:(any "none") step_pp)
         ostep Flag.pp flag
         (list ~sep:(any "@\n@\n") (hovbox Asrt.pp))
         posts
+        (Fmt.list ~sep:comma Fmt.string)
+        ox
   | Inner (step, next_ups) ->
       let pp_children ft ch =
         if List.length ch = 1 then pp ft (List.hd ch)
@@ -793,7 +818,10 @@ let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
           KB.of_list (List.map (fun x -> Expr.PVar x) spec.spec_params)
         in
         let sspecs :
-            (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option))
+            (Asrt.t
+            * ((string * SS.t) option
+              * (Flag.t * Asrt.t list) option
+              * string list))
             list =
           List.mapi
             (fun i (sspec : Spec.st) ->
@@ -806,7 +834,8 @@ let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
                     sspec.ss_label);
               ( sspec.ss_pre,
                 ( Spec.label_vars_to_set sspec.ss_label,
-                  Some (sspec.ss_flag, sspec.ss_posts) ) ))
+                  Some (sspec.ss_flag, sspec.ss_posts),
+                  [] ) ))
             spec.spec_sspecs
         in
 
@@ -837,12 +866,15 @@ let init_lemmas (preds : (string, int list) Hashtbl.t) (lemmas : Lemma.t list) :
           KB.of_list (List.map (fun x -> Expr.PVar x) lemma.lemma_params)
         in
         let sspecs :
-            (Asrt.t * ((string * SS.t) option * (Flag.t * Asrt.t list) option))
+            (Asrt.t
+            * ((string * SS.t) option
+              * (Flag.t * Asrt.t list) option
+              * string list))
             list =
           List.map
             (fun spec ->
               ( spec.Lemma.lemma_hyp,
-                (None, Some (Flag.Normal, spec.lemma_concs)) ))
+                (None, Some (Flag.Normal, spec.lemma_concs), []) ))
             lemma.lemma_specs
         in
         let up = init ~use_params:true KB.empty params preds sspecs in
@@ -888,11 +920,11 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
 
         let defs =
           List.map
-            (fun (lab, def) ->
+            (fun (lab, def, ox) ->
               let lab' =
                 Option.map (fun (s, vars) -> (s, SS.of_list vars)) lab
               in
-              (def, (lab', None)))
+              (def, (lab', None, ox)))
             pred.pred_definitions
         in
 
@@ -1069,7 +1101,7 @@ let add_spec (prog : prog) (spec : Spec.t) : unit =
   let new_uspec (spec : Spec.t) : spec =
     let posts =
       List.map
-        (fun (x, y) -> (x, (None, y)))
+        (fun (x, y) -> (x, (None, y, [])))
         (posts_from_sspecs spec.spec_sspecs)
     in
     let up = init ~use_params:true KB.empty params pred_ins posts in
@@ -1108,7 +1140,7 @@ let add_spec (prog : prog) (spec : Spec.t) : unit =
                     uspec.spec.spec_name Asrt.pp pre);
               (* Printf.printf "%s" msg; *)
               g_up
-          | Ok pre_up -> add_up g_up (pre_up, posts))
+          | Ok pre_up -> add_up g_up (pre_up, posts) [])
         uspec.up ups
     in
     let uspec' : spec = { spec; up = new_gup } in

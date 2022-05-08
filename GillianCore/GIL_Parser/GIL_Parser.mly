@@ -133,6 +133,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token EXISTENTIALS
 %token BRANCH
 %token USESUBST
+%token OX
 (* Command keywords  *)
 %token SKIP
 %token DEFEQ
@@ -639,12 +640,12 @@ g_mult_spec_line:
 
 g_sspec_target:
 (* [spec_name: #bla, #ble, #bli] [[ .... ]] [[ .... ]] Normal *)
-  | option(lab_spec_target) g_spec_line g_mult_spec_line NORMAL
-    { Spec.{ ss_pre = $2; ss_posts = $3; ss_flag = Normal; ss_to_verify = true; ss_label = $1 } }
+  | option(lab_spec_target) g_spec_line g_mult_spec_line option(variant_target) NORMAL
+    { Spec.{ ss_pre = $2; ss_posts = $3; ss_variant = $4; ss_flag = Normal; ss_to_verify = true; ss_label = $1 } }
 (* [[ .... ]] [[ .... ]] Error *)
-  | lab_spec = option(lab_spec_target); ss_pre = g_spec_line; ss_posts = g_mult_spec_line; ERROR
+  | lab_spec = option(lab_spec_target); ss_pre = g_spec_line; ss_posts = g_mult_spec_line; ss_variant = option(variant_target); ERROR
   {
-    let spec : Spec.st = { ss_pre; ss_posts; ss_flag = Error; ss_to_verify = true; ss_label = lab_spec} in
+    let spec : Spec.st = { ss_pre; ss_posts; ss_variant; ss_flag = Error; ss_to_verify = true; ss_label = lab_spec} in
     spec
   }
 ;
@@ -688,9 +689,13 @@ g_macro_target:
   }
 ;
 
+ox_vars:
+  | LBRACKET; OX; COLON; ox = separated_list(COMMA, LVAR); RBRACKET;
+    { ox }
+
 g_named_assertion_target:
-  id = option(assertion_id_target); a = g_assertion_target
-  { (id, a) }
+  id = option(assertion_id_target); a = g_assertion_target; ox = option(ox_vars)
+  { (id, a, Option.value ox ~default:[]) }
 ;
 
 g_logic_cmd_target:
@@ -818,9 +823,13 @@ g_pred_target:
   }
 ;
 
-lemma_variant_target:
+variant_target:
   VARIANT LBRACE; variant = expr_target; RBRACE
   { variant }
+
+ox_target:
+  OX; COLON; ox = separated_list(COMMA, LVAR)
+    { ox }
 
 lemma_head_target:
   lemma_name = VAR; LBRACE; lemma_params = separated_list(COMMA, VAR); RBRACE
@@ -838,7 +847,8 @@ g_lemma_target:
   internal = option(INTERNAL);
   LEMMA;
   lemma_head = lemma_head_target;
-  lemma_variant = option(lemma_variant_target);
+  lemma_variant = option(variant_target);
+  lemma_ox = option(ox_target);
   lemma_hyp = g_spec_line;
   lemma_concs = g_mult_spec_line;
   lemma_existentials = option(existentials_target);
@@ -854,6 +864,8 @@ g_lemma_target:
     let spec = Lemma.{
       lemma_hyp;
       lemma_concs;
+      lemma_spec_variant = lemma_variant;
+      lemma_spec_ox = lemma_ox
     } in
     Lemma.
       {
@@ -863,6 +875,7 @@ g_lemma_target:
         lemma_params;
         lemma_specs = [ spec ];
         lemma_variant;
+        lemma_ox;
         lemma_proof;
         lemma_existentials;
       }

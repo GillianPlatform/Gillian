@@ -19,6 +19,8 @@ module type S = sig
   val strategic_choice : t -> (abs_t -> int) -> abs_t option
   val remove_by_name : t -> string -> abs_t option
   val find_pabs_by_name : t -> string -> abs_t list
+  val get_lvars : t -> SS.t
+  val get_alocs : t -> SS.t
   val pp : Format.formatter -> t -> unit
   val pp_pabs : Format.formatter -> abs_t -> unit
 
@@ -37,6 +39,8 @@ module type S = sig
 
   (** Turns a predicate set into a list of assertions *)
   val to_assertions : t -> Asrt.t list
+
+  val is_in : t -> Expr.t -> bool
 end
 
 module Make

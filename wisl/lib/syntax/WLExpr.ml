@@ -6,6 +6,7 @@ type tt =
   | PVar of string
   | LBinOp of t * WBinOp.t * t
   | LUnOp of WUnOp.t * t
+  | LLSub of t * t * t
   | LEList of t list
   | LESet of t list
 
@@ -60,6 +61,8 @@ let rec pp fmt lexpr =
   | LBinOp (le1, b, le2) ->
       Format.fprintf fmt "@[(%a %a %a)@]" pp le1 WBinOp.pp b pp le2
   | LUnOp (u, le) -> Format.fprintf fmt "@[(%a %a)@]" WUnOp.pp u pp le
+  | LLSub (le1, le2, le3) ->
+      Format.fprintf fmt "@[sub(%a, %a, %a)@]" pp le1 pp le2 pp le3
   | LEList lel ->
       WPrettyUtils.pp_list ~pre:(format_of_string "@[[")
         ~suf:(format_of_string "]@]")
@@ -81,6 +84,7 @@ let rec substitution (subst : (string, tt) Hashtbl.t) (e : t) : t =
     | PVar x -> Option.value ~default:(PVar x) (Hashtbl.find_opt subst x)
     | LBinOp (e1, binop, e2) -> LBinOp (f e1, binop, f e2)
     | LUnOp (unop, e1) -> LUnOp (unop, f e1)
+    | LLSub (e1, e2, e3) -> LLSub (f e1, f e2, f e3)
     | LEList le -> LEList (List.map f le)
     | LESet le -> LESet (List.map f le)
   in

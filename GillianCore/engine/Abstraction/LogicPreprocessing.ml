@@ -38,7 +38,7 @@ let rec auto_unfold
             name (List.length args) (List.length params)
       in
       let subst = SVal.SSubst.init combined in
-      let defs = snd (List.split pred.pred_definitions) in
+      let defs = List.map (fun (_, def, _) -> def) pred.pred_definitions in
       List.map (SVal.SSubst.substitute_asrt subst ~partial:false) defs
   | Pred (name, args) -> (
       try
@@ -54,7 +54,7 @@ let rec auto_unfold
               (List.length pred.pred_definitions));
         let new_asrts =
           List.map
-            (fun (_, a) ->
+            (fun (_, a, _) ->
               L.tmi (fun fmt -> fmt "Before Auto Unfolding: %a" Asrt.pp a);
               let facts =
                 List.map (fun fact -> Asrt.Pure fact) pred.pred_facts
@@ -115,7 +115,7 @@ let find_recursive_preds (preds : (string, Pred.t) Hashtbl.t) :
         let neighbours =
           List.concat
             (List.map
-               (fun (_, asrt) -> Asrt.pred_names asrt)
+               (fun (_, asrt, _) -> Asrt.pred_names asrt)
                pred.pred_definitions)
         in
         (* Compute the smallest index reachable from its neighbours *)
@@ -149,11 +149,13 @@ let simplify_and_prune (pred : Pred.t) : Pred.t =
         (List.length pred.pred_definitions));
   let new_defs =
     List.map
-      (fun (oc, x) -> (oc, Reduction.reduce_assertion x))
+      (fun (oc, x, ox) -> (oc, Reduction.reduce_assertion x, ox))
       pred.pred_definitions
   in
   let new_defs =
-    List.filter (fun (_, x) -> Simplifications.admissible_assertion x) new_defs
+    List.filter
+      (fun (_, x, _) -> Simplifications.admissible_assertion x)
+      new_defs
   in
   L.verbose (fun fmt ->
       fmt "Predicate %s left with %d definitions after pruning." pred.pred_name
@@ -181,7 +183,7 @@ let find_pure_preds (preds : (string, Pred.t) Hashtbl.t) :
         let pred = Hashtbl.find preds pred_name in
         let is_pure =
           List.for_all
-            (fun (_, asrt) -> Asrt.is_pure_asrt asrt)
+            (fun (_, asrt, _) -> Asrt.is_pure_asrt asrt)
             pred.pred_definitions
         in
 
@@ -203,7 +205,7 @@ let unfold_preds (preds : (string, Pred.t) Hashtbl.t) :
         let deps =
           List.sort_uniq compare
             (List.concat_map
-               (fun (_, asrt) -> Asrt.pred_names asrt)
+               (fun (_, asrt, _) -> Asrt.pred_names asrt)
                pred.pred_definitions)
         in
         (name, deps) :: res)
@@ -227,11 +229,14 @@ let unfold_preds (preds : (string, Pred.t) Hashtbl.t) :
     (fun (name, _) ->
       let pred = Hashtbl.find preds name in
       L.verbose (fun fmt -> fmt "Unfolding predicate: %s" pred.pred_name);
-      let definitions' : ((string * string list) option * Asrt.t) list =
+      let definitions' :
+          ((string * string list) option * Asrt.t * string list) list =
         List.flatten
           (List.map
-             (fun (os, a) ->
-               List.map (fun a -> (os, a)) (auto_unfold preds recursion_info a))
+             (fun (os, a, ox) ->
+               List.map
+                 (fun a -> (os, a, ox))
+                 (auto_unfold preds recursion_info a))
              pred.pred_definitions)
       in
       L.verbose (fun fmt ->
@@ -292,7 +297,16 @@ let unfold_lemma
     let lemma_concs : Asrt.t list =
       List.concat (List.map (auto_unfold preds rec_info) spec.lemma_concs)
     in
-    List.map (fun lemma_hyp -> Lemma.{ lemma_hyp; lemma_concs }) lemma_hyps
+    List.map
+      (fun lemma_hyp ->
+        Lemma.
+          {
+            lemma_hyp;
+            lemma_concs;
+            lemma_spec_variant = lemma.lemma_variant;
+            lemma_spec_ox = lemma.lemma_ox;
+          })
+      lemma_hyps
   in
   {
     lemma with
@@ -429,8 +443,8 @@ let explicit_param_types
       let defs =
         pred1.pred_definitions
         @ List.map
-            (fun (oid, a) ->
-              (oid, SVal.SSubst.substitute_asrt subst ~partial:true a))
+            (fun (oid, a, ox) ->
+              (oid, SVal.SSubst.substitute_asrt subst ~partial:true a, ox))
             pred2.pred_definitions
       in
       { pred1 with pred_definitions = defs }

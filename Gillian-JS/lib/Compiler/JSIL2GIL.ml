@@ -77,6 +77,8 @@ let jsil2gil_sspec (sspec : Spec.st) : GSpec.st =
   {
     ss_pre = jsil2gil_asrt sspec.pre;
     ss_posts = List.map jsil2gil_asrt sspec.posts;
+    (* FIXME: bring in variant *)
+    ss_variant = None;
     ss_flag = sspec.flag;
     ss_to_verify = sspec.to_verify;
     ss_label;
@@ -92,6 +94,7 @@ let jsil2gil_spec (spec : Spec.t) : GSpec.t =
     spec_to_verify = spec.to_verify;
   }
 
+(* TODO: Bring in OX *)
 let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
   {
     lemma_name = lemma.name;
@@ -104,10 +107,13 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
         {
           lemma_hyp = jsil2gil_asrt lemma.pre;
           lemma_concs = List.map jsil2gil_asrt lemma.posts;
+          lemma_spec_variant = lemma.variant;
+          lemma_spec_ox = None;
         };
       ];
     lemma_proof = Option.map (List.map jsil2gil_lcmd) lemma.proof;
     lemma_variant = lemma.variant;
+    lemma_ox = None;
     lemma_existentials = lemma.existentials;
   }
 
@@ -121,7 +127,9 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
     pred_params = pred.params;
     pred_ins = pred.ins;
     pred_definitions =
-      List.map (fun (info, asrt) -> (info, jsil2gil_asrt asrt)) pred.definitions;
+      List.map
+        (fun (info, asrt) -> (info, jsil2gil_asrt asrt, []))
+        pred.definitions;
     pred_facts = pred.facts;
     pred_pure = pred.pure;
     pred_abstract = pred.abstract;

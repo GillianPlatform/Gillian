@@ -33,6 +33,7 @@ val empty : t
 val freed : t
 val is_empty : t -> bool
 val lvars : t -> SS.t
+val alocs : t -> SS.t
 val get_bounds : t -> Range.t option or_error
 val set_bounds : t -> Range.t option -> t or_error
 val rem_bounds : t -> t or_error

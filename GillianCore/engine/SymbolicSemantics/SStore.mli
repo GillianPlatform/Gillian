@@ -30,3 +30,4 @@ val is_well_formed : t -> bool
 val bindings : t -> (Var.t * vt) list
 val to_ssubst : t -> SVal.SESubst.t
 val symbolics : t -> Var.Set.t
+val is_in : t -> Expr.t -> bool

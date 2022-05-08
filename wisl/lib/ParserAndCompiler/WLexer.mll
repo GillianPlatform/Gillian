@@ -32,24 +32,29 @@ rule read =
   | "else"   { ELSE (curr lexbuf) }
   | "skip"   { SKIP (curr lexbuf) }
   | "new"    { NEW (curr lexbuf) }
-  | "delete" { DELETE (curr lexbuf) }
+  | "free"   { DELETE (curr lexbuf) }
+  | "dispose"{ DELETE (curr lexbuf) }
   | "function" { FUNCTION (curr lexbuf) }
   | "predicate" { PREDICATE (curr lexbuf) }
   | "invariant" { INVARIANT (curr lexbuf) }
   | "return" { RETURN (curr lexbuf) }
   | "fold"   { FOLD (curr lexbuf) }
   | "unfold" { UNFOLD (curr lexbuf) }
+  | "nounfold" { NOUNFOLD (curr lexbuf) }
   | "apply"  { APPLY (curr lexbuf) }
   | "assert" { ASSERT (curr lexbuf) }
+  | "with" { WITH (curr lexbuf) }
   | "variant" { VARIANT (curr lexbuf) }
   | "statement" { STATEMENT (curr lexbuf) }
   | "proof"  { PROOF (curr lexbuf) }
   | "lemma"  { LEMMA (curr lexbuf) }
   | "forall" { FORALL (curr lexbuf) }
   | "bind" { EXIST (curr lexbuf) }
+  | "ox" { OX (curr lexbuf) }
   (* types *)
   | "List" { TLIST (curr lexbuf) }
   | "Int" { TINT (curr lexbuf) }
+  | "Bool" { TBOOL (curr lexbuf) }
   (* strings and comments *)
   | '"'      { let () = l_start_string := curr lexbuf in
                read_string (Buffer.create 17) lexbuf }
@@ -104,6 +109,7 @@ rule read =
   | "hd"     { HEAD (curr lexbuf) }
   | "tl"     { TAIL (curr lexbuf) }
   | "rev"    { REV (curr lexbuf) }
+  | "sub"    { SUB (curr lexbuf) }
   | '!'      { LNOT (curr lexbuf) }
   (* identifiers *)
   | white    { read lexbuf }

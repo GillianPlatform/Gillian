@@ -21,6 +21,7 @@ module Make
   type fix_t
   type m_err_t = CMemory.err_t
   type err_t = (m_err_t, vt) StateErr.err_t
+  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
   exception Internal_State_Error of err_t list * t
 
@@ -30,7 +31,9 @@ module Make
   let lift_merrs (errs : m_err_t list) : err_t list =
     List.map (fun x -> StateErr.EMem x) errs
 
-  let init (_ : UP.preds_tbl_t option) : t =
+  let init ?(preds : UP.preds_tbl_t option) ?(variants : variants_t option) () :
+      t =
+    let _, _ = (preds, variants) in
     (CMemory.init (), CStore.init [], [])
 
   let get_pred_defs (_ : t) : UP.preds_tbl_t option = None
@@ -137,11 +140,13 @@ module Make
   let simplify_val _ v = v
 
   let struct_init
-      (_ : UP.preds_tbl_t option)
+      ?(preds : UP.preds_tbl_t option)
+      ?(variants : variants_t option)
       (_ : store_t)
       (_ : PFS.t)
       (_ : TypEnv.t)
       (_ : SS.t) : t =
+    let _, _ = (preds, variants) in
     raise (Failure "ERROR. struct_init not supported at the concrete level")
 
   let add_spec_vars _ _ =
@@ -152,6 +157,9 @@ module Make
 
   let get_lvars _ =
     raise (Failure "ERROR: get_lvars called for concrete executions")
+
+  let get_lvars_for_exact _ =
+    raise (Failure "ERROR: get_lvars_for_exact called for concrete executions")
 
   let to_assertions ?to_keep:_ (_ : t) : Asrt.t list =
     raise (Failure "ERROR: to_assertions called for concrete executions")
@@ -188,7 +196,7 @@ module Make
   let fresh_loc ?loc:_ (_ : t) =
     raise (Failure "fresh_loc not implemented in concrete state")
 
-  let clean_up (_ : t) = raise (Failure "Cleanup of concrete state.")
+  let clean_up ?keep:_ _ = raise (Failure "Cleanup of concrete state.")
 
   let unify_assertion (_ : t) (_ : st) (_ : UP.step) : u_res =
     raise (Failure "Unify assertion from concrete state.")

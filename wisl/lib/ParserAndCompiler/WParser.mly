@@ -3,8 +3,8 @@
 (* key words *)
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP NEW DELETE
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
-%token <CodeLoc.t> INVARIANT FOLD UNFOLD APPLY ASSERT EXIST FORALL
-%token <CodeLoc.t> STATEMENT VARIANT PROOF
+%token <CodeLoc.t> INVARIANT FOLD UNFOLD NOUNFOLD APPLY ASSERT EXIST OX FORALL
+%token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
 
 (* punctuation *)
 %token <CodeLoc.t> COLON            /* : */
@@ -27,6 +27,7 @@
 (* types *)
 %token <CodeLoc.t> TLIST
 %token <CodeLoc.t> TINT
+%token <CodeLoc.t> TBOOL
 
 (* names *)
 %token <CodeLoc.t * string> IDENTIFIER
@@ -53,7 +54,7 @@
 %token LSTCAT          /* @ */
 
 (* Unary operators *)
-%token <CodeLoc.t> NOT HEAD TAIL REV LEN
+%token <CodeLoc.t> NOT HEAD TAIL REV LEN SUB
 
 (* Logic Binary *)
 %token ARROW          /* -> */
@@ -106,7 +107,8 @@
 %type <CodeLoc.t * WVal.t>                         value_with_loc
 %type <CodeLoc.t * WUnOp.t>                        unop_with_loc
 %type <WBinOp.t>                                   binop
-%type <WExpr.t>                                    variant_def
+%type <WLExpr.t>                                   variant_def
+%type <WLExpr.t>                                   with_variant_def
 %type <WLCmd.t list>                               proof_def
 %type <(string * WType.t option) * bool>           pred_param_ins
 %type <CodeLoc.t * string list>                    bindings_with_loc
@@ -136,12 +138,11 @@ definitions:
     { let (fs, ps, ls) = fpdcl in
       (f::fs, ps, ls) }
 
-
 fct_with_specs:
-  | lstart = LCBRACE; pre = logic_assertion; RCBRACE; f = fct; LCBRACE;
+  | lstart = LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
     post = logic_assertion; lend = RCBRACE
     { let loc = CodeLoc.merge lstart lend in
-      WFun.add_spec f pre post loc }
+      WFun.add_spec f pre post variant loc }
   | f = fct { f }
 
 fct:
@@ -314,6 +315,7 @@ lemma:
       FORALL lemma_params = var_list; DOT;
       lemma_hypothesis = logic_assertion; VDASH; lemma_conclusion = logic_assertion;
       lemma_variant = option(variant_def);
+      lemma_ox = option(ox_def);
       lemma_proof = option(proof_def);
       lend = RCBRACE
       { let (_, lemma_name) = lname in
@@ -324,6 +326,7 @@ lemma:
           lemma_params;
           lemma_proof;
           lemma_variant;
+          lemma_ox;
           lemma_hypothesis;
           lemma_conclusion;
           lemma_loc;
@@ -331,15 +334,31 @@ lemma:
           } }
 
 variant_def:
-  | VARIANT; COLON; e = expression { e }
+  | VARIANT; COLON; e = logic_expression { e }
+
+ox_def:
+  | OX; COLON; ox = separated_list(COMMA, LVAR);
+    { snd(List.split ox) }
+
+with_variant_def:
+  | WITH; variant = variant_def { variant }
 
 proof_def:
   | PROOF; COLON; pr = separated_nonempty_list(SEMICOLON, logic_command)
     { pr }
 
+ox_vars:
+  | LBRACK; OX; COLON; ox = separated_list(COMMA, LVAR); RBRACK;
+    { snd(List.split ox) }
+
+pred_def:
+  | def = logic_assertion; ox = option(ox_vars);
+    { let ox = Option.value ox ~default:[] in
+        (def, ox) }
+
 predicate:
-  | lstart = PREDICATE; lpname = IDENTIFIER; LBRACE; params_ins = separated_list(COMMA, pred_param_ins); RBRACE; LCBRACE;
-    pred_definitions = separated_nonempty_list(SEMICOLON, logic_assertion);
+  | lstart = PREDICATE; pred_nounfold = option(NOUNFOLD); lpname = IDENTIFIER; LBRACE; params_ins = separated_list(COMMA, pred_param_ins); RBRACE; LCBRACE;
+    pred_definitions = separated_nonempty_list(SEMICOLON, pred_def);
     lend = RCBRACE;
     { let (_, pred_name) = lpname in
       let (pred_params, ins) : (string * WType.t option) list * bool list = List.split params_ins in
@@ -352,6 +371,7 @@ predicate:
       (* ins looks like [0, 2] *)
   		let pred_ins = if (List.length ins) > 0 then ins else (List.mapi (fun i _ -> i) pred_params) in
       (* if ins is empty then everything is an in *)
+      let pred_nounfold = (pred_nounfold <> None) in
       let pred_loc = CodeLoc.merge lstart lend in
       let pred_id = Generators.gen_id () in
       WPred.{
@@ -359,6 +379,7 @@ predicate:
         pred_params;
         pred_definitions;
         pred_ins;
+        pred_nounfold;
         pred_loc;
         pred_id;
       } }
@@ -366,6 +387,7 @@ predicate:
 type_target:
   | TLIST { WType.WList }
   | TINT { WType.WInt }
+  | TBOOL { WType.WBool }
 
 pred_param_ins:
   | inp = option(PLUS); lx = IDENTIFIER; option(preceded(COLON, type_target))
@@ -411,11 +433,11 @@ logic_command:
       let loc = CodeLoc.merge lstart lend in
       let bare_lcmd = WLCmd.Assert (a, b) in
       WLCmd.make bare_lcmd loc }
-  | lstart = INVARIANT; lbopt = option(bindings_with_loc); a = logic_assertion;
+  | lstart = INVARIANT; lbopt = option(bindings_with_loc); a = logic_assertion; variant = option(with_variant_def);
     { let lend = WLAssert.get_loc a in
       let (_, b) = Option.value ~default:(lstart, []) lbopt in
       let loc = CodeLoc.merge lstart lend in
-      let bare_lcmd = WLCmd.Invariant (a, b) in
+      let bare_lcmd = WLCmd.Invariant (a, b, variant) in
       WLCmd.make bare_lcmd loc }
 
 bindings_with_loc:
@@ -550,6 +572,10 @@ logic_expression:
       let lstart, lend = WLExpr.get_loc e1, WLExpr.get_loc e2 in
       let loc = CodeLoc.merge lstart lend in
       WLExpr.make bare_lexpr loc } %prec binop_prec
+  | lstart = SUB; LBRACE; e1 = logic_expression; COMMA; e2 = logic_expression; COMMA; e3 = logic_expression; lend = RBRACE {
+      let loc = CodeLoc.merge lstart lend in
+      let bare_lexpr = WLExpr.LLSub(e1, e2, e3) in
+      WLExpr.make bare_lexpr loc }
   | lu = unop_with_loc; e = logic_expression
     { let (lstart, u) = lu in
       let lend = WLExpr.get_loc e in

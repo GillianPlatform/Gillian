@@ -23,6 +23,7 @@ struct
   type err_t = State.err_t [@@deriving yojson]
   type fix_t = State.fix_t
   type m_err_t = State.m_err_t
+  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
   exception Internal_State_Error of err_t list * t
 
@@ -59,8 +60,10 @@ struct
       in
       ASucc (List.concat rets)
 
-  let init (pred_defs : UP.preds_tbl_t option) : t =
-    (SS.empty, State.init pred_defs, State.init pred_defs)
+  let init ?(preds : UP.preds_tbl_t option) ?(variants : variants_t option) () :
+      t =
+    let _ = variants in
+    (SS.empty, State.init ?preds (), State.init ?preds ())
 
   let get_pred_defs (bi_state : t) : UP.preds_tbl_t option =
     let _, state, _ = bi_state in
@@ -70,7 +73,7 @@ struct
       (procs : SS.t)
       (state : State.t)
       (pred_defs : UP.preds_tbl_t option) : t =
-    (procs, state, State.init pred_defs)
+    (procs, state, State.init ?preds:pred_defs ())
 
   let eval_expr (bi_state : t) (e : Expr.t) =
     let _, state, _ = bi_state in
@@ -203,6 +206,10 @@ struct
     let _, state, _ = bi_state in
     State.get_lvars state
 
+  let get_lvars_for_exact (bi_state : t) : Var.Set.t =
+    let _, state, _ = bi_state in
+    State.get_lvars_for_exact state
+
   let to_assertions ?(to_keep : SS.t option) (bi_state : t) : Asrt.t list =
     let _, state, _ = bi_state in
     State.to_assertions ?to_keep state
@@ -234,7 +241,7 @@ struct
   let fresh_loc ?loc:_ (_ : t) : vt =
     raise (Failure "fresh_loc inside BI STATE")
 
-  let clean_up (bi_state : t) : unit =
+  let clean_up ?keep:_ (bi_state : t) : unit =
     let _, state, _ = bi_state in
     State.clean_up state
 
@@ -533,7 +540,8 @@ struct
     Error "Automatic unfold not supported in bi-abduction yet"
 
   let struct_init
-      (_ : UP.preds_tbl_t option)
+      ?preds:_
+      ?variants:_
       (_ : Store.t)
       (_ : PFS.t)
       (_ : TypEnv.t)

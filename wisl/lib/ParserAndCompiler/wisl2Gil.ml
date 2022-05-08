@@ -216,6 +216,13 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
     | LUnOp (u, e) ->
         let gvars, asrt, comp_expr = compile_lexpr e in
         (gvars, asrt, Expr.UnOp (compile_unop u, comp_expr))
+    | LLSub (e1, e2, e3) ->
+        let gvars1, asrt1, comp_e1 = compile_lexpr e1 in
+        let gvars2, asrt2, comp_e2 = compile_lexpr e2 in
+        let gvars3, asrt3, comp_e3 = compile_lexpr e3 in
+        ( gvars1 @ gvars2 @ gvars3,
+          asrt1 @ asrt2 @ asrt3,
+          Expr.LstSub (comp_e1, comp_e2, comp_e3) )
     | LEList l ->
         let gvars, asrtsl, comp_exprs =
           list_split_3 (List.map compile_lexpr l)
@@ -444,9 +451,9 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
   let loop_fname = gen_str (fname ^ "_loop") in
   let while_loc = WStmt.get_loc while_stmt in
   let invariant_loc = WLCmd.get_loc invariant in
-  let inv_asrt, inv_exs =
+  let inv_asrt, inv_exs, inv_variant =
     match WLCmd.get invariant with
-    | Invariant (la, lb) -> (la, lb)
+    | Invariant (la, lb, lv) -> (la, lb, lv)
     | _ -> failwith "That can't happen, it's not an invariant"
   in
   let guard, wcmds =
@@ -530,6 +537,8 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         {
           pre;
           post;
+          (* FIGURE OUT VARIANT *)
+          variant = inv_variant;
           spid = Generators.gen_id ();
           fname = loop_fname;
           fparams = vars;
@@ -807,10 +816,19 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let comp_rest, new_functions = compile_list rest in
       (cmds_with_annot @ comp_rest, new_functions)
 
-let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials; _ }
-    =
+let compile_spec
+    ?(fname = "main")
+    WSpec.{ pre; post; variant; fparams; existentials; _ } =
   let _, comp_pre = compile_lassert ~fname pre in
   let _, comp_post = compile_lassert ~fname post in
+  let comp_variant =
+    Option.map
+      (fun variant ->
+        (* FIXME: what happens with the global assertions? *)
+        let _, _, comp_variant = compile_lexpr variant in
+        comp_variant)
+      variant
+  in
   let label_opt =
     match existentials with
     | None -> None
@@ -818,24 +836,27 @@ let compile_spec ?(fname = "main") WSpec.{ pre; post; fparams; existentials; _ }
   in
   let single_spec =
     match label_opt with
-    | None -> Spec.s_init comp_pre [ comp_post ] Flag.Normal true
+    | None -> Spec.s_init comp_pre [ comp_post ] comp_variant Flag.Normal true
     | Some ss_label ->
-        Spec.s_init ~ss_label comp_pre [ comp_post ] Flag.Normal true
+        Spec.s_init ~ss_label comp_pre [ comp_post ] comp_variant Flag.Normal
+          true
   in
   Spec.init fname fparams [ single_spec ] false false true
 
 let compile_pred filepath pred =
   let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; _ } = pred in
-  let types = WType.infer_types_pred pred_params pred_definitions in
+  let just_pred_definitions = fst (List.split pred_definitions) in
+  let types = WType.infer_types_pred pred_params just_pred_definitions in
   let getWISLTypes str = (str, WType.of_variable str types) in
   let paramsWISLType = List.map (fun (x, _) -> getWISLTypes x) pred_params in
   let getGILTypes (str, t) =
     (str, Option.fold ~some:compile_type ~none:None t)
   in
   let pred_params = List.map getGILTypes paramsWISLType in
-  let build_def asrt =
+  let build_def pred_def =
+    let asrt, ox = pred_def in
     let _, casrt = compile_lassert asrt in
-    (None, casrt)
+    (None, casrt, ox)
   in
   Pred.
     {
@@ -851,7 +872,7 @@ let compile_pred filepath pred =
       pred_facts = [];
       pred_abstract = false;
       pred_pure = false;
-      pred_nounfold = false;
+      pred_nounfold = pred.pred_nounfold;
     }
 
 let rec compile_function
@@ -898,6 +919,7 @@ let preprocess_lemma
         lemma_params;
         lemma_proof;
         lemma_variant;
+        lemma_ox;
         lemma_hypothesis;
         lemma_conclusion;
         lemma_id;
@@ -943,6 +965,7 @@ let preprocess_lemma
       lemma_params;
       lemma_proof = new_lemma_proof;
       lemma_variant;
+      lemma_ox;
       lemma_hypothesis = new_lemma_hypothesis;
       lemma_conclusion = new_lemma_conclusion;
       lemma_id;
@@ -957,12 +980,13 @@ let compile_lemma
         lemma_params;
         lemma_proof;
         lemma_variant;
+        lemma_ox;
         lemma_hypothesis;
         lemma_conclusion;
         _;
       } =
   let compile_lcmd = compile_lcmd ~fname:lemma_name in
-  let compile_expr = compile_expr ~fname:lemma_name in
+  let compile_lexpr = compile_lexpr ~fname:lemma_name in
   let compile_lassert = compile_lassert ~fname:lemma_name in
   let compile_and_agregate_lcmd lcmd =
     let a_opt, clcmd = compile_lcmd lcmd in
@@ -976,8 +1000,13 @@ let compile_lemma
       lemma_proof
   in
   (* FIXME: compilation can get wrong here if we compile stuff with pointer arith in the variant *)
+  (* FIXME: not sure where the global assertions should go *)
   let lemma_variant =
-    Option.map (fun x -> snd (compile_expr x)) lemma_variant
+    Option.map
+      (fun x ->
+        let _, _, comp_lexpr = compile_lexpr x in
+        comp_lexpr)
+      lemma_variant
   in
   let _, lemma_hyp = compile_lassert lemma_hypothesis in
   let _, post = compile_lassert lemma_conclusion in
@@ -991,7 +1020,16 @@ let compile_lemma
       lemma_params;
       lemma_proof;
       lemma_variant;
-      lemma_specs = [ { lemma_hyp; lemma_concs = [ post ] } ];
+      lemma_ox;
+      lemma_specs =
+        [
+          {
+            lemma_hyp;
+            lemma_concs = [ post ];
+            lemma_spec_variant = lemma_variant;
+            lemma_spec_ox = lemma_ox;
+          };
+        ];
       lemma_existentials;
     }
 

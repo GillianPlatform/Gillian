@@ -88,6 +88,7 @@ struct
     SAInterpreter.reset ()
 
   let testify
+      (func_or_lemma_name : string)
       (preds : (string, UP.pred) Hashtbl.t)
       (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
@@ -95,6 +96,8 @@ struct
       (id : int)
       (pre : Asrt.t)
       (posts : Asrt.t list)
+      (variant : Expr.t option)
+      (ox : string list option)
       (flag : Flag.t option)
       (label : (string * SS.t) option)
       (to_verify : bool) : (t option * (Asrt.t * Asrt.t list) option) list =
@@ -181,7 +184,32 @@ struct
             label
         in
         let known_unifiables = Expr.Set.union known_unifiables existentials in
-        let simple_posts = List.map (fun post -> (post, (label, None))) posts in
+        let ox =
+          match (flag, ox) with
+          | None, Some ox -> ox
+          | None, None when !Config.Verification.exact ->
+              failwith "Lemma must declare ox logicals in exact verification"
+          | _, _ -> []
+        in
+        let simple_posts =
+          List.map
+            (fun post ->
+              let post_lvars = Asrt.lvars post in
+              let lstr_pp = Fmt.(list ~sep:comma string) in
+              let () =
+                L.verbose (fun fmt ->
+                    fmt "OX hiding: %a\nPost lvars: %a" lstr_pp ox lstr_pp
+                      (SS.elements post_lvars))
+              in
+              let inter = SS.inter post_lvars (SS.of_list ox) in
+              match SS.is_empty inter with
+              | true -> (post, (label, None, ox))
+              | false ->
+                  failwith
+                    ("Error: Exact lemma with impossible hiding: "
+                   ^ SS.min_elt inter))
+            posts
+        in
         let post_up =
           UP.init known_unifiables Expr.Set.empty pred_ins simple_posts
         in
@@ -196,6 +224,15 @@ struct
             L.verbose (fun m -> m "%s" msg);
             (None, None)
         | Ok post_up ->
+            let pre' = Asrt.star (SPState.to_assertions ss_pre) in
+            let ss_pre =
+              match flag with
+              (* Lemmas should not have stores when being proven *)
+              | None ->
+                  let empty_store = SStore.init [] in
+                  SPState.set_store ss_pre empty_store
+              | Some _ -> ss_pre
+            in
             let test =
               {
                 name;
@@ -207,7 +244,6 @@ struct
                 spec_vars;
               }
             in
-            let pre' = Asrt.star (SPState.to_assertions ss_pre) in
             (Some test, Some (pre', posts))
     in
     try
@@ -218,7 +254,18 @@ struct
       with
       | Error _ -> [ (None, None) ]
       | Ok normalised_assertions ->
-          List.mapi test_of_normalised_state normalised_assertions
+          let variants = Hashtbl.create 1 in
+          let () = Hashtbl.add variants func_or_lemma_name variant in
+          let normalised_assertions =
+            List.map
+              (fun (state, subst) ->
+                (SPState.set_variants state (Hashtbl.copy variants), subst))
+              normalised_assertions
+          in
+          let result =
+            List.mapi test_of_normalised_state normalised_assertions
+          in
+          result
     with Failure msg ->
       let new_msg =
         Printf.sprintf
@@ -230,6 +277,7 @@ struct
       [ (None, None) ]
 
   let testify_sspec
+      (spec_name : string)
       (preds : UP.preds_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (name : string)
@@ -238,8 +286,8 @@ struct
       (sspec : Spec.st) : (t option * Spec.st option) list =
     let ( let+ ) x f = List.map f x in
     let+ stest, sspec' =
-      testify preds pred_ins name params id sspec.ss_pre sspec.ss_posts
-        (Some sspec.ss_flag)
+      testify spec_name preds pred_ins name params id sspec.ss_pre
+        sspec.ss_posts sspec.ss_variant None (Some sspec.ss_flag)
         (Spec.label_vars_to_set sspec.ss_label)
         sspec.ss_to_verify
     in
@@ -251,6 +299,7 @@ struct
     (stest, sspec')
 
   let testify_spec
+      (spec_name : string)
       (preds : UP.preds_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (spec : Spec.t) : t list * Spec.t =
@@ -277,8 +326,8 @@ struct
         List.fold_left
           (fun (id, tests, sspecs) sspec ->
             let tests_and_specs =
-              testify_sspec preds pred_ins spec.spec_name spec.spec_params id
-                sspec
+              testify_sspec spec_name preds pred_ins spec.spec_name
+                spec.spec_params id sspec
             in
             let new_tests, new_specs =
               List.fold_left
@@ -309,9 +358,10 @@ struct
       (lemma : Lemma.t) : t list * Lemma.t =
     let tests_and_specs =
       List.concat_map
-        (fun Lemma.{ lemma_hyp; lemma_concs } ->
-          testify preds pred_ins lemma.lemma_name lemma.lemma_params 0 lemma_hyp
-            lemma_concs None None true)
+        (fun Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant; lemma_spec_ox } ->
+          testify lemma.lemma_name preds pred_ins lemma.lemma_name
+            lemma.lemma_params 0 lemma_hyp lemma_concs lemma_spec_variant
+            lemma_spec_ox None None true)
         lemma.lemma_specs
     in
     let tests, specs =
@@ -325,7 +375,14 @@ struct
           let spec_acc =
             match spec_opt with
             | Some (lemma_hyp, lemma_concs) ->
-                Lemma.{ lemma_hyp; lemma_concs } :: spec_acc
+                Lemma.
+                  {
+                    lemma_hyp;
+                    lemma_concs;
+                    lemma_spec_variant = lemma.lemma_variant;
+                    lemma_spec_ox = lemma.lemma_ox;
+                  }
+                :: spec_acc
             | None -> spec_acc
           in
           (test_acc, spec_acc))
@@ -340,16 +397,6 @@ struct
       | _ -> ()
     in
     (tests, { lemma with lemma_specs = specs })
-
-  (* let (tests, lemmas) = List.fold_left
-     let tests = Option.fold ~some:(fun test -> [ test ]) ~none:[] test in
-     match sspec with
-     | Some (lemma_hyp, lemma_concs) ->
-         (tests, { lemma with lemma_hyp; lemma_concs })
-     | None ->
-         raise
-           (Failure
-              (Printf.sprintf "Could not testify lemma %s" lemma.lemma_name)) *)
 
   let analyse_result (subst : SSubst.t) (test : t) (state : SPState.t) : bool =
     (* TODO: ASSUMING SIMPLIFICATION DOES NOT BRANCH HERE *)
@@ -366,12 +413,6 @@ struct
           SSubst.add subst (LVar x) (LVar x))
       (SS.elements (SPState.get_spec_vars state));
 
-    (* TODO: Understand if this should be done: setup all program variables in the subst *)
-    SStore.iter (SPState.get_store state) (fun v value ->
-        if not (SSubst.mem subst (PVar v)) then SSubst.put subst (PVar v) value);
-
-    (* Option.may (fun v_ret -> SSubst.put subst Names.return_variable v_ret)
-       (SStore.get (SState.get_store state) Names.return_variable); *)
     L.verbose (fun m ->
         m "Analyse result: About to unify one postcondition of %s. post: %a"
           test.name UP.pp test.post_up);
@@ -434,6 +475,11 @@ struct
                    Fmt.pr "f @?";
                    false)
                  else
+                   let store = SPState.get_store state in
+                   let () =
+                     SStore.filter store (fun x v ->
+                         if x = Names.return_variable then Some v else None)
+                   in
                    let subst = make_post_subst test state in
                    if analyse_result subst test state then (
                      L.normal (fun m ->
@@ -470,6 +516,8 @@ struct
       rets <> []
       && List.fold_left
            (fun ac final_state ->
+             let empty_store = SStore.init [] in
+             let final_state = SPState.set_store final_state empty_store in
              let subst = make_post_subst test final_state in
              if analyse_result subst test final_state then (
                L.normal (fun m ->
@@ -651,8 +699,10 @@ struct
         (* Printf.printf "Converting symbolic tests from specs: %f\n" (cur_time -. start_time); *)
         let tests : t list =
           List.concat_map
-            (fun spec ->
-              let tests, new_spec = testify_spec preds pred_ins spec in
+            (fun (spec : Spec.t) ->
+              let tests, new_spec =
+                testify_spec spec.spec_name preds pred_ins spec
+              in
               let proc = Prog.get_proc_exn prog spec.spec_name in
               Hashtbl.replace prog.procs proc.proc_name
                 { proc with proc_spec = Some new_spec };

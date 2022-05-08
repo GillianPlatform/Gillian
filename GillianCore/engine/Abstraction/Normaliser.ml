@@ -960,7 +960,7 @@ struct
         (* Step 7 -- Construct the state *)
         let preds' = normalise_preds pred_defs store pfs gamma subst preds in
         let astate : SPState.t =
-          SPState.struct_init pred_defs store pfs gamma svars
+          SPState.struct_init ?preds:pred_defs store pfs gamma svars
         in
         let astate = SPState.set_preds astate preds' in
         let astate = produce_core_asrts astate c_asrts' in
