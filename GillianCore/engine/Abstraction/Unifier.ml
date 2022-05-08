@@ -1245,13 +1245,16 @@ module Make
           astate = astate_rec_of astate;
           subst; up
         } in
-        (L.normal_specific (L.Loggable.make L.dummy_pp unify_case_report_of_yojson unify_case_report_to_yojson unify_case_report)
+        let new_parent_id =(L.normal_specific (L.Loggable.make L.dummy_pp unify_case_report_of_yojson unify_case_report_to_yojson unify_case_report)
           L.LoggingConstants.ContentType.unify_case)
-          |> Option.iter (fun new_parent_id -> 
-            L.set_parent new_parent_id;
-            parent_ids_ref := (new_parent_id :: !parent_ids_ref)
-          )
-      )
+        in match new_parent_id with
+        | Some new_parent_id -> (
+          L.set_parent new_parent_id;
+          parent_ids_ref := (new_parent_id :: !parent_ids_ref);
+          target_case_depth
+        )
+        | None -> target_case_depth
+      ) else target_case_depth
     );
 
   and unify_up' (parent_ids : L.ReportId.t list ref) (s_states : search_state') : up_u_res =
@@ -1264,7 +1267,7 @@ module Make
     match s_states with
     | [] -> UPUFail errs_so_far
     | ((state, subst, up), target_case_depth, is_new_case) :: rest -> (
-        structure_unify_case_reports parent_ids target_case_depth is_new_case state subst up;
+        let case_depth = structure_unify_case_reports parent_ids target_case_depth is_new_case state subst up in
         let cur_step : UP.step option = UP.head up in
         let ret =
           try
@@ -1308,7 +1311,7 @@ module Make
               )
             | Some [ (up, lab) ] ->
                 if complete_subst subst lab then
-                  f (((state', subst, up), target_case_depth, false) :: rest, errs_so_far)
+                  f (((state', subst, up), case_depth, false) :: rest, errs_so_far)
                 else f (rest, errs_so_far)
             | Some ((up, lab) :: ups') ->
                 let next_states =
@@ -1327,7 +1330,7 @@ module Make
                     (state', subst, up) :: next_states
                   else next_states
                 in
-                let next_states = next_states |> List.map (fun state -> state, (target_case_depth + 1), true) in
+                let next_states = next_states |> List.map (fun state -> state, (case_depth + 1), true) in
                 f (next_states @ rest, errs_so_far)
             | Some [] -> L.fail "ERROR: unify_up: empty unification plan")
         | UFail errors ->
