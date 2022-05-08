@@ -37,6 +37,8 @@ jobs:
         id: esy-build
       - name: Basic checks
         run: "esy test"
+      - name: Wisl checks
+        run: "./wisl/scripts/quicktests.sh"
       - name: Format checking
         run: "esy format-check"
       - name: Building release
