@@ -30,7 +30,7 @@ and pp fmt stmt =
   | Skip -> Format.fprintf fmt "@[%s@]" "skip"
   | VarAssign (v, e) -> Format.fprintf fmt "@[%s := %a@]" v WExpr.pp e
   | New (v, r) -> Format.fprintf fmt "@[%s := new(%i)@]" v r
-  | Dispose e -> Format.fprintf fmt "@[delete@ %a@]" WExpr.pp e
+  | Dispose e -> Format.fprintf fmt "@[free@ %a@]" WExpr.pp e
   | Lookup (v, e) -> Format.fprintf fmt "@[%s := [%a]@]" v WExpr.pp e
   | Update (e1, e2) ->
       Format.fprintf fmt "@[[%a] := %a@]" WExpr.pp e1 WExpr.pp e2

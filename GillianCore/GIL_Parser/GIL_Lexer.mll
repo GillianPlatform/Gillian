@@ -116,6 +116,7 @@
       "sep_assert",   GIL_Parser.SEPASSERT;
       "branch",       GIL_Parser.BRANCH;
       "use_subst",    GIL_Parser.USESUBST;
+      "ox",           GIL_Parser.OX;
 
       (* Procedure specification keywords *)
       "axiomatic",    GIL_Parser.AXIOMATIC;

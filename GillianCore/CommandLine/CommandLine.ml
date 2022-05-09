@@ -354,7 +354,7 @@ struct
         ignore
           (SInterpreter.evaluate_proc
              (fun x -> x)
-             prog "main" [] (SState.init None))
+             prog "main" [] (SState.init ()))
       in
       if incremental && prev_results_exist () then
         (* Only re-run program if transitive callees of main proc have changed *)
@@ -503,6 +503,10 @@ struct
       let doc = "Disable automatic folding and unfolding heuristics." in
       Arg.(value & flag & info [ "m"; "manual" ] ~doc)
 
+    let exact =
+      let doc = "Exact verification" in
+      Arg.(value & flag & info [ "exv"; "exact-verification" ] ~doc)
+
     let process_files files already_compiled outfile_opt no_unfold incremental =
       Verification.start_time := Sys.time ();
       Fmt.pr "Parsing and compiling...\n@?";
@@ -546,6 +550,7 @@ struct
         stats
         no_lemma_proof
         manual
+        exact
         incremental
         procs_to_verify
         lemmas_to_verify
@@ -556,6 +561,8 @@ struct
       let () = Config.current_exec_mode := Verification in
       let () = PC.initialize Verification in
       let () = Config.manual_proof := manual in
+      let () = Config.Verification.exact := exact in
+      let () = if exact then Fmt.pr "Exact verification enabled.\n" in
       let () = Config.Verification.set_procs_to_verify procs_to_verify in
       let () = Config.Verification.set_lemmas_to_verify lemmas_to_verify in
       let () =
@@ -567,7 +574,7 @@ struct
     let verify_t =
       Term.(
         const verify $ files $ already_compiled $ output_gil $ no_unfold $ stats
-        $ no_lemma_proof $ manual $ incremental $ proc_arg $ lemma_arg)
+        $ no_lemma_proof $ manual $ exact $ incremental $ proc_arg $ lemma_arg)
 
     let verify_info =
       let doc = "Verifies a file of the target language" in

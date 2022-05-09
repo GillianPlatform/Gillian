@@ -1679,7 +1679,7 @@ struct
         ()
     in
     let initial_proc_body_index = 0 in
-    let initial_state = State.init (Some prog.preds) in
+    let initial_state = State.init ~preds:prog.preds () in
     let initial_conf =
       make_confcont
         ~state:initial_state

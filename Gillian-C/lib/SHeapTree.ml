@@ -92,6 +92,7 @@ module Range = struct
 
   let split_at (l, h) x = ((l, x), (x, h))
   let lvars (a, b) = SS.union (Expr.lvars a) (Expr.lvars b)
+  let alocs (a, b) = SS.union (Expr.alocs a) (Expr.alocs b)
   let substitution ~le_subst (a, b) = (le_subst a, le_subst b)
 end
 
@@ -494,6 +495,11 @@ module Node = struct
 
   let lvars = function
     | MemVal { mem_val = Single { value = e; _ }; _ } -> SVal.lvars e
+    | _ -> SS.empty
+
+  let alocs = function
+    | MemVal { mem_val = Single { value = e; _ }; _ } -> SVal.alocs e
+    | MemVal { mem_val = Array { values = Arr e; _ }; _ } -> Expr.alocs e
     | _ -> SS.empty
 
   let substitution ~sval_subst ~svarr_subst n =
@@ -984,6 +990,16 @@ module Tree = struct
     in
     SS.union (SS.union node_lvars span_lvars) children_lvars
 
+  let rec alocs { node; span; children; _ } =
+    let node_lvars = Node.alocs node in
+    let span_lvars = Range.alocs span in
+    let children_lvars =
+      match children with
+      | Some (a, b) -> SS.union (alocs a) (alocs b)
+      | None -> SS.empty
+    in
+    SS.union (SS.union node_lvars span_lvars) children_lvars
+
   let rec assertions ~loc { node; span; children; _ } =
     let low, high = span in
     match node with
@@ -1095,6 +1111,13 @@ let lvars = function
       SS.union
         (Option.fold ~none:SS.empty ~some:Range.lvars bounds)
         (Option.fold ~none:SS.empty ~some:Tree.lvars root)
+
+let alocs = function
+  | Freed -> SS.empty
+  | Tree { bounds; root } ->
+      SS.union
+        (Option.fold ~none:SS.empty ~some:Range.alocs bounds)
+        (Option.fold ~none:SS.empty ~some:Tree.alocs root)
 
 let get_root = function
   | Freed -> Error UseAfterFree

@@ -15,8 +15,8 @@ let get_loc f = f.floc
 let get_name f = f.name
 let get_spec f = f.spec
 
-let add_spec f pre post loc =
-  let spec = WSpec.make pre post f.name f.params loc in
+let add_spec f pre post variant loc =
+  let spec = WSpec.make pre post variant f.name f.params loc in
   { f with spec = Some spec; floc = loc }
 
 let functions_called f = WStmt.functions_called_by_list f.body

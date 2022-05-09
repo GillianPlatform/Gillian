@@ -6,7 +6,8 @@ module type S = sig
   type err_t
   type state_t
   type preds_t
-  type t = state_t * preds_t * UP.preds_tbl_t
+  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
+  type t = state_t * preds_t * UP.preds_tbl_t * variants_t
   type post_res = (Flag.t * Asrt.t list) option
   type search_state = (t * st * UP.t) list * err_t list
   type up_u_res = UPUSucc of (t * st * post_res) list | UPUFail of err_t list
@@ -22,17 +23,24 @@ module type S = sig
   val unfold_all : t -> string -> t list
   val unfold_with_vals : t -> vt list -> (st * t) list * bool
   val unfold_concrete_preds : t -> (st option * t) option
-  val unify_assertion : t -> st -> UP.step -> u_res
+  val unify_assertion : t -> st -> string list option -> UP.step -> u_res
   val unify_up : search_state -> up_u_res
   val unify : ?in_unification:bool -> t -> st -> UP.t -> unify_kind -> up_u_res
-  val get_pred : ?in_unification:bool -> t -> string -> vt option list -> gp_ret
+
+  val get_pred :
+    ?in_unification:bool ->
+    t ->
+    string ->
+    vt option list ->
+    (st * UP.step * UP.outs * Expr.t list) option ->
+    gp_ret
 end
 
 module Make
     (Val : Val.S)
     (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
-    (State : State.S
+    (State : SState.S
                with type vt = Val.t
                 and type st = ESubst.t
                 and type store_t = Store.t)

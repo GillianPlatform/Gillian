@@ -15,6 +15,7 @@ type err =
 val init : unit -> t
 val alloc : t -> int -> string
 val dispose : t -> string -> (unit, err) Result.t
+val clean_up : Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
 
 val get_cell :
   pfs:PureContext.t ->
@@ -42,6 +43,8 @@ val set_freed : t -> string -> unit
 val rem_freed : t -> string -> (unit, err) result
 val pp : t Fmt.t
 val copy : t -> t
+val lvars : t -> SS.t
+val alocs : t -> SS.t
 
 val substitution_in_place :
   Gillian.Symbolic.Subst.t ->

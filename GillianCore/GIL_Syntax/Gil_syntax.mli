@@ -342,6 +342,9 @@ module Expr : sig
 
   (** [is_unifiable x] returns whether or not the expression [e] is unifiable *)
   val is_unifiable : t -> bool
+
+  (** Sub-expression check *)
+  val sub_expr : t -> t -> bool
 end
 
 module Formula : sig
@@ -700,7 +703,8 @@ module Pred : sig
     pred_params : (string * Type.t option) list;
         (** Parameter names and (optional) types *)
     pred_ins : int list;  (** Ins *)
-    pred_definitions : ((string * string list) option * Asrt.t) list;
+    pred_definitions :
+      ((string * string list) option * Asrt.t * string list) list;
         (** Predicate definitions *)
     pred_facts : Formula.t list;  (** Facts that hold for every definition *)
     pred_pure : bool;  (** Is the predicate pure? *)
@@ -764,6 +768,8 @@ module Lemma : sig
   type spec = {
     lemma_hyp : Asrt.t;  (** Hypothesis *)
     lemma_concs : Asrt.t list;  (** Conclusion *)
+    lemma_spec_variant : Expr.t option;  (** Variant *)
+    lemma_spec_ox : string list option;  (** Over-approximating logicals *)
   }
 
   type t = {
@@ -774,6 +780,7 @@ module Lemma : sig
     lemma_specs : spec list;  (** Specs of the Lemma *)
     lemma_proof : LCmd.t list option;  (** (Optional) Proof *)
     lemma_variant : Expr.t option;  (** Variant *)
+    lemma_ox : string list option;  (** Over-approximating logicals *)
     lemma_existentials : string list; (* Existentials *)
   }
 
@@ -821,6 +828,7 @@ module Spec : sig
   type st = {
     ss_pre : Asrt.t;  (** Precondition *)
     ss_posts : Asrt.t list;  (** Postcondition *)
+    ss_variant : Expr.t option;  (** Variant *)
     ss_flag : Flag.t;  (** Return flag *)
     ss_to_verify : bool;  (** Should the spec be verified? *)
     ss_label : (string * string list) option;
@@ -842,6 +850,7 @@ module Spec : sig
     ?ss_label:string * string list ->
     Asrt.t ->
     Asrt.t list ->
+    Expr.t option ->
     Flag.t ->
     bool ->
     st

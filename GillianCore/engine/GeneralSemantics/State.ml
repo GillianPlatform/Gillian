@@ -28,12 +28,14 @@ module type S = sig
 
   type action_ret = ASucc of (t * vt list) list | AFail of err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
+  type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
   (** Initialisation *)
-  val init : UP.preds_tbl_t option -> t
+  val init : ?preds:UP.preds_tbl_t -> ?variants:variants_t -> unit -> t
 
   val struct_init :
-    UP.preds_tbl_t option ->
+    ?preds:UP.preds_tbl_t ->
+    ?variants:variants_t ->
     store_t ->
     PFS.t ->
     TypEnv.t ->
@@ -124,6 +126,9 @@ module type S = sig
   (** Get all logical variables *)
   val get_lvars : t -> Var.Set.t
 
+  (** Get all logical variables relevant for exact reasoning *)
+  val get_lvars_for_exact : t -> Var.Set.t
+
   (** Turns a state into a list of assertions *)
   val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
 
@@ -147,7 +152,7 @@ module type S = sig
   val automatic_unfold : t -> vt list -> (t list, string) result
   val substitution_in_place : ?subst_all:bool -> st -> t -> t list
   val fresh_val : t -> vt
-  val clean_up : t -> unit
+  val clean_up : ?keep:Expr.Set.t -> t -> unit
   val unify_assertion : t -> st -> UP.step -> u_res
   val produce_posts : t -> st -> Asrt.t list -> t list
   val produce : t -> st -> Asrt.t -> (t list, string) result

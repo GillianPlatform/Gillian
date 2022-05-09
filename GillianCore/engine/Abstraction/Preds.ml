@@ -19,6 +19,8 @@ module type S = sig
   val strategic_choice : t -> (abs_t -> int) -> abs_t option
   val remove_by_name : t -> string -> abs_t option
   val find_pabs_by_name : t -> string -> abs_t list
+  val get_lvars : t -> SS.t
+  val get_alocs : t -> SS.t
   val pp : Format.formatter -> t -> unit
   val pp_pabs : Format.formatter -> abs_t -> unit
 
@@ -37,6 +39,8 @@ module type S = sig
 
   (** Turns a predicate set into a list of assertions *)
   val to_assertions : t -> Asrt.t list
+
+  val is_in : t -> Expr.t -> bool
 end
 
 module Make
@@ -126,6 +130,22 @@ module Make
   (** Find predicate_assertion via pname. Returns a list with all the pabs with name pname *)
   let find_pabs_by_name (preds : t) (pname : string) : abs_t list =
     List.filter (fun (pn, _) -> pn = pname) !preds
+
+  let get_lvars (preds : t) : SS.t =
+    List.fold_left
+      (fun ac (_, vs) ->
+        List.fold_left
+          (fun ac e -> SS.union ac (Expr.lvars (Val.to_expr e)))
+          ac vs)
+      SS.empty !preds
+
+  let get_alocs (preds : t) : SS.t =
+    List.fold_left
+      (fun ac (_, vs) ->
+        List.fold_left
+          (fun ac e -> SS.union ac (Expr.alocs (Val.to_expr e)))
+          ac vs)
+      SS.empty !preds
 
   (** Printing function *)
   let pp_pabs fmt pa =
@@ -264,6 +284,12 @@ module Make
       Asrt.Pred (n, args)
     in
     List.sort Asrt.compare (List.map pred_to_assert preds)
+
+  let is_in (preds : t) (ue : Expr.t) : bool =
+    List.exists
+      (fun (_, vs) ->
+        List.exists (fun v -> Expr.sub_expr ue (Val.to_expr v)) vs)
+      !preds
 end
 
 module SPreds = Make (SVal.M) (SVal.SESubst)

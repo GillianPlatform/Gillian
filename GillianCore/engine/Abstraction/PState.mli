@@ -9,13 +9,17 @@ module type S = sig
   type preds_t
   type abs_t = string * vt list
 
-  val initialise : state_t -> preds_t -> UP.preds_tbl_t option -> t
+  val initialise :
+    state_t -> preds_t -> UP.preds_tbl_t option -> variants_t -> t
 
   (** Get preds of given symbolic state *)
   val get_preds : t -> preds_t
 
   (** Set preds of given symbolic state *)
   val set_preds : t -> preds_t -> t
+
+  (** Set variants of given symbolic state *)
+  val set_variants : t -> variants_t -> t
 
   val unify : t -> st -> UP.t -> Unifier.unify_kind -> bool
   val add_pred_defs : UP.preds_tbl_t -> t -> t

@@ -461,3 +461,14 @@ let rec pvars_to_lvars (e : t) : t =
   | EList les -> EList (List.map f les)
   | ESet les -> ESet (List.map f les)
   | _ -> e
+
+let rec sub_expr ue e =
+  let f = sub_expr ue in
+  equal ue e
+  ||
+  match e with
+  | Lit _ | PVar _ | LVar _ | ALoc _ -> false
+  | UnOp (_, e) -> f e
+  | BinOp (e1, _, e2) -> f e1 || f e2
+  | LstSub (e1, e2, e3) -> f e1 || f e2 || f e3
+  | NOp (_, les) | EList les | ESet les -> List.exists f les

@@ -38,8 +38,9 @@ module type S = sig
 
   val substitution_in_place : st -> t -> t Delayed.t
   val fresh_val : t -> vt
-  val clean_up : t -> unit
+  val clean_up : ?keep:Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
   val lvars : t -> Containers.SS.t
+  val alocs : t -> Containers.SS.t
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
   val mem_constraints : t -> Formula.t list
   val pp_i_fix : Format.formatter -> i_fix_t -> unit

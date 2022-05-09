@@ -285,11 +285,12 @@ let pp_c_fix _ _ = ()
 let pp_i_fix _ _ = ()
 let substitution_in_place ~pfs:_ ~gamma:_ = WislSHeap.substitution_in_place
 let fresh_val _ = Expr.LVar (LVar.alloc ())
-let clean_up _ = ()
 
-(** FIXME: that's not normal ? *)
-let lvars _heap = SS.empty
+let clean_up ?(keep = Expr.Set.empty) (mem : t) : Expr.Set.t * Expr.Set.t =
+  WislSHeap.clean_up keep mem
 
+let lvars heap = WislSHeap.lvars heap
+let alocs heap = WislSHeap.alocs heap
 let assertions ?to_keep:_ heap = WislSHeap.assertions heap
 let mem_constraints _ = []
 let is_overlapping_asrt _ = false
