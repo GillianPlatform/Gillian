@@ -67,17 +67,20 @@ module type S = sig
     | Finished of 'a list
     | Continue of (Logging.ReportId.t option * (unit -> 'a cont_func))
 
-  type cmd_step = {
-    callstack : CallStack.t;
-    proc_body_index : int;
-    state : state_t option;
-    errors : err_t list;
-    branch_case : branch_case option;
-  }
-  [@@deriving yojson]
-
-  val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
-  val pp_result : Format.formatter -> result_t list -> unit
+  module Logging : sig
+    module CmdStep : sig
+      type t = {
+        callstack : CallStack.t;
+        proc_body_index : int;
+        state : state_t option;
+        errors : err_t list;
+        branch_case : branch_case option;
+      }
+      [@@deriving yojson]
+    end
+    val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
+    val pp_result : Format.formatter -> result_t list -> unit
+  end
   val call_graph : CallGraph.t
   val reset : unit -> unit
   val evaluate_lcmds : UP.prog -> LCmd.t list -> state_t -> state_t list
@@ -127,19 +130,6 @@ struct
   type invariant_frames = (string * State.t) list
   type err_t = (Val.t, State.err_t) ExecErr.t [@@deriving yojson]
   type branch_case = state_vt branch_case' [@@deriving yojson]
-  type config_log = {
-    proc_line : int;
-    time : float;
-    cmd : string;
-    callstack : CallStack.t;
-    annot : Annot.t;
-    branching : int;
-    state : state_t;
-    branch_case : branch_case option;
-  } [@@deriving yojson, make]
-
-  let pp_err = ExecErr.pp Val.pp State.pp_err
-  let pp_str_list = Fmt.(brackets (list ~sep:comma string))
 
   (** Type of configurations: state, call stack, previous index, previous loop ids, current index, branching *)
   type cconf_t =
@@ -196,17 +186,151 @@ struct
     | Finished of 'a list
     | Continue of (Logging.ReportId.t option * (unit -> 'a cont_func))
 
-  type cmd_step = {
-    callstack : CallStack.t;
-    proc_body_index : int;
-    state : state_t option;
-    errors : err_t list;
-    branch_case : branch_case option;
-  }
-  [@@deriving yojson]
+  module Logging = struct
+    let pp_str_list = Fmt.(brackets (list ~sep:comma string))
 
-  type annotated_action = { annot : Annot.t; action_name : string }
-  [@@deriving yojson]
+    module ConfigReport = struct
+      type t = {
+        proc_line : int;
+        time : float;
+        cmd : string;
+        callstack : CallStack.t;
+        annot : Annot.t;
+        branching : int;
+        state : state_t;
+        branch_case : branch_case option;
+      } [@@deriving yojson, make]
+
+      let pp state_printer fmt { proc_line=i; time; cmd; callstack=cs; annot; branching; state; _ } =
+        Fmt.pf fmt
+          "@[------------------------------------------------------@\n\
+           --%s: %i--@\n\
+           TIME: %f@\n\
+           CMD: %s@\n\
+           PROCS: %a@\n\
+           LOOPS: %a ++ %a@\n\
+           BRANCHING: %d@\n\
+           @\n\
+           %a@\n\
+           ------------------------------------------------------@]\n"
+          (CallStack.get_cur_proc_id cs) i
+          time
+          cmd
+          pp_str_list (CallStack.get_cur_procs cs)
+          pp_str_list (Annot.get_loop_info annot)
+          pp_str_list (CallStack.get_loop_ids cs)
+          branching
+          state_printer state
+      
+      let to_loggable state_printer =
+        L.Loggable.make (pp state_printer) of_yojson to_yojson
+
+      let log state_printer report = L.normal_specific
+        (to_loggable state_printer report)
+        L.LoggingConstants.ContentType.cmd
+
+    end
+
+    module CmdStep = struct
+      type t = {
+        callstack : CallStack.t;
+        proc_body_index : int;
+        state : state_t option;
+        errors : err_t list;
+        branch_case : branch_case option;
+      }
+      [@@deriving yojson]
+
+      let pp fmt cmd_step =
+        (* TODO: Cmd step should contain all things in a configuration
+                 print the same contents as log_configuration *)
+        CallStack.pp fmt cmd_step.callstack
+      
+      let to_loggable =
+        L.Loggable.make pp of_yojson to_yojson
+      
+      let log type_ report = L.normal_specific
+        (to_loggable report)
+        type_
+
+      let log_result = log L.LoggingConstants.ContentType.cmd_result
+
+      let log_step = log L.LoggingConstants.ContentType.cmd_step
+    end
+  
+
+    module AnnotatedAction = struct
+      type t = {
+        annot : Annot.t;
+        action_name : string
+      } [@@deriving yojson]
+
+      let pp fmt annotated_action =
+        let origin_loc = Annot.get_origin_loc annotated_action.annot in
+        Fmt.pf fmt "Executing action '%s' at %a" annotated_action.action_name
+          (Fmt.option ~none:(Fmt.any "none") Location.pp)
+          origin_loc
+      
+      let to_loggable =
+        L.Loggable.make pp of_yojson to_yojson
+      
+      let log report = L.normal_specific
+        (to_loggable report)
+        L.LoggingConstants.ContentType.annotated_action
+    end
+  
+    let log_configuration
+        (cmd : Annot.t * int Cmd.t)
+        (state : State.t)
+        (cs : CallStack.t)
+        (i : int)
+        (b_counter : int)
+        (branch_case : branch_case option): L.ReportId.t option =
+      let annot, cmd = cmd in
+      let state_printer =
+        match !Config.pbn with
+        | false -> State.pp
+        | true ->
+            let pvars, lvars, locs =
+              (Cmd.pvars cmd, Cmd.lvars cmd, Cmd.locs cmd)
+            in
+            State.pp_by_need pvars lvars locs
+      in
+      ConfigReport.log state_printer (
+        ConfigReport.make
+        ~proc_line:i
+        ~time:(Sys.time ())
+        ~cmd: (Fmt.to_to_string Cmd.pp_indexed cmd)
+        ~callstack:cs
+        ~annot
+        ~branching:b_counter
+        ~state
+        ?branch_case
+        ()
+      )
+
+    let print_lconfiguration (lcmd : LCmd.t) (state : State.t) : unit =
+      L.normal (fun m ->
+          m
+            "@[------------------------------------------------------@\n\
+              TIME: %f@\n\
+              LCMD: %a@\n\
+              @\n\
+              %a@\n\
+              ------------------------------------------------------@]@\n"
+            (Sys.time ()) LCmd.pp lcmd State.pp state)
+
+    let pp_err = ExecErr.pp Val.pp State.pp_err
+
+    let pp_single_result ft res = ExecRes.pp State.pp Val.pp pp_err ft res
+
+    (** Configuration pretty-printer *)
+    let pp_result (ft : Format.formatter) (reslt : result_t list) : unit =
+      let open Fmt in
+      let pp_one ft (i, res) = pf ft "RESULT: %d.@\n%a" i pp_single_result res in
+      (iter_bindings List.iteri pp_one) ft reslt
+  end
+  open Logging
 
   let max_branching = 100
 
@@ -218,7 +342,6 @@ struct
   (** Syntax error, carrying a string description *)
   exception Syntax_error of string
 
-  let pp_single_result ft res = ExecRes.pp State.pp Val.pp pp_err ft res
   let call_graph = CallGraph.make ~init_capacity:128 ()
   let reset () = CallGraph.reset call_graph
 
@@ -303,81 +426,6 @@ struct
     try State.eval_expr state e
     with State.Internal_State_Error (errs, s) ->
       raise (Interpreter_error (List.map (fun x -> ExecErr.ESt x) errs, s))
-
-  let log_configuration
-      (cmd : Annot.t * int Cmd.t)
-      (state : State.t)
-      (cs : CallStack.t)
-      (i : int)
-      (b_counter : int)
-      (branch_case : branch_case option): L.ReportId.t option =
-    let annot, cmd = cmd in
-    let state_printer =
-      match !Config.pbn with
-      | false -> State.pp
-      | true ->
-          let pvars, lvars, locs =
-            (Cmd.pvars cmd, Cmd.lvars cmd, Cmd.locs cmd)
-          in
-          State.pp_by_need pvars lvars locs
-    in
-    let config_log = make_config_log
-      ~proc_line:i
-      ~time:(Sys.time ())
-      ~cmd: (Fmt.to_to_string Cmd.pp_indexed cmd)
-      ~callstack:cs
-      ~annot
-      ~branching:b_counter
-      ~state
-      ?branch_case
-      ()
-    in
-    let pp fmt { proc_line=i; time; cmd; callstack=cs; annot; branching; state; _ } =
-        Fmt.pf fmt
-          "@[------------------------------------------------------@\n\
-           --%s: %i--@\n\
-           TIME: %f@\n\
-           CMD: %s@\n\
-           PROCS: %a@\n\
-           LOOPS: %a ++ %a@\n\
-           BRANCHING: %d@\n\
-           @\n\
-           %a@\n\
-           ------------------------------------------------------@]\n"
-          (CallStack.get_cur_proc_id cs) i
-          time
-          cmd
-          pp_str_list (CallStack.get_cur_procs cs)
-          pp_str_list (Annot.get_loop_info annot)
-          pp_str_list (CallStack.get_loop_ids cs)
-          branching
-          state_printer state
-    in
-    L.normal_specific
-      (L.Loggable.make pp config_log_of_yojson config_log_to_yojson config_log)
-      L.LoggingConstants.ContentType.cmd
-
-  let cmd_step_pp fmt cmd_step =
-    (* TODO: Cmd step should contain all things in a configuration
-             print the same contents as log_configuration *)
-    CallStack.pp fmt cmd_step.callstack
-
-  let annotated_action_pp fmt annotated_action =
-    let origin_loc = Annot.get_origin_loc annotated_action.annot in
-    Fmt.pf fmt "Executing action '%s' at %a" annotated_action.action_name
-      (Fmt.option ~none:(Fmt.any "none") Location.pp)
-      origin_loc
-
-  let print_lconfiguration (lcmd : LCmd.t) (state : State.t) : unit =
-    L.normal (fun m ->
-        m
-          "@[------------------------------------------------------@\n\
-           TIME: %f@\n\
-           LCMD: %a@\n\
-           @\n\
-           %a@\n\
-           ------------------------------------------------------@]@\n"
-          (Sys.time ()) LCmd.pp lcmd State.pp state)
 
   let check_loop_ids actual expected =
     match actual = expected with
@@ -875,12 +923,9 @@ struct
         ]
     (* Action *)
     | LAction (x, a, es) -> (
-        let _ =
-          L.normal_specific
-            (L.Loggable.make annotated_action_pp annotated_action_of_yojson
-              annotated_action_to_yojson { annot; action_name = a })
-            L.LoggingConstants.ContentType.annotated_action
-        in
+        AnnotatedAction.log
+          { annot; action_name = a }
+          |> ignore;
         let v_es = List.map eval_expr es in
         match State.execute_action a state v_es with
         | ASucc [] ->
@@ -1446,26 +1491,18 @@ struct
       match rest_confs with
       | ConfCont { state; callstack; next_idx = proc_body_index; branch_case; new_branches; _ } :: _ ->
           List.iter (fun (state, proc_body_index, branch_case) -> 
-            L.normal_specific
-              (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
-                { callstack; proc_body_index; state = Some state; errors = []; branch_case = Some branch_case })
-              L.LoggingConstants.ContentType.cmd_result
+            CmdStep.log_result
+              { callstack; proc_body_index; state = Some state; errors = []; branch_case = Some branch_case }
               |> ignore
           ) new_branches;
-          let report_id =
-            L.normal_specific
-              (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
-                 { callstack; proc_body_index; state = Some state; errors = []; branch_case })
-              L.LoggingConstants.ContentType.cmd_result
+          let report_id = CmdStep.log_result
+            { callstack; proc_body_index; state = Some state; errors = []; branch_case }
           in Continue (report_id, cont_func)
       | ConfErr
           { callstack; proc_idx = proc_body_index; error_state = state; errors }
         :: _ ->
-          let report_id =
-            L.normal_specific
-              (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
-                 { callstack; proc_body_index; state = Some state; errors; branch_case = None })
-              L.LoggingConstants.ContentType.cmd_result
+          let report_id = CmdStep.log_result
+            { callstack; proc_body_index; state = Some state; errors; branch_case = None }
           in
           Continue (report_id, cont_func)
       | _ -> cont_func ()
@@ -1635,11 +1672,8 @@ struct
         ~branch_count:0
         ()
     in
-    let report_id =
-      L.normal_specific
-        (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
-           { callstack = cs; proc_body_index; state = Some state; errors = []; branch_case = None })
-        L.LoggingConstants.ContentType.cmd_step
+    let report_id = CmdStep.log_step
+      { callstack = cs; proc_body_index; state = Some state; errors = []; branch_case = None }
     in
     Continue
       ( report_id,
@@ -1691,17 +1725,14 @@ struct
         ~branch_count:0
         ()
     in
-    let report_id =
-      L.normal_specific
-        (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
-           {
-             callstack = initial_cs;
-             proc_body_index = initial_proc_body_index;
-             state = Some initial_state;
-             errors = [];
-             branch_case = None;
-           })
-        L.LoggingConstants.ContentType.cmd_step
+    let report_id = CmdStep.log_step
+      {
+        callstack = initial_cs;
+        proc_body_index = initial_proc_body_index;
+        state = Some initial_state;
+        errors = [];
+        branch_case = None;
+      }
     in
     let init_func =
       Continue
@@ -1710,10 +1741,4 @@ struct
             evaluate_cmd_step ret_fun true prog [] [] [ initial_conf ] [] )
     in
     evaluate_cmd_iter init_func
-
-  (** Configuration pretty-printer *)
-  let pp_result (ft : Format.formatter) (reslt : result_t list) : unit =
-    let open Fmt in
-    let pp_one ft (i, res) = pf ft "RESULT: %d.@\n%a" i pp_single_result res in
-    (iter_bindings List.iteri pp_one) ft reslt
 end

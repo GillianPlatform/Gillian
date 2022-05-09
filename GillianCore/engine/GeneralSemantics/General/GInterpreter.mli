@@ -64,17 +64,21 @@ module type S = sig
     | Finished of 'a list
     | Continue of (Logging.ReportId.t option * (unit -> 'a cont_func))
 
-  type cmd_step = {
-    callstack : CallStack.t;
-    proc_body_index : int;
-    state : state_t option;
-    errors : err_t list;
-    branch_case : branch_case option;
-  }
-  [@@deriving yojson]
+  module Logging : sig
+    module CmdStep : sig
+      type t = {
+        callstack : CallStack.t;
+        proc_body_index : int;
+        state : state_t option;
+        errors : err_t list;
+        branch_case : branch_case option;
+      }
+      [@@deriving yojson]
+    end
+    val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
+    val pp_result : Format.formatter -> result_t list -> unit
+  end
 
-  val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
-  val pp_result : Format.formatter -> result_t list -> unit
   val call_graph : CallGraph.t
   val reset : unit -> unit
   val evaluate_lcmds : UP.prog -> LCmd.t list -> state_t -> state_t list

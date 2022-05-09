@@ -459,7 +459,7 @@ struct
                        proc proc_idx test.name
                        (Fmt.Dump.pair Fmt.int Fmt.int)
                        test.id SPState.pp error_state
-                       Fmt.(list ~sep:(any "@\n") SAInterpreter.pp_err)
+                       Fmt.(list ~sep:(any "@\n") SAInterpreter.Logging.pp_err)
                        errors);
                  Fmt.pr "f @?";
                  false
@@ -572,7 +572,7 @@ struct
         in
         L.verbose (fun m ->
             m "Verification: Concluded evaluation: %d obtained results.%a@\n"
-              (List.length rets) SAInterpreter.pp_result rets);
+              (List.length rets) SAInterpreter.Logging.pp_result rets);
         analyse_proc_results test flag rets
     | None -> (
         let lemma = Prog.get_lemma_exn prog.prog test.name in
