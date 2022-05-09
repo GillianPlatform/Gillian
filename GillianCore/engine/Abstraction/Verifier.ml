@@ -416,7 +416,7 @@ struct
     L.verbose (fun m ->
         m "Analyse result: About to unify one postcondition of %s. post: %a"
           test.name UP.pp test.post_up);
-    match SPState.unify state subst test.post_up Unifier.Postcondition with
+    match SPState.unify state subst test.post_up UnifierLogging.Types.Postcondition with
     | true ->
         L.verbose (fun m ->
             m "Analyse result: Postcondition unified successfully");

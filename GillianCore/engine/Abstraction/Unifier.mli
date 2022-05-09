@@ -1,4 +1,4 @@
-type unify_kind = Postcondition | Fold | FunctionCall | Invariant | LogicCommand
+open UnifierLogging.Types
 
 module type S = sig
   type vt
