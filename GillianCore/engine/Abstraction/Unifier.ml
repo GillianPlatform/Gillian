@@ -71,45 +71,165 @@ module Make
   type gp_ret = GPSucc of (t * vt list) list | GPFail of err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
   type up_u_res = UPUSucc of (t * st * post_res) list | UPUFail of err_t list
-  type astate_rec = {
-    state : state_t;
-    preds : preds_t;
-    variants : variants_t;
-  } [@@deriving yojson]
-  type assertion_report = {
-    step : UP.step;
-    subst : ESubst.t;
-    astate : astate_rec;
-  } [@@deriving yojson]
-  type unify_report = {
-    astate : astate_rec;
-    subst : ESubst.t;
-    up : UP.t;
-    unify_kind : unify_kind;
-  } [@@deriving yojson]
-  type unify_result_report_state = {
-    astate : astate_rec;
-    subst : st;
-    up : UP.t;
-  } [@@deriving yojson]
-  type unify_result_report =
-    Success of {
-      astate : astate_rec;
-      subst : st;
-      posts : (Flag.t * Asrt.t list) option;
-      remaining_states : unify_result_report_state list;
-    } 
-    | Failure of {
-      cur_step : UP.step option;
-      subst : st;
-      astate : astate_rec;
-      errors : err_t list;
-    }
-  [@@deriving yojson]
-  type unify_case_report = unify_result_report_state [@@deriving yojson]
 
-  let astate_rec_of (astate : t) =
-    let state, preds, _, variants = astate in { state; preds; variants }
+  module Logging = struct
+    let pp_variants : (string * Expr.t option) Fmt.t =
+      Fmt.pair ~sep:Fmt.comma Fmt.string (Fmt.option Expr.pp)
+    
+    let pp_astate fmt astate =
+      let state, preds, _, variants = astate in
+      Fmt.pf fmt "%a@\nPREDS:@\n%a@\nVARIANTS:@\n%a@\n" State.pp state Preds.pp
+        preds
+        (Fmt.hashtbl ~sep:Fmt.semi pp_variants)
+        variants
+  
+    let pp_astate_by_need (pvars : SS.t) (lvars : SS.t) (locs : SS.t) fmt astate =
+      let state, preds, _, variants = astate in
+      Fmt.pf fmt "%a@\n@\nPREDS:@\n%a@\nVARIANTS:@\n%a@\n"
+        (State.pp_by_need pvars lvars locs)
+        state Preds.pp preds
+        (Fmt.hashtbl ~sep:Fmt.semi pp_variants)
+        variants
+
+    module AstateRec = struct
+      type t = {
+        state : state_t;
+        preds : preds_t;
+        variants : variants_t;
+      } [@@deriving yojson]
+
+      let from (state, preds, _, variants) =
+        { state; preds; variants }
+
+      let pp_custom pp_astate fmt { state; preds; variants } =
+        pp_astate fmt (state, preds, (), variants)
+
+      let pp = pp_custom pp_astate
+    end
+
+    module AssertionReport = struct
+      type t = {
+        step : UP.step;
+        subst : ESubst.t;
+        astate : AstateRec.t;
+      } [@@deriving yojson]
+
+      let pp_custom pp_astate pp_subst fmt { step; subst; astate } =
+        Fmt.pf fmt "Unify assertion: @[<h>%a@]@\nSubst:@\n%a@\n@[<v 2>STATE:@\n%a@]"
+          UP.step_pp step pp_subst subst (AstateRec.pp_custom pp_astate) astate
+      
+      let to_loggable pp_astate pp_subst =
+        L.Loggable.make (pp_custom pp_astate pp_subst) of_yojson to_yojson
+    end
+
+    module UnifyReport = struct
+      type t = {
+        astate : AstateRec.t;
+        subst : ESubst.t;
+        up : UP.t;
+        unify_kind : unify_kind;
+      } [@@deriving yojson]
+
+      let pp fmt _ = Fmt.pf fmt "Unifier.unify: about to unify UP."
+
+      let to_loggable =
+        L.Loggable.make pp of_yojson to_yojson
+
+      let as_parent report f =
+        L.with_parent 
+          (Some (to_loggable report))
+          L.LoggingConstants.ContentType.unify
+          f
+    end
+
+    module UnifyCaseReport = struct
+      type t = {
+        astate : AstateRec.t;
+        subst : st;
+        up : UP.t;
+      } [@@deriving yojson]
+
+      let to_loggable =
+        L.Loggable.make L.dummy_pp of_yojson to_yojson
+
+      let log report = L.normal_specific (to_loggable report)
+        L.LoggingConstants.ContentType.unify_case
+    end
+
+    module UnifyResultReport = struct
+      type remaining_state = UnifyCaseReport.t [@@deriving yojson]
+
+      type t = 
+        Success of {
+          astate : AstateRec.t;
+          subst : st;
+          posts : (Flag.t * Asrt.t list) option;
+          remaining_states : remaining_state list;
+        } 
+        | Failure of {
+          cur_step : UP.step option;
+          subst : st;
+          astate : AstateRec.t;
+          errors : err_t list;
+        }
+      [@@deriving yojson]
+
+      let pp fmt report =
+        match report with
+        | Success data ->
+          Fmt.pf fmt "Unifier.unify_up: Unification successful: %d states left"
+            (1 + (List.length data.remaining_states))
+        | Failure { cur_step; subst; astate; errors } ->
+          Fmt.pf fmt 
+            "@[<v 2>WARNING: Unify Assertion Failed: @[<h>%a@] with \
+            subst @\n\
+            %a in state @\n\
+            %a with errors:@\n\
+            %a@]"
+            Fmt.(
+              option
+                ~none:(any "no assertion - phantom node")
+                UP.step_pp)
+            cur_step ESubst.pp subst (AstateRec.pp) astate
+            Fmt.(list ~sep:(any "@\n") State.pp_err)
+            errors
+
+      let to_loggable =
+        L.Loggable.make pp of_yojson to_yojson
+
+      let log report = L.normal_specific (to_loggable report)
+        L.LoggingConstants.ContentType.unify_result
+    end
+
+    let structure_unify_case_reports parent_ids_ref target_case_depth is_new_case astate subst up =
+      let target_case_depth = (if is_new_case then target_case_depth - 1 else target_case_depth) in 
+      let case_depth = List.length !parent_ids_ref in (
+        assert (target_case_depth <= case_depth);
+        for _ = case_depth downto (target_case_depth + 1) do
+          match !parent_ids_ref with
+          | [] -> raise (Failure "Mismatched case depth and parent_id list!")
+          | (parent_id :: rest) -> (
+            L.release_parent (Some parent_id);
+            parent_ids_ref := rest
+          )
+        done;
+        if is_new_case then (
+          let new_parent_id = UnifyCaseReport.log
+            {
+              astate = AstateRec.from astate;
+              subst; up
+            }
+          in match new_parent_id with
+          | Some new_parent_id -> (
+            L.set_parent new_parent_id;
+            parent_ids_ref := (new_parent_id :: !parent_ids_ref);
+            target_case_depth
+          )
+          | None -> target_case_depth
+        ) else target_case_depth
+      );
+  end
+  open Logging
 
   let update_store (astate : t) (x : string) (v : Val.t) : t =
     let state, preds, pred_defs, variants = astate in
@@ -134,50 +254,6 @@ module Make
             (fun state ->
               (state, Preds.copy preds, pred_defs, Hashtbl.copy variants))
             states )
-
-  let pp_variants : (string * Expr.t option) Fmt.t =
-    Fmt.pair ~sep:Fmt.comma Fmt.string (Fmt.option Expr.pp)
-
-  let pp_astate fmt astate =
-    let state, preds, _, variants = astate in
-    Fmt.pf fmt "%a@\nPREDS:@\n%a@\nVARIANTS:@\n%a@\n" State.pp state Preds.pp
-      preds
-      (Fmt.hashtbl ~sep:Fmt.semi pp_variants)
-      variants
-
-  let pp_astate_by_need (pvars : SS.t) (lvars : SS.t) (locs : SS.t) fmt astate =
-    let state, preds, _, variants = astate in
-    Fmt.pf fmt "%a@\n@\nPREDS:@\n%a@\nVARIANTS:@\n%a@\n"
-      (State.pp_by_need pvars lvars locs)
-      state Preds.pp preds
-      (Fmt.hashtbl ~sep:Fmt.semi pp_variants)
-      variants
-
-  let pp_astate_rec fmt astate =
-    let { state; preds; variants } = astate in
-      pp_astate fmt (state, preds, (), variants)
-
-  let pp_unify_result_report fmt report =
-    match report with
-    | Success data ->
-      Fmt.pf fmt "Unifier.unify_up: Unification successful: %d states left"
-        (1 + (List.length data.remaining_states))
-    | Failure { cur_step; subst; astate; errors } ->
-      Fmt.pf fmt 
-        "@[<v 2>WARNING: Unify Assertion Failed: @[<h>%a@] with \
-        subst @\n\
-        %a in state @\n\
-        %a with errors:@\n\
-        %a@]"
-        Fmt.(
-          option
-            ~none:(any "no assertion - phantom node")
-            UP.step_pp)
-        cur_step ESubst.pp subst pp_astate_rec astate
-        Fmt.(list ~sep:(any "@\n") State.pp_err)
-        errors
-
-  let loggable_of_unify_result_report = L.Loggable.make pp_unify_result_report unify_result_report_of_yojson unify_result_report_to_yojson
 
   let copy_astate (astate : t) : t =
     let state, preds, pred_defs, variants = astate in
@@ -1051,7 +1127,7 @@ module Make
 
     let make_resource_fail () = UFail [ EAsrt ([], True, []) ] in
 
-    let assertion_loggable = if Logging.Mode.enabled () then Some (
+    let assertion_loggable = if L.Mode.enabled () then Some (
       let a = fst step in
       (* Get pvars, lvars, locs from the assertion *)
       let a_pvars, a_lvars, a_locs =
@@ -1098,18 +1174,8 @@ module Make
         | true -> pp_astate_by_need s_pvars s_lvars s_locs
       in
 
-      let pp_astate_rec fmt astate_rec =
-        let { state; preds; variants } = astate_rec in
-        pp_astate fmt (state, preds, (), variants)
-      in
-
-      let pp_assertion_report fmt u_assert_log =
-        Fmt.pf fmt "Unify assertion: @[<h>%a@]@\nSubst:@\n%a@\n@[<v 2>STATE:@\n%a@]"
-          UP.step_pp u_assert_log.step subst_pp u_assert_log.subst pp_astate_rec u_assert_log.astate
-      in
-
-      let assertion_report = { step; subst; astate=(astate_rec_of astate) } in
-      L.Loggable.make pp_assertion_report assertion_report_of_yojson assertion_report_to_yojson assertion_report
+      AssertionReport.to_loggable pp_astate subst_pp
+        { step; subst; astate=(AstateRec.from astate) }
     ) else None in
 
     L.with_parent assertion_loggable L.LoggingConstants.ContentType.assertion (fun () ->
@@ -1355,35 +1421,6 @@ module Make
                 in
                 make_resource_fail ())))
 
-  and structure_unify_case_reports parent_ids_ref target_case_depth is_new_case astate subst up =
-    let target_case_depth = (if is_new_case then target_case_depth - 1 else target_case_depth) in 
-    let case_depth = List.length !parent_ids_ref in (
-      assert (target_case_depth <= case_depth);
-      for _ = case_depth downto (target_case_depth + 1) do
-        match !parent_ids_ref with
-        | [] -> raise (Failure "Mismatched case depth and parent_id list!")
-        | (parent_id :: rest) -> (
-          L.release_parent (Some parent_id);
-          parent_ids_ref := rest
-        )
-      done;
-      if is_new_case then (
-        let unify_case_report = {
-          astate = astate_rec_of astate;
-          subst; up
-        } in
-        let new_parent_id =(L.normal_specific (L.Loggable.make L.dummy_pp unify_case_report_of_yojson unify_case_report_to_yojson unify_case_report)
-          L.LoggingConstants.ContentType.unify_case)
-        in match new_parent_id with
-        | Some new_parent_id -> (
-          L.set_parent new_parent_id;
-          parent_ids_ref := (new_parent_id :: !parent_ids_ref);
-          target_case_depth
-        )
-        | None -> target_case_depth
-      ) else target_case_depth
-    );
-
   and unify_up' (parent_ids : L.ReportId.t list ref) (s_states : search_state') : up_u_res =
     let s_states, errs_so_far = s_states in
     L.(
@@ -1424,17 +1461,16 @@ module Make
             match UP.next up with
             | None ->
               let posts = UP.posts up in (
-                let unify_result_report = loggable_of_unify_result_report @@ Success {
-                  remaining_states = List.map (fun ((astate, subst, up), _, _) -> {
-                    astate = astate_rec_of astate;
-                    subst; up
-                  }) rest;
-                  astate = astate_rec_of state';
-                  subst; posts
-                } in
-                L.normal_specific unify_result_report
-                  L.LoggingConstants.ContentType.unify_result
-                  |> ignore;
+                UnifyResultReport.log (
+                  Success {
+                    remaining_states = List.map (fun ((astate, subst, up), _, _) -> ({
+                      astate = AstateRec.from astate;
+                      subst; up
+                    } : UnifyResultReport.remaining_state)) rest;
+                    astate = AstateRec.from state';
+                    subst; posts
+                  }
+                ) |> ignore;
                 UPUSucc [ (state', subst, posts) ]
               )
             | Some [ (up, lab) ] ->
@@ -1462,13 +1498,12 @@ module Make
                 f (next_states @ rest, errs_so_far)
             | Some [] -> L.fail "ERROR: unify_up: empty unification plan")
         | UFail errors ->
-          let unify_result_report = loggable_of_unify_result_report @@ Failure {
-            astate = astate_rec_of state;
-            cur_step; subst; errors
-          } in
-          L.normal_specific unify_result_report
-            L.LoggingConstants.ContentType.unify_result
-            |> ignore;
+          UnifyResultReport.log (
+            Failure {
+              astate = AstateRec.from state;
+              cur_step; subst; errors
+            }
+          ) |> ignore;
           f (rest, errors @ errs_so_far))
 
   and unify_up (s_states : search_state) : up_u_res =
@@ -1522,11 +1557,8 @@ module Make
         in
         UPUSucc (List.concat rets)
     in
-    let unify_report = { astate=(astate_rec_of astate); subst; up; unify_kind } in
-    L.with_parent 
-      (Some (L.Loggable.make (fun fmt _ -> Fmt.pf fmt "Unifier.unify: about to unify UP.")
-        unify_report_of_yojson unify_report_to_yojson unify_report))
-      L.LoggingConstants.ContentType.unify
+    UnifyReport.as_parent
+      { astate=AstateRec.from astate; subst; up; unify_kind }
       (fun () ->
         let ret = unify_up ([ (astate, subst, up) ], []) in
         match ret with
