@@ -239,7 +239,7 @@ struct
         match type_ with
         | t when t = Logging.LoggingConstants.ContentType.cmd_step -> (
             let cmd_step =
-              content |> Yojson.Safe.from_string |> IL.CmdStep.of_yojson
+              content |> Yojson.Safe.from_string |> cmd_step_of_yojson
             in
             match cmd_step with
             | Ok cmd_step ->

@@ -1,6 +1,13 @@
 open Literal
-open GInterpreterLogging.Types
 module L = Logging
+
+type 'state_vt branch_case' =
+  | GuardedGoto of bool
+  | LCmd of int
+  | SpecExec of Flag.t
+  | LAction of 'state_vt list
+  | LActionFail of int
+[@@deriving yojson]
 
 module type S = sig
   module CallStack : CallStack.S
@@ -18,11 +25,6 @@ module type S = sig
 
   type invariant_frames = (string * state_t) list
   type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
-
-  module IL : GInterpreterLogging.S
-  with type state_t = state_t
-   and type err_t = err_t
-   and type cs = CallStack.t
 
   type branch_case = state_vt branch_case'
 
@@ -65,6 +67,15 @@ module type S = sig
     | Finished of 'a list
     | Continue of (Logging.ReportId.t option * (unit -> 'a cont_func))
 
+  type cmd_step = {
+    callstack : CallStack.t;
+    proc_body_index : int;
+    state : state_t option;
+    errors : err_t list;
+    branch_case : branch_case option;
+  }
+  [@@deriving yojson]
+
   val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
   val pp_result : Format.formatter -> result_t list -> unit
   val call_graph : CallGraph.t
@@ -105,8 +116,6 @@ struct
   module Val = Val
   module State = State
   module Store = Store
-  module IL = GInterpreterLogging.Make (Val) (ESubst) (Store) (State) (CallStack)
-  open IL
 
   type vt = Val.t
   type st = ESubst.t
@@ -118,6 +127,16 @@ struct
   type invariant_frames = (string * State.t) list
   type err_t = (Val.t, State.err_t) ExecErr.t [@@deriving yojson]
   type branch_case = state_vt branch_case' [@@deriving yojson]
+  type config_log = {
+    proc_line : int;
+    time : float;
+    cmd : string;
+    callstack : CallStack.t;
+    annot : Annot.t;
+    branching : int;
+    state : state_t;
+    branch_case : branch_case option;
+  } [@@deriving yojson, make]
 
   let pp_err = ExecErr.pp Val.pp State.pp_err
   let pp_str_list = Fmt.(brackets (list ~sep:comma string))
@@ -176,6 +195,15 @@ struct
   type 'a cont_func =
     | Finished of 'a list
     | Continue of (Logging.ReportId.t option * (unit -> 'a cont_func))
+
+  type cmd_step = {
+    callstack : CallStack.t;
+    proc_body_index : int;
+    state : state_t option;
+    errors : err_t list;
+    branch_case : branch_case option;
+  }
+  [@@deriving yojson]
 
   type annotated_action = { annot : Annot.t; action_name : string }
   [@@deriving yojson]
@@ -293,7 +321,7 @@ struct
           in
           State.pp_by_need pvars lvars locs
     in
-    let config_report = ConfigReport.make
+    let config_log = make_config_log
       ~proc_line:i
       ~time:(Sys.time ())
       ~cmd: (Fmt.to_to_string Cmd.pp_indexed cmd)
@@ -304,7 +332,7 @@ struct
       ?branch_case
       ()
     in
-    let pp fmt ({ proc_line=i; time; cmd; callstack=cs; annot; branching; state; _ } : ConfigReport.t) =
+    let pp fmt { proc_line=i; time; cmd; callstack=cs; annot; branching; state; _ } =
         Fmt.pf fmt
           "@[------------------------------------------------------@\n\
            --%s: %i--@\n\
@@ -325,7 +353,14 @@ struct
           branching
           state_printer state
     in
-    ConfigReport.log pp config_report
+    L.normal_specific
+      (L.Loggable.make pp config_log_of_yojson config_log_to_yojson config_log)
+      L.LoggingConstants.ContentType.cmd
+
+  let cmd_step_pp fmt cmd_step =
+    (* TODO: Cmd step should contain all things in a configuration
+             print the same contents as log_configuration *)
+    CallStack.pp fmt cmd_step.callstack
 
   let annotated_action_pp fmt annotated_action =
     let origin_loc = Annot.get_origin_loc annotated_action.annot in
@@ -1411,18 +1446,26 @@ struct
       match rest_confs with
       | ConfCont { state; callstack; next_idx = proc_body_index; branch_case; new_branches; _ } :: _ ->
           List.iter (fun (state, proc_body_index, branch_case) -> 
-            CmdStep.log_result
-              { callstack; proc_body_index; state = Some state; errors = []; branch_case = Some branch_case }
+            L.normal_specific
+              (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
+                { callstack; proc_body_index; state = Some state; errors = []; branch_case = Some branch_case })
+              L.LoggingConstants.ContentType.cmd_result
               |> ignore
           ) new_branches;
-          let report_id = CmdStep.log_result
-            { callstack; proc_body_index; state = Some state; errors = []; branch_case }
+          let report_id =
+            L.normal_specific
+              (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
+                 { callstack; proc_body_index; state = Some state; errors = []; branch_case })
+              L.LoggingConstants.ContentType.cmd_result
           in Continue (report_id, cont_func)
       | ConfErr
           { callstack; proc_idx = proc_body_index; error_state = state; errors }
         :: _ ->
-          let report_id = CmdStep.log_result
-            { callstack; proc_body_index; state = Some state; errors; branch_case = None }
+          let report_id =
+            L.normal_specific
+              (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
+                 { callstack; proc_body_index; state = Some state; errors; branch_case = None })
+              L.LoggingConstants.ContentType.cmd_result
           in
           Continue (report_id, cont_func)
       | _ -> cont_func ()
@@ -1592,8 +1635,11 @@ struct
         ~branch_count:0
         ()
     in
-    let report_id = CmdStep.log_step
-      { callstack = cs; proc_body_index; state = Some state; errors = []; branch_case = None }
+    let report_id =
+      L.normal_specific
+        (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
+           { callstack = cs; proc_body_index; state = Some state; errors = []; branch_case = None })
+        L.LoggingConstants.ContentType.cmd_step
     in
     Continue
       ( report_id,
@@ -1645,14 +1691,17 @@ struct
         ~branch_count:0
         ()
     in
-    let report_id = CmdStep.log_step
-      {
-        callstack = initial_cs;
-        proc_body_index = initial_proc_body_index;
-        state = Some initial_state;
-        errors = [];
-        branch_case = None;
-      }
+    let report_id =
+      L.normal_specific
+        (L.Loggable.make cmd_step_pp cmd_step_of_yojson cmd_step_to_yojson
+           {
+             callstack = initial_cs;
+             proc_body_index = initial_proc_body_index;
+             state = Some initial_state;
+             errors = [];
+             branch_case = None;
+           })
+        L.LoggingConstants.ContentType.cmd_step
     in
     let init_func =
       Continue
