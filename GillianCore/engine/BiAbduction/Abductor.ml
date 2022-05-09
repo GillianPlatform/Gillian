@@ -213,12 +213,12 @@ struct
     let process_spec = make_spec prog in
     let state_i = SBAState.copy state_i in
     match result with
-    | RFail (_, _, state_f, _) ->
-        let sspec, spec = process_spec name params state_i state_f Flag.Error in
+    | RFail { error_state; _ } ->
+        let sspec, spec = process_spec name params state_i error_state Flag.Error in
         if !Config.bug_specs_propagation then UP.add_spec prog spec;
         (sspec, false)
-    | RSucc (fl, _, state_f, _) ->
-        let sspec, spec = process_spec name params state_i state_f fl in
+    | RSucc { flag; final_state; _ } ->
+        let sspec, spec = process_spec name params state_i final_state flag in
         let () =
           try UP.add_spec prog spec
           with _ ->

@@ -447,7 +447,7 @@ struct
       && List.fold_left
            (fun ac result ->
              match (result : SAInterpreter.result_t) with
-             | ExecRes.RFail (proc, i, state, errs) ->
+             | ExecRes.RFail { proc; proc_idx; error_state; errors } ->
                  L.verbose (fun m ->
                      m
                        "VERIFICATION FAILURE: Procedure %s, Command %d\n\
@@ -456,14 +456,14 @@ struct
                         %a@]@\n\
                         @[<v 2>Errors:@\n\
                         %a@]@\n"
-                       proc i test.name
+                       proc proc_idx test.name
                        (Fmt.Dump.pair Fmt.int Fmt.int)
-                       test.id SPState.pp state
+                       test.id SPState.pp error_state
                        Fmt.(list ~sep:(any "@\n") SAInterpreter.pp_err)
-                       errs);
+                       errors);
                  Fmt.pr "f @?";
                  false
-             | ExecRes.RSucc (fl, _, state, prev_report_id) ->
+             | ExecRes.RSucc { flag=fl; final_state; last_report; _ } ->
                  if Some fl <> test.flag then (
                    L.normal (fun m ->
                        m
@@ -475,14 +475,14 @@ struct
                    Fmt.pr "f @?";
                    false)
                  else (
-                   L.set_previous prev_report_id;
-                   let store = SPState.get_store state in
+                   L.set_previous last_report;
+                   let store = SPState.get_store final_state in
                    let () =
                      SStore.filter store (fun x v ->
                          if x = Names.return_variable then Some v else None)
                    in
-                   let subst = make_post_subst test state in
-                   if analyse_result subst test state then (
+                   let subst = make_post_subst test final_state in
+                   if analyse_result subst test final_state then (
                      L.normal (fun m ->
                          m
                            "VERIFICATION SUCCESS: Spec %s %a terminated \

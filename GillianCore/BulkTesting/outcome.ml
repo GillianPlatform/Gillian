@@ -65,13 +65,13 @@ module Make
         Fmt.pf fmt "failed at execution with message: \"%s\"" msg
     | FinishedExec [ RSucc _ ] ->
         Fmt.pf fmt "finished its execution successfully"
-    | FinishedExec [ RFail (proc, i, _, errs) ] ->
+    | FinishedExec [ RFail { proc; proc_idx; errors; _ } ] ->
         Fmt.pf fmt
           "finished its execution with failure in proc %s at command %i with \
            errors: %a"
-          proc i
+          proc proc_idx
           (Fmt.Dump.list (ExecErr.pp Val.pp State.pp_err))
-          errs
+          errors
     | FinishedExec _ ->
         Fmt.pf fmt "finished its execution with several branches"
 

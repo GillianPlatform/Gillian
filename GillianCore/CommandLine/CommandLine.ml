@@ -284,7 +284,7 @@ struct
       assert (List.length ret = 1);
       let ret = List.hd ret in
       match ret with
-      | ExecRes.RSucc (Flag.Normal, _, _, _) -> true
+      | ExecRes.RSucc { flag = Flag.Normal; _ } -> true
       | _ -> false
 
     let run debug (prog : ('a, int) Prog.t) : unit =

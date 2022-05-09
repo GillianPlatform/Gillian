@@ -1486,12 +1486,12 @@ struct
           continue_or_pause rest_confs (fun () -> f rest_confs results)
       | ConfErr { callstack; proc_idx; error_state; errors } :: rest_confs ->
           let proc = CallStack.get_cur_proc_id callstack in
-          let result = ExecRes.RFail (proc, proc_idx, error_state, errors) in
+          let result = ExecRes.RFail { proc; proc_idx; error_state; errors } in
           continue_or_pause rest_confs (fun () ->
               f rest_confs (result :: results))
-      | ConfFinish { flag = fl; ret_val = v; final_state = state } :: rest_confs
+      | ConfFinish { flag; ret_val; final_state } :: rest_confs
         ->
-          let result = ExecRes.RSucc (fl, v, state, L.get_parent ()) in
+          let result = ExecRes.RSucc { flag; ret_val; final_state; last_report = L.get_parent () } in
           continue_or_pause rest_confs (fun () ->
               f rest_confs (result :: results))
       | ConfSusp
