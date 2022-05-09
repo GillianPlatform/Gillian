@@ -288,8 +288,12 @@ import_verify_target:
   IMPORT; VERIFY; imports = separated_nonempty_list(COMMA, STRING); SCOLON { imports }
 ;
 
+proc_name:
+  | proc_name = VAR { proc_name }
+  | proc_name = STRING { proc_name }
+
 proc_head_target:
-  PROC; proc_name = VAR; LBRACE; param_list = separated_list(COMMA, VAR); RBRACE
+  PROC; proc_name = proc_name; LBRACE; param_list = separated_list(COMMA, VAR); RBRACE
     { (proc_name, param_list) }
 ;
 
