@@ -1,5 +1,3 @@
-open UnifierLogging.Types
-
 (**
     Interface for GIL Predicate States.
     They are considered to be mutable.
@@ -21,7 +19,7 @@ module type S = sig
   val set_preds : t -> preds_t -> t
 
   val set_variants : t -> variants_t -> t
-  val unify : t -> st -> UP.t -> unify_kind -> bool
+  val unify : t -> st -> UP.t -> Unifier.unify_kind -> bool
   val add_pred_defs : UP.preds_tbl_t -> t -> t
   val deabstract : t -> state_t * bool
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
@@ -1194,7 +1192,7 @@ module Make
               spec.spec.spec_name);
         []
 
-  let unify (astate : t) (subst : st) (up : UP.t) (unify_type : unify_kind) : bool =
+  let unify (astate : t) (subst : st) (up : UP.t) (unify_type : Unifier.unify_kind) : bool =
     let result =
       match SUnifier.unify astate subst up unify_type with
       | SUnifier.UPUSucc _ -> true

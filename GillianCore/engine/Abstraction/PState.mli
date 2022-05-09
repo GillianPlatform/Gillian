@@ -1,5 +1,3 @@
-open UnifierLogging.Types
-
 (**
     Interface for GIL General States.
     They are considered to be mutable.
@@ -23,7 +21,7 @@ module type S = sig
   (** Set variants of given symbolic state *)
   val set_variants : t -> variants_t -> t
 
-  val unify : t -> st -> UP.t -> unify_kind -> bool
+  val unify : t -> st -> UP.t -> Unifier.unify_kind -> bool
   val add_pred_defs : UP.preds_tbl_t -> t -> t
   val deabstract : t -> state_t * bool
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
