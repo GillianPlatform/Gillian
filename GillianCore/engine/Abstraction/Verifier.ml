@@ -463,7 +463,7 @@ struct
                        errors);
                  Fmt.pr "f @?";
                  false
-             | ExecRes.RSucc { flag=fl; final_state; last_report; _ } ->
+             | ExecRes.RSucc { flag = fl; final_state; last_report; _ } ->
                  if Some fl <> test.flag then (
                    L.normal (fun m ->
                        m

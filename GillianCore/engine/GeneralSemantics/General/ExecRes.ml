@@ -1,16 +1,16 @@
 type ('state, 'value, 'err) t =
   | RFail of {
-    proc: string;
-    proc_idx: int;
-    error_state: 'state;
-    errors: 'err list;
-  }
+      proc : string;
+      proc_idx : int;
+      error_state : 'state;
+      errors : 'err list;
+    }
   | RSucc of {
-    flag: Flag.t;
-    ret_val: 'value;
-    final_state: 'state;
-    last_report: Logging.ReportId.t option;
-  }
+      flag : Flag.t;
+      ret_val : 'value;
+      final_state : 'state;
+      last_report : Logging.ReportId.t option;
+    }
 
 let pp pp_state pp_value pp_err ft res =
   let open Fmt in

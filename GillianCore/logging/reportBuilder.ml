@@ -27,7 +27,6 @@ let make
   previous := Some report.id;
   report
 
-
 let set_previous = function
   | None -> ()
   | Some _ as id -> previous := id
@@ -57,5 +56,4 @@ let start_phase level ?title ?severity () =
   else None
 
 let end_phase = release_parent
-
 let get_cur_parent_id () = Stack.top_opt parents

@@ -1192,7 +1192,11 @@ module Make
               spec.spec.spec_name);
         []
 
-  let unify (astate : t) (subst : st) (up : UP.t) (unify_type : Unifier.unify_kind) : bool =
+  let unify
+      (astate : t)
+      (subst : st)
+      (up : UP.t)
+      (unify_type : Unifier.unify_kind) : bool =
     let result =
       match SUnifier.unify astate subst up unify_type with
       | SUnifier.UPUSucc _ -> true

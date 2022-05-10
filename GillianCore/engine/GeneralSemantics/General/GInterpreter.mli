@@ -22,7 +22,6 @@ module type S = sig
 
   type invariant_frames = (string * state_t) list
   type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
-
   type branch_case = state_vt branch_case'
 
   type cconf_t =
@@ -75,6 +74,7 @@ module type S = sig
       }
       [@@deriving yojson]
     end
+
     val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
     val pp_result : Format.formatter -> result_t list -> unit
   end

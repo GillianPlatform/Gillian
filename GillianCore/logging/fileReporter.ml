@@ -6,7 +6,9 @@ let filename = "file.log"
 let out_channel = ref None
 let formatter = ref None
 
-let accepted_types = LoggingConstants.ContentType.([debug; assertion; phase; cmd; unify; unify_result])
+let accepted_types =
+  LoggingConstants.ContentType.
+    [ debug; assertion; phase; cmd; unify; unify_result ]
 
 let initialize () =
   let () = out_channel := Some (open_out filename) in
@@ -21,8 +23,7 @@ let log (report : Report.t) : unit =
       (* TODO: This should eventually log all types when all regular calls to
                log of specific types are replaced *)
       match report.type_ with
-      | type_
-        when will_log type_ ->
+      | type_ when will_log type_ ->
           let () = Loggable.pp report.content formatter in
           Format.fprintf formatter "@,@?"
       | _ -> ())

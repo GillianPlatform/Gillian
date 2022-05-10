@@ -214,7 +214,9 @@ struct
     let state_i = SBAState.copy state_i in
     match result with
     | RFail { error_state; _ } ->
-        let sspec, spec = process_spec name params state_i error_state Flag.Error in
+        let sspec, spec =
+          process_spec name params state_i error_state Flag.Error
+        in
         if !Config.bug_specs_propagation then UP.add_spec prog spec;
         (sspec, false)
     | RSucc { flag; final_state; _ } ->

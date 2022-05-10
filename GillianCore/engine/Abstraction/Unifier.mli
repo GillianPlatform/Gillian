@@ -1,4 +1,9 @@
-type unify_kind = Postcondition | Fold | FunctionCall | Invariant | LogicCommand
+type unify_kind =
+  | Postcondition
+  | Fold
+  | FunctionCall
+  | Invariant
+  | LogicCommand
 
 module type S = sig
   type vt

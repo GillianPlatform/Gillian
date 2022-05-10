@@ -73,29 +73,28 @@ let fail msg =
   raise (Failure msg)
 
 let set_previous = ReportBuilder.set_previous
-
 let get_parent = ReportBuilder.get_parent
-
 let set_parent = ReportBuilder.set_parent
-
 let release_parent = ReportBuilder.release_parent
 
-let with_parent ?title ?(lvl=Mode.Normal) ?severity loggable type_ f =
-  match Option.bind loggable (fun loggable -> log_specific lvl ?title ?severity loggable type_) with
+let with_parent ?title ?(lvl = Mode.Normal) ?severity loggable type_ f =
+  match
+    Option.bind loggable (fun loggable ->
+        log_specific lvl ?title ?severity loggable type_)
+  with
   | None -> f ()
   | Some parent_id -> (
-    set_parent parent_id;
-    let result =
-      try Ok (f ())
-    with e ->
-      Printf.printf "Original Backtrace:\n%s" (Printexc.get_backtrace ());
-      Error e
-    in
-    release_parent (Some parent_id);
-    match result with
-    | Ok ok -> ok
-    | Error e -> raise e
-  )
+      set_parent parent_id;
+      let result =
+        try Ok (f ())
+        with e ->
+          Printf.printf "Original Backtrace:\n%s" (Printexc.get_backtrace ());
+          Error e
+      in
+      release_parent (Some parent_id);
+      match result with
+      | Ok ok -> ok
+      | Error e -> raise e)
 
 let start_phase level ?title ?severity () =
   let phase_report = ReportBuilder.start_phase level ?title ?severity () in
@@ -130,4 +129,5 @@ let with_verbose_phase ?title ?severity f =
 
 let with_tmi_phase ?title ?severity f = with_phase TMI ?title ?severity f
 
-let dummy_pp fmt _ = Fmt.pf fmt "!!! YOU SHOULDN'T BE SEEING THIS PRETTY PRINT !!!"
+let dummy_pp fmt _ =
+  Fmt.pf fmt "!!! YOU SHOULDN'T BE SEEING THIS PRETTY PRINT !!!"

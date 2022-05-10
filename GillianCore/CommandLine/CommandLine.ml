@@ -296,7 +296,8 @@ struct
       let ret = CInterpreter.evaluate_prog prog in
       let () =
         if debug then
-          Format.printf "Final state: @\n%a@\n" CInterpreter.Logging.pp_result ret
+          Format.printf "Final state: @\n%a@\n" CInterpreter.Logging.pp_result
+            ret
       in
       return_to_exit (valid_concrete_result ret)
 
