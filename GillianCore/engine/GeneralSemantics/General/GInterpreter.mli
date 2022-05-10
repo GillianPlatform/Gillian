@@ -1,3 +1,11 @@
+type 'state_vt branch_case' =
+  | GuardedGoto of bool
+  | LCmd of int
+  | SpecExec of Flag.t
+  | LAction of 'state_vt list
+  | LActionFail of int
+[@@deriving yojson]
+
 module type S = sig
   module CallStack : CallStack.S
 
@@ -14,6 +22,7 @@ module type S = sig
 
   type invariant_frames = (string * state_t) list
   type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
+  type branch_case = state_vt branch_case'
 
   type cconf_t =
     | ConfErr of {
@@ -30,6 +39,9 @@ module type S = sig
         next_idx : int;
         loop_ids : string list;
         branch_count : int;
+        prev_report_id : Logging.ReportId.t option;
+        branch_case : branch_case option;
+        new_branches : (state_t * int * branch_case) list;
       }
     | ConfFinish of { flag : Flag.t; ret_val : state_vt; final_state : state_t }
         (** Equal to Conf cont + the id of the required spec *)
@@ -51,16 +63,22 @@ module type S = sig
     | Finished of 'a list
     | Continue of (Logging.ReportId.t option * (unit -> 'a cont_func))
 
-  type cmd_step = {
-    callstack : CallStack.t;
-    proc_body_index : int;
-    state : state_t option;
-    errors : err_t list;
-  }
-  [@@deriving yojson]
+  module Logging : sig
+    module CmdStep : sig
+      type t = {
+        callstack : CallStack.t;
+        proc_body_index : int;
+        state : state_t option;
+        errors : err_t list;
+        branch_case : branch_case option;
+      }
+      [@@deriving yojson]
+    end
 
-  val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
-  val pp_result : Format.formatter -> result_t list -> unit
+    val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
+    val pp_result : Format.formatter -> result_t list -> unit
+  end
+
   val call_graph : CallGraph.t
   val reset : unit -> unit
   val evaluate_lcmds : UP.prog -> LCmd.t list -> state_t -> state_t list

@@ -284,7 +284,7 @@ struct
       assert (List.length ret = 1);
       let ret = List.hd ret in
       match ret with
-      | ExecRes.RSucc (Flag.Normal, _, _) -> true
+      | ExecRes.RSucc { flag = Flag.Normal; _ } -> true
       | _ -> false
 
     let run debug (prog : ('a, int) Prog.t) : unit =
@@ -296,7 +296,8 @@ struct
       let ret = CInterpreter.evaluate_prog prog in
       let () =
         if debug then
-          Format.printf "Final state: @\n%a@\n" CInterpreter.pp_result ret
+          Format.printf "Final state: @\n%a@\n" CInterpreter.Logging.pp_result
+            ret
       in
       return_to_exit (valid_concrete_result ret)
 

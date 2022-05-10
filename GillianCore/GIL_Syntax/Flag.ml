@@ -2,6 +2,7 @@
 type t = TypeDef__.flag =
   | Normal  (** Normal return *)
   | Error  (** Error return *)
+[@@deriving yojson]
 
 (** GIL spec return flag *)
 let str (flag : t) : string =

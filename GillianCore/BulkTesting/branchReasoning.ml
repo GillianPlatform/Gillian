@@ -21,15 +21,15 @@ let oneResInMode
     ?(fmtexp = fun x -> x)
     ?(fmtrcv = fun x -> x)
     ~pp_what_branch_did
-    flag
+    fl
     const_opt
     res =
   let pp_rcv pp fmt x = (makeFormater fmtrcv) pp fmt x in
   let pp_exp pp fmt x = (makeFormater fmtexp) pp fmt x in
   match (res, const_opt) with
-  | Engine.ExecRes.RSucc (fl, _, _), None when fl = flag -> (true, "")
-  | RSucc (fl, v, state), Some (cn, f) when fl = flag ->
-      if f v state then (true, "")
+  | Engine.ExecRes.RSucc { flag; _ }, None when fl = flag -> (true, "")
+  | RSucc { flag; ret_val; final_state; _ }, Some (cn, f) when fl = flag ->
+      if f ret_val final_state then (true, "")
       else
         let failure_message =
           Fmt.str
@@ -38,7 +38,7 @@ let oneResInMode
             (pp_rcv Fmt.string) cn
         in
         (false, failure_message)
-  | RSucc (fl, _, _), _ ->
+  | RSucc { flag; _ }, _ ->
       let failure_message =
         Fmt.str
           "successfully finished in %a mode\n\
@@ -50,7 +50,7 @@ let oneResInMode
       let failure_message =
         Fmt.str
           "was expected to finish successfully in %a mode\nbut actually %a"
-          (pp_exp Flag.pp) flag
+          (pp_exp Flag.pp) fl
           (pp_rcv pp_what_branch_did)
           res
       in

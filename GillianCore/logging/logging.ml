@@ -26,19 +26,23 @@ let wrap_up () =
 let log_on_all_reporters (report : Report.t) =
   List.iter (fun reporter -> Reporter.log reporter report) !reporters
 
+let will_log_on_any_reporter (type_ : string) =
+  List.exists (fun reporter -> Reporter.will_log reporter type_) !reporters
+
 let log lvl ?title ?severity msgf =
-  if Mode.should_log lvl then
+  let type_ = LoggingConstants.ContentType.debug in
+  if Mode.should_log lvl && will_log_on_any_reporter type_ then
     let report =
       ReportBuilder.make ?title
         ~content:
           (Loggable.make PackedPP.pp PackedPP.of_yojson PackedPP.to_yojson
              (PP msgf))
-        ~type_:LoggingConstants.ContentType.debug ?severity ()
+        ~type_ ?severity ()
     in
     log_on_all_reporters report
 
 let log_specific lvl ?title ?severity loggable type_ =
-  if Mode.should_log lvl then
+  if Mode.should_log lvl && will_log_on_any_reporter type_ then
     let report =
       ReportBuilder.make ?title ~content:loggable ~type_ ?severity ()
     in
@@ -67,6 +71,30 @@ let print_to_all (str : string) =
 let fail msg =
   normal ~severity:Error (fun m -> m "%a" Format.pp_print_string msg);
   raise (Failure msg)
+
+let set_previous = ReportBuilder.set_previous
+let get_parent = ReportBuilder.get_parent
+let set_parent = ReportBuilder.set_parent
+let release_parent = ReportBuilder.release_parent
+
+let with_parent ?title ?(lvl = Mode.Normal) ?severity loggable type_ f =
+  match
+    Option.bind loggable (fun loggable ->
+        log_specific lvl ?title ?severity loggable type_)
+  with
+  | None -> f ()
+  | Some parent_id -> (
+      set_parent parent_id;
+      let result =
+        try Ok (f ())
+        with e ->
+          Printf.printf "Original Backtrace:\n%s" (Printexc.get_backtrace ());
+          Error e
+      in
+      release_parent (Some parent_id);
+      match result with
+      | Ok ok -> ok
+      | Error e -> raise e)
 
 let start_phase level ?title ?severity () =
   let phase_report = ReportBuilder.start_phase level ?title ?severity () in
@@ -100,3 +128,6 @@ let with_verbose_phase ?title ?severity f =
   with_phase Verbose ?title ?severity f
 
 let with_tmi_phase ?title ?severity f = with_phase TMI ?title ?severity f
+
+let dummy_pp fmt _ =
+  Fmt.pf fmt "!!! YOU SHOULDN'T BE SEEING THIS PRETTY PRINT !!!"

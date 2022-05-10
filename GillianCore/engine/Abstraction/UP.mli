@@ -7,11 +7,11 @@ val outs_pp : outs Fmt.t
 (** The [up_step] type represents a unification plan step,
     consisting of an assertion together with the possible
     learned outs *)
-type step = Asrt.t * outs
+type step = Asrt.t * outs [@@deriving yojson]
 
 val step_pp : step Fmt.t
 
-type t
+type t [@@deriving yojson]
 type pred = { pred : Pred.t; up : t }
 type spec = { spec : Spec.t; up : t }
 type lemma = { lemma : Lemma.t; up : t }

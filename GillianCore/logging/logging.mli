@@ -55,6 +55,8 @@ module Loggable : sig
     ('a -> Yojson.Safe.t) ->
     'a ->
     t
+
+  val make_string : string -> t
 end
 
 module LogQueryer : sig
@@ -170,3 +172,19 @@ val with_verbose_phase :
     `TMI` *)
 val with_tmi_phase :
   ?title:string -> ?severity:Report.severity -> (unit -> 'a) -> 'a
+
+val set_previous : ReportId.t option -> unit
+val get_parent : unit -> ReportId.t option
+val set_parent : ReportId.t -> unit
+val release_parent : ReportId.t option -> unit
+
+val with_parent :
+  ?title:string ->
+  ?lvl:Mode.level ->
+  ?severity:Report.severity ->
+  Loggable.t option ->
+  string ->
+  (unit -> 'a) ->
+  'a
+
+val dummy_pp : Format.formatter -> 'a -> unit

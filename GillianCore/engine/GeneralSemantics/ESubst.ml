@@ -8,7 +8,7 @@ module type S = sig
   type vt
 
   (** Type of GIL e-substitutions *)
-  type t
+  type t [@@deriving yojson]
 
   (** E-substitution constructor, with a list of bindings of the form (variable, value) *)
   val init : (Expr.t * vt) list -> t
@@ -90,10 +90,10 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   module L = Logging
 
   (** Type of GIL values *)
-  type vt = Val.t
+  type vt = Val.t [@@deriving yojson]
 
   (** Type of GIL substitutions, implemented as hashtables *)
-  type t = (Expr.t, vt) Hashtbl.t
+  type t = (Expr.t, vt) Hashtbl.t [@@deriving yojson]
 
   (**
     Substitution constructor

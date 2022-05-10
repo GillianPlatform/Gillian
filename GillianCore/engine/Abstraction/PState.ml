@@ -19,7 +19,7 @@ module type S = sig
   val set_preds : t -> preds_t -> t
 
   val set_variants : t -> variants_t -> t
-  val unify : t -> st -> UP.t -> bool
+  val unify : t -> st -> UP.t -> Unifier.unify_kind -> bool
   val add_pred_defs : UP.preds_tbl_t -> t -> t
   val deabstract : t -> state_t * bool
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
@@ -50,7 +50,7 @@ module Make
 
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type t = State.t * Preds.t * UP.preds_tbl_t * variants_t
-  type vt = Val.t
+  type vt = Val.t [@@deriving yojson]
   type st = ESubst.t
   type store_t = Store.t
   type heap_t = State.heap_t
@@ -73,7 +73,7 @@ module Make
                upu)
       | _ -> None)
 
-  module Unifier = Unifier.Make (Val) (ESubst) (Store) (State) (Preds)
+  module SUnifier = Unifier.Make (Val) (ESubst) (Store) (State) (Preds)
 
   type action_ret = ASucc of (t * vt list) list | AFail of err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
@@ -189,7 +189,7 @@ module Make
                    (List.filter (fun x -> x <> None) unfold_vals)
                in
                let next_states, worked =
-                 Unifier.unfold_with_vals astate' unfold_vals
+                 SUnifier.unfold_with_vals astate' unfold_vals
                in
                if not worked then [ astate' ]
                else
@@ -319,7 +319,7 @@ module Make
       (up : UP.t)
       (astate : t)
       (x : string option)
-      (args : vt list) : ((t * Flag.t) list, Unifier.err_t list) result =
+      (args : vt list) : ((t * Flag.t) list, SUnifier.err_t list) result =
     L.verbose (fun m ->
         m "INSIDE RUN spec of %s with the following UP:@\n%a@\n" name UP.pp up);
 
@@ -351,7 +351,7 @@ module Make
         m "About to use the spec of %s with the following UP:@\n%a@\n" name
           UP.pp up);
 
-    match Unifier.unify astate' subst up with
+    match SUnifier.unify astate' subst up FunctionCall with
     | UPUSucc rets ->
         let acceptable =
           match !Config.Verification.exact with
@@ -417,7 +417,7 @@ module Make
              in
              (* OK FOR DELAY ENTAILMENT *)
              let++ final_state =
-               Unifier.produce_posts frame_state subst posts
+               SUnifier.produce_posts frame_state subst posts
              in
              let final_store = get_store final_state in
              let v_ret = Store.get final_store Names.return_variable in
@@ -431,7 +431,7 @@ module Make
              let _, final_states = simplify ~unification:true final_state in
              List.map
                (fun final_state ->
-                 ( snd (Option.get (Unifier.unfold_concrete_preds final_state)),
+                 ( snd (Option.get (SUnifier.unfold_concrete_preds final_state)),
                    fl ))
                final_states)
         else
@@ -579,7 +579,7 @@ module Make
             in
             let old_astate = copy astate in
             let subst = ESubst.init bindings in
-            let u_ret = Unifier.unify astate subst up in
+            let u_ret = SUnifier.unify astate subst up Invariant in
             match u_ret with
             | UPUSucc states ->
                 List.concat_map
@@ -697,7 +697,7 @@ module Make
                       in
                       let invariant_state = set_store invariant_state store in
                       match
-                        Unifier.produce invariant_state full_subst a_produce
+                        SUnifier.produce invariant_state full_subst a_produce
                       with
                       (* FIXME: Should allow several new states ? *)
                       | Ok ([ _new_astate ] as new_astates) ->
@@ -779,7 +779,7 @@ module Make
           let++ astate =
             let frame_asrt = Asrt.star (to_assertions frame) in
             let full_subst = make_id_subst frame_asrt in
-            match Unifier.produce astate full_subst frame_asrt with
+            match SUnifier.produce astate full_subst frame_asrt with
             | Error msg ->
                 L.fail
                   (Format.asprintf
@@ -841,7 +841,7 @@ module Make
                 List.map (fun (x, v) -> (Expr.PVar x, v)) param_bindings
               in
               let subst = ESubst.init (i_bindings @ param_bindings) in
-              match Unifier.unify astate subst pred.up with
+              match SUnifier.unify astate subst pred.up LogicCommand with
               | UPUSucc [ (astate', subst', _) ] ->
                   let _, preds', _, _ = astate' in
                   let arg_vs =
@@ -884,7 +884,7 @@ module Make
               let vs_ins = Pred.in_args pred.pred vs in
               let vs = List.map (fun x -> Some x) vs in
               (* FIXME: make sure correct number of params *)
-              match Unifier.get_pred astate pname vs None with
+              match SUnifier.get_pred astate pname vs None with
               | GPSucc [ (_, vs') ] ->
                   L.verbose (fun m ->
                       m "@[<h>Returned values: %a@]"
@@ -896,7 +896,7 @@ module Make
                         "@[<h>LCMD Unfold about to happen with rec %b info: \
                          %a@]"
                         b SLCmd.pp_unfold_info unfold_info);
-                  if b then Ok (Unifier.rec_unfold astate pname vs)
+                  if b then Ok (SUnifier.rec_unfold astate pname vs)
                   else (
                     L.verbose (fun m ->
                         m "@[<h>Values: %a@]" Fmt.(list ~sep:comma Val.pp) vs);
@@ -908,10 +908,10 @@ module Make
                                state
                            in
                            states)
-                         (Unifier.unfold astate pname vs unfold_info)))
+                         (SUnifier.unfold astate pname vs unfold_info)))
               | _ -> Fmt.failwith "IMPOSSIBLE UNFOLD: %a" SLCmd.pp lcmd))
       | GUnfold pname ->
-          let astates = Unifier.unfold_all astate pname in
+          let astates = SUnifier.unfold_all astate pname in
           let astates =
             List.concat_map
               (fun astate -> snd (simplify ~kill_new_lvars:true astate))
@@ -1008,7 +1008,7 @@ module Make
                   in
                   let old_astate = copy astate in
                   let subst = ESubst.init bindings in
-                  let u_ret = Unifier.unify astate subst up in
+                  let u_ret = SUnifier.unify astate subst up LogicCommand in
                   match u_ret with
                   | UPUSucc [ (new_state, subst', _) ] -> (
                       (* Successful Unification *)
@@ -1058,7 +1058,7 @@ module Make
                           Asrt.star [ a_new_bindings; a_substed ]
                         in
                         match
-                          Unifier.produce new_state full_subst a_produce
+                          SUnifier.produce new_state full_subst a_produce
                         with
                         | Ok new_astates ->
                             List.concat_map
@@ -1192,10 +1192,14 @@ module Make
               spec.spec.spec_name);
         []
 
-  let unify (astate : t) (subst : st) (up : UP.t) : bool =
+  let unify
+      (astate : t)
+      (subst : st)
+      (up : UP.t)
+      (unify_type : Unifier.unify_kind) : bool =
     let result =
-      match Unifier.unify astate subst up with
-      | Unifier.UPUSucc _ -> true
+      match SUnifier.unify astate subst up unify_type with
+      | SUnifier.UPUSucc _ -> true
       | _ -> false
     in
     L.verbose (fun fmt -> fmt "PSTATE.unify: Success: %b" result);
@@ -1226,16 +1230,16 @@ module Make
     State.clean_up state
 
   let produce (astate : t) (subst : st) (a : Asrt.t) : (t list, string) result =
-    Unifier.produce astate subst a
+    SUnifier.produce astate subst a
 
   let unify_assertion (astate : t) (subst : st) (step : UP.step) : u_res =
-    match Unifier.unify_assertion astate subst None step with
+    match SUnifier.unify_assertion astate subst None step with
     | UWTF -> UWTF
     | USucc astate' -> USucc astate'
     | UFail errs -> UFail errs
 
   let produce_posts (astate : t) (subst : st) (asrts : Asrt.t list) : t list =
-    Unifier.produce_posts astate subst asrts
+    SUnifier.produce_posts astate subst asrts
 
   let get_all_preds ?(keep : bool option) (sel : abs_t -> bool) (astate : t) :
       abs_t list =
@@ -1286,7 +1290,7 @@ module Make
     State.get_recovery_vals state vs
 
   let automatic_unfold (astate : t) (rvs : vt list) : (t list, string) result =
-    let next_states, worked = Unifier.unfold_with_vals astate rvs in
+    let next_states, worked = SUnifier.unfold_with_vals astate rvs in
     if not worked then Error "Automatic unfold failed"
     else Ok (List.map (fun (_, astate) -> astate) next_states)
 

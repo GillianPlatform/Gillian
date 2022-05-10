@@ -416,7 +416,7 @@ struct
     L.verbose (fun m ->
         m "Analyse result: About to unify one postcondition of %s. post: %a"
           test.name UP.pp test.post_up);
-    match SPState.unify state subst test.post_up with
+    match SPState.unify state subst test.post_up Unifier.Postcondition with
     | true ->
         L.verbose (fun m ->
             m "Analyse result: Postcondition unified successfully");
@@ -447,7 +447,7 @@ struct
       && List.fold_left
            (fun ac result ->
              match (result : SAInterpreter.result_t) with
-             | ExecRes.RFail (proc, i, state, errs) ->
+             | ExecRes.RFail { proc; proc_idx; error_state; errors } ->
                  L.verbose (fun m ->
                      m
                        "VERIFICATION FAILURE: Procedure %s, Command %d\n\
@@ -456,14 +456,14 @@ struct
                         %a@]@\n\
                         @[<v 2>Errors:@\n\
                         %a@]@\n"
-                       proc i test.name
+                       proc proc_idx test.name
                        (Fmt.Dump.pair Fmt.int Fmt.int)
-                       test.id SPState.pp state
-                       Fmt.(list ~sep:(any "@\n") SAInterpreter.pp_err)
-                       errs);
+                       test.id SPState.pp error_state
+                       Fmt.(list ~sep:(any "@\n") SAInterpreter.Logging.pp_err)
+                       errors);
                  Fmt.pr "f @?";
                  false
-             | ExecRes.RSucc (fl, _, state) ->
+             | ExecRes.RSucc { flag = fl; final_state; last_report; _ } ->
                  if Some fl <> test.flag then (
                    L.normal (fun m ->
                        m
@@ -474,14 +474,15 @@ struct
                          test.id (Flag.str fl) (Flag.str flag));
                    Fmt.pr "f @?";
                    false)
-                 else
-                   let store = SPState.get_store state in
+                 else (
+                   L.set_previous last_report;
+                   let store = SPState.get_store final_state in
                    let () =
                      SStore.filter store (fun x v ->
                          if x = Names.return_variable then Some v else None)
                    in
-                   let subst = make_post_subst test state in
-                   if analyse_result subst test state then (
+                   let subst = make_post_subst test final_state in
+                   if analyse_result subst test final_state then (
                      L.normal (fun m ->
                          m
                            "VERIFICATION SUCCESS: Spec %s %a terminated \
@@ -500,7 +501,7 @@ struct
                            (Fmt.Dump.pair Fmt.int Fmt.int)
                            test.id);
                      Fmt.pr "f @?";
-                     false))
+                     false)))
            true rets
     in
     if rets = [] then (
@@ -571,7 +572,7 @@ struct
         in
         L.verbose (fun m ->
             m "Verification: Concluded evaluation: %d obtained results.%a@\n"
-              (List.length rets) SAInterpreter.pp_result rets);
+              (List.length rets) SAInterpreter.Logging.pp_result rets);
         analyse_proc_results test flag rets
     | None -> (
         let lemma = Prog.get_lemma_exn prog.prog test.name in

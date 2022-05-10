@@ -229,7 +229,7 @@ struct
 
   let update_report_id_and_inspection_fields report_id dbg =
     dbg.cur_report_id <- report_id;
-    match Logging.LogQueryer.get_report report_id with
+    match L.LogQueryer.get_report report_id with
     | None ->
         Fmt.failwith
           "Unable to find report id '%a'. Check the logging level is set \
@@ -237,9 +237,9 @@ struct
           L.ReportId.pp report_id
     | Some (content, type_) -> (
         match type_ with
-        | t when t = Logging.LoggingConstants.ContentType.cmd_step -> (
+        | t when t = L.LoggingConstants.ContentType.cmd_step -> (
             let cmd_step =
-              content |> Yojson.Safe.from_string |> cmd_step_of_yojson
+              content |> Yojson.Safe.from_string |> Logging.CmdStep.of_yojson
             in
             match cmd_step with
             | Ok cmd_step ->
@@ -357,7 +357,7 @@ struct
     let stop_reason =
       if reverse then
         let prev_report_id =
-          Logging.LogQueryer.get_previous_report_id dbg.cur_report_id
+          L.LogQueryer.get_previous_report_id dbg.cur_report_id
         in
         match prev_report_id with
         | None -> ReachedStart
@@ -368,7 +368,7 @@ struct
             Step
       else
         let next_report_id =
-          Logging.LogQueryer.get_next_report_id dbg.cur_report_id
+          L.LogQueryer.get_next_report_id dbg.cur_report_id
         in
         match next_report_id with
         | None -> execute_step dbg
@@ -451,7 +451,7 @@ struct
   let terminate dbg =
     let () = Verification.postprocess_files dbg.source_files in
     let () = if !Config.stats then Statistics.print_statistics () in
-    Logging.wrap_up ()
+    L.wrap_up ()
 
   let get_frames dbg = dbg.frames
   let get_scopes dbg = dbg.top_level_scopes
@@ -464,7 +464,7 @@ struct
   let get_exception_info (dbg : debugger_state) =
     let error = List.hd dbg.errors in
     let non_mem_exception_info =
-      { id = Fmt.to_to_string pp_err error; description = None }
+      { id = Fmt.to_to_string Logging.pp_err error; description = None }
     in
     match error with
     | ExecErr.ESt state_error -> (
