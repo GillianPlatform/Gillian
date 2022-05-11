@@ -38,14 +38,15 @@ module type S = sig
 end
 
 module Make
-    (SState : State.S
+    (SState : SState.S
                 with type vt = SVal.M.t
                  and type st = SVal.SESubst.t
                  and type store_t = SStore.t)
     (SPState : PState.S
-                 with type vt = SVal.M.t
-                  and type st = SVal.SESubst.t
-                  and type store_t = SStore.t
+                 with type vt = SState.vt
+                  and type st = SState.st
+                  and type state_t = SState.t
+                  and type store_t = SState.store_t
                   and type preds_t = Preds.SPreds.t)
     (External : External.S) :
   S with type heap_t = SPState.heap_t and type m_err = SPState.m_err_t

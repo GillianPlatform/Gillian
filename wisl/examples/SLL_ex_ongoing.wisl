@@ -7,7 +7,7 @@ predicate SLL_addrs(+x, xs : List) {
   // Empty SLL
   (x == null) * (xs == []);
   // One SLL node and the rest
-  (x -b> #v, #y) * SLL_addrs(#y, #xs) * (xs == #y :: #xs) [ox: #v]
+  (x -b> #v, #y) * SLL_addrs(#y, #xs) * (xs == #y :: #xs)
 }
 
 // With values
@@ -15,7 +15,7 @@ predicate SLL_vals(+x, vs : List) {
   // Empty SLL
   (x == null) * (vs == []);
   // One SLL node and the rest
-  (x -b> #v, #y) * SLL_vals(#y, #vs) * (vs == #v :: #vs) [ox: #y]
+  (x -b> #v, #y) * SLL_vals(#y, #vs) * (vs == #v :: #vs)
 }
 
 // With values
@@ -23,7 +23,7 @@ predicate SLL(+x, xs : List, vs : List) {
   // Empty SLL
   (x == null) * (xs == []) * (vs == []);
   // One SLL node and the rest
-  (x -b> #v, #y) * SLL(#y, #xs, #vs) * (xs == #y :: #xs) * (vs == #v :: #vs) [ox: ]
+  (x -b> #v, #y) * SLL(#y, #xs, #vs) * (xs == #y :: #xs) * (vs == #v :: #vs)
 }
 
 // With length
@@ -31,7 +31,7 @@ predicate SLL_len(+x, n : Int) {
   // Empty SLL
   (x == null) * (n == 0);
   // One SLL node and the rest
-  (x -b> #v, #y) * (0 <# n) * SLL_len(#y, n - 1) [ox: #v, #y]
+  (x -b> #v, #y) * (0 <# n) * SLL_len(#y, n - 1)
 }
 
 //
@@ -75,7 +75,7 @@ function SLL_length(x) {
 //
 predicate SLLseg_len(+x, y, n : Int) {
   (x == y) * (n == 0);
-  (x -b> #v, #z) * SLLseg_len(#z, y, n - 1) * (0 <# n) [ox: #v, #z]
+  (x -b> #v, #z) * SLLseg_len(#z, y, n - 1) * (0 <# n)
 }
 
 //

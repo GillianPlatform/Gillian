@@ -40,14 +40,15 @@ module type S = sig
 end
 
 module Make
-    (SState : State.S
+    (SState : SState.S
                 with type vt = SVal.M.t
                  and type st = SVal.SESubst.t
                  and type store_t = SStore.t)
     (SPState : PState.S
-                 with type vt = SVal.M.t
-                  and type st = SVal.SESubst.t
-                  and type store_t = SStore.t
+                 with type vt = SState.vt
+                  and type st = SState.st
+                  and type state_t = SState.t
+                  and type store_t = SState.store_t
                   and type preds_t = Preds.SPreds.t)
     (External : External.S) =
 struct
@@ -58,12 +59,16 @@ struct
     GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SPState) (External)
 
   module Normaliser = Normaliser.Make (SPState)
-  module SPState = SPState
 
   type st = SPState.st
   type state = SPState.t
   type heap_t = SPState.heap_t
   type m_err = SPState.m_err_t
+
+  module SPState = SPState
+
+  module SUnifier =
+    Unifier.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
 
   let print_success_or_failure success =
     if success then Fmt.pr "%a" (Fmt.styled `Green Fmt.string) "Success\n"
@@ -86,6 +91,218 @@ struct
   let reset () =
     VerificationResults.reset global_results;
     SAInterpreter.reset ()
+
+  let derive_predicate_hiding
+      (prog : (Annot.t, int) Prog.t)
+      (preds : (string, UP.pred) Hashtbl.t) : unit =
+    match !Config.Verification.exact with
+    | true ->
+        let () =
+          L.verbose (fun fmt -> fmt "EXACT: Examining hiding in predicates")
+        in
+        let prog : UP.prog =
+          {
+            preds;
+            specs = Hashtbl.create 1;
+            lemmas = Hashtbl.create 1;
+            coverage = Hashtbl.create 1;
+            prog;
+          }
+        in
+        let module KB = UP.KB in
+        let pred_ins =
+          Hashtbl.fold
+            (fun name (pred_with_up : UP.pred) pred_ins ->
+              Hashtbl.add pred_ins name pred_with_up.pred.pred_ins;
+              pred_ins)
+            preds
+            (Hashtbl.create Config.medium_tbl_size)
+        in
+        Hashtbl.iter
+          (fun pred_name (up_pred : UP.pred) ->
+            let pred = up_pred.pred in
+            L.verbose (fun fmt -> fmt "Examinining predicate: %s" pred_name);
+            let pred_params = pred.pred_params in
+            let defs = pred.pred_definitions in
+            let subst_params =
+              List.map
+                (fun (pv, _) -> (Expr.PVar pv, Expr.LVar ("#_" ^ pv)))
+                pred_params
+            in
+            let defs, orig_defs =
+              List.split
+                (List.map
+                   (fun (info, def, ox) ->
+                     let subst_def =
+                       List.fold_left
+                         (fun def (pv, lv) ->
+                           Asrt.subst_expr_for_expr ~to_subst:pv ~subst_with:lv
+                             def)
+                         def subst_params
+                     in
+                     ((info, subst_def, ox), (info, def)))
+                   defs)
+            in
+            let defs =
+              List.map
+                (fun (lab, def, ox) ->
+                  let lab' =
+                    Option.map (fun (s, vars) -> (s, SS.of_list vars)) lab
+                  in
+                  (def, (lab', None, ox)))
+                defs
+            in
+            let known_params =
+              KB.of_list
+                (List.map
+                   (fun i -> snd (List.nth subst_params i))
+                   pred.pred_ins)
+            in
+            let subst_params = snd (List.split subst_params) in
+            let new_defs =
+              List.map2
+                (fun def (orig_info, orig_def) ->
+                  L.verbose (fun fmt ->
+                      fmt "Examining definition: %a" Asrt.pp (fst def));
+                  match UP.init known_params KB.empty pred_ins [ def ] with
+                  | Ok def_up -> (
+                      let a, _ = def in
+                      let def_states =
+                        Normaliser.normalise_assertion ~pred_defs:preds a
+                      in
+                      match def_states with
+                      | Ok [ (state, _) ] -> (
+                          (* FOLD/UNFOLD/UNIFY *)
+                          let fold_predicate =
+                            SLCmd.Fold (pred_name, subst_params, None)
+                          in
+                          let fstate =
+                            SPState.evaluate_slcmd prog fold_predicate state
+                          in
+                          match fstate with
+                          | Ok [ fstate ] -> (
+                              let unfold_predicate =
+                                SLCmd.Unfold
+                                  (pred_name, subst_params, None, false)
+                              in
+                              let fustate =
+                                SPState.evaluate_slcmd prog unfold_predicate
+                                  fstate
+                              in
+                              match fustate with
+                              | Ok [ fustate ] -> (
+                                  L.verbose (fun fmt ->
+                                      fmt "EXACT: Hiding: Before:\n%a"
+                                        SPState.pp state);
+                                  L.verbose (fun fmt ->
+                                      fmt "EXACT: Hiding: After:\n%a" SPState.pp
+                                        fustate);
+                                  let state, predicates, _, variants =
+                                    SPState.expose fustate
+                                  in
+                                  let subst =
+                                    SVal.SESubst.init
+                                      (List.map (fun x -> (x, x)) subst_params)
+                                  in
+                                  let unification_result =
+                                    SUnifier.unify
+                                      (state, predicates, preds, variants)
+                                      subst def_up LogicCommand
+                                  in
+                                  match unification_result with
+                                  | UPUSucc [ (_, subst, _) ] ->
+                                      L.verbose (fun fmt ->
+                                          fmt "EXACT: Obtained subst: %a"
+                                            SSubst.pp subst);
+                                      let def_lvars =
+                                        Expr.Set.of_list
+                                          (List.map
+                                             (fun x -> Expr.LVar x)
+                                             (SS.elements (Asrt.lvars a)))
+                                      in
+                                      SSubst.filter_in_place subst (fun k v ->
+                                          match
+                                            (k = v, Expr.Set.mem k def_lvars)
+                                          with
+                                          | _, false -> None
+                                          | true, _ -> None
+                                          | _ -> Some v);
+                                      L.verbose (fun fmt ->
+                                          fmt "EXACT: Filtered subst: %a"
+                                            SSubst.pp subst);
+                                      let subst = SSubst.to_list subst in
+                                      let hidden =
+                                        List.map
+                                          (fun (before, after) ->
+                                            let we_good_bro =
+                                              Expr.UnOp
+                                                ( UNot,
+                                                  Expr.BinOp
+                                                    (before, Equal, after) )
+                                            in
+                                            ( before,
+                                              SPState.sat_check fustate
+                                                we_good_bro ))
+                                          subst
+                                      in
+                                      let hidden =
+                                        List.filter_map
+                                          (fun (before, b) ->
+                                            match (b, before) with
+                                            | false, _ -> None
+                                            | true, Expr.LVar x -> Some x
+                                            | true, _ ->
+                                                Fmt.failwith
+                                                  "EXACT: Error: non-LVar in \
+                                                   ESubst")
+                                          hidden
+                                      in
+                                      L.verbose (fun fmt ->
+                                          fmt "EXACT: Hidden variables: %a"
+                                            Fmt.(list ~sep:comma string)
+                                            hidden);
+                                      (orig_info, orig_def, hidden)
+                                  | UPUSucc _ ->
+                                      Fmt.failwith
+                                        "EXACT: ERROR: initial definition \
+                                         unified against in multiple ways"
+                                  | UPUFail _ ->
+                                      Fmt.failwith
+                                        "EXACT: ERROR: cannot unify against \
+                                         initial definition")
+                              | Ok _ ->
+                                  Fmt.failwith
+                                    "EXACT: ERROR: unfold resulting in \
+                                     multiple states"
+                              | Error _ ->
+                                  Fmt.failwith "EXACT: ERROR: Impossible unfold"
+                              )
+                          | Ok _ ->
+                              Fmt.failwith
+                                "EXACT: ERROR: fold resulting in multiple \
+                                 states"
+                          | Error _ ->
+                              Fmt.failwith "EXACT: ERROR: Impossible fold")
+                      | Error msg ->
+                          Fmt.failwith
+                            "Creation of unification plans for predicates \
+                             failed: %s"
+                            msg
+                      | _ ->
+                          Fmt.failwith
+                            "Creation of unification plans for predicates \
+                             failed: normalisation resulted in more than one \
+                             state")
+                  | Error _ ->
+                      Fmt.failwith
+                        "Creation of unification plans for predicates failed.")
+                defs orig_defs
+            in
+            let pred = { pred with pred_definitions = new_defs } in
+            let new_pred : UP.pred = { up_pred with pred } in
+            Hashtbl.replace preds pred_name new_pred)
+          preds
+    | false -> ()
 
   let testify
       (func_or_lemma_name : string)
@@ -679,6 +896,8 @@ struct
           UP.pp_up_err_t e;
         Fmt.failwith "Creation of unification plans for predicates failed."
     | Ok preds -> (
+        let () = derive_predicate_hiding prog preds in
+
         let pred_ins =
           Hashtbl.fold
             (fun name (pred : UP.pred) pred_ins ->
