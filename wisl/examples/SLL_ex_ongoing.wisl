@@ -75,7 +75,7 @@ predicate SLLseg_vals(+x, y, vs) {
 // SLLseg_vals + trailing node -> larger, non-empty SLLseg_vals
 lemma SSLseg_vals_append {
   statement:
-    forall x, vs, v, z.
+    forall x.
       SLLseg_vals(#x, #y, #vs) * (#y -b> #v, #z) |- SLLseg_vals(#x, #z, #vs @ [ #v ])
 
   variant: (len #vs)
@@ -83,10 +83,8 @@ lemma SSLseg_vals_append {
   proof:
     unfold SLLseg_vals(#x, #y, #vs);
     if (not (#x = #y)) {
-      assert {bind: #nv, #nnext, #nvs}
-        (#x -b> #nv, #nnext) * SLLseg_vals(#nnext, #y, #nvs) *
-        (#vs == #nv :: #nvs);
-      apply SSLseg_vals_append(#nnext, #nvs, #v, #z);
+      assert {bind: #nnext} (#x + 1 -> #nnext);
+      apply SSLseg_vals_append(#nnext);
       fold SLLseg_vals(#x, #z, #vs @ [ #v ])
     } else {
       fold SLLseg_vals(#y, #z, [ #v ])
@@ -96,33 +94,32 @@ lemma SSLseg_vals_append {
 // SLLseg_vals + SLL_vals -> SLL_vals
 lemma SLLseg_vals_concat_SLL_vals {
   statement:
-    forall x, y.
-      SLLseg_vals(x, y, #vx) * SLL_vals(y, #vy) |- SLL_vals (x, #vx @ #vy)
+    forall x.
+      SLLseg_vals(#x, #y, #vx) * SLL_vals(#y, #vy) |- SLL_vals (#x, #vx @ #vy)
 
   variant: (len #vx)
 
   proof:
-    unfold SLLseg_vals(x, y, #vx);
+    unfold SLLseg_vals(#x, #y, #vx);
     if (not (#vx = [])){
-      assert {bind: #nv, #nnext} (x -b> #nv, #nnext);
-      apply SLLseg_vals_concat_SLL_vals(#nnext, y)
+      assert {bind: #nnext} (#x + 1 -> #nnext);
+      apply SLLseg_vals_concat_SLL_vals(#nnext)
     }
 }
 
 // SLLseg_len + trailing node -> larger, non-empty SLLseg_len
 lemma SSLseg_len_append_lr {
   statement:
-    forall x, z, n.
-      SLLseg_len(#x, #y, #n) * (#y -b> #v, #z) |- SLLseg_len(#x, #z, #n + 1) * (0 <=# n)
+    forall x.
+      SLLseg_len(#x, #y, #n) * (#y -b> #v, #z) |- SLLseg_len(#x, #z, #n + 1) * (0 <=# #n)
 
   variant: #n
 
   proof:
     unfold SLLseg_len(#x, #y, #n);
     if (not (#n = 0)) {
-      assert {bind: #nv, #nnext}
-        (#x -b> #nv, #nnext) * SLLseg_len(#nnext, #y, #n - 1);
-      apply SSLseg_len_append_lr(#nnext, #z, #n - 1)
+      assert {bind: #nnext} (#x + 1 -> #nnext);
+      apply SSLseg_len_append_lr(#nnext)
     };
     fold SLLseg_len(#x, #z, #n + 1)
 }
@@ -130,19 +127,17 @@ lemma SSLseg_len_append_lr {
 // non-empty SLLseg_len -> smaller SLLseg_len + trailing node
 lemma SSLseg_len_append_rl {
   statement:
-    forall x, z, n.
+    forall x.
       SLLseg_len(#x, #z, #n + 1) * (0 <=# #n) |- SLLseg_len(#x, #y, #n) * (#y -b> #v, #z)
 
   variant: #n
 
   proof:
     unfold SLLseg_len(#x, #z, #n + 1);
-    assert {bind: #nv, #nnext}
-        (#x -b> #nv, #nnext) * SLLseg_len(#nnext, #z, #n);
+    assert {bind: #nnext} (#x + 1 -> #nnext);
     if (not (#n = 0)) {
-        apply SSLseg_len_append_rl(#nnext, #z, #n - 1);
-        assert {bind: #y, #v}
-            (SLLseg_len(#nnext, #y, #n - 1) * (#y -b> #v, #z));
+        apply SSLseg_len_append_rl(#nnext);
+        assert {bind: #y} SLLseg_len(#nnext, #y, #n - 1);
         fold SLLseg_len(#x, #y, #n)
     }
 }
@@ -256,7 +251,7 @@ function SLL_length_iter(x) {
   while (not (y = null)) {
     y := [y + 1];
     n := n + 1;
-    [[ apply SSLseg_len_append_lr(x, y, n - 1) ]]
+    [[ apply SSLseg_len_append_lr(x) ]]
   };
   [[ apply SLLseg_len_to_SLL_len(x) ]];
   return n
@@ -280,15 +275,13 @@ function SLL_concat_iter(x, y){
           SLLseg_vals(head, prev, #vs1) * (prev -b> #v, next) * SLL_vals(next, #vs2) *
           (#vx == #vs1 @ (#v :: #vs2)) with variant: (len #vs2) ]];
     while (not (next = null)) {
-        [[ assert {bind: #prev} prev == #prev ]];
         prev := next;
         next := [next + 1];
-        [[ apply SSLseg_vals_append(head, #vs1, #v, prev) ]]
+        [[ apply SSLseg_vals_append(head) ]]
     };
     [prev + 1] := y;
-    [[ assert {bind:#svs, #sv} SLLseg_vals(head, prev, #svs) * (prev -b> #sv, y) ]];
-    [[ apply SSLseg_vals_append(head, #svs, #sv, y) ]];
-    [[ apply SLLseg_vals_concat_SLL_vals(head, y) ]]
+    [[ apply SSLseg_vals_append(head) ]];
+    [[ apply SLLseg_vals_concat_SLL_vals(head) ]]
   };
   return head
 }
