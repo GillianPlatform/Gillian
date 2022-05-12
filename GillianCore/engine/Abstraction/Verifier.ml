@@ -132,7 +132,7 @@ struct
             let defs, orig_defs =
               List.split
                 (List.map
-                   (fun (info, def, ox) ->
+                   (fun (info, def, hides) ->
                      let subst_def =
                        List.fold_left
                          (fun def (pv, lv) ->
@@ -140,16 +140,16 @@ struct
                              def)
                          def subst_params
                      in
-                     ((info, subst_def, ox), (info, def)))
+                     ((info, subst_def, hides), (info, def)))
                    defs)
             in
             let defs =
               List.map
-                (fun (lab, def, ox) ->
+                (fun (lab, def, hides) ->
                   let lab' =
                     Option.map (fun (s, vars) -> (s, SS.of_list vars)) lab
                   in
-                  (def, (lab', None, ox)))
+                  (def, (lab', None, hides)))
                 defs
             in
             let known_params =
@@ -314,7 +314,7 @@ struct
       (pre : Asrt.t)
       (posts : Asrt.t list)
       (variant : Expr.t option)
-      (ox : string list option)
+      (hides : string list option)
       (flag : Flag.t option)
       (label : (string * SS.t) option)
       (to_verify : bool) : (t option * (Asrt.t * Asrt.t list) option) list =
@@ -401,11 +401,11 @@ struct
             label
         in
         let known_unifiables = Expr.Set.union known_unifiables existentials in
-        let ox =
-          match (flag, ox) with
-          | None, Some ox -> ox
+        let hides =
+          match (flag, hides) with
+          | None, Some hides -> hides
           | None, None when !Config.Verification.exact ->
-              failwith "Lemma must declare ox logicals in exact verification"
+              failwith "Lemma must declare hides logicals in exact verification"
           | _, _ -> []
         in
         let simple_posts =
@@ -415,12 +415,12 @@ struct
               let lstr_pp = Fmt.(list ~sep:comma string) in
               let () =
                 L.verbose (fun fmt ->
-                    fmt "OX hiding: %a\nPost lvars: %a" lstr_pp ox lstr_pp
+                    fmt "OX hiding: %a\nPost lvars: %a" lstr_pp hides lstr_pp
                       (SS.elements post_lvars))
               in
-              let inter = SS.inter post_lvars (SS.of_list ox) in
+              let inter = SS.inter post_lvars (SS.of_list hides) in
               match SS.is_empty inter with
-              | true -> (post, (label, None, ox))
+              | true -> (post, (label, None, hides))
               | false ->
                   failwith
                     ("Error: Exact lemma with impossible hiding: "
@@ -575,17 +575,18 @@ struct
       (lemma : Lemma.t) : t list * Lemma.t =
     let tests_and_specs =
       List.concat_map
-        (fun Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant; lemma_spec_ox } ->
+        (fun Lemma.
+               { lemma_hyp; lemma_concs; lemma_spec_variant; lemma_spec_hides } ->
           List.map
-            (fun t -> (t, lemma_spec_ox))
+            (fun t -> (t, lemma_spec_hides))
             (testify lemma.lemma_name preds pred_ins lemma.lemma_name
                lemma.lemma_params 0 lemma_hyp lemma_concs lemma_spec_variant
-               lemma_spec_ox None None true))
+               lemma_spec_hides None None true))
         lemma.lemma_specs
     in
     let tests, specs =
       List.fold_left
-        (fun (test_acc, spec_acc) ((test_opt, spec_opt), lemma_spec_ox) ->
+        (fun (test_acc, spec_acc) ((test_opt, spec_opt), lemma_spec_hides) ->
           let test_acc =
             match test_opt with
             | Some t -> t :: test_acc
@@ -599,7 +600,7 @@ struct
                     lemma_hyp;
                     lemma_concs;
                     lemma_spec_variant = lemma.lemma_variant;
-                    lemma_spec_ox;
+                    lemma_spec_hides;
                   }
                 :: spec_acc
             | None -> spec_acc

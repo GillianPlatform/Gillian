@@ -803,7 +803,7 @@ let trans_lemma ~ann ~filepath lemma =
           lemma_hyp;
           lemma_concs;
           lemma_spec_variant = None;
-          lemma_spec_ox = None;
+          lemma_spec_hides = None;
         };
     ]
   in

@@ -217,7 +217,7 @@ and lemma_spec = {
   lemma_hyp : assertion;
   lemma_concs : assertion list;
   lemma_spec_variant : expr option;
-  lemma_spec_ox : string list option;
+  lemma_spec_hides : string list option;
 }
 
 and lemma = {

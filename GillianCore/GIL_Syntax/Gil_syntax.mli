@@ -769,7 +769,7 @@ module Lemma : sig
     lemma_hyp : Asrt.t;  (** Hypothesis *)
     lemma_concs : Asrt.t list;  (** Conclusion *)
     lemma_spec_variant : Expr.t option;  (** Variant *)
-    lemma_spec_ox : string list option;  (** Over-approximating logicals *)
+    lemma_spec_hides : string list option;  (** Over-approximating logicals *)
   }
 
   type t = {

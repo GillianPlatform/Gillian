@@ -149,7 +149,7 @@ let simplify_and_prune (pred : Pred.t) : Pred.t =
         (List.length pred.pred_definitions));
   let new_defs =
     List.map
-      (fun (oc, x, ox) -> (oc, Reduction.reduce_assertion x, ox))
+      (fun (oc, x, hides) -> (oc, Reduction.reduce_assertion x, hides))
       pred.pred_definitions
   in
   let new_defs =
@@ -233,9 +233,9 @@ let unfold_preds (preds : (string, Pred.t) Hashtbl.t) :
           ((string * string list) option * Asrt.t * string list) list =
         List.flatten
           (List.map
-             (fun (os, a, ox) ->
+             (fun (os, a, hides) ->
                List.map
-                 (fun a -> (os, a, ox))
+                 (fun a -> (os, a, hides))
                  (auto_unfold preds recursion_info a))
              pred.pred_definitions)
       in
@@ -304,7 +304,7 @@ let unfold_lemma
             lemma_hyp;
             lemma_concs;
             lemma_spec_variant = lemma.lemma_variant;
-            lemma_spec_ox = spec.lemma_spec_ox;
+            lemma_spec_hides = spec.lemma_spec_hides;
           })
       lemma_hyps
   in
@@ -443,8 +443,8 @@ let explicit_param_types
       let defs =
         pred1.pred_definitions
         @ List.map
-            (fun (oid, a, ox) ->
-              (oid, SVal.SSubst.substitute_asrt subst ~partial:true a, ox))
+            (fun (oid, a, hides) ->
+              (oid, SVal.SSubst.substitute_asrt subst ~partial:true a, hides))
             pred2.pred_definitions
       in
       { pred1 with pred_definitions = defs }
@@ -601,7 +601,7 @@ let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
                       Some (SS.elements (SS.diff pre_lvars post_lvars))
                   | false -> None
                 in
-                { spec with lemma_spec_ox = hidden })
+                { spec with lemma_spec_hides = hidden })
               lemma.lemma_specs
           in
           let lemma = { lemma with lemma_specs = lemma_specs_with_hiding } in

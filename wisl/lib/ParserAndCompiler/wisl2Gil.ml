@@ -845,8 +845,7 @@ let compile_spec
 
 let compile_pred filepath pred =
   let WPred.{ pred_definitions; pred_params; pred_name; pred_ins; _ } = pred in
-  let just_pred_definitions = fst (List.split pred_definitions) in
-  let types = WType.infer_types_pred pred_params just_pred_definitions in
+  let types = WType.infer_types_pred pred_params pred_definitions in
   let getWISLTypes str = (str, WType.of_variable str types) in
   let paramsWISLType = List.map (fun (x, _) -> getWISLTypes x) pred_params in
   let getGILTypes (str, t) =
@@ -854,9 +853,8 @@ let compile_pred filepath pred =
   in
   let pred_params = List.map getGILTypes paramsWISLType in
   let build_def pred_def =
-    let asrt, ox = pred_def in
-    let _, casrt = compile_lassert asrt in
-    (None, casrt, ox)
+    let _, casrt = compile_lassert pred_def in
+    (None, casrt, [])
   in
   Pred.
     {
@@ -919,7 +917,6 @@ let preprocess_lemma
         lemma_params;
         lemma_proof;
         lemma_variant;
-        lemma_ox;
         lemma_hypothesis;
         lemma_conclusion;
         lemma_id;
@@ -965,7 +962,6 @@ let preprocess_lemma
       lemma_params;
       lemma_proof = new_lemma_proof;
       lemma_variant;
-      lemma_ox;
       lemma_hypothesis = new_lemma_hypothesis;
       lemma_conclusion = new_lemma_conclusion;
       lemma_id;
@@ -980,7 +976,6 @@ let compile_lemma
         lemma_params;
         lemma_proof;
         lemma_variant;
-        lemma_ox;
         lemma_hypothesis;
         lemma_conclusion;
         _;
@@ -1026,7 +1021,7 @@ let compile_lemma
             lemma_hyp;
             lemma_concs = [ post ];
             lemma_spec_variant = lemma_variant;
-            lemma_spec_ox = lemma_ox;
+            lemma_spec_hides = None;
           };
         ];
       lemma_existentials;

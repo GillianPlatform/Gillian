@@ -1119,7 +1119,7 @@ module Make
   and unify_assertion
       (astate : t)
       (subst : ESubst.t)
-      (ox : string list option)
+      (hides : string list option)
       (step : UP.step) : u_res =
     (* Auxiliary function for actions and predicates, with indexed outs *)
     let state, preds, pred_defs, variants = astate in
@@ -1372,17 +1372,17 @@ module Make
           | _ -> raise (Failure "Illegal Assertion in Unification Plan")
         in
         (* TODO: Exact unification *)
-        match (!Config.Verification.exact, ox, result) with
+        match (!Config.Verification.exact, hides, result) with
         | false, _, _
         | true, None, _
         | true, Some [], _
         | true, _, UWTF
         | true, _, UFail _ -> result
-        | true, Some ox, USucc (state, preds, _, _) -> (
+        | true, Some hides, USucc (state, preds, _, _) -> (
             L.verbose (fun fmt ->
                 fmt "EXACT: Hiding: %a\n"
                   (Fmt.list ~sep:Fmt.comma Fmt.string)
-                  ox);
+                  hides);
             let ox_bindings =
               List.filter_map
                 (fun x ->
@@ -1403,7 +1403,7 @@ module Make
                   | None ->
                       L.verbose (fun fmt -> fmt "Subst:\n%a" ESubst.pp subst);
                       failwith ("EXACT: ERROR: no binding in subst for " ^ x))
-                ox
+                hides
             in
             (* TODO: Some setup using preds *)
             let used_unifiables =
@@ -1455,11 +1455,11 @@ module Make
             state subst up
         in
         let cur_step : UP.step option = UP.head up in
-        let ox = UP.ox up in
+        let hides = UP.hides up in
         let ret =
           try
             Option.fold
-              ~some:(unify_assertion state subst ox)
+              ~some:(unify_assertion state subst hides)
               ~none:(USucc state) cur_step
           with err -> (
             L.verbose (fun fmt ->

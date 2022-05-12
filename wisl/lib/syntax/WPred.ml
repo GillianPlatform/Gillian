@@ -3,7 +3,7 @@ open VisitorUtils
 type t = {
   pred_name : string;
   pred_params : (string * WType.t option) list;
-  pred_definitions : (WLAssert.t * string list) list;
+  pred_definitions : WLAssert.t list;
   pred_ins : int list;
   pred_nounfold : bool;
   pred_loc : CodeLoc.t;
@@ -18,8 +18,7 @@ let get_ins p = p.pred_ins
 let get_by_id id pred =
   let lassert_list_visitor = list_visitor_builder WLAssert.get_by_id id in
   let self_or_none = if get_id pred = id then `WPred pred else `None in
-  let just_pred_definitions = fst (List.split pred.pred_definitions) in
-  self_or_none |>> (lassert_list_visitor, just_pred_definitions)
+  self_or_none |>> (lassert_list_visitor, pred.pred_definitions)
 
 (* TODO: write pretty_print function *)
 
