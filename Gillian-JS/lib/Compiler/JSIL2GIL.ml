@@ -113,7 +113,6 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
       ];
     lemma_proof = Option.map (List.map jsil2gil_lcmd) lemma.proof;
     lemma_variant = lemma.variant;
-    lemma_ox = None;
     lemma_existentials = lemma.existentials;
   }
 

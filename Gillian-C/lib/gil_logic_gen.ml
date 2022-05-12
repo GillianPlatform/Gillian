@@ -815,7 +815,6 @@ let trans_lemma ~ann ~filepath lemma =
       lemma_existentials = [];
       lemma_internal = false;
       lemma_variant = None;
-      lemma_ox = None;
       lemma_specs;
       lemma_proof;
     }

@@ -1401,6 +1401,7 @@ module Make
                             ("EXACT: ERROR: Program variable in bindings: " ^ x)
                       | e -> Some e)
                   | None ->
+                      L.verbose (fun fmt -> fmt "Subst:\n%a" ESubst.pp subst);
                       failwith ("EXACT: ERROR: no binding in subst for " ^ x))
                 ox
             in

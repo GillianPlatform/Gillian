@@ -885,7 +885,7 @@ module Make (SMemory : SMemory.S) :
                 in
                 let () =
                   L.verbose (fun fmt ->
-                      fmt "EXACT: ERROR: hidden expression in store: %a" Expr.pp
+                      fmt "EXACT: ERROR: hidden expression in state: %a" Expr.pp
                         non_hidable_expr)
                 in
                 Error non_hidable_expr))

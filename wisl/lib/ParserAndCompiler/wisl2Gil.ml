@@ -1020,7 +1020,6 @@ let compile_lemma
       lemma_params;
       lemma_proof;
       lemma_variant;
-      lemma_ox;
       lemma_specs =
         [
           {

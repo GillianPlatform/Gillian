@@ -576,14 +576,16 @@ struct
     let tests_and_specs =
       List.concat_map
         (fun Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant; lemma_spec_ox } ->
-          testify lemma.lemma_name preds pred_ins lemma.lemma_name
-            lemma.lemma_params 0 lemma_hyp lemma_concs lemma_spec_variant
-            lemma_spec_ox None None true)
+          List.map
+            (fun t -> (t, lemma_spec_ox))
+            (testify lemma.lemma_name preds pred_ins lemma.lemma_name
+               lemma.lemma_params 0 lemma_hyp lemma_concs lemma_spec_variant
+               lemma_spec_ox None None true))
         lemma.lemma_specs
     in
     let tests, specs =
       List.fold_left
-        (fun (test_acc, spec_acc) (test_opt, spec_opt) ->
+        (fun (test_acc, spec_acc) ((test_opt, spec_opt), lemma_spec_ox) ->
           let test_acc =
             match test_opt with
             | Some t -> t :: test_acc
@@ -597,7 +599,7 @@ struct
                     lemma_hyp;
                     lemma_concs;
                     lemma_spec_variant = lemma.lemma_variant;
-                    lemma_spec_ox = lemma.lemma_ox;
+                    lemma_spec_ox;
                   }
                 :: spec_acc
             | None -> spec_acc

@@ -879,7 +879,6 @@ g_lemma_target:
         lemma_params;
         lemma_specs = [ spec ];
         lemma_variant;
-        lemma_ox;
         lemma_proof;
         lemma_existentials;
       }

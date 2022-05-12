@@ -228,7 +228,6 @@ and lemma = {
   lemma_specs : lemma_spec list;
   lemma_proof : lcmd list option;
   lemma_variant : expr option;
-  lemma_ox : string list option;
   lemma_existentials : string list;
 }
 

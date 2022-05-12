@@ -780,7 +780,6 @@ module Lemma : sig
     lemma_specs : spec list;  (** Specs of the Lemma *)
     lemma_proof : LCmd.t list option;  (** (Optional) Proof *)
     lemma_variant : Expr.t option;  (** Variant *)
-    lemma_ox : string list option;  (** Over-approximating logicals *)
     lemma_existentials : string list; (* Existentials *)
   }
 

@@ -304,7 +304,7 @@ let unfold_lemma
             lemma_hyp;
             lemma_concs;
             lemma_spec_variant = lemma.lemma_variant;
-            lemma_spec_ox = lemma.lemma_ox;
+            lemma_spec_ox = spec.lemma_spec_ox;
           })
       lemma_hyps
   in
@@ -567,6 +567,44 @@ let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
       Hashtbl.iter
         (fun name lemma ->
           let lemma = Lemma.add_param_bindings lemma in
+          let lemma_specs_with_hiding =
+            List.map
+              (fun (spec : Lemma.spec) ->
+                assert (List.length spec.lemma_concs = 1);
+                let hidden =
+                  match !Config.Verification.exact with
+                  | true ->
+                      let pre_lvars =
+                        SS.filter Names.is_spec_var_name
+                          (Asrt.lvars spec.lemma_hyp)
+                      in
+                      let post_lvars =
+                        SS.filter Names.is_spec_var_name
+                          (Asrt.lvars (List.hd spec.lemma_concs))
+                      in
+                      L.verbose (fun fmt ->
+                          fmt "Hidden logicals for one spec of lemma %s"
+                            lemma.lemma_name);
+                      L.verbose (fun fmt ->
+                          fmt "Logical variables of pre-condition: %a"
+                            Fmt.(list ~sep:comma string)
+                            (SS.elements pre_lvars));
+                      L.verbose (fun fmt ->
+                          fmt "Logical variables of post-condition: %a"
+                            Fmt.(list ~sep:comma string)
+                            (SS.elements post_lvars));
+                      let hidden_variables = SS.diff pre_lvars post_lvars in
+                      L.verbose (fun fmt ->
+                          fmt "Hidden logicals: %a"
+                            Fmt.(list ~sep:comma string)
+                            (SS.elements hidden_variables));
+                      Some (SS.elements (SS.diff pre_lvars post_lvars))
+                  | false -> None
+                in
+                { spec with lemma_spec_ox = hidden })
+              lemma.lemma_specs
+          in
+          let lemma = { lemma with lemma_specs = lemma_specs_with_hiding } in
           Hashtbl.replace lemmas' name lemma)
         lemmas'
     in
