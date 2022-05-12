@@ -1,5 +1,5 @@
 //
-//  SLL predicates
+// SLL predicates
 //
 
 // With addresses, including first
@@ -51,7 +51,7 @@ predicate SLL_len(+x, n : Int) {
 }
 
 //
-//  SLLseg predicates
+// SLLseg predicates
 //
 
 // With length
