@@ -72,3 +72,44 @@ module type S = sig
 
   val apply_fix : t -> PFS.t -> TypEnv.t -> c_fix_t -> t
 end
+
+module Dummy : S = struct
+  type vt = SVal.M.t
+  type st = SVal.SESubst.t
+  type i_fix_t = unit
+  type c_fix_t = unit
+  type err_t = unit [@@deriving yojson]
+  type t = unit [@@deriving yojson]
+
+  type action_ret =
+    | ASucc of (t * vt list * Formula.t list * (string * Type.t) list) list
+    | AFail of err_t list
+
+  let init () = ()
+
+  let execute_action ?unification:_ _ _ _ _ _ =
+    failwith "Please implement SMemory"
+
+  let ga_to_setter _ = failwith "Please implement SMemory"
+  let ga_to_getter _ = failwith "Please implement SMemory"
+  let ga_to_deleter _ = failwith "Please implement SMemory"
+  let is_overlapping_asrt _ = failwith "Please implement SMemory"
+  let copy () = ()
+  let pp _ _ = ()
+  let pp_by_need _ _ _ = ()
+  let get_print_info _ _ = failwith "Please implement SMemory"
+  let substitution_in_place ~pfs:_ ~gamma:_ _ _ = []
+  let fresh_val _ = failwith "Please implement SMemory"
+  let clean_up ?keep:_ _ = failwith "Please implement SMemory"
+  let lvars _ = failwith "Please implement SMemory"
+  let alocs _ = failwith "Please implement SMemory"
+  let assertions ?to_keep:_ _ = failwith "Please implement SMemory"
+  let mem_constraints _ = failwith "Please implement SMemory"
+  let pp_i_fix _ _ = ()
+  let pp_c_fix _ _ = ()
+  let get_recovery_vals _ _ = failwith "Please implement SMemory"
+  let pp_err _ _ = ()
+  let get_failing_constraint _ = failwith "Please implement SMemory"
+  let get_fixes ?simple_fix:_ _ _ _ _ = failwith "Please implement SMemory"
+  let apply_fix _ _ _ _ = failwith "Please implement SMemory"
+end

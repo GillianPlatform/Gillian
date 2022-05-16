@@ -9,6 +9,8 @@ module type S = sig
   (** Type of extended substitutions for GIL values *)
   type et
 
+  val equal : t -> t -> bool
+
   (** Printer *)
   val pp : Format.formatter -> t -> unit
 

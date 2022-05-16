@@ -11,6 +11,7 @@ struct
   type st = CSubst.t
   type et = CESubst.t
 
+  let equal = Literal.equal
   let pp = Literal.pp
   let full_pp = Literal.pp
   let full_pp_list = Fmt.list ~sep:(Fmt.any "; ") full_pp
