@@ -5,7 +5,6 @@ module type S = sig
   (** Type of GIL substitutions *)
   type st = SVal.SESubst.t
 
-  type i_fix_t
   type c_fix_t
   type err_t [@@deriving yojson]
 
@@ -56,7 +55,6 @@ module type S = sig
   val alocs : t -> Containers.SS.t
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
   val mem_constraints : t -> Formula.t list
-  val pp_i_fix : Format.formatter -> i_fix_t -> unit
   val pp_c_fix : Format.formatter -> c_fix_t -> unit
   val get_recovery_vals : t -> err_t -> vt list
   val pp_err : Format.formatter -> err_t -> unit
@@ -76,7 +74,6 @@ end
 module Dummy : S = struct
   type vt = SVal.M.t
   type st = SVal.SESubst.t
-  type i_fix_t = unit
   type c_fix_t = unit
   type err_t = unit [@@deriving yojson]
   type t = unit [@@deriving yojson]
@@ -105,7 +102,6 @@ module Dummy : S = struct
   let alocs _ = failwith "Please implement SMemory"
   let assertions ?to_keep:_ _ = failwith "Please implement SMemory"
   let mem_constraints _ = failwith "Please implement SMemory"
-  let pp_i_fix _ _ = ()
   let pp_c_fix _ _ = ()
   let get_recovery_vals _ _ = failwith "Please implement SMemory"
   let pp_err _ _ = ()

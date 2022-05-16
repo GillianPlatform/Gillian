@@ -9,7 +9,6 @@ module type S = sig
   (** Type of GIL substitutions *)
   type st = SVal.SESubst.t
 
-  type i_fix_t
   type c_fix_t
   type err_t
 
@@ -43,7 +42,6 @@ module type S = sig
   val alocs : t -> Containers.SS.t
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
   val mem_constraints : t -> Formula.t list
-  val pp_i_fix : Format.formatter -> i_fix_t -> unit
   val pp_c_fix : Format.formatter -> c_fix_t -> unit
   val get_recovery_vals : t -> err_t -> vt list
   val pp_err : Format.formatter -> err_t -> unit
