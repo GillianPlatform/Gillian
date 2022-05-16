@@ -8,8 +8,6 @@ module type S = sig
   (** Errors *)
   type err_t
 
-  type fix_t
-
   (** Type of GIL general states *)
   type t
 

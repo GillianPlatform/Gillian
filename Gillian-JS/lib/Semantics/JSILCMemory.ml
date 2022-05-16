@@ -14,7 +14,6 @@ module M : Memory_S = struct
   (** Errors *)
   type err_t = unit
 
-  type fix_t = unit
   type action_ret = ASucc of (t * vt list) | AFail of err_t list
 
   let pp = CHeap.pp

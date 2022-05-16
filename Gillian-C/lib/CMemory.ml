@@ -6,7 +6,6 @@ module Expr = Gillian.Gil_syntax.Expr
 
 type vt = Values.t
 type st = Subst.t
-type fix_t = unit
 type err_t = unit
 
 let pp_err _ () = ()
