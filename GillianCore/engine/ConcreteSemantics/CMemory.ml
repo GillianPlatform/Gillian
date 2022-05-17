@@ -8,8 +8,6 @@ module type S = sig
   (** Errors *)
   type err_t
 
-  type fix_t
-
   (** Type of GIL general states *)
   type t
 
@@ -21,21 +19,11 @@ module type S = sig
   (** Execute action *)
   val execute_action : string -> t -> vt list -> action_ret
 
-  val ga_to_setter : string -> string
-  val ga_to_getter : string -> string
-  val ga_to_deleter : string -> string
-  val is_overlapping_asrt : string -> bool
-
   (** State Copy *)
   val copy : t -> t
 
   (** Printer *)
   val pp : Format.formatter -> t -> unit
 
-  val substitution_in_place : st -> t -> unit
-  val fresh_val : t -> vt
-  val clean_up : ?keep:Expr.Set.t -> t -> Expr.Set.t
-  val lvars : t -> Containers.SS.t
-  val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
   val pp_err : Format.formatter -> err_t -> unit
 end

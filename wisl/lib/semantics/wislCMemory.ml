@@ -4,7 +4,6 @@ module Literal = Gillian.Gil_syntax.Literal
 type vt = Values.t
 type st = Subst.t
 type err_t = unit
-type fix_t = unit
 type t = WislCHeap.t
 type action_ret = ASucc of (t * vt list) | AFail of err_t list
 
@@ -12,9 +11,6 @@ let init = WislCHeap.init
 let copy = WislCHeap.copy
 let pp fmt h = Format.fprintf fmt "%s" (WislCHeap.str h)
 let pp_err _fmt () = ()
-let ga_to_setter = WislLActions.ga_to_setter_str
-let ga_to_getter = WislLActions.ga_to_getter_str
-let ga_to_deleter = WislLActions.ga_to_deleter_str
 
 (* Small util for retrocompat *)
 let vstr v = Format.asprintf "%a" Values.pp v
@@ -95,14 +91,3 @@ let execute_action name heap params =
     | _ -> failwith "Can't use consumer and producers in concrete execution")
 
 (** Non-implemented functions *)
-let assertions ?to_keep:_ _ =
-  raise (Failure "ERROR: to_assertions called for concrete executions")
-
-let lvars _ = raise (Failure "ERROR: get_lvars called for concrete executions")
-let clean_up ?keep:_ _ = raise (Failure "Cleanup of concrete state.")
-let fresh_val _ = raise (Failure "fresh_val not implemented in concrete state")
-
-let substitution_in_place _ _ =
-  raise (Failure "substitution_in_place not implemented in concrete state")
-
-let is_overlapping_asrt _ = false

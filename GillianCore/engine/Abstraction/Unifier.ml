@@ -1312,7 +1312,8 @@ module Make
                               | None ->
                                   ESubst.put subst u out;
                                   (true, discharges)
-                              | Some out' when out = out' -> (true, discharges)
+                              | Some out' when Val.equal out out' ->
+                                  (true, discharges)
                               | Some out' ->
                                   ( true,
                                     Formula.Eq
@@ -1342,7 +1343,9 @@ module Make
                       let discharges_pf =
                         List.fold_left
                           (fun ac x ->
-                            if ac = Formula.True then x else And (ac, x))
+                            match ac with
+                            | Formula.True -> x
+                            | _ -> And (ac, x))
                           True discharges
                       in
                       let discharges_pf =
@@ -1353,7 +1356,7 @@ module Make
                       else
                         let vs = State.unfolding_vals state [ pf ] in
                         UFail [ EAsrt (vs, Not pf, [ [ Pure pf ] ]) ]))
-          | Types les ->
+          | Types les -> (
               let corrections =
                 List.fold_left
                   (fun (ac : Formula.t list) (le, t) ->
@@ -1370,18 +1373,19 @@ module Make
                   [] les
               in
 
-              if corrections = [] then USucc astate
-              else
-                let les, _ = List.split les in
-                let les = List.map (subst_in_expr_opt astate subst) les in
-                UFail
-                  [
-                    EAsrt
-                      ( List.map Option.get
-                          (List.filter (fun x -> x <> None) les),
-                        Not (Formula.conjunct corrections),
-                        [ [ Pure (Formula.conjunct corrections) ] ] );
-                  ]
+              match corrections with
+              | [] -> USucc astate
+              | _ ->
+                  let les, _ = List.split les in
+                  let les = List.map (subst_in_expr_opt astate subst) les in
+                  UFail
+                    [
+                      EAsrt
+                        ( List.map Option.get
+                            (List.filter (fun x -> x <> None) les),
+                          Not (Formula.conjunct corrections),
+                          [ [ Pure (Formula.conjunct corrections) ] ] );
+                    ])
           (* LTrue, LFalse, LEmp, LStar *)
           | _ -> raise (Failure "Illegal Assertion in Unification Plan")
         in

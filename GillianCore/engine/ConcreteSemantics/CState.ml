@@ -48,10 +48,10 @@ module Make
     | CMemory.ASucc (heap, vs) -> ASucc [ ((heap, store, locs), vs) ]
     | CMemory.AFail errs -> AFail (lift_merrs errs)
 
-  let ga_to_setter (a_id : string) = CMemory.ga_to_setter a_id
-  let ga_to_getter (a_id : string) = CMemory.ga_to_getter a_id
-  let ga_to_deleter (a_id : string) = CMemory.ga_to_deleter a_id
-  let is_overlapping_asrt (a : string) : bool = CMemory.is_overlapping_asrt a
+  let ga_to_setter _ = failwith "ga_to_setter for CState"
+  let ga_to_getter _ = failwith "ga_to_getter for CState"
+  let ga_to_deleter _ = failwith "ga_to_deleter for CState"
+  let is_overlapping_asrt _ = failwith "is_overlapping_assert for CState"
 
   let eval_expr state e =
     let _, store, _ = state in

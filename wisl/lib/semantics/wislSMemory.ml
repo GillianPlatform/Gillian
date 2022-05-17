@@ -9,7 +9,6 @@ type vt = Values.t
 type st = Subst.t
 type err_t = WislSHeap.err [@@deriving yojson]
 type c_fix_t = unit
-type i_fix_t = unit
 type t = WislSHeap.t [@@deriving yojson]
 
 type action_ret =
@@ -282,7 +281,6 @@ let pp_err fmt t =
 
 let get_recovery_vals _ _ = []
 let pp_c_fix _ _ = ()
-let pp_i_fix _ _ = ()
 let substitution_in_place ~pfs:_ ~gamma:_ = WislSHeap.substitution_in_place
 let fresh_val _ = Expr.LVar (LVar.alloc ())
 

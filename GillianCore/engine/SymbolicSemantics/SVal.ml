@@ -13,6 +13,7 @@ struct
   type st = SSubst.t
   type et = SESubst.t
 
+  let equal = Expr.equal
   let pp = Expr.pp
   let full_pp = Expr.full_pp
   let full_pp_list = Fmt.list ~sep:(Fmt.any "; ") full_pp

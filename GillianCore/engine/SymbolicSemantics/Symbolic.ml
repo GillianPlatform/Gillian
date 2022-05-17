@@ -8,3 +8,5 @@ module FOLogic = struct
 end
 
 module type Memory_S = SMemory.S
+
+module Dummy_memory = SMemory.Dummy

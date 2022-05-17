@@ -14,7 +14,6 @@ module M : Memory_S = struct
   (** Errors *)
   type err_t = unit
 
-  type fix_t = unit
   type action_ret = ASucc of (t * vt list) | AFail of err_t list
 
   let pp = CHeap.pp
@@ -150,41 +149,6 @@ module M : Memory_S = struct
       | [ loc ] -> get_metadata heap loc
       | _ -> raise (Failure "Internal Error. execute_action")
     else raise (Failure "Internal Error. execute_action")
-
-  let ga_to_setter (a_id : string) =
-    if a_id = JSILNames.aCell then JSILNames.setCell
-    else if a_id = JSILNames.aMetadata then JSILNames.setMetadata
-    else if a_id = JSILNames.aProps then JSILNames.setProps
-    else raise (Failure "DEATH. ga_to_setter")
-
-  let ga_to_getter (a_id : string) =
-    if a_id = JSILNames.aCell then JSILNames.getCell
-    else if a_id = JSILNames.aMetadata then JSILNames.getMetadata
-    else if a_id = JSILNames.aProps then JSILNames.getProps
-    else raise (Failure "DEATH. ga_to_setter")
-
-  let ga_to_deleter (a_id : string) =
-    if a_id = JSILNames.aCell then JSILNames.delCell
-    else if a_id = JSILNames.aMetadata then JSILNames.delMetadata
-    else if a_id = JSILNames.aProps then JSILNames.delProps
-    else raise (Failure "DEATH. ga_to_setter")
-
-  (** Non-implemented functions *)
-  let assertions ?to_keep:_ (_ : t) : Asrt.t list =
-    raise (Failure "ERROR: to_assertions called for concrete executions")
-
-  let lvars _ =
-    raise (Failure "ERROR: get_lvars called for concrete executions")
-
-  let clean_up ?keep:_ (_ : t) = raise (Failure "Cleanup of concrete state.")
-
-  let fresh_val (_ : t) =
-    raise (Failure "fresh_val not implemented in concrete state")
-
-  let substitution_in_place (_ : st) (_ : t) : unit = ()
-
-  let is_overlapping_asrt (a : string) : bool =
-    if a = JSILNames.aMetadata then true else false
 
   let pp_err _ _ = ()
 end

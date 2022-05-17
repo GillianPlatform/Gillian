@@ -6,7 +6,6 @@ module Expr = Gillian.Gil_syntax.Expr
 
 type vt = Values.t
 type st = Subst.t
-type fix_t = unit
 type err_t = unit
 
 let pp_err _ () = ()
@@ -29,10 +28,6 @@ let pp_mem fmt mem =
 
 let pp fmt h =
   Format.fprintf fmt "GEnv : @[%a@]@\nMem: @[%a@]" GEnv.pp h.genv pp_mem h.mem
-
-let ga_to_setter = LActions.ga_to_setter_str
-let ga_to_getter = LActions.ga_to_getter_str
-let ga_to_deleter = LActions.ga_to_deleter_str
 
 let execute_store heap params =
   let open Gillian.Gil_syntax.Literal in
@@ -207,16 +202,3 @@ let execute_action name heap params =
            "%s is an action related to a General Assertion, it should never be \
             called during a concrete execution"
            name)
-
-(** Non-implemented functions *)
-let assertions ?to_keep:_ _ =
-  raise (Failure "ERROR: to_assertions called for concrete executions")
-
-let lvars _ = raise (Failure "ERROR: get_lvars called for concrete executions")
-let clean_up ?keep:_ = raise (Failure "Cleanup of concrete state.")
-let fresh_val _ = raise (Failure "fresh_val not implemented in concrete state")
-
-let substitution_in_place _ _ =
-  raise (Failure "substitution_in_place not implemented in concrete state")
-
-let is_overlapping_asrt _ = false

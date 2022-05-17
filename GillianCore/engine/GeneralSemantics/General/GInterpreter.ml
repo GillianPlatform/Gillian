@@ -931,7 +931,7 @@ struct
                          ~callstack:(CallStack.copy cs)
                          ~invariant_frames:iframes ~prev_idx:i ~loop_ids
                          ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
-                         (),
+                         ?prev_report_id:!report_id_ref (),
                        (r_state', i + 1, branch_case) ))
                    rest_rets
             in
@@ -956,7 +956,7 @@ struct
                       make_confcont ~state:state'' ~callstack:cs
                         ~invariant_frames:iframes ~prev_idx:i ~loop_ids
                         ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
-                        ~new_branches ();
+                        ?prev_report_id:!report_id_ref ~new_branches ();
                     ])
             | false, true -> (
                 (* Can split into two threads *)
@@ -969,7 +969,7 @@ struct
                       make_confcont ~state:state'' ~callstack:cs
                         ~invariant_frames:iframes ~prev_idx:i ~loop_ids
                         ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
-                        ~new_branches ();
+                        ?prev_report_id:!report_id_ref ~new_branches ();
                     ]
                 | _ -> rest_confs)
             | _ ->
@@ -1160,7 +1160,7 @@ struct
                        (state, next, GuardedGoto case))
                      (List.tl sp)
                   else [])
-                ())
+                ?prev_report_id:!report_id_ref ())
             sp
         in
         match

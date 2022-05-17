@@ -34,7 +34,6 @@ let expr_of_loc_name loc_name =
 
 type vt = Values.t
 type st = Subst.t
-type i_fix_t
 
 type err_t =
   | InvalidLocation of Expr.t
@@ -843,13 +842,7 @@ type c_fix_t
 
 (* Pretty printing utils *)
 
-let pp_i_fix _fmt _i_fix = failwith "Not ready for bi-abduction yet"
-
-(* let str_of_i_fix i_f = Format.asprintf "%a" pp_i_fix i_f *)
-
 let pp_c_fix _fmt _c_fix = failwith "Not ready for bi-abduction yet"
-
-(* let str_of_c_fix c_f = Format.asprintf "%a" pp_c_fix c_f *)
 
 let pp_err fmt (e : err_t) =
   match e with
