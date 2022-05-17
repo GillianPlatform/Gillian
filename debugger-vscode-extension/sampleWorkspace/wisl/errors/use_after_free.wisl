@@ -1,0 +1,39 @@
+{ (x == #x) * freed(#x) }
+function use_after_free_spec(x) {
+  y := [x];
+  return y
+}
+{ x -b> 1 }
+
+{ emp }
+function lookup_var() {
+  x := new(1);
+  [x] := 1;
+  delete(x);
+  y := x;
+  y := [x];
+  return y
+}
+{ ret == 1 }
+
+{ emp }
+function lookup_vars_with_arithmetic() {
+  x := new(2);
+  [x] := 1;
+  delete(x);
+  y := x;
+  y := [x + 1];
+  return null
+}
+{ emp }
+
+{ emp }
+function update_vars_with_arithmetic() {
+  x := new(2);
+  [x] := 1;
+  delete(x);
+  [x + 1] := 2;
+  y := [x + 1];
+  return null
+}
+{ emp }

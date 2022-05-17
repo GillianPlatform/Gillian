@@ -1,0 +1,113 @@
+import "wisl_pointer_arith.gil", "wisl_core.gil";
+
+
+pred freed_ptrs(ptrs : List) : (ptrs == {{  }}),
+  (ptrs == l+ ({{ #x }}, #rest)) * freed(#x) * freed_ptrs(#rest);
+
+
+pred list(+x, alpha : List, ptrs : List) : (x == null) * (alpha == {{  }}) *
+  (ptrs == {{  }}), <cell>(#lgvar0, 0.; #v) * <bound>(#lgvar0; 2.) *
+  <cell>(#lgvar0, 1.; #z) * types(#lgvar0 : Obj) * (x == {{ #lgvar0, 0. }}) *
+  list(#z, #beta, #rptrs) * (alpha == l+ ({{ #v }}, #beta)) *
+  (ptrs == l+ ({{ x }}, #rptrs));
+
+spec list_dispose_out_of_bounds(x)
+  [[  (x == #x) * list(#x, #alpha, #ptrs)  ]]
+  [[  freed_ptrs(#ptrs)  ]]
+  normal
+proc list_dispose_out_of_bounds(x) {
+             goto [(not (x = null))] then0 else0;
+  then0:     gvar0 := "i__add"(x, 2.);
+             gvar1 := [getcell](l-nth(gvar0, 0.), l-nth(gvar0, 1.));
+             tail := l-nth(gvar1, 2.);
+             u := "list_dispose_out_of_bounds"(tail);
+             goto [(l-nth(x, 1.) = 0.)] continue0 fail0;
+  fail0:     fail [InvalidBlockPointer](x);
+  continue0: gvar2 := [dispose](l-nth(x, 0.));
+             goto endif0;
+  else0:     skip;
+  endif0:    skip;
+             ret := null;
+             return
+};
+
+
+spec list_dispose_double_free(x)
+  [[  (x == #x) * list(#x, #alpha, #ptrs)  ]]
+  [[  freed_ptrs(#ptrs)  ]]
+  normal
+proc list_dispose_double_free(x) {
+             goto [(not (x = null))] then0 else0;
+  then0:     gvar0 := "i__add"(x, 1.);
+             gvar1 := [getcell](l-nth(gvar0, 0.), l-nth(gvar0, 1.));
+             tail := l-nth(gvar1, 2.);
+             goto [(l-nth(x, 1.) = 0.)] continue0 fail0;
+  fail0:     fail [InvalidBlockPointer](x);
+  continue0: gvar2 := [dispose](l-nth(x, 0.));
+             u := "list_dispose_double_free"(tail);
+             goto [(l-nth(x, 1.) = 0.)] continue1 fail1;
+  fail1:     fail [InvalidBlockPointer](x);
+  continue1: gvar3 := [dispose](l-nth(x, 0.));
+             goto endif0;
+  else0:     skip;
+  endif0:    skip;
+             ret := null;
+             return
+};
+
+
+spec dispose(x)
+  [[  (x == #x) * list(#x, #alpha, #ptrs)  ]]
+  [[  freed_ptrs(#x)  ]]
+  normal
+proc dispose(x) {
+    gvar0 := "dispose_loop0"(x);
+    x := l-nth(gvar0, 0.);
+    ret := null;
+    return
+};
+
+
+spec dispose_loop0(x)
+  [[  (x == #pvar_x) * list(#pvar_x, #beta, #rest_ptrs)  ]]
+  [[  list(#new_pvar_x, #beta__new, #rest_ptrs__new) *
+      (ret == {{ #new_pvar_x }}) *
+      (#new_pvar_x == null)  ]]
+  normal
+proc dispose_loop0(x) {
+             goto [(not (x = null))] then0 else0;
+  then0:     gvar0 := "i__add"(x, 1.);
+             gvar1 := [getcell](l-nth(gvar0, 0.), l-nth(gvar0, 1.));
+             t := l-nth(gvar1, 2.);
+             goto [(l-nth(x, 1.) = 0.)] continue0 fail0;
+  fail0:     fail [InvalidBlockPointer](x);
+  continue0: gvar2 := [dispose](l-nth(x, 0.));
+             x := t;
+             loopretvar__ := "dispose_loop0"(x);
+             goto endif0;
+  else0:     loopretvar__ := {{ x }};
+  endif0:    skip;
+             ret := loopretvar__;
+             return
+};
+
+
+spec list_dispose_bad_spec(x)
+  [[  (x == #x) * list(#x, #alpha, #ptrs)  ]]
+  [[  freed_ptrs(#ptrs)  ]]
+  normal
+proc list_dispose_bad_spec(x) {
+             goto [(not (x = null))] then0 else0;
+  then0:     gvar0 := "i__add"(x, 1.);
+             gvar1 := [getcell](l-nth(gvar0, 0.), l-nth(gvar0, 1.));
+             tail := l-nth(gvar1, 2.);
+             u := "list_dispose_bad_spec"(tail);
+             goto [(l-nth(x, 1.) = 0.)] continue0 fail0;
+  fail0:     fail [InvalidBlockPointer](x);
+  continue0: gvar2 := [dispose](l-nth(x, 0.));
+             goto endif0;
+  else0:     skip;
+  endif0:    skip;
+             ret := null;
+             return
+};

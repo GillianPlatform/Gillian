@@ -1,0 +1,77 @@
+import "wisl_pointer_arith.gil", "wisl_core.gil";
+
+
+spec use_after_free_spec(x)
+  [[  (x == #x) * freed(#x)  ]]
+  [[  <cell>(#lgvar0, 0.; 1.) *
+      <bound>(#lgvar0; 1.) *
+      types(#lgvar0 : Obj) *
+      (x == {{ #lgvar0, 0. }})  ]]
+  normal
+proc use_after_free_spec(x) {
+    gvar0 := [getcell](l-nth(x, 0.), l-nth(x, 1.));
+    y := l-nth(gvar0, 2.);
+    ret := y;
+    return
+};
+
+
+spec lookup_var()
+  [[  emp  ]]
+  [[  (ret == 1.)  ]]
+  normal
+proc lookup_var() {
+             x := [alloc](1.);
+             gvar0 := [getcell](l-nth(x, 0.), l-nth(x, 1.));
+             gvar1 := [setcell](l-nth(gvar0, 0.), l-nth(gvar0, 1.), 1.);
+             goto [(l-nth(x, 1.) = 0.)] continue0 fail0;
+  fail0:     fail [InvalidBlockPointer](x);
+  continue0: gvar2 := [dispose](l-nth(x, 0.));
+             y := x;
+             gvar3 := [getcell](l-nth(x, 0.), l-nth(x, 1.));
+             y := l-nth(gvar3, 2.);
+             ret := y;
+             return
+};
+
+
+spec lookup_vars_with_arithmetic()
+  [[  emp  ]]
+  [[  emp  ]]
+  normal
+proc lookup_vars_with_arithmetic() {
+             x := [alloc](2.);
+             gvar0 := [getcell](l-nth(x, 0.), l-nth(x, 1.));
+             gvar1 := [setcell](l-nth(gvar0, 0.), l-nth(gvar0, 1.), 1.);
+             goto [(l-nth(x, 1.) = 0.)] continue0 fail0;
+  fail0:     fail [InvalidBlockPointer](x);
+  continue0: gvar2 := [dispose](l-nth(x, 0.));
+             y := x;
+             gvar3 := "i__add"(x, 1.);
+             gvar4 := [getcell](l-nth(gvar3, 0.), l-nth(gvar3, 1.));
+             y := l-nth(gvar4, 2.);
+             ret := null;
+             return
+};
+
+
+spec update_vars_with_arithmetic()
+  [[  emp  ]]
+  [[  emp  ]]
+  normal
+proc update_vars_with_arithmetic() {
+             x := [alloc](2.);
+             gvar0 := [getcell](l-nth(x, 0.), l-nth(x, 1.));
+             gvar1 := [setcell](l-nth(gvar0, 0.), l-nth(gvar0, 1.), 1.);
+             goto [(l-nth(x, 1.) = 0.)] continue0 fail0;
+  fail0:     fail [InvalidBlockPointer](x);
+  continue0: gvar2 := [dispose](l-nth(x, 0.));
+             gvar3 := "i__add"(x, 1.);
+             gvar4 := [getcell](l-nth(gvar3, 0.), l-nth(gvar3, 1.));
+             gvar5 := [setcell](l-nth(gvar4, 0.), l-nth(gvar4, 1.), 2.);
+             gvar6 := "i__add"(x, 1.);
+             gvar7 := [getcell](l-nth(gvar6, 0.), l-nth(gvar6, 1.));
+             y := l-nth(gvar7, 2.);
+             ret := null;
+             return
+};

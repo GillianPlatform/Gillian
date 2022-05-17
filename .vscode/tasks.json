@@ -1,0 +1,31 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "npm",
+            "script": "compile",
+            "isBackground": false,
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": "$tsc-watch",
+            "options": {
+                "cwd": "${workspaceFolder}/debugger-vscode-extension"
+            }
+        },
+        {
+            "type": "npm",
+            "script": "watch",
+            "group": "build",
+            "isBackground": true,
+            "problemMatcher": [
+                "$ts-webpack-watch",
+                "$tslint-webpack-watch"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/debugger-vscode-extension"
+            }
+        }
+    ]
+}

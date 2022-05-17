@@ -1,0 +1,542 @@
+import "javert_internal_functions.jsil", "javert_logic_macros.jsil",
+       "ArrayBuffer.jsil", "ArrayLogic.jsil", "DataView.jsil",
+       "ByteLogic.gil", "Uint8Array.jsil";
+
+
+@nopath
+pred SLL(+x, alpha : List) : (x == null) * (alpha == {{  }}),
+  Node(x, #val, #next) * SLL(#next, #beta) *
+  (alpha == l+ ({{ #val }}, #beta));
+
+
+@nopath
+pred Node(+x : Obj, val, next) : JSObject(x) * DataProp(x, "val", val) *
+  DataProp(x, "next", next);
+
+@nopath
+proc main() {
+        x_0 := "setupInitialHeap"();
+        x__scope := {{ $lg }};
+        x__sc_fst := {{ $lg }};
+        x__this := $lg;
+        gvar_aux_0 := $lg;
+        gvar_aux_1 := "arguments";
+        gvar_aux_2 := {{ "d", undefined, true, true, false }};
+        gvar_aux_3 := [GetCell](gvar_aux_0, gvar_aux_1);
+        gvar_aux_4 := [SetCell](l-nth(gvar_aux_3, 0.), l-nth(gvar_aux_3, 1.),
+                                gvar_aux_2);
+        x__te := "TypeError"();
+        x__se := "SyntaxError"();
+        x__re := "ReferenceError"();
+        x_f_0 := "create_function_object"(x__sc_fst, "listCopy", "listCopy",
+                                          {{ "lst" }});
+        x_er_0 := l-nth(x__sc_fst, 0.);
+        gvar_aux_5 := x_er_0;
+        gvar_aux_6 := "listCopy";
+        gvar_aux_7 := {{ "d", x_f_0, true, true, false }};
+        gvar_aux_8 := [GetCell](gvar_aux_5, gvar_aux_6);
+        gvar_aux_9 := [SetCell](l-nth(gvar_aux_8, 0.), l-nth(gvar_aux_8, 1.),
+                                gvar_aux_7);
+        x_f_1 := "create_function_object"(x__sc_fst, "listConcat",
+                                          "listConcat", {{ "la", "lb" }});
+        x_er_1 := l-nth(x__sc_fst, 0.);
+        gvar_aux_10 := x_er_1;
+        gvar_aux_11 := "listConcat";
+        gvar_aux_12 := {{ "d", x_f_1, true, true, false }};
+        gvar_aux_13 := [GetCell](gvar_aux_10, gvar_aux_11);
+        gvar_aux_14 := [SetCell](l-nth(gvar_aux_13, 0.),
+                                 l-nth(gvar_aux_13, 1.), gvar_aux_12);
+        x_f_2 := "create_function_object"(x__sc_fst, "listAppend",
+                                          "listAppend", {{ "lst", "v" }});
+        x_er_2 := l-nth(x__sc_fst, 0.);
+        gvar_aux_15 := x_er_2;
+        gvar_aux_16 := "listAppend";
+        gvar_aux_17 := {{ "d", x_f_2, true, true, false }};
+        gvar_aux_18 := [GetCell](gvar_aux_15, gvar_aux_16);
+        gvar_aux_19 := [SetCell](l-nth(gvar_aux_18, 0.),
+                                 l-nth(gvar_aux_18, 1.), gvar_aux_17);
+        x_1_v := "i__getValue"("use strict") with elab;
+        GPVUnfold("use strict");
+        ret := empty;
+        x_2 := "i__purge"(x__te);
+        x_2 := "i__purge"(x__se);
+        x_2 := "i__purge"(x__re);
+  rlab: return;
+  elab: ret := x_1_v;
+        throw
+};
+
+
+@nopath
+spec listConcat(x__scope, x__this, la, lb)
+  [[  GlobalObject() *
+      <Cell>($lg, "listConcat"; {{ "d", #listConcat, true, true, false }}) *
+      ($lg == l-nth(_lvar_js_0, 0.)) *
+      (1. == (l-len _lvar_js_0)) *
+      JSFunctionObject(#listConcat, "listConcat", _lvar_js_0, _lvar_js_1, _lvar_js_2) *
+      (_lvar_js_0 == {{ $lg }}) *
+      (la == #la) *
+      SLL(#la, #alpha) *
+      (lb == #lb) *
+      SLL(#lb, #beta) *
+      (x__scope == {{ $lg }}) *
+      (x__this == #this) *
+      (! (x__scope == empty)) *
+      (! (x__this == empty)) *
+      (! (la == empty)) *
+      (! (lb == empty)) *
+      (! (x__scope == none)) *
+      (! (x__this == none)) *
+      (! (la == none)) *
+      (! (lb == none)) *
+      ((typeOf x__scope) == List) *
+      (! ((typeOf x__this) == List)) *
+      (! ((typeOf la) == List)) *
+      (! ((typeOf lb) == List))  ]]
+  [[  GlobalObject() *
+      <Cell>($lg, "listConcat"; {{ "d", #listConcat, true, true, false }}) *
+      ($lg == l-nth(_lvar_js_3, 0.)) *
+      (1. == (l-len _lvar_js_3)) *
+      JSFunctionObject(#listConcat, "listConcat", _lvar_js_3, _lvar_js_4, _lvar_js_5) *
+      (_lvar_js_3 == {{ $lg }}) *
+      SLL(ret, l+ (#alpha, #beta)) *
+      (x__this == #this) *
+      (x__scope == {{ $lg }})  ]]
+  normal
+proc listConcat(x__scope, x__this, la, lb) {
+               gvar_aux_20 := [Alloc](empty, null);
+               x__er_m := l-nth(gvar_aux_20, 0.);
+               gvar_aux_21 := [Alloc](empty, x__er_m);
+               x__er := l-nth(gvar_aux_21, 0.);
+               gvar_aux_22 := x__er_m;
+               gvar_aux_23 := "@er";
+               gvar_aux_24 := true;
+               gvar_aux_25 := [GetCell](gvar_aux_22, gvar_aux_23);
+               gvar_aux_26 := [SetCell](l-nth(gvar_aux_25, 0.),
+                                        l-nth(gvar_aux_25, 1.), gvar_aux_24);
+               gvar_aux_27 := x__er;
+               gvar_aux_28 := "arguments";
+               gvar_aux_29 := undefined;
+               gvar_aux_30 := [GetCell](gvar_aux_27, gvar_aux_28);
+               gvar_aux_31 := [SetCell](l-nth(gvar_aux_30, 0.),
+                                        l-nth(gvar_aux_30, 1.), gvar_aux_29);
+               gvar_aux_32 := x__er;
+               gvar_aux_33 := "la";
+               gvar_aux_34 := la;
+               gvar_aux_35 := [GetCell](gvar_aux_32, gvar_aux_33);
+               gvar_aux_36 := [SetCell](l-nth(gvar_aux_35, 0.),
+                                        l-nth(gvar_aux_35, 1.), gvar_aux_34);
+               gvar_aux_37 := x__er;
+               gvar_aux_38 := "lb";
+               gvar_aux_39 := lb;
+               gvar_aux_40 := [GetCell](gvar_aux_37, gvar_aux_38);
+               gvar_aux_41 := [SetCell](l-nth(gvar_aux_40, 0.),
+                                        l-nth(gvar_aux_40, 1.), gvar_aux_39);
+               x__sc_fst := l+ (x__scope, {{ x__er }});
+               x__te := "TypeError"();
+               x__se := "SyntaxError"();
+               x__re := "ReferenceError"();
+               x_5 := l-nth(x__sc_fst, 1.);
+               x_6 := {{ "v", x_5, "la", true }};
+               x_6_v := "i__getValue"(x_6) with pre_elab;
+               GPVUnfold(x_6);
+               x_7_v := "i__getValue"(null) with pre_elab;
+               GPVUnfold(null);
+               x_8 := "i__strictEquality"(x_6_v, x_7_v) with pre_elab;
+               x_8_v := "i__getValue"(x_8) with pre_elab;
+               GPVUnfold(x_8);
+               x_8_b := "i__toBoolean"(x_8_v) with pre_elab;
+               goto [x_8_b] then_0 else_0;
+  then_0:      x_9 := l-nth(x__sc_fst, 1.);
+               x_10 := {{ "v", x_9, "lb", true }};
+               x_10_v := "i__getValue"(x_10) with pre_elab;
+               GPVUnfold(x_10);
+               goto pre_rlab;
+               goto end_0;
+  else_0:      x_11 := empty;
+  end_0:       PHI(x_12: x_10_v, x_11);
+               x_13 := l-nth(x__sc_fst, 1.);
+               x_14 := {{ "v", x_13, "la", true }};
+               x_14_v := "i__getValue"(x_14) with pre_elab;
+               GPVUnfold(x_14);
+               x_15 := "i__checkObjectCoercible"(x_14_v) with pre_elab;
+               x_16 := {{ "o", x_14_v, "next", true }};
+               x_17 := l-nth(x__sc_fst, 0.);
+               x_18 := {{ "v", x_17, "listConcat", true }};
+               x_18_v := "i__getValue"(x_18) with pre_elab;
+               GPVUnfold(x_18);
+               x_19 := l-nth(x__sc_fst, 1.);
+               x_20 := {{ "v", x_19, "la", true }};
+               x_20_v := "i__getValue"(x_20) with pre_elab;
+               GPVUnfold(x_20);
+               x_21 := "i__checkObjectCoercible"(x_20_v) with pre_elab;
+               x_22 := {{ "o", x_20_v, "next", true }};
+               x_22_v := "i__getValue"(x_22) with pre_elab;
+               GPVUnfold(x_22);
+               x_23 := l-nth(x__sc_fst, 1.);
+               x_24 := {{ "v", x_23, "lb", true }};
+               x_24_v := "i__getValue"(x_24) with pre_elab;
+               GPVUnfold(x_24);
+               goto [(not ((typeOf x_18_v) = Obj))] pre_elab next_0;
+  next_0:      gvar_aux_42 := x_18_v;
+               gvar_aux_43 := [GetMetadata](gvar_aux_42);
+               goto [(l-nth(gvar_aux_43, 1.) = none)] glab_then_0 glab_else_0;
+  glab_then_0: fail [ResourceError](gvar_aux_42);
+  glab_else_0: x_26 := l-nth(gvar_aux_43, 1.);
+               x_25 := "i__isCallable"(x_18_v);
+               goto [x_25] lab_0 pre_elab;
+  lab_0:       gvar_aux_44 := x_26;
+               gvar_aux_45 := "@call";
+               gvar_aux_46 := [GetCell](gvar_aux_44, gvar_aux_45);
+               goto [(l-nth(gvar_aux_46, 2.) = none)] glab_then_1 glab_else_1;
+  glab_then_1: fail [ResourceError](gvar_aux_44, gvar_aux_45);
+  glab_else_1: x_body_1 := l-nth(gvar_aux_46, 2.);
+  else_2:      gvar_aux_47 := x_26;
+               gvar_aux_48 := "@scope";
+               gvar_aux_49 := [GetCell](gvar_aux_47, gvar_aux_48);
+               goto [(l-nth(gvar_aux_49, 2.) = none)] glab_then_2 glab_else_2;
+  glab_then_2: fail [ResourceError](gvar_aux_47, gvar_aux_48);
+  glab_else_2: x_fscope_1 := l-nth(gvar_aux_49, 2.);
+               goto [((typeOf x_18) = List)] then_2 else_3;
+  then_2:      goto [(l-nth(x_18, 0.) = "o")] then_3 else_3;
+  then_3:      x_this_0 := l-nth(x_18, 1.);
+               goto fi_0;
+  else_3:      x_this_1 := undefined;
+  fi_0:        PHI(x_this_2: x_this_0, x_this_1);
+               x_35 := x_body_1(x_fscope_1, x_this_2, x_22_v, x_24_v) with pre_elab;
+               x_35_v := "i__getValue"(x_35) with pre_elab;
+               GPVUnfold(x_35);
+               x_37 := "i__checkAssignmentErrors"(x_16) with pre_elab;
+               x_38 := "i__putValue"(x_16, x_35_v) with pre_elab;
+               GPVUnfold(x_16);
+               skip;
+               x_39 := l-nth(x__sc_fst, 1.);
+               x_40 := {{ "v", x_39, "la", true }};
+               x_40_v := "i__getValue"(x_40) with pre_elab;
+               GPVUnfold(x_40);
+               goto pre_rlab;
+               x_41 := undefined;
+  pre_rlab:    PHI(ret: x_10_v, x_40_v, x_41);
+               x_42 := "i__purge"(x__te);
+               x_42 := "i__purge"(x__se);
+               x_42 := "i__purge"(x__re);
+               x__scope_f := x__sc_fst;
+               return;
+  pre_elab:    PHI(ret: x_6_v, x_7_v, x_8, x_8_v, x_8_b, x_10_v, x_14_v, x_15, x_18_v, x_20_v, x_21, x_22_v, x_24_v, x__te, x__te, x_35, x_35_v, x_37, x_38, x_40_v);
+               x__scope_f := x__sc_fst;
+               throw
+};
+
+
+@nopath
+spec listAppend(x__scope, x__this, lst, v)
+  [[  GlobalObject() *
+      <Cell>($lg, "listConcat"; {{ "d", #listConcat, true, true, false }}) *
+      ($lg == l-nth(_lvar_js_7, 0.)) *
+      (1. == (l-len _lvar_js_7)) *
+      JSFunctionObject(#listConcat, "listConcat", _lvar_js_7, _lvar_js_8, _lvar_js_9) *
+      (_lvar_js_7 == {{ $lg }}) *
+      (lst == #lst) *
+      SLL(#lst, #alpha) *
+      (v == #v) *
+      (x__scope == {{ $lg }}) *
+      (x__this == #this) *
+      (! (x__scope == empty)) *
+      (! (x__this == empty)) *
+      (! (lst == empty)) *
+      (! (v == empty)) *
+      (! (x__scope == none)) *
+      (! (x__this == none)) *
+      (! (lst == none)) *
+      (! (v == none)) *
+      ((typeOf x__scope) == List) *
+      (! ((typeOf x__this) == List)) *
+      (! ((typeOf lst) == List)) *
+      (! ((typeOf v) == List))  ]]
+  [[  GlobalObject() *
+      <Cell>($lg, "listConcat"; {{ "d", #listConcat, true, true, false }}) *
+      ($lg == l-nth(_lvar_js_10, 0.)) *
+      (1. == (l-len _lvar_js_10)) *
+      JSFunctionObject(#listConcat, "listConcat", _lvar_js_10, _lvar_js_11, _lvar_js_12) *
+      (_lvar_js_10 == {{ $lg }}) *
+      SLL(ret, l+ (#alpha, {{ #v }})) *
+      (x__this == #this) *
+      (x__scope == {{ $lg }})  ]]
+  normal
+proc listAppend(x__scope, x__this, lst, v) {
+               gvar_aux_75 := [Alloc](empty, null);
+               x__er_m := l-nth(gvar_aux_75, 0.);
+               gvar_aux_76 := [Alloc](empty, x__er_m);
+               x__er := l-nth(gvar_aux_76, 0.);
+               gvar_aux_77 := x__er_m;
+               gvar_aux_78 := "@er";
+               gvar_aux_79 := true;
+               gvar_aux_80 := [GetCell](gvar_aux_77, gvar_aux_78);
+               gvar_aux_81 := [SetCell](l-nth(gvar_aux_80, 0.),
+                                        l-nth(gvar_aux_80, 1.), gvar_aux_79);
+               gvar_aux_82 := x__er;
+               gvar_aux_83 := "newNode";
+               gvar_aux_84 := undefined;
+               gvar_aux_85 := [GetCell](gvar_aux_82, gvar_aux_83);
+               gvar_aux_86 := [SetCell](l-nth(gvar_aux_85, 0.),
+                                        l-nth(gvar_aux_85, 1.), gvar_aux_84);
+               gvar_aux_87 := x__er;
+               gvar_aux_88 := "arguments";
+               gvar_aux_89 := undefined;
+               gvar_aux_90 := [GetCell](gvar_aux_87, gvar_aux_88);
+               gvar_aux_91 := [SetCell](l-nth(gvar_aux_90, 0.),
+                                        l-nth(gvar_aux_90, 1.), gvar_aux_89);
+               gvar_aux_92 := x__er;
+               gvar_aux_93 := "lst";
+               gvar_aux_94 := lst;
+               gvar_aux_95 := [GetCell](gvar_aux_92, gvar_aux_93);
+               gvar_aux_96 := [SetCell](l-nth(gvar_aux_95, 0.),
+                                        l-nth(gvar_aux_95, 1.), gvar_aux_94);
+               gvar_aux_97 := x__er;
+               gvar_aux_98 := "v";
+               gvar_aux_99 := v;
+               gvar_aux_100 := [GetCell](gvar_aux_97, gvar_aux_98);
+               gvar_aux_101 := [SetCell](l-nth(gvar_aux_100, 0.),
+                                         l-nth(gvar_aux_100, 1.), gvar_aux_99);
+               x__sc_fst := l+ (x__scope, {{ x__er }});
+               x__te := "TypeError"();
+               x__se := "SyntaxError"();
+               x__re := "ReferenceError"();
+               x_80 := "create_default_object"($lobj_proto);
+               x_81 := l-nth(x__sc_fst, 1.);
+               x_82 := {{ "v", x_81, "v", true }};
+               x_82_v := "i__getValue"(x_82) with pre_elab;
+               GPVUnfold(x_82);
+               x_desc_2 := {{ "d", x_82_v, true, true, true }};
+               x_83 := "defineOwnProperty"(x_80, "val", x_desc_2, true) with pre_elab;
+               x_84_v := "i__getValue"(null) with pre_elab;
+               GPVUnfold(null);
+               x_desc_3 := {{ "d", x_84_v, true, true, true }};
+               x_85 := "defineOwnProperty"(x_80, "next", x_desc_3, true) with pre_elab;
+               x_80_v := "i__getValue"(x_80) with pre_elab;
+               GPVUnfold(x_80);
+               x_86 := l-nth(x__sc_fst, 1.);
+               x_87 := {{ "v", x_86, "newNode", true }};
+               x_88 := "i__checkAssignmentErrors"(x_87) with pre_elab;
+               x_89 := "i__putValue"(x_87, x_80_v) with pre_elab;
+               GPVUnfold(x_87);
+               x_90 := empty;
+               x_91 := l-nth(x__sc_fst, 1.);
+               x_92 := {{ "v", x_91, "lst", true }};
+               x_92_v := "i__getValue"(x_92) with pre_elab;
+               GPVUnfold(x_92);
+               x_93_v := "i__getValue"(null) with pre_elab;
+               GPVUnfold(null);
+               x_94 := "i__strictEquality"(x_92_v, x_93_v) with pre_elab;
+               x_94_v := "i__getValue"(x_94) with pre_elab;
+               GPVUnfold(x_94);
+               x_94_b := "i__toBoolean"(x_94_v) with pre_elab;
+               goto [x_94_b] then_11 else_11;
+  then_11:     x_95 := l-nth(x__sc_fst, 1.);
+               x_96 := {{ "v", x_95, "newNode", true }};
+               x_96_v := "i__getValue"(x_96) with pre_elab;
+               GPVUnfold(x_96);
+               goto pre_rlab;
+               goto end_2;
+  else_11:     x_97 := l-nth(x__sc_fst, 0.);
+               x_98 := {{ "v", x_97, "listConcat", true }};
+               x_98_v := "i__getValue"(x_98) with pre_elab;
+               GPVUnfold(x_98);
+               x_99 := l-nth(x__sc_fst, 1.);
+               x_100 := {{ "v", x_99, "lst", true }};
+               x_100_v := "i__getValue"(x_100) with pre_elab;
+               GPVUnfold(x_100);
+               x_101 := l-nth(x__sc_fst, 1.);
+               x_102 := {{ "v", x_101, "newNode", true }};
+               x_102_v := "i__getValue"(x_102) with pre_elab;
+               GPVUnfold(x_102);
+               goto [(not ((typeOf x_98_v) = Obj))] pre_elab next_4;
+  next_4:      gvar_aux_102 := x_98_v;
+               gvar_aux_103 := [GetMetadata](gvar_aux_102);
+               goto [(l-nth(gvar_aux_103, 1.) = none)] glab_then_6 glab_else_6;
+  glab_then_6: fail [ResourceError](gvar_aux_102);
+  glab_else_6: x_104 := l-nth(gvar_aux_103, 1.);
+               x_103 := "i__isCallable"(x_98_v);
+               goto [x_103] lab_4 pre_elab;
+  lab_4:       gvar_aux_104 := x_104;
+               gvar_aux_105 := "@call";
+               gvar_aux_106 := [GetCell](gvar_aux_104, gvar_aux_105);
+               goto [(l-nth(gvar_aux_106, 2.) = none)] glab_then_7 glab_else_7;
+  glab_then_7: fail [ResourceError](gvar_aux_104, gvar_aux_105);
+  glab_else_7: x_body_5 := l-nth(gvar_aux_106, 2.);
+  else_9:      gvar_aux_107 := x_104;
+               gvar_aux_108 := "@scope";
+               gvar_aux_109 := [GetCell](gvar_aux_107, gvar_aux_108);
+               goto [(l-nth(gvar_aux_109, 2.) = none)] glab_then_8 glab_else_8;
+  glab_then_8: fail [ResourceError](gvar_aux_107, gvar_aux_108);
+  glab_else_8: x_fscope_5 := l-nth(gvar_aux_109, 2.);
+               goto [((typeOf x_98) = List)] then_9 else_10;
+  then_9:      goto [(l-nth(x_98, 0.) = "o")] then_10 else_10;
+  then_10:     x_this_6 := l-nth(x_98, 1.);
+               goto fi_2;
+  else_10:     x_this_7 := undefined;
+  fi_2:        PHI(x_this_8: x_this_6, x_this_7);
+               x_113 := x_body_5(x_fscope_5, x_this_8, x_100_v, x_102_v) with pre_elab;
+               x_113_v := "i__getValue"(x_113) with pre_elab;
+               GPVUnfold(x_113);
+               goto pre_rlab;
+  end_2:       PHI(x_115: x_96_v, x_113_v);
+               goto [(x_115 = empty)] next_6 next_7;
+  next_6:      skip;
+  next_7:      PHI(x_116: x_115, x_90);
+               x_117 := undefined;
+  pre_rlab:    PHI(ret: x_96_v, x_113_v, x_117);
+               x_118 := "i__purge"(x__te);
+               x_118 := "i__purge"(x__se);
+               x_118 := "i__purge"(x__re);
+               x__scope_f := x__sc_fst;
+               return;
+  pre_elab:    PHI(ret: x_82_v, x_83, x_84_v, x_85, x_80_v, x_88, x_89, x_92_v, x_93_v, x_94, x_94_v, x_94_b, x_96_v, x_98_v, x_100_v, x_102_v, x__te, x__te, x_113, x_113_v);
+               x__scope_f := x__sc_fst;
+               throw
+};
+
+
+@nopath
+spec listCopy(x__scope, x__this, lst)
+  [[  GlobalObject() *
+      <Cell>($lg, "listCopy"; {{ "d", #listCopy, true, true, false }}) *
+      ($lg == l-nth(_lvar_js_14, 0.)) *
+      (1. == (l-len _lvar_js_14)) *
+      JSFunctionObject(#listCopy, "listCopy", _lvar_js_14, _lvar_js_15, _lvar_js_16) *
+      (_lvar_js_14 == {{ $lg }}) *
+      (lst == #lst) *
+      SLL(#lst, #alpha) *
+      (x__scope == {{ $lg }}) *
+      (x__this == #this) *
+      (! (x__scope == empty)) *
+      (! (x__this == empty)) *
+      (! (lst == empty)) *
+      (! (x__scope == none)) *
+      (! (x__this == none)) *
+      (! (lst == none)) *
+      ((typeOf x__scope) == List) *
+      (! ((typeOf x__this) == List)) *
+      (! ((typeOf lst) == List))  ]]
+  [[  GlobalObject() *
+      <Cell>($lg, "listCopy"; {{ "d", #listCopy, true, true, false }}) *
+      ($lg == l-nth(_lvar_js_17, 0.)) *
+      (1. == (l-len _lvar_js_17)) *
+      JSFunctionObject(#listCopy, "listCopy", _lvar_js_17, _lvar_js_18, _lvar_js_19) *
+      (_lvar_js_17 == {{ $lg }}) *
+      SLL(#lst, #alpha) *
+      SLL(ret, #alpha) *
+      (x__this == #this) *
+      (x__scope == {{ $lg }})  ]]
+  normal
+proc listCopy(x__scope, x__this, lst) {
+               gvar_aux_50 := [Alloc](empty, null);
+               x__er_m := l-nth(gvar_aux_50, 0.);
+               gvar_aux_51 := [Alloc](empty, x__er_m);
+               x__er := l-nth(gvar_aux_51, 0.);
+               gvar_aux_52 := x__er_m;
+               gvar_aux_53 := "@er";
+               gvar_aux_54 := true;
+               gvar_aux_55 := [GetCell](gvar_aux_52, gvar_aux_53);
+               gvar_aux_56 := [SetCell](l-nth(gvar_aux_55, 0.),
+                                        l-nth(gvar_aux_55, 1.), gvar_aux_54);
+               gvar_aux_57 := x__er;
+               gvar_aux_58 := "arguments";
+               gvar_aux_59 := undefined;
+               gvar_aux_60 := [GetCell](gvar_aux_57, gvar_aux_58);
+               gvar_aux_61 := [SetCell](l-nth(gvar_aux_60, 0.),
+                                        l-nth(gvar_aux_60, 1.), gvar_aux_59);
+               gvar_aux_62 := x__er;
+               gvar_aux_63 := "lst";
+               gvar_aux_64 := lst;
+               gvar_aux_65 := [GetCell](gvar_aux_62, gvar_aux_63);
+               gvar_aux_66 := [SetCell](l-nth(gvar_aux_65, 0.),
+                                        l-nth(gvar_aux_65, 1.), gvar_aux_64);
+               x__sc_fst := l+ (x__scope, {{ x__er }});
+               x__te := "TypeError"();
+               x__se := "SyntaxError"();
+               x__re := "ReferenceError"();
+               x_45 := l-nth(x__sc_fst, 1.);
+               x_46 := {{ "v", x_45, "lst", true }};
+               x_46_v := "i__getValue"(x_46) with pre_elab;
+               GPVUnfold(x_46);
+               x_47_v := "i__getValue"(null) with pre_elab;
+               GPVUnfold(null);
+               x_48 := "i__strictEquality"(x_46_v, x_47_v) with pre_elab;
+               x_48_v := "i__getValue"(x_48) with pre_elab;
+               GPVUnfold(x_48);
+               x_48_b := "i__toBoolean"(x_48_v) with pre_elab;
+               goto [x_48_b] then_7 else_7;
+  then_7:      x_49_v := "i__getValue"(null) with pre_elab;
+               GPVUnfold(null);
+               goto pre_rlab;
+               goto end_1;
+  else_7:      x_50 := "create_default_object"($lobj_proto);
+               x_51 := l-nth(x__sc_fst, 1.);
+               x_52 := {{ "v", x_51, "lst", true }};
+               x_52_v := "i__getValue"(x_52) with pre_elab;
+               GPVUnfold(x_52);
+               x_53 := "i__checkObjectCoercible"(x_52_v) with pre_elab;
+               x_54 := {{ "o", x_52_v, "val", true }};
+               x_54_v := "i__getValue"(x_54) with pre_elab;
+               GPVUnfold(x_54);
+               x_desc_0 := {{ "d", x_54_v, true, true, true }};
+               x_55 := "defineOwnProperty"(x_50, "val", x_desc_0, true) with pre_elab;
+               x_56 := l-nth(x__sc_fst, 0.);
+               x_57 := {{ "v", x_56, "listCopy", true }};
+               x_57_v := "i__getValue"(x_57) with pre_elab;
+               GPVUnfold(x_57);
+               x_58 := l-nth(x__sc_fst, 1.);
+               x_59 := {{ "v", x_58, "lst", true }};
+               x_59_v := "i__getValue"(x_59) with pre_elab;
+               GPVUnfold(x_59);
+               x_60 := "i__checkObjectCoercible"(x_59_v) with pre_elab;
+               x_61 := {{ "o", x_59_v, "next", true }};
+               x_61_v := "i__getValue"(x_61) with pre_elab;
+               GPVUnfold(x_61);
+               goto [(not ((typeOf x_57_v) = Obj))] pre_elab next_2;
+  next_2:      gvar_aux_67 := x_57_v;
+               gvar_aux_68 := [GetMetadata](gvar_aux_67);
+               goto [(l-nth(gvar_aux_68, 1.) = none)] glab_then_3 glab_else_3;
+  glab_then_3: fail [ResourceError](gvar_aux_67);
+  glab_else_3: x_63 := l-nth(gvar_aux_68, 1.);
+               x_62 := "i__isCallable"(x_57_v);
+               goto [x_62] lab_2 pre_elab;
+  lab_2:       gvar_aux_69 := x_63;
+               gvar_aux_70 := "@call";
+               gvar_aux_71 := [GetCell](gvar_aux_69, gvar_aux_70);
+               goto [(l-nth(gvar_aux_71, 2.) = none)] glab_then_4 glab_else_4;
+  glab_then_4: fail [ResourceError](gvar_aux_69, gvar_aux_70);
+  glab_else_4: x_body_3 := l-nth(gvar_aux_71, 2.);
+  else_5:      gvar_aux_72 := x_63;
+               gvar_aux_73 := "@scope";
+               gvar_aux_74 := [GetCell](gvar_aux_72, gvar_aux_73);
+               goto [(l-nth(gvar_aux_74, 2.) = none)] glab_then_5 glab_else_5;
+  glab_then_5: fail [ResourceError](gvar_aux_72, gvar_aux_73);
+  glab_else_5: x_fscope_3 := l-nth(gvar_aux_74, 2.);
+               goto [((typeOf x_57) = List)] then_5 else_6;
+  then_5:      goto [(l-nth(x_57, 0.) = "o")] then_6 else_6;
+  then_6:      x_this_3 := l-nth(x_57, 1.);
+               goto fi_1;
+  else_6:      x_this_4 := undefined;
+  fi_1:        PHI(x_this_5: x_this_3, x_this_4);
+               x_72 := x_body_3(x_fscope_3, x_this_5, x_61_v) with pre_elab;
+               x_72_v := "i__getValue"(x_72) with pre_elab;
+               GPVUnfold(x_72);
+               x_desc_1 := {{ "d", x_72_v, true, true, true }};
+               x_74 := "defineOwnProperty"(x_50, "next", x_desc_1, true) with pre_elab;
+               x_50_v := "i__getValue"(x_50) with pre_elab;
+               GPVUnfold(x_50);
+               goto pre_rlab;
+  end_1:       PHI(x_75: x_49_v, x_50_v);
+               x_76 := undefined;
+  pre_rlab:    PHI(ret: x_49_v, x_50_v, x_76);
+               x_77 := "i__purge"(x__te);
+               x_77 := "i__purge"(x__se);
+               x_77 := "i__purge"(x__re);
+               x__scope_f := x__sc_fst;
+               return;
+  pre_elab:    PHI(ret: x_46_v, x_47_v, x_48, x_48_v, x_48_b, x_49_v, x_52_v, x_53, x_54_v, x_55, x_57_v, x_59_v, x_60, x_61_v, x__te, x__te, x_72, x_72_v, x_74, x_50_v);
+               x__scope_f := x__sc_fst;
+               throw
+};

@@ -1,0 +1,44 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "gillian",
+			"request": "launch",
+			"name": "Debug list_append.gil",
+			"program": "${workspaceFolder}/wisl/list_append.gil",
+			"stopOnEntry": true,
+			"targetLanguage": "wisl",
+			"trace": false
+		},
+		{
+			"type": "gillian",
+			"request": "launch",
+			"name": "Debug SLL.gil",
+			"program": "${workspaceFolder}/js/SLL.gil",
+			"stopOnEntry": true,
+			"targetLanguage": "js",
+			"trace": false
+		},
+		{
+			"type": "gillian",
+			"request": "launch",
+			"name": "Debug SLL.js: listCopy",
+			"program": "${workspaceFolder}/js/SLL.js",
+			"stopOnEntry": true,
+			"targetLanguage": "js",
+			"procedureName": "listCopy",
+			"trace": false
+		},
+		{
+			"type": "gillian",
+			"request": "launch",
+			"name": "Debug list_dispose.wisl",
+			"program": "${workspaceFolder}/wisl/list_dispose.wisl",
+			"stopOnEntry": true,
+			"trace": false
+		}
+	]
+}

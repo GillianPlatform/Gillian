@@ -1,6 +1,7 @@
 {
   "search.exclude": {
-    "esy.lock/**": true
+    "esy.lock/**": true,
+    "debugger-vscode-extension/out": true
   },
   "files.associations": {
     "stdlib.h": "c",
@@ -20,5 +21,7 @@
   "ocaml.sandbox": {
     "kind": "esy",
     "root": "${workspaceFolder:Gillian}"
-  }
+  },
+  // Turn off tsc task auto detection since we have the necessary tasks as npm scripts
+  "typescript.tsc.autoDetect": "off"
 }

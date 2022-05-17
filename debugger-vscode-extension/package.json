@@ -1,0 +1,229 @@
+{
+  "name": "gillian-debugger",
+  "displayName": "Gillian Debugger",
+  "version": "0.0.1",
+  "description": "Debugger for Gillian.",
+  "author": {
+    "name": "Verified Trustworthy Software Specification Group at Imperial College",
+    "url": "https://vtss.doc.ic.ac.uk"
+  },
+  "homepage": "GillianDev.github.io",
+  "license": "BSD-3-Clause",
+  "keywords": [
+    "multi-root ready"
+  ],
+  "engines": {
+    "vscode": "^1.49.0"
+  },
+  "icon": "TODO",
+  "categories": [
+    "Debuggers"
+  ],
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GillianPlatform/Gillian.git"
+  },
+  "bugs": {
+    "url": "https://github.com/GillianPlatform/Gillian/issues"
+  },
+  "scripts": {
+    "vscode:prepublish": "yarn run package-ext && yarn run package-web",
+    "compile": "tsc -p ./",
+    "lint": "eslint src --ext ts",
+    "watch": "webpack --watch --devtool nosources-source-map --info-verbosity verbose --config ./build/extension.webpack.config.js",
+    "watch2": "tsc -watch -p ./",
+    "package": "vsce package",
+    "publish": "vsce publish",
+    "package-ext": "webpack --mode production --config ./build/extension.webpack.config.js"
+  },
+  "dependencies": {
+    "await-notify": "1.0.1",
+    "vscode-debugadapter": "^1.43.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.49.0",
+    "@types/node": "^14.0.27",
+    "eslint": "^7.6.0",
+    "@typescript-eslint/eslint-plugin": "^3.8.0",
+    "@typescript-eslint/parser": "^3.8.0",
+    "typescript": "^3.8.3",
+    "vscode-debugadapter-testsupport": "^1.43.0",
+    "vsce": "^1.81.1",
+    "ts-loader": "^8.0.3",
+    "webpack": "^4.44.1",
+    "webpack-cli": "^3.3.12"
+  },
+  "main": "./dist/ext/extension.js",
+  "activationEvents": [
+    "onDebugDynamicConfigurations:gillian",
+    "onCommand:extension.gillian-debug.getProgramName",
+    "onCommand:extension.gillian-debug.runEditorContents",
+    "onCommand:extension.gillian-debug.debugEditorContents",
+    "onLanguage:javascript",
+    "onLanguage:gil",
+    "onLanguage:wisl"
+  ],
+  "contributes": {
+    "configuration": {
+      "title": "gillian-debugger",
+      "properties": {
+        "gillianDebugger.gillianSourceRepository": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "Specifies the path to the Gillian source repository used to execute/debug a program."
+        }
+      }
+    },
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "extension.gillian-debug.runEditorContents",
+          "when": "resourceLangId == gil"
+        },
+        {
+          "command": "extension.gillian-debug.debugEditorContents",
+          "when": "resourceLangId == gil"
+        },
+        {
+          "command": "extension.gillian-debug.runEditorContents",
+          "when": "resourceLangId == wisl"
+        },
+        {
+          "command": "extension.gillian-debug.debugEditorContents",
+          "when": "resourceLangId == wisl"
+        },
+        {
+          "command": "extension.gillian-debug.runEditorContents",
+          "when": "resourceLangId == javascript"
+        },
+        {
+          "command": "extension.gillian-debug.debugEditorContents",
+          "when": "resourceLangId == javascript"
+        }
+      ],
+      "commandPalette": [
+				{
+					"command": "extension.gillian-debug.debugEditorContents",
+					"when": "resourceLangId == gil"
+				},
+				{
+					"command": "extension.gillian-debug.runEditorContents",
+					"when": "resourceLangId == gil"
+				},
+        {
+					"command": "extension.gillian-debug.debugEditorContents",
+					"when": "resourceLangId == wisl"
+				},
+				{
+					"command": "extension.gillian-debug.runEditorContents",
+					"when": "resourceLangId == wisl"
+				},
+        {
+					"command": "extension.gillian-debug.debugEditorContents",
+					"when": "resourceLangId == javascript"
+				},
+				{
+					"command": "extension.gillian-debug.runEditorContents",
+					"when": "resourceLangId == javascript"
+				}
+			]
+    },
+    "commands": [
+      {
+        "command": "extension.gillian-debug.debugEditorContents",
+        "title": "Debug File",
+        "category": "Gillian Debugger",
+				"enablement": "!inDebugMode",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "extension.gillian-debug.runEditorContents",
+        "title": "Run File",
+        "category": "Gillian Debugger",
+				"enablement": "!inDebugMode",
+        "icon": "$(play)"
+      },
+      {
+        "command": "extension.code-lens.debugProcedure",
+        "title": "Debug Procedure"
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "gil"
+      },
+      {
+        "language": "wisl"
+      },
+      {
+        "language": "javascript"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "gillian",
+        "label": "Gillian Debugger",
+        "program": "TODO: Compile Gillian as executable",
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to a text file.",
+                "default": "${workspaceFolder}/${command:AskForProgramName}"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Automatically stop after launch.",
+                "default": true
+              },
+              "targetLanguage": {
+                "type": "string",
+                "description": "Target language of the program to debug (wisl, js, etc.).",
+                "default": "wisl"
+              },
+              "procedureName": {
+                "type": "string",
+                "description": "Name of procedure to debug"
+              },
+              "trace": {
+                "type": "boolean",
+                "description": "Enable logging of the Debug Adapter Protocol.",
+                "default": true
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "gillian",
+            "request": "launch",
+            "name": "Ask for file name",
+            "program": "${workspaceFolder}/${command:AskForProgramName}",
+            "stopOnEntry": true
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Gillian Debugger: Launch",
+            "description": "A new configuration for 'debugging' a user selected file in Gillian.",
+            "body": {
+              "type": "gillian",
+              "request": "launch",
+              "name": "Ask for file name",
+              "program": "^\"\\${workspaceFolder}/\\${command:AskForProgramName}\"",
+              "stopOnEntry": true
+            }
+          }
+        ],
+        "variables": {
+          "AskForProgramName": "extension.gillian-debug.getProgramName"
+        }
+      }
+    ]
+  }
+}

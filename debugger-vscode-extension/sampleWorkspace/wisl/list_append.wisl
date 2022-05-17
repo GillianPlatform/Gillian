@@ -1,0 +1,35 @@
+predicate list(+x, alpha) {
+    (x == null) * (alpha == nil);
+    (x -> #v, #z) * list(#z, #beta) * (alpha == #v::#beta)
+}
+
+{ (x == #x) * (v == #v) * list(#x, #alpha) }
+function append(x, v) {
+  if (x = null) {
+    x := new(2);
+    [x] := v;
+    [x + 1] := null
+  } else {
+    t := [x + 1];
+    t := append(t, v);
+    [x + 1] := t
+  };
+  return x
+}
+{ list(ret, #alpha @ [#v]) }
+
+
+{ (x == #x) * (v == #v) * list(#x, #alpha) }
+function append_out_of_bounds(x, v) {
+  if (x = null) {
+    x := new(2);
+    [x + 1] := v;
+    [x + 2] := null
+  } else {
+    t := [x + 1];
+    t := append(t, v);
+    [x + 1] := t
+  };
+  return x
+}
+{ list(ret, #alpha @ [#v]) }
