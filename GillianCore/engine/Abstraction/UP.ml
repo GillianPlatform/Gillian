@@ -671,6 +671,8 @@ let lift_ups
       (fun ac (up, posts, hides) -> add_up ac (up, posts) hides)
       (PhantomInner []) ups'
 
+let empty_up = Leaf (None, None, [])
+
 let init
     ?(use_params : bool option)
     (known_unifiables : KB.t)

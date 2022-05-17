@@ -3,8 +3,10 @@ module type S = sig
 
   val get_typ_env : t -> TypEnv.t
   val get_pfs : t -> PFS.t
+  val get_lvars_for_exact : t -> Var.Set.t
 
   val hides :
+    ?is_post:bool ->
     used_unifiables:Expr.Set.t ->
     t ->
     exprs_to_hide:Expr.t list ->

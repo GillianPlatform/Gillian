@@ -41,6 +41,7 @@ val learn_expr :
 
 val ins_outs_expr : KB.t -> Expr.t -> Expr.t -> (KB.t * outs) list
 val collect_simple_asrts : Asrt.t -> Asrt.t list
+val empty_up : t
 
 val init :
   ?use_params:bool ->

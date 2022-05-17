@@ -173,6 +173,10 @@ struct
                       match def_states with
                       | Ok [ (state, _) ] -> (
                           (* FOLD/UNFOLD/UNIFY *)
+                          let () =
+                            L.verbose (fun fmt ->
+                                fmt "EXACT: hiding fold:\n%a" SPState.pp state)
+                          in
                           let fold_predicate =
                             SLCmd.Fold (pred_name, subst_params, None)
                           in
@@ -181,6 +185,11 @@ struct
                           in
                           match fstate with
                           | Ok [ fstate ] -> (
+                              let () =
+                                L.verbose (fun fmt ->
+                                    fmt "EXACT: hiding unfold:\n%a" SPState.pp
+                                      fstate)
+                              in
                               let unfold_predicate =
                                 SLCmd.Unfold
                                   (pred_name, subst_params, None, false)
@@ -226,7 +235,13 @@ struct
                                           with
                                           | _, false -> None
                                           | true, _ -> None
-                                          | _ -> Some v);
+                                          | _ -> (
+                                              match k with
+                                              | Expr.LVar x
+                                                when not
+                                                       (Names.is_spec_var_name x)
+                                                -> None
+                                              | _ -> Some v));
                                       L.verbose (fun fmt ->
                                           fmt "EXACT: Filtered subst: %a"
                                             SSubst.pp subst);
@@ -900,6 +915,17 @@ struct
         Fmt.failwith "Creation of unification plans for predicates failed."
     | Ok preds -> (
         let () = derive_predicate_hiding prog preds in
+
+        let preds_with_hiding = Hashtbl.create 1 in
+        let () =
+          Hashtbl.iter
+            (fun name (up_pred : UP.pred) ->
+              Hashtbl.replace preds_with_hiding name up_pred.pred)
+            preds
+        in
+
+        let ipreds = UP.init_preds preds_with_hiding in
+        let preds = Result.get_ok ipreds in
 
         let pred_ins =
           Hashtbl.fold

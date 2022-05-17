@@ -81,6 +81,14 @@ let filter_map = ExtList.filter_map
 let exists = ExtList.exists
 let get_nth = ExtList.nth
 
+let clean_up pfs =
+  ExtList.filter
+    (fun (pf : Formula.t) ->
+      match pf with
+      | Formula.ILessEq (Lit (Int x), UnOp (LstLen, _)) when x = Z.zero -> false
+      | _ -> true)
+    pfs
+
 let rec get_relevant_info (_ : SS.t) (lvars : SS.t) (locs : SS.t) (pfs : t) :
     SS.t * SS.t * SS.t =
   let relevant = SS.union lvars locs in

@@ -234,22 +234,29 @@ let rem_freed heap loc =
 
 (***** Some things specific to symbolic heaps ********)
 
-let merge_loc heap new_loc old_loc =
-  let old_block =
-    Option.value ~default:Block.empty (Hashtbl.find_opt heap old_loc)
-  in
-  let new_block =
-    Option.value ~default:Block.empty (Hashtbl.find_opt heap new_loc)
+let merge_loc (heap : t) new_loc old_loc : unit =
+  let old_block, new_block =
+    (Hashtbl.find_opt heap old_loc, Hashtbl.find_opt heap new_loc)
   in
   match (old_block, new_block) with
-  | Freed, Freed -> Hashtbl.remove heap old_loc
-  | _, Freed | Freed, _ -> failwith "merging non-freed and freed block"
-  | ( Allocated { data = old_data; bound = old_bound },
-      Allocated { data = new_data; bound = new_bound } ) ->
-      let data = SFVL.union new_data old_data in
-      let bound = if Option.is_some new_bound then new_bound else old_bound in
-      let () = Hashtbl.replace heap new_loc (Allocated { data; bound }) in
+  | Some Block.Freed, Some Block.Freed -> Hashtbl.remove heap old_loc
+  | None, Some Block.Freed -> ()
+  | Some Block.Freed, None ->
+      Hashtbl.replace heap new_loc Block.Freed;
       Hashtbl.remove heap old_loc
+  | _, _ -> (
+      let old_block = Option.value ~default:Block.empty old_block in
+      let new_block = Option.value ~default:Block.empty new_block in
+      match (old_block, new_block) with
+      | _, Freed | Freed, _ -> failwith "merging non-freed and freed block"
+      | ( Allocated { data = old_data; bound = old_bound },
+          Allocated { data = new_data; bound = new_bound } ) ->
+          let data = SFVL.union new_data old_data in
+          let bound =
+            if Option.is_some new_bound then new_bound else old_bound
+          in
+          let () = Hashtbl.replace heap new_loc (Allocated { data; bound }) in
+          Hashtbl.remove heap old_loc)
 
 let substitution_in_place subst heap :
     (t * Formula.Set.t * (string * Type.t) list) list =

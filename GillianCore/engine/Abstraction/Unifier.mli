@@ -28,11 +28,23 @@ module type S = sig
   val unfold_all : t -> string -> t list
   val unfold_with_vals : t -> vt list -> (st * t) list * bool
   val unfold_concrete_preds : t -> (st option * t) option
-  val unify_assertion : t -> st -> string list option -> UP.step -> u_res
-  val unify_up : search_state -> up_u_res
-  val unify : ?in_unification:bool -> t -> st -> UP.t -> unify_kind -> up_u_res
+
+  val unify_assertion :
+    ?is_post:bool -> t -> st -> string list option -> UP.step -> u_res
+
+  val unify_up : ?is_post:bool -> search_state -> up_u_res
+
+  val unify :
+    ?is_post:bool ->
+    ?in_unification:bool ->
+    t ->
+    st ->
+    UP.t ->
+    unify_kind ->
+    up_u_res
 
   val get_pred :
+    ?is_post:bool ->
     ?in_unification:bool ->
     t ->
     string ->

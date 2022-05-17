@@ -89,6 +89,7 @@ val filter_with_info :
 val sort : t -> unit
 
 val remove_duplicates : t -> unit
+val clean_up : t -> unit
 
 val get_relevant_info :
   Containers.SS.t ->
