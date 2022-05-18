@@ -9,9 +9,34 @@ import { ProviderResult } from 'vscode';
 import { activateCodeLens } from './activateCodeLens';
 import { activateDebug } from './activateDebug';
 
+type LogEvent = {
+	msg: string,
+	json?: string
+};
+
+function handleCustomEvent({ body, event, session } : vscode.DebugSessionCustomEvent) {
+	switch (event) {
+		case 'log':
+			const { msg, json } = body as LogEvent;
+			console.log(msg);
+			if (json !== undefined) {
+				try {
+					const parsedJson = JSON.parse(json);
+					if (parsedJson !== null && parsedJson !== undefined) {
+						console.log(JSON.parse(json));
+					}
+				} catch (e) {}
+			}
+			break;
+		default:
+			console.error(`Unhandled custom event '${event}'`);
+	}
+}
+
 export function activate(context: vscode.ExtensionContext) {
 	activateDebug(context, new DebugAdapterExecutableFactory());
 	activateCodeLens(context);
+	context.subscriptions.push(vscode.debug.onDidReceiveDebugSessionCustomEvent(handleCustomEvent));
 }
 
 export function deactivate() {
