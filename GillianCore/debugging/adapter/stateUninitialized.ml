@@ -10,7 +10,7 @@ module Make (Debugger : Debugger.S) = struct
       (module Initialize_command)
       (fun arg ->
         prevent_reenter ();
-        Log.info "Initialize request received";
+        "Initialize request received" |> Log.to_rpc rpc;
         let caps =
           Capabilities.(
             make ~supports_configuration_done_request:(Some true)

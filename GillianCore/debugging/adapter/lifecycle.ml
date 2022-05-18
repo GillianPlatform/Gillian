@@ -8,24 +8,22 @@ module Make (Debugger : Debugger.S) = struct
     let send_initialize_event () =
       Debug_rpc.send_event rpc (module Initialized_event) ()
     in
+    let () = "Howdy!" |> Log.to_rpc rpc in
     Debug_rpc.set_command_handler rpc
       (module Configuration_done_command)
       (fun _ ->
-        Log.info "Configuration done ";
+        "Configuration done " |> Log.to_rpc rpc;
         let open Launch_command.Arguments in
         if not launch_args.stop_on_entry then (
-          Log.info "Do not stop on entry";
+          "Do not stop on entry" |> Log.to_rpc rpc;
           let stop_reason = Debugger.run ~launch:true dbg in
           match stop_reason with
           | Step ->
-              let () =
-                Log.info
-                  "Debugger stopped because of step after running. This should \
-                   not happen"
-              in
+              "Debugger stopped because of step after running. This should not \
+               happen" |> Log.to_rpc rpc;
               Lwt.return_unit
           | ReachedEnd ->
-              let () = Log.info "ReachedEnd: exiting" in
+              "ReachedEnd: exiting" |> Log.to_rpc rpc;
               Debug_rpc.send_event rpc
                 (module Exited_event)
                 Exited_event.Payload.(make ~exit_code:0);%lwt
@@ -55,7 +53,7 @@ module Make (Debugger : Debugger.S) = struct
                   make ~reason:Stopped_event.Payload.Reason.Exception
                     ~thread_id:(Some 0) ()))
         else (
-          Log.info "Stop on entry";
+          "Stop on entry" |> Log.to_rpc rpc;
           Debug_rpc.send_event rpc
             (module Stopped_event)
             Stopped_event.Payload.(
@@ -64,9 +62,8 @@ module Make (Debugger : Debugger.S) = struct
     Debug_rpc.set_command_handler rpc
       (module Disconnect_command)
       (fun _ ->
-        Log.info
-          "Disconnect request received: interrupting the debugger is not \
-           supported";
+        "Disconnect request received: interrupting the debugger is not \
+         supported" |> Log.to_rpc rpc;
         Debugger.terminate dbg;
         Debug_rpc.remove_command_handler rpc (module Disconnect_command);
         Lwt.wakeup_later_exn resolver Exit;

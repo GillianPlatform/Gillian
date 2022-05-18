@@ -10,7 +10,7 @@ module Make (Debugger : Debugger.S) = struct
     Debug_rpc.set_command_handler rpc
       (module Launch_command)
       (fun (launch_args : DebugProtocolEx.Launch_command.Arguments.t) ->
-        Log.info "Launch request received";
+        "Launch request received" |> Log.to_rpc rpc;
         prevent_reenter ();
         let () =
           match
@@ -18,20 +18,20 @@ module Make (Debugger : Debugger.S) = struct
           with
           | Ok dbg -> Lwt.wakeup_later resolver (launch_args, dbg)
           | Error err ->
-              let () = Log.info err in
+              err |> Log.to_rpc rpc;
               Lwt.wakeup_later_exn resolver Exit
         in
         Lwt.return_unit);
     Debug_rpc.set_command_handler rpc
       (module Attach_command)
       (fun _ ->
-        Log.info "Attach request received";
+        "Attach request received" |> Log.to_rpc rpc;
         prevent_reenter ();
         Lwt.fail_with "Attach request is unsupported");
     Debug_rpc.set_command_handler rpc
       (module Disconnect_command)
       (fun _ ->
-        Log.info "Disconnect request received";
+        "Disconnect request received" |> Log.to_rpc rpc;
         Debug_rpc.remove_command_handler rpc (module Disconnect_command);
         Lwt.wakeup_later_exn resolver Exit;
         Lwt.return_unit);
