@@ -6,7 +6,7 @@ module Make (Debugger : Debugger.S) = struct
     Debug_rpc.set_command_handler rpc
       (module Set_breakpoints_command)
       (fun args ->
-        "Set breakpoints request received" |> Log.to_rpc rpc;
+        "Set breakpoints request received" |> Log.to_rpc;
         let source =
           args.Set_breakpoints_command.Arguments.source.Source.path
         in

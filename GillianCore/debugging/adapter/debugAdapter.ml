@@ -8,14 +8,14 @@ module Make (Debugger : Debugger.S) = struct
   module StateDebug = StateDebug.Make (Debugger)
 
   let start in_ out =
-    Log.reset ();
     let rpc = Debug_rpc.create ~in_ ~out () in
+    let () = Log.setup rpc in
     let cancel = ref (fun () -> ()) in
     Lwt.async (fun () ->
         (try%lwt
-           "Initializing Debug Adapter..." |> Log.to_rpc rpc;
+           "Initializing Debug Adapter..." |> Log.to_rpc;
            let%lwt _, _ = StateUninitialized.run rpc in
-           "Initialized Debug Adapter" |> Log.to_rpc rpc;
+           "Initialized Debug Adapter" |> Log.to_rpc;
            let%lwt launch_args, dbg = StateInitialized.run rpc in
            StateDebug.run launch_args dbg rpc;%lwt
            fst (Lwt.task ())
@@ -25,6 +25,6 @@ module Make (Debugger : Debugger.S) = struct
     let loop = Debug_rpc.start rpc in
     (cancel := fun () -> Lwt.cancel loop);
     (try%lwt loop with Lwt.Canceled -> Lwt.return_unit);%lwt
-    "Loop end" |> Log.to_rpc rpc;
+    "Loop end" |> Log.to_rpc;
     Lwt.return ()
 end

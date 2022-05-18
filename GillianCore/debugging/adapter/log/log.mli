@@ -1,3 +1,3 @@
 val info : string -> unit
-val reset : unit -> unit
-val to_rpc : Debug_rpc.t -> ?json:string -> string -> unit
+val setup : Debug_rpc.t -> unit
+val to_rpc : ?json:string -> string -> unit
