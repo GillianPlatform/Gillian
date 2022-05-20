@@ -1347,7 +1347,7 @@ module Make
     let state, _, _, _ = pstate in
     State.get_pfs state
 
-  let hides ?is_post:_ ~used_unifiables:_ _ ~exprs_to_hide:_ =
+  let hides ~is_post:_ ~used_unifiables:_ ~exprs_to_hide:_ _ =
     failwith "Check for hidden variables only available from symbolic states."
 
   let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =

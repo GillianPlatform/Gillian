@@ -11,10 +11,10 @@ module type S = sig
   val get_lvars_for_exact : t -> Var.Set.t
 
   val hides :
-    ?is_post:bool ->
+    is_post:bool ->
     used_unifiables:Expr.Set.t ->
-    t ->
     exprs_to_hide:Expr.t list ->
+    t ->
     (unit, Expr.t) result
 end
 
@@ -823,10 +823,10 @@ module Make (SMemory : SMemory.S) :
     pfs
 
   let hides
-      ?(is_post = false)
+      ~is_post
       ~(used_unifiables : ES.t)
-      (state : t)
-      ~(exprs_to_hide : vt list) =
+      ~(exprs_to_hide : vt list)
+      (state : t) =
     let elist_pp = Fmt.list ~sep:Fmt.comma Expr.pp in
     let () =
       L.verbose (fun fmt ->
