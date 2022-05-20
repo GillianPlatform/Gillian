@@ -33,8 +33,6 @@ module type S = sig
   val unify_assertion :
     ?is_post:bool -> t -> st -> string list option -> UP.step -> u_res
 
-  val unify_up : ?is_post:bool -> search_state -> up_u_res
-
   val unify :
     ?is_post:bool ->
     ?in_unification:bool ->
@@ -1459,7 +1457,7 @@ module Make
                     make_resource_fail ())))
 
   and unify_up'
-      ?(is_post = false)
+      ~is_post
       (parent_ids : L.ReportId.t list ref)
       (s_states : search_state') : up_u_res =
     let s_states, errs_so_far = s_states in
@@ -1555,7 +1553,7 @@ module Make
             |> ignore;
             f (rest, errors @ errs_so_far))
 
-  and unify_up ?(is_post = false) (s_states : search_state) : up_u_res =
+  and unify_up ~is_post (s_states : search_state) : up_u_res =
     let () =
       L.verbose (fun fmt -> fmt "Unify UP: is-post: %a" Fmt.bool is_post)
     in

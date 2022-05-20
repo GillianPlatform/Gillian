@@ -32,8 +32,6 @@ module type S = sig
   val unify_assertion :
     ?is_post:bool -> t -> st -> string list option -> UP.step -> u_res
 
-  val unify_up : ?is_post:bool -> search_state -> up_u_res
-
   val unify :
     ?is_post:bool ->
     ?in_unification:bool ->
