@@ -125,6 +125,23 @@ lemma SLLseg_vals_concat_SLL_vals {
     }
 }
 
+// A null-terminating SLLseg_vals is an SLL_vals
+lemma SLLseg_vals_to_SLL_vals {
+  statement:
+    forall x.
+      SLLseg_vals(#x, null, #vs) |- SLL_vals(#x, #vs)
+
+  variant: len #vs
+
+  proof:
+    unfold SLLseg_vals(#x, null, #vs);
+    if (not (#vs = [])) {
+      assert {bind: #nv, #nnext} (#x -b> #nv, #nnext);
+      apply SLLseg_vals_to_SLL_vals(#nnext)
+    };
+    fold SLL_vals(#x, #vs)
+}
+
 // SLLseg_len + trailing node -> larger, non-empty SLLseg_len
 lemma SSLseg_len_append_lr {
   statement:
@@ -164,17 +181,33 @@ lemma SSLseg_len_append_rl {
 lemma SLLseg_len_to_SLL_len {
   statement:
     forall x.
-      SLLseg_len(x, null, #n) |- SLL_len(x, #n)
+      SLLseg_len(#x, null, #n) |- SLL_len(#x, #n)
 
   variant: #n
 
   proof:
-    unfold SLLseg_len(x, null, #n);
+    unfold SLLseg_len(#x, null, #n);
     if (not (#n = 0)) {
-      assert {bind: #nv, #nnext} (x -b> #nv, #nnext);
+      assert {bind: #nv, #nnext} (#x -b> #nv, #nnext);
       apply SLLseg_len_to_SLL_len(#nnext)
     };
     fold SLL_len(#x, #n)
+}
+
+// List membership-concat compatibility
+lemma list_member_concat {
+  statement:
+    forall vs1, vs2, v.
+      list_member(#vs1, #v, #r1) * list_member(#vs2, #v, #r2) |- list_member(#vs1 @ #vs2, #v, (#r1 || #r2))
+
+  variant: len #vs1
+
+  proof:
+    unfold list_member(#vs1, #v, #r1);
+    if (not (#vs1 = [])) {
+      assert {bind: #nv1, #nvs1, #nr1} (#vs1 == #nv1 :: #nvs1) * list_member(#nvs1, v, #nr1);
+      apply list_member_concat(#nvs1, #vs2, #v)
+    }
 }
 
 //
@@ -414,6 +447,41 @@ function SLL_member(x, k){
   return found
 }
 { SLL_member_post(#def, #x, #vs) * list_member(#vs, #k, #r) * (ret == #r) }
+
+//
+// 05i. List membership
+//
+{ (x == #x) * (k == #k) * SLL_vals(#x, #vs) * list_member(#vs, #k, #r) }
+function SLL_member_iter(x, k) {
+  found := false;
+  next := x;
+  [[ invariant {bind: found, next, #beta, #gamma, #rg}
+       SLLseg_vals(x, next, #beta) * SLL_vals(next, #gamma) *
+         (#alpha == (#beta @ #gamma)) * (#r == (found || #rg)) *
+           list_member(#beta, k, found) * list_member(#gamma, k, #rg)
+     with variant: (len #gamma) ]] ;
+  while ((found = false) && (not (next = null))) {
+    [[ assert found == false ]];
+    [[ assert {bind: #v} next -> #v ]];
+    v := [ next ];
+    found := (v = k);
+    next := [next + 1];
+    [[ apply SSLseg_vals_append(x) ]];
+    [[ unfold list_member(#gamma, k, #rg) ]];
+    [[ apply list_member_concat(#beta, [ #v ], k) ]]
+  };
+  [[
+     if (found = false) {
+       apply SLLseg_vals_to_SLL_vals(#x)
+     } else {
+       assert {bind: #beta, #gamma} SLLseg_vals(#x, next, #beta) * SLL_vals(next, #gamma);
+       apply list_member_concat(#beta, #gamma, #k);
+       apply SLLseg_vals_concat_SLL_vals(#x)
+     }
+  ]];
+  return found
+}
+{ SLL_vals(#x, #vs) * list_member(#vs, #k, #r) * (ret == #r) }
 
 //
 // 06r. Freeing a given SLL
