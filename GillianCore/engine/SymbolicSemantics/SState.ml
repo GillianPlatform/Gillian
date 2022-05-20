@@ -466,10 +466,11 @@ module Make (SMemory : SMemory.S) :
     |> SS.union (SMemory.lvars heap)
     |> SS.union (PFS.lvars pfs)
 
-  let get_alocs_for_exact ?(is_post = false) (state : t) : Var.Set.t =
+  let get_alocs_for_exact (state : t) : Var.Set.t =
     let heap, store, pfs, _, _ = state in
-    let initial = if is_post then SStore.alocs store else SS.empty in
-    initial |> SS.union (SMemory.alocs heap) |> SS.union (PFS.alocs pfs)
+    SStore.alocs store
+    |> SS.union (SMemory.alocs heap)
+    |> SS.union (PFS.alocs pfs)
 
   let to_assertions ?(to_keep : SS.t option) (state : t) : Asrt.t list =
     let heap, store, pfs, gamma, _ = state in
