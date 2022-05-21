@@ -8,11 +8,13 @@ module type S = sig
 
   val get_typ_env : t -> TypEnv.t
   val get_pfs : t -> PFS.t
+  val get_lvars_for_exact : t -> Var.Set.t
 
   val hides :
+    is_post:bool ->
     used_unifiables:Expr.Set.t ->
-    t ->
     exprs_to_hide:Expr.t list ->
+    t ->
     (unit, Expr.t) result
 end
 
@@ -459,16 +461,16 @@ module Make (SMemory : SMemory.S) :
     |> SS.union svars
 
   let get_lvars_for_exact (state : t) : Var.Set.t =
-    let heap, store, pfs, gamma, _ = state in
-    SMemory.lvars heap
-    |> SS.union (SStore.lvars store)
+    let heap, store, pfs, _, _ = state in
+    SStore.lvars store
+    |> SS.union (SMemory.lvars heap)
     |> SS.union (PFS.lvars pfs)
-    |> SS.union (TypEnv.lvars gamma)
 
   let get_alocs_for_exact (state : t) : Var.Set.t =
     let heap, store, pfs, _, _ = state in
-    List.fold_left SS.union SS.empty
-      [ SMemory.alocs heap; SStore.alocs store; PFS.alocs pfs ]
+    SStore.alocs store
+    |> SS.union (SMemory.alocs heap)
+    |> SS.union (PFS.alocs pfs)
 
   let to_assertions ?(to_keep : SS.t option) (state : t) : Asrt.t list =
     let heap, store, pfs, gamma, _ = state in
@@ -821,20 +823,28 @@ module Make (SMemory : SMemory.S) :
     let _, _, pfs, _, _ = state in
     pfs
 
-  let hides ~(used_unifiables : ES.t) (state : t) ~(exprs_to_hide : vt list) =
+  let hides
+      ~is_post
+      ~(used_unifiables : ES.t)
+      ~(exprs_to_hide : vt list)
+      (state : t) =
     let elist_pp = Fmt.list ~sep:Fmt.comma Expr.pp in
     let () =
       L.verbose (fun fmt ->
-          fmt "\nEXACT: HIDES: \nUsed: %a\nTo hide: %a\n\nSTATE:\n%a\n" elist_pp
+          fmt
+            "\nEXACT: HIDES: In-post: %a\nUsed: %a\nTo hide: %a\n\nSTATE:\n%a\n"
+            Fmt.bool is_post elist_pp
             (ES.elements used_unifiables)
             elist_pp exprs_to_hide pp state)
     in
     let heap, store, pfs, gamma, _ = copy state in
+    let store = if is_post then SStore.init [] else store in
     let state = (heap, store, pfs, gamma, SS.empty) in
     let subst, states = simplify ~kill_new_lvars:true state in
     List.fold_left
       (fun outcome state ->
-        let heap, _, _, _, _ = state in
+        let heap, _, pfs, _, _ = state in
+        PFS.clean_up pfs;
         let used_unifiables =
           ES.map (SSubst.subst_in_expr ~partial:true subst) used_unifiables
         in
@@ -885,7 +895,7 @@ module Make (SMemory : SMemory.S) :
                 in
                 let () =
                   L.verbose (fun fmt ->
-                      fmt "EXACT: ERROR: hidden expression in store: %a" Expr.pp
+                      fmt "EXACT: ERROR: hidden expression in state: %a" Expr.pp
                         non_hidable_expr)
                 in
                 Error non_hidable_expr))

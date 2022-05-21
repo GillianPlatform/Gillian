@@ -41,6 +41,7 @@ val learn_expr :
 
 val ins_outs_expr : KB.t -> Expr.t -> Expr.t -> (KB.t * outs) list
 val collect_simple_asrts : Asrt.t -> Asrt.t list
+val empty_up : t
 
 val init :
   ?use_params:bool ->
@@ -55,7 +56,7 @@ val init :
 val next : t -> (t * (string * SS.t) option) list option
 val head : t -> step option
 val posts : t -> (Flag.t * Asrt.t list) option
-val ox : t -> string list option
+val hides : t -> string list option
 
 val init_prog :
   ?preds_tbl:(string, pred) Hashtbl.t ->

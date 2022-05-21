@@ -628,19 +628,20 @@ let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
 let rec lift_up
     (up : pt)
     (posts : (Flag.t * Asrt.t list) option)
-    (ox : string list) : t =
+    (hides : string list) : t =
   match up with
-  | [] -> Leaf (None, posts, ox)
-  | [ p ] -> Leaf (Some p, posts, ox)
-  | p :: up' -> Inner (p, [ lift_up up' posts ox ])
+  | [] -> Leaf (None, posts, hides)
+  | [ p ] -> Leaf (Some p, posts, hides)
+  | p :: up' -> Inner (p, [ lift_up up' posts hides ])
 
 let add_up
     (g_up : t)
     (up_post : pt * (Flag.t * Asrt.t list) option)
-    (ox : string list) : t =
+    (hides : string list) : t =
   match (g_up, up_post) with
-  | PhantomInner ups, (up, posts) -> PhantomInner (ups @ [ lift_up up posts ox ])
-  | _, (up, posts) -> PhantomInner [ g_up; lift_up up posts ox ]
+  | PhantomInner ups, (up, posts) ->
+      PhantomInner (ups @ [ lift_up up posts hides ])
+  | _, (up, posts) -> PhantomInner [ g_up; lift_up up posts hides ]
 
 let lift_ups
     (ups :
@@ -656,17 +657,21 @@ let lift_ups
         | _ -> false)
       ups
   in
-  let ups' = List.map (fun (up, (_, posts), ox) -> (up, posts, ox)) ups in
+  let ups' = List.map (fun (up, (_, posts), hides) -> (up, posts, hides)) ups in
   if b then
     (* Printf.printf "BUILDING GUP FOR SPEC WITH EXISTENTIALS\n"; *)
     let gups =
-      List.map (fun (up, (lab, posts), ox) -> (lift_up up posts ox, lab)) ups
+      List.map
+        (fun (up, (lab, posts), hides) -> (lift_up up posts hides, lab))
+        ups
     in
     LabPhantomInner gups
   else
     List.fold_left
-      (fun ac (up, posts, ox) -> add_up ac (up, posts) ox)
+      (fun ac (up, posts, hides) -> add_up ac (up, posts) hides)
       (PhantomInner []) ups'
+
+let empty_up = Leaf (None, None, [])
 
 let init
     ?(use_params : bool option)
@@ -685,7 +690,7 @@ let init
 
   let ups =
     List.map
-      (fun (asrt, (lab, posts, ox)) ->
+      (fun (asrt, (lab, posts, hides)) ->
         let existentials =
           Option.fold
             ~some:(fun (_, existentials) ->
@@ -698,7 +703,7 @@ let init
         L.verbose (fun m -> m "Known unifiables: %a\n" kb_pp known_unifiables);
         L.verbose (fun m -> m "Existentials: %a\n" kb_pp existentials);
         let known_unifiables = KB.union known_unifiables existentials in
-        (s_init known_unifiables preds asrt, (lab, posts, ox)))
+        (s_init known_unifiables preds asrt, (lab, posts, hides)))
       asrts_posts
   in
   let errors, _ =
@@ -724,13 +729,13 @@ let init
     Ok
       (lift_ups
          (List.map
-            (fun (up, (lab, posts, ox)) ->
+            (fun (up, (lab, posts, hides)) ->
               ( (match up with
                 | Ok up -> up
                 | Error _ ->
                     raise (Failure "UP: init: Impossible: ok, but error")),
                 (lab, posts),
-                ox ))
+                hides ))
             ups))
 
 let next (up : t) : (t * (string * SS.t) option) list option =
@@ -754,9 +759,9 @@ let posts (up : t) : (Flag.t * Asrt.t list) option =
   | Leaf (_, posts, _) -> posts
   | _ -> None
 
-let ox (up : t) : string list option =
+let hides (up : t) : string list option =
   match up with
-  | Leaf (_, _, ox) -> Some ox
+  | Leaf (_, _, hides) -> Some hides
   | _ -> None
 
 let rec pp ft up =
@@ -766,20 +771,20 @@ let rec pp ft up =
     pf ft " [%s: @[<h>%a@]]" lab (iter ~sep:comma SS.iter string) vars
   in
   match up with
-  | Leaf (ostep, None, ox) ->
+  | Leaf (ostep, None, hides) ->
       pf ft "Leaf: @[%a@], Posts = NONE, hiding [%a]"
         (option ~none:(any "none") step_pp)
         ostep
         (Fmt.list ~sep:comma Fmt.string)
-        ox
-  | Leaf (ostep, Some (flag, posts), ox) ->
+        hides
+  | Leaf (ostep, Some (flag, posts), hides) ->
       pf ft "Leaf: @[%a@] with Flag %a, Posts:@\n  @[%a@], hiding [%a]"
         (option ~none:(any "none") step_pp)
         ostep Flag.pp flag
         (list ~sep:(any "@\n@\n") (hovbox Asrt.pp))
         posts
         (Fmt.list ~sep:comma Fmt.string)
-        ox
+        hides
   | Inner (step, next_ups) ->
       let pp_children ft ch =
         if List.length ch = 1 then pp ft (List.hd ch)
@@ -921,11 +926,11 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
 
         let defs =
           List.map
-            (fun (lab, def, ox) ->
+            (fun (lab, def, hides) ->
               let lab' =
                 Option.map (fun (s, vars) -> (s, SS.of_list vars)) lab
               in
-              (def, (lab', None, ox)))
+              (def, (lab', None, hides)))
             pred.pred_definitions
         in
 

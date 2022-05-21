@@ -506,7 +506,7 @@ struct
 
     let exact =
       let doc = "Exact verification" in
-      Arg.(value & flag & info [ "exv"; "exact-verification" ] ~doc)
+      Arg.(value & flag & info [ "exv"; "exact" ] ~doc)
 
     let process_files files already_compiled outfile_opt no_unfold incremental =
       Verification.start_time := Sys.time ();

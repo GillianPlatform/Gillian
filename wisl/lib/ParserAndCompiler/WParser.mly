@@ -3,7 +3,7 @@
 (* key words *)
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP NEW DELETE
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
-%token <CodeLoc.t> INVARIANT FOLD UNFOLD NOUNFOLD APPLY ASSERT EXIST OX FORALL
+%token <CodeLoc.t> INVARIANT FOLD UNFOLD NOUNFOLD APPLY ASSERT EXIST FORALL
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
 
 (* punctuation *)
@@ -315,7 +315,6 @@ lemma:
       FORALL lemma_params = var_list; DOT;
       lemma_hypothesis = logic_assertion; VDASH; lemma_conclusion = logic_assertion;
       lemma_variant = option(variant_def);
-      lemma_ox = option(ox_def);
       lemma_proof = option(proof_def);
       lend = RCBRACE
       { let (_, lemma_name) = lname in
@@ -326,7 +325,6 @@ lemma:
           lemma_params;
           lemma_proof;
           lemma_variant;
-          lemma_ox;
           lemma_hypothesis;
           lemma_conclusion;
           lemma_loc;
@@ -336,10 +334,6 @@ lemma:
 variant_def:
   | VARIANT; COLON; e = logic_expression { e }
 
-ox_def:
-  | OX; COLON; ox = separated_list(COMMA, LVAR);
-    { snd(List.split ox) }
-
 with_variant_def:
   | WITH; variant = variant_def { variant }
 
@@ -347,18 +341,9 @@ proof_def:
   | PROOF; COLON; pr = separated_nonempty_list(SEMICOLON, logic_command)
     { pr }
 
-ox_vars:
-  | LBRACK; OX; COLON; ox = separated_list(COMMA, LVAR); RBRACK;
-    { snd(List.split ox) }
-
-pred_def:
-  | def = logic_assertion; ox = option(ox_vars);
-    { let ox = Option.value ox ~default:[] in
-        (def, ox) }
-
 predicate:
   | lstart = PREDICATE; pred_nounfold = option(NOUNFOLD); lpname = IDENTIFIER; LBRACE; params_ins = separated_list(COMMA, pred_param_ins); RBRACE; LCBRACE;
-    pred_definitions = separated_nonempty_list(SEMICOLON, pred_def);
+    pred_definitions = separated_nonempty_list(SEMICOLON, logic_assertion);
     lend = RCBRACE;
     { let (_, pred_name) = lpname in
       let (pred_params, ins) : (string * WType.t option) list * bool list = List.split params_ins in

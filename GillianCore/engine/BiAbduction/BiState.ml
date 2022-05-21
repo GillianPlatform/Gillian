@@ -206,10 +206,6 @@ struct
     let _, state, _ = bi_state in
     State.get_lvars state
 
-  let get_lvars_for_exact (bi_state : t) : Var.Set.t =
-    let _, state, _ = bi_state in
-    State.get_lvars_for_exact state
-
   let to_assertions ?(to_keep : SS.t option) (bi_state : t) : Asrt.t list =
     let _, state, _ = bi_state in
     State.to_assertions ?to_keep state

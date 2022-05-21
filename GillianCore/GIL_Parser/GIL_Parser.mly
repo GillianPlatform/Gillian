@@ -133,7 +133,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token EXISTENTIALS
 %token BRANCH
 %token USESUBST
-%token OX
+%token HIDES
 (* Command keywords  *)
 %token SKIP
 %token DEFEQ
@@ -693,13 +693,13 @@ g_macro_target:
   }
 ;
 
-ox_vars:
-  | LBRACKET; OX; COLON; ox = separated_list(COMMA, LVAR); RBRACKET;
-    { ox }
+hides_vars:
+  | LBRACKET; HIDES; COLON; hides = separated_list(COMMA, LVAR); RBRACKET;
+    { hides }
 
 g_named_assertion_target:
-  id = option(assertion_id_target); a = g_assertion_target; ox = option(ox_vars)
-  { (id, a, Option.value ox ~default:[]) }
+  id = option(assertion_id_target); a = g_assertion_target; hides = option(hides_vars)
+  { (id, a, Option.value hides ~default:[]) }
 ;
 
 g_logic_cmd_target:
@@ -831,9 +831,9 @@ variant_target:
   VARIANT LBRACE; variant = expr_target; RBRACE
   { variant }
 
-ox_target:
-  OX; COLON; ox = separated_list(COMMA, LVAR)
-    { ox }
+hides_target:
+  HIDES; COLON; hides = separated_list(COMMA, LVAR)
+    { hides }
 
 lemma_head_target:
   lemma_name = VAR; LBRACE; lemma_params = separated_list(COMMA, VAR); RBRACE
@@ -852,7 +852,7 @@ g_lemma_target:
   LEMMA;
   lemma_head = lemma_head_target;
   lemma_variant = option(variant_target);
-  lemma_ox = option(ox_target);
+  lemma_hides = option(hides_target);
   lemma_hyp = g_spec_line;
   lemma_concs = g_mult_spec_line;
   lemma_existentials = option(existentials_target);
@@ -869,7 +869,7 @@ g_lemma_target:
       lemma_hyp;
       lemma_concs;
       lemma_spec_variant = lemma_variant;
-      lemma_spec_ox = lemma_ox
+      lemma_spec_hides = lemma_hides
     } in
     Lemma.
       {
@@ -879,7 +879,6 @@ g_lemma_target:
         lemma_params;
         lemma_specs = [ spec ];
         lemma_variant;
-        lemma_ox;
         lemma_proof;
         lemma_existentials;
       }

@@ -12,6 +12,8 @@ module type S = sig
   val initialise :
     state_t -> preds_t -> UP.preds_tbl_t option -> variants_t -> t
 
+  val expose : t -> state_t * preds_t * UP.preds_tbl_t * variants_t
+
   (** Get preds of given symbolic state *)
   val get_preds : t -> preds_t
 
@@ -114,6 +116,8 @@ module Make
       (variants : variants_t) : t =
     let pred_defs = Option.value ~default:(UP.init_pred_defs ()) pred_defs in
     (state, preds, pred_defs, variants)
+
+  let expose state = state
 
   let simplify
       ?(save = false)
@@ -1198,7 +1202,8 @@ module Make
       (up : UP.t)
       (unify_type : Unifier.unify_kind) : bool =
     let result =
-      match SUnifier.unify astate subst up unify_type with
+      let is_post = unify_type = Unifier.Postcondition in
+      match SUnifier.unify ~is_post astate subst up unify_type with
       | SUnifier.UPUSucc _ -> true
       | _ -> false
     in
@@ -1342,7 +1347,7 @@ module Make
     let state, _, _, _ = pstate in
     State.get_pfs state
 
-  let hides ~used_unifiables:_ _ ~exprs_to_hide:_ =
+  let hides ~is_post:_ ~used_unifiables:_ ~exprs_to_hide:_ _ =
     failwith "Check for hidden variables only available from symbolic states."
 
   let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =

@@ -108,12 +108,11 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
           lemma_hyp = jsil2gil_asrt lemma.pre;
           lemma_concs = List.map jsil2gil_asrt lemma.posts;
           lemma_spec_variant = lemma.variant;
-          lemma_spec_ox = None;
+          lemma_spec_hides = None;
         };
       ];
     lemma_proof = Option.map (List.map jsil2gil_lcmd) lemma.proof;
     lemma_variant = lemma.variant;
-    lemma_ox = None;
     lemma_existentials = lemma.existentials;
   }
 

@@ -803,7 +803,7 @@ let trans_lemma ~ann ~filepath lemma =
           lemma_hyp;
           lemma_concs;
           lemma_spec_variant = None;
-          lemma_spec_ox = None;
+          lemma_spec_hides = None;
         };
     ]
   in
@@ -815,7 +815,6 @@ let trans_lemma ~ann ~filepath lemma =
       lemma_existentials = [];
       lemma_internal = false;
       lemma_variant = None;
-      lemma_ox = None;
       lemma_specs;
       lemma_proof;
     }

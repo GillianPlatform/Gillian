@@ -29,11 +29,21 @@ module type S = sig
   val unfold_all : t -> string -> t list
   val unfold_with_vals : t -> vt list -> (st * t) list * bool
   val unfold_concrete_preds : t -> (st option * t) option
-  val unify_assertion : t -> st -> string list option -> UP.step -> u_res
-  val unify_up : search_state -> up_u_res
-  val unify : ?in_unification:bool -> t -> st -> UP.t -> unify_kind -> up_u_res
+
+  val unify_assertion :
+    ?is_post:bool -> t -> st -> string list option -> UP.step -> u_res
+
+  val unify :
+    ?is_post:bool ->
+    ?in_unification:bool ->
+    t ->
+    st ->
+    UP.t ->
+    unify_kind ->
+    up_u_res
 
   val get_pred :
+    ?is_post:bool ->
     ?in_unification:bool ->
     t ->
     string ->
@@ -895,6 +905,7 @@ module Make
           true (SS.elements existentials)
 
   let rec get_pred
+      ?(is_post = false)
       ?(in_unification : bool option)
       (astate : t)
       (pname : string)
@@ -987,7 +998,7 @@ module Make
         let vs_ins = Pred.in_args pred.pred vs in
         let vs_ins = List.map Option.get vs_ins in
         let subst = ESubst.init (List.combine param_ins vs_ins) in
-        match unify ?in_unification astate subst up Fold with
+        match unify ~is_post ?in_unification astate subst up Fold with
         | UPUSucc rets ->
             let rets =
               List.map
@@ -1117,9 +1128,10 @@ module Make
               (success, fail_pf)
 
   and unify_assertion
+      ?(is_post = false)
       (astate : t)
       (subst : ESubst.t)
-      (ox : string list option)
+      (hides : string list option)
       (step : UP.step) : u_res =
     (* Auxiliary function for actions and predicates, with indexed outs *)
     let state, preds, pred_defs, variants = astate in
@@ -1260,7 +1272,7 @@ module Make
                       Fmt.(brackets (list ~sep:comma Val.pp))
                       vs_ins);
                 match
-                  get_pred ~in_unification:true astate pname vs
+                  get_pred ~is_post ~in_unification:true astate pname vs
                     (Some (subst, step, outs, les_outs))
                 with
                 | GPSucc [] ->
@@ -1376,17 +1388,17 @@ module Make
           | _ -> raise (Failure "Illegal Assertion in Unification Plan")
         in
         (* TODO: Exact unification *)
-        match (!Config.Verification.exact, ox, result) with
+        match (!Config.Verification.exact, hides, result) with
         | false, _, _
         | true, None, _
         | true, Some [], _
         | true, _, UWTF
         | true, _, UFail _ -> result
-        | true, Some ox, USucc (state, preds, _, _) -> (
+        | true, Some hides, USucc (state, preds, _, _) -> (
             L.verbose (fun fmt ->
                 fmt "EXACT: Hiding: %a\n"
                   (Fmt.list ~sep:Fmt.comma Fmt.string)
-                  ox);
+                  hides);
             let ox_bindings =
               List.filter_map
                 (fun x ->
@@ -1405,8 +1417,9 @@ module Make
                             ("EXACT: ERROR: Program variable in bindings: " ^ x)
                       | e -> Some e)
                   | None ->
+                      L.verbose (fun fmt -> fmt "Subst:\n%a" ESubst.pp subst);
                       failwith ("EXACT: ERROR: no binding in subst for " ^ x))
-                ox
+                hides
             in
             (* TODO: Some setup using preds *)
             let used_unifiables =
@@ -1431,7 +1444,8 @@ module Make
                 make_resource_fail ()
             | true -> (
                 match
-                  State.hides ~used_unifiables state ~exprs_to_hide:ox_bindings
+                  State.hides ~is_post ~used_unifiables state
+                    ~exprs_to_hide:ox_bindings
                 with
                 | Ok () -> result
                 | Error nhe ->
@@ -1442,14 +1456,16 @@ module Make
                     in
                     make_resource_fail ())))
 
-  and unify_up' (parent_ids : L.ReportId.t list ref) (s_states : search_state')
-      : up_u_res =
+  and unify_up'
+      ~is_post
+      (parent_ids : L.ReportId.t list ref)
+      (s_states : search_state') : up_u_res =
     let s_states, errs_so_far = s_states in
     L.(
       verbose (fun m ->
           m "Unify UP: There are %d states left to consider."
             (List.length s_states)));
-    let f = unify_up' parent_ids in
+    let f = unify_up' ~is_post parent_ids in
     match s_states with
     | [] -> UPUFail errs_so_far
     | ((state, subst, up), target_case_depth, is_new_case) :: rest -> (
@@ -1458,11 +1474,11 @@ module Make
             state subst up
         in
         let cur_step : UP.step option = UP.head up in
-        let ox = UP.ox up in
+        let hides = UP.hides up in
         let ret =
           try
             Option.fold
-              ~some:(unify_assertion state subst ox)
+              ~some:(unify_assertion ~is_post state subst hides)
               ~none:(USucc state) cur_step
           with err -> (
             L.verbose (fun fmt ->
@@ -1537,18 +1553,22 @@ module Make
             |> ignore;
             f (rest, errors @ errs_so_far))
 
-  and unify_up (s_states : search_state) : up_u_res =
+  and unify_up ~is_post (s_states : search_state) : up_u_res =
+    let () =
+      L.verbose (fun fmt -> fmt "Unify UP: is-post: %a" Fmt.bool is_post)
+    in
     let parent_ids = ref [] in
     let s_states =
       let states, errs = s_states in
       let states = states |> List.map (fun state -> (state, 0, false)) in
       (states, errs)
     in
-    let res = unify_up' parent_ids s_states in
+    let res = unify_up' ~is_post parent_ids s_states in
     List.iter (fun parent_id -> L.release_parent (Some parent_id)) !parent_ids;
     res
 
   and unify
+      ?(is_post = false)
       ?(in_unification = false)
       (astate : t)
       (subst : ESubst.t)
@@ -1591,7 +1611,7 @@ module Make
     UnifyReport.as_parent
       { astate = AstateRec.from astate; subst; up; unify_kind }
       (fun () ->
-        let ret = unify_up ([ (astate, subst, up) ], []) in
+        let ret = unify_up ~is_post ([ (astate, subst, up) ], []) in
         match ret with
         | UPUSucc _ ->
             L.verbose (fun fmt -> fmt "Unifier.unify: Success");
@@ -1623,7 +1643,7 @@ module Make
                     | Some (_, astate) ->
                         (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
                         let subst'' = ESubst.copy subst_i in
-                        unify_up ([ (astate, subst'', up) ], []))
+                        unify_up ~is_post ([ (astate, subst'', up) ], []))
                   sp
               in
               merge_upu_res rets)

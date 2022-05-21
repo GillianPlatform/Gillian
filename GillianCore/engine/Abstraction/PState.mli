@@ -12,6 +12,8 @@ module type S = sig
   val initialise :
     state_t -> preds_t -> UP.preds_tbl_t option -> variants_t -> t
 
+  val expose : t -> state_t * preds_t * UP.preds_tbl_t * variants_t
+
   (** Get preds of given symbolic state *)
   val get_preds : t -> preds_t
 

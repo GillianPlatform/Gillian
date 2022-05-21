@@ -3,7 +3,6 @@ type t = {
   lemma_params : string list;
   lemma_proof : WLCmd.t list option;
   lemma_variant : WLExpr.t option;
-  lemma_ox : string list option;
   lemma_hypothesis : WLAssert.t;
   lemma_conclusion : WLAssert.t;
   lemma_id : int;
