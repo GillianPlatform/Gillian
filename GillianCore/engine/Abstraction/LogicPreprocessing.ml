@@ -554,6 +554,35 @@ let unfold_bispecs
                  Hashtbl.replace procs name { proc with Proc.spec = Some { spec with sspecs = spec.sspecs @ [ sspec ] } }
      ) procs *)
 
+(** Only use in exact mode, as assertion may fail in over-approx mode *)
+let lemma_spec_hidings (lemma_name : string) (spec : Lemma.spec) =
+  let pre_lvars =
+    SS.filter Names.is_spec_var_name (Asrt.lvars spec.lemma_hyp)
+  in
+  let post_lvars =
+    SS.filter Names.is_spec_var_name (Asrt.lvars (List.hd spec.lemma_concs))
+  in
+  L.verbose (fun fmt ->
+      fmt "Hidden logicals for one spec of lemma %s" lemma_name);
+  L.verbose (fun fmt ->
+      fmt "Logical variables of pre-condition: %a"
+        Fmt.(list ~sep:comma string)
+        (SS.elements pre_lvars));
+  L.verbose (fun fmt ->
+      fmt "Logical variables of post-condition: %a"
+        Fmt.(list ~sep:comma string)
+        (SS.elements post_lvars));
+  let hidden_variables = SS.diff pre_lvars post_lvars in
+  L.verbose (fun fmt ->
+      fmt "Hidden logicals: %a"
+        Fmt.(list ~sep:comma string)
+        (SS.elements hidden_variables));
+  SS.elements (SS.diff pre_lvars post_lvars)
+
+let add_hides_to_spec lemma_name spec =
+  let hidings = lemma_spec_hidings lemma_name spec in
+  { spec with lemma_spec_hides = Some hidings }
+
 let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
   let f (prog : ('a, int) Prog.t) unfold =
     let procs = prog.procs in
@@ -564,48 +593,17 @@ let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
     let procs', preds', lemmas' = explicit_param_types procs preds lemmas in
 
     let () =
-      Hashtbl.iter
+      Hashtbl.filter_map_inplace
         (fun name lemma ->
           let lemma = Lemma.add_param_bindings lemma in
-          let lemma_specs_with_hiding =
-            List.map
-              (fun (spec : Lemma.spec) ->
-                assert (List.length spec.lemma_concs = 1);
-                let hidden =
-                  match !Config.Verification.exact with
-                  | true ->
-                      let pre_lvars =
-                        SS.filter Names.is_spec_var_name
-                          (Asrt.lvars spec.lemma_hyp)
-                      in
-                      let post_lvars =
-                        SS.filter Names.is_spec_var_name
-                          (Asrt.lvars (List.hd spec.lemma_concs))
-                      in
-                      L.verbose (fun fmt ->
-                          fmt "Hidden logicals for one spec of lemma %s"
-                            lemma.lemma_name);
-                      L.verbose (fun fmt ->
-                          fmt "Logical variables of pre-condition: %a"
-                            Fmt.(list ~sep:comma string)
-                            (SS.elements pre_lvars));
-                      L.verbose (fun fmt ->
-                          fmt "Logical variables of post-condition: %a"
-                            Fmt.(list ~sep:comma string)
-                            (SS.elements post_lvars));
-                      let hidden_variables = SS.diff pre_lvars post_lvars in
-                      L.verbose (fun fmt ->
-                          fmt "Hidden logicals: %a"
-                            Fmt.(list ~sep:comma string)
-                            (SS.elements hidden_variables));
-                      Some (SS.elements (SS.diff pre_lvars post_lvars))
-                  | false -> None
-                in
-                { spec with lemma_spec_hides = hidden })
-              lemma.lemma_specs
-          in
-          let lemma = { lemma with lemma_specs = lemma_specs_with_hiding } in
-          Hashtbl.replace lemmas' name lemma)
+          if !Config.Verification.exact then
+            Some
+              {
+                lemma with
+                lemma_specs =
+                  List.map (add_hides_to_spec name) lemma.lemma_specs;
+              }
+          else Some lemma)
         lemmas'
     in
 
