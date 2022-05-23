@@ -7,8 +7,8 @@
 		{
 			"type": "gillian",
 			"request": "launch",
-			"name": "Debug list_append.gil",
-			"program": "${workspaceFolder}/wisl/list_append.gil",
+			"name": "Debug list_length.wisl",
+			"program": "${workspaceFolder}/list_length.gil",
 			"stopOnEntry": true,
 			"targetLanguage": "wisl",
 			"trace": false
@@ -30,14 +30,6 @@
 			"stopOnEntry": true,
 			"targetLanguage": "js",
 			"procedureName": "listCopy",
-			"trace": false
-		},
-		{
-			"type": "gillian",
-			"request": "launch",
-			"name": "Debug list_dispose.wisl",
-			"program": "${workspaceFolder}/wisl/list_dispose.wisl",
-			"stopOnEntry": true,
 			"trace": false
 		}
 	]

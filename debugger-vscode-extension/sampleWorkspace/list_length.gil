@@ -1,0 +1,26 @@
+import "wisl_pointer_arith.gil", "wisl_core.gil";
+
+
+pred list(+x, alpha : List) : (x == null) * (alpha == {{  }}),
+  <cell>(#lgvar0, #lgvar1; #v) * <cell>(#lgvar0, (#lgvar1 i+ 1i); #z) *
+  types(#lgvar0 : Obj, #lgvar1 : Int) * (x == {{ #lgvar0, #lgvar1 }}) *
+  list(#z, #beta) * (alpha == l+ ({{ #v }}, #beta));
+
+spec llen(x)
+  [[  (x == #x) * list(#x, #alpha)  ]]
+  [[  list(#x, #alpha) * (ret == (l-len #alpha))  ]]
+  normal
+proc llen(x) {
+          goto [(x = null)] then0 else0;
+  then0:  n := 0i;
+          goto endif0;
+  else0:  gvar0 := "i__add"(x, 1i);
+          gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+          t := l-nth(gvar1, 2i);
+          n := "llen"(t);
+          gvar2 := "i__add"(n, 1i);
+          n := gvar2;
+  endif0: skip;
+          ret := n;
+          return
+};
