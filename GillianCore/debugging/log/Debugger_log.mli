@@ -7,5 +7,6 @@ exception FailureJson of string * JsonMap.t
 val info : string -> unit
 val enabled : unit -> bool
 val setup : Debug_rpc.t -> unit
-val to_rpc : ?json:JsonMap.t -> string -> unit
 val show_report : string -> Logging.ReportId.t -> unit
+val log : (unit -> string * JsonMap.t) -> unit
+val failwith : (unit -> JsonMap.t) -> string -> 'a

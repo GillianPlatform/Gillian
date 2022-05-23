@@ -1,5 +1,5 @@
 open DebugProtocolEx
-module Log = Debugger_log
+module DL = Debugger_log
 
 module Make (Debugger : Debugger.S) = struct
   let run dbg rpc =
@@ -7,7 +7,7 @@ module Make (Debugger : Debugger.S) = struct
     Debug_rpc.set_command_handler rpc
       (module Set_breakpoints_command)
       (fun args ->
-        "Set breakpoints request received" |> Log.to_rpc;
+        DL.log (fun () -> ("Set breakpoints request received", []));
         let source =
           args.Set_breakpoints_command.Arguments.source.Source.path
         in

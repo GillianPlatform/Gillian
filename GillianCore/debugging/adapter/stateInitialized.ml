@@ -1,5 +1,5 @@
 open DebugProtocolEx
-module Log = Debugger_log
+module DL = Debugger_log
 
 module Make (Debugger : Debugger.S) = struct
   let run rpc =
@@ -11,7 +11,7 @@ module Make (Debugger : Debugger.S) = struct
     Debug_rpc.set_command_handler rpc
       (module Launch_command)
       (fun (launch_args : DebugProtocolEx.Launch_command.Arguments.t) ->
-        "Launch request received" |> Log.to_rpc;
+        DL.log (fun () -> ("Launch request received", []));
         prevent_reenter ();
         let () =
           match
@@ -19,20 +19,20 @@ module Make (Debugger : Debugger.S) = struct
           with
           | Ok dbg -> Lwt.wakeup_later resolver (launch_args, dbg)
           | Error err ->
-              err |> Log.to_rpc;
+              DL.log (fun () -> (err, []));
               Lwt.wakeup_later_exn resolver Exit
         in
         Lwt.return_unit);
     Debug_rpc.set_command_handler rpc
       (module Attach_command)
       (fun _ ->
-        "Attach request received" |> Log.to_rpc;
+        DL.log (fun () -> ("Attach request received", []));
         prevent_reenter ();
         Lwt.fail_with "Attach request is unsupported");
     Debug_rpc.set_command_handler rpc
       (module Disconnect_command)
       (fun _ ->
-        "Disconnect request received" |> Log.to_rpc;
+        DL.log (fun () -> ("Disconnect request received", []));
         Debug_rpc.remove_command_handler rpc (module Disconnect_command);
         Lwt.wakeup_later_exn resolver Exit;
         Lwt.return_unit);

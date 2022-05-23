@@ -1,5 +1,5 @@
 module L = Logging
-module Log = Debugger_log
+module DL = Debugger_log
 module Gil_to_tl_lifter = Gil_to_tl_lifter
 module DebuggerTypes = DebuggerTypes
 module DebuggerUtils = DebuggerUtils
@@ -253,7 +253,7 @@ struct
            correctly"
           L.ReportId.pp report_id
     | Some (content, type_) -> (
-        Log.show_report ("Got report type " ^ type_) report_id;
+        DL.show_report ("Got report type " ^ type_) report_id;
         match type_ with
         | t when t = L.LoggingConstants.ContentType.cmd -> (
             dbg.cur_report_id <- report_id;
@@ -274,28 +274,27 @@ struct
             in
             match result with
             | None ->
-                let msg = "No matching result for branch case!" in
-                let branch_case_json =
-                  match branch_case with
-                  | Some branch_case -> branch_case_to_yojson branch_case
-                  | None -> `Null
-                in
-                let results_json =
-                  results
-                  |> List.map (fun (id, content) ->
-                         `List
-                           [
-                             L.ReportId.to_yojson id;
-                             Yojson.Safe.from_string content;
-                           ])
-                in
-                let json =
-                  [
-                    ("branch_case", branch_case_json);
-                    ("results", `List results_json);
-                  ]
-                in
-                raise (Log.FailureJson (msg, json))
+                DL.failwith
+                  (fun () ->
+                    let branch_case_json =
+                      match branch_case with
+                      | Some branch_case -> branch_case_to_yojson branch_case
+                      | None -> `Null
+                    in
+                    let results_json =
+                      results
+                      |> List.map (fun (id, content) ->
+                             `List
+                               [
+                                 L.ReportId.to_yojson id;
+                                 Yojson.Safe.from_string content;
+                               ])
+                    in
+                    [
+                      ("branch_case", branch_case_json);
+                      ("results", `List results_json);
+                    ])
+                  "No matching result for branch case!"
             | Some (id, _) ->
                 update_report_id_and_inspection_fields id NoCase dbg)
         | t
@@ -405,12 +404,12 @@ struct
     let open Verification.SAInterpreter in
     match dbg.cont_func with
     | None ->
-        "No cont_func; reached end" |> Log.to_rpc;
+        DL.log (fun () -> ("No cont_func; reached end", []));
         ReachedEnd
     | Some cont_func -> (
         match cont_func () with
         | Finished _ ->
-            "cont_func is Finished; reached end" |> Log.to_rpc;
+            DL.log (fun () -> ("cont_func is Finished; reached end", []));
             let () = dbg.cont_func <- None in
             ReachedEnd
         | Continue (cur_report_id, branch_case, cont_func) -> (
@@ -449,7 +448,7 @@ struct
         match prev_report_id with
         | None -> ReachedStart
         | Some prev_report_id ->
-            Log.show_report "Previous report" prev_report_id;
+            DL.show_report "Previous report" prev_report_id;
             let () =
               update_report_id_and_inspection_fields prev_report_id
                 (case_of_option branch_case)
@@ -476,10 +475,10 @@ struct
         in
         match next_report_id with
         | None ->
-            "No next report ID; executing next step" |> Log.to_rpc;
+            DL.log (fun () -> ("No next report ID; executing next step", []));
             execute_step dbg
         | Some next_report_id ->
-            Log.show_report "Next report ID found; not executing" next_report_id;
+            DL.show_report "Next report ID found; not executing" next_report_id;
             let () =
               update_report_id_and_inspection_fields next_report_id TakeFirst
                 dbg

@@ -1,4 +1,4 @@
-module Log = Debugger_log
+module DL = Debugger_log
 
 module type S = sig
   val start : Lwt_io.input_channel -> Lwt_io.output_channel -> unit Lwt.t
@@ -11,13 +11,13 @@ module Make (Debugger : Debugger.S) = struct
 
   let start in_ out =
     let rpc = Debug_rpc.create ~in_ ~out () in
-    let () = Log.setup rpc in
+    let () = DL.setup rpc in
     let cancel = ref (fun () -> ()) in
     Lwt.async (fun () ->
         (try%lwt
-           "Initializing Debug Adapter..." |> Log.to_rpc;
+           DL.log (fun () -> ("Initializing Debug Adapter...", []));
            let%lwt _, _ = StateUninitialized.run rpc in
-           "Initialized Debug Adapter" |> Log.to_rpc;
+           DL.log (fun () -> ("Initialized Debug Adapter", []));
            let%lwt launch_args, dbg = StateInitialized.run rpc in
            StateDebug.run launch_args dbg rpc;%lwt
            fst (Lwt.task ())

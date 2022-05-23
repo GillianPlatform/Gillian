@@ -49,13 +49,26 @@ let to_rpc ?(json : JsonMap.t = []) msg =
   | None -> ()
 
 let show_report msg id =
-  let report_json : Yojson.Safe.t =
-    match L.LogQueryer.get_report id with
-    | Some (content, type_) ->
-        `Assoc
-          [
-            ("content", Yojson.Safe.from_string content); ("type", `String type_);
-          ]
-    | None -> `Null
-  in
-  to_rpc ~json:[ ("report", report_json) ] msg
+  if enabled () then
+    let report_json : Yojson.Safe.t =
+      match L.LogQueryer.get_report id with
+      | Some (content, type_) ->
+          `Assoc
+            [
+              ("content", Yojson.Safe.from_string content);
+              ("type", `String type_);
+            ]
+      | None -> `Null
+    in
+    to_rpc ~json:[ ("report", report_json) ] msg
+
+let log f =
+  if enabled () then
+    let msg, json = f () in
+    to_rpc ~json msg
+
+let failwith json_f msg =
+  if enabled () then
+    let json = json_f () in
+    raise @@ FailureJson (msg, json)
+  else failwith msg

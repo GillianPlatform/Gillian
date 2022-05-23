@@ -928,10 +928,8 @@ struct
         ]
     (* Assignment *)
     | Assignment (x, e) ->
-        if DL.enabled () then
-          DL.to_rpc
-            ~json:[ ("target", `String x); ("expr", Expr.to_yojson e) ]
-            "Assignment";
+        DL.log (fun () ->
+            ("Assignment", [ ("target", `String x); ("expr", Expr.to_yojson e) ]));
         let v = eval_expr e in
         let state' = update_store state x v in
         [
@@ -940,28 +938,24 @@ struct
         ]
     (* Action *)
     | LAction (x, a, es) -> (
-        if DL.enabled () then
-          DL.to_rpc
-            ~json:
+        DL.log (fun () ->
+            ( "LAction",
               [
                 ("x", `String x);
                 ("a", `String a);
                 ("es", `List (List.map Expr.to_yojson es));
-              ]
-            "LAction";
+              ] ));
         AnnotatedAction.log { annot; action_name = a } |> ignore;
         let v_es = List.map eval_expr es in
         match State.execute_action a state v_es with
         | ASucc [] -> failwith "HORROR: Successful action resulted in no states"
         | ASucc ((state', vs) :: rest_rets) -> (
-            if DL.enabled () then
-              DL.to_rpc
-                ~json:
+            DL.log (fun () ->
+                ( "ASucc",
                   [
                     ("state'", state_t_to_yojson state');
                     ("vs", `List (List.map state_vt_to_yojson vs));
-                  ]
-                "ASucc";
+                  ] ));
             let e' = Expr.EList (List.map Val.to_expr vs) in
             let v' = eval_expr e' in
             let state'' = update_store state' x v' in
@@ -1024,10 +1018,9 @@ struct
                   ~next_idx:(i + 1) ~branch_count:b_counter ()
                 :: rest_confs)
         | AFail errs ->
-            if DL.enabled () then
-              DL.to_rpc
-                ~json:[ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
-                "AFail";
+            DL.log (fun () ->
+                ( "AFail",
+                  [ ("errs", `List (List.map state_err_t_to_yojson errs)) ] ));
             if not (ExecMode.concrete_exec !Config.current_exec_mode) then (
               let expr_params = List.map Val.to_expr v_es in
               let recovery_params =
@@ -1078,7 +1071,7 @@ struct
             else Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd)
     (* Logic command *)
     | Logic lcmd -> (
-        if DL.enabled () then "LCmd" |> DL.to_rpc;
+        DL.log (fun () -> ("LCmd", []));
         match lcmd with
         | SL SymbExec ->
             symb_exec_next := true;
@@ -1226,7 +1219,7 @@ struct
             | _ -> List.tl result)
         | false -> result)
     | PhiAssignment lxarr ->
-        if DL.enabled () then "PhiAssignment" |> DL.to_rpc;
+        DL.log (fun () -> ("PhiAssignment", []));
         let j = get_predecessor prog cs prev i in
         let state' =
           List.fold_left
@@ -1242,14 +1235,14 @@ struct
         ]
     (* Function call *)
     | Call (x, e, args, j, subst) ->
-        if DL.enabled () then "Call" |> DL.to_rpc;
+        DL.log (fun () -> ("Call", []));
         let pid = eval_expr e in
         let v_args = List.map eval_expr args in
         let result = evaluate_procedure_call x pid v_args j subst in
         result
     (* External function call *)
     | ECall (x, pid, args, j) ->
-        if DL.enabled () then "ECall" |> DL.to_rpc;
+        DL.log (fun () -> ("ECall", []));
         let pid =
           match pid with
           | PVar pid -> pid
@@ -1267,7 +1260,7 @@ struct
           (External.execute prog.prog state cs i x pid v_args j)
     (* Function application *)
     | Apply (x, pid_args, j) -> (
-        if DL.enabled () then "Apply" |> DL.to_rpc;
+        DL.log (fun () -> ("Apply", []));
         let v_pid_args = eval_expr pid_args in
         let v_pid_args_list = Val.to_list v_pid_args in
         match v_pid_args_list with
@@ -1282,7 +1275,7 @@ struct
                     v_pid_args)))
     (* Arguments *)
     | Arguments x ->
-        if DL.enabled () then "Arguments" |> DL.to_rpc;
+        DL.log (fun () -> ("Arguments", []));
         let args = CallStack.get_cur_args cs in
         let args = Val.from_list args in
         let state' = update_store state x args in
@@ -1466,8 +1459,8 @@ struct
               branch_case;
             }
           in
-          if DL.enabled () then
-            DL.to_rpc ~json:[ ("conf", CmdStep.to_yojson cmd_step) ] "confcont";
+          DL.log (fun () ->
+              ("confcont", [ ("conf", CmdStep.to_yojson cmd_step) ]));
           CmdStep.log_result cmd_step |> ignore;
           Continue (!parent_id_ref, branch_case, cont_func)
       | ConfErr
@@ -1486,13 +1479,9 @@ struct
       | _ -> cont_func ()
     in
 
-    let () =
-      if DL.enabled () then
-        let confs_json : Yojson.Safe.t =
-          `List (List.map cconf_t_to_yojson confs)
-        in
-        DL.to_rpc ~json:[ ("confs", confs_json) ] "Evaluating conf"
-    in
+    DL.log (fun () ->
+        ( "PhiAssignment",
+          [ ("confs", `List (List.map cconf_t_to_yojson confs)) ] ));
 
     Fun.protect
       ~finally:(fun () -> L.release_parent !parent_id_ref)
