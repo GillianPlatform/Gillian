@@ -2,6 +2,7 @@
 module ContentType = struct
   let debug = "debug"
   let phase = "phase"
+  let proc_init = "proc_init"
   let cmd = "cmd"
   let cmd_result = "cmd_result"
   let cmd_step = "cmd_step" (* TODO: Remove *)

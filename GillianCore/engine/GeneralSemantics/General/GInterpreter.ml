@@ -273,8 +273,12 @@ struct
 
       let to_loggable = L.Loggable.make pp of_yojson to_yojson
       let log type_ report = L.normal_specific (to_loggable report) type_
-      let log_result = log L.LoggingConstants.ContentType.cmd_result
-      let log_step = log L.LoggingConstants.ContentType.cmd_step
+
+      open L.LoggingConstants.ContentType
+
+      let log_result = log cmd_result
+      let log_init = log proc_init
+      let log_step = log cmd_step
     end
 
     module AnnotatedAction = struct
@@ -1599,7 +1603,7 @@ struct
         ~loop_ids:[] ~next_idx:proc_body_index ~branch_count:0 ()
     in
     let report_id =
-      CmdStep.log_step
+      CmdStep.log_init
         {
           callstack = cs;
           proc_body_index;
