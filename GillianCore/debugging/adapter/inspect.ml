@@ -1,5 +1,6 @@
 open DebugProtocolEx
 open Debugger.DebuggerTypes
+module Log = Debugger_log
 
 module Make (Debugger : Debugger.S) = struct
   let run dbg rpc =

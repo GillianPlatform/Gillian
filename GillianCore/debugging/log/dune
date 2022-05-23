@@ -1,5 +1,5 @@
 (library
- (name log)
+ (name debugger_log)
  (public_name gillian.debugging._log)
  (preprocess
   (pps ppx_deriving_yojson))

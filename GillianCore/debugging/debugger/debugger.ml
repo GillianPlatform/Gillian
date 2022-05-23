@@ -1,4 +1,5 @@
 module L = Logging
+module Log = Debugger_log
 module Gil_to_tl_lifter = Gil_to_tl_lifter
 module DebuggerTypes = DebuggerTypes
 module DebuggerUtils = DebuggerUtils

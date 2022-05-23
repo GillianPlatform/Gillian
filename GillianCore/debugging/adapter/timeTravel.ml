@@ -1,5 +1,6 @@
 open DebugProtocolEx
 open Debugger.DebuggerTypes
+module Log = Debugger_log
 
 module Make (Debugger : Debugger.S) = struct
   let send_stopped_events stop_reason rpc resolver dbg =
@@ -56,9 +57,13 @@ module Make (Debugger : Debugger.S) = struct
         try%lwt
           let stop_reason = Debugger.step dbg in
           send_stopped_events stop_reason rpc resolver dbg
-        with Failure e ->
-          Log.to_rpc ("[Error] " ^ e);
-          Lwt.return_unit);
+        with
+        | Log.FailureJson (e, json) ->
+            Log.to_rpc ~json ("[Error] " ^ e);
+            failwith e
+        | Failure e ->
+            Log.to_rpc ("[Error] " ^ e);
+            failwith e);
     Debug_rpc.set_command_handler rpc
       (module Reverse_continue_command)
       (fun _ ->
