@@ -53,8 +53,12 @@ module Make (Debugger : Debugger.S) = struct
       (module Next_command)
       (fun _ ->
         "Next request received" |> Log.to_rpc;
-        let stop_reason = Debugger.step dbg in
-        send_stopped_events stop_reason rpc resolver dbg);
+        try%lwt
+          let stop_reason = Debugger.step dbg in
+          send_stopped_events stop_reason rpc resolver dbg
+        with Failure e ->
+          Log.to_rpc ("[Error] " ^ e);
+          Lwt.return_unit);
     Debug_rpc.set_command_handler rpc
       (module Reverse_continue_command)
       (fun _ ->
