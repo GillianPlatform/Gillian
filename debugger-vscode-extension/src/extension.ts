@@ -11,7 +11,7 @@ import { activateDebug } from './activateDebug';
 
 type LogEvent = {
 	msg: string,
-	json?: string
+	json: any
 };
 
 function handleCustomEvent({ body, event, session } : vscode.DebugSessionCustomEvent) {
@@ -19,13 +19,8 @@ function handleCustomEvent({ body, event, session } : vscode.DebugSessionCustomE
 		case 'log':
 			const { msg, json } = body as LogEvent;
 			console.log(msg);
-			if (json !== undefined) {
-				try {
-					const parsedJson = JSON.parse(json);
-					if (parsedJson !== null && parsedJson !== undefined) {
-						console.log(JSON.parse(json));
-					}
-				} catch (e) {}
+			if (Object.keys(json).length > 0) {
+				console.log(json);
 			}
 			break;
 		default:
@@ -84,7 +79,7 @@ class DebugAdapterExecutableFactory implements vscode.DebugAdapterDescriptorFact
 				vscode.workspace.getConfiguration('gillianDebugger').gillianSourceRepository;
 
 		const command = "esy";
-		const args = ["x", gillianExecutableCommand, "debugverify", "-r", "db,file"];
+		const args = ["x", gillianExecutableCommand, "debugverify", "-r", "db"];
 		const options = {
 			cwd: gillianSourceRepository
 		};
