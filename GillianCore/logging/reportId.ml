@@ -1,4 +1,4 @@
-type t = int64
+type t = int64 [@@deriving yojson]
 
 let next =
   let current = ref Int64.zero in

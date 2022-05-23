@@ -21,7 +21,7 @@ module Mode : sig
 end
 
 module ReportId : sig
-  type t
+  type t [@@deriving yojson]
 
   val equal : t -> t -> bool
   val pp : Format.formatter -> t -> unit
