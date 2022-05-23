@@ -236,6 +236,7 @@ struct
            correctly"
           L.ReportId.pp report_id
     | Some (content, type_) -> (
+        Log.show_report ("Got report type " ^ type_) report_id;
         match type_ with
         | t when t = L.LoggingConstants.ContentType.cmd_step -> (
             let cmd_step =
@@ -332,11 +333,14 @@ struct
   let execute_step dbg =
     let open Verification.SAInterpreter in
     match dbg.cont_func with
-    | None -> ReachedEnd
+    | None ->
+        "No cont_func; reached end" |> Log.to_rpc;
+        ReachedEnd
     | Some cont_func -> (
-        let cont_func = cont_func () in
-        match cont_func with
+        let cont_func_result = cont_func () in
+        match cont_func_result with
         | Finished _ ->
+            "cont_func is Finished; reached end" |> Log.to_rpc;
             let () = dbg.cont_func <- None in
             ReachedEnd
         | Continue (cur_report_id, cont_func) -> (
@@ -355,24 +359,28 @@ struct
 
   let step_in ?(reverse = false) dbg =
     let stop_reason =
-      if reverse then
+      if reverse then (
         let prev_report_id =
           L.LogQueryer.get_previous_report_id dbg.cur_report_id
         in
         match prev_report_id with
         | None -> ReachedStart
         | Some prev_report_id ->
+            Log.show_report "Previous report" prev_report_id;
             let () =
               update_report_id_and_inspection_fields prev_report_id dbg
             in
-            Step
+            Step)
       else
         let next_report_id =
           L.LogQueryer.get_next_report_id dbg.cur_report_id
         in
         match next_report_id with
-        | None -> execute_step dbg
+        | None ->
+            "No next report ID; executing next step" |> Log.to_rpc;
+            execute_step dbg
         | Some next_report_id ->
+            Log.show_report "Next report ID found; not executing" next_report_id;
             let () =
               update_report_id_and_inspection_fields next_report_id dbg
             in
