@@ -114,17 +114,13 @@ let get_report id =
 
 let get_previous_report_id id =
   let db = get_db () in
-  let stmt =
-    Sqlite3.prepare db
-      "SELECT id FROM report WHERE elapsed_time < (SELECT elapsed_time FROM \
-       report WHERE id=?) AND type='cmd_step' ORDER BY elapsed_time DESC LIMIT \
-       1;"
-  in
+  let stmt = Sqlite3.prepare db "SELECT previous FROM report WHERE id = ?;" in
   Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
   |> check_result_code db ~log:"get previous report bind id";
-  let row = zero_or_one_row db ~log:"step: get next report" ~stmt in
+  let row = zero_or_one_row db ~log:"step: get previous report" ~stmt in
   let prev_report_id =
-    Option.map (fun row -> Sqlite3.Data.to_int64_exn row.(0)) row
+    Option.bind row (fun row ->
+        Int64.of_string_opt @@ Sqlite3.Data.to_string_exn row.(0))
   in
   Sqlite3.finalize stmt
   |> check_result_code db ~log:"finalize: get previous report";
@@ -133,9 +129,7 @@ let get_previous_report_id id =
 let get_next_report_id id =
   let db = get_db () in
   let stmt =
-    Sqlite3.prepare db
-      "SELECT id FROM report WHERE elapsed_time > (SELECT elapsed_time FROM \
-       report WHERE id=?) AND type='cmd_step' ORDER BY elapsed_time LIMIT 1;"
+    Sqlite3.prepare db "SELECT id FROM report WHERE previous = ? LIMIT 1;"
   in
   Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
   |> check_result_code db ~log:"get next report bind id";
