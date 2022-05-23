@@ -21,6 +21,7 @@ let info line =
   Printf.fprintf out "%s\n" line;
   close_out out
 
+let enabled () = Option.is_some !rpc_ref
 let reset () = if Sys.file_exists file_name then Sys.remove file_name else ()
 
 let setup rpc =
