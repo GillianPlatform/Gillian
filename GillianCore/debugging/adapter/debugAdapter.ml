@@ -25,6 +25,5 @@ module Make (Debugger : Debugger.S) = struct
     let loop = Debug_rpc.start rpc in
     (cancel := fun () -> Lwt.cancel loop);
     (try%lwt loop with Lwt.Canceled -> Lwt.return_unit);%lwt
-    "Loop end" |> Log.to_rpc;
     Lwt.return ()
 end

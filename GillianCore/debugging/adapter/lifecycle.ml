@@ -8,7 +8,6 @@ module Make (Debugger : Debugger.S) = struct
     let send_initialize_event () =
       Debug_rpc.send_event rpc (module Initialized_event) ()
     in
-    let () = "Howdy!" |> Log.to_rpc in
     Debug_rpc.set_command_handler rpc
       (module Configuration_done_command)
       (fun _ ->
