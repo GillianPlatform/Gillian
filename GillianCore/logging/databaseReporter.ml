@@ -7,7 +7,7 @@ let initialize () =
   LogDatabase.create_db ()
 
 let will_log (type_ : string) =
-  not (List.mem type_ LoggingConstants.ContentType.[ debug; phase ])
+  not LoggingConstants.ContentType.(type_ = debug || type_ = phase)
 
 let log (report : Report.t) =
   if will_log report.type_ then

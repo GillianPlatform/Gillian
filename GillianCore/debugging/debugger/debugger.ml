@@ -299,9 +299,8 @@ struct
             | Some (id, _) ->
                 update_report_id_and_inspection_fields id NoCase dbg)
         | t
-          when List.mem t
-                 L.LoggingConstants.ContentType.
-                   [ cmd_step; cmd_result; proc_init ] -> (
+          when L.LoggingConstants.ContentType.(
+                 t = cmd_step || t = cmd_result || t = proc_init) -> (
             if t = L.LoggingConstants.ContentType.proc_init then
               dbg.cur_report_id <- report_id;
             let cmd_step =
@@ -409,8 +408,7 @@ struct
         "No cont_func; reached end" |> Log.to_rpc;
         ReachedEnd
     | Some cont_func -> (
-        let cont_func_result = cont_func () in
-        match cont_func_result with
+        match cont_func () with
         | Finished _ ->
             "cont_func is Finished; reached end" |> Log.to_rpc;
             let () = dbg.cont_func <- None in
