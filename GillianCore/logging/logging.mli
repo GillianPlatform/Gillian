@@ -74,6 +74,10 @@ module LogQueryer : sig
   (* Returns the annotation corresponding to the previous set freed action
      for a given location in the current phase if it exists *)
   val get_previously_freed_annot : string -> string option
+
+  (* Returns the list of IDs and content of any children of the given report
+     ID who have type 'cmd_result' *)
+  val get_cmd_results : ReportId.t -> (ReportId.t * string) list
 end
 
 (** Initializes the logging module with the specified reporters and initializes

@@ -168,3 +168,23 @@ let get_previously_freed_annot loc =
   Sqlite3.finalize stmt
   |> check_result_code db ~log:"finalize: get previous freed annot";
   annot
+
+let get_cmd_results id =
+  let db = get_db () in
+  let stmt =
+    Sqlite3.prepare db
+      "SELECT child.id AS id, child.content AS content FROM report child INNER \
+       JOIN report parent ON child.parent = parent.id WHERE parent.id = ? AND \
+       child.type=\"cmd_result\""
+  in
+  Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
+  |> check_result_code db ~log:"get cmd results bind id";
+  let _, results =
+    Sqlite3.fold stmt
+      ~f:(fun results row ->
+        let id : ReportId.t = Sqlite3.Data.to_int64_exn row.(0) in
+        let content = Sqlite3.Data.to_string_exn row.(1) in
+        (id, content) :: results)
+      ~init:[]
+  in
+  results
