@@ -1,5 +1,6 @@
 open Literal
 module L = Logging
+module DL = Debugger_log
 
 type 'state_vt branch_case' =
   | GuardedGoto of bool
@@ -25,7 +26,7 @@ module type S = sig
 
   type invariant_frames = (string * state_t) list
   type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
-  type branch_case = state_vt branch_case'
+  type branch_case = state_vt branch_case' [@@deriving yojson]
 
   type cconf_t =
     | ConfErr of {
@@ -42,7 +43,7 @@ module type S = sig
         next_idx : int;
         loop_ids : string list;
         branch_count : int;
-        prev_report_id : L.ReportId.t option;
+        prev_cmd_report_id : L.ReportId.t option;
         branch_case : branch_case option;
         new_branches : (state_t * int * branch_case) list;
       }
@@ -64,9 +65,26 @@ module type S = sig
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (Logging.ReportId.t option * (unit -> 'a cont_func))
+    | Continue of
+        (Logging.ReportId.t option
+        * branch_case option
+        * (unit -> 'a cont_func))
 
   module Logging : sig
+    module ConfigReport : sig
+      type t = {
+        proc_line : int;
+        time : float;
+        cmd : string;
+        callstack : CallStack.t;
+        annot : Annot.t;
+        branching : int;
+        state : state_t;
+        branch_case : branch_case option;
+      }
+      [@@deriving yojson]
+    end
+
     module CmdStep : sig
       type t = {
         callstack : CallStack.t;
@@ -125,10 +143,10 @@ struct
   type st = ESubst.t
   type store_t = Store.t
   type state_t = State.t [@@deriving yojson]
-  type state_err_t = State.err_t
+  type state_err_t = State.err_t [@@deriving yojson]
   type state_vt = State.vt [@@deriving yojson]
   type heap_t = State.heap_t
-  type invariant_frames = (string * State.t) list
+  type invariant_frames = (string * State.t) list [@@deriving yojson]
   type err_t = (Val.t, State.err_t) ExecErr.t [@@deriving yojson]
   type branch_case = state_vt branch_case' [@@deriving yojson]
 
@@ -148,7 +166,7 @@ struct
         next_idx : int;
         loop_ids : string list;
         branch_count : int;
-        prev_report_id : L.ReportId.t option;
+        prev_cmd_report_id : L.ReportId.t option;
         branch_case : branch_case option;
         new_branches : (state_t * int * branch_case) list;
       }
@@ -164,6 +182,7 @@ struct
         loop_ids : string list;
         branch_count : int;
       }
+  [@@deriving yojson]
 
   let make_confcont
       ~state
@@ -173,7 +192,7 @@ struct
       ~next_idx
       ~loop_ids
       ~branch_count
-      ?prev_report_id
+      ?prev_cmd_report_id
       ?branch_case
       ?(new_branches = [])
       () =
@@ -186,7 +205,7 @@ struct
         next_idx;
         loop_ids;
         branch_count;
-        prev_report_id;
+        prev_cmd_report_id;
         branch_case;
         new_branches;
       }
@@ -196,7 +215,10 @@ struct
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (Logging.ReportId.t option * (unit -> 'a cont_func))
+    | Continue of
+        (Logging.ReportId.t option
+        * branch_case option
+        * (unit -> 'a cont_func))
 
   module Logging = struct
     let pp_str_list = Fmt.(brackets (list ~sep:comma string))
@@ -906,6 +928,9 @@ struct
         ]
     (* Assignment *)
     | Assignment (x, e) ->
+        DL.to_rpc
+          ~json:[ ("target", `String x); ("expr", Expr.to_yojson e) ]
+          "Assignment";
         let v = eval_expr e in
         let state' = update_store state x v in
         [
@@ -914,12 +939,26 @@ struct
         ]
     (* Action *)
     | LAction (x, a, es) -> (
+        Debugger_log.to_rpc
+          ~json:
+            [
+              ("x", `String x);
+              ("a", `String a);
+              ("es", `List (List.map Expr.to_yojson es));
+            ]
+          "LAction";
         AnnotatedAction.log { annot; action_name = a } |> ignore;
         let v_es = List.map eval_expr es in
         match State.execute_action a state v_es with
-        | ASucc [] ->
-            raise (Failure "HORROR: Successful action resulted in no states")
+        | ASucc [] -> failwith "HORROR: Successful action resulted in no states"
         | ASucc ((state', vs) :: rest_rets) -> (
+            Debugger_log.to_rpc
+              ~json:
+                [
+                  ("state'", state_t_to_yojson state');
+                  ("vs", `List (List.map state_vt_to_yojson vs));
+                ]
+              "ASucc";
             let e' = Expr.EList (List.map Val.to_expr vs) in
             let v' = eval_expr e' in
             let state'' = update_store state' x v' in
@@ -935,7 +974,7 @@ struct
                          ~callstack:(CallStack.copy cs)
                          ~invariant_frames:iframes ~prev_idx:i ~loop_ids
                          ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
-                         ?prev_report_id:!report_id_ref (),
+                         ?prev_cmd_report_id:!report_id_ref (),
                        (r_state', i + 1, branch_case) ))
                    rest_rets
             in
@@ -960,7 +999,7 @@ struct
                       make_confcont ~state:state'' ~callstack:cs
                         ~invariant_frames:iframes ~prev_idx:i ~loop_ids
                         ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
-                        ?prev_report_id:!report_id_ref ~new_branches ();
+                        ?prev_cmd_report_id:!report_id_ref ~new_branches ();
                     ])
             | false, true -> (
                 (* Can split into two threads *)
@@ -973,7 +1012,7 @@ struct
                       make_confcont ~state:state'' ~callstack:cs
                         ~invariant_frames:iframes ~prev_idx:i ~loop_ids
                         ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
-                        ?prev_report_id:!report_id_ref ~new_branches ();
+                        ?prev_cmd_report_id:!report_id_ref ~new_branches ();
                     ]
                 | _ -> rest_confs)
             | _ ->
@@ -982,6 +1021,9 @@ struct
                   ~next_idx:(i + 1) ~branch_count:b_counter ()
                 :: rest_confs)
         | AFail errs ->
+            DL.to_rpc
+              ~json:[ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
+              "AFail";
             if not (ExecMode.concrete_exec !Config.current_exec_mode) then (
               let expr_params = List.map Val.to_expr v_es in
               let recovery_params =
@@ -1032,6 +1074,7 @@ struct
             else Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd)
     (* Logic command *)
     | Logic lcmd -> (
+        "LCmd" |> DL.to_rpc;
         match lcmd with
         | SL SymbExec ->
             symb_exec_next := true;
@@ -1151,21 +1194,21 @@ struct
           else b_counter
         in
         let result =
-          List.mapi
-            (fun j ((state, next), case) ->
-              make_confcont ~state
-                ~callstack:(if j = 0 then cs else CallStack.copy cs)
-                ~invariant_frames:iframes ~prev_idx:i ~loop_ids ~next_idx:next
-                ~branch_count:b_counter ~branch_case:(GuardedGoto case)
-                ~new_branches:
-                  (if j = 0 then
-                   List.map
-                     (fun ((state, next), case) ->
-                       (state, next, GuardedGoto case))
-                     (List.tl sp)
-                  else [])
-                ?prev_report_id:!report_id_ref ())
-            sp
+          sp
+          |> List.mapi (fun j ((state, next), case) ->
+                 make_confcont ~state
+                   ~callstack:(if j = 0 then cs else CallStack.copy cs)
+                   ~invariant_frames:iframes ~prev_idx:i ~loop_ids
+                   ~next_idx:next ~branch_count:b_counter
+                   ~branch_case:(GuardedGoto case)
+                   ~new_branches:
+                     (if j = 0 then
+                      List.map
+                        (fun ((state, next), case) ->
+                          (state, next, GuardedGoto case))
+                        (List.tl sp)
+                     else [])
+                   ?prev_cmd_report_id:!report_id_ref ())
         in
         match
           List.length result = 2 && !Config.parallel
@@ -1179,6 +1222,7 @@ struct
             | _ -> List.tl result)
         | false -> result)
     | PhiAssignment lxarr ->
+        "PhiAssignment" |> DL.to_rpc;
         let j = get_predecessor prog cs prev i in
         let state' =
           List.fold_left
@@ -1194,12 +1238,14 @@ struct
         ]
     (* Function call *)
     | Call (x, e, args, j, subst) ->
+        "Call" |> DL.to_rpc;
         let pid = eval_expr e in
         let v_args = List.map eval_expr args in
         let result = evaluate_procedure_call x pid v_args j subst in
         result
     (* External function call *)
     | ECall (x, pid, args, j) ->
+        "ECall" |> DL.to_rpc;
         let pid =
           match pid with
           | PVar pid -> pid
@@ -1217,6 +1263,7 @@ struct
           (External.execute prog.prog state cs i x pid v_args j)
     (* Function application *)
     | Apply (x, pid_args, j) -> (
+        "Apply" |> DL.to_rpc;
         let v_pid_args = eval_expr pid_args in
         let v_pid_args_list = Val.to_list v_pid_args in
         match v_pid_args_list with
@@ -1231,6 +1278,7 @@ struct
                     v_pid_args)))
     (* Arguments *)
     | Arguments x ->
+        "Arguments" |> DL.to_rpc;
         let args = CallStack.get_cur_args cs in
         let args = Val.from_list args in
         let state' = update_store state x args in
@@ -1386,7 +1434,7 @@ struct
       (confs : cconf_t list)
       (results : result_t list) : 'a cont_func =
     let f = evaluate_cmd_step ret_fun retry prog hold_results on_hold in
-    let report_id_ref = ref None in
+    let parent_id_ref = ref None in
 
     let continue_or_pause rest_confs cont_func =
       match rest_confs with
@@ -1396,52 +1444,48 @@ struct
             callstack;
             next_idx = proc_body_index;
             branch_case;
-            new_branches;
+            prev_cmd_report_id;
             _;
           }
         :: _ ->
-          List.iter
-            (fun (state, proc_body_index, branch_case) ->
-              CmdStep.log_result
-                {
-                  callstack;
-                  proc_body_index;
-                  state = Some state;
-                  errors = [];
-                  branch_case = Some branch_case;
-                }
-              |> ignore)
-            new_branches;
-          let report_id =
-            CmdStep.log_result
-              {
-                callstack;
-                proc_body_index;
-                state = Some state;
-                errors = [];
-                branch_case;
-              }
+          prev_cmd_report_id
+          |> Option.iter (fun prev_report_id ->
+                 L.release_parent !parent_id_ref;
+                 L.set_parent prev_report_id;
+                 parent_id_ref := Some prev_report_id);
+          let cmd_step : CmdStep.t =
+            {
+              callstack;
+              proc_body_index;
+              state = Some state;
+              errors = [];
+              branch_case;
+            }
           in
-          Continue (report_id, cont_func)
+          DL.to_rpc ~json:[ ("conf", CmdStep.to_yojson cmd_step) ] "confcont";
+          CmdStep.log_result cmd_step |> ignore;
+          Continue (!parent_id_ref, branch_case, cont_func)
       | ConfErr
           { callstack; proc_idx = proc_body_index; error_state = state; errors }
         :: _ ->
-          let report_id =
-            CmdStep.log_result
-              {
-                callstack;
-                proc_body_index;
-                state = Some state;
-                errors;
-                branch_case = None;
-              }
-          in
-          Continue (report_id, cont_func)
+          CmdStep.log_result
+            {
+              callstack;
+              proc_body_index;
+              state = Some state;
+              errors;
+              branch_case = None;
+            }
+          |> ignore;
+          Continue (!parent_id_ref, None, cont_func)
       | _ -> cont_func ()
     in
 
+    let confs_json : Yojson.Safe.t = `List (List.map cconf_t_to_yojson confs) in
+    DL.to_rpc ~json:[ ("confs", confs_json) ] "Evaluating conf";
+
     Fun.protect
-      ~finally:(fun () -> L.release_parent !report_id_ref)
+      ~finally:(fun () -> L.release_parent !parent_id_ref)
       (fun () ->
         match confs with
         | [] ->
@@ -1467,16 +1511,16 @@ struct
               loop_ids = prev_loop_ids;
               next_idx = i;
               branch_count = b_counter;
-              prev_report_id;
+              prev_cmd_report_id;
               branch_case;
               _;
             }
           :: rest_confs
           when b_counter < max_branching ->
-            L.set_previous prev_report_id;
+            L.set_previous prev_cmd_report_id;
             let next_confs =
               protected_evaluate_cmd prog state cs iframes prev prev_loop_ids i
-                b_counter report_id_ref branch_case
+                b_counter parent_id_ref branch_case
             in
             continue_or_pause (next_confs @ rest_confs) (fun () ->
                 f (next_confs @ rest_confs) results)
@@ -1486,14 +1530,14 @@ struct
               callstack = cs;
               next_idx = i;
               branch_count = b_counter;
-              prev_report_id;
+              prev_cmd_report_id;
               branch_case;
               _;
             }
           :: rest_confs ->
             let _, annot_cmd = get_cmd prog cs i in
             Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
-            L.set_previous prev_report_id;
+            L.set_previous prev_cmd_report_id;
             L.(
               verbose (fun m ->
                   m
@@ -1502,7 +1546,7 @@ struct
                     b_counter));
             log_configuration annot_cmd state cs i b_counter branch_case
             |> Option.iter (fun report_id ->
-                   report_id_ref := Some report_id;
+                   parent_id_ref := Some report_id;
                    L.set_parent report_id);
             continue_or_pause rest_confs (fun () -> f rest_confs results)
         | ConfErr { callstack; proc_idx; error_state; errors } :: rest_confs ->
@@ -1554,7 +1598,7 @@ struct
   let rec evaluate_cmd_iter (init_func : 'a cont_func) : 'a list =
     match init_func with
     | Finished results -> results
-    | Continue (_, cont_func) -> evaluate_cmd_iter (cont_func ())
+    | Continue (_, _, cont_func) -> evaluate_cmd_iter (cont_func ())
 
   (**
   Sets the initial values for evaluating a program, and returns a continuation
@@ -1614,6 +1658,7 @@ struct
     in
     Continue
       ( report_id,
+        None,
         fun () -> evaluate_cmd_step ret_fun true prog [] [] [ conf ] [] )
 
   (**
@@ -1669,6 +1714,7 @@ struct
     let init_func =
       Continue
         ( report_id,
+          None,
           fun () ->
             evaluate_cmd_step ret_fun true prog [] [] [ initial_conf ] [] )
     in
