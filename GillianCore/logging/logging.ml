@@ -97,17 +97,22 @@ let with_parent ?title ?(lvl = Mode.Normal) ?severity loggable type_ f =
       | Error e -> raise e)
 
 let start_phase level ?title ?severity () =
-  let phase_report = ReportBuilder.start_phase level ?title ?severity () in
-  match phase_report with
-  | Some phase_report ->
-      let () = log_on_all_reporters phase_report in
-      Some phase_report.id
-  | None -> None
+  if will_log_on_any_reporter LoggingConstants.ContentType.phase then
+    let phase_report = ReportBuilder.start_phase level ?title ?severity () in
+    match phase_report with
+    | Some phase_report ->
+        let () = log_on_all_reporters phase_report in
+        Some phase_report.id
+    | None -> None
+  else None
 
 let normal_phase = start_phase Normal
 let verbose_phase = start_phase Verbose
 let tmi_phase = start_phase TMI
-let end_phase = ReportBuilder.end_phase
+
+let end_phase id =
+  if will_log_on_any_reporter LoggingConstants.ContentType.phase then
+    ReportBuilder.end_phase id
 
 let with_phase level ?title ?severity f =
   let phase = start_phase level ?title ?severity () in
