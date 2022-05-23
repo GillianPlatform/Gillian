@@ -59,7 +59,7 @@ struct
 
   type branch_case_option = Case of branch_case | TakeFirst | NoCase
 
-  let to_option = function
+  let case_of_option = function
     | Some case -> Case case
     | None -> NoCase
 
@@ -397,7 +397,8 @@ struct
             in
             let _ =
               update_report_id_and_inspection_fields cur_report_id
-                (to_option branch_case) dbg
+                (case_of_option branch_case)
+                dbg
             in
             Ok dbg)
 
@@ -425,7 +426,8 @@ struct
                 let () = dbg.cont_func <- Some cont_func in
                 let () =
                   update_report_id_and_inspection_fields cur_report_id
-                    (to_option branch_case) dbg
+                    (case_of_option branch_case)
+                    dbg
                 in
                 Step))
 
@@ -452,7 +454,8 @@ struct
             Log.show_report "Previous report" prev_report_id;
             let () =
               update_report_id_and_inspection_fields prev_report_id
-                (to_option branch_case) dbg
+                (case_of_option branch_case)
+                dbg
             in
             Step)
       else
