@@ -6,7 +6,7 @@ module Make (Debugger : Debugger.S) = struct
   let send_stopped_events stop_reason rpc resolver dbg =
     match stop_reason with
     | ReachedEnd ->
-        DL.log (fun () -> ("ReachedEnd: exiting", []));
+        DL.log (fun m -> m "ReachedEnd: exiting");
         Debug_rpc.send_event rpc
           (module Exited_event)
           Exited_event.Payload.(make ~exit_code:0);%lwt
@@ -17,7 +17,7 @@ module Make (Debugger : Debugger.S) = struct
         Lwt.wakeup_later_exn resolver Exit;
         Lwt.return_unit
     | Step | ReachedStart ->
-        DL.log (fun () -> ("Stopped: Step/ReachedStart", []));
+        DL.log (fun m -> m "Stopped: Step/ReachedStart");
         (* Send step stopped event after reaching the end to allow for stepping
            backwards *)
         Debug_rpc.send_event rpc
@@ -26,14 +26,14 @@ module Make (Debugger : Debugger.S) = struct
             make ~reason:Stopped_event.Payload.Reason.Step ~thread_id:(Some 0)
               ())
     | Breakpoint ->
-        DL.log (fun () -> ("Stopped: Breakpoint", []));
+        DL.log (fun m -> m "Stopped: Breakpoint");
         Debug_rpc.send_event rpc
           (module Stopped_event)
           Stopped_event.Payload.(
             make ~reason:Stopped_event.Payload.Reason.Breakpoint
               ~thread_id:(Some 0) ())
     | ExecutionError ->
-        DL.log (fun () -> ("Stopped: ExecutionError", []));
+        DL.log (fun m -> m "Stopped: ExecutionError");
         Debug_rpc.send_event rpc
           (module Stopped_event)
           Stopped_event.Payload.(
@@ -46,46 +46,46 @@ module Make (Debugger : Debugger.S) = struct
     Debug_rpc.set_command_handler rpc
       (module Continue_command)
       (fun _ ->
-        DL.log (fun () -> ("Continue request received", []));
+        DL.log (fun m -> m "Continue request received");
         let stop_reason = Debugger.run dbg in
         send_stopped_events stop_reason rpc resolver dbg;%lwt
         Lwt.return (Continue_command.Result.make ()));
     Debug_rpc.set_command_handler rpc
       (module Next_command)
       (fun _ ->
-        DL.log (fun () -> ("Next request received", []));
+        DL.log (fun m -> m "Next request received");
         try%lwt
           let stop_reason = Debugger.step dbg in
           send_stopped_events stop_reason rpc resolver dbg
         with
         | DL.FailureJson (e, json) ->
-            DL.log (fun () -> ("[Error] " ^ e, json));
+            DL.log (fun m -> m ~json "[Error] %s" e);
             failwith e
         | Failure e ->
-            DL.log (fun () -> ("[Error] " ^ e, []));
+            DL.log (fun m -> m "[Error] %s" e);
             failwith e);
     Debug_rpc.set_command_handler rpc
       (module Reverse_continue_command)
       (fun _ ->
-        DL.log (fun () -> ("Reverse continue request received", []));
+        DL.log (fun m -> m "Reverse continue request received");
         let stop_reason = Debugger.run ~reverse:true dbg in
         send_stopped_events stop_reason rpc resolver dbg);
     Debug_rpc.set_command_handler rpc
       (module Step_back_command)
       (fun _ ->
-        DL.log (fun () -> ("Step back request received", []));
+        DL.log (fun m -> m "Step back request received");
         let stop_reason = Debugger.step_in ~reverse:true dbg in
         send_stopped_events stop_reason rpc resolver dbg);
     Debug_rpc.set_command_handler rpc
       (module Step_in_command)
       (fun _ ->
-        DL.log (fun () -> ("Step in request received", []));
+        DL.log (fun m -> m "Step in request received");
         let stop_reason = Debugger.step_in dbg in
         send_stopped_events stop_reason rpc resolver dbg);
     Debug_rpc.set_command_handler rpc
       (module Step_out_command)
       (fun _ ->
-        DL.log (fun () -> ("Step out request received", []));
+        DL.log (fun m -> m "Step out request received");
         let stop_reason = Debugger.step_out dbg in
         send_stopped_events stop_reason rpc resolver dbg);
     Lwt.join [ promise ]

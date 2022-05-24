@@ -253,7 +253,7 @@ struct
            correctly"
           L.ReportId.pp report_id
     | Some (content, type_) -> (
-        DL.show_report ("Got report type " ^ type_) report_id;
+        DL.show_report report_id ("Got report type " ^ type_);
         match type_ with
         | t when t = L.LoggingConstants.ContentType.cmd -> (
             dbg.cur_report_id <- report_id;
@@ -404,12 +404,12 @@ struct
     let open Verification.SAInterpreter in
     match dbg.cont_func with
     | None ->
-        DL.log (fun () -> ("No cont_func; reached end", []));
+        DL.log (fun m -> m "No cont_func; reached end");
         ReachedEnd
     | Some cont_func -> (
         match cont_func () with
         | Finished _ ->
-            DL.log (fun () -> ("cont_func is Finished; reached end", []));
+            DL.log (fun m -> m "cont_func is Finished; reached end");
             let () = dbg.cont_func <- None in
             ReachedEnd
         | Continue (cur_report_id, branch_case, cont_func) -> (
@@ -448,7 +448,7 @@ struct
         match prev_report_id with
         | None -> ReachedStart
         | Some prev_report_id ->
-            DL.show_report "Previous report" prev_report_id;
+            DL.show_report prev_report_id "Previous report";
             let () =
               update_report_id_and_inspection_fields prev_report_id
                 (case_of_option branch_case)
@@ -475,10 +475,10 @@ struct
         in
         match next_report_id with
         | None ->
-            DL.log (fun () -> ("No next report ID; executing next step", []));
+            DL.log (fun m -> m "No next report ID; executing next step");
             execute_step dbg
         | Some next_report_id ->
-            DL.show_report "Next report ID found; not executing" next_report_id;
+            DL.show_report next_report_id "Next report ID found; not executing";
             let () =
               update_report_id_and_inspection_fields next_report_id TakeFirst
                 dbg

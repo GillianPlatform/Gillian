@@ -7,13 +7,13 @@ module Make (Debugger : Debugger.S) = struct
     Debug_rpc.set_command_handler rpc
       (module Threads_command)
       (fun () ->
-        DL.log (fun () -> ("Threads request received", []));
+        DL.log (fun m -> m "Threads request received");
         let main_thread = Thread.make ~id:0 ~name:"main" in
         Lwt.return (Threads_command.Result.make ~threads:[ main_thread ] ()));
     Debug_rpc.set_command_handler rpc
       (module Stack_trace_command)
       (fun _ ->
-        DL.log (fun () -> ("Stack trace request received", []));
+        DL.log (fun m -> m "Stack trace request received");
         let (frames : frame list) = Debugger.get_frames dbg in
         let stack_frames =
           frames
@@ -30,7 +30,7 @@ module Make (Debugger : Debugger.S) = struct
     Debug_rpc.set_command_handler rpc
       (module Scopes_command)
       (fun _ ->
-        DL.log (fun () -> ("Scopes request received", []));
+        DL.log (fun m -> m "Scopes request received");
         let scopes = Debugger.get_scopes dbg in
         let scopes =
           scopes
@@ -43,7 +43,7 @@ module Make (Debugger : Debugger.S) = struct
     Debug_rpc.set_command_handler rpc
       (module Variables_command)
       (fun args ->
-        DL.log (fun () -> ("Variables request received", []));
+        DL.log (fun m -> m "Variables request received");
         let variables = Debugger.get_variables args.variables_reference dbg in
         let variables =
           variables
@@ -58,7 +58,7 @@ module Make (Debugger : Debugger.S) = struct
     Debug_rpc.set_command_handler rpc
       (module Exception_info_command)
       (fun _ ->
-        DL.log (fun () -> ("Exception info request received", []));
+        DL.log (fun m -> m "Exception info request received");
         let exception_info = Debugger.get_exception_info dbg in
         let exception_id = exception_info.id in
         let description = exception_info.description in

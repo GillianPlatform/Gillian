@@ -15,9 +15,9 @@ module Make (Debugger : Debugger.S) = struct
     let cancel = ref (fun () -> ()) in
     Lwt.async (fun () ->
         (try%lwt
-           DL.log (fun () -> ("Initializing Debug Adapter...", []));
+           DL.log (fun m -> m "Initializing Debug Adapter...");
            let%lwt _, _ = StateUninitialized.run rpc in
-           DL.log (fun () -> ("Initialized Debug Adapter", []));
+           DL.log (fun m -> m "Initialized Debug Adapter");
            let%lwt launch_args, dbg = StateInitialized.run rpc in
            StateDebug.run launch_args dbg rpc;%lwt
            fst (Lwt.task ())

@@ -14,6 +14,13 @@ module JsonMap = struct
     | _ -> Error "Invalid yojson for jsonMap"
 end
 
+let get_fmt_with_json msgf : string * JsonMap.t =
+  let result = ref ("", []) in
+  (fun ?(json : JsonMap.t = []) fmt ->
+    Format.kasprintf (fun s -> result := (s, json)) fmt)
+  |> msgf;
+  !result
+
 exception FailureJson of string * JsonMap.t
 
 let info line =
@@ -37,7 +44,7 @@ module Log_event = struct
   end
 end
 
-let to_rpc ?(json : JsonMap.t = []) msg =
+let to_rpc msg json =
   match !rpc_ref with
   | Some rpc ->
       (info
@@ -48,24 +55,24 @@ let to_rpc ?(json : JsonMap.t = []) msg =
       |> ignore
   | None -> ()
 
-let show_report msg id =
-  if enabled () then
-    let report_json : Yojson.Safe.t =
-      match L.LogQueryer.get_report id with
-      | Some (content, type_) ->
-          `Assoc
-            [
-              ("content", Yojson.Safe.from_string content);
-              ("type", `String type_);
-            ]
-      | None -> `Null
-    in
-    to_rpc ~json:[ ("report", report_json) ] msg
-
 let log f =
   if enabled () then
-    let msg, json = f () in
-    to_rpc ~json msg
+    let msg, json = get_fmt_with_json f in
+    to_rpc msg json
+
+let show_report id msg =
+  log (fun m ->
+      let report_json : Yojson.Safe.t =
+        match L.LogQueryer.get_report id with
+        | Some (content, type_) ->
+            `Assoc
+              [
+                ("content", Yojson.Safe.from_string content);
+                ("type", `String type_);
+              ]
+        | None -> `Null
+      in
+      m ~json:[ ("report", report_json) ] "%s" msg)
 
 let failwith json_f msg =
   if enabled () then

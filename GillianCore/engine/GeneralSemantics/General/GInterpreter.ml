@@ -928,8 +928,10 @@ struct
         ]
     (* Assignment *)
     | Assignment (x, e) ->
-        DL.log (fun () ->
-            ("Assignment", [ ("target", `String x); ("expr", Expr.to_yojson e) ]));
+        DL.log (fun m ->
+            m
+              ~json:[ ("target", `String x); ("expr", Expr.to_yojson e) ]
+              "Assignment");
         let v = eval_expr e in
         let state' = update_store state x v in
         [
@@ -938,24 +940,28 @@ struct
         ]
     (* Action *)
     | LAction (x, a, es) -> (
-        DL.log (fun () ->
-            ( "LAction",
-              [
-                ("x", `String x);
-                ("a", `String a);
-                ("es", `List (List.map Expr.to_yojson es));
-              ] ));
+        DL.log (fun m ->
+            m
+              ~json:
+                [
+                  ("x", `String x);
+                  ("a", `String a);
+                  ("es", `List (List.map Expr.to_yojson es));
+                ]
+              "LAction");
         AnnotatedAction.log { annot; action_name = a } |> ignore;
         let v_es = List.map eval_expr es in
         match State.execute_action a state v_es with
         | ASucc [] -> failwith "HORROR: Successful action resulted in no states"
         | ASucc ((state', vs) :: rest_rets) -> (
-            DL.log (fun () ->
-                ( "ASucc",
-                  [
-                    ("state'", state_t_to_yojson state');
-                    ("vs", `List (List.map state_vt_to_yojson vs));
-                  ] ));
+            DL.log (fun m ->
+                m
+                  ~json:
+                    [
+                      ("state'", state_t_to_yojson state');
+                      ("vs", `List (List.map state_vt_to_yojson vs));
+                    ]
+                  "ASucc");
             let e' = Expr.EList (List.map Val.to_expr vs) in
             let v' = eval_expr e' in
             let state'' = update_store state' x v' in
@@ -1018,9 +1024,11 @@ struct
                   ~next_idx:(i + 1) ~branch_count:b_counter ()
                 :: rest_confs)
         | AFail errs ->
-            DL.log (fun () ->
-                ( "AFail",
-                  [ ("errs", `List (List.map state_err_t_to_yojson errs)) ] ));
+            DL.log (fun m ->
+                m
+                  ~json:
+                    [ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
+                  "AFail");
             if not (ExecMode.concrete_exec !Config.current_exec_mode) then (
               let expr_params = List.map Val.to_expr v_es in
               let recovery_params =
@@ -1071,7 +1079,7 @@ struct
             else Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd)
     (* Logic command *)
     | Logic lcmd -> (
-        DL.log (fun () -> ("LCmd", []));
+        DL.log (fun m -> m "LCmd");
         match lcmd with
         | SL SymbExec ->
             symb_exec_next := true;
@@ -1219,7 +1227,7 @@ struct
             | _ -> List.tl result)
         | false -> result)
     | PhiAssignment lxarr ->
-        DL.log (fun () -> ("PhiAssignment", []));
+        DL.log (fun m -> m "PhiAssignment");
         let j = get_predecessor prog cs prev i in
         let state' =
           List.fold_left
@@ -1235,14 +1243,14 @@ struct
         ]
     (* Function call *)
     | Call (x, e, args, j, subst) ->
-        DL.log (fun () -> ("Call", []));
+        DL.log (fun m -> m "Call");
         let pid = eval_expr e in
         let v_args = List.map eval_expr args in
         let result = evaluate_procedure_call x pid v_args j subst in
         result
     (* External function call *)
     | ECall (x, pid, args, j) ->
-        DL.log (fun () -> ("ECall", []));
+        DL.log (fun m -> m "ECall");
         let pid =
           match pid with
           | PVar pid -> pid
@@ -1260,7 +1268,7 @@ struct
           (External.execute prog.prog state cs i x pid v_args j)
     (* Function application *)
     | Apply (x, pid_args, j) -> (
-        DL.log (fun () -> ("Apply", []));
+        DL.log (fun m -> m "Apply");
         let v_pid_args = eval_expr pid_args in
         let v_pid_args_list = Val.to_list v_pid_args in
         match v_pid_args_list with
@@ -1275,7 +1283,7 @@ struct
                     v_pid_args)))
     (* Arguments *)
     | Arguments x ->
-        DL.log (fun () -> ("Arguments", []));
+        DL.log (fun m -> m "Arguments");
         let args = CallStack.get_cur_args cs in
         let args = Val.from_list args in
         let state' = update_store state x args in
@@ -1459,8 +1467,8 @@ struct
               branch_case;
             }
           in
-          DL.log (fun () ->
-              ("confcont", [ ("conf", CmdStep.to_yojson cmd_step) ]));
+          DL.log (fun m ->
+              m ~json:[ ("conf", CmdStep.to_yojson cmd_step) ] "confcont");
           CmdStep.log_result cmd_step |> ignore;
           Continue (!parent_id_ref, branch_case, cont_func)
       | ConfErr
@@ -1479,9 +1487,10 @@ struct
       | _ -> cont_func ()
     in
 
-    DL.log (fun () ->
-        ( "PhiAssignment",
-          [ ("confs", `List (List.map cconf_t_to_yojson confs)) ] ));
+    DL.log (fun m ->
+        m
+          ~json:[ ("confs", `List (List.map cconf_t_to_yojson confs)) ]
+          "Evaluating conf");
 
     Fun.protect
       ~finally:(fun () -> L.release_parent !parent_id_ref)

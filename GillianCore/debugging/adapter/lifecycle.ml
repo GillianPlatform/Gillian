@@ -12,20 +12,20 @@ module Make (Debugger : Debugger.S) = struct
     Debug_rpc.set_command_handler rpc
       (module Configuration_done_command)
       (fun _ ->
-        DL.log (fun () -> ("Configuration done", []));
+        DL.log (fun m -> m "Configuration done");
         let open Launch_command.Arguments in
         if not launch_args.stop_on_entry then (
-          DL.log (fun () -> ("Do not stop on entry", []));
+          DL.log (fun m -> m "Do not stop on entry");
           let stop_reason = Debugger.run ~launch:true dbg in
           match stop_reason with
           | Step ->
-              DL.log (fun () ->
-                  ( "Debugger stopped because of step after running. This \
-                     should not happen",
-                    [] ));
+              DL.log (fun m ->
+                  m
+                    "Debugger stopped because of step after running. This \
+                     should not happen");
               Lwt.return_unit
           | ReachedEnd ->
-              DL.log (fun () -> ("ReachedEnd: exiting", []));
+              DL.log (fun m -> m "ReachedEnd: exiting");
               Debug_rpc.send_event rpc
                 (module Exited_event)
                 Exited_event.Payload.(make ~exit_code:0);%lwt
@@ -55,7 +55,7 @@ module Make (Debugger : Debugger.S) = struct
                   make ~reason:Stopped_event.Payload.Reason.Exception
                     ~thread_id:(Some 0) ()))
         else (
-          DL.log (fun () -> ("Stop on entry", []));
+          DL.log (fun m -> m "Stop on entry");
           Debug_rpc.send_event rpc
             (module Stopped_event)
             Stopped_event.Payload.(
@@ -64,10 +64,10 @@ module Make (Debugger : Debugger.S) = struct
     Debug_rpc.set_command_handler rpc
       (module Disconnect_command)
       (fun _ ->
-        DL.log (fun () ->
-            ( "Disconnect request received: interrupting the debugger is not \
-               supported",
-              [] ));
+        DL.log (fun m ->
+            m
+              "Disconnect request received: interrupting the debugger is not \
+               supported");
         Debugger.terminate dbg;
         Debug_rpc.remove_command_handler rpc (module Disconnect_command);
         Lwt.wakeup_later_exn resolver Exit;
