@@ -410,7 +410,7 @@ struct
         match cont_func () with
         | Finished _ ->
             DL.log (fun m -> m "cont_func is Finished; reached end");
-            let () = dbg.cont_func <- None in
+            dbg.cont_func <- None;
             ReachedEnd
         | Continue (cur_report_id, branch_case, cont_func) -> (
             match cur_report_id with
