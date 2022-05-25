@@ -1,8 +1,11 @@
 module L = Logging
+module DL = Debugger_log
 module Gil_to_tl_lifter = Gil_to_tl_lifter
 module DebuggerTypes = DebuggerTypes
 module DebuggerUtils = DebuggerUtils
 open DebuggerTypes
+
+let ( let* ) = Option.bind
 
 module type S = sig
   type tl_ast
@@ -51,7 +54,14 @@ struct
     mutable variables : variables;
     mutable errors : err_t list;
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
+    mutable branch_case : branch_case option;
   }
+
+  type branch_case_option = Case of branch_case | TakeFirst | NoCase
+
+  let case_of_option = function
+    | Some case -> Case case
+    | None -> NoCase
 
   let top_level_scopes : scope list =
     let top_level_scope_names =
@@ -227,8 +237,15 @@ struct
         in
         frame :: call_stack_to_frames rest se.call_index prog
 
-  let update_report_id_and_inspection_fields report_id dbg =
-    dbg.cur_report_id <- report_id;
+  let rec update_report_id_and_inspection_fields
+      report_id
+      branch_case_option
+      (dbg : debugger_state) =
+    let branch_case =
+      match branch_case_option with
+      | Case branch_case -> Some branch_case
+      | NoCase | TakeFirst -> None
+    in
     match L.LogQueryer.get_report report_id with
     | None ->
         Fmt.failwith
@@ -236,13 +253,61 @@ struct
            correctly"
           L.ReportId.pp report_id
     | Some (content, type_) -> (
+        DL.show_report report_id ("Got report type " ^ type_);
         match type_ with
-        | t when t = L.LoggingConstants.ContentType.cmd_step -> (
+        | t when t = L.LoggingConstants.ContentType.cmd -> (
+            dbg.cur_report_id <- report_id;
+            let results = L.LogQueryer.get_cmd_results report_id in
+            let result =
+              match branch_case_option with
+              | NoCase | Case _ ->
+                  results
+                  |> List.find_opt (fun (_, content) ->
+                         let cmd_result =
+                           content |> Yojson.Safe.from_string
+                           |> Logging.CmdStep.of_yojson
+                         in
+                         match cmd_result with
+                         | Error _ -> false
+                         | Ok { branch_case = bc; _ } -> bc = branch_case)
+              | TakeFirst -> List.nth_opt results 0
+            in
+            match result with
+            | None ->
+                DL.failwith
+                  (fun () ->
+                    let branch_case_json =
+                      match branch_case with
+                      | Some branch_case -> branch_case_to_yojson branch_case
+                      | None -> `Null
+                    in
+                    let results_json =
+                      results
+                      |> List.map (fun (id, content) ->
+                             `List
+                               [
+                                 L.ReportId.to_yojson id;
+                                 Yojson.Safe.from_string content;
+                               ])
+                    in
+                    [
+                      ("branch_case", branch_case_json);
+                      ("results", `List results_json);
+                    ])
+                  "No matching result for branch case!"
+            | Some (id, _) ->
+                update_report_id_and_inspection_fields id NoCase dbg)
+        | t
+          when L.LoggingConstants.ContentType.(
+                 t = cmd_step || t = cmd_result || t = proc_init) -> (
+            if t = L.LoggingConstants.ContentType.proc_init then
+              dbg.cur_report_id <- report_id;
             let cmd_step =
               content |> Yojson.Safe.from_string |> Logging.CmdStep.of_yojson
             in
             match cmd_step with
             | Ok cmd_step ->
+                dbg.branch_case <- cmd_step.branch_case;
                 let () =
                   dbg.frames <-
                     call_stack_to_frames cmd_step.callstack
@@ -302,7 +367,8 @@ struct
     let cont_func = Verification.verify_up_to_procs prog in
     match cont_func with
     | Verification.SAInterpreter.Finished _ -> Error "Nothing to run"
-    | Verification.SAInterpreter.Continue (cur_report_id, cont_func) -> (
+    | Verification.SAInterpreter.Continue (cur_report_id, branch_case, cont_func)
+      -> (
         match cur_report_id with
         | None ->
             raise
@@ -323,23 +389,30 @@ struct
                  variables = Hashtbl.create 0;
                  errors = [];
                  cur_cmd = None;
+                 branch_case = None;
                }
                 : debugger_state)
             in
-            let _ = update_report_id_and_inspection_fields cur_report_id dbg in
+            let _ =
+              update_report_id_and_inspection_fields cur_report_id
+                (case_of_option branch_case)
+                dbg
+            in
             Ok dbg)
 
   let execute_step dbg =
     let open Verification.SAInterpreter in
     match dbg.cont_func with
-    | None -> ReachedEnd
+    | None ->
+        DL.log (fun m -> m "No cont_func; reached end");
+        ReachedEnd
     | Some cont_func -> (
-        let cont_func = cont_func () in
-        match cont_func with
+        match cont_func () with
         | Finished _ ->
+            DL.log (fun m -> m "cont_func is Finished; reached end");
             let () = dbg.cont_func <- None in
             ReachedEnd
-        | Continue (cur_report_id, cont_func) -> (
+        | Continue (cur_report_id, branch_case, cont_func) -> (
             match cur_report_id with
             | None ->
                 raise
@@ -349,32 +422,66 @@ struct
             | Some cur_report_id ->
                 let () = dbg.cont_func <- Some cont_func in
                 let () =
-                  update_report_id_and_inspection_fields cur_report_id dbg
+                  update_report_id_and_inspection_fields cur_report_id
+                    (case_of_option branch_case)
+                    dbg
                 in
                 Step))
 
   let step_in ?(reverse = false) dbg =
+    let branch_case =
+      let* content, type_ = L.LogQueryer.get_report dbg.cur_report_id in
+      if type_ = L.LoggingConstants.ContentType.cmd then
+        let config_report =
+          content |> Yojson.Safe.from_string |> Logging.ConfigReport.of_yojson
+        in
+        match config_report with
+        | Error _ -> None
+        | Ok { branch_case; _ } -> branch_case
+      else None
+    in
     let stop_reason =
-      if reverse then
+      if reverse then (
         let prev_report_id =
           L.LogQueryer.get_previous_report_id dbg.cur_report_id
         in
         match prev_report_id with
         | None -> ReachedStart
         | Some prev_report_id ->
+            DL.show_report prev_report_id "Previous report";
             let () =
-              update_report_id_and_inspection_fields prev_report_id dbg
+              update_report_id_and_inspection_fields prev_report_id
+                (case_of_option branch_case)
+                dbg
             in
-            Step
+            Step)
       else
         let next_report_id =
-          L.LogQueryer.get_next_report_id dbg.cur_report_id
+          Option.bind (L.LogQueryer.get_next_report_id dbg.cur_report_id)
+            (fun id ->
+              match dbg.branch_case with
+              | None -> Some id
+              | Some branch_case -> (
+                  let content, _ = Option.get @@ L.LogQueryer.get_report id in
+                  let next_cmd =
+                    content |> Yojson.Safe.from_string
+                    |> Logging.ConfigReport.of_yojson
+                  in
+                  match next_cmd with
+                  | Error _ -> failwith "Schrodinger's next-report-id!"
+                  | Ok next_cmd ->
+                      if next_cmd.branch_case = Some branch_case then Some id
+                      else None))
         in
         match next_report_id with
-        | None -> execute_step dbg
+        | None ->
+            DL.log (fun m -> m "No next report ID; executing next step");
+            execute_step dbg
         | Some next_report_id ->
+            DL.show_report next_report_id "Next report ID found; not executing";
             let () =
-              update_report_id_and_inspection_fields next_report_id dbg
+              update_report_id_and_inspection_fields next_report_id TakeFirst
+                dbg
             in
             Step
     in

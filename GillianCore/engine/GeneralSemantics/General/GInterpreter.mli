@@ -22,7 +22,7 @@ module type S = sig
 
   type invariant_frames = (string * state_t) list
   type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
-  type branch_case = state_vt branch_case'
+  type branch_case = state_vt branch_case' [@@deriving yojson]
 
   type cconf_t =
     | ConfErr of {
@@ -39,7 +39,7 @@ module type S = sig
         next_idx : int;
         loop_ids : string list;
         branch_count : int;
-        prev_report_id : Logging.ReportId.t option;
+        prev_cmd_report_id : Logging.ReportId.t option;
         branch_case : branch_case option;
         new_branches : (state_t * int * branch_case) list;
       }
@@ -61,9 +61,26 @@ module type S = sig
 
   type 'a cont_func =
     | Finished of 'a list
-    | Continue of (Logging.ReportId.t option * (unit -> 'a cont_func))
+    | Continue of
+        (Logging.ReportId.t option
+        * branch_case option
+        * (unit -> 'a cont_func))
 
   module Logging : sig
+    module ConfigReport : sig
+      type t = {
+        proc_line : int;
+        time : float;
+        cmd : string;
+        callstack : CallStack.t;
+        annot : Annot.t;
+        branching : int;
+        state : state_t;
+        branch_case : branch_case option;
+      }
+      [@@deriving yojson]
+    end
+
     module CmdStep : sig
       type t = {
         callstack : CallStack.t;

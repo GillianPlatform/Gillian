@@ -6,7 +6,8 @@ let initialize () =
   LogDatabase.reset_db ();
   LogDatabase.create_db ()
 
-let will_log (type_ : string) = type_ <> LoggingConstants.ContentType.debug
+let will_log (type_ : string) =
+  not LoggingConstants.ContentType.(type_ = debug || type_ = phase)
 
 let log (report : Report.t) =
   if will_log report.type_ then

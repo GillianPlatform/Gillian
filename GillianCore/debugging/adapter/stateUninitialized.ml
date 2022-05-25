@@ -1,4 +1,5 @@
 open DebugProtocolEx
+module DL = Debugger_log
 
 module Make (Debugger : Debugger.S) = struct
   let run rpc =
@@ -10,7 +11,7 @@ module Make (Debugger : Debugger.S) = struct
       (module Initialize_command)
       (fun arg ->
         prevent_reenter ();
-        Log.info "Initialize request received";
+        DL.log (fun m -> m "Initialize request received");
         let caps =
           Capabilities.(
             make ~supports_configuration_done_request:(Some true)

@@ -4,5 +4,5 @@
  ; This has to use ppx_deriving_yojson
  ; to work with ocaml-dap
  (preprocess
-  (pps lwt_ppx ppx_deriving_yojson))
- (libraries debugger log dap.rpc_lwt dap.types))
+  (pps lwt_ppx ppx_deriving.std ppx_deriving_yojson))
+ (libraries debugger debugger_log dap.rpc_lwt dap.types))

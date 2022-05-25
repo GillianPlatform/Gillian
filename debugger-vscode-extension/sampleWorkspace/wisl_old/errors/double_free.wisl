@@ -1,0 +1,20 @@
+{ emp }
+function double_free_one_var(x) {
+  x := new(1);
+  delete(x);
+  delete(x);
+  return null
+}
+{ emp }
+
+{ emp }
+function double_free_many_vars() {
+  y := new(2);
+  x := new(3);
+  z := x;
+  delete(x);
+  delete(y);
+  delete(z);
+  return null
+}
+{ emp }

@@ -1,0 +1,17 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Debugger Extension",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}/debugger-vscode-extension",
+				"${workspaceFolder}/debugger-vscode-extension/sampleWorkspace"
+			],
+			"outFiles": [
+				"${workspaceFolder}/debugger-vscode-extension/dist/ext/**/*.js"
+			]
+		},
+	]
+}
