@@ -41,6 +41,7 @@ module type S = sig
         branch_count : int;
         prev_cmd_report_id : Logging.ReportId.t option;
         branch_case : branch_case option;
+        branch_path : branch_case list;
         new_branches : (state_t * int * branch_case) list;
       }
     | ConfFinish of { flag : Flag.t; ret_val : state_vt; final_state : state_t }
@@ -54,6 +55,7 @@ module type S = sig
         next_idx : int;
         loop_ids : string list;
         branch_count : int;
+        branch_path : branch_case list;
       }
 
   type conf_t = BConfErr of err_t list | BConfCont of state_t

@@ -45,6 +45,7 @@ module type S = sig
         branch_count : int;
         prev_cmd_report_id : L.ReportId.t option;
         branch_case : branch_case option;
+        branch_path : branch_case list;
         new_branches : (state_t * int * branch_case) list;
       }
     | ConfFinish of { flag : Flag.t; ret_val : state_vt; final_state : state_t }
@@ -58,6 +59,7 @@ module type S = sig
         next_idx : int;
         loop_ids : string list;
         branch_count : int;
+        branch_path : branch_case list;
       }
 
   type conf_t = BConfErr of err_t list | BConfCont of state_t
@@ -168,6 +170,7 @@ struct
         branch_count : int;
         prev_cmd_report_id : L.ReportId.t option;
         branch_case : branch_case option;
+        branch_path : branch_case list;
         new_branches : (state_t * int * branch_case) list;
       }
     | ConfFinish of { flag : Flag.t; ret_val : State.vt; final_state : State.t }
@@ -181,6 +184,7 @@ struct
         next_idx : int;
         loop_ids : string list;
         branch_count : int;
+        branch_path : branch_case list;
       }
   [@@deriving yojson]
 
@@ -192,10 +196,16 @@ struct
       ~next_idx
       ~loop_ids
       ~branch_count
+      ~branch_path
       ?prev_cmd_report_id
       ?branch_case
       ?(new_branches = [])
       () =
+    let branch_path =
+      match branch_case with
+      | Some case -> case :: branch_path
+      | None -> branch_path
+    in
     ConfCont
       {
         state;
@@ -205,6 +215,7 @@ struct
         next_idx;
         loop_ids;
         branch_count;
+        branch_path;
         prev_cmd_report_id;
         branch_case;
         new_branches;
@@ -674,6 +685,7 @@ struct
       (i : int)
       (b_counter : int)
       (report_id_ref : L.ReportId.t option ref)
+      (branch_path : branch_case list)
       (branch_case : branch_case option) : cconf_t list =
     let _, (annot, _) = get_cmd prog cs i in
 
@@ -689,7 +701,7 @@ struct
     in
     let eval_in_state state =
       evaluate_cmd_after_frame_handling prog state cs iframes prev prev_loop_ids
-        i b_counter report_id_ref branch_case
+        i b_counter report_id_ref branch_path branch_case
     in
     match loop_action with
     | Nothing -> eval_in_state state
@@ -720,6 +732,7 @@ struct
       (i : int)
       (b_counter : int)
       (report_id_ref : L.ReportId.t option ref)
+      (branch_path : branch_case list)
       (branch_case : branch_case option) : cconf_t list =
     let store = State.get_store state in
     let eval_expr = make_eval_expr state in
@@ -738,6 +751,8 @@ struct
     |> Option.iter (fun report_id ->
            report_id_ref := Some report_id;
            L.set_parent report_id);
+
+    let make_confcont = make_confcont ~branch_path in
 
     let evaluate_procedure_call x pid v_args j subst =
       let pid =
@@ -893,6 +908,7 @@ struct
                     prev_idx = prev;
                     loop_ids = prev_loop_ids;
                     next_idx = i;
+                    branch_path;
                     branch_count = b_counter;
                   };
               ]
@@ -1392,6 +1408,7 @@ struct
       (i : int)
       (b_counter : int)
       (report_id_ref : L.ReportId.t option ref)
+      (branch_path : branch_case list)
       (branch_case : branch_case option) : cconf_t list =
     let states =
       match get_cmd prog cs i with
@@ -1402,7 +1419,7 @@ struct
       (fun state ->
         try
           evaluate_cmd prog state cs iframes prev prev_loop_ids i b_counter
-            report_id_ref branch_case
+            report_id_ref branch_path branch_case
         with
         | Interpreter_error (errors, error_state) ->
             [ ConfErr { callstack = cs; proc_idx = i; error_state; errors } ]
@@ -1520,6 +1537,7 @@ struct
               next_idx = i;
               branch_count = b_counter;
               prev_cmd_report_id;
+              branch_path;
               branch_case;
               _;
             }
@@ -1528,7 +1546,7 @@ struct
             L.set_previous prev_cmd_report_id;
             let next_confs =
               protected_evaluate_cmd prog state cs iframes prev prev_loop_ids i
-                b_counter parent_id_ref branch_case
+                b_counter parent_id_ref branch_path branch_case
             in
             continue_or_pause (next_confs @ rest_confs) (fun () ->
                 f (next_confs @ rest_confs) results)
@@ -1581,12 +1599,13 @@ struct
               loop_ids;
               next_idx;
               branch_count;
+              branch_path;
             }
           :: rest_confs
           when retry ->
             let conf =
               make_confcont ~state ~callstack ~invariant_frames ~prev_idx
-                ~loop_ids ~next_idx ~branch_count ()
+                ~loop_ids ~next_idx ~branch_count ~branch_path ()
             in
             L.(
               verbose (fun m ->
@@ -1652,7 +1671,8 @@ struct
     let proc_body_index = 0 in
     let conf : cconf_t =
       make_confcont ~state ~callstack:cs ~invariant_frames:[] ~prev_idx:(-1)
-        ~loop_ids:[] ~next_idx:proc_body_index ~branch_count:0 ()
+        ~loop_ids:[] ~next_idx:proc_body_index ~branch_count:0 ~branch_path:[]
+        ()
     in
     let report_id =
       CmdStep.log_init
@@ -1707,7 +1727,7 @@ struct
     let initial_conf =
       make_confcont ~state:initial_state ~callstack:initial_cs
         ~invariant_frames:[] ~prev_idx:(-1) ~loop_ids:[]
-        ~next_idx:initial_proc_body_index ~branch_count:0 ()
+        ~next_idx:initial_proc_body_index ~branch_count:0 ~branch_path:[] ()
     in
     let report_id =
       CmdStep.log_step
