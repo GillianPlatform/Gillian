@@ -365,42 +365,53 @@ struct
       preprocess_files [ file_name ] already_compiled outfile_opt no_unfold
     in
     let cont_func = Verification.verify_up_to_procs prog in
-    match cont_func with
-    | Verification.SAInterpreter.Finished _ -> Error "Nothing to run"
-    | Verification.SAInterpreter.Continue (cur_report_id, branch_case, cont_func)
-      -> (
-        match cur_report_id with
-        | None ->
-            raise
-              (Failure
-                 "Did not log report. Check the logging level is set correctly")
-        | Some cur_report_id ->
-            let dbg =
-              ({
-                 source_file = file_name;
-                 source_files = source_files_opt;
-                 top_level_scopes;
-                 cont_func = Some cont_func;
-                 prog;
-                 tl_ast;
-                 frames = [];
-                 cur_report_id;
-                 breakpoints = Hashtbl.create 0;
-                 variables = Hashtbl.create 0;
-                 errors = [];
-                 cur_cmd = None;
-                 branch_case = None;
-               }
-                : debugger_state)
-            in
-            let _ =
-              update_report_id_and_inspection_fields cur_report_id
-                (case_of_option branch_case)
-                dbg
-            in
-            Ok dbg)
+    let rec init_with_no_proc_init cont_func =
+      match cont_func with
+      | Verification.SAInterpreter.Finished _ -> Error "Nothing to run"
+      | Verification.SAInterpreter.Continue
+          (cur_report_id, branch_case, cont_func) -> (
+          match cur_report_id with
+          | None ->
+              raise
+                (Failure
+                   "Did not log report. Check the logging level is set \
+                    correctly")
+          | Some cur_report_id ->
+              let _, type_ =
+                Option.get @@ L.LogQueryer.get_report cur_report_id
+              in
+              if type_ = L.LoggingConstants.ContentType.proc_init then (
+                DL.log (fun m -> m "(launch) Skipping proc_init...");
+                init_with_no_proc_init (cont_func ()))
+              else
+                let dbg =
+                  ({
+                     source_file = file_name;
+                     source_files = source_files_opt;
+                     top_level_scopes;
+                     cont_func = Some cont_func;
+                     prog;
+                     tl_ast;
+                     frames = [];
+                     cur_report_id;
+                     breakpoints = Hashtbl.create 0;
+                     variables = Hashtbl.create 0;
+                     errors = [];
+                     cur_cmd = None;
+                     branch_case = None;
+                   }
+                    : debugger_state)
+                in
+                let _ =
+                  update_report_id_and_inspection_fields cur_report_id
+                    (case_of_option branch_case)
+                    dbg
+                in
+                Ok dbg)
+    in
+    init_with_no_proc_init cont_func
 
-  let execute_step dbg =
+  let rec execute_step dbg =
     let open Verification.SAInterpreter in
     match dbg.cont_func with
     | None ->
@@ -420,13 +431,18 @@ struct
                      "Did not log report. Check the logging level is set \
                       correctly")
             | Some cur_report_id ->
-                let () = dbg.cont_func <- Some cont_func in
-                let () =
+                dbg.cont_func <- Some cont_func;
+                let _, type_ =
+                  Option.get @@ L.LogQueryer.get_report cur_report_id
+                in
+                if type_ = L.LoggingConstants.ContentType.proc_init then (
+                  DL.log (fun m -> m "(execute_step) Skipping proc_init...");
+                  execute_step dbg)
+                else (
                   update_report_id_and_inspection_fields cur_report_id
                     (case_of_option branch_case)
-                    dbg
-                in
-                Step))
+                    dbg;
+                  Step)))
 
   let step_in ?(reverse = false) dbg =
     let branch_case =
