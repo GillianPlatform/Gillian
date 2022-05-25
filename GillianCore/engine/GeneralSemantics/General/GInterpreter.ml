@@ -87,7 +87,7 @@ module type S = sig
       [@@deriving yojson]
     end
 
-    module CmdStep : sig
+    module CmdResult : sig
       type t = {
         callstack : CallStack.t;
         proc_body_index : int;
@@ -289,7 +289,7 @@ struct
           L.LoggingConstants.ContentType.cmd
     end
 
-    module CmdStep = struct
+    module CmdResult = struct
       type t = {
         callstack : CallStack.t;
         proc_body_index : int;
@@ -1475,7 +1475,7 @@ struct
                  L.release_parent !parent_id_ref;
                  L.set_parent prev_report_id;
                  parent_id_ref := Some prev_report_id);
-          let cmd_step : CmdStep.t =
+          let cmd_step : CmdResult.t =
             {
               callstack;
               proc_body_index;
@@ -1485,13 +1485,13 @@ struct
             }
           in
           DL.log (fun m ->
-              m ~json:[ ("conf", CmdStep.to_yojson cmd_step) ] "confcont");
-          CmdStep.log_result cmd_step |> ignore;
+              m ~json:[ ("conf", CmdResult.to_yojson cmd_step) ] "confcont");
+          CmdResult.log_result cmd_step |> ignore;
           Continue (!parent_id_ref, branch_case, cont_func)
       | ConfErr
           { callstack; proc_idx = proc_body_index; error_state = state; errors }
         :: _ ->
-          CmdStep.log_result
+          CmdResult.log_result
             {
               callstack;
               proc_body_index;
@@ -1675,7 +1675,7 @@ struct
         ()
     in
     let report_id =
-      CmdStep.log_init
+      CmdResult.log_init
         {
           callstack = cs;
           proc_body_index;
@@ -1730,7 +1730,7 @@ struct
         ~next_idx:initial_proc_body_index ~branch_count:0 ~branch_path:[] ()
     in
     let report_id =
-      CmdStep.log_step
+      CmdResult.log_step
         {
           callstack = initial_cs;
           proc_body_index = initial_proc_body_index;

@@ -83,7 +83,7 @@ module type S = sig
       [@@deriving yojson]
     end
 
-    module CmdStep : sig
+    module CmdResult : sig
       type t = {
         callstack : CallStack.t;
         proc_body_index : int;

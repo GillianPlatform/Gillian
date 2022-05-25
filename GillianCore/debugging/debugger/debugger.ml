@@ -273,7 +273,7 @@ struct
                 |> List.map (fun (result_id, content) ->
                        let cmd_result =
                          content |> Yojson.Safe.from_string
-                         |> Logging.CmdStep.of_yojson
+                         |> Logging.CmdResult.of_yojson
                        in
                        match cmd_result with
                        | Error _ -> None
@@ -283,7 +283,8 @@ struct
               match branch_case_option with
               | NoCase | Case _ ->
                   results
-                  |> List.find_opt (fun (_, (cmd_result : Logging.CmdStep.t)) ->
+                  |> List.find_opt
+                       (fun (_, (cmd_result : Logging.CmdResult.t)) ->
                          cmd_result.branch_case = branch_case)
               | TakeFirst -> List.nth_opt results 0
             in
@@ -302,7 +303,7 @@ struct
                              `List
                                [
                                  L.ReportId.to_yojson id;
-                                 Logging.CmdStep.to_yojson cmd_result;
+                                 Logging.CmdResult.to_yojson cmd_result;
                                ])
                     in
                     [
