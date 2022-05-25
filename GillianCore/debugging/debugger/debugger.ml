@@ -237,7 +237,7 @@ struct
         in
         frame :: call_stack_to_frames rest se.call_index prog
 
-  let rec update_report_id_and_inspection_fields
+  let update_report_id_and_inspection_fields
       report_id
       branch_case_option
       (dbg : debugger_state) =
@@ -257,19 +257,34 @@ struct
         match type_ with
         | t when t = L.LoggingConstants.ContentType.cmd -> (
             dbg.cur_report_id <- report_id;
+            let cmd =
+              content |> Yojson.Safe.from_string
+              |> Logging.ConfigReport.of_yojson
+            in
+            let cmd =
+              match cmd with
+              | Ok cmd -> cmd
+              | Error _ -> failwith "Invalid cmd content!"
+            in
             let results = L.LogQueryer.get_cmd_results report_id in
+            let results =
+              List_utils.get_list_somes
+                (results
+                |> List.map (fun (result_id, content) ->
+                       let cmd_result =
+                         content |> Yojson.Safe.from_string
+                         |> Logging.CmdStep.of_yojson
+                       in
+                       match cmd_result with
+                       | Error _ -> None
+                       | Ok cmd_result -> Some (result_id, cmd_result)))
+            in
             let result =
               match branch_case_option with
               | NoCase | Case _ ->
                   results
-                  |> List.find_opt (fun (_, content) ->
-                         let cmd_result =
-                           content |> Yojson.Safe.from_string
-                           |> Logging.CmdStep.of_yojson
-                         in
-                         match cmd_result with
-                         | Error _ -> false
-                         | Ok { branch_case = bc; _ } -> bc = branch_case)
+                  |> List.find_opt (fun (_, (cmd_result : Logging.CmdStep.t)) ->
+                         cmd_result.branch_case = branch_case)
               | TakeFirst -> List.nth_opt results 0
             in
             match result with
@@ -283,11 +298,11 @@ struct
                     in
                     let results_json =
                       results
-                      |> List.map (fun (id, content) ->
+                      |> List.map (fun (id, cmd_result) ->
                              `List
                                [
                                  L.ReportId.to_yojson id;
-                                 Yojson.Safe.from_string content;
+                                 Logging.CmdStep.to_yojson cmd_result;
                                ])
                     in
                     [
@@ -295,35 +310,24 @@ struct
                       ("results", `List results_json);
                     ])
                   "No matching result for branch case!"
-            | Some (id, _) ->
-                update_report_id_and_inspection_fields id NoCase dbg)
-        | t
-          when L.LoggingConstants.ContentType.(
-                 t = cmd_step || t = cmd_result || t = proc_init) -> (
-            if t = L.LoggingConstants.ContentType.proc_init then
-              dbg.cur_report_id <- report_id;
-            let cmd_step =
-              content |> Yojson.Safe.from_string |> Logging.CmdStep.of_yojson
-            in
-            match cmd_step with
-            | Ok cmd_step ->
-                dbg.branch_case <- cmd_step.branch_case;
+            | Some (_, cmd_result) ->
+                dbg.branch_case <- cmd_result.branch_case;
                 let () =
                   dbg.frames <-
-                    call_stack_to_frames cmd_step.callstack
-                      cmd_step.proc_body_index dbg.prog
+                    call_stack_to_frames cmd.callstack cmd.proc_line dbg.prog
                 in
                 let lifted_scopes, variables =
-                  create_variables cmd_step.state (is_gil_file dbg.source_file)
+                  create_variables cmd_result.state
+                    (is_gil_file dbg.source_file)
                 in
                 let () = dbg.variables <- variables in
                 let () =
                   dbg.top_level_scopes <-
                     List.concat [ lifted_scopes; top_level_scopes ]
                 in
-                let () = dbg.errors <- cmd_step.errors in
+                let () = dbg.errors <- cmd_result.errors in
                 let cur_cmd =
-                  match cmd_step.callstack with
+                  match cmd_result.callstack with
                   | [] -> None
                   | (se : CallStack.stack_element) :: _ -> (
                       let proc = Prog.get_proc dbg.prog se.pid in
@@ -331,12 +335,15 @@ struct
                       | None -> None
                       | Some proc ->
                           let annot, _, cmd =
-                            proc.proc_body.(cmd_step.proc_body_index)
+                            proc.proc_body.(cmd_result.proc_body_index)
                           in
                           Some (cmd, annot))
                 in
-                dbg.cur_cmd <- cur_cmd
-            | Error err -> failwith err)
+                dbg.cur_cmd <- cur_cmd)
+        | t
+          when L.LoggingConstants.ContentType.(
+                 t = cmd_step || t = cmd_result || t = proc_init) ->
+            Fmt.failwith "Shouldn't encounter log type '%s'!" t
         | _ as t ->
             raise
               (Failure
