@@ -1,6 +1,8 @@
 let db_name = "log.db"
 let db = ref None
 
+type relationship = Child | Next
+
 exception Error of string
 
 let error fmt = Format.kasprintf (fun err -> raise (Error err)) fmt
@@ -182,3 +184,22 @@ let get_cmd_results id =
       ~init:[]
   in
   results
+
+let get_unification_for id relationship =
+  let db = get_db () in
+  let relationship =
+    match relationship with
+    | Child -> "parent"
+    | Next -> "previous"
+  in
+  let stmt =
+    Sqlite3.prepare db
+      (Fmt.str "SELECT id FROM report WHERE type=\"unify\" AND %s=? LIMIT 1"
+         relationship)
+  in
+  Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
+  |> check_result_code db ~log:"get unification bind id";
+  let row = zero_or_one_row db ~log:"step: get unification" ~stmt in
+  let id = Option.map (fun row -> Sqlite3.Data.to_int64_exn row.(0)) row in
+  Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: get unification";
+  id

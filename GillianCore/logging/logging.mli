@@ -60,6 +60,8 @@ module Loggable : sig
 end
 
 module LogQueryer : sig
+  type relationship = Child | Next
+
   (* Returns the content and the content type given the report id *)
   val get_report : ReportId.t -> (string * string) option
 
@@ -78,6 +80,7 @@ module LogQueryer : sig
   (* Returns the list of IDs and content of any children of the given report
      ID who have type 'cmd_result' *)
   val get_cmd_results : ReportId.t -> (ReportId.t * string) list
+  val get_unification_for : ReportId.t -> relationship -> ReportId.t option
 end
 
 (** Initializes the logging module with the specified reporters and initializes
