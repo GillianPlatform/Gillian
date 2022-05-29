@@ -3,5 +3,7 @@
  (public_name gillian.debugger)
  (libraries str fmt.tty engine gil_syntax incrementalAnalysis logging
    parserAndCompiler utils debugger_log)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson))
  (flags :standard -open Utils -open Engine -open Gil_syntax -open
    IncrementalAnalysis))

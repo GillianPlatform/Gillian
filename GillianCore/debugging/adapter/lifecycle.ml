@@ -9,10 +9,9 @@ module Make (Debugger : Debugger.S) = struct
     let send_initialize_event () =
       Debug_rpc.send_event rpc (module Initialized_event) ()
     in
-    Debug_rpc.set_command_handler rpc
+    DL.set_rpc_command_handler rpc ~name:"Configuration-done"
       (module Configuration_done_command)
       (fun _ ->
-        DL.log (fun m -> m "Configuration done");
         let open Launch_command.Arguments in
         if not launch_args.stop_on_entry then (
           DL.log (fun m -> m "Do not stop on entry");
@@ -61,13 +60,10 @@ module Make (Debugger : Debugger.S) = struct
             Stopped_event.Payload.(
               make ~reason:Stopped_event.Payload.Reason.Entry
                 ~thread_id:(Some 0) ())));
-    Debug_rpc.set_command_handler rpc
+    DL.set_rpc_command_handler rpc ~name:"Disconnect"
       (module Disconnect_command)
       (fun _ ->
-        DL.log (fun m ->
-            m
-              "Disconnect request received: interrupting the debugger is not \
-               supported");
+        DL.log (fun m -> m "Interrupting the debugger is not supported");
         Debugger.terminate dbg;
         Debug_rpc.remove_command_handler rpc (module Disconnect_command);
         Lwt.wakeup_later_exn resolver Exit;
