@@ -111,3 +111,23 @@ let rec map_option f =
       let* a = f a in
       let* r = map_option f r in
       Some (a :: r)
+
+let rec starts_with a b =
+  match (a, b) with
+  | _, [] -> true
+  | a' :: a, b' :: b when a' = b' -> starts_with a b
+  | _, _ -> false
+
+let ends_with a b = starts_with (List.rev a) (List.rev b)
+
+let pop_where f =
+  let rec aux pre = function
+    | [] -> (None, List.rev pre)
+    | x :: xs when f x -> (Some x, List.rev pre @ xs)
+    | x :: xs -> aux (x :: pre) xs
+  in
+  aux []
+
+let hd_tl = function
+  | x :: xs -> (Some x, xs)
+  | [] -> (None, [])
