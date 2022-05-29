@@ -6,6 +6,7 @@ module DebuggerUtils = DebuggerUtils
 open DebuggerTypes
 
 let ( let* ) = Option.bind
+let ( let+ ) o f = Option.map f o
 
 module type S = sig
   type tl_ast
@@ -32,6 +33,7 @@ module Make
                  and type memory_error = Verification.SPState.m_err_t
                  and type tl_ast = PC.tl_ast) =
 struct
+  open L.LoggingConstants
   open Verification.SAInterpreter
   module Breakpoints = Set.Make (Int)
 
@@ -41,10 +43,10 @@ struct
   type debugger_state = {
     source_file : string;
     source_files : SourceFiles.t option;
-    prog : (Annot.t, int) Prog.t;
+    prog : Verification.prog_t;
     tl_ast : tl_ast option;
-    mutable cont_func :
-      (unit -> Verification.SAInterpreter.result_t cont_func) option;
+    tests : (string * Verification.t) list;
+    mutable cont_func : result_t cont_func_f option;
     mutable breakpoints : breakpoints;
     mutable cur_report_id : L.ReportId.t;
     (* TODO: The below fields only depend on the
@@ -55,6 +57,7 @@ struct
     mutable errors : err_t list;
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
     mutable branch_case : branch_case option;
+    mutable branch_path : branch_path;
   }
 
   type branch_case_option = Case of branch_case | TakeFirst | NoCase
@@ -255,7 +258,7 @@ struct
     | Some (content, type_) -> (
         DL.show_report report_id ("Got report type " ^ type_);
         match type_ with
-        | t when t = L.LoggingConstants.ContentType.cmd -> (
+        | t when t = ContentType.cmd -> (
             dbg.cur_report_id <- report_id;
             let cmd =
               content |> Yojson.Safe.from_string
@@ -266,6 +269,8 @@ struct
               | Ok cmd -> cmd
               | Error _ -> failwith "Invalid cmd content!"
             in
+            dbg.frames <-
+              call_stack_to_frames cmd.callstack cmd.proc_line dbg.prog;
             let results = L.LogQueryer.get_cmd_results report_id in
             let results =
               List_utils.get_list_somes
@@ -312,11 +317,15 @@ struct
                     ])
                   "No matching result for branch case!"
             | Some (_, cmd_result) ->
+                DL.log (fun m ->
+                    let json =
+                      [ ("cmd_result", Logging.CmdResult.to_yojson cmd_result) ]
+                    in
+                    m ~json "...and got accompanying cmd_result");
                 dbg.branch_case <- cmd_result.branch_case;
-                let () =
-                  dbg.frames <-
-                    call_stack_to_frames cmd.callstack cmd.proc_line dbg.prog
-                in
+                cmd_result.branch_case
+                |> Option.iter (fun bc ->
+                       dbg.branch_path <- bc :: dbg.branch_path);
                 let lifted_scopes, variables =
                   create_variables cmd_result.state
                     (is_gil_file dbg.source_file)
@@ -328,28 +337,63 @@ struct
                 in
                 let () = dbg.errors <- cmd_result.errors in
                 let cur_cmd =
-                  match cmd_result.callstack with
+                  match cmd.callstack with
                   | [] -> None
                   | (se : CallStack.stack_element) :: _ -> (
                       let proc = Prog.get_proc dbg.prog se.pid in
                       match proc with
                       | None -> None
                       | Some proc ->
-                          let annot, _, cmd =
-                            proc.proc_body.(cmd_result.proc_body_index)
-                          in
+                          let annot, _, cmd = proc.proc_body.(cmd.proc_line) in
                           Some (cmd, annot))
                 in
                 dbg.cur_cmd <- cur_cmd)
-        | t
-          when L.LoggingConstants.ContentType.(
-                 t = cmd_step || t = cmd_result || t = proc_init) ->
-            Fmt.failwith "Shouldn't encounter log type '%s'!" t
+        | t when t = ContentType.unify ->
+            dbg.branch_case <- None;
+            dbg.cur_report_id <- report_id;
+            let cmd_id =
+              match L.LogQueryer.get_previous_report_id report_id with
+              | None ->
+                  Fmt.failwith
+                    "Postcond unify report (%a) has nonexistent previous!"
+                    L.ReportId.pp report_id
+              | Some id -> id
+            in
+            let cmd =
+              Option.get
+              @@ Option.bind (L.LogQueryer.get_report cmd_id)
+                   (fun (content, _) ->
+                     content |> Yojson.Safe.from_string
+                     |> Logging.ConfigReport.of_yojson |> Result.to_option)
+            in
+            DL.log (fun m ->
+                m
+                  ~json:[ ("cmd", Logging.ConfigReport.to_yojson cmd) ]
+                  "...and got accompanying (previous) cmd");
+            dbg.frames <-
+              call_stack_to_frames cmd.callstack cmd.proc_line dbg.prog;
+            let lifted_scopes, variables =
+              create_variables (Some cmd.state) (is_gil_file dbg.source_file)
+            in
+            dbg.variables <- variables;
+            dbg.top_level_scopes <-
+              List.concat [ lifted_scopes; top_level_scopes ];
+            dbg.errors <- [];
+            let cur_cmd =
+              match cmd.callstack with
+              | [] -> None
+              | se :: _ -> (
+                  let proc = Prog.get_proc dbg.prog se.pid in
+                  match proc with
+                  | None -> None
+                  | Some proc ->
+                      let annot, _, cmd = proc.proc_body.(cmd.proc_line) in
+                      Some (cmd, annot))
+            in
+            dbg.cur_cmd <- cur_cmd
         | _ as t ->
-            raise
-              (Failure
-                 (Printf.sprintf
-                    "Cannot deserialize: type '%s' does not match cmd_step" t)))
+            Fmt.failwith
+              "Debugger: don't know how to handle report of type '%s'!" t)
 
   let launch file_name proc_name =
     let () = Fmt_tty.setup_std_outputs () in
@@ -375,7 +419,9 @@ struct
     let cont_func = Verification.verify_up_to_procs prog in
     let rec init_with_no_proc_init cont_func =
       match cont_func with
-      | Verification.SAInterpreter.Finished _ -> Error "Nothing to run"
+      | Verification.SAInterpreter.Finished _ ->
+          failwith "HORROR: Shouldn't encounter Finished when debugging!"
+      | Verification.SAInterpreter.EndOfBranch _ -> Error "Nothing to run"
       | Verification.SAInterpreter.Continue
           (cur_report_id, branch_case, cont_func) -> (
           match cur_report_id with
@@ -388,10 +434,11 @@ struct
               let _, type_ =
                 Option.get @@ L.LogQueryer.get_report cur_report_id
               in
-              if type_ = L.LoggingConstants.ContentType.proc_init then (
+              if type_ = ContentType.proc_init then (
                 DL.log (fun m -> m "(launch) Skipping proc_init...");
-                init_with_no_proc_init (cont_func ()))
+                init_with_no_proc_init (cont_func ~path:[] ()))
               else
+                let tests = Verification.Debug.get_tests_for_prog prog in
                 let dbg =
                   ({
                      source_file = file_name;
@@ -400,6 +447,7 @@ struct
                      cont_func = Some cont_func;
                      prog;
                      tl_ast;
+                     tests;
                      frames = [];
                      cur_report_id;
                      breakpoints = Hashtbl.create 0;
@@ -407,6 +455,7 @@ struct
                      errors = [];
                      cur_cmd = None;
                      branch_case = None;
+                     branch_path = [];
                    }
                     : debugger_state)
                 in
@@ -419,18 +468,53 @@ struct
     in
     init_with_no_proc_init cont_func
 
-  let rec execute_step dbg =
+  let unify result proc_name prev_id dbg =
+    match dbg.tests |> List.assoc_opt proc_name with
+    | None ->
+        DL.failwith
+          (fun () ->
+            let tests_json = Verification.proc_tests_to_yojson dbg.tests in
+            [ ("tests", tests_json) ])
+          (Fmt.str "No test found for proc `%s`!" proc_name)
+    | Some test -> (
+        let _ = Verification.Debug.analyse_result test result in
+        match L.LogQueryer.get_unification_for prev_id Next with
+        | None -> failwith "No unify report found!"
+        | Some id -> id)
+
+  let rec execute_step ?prev_id dbg =
     let open Verification.SAInterpreter in
     match dbg.cont_func with
     | None ->
         DL.log (fun m -> m "No cont_func; reached end");
         ReachedEnd
     | Some cont_func -> (
-        match cont_func () with
+        match cont_func ~path:dbg.branch_path () with
         | Finished _ ->
-            DL.log (fun m -> m "cont_func is Finished; reached end");
             dbg.cont_func <- None;
-            ReachedEnd
+            failwith "HORROR: Shouldn't encounter Finished when debugging!"
+        | EndOfBranch (result, cont_func) ->
+            dbg.cont_func <- Some cont_func;
+            let prev =
+              Option.bind prev_id (fun prev_id ->
+                  let+ content, type_ = L.LogQueryer.get_report prev_id in
+                  (prev_id, content, type_))
+            in
+            (match prev with
+            | Some (prev_id, content, type_) when type_ = ContentType.cmd ->
+                let cmd =
+                  content |> Yojson.Safe.from_string
+                  |> Logging.ConfigReport.of_yojson |> Result.get_ok
+                in
+                let proc_name = (List.hd cmd.callstack).pid in
+                let unify_id = unify result proc_name prev_id dbg in
+                update_report_id_and_inspection_fields unify_id NoCase dbg
+                (* DL.log (fun m -> m "--- premature step ---"); (unify_id) |> ignore *)
+            | Some (prev_id, _, type_) ->
+                Fmt.failwith "EndOfBranch: prev cmd (%a) is '%s', not '%s'!"
+                  L.ReportId.pp prev_id type_ ContentType.cmd
+            | None -> failwith "EndOfBranch: no prev ID!");
+            Step
         | Continue (cur_report_id, branch_case, cont_func) -> (
             match cur_report_id with
             | None ->
@@ -438,76 +522,110 @@ struct
                   (Failure
                      "Did not log report. Check the logging level is set \
                       correctly")
-            | Some cur_report_id ->
+            | Some cur_report_id -> (
                 dbg.cont_func <- Some cont_func;
                 let _, type_ =
                   Option.get @@ L.LogQueryer.get_report cur_report_id
                 in
-                if type_ = L.LoggingConstants.ContentType.proc_init then (
+                if type_ = ContentType.proc_init then (
                   DL.log (fun m -> m "(execute_step) Skipping proc_init...");
                   execute_step dbg)
-                else (
-                  update_report_id_and_inspection_fields cur_report_id
-                    (case_of_option branch_case)
-                    dbg;
-                  Step)))
+                else
+                  match L.LogQueryer.get_cmd_results cur_report_id with
+                  | [] ->
+                      DL.log (fun m ->
+                          m
+                            "No results for cmd; assuming eob, stepping \
+                             again...");
+                      execute_step ~prev_id:cur_report_id dbg
+                  | _ ->
+                      update_report_id_and_inspection_fields cur_report_id
+                        (case_of_option branch_case)
+                        dbg;
+                      Step)))
 
   let step_in ?(reverse = false) dbg =
-    let branch_case =
-      let* content, type_ = L.LogQueryer.get_report dbg.cur_report_id in
-      if type_ = L.LoggingConstants.ContentType.cmd then
-        let config_report =
-          content |> Yojson.Safe.from_string |> Logging.ConfigReport.of_yojson
-        in
-        match config_report with
-        | Error _ -> None
-        | Ok { branch_case; _ } -> branch_case
-      else None
-    in
     let stop_reason =
+      let _, current_report_type =
+        Option.get (L.LogQueryer.get_report dbg.cur_report_id)
+      in
       if reverse then (
         let prev_report_id =
-          L.LogQueryer.get_previous_report_id dbg.cur_report_id
+          let* prev_id =
+            L.LogQueryer.get_previous_report_id dbg.cur_report_id
+          in
+          if current_report_type = ContentType.unify then (
+            DL.log (fun m ->
+                m "Current report is '%s'; moving back an extra step..."
+                  current_report_type);
+            L.LogQueryer.get_previous_report_id prev_id)
+          else Some prev_id
         in
         match prev_report_id with
         | None -> ReachedStart
         | Some prev_report_id ->
             DL.show_report prev_report_id "Previous report";
-            let () =
-              update_report_id_and_inspection_fields prev_report_id
-                (case_of_option branch_case)
-                dbg
+            let _, prev_report_type =
+              Option.get (L.LogQueryer.get_report prev_report_id)
             in
-            Step)
+            if prev_report_type = ContentType.proc_init then (
+              DL.log (fun m ->
+                  m "Prev report is '%s'; not stepping." prev_report_type);
+              ReachedStart)
+            else (
+              update_report_id_and_inspection_fields prev_report_id TakeFirst
+                dbg;
+              Step))
       else
-        let next_report_id =
-          Option.bind (L.LogQueryer.get_next_report_id dbg.cur_report_id)
-            (fun id ->
-              match dbg.branch_case with
-              | None -> Some id
-              | Some branch_case -> (
-                  let content, _ = Option.get @@ L.LogQueryer.get_report id in
-                  let next_cmd =
-                    content |> Yojson.Safe.from_string
-                    |> Logging.ConfigReport.of_yojson
-                  in
-                  match next_cmd with
-                  | Error _ -> failwith "Schrodinger's next-report-id!"
-                  | Ok next_cmd ->
-                      if next_cmd.branch_case = Some branch_case then Some id
-                      else None))
+        let _, type_ =
+          Option.get @@ L.LogQueryer.get_report dbg.cur_report_id
         in
-        match next_report_id with
-        | None ->
-            DL.log (fun m -> m "No next report ID; executing next step");
-            execute_step dbg
-        | Some next_report_id ->
-            DL.show_report next_report_id "Next report ID found; not executing";
-            let () =
+        if type_ = ContentType.unify then (
+          DL.log (fun m ->
+              m "Current report has type `unify`; assuming end-of-branch.");
+          ReachedEnd)
+        else
+          let next_report_id =
+            Option.bind (L.LogQueryer.get_next_report_id dbg.cur_report_id)
+              (fun id ->
+                match dbg.branch_case with
+                | None -> Some id
+                | Some branch_case -> (
+                    let content, _ = Option.get @@ L.LogQueryer.get_report id in
+                    let next_cmd =
+                      content |> Yojson.Safe.from_string
+                      |> Logging.ConfigReport.of_yojson
+                    in
+                    match next_cmd with
+                    | Error _ -> failwith "Schrodinger's next-report-id!"
+                    | Ok next_cmd ->
+                        if next_cmd.branch_case = Some branch_case then Some id
+                        else None))
+          in
+          match next_report_id with
+          | None ->
+              DL.log (fun m -> m "No next report ID; executing next step");
+              execute_step dbg
+          | Some next_report_id ->
+              DL.show_report next_report_id
+                "Next report ID found; not executing";
+              let next_report_id =
+                Option.value
+                  (let* lookahead_id =
+                     L.LogQueryer.get_next_report_id next_report_id
+                   in
+                   let* _, lookahead_type =
+                     L.LogQueryer.get_report lookahead_id
+                   in
+                   if lookahead_type = ContentType.unify then (
+                     DL.log (fun m -> m "Stepping ahead to unify...");
+                     Some lookahead_id)
+                   else None)
+                  ~default:next_report_id
+              in
               update_report_id_and_inspection_fields next_report_id TakeFirst
-                dbg
-            in
-            Step
+                dbg;
+              Step
     in
     if has_hit_breakpoint dbg then Breakpoint
     else if List.length dbg.errors > 0 then
