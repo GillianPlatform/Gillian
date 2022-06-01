@@ -10,7 +10,7 @@
 				"${workspaceFolder}/debugger-vscode-extension/sampleWorkspace"
 			],
 			"outFiles": [
-				"${workspaceFolder}/debugger-vscode-extension/dist/ext/**/*.js"
+				"${workspaceFolder}/debugger-vscode-extension/out/**/*.js"
 			]
 		},
 	]

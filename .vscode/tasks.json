@@ -2,14 +2,35 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "script": "build",
+            "label": "snowpack-build",
             "type": "npm",
-            "script": "compile",
-            "isBackground": false,
-            "group": {
-                "kind": "build",
-                "isDefault": false
+            "options": {
+                "cwd": "${workspaceFolder}/debugger-vscode-extension"
+            }
+        },
+        {
+            "script": "dev",
+            "label": "snowpack-build-dev",
+            "type": "npm",
+            "problemMatcher": {
+                "owner": "typescript",
+                "fileLocation": "absolute",
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                },
+                "background": {
+                    "activeOnStart": false,
+                    "beginsPattern": "^\\[nodemon\\] starting",
+                    "endsPattern": "^\\[nodemon\\] clean exit"
+                }
             },
-            "problemMatcher": "$tsc-watch",
+            "isBackground": true,
             "options": {
                 "cwd": "${workspaceFolder}/debugger-vscode-extension"
             }
@@ -17,15 +38,47 @@
         {
             "type": "npm",
             "script": "watch",
-            "group": "build",
+            "problemMatcher": "$tsc-watch",
             "isBackground": true,
-            "problemMatcher": [
-                "$ts-webpack-watch",
-                "$tslint-webpack-watch"
-            ],
+            "presentation": {
+                "reveal": "never"
+            },
+            "group": {
+            "kind": "build",
+            "isDefault": true
+            },
+            "dependsOn": ["snowpack-build-dev"],
             "options": {
                 "cwd": "${workspaceFolder}/debugger-vscode-extension"
             }
         }
     ]
+    // "tasks": [
+    //     {
+    //         "type": "npm",
+    //         "script": "compile",
+    //         "isBackground": false,
+    //         "group": {
+    //             "kind": "build",
+    //             "isDefault": false
+    //         },
+    //         "problemMatcher": "$tsc-watch",
+    //         "options": {
+    //             "cwd": "${workspaceFolder}/debugger-vscode-extension"
+    //         }
+    //     },
+    //     {
+    //         "type": "npm",
+    //         "script": "watch",
+    //         "group": "build",
+    //         "isBackground": true,
+    //         "problemMatcher": [
+    //             "$ts-webpack-watch",
+    //             "$tslint-webpack-watch"
+    //         ],
+    //         "options": {
+    //             "cwd": "${workspaceFolder}/debugger-vscode-extension"
+    //         }
+    //     }
+    // ]
 }
