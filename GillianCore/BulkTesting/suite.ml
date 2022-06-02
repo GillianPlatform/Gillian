@@ -72,7 +72,7 @@ struct
 
   let suffix i str = String.sub str i (String.length str - i)
 
-  type info = { filename : string }
+  type info = unit
 
   let pp_info _ _ = ()
 
@@ -110,7 +110,7 @@ struct
     let cut_source = remove_common_root source in
     let dname = Filename.dirname cut_source in
     let cat = get_cat dname in
-    [ (cut_source, { filename = source }, cat) ]
+    [ (cut_source, (), cat) ]
 
   let filter_source _ = true
   let beforeEach _ = ()
