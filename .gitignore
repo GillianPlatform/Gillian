@@ -66,6 +66,7 @@ doc
 *.install
 _build.prev
 _release
+gillian.esy.lock
 
 # Gillian-specific stuff
 */environment

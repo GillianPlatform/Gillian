@@ -25,7 +25,7 @@ module Suite = struct
 end
 
 module Expectations = struct
-  type matcher = Gillian_bulk_alcotest.AlcotestCheckers.Make(Outcome).matcher
+  type matcher = Alcotest_runner.AlcotestCheckers.Make(Outcome).matcher
   type outcome = Outcome.t
   type category = Suite.category
   type info = Suite.info
@@ -34,5 +34,4 @@ module Expectations = struct
     expect.finish_in_normal_mode AllOfThem outcome
 end
 
-include
-  Gillian_bulk_alcotest.AlcotestRunner.Make (Outcome) (Suite) (Expectations)
+include Alcotest_runner.AlcotestRunner.Make (Outcome) (Suite) (Expectations)

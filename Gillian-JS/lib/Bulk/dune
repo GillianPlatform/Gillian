@@ -1,3 +1,3 @@
 (library
  (name cosetteRunner)
- (libraries js2jsil_lib gillian-bulk-alcotest semantics str))
+ (libraries js2jsil_lib gillian.alcotest-runner semantics str))
