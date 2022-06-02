@@ -42,4 +42,4 @@ module ByFolder (P : sig
   val max_depth : int
   val cmd_name : string
   val exec_mode : ExecMode.t
-end) : S with type info = string
+end) : S
