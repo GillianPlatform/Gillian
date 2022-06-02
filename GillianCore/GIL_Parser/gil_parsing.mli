@@ -22,3 +22,6 @@ val eprog_to_prog :
     to allow the import-resolving mechanism to work without having to first
     write the GIL programs to file. *)
 val cache_labelled_progs : (string * (Annot.t, string) Prog.t) list -> unit
+
+(** Takes a lexbuf and simply parses a literal *)
+val parse_literal : Lexing.lexbuf -> Literal.t

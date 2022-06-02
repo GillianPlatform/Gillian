@@ -269,3 +269,5 @@ let eprog_to_prog ~other_imports ext_program =
   Prog.make_indexed ~lemmas:ext_program.lemmas ~preds:ext_program.preds
     ~only_specs:ext_program.only_specs ~procs ~predecessors
     ~macros:ext_program.macros ~bi_specs:ext_program.bi_specs ()
+
+let parse_literal lexbuf = parse GIL_Parser.lit_target lexbuf

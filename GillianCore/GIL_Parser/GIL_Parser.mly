@@ -274,6 +274,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %start gmain_target
 %start top_level_expr_target
 %start top_level_g_assertion_target
+%start lit_target
 %%
 
 (********************************)
