@@ -271,3 +271,4 @@ let eprog_to_prog ~other_imports ext_program =
     ~macros:ext_program.macros ~bi_specs:ext_program.bi_specs ()
 
 let parse_literal lexbuf = parse GIL_Parser.lit_target lexbuf
+let parse_expression lexbuf = parse GIL_Parser.top_level_expr_target lexbuf
