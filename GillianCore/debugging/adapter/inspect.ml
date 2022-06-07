@@ -1,5 +1,6 @@
 open DebugProtocolEx
 open Debugger.DebuggerTypes
+open DapCustom.Commands
 module DL = Debugger_log
 
 module Make (Debugger : Debugger.S) = struct
@@ -61,5 +62,9 @@ module Make (Debugger : Debugger.S) = struct
         Lwt.return
           (Exception_info_command.Result.make ~exception_id ~description
              ~break_mode ()));
+    DL.set_rpc_command_handler rpc ~name:"Debugger state"
+      (module Debugger_state_command (Debugger))
+      (fun _ -> Lwt.return (Debugger.Inspect.get_debug_state dbg));
+
     Lwt.return ()
 end
