@@ -100,3 +100,7 @@ module SS = Containers.SS
 module SI = Containers.SI
 module SN = Containers.SN
 module Syntaxes = Syntaxes
+
+let opt_to_yojson (to_yojson : 'a -> Yojson.Safe.t) = function
+  | None -> `Null
+  | Some x -> to_yojson x

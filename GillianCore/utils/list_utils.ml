@@ -47,6 +47,30 @@ let get_list_somes (lst : 'a option list) : 'a list =
   in
   aux lst
 
+let rec map_opt f = function
+  | [] -> []
+  | x :: rest -> (
+      match f x with
+      | Some y -> y :: map_opt f rest
+      | None -> map_opt f rest)
+
+let mapi_opt f =
+  let rec aux i = function
+    | [] -> []
+    | x :: rest -> (
+        match f i x with
+        | Some y -> y :: aux (i + 1) rest
+        | None -> aux (i + 1) rest)
+  in
+  aux 0
+
+let rec concat_map_opt f = function
+  | [] -> []
+  | x :: rest -> (
+      match f x with
+      | Some ys -> ys @ concat_map_opt f rest
+      | None -> concat_map_opt f rest)
+
 let divide_list_by_index (lst : 'a list) (len : int) : 'a list * 'a list =
   let rec f (i : int) (l_lst : 'a list) (r_list : 'a list) : 'a list * 'a list =
     if i >= len then (List.rev l_lst, r_list)
@@ -131,3 +155,25 @@ let pop_where f =
 let hd_tl = function
   | x :: xs -> (Some x, xs)
   | [] -> (None, [])
+
+let hd_opt = function
+  | x :: _ -> Some x
+  | [] -> None
+
+let rec tl_opt = function
+  | [] -> None
+  | [ x ] -> Some x
+  | _ :: rest -> tl_opt rest
+
+let replace_assoc_opt k f l =
+  let rec aux prev = function
+    | (k', v) :: rest when k = k' -> Some (List.rev prev @ ((k', f v) :: rest))
+    | e :: rest -> aux (e :: prev) rest
+    | [] -> None
+  in
+  aux [] l
+
+let cons_opt x xs =
+  match x with
+  | None -> xs
+  | Some x -> x :: xs

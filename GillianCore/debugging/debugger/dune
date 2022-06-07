@@ -5,5 +5,5 @@
    parserAndCompiler utils debugger_log)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson))
- (flags :standard -open Utils -open Engine -open Gil_syntax -open
-   IncrementalAnalysis))
+ (flags :standard -open Utils -open Utils.Prelude -open Engine -open
+   Gil_syntax -open IncrementalAnalysis))
