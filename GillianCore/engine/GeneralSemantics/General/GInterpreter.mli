@@ -14,7 +14,7 @@ module type S = sig
   type store_t
   type state_t
   type state_err_t
-  type state_vt
+  type state_vt [@@deriving show]
   type heap_t
 
   module Val : Val.S with type t = vt

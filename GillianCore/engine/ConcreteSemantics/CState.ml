@@ -13,7 +13,7 @@ module Make
     with type st = CVal.CESubst.t
      and type vt = Literal.t
      and type store_t = CStore.t = struct
-  type vt = CVal.M.t [@@deriving yojson]
+  type vt = CVal.M.t [@@deriving yojson, show]
   type st = CVal.CESubst.t
   type store_t = CStore.t
   type heap_t = CMemory.t

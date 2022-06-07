@@ -25,7 +25,7 @@ module Make (SMemory : SMemory.S) :
      and type store_t = SStore.t
      and type heap_t = SMemory.t
      and type m_err_t = SMemory.err_t = struct
-  type vt = SVal.M.t [@@deriving yojson]
+  type vt = SVal.M.t [@@deriving yojson, show]
   type st = SVal.M.et
   type heap_t = SMemory.t [@@deriving yojson]
   type store_t = SStore.t [@@deriving yojson]
