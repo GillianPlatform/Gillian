@@ -1,36 +1,26 @@
 {
-	// Use IntelliSense to learn about possible attributes.
-	// Hover to view descriptions of existing attributes.
-	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-	"version": "0.2.0",
-	"configurations": [
-		{
-			"type": "gillian",
-			"request": "launch",
-			"name": "Debug list_length.wisl",
-			"program": "${workspaceFolder}/list_length.gil",
-			"stopOnEntry": true,
-			"targetLanguage": "wisl",
-			"trace": false
-		},
-		{
-			"type": "gillian",
-			"request": "launch",
-			"name": "Debug SLL.gil",
-			"program": "${workspaceFolder}/js/SLL.gil",
-			"stopOnEntry": true,
-			"targetLanguage": "js",
-			"trace": false
-		},
-		{
-			"type": "gillian",
-			"request": "launch",
-			"name": "Debug SLL.js: listCopy",
-			"program": "${workspaceFolder}/js/SLL.js",
-			"stopOnEntry": true,
-			"targetLanguage": "js",
-			"procedureName": "listCopy",
-			"trace": false
-		}
-	]
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {	
+      "type": "gillian",
+      "request": "launch",
+      "name": "Debug list_length_rec.wisl",
+      "program": "${workspaceFolder}/list_length_rec.gil",
+      "stopOnEntry": true,
+      "targetLanguage": "wisl",
+      "trace": false
+    },
+    {
+      "type": "gillian",
+      "request": "launch",
+      "name": "Debug list_length_iter.wisl",
+      "program": "${workspaceFolder}/list_length_iter.gil",
+      "stopOnEntry": true,
+      "targetLanguage": "wisl",
+      "trace": false
+    }
+  ]
 }
