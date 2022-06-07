@@ -1,4 +1,3 @@
-open DapCustom.Events
 module DL = Debugger_log
 
 module type S = sig
@@ -9,6 +8,7 @@ module Make (Debugger : Debugger.S) = struct
   module StateUninitialized = StateUninitialized.Make (Debugger)
   module StateInitialized = StateInitialized.Make (Debugger)
   module StateDebug = StateDebug.Make (Debugger)
+  open DapCustom.Events (Debugger)
 
   let start in_ out =
     try%lwt
@@ -23,7 +23,7 @@ module Make (Debugger : Debugger.S) = struct
              DL.log (fun m -> m "Initialized Debug Adapter");
              let%lwt launch_args, dbg = StateInitialized.run rpc in
              Debug_rpc.send_event rpc
-               (module Debug_state_update_event (Debugger))
+               (module Debug_state_update_event)
                (Debugger.Inspect.get_debug_state dbg);%lwt
              StateDebug.run launch_args dbg rpc;%lwt
              fst (Lwt.task ())

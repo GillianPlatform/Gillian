@@ -1,41 +1,10 @@
 open DebugProtocolEx
 open Debugger.DebuggerTypes
-open DapCustom.Commands
-open DapCustom.Events
 module DL = Debugger_log
 
 module Make (Debugger : Debugger.S) = struct
-  let send_stopped_events dbg rpc stop_reason =
-    (match stop_reason with
-    | Step | ReachedStart | ReachedEnd ->
-        DL.log (fun m ->
-            m
-              ~json:[ ("reason", stop_reason_to_yojson stop_reason) ]
-              "Stopped: Step/ReachedStart/ReachedEnd");
-        (* Send step stopped event after reaching the end to allow for stepping
-           backwards *)
-        Debug_rpc.send_event rpc
-          (module Stopped_event)
-          Stopped_event.Payload.(
-            make ~reason:Stopped_event.Payload.Reason.Step ~thread_id:(Some 0)
-              ())
-    | Breakpoint ->
-        DL.log (fun m -> m "Stopped: Breakpoint");
-        Debug_rpc.send_event rpc
-          (module Stopped_event)
-          Stopped_event.Payload.(
-            make ~reason:Stopped_event.Payload.Reason.Breakpoint
-              ~thread_id:(Some 0) ())
-    | ExecutionError ->
-        DL.log (fun m -> m "Stopped: ExecutionError");
-        Debug_rpc.send_event rpc
-          (module Stopped_event)
-          Stopped_event.Payload.(
-            make ~reason:Stopped_event.Payload.Reason.Exception
-              ~thread_id:(Some 0) ()));%lwt
-    Debug_rpc.send_event rpc
-      (module Debug_state_update_event (Debugger))
-      (Debugger.Inspect.get_debug_state dbg)
+  open DapCustom.Events (Debugger)
+  open DapCustom.Commands (Debugger)
 
   let run dbg rpc =
     let send_stopped_events = send_stopped_events dbg rpc in
@@ -82,7 +51,6 @@ module Make (Debugger : Debugger.S) = struct
         | Ok () ->
             send_stopped_events Step;%lwt
             Lwt.return (Jump_command.Result.make ~success:true ()));
-    let module Step_specific_command = Step_specific_command (Debugger) in
     DL.set_rpc_command_handler rpc ~name:"Step specific"
       (module Step_specific_command)
       (fun { prev_id; branch_case } ->
