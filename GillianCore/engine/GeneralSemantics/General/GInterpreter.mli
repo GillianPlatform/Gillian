@@ -72,7 +72,10 @@ module type S = sig
   and 'a cont_func =
     | Finished of 'a list
     | Continue of
-        (Logging.ReportId.t option * branch_case option * 'a cont_func_f)
+        (Logging.ReportId.t option
+        * branch_path
+        * branch_case list option
+        * 'a cont_func_f)
     | EndOfBranch of 'a * 'a cont_func_f
 
   module Logging : sig

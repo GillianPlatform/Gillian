@@ -4,17 +4,40 @@ module Gil_to_tl_lifter = Gil_to_tl_lifter
 module DebuggerTypes = DebuggerTypes
 module DebuggerUtils = DebuggerUtils
 open DebuggerTypes
+open Syntaxes.Option
 
-let ( let* ) = Option.bind
-let ( let+ ) o f = Option.map f o
+let ( let** ) = Result.bind
+let ( let++ ) f o = Result.map o f
 
 module type S = sig
   type tl_ast
   type debugger_state
 
+  module PackagedBranchCase : sig
+    type t [@@deriving yojson]
+  end
+
+  module ExecMap : sig
+    type 'a t [@@deriving yojson]
+  end
+
+  module Inspect : sig
+    type debug_state [@@deriving yojson]
+
+    val get_debug_state : debugger_state -> debug_state
+  end
+
   val launch : string -> string option -> (debugger_state, string) result
+  val jump_to_id : L.ReportId.t -> debugger_state -> (unit, string) result
   val step_in : ?reverse:bool -> debugger_state -> stop_reason
-  val step : debugger_state -> stop_reason
+  val step : ?reverse:bool -> debugger_state -> stop_reason
+
+  val step_specific :
+    PackagedBranchCase.t option ->
+    Logging.ReportId.t ->
+    debugger_state ->
+    (stop_reason, string) result
+
   val step_out : debugger_state -> stop_reason
   val run : ?reverse:bool -> ?launch:bool -> debugger_state -> stop_reason
   val terminate : debugger_state -> unit
@@ -40,6 +63,218 @@ struct
   type breakpoints = (string, Breakpoints.t) Hashtbl.t
   type tl_ast = PC.tl_ast
 
+  module PackagedBranchCase = struct
+    type t = { kind : string; display : string * string; json : Yojson.Safe.t }
+    [@@deriving yojson]
+
+    let from case =
+      let open Verification.SAInterpreter in
+      let json = branch_case_to_yojson case in
+      let kind, display =
+        match case with
+        | GuardedGoto b -> ("GuardedGoto", ("If/Else", Fmt.str "%B" b))
+        | LCmd x -> ("LCmd", ("Logical command", Fmt.str "%d" x))
+        | SpecExec fl -> ("SpecExec", ("Spec exec", Fmt.str "%a" Flag.pp fl))
+        | LAction vs ->
+            let vs = vs |> List.map show_state_vt in
+            ( "LAction",
+              ( "Logical action",
+                Fmt.str "%a" (Fmt.list ~sep:(Fmt.any ", ") Fmt.string) vs ) )
+        | LActionFail x ->
+            ("LActionFail", ("Logical action failure", Fmt.str "%d" x))
+      in
+      { kind; display; json }
+
+    let unpackage { json; _ } =
+      json |> branch_case_of_yojson
+      |> Result.map_error (fun _ -> "Malformed branch case json!")
+  end
+
+  module ExecMap = struct
+    type 'case t =
+      | Nothing
+      | Cmd of { id : L.ReportId.t; display : string; next : 'case t }
+      | BranchCmd of {
+          id : L.ReportId.t;
+          display : string;
+          nexts : ('case * 'case t) list;
+        }
+      | FinalCmd of { id : L.ReportId.t; display : string }
+    [@@deriving yojson]
+
+    type cmd_kind = Branch of branch_case list | Normal | Final
+    [@@deriving yojson]
+
+    type 'case with_source = string option * 'case t
+
+    let kind_of_cases = function
+      | Some cases -> Branch cases
+      | None -> Normal
+
+    let insert_cmd_sourceless cmd_kind new_id display path map =
+      let fail () =
+        DL.failwith
+          (fun () ->
+            [
+              ("cmd_type", cmd_kind_to_yojson cmd_kind);
+              ("path", branch_path_to_yojson path);
+              ("new_id", L.ReportId.to_yojson new_id);
+              ("display", `String display);
+              ("map", to_yojson branch_case_to_yojson map);
+            ])
+          "ExecMap.insert_cmd: malformed request"
+      in
+
+      let rec aux path map =
+        match (map, path) with
+        | Nothing, [] -> (
+            match cmd_kind with
+            | Branch branch_cases ->
+                BranchCmd
+                  {
+                    id = new_id;
+                    display;
+                    nexts = branch_cases |> List.map (fun bc -> (bc, Nothing));
+                  }
+            | Final -> FinalCmd { id = new_id; display }
+            | Normal -> Cmd { id = new_id; display; next = Nothing })
+        | Cmd { id; display; next }, _ ->
+            let next = aux path next in
+            Cmd { id; display; next }
+        | BranchCmd { id; display; nexts }, case :: path -> (
+            let new_nexts =
+              nexts
+              |> List_utils.replace_assoc_opt case (fun map -> aux path map)
+            in
+            match new_nexts with
+            | None -> fail ()
+            | Some nexts -> BranchCmd { id; display; nexts })
+        | _ -> fail ()
+      in
+      aux path map
+
+    let insert_cmd
+        cmd_kind
+        new_id
+        display
+        path
+        new_source
+        ((source, map) : 'a with_source) =
+      match source with
+      | None ->
+          ( Some new_source,
+            insert_cmd_sourceless cmd_kind new_id display path map )
+      | Some source ->
+          if new_source == source then
+            (Some source, insert_cmd_sourceless cmd_kind new_id display path map)
+          else (
+            DL.log (fun m -> m "TRIED TO INSERT %a" L.ReportId.pp new_id);
+            (Some source, map))
+
+    let path_of_id_opt selected_id =
+      let rec aux acc = function
+        | Nothing -> None
+        | Cmd { id; next; _ } ->
+            if id = selected_id then Some acc else aux acc next
+        | BranchCmd { id; nexts; _ } ->
+            if id = selected_id then Some acc
+            else
+              nexts
+              |> List.find_map (fun (case, next) -> aux (case :: acc) next)
+        | FinalCmd { id; _ } -> if id = selected_id then Some acc else None
+      in
+      aux []
+
+    let at_path ?(stop_early = false) path map =
+      let rec aux path map =
+        match (map, path) with
+        | Cmd { next; _ }, _ when not stop_early -> aux path next
+        | map, [] -> Some map
+        | Cmd { next; _ }, _ -> aux path next
+        | BranchCmd { nexts; _ }, case :: path ->
+            nexts
+            |> List.find_map (fun (next_case, map) ->
+                   if case = next_case then aux path map else None)
+        | (Nothing | FinalCmd _), _ :: _ -> None
+      in
+      match aux path map with
+      | None ->
+          DL.failwith
+            (fun () ->
+              [
+                ("path", branch_path_to_yojson path);
+                ("map", to_yojson branch_case_to_yojson map);
+              ])
+            "ExecMap.at_path: malformed request"
+      | Some map -> map
+
+    let find_unfinished path (_, map) =
+      let rec aux prev_id branch_case = function
+        | FinalCmd _ -> None
+        | Nothing -> Some (prev_id, branch_case)
+        | Cmd { id; next; _ } -> aux id None next
+        | BranchCmd { id; nexts; _ } ->
+            nexts |> List.find_map (fun (case, next) -> aux id (Some case) next)
+      in
+      let submap = map |> at_path ~stop_early:true path in
+      DL.log (fun m ->
+          m
+            ~json:
+              [
+                ("path", branch_path_to_yojson path);
+                ("map", to_yojson branch_case_to_yojson map);
+                ("submap", to_yojson branch_case_to_yojson submap);
+              ]
+            "ExecMap.find_unfinished: Got submap");
+      match submap with
+      | FinalCmd _ | Nothing ->
+          DL.failwith
+            (fun () ->
+              [
+                ("path", branch_path_to_yojson path);
+                ("map", to_yojson branch_case_to_yojson map);
+              ])
+            "ExecMap.find_unfinished: malformed request"
+      | Cmd { id; next; _ } -> aux id None next
+      | BranchCmd { id; nexts; _ } ->
+          nexts |> List.find_map (fun (case, next) -> aux id (Some case) next)
+
+    let next_paths path map =
+      match at_path path map with
+      | Cmd _ ->
+          DL.failwith
+            (fun () ->
+              [
+                ("path", branch_path_to_yojson path);
+                ("map", to_yojson branch_case_to_yojson map);
+              ])
+            "ExecMap.at_path: shouldn't get Cmd from at_path!"
+      | Nothing | FinalCmd _ -> [ path ]
+      | BranchCmd { nexts; _ } ->
+          nexts |> List.map (fun (case, _) -> case :: path)
+
+    let path_of_id id map =
+      match path_of_id_opt id map with
+      | Some path -> path
+      | None -> Fmt.failwith "ID %a doesn't exist in exec map!" L.ReportId.pp id
+
+    let rec package = function
+      | Nothing -> Nothing
+      | Cmd { id; display; next } ->
+          let next = package next in
+          Cmd { id; display; next }
+      | BranchCmd { id; display; nexts } ->
+          let nexts =
+            nexts
+            |> List.map (fun (case, next) ->
+                   (PackagedBranchCase.from case, package next))
+          in
+          BranchCmd { id; display; nexts }
+      | FinalCmd id -> FinalCmd id
+  end
+
+  type exec_map = branch_case ExecMap.with_source
+
   type debugger_state = {
     source_file : string;
     source_files : SourceFiles.t option;
@@ -56,15 +291,50 @@ struct
     mutable variables : variables;
     mutable errors : err_t list;
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
-    mutable branch_case : branch_case option;
-    mutable branch_path : branch_path;
+    mutable exec_map : exec_map;
+    mutable proc_name : string option;
   }
 
-  type branch_case_option = Case of branch_case | TakeFirst | NoCase
+  module Inspect = struct
+    type exec_map_pkg = PackagedBranchCase.t ExecMap.t [@@deriving yojson]
+    type branch_path_pkg = PackagedBranchCase.t list [@@deriving yojson]
 
-  let case_of_option = function
-    | Some case -> Case case
-    | None -> NoCase
+    let get_exec_map_pkg { exec_map = _, map; _ } = ExecMap.package map
+
+    let get_current_cmd_id { cur_report_id; _ } =
+      let _, type_ = Option.get @@ L.LogQueryer.get_report cur_report_id in
+      if type_ = ContentType.unify then
+        Option.get @@ L.LogQueryer.get_previous_report_id cur_report_id
+      else cur_report_id
+
+    let get_proc_name dbg =
+      match dbg.proc_name with
+      | None ->
+          let proc_name =
+            let+ frame = List_utils.tl_opt dbg.frames in
+            frame.name
+          in
+          dbg.proc_name <- proc_name;
+          proc_name
+      | name -> name
+
+    type debug_state = {
+      exec_map : exec_map_pkg; [@key "execMap"]
+      current_cmd_id : L.ReportId.t; [@key "currentCmdId"]
+      proc_name : string; [@key "procName"]
+    }
+    [@@deriving yojson]
+
+    let get_debug_state dbg : debug_state =
+      let current_cmd_id = get_current_cmd_id dbg in
+      let exec_map = get_exec_map_pkg dbg in
+      let proc_name =
+        match dbg |> get_proc_name with
+        | None -> "unknown proc"
+        | Some proc_name -> proc_name
+      in
+      { exec_map; current_cmd_id; proc_name }
+  end
 
   let top_level_scopes : scope list =
     let top_level_scope_names =
@@ -240,15 +510,7 @@ struct
         in
         frame :: call_stack_to_frames rest se.call_index prog
 
-  let update_report_id_and_inspection_fields
-      report_id
-      branch_case_option
-      (dbg : debugger_state) =
-    let branch_case =
-      match branch_case_option with
-      | Case branch_case -> Some branch_case
-      | NoCase | TakeFirst -> None
-    in
+  let update_report_id_and_inspection_fields report_id (dbg : debugger_state) =
     match L.LogQueryer.get_report report_id with
     | None ->
         Fmt.failwith
@@ -256,9 +518,9 @@ struct
            correctly"
           L.ReportId.pp report_id
     | Some (content, type_) -> (
-        DL.show_report report_id ("Got report type " ^ type_);
+        DL.show_report report_id ("Debugger.update...: Got report type " ^ type_);
         match type_ with
-        | t when t = ContentType.cmd -> (
+        | t when t = ContentType.cmd ->
             dbg.cur_report_id <- report_id;
             let cmd =
               content |> Yojson.Safe.from_string
@@ -271,85 +533,29 @@ struct
             in
             dbg.frames <-
               call_stack_to_frames cmd.callstack cmd.proc_line dbg.prog;
-            let results = L.LogQueryer.get_cmd_results report_id in
-            let results =
-              List_utils.get_list_somes
-                (results
-                |> List.map (fun (result_id, content) ->
-                       let cmd_result =
-                         content |> Yojson.Safe.from_string
-                         |> Logging.CmdResult.of_yojson
-                       in
-                       match cmd_result with
-                       | Error _ -> None
-                       | Ok cmd_result -> Some (result_id, cmd_result)))
+            let lifted_scopes, variables =
+              create_variables (Some cmd.state) (is_gil_file dbg.source_file)
             in
-            let result =
-              match branch_case_option with
-              | NoCase | Case _ ->
-                  results
-                  |> List.find_opt
-                       (fun (_, (cmd_result : Logging.CmdResult.t)) ->
-                         cmd_result.branch_case = branch_case)
-              | TakeFirst -> List.nth_opt results 0
+            let () = dbg.variables <- variables in
+            let () =
+              dbg.top_level_scopes <-
+                List.concat [ lifted_scopes; top_level_scopes ]
             in
-            match result with
-            | None ->
-                DL.failwith
-                  (fun () ->
-                    let branch_case_json =
-                      match branch_case with
-                      | Some branch_case -> branch_case_to_yojson branch_case
-                      | None -> `Null
-                    in
-                    let results_json =
-                      results
-                      |> List.map (fun (id, cmd_result) ->
-                             `List
-                               [
-                                 L.ReportId.to_yojson id;
-                                 Logging.CmdResult.to_yojson cmd_result;
-                               ])
-                    in
-                    [
-                      ("branch_case", branch_case_json);
-                      ("results", `List results_json);
-                    ])
-                  "No matching result for branch case!"
-            | Some (_, cmd_result) ->
-                DL.log (fun m ->
-                    let json =
-                      [ ("cmd_result", Logging.CmdResult.to_yojson cmd_result) ]
-                    in
-                    m ~json "...and got accompanying cmd_result");
-                dbg.branch_case <- cmd_result.branch_case;
-                cmd_result.branch_case
-                |> Option.iter (fun bc ->
-                       dbg.branch_path <- bc :: dbg.branch_path);
-                let lifted_scopes, variables =
-                  create_variables cmd_result.state
-                    (is_gil_file dbg.source_file)
-                in
-                let () = dbg.variables <- variables in
-                let () =
-                  dbg.top_level_scopes <-
-                    List.concat [ lifted_scopes; top_level_scopes ]
-                in
-                let () = dbg.errors <- cmd_result.errors in
-                let cur_cmd =
-                  match cmd.callstack with
-                  | [] -> None
-                  | (se : CallStack.stack_element) :: _ -> (
-                      let proc = Prog.get_proc dbg.prog se.pid in
-                      match proc with
-                      | None -> None
-                      | Some proc ->
-                          let annot, _, cmd = proc.proc_body.(cmd.proc_line) in
-                          Some (cmd, annot))
-                in
-                dbg.cur_cmd <- cur_cmd)
+            (* TODO: fix *)
+            (* let () = dbg.errors <- cmd_result.errors in *)
+            let cur_cmd =
+              match cmd.callstack with
+              | [] -> None
+              | (se : CallStack.stack_element) :: _ -> (
+                  let proc = Prog.get_proc dbg.prog se.pid in
+                  match proc with
+                  | None -> None
+                  | Some proc ->
+                      let annot, _, cmd = proc.proc_body.(cmd.proc_line) in
+                      Some (cmd, annot))
+            in
+            dbg.cur_cmd <- cur_cmd
         | t when t = ContentType.unify ->
-            dbg.branch_case <- None;
             dbg.cur_report_id <- report_id;
             let cmd_id =
               match L.LogQueryer.get_previous_report_id report_id with
@@ -423,7 +629,7 @@ struct
           failwith "HORROR: Shouldn't encounter Finished when debugging!"
       | Verification.SAInterpreter.EndOfBranch _ -> Error "Nothing to run"
       | Verification.SAInterpreter.Continue
-          (cur_report_id, branch_case, cont_func) -> (
+          (cur_report_id, branch_path, new_branch_cases, cont_func) -> (
           match cur_report_id with
           | None ->
               raise
@@ -431,14 +637,27 @@ struct
                    "Did not log report. Check the logging level is set \
                     correctly")
           | Some cur_report_id ->
-              let _, type_ =
+              let content, type_ =
                 Option.get @@ L.LogQueryer.get_report cur_report_id
               in
               if type_ = ContentType.proc_init then (
-                DL.log (fun m -> m "(launch) Skipping proc_init...");
+                DL.log (fun m -> m "Debugger.launch: Skipping proc_init...");
                 init_with_no_proc_init (cont_func ~path:[] ()))
               else
+                let cmd =
+                  Result.get_ok
+                    (content |> Yojson.Safe.from_string
+                   |> Logging.ConfigReport.of_yojson)
+                in
+                let cmd_display = cmd.cmd in
                 let tests = Verification.Debug.get_tests_for_prog prog in
+                let map =
+                  ExecMap.(
+                    Nothing
+                    |> insert_cmd_sourceless
+                         (kind_of_cases new_branch_cases)
+                         cur_report_id cmd_display branch_path)
+                in
                 let dbg =
                   ({
                      source_file = file_name;
@@ -454,15 +673,13 @@ struct
                      variables = Hashtbl.create 0;
                      errors = [];
                      cur_cmd = None;
-                     branch_case = None;
-                     branch_path = [];
+                     exec_map = (None, map);
+                     proc_name = None;
                    }
                     : debugger_state)
                 in
                 let _ =
-                  update_report_id_and_inspection_fields cur_report_id
-                    (case_of_option branch_case)
-                    dbg
+                  update_report_id_and_inspection_fields cur_report_id dbg
                 in
                 Ok dbg)
     in
@@ -482,14 +699,50 @@ struct
         | None -> failwith "No unify report found!"
         | Some id -> id)
 
-  let rec execute_step ?prev_id dbg =
+  let jump_to_id id dbg =
+    try
+      DL.log (fun m -> m "Jumping to id %a" L.ReportId.pp id);
+      dbg.exec_map |> snd |> ExecMap.path_of_id id |> ignore;
+      let id =
+        Option.value
+          (let* next_id = L.LogQueryer.get_next_report_id id in
+           let* _, type_ = L.LogQueryer.get_report next_id in
+           if type_ = ContentType.unify then Some next_id else None)
+          ~default:id
+      in
+      update_report_id_and_inspection_fields id dbg;
+      Ok ()
+    with Failure msg -> Error msg
+
+  let rec execute_step ?prev_id prev_id_in_frame ?branch_case dbg =
     let open Verification.SAInterpreter in
     match dbg.cont_func with
     | None ->
         DL.log (fun m -> m "No cont_func; reached end");
         ReachedEnd
     | Some cont_func -> (
-        match cont_func ~path:dbg.branch_path () with
+        DL.log (fun m ->
+            m
+              ~json:
+                [
+                  ("id", L.ReportId.to_yojson dbg.cur_report_id);
+                  ( "map",
+                    dbg.exec_map |> snd
+                    |> ExecMap.to_yojson branch_case_to_yojson );
+                ]
+              "Grabbing path for step...");
+        let branch_path =
+          dbg.exec_map |> snd |> ExecMap.path_of_id prev_id_in_frame
+        in
+        let branch_path =
+          match branch_case with
+          | Some case -> case :: branch_path
+          | None ->
+              dbg.exec_map |> snd |> ExecMap.next_paths branch_path |> List.hd
+        in
+        DL.log (fun m ->
+            m ~json:[ ("path", branch_path_to_yojson branch_path) ] "Got path");
+        match cont_func ~path:branch_path () with
         | Finished _ ->
             dbg.cont_func <- None;
             failwith "HORROR: Shouldn't encounter Finished when debugging!"
@@ -508,28 +761,27 @@ struct
                 in
                 let proc_name = (List.hd cmd.callstack).pid in
                 let unify_id = unify result proc_name prev_id dbg in
-                update_report_id_and_inspection_fields unify_id NoCase dbg
+                update_report_id_and_inspection_fields unify_id dbg
                 (* DL.log (fun m -> m "--- premature step ---"); (unify_id) |> ignore *)
             | Some (prev_id, _, type_) ->
                 Fmt.failwith "EndOfBranch: prev cmd (%a) is '%s', not '%s'!"
                   L.ReportId.pp prev_id type_ ContentType.cmd
             | None -> failwith "EndOfBranch: no prev ID!");
             Step
-        | Continue (cur_report_id, branch_case, cont_func) -> (
+        | Continue (cur_report_id, branch_path, new_branch_cases, cont_func)
+          -> (
             match cur_report_id with
             | None ->
-                raise
-                  (Failure
-                     "Did not log report. Check the logging level is set \
-                      correctly")
+                failwith
+                  "Did not log report. Check the logging level is set correctly"
             | Some cur_report_id -> (
                 dbg.cont_func <- Some cont_func;
-                let _, type_ =
+                let content, type_ =
                   Option.get @@ L.LogQueryer.get_report cur_report_id
                 in
                 if type_ = ContentType.proc_init then (
                   DL.log (fun m -> m "(execute_step) Skipping proc_init...");
-                  execute_step dbg)
+                  execute_step prev_id_in_frame dbg)
                 else
                   match L.LogQueryer.get_cmd_results cur_report_id with
                   | [] ->
@@ -537,14 +789,44 @@ struct
                           m
                             "No results for cmd; assuming eob, stepping \
                              again...");
-                      execute_step ~prev_id:cur_report_id dbg
+                      let cmd =
+                        Result.get_ok
+                          (content |> Yojson.Safe.from_string
+                         |> Logging.ConfigReport.of_yojson)
+                      in
+                      let cmd_display = cmd.cmd in
+                      dbg.exec_map <-
+                        (dbg.exec_map
+                        |> ExecMap.(
+                             let source_file =
+                               (List.hd dbg.frames).source_path
+                             in
+                             insert_cmd Final cur_report_id cmd_display
+                               branch_path source_file));
+                      execute_step ~prev_id:cur_report_id prev_id_in_frame dbg
                   | _ ->
-                      update_report_id_and_inspection_fields cur_report_id
-                        (case_of_option branch_case)
-                        dbg;
+                      update_report_id_and_inspection_fields cur_report_id dbg;
+                      (if type_ <> ContentType.unify then
+                       ExecMap.(
+                         let cmd =
+                           Result.get_ok
+                             (content |> Yojson.Safe.from_string
+                            |> Logging.ConfigReport.of_yojson)
+                         in
+                         let cmd_display = cmd.cmd in
+                         let cmd_kind =
+                           match new_branch_cases with
+                           | Some cases -> Branch cases
+                           | None -> Normal
+                         in
+                         let source_file = (List.hd dbg.frames).source_path in
+                         dbg.exec_map <-
+                           dbg.exec_map
+                           |> insert_cmd cmd_kind cur_report_id cmd_display
+                                branch_path source_file));
                       Step)))
 
-  let step_in ?(reverse = false) dbg =
+  let step_in_branch_case prev_id_in_frame ?branch_case ?(reverse = false) dbg =
     let stop_reason =
       let _, current_report_type =
         Option.get (L.LogQueryer.get_report dbg.cur_report_id)
@@ -573,8 +855,7 @@ struct
                   m "Prev report is '%s'; not stepping." prev_report_type);
               ReachedStart)
             else (
-              update_report_id_and_inspection_fields prev_report_id TakeFirst
-                dbg;
+              update_report_id_and_inspection_fields prev_report_id dbg;
               Step))
       else
         let _, type_ =
@@ -585,27 +866,30 @@ struct
               m "Current report has type `unify`; assuming end-of-branch.");
           ReachedEnd)
         else
+          let next_report_ids =
+            L.LogQueryer.get_next_report_ids dbg.cur_report_id
+          in
           let next_report_id =
-            Option.bind (L.LogQueryer.get_next_report_id dbg.cur_report_id)
-              (fun id ->
-                match dbg.branch_case with
-                | None -> Some id
-                | Some branch_case -> (
-                    let content, _ = Option.get @@ L.LogQueryer.get_report id in
-                    let next_cmd =
-                      content |> Yojson.Safe.from_string
-                      |> Logging.ConfigReport.of_yojson
-                    in
-                    match next_cmd with
-                    | Error _ -> failwith "Schrodinger's next-report-id!"
-                    | Ok next_cmd ->
-                        if next_cmd.branch_case = Some branch_case then Some id
-                        else None))
+            match branch_case with
+            | None -> List_utils.hd_opt next_report_ids
+            | Some branch_case ->
+                next_report_ids
+                |> List.find_opt (fun id ->
+                       match L.LogQueryer.get_report id with
+                       | Some (content, type_) when type_ = ContentType.cmd -> (
+                           match
+                             content |> Yojson.Safe.from_string
+                             |> Logging.ConfigReport.of_yojson
+                           with
+                           | Error _ -> false
+                           | Ok cmd ->
+                               Option_utils.eq cmd.branch_case branch_case)
+                       | _ -> false)
           in
           match next_report_id with
           | None ->
               DL.log (fun m -> m "No next report ID; executing next step");
-              execute_step dbg
+              execute_step ?branch_case prev_id_in_frame dbg
           | Some next_report_id ->
               DL.show_report next_report_id
                 "Next report ID found; not executing";
@@ -623,8 +907,7 @@ struct
                    else None)
                   ~default:next_report_id
               in
-              update_report_id_and_inspection_fields next_report_id TakeFirst
-                dbg;
+              update_report_id_and_inspection_fields next_report_id dbg;
               Step
     in
     if has_hit_breakpoint dbg then Breakpoint
@@ -633,12 +916,20 @@ struct
       ExecutionError
     else stop_reason
 
+  let step_in ?(reverse = false) dbg =
+    step_in_branch_case dbg.cur_report_id ?branch_case:None ~reverse dbg
+
   let rec step_until_cond
+      ?(reverse = false)
+      ?(branch_case : branch_case option)
+      (prev_id_in_frame : L.ReportId.t)
       (prev_frame : frame)
       (prev_stack_depth : int)
       (cond : frame -> frame -> int -> int -> bool)
       (dbg : debugger_state) : stop_reason =
-    let stop_reason = step_in dbg in
+    let stop_reason =
+      step_in_branch_case ~reverse ?branch_case prev_id_in_frame dbg
+    in
     match stop_reason with
     | Step -> (
         match dbg.frames with
@@ -647,17 +938,20 @@ struct
             let cur_stack_depth = List.length dbg.frames in
             if cond prev_frame cur_frame prev_stack_depth cur_stack_depth then
               stop_reason
-            else step_until_cond prev_frame prev_stack_depth cond dbg)
+            else
+              step_until_cond ~reverse prev_id_in_frame prev_frame
+                prev_stack_depth cond dbg)
     | other_stop_reason -> other_stop_reason
 
-  let step dbg =
+  let step_case ?(reverse = false) ?branch_case dbg =
     match dbg.frames with
     | [] -> failwith "Nothing in call stack, cannot step"
     | frame :: _ ->
         if is_gil_file dbg.source_file then
           (* If GIL file, step until next cmd in the same frame (like in regular
              debuggers) *)
-          step_until_cond frame (List.length dbg.frames)
+          step_until_cond ~reverse ?branch_case dbg.cur_report_id frame
+            (List.length dbg.frames)
             (fun prev_frame cur_frame prev_stack_depth cur_stack_depth ->
               cur_frame.source_path = prev_frame.source_path
               && cur_frame.name = prev_frame.name
@@ -666,7 +960,8 @@ struct
         else
           (* If target language file, step until the code origin location is
              different, indicating an actual step in the target language*)
-          step_until_cond frame (List.length dbg.frames)
+          step_until_cond ~reverse ?branch_case dbg.cur_report_id frame
+            (List.length dbg.frames)
             (fun prev_frame cur_frame _ _ ->
               cur_frame.source_path = prev_frame.source_path
               && (cur_frame.start_line <> prev_frame.start_line
@@ -674,6 +969,17 @@ struct
                  || cur_frame.end_line <> prev_frame.end_line
                  || cur_frame.end_column <> prev_frame.end_column))
             dbg
+
+  let step ?(reverse = false) dbg = step_case ~reverse dbg
+
+  let step_specific (branch_case : PackagedBranchCase.t option) prev_id dbg =
+    let** branch_case =
+      branch_case
+      |> Option.map PackagedBranchCase.unpackage
+      |> Option_utils.to_result
+    in
+    let++ () = dbg |> jump_to_id prev_id in
+    step_case ?branch_case dbg
 
   let step_out dbg =
     let rec step_out stack_depth dbg =
@@ -686,16 +992,49 @@ struct
     in
     step_out (List.length dbg.frames) dbg
 
-  let rec run ?(reverse = false) ?(launch = false) dbg =
-    (* We need to check if a breakpoint has been hit if run is called
-       immediately after launching to prevent missing a breakpoint on the first
-       line *)
-    if launch && has_hit_breakpoint dbg then Breakpoint
-    else
-      let stop_reason = step_in ~reverse dbg in
-      match stop_reason with
-      | Step -> run ~reverse dbg
-      | other_stop_reason -> other_stop_reason
+  let run ?(reverse = false) ?(launch = false) dbg =
+    let current_id = dbg |> Inspect.get_current_cmd_id in
+    let branch_path = dbg.exec_map |> snd |> ExecMap.path_of_id current_id in
+    DL.log (fun m ->
+        m
+          ~json:
+            [
+              ("current_id", L.ReportId.to_yojson current_id);
+              ("path", branch_path_to_yojson branch_path);
+              ( "map",
+                dbg.exec_map |> snd |> ExecMap.to_yojson branch_case_to_yojson
+              );
+            ]
+          "Debugger.run");
+    let rec aux ?(launch = false) count branch_case =
+      if count > 20 then failwith "Debugger.run: infinite loop?";
+      (* We need to check if a breakpoint has been hit if run is called
+         immediately after launching to prevent missing a breakpoint on the first
+         line *)
+      if launch && has_hit_breakpoint dbg then Breakpoint
+      else
+        let stop_reason = step_case ?branch_case ~reverse dbg in
+        match stop_reason with
+        | Step -> aux count None
+        | Breakpoint -> Breakpoint
+        | other_stop_reason -> (
+            if reverse then other_stop_reason
+            else
+              match dbg.exec_map |> ExecMap.find_unfinished branch_path with
+              | None -> other_stop_reason
+              | Some (prev_id, branch_case) ->
+                  DL.log (fun m ->
+                      m
+                        ~json:
+                          [
+                            ("prev_id", L.ReportId.to_yojson prev_id);
+                            ("", opt_to_yojson branch_case_to_yojson branch_case);
+                          ]
+                        "Debugger.run: found unfinished path");
+                  dbg |> jump_to_id prev_id |> Result.get_ok;
+                  aux (count + 1) branch_case)
+    in
+    aux ~launch 0 None
 
   let terminate dbg =
     let () = Verification.postprocess_files dbg.source_files in
