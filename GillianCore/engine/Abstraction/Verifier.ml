@@ -1186,7 +1186,9 @@ struct
                (spec.spec_name, test))
       in
       DL.log (fun m ->
-          m ~json:[ ("tests", proc_tests_to_yojson tests) ] "Got tests");
+          m
+            ~json:[ ("tests", proc_tests_to_yojson tests) ]
+            "Verifier.Debug.get_tests_for_prog: Got tests");
       tests
 
     let analyse_result test result = analyse_proc_result test Normal result
