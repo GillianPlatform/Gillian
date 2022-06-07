@@ -29,6 +29,7 @@ module type S = sig
 
   val launch : string -> string option -> (debugger_state, string) result
   val jump_to_id : L.ReportId.t -> debugger_state -> (unit, string) result
+  val jump_to_start : debugger_state -> unit
   val step_in : ?reverse:bool -> debugger_state -> stop_reason
   val step : ?reverse:bool -> debugger_state -> stop_reason
 
@@ -713,6 +714,19 @@ struct
       update_report_id_and_inspection_fields id dbg;
       Ok ()
     with Failure msg -> Error msg
+
+  let jump_to_start dbg =
+    let result =
+      let** root_id =
+        match dbg.exec_map |> snd with
+        | Nothing -> Error "Debugger.jump_to_start: exec map is Nothing!"
+        | Cmd { id; _ } | BranchCmd { id; _ } | FinalCmd { id; _ } -> Ok id
+      in
+      dbg |> jump_to_id root_id
+    in
+    match result with
+    | Error msg -> failwith msg
+    | Ok () -> ()
 
   let rec execute_step ?prev_id prev_id_in_frame ?branch_case dbg =
     let open Verification.SAInterpreter in

@@ -23,6 +23,7 @@ module type S = sig
 
   val launch : string -> string option -> (debugger_state, string) result
   val jump_to_id : Logging.ReportId.t -> debugger_state -> (unit, string) result
+  val jump_to_start : debugger_state -> unit
   val step_in : ?reverse:bool -> debugger_state -> stop_reason
   val step : ?reverse:bool -> debugger_state -> stop_reason
 
