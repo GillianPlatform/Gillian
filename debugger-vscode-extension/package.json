@@ -33,7 +33,7 @@
     "compile": "run-s webpack:build webview:build",
     "lint": "eslint . --ext .ts,.tsx",
     "watch": "tsc -watch -p ./",
-    "format": "prettier --write **/*.ts",
+    "format": "prettier --write **/*.ts **/*.tsx",
     "dev": "nodemon --watch src/webviews/ -e 'ts,tsx,css' --exec snowpack build",
     "build": "TAILWIND_MODE='build' snowpack build",
     "webpack:build": "webpack",
@@ -60,6 +60,7 @@
     "autoprefixer": "^10.2.5",
     "babel-loader": "^8.2.2",
     "eslint": "^7.21.0",
+    "eslint-plugin-react": "^7.30.0",
     "nodemon": "^2.0.7",
     "npm-run-all": "^4.1.5",
     "postcss": "^8.4.5",
@@ -75,7 +76,8 @@
     "@radix-ui/react-dropdown-menu": "^0.0.17",
     "@reach/combobox": "^0.16.5",
     "@types/isomorphic-fetch": "^0.0.35",
-    "@vscode/codicons": "^0.0.27",
+    "@vscode/codicons": "^0.0.30",
+    "@vscode/debugadapter": "^1.55.1",
     "@vscode/webview-ui-toolkit": "^0.9.0",
     "cronstrue": "^1.123.0",
     "immer": "^9.0.1",
@@ -84,6 +86,7 @@
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
     "react-error-boundary": "^3.1.4",
+    "react-flow-renderer": "^10.3.5",
     "ts-debounce": "^3.0.0",
     "yup": "^0.32.9",
     "zod": "^3.0.0-alpha.33",
@@ -114,7 +117,10 @@
       "title": "gillian-debugger",
       "properties": {
         "gillianDebugger.gillianSourceRepository": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "default": null,
           "description": "Specifies the path to the Gillian source repository used to execute/debug a program."
         }
@@ -148,45 +154,45 @@
         }
       ],
       "commandPalette": [
-				{
-					"command": "extension.gillian-debug.debugEditorContents",
-					"when": "resourceLangId == gil"
-				},
-				{
-					"command": "extension.gillian-debug.runEditorContents",
-					"when": "resourceLangId == gil"
-				},
         {
-					"command": "extension.gillian-debug.debugEditorContents",
-					"when": "resourceLangId == wisl"
-				},
-				{
-					"command": "extension.gillian-debug.runEditorContents",
-					"when": "resourceLangId == wisl"
-				},
+          "command": "extension.gillian-debug.debugEditorContents",
+          "when": "resourceLangId == gil"
+        },
         {
-					"command": "extension.gillian-debug.debugEditorContents",
-					"when": "resourceLangId == javascript"
-				},
-				{
-					"command": "extension.gillian-debug.runEditorContents",
-					"when": "resourceLangId == javascript"
-				}
-			]
+          "command": "extension.gillian-debug.runEditorContents",
+          "when": "resourceLangId == gil"
+        },
+        {
+          "command": "extension.gillian-debug.debugEditorContents",
+          "when": "resourceLangId == wisl"
+        },
+        {
+          "command": "extension.gillian-debug.runEditorContents",
+          "when": "resourceLangId == wisl"
+        },
+        {
+          "command": "extension.gillian-debug.debugEditorContents",
+          "when": "resourceLangId == javascript"
+        },
+        {
+          "command": "extension.gillian-debug.runEditorContents",
+          "when": "resourceLangId == javascript"
+        }
+      ]
     },
     "commands": [
       {
         "command": "extension.gillian-debug.debugEditorContents",
         "title": "Debug File",
         "category": "Gillian Debugger",
-				"enablement": "!inDebugMode",
+        "enablement": "!inDebugMode",
         "icon": "$(debug-alt)"
       },
       {
         "command": "extension.gillian-debug.runEditorContents",
         "title": "Run File",
         "category": "Gillian Debugger",
-				"enablement": "!inDebugMode",
+        "enablement": "!inDebugMode",
         "icon": "$(play)"
       },
       {
