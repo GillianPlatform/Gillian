@@ -1,0 +1,106 @@
+.exec-map-view {
+  height: 100%;
+  width: 100%;
+  overflow: scroll;
+}
+
+.exec-map-view .react-flow__container svg {
+  height: 100%;
+  width: 100%;
+}
+
+.exec-map-view .react-flow__edge-textbg {
+  fill: var(--background);
+}
+
+.exec-map-view .react-flow__edge-text {
+  fill: var(--vscode-editor-foreground);
+}
+
+.react-flow__controls-button {
+  background: var(--vscode-button-secondaryBackground) !important;
+  border-bottom: 0 !important;
+}
+
+.react-flow__controls-button svg {
+  fill: var(--vscode-button-secondaryForeground) !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--vscode-button-secondaryHoverBackground) !important;
+}
+
+.react-flow__controls-fitview {
+  background: var(--vscode-button-background) !important;
+}
+
+.react-flow__controls-fitview svg {
+  fill: var(--vscode-button-foreground) !important;
+}
+
+.react-flow__controls-fitview:hover {
+  background: var(--vscode-button-hoverBackground) !important;
+}
+
+.node-content {
+  font-size: 12px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--vscode-editor-foreground);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  cursor: default;
+}
+
+.node-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+  border-radius: 1px;
+  background: linear-gradient(to right, var(--background), var(--background));
+  border: 1px solid var(--vscode-editorCursor-foreground);
+}
+
+.node-selected .node-content {
+  color: var(--vscode-editor-selectionForeground, var(--vscode-editor-foreground));
+}
+
+.node-selected .node-background {
+  background:
+    linear-gradient(to right, var(--vscode-editor-selectionBackground), var(--vscode-editor-selectionBackground)),
+    linear-gradient(to right, var(--background), var(--background));
+  width: calc(100% - 7px);
+  height: calc(100% - 7px);
+  border: 3.5px double var(--vscode-editorCursor-foreground);
+}
+
+.node-empty .node-background {
+  border-radius: 100%;
+  border-style: dashed;
+}
+
+.node-root .node-background {
+  width: calc(100% - 6px);
+  height: calc(100% - 6px);
+  border-radius: 0;
+  border-width: 3px;
+}
+
+.node-root .node-content {
+  font-size: 16px;
+}
+
+.node-content pre {
+  margin: 0;
+  text-align: center;
+  width: calc(100% - 10px);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  font-family: var(--vscode-editor-font-family);
+}

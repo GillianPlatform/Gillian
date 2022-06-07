@@ -1,47 +1,82 @@
-import * as vscode from 'vscode'
+import * as vscode from 'vscode';
+import * as debug from './debug';
 
-import { getNonce } from './lib'
+import { getNonce } from './lib';
+import { DebugState, MessageFromWebview, MessageToWebview } from './types';
 
 export class WebviewPanel {
-  public static currentPanel: WebviewPanel | undefined
-  private readonly _panel: vscode.WebviewPanel
-  private _disposables: vscode.Disposable[] = []
+  public static currentPanel: WebviewPanel | undefined;
+  private readonly _panel: vscode.WebviewPanel;
+  private _disposables: vscode.Disposable[] = [];
 
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-    this._panel = panel
-    this._panel.onDidDispose(this.dispose, null, this._disposables)
+    this._panel = panel;
+    this._panel.webview.onDidReceiveMessage(
+      e => this.handleMessage(e),
+      null,
+      this._disposables
+    );
+    this._panel.onDidDispose(
+      () => {
+        this.dispose();
+      },
+      null,
+      this._disposables
+    );
     this._panel.webview.html = this.getWebviewContent(
       this._panel.webview,
       extensionUri
-    )
+    );
   }
 
   public static render(extensionUri: vscode.Uri) {
     if (WebviewPanel.currentPanel) {
-      WebviewPanel.currentPanel._panel.reveal(vscode.ViewColumn.One)
+      WebviewPanel.currentPanel._panel.reveal(vscode.ViewColumn.Beside);
     } else {
       const panel = vscode.window.createWebviewPanel(
-        'hello-world',
-        'Hello World',
-        vscode.ViewColumn.One,
+        'gillian-debug',
+        'Gillian Debugger',
+        vscode.ViewColumn.Beside,
         {
           enableScripts: true,
         }
-      )
+      );
 
-      WebviewPanel.currentPanel = new WebviewPanel(panel, extensionUri)
+      WebviewPanel.currentPanel = new WebviewPanel(panel, extensionUri);
     }
   }
 
-  public dispose() {
-    WebviewPanel.currentPanel = undefined
+  private async sendMessage(e: MessageToWebview) {
+    await this._panel.webview.postMessage(e);
+  }
 
-    this._panel.dispose()
+  private async handleMessage(e: MessageFromWebview) {
+    if (e.type === 'request_state_update') {
+      const state = await debug.getDebugState();
+      if (state !== undefined) {
+        this.updateState(state);
+      }
+    } else if (e.type === 'request_jump') {
+      await debug.jumpToCmd(e.cmdId);
+    } else if (e.type === 'request_exec_specific') {
+      await debug.execSpecificCmd(e.prevId, e.branchCase);
+    }
+  }
+
+  public updateState(state: DebugState) {
+    console.log('Got state', state);
+    this.sendMessage({ type: 'state_update', state });
+  }
+
+  public dispose() {
+    WebviewPanel.currentPanel = undefined;
+
+    this._panel.dispose();
 
     while (this._disposables.length) {
-      const disposable = this._disposables.pop()
+      const disposable = this._disposables.pop();
       if (disposable) {
-        disposable.dispose()
+        disposable.dispose();
       }
     }
   }
@@ -56,18 +91,17 @@ export class WebviewPanel {
     // Local path to script and css for the webview
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(extensionUri, 'out/webviews/index.js')
-    )
+    );
 
     const styleVSCodeUri = webview.asWebviewUri(
       vscode.Uri.joinPath(extensionUri, 'out/webviews/index.css')
-    )
+    );
     const codiconsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(extensionUri, 'out/webviews/public/codicon.css')
-    )
+    );
 
     // Use a nonce to whitelist which scripts can be run
-    const nonce = getNonce()
-    console.log(nonce)
+    const nonce = getNonce();
 
     return /* html */ `
       <!DOCTYPE html>
@@ -79,7 +113,7 @@ export class WebviewPanel {
         Use a content security policy to only allow loading images from https or from our extension directory,
         and only allow scripts that have a specific nonce.
         -->
-        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} 'self' data:; style-src ${webview.cspSource}; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} 'self' data:; style-src ${webview.cspSource} 'self' 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
 
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -96,6 +130,6 @@ export class WebviewPanel {
         <div id="root"></div>
         <script nonce="${nonce}" src="${scriptUri}"></script>
       </body>
-      </html>`
+      </html>`;
   }
 }

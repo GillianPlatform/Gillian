@@ -2,35 +2,44 @@
  * Copyright (C) Microsoft Corporation. All rights reserved.
  *--------------------------------------------------------*/
 
-'use strict'
+'use strict';
 
-import * as vscode from 'vscode'
+import * as vscode from 'vscode';
 import {
   WorkspaceFolder,
   DebugConfiguration,
   ProviderResult,
   CancellationToken,
-} from 'vscode'
+} from 'vscode';
 
-import { startDebugging } from './commands'
-import { WebviewPanel } from './WebviewPanel'
+import { startDebugging } from './commands';
+import { BranchCase, DebugState } from './types';
+import { WebviewPanel } from './WebviewPanel';
 
 type LogEvent = {
-  msg: string
-  json: any
-}
+  msg: string;
+  json: any;
+};
 
-function handleCustomEvent({ body, event }: vscode.DebugSessionCustomEvent) {
-  switch (event) {
-    case 'log':
-      const { msg, json } = body as LogEvent
-      console.log(msg)
-      if (Object.keys(json).length > 0) {
-        console.log(json)
-      }
-      break
-    default:
-      console.error(`Unhandled custom event '${event}'`)
+type Disposable = {
+  dispose(): any;
+};
+
+function handleCustomDebugEvent({
+  body,
+  event,
+}: vscode.DebugSessionCustomEvent) {
+  if (event === 'log') {
+    const { msg, json } = body as LogEvent;
+    if (Object.keys(json).length === 0) {
+      console.log(`<D> ${msg}`);
+    } else {
+      console.log(`<D> ${msg}`, json);
+    }
+  } else if (event === 'debugStateUpdate') {
+    WebviewPanel.currentPanel?.updateState(body as DebugState);
+  } else {
+    console.error(`Unhandled custom event '${event}'`);
   }
 }
 
@@ -42,9 +51,9 @@ export function activateDebug(
     vscode.commands.registerCommand(
       'extension.gillian-debug.runEditorContents',
       (resource: vscode.Uri) => {
-        let targetResource = resource
+        let targetResource = resource;
         if (!targetResource && vscode.window.activeTextEditor) {
-          targetResource = vscode.window.activeTextEditor.document.uri
+          targetResource = vscode.window.activeTextEditor.document.uri;
         }
         if (targetResource) {
           startDebugging({
@@ -52,16 +61,16 @@ export function activateDebug(
             name: 'Run File',
             request: 'launch',
             program: targetResource.fsPath,
-          })
+          });
         }
       }
     ),
     vscode.commands.registerCommand(
       'extension.gillian-debug.debugEditorContents',
       (resource: vscode.Uri) => {
-        let targetResource = resource
+        let targetResource = resource;
         if (!targetResource && vscode.window.activeTextEditor) {
-          targetResource = vscode.window.activeTextEditor.document.uri
+          targetResource = vscode.window.activeTextEditor.document.uri;
         }
         if (targetResource) {
           startDebugging({
@@ -69,21 +78,21 @@ export function activateDebug(
             name: 'Debug File',
             request: 'launch',
             program: targetResource.fsPath,
-          })
+          });
         }
       }
     ),
     vscode.commands.registerCommand(
       'extension.gillian-debug.showDebuggerWebview',
       () => {
-        WebviewPanel.render(context.extensionUri)
+        WebviewPanel.render(context.extensionUri);
       }
     ),
     vscode.debug.onDidStartDebugSession(() => {
-      WebviewPanel.render(context.extensionUri)
+      WebviewPanel.render(context.extensionUri);
     }),
-    vscode.debug.onDidReceiveDebugSessionCustomEvent(handleCustomEvent)
-  )
+    vscode.debug.onDidReceiveDebugSessionCustomEvent(handleCustomDebugEvent)
+  );
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -91,22 +100,22 @@ export function activateDebug(
       config => {
         return vscode.window.showInputBox({
           placeHolder: 'Please enter the name of a file',
-        })
+        });
       }
     )
-  )
+  );
 
   // register a configuration provider for 'gillian' debug type
-  const provider = new ConfigurationProvider()
+  const provider = new ConfigurationProvider();
   context.subscriptions.push(
     vscode.debug.registerDebugConfigurationProvider('gillian', provider)
-  )
+  );
 
   context.subscriptions.push(
     vscode.debug.registerDebugAdapterDescriptorFactory('gillian', factory)
-  )
+  );
   if ('dispose' in factory) {
-    context.subscriptions.push(factory)
+    context.subscriptions.push(factory as unknown as Disposable);
   }
 }
 
@@ -122,13 +131,13 @@ class ConfigurationProvider implements vscode.DebugConfigurationProvider {
   ): ProviderResult<DebugConfiguration> {
     // if launch.json is missing or empty
     if (!config.type && !config.request && !config.name) {
-      const editor = vscode.window.activeTextEditor
+      const editor = vscode.window.activeTextEditor;
       if (editor) {
-        config.type = 'gillian'
-        config.name = 'Launch'
-        config.request = 'launch'
-        config.program = '${file}'
-        config.stopOnEntry = true
+        config.type = 'gillian';
+        config.name = 'Launch';
+        config.request = 'launch';
+        config.program = '${file}';
+        config.stopOnEntry = true;
       }
     }
 
@@ -136,10 +145,44 @@ class ConfigurationProvider implements vscode.DebugConfigurationProvider {
       return vscode.window
         .showInformationMessage('Cannot find a program to debug')
         .then(_ => {
-          return undefined // abort launch
-        })
+          return undefined; // abort launch
+        });
     }
 
-    return config
+    return config;
+  }
+}
+
+export async function getDebugState() {
+  const session = vscode.debug.activeDebugSession;
+  if (session !== undefined) {
+    const state: DebugState = await session.customRequest('debuggerState');
+    return state;
+  }
+}
+
+export async function jumpToCmd(id: number) {
+  const session = vscode.debug.activeDebugSession;
+  if (session !== undefined) {
+    const result = await session.customRequest('jump', { id });
+    if (!result.success) {
+      vscode.window.showErrorMessage(result.err || 'help');
+    }
+  }
+}
+
+export async function execSpecificCmd(
+  prevId: number,
+  branchCase: BranchCase | null
+) {
+  const session = vscode.debug.activeDebugSession;
+  if (session !== undefined) {
+    const result = await session.customRequest('stepSpecific', {
+      prevId,
+      branchCase,
+    });
+    if (!result.success) {
+      vscode.window.showErrorMessage(result.err || 'help');
+    }
   }
 }

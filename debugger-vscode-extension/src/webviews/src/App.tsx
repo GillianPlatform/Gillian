@@ -1,12 +1,19 @@
-import React from 'react'
-import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
+import React from 'react';
+import useDebugStore from './store';
+import WaitingForState from './WaitingForState';
+import DebuggerPanel from './DebuggerPanel';
 
+const App = () => {
+  const { state } = useDebugStore();
 
-const App = () => (
-  <>
-    <h1>Hi there~</h1>
-    <VSCodeButton>Click me!</VSCodeButton>
-  </>
-);
+  const content =
+    state === undefined ? (
+      <WaitingForState />
+    ) : (
+      <DebuggerPanel {...{ state }} />
+    );
+
+  return <div style={{ margin: '10px' }}>{content}</div>;
+};
 
 export default App;
