@@ -69,7 +69,11 @@ module LogQueryer : sig
      report id *)
   val get_previous_report_id : ReportId.t -> ReportId.t option
 
-  (* Returns the next report id which has type cmd_step given the current
+  (* Returns the all next report ids which have type cmd_step, given the current
+     report id *)
+  val get_next_report_ids : ReportId.t -> ReportId.t list
+
+  (* Returns the 'first' next report id which has type cmd_step, given the current
      report id *)
   val get_next_report_id : ReportId.t -> ReportId.t option
 

@@ -13,8 +13,14 @@ let get_report report_id =
 let get_previous_report_id cur_report_id =
   with_enabled (fun () -> LogDatabase.get_previous_report_id cur_report_id)
 
+let get_next_report_ids cur_report_id =
+  with_enabled (fun () -> Some (LogDatabase.get_next_report_ids cur_report_id))
+  |> Option.value ~default:[]
+
 let get_next_report_id cur_report_id =
-  with_enabled (fun () -> LogDatabase.get_next_report_id cur_report_id)
+  match get_next_report_ids cur_report_id with
+  | id :: _ -> Some id
+  | [] -> None
 
 let get_previously_freed_annot loc =
   with_enabled (fun () -> LogDatabase.get_previously_freed_annot loc)

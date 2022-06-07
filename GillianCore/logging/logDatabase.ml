@@ -128,19 +128,19 @@ let get_previous_report_id id =
   |> check_result_code db ~log:"finalize: get previous report";
   prev_report_id
 
-let get_next_report_id id =
+let get_next_report_ids id =
   let db = get_db () in
-  let stmt =
-    Sqlite3.prepare db "SELECT id FROM report WHERE previous = ? LIMIT 1;"
-  in
+  let stmt = Sqlite3.prepare db "SELECT id FROM report WHERE previous = ?;" in
   Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
   |> check_result_code db ~log:"get next report bind id";
-  let row = zero_or_one_row db ~log:"step: get next report" ~stmt in
-  let next_report_id =
-    Option.map (fun row -> Sqlite3.Data.to_int64_exn row.(0)) row
+  let _, nexts =
+    Sqlite3.fold stmt
+      ~f:(fun nexts row ->
+        let next_id : ReportId.t = Sqlite3.Data.to_int64_exn row.(0) in
+        next_id :: nexts)
+      ~init:[]
   in
-  Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: get next report";
-  next_report_id
+  List.rev nexts
 
 let get_previously_freed_annot loc =
   let db = get_db () in
