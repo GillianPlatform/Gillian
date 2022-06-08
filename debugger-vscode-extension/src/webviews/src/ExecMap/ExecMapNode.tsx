@@ -3,7 +3,7 @@ import { Handle, NodeProps, Position } from 'react-flow-renderer';
 import { VSCodeBadge, VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 import { BranchCase, CmdData } from '../../../types';
 import VSCodeAPI from '../VSCodeAPI';
-import { NODE_WIDTH, NODE_HEIGHT } from './ExecMapView';
+import { NODE_WIDTH, NODE_HEIGHT } from '../TreeMapView/TreeMapView';
 
 import './ExecMapView.css';
 
@@ -121,12 +121,12 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData>) => {
 
   const unifyBadge = cmdData.hasUnify ? (
     <>
-      <VSCodeBadge>
-        + Unify
-      </VSCodeBadge>
+      <VSCodeBadge>+ Unify</VSCodeBadge>
       &nbsp;
     </>
-  ) : <></>;
+  ) : (
+    <></>
+  );
 
   return (
     <NodeWrap
@@ -134,7 +134,7 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData>) => {
       noSourceHandle={isFinal}
     >
       <pre>{cmdData.display}</pre>
-      <div className='node-button-row'>
+      <div className="node-button-row">
         {unifyBadge}
         <VSCodeButton
           appearance="icon"

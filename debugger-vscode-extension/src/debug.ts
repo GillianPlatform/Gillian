@@ -13,7 +13,7 @@ import {
 } from 'vscode';
 
 import { startDebugging } from './commands';
-import { BranchCase, DebugState } from './types';
+import { BranchCase, DebugState, UnifyMap } from './types';
 import { WebviewPanel } from './WebviewPanel';
 
 type LogEvent = {
@@ -161,12 +161,28 @@ export async function getDebugState() {
   }
 }
 
+export async function getUnification(
+  parentId: number
+): Promise<[number, UnifyMap] | undefined> {
+  const session = vscode.debug.activeDebugSession;
+  if (session !== undefined) {
+    const result = await session.customRequest('unification', { parentId });
+    if (!result.success) {
+      vscode.window.showErrorMessage(
+        result.err || 'getUnification: unknown error'
+      );
+    }
+    const { unifyId, unifyMap } = result.data;
+    return [unifyId, unifyMap];
+  }
+}
+
 export async function jumpToCmd(id: number) {
   const session = vscode.debug.activeDebugSession;
   if (session !== undefined) {
     const result = await session.customRequest('jump', { id });
     if (!result.success) {
-      vscode.window.showErrorMessage(result.err || 'help');
+      vscode.window.showErrorMessage(result.err || 'jumpToCmd: unknown error');
     }
   }
 }

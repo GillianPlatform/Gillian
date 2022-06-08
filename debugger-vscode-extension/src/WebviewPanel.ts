@@ -2,7 +2,12 @@ import * as vscode from 'vscode';
 import * as debug from './debug';
 
 import { getNonce } from './lib';
-import { DebugState, MessageFromWebview, MessageToWebview } from './types';
+import {
+  DebugState,
+  MessageFromWebview,
+  MessageToWebview,
+  UnifyMap,
+} from './types';
 
 export class WebviewPanel {
   public static currentPanel: WebviewPanel | undefined;
@@ -60,12 +65,23 @@ export class WebviewPanel {
       await debug.jumpToCmd(e.cmdId);
     } else if (e.type === 'request_exec_specific') {
       await debug.execSpecificCmd(e.prevId, e.branchCase);
+    } else if (e.type === 'request_unification') {
+      const unifyData = await debug.getUnification(e.parentId);
+      if (unifyData !== undefined) {
+        const [unifyId, unifyMap] = unifyData;
+        this.updateUnification(unifyId, unifyMap);
+      }
     }
   }
 
   public updateState(state: DebugState) {
-    console.log('Got state', state);
+    console.info('Got state', state);
     this.sendMessage({ type: 'state_update', state });
+  }
+
+  public updateUnification(unifyId: number, unifyMap: UnifyMap) {
+    console.info('Got unification', { unifyId, unifyMap });
+    this.sendMessage({ type: 'unify_update', unifyId, unifyMap });
   }
 
   public dispose() {
