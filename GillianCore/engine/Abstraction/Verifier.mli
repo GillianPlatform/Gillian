@@ -23,6 +23,8 @@ module type S = sig
        and type heap_t = heap_t
        and type state_err_t = SPState.err_t
 
+  module SUnifier : Unifier.S with type st = SVal.SESubst.t
+
   type t
   type prog_t = (Annot.t, int) Prog.t
   type proc_tests = (string * t) list [@@deriving to_yojson]
