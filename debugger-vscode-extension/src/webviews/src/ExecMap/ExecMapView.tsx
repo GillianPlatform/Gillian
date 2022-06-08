@@ -35,9 +35,9 @@ const ExecMapView = ({ state }: Props) => {
     if (map[0] == 'Nothing') {
       return [`empty${emptyCount++}`, null, false];
     }
-    const { id, display } = map[1];
-    const hasNext = map[0] != 'FinalCmd';
-    return [`${id}`, { id, display }, hasNext];
+
+    const [ , cmdData] = map;
+    return [`${cmdData.id}`, cmdData, map[0] !== 'FinalCmd'];
   };
 
   const depthCounts: number[] = [1];
@@ -87,9 +87,11 @@ const ExecMapView = ({ state }: Props) => {
     });
 
     if (map[0] == 'Cmd') {
-      mapToElems(map[1].next, depth + 1, id, null);
+      const [ , , next ] = map;
+      mapToElems(next, depth + 1, id, null);
     } else if (map[0] == 'BranchCmd') {
-      for (const [branchCase, next] of map[1].nexts) {
+      const [ , , nexts ] = map;
+      for (const [branchCase, next] of nexts) {
         mapToElems(next, depth + 1, id, branchCase);
       }
     }

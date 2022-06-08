@@ -1,6 +1,6 @@
 import React, { FC } from 'react';
 import { Handle, NodeProps, Position } from 'react-flow-renderer';
-import { VSCodeButton } from '@vscode/webview-ui-toolkit/react';
+import { VSCodeBadge, VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 import { BranchCase, CmdData } from '../../../types';
 import VSCodeAPI from '../VSCodeAPI';
 import { NODE_WIDTH, NODE_HEIGHT } from './ExecMapView';
@@ -119,21 +119,33 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData>) => {
     VSCodeAPI.postMessage({ type: 'request_jump', cmdId: cmdData.id });
   };
 
+  const unifyBadge = cmdData.hasUnify ? (
+    <>
+      <VSCodeBadge>
+        + Unify
+      </VSCodeBadge>
+      &nbsp;
+    </>
+  ) : <></>;
+
   return (
     <NodeWrap
       classes={isCurrentCmd ? ['node-selected'] : []}
       noSourceHandle={isFinal}
     >
       <pre>{cmdData.display}</pre>
-      <VSCodeButton
-        appearance="icon"
-        aria-label="Jump here"
-        title="Jump here"
-        disabled={isCurrentCmd}
-        onClick={isCurrentCmd ? undefined : jump}
-      >
-        <span className="codicon codicon-target" />
-      </VSCodeButton>
+      <div className='node-button-row'>
+        {unifyBadge}
+        <VSCodeButton
+          appearance="icon"
+          aria-label="Jump here"
+          title="Jump here"
+          disabled={isCurrentCmd}
+          onClick={isCurrentCmd ? undefined : jump}
+        >
+          <span className="codicon codicon-target" />
+        </VSCodeButton>
+      </div>
     </NodeWrap>
   );
 };

@@ -7,14 +7,15 @@ export type BranchCase = {
 type BranchPath = BranchCase[];
 
 export type CmdData = {
-  id: number;
-  display: string;
+  id: number,
+  display: string,
+  hasUnify: boolean
 };
 
 export type ExecMap =
   | ['Nothing']
-  | ['Cmd', CmdData & { next: ExecMap }]
-  | ['BranchCmd', CmdData & { nexts: [BranchCase, ExecMap][] }]
+  | ['Cmd', CmdData, ExecMap ]
+  | ['BranchCmd', CmdData, ([BranchCase, ExecMap][])]
   | ['FinalCmd', CmdData];
 
 export type DebugState = {

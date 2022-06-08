@@ -92,15 +92,18 @@ struct
   end
 
   module ExecMap = struct
+    type cmd_data = {
+      id : L.ReportId.t;
+      display : string;
+      has_unify : bool; [@key "hasUnify"]
+    }
+    [@@deriving yojson]
+
     type 'case t =
       | Nothing
-      | Cmd of { id : L.ReportId.t; display : string; next : 'case t }
-      | BranchCmd of {
-          id : L.ReportId.t;
-          display : string;
-          nexts : ('case * 'case t) list;
-        }
-      | FinalCmd of { id : L.ReportId.t; display : string }
+      | Cmd of cmd_data * 'case t
+      | BranchCmd of cmd_data * ('case * 'case t) list
+      | FinalCmd of cmd_data
     [@@deriving yojson]
 
     type cmd_kind = Branch of branch_case list | Normal | Final
@@ -112,44 +115,51 @@ struct
       | Some cases -> Branch cases
       | None -> Normal
 
-    let insert_cmd_sourceless cmd_kind new_id display path map =
+    let insert_cmd_sourceless
+        cmd_kind
+        new_id
+        display
+        ?(has_unify = false)
+        path
+        map =
       let fail () =
         DL.failwith
           (fun () ->
             [
               ("cmd_type", cmd_kind_to_yojson cmd_kind);
-              ("path", branch_path_to_yojson path);
               ("new_id", L.ReportId.to_yojson new_id);
               ("display", `String display);
+              ("has_unify", `Bool has_unify);
+              ("path", branch_path_to_yojson path);
               ("map", to_yojson branch_case_to_yojson map);
             ])
           "ExecMap.insert_cmd: malformed request"
       in
+
+      let cmd_data = { id = new_id; display; has_unify } in
 
       let rec aux path map =
         match (map, path) with
         | Nothing, [] -> (
             match cmd_kind with
             | Branch branch_cases ->
-                BranchCmd
-                  {
-                    id = new_id;
-                    display;
-                    nexts = branch_cases |> List.map (fun bc -> (bc, Nothing));
-                  }
-            | Final -> FinalCmd { id = new_id; display }
-            | Normal -> Cmd { id = new_id; display; next = Nothing })
-        | Cmd { id; display; next }, _ ->
+                let nexts =
+                  branch_cases |> List.map (fun bc -> (bc, Nothing))
+                in
+                BranchCmd (cmd_data, nexts)
+            | Final -> FinalCmd cmd_data
+            | Normal -> Cmd (cmd_data, Nothing))
+        | Cmd (cmd_data, next), _ ->
             let next = aux path next in
-            Cmd { id; display; next }
-        | BranchCmd { id; display; nexts }, case :: path -> (
+            Cmd (cmd_data, next)
+        | BranchCmd (cmd_data, nexts), case :: path -> (
             let new_nexts =
               nexts
               |> List_utils.replace_assoc_opt case (fun map -> aux path map)
             in
             match new_nexts with
             | None -> fail ()
-            | Some nexts -> BranchCmd { id; display; nexts })
+            | Some nexts -> BranchCmd (cmd_data, nexts))
         | _ -> fail ()
       in
       aux path map
@@ -158,16 +168,17 @@ struct
         cmd_kind
         new_id
         display
+        ?(has_unify = false)
         path
         new_source
         ((source, map) : 'a with_source) =
+      let insert () =
+        insert_cmd_sourceless cmd_kind new_id display ~has_unify path map
+      in
       match source with
-      | None ->
-          ( Some new_source,
-            insert_cmd_sourceless cmd_kind new_id display path map )
+      | None -> (Some new_source, insert ())
       | Some source ->
-          if new_source == source then
-            (Some source, insert_cmd_sourceless cmd_kind new_id display path map)
+          if new_source == source then (Some source, insert ())
           else (
             DL.log (fun m -> m "TRIED TO INSERT %a" L.ReportId.pp new_id);
             (Some source, map))
@@ -175,9 +186,9 @@ struct
     let path_of_id_opt selected_id =
       let rec aux acc = function
         | Nothing -> None
-        | Cmd { id; next; _ } ->
+        | Cmd ({ id; _ }, next) ->
             if id = selected_id then Some acc else aux acc next
-        | BranchCmd { id; nexts; _ } ->
+        | BranchCmd ({ id; _ }, nexts) ->
             if id = selected_id then Some acc
             else
               nexts
@@ -189,10 +200,10 @@ struct
     let at_path ?(stop_early = false) path map =
       let rec aux path map =
         match (map, path) with
-        | Cmd { next; _ }, _ when not stop_early -> aux path next
+        | Cmd (_, next), _ when not stop_early -> aux path next
         | map, [] -> Some map
-        | Cmd { next; _ }, _ -> aux path next
-        | BranchCmd { nexts; _ }, case :: path ->
+        | Cmd (_, next), _ -> aux path next
+        | BranchCmd (_, nexts), case :: path ->
             nexts
             |> List.find_map (fun (next_case, map) ->
                    if case = next_case then aux path map else None)
@@ -213,8 +224,8 @@ struct
       let rec aux prev_id branch_case = function
         | FinalCmd _ -> None
         | Nothing -> Some (prev_id, branch_case)
-        | Cmd { id; next; _ } -> aux id None next
-        | BranchCmd { id; nexts; _ } ->
+        | Cmd ({ id; _ }, next) -> aux id None next
+        | BranchCmd ({ id; _ }, nexts) ->
             nexts |> List.find_map (fun (case, next) -> aux id (Some case) next)
       in
       let submap = map |> at_path ~stop_early:true path in
@@ -236,8 +247,8 @@ struct
                 ("map", to_yojson branch_case_to_yojson map);
               ])
             "ExecMap.find_unfinished: malformed request"
-      | Cmd { id; next; _ } -> aux id None next
-      | BranchCmd { id; nexts; _ } ->
+      | Cmd ({ id; _ }, next) -> aux id None next
+      | BranchCmd ({ id; _ }, nexts) ->
           nexts |> List.find_map (fun (case, next) -> aux id (Some case) next)
 
     let next_paths path map =
@@ -251,7 +262,7 @@ struct
               ])
             "ExecMap.at_path: shouldn't get Cmd from at_path!"
       | Nothing | FinalCmd _ -> [ path ]
-      | BranchCmd { nexts; _ } ->
+      | BranchCmd (_, nexts) ->
           nexts |> List.map (fun (case, _) -> case :: path)
 
     let path_of_id id map =
@@ -261,17 +272,22 @@ struct
 
     let rec package = function
       | Nothing -> Nothing
-      | Cmd { id; display; next } ->
+      | Cmd (cmd_data, next) ->
           let next = package next in
-          Cmd { id; display; next }
-      | BranchCmd { id; display; nexts } ->
+          Cmd (cmd_data, next)
+      | BranchCmd (cmd_data, nexts) ->
           let nexts =
             nexts
             |> List.map (fun (case, next) ->
                    (PackagedBranchCase.from case, package next))
           in
-          BranchCmd { id; display; nexts }
-      | FinalCmd id -> FinalCmd id
+          BranchCmd (cmd_data, nexts)
+      | FinalCmd cmd_data -> FinalCmd cmd_data
+
+    let id_of = function
+      | Nothing -> None
+      | Cmd ({ id; _ }, _) | BranchCmd ({ id; _ }, _) | FinalCmd { id; _ } ->
+          Some id
   end
 
   type exec_map = branch_case ExecMap.with_source
@@ -670,9 +686,8 @@ struct
   let jump_to_start dbg =
     let result =
       let** root_id =
-        match dbg.exec_map |> snd with
-        | Nothing -> Error "Debugger.jump_to_start: exec map is Nothing!"
-        | Cmd { id; _ } | BranchCmd { id; _ } | FinalCmd { id; _ } -> Ok id
+        ExecMap.id_of (snd dbg.exec_map)
+        |> Option.to_result ~none:"Debugger.jump_to_start: exec map is Nothing!"
       in
       dbg |> jump_to_id root_id
     in
@@ -769,7 +784,7 @@ struct
                                (List.hd dbg.frames).source_path
                              in
                              insert_cmd Final cur_report_id cmd_display
-                               branch_path source_file));
+                               ~has_unify:true branch_path source_file));
                       execute_step cur_report_id dbg
                   | _ ->
                       update_report_id_and_inspection_fields cur_report_id dbg;
@@ -786,10 +801,14 @@ struct
                           | None -> Normal
                         in
                         let source_file = (List.hd dbg.frames).source_path in
+                        let has_unify =
+                          L.LogQueryer.get_unification_for cur_report_id
+                          |> Option.is_some
+                        in
                         dbg.exec_map <-
                           dbg.exec_map
                           |> insert_cmd cmd_kind cur_report_id cmd_display
-                               branch_path source_file);
+                               ~has_unify branch_path source_file);
                       Step)))
 
   let step_in_branch_case prev_id_in_frame ?branch_case ?(reverse = false) dbg =

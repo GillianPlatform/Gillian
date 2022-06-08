@@ -104,3 +104,9 @@
   overflow: hidden;
   font-family: var(--vscode-editor-font-family);
 }
+
+.node-button-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
