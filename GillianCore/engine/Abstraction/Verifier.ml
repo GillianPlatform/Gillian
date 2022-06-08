@@ -41,7 +41,9 @@ module type S = sig
 
   module Debug : sig
     val get_tests_for_prog : prog_t -> proc_tests
-    val analyse_result : t -> SAInterpreter.result_t -> bool
+
+    val analyse_result :
+      t -> Logging.ReportId.t -> SAInterpreter.result_t -> bool
   end
 end
 
@@ -668,7 +670,7 @@ struct
     let subst = SSubst.init (subst_lst @ params_subst_lst) in
     subst
 
-  let analyse_proc_result test flag result =
+  let analyse_proc_result test flag ?parent_id result =
     match (result : SAInterpreter.result_t) with
     | ExecRes.RFail { proc; proc_idx; error_state; errors } ->
         L.verbose (fun m ->
@@ -697,32 +699,41 @@ struct
                 test.id (Flag.str fl) (Flag.str flag));
           if not !Config.debug then Fmt.pr "f @?";
           false)
-        else (
-          L.set_previous last_report;
-          let store = SPState.get_store final_state in
-          let () =
-            SStore.filter store (fun x v ->
-                if x = Names.return_variable then Some v else None)
+        else
+          let parent_id =
+            match parent_id with
+            | None -> last_report
+            | id -> id
           in
-          let subst = make_post_subst test final_state in
-          if analyse_result subst test final_state then (
-            L.normal (fun m ->
-                m "VERIFICATION SUCCESS: Spec %s %a terminated successfully\n"
-                  test.name
-                  (Fmt.Dump.pair Fmt.int Fmt.int)
-                  test.id);
-            if not !Config.debug then Fmt.pr "s @?";
-            true)
-          else (
-            L.normal (fun m ->
-                m
-                  "VERIFICATION FAILURE: Spec %s %a - post condition not \
-                   unifiable\n"
-                  test.name
-                  (Fmt.Dump.pair Fmt.int Fmt.int)
-                  test.id);
-            if not !Config.debug then Fmt.pr "f @?";
-            false))
+          DL.log (fun m ->
+              m "Unify: setting parent to %a" (Fmt.option L.ReportId.pp)
+                parent_id);
+          L.with_parent_id parent_id (fun () ->
+              let store = SPState.get_store final_state in
+              let () =
+                SStore.filter store (fun x v ->
+                    if x = Names.return_variable then Some v else None)
+              in
+              let subst = make_post_subst test final_state in
+              if analyse_result subst test final_state then (
+                L.normal (fun m ->
+                    m
+                      "VERIFICATION SUCCESS: Spec %s %a terminated successfully\n"
+                      test.name
+                      (Fmt.Dump.pair Fmt.int Fmt.int)
+                      test.id);
+                if not !Config.debug then Fmt.pr "s @?";
+                true)
+              else (
+                L.normal (fun m ->
+                    m
+                      "VERIFICATION FAILURE: Spec %s %a - post condition not \
+                       unifiable\n"
+                      test.name
+                      (Fmt.Dump.pair Fmt.int Fmt.int)
+                      test.id);
+                if not !Config.debug then Fmt.pr "f @?";
+                false))
 
   let analyse_proc_results
       (test : t)
@@ -1191,7 +1202,8 @@ struct
             "Verifier.Debug.get_tests_for_prog: Got tests");
       tests
 
-    let analyse_result test result = analyse_proc_result test Normal result
+    let analyse_result test parent_id result =
+      analyse_proc_result test Normal ~parent_id result
   end
 end
 

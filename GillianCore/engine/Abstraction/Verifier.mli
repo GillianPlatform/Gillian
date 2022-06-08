@@ -38,7 +38,9 @@ module type S = sig
 
   module Debug : sig
     val get_tests_for_prog : prog_t -> proc_tests
-    val analyse_result : t -> SAInterpreter.result_t -> bool
+
+    val analyse_result :
+      t -> Logging.ReportId.t -> SAInterpreter.result_t -> bool
   end
 end
 

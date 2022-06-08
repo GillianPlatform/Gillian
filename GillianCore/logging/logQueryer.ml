@@ -3,8 +3,6 @@
     Queries will return None if the LogQueryer is not enabled.
 *)
 
-type relationship = LogDatabase.relationship = Child | Next
-
 let with_enabled func = if LogDatabase.is_enabled () then func () else None
 
 let get_report report_id =
@@ -29,5 +27,5 @@ let get_cmd_results cmd_report_id =
   if LogDatabase.is_enabled () then LogDatabase.get_cmd_results cmd_report_id
   else []
 
-let get_unification_for id relationship =
-  with_enabled (fun () -> LogDatabase.get_unification_for id relationship)
+let get_unification_for id =
+  with_enabled (fun () -> LogDatabase.get_unification_for id)
