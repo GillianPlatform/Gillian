@@ -21,10 +21,17 @@ module type S = sig
     type 'a t [@@deriving yojson]
   end
 
+  module UnifyMap : sig
+    type t [@@deriving yojson]
+  end
+
   module Inspect : sig
     type debug_state [@@deriving yojson]
 
     val get_debug_state : debugger_state -> debug_state
+
+    val get_unification :
+      L.ReportId.t -> debugger_state -> (UnifyMap.t, string) result
   end
 
   val launch : string -> string option -> (debugger_state, string) result
@@ -292,6 +299,104 @@ struct
 
   type exec_map = branch_case ExecMap.with_source
 
+  module UnifyMap = struct
+    module ULogging = Verification.SUnifier.Logging
+
+    type assertion_data = { fold_id : L.ReportId.t option } [@@deriving yojson]
+
+    type unify_seg =
+      | Assertion of assertion_data * unify_seg
+      | UnifyResult of bool
+    [@@deriving yojson]
+
+    type t = Fold of unify_seg list | Direct of unify_seg [@@deriving yojson]
+
+    let rec build_seg (id, type_, content) : unify_seg =
+      if type_ = ContentType.assertion then
+        (* let assertion = content |> Yojson.Safe.from_string |> ULogging.Assertion.of_yojson in *)
+        let fold_id =
+          let+ child_id, type_, _ =
+            match L.LogQueryer.get_children_of id with
+            | [] -> None
+            | [ child ] -> Some child
+            | _ ->
+                Fmt.failwith
+                  "UnifyMap.build_seg: assertion %a has multiple children!"
+                  L.ReportId.pp id
+          in
+          if type_ <> ContentType.unify then
+            Fmt.failwith
+              "UnifyMap.build_seg: report %a (child of assertion %a) has type \
+               %s (expected %s)!"
+              L.ReportId.pp child_id L.ReportId.pp id type_ ContentType.unify;
+          child_id
+        in
+        let seg =
+          match L.LogQueryer.get_next_report_ids id with
+          | [] ->
+              Fmt.failwith "UnifyMap.build_seg: assertion %a has no next!"
+                L.ReportId.pp id
+          | [ next_id ] ->
+              let content, type_ =
+                L.LogQueryer.get_report next_id |> Option.get
+              in
+              build_seg (next_id, content, type_)
+          | _ ->
+              Fmt.failwith
+                "UnifyMap.build_seg: assertion %a has multiple nexts!"
+                L.ReportId.pp id
+        in
+        Assertion ({ fold_id }, seg)
+      else if type_ = ContentType.unify_result then
+        let result =
+          content |> Yojson.Safe.from_string
+          |> ULogging.UnifyResultReport.of_yojson |> Result.get_ok
+        in
+        let success =
+          match result with
+          | Success _ -> true
+          | Failure _ -> false
+        in
+        UnifyResult success
+      else
+        Fmt.failwith
+          "UnifyMap.build_seg: report %a has invalid type (%s) for unify_seg!"
+          L.ReportId.pp id type_
+
+    let build_case id : unify_seg =
+      match L.LogQueryer.get_children_of ~roots_only:true id with
+      | [] ->
+          Fmt.failwith "UnifyMap.build_case: id %a has no children!"
+            L.ReportId.pp id
+      | [ child ] -> build_seg child
+      | _ ->
+          Fmt.failwith "UnifyMap.build_case: id %a has multiple children!"
+            L.ReportId.pp id
+
+    let build unify_id =
+      match L.LogQueryer.get_children_of ~roots_only:true unify_id with
+      | [] ->
+          Fmt.failwith "UnifyMap.build: unify id %a has no children!"
+            L.ReportId.pp unify_id
+      | (_, type_, _) :: _ as children ->
+          if type_ = ContentType.unify_case then
+            let segs =
+              children
+              |> List.map (fun (id, type_, _) ->
+                     if type_ <> ContentType.unify_case then
+                       Fmt.failwith
+                         "UnifyMap.build: id %a (child of %a) is %s - expected \
+                          %s!"
+                         L.ReportId.pp id L.ReportId.pp unify_id type_
+                         ContentType.unify_case;
+                     build_case id)
+            in
+            Fold segs
+          else
+            let seg = build_case unify_id in
+            Direct seg
+  end
+
   type debugger_state = {
     source_file : string;
     source_files : SourceFiles.t option;
@@ -310,6 +415,7 @@ struct
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
     mutable exec_map : exec_map;
     mutable proc_name : string option;
+    mutable unify_maps : (L.ReportId.t * UnifyMap.t) list;
   }
 
   module Inspect = struct
@@ -345,6 +451,20 @@ struct
         | Some proc_name -> proc_name
       in
       { exec_map; current_cmd_id; proc_name }
+
+    let get_unification parent_id dbg =
+      let++ unify_id =
+        match L.LogQueryer.get_unify_for parent_id with
+        | Some id -> Ok id
+        | None ->
+            Fmt.error "Report %a has no unification!" L.ReportId.pp parent_id
+      in
+      match dbg.unify_maps |> List.assoc_opt unify_id with
+      | Some map -> map
+      | None ->
+          let map = UnifyMap.build unify_id in
+          dbg.unify_maps <- (unify_id, map) :: dbg.unify_maps;
+          map
   end
 
   let top_level_scopes : scope list =
@@ -644,6 +764,7 @@ struct
                      cur_cmd = None;
                      exec_map = (None, map);
                      proc_name = None;
+                     unify_maps = [];
                    }
                     : debugger_state)
                 in
@@ -663,7 +784,7 @@ struct
             [ ("tests", tests_json) ])
           (Fmt.str "No test found for proc `%s`!" proc_name)
     | Some test -> (
-        match L.LogQueryer.get_unification_for prev_id with
+        match L.LogQueryer.get_unify_for prev_id with
         | Some _ ->
             DL.log (fun m ->
                 m "Unification for %a already exists; skipping unify"
@@ -671,7 +792,7 @@ struct
         | None -> (
             DL.log (fun m -> m "Unifying result for %a" L.ReportId.pp prev_id);
             let _ = Verification.Debug.analyse_result test prev_id result in
-            match L.LogQueryer.get_unification_for prev_id with
+            match L.LogQueryer.get_unify_for prev_id with
             | None -> failwith "No unify report found!"
             | Some _ -> ()))
 
@@ -802,7 +923,7 @@ struct
                         in
                         let source_file = (List.hd dbg.frames).source_path in
                         let has_unify =
-                          L.LogQueryer.get_unification_for cur_report_id
+                          L.LogQueryer.get_unify_for cur_report_id
                           |> Option.is_some
                         in
                         dbg.exec_map <-

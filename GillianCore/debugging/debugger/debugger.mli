@@ -15,10 +15,17 @@ module type S = sig
     type 'a t [@@deriving yojson]
   end
 
+  module UnifyMap : sig
+    type t [@@deriving yojson]
+  end
+
   module Inspect : sig
     type debug_state [@@deriving yojson]
 
     val get_debug_state : debugger_state -> debug_state
+
+    val get_unification :
+      Logging.ReportId.t -> debugger_state -> (UnifyMap.t, string) result
   end
 
   val launch : string -> string option -> (debugger_state, string) result
