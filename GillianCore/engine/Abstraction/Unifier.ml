@@ -213,12 +213,12 @@ module Make
         astate
         subst
         up =
-      let target_case_depth =
+      let actual_target_depth =
         if is_new_case then target_case_depth - 1 else target_case_depth
       in
       let case_depth = List.length !parent_ids_ref in
-      assert (target_case_depth <= case_depth);
-      for _ = case_depth downto target_case_depth + 1 do
+      assert (actual_target_depth <= case_depth);
+      for _ = case_depth downto actual_target_depth + 1 do
         match !parent_ids_ref with
         | [] -> raise (Failure "Mismatched case depth and parent_id list!")
         | parent_id :: rest ->
