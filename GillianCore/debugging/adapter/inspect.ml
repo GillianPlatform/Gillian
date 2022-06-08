@@ -66,6 +66,19 @@ module Make (Debugger : Debugger.S) = struct
     DL.set_rpc_command_handler rpc ~name:"Debugger state"
       (module Debugger_state_command)
       (fun _ -> Lwt.return (Debugger.Inspect.get_debug_state dbg));
+    DL.set_rpc_command_handler rpc ~name:"Unification"
+      (module Unification_command)
+      (fun { parentId } ->
+        let result =
+          match dbg |> Debugger.Inspect.get_unification parentId with
+          | Error e ->
+              Unification_command.Result.make ~success:false ~err:(Some e) ()
+          | Ok (unify_id, unify_map) ->
+              Unification_command.Result.make ~success:true
+                ~data:(Some { unify_id; unify_map })
+                ()
+        in
+        Lwt.return result);
 
     Lwt.return ()
 end

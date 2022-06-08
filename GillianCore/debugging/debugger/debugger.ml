@@ -31,7 +31,9 @@ module type S = sig
     val get_debug_state : debugger_state -> debug_state
 
     val get_unification :
-      L.ReportId.t -> debugger_state -> (UnifyMap.t, string) result
+      L.ReportId.t ->
+      debugger_state ->
+      (L.ReportId.t * UnifyMap.t, string) result
   end
 
   val launch : string -> string option -> (debugger_state, string) result
@@ -309,7 +311,7 @@ struct
       | UnifyResult of bool
     [@@deriving yojson]
 
-    type t = Fold of unify_seg list | Direct of unify_seg [@@deriving yojson]
+    type t = Direct of unify_seg | Fold of unify_seg list [@@deriving yojson]
 
     let rec build_seg (id, type_, content) : unify_seg =
       if type_ = ContentType.assertion then
@@ -460,11 +462,11 @@ struct
             Fmt.error "Report %a has no unification!" L.ReportId.pp parent_id
       in
       match dbg.unify_maps |> List.assoc_opt unify_id with
-      | Some map -> map
+      | Some map -> (unify_id, map)
       | None ->
           let map = UnifyMap.build unify_id in
           dbg.unify_maps <- (unify_id, map) :: dbg.unify_maps;
-          map
+          (unify_id, map)
   end
 
   let top_level_scopes : scope list =

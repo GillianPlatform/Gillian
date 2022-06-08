@@ -1,5 +1,6 @@
 open DebugProtocolEx
 open Debugger.DebuggerTypes
+module L = Logging
 module DL = Debugger_log
 
 module Events (Debugger : Debugger.S) = struct
@@ -57,11 +58,34 @@ module Commands (Debugger : Debugger.S) = struct
     end
   end
 
+  module Unification_command = struct
+    let type_ = "unification"
+
+    module Arguments = struct
+      type t = { parentId : L.ReportId.t } [@@deriving yojson]
+    end
+
+    module Result = struct
+      type data = {
+        unify_id : L.ReportId.t; [@key "unifyId"]
+        unify_map : Debugger.UnifyMap.t; [@key "unifyMap"]
+      }
+      [@@deriving yojson]
+
+      type t = {
+        success : bool;
+        data : data option; [@default None]
+        err : string option; [@default None]
+      }
+      [@@deriving yojson, make]
+    end
+  end
+
   module Jump_command = struct
     let type_ = "jump"
 
     module Arguments = struct
-      type t = { id : Logging.ReportId.t } [@@deriving yojson]
+      type t = { id : L.ReportId.t } [@@deriving yojson]
     end
 
     module Result = struct
@@ -75,7 +99,7 @@ module Commands (Debugger : Debugger.S) = struct
 
     module Arguments = struct
       type t = {
-        prev_id : Logging.ReportId.t; [@key "prevId"]
+        prev_id : L.ReportId.t; [@key "prevId"]
         branch_case : Debugger.PackagedBranchCase.t option; [@key "branchCase"]
       }
       [@@deriving yojson]
