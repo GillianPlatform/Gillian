@@ -23,9 +23,18 @@ let get_next_report_id cur_report_id =
 let get_previously_freed_annot loc =
   with_enabled (fun () -> LogDatabase.get_previously_freed_annot loc)
 
-let get_cmd_results cmd_report_id =
-  if LogDatabase.is_enabled () then LogDatabase.get_cmd_results cmd_report_id
+let get_children_of ?(roots_only = false) id =
+  if LogDatabase.is_enabled () then LogDatabase.get_children_of roots_only id
   else []
 
-let get_unification_for id =
-  with_enabled (fun () -> LogDatabase.get_unification_for id)
+let get_cmd_results cmd_report_id =
+  get_children_of cmd_report_id
+  |> List.filter_map (fun (id, type_, content) ->
+         if type_ = LoggingConstants.ContentType.cmd_result then
+           Some (id, content)
+         else None)
+
+let get_unify_for id =
+  get_children_of id
+  |> List.find_map (fun (id, type_, _) ->
+         if type_ = LoggingConstants.ContentType.unify then Some id else None)

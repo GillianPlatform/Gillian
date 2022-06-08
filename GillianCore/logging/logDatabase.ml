@@ -130,14 +130,15 @@ let get_next_report_ids id =
   let db = get_db () in
   let stmt = Sqlite3.prepare db "SELECT id FROM report WHERE previous = ?;" in
   Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
-  |> check_result_code db ~log:"get next report bind id";
-  let _, nexts =
+  |> check_result_code db ~log:"get next reports bind id";
+  let rc, nexts =
     Sqlite3.fold stmt
       ~f:(fun nexts row ->
         let next_id : ReportId.t = Sqlite3.Data.to_int64_exn row.(0) in
         next_id :: nexts)
       ~init:[]
   in
+  rc |> check_result_code db ~log:"fold: get next reports";
   List.rev nexts
 
 let get_previously_freed_annot loc =
@@ -163,35 +164,23 @@ let get_previously_freed_annot loc =
   |> check_result_code db ~log:"finalize: get previous freed annot";
   annot
 
-let get_cmd_results id =
+let get_children_of roots_only id =
   let db = get_db () in
-  let stmt =
-    Sqlite3.prepare db
-      "SELECT child.id AS id, child.content AS content FROM report child INNER \
-       JOIN report parent ON child.parent = parent.id WHERE parent.id = ? AND \
-       child.type=\"cmd_result\""
+  let query =
+    Fmt.str "SELECT id, type, content FROM report WHERE parent=?%s;"
+      (if roots_only then " AND previous IS NULL" else "")
   in
+  let stmt = Sqlite3.prepare db query in
   Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
-  |> check_result_code db ~log:"get cmd results bind id";
-  let _, results =
+  |> check_result_code db ~log:"get children bind id";
+  let rc, children =
     Sqlite3.fold stmt
       ~f:(fun results row ->
         let id : ReportId.t = Sqlite3.Data.to_int64_exn row.(0) in
-        let content = Sqlite3.Data.to_string_exn row.(1) in
-        (id, content) :: results)
+        let type_ = Sqlite3.Data.to_string_exn row.(1) in
+        let content = Sqlite3.Data.to_string_exn row.(2) in
+        (id, type_, content) :: results)
       ~init:[]
   in
-  results
-
-let get_unification_for id =
-  let db = get_db () in
-  let stmt =
-    Sqlite3.prepare db
-      "SELECT id FROM report WHERE type=\"unify\" AND parent=? LIMIT 1"
-  in
-  Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
-  |> check_result_code db ~log:"get unification bind id";
-  let row = zero_or_one_row db ~log:"step: get unification" ~stmt in
-  let id = Option.map (fun row -> Sqlite3.Data.to_int64_exn row.(0)) row in
-  Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: get unification";
-  id
+  rc |> check_result_code db ~log:"fold: get children";
+  children

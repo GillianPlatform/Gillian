@@ -79,10 +79,18 @@ module LogQueryer : sig
      for a given location in the current phase if it exists *)
   val get_previously_freed_annot : string -> string option
 
+  (* Returns the ids, types, and content of any children of the given report id;
+     if `roots_only` is true, only get children with no previous*)
+  val get_children_of :
+    ?roots_only:bool -> ReportId.t -> (ReportId.t * string * string) list
+
   (* Returns the list of IDs and content of any children of the given report
      ID who have type 'cmd_result' *)
   val get_cmd_results : ReportId.t -> (ReportId.t * string) list
-  val get_unification_for : ReportId.t -> ReportId.t option
+
+  (* Returns a 'unify' report that is the direct child of the given report id,
+     if it exists *)
+  val get_unify_for : ReportId.t -> ReportId.t option
 end
 
 (** Initializes the logging module with the specified reporters and initializes
