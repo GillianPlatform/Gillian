@@ -99,6 +99,7 @@ class DebugCodeLensProvider implements CodeLensProvider {
       request: 'launch',
       program: program,
       procedureName: procedureName,
+      stopOnEntry: true,
     };
   }
 }
