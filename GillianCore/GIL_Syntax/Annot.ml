@@ -1,14 +1,14 @@
 (** {b GIL annot}. *)
 type t = {
   origin_loc : Location.t option;  (** Better not to know what this is for *)
-  origin_id : int;  (** Origin Id, that should be abstracted away *)
+  origin_id : int option;  (** Origin Id, that should be abstracted away *)
   loop_info : string list;
 }
 [@@deriving yojson]
 
 (**/**)
 
-let make ?origin_loc ?(origin_id = -1) ?(loop_info = []) () =
+let make ?origin_loc ?origin_id ?(loop_info = []) () =
   { origin_loc; origin_id; loop_info }
 
 let get_loop_info (annot : t) = annot.loop_info

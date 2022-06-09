@@ -9,6 +9,13 @@ module type S = sig
   type tl_ast
   type memory
 
+  val source_map_ability : bool
+
+  (** Take the origin [tl_ast], an origin [node_id] and returns
+      a string representing the evaluation step for the exec map.
+      Should never be called if [source_map_ability] is false *)
+  val get_origin_node_str : tl_ast -> int option -> string
+
   val memory_error_to_exception_info :
     (memory_error, tl_ast) memory_error_info -> DebuggerTypes.exception_info
 
@@ -29,6 +36,9 @@ module Default (SMemory : SMemory.S) (PC : ParserAndCompiler.S) :
   type memory = SMemory.t
   type tl_ast = PC.tl_ast
   type memory_error = SMemory.err_t
+
+  let source_map_ability = false
+  let get_origin_node_str _ _ = failwith "Not implemented in Default lifter"
 
   let memory_error_to_exception_info { error; _ } : DebuggerTypes.exception_info
       =

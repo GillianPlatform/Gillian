@@ -47,6 +47,11 @@ and pp fmt stmt =
         pp_list s1 pp_list s2
   | Logic lcmd -> Format.fprintf fmt "@[[[ %a ]]@]" WLCmd.pp lcmd
 
+and pp_head fmt stmt =
+  match get stmt with
+  | If (e, _, _) -> Format.fprintf fmt "if (%a)" WExpr.pp e
+  | _ -> pp fmt stmt
+
 let is_while s =
   match get s with
   | While _ -> true

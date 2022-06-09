@@ -9,7 +9,7 @@ val get_context : t -> WFun.t list
 val get_by_id :
   ?fname:string option ->
   t ->
-  int ->
+  int option ->
   [> `None
   | `WExpr of WExpr.t
   | `WFun of WFun.t

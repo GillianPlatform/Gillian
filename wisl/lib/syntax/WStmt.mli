@@ -19,6 +19,7 @@ val get_loc : t -> CodeLoc.t
 val make : tt -> CodeLoc.t -> t
 val pp_list : Format.formatter -> t list -> unit
 val pp : Format.formatter -> t -> unit
+val pp_head : Format.formatter -> t -> unit
 val is_while : t -> bool
 val is_fold : t -> bool
 val is_unfold : t -> bool
