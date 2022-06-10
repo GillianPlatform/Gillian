@@ -53,7 +53,7 @@ export type UnifyStep =
   | readonly ['Result', number, UnifyResult];
 
 export type Unification = {
-  readonly map: unknown;  // TODO: fix when Immer supports recursive types
+  readonly map: unknown; // TODO: fix when Immer supports recursive types
   readonly selected?: UnifyStep;
 };
 

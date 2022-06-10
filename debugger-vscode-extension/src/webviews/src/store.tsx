@@ -1,6 +1,12 @@
 import produce, { Draft, enableMapSet } from 'immer';
 import create, { State as ZState, StateCreator } from 'zustand';
-import { DebugState, UnifyMap, State, Unification, UnifyStep } from '../../types';
+import {
+  DebugState,
+  UnifyMap,
+  State,
+  Unification,
+  UnifyStep,
+} from '../../types';
 
 enableMapSet();
 const immer =
@@ -22,14 +28,15 @@ type Store = State & {
 
 const useStore = create<Store>(
   immer((set, get) => {
-    const isUnifyInStore = (unifyId: number) => get().unifyState.unifications[unifyId] !== undefined;
+    const isUnifyInStore = (unifyId: number) =>
+      get().unifyState.unifications[unifyId] !== undefined;
 
     return {
       unifyState: {
         path: [],
-        unifications: {}
+        unifications: {},
       },
-      updateDebugState: (debugState) => { 
+      updateDebugState: debugState => {
         set(() => ({ debugState }));
       },
       loadUnification: (unifyId, map) => {
@@ -37,7 +44,7 @@ const useStore = create<Store>(
           unifyState.unifications[unifyId] = { map };
         });
       },
-      selectBaseUnification: (unifyId) => {
+      selectBaseUnification: unifyId => {
         set(({ unifyState }) => {
           unifyState.path.unshift(unifyId);
         });
@@ -56,12 +63,12 @@ const useStore = create<Store>(
       },
       popUnifications: (n: number) => {
         set(({ unifyState }) => {
-          while(n--) {
+          while (n--) {
             unifyState.path.shift();
           }
         });
       },
-      selectUnifyStep: (step) => {
+      selectUnifyStep: step => {
         console.log('selecting step!');
         set(({ unifyState: { path, unifications } }) => {
           const unifyId = path[0];
@@ -70,27 +77,30 @@ const useStore = create<Store>(
             unification.selected = step as any;
           }
         });
-      }
+      },
     };
   })
 );
 
-export const mutateStore = () => useStore(({
-  updateDebugState,
-  loadUnification,
-  selectBaseUnification,
-  clearUnification,
-  pushUnification,
-  popUnifications,
-  selectUnifyStep
-}) => ({
-  updateDebugState,
-  loadUnification,
-  selectBaseUnification,
-  clearUnification,
-  pushUnification,
-  popUnifications,
-  selectUnifyStep
-}));
+export const mutateStore = () =>
+  useStore(
+    ({
+      updateDebugState,
+      loadUnification,
+      selectBaseUnification,
+      clearUnification,
+      pushUnification,
+      popUnifications,
+      selectUnifyStep,
+    }) => ({
+      updateDebugState,
+      loadUnification,
+      selectBaseUnification,
+      clearUnification,
+      pushUnification,
+      popUnifications,
+      selectUnifyStep,
+    })
+  );
 
 export default useStore;

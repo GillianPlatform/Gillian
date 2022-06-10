@@ -53,7 +53,7 @@ const UnifyMapView = ({ unification, selectStep }: Props) => {
           result,
           setSelected: () => {
             selectStep(['Result', id, result]);
-          }
+          },
         },
         nexts: [],
       };

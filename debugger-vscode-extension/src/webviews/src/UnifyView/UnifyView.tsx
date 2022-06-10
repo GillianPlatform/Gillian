@@ -21,7 +21,7 @@ const UnifyView = () => {
       </Hero>
     );
   }
-  
+
   const unifyMapView = (() => {
     const unifyId = path[0];
     const unification = unifications[unifyId];
@@ -29,24 +29,18 @@ const UnifyView = () => {
       const load = () => {
         VSCodeAPI.postMessage({
           type: 'request_unification',
-          id: unifyId
+          id: unifyId,
         });
       };
-      
-      return (
-        <Loading refresh={load} />
-      );
+
+      return <Loading refresh={load} />;
     }
-    return (
-      <UnifyMapView {...{ unification, selectStep }} />
-    );
+    return <UnifyMapView {...{ unification, selectStep }} />;
   })();
 
   return (
     <Allotment>
-      <Allotment.Pane>
-        {unifyMapView}
-      </Allotment.Pane>
+      <Allotment.Pane>{unifyMapView}</Allotment.Pane>
       <Allotment.Pane>
         <UnifyData />
       </Allotment.Pane>

@@ -14,9 +14,11 @@ const App = () => {
   };
 
   const content =
-    debugState === undefined ? <Loading {...{refresh}} /> : <DebuggerPanel />;
+    debugState === undefined ? <Loading {...{ refresh }} /> : <DebuggerPanel />;
 
-  return <div style={{ margin: '10px', boxSizing: 'border-box' }}>{content}</div>;
+  return (
+    <div style={{ margin: '10px', boxSizing: 'border-box' }}>{content}</div>
+  );
 };
 
 export default App;

@@ -5,19 +5,16 @@ import {
 } from '@vscode/webview-ui-toolkit/react';
 import Hero from './Hero';
 
-
 type Props = {
   refresh: () => void;
   msg?: string;
-}
+};
 
-const Loading = ({refresh, msg = 'Waiting for debugger...'}: Props) => (
+const Loading = ({ refresh, msg = 'Waiting for debugger...' }: Props) => (
   <Hero>
     <VSCodeProgressRing />
     <h2>{msg}</h2>
-    <VSCodeButton onClick={refresh} >
-      Manual Refresh
-    </VSCodeButton>
+    <VSCodeButton onClick={refresh}>Manual Refresh</VSCodeButton>
   </Hero>
 );
 

@@ -13,7 +13,9 @@ import './DebuggerPanel.css';
 
 const DebuggerPanel = () => {
   const debugState = useStore(({ debugState }) => debugState);
-  const hasUnify = useStore(({ unifyState: { path } }) => path && path.length > 0);
+  const hasUnify = useStore(
+    ({ unifyState: { path } }) => path && path.length > 0
+  );
   const [activeTab, setActiveTab] = useState('debug-exec-tab');
 
   useEffect(() => {
@@ -21,12 +23,26 @@ const DebuggerPanel = () => {
       setActiveTab('debug-exec-tab');
     }
   }, [hasUnify]);
-  
+
   return (
     <div className="debugger-panel">
       <VSCodePanels activeid={activeTab}>
-        <VSCodePanelTab id="debug-exec-tab" onClick={ () => { setActiveTab('debug-exec-tab'); } }>EXEC MAP</VSCodePanelTab>
-        <VSCodePanelTab id="debug-unify-tab" onClick={ () => { setActiveTab('debug-unify-tab'); } }>UNIFICATION</VSCodePanelTab>
+        <VSCodePanelTab
+          id="debug-exec-tab"
+          onClick={() => {
+            setActiveTab('debug-exec-tab');
+          }}
+        >
+          EXEC MAP
+        </VSCodePanelTab>
+        <VSCodePanelTab
+          id="debug-unify-tab"
+          onClick={() => {
+            setActiveTab('debug-unify-tab');
+          }}
+        >
+          UNIFICATION
+        </VSCodePanelTab>
 
         <VSCodePanelView id="debug-exec-panel">
           <ExecMapView {...{ state: debugState as DebugState }} />
