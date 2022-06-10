@@ -7,3 +7,7 @@ let eq ox y =
   match ox with
   | Some x -> x = y
   | None -> false
+
+let calc f = function
+  | Some x -> x
+  | None -> f ()
