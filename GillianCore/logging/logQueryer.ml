@@ -11,9 +11,12 @@ let get_report report_id =
 let get_previous_report_id cur_report_id =
   with_enabled (fun () -> LogDatabase.get_previous_report_id cur_report_id)
 
-let get_next_report_ids cur_report_id =
-  with_enabled (fun () -> Some (LogDatabase.get_next_report_ids cur_report_id))
+let get_next_reports id =
+  with_enabled (fun () -> Some (LogDatabase.get_next_reports id))
   |> Option.value ~default:[]
+
+let get_next_report_ids cur_report_id =
+  get_next_reports cur_report_id |> List.map (fun (id, _, _) -> id)
 
 let get_next_report_id cur_report_id =
   match get_next_report_ids cur_report_id with
