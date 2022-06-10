@@ -1,4 +1,4 @@
-import { MessageFromWebview, MessageToWebview } from '../../types';
+import { BranchCase, MessageFromWebview, MessageToWebview } from '../../types';
 
 declare const acquireVsCodeApi: () => VSCodeApi;
 
@@ -32,6 +32,18 @@ class VSCodeWrapper {
     return () => window.removeEventListener('message', callback);
   }
 }
+
+export const execSpecific = (prevId: number, branchCase: BranchCase) => {
+  VSCodeAPI.postMessage({
+    type: 'request_exec_specific',
+    prevId,
+    branchCase,
+  });
+};
+
+export const jumpToId = (id: number) => {
+  VSCodeAPI.postMessage({ type: 'request_jump', cmdId: id });
+};
 
 // Singleton to prevent multiple fetches of VsCodeAPI.
 const VSCodeAPI: VSCodeWrapper = new VSCodeWrapper();

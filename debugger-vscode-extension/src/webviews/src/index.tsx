@@ -7,10 +7,26 @@ import VSCodeAPI from './VSCodeAPI';
 
 VSCodeAPI.onMessage(e => {
   const message = e.data;
+  const store = useDebugStore.getState();
+
   if (message.type === 'state_update') {
-    useDebugStore.setState({
-      state: message.state,
-    });
+    store.updateDebugState(message.state);
+    const { unifyId } = message.state;
+    if (unifyId) {
+      const isInStore = store.selectBaseUnification(unifyId);
+      if (!isInStore) {
+        VSCodeAPI.postMessage({
+          type: 'request_unification',
+          id: unifyId,
+        });
+      }
+    } else {
+      store.clearUnification();
+    }
+  }
+
+  if (message.type === 'unify_update') {
+    store.loadUnification(message.unifyId, message.unifyMap);
   }
 });
 

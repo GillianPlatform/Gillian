@@ -4,6 +4,7 @@ import TreeMapView, {
   TransformResult,
   TransformFunc,
 } from '../TreeMapView/TreeMapView';
+import { execSpecific, jumpToId } from '../VSCodeAPI';
 import ExecMapNode, { ExecMapNodeData } from './ExecMapNode';
 
 export type Props = {
@@ -35,8 +36,9 @@ const ExecMapView = ({ state }: Props) => {
         id: `empty${emptyCount++}`,
         data: {
           type: 'Empty',
-          prevId: +parent,
-          branchCase,
+          exec: () => {
+            execSpecific(+parent, branchCase as BranchCase);
+          },
         },
         nexts: [],
         edgeLabel,
@@ -60,6 +62,9 @@ const ExecMapView = ({ state }: Props) => {
         cmdData,
         isCurrentCmd: cmdData.id === currentCmdId,
         isFinal: map[0] === 'FinalCmd',
+        jump: () => {
+          jumpToId(cmdData.id);
+        },
       },
       nexts,
       edgeLabel,

@@ -66,7 +66,7 @@ export class WebviewPanel {
     } else if (e.type === 'request_exec_specific') {
       await debug.execSpecificCmd(e.prevId, e.branchCase);
     } else if (e.type === 'request_unification') {
-      const unifyData = await debug.getUnification(e.parentId);
+      const unifyData = await debug.getUnification(e.id);
       if (unifyData !== undefined) {
         const [unifyId, unifyMap] = unifyData;
         this.updateUnification(unifyId, unifyMap);

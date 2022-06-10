@@ -162,17 +162,12 @@ export async function getDebugState() {
 }
 
 export async function getUnification(
-  parentId: number
+  id: number
 ): Promise<[number, UnifyMap] | undefined> {
   const session = vscode.debug.activeDebugSession;
   if (session !== undefined) {
-    const result = await session.customRequest('unification', { parentId });
-    if (!result.success) {
-      vscode.window.showErrorMessage(
-        result.err || 'getUnification: unknown error'
-      );
-    }
-    const { unifyId, unifyMap } = result.data;
+    const result = await session.customRequest('unification', { id });
+    const { unifyId, unifyMap } = result;
     return [unifyId, unifyMap];
   }
 }

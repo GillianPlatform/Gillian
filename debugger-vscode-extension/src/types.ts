@@ -1,68 +1,109 @@
+// #region ExecMap
+
 export type BranchCase = {
-  kind: string;
-  display: [string, string];
-  json: any;
+  readonly kind: string;
+  readonly display: [string, string];
+  readonly json: any;
 };
 
 export type CmdData = {
-  id: number;
-  display: string;
-  hasUnify: boolean;
+  readonly id: number;
+  readonly display: string;
+  readonly unifyResult: UnifyResult;
 };
 
 export type ExecMap =
-  | ['Nothing']
-  | ['Cmd', CmdData, ExecMap]
-  | ['BranchCmd', CmdData, [BranchCase, ExecMap][]]
-  | ['FinalCmd', CmdData];
+  | readonly ['Nothing']
+  | readonly ['Cmd', CmdData, ExecMap]
+  | readonly ['BranchCmd', CmdData, [BranchCase, ExecMap][]]
+  | readonly ['FinalCmd', CmdData];
+
+// #endregion
+
+// #region UnifyMap
+
+export type UnifyResult = readonly ['Success' | 'Failure'];
 
 export type AssertionData = {
-  foldId: number;
+  readonly id: number;
+  readonly fold: readonly [number, UnifyResult] | null;
+  readonly assertion: string;
+  readonly substitutions: readonly [string, string][];
 };
 
 export type UnifySeg =
-  | ['Assertion', AssertionData, UnifySeg]
-  | ['UnifyResult', boolean];
+  | readonly ['Assertion', AssertionData, UnifySeg]
+  | readonly ['UnifyResult', number, UnifyResult];
 
-export type UnifyMap = ['Direct', UnifySeg] | ['Fold', UnifySeg[]];
+export type UnifyMap =
+  | readonly ['Direct', UnifySeg]
+  | readonly ['Fold', UnifySeg[]];
+
+// #endregion
 
 export type DebugState = {
-  execMap: ExecMap;
-  currentCmdId: number;
-  procName: string;
+  readonly execMap: ExecMap;
+  readonly currentCmdId: number;
+  readonly unifyId: number | null;
+  readonly procName: string;
 };
 
+export type UnifyStep =
+  | readonly ['Assertion', AssertionData]
+  | readonly ['Result', number, UnifyResult];
+
+export type Unification = {
+  readonly map: unknown;  // TODO: fix when Immer supports recursive types
+  readonly selected?: UnifyStep;
+};
+
+export type UnifyState = {
+  readonly path: number[];
+  readonly unifications: Record<number, Unification | undefined>;
+};
+
+export type State = {
+  readonly debugState?: DebugState;
+  readonly unifyState: UnifyState;
+};
+
+// #region MessageToWebview
+
 type StateUpdateMsg = {
-  type: 'state_update';
-  state: DebugState;
+  readonly type: 'state_update';
+  readonly state: DebugState;
 };
 
 type UnifyUpdateMsg = {
-  type: 'unify_update';
-  unifyId: number;
-  unifyMap: UnifyMap;
+  readonly type: 'unify_update';
+  readonly unifyId: number;
+  readonly unifyMap: UnifyMap;
 };
 
 export type MessageToWebview = StateUpdateMsg | UnifyUpdateMsg;
 
+// #endregion
+
+// #region MessageFromWebiew
+
 type RequestStateUpdateMsg = {
-  type: 'request_state_update';
+  readonly type: 'request_state_update';
 };
 
 type RequestJump = {
-  type: 'request_jump';
-  cmdId: number;
+  readonly type: 'request_jump';
+  readonly cmdId: number;
 };
 
 type RequestExecSpecific = {
-  type: 'request_exec_specific';
-  prevId: number;
-  branchCase: BranchCase | null;
+  readonly type: 'request_exec_specific';
+  readonly prevId: number;
+  readonly branchCase: BranchCase | null;
 };
 
 type RequestUnification = {
-  type: 'request_unification';
-  parentId: number;
+  readonly type: 'request_unification';
+  readonly id: number;
 };
 
 export type MessageFromWebview =
@@ -70,3 +111,5 @@ export type MessageFromWebview =
   | RequestJump
   | RequestExecSpecific
   | RequestUnification;
+
+// #endregion

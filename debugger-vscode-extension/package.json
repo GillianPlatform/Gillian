@@ -79,6 +79,7 @@
     "@vscode/codicons": "^0.0.30",
     "@vscode/debugadapter": "^1.55.1",
     "@vscode/webview-ui-toolkit": "^0.9.0",
+    "allotment": "^1.14.2",
     "cronstrue": "^1.123.0",
     "immer": "^9.0.1",
     "isomorphic-fetch": "^3.0.0",

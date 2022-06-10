@@ -10,7 +10,7 @@ import ReactFlow, {
 import './TreeMapView.css';
 
 export type TransformResult<M, D, A> = {
-  id: string;
+  id: string | number;
   data: D;
   nexts: [A, M][];
   edgeLabel?: React.ReactNode;
@@ -29,7 +29,7 @@ export type Props<M, D, A> = {
 };
 
 type IntermediateElem<D> = {
-  id: string;
+  id: string | number;
   depth: number;
   nthInDepth: number;
   data: D;
@@ -70,17 +70,17 @@ const TreeMapView = <M, D, A>({
     edges.push({
       id: `edge-${parent}-${id}`,
       source: parent,
-      target: id,
+      target: `${id}`,
       ...(edgeLabel ? { label: edgeLabel } : {}),
     });
 
     for (const [aux, nextMap] of nexts) {
-      buildElems(nextMap, aux, id, depth + 1);
+      buildElems(nextMap, aux, `${id}`, depth + 1);
     }
   };
 
   for (const [aux, nextMap] of initElem.nexts) {
-    buildElems(nextMap, aux, initElem.id, 1);
+    buildElems(nextMap, aux, `${initElem.id}`, 1);
   }
 
   const maxWidth = Math.max(...depthCounts);
@@ -92,7 +92,7 @@ const TreeMapView = <M, D, A>({
         NODE_WIDTH / 2;
       const y = depth * (NODE_HEIGHT + NODE_GAP_Y) + NODE_GAP_Y;
       return {
-        id,
+        id: `${id}`,
         position: { x, y },
         type: 'customNode',
         data,

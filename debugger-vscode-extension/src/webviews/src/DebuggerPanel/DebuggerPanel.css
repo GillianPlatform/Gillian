@@ -1,0 +1,19 @@
+
+.debugger-panel {
+  position: absolute;
+  width: 100vw;
+  height: 100vh;
+  top: 0;
+  left: 0;
+  padding-left: 5px;
+  box-sizing: border-box;
+}
+
+.debugger-panel vscode-panels {
+  height: 100%;
+}
+
+.debugger-panel vscode-panel-view {
+  height: 100%;
+  padding: 0
+}
