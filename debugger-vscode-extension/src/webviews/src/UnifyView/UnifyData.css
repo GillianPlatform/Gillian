@@ -15,13 +15,19 @@
 }
 
 .subst-grid {
-  width: fit-content
+  width: fit-content;
 }
 
 .subst-expr {
-  overflow: hidden
+  overflow: hidden;
 }
 
 .subst-val {
-  overflow: hidden
+  overflow: hidden;
+}
+
+.unify-link {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
 }

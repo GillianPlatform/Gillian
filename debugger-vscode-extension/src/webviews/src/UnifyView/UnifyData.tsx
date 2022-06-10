@@ -1,4 +1,4 @@
-import { VSCodeButton, VSCodeDataGrid, VSCodeDataGridCell, VSCodeDataGridRow, VSCodeDivider } from '@vscode/webview-ui-toolkit/react';
+import { VSCodeButton, VSCodeDataGrid, VSCodeDataGridCell, VSCodeDataGridRow, VSCodeDivider, VSCodeLink } from '@vscode/webview-ui-toolkit/react';
 import React from 'react';
 import useStore, { mutateStore } from '../store';
 import VSCodeAPI from '../VSCodeAPI';
@@ -6,10 +6,52 @@ import VSCodeAPI from '../VSCodeAPI';
 import './UnifyData.css';
 
 const UnifyData = () => {
+  const procName = useStore((store) => store.debugState?.procName || '');
   const { path, unifications } = useStore((store) => store.unifyState);
-  const { pushUnification } = mutateStore();
+  const { pushUnification, popUnifications } = mutateStore();
 
   const selectedStep = unifications[path[0]]?.selected;
+
+  const unifyNames = [(
+    <>
+      <span>
+        Unify <span className='code'>{procName}</span>
+      </span>
+    </>
+  )];
+  for (let i = path.length-1; i > 0; i--) {
+    const unifyId = path[i];
+    const unification = unifications[unifyId];
+    if (!unification || !unification.selected || unification.selected[0] !== 'Assertion') {
+      console.error('UnifyData: malformed state', { path, unifyId, unification });
+      continue;
+    }
+    const { assertion } = unification.selected[1];
+
+    unifyNames.push((
+      <span className='code'>{assertion}</span>
+    ));
+  }
+  const unifyLinks = unifyNames.map((name, i) => {
+    let link = i > path.length-2 ? name : (
+      <VSCodeLink onClick={() => { popUnifications(path.length-i-1); }}>
+        {name}
+      </VSCodeLink>
+    );
+    if (i > 0) {
+      link = (
+        <>
+          <div className="codicon codicon-arrow-right" />
+          {link}
+        </>
+      );
+    }
+    return (
+      <div key={`${i}`} className="unify-link">
+        {link}
+      </div>
+    );
+  });
 
   let stepInFoldButton = <></>;
   let subst = <></>;
@@ -55,10 +97,14 @@ const UnifyData = () => {
               substitutions.map(([expr, val]) => (
                 <VSCodeDataGridRow key={expr}>
                   <VSCodeDataGridCell gridColumn="1" className='subst-expr'>
-                    <b><pre>{expr}</pre></b>
+                    <span className="code">
+                      <b>{expr}</b>
+                    </span>
                   </VSCodeDataGridCell>
                   <VSCodeDataGridCell gridColumn="2" className='subst-val'>
-                    <pre>{val}</pre>
+                    <span className="code">
+                      {val}
+                    </span>
                   </VSCodeDataGridCell>
                 </VSCodeDataGridRow>
               ))
@@ -72,8 +118,9 @@ const UnifyData = () => {
   return (
     <div className='unify-data-wrap'>
       <div className='unify-data'>
-        (unify path here)
-        <br/>
+        <p>
+          {unifyLinks}
+        </p>
         {stepInFoldButton}
         
         <VSCodeDivider />
