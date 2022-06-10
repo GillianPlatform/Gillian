@@ -72,6 +72,8 @@ module type S = sig
   (** Convert substitution to list *)
   val to_list : t -> (Expr.t * vt) list
 
+  val to_list_pp : t -> (string * string) list
+
   (** Substitution inside a logical expression *)
   val subst_in_expr : t -> partial:bool -> Expr.t -> Expr.t
 
@@ -324,6 +326,11 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   *)
   let to_list (subst : t) : (Expr.t * vt) list =
     Hashtbl.fold (fun e e_val ac -> (e, e_val) :: ac) subst []
+
+  let to_list_pp (subst : t) : (string * string) list =
+    subst |> to_list
+    |> List.map (fun (e, e_val) ->
+           (Fmt.str "%a" Expr.pp e, Fmt.str "%a" Val.pp e_val))
 
   let substitutor =
     object (self)

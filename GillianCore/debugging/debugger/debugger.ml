@@ -6,6 +6,8 @@ module DebuggerUtils = DebuggerUtils
 open DebuggerTypes
 open Syntaxes.Option
 
+type rid = L.ReportId.t [@@deriving show, yojson]
+
 let ( let** ) = Result.bind
 let ( let++ ) f o = Result.map o f
 
@@ -17,27 +19,23 @@ module type S = sig
     type t [@@deriving yojson]
   end
 
-  module ExecMap : sig
-    type 'a t [@@deriving yojson]
-  end
-
   module UnifyMap : sig
     type t [@@deriving yojson]
+  end
+
+  module ExecMap : sig
+    type 'a t [@@deriving yojson]
   end
 
   module Inspect : sig
     type debug_state [@@deriving yojson]
 
     val get_debug_state : debugger_state -> debug_state
-
-    val get_unification :
-      L.ReportId.t ->
-      debugger_state ->
-      (L.ReportId.t * UnifyMap.t, string) result
+    val get_unification : rid -> debugger_state -> rid * UnifyMap.t
   end
 
   val launch : string -> string option -> (debugger_state, string) result
-  val jump_to_id : L.ReportId.t -> debugger_state -> (unit, string) result
+  val jump_to_id : rid -> debugger_state -> (unit, string) result
   val jump_to_start : debugger_state -> unit
   val step_in : ?reverse:bool -> debugger_state -> stop_reason
   val step : ?reverse:bool -> debugger_state -> stop_reason
@@ -100,11 +98,166 @@ struct
       |> Result.map_error (fun _ -> "Malformed branch case json!")
   end
 
+  module UnifyMap = struct
+    open Verification.SUnifier.Logging
+
+    type unify_result = Success | Failure [@@deriving yojson]
+
+    type assertion_data = {
+      id : rid;
+      fold : (rid * unify_result) option;
+      assertion : string;
+      substitutions : (string * string) list;
+    }
+    [@@deriving yojson]
+
+    type unify_seg =
+      | Assertion of assertion_data * unify_seg
+      | UnifyResult of rid * unify_result
+    [@@deriving yojson]
+
+    type t = Direct of unify_seg | Fold of unify_seg list [@@deriving yojson]
+
+    let result_of_id id =
+      let rec aux id =
+        let children = L.LogQueryer.get_children_of id in
+        if children = [] then
+          Fmt.failwith "UnifyMap.result_of_id: report %a has no children!"
+            pp_rid id;
+        match
+          children
+          |> List.find_opt (fun (_, type_, _) ->
+                 type_ = ContentType.unify_result)
+        with
+        | Some (_, _, content) -> (
+            let result_report =
+              content |> Yojson.Safe.from_string |> UnifyResultReport.of_yojson
+              |> Result.get_ok
+            in
+            match result_report with
+            | Success _ -> true
+            | Failure _ -> false)
+        | None -> children |> List.exists (fun (id, _, _) -> aux id)
+      in
+      if aux id then Success else Failure
+
+    let rec seg_result = function
+      | Assertion (_, next) -> seg_result next
+      | UnifyResult (_, result) -> result
+
+    let result = function
+      | Direct seg -> seg_result seg
+      | Fold segs ->
+          if segs |> List.exists (fun seg -> seg_result seg = Success) then
+            Success
+          else Failure
+
+    let rec build_seg (id, type_, content) : unify_seg =
+      let module Subst = Verification.SUnifier.ESubst in
+      if type_ = ContentType.assertion then
+        let asrt_report =
+          content |> Yojson.Safe.from_string |> AssertionReport.of_yojson
+          |> Result.get_ok
+        in
+        let assertion =
+          let asrt, _ = asrt_report.step in
+          Fmt.str "%a" Asrt.pp asrt
+        in
+        let substitutions = asrt_report.subst |> Subst.to_list_pp in
+        let fold =
+          let+ child_id, type_, _ =
+            match L.LogQueryer.get_children_of id with
+            | [] -> None
+            | [ child ] -> Some child
+            | _ ->
+                Fmt.failwith
+                  "UnifyMap.build_seg: assertion %a has multiple children!"
+                  pp_rid id
+          in
+          if type_ <> ContentType.unify then
+            Fmt.failwith
+              "UnifyMap.build_seg: report %a (child of assertion %a) has type \
+               %s (expected %s)!"
+              pp_rid child_id pp_rid id type_ ContentType.unify;
+          (child_id, result_of_id child_id)
+        in
+        let seg =
+          match L.LogQueryer.get_next_report_ids id with
+          | [] ->
+              Fmt.failwith "UnifyMap.build_seg: assertion %a has no next!"
+                pp_rid id
+          | [ next_id ] ->
+              let content, type_ =
+                L.LogQueryer.get_report next_id |> Option.get
+              in
+              build_seg (next_id, type_, content)
+          | _ ->
+              Fmt.failwith
+                "UnifyMap.build_seg: assertion %a has multiple nexts!" pp_rid id
+        in
+        Assertion ({ id; fold; assertion; substitutions }, seg)
+      else if type_ = ContentType.unify_result then
+        let result_report =
+          content |> Yojson.Safe.from_string |> UnifyResultReport.of_yojson
+          |> Result.get_ok
+        in
+        let result =
+          match result_report with
+          | Success _ -> Success
+          | Failure _ -> Failure
+        in
+        UnifyResult (id, result)
+      else
+        Fmt.failwith
+          "UnifyMap.build_seg: report %a has invalid type (%s) for unify_seg!"
+          pp_rid id type_
+
+    let build_case id : unify_seg =
+      match L.LogQueryer.get_children_of ~roots_only:true id with
+      | [] ->
+          Fmt.failwith "UnifyMap.build_case: id %a has no children!" pp_rid id
+      | [ child ] -> build_seg child
+      | _ ->
+          Fmt.failwith "UnifyMap.build_case: id %a has multiple children!"
+            pp_rid id
+
+    let build_cases id : unify_seg list =
+      let rec aux id acc =
+        let acc = build_case id :: acc in
+        match L.LogQueryer.get_next_reports id with
+        | [] -> acc
+        | [ (id, type_, _) ] ->
+            if type_ <> ContentType.unify_case then
+              Fmt.failwith "UnifyMap.build_cases: %a has type %s (expected %s)!"
+                pp_rid id type_ ContentType.unify_case
+            else aux id acc
+        | _ ->
+            Fmt.failwith
+              "UnifyMap.build_cases: unify_case %a has multiple nexts!" pp_rid
+              id
+      in
+
+      aux id [] |> List.rev
+
+    let build unify_id =
+      match L.LogQueryer.get_children_of ~roots_only:true unify_id with
+      | [] | _ :: _ :: _ ->
+          Fmt.failwith "UnifyMap.build: unify id %a should have one root child!"
+            pp_rid unify_id
+      | [ (id, type_, _) ] ->
+          if type_ = ContentType.unify_case then
+            let segs = build_cases id in
+            Fold segs
+          else
+            let seg = build_case unify_id in
+            Direct seg
+  end
+
   module ExecMap = struct
     type cmd_data = {
-      id : L.ReportId.t;
+      id : rid;
       display : string;
-      has_unify : bool; [@key "hasUnify"]
+      unify_result : UnifyMap.unify_result option; [@key "unifyResult"]
     }
     [@@deriving yojson]
 
@@ -124,28 +277,23 @@ struct
       | Some cases -> Branch cases
       | None -> Normal
 
-    let insert_cmd_sourceless
-        cmd_kind
-        new_id
-        display
-        ?(has_unify = false)
-        path
-        map =
+    let insert_cmd_sourceless cmd_kind new_id display ?unify_result path map =
       let fail () =
         DL.failwith
           (fun () ->
             [
               ("cmd_type", cmd_kind_to_yojson cmd_kind);
-              ("new_id", L.ReportId.to_yojson new_id);
+              ("new_id", rid_to_yojson new_id);
               ("display", `String display);
-              ("has_unify", `Bool has_unify);
+              ( "unify_result",
+                opt_to_yojson UnifyMap.unify_result_to_yojson unify_result );
               ("path", branch_path_to_yojson path);
               ("map", to_yojson branch_case_to_yojson map);
             ])
           "ExecMap.insert_cmd: malformed request"
       in
 
-      let cmd_data = { id = new_id; display; has_unify } in
+      let cmd_data = { id = new_id; display; unify_result } in
 
       let rec aux path map =
         match (map, path) with
@@ -177,19 +325,19 @@ struct
         cmd_kind
         new_id
         display
-        ?(has_unify = false)
+        ?unify_result
         path
         new_source
         ((source, map) : 'a with_source) =
       let insert () =
-        insert_cmd_sourceless cmd_kind new_id display ~has_unify path map
+        insert_cmd_sourceless cmd_kind new_id display ?unify_result path map
       in
       match source with
       | None -> (Some new_source, insert ())
       | Some source ->
           if new_source == source then (Some source, insert ())
           else (
-            DL.log (fun m -> m "TRIED TO INSERT %a" L.ReportId.pp new_id);
+            DL.log (fun m -> m "TRIED TO INSERT %a" pp_rid new_id);
             (Some source, map))
 
     let path_of_id_opt selected_id =
@@ -277,7 +425,7 @@ struct
     let path_of_id id map =
       match path_of_id_opt id map with
       | Some path -> path
-      | None -> Fmt.failwith "ID %a doesn't exist in exec map!" L.ReportId.pp id
+      | None -> Fmt.failwith "ID %a doesn't exist in exec map!" pp_rid id
 
     let rec package = function
       | Nothing -> Nothing
@@ -301,104 +449,6 @@ struct
 
   type exec_map = branch_case ExecMap.with_source
 
-  module UnifyMap = struct
-    module ULogging = Verification.SUnifier.Logging
-
-    type assertion_data = { fold_id : L.ReportId.t option } [@@deriving yojson]
-
-    type unify_seg =
-      | Assertion of assertion_data * unify_seg
-      | UnifyResult of bool
-    [@@deriving yojson]
-
-    type t = Direct of unify_seg | Fold of unify_seg list [@@deriving yojson]
-
-    let rec build_seg (id, type_, content) : unify_seg =
-      if type_ = ContentType.assertion then
-        (* let assertion = content |> Yojson.Safe.from_string |> ULogging.Assertion.of_yojson in *)
-        let fold_id =
-          let+ child_id, type_, _ =
-            match L.LogQueryer.get_children_of id with
-            | [] -> None
-            | [ child ] -> Some child
-            | _ ->
-                Fmt.failwith
-                  "UnifyMap.build_seg: assertion %a has multiple children!"
-                  L.ReportId.pp id
-          in
-          if type_ <> ContentType.unify then
-            Fmt.failwith
-              "UnifyMap.build_seg: report %a (child of assertion %a) has type \
-               %s (expected %s)!"
-              L.ReportId.pp child_id L.ReportId.pp id type_ ContentType.unify;
-          child_id
-        in
-        let seg =
-          match L.LogQueryer.get_next_report_ids id with
-          | [] ->
-              Fmt.failwith "UnifyMap.build_seg: assertion %a has no next!"
-                L.ReportId.pp id
-          | [ next_id ] ->
-              let content, type_ =
-                L.LogQueryer.get_report next_id |> Option.get
-              in
-              build_seg (next_id, content, type_)
-          | _ ->
-              Fmt.failwith
-                "UnifyMap.build_seg: assertion %a has multiple nexts!"
-                L.ReportId.pp id
-        in
-        Assertion ({ fold_id }, seg)
-      else if type_ = ContentType.unify_result then
-        let result =
-          content |> Yojson.Safe.from_string
-          |> ULogging.UnifyResultReport.of_yojson |> Result.get_ok
-        in
-        let success =
-          match result with
-          | Success _ -> true
-          | Failure _ -> false
-        in
-        UnifyResult success
-      else
-        Fmt.failwith
-          "UnifyMap.build_seg: report %a has invalid type (%s) for unify_seg!"
-          L.ReportId.pp id type_
-
-    let build_case id : unify_seg =
-      match L.LogQueryer.get_children_of ~roots_only:true id with
-      | [] ->
-          Fmt.failwith "UnifyMap.build_case: id %a has no children!"
-            L.ReportId.pp id
-      | [ child ] -> build_seg child
-      | _ ->
-          Fmt.failwith "UnifyMap.build_case: id %a has multiple children!"
-            L.ReportId.pp id
-
-    let build unify_id =
-      match L.LogQueryer.get_children_of ~roots_only:true unify_id with
-      | [] ->
-          Fmt.failwith "UnifyMap.build: unify id %a has no children!"
-            L.ReportId.pp unify_id
-      | (_, type_, _) :: _ as children ->
-          if type_ = ContentType.unify_case then
-            let segs =
-              children
-              |> List.map (fun (id, type_, _) ->
-                     if type_ <> ContentType.unify_case then
-                       Fmt.failwith
-                         "UnifyMap.build: id %a (child of %a) is %s - expected \
-                          %s!"
-                         L.ReportId.pp id L.ReportId.pp unify_id type_
-                         ContentType.unify_case;
-                     build_case id)
-            in
-            Fold segs
-          else
-            let seg = build_case unify_id in
-            Direct seg
-  end
-
   type debugger_state = {
     source_file : string;
     source_files : SourceFiles.t option;
@@ -407,7 +457,7 @@ struct
     tests : (string * Verification.t) list;
     mutable cont_func : result_t cont_func_f option;
     mutable breakpoints : breakpoints;
-    mutable cur_report_id : L.ReportId.t;
+    mutable cur_report_id : rid;
     (* TODO: The below fields only depend on the
              cur_report_id and could be refactored to use this *)
     mutable top_level_scopes : scope list;
@@ -417,7 +467,7 @@ struct
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
     mutable exec_map : exec_map;
     mutable proc_name : string option;
-    mutable unify_maps : (L.ReportId.t * UnifyMap.t) list;
+    mutable unify_maps : (rid * UnifyMap.t) list;
   }
 
   module Inspect = struct
@@ -439,28 +489,24 @@ struct
 
     type debug_state = {
       exec_map : exec_map_pkg; [@key "execMap"]
-      current_cmd_id : L.ReportId.t; [@key "currentCmdId"]
+      current_cmd_id : rid; [@key "currentCmdId"]
+      unify_id : rid option; [@key "unifyId"]
       proc_name : string; [@key "procName"]
     }
     [@@deriving yojson]
 
     let get_debug_state dbg : debug_state =
       let current_cmd_id = dbg.cur_report_id in
+      let unify_id = L.LogQueryer.get_unify_for dbg.cur_report_id in
       let exec_map = get_exec_map_pkg dbg in
       let proc_name =
         match dbg |> get_proc_name with
         | None -> "unknown proc"
         | Some proc_name -> proc_name
       in
-      { exec_map; current_cmd_id; proc_name }
+      { exec_map; current_cmd_id; unify_id; proc_name }
 
-    let get_unification parent_id dbg =
-      let++ unify_id =
-        match L.LogQueryer.get_unify_for parent_id with
-        | Some id -> Ok id
-        | None ->
-            Fmt.error "Report %a has no unification!" L.ReportId.pp parent_id
-      in
+    let get_unification unify_id dbg =
       match dbg.unify_maps |> List.assoc_opt unify_id with
       | Some map -> (unify_id, map)
       | None ->
@@ -649,7 +695,7 @@ struct
         Fmt.failwith
           "Unable to find report id '%a'. Check the logging level is set \
            correctly"
-          L.ReportId.pp report_id
+          pp_rid report_id
     | Some (content, type_) -> (
         DL.show_report report_id ("Debugger.update...: Got report type " ^ type_);
         match type_ with
@@ -789,18 +835,21 @@ struct
         match L.LogQueryer.get_unify_for prev_id with
         | Some _ ->
             DL.log (fun m ->
-                m "Unification for %a already exists; skipping unify"
-                  L.ReportId.pp prev_id)
+                m "Unification for %a already exists; skipping unify" pp_rid
+                  prev_id);
+            None
         | None -> (
-            DL.log (fun m -> m "Unifying result for %a" L.ReportId.pp prev_id);
-            let _ = Verification.Debug.analyse_result test prev_id result in
+            DL.log (fun m -> m "Unifying result for %a" pp_rid prev_id);
+            let success =
+              Verification.Debug.analyse_result test prev_id result
+            in
             match L.LogQueryer.get_unify_for prev_id with
             | None -> failwith "No unify report found!"
-            | Some _ -> ()))
+            | Some _ -> Some UnifyMap.(if success then Success else Failure)))
 
   let jump_to_id id dbg =
     try
-      DL.log (fun m -> m "Jumping to id %a" L.ReportId.pp id);
+      DL.log (fun m -> m "Jumping to id %a" pp_rid id);
       dbg.exec_map |> snd |> ExecMap.path_of_id id |> ignore;
       update_report_id_and_inspection_fields id dbg;
       Ok ()
@@ -818,7 +867,7 @@ struct
     | Error msg -> failwith msg
     | Ok () -> ()
 
-  let rec execute_step prev_id_in_frame ?branch_case dbg =
+  let rec execute_step prev_id_in_frame ?branch_case ?prev_branch_path dbg =
     let open Verification.SAInterpreter in
     match dbg.cont_func with
     | None ->
@@ -829,20 +878,27 @@ struct
             m
               ~json:
                 [
-                  ("id", L.ReportId.to_yojson dbg.cur_report_id);
+                  ("id", rid_to_yojson dbg.cur_report_id);
                   ( "map",
                     dbg.exec_map |> snd
                     |> ExecMap.to_yojson branch_case_to_yojson );
                 ]
               "Grabbing path for step...");
         let branch_path =
-          dbg.exec_map |> snd |> ExecMap.path_of_id prev_id_in_frame
-        in
-        let branch_path =
-          match branch_case with
-          | Some case -> case :: branch_path
-          | None ->
-              dbg.exec_map |> snd |> ExecMap.next_paths branch_path |> List.hd
+          prev_branch_path
+          |> Option_utils.calc (fun () ->
+                 let path_to_id =
+                   dbg.exec_map |> snd |> ExecMap.path_of_id prev_id_in_frame
+                 in
+                 let full_path =
+                   match branch_case with
+                   | Some case -> case :: path_to_id
+                   | None ->
+                       dbg.exec_map |> snd
+                       |> ExecMap.next_paths path_to_id
+                       |> List.hd
+                 in
+                 full_path)
         in
         DL.log (fun m ->
             m ~json:[ ("path", branch_path_to_yojson branch_path) ] "Got path");
@@ -863,15 +919,21 @@ struct
                   |> Logging.ConfigReport.of_yojson |> Result.get_ok
                 in
                 let proc_name = (List.hd cmd.callstack).pid in
-                unify result proc_name prev_id dbg;
+                let unify_result = unify result proc_name prev_id dbg in
+                let cmd_display = cmd.cmd in
+                dbg.exec_map <-
+                  (dbg.exec_map
+                  |> ExecMap.(
+                       let source_file = (List.hd dbg.frames).source_path in
+                       insert_cmd Final prev_id cmd_display ?unify_result
+                         branch_path source_file));
                 update_report_id_and_inspection_fields prev_id dbg
-                (* DL.log (fun m -> m "--- premature step ---"); (unify_id) |> ignore *)
             | Some (prev_id, _, type_) ->
                 Fmt.failwith "EndOfBranch: prev cmd (%a) is '%s', not '%s'!"
-                  L.ReportId.pp prev_id type_ ContentType.cmd
+                  pp_rid prev_id type_ ContentType.cmd
             | None ->
-                Fmt.failwith "EndOfBranch: prev id '%a' doesn't exist!"
-                  L.ReportId.pp prev_id_in_frame);
+                Fmt.failwith "EndOfBranch: prev id '%a' doesn't exist!" pp_rid
+                  prev_id_in_frame);
             ReachedEnd
         | Continue (cur_report_id, branch_path, new_branch_cases, cont_func)
           -> (
@@ -894,21 +956,8 @@ struct
                           m
                             "No results for cmd; assuming eob, stepping \
                              again...");
-                      let cmd =
-                        Result.get_ok
-                          (content |> Yojson.Safe.from_string
-                         |> Logging.ConfigReport.of_yojson)
-                      in
-                      let cmd_display = cmd.cmd in
-                      dbg.exec_map <-
-                        (dbg.exec_map
-                        |> ExecMap.(
-                             let source_file =
-                               (List.hd dbg.frames).source_path
-                             in
-                             insert_cmd Final cur_report_id cmd_display
-                               ~has_unify:true branch_path source_file));
-                      execute_step cur_report_id dbg
+                      execute_step ~prev_branch_path:branch_path cur_report_id
+                        dbg
                   | _ ->
                       update_report_id_and_inspection_fields cur_report_id dbg;
                       ExecMap.(
@@ -924,14 +973,29 @@ struct
                           | None -> Normal
                         in
                         let source_file = (List.hd dbg.frames).source_path in
-                        let has_unify =
-                          L.LogQueryer.get_unify_for cur_report_id
-                          |> Option.is_some
+                        let unify_result =
+                          DL.log (fun m ->
+                              m "getting unify_result for %a" pp_rid
+                                cur_report_id);
+                          let+ unify_id =
+                            L.LogQueryer.get_unify_for cur_report_id
+                          in
+                          DL.log (fun m -> m "got unify ID");
+                          let unify_map =
+                            match dbg.unify_maps |> List.assoc_opt unify_id with
+                            | Some map -> map
+                            | None ->
+                                let map = UnifyMap.build unify_id in
+                                dbg.unify_maps <-
+                                  (unify_id, map) :: dbg.unify_maps;
+                                map
+                          in
+                          unify_map |> UnifyMap.result
                         in
                         dbg.exec_map <-
                           dbg.exec_map
                           |> insert_cmd cmd_kind cur_report_id cmd_display
-                               ~has_unify branch_path source_file);
+                               ?unify_result branch_path source_file);
                       Step)))
 
   let step_in_branch_case prev_id_in_frame ?branch_case ?(reverse = false) dbg =
@@ -996,7 +1060,7 @@ struct
   let rec step_until_cond
       ?(reverse = false)
       ?(branch_case : branch_case option)
-      (prev_id_in_frame : L.ReportId.t)
+      (prev_id_in_frame : rid)
       (prev_frame : frame)
       (prev_stack_depth : int)
       (cond : frame -> frame -> int -> int -> bool)
@@ -1073,7 +1137,7 @@ struct
         m
           ~json:
             [
-              ("current_id", L.ReportId.to_yojson current_id);
+              ("current_id", rid_to_yojson current_id);
               ("path", branch_path_to_yojson branch_path);
               ( "map",
                 dbg.exec_map |> snd |> ExecMap.to_yojson branch_case_to_yojson
@@ -1101,7 +1165,7 @@ struct
                       m
                         ~json:
                           [
-                            ("prev_id", L.ReportId.to_yojson prev_id);
+                            ("prev_id", rid_to_yojson prev_id);
                             ("", opt_to_yojson branch_case_to_yojson branch_case);
                           ]
                         "Debugger.run: found unfinished path");

@@ -62,20 +62,13 @@ module Commands (Debugger : Debugger.S) = struct
     let type_ = "unification"
 
     module Arguments = struct
-      type t = { parentId : L.ReportId.t } [@@deriving yojson]
+      type t = { id : L.ReportId.t } [@@deriving yojson]
     end
 
     module Result = struct
-      type data = {
+      type t = {
         unify_id : L.ReportId.t; [@key "unifyId"]
         unify_map : Debugger.UnifyMap.t; [@key "unifyMap"]
-      }
-      [@@deriving yojson]
-
-      type t = {
-        success : bool;
-        data : data option; [@default None]
-        err : string option; [@default None]
       }
       [@@deriving yojson, make]
     end
