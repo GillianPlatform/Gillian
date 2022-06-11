@@ -1,9 +1,7 @@
-import React, { FC } from 'react';
-import { Handle, NodeProps, Position } from 'react-flow-renderer';
+import React, { ReactNode } from 'react';
+import { NodeProps } from 'react-flow-renderer';
 import { VSCodeBadge, VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 import { AssertionData, UnifyResult } from '../../../types';
-import VSCodeAPI from '../VSCodeAPI';
-import { NODE_WIDTH, NODE_HEIGHT } from '../TreeMapView/TreeMapView';
 import NodeWrap from '../TreeMapView/NodeWrap';
 
 export type UnifyMapNodeData =
@@ -20,15 +18,17 @@ export type UnifyMapNodeData =
     }
   | {
       type: 'Root';
+      title: ReactNode;
+      subtitle: ReactNode;
     };
 
 const UnifyMapNode = ({ data }: NodeProps<UnifyMapNodeData>) => {
   if (data.type === 'Root') {
+    const { title, subtitle } = data;
     return (
       <NodeWrap root noTargetHandle>
-        <pre>
-          <b>Unify</b>
-        </pre>
+        <span className="node-title">{title}</span>
+        <span className="node-subtitle">{subtitle}</span>
       </NodeWrap>
     );
   }

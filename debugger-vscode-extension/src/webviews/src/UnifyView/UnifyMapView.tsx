@@ -7,6 +7,8 @@ import TreeMapView, {
 import UnifyMapNode, { UnifyMapNodeData } from './UnifyMapNode';
 
 import 'allotment/dist/style.css';
+import { getUnifyName } from '../util';
+import useStore from '../store';
 
 type Props = {
   unification: Unification;
@@ -18,7 +20,7 @@ type D = UnifyMapNodeData;
 type A = null;
 
 const UnifyMapView = ({ unification, selectStep }: Props) => {
-  const unifyMap = unification.map as UnifyMap;
+  const unifyMap = (unification.map as UnifyMap)[1];
   const selectedId = (() => {
     if (!unification.selected) {
       return -1;
@@ -31,9 +33,14 @@ const UnifyMapView = ({ unification, selectStep }: Props) => {
     }
   })();
 
+  const [title, subtitle] = useStore(state => getUnifyName(state));
   const initElem: TransformResult<M, D, A> = {
     id: 'root',
-    data: { type: 'Root' },
+    data: {
+      type: 'Root',
+      title,
+      subtitle,
+    },
     nexts: (() => {
       if (unifyMap[0] === 'Direct') {
         return [[null, unifyMap[1]]];

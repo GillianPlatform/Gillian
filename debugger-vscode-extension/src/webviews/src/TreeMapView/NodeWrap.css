@@ -48,8 +48,13 @@
   border-width: 3px;
 }
 
-.node-root .node-content {
+.node-content .node-title {
   font-size: 16px;
+  font-weight: bold;
+}
+
+.node-content .node-subtitle {
+  color: var(--vscode-descriptionForeground);
 }
 
 .node-content pre {

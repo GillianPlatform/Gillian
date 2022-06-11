@@ -1,12 +1,6 @@
 import produce, { Draft, enableMapSet } from 'immer';
 import create, { State as ZState, StateCreator } from 'zustand';
-import {
-  DebugState,
-  UnifyMap,
-  State,
-  Unification,
-  UnifyStep,
-} from '../../types';
+import { DebugState, UnifyMap, State, UnifyStep, UnifyKind } from '../../types';
 
 enableMapSet();
 const immer =
@@ -16,7 +10,7 @@ const immer =
   (set, get, api) =>
     config(fn => set(produce<T>(fn)), get, api);
 
-type Store = State & {
+export type Store = State & {
   updateDebugState: (debugState: DebugState) => void;
   loadUnification: (unifyId: number, map: UnifyMap) => void;
   selectBaseUnification: (unifyId: number) => boolean;
@@ -46,7 +40,7 @@ const useStore = create<Store>(
       },
       selectBaseUnification: unifyId => {
         set(({ unifyState }) => {
-          unifyState.path.unshift(unifyId);
+          unifyState.path = [unifyId];
         });
         return isUnifyInStore(unifyId);
       },

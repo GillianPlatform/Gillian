@@ -101,6 +101,7 @@ struct
   module UnifyMap = struct
     open Verification.SUnifier.Logging
 
+    type unify_kind = Unifier.unify_kind [@@deriving yojson]
     type unify_result = Success | Failure [@@deriving yojson]
 
     type assertion_data = {
@@ -116,7 +117,10 @@ struct
       | UnifyResult of rid * unify_result
     [@@deriving yojson]
 
-    type t = Direct of unify_seg | Fold of unify_seg list [@@deriving yojson]
+    type map = Direct of unify_seg | Fold of unify_seg list
+    [@@deriving yojson]
+
+    type t = unify_kind * map [@@deriving yojson]
 
     let result_of_id id =
       let rec aux id =
@@ -146,8 +150,8 @@ struct
       | UnifyResult (_, result) -> result
 
     let result = function
-      | Direct seg -> seg_result seg
-      | Fold segs ->
+      | _, Direct seg -> seg_result seg
+      | _, Fold segs ->
           if segs |> List.exists (fun seg -> seg_result seg = Success) then
             Success
           else Failure
@@ -240,17 +244,29 @@ struct
       aux id [] |> List.rev
 
     let build unify_id =
-      match L.LogQueryer.get_children_of ~roots_only:true unify_id with
-      | [] | _ :: _ :: _ ->
-          Fmt.failwith "UnifyMap.build: unify id %a should have one root child!"
-            pp_rid unify_id
-      | [ (id, type_, _) ] ->
-          if type_ = ContentType.unify_case then
-            let segs = build_cases id in
-            Fold segs
-          else
-            let seg = build_case unify_id in
-            Direct seg
+      let kind =
+        let content, _ = L.LogQueryer.get_report unify_id |> Option.get in
+        let unify_report =
+          content |> Yojson.Safe.from_string |> UnifyReport.of_yojson
+          |> Result.get_ok
+        in
+        unify_report.unify_kind
+      in
+      let map =
+        match L.LogQueryer.get_children_of ~roots_only:true unify_id with
+        | [] | _ :: _ :: _ ->
+            Fmt.failwith
+              "UnifyMap.build: unify id %a should have one root child!" pp_rid
+              unify_id
+        | [ (id, type_, _) ] ->
+            if type_ = ContentType.unify_case then
+              let segs = build_cases id in
+              Fold segs
+            else
+              let seg = build_case unify_id in
+              Direct seg
+      in
+      (kind, map)
   end
 
   module ExecMap = struct

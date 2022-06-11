@@ -4,6 +4,7 @@ type unify_kind =
   | FunctionCall
   | Invariant
   | LogicCommand
+[@@deriving yojson]
 
 module type S = sig
   module Val : Val.S

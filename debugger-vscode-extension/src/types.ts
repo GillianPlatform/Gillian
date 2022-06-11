@@ -35,9 +35,14 @@ export type UnifySeg =
   | readonly ['Assertion', AssertionData, UnifySeg]
   | readonly ['UnifyResult', number, UnifyResult];
 
-export type UnifyMap =
-  | readonly ['Direct', UnifySeg]
-  | readonly ['Fold', UnifySeg[]];
+export type UnifyKind = [
+  'Postcondition' | 'Fold' | 'FunctionCall' | 'Invariant' | 'LogicCommand'
+];
+
+export type UnifyMap = readonly [
+  UnifyKind,
+  readonly ['Direct', UnifySeg] | readonly ['Fold', UnifySeg[]]
+];
 
 // #endregion
 

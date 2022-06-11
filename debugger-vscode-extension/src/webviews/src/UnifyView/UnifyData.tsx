@@ -6,23 +6,30 @@ import {
   VSCodeDivider,
   VSCodeLink,
 } from '@vscode/webview-ui-toolkit/react';
-import React from 'react';
+import React, { useEffect } from 'react';
 import useStore, { mutateStore } from '../store';
+import { Code, showBaseUnifyKind } from '../util';
 import VSCodeAPI from '../VSCodeAPI';
 
 import './UnifyData.css';
 
 const UnifyData = () => {
   const procName = useStore(store => store.debugState?.procName || '');
-  const { path, unifications } = useStore(store => store.unifyState);
+  const [{ path, unifications }, baseUnifyKind] = useStore(store => [
+    store.unifyState,
+    showBaseUnifyKind(store),
+  ]);
   const { pushUnification, popUnifications } = mutateStore();
 
+  useEffect(() => {
+    console.log('Showing unify data', path, unifications);
+  }, [path, unifications]);
   const selectedStep = unifications[path[0]]?.selected;
 
   const unifyNames = [
     <>
       <span>
-        Unify <span className="code">{procName}</span>
+        Unify <Code>{procName}</Code> ({baseUnifyKind})
       </span>
     </>,
   ];
@@ -43,7 +50,7 @@ const UnifyData = () => {
     }
     const { assertion } = unification.selected[1];
 
-    unifyNames.push(<span className="code">{assertion}</span>);
+    unifyNames.push(<Code>{assertion}</Code>);
   }
   const unifyLinks = unifyNames.map((name, i) => {
     let link =
@@ -51,6 +58,7 @@ const UnifyData = () => {
         name
       ) : (
         <VSCodeLink
+          title="Step out to this unification"
           onClick={() => {
             popUnifications(path.length - i - 1);
           }}
@@ -61,7 +69,7 @@ const UnifyData = () => {
     if (i > 0) {
       link = (
         <>
-          <div className="codicon codicon-arrow-right" />
+          <div className="codicon codicon-reply" />
           {link}
         </>
       );
@@ -112,12 +120,12 @@ const UnifyData = () => {
             {substitutions.map(([expr, val]) => (
               <VSCodeDataGridRow key={expr}>
                 <VSCodeDataGridCell gridColumn="1" className="subst-expr">
-                  <span className="code">
+                  <Code>
                     <b>{expr}</b>
-                  </span>
+                  </Code>
                 </VSCodeDataGridCell>
                 <VSCodeDataGridCell gridColumn="2" className="subst-val">
-                  <span className="code">{val}</span>
+                  <Code>{val}</Code>
                 </VSCodeDataGridCell>
               </VSCodeDataGridRow>
             ))}

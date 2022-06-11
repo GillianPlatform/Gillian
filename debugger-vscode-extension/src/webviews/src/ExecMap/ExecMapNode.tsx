@@ -1,10 +1,10 @@
-import React, { FC } from 'react';
+import React from 'react';
 import { VSCodeBadge, VSCodeButton } from '@vscode/webview-ui-toolkit/react';
-import { BranchCase, CmdData } from '../../../types';
-import VSCodeAPI from '../VSCodeAPI';
+import { CmdData } from '../../../types';
 import { NODE_HEIGHT } from '../TreeMapView/TreeMapView';
 import NodeWrap from '../TreeMapView/NodeWrap';
 import { NodeProps } from 'react-flow-renderer';
+import { Code } from '../util';
 
 export type ExecMapNodeData =
   | {
@@ -42,9 +42,9 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData>) => {
   if (data.type === 'Root') {
     return (
       <NodeWrap root noTargetHandle>
-        <pre>
-          <b>{data.procName}</b>
-        </pre>
+        <span className="node-title">
+          <Code>{data.procName}</Code>
+        </span>
       </NodeWrap>
     );
   }

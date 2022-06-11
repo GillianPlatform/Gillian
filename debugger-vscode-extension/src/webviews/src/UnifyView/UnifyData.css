@@ -31,3 +31,7 @@
   flex-direction: row;
   align-items: center;
 }
+
+.unify-link .codicon-reply {
+  transform: rotate(0.5turn)
+}
