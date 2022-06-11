@@ -253,18 +253,20 @@ struct
         unify_report.unify_kind
       in
       let map =
-        match L.LogQueryer.get_children_of ~roots_only:true unify_id with
-        | [] | _ :: _ :: _ ->
-            Fmt.failwith
-              "UnifyMap.build: unify id %a should have one root child!" pp_rid
-              unify_id
-        | [ (id, type_, _) ] ->
-            if type_ = ContentType.unify_case then
-              let segs = build_cases id in
-              Fold segs
-            else
-              let seg = build_case unify_id in
-              Direct seg
+        let id, type_, _ =
+          match L.LogQueryer.get_children_of ~roots_only:true unify_id with
+          | [ child ] -> child
+          | _ ->
+              Fmt.failwith
+                "UnifyMap.build: unify id %a should have one root child!" pp_rid
+                unify_id
+        in
+        if type_ = ContentType.unify_case then
+          let segs = build_cases id in
+          Fold segs
+        else
+          let seg = build_case unify_id in
+          Direct seg
       in
       (kind, map)
   end
@@ -837,12 +839,7 @@ struct
             dbg.cur_report_id <- report_id;
             let cmd =
               content |> Yojson.Safe.from_string
-              |> Logging.ConfigReport.of_yojson
-            in
-            let cmd =
-              match cmd with
-              | Ok cmd -> cmd
-              | Error _ -> failwith "Invalid cmd content!"
+              |> Logging.ConfigReport.of_yojson |> Result.get_ok
             in
             dbg.frames <-
               call_stack_to_frames cmd.callstack cmd.proc_line dbg.prog;
@@ -973,22 +970,24 @@ struct
                 m "Unification for %a already exists; skipping unify" pp_rid
                   prev_id);
             None
-        | None -> (
+        | None ->
             DL.log (fun m -> m "Unifying result for %a" pp_rid prev_id);
             let success =
               Verification.Debug.analyse_result test prev_id result
             in
-            match L.LogQueryer.get_unify_for prev_id with
-            | None -> failwith "No unify report found!"
-            | Some (id, content) ->
-                let unify_report =
-                  content |> Yojson.Safe.from_string
-                  |> Verification.SUnifier.Logging.UnifyReport.of_yojson
-                  |> Result.get_ok
-                in
-                let kind = unify_report.unify_kind in
-                let result = UnifyMap.(if success then Success else Failure) in
-                Some (id, kind, result)))
+            let id, content =
+              match L.LogQueryer.get_unify_for prev_id with
+              | None -> failwith "No unify report found!"
+              | Some u -> u
+            in
+            let unify_report =
+              content |> Yojson.Safe.from_string
+              |> Verification.SUnifier.Logging.UnifyReport.of_yojson
+              |> Result.get_ok
+            in
+            let kind = unify_report.unify_kind in
+            let result = UnifyMap.(if success then Success else Failure) in
+            Some (id, kind, result))
 
   let jump_to_id id dbg =
     try
@@ -1220,44 +1219,46 @@ struct
       step_in_branch_case ~reverse ?branch_case prev_id_in_frame dbg
     in
     match stop_reason with
-    | Step -> (
-        match dbg.frames with
-        | [] -> failwith "Nothing in call stack, cannot step"
-        | cur_frame :: _ ->
-            let cur_stack_depth = List.length dbg.frames in
-            if cond prev_frame cur_frame prev_stack_depth cur_stack_depth then
-              stop_reason
-            else
-              step_until_cond ~reverse prev_id_in_frame prev_frame
-                prev_stack_depth cond dbg)
+    | Step ->
+        let cur_frame =
+          match dbg.frames with
+          | [] -> failwith "Nothing in call stack, cannot step"
+          | cur_frame :: _ -> cur_frame
+        in
+        let cur_stack_depth = List.length dbg.frames in
+        if cond prev_frame cur_frame prev_stack_depth cur_stack_depth then
+          stop_reason
+        else
+          step_until_cond ~reverse prev_id_in_frame prev_frame prev_stack_depth
+            cond dbg
     | other_stop_reason -> other_stop_reason
 
   let step_case ?(reverse = false) ?branch_case dbg =
-    match dbg.frames with
-    | [] -> failwith "Nothing in call stack, cannot step"
-    | frame :: _ ->
-        if is_gil_file dbg.source_file then
-          (* If GIL file, step until next cmd in the same frame (like in regular
-             debuggers) *)
-          step_until_cond ~reverse ?branch_case dbg.cur_report_id frame
-            (List.length dbg.frames)
-            (fun prev_frame cur_frame prev_stack_depth cur_stack_depth ->
-              cur_frame.source_path = prev_frame.source_path
-              && cur_frame.name = prev_frame.name
-              || cur_stack_depth < prev_stack_depth)
-            dbg
-        else
-          (* If target language file, step until the code origin location is
-             different, indicating an actual step in the target language*)
-          step_until_cond ~reverse ?branch_case dbg.cur_report_id frame
-            (List.length dbg.frames)
-            (fun prev_frame cur_frame _ _ ->
-              cur_frame.source_path = prev_frame.source_path
-              && (cur_frame.start_line <> prev_frame.start_line
-                 || cur_frame.start_column <> prev_frame.start_column
-                 || cur_frame.end_line <> prev_frame.end_line
-                 || cur_frame.end_column <> prev_frame.end_column))
-            dbg
+    let frame =
+      match dbg.frames with
+      | [] -> failwith "Nothing in call stack, cannot step"
+      | frame :: _ -> frame
+    in
+    let cond =
+      if is_gil_file dbg.source_file then
+        (* If GIL file, step until next cmd in the same frame (like in regular
+           debuggers) *)
+        fun prev_frame cur_frame prev_stack_depth cur_stack_depth ->
+        cur_frame.source_path = prev_frame.source_path
+        && cur_frame.name = prev_frame.name
+        || cur_stack_depth < prev_stack_depth
+      else
+        (* If target language file, step until the code origin location is
+           different, indicating an actual step in the target language*)
+        fun prev_frame cur_frame _ _ ->
+        cur_frame.source_path = prev_frame.source_path
+        && (cur_frame.start_line <> prev_frame.start_line
+           || cur_frame.start_column <> prev_frame.start_column
+           || cur_frame.end_line <> prev_frame.end_line
+           || cur_frame.end_column <> prev_frame.end_column)
+    in
+    step_until_cond ~reverse ?branch_case dbg.cur_report_id frame
+      (List.length dbg.frames) cond dbg
 
   let step ?(reverse = false) dbg = step_case ~reverse dbg
 
