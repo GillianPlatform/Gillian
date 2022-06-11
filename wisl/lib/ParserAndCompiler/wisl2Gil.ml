@@ -881,21 +881,20 @@ let rec compile_function
     List.concat (List.map (compile_function filepath) new_functions)
   in
   let cmdle, comp_ret_expr = compile_expr ~fname:name return_expr in
+  let ret_annot =
+    Annot.make
+      ~origin_loc:(CodeLoc.to_location (WExpr.get_loc return_expr))
+      ~origin_id:(WExpr.get_id return_expr) ()
+  in
   let retassigncmds =
     cmdle
     @ [
-        ( Annot.make
-            ~origin_loc:(CodeLoc.to_location (WExpr.get_loc return_expr))
-            (),
+        ( ret_annot,
           None,
           Cmd.Assignment (Gillian.Utils.Names.return_variable, comp_ret_expr) );
       ]
   in
-  let retcmd =
-    ( Annot.make ~origin_loc:(CodeLoc.to_location (WExpr.get_loc return_expr)) (),
-      None,
-      Cmd.ReturnNormal )
-  in
+  let retcmd = (ret_annot, None, Cmd.ReturnNormal) in
   let lbody_withret = lbodylist @ retassigncmds @ [ retcmd ] in
   let gil_body = Array.of_list lbody_withret in
   let gil_spec = Option.map (compile_spec ~fname:name) spec in

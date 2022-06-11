@@ -52,8 +52,8 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData>) => {
   const { cmdData, isFinal, isCurrentCmd } = data;
 
   const unifyBadge = (() => {
-    if (cmdData.unifyResult) {
-      const [result] = cmdData.unifyResult;
+    if (cmdData.unifys.length > 0) {
+      const [, , [result]] = cmdData.unifys[0];
       return (
         <>
           <VSCodeBadge>

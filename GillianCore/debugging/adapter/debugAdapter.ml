@@ -22,9 +22,15 @@ module Make (Debugger : Debugger.S) = struct
              let%lwt _, _ = StateUninitialized.run rpc in
              DL.log (fun m -> m "Initialized Debug Adapter");
              let%lwt launch_args, dbg = StateInitialized.run rpc in
+             let debug_state =
+               try Debugger.Inspect.get_debug_state dbg
+               with e ->
+                 DL.log (fun m -> m "ERROR! %a" Fmt.exn e);
+                 raise e
+             in
              Debug_rpc.send_event rpc
                (module Debug_state_update_event)
-               (Debugger.Inspect.get_debug_state dbg);%lwt
+               debug_state;%lwt
              StateDebug.run launch_args dbg rpc;%lwt
              fst (Lwt.task ())
            with Exit -> Lwt.return_unit);%lwt

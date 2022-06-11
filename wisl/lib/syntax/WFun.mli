@@ -23,6 +23,7 @@ val get_by_id :
   int ->
   t ->
   [> `None
+  | `Return of WExpr.t
   | `WExpr of WExpr.t
   | `WFun of t
   | `WLAssert of WLAssert.t

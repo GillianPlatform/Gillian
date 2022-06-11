@@ -11,6 +11,7 @@ val get_by_id :
   t ->
   int option ->
   [> `None
+  | `Return of WExpr.t
   | `WExpr of WExpr.t
   | `WFun of WFun.t
   | `WLAssert of WLAssert.t

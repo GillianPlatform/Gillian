@@ -85,14 +85,14 @@ let rec get_by_id id stmt =
   let lcmd_getter = WLCmd.get_by_id id in
   let aux s =
     match get s with
-    | VarAssign (_, e) -> expr_getter e
+    | Dispose e | Lookup (_, e) | VarAssign (_, e) -> expr_getter e
     | Update (e1, e2) -> expr_getter e1 |>> (expr_getter, e2)
     | FunCall (_, _, el, _) -> expr_list_visitor el
     | While (e, sl) -> expr_getter e |>> (list_visitor, sl)
     | If (e, sl1, sl2) ->
         expr_getter e |>> (list_visitor, sl1) |>> (list_visitor, sl2)
     | Logic lcmd -> lcmd_getter lcmd
-    | _ -> `None
+    | New _ | Skip -> `None
   in
   let self_or_none = if get_id stmt = id then `WStmt stmt else `None in
   self_or_none |>> (aux, stmt)

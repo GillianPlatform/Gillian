@@ -39,5 +39,6 @@ let get_cmd_results cmd_report_id =
 
 let get_unify_for id =
   get_children_of id
-  |> List.find_map (fun (id, type_, _) ->
-         if type_ = LoggingConstants.ContentType.unify then Some id else None)
+  |> List.find_map (fun (id, type_, content) ->
+         if type_ = LoggingConstants.ContentType.unify then Some (id, content)
+         else None)

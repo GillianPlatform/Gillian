@@ -11,8 +11,9 @@ VSCodeAPI.onMessage(e => {
 
   if (message.type === 'state_update') {
     store.updateDebugState(message.state);
-    const { unifyId } = message.state;
-    if (unifyId) {
+    const { unifys } = message.state;
+    if (unifys.length > 0) {
+      const [unifyId, ,] = unifys[0];
       const isInStore = store.selectBaseUnification(unifyId);
       if (!isInStore) {
         VSCodeAPI.postMessage({

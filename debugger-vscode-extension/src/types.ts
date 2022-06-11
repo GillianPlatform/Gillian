@@ -8,8 +8,9 @@ export type BranchCase = {
 
 export type CmdData = {
   readonly id: number;
+  readonly originId: number | null;
   readonly display: string;
-  readonly unifyResult: UnifyResult;
+  readonly unifys: readonly (readonly [number, UnifyKind, UnifyResult])[];
 };
 
 export type ExecMap =
@@ -48,8 +49,9 @@ export type UnifyMap = readonly [
 
 export type DebugState = {
   readonly execMap: ExecMap;
+  readonly liftedExecMap: ExecMap | null;
   readonly currentCmdId: number;
-  readonly unifyId: number | null;
+  readonly unifys: readonly (readonly [number, UnifyKind, UnifyResult])[];
   readonly procName: string;
 };
 

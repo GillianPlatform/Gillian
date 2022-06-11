@@ -8,6 +8,10 @@ val to_file : string -> unit
 val enabled : unit -> bool
 val setup : Debug_rpc.t -> unit
 
+val log_async :
+  ((?json:JsonMap.t -> ('a, Format.formatter, unit) format -> 'a) -> unit) ->
+  unit Lwt.t
+
 val log :
   ((?json:JsonMap.t -> ('a, Format.formatter, unit) format -> 'a) -> unit) ->
   unit

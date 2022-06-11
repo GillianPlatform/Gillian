@@ -272,8 +272,9 @@ struct
   module ExecMap = struct
     type cmd_data = {
       id : rid;
+      origin_id : int option; [@name "originId"]
       display : string;
-      unify_result : UnifyMap.unify_result option; [@key "unifyResult"]
+      unifys : (rid * Unifier.unify_kind * UnifyMap.unify_result) list;
     }
     [@@deriving yojson]
 
@@ -287,13 +288,20 @@ struct
     type cmd_kind = Branch of branch_case list | Normal | Final
     [@@deriving yojson]
 
-    type 'case with_source = string option * 'case t
+    type 'case with_source = string option * 'case t [@@deriving yojson]
 
     let kind_of_cases = function
       | Some cases -> Branch cases
       | None -> Normal
 
-    let insert_cmd_sourceless cmd_kind new_id display ?unify_result path map =
+    let insert_cmd_sourceless
+        cmd_kind
+        new_id
+        display
+        ?(unifys = [])
+        path
+        origin_id
+        map =
       let fail () =
         DL.failwith
           (fun () ->
@@ -301,15 +309,20 @@ struct
               ("cmd_type", cmd_kind_to_yojson cmd_kind);
               ("new_id", rid_to_yojson new_id);
               ("display", `String display);
-              ( "unify_result",
-                opt_to_yojson UnifyMap.unify_result_to_yojson unify_result );
+              ( "unifys",
+                `Assoc
+                  (unifys
+                  |> List.map (fun (id, kind, result) ->
+                         let kind = Unifier.unify_kind_to_yojson kind in
+                         let result = UnifyMap.unify_result_to_yojson result in
+                         (show_rid id, `List [ kind; result ]))) );
               ("path", branch_path_to_yojson path);
               ("map", to_yojson branch_case_to_yojson map);
             ])
           "ExecMap.insert_cmd: malformed request"
       in
 
-      let cmd_data = { id = new_id; display; unify_result } in
+      let cmd_data = { id = new_id; display; unifys; origin_id } in
 
       let rec aux path map =
         match (map, path) with
@@ -341,13 +354,15 @@ struct
         cmd_kind
         new_id
         display
-        ?unify_result
+        ?(unifys = [])
         path
         new_source
+        origin_id
         ((source, map) : 'a with_source) =
       let insert () =
-        insert_cmd_sourceless cmd_kind new_id display ?unify_result path map
+        insert_cmd_sourceless cmd_kind new_id display ~unifys path origin_id map
       in
+
       match source with
       | None -> (Some new_source, insert ())
       | Some source ->
@@ -443,6 +458,31 @@ struct
       | Some path -> path
       | None -> Fmt.failwith "ID %a doesn't exist in exec map!" pp_rid id
 
+    let at_id search_id map =
+      let rec aux = function
+        | (Cmd ({ id; _ }, _) as map)
+        | (BranchCmd ({ id; _ }, _) as map)
+        | (FinalCmd { id; _ } as map)
+          when id = search_id -> Some map
+        | Cmd (_, next) -> aux next
+        | BranchCmd (_, nexts) ->
+            nexts |> List.find_map (fun (_, next) -> aux next)
+        | Nothing | FinalCmd _ -> None
+      in
+      match aux map with
+      | None -> Fmt.failwith "ID %a doesn't exist in map!" pp_rid search_id
+      | Some map -> map
+
+    let unifys_at_id id (_, map) =
+      let map = map |> at_id id in
+      match map with
+      | Cmd ({ unifys; _ }, _)
+      | BranchCmd ({ unifys; _ }, _)
+      | FinalCmd { unifys; _ } -> unifys
+      | _ ->
+          Fmt.failwith "ExecMap.unifys_at_id: map at ID %a is Nothing!" pp_rid
+            id
+
     let rec package = function
       | Nothing -> Nothing
       | Cmd (cmd_data, next) ->
@@ -461,9 +501,81 @@ struct
       | Nothing -> None
       | Cmd ({ id; _ }, _) | BranchCmd ({ id; _ }, _) | FinalCmd { id; _ } ->
           Some id
+
+    let lift ~tl_ast exec_map =
+      DL.log (fun m -> m "Lifting");
+      let lift_data cmd_data =
+        let new_display =
+          Lifter.get_origin_node_str tl_ast cmd_data.origin_id
+        in
+        let new_displa =
+          if new_display = "No info!" then cmd_data.display else new_display
+        in
+        { cmd_data with display = new_displa }
+      in
+      let origin_id = function
+        | Nothing -> None
+        | Cmd (data, _) | FinalCmd data | BranchCmd (data, _) -> data.origin_id
+      in
+      let eq_opt ida idb =
+        match (ida, idb) with
+        | Some ida, Some idb -> Int.equal ida idb
+        | _ -> false
+      in
+      let merge_data ~left ~right =
+        (* Note that we don't need to lift left here, we only need to lift right
+           before calling this. *)
+        (* This is a tad problematic: in case left has a unification but not right,
+           the report id kept is the one of right, and it's going to be hard to look for unification there.
+           We keep the left one, because that's what we might require to click on the next possible branches.
+           On the other hand, if both have a unify, then I don't know what to do at all.
+           I suggest, we change cmd_data with
+           {
+             last_id: L.ReportId.t;
+             unify_ids : L.ReportId.t list // if empty, then has_unify is false
+             display;
+             origin_id;
+           }
+           In any case, this should be done after the report deadline.
+        *)
+        let origin_id =
+          match (left.origin_id, right.origin_id) with
+          | _, Some id | Some id, _ -> Some id
+          | _ -> None
+        in
+        { right with unifys = left.unifys @ right.unifys; origin_id }
+      in
+      let rec aux = function
+        | Nothing -> Nothing
+        | Cmd (data, next) -> (
+            let next = aux next in
+            if not (eq_opt data.origin_id (origin_id next)) then
+              Cmd (lift_data data, next)
+            else
+              match next with
+              | Cmd (data', next') ->
+                  Cmd (merge_data ~left:data ~right:data', next')
+              | FinalCmd data' -> FinalCmd (merge_data ~left:data ~right:data')
+              | BranchCmd (data', branches) ->
+                  BranchCmd (merge_data ~left:data ~right:data', branches)
+              | Nothing ->
+                  failwith "unreachable! id cannot be equal when there is no id"
+            )
+        | BranchCmd (data, branches) ->
+            let branches = List.map (fun (c, b) -> (c, aux b)) branches in
+            if
+              List.exists
+                (fun (_, b) -> eq_opt (origin_id b) data.origin_id)
+                branches
+            then
+              failwith "branch_cmd has the same id as its next: unhandled yet."
+            else BranchCmd (lift_data data, branches)
+        | FinalCmd data -> FinalCmd (lift_data data)
+      in
+      aux exec_map
   end
 
-  type exec_map = branch_case ExecMap.with_source
+  type exec_map = branch_case ExecMap.with_source [@@deriving yojson]
 
   type debugger_state = {
     source_file : string;
@@ -505,22 +617,28 @@ struct
 
     type debug_state = {
       exec_map : exec_map_pkg; [@key "execMap"]
+      lifted_exec_map : exec_map_pkg option; [@key "liftedExecMap"]
       current_cmd_id : rid; [@key "currentCmdId"]
-      unify_id : rid option; [@key "unifyId"]
+      unifys : (rid * Unifier.unify_kind * UnifyMap.unify_result) list;
       proc_name : string; [@key "procName"]
     }
     [@@deriving yojson]
 
     let get_debug_state dbg : debug_state =
       let current_cmd_id = dbg.cur_report_id in
-      let unify_id = L.LogQueryer.get_unify_for dbg.cur_report_id in
+      let unifys = dbg.exec_map |> ExecMap.unifys_at_id current_cmd_id in
       let exec_map = get_exec_map_pkg dbg in
+      let lifted_exec_map =
+        match (Lifter.source_map_ability, dbg.tl_ast) with
+        | true, Some tl_ast -> Some (ExecMap.lift ~tl_ast exec_map)
+        | _ -> None
+      in
       let proc_name =
         match dbg |> get_proc_name with
         | None -> "unknown proc"
         | Some proc_name -> proc_name
       in
-      { exec_map; current_cmd_id; unify_id; proc_name }
+      { exec_map; current_cmd_id; unifys; proc_name; lifted_exec_map }
 
     let get_unification unify_id dbg =
       match dbg.unify_maps |> List.assoc_opt unify_id with
@@ -803,13 +921,14 @@ struct
                    |> Logging.ConfigReport.of_yojson)
                 in
                 let cmd_display = cmd.cmd in
+                let origin_id = Annot.get_origin_id cmd.annot in
                 let tests = Verification.Debug.get_tests_for_prog prog in
                 let map =
                   ExecMap.(
                     Nothing
                     |> insert_cmd_sourceless
                          (kind_of_cases new_branch_cases)
-                         cur_report_id cmd_display branch_path)
+                         cur_report_id cmd_display branch_path origin_id)
                 in
                 let dbg =
                   ({
@@ -861,7 +980,15 @@ struct
             in
             match L.LogQueryer.get_unify_for prev_id with
             | None -> failwith "No unify report found!"
-            | Some _ -> Some UnifyMap.(if success then Success else Failure)))
+            | Some (id, content) ->
+                let unify_report =
+                  content |> Yojson.Safe.from_string
+                  |> Verification.SUnifier.Logging.UnifyReport.of_yojson
+                  |> Result.get_ok
+                in
+                let kind = unify_report.unify_kind in
+                let result = UnifyMap.(if success then Success else Failure) in
+                Some (id, kind, result)))
 
   let jump_to_id id dbg =
     try
@@ -935,14 +1062,17 @@ struct
                   |> Logging.ConfigReport.of_yojson |> Result.get_ok
                 in
                 let proc_name = (List.hd cmd.callstack).pid in
-                let unify_result = unify result proc_name prev_id dbg in
+                let unifys =
+                  unify result proc_name prev_id dbg |> Option.to_list
+                in
                 let cmd_display = cmd.cmd in
+                let origin_id = Annot.get_origin_id cmd.annot in
                 dbg.exec_map <-
                   (dbg.exec_map
                   |> ExecMap.(
                        let source_file = (List.hd dbg.frames).source_path in
-                       insert_cmd Final prev_id cmd_display ?unify_result
-                         branch_path source_file));
+                       insert_cmd Final prev_id cmd_display ~unifys branch_path
+                         source_file origin_id));
                 update_report_id_and_inspection_fields prev_id dbg
             | Some (prev_id, _, type_) ->
                 Fmt.failwith "EndOfBranch: prev cmd (%a) is '%s', not '%s'!"
@@ -983,35 +1113,40 @@ struct
                            |> Logging.ConfigReport.of_yojson)
                         in
                         let cmd_display = cmd.cmd in
+                        let origin_id = Annot.get_origin_id cmd.annot in
                         let cmd_kind =
                           match new_branch_cases with
                           | Some cases -> Branch cases
                           | None -> Normal
                         in
                         let source_file = (List.hd dbg.frames).source_path in
-                        let unify_result =
-                          DL.log (fun m ->
-                              m "getting unify_result for %a" pp_rid
-                                cur_report_id);
-                          let+ unify_id =
-                            L.LogQueryer.get_unify_for cur_report_id
-                          in
-                          DL.log (fun m -> m "got unify ID");
-                          let unify_map =
-                            match dbg.unify_maps |> List.assoc_opt unify_id with
-                            | Some map -> map
-                            | None ->
-                                let map = UnifyMap.build unify_id in
-                                dbg.unify_maps <-
-                                  (unify_id, map) :: dbg.unify_maps;
-                                map
-                          in
-                          unify_map |> UnifyMap.result
+                        let unifys =
+                          (DL.log (fun m ->
+                               m "getting unify_result for %a" pp_rid
+                                 cur_report_id);
+                           let+ unify_id, _ =
+                             L.LogQueryer.get_unify_for cur_report_id
+                           in
+                           DL.log (fun m -> m "got unify ID");
+                           let unify_map =
+                             match
+                               dbg.unify_maps |> List.assoc_opt unify_id
+                             with
+                             | Some map -> map
+                             | None ->
+                                 let map = UnifyMap.build unify_id in
+                                 dbg.unify_maps <-
+                                   (unify_id, map) :: dbg.unify_maps;
+                                 map
+                           in
+                           let result = unify_map |> UnifyMap.result in
+                           (unify_id, fst unify_map, result))
+                          |> Option.to_list
                         in
                         dbg.exec_map <-
                           dbg.exec_map
                           |> insert_cmd cmd_kind cur_report_id cmd_display
-                               ?unify_result branch_path source_file);
+                               ~unifys branch_path source_file origin_id);
                       Step)))
 
   let step_in_branch_case prev_id_in_frame ?branch_case ?(reverse = false) dbg =
@@ -1175,7 +1310,12 @@ struct
             if reverse then other_stop_reason
             else
               match dbg.exec_map |> ExecMap.find_unfinished branch_path with
-              | None -> other_stop_reason
+              | None ->
+                  DL.log (fun m ->
+                      m
+                        ~json:[ ("map", exec_map_to_yojson dbg.exec_map) ]
+                        "Debugger.run: map has no unfinished branches");
+                  other_stop_reason
               | Some (prev_id, branch_case) ->
                   DL.log (fun m ->
                       m

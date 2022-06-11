@@ -91,7 +91,7 @@ module LogQueryer : sig
 
   (* Returns a 'unify' report that is the direct child of the given report id,
      if it exists *)
-  val get_unify_for : ReportId.t -> ReportId.t option
+  val get_unify_for : ReportId.t -> (ReportId.t * string) option
 end
 
 (** Initializes the logging module with the specified reporters and initializes

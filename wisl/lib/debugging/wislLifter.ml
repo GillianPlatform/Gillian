@@ -142,6 +142,7 @@ let source_map_ability = true
 let get_origin_node_str wisl_ast origin_id =
   let node = WProg.get_by_id wisl_ast origin_id in
   match node with
+  | `Return we -> Fmt.str "return %a" WExpr.pp we
   | `WExpr we -> Fmt.str "Evaluating: %a" WExpr.pp we
   | `WLCmd lcmd -> Fmt.str "%a" WLCmd.pp lcmd
   | `WStmt stmt -> Fmt.str "%a" WStmt.pp_head stmt
