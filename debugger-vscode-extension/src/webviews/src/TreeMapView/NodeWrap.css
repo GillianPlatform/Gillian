@@ -1,3 +1,9 @@
+.react-flow__node {
+  cursor: auto !important;
+  pointer-events: auto !important;
+  user-select: auto !important;
+}
+
 .node-content {
   font-size: 12px;
   position: absolute;
@@ -8,10 +14,10 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  cursor: default;
 }
 
 .node-background {
+  --border-color: var(--vscode-editorCursor-foreground);
   position: absolute;
   top: 0;
   left: 0;
@@ -20,7 +26,7 @@
   height: calc(100% - 2px);
   border-radius: 1px;
   background: linear-gradient(to right, var(--background), var(--background));
-  border: 1px solid var(--vscode-editorCursor-foreground);
+  border: 1px solid var(--border-color);
 }
 
 .node-selected .node-content {
@@ -33,7 +39,11 @@
     linear-gradient(to right, var(--background), var(--background));
   width: calc(100% - 7px);
   height: calc(100% - 7px);
-  border: 3.5px double var(--vscode-editorCursor-foreground);
+  border: 3.5px double var(--border-color);
+}
+
+.node-error .node-background {
+  --border-color: var(--vscode-errorForeground);
 }
 
 .node-empty .node-background {

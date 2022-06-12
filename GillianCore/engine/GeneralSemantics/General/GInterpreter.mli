@@ -13,7 +13,7 @@ module type S = sig
   type st
   type store_t
   type state_t
-  type state_err_t
+  type state_err_t [@@deriving show]
   type state_vt [@@deriving show]
   type heap_t
 
@@ -21,7 +21,7 @@ module type S = sig
   module Store : Store.S with type t = store_t and type vt = vt
 
   type invariant_frames = (string * state_t) list
-  type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
+  type err_t = (vt, state_err_t) ExecErr.t [@@deriving show, yojson]
   type branch_case = state_vt branch_case' [@@deriving yojson]
   type branch_path = branch_case list [@@deriving yojson]
 

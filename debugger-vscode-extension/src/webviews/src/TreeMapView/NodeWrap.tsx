@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { ReactNode, FC, useContext } from 'react';
 import { Handle, NodeProps, Position } from 'react-flow-renderer';
-import { NODE_WIDTH, NODE_HEIGHT } from './TreeMapView';
+import Tippy from '@tippyjs/react';
+import 'tippy.js/dist/tippy.css';
+import { NODE_WIDTH, NODE_HEIGHT, FlowRefContext } from './TreeMapView';
 
 import './NodeWrap.css';
 
@@ -11,12 +13,14 @@ type NodeWrapProps = {
   height?: number;
   root?: boolean;
   selected?: boolean;
+  error?: boolean;
   classes?: string[];
+  tooltip?: ReactNode;
 };
 
 const HANDLE_STYLE = { background: '#555' };
 
-const NodeWrap: React.FC<NodeWrapProps> = ({
+const NodeWrap: FC<NodeWrapProps> = ({
   children,
   noTargetHandle = false,
   noSourceHandle = false,
@@ -24,8 +28,12 @@ const NodeWrap: React.FC<NodeWrapProps> = ({
   height = NODE_HEIGHT,
   root = false,
   selected = false,
+  error = false,
   classes = [],
+  tooltip,
 }) => {
+  const flowRef = useContext(FlowRefContext);
+
   classes.unshift('node-wrap');
   if (selected) {
     classes.unshift('node-selected');
@@ -33,8 +41,18 @@ const NodeWrap: React.FC<NodeWrapProps> = ({
   if (root) {
     classes.unshift('node-root');
   }
+  if (error) {
+    classes.unshift('node-error');
+  }
 
-  return (
+  const getFlowViewport = () => {
+    const flow = flowRef!.current;
+    const elems = flow.getElementsByClassName('react-flow__viewport');
+    const elem = elems[0];
+    return elem;
+  };
+
+  const nodeWrap = (
     <div
       className={classes.join(' ')}
       style={{
@@ -68,6 +86,23 @@ const NodeWrap: React.FC<NodeWrapProps> = ({
       <div className="node-background" />
     </div>
   );
+
+  if (tooltip) {
+    return (
+      <Tippy
+        content={tooltip}
+        maxWidth={`${NODE_WIDTH * 2}px`}
+        interactive
+        className="tooltip"
+        // Append to viewport, since node width constrains tooltip width
+        appendTo={getFlowViewport}
+        placement="bottom"
+      >
+        {nodeWrap}
+      </Tippy>
+    );
+  }
+  return nodeWrap;
 };
 
 export default NodeWrap;

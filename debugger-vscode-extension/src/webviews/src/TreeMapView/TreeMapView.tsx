@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import ReactFlow, {
   Background,
   Edge,
@@ -40,11 +40,15 @@ export const NODE_HEIGHT = 50;
 const NODE_GAP_X = 50;
 const NODE_GAP_Y = 50;
 
+export type FlowRef = React.MutableRefObject<HTMLDivElement> | undefined;
+export const FlowRefContext = React.createContext(undefined as FlowRef);
+
 const TreeMapView = <M, D, A>({
   initElem,
   transform,
   nodeComponent,
 }: Props<M, D, A>) => {
+  const flowRef: FlowRef = useRef(undefined as unknown as HTMLDivElement);
   const nodeTypes = { customNode: nodeComponent };
   const depthCounts: number[] = [1];
   const intermediateElems: IntermediateElem<D>[] = [
@@ -104,22 +108,26 @@ const TreeMapView = <M, D, A>({
         },
         draggable: false,
         connectable: false,
+        selectable: true,
       };
     }
   );
 
   const ret = (
     <div className="tree-map-view">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        nodeTypes={nodeTypes}
-      >
-        <Controls showInteractive={false} />
-        <Background color="#aaa" gap={16} />
-      </ReactFlow>
+      <FlowRefContext.Provider value={flowRef}>
+        <ReactFlow
+          ref={flowRef}
+          nodes={nodes}
+          edges={edges}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          nodeTypes={nodeTypes}
+        >
+          <Controls showInteractive={false} />
+          <Background color="#aaa" gap={16} />
+        </ReactFlow>
+      </FlowRefContext.Provider>
     </div>
   );
 

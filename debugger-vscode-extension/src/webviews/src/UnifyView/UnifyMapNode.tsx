@@ -4,6 +4,8 @@ import { VSCodeBadge, VSCodeButton } from '@vscode/webview-ui-toolkit/react';
 import { AssertionData, UnifyResult } from '../../../types';
 import NodeWrap from '../TreeMapView/NodeWrap';
 
+import './UnifyMapNode.css';
+
 export type UnifyMapNodeData =
   | {
       type: 'Assertion';
@@ -34,8 +36,13 @@ const UnifyMapNode = ({ data }: NodeProps<UnifyMapNodeData>) => {
   }
 
   if (data.type === 'Result') {
+    const [result] = data.result;
     return (
-      <NodeWrap noSourceHandle>
+      <NodeWrap
+        classes={['unify-map-result']}
+        noSourceHandle
+        error={result !== 'Success'}
+      >
         <i>{data.result}</i>
       </NodeWrap>
     );

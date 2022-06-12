@@ -17,7 +17,7 @@ module type S = sig
   type st
   type store_t
   type state_t
-  type state_err_t
+  type state_err_t [@@deriving show]
   type state_vt [@@deriving show]
   type heap_t
 
@@ -25,7 +25,7 @@ module type S = sig
   module Store : Store.S with type t = store_t and type vt = vt
 
   type invariant_frames = (string * state_t) list
-  type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
+  type err_t = (vt, state_err_t) ExecErr.t [@@deriving show, yojson]
   type branch_case = state_vt branch_case' [@@deriving yojson]
   type branch_path = branch_case list [@@deriving yojson]
 
@@ -156,10 +156,14 @@ struct
   type store_t = Store.t
   type state_t = State.t [@@deriving yojson]
   type state_err_t = State.err_t [@@deriving yojson]
+
+  let pp_state_err_t = State.pp_err
+  let show_state_err_t = Fmt.to_to_string pp_state_err_t
+
   type state_vt = State.vt [@@deriving yojson, show]
   type heap_t = State.heap_t
   type invariant_frames = (string * State.t) list [@@deriving yojson]
-  type err_t = (Val.t, State.err_t) ExecErr.t [@@deriving yojson]
+  type err_t = (Val.t, state_err_t) ExecErr.t [@@deriving show, yojson]
   type branch_case = state_vt branch_case' [@@deriving yojson]
   type branch_path = branch_case list [@@deriving yojson]
 
@@ -783,6 +787,10 @@ struct
     let make_confcont =
       make_confcont ?prev_cmd_report_id:!report_id_ref ~branch_path
     in
+    DL.log (fun m ->
+        m
+          ~json:[ ("path", branch_path_to_yojson branch_path) ]
+          "GInterpreter: stepping with path");
 
     let evaluate_procedure_call x pid v_args j subst =
       let pid =
@@ -1463,6 +1471,7 @@ struct
             report_id_ref branch_path branch_case
         with
         | Interpreter_error (errors, error_state) ->
+            DL.log (fun m -> m "INTERPRETER ERROR");
             [
               ConfErr
                 {
@@ -1470,10 +1479,11 @@ struct
                   proc_idx = i;
                   error_state;
                   errors;
-                  branch_path;
+                  branch_path = List_utils.cons_opt branch_case branch_path;
                 };
             ]
         | State.Internal_State_Error (errs, error_state) ->
+            DL.log (fun m -> m "INTERNAL_STATE ERROR");
             (* Return: current procedure name, current command index, the state, and the associated errors *)
             [
               ConfErr
@@ -1482,7 +1492,7 @@ struct
                   proc_idx = i;
                   error_state;
                   errors = List.map (fun x -> ExecErr.ESt x) errs;
-                  branch_path : branch_path;
+                  branch_path = List_utils.cons_opt branch_case branch_path;
                 };
             ])
       states
@@ -1545,6 +1555,11 @@ struct
     in
 
     let continue_or_pause rest_confs cont_func =
+      DL.log (fun m ->
+          m
+            ~json:
+              [ ("confs", `List (rest_confs |> List.map cconf_t_to_yojson)) ]
+            "GOT CONFS");
       match rest_confs with
       | ConfCont { branch_case; new_branches; branch_path; _ } :: _ ->
           rest_confs
@@ -1727,15 +1742,18 @@ struct
             let result =
               ExecRes.RFail { proc; proc_idx; error_state; errors }
             in
-            continue_or_pause [] (fun ?path () ->
-                f rest_confs path ((branch_path, result) :: results))
+            let results = (branch_path, result) :: results in
+            if !Config.debug then end_of_branch results
+            else
+              continue_or_pause rest_confs (fun ?path () ->
+                  f rest_confs path results)
         | Some (ConfFinish { flag; ret_val; final_state; branch_path }), _ ->
             let result =
               ExecRes.RSucc
                 { flag; ret_val; final_state; last_report = L.get_parent () }
             in
             let results = (branch_path, result) :: results in
-            if !Config.debug then end_of_branch @@ results
+            if !Config.debug then end_of_branch results
             else
               continue_or_pause rest_confs (fun ?path () ->
                   f rest_confs path results)

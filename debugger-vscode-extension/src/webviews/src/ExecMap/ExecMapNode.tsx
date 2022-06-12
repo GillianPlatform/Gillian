@@ -1,10 +1,16 @@
 import React from 'react';
-import { VSCodeBadge, VSCodeButton } from '@vscode/webview-ui-toolkit/react';
+import {
+  VSCodeBadge,
+  VSCodeButton,
+  VSCodeDivider,
+} from '@vscode/webview-ui-toolkit/react';
 import { CmdData } from '../../../types';
 import { NODE_HEIGHT } from '../TreeMapView/TreeMapView';
 import NodeWrap from '../TreeMapView/NodeWrap';
 import { NodeProps } from 'react-flow-renderer';
 import { Code } from '../util';
+
+import './ExecMap.css';
 
 export type ExecMapNodeData =
   | {
@@ -72,22 +78,52 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData>) => {
     }
   })();
 
+  let errorTooltip = <></>;
+  if (cmdData.errors.length > 0) {
+    errorTooltip = (
+      <>
+        <VSCodeDivider />
+        <div className="tooltip-error">
+          <ul>
+            {cmdData.errors.map((error, i) => (
+              <li key={i}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      </>
+    );
+  }
+
+  const tooltip = (
+    <div className="tooltip">
+      <Code>{cmdData.display}</Code>
+      {errorTooltip}
+    </div>
+  );
+
   return (
-    <NodeWrap selected={isCurrentCmd} noSourceHandle={isFinal}>
-      <pre>{cmdData.display}</pre>
-      <div className="node-button-row">
-        {unifyBadge}
-        <VSCodeButton
-          appearance="icon"
-          aria-label="Jump here"
-          title="Jump here"
-          disabled={isCurrentCmd}
-          onClick={isCurrentCmd ? undefined : data.jump}
-        >
-          <span className="codicon codicon-target" />
-        </VSCodeButton>
-      </div>
-    </NodeWrap>
+    <>
+      <NodeWrap
+        selected={isCurrentCmd}
+        error={cmdData.errors.length > 0}
+        noSourceHandle={isFinal}
+        tooltip={tooltip}
+      >
+        <pre>{cmdData.display}</pre>
+        <div className="node-button-row">
+          {unifyBadge}
+          <VSCodeButton
+            appearance="icon"
+            aria-label="Jump here"
+            title="Jump here"
+            disabled={isCurrentCmd}
+            onClick={isCurrentCmd ? undefined : data.jump}
+          >
+            <span className="codicon codicon-target" />
+          </VSCodeButton>
+        </div>
+      </NodeWrap>
+    </>
   );
 };
 

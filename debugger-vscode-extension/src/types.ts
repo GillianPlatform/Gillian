@@ -11,6 +11,7 @@ export type CmdData = {
   readonly originId: number | null;
   readonly display: string;
   readonly unifys: readonly (readonly [number, UnifyKind, UnifyResult])[];
+  readonly errors: readonly string[];
 };
 
 export type ExecMap =
