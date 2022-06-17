@@ -82,9 +82,16 @@ const UnifyData = () => {
   });
 
   let stepInFoldButton = <></>;
+  let asrt = <></>;
   let subst = <></>;
   if (selectedStep !== undefined && selectedStep[0] === 'Assertion') {
-    const { fold, substitutions } = selectedStep[1];
+    const { assertion, fold, substitutions } = selectedStep[1];
+
+    asrt = (
+      <p>
+        <Code>{assertion}</Code>
+      </p>
+    );
 
     if (fold !== null) {
       const foldId = fold[0];
@@ -143,6 +150,7 @@ const UnifyData = () => {
 
         <VSCodeDivider />
 
+        {asrt}
         {subst}
       </div>
     </div>
