@@ -44,6 +44,9 @@ class DebugAdapterExecutableFactory
           case 'js':
             gillianExecutableCommand = 'gillian-js';
             break;
+          case 'c':
+            gillianExecutableCommand = 'gillian-c';
+            break;
           case 'wisl':
           default:
             // Default to WISL

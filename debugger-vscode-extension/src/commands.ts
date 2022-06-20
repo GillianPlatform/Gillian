@@ -4,10 +4,10 @@ export async function startDebugging(
   config: DebugConfiguration,
   noDebug = false
 ) {
-  const validInputs = new Set(['wisl', 'js']);
+  const validInputs = new Set(['wisl', 'js', 'c']);
   const validateInput = (input: string) => {
     if (!validInputs.has(input)) {
-      return 'The target language must be one of: wisl, js';
+      return 'The target language must be one of: wisl, js, c';
     }
 
     return null;
@@ -19,7 +19,7 @@ export async function startDebugging(
       prompt: 'Target language',
       value: 'wisl',
       valueSelection: [0, 5],
-      placeHolder: 'e.g. wisl, js',
+      placeHolder: 'e.g. wisl, js, c',
       validateInput: validateInput,
     });
     config = {

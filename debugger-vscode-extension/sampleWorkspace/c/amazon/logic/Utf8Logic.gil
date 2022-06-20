@@ -1,0 +1,107 @@
+(************************************
+ ************************************
+ *******                      *******
+ *******   Axiomatic          *******
+ *******   UTF-8 Conversion   *******
+ *******                      *******
+ ************************************
+ ************************************)
+
+(*
+    toUt8(rawData, utf8Data) is an abstract predicate which
+    denotes that the string utf8Data is obtained by converting
+    the raw bytes rawData to UTF-8 format
+*)
+@nopath
+abstract pure nounfold pred toUtf8(+rawData : List, utf8Data : Str);
+
+lemma toUtf8Injective(rawData1, utf8Data1, rawData2, utf8Data2)
+  [[  toUtf8(#rawData1, #utf8Data1) * toUtf8(#rawData2, #utf8Data2) ]]
+  [[  (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
+      (! (#rawData1 == #rawData2)) * (! (#utf8Data1 == #utf8Data2)) ]]
+
+pure pred toUtf8Map(+data : List, utf8Data : List) : (data == {{  }}) *
+  (utf8Data == {{  }}), (data == l+ ({{ #fst }}, #rest)) *
+  toUtf8(#fst, #utf8Fst) * toUtf8Map(#rest, #utf8Rest) *
+  (utf8Data == l+ ({{ #utf8Fst }}, #utf8Rest));
+
+(* UTF-8 Mapping of lists of pairs *)
+@nopath
+pure pred toUtf8PairMap(+data : List, utf8Data : List) :
+  (data == {{  }}) * (utf8Data == {{  }}),
+  (data == l+ ({{ {{ #prop, #value }} }}, #rest)) *
+    toUtf8(#prop, #utf8Prop) * toUtf8(#value, #utf8Value) *
+    toUtf8PairMap(#rest, #utf8Rest) *
+    (utf8Data == l+ ({{ {{ #utf8Prop, #utf8Value }} }}, #utf8Rest));
+
+lemma toUtf8PairMapAppendPair(data, utf8Data, prop, value)
+  [[  toUtf8PairMap(#data, #utf8Data) *
+      toUtf8(#prop, #utf8Prop) *
+      toUtf8(#value, #utf8Value) ]]
+  [[  toUtf8PairMap(
+        l+ (#data, {{ {{ #prop, #value }} }}),
+        l+ (#utf8Data, {{ {{ #utf8Prop, #utf8Value }} }})
+      )
+  ]]
+  [*  unfold toUtf8PairMap(#data, #utf8Data) ;
+      if ((not (#data = {{  }}))) then {
+        sep_assert ((#data == l+ ({{ {{ #fProp, #fValue }} }}, #restPVPairs)))
+          [bind: #fProp, #fValue, #restPVPairs];
+        sep_assert (toUtf8PairMap(#restPVPairs, #restUtf8Data)) [bind: #restUtf8Data];
+        apply toUtf8PairMapAppendPair(#restPVPairs, #restUtf8Data, #prop, #value)
+      }  *]
+
+lemma toUtf8PairMapInjective(rawData1, utf8Data1, rawData2, utf8Data2)
+  [[  toUtf8PairMap(#rawData1, #utf8Data1) *
+      toUtf8PairMap(#rawData2, #utf8Data2) ]]
+  [[  (#rawData1 == #rawData2) * (#utf8Data1 == #utf8Data2);
+      (! (#rawData1 == #rawData2)) * (! (#utf8Data1 == #utf8Data2)) ]]
+  [*  unfold toUtf8PairMap(#rawData1, #utf8Data1) ;
+      unfold toUtf8PairMap(#rawData2, #utf8Data2) ;
+      if (((not (#rawData1 = {{  }})) and (not (#rawData2 = {{  }}))))
+      then {
+        sep_assert ((#rawData1 == l+ ({{ {{ #p1, #v1 }} }}, #restd1)) *
+                    (#rawData2 == l+ ({{ {{ #p2, #v2 }} }}, #restd2)) *
+                    (#utf8Data1 == l+ ({{ {{ #up1, #uv1 }} }}, #restu1)) *
+                    (#utf8Data2 == l+ ({{ {{ #up2, #uv2 }} }}, #restu2)))
+          [bind: #p1, #v1, #restd1, #p2, #v2, #restd2, #up1, #uv1, #restu1, #up2, #uv2, #restu2];
+        apply toUtf8Injective(#p1, #up1, #p2, #up2) ;
+        apply toUtf8Injective(#v1, #uv1, #v2, #uv2) ;
+        apply toUtf8PairMapInjective(#restd1, #restu1, #restd2, #restu2)
+      }
+  *]
+
+lemma NotInListToUtf8(prop, props)
+  [[  ListToSet(#props, #propsSet) * (! (#prop --e-- #propsSet)) *
+      toUtf8(#prop, #utf8Prop) * toUtf8Map(#props, #utf8Props) *
+      ListToSet(#utf8Props, #utf8PropsSet) ]]
+  [[  (! (#utf8Prop --e-- #utf8PropsSet)) ]]
+  [*  unfold ListToSet(#props, #propsSet) ;
+      unfold toUtf8Map(#props, #utf8Props) ;
+      unfold ListToSet(#utf8Props, #utf8PropsSet) ;
+      if ((not (#props = {{  }}))) then {
+        sep_assert ((#props == l+ ({{ #fstProp }}, #rest))) [bind: #rest];
+        sep_assert (toUtf8(#fstProp, #utf8FstProp)) [bind: #utf8FstProp];
+        apply toUtf8Injective(#prop, #utf8Prop, #fstProp, #utf8FstProp);
+        apply NotInListToUtf8(#prop, #rest)
+      }  *]
+
+lemma InListToUtf8(prop, props)
+  [[  ListToSet(#props, #propsSet) * (#prop --e-- #propsSet) *
+      toUtf8(#prop, #utf8Prop) * toUtf8Map(#props, #utf8Props) *
+      ListToSet(#utf8Props, #utf8PropsSet) ]]
+  [[  (#utf8Prop --e-- #utf8PropsSet) ]]
+  [*  unfold ListToSet(#props, #propsSet) ;
+      if ((not (#props = {{  }}))) then {
+        sep_assert ((#props == l+ ({{ #fstProp }}, #rest))) [bind: #rest];
+        unfold toUtf8Map(#props, #utf8Props) ;
+        sep_assert (toUtf8(#fstProp, #utf8FstProp)) [bind: #utf8FstProp];
+        sep_assert ((#utf8Props == l+ ({{ #utf8FstProp }}, #restUtf8))) [bind: #restUtf8];
+        unfold ListToSet(#utf8Props, #utf8PropsSet);
+        if ((#prop = #fstProp)) then {
+          apply toUtf8Injective(#prop, #utf8Prop, #fstProp, #utf8FstProp)
+        } else {
+          apply toUtf8Injective(#prop, #utf8Prop, #fstProp, #utf8FstProp) ;
+          apply InListToUtf8(#prop, #rest)
+        }
+      }  *]

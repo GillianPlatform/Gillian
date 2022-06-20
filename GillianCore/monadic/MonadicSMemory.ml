@@ -117,20 +117,15 @@ module Lift (MSM : S) : SMemory.S = struct
           leeloo_dallas_multibranch
 
   let of_yojson _ =
-    failwith
-      "Please implement of_yojson to enable logging this type to a database"
+    Debugger_log.log (fun m -> m "[WARN] MonadicSMemory.Lift: of_yojson used!");
+    Ok (init ())
 
-  let to_yojson _ =
-    failwith
-      "Please implement to_yojson to enable logging this type to a database"
+  let to_yojson _ = `String "MonadicSMemory.Lift: dummy yojson!"
 
   let err_t_of_yojson _ =
     failwith
       "Please implement err_t_of_yojson to enable logging this type to a \
        database"
 
-  let err_t_to_yojson _ =
-    failwith
-      "Please implement err_t_to_yojson to enable logging this type to a \
-       database"
+  let err_t_to_yojson _ = `String "MonadicSMemory.Lift: dummy yojson!"
 end
