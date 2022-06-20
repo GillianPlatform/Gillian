@@ -631,8 +631,6 @@ struct
     (tests, { lemma with lemma_specs = specs })
 
   let analyse_result (subst : SSubst.t) (test : t) (state : SPState.t) : bool =
-    (* (subst, test, state) |> ignore; DL.log (fun m -> m "--- fake analyze ---");
-       true *)
     (* TODO: ASSUMING SIMPLIFICATION DOES NOT BRANCH HERE *)
     let _, states = SPState.simplify state in
     assert (List.length states = 1);

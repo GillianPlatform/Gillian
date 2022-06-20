@@ -1092,10 +1092,6 @@ struct
                 failwith
                   "Did not log report. Check the logging level is set correctly"
             | Some cur_report_id ->
-                DL.log (fun m ->
-                    m
-                      ~json:[ ("path", branch_path_to_yojson branch_path) ]
-                      "GOT PATH FROM INTERPRETER");
                 dbg.cont_func <- Some cont_func;
                 let content, type_ =
                   Option.get @@ L.LogQueryer.get_report cur_report_id
@@ -1139,7 +1135,6 @@ struct
                        let+ unify_id, _ =
                          L.LogQueryer.get_unify_for cur_report_id
                        in
-                       DL.log (fun m -> m "got unify ID");
                        let unify_map =
                          match dbg.unify_maps |> List.assoc_opt unify_id with
                          | Some map -> map

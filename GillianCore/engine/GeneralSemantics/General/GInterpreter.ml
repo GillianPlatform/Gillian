@@ -1471,7 +1471,6 @@ struct
             report_id_ref branch_path branch_case
         with
         | Interpreter_error (errors, error_state) ->
-            DL.log (fun m -> m "INTERPRETER ERROR");
             [
               ConfErr
                 {
@@ -1483,7 +1482,6 @@ struct
                 };
             ]
         | State.Internal_State_Error (errs, error_state) ->
-            DL.log (fun m -> m "INTERNAL_STATE ERROR");
             (* Return: current procedure name, current command index, the state, and the associated errors *)
             [
               ConfErr
@@ -1555,11 +1553,6 @@ struct
     in
 
     let continue_or_pause rest_confs cont_func =
-      DL.log (fun m ->
-          m
-            ~json:
-              [ ("confs", `List (rest_confs |> List.map cconf_t_to_yojson)) ]
-            "GOT CONFS");
       match rest_confs with
       | ConfCont { branch_case; new_branches; branch_path; _ } :: _ ->
           rest_confs
