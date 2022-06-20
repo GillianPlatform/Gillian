@@ -1167,6 +1167,7 @@ struct
 
   module Debug = struct
     let get_tests_for_prog (prog : prog_t) =
+      let open Syntaxes.Option in
       let ipreds = UP.init_preds prog.preds in
       let preds = Result.get_ok ipreds in
       let pred_ins =
@@ -1180,7 +1181,7 @@ struct
       let specs = Prog.get_specs prog in
       let tests =
         specs
-        |> List.map (fun (spec : Spec.t) ->
+        |> List_utils.map_opt (fun (spec : Spec.t) ->
                let tests, new_spec =
                  testify_spec spec.spec_name preds pred_ins spec
                in
@@ -1192,7 +1193,7 @@ struct
                      let spec_json = ("spec", Spec.to_yojson spec) in
                      m ~json:[ tests_json; spec_json ]
                        "Spec for %s gave multiple tests???" spec.spec_name);
-               let test = List.hd tests in
+               let+ test = List_utils.hd_opt tests in
                let proc = Prog.get_proc_exn prog spec.spec_name in
                Hashtbl.replace prog.procs proc.proc_name
                  { proc with proc_spec = Some new_spec };
