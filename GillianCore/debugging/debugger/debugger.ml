@@ -294,7 +294,8 @@ struct
     type cmd_kind = Branch of branch_case list | Normal | Final
     [@@deriving yojson]
 
-    type 'case with_source = string option * 'case t [@@deriving yojson]
+    type 'case with_source = (string * string) option * 'case t
+    [@@deriving yojson]
 
     let kind_of_cases = function
       | Some cases -> Branch cases
@@ -371,10 +372,23 @@ struct
       match source with
       | None -> (Some new_source, insert ())
       | Some source ->
-          if new_source == source then (Some source, insert ())
-          else (
-            DL.log (fun m -> m "TRIED TO INSERT %a" pp_rid new_id);
-            (Some source, map))
+          if new_source = source then (Some source, insert ())
+          else
+            let path, pid = source in
+            let new_path, new_pid = new_source in
+            DL.log (fun m ->
+                m
+                  ~json:
+                    [
+                      ("path", `String path);
+                      ("new_path", `String new_path);
+                      ("pid", `String pid);
+                      ("new_pid", `String new_pid);
+                    ]
+                  "ExecMap.insert_cmd: didn't insert id %a due to differing \
+                   source"
+                  pp_rid new_id);
+            (Some source, map)
 
     let path_of_id_opt selected_id =
       let rec aux acc = function
@@ -1018,6 +1032,10 @@ struct
     | Error msg -> failwith msg
     | Ok () -> ()
 
+  let get_current_source dbg =
+    let { source_path; name; _ } = List.hd dbg.frames in
+    (source_path, name)
+
   let rec execute_step prev_id_in_frame ?branch_case ?prev_branch_path dbg =
     let open Verification.SAInterpreter in
     match dbg.cont_func with
@@ -1074,9 +1092,9 @@ struct
                 dbg.exec_map <-
                   (dbg.exec_map
                   |> ExecMap.(
-                       let source_file = (List.hd dbg.frames).source_path in
+                       let source = get_current_source dbg in
                        insert_cmd Final prev_id cmd_display ~unifys ~errors
-                         branch_path source_file origin_id));
+                         branch_path source origin_id));
                 update_report_id_and_inspection_fields prev_id dbg
             | Some (prev_id, _, type_) ->
                 Fmt.failwith "EndOfBranch: prev cmd (%a) is '%s', not '%s'!"
@@ -1128,7 +1146,7 @@ struct
                       | Some cases -> Branch cases
                       | None -> Normal
                     in
-                    let source_file = (List.hd dbg.frames).source_path in
+                    let source = get_current_source dbg in
                     let unifys =
                       (DL.log (fun m ->
                            m "getting unify_result for %a" pp_rid cur_report_id);
@@ -1150,7 +1168,7 @@ struct
                     dbg.exec_map <-
                       dbg.exec_map
                       |> insert_cmd cmd_kind cur_report_id cmd_display ~unifys
-                           branch_path source_file origin_id);
+                           branch_path source origin_id);
                   Step)))
 
   let step_in_branch_case prev_id_in_frame ?branch_case ?(reverse = false) dbg =
