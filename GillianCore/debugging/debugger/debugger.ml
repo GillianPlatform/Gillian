@@ -475,7 +475,7 @@ struct
     let path_of_id id map =
       match path_of_id_opt id map with
       | Some path -> path
-      | None -> Fmt.failwith "ID %a doesn't exist in exec map!" pp_rid id
+      | None -> Fmt.failwith "ExecMap.path_of_id: %a not in map!" pp_rid id
 
     let at_id search_id map =
       let rec aux = function
@@ -488,19 +488,20 @@ struct
             nexts |> List.find_map (fun (_, next) -> aux next)
         | Nothing | FinalCmd _ -> None
       in
-      match aux map with
-      | None -> Fmt.failwith "ID %a doesn't exist in map!" pp_rid search_id
-      | Some map -> map
+      aux map
 
     let unifys_at_id id (_, map) =
-      let map = map |> at_id id in
-      match map with
-      | Cmd ({ unifys; _ }, _)
-      | BranchCmd ({ unifys; _ }, _)
-      | FinalCmd { unifys; _ } -> unifys
-      | _ ->
-          Fmt.failwith "ExecMap.unifys_at_id: map at ID %a is Nothing!" pp_rid
-            id
+      match map |> at_id id with
+      | None -> []
+      | Some map -> (
+          match map with
+          | Cmd ({ unifys; _ }, _)
+          | BranchCmd ({ unifys; _ }, _)
+          | FinalCmd { unifys; _ } -> unifys
+          | _ ->
+              Fmt.failwith
+                "ExecMap.unifys_at_id: HORROR - map at %a is Nothing!" pp_rid id
+          )
 
     let rec package = function
       | Nothing -> Nothing
@@ -1087,6 +1088,7 @@ struct
                 let unifys =
                   unify result proc_name prev_id dbg |> Option.to_list
                 in
+                update_report_id_and_inspection_fields prev_id dbg;
                 let cmd_display = cmd.cmd in
                 let origin_id = Annot.get_origin_id cmd.annot in
                 dbg.exec_map <-
@@ -1094,8 +1096,7 @@ struct
                   |> ExecMap.(
                        let source = get_current_source dbg in
                        insert_cmd Final prev_id cmd_display ~unifys ~errors
-                         branch_path source origin_id));
-                update_report_id_and_inspection_fields prev_id dbg
+                         branch_path source origin_id))
             | Some (prev_id, _, type_) ->
                 Fmt.failwith "EndOfBranch: prev cmd (%a) is '%s', not '%s'!"
                   pp_rid prev_id type_ ContentType.cmd
