@@ -63,3 +63,10 @@ proc i__binop_cmpu_le(v1, v2) {
         return;
   unde: fail[comparison]("Cannot compare non-comparable values")
 };
+
+proc i__binop_cmpu_ge(v1, v2) {
+        goto [ (l-nth(v1, 0i) = "int") and (l-nth(v2, 0i) = "int") ] bint unde;
+  bint: ret := "i__value_of_bool"(l-nth(v1, 1i) i>= l-nth(v2, 1i));
+        return;
+  unde: fail[comparison]("Cannot compare non-comparable values")
+};
