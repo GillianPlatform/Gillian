@@ -254,6 +254,7 @@ module Expr : sig
     val ( - ) : t -> t -> t
     val ( * ) : t -> t -> t
     val ( / ) : t -> t -> t
+    val not : t -> t
 
     (** [a @+ b] is [list_cat a b] *)
     val ( @+ ) : t -> t -> t
