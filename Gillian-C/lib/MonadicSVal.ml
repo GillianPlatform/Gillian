@@ -138,11 +138,12 @@ let sure_is_zero = function
   | _ -> false
 
 module SVArray = struct
-  type nonrec t =
+  type t =
     | Arr of Expr.t
         (** the parameter should be a list representing a *NON-EMPTY* list *)
     | AllUndef
     | AllZeros
+  [@@deriving yojson]
 
   let reduce t =
     let open Delayed.Syntax in
