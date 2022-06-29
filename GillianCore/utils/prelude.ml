@@ -96,6 +96,16 @@ key-value pair is list of two elements. *)
   end
 end
 
+module Hashset = struct
+  type 'a t = ('a, unit) Hashtbl.t
+
+  let empty ?(size = 1) () : 'a t = Hashtbl.create size
+  let mem (h : 'a t) (x : 'a) = Hashtbl.mem h x
+  let add (h : 'a t) (x : 'a) = Hashtbl.add h x ()
+  let remove (h : 'a t) (x : 'a) = Hashtbl.remove h x
+  let length (h : 'a t) = Hashtbl.length h
+end
+
 module SS = Containers.SS
 module SI = Containers.SI
 module SN = Containers.SN
