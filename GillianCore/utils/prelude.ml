@@ -104,6 +104,7 @@ module Hashset = struct
   let add (h : 'a t) (x : 'a) = Hashtbl.add h x ()
   let remove (h : 'a t) (x : 'a) = Hashtbl.remove h x
   let length (h : 'a t) = Hashtbl.length h
+  let iter f set = Hashtbl.iter (fun x () -> f x) set
 end
 
 module SS = Containers.SS
