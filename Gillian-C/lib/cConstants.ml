@@ -217,6 +217,7 @@ module Internal_Functions = struct
   let glob_set_var = "i__glob_set_var"
   let val_of_bool = "i__value_of_bool"
   let bool_of_val = "i__bool_of_value"
+  let store_zeros = "i__store_zeros"
   let printf = "EXTERN_printf"
 end
 

@@ -110,7 +110,7 @@ module Hashset = struct
     Hashtbl.filter_map_inplace (fun x () -> if f x then Some () else None) h
 
   let copy (h : 'a t) = Hashtbl.copy h
-  let to_seq (h : 'a t) = Seq.map (fun (x, ()) -> x) (Hashtbl.to_seq h)
+  let to_seq (h : 'a t) : 'a Seq.t = Hashtbl.to_seq_keys h
 end
 
 module SS = Containers.SS
