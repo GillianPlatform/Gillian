@@ -44,7 +44,7 @@ let get_scope_table (cc_tbl : cc_tbl_type) (fid : string) =
     let msg = Printf.sprintf "var tbl of function %s is not in cc-table" fid in
     L.fail msg
 
-let main_fid = "main"
+let main_fid = !Config.entry_point
 let pi_pred_name = "Pi"
 let object_class = "Object"
 let syntax_error_pred_name = "SyntaxError"

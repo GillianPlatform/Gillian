@@ -628,7 +628,11 @@ let translate_only_specs cc_tbl old_fun_tbl fun_tbl vis_tbl js_only_specs =
       Hashtbl.replace cc_tbl name (Hashtbl.create 1);
       (* TODO: This strictness is wrong - just assuming everything strict for the moment *)
       Hashtbl.replace old_fun_tbl name
-        (name, params, None, true, ([], [ name; "main" ], Hashtbl.create 1));
+        ( name,
+          params,
+          None,
+          true,
+          ([], [ name; !Config.entry_point ], Hashtbl.create 1) );
       Hashtbl.replace fun_tbl name (name, params, None, true, Some spec))
     js_only_specs;
   only_specs

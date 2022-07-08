@@ -95,7 +95,8 @@ let asrts_js_val (x_val : Expr.t) : Asrt.t list =
 
 let var_assertion (fid : string) (x : string) (x_val : Expr.t) : Asrt.t =
   let asrt_val : Asrt.t =
-    if fid <> "main" then PointsTo (expr_from_fid fid, Lit (String x), x_val)
+    if fid <> !Config.entry_point then
+      PointsTo (expr_from_fid fid, Lit (String x), x_val)
     else
       PointsTo
         ( expr_from_fid fid,
@@ -460,7 +461,7 @@ let create_new_bispec
   match eproc.spec with
   | Some _ -> ()
   | None ->
-      if eproc.name = "main" then ()
+      if eproc.name = !Config.entry_point then ()
       else
         let pre =
           scope_info_to_assertion eprog cc_tbl vis_tbl eproc.name
