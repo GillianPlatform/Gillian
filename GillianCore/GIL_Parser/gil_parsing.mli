@@ -25,3 +25,5 @@ val cache_labelled_progs : (string * (Annot.t, string) Prog.t) list -> unit
 
 (** Takes a lexbuf and simply parses a literal *)
 val parse_literal : Lexing.lexbuf -> Literal.t
+
+val parse_expression : Lexing.lexbuf -> Expr.t
