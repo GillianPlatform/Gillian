@@ -8,10 +8,9 @@ module Make (Debugger : Debugger.S) = struct
       Debug_rpc.remove_command_handler rpc (module Launch_command);
       Debug_rpc.remove_command_handler rpc (module Attach_command)
     in
-    Debug_rpc.set_command_handler rpc
+    DL.set_rpc_command_handler rpc ~name:"Launch"
       (module Launch_command)
       (fun (launch_args : DebugProtocolEx.Launch_command.Arguments.t) ->
-        DL.log (fun m -> m "Launch request received");
         prevent_reenter ();
         let () =
           match
@@ -23,16 +22,14 @@ module Make (Debugger : Debugger.S) = struct
               Lwt.wakeup_later_exn resolver Exit
         in
         Lwt.return_unit);
-    Debug_rpc.set_command_handler rpc
+    DL.set_rpc_command_handler rpc ~name:"Attach"
       (module Attach_command)
       (fun _ ->
-        DL.log (fun m -> m "Attach request received");
         prevent_reenter ();
         Lwt.fail_with "Attach request is unsupported");
-    Debug_rpc.set_command_handler rpc
+    DL.set_rpc_command_handler rpc ~name:"Disconnect"
       (module Disconnect_command)
       (fun _ ->
-        DL.log (fun m -> m "Disconnect request received");
         Debug_rpc.remove_command_handler rpc (module Disconnect_command);
         Lwt.wakeup_later_exn resolver Exit;
         Lwt.return_unit);

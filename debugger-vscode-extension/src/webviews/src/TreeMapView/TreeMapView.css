@@ -1,0 +1,43 @@
+.tree-map-view {
+  height: 100%;
+  width: 100%;
+  overflow: scroll;
+}
+
+.tree-map-view .react-flow__container svg {
+  height: 100%;
+  width: 100%;
+}
+
+.tree-map-view .react-flow__edge-textbg {
+  fill: var(--background);
+}
+
+.tree-map-view .react-flow__edge-text {
+  fill: var(--vscode-editor-foreground);
+}
+
+.react-flow__controls-button {
+  background: var(--vscode-button-secondaryBackground) !important;
+  border-bottom: 0 !important;
+}
+
+.react-flow__controls-button svg {
+  fill: var(--vscode-button-secondaryForeground) !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--vscode-button-secondaryHoverBackground) !important;
+}
+
+.react-flow__controls-fitview {
+  background: var(--vscode-button-background) !important;
+}
+
+.react-flow__controls-fitview svg {
+  fill: var(--vscode-button-foreground) !important;
+}
+
+.react-flow__controls-fitview:hover {
+  background: var(--vscode-button-hoverBackground) !important;
+}

@@ -4,10 +4,9 @@ module DL = Debugger_log
 module Make (Debugger : Debugger.S) = struct
   let run dbg rpc =
     Lwt.pause ();%lwt
-    Debug_rpc.set_command_handler rpc
+    DL.set_rpc_command_handler rpc ~name:"Set breakpoints"
       (module Set_breakpoints_command)
       (fun args ->
-        DL.log (fun m -> m "Set breakpoints request received");
         let source =
           args.Set_breakpoints_command.Arguments.source.Source.path
         in

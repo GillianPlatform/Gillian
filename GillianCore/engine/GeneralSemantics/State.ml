@@ -5,7 +5,7 @@
 
 module type S = sig
   (** Type of GIL values *)
-  type vt [@@deriving yojson]
+  type vt [@@deriving yojson, show]
 
   (** Type of GIL general states *)
   type t [@@deriving yojson]

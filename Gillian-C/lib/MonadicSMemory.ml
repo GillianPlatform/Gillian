@@ -57,7 +57,16 @@ let resolve_loc_result loc =
 
 module Mem = struct
   open Delayed.Syntax
-  module SMap = Map.Make (String)
+
+  module SMap = GUtils.Prelude.Map.Make (struct
+    include String
+
+    let of_yojson = function
+      | `String s -> Ok s
+      | _ -> Error "string_of_yojson: expected string"
+
+    let to_yojson s = `String s
+  end)
 
   module LastOp = struct
     (** This is used internally to keep track of the last operation done.
@@ -75,6 +84,12 @@ module Mem = struct
 
   type t = { map : SHeapTree.t SMap.t; last_op : LastOp.t }
 
+  let of_yojson json =
+    Result.map
+      (fun map -> { map; last_op = Other })
+      (SMap.of_yojson SHeapTree.of_yojson json)
+
+  let to_yojson { map; _ } = SMap.to_yojson SHeapTree.to_yojson map
   let make ~last_op map = { last_op; map }
   let make_other = make ~last_op:Other
   let map_lift_err loc res = DR.map_error res (lift_sheaptree_err loc)
@@ -473,6 +488,14 @@ end
 
 type t' = { genv : GEnv.t; mem : Mem.t }
 type t = t' ref
+
+let to_yojson t =
+  let { genv = _; mem } = !t in
+  Mem.to_yojson mem
+
+let of_yojson m =
+  Result.map (fun mem -> ref { genv = GEnv.empty; mem }) (Mem.of_yojson m)
+
 type action_ret = Success of (t * vt list) | Failure of err_t
 
 let make_branch ~heap ?(rets = []) () = (ref heap, rets)
@@ -969,6 +992,64 @@ let assertions ?to_keep:_ heap =
 
 let mem_constraints _heap = []
 let is_overlapping_asrt = LActions.is_overlapping_asrt_str
+
+module Lift = struct
+  open Debugger
+  open DebuggerTypes
+
+  let get_store_vars store =
+    store
+    |> List.map (fun (var, value) : variable ->
+           let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
+           create_leaf_variable var value ())
+    |> List.sort (fun (v : DebuggerTypes.variable) w ->
+           Stdlib.compare v.name w.name)
+
+  let make_node ~get_new_scope_id ~variables ~name ~value ?(children = []) () :
+      variable =
+    let var_ref = get_new_scope_id () in
+    let () =
+      match children with
+      | [] -> ()
+      | _ -> Hashtbl.replace variables var_ref children
+    in
+    let type_ =
+      match children with
+      | [] -> None
+      | _ -> Some "object"
+    in
+    { name; value; var_ref; type_ }
+
+  let add_variables ~store ~memory ~is_gil_file:_ ~get_new_scope_id variables =
+    let open DebuggerTypes in
+    let { mem; genv = _ } = !memory in
+    (* Store first *)
+    let store_id = get_new_scope_id () in
+    let store_vars = get_store_vars store in
+    Hashtbl.replace variables store_id store_vars;
+    (* Then genv *)
+    (* TODO: Print the global environment *)
+    (* let genv_id = get_new_scope_id () in
+       let genv_vars = GEnv.Lifting.get_vars genv in
+       Hashtbl.replace variables genv_id genv_vars; *)
+    (* And finally heap*)
+    let make_node = make_node ~get_new_scope_id ~variables in
+    let heap_id = get_new_scope_id () in
+    let heap_vars =
+      Mem.SMap.to_seq mem.map
+      |> Seq.map (fun (loc, tree) ->
+             SHeapTree.Lift.get_variable ~make_node ~loc tree)
+      |> List.of_seq
+    in
+    Debugger_log.log (fun fmt ->
+        fmt "There are %d heap vars" (List.length heap_vars));
+    Hashtbl.replace variables heap_id heap_vars;
+    [
+      { id = store_id; name = "Store" };
+      { id = heap_id; name = "Heap" }
+      (* { id = genv_id; name = "Global Environment" }; *);
+    ]
+end
 
 (** Things defined for BiAbduction *)
 

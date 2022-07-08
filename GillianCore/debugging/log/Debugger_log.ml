@@ -23,7 +23,7 @@ let get_fmt_with_json msgf : string * JsonMap.t =
 
 exception FailureJson of string * JsonMap.t
 
-let info line =
+let to_file line =
   let out = open_out_gen [ Open_append; Open_creat ] 0o666 file_name in
   Printf.fprintf out "%s\n" line;
   close_out out
@@ -47,18 +47,20 @@ end
 let to_rpc msg json =
   match !rpc_ref with
   | Some rpc ->
-      (info
-         (match json with
-         | _ :: _ -> msg ^ " (+)"
-         | [] -> msg);
-       Debug_rpc.send_event rpc (module Log_event) { msg; json })
-      |> ignore
-  | None -> ()
+      to_file
+        (match json with
+        | _ :: _ -> msg ^ " (+)"
+        | [] -> msg);
+      Debug_rpc.send_event rpc (module Log_event) { msg; json }
+  | None -> Lwt.return_unit
 
-let log f =
+let log_async f =
   if enabled () then
     let msg, json = get_fmt_with_json f in
     to_rpc msg json
+  else Lwt.return_unit
+
+let log f = log_async f |> ignore
 
 let show_report id msg =
   log (fun m ->
@@ -73,6 +75,23 @@ let show_report id msg =
         | None -> `Null
       in
       m ~json:[ ("report", report_json) ] "%s" msg)
+
+let set_rpc_command_handler rpc ?name module_ f =
+  let f x =
+    let%lwt () =
+      match name with
+      | Some name -> log_async (fun m -> m "%s request received" name)
+      | None -> Lwt.return_unit
+    in
+    try%lwt f x with
+    | FailureJson (e, json) ->
+        log_async (fun m -> m ~json "[Error] %s" e);%lwt
+        failwith e
+    | Failure e ->
+        log_async (fun m -> m "[Error] %s" e);%lwt
+        failwith e
+  in
+  Debug_rpc.set_command_handler rpc module_ f
 
 let failwith json_f msg =
   if enabled () then

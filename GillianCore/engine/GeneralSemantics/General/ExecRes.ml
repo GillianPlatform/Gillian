@@ -11,6 +11,7 @@ type ('state, 'value, 'err) t =
       final_state : 'state;
       last_report : Logging.ReportId.t option;
     }
+[@@deriving yojson]
 
 let pp pp_state pp_value pp_err ft res =
   let open Fmt in

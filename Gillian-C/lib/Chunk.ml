@@ -9,6 +9,7 @@ type t = Compcert.AST.memory_chunk =
   | Mfloat64
   | Many32
   | Many64
+[@@deriving yojson]
 
 let of_string = function
   | "int8signed" -> Mint8signed

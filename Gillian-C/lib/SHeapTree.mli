@@ -25,7 +25,7 @@ module Range : sig
   val of_low_chunk_and_size : Expr.t -> Chunk.t -> Expr.t -> t
 end
 
-type t
+type t [@@deriving yojson]
 
 val pp : t Fmt.t
 val pp_full : t Fmt.t
@@ -88,3 +88,18 @@ val substitution :
   t
 
 val merge : old_tree:t -> new_tree:t -> t d_or_error
+
+module Lift : sig
+  open Debugger.DebuggerTypes
+
+  val get_variable :
+    make_node:
+      (name:string ->
+      value:string ->
+      ?children:variable list ->
+      unit ->
+      variable) ->
+    loc:string ->
+    t ->
+    variable
+end

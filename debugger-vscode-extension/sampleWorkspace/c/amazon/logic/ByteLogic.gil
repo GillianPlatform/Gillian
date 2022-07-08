@@ -1,0 +1,49 @@
+(****************************************
+ ****************************************
+ *******                          *******
+ *******   Byte Interpretations   *******
+ *******                          *******
+ ****************************************
+ ****************************************)
+
+(* A byte is positive and less than 256i *)
+pred isByte(+byte: Int):
+  (byte i<# 256i) * (0i i<=# byte);
+
+(* Interpretation: one byte as an unsigned 8i-bit integer *)
+pure pred rawToUInt8(+bytes:List, num:Int) :
+    (bytes == {{ #b0 }}) * (num == #b0) *
+    (0i i<=# #b0) * (#b0 i<# 256i);
+
+(* Interpretation: two bytes as an unsigned 16i-bit integer *)
+@nopath
+pure pred rawToUInt16(+bytes:List, +littleEndian:Bool, num:Int) :
+    (littleEndian == false) *
+      (bytes == {{ #b0, #b1 }}) *
+      (0i i<=# #b0) * (#b0 i<# 256i) *
+      (0i i<=# #b1) * (#b1 i<# 256i) *
+      (num == (#b0 i* 256i) i+ #b1),
+    (littleEndian == true) *
+      (bytes == {{ #b0, #b1 }}) *
+      (0i i<=# #b0) * (#b0 i<# 256i) *
+      (0i i<=# #b1) * (#b1 i<# 256i) *
+      (num == (#b1 i* 256i) i+ #b0);
+
+
+(* Interpretation: four bytes as an unsigned 32i-bit integer *)
+@nopath
+pure pred rawToUInt32(+bytes:List, +littleEndian:Bool, num:Int) :
+    (littleEndian == false) *
+      (bytes == {{ #b0, #b1, #b2, #b3 }}) *
+      (0i i<=# #b0) * (#b0 i<# 256i) *
+      (0i i<=# #b1) * (#b1 i<# 256i) *
+      (0i i<=# #b2) * (#b2 i<# 256i) *
+      (0i i<=# #b3) * (#b3 i<# 256i) *
+      (num == (#b0 i* 16777216i) i+ (#b1 i* 65536i) i+ (#b2 i* 256i) i+ #b3),
+    (littleEndian == true) *
+      (bytes == {{ #b0, #b1, #b2, #b3 }}) *
+      (0i i<=# #b0) * (#b0 i<# 256i) *
+      (0i i<=# #b1) * (#b1 i<# 256i) *
+      (0i i<=# #b2) * (#b2 i<# 256i) *
+      (0i i<=# #b3) * (#b3 i<# 256i) *
+      (num == (#b3 i* 16777216i) i+ (#b2 i* 65536i) i+ (#b1 i* 256i) i+ #b0);    

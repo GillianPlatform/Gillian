@@ -1,0 +1,25 @@
+(******************************
+ ******************************
+ *******                *******
+ *******   AWS Strings  *******
+ *******                *******
+ ******************************
+ ******************************)
+
+(*
+   Because of the unusual layout of the aws_string structure,
+   the compiler gets confused and we have to write a custom
+   structure predicate that exposes a pointer to the last part.
+*)
+
+@internal
+pred m_struct_aws_string_exposing_pointer(+ptr: List, allocator : List,
+                          len : List, bytes : List) :
+  i__ptr_to_0(ptr, #loc) *
+  i__is_ptr_opt(allocator) *
+  <mem_single>(#loc, 0i, "int64"; allocator, "Freeable") *
+  i__long(len, #i__len_v) *
+  <mem_single>(#loc, 8i, "int64"; {{ "long", #i__len_v }}, "Freeable") *
+  (bytes == {{ #loc, 16i }}) *
+  <mem_single>(#loc, -8i, "int64"; {{ "long", #i__len_v i+ 17i }}, "Freeable") *
+  <mem_bounds>(#loc; {{ -8i, #i__len_v i+ 17i }});

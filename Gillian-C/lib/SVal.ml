@@ -11,6 +11,7 @@ type t =
   | SVlong of Expr.t
   | SVsingle of Expr.t
   | SVfloat of Expr.t
+[@@deriving yojson]
 
 let equal a b =
   match (a, b) with

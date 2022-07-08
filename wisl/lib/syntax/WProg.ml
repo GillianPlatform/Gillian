@@ -64,19 +64,21 @@ let get_fun prog name =
   aux prog.context
 
 let get_by_id ?(fname = None) prog id =
-  let aux_f = list_visitor_builder WFun.get_by_id id in
-  let aux_p = list_visitor_builder WPred.get_by_id id in
-  let aux_l = list_visitor_builder WLemma.get_by_id id in
-  let fun_getter = WFun.get_by_id id in
-  if id = -1 then `None
-  else
-    match fname with
-    | None ->
-        aux_f prog.context |>> (aux_p, prog.predicates) |>> (aux_l, prog.lemmas)
-    | Some f -> (
-        match List.find_opt (fun ff -> ff.WFun.name = f) prog.context with
-        | None -> `None
-        | Some ff -> fun_getter ff)
+  match id with
+  | None -> `None
+  | Some id -> (
+      let aux_f = list_visitor_builder WFun.get_by_id id in
+      let aux_p = list_visitor_builder WPred.get_by_id id in
+      let aux_l = list_visitor_builder WLemma.get_by_id id in
+      let fun_getter = WFun.get_by_id id in
+      match fname with
+      | None ->
+          aux_f prog.context |>> (aux_p, prog.predicates)
+          |>> (aux_l, prog.lemmas)
+      | Some f -> (
+          match List.find_opt (fun ff -> ff.WFun.name = f) prog.context with
+          | None -> `None
+          | Some ff -> fun_getter ff))
 
 let get_function_name_of_element prog id =
   let is_in_function f =

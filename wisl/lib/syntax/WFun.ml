@@ -27,9 +27,13 @@ let get_by_id id f =
   let aux_spec = Option.fold ~some:(WSpec.get_by_id id) ~none:`None in
   let expr_getter = WExpr.get_by_id id in
   let self_or_none = if f.fid = id then `WFun f else `None in
+  let return_getter (ret_exp : WExpr.t) =
+    if WExpr.get_id ret_exp = id then `Return ret_exp else `None
+  in
   self_or_none
-  |>> (stmt_list_visitor, f.body)
+  |>> (return_getter, f.return_expr)
   |>> (expr_getter, f.return_expr)
+  |>> (stmt_list_visitor, f.body)
   |>> (aux_spec, f.spec)
 
 let pp fmt f =

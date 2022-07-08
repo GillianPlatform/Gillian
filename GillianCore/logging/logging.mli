@@ -66,8 +66,13 @@ module LogQueryer : sig
   (* Returns the previous report id which has type cmd_step given the current
      report id *)
   val get_previous_report_id : ReportId.t -> ReportId.t option
+  val get_next_reports : ReportId.t -> (ReportId.t * string * string) list
 
-  (* Returns the next report id which has type cmd_step given the current
+  (* Returns the all next report ids which have type cmd_step, given the current
+     report id *)
+  val get_next_report_ids : ReportId.t -> ReportId.t list
+
+  (* Returns the 'first' next report id which has type cmd_step, given the current
      report id *)
   val get_next_report_id : ReportId.t -> ReportId.t option
 
@@ -75,9 +80,18 @@ module LogQueryer : sig
      for a given location in the current phase if it exists *)
   val get_previously_freed_annot : string -> string option
 
+  (* Returns the ids, types, and content of any children of the given report id;
+     if `roots_only` is true, only get children with no previous*)
+  val get_children_of :
+    ?roots_only:bool -> ReportId.t -> (ReportId.t * string * string) list
+
   (* Returns the list of IDs and content of any children of the given report
      ID who have type 'cmd_result' *)
   val get_cmd_results : ReportId.t -> (ReportId.t * string) list
+
+  (* Returns a 'unify' report that is the direct child of the given report id,
+     if it exists *)
+  val get_unify_for : ReportId.t -> (ReportId.t * string) option
 end
 
 (** Initializes the logging module with the specified reporters and initializes
@@ -181,6 +195,7 @@ val set_previous : ReportId.t option -> unit
 val get_parent : unit -> ReportId.t option
 val set_parent : ReportId.t -> unit
 val release_parent : ReportId.t option -> unit
+val with_parent_id : ReportId.t option -> (unit -> 'a) -> 'a
 
 val with_parent :
   ?title:string ->

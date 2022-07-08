@@ -3,17 +3,17 @@ open Debugger.DebuggerTypes
 module DL = Debugger_log
 
 module Make (Debugger : Debugger.S) = struct
+  open DapCustom.Commands (Debugger)
+
   let run dbg rpc =
-    Debug_rpc.set_command_handler rpc
+    DL.set_rpc_command_handler rpc ~name:"Threads"
       (module Threads_command)
       (fun () ->
-        DL.log (fun m -> m "Threads request received");
         let main_thread = Thread.make ~id:0 ~name:"main" in
         Lwt.return (Threads_command.Result.make ~threads:[ main_thread ] ()));
-    Debug_rpc.set_command_handler rpc
+    DL.set_rpc_command_handler rpc ~name:"Stack trace"
       (module Stack_trace_command)
       (fun _ ->
-        DL.log (fun m -> m "Stack trace request received");
         let (frames : frame list) = Debugger.get_frames dbg in
         let stack_frames =
           frames
@@ -27,10 +27,9 @@ module Make (Debugger : Debugger.S) = struct
                    ~end_column:(Some frame.end_column) ())
         in
         Lwt.return Stack_trace_command.Result.(make ~stack_frames ()));
-    Debug_rpc.set_command_handler rpc
+    DL.set_rpc_command_handler rpc ~name:"Scopes"
       (module Scopes_command)
       (fun _ ->
-        DL.log (fun m -> m "Scopes request received");
         let scopes = Debugger.get_scopes dbg in
         let scopes =
           scopes
@@ -40,10 +39,9 @@ module Make (Debugger : Debugger.S) = struct
                  Scope.make ~name ~variables_reference ~expensive:false ())
         in
         Lwt.return (Scopes_command.Result.make ~scopes ()));
-    Debug_rpc.set_command_handler rpc
+    DL.set_rpc_command_handler rpc ~name:"Variables"
       (module Variables_command)
       (fun args ->
-        DL.log (fun m -> m "Variables request received");
         let variables = Debugger.get_variables args.variables_reference dbg in
         let variables =
           variables
@@ -55,10 +53,9 @@ module Make (Debugger : Debugger.S) = struct
                  Variable.make ~name ~value ~type_ ~variables_reference ())
         in
         Lwt.return (Variables_command.Result.make ~variables ()));
-    Debug_rpc.set_command_handler rpc
+    DL.set_rpc_command_handler rpc ~name:"Exception info"
       (module Exception_info_command)
       (fun _ ->
-        DL.log (fun m -> m "Exception info request received");
         let exception_info = Debugger.get_exception_info dbg in
         let exception_id = exception_info.id in
         let description = exception_info.description in
@@ -66,5 +63,14 @@ module Make (Debugger : Debugger.S) = struct
         Lwt.return
           (Exception_info_command.Result.make ~exception_id ~description
              ~break_mode ()));
+    DL.set_rpc_command_handler rpc ~name:"Debugger state"
+      (module Debugger_state_command)
+      (fun _ -> Lwt.return (Debugger.Inspect.get_debug_state dbg));
+    DL.set_rpc_command_handler rpc ~name:"Unification"
+      (module Unification_command)
+      (fun { id } ->
+        let unify_id, unify_map = dbg |> Debugger.Inspect.get_unification id in
+        let result = Unification_command.Result.make ~unify_id ~unify_map in
+        Lwt.return result);
     Lwt.return ()
 end

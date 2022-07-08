@@ -137,3 +137,16 @@ let memory_error_to_exception_info info : Debugger.DebuggerTypes.exception_info
   { id; description }
 
 let add_variables = WislSMemory.add_debugger_variables
+let source_map_ability = true
+
+let get_origin_node_str wisl_ast origin_id =
+  let node = WProg.get_by_id wisl_ast origin_id in
+  match node with
+  | `Return we -> Fmt.str "return %a" WExpr.pp we
+  | `WExpr we -> Fmt.str "Evaluating: %a" WExpr.pp we
+  | `WLCmd lcmd -> Fmt.str "%a" WLCmd.pp lcmd
+  | `WStmt stmt -> Fmt.str "%a" WStmt.pp_head stmt
+  | `WLExpr le -> Fmt.str "LEXpr: %a" WLExpr.pp le
+  | `WFun f -> Fmt.str "WFun: %s" f.name
+  | `None -> "No info!"
+  | _ -> "Unknown Kind of Node"

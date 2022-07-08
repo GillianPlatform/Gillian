@@ -1,0 +1,14 @@
+{
+  "arrowParens": "avoid",
+  "semi": true,
+  "singleQuote": true,
+  "overrides": [
+    {
+      "files": "tailwind.config.js",
+      "options": {
+        "quoteProps": "consistent",
+        "printWidth": 200
+      }
+    }
+  ]
+}
