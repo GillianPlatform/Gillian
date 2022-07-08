@@ -89,7 +89,7 @@
     "@opam/fileutils": "*",
     "@opam/utop": "*",
     "@opam/shexp": "v0.14.0",
-    "@opam/ocaml-lsp-server": "*",
+    "@opam/ocaml-lsp-server": "1.12.2",
     "@opam/odoc": "*",
     "@opam/ocamlformat": "0.20.1",
     "@opam/ocamlfind": "*"

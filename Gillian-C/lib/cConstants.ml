@@ -215,7 +215,9 @@ module Internal_Functions = struct
   let get_function_name = "i__get_function_name"
   let glob_set_fun = "i__glob_set_fun"
   let glob_set_var = "i__glob_set_var"
+  let val_of_bool = "i__value_of_bool"
   let bool_of_val = "i__bool_of_value"
+  let store_zeros = "i__store_zeros"
   let printf = "EXTERN_printf"
 end
 
@@ -260,6 +262,7 @@ module BinOp_Functions = struct
   let cmpu_gt = "i__binop_cmpu_gt"
   let cmpu_ne = "i__binop_cmpu_ne"
   let cmpu_eq = "i__binop_cmpu_eq"
+  let cmpu_ge = "i__binop_cmpu_ge"
   let cmplu_le = "i__binop_cmplu_le"
   let cmplu_eq = "i__binop_cmplu_eq"
   let cmplu_ne = "i__binop_cmplu_ne"

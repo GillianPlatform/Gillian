@@ -199,6 +199,11 @@ module Infix = struct
     | Lit (Int x), Lit (Int y) -> Lit (Int (x / y))
     | _ -> BinOp (a, IDiv, b)
 
+  let not a =
+    match a with
+    | Lit (Bool a) -> Lit (Bool (not a))
+    | x -> UnOp (UNot, x)
+
   let ( @+ ) = list_cat
 end
 

@@ -96,6 +96,23 @@ key-value pair is list of two elements. *)
   end
 end
 
+module Hashset = struct
+  type 'a t = ('a, unit) Hashtbl.t
+
+  let empty ?(size = 1) () : 'a t = Hashtbl.create size
+  let mem (h : 'a t) (x : 'a) = Hashtbl.mem h x
+  let add (h : 'a t) (x : 'a) = Hashtbl.replace h x ()
+  let remove (h : 'a t) (x : 'a) = Hashtbl.remove h x
+  let length (h : 'a t) = Hashtbl.length h
+  let iter f set = Hashtbl.iter (fun x () -> f x) set
+
+  let filter_in_place (h : 'a t) (f : 'a -> bool) =
+    Hashtbl.filter_map_inplace (fun x () -> if f x then Some () else None) h
+
+  let copy (h : 'a t) = Hashtbl.copy h
+  let to_seq (h : 'a t) : 'a Seq.t = Hashtbl.to_seq_keys h
+end
+
 module SS = Containers.SS
 module SI = Containers.SI
 module SN = Containers.SN
