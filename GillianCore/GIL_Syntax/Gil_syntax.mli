@@ -924,7 +924,7 @@ module Annot : sig
   val get_origin_loc : t -> Location.t option
 
   (* Get the origin id *)
-  val get_origin_id : t -> int
+  val get_origin_id : t -> int option
 end
 
 module Proc : sig

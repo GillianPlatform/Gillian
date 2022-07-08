@@ -1,0 +1,77 @@
+//
+// Standard over-approximating SLL predicate with contents
+//
+predicate SLL(+x, vs) {
+  // Empty SLL
+  (x == null) * (vs == []);
+  // One SLL node and the rest
+  (x -b> #v, #next) * SLL(#next, #vs) *
+  (vs == #v :: #vs)
+}
+
+//
+// Standard over-approximating SLL segment predicate with contents
+//
+predicate SLLseg(+x, y, vs) {
+  (x == y) * (vs == []);
+  (x -b> #v, #next) * SLLseg(#next, y, #vs) * (vs == #v :: #vs)
+}
+
+
+//
+// Lemma: appending a given value to a given SLLseg
+//
+lemma SSLseg_append {
+  statement:
+    forall x, vs, v, z.
+      SLLseg(x, #y, vs) * (#y -b> v, z) |- SLLseg(x, z, vs @ [ v ])
+
+  proof:
+    unfold SLLseg(x, #y, vs);
+    if (not (x = #y)) {
+      assert {bind: #nv, #nnext, #nvs}
+        (x -b> #nv, #nnext) * SLLseg(#nnext, #y, #nvs) *
+        (vs == #nv :: #nvs);
+      apply SSLseg_append(#nnext, #nvs, v, z);
+      fold SLLseg(x, z, vs @ [ v ])
+    } else {
+      fold SLLseg(#y, z, [ v ])
+    }
+}
+
+//
+// Lemma: a null-terminating SLLseg is an SLL
+//
+lemma SLLseg_to_SLL {
+  statement:
+    forall x.
+      SLLseg(x, null, #vx) |- SLL(x, #vx)
+
+  proof:
+    unfold SLLseg(x, null, #vx);
+    if (not (#vx = [])){
+      assert {bind: #nv, #nnext} (x -b> #nv, #nnext);
+      apply SLLseg_to_SLL(#nnext)
+    }
+}
+
+
+{ (x == #x) * SLL(x, #vx) }
+function SLL_length_iter(x) {
+  y := x;
+  n := 0;
+  [[invariant {bind: n, y, #nvx,  #nvy}
+      SLLseg(x, y,  #nvx) * SLL(y, #nvy) *
+         (#vx == (#nvx@#nvy)) * (n == len #nvx) ]];
+  while (not (y = null)) {
+    [[ assert {bind: #y} y == #y ]];
+    [[ assert {bind: #v, #z} #y -b> #v, #z ]];
+    y := [y+1];
+    n := n+1;
+    [[ apply SSLseg_append(x, #nvx, #v, y) ]]
+  };
+  [[ unfold SLL(null, #nvy)]];
+  [[ apply SLLseg_to_SLL(x) ]];
+  return n
+}
+{ SLL(#x, #vx) * (ret == len(#vx)) }

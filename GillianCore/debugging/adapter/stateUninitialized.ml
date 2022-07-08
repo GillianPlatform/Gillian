@@ -7,11 +7,10 @@ module Make (Debugger : Debugger.S) = struct
     let prevent_reenter () =
       Debug_rpc.remove_command_handler rpc (module Initialize_command)
     in
-    Debug_rpc.set_command_handler rpc
+    DL.set_rpc_command_handler rpc ~name:"Initialize"
       (module Initialize_command)
       (fun arg ->
         prevent_reenter ();
-        DL.log (fun m -> m "Initialize request received");
         let caps =
           Capabilities.(
             make ~supports_configuration_done_request:(Some true)

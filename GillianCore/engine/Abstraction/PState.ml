@@ -52,7 +52,7 @@ module Make
 
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type t = State.t * Preds.t * UP.preds_tbl_t * variants_t
-  type vt = Val.t [@@deriving yojson]
+  type vt = Val.t [@@deriving yojson, show]
   type st = ESubst.t
   type store_t = Store.t
   type heap_t = State.heap_t

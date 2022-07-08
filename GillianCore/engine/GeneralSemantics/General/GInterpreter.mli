@@ -13,16 +13,17 @@ module type S = sig
   type st
   type store_t
   type state_t
-  type state_err_t
-  type state_vt
+  type state_err_t [@@deriving show]
+  type state_vt [@@deriving show]
   type heap_t
 
   module Val : Val.S with type t = vt
   module Store : Store.S with type t = store_t and type vt = vt
 
   type invariant_frames = (string * state_t) list
-  type err_t = (vt, state_err_t) ExecErr.t [@@deriving yojson]
+  type err_t = (vt, state_err_t) ExecErr.t [@@deriving show, yojson]
   type branch_case = state_vt branch_case' [@@deriving yojson]
+  type branch_path = branch_case list [@@deriving yojson]
 
   type cconf_t =
     | ConfErr of {
@@ -30,6 +31,7 @@ module type S = sig
         proc_idx : int;
         error_state : state_t;
         errors : err_t list;
+        branch_path : branch_path;
       }
     | ConfCont of {
         state : state_t;
@@ -41,10 +43,15 @@ module type S = sig
         branch_count : int;
         prev_cmd_report_id : Logging.ReportId.t option;
         branch_case : branch_case option;
+        branch_path : branch_path;
         new_branches : (state_t * int * branch_case) list;
       }
-    | ConfFinish of { flag : Flag.t; ret_val : state_vt; final_state : state_t }
-        (** Equal to Conf cont + the id of the required spec *)
+    | ConfFinish of {
+        flag : Flag.t;
+        ret_val : state_vt;
+        final_state : state_t;
+        branch_path : branch_path;
+      }  (** Equal to Conf cont + the id of the required spec *)
     | ConfSusp of {
         spec_id : string;
         state : state_t;
@@ -54,17 +61,22 @@ module type S = sig
         next_idx : int;
         loop_ids : string list;
         branch_count : int;
+        branch_path : branch_path;
       }
 
   type conf_t = BConfErr of err_t list | BConfCont of state_t
   type result_t = (state_t, state_vt, err_t) ExecRes.t
 
-  type 'a cont_func =
+  type 'a cont_func_f = ?path:branch_path -> unit -> 'a cont_func
+
+  and 'a cont_func =
     | Finished of 'a list
     | Continue of
         (Logging.ReportId.t option
-        * branch_case option
-        * (unit -> 'a cont_func))
+        * branch_path
+        * branch_case list option
+        * 'a cont_func_f)
+    | EndOfBranch of 'a * 'a cont_func_f
 
   module Logging : sig
     module ConfigReport : sig
@@ -81,7 +93,7 @@ module type S = sig
       [@@deriving yojson]
     end
 
-    module CmdStep : sig
+    module CmdResult : sig
       type t = {
         callstack : CallStack.t;
         proc_body_index : int;

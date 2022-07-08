@@ -10,6 +10,13 @@ module type S = sig
   type tl_ast
   type memory
 
+  val source_map_ability : bool
+
+  (** Take the origin [tl_ast], an origin [node_id] and returns
+      a string representing the evaluation step for the exec map.
+      Should never be called if [source_map_ability] is false *)
+  val get_origin_node_str : tl_ast -> int option -> string
+
   val memory_error_to_exception_info :
     (memory_error, tl_ast) memory_error_info -> DebuggerTypes.exception_info
 

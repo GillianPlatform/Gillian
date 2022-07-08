@@ -23,18 +23,27 @@ module type S = sig
        and type heap_t = heap_t
        and type state_err_t = SPState.err_t
 
+  module SUnifier : Unifier.S with type st = SVal.SESubst.t
+
   type t
+  type prog_t = (Annot.t, int) Prog.t
+  type proc_tests = (string * t) list [@@deriving to_yojson]
 
   val start_time : float ref
   val reset : unit -> unit
-
-  val verify_prog :
-    (Annot.t, int) Prog.t -> bool -> SourceFiles.t option -> unit
+  val verify_prog : prog_t -> bool -> SourceFiles.t option -> unit
 
   val verify_up_to_procs :
-    (Annot.t, int) Prog.t -> SAInterpreter.result_t SAInterpreter.cont_func
+    prog_t -> SAInterpreter.result_t SAInterpreter.cont_func
 
   val postprocess_files : SourceFiles.t option -> unit
+
+  module Debug : sig
+    val get_tests_for_prog : prog_t -> proc_tests
+
+    val analyse_result :
+      t -> Logging.ReportId.t -> SAInterpreter.result_t -> bool
+  end
 end
 
 module Make

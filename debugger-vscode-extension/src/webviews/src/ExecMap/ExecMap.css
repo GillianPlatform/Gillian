@@ -1,0 +1,12 @@
+.tooltip {
+  font-size: 12px;
+  width: auto;
+}
+
+.tooltip-error {
+  color: var(--vscode-errorForeground);
+}
+
+.tooltip-error ul {
+  padding-left: 20px;
+}

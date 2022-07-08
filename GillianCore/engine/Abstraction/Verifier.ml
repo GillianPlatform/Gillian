@@ -1,4 +1,5 @@
 open Containers
+module DL = Debugger_log
 
 module type S = sig
   type st
@@ -25,18 +26,27 @@ module type S = sig
        and type heap_t = heap_t
        and type state_err_t = SPState.err_t
 
+  module SUnifier : Unifier.S with type st = SVal.SESubst.t
+
   type t
+  type prog_t = (Annot.t, int) Prog.t
+  type proc_tests = (string * t) list [@@deriving to_yojson]
 
   val start_time : float ref
   val reset : unit -> unit
-
-  val verify_prog :
-    (Annot.t, int) Prog.t -> bool -> SourceFiles.t option -> unit
+  val verify_prog : prog_t -> bool -> SourceFiles.t option -> unit
 
   val verify_up_to_procs :
-    (Annot.t, int) Prog.t -> SAInterpreter.result_t SAInterpreter.cont_func
+    prog_t -> SAInterpreter.result_t SAInterpreter.cont_func
 
   val postprocess_files : SourceFiles.t option -> unit
+
+  module Debug : sig
+    val get_tests_for_prog : prog_t -> proc_tests
+
+    val analyse_result :
+      t -> Logging.ReportId.t -> SAInterpreter.result_t -> bool
+  end
 end
 
 module Make
@@ -75,6 +85,9 @@ struct
     else Fmt.pr "%a" (Fmt.styled `Red Fmt.string) "Failure\n";
     Format.print_flush ()
 
+  let yojson_of_expr_set set =
+    `List (List.map Expr.to_yojson (Expr.Set.elements set))
+
   type t = {
     name : string;
     id : int * int;
@@ -82,8 +95,17 @@ struct
     pre_state : SPState.t;
     post_up : UP.t;
     flag : Flag.t option;
-    spec_vars : Expr.Set.t;
+    spec_vars : Expr.Set.t; [@to_yojson yojson_of_expr_set]
   }
+  [@@deriving to_yojson]
+
+  type prog_t = (Annot.t, int) Prog.t
+  type proc_tests = (string * t) list
+
+  let proc_tests_to_yojson tests =
+    `List
+      (tests
+      |> List.map (fun (name, test) -> `List [ `String name; to_yojson test ]))
 
   let global_results = VerificationResults.make ()
   let start_time = ref 0.
@@ -257,7 +279,7 @@ struct
     (** Given a program and its unification plans, modifies the program in place
         to add the hides to every predicate definition. *)
     let derive_predicates_hiding
-        (prog : (Annot.t, int) Prog.t)
+        (prog : prog_t)
         (preds : (string, UP.pred) Hashtbl.t) : unit =
       if not !Config.Verification.exact then ()
       else
@@ -648,77 +670,81 @@ struct
     let subst = SSubst.init (subst_lst @ params_subst_lst) in
     subst
 
+  let analyse_proc_result test flag ?parent_id result =
+    match (result : SAInterpreter.result_t) with
+    | ExecRes.RFail { proc; proc_idx; error_state; errors } ->
+        L.verbose (fun m ->
+            m
+              "VERIFICATION FAILURE: Procedure %s, Command %d\n\
+               Spec %s %a\n\
+               @[<v 2>State:@\n\
+               %a@]@\n\
+               @[<v 2>Errors:@\n\
+               %a@]@\n"
+              proc proc_idx test.name
+              (Fmt.Dump.pair Fmt.int Fmt.int)
+              test.id SPState.pp error_state
+              Fmt.(list ~sep:(any "@\n") SAInterpreter.Logging.pp_err)
+              errors);
+        if not !Config.debug then Fmt.pr "f @?";
+        false
+    | ExecRes.RSucc { flag = fl; final_state; last_report; _ } ->
+        if Some fl <> test.flag then (
+          L.normal (fun m ->
+              m
+                "VERIFICATION FAILURE: Spec %s %a terminated with flag %s \
+                 instead of %s\n"
+                test.name
+                (Fmt.Dump.pair Fmt.int Fmt.int)
+                test.id (Flag.str fl) (Flag.str flag));
+          if not !Config.debug then Fmt.pr "f @?";
+          false)
+        else
+          let parent_id =
+            match parent_id with
+            | None -> last_report
+            | id -> id
+          in
+          DL.log (fun m ->
+              m "Unify: setting parent to %a" (Fmt.option L.ReportId.pp)
+                parent_id);
+          L.with_parent_id parent_id (fun () ->
+              let store = SPState.get_store final_state in
+              let () =
+                SStore.filter store (fun x v ->
+                    if x = Names.return_variable then Some v else None)
+              in
+              let subst = make_post_subst test final_state in
+              if analyse_result subst test final_state then (
+                L.normal (fun m ->
+                    m
+                      "VERIFICATION SUCCESS: Spec %s %a terminated successfully\n"
+                      test.name
+                      (Fmt.Dump.pair Fmt.int Fmt.int)
+                      test.id);
+                if not !Config.debug then Fmt.pr "s @?";
+                true)
+              else (
+                L.normal (fun m ->
+                    m
+                      "VERIFICATION FAILURE: Spec %s %a - post condition not \
+                       unifiable\n"
+                      test.name
+                      (Fmt.Dump.pair Fmt.int Fmt.int)
+                      test.id);
+                if not !Config.debug then Fmt.pr "f @?";
+                false))
+
   let analyse_proc_results
       (test : t)
       (flag : Flag.t)
       (rets : SAInterpreter.result_t list) : bool =
-    let success : bool =
-      rets <> []
-      && List.fold_left
-           (fun ac result ->
-             match (result : SAInterpreter.result_t) with
-             | ExecRes.RFail { proc; proc_idx; error_state; errors } ->
-                 L.verbose (fun m ->
-                     m
-                       "VERIFICATION FAILURE: Procedure %s, Command %d\n\
-                        Spec %s %a\n\
-                        @[<v 2>State:@\n\
-                        %a@]@\n\
-                        @[<v 2>Errors:@\n\
-                        %a@]@\n"
-                       proc proc_idx test.name
-                       (Fmt.Dump.pair Fmt.int Fmt.int)
-                       test.id SPState.pp error_state
-                       Fmt.(list ~sep:(any "@\n") SAInterpreter.Logging.pp_err)
-                       errors);
-                 Fmt.pr "f @?";
-                 false
-             | ExecRes.RSucc { flag = fl; final_state; last_report; _ } ->
-                 if Some fl <> test.flag then (
-                   L.normal (fun m ->
-                       m
-                         "VERIFICATION FAILURE: Spec %s %a terminated with \
-                          flag %s instead of %s\n"
-                         test.name
-                         (Fmt.Dump.pair Fmt.int Fmt.int)
-                         test.id (Flag.str fl) (Flag.str flag));
-                   Fmt.pr "f @?";
-                   false)
-                 else (
-                   L.set_previous last_report;
-                   let store = SPState.get_store final_state in
-                   let () =
-                     SStore.filter store (fun x v ->
-                         if x = Names.return_variable then Some v else None)
-                   in
-                   let subst = make_post_subst test final_state in
-                   if analyse_result subst test final_state then (
-                     L.normal (fun m ->
-                         m
-                           "VERIFICATION SUCCESS: Spec %s %a terminated \
-                            successfully\n"
-                           test.name
-                           (Fmt.Dump.pair Fmt.int Fmt.int)
-                           test.id);
-                     Fmt.pr "s @?";
-                     ac)
-                   else (
-                     L.normal (fun m ->
-                         m
-                           "VERIFICATION FAILURE: Spec %s %a - post condition \
-                            not unifiable\n"
-                           test.name
-                           (Fmt.Dump.pair Fmt.int Fmt.int)
-                           test.id);
-                     Fmt.pr "f @?";
-                     false)))
-           true rets
-    in
     if rets = [] then (
       L.(
         normal (fun m ->
             m "ERROR: Function %s evaluates to 0 results." test.name));
       exit 1);
+    let success = List.for_all (analyse_proc_result test flag) rets in
     print_success_or_failure success;
     success
 
@@ -878,7 +904,7 @@ struct
       prev_results
 
   let get_tests_to_verify
-      (prog : (Annot.t, int) Prog.t)
+      (prog : prog_t)
       (pnames_to_verify : SS.t)
       (lnames_to_verify : SS.t) : UP.prog * t list * t list =
     let ipreds = UP.init_preds prog.preds in
@@ -993,7 +1019,7 @@ struct
 
   let verify_procs
       ?(prev_results : VerificationResults.t option)
-      (prog : (Annot.t, int) Prog.t)
+      (prog : prog_t)
       (pnames_to_verify : SS.t)
       (lnames_to_verify : SS.t) : unit =
     let prog', tests', tests =
@@ -1019,7 +1045,7 @@ struct
     Printf.printf "%s\n" msg;
     L.normal (fun m -> m "%s" msg)
 
-  let verify_up_to_procs (prog : (Annot.t, int) Prog.t) :
+  let verify_up_to_procs (prog : prog_t) :
       SAInterpreter.result_t SAInterpreter.cont_func =
     L.with_normal_phase ~title:"Program verification" (fun () ->
         (* Analyse all procedures and lemmas *)
@@ -1056,7 +1082,7 @@ struct
       global_results
 
   let verify_prog
-      (prog : (Annot.t, int) Prog.t)
+      (prog : prog_t)
       (incremental : bool)
       (source_files : SourceFiles.t option) : unit =
     let f prog incremental source_files =
@@ -1136,6 +1162,50 @@ struct
     in
     L.with_normal_phase ~title:"Program verification" (fun () ->
         f prog incremental source_files)
+
+  module Debug = struct
+    let get_tests_for_prog (prog : prog_t) =
+      let open Syntaxes.Option in
+      let ipreds = UP.init_preds prog.preds in
+      let preds = Result.get_ok ipreds in
+      let pred_ins =
+        Hashtbl.fold
+          (fun name (pred : UP.pred) pred_ins ->
+            Hashtbl.add pred_ins name pred.pred.pred_ins;
+            pred_ins)
+          preds
+          (Hashtbl.create Config.medium_tbl_size)
+      in
+      let specs = Prog.get_specs prog in
+      let tests =
+        specs
+        |> List.filter_map (fun (spec : Spec.t) ->
+               let tests, new_spec =
+                 testify_spec spec.spec_name preds pred_ins spec
+               in
+               if List.length tests > 1 then
+                 DL.log (fun m ->
+                     let tests_json =
+                       ("tests", `List (List.map to_yojson tests))
+                     in
+                     let spec_json = ("spec", Spec.to_yojson spec) in
+                     m ~json:[ tests_json; spec_json ]
+                       "Spec for %s gave multiple tests???" spec.spec_name);
+               let+ test = List_utils.hd_opt tests in
+               let proc = Prog.get_proc_exn prog spec.spec_name in
+               Hashtbl.replace prog.procs proc.proc_name
+                 { proc with proc_spec = Some new_spec };
+               (spec.spec_name, test))
+      in
+      DL.log (fun m ->
+          m
+            ~json:[ ("tests", proc_tests_to_yojson tests) ]
+            "Verifier.Debug.get_tests_for_prog: Got tests");
+      tests
+
+    let analyse_result test parent_id result =
+      analyse_proc_result test Normal ~parent_id result
+  end
 end
 
 module From_scratch (SMemory : SMemory.S) (External : External.S) = struct

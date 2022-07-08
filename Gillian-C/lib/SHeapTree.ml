@@ -57,14 +57,31 @@ module PathTaken = struct
   (** Going through a tree can become quite expensive.
       Remover is always called right after the getter, so we take note of the last path taken and on remove we just go for it directly.  *)
 
-  type t = Left | Right | Here
+  type t = Left | Right | Here [@@deriving yojson]
 end
 
 module Range = struct
-  type t = Expr.t * Expr.t
+  type t = Expr.t * Expr.t [@@deriving yojson]
 
   let pp fmt (a, b) = Fmt.pf fmt "@[<h>[%a; %a[@]" Expr.pp a Expr.pp b
   let make low high = (low, high)
+
+  module Lift = struct
+    open Debugger.DebuggerTypes
+
+    let as_variables
+        ~(make_node :
+           name:string ->
+           value:string ->
+           ?children:variable list ->
+           unit ->
+           variable)
+        (low, high) =
+      let str = Fmt.to_to_string (Fmt.hbox Expr.pp) in
+      let from = make_node ~name:"From" ~value:(str low) () in
+      let to_ = make_node ~name:"To" ~value:(str high) () in
+      [ from; to_ ]
+  end
 
   let of_low_and_chunk low chunk =
     let open Expr.Infix in
@@ -97,7 +114,7 @@ module Range = struct
 end
 
 module Node = struct
-  type qty = Totally | Partially
+  type qty = Totally | Partially [@@deriving yojson]
 
   let str_qty = function
     | Totally -> "TOTALLY"
@@ -106,8 +123,9 @@ module Node = struct
   type mem_val =
     | Zeros
     | Undef of qty
-    | Single of { chunk : Compcert.AST.memory_chunk; value : SVal.t }
-    | Array of { chunk : Compcert.AST.memory_chunk; values : SVArr.t }
+    | Single of { chunk : Chunk.t; value : SVal.t }
+    | Array of { chunk : Chunk.t; values : SVArr.t }
+  [@@deriving yojson]
 
   let eq_mem_val ma mb =
     match (ma, mb) with
@@ -129,6 +147,7 @@ module Node = struct
         exact_perm : Perm.t option;
         mem_val : mem_val;
       }
+  [@@deriving yojson]
 
   let make_owned ~mem_val ~perm =
     MemVal { mem_val; min_perm = perm; exact_perm = Some perm }
@@ -518,8 +537,32 @@ module Tree = struct
     node : Node.t;
     span : Range.t;
     children : (t * t) option;
-    last_path : PathTaken.t option;
+    last_path : PathTaken.t option; [@ignore]
   }
+  [@@deriving yojson]
+
+  module Lift = struct
+    open Debugger.DebuggerTypes
+
+    let rec as_variable
+        ~(make_node :
+           name:string ->
+           value:string ->
+           ?children:variable list ->
+           unit ->
+           variable)
+        (tree : t) : variable =
+      let as_variable = as_variable ~make_node in
+      let str pp = Fmt.to_to_string (Fmt.hbox pp) in
+      let name = (str Range.pp) tree.span in
+      let value = (str Node.pp) tree.node in
+      let children =
+        Option.map
+          (fun (a, b) -> [ as_variable a; as_variable b ])
+          tree.children
+      in
+      make_node ~name ~value ?children ()
+  end
 
   let box_range_and_node span node =
     let open PrintBox in
@@ -1068,6 +1111,7 @@ module Tree = struct
 end
 
 type t = Freed | Tree of { bounds : Range.t option; root : Tree.t option }
+[@@deriving yojson]
 
 let pp_full fmt = function
   | Freed -> Fmt.pf fmt "FREED"
@@ -1494,3 +1538,34 @@ let substitution ~le_subst ~sval_subst ~svarr_subst t =
         Option.map (Tree.substitution ~sval_subst ~le_subst ~svarr_subst) root
       in
       Tree { bounds; root }
+
+module Lift = struct
+  open Debugger.DebuggerTypes
+
+  let get_variable
+      ~(make_node :
+         name:string ->
+         value:string ->
+         ?children:variable list ->
+         unit ->
+         variable)
+      ~loc
+      t : variable =
+    match t with
+    | Freed -> make_node ~name:loc ~value:"Freed" ()
+    | Tree { bounds; root } ->
+        let bounds =
+          match bounds with
+          | None -> make_node ~name:"Bounds" ~value:"Not owned" ()
+          | Some bounds ->
+              make_node ~name:"Bounds" ~value:""
+                ~children:(Range.Lift.as_variables ~make_node bounds)
+                ()
+        in
+        let root =
+          match root with
+          | None -> make_node ~name:"Tree" ~value:"Not owned" ()
+          | Some root -> Tree.Lift.as_variable ~make_node root
+        in
+        make_node ~name:loc ~value:"Allocated" ~children:[ bounds; root ] ()
+end

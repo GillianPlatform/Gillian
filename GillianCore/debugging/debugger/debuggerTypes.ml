@@ -6,6 +6,7 @@ type stop_reason =
   | ReachedEnd
   | Breakpoint
   | ExecutionError
+[@@deriving yojson]
 
 type frame = {
   index : int;

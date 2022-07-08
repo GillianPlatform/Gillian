@@ -126,19 +126,24 @@ let get_previous_report_id id =
   |> check_result_code db ~log:"finalize: get previous report";
   prev_report_id
 
-let get_next_report_id id =
+let get_next_reports id =
   let db = get_db () in
   let stmt =
-    Sqlite3.prepare db "SELECT id FROM report WHERE previous = ? LIMIT 1;"
+    Sqlite3.prepare db "SELECT id, type, content FROM report WHERE previous=?;"
   in
   Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
-  |> check_result_code db ~log:"get next report bind id";
-  let row = zero_or_one_row db ~log:"step: get next report" ~stmt in
-  let next_report_id =
-    Option.map (fun row -> Sqlite3.Data.to_int64_exn row.(0)) row
+  |> check_result_code db ~log:"get nexts bind id";
+  let rc, children =
+    Sqlite3.fold stmt
+      ~f:(fun results row ->
+        let id : ReportId.t = Sqlite3.Data.to_int64_exn row.(0) in
+        let type_ = Sqlite3.Data.to_string_exn row.(1) in
+        let content = Sqlite3.Data.to_string_exn row.(2) in
+        (id, type_, content) :: results)
+      ~init:[]
   in
-  Sqlite3.finalize stmt |> check_result_code db ~log:"finalize: get next report";
-  next_report_id
+  rc |> check_result_code db ~log:"fold: get nexts";
+  children
 
 let get_previously_freed_annot loc =
   let db = get_db () in
@@ -163,22 +168,23 @@ let get_previously_freed_annot loc =
   |> check_result_code db ~log:"finalize: get previous freed annot";
   annot
 
-let get_cmd_results id =
+let get_children_of roots_only id =
   let db = get_db () in
-  let stmt =
-    Sqlite3.prepare db
-      "SELECT child.id AS id, child.content AS content FROM report child INNER \
-       JOIN report parent ON child.parent = parent.id WHERE parent.id = ? AND \
-       child.type=\"cmd_result\""
+  let query =
+    Fmt.str "SELECT id, type, content FROM report WHERE parent=?%s;"
+      (if roots_only then " AND previous IS NULL" else "")
   in
+  let stmt = Sqlite3.prepare db query in
   Sqlite3.bind stmt 1 (Sqlite3.Data.INT id)
-  |> check_result_code db ~log:"get cmd results bind id";
-  let _, results =
+  |> check_result_code db ~log:"get children bind id";
+  let rc, children =
     Sqlite3.fold stmt
       ~f:(fun results row ->
         let id : ReportId.t = Sqlite3.Data.to_int64_exn row.(0) in
-        let content = Sqlite3.Data.to_string_exn row.(1) in
-        (id, content) :: results)
+        let type_ = Sqlite3.Data.to_string_exn row.(1) in
+        let content = Sqlite3.Data.to_string_exn row.(2) in
+        (id, type_, content) :: results)
       ~init:[]
   in
-  results
+  rc |> check_result_code db ~log:"fold: get children";
+  children

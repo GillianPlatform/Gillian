@@ -1,0 +1,82 @@
+.react-flow__node {
+  cursor: auto !important;
+  pointer-events: auto !important;
+  user-select: auto !important;
+}
+
+.node-content {
+  font-size: 12px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--vscode-editor-foreground);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.node-background {
+  --border-color: var(--vscode-editorCursor-foreground);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+  border-radius: 1px;
+  background: linear-gradient(to right, var(--background), var(--background));
+  border: 1px solid var(--border-color);
+}
+
+.node-selected .node-content {
+  color: var(--vscode-editor-selectionForeground, var(--vscode-editor-foreground));
+}
+
+.node-selected .node-background {
+  background:
+    linear-gradient(to right, var(--vscode-editor-selectionBackground), var(--vscode-editor-selectionBackground)),
+    linear-gradient(to right, var(--background), var(--background));
+  width: calc(100% - 7px);
+  height: calc(100% - 7px);
+  border: 3.5px double var(--border-color);
+}
+
+.node-error .node-background {
+  --border-color: var(--vscode-errorForeground);
+}
+
+.node-empty .node-background {
+  border-radius: 100%;
+  border-style: dashed;
+}
+
+.node-root .node-background {
+  width: calc(100% - 6px);
+  height: calc(100% - 6px);
+  border-radius: 0;
+  border-width: 3px;
+}
+
+.node-content .node-title {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.node-content .node-subtitle {
+  color: var(--vscode-descriptionForeground);
+}
+
+.node-content pre {
+  margin: 0;
+  text-align: center;
+  width: calc(100% - 10px);
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.node-button-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}

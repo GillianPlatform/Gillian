@@ -30,7 +30,7 @@ module SS = struct
     let str_of_yojson j =
       match j with
       | `String s -> Ok s
-      | _ -> Error (Fmt.str "Invalid json string: %a" Yojson.Safe.pp j)
+      | _ -> Fmt.error "Invalid json string: %a" Yojson.Safe.pp j
     in
     match yojson with
     | `List l ->
@@ -40,7 +40,7 @@ module SS = struct
             | Ok set, Ok s -> Ok (add s set)
             | (Error _ as err), _ | _, (Error _ as err) -> err)
           (Ok empty) l
-    | _ -> Error (Fmt.str "Invalid json set: %a" Yojson.Safe.pp yojson)
+    | _ -> Fmt.error "Invalid json set: %a" Yojson.Safe.pp yojson
 end
 
 module SI = Set.Make (MyInt)

@@ -7,9 +7,39 @@ module type S = sig
   type tl_ast
   type debugger_state
 
+  module PackagedBranchCase : sig
+    type t [@@deriving yojson]
+  end
+
+  module UnifyMap : sig
+    type t [@@deriving yojson]
+  end
+
+  module ExecMap : sig
+    type 'a t [@@deriving yojson]
+  end
+
+  module Inspect : sig
+    type debug_state [@@deriving yojson]
+
+    val get_debug_state : debugger_state -> debug_state
+
+    val get_unification :
+      Logging.ReportId.t -> debugger_state -> Logging.ReportId.t * UnifyMap.t
+  end
+
   val launch : string -> string option -> (debugger_state, string) result
+  val jump_to_id : Logging.ReportId.t -> debugger_state -> (unit, string) result
+  val jump_to_start : debugger_state -> unit
   val step_in : ?reverse:bool -> debugger_state -> stop_reason
-  val step : debugger_state -> stop_reason
+  val step : ?reverse:bool -> debugger_state -> stop_reason
+
+  val step_specific :
+    PackagedBranchCase.t option ->
+    Logging.ReportId.t ->
+    debugger_state ->
+    (stop_reason, string) result
+
   val step_out : debugger_state -> stop_reason
   val run : ?reverse:bool -> ?launch:bool -> debugger_state -> stop_reason
   val terminate : debugger_state -> unit

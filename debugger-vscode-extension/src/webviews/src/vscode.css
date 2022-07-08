@@ -1,0 +1,23 @@
+/* @tailwind base; */
+
+body {
+  padding: 0;
+  margin: 0;
+}
+
+@tailwind components;
+@tailwind utilities;
+
+[data-reach-combobox-option][aria-selected='true'] {
+  background: var(--list-active-selection-background) !important;
+  border: calc(var(--border-width) * 1px) solid var(--focus-border) !important;
+  color: var(--list-active-selection-foreground) !important;
+}
+
+[data-reach-combobox-option]:hover {
+  background: var(--list-active-selection-background) !important;
+}
+
+[data-reach-combobox-option][aria-selected='true']:hover {
+  background: var(--list-active-selection-background) !important;
+}

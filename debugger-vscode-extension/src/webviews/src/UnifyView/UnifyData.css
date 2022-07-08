@@ -1,0 +1,37 @@
+
+.unify-data-wrap {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: scroll;
+}
+
+.unify-data {
+  width: 100%;
+  height: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+  min-width: 250px;
+}
+
+.subst-grid {
+  width: fit-content;
+}
+
+.subst-expr {
+  overflow: hidden;
+}
+
+.subst-val {
+  overflow: hidden;
+}
+
+.unify-link {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.unify-link .codicon-reply {
+  transform: rotate(0.5turn)
+}

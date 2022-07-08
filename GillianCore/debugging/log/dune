@@ -2,5 +2,5 @@
  (name debugger_log)
  (public_name gillian.debugging._log)
  (preprocess
-  (pps ppx_deriving_yojson))
+  (pps ppx_deriving.std ppx_deriving_yojson lwt_ppx))
  (libraries dap.rpc_lwt logging))

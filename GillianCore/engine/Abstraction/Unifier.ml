@@ -7,6 +7,9 @@ type unify_kind =
 [@@deriving yojson]
 
 module type S = sig
+  module Val : Val.S
+  module ESubst : ESubst.S with type vt = Val.t and type t = Val.et
+
   type vt
   type st
   type err_t
@@ -17,6 +20,53 @@ module type S = sig
   type post_res = (Flag.t * Asrt.t list) option
   type search_state = (t * st * UP.t) list * err_t list
   type up_u_res = UPUSucc of (t * st * post_res) list | UPUFail of err_t list
+
+  module Logging : sig
+    module AstateRec : sig
+      type t = { state : state_t; preds : preds_t; variants : variants_t }
+      [@@deriving yojson]
+    end
+
+    module AssertionReport : sig
+      type t = { step : UP.step; subst : ESubst.t; astate : AstateRec.t }
+      [@@deriving yojson]
+    end
+
+    module UnifyReport : sig
+      type t = {
+        astate : AstateRec.t;
+        subst : ESubst.t;
+        up : UP.t;
+        unify_kind : unify_kind;
+      }
+      [@@deriving yojson]
+    end
+
+    module UnifyCaseReport : sig
+      type t = { astate : AstateRec.t; subst : st; up : UP.t }
+      [@@deriving yojson]
+    end
+
+    module UnifyResultReport : sig
+      type remaining_state = UnifyCaseReport.t [@@deriving yojson]
+
+      type t =
+        | Success of {
+            astate : AstateRec.t;
+            subst : st;
+            posts : (Flag.t * Asrt.t list) option;
+            remaining_states : remaining_state list;
+          }
+        | Failure of {
+            cur_step : UP.step option;
+            subst : st;
+            astate : AstateRec.t;
+            errors : err_t list;
+          }
+      [@@deriving yojson]
+    end
+  end
+
   type gp_ret = GPSucc of (t * vt list) list | GPFail of err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
   type unfold_info_t = (string * string) list
@@ -70,6 +120,8 @@ module Make
   open Literal
   open Containers
   module L = Logging
+  module Val = Val
+  module ESubst = ESubst
 
   type vt = Val.t
   type st = ESubst.t [@@deriving yojson]
@@ -213,12 +265,12 @@ module Make
         astate
         subst
         up =
-      let target_case_depth =
+      let actual_target_depth =
         if is_new_case then target_case_depth - 1 else target_case_depth
       in
       let case_depth = List.length !parent_ids_ref in
-      assert (target_case_depth <= case_depth);
-      for _ = case_depth downto target_case_depth + 1 do
+      assert (actual_target_depth <= case_depth + 1);
+      for _ = case_depth downto actual_target_depth + 1 do
         match !parent_ids_ref with
         | [] -> raise (Failure "Mismatched case depth and parent_id list!")
         | parent_id :: rest ->

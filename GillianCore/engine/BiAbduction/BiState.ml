@@ -14,7 +14,7 @@ struct
   module Preds = Preds.Make (Val) (ESubst)
   module AState = PState.Make (Val) (ESubst) (Store) (State) (Preds)
 
-  type vt = Val.t [@@deriving yojson]
+  type vt = Val.t [@@deriving yojson, show]
   type st = ESubst.t
   type store_t = Store.t
   type heap_t = State.heap_t

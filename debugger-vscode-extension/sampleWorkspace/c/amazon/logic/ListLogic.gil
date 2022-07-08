@@ -1,0 +1,168 @@
+lemma DestructList(lst)
+  [[  types(#lst : List) ]]
+  [[  (#lst == {{  }}); (#lst == l+ ({{ #hd }}, #tl)) ]]
+
+(*****************************************
+ *****************************************
+ *******                           *******
+ *******   List first projection   *******
+ *******                           *******
+ *****************************************
+ *****************************************)
+
+(* First projection of a list of pairs *)
+pure pred FirstProj(+lst : List, fProj : List) : (lst == {{  }}) *
+  (fProj == {{  }}), (lst == l+ ({{ {{ #fst, _lvar_js_7 }} }}, #rest)) *
+  FirstProj(#rest, #fProjRest) * (fProj == l+ ({{ #fst }}, #fProjRest));
+  
+
+lemma FirstProjFunction(lst1, proj1, lst2, proj2)
+  [[  FirstProj(#lst1, #proj1) * FirstProj(#lst2, #proj2) * (#lst1 == #lst2) ]]
+  [[  (#proj1 == #proj2) ]]
+  [*  unfold FirstProj(#lst1, #proj1)  [bind: (#fst := #fst1) and (#rest := #rest1) and (#fProjRest := #fProjRest1)];
+      if ((not (#lst1 = {{  }}))) then {
+        unfold FirstProj(#lst2, #proj2)  [bind: (#fst := #fst2) and (#rest := #rest2) and (#fProjRest := #fProjRest2)];
+        apply FirstProjFunction(#rest1, #fProjRest1, #rest2, #fProjRest2) 
+      }
+  *]
+
+lemma FirstProjAppendPair(lst, fProj, prop, value)
+  [[  FirstProj(#lst, #fProj) ]]
+  [[  FirstProj(l+ (#lst, {{ {{ #prop, #value }} }}), l+ (#fProj, {{ #prop }})) ]]
+  [*  unfold FirstProj(#lst, #fProj) ;
+      if ((not (#lst = {{  }}))) then {
+        sep_assert ((#lst == l+ ({{ {{ #fProp, #fValue }} }}, #restPVPairs)))
+          [bind: #fProp, #fValue, #restPVPairs];
+        sep_assert (FirstProj(#restPVPairs, #restProj)) [bind: #restProj];
+        apply FirstProjAppendPair(#restPVPairs, #restProj, #prop, #value) 
+      }
+  *]
+      
+lemma FirstProjConcatSplit(PVPairs, prefix, suffix)
+  [[  (#PVPairs == l+ (#prefix, #suffix)) * FirstProj(#PVPairs, #props) *
+      FirstProj(#prefix, #preProps) * FirstProj(#suffix, #sufProps) ]]
+  [[  (#props == l+ (#preProps, #sufProps)) ]]
+  [*  apply DestructList(#prefix) ; unfold FirstProj(#prefix, #preProps) ;
+      if ((#prefix = {{  }})) then {
+        apply FirstProjFunction(#PVPairs, #props, #suffix, #sufProps) 
+      } else {
+        sep_assert ((#prefix == l+ ({{ {{ #prop, #value }} }}, #restPrefix))) [bind: #restPrefix];
+        unfold FirstProj(#PVPairs, #props) ;
+        unfold FirstProj(#prefix, #preProps) ;
+        apply FirstProjConcatSplit(l+ (#restPrefix, #suffix), #restPrefix, #suffix)  }
+  *]
+
+lemma FirstProjToUtf8MapPairCompat(PVPairs)
+  [[  FirstProj(#PVPairs, #props) * toUtf8PairMap(#PVPairs, #utf8PVPairs) *
+      FirstProj(#utf8PVPairs, #utf8Props) ]]
+  [[  toUtf8Map(#props, #utf8Props) ]]
+  [*  unfold FirstProj(#PVPairs, #props) ;
+      unfold toUtf8PairMap(#PVPairs, #utf8PVPairs) ;
+      unfold FirstProj(#utf8PVPairs, #utf8Props) ;
+      if ((not (#PVPairs = {{  }}))) then {
+        sep_assert ((#PVPairs == l+ ({{ {{ _, _ }} }}, #restPVPairs))) [bind: #restPVPairs];
+        apply FirstProjToUtf8MapPairCompat
+        (#restPVPairs) 
+      }  *]
+
+(********************************
+ ********************************
+ *******                  *******
+ *******   Unique lists   *******
+ *******                  *******
+ ********************************
+ ********************************)
+  
+@nopath
+pure pred Unique(l : List) :
+  (l == {{  }}),
+  (l == l+ ({{ #fst }}, #rest)) * ListToSet(#rest, #setRest) *
+    (! (#fst --e-- #setRest)) * Unique(#rest);
+    
+lemma UniqueConcatSplitNotInSuffix(props, prefix, suffix, prop)
+  [[  (#props == l+ (#prefix, #suffix)) * Unique(#props) *
+      ListToSet(#prefix, #setPrefix) * ListToSet(#suffix, #setSuffix) *
+      (#prop --e-- #setSuffix) ]]
+  [[  (! (#prop --e-- #setPrefix)) ]]
+  [*  apply DestructList(#prefix) ;
+      if ((not (#prefix = {{  }}))) then {
+        sep_assert ((#prefix == l+ ({{ #firstProp }}, #restPrefix)))
+          [bind: #firstProp, #restPrefix];
+        unfold Unique(#props) ;
+        unfold ListToSet(#prefix, #setPrefix) ;
+        apply UniqueConcatSplitNotInSuffix(l+ (#restPrefix, #suffix),
+                                           #restPrefix, #suffix, #prop) ;
+        branch ((#firstProp == #prop));
+        if ((#firstProp = #prop)) then {
+          apply ListToSetUnion(#restPrefix, #suffix) 
+        }
+      } else {
+        unfold ListToSet(#prefix, #setPrefix) 
+      }
+    *]
+    
+(************************************
+ ************************************
+ *******                      *******
+ *******   Duplicated lists   *******
+ *******                      *******
+ ************************************
+ ************************************)
+
+(* Lists with duplicates *)
+pure pred Duplicated(+prefix:List, +suffix:List) :
+    (* Either the head is duplicated *)
+    (suffix == l+ ({{ #fst }}, #rest)) *
+    ListToSet(prefix, #preSet) *
+    (#fst --e-- #preSet),
+
+    (* Or the duplication is in the tail *)
+    (suffix == l+ ({{ #fst }}, #rest)) *
+    ListToSet(prefix, #preSet) *
+    (! (#fst --e-- #preSet)) *
+    Duplicated(l+ (prefix, {{ #fst }}), #rest);
+        
+
+(*****************************************
+******************************************
+*******                            *******
+*******   List to Set conversion   *******
+*******                            *******
+******************************************
+******************************************)
+
+pure pred ListToSet(+lst : List, set : Set) :
+  (lst == {{  }}) * (set == -{  }-),
+  (lst == l+ ({{ #e }}, #restLst)) *
+    ListToSet(#restLst, #restSet) * (set == -u- (#restSet, -{ #e }-));
+
+lemma ListToSetUnion(lst1, lst2)
+  [[  ListToSet(#lst1, #set1) * ListToSet(#lst2, #set2) *
+      ListToSet(l+ (#lst1, #lst2), #uset) ]]
+  [[  (#uset == -u- (#set1, #set2)) ]]
+  [*  sep_assert ((#x == l+ (#lst1, #lst2))) [bind: #x];
+      unfold ListToSet(#lst1, #set1)  [bind: (#e := #h1) and (#restLst := #rest1) and (#restSet := #restSet1)];
+      if ((#lst1 = {{  }})) then {
+        apply ListToSetFunction(#lst2, #set2, #x, #uset) 
+      } else { unfold ListToSet(l+ (#lst1, #lst2), #uset) ;
+        apply ListToSetUnion(#rest1, #lst2)  }
+  *]
+  
+lemma ListToSetFunction(lst1, set1, lst2, set2)
+  [[  ListToSet(#lst1, #set1) * ListToSet(#lst2, #set2) * (#lst1 == #lst2) ]]
+  [[  (#set1 == #set2) ]]
+  [*  unfold ListToSet(#lst1, #set1)  [bind: (#e := #h1) and (#restLst := #t1) and (#restSet := #restSet1)];
+      if ((not (#lst1 = {{  }}))) then {
+        unfold ListToSet(#lst2, #set2)  [bind: (#e := #h2) and (#restLst := #t2) and (#restSet := #restSet2)];
+        apply ListToSetFunction(#t1, #restSet1, #t2, #restSet2) 
+      }  *]
+    
+lemma ProduceListToSet(lst)
+  [[  types(lst : List) ]]
+  [[  ListToSet(#lst, #set) ]]
+  [*  apply DestructList(#lst) ;
+      if ((not (#lst = {{  }}))) then {
+        sep_assert ((#lst == l+ ({{ #head }}, #rest))) [bind: #head, #rest];
+        apply ProduceListToSet(#rest) 
+      } 
+  *]

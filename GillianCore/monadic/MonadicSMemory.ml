@@ -13,7 +13,7 @@ module type S = sig
   type err_t
 
   (** Type of GIL general states *)
-  type t
+  type t [@@deriving yojson]
 
   type action_ret = Success of (t * vt list) | Failure of err_t
 
@@ -61,7 +61,7 @@ module type S = sig
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
 end
 
-module Lift (MSM : S) : SMemory.S = struct
+module Lift (MSM : S) : SMemory.S with type t = MSM.t = struct
   include MSM
 
   let assertions ?to_keep t =
@@ -116,21 +116,13 @@ module Lift (MSM : S) : SMemory.S = struct
             (bch.value, bch.pc.learned, bch.pc.learned_types))
           leeloo_dallas_multibranch
 
-  let of_yojson _ =
-    failwith
-      "Please implement of_yojson to enable logging this type to a database"
-
-  let to_yojson _ =
-    failwith
-      "Please implement to_yojson to enable logging this type to a database"
+  let of_yojson = MSM.of_yojson
+  let to_yojson = MSM.to_yojson
 
   let err_t_of_yojson _ =
     failwith
       "Please implement err_t_of_yojson to enable logging this type to a \
        database"
 
-  let err_t_to_yojson _ =
-    failwith
-      "Please implement err_t_to_yojson to enable logging this type to a \
-       database"
+  let err_t_to_yojson _ = `String "MonadicSMemory.Lift: dummy yojson!"
 end

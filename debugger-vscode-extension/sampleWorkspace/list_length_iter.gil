@@ -1,0 +1,96 @@
+import "wisl_pointer_arith.gil", "wisl_core.gil";
+
+
+lemma SLLseg_to_SLL(x)
+  [[  emp * (x == #x) * SLLseg(#x, null, #vx) ]]
+  [[  SLL(#x, #vx) ]]
+  [*  unfold SLLseg(#x, null, #vx) ;
+      if ((not (#vx = {{  }}))) then {
+                                  sep_assert (<cell>(_lvar_0, 0i; #nv) *
+                                              <bound>(_lvar_0; 2i) *
+                                              <cell>(_lvar_0, 1i; #nnext) *
+                                              types(_lvar_0 : Obj) *
+                                              (#x == {{ _lvar_0, 0i }})) [bind: _lvar_0,
+                                  #nv, #nnext]; apply SLLseg_to_SLL(#nnext) 
+      }  *]
+
+lemma SSLseg_append(x, vs, v, z)
+  [[  emp * (x == #x) * (vs == #vs) * (v == #v) * (z == #z) *
+      SLLseg(#x, #y, #vs) * <cell>(_lvar_1, 0i; #v) * <bound>(_lvar_1; 2i) *
+      <cell>(_lvar_1, 1i; #z) * types(_lvar_1 : Obj) *
+      (#y == {{ _lvar_1, 0i }}) ]]
+  [[  SLLseg(#x, #z, l+ (#vs, {{ #v }})) ]]
+  [*  unfold SLLseg(#x, #y, #vs) ;
+      if ((not (#x = #y))) then {
+        sep_assert (<cell>(_lvar_0, 0i; #nv) * <bound>(_lvar_0; 2i) *
+                    <cell>(_lvar_0, 1i; #nnext) * types(_lvar_0 : Obj) *
+                    (#x == {{ _lvar_0, 0i }}) * SLLseg(#nnext, #y, #nvs) *
+                    (#vs == l+ ({{ #nv }}, #nvs))) [bind: _lvar_0,
+        #nv, #nnext, #nvs]; apply SSLseg_append(#nnext, #nvs, #v, #z) ;
+        fold SLLseg(#x, #z, l+ (#vs, {{ #v }}))
+      } else { fold SLLseg(#y, #z, {{ #v }}) }  *]
+pred SLL(+x, vs : List) : (x == null) * (vs == {{  }}),
+  <cell>(_lvar_1, 0i; #v) * <bound>(_lvar_1; 2i) *
+  <cell>(_lvar_1, 1i; #next) * types(_lvar_1 : Obj) *
+  (x == {{ _lvar_1, 0i }}) * SLL(#next, #vs) * (vs == l+ ({{ #v }}, #vs));
+
+
+pred SLLseg(+x, y, vs : List) : (x == y) * (vs == {{  }}),
+  <cell>(_lvar_0, 0i; #v) * <bound>(_lvar_0; 2i) *
+  <cell>(_lvar_0, 1i; #next) * types(_lvar_0 : Obj) *
+  (x == {{ _lvar_0, 0i }}) * SLLseg(#next, y, #vs) *
+  (vs == l+ ({{ #v }}, #vs));
+
+spec SLL_length_iter_loop0(n, x, y)
+  [[  (y == #pvar_y) *
+      (x == #pvar_x) *
+      (n == #pvar_n) *
+      SLLseg(#pvar_x, #pvar_y, #nvx) *
+      SLL(#pvar_y, #nvy) *
+      (#vx == l+ (#nvx, #nvy)) *
+      (#pvar_n == (l-len #nvx))  ]]
+  [[  SLLseg(#pvar_x, #new_pvar_y, #nvx__new) *
+      SLL(#new_pvar_y, #nvy__new) *
+      (#vx == l+ (#nvx__new, #nvy__new)) *
+      (#new_pvar_n == (l-len #nvx__new)) *
+      (ret == {{ #new_pvar_n, #pvar_x, #new_pvar_y }}) *
+      (#new_pvar_y == null)  ]]
+  normal
+proc SLL_length_iter_loop0(n, x, y) {
+          goto [(not (y = null))] then0 else0;
+  then0:  sep_assert ((y == #y)) [bind: #y];
+          sep_assert (<cell>(_lvar_0, 0i; #v) * <bound>(_lvar_0; 2i) *
+                      <cell>(_lvar_0, 1i; #z) * types(_lvar_0 : Obj) *
+                      (#y == {{ _lvar_0, 0i }})) [bind: _lvar_0,
+          #v, #z];
+          gvar0 := "i__add"(y, 1i);
+          gvar1 := [getcell](l-nth(gvar0, 0i), l-nth(gvar0, 1i));
+          y := l-nth(gvar1, 2i);
+          gvar2 := "i__add"(n, 1i);
+          n := gvar2;
+          apply SSLseg_append(x, #nvx, #v, y) ;
+          loopretvar__ := "SLL_length_iter_loop0"(n, x, y);
+          goto endif0;
+  else0:  loopretvar__ := {{ n, x, y }};
+  endif0: skip;
+          ret := loopretvar__;
+          return
+};
+
+
+spec SLL_length_iter(x)
+  [[  (x == #x) * SLL(x, #vx)  ]]
+  [[  SLL(#x, #vx) * (ret == (l-len #vx))  ]]
+  normal
+proc SLL_length_iter(x) {
+    y := x;
+    n := 0i;
+    gvar0 := "SLL_length_iter_loop0"(n, x, y);
+    n := l-nth(gvar0, 0i);
+    x := l-nth(gvar0, 1i);
+    y := l-nth(gvar0, 2i);
+    unfold SLL(null, #nvy) ;
+    apply SLLseg_to_SLL(x) ;
+    ret := n;
+    return
+};
