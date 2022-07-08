@@ -1056,7 +1056,7 @@ struct
               "Grabbing path for step...");
         let branch_path =
           prev_branch_path
-          |> Option_utils.calc (fun () ->
+          |> Option_utils.or_else (fun () ->
                  dbg.exec_map |> snd |> ExecMap.path_of_id prev_id_in_frame)
         in
         let branch_path =
@@ -1209,8 +1209,9 @@ struct
                            |> Logging.ConfigReport.of_yojson
                          with
                          | Error _ -> false
-                         | Ok cmd -> Option_utils.eq cmd.branch_case branch_case
-                         )
+                         | Ok cmd ->
+                             Option_utils.somes_and_eq cmd.branch_case
+                               branch_case)
                      | _ -> false)
         in
         match next_report_id with
