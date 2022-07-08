@@ -1179,7 +1179,7 @@ struct
       let specs = Prog.get_specs prog in
       let tests =
         specs
-        |> List_utils.map_opt (fun (spec : Spec.t) ->
+        |> List.filter_map (fun (spec : Spec.t) ->
                let tests, new_spec =
                  testify_spec spec.spec_name preds pred_ins spec
                in

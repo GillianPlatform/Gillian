@@ -47,30 +47,6 @@ let get_list_somes (lst : 'a option list) : 'a list =
   in
   aux lst
 
-let rec map_opt f = function
-  | [] -> []
-  | x :: rest -> (
-      match f x with
-      | Some y -> y :: map_opt f rest
-      | None -> map_opt f rest)
-
-let mapi_opt f =
-  let rec aux i = function
-    | [] -> []
-    | x :: rest -> (
-        match f i x with
-        | Some y -> y :: aux (i + 1) rest
-        | None -> aux (i + 1) rest)
-  in
-  aux 0
-
-let rec concat_map_opt f = function
-  | [] -> []
-  | x :: rest -> (
-      match f x with
-      | Some ys -> ys @ concat_map_opt f rest
-      | None -> concat_map_opt f rest)
-
 let divide_list_by_index (lst : 'a list) (len : int) : 'a list * 'a list =
   let rec f (i : int) (l_lst : 'a list) (r_list : 'a list) : 'a list * 'a list =
     if i >= len then (List.rev l_lst, r_list)
