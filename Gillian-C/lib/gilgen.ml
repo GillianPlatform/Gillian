@@ -57,7 +57,7 @@ let internal_proc_of_unop uop =
         (Printf.sprintf "Unhandled unary operator : %s"
            (PrintCsharpminor.name_of_unop uop))
 
-let trans_binop_expr ?(fname = "main") binop te1 te2 =
+let trans_binop_expr ~fname binop te1 te2 =
   let call func =
     let gvar = Generators.gen_str ~fname Prefix.gvar in
     ( [
@@ -129,7 +129,7 @@ let trans_binop_expr ?(fname = "main") binop te1 te2 =
   | Omulfs -> call BinOp_Functions.mulfs
   | _ -> failwith "Unhandled"
 
-let rec trans_expr ?(fname = "main") ~local_env expr =
+let rec trans_expr ~fname ~local_env expr =
   let trans_expr = trans_expr ~fname ~local_env in
   let trans_binop_expr = trans_binop_expr ~fname in
   let gen_str = Generators.gen_str ~fname in
@@ -216,7 +216,7 @@ let make_free_cmd fname var_list =
   | blocks ->
       Some (Cmd.Call (gvar, freelist, [ Expr.EList blocks ], None, None))
 
-let make_symb_gen ?(fname = "main") ~ctx assigned_id x type_string =
+let make_symb_gen ~fname ~ctx assigned_id x type_string =
   let gen_str = Generators.gen_str ~fname in
   let assigned = true_name assigned_id in
   let str_x =
@@ -266,7 +266,7 @@ let get_invariant () =
   last_invariant := None;
   i
 
-let rec trans_stmt ?(fname = "main") ~context stmt =
+let rec trans_stmt ~fname ~context stmt =
   let trans_stmt ?(context = context) = trans_stmt ~fname ~context in
   let make_symb_gen = make_symb_gen ~fname in
   (* Default context is the given context *)
@@ -614,7 +614,7 @@ let trans_function
   in
   let register_vars = List.concat (List.map (alloc_var fname) fn_vars) in
   let init_genv =
-    if String.equal fname "main" then
+    if String.equal fname !Utils.Config.entry_point then
       let gvar = Generators.gen_str ~fname Prefix.gvar in
       let expr_fn =
         Expr.Lit (Literal.String CConstants.Internal_Functions.initialize_genv)

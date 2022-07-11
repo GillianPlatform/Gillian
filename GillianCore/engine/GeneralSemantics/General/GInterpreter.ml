@@ -1885,9 +1885,9 @@ struct
     Random.self_init ();
     let ret_fun x = x in
     let initial_cs =
-      CallStack.push CallStack.empty ~pid:"main" ~arguments:[] ~loop_ids:[]
-        ~ret_var:"out" ~call_index:(-1) ~continue_index:(-1) ~error_index:(-1)
-        ()
+      CallStack.push CallStack.empty ~pid:!Config.entry_point ~arguments:[]
+        ~loop_ids:[] ~ret_var:"out" ~call_index:(-1) ~continue_index:(-1)
+        ~error_index:(-1) ()
     in
     let initial_proc_body_index = 0 in
     let initial_state = State.init ~preds:prog.preds () in

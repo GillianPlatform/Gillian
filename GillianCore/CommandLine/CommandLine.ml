@@ -40,6 +40,13 @@ struct
   module Debugger = Debugger.Make (PC) (Verification) (Gil_to_tl_lifter)
   module DebugAdapter = DebugAdapter.Make (Debugger)
 
+  let entry_point =
+    let doc = "Entry point of execution." in
+    let docv = "PROCEDURE_NAME" in
+    let default = !Utils.Config.entry_point in
+    Arg.(
+      value & opt string default & info [ "start"; "entry-point" ] ~docv ~doc)
+
   let files =
     let doc = "Input file." in
     let docv = "FILE" in
@@ -301,10 +308,11 @@ struct
       in
       return_to_exit (valid_concrete_result ret)
 
-    let exec files already_compiled debug outfile_opt no_heap () =
+    let exec files already_compiled debug outfile_opt no_heap entry_point () =
       let () = Config.current_exec_mode := Concrete in
       let () = PC.initialize Concrete in
       let () = Config.no_heap := no_heap in
+      let () = Config.entry_point := entry_point in
       let e_prog =
         if not already_compiled then (
           let e_progs =
@@ -332,7 +340,8 @@ struct
 
     let exec_t =
       Term.(
-        const exec $ files $ already_compiled $ debug $ output_gil $ no_heap)
+        const exec $ files $ already_compiled $ debug $ output_gil $ no_heap
+        $ entry_point)
 
     let exec_info =
       let doc = "Concretely executes a file of the target language" in
@@ -355,7 +364,7 @@ struct
         ignore
           (SInterpreter.evaluate_proc
              (fun x -> x)
-             prog "main" [] (SState.init ()))
+             prog !Config.entry_point [] (SState.init ()))
       in
       if incremental && prev_results_exist () then
         (* Only re-run program if transitive callees of main proc have changed *)
@@ -374,7 +383,7 @@ struct
             (proc_changes.changed_procs @ proc_changes.new_procs
            @ proc_changes.dependent_procs)
         in
-        if SS.mem "main" changed_procs then
+        if SS.mem !Config.entry_point changed_procs then
           let () = run_main prog in
           let cur_call_graph = SInterpreter.call_graph in
           let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
@@ -436,6 +445,7 @@ struct
         stats
         parallel
         incremental
+        entry_point
         () =
       let () = Config.current_exec_mode := Symbolic in
       let () = PC.initialize Symbolic in
@@ -443,6 +453,7 @@ struct
       let () = Config.stats := stats in
       let () = Config.parallel := parallel in
       let () = Config.no_heap := no_heap in
+      let () = Config.entry_point := entry_point in
       let () = process_files files already_compiled outfile_opt incremental in
       let () = if stats then Statistics.print_statistics () in
       let () = Logging.wrap_up () in
@@ -456,7 +467,7 @@ struct
     let wpst_t =
       Term.(
         const wpst $ files $ already_compiled $ output_gil $ no_heap $ stats
-        $ parallel $ incremental)
+        $ parallel $ incremental $ entry_point)
 
     let wpst_info =
       let doc = "Symbolically executes a file of the target language" in

@@ -222,7 +222,7 @@ let reserved_vars =
     Names.return_variable;
   ]
 
-let main_fid = "main"
+let main_fid = !Config.entry_point
 let macro_GPVF_name = "GPVFold"
 let macro_GPVU_name = "GPVUnfold"
 let pi_predicate_name = "Pi"

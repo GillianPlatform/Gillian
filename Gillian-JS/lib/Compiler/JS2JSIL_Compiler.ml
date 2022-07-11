@@ -7226,8 +7226,8 @@ let js2jsil_function_constructor_prop
   let prog, which_pred = (prog.procs, prog.predecessors) in
 
   let _, new_fid, _, new_fun_tbl =
-    JS2JSIL_Preprocessing.preprocess_eval cc_tbl vis_tbl strictness e "main"
-      params
+    JS2JSIL_Preprocessing.preprocess_eval cc_tbl vis_tbl strictness e
+      !Config.entry_point params
   in
 
   Hashtbl.iter
@@ -7319,6 +7319,6 @@ let js2jsil ~filename e for_verification =
   let macros = Macro.init_tbl () in
   let bispecs = BiSpec.init_tbl () in
   ( EProg.init imports lemmas predicates only_specs procedures macros bispecs
-      (ids @ [ "main" ]),
+      (ids @ [ !Config.entry_point ]),
     cc_tbl,
     vis_tbl )

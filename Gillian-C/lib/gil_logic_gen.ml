@@ -582,9 +582,10 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
       in
       pr ** to_assert ** malloc_chunk siz
 
-let rec trans_asrt ?(fname = "main") ?(ann = empty) asrt =
+let rec trans_asrt ~fname ~ann asrt =
   match asrt with
-  | CAssert.Star (a1, a2) -> trans_asrt ~ann a1 ** trans_asrt ~ann a2
+  | CAssert.Star (a1, a2) ->
+      trans_asrt ~fname ~ann a1 ** trans_asrt ~fname ~ann a2
   | Array { ptr; chunk; size; content; malloced } ->
       let a1, _, ptr = trans_expr ptr in
       let a2, _, size = trans_expr size in
@@ -621,7 +622,7 @@ let rec trans_asrt ?(fname = "main") ?(ann = empty) asrt =
   | Emp -> Emp
   | PointsTo { ptr = s; constr = c; typ } -> trans_constr ~fname ~typ ann s c
 
-let rec trans_lcmd ?(fname = "main") ?(ann = empty) lcmd =
+let rec trans_lcmd ~fname ~ann lcmd =
   let trans_lcmd = trans_lcmd ~fname ~ann in
   let trans_asrt = trans_asrt ~fname ~ann in
   let make_assert ~bindings = function
@@ -706,7 +707,7 @@ let trans_abs_pred ~filepath cl_pred =
       pred_normalised = false;
     }
 
-let trans_pred ?(ann = empty) ~filepath cl_pred =
+let trans_pred ~ann ~filepath cl_pred =
   let CPred.
         {
           name = pred_name;
@@ -752,7 +753,7 @@ let add_trans_pred filepath ann cl_pred =
 let add_trans_abs_pred filepath ann cl_pred =
   { ann with preds = trans_abs_pred ~filepath cl_pred :: ann.preds }
 
-let trans_sspec ?(ann = empty) fname sspecs =
+let trans_sspec ~ann fname sspecs =
   let CSpec.{ pre; posts; spec_annot } = sspecs in
   let tap, spa =
     match spec_annot with
@@ -819,7 +820,7 @@ let trans_lemma ~ann ~filepath lemma =
       lemma_proof;
     }
 
-let trans_spec ?(ann = empty) ?(only_spec = false) cl_spec =
+let trans_spec ~ann ?(only_spec = false) cl_spec =
   let CSpec.{ fname; params; sspecs } = cl_spec in
   let result =
     Spec.

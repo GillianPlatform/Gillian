@@ -98,7 +98,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
                 (proc_changes.changed_procs @ proc_changes.new_procs
                @ proc_changes.dependent_procs)
             in
-            if SS.mem "main" changed_procs then true
+            if SS.mem !Config.entry_point changed_procs then true
             else (
               (* Keep previous call graph *)
               Hashtbl.add cur_call_graphs filename prev_call_graph;
