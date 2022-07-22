@@ -542,18 +542,13 @@ struct
     let eval_expr = make_eval_expr state in
     match lcmd with
     | AssumeType (e, t) -> (
-        match Val.from_expr e with
-        | Some v_x -> (
-            match State.assume_t state v_x t with
-            | Some state' -> [ state' ]
-            | _ ->
-                Fmt.failwith
-                  "ERROR: AssumeType: Cannot assume type %s for expression %a."
-                  (Type.str t) Expr.pp e)
+        let v_x = eval_expr e in
+        match State.assume_t state v_x t with
+        | Some state' -> [ state' ]
         | _ ->
             Fmt.failwith
-              "ERROR: AssumeType: Variable %a cannot be turned into a value."
-              Expr.pp e)
+              "ERROR: AssumeType: Cannot assume type %s for expression %a."
+              (Type.str t) Expr.pp e)
     | Assume f ->
         let store_subst = Store.to_ssubst (State.get_store state) in
         let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
