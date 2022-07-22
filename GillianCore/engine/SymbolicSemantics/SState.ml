@@ -216,7 +216,7 @@ module Make (SMemory : SMemory.S) :
         | ESet es -> ESet (List.map f es)
         | NOp (op, es) -> NOp (op, List.map f es)
         | LstSub (e1, e2, e3) -> LstSub (f e1, f e2, f e3)
-        | _ -> expr
+        | Lit _ | LVar _ | ALoc _ -> expr
       in
       (* Perform reduction *)
       if no_reduce then result

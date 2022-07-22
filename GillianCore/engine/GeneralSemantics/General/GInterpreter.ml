@@ -583,8 +583,8 @@ struct
              fos)
     | FreshSVar x ->
         let new_svar = Generators.fresh_svar () in
-        let state' = State.add_spec_vars state (SS.singleton x) in
-        let v = State.eval_expr state' (LVar new_svar) in
+        let state' = State.add_spec_vars state (SS.singleton new_svar) in
+        let v = Val.from_expr (LVar new_svar) |> Option.get in
         [ update_store state' x v ]
     | Assert f -> (
         let store_subst = Store.to_ssubst (State.get_store state) in
