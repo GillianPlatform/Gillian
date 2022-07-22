@@ -35,7 +35,7 @@ let rec pp fmt lcmd =
   | Macro (name, lparams) -> Fmt.pf fmt "%s(%a)" name pp_params lparams
   | Assert a -> Fmt.pf fmt "assert (%a)" Formula.pp a
   | Assume a -> Fmt.pf fmt "assume (%a)" Formula.pp a
-  | FreshSVar x -> Fmt.pf fmt "%s := symbol()" x
+  | FreshSVar x -> Fmt.pf fmt "%s := fresh_svar()" x
   | SL sl_cmd -> SLCmd.pp fmt sl_cmd
   | AssumeType (e, t) ->
       Fmt.pf fmt "assume_type (%a, %s)" Expr.pp e (Type.str t)

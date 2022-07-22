@@ -2198,7 +2198,7 @@ let rec translate_expr tr_ctx e :
       let cmd1 = (metadata, None, LLogic (FreshSVar x_v)) in
       let x_v = PVar x_v in
       let cmd2 =
-        (metadata, None, LLogic (LCmd.AssumeType (x_v, Type.StringType)))
+        (metadata, None, LLogic (LCmd.AssumeType (x_v, Type.BooleanType)))
       in
       ([ cmd1; cmd2 ], x_v, [])
   | JS_Parser.Syntax.Call (e_f, xes)

@@ -94,4 +94,4 @@ let rec pp fmt lcmd =
   | AssumeType (e, t) ->
       Fmt.pf fmt "assume_type (%a, %s)" Expr.pp e (Type.str t)
   | SL sl_cmd -> SLCmd.pp fmt sl_cmd
-  | FreshSVar x -> Fmt.pf fmt "%s := Symbol()" x
+  | FreshSVar x -> Fmt.pf fmt "%s := fresh_svar()" x

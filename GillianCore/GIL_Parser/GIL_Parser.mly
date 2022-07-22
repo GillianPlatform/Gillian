@@ -184,7 +184,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LIF
 %token LTHEN
 %token LELSE
-%token SYMBOL
+%token FRESH_SVAR
 (* Procedure specification keywords *)
 %token AXIOMATIC
 %token INCOMPLETE
@@ -768,7 +768,7 @@ g_logic_cmd_target:
 
 
   (* x := e *)
-  | v=VAR; DEFEQ; SYMBOL; LBRACE; RBRACE
+  | v=VAR; DEFEQ; FRESH_SVAR; LBRACE; RBRACE
     { LCmd.FreshSVar (v) }
 
 (* branch (fo) *)

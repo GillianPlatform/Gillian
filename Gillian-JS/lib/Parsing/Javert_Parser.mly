@@ -120,7 +120,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token SEPASSERT
 %token INVARIANT
 %token ASSUME_TYPE
-%token SYMBOL
+%token FRESH_SVAR
 %token LSTNTH
 %token LSTSUB
 %token STRNTH
@@ -567,7 +567,7 @@ logic_cmd_target:
     { LCmd.Assume a }
   | ASSUME_TYPE; LBRACE; e=expr_target; COMMA; t=type_target; RBRACE
     { LCmd.AssumeType (e, t) }
-  | v = VAR; DEFEQ; SYMBOL; LBRACE; RBRACE
+  | v = VAR; DEFEQ; FRESH_SVAR; LBRACE; RBRACE
     { LCmd.FreshSVar v}
   | BRANCH; LBRACE; fo = pure_assertion_target; RBRACE
      { LCmd.Branch fo }
