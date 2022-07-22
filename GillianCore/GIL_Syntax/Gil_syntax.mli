@@ -630,7 +630,7 @@ module LCmd : sig
     | Assert of Formula.t  (** Assert *)
     | Assume of Formula.t  (** Assume *)
     | AssumeType of Expr.t * Type.t  (** Assume Type *)
-    | FreshSVar of string  (** x := Symbol() *)
+    | FreshSVar of string  (** x := fresh_svar() *)
     | SL of SLCmd.t  (** Separation-logic-related commands ({!type:SLCmd.t}) *)
 
   (** Deprecated. Use {!Visitors} instead *)
