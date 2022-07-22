@@ -165,7 +165,7 @@ proc i__binop_mod(v1, v2) {
 proc i__binop_mulfs(v1, v2) {
         goto [ l-nth(v1, 0i) = "single" ] llon unde;
   llon: goto [ l-nth(v2, 0i) = "single" ] blon unde;
-  blon: ret := {{ "single", l-nth(v1, 1i) i* l-nth(v2, 1i) }};
+  blon: ret := {{ "single", l-nth(v1, 1i) * l-nth(v2, 1i) }};
         return;
   unde: fail[operator]("Using *s operator for non-long elements")
 };

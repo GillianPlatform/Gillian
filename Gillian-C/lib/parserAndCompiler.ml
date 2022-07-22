@@ -383,24 +383,24 @@ let parse_and_compile_files paths =
         | a, b -> compare a b)
       init_asrts
   in
+  let main_path = List.hd paths in
+  let main_prog, Gilgen.{ genv_pred_asrts; genv_init_cmds; _ } =
+    Hashtbl.find compiled_progs (List.hd paths)
+  in
   let init_cmds =
     List.sort_uniq
       (fun a b ->
         match (a, b) with
         | ( Cmd.Call (_, _, Lit (String a) :: _, _, _),
             Cmd.Call (_, _, Lit (String b) :: _, _, _) ) -> String.compare a b
-        | a, b -> compare a b)
-      init_cmds
-  in
-  let main_path = List.hd paths in
-  let main_prog, Gilgen.{ genv_pred_asrts; genv_init_cmds; _ } =
-    Hashtbl.find compiled_progs (List.hd paths)
+        | _ -> failwith "Wrong init cmd")
+      (init_cmds @ genv_init_cmds)
   in
   let current_genv_config = CConstants.GEnvConfig.current_genv_config () in
   let all_imports =
     Imports.imports current_arch exec_mode current_genv_config @ imports
   in
-  let init_proc = Gilgen.make_init_proc (genv_init_cmds @ init_cmds) in
+  let init_proc = Gilgen.make_init_proc init_cmds in
   let init_proc_name = init_proc.Proc.proc_name in
   let all_proc_names = init_proc_name :: main_prog.proc_names in
   let () = Hashtbl.add main_prog.procs init_proc_name init_proc in

@@ -541,25 +541,19 @@ struct
 
     let eval_expr = make_eval_expr state in
     match lcmd with
-    | AssumeType (x, t) -> (
-        match Val.from_expr (LVar x) with
+    | AssumeType (e, t) -> (
+        match Val.from_expr e with
         | Some v_x -> (
             match State.assume_t state v_x t with
             | Some state' -> [ state' ]
             | _ ->
-                raise
-                  (Failure
-                     (Printf.sprintf
-                        "ERROR: AssumeType: Cannot assume type %s for variable \
-                         %s."
-                        (Type.str t) x)))
+                Fmt.failwith
+                  "ERROR: AssumeType: Cannot assume type %s for expression %a."
+                  (Type.str t) Expr.pp e)
         | _ ->
-            raise
-              (Failure
-                 (Printf.sprintf
-                    "ERROR: AssumeType: Variable %s cannot be turned into a \
-                     value."
-                    x)))
+            Fmt.failwith
+              "ERROR: AssumeType: Variable %a cannot be turned into a value."
+              Expr.pp e)
     | Assume f ->
         let store_subst = Store.to_ssubst (State.get_store state) in
         let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
@@ -587,7 +581,11 @@ struct
                | Some state' -> [ state' ]
                | _ -> [])
              fos)
-    | SpecVar xs -> [ State.add_spec_vars state (Var.Set.of_list xs) ]
+    | FreshSVar x ->
+        let new_svar = Generators.fresh_svar () in
+        let state' = State.add_spec_vars state (SS.singleton x) in
+        let v = State.eval_expr state' (LVar new_svar) in
+        [ update_store state' x v ]
     | Assert f -> (
         let store_subst = Store.to_ssubst (State.get_store state) in
         let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
@@ -1125,6 +1123,12 @@ struct
                         ~branch_count:b_counter ?branch_case ?new_branches ())
                     recovery_states
               | _ ->
+                  let pp_err ft (a, errs) =
+                    Fmt.pf ft "FAILURE: Action %s failed with: %a" a
+                      (Fmt.Dump.list State.pp_err)
+                      errs
+                  in
+                  Fmt.pr "%a\n@?" (Fmt.styled `Red pp_err) (a, errs);
                   L.normal ~title:"failure" ~severity:Error (fun m ->
                       m "Action call failed with:@.%a"
                         (Fmt.Dump.list State.pp_err)

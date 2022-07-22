@@ -19,6 +19,8 @@ let aloc_prefix = "_$l_"
 (** Logical variable prefix  *)
 let lvar_prefix = "_lvar_"
 
+let svar_prefix = "#var_"
+
 (** Logical variable prefix  *)
 let lvar_prefix_bi = "_lvar_bi_"
 

@@ -447,6 +447,7 @@ struct
         incremental
         entry_point
         () =
+      let () = Fmt_tty.setup_std_outputs () in
       let () = Config.current_exec_mode := Symbolic in
       let () = PC.initialize Symbolic in
       let () = Printexc.record_backtrace @@ L.Mode.enabled () in
