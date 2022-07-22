@@ -51,11 +51,11 @@ function isNode(n, pri, val, next) {
 
 var pq = new PriorityQueue();
 
-var pri1 = symb_number(pri1);
-var val1 = symb(val1);
+var pri1 = symb_number();
+var val1 = symb();
 
-var pri2 = symb_number(pri2);
-var val2 = symb(val2);
+var pri2 = symb_number();
+var val2 = symb();
 
 pq.enqueue(pri1, val1);
 pq.enqueue(pri2, val2);

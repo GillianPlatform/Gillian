@@ -952,10 +952,10 @@ buckets.Bag = function (toStrFunction) {
 var bag = new buckets.Bag();
 
 // size
-var n1 = symb_number(n1);
-var n2 = symb_number(n2);
-var n3 = symb_number(n3);
-var n4 = symb_number(n4);
+var n1 = symb_number();
+var n2 = symb_number();
+var n3 = symb_number();
+var n4 = symb_number();
 
 var res1 = bag.isEmpty();
 Assert(res1);

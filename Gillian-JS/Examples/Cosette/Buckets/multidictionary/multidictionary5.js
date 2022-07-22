@@ -749,11 +749,11 @@ buckets.MultiDictionary = function (toStrFunction, valuesEqualsFunction) {
 
 var dict = new buckets.MultiDictionary()
 
-var s1 = symb_string(s1);
-var s2 = symb_string(s2);
-var x1 = symb_number(x1);
-var x2 = symb_number(x2);
-var x3 = symb_number(x3);
+var s1 = symb_string();
+var s2 = symb_string();
+var x1 = symb_number();
+var x2 = symb_number();
+var x3 = symb_number();
 
 Assume (not (x1 = x2));
 Assume (not (x1 = x3));

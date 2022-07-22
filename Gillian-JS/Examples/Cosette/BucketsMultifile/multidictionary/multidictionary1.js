@@ -2,10 +2,10 @@ var buckets = require('../../buckets');
 
 var dict = new buckets.MultiDictionary()
 
-var s1 = symb_string(s1);
-var s2 = symb_string(s2);
-var x1 = symb_number(x1);
-var x2 = symb_number(x2);
+var s1 = symb_string();
+var s2 = symb_string();
+var x1 = symb_number();
+var x2 = symb_number();
 
 dict.set(s1, x1);
 dict.set(s2, x2);
@@ -13,7 +13,7 @@ dict.set(s2, x2);
 var res1 = dict.set(s1, undefined);
 Assert(not res1);
 
-var s3 = symb_string(s3);
+var s3 = symb_string();
 Assume(not (s1 = s3));
 Assume(not (s2 = s3));
 var res2 = dict.get(s3).length;

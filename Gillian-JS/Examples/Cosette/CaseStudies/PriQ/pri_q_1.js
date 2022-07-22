@@ -58,8 +58,8 @@ try {
   var em = e.message; Assert(em = "Queue is empty");
 }
 
-var pri = symb_number(pri);
-var val = symb(val);
+var pri = symb_number();
+var val = symb();
 pq.enqueue(pri, val);
 var t2 = isNode(pq._head, pri, val, null)
 Assert(t2);

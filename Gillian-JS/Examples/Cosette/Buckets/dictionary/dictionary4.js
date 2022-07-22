@@ -353,10 +353,10 @@ buckets.Dictionary = function (toStrFunction) {
 
 var dict = new buckets.Dictionary();
 
-var x1 = symb_number(x1); //1
-var x2 = symb_number(x2); //2
-var s1 = symb_string(s1); // "2"
-var s2 = symb_string(s2); // "foo"
+var x1 = symb_number(); //1
+var x2 = symb_number(); //2
+var s1 = symb_string(); // "2"
+var s2 = symb_string(); // "foo"
 
 Assume(not (s1 = s2));
 
@@ -366,7 +366,7 @@ dict.set(s2, x2);
 
 var res1 = "";
 var res2 = 0;
-var s3 = symb_string(s3);
+var s3 = symb_string();
 
 dict.forEach(function(k, v) {
   if (k === s3) {

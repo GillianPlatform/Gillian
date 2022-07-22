@@ -41,7 +41,7 @@ function evalBinop (op, l1, l2) {
 /** Test 3 */
 
 var store = {}; 
-var b = symb_bool(b);
+var b = symb_bool();
 var lit = { type: "lit",  val: b }; 
 var e   = { type: "unop", op: "not", arg: lit}; 
 var ret = evalExpr(store, e);

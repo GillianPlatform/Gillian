@@ -309,10 +309,10 @@ buckets.arrays.forEach = function (array, callback) {
 
 // ------------------------------ our test now -------------------------------
 
-var n1 = symb_number(n1); // 1
-var n2 = symb_number(n2); // 8
-var n3 = symb_number(n3); // 10
-var n4 = symb_number(n4); // 42
+var n1 = symb_number(); // 1
+var n2 = symb_number(); // 8
+var n3 = symb_number(); // 10
+var n4 = symb_number(); // 42
 
 Assume(not (n1 = n2));
 Assume(not (n1 = n3));
@@ -334,7 +334,7 @@ var reset = function() {
 reset();
 
 // swap
-var i = symb_number(i);
+var i = symb_number();
 var res = buckets.arrays.swap(numberArray, 0, i);
 var l = numberArray.length;
 Assert(((i >= 0) and (i < l) and res) or (((i < 0) or (i >= l)) and (not res)));

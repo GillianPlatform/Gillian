@@ -548,8 +548,8 @@ buckets.Set = function (toStringFunction) {
 
 var set = new buckets.Set();
 
-var x1 = symb_number(x1);
-var x2 = symb_number(x2);
+var x1 = symb_number();
+var x2 = symb_number();
 
 var res1 = set.isEmpty();
 Assert(res1);

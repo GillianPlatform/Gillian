@@ -41,7 +41,7 @@ function evalBinop (op, l1, l2) {
 /** Test 3 */
 
 var store = Object.create(null); 
-var x = symb_string(x), y = symb_string(y), v = symb(v);
+var x = symb_string(), y = symb_string(), v = symb();
 var lit = { type: "var",  name: x };
 store[y] = v;
 

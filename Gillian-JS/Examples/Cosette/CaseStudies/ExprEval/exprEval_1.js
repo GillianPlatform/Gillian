@@ -40,7 +40,7 @@ function evalBinop (op, l1, l2) {
 
 /** Test 1 */
 
-var store = {}, x = symb(x);
+var store = {}, x = symb();
 var tx = typeof x; Assume(not (tx = "object")); 
 try {
   evalExpr(store, x)

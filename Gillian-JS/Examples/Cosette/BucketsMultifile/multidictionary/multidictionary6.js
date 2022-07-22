@@ -3,10 +3,10 @@ var buckets = require('../../buckets');
 var dict1 = new buckets.MultiDictionary();
 var dict2 = new buckets.MultiDictionary();
 
-var s1 = symb_string(s1);
-var s2 = symb_string(s2);
-var x1 = symb_number(x1);
-var x2 = symb_number(x2);
+var s1 = symb_string();
+var s2 = symb_string();
+var x1 = symb_number();
+var x2 = symb_number();
 
 Assume (not (x1 = x2));
 

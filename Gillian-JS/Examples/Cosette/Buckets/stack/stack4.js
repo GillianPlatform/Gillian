@@ -670,9 +670,9 @@ buckets.Stack = function () {
 
 var stack = new buckets.Stack();
 
-var n1 = symb_number(n1);
-var n2 = symb_number(n2);
-var n3 = symb_number(n3);
+var n1 = symb_number();
+var n2 = symb_number();
+var n3 = symb_number();
 Assume(not (n1 = n2));
 Assume(not (n1 = n3));
 Assume(not (n2 = n3));
