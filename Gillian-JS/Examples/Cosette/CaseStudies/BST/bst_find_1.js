@@ -52,10 +52,10 @@ function isNode(n, v, l, r) {
 }
 
 /* Test 1 */
-var v1 = symb_number(v1);
-var v2 = symb_number(v2);
-var v3 = symb_number(v3);
-var v4 = symb_number(v4);
+var v1 = symb_number();
+var v2 = symb_number();
+var v3 = symb_number();
+var v4 = symb_number();
 
 Assume((v1 < v2) and (v2 < v3));
 Assume((not (v4 = v1)) and (not (v4 = v2)) and (not (v4 = v3)));

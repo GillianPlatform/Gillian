@@ -4,8 +4,8 @@ var buckets = require('../../buckets');
 var bag = new buckets.Bag();
 
 // size
-var n1 = symb_number(n1);
-var n2 = symb_number(n2);
+var n1 = symb_number();
+var n2 = symb_number();
 
 bag.add(n1);
 bag.add(n2);

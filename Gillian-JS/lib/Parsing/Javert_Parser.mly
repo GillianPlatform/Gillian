@@ -120,7 +120,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token SEPASSERT
 %token INVARIANT
 %token ASSUME_TYPE
-%token SPEC_VAR
+%token FRESH_SVAR
 %token LSTNTH
 %token LSTSUB
 %token STRNTH
@@ -565,10 +565,10 @@ logic_cmd_target:
     { let (name, params) = macro in LCmd.Macro (name, params) }
   | ASSUME; LBRACE; a = pure_assertion_target; RBRACE
     { LCmd.Assume a }
-  | ASSUME_TYPE; LBRACE; x=LVAR; COMMA; t=type_target; RBRACE
-    { LCmd.AssumeType (x, t) }
-  | SPEC_VAR; LBRACE; xs = separated_list(COMMA, LVAR); RBRACE
-    { LCmd.SpecVar xs }
+  | ASSUME_TYPE; LBRACE; e=expr_target; COMMA; t=type_target; RBRACE
+    { LCmd.AssumeType (e, t) }
+  | v = VAR; DEFEQ; FRESH_SVAR; LBRACE; RBRACE
+    { LCmd.FreshSVar v}
   | BRANCH; LBRACE; fo = pure_assertion_target; RBRACE
      { LCmd.Branch fo }
 

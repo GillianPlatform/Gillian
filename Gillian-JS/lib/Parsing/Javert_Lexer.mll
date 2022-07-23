@@ -122,7 +122,7 @@
       "assert",       Javert_Parser.ASSERT;
       "assume",       Javert_Parser.ASSUME;
       "assume_type",  Javert_Parser.ASSUME_TYPE;
-      "spec_var",     Javert_Parser.SPEC_VAR;
+      "fresh_svar",   Javert_Parser.FRESH_SVAR;
       "bind",         Javert_Parser.BIND;
       "existentials", Javert_Parser.EXISTENTIALS;
       "sep_assert",   Javert_Parser.SEPASSERT;

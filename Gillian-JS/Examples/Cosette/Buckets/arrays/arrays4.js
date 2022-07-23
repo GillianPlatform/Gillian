@@ -309,10 +309,10 @@ buckets.arrays.forEach = function (array, callback) {
 
 // ------------------------------ our test now -------------------------------
 
-var n1 = symb_number(n1); // 1
-var n2 = symb_number(n2); // 8
-var n3 = symb_number(n3); // 10
-var n4 = symb_number(n4); // 42
+var n1 = symb_number(); // 1
+var n2 = symb_number(); // 8
+var n3 = symb_number(); // 10
+var n4 = symb_number(); // 42
 
 Assume(not (n1 = n2));
 Assume(not (n1 = n3));

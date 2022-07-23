@@ -15,8 +15,8 @@ type t =
   | Macro of string * Expr.t list  (** Macro            *)
   | Assert of Formula.t  (** Assert           *)
   | Assume of Formula.t  (** Assume           *)
-  | AssumeType of string * Type.t  (** Assume Type      *)
-  | SpecVar of string list  (** Spec Var         *)
+  | AssumeType of Expr.t * Type.t  (** Assume Type      *)
+  | FreshSVar of string
   | SL of SLCmd.t
 
 let rec pp fmt lcmd =
@@ -35,7 +35,7 @@ let rec pp fmt lcmd =
   | Macro (name, lparams) -> Fmt.pf fmt "%s(%a)" name pp_params lparams
   | Assert a -> Fmt.pf fmt "assert (%a)" Formula.pp a
   | Assume a -> Fmt.pf fmt "assume (%a)" Formula.pp a
-  | SpecVar xs ->
-      Fmt.pf fmt "spec_var (%a)" (Fmt.list ~sep:Fmt.comma Fmt.string) xs
+  | FreshSVar x -> Fmt.pf fmt "%s := fresh_svar()" x
   | SL sl_cmd -> SLCmd.pp fmt sl_cmd
-  | AssumeType (x, t) -> Fmt.pf fmt "assume_type (%s, %s)" x (Type.str t)
+  | AssumeType (e, t) ->
+      Fmt.pf fmt "assume_type (%a, %s)" Expr.pp e (Type.str t)

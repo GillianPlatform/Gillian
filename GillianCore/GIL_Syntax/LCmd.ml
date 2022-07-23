@@ -8,8 +8,8 @@ type t = TypeDef__.lcmd =
   | Macro of string * Expr.t list  (** Macro            *)
   | Assert of Formula.t  (** Assert           *)
   | Assume of Formula.t  (** Assume           *)
-  | AssumeType of string * Type.t  (** Assume Type      *)
-  | SpecVar of string list  (** Spec Var         *)
+  | AssumeType of Expr.t * Type.t  (** Assume Type      *)
+  | FreshSVar of string  (** x := fresh_svar() *)
   | SL of SLCmd.t
 
 let rec map
@@ -34,8 +34,8 @@ let rec map
   | Macro (s, l) -> Macro (s, List.map map_e l)
   | Assume a -> Assume (map_p a)
   | Assert a -> Assert (map_p a)
-  | AssumeType _ -> mapped_lcmd
-  | SpecVar _ -> mapped_lcmd
+  | AssumeType (e, t) -> AssumeType (map_e e, t)
+  | FreshSVar _ -> mapped_lcmd
   | SL sl_cmd -> SL (map_sl sl_cmd)
 
 let fold = List.fold_left SS.union SS.empty
@@ -48,9 +48,8 @@ let rec pvars (lcmd : t) : SS.t =
       SS.union (Expr.pvars e) (SS.union (pvars_lcmds lthen) (pvars_lcmds lelse))
   | Macro (_, es) -> pvars_es es
   | Branch pf | Assert pf | Assume pf -> Formula.pvars pf
-  | AssumeType (x, _) ->
-      if Names.is_pvar_name x then SS.singleton x else SS.empty
-  | SpecVar _ -> SS.empty
+  | AssumeType (e, _) -> Expr.pvars e
+  | FreshSVar name -> SS.singleton name
   | SL slcmd -> SLCmd.pvars slcmd
 
 let rec lvars (lcmd : t) : SS.t =
@@ -61,10 +60,9 @@ let rec lvars (lcmd : t) : SS.t =
       SS.union (Expr.lvars e) (SS.union (lvars_lcmds lthen) (lvars_lcmds lelse))
   | Macro (_, es) -> lvars_es es
   | Branch pf | Assert pf | Assume pf -> Formula.lvars pf
-  | AssumeType (x, _) ->
-      if Names.is_lvar_name x then SS.singleton x else SS.empty
-  | SpecVar svars -> SS.of_list svars
+  | AssumeType (e, _) -> Expr.lvars e
   | SL slcmd -> SLCmd.lvars slcmd
+  | FreshSVar _ -> SS.empty
 
 let rec locs (lcmd : t) : SS.t =
   let locs_es es = fold (List.map Expr.locs es) in
@@ -74,9 +72,9 @@ let rec locs (lcmd : t) : SS.t =
       SS.union (Expr.locs e) (SS.union (locs_lcmds lthen) (locs_lcmds lelse))
   | Macro (_, es) -> locs_es es
   | Branch pf | Assert pf | Assume pf -> Formula.locs pf
-  | AssumeType _ -> SS.empty
-  | SpecVar svars -> SS.of_list svars
+  | AssumeType (e, _) -> Expr.locs e
   | SL slcmd -> SLCmd.locs slcmd
+  | FreshSVar _ -> SS.empty
 
 let rec pp fmt lcmd =
   let pp_list = Fmt.list ~sep:Fmt.semi pp in
@@ -93,7 +91,7 @@ let rec pp fmt lcmd =
   | Macro (name, lparams) -> Fmt.pf fmt "%s(@[%a@])" name pp_params lparams
   | Assert a -> Fmt.pf fmt "assert (@[%a@])" Formula.pp a
   | Assume a -> Fmt.pf fmt "assume (@[%a@])" Formula.pp a
-  | AssumeType (x, t) -> Fmt.pf fmt "assume_type (%s, %s)" x (Type.str t)
-  | SpecVar xs ->
-      Fmt.pf fmt "spec_var (@[%a@])" (Fmt.list ~sep:Fmt.comma Fmt.string) xs
+  | AssumeType (e, t) ->
+      Fmt.pf fmt "assume_type (%a, %s)" Expr.pp e (Type.str t)
   | SL sl_cmd -> SLCmd.pp fmt sl_cmd
+  | FreshSVar x -> Fmt.pf fmt "%s := fresh_svar()" x

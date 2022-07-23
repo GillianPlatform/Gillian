@@ -1114,9 +1114,9 @@ buckets.BSTree = function (compareFunction) {
 
 var bst = new buckets.BSTree();
 
-var x1 = symb_number(x1);
-var x2 = symb_number(x2);
-var x3 = symb_number(x3);
+var x1 = symb_number();
+var x2 = symb_number();
+var x3 = symb_number();
 
 Assume(not (x1 = x2));
 Assume(not (x1 = x3));

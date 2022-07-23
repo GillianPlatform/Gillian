@@ -216,34 +216,18 @@ let make_free_cmd fname var_list =
   | blocks ->
       Some (Cmd.Call (gvar, freelist, [ Expr.EList blocks ], None, None))
 
-let make_symb_gen ~fname ~ctx assigned_id x type_string =
+let make_symb_gen ~fname ~ctx assigned_id type_string =
   let gen_str = Generators.gen_str ~fname in
   let assigned = true_name assigned_id in
-  let str_x =
-    match x with
-    | Csharpminor.Evar idl
-    | Csharpminor.Eload (_, Eaddrof idl)
-    | Csharpminor.Eload (_, Evar idl) -> true_name idl
-    | _ ->
-        failwith
-          (Format.asprintf "symb_int received invalid parameter %a"
-             PrintCsharpminor.print_expr x)
-  in
-  let hash_x = "#" ^ str_x in
-  let lvar_x = Expr.LVar hash_x in
-  let lvar_val_string = gen_str Prefix.lvar in
-  let lvar_val = Expr.LVar lvar_val_string in
-  let assignment = Cmd.Assignment (assigned, lvar_x) in
-  let specvar = Cmd.Logic (LCmd.SpecVar [ hash_x ]) in
+  let fresh_svar = Cmd.Logic (FreshSVar assigned) in
+  let lvar_val = Expr.LVar (gen_str Prefix.lvar) in
   let assume_list =
     Cmd.Logic
       (LCmd.Assume
-         (Eq (lvar_x, Expr.EList [ Lit (String type_string); lvar_val ])))
+         (Eq (PVar assigned, Expr.EList [ Lit (String type_string); lvar_val ])))
   in
-  let assume_val_t =
-    Cmd.Logic (LCmd.AssumeType (lvar_val_string, Type.IntType))
-  in
-  add_annots ~ctx [ assignment; specvar; assume_list; assume_val_t ]
+  let assume_val_t = Cmd.Logic (LCmd.AssumeType (lvar_val, Type.IntType)) in
+  add_annots ~ctx [ fresh_svar; assume_list; assume_val_t ]
 
 let is_call name e =
   match e with
@@ -531,26 +515,26 @@ let rec trans_stmt ~fname ~context stmt =
             me, but we're not in Symbolic testing mode :\n\
             %a"
            PrintCsharpminor.print_stmt stmt)
-  | Sbuiltin (Some id, AST.EF_annot_val (_, s, _), [ x ])
+  | Sbuiltin (Some id, AST.EF_annot_val (_, s, _), [ _ ])
     when String.equal
            (String.init (List.length s) (List.nth s))
            CConstants.Symbolic_Constr.symb_int ->
-      make_symb_gen ~ctx:context id x CConstants.VTypes.int_type
-  | Sbuiltin (Some id, AST.EF_annot_val (_, s, _), [ x ])
+      make_symb_gen ~ctx:context id CConstants.VTypes.int_type
+  | Sbuiltin (Some id, AST.EF_annot_val (_, s, _), [ _ ])
     when String.equal
            (String.init (List.length s) (List.nth s))
            CConstants.Symbolic_Constr.symb_long ->
-      make_symb_gen ~ctx:context id x CConstants.VTypes.long_type
-  | Sbuiltin (Some id, AST.EF_annot_val (_, s, _), [ x ])
+      make_symb_gen ~ctx:context id CConstants.VTypes.long_type
+  | Sbuiltin (Some id, AST.EF_annot_val (_, s, _), [ _ ])
     when String.equal
            (String.init (List.length s) (List.nth s))
            CConstants.Symbolic_Constr.symb_single ->
-      make_symb_gen ~ctx:context id x CConstants.VTypes.single_type
-  | Sbuiltin (Some id, AST.EF_annot_val (_, s, _), [ x ])
+      make_symb_gen ~ctx:context id CConstants.VTypes.single_type
+  | Sbuiltin (Some id, AST.EF_annot_val (_, s, _), [ _ ])
     when String.equal
            (String.init (List.length s) (List.nth s))
            CConstants.Symbolic_Constr.symb_float ->
-      make_symb_gen ~ctx:context id x CConstants.VTypes.float_type
+      make_symb_gen ~ctx:context id CConstants.VTypes.float_type
   | Sbuiltin (None, AST.EF_memcpy (sz, al), [ dst; src ]) ->
       let sz = ValueTranslation.int_of_z sz in
       let al = ValueTranslation.int_of_z al in

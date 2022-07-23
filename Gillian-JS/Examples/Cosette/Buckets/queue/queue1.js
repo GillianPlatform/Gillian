@@ -679,9 +679,9 @@ buckets.Queue = function () {
 
 var queue = new buckets.Queue();
 
-var x1 = symb_number(x1); // 1
-var x2 = symb_number(x2); // 2
-var x3 = symb_number(x3); // 3
+var x1 = symb_number(); // 1
+var x2 = symb_number(); // 2
+var x3 = symb_number(); // 3
 Assume((x1 < x2) and (x2 < x3));
 
 function createQueue() {
@@ -700,7 +700,7 @@ Assert(size = 0);
 createQueue();
 var size = queue.size();
 Assert(size = 3);
-var x4 = symb_number(x4);
+var x4 = symb_number();
 queue.add(x4); // synonym to enqueue
 var size = queue.size();
 Assert(size = 4);

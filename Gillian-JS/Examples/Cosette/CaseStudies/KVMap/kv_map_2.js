@@ -30,7 +30,7 @@ Map.prototype.put = function (k, v) {
 
 var map = new Map();
 
-var ivk = symb_number(ivk);
+var ivk = symb_number();
 
 try {
   map.get(ivk);

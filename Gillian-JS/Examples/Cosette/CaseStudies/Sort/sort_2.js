@@ -34,8 +34,8 @@ function isNode(n, v, nxt) {
 var s1 = sort(null);
 Assert(s1 = null);
 
-var v1 = symb_number(v1);
-var v2 = symb_number(v2);
+var v1 = symb_number();
+var v2 = symb_number();
 
 var n2 = { value: v2, next : null};
 var n1 = { value: v1, next: n2 };

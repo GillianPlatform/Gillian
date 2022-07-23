@@ -755,9 +755,9 @@ buckets.MultiDictionary = function (toStrFunction, valuesEqualsFunction) {
 
 var dict = new buckets.MultiDictionary()
 
-var s = symb_string(s);
-var x1 = symb_number(x1);
-var x2 = symb_number(x2);
+var s = symb_string();
+var x1 = symb_number();
+var x2 = symb_number();
 
 dict.set(s, x1);
 dict.set(s, x2);

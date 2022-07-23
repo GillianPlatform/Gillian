@@ -41,7 +41,7 @@ function evalBinop (op, l1, l2) {
 /** Test 3 */
 
 var store = {}; 
-var n1 = symb_number(n1), n2 = symb_number(n2), op = symb_string(op); 
+var n1 = symb_number(), n2 = symb_number(), op = symb_string(); 
 var l1 = { type: "lit",  val: n1 }, l2 = { type: "lit",  val: n2 }; 
 var e   = { type: "binop", op: op, left: l1, right: l2}; 
 Assume ((not (op = "and")) and (not (op = "or")));

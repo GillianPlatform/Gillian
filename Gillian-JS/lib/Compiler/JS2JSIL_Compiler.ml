@@ -2134,73 +2134,73 @@ let rec translate_expr tr_ctx e :
   | JS_Parser.Syntax.Call (e_f, xes)
     when e_f.JS_Parser.Syntax.exp_stx
          = JS_Parser.Syntax.Var js_symbolic_constructs.js_symb ->
-      let x =
-        match List.map (fun xe -> xe.JS_Parser.Syntax.exp_stx) xes with
-        | [ JS_Parser.Syntax.Var x ] -> "#" ^ x
+      let () =
+        match xes with
+        | [] -> ()
         | _ -> raise (Failure "Invalid symbolic")
       in
       let x_v = fresh_var () ^ "_v" in
-      let cmd1 = (metadata, None, LBasic (BCmd.Assignment (x_v, LVar x))) in
-      let cmd2 = (metadata, None, LLogic (LCmd.SpecVar [ x ])) in
+      let cmd1 = (metadata, None, LLogic (LCmd.FreshSVar x_v)) in
+      let x_v = PVar x_v in
+      let cmd2 =
+        (metadata, None, LLogic (LCmd.Assume (Not (Eq (x_v, Lit Empty)))))
+      in
       let cmd3 =
-        (metadata, None, LLogic (LCmd.Assume (Not (Eq (LVar x, Lit Empty)))))
+        (metadata, None, LLogic (LCmd.Assume (Not (Eq (x_v, Lit Nono)))))
       in
       let cmd4 =
-        (metadata, None, LLogic (LCmd.Assume (Not (Eq (LVar x, Lit Nono)))))
-      in
-      let cmd5 =
         ( metadata,
           None,
           LLogic
-            (LCmd.Assume (Not (Eq (UnOp (TypeOf, LVar x), Lit (Type ListType)))))
+            (LCmd.Assume (Not (Eq (UnOp (TypeOf, x_v), Lit (Type ListType)))))
         )
       in
-      ([ cmd1; cmd2; cmd3; cmd4; cmd5 ], PVar x_v, [])
+      ([ cmd1; cmd2; cmd3; cmd4 ], x_v, [])
   | JS_Parser.Syntax.Call (e_f, xes)
     when e_f.JS_Parser.Syntax.exp_stx
          = JS_Parser.Syntax.Var js_symbolic_constructs.js_symb_number ->
-      let x =
-        match List.map (fun xe -> xe.JS_Parser.Syntax.exp_stx) xes with
-        | [ JS_Parser.Syntax.Var x ] -> "#" ^ x
+      let () =
+        match xes with
+        | [] -> ()
         | _ -> raise (Failure "Invalid symb_number")
       in
       let x_v = fresh_var () ^ "_v" in
-      let cmd1 = (metadata, None, LBasic (BCmd.Assignment (x_v, LVar x))) in
-      let cmd2 = (metadata, None, LLogic (LCmd.SpecVar [ x ])) in
-      let cmd3 =
-        (metadata, None, LLogic (LCmd.AssumeType (x, Type.NumberType)))
+      let cmd1 = (metadata, None, LLogic (FreshSVar x_v)) in
+      let x_v = PVar x_v in
+      let cmd2 =
+        (metadata, None, LLogic (LCmd.AssumeType (x_v, Type.NumberType)))
       in
-      ([ cmd1; cmd2; cmd3 ], PVar x_v, [])
+      ([ cmd1; cmd2 ], x_v, [])
   | JS_Parser.Syntax.Call (e_f, xes)
     when e_f.JS_Parser.Syntax.exp_stx
          = JS_Parser.Syntax.Var js_symbolic_constructs.js_symb_string ->
-      let x =
-        match List.map (fun xe -> xe.JS_Parser.Syntax.exp_stx) xes with
-        | [ JS_Parser.Syntax.Var x ] -> "#" ^ x
-        | _ -> raise (Failure "Invalid symb_number")
+      let () =
+        match xes with
+        | [] -> ()
+        | _ -> raise (Failure "Invalid symb_string")
       in
       let x_v = fresh_var () ^ "_v" in
-      let cmd1 = (metadata, None, LBasic (BCmd.Assignment (x_v, LVar x))) in
-      let cmd2 = (metadata, None, LLogic (LCmd.SpecVar [ x ])) in
-      let cmd3 =
-        (metadata, None, LLogic (LCmd.AssumeType (x, Type.StringType)))
+      let cmd1 = (metadata, None, LLogic (FreshSVar x_v)) in
+      let x_v = PVar x_v in
+      let cmd2 =
+        (metadata, None, LLogic (LCmd.AssumeType (x_v, Type.StringType)))
       in
-      ([ cmd1; cmd2; cmd3 ], PVar x_v, [])
+      ([ cmd1; cmd2 ], x_v, [])
   | JS_Parser.Syntax.Call (e_f, xes)
     when e_f.JS_Parser.Syntax.exp_stx
          = JS_Parser.Syntax.Var js_symbolic_constructs.js_symb_bool ->
-      let x =
-        match List.map (fun xe -> xe.JS_Parser.Syntax.exp_stx) xes with
-        | [ JS_Parser.Syntax.Var x ] -> "#" ^ x
+      let () =
+        match xes with
+        | [] -> ()
         | _ -> raise (Failure "Invalid symb_bool")
       in
       let x_v = fresh_var () ^ "_v" in
-      let cmd1 = (metadata, None, LBasic (BCmd.Assignment (x_v, LVar x))) in
-      let cmd2 = (metadata, None, LLogic (LCmd.SpecVar [ x ])) in
-      let cmd3 =
-        (metadata, None, LLogic (LCmd.AssumeType (x, Type.BooleanType)))
+      let cmd1 = (metadata, None, LLogic (FreshSVar x_v)) in
+      let x_v = PVar x_v in
+      let cmd2 =
+        (metadata, None, LLogic (LCmd.AssumeType (x_v, Type.BooleanType)))
       in
-      ([ cmd1; cmd2; cmd3 ], PVar x_v, [])
+      ([ cmd1; cmd2 ], x_v, [])
   | JS_Parser.Syntax.Call (e_f, xes)
     when Gillian.Utils.(ExecMode.biabduction_exec !Config.current_exec_mode)
          &&

@@ -28,10 +28,10 @@ Map.prototype.put = function (k, v) {
     throw new Error("Invalid Key")
 }
 
-var k1 = symb_string(k1);
-var k2 = symb_string(k2);
+var k1 = symb_string();
+var k2 = symb_string();
 
-var v1 = symb_number(v1);
+var v1 = symb_number();
 
 var map = new Map();
 var cts = map._contents;

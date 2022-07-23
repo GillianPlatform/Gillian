@@ -549,10 +549,10 @@ buckets.Set = function (toStringFunction) {
 var set1 = new buckets.Set();
 var set2 = new buckets.Set();
 
-var x1 = symb_string(x1);
-var x2 = symb_string(x2);
-var x3 = symb_string(x3);
-var x4 = symb_string(x4);
+var x1 = symb_string();
+var x2 = symb_string();
+var x3 = symb_string();
+var x4 = symb_string();
 
 set1.add(x1);
 set1.add(x2);

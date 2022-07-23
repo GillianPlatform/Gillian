@@ -175,8 +175,8 @@ and lcmd =
   | Macro of string * expr list
   | Assert of formula
   | Assume of formula
-  | AssumeType of string * typ
-  | SpecVar of string list
+  | AssumeType of expr * typ
+  | FreshSVar of string
   | SL of slcmd
 
 and 'label cmd =

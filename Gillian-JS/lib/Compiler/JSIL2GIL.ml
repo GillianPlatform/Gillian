@@ -67,7 +67,7 @@ let rec jsil2gil_lcmd (lcmd : LCmd.t) : GLCmd.t =
   | Assert f -> Assert f
   | Assume f -> Assume f
   | AssumeType (x, t) -> AssumeType (x, t)
-  | SpecVar xs -> SpecVar xs
+  | FreshSVar x -> FreshSVar x
   | SL slcmd -> SL (jsil2gil_slcmd slcmd)
 
 let jsil2gil_sspec (sspec : Spec.st) : GSpec.st =

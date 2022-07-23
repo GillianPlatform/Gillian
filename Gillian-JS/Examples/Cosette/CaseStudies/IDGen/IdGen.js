@@ -17,7 +17,7 @@ var makeIdGen = function (prefix) {
 	}
 };
 
-var prefix = symb_string(prefix);
+var prefix = symb_string();
 
 var idgen = makeIdGen (prefix);
 var id  = idgen.getId();

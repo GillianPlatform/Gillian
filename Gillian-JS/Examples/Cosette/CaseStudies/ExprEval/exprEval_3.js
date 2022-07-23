@@ -41,7 +41,7 @@ function evalBinop (op, l1, l2) {
 /** Test 3 */
 
 var store = {}; 
-var n = symb_number(n), s = symb_string(s); 
+var n = symb_number(), s = symb_string(); 
 var lit = { type: "lit",  val: n }; 
 var e   = { type: "unop", op: s, arg: lit}; 
 Assume (not (s = "not"));

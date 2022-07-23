@@ -34,7 +34,7 @@ function isNode(n, v, l, r) {
 
 
 /* Test 1 */
-var v = symb_number(v);
+var v = symb_number();
 
 var res = insert(v, null);
 var ret = isNode(res, v, null, null);

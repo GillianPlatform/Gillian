@@ -28,8 +28,11 @@ let fresh_lvar, reset_lvar = fresh_sth lvar_prefix
 (** Logical variable counter *)
 let fresh_lvar_bi, reset_lvar_bi = fresh_sth lvar_prefix_bi
 
+let fresh_svar, reset_svar = fresh_sth "#gen__"
+
 let reset () =
   reset_loc ();
   reset_pvar ();
   reset_lvar ();
-  reset_lvar_bi ()
+  reset_lvar_bi ();
+  reset_svar ()

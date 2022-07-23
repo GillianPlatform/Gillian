@@ -33,8 +33,8 @@ function isNode(n, v, l, r) {
 }
 
 /* Test 2 */
-var v = symb_number(v);
-var w = symb_number(w);
+var v = symb_number();
+var w = symb_number();
 
 var root = insert(v, null);
 insert(w, root);

@@ -110,7 +110,7 @@
       "assert",       GIL_Parser.ASSERT;
       "assume",       GIL_Parser.ASSUME;
       "assume_type",  GIL_Parser.ASSUME_TYPE;
-      "spec_var",     GIL_Parser.SPEC_VAR;
+      "fresh_svar",   GIL_Parser.FRESH_SVAR;
       "bind",         GIL_Parser.BIND;
       "existentials", GIL_Parser.EXISTENTIALS;
       "sep_assert",   GIL_Parser.SEPASSERT;

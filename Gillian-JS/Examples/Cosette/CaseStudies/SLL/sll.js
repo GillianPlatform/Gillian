@@ -29,7 +29,7 @@ var cl1 = listCopy(l1);
 Assert(cl1 = null);
 
 /* Append to empty list */
-var v1 = symb(v1);
+var v1 = symb();
 var l2 = listAppend(l1, v1);
 var in2 = isNode(l2, v1, null);
 Assert (in2);
@@ -40,7 +40,7 @@ var in3 = isNode(l3, v1, null);
 Assert (in3);
 
 /* Append to non-empty list */
-var v2 = symb(v2);
+var v2 = symb();
 var l4 = listAppend(l3, v2);
 var in4 = isNode(l4, v1, l4.next) && isNode(l4.next, v2, null);
 Assert (in4);

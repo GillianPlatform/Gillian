@@ -629,8 +629,8 @@ module LCmd : sig
     | Macro of string * Expr.t list  (** Macros *)
     | Assert of Formula.t  (** Assert *)
     | Assume of Formula.t  (** Assume *)
-    | AssumeType of string * Type.t  (** Assume Type *)
-    | SpecVar of string list  (** Specification variables (spec vars) *)
+    | AssumeType of Expr.t * Type.t  (** Assume Type *)
+    | FreshSVar of string  (** x := fresh_svar() *)
     | SL of SLCmd.t  (** Separation-logic-related commands ({!type:SLCmd.t}) *)
 
   (** Deprecated. Use {!Visitors} instead *)
@@ -1136,7 +1136,7 @@ module Visitors : sig
            ; visit_Assert : 'c -> LCmd.t -> Formula.t -> LCmd.t
            ; visit_Assignment : 'c -> 'f Cmd.t -> string -> Expr.t -> 'f Cmd.t
            ; visit_Assume : 'c -> LCmd.t -> Formula.t -> LCmd.t
-           ; visit_AssumeType : 'c -> LCmd.t -> string -> Type.t -> LCmd.t
+           ; visit_AssumeType : 'c -> LCmd.t -> Expr.t -> Type.t -> LCmd.t
            ; visit_BAnd : 'c -> BinOp.t -> BinOp.t
            ; visit_BOr : 'c -> BinOp.t -> BinOp.t
            ; visit_BSetMem : 'c -> BinOp.t -> BinOp.t
@@ -1297,7 +1297,7 @@ module Visitors : sig
            ; visit_SignedRightShift : 'c -> BinOp.t -> BinOp.t
            ; visit_SignedRightShiftL : 'c -> BinOp.t -> BinOp.t
            ; visit_Skip : 'c -> 'f Cmd.t -> 'f Cmd.t
-           ; visit_SpecVar : 'c -> LCmd.t -> string list -> LCmd.t
+           ; visit_FreshSVar : 'c -> LCmd.t -> string -> LCmd.t
            ; visit_Star : 'c -> Asrt.t -> Asrt.t -> Asrt.t -> Asrt.t
            ; visit_StrCat : 'c -> BinOp.t -> BinOp.t
            ; visit_StrLen : 'c -> UnOp.t -> UnOp.t
@@ -1376,7 +1376,7 @@ module Visitors : sig
       method visit_Assert : 'c -> LCmd.t -> Formula.t -> LCmd.t
       method visit_Assignment : 'c -> 'f Cmd.t -> string -> Expr.t -> 'f Cmd.t
       method visit_Assume : 'c -> LCmd.t -> Formula.t -> LCmd.t
-      method visit_AssumeType : 'c -> LCmd.t -> string -> Type.t -> LCmd.t
+      method visit_AssumeType : 'c -> LCmd.t -> Expr.t -> Type.t -> LCmd.t
       method visit_BAnd : 'c -> BinOp.t -> BinOp.t
       method visit_BOr : 'c -> BinOp.t -> BinOp.t
       method visit_BSetMem : 'c -> BinOp.t -> BinOp.t
@@ -1553,7 +1553,7 @@ module Visitors : sig
       method visit_SignedRightShift : 'c -> BinOp.t -> BinOp.t
       method visit_SignedRightShiftL : 'c -> BinOp.t -> BinOp.t
       method visit_Skip : 'c -> 'f Cmd.t -> 'f Cmd.t
-      method visit_SpecVar : 'c -> LCmd.t -> string list -> LCmd.t
+      method visit_FreshSVar : 'c -> LCmd.t -> string -> LCmd.t
       method visit_Star : 'c -> Asrt.t -> Asrt.t -> Asrt.t -> Asrt.t
       method visit_StrCat : 'c -> BinOp.t -> BinOp.t
       method visit_StrLen : 'c -> UnOp.t -> UnOp.t
@@ -1670,7 +1670,7 @@ module Visitors : sig
            ; visit_Assert : 'c -> Formula.t -> 'f
            ; visit_Assignment : 'c -> string -> Expr.t -> 'f
            ; visit_Assume : 'c -> Formula.t -> 'f
-           ; visit_AssumeType : 'c -> string -> Type.t -> 'f
+           ; visit_AssumeType : 'c -> Expr.t -> Type.t -> 'f
            ; visit_BAnd : 'c -> 'f
            ; visit_BOr : 'c -> 'f
            ; visit_BSetMem : 'c -> 'f
@@ -1810,7 +1810,7 @@ module Visitors : sig
            ; visit_SignedRightShift : 'c -> 'f
            ; visit_SignedRightShiftL : 'c -> 'f
            ; visit_Skip : 'c -> 'f
-           ; visit_SpecVar : 'c -> string list -> 'f
+           ; visit_FreshSVar : 'c -> string -> 'f
            ; visit_Star : 'c -> Asrt.t -> Asrt.t -> 'f
            ; visit_StrCat : 'c -> 'f
            ; visit_StrLen : 'c -> 'f
@@ -1885,7 +1885,7 @@ module Visitors : sig
       method visit_Assert : 'c -> Formula.t -> 'f
       method visit_Assignment : 'c -> string -> Expr.t -> 'f
       method visit_Assume : 'c -> Formula.t -> 'f
-      method visit_AssumeType : 'c -> string -> Type.t -> 'f
+      method visit_AssumeType : 'c -> Expr.t -> Type.t -> 'f
       method visit_BAnd : 'c -> 'f
       method visit_BOr : 'c -> 'f
       method visit_BSetMem : 'c -> 'f
@@ -2032,7 +2032,7 @@ module Visitors : sig
       method visit_SignedRightShift : 'c -> 'f
       method visit_SignedRightShiftL : 'c -> 'f
       method visit_Skip : 'c -> 'f
-      method visit_SpecVar : 'c -> string list -> 'f
+      method visit_FreshSVar : 'c -> string -> 'f
       method visit_Star : 'c -> Asrt.t -> Asrt.t -> 'f
       method visit_StrCat : 'c -> 'f
       method visit_StrLen : 'c -> 'f
@@ -2112,7 +2112,7 @@ module Visitors : sig
            ; visit_Assert : 'c -> Formula.t -> unit
            ; visit_Assignment : 'c -> string -> Expr.t -> unit
            ; visit_Assume : 'c -> Formula.t -> unit
-           ; visit_AssumeType : 'c -> string -> Type.t -> unit
+           ; visit_AssumeType : 'c -> Expr.t -> Type.t -> unit
            ; visit_BAnd : 'c -> unit
            ; visit_BOr : 'c -> unit
            ; visit_BSetMem : 'c -> unit
@@ -2256,7 +2256,7 @@ module Visitors : sig
            ; visit_SignedRightShift : 'c -> unit
            ; visit_SignedRightShiftL : 'c -> unit
            ; visit_Skip : 'c -> unit
-           ; visit_SpecVar : 'c -> string list -> unit
+           ; visit_FreshSVar : 'c -> string -> unit
            ; visit_Star : 'c -> Asrt.t -> Asrt.t -> unit
            ; visit_StrCat : 'c -> unit
            ; visit_StrLen : 'c -> unit
@@ -2326,7 +2326,7 @@ module Visitors : sig
       method visit_Assert : 'c -> Formula.t -> unit
       method visit_Assignment : 'c -> string -> Expr.t -> unit
       method visit_Assume : 'c -> Formula.t -> unit
-      method visit_AssumeType : 'c -> string -> Type.t -> unit
+      method visit_AssumeType : 'c -> Expr.t -> Type.t -> unit
       method visit_BAnd : 'c -> unit
       method visit_BOr : 'c -> unit
       method visit_BSetMem : 'c -> unit
@@ -2477,7 +2477,7 @@ module Visitors : sig
       method visit_SignedRightShift : 'c -> unit
       method visit_SignedRightShiftL : 'c -> unit
       method visit_Skip : 'c -> unit
-      method visit_SpecVar : 'c -> string list -> unit
+      method visit_FreshSVar : 'c -> string -> unit
       method visit_Star : 'c -> Asrt.t -> Asrt.t -> unit
       method visit_StrCat : 'c -> unit
       method visit_StrLen : 'c -> unit

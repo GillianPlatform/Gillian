@@ -2,9 +2,9 @@ var buckets = require('../../buckets');
 
 var bst = new buckets.BSTree();
 
-var x1 = symb_number(x1);
-var x2 = symb_number(x2);
-var x3 = symb_number(x3);
+var x1 = symb_number();
+var x2 = symb_number();
+var x3 = symb_number();
 
 Assume(not (x1 = x2));
 Assume(not (x1 = x3));
@@ -16,7 +16,7 @@ bst.add(x3);
 
 // test2: something fails
 
-var x4 = symb_number(x4);
+var x4 = symb_number();
 var ar2 = [];
 bst.preorderTraversal(function(x) {
   if (x === x4) {
