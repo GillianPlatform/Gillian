@@ -6,8 +6,8 @@ module Prefix : sig
   (** Prefix for generated variables *)
   val gvar : string
 
-  (** Prefix for generated logic variables *)
-  val lgvar : string
+  (** Prefix for generated symbolic variables *)
+  val sgvar : string
 
   (** Prefix for loop invariant labels *)
   val loopinv_lab : string

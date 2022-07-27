@@ -186,7 +186,7 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
         (gvars1 @ gvars2, asrtl1 @ asrtl2, expr)
     | LBinOp (e1, b, e2) when is_internal_pred b ->
         (* Operator corresponds to pointer arithmetics *)
-        let lout = gen_str lgvar in
+        let lout = gen_str sgvar in
         let internal_pred = expr_pname_of_binop b in
         let gvars1, asrtl1, comp_expr1 = compile_lexpr e1 in
         let gvars2, asrtl2, comp_expr2 = compile_lexpr e2 in
@@ -261,28 +261,28 @@ let rec compile_lformula ?(fname = "main") formula : Asrt.t list * Formula.t =
     | LLess (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
-        let expr_l_var_out = Expr.LVar (gen_str lgvar) in
+        let expr_l_var_out = Expr.LVar (gen_str sgvar) in
         let pred = Asrt.Pred (internal_pred_lt, [ c1; c2; expr_l_var_out ]) in
         ( a1 @ a2 @ [ pred ],
           Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
     | LGreater (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
-        let expr_l_var_out = Expr.LVar (gen_str lgvar) in
+        let expr_l_var_out = Expr.LVar (gen_str sgvar) in
         let pred = Asrt.Pred (internal_pred_gt, [ c1; c2; expr_l_var_out ]) in
         ( a1 @ a2 @ [ pred ],
           Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
     | LLessEq (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
-        let expr_l_var_out = Expr.LVar (gen_str lgvar) in
+        let expr_l_var_out = Expr.LVar (gen_str sgvar) in
         let pred = Asrt.Pred (internal_pred_leq, [ c1; c2; expr_l_var_out ]) in
         ( a1 @ a2 @ [ pred ],
           Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
     | LGreaterEq (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
-        let expr_l_var_out = Expr.LVar (gen_str lgvar) in
+        let expr_l_var_out = Expr.LVar (gen_str sgvar) in
         let pred = Asrt.Pred (internal_pred_geq, [ c1; c2; expr_l_var_out ]) in
         ( a1 @ a2 @ [ pred ],
           Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) ))
@@ -324,10 +324,10 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
           ([], [], (l, bo), expr_offset)
       | None ->
           let exs1, la1, e1 = compile_lexpr le1 in
-          let loc = gen_str lgvar in
+          let loc = gen_str sgvar in
           let offset, expr_offset =
             if not block then
-              let offset = gen_str lgvar in
+              let offset = gen_str sgvar in
               (Some offset, Expr.LVar offset)
             else (None, Expr.zero_i)
           in

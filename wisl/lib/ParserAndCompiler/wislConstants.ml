@@ -3,7 +3,7 @@ let internal_prefix = "i__"
 
 module Prefix = struct
   let gvar = "gvar"
-  let lgvar = "_lvar_"
+  let sgvar = "#wisl__"
   let loopinv_lab = "loopinv"
   let loop_lab = "loop"
   let ctn_lab = "continue"
