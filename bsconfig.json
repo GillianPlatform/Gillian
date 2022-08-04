@@ -1,0 +1,26 @@
+{
+  "name": "your-project-name",
+  "sources": [
+    {
+      "dir": "debugger-vscode-extension/src",
+      "subdirs": true
+    },
+    {
+      "dir": "GillianCommon",
+      "subdirs": true
+    }
+  ],
+  "package-specs": [
+    {
+      "module": "es6",
+      "in-source": true
+    }
+  ],
+  "suffix": ".bs.js",
+  "bs-dependencies": [ ],
+  "gentypeconfig": {
+    "language": "typescript",
+    "generatedFileExtension": ".gen.tsx",
+    "module": "es6"
+  }
+}

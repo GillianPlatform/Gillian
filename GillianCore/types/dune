@@ -1,0 +1,6 @@
+(library
+ (name types)
+ (public_name gillian.types)
+ (libraries gillian-common.types)
+ (preprocess
+  (staged_pps ppx_import ppx_deriving_yojson ppx_deriving.std)))

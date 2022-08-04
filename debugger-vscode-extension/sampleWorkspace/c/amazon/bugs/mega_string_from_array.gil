@@ -1,0 +1,437 @@
+import "unops_common.gil", "internals.gil", "global_environment_common.gil",
+       "binops_common.gil", "logic_common.gil", "string.gil",
+       "stdlib_archi64.gil", "stdlib_archi64_verif.gil",
+       "global_environment_archi64.gil", "logic_archi64.gil",
+       "binops_archi64_all_exec.gil", "binops_archi64_non_bi.gil",
+       "genv_unallocated_functions.gil",
+       "debugger-vscode-extension/sampleWorkspace/c/amazon/bugs/../logic/EncryptionHeaderLogic.gil",
+       "debugger-vscode-extension/sampleWorkspace/c/amazon/bugs/../logic/ListLogic.gil",
+       "debugger-vscode-extension/sampleWorkspace/c/amazon/bugs/../logic/Utf8Logic.gil",
+       "debugger-vscode-extension/sampleWorkspace/c/amazon/bugs/../logic/ByteLogic.gil",
+       "debugger-vscode-extension/sampleWorkspace/c/amazon/bugs/../logic/StringStruct.gil";
+
+
+lemma optBytesConcat(lptr, llength, rptr, rlength)
+  [[  optBytes(#lptr, #llength, #lcont) * optBytes(#rptr, #rlength, #rcont) *
+      i__ptr_add(#lptr, #llength, _lvar_i_8) * (#rptr == _lvar_i_8) *
+      i__global_env() ]]
+  [[  optBytes(#lptr, (#llength i+ #rlength), l+ (#lcont, #rcont)) ]]
+  [*  unfold optBytes(#lptr, #llength, #lcont) ;
+      unfold optBytes(#rptr, #rlength, #rcont) ; fold optBytes(#lptr,
+      (#llength i+ #rlength), l+ (#lcont, #rcont))  *]
+pred aws_add_u64_checked(+a, +b, out) : (out == (a i+ b)) *
+  (out i<# 4611686018427387903i);
+
+
+@nopath
+@internal
+pred p__struct_aws_allocator(+loc : Obj, +ofs : Int, mem_acquire : List,
+                             mem_release : List, mem_realloc : List,
+                             mem_calloc : List, impl : List) :
+  i__is_ptr_opt(mem_acquire) *
+  <mem_single>(loc, ofs, "int64"; mem_acquire, "Freeable") *
+  i__is_ptr_opt(mem_release) *
+  <mem_single>(loc, (ofs i+ 8i), "int64"; mem_release, "Freeable") *
+  i__is_ptr_opt(mem_realloc) *
+  <mem_single>(loc, (ofs i+ 16i), "int64"; mem_realloc, "Freeable") *
+  i__is_ptr_opt(mem_calloc) *
+  <mem_single>(loc, (ofs i+ 24i), "int64"; mem_calloc, "Freeable") *
+  i__is_ptr_opt(impl) *
+  <mem_single>(loc, (ofs i+ 32i), "int64"; impl, "Freeable");
+
+
+@nopath
+@internal
+pred p__struct_aws_string(+loc : Obj, +ofs : Int, allocator : List,
+                          len : List, bytes : List) :
+  i__is_ptr_opt(allocator) *
+  <mem_single>(loc, ofs, "int64"; allocator, "Freeable") *
+  i__long(len, #i__len_v) *
+  <mem_single>(loc, (ofs i+ 8i), "int64"; {{ "long", #i__len_v }}, "Freeable") *
+  <mem_array>(loc, (ofs i+ 16i), 1i, "int8unsigned"; bytes, "Freeable");
+
+
+nounfold pred optBytes(+bytes, +length, content) : (length == 0i) *
+  (content == {{  }}), (0i i<# length) *
+  i__array_ptr(bytes, length, "int8unsigned", content);
+
+
+nounfold pred optBytes(+bytes, +length, content) : (length == 0i) *
+  (content == {{  }}), (0i i<# length) *
+  i__array_ptr(bytes, length, "int8unsigned", content);
+
+
+pred any_aws_last_error() :
+  <mem_single>(_lvar_i_0, 0i, "int32"; {{ "int", #trash }}, "Freeable") *
+  <genv_symb>("error__tl_last_error"; _lvar_i_0) * types(#trash : Int);
+
+
+pred aws_mul_u64_checked(+a, +b, out) : (out == (a i* b)) *
+  (out i<# 4611686018427387903i);
+
+
+pred aws_last_error_is_BAD_CIPHERTEXT() : aws_last_error_is(8192i);
+
+
+@nopath
+@internal
+pred i__global_env() : i__glob_fun("malloc", "i__malloc") *
+  i__glob_fun("calloc", "i__calloc") * i__glob_fun("free", "i__free") *
+  i__glob_fun("memcpy", "i__memcpy") *
+  i__glob_var_unallocated("mega_string_from_array__tl_last_error", "tl_last_error") *
+  i__glob_fun("aws_raise_error_private", "aws_raise_error_private") *
+  i__glob_fun("aws_raise_error", "aws_raise_error") *
+  i__glob_fun("aws_last_error", "aws_last_error") *
+  i__glob_fun("s_default_malloc", "s_default_malloc") *
+  i__glob_fun("s_default_free", "s_default_free") *
+  i__glob_fun("s_default_calloc", "s_default_calloc") *
+  i__glob_fun("s_default_realloc", "s_default_realloc") *
+  i__glob_fun("aws_mem_acquire", "aws_mem_acquire") *
+  i__glob_fun("aws_mem_release", "aws_mem_release") *
+  i__glob_fun("aws_add_size_checked", "aws_add_size_checked") *
+  i__glob_fun("aws_mul_size_checked", "aws_mul_size_checked") *
+  i__glob_fun("aws_string_new_from_array", "aws_string_new_from_array");
+
+
+pred default_allocator(allocator) :
+  p__struct_aws_allocator(_lvar_i_2, _lvar_i_3, _lvar_i_4, _lvar_i_5, _lvar_i_6, _lvar_i_7, {{ "long", 0i }}) *
+  i__function_ptr("s_default_malloc", _lvar_i_4) *
+  i__function_ptr("s_default_free", _lvar_i_5) *
+  i__function_ptr("s_default_realloc", _lvar_i_6) *
+  i__function_ptr("s_default_calloc", _lvar_i_7) *
+  i__ptr(allocator, _lvar_i_2, _lvar_i_3);
+
+
+nounfold pred writable_memory(+pointer, +length, content) : (length == 0i) *
+  (content == {{  }}), (0i i<# length) *
+  i__array_ptr(pointer, length, "int8unsigned", content);
+
+
+pred aws_last_error_is(err) :
+  <mem_single>(_lvar_i_1, 0i, "int32"; {{ "int", err }}, "Freeable") *
+  <genv_symb>("error__tl_last_error"; _lvar_i_1) * types(err : Int);
+
+
+pred valid_aws_string_ptr(+str, alloc, content) : types(#len : Int) *
+  m_struct_aws_string_exposing_pointer(str, alloc, {{ "long", #len }}, #bytes) *
+  (0i i<=# #len) *
+  i__array_ptr(#bytes, (#len i+ 1i), "int8unsigned", #bytes_content) *
+  (#rawContent == l-sub(#bytes_content, 0i, #len)) *
+  (#bytes_content == l+ (#rawContent, {{ 0i }})) *
+  toUtf8(#rawContent, content);
+
+
+pred aws_last_error_is_SHORT_BUF() : aws_last_error_is(3i);
+
+proc aws_mem_release(allocator, ptr) {
+          gvar__0 := "i__unop_longofint"({{ "int", 0i }});
+          gvar__1 := "i__binop_cmplu_ne"(ptr, gvar__0);
+          gvar__6 := "i__bool_of_value"(gvar__1);
+          goto [gvar__6] then0 else0;
+  then0:  gvar__3 := "i__binop_addl"(allocator, {{ "long", 8i }});
+          gvar__4 := "i__loadv"("int64", gvar__3);
+          gvar__5 := "i__get_function_name"(gvar__4);
+          gvar__2 := gvar__5(allocator, ptr);
+          goto endif0;
+  else0:  skip;
+  endif0: skip;
+          ret := 0i;
+          return
+};
+
+
+proc s_default_realloc(allocator, ptr, oldsize, newsize) {
+          new_mem := undefined;
+          uvar__99 := undefined;
+          gvar__0 := "i__unop_longofint"({{ "int", 0i }});
+          gvar__1 := "i__binop_cmplu_eq"(newsize, gvar__0);
+          gvar__8 := "i__bool_of_value"(gvar__1);
+          goto [gvar__8] then0 else0;
+  then0:  gvar__3 := [genv_getsymbol]("free");
+          gvar__4 := {{ l-nth(gvar__3, 1i), 0i }};
+          gvar__5 := "i__get_function_name"({{ l-nth(gvar__4, 0i), 0i }});
+          gvar__2 := gvar__5(ptr);
+          gvar__6 := "i__unop_longofint"({{ "int", 0i }});
+          ret := gvar__6;
+          return;
+          goto endif0;
+  else0:  skip;
+  endif0: skip;
+          gvar__9 := "i__binop_cmplu_le"(newsize, oldsize);
+          gvar__11 := "i__bool_of_value"(gvar__9);
+          goto [gvar__11] then1 else1;
+  then1:  ret := ptr;
+          return;
+          goto endif1;
+  else1:  skip;
+  endif1: skip;
+          gvar__12 := [genv_getsymbol]("s_default_malloc");
+          gvar__13 := {{ l-nth(gvar__12, 1i), 0i }};
+          gvar__14 := "i__get_function_name"({{ l-nth(gvar__13, 0i), 0i }});
+          uvar__99 := gvar__14(allocator, newsize);
+          new_mem := uvar__99;
+          gvar__16 := [genv_getsymbol]("memcpy");
+          gvar__17 := {{ l-nth(gvar__16, 1i), 0i }};
+          gvar__18 := "i__get_function_name"({{ l-nth(gvar__17, 0i), 0i }});
+          gvar__15 := gvar__18(new_mem, ptr, oldsize);
+          gvar__20 := [genv_getsymbol]("s_default_free");
+          gvar__21 := {{ l-nth(gvar__20, 1i), 0i }};
+          gvar__22 := "i__get_function_name"({{ l-nth(gvar__21, 0i), 0i }});
+          gvar__19 := gvar__22(allocator, ptr);
+          ret := new_mem;
+          return
+};
+
+
+proc aws_raise_error(err) {
+    gvar__1 := [genv_getsymbol]("aws_raise_error_private");
+    gvar__2 := {{ l-nth(gvar__1, 1i), 0i }};
+    gvar__3 := "i__get_function_name"({{ l-nth(gvar__2, 0i), 0i }});
+    gvar__0 := gvar__3(err);
+    gvar__4 := "i__unop_negint"({{ "int", 1i }});
+    ret := gvar__4;
+    return
+};
+
+
+proc aws_mem_acquire(allocator, size) {
+          mem := undefined;
+          uvar__99 := undefined;
+          gvar__0 := "i__binop_addl"(allocator, {{ "long", 0i }});
+          gvar__1 := "i__loadv"("int64", gvar__0);
+          gvar__2 := "i__get_function_name"(gvar__1);
+          uvar__99 := gvar__2(allocator, size);
+          mem := uvar__99;
+          gvar__3 := "i__binop_cmplu_eq"(mem, {{ "long", 0i }});
+          gvar__8 := "i__bool_of_value"(gvar__3);
+          goto [gvar__8] then0 else0;
+  then0:  gvar__5 := [genv_getsymbol]("aws_raise_error");
+          gvar__6 := {{ l-nth(gvar__5, 1i), 0i }};
+          gvar__7 := "i__get_function_name"({{ l-nth(gvar__6, 0i), 0i }});
+          gvar__4 := gvar__7({{ "int", 1i }});
+          goto endif0;
+  else0:  skip;
+  endif0: skip;
+          ret := mem;
+          return
+};
+
+
+@nopath
+@internal
+proc i__initialize_genv() {
+    u := "i__glob_set_fun"("malloc", "i__malloc");
+    u := "i__glob_set_fun"("calloc", "i__calloc");
+    u := "i__glob_set_fun"("free", "i__free");
+    u := "i__glob_set_fun"("memcpy", "i__memcpy");
+    u := "i__glob_set_var"("mega_string_from_array__tl_last_error",
+                           "mega_string_from_array__tl_last_error", 4i,
+                           {{ {{ "int32", 0i }} }}, "Writable");
+    u := "i__glob_set_fun"("aws_raise_error_private",
+                           "aws_raise_error_private");
+    u := "i__glob_set_fun"("aws_raise_error", "aws_raise_error");
+    u := "i__glob_set_fun"("aws_last_error", "aws_last_error");
+    u := "i__glob_set_fun"("s_default_malloc", "s_default_malloc");
+    u := "i__glob_set_fun"("s_default_free", "s_default_free");
+    u := "i__glob_set_fun"("s_default_calloc", "s_default_calloc");
+    u := "i__glob_set_fun"("s_default_realloc", "s_default_realloc");
+    u := "i__glob_set_fun"("aws_mem_acquire", "aws_mem_acquire");
+    u := "i__glob_set_fun"("aws_mem_release", "aws_mem_release");
+    u := "i__glob_set_fun"("aws_add_size_checked", "aws_add_size_checked");
+    u := "i__glob_set_fun"("aws_mul_size_checked", "aws_mul_size_checked");
+    u := "i__glob_set_fun"("aws_string_new_from_array",
+                           "aws_string_new_from_array");
+    ret := undefined;
+    return
+};
+
+
+proc aws_mul_size_checked(a, b, res) {
+          uvar__99 := undefined;
+          gvar__0 := "i__unop_longofint"({{ "int", 65535i }});
+          gvar__1 := "i__binop_cmplu_gt"(a, gvar__0);
+          gvar__4 := "i__bool_of_value"(gvar__1);
+          goto [gvar__4] then0 else0;
+  then0:  uvar__99 := {{ "int", 1i }};
+          goto endif0;
+  else0:  gvar__2 := "i__unop_longofint"({{ "int", 65535i }});
+          gvar__3 := "i__binop_cmplu_gt"(b, gvar__2);
+          uvar__99 := gvar__3;
+  endif0: skip;
+          gvar__5 := "i__binop_cmpu_ne"(uvar__99, {{ "int", 0i }});
+          gvar__10 := "i__bool_of_value"(gvar__5);
+          goto [gvar__10] then1 else1;
+  then1:  sep_assert (False) ;
+          ret := {{ "int", 0i }};
+          return;
+          goto endif1;
+  else1:  gvar__7 := "i__binop_mull"(a, b);
+          gvar__8 := "i__storev"("int64", res, gvar__7);
+          ret := {{ "int", 0i }};
+          return;
+  endif1: skip;
+          ret := 0i;
+          return
+};
+
+
+proc aws_raise_error_private(err) {
+    gvar__0 := [genv_getsymbol]("mega_string_from_array__tl_last_error");
+    gvar__1 := {{ l-nth(gvar__0, 1i), 0i }};
+    gvar__2 := "i__storev"("int32", {{ l-nth(gvar__1, 0i), 0i }}, err);
+    ret := 0i;
+    return
+};
+
+
+spec aws_string_new_from_array(allocator, bytes, length)
+  [[  (allocator == #alloc) *
+      (bytes == #bytes) *
+      types(#len : Int) *
+      (length == {{ "long", #len }}) *
+      (#len i<=# 65535i) *
+      optBytes(#bytes, #len, #rawContent) *
+      toUtf8(#rawContent, #strContent) *
+      default_allocator(#alloc) *
+      i__global_env()  ]]
+  [[  valid_aws_string_ptr(ret, #alloc, #strContent) *
+      optBytes(#bytes, #len, #rawContent) *
+      default_allocator(#alloc)  ]]
+  normal
+proc aws_string_new_from_array(allocator, bytes, length) {
+          gvar__0 := [mem_alloc](0i, 8i);
+          malloc_size := {{ l-nth(gvar__0, 0i), 8i }};
+          str := undefined;
+          uvar__100 := undefined;
+          uvar__99 := undefined;
+          gvar__1 := [genv_getsymbol]("aws_add_size_checked");
+          gvar__2 := {{ l-nth(gvar__1, 1i), 0i }};
+          gvar__3 := "i__unop_longofint"({{ "int", 1i }});
+          gvar__4 := "i__binop_addl"({{ "long", 24i }}, gvar__3);
+          gvar__5 := "i__get_function_name"({{ l-nth(gvar__2, 0i), 0i }});
+          uvar__99 := gvar__5(gvar__4, length, {{ l-nth(malloc_size, 0i),
+                              0i }});
+          gvar__6 := "i__binop_cmpu_ne"(uvar__99, {{ "int", 0i }});
+          gvar__9 := "i__bool_of_value"(gvar__6);
+          goto [gvar__9] then0 else0;
+  then0:  gvar__7 := "i__unop_longofint"({{ "int", 0i }});
+          ret := gvar__7;
+          gvar__8 := "i__free_list"({{ {{ l-nth(malloc_size, 0i), 0i,
+                                    l-nth(malloc_size, 1i) }} }});
+          return;
+          goto endif0;
+  else0:  skip;
+  endif0: skip;
+          gvar__10 := [genv_getsymbol]("aws_mem_acquire");
+          gvar__11 := {{ l-nth(gvar__10, 1i), 0i }};
+          gvar__12 := "i__loadv"("int64", {{ l-nth(malloc_size, 0i), 0i }});
+          gvar__13 := "i__get_function_name"({{ l-nth(gvar__11, 0i), 0i }});
+          uvar__100 := gvar__13(allocator, gvar__12);
+          str := uvar__100;
+          gvar__14 := "i__binop_cmplu_eq"(str, {{ "long", 0i }});
+          gvar__17 := "i__bool_of_value"(gvar__14);
+          goto [gvar__17] then1 else1;
+  then1:  gvar__15 := "i__unop_longofint"({{ "int", 0i }});
+          ret := gvar__15;
+          gvar__16 := "i__free_list"({{ {{ l-nth(malloc_size, 0i), 0i,
+                                     l-nth(malloc_size, 1i) }} }});
+          return;
+          goto endif1;
+  else1:  skip;
+  endif1: skip;
+          gvar__18 := "i__binop_addl"(str, {{ "long", 0i }});
+          gvar__19 := "i__storev"("int64", gvar__18, allocator);
+          gvar__20 := "i__binop_addl"(str, {{ "long", 8i }});
+          gvar__21 := "i__storev"("int64", gvar__20, length);
+          gvar__22 := "i__unop_longofint"({{ "int", 0i }});
+          gvar__23 := "i__binop_cmplu_gt"(length, gvar__22);
+          gvar__29 := "i__bool_of_value"(gvar__23);
+          goto [gvar__29] then2 else2;
+  then2:  gvar__25 := [genv_getsymbol]("memcpy");
+          gvar__26 := {{ l-nth(gvar__25, 1i), 0i }};
+          gvar__27 := "i__binop_addl"(str, {{ "long", 16i }});
+          gvar__28 := "i__get_function_name"({{ l-nth(gvar__26, 0i), 0i }});
+          gvar__24 := gvar__28(gvar__27, bytes, length);
+          goto endif2;
+  else2:  skip;
+  endif2: skip;
+          gvar__30 := "i__binop_addl"(str, {{ "long", 16i }});
+          gvar__31 := "i__binop_mull"({{ "long", 1i }}, length);
+          gvar__32 := "i__binop_addl"(gvar__30, gvar__31);
+          gvar__33 := "i__unop_cast8unsigned"({{ "int", 0i }});
+          gvar__34 := "i__storev"("int8unsigned", gvar__32, gvar__33);
+          ret := str;
+          gvar__35 := "i__free_list"({{ {{ l-nth(malloc_size, 0i), 0i,
+                                     l-nth(malloc_size, 1i) }} }});
+          return
+};
+
+
+proc s_default_malloc(allocator, size) {
+    uvar__99 := undefined;
+    gvar__0 := [genv_getsymbol]("malloc");
+    gvar__1 := {{ l-nth(gvar__0, 1i), 0i }};
+    gvar__2 := "i__get_function_name"({{ l-nth(gvar__1, 0i), 0i }});
+    uvar__99 := gvar__2(size);
+    ret := uvar__99;
+    return
+};
+
+
+proc aws_last_error() {
+    gvar__0 := [genv_getsymbol]("mega_string_from_array__tl_last_error");
+    gvar__1 := {{ l-nth(gvar__0, 1i), 0i }};
+    gvar__2 := "i__loadv"("int32", {{ l-nth(gvar__1, 0i), 0i }});
+    ret := gvar__2;
+    return
+};
+
+
+proc s_default_free(allocator, ptr) {
+    gvar__1 := [genv_getsymbol]("free");
+    gvar__2 := {{ l-nth(gvar__1, 1i), 0i }};
+    gvar__3 := "i__get_function_name"({{ l-nth(gvar__2, 0i), 0i }});
+    gvar__0 := gvar__3(ptr);
+    ret := 0i;
+    return
+};
+
+
+proc s_default_calloc(allocator, num, size) {
+    uvar__99 := undefined;
+    gvar__0 := [genv_getsymbol]("calloc");
+    gvar__1 := {{ l-nth(gvar__0, 1i), 0i }};
+    gvar__2 := "i__get_function_name"({{ l-nth(gvar__1, 0i), 0i }});
+    uvar__99 := gvar__2(num, size);
+    ret := uvar__99;
+    return
+};
+
+
+proc aws_add_size_checked(a, b, res) {
+          uvar__99 := undefined;
+          gvar__0 := "i__unop_longofint"({{ "int", 65535i }});
+          gvar__1 := "i__binop_cmplu_gt"(a, gvar__0);
+          gvar__4 := "i__bool_of_value"(gvar__1);
+          goto [gvar__4] then0 else0;
+  then0:  uvar__99 := {{ "int", 1i }};
+          goto endif0;
+  else0:  gvar__2 := "i__unop_longofint"({{ "int", 65535i }});
+          gvar__3 := "i__binop_cmplu_gt"(b, gvar__2);
+          uvar__99 := gvar__3;
+  endif0: skip;
+          gvar__5 := "i__binop_cmpu_ne"(uvar__99, {{ "int", 0i }});
+          gvar__10 := "i__bool_of_value"(gvar__5);
+          goto [gvar__10] then1 else1;
+  then1:  sep_assert (False) ;
+          ret := {{ "int", 1i }};
+          return;
+          goto endif1;
+  else1:  gvar__7 := "i__binop_addl"(a, b);
+          gvar__8 := "i__storev"("int64", res, gvar__7);
+          ret := {{ "int", 0i }};
+          return;
+  endif1: skip;
+          ret := 0i;
+          return
+};

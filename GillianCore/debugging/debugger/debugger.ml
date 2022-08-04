@@ -3,6 +3,7 @@ module DL = Debugger_log
 module Gil_to_tl_lifter = Gil_to_tl_lifter
 module DebuggerTypes = DebuggerTypes
 module DebuggerUtils = DebuggerUtils
+module CommonTypes = Types.Common
 open DebuggerTypes
 open Syntaxes.Option
 
@@ -72,12 +73,12 @@ struct
   type tl_ast = PC.tl_ast
 
   module PackagedBranchCase = struct
-    type t = { kind : string; display : string * string; json : Yojson.Safe.t }
-    [@@deriving yojson]
+    open CommonTypes
+    type t = branch_case_pkg [@@deriving yojson]
 
     let from case =
       let open Verification.SAInterpreter in
-      let json = branch_case_to_yojson case in
+      let json = branch_case_to_yojson case |> Yojson.Safe.to_string in
       let kind, display =
         match case with
         | GuardedGoto b -> ("GuardedGoto", ("If/Else", Fmt.str "%B" b))
@@ -93,34 +94,23 @@ struct
       in
       { kind; display; json }
 
-    let unpackage { json; _ } =
-      json |> branch_case_of_yojson
+    let unpackage ({ json; _ } : t) =
+      json |> Yojson.Safe.from_string |> branch_case_of_yojson
       |> Result.map_error (fun _ -> "Malformed branch case json!")
   end
 
   module UnifyMap = struct
     open Verification.SUnifier.Logging
+    module UMTypes = CommonTypes.UnifyMap
+    open UMTypes
 
     type unify_kind = Unifier.unify_kind [@@deriving yojson]
-    type unify_result = Success | Failure [@@deriving yojson]
+    type unify_result = UMTypes.unify_result [@@deriving yojson]
+    type assertion_data = rid UMTypes.assertion_data [@@deriving yojson]
 
-    type assertion_data = {
-      id : rid;
-      fold : (rid * unify_result) option;
-      assertion : string;
-      substitutions : (string * string) list;
-    }
-    [@@deriving yojson]
+    type unify_seg = rid UMTypes.unify_seg [@@deriving yojson]
 
-    type unify_seg =
-      | Assertion of assertion_data * unify_seg
-      | UnifyResult of rid * unify_result
-    [@@deriving yojson]
-
-    type map = Direct of unify_seg | Fold of unify_seg list
-    [@@deriving yojson]
-
-    type t = unify_kind * map [@@deriving yojson]
+    type t = rid UMTypes.t [@@deriving yojson]
 
     let result_of_id id =
       let rec aux id =
@@ -206,9 +196,9 @@ struct
           |> Result.get_ok
         in
         let result =
-          match result_report with
-          | Success _ -> Success
-          | Failure _ -> Failure
+            match result_report with
+            | Success _ -> Success
+            | Failure _ -> Failure
         in
         UnifyResult (id, result)
       else
@@ -272,24 +262,14 @@ struct
   end
 
   module ExecMap = struct
-    type unifys = (rid * Unifier.unify_kind * UnifyMap.unify_result) list
-    [@@deriving yojson]
+    module EMTypes = CommonTypes.ExecMap
+    open EMTypes
 
-    type cmd_data = {
-      id : rid;
-      origin_id : int option; [@name "originId"]
-      display : string;
-      unifys : unifys;
-      errors : string list;
-    }
-    [@@deriving yojson]
+    type unifys = rid EMTypes.unifys [@@deriving yojson]
 
-    type 'case t =
-      | Nothing
-      | Cmd of cmd_data * 'case t
-      | BranchCmd of cmd_data * ('case * 'case t) list
-      | FinalCmd of cmd_data
-    [@@deriving yojson]
+    type cmd_data = rid EMTypes.cmd_data [@@deriving yojson]
+
+    type 'case t = (rid, 'case) EMTypes.t [@@deriving yojson]
 
     type cmd_kind = Branch of branch_case list | Normal | Final
     [@@deriving yojson]
@@ -640,14 +620,7 @@ struct
           proc_name
       | name -> name
 
-    type debug_state = {
-      exec_map : exec_map_pkg; [@key "execMap"]
-      lifted_exec_map : exec_map_pkg option; [@key "liftedExecMap"]
-      current_cmd_id : rid; [@key "currentCmdId"]
-      unifys : (rid * Unifier.unify_kind * UnifyMap.unify_result) list;
-      proc_name : string; [@key "procName"]
-    }
-    [@@deriving yojson]
+    type debug_state = rid CommonTypes.debug_state [@@deriving yojson]
 
     let get_debug_state dbg : debug_state =
       let current_cmd_id = dbg.cur_report_id in
@@ -663,7 +636,7 @@ struct
         | None -> "unknown proc"
         | Some proc_name -> proc_name
       in
-      { exec_map; current_cmd_id; unifys; proc_name; lifted_exec_map }
+      CommonTypes.({ exec_map; current_cmd_id; unifys; proc_name; lifted_exec_map })
 
     let get_unification unify_id dbg =
       match dbg.unify_maps |> List.assoc_opt unify_id with
@@ -1005,7 +978,7 @@ struct
               |> Result.get_ok
             in
             let kind = unify_report.unify_kind in
-            let result = UnifyMap.(if success then Success else Failure) in
+            let result = CommonTypes.UnifyMap.(if success then Success else Failure) in
             (id, kind, result))
 
   let show_result_errors = function

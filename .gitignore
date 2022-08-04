@@ -89,3 +89,8 @@ javert-test262
 
 # Temporary databases for logs
 *.db
+
+# ReScript build output
+*.bs.js
+lib/bs
+*.gen.tsx

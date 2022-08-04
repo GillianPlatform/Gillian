@@ -1,4 +1,4 @@
-(dirs wisl GillianCore Gillian-Rely-Runner Gillian-JS Gillian-C
+(dirs wisl GillianCore GillianCommon Gillian-Rely-Runner Gillian-JS Gillian-C
   Gillian-Alcotest-Runner ppx_sat)
 
 (env

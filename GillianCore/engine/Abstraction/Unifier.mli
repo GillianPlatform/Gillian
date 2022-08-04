@@ -1,4 +1,4 @@
-type unify_kind =
+type unify_kind = Types.Common.unify_kind =
   | Postcondition
   | Fold
   | FunctionCall
