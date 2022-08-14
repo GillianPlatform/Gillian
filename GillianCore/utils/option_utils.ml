@@ -11,3 +11,8 @@ let somes_and_eq ox y =
 let or_else f = function
   | Some x -> x
   | None -> f ()
+
+let coalesce a b =
+  match (a, b) with
+  | Some x, _ | _, Some x -> Some x
+  | _ -> None
