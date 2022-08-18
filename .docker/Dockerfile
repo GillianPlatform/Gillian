@@ -15,7 +15,7 @@ RUN apt-get install -y \
   zsh \
   m4
 
-RUN npm install -g esy@0.6.6 --unsafe-perm
+RUN npm install -g esy@0.6.12 --unsafe-perm
 
 RUN mkdir /app
 
