@@ -104,11 +104,17 @@ struct
     type unify_kind = Unifier.unify_kind [@@deriving yojson]
     type unify_result = Success | Failure [@@deriving yojson]
 
+    type substitution = {
+      assert_id : rid; [@key "assertId"]
+      subst : string * string;
+    }
+    [@@deriving yojson]
+
     type assertion_data = {
       id : rid;
       fold : (rid * unify_result) option;
       assertion : string;
-      substitutions : (string * string) list;
+      substitutions : substitution list;
     }
     [@@deriving yojson]
 
@@ -156,7 +162,7 @@ struct
             Success
           else Failure
 
-    let rec build_seg (id, type_, content) : unify_seg =
+    let rec build_seg ?(prev_substs = []) (id, type_, content) : unify_seg =
       let module Subst = Verification.SUnifier.ESubst in
       if type_ = ContentType.assertion then
         let asrt_report =
@@ -167,7 +173,12 @@ struct
           let asrt, _ = asrt_report.step in
           Fmt.str "%a" Asrt.pp asrt
         in
-        let substitutions = asrt_report.subst |> Subst.to_list_pp in
+        let substitutions =
+          asrt_report.subst |> Subst.to_list_pp
+          |> List.map (fun subst ->
+                 List.find_opt (fun prev -> prev.subst = subst) prev_substs
+                 |> Option.value ~default:{ assert_id = id; subst })
+        in
         let fold =
           let+ child_id, type_, _ =
             match L.LogQueryer.get_children_of id with
@@ -194,7 +205,7 @@ struct
               let content, type_ =
                 L.LogQueryer.get_report next_id |> Option.get
               in
-              build_seg (next_id, type_, content)
+              build_seg ~prev_substs:substitutions (next_id, type_, content)
           | _ ->
               Fmt.failwith
                 "UnifyMap.build_seg: assertion %a has multiple nexts!" pp_rid id
