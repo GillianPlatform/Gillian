@@ -176,7 +176,9 @@ struct
         let substitutions =
           asrt_report.subst |> Subst.to_list_pp
           |> List.map (fun subst ->
-                 List.find_opt (fun prev -> prev.subst = subst) prev_substs
+                 List.find_opt
+                   (fun prev -> [%eq: string * string] prev.subst subst)
+                   prev_substs
                  |> Option.value ~default:{ assert_id = id; subst })
         in
         let fold =
