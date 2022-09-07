@@ -26,11 +26,16 @@ export type ExecMap =
 
 export type UnifyResult = readonly ['Success' | 'Failure'];
 
+export type Substitution = {
+  readonly assertId: number;
+  readonly subst: readonly [string, string];
+};
+
 export type AssertionData = {
   readonly id: number;
   readonly fold: readonly [number, UnifyResult] | null;
   readonly assertion: string;
-  readonly substitutions: readonly [string, string][];
+  readonly substitutions: readonly Substitution[];
 };
 
 export type UnifySeg =

@@ -6,14 +6,29 @@ import {
   VSCodeDivider,
   VSCodeLink,
 } from '@vscode/webview-ui-toolkit/react';
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
+import { UnifyMap, UnifySeg, UnifyStep } from '../../../types';
 import useStore, { mutateStore } from '../store';
 import { Code, showBaseUnifyKind } from '../util';
 import VSCodeAPI from '../VSCodeAPI';
 
 import './UnifyData.css';
 
-const UnifyData = () => {
+type Props = {
+  selectStep: (step: UnifyStep) => void;
+};
+
+const extractTargets = (seg: UnifySeg): { [key: number]: UnifyStep } => {
+  if (seg[0] === 'UnifyResult') {
+    const [, id, result] = seg;
+    return { [id]: ['Result', id, result] };
+  }
+
+  const [, asrt, next] = seg;
+  return { [asrt.id]: ['Assertion', asrt], ...extractTargets(next) };
+};
+
+const UnifyData = ({ selectStep }: Props) => {
   const procName = useStore(store => store.debugState?.procName || '');
   const [{ path, unifications }, baseUnifyKind] = useStore(store => [
     store.unifyState,
@@ -24,7 +39,21 @@ const UnifyData = () => {
   useEffect(() => {
     console.log('Showing unify data', path, unifications);
   }, [path, unifications]);
-  const selectedStep = unifications[path[0]]?.selected;
+  const unification = unifications[path[0]];
+  const selectedStep = unification?.selected;
+
+  const unifyJumpTargets = useMemo(() => {
+    if (unification?.map === undefined) return {};
+    const unifyMap = unification?.map as UnifyMap;
+    if (unifyMap[1][0] === 'Direct') {
+      return extractTargets(unifyMap[1][1]);
+    } else {
+      return unifyMap[1][1].reduce(
+        (acc, seg) => ({ ...acc, ...extractTargets(seg) }),
+        {}
+      );
+    }
+  }, [unification]);
 
   const unifyNames = [
     <>
@@ -123,19 +152,43 @@ const UnifyData = () => {
               <VSCodeDataGridCell cellType="columnheader" gridColumn="2">
                 Value
               </VSCodeDataGridCell>
+              <VSCodeDataGridCell cellType="columnheader" gridColumn="3" />
             </VSCodeDataGridRow>
-            {substitutions.map(([expr, val]) => (
-              <VSCodeDataGridRow key={expr}>
-                <VSCodeDataGridCell gridColumn="1" className="subst-expr">
-                  <Code>
-                    <b>{expr}</b>
-                  </Code>
-                </VSCodeDataGridCell>
-                <VSCodeDataGridCell gridColumn="2" className="subst-val">
-                  <Code>{val}</Code>
-                </VSCodeDataGridCell>
-              </VSCodeDataGridRow>
-            ))}
+            {substitutions.map(({ assertId, subst: [expr, val] }) => {
+              const target = unifyJumpTargets[assertId];
+              const jumpButtonIcon =
+                target === undefined ? 'question' : 'target';
+              const jumpButton = (
+                <VSCodeButton
+                  appearance="icon"
+                  aria-label="Jump to assertion of origin"
+                  title="Jump to assertion of origin"
+                  disabled={
+                    target === undefined || selectedStep[1].id === assertId
+                  }
+                  onClick={() => {
+                    selectStep(target);
+                  }}
+                >
+                  <span className={`codicon codicon-${jumpButtonIcon}`} />
+                </VSCodeButton>
+              );
+              return (
+                <VSCodeDataGridRow key={expr}>
+                  <VSCodeDataGridCell gridColumn="1" className="subst-expr">
+                    <Code>
+                      <b>{expr}</b>
+                    </Code>
+                  </VSCodeDataGridCell>
+                  <VSCodeDataGridCell gridColumn="2" className="subst-val">
+                    <Code>{val}</Code>
+                  </VSCodeDataGridCell>
+                  <VSCodeDataGridCell gridColumn="3" className="subst-jump">
+                    {jumpButton}
+                  </VSCodeDataGridCell>
+                </VSCodeDataGridRow>
+              );
+            })}
           </VSCodeDataGrid>
         </>
       );

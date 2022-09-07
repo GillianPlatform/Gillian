@@ -42,7 +42,7 @@ const UnifyView = () => {
     <Allotment>
       <Allotment.Pane>{unifyMapView}</Allotment.Pane>
       <Allotment.Pane>
-        <UnifyData />
+        <UnifyData {...{ selectStep }} />
       </Allotment.Pane>
     </Allotment>
   );
