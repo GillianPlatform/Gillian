@@ -218,4 +218,4 @@ jobs:
           load: true
           tags: ${{ env.DOCKER_TEST_TAG }}
       - name: test
-        run: docker run --rm -it ${{ env.DOCKER_TEST_TAG }} esy test
+        run: docker run --rm ${{ env.DOCKER_TEST_TAG }} esy test
