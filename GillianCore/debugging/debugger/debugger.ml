@@ -977,6 +977,8 @@ struct
                 let map =
                   Nothing |> insert_cmd_sourceless new_cmd branch_path
                 in
+                if Annot.is_hidden cmd.annot then
+                  failwith "HORROR: First command is hidden!";
                 let lifted_map =
                   match (Lifter.source_map_ability, tl_ast) with
                   | true, Some tl_ast ->
@@ -1086,14 +1088,21 @@ struct
       let new_cmd =
         new_cmd cmd_kind cur_report_id cmd_display ~unifys ~errors origin_id
       in
-      let- exec_map = dbg.exec_map |> insert_cmd new_cmd branch_path source in
-      dbg.exec_map <- exec_map;
-      let- tl_ast = dbg.tl_ast in
-      let- lifted_exec_map = dbg.lifted_exec_map in
-      let lifted_exec_map =
-        lifted_exec_map |> insert_lifted tl_ast new_cmd branch_path
-      in
-      dbg.lifted_exec_map <- Some lifted_exec_map)
+      let exec_map = dbg.exec_map |> insert_cmd new_cmd branch_path source in
+      match exec_map with
+      | None -> false
+      | Some exec_map -> (
+          dbg.exec_map <- exec_map;
+          match (dbg.tl_ast, dbg.lifted_exec_map) with
+          | Some tl_ast, Some lifted_exec_map ->
+              if Annot.is_hidden cmd.annot then false
+              else
+                let lifted_exec_map =
+                  lifted_exec_map |> insert_lifted tl_ast new_cmd branch_path
+                in
+                dbg.lifted_exec_map <- Some lifted_exec_map;
+                true
+          | _ -> true))
 
   let rec execute_step prev_id_in_frame ?branch_case ?prev_branch_path dbg =
     let open Verification.SAInterpreter in
@@ -1147,9 +1156,13 @@ struct
                   unify result proc_name prev_id dbg |> Option.to_list
                 in
                 update_report_id_and_inspection_fields prev_id dbg;
-                dbg
-                |> update_exec_maps Final prev_id cmd ~unifys ~errors
-                     branch_path
+                let inserted =
+                  dbg
+                  |> update_exec_maps Final prev_id cmd ~unifys ~errors
+                       branch_path
+                in
+                if not inserted then
+                  failwith "HORROR: didn't insert on EndOfBranch!"
             | Some (prev_id, _, type_) ->
                 Fmt.failwith "EndOfBranch: prev cmd (%a) is '%s', not '%s'!"
                   pp_rid prev_id type_ ContentType.cmd
@@ -1216,10 +1229,15 @@ struct
                        (unify_id, fst unify_map, result))
                       |> Option.to_list
                     in
-                    dbg
-                    |> update_exec_maps cmd_kind cur_report_id cmd ~unifys
-                         branch_path);
-                  Step)))
+                    let inserted =
+                      dbg
+                      |> update_exec_maps cmd_kind cur_report_id cmd ~unifys
+                           branch_path
+                    in
+                    if not inserted then
+                      execute_step cur_report_id ~prev_branch_path:branch_path
+                        dbg
+                    else Step))))
 
   let step_in_branch_case prev_id_in_frame ?branch_case ?(reverse = false) dbg =
     let stop_reason =
