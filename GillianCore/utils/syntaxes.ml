@@ -6,5 +6,4 @@ end
 module Option = struct
   let ( let+ ) f o = Option.map o f
   let ( let* ) o f = Option.bind o f
-  let ( let- ) f o = Option.iter o f
 end
