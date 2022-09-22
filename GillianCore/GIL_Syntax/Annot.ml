@@ -2,14 +2,10 @@
 type t = {
   origin_loc : Location.t option;  (** Better not to know what this is for *)
   origin_id : int option;  (** Origin Id, that should be abstracted away *)
-  loop_info : string list;
+  loop_info : string list; [@default []]
+  lift_hidden : bool; [@default false]  (** Hidden when lifting *)
 }
-[@@deriving yojson]
-
-(**/**)
-
-let make ?origin_loc ?origin_id ?(loop_info = []) () =
-  { origin_loc; origin_id; loop_info }
+[@@deriving yojson, make]
 
 let get_loop_info (annot : t) = annot.loop_info
 
@@ -18,3 +14,5 @@ let set_loop_info (annot : t) (loop_info : string list) =
 
 let get_origin_loc annot = annot.origin_loc
 let get_origin_id annot = annot.origin_id
+let hide (annot : t) = { annot with lift_hidden = true }
+let is_hidden (annot : t) = annot.lift_hidden

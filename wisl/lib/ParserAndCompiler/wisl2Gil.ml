@@ -781,6 +781,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let annot =
         Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
+      let annot_hidden = Annot.hide annot in
       let cmdle, guard = compile_expr e in
       let comp_sl1, new_functions1 = compile_list sl1 in
       let comp_sl2, new_functions2 = compile_list sl2 in
@@ -790,9 +791,9 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let ifelsecmd = Cmd.GuardedGoto (guard, thenlab, elselab) in
       let ifelsecmd_lab = (annot, None, ifelsecmd) in
       let gotoendcmd = Cmd.Goto endlab in
-      let gotoendcmd_lab = (annot, None, gotoendcmd) in
+      let gotoendcmd_lab = (annot_hidden, None, gotoendcmd) in
       let endcmd = Cmd.Skip in
-      let endcmd_lab = (annot, Some endlab, endcmd) in
+      let endcmd_lab = (annot_hidden, Some endlab, endcmd) in
       let comp_rest, new_functions3 = compile_list rest in
       ( cmdle
         @ (ifelsecmd_lab :: comp_sl1)

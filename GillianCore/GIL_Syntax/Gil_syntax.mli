@@ -911,6 +911,7 @@ module Annot : sig
     ?origin_loc:Location.t ->
     ?origin_id:int ->
     ?loop_info:string list ->
+    ?lift_hidden:bool ->
     unit ->
     t
 
@@ -925,6 +926,8 @@ module Annot : sig
 
   (* Get the origin id *)
   val get_origin_id : t -> int option
+  val hide : t -> t
+  val is_hidden : t -> bool
 end
 
 module Proc : sig
