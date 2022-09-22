@@ -6,8 +6,9 @@ type tt =
       (** x -> a, b <=> (x -> a) * (x+1 -> b) *)
   | LBlockPointsTo of WLExpr.t * WLExpr.t list
   | LPure of WLFormula.t
+[@@deriving yojson]
 
-and t
+and t [@@deriving yojson]
 
 val get : t -> tt
 val get_id : t -> int

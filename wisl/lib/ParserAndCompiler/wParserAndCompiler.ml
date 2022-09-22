@@ -2,7 +2,7 @@ open Lexing
 open WLexer
 
 type err = unit
-type tl_ast = WProg.t
+type tl_ast = WProg.t [@@deriving yojson]
 
 let pp_err _ () = ()
 

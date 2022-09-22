@@ -9,6 +9,7 @@ type t = {
   floc : CodeLoc.t;
   fid : int;
 }
+[@@deriving yojson]
 
 let get_id f = f.fid
 let get_loc f = f.floc

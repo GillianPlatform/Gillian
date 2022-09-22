@@ -7,8 +7,9 @@ type tt =
   | Assert of WLAssert.t * string list  (**  assert \{exists: ...\} ... *)
   | Invariant of WLAssert.t * string list * WLExpr.t option
       (** invariant \{exists: ... \} ...*)
+[@@deriving yojson]
 
-and t
+and t [@@deriving yojson]
 
 val get : t -> tt
 val get_id : t -> int

@@ -13,6 +13,7 @@ type comparison_op =
   | Ge
   | In
   | InstanceOf
+[@@deriving yojson]
 
 type arith_op =
   | Plus
@@ -26,13 +27,15 @@ type arith_op =
   | Bitand
   | Bitor
   | Bitxor
+[@@deriving yojson]
 
-type bool_op = And | Or
+type bool_op = And | Or [@@deriving yojson]
 
 type bin_op =
   | Comparison of comparison_op
   | Arith of arith_op
   | Boolean of bool_op
+[@@deriving yojson]
 
 type unary_op =
   | Not
@@ -45,8 +48,9 @@ type unary_op =
   | Post_Incr
   | Bitnot
   | Void
+[@@deriving yojson]
 
-type var = string
+type var = string [@@deriving yojson]
 
 type annotation_type =
   | Import  (** Import a JSIL or GIL file *)
@@ -67,21 +71,25 @@ type annotation_type =
   | BiAbduce  (** Bi-abduction indicator *)
   | Call  (** Function call with substitution *)
   | JSIL_only  (** Function called in JSIL only *)
+[@@deriving yojson]
 
 type annotation = { annot_type : annotation_type; annot_formula : string }
+[@@deriving yojson]
 
 type propname =
   | PropnameId of string
   | PropnameString of string
   | PropnameNum of float
+[@@deriving yojson]
 
-type proptype = PropbodyVal | PropbodyGet | PropbodySet
+type proptype = PropbodyVal | PropbodyGet | PropbodySet [@@deriving yojson]
 
 type exp = {
   exp_loc : Loc.t;
   exp_stx : exp_syntax;
   exp_annot : annotation list;
 }
+[@@deriving yojson]
 
 and exp_syntax =
   | Num of float  (** 17 *)
@@ -128,9 +136,10 @@ and exp_syntax =
   | ConditionalOp of exp * exp * exp  (** (e ? e : e) *)
   | Block of exp list  (** { es } *)
   | Script of bool * exp list
+[@@deriving yojson]
 
 (* top node *)
-and switch_case = Case of exp | DefaultCase
+and switch_case = Case of exp | DefaultCase [@@deriving yojson]
 
 let mk_exp s o annots = { exp_loc = o; exp_stx = s; exp_annot = annots }
 

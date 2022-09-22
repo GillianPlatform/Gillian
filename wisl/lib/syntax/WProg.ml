@@ -5,6 +5,7 @@ type t = {
   predicates : WPred.t list;
   lemmas : WLemma.t list;
 }
+[@@deriving yojson]
 
 let get_context p = p.context
 

@@ -10,8 +10,9 @@ type tt =
   | While of WExpr.t * t list  (** while (e) \{ s \} *)
   | If of WExpr.t * t list * t list  (** if (e) \{ s \} else \{ s \} *)
   | Logic of WLCmd.t  (** logic command *)
+[@@deriving yojson]
 
-and t = { sid : int; sloc : CodeLoc.t; snode : tt }
+and t = { sid : int; sloc : CodeLoc.t; snode : tt } [@@deriving yojson]
 
 val get : t -> tt
 val get_id : t -> int

@@ -11,8 +11,9 @@ type tt =
   | LGreater of WLExpr.t * WLExpr.t
   | LLessEq of WLExpr.t * WLExpr.t
   | LGreaterEq of WLExpr.t * WLExpr.t
+[@@deriving yojson]
 
-and t = { wlfid : int; wlfloc : CodeLoc.t; wlfnode : tt }
+and t = { wlfid : int; wlfloc : CodeLoc.t; wlfnode : tt } [@@deriving yojson]
 
 let get lf = lf.wlfnode
 let get_loc e = e.wlfloc

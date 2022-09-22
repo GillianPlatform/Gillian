@@ -8,6 +8,7 @@ type t =
   | WInt
   | WAny
   | WSet
+[@@deriving yojson]
 
 (** Are types t1 and t2 compatible *)
 let compatible t1 t2 =

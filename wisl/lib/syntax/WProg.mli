@@ -3,6 +3,7 @@ type t = {
   predicates : WPred.t list;
   lemmas : WLemma.t list;
 }
+[@@deriving yojson]
 
 val get_context : t -> WFun.t list
 

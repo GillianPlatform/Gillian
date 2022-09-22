@@ -1,4 +1,4 @@
-type t = NOT | LEN | REV | HEAD | TAIL
+type t = NOT | LEN | REV | HEAD | TAIL [@@deriving yojson]
 
 let is_logic_only u =
   match u with

@@ -9,8 +9,9 @@ type tt =
   | LGreater of WLExpr.t * WLExpr.t
   | LLessEq of WLExpr.t * WLExpr.t
   | LGreaterEq of WLExpr.t * WLExpr.t
+[@@deriving yojson]
 
-and t
+and t [@@deriving yojson]
 
 val get : t -> tt
 val get_loc : t -> CodeLoc.t

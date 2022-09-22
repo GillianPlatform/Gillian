@@ -7,8 +7,9 @@ type tt =
   | LLSub of t * t * t
   | LEList of t list
   | LESet of t list
+[@@deriving yojson]
 
-and t
+and t [@@deriving yojson]
 
 val get : t -> tt
 val get_loc : t -> CodeLoc.t

@@ -2,4 +2,6 @@
  (name parserAndCompiler)
  (public_name gillian.parserAndCompiler)
  (libraries cmdliner gil_syntax utils incrementalAnalysis)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson))
  (flags :standard -open Gil_syntax -open Utils -open IncrementalAnalysis))

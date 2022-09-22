@@ -1,4 +1,5 @@
 type t = Bool of bool | Int of int | Str of string | Null | VList of t list
+[@@deriving yojson]
 
 let rec pp fmt v =
   match v with

@@ -7,6 +7,7 @@ type t = {
   pred_loc : CodeLoc.t;
   pred_id : int;
 }
+[@@deriving yojson]
 
 val get_id : t -> int
 val get_loc : t -> CodeLoc.t

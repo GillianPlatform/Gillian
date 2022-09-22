@@ -4,8 +4,9 @@ type tt =
   | BinOp of t * WBinOp.t * t
   | UnOp of WUnOp.t * t
   | List of t list
+[@@deriving yojson]
 
-and t
+and t [@@deriving yojson]
 
 val get : t -> tt
 val get_loc : t -> CodeLoc.t

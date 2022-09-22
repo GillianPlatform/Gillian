@@ -23,7 +23,9 @@ module TargetLangOptions = struct
 end
 
 type err = JSParserErr of JS_Parser.Error.t | JS2GILErr of string
+
 type tl_ast = JavaScriptSource of JS_Parser.Syntax.exp | JsilSource
+[@@deriving yojson]
 
 let pp_err fmt = function
   | JS2GILErr s -> Fmt.pf fmt "%s" s

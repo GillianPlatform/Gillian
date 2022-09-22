@@ -12,6 +12,7 @@ type t = {
   (* parameters of the function *)
   sploc : CodeLoc.t;
 }
+[@@deriving yojson]
 
 let get_id spec = spec.spid
 let get_pre spec = spec.pre

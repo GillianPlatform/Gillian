@@ -6,8 +6,9 @@ type tt =
   | BinOp of t * WBinOp.t * t
   | UnOp of WUnOp.t * t
   | List of t list
+[@@deriving yojson]
 
-and t = { weid : int; weloc : CodeLoc.t; wenode : tt }
+and t = { weid : int; weloc : CodeLoc.t; wenode : tt } [@@deriving yojson]
 
 let get e = e.wenode
 let get_loc e = e.weloc

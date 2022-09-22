@@ -170,7 +170,7 @@ let get_deps_path c_path = Filename.chop_extension c_path ^ ".deps"
 type err = Errors.errmsg
 
 (* TODO: Include some form of the C AST *)
-type tl_ast = unit
+type tl_ast = unit [@@deriving yojson]
 
 let pp_err fmt e = Driveraux.print_error fmt e
 

@@ -10,6 +10,7 @@ type t = {
   lemma_id : int;
   lemma_loc : CodeLoc.t;
 }
+[@@deriving yojson]
 
 let get_id l = l.lemma_id
 let get_loc l = l.lemma_loc

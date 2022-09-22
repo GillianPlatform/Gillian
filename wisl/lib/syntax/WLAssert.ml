@@ -8,8 +8,9 @@ type tt =
   | LPointsTo of WLExpr.t * WLExpr.t list
   | LBlockPointsTo of WLExpr.t * WLExpr.t list
   | LPure of WLFormula.t
+[@@deriving yojson]
 
-and t = { wlaid : int; wlaloc : CodeLoc.t; wlanode : tt }
+and t = { wlaid : int; wlaloc : CodeLoc.t; wlanode : tt } [@@deriving yojson]
 
 let get la = la.wlanode
 let get_id la = la.wlaid

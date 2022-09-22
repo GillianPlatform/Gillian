@@ -1,4 +1,6 @@
 (library
  (name js2jsil_lib)
  (flags :standard -open Gillian.Utils)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson))
  (libraries jsil_syntax jslogic parsing javert_utils str))

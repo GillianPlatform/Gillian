@@ -9,8 +9,9 @@ type tt =
   | LLSub of t * t * t
   | LEList of t list
   | LESet of t list
+[@@deriving yojson]
 
-and t = { wleid : int; wleloc : CodeLoc.t; wlenode : tt }
+and t = { wleid : int; wleloc : CodeLoc.t; wlenode : tt } [@@deriving yojson]
 
 let get le = le.wlenode
 let get_loc le = le.wleloc

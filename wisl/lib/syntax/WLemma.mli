@@ -8,6 +8,7 @@ type t = {
   lemma_id : int;
   lemma_loc : CodeLoc.t;
 }
+[@@deriving yojson]
 
 val get_id : t -> int
 val get_loc : t -> CodeLoc.t

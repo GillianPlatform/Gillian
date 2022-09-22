@@ -1,4 +1,6 @@
 (library
  (name wSyntax)
  (libraries wUtils)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson))
  (flags :standard -open WUtils))

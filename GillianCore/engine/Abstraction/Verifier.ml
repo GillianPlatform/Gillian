@@ -1045,7 +1045,7 @@ struct
     Printf.printf "%s\n" msg;
     L.normal (fun m -> m "%s" msg)
 
-  let verify_up_to_procs (prog : prog_t) :
+  let verify_up_to_procs (*?(proc_name : string option)*) (prog : prog_t) :
       SAInterpreter.result_t SAInterpreter.cont_func =
     L.with_normal_phase ~title:"Program verification" (fun () ->
         (* Analyse all procedures and lemmas *)

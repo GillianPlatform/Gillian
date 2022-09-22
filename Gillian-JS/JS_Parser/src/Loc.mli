@@ -6,6 +6,7 @@ type t = Flow_parser.Loc.t = {
   start : position;
   _end : position;
 }
+[@@deriving yojson]
 
 val none : t
 val file_key_to_string : file_key -> string

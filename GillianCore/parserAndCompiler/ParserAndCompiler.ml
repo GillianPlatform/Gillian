@@ -20,7 +20,7 @@ module type S = sig
   type err
 
   (** Type of the target language AST *)
-  type tl_ast
+  type tl_ast [@@deriving yojson]
 
   (** Pretty printer for type {!err} *)
   val pp_err : Format.formatter -> err -> unit
@@ -55,7 +55,7 @@ module Dummy : S = struct
     let apply () = ()
   end
 
-  type tl_ast = unit
+  type tl_ast = unit [@@deriving yojson]
   type err = unit
 
   let pp_err _ _ =

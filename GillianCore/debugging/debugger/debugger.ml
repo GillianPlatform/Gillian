@@ -69,7 +69,7 @@ struct
   module Breakpoints = Set.Make (Int)
 
   type breakpoints = (string, Breakpoints.t) Hashtbl.t
-  type tl_ast = PC.tl_ast
+  type tl_ast = PC.tl_ast [@@deriving yojson]
 
   module PackagedBranchCase = struct
     type t = { kind : string; display : string * string; json : Yojson.Safe.t }

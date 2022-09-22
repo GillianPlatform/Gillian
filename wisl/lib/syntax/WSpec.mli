@@ -9,6 +9,7 @@ type t = {
       (** Parameters of the function the spec is attached to *)
   sploc : CodeLoc.t;  (** Code location of the spec *)
 }
+[@@deriving yojson]
 
 val get_id : t -> int
 val get_pre : t -> WLAssert.t

@@ -23,7 +23,7 @@ module type S = sig
   type err
 
   (** Type of the target language AST *)
-  type tl_ast
+  type tl_ast [@@deriving yojson]
 
   (** Pretty printer for type {!err} *)
   val pp_err : Format.formatter -> err -> unit

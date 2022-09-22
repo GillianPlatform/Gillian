@@ -1,6 +1,47 @@
 open Lexing
 
-type t = { loc_start : Lexing.position; loc_end : Lexing.position }
+type lex_pos = Lexing.position
+
+let lex_pos_to_yojson { pos_fname; pos_lnum; pos_bol; pos_cnum } : Yojson.Safe.t
+    =
+  `Assoc
+    [
+      ("pos_fname", `String pos_fname);
+      ("pos_lnum", `Int pos_lnum);
+      ("pos_bol", `Int pos_bol);
+      ("pos_cnum", `Int pos_cnum);
+    ]
+
+let lex_pos_of_yojson (json : Yojson.Safe.t) =
+  let err = Error "lex_pos_of_yojson" in
+  let ( let* ) o f = Result.bind o f in
+  match json with
+  | `Assoc data ->
+      let* () = if List.length data = 4 then Ok () else err in
+      let* pos_fname =
+        match data |> List.assoc_opt "pos_fname" with
+        | Some (`String s) -> Ok s
+        | _ -> err
+      in
+      let* pos_lnum =
+        match data |> List.assoc_opt "pos_lnum" with
+        | Some (`Int i) -> Ok i
+        | _ -> err
+      in
+      let* pos_bol =
+        match data |> List.assoc_opt "pos_bol" with
+        | Some (`Int i) -> Ok i
+        | _ -> err
+      in
+      let* pos_cnum =
+        match data |> List.assoc_opt "pos_cnum" with
+        | Some (`Int i) -> Ok i
+        | _ -> err
+      in
+      Ok { pos_fname; pos_lnum; pos_bol; pos_cnum }
+  | _ -> err
+
+type t = { loc_start : lex_pos; loc_end : lex_pos } [@@deriving yojson]
 
 let curr lexbuf =
   let loc_start = lexeme_start_p lexbuf in

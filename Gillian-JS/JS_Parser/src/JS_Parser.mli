@@ -91,6 +91,7 @@ module Syntax : sig
     exp_stx : exp_syntax;
     exp_annot : annotation list;
   }
+  [@@deriving yojson]
 
   and exp_syntax =
     | Num of float

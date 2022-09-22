@@ -7,8 +7,9 @@ type tt =
   | LogicIf of WLExpr.t * t list * t list
   | Assert of WLAssert.t * string list
   | Invariant of WLAssert.t * string list * WLExpr.t option
+[@@deriving yojson]
 
-and t = { wlcnode : tt; wlcid : int; wlcloc : CodeLoc.t }
+and t = { wlcnode : tt; wlcid : int; wlcloc : CodeLoc.t } [@@deriving yojson]
 
 let get lcmd = lcmd.wlcnode
 let get_id lcmd = lcmd.wlcid

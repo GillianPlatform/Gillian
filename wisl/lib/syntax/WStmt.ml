@@ -11,8 +11,9 @@ type tt =
   | While of WExpr.t * t list
   | If of WExpr.t * t list * t list
   | Logic of WLCmd.t
+[@@deriving yojson]
 
-and t = { sid : int; sloc : CodeLoc.t; snode : tt }
+and t = { sid : int; sloc : CodeLoc.t; snode : tt } [@@deriving yojson]
 
 let get lcmd = lcmd.snode
 let get_id lcmd = lcmd.sid

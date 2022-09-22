@@ -9,6 +9,7 @@ type t = {
   pred_loc : CodeLoc.t;
   pred_id : int;
 }
+[@@deriving yojson]
 
 let get_id p = p.pred_id
 let get_loc p = p.pred_loc

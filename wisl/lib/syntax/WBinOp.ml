@@ -16,6 +16,7 @@ type t =
   | LSTCONS
   (* list construction a::l, only for logic *)
   | LSTCAT
+[@@deriving yojson]
 
 (* list concatenation, only for logic *)
 

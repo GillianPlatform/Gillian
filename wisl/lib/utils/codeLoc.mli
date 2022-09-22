@@ -1,4 +1,4 @@
-type t
+type t [@@deriving yojson]
 
 val curr : Lexing.lexbuf -> t
 val fname : t -> string

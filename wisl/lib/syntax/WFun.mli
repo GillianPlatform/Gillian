@@ -7,6 +7,7 @@ type t = {
   floc : CodeLoc.t;
   fid : int;
 }
+[@@deriving yojson]
 
 val get_id : t -> int
 val get_loc : t -> CodeLoc.t
