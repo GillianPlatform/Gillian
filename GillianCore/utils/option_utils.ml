@@ -13,6 +13,6 @@ let or_else f = function
   | None -> f ()
 
 let coalesce a b =
-  match (a, b) with
-  | Some x, _ | _, Some x -> Some x
-  | _ -> None
+  match a with
+  | Some _ -> a
+  | None -> b
