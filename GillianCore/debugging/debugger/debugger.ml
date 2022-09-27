@@ -31,29 +31,50 @@ module type S = sig
     type debug_state [@@deriving yojson]
 
     val get_debug_state : debugger_state -> debug_state
-    val get_unification : rid -> debugger_state -> rid * UnifyMap.t
+
+    val get_unification :
+      ?proc_name:string -> rid -> debugger_state -> rid * UnifyMap.t
   end
 
   val launch : string -> string option -> (debugger_state, string) result
-  val jump_to_id : rid -> debugger_state -> (unit, string) result
-  val jump_to_start : debugger_state -> unit
-  val step_in : ?reverse:bool -> debugger_state -> stop_reason
-  val step : ?reverse:bool -> debugger_state -> stop_reason
+
+  val jump_to_id :
+    ?proc_name:string -> rid -> debugger_state -> (unit, string) result
+
+  val jump_to_start : ?proc_name:string -> debugger_state -> unit
+
+  val step_in :
+    ?proc_name:string -> ?reverse:bool -> debugger_state -> stop_reason
+
+  val step : ?proc_name:string -> ?reverse:bool -> debugger_state -> stop_reason
 
   val step_specific :
+    ?proc_name:string ->
     PackagedBranchCase.t option ->
     Logging.ReportId.t ->
     debugger_state ->
     (stop_reason, string) result
 
-  val step_out : debugger_state -> stop_reason
-  val run : ?reverse:bool -> ?launch:bool -> debugger_state -> stop_reason
+  val step_out : ?proc_name:string -> debugger_state -> stop_reason
+
+  val run :
+    ?proc_name:string ->
+    ?reverse:bool ->
+    ?launch:bool ->
+    debugger_state ->
+    stop_reason
+
   val terminate : debugger_state -> unit
-  val get_frames : debugger_state -> frame list
-  val get_scopes : debugger_state -> scope list
-  val get_variables : int -> debugger_state -> variable list
-  val get_exception_info : debugger_state -> exception_info
-  val set_breakpoints : string option -> int list -> debugger_state -> unit
+  val get_frames : ?proc_name:string -> debugger_state -> frame list
+  val get_scopes : ?proc_name:string -> debugger_state -> scope list
+
+  val get_variables :
+    ?proc_name:string -> int -> debugger_state -> variable list
+
+  val get_exception_info : ?proc_name:string -> debugger_state -> exception_info
+
+  val set_breakpoints :
+    ?proc_name:string -> string option -> int list -> debugger_state -> unit
 end
 
 module Make
@@ -630,12 +651,7 @@ struct
 
   type exec_map = branch_case ExecMap.with_source [@@deriving yojson]
 
-  type debugger_state = {
-    source_file : string;
-    source_files : SourceFiles.t option;
-    prog : Verification.prog_t;
-    tl_ast : tl_ast option;
-    tests : (string * Verification.t) list;
+  type debugger_proc_state = {
     mutable cont_func : result_t cont_func_f option;
     mutable breakpoints : breakpoints;
     mutable cur_report_id : rid;
@@ -652,23 +668,31 @@ struct
     mutable unify_maps : (rid * UnifyMap.t) list;
   }
 
+  type debugger_cfg = {
+    source_file : string;
+    source_files : SourceFiles.t option;
+    prog : Verification.prog_t;
+    tl_ast : tl_ast option;
+    tests : (string * Verification.t) list;
+    main_proc_name : string;
+  }
+
+  type debugger_state = {
+    cfg : debugger_cfg;
+    procs : (string, debugger_proc_state) Hashtbl.t;
+  }
+
+  let get_proc_state ?proc_name { cfg; procs } =
+    let proc_name = proc_name |> Option.value ~default:cfg.main_proc_name in
+    let proc_state = Hashtbl.find procs proc_name in
+    proc_state
+
   module Inspect = struct
     type exec_map_pkg = PackagedBranchCase.t ExecMap.t [@@deriving yojson]
     type branch_path_pkg = PackagedBranchCase.t list [@@deriving yojson]
 
     let get_exec_maps_pkg { exec_map = _, map; lifted_exec_map; _ } =
       (ExecMap.package map, Option.map ExecMap.package lifted_exec_map)
-
-    let get_proc_name dbg =
-      match dbg.proc_name with
-      | None ->
-          let proc_name =
-            let+ frame = List_utils.tl_opt dbg.frames in
-            frame.name
-          in
-          dbg.proc_name <- proc_name;
-          proc_name
-      | name -> name
 
     type debug_state = {
       exec_map : exec_map_pkg; [@key "execMap"]
@@ -680,22 +704,20 @@ struct
     [@@deriving yojson]
 
     let get_debug_state dbg : debug_state =
-      let current_cmd_id = dbg.cur_report_id in
-      let unifys = dbg.exec_map |> ExecMap.unifys_at_id current_cmd_id in
-      let exec_map, lifted_exec_map = get_exec_maps_pkg dbg in
-      let proc_name =
-        match dbg |> get_proc_name with
-        | None -> "unknown proc"
-        | Some proc_name -> proc_name
-      in
+      let proc_name = dbg.cfg.main_proc_name in
+      let state = Hashtbl.find dbg.procs proc_name in
+      let current_cmd_id = state.cur_report_id in
+      let unifys = state.exec_map |> ExecMap.unifys_at_id current_cmd_id in
+      let exec_map, lifted_exec_map = get_exec_maps_pkg state in
       { exec_map; current_cmd_id; unifys; proc_name; lifted_exec_map }
 
-    let get_unification unify_id dbg =
-      match dbg.unify_maps |> List.assoc_opt unify_id with
+    let get_unification ?proc_name unify_id dbg =
+      let state = dbg |> get_proc_state ?proc_name in
+      match state.unify_maps |> List.assoc_opt unify_id with
       | Some map -> (unify_id, map)
       | None ->
           let map = UnifyMap.build unify_id in
-          dbg.unify_maps <- (unify_id, map) :: dbg.unify_maps;
+          state.unify_maps <- (unify_id, map) :: state.unify_maps;
           (unify_id, map)
   end
 
@@ -881,7 +903,7 @@ struct
         in
         frame :: call_stack_to_frames rest se.call_index prog
 
-  let update_report_id_and_inspection_fields report_id (dbg : debugger_state) =
+  let update_report_id_and_inspection_fields report_id cfg state =
     match L.LogQueryer.get_report report_id with
     | None ->
         Fmt.failwith
@@ -892,19 +914,19 @@ struct
         DL.show_report report_id ("Debugger.update...: Got report type " ^ type_);
         match type_ with
         | t when t = ContentType.cmd ->
-            dbg.cur_report_id <- report_id;
+            state.cur_report_id <- report_id;
             let cmd =
               content |> Yojson.Safe.from_string
               |> Logging.ConfigReport.of_yojson |> Result.get_ok
             in
-            dbg.frames <-
-              call_stack_to_frames cmd.callstack cmd.proc_line dbg.prog;
+            state.frames <-
+              call_stack_to_frames cmd.callstack cmd.proc_line cfg.prog;
             let lifted_scopes, variables =
-              create_variables (Some cmd.state) (is_gil_file dbg.source_file)
+              create_variables (Some cmd.state) (is_gil_file cfg.source_file)
             in
-            let () = dbg.variables <- variables in
+            let () = state.variables <- variables in
             let () =
-              dbg.top_level_scopes <-
+              state.top_level_scopes <-
                 List.concat [ lifted_scopes; top_level_scopes ]
             in
             (* TODO: fix *)
@@ -913,17 +935,86 @@ struct
               match cmd.callstack with
               | [] -> None
               | (se : CallStack.stack_element) :: _ -> (
-                  let proc = Prog.get_proc dbg.prog se.pid in
+                  let proc = Prog.get_proc cfg.prog se.pid in
                   match proc with
                   | None -> None
                   | Some proc ->
                       let annot, _, cmd = proc.proc_body.(cmd.proc_line) in
                       Some (cmd, annot))
             in
-            dbg.cur_cmd <- cur_cmd
+            state.cur_cmd <- cur_cmd
         | _ as t ->
             Fmt.failwith
               "Debugger: don't know how to handle report of type '%s'!" t)
+
+  let launch_proc cfg proc_name =
+    let rec aux = function
+      | Verification.SAInterpreter.Finished _ ->
+          Error "HORROR: Shouldn't encounter Finished when debugging!"
+      | Verification.SAInterpreter.EndOfBranch _ -> Error "Nothing to run"
+      | Verification.SAInterpreter.Continue
+          (cur_report_id, branch_path, new_branch_cases, cont_func) -> (
+          match cur_report_id with
+          | None ->
+              raise
+                (Failure
+                   "Did not log report. Check the logging level is set \
+                    correctly")
+          | Some cur_report_id ->
+              let content, type_ =
+                Option.get @@ L.LogQueryer.get_report cur_report_id
+              in
+              if type_ = ContentType.proc_init then (
+                DL.log (fun m -> m "Debugger.launch: Skipping proc_init...");
+                aux (cont_func ~path:[] ()))
+              else
+                let cmd =
+                  Result.get_ok
+                    (content |> Yojson.Safe.from_string
+                   |> Logging.ConfigReport.of_yojson)
+                in
+                let cmd_display = cmd.cmd in
+                let origin_id = Annot.get_origin_id cmd.annot in
+
+                let open ExecMap in
+                let new_cmd =
+                  new_cmd
+                    (kind_of_cases new_branch_cases)
+                    cur_report_id cmd_display origin_id
+                in
+                let map =
+                  Nothing |> insert_cmd_sourceless new_cmd branch_path
+                in
+                if Annot.is_hidden cmd.annot then
+                  failwith "HORROR: First command is hidden!";
+                let lifted_map =
+                  match (Lifter.source_map_ability, cfg.tl_ast) with
+                  | true, Some tl_ast ->
+                      Some (Nothing |> insert_lifted tl_ast new_cmd branch_path)
+                  | _ -> None
+                in
+                let state =
+                  {
+                    cont_func = Some cont_func;
+                    breakpoints = Hashtbl.create 0;
+                    cur_report_id;
+                    top_level_scopes;
+                    frames = [];
+                    variables = Hashtbl.create 0;
+                    errors = [];
+                    cur_cmd = None;
+                    exec_map = (None, map);
+                    lifted_exec_map = lifted_map;
+                    proc_name = None;
+                    unify_maps = [];
+                  }
+                in
+                state
+                |> update_report_id_and_inspection_fields cur_report_id cfg;
+                Ok state)
+    in
+    let cont_func = Verification.verify_up_to_procs ~proc_name cfg.prog in
+    aux cont_func
 
   let launch file_name proc_name =
     let () = Fmt_tty.setup_std_outputs () in
@@ -946,81 +1037,26 @@ struct
     let prog, source_files_opt, tl_ast =
       preprocess_files [ file_name ] already_compiled outfile_opt no_unfold
     in
-    let cont_func = Verification.verify_up_to_procs prog in
-    let rec init_with_no_proc_init cont_func =
-      match cont_func with
-      | Verification.SAInterpreter.Finished _ ->
-          failwith "HORROR: Shouldn't encounter Finished when debugging!"
-      | Verification.SAInterpreter.EndOfBranch _ -> Error "Nothing to run"
-      | Verification.SAInterpreter.Continue
-          (cur_report_id, branch_path, new_branch_cases, cont_func) -> (
-          match cur_report_id with
-          | None ->
-              raise
-                (Failure
-                   "Did not log report. Check the logging level is set \
-                    correctly")
-          | Some cur_report_id ->
-              let content, type_ =
-                Option.get @@ L.LogQueryer.get_report cur_report_id
-              in
-              if type_ = ContentType.proc_init then (
-                DL.log (fun m -> m "Debugger.launch: Skipping proc_init...");
-                init_with_no_proc_init (cont_func ~path:[] ()))
-              else
-                let cmd =
-                  Result.get_ok
-                    (content |> Yojson.Safe.from_string
-                   |> Logging.ConfigReport.of_yojson)
-                in
-                let cmd_display = cmd.cmd in
-                let origin_id = Annot.get_origin_id cmd.annot in
-                let tests = Verification.Debug.get_tests_for_prog prog in
-                let open ExecMap in
-                let new_cmd =
-                  new_cmd
-                    (kind_of_cases new_branch_cases)
-                    cur_report_id cmd_display origin_id
-                in
-                let map =
-                  Nothing |> insert_cmd_sourceless new_cmd branch_path
-                in
-                if Annot.is_hidden cmd.annot then
-                  failwith "HORROR: First command is hidden!";
-                let lifted_map =
-                  match (Lifter.source_map_ability, tl_ast) with
-                  | true, Some tl_ast ->
-                      Some (Nothing |> insert_lifted tl_ast new_cmd branch_path)
-                  | _ -> None
-                in
-                let dbg =
-                  ({
-                     source_file = file_name;
-                     source_files = source_files_opt;
-                     top_level_scopes;
-                     cont_func = Some cont_func;
-                     prog;
-                     tl_ast;
-                     tests;
-                     frames = [];
-                     cur_report_id;
-                     breakpoints = Hashtbl.create 0;
-                     variables = Hashtbl.create 0;
-                     errors = [];
-                     cur_cmd = None;
-                     exec_map = (None, map);
-                     lifted_exec_map = lifted_map;
-                     proc_name = None;
-                     unify_maps = [];
-                   }
-                    : debugger_state)
-                in
-                let _ =
-                  update_report_id_and_inspection_fields cur_report_id dbg
-                in
-                Ok dbg)
+    let tests = Verification.Debug.get_tests_for_prog prog in
+    let proc_name =
+      match proc_name with
+      | Some proc_name -> proc_name
+      | None -> tests |> List.hd |> fst
     in
-    init_with_no_proc_init cont_func
+    let cfg =
+      {
+        source_file = file_name;
+        source_files = source_files_opt;
+        prog;
+        tl_ast;
+        tests;
+        main_proc_name = proc_name;
+      }
+    in
+    let++ main_proc_state = launch_proc cfg proc_name in
+    let dbg = { cfg; procs = Hashtbl.create 0 } in
+    Hashtbl.add dbg.procs proc_name main_proc_state;
+    dbg
 
   let unify result proc_name prev_id dbg =
     match dbg.tests |> List.assoc_opt proc_name with
@@ -1057,21 +1093,28 @@ struct
     | ExecRes.RFail { errors; _ } ->
         errors |> List.map Verification.SAInterpreter.show_err_t
 
-  let jump_to_id id dbg =
+  let jump_state_to_id id cfg state =
     try
       DL.log (fun m -> m "Jumping to id %a" pp_rid id);
-      dbg.exec_map |> snd |> ExecMap.path_of_id id |> ignore;
-      update_report_id_and_inspection_fields id dbg;
+      state.exec_map |> snd |> ExecMap.path_of_id id |> ignore;
+      state |> update_report_id_and_inspection_fields id cfg;
       Ok ()
     with Failure msg -> Error msg
 
-  let jump_to_start dbg =
+  let jump_to_id ?proc_name id dbg =
+    let { cfg; _ } = dbg in
+    let state = dbg |> get_proc_state ?proc_name in
+    state |> jump_state_to_id id cfg
+
+  let jump_to_start ?proc_name dbg =
+    let { cfg; _ } = dbg in
+    let state = dbg |> get_proc_state ?proc_name in
     let result =
       let** root_id =
-        ExecMap.id_of (snd dbg.exec_map)
+        ExecMap.id_of (snd state.exec_map)
         |> Option.to_result ~none:"Debugger.jump_to_start: exec map is Nothing!"
       in
-      dbg |> jump_to_id root_id
+      state |> jump_state_to_id root_id cfg
     in
     match result with
     | Error msg -> failwith msg
@@ -1088,33 +1131,35 @@ struct
       ?(unifys = [])
       ?(errors = [])
       branch_path
-      dbg =
+      cfg
+      state =
     let cmd_display = cmd.cmd in
     let origin_id = Annot.get_origin_id cmd.annot in
-    let source = dbg |> get_current_source in
+    let source = state |> get_current_source in
     ExecMap.(
       let new_cmd =
         new_cmd cmd_kind cur_report_id cmd_display ~unifys ~errors origin_id
       in
-      let exec_map = dbg.exec_map |> insert_cmd new_cmd branch_path source in
+      let exec_map = state.exec_map |> insert_cmd new_cmd branch_path source in
       match exec_map with
       | None -> false
       | Some exec_map -> (
-          dbg.exec_map <- exec_map;
-          match (dbg.tl_ast, dbg.lifted_exec_map) with
+          state.exec_map <- exec_map;
+          match (cfg.tl_ast, state.lifted_exec_map) with
           | Some tl_ast, Some lifted_exec_map ->
               if Annot.is_hidden cmd.annot then false
               else
                 let lifted_exec_map =
                   lifted_exec_map |> insert_lifted tl_ast new_cmd branch_path
                 in
-                dbg.lifted_exec_map <- Some lifted_exec_map;
+                state.lifted_exec_map <- Some lifted_exec_map;
                 true
           | _ -> true))
 
-  let rec execute_step prev_id_in_frame ?branch_case ?prev_branch_path dbg =
+  let rec execute_step prev_id_in_frame ?branch_case ?prev_branch_path cfg state
+      =
     let open Verification.SAInterpreter in
-    match dbg.cont_func with
+    match state.cont_func with
     | None ->
         DL.log (fun m -> m "No cont_func; reached end");
         ReachedEnd
@@ -1123,31 +1168,31 @@ struct
             m
               ~json:
                 [
-                  ("id", rid_to_yojson dbg.cur_report_id);
+                  ("id", rid_to_yojson state.cur_report_id);
                   ( "map",
-                    dbg.exec_map |> snd
+                    state.exec_map |> snd
                     |> ExecMap.to_yojson branch_case_to_yojson );
                 ]
               "Grabbing path for step...");
         let branch_path =
           prev_branch_path
           |> Option_utils.or_else (fun () ->
-                 dbg.exec_map |> snd |> ExecMap.path_of_id prev_id_in_frame)
+                 state.exec_map |> snd |> ExecMap.path_of_id prev_id_in_frame)
         in
         let branch_path =
           match branch_case with
           | Some case -> case :: branch_path
           | None ->
-              dbg.exec_map |> snd |> ExecMap.next_paths branch_path |> List.hd
+              state.exec_map |> snd |> ExecMap.next_paths branch_path |> List.hd
         in
         DL.log (fun m ->
             m ~json:[ ("path", branch_path_to_yojson branch_path) ] "Got path");
         match cont_func ~path:branch_path () with
         | Finished _ ->
-            dbg.cont_func <- None;
+            state.cont_func <- None;
             failwith "HORROR: Shouldn't encounter Finished when debugging!"
         | EndOfBranch (result, cont_func) ->
-            dbg.cont_func <- Some cont_func;
+            state.cont_func <- Some cont_func;
             let prev =
               let+ content, type_ = L.LogQueryer.get_report prev_id_in_frame in
               (prev_id_in_frame, content, type_)
@@ -1161,13 +1206,13 @@ struct
                 let proc_name = (List.hd cmd.callstack).pid in
                 let errors = show_result_errors result in
                 let unifys =
-                  unify result proc_name prev_id dbg |> Option.to_list
+                  unify result proc_name prev_id cfg |> Option.to_list
                 in
-                update_report_id_and_inspection_fields prev_id dbg;
+                state |> update_report_id_and_inspection_fields prev_id cfg;
                 let inserted =
-                  dbg
+                  state
                   |> update_exec_maps Final prev_id cmd ~unifys ~errors
-                       branch_path
+                       branch_path cfg
                 in
                 if not inserted then
                   failwith "HORROR: didn't insert on EndOfBranch!"
@@ -1185,13 +1230,13 @@ struct
                 failwith
                   "Did not log report. Check the logging level is set correctly"
             | Some cur_report_id ->
-                dbg.cont_func <- Some cont_func;
+                state.cont_func <- Some cont_func;
                 let content, type_ =
                   Option.get @@ L.LogQueryer.get_report cur_report_id
                 in
                 if type_ = ContentType.proc_init then (
                   DL.log (fun m -> m "(execute_step) Skipping proc_init...");
-                  execute_step prev_id_in_frame dbg)
+                  state |> execute_step prev_id_in_frame cfg)
                 else if
                   L.LogQueryer.get_cmd_results cur_report_id
                   |> List.for_all (fun (_, content) ->
@@ -1205,9 +1250,12 @@ struct
                       m
                         "No results for cmd (or all results have error); \
                          assuming eob, stepping again...");
-                  execute_step ~prev_branch_path:branch_path cur_report_id dbg)
+                  state
+                  |> execute_step ~prev_branch_path:branch_path cur_report_id
+                       cfg)
                 else (
-                  update_report_id_and_inspection_fields cur_report_id dbg;
+                  state
+                  |> update_report_id_and_inspection_fields cur_report_id cfg;
                   ExecMap.(
                     let cmd =
                       Result.get_ok
@@ -1226,11 +1274,12 @@ struct
                          L.LogQueryer.get_unify_for cur_report_id
                        in
                        let unify_map =
-                         match dbg.unify_maps |> List.assoc_opt unify_id with
+                         match state.unify_maps |> List.assoc_opt unify_id with
                          | Some map -> map
                          | None ->
                              let map = UnifyMap.build unify_id in
-                             dbg.unify_maps <- (unify_id, map) :: dbg.unify_maps;
+                             state.unify_maps <-
+                               (unify_id, map) :: state.unify_maps;
                              map
                        in
                        let result = unify_map |> UnifyMap.result in
@@ -1238,20 +1287,26 @@ struct
                       |> Option.to_list
                     in
                     let inserted =
-                      dbg
+                      state
                       |> update_exec_maps cmd_kind cur_report_id cmd ~unifys
-                           branch_path
+                           branch_path cfg
                     in
                     if not inserted then
-                      execute_step cur_report_id ~prev_branch_path:branch_path
-                        dbg
+                      state
+                      |> execute_step cur_report_id
+                           ~prev_branch_path:branch_path cfg
                     else Step))))
 
-  let step_in_branch_case prev_id_in_frame ?branch_case ?(reverse = false) dbg =
+  let step_in_branch_case
+      prev_id_in_frame
+      ?branch_case
+      ?(reverse = false)
+      cfg
+      state =
     let stop_reason =
       if reverse then (
         let prev_report_id =
-          L.LogQueryer.get_previous_report_id dbg.cur_report_id
+          L.LogQueryer.get_previous_report_id state.cur_report_id
         in
         match prev_report_id with
         | None -> ReachedStart
@@ -1265,11 +1320,11 @@ struct
                   m "Prev report is '%s'; not stepping." prev_report_type);
               ReachedStart)
             else (
-              update_report_id_and_inspection_fields prev_report_id dbg;
+              state |> update_report_id_and_inspection_fields prev_report_id cfg;
               Step))
       else
         let next_report_ids =
-          L.LogQueryer.get_next_report_ids dbg.cur_report_id
+          L.LogQueryer.get_next_report_ids state.cur_report_id
         in
         let next_report_id =
           match branch_case with
@@ -1292,55 +1347,61 @@ struct
         match next_report_id with
         | None ->
             DL.log (fun m -> m "No next report ID; executing next step");
-            execute_step ?branch_case prev_id_in_frame dbg
+            state |> execute_step ?branch_case prev_id_in_frame cfg
         | Some next_report_id ->
             DL.show_report next_report_id "Next report ID found; not executing";
-            update_report_id_and_inspection_fields next_report_id dbg;
+            state |> update_report_id_and_inspection_fields next_report_id cfg;
             Step
     in
-    if has_hit_breakpoint dbg then Breakpoint
-    else if List.length dbg.errors > 0 then
-      let () = dbg.cont_func <- None in
+    if has_hit_breakpoint state then Breakpoint
+    else if List.length state.errors > 0 then
+      let () = state.cont_func <- None in
       ExecutionError
     else stop_reason
 
-  let step_in ?(reverse = false) dbg =
-    step_in_branch_case dbg.cur_report_id ?branch_case:None ~reverse dbg
+  let step_in_state ?(reverse = false) cfg state =
+    step_in_branch_case state.cur_report_id ?branch_case:None ~reverse cfg state
 
-  let rec step_until_cond
+  let step_in ?proc_name ?(reverse = false) dbg =
+    let { cfg; _ } = dbg in
+    let state = dbg |> get_proc_state ?proc_name in
+    step_in_state ~reverse cfg state
+
+  let step_until_cond
       ?(reverse = false)
       ?(branch_case : branch_case option)
-      (prev_id_in_frame : rid)
-      (prev_frame : frame)
-      (prev_stack_depth : int)
       (cond : frame -> frame -> int -> int -> bool)
-      (dbg : debugger_state) : stop_reason =
-    let stop_reason =
-      step_in_branch_case ~reverse ?branch_case prev_id_in_frame dbg
-    in
-    match stop_reason with
-    | Step ->
-        let cur_frame =
-          match dbg.frames with
-          | [] -> failwith "Nothing in call stack, cannot step"
-          | cur_frame :: _ -> cur_frame
-        in
-        let cur_stack_depth = List.length dbg.frames in
-        if cond prev_frame cur_frame prev_stack_depth cur_stack_depth then
-          stop_reason
-        else
-          step_until_cond ~reverse prev_id_in_frame prev_frame prev_stack_depth
-            cond dbg
-    | other_stop_reason -> other_stop_reason
-
-  let step_case ?(reverse = false) ?branch_case dbg =
-    let frame =
-      match dbg.frames with
+      (cfg : debugger_cfg)
+      (state : debugger_proc_state) : stop_reason =
+    let prev_id_in_frame = state.cur_report_id in
+    let prev_frame =
+      match state.frames with
       | [] -> failwith "Nothing in call stack, cannot step"
       | frame :: _ -> frame
     in
+    let prev_stack_depth = List.length state.frames in
+    let rec aux () =
+      let stop_reason =
+        state |> step_in_branch_case ~reverse ?branch_case prev_id_in_frame cfg
+      in
+      match stop_reason with
+      | Step ->
+          let cur_frame =
+            match state.frames with
+            | [] -> failwith "Nothing in call stack, cannot step"
+            | cur_frame :: _ -> cur_frame
+          in
+          let cur_stack_depth = List.length state.frames in
+          if cond prev_frame cur_frame prev_stack_depth cur_stack_depth then
+            stop_reason
+          else aux ()
+      | other_stop_reason -> other_stop_reason
+    in
+    aux ()
+
+  let step_case ?(reverse = false) ?branch_case cfg state =
     let cond =
-      if is_gil_file dbg.source_file then
+      if is_gil_file cfg.source_file then
         (* If GIL file, step until next cmd in the same frame (like in regular
            debuggers) *)
         fun prev_frame cur_frame prev_stack_depth cur_stack_depth ->
@@ -1357,34 +1418,46 @@ struct
            || cur_frame.end_line <> prev_frame.end_line
            || cur_frame.end_column <> prev_frame.end_column)
     in
-    step_until_cond ~reverse ?branch_case dbg.cur_report_id frame
-      (List.length dbg.frames) cond dbg
+    state |> step_until_cond ~reverse ?branch_case cond cfg
 
-  let step ?(reverse = false) dbg = step_case ~reverse dbg
+  let step ?proc_name ?(reverse = false) dbg =
+    let { cfg; _ } = dbg in
+    let state = dbg |> get_proc_state ?proc_name in
+    step_case ~reverse cfg state
 
-  let step_specific (branch_case : PackagedBranchCase.t option) prev_id dbg =
+  let step_specific
+      ?proc_name
+      (branch_case : PackagedBranchCase.t option)
+      prev_id
+      dbg =
+    let { cfg; _ } = dbg in
+    let state = dbg |> get_proc_state ?proc_name in
     let** branch_case =
       branch_case
       |> Option.map PackagedBranchCase.unpackage
       |> Option_utils.to_result
     in
-    let++ () = dbg |> jump_to_id prev_id in
-    step_case ?branch_case dbg
+    let++ () = state |> jump_state_to_id prev_id cfg in
+    state |> step_case ?branch_case cfg
 
-  let step_out dbg =
-    let rec step_out stack_depth dbg =
-      let stop_reason = step_in dbg in
+  let step_out ?proc_name dbg =
+    let { cfg; _ } = dbg in
+    let state = dbg |> get_proc_state ?proc_name in
+    let rec aux stack_depth =
+      let stop_reason = state |> step_in_state cfg in
       match stop_reason with
       | Step ->
-          if List.length dbg.frames < stack_depth then stop_reason
-          else step_out stack_depth dbg
+          if List.length state.frames < stack_depth then stop_reason
+          else aux stack_depth
       | other_stop_reason -> other_stop_reason
     in
-    step_out (List.length dbg.frames) dbg
+    aux (List.length state.frames)
 
-  let run ?(reverse = false) ?(launch = false) dbg =
-    let current_id = dbg.cur_report_id in
-    let branch_path = dbg.exec_map |> snd |> ExecMap.path_of_id current_id in
+  let run ?proc_name ?(reverse = false) ?(launch = false) dbg =
+    let { cfg; _ } = dbg in
+    let state = dbg |> get_proc_state ?proc_name in
+    let current_id = state.cur_report_id in
+    let branch_path = state.exec_map |> snd |> ExecMap.path_of_id current_id in
     DL.log (fun m ->
         m
           ~json:
@@ -1392,7 +1465,7 @@ struct
               ("current_id", rid_to_yojson current_id);
               ("path", branch_path_to_yojson branch_path);
               ( "map",
-                dbg.exec_map |> snd |> ExecMap.to_yojson branch_case_to_yojson
+                state.exec_map |> snd |> ExecMap.to_yojson branch_case_to_yojson
               );
             ]
           "Debugger.run");
@@ -1401,20 +1474,20 @@ struct
       (* We need to check if a breakpoint has been hit if run is called
          immediately after launching to prevent missing a breakpoint on the first
          line *)
-      if launch && has_hit_breakpoint dbg then Breakpoint
+      if launch && has_hit_breakpoint state then Breakpoint
       else
-        let stop_reason = step_case ?branch_case ~reverse dbg in
+        let stop_reason = step_case ?branch_case ~reverse cfg state in
         match stop_reason with
         | Step -> aux count None
         | Breakpoint -> Breakpoint
         | other_stop_reason -> (
             if reverse then other_stop_reason
             else
-              match dbg.exec_map |> ExecMap.find_unfinished branch_path with
+              match state.exec_map |> ExecMap.find_unfinished branch_path with
               | None ->
                   DL.log (fun m ->
                       m
-                        ~json:[ ("map", exec_map_to_yojson dbg.exec_map) ]
+                        ~json:[ ("map", exec_map_to_yojson state.exec_map) ]
                         "Debugger.run: map has no unfinished branches");
                   other_stop_reason
               | Some (prev_id, branch_case) ->
@@ -1426,26 +1499,35 @@ struct
                             ("", opt_to_yojson branch_case_to_yojson branch_case);
                           ]
                         "Debugger.run: found unfinished path");
-                  dbg |> jump_to_id prev_id |> Result.get_ok;
+                  state |> jump_state_to_id prev_id cfg |> Result.get_ok;
                   aux (count + 1) branch_case)
     in
     aux ~launch 0 None
 
   let terminate dbg =
-    let () = Verification.postprocess_files dbg.source_files in
+    let () = Verification.postprocess_files dbg.cfg.source_files in
     let () = if !Config.stats then Statistics.print_statistics () in
     L.wrap_up ()
 
-  let get_frames dbg = dbg.frames
-  let get_scopes dbg = dbg.top_level_scopes
+  let get_frames ?proc_name dbg =
+    let state = dbg |> get_proc_state ?proc_name in
+    state.frames
 
-  let get_variables (var_ref : int) (dbg : debugger_state) : variable list =
-    match Hashtbl.find_opt dbg.variables var_ref with
+  let get_scopes ?proc_name dbg =
+    let state = dbg |> get_proc_state ?proc_name in
+    state.top_level_scopes
+
+  let get_variables ?proc_name (var_ref : int) (dbg : debugger_state) :
+      variable list =
+    let state = dbg |> get_proc_state ?proc_name in
+    match Hashtbl.find_opt state.variables var_ref with
     | None -> []
     | Some vars -> vars
 
-  let get_exception_info (dbg : debugger_state) =
-    let error = List.hd dbg.errors in
+  let get_exception_info ?proc_name (dbg : debugger_state) =
+    let { cfg; _ } = dbg in
+    let state = dbg |> get_proc_state ?proc_name in
+    let error = List.hd state.errors in
     let non_mem_exception_info =
       { id = Fmt.to_to_string Logging.pp_err error; description = None }
     in
@@ -1454,15 +1536,16 @@ struct
         match state_error with
         | StateErr.EMem merr ->
             Lifter.memory_error_to_exception_info
-              { error = merr; command = dbg.cur_cmd; tl_ast = dbg.tl_ast }
+              { error = merr; command = state.cur_cmd; tl_ast = cfg.tl_ast }
         | _ -> non_mem_exception_info)
     | _ -> non_mem_exception_info
 
-  let set_breakpoints source bp_list dbg =
+  let set_breakpoints ?proc_name source bp_list dbg =
+    let state = dbg |> get_proc_state ?proc_name in
     match source with
     (* We can't set the breakpoints if we do not know the source file *)
     | None -> ()
     | Some source ->
         let bp_set = Breakpoints.of_list bp_list in
-        Hashtbl.replace dbg.breakpoints source bp_set
+        Hashtbl.replace state.breakpoints source bp_set
 end
