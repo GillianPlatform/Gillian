@@ -680,11 +680,18 @@ struct
   type debugger_state = {
     cfg : debugger_cfg;
     procs : (string, debugger_proc_state) Hashtbl.t;
+    mutable cur_proc_name : string;
   }
 
-  let get_proc_state ?proc_name { cfg; procs } =
-    let proc_name = proc_name |> Option.value ~default:cfg.main_proc_name in
-    let proc_state = Hashtbl.find procs proc_name in
+  let get_proc_state ?proc_name dbg =
+    let proc_name =
+      match proc_name with
+      | Some proc_name ->
+          dbg.cur_proc_name <- proc_name;
+          proc_name
+      | None -> dbg.cur_proc_name
+    in
+    let proc_state = Hashtbl.find dbg.procs proc_name in
     proc_state
 
   module Inspect = struct
@@ -1054,7 +1061,7 @@ struct
       }
     in
     let++ main_proc_state = launch_proc cfg proc_name in
-    let dbg = { cfg; procs = Hashtbl.create 0 } in
+    let dbg = { cfg; procs = Hashtbl.create 0; cur_proc_name = proc_name } in
     Hashtbl.add dbg.procs proc_name main_proc_state;
     dbg
 
