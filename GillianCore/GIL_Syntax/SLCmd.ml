@@ -5,8 +5,8 @@
 
 module SS = Containers.SS
 
-type folding_info = string * (string * Expr.t) list
-type unfold_info = (string * string) list
+type folding_info = string * (string * Expr.t) list [@@deriving yojson]
+type unfold_info = (string * string) list [@@deriving yojson]
 
 (** {b GIL Separation Logic commands}. *)
 type t = TypeDef__.slcmd =
@@ -18,6 +18,7 @@ type t = TypeDef__.slcmd =
   | SepAssert of Asrt.t * string list  (** Assert           *)
   | Invariant of Asrt.t * string list  (** Invariant        *)
   | SymbExec
+[@@deriving yojson]
 
 let map
     (f_l : (t -> t) option)

@@ -7,7 +7,7 @@
 
 module SS = Containers.SS
 
-type logic_bindings_t = string * (string * Expr.t) list
+type logic_bindings_t = string * (string * Expr.t) list [@@deriving yojson]
 
 type 'label t = 'label TypeDef__.cmd =
   | Skip  (** Skip                *)
@@ -28,6 +28,7 @@ type 'label t = 'label TypeDef__.cmd =
   | ReturnNormal  (** Normal return       *)
   | ReturnError  (** Error return        *)
   | Fail of string * Expr.t list  (** Failure             *)
+[@@deriving yojson]
 
 let fold = List.fold_left SS.union SS.empty
 

@@ -944,6 +944,7 @@ module Proc : sig
     proc_params : string list;
     proc_spec : Spec.t option;
   }
+  [@@deriving yojson]
 
   (** Gets the parameters of the procedure *)
   val get_params : ('a, 'b) t -> string list
