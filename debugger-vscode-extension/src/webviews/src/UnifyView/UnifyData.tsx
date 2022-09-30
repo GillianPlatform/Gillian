@@ -29,7 +29,7 @@ const extractTargets = (seg: UnifySeg): { [key: number]: UnifyStep } => {
 };
 
 const UnifyData = ({ selectStep }: Props) => {
-  const procName = useStore(store => store.debugState?.procName || '');
+  const mainProcName = useStore(store => store.debugState?.mainProc || '');
   const [{ path, unifications }, baseUnifyKind] = useStore(store => [
     store.unifyState,
     showBaseUnifyKind(store),
@@ -58,7 +58,7 @@ const UnifyData = ({ selectStep }: Props) => {
   const unifyNames = [
     <>
       <span>
-        Unify <Code>{procName}</Code> ({baseUnifyKind})
+        Unify <Code>{mainProcName}</Code> ({baseUnifyKind})
       </span>
     </>,
   ];

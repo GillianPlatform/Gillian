@@ -16,7 +16,8 @@ type D = ExecMapNodeData;
 type A = BranchCase | null;
 
 const ExecMapView = ({ state }: Props) => {
-  const { execMap, currentCmdId, procName, liftedExecMap } = state;
+  const { mainProc, procs } = state;
+  const { execMap, currentCmdId, procName, liftedExecMap } = procs[mainProc];
   const usedExecMap = liftedExecMap ?? execMap;
 
   const initElem: TransformResult<M, D, A> = {
