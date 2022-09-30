@@ -825,6 +825,14 @@ struct
       L.verbose (fun m ->
           m "@\nProgram after logic preprocessing:@\n%a@\n" Prog.pp_indexed prog)
     in
+    DL.log (fun m ->
+        let proc_to_yojson = Proc.to_yojson Annot.to_yojson (fun x -> `Int x) in
+        let procs_json =
+          Hashtbl.fold
+            (fun name proc acc -> (name, proc_to_yojson proc) :: acc)
+            prog.procs []
+        in
+        m ~json:procs_json "Got %d procs" (Hashtbl.length prog.procs));
     (prog, source_files_opt, tl_ast)
 
   let has_hit_breakpoint dbg =
