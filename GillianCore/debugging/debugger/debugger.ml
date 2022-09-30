@@ -13,7 +13,7 @@ let ( let++ ) f o = Result.map o f
 
 module type S = sig
   type tl_ast
-  type debugger_state
+  type debug_state
 
   module PackagedBranchCase : sig
     type t [@@deriving yojson]
@@ -28,53 +28,47 @@ module type S = sig
   end
 
   module Inspect : sig
-    type debug_state [@@deriving yojson]
+    type debug_state_view [@@deriving yojson]
 
-    val get_debug_state : debugger_state -> debug_state
+    val get_debug_state : debug_state -> debug_state_view
 
     val get_unification :
-      ?proc_name:string -> rid -> debugger_state -> rid * UnifyMap.t
+      ?proc_name:string -> rid -> debug_state -> rid * UnifyMap.t
   end
 
-  val launch : string -> string option -> (debugger_state, string) result
+  val launch : string -> string option -> (debug_state, string) result
 
   val jump_to_id :
-    ?proc_name:string -> rid -> debugger_state -> (unit, string) result
+    ?proc_name:string -> rid -> debug_state -> (unit, string) result
 
-  val jump_to_start : ?proc_name:string -> debugger_state -> unit
-
-  val step_in :
-    ?proc_name:string -> ?reverse:bool -> debugger_state -> stop_reason
-
-  val step : ?proc_name:string -> ?reverse:bool -> debugger_state -> stop_reason
+  val jump_to_start : ?proc_name:string -> debug_state -> unit
+  val step_in : ?proc_name:string -> ?reverse:bool -> debug_state -> stop_reason
+  val step : ?proc_name:string -> ?reverse:bool -> debug_state -> stop_reason
 
   val step_specific :
     ?proc_name:string ->
     PackagedBranchCase.t option ->
     Logging.ReportId.t ->
-    debugger_state ->
+    debug_state ->
     (stop_reason, string) result
 
-  val step_out : ?proc_name:string -> debugger_state -> stop_reason
+  val step_out : ?proc_name:string -> debug_state -> stop_reason
 
   val run :
     ?proc_name:string ->
     ?reverse:bool ->
     ?launch:bool ->
-    debugger_state ->
+    debug_state ->
     stop_reason
 
-  val terminate : debugger_state -> unit
-  val get_frames : ?proc_name:string -> debugger_state -> frame list
-  val get_scopes : ?proc_name:string -> debugger_state -> scope list
-
-  val get_variables :
-    ?proc_name:string -> int -> debugger_state -> variable list
-
-  val get_exception_info : ?proc_name:string -> debugger_state -> exception_info
+  val terminate : debug_state -> unit
+  val get_frames : ?proc_name:string -> debug_state -> frame list
+  val get_scopes : ?proc_name:string -> debug_state -> scope list
+  val get_variables : ?proc_name:string -> int -> debug_state -> variable list
+  val get_exception_info : ?proc_name:string -> debug_state -> exception_info
 
   val set_breakpoints :
-    ?proc_name:string -> string option -> int list -> debugger_state -> unit
+    ?proc_name:string -> string option -> int list -> debug_state -> unit
 end
 
 module Make
@@ -309,23 +303,27 @@ struct
     type unifys = (rid * Unifier.unify_kind * UnifyMap.unify_result) list
     [@@deriving yojson]
 
-    type cmd_data = {
+    type 'case submap = NoSubmap | Submap of 'case t | Proc of string
+    [@@deriving yojson]
+
+    and 'case cmd_data = {
       id : rid;
       origin_id : int option; [@name "originId"]
       display : string;
       unifys : unifys;
       errors : string list;
+      submap : 'case submap;
     }
     [@@deriving yojson]
 
-    type stop_at = StartOfPath | EndOfPath | BeforeNothing
-
-    type 'case t =
+    and 'case t =
       | Nothing
-      | Cmd of cmd_data * 'case t
-      | BranchCmd of cmd_data * ('case * 'case t) list
-      | FinalCmd of cmd_data
+      | Cmd of 'case cmd_data * 'case t
+      | BranchCmd of 'case cmd_data * ('case * 'case t) list
+      | FinalCmd of 'case cmd_data
     [@@deriving yojson]
+
+    type stop_at = StartOfPath | EndOfPath | BeforeNothing
 
     type cmd_kind = Branch of branch_case list | Normal | Final
     [@@deriving yojson]
@@ -337,9 +335,17 @@ struct
       | Some cases -> Branch cases
       | None -> Normal
 
-    let new_cmd cmd_kind new_id display ?(unifys = []) ?(errors = []) origin_id
-        =
-      let cmd_data = { id = new_id; display; unifys; errors; origin_id } in
+    let new_cmd
+        cmd_kind
+        new_id
+        display
+        ?(unifys = [])
+        ?(errors = [])
+        ?(submap = NoSubmap)
+        origin_id =
+      let cmd_data =
+        { id = new_id; display; unifys; errors; origin_id; submap }
+      in
       match cmd_kind with
       | Normal -> Cmd (cmd_data, Nothing)
       | Branch cases ->
@@ -555,15 +561,24 @@ struct
       | Nothing -> Nothing
       | Cmd (cmd_data, next) ->
           let next = package next in
-          Cmd (cmd_data, next)
+          Cmd (package_data cmd_data, next)
       | BranchCmd (cmd_data, nexts) ->
           let nexts =
             nexts
             |> List.map (fun (case, next) ->
                    (PackagedBranchCase.from case, package next))
           in
-          BranchCmd (cmd_data, nexts)
-      | FinalCmd cmd_data -> FinalCmd cmd_data
+          BranchCmd (package_data cmd_data, nexts)
+      | FinalCmd cmd_data -> FinalCmd (package_data cmd_data)
+
+    and package_data cmd_data =
+      let submap =
+        match cmd_data.submap with
+        | Submap map -> Submap (package map)
+        | NoSubmap -> NoSubmap
+        | Proc p -> Proc p
+      in
+      { cmd_data with submap }
 
     let id_of = function
       | Nothing -> None
@@ -651,7 +666,7 @@ struct
 
   type exec_map = branch_case ExecMap.with_source [@@deriving yojson]
 
-  type debugger_proc_state = {
+  type debug_proc_state = {
     mutable cont_func : result_t cont_func_f option;
     mutable breakpoints : breakpoints;
     mutable cur_report_id : rid;
@@ -668,7 +683,7 @@ struct
     mutable unify_maps : (rid * UnifyMap.t) list;
   }
 
-  type debugger_cfg = {
+  type debug_cfg = {
     source_file : string;
     source_files : SourceFiles.t option;
     prog : Verification.prog_t;
@@ -677,9 +692,9 @@ struct
     main_proc_name : string;
   }
 
-  type debugger_state = {
-    cfg : debugger_cfg;
-    procs : (string, debugger_proc_state) Hashtbl.t;
+  type debug_state = {
+    cfg : debug_cfg;
+    procs : (string, debug_proc_state) Hashtbl.t;
     mutable cur_proc_name : string;
   }
 
@@ -701,7 +716,7 @@ struct
     let get_exec_maps_pkg { exec_map = _, map; lifted_exec_map; _ } =
       (ExecMap.package map, Option.map ExecMap.package lifted_exec_map)
 
-    type debug_state = {
+    type debug_proc_state_view = {
       exec_map : exec_map_pkg; [@key "execMap"]
       lifted_exec_map : exec_map_pkg option; [@key "liftedExecMap"]
       current_cmd_id : rid; [@key "currentCmdId"]
@@ -710,13 +725,49 @@ struct
     }
     [@@deriving yojson]
 
-    let get_debug_state dbg : debug_state =
-      let proc_name = dbg.cfg.main_proc_name in
-      let state = Hashtbl.find dbg.procs proc_name in
-      let current_cmd_id = state.cur_report_id in
-      let unifys = state.exec_map |> ExecMap.unifys_at_id current_cmd_id in
-      let exec_map, lifted_exec_map = get_exec_maps_pkg state in
-      { exec_map; current_cmd_id; unifys; proc_name; lifted_exec_map }
+    let procs_to_yosjon procs : Yojson.Safe.t =
+      let procs =
+        procs |> List.map (fun (k, v) -> (k, debug_proc_state_view_to_yojson v))
+      in
+      `Assoc procs
+
+    let procs_of_yojson json =
+      let procs =
+        json |> Yojson.Safe.Util.to_assoc
+        |> List_utils.map_results (fun (k, v) ->
+               let++ v' = debug_proc_state_view_of_yojson v in
+               (k, v'))
+      in
+      procs
+
+    type debug_state_view = {
+      main_proc_name : string; [@key "mainProc"]
+      current_proc_name : string; [@key "currentProc"]
+      procs : (string * debug_proc_state_view) list;
+          [@to_yojson procs_to_yosjon] [@of_yojson procs_of_yojson]
+    }
+    [@@deriving yojson]
+
+    let get_debug_state (dbg : debug_state) : debug_state_view =
+      let procs =
+        Hashtbl.fold
+          (fun proc_name state acc ->
+            let current_cmd_id = state.cur_report_id in
+            let unifys =
+              state.exec_map |> ExecMap.unifys_at_id current_cmd_id
+            in
+            let exec_map, lifted_exec_map = get_exec_maps_pkg state in
+            let proc =
+              { exec_map; lifted_exec_map; current_cmd_id; unifys; proc_name }
+            in
+            (proc_name, proc) :: acc)
+          dbg.procs []
+      in
+      {
+        main_proc_name = dbg.cfg.main_proc_name;
+        current_proc_name = dbg.cur_proc_name;
+        procs;
+      }
 
     let get_unification ?proc_name unify_id dbg =
       let state = dbg |> get_proc_state ?proc_name in
@@ -1378,8 +1429,8 @@ struct
       ?(reverse = false)
       ?(branch_case : branch_case option)
       (cond : frame -> frame -> int -> int -> bool)
-      (cfg : debugger_cfg)
-      (state : debugger_proc_state) : stop_reason =
+      (cfg : debug_cfg)
+      (state : debug_proc_state) : stop_reason =
     let prev_id_in_frame = state.cur_report_id in
     let prev_frame =
       match state.frames with
@@ -1524,14 +1575,14 @@ struct
     let state = dbg |> get_proc_state ?proc_name in
     state.top_level_scopes
 
-  let get_variables ?proc_name (var_ref : int) (dbg : debugger_state) :
+  let get_variables ?proc_name (var_ref : int) (dbg : debug_state) :
       variable list =
     let state = dbg |> get_proc_state ?proc_name in
     match Hashtbl.find_opt state.variables var_ref with
     | None -> []
     | Some vars -> vars
 
-  let get_exception_info ?proc_name (dbg : debugger_state) =
+  let get_exception_info ?proc_name (dbg : debug_state) =
     let { cfg; _ } = dbg in
     let state = dbg |> get_proc_state ?proc_name in
     let error = List.hd state.errors in
