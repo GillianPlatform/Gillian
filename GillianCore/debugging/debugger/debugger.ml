@@ -1189,14 +1189,29 @@ struct
       ?(unifys = [])
       ?(errors = [])
       branch_path
-      cfg
+      dbg
       state =
+    let { cfg; _ } = dbg in
     let cmd_display = cmd.cmd in
     let origin_id = Annot.get_origin_id cmd.annot in
     let source = state |> get_current_source in
+    let submap =
+      let open ExecMap in
+      match Annot.get_expansion_kind cmd.annot with
+      | NoExpansion -> NoSubmap
+      | Function fname -> (
+          match launch_proc cfg fname with
+          | Error msg ->
+              DL.log (fun m -> m "Failed to launch proc %s: %s" fname msg);
+              NoSubmap
+          | Ok state' ->
+              Hashtbl.replace dbg.procs fname state';
+              Proc fname)
+    in
     ExecMap.(
       let new_cmd =
-        new_cmd cmd_kind cur_report_id cmd_display ~unifys ~errors origin_id
+        new_cmd cmd_kind cur_report_id cmd_display ~unifys ~errors ~submap
+          origin_id
       in
       let exec_map = state.exec_map |> insert_cmd new_cmd branch_path source in
       match exec_map with
@@ -1214,9 +1229,10 @@ struct
                 true
           | _ -> true))
 
-  let rec execute_step prev_id_in_frame ?branch_case ?prev_branch_path cfg state
+  let rec execute_step prev_id_in_frame ?branch_case ?prev_branch_path dbg state
       =
     let open Verification.SAInterpreter in
+    let { cfg; _ } = dbg in
     match state.cont_func with
     | None ->
         DL.log (fun m -> m "No cont_func; reached end");
@@ -1270,7 +1286,7 @@ struct
                 let inserted =
                   state
                   |> update_exec_maps Final prev_id cmd ~unifys ~errors
-                       branch_path cfg
+                       branch_path dbg
                 in
                 if not inserted then
                   failwith "HORROR: didn't insert on EndOfBranch!"
@@ -1294,7 +1310,7 @@ struct
                 in
                 if type_ = ContentType.proc_init then (
                   DL.log (fun m -> m "(execute_step) Skipping proc_init...");
-                  state |> execute_step prev_id_in_frame cfg)
+                  state |> execute_step prev_id_in_frame dbg)
                 else if
                   L.LogQueryer.get_cmd_results cur_report_id
                   |> List.for_all (fun (_, content) ->
@@ -1310,7 +1326,7 @@ struct
                          assuming eob, stepping again...");
                   state
                   |> execute_step ~prev_branch_path:branch_path cur_report_id
-                       cfg)
+                       dbg)
                 else (
                   state
                   |> update_report_id_and_inspection_fields cur_report_id cfg;
@@ -1347,20 +1363,21 @@ struct
                     let inserted =
                       state
                       |> update_exec_maps cmd_kind cur_report_id cmd ~unifys
-                           branch_path cfg
+                           branch_path dbg
                     in
                     if not inserted then
                       state
                       |> execute_step cur_report_id
-                           ~prev_branch_path:branch_path cfg
+                           ~prev_branch_path:branch_path dbg
                     else Step))))
 
   let step_in_branch_case
       prev_id_in_frame
       ?branch_case
       ?(reverse = false)
-      cfg
+      dbg
       state =
+    let { cfg; _ } = dbg in
     let stop_reason =
       if reverse then (
         let prev_report_id =
@@ -1405,7 +1422,7 @@ struct
         match next_report_id with
         | None ->
             DL.log (fun m -> m "No next report ID; executing next step");
-            state |> execute_step ?branch_case prev_id_in_frame cfg
+            state |> execute_step ?branch_case prev_id_in_frame dbg
         | Some next_report_id ->
             DL.show_report next_report_id "Next report ID found; not executing";
             state |> update_report_id_and_inspection_fields next_report_id cfg;
@@ -1421,15 +1438,14 @@ struct
     step_in_branch_case state.cur_report_id ?branch_case:None ~reverse cfg state
 
   let step_in ?proc_name ?(reverse = false) dbg =
-    let { cfg; _ } = dbg in
     let state = dbg |> get_proc_state ?proc_name in
-    step_in_state ~reverse cfg state
+    step_in_state ~reverse dbg state
 
   let step_until_cond
       ?(reverse = false)
       ?(branch_case : branch_case option)
       (cond : frame -> frame -> int -> int -> bool)
-      (cfg : debug_cfg)
+      (dbg : debug_state)
       (state : debug_proc_state) : stop_reason =
     let prev_id_in_frame = state.cur_report_id in
     let prev_frame =
@@ -1440,7 +1456,7 @@ struct
     let prev_stack_depth = List.length state.frames in
     let rec aux () =
       let stop_reason =
-        state |> step_in_branch_case ~reverse ?branch_case prev_id_in_frame cfg
+        state |> step_in_branch_case ~reverse ?branch_case prev_id_in_frame dbg
       in
       match stop_reason with
       | Step ->
@@ -1457,7 +1473,8 @@ struct
     in
     aux ()
 
-  let step_case ?(reverse = false) ?branch_case cfg state =
+  let step_case ?(reverse = false) ?branch_case dbg state =
+    let { cfg; _ } = dbg in
     let cond =
       if is_gil_file cfg.source_file then
         (* If GIL file, step until next cmd in the same frame (like in regular
@@ -1476,12 +1493,11 @@ struct
            || cur_frame.end_line <> prev_frame.end_line
            || cur_frame.end_column <> prev_frame.end_column)
     in
-    state |> step_until_cond ~reverse ?branch_case cond cfg
+    state |> step_until_cond ~reverse ?branch_case cond dbg
 
   let step ?proc_name ?(reverse = false) dbg =
-    let { cfg; _ } = dbg in
     let state = dbg |> get_proc_state ?proc_name in
-    step_case ~reverse cfg state
+    step_case ~reverse dbg state
 
   let step_specific
       ?proc_name
@@ -1496,13 +1512,12 @@ struct
       |> Option_utils.to_result
     in
     let++ () = state |> jump_state_to_id prev_id cfg in
-    state |> step_case ?branch_case cfg
+    state |> step_case ?branch_case dbg
 
   let step_out ?proc_name dbg =
-    let { cfg; _ } = dbg in
     let state = dbg |> get_proc_state ?proc_name in
     let rec aux stack_depth =
-      let stop_reason = state |> step_in_state cfg in
+      let stop_reason = state |> step_in_state dbg in
       match stop_reason with
       | Step ->
           if List.length state.frames < stack_depth then stop_reason
@@ -1534,7 +1549,7 @@ struct
          line *)
       if launch && has_hit_breakpoint state then Breakpoint
       else
-        let stop_reason = step_case ?branch_case ~reverse cfg state in
+        let stop_reason = step_case ?branch_case ~reverse dbg state in
         match stop_reason with
         | Step -> aux count None
         | Breakpoint -> Breakpoint
