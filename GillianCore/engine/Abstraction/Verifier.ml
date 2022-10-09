@@ -1073,9 +1073,18 @@ struct
                procedure (unless specified).
                Assume there is at least one procedure*)
         let test =
-          match proc_tests with
-          | test :: _ -> test
-          | _ -> failwith "No tests found!"
+          match proc_name with
+          | Some proc_name -> (
+              match
+                proc_tests |> List.find_opt (fun test -> test.name = proc_name)
+              with
+              | Some test -> test
+              | None ->
+                  Fmt.failwith "Couldn't find test for proc '%s'!" proc_name)
+          | None -> (
+              match proc_tests with
+              | test :: _ -> test
+              | _ -> failwith "No tests found!")
         in
         SAInterpreter.init_evaluate_proc
           (fun x -> x)

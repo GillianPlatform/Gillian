@@ -1091,11 +1091,6 @@ struct
     let () = Config.stats := false in
     let () = Config.lemma_proof := true in
     let () = Config.manual_proof := false in
-    let () =
-      match proc_name with
-      | None -> ()
-      | Some proc_name -> Config.Verification.set_procs_to_verify [ proc_name ]
-    in
     (* If the file is a GIL file, assume it is already compiled *)
     let already_compiled = is_gil_file file_name in
     let outfile_opt = None in
