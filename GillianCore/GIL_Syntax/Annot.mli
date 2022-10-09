@@ -8,7 +8,6 @@ val make :
   ?origin_loc:Location.t ->
   ?origin_id:int ->
   ?loop_info:string list ->
-  ?lift_hidden:bool ->
   ?expansion_kind:expansion_kind ->
   unit ->
   t
