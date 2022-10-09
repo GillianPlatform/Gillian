@@ -902,6 +902,16 @@ module BiSpec : sig
   val pp : Format.formatter -> t -> unit
 end
 
+module BranchCase : sig
+  type t =
+    | GuardedGoto of bool
+    | LCmd of int
+    | SpecExec of Flag.t
+    | LAction of Yojson.Safe.t list
+    | LActionFail of int
+  [@@deriving yojson]
+end
+
 module Annot : sig
   (** {b GIL annot}. *)
   type expansion_kind = NoExpansion | Function of string [@@deriving yojson]

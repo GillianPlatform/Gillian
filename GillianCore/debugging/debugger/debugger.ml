@@ -7,6 +7,7 @@ open DebuggerTypes
 open Syntaxes.Option
 
 type rid = L.ReportId.t [@@deriving show, yojson]
+type branch_case = BranchCase.t [@@deriving yojson]
 
 let ( let** ) = Result.bind
 let ( let++ ) f o = Result.map o f
@@ -99,7 +100,11 @@ struct
         | LCmd x -> ("LCmd", ("Logical command", Fmt.str "%d" x))
         | SpecExec fl -> ("SpecExec", ("Spec exec", Fmt.str "%a" Flag.pp fl))
         | LAction vs ->
-            let vs = vs |> List.map show_state_vt in
+            let vs =
+              vs
+              |> List_utils.map_results state_vt_of_yojson
+              |> Result.get_ok |> List.map show_state_vt
+            in
             ( "LAction",
               ( "Logical action",
                 Fmt.str "%a" (Fmt.list ~sep:(Fmt.any ", ") Fmt.string) vs ) )

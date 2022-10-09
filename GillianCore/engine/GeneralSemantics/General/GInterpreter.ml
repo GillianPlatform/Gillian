@@ -1,14 +1,9 @@
 open Literal
+open BranchCase
 module L = Logging
 module DL = Debugger_log
 
-type 'state_vt branch_case' =
-  | GuardedGoto of bool
-  | LCmd of int
-  | SpecExec of Flag.t
-  | LAction of 'state_vt list
-  | LActionFail of int
-[@@deriving yojson]
+type branch_case = BranchCase.t [@@deriving yojson]
 
 module type S = sig
   module CallStack : CallStack.S
@@ -18,7 +13,7 @@ module type S = sig
   type store_t
   type state_t
   type state_err_t [@@deriving show]
-  type state_vt [@@deriving show]
+  type state_vt [@@deriving yojson, show]
   type heap_t
 
   module Val : Val.S with type t = vt
@@ -26,7 +21,6 @@ module type S = sig
 
   type invariant_frames = (string * state_t) list
   type err_t = (vt, state_err_t) ExecErr.t [@@deriving show, yojson]
-  type branch_case = state_vt branch_case' [@@deriving yojson]
   type branch_path = branch_case list [@@deriving yojson]
 
   type cconf_t =
@@ -164,7 +158,6 @@ struct
   type heap_t = State.heap_t
   type invariant_frames = (string * State.t) list [@@deriving yojson]
   type err_t = (Val.t, state_err_t) ExecErr.t [@@deriving show, yojson]
-  type branch_case = state_vt branch_case' [@@deriving yojson]
   type branch_path = branch_case list [@@deriving yojson]
 
   (** Type of configurations: state, call stack, previous index, previous loop ids, current index, branching *)
@@ -1019,7 +1012,9 @@ struct
                      let r_e = Expr.EList (List.map Val.to_expr r_vs) in
                      let r_v = eval_expr r_e in
                      let r_state' = update_store r_state x r_v in
-                     let branch_case = LAction r_vs in
+                     let branch_case =
+                       LAction (r_vs |> List.map state_vt_to_yojson)
+                     in
                      ( make_confcont ~state:r_state'
                          ~callstack:(CallStack.copy cs)
                          ~invariant_frames:iframes ~prev_idx:i ~loop_ids
@@ -1030,7 +1025,7 @@ struct
             in
             let ret_len = 1 + List.length rest_rets in
             let b_counter = b_counter + if ret_len > 1 then 1 else 0 in
-            let branch_case = LAction vs in
+            let branch_case = LAction (vs |> List.map state_vt_to_yojson) in
             match
               (ret_len >= 3 && !Config.parallel, ret_len = 2 && !Config.parallel)
               (* XXX: && !Config.act_threads < !Config.max_threads ) *)
