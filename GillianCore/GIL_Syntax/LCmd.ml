@@ -11,6 +11,7 @@ type t = TypeDef__.lcmd =
   | AssumeType of Expr.t * Type.t  (** Assume Type      *)
   | FreshSVar of string  (** x := fresh_svar() *)
   | SL of SLCmd.t
+[@@deriving yojson]
 
 let rec map
     (f_l : (t -> t) option)

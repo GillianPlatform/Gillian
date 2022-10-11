@@ -13,6 +13,7 @@ type ('annot, 'label) t = ('annot, 'label) TypeDef__.proc = {
   proc_params : string list;
   proc_spec : Spec.t option;
 }
+[@@deriving yojson]
 
 let get_params proc = proc.proc_params
 
