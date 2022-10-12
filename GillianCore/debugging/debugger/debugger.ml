@@ -1082,6 +1082,10 @@ struct
                 |> update_report_id_and_inspection_fields cur_report_id cfg;
                 Ok state)
     in
+    Config.Verification.(
+      let procs_to_verify = !procs_to_verify in
+      if not (procs_to_verify |> List.mem proc_name) then
+        set_procs_to_verify (procs_to_verify @ [ proc_name ]));
     report_state
     |> L.with_report_state (fun () ->
            let cont_func =
@@ -1096,6 +1100,11 @@ struct
     let () = Config.stats := false in
     let () = Config.lemma_proof := true in
     let () = Config.manual_proof := false in
+    let () =
+      match proc_name with
+      | None -> ()
+      | Some proc_name -> Config.Verification.set_procs_to_verify [ proc_name ]
+    in
     (* If the file is a GIL file, assume it is already compiled *)
     let already_compiled = is_gil_file file_name in
     let outfile_opt = None in
