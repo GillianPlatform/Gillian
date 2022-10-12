@@ -605,14 +605,9 @@ struct
         let new_display =
           Lifter.get_origin_node_str tl_ast cmd_data.origin_id
         in
-        if new_display = "No info!" then
-          DL.failwith
-            (fun () ->
-              let cmd_data =
-                cmd_data_to_yojson branch_case_to_yojson cmd_data
-              in
-              [ ("cmd_data", cmd_data) ])
-            "HORROR: tried to lift hidden command!";
+        let new_display =
+          if new_display = "No info!" then cmd_data.display else new_display
+        in
         { cmd_data with display = new_display }
       in
       let eq_opt ida idb =
