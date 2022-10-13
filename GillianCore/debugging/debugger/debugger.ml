@@ -1216,23 +1216,9 @@ struct
     let cmd_display = cmd.cmd in
     let origin_id = Annot.get_origin_id cmd.annot in
     let source = state |> get_current_source in
-    let submap =
-      let open ExecMap in
-      match Annot.get_expansion_kind cmd.annot with
-      | NoExpansion -> NoSubmap
-      | Function fname -> (
-          match launch_proc cfg fname with
-          | Error msg ->
-              DL.log (fun m -> m "Failed to launch proc %s: %s" fname msg);
-              NoSubmap
-          | Ok state' ->
-              Hashtbl.replace dbg.procs fname state';
-              Proc fname)
-    in
     ExecMap.(
       let new_cmd =
-        new_cmd cmd_kind cur_report_id cmd_display ~unifys ~errors ~submap
-          origin_id
+        new_cmd cmd_kind cur_report_id cmd_display ~unifys ~errors origin_id
       in
       let exec_map = state.exec_map |> insert_cmd new_cmd branch_path source in
       match exec_map with
