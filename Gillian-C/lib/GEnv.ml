@@ -31,11 +31,7 @@ struct
 
   type nonrec err_t = err_t
   type def = FunDef of Def_value.t | GlobVar of Def_value.t
-
-  type t = {
-    symb : (string, string) PMap.t;  (** maps symbols to loc names *)
-    defs : (string, def) PMap.t;  (** maps loc names to definitions *)
-  }
+  type t = { symb : (string, string) PMap.t; defs : (string, def) PMap.t }
 
   let find_opt x s = try Some (PMap.find x s) with Not_found -> None
 

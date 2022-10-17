@@ -158,6 +158,8 @@ module TargetLangOptions = struct
     Config.allocated_functions := allocated_functions
 end
 
+type genv = unit
+
 (** Cache of compiled but unlinked GIL programs and their compilation data. *)
 let compiled_progs = Hashtbl.create small_tbl_size
 
@@ -313,7 +315,7 @@ let create_compilation_result gil_progs =
         (get_gil_path path, prog))
       gil_progs
   in
-  { gil_progs; source_files; tl_ast = () }
+  { gil_progs; source_files; tl_ast = (); genv = () }
 
 let parse_and_compile_files paths =
   let exec_mode = !Gillian.Utils.Config.current_exec_mode in

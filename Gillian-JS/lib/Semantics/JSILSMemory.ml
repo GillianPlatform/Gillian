@@ -11,6 +11,7 @@ module TypEnv = Gillian.Symbolic.TypEnv
 open Gillian.Logic
 
 module M = struct
+  type genv = unit
   type vt = SVal.t [@@deriving yojson]
 
   (** Type of JSIL general states *)

@@ -1,10 +1,11 @@
 (** This defines an interface that allows a user to indicate how to parse their own programming language,
     preprocess the obtained language and compile it to GIL (type [Prog.t]) *)
 
-type 'tl_ast compiled_progs = {
+type ('tl_ast, 'genv) compiled_progs = {
   gil_progs : (string * (Annot.t, string) Prog.t) list;
   source_files : SourceFiles.t;
   tl_ast : 'tl_ast;
+  genv : 'genv;
 }
 
 module type S = sig
@@ -19,6 +20,8 @@ module type S = sig
     val apply : t -> unit
   end
 
+  type genv
+
   (** Type of error that can occur during parsing or compilation *)
   type err
 
@@ -32,7 +35,7 @@ module type S = sig
       then compiles them to a single or a set of GIL programs. The returned GIL
       program(s) should be ready to be analysed. *)
   val parse_and_compile_files :
-    string list -> (tl_ast compiled_progs, err) result
+    string list -> ((tl_ast, genv) compiled_progs, err) result
 
   (** [other_imports] is an association list that maps extensions to a parser
       and compiler. For example, it is possible to import a JSIL file in a GIL

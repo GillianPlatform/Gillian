@@ -1,4 +1,6 @@
 module type S = sig
+  type genv
+
   (** Type of GIL values *)
   type vt = CVal.M.t
 

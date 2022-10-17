@@ -1,6 +1,7 @@
 open Gillian.Concrete
 module Literal = Gillian.Gil_syntax.Literal
 
+type genv = unit
 type vt = Values.t
 type st = Subst.t
 type err_t = unit

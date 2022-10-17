@@ -13,6 +13,8 @@ module GEnv = GEnv.Symbolic
 
 (* Some utils first *)
 
+type genv = Genv2.t
+
 let resolve_or_create_loc_name (lvar_loc : Expr.t) : string Delayed.t =
   let open Delayed.Syntax in
   let* loc_name = Delayed.resolve_loc lvar_loc in

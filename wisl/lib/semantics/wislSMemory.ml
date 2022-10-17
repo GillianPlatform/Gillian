@@ -5,6 +5,7 @@ module Logging = Gillian.Logging
 module SFVL = SFVL
 module SS = Gillian.Utils.Containers.SS
 
+type genv = unit
 type vt = Values.t
 type st = Subst.t
 type err_t = WislSHeap.err [@@deriving yojson]

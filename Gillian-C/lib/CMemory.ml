@@ -4,6 +4,7 @@ module Literal = Gillian.Gil_syntax.Literal
 module GEnv = GEnv.Concrete
 module Expr = Gillian.Gil_syntax.Expr
 
+type genv = Genv2.t
 type vt = Values.t
 type st = Subst.t
 type err_t = unit

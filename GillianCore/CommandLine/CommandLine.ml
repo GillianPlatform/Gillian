@@ -11,8 +11,9 @@ let convert_other_imports oi =
     oi
 
 module Make
-    (CMemory : CMemory.S)
-    (SMemory : SMemory.S)
+    (Genv : Global_env.S)
+    (CMemory : CMemory.S with type genv = Genv.t)
+    (SMemory : SMemory.S with type genv = Genv.t)
     (External : External.S)
     (PC : ParserAndCompiler.S) (Runners : sig
       val runners : Bulk.Runner.t list

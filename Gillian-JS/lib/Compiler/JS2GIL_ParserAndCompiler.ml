@@ -22,6 +22,7 @@ module TargetLangOptions = struct
     Javert_utils.Js_config.js2jsil_harnessing := harness
 end
 
+type genv = unit
 type err = JSParserErr of JS_Parser.Error.t | JS2GILErr of string
 type tl_ast = JavaScriptSource of JS_Parser.Syntax.exp | JsilSource
 
@@ -36,7 +37,12 @@ let create_compilation_result path prog tl_prog =
   (* TODO (Alexis): Track any require()'d modules *)
   let () = SourceFiles.add_source_file source_files ~path in
   let gil_path = Filename.chop_extension path ^ ".gil" in
-  { gil_progs = [ (gil_path, prog) ]; source_files; tl_ast = tl_prog }
+  {
+    gil_progs = [ (gil_path, prog) ];
+    source_files;
+    tl_ast = tl_prog;
+    genv = ();
+  }
 
 let parse_and_compile_js path =
   try

@@ -1,4 +1,7 @@
 module type S = sig
+  (** Type of the static global environment, if one needs to give context *)
+  type genv
+
   (** Type of GIL values *)
   type vt = SVal.M.t
 
@@ -72,6 +75,7 @@ module type S = sig
 end
 
 module Dummy : S = struct
+  type genv = unit
   type vt = SVal.M.t
   type st = SVal.SESubst.t
   type c_fix_t = unit
