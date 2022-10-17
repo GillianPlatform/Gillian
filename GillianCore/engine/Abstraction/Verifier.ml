@@ -1049,7 +1049,6 @@ struct
 
   let verify_up_to_procs ?(proc_name : string option) (prog : prog_t) :
       SAInterpreter.result_t SAInterpreter.cont_func =
-    proc_name |> ignore;
     L.with_normal_phase ~title:"Program verification" (fun () ->
         (* Analyse all procedures and lemmas *)
         let procs_to_verify =

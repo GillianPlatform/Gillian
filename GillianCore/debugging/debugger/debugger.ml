@@ -32,44 +32,29 @@ module type S = sig
     type debug_state_view [@@deriving yojson]
 
     val get_debug_state : debug_state -> debug_state_view
-
-    val get_unification :
-      ?proc_name:string -> rid -> debug_state -> rid * UnifyMap.t
+    val get_unification : rid -> debug_state -> rid * UnifyMap.t
   end
 
   val launch : string -> string option -> (debug_state, string) result
-
-  val jump_to_id :
-    ?proc_name:string -> rid -> debug_state -> (unit, string) result
-
-  val jump_to_start : ?proc_name:string -> debug_state -> unit
-  val step_in : ?proc_name:string -> ?reverse:bool -> debug_state -> stop_reason
-  val step : ?proc_name:string -> ?reverse:bool -> debug_state -> stop_reason
+  val jump_to_id : rid -> debug_state -> (unit, string) result
+  val jump_to_start : debug_state -> unit
+  val step_in : ?reverse:bool -> debug_state -> stop_reason
+  val step : ?reverse:bool -> debug_state -> stop_reason
 
   val step_specific :
-    ?proc_name:string ->
     PackagedBranchCase.t option ->
     Logging.ReportId.t ->
     debug_state ->
     (stop_reason, string) result
 
-  val step_out : ?proc_name:string -> debug_state -> stop_reason
-
-  val run :
-    ?proc_name:string ->
-    ?reverse:bool ->
-    ?launch:bool ->
-    debug_state ->
-    stop_reason
-
+  val step_out : debug_state -> stop_reason
+  val run : ?reverse:bool -> ?launch:bool -> debug_state -> stop_reason
   val terminate : debug_state -> unit
-  val get_frames : ?proc_name:string -> debug_state -> frame list
-  val get_scopes : ?proc_name:string -> debug_state -> scope list
-  val get_variables : ?proc_name:string -> int -> debug_state -> variable list
-  val get_exception_info : ?proc_name:string -> debug_state -> exception_info
-
-  val set_breakpoints :
-    ?proc_name:string -> string option -> int list -> debug_state -> unit
+  val get_frames : debug_state -> frame list
+  val get_scopes : debug_state -> scope list
+  val get_variables : int -> debug_state -> variable list
+  val get_exception_info : debug_state -> exception_info
+  val set_breakpoints : string option -> int list -> debug_state -> unit
 end
 
 module Make
@@ -777,8 +762,8 @@ struct
         procs;
       }
 
-    let get_unification ?proc_name unify_id dbg =
-      let state = dbg |> get_proc_state ?proc_name in
+    let get_unification unify_id dbg =
+      let state = dbg |> get_proc_state in
       match state.unify_maps |> List.assoc_opt unify_id with
       | Some map -> (unify_id, map)
       | None ->
@@ -1179,14 +1164,14 @@ struct
       Ok ()
     with Failure msg -> Error msg
 
-  let jump_to_id ?proc_name id dbg =
+  let jump_to_id id dbg =
     let { cfg; _ } = dbg in
-    let state = dbg |> get_proc_state ?proc_name in
+    let state = dbg |> get_proc_state in
     state |> jump_state_to_id id cfg
 
-  let jump_to_start ?proc_name dbg =
+  let jump_to_start dbg =
     let { cfg; _ } = dbg in
-    let state = dbg |> get_proc_state ?proc_name in
+    let state = dbg |> get_proc_state in
     let result =
       let** root_id =
         ExecMap.id_of (snd state.exec_map)
@@ -1443,8 +1428,8 @@ struct
   let step_in_state ?(reverse = false) cfg state =
     step_in_branch_case state.cur_report_id ?branch_case:None ~reverse cfg state
 
-  let step_in ?proc_name ?(reverse = false) dbg =
-    let state = dbg |> get_proc_state ?proc_name in
+  let step_in ?(reverse = false) dbg =
+    let state = dbg |> get_proc_state in
     step_in_state ~reverse dbg state
 
   let step_until_cond
@@ -1501,17 +1486,13 @@ struct
     in
     state |> step_until_cond ~reverse ?branch_case cond dbg
 
-  let step ?proc_name ?(reverse = false) dbg =
-    let state = dbg |> get_proc_state ?proc_name in
+  let step ?(reverse = false) dbg =
+    let state = dbg |> get_proc_state in
     step_case ~reverse dbg state
 
-  let step_specific
-      ?proc_name
-      (branch_case : PackagedBranchCase.t option)
-      prev_id
-      dbg =
+  let step_specific (branch_case : PackagedBranchCase.t option) prev_id dbg =
     let { cfg; _ } = dbg in
-    let state = dbg |> get_proc_state ?proc_name in
+    let state = dbg |> get_proc_state in
     let** branch_case =
       branch_case
       |> Option.map PackagedBranchCase.unpackage
@@ -1520,8 +1501,8 @@ struct
     let++ () = state |> jump_state_to_id prev_id cfg in
     state |> step_case ?branch_case dbg
 
-  let step_out ?proc_name dbg =
-    let state = dbg |> get_proc_state ?proc_name in
+  let step_out dbg =
+    let state = dbg |> get_proc_state in
     let rec aux stack_depth =
       let stop_reason = state |> step_in_state dbg in
       match stop_reason with
@@ -1532,9 +1513,9 @@ struct
     in
     aux (List.length state.frames)
 
-  let run ?proc_name ?(reverse = false) ?(launch = false) dbg =
+  let run ?(reverse = false) ?(launch = false) dbg =
     let { cfg; _ } = dbg in
-    let state = dbg |> get_proc_state ?proc_name in
+    let state = dbg |> get_proc_state in
     let current_id = state.cur_report_id in
     let branch_path = state.exec_map |> snd |> ExecMap.path_of_id current_id in
     DL.log (fun m ->
@@ -1589,24 +1570,23 @@ struct
     if !Config.stats then Statistics.print_statistics ();
     L.wrap_up ()
 
-  let get_frames ?proc_name dbg =
-    let state = dbg |> get_proc_state ?proc_name in
+  let get_frames dbg =
+    let state = dbg |> get_proc_state in
     state.frames
 
-  let get_scopes ?proc_name dbg =
-    let state = dbg |> get_proc_state ?proc_name in
+  let get_scopes dbg =
+    let state = dbg |> get_proc_state in
     state.top_level_scopes
 
-  let get_variables ?proc_name (var_ref : int) (dbg : debug_state) :
-      variable list =
-    let state = dbg |> get_proc_state ?proc_name in
+  let get_variables (var_ref : int) (dbg : debug_state) : variable list =
+    let state = dbg |> get_proc_state in
     match Hashtbl.find_opt state.variables var_ref with
     | None -> []
     | Some vars -> vars
 
-  let get_exception_info ?proc_name (dbg : debug_state) =
+  let get_exception_info (dbg : debug_state) =
     let { cfg; _ } = dbg in
-    let state = dbg |> get_proc_state ?proc_name in
+    let state = dbg |> get_proc_state in
     let error = List.hd state.errors in
     let non_mem_exception_info =
       { id = Fmt.to_to_string Logging.pp_err error; description = None }
@@ -1620,8 +1600,8 @@ struct
         | _ -> non_mem_exception_info)
     | _ -> non_mem_exception_info
 
-  let set_breakpoints ?proc_name source bp_list dbg =
-    let state = dbg |> get_proc_state ?proc_name in
+  let set_breakpoints source bp_list dbg =
+    let state = dbg |> get_proc_state in
     match source with
     (* We can't set the breakpoints if we do not know the source file *)
     | None -> ()
