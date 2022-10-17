@@ -1,47 +1,48 @@
-type report_state = {
-  previous : ReportId.t option ref;
-  parents : ReportId.t Stack.t;
-}
+module ReportState = struct
+  type t = { previous : ReportId.t option ref; parents : ReportId.t Stack.t }
 
-let new_report_state () = { previous = ref None; parents = Stack.create () }
+  let make () = { previous = ref None; parents = Stack.create () }
 
-let clone_report_state { previous; parents } =
-  { previous = ref !previous; parents = Stack.copy parents }
+  let clone { previous; parents } =
+    { previous = ref !previous; parents = Stack.copy parents }
 
-let global_report_state = new_report_state ()
-let active_report_state = ref global_report_state
-let activate_report_state state = active_report_state := state
+  let global_state = make ()
+  let active_state = ref global_state
+  let activate state = active_state := state
 
-let with_report_state f state =
-  let prev_report_state = !active_report_state in
-  active_report_state := state;
-  let result = f () in
-  active_report_state := prev_report_state;
-  result
+  let with_state f state =
+    let prev_report_state = !active_state in
+    active_state := state;
+    let result = f () in
+    active_state := prev_report_state;
+    result
+end
+
+open ReportState
 
 let get_previous () =
-  let { previous; _ } = !active_report_state in
+  let { previous; _ } = !active_state in
   !previous
 
 let set_previous id =
-  let { previous; _ } = !active_report_state in
+  let { previous; _ } = !active_state in
   match id with
   | None -> ()
   | id -> previous := id
 
 let get_parent () =
-  let { parents; _ } = !active_report_state in
+  let { parents; _ } = !active_state in
   Stack.top_opt parents
 
 let set_parent id =
-  let { previous; parents } = !active_report_state in
+  let { previous; parents } = !active_state in
   previous := None;
   Stack.push id parents
 
 let release_parent = function
   | None -> ()
   | Some rid as id_opt ->
-      let { previous; parents } = !active_report_state in
+      let { previous; parents } = !active_state in
       let parent_id = Stack.pop parents in
       assert (ReportId.equal rid parent_id);
       previous := id_opt

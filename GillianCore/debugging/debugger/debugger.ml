@@ -686,7 +686,7 @@ struct
     mutable lifted_exec_map : branch_case ExecMap.t option;
     mutable proc_name : string option;
     mutable unify_maps : (rid * UnifyMap.t) list;
-    report_state : L.report_state;
+    report_state : L.ReportState.t;
   }
 
   type debug_cfg = {
@@ -696,7 +696,7 @@ struct
     tl_ast : tl_ast option;
     tests : (string * Verification.t) list;
     main_proc_name : string;
-    report_state_base : L.report_state;
+    report_state_base : L.ReportState.t;
   }
 
   type debug_state = {
@@ -714,8 +714,7 @@ struct
       | None -> dbg.cur_proc_name
     in
     let proc_state = Hashtbl.find dbg.procs proc_name in
-    if activate_report_state then
-      L.activate_report_state proc_state.report_state;
+    if activate_report_state then L.ReportState.activate proc_state.report_state;
     proc_state
 
   module Inspect = struct
@@ -1015,7 +1014,7 @@ struct
               "Debugger: don't know how to handle report of type '%s'!" t)
 
   let launch_proc cfg proc_name =
-    let report_state = L.(clone_report_state cfg.report_state_base) in
+    let report_state = L.ReportState.clone cfg.report_state_base in
     let rec aux = function
       | Verification.SAInterpreter.Finished _ ->
           Error "HORROR: Shouldn't encounter Finished when debugging!"
@@ -1087,7 +1086,7 @@ struct
       if not (procs_to_verify |> List.mem proc_name) then
         set_procs_to_verify (procs_to_verify @ [ proc_name ]));
     report_state
-    |> L.with_report_state (fun () ->
+    |> L.ReportState.with_state (fun () ->
            let cont_func =
              Verification.verify_up_to_procs ~proc_name cfg.prog
            in
@@ -1128,11 +1127,11 @@ struct
         tl_ast;
         tests;
         main_proc_name = proc_name;
-        report_state_base = L.(clone_report_state global_report_state);
+        report_state_base = L.ReportState.(clone global_state);
       }
     in
     let++ main_proc_state = launch_proc cfg proc_name in
-    main_proc_state.report_state |> L.activate_report_state;
+    main_proc_state.report_state |> L.ReportState.activate;
     let dbg = { cfg; procs = Hashtbl.create 0; cur_proc_name = proc_name } in
     Hashtbl.add dbg.procs proc_name main_proc_state;
     dbg
@@ -1585,7 +1584,7 @@ struct
     aux ~launch 0 None
 
   let terminate dbg =
-    L.(activate_report_state global_report_state);
+    L.ReportState.(activate global_state);
     Verification.postprocess_files dbg.cfg.source_files;
     if !Config.stats then Statistics.print_statistics ();
     L.wrap_up ()

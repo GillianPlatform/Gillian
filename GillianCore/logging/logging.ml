@@ -5,14 +5,7 @@ module Reporter = Reporter
 module Loggable = Loggable
 module LogQueryer = LogQueryer
 module ReportId = ReportId
-
-type report_state = ReportBuilder.report_state
-
-let new_report_state = ReportBuilder.new_report_state
-let clone_report_state = ReportBuilder.clone_report_state
-let global_report_state = ReportBuilder.global_report_state
-let activate_report_state = ReportBuilder.activate_report_state
-let with_report_state = ReportBuilder.with_report_state
+module ReportState = ReportBuilder.ReportState
 
 let () =
   Printexc.register_printer (function

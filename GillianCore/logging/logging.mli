@@ -94,13 +94,15 @@ module LogQueryer : sig
   val get_unify_for : ReportId.t -> (ReportId.t * string) option
 end
 
-type report_state
+module ReportState : sig
+  type t
 
-val new_report_state : unit -> report_state
-val clone_report_state : report_state -> report_state
-val global_report_state : report_state
-val activate_report_state : report_state -> unit
-val with_report_state : (unit -> 'a) -> report_state -> 'a
+  val make : unit -> t
+  val clone : t -> t
+  val global_state : t
+  val activate : t -> unit
+  val with_state : (unit -> 'a) -> t -> 'a
+end
 
 (** Initializes the logging module with the specified reporters and initializes
     the reporters *)
