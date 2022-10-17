@@ -590,7 +590,10 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
       ()
   in
   let lab_cmds =
-    List.map (fun cmd -> (annot_while, None, cmd)) (call_cmd :: reassign_vars)
+    ( Annot.(set_expansion_kind (Function loop_fname) annot_while),
+      None,
+      call_cmd )
+    :: List.map (fun cmd -> (annot_while, None, cmd)) reassign_vars
   in
   (lab_cmds, loop_funct)
 

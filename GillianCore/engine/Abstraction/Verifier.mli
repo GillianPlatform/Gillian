@@ -34,7 +34,9 @@ module type S = sig
   val verify_prog : prog_t -> bool -> SourceFiles.t option -> unit
 
   val verify_up_to_procs :
-    prog_t -> SAInterpreter.result_t SAInterpreter.cont_func
+    ?proc_name:string ->
+    prog_t ->
+    SAInterpreter.result_t SAInterpreter.cont_func
 
   val postprocess_files : SourceFiles.t option -> unit
 

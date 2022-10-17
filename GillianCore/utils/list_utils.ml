@@ -153,3 +153,13 @@ let cons_opt x xs =
   match x with
   | None -> xs
   | Some x -> x :: xs
+
+let map_results f l =
+  let rec aux acc = function
+    | [] -> Ok (List.rev acc)
+    | x :: xs -> (
+        match f x with
+        | Ok x -> aux (x :: acc) xs
+        | Error e -> Error e)
+  in
+  aux [] l

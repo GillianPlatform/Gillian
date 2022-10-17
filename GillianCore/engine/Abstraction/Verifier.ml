@@ -37,7 +37,9 @@ module type S = sig
   val verify_prog : prog_t -> bool -> SourceFiles.t option -> unit
 
   val verify_up_to_procs :
-    prog_t -> SAInterpreter.result_t SAInterpreter.cont_func
+    ?proc_name:string ->
+    prog_t ->
+    SAInterpreter.result_t SAInterpreter.cont_func
 
   val postprocess_files : SourceFiles.t option -> unit
 
@@ -1045,7 +1047,7 @@ struct
     Printf.printf "%s\n" msg;
     L.normal (fun m -> m "%s" msg)
 
-  let verify_up_to_procs (prog : prog_t) :
+  let verify_up_to_procs ?(proc_name : string option) (prog : prog_t) :
       SAInterpreter.result_t SAInterpreter.cont_func =
     L.with_normal_phase ~title:"Program verification" (fun () ->
         (* Analyse all procedures and lemmas *)
@@ -1067,8 +1069,22 @@ struct
           get_tests_to_verify prog procs_to_verify lemmas_to_verify
         in
         (* TODO: Verify All procedures. Currently we only verify the first
-               procedure. Assume there is at least one procedure*)
-        let test = List.hd proc_tests in
+               procedure (unless specified).
+               Assume there is at least one procedure*)
+        let test =
+          match proc_name with
+          | Some proc_name -> (
+              match
+                proc_tests |> List.find_opt (fun test -> test.name = proc_name)
+              with
+              | Some test -> test
+              | None ->
+                  Fmt.failwith "Couldn't find test for proc '%s'!" proc_name)
+          | None -> (
+              match proc_tests with
+              | test :: _ -> test
+              | _ -> failwith "No tests found!")
+        in
         SAInterpreter.init_evaluate_proc
           (fun x -> x)
           prog test.name test.params test.pre_state)

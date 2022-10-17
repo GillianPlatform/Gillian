@@ -8,7 +8,7 @@ module Events (Debugger : Debugger.S) = struct
     let type_ = "debugStateUpdate"
 
     module Payload = struct
-      type t = Debugger.Inspect.debug_state [@@deriving yojson]
+      type t = Debugger.Inspect.debug_state_view [@@deriving yojson]
     end
   end
 
@@ -54,7 +54,7 @@ module Commands (Debugger : Debugger.S) = struct
     end
 
     module Result = struct
-      type t = Debugger.Inspect.debug_state [@@deriving yojson]
+      type t = Debugger.Inspect.debug_state_view [@@deriving yojson]
     end
   end
 

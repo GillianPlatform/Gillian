@@ -902,8 +902,20 @@ module BiSpec : sig
   val pp : Format.formatter -> t -> unit
 end
 
+module BranchCase : sig
+  type t =
+    | GuardedGoto of bool
+    | LCmd of int
+    | SpecExec of Flag.t
+    | LAction of Yojson.Safe.t list
+    | LActionFail of int
+  [@@deriving yojson]
+end
+
 module Annot : sig
   (** {b GIL annot}. *)
+  type expansion_kind = NoExpansion | Function of string [@@deriving yojson]
+
   type t [@@deriving yojson]
 
   (** make an annotation *)
@@ -911,7 +923,7 @@ module Annot : sig
     ?origin_loc:Location.t ->
     ?origin_id:int ->
     ?loop_info:string list ->
-    ?lift_hidden:bool ->
+    ?expansion_kind:expansion_kind ->
     unit ->
     t
 
@@ -926,8 +938,10 @@ module Annot : sig
 
   (* Get the origin id *)
   val get_origin_id : t -> int option
-  val hide : t -> t
   val is_hidden : t -> bool
+  val hide : t -> t
+  val get_expansion_kind : t -> expansion_kind
+  val set_expansion_kind : expansion_kind -> t -> t
 end
 
 module Proc : sig

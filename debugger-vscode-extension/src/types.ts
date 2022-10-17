@@ -6,12 +6,18 @@ export type BranchCase = {
   readonly json: any;
 };
 
+type Submap =
+  | readonly ['NoSubmap']
+  | readonly ['Submap', ExecMap]
+  | readonly ['Proc', string];
+
 export type CmdData = {
   readonly id: number;
   readonly originId: number | null;
   readonly display: string;
   readonly unifys: readonly (readonly [number, UnifyKind, UnifyResult])[];
   readonly errors: readonly string[];
+  readonly submap: Submap;
 };
 
 export type ExecMap =
@@ -53,13 +59,19 @@ export type UnifyMap = readonly [
 
 // #endregion
 
-export type DebugState = {
+export type DebugProcState = {
   readonly execMap: ExecMap;
   readonly liftedExecMap: ExecMap | null;
   readonly currentCmdId: number;
   readonly unifys: readonly (readonly [number, UnifyKind, UnifyResult])[];
   readonly procName: string;
 };
+
+export type DebugState = {
+  readonly mainProc : string;
+  readonly currentProc : string;
+  readonly procs: Record<string, DebugProcState>;
+}
 
 export type UnifyStep =
   | readonly ['Assertion', AssertionData]

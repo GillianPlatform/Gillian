@@ -5,6 +5,7 @@ module Reporter = Reporter
 module Loggable = Loggable
 module LogQueryer = LogQueryer
 module ReportId = ReportId
+module ReportState = ReportBuilder.ReportState
 
 let () =
   Printexc.register_printer (function

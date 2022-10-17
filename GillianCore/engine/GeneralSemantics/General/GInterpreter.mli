@@ -1,10 +1,4 @@
-type 'state_vt branch_case' =
-  | GuardedGoto of bool
-  | LCmd of int
-  | SpecExec of Flag.t
-  | LAction of 'state_vt list
-  | LActionFail of int
-[@@deriving yojson]
+type branch_case = BranchCase.t
 
 module type S = sig
   module CallStack : CallStack.S
@@ -14,7 +8,7 @@ module type S = sig
   type store_t
   type state_t
   type state_err_t [@@deriving show]
-  type state_vt [@@deriving show]
+  type state_vt [@@deriving yojson, show]
   type heap_t
 
   module Val : Val.S with type t = vt
@@ -22,7 +16,6 @@ module type S = sig
 
   type invariant_frames = (string * state_t) list
   type err_t = (vt, state_err_t) ExecErr.t [@@deriving show, yojson]
-  type branch_case = state_vt branch_case' [@@deriving yojson]
   type branch_path = branch_case list [@@deriving yojson]
 
   type cconf_t =

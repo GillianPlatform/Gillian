@@ -50,6 +50,7 @@ and pp fmt stmt =
 and pp_head fmt stmt =
   match get stmt with
   | If (e, _, _) -> Format.fprintf fmt "if (%a)" WExpr.pp e
+  | While (e, _) -> Format.fprintf fmt "while (%a)" WExpr.pp e
   | _ -> pp fmt stmt
 
 let is_while s =

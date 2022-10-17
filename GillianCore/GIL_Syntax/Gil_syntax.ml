@@ -3,6 +3,7 @@ module Annot = Annot
 module Asrt = Asrt
 module BinOp = BinOp
 module BiSpec = BiSpec
+module BranchCase = BranchCase
 module Cmd = Cmd
 module Constant = Constant
 module Expr = Expr
