@@ -4,7 +4,7 @@ module Literal = Gillian.Gil_syntax.Literal
 module GEnv = GEnv.Concrete
 module Expr = Gillian.Gil_syntax.Expr
 
-type genv = Genv2.t
+type init_data = unit
 type vt = Values.t
 type st = Subst.t
 type err_t = unit
@@ -17,7 +17,7 @@ let empty = { mem = Mem.empty; genv = GEnv.empty }
 
 type action_ret = ASucc of (t * vt list) | AFail of err_t list
 
-let init () = empty
+let init _ = empty
 
 (** No need to copy immutable data *)
 let copy x = x

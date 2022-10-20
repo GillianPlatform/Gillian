@@ -1,6 +1,7 @@
 module type S = sig
-  (** Type of the static global environment, if one needs to give context *)
-  type genv
+  (** Type of data that is given the first time memory is created.
+      Useful when there's global context to know about like a type-system *)
+  type init_data
 
   (** Type of GIL values *)
   type vt = SVal.M.t
@@ -19,7 +20,9 @@ module type S = sig
     | AFail of err_t list
 
   (** Initialisation *)
-  val init : unit -> t
+  val init : init_data -> t
+
+  val clear : t -> t
 
   (** Execute action *)
   val execute_action :
@@ -75,7 +78,7 @@ module type S = sig
 end
 
 module Dummy : S = struct
-  type genv = unit
+  type init_data = unit
   type vt = SVal.M.t
   type st = SVal.SESubst.t
   type c_fix_t = unit
@@ -87,6 +90,7 @@ module Dummy : S = struct
     | AFail of err_t list
 
   let init () = ()
+  let clear () = ()
 
   let execute_action ?unification:_ _ _ _ _ _ =
     failwith "Please implement SMemory"

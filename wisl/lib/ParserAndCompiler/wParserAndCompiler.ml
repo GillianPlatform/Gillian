@@ -1,7 +1,7 @@
 open Lexing
 open WLexer
 
-type genv = unit
+type init_data = unit
 type err = unit
 type tl_ast = WProg.t
 
@@ -34,7 +34,12 @@ let create_compilation_result path prog wprog =
   let source_files = SourceFiles.make () in
   let () = SourceFiles.add_source_file source_files ~path in
   let gil_path = Filename.chop_extension path ^ ".gil" in
-  { gil_progs = [ (gil_path, prog) ]; source_files; tl_ast = wprog; genv = () }
+  {
+    gil_progs = [ (gil_path, prog) ];
+    source_files;
+    tl_ast = wprog;
+    init_data = ();
+  }
 
 let parse_and_compile_files files =
   let f files =

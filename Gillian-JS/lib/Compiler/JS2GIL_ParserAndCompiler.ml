@@ -22,7 +22,7 @@ module TargetLangOptions = struct
     Javert_utils.Js_config.js2jsil_harnessing := harness
 end
 
-type genv = unit
+type init_data = unit
 type err = JSParserErr of JS_Parser.Error.t | JS2GILErr of string
 type tl_ast = JavaScriptSource of JS_Parser.Syntax.exp | JsilSource
 
@@ -41,7 +41,7 @@ let create_compilation_result path prog tl_prog =
     gil_progs = [ (gil_path, prog) ];
     source_files;
     tl_ast = tl_prog;
-    genv = ();
+    init_data = ();
   }
 
 let parse_and_compile_js path =

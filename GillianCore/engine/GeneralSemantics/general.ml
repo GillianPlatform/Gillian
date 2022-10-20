@@ -7,4 +7,4 @@ module State = State
 module External = External
 module GInterpreter = GInterpreter
 module ExecErr = ExecErr
-module Global_env = Global_env
+module Init_data = Init_data

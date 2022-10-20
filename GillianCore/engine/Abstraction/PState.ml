@@ -9,10 +9,19 @@ module type S = sig
   type preds_t
   type abs_t = string * vt list
 
-  val initialise :
-    state_t -> preds_t -> UP.preds_tbl_t option -> variants_t -> t
-
   val expose : t -> state_t * preds_t * UP.preds_tbl_t * variants_t
+
+  val make_p :
+    preds:UP.preds_tbl_t ->
+    init_data:init_data ->
+    store:store_t ->
+    pfs:PFS.t ->
+    gamma:TypEnv.t ->
+    spec_vars:SS.t ->
+    unit ->
+    t
+
+  val init_with_pred_table : UP.preds_tbl_t -> init_data -> t
 
   (** Get preds of given symbolic state *)
   val get_preds : t -> preds_t
@@ -45,11 +54,13 @@ module Make
      and type state_t = State.t
      and type preds_t = Preds.t
      and type heap_t = State.heap_t
-     and type m_err_t = State.m_err_t = struct
+     and type m_err_t = State.m_err_t
+     and type init_data = State.init_data = struct
   open Containers
   open Literal
   module L = Logging
 
+  type init_data = State.init_data
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type t = State.t * Preds.t * UP.preds_tbl_t * variants_t
   type vt = Val.t [@@deriving yojson, show]
@@ -80,42 +91,29 @@ module Make
   type action_ret = ASucc of (t * vt list) list | AFail of err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
 
-  let init ?(preds : UP.preds_tbl_t option) ?(variants : variants_t option) () =
+  let init_with_pred_table pred_defs init_data =
+    let empty_variants : variants_t = Hashtbl.create 1 in
+    (State.init init_data, Preds.init [], pred_defs, empty_variants)
+
+  let init init_data =
     let empty_pred_defs : UP.preds_tbl_t = UP.init_pred_defs () in
     let empty_variants : variants_t = Hashtbl.create 1 in
-    let new_pred_defs : UP.preds_tbl_t =
-      Option.value ~default:empty_pred_defs preds
-    in
-    let new_variants : variants_t =
-      Option.value ~default:empty_variants variants
-    in
-    (State.init (), Preds.init [], new_pred_defs, new_variants)
+    (State.init init_data, Preds.init [], empty_pred_defs, empty_variants)
 
-  let struct_init
-      ?(preds : UP.preds_tbl_t option)
-      ?(variants : variants_t option)
-      (store : store_t)
-      (pfs : PFS.t)
-      (gamma : TypEnv.t)
-      (svars : SS.t) : t =
-    let empty_pred_defs : UP.preds_tbl_t = UP.init_pred_defs () in
-    let empty_variants : variants_t = Hashtbl.create 1 in
-    let new_pred_defs : UP.preds_tbl_t =
-      Option.value ~default:empty_pred_defs preds
-    in
-    let new_variants : variants_t =
-      Option.value ~default:empty_variants variants
-    in
-    let state = State.struct_init store pfs gamma svars in
-    (state, Preds.init [], new_pred_defs, new_variants)
+  let make_p
+      ~(preds : UP.preds_tbl_t)
+      ~(init_data : init_data)
+      ~(store : store_t)
+      ~(pfs : PFS.t)
+      ~(gamma : TypEnv.t)
+      ~(spec_vars : SS.t)
+      () : t =
+    let state = State.make_s ~init_data ~store ~pfs ~gamma ~spec_vars in
+    let variants = Hashtbl.create 1 in
+    (state, Preds.init [], preds, variants)
 
-  let initialise
-      (state : State.t)
-      (preds : Preds.t)
-      (pred_defs : UP.preds_tbl_t option)
-      (variants : variants_t) : t =
-    let pred_defs = Option.value ~default:(UP.init_pred_defs ()) pred_defs in
-    (state, preds, pred_defs, variants)
+  let make_s ~init_data:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ : t =
+    failwith "Calling make_s on a PState"
 
   let expose state = state
 

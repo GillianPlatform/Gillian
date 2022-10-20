@@ -3,7 +3,7 @@ open Engine
 open Gil_syntax
 
 module type S = sig
-  type genv
+  type init_data
 
   (** Type of GIL values *)
   type vt = SVal.M.t
@@ -20,7 +20,9 @@ module type S = sig
   type action_ret = Success of (t * vt list) | Failure of err_t
 
   (** Initialisation *)
-  val init : unit -> t
+  val init : init_data -> t
+
+  val clear : t -> t
 
   (** Execute action *)
   val execute_action :
@@ -63,8 +65,8 @@ module type S = sig
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
 end
 
-module Lift (MSM : S) : SMemory.S with type t = MSM.t and type genv = MSM.genv =
-struct
+module Lift (MSM : S) :
+  SMemory.S with type t = MSM.t and type init_data = MSM.init_data = struct
   include MSM
 
   let assertions ?to_keep t =

@@ -11,7 +11,7 @@ module TypEnv = Gillian.Symbolic.TypEnv
 open Gillian.Logic
 
 module M = struct
-  type genv = unit
+  type init_data = unit
   type vt = SVal.t [@@deriving yojson]
 
   (** Type of JSIL general states *)
@@ -118,6 +118,7 @@ module M = struct
   let get_print_info = SHeap.get_print_info
   let copy (heap : t) : t = SHeap.copy heap
   let init () : t = SHeap.init ()
+  let clear (_ : t) = init () (* We don't maintain any context *)
 
   let get_loc_name pfs gamma =
     Gillian.Logic.FOSolver.resolve_loc_name ~pfs ~gamma

@@ -29,18 +29,7 @@ module type S = sig
   type action_ret = ASucc of (t * vt list) list | AFail of err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
-
-  (** Initialisation *)
-  val init : ?preds:UP.preds_tbl_t -> ?variants:variants_t -> unit -> t
-
-  val struct_init :
-    ?preds:UP.preds_tbl_t ->
-    ?variants:variants_t ->
-    store_t ->
-    PFS.t ->
-    TypEnv.t ->
-    Containers.SS.t ->
-    t
+  type init_data
 
   val execute_action : ?unification:bool -> string -> t -> vt list -> action_ret
   val ga_to_setter : string -> string
@@ -134,7 +123,6 @@ module type S = sig
   val unify_invariant :
     UP.prog -> bool -> t -> Asrt.t -> string list -> (t * t) list
 
-  val clear_resource : t -> t
   val frame_on : t -> (string * t) list -> string list -> t list
 
   val run_spec :

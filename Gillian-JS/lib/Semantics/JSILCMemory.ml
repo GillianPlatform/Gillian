@@ -2,8 +2,8 @@ open Gillian.Concrete
 open Gillian.Gil_syntax
 open Javert_utils
 
-module M : Memory_S with type genv = unit = struct
-  type genv = unit
+module M : Memory_S with type init_data = unit = struct
+  type init_data = unit
   type vt = Values.t
 
   (** Type of JSIL general states *)

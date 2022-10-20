@@ -1,5 +1,5 @@
 module type S = sig
-  type genv
+  type init_data
 
   (** Type of GIL values *)
   type vt = CVal.M.t
@@ -16,7 +16,7 @@ module type S = sig
   type action_ret = ASucc of (t * vt list) | AFail of err_t list
 
   (** Initialisation *)
-  val init : unit -> t
+  val init : init_data -> t
 
   (** Execute action *)
   val execute_action : string -> t -> vt list -> action_ret

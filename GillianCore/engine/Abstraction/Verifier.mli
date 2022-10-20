@@ -31,17 +31,24 @@ module type S = sig
 
   val start_time : float ref
   val reset : unit -> unit
-  val verify_prog : prog_t -> bool -> SourceFiles.t option -> unit
+
+  val verify_prog :
+    init_data:SPState.init_data ->
+    prog_t ->
+    bool ->
+    SourceFiles.t option ->
+    unit
 
   val verify_up_to_procs :
     ?proc_name:string ->
+    init_data:SPState.init_data ->
     prog_t ->
     SAInterpreter.result_t SAInterpreter.cont_func
 
   val postprocess_files : SourceFiles.t option -> unit
 
   module Debug : sig
-    val get_tests_for_prog : prog_t -> proc_tests
+    val get_tests_for_prog : init_data:SPState.init_data -> prog_t -> proc_tests
 
     val analyse_result :
       t -> Logging.ReportId.t -> SAInterpreter.result_t -> bool
@@ -58,6 +65,12 @@ module Make
                   and type st = SState.st
                   and type state_t = SState.t
                   and type store_t = SState.store_t
-                  and type preds_t = Preds.SPreds.t)
+                  and type preds_t = Preds.SPreds.t
+                  and type init_data = SState.init_data)
     (External : External.S) :
-  S with type heap_t = SPState.heap_t and type m_err = SPState.m_err_t
+  S
+    with type heap_t = SPState.heap_t
+     and type m_err = SPState.m_err_t
+     and type state = SPState.t
+     and type st = SPState.st
+     and module SPState = SPState

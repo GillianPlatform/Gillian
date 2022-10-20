@@ -1,4 +1,4 @@
-include Gillian.Monadic.MonadicSMemory.S with type genv = Genv2.t
+include Gillian.Monadic.MonadicSMemory.S with type init_data = unit
 
 module Lift : sig
   open Debugger.DebuggerTypes

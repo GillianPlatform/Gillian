@@ -6,6 +6,16 @@ module SSubst = SVal.SESubst
 module type S = sig
   include State.S
 
+  val make_s :
+    init_data:init_data ->
+    store:store_t ->
+    pfs:PFS.t ->
+    gamma:TypEnv.t ->
+    spec_vars:SS.t ->
+    t
+
+  val init : init_data -> t
+  val clear_resource : t -> t
   val get_typ_env : t -> TypEnv.t
   val get_pfs : t -> PFS.t
   val get_lvars_for_exact : t -> Var.Set.t
@@ -24,7 +34,8 @@ module Make (SMemory : SMemory.S) :
      and type vt = SVal.M.t
      and type store_t = SStore.t
      and type heap_t = SMemory.t
-     and type m_err_t = SMemory.err_t = struct
+     and type m_err_t = SMemory.err_t
+     and type init_data = SMemory.init_data = struct
   type vt = SVal.M.t [@@deriving yojson, show]
   type st = SVal.M.et
   type heap_t = SMemory.t [@@deriving yojson]
@@ -32,6 +43,7 @@ module Make (SMemory : SMemory.S) :
   type m_err_t = SMemory.err_t [@@deriving yojson]
   type t = heap_t * store_t * PFS.t * TypEnv.t * SS.t [@@deriving yojson]
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
+  type init_data = SMemory.init_data
 
   type fix_t =
     | MFix of SMemory.c_fix_t
@@ -155,19 +167,20 @@ module Make (SMemory : SMemory.S) :
       (TypEnv.pp_by_need (List.fold_left SS.union SS.empty [ pvars; lvars ]))
       gamma
 
-  let init ?(preds : UP.preds_tbl_t option) ?(variants : variants_t option) () =
-    let _, _ = (preds, variants) in
-    (SMemory.init (), SStore.init [], PFS.init (), TypEnv.init (), SS.empty)
+  let init init_data =
+    ( SMemory.init init_data,
+      SStore.init [],
+      PFS.init (),
+      TypEnv.init (),
+      SS.empty )
 
-  let struct_init
-      ?(preds : UP.preds_tbl_t option)
-      ?(variants : variants_t option)
-      (store : SStore.t)
-      (pfs : PFS.t)
-      (gamma : TypEnv.t)
-      (svars : SS.t) : t =
-    let _, _ = (preds, variants) in
-    (SMemory.init (), store, pfs, gamma, svars)
+  let make_s
+      ~(init_data : init_data)
+      ~(store : SStore.t)
+      ~(pfs : PFS.t)
+      ~(gamma : TypEnv.t)
+      ~(spec_vars : SS.t) : t =
+    (SMemory.init init_data, store, pfs, gamma, spec_vars)
 
   let execute_action
       ?(unification = false)
@@ -499,8 +512,9 @@ module Make (SMemory : SMemory.S) :
     raise (Failure "ERROR: unify_invariant called for pure symbolic execution")
 
   let clear_resource (state : t) : t =
-    let _, store, pfs, gamma, svars = state in
-    (SMemory.init (), store, pfs, gamma, svars)
+    let memory, store, pfs, gamma, svars = state in
+
+    (SMemory.clear memory, store, pfs, gamma, svars)
 
   let frame_on _ _ _ =
     raise (Failure "ERROR: framing called for symbolic execution")

@@ -112,7 +112,8 @@ let trans_lemmas lemmas path internal_file =
   in
   lemmas'
 
-let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
+let parse_eprog_from_file ~(init_data_parse : string -> 'a) (path : string) :
+    (Annot.t, string) Prog.t * 'a =
   let f path =
     (* Check that the file is of a valid type *)
     let extension = Filename.extension path in
@@ -132,6 +133,7 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
         Fmt.epr "In file at path: %s\n" path;
         raise exn
     in
+    let genv = init_data_parse "" in
     let () = close_in in_channel in
 
     (* Correctly label components that have @internal and/or @nopath directives *)
@@ -140,7 +142,7 @@ let parse_eprog_from_file (path : string) : (Annot.t, string) Prog.t =
     let preds = trans_preds prog.preds path internal_file in
     let lemmas = trans_lemmas prog.lemmas path internal_file in
     Parser_state.reset ();
-    { prog with procs; preds; lemmas }
+    ({ prog with procs; preds; lemmas }, genv)
   in
   L.with_normal_phase ~title:"Program parsing" (fun () -> f path)
 
@@ -173,7 +175,8 @@ let fetch_imported_prog path other_imports : (Annot.t, string) Prog.t =
     let file = resolve_path path in
     let extension = Filename.extension file in
     let prog =
-      if String.equal extension ".gil" then parse_eprog_from_file file
+      if String.equal extension ".gil" then
+        fst @@ parse_eprog_from_file ~init_data_parse:(fun _ -> ()) file
       else
         match List.assoc_opt (remove_dot extension) other_imports with
         | None -> failwith (Printf.sprintf "Cannot import file \"%s\"" file)

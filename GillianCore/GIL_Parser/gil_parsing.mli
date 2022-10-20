@@ -1,5 +1,6 @@
-(** Takes a path to a file and returns the parsed GIL program. *)
-val parse_eprog_from_file : string -> (Annot.t, string) Prog.t
+(** Takes a path to a file and returns the parsed GIL program with its global environment. *)
+val parse_eprog_from_file :
+  init_data_parse:(string -> 'a) -> string -> (Annot.t, string) Prog.t * 'a
 
 (** Takes a string containing a GIL program and parses it. *)
 val parse_eprog_from_string : string -> (Annot.t, string) Prog.t

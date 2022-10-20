@@ -1,6 +1,6 @@
 module CLI =
   Gillian.CommandLine.Make
-    (Gillian.General.Global_env.Dummy)
+    (Gillian.General.Init_data.Dummy)
     (WSemantics.WislCMemory)
     (WSemantics.WislSMemory)
     (Gillian.General.External.Dummy)

@@ -34,17 +34,24 @@ module type S = sig
 
   val start_time : float ref
   val reset : unit -> unit
-  val verify_prog : prog_t -> bool -> SourceFiles.t option -> unit
+
+  val verify_prog :
+    init_data:SPState.init_data ->
+    prog_t ->
+    bool ->
+    SourceFiles.t option ->
+    unit
 
   val verify_up_to_procs :
     ?proc_name:string ->
+    init_data:SPState.init_data ->
     prog_t ->
     SAInterpreter.result_t SAInterpreter.cont_func
 
   val postprocess_files : SourceFiles.t option -> unit
 
   module Debug : sig
-    val get_tests_for_prog : prog_t -> proc_tests
+    val get_tests_for_prog : init_data:SPState.init_data -> prog_t -> proc_tests
 
     val analyse_result :
       t -> Logging.ReportId.t -> SAInterpreter.result_t -> bool
@@ -61,11 +68,13 @@ module Make
                   and type st = SState.st
                   and type state_t = SState.t
                   and type store_t = SState.store_t
-                  and type preds_t = Preds.SPreds.t)
+                  and type preds_t = Preds.SPreds.t
+                  and type init_data = SState.init_data)
     (External : External.S) =
 struct
   module L = Logging
   module SSubst = SVal.SESubst
+  module SPState = SPState
 
   module SAInterpreter =
     GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SPState) (External)
@@ -76,8 +85,6 @@ struct
   type state = SPState.t
   type heap_t = SPState.heap_t
   type m_err = SPState.m_err_t
-
-  module SPState = SPState
 
   module SUnifier =
     Unifier.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
@@ -121,6 +128,7 @@ struct
         corresponding logical variables it hides. *)
     let add_hides
         ~prog
+        ~init_data
         ~pred_ins
         ~preds
         ~pred_name
@@ -150,7 +158,7 @@ struct
       in
       let a, _ = def in
       let* state =
-        match Normaliser.normalise_assertion ~pred_defs:preds a with
+        match Normaliser.normalise_assertion ~init_data ~pred_defs:preds a with
         | Ok [ (state, _) ] -> Ok state
         | Ok _ ->
             Error
@@ -242,6 +250,7 @@ struct
     (** Same as add_hides, but fails in case of error *)
     let add_hides_exn
         ~prog
+        ~init_data
         ~pred_ins
         ~preds
         ~pred_name
@@ -249,14 +258,19 @@ struct
         ~known_params
         pred_def =
       match
-        add_hides ~prog ~pred_ins ~preds ~pred_name ~subst_params ~known_params
-          pred_def
+        add_hides ~prog ~init_data ~pred_ins ~preds ~pred_name ~subst_params
+          ~known_params pred_def
       with
       | Ok x -> x
       | Error msg -> failwith msg
 
     (** For a given predicate, returns a new predicate where the hides have been derived *)
-    let derive_predicate_hiding ~preds ~prog ~pred_ins (pred : Pred.t) =
+    let derive_predicate_hiding
+        ~preds
+        ~prog
+        ~init_data
+        ~pred_ins
+        (pred : Pred.t) =
       let module KB = UP.KB in
       L.verbose (fun fmt -> fmt "Examinining predicate: %s" pred.pred_name);
       let pred_params = pred.pred_params in
@@ -272,8 +286,8 @@ struct
       in
       let new_defs =
         List.map
-          (add_hides_exn ~prog ~pred_ins ~preds ~pred_name:pred.pred_name
-             ~subst_params ~known_params)
+          (add_hides_exn ~prog ~init_data ~pred_ins ~preds
+             ~pred_name:pred.pred_name ~subst_params ~known_params)
           defs
       in
       { pred with pred_definitions = new_defs }
@@ -281,7 +295,8 @@ struct
     (** Given a program and its unification plans, modifies the program in place
         to add the hides to every predicate definition. *)
     let derive_predicates_hiding
-        (prog : prog_t)
+        ~(prog : prog_t)
+        ~(init_data : SPState.init_data)
         (preds : (string, UP.pred) Hashtbl.t) : unit =
       if not !Config.Verification.exact then ()
       else
@@ -313,12 +328,14 @@ struct
                 {
                   up_pred with
                   pred =
-                    derive_predicate_hiding ~preds ~prog ~pred_ins up_pred.pred;
+                    derive_predicate_hiding ~preds ~prog ~init_data ~pred_ins
+                      up_pred.pred;
                 })
           preds
   end
 
   let testify
+      ~(init_data : SPState.init_data)
       (func_or_lemma_name : string)
       (preds : (string, UP.pred) Hashtbl.t)
       (pred_ins : (string, int list) Hashtbl.t)
@@ -480,7 +497,7 @@ struct
     try
       (* Step 1 - normalise the precondition *)
       match
-        Normaliser.normalise_assertion ~pred_defs:preds
+        Normaliser.normalise_assertion ~init_data ~pred_defs:preds
           ~pvars:(SS.of_list params) pre
       with
       | Error _ -> [ (None, None) ]
@@ -508,6 +525,7 @@ struct
       [ (None, None) ]
 
   let testify_sspec
+      ~init_data
       (spec_name : string)
       (preds : UP.preds_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
@@ -517,7 +535,7 @@ struct
       (sspec : Spec.st) : (t option * Spec.st option) list =
     let ( let+ ) x f = List.map f x in
     let+ stest, sspec' =
-      testify spec_name preds pred_ins name params id sspec.ss_pre
+      testify ~init_data spec_name preds pred_ins name params id sspec.ss_pre
         sspec.ss_posts sspec.ss_variant None (Some sspec.ss_flag)
         (Spec.label_vars_to_set sspec.ss_label)
         sspec.ss_to_verify
@@ -530,6 +548,7 @@ struct
     (stest, sspec')
 
   let testify_spec
+      ~init_data
       (spec_name : string)
       (preds : UP.preds_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
@@ -557,7 +576,7 @@ struct
         List.fold_left
           (fun (id, tests, sspecs) sspec ->
             let tests_and_specs =
-              testify_sspec spec_name preds pred_ins spec.spec_name
+              testify_sspec ~init_data spec_name preds pred_ins spec.spec_name
                 spec.spec_params id sspec
             in
             let new_tests, new_specs =
@@ -584,6 +603,7 @@ struct
       (tests, new_spec)
 
   let testify_lemma
+      ~init_data
       (preds : UP.preds_tbl_t)
       (pred_ins : (string, int list) Hashtbl.t)
       (lemma : Lemma.t) : t list * Lemma.t =
@@ -593,7 +613,7 @@ struct
                { lemma_hyp; lemma_concs; lemma_spec_variant; lemma_spec_hides } ->
           List.map
             (fun t -> (t, lemma_spec_hides))
-            (testify lemma.lemma_name preds pred_ins lemma.lemma_name
+            (testify ~init_data lemma.lemma_name preds pred_ins lemma.lemma_name
                lemma.lemma_params 0 lemma_hyp lemma_concs lemma_spec_variant
                lemma_spec_hides None None true))
         lemma.lemma_specs
@@ -785,6 +805,7 @@ struct
     print_success_or_failure success;
     success
 
+  (* FIXME: This function name is very bad! *)
   let verify_up_to_procs (prog : UP.prog) (test : t) : UP.prog =
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
     match test.flag with
@@ -906,6 +927,7 @@ struct
       prev_results
 
   let get_tests_to_verify
+      ~init_data
       (prog : prog_t)
       (pnames_to_verify : SS.t)
       (lnames_to_verify : SS.t) : UP.prog * t list * t list =
@@ -917,7 +939,9 @@ struct
           UP.pp_up_err_t e;
         Fmt.failwith "Creation of unification plans for predicates failed."
     | Ok preds -> (
-        let () = Hides_derivations.derive_predicates_hiding prog preds in
+        let () =
+          Hides_derivations.derive_predicates_hiding ~init_data ~prog preds
+        in
 
         let preds_with_hiding = Hashtbl.create 1 in
         let () =
@@ -953,7 +977,7 @@ struct
           List.concat_map
             (fun (spec : Spec.t) ->
               let tests, new_spec =
-                testify_spec spec.spec_name preds pred_ins spec
+                testify_spec ~init_data spec.spec_name preds pred_ins spec
               in
               let proc = Prog.get_proc_exn prog spec.spec_name in
               Hashtbl.replace prog.procs proc.proc_name
@@ -981,7 +1005,9 @@ struct
         let tests' : t list =
           List.concat_map
             (fun lemma ->
-              let tests, new_lemma = testify_lemma preds pred_ins lemma in
+              let tests, new_lemma =
+                testify_lemma ~init_data preds pred_ins lemma
+              in
               Hashtbl.replace prog.lemmas lemma.lemma_name new_lemma;
               tests)
             lemmas_to_verify
@@ -1020,12 +1046,13 @@ struct
             (prog', tests', tests))
 
   let verify_procs
+      ~(init_data : SPState.init_data)
       ?(prev_results : VerificationResults.t option)
       (prog : prog_t)
       (pnames_to_verify : SS.t)
       (lnames_to_verify : SS.t) : unit =
     let prog', tests', tests =
-      get_tests_to_verify prog pnames_to_verify lnames_to_verify
+      get_tests_to_verify ~init_data prog pnames_to_verify lnames_to_verify
     in
     (* STEP 6: Run the symbolic tests *)
     let cur_time = Sys.time () in
@@ -1047,8 +1074,10 @@ struct
     Printf.printf "%s\n" msg;
     L.normal (fun m -> m "%s" msg)
 
-  let verify_up_to_procs ?(proc_name : string option) (prog : prog_t) :
-      SAInterpreter.result_t SAInterpreter.cont_func =
+  let verify_up_to_procs
+      ?(proc_name : string option)
+      ~(init_data : SPState.init_data)
+      (prog : prog_t) : SAInterpreter.result_t SAInterpreter.cont_func =
     L.with_normal_phase ~title:"Program verification" (fun () ->
         (* Analyse all procedures and lemmas *)
         let procs_to_verify =
@@ -1066,7 +1095,7 @@ struct
           else (procs_to_verify, lemmas_to_verify)
         in
         let prog, _, proc_tests =
-          get_tests_to_verify prog procs_to_verify lemmas_to_verify
+          get_tests_to_verify ~init_data prog procs_to_verify lemmas_to_verify
         in
         (* TODO: Verify All procedures. Currently we only verify the first
                procedure (unless specified).
@@ -1098,6 +1127,7 @@ struct
       global_results
 
   let verify_prog
+      ~(init_data : SPState.init_data)
       (prog : prog_t)
       (incremental : bool)
       (source_files : SourceFiles.t option) : unit =
@@ -1144,7 +1174,7 @@ struct
         if !Config.Verification.verify_only_some_of_the_things then
           failwith "Cannot use --incremental and --procs or --lemma together";
         let () =
-          verify_procs ~prev_results:results prog procs_to_verify
+          verify_procs ~init_data ~prev_results:results prog procs_to_verify
             lemmas_to_verify
         in
         let cur_call_graph = SAInterpreter.call_graph in
@@ -1172,7 +1202,9 @@ struct
                 (SS.of_list !Config.Verification.lemmas_to_verify) )
           else (procs_to_verify, lemmas_to_verify)
         in
-        let () = verify_procs prog procs_to_verify lemmas_to_verify in
+        let () =
+          verify_procs ~init_data prog procs_to_verify lemmas_to_verify
+        in
         let call_graph = SAInterpreter.call_graph in
         write_verif_results cur_source_files call_graph ~diff:"" global_results
     in
@@ -1180,7 +1212,7 @@ struct
         f prog incremental source_files)
 
   module Debug = struct
-    let get_tests_for_prog (prog : prog_t) =
+    let get_tests_for_prog ~init_data (prog : prog_t) =
       let open Syntaxes.Option in
       let ipreds = UP.init_preds prog.preds in
       let preds = Result.get_ok ipreds in
@@ -1197,7 +1229,7 @@ struct
         specs
         |> List.filter_map (fun (spec : Spec.t) ->
                let tests, new_spec =
-                 testify_spec spec.spec_name preds pred_ins spec
+                 testify_spec ~init_data spec.spec_name preds pred_ins spec
                in
                if List.length tests > 1 then
                  DL.log (fun m ->

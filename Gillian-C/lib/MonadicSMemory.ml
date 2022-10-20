@@ -13,7 +13,7 @@ module GEnv = GEnv.Symbolic
 
 (* Some utils first *)
 
-type genv = Genv2.t
+type init_data = unit
 
 let resolve_or_create_loc_name (lvar_loc : Expr.t) : string Delayed.t =
   let open Delayed.Syntax in
@@ -504,7 +504,13 @@ let make_branch ~heap ?(rets = []) () = (ref heap, rets)
 
 (* Init *)
 
-let init () = ref { genv = GEnv.empty; mem = Mem.empty }
+let init _ = ref { genv = GEnv.empty; mem = Mem.empty }
+let clear _ = ref { genv = GEnv.empty; mem = Mem.empty }
+
+(* Getters *)
+
+(* Getters *)
+
 let copy h = ref { genv = !h.genv; mem = Mem.copy !h.mem }
 
 (* let subst_spec_vars _ _ = () *)

@@ -1,1 +1,1 @@
-include Gillian.Concrete.Memory_S with type genv = unit
+include Gillian.Concrete.Memory_S with type init_data = unit
