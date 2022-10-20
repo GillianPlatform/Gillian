@@ -1,3 +1,3 @@
-include Gillian.CommandLine.ParserAndCompiler.S with type init_data = unit
+include Gillian.CommandLine.ParserAndCompiler.S
 
 val init_compcert : unit -> unit
