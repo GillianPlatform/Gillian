@@ -23,175 +23,47 @@ end
 module Imports = struct
   open ExecMode
   open Architecture
-  open GEnvConfig
 
   let env_path_var = "GILLIAN_C_RUNTIME_PATH"
 
-  type t = {
-    file : string;
-    arch : Architecture.t list;
-    exec : ExecMode.t list;
-    genv_config : GEnvConfig.t list;
-  }
+  type t = { file : string; arch : Architecture.t list; exec : ExecMode.t list }
 
   (** All imports, should not be used as such, imports should be selected using the [import] function *)
   let all_imports =
     [
       (* Common *)
-      {
-        file = "unops_common.gil";
-        arch = any_arch;
-        exec = all_exec;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "internals.gil";
-        arch = any_arch;
-        exec = all_exec;
-        genv_config = any_genv_config;
-      };
+      { file = "unops_common.gil"; arch = any_arch; exec = all_exec };
+      { file = "internals.gil"; arch = any_arch; exec = all_exec };
       {
         file = "global_environment_common.gil";
         arch = any_arch;
         exec = all_exec;
-        genv_config = any_genv_config;
       };
-      {
-        file = "binops_common.gil";
-        arch = any_arch;
-        exec = all_exec;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "logic_common.gil";
-        arch = any_arch;
-        exec = exec_with_preds;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "string.gil";
-        arch = any_arch;
-        exec = all_exec;
-        genv_config = any_genv_config;
-      };
+      { file = "binops_common.gil"; arch = any_arch; exec = all_exec };
+      { file = "logic_common.gil"; arch = any_arch; exec = exec_with_preds };
+      { file = "string.gil"; arch = any_arch; exec = all_exec };
       (* Arch64 specific *)
-      {
-        file = "stdlib_archi64.gil";
-        arch = a64;
-        exec = all_exec;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "stdlib_archi64_verif.gil";
-        arch = a64;
-        exec = ver_exec;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "stdlib_archi64_non_verif.gil";
-        arch = a64;
-        exec = non_ver_exec;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "global_environment_archi64.gil";
-        arch = a64;
-        exec = all_exec;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "logic_archi64.gil";
-        arch = a64;
-        exec = exec_with_preds;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "binops_archi64_all_exec.gil";
-        arch = a64;
-        exec = all_exec;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "binops_archi64_non_bi.gil";
-        arch = a64;
-        exec = non_bi_exec;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "binops_archi64_bi_exec.gil";
-        arch = a64;
-        exec = bi_exec;
-        genv_config = any_genv_config;
-      };
+      { file = "stdlib_archi64.gil"; arch = a64; exec = all_exec };
+      { file = "stdlib_archi64_verif.gil"; arch = a64; exec = ver_exec };
+      { file = "stdlib_archi64_non_verif.gil"; arch = a64; exec = non_ver_exec };
+      { file = "global_environment_archi64.gil"; arch = a64; exec = all_exec };
+      { file = "logic_archi64.gil"; arch = a64; exec = exec_with_preds };
+      { file = "binops_archi64_all_exec.gil"; arch = a64; exec = all_exec };
+      { file = "binops_archi64_non_bi.gil"; arch = a64; exec = non_bi_exec };
+      { file = "binops_archi64_bi_exec.gil"; arch = a64; exec = bi_exec };
       (* Arch32 specific *)
-      {
-        file = "stdlib_archi32.gil";
-        arch = a32;
-        exec = all_exec;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "stdlib_archi32_verif.gil";
-        arch = a32;
-        exec = ver_exec;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "stdlib_archi32_non_verif.gil";
-        arch = a32;
-        exec = non_ver_exec;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "global_environment_archi32.gil";
-        arch = a32;
-        exec = all_exec;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "logic_archi32.gil";
-        arch = a32;
-        exec = exec_with_preds;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "binops_archi32_all_exec.gil";
-        arch = a32;
-        exec = all_exec;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "binops_archi32_non_bi.gil";
-        arch = a32;
-        exec = non_bi_exec;
-        genv_config = any_genv_config;
-      };
-      {
-        file = "binops_archi32_bi_exec.gil";
-        arch = a32;
-        exec = bi_exec;
-        genv_config = any_genv_config;
-      };
-      (* Global functions *)
-      {
-        file = "genv_allocated_functions.gil";
-        arch = any_arch;
-        exec = all_exec;
-        genv_config = allocated;
-      };
-      {
-        file = "genv_unallocated_functions.gil";
-        arch = any_arch;
-        exec = all_exec;
-        genv_config = unallocated;
-      };
+      { file = "stdlib_archi32.gil"; arch = a32; exec = all_exec };
+      { file = "stdlib_archi32_verif.gil"; arch = a32; exec = ver_exec };
+      { file = "stdlib_archi32_non_verif.gil"; arch = a32; exec = non_ver_exec };
+      { file = "global_environment_archi32.gil"; arch = a32; exec = all_exec };
+      { file = "logic_archi32.gil"; arch = a32; exec = exec_with_preds };
+      { file = "binops_archi32_all_exec.gil"; arch = a32; exec = all_exec };
+      { file = "binops_archi32_non_bi.gil"; arch = a32; exec = non_bi_exec };
+      { file = "binops_archi32_bi_exec.gil"; arch = a32; exec = bi_exec };
     ]
 
-  let imports arch exec_mode genv_config =
-    let select x =
-      List.mem arch x.arch && List.mem exec_mode x.exec
-      && List.mem genv_config x.genv_config
-    in
+  let imports arch exec_mode =
+    let select x = List.mem arch x.arch && List.mem exec_mode x.exec in
     List.map (fun imp -> (imp.file, false)) (List.filter select all_imports)
 end
 
@@ -213,7 +85,6 @@ module Internal_Functions = struct
   let free_list = "i__free_list"
   let not_implemented = "i__not_implemented"
   let get_function_name = "i__get_function_name"
-  let glob_set_fun = "i__glob_set_fun"
   let glob_set_var = "i__glob_set_var"
   let val_of_bool = "i__value_of_bool"
   let bool_of_val = "i__bool_of_value"
@@ -352,17 +223,6 @@ module Internal_Predicates = struct
   let single_get = Prefix.internal_preds ^ "single"
   let long_get = Prefix.internal_preds ^ "long"
   let float_get = Prefix.internal_preds ^ "float"
-
-  (** global_env *)
-  let global_env = Prefix.internal_preds ^ "global_env"
-
-  let glob_fun = Prefix.internal_preds ^ "glob_fun"
-  let glob_var_unallocated = Prefix.internal_preds ^ "glob_var_unallocated"
-
-  let glob_var_unallocated_loc =
-    Prefix.internal_preds ^ "glob_var_unallocated_loc"
-
-  let fun_ptr = Prefix.internal_preds ^ "function_ptr"
 
   (* Arrays *)
 

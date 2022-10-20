@@ -61,9 +61,3 @@ pred i__array_ptr(+ptr: List, +size: Int, +chk: Str, content: List):
 pred i__ptr_add(+ptr: List, +to_add:Int, res: List):
   i__ptr(ptr, #l, #o) *
   (res == {{ #l, #o i+ to_add }});
-
-(* Global environment *)
-
-pred i__function_ptr(+s: Str, p : List):
-  i__ptr_to_0(p, #l) * <genv_symb>(s; #l) *
-  <genv_def>(#l; {{ "function" , _ }});

@@ -8,8 +8,7 @@ module Gil_to_c_lifter = struct
 end
 
 module CLI =
-  Gillian.CommandLine.Make (Gillian.General.Init_data.Dummy) (CMemory) (SMemory)
-    (External.M)
+  Gillian.CommandLine.Make (Global_env) (CMemory) (SMemory) (External.M)
     (ParserAndCompiler)
     (struct
       let runners : Gillian.Bulk.Runner.t list =

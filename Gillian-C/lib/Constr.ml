@@ -25,8 +25,6 @@ module Core = struct
     in
     pred (GMem Hole) [ loc; low; high ] [ perm ]
 
-  let symbol ~symb ~loc = pred (GGenv Symbol) [ Expr.string symb ] [ loc ]
-
   let zeros ~loc ~low ~high ~perm =
     let perm = Expr.string (ValueTranslation.string_of_permission_opt perm) in
     pred (GMem Zeros) [ loc; low; high ] [ perm ]
@@ -63,17 +61,4 @@ module Others = struct
 
   let ptr_add ~ptr ~to_add ~res =
     pred Internal_Predicates.ptr_add [ ptr; to_add; res ]
-
-  let fun_ptr ~ptr ~symb =
-    pred Internal_Predicates.fun_ptr [ Lit (String symb); ptr ]
-
-  let glob_fun ~symb ~fname =
-    pred Internal_Predicates.glob_fun [ Lit (String symb); fname ]
-
-  let glob_var_unallocated ~symb ~vname =
-    pred Internal_Predicates.glob_var_unallocated [ Expr.string symb; vname ]
-
-  let glob_var_unallocated_loc ~symb ~loc ~vname =
-    pred Internal_Predicates.glob_var_unallocated_loc
-      [ Expr.string symb; loc; vname ]
 end

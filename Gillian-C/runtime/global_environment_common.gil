@@ -1,13 +1,5 @@
 #internal
 
-pred i__glob_var_unallocated(+symb, +vname):
-      <genv_symb>(symb; #l) *
-      <genv_def>(#l; {{ "variable", vname }});
-      
-pred i__glob_var_unallocated_loc(+symb, loc, +vname):
-      <genv_symb>(symb; loc) *
-      <genv_def>(loc; {{ "variable", vname }});
-
 proc i__get_function_name(v_ptr) {
          (* The value given should be a pointer *)
          goto [not (typeOf (l-nth (v_ptr, 0i)) = Obj)] fail1 ctn1;
@@ -24,24 +16,10 @@ proc i__get_function_name(v_ptr) {
          return
 };
 
-proc i__glob_set_fun(symb, fname) {
-      ll := [mem_alloc](0i, 1i);
-      l := l-nth(ll, 0i);
-      u := [mem_dropperm](l, 0i, 1i, "Nonempty");
-      u := [genv_setsymbol](symb, l);
-      u := [genv_setdef](l, {{ "function", fname }});
-      ret := null;
-      return
-};
-
-proc i__glob_set_var(symb, vname, size, init_data_list, permission) {
-      ll := [mem_alloc](0i, size);
-      l := l-nth(ll, 0i);
-      u := "i__store_zeros"(l, size);
-      u := "i__store_init_data_list"(l, init_data_list);
-      u := [mem_dropperm](l, 0i, size, permission);
-      u := [genv_setsymbol](symb, l);
-      u := [genv_setdef](l, {{ "variable", vname }});
+proc i__glob_set_var(loc, size, init_data_list, permission) {
+      u := [mem_setHole](loc, 0i, size, permission);
+      u := "i__store_zeros"(loc, size);
+      u := "i__store_init_data_list"(loc, init_data_list);
       ret := null;
       return
 };

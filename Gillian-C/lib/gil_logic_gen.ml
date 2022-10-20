@@ -344,10 +344,9 @@ let trans_sval (sv : CSVal.t) : Asrt.t * Var.t list * Expr.t =
       let eg1, eg2 = (tse se1, tse se2) in
       (tloc eg1 ** tint eg2, [], Expr.EList [ tse se1; tse se2 ])
   | Sfunptr symb ->
-      let lvar = fresh_lvar () in
-      let ptr = Expr.LVar lvar in
-      let pred = Constr.Others.fun_ptr ~ptr ~symb in
-      (pred, [ lvar ], ptr)
+      let loc = Global_env.location_of_symbol symb in
+      let ptr = Expr.EList [ Lit (Loc loc); Expr.zero_i ] in
+      (Asrt.Emp, [], ptr)
 
 (** Returns assertions that are necessary to define the expression,
       the created variable for binding when necessary, and the used expression *)
@@ -485,10 +484,10 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
           | CExpr.SExpr (String symb) -> symb
           | _ -> failwith "Impossible by parser"
         in
-        let locv = gen_loc_var () in
+        let loc = Global_env.location_of_symbol symb in
+        let loc = Expr.Lit (Loc loc) in
         let ofsv = Expr.int 0 in
-        let p = Constr.Core.symbol ~symb ~loc:locv in
-        (p, locv, ofsv)
+        (Asrt.Emp, loc, ofsv)
     | _ ->
         let a_s, _, s_e = trans_expr s in
         let locv = gen_loc_var () in
@@ -550,17 +549,14 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
       in
       ga ** to_assert ** tloc l ** tint o ** malloc_chunk siz
   | ConsExpr (SVal (Sfunptr fname)) ->
-      let l = gen_loc_var () in
-      let o = gen_ofs_var () in
+      let l = Global_env.location_of_symbol fname in
+      let ptr = Expr.EList [ Expr.Lit (Loc l); Expr.zero_i ] in
       let chunk = Chunk.ptr in
-      let ptr = mk_ptr l o in
       let siz = sz (Sfunptr fname) in
       let ga_single =
         CoreP.single ~loc:locv ~ofs:ofsv ~chunk ~sval:ptr ~perm:(Some Freeable)
       in
-      let funptr_pred = Constr.Others.fun_ptr ~ptr ~symb:fname in
-      ga_single ** to_assert ** funptr_pred ** tloc l ** tint o
-      ** malloc_chunk siz
+      ga_single ** to_assert ** malloc_chunk siz
   | ConsExpr _ ->
       Fmt.failwith "Constructor %a is not handled yet" CConstructor.pp c
   | ConsStruct (sname, el) ->
@@ -662,8 +658,7 @@ let rec trans_lcmd ~fname ~ann lcmd =
       `Normal (make_assert ~bindings:vs f @ [ If (ge, gcl1, gcl2) ])
   | Invariant { bindings; assertion } ->
       let asrt = trans_asrt assertion in
-      let genv = Asrt.Pred (CConstants.Internal_Predicates.global_env, []) in
-      `Invariant (SLCmd.Invariant (genv ** asrt, bindings))
+      `Invariant (SLCmd.Invariant (asrt, bindings))
   | SymbExec -> `Normal [ SL SymbExec ]
 
 let trans_asrt_annot da =
@@ -762,14 +757,11 @@ let trans_sspec ~ann fname sspecs =
         let a, (label, exs) = trans_asrt_annot spa in
         (a, Some (label, exs))
   in
-  let genv = Asrt.Pred (CConstants.Internal_Predicates.global_env, []) in
   let ta = trans_asrt ~fname ~ann in
-  let make_post p =
-    if !Config.allocated_functions then ta p ** genv else ta p
-  in
+  let make_post p = if !Config.allocated_functions then ta p else ta p in
   Spec.
     {
-      ss_pre = tap ** ta pre ** genv;
+      ss_pre = tap ** ta pre;
       ss_posts = List.map make_post posts;
       (* FIXME: bring in variant *)
       ss_variant = None;
@@ -782,11 +774,10 @@ let trans_lemma ~ann ~filepath lemma =
   let CLemma.{ name; params; hypothesis; conclusions; proof } = lemma in
   let trans_asrt = trans_asrt ~ann ~fname:name in
   let trans_lcmd = trans_lcmd ~ann ~fname:name in
-  let genv = Asrt.Pred (CConstants.Internal_Predicates.global_env, []) in
   let make_post p =
-    if !Config.allocated_functions then trans_asrt p ** genv else trans_asrt p
+    if !Config.allocated_functions then trans_asrt p else trans_asrt p
   in
-  let lemma_hyp = trans_asrt hypothesis ** genv in
+  let lemma_hyp = trans_asrt hypothesis in
   let lemma_concs = List.map make_post conclusions in
   let lemma_proof =
     Option.map
@@ -886,28 +877,6 @@ let trans_annots clight_prog log_prog filepath =
       log_prog.imports
   in
   { with_only_specs with imports }
-
-let glob_fun_pred symb target =
-  Constr.Others.glob_fun ~symb ~fname:(Expr.Lit (String target))
-
-let make_global_env_pred init_asrts =
-  let def = fold_star init_asrts in
-  Pred.
-    {
-      pred_name = CConstants.Internal_Predicates.global_env;
-      pred_source_path = None;
-      pred_internal = true;
-      pred_num_params = 0;
-      pred_params = [];
-      pred_ins = [];
-      pred_definitions = [ (None, def, []) ];
-      (* FIXME: ADD SUPPORT FOR PURE, ABSTRACT, NOUNFOLD *)
-      pred_facts = [];
-      pred_pure = false;
-      pred_abstract = false;
-      pred_nounfold = false;
-      pred_normalised = false;
-    }
 
 let get_clight_fun clight_prog ident =
   let _, f =
@@ -1195,8 +1164,7 @@ let generate_bispec clight_prog fname ident f =
      The C type will be used to discriminate long/int from pointers *)
   let pred_list = List.map predicate_from_triple triples in
   let prec_without_genv = fold_star pred_list in
-  let genv_pred = Asrt.Pred (CConstants.Internal_Predicates.global_env, []) in
-  let prec = prec_without_genv ** genv_pred in
+  let prec = prec_without_genv in
   BiSpec.
     {
       bispec_name = fname;

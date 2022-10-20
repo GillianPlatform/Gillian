@@ -167,18 +167,14 @@ let rec trans_expr ~fname ~local_env expr =
       ([], res)
   | Eaddrof id ->
       let name = true_name id in
-      let gvar_act = gen_str Prefix.gvar in
+      let symb_loc = Global_env.location_of_symbol name in
       let gvar_val = gen_str Prefix.gvar in
-      let genvlookup = LActions.(str_ac (AGEnv GetSymbol)) in
-      let cmd_act =
-        Cmd.LAction (gvar_act, genvlookup, [ Expr.Lit (Literal.String name) ])
-      in
       let zero = Expr.Lit (Literal.Int Z.zero) in
       let cmd_assign =
-        Cmd.Assignment (gvar_val, Expr.EList [ nth gvar_act 1; zero ])
+        Cmd.Assignment (gvar_val, Expr.EList [ Lit (Loc symb_loc); zero ])
       in
       let res = EList [ nth gvar_val 0; Expr.zero_i ] in
-      ([ cmd_act; cmd_assign ], res)
+      ([ cmd_assign ], res)
 
 let annot_ctx ctx = Annot.make ~loop_info:ctx.loop_stack ()
 
@@ -633,12 +629,6 @@ let trans_function
       proc_spec = None;
     }
 
-let set_global_function symbol target =
-  let gvar = "u" in
-  let fname = Expr.Lit (String Internal_Functions.glob_set_fun) in
-  Cmd.Call
-    (gvar, fname, [ Lit (String symbol); Lit (String target) ], None, None)
-
 let set_global_var symbol target v =
   let symexpr = Expr.Lit (String symbol) in
   let target_expr = Expr.Lit (String target) in
@@ -716,11 +706,13 @@ let sym_name symbol = symbol.name
 let mangle_symbol symbol filepath mangled_syms =
   let filename = Filename.basename (Filename.chop_extension filepath) in
   let mangled_sym = filename ^ "__" ^ symbol in
-  Hashtbl.add mangled_syms symbol mangled_sym;
+  let mangled_loc = Global_env.location_of_symbol mangled_sym in
+  let loc = Global_env.location_of_symbol symbol in
+  Hashtbl.add mangled_syms loc mangled_loc;
   mangled_sym
 
 type compilation_data = {
-  genv_pred_asrts : Asrt.t list;
+  genv_defs : (string * Global_env.def) list;
   genv_init_cmds : string Cmd.t list;
   symbols : symbol list;
 }
@@ -742,7 +734,7 @@ let rec trans_globdefs
   | [] -> ([], [], [], [], [])
   | (id, Gfun (Internal f)) :: r ->
       (* Internally-defined function (has either file or global scope) *)
-      let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
+      let genv_defs, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let original_sym = true_name id in
       let has_global_scope = SS.mem original_sym global_syms in
       let symbol =
@@ -750,19 +742,18 @@ let rec trans_globdefs
         else mangle_symbol original_sym filepath mangled_syms
       in
       let target = symbol in
-      let new_cmd = set_global_function symbol target in
-      let new_asrt = Gil_logic_gen.glob_fun_pred symbol target in
       let new_bi_specs =
         if ExecMode.biabduction_exec exec_mode then
           Gil_logic_gen.generate_bispec clight_prog symbol id f :: bi_specs
         else []
       in
+      let new_def = (symbol, Global_env.FunDef target) in
       let new_syms =
         if has_global_scope then { name = symbol; defined = true } :: syms
         else syms
       in
-      ( new_asrt :: init_asrts,
-        new_cmd :: init_acts,
+      ( new_def :: genv_defs,
+        init_acts,
         new_bi_specs,
         trans_function ~gil_annot ~exec_mode filepath symbol f :: fs,
         new_syms )
@@ -773,47 +764,43 @@ let rec trans_globdefs
       trans_globdefs r
   | (id, Gfun (External f)) :: r when not_implemented f ->
       (* Externally-defined, non-built-in function *)
-      let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
+      let defs, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let symbol = true_name id in
       let new_sym = { name = symbol; defined = false } in
-      (init_asrts, init_acts, bi_specs, fs, new_sym :: syms)
+      (defs, init_acts, bi_specs, fs, new_sym :: syms)
   | (id, Gfun (External f)) :: r ->
       (* Externally-defined, built-in function with existing implementation *)
       let symbol = true_name id in
-      let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
+      let defs, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let target, is_ext_call = intern_impl_of_extern_function f in
       if not is_ext_call then
-        let new_cmd = set_global_function symbol target in
-        let new_asrt = Gil_logic_gen.glob_fun_pred symbol target in
-        (new_asrt :: init_asrts, new_cmd :: init_acts, bi_specs, fs, syms)
-      else (init_asrts, init_acts, bi_specs, fs, syms)
+        let new_def = (symbol, Global_env.FunDef target) in
+        (new_def :: defs, init_acts, bi_specs, fs, syms)
+      else (defs, init_acts, bi_specs, fs, syms)
   | (id, Gvar v) :: r
     when Camlcoq.Z.to_int (init_data_list_size v.gvar_init) == 0 ->
       (* Externally-defined global variable *)
-      let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
+      let defs, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let symbol = true_name id in
       let new_sym = { name = symbol; defined = false } in
-      (init_asrts, init_acts, bi_specs, fs, new_sym :: syms)
+      (defs, init_acts, bi_specs, fs, new_sym :: syms)
   | (id, Gvar v) :: r ->
       (* Internally-defined global variable (has either file or global scope) *)
-      let init_asrts, init_acts, bi_specs, fs, syms = trans_globdefs r in
+      let defs, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let original_sym = true_name id in
       let has_global_scope = SS.mem original_sym global_syms in
       let symbol =
         if has_global_scope then original_sym
         else mangle_symbol original_sym filepath mangled_syms
       in
-      let new_asrt =
-        Constr.Others.glob_var_unallocated ~symb:symbol
-          ~vname:(Expr.string original_sym)
-      in
       let target = symbol in
+      let new_def = (symbol, Global_env.GlobVar target) in
       let new_cmd = set_global_var symbol target v in
       let new_syms =
         if has_global_scope then { name = symbol; defined = true } :: syms
         else syms
       in
-      (new_asrt :: init_asrts, new_cmd :: init_acts, bi_specs, fs, new_syms)
+      (new_def :: defs, new_cmd :: init_acts, bi_specs, fs, new_syms)
 
 let make_init_proc init_cmds =
   let end_cmds =
@@ -846,7 +833,7 @@ let trans_program
     prog =
   let AST.{ prog_defs; prog_public; _ } = prog in
   let global_syms = SS.of_list (List.map true_name prog_public) in
-  let init_asrts, init_acts, bi_specs, procedures, symbols =
+  let genv_defs, init_acts, bi_specs, procedures, symbols =
     trans_globdefs ~clight_prog ~exec_mode ~gil_annot ~global_syms ~filepath
       ~mangled_syms prog_defs
   in
@@ -870,7 +857,7 @@ let trans_program
         procs = make_hashtbl get_proc_name procedures;
         predecessors = Hashtbl.create 1;
       },
-    { genv_pred_asrts = init_asrts; genv_init_cmds = init_acts; symbols } )
+    { genv_defs; genv_init_cmds = init_acts; symbols } )
 
 let annotate prog gil_annots =
   let () =
@@ -904,16 +891,15 @@ let annotate prog gil_annots =
 
 let get_compilation_data_from_only_specs ospecs =
   let cdata_of_ospec_name sname =
-    let init_cmd = set_global_function sname sname in
-    let init_asrt = Gil_logic_gen.glob_fun_pred sname sname in
+    let def = (sname, Global_env.FunDef sname) in
     let symbol = { name = sname; defined = true } in
-    (init_asrt, init_cmd, symbol)
+    (def, symbol)
   in
   List.fold_left
-    (fun (iasrts, icmds, syms) Spec.{ spec_name; _ } ->
-      let a, c, s = cdata_of_ospec_name spec_name in
-      (a :: iasrts, c :: icmds, s :: syms))
-    ([], [], []) ospecs
+    (fun (defs, syms) Spec.{ spec_name; _ } ->
+      let d, s = cdata_of_ospec_name spec_name in
+      (d :: defs, s :: syms))
+    ([], []) ospecs
 
 let trans_program_with_annots
     ~exec_mode
@@ -934,14 +920,14 @@ let trans_program_with_annots
       prog
   in
   (* Onlyspecs are considered to be defined *)
-  let osa, osc, oss =
+  let osd, oss =
     get_compilation_data_from_only_specs gil_annot.Gil_logic_gen.onlyspecs
   in
   let compilation_data =
     {
       symbols = oss @ compilation_data.symbols;
-      genv_pred_asrts = osa @ compilation_data.genv_pred_asrts;
-      genv_init_cmds = osc @ compilation_data.genv_init_cmds;
+      genv_defs = osd @ compilation_data.genv_defs;
+      genv_init_cmds = compilation_data.genv_init_cmds;
     }
   in
   let annotated_prog = annotate non_annotated_prog gil_annot in
