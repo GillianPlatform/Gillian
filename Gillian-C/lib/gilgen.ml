@@ -623,9 +623,9 @@ let trans_function
       proc_spec = None;
     }
 
-let set_global_var symbol target v =
-  let symexpr = Expr.Lit (String symbol) in
-  let target_expr = Expr.Lit (String target) in
+let set_global_var symbol v =
+  let loc = Global_env.location_of_symbol symbol in
+  let loc = Expr.Lit (Loc loc) in
   let sz =
     Expr.Lit
       (Int (ValueTranslation.int_of_z AST.(init_data_list_size v.gvar_init)))
@@ -642,7 +642,7 @@ let set_global_var symbol target v =
   Cmd.Call
     ( "u",
       Lit (String setvar),
-      [ symexpr; target_expr; sz; id_list_expr; perm_string ],
+      [ loc; sz; id_list_expr; perm_string ],
       None,
       None )
 
@@ -787,9 +787,8 @@ let rec trans_globdefs
         if has_global_scope then original_sym
         else mangle_symbol original_sym filepath mangled_syms
       in
-      let target = symbol in
-      let new_def = (symbol, Global_env.GlobVar target) in
-      let new_cmd = set_global_var symbol target v in
+      let new_def = (symbol, Global_env.GlobVar symbol) in
+      let new_cmd = set_global_var symbol v in
       let new_syms =
         if has_global_scope then { name = symbol; defined = true } :: syms
         else syms

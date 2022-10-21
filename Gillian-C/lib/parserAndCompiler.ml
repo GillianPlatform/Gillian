@@ -233,7 +233,7 @@ let mangle_proc proc mangled_syms =
   mangling_visitor#visit_proc () proc
 
 let optimise_calls_in_proc proc genv =
-  let get_fname loc = Global_env.find_function genv loc in
+  let get_fname loc = Global_env.find_function_opt genv loc in
   let call_replacer =
     object
       inherit [_] Gillian.Gil_syntax.Visitors.endo
@@ -247,9 +247,14 @@ let optimise_calls_in_proc proc genv =
               None,
               None )
           when fname = Internal_Functions.get_function_name && Z.(equal z zero)
-          ->
-            let fname = get_fname l in
-            Assignment (x, Lit (String fname))
+          -> (
+            match get_fname l with
+            | Some fname -> Assignment (x, Lit (String fname))
+            | None ->
+                cmd
+                (* Can only happen when hide_undef is true, in which case we safely ignore.
+                   If hide_undef was false, the missing definition would be caught earlier *)
+            )
         | _ -> cmd
     end
   in
@@ -412,8 +417,8 @@ let parse_and_compile_files paths =
     List.sort_uniq
       (fun a b ->
         match (a, b) with
-        | ( Cmd.Call (_, _, Lit (String a) :: _, _, _),
-            Cmd.Call (_, _, Lit (String b) :: _, _, _) ) -> String.compare a b
+        | ( Cmd.Call (_, _, Lit (Loc a) :: _, _, _),
+            Cmd.Call (_, _, Lit (Loc b) :: _, _, _) ) -> String.compare a b
         | _ -> failwith "Wrong init cmd")
       (init_cmds @ genv_init_cmds)
   in

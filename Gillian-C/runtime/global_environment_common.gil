@@ -17,9 +17,9 @@ proc i__get_function_name(v_ptr) {
 };
 
 proc i__glob_set_var(loc, size, init_data_list, permission) {
-      u := [mem_setHole](loc, 0i, size, permission);
-      u := "i__store_zeros"(loc, size);
+      u := [mem_setZeros](loc, 0i, size, "Freeable");
       u := "i__store_init_data_list"(loc, init_data_list);
+      u := [mem_dropperm](loc, 0i, size, permission);
       ret := null;
       return
 };

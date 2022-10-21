@@ -27,8 +27,8 @@ let pp_err fmt = function
   | UseAfterFree -> Fmt.pf fmt "Use After Free"
   | BufferOverrun -> Fmt.pf fmt "Buffer Overrun"
   | InsufficientPermission { required; actual } ->
-      Fmt.pf fmt "Insufficient Permision: Got %a but required %a" Perm.pp
-        required Perm.pp actual
+      Fmt.pf fmt "Insufficient Permision: Got %a but required %a" Perm.pp actual
+        Perm.pp required
   | InvalidAlignment { alignment; offset } ->
       Fmt.pf fmt "Invalid alignment: %d should divide %a" alignment Expr.pp
         offset
@@ -1376,6 +1376,20 @@ let get_freed t =
   match t with
   | Freed -> Ok ()
   | _ -> Error MemoryNotFreed
+
+let allocated_function : t =
+  Tree
+    {
+      bounds = Some (Expr.zero_i, Expr.one_i);
+      root =
+        Some
+          {
+            node = Node.make_owned ~perm:Nonempty ~mem_val:(Undef Totally);
+            span = (Expr.zero_i, Expr.one_i);
+            children = None;
+            last_path = None;
+          };
+    }
 
 let _check_valid_alignment chunk ofs =
   let al = Chunk.align chunk in

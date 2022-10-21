@@ -311,6 +311,10 @@ module Mem = struct
 
   let set_hole = set_simple ~sheap_setter:SHeapTree.set_hole
 
+  let allocate_function { map; _ } loc =
+    let tree = SHeapTree.allocated_function in
+    SMap.add loc tree map |> make_other
+
   let rem_hole =
     rem_simple ~check:(fun last_op loc low high ->
         match last_op with
@@ -388,8 +392,11 @@ module Mem = struct
       (fun _ tree acc -> SS.union (SHeapTree.alocs tree) acc)
       map SS.empty
 
-  let assertions { map; _ } =
-    SMap.fold (fun loc tree acc -> SHeapTree.assertions ~loc tree @ acc) map []
+  let assertions ~exclude { map; _ } =
+    SMap.fold
+      (fun loc tree acc ->
+        if exclude loc then acc else SHeapTree.assertions ~loc tree @ acc)
+      map []
 
   let pp_full ft mem =
     let open Fmt in
@@ -447,16 +454,17 @@ module Mem = struct
       in
       { map; last_op }
 
-  let pp_normal ft mem =
+  let pp_normal ~exclude ft mem =
     let is_first = ref true in
     SMap.iter
       (fun loc tree ->
-        if !is_first then is_first := false else Fmt.pf ft "@\n";
-        Fmt.pf ft "%s -> @[<v 0>%a@]" loc SHeapTree.pp tree)
+        if not (exclude loc) then (
+          if !is_first then is_first := false else Fmt.pf ft "@\n";
+          Fmt.pf ft "%s -> @[<v 0>%a@]" loc SHeapTree.pp tree))
       mem
 
-  let pp fmt { map = t; _ } =
-    if !Config.pp_full_tree then pp_full fmt t else pp_normal fmt t
+  let pp ~exclude fmt { map = t; _ } =
+    if !Config.pp_full_tree then pp_full fmt t else pp_normal ~exclude fmt t
 end
 
 type t = { genv : Global_env.t; mem : Mem.t ref }
@@ -476,8 +484,20 @@ let make_branch ~heap ?(rets = []) () = (heap, rets)
 
 (* Init *)
 
-let init genv = { genv; mem = ref Mem.empty }
-let clear memory = { memory with mem = ref Mem.empty }
+let just_functions genv =
+  if !Config.allocated_functions then
+    PMap.foldi
+      (fun loc def acc ->
+        match def with
+        | Global_env.FunDef _ -> Mem.allocate_function acc loc
+        | GlobVar _ -> acc)
+      genv Mem.empty
+  else Mem.empty
+
+let init genv = { genv; mem = ref (just_functions genv) }
+let clear { genv; _ } = { genv; mem = ref (just_functions genv) }
+
+(* Getters *)
 
 (* Getters *)
 
@@ -829,7 +849,16 @@ let pp_err fmt (e : err_t) =
 
 (* let str_of_err e = Format.asprintf "%a" pp_err e *)
 
-let pp fmt h = Format.fprintf fmt "@[%a@]" Mem.pp !(h.mem)
+let pp fmt h =
+  let exclude loc =
+    try
+      match PMap.find loc h.genv with
+      | Global_env.FunDef _ -> true
+      | _ -> false
+    with Not_found -> false
+  in
+  Format.fprintf fmt "@[%a@]" (Mem.pp ~exclude) !(h.mem)
+
 let pp_by_need (_ : SS.t) fmt h = pp fmt h
 let get_print_info _ _ = (SS.empty, SS.empty)
 
@@ -913,7 +942,14 @@ let lvars heap = Mem.lvars !(heap.mem)
 let alocs heap = Mem.alocs !(heap.mem)
 
 let assertions ?to_keep:_ heap =
-  let mem_asrts = Mem.assertions !(heap.mem) in
+  let exclude loc =
+    try
+      match PMap.find loc heap.genv with
+      | Global_env.FunDef _ -> true
+      | _ -> false
+    with Not_found -> false
+  in
+  let mem_asrts = Mem.assertions ~exclude !(heap.mem) in
   mem_asrts
 
 let mem_constraints _heap = []
