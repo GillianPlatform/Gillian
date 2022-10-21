@@ -862,11 +862,18 @@ struct
         exit 1
 
   let burn_gil ~init_data prog outfile_opt =
-    ignore init_data;
     match outfile_opt with
     | Some outfile ->
         let outc = open_out outfile in
         let fmt = Format.formatter_of_out_channel outc in
+        let () =
+          match init_data with
+          | `Null -> ()
+          | init_data ->
+              Fmt.pf fmt "#begin_init_data@\n%a@\n#end_init_data@\n"
+                (Yojson.Safe.pretty_print ~std:true)
+                init_data
+        in
         let () = Prog.pp_labeled fmt prog in
         close_out outc
     | None -> ()
@@ -881,13 +888,17 @@ struct
         let source_files = progs.source_files in
         (e_prog, progs.init_data, Some source_files, Some progs.tl_ast)
       else
-        let e_prog, init_data =
-          Gil_parsing.parse_eprog_from_file ~init_data_parse:ID.parse
-            (List.hd files)
+        let Gil_parsing.{ labeled_prog; init_data } =
+          Gil_parsing.parse_eprog_from_file (List.hd files)
         in
-        (e_prog, init_data, None, None)
+        let init_data =
+          match ID.of_yojson init_data with
+          | Ok d -> d
+          | Error e -> failwith e
+        in
+        (labeled_prog, init_data, None, None)
     in
-    let () = burn_gil ~init_data e_prog outfile_opt in
+    let () = burn_gil ~init_data:(ID.to_yojson init_data) e_prog outfile_opt in
     (* Prog.perform_syntax_checks e_prog; *)
     let prog =
       Gil_parsing.eprog_to_prog

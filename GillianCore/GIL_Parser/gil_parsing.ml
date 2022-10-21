@@ -7,29 +7,10 @@ module Preprocess_GCmd = PreProcessing_Utils.M (struct
   let successors = Cmd.successors
 end)
 
-(** Used to avoid redundant parsing. *)
-
-(* let cached_progs = Hashtbl.create Config.small_tbl_size *)
-
-(* let cache_gil_prog path prog = Hashtbl.add cached_progs path prog *)
-
-(* let cache_labelled_progs (progs : (string * (Annot.t, string) Prog.t) list) =
-   List.iter
-     (fun (path, prog) ->
-       if not (Hashtbl.mem cached_progs path) then cache_gil_prog path prog)
-     progs *)
-
-(** Used to avoid redundant parsing. *)
-
-(* let cached_progs = Hashtbl.create Config.small_tbl_size *)
-
-(* let cache_gil_prog path prog = Hashtbl.add cached_progs path prog *)
-
-(* let cache_labelled_progs (progs : (string * (Annot.t, string) Prog.t) list) =
-   List.iter
-     (fun (path, prog) ->
-       if not (Hashtbl.mem cached_progs path) then cache_gil_prog path prog)
-     progs *)
+type parsing_result = {
+  labeled_prog : (Annot.t, string) Prog.t;
+  init_data : Yojson.Safe.t;  (** Will be `Null if no [init_data] is parsed *)
+}
 
 let col pos = pos.pos_cnum - pos.pos_bol + 1
 
@@ -63,8 +44,9 @@ let parse_from_string start str =
         (Printf.sprintf "Unkown parsing error while parsing the string:@\n%s"
            str)
 
-let parse_eprog_from_string : string -> (Annot.t, string) Prog.t =
-  parse_from_string GIL_Parser.gmain_target
+let parse_eprog_from_string str : parsing_result =
+  let labeled_prog, init_data = parse_from_string GIL_Parser.gmain_target str in
+  { labeled_prog; init_data }
 
 let trans_procs procs path internal_file =
   let procs' = Hashtbl.create Config.small_tbl_size in
@@ -112,8 +94,7 @@ let trans_lemmas lemmas path internal_file =
   in
   lemmas'
 
-let parse_eprog_from_file ~(init_data_parse : string -> 'a) (path : string) :
-    (Annot.t, string) Prog.t * 'a =
+let parse_eprog_from_file (path : string) : parsing_result =
   let f path =
     (* Check that the file is of a valid type *)
     let extension = Filename.extension path in
@@ -127,13 +108,12 @@ let parse_eprog_from_file ~(init_data_parse : string -> 'a) (path : string) :
     let in_channel = open_in path in
     let lexbuf = Lexing.from_channel in_channel in
     let () = lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = path } in
-    let prog =
+    let prog, init_data =
       try parse GIL_Parser.gmain_target lexbuf
       with exn ->
         Fmt.epr "In file at path: %s\n" path;
         raise exn
     in
-    let genv = init_data_parse "" in
     let () = close_in in_channel in
 
     (* Correctly label components that have @internal and/or @nopath directives *)
@@ -142,7 +122,7 @@ let parse_eprog_from_file ~(init_data_parse : string -> 'a) (path : string) :
     let preds = trans_preds prog.preds path internal_file in
     let lemmas = trans_lemmas prog.lemmas path internal_file in
     Parser_state.reset ();
-    ({ prog with procs; preds; lemmas }, genv)
+    { labeled_prog = { prog with procs; preds; lemmas }; init_data }
   in
   L.with_normal_phase ~title:"Program parsing" (fun () -> f path)
 
@@ -176,7 +156,10 @@ let fetch_imported_prog path other_imports : (Annot.t, string) Prog.t =
     let extension = Filename.extension file in
     let prog =
       if String.equal extension ".gil" then
-        fst @@ parse_eprog_from_file ~init_data_parse:(fun _ -> ()) file
+        let result = parse_eprog_from_file file in
+        match result.init_data with
+        | `Null -> result.labeled_prog
+        | _ -> failwith "imported file had init_data, don't know what to do"
       else
         match List.assoc_opt (remove_dot extension) other_imports with
         | None -> failwith (Printf.sprintf "Cannot import file \"%s\"" file)

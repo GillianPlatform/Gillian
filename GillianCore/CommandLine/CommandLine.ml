@@ -220,13 +220,19 @@ struct
     in
     Term.(term $ common_term)
 
-  let burn_gil ~init_data prog outfile_opt =
+  let burn_gil ~(init_data : Yojson.Safe.t) prog outfile_opt =
     match outfile_opt with
     | Some outfile ->
         let outc = open_out outfile in
         let fmt = Format.formatter_of_out_channel outc in
-        ignore init_data;
-        (* FIXME: actually burn the init_data *)
+        let () =
+          match init_data with
+          | `Null -> ()
+          | init_data ->
+              Fmt.pf fmt "#begin_init_data@\n%a@\n#end_init_data@\n"
+                (Yojson.Safe.pretty_print ~std:true)
+                init_data
+        in
         let () = Prog.pp_labeled fmt prog in
         close_out outc
     | None -> ()
@@ -327,11 +333,18 @@ struct
           Gil_parsing.cache_labelled_progs (List.tl e_progs);
           (snd (List.hd e_progs), init_data))
         else
-          Gil_parsing.parse_eprog_from_file ~init_data_parse:ID.parse
-            (List.hd files)
+          let Gil_parsing.{ labeled_prog; init_data } =
+            Gil_parsing.parse_eprog_from_file (List.hd files)
+          in
+          let init_data =
+            match ID.of_yojson init_data with
+            | Ok d -> d
+            | Error e -> failwith e
+          in
+          (labeled_prog, init_data)
       in
       let () =
-        burn_gil ~init_data:(ID.to_string init_data) e_prog outfile_opt
+        burn_gil ~init_data:(ID.to_yojson init_data) e_prog outfile_opt
       in
       let prog =
         Gil_parsing.eprog_to_prog
@@ -430,13 +443,20 @@ struct
             L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
           in
           let e_prog, init_data =
-            Gil_parsing.parse_eprog_from_file ~init_data_parse:ID.parse
-              (List.hd files)
+            let Gil_parsing.{ labeled_prog; init_data } =
+              Gil_parsing.parse_eprog_from_file (List.hd files)
+            in
+            let init_data =
+              match ID.of_yojson init_data with
+              | Ok d -> d
+              | Error e -> failwith e
+            in
+            (labeled_prog, init_data)
           in
           (e_prog, init_data, None)
       in
       let () =
-        burn_gil ~init_data:(ID.to_string init_data) e_prog outfile_opt
+        burn_gil ~init_data:(ID.to_yojson init_data) e_prog outfile_opt
       in
       let () =
         L.normal (fun m -> m "*** Stage 2: Transforming the program.\n")
@@ -550,13 +570,20 @@ struct
           (e_prog, progs.init_data, Some source_files)
         else
           let e_prog, init_data =
-            Gil_parsing.parse_eprog_from_file ~init_data_parse:ID.parse
-              (List.hd files)
+            let Gil_parsing.{ labeled_prog; init_data } =
+              Gil_parsing.parse_eprog_from_file (List.hd files)
+            in
+            let init_data =
+              match ID.of_yojson init_data with
+              | Ok d -> d
+              | Error e -> failwith e
+            in
+            (labeled_prog, init_data)
           in
           (e_prog, init_data, None)
       in
       let () =
-        burn_gil ~init_data:(ID.to_string init_data) e_prog outfile_opt
+        burn_gil ~init_data:(ID.to_yojson init_data) e_prog outfile_opt
       in
       (* Prog.perform_syntax_checks e_prog; *)
       Fmt.pr "Preprocessing...\n@?";
@@ -657,13 +684,18 @@ struct
           let () =
             L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
           in
-          let e_prog, init_data =
-            Gil_parsing.parse_eprog_from_file ~init_data_parse:ID.parse file
+          let Gil_parsing.{ labeled_prog; init_data } =
+            Gil_parsing.parse_eprog_from_file file
           in
-          (e_prog, init_data, None)
+          let init_data =
+            match ID.of_yojson init_data with
+            | Ok d -> d
+            | Error e -> failwith e
+          in
+          (labeled_prog, init_data, None)
       in
       let () =
-        burn_gil ~init_data:(ID.to_string init_data) e_prog outfile_opt
+        burn_gil ~init_data:(ID.to_yojson init_data) e_prog outfile_opt
       in
       let () =
         L.normal (fun m -> m "*** Stage 2: Transforming the program.@\n")

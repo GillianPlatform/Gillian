@@ -1,13 +1,13 @@
 module type S = sig
-  type t
-
-  val parse : string -> t
-  val to_string : t -> string
+  type t [@@deriving yojson]
 end
 
 module Dummy : S with type t = unit = struct
   type t = unit
 
-  let parse _ = ()
-  let to_string _ = ""
+  let of_yojson = function
+    | `Null -> Ok ()
+    | _ -> Error "Provided init_data but did not implement its parser"
+
+  let to_yojson () = `Null
 end

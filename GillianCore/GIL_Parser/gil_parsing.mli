@@ -1,9 +1,13 @@
+type parsing_result = {
+  labeled_prog : (Annot.t, string) Prog.t;
+  init_data : Yojson.Safe.t;  (** Will be `Null if no [init_data] is parsed *)
+}
+
 (** Takes a path to a file and returns the parsed GIL program with its global environment. *)
-val parse_eprog_from_file :
-  init_data_parse:(string -> 'a) -> string -> (Annot.t, string) Prog.t * 'a
+val parse_eprog_from_file : string -> parsing_result
 
 (** Takes a string containing a GIL program and parses it. *)
-val parse_eprog_from_string : string -> (Annot.t, string) Prog.t
+val parse_eprog_from_string : string -> parsing_result
 
 (** Converts a string-labelled [Prog.t] to an index-labelled [Prog.t],
     resolving the imports in the meantime. The parameter [other_imports] is an

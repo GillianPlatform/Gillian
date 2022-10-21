@@ -3,36 +3,22 @@ type def = FunDef of string | GlobVar of string
 
 let location_of_symbol str = "$l_" ^ str
 
-type t = {
-  symb : (string, string) PMap.t;  (** maps symbols to loc names *)
-  defs : (string, def) PMap.t;  (** maps loc names to definitions *)
-}
+(** maps location to definition *)
+type t = (string, def) PMap.t
 
-let empty = { symb = PMap.empty; defs = PMap.empty }
-
-let add_fundef genv symb loc fdef =
-  let symb = PMap.add symb loc genv.symb in
-  let defs = PMap.add loc (FunDef fdef) genv.defs in
-  { symb; defs }
-
-let add_globvar genv symb loc gvar =
-  let symb = PMap.add symb loc genv.symb in
-  let defs = PMap.add loc (GlobVar gvar) genv.defs in
-  { symb; defs }
-
-let add_def genv symb loc def =
-  let symb = PMap.add symb loc genv.symb in
-  let defs = PMap.add loc def genv.defs in
-  { symb; defs }
+let empty = PMap.empty
+let add_fundef genv loc fdef = PMap.add loc (FunDef fdef) genv
+let add_globvar genv loc gvar = PMap.add loc (GlobVar gvar) genv
+let add_def genv loc def = PMap.add loc def genv
 
 let of_definition_list defs =
   List.fold_left
     (fun genv (symb, def) ->
       let loc = location_of_symbol symb in
-      add_def genv symb loc def)
+      add_def genv loc def)
     empty defs
 
-let find_def genv loc = PMap.find loc genv.defs
+let find_def genv loc = PMap.find loc genv
 
 let serialize_def def =
   let open Gil_syntax in
@@ -43,28 +29,70 @@ let serialize_def def =
   in
   lit
 
-let parse str =
-  str |> String.trim |> String.split_on_char '\n'
-  |> List.map (fun x -> x |> String.trim |> String.split_on_char ',')
-  |> List.fold_left
-       (fun genv quad ->
-         match quad with
-         | [ symbol; loc; "fun"; fun_def ] -> add_fundef genv symbol loc fun_def
-         | [ symbol; loc; "var"; gvar ] -> add_globvar genv symbol loc gvar
-         | _ -> failwith "invalid global environment")
-       empty
+module Serialization = struct
+  module Loc = struct
+    open Gillian.Utils
 
-let to_string genv =
-  let lines =
+    type t = string
+
+    let of_yojson yjs =
+      match yjs with
+      | `String str when Names.is_lloc_name str -> Ok str
+      | _ -> Error ("invalid symbol location: " ^ Yojson.Safe.to_string yjs)
+
+    let to_yojson loc = `String loc
+  end
+
+  type kind = Function [@name "fun"] | Variable [@name "var"]
+
+  let kind_to_yojson kind =
+    match kind with
+    | Function -> `String "fun"
+    | Variable -> `String "var"
+
+  let kind_of_yojson yjs =
+    match yjs with
+    | `String "fun" -> Ok Function
+    | `String "var" -> Ok Variable
+    | _ -> Error ("invalid symbol kind: " ^ Yojson.Safe.to_string yjs)
+
+  type entry = { loc : Loc.t; kind : kind; name : string } [@@deriving yojson]
+
+  let add_entry genv entry =
+    match entry.kind with
+    | Function -> add_fundef genv entry.loc entry.name
+    | Variable -> add_globvar genv entry.loc entry.name
+
+  let of_definition_list (entries : entry list) =
+    List.fold_left add_entry empty entries
+
+  let to_definition_list genv =
     PMap.foldi
-      (fun symb loc acc ->
-        let def = PMap.find loc genv.defs in
-        let kind, def =
+      (fun loc def acc ->
+        let entry =
           match def with
-          | FunDef fdef -> ("fun", fdef)
-          | GlobVar gvar -> ("var", gvar)
+          | FunDef fname -> { loc; kind = Function; name = fname }
+          | GlobVar vname -> { loc; kind = Variable; name = vname }
         in
-        Printf.sprintf "%s,%s,%s,%s" symb loc kind def :: acc)
-      genv.symb []
+        entry :: acc)
+      genv []
+end
+
+let of_yojson json =
+  Result.map Serialization.of_definition_list
+    ([%of_yojson: Serialization.entry list] json)
+
+let to_yojson genv =
+  let open Serialization in
+  to_definition_list genv |> [%to_yojson: Serialization.entry list]
+
+let pp ft genv =
+  let open Fmt in
+  let pp_binding ft (loc, def) =
+    let pp_def ft = function
+      | FunDef fdef -> pf ft "%s (Function)" fdef
+      | GlobVar gvar -> pf ft "%s (Variable)" gvar
+    in
+    pf ft "%s -> %a" loc pp_def def
   in
-  String.concat "\n" lines
+  (Fmt.iter_bindings ~sep:(any "@\n") PMap.iter pp_binding) ft genv

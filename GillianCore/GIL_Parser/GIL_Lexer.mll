@@ -272,7 +272,7 @@ rule read = parse
                            GIL_Parser.INTEGER n }
   | float                { let n = float_of_string (Lexing.lexeme lexbuf) in
                            GIL_Parser.FLOAT n }
-  | '"'                  { read_string (Buffer.create 17) lexbuf }
+  | '"'                  { read_string (Buffer.create 32) lexbuf }
   | loc                  { GIL_Parser.LOC (Lexing.lexeme lexbuf) }
   | aloc                 { GIL_Parser.ALOC (Lexing.lexeme lexbuf) }
   | normalised_aloc      { GIL_Parser.ALOC (Lexing.lexeme lexbuf) }
@@ -280,6 +280,7 @@ rule read = parse
   | "@nopath"            { GIL_Parser.NO_PATH }
   | "@internal"          { GIL_Parser.INTERNAL }
   | "#internal"          { GIL_Parser.INTERNAL_FILE }
+  | "#begin_init_data"   { read_init_data (Buffer.create 1024) lexbuf }
 (* Variables *)
   | identifier           { let candidate = Lexing.lexeme lexbuf in
                            match (Hashtbl.mem keyword_table candidate) with
@@ -293,9 +294,8 @@ rule read = parse
 (* EOF *)
   | eof                  { GIL_Parser.EOF }
   | _                    { raise (Syntax_error ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
-and
-(* Read strings *)
-read_string buf =
+
+and read_string buf =
   parse
   | '"'                  { GIL_Parser.STRING (Buffer.contents buf) }
   | '\\' '/'             { Buffer.add_char buf '/'; read_string buf lexbuf }
@@ -312,11 +312,17 @@ read_string buf =
                          }
   | _                    { raise (Syntax_error ("Illegal string character: " ^ Lexing.lexeme lexbuf)) }
   | eof                  { raise (Syntax_error ("String is not terminated")) }
-and
-(* Read comments *)
-read_comment =
+
+and read_comment =
   parse
   | newline              { new_line lexbuf; read_comment lexbuf }
   | "*)"                 { read lexbuf }
   | eof                  { raise (Syntax_error ("Comment is not terminated")) }
   | _                    { read_comment lexbuf }
+
+and read_init_data buf =
+  parse
+  | newline { new_line lexbuf; Buffer.add_char buf '\n'; read_init_data buf lexbuf }
+  | eof     { raise (Syntax_error ("Init_data is not terminated")) }
+  | "#end_init_data" { GIL_Parser.INIT_DATA (Yojson.Safe.from_string (Buffer.contents buf)) }
+  | _        { Buffer.add_string buf (Lexing.lexeme lexbuf); read_init_data buf lexbuf }
