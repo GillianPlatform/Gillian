@@ -34,8 +34,7 @@ type ac =
   | AGEnv of genv_ac  (** Actions related to the memory *)
   | AMem of mem_ac  (** Actions related to the global environment *)
 
-type mem_ga = Single | Array | Hole | Zeros | Bounds | Freed
-type ga = GMem of mem_ga
+type ga = Single | Array | Hole | Zeros | Bounds | Freed
 
 (** {3 Serialization of actions} *)
 

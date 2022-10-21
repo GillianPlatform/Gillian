@@ -30,40 +30,41 @@ type mem_ac =
 
 type genv_ac = GetDef
 type ac = AGEnv of genv_ac | AMem of mem_ac
-type mem_ga = Single | Array | Hole | Zeros | Bounds | Freed
-type ga = GMem of mem_ga
+type ga = Single | Array | Hole | Zeros | Bounds | Freed
 
 (* Some things about the semantics of these Actions *)
 
 let is_overlapping_asrt _ = false
 
-let mem_ga_to_setter = function
-  | Single -> SetSingle
-  | Array -> SetArray
-  | Hole -> SetHole
-  | Zeros -> SetZeros
-  | Bounds -> SetBounds
-  | Freed -> SetFreed
+let ga_to_setter ga =
+  AMem
+    (match ga with
+    | Single -> SetSingle
+    | Array -> SetArray
+    | Hole -> SetHole
+    | Zeros -> SetZeros
+    | Bounds -> SetBounds
+    | Freed -> SetFreed)
 
-let mem_ga_to_getter = function
-  | Single -> GetSingle
-  | Array -> GetArray
-  | Hole -> GetHole
-  | Zeros -> GetZeros
-  | Bounds -> GetBounds
-  | Freed -> GetFreed
+let ga_to_getter ga =
+  AMem
+    (match ga with
+    | Single -> GetSingle
+    | Array -> GetArray
+    | Hole -> GetHole
+    | Zeros -> GetZeros
+    | Bounds -> GetBounds
+    | Freed -> GetFreed)
 
-let mem_ga_to_deleter = function
-  | Single -> RemSingle
-  | Array -> RemArray
-  | Hole -> RemHole
-  | Zeros -> RemZeros
-  | Bounds -> RemBounds
-  | Freed -> RemFreed
-
-let ga_to_getter (GMem mga) = AMem (mem_ga_to_getter mga)
-let ga_to_setter (GMem mga) = AMem (mem_ga_to_setter mga)
-let ga_to_deleter (GMem mga) = AMem (mem_ga_to_deleter mga)
+let ga_to_deleter ga =
+  AMem
+    (match ga with
+    | Single -> RemSingle
+    | Array -> RemArray
+    | Hole -> RemHole
+    | Zeros -> RemZeros
+    | Bounds -> RemBounds
+    | Freed -> RemFreed)
 
 (* Then serialization and deserialization functions *)
 
@@ -148,29 +149,22 @@ let ac_from_str str =
       AGEnv (genv_ac_from_str ac)
   | _ -> failwith ("Unkown action : " ^ str)
 
-let str_mem_ga = function
-  | Single -> "single"
-  | Array -> "array"
-  | Hole -> "hole"
-  | Zeros -> "zeros"
-  | Bounds -> "bounds"
-  | Freed -> "freed"
+let str_ga = function
+  | Single -> "mem_single"
+  | Array -> "mem_array"
+  | Hole -> "mem_hole"
+  | Zeros -> "mem_zeros"
+  | Bounds -> "mem_bounds"
+  | Freed -> "mem_freed"
 
-let mem_ga_from_str = function
-  | "single" -> Single
-  | "array" -> Array
-  | "bounds" -> Bounds
-  | "zeros" -> Zeros
-  | "hole" -> Hole
-  | "freed" -> Freed
+let ga_from_str = function
+  | "mem_single" -> Single
+  | "mem_array" -> Array
+  | "mem_bounds" -> Bounds
+  | "mem_zeros" -> Zeros
+  | "mem_hole" -> Hole
+  | "mem_freed" -> Freed
   | str -> failwith ("Unkown memory assertion : " ^ str)
-
-let str_ga (GMem mem_ga) = mem_prefix ^ separator_string ^ str_mem_ga mem_ga
-
-let ga_from_str str =
-  match String.split_on_char separator_char str with
-  | [ pref; ga ] when String.equal pref mem_prefix -> GMem (mem_ga_from_str ga)
-  | _ -> failwith ("Unknown GA : " ^ str)
 
 let ga_to_action_str action str = ga_from_str str |> action |> str_ac
 let ga_to_setter_str = ga_to_action_str ga_to_setter

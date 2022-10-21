@@ -974,7 +974,7 @@ let asserts_of_rec_member cenv members id typ =
   let perm_exp =
     Expr.Lit (String (ValueTranslation.string_of_permission Memtype.Freeable))
   in
-  let mem_ga = LActions.str_ga (GMem Single) in
+  let mem_ga = LActions.str_ga Single in
   let ga_asrt sval =
     Asrt.GA
       (mem_ga, [ pvloc; pvoffs ++ fo; pvoffs ++ fo ++ sz ], [ sval; perm_exp ])
