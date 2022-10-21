@@ -16,6 +16,7 @@ end
 
 module Abstraction = struct
   module UP = Engine.UP
+  module Verifier = Engine.Verifier
 end
 
 (* module Test262 = Test262_main *)
