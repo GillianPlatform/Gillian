@@ -33,7 +33,7 @@ proc i__free(ptr) {
    ctc:  u := [mem_free](l-nth(ptr, 0i), l-nth(ptr, 1i) i- 8i, l-nth(ptr, 1i) i+ sz);
    end:  ret := undefined;
          return;
-   die:  fail[free]("Deallocating a pointer of negative size")
+   die:  fail[free]("Deallocating an invalid pointer")
 };
 
 proc i__memmove(ptr1, ptr2, vsz) {
