@@ -889,42 +889,30 @@ struct
               ("lifter_state", state.lifter_state |> Lifter.dump);
             ]
           "Debugger.run");
-    let rec aux ?(launch = false) count branch_case =
-      if count > 20 then failwith "Debugger.run: infinite loop?";
+    let rec aux ?(launch = false) count =
+      if count > 100 then failwith "Debugger.run: infinite loop?";
       (* We need to check if a breakpoint has been hit if run is called
          immediately after launching to prevent missing a breakpoint on the first
          line *)
       if launch && has_hit_breakpoint state then Breakpoint
       else
-        let stop_reason = step_case ?branch_case ~reverse dbg state in
-        match stop_reason with
-        | Step -> aux count None
-        | Breakpoint -> Breakpoint
-        | other_stop_reason -> (
-            if reverse then other_stop_reason
-            else
-              match
-                state.lifter_state
-                |> Lifter.find_unfinished_path ~at_path:branch_path
-              with
-              | None ->
-                  DL.log (fun m ->
-                      m "Debugger.run: map has no unfinished branches");
-                  other_stop_reason
-              | Some (prev_id, branch_case) ->
-                  DL.log (fun m ->
-                      m
-                        ~json:
-                          [
-                            ("prev_id", rid_to_yojson prev_id);
-                            ( "branch_case",
-                              opt_to_yojson branch_case_to_yojson branch_case );
-                          ]
-                        "Debugger.run: found unfinished path");
-                  state |> jump_state_to_id prev_id cfg |> Result.get_ok;
-                  aux (count + 1) branch_case)
+        let unfinished =
+          state.lifter_state |> Lifter.find_unfinished_path ~at_path:branch_path
+        in
+        match unfinished with
+        | None ->
+            DL.log (fun m -> m "Debugger.run: map has no unfinished branches");
+            ReachedEnd
+        | Some (prev_id, branch_case) -> (
+            state |> jump_state_to_id prev_id cfg |> Result.get_ok;
+            let stop_reason = step_case ?branch_case ~reverse dbg state in
+            match stop_reason with
+            | Step -> aux count
+            | Breakpoint -> Breakpoint
+            | other_stop_reason ->
+                if reverse then other_stop_reason else aux (count + 1))
     in
-    aux ~launch 0 None
+    aux ~launch 0
 
   let terminate dbg =
     L.ReportState.(activate global_state);
