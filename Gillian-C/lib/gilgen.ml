@@ -168,13 +168,7 @@ let rec trans_expr ~fname ~local_env expr =
   | Eaddrof id ->
       let name = true_name id in
       let symb_loc = Global_env.location_of_symbol name in
-      let gvar_val = gen_str Prefix.gvar in
-      let zero = Expr.Lit (Literal.Int Z.zero) in
-      let cmd_assign =
-        Cmd.Assignment (gvar_val, Expr.EList [ Lit (Loc symb_loc); zero ])
-      in
-      let res = EList [ nth gvar_val 0; Expr.zero_i ] in
-      ([ cmd_assign ], res)
+      ([], EList [ Lit (Loc symb_loc); Expr.zero_i ])
 
 let annot_ctx ctx = Annot.make ~loop_info:ctx.loop_stack ()
 
