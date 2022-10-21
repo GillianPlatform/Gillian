@@ -75,7 +75,7 @@ module Packaged = struct
   type t = (branch_case, cmd_data) _map
 
   and cmd_data = {
-    id : rid;
+    ids : rid list;
     display : string;
     unifys : unifys;
     errors : string list;

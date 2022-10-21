@@ -12,7 +12,7 @@ type Submap =
   | readonly ['Proc', string];
 
 export type CmdData = {
-  readonly id: number;
+  readonly ids: readonly number[];
   readonly display: string;
   readonly unifys: readonly (readonly [number, UnifyKind, UnifyResult])[];
   readonly errors: readonly string[];

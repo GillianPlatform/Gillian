@@ -58,14 +58,14 @@ const ExecMapView = ({ state }: Props) => {
       }
     })();
     return {
-      id: `${cmdData.id}`,
+      id: `${cmdData.ids[0]}`,
       data: {
         type: 'Cmd',
         cmdData,
-        isCurrentCmd: cmdData.id === currentCmdId,
+        isCurrentCmd: cmdData.ids.includes(currentCmdId),
         isFinal: map[0] === 'FinalCmd',
         jump: () => {
-          jumpToId(cmdData.id);
+          jumpToId(cmdData.ids[0]);
         },
       },
       nexts,

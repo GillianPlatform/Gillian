@@ -238,7 +238,7 @@ struct
         | Proc p -> Proc p
         | Submap map -> Submap (aux map)
       in
-      Packaged.{ id; display; unifys; errors; submap }
+      Packaged.{ ids = [ id ]; display; unifys; errors; submap }
     in
     aux map
 
