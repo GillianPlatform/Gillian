@@ -1,22 +1,15 @@
 module DebuggerTypes = DebuggerTypes
 module DebuggerUtils = DebuggerUtils
 module Gil_to_tl_lifter = Gil_to_tl_lifter
+module ExecMap = ExecMap
 open DebuggerTypes
 
 module type S = sig
   type tl_ast
   type debug_state
 
-  module PackagedBranchCase : sig
-    type t [@@deriving yojson]
-  end
-
   module UnifyMap : sig
     type t [@@deriving yojson]
-  end
-
-  module ExecMap : sig
-    type 'a t [@@deriving yojson]
   end
 
   module Inspect : sig
@@ -35,7 +28,7 @@ module type S = sig
   val step : ?reverse:bool -> debug_state -> stop_reason
 
   val step_specific :
-    PackagedBranchCase.t option ->
+    ExecMap.Packaged.branch_case option ->
     Logging.ReportId.t ->
     debug_state ->
     (stop_reason, string) result
@@ -52,8 +45,10 @@ end
 
 module Make
     (PC : ParserAndCompiler.S)
-    (Verification : Verifier.S)
+    (V : Verifier.S)
     (Lifter : Gil_to_tl_lifter.S
-                with type memory = Verification.SAInterpreter.heap_t
-                 and type memory_error = Verification.SPState.m_err_t
-                 and type tl_ast = PC.tl_ast) : S
+                with type memory = V.SAInterpreter.heap_t
+                 and type memory_error = V.SPState.m_err_t
+                 and type tl_ast = PC.tl_ast
+                 and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t) :
+  S

@@ -910,6 +910,8 @@ module BranchCase : sig
     | LAction of Yojson.Safe.t list
     | LActionFail of int
   [@@deriving yojson]
+
+  type path = t list [@@deriving yojson]
 end
 
 module Annot : sig

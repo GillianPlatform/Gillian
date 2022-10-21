@@ -16,11 +16,12 @@ module Make
     (External : External.S)
     (PC : ParserAndCompiler.S) (Runners : sig
       val runners : Bulk.Runner.t list
-    end)
-    (Gil_to_tl_lifter : Debugger.Gil_to_tl_lifter.S
-                          with type memory = SMemory.t
-                           and type memory_error = SMemory.err_t
-                           and type tl_ast = PC.tl_ast) =
+    end) (Gil_to_tl_lifter : functor (V : Verifier.S) ->
+      Debugger.Gil_to_tl_lifter.S
+        with type memory = SMemory.t
+         and type memory_error = SMemory.err_t
+         and type tl_ast = PC.tl_ast
+         and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t) =
 struct
   module CState = CState.Make (CMemory)
 
@@ -36,6 +37,7 @@ struct
     PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
 
   module Verification = Verifier.Make (SState) (SPState) (External)
+  module Gil_to_tl_lifter = Gil_to_tl_lifter (Verification)
   module Abductor = Abductor.Make (SState) (SPState) (External)
   module Debugger = Debugger.Make (PC) (Verification) (Gil_to_tl_lifter)
   module DebugAdapter = DebugAdapter.Make (Debugger)

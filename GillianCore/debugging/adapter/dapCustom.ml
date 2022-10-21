@@ -1,5 +1,6 @@
 open DebugProtocolEx
 open Debugger.DebuggerTypes
+module ExecMap = Debugger.ExecMap
 module L = Logging
 module DL = Debugger_log
 
@@ -93,7 +94,7 @@ module Commands (Debugger : Debugger.S) = struct
     module Arguments = struct
       type t = {
         prev_id : L.ReportId.t; [@key "prevId"]
-        branch_case : Debugger.PackagedBranchCase.t option; [@key "branchCase"]
+        branch_case : ExecMap.Packaged.branch_case option; [@key "branchCase"]
       }
       [@@deriving yojson]
     end

@@ -5,6 +5,35 @@ module Hashtbl = struct
 
   include Hashtbl
 
+  let map f tbl =
+    let tbl' = create (length tbl) in
+    iter
+      (fun k v ->
+        let k', v' = f k v in
+        add tbl' k' v')
+      tbl;
+    tbl'
+
+  let map_values f tbl = map (fun k v -> (k, f v)) tbl
+
+  let find_map f tbl =
+    let exception Found in
+    let result = ref None in
+    let aux () =
+      Hashtbl.iter
+        (fun k v ->
+          match f k v with
+          | None -> ()
+          | x ->
+              result := x;
+              raise Found)
+        tbl
+    in
+    try
+      aux ();
+      None
+    with Found -> !result
+
   let of_yojson
       (key_of_yojson : Yojson.Safe.t -> ('a, string) result)
       (val_of_yojson : Yojson.Safe.t -> ('b, string) result)
