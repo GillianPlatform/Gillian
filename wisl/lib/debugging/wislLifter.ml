@@ -37,6 +37,8 @@ module Make (Verification : Engine.Verifier.S) = struct
 
   let get_root_id { gil_state } = GilLifter.get_root_id gil_state
   let path_of_id id { gil_state } = GilLifter.path_of_id id gil_state
+  let next_steps id { gil_state } = GilLifter.next_steps id gil_state
+  let previous_step id { gil_state } = GilLifter.previous_step id gil_state
 
   let select_next_path case id { gil_state } =
     GilLifter.select_next_path case id gil_state

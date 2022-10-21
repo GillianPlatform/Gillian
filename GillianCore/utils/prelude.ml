@@ -34,6 +34,11 @@ module Hashtbl = struct
       None
     with Found -> !result
 
+  let hd tbl =
+    match find_map (fun k v -> Some (k, v)) tbl with
+    | None -> failwith "Hashtbl.hd"
+    | Some v -> v
+
   let of_yojson
       (key_of_yojson : Yojson.Safe.t -> ('a, string) result)
       (val_of_yojson : Yojson.Safe.t -> ('b, string) result)

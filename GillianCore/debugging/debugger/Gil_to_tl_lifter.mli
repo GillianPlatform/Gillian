@@ -1,3 +1,4 @@
+type rid = Logging.ReportId.t
 type unify_result = Success | Failure [@@deriving yojson]
 
 type ('err, 'ast) memory_error_info = {
@@ -9,7 +10,7 @@ type ('err, 'ast) memory_error_info = {
 
 type 'cmd_report executed_cmd_data = {
   kind : BranchCase.t ExecMap.cmd_kind;
-  id : Logging.ReportId.t;
+  id : rid;
   cmd : 'cmd_report;
   unifys : ExecMap.unifys;
   errors : string list;
@@ -18,16 +19,14 @@ type 'cmd_report executed_cmd_data = {
 
 val make_executed_cmd_data :
   BranchCase.t ExecMap.cmd_kind ->
-  Logging.ReportId.t ->
+  rid ->
   'cmd_report ->
   ?unifys:ExecMap.unifys ->
   ?errors:string list ->
   BranchCase.path ->
   'cmd_report executed_cmd_data
 
-type handle_cmd_result =
-  | Stop
-  | ExecNext of (Logging.ReportId.t option * BranchCase.t option)
+type handle_cmd_result = Stop | ExecNext of (rid option * BranchCase.t option)
 [@@deriving yojson]
 
 module type S = sig
@@ -42,17 +41,15 @@ module type S = sig
   val handle_cmd : cmd_report executed_cmd_data -> t -> handle_cmd_result
   val get_gil_map : t -> ExecMap.Packaged.t
   val get_lifted_map : t -> ExecMap.Packaged.t option
-  val get_unifys_at_id : Logging.ReportId.t -> t -> ExecMap.unifys
-  val get_root_id : t -> Logging.ReportId.t option
-  val path_of_id : Logging.ReportId.t -> t -> BranchCase.path
-
-  val select_next_path :
-    BranchCase.t option -> Logging.ReportId.t -> t -> BranchCase.path
+  val get_unifys_at_id : rid -> t -> ExecMap.unifys
+  val get_root_id : t -> rid option
+  val path_of_id : rid -> t -> BranchCase.path
+  val next_steps : rid -> t -> (rid * BranchCase.t option) list
+  val previous_step : rid -> t -> (rid * BranchCase.t option) option
+  val select_next_path : BranchCase.t option -> rid -> t -> BranchCase.path
 
   val find_unfinished_path :
-    ?at_path:BranchCase.path ->
-    t ->
-    (Logging.ReportId.t * BranchCase.t option) option
+    ?at_path:BranchCase.path -> t -> (rid * BranchCase.t option) option
 
   (** Take the origin [tl_ast], an origin [node_id] and returns
       a string representing the evaluation step for the exec map.

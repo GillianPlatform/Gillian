@@ -518,6 +518,7 @@ struct
             (ReachedEnd, None)
         | Continue (cur_report_id, branch_path, new_branch_cases, cont_func)
           -> (
+            DL.to_file "CONTINUE";
             match cur_report_id with
             | None ->
                 failwith
@@ -746,52 +747,35 @@ struct
     let { cfg; _ } = dbg in
     let stop_reason =
       if reverse then (
-        let prev_report_id =
-          L.LogQueryer.get_previous_report_id state.cur_report_id
-        in
-        match prev_report_id with
+        match
+          state.lifter_state |> Lifter.previous_step state.cur_report_id
+        with
         | None -> ReachedStart
-        | Some prev_report_id ->
-            DL.show_report prev_report_id "Previous report";
-            let _, prev_report_type =
-              Option.get (L.LogQueryer.get_report prev_report_id)
-            in
-            if prev_report_type = ContentType.proc_init then (
-              DL.log (fun m ->
-                  m "Prev report is '%s'; not stepping." prev_report_type);
-              ReachedStart)
-            else (
-              state |> update_report_id_and_inspection_fields prev_report_id cfg;
-              Step))
+        | Some (prev_id, _) ->
+            state |> update_report_id_and_inspection_fields prev_id cfg;
+            Step)
       else
-        let next_report_ids =
-          L.LogQueryer.get_next_report_ids state.cur_report_id
+        let next_id =
+          match state.lifter_state |> Lifter.next_steps state.cur_report_id with
+          | [] -> None
+          | nexts -> (
+              match branch_case with
+              | Some branch_case ->
+                  let+ id, _ =
+                    List.find_opt
+                      (fun (_, bc) -> bc |> Option.get = branch_case)
+                      nexts
+                  in
+                  id
+              | None -> Some (List.hd nexts |> fst))
         in
-        let next_report_id =
-          match branch_case with
-          | None -> List_utils.hd_opt next_report_ids
-          | Some branch_case ->
-              next_report_ids
-              |> List.find_opt (fun id ->
-                     match L.LogQueryer.get_report id with
-                     | Some (content, type_) when type_ = ContentType.cmd -> (
-                         match
-                           content |> Yojson.Safe.from_string
-                           |> Logging.ConfigReport.of_yojson
-                         with
-                         | Error _ -> false
-                         | Ok cmd ->
-                             Option_utils.somes_and_eq cmd.branch_case
-                               branch_case)
-                     | _ -> false)
-        in
-        match next_report_id with
+        match next_id with
         | None ->
             DL.log (fun m -> m "No next report ID; executing next step");
             state |> execute_step ?branch_case prev_id_in_frame dbg |> fst
-        | Some next_report_id ->
-            DL.show_report next_report_id "Next report ID found; not executing";
-            state |> update_report_id_and_inspection_fields next_report_id cfg;
+        | Some id ->
+            DL.show_report id "Next report ID found; not executing";
+            state |> update_report_id_and_inspection_fields id cfg;
             Step
     in
     if has_hit_breakpoint state then Breakpoint
