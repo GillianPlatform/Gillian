@@ -47,12 +47,12 @@ const ExecMapView = ({ state }: Props) => {
       };
     }
 
-    const [, cmdData] = map;
+    const [, { data: cmdData }] = map;
     const nexts = (() => {
       if (map[0] === 'Cmd') {
-        return [[null, map[2]] as [A, ExecMap]];
+        return [[null, map[1].next] as [A, ExecMap]];
       } else if (map[0] === 'BranchCmd') {
-        return map[2];
+        return map[1].nexts;
       } else {
         return [];
       }

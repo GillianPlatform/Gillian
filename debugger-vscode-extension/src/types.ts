@@ -13,7 +13,6 @@ type Submap =
 
 export type CmdData = {
   readonly id: number;
-  readonly originId: number | null;
   readonly display: string;
   readonly unifys: readonly (readonly [number, UnifyKind, UnifyResult])[];
   readonly errors: readonly string[];
@@ -22,9 +21,9 @@ export type CmdData = {
 
 export type ExecMap =
   | readonly ['Nothing']
-  | readonly ['Cmd', CmdData, ExecMap]
-  | readonly ['BranchCmd', CmdData, [BranchCase, ExecMap][]]
-  | readonly ['FinalCmd', CmdData];
+  | readonly ['Cmd', { data: CmdData, next: ExecMap }]
+  | readonly ['BranchCmd', { data: CmdData, nexts: [BranchCase, ExecMap][] }]
+  | readonly ['FinalCmd', { data: CmdData }];
 
 // #endregion
 
