@@ -43,6 +43,10 @@ module type S = sig
   val get_root_id : t -> Logging.ReportId.t option
   val path_of_id : Logging.ReportId.t -> t -> BranchCase.path
   val next_steps : rid -> t -> (rid * BranchCase.t option) list
+
+  val next_step_specific :
+    rid -> ExecMap.Packaged.branch_case option -> t -> rid * BranchCase.t option
+
   val previous_step : rid -> t -> (rid * BranchCase.t option) option
 
   val select_next_path :
@@ -279,6 +283,14 @@ struct
             nexts []
         in
         List.rev nexts
+
+  let next_step_specific id case _ =
+    let case =
+      case
+      |> Option.map (fun (case : ExecMap.Packaged.branch_case) ->
+             case.json |> BranchCase.of_yojson |> Result.get_ok)
+    in
+    (id, case)
 
   let previous_step id state =
     match state |> at_id id |> fst with

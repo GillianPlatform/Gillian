@@ -45,6 +45,10 @@ module type S = sig
   val get_root_id : t -> rid option
   val path_of_id : rid -> t -> BranchCase.path
   val next_steps : rid -> t -> (rid * BranchCase.t option) list
+
+  val next_step_specific :
+    rid -> ExecMap.Packaged.branch_case option -> t -> rid * BranchCase.t option
+
   val previous_step : rid -> t -> (rid * BranchCase.t option) option
   val select_next_path : BranchCase.t option -> rid -> t -> BranchCase.path
 

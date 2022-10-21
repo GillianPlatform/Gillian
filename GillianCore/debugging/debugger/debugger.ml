@@ -849,18 +849,13 @@ struct
     let state = dbg |> get_proc_state in
     step_case ~reverse dbg state
 
-  let step_specific
-      (branch_case : ExecMap.Packaged.branch_case option)
-      prev_id
-      dbg =
+  let step_specific branch_case prev_id dbg =
     let { cfg; _ } = dbg in
     let state = dbg |> get_proc_state in
-    let** branch_case =
-      (let+ branch_case in
-       BranchCase.of_yojson branch_case.json)
-      |> Option_utils.to_result
+    let id, branch_case =
+      state.lifter_state |> Lifter.next_step_specific prev_id branch_case
     in
-    let++ () = state |> jump_state_to_id prev_id cfg in
+    let++ () = state |> jump_state_to_id id cfg in
     state |> step_case ?branch_case dbg
 
   let step_out dbg =
