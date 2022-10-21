@@ -232,6 +232,34 @@ let mangle_proc proc mangled_syms =
   in
   mangling_visitor#visit_proc () proc
 
+let optimise_calls_in_proc proc genv =
+  let get_fname loc = Global_env.find_function genv loc in
+  let call_replacer =
+    object
+      inherit [_] Gillian.Gil_syntax.Visitors.endo
+
+      method! visit_cmd _ cmd =
+        match cmd with
+        | Call
+            ( x,
+              Lit (String fname),
+              [ EList [ Lit (Loc l); Lit (Int z) ] ],
+              None,
+              None )
+          when fname = Internal_Functions.get_function_name && Z.(equal z zero)
+          ->
+            let fname = get_fname l in
+            Assignment (x, Lit (String fname))
+        | _ -> cmd
+    end
+  in
+  call_replacer#visit_proc () proc
+
+let optimise_calls prog genv =
+  Hashtbl.filter_map_inplace
+    (fun _ proc -> Some (optimise_calls_in_proc proc genv))
+    prog.Gil_syntax.Prog.procs
+
 let write_dependencies_file c_path =
   let prev_options = Preprocessor.get_options () in
   Preprocessor.set_output_dependencies_opts (get_deps_path c_path);
@@ -293,7 +321,7 @@ let get_included_headers deps_file =
     Hashtbl.add included_headers_cache deps_file included_headers;
     included_headers
 
-let create_compilation_result gil_progs all_defs =
+let create_compilation_result gil_progs genv =
   let open IncrementalAnalysis in
   let open CommandLine.ParserAndCompiler in
   let source_files = SourceFiles.make () in
@@ -312,7 +340,6 @@ let create_compilation_result gil_progs all_defs =
         (get_gil_path path, prog))
       gil_progs
   in
-  let genv = Global_env.of_definition_list all_defs in
   { gil_progs; source_files; tl_ast = (); init_data = genv }
 
 let parse_and_compile_files paths =
@@ -412,8 +439,10 @@ let parse_and_compile_files paths =
       compiled_progs []
   in
   let all_defs = genv_defs @ main_genv_defs in
+  let genv = Global_env.of_definition_list all_defs in
   let all_progs = (main_path, main_prog) :: all_other_progs in
-  Ok (create_compilation_result all_progs all_defs)
+  let () = List.iter (fun (_, prog) -> optimise_calls prog genv) all_progs in
+  Ok (create_compilation_result all_progs genv)
 
 let other_imports = []
 let env_var_import_path = Some CConstants.Imports.env_path_var

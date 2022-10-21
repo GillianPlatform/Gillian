@@ -20,6 +20,11 @@ let of_definition_list defs =
 
 let find_def genv loc = PMap.find loc genv
 
+let find_function genv loc =
+  match find_def genv loc with
+  | FunDef f -> f
+  | GlobVar _ -> failwith "Gillian-C.Global_env.find_function: Not a function!"
+
 let serialize_def def =
   let open Gil_syntax in
   let lit =
