@@ -17,11 +17,13 @@ proc i__malloc(vsz) {
 };
 
 proc i__free(ptr) {
-         vszl := [mem_load]("int32", l-nth(ptr, 0i), l-nth(ptr, 1i) i- 4i); (* 4 is size_chunk of "int32" *)
+         goto [ ptr = {{ "int", 0i }} ] end cta;
+   cta:  goto [ l-nth(ptr, 1i) = 0i ] ctb die;
+   ctb:  vszl := [mem_load]("int32", l-nth(ptr, 0i), l-nth(ptr, 1i) i- 4i); (* 4 is size_chunk of "int32" *)
          sz := "i__alloc_size"(l-nth(vszl, 0i));
-         goto [ sz i< 0i ] die ctn;
-   die:  fail[free]("Deallocating a pointer of negative size");
-   ctn:  u := [mem_free](l-nth(ptr, 0i), l-nth(ptr, 1i) i- 4i, l-nth(ptr, 1i) i+ sz);
-         ret := undefined;
-         return
+         goto [ sz i< 0i ] die ctc;
+   ctc:  u := [mem_free](l-nth(ptr, 0i), l-nth(ptr, 1i) i- 4i, l-nth(ptr, 1i) i+ sz);
+   end:  ret := undefined;
+         return;
+   die:  fail[free]("Deallocating a pointer of negative size")
 };
