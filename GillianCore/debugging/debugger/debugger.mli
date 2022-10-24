@@ -51,8 +51,9 @@ module type S = sig
 end
 
 module Make
-    (PC : ParserAndCompiler.S)
-    (Verification : Verifier.S)
+    (ID : Init_data.S)
+    (PC : ParserAndCompiler.S with type init_data = ID.t)
+    (Verification : Verifier.S with type SPState.init_data = ID.t)
     (Lifter : Gil_to_tl_lifter.S
                 with type memory = Verification.SAInterpreter.heap_t
                  and type memory_error = Verification.SPState.m_err_t

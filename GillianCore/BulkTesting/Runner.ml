@@ -130,7 +130,12 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
               | Error _ -> failwith "Failed to create unification plans"
               | Ok prog ->
                   let () = before_execution () in
-                  let ret = Interpreter.evaluate_prog prog in
+                  let ret =
+                    Interpreter.evaluate_proc
+                      (fun x -> x)
+                      prog !Config.entry_point []
+                      (State.init progs.init_data)
+                  in
                   let call_graph = Interpreter.call_graph in
                   let copy = CallGraph.merge (CallGraph.make ()) call_graph in
                   let () = Hashtbl.add cur_call_graphs filename copy in

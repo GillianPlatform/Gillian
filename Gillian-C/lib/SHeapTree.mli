@@ -73,6 +73,9 @@ val drop_perm : t -> Expr.t -> Expr.t -> Perm.t -> t d_or_error
 val get_perm_at : t -> Expr.t -> Perm.t option d_or_error
 val weak_valid_pointer : t -> Expr.t -> bool d_or_error
 
+(** An allocated function always has the exact same tree *)
+val allocated_function : t
+
 (** [move dst_tree dst_ofs src_tree src_ofs size] moves [size] bytes from
     [src_tree] at [src_ofs] into [dst_tree] at [dst_ofs] and returns the new
     [dst_tree] after modification *)

@@ -158,6 +158,8 @@ module TargetLangOptions = struct
     Config.allocated_functions := allocated_functions
 end
 
+type init_data = Global_env.t
+
 (** Cache of compiled but unlinked GIL programs and their compilation data. *)
 let compiled_progs = Hashtbl.create small_tbl_size
 
@@ -224,11 +226,44 @@ let mangle_proc proc mangled_syms =
 
       method! visit_PVar _ _ var = Gillian.Gil_syntax.Expr.PVar (mangle_var var)
 
-      method! visit_String _ _ str =
-        Gillian.Gil_syntax.Literal.String (mangle_symbol str)
+      method! visit_Loc _ _ str =
+        Gillian.Gil_syntax.Literal.Loc (mangle_symbol str)
     end
   in
   mangling_visitor#visit_proc () proc
+
+let optimise_calls_in_proc proc genv =
+  let get_fname loc = Global_env.find_function_opt genv loc in
+  let call_replacer =
+    object
+      inherit [_] Gillian.Gil_syntax.Visitors.endo
+
+      method! visit_cmd _ cmd =
+        match cmd with
+        | Call
+            ( x,
+              Lit (String fname),
+              [ EList [ Lit (Loc l); Lit (Int z) ] ],
+              None,
+              None )
+          when fname = Internal_Functions.get_function_name && Z.(equal z zero)
+          -> (
+            match get_fname l with
+            | Some fname -> Assignment (x, Lit (String fname))
+            | None ->
+                cmd
+                (* Can only happen when hide_undef is true, in which case we safely ignore.
+                   If hide_undef was false, the missing definition would be caught earlier *)
+            )
+        | _ -> cmd
+    end
+  in
+  call_replacer#visit_proc () proc
+
+let optimise_calls prog genv =
+  Hashtbl.filter_map_inplace
+    (fun _ proc -> Some (optimise_calls_in_proc proc genv))
+    prog.Gil_syntax.Prog.procs
 
 let write_dependencies_file c_path =
   let prev_options = Preprocessor.get_options () in
@@ -276,9 +311,6 @@ let linker_error msg symbols =
 let current_arch =
   if Archi.ptr64 then Architecture.Arch64 else Architecture.Arch32
 
-let is_verif_or_act exec_mode =
-  ExecMode.verification_exec exec_mode || ExecMode.biabduction_exec exec_mode
-
 let parse_dependencies_file deps_file =
   let file_str = Gillian.Utils.Io_utils.load_file deps_file in
   let delims = Str.regexp "[ \\( \\\\\\)\n\r\t]+" in
@@ -294,7 +326,7 @@ let get_included_headers deps_file =
     Hashtbl.add included_headers_cache deps_file included_headers;
     included_headers
 
-let create_compilation_result gil_progs =
+let create_compilation_result gil_progs genv =
   let open IncrementalAnalysis in
   let open CommandLine.ParserAndCompiler in
   let source_files = SourceFiles.make () in
@@ -313,7 +345,7 @@ let create_compilation_result gil_progs =
         (get_gil_path path, prog))
       gil_progs
   in
-  { gil_progs; source_files; tl_ast = () }
+  { gil_progs; source_files; tl_ast = (); init_data = genv }
 
 let parse_and_compile_files paths =
   let exec_mode = !Gillian.Utils.Config.current_exec_mode in
@@ -359,58 +391,42 @@ let parse_and_compile_files paths =
 
   (* Create main GIL program with references to all other files *)
   let open Gillian.Gil_syntax in
-  let rec combine paths comb_imports comb_init_asrts comb_init_cmds =
+  let rec combine paths comb_imports comb_defs comb_init_cmds =
     match paths with
-    | [] -> (comb_imports, comb_init_asrts, comb_init_cmds)
+    | [] -> (comb_imports, comb_defs, comb_init_cmds)
     | path :: rest ->
-        let _, Gilgen.{ genv_pred_asrts; genv_init_cmds; _ } =
+        let _, Gilgen.{ genv_defs; genv_init_cmds; _ } =
           Hashtbl.find compiled_progs path
         in
         combine rest
           (comb_imports @ [ (get_gil_path path, true) ])
-          (comb_init_asrts @ genv_pred_asrts)
+          (comb_defs @ genv_defs)
           (comb_init_cmds @ genv_init_cmds)
   in
-  let imports, init_asrts, init_cmds = combine (List.tl paths) [] [] [] in
-  (* init_asrts and init_cmds can contain duplicated things
+  let imports, genv_defs, init_cmds = combine (List.tl paths) [] [] [] in
+  (* defs and init_cmds can contain duplicated things
       in the case of memcpy or equivalents. We need to remove those duplicates *)
-  let init_asrts =
-    List.sort_uniq
-      (fun a b ->
-        match (a, b) with
-        | Asrt.Pred (_, Lit (String a) :: _), Asrt.Pred (_, Lit (String b) :: _)
-          -> String.compare a b
-        | a, b -> compare a b)
-      init_asrts
+  let genv_defs =
+    List.sort_uniq (fun (n1, _) (n2, _) -> String.compare n1 n2) genv_defs
   in
   let main_path = List.hd paths in
-  let main_prog, Gilgen.{ genv_pred_asrts; genv_init_cmds; _ } =
+  let main_prog, Gilgen.{ genv_defs = main_genv_defs; genv_init_cmds; _ } =
     Hashtbl.find compiled_progs (List.hd paths)
   in
   let init_cmds =
     List.sort_uniq
       (fun a b ->
         match (a, b) with
-        | ( Cmd.Call (_, _, Lit (String a) :: _, _, _),
-            Cmd.Call (_, _, Lit (String b) :: _, _, _) ) -> String.compare a b
+        | ( Cmd.Call (_, _, Lit (Loc a) :: _, _, _),
+            Cmd.Call (_, _, Lit (Loc b) :: _, _, _) ) -> String.compare a b
         | _ -> failwith "Wrong init cmd")
       (init_cmds @ genv_init_cmds)
   in
-  let current_genv_config = CConstants.GEnvConfig.current_genv_config () in
-  let all_imports =
-    Imports.imports current_arch exec_mode current_genv_config @ imports
-  in
+  let all_imports = Imports.imports current_arch exec_mode @ imports in
   let init_proc = Gilgen.make_init_proc init_cmds in
   let init_proc_name = init_proc.Proc.proc_name in
   let all_proc_names = init_proc_name :: main_prog.proc_names in
   let () = Hashtbl.add main_prog.procs init_proc_name init_proc in
-  let () =
-    if is_verif_or_act exec_mode then
-      let init_pred =
-        Gil_logic_gen.make_global_env_pred (genv_pred_asrts @ init_asrts)
-      in
-      Hashtbl.add main_prog.preds init_pred.Pred.pred_name init_pred
-  in
   let main_prog =
     {
       main_prog with
@@ -427,8 +443,11 @@ let parse_and_compile_files paths =
         else acc)
       compiled_progs []
   in
+  let all_defs = genv_defs @ main_genv_defs in
+  let genv = Global_env.of_definition_list all_defs in
   let all_progs = (main_path, main_prog) :: all_other_progs in
-  Ok (create_compilation_result all_progs)
+  let () = List.iter (fun (_, prog) -> optimise_calls prog genv) all_progs in
+  Ok (create_compilation_result all_progs genv)
 
 let other_imports = []
 let env_var_import_path = Some CConstants.Imports.env_path_var

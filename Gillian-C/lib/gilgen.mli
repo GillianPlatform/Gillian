@@ -9,7 +9,7 @@ val sym_name : symbol -> string
 
 (** Data exported during compilation and used during linking. *)
 type compilation_data = {
-  genv_pred_asrts : Asrt.t list;
+  genv_defs : (string * Global_env.def) list;
   genv_init_cmds : string Cmd.t list;
   symbols : symbol list;
 }

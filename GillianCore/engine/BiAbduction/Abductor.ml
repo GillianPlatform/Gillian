@@ -1,10 +1,6 @@
 open Containers
 
 module Make
-    (SState : State.S
-                with type vt = SVal.M.t
-                 and type st = SVal.SESubst.t
-                 and type store_t = SStore.t)
     (SPState : PState.S
                  with type vt = SVal.M.t
                   and type st = SVal.SESubst.t
@@ -171,12 +167,13 @@ struct
     (* update_statistics "make_spec_AbsBi" (time() -. start_time); *)
     (sspec, spec)
 
-  let testify (prog : UP.prog) (bi_spec : BiSpec.t) : t list =
+  let testify ~init_data ~(prog : UP.prog) (bi_spec : BiSpec.t) : t list =
     L.verbose (fun m -> m "Bi-testifying: %s" bi_spec.bispec_name);
     let proc_names = Prog.get_proc_names prog.prog in
     let params = SS.of_list bi_spec.bispec_params in
     let normalise =
-      Normaliser.normalise_assertion ~pred_defs:prog.preds ~pvars:params
+      Normaliser.normalise_assertion ~init_data ~pred_defs:prog.preds
+        ~pvars:params
     in
     let make_test asrt =
       match normalise asrt with
@@ -188,8 +185,8 @@ struct
                 name = bi_spec.bispec_name;
                 params = bi_spec.bispec_params;
                 state =
-                  SBAState.initialise (SS.of_list proc_names) ss_pre
-                    (Some prog.preds);
+                  SBAState.make ~procs:(SS.of_list proc_names) ~state:ss_pre
+                    ~init_data;
               })
             l
     in
@@ -304,13 +301,13 @@ struct
 
   let str_concat = String.concat ", "
 
-  let test_procs (prog : UP.prog) =
+  let test_procs ~init_data (prog : UP.prog) =
     L.verbose (fun m -> m "Starting bi-abductive testing in normal mode");
     let proc_names = Prog.get_noninternal_proc_names prog.prog in
     L.verbose (fun m -> m "Proc names: %s" (str_concat proc_names));
     let bi_specs = List.map (Prog.get_bispec_exn prog.prog) proc_names in
 
-    let tests = List.concat_map (testify prog) bi_specs in
+    let tests = List.concat_map (testify ~init_data ~prog) bi_specs in
     let test_names tests = str_concat (List.map (fun t -> t.name) tests) in
     L.verbose (fun m -> m "I have tests for: %s" (test_names tests));
     let tests = List.sort (fun t1 t2 -> Stdlib.compare t1.name t2.name) tests in
@@ -324,6 +321,7 @@ struct
 
   let test_procs_incrementally
       (prog : UP.prog)
+      ~(init_data : SPState.init_data)
       ~(prev_results : BiAbductionResults.t)
       ~(reverse_graph : CallGraph.t)
       ~(changed_procs : string list)
@@ -344,7 +342,9 @@ struct
       | [] -> (succ_specs, bug_specs)
       | proc_name :: rest ->
           let () = UP.remove_spec prog proc_name in
-          let tests = testify prog (Prog.get_bispec_exn prog.prog proc_name) in
+          let tests =
+            testify ~init_data ~prog (Prog.get_bispec_exn prog.prog proc_name)
+          in
           let cur_succ_specs, cur_bug_specs = run_tests prog tests in
           let checked = SS.add proc_name checked in
           let new_to_test =
@@ -382,6 +382,7 @@ struct
     get_test_results prog succ_specs bug_specs
 
   let test_prog
+      ~init_data
       (prog : UP.prog)
       (incremental : bool)
       (source_files : SourceFiles.t option) : unit =
@@ -405,7 +406,7 @@ struct
       let to_prune = proc_changes.changed_procs @ proc_changes.deleted_procs in
       let reverse_graph = CallGraph.to_reverse_graph prev_call_graph in
       let cur_results =
-        test_procs_incrementally prog ~prev_results ~reverse_graph
+        test_procs_incrementally prog ~init_data ~prev_results ~reverse_graph
           ~changed_procs:proc_changes.changed_procs ~to_test
       in
       let cur_call_graph = SBAInterpreter.call_graph in
@@ -420,19 +421,12 @@ struct
         Option.value ~default:(SourceFiles.make ()) source_files
       in
       let call_graph = SBAInterpreter.call_graph in
-      let results = test_procs prog in
+      let results = test_procs ~init_data prog in
       write_biabduction_results cur_source_files call_graph ~diff:"" results
 end
 
-module From_scratch (SMemory : SMemory.S) (External : External.S) = struct
-  module INTERNAL__ = struct
-    module SState = SState.Make (SMemory)
-  end
-
-  include
-    Make
-      (INTERNAL__.SState)
-      (PState.Make (SVal.M) (SVal.SESubst) (SStore) (INTERNAL__.SState)
-         (Preds.SPreds))
-      (External)
-end
+module From_scratch (SMemory : SMemory.S) (External : External.S) =
+  Make
+    (PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState.Make (SMemory))
+       (Preds.SPreds))
+       (External)
