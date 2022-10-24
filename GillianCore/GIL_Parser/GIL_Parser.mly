@@ -927,7 +927,7 @@ lab_spec_target:
 ;
 
 spec_head_target:
-  spec_name = VAR; LBRACE; spec_params = separated_list(COMMA, VAR); RBRACE
+  spec_name = proc_name; LBRACE; spec_params = separated_list(COMMA, VAR); RBRACE
   { (* enter_specs spec_params; *)
     (spec_name, spec_params)
   }
