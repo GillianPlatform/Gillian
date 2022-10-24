@@ -496,18 +496,7 @@ let just_functions genv =
 
 let init genv = { genv; mem = ref (just_functions genv) }
 let clear { genv; _ } = { genv; mem = ref (just_functions genv) }
-
-(* Getters *)
-
-(* Getters *)
-
-(* Getters *)
-
 let copy h = { genv = h.genv; mem = ref (Mem.copy !(h.mem)) }
-
-(* let subst_spec_vars _ _ = () *)
-
-(* Ungraceful failure *)
 
 let pp_params fmt params =
   let rec aux fmtp = function
