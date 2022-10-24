@@ -1,5 +1,4 @@
 open Literal
-open Containers
 
 (*********************)
 (*                   *)
@@ -8,11 +7,16 @@ open Containers
 (*********************)
 
 module Make
-    (CMemory : CMemory.S with type vt = CVal.M.t and type st = CVal.M.st) :
-  State.S
-    with type st = CVal.CESubst.t
-     and type vt = Literal.t
-     and type store_t = CStore.t = struct
+    (CMemory : CMemory.S with type vt = CVal.M.t and type st = CVal.M.st) : sig
+  include
+    State.S
+      with type st = CVal.CESubst.t
+       and type vt = Literal.t
+       and type store_t = CStore.t
+       and type init_data = CMemory.init_data
+
+  val init : init_data -> t
+end = struct
   type vt = CVal.M.t [@@deriving yojson, show]
   type st = CVal.CESubst.t
   type store_t = CStore.t
@@ -21,6 +25,7 @@ module Make
   type fix_t
   type m_err_t = CMemory.err_t
   type err_t = (m_err_t, vt) StateErr.err_t
+  type init_data = CMemory.init_data
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
   exception Internal_State_Error of err_t list * t
@@ -31,11 +36,7 @@ module Make
   let lift_merrs (errs : m_err_t list) : err_t list =
     List.map (fun x -> StateErr.EMem x) errs
 
-  let init ?(preds : UP.preds_tbl_t option) ?(variants : variants_t option) () :
-      t =
-    let _, _ = (preds, variants) in
-    (CMemory.init (), CStore.init [], [])
-
+  let init init_data : t = (CMemory.init init_data, CStore.init [], [])
   let get_pred_defs (_ : t) : UP.preds_tbl_t option = None
 
   let execute_action
@@ -139,16 +140,6 @@ module Make
 
   let simplify_val _ v = v
 
-  let struct_init
-      ?(preds : UP.preds_tbl_t option)
-      ?(variants : variants_t option)
-      (_ : store_t)
-      (_ : PFS.t)
-      (_ : TypEnv.t)
-      (_ : SS.t) : t =
-    let _, _ = (preds, variants) in
-    raise (Failure "ERROR. struct_init not supported at the concrete level")
-
   let add_spec_vars _ _ =
     raise (Failure "ERROR: add_spec_var called for concrete executions")
 
@@ -181,9 +172,6 @@ module Make
 
   let frame_on _ _ _ =
     raise (Failure "ERROR: framing called for concrete execution")
-
-  let clear_resource _ =
-    raise (Failure "ERROR: clear_resource called for concrete execution")
 
   let substitution_in_place ?subst_all:_ (_ : st) (_ : t) : t list = []
 

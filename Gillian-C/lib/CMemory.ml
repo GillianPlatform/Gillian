@@ -1,24 +1,19 @@
 open Gillian.Concrete
 module Mem = Compcert.Memory.Mem
 module Literal = Gillian.Gil_syntax.Literal
-module GEnv = GEnv.Concrete
 module Expr = Gillian.Gil_syntax.Expr
 
+type init_data = Global_env.t
 type vt = Values.t
 type st = Subst.t
 type err_t = unit
 
 let pp_err _ () = ()
 
-type t = { mem : Compcert.Memory.Mem.mem; genv : GEnv.t }
-
-let empty = { mem = Mem.empty; genv = GEnv.empty }
-
+type t = { mem : Compcert.Memory.Mem.mem; genv : Global_env.t }
 type action_ret = ASucc of (t * vt list) | AFail of err_t list
 
-let init () = empty
-
-(** No need to copy immutable data *)
+let init genv = { mem = Mem.empty; genv }
 let copy x = x
 
 let pp_mem fmt mem =
@@ -26,8 +21,7 @@ let pp_mem fmt mem =
   let open Compcert.Memory.Mem in
   Format.fprintf fmt "{@[<v 2>@\nnext block: %i@]@\n}" (int_of_p mem.nextblock)
 
-let pp fmt h =
-  Format.fprintf fmt "GEnv : @[%a@]@\nMem: @[%a@]" GEnv.pp h.genv pp_mem h.mem
+let pp fmt h = Format.fprintf fmt "@[%a@]" pp_mem h.mem
 
 let execute_store heap params =
   let open Gillian.Gil_syntax.Literal in
@@ -131,33 +125,11 @@ let execute_drop_perm heap params =
       | None -> AFail [])
   | _ -> failwith "invalid call to drop_perm"
 
-let execute_genvgetsymbol heap params =
-  match params with
-  | [ Literal.String symbol ] ->
-      let loc = Result.get_ok (GEnv.find_symbol heap.genv symbol) in
-      ASucc (heap, [ String symbol; Loc loc ])
-  | _ -> failwith "invalid call to genvgetsymbol"
-
-let execute_genvsetsymbol heap params =
-  match params with
-  | [ Literal.String symbol; Literal.Loc loc ] ->
-      let genv = GEnv.set_symbol heap.genv symbol loc in
-      ASucc ({ heap with genv }, [])
-  | _ -> failwith "invalid call to genvsetsymbol"
-
-let execute_genvsetdef heap params =
-  match params with
-  | [ Literal.Loc loc; v_def ] ->
-      let def = GEnv.deserialize_def v_def in
-      let genv = GEnv.set_def heap.genv loc def in
-      ASucc ({ heap with genv }, [])
-  | _ -> failwith "invalid call to genvsetdef"
-
 let execute_genvgetdef heap params =
   match params with
   | [ Literal.Loc loc ] ->
-      let def = GEnv.find_def heap.genv loc in
-      let v = GEnv.serialize_def def in
+      let def = Global_env.find_def heap.genv loc in
+      let v = Global_env.serialize_def def in
       ASucc (heap, [ Loc loc; v ])
   | _ -> failwith "invalid call to genvgetdef"
 
@@ -173,9 +145,6 @@ let execute_action name heap params =
   | AMem Load -> execute_load heap params
   | AMem Free -> execute_free heap params
   | AMem Move -> execute_move heap params
-  | AGEnv GetSymbol -> execute_genvgetsymbol heap params
-  | AGEnv SetSymbol -> execute_genvsetsymbol heap params
-  | AGEnv SetDef -> execute_genvsetdef heap params
   | AGEnv GetDef -> execute_genvgetdef heap params
   | AMem
       ( GetSingle
@@ -195,8 +164,7 @@ let execute_action name heap params =
       | RemZeros
       | GetFreed
       | SetFreed
-      | RemFreed )
-  | AGEnv (RemDef | RemSymbol) ->
+      | RemFreed ) ->
       failwith
         (Printf.sprintf
            "%s is an action related to a General Assertion, it should never be \

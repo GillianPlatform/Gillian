@@ -205,6 +205,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token NO_PATH
 %token INTERNAL
 %token INTERNAL_FILE
+%token <Yojson.Safe.t> INIT_DATA
 (* Separators *)
 %token DOT
 %token COMMA
@@ -264,7 +265,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %type <NOp.t>        nop_target
 %type <Formula.t>    pure_assertion_target
 
-%type <(Annot.t, string) Prog.t> gmain_target
+%type <(Annot.t, string) Prog.t * Yojson.Safe.t> gmain_target
 %type <Expr.t> top_level_expr_target
 
 %type <Spec.st> g_sspec_target
@@ -436,6 +437,7 @@ var_and_var_target:
 (***********************)
 
 gmain_target:
+  init_data = option(INIT_DATA);
   internal = option(INTERNAL_FILE);
   imports = option(import_target);
   imports_to_verify = option(import_verify_target);
@@ -443,13 +445,14 @@ gmain_target:
   EOF
     {
       internal_file := Option.is_some internal;
+      let init_data = Option.value init_data ~default:`Null in
       let imports = List.map (fun path -> (path, false))
         (Option.value ~default:[] imports)
       in
       let imports_to_verify = List.map (fun path -> (path, true))
         (Option.value ~default:[] imports_to_verify)
       in
-      Prog.update_imports g_prog (imports @ imports_to_verify);
+      (Prog.update_imports g_prog (imports @ imports_to_verify), init_data);
     }
 ;
 

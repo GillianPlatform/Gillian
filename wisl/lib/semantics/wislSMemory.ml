@@ -5,6 +5,7 @@ module Logging = Gillian.Logging
 module SFVL = SFVL
 module SS = Gillian.Utils.Containers.SS
 
+type init_data = unit
 type vt = Values.t
 type st = Subst.t
 type err_t = WislSHeap.err [@@deriving yojson]
@@ -16,6 +17,7 @@ type action_ret =
   | AFail of err_t list
 
 let init () = WislSHeap.init ()
+let clear _ = WislSHeap.init ()
 
 let resolve_loc pfs gamma loc =
   Gillian.Logic.FOSolver.resolve_loc_name ~pfs ~gamma loc
