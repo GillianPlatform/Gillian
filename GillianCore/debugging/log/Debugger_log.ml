@@ -78,6 +78,11 @@ let show_report id msg =
 
 let set_rpc_command_handler rpc ?name module_ f =
   let f x =
+    let name_json =
+      match name with
+      | Some name -> [ ("dap_cmd", `String name) ]
+      | None -> []
+    in
     let%lwt () =
       match name with
       | Some name -> log_async (fun m -> m "%s request received" name)
@@ -85,11 +90,15 @@ let set_rpc_command_handler rpc ?name module_ f =
     in
     try%lwt f x with
     | FailureJson (e, json) ->
+        let json = name_json @ json in
         log_async (fun m -> m ~json "[Error] %s" e);%lwt
         failwith e
     | Failure e ->
-        log_async (fun m -> m "[Error] %s" e);%lwt
+        log_async (fun m -> m ~json:name_json "[Error] %s" e);%lwt
         failwith e
+    | Not_found ->
+        log_async (fun m -> m ~json:name_json "[Error] Not found");%lwt
+        raise Not_found
   in
   Debug_rpc.set_command_handler rpc module_ f
 
