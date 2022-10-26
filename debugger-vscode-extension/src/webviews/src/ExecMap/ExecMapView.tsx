@@ -29,6 +29,15 @@ const ExecMapView = ({ state }: Props) => {
     nexts: [[null, usedExecMap]],
   };
 
+  const cleanNexts = (nexts: [A, [null, M]][]) : [A, M][] => {
+    return nexts.map((next) => {
+      return [
+      next[0],
+      next[1][1],
+      ];
+    });
+  };
+
   let emptyCount = 0;
   const transform: TransformFunc<M, D, A> = (map, parent, branchCase) => {
     const edgeLabel = branchCase ? <>{branchCase.display[1]}</> : undefined;
@@ -52,11 +61,12 @@ const ExecMapView = ({ state }: Props) => {
       if (map[0] === 'Cmd') {
         return [[null, map[1].next] as [A, ExecMap]];
       } else if (map[0] === 'BranchCmd') {
-        return map[1].nexts;
+        return cleanNexts(map[1].nexts);
       } else {
         return [];
       }
     })();
+    console.log({ map, cmdData });
     return {
       id: `${cmdData.ids[0]}`,
       data: {

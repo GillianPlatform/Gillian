@@ -22,7 +22,7 @@ export type CmdData = {
 export type ExecMap =
   | readonly ['Nothing']
   | readonly ['Cmd', { data: CmdData, next: ExecMap }]
-  | readonly ['BranchCmd', { data: CmdData, nexts: [BranchCase, ExecMap][] }]
+  | readonly ['BranchCmd', { data: CmdData, nexts: [BranchCase, [null, ExecMap]][] }]
   | readonly ['FinalCmd', { data: CmdData }];
 
 // #endregion
