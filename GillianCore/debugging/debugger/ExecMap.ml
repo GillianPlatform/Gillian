@@ -2,18 +2,18 @@ module L = Logging
 
 type rid = L.ReportId.t [@@deriving yojson]
 
-type 'case cmd_kind = Normal | Branch of 'case list | Final
+type ('c, 'bd) cmd_kind = Normal | Branch of ('c * 'bd) list | Final
 [@@deriving yojson]
 
 let kind_of_cases = function
   | [] -> Normal
-  | cases -> Branch cases
+  | cases -> Branch (List.map (fun case -> (case, ())) cases)
 
-type ('case, 'data) t =
+type ('c, 'd, 'bd) t =
   | Nothing
-  | Cmd of { data : 'data; mutable next : ('case, 'data) t }
-  | BranchCmd of { data : 'data; nexts : ('case, ('case, 'data) t) Hashtbl.t }
-  | FinalCmd of { data : 'data }
+  | Cmd of { data : 'd; mutable next : ('c, 'd, 'bd) t }
+  | BranchCmd of { data : 'd; nexts : ('c, 'bd * ('c, 'd, 'bd) t) Hashtbl.t }
+  | FinalCmd of { data : 'd }
 [@@deriving yojson]
 
 type stop_at = StartOfPath | EndOfPath | BeforeNothing
@@ -29,7 +29,7 @@ let find_path_opt pred map =
       when pred data -> Some acc
     | Cmd { next; _ } -> aux acc next
     | BranchCmd { nexts; _ } ->
-        nexts |> Hashtbl.find_map (fun case next -> aux (case :: acc) next)
+        nexts |> Hashtbl.find_map (fun case (_, next) -> aux (case :: acc) next)
     | _ -> None
   in
   aux [] map
@@ -45,11 +45,12 @@ let at_path_opt ?(stop_at = EndOfPath) path map =
     | map, [], StartOfPath -> Some map
     | (Cmd { next = Nothing; _ } as map), [], BeforeNothing -> Some map
     | (BranchCmd { nexts; _ } as map), [ case ], BeforeNothing
-      when Hashtbl.find_opt nexts case = Some Nothing -> Some map
+      when Hashtbl.find_opt nexts case |> Option.map snd = Some Nothing ->
+        Some map
     | Cmd { next; _ }, _, _ -> aux path next
     | BranchCmd { nexts; _ }, case :: path, _ -> (
         match Hashtbl.find_opt nexts case with
-        | Some next -> aux path next
+        | Some (_, next) -> aux path next
         | None -> None)
     | map, [], (EndOfPath | BeforeNothing) -> Some map
     | _, _, _ -> None
@@ -69,10 +70,11 @@ module Packaged = struct
   }
   [@@deriving yojson]
 
-  type ('a, 'b) _map = ('a, 'b) t (* Need this to avoid name conflict *)
+  type ('c, 'd, 'bd) _map = ('c, 'd, 'bd) t
+  (* Need this to avoid name conflict *)
   [@@deriving yojson]
 
-  type t = (branch_case, cmd_data) _map
+  type t = (branch_case, cmd_data, unit) _map
 
   and cmd_data = {
     ids : rid list;
