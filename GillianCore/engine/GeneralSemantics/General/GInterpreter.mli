@@ -76,7 +76,8 @@ module type S = sig
       type t = {
         proc_line : int;
         time : float;
-        cmd : string;
+        cmd : int Cmd.t;
+        cmd_display : string;
         callstack : CallStack.t;
         annot : Annot.t;
         branching : int;

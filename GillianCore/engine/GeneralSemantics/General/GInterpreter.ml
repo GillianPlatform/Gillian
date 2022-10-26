@@ -81,7 +81,8 @@ module type S = sig
       type t = {
         proc_line : int;
         time : float;
-        cmd : string;
+        cmd : int Cmd.t;
+        cmd_display : string;
         callstack : CallStack.t;
         annot : Annot.t;
         branching : int;
@@ -262,7 +263,8 @@ struct
       type t = {
         proc_line : int;
         time : float;
-        cmd : string;
+        cmd : int Cmd.t;
+        cmd_display : string;
         callstack : CallStack.t;
         annot : Annot.t;
         branching : int;
@@ -277,7 +279,7 @@ struct
           {
             proc_line = i;
             time;
-            cmd;
+            cmd_display;
             callstack = cs;
             annot;
             branching;
@@ -296,7 +298,7 @@ struct
            %a@\n\
            ------------------------------------------------------@]\n"
           (CallStack.get_cur_proc_id cs)
-          i time cmd pp_str_list
+          i time cmd_display pp_str_list
           (CallStack.get_cur_procs cs)
           pp_str_list
           (Annot.get_loop_info annot)
@@ -372,8 +374,8 @@ struct
             State.pp_by_need pvars lvars locs
       in
       ConfigReport.log state_printer
-        (ConfigReport.make ~proc_line:i ~time:(Sys.time ())
-           ~cmd:(Fmt.to_to_string Cmd.pp_indexed cmd)
+        (ConfigReport.make ~proc_line:i ~time:(Sys.time ()) ~cmd
+           ~cmd_display:(Fmt.to_to_string Cmd.pp_indexed cmd)
            ~callstack:cs ~annot ~branching:b_counter ~state ?branch_case ())
 
     let print_lconfiguration (lcmd : LCmd.t) (state : State.t) : unit =

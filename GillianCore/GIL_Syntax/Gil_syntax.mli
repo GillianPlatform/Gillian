@@ -671,6 +671,7 @@ module Cmd : sig
     | ReturnNormal  (** Normal return *)
     | ReturnError  (** Error return *)
     | Fail of string * Expr.t list  (** Failure *)
+  [@@deriving yojson]
 
   (** Pretty-printer *)
   val pp : pp_label:'a Fmt.t -> Format.formatter -> 'a t -> unit
