@@ -1,3 +1,6 @@
+let pp_option pp = Fmt.option ~none:(Fmt.any "None") pp
+let pp_list ?(sep = Fmt.any ", ") = Fmt.list ~sep
+
 module Hashtbl = struct
   (** Extension of Hashtbl with functions to serialize to and deserialize
     from yojson. A Hashtbl is a represented as a list of key-value pairs,
