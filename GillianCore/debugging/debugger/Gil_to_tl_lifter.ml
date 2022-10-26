@@ -2,7 +2,9 @@ module L = Logging
 module DL = Debugger_log
 
 type rid = L.ReportId.t [@@deriving yojson]
-type unify_result = Success | Failure [@@deriving yojson]
+
+type unify_result = UnifyMap.unify_result = Success | Failure
+[@@deriving yojson]
 
 type ('err, 'ast) memory_error_info = {
   error : 'err;  (** The memory error that needs to be lifted *)
@@ -11,18 +13,23 @@ type ('err, 'ast) memory_error_info = {
 }
 
 type 'cmd_report executed_cmd_data = {
-  kind : BranchCase.t ExecMap.cmd_kind;
+  kind : (BranchCase.t, unit) ExecMap.cmd_kind;
   id : rid;
-  cmd : 'cmd_report;
+  cmd_report : 'cmd_report;
   unifys : ExecMap.unifys; [@default []]
   errors : string list; [@default []]
   branch_path : BranchCase.path;
 }
 [@@deriving yojson]
 
-let make_executed_cmd_data kind id cmd ?(unifys = []) ?(errors = []) branch_path
-    =
-  { kind; id; cmd; unifys; errors; branch_path }
+let make_executed_cmd_data
+    kind
+    id
+    cmd_report
+    ?(unifys = [])
+    ?(errors = [])
+    branch_path =
+  { kind; id; cmd_report; unifys; errors; branch_path }
 
 type handle_cmd_result = Stop | ExecNext of (rid option * BranchCase.t option)
 [@@deriving yojson]
@@ -34,33 +41,41 @@ module type S = sig
   type memory
   type cmd_report
 
-  val init : cmd_report executed_cmd_data -> t * handle_cmd_result
+  val init :
+    tl_ast option -> cmd_report executed_cmd_data -> t * handle_cmd_result
+
   val dump : t -> Yojson.Safe.t
-  val handle_cmd : cmd_report executed_cmd_data -> t -> handle_cmd_result
+
+  val handle_cmd :
+    rid ->
+    BranchCase.t option ->
+    cmd_report executed_cmd_data ->
+    t ->
+    handle_cmd_result
+
   val get_gil_map : t -> ExecMap.Packaged.t
   val get_lifted_map : t -> ExecMap.Packaged.t option
   val get_unifys_at_id : Logging.ReportId.t -> t -> ExecMap.unifys
   val get_root_id : t -> Logging.ReportId.t option
   val path_of_id : Logging.ReportId.t -> t -> BranchCase.path
-  val next_steps : rid -> t -> (rid * BranchCase.t option) list
+  val existing_next_steps : rid -> t -> (rid * BranchCase.t option) list
 
   val next_step_specific :
     rid -> ExecMap.Packaged.branch_case option -> t -> rid * BranchCase.t option
 
-  val previous_step : rid -> t -> (rid * BranchCase.t option) option
+  val previous_step :
+    rid -> t -> (rid * ExecMap.Packaged.branch_case option) option
 
   val select_next_path :
     BranchCase.t option -> Logging.ReportId.t -> t -> BranchCase.path
 
   val find_unfinished_path :
-    ?at_path:BranchCase.path ->
-    t ->
-    (Logging.ReportId.t * BranchCase.t option) option
+    ?at_id:rid -> t -> (Logging.ReportId.t * BranchCase.t option) option
 
   (** Take the origin [tl_ast], an origin [node_id] and returns
       a string representing the evaluation step for the exec map.
       Should never be called if [source_map_ability] is false *)
-  val get_origin_node_str : tl_ast -> int option -> string
+  (* val get_origin_node_str : tl_ast -> int option -> string *)
 
   val memory_error_to_exception_info :
     (memory_error, tl_ast) memory_error_info -> DebuggerTypes.exception_info
@@ -90,7 +105,7 @@ struct
   type branch_path = BranchCase.path [@@deriving yojson]
 
   (* Some fields are Null'd in yojson to stop huge memory inefficiency *)
-  type map = (branch_case, cmd_data) ExecMap.t
+  type map = (branch_case, cmd_data, unit) ExecMap.t
 
   and cmd_data = {
     id : rid;
@@ -106,7 +121,6 @@ struct
   type t = {
     map : map;
     root_proc : string;
-    mutable prev_id : rid option;
     id_map : (rid, map) Hashtbl.t; [@to_yojson fun _ -> `Null]
   }
   [@@deriving to_yojson]
@@ -122,9 +136,9 @@ struct
 
   let dump = to_yojson
 
-  let get_proc_name ({ cmd; _ } : exec_data) =
+  let get_proc_name ({ cmd_report; _ } : exec_data) =
     let open Verification.SAInterpreter.Logging.ConfigReport in
-    let cs = cmd.callstack in
+    let cs = cmd_report.callstack in
     let head = List.hd cs in
     head.pid
 
@@ -132,16 +146,17 @@ struct
       ?(submap = NoSubmap)
       ~parent
       id_map
-      { kind; id; unifys; errors; cmd : cmd_report; branch_path }
+      { kind; id; unifys; errors; cmd_report : cmd_report; branch_path }
       () =
-    let display = cmd.cmd in
+    let display = cmd_report.cmd_display in
     let data = { id; display; unifys; errors; submap; branch_path; parent } in
     let cmd =
       match kind with
       | Normal -> Cmd { data; next = Nothing }
       | Branch cases ->
           let nexts = Hashtbl.create (List.length cases) in
-          cases |> List.iter (fun case -> Hashtbl.add nexts case Nothing);
+          cases
+          |> List.iter (fun (case, _) -> Hashtbl.add nexts case ((), Nothing));
           BranchCmd { data; nexts }
       | Final -> FinalCmd { data }
     in
@@ -158,32 +173,46 @@ struct
     | None -> failwith "Tried to get id of Nothing!"
     | Some id -> id
 
-  let at_id id state =
-    let failwith s =
-      DL.failwith
-        (fun () -> [ ("id", rid_to_yojson id); ("state", dump state) ])
-        ("at_id: " ^ s)
-    in
+  let at_id_result id state =
     match Hashtbl.find_opt state.id_map id with
-    | None -> failwith "id not found"
-    | Some Nothing -> failwith "HORROR - got Nothing at id!"
+    | None -> Error "id not found"
+    | Some Nothing -> Error "HORROR - got Nothing at id!"
     | Some
         ((Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data }) as map)
-      -> (map, data.branch_path)
+      -> Ok (map, data.branch_path)
 
-  let init exec_data =
+  let at_id_opt id state =
+    match at_id_result id state with
+    | Ok (map, branch_path) -> Some (map, branch_path)
+    | Error _ -> None
+
+  let at_id id state =
+    match at_id_result id state with
+    | Ok (map, branch_path) -> (map, branch_path)
+    | Error s ->
+        DL.failwith
+          (fun () -> [ ("id", rid_to_yojson id); ("state", dump state) ])
+          ("at_id: " ^ s)
+
+  let init _ exec_data =
     let id_map = Hashtbl.create 1 in
     let map = new_cmd id_map exec_data ~parent:None () in
     let root_proc = get_proc_name exec_data in
-    ({ map; root_proc; id_map; prev_id = None }, Stop)
+    ({ map; root_proc; id_map }, Stop)
 
-  let handle_cmd exec_data state =
-    let { map; root_proc; prev_id; _ } = state in
+  let handle_cmd prev_id branch_case exec_data state =
+    let { root_proc; id_map; _ } = state in
     let current_proc = get_proc_name exec_data in
-    if root_proc <> current_proc then ExecNext (prev_id, None)
-    else (
-      state.prev_id <- Some exec_data.id;
-      let new_cmd = new_cmd state.id_map exec_data in
+    DL.to_file
+      (Fmt.str
+         "HANDLE GIL current: '%s', root: '%s', eq: %b, hidden: %b, cmd: %s"
+         current_proc root_proc (current_proc = root_proc)
+         (Annot.is_hidden exec_data.cmd_report.annot)
+         exec_data.cmd_report.cmd_display);
+    if root_proc <> current_proc || Annot.is_hidden exec_data.cmd_report.annot
+    then ExecNext (Some prev_id, None)
+    else
+      let new_cmd = new_cmd id_map exec_data in
       let failwith s =
         DL.log (fun m ->
             m
@@ -194,59 +223,37 @@ struct
                 ]
               "handle_cmd: %s" s)
       in
-      let map =
-        map |> ExecMap.(at_path ~stop_at:BeforeNothing) exec_data.branch_path
-      in
+      let map = Hashtbl.find id_map prev_id in
       (match map with
       | Cmd cmd when cmd.next = Nothing ->
           let parent = Some (map, None) in
           cmd.next <- new_cmd ~parent ()
       | BranchCmd { nexts; _ } -> (
-          let case = List_utils.hd_opt (List.rev exec_data.branch_path) in
-          match case with
-          | None -> failwith "HORROR - branch cmd has no cases!"
+          match branch_case with
+          | None ->
+              failwith "HORROR - need branch case to insert to branch cmd!"
           | Some case -> (
               match Hashtbl.find_opt nexts case with
-              | Some Nothing ->
+              | Some ((), Nothing) ->
                   let parent = Some (map, Some case) in
-                  Hashtbl.replace nexts case (new_cmd ~parent ())
+                  Hashtbl.replace nexts case ((), new_cmd ~parent ())
               | _ -> failwith "colliding cases in branch cmd"))
       | _ -> failwith "can't insert to Nothing or FinalCmd");
-      Stop)
+      Stop
 
-  let package state : Packaged.t =
-    let { map; _ } = state in
-    let rec aux = function
-      | Nothing -> Nothing
-      | Cmd { data; next } ->
-          let data = package_data data in
-          let next = aux next in
-          Cmd { data; next }
-      | BranchCmd { data; nexts } ->
-          let data = package_data data in
-          let nexts =
-            nexts
-            |> Hashtbl.map (fun case next ->
-                   let case = Packaged.package_case case in
-                   let next = aux next in
-                   (case, next))
-          in
-          BranchCmd { data; nexts }
-      | FinalCmd { data } ->
-          let data = package_data data in
-          FinalCmd { data }
-    and package_data { id; display; unifys; errors; submap; _ } =
-      let submap =
-        match submap with
-        | NoSubmap -> NoSubmap
-        | Proc p -> Proc p
-        | Submap map -> Submap (aux map)
-      in
-      Packaged.{ ids = [ id ]; display; unifys; errors; submap }
+  let package_case _ = Packaged.package_case
+
+  let package_data package { id; display; unifys; errors; submap; _ } =
+    let submap =
+      match submap with
+      | NoSubmap -> NoSubmap
+      | Proc p -> Proc p
+      | Submap map -> Submap (package map)
     in
-    aux map
+    Packaged.{ ids = [ id ]; display; unifys; errors; submap }
 
-  let get_gil_map state = package state
+  let package = Packaged.package package_data package_case
+  let get_gil_map state = package state.map
   let get_lifted_map _ = None
 
   let get_unifys_at_id id state =
@@ -265,24 +272,26 @@ struct
 
   let path_of_id id state = state |> at_id id |> snd
 
-  let next_steps id state =
-    let map, _ = state |> at_id id in
-    match map with
-    | Nothing -> failwith "next_step: HORROR - map is Nothing!"
-    | Cmd { next = Nothing; _ } | FinalCmd _ -> []
-    | Cmd { next; _ } ->
-        let id = get_id next in
-        [ (id, None) ]
-    | BranchCmd { nexts; _ } ->
-        let nexts =
-          Hashtbl.fold
-            (fun case next acc ->
-              match get_id_opt next with
-              | None -> acc
-              | Some id -> (id, Some case) :: acc)
-            nexts []
-        in
-        List.rev nexts
+  let existing_next_steps id state =
+    match state |> at_id_opt id with
+    | None -> []
+    | Some (map, _) -> (
+        match map with
+        | Nothing -> failwith "existing_next_steps: map is Nothing!"
+        | Cmd { next = Nothing; _ } | FinalCmd _ -> []
+        | Cmd { next; _ } ->
+            let id = get_id next in
+            [ (id, None) ]
+        | BranchCmd { nexts; _ } ->
+            let nexts =
+              Hashtbl.fold
+                (fun case (_, next) acc ->
+                  match get_id_opt next with
+                  | None -> acc
+                  | Some id -> (id, Some case) :: acc)
+                nexts []
+            in
+            List.rev nexts)
 
   let next_step_specific id case _ =
     let case =
@@ -301,7 +310,9 @@ struct
         | Some (Nothing, _) -> failwith "HORROR - parent is Nothing!"
         | Some
             ((Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data }), case)
-          -> Some (data.id, case))
+          ->
+            let case = case |> Option.map ExecMap.Packaged.package_case in
+            Some (data.id, case))
 
   let select_next_path case id state =
     let map, path = state |> at_id id in
@@ -326,13 +337,14 @@ struct
         | None -> failwith "case not found"
         | Some _ -> case :: path)
 
-  let find_unfinished_path ?(at_path = []) state =
+  let find_unfinished_path ?at_id state =
     let rec aux = function
       | Nothing ->
           DL.failwith
             (fun () ->
               [
-                ("state", dump state); ("at_path", branch_path_to_yojson at_path);
+                ("state", dump state);
+                ("at_id", opt_to_yojson rid_to_yojson at_id);
               ])
             "find_unfinished_path: started at Nothing"
       | Cmd { data = { id; _ }; next = Nothing } -> Some (id, None)
@@ -340,18 +352,20 @@ struct
       | BranchCmd { nexts; data = { id; _ } } -> (
           match
             Hashtbl.find_map
-              (fun case next ->
+              (fun case (_, next) ->
                 if next = Nothing then Some (id, Some case) else None)
               nexts
           with
-          | None -> Hashtbl.find_map (fun _ next -> aux next) nexts
+          | None -> Hashtbl.find_map (fun _ (_, next) -> aux next) nexts
           | result -> result)
       | FinalCmd _ -> None
     in
-    let map = state.map |> ExecMap.(at_path ~stop_at:StartOfPath) at_path in
+    let map =
+      match at_id with
+      | None -> state.map
+      | Some id -> Hashtbl.find state.id_map id
+    in
     aux map
-
-  let get_origin_node_str _ _ = failwith "Not implemented in Default lifter"
 
   let memory_error_to_exception_info { error; _ } : DebuggerTypes.exception_info
       =

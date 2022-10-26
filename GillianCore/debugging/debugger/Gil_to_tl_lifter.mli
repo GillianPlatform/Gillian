@@ -1,5 +1,7 @@
 type rid = Logging.ReportId.t
-type unify_result = Success | Failure [@@deriving yojson]
+
+type unify_result = UnifyMap.unify_result = Success | Failure
+[@@deriving yojson]
 
 type ('err, 'ast) memory_error_info = {
   error : 'err;  (** The memory error that needs to be lifted *)
@@ -9,16 +11,16 @@ type ('err, 'ast) memory_error_info = {
 }
 
 type 'cmd_report executed_cmd_data = {
-  kind : BranchCase.t ExecMap.cmd_kind;
+  kind : (BranchCase.t, unit) ExecMap.cmd_kind;
   id : rid;
-  cmd : 'cmd_report;
+  cmd_report : 'cmd_report;
   unifys : ExecMap.unifys;
   errors : string list;
   branch_path : BranchCase.path;
 }
 
 val make_executed_cmd_data :
-  BranchCase.t ExecMap.cmd_kind ->
+  (BranchCase.t, unit) ExecMap.cmd_kind ->
   rid ->
   'cmd_report ->
   ?unifys:ExecMap.unifys ->
@@ -36,29 +38,40 @@ module type S = sig
   type memory
   type cmd_report
 
-  val init : cmd_report executed_cmd_data -> t * handle_cmd_result
+  val init :
+    tl_ast option -> cmd_report executed_cmd_data -> t * handle_cmd_result
+
   val dump : t -> Yojson.Safe.t
-  val handle_cmd : cmd_report executed_cmd_data -> t -> handle_cmd_result
+
+  val handle_cmd :
+    rid ->
+    BranchCase.t option ->
+    cmd_report executed_cmd_data ->
+    t ->
+    handle_cmd_result
+
   val get_gil_map : t -> ExecMap.Packaged.t
   val get_lifted_map : t -> ExecMap.Packaged.t option
   val get_unifys_at_id : rid -> t -> ExecMap.unifys
   val get_root_id : t -> rid option
   val path_of_id : rid -> t -> BranchCase.path
-  val next_steps : rid -> t -> (rid * BranchCase.t option) list
+  val existing_next_steps : rid -> t -> (rid * BranchCase.t option) list
 
   val next_step_specific :
     rid -> ExecMap.Packaged.branch_case option -> t -> rid * BranchCase.t option
 
-  val previous_step : rid -> t -> (rid * BranchCase.t option) option
+  val previous_step :
+    rid -> t -> (rid * ExecMap.Packaged.branch_case option) option
+
   val select_next_path : BranchCase.t option -> rid -> t -> BranchCase.path
 
   val find_unfinished_path :
-    ?at_path:BranchCase.path -> t -> (rid * BranchCase.t option) option
+    ?at_id:rid -> t -> (rid * BranchCase.t option) option
 
   (** Take the origin [tl_ast], an origin [node_id] and returns
       a string representing the evaluation step for the exec map.
       Should never be called if [source_map_ability] is false *)
-  val get_origin_node_str : tl_ast -> int option -> string
+  (* val get_origin_node_str : tl_ast -> int option -> string *)
 
   val memory_error_to_exception_info :
     (memory_error, tl_ast) memory_error_info -> DebuggerTypes.exception_info

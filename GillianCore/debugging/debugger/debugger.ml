@@ -479,6 +479,9 @@ struct
             in
             (match prev with
             | Some (prev_id, content, type_) when type_ = ContentType.cmd -> (
+                let prev_prev_id =
+                  L.LogQueryer.get_previous_report_id prev_id |> Option.get
+                in
                 let cmd =
                   content |> Yojson.Safe.from_string
                   |> Logging.ConfigReport.of_yojson |> Result.get_ok
@@ -494,7 +497,8 @@ struct
                     cmd ~unifys ~errors branch_path
                 in
                 let handler_result =
-                  state.lifter_state |> Lifter.handle_cmd exec_data
+                  state.lifter_state
+                  |> Lifter.handle_cmd prev_prev_id cmd.branch_case exec_data
                 in
                 match handler_result with
                 | Stop -> ()
@@ -518,7 +522,6 @@ struct
             (ReachedEnd, None)
         | Continue (cur_report_id, branch_path, new_branch_cases, cont_func)
           -> (
-            DL.to_file "CONTINUE";
             match cur_report_id with
             | None ->
                 failwith
@@ -556,7 +559,7 @@ struct
                     in
                     let cmd_kind =
                       match new_branch_cases with
-                      | Some cases -> Branch cases
+                      | Some cases -> ExecMap.kind_of_cases cases
                       | None -> Normal
                     in
                     let unifys =
@@ -583,13 +586,20 @@ struct
                         cur_report_id cmd ~unifys branch_path
                     in
                     let handler_result =
-                      state.lifter_state |> Lifter.handle_cmd exec_data
+                      state.lifter_state
+                      |> Lifter.handle_cmd prev_id_in_frame branch_case
+                           exec_data
                     in
                     match handler_result with
                     | ExecNext (id, branch_case) ->
+                        DL.log (fun m ->
+                            m "EXEC NEXT (%a, %a)" (pp_option pp_rid) id
+                              (pp_option BranchCase.pp) branch_case);
                         let id = id |> Option.value ~default:cur_report_id in
                         execute_step id ?branch_case dbg state
-                    | Stop -> (Step, Some cur_report_id)))))
+                    | Stop ->
+                        DL.log (fun m -> m "STOP (%a)" pp_rid cur_report_id);
+                        (Step, Some cur_report_id)))))
 
   let launch_proc dbg proc_name =
     let { cfg; _ } = dbg in
@@ -626,7 +636,7 @@ struct
                     Gil_to_tl_lifter.make_executed_cmd_data kind id cmd
                       branch_path
                   in
-                  Lifter.init exec_data
+                  Lifter.init cfg.tl_ast exec_data
                 in
                 let state =
                   {
@@ -646,8 +656,13 @@ struct
                 in
                 let id =
                   match handler_result with
-                  | Stop -> id
+                  | Stop ->
+                      DL.log (fun m -> m "STOP (%a)" pp_rid id);
+                      id
                   | ExecNext (id', branch_case) ->
+                      DL.log (fun m ->
+                          m "EXEC NEXT (%a, %a)" (pp_option pp_rid) id'
+                            (pp_option BranchCase.pp) branch_case);
                       let id = id' |> Option.value ~default:id in
                       execute_step ?branch_case id dbg state
                       |> snd |> Option.value ~default:id
@@ -756,7 +771,9 @@ struct
             Step)
       else
         let next_id =
-          match state.lifter_state |> Lifter.next_steps state.cur_report_id with
+          match
+            state.lifter_state |> Lifter.existing_next_steps state.cur_report_id
+          with
           | [] -> None
           | nexts -> (
               match branch_case with
@@ -874,13 +891,11 @@ struct
     let { cfg; _ } = dbg in
     let state = dbg |> get_proc_state in
     let current_id = state.cur_report_id in
-    let branch_path = state.lifter_state |> Lifter.path_of_id current_id in
     DL.log (fun m ->
         m
           ~json:
             [
               ("current_id", rid_to_yojson current_id);
-              ("path", branch_path_to_yojson branch_path);
               ("lifter_state", state.lifter_state |> Lifter.dump);
             ]
           "Debugger.run");
@@ -890,9 +905,15 @@ struct
          immediately after launching to prevent missing a breakpoint on the first
          line *)
       if launch && has_hit_breakpoint state then Breakpoint
+      else if reverse then
+        let stop_reason = step_case ~reverse dbg state in
+        match stop_reason with
+        | Step -> aux count
+        | Breakpoint -> Breakpoint
+        | other_stop_reason -> other_stop_reason
       else
         let unfinished =
-          state.lifter_state |> Lifter.find_unfinished_path ~at_path:branch_path
+          state.lifter_state |> Lifter.find_unfinished_path ~at_id:current_id
         in
         match unfinished with
         | None ->
@@ -904,8 +925,7 @@ struct
             match stop_reason with
             | Step -> aux count
             | Breakpoint -> Breakpoint
-            | other_stop_reason ->
-                if reverse then other_stop_reason else aux (count + 1))
+            | _ -> aux (count + 1))
     in
     aux ~launch 0
 
