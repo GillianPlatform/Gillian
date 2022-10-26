@@ -11,6 +11,9 @@ module type S = sig
   type state_vt [@@deriving yojson, show]
   type heap_t
 
+  (** Data necessary to initialize the state, language-dependent *)
+  type init_data
+
   module Val : Val.S with type t = vt
   module Store : Store.S with type t = store_t and type vt = vt
 
@@ -116,8 +119,6 @@ module type S = sig
 
   val evaluate_proc :
     (result_t -> 'a) -> UP.prog -> string -> string list -> state_t -> 'a list
-
-  val evaluate_prog : UP.prog -> result_t list
 end
 
 (** General GIL Interpreter *)
@@ -138,3 +139,4 @@ module Make
      and type state_err_t = State.err_t
      and type state_vt = State.vt
      and type heap_t = State.heap_t
+     and type init_data = State.init_data

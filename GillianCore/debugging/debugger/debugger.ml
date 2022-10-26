@@ -51,8 +51,9 @@ module type S = sig
 end
 
 module Make
-    (PC : ParserAndCompiler.S)
-    (Verification : Verifier.S)
+    (ID : Init_data.S)
+    (PC : ParserAndCompiler.S with type init_data = ID.t)
+    (Verification : Verifier.S with type SPState.init_data = ID.t)
     (Lifter : Gil_to_tl_lifter.S
                 with type memory = Verification.SAInterpreter.heap_t
                  and type memory_error = Verification.SPState.m_err_t
@@ -269,29 +270,44 @@ struct
         Fmt.pr "Error during compilation to GIL:\n%a" PC.pp_err err;
         exit 1
 
-  let burn_gil prog outfile_opt =
+  let burn_gil ~init_data prog outfile_opt =
     match outfile_opt with
     | Some outfile ->
         let outc = open_out outfile in
         let fmt = Format.formatter_of_out_channel outc in
+        let () =
+          match init_data with
+          | `Null -> ()
+          | init_data ->
+              Fmt.pf fmt "#begin_init_data@\n%a@\n#end_init_data@\n"
+                (Yojson.Safe.pretty_print ~std:true)
+                init_data
+        in
         let () = Prog.pp_labeled fmt prog in
         close_out outc
     | None -> ()
 
   let preprocess_files files already_compiled outfile_opt no_unfold =
-    let e_prog, source_files_opt, tl_ast =
+    let e_prog, init_data, source_files_opt, tl_ast =
       if not already_compiled then
         let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
         let e_progs = progs.gil_progs in
         let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
         let e_prog = snd (List.hd e_progs) in
         let source_files = progs.source_files in
-        (e_prog, Some source_files, Some progs.tl_ast)
+        (e_prog, progs.init_data, Some source_files, Some progs.tl_ast)
       else
-        let e_prog = Gil_parsing.parse_eprog_from_file (List.hd files) in
-        (e_prog, None, None)
+        let Gil_parsing.{ labeled_prog; init_data } =
+          Gil_parsing.parse_eprog_from_file (List.hd files)
+        in
+        let init_data =
+          match ID.of_yojson init_data with
+          | Ok d -> d
+          | Error e -> failwith e
+        in
+        (labeled_prog, init_data, None, None)
     in
-    let () = burn_gil e_prog outfile_opt in
+    let () = burn_gil ~init_data:(ID.to_yojson init_data) e_prog outfile_opt in
     (* Prog.perform_syntax_checks e_prog; *)
     let prog =
       Gil_parsing.eprog_to_prog
@@ -315,7 +331,7 @@ struct
             prog.procs []
         in
         m ~json:procs_json "Got %d procs" (Hashtbl.length prog.procs));
-    (prog, source_files_opt, tl_ast)
+    (prog, init_data, source_files_opt, tl_ast)
 
   let has_hit_breakpoint dbg =
     match dbg.frames with
@@ -601,7 +617,7 @@ struct
                         DL.log (fun m -> m "STOP (%a)" pp_rid cur_report_id);
                         (Step, Some cur_report_id)))))
 
-  let launch_proc dbg proc_name =
+  let launch_proc ~init_data dbg proc_name =
     let { cfg; _ } = dbg in
     let report_state = L.ReportState.clone cfg.report_state_base in
     let open Verification.SAInterpreter in
@@ -677,7 +693,7 @@ struct
     report_state
     |> L.ReportState.with_state (fun () ->
            let cont_func =
-             Verification.verify_up_to_procs ~proc_name cfg.prog
+             Verification.verify_up_to_procs ~init_data ~proc_name cfg.prog
            in
            aux cont_func)
 
@@ -699,10 +715,10 @@ struct
     let no_unfold = false in
     (* TODO: Support debugging incremental mode *)
     (* let incremental = false in *)
-    let prog, source_files_opt, tl_ast =
+    let prog, init_data, source_files_opt, tl_ast =
       preprocess_files [ file_name ] already_compiled outfile_opt no_unfold
     in
-    let tests = Verification.Debug.get_tests_for_prog prog in
+    let tests = Verification.Debug.get_tests_for_prog ~init_data prog in
     let proc_name =
       match proc_name with
       | Some proc_name -> proc_name
@@ -720,7 +736,7 @@ struct
       }
     in
     let dbg = { cfg; procs = Hashtbl.create 0; cur_proc_name = proc_name } in
-    let++ main_proc_state = launch_proc dbg proc_name in
+    let++ main_proc_state = launch_proc ~init_data dbg proc_name in
     main_proc_state.report_state |> L.ReportState.activate;
     Hashtbl.add dbg.procs proc_name main_proc_state;
     dbg

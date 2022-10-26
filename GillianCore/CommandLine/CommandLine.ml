@@ -11,10 +11,11 @@ let convert_other_imports oi =
     oi
 
 module Make
-    (CMemory : CMemory.S)
-    (SMemory : SMemory.S)
+    (ID : Init_data.S)
+    (CMemory : CMemory.S with type init_data = ID.t)
+    (SMemory : SMemory.S with type init_data = ID.t)
     (External : External.S)
-    (PC : ParserAndCompiler.S) (Runners : sig
+    (PC : ParserAndCompiler.S with type init_data = ID.t) (Runners : sig
       val runners : Bulk.Runner.t list
     end) (Gil_to_tl_lifter : functor (V : Verifier.S) ->
       Debugger.Gil_to_tl_lifter.S
@@ -38,8 +39,8 @@ struct
 
   module Verification = Verifier.Make (SState) (SPState) (External)
   module Gil_to_tl_lifter = Gil_to_tl_lifter (Verification)
-  module Abductor = Abductor.Make (SState) (SPState) (External)
-  module Debugger = Debugger.Make (PC) (Verification) (Gil_to_tl_lifter)
+  module Abductor = Abductor.Make (SPState) (External)
+  module Debugger = Debugger.Make (ID) (PC) (Verification) (Gil_to_tl_lifter)
   module DebugAdapter = DebugAdapter.Make (Debugger)
 
   let entry_point =
@@ -221,11 +222,19 @@ struct
     in
     Term.(term $ common_term)
 
-  let burn_gil prog outfile_opt =
+  let burn_gil ~(init_data : Yojson.Safe.t) prog outfile_opt =
     match outfile_opt with
     | Some outfile ->
         let outc = open_out outfile in
         let fmt = Format.formatter_of_out_channel outc in
+        let () =
+          match init_data with
+          | `Null -> ()
+          | init_data ->
+              Fmt.pf fmt "#begin_init_data@\n%a@\n#end_init_data@\n"
+                (Yojson.Safe.pretty_print ~std:true)
+                init_data
+        in
         let () = Prog.pp_labeled fmt prog in
         close_out outc
     | None -> ()
@@ -296,13 +305,17 @@ struct
       | ExecRes.RSucc { flag = Flag.Normal; _ } -> true
       | _ -> false
 
-    let run debug (prog : ('a, int) Prog.t) : unit =
+    let run debug (prog : ('a, int) Prog.t) init_data : unit =
       let prog =
         match UP.init_prog prog with
         | Ok prog -> prog
         | _ -> failwith "Program could not be initialised"
       in
-      let ret = CInterpreter.evaluate_prog prog in
+      let ret =
+        CInterpreter.evaluate_proc
+          (fun x -> x)
+          prog !Config.entry_point [] (CState.init init_data)
+      in
       let () =
         if debug then
           Format.printf "Final state: @\n%a@\n" CInterpreter.Logging.pp_result
@@ -315,22 +328,32 @@ struct
       let () = PC.initialize Concrete in
       let () = Config.no_heap := no_heap in
       let () = Config.entry_point := entry_point in
-      let e_prog =
+      let e_prog, init_data =
         if not already_compiled then (
-          let e_progs =
-            (get_progs_or_fail (PC.parse_and_compile_files files)).gil_progs
-          in
+          let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
+          let e_progs, init_data = (progs.gil_progs, progs.init_data) in
           Gil_parsing.cache_labelled_progs (List.tl e_progs);
-          snd (List.hd e_progs))
-        else Gil_parsing.parse_eprog_from_file (List.hd files)
+          (snd (List.hd e_progs), init_data))
+        else
+          let Gil_parsing.{ labeled_prog; init_data } =
+            Gil_parsing.parse_eprog_from_file (List.hd files)
+          in
+          let init_data =
+            match ID.of_yojson init_data with
+            | Ok d -> d
+            | Error e -> failwith e
+          in
+          (labeled_prog, init_data)
       in
-      let () = burn_gil e_prog outfile_opt in
+      let () =
+        burn_gil ~init_data:(ID.to_yojson init_data) e_prog outfile_opt
+      in
       let prog =
         Gil_parsing.eprog_to_prog
           ~other_imports:(convert_other_imports PC.other_imports)
           e_prog
       in
-      let () = run debug prog in
+      let () = run debug prog init_data in
       Logging.wrap_up ()
 
     let debug =
@@ -359,14 +382,14 @@ struct
   end
 
   module SInterpreterConsole = struct
-    let run (prog : UP.prog) incremental source_files =
+    let run (prog : UP.prog) init_data incremental source_files =
       let open ResultsDir in
       let open ChangeTracker in
       let run_main prog =
         ignore
           (SInterpreter.evaluate_proc
              (fun x -> x)
-             prog !Config.entry_point [] (SState.init ()))
+             prog !Config.entry_point [] (SState.init init_data))
       in
       if incremental && prev_results_exist () then
         (* Only re-run program if transitive callees of main proc have changed *)
@@ -401,7 +424,7 @@ struct
         write_symbolic_results cur_source_files call_graph ~diff:""
 
     let process_files files already_compiled outfile_opt incremental =
-      let e_prog, source_files_opt =
+      let e_prog, init_data, source_files_opt =
         if not already_compiled then
           let () =
             L.verbose (fun m ->
@@ -411,18 +434,32 @@ struct
                    compiling to Gil. ***@\n")
           in
           let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
+          let init_data = progs.init_data in
           let e_progs = progs.gil_progs in
           let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
           let e_prog = snd (List.hd e_progs) in
           let source_files = progs.source_files in
-          (e_prog, Some source_files)
+          (e_prog, init_data, Some source_files)
         else
           let () =
             L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
           in
-          (Gil_parsing.parse_eprog_from_file (List.hd files), None)
+          let e_prog, init_data =
+            let Gil_parsing.{ labeled_prog; init_data } =
+              Gil_parsing.parse_eprog_from_file (List.hd files)
+            in
+            let init_data =
+              match ID.of_yojson init_data with
+              | Ok d -> d
+              | Error e -> failwith e
+            in
+            (labeled_prog, init_data)
+          in
+          (e_prog, init_data, None)
       in
-      let () = burn_gil e_prog outfile_opt in
+      let () =
+        burn_gil ~init_data:(ID.to_yojson init_data) e_prog outfile_opt
+      in
       let () =
         L.normal (fun m -> m "*** Stage 2: Transforming the program.\n")
       in
@@ -437,7 +474,7 @@ struct
       let () = L.normal (fun m -> m "*** Stage 3: Symbolic Execution.\n") in
       match UP.init_prog prog with
       | Error _ -> failwith "Creation of unification plans failed"
-      | Ok prog' -> run prog' incremental source_files_opt
+      | Ok prog' -> run prog' init_data incremental source_files_opt
 
     let wpst
         files
@@ -525,19 +562,31 @@ struct
     let process_files files already_compiled outfile_opt no_unfold incremental =
       Verification.start_time := Sys.time ();
       Fmt.pr "Parsing and compiling...\n@?";
-      let e_prog, source_files_opt =
+      let e_prog, init_data, source_files_opt =
         if not already_compiled then
           let progs = get_progs_or_fail (PC.parse_and_compile_files files) in
           let e_progs = progs.gil_progs in
           let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
           let e_prog = snd (List.hd e_progs) in
           let source_files = progs.source_files in
-          (e_prog, Some source_files)
+          (e_prog, progs.init_data, Some source_files)
         else
-          let e_prog = Gil_parsing.parse_eprog_from_file (List.hd files) in
-          (e_prog, None)
+          let e_prog, init_data =
+            let Gil_parsing.{ labeled_prog; init_data } =
+              Gil_parsing.parse_eprog_from_file (List.hd files)
+            in
+            let init_data =
+              match ID.of_yojson init_data with
+              | Ok d -> d
+              | Error e -> failwith e
+            in
+            (labeled_prog, init_data)
+          in
+          (e_prog, init_data, None)
       in
-      let () = burn_gil e_prog outfile_opt in
+      let () =
+        burn_gil ~init_data:(ID.to_yojson init_data) e_prog outfile_opt
+      in
       (* Prog.perform_syntax_checks e_prog; *)
       Fmt.pr "Preprocessing...\n@?";
       let prog =
@@ -555,7 +604,7 @@ struct
             m "@\nProgram after logic preprocessing:@\n%a@\n" Prog.pp_indexed
               prog)
       in
-      Verification.verify_prog prog incremental source_files_opt
+      Verification.verify_prog ~init_data prog incremental source_files_opt
 
     let verify
         files
@@ -618,7 +667,7 @@ struct
     let process_files files already_compiled outfile_opt emit_specs incremental
         =
       let file = List.hd files in
-      let e_prog, source_files_opt =
+      let e_prog, init_data, source_files_opt =
         if not already_compiled then
           let () =
             L.verbose (fun m ->
@@ -632,14 +681,24 @@ struct
           let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
           let e_prog = snd (List.hd e_progs) in
           let source_files = progs.source_files in
-          (e_prog, Some source_files)
+          (e_prog, progs.init_data, Some source_files)
         else
           let () =
             L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
           in
-          (Gil_parsing.parse_eprog_from_file file, None)
+          let Gil_parsing.{ labeled_prog; init_data } =
+            Gil_parsing.parse_eprog_from_file file
+          in
+          let init_data =
+            match ID.of_yojson init_data with
+            | Ok d -> d
+            | Error e -> failwith e
+          in
+          (labeled_prog, init_data, None)
       in
-      let () = burn_gil e_prog outfile_opt in
+      let () =
+        burn_gil ~init_data:(ID.to_yojson init_data) e_prog outfile_opt
+      in
       let () =
         L.normal (fun m -> m "*** Stage 2: Transforming the program.@\n")
       in
@@ -658,7 +717,9 @@ struct
       match UP.init_prog prog with
       | Error _ -> failwith "Creation of unification plans failed."
       | Ok prog' ->
-          let () = Abductor.test_prog prog' incremental source_files_opt in
+          let () =
+            Abductor.test_prog ~init_data prog' incremental source_files_opt
+          in
           if emit_specs then
             let () = Prog.update_specs e_prog prog'.prog in
             let fname = Filename.chop_extension (Filename.basename file) in

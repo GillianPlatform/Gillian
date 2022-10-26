@@ -1,7 +1,7 @@
 (library
  (name gil_parsing)
  (public_name gillian.gil_parsing)
- (libraries utils gil_syntax str)
+ (libraries utils gil_syntax str yojson)
  (flags :standard -open Utils -open Utils.Prelude -open Gil_syntax))
 
 (menhir

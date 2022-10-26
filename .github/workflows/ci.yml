@@ -173,7 +173,7 @@ jobs:
         with:
           repository: GillianPlatform/collections-c-for-gillian
           path: collections-c
-          ref: efa82610f2a60e861a13b1e3943a15311ba4b471
+          ref: c14d61c5d636e0bf5e4d608ec0e880575ddef6a7
       - name: Symbolic Testing Collections-C
         run: "./runGillianTests.sh"
         working-directory: collections-c

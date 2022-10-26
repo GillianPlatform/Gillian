@@ -613,7 +613,7 @@ struct
 
   (** Normalise Predicate Assertions (Initialise Predicate Set) *)
   let normalise_preds
-      (pred_defs : (string, UP.pred) Hashtbl.t option)
+      (pred_defs : (string, UP.pred) Hashtbl.t)
       (store : SStore.t)
       (pfs : PFS.t)
       (gamma : TypEnv.t)
@@ -621,9 +621,6 @@ struct
       (pred_asrts : (string * Expr.t list) list) : SPreds.t =
     let fe = normalise_logic_expression store gamma subst in
     let preds = SPreds.init [] in
-    let pred_defs =
-      Option.value ~default:(Hashtbl.create Config.small_tbl_size) pred_defs
-    in
 
     List.iter
       (fun (pn, les) ->
@@ -893,8 +890,8 @@ struct
 
   (** Given an assertion creates a symbolic state and a substitution *)
   let normalise_assertion
-      ?(pred_defs : UP.preds_tbl_t option)
-      ?(gamma = TypEnv.init ())
+      ~(pred_defs : UP.preds_tbl_t)
+      ~(init_data : SPState.init_data)
       ?(pvars : SS.t option)
       (a : Asrt.t) : ((SPState.t * SESubst.t) list, string) result =
     let falsePFs pfs = PFS.mem pfs False in
@@ -910,7 +907,7 @@ struct
 
     (* Step 2a -- Create empty symbolic heap, symbolic store, typing environment, and substitution *)
     let store = SStore.init [] in
-    let gamma = TypEnv.copy gamma in
+    let gamma = TypEnv.init () in
     let subst = SESubst.init [] in
 
     (* Step 2b -- Separate assertion *)
@@ -960,7 +957,8 @@ struct
         (* Step 7 -- Construct the state *)
         let preds' = normalise_preds pred_defs store pfs gamma subst preds in
         let astate : SPState.t =
-          SPState.struct_init ?preds:pred_defs store pfs gamma svars
+          SPState.make_p ~preds:pred_defs ~init_data ~store ~pfs ~gamma
+            ~spec_vars:svars ()
         in
         let astate = SPState.set_preds astate preds' in
         let astate = produce_core_asrts astate c_asrts' in

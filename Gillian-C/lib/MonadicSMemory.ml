@@ -9,9 +9,10 @@ open Gillian.Gil_syntax
 module Logging = Gillian.Logging
 module SS = GUtils.Containers.SS
 module SVal = MonadicSVal
-module GEnv = GEnv.Symbolic
 
 (* Some utils first *)
+
+type init_data = Global_env.t
 
 let resolve_or_create_loc_name (lvar_loc : Expr.t) : string Delayed.t =
   let open Delayed.Syntax in
@@ -42,12 +43,9 @@ type err_t =
       at_locations : string list;
       sheaptree_err : SHeapTree.err;
     }
-  | GEnvErr of GEnv.err_t
 
 let lift_sheaptree_err loc err =
   SHeapTreeErr { at_locations = [ loc ]; sheaptree_err = err }
-
-let lift_genv_res r = Result.map_error (fun e -> GEnvErr e) r
 
 let resolve_loc_result loc =
   Delayed_result.of_do ~none:(InvalidLocation loc) (Delayed.resolve_loc loc)
@@ -313,6 +311,10 @@ module Mem = struct
 
   let set_hole = set_simple ~sheap_setter:SHeapTree.set_hole
 
+  let allocate_function { map; _ } loc =
+    let tree = SHeapTree.allocated_function in
+    SMap.add loc tree map |> make_other
+
   let rem_hole =
     rem_simple ~check:(fun last_op loc low high ->
         match last_op with
@@ -393,28 +395,14 @@ module Mem = struct
   let assertions ~exclude { map; _ } =
     SMap.fold
       (fun loc tree acc ->
-        if not (List.mem loc exclude) then SHeapTree.assertions ~loc tree @ acc
-        else acc)
+        if exclude loc then acc else SHeapTree.assertions ~loc tree @ acc)
       map []
 
-  let pp_full ~genv ft mem =
-    let is_fun loc =
-      try
-        match GEnv.find_def genv loc with
-        | FunDef _ -> true
-        | _ -> false
-      with Not_found -> false
-    in
-    let iter_exclude f map =
-      SMap.iter (fun loc x -> if not (is_fun loc) then f loc x) map
-    in
+  let pp_full ft mem =
     let open Fmt in
-    pf ft "%a"
-      (Dump.iter_bindings iter_exclude nop string SHeapTree.pp_full)
-      mem
+    (Dump.iter_bindings SMap.iter nop string SHeapTree.pp_full) ft mem
 
-  let substitution ?(genv = GEnv.empty) subst ({ map; last_op } as mem) :
-      (t, SHeapTree.err) DR.t =
+  let substitution subst ({ map; last_op } as mem) : (t, SHeapTree.err) DR.t =
     let open DR.Syntax in
     if Subst.domain subst None = Expr.Set.empty then DR.ok mem
     else
@@ -439,7 +427,7 @@ module Mem = struct
             let** acc in
             Logging.verbose (fun fmt ->
                 fmt "SHOULD Merge locs: %s --> %a" old_loc Expr.pp new_loc);
-            Logging.tmi (fun fmt -> fmt "IN MEMORY: %a" (pp_full ~genv) acc);
+            Logging.tmi (fun fmt -> fmt "IN MEMORY: %a" pp_full acc);
             let new_loc =
               match new_loc with
               | Lit (Loc loc) | ALoc loc -> loc
@@ -466,48 +454,49 @@ module Mem = struct
       in
       { map; last_op }
 
-  let pp_normal ~genv ft mem =
-    let is_fun loc =
-      try
-        match GEnv.find_def genv loc with
-        | FunDef _ -> true
-        | _ -> false
-      with Not_found -> false
-    in
+  let pp_normal ~exclude ft mem =
     let is_first = ref true in
     SMap.iter
       (fun loc tree ->
-        if not (is_fun loc) then (
+        if not (exclude loc) then (
           if !is_first then is_first := false else Fmt.pf ft "@\n";
           Fmt.pf ft "%s -> @[<v 0>%a@]" loc SHeapTree.pp tree))
       mem
 
-  let pp ?(genv = GEnv.empty) fmt { map = t; _ } =
-    if !Config.pp_full_tree then pp_full ~genv fmt t else pp_normal ~genv fmt t
+  let pp ~exclude fmt { map = t; _ } =
+    if !Config.pp_full_tree then pp_full fmt t else pp_normal ~exclude fmt t
 end
 
-type t' = { genv : GEnv.t; mem : Mem.t }
-type t = t' ref
+type t = { genv : Global_env.t; mem : Mem.t ref }
 
 let to_yojson t =
-  let { genv = _; mem } = !t in
-  Mem.to_yojson mem
+  let { genv = _; mem } = t in
+  Mem.to_yojson !mem
 
 let of_yojson m =
-  Result.map (fun mem -> ref { genv = GEnv.empty; mem }) (Mem.of_yojson m)
+  Result.map
+    (fun mem -> { genv = Global_env.empty; mem = ref mem })
+    (Mem.of_yojson m)
 
 type action_ret = Success of (t * vt list) | Failure of err_t
 
-let make_branch ~heap ?(rets = []) () = (ref heap, rets)
+let make_branch ~heap ?(rets = []) () = (heap, rets)
 
 (* Init *)
 
-let init () = ref { genv = GEnv.empty; mem = Mem.empty }
-let copy h = ref { genv = !h.genv; mem = Mem.copy !h.mem }
+let just_functions genv =
+  if !Config.allocated_functions then
+    PMap.foldi
+      (fun loc def acc ->
+        match def with
+        | Global_env.FunDef _ -> Mem.allocate_function acc loc
+        | GlobVar _ -> acc)
+      genv Mem.empty
+  else Mem.empty
 
-(* let subst_spec_vars _ _ = () *)
-
-(* Ungraceful failure *)
+let init genv = { genv; mem = ref (just_functions genv) }
+let clear { genv; _ } = { genv; mem = ref (just_functions genv) }
+let copy h = { genv = h.genv; mem = ref (Mem.copy !(h.mem)) }
 
 let pp_params fmt params =
   let rec aux fmtp = function
@@ -527,9 +516,9 @@ let fail_ungracefully act_name params =
 let execute_alloc heap params =
   match params with
   | [ low; high ] ->
-      let mem, loc = Mem.alloc heap.mem low high in
+      let mem, loc = Mem.alloc !(heap.mem) low high in
       let result =
-        make_branch ~heap:{ heap with mem } ~rets:[ Expr.ALoc loc ] ()
+        make_branch ~heap:{ heap with mem = ref mem } ~rets:[ Expr.ALoc loc ] ()
       in
       DR.ok result
   | _ -> fail_ungracefully "alloc" params
@@ -538,7 +527,7 @@ let execute_getcurperm heap params =
   let open DR.Syntax in
   match params with
   | [ loc; ofs ] ->
-      let** perm = Mem.getcurperm heap.mem loc ofs in
+      let** perm = Mem.getcurperm !(heap.mem) loc ofs in
       let perm_string =
         Expr.Lit (String (ValueTranslation.string_of_permission_opt perm))
       in
@@ -550,7 +539,7 @@ let execute_weak_valid_pointer heap params =
   let open DR.Syntax in
   match params with
   | [ loc; ofs ] ->
-      let** bool = Mem.weak_valid_pointer heap.mem loc ofs in
+      let** bool = Mem.weak_valid_pointer !(heap.mem) loc ofs in
       let res = Expr.bool bool in
       let branch = make_branch ~heap ~rets:[ res ] () in
       DR.ok branch
@@ -561,8 +550,8 @@ let execute_drop_perm heap params =
   match params with
   | [ loc; low; high; Expr.Lit (String perm_string) ] ->
       let perm = ValueTranslation.permission_of_string perm_string in
-      let++ mem = Mem.drop_perm heap.mem loc low high perm in
-      make_branch ~heap:{ heap with mem } ~rets:[] ()
+      let++ mem = Mem.drop_perm !(heap.mem) loc low high perm in
+      make_branch ~heap:{ heap with mem = ref mem } ~rets:[] ()
   | _ -> fail_ungracefully "drop_perm" params
 
 let execute_store heap params =
@@ -571,8 +560,8 @@ let execute_store heap params =
   | [ Expr.Lit (String chunk_name); loc; ofs; value ] ->
       let* sval = SVal.of_gil_expr_exn value in
       let chunk = ValueTranslation.chunk_of_string chunk_name in
-      let++ mem = Mem.store heap.mem loc chunk ofs sval in
-      make_branch ~heap:{ heap with mem } ~rets:[] ()
+      let++ mem = Mem.store !(heap.mem) loc chunk ofs sval in
+      make_branch ~heap:{ heap with mem = ref mem } ~rets:[] ()
   | _ -> fail_ungracefully "store" params
 
 let execute_load heap params =
@@ -580,25 +569,26 @@ let execute_load heap params =
   match params with
   | [ Expr.Lit (String chunk_name); loc; ofs ] ->
       let chunk = ValueTranslation.chunk_of_string chunk_name in
-      let** value, mem = Mem.load heap.mem loc chunk ofs in
+      let** value, mem = Mem.load !(heap.mem) loc chunk ofs in
       let* gil_value = SVal.to_gil_expr value in
-      DR.ok (make_branch ~heap:{ heap with mem } ~rets:[ gil_value ] ())
+      DR.ok
+        (make_branch ~heap:{ heap with mem = ref mem } ~rets:[ gil_value ] ())
   | _ -> fail_ungracefully "store" params
 
 let execute_free heap params =
   let open DR.Syntax in
   match params with
   | [ loc; low; high ] ->
-      let++ mem = Mem.free heap.mem loc low high in
-      make_branch ~heap:{ heap with mem } ~rets:[] ()
+      let++ mem = Mem.free !(heap.mem) loc low high in
+      make_branch ~heap:{ heap with mem = ref mem } ~rets:[] ()
   | _ -> fail_ungracefully "free" params
 
 let execute_move heap params =
   let open DR.Syntax in
   match params with
   | [ dst_loc; dst_ofs; src_loc; src_ofs; size ] ->
-      let++ mem = Mem.move heap.mem dst_loc dst_ofs src_loc src_ofs size in
-      make_branch ~heap:{ heap with mem } ~rets:[] ()
+      let++ mem = Mem.move !(heap.mem) dst_loc dst_ofs src_loc src_ofs size in
+      make_branch ~heap:{ heap with mem = ref mem } ~rets:[] ()
   | _ -> fail_ungracefully "wrong call to execute_move" params
 
 let execute_get_single heap params =
@@ -606,12 +596,15 @@ let execute_get_single heap params =
   match params with
   | [ loc; ofs; Expr.Lit (String chunk_string) ] ->
       let chunk = ValueTranslation.chunk_of_string chunk_string in
-      let** mem, loc_name, sval, perm = Mem.get_single heap.mem loc ofs chunk in
+      let** mem, loc_name, sval, perm =
+        Mem.get_single !(heap.mem) loc ofs chunk
+      in
       let loc_e = expr_of_loc_name loc_name in
       let* sval_e = SVal.to_gil_expr sval in
       let perm_string = ValueTranslation.string_of_permission_opt perm in
       DR.ok
-        (make_branch ~heap:{ heap with mem }
+        (make_branch
+           ~heap:{ heap with mem = ref mem }
            ~rets:
              [
                loc_e;
@@ -636,8 +629,8 @@ let execute_set_single heap params =
       let perm = ValueTranslation.permission_of_string perm_string in
       let chunk = ValueTranslation.chunk_of_string chunk_string in
       let* sval = SVal.of_gil_expr_exn sval_e in
-      let++ mem = Mem.set_single heap.mem loc ofs chunk sval perm in
-      make_branch ~heap:{ heap with mem } ~rets:[] ()
+      let++ mem = Mem.set_single !(heap.mem) loc ofs chunk sval perm in
+      make_branch ~heap:{ heap with mem = ref mem } ~rets:[] ()
   | _ -> fail_ungracefully "set_single" params
 
 let execute_rem_single heap params =
@@ -645,8 +638,8 @@ let execute_rem_single heap params =
   match params with
   | [ loc; ofs; Expr.Lit (String chunk_string) ] ->
       let chunk = ValueTranslation.chunk_of_string chunk_string in
-      let+ mem = Mem.rem_single heap.mem loc ofs chunk in
-      Ok (make_branch ~heap:{ heap with mem } ~rets:[] ())
+      let+ mem = Mem.rem_single !(heap.mem) loc ofs chunk in
+      Ok (make_branch ~heap:{ heap with mem = ref mem } ~rets:[] ())
   | _ -> fail_ungracefully "rem_single" params
 
 let execute_get_array heap params =
@@ -655,14 +648,15 @@ let execute_get_array heap params =
   | [ loc; ofs; size; Expr.Lit (String chunk_string) ] ->
       let chunk = ValueTranslation.chunk_of_string chunk_string in
       let** mem, loc_name, array, perm =
-        Mem.get_array heap.mem loc ofs size chunk
+        Mem.get_array !(heap.mem) loc ofs size chunk
       in
       let loc_e = expr_of_loc_name loc_name in
       let range = SHeapTree.Range.of_low_chunk_and_size ofs chunk size in
       let* array_e = MonadicSVal.SVArray.to_gil_expr ~chunk ~range array in
       let perm_string = ValueTranslation.string_of_permission_opt perm in
       DR.ok
-        (make_branch ~heap:{ heap with mem }
+        (make_branch
+           ~heap:{ heap with mem = ref mem }
            ~rets:
              [
                loc_e;
@@ -689,8 +683,8 @@ let execute_set_array heap params =
       let perm = ValueTranslation.permission_of_string perm_string in
       let chunk = ValueTranslation.chunk_of_string chunk_string in
       let arr = MonadicSVal.SVArray.of_gil_expr_exn arr_e in
-      let++ mem = Mem.set_array heap.mem loc ofs size chunk arr perm in
-      make_branch ~heap:{ heap with mem } ~rets:[] ()
+      let++ mem = Mem.set_array !(heap.mem) loc ofs size chunk arr perm in
+      make_branch ~heap:{ heap with mem = ref mem } ~rets:[] ()
   | _ -> fail_ungracefully "set_single" params
 
 let execute_rem_array heap params =
@@ -698,21 +692,22 @@ let execute_rem_array heap params =
   match params with
   | [ loc; ofs; size; Expr.Lit (String chunk_string) ] ->
       let chunk = ValueTranslation.chunk_of_string chunk_string in
-      let+ mem = Mem.rem_array heap.mem loc ofs size chunk in
-      Ok (make_branch ~heap:{ heap with mem } ~rets:[] ())
+      let+ mem = Mem.rem_array !(heap.mem) loc ofs size chunk in
+      Ok (make_branch ~heap:{ heap with mem = ref mem } ~rets:[] ())
   | _ -> fail_ungracefully "rem_single" params
 
 let execute_get_simple ~mem_getter ~name heap params =
   let open DR.Syntax in
   match params with
   | [ loc; low; high ] ->
-      let** mem, loc_name, perm = mem_getter heap.mem loc low high in
+      let** mem, loc_name, perm = mem_getter !(heap.mem) loc low high in
       let loc_e = expr_of_loc_name loc_name in
       let perm_e =
         Expr.string (ValueTranslation.string_of_permission_opt perm)
       in
       DR.ok
-        (make_branch ~heap:{ heap with mem }
+        (make_branch
+           ~heap:{ heap with mem = ref mem }
            ~rets:[ loc_e; low; high; perm_e ]
            ())
   | _ -> fail_ungracefully name params
@@ -722,15 +717,15 @@ let execute_set_simple ~mem_setter ~name heap params =
   match params with
   | [ loc; low; high; Expr.Lit (String perm_string) ] ->
       let perm = ValueTranslation.permission_of_string perm_string in
-      let++ mem = mem_setter heap.mem loc low high perm in
-      make_branch ~heap:{ heap with mem } ~rets:[] ()
+      let++ mem = mem_setter !(heap.mem) loc low high perm in
+      make_branch ~heap:{ heap with mem = ref mem } ~rets:[] ()
   | _ -> fail_ungracefully name params
 
 let execute_rem_simple ~mem_remover ~name heap params =
   match params with
   | [ loc; low; high ] ->
-      let+ mem = mem_remover heap.mem loc low high in
-      Ok (make_branch ~heap:{ heap with mem } ~rets:[] ())
+      let+ mem = mem_remover !(heap.mem) loc low high in
+      Ok (make_branch ~heap:{ heap with mem = ref mem } ~rets:[] ())
   | _ -> fail_ungracefully name params
 
 let execute_get_hole =
@@ -755,30 +750,30 @@ let execute_get_freed heap params =
   let open DR.Syntax in
   match params with
   | [ loc ] ->
-      let++ () = Mem.get_freed heap.mem loc in
+      let++ () = Mem.get_freed !(heap.mem) loc in
       make_branch ~heap ~rets:[] ()
   | _ -> fail_ungracefully "get_freed" params
 
 let execute_set_freed heap params =
   match params with
   | [ loc ] ->
-      let+ mem = Mem.set_freed heap.mem loc in
-      Ok (make_branch ~heap:{ heap with mem } ~rets:[] ())
+      let+ mem = Mem.set_freed !(heap.mem) loc in
+      Ok (make_branch ~heap:{ heap with mem = ref mem } ~rets:[] ())
   | _ -> fail_ungracefully "set_freed" params
 
 let execute_rem_freed heap params =
   let open DR.Syntax in
   match params with
   | [ loc ] ->
-      let++ mem = Mem.rem_freed heap.mem loc in
-      make_branch ~heap:{ heap with mem } ~rets:[] ()
+      let++ mem = Mem.rem_freed !(heap.mem) loc in
+      make_branch ~heap:{ heap with mem = ref mem } ~rets:[] ()
   | _ -> fail_ungracefully "rem_freed" params
 
 let execute_get_bounds heap params =
   let open DR.Syntax in
   match params with
   | [ loc ] ->
-      let++ loc_name, bounds = Mem.get_bounds heap.mem loc in
+      let++ loc_name, bounds = Mem.get_bounds !(heap.mem) loc in
       let bounds_e =
         match bounds with
         | None -> Expr.Lit Null
@@ -799,65 +794,25 @@ let execute_set_bounds heap params =
         | Lit Null -> None
         | _ -> fail_ungracefully "set_bounds" params
       in
-      let++ mem = Mem.set_bounds heap.mem loc bounds in
-      make_branch ~heap:{ heap with mem } ~rets:[] ()
+      let++ mem = Mem.set_bounds !(heap.mem) loc bounds in
+      make_branch ~heap:{ heap with mem = ref mem } ~rets:[] ()
   | _ -> fail_ungracefully "set_bounds" params
 
 let execute_rem_bounds heap params =
   let open DR.Syntax in
   match params with
   | [ loc ] ->
-      let++ mem = Mem.rem_bounds heap.mem loc in
-      make_branch ~heap:{ heap with mem } ~rets:[] ()
+      let++ mem = Mem.rem_bounds !(heap.mem) loc in
+      make_branch ~heap:{ heap with mem = ref mem } ~rets:[] ()
   | _ -> fail_ungracefully "rem_bounds" params
 
-let execute_genvgetsymbol heap params =
-  let ( let- ) x f = Result.map f (lift_genv_res x) in
-  let open Gillian.Gil_syntax.Expr in
-  match params with
-  | [ Lit (String symbol) ] ->
-      Delayed.return
-      @@ let- sym = GEnv.find_symbol heap.genv symbol in
-         make_branch ~heap
-           ~rets:[ Lit (String symbol); loc_from_loc_name sym ]
-           ()
-  | _ -> fail_ungracefully "genv_getsymbol" params
-
-let execute_genvsetsymbol heap params =
-  match params with
-  | [ Expr.Lit (String symbol); lvar_loc ] ->
-      let+ genv = GEnv.set_symbol heap.genv symbol lvar_loc in
-      Ok (make_branch ~heap:{ heap with genv } ~rets:[] ())
-  | _ -> fail_ungracefully "genv_getsymbol" params
-
-let execute_genvremsymbol heap params =
-  match params with
-  | [ _symbolc ] -> DR.ok (make_branch ~heap ())
-  | _ -> fail_ungracefully "genv_remsymbol" params
-
 let execute_genvgetdef heap params =
-  let open DR.Syntax in
   match params with
-  | [ loc ] ->
-      let** loc_name = resolve_loc_result loc in
-      let def = GEnv.find_def heap.genv loc_name in
-      let v = GEnv.serialize_def def in
-      DR.ok (make_branch ~heap ~rets:[ Expr.loc_from_loc_name loc_name; v ] ())
+  | [ Expr.Lit (Loc loc) ] ->
+      let def = Global_env.find_def heap.genv loc in
+      let v = Global_env.serialize_def def in
+      DR.ok (make_branch ~heap ~rets:[ Expr.Lit (Loc loc); Expr.Lit v ] ())
   | _ -> fail_ungracefully "genv_getdef" params
-
-let execute_genvsetdef heap params =
-  match params with
-  | [ lvar_loc; v_def ] ->
-      let* loc_name = resolve_or_create_loc_name lvar_loc in
-      let def = GEnv.deserialize_def v_def in
-      let* genv = GEnv.set_def heap.genv loc_name def in
-      DR.ok (make_branch ~heap:{ heap with genv } ())
-  | _ -> fail_ungracefully "genv_setdef" params
-
-let execute_genvremdef heap params =
-  match params with
-  | [ _loc ] -> DR.ok (make_branch ~heap ())
-  | _ -> fail_ungracefully "genv_remdef" params
 
 (* Complete fixes  *)
 
@@ -880,13 +835,18 @@ let pp_err fmt (e : err_t) =
           | [ s ] -> Fmt.pf fmt " '%s'" s
           | l -> Fmt.pf fmt "s %a" (Fmt.Dump.list Fmt.string) l)
         at_locations SHeapTree.pp_err sheaptree_err
-  | GEnvErr (Symbol_not_found s) -> Fmt.pf fmt "Symbol not found: %s" s
 
 (* let str_of_err e = Format.asprintf "%a" pp_err e *)
 
 let pp fmt h =
-  Format.fprintf fmt "GEnv : @[%a@]@\nMem  : @[%a@]" GEnv.pp !h.genv
-    (Mem.pp ~genv:!h.genv) !h.mem
+  let exclude loc =
+    try
+      match PMap.find loc h.genv with
+      | Global_env.FunDef _ -> true
+      | _ -> false
+    with Not_found -> false
+  in
+  Format.fprintf fmt "@[%a@]" (Mem.pp ~exclude) !(h.mem)
 
 let pp_by_need (_ : SS.t) fmt h = pp fmt h
 let get_print_info _ _ = (SS.empty, SS.empty)
@@ -917,38 +877,33 @@ let execute_action ~action_name heap params =
   let open LActions in
   let a_ret =
     match ac_from_str action_name with
-    | AMem Alloc -> execute_alloc !heap params
-    | AMem GetCurPerm -> execute_getcurperm !heap params
-    | AMem WeakValidPointer -> execute_weak_valid_pointer !heap params
-    | AMem DropPerm -> execute_drop_perm !heap params
-    | AMem Store -> execute_store !heap params
-    | AMem Load -> execute_load !heap params
-    | AMem Free -> execute_free !heap params
-    | AMem Move -> execute_move !heap params
-    | AMem GetSingle -> execute_get_single !heap params
-    | AMem SetSingle -> execute_set_single !heap params
-    | AMem RemSingle -> execute_rem_single !heap params
-    | AMem GetArray -> execute_get_array !heap params
-    | AMem SetArray -> execute_set_array !heap params
-    | AMem RemArray -> execute_rem_array !heap params
-    | AMem GetBounds -> execute_get_bounds !heap params
-    | AMem SetBounds -> execute_set_bounds !heap params
-    | AMem RemBounds -> execute_rem_bounds !heap params
-    | AMem GetHole -> execute_get_hole !heap params
-    | AMem SetHole -> execute_set_hole !heap params
-    | AMem RemHole -> execute_rem_hole !heap params
-    | AMem GetZeros -> execute_get_zeros !heap params
-    | AMem SetZeros -> execute_set_zeros !heap params
-    | AMem RemZeros -> execute_rem_zeros !heap params
-    | AMem GetFreed -> execute_get_freed !heap params
-    | AMem SetFreed -> execute_set_freed !heap params
-    | AMem RemFreed -> execute_rem_freed !heap params
-    | AGEnv GetSymbol -> execute_genvgetsymbol !heap params
-    | AGEnv SetSymbol -> execute_genvsetsymbol !heap params
-    | AGEnv RemSymbol -> execute_genvremsymbol !heap params
-    | AGEnv GetDef -> execute_genvgetdef !heap params
-    | AGEnv SetDef -> execute_genvsetdef !heap params
-    | AGEnv RemDef -> execute_genvremdef !heap params
+    | AMem Alloc -> execute_alloc heap params
+    | AMem GetCurPerm -> execute_getcurperm heap params
+    | AMem WeakValidPointer -> execute_weak_valid_pointer heap params
+    | AMem DropPerm -> execute_drop_perm heap params
+    | AMem Store -> execute_store heap params
+    | AMem Load -> execute_load heap params
+    | AMem Free -> execute_free heap params
+    | AMem Move -> execute_move heap params
+    | AMem GetSingle -> execute_get_single heap params
+    | AMem SetSingle -> execute_set_single heap params
+    | AMem RemSingle -> execute_rem_single heap params
+    | AMem GetArray -> execute_get_array heap params
+    | AMem SetArray -> execute_set_array heap params
+    | AMem RemArray -> execute_rem_array heap params
+    | AMem GetBounds -> execute_get_bounds heap params
+    | AMem SetBounds -> execute_set_bounds heap params
+    | AMem RemBounds -> execute_rem_bounds heap params
+    | AMem GetHole -> execute_get_hole heap params
+    | AMem SetHole -> execute_set_hole heap params
+    | AMem RemHole -> execute_rem_hole heap params
+    | AMem GetZeros -> execute_get_zeros heap params
+    | AMem SetZeros -> execute_set_zeros heap params
+    | AMem RemZeros -> execute_rem_zeros heap params
+    | AMem GetFreed -> execute_get_freed heap params
+    | AMem SetFreed -> execute_set_freed heap params
+    | AMem RemFreed -> execute_rem_freed heap params
+    | AGEnv GetDef -> execute_genvgetdef heap params
   in
   lift_dr_and_log a_ret
 
@@ -961,34 +916,30 @@ let ga_to_deleter = LActions.ga_to_deleter_str
 (* Serialization and operations *)
 let substitution_in_place subst heap =
   let open Delayed.Syntax in
-  let { mem; genv } = !heap in
-  let genv = GEnv.substitution subst genv in
-  let+ mem = Mem.substitution ~genv subst mem in
+  let { mem; genv } = heap in
+  let+ mem = Mem.substitution subst !mem in
   match mem with
-  | Ok mem -> ref { mem; genv }
+  | Ok mem -> { mem = ref mem; genv }
   | Error e -> Fmt.failwith "Error in substitution: %a" SHeapTree.pp_err e
-
-(* let { mem; genv } = !heap in
-   let nmem = Mem.substitution subst mem in
-   let ngenv = GEnv.substitution subst genv in
-   heap := { mem = nmem; genv = ngenv } *)
 
 let fresh_val _ = Expr.LVar (LVar.alloc ())
 
 let clean_up ?(keep = Expr.Set.empty) _ : Expr.Set.t * Expr.Set.t =
   (Expr.Set.empty, keep)
 
-let lvars heap = Mem.lvars !heap.mem
-let alocs heap = Mem.alocs !heap.mem
+let lvars heap = Mem.lvars !(heap.mem)
+let alocs heap = Mem.alocs !(heap.mem)
 
 let assertions ?to_keep:_ heap =
-  let genv_locs, genv_asrts = GEnv.assertions !heap.genv in
-  let mem_asrts = Mem.assertions ~exclude:genv_locs !heap.mem in
-  genv_asrts @ mem_asrts
-
-(* let genv_locs, genv_asrts = GEnv.assertions !heap.genv in
-   let mem_asrts = Mem.assertions ~exclude:genv_locs !heap.mem in
-   genv_asrts @ mem_asrts *)
+  let exclude loc =
+    try
+      match PMap.find loc heap.genv with
+      | Global_env.FunDef _ -> true
+      | _ -> false
+    with Not_found -> false
+  in
+  let mem_asrts = Mem.assertions ~exclude !(heap.mem) in
+  mem_asrts
 
 let mem_constraints _heap = []
 let is_overlapping_asrt = LActions.is_overlapping_asrt_str
@@ -1020,18 +971,18 @@ module Lift = struct
     in
     { name; value; var_ref; type_ }
 
-  let add_variables ~store ~memory ~is_gil_file:_ ~get_new_scope_id variables =
+  let add_variables
+      ~store
+      ~(memory : t)
+      ~is_gil_file:_
+      ~get_new_scope_id
+      variables =
     let open DebuggerTypes in
-    let { mem; genv = _ } = !memory in
+    let mem = !(memory.mem) in
     (* Store first *)
     let store_id = get_new_scope_id () in
     let store_vars = get_store_vars store in
     Hashtbl.replace variables store_id store_vars;
-    (* Then genv *)
-    (* TODO: Print the global environment *)
-    (* let genv_id = get_new_scope_id () in
-       let genv_vars = GEnv.Lifting.get_vars genv in
-       Hashtbl.replace variables genv_id genv_vars; *)
     (* And finally heap*)
     let make_node = make_node ~get_new_scope_id ~variables in
     let heap_id = get_new_scope_id () in
@@ -1059,7 +1010,6 @@ let get_recovery_vals _ = function
   | MissingLocResource l -> [ Expr.loc_from_loc_name l ]
   | SHeapTreeErr { at_locations; _ } ->
       List.map Expr.loc_from_loc_name at_locations
-  | GEnvErr (Symbol_not_found s) -> [ Expr.string s ]
 
 let get_failing_constraint _e = failwith "Not ready for bi-abduction yet"
 

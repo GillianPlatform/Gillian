@@ -15,6 +15,7 @@ module type S = sig
   type state_err_t [@@deriving show]
   type state_vt [@@deriving yojson, show]
   type heap_t
+  type init_data
 
   module Val : Val.S with type t = vt
   module Store : Store.S with type t = store_t and type vt = vt
@@ -121,8 +122,6 @@ module type S = sig
 
   val evaluate_proc :
     (result_t -> 'a) -> UP.prog -> string -> string list -> state_t -> 'a list
-
-  val evaluate_prog : UP.prog -> result_t list
 end
 
 (** General GIL Interpreter *)
@@ -151,6 +150,7 @@ struct
   type store_t = Store.t
   type state_t = State.t [@@deriving yojson]
   type state_err_t = State.err_t [@@deriving yojson]
+  type init_data = State.init_data
 
   let pp_state_err_t = State.pp_err
   let show_state_err_t = Fmt.to_to_string pp_state_err_t
@@ -337,7 +337,6 @@ struct
 
       let log_result = log cmd_result
       let log_init = log proc_init
-      let log_step = log cmd_step
     end
 
     module AnnotatedAction = struct
@@ -1877,39 +1876,4 @@ struct
   @param prog Target GIL program
   @return Final configurations
 *)
-  let evaluate_prog (prog : UP.prog) : result_t list =
-    Random.self_init ();
-    let ret_fun x = x in
-    let initial_cs =
-      CallStack.push CallStack.empty ~pid:!Config.entry_point ~arguments:[]
-        ~loop_ids:[] ~ret_var:"out" ~call_index:(-1) ~continue_index:(-1)
-        ~error_index:(-1) ()
-    in
-    let initial_proc_body_index = 0 in
-    let initial_state = State.init ~preds:prog.preds () in
-    let initial_conf =
-      make_confcont ~state:initial_state ~callstack:initial_cs
-        ~invariant_frames:[] ~prev_idx:(-1) ~loop_ids:[]
-        ~next_idx:initial_proc_body_index ~branch_count:0 ~branch_path:[] ()
-    in
-    let report_id =
-      CmdResult.log_step
-        {
-          callstack = initial_cs;
-          proc_body_index = initial_proc_body_index;
-          state = Some initial_state;
-          errors = [];
-          branch_case = None;
-        }
-    in
-    let init_func =
-      Continue
-        ( report_id,
-          [],
-          None,
-          fun ?path () ->
-            evaluate_cmd_step ret_fun true prog [] [] [ initial_conf ] path []
-        )
-    in
-    evaluate_cmd_iter init_func
 end

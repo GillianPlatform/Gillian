@@ -1,4 +1,4 @@
-include Gillian.Monadic.MonadicSMemory.S
+include Gillian.Monadic.MonadicSMemory.S with type init_data = Global_env.t
 
 module Lift : sig
   open Debugger.DebuggerTypes

@@ -1,5 +1,8 @@
 module CLI =
-  Gillian.CommandLine.Make (Semantics.Concrete) (Semantics.Symbolic)
+  Gillian.CommandLine.Make
+    (Gillian.General.Init_data.Dummy)
+    (Semantics.Concrete)
+    (Semantics.Symbolic)
     (Semantics.External)
     (Js2jsil_lib.JS2GIL_ParserAndCompiler)
     (struct

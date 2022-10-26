@@ -28,15 +28,13 @@ type mem_ac =
   | SetFreed
   | RemFreed
 
-type genv_ac = GetSymbol | SetSymbol | RemSymbol | GetDef | SetDef | RemDef
+type genv_ac = GetDef
 
 type ac =
   | AGEnv of genv_ac  (** Actions related to the memory *)
   | AMem of mem_ac  (** Actions related to the global environment *)
 
-type mem_ga = Single | Array | Hole | Zeros | Bounds | Freed
-type genv_ga = Symbol | Definition
-type ga = GMem of mem_ga | GGenv of genv_ga
+type ga = Single | Array | Hole | Zeros | Bounds | Freed
 
 (** {3 Serialization of actions} *)
 

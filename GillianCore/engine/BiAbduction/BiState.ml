@@ -11,9 +11,6 @@ module Make
                 and type st = ESubst.t
                 and type store_t = Store.t) =
 struct
-  module Preds = Preds.Make (Val) (ESubst)
-  module AState = PState.Make (Val) (ESubst) (Store) (State) (Preds)
-
   type vt = Val.t [@@deriving yojson, show]
   type st = ESubst.t
   type store_t = Store.t
@@ -24,6 +21,7 @@ struct
   type fix_t = State.fix_t
   type m_err_t = State.m_err_t
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
+  type init_data = State.init_data
 
   exception Internal_State_Error of err_t list * t
 
@@ -60,20 +58,13 @@ struct
       in
       ASucc (List.concat rets)
 
-  let init ?(preds : UP.preds_tbl_t option) ?(variants : variants_t option) () :
-      t =
-    let _ = variants in
-    (SS.empty, State.init ?preds (), State.init ?preds ())
-
   let get_pred_defs (bi_state : t) : UP.preds_tbl_t option =
     let _, state, _ = bi_state in
     State.get_pred_defs state
 
-  let initialise
-      (procs : SS.t)
-      (state : State.t)
-      (pred_defs : UP.preds_tbl_t option) : t =
-    (procs, state, State.init ?preds:pred_defs ())
+  let make ~(procs : SS.t) ~(state : State.t) ~(init_data : State.init_data) : t
+      =
+    (procs, state, State.init init_data)
 
   let eval_expr (bi_state : t) (e : Expr.t) =
     let _, state, _ = bi_state in
@@ -218,9 +209,6 @@ struct
 
   let unify_invariant _ _ _ _ _ =
     raise (Failure "ERROR: unify_invariant called for bi-abductive execution")
-
-  let clear_resource _ =
-    raise (Failure "ERROR: clear_resource called for bi-abdutive execution")
 
   let frame_on _ _ _ =
     raise (Failure "ERROR: framing called for bi-abductive execution")
@@ -534,15 +522,6 @@ struct
 
   let automatic_unfold _ _ : (t list, string) result =
     Error "Automatic unfold not supported in bi-abduction yet"
-
-  let struct_init
-      ?preds:_
-      ?variants:_
-      (_ : Store.t)
-      (_ : PFS.t)
-      (_ : TypEnv.t)
-      (_ : SS.t) : t =
-    raise (Failure "struct_init not implemented in MakeBiState")
 
   (** new functions *)
 

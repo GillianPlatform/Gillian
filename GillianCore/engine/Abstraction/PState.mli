@@ -9,10 +9,19 @@ module type S = sig
   type preds_t
   type abs_t = string * vt list
 
-  val initialise :
-    state_t -> preds_t -> UP.preds_tbl_t option -> variants_t -> t
-
   val expose : t -> state_t * preds_t * UP.preds_tbl_t * variants_t
+
+  val make_p :
+    preds:UP.preds_tbl_t ->
+    init_data:init_data ->
+    store:store_t ->
+    pfs:PFS.t ->
+    gamma:TypEnv.t ->
+    spec_vars:SS.t ->
+    unit ->
+    t
+
+  val init_with_pred_table : UP.preds_tbl_t -> init_data -> t
 
   (** Get preds of given symbolic state *)
   val get_preds : t -> preds_t
@@ -48,3 +57,4 @@ module Make
      and type preds_t = Preds.t
      and type heap_t = State.heap_t
      and type m_err_t = State.m_err_t
+     and type init_data = State.init_data

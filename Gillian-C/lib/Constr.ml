@@ -10,32 +10,30 @@ module Core = struct
     let perm =
       Expr.Lit (String (ValueTranslation.string_of_permission_opt perm))
     in
-    pred (GMem Single) [ loc; ofs; chunk ] [ sval; perm ]
+    pred Single [ loc; ofs; chunk ] [ sval; perm ]
 
   let array ~loc ~ofs ~chunk ~size ~sval_arr ~perm =
     let chunk = Expr.Lit (String (ValueTranslation.string_of_chunk chunk)) in
     let perm =
       Expr.Lit (String (ValueTranslation.string_of_permission_opt perm))
     in
-    pred (GMem Array) [ loc; ofs; size; chunk ] [ sval_arr; perm ]
+    pred Array [ loc; ofs; size; chunk ] [ sval_arr; perm ]
 
   let hole ~loc ~low ~high ~perm =
     let perm =
       Expr.Lit (String (ValueTranslation.string_of_permission_opt perm))
     in
-    pred (GMem Hole) [ loc; low; high ] [ perm ]
-
-  let symbol ~symb ~loc = pred (GGenv Symbol) [ Expr.string symb ] [ loc ]
+    pred Hole [ loc; low; high ] [ perm ]
 
   let zeros ~loc ~low ~high ~perm =
     let perm = Expr.string (ValueTranslation.string_of_permission_opt perm) in
-    pred (GMem Zeros) [ loc; low; high ] [ perm ]
+    pred Zeros [ loc; low; high ] [ perm ]
 
   let bounds ~loc ~low ~high =
     let bounds = Expr.EList [ low; high ] in
-    pred (GMem Bounds) [ loc ] [ bounds ]
+    pred Bounds [ loc ] [ bounds ]
 
-  let freed ~loc = pred (GMem Freed) [ loc ] []
+  let freed ~loc = pred Freed [ loc ] []
 end
 
 module Others = struct
@@ -63,17 +61,4 @@ module Others = struct
 
   let ptr_add ~ptr ~to_add ~res =
     pred Internal_Predicates.ptr_add [ ptr; to_add; res ]
-
-  let fun_ptr ~ptr ~symb =
-    pred Internal_Predicates.fun_ptr [ Lit (String symb); ptr ]
-
-  let glob_fun ~symb ~fname =
-    pred Internal_Predicates.glob_fun [ Lit (String symb); fname ]
-
-  let glob_var_unallocated ~symb ~vname =
-    pred Internal_Predicates.glob_var_unallocated [ Expr.string symb; vname ]
-
-  let glob_var_unallocated_loc ~symb ~loc ~vname =
-    pred Internal_Predicates.glob_var_unallocated_loc
-      [ Expr.string symb; loc; vname ]
 end
