@@ -910,7 +910,7 @@ module BranchCase : sig
     | SpecExec of Flag.t
     | LAction of Yojson.Safe.t list
     | LActionFail of int
-  [@@deriving yojson]
+  [@@deriving yojson, show]
 
   type path = t list [@@deriving yojson]
 end

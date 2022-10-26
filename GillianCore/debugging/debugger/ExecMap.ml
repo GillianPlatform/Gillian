@@ -99,4 +99,26 @@ module Packaged = struct
           ("LActionFail", ("Logical action failure", Fmt.str "%d" x))
     in
     { kind; display; json }
+
+  let package package_data package_case (map : ('c, 'd, 'bd) _map) : t =
+    let rec aux map =
+      match map with
+      | Nothing -> Nothing
+      | Cmd { data; next } ->
+          Cmd { data = package_data aux data; next = aux next }
+      | BranchCmd { data; nexts } ->
+          let data = package_data aux data in
+          let nexts =
+            nexts
+            |> Hashtbl.map (fun case (bdata, next) ->
+                   let case = package_case bdata case in
+                   let next = aux next in
+                   (case, ((), next)))
+          in
+          BranchCmd { data; nexts }
+      | FinalCmd { data } ->
+          let data = package_data aux data in
+          FinalCmd { data }
+    in
+    aux map
 end
