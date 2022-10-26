@@ -1,6 +1,6 @@
 predicate list(+x) {
     (x == null);
-    (x -> #v, #z) * list(#z)
+    (x -b> #v, #z) * list(#z)
 }
 
 { (x == #x) * list(#x) }

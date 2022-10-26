@@ -1,10 +1,9 @@
 import "wisl_pointer_arith.gil", "wisl_core.gil";
 
 
-pred list(x) : (x == null), <cell>(#wisl__0, #wisl__1; #v) *
-  <cell>(#wisl__0, (#wisl__1 i+ 1i); #z) *
-  types(#wisl__0 : Obj, #wisl__1 : Int) * (x == {{ #wisl__0, #wisl__1 }}) *
-  list(#z);
+pred list(x) : (x == null), <cell>(#wisl__0, 0i; #v) *
+  <bound>(#wisl__0; 2i) * <cell>(#wisl__0, 1i; #z) * types(#wisl__0 : Obj) *
+  (x == {{ #wisl__0, 0i }}) * list(#z);
 
 spec list_dispose(x)
   [[  (x == #x) * list(#x)  ]]
