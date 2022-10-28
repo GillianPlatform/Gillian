@@ -1,5 +1,5 @@
 (library
  (name ppx_sat_expander)
- (public_name ppx_sat.expander)
+ (public_name gillian.ppx_sat.expander)
  (libraries ppxlib)
  (preprocess no_preprocessing))
