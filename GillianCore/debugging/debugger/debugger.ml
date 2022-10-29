@@ -92,6 +92,7 @@ struct
     tests : (string * Verification.t) list;
     main_proc_name : string;
     report_state_base : L.ReportState.t;
+    init_data : ID.t;
   }
 
   type debug_state = {
@@ -615,8 +616,8 @@ struct
                     | Stop ->
                         DL.log (fun m -> m "STOP (%a)" pp_rid cur_report_id);
                         (Step, Some cur_report_id)))))
-
-  let launch_proc ~init_data dbg proc_name =
+  
+  let launch_proc dbg proc_name =
     let { cfg; _ } = dbg in
     let report_state = L.ReportState.clone cfg.report_state_base in
     let open Verification.SAInterpreter in
@@ -691,7 +692,8 @@ struct
     report_state
     |> L.ReportState.with_state (fun () ->
            let cont_func =
-             Verification.verify_up_to_procs ~init_data ~proc_name cfg.prog
+             Verification.verify_up_to_procs ~init_data:cfg.init_data ~proc_name
+               cfg.prog
            in
            aux cont_func)
 
@@ -731,10 +733,11 @@ struct
         tests;
         main_proc_name = proc_name;
         report_state_base = L.ReportState.(clone global_state);
+        init_data;
       }
     in
     let dbg = { cfg; procs = Hashtbl.create 0; cur_proc_name = proc_name } in
-    let++ main_proc_state = launch_proc ~init_data dbg proc_name in
+    let++ main_proc_state = launch_proc dbg proc_name in
     main_proc_state.report_state |> L.ReportState.activate;
     Hashtbl.add dbg.procs proc_name main_proc_state;
     dbg
