@@ -613,11 +613,18 @@ struct
                               (pp_option BranchCase.pp) branch_case);
                         let id = id |> Option.value ~default:cur_report_id in
                         execute_step id ?branch_case dbg state
+                    | StartProc proc_name -> (
+                        DL.log (fun m -> m "START PROC (%s)" proc_name);
+                        match launch_proc dbg proc_name with
+                        | Error e -> failwith e
+                        | Ok proc_state ->
+                            Hashtbl.add dbg.procs proc_name proc_state;
+                            (Step, Some cur_report_id))
                     | Stop ->
                         DL.log (fun m -> m "STOP (%a)" pp_rid cur_report_id);
                         (Step, Some cur_report_id)))))
-  
-  let launch_proc dbg proc_name =
+
+  and launch_proc dbg proc_name =
     let { cfg; _ } = dbg in
     let report_state = L.ReportState.clone cfg.report_state_base in
     let open Verification.SAInterpreter in
@@ -671,9 +678,6 @@ struct
                 in
                 let id =
                   match handler_result with
-                  | Stop ->
-                      DL.log (fun m -> m "STOP (%a)" pp_rid id);
-                      id
                   | ExecNext (id', branch_case) ->
                       DL.log (fun m ->
                           m "EXEC NEXT (%a, %a)" (pp_option pp_rid) id'
@@ -681,6 +685,16 @@ struct
                       let id = id' |> Option.value ~default:id in
                       execute_step ?branch_case id dbg state
                       |> snd |> Option.value ~default:id
+                  | StartProc proc_name -> (
+                      DL.log (fun m -> m "START PROC (%s)" proc_name);
+                      match launch_proc dbg proc_name with
+                      | Error e -> failwith e
+                      | Ok proc_state ->
+                          Hashtbl.add dbg.procs proc_name proc_state;
+                          id)
+                  | Stop ->
+                      DL.log (fun m -> m "STOP (%a)" pp_rid id);
+                      id
                 in
                 state |> update_report_id_and_inspection_fields id cfg;
                 Ok state)
