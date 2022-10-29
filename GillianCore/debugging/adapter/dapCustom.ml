@@ -1,8 +1,7 @@
 open DebugProtocolEx
-open Debugger.DebuggerTypes
-module ExecMap = Debugger.ExecMap
 module L = Logging
 module DL = Debugger_log
+module ExecMap = Debugger_utils.ExecMap
 
 module Events (Debugger : Debugger.S) = struct
   module Debug_state_update_event = struct

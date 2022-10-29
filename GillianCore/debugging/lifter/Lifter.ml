@@ -1,4 +1,6 @@
-type rid = Logging.ReportId.t
+module L = Logging
+
+type rid = L.ReportId.t [@@deriving yojson]
 
 type unify_result = UnifyMap.unify_result = Success | Failure
 [@@deriving yojson]
@@ -7,26 +9,26 @@ type ('err, 'ast) memory_error_info = {
   error : 'err;  (** The memory error that needs to be lifted *)
   command : (int Cmd.t * Annot.t) option;  (** The command where it happened *)
   tl_ast : 'ast option;
-      (** If the program was compiled from the target language, we keep the tl ast around *)
 }
 
 type 'cmd_report executed_cmd_data = {
   kind : (BranchCase.t, unit) ExecMap.cmd_kind;
   id : rid;
   cmd_report : 'cmd_report;
-  unifys : ExecMap.unifys;
-  errors : string list;
+  unifys : ExecMap.unifys; [@default []]
+  errors : string list; [@default []]
   branch_path : BranchCase.path;
 }
+[@@deriving yojson]
 
-val make_executed_cmd_data :
-  (BranchCase.t, unit) ExecMap.cmd_kind ->
-  rid ->
-  'cmd_report ->
-  ?unifys:ExecMap.unifys ->
-  ?errors:string list ->
-  BranchCase.path ->
-  'cmd_report executed_cmd_data
+let make_executed_cmd_data
+    kind
+    id
+    cmd_report
+    ?(unifys = [])
+    ?(errors = [])
+    branch_path =
+  { kind; id; cmd_report; unifys; errors; branch_path }
 
 type handle_cmd_result = Stop | ExecNext of (rid option * BranchCase.t option)
 [@@deriving yojson]
@@ -41,6 +43,11 @@ module type S = sig
   val init :
     tl_ast option -> cmd_report executed_cmd_data -> t * handle_cmd_result
 
+  val init_opt :
+    tl_ast option ->
+    cmd_report executed_cmd_data ->
+    (t * handle_cmd_result) option
+
   val dump : t -> Yojson.Safe.t
 
   val handle_cmd :
@@ -51,10 +58,11 @@ module type S = sig
     handle_cmd_result
 
   val get_gil_map : t -> ExecMap.Packaged.t
-  val get_lifted_map : t -> ExecMap.Packaged.t option
-  val get_unifys_at_id : rid -> t -> ExecMap.unifys
-  val get_root_id : t -> rid option
-  val path_of_id : rid -> t -> BranchCase.path
+  val get_lifted_map_opt : t -> ExecMap.Packaged.t option
+  val get_lifted_map : t -> ExecMap.Packaged.t
+  val get_unifys_at_id : Logging.ReportId.t -> t -> ExecMap.unifys
+  val get_root_id : t -> Logging.ReportId.t option
+  val path_of_id : Logging.ReportId.t -> t -> BranchCase.path
   val existing_next_steps : rid -> t -> (rid * BranchCase.t option) list
 
   val next_step_specific :
@@ -63,10 +71,11 @@ module type S = sig
   val previous_step :
     rid -> t -> (rid * ExecMap.Packaged.branch_case option) option
 
-  val select_next_path : BranchCase.t option -> rid -> t -> BranchCase.path
+  val select_next_path :
+    BranchCase.t option -> Logging.ReportId.t -> t -> BranchCase.path
 
   val find_unfinished_path :
-    ?at_id:rid -> t -> (rid * BranchCase.t option) option
+    ?at_id:rid -> t -> (Logging.ReportId.t * BranchCase.t option) option
 
   (** Take the origin [tl_ast], an origin [node_id] and returns
       a string representing the evaluation step for the exec map.
@@ -74,23 +83,13 @@ module type S = sig
   (* val get_origin_node_str : tl_ast -> int option -> string *)
 
   val memory_error_to_exception_info :
-    (memory_error, tl_ast) memory_error_info -> DebuggerTypes.exception_info
+    (memory_error, tl_ast) memory_error_info -> exception_info
 
   val add_variables :
     store:(string * Expr.t) list ->
     memory:memory ->
     is_gil_file:bool ->
     get_new_scope_id:(unit -> int) ->
-    DebuggerTypes.variables ->
-    DebuggerTypes.scope list
+    variables ->
+    scope list
 end
-
-module BaseGilLifter
-    (V : Verifier.S)
-    (SMemory : SMemory.S)
-    (PC : ParserAndCompiler.S) :
-  S
-    with type memory = SMemory.t
-     and type tl_ast = PC.tl_ast
-     and type memory_error = SMemory.err_t
-     and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t

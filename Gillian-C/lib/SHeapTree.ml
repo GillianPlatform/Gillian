@@ -67,7 +67,7 @@ module Range = struct
   let make low high = (low, high)
 
   module Lift = struct
-    open Debugger.DebuggerTypes
+    open Gillian.Debugger.Utils
 
     let as_variables
         ~(make_node :
@@ -542,7 +542,7 @@ module Tree = struct
   [@@deriving yojson]
 
   module Lift = struct
-    open Debugger.DebuggerTypes
+    open Gillian.Debugger.Utils
 
     let rec as_variable
         ~(make_node :
@@ -1554,7 +1554,7 @@ let substitution ~le_subst ~sval_subst ~svarr_subst t =
       Tree { bounds; root }
 
 module Lift = struct
-  open Debugger.DebuggerTypes
+  open Gillian.Debugger.Utils
 
   let get_variable
       ~(make_node :

@@ -1,3 +1,5 @@
+open Gillian.Debugger
+
 module CLI =
   Gillian.CommandLine.Make
     (Gillian.General.Init_data.Dummy)
@@ -6,6 +8,7 @@ module CLI =
     (Gillian.General.External.Dummy)
     (WParserAndCompiler)
     (Gillian.Bulk.Runner.DummyRunners)
-    (WDebugging.WislLifter.Make)
+    (Lifter.GilFallbackLifter.Make (WSemantics.WislSMemory) (WParserAndCompiler)
+       (WDebugging.WislLifter.Make))
 
 let () = CLI.main ()

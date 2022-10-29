@@ -3,7 +3,7 @@ module SMemory = Gillian.Monadic.MonadicSMemory.Lift (MonadicSMemory)
 
 module Gil_to_c_lifter (Verification : Gillian.Abstraction.Verifier.S) = struct
   include
-    Debugger.Gil_to_tl_lifter.BaseGilLifter (Verification) (SMemory)
+    Gillian.Debugger.Lifter.GilLifter.Make (Verification) (SMemory)
       (ParserAndCompiler)
 
   let add_variables = MonadicSMemory.Lift.add_variables

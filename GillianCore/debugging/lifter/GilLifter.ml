@@ -1,103 +1,16 @@
 module L = Logging
 module DL = Debugger_log
+open Lifter
 
-type rid = L.ReportId.t [@@deriving yojson]
-
-type unify_result = UnifyMap.unify_result = Success | Failure
-[@@deriving yojson]
-
-type ('err, 'ast) memory_error_info = {
-  error : 'err;  (** The memory error that needs to be lifted *)
-  command : (int Cmd.t * Annot.t) option;  (** The command where it happened *)
-  tl_ast : 'ast option;
-}
-
-type 'cmd_report executed_cmd_data = {
-  kind : (BranchCase.t, unit) ExecMap.cmd_kind;
-  id : rid;
-  cmd_report : 'cmd_report;
-  unifys : ExecMap.unifys; [@default []]
-  errors : string list; [@default []]
-  branch_path : BranchCase.path;
-}
-[@@deriving yojson]
-
-let make_executed_cmd_data
-    kind
-    id
-    cmd_report
-    ?(unifys = [])
-    ?(errors = [])
-    branch_path =
-  { kind; id; cmd_report; unifys; errors; branch_path }
-
-type handle_cmd_result = Stop | ExecNext of (rid option * BranchCase.t option)
-[@@deriving yojson]
-
-module type S = sig
-  type t
-  type memory_error
-  type tl_ast
-  type memory
-  type cmd_report
-
-  val init :
-    tl_ast option -> cmd_report executed_cmd_data -> t * handle_cmd_result
-
-  val dump : t -> Yojson.Safe.t
-
-  val handle_cmd :
-    rid ->
-    BranchCase.t option ->
-    cmd_report executed_cmd_data ->
-    t ->
-    handle_cmd_result
-
-  val get_gil_map : t -> ExecMap.Packaged.t
-  val get_lifted_map : t -> ExecMap.Packaged.t option
-  val get_unifys_at_id : Logging.ReportId.t -> t -> ExecMap.unifys
-  val get_root_id : t -> Logging.ReportId.t option
-  val path_of_id : Logging.ReportId.t -> t -> BranchCase.path
-  val existing_next_steps : rid -> t -> (rid * BranchCase.t option) list
-
-  val next_step_specific :
-    rid -> ExecMap.Packaged.branch_case option -> t -> rid * BranchCase.t option
-
-  val previous_step :
-    rid -> t -> (rid * ExecMap.Packaged.branch_case option) option
-
-  val select_next_path :
-    BranchCase.t option -> Logging.ReportId.t -> t -> BranchCase.path
-
-  val find_unfinished_path :
-    ?at_id:rid -> t -> (Logging.ReportId.t * BranchCase.t option) option
-
-  (** Take the origin [tl_ast], an origin [node_id] and returns
-      a string representing the evaluation step for the exec map.
-      Should never be called if [source_map_ability] is false *)
-  (* val get_origin_node_str : tl_ast -> int option -> string *)
-
-  val memory_error_to_exception_info :
-    (memory_error, tl_ast) memory_error_info -> DebuggerTypes.exception_info
-
-  val add_variables :
-    store:(string * Expr.t) list ->
-    memory:memory ->
-    is_gil_file:bool ->
-    get_new_scope_id:(unit -> int) ->
-    DebuggerTypes.variables ->
-    DebuggerTypes.scope list
-end
-
-module BaseGilLifter
-    (Verification : Verifier.S)
+module Make
+    (Verifier : Verifier.S)
     (SMemory : SMemory.S)
     (PC : ParserAndCompiler.S) :
   S
     with type memory = SMemory.t
      and type tl_ast = PC.tl_ast
      and type memory_error = SMemory.err_t
-     and type cmd_report = Verification.SAInterpreter.Logging.ConfigReport.t =
+     and type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t =
 struct
   open ExecMap
 
@@ -129,7 +42,7 @@ struct
   type tl_ast = PC.tl_ast
   type memory_error = SMemory.err_t
 
-  type cmd_report = Verification.SAInterpreter.Logging.ConfigReport.t
+  type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t
   [@@deriving yojson]
 
   type exec_data = cmd_report executed_cmd_data [@@deriving yojson]
@@ -137,7 +50,7 @@ struct
   let dump = to_yojson
 
   let get_proc_name ({ cmd_report; _ } : exec_data) =
-    let open Verification.SAInterpreter.Logging.ConfigReport in
+    let open Verifier.SAInterpreter.Logging.ConfigReport in
     let cs = cmd_report.callstack in
     let head = List.hd cs in
     head.pid
@@ -200,6 +113,8 @@ struct
     let root_proc = get_proc_name exec_data in
     ({ map; root_proc; id_map }, Stop)
 
+  let init_opt _ exec_data = Some (init None exec_data)
+
   let handle_cmd prev_id branch_case exec_data state =
     let { root_proc; id_map; _ } = state in
     let current_proc = get_proc_name exec_data in
@@ -254,7 +169,8 @@ struct
 
   let package = Packaged.package package_data package_case
   let get_gil_map state = package state.map
-  let get_lifted_map _ = None
+  let get_lifted_map_opt _ = None
+  let get_lifted_map = failwith "get_lifted_map not implemented for GIL lifter"
 
   let get_unifys_at_id id state =
     match state |> at_id id |> fst with
@@ -367,13 +283,11 @@ struct
     in
     aux map
 
-  let memory_error_to_exception_info { error; _ } : DebuggerTypes.exception_info
-      =
+  let memory_error_to_exception_info { error; _ } : exception_info =
     { id = Fmt.to_to_string SMemory.pp_err error; description = None }
 
   let add_variables ~store ~memory ~is_gil_file ~get_new_scope_id variables :
-      DebuggerTypes.scope list =
-    let open DebuggerTypes in
+      scope list =
     let () = ignore is_gil_file in
     let store_id = get_new_scope_id () in
     let memory_id = get_new_scope_id () in
@@ -385,8 +299,7 @@ struct
       |> List.map (fun (var, value) : variable ->
              let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
              create_leaf_variable var value ())
-      |> List.sort (fun (v : DebuggerTypes.variable) w ->
-             Stdlib.compare v.name w.name)
+      |> List.sort (fun (v : variable) w -> Stdlib.compare v.name w.name)
     in
     let memory_vars =
       [

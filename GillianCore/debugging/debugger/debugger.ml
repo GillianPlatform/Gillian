@@ -1,10 +1,7 @@
 module L = Logging
 module DL = Debugger_log
-module Gil_to_tl_lifter = Gil_to_tl_lifter
-module DebuggerTypes = DebuggerTypes
-module DebuggerUtils = DebuggerUtils
+module Lift = Debugger_lifter
 module ExecMap = ExecMap
-open DebuggerTypes
 open Syntaxes.Option
 
 type rid = L.ReportId.t [@@deriving show, yojson]
@@ -54,7 +51,7 @@ module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
     (Verification : Verifier.S with type SPState.init_data = ID.t)
-    (Lifter : Gil_to_tl_lifter.S
+    (Lifter : Lift.S
                 with type memory = Verification.SAInterpreter.heap_t
                  and type memory_error = Verification.SPState.m_err_t
                  and type tl_ast = PC.tl_ast
@@ -158,7 +155,9 @@ struct
               state.lifter_state |> Lifter.get_unifys_at_id current_cmd_id
             in
             let exec_map = state.lifter_state |> Lifter.get_gil_map in
-            let lifted_exec_map = state.lifter_state |> Lifter.get_lifted_map in
+            let lifted_exec_map =
+              state.lifter_state |> Lifter.get_lifted_map_opt
+            in
             let proc =
               { exec_map; lifted_exec_map; current_cmd_id; unifys; proc_name }
             in
@@ -358,7 +357,7 @@ struct
               match loc_opt with
               | None -> defaults
               | Some loc ->
-                  let loc = DebuggerUtils.location_to_display_location loc in
+                  let loc = location_to_display_location loc in
                   ( loc.loc_start.pos_line,
                     loc.loc_start.pos_column,
                     loc.loc_end.pos_line,
@@ -509,8 +508,8 @@ struct
                 in
                 state |> update_report_id_and_inspection_fields prev_id cfg;
                 let exec_data =
-                  Gil_to_tl_lifter.make_executed_cmd_data ExecMap.Final prev_id
-                    cmd ~unifys ~errors branch_path
+                  Lift.make_executed_cmd_data ExecMap.Final prev_id cmd ~unifys
+                    ~errors branch_path
                 in
                 let handler_result =
                   state.lifter_state
@@ -524,8 +523,8 @@ struct
                           ~json:
                             [
                               ( "handler_result",
-                                Gil_to_tl_lifter.handle_cmd_result_to_yojson
-                                  handler_result );
+                                Lift.handle_cmd_result_to_yojson handler_result
+                              );
                               ("lifter_state", Lifter.dump state.lifter_state);
                             ]
                           "HORROR: Lifter didn't give Stop for Final cmd!"))
@@ -598,8 +597,8 @@ struct
                       |> Option.to_list
                     in
                     let exec_data =
-                      Gil_to_tl_lifter.make_executed_cmd_data cmd_kind
-                        cur_report_id cmd ~unifys branch_path
+                      Lift.make_executed_cmd_data cmd_kind cur_report_id cmd
+                        ~unifys branch_path
                     in
                     let handler_result =
                       state.lifter_state
@@ -649,8 +648,7 @@ struct
                     @@ Option.value ~default:[] new_branch_cases
                   in
                   let exec_data =
-                    Gil_to_tl_lifter.make_executed_cmd_data kind id cmd
-                      branch_path
+                    Lift.make_executed_cmd_data kind id cmd branch_path
                   in
                   Lifter.init cfg.tl_ast exec_data
                 in

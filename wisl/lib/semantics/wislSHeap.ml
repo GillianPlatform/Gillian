@@ -3,6 +3,7 @@ open Gillian.Symbolic
 open Gillian.Gil_syntax
 module Solver = Gillian.Logic.FOSolver
 module Reduction = Gillian.Logic.Reduction
+open Gillian.Debugger.Utils
 
 type err =
   | MissingResource of (WislLActions.ga * string * Expr.t option)
@@ -340,15 +341,12 @@ let get_store_vars store is_gil_file =
             -> match_offset rest loc Fmt.string
           | _ -> Fmt.to_to_string (Fmt.hbox Expr.pp) value
         in
-        Some
-          ({ name = var; value; type_ = None; var_ref = 0 }
-            : Debugger.DebuggerTypes.variable))
+        Some ({ name = var; value; type_ = None; var_ref = 0 } : variable))
     store
   |> List.sort Stdlib.compare
 
 let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
-    Debugger.DebuggerTypes.variable list =
-  let open Debugger.DebuggerTypes in
+    variable list =
   let vstr = Fmt.to_to_string (Fmt.hbox Expr.pp) in
   let compare_offsets (v, _) (w, _) =
     try
@@ -400,7 +398,6 @@ let add_debugger_variables
     ~is_gil_file
     ~get_new_scope_id
     variables =
-  let open Debugger.DebuggerTypes in
   let store_id = get_new_scope_id () in
   let memory_id = get_new_scope_id () in
   let scopes : scope list =

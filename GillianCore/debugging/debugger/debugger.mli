@@ -1,9 +1,3 @@
-module DebuggerTypes = DebuggerTypes
-module DebuggerUtils = DebuggerUtils
-module Gil_to_tl_lifter = Gil_to_tl_lifter
-module ExecMap = ExecMap
-open DebuggerTypes
-
 module type S = sig
   type tl_ast
   type debug_state
@@ -47,7 +41,7 @@ module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
     (V : Verifier.S with type SPState.init_data = ID.t)
-    (Lifter : Gil_to_tl_lifter.S
+    (Lifter : Debugger_lifter.S
                 with type memory = V.SAInterpreter.heap_t
                  and type memory_error = V.SPState.m_err_t
                  and type tl_ast = PC.tl_ast

@@ -1,36 +1,36 @@
 open WSemantics
 open WSyntax
 open Gil_syntax
-open Debugger
 module L = Logging
 module DL = Debugger_log
-module ExecMap = Debugger.ExecMap
-open Gil_to_tl_lifter
+module ExecMap = Debugger.Utils.ExecMap
+module UnifyMap = Debugger.Utils.UnifyMap
 open Syntaxes.Option
 module ExtList = Utils.ExtList
+open Debugger.Lifter
 
 type rid = L.ReportId.t [@@deriving yojson]
 
 let cmd_to_yojson = Cmd.to_yojson (fun x -> `Int x)
 
-module Make (Verification : Engine.Verifier.S) = struct
+module Make
+    (Gil : Gillian.Debugger.Lifter.GilFallbackLifter.GilLifterWithState)
+    (Verification : Engine.Verifier.S) =
+struct
   open ExecMap
-
-  module GilLifter =
-    BaseGilLifter (Verification) (WislSMemory) (WParserAndCompiler)
 
   type memory_error = WislSMemory.err_t
   type tl_ast = WParserAndCompiler.tl_ast
   type memory = WislSMemory.t
 
   module CmdReport = Verification.SAInterpreter.Logging.ConfigReport
+  module GilLifter = Gil.Lifter
 
   type cmd_report = CmdReport.t [@@deriving yojson]
   type branch_case = IfElse of bool | LCmd of int [@@deriving yojson]
   type branch_data = rid * BranchCase.t [@@deriving yojson]
 
   let annot_to_wisl_stmt annot wisl_ast =
-    let* wisl_ast in
     let origin_id = Annot.get_origin_id annot in
     let wprog = WProg.get_by_id wisl_ast origin_id in
     match wprog with
@@ -56,7 +56,8 @@ module Make (Verification : Engine.Verifier.S) = struct
       display : string;
       ids : rid ExtList.t;
       errors : string ExtList.t;
-      unifys : (rid * Engine.Unifier.unify_kind * unify_result) ExtList.t;
+      unifys :
+        (rid * Engine.Unifier.unify_kind * UnifyMap.unify_result) ExtList.t;
     }
 
     let make_partial_data display =
@@ -217,7 +218,6 @@ module Make (Verification : Engine.Verifier.S) = struct
       in
       (let* origin_id = Annot.get_origin_id annot in
        let* stmt = annot_to_wisl_stmt annot tl_ast in
-       let* tl_ast in
        match Hashtbl.find_opt partial_cmds origin_id with
        | Some partial ->
            let result = update partial exec_data in
@@ -249,7 +249,7 @@ module Make (Verification : Engine.Verifier.S) = struct
 
   type t = {
     gil_state : GilLifter.t; [@to_yojson GilLifter.dump]
-    tl_ast : tl_ast option; [@to_yojson fun a -> `Bool (a <> None)]
+    tl_ast : tl_ast; [@to_yojson fun _ -> `Null]
     partial_cmds : PartialCmds.t; [@to_yojson fun _ -> `Null]
     mutable map : map;
     id_map : (rid, map) Hashtbl.t; [@to_yojson fun _ -> `Null]
@@ -409,27 +409,29 @@ module Make (Verification : Engine.Verifier.S) = struct
     let kind = convert_kind id kind in
     new_cmd id_map kind [ id ] display unifys errors gil_branch_path ~submap
 
-  let init tl_ast exec_data =
-    let gil_state = GilLifter.init tl_ast exec_data |> fst in
+  let init_opt tl_ast exec_data =
+    let gil_state = Gil.get_state () in
+    let+ tl_ast in
     let partial_cmds = Hashtbl.create 0 in
     let id_map = Hashtbl.create 0 in
     let before_partial = None in
     let map, result =
-      match tl_ast with
-      | None -> (Nothing, Stop)
-      | Some tl_ast -> (
-          match PartialCmds.handle exec_data (Some tl_ast) partial_cmds with
-          | StepAgain result -> (Nothing, ExecNext result)
-          | NoPartial ->
-              let new_cmd = prepare_basic_cmd tl_ast id_map exec_data in
-              (new_cmd ~parent:None (), Stop)
-          | Finished _ -> failwith "init: HORROR - Finished PartialCmd on init!"
-          )
+      match PartialCmds.handle exec_data tl_ast partial_cmds with
+      | StepAgain result -> (Nothing, ExecNext result)
+      | NoPartial ->
+          let new_cmd = prepare_basic_cmd tl_ast id_map exec_data in
+          (new_cmd ~parent:None (), Stop)
+      | Finished _ -> failwith "init: HORROR - Finished PartialCmd on init!"
     in
     let state =
       { gil_state; tl_ast; partial_cmds; map; id_map; before_partial }
     in
     (state, result)
+
+  let init tl_ast exec_data =
+    match init_opt tl_ast exec_data with
+    | None -> failwith "init: wislLifter needs a tl_ast!"
+    | Some x -> x
 
   let handle_cmd
       prev_id
@@ -439,42 +441,33 @@ module Make (Verification : Engine.Verifier.S) = struct
     DL.log (fun m ->
         m "HANDLING %a (prev %a)" L.ReportId.pp exec_data.id L.ReportId.pp
           prev_id);
-    let gil_result =
-      GilLifter.handle_cmd prev_id branch_case exec_data state.gil_state
-    in
-    match gil_result with
-    | Stop -> (
-        let { tl_ast; partial_cmds; id_map; _ } = state in
-        match tl_ast with
-        | None -> Stop
-        | Some tl_ast -> (
-            match PartialCmds.handle exec_data (Some tl_ast) partial_cmds with
-            | StepAgain result ->
-                if Option.is_none state.before_partial then
-                  state.before_partial <- Some (prev_id, branch_case);
-                ExecNext result
-            | NoPartial ->
-                let new_cmd = prepare_basic_cmd tl_ast id_map exec_data in
-                (match state.map with
-                | Nothing -> state.map <- new_cmd ~parent:None ()
-                | _ -> insert_new_cmd new_cmd prev_id branch_case id_map);
-                Stop
-            | Finished { ids; display; unifys; errors; cmd_kind } ->
-                let gil_branch_path =
-                  GilLifter.path_of_id (List.hd ids) state.gil_state
-                in
-                let submap = NoSubmap in
-                let new_cmd =
-                  new_cmd id_map cmd_kind ids display unifys errors
-                    gil_branch_path ~submap
-                in
-                let prev_id, branch_case = state.before_partial |> Option.get in
-                insert_new_cmd new_cmd prev_id branch_case id_map;
-                state.before_partial <- None;
-                Stop))
-    | r -> r
+    let { tl_ast; partial_cmds; id_map; _ } = state in
+    match PartialCmds.handle exec_data tl_ast partial_cmds with
+    | StepAgain result ->
+        if Option.is_none state.before_partial then
+          state.before_partial <- Some (prev_id, branch_case);
+        ExecNext result
+    | NoPartial ->
+        let new_cmd = prepare_basic_cmd tl_ast id_map exec_data in
+        (match state.map with
+        | Nothing -> state.map <- new_cmd ~parent:None ()
+        | _ -> insert_new_cmd new_cmd prev_id branch_case id_map);
+        Stop
+    | Finished { ids; display; unifys; errors; cmd_kind } ->
+        let gil_branch_path =
+          GilLifter.path_of_id (List.hd ids) state.gil_state
+        in
+        let submap = NoSubmap in
+        let new_cmd =
+          new_cmd id_map cmd_kind ids display unifys errors gil_branch_path
+            ~submap
+        in
+        let prev_id, branch_case = state.before_partial |> Option.get in
+        insert_new_cmd new_cmd prev_id branch_case id_map;
+        state.before_partial <- None;
+        Stop
 
-  let get_gil_map state = GilLifter.get_gil_map state.gil_state
+  let get_gil_map _ = failwith "get_gil_map: not implemented!"
 
   let package_case _ (case : branch_case) : Packaged.branch_case =
     let json = branch_case_to_yojson case in
@@ -495,129 +488,100 @@ module Make (Verification : Engine.Verifier.S) = struct
     Packaged.{ ids; display; unifys; errors; submap }
 
   let package = Packaged.package package_data package_case
+  let get_lifted_map { map; _ } = package map
+  let get_lifted_map_opt state = Some (get_lifted_map state)
 
-  let get_lifted_map state =
-    let+ _ = state.tl_ast in
-    package state.map
+  let get_unifys_at_id id { id_map; _ } =
+    let map = Hashtbl.find id_map id in
+    match map with
+    | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } -> data.unifys
+    | _ -> failwith "get_unifys_at_id: HORROR - tried to get unifys at non-cmd!"
 
-  let get_unifys_at_id id state =
-    match state.tl_ast with
-    | None -> GilLifter.get_unifys_at_id id state.gil_state
-    | Some _ -> (
-        let map = Hashtbl.find state.id_map id in
-        match map with
-        | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } ->
-            data.unifys
-        | _ ->
-            failwith
-              "get_unifys_at_id: HORROR - tried to get unifys at non-cmd!")
+  let get_root_id { map; _ } =
+    match map with
+    | Nothing -> None
+    | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } ->
+        Some (List.hd data.ids)
 
-  let get_root_id state =
-    match state.tl_ast with
-    | None -> GilLifter.get_root_id state.gil_state
-    | Some _ -> (
-        match state.map with
-        | Nothing -> None
-        | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } ->
-            Some (List.hd data.ids))
+  let path_of_id id { id_map; _ } =
+    let map = Hashtbl.find id_map id in
+    gil_path_of_map map
 
-  let path_of_id id state =
-    match state.tl_ast with
-    | None -> GilLifter.path_of_id id state.gil_state
-    | Some _ ->
-        let map = Hashtbl.find state.id_map id in
-        gil_path_of_map map
-
-  let existing_next_steps id { gil_state; id_map; tl_ast; _ } =
-    let nexts = GilLifter.existing_next_steps id gil_state in
-    let nexts =
-      match tl_ast with
-      | None -> nexts
-      | Some _ -> nexts |> List.filter (fun (id, _) -> Hashtbl.mem id_map id)
-    in
-    nexts
+  let existing_next_steps id { gil_state; id_map; _ } =
+    GilLifter.existing_next_steps id gil_state
+    |> List.filter (fun (id, _) -> Hashtbl.mem id_map id)
 
   let next_step_specific id case state =
-    let { id_map; tl_ast; gil_state; _ } = state in
-    match tl_ast with
-    | None -> GilLifter.next_step_specific id case gil_state
-    | Some _ -> (
-        let failwith s =
-          DL.failwith
-            (fun () ->
-              [
-                ("state", dump state);
-                ("id", rid_to_yojson id);
-                ("case", opt_to_yojson Packaged.branch_case_to_yojson case);
-              ])
-            ("next_step_specific: " ^ s)
+    let failwith s =
+      DL.failwith
+        (fun () ->
+          [
+            ("state", dump state);
+            ("id", rid_to_yojson id);
+            ("case", opt_to_yojson Packaged.branch_case_to_yojson case);
+          ])
+        ("next_step_specific: " ^ s)
+    in
+    match (Hashtbl.find state.id_map id, case) with
+    | Nothing, _ -> failwith "HORROR - cmd at id is Nothing!"
+    | FinalCmd _, _ -> failwith "can't get next at final cmd!"
+    | Cmd _, Some _ -> failwith "got branch case at non-branch cmd!"
+    | BranchCmd _, None -> failwith "expected branch case at branch cmd!"
+    | Cmd { data; _ }, None ->
+        let id = List.hd (List.rev data.ids) in
+        (id, None)
+    | BranchCmd { nexts; _ }, Some case -> (
+        let case =
+          Packaged.(case.json) |> branch_case_of_yojson |> Result.get_ok
         in
-        match (Hashtbl.find id_map id, case) with
-        | Nothing, _ -> failwith "HORROR - cmd at id is Nothing!"
-        | FinalCmd _, _ -> failwith "can't get next at final cmd!"
-        | Cmd _, Some _ -> failwith "got branch case at non-branch cmd!"
-        | BranchCmd _, None -> failwith "expected branch case at branch cmd!"
-        | Cmd { data; _ }, None ->
-            let id = List.hd (List.rev data.ids) in
-            (id, None)
-        | BranchCmd { nexts; _ }, Some case -> (
-            let case =
-              Packaged.(case.json) |> branch_case_of_yojson |> Result.get_ok
-            in
-            match Hashtbl.find_opt nexts case with
-            | None -> failwith "branch case not found!"
-            | Some ((id, case), _) -> (id, Some case)))
+        match Hashtbl.find_opt nexts case with
+        | None -> failwith "branch case not found!"
+        | Some ((id, case), _) -> (id, Some case))
 
-  let previous_step id { id_map; tl_ast; gil_state; _ } =
-    match tl_ast with
-    | None -> GilLifter.previous_step id gil_state
-    | Some _ -> (
-        match Hashtbl.find id_map id with
-        | Nothing -> None
-        | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } ->
-            let+ parent, case = data.parent in
-            let id = id_of_map parent in
-            let case = case |> Option.map (package_case ()) in
-            (id, case))
+  let previous_step id { id_map; _ } =
+    match Hashtbl.find id_map id with
+    | Nothing -> None
+    | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } ->
+        let+ parent, case = data.parent in
+        let id = id_of_map parent in
+        let case = case |> Option.map (package_case ()) in
+        (id, case)
 
   let select_next_path case id { gil_state; _ } =
     GilLifter.select_next_path case id gil_state
 
   let find_unfinished_path ?at_id state =
-    let { map; id_map; tl_ast; gil_state; _ } = state in
-    match tl_ast with
-    | None -> GilLifter.find_unfinished_path ?at_id gil_state
-    | Some _ ->
-        let rec aux = function
-          | Nothing ->
-              DL.failwith
-                (fun () ->
-                  [
-                    ("state", dump state);
-                    ("at_id", opt_to_yojson rid_to_yojson at_id);
-                  ])
-                "find_unfinished_path: started at Nothing"
-          | Cmd { data = { ids; _ }; next = Nothing } ->
-              let id = List.hd (List.rev ids) in
-              Some (id, None)
-          | Cmd { next; _ } -> aux next
-          | BranchCmd { nexts; _ } -> (
-              match
-                Hashtbl.find_map
-                  (fun _ ((id, gil_case), next) ->
-                    if next = Nothing then Some (id, Some gil_case) else None)
-                  nexts
-              with
-              | None -> Hashtbl.find_map (fun _ (_, next) -> aux next) nexts
-              | result -> result)
-          | FinalCmd _ -> None
-        in
-        let map =
-          match at_id with
-          | None -> map
-          | Some id -> Hashtbl.find id_map id
-        in
-        aux map
+    let { map; id_map; _ } = state in
+    let rec aux = function
+      | Nothing ->
+          DL.failwith
+            (fun () ->
+              [
+                ("state", dump state);
+                ("at_id", opt_to_yojson rid_to_yojson at_id);
+              ])
+            "find_unfinished_path: started at Nothing"
+      | Cmd { data = { ids; _ }; next = Nothing } ->
+          let id = List.hd (List.rev ids) in
+          Some (id, None)
+      | Cmd { next; _ } -> aux next
+      | BranchCmd { nexts; _ } -> (
+          match
+            Hashtbl.find_map
+              (fun _ ((id, gil_case), next) ->
+                if next = Nothing then Some (id, Some gil_case) else None)
+              nexts
+          with
+          | None -> Hashtbl.find_map (fun _ (_, next) -> aux next) nexts
+          | result -> result)
+      | FinalCmd _ -> None
+    in
+    let map =
+      match at_id with
+      | None -> map
+      | Some id -> Hashtbl.find id_map id
+    in
+    aux map
 
   let get_wisl_stmt gil_cmd wisl_ast =
     let* annot =
@@ -631,7 +595,7 @@ module Make (Verification : Engine.Verifier.S) = struct
     let open Syntaxes.Option in
     match wisl_ast with
     | Some ast -> (
-        let* stmt = get_wisl_stmt gil_cmd (Some ast) in
+        let* stmt = get_wisl_stmt gil_cmd ast in
         match stmt with
         | WStmt.Lookup (_, e) | WStmt.Update (e, _) -> Some (WExpr.str e)
         | _ -> None)
@@ -647,7 +611,7 @@ module Make (Verification : Engine.Verifier.S) = struct
     let var =
       match wisl_ast with
       | Some ast -> (
-          let* stmt = get_wisl_stmt gil_cmd (Some ast) in
+          let* stmt = get_wisl_stmt gil_cmd ast in
           match stmt with
           (* TODO: Catch all the cases that use after free can happen to get the
                       variable names *)
@@ -674,7 +638,7 @@ module Make (Verification : Engine.Verifier.S) = struct
         | None -> Fmt.str "%s at unknown location" msg_prefix
         | Some origin_loc ->
             let origin_loc =
-              DebuggerUtils.location_to_display_location origin_loc
+              Debugger.Utils.location_to_display_location origin_loc
             in
             Fmt.str "%s at %a" msg_prefix Location.pp origin_loc)
 
@@ -705,19 +669,20 @@ module Make (Verification : Engine.Verifier.S) = struct
       | None -> prefix
       | Some offset -> Fmt.str "%s, offset='%a'" prefix Expr.pp offset
     in
-    match core_pred with
-    | WislLActions.Cell -> (
-        let wstmt = get_wisl_stmt gil_cmd wisl_ast in
-        let var = get_missing_resource_var wstmt in
-        match var with
-        | Some var ->
-            Fmt.str "Try adding %s -> #new_var to the specification" var
-        | None -> default_err_msg)
-    | _ -> default_err_msg
+    match wisl_ast with
+    | None -> default_err_msg
+    | Some wisl_ast -> (
+        match core_pred with
+        | WislLActions.Cell -> (
+            let wstmt = get_wisl_stmt gil_cmd wisl_ast in
+            let var = get_missing_resource_var wstmt in
+            match var with
+            | Some var ->
+                Fmt.str "Try adding %s -> #new_var to the specification" var
+            | None -> default_err_msg)
+        | _ -> default_err_msg)
 
-  let memory_error_to_exception_info info :
-      Debugger.DebuggerTypes.exception_info =
-    let open Gil_to_tl_lifter in
+  let memory_error_to_exception_info info : Debugger.Utils.exception_info =
     let id = Fmt.to_to_string WislSMemory.pp_err info.error in
     let description =
       match info.error with
