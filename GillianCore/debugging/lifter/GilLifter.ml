@@ -170,7 +170,9 @@ struct
   let package = Packaged.package package_data package_case
   let get_gil_map state = package state.map
   let get_lifted_map_opt _ = None
-  let get_lifted_map = failwith "get_lifted_map not implemented for GIL lifter"
+
+  let get_lifted_map _ =
+    failwith "get_lifted_map not implemented for GIL lifter"
 
   let get_unifys_at_id id state =
     match state |> at_id id |> fst with
