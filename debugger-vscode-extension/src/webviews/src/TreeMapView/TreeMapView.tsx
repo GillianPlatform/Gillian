@@ -136,7 +136,7 @@ const TreeMapView = <M, D, A>({
           nodeTypes={nodeTypes}
         >
           <Controls showInteractive={false} />
-          <Background color="#aaa" gap={16} />
+          <Background color="#aaa" gap={25} />
         </ReactFlow>
       </FlowRefContext.Provider>
     </div>

@@ -60,15 +60,18 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData>) => {
   const unifyBadge = (() => {
     if (cmdData.unifys.length > 0) {
       const [, , [result]] = cmdData.unifys[0];
+      const colorStyle = result === 'Success' ? {} : { color: 'red'};
       return (
         <>
           <VSCodeBadge>
             <div
+              style={colorStyle}
               className={`codicon codicon-${
                 result === 'Success' ? 'pass' : 'error'
               }`}
             />
-            &nbsp; Unify
+            &nbsp;
+            <div style={colorStyle}>Unify</div>
           </VSCodeBadge>
           &nbsp;
         </>
