@@ -3,6 +3,7 @@ import { Unification, UnifyMap, UnifySeg, UnifyStep } from '../../../types';
 import TreeMapView, {
   TransformFunc,
   TransformResult,
+  DEFAULT_NODE_SIZE
 } from '../TreeMapView/TreeMapView';
 import UnifyMapNode, { UnifyMapNodeData } from './UnifyMapNode';
 
@@ -48,13 +49,14 @@ const UnifyMapView = ({ unification, selectStep }: Props) => {
         return unifyMap[1].map(seg => [null, seg]);
       }
     })(),
+    ...DEFAULT_NODE_SIZE
   };
 
   const transform: TransformFunc<M, D, A> = map => {
     if (map[0] === 'UnifyResult') {
       const [, id, result] = map;
       return {
-        id,
+        id: `${id}`,
         data: {
           type: 'Result',
           result,
@@ -63,13 +65,14 @@ const UnifyMapView = ({ unification, selectStep }: Props) => {
           },
         },
         nexts: [],
+        ...DEFAULT_NODE_SIZE
       };
     }
 
     const [, assertionData, next] = map;
     const { id } = assertionData;
     return {
-      id,
+      id: `${id}`,
       data: {
         type: 'Assertion',
         assertionData,
@@ -79,6 +82,7 @@ const UnifyMapView = ({ unification, selectStep }: Props) => {
         },
       },
       nexts: [[null, next]],
+      ...DEFAULT_NODE_SIZE
     };
   };
 

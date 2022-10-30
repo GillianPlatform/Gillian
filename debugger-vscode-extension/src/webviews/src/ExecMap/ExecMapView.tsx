@@ -6,6 +6,7 @@ import TreeMapView, {
 } from '../TreeMapView/TreeMapView';
 import { execSpecific, jumpToId } from '../VSCodeAPI';
 import ExecMapNode, { ExecMapNodeData } from './ExecMapNode';
+import { NODE_WIDTH, NODE_HEIGHT, DEFAULT_NODE_SIZE } from '../TreeMapView/TreeMapView';
 
 export type Props = {
   state: DebugState;
@@ -27,6 +28,8 @@ const ExecMapView = ({ state }: Props) => {
       procName,
     },
     nexts: [[null, usedExecMap]],
+    width: NODE_WIDTH,
+    height: NODE_HEIGHT,
   };
 
   const cleanNexts = (nexts: [A, [null, M]][]) : [A, M][] => {
@@ -53,6 +56,8 @@ const ExecMapView = ({ state }: Props) => {
         },
         nexts: [],
         edgeLabel,
+        width: NODE_HEIGHT,
+        height: NODE_HEIGHT,
       };
     }
 
@@ -66,7 +71,7 @@ const ExecMapView = ({ state }: Props) => {
         return [];
       }
     })();
-    console.log({ map, cmdData });
+    
     return {
       id: `${cmdData.ids[0]}`,
       data: {
@@ -80,6 +85,7 @@ const ExecMapView = ({ state }: Props) => {
       },
       nexts,
       edgeLabel,
+      ...DEFAULT_NODE_SIZE
     };
   };
 
