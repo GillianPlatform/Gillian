@@ -100,6 +100,7 @@ struct
       | Update of { d : partial_data; mutable get_cmd_found : bool }
       | FunCall of { d : partial_data; target_var : string }
       | While of { d : partial_data; submap : map submap }
+      | Return of { d : partial_data }
 
     type t = (int, partial) Hashtbl.t
 
@@ -109,7 +110,8 @@ struct
       | Lookup { d; _ }
       | Update { d; _ }
       | FunCall { d; _ }
-      | While { d; _ } -> d
+      | While { d; _ }
+      | Return { d } -> d
 
     let update_partial_data { id; unifys; errors; _ } d =
       d.ids |> ExtList.append id;
@@ -144,55 +146,59 @@ struct
       | _ -> (
           let d = make_partial_data display in
           d |> update_partial_data exec_data;
-          match stmt with
-          | WStmt.VarAssign (v, _) -> (
-              match gil_cmd with
-              | Cmd.Assignment (v', _) when v = v' -> None
-              | _ ->
-                  let partial = VarAssign { d; target_var = v } in
-                  Some (partial, StepAgain (None, None)))
-          | WStmt.Dispose _ -> (
-              match gil_cmd with
-              | Cmd.GuardedGoto _ ->
-                  let partial = Dispose { d } in
-                  Some
-                    ( partial,
-                      StepAgain (None, Some (BranchCase.GuardedGoto true)) )
-              | _ -> failwith "first cmd of Dispose wasn't GuardedGoto!")
-          | WStmt.Lookup (x, _) ->
-              let partial = Lookup { d; target_var = x } in
-              Some (partial, StepAgain (None, None))
-          | WStmt.Update _ -> (
-              match gil_cmd with
-              | Cmd.LAction (_, action, _)
-                when WislLActions.(ac_from_str action = SetCell) ->
-                  failwith "first cmd of Update was SetCell!"
-              | Cmd.LAction (_, action, _)
-                when WislLActions.(ac_from_str action = GetCell) ->
-                  let partial = Update { d; get_cmd_found = true } in
-                  Some (partial, StepAgain (None, None))
-              | _ ->
-                  let partial = Update { d; get_cmd_found = false } in
-                  Some (partial, StepAgain (None, None)))
-          | WStmt.FunCall (x, _, _, _) -> (
-              match gil_cmd with
-              | Cmd.Call (x', _, _, _, _) when x = x' -> None
-              | _ ->
-                  let partial = FunCall { d; target_var = x } in
-                  Some (partial, StepAgain (None, None)))
-          | WStmt.While _ -> (
-              match gil_cmd with
-              | Cmd.Call _ ->
-                  let submap =
-                    match annot |> Annot.get_expansion_kind with
-                    | Annot.NoExpansion ->
-                        failwith "Call for While has no expansion!"
-                    | Annot.Function p -> ExecMap.Proc p
-                  in
-                  let partial = While { d; submap } in
-                  Some (partial, StepAgain (None, None))
-              | _ -> failwith "first cmd of While wasn't Call!")
-          | _ -> None)
+          if annot |> Annot.is_return then
+            Some (Return { d }, StepAgain (None, None))
+          else
+            let* stmt in
+            match stmt with
+            | WStmt.VarAssign (v, _) -> (
+                match gil_cmd with
+                | Cmd.Assignment (v', _) when v = v' -> None
+                | _ ->
+                    let partial = VarAssign { d; target_var = v } in
+                    Some (partial, StepAgain (None, None)))
+            | WStmt.Dispose _ -> (
+                match gil_cmd with
+                | Cmd.GuardedGoto _ ->
+                    let partial = Dispose { d } in
+                    Some
+                      ( partial,
+                        StepAgain (None, Some (BranchCase.GuardedGoto true)) )
+                | _ -> failwith "first cmd of Dispose wasn't GuardedGoto!")
+            | WStmt.Lookup (x, _) ->
+                let partial = Lookup { d; target_var = x } in
+                Some (partial, StepAgain (None, None))
+            | WStmt.Update _ -> (
+                match gil_cmd with
+                | Cmd.LAction (_, action, _)
+                  when WislLActions.(ac_from_str action = SetCell) ->
+                    failwith "first cmd of Update was SetCell!"
+                | Cmd.LAction (_, action, _)
+                  when WislLActions.(ac_from_str action = GetCell) ->
+                    let partial = Update { d; get_cmd_found = true } in
+                    Some (partial, StepAgain (None, None))
+                | _ ->
+                    let partial = Update { d; get_cmd_found = false } in
+                    Some (partial, StepAgain (None, None)))
+            | WStmt.FunCall (x, _, _, _) -> (
+                match gil_cmd with
+                | Cmd.Call (x', _, _, _, _) when x = x' -> None
+                | _ ->
+                    let partial = FunCall { d; target_var = x } in
+                    Some (partial, StepAgain (None, None)))
+            | WStmt.While _ -> (
+                match gil_cmd with
+                | Cmd.Call _ ->
+                    let submap =
+                      match annot |> Annot.get_expansion_kind with
+                      | Annot.NoExpansion ->
+                          failwith "Call for While has no expansion!"
+                      | Annot.Function p -> ExecMap.Proc p
+                    in
+                    let partial = While { d; submap } in
+                    Some (partial, StepAgain (None, None))
+                | _ -> failwith "first cmd of While wasn't Call!")
+            | _ -> None)
 
     let update partial exec_data =
       let { cmd_report; _ } = exec_data in
@@ -258,7 +264,8 @@ struct
               | Cmd.Assignment _ ->
                   if annot |> Annot.is_end_of_cmd then finished ~submap Normal
                   else StepAgain (None, None)
-              | _ -> failwith "expected Call for While!"))
+              | _ -> failwith "expected Call for While!")
+          | Return _ -> StepAgain (None, None))
 
     let handle exec_data tl_ast partial_cmds =
       let annot =
@@ -266,7 +273,7 @@ struct
         CmdReport.(cmd_report.annot)
       in
       (let* origin_id = Annot.get_origin_id annot in
-       let* stmt = annot_to_wisl_stmt annot tl_ast in
+       let stmt = annot_to_wisl_stmt annot tl_ast in
        match Hashtbl.find_opt partial_cmds origin_id with
        | Some partial ->
            let result = update partial exec_data in

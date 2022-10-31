@@ -12,6 +12,7 @@ type t = {
   (* TODO: move the following fields to WISL-specific annot *)
   loop_prefix : bool; [@default false]
   end_of_cmd : bool; [@default false]
+  is_return : bool; [@default false]
 }
 [@@deriving yojson, make]
 
@@ -36,3 +37,5 @@ let set_loop_prefix ?(is_prefix = true) (annot : t) =
 
 let is_end_of_cmd (annot : t) = annot.end_of_cmd
 let set_end_of_cmd (annot : t) = { annot with end_of_cmd = true }
+let is_return (annot : t) = annot.is_return
+let set_return (annot : t) = { annot with is_return = true }

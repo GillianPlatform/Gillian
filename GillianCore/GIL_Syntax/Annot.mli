@@ -12,6 +12,7 @@ val make :
   ?expansion_kind:expansion_kind ->
   ?loop_prefix:bool ->
   ?end_of_cmd:bool ->
+  ?is_return:bool ->
   unit ->
   t
 
@@ -34,3 +35,5 @@ val is_loop_prefix : t -> bool
 val set_loop_prefix : ?is_prefix:bool -> t -> t
 val is_end_of_cmd : t -> bool
 val set_end_of_cmd : t -> t
+val is_return : t -> bool
+val set_return : t -> t

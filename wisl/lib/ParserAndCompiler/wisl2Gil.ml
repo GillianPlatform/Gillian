@@ -909,12 +909,12 @@ let rec compile_function
   let retassigncmds =
     cmdle
     @ [
-        ( ret_annot,
+        ( ret_annot |> Annot.set_return,
           None,
           Cmd.Assignment (Gillian.Utils.Names.return_variable, comp_ret_expr) );
       ]
   in
-  let retcmd = (ret_annot, None, Cmd.ReturnNormal) in
+  let retcmd = (ret_annot |> Annot.set_return, None, Cmd.ReturnNormal) in
   let lbody_withret = lbodylist @ retassigncmds @ [ retcmd ] in
   let gil_body = Array.of_list lbody_withret in
   let gil_spec = Option.map (compile_spec ~fname:name) spec in
