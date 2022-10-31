@@ -51,6 +51,21 @@ struct
     | `None -> None
     | _ -> failwith "get_origin_node_str: Unknown Kind of Node"
 
+  type map = (branch_case, cmd_data, branch_data) ExecMap.t
+
+  and cmd_data = {
+    ids : rid list;
+    display : string;
+    unifys : unifys;
+    errors : string list;
+    submap : map submap;
+    gil_branch_path : BranchCase.path;
+    branch_path : branch_case list;
+    parent : parent; [@to_yojson fun _ -> `Null]
+  }
+
+  and parent = (map * branch_case option) option [@@deriving yojson]
+
   module PartialCmds = struct
     type partial_data = {
       display : string;
@@ -96,6 +111,7 @@ struct
           unifys : unifys;
           errors : string list;
           cmd_kind : (branch_case, branch_data) cmd_kind;
+          submap : map submap;
         }
       | StepAgain of (rid option * BranchCase.t option)
       | NoPartial
@@ -167,7 +183,12 @@ struct
         let ids = ids |> ExtList.to_list in
         let unifys = unifys |> ExtList.to_list in
         let errors = errors |> ExtList.to_list in
-        Finished { ids; display; unifys; errors; cmd_kind }
+        let submap =
+          match Annot.get_expansion_kind cmd_report.annot with
+          | Annot.NoExpansion -> NoSubmap
+          | Annot.Function p -> Proc p
+        in
+        Finished { ids; display; unifys; errors; cmd_kind; submap }
       in
       match exec_data.kind with
       | Final -> finished Final
@@ -231,21 +252,6 @@ struct
            Some result)
       |> Option.value ~default:NoPartial
   end
-
-  type map = (branch_case, cmd_data, branch_data) ExecMap.t
-
-  and cmd_data = {
-    ids : rid list;
-    display : string;
-    unifys : unifys;
-    errors : string list;
-    submap : map submap;
-    gil_branch_path : BranchCase.path;
-    branch_path : branch_case list;
-    parent : parent; [@to_yojson fun _ -> `Null]
-  }
-
-  and parent = (map * branch_case option) option [@@deriving yojson]
 
   type t = {
     gil_state : GilLifter.t; [@to_yojson GilLifter.dump]
@@ -390,10 +396,8 @@ struct
 
   let prepare_basic_cmd tl_ast id_map exec_data =
     let { cmd_report; _ } = exec_data in
-    let origin_id =
-      let annot = CmdReport.(cmd_report.annot) in
-      Annot.get_origin_id annot
-    in
+    let annot = CmdReport.(cmd_report.annot) in
+    let origin_id = Annot.get_origin_id annot in
     let display =
       get_origin_node_str tl_ast origin_id
       |> Option.value ~default:"Unknown command!"
@@ -402,7 +406,7 @@ struct
       exec_data
     in
     let submap =
-      match Annot.get_expansion_kind cmd_report.annot with
+      match Annot.get_expansion_kind annot with
       | NoExpansion -> NoSubmap
       | Function p -> Proc p
     in
@@ -448,16 +452,24 @@ struct
           state.before_partial <- Some (prev_id, branch_case);
         ExecNext result
     | NoPartial ->
+        DL.log (fun m ->
+            let annot = CmdReport.(exec_data.cmd_report.annot) in
+            m
+              ~json:
+                [
+                  ("id", rid_to_yojson exec_data.id);
+                  ("annot", Annot.to_yojson annot);
+                ]
+              "NO PARTIAL");
         let new_cmd = prepare_basic_cmd tl_ast id_map exec_data in
         (match state.map with
         | Nothing -> state.map <- new_cmd ~parent:None ()
         | _ -> insert_new_cmd new_cmd prev_id branch_case id_map);
         Stop
-    | Finished { ids; display; unifys; errors; cmd_kind } ->
+    | Finished { ids; display; unifys; errors; cmd_kind; submap } ->
         let gil_branch_path =
           GilLifter.path_of_id (List.hd ids) state.gil_state
         in
-        let submap = NoSubmap in
         let new_cmd =
           new_cmd id_map cmd_kind ids display unifys errors gil_branch_path
             ~submap

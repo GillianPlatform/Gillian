@@ -96,6 +96,9 @@ let set_rpc_command_handler rpc ?name module_ f =
     | Failure e ->
         log_async (fun m -> m ~json:name_json "[Error] %s" e);%lwt
         failwith e
+    | Invalid_argument e as err ->
+        log_async (fun m -> m ~json:name_json "[Error] %s" e);%lwt
+        raise err
     | Not_found ->
         log_async (fun m -> m ~json:name_json "[Error] Not found");%lwt
         raise Not_found

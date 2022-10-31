@@ -29,10 +29,7 @@ val make_executed_cmd_data :
   BranchCase.path ->
   'cmd_report executed_cmd_data
 
-type handle_cmd_result =
-  | Stop
-  | ExecNext of (rid option * BranchCase.t option)
-  | StartProc of string
+type handle_cmd_result = Stop | ExecNext of (rid option * BranchCase.t option)
 [@@deriving yojson]
 
 module type S = sig

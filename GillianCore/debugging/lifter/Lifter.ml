@@ -30,10 +30,7 @@ let make_executed_cmd_data
     branch_path =
   { kind; id; cmd_report; unifys; errors; branch_path }
 
-type handle_cmd_result =
-  | Stop
-  | ExecNext of (rid option * BranchCase.t option)
-  | StartProc of string
+type handle_cmd_result = Stop | ExecNext of (rid option * BranchCase.t option)
 [@@deriving yojson]
 
 module type S = sig
