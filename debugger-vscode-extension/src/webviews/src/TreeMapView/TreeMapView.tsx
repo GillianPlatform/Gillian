@@ -16,18 +16,24 @@ export type TransformResult<M, D, A> = {
   edgeLabel?: React.ReactNode;
   width: number;
   height: number;
+  submap?: TransformResult<M, D, A>;
 };
 
 export type TransformFunc<M, D, A> = (
   map: M,
-  parent: string,
+  parent: string | undefined,
   aux: A
 ) => TransformResult<M, D, A>;
+
+export type Dims = {
+  width: number;
+  height: number;
+};
 
 export type Props<M, D, A> = {
   initElem: TransformResult<M, D, A>;
   transform: TransformFunc<M, D, A>;
-  nodeComponent: React.ComponentType<NodeProps<D>>;
+  nodeComponent: React.ComponentType<NodeProps<D & Dims>>;
 };
 
 type IntermediateElem<D> = {
@@ -38,7 +44,11 @@ type IntermediateElem<D> = {
   minX: number;
   maxX: number;
   nexts: IntermediateElem<D>[];
-  childOffset: number;
+  childXOffset: number;
+  submap?: IntermediateElem<D>;
+  submapXOffset: number;
+  y: number;
+  maxY: number;
 };
 
 export const NODE_WIDTH = 150;
@@ -49,6 +59,8 @@ export const DEFAULT_NODE_SIZE = {
 };
 const NODE_GAP_X = 50;
 const NODE_GAP_Y = 50;
+
+const NODE_PAD = 25;
 
 export type FlowRef = React.MutableRefObject<HTMLDivElement> | undefined;
 export const FlowRefContext = React.createContext(undefined as FlowRef);
@@ -63,16 +75,42 @@ const TreeMapView = <M, D, A>({
 
   const edges: Edge[] = [];
 
-  const buildElem = (tResult: TransformResult<M, D, A>, minX = 0, parent?: string) : IntermediateElem<D> => {
-    const { id, data, nexts, edgeLabel, width, height } = tResult;
+  const buildElem = (
+    {
+      id,
+      data,
+      nexts,
+      edgeLabel,
+      width: initWidth,
+      height: initHeight,
+      submap: rawSubmap,
+    }: TransformResult<M, D, A>,
+    minX = 0,
+    y = 0,
+    parent?: string
+  ): IntermediateElem<D> => {
+    let submap: IntermediateElem<D> | undefined = undefined;
+    let width = initWidth;
+    let height = initHeight;
+    let submapXOffset = 0;
+    if (rawSubmap !== undefined) {
+      submap = buildElem(rawSubmap, 0, y + height + NODE_PAD);
+      const submapWidth = submap.maxX - submap.minX + NODE_PAD * 2;
+      submapXOffset = Math.max(width - submapWidth, 0) / 2;
+      width = Math.max(submapWidth, width);
+      height = submap.maxY - y + NODE_PAD;
+    }
+
     let maxX = minX;
+    let maxY = y + height;
     const nextElems = nexts.map(([aux, nextMap]) => {
       const transformed = transform(nextMap, id, aux);
-      const next = buildElem(transformed, maxX, id);
-      maxX = next.maxX + NODE_GAP_X;
+      const next = buildElem(transformed, maxX, y + height + NODE_GAP_Y, id);
+      maxX = Math.max(next.maxX + NODE_GAP_X, maxX);
+      maxY = Math.max(next.maxY, maxY);
       return next;
     });
-    const childOffset = Math.max(minX + width - (maxX - NODE_GAP_X), 0) / 2;
+    const childXOffset = Math.max(minX + width - (maxX - NODE_GAP_X), 0) / 2;
     maxX = Math.max(minX + width, maxX - NODE_GAP_X);
 
     if (parent !== undefined) {
@@ -92,21 +130,44 @@ const TreeMapView = <M, D, A>({
       minX,
       maxX,
       nexts: nextElems,
-      childOffset,
+      childXOffset,
+      y,
+      maxY,
+      submap,
+      submapXOffset,
     };
     return elem;
   };
 
   const elem = buildElem(initElem);
-  const nodes: Node<D>[] = [];
+  const nodes: Node<D & Dims>[] = [];
 
-  const buildNodes = ({ id, data, width, height, minX, maxX, nexts, childOffset }: IntermediateElem<D>, xOffset = 0, y = 0) => {
+  const buildNodes = (
+    {
+      id,
+      data,
+      width,
+      height,
+      minX,
+      maxX,
+      y,
+      nexts,
+      childXOffset,
+      submap,
+      submapXOffset,
+    }: IntermediateElem<D>,
+    xOffset = 0
+  ) => {
     const x = (minX + maxX) / 2 - width / 2 + xOffset;
     nodes.push({
       id: `${id}`,
       position: { x, y },
       type: 'customNode',
-      data,
+      data: {
+        width,
+        height,
+        ...data,
+      },
       style: {
         width: `${width}px`,
         height: `${height}px`,
@@ -118,8 +179,12 @@ const TreeMapView = <M, D, A>({
       selectable: true,
     });
 
-    nexts.forEach((next) => {
-      buildNodes(next, xOffset + childOffset, y + height + NODE_GAP_Y);
+    if (submap !== undefined) {
+      buildNodes(submap, xOffset + submapXOffset + NODE_PAD);
+    }
+
+    nexts.forEach(next => {
+      buildNodes(next, xOffset + childXOffset);
     });
   };
   buildNodes(elem);
@@ -141,8 +206,6 @@ const TreeMapView = <M, D, A>({
       </FlowRefContext.Provider>
     </div>
   );
-
-  console.log({ nodes, edges, initElem, ret });
 
   return ret;
 };

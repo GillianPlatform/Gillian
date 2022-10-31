@@ -5,7 +5,7 @@ import {
   VSCodeDivider,
 } from '@vscode/webview-ui-toolkit/react';
 import { CmdData } from '../../../types';
-import { NODE_HEIGHT } from '../TreeMapView/TreeMapView';
+import { NODE_HEIGHT, Dims } from '../TreeMapView/TreeMapView';
 import NodeWrap from '../TreeMapView/NodeWrap';
 import { NodeProps } from 'react-flow-renderer';
 import { Code } from '../util';
@@ -18,10 +18,12 @@ export type ExecMapNodeData =
       cmdData: CmdData;
       isFinal: boolean;
       isCurrentCmd: boolean;
+      hasParent: boolean;
       jump: () => void;
     }
   | {
       type: 'Empty';
+      hasParent: boolean;
       exec: () => void;
     }
   | {
@@ -29,10 +31,17 @@ export type ExecMapNodeData =
       procName: string;
     };
 
-const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData>) => {
-  if (data.type === 'Empty') {
+const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & Dims>) => {
+  const { type, width, height } = data;
+  if (type === 'Empty') {
     return (
-      <NodeWrap classes={['node-empty']} noSourceHandle width={NODE_HEIGHT}>
+      <NodeWrap
+        classes={['node-empty']}
+        noSourceHandle
+        noTargetHandle={!data.hasParent}
+        width={width}
+        height={height}
+      >
         <VSCodeButton
           appearance="icon"
           aria-label="Execute here"
@@ -45,9 +54,9 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData>) => {
     );
   }
 
-  if (data.type === 'Root') {
+  if (type === 'Root') {
     return (
-      <NodeWrap root noTargetHandle>
+      <NodeWrap root noTargetHandle width={width} height={height}>
         <span className="node-title">
           <Code>{data.procName}</Code>
         </span>
@@ -55,12 +64,12 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData>) => {
     );
   }
 
-  const { cmdData, isFinal, isCurrentCmd } = data;
+  const { cmdData, isFinal, isCurrentCmd, hasParent } = data;
 
   const unifyBadge = (() => {
     if (cmdData.unifys.length > 0) {
       const [, , [result]] = cmdData.unifys[0];
-      const colorStyle = result === 'Success' ? {} : { color: 'red'};
+      const colorStyle = result === 'Success' ? {} : { color: 'red' };
       return (
         <>
           <VSCodeBadge>
@@ -105,28 +114,29 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData>) => {
   );
 
   return (
-    <>
-      <NodeWrap
-        selected={isCurrentCmd}
-        error={cmdData.errors.length > 0}
-        noSourceHandle={isFinal}
-        tooltip={tooltip}
-      >
-        <pre>{cmdData.display}</pre>
-        <div className="node-button-row">
-          {unifyBadge}
-          <VSCodeButton
-            appearance="icon"
-            aria-label="Jump here"
-            title="Jump here"
-            disabled={isCurrentCmd}
-            onClick={isCurrentCmd ? undefined : data.jump}
-          >
-            <span className="codicon codicon-target" />
-          </VSCodeButton>
-        </div>
-      </NodeWrap>
-    </>
+    <NodeWrap
+      selected={isCurrentCmd}
+      error={cmdData.errors.length > 0}
+      noSourceHandle={isFinal}
+      noTargetHandle={!hasParent}
+      tooltip={tooltip}
+      width={width}
+      height={height}
+    >
+      <pre>{cmdData.display}</pre>
+      <div className="node-button-row">
+        {unifyBadge}
+        <VSCodeButton
+          appearance="icon"
+          aria-label="Jump here"
+          title="Jump here"
+          disabled={isCurrentCmd}
+          onClick={isCurrentCmd ? undefined : data.jump}
+        >
+          <span className="codicon codicon-target" />
+        </VSCodeButton>
+      </div>
+    </NodeWrap>
   );
 };
 

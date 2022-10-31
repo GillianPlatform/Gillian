@@ -4,6 +4,18 @@
   user-select: auto !important;
 }
 
+.node-wrap {
+  --border-color: var(--vscode-editorCursor-foreground);
+}
+
+.node-selected {
+  color: var(--vscode-editor-selectionForeground, var(--vscode-editor-foreground));
+}
+
+.node-error {
+  --border-color: var(--vscode-errorForeground);
+}
+
 .node-content {
   font-size: 12px;
   position: absolute;
@@ -16,8 +28,7 @@
   align-items: center;
 }
 
-.node-background {
-  --border-color: var(--vscode-editorCursor-foreground);
+.node-border {
   position: absolute;
   top: 0;
   left: 0;
@@ -25,33 +36,45 @@
   width: calc(100% - 2px);
   height: calc(100% - 2px);
   border-radius: 1px;
-  background: linear-gradient(to right, var(--background), var(--background));
   border: 1px solid var(--border-color);
 }
 
-.node-selected .node-content {
-  color: var(--vscode-editor-selectionForeground, var(--vscode-editor-foreground));
+.node-background {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  z-index: -2;
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+  background: linear-gradient(to right, var(--background), var(--background));
+}
+
+.node-background-border {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.node-selected .node-border {
+  width: calc(100% - 7px);
+  height: calc(100% - 7px);
+  border: 3.5px double var(--border-color);
 }
 
 .node-selected .node-background {
   background:
     linear-gradient(to right, var(--vscode-editor-selectionBackground), var(--vscode-editor-selectionBackground)),
     linear-gradient(to right, var(--background), var(--background));
-  width: calc(100% - 7px);
-  height: calc(100% - 7px);
-  border: 3.5px double var(--border-color);
+  top: 3px;
+  left: 3px;
+  width: calc(100% - 6px);
+  height: calc(100% - 6px);
 }
 
-.node-error .node-background {
-  --border-color: var(--vscode-errorForeground);
-}
-
-.node-empty .node-background {
+.node-empty .node-border {
   border-radius: 100%;
   border-style: dashed;
 }
 
-.node-root .node-background {
+.node-root .node-border {
   width: calc(100% - 6px);
   height: calc(100% - 6px);
   border-radius: 0;
