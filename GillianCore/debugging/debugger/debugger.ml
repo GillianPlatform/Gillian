@@ -26,12 +26,13 @@ module type S = sig
   end
 
   val launch : string -> string option -> (debug_state, string) result
-  val jump_to_id : rid -> debug_state -> (unit, string) result
+  val jump_to_id : string -> rid -> debug_state -> (unit, string) result
   val jump_to_start : debug_state -> unit
   val step_in : ?reverse:bool -> debug_state -> stop_reason
   val step : ?reverse:bool -> debug_state -> stop_reason
 
   val step_specific :
+    string ->
     ExecMap.Packaged.branch_case option ->
     Logging.ReportId.t ->
     debug_state ->
@@ -39,6 +40,7 @@ module type S = sig
 
   val step_out : debug_state -> stop_reason
   val run : ?reverse:bool -> ?launch:bool -> debug_state -> stop_reason
+  val start_proc : string -> debug_state -> (stop_reason, string) result
   val terminate : debug_state -> unit
   val get_frames : debug_state -> frame list
   val get_scopes : debug_state -> scope list
@@ -101,7 +103,7 @@ struct
     mutable cur_proc_name : string;
   }
 
-  let get_proc_state ?proc_name ?(activate_report_state = true) dbg =
+  let get_proc_state_result ?proc_name ?(activate_report_state = true) dbg =
     let proc_name =
       match proc_name with
       | Some proc_name ->
@@ -109,9 +111,17 @@ struct
           proc_name
       | None -> dbg.cur_proc_name
     in
-    let proc_state = Hashtbl.find dbg.procs proc_name in
-    if activate_report_state then L.ReportState.activate proc_state.report_state;
-    proc_state
+    match Hashtbl.find_opt dbg.procs proc_name with
+    | None -> Error ("get_proc_state: couldn't find proc " ^ proc_name)
+    | Some proc_state ->
+        if activate_report_state then
+          L.ReportState.activate proc_state.report_state;
+        Ok proc_state
+
+  let get_proc_state ?proc_name ?(activate_report_state = true) dbg =
+    match get_proc_state_result ?proc_name ~activate_report_state dbg with
+    | Ok proc_state -> proc_state
+    | Error msg -> failwith msg
 
   module Inspect = struct
     type debug_proc_state_view = {
@@ -613,18 +623,11 @@ struct
                               (pp_option BranchCase.pp) branch_case);
                         let id = id |> Option.value ~default:cur_report_id in
                         execute_step id ?branch_case dbg state
-                    | StartProc proc_name -> (
-                        DL.log (fun m -> m "START PROC (%s)" proc_name);
-                        match launch_proc dbg proc_name with
-                        | Error e -> failwith e
-                        | Ok proc_state ->
-                            Hashtbl.add dbg.procs proc_name proc_state;
-                            (Step, Some cur_report_id))
                     | Stop ->
                         DL.log (fun m -> m "STOP (%a)" pp_rid cur_report_id);
                         (Step, Some cur_report_id)))))
 
-  and launch_proc dbg proc_name =
+  and launch_proc proc_name dbg =
     let { cfg; _ } = dbg in
     let report_state = L.ReportState.clone cfg.report_state_base in
     let open Verification.SAInterpreter in
@@ -676,28 +679,23 @@ struct
                     report_state;
                   }
                 in
-                let id =
+                let id, stop_reason =
                   match handler_result with
                   | ExecNext (id', branch_case) ->
                       DL.log (fun m ->
                           m "EXEC NEXT (%a, %a)" (pp_option pp_rid) id'
                             (pp_option BranchCase.pp) branch_case);
                       let id = id' |> Option.value ~default:id in
-                      execute_step ?branch_case id dbg state
-                      |> snd |> Option.value ~default:id
-                  | StartProc proc_name -> (
-                      DL.log (fun m -> m "START PROC (%s)" proc_name);
-                      match launch_proc dbg proc_name with
-                      | Error e -> failwith e
-                      | Ok proc_state ->
-                          Hashtbl.add dbg.procs proc_name proc_state;
-                          id)
+                      let stop_reason, id' =
+                        execute_step ?branch_case id dbg state
+                      in
+                      (id' |> Option.value ~default:id, stop_reason)
                   | Stop ->
                       DL.log (fun m -> m "STOP (%a)" pp_rid id);
-                      id
+                      (id, Step)
                 in
                 state |> update_report_id_and_inspection_fields id cfg;
-                Ok state)
+                Ok (state, stop_reason))
     in
     Config.Verification.(
       let procs_to_verify = !procs_to_verify in
@@ -751,7 +749,7 @@ struct
       }
     in
     let dbg = { cfg; procs = Hashtbl.create 0; cur_proc_name = proc_name } in
-    let++ main_proc_state = launch_proc dbg proc_name in
+    let++ main_proc_state, _ = dbg |> launch_proc proc_name in
     main_proc_state.report_state |> L.ReportState.activate;
     Hashtbl.add dbg.procs proc_name main_proc_state;
     dbg
@@ -765,9 +763,9 @@ struct
       Ok ()
     with Failure msg -> Error msg
 
-  let jump_to_id id dbg =
+  let jump_to_id proc_name id dbg =
     let { cfg; _ } = dbg in
-    let state = dbg |> get_proc_state in
+    let** state = dbg |> get_proc_state_result ~proc_name in
     state |> jump_state_to_id id cfg
 
   let jump_to_start dbg =
@@ -897,9 +895,9 @@ struct
     let state = dbg |> get_proc_state in
     step_case ~reverse dbg state
 
-  let step_specific branch_case prev_id dbg =
+  let step_specific proc_name branch_case prev_id dbg =
     let { cfg; _ } = dbg in
-    let state = dbg |> get_proc_state in
+    let** state = dbg |> get_proc_state_result ~proc_name in
     let id, branch_case =
       state.lifter_state |> Lifter.next_step_specific prev_id branch_case
     in
@@ -959,6 +957,12 @@ struct
             | _ -> aux (count + 1))
     in
     aux ~launch 0
+
+  let start_proc proc_name dbg =
+    let++ proc_state, stop_reason = dbg |> launch_proc proc_name in
+    Hashtbl.add dbg.procs proc_name proc_state;
+    dbg.cur_proc_name <- proc_name;
+    stop_reason
 
   let terminate dbg =
     L.ReportState.(activate global_state);

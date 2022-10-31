@@ -16,12 +16,16 @@ module type S = sig
   end
 
   val launch : string -> string option -> (debug_state, string) result
-  val jump_to_id : Logging.ReportId.t -> debug_state -> (unit, string) result
+
+  val jump_to_id :
+    string -> Logging.ReportId.t -> debug_state -> (unit, string) result
+
   val jump_to_start : debug_state -> unit
   val step_in : ?reverse:bool -> debug_state -> stop_reason
   val step : ?reverse:bool -> debug_state -> stop_reason
 
   val step_specific :
+    string ->
     ExecMap.Packaged.branch_case option ->
     Logging.ReportId.t ->
     debug_state ->
@@ -29,6 +33,7 @@ module type S = sig
 
   val step_out : debug_state -> stop_reason
   val run : ?reverse:bool -> ?launch:bool -> debug_state -> stop_reason
+  val start_proc : string -> debug_state -> (stop_reason, string) result
   val terminate : debug_state -> unit
   val get_frames : debug_state -> frame list
   val get_scopes : debug_state -> scope list
