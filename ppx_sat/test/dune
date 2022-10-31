@@ -1,7 +1,7 @@
 (executable
  (name test)
- (libraries gillian.gil_syntax gillian.monadic gillian.engine ppx_sat.runtime
-   fmt)
+ (libraries gillian.gil_syntax gillian.monadic gillian.engine
+   gillian.ppx_sat.runtime fmt)
  (preprocess
   (pps ppx_sat)))
 
