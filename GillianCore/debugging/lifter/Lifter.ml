@@ -41,9 +41,13 @@ module type S = sig
   type cmd_report
 
   val init :
-    tl_ast option -> cmd_report executed_cmd_data -> t * handle_cmd_result
+    string ->
+    tl_ast option ->
+    cmd_report executed_cmd_data ->
+    t * handle_cmd_result
 
   val init_opt :
+    string ->
     tl_ast option ->
     cmd_report executed_cmd_data ->
     (t * handle_cmd_result) option

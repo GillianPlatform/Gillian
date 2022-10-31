@@ -51,6 +51,16 @@ struct
     | `None -> None
     | _ -> failwith "get_origin_node_str: Unknown Kind of Node"
 
+  let get_fun_call_name exec_data =
+    let cmd = CmdReport.(exec_data.cmd_report.cmd) in
+    match cmd with
+    | Cmd.Call (_, name_expr, _, _, _) -> (
+        match name_expr with
+        | Expr.Lit (Literal.String name) -> Some name
+        | _ ->
+            failwith "get_fun_call_name: function name wasn't a literal expr!")
+    | _ -> None
+
   type map = (branch_case, cmd_data, branch_data) ExecMap.t
 
   and cmd_data = {
@@ -89,6 +99,7 @@ struct
       | Lookup of { d : partial_data; target_var : string }
       | Update of { d : partial_data; mutable get_cmd_found : bool }
       | FunCall of { d : partial_data; target_var : string }
+      | While of { d : partial_data; submap : map submap }
 
     type t = (int, partial) Hashtbl.t
 
@@ -97,7 +108,8 @@ struct
       | Dispose { d }
       | Lookup { d; _ }
       | Update { d; _ }
-      | FunCall { d; _ } -> d
+      | FunCall { d; _ }
+      | While { d; _ } -> d
 
     let update_partial_data { id; unifys; errors; _ } d =
       d.ids |> ExtList.append id;
@@ -112,6 +124,7 @@ struct
           errors : string list;
           cmd_kind : (branch_case, branch_data) cmd_kind;
           submap : map submap;
+          fun_call_name : string option;
         }
       | StepAgain of (rid option * BranchCase.t option)
       | NoPartial
@@ -167,28 +180,37 @@ struct
               | _ ->
                   let partial = FunCall { d; target_var = x } in
                   Some (partial, StepAgain (None, None)))
+          | WStmt.While _ -> (
+              match gil_cmd with
+              | Cmd.Call _ ->
+                  let submap =
+                    match annot |> Annot.get_expansion_kind with
+                    | Annot.NoExpansion ->
+                        failwith "Call for While has no expansion!"
+                    | Annot.Function p -> ExecMap.Proc p
+                  in
+                  let partial = While { d; submap } in
+                  Some (partial, StepAgain (None, None))
+              | _ -> failwith "first cmd of While wasn't Call!")
           | _ -> None)
 
     let update partial exec_data =
       let { cmd_report; _ } = exec_data in
       let gil_cmd = CmdReport.(cmd_report.cmd) in
       partial |> get_partial_data |> update_partial_data exec_data;
+      let annot = CmdReport.(cmd_report.annot) in
       let failwith s =
         DL.failwith
           (fun () -> [ ("gil_cmd", cmd_to_yojson gil_cmd) ])
           ("PartialCmds.update: " ^ s)
       in
-      let finished cmd_kind =
+      let finished ?(submap = NoSubmap) ?fun_call_name cmd_kind =
         let { display; ids; unifys; errors } = get_partial_data partial in
         let ids = ids |> ExtList.to_list in
         let unifys = unifys |> ExtList.to_list in
         let errors = errors |> ExtList.to_list in
-        let submap =
-          match Annot.get_expansion_kind cmd_report.annot with
-          | Annot.NoExpansion -> NoSubmap
-          | Annot.Function p -> Proc p
-        in
-        Finished { ids; display; unifys; errors; cmd_kind; submap }
+        Finished
+          { ids; display; unifys; errors; cmd_kind; submap; fun_call_name }
       in
       match exec_data.kind with
       | Final -> finished Final
@@ -230,7 +252,13 @@ struct
           | FunCall { target_var; _ } -> (
               match gil_cmd with
               | Cmd.Call (x, _, _, _, _) when x = target_var -> finished Normal
-              | _ -> StepAgain (None, None)))
+              | _ -> StepAgain (None, None))
+          | While { submap; _ } -> (
+              match gil_cmd with
+              | Cmd.Assignment _ ->
+                  if annot |> Annot.is_end_of_cmd then finished ~submap Normal
+                  else StepAgain (None, None)
+              | _ -> failwith "expected Call for While!"))
 
     let handle exec_data tl_ast partial_cmds =
       let annot =
@@ -247,19 +275,21 @@ struct
            | _ -> ());
            Some result
        | None ->
-           let* partial, result = create annot tl_ast stmt exec_data in
+           let+ partial, result = create annot tl_ast stmt exec_data in
            Hashtbl.add partial_cmds origin_id partial;
-           Some result)
+           result)
       |> Option.value ~default:NoPartial
   end
 
   type t = {
+    proc_name : string;
     gil_state : GilLifter.t; [@to_yojson GilLifter.dump]
     tl_ast : tl_ast; [@to_yojson fun _ -> `Null]
     partial_cmds : PartialCmds.t; [@to_yojson fun _ -> `Null]
     mutable map : map;
     id_map : (rid, map) Hashtbl.t; [@to_yojson fun _ -> `Null]
     mutable before_partial : (rid * BranchCase.t option) option;
+    is_loop_func : bool;
   }
   [@@deriving to_yojson]
 
@@ -394,13 +424,16 @@ struct
         failwith
           "insert_new_cmd: HORROR - tried to insert to FinalCmd or Nothing!"
 
-  let prepare_basic_cmd tl_ast id_map exec_data =
+  let prepare_basic_cmd ?display ?(final = false) tl_ast id_map exec_data =
     let { cmd_report; _ } = exec_data in
     let annot = CmdReport.(cmd_report.annot) in
     let origin_id = Annot.get_origin_id annot in
     let display =
-      get_origin_node_str tl_ast origin_id
-      |> Option.value ~default:"Unknown command!"
+      match display with
+      | Some d -> d
+      | None ->
+          get_origin_node_str tl_ast origin_id
+          |> Option.value ~default:"Unknown command!"
     in
     let { id; unifys; errors; branch_path = gil_branch_path; kind; _ } =
       exec_data
@@ -410,30 +443,57 @@ struct
       | NoExpansion -> NoSubmap
       | Function p -> Proc p
     in
-    let kind = convert_kind id kind in
+    let kind = if final then Final else convert_kind id kind in
     new_cmd id_map kind [ id ] display unifys errors gil_branch_path ~submap
 
-  let init_opt tl_ast exec_data =
+  let handle_loop_prefix exec_data =
+    let annot = CmdReport.(exec_data.cmd_report.annot) in
+    if annot |> Annot.is_loop_prefix then
+      Some
+        (match exec_data.cmd_report.cmd with
+        | Cmd.GuardedGoto _ ->
+            ExecNext (None, Some (BranchCase.GuardedGoto true))
+        | _ -> ExecNext (None, None))
+    else None
+
+  let init_opt proc_name tl_ast exec_data =
     let gil_state = Gil.get_state () in
     let+ tl_ast in
+    CmdReport.(
+      let annot = exec_data.cmd_report.annot in
+      DL.log (fun m ->
+          m "LIFT INIT - is loop prefix: %b" (annot |> Annot.is_loop_prefix)));
     let partial_cmds = Hashtbl.create 0 in
     let id_map = Hashtbl.create 0 in
     let before_partial = None in
-    let map, result =
-      match PartialCmds.handle exec_data tl_ast partial_cmds with
-      | StepAgain result -> (Nothing, ExecNext result)
-      | NoPartial ->
-          let new_cmd = prepare_basic_cmd tl_ast id_map exec_data in
-          (new_cmd ~parent:None (), Stop)
-      | Finished _ -> failwith "init: HORROR - Finished PartialCmd on init!"
+    let map, result, is_loop_func =
+      match handle_loop_prefix exec_data with
+      | Some result -> (Nothing, result, true)
+      | None -> (
+          match PartialCmds.handle exec_data tl_ast partial_cmds with
+          | StepAgain result -> (Nothing, ExecNext result, false)
+          | NoPartial ->
+              let new_cmd = prepare_basic_cmd tl_ast id_map exec_data in
+              (new_cmd ~parent:None (), Stop, false)
+          | Finished _ -> failwith "init: HORROR - Finished PartialCmd on init!"
+          )
     in
     let state =
-      { gil_state; tl_ast; partial_cmds; map; id_map; before_partial }
+      {
+        proc_name;
+        gil_state;
+        tl_ast;
+        partial_cmds;
+        map;
+        id_map;
+        before_partial;
+        is_loop_func;
+      }
     in
     (state, result)
 
-  let init tl_ast exec_data =
-    match init_opt tl_ast exec_data with
+  let init proc_name tl_ast exec_data =
+    match init_opt proc_name tl_ast exec_data with
     | None -> failwith "init: wislLifter needs a tl_ast!"
     | Some x -> x
 
@@ -445,39 +505,46 @@ struct
     DL.log (fun m ->
         m "HANDLING %a (prev %a)" L.ReportId.pp exec_data.id L.ReportId.pp
           prev_id);
-    let { tl_ast; partial_cmds; id_map; _ } = state in
-    match PartialCmds.handle exec_data tl_ast partial_cmds with
-    | StepAgain result ->
-        if Option.is_none state.before_partial then
-          state.before_partial <- Some (prev_id, branch_case);
-        ExecNext result
-    | NoPartial ->
-        DL.log (fun m ->
-            let annot = CmdReport.(exec_data.cmd_report.annot) in
-            m
-              ~json:
-                [
-                  ("id", rid_to_yojson exec_data.id);
-                  ("annot", Annot.to_yojson annot);
-                ]
-              "NO PARTIAL");
-        let new_cmd = prepare_basic_cmd tl_ast id_map exec_data in
-        (match state.map with
-        | Nothing -> state.map <- new_cmd ~parent:None ()
-        | _ -> insert_new_cmd new_cmd prev_id branch_case id_map);
-        Stop
-    | Finished { ids; display; unifys; errors; cmd_kind; submap } ->
-        let gil_branch_path =
-          GilLifter.path_of_id (List.hd ids) state.gil_state
-        in
-        let new_cmd =
-          new_cmd id_map cmd_kind ids display unifys errors gil_branch_path
-            ~submap
-        in
-        let prev_id, branch_case = state.before_partial |> Option.get in
-        insert_new_cmd new_cmd prev_id branch_case id_map;
-        state.before_partial <- None;
-        Stop
+    let { tl_ast; partial_cmds; id_map; proc_name; is_loop_func; _ } = state in
+    match handle_loop_prefix exec_data with
+    | Some result -> result
+    | None -> (
+        match PartialCmds.handle exec_data tl_ast partial_cmds with
+        | StepAgain result ->
+            if Option.is_none state.before_partial then
+              state.before_partial <- Some (prev_id, branch_case);
+            ExecNext result
+        | NoPartial ->
+            let display, final =
+              if is_loop_func && get_fun_call_name exec_data = Some proc_name
+              then (Some "<end of loop>", true)
+              else (None, false)
+            in
+            let new_cmd =
+              prepare_basic_cmd ?display ~final tl_ast id_map exec_data
+            in
+            (match state.map with
+            | Nothing -> state.map <- new_cmd ~parent:None ()
+            | _ -> insert_new_cmd new_cmd prev_id branch_case id_map);
+            Stop
+        | Finished
+            { ids; display; unifys; errors; cmd_kind; submap; fun_call_name } ->
+            let display, cmd_kind =
+              if is_loop_func && fun_call_name = Some proc_name then
+                ("<end of loop>", Final)
+              else (display, cmd_kind)
+            in
+            let gil_branch_path =
+              GilLifter.path_of_id (List.hd ids) state.gil_state
+            in
+            let new_cmd =
+              new_cmd id_map cmd_kind ids display unifys errors gil_branch_path
+                ~submap
+            in
+            let prev_id, branch_case = state.before_partial |> Option.get in
+            insert_new_cmd new_cmd prev_id branch_case id_map;
+            state.before_partial <- None;
+            Stop)
 
   let get_gil_map _ = failwith "get_gil_map: not implemented!"
 

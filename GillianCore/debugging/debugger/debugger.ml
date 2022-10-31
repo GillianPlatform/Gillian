@@ -661,7 +661,7 @@ struct
                   let exec_data =
                     Lift.make_executed_cmd_data kind id cmd branch_path
                   in
-                  Lifter.init cfg.tl_ast exec_data
+                  Lifter.init proc_name cfg.tl_ast exec_data
                 in
                 let state =
                   {

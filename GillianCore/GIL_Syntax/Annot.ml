@@ -9,6 +9,9 @@ type t = {
       (** Should this command be hidden when debugging? *)
   expansion_kind : expansion_kind; [@default NoExpansion]
       (** Should this command be expanded when lifting? (i.e. loops to functions in WISL) *)
+  (* TODO: move the following fields to WISL-specific annot *)
+  loop_prefix : bool; [@default false]
+  end_of_cmd : bool; [@default false]
 }
 [@@deriving yojson, make]
 
@@ -25,3 +28,11 @@ let get_expansion_kind (annot : t) = annot.expansion_kind
 
 let set_expansion_kind expansion_kind (annot : t) =
   { annot with expansion_kind }
+
+let is_loop_prefix (annot : t) = annot.loop_prefix
+
+let set_loop_prefix ?(is_prefix = true) (annot : t) =
+  { annot with loop_prefix = is_prefix }
+
+let is_end_of_cmd (annot : t) = annot.end_of_cmd
+let set_end_of_cmd (annot : t) = { annot with end_of_cmd = true }

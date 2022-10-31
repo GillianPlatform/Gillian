@@ -107,13 +107,13 @@ struct
           (fun () -> [ ("id", rid_to_yojson id); ("state", dump state) ])
           ("at_id: " ^ s)
 
-  let init _ exec_data =
+  let init _ _ exec_data =
     let id_map = Hashtbl.create 1 in
     let map = new_cmd id_map exec_data ~parent:None () in
     let root_proc = get_proc_name exec_data in
     ({ map; root_proc; id_map }, Stop)
 
-  let init_opt _ exec_data = Some (init None exec_data)
+  let init_opt _ _ exec_data = Some (init "" None exec_data)
 
   let handle_cmd prev_id branch_case exec_data state =
     let { root_proc; id_map; _ } = state in

@@ -65,10 +65,10 @@ let rec compile_val v =
   | Str s -> Literal.String s
   | VList l -> Literal.LList (List.map compile_val l)
 
-let rec compile_expr ?(fname = "main") expr :
+let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
     (Annot.t * string option * string Cmd.t) list * Expr.t =
   let gen_str = Generators.gen_str fname in
-  let compile_expr = compile_expr ~fname in
+  let compile_expr = compile_expr ~fname ~is_loop_prefix in
   let expr_of_string s = Expr.Lit (Literal.String s) in
   let expr_fname_of_binop b =
     WBinOp.(
@@ -126,7 +126,7 @@ let rec compile_expr ?(fname = "main") expr :
         @ [
             ( Annot.make ~origin_id:(get_id expr)
                 ~origin_loc:(CodeLoc.to_location (get_loc expr))
-                (),
+                ~loop_prefix:is_loop_prefix (),
               None,
               call_i_plus );
           ],
@@ -566,6 +566,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         return_expr = WExpr.make (Var loopretvar) while_loc;
         floc = while_loc;
         fid = Generators.gen_id ();
+        is_loop_body = true;
       }
   in
   let retv = gen_str gvar in
@@ -589,15 +590,25 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
       ~origin_loc:(CodeLoc.to_location while_loc)
       ()
   in
+  let rec map_reassign_vars acc = function
+    | cmd :: rest ->
+        let annot_while =
+          match rest with
+          | [] -> annot_while |> Annot.set_end_of_cmd
+          | _ -> annot_while
+        in
+        map_reassign_vars ((annot_while, None, cmd) :: acc) rest
+    | [] -> List.rev acc
+  in
   let lab_cmds =
     ( Annot.(set_expansion_kind (Function loop_fname) annot_while),
       None,
       call_cmd )
-    :: List.map (fun cmd -> (annot_while, None, cmd)) reassign_vars
+    :: map_reassign_vars [] reassign_vars
   in
   (lab_cmds, loop_funct)
 
-let rec compile_stmt_list ?(fname = "main") stmtl =
+let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   (* create generator that works in the context of this function *)
   let compile_expr = compile_expr ~fname in
   let compile_lcmd = compile_lcmd ~fname in
@@ -785,6 +796,9 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
         Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let annot_hidden = Annot.hide annot in
+      let annot_prefix =
+        annot |> Annot.set_loop_prefix ~is_prefix:is_loop_prefix
+      in
       let cmdle, guard = compile_expr e in
       let comp_sl1, new_functions1 = compile_list sl1 in
       let comp_sl2, new_functions2 = compile_list sl2 in
@@ -792,7 +806,7 @@ let rec compile_stmt_list ?(fname = "main") stmtl =
       let comp_sl1, thenlab = get_or_create_lab comp_sl1 then_lab in
       let comp_sl2, elselab = get_or_create_lab comp_sl2 else_lab in
       let ifelsecmd = Cmd.GuardedGoto (guard, thenlab, elselab) in
-      let ifelsecmd_lab = (annot, None, ifelsecmd) in
+      let ifelsecmd_lab = (annot_prefix, None, ifelsecmd) in
       let gotoendcmd = Cmd.Goto endlab in
       let gotoendcmd_lab = (annot_hidden, None, gotoendcmd) in
       let endcmd = Cmd.Skip in
@@ -879,8 +893,10 @@ let compile_pred filepath pred =
 
 let rec compile_function
     filepath
-    WFun.{ name; params; body; spec; return_expr; _ } =
-  let lbodylist, new_functions = compile_stmt_list ~fname:name body in
+    WFun.{ name; params; body; spec; return_expr; is_loop_body; _ } =
+  let lbodylist, new_functions =
+    compile_stmt_list ~fname:name ~is_loop_prefix:is_loop_body body
+  in
   let other_procs =
     List.concat (List.map (compile_function filepath) new_functions)
   in

@@ -49,17 +49,19 @@ struct
   type memory_error = SMemory.err_t
   type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t
 
-  let init tl_ast exec_data =
-    let gil, gil_result = GilLifter.init tl_ast exec_data in
+  let init proc_name tl_ast exec_data =
+    let gil, gil_result = GilLifter.init proc_name tl_ast exec_data in
     gil_state := Some gil;
     let ret =
-      match TLLifter.init_opt tl_ast exec_data with
+      match TLLifter.init_opt proc_name tl_ast exec_data with
       | None -> ({ gil; tl = None }, gil_result)
       | Some (tl, tl_result) -> ({ gil; tl = Some tl }, tl_result)
     in
     ret
 
-  let init_opt tl_ast exec_data = Some (init tl_ast exec_data)
+  let init_opt proc_name tl_ast exec_data =
+    Some (init proc_name tl_ast exec_data)
+
   let dump = to_yojson
 
   let handle_cmd prev_id branch_case exec_data { gil; tl } =
