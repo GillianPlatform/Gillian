@@ -130,11 +130,12 @@ let pp fmt pred =
     | [] -> ()
     | defs -> Fmt.pf fmt ":@ %a" (Fmt.list ~sep:Fmt.comma pp_def) defs
   in
+  let name = Pp_utils.maybe_quote_ident pred.pred_name in
   Fmt.pf fmt "%a%a@[<hov 2>%a%a%apred %s%a %a@];@\n%a" pp_path_opt
     pred.pred_source_path pp_internal pred.pred_internal pp_abstract
     pred.pred_abstract pp_pure pred.pred_pure pp_nounfold pred.pred_nounfold
-    pred.pred_name (Fmt.parens pp_params) pred.pred_params pp_defs
-    pred.pred_definitions pp_facts pred.pred_facts
+    name (Fmt.parens pp_params) pred.pred_params pp_defs pred.pred_definitions
+    pp_facts pred.pred_facts
 
 (* Fmt.pf fmt
    "%a%a@[<hov 2>@[<h>%a%a%apred %s(%a) :@]@\n%a;%a@]@\n" pp_path_opt

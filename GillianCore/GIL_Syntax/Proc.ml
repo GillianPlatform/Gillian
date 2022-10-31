@@ -28,13 +28,7 @@ let pp ~(show_labels : bool) ~(pp_label : 'a Fmt.t) fmt labproc =
   } =
     labproc
   in
-  let name =
-    let matches =
-      Str.string_match (Str.regexp "[A-Za-z][A-Za-z0-9_]*") name 0
-    in
-    if matches && Str.match_end () == String.length name then name
-    else "\"" ^ name ^ "\""
-  in
+  let name = Pp_utils.maybe_quote_ident name in
   let len_lab l = String.length ((Fmt.to_to_string pp_label) l) in
   let len_opt l = Option.fold ~none:0 ~some:len_lab l in
   let max_size_lab =

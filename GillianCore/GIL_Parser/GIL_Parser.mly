@@ -337,7 +337,7 @@ pred_param_target:
 ;
 
 pred_head_target:
-  name = VAR; LBRACE; params = separated_list(COMMA, pred_param_target); RBRACE;
+  name = proc_name; LBRACE; params = separated_list(COMMA, pred_param_target); RBRACE;
   { (* Register the predicate declaration in the syntax checker *)
     let num_params = List.length params in
     let params, ins = List.split params in
@@ -673,7 +673,7 @@ g_assertion_target:
   | LEMP;
     { Asrt.Emp }
 (* x(e1, ..., en) *)
-  | name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE
+  | name = proc_name; LBRACE; params = separated_list(COMMA, expr_target); RBRACE
     { (* validate_pred_assertion (name, params); *)
       Asrt.Pred (name, params)
     }
