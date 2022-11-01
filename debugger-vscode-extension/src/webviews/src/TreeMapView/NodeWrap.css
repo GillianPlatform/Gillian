@@ -16,6 +16,10 @@
   --border-color: var(--vscode-errorForeground);
 }
 
+.node-inactive {
+  --border-color: var(--vscode-editorCursor-background);
+}
+
 .node-content {
   font-size: 12px;
   position: absolute;

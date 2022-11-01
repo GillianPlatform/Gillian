@@ -14,6 +14,7 @@ type NodeWrapProps = {
   contentHeight?: number;
   root?: boolean;
   selected?: boolean;
+  active?: boolean;
   error?: boolean;
   classes?: string[];
   tooltip?: ReactNode;
@@ -30,6 +31,7 @@ const NodeWrap: FC<NodeWrapProps> = ({
   contentHeight = NODE_HEIGHT,
   root = false,
   selected = false,
+  active = true,
   error = false,
   classes = [],
   tooltip,
@@ -45,6 +47,9 @@ const NodeWrap: FC<NodeWrapProps> = ({
   }
   if (error) {
     classes.unshift('node-error');
+  }
+  if (!active) {
+    classes.unshift('node-inactive');
   }
 
   const bgClasses = ['node-background'];
