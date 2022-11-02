@@ -1,5 +1,4 @@
 open DebugProtocolEx
-open Debugger.DebuggerTypes
 module DL = Debugger_log
 
 module Make (Debugger : Debugger.S) = struct
@@ -43,8 +42,8 @@ module Make (Debugger : Debugger.S) = struct
         send_stopped_events stop_reason);
     DL.set_rpc_command_handler rpc ~name:"Jump"
       (module Jump_command)
-      (fun { id } ->
-        match dbg |> Debugger.jump_to_id id with
+      (fun { proc_name; id } ->
+        match dbg |> Debugger.jump_to_id proc_name id with
         | Error e ->
             Lwt.return
               (Jump_command.Result.make ~success:false ~err:(Some e) ())
@@ -53,13 +52,23 @@ module Make (Debugger : Debugger.S) = struct
             Lwt.return (Jump_command.Result.make ~success:true ()));
     DL.set_rpc_command_handler rpc ~name:"Step specific"
       (module Step_specific_command)
-      (fun { prev_id; branch_case } ->
-        match dbg |> Debugger.step_specific branch_case prev_id with
+      (fun { proc_name; prev_id; branch_case } ->
+        match dbg |> Debugger.step_specific proc_name branch_case prev_id with
         | Error e ->
             Lwt.return
               (Step_specific_command.Result.make ~success:false ~err:(Some e) ())
         | Ok stop_reason ->
             send_stopped_events stop_reason;%lwt
             Lwt.return (Step_specific_command.Result.make ~success:true ()));
+    DL.set_rpc_command_handler rpc ~name:"Start proc"
+      (module Start_proc_command)
+      (fun { proc_name } ->
+        match dbg |> Debugger.start_proc proc_name with
+        | Error e ->
+            Lwt.return
+              (Start_proc_command.Result.make ~success:false ~err:(Some e) ())
+        | Ok stop_reason ->
+            send_stopped_events stop_reason;%lwt
+            Lwt.return (Start_proc_command.Result.make ~success:true ()));
     Lwt.join [ promise ]
 end

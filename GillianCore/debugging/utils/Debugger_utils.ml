@@ -1,3 +1,17 @@
+(* VSCode column numbers start from 1 while GIL location columns start from 0 *)
+let location_to_display_location (loc : Location.t) : Location.t =
+  let loc_source = loc.loc_source in
+  let loc_start : Location.position =
+    {
+      pos_line = loc.loc_start.pos_line;
+      pos_column = loc.loc_start.pos_column + 1;
+    }
+  in
+  let loc_end : Location.position =
+    { pos_line = loc.loc_end.pos_line; pos_column = loc.loc_end.pos_column + 1 }
+  in
+  { loc_start; loc_end; loc_source }
+
 (* TODO: these types should be categorised and put in separate files. *)
 
 type stop_reason =
@@ -38,3 +52,6 @@ let create_leaf_variable (name : string) (value : string) ?(type_ = None) () :
 let create_node_variable (name : string) (var_ref : int) ?(value = "") () :
     variable =
   { name; value; type_ = Some "object"; var_ref }
+
+module ExecMap = ExecMap
+module UnifyMap = UnifyMap

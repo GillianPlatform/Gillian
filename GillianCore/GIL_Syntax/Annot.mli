@@ -8,7 +8,11 @@ val make :
   ?origin_loc:Location.t ->
   ?origin_id:int ->
   ?loop_info:string list ->
+  ?hidden:bool ->
   ?expansion_kind:expansion_kind ->
+  ?loop_prefix:bool ->
+  ?end_of_cmd:bool ->
+  ?is_return:bool ->
   unit ->
   t
 
@@ -27,3 +31,9 @@ val is_hidden : t -> bool
 val hide : t -> t
 val get_expansion_kind : t -> expansion_kind
 val set_expansion_kind : expansion_kind -> t -> t
+val is_loop_prefix : t -> bool
+val set_loop_prefix : ?is_prefix:bool -> t -> t
+val is_end_of_cmd : t -> bool
+val set_end_of_cmd : t -> t
+val is_return : t -> bool
+val set_return : t -> t

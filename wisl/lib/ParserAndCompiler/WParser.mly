@@ -162,6 +162,7 @@ fct:
         spec = None;
         floc;
         fid;
+        is_loop_body = false;
       } }
 
 

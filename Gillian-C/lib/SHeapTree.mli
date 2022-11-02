@@ -93,7 +93,7 @@ val substitution :
 val merge : old_tree:t -> new_tree:t -> t d_or_error
 
 module Lift : sig
-  open Debugger.DebuggerTypes
+  open Gillian.Debugger.Utils
 
   val get_variable :
     make_node:

@@ -4,4 +4,6 @@ type t =
   | SpecExec of Flag.t
   | LAction of Yojson.Safe.t list
   | LActionFail of int
-[@@deriving yojson]
+[@@deriving show, yojson]
+
+type path = t list [@@deriving yojson]

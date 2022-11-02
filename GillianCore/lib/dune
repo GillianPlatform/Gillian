@@ -12,4 +12,7 @@
   logging
   incrementalAnalysis
   monadic
-  debugger))
+  debugger
+  debugger_log
+  debugger_utils
+  debugger_lifter))

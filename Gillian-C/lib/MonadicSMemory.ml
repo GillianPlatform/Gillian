@@ -9,6 +9,7 @@ open Gillian.Gil_syntax
 module Logging = Gillian.Logging
 module SS = GUtils.Containers.SS
 module SVal = MonadicSVal
+module Debugger = Gillian.Debugger
 
 (* Some utils first *)
 
@@ -945,16 +946,14 @@ let mem_constraints _heap = []
 let is_overlapping_asrt = LActions.is_overlapping_asrt_str
 
 module Lift = struct
-  open Debugger
-  open DebuggerTypes
+  open Debugger.Utils
 
   let get_store_vars store =
     store
     |> List.map (fun (var, value) : variable ->
            let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
            create_leaf_variable var value ())
-    |> List.sort (fun (v : DebuggerTypes.variable) w ->
-           Stdlib.compare v.name w.name)
+    |> List.sort (fun (v : variable) w -> Stdlib.compare v.name w.name)
 
   let make_node ~get_new_scope_id ~variables ~name ~value ?(children = []) () :
       variable =
@@ -977,7 +976,6 @@ module Lift = struct
       ~is_gil_file:_
       ~get_new_scope_id
       variables =
-    let open DebuggerTypes in
     let mem = !(memory.mem) in
     (* Store first *)
     let store_id = get_new_scope_id () in

@@ -1,8 +1,10 @@
 open Cgil_lib
 module SMemory = Gillian.Monadic.MonadicSMemory.Lift (MonadicSMemory)
 
-module Gil_to_c_lifter = struct
-  include Debugger.Gil_to_tl_lifter.Default (SMemory) (ParserAndCompiler)
+module Gil_to_c_lifter (Verification : Gillian.Abstraction.Verifier.S) = struct
+  include
+    Gillian.Debugger.Lifter.GilLifter.Make (Verification) (SMemory)
+      (ParserAndCompiler)
 
   let add_variables = MonadicSMemory.Lift.add_variables
 end

@@ -1,7 +1,7 @@
 include Gillian.Monadic.MonadicSMemory.S with type init_data = Global_env.t
 
 module Lift : sig
-  open Debugger.DebuggerTypes
+  open Gillian.Debugger.Utils
 
   val add_variables :
     store:(string * vt) list ->

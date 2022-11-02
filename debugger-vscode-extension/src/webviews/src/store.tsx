@@ -63,7 +63,6 @@ const useStore = create<Store>(
         });
       },
       selectUnifyStep: step => {
-        console.log('selecting step!');
         set(({ unifyState: { path, unifications } }) => {
           const unifyId = path[0];
           const unification = unifications[unifyId];

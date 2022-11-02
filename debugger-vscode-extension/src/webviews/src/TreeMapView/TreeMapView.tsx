@@ -10,35 +10,57 @@ import ReactFlow, {
 import './TreeMapView.css';
 
 export type TransformResult<M, D, A> = {
-  id: string | number;
+  id: string;
   data: D;
   nexts: [A, M][];
   edgeLabel?: React.ReactNode;
+  width: number;
+  height: number;
+  submap?: TransformResult<M, D, A>;
 };
 
 export type TransformFunc<M, D, A> = (
   map: M,
-  parent: string,
+  parent: string | undefined,
   aux: A
 ) => TransformResult<M, D, A>;
+
+export type Dims = {
+  width: number;
+  height: number;
+};
 
 export type Props<M, D, A> = {
   initElem: TransformResult<M, D, A>;
   transform: TransformFunc<M, D, A>;
-  nodeComponent: React.ComponentType<NodeProps<D>>;
+  nodeComponent: React.ComponentType<NodeProps<D & Dims>>;
 };
 
 type IntermediateElem<D> = {
-  id: string | number;
-  depth: number;
-  nthInDepth: number;
+  id: string;
   data: D;
+  width: number;
+  height: number;
+  minX: number;
+  maxX: number;
+  nexts: IntermediateElem<D>[];
+  childXOffset: number;
+  submap?: IntermediateElem<D>;
+  submapXOffset: number;
+  y: number;
+  maxY: number;
 };
 
 export const NODE_WIDTH = 150;
 export const NODE_HEIGHT = 50;
+export const DEFAULT_NODE_SIZE = {
+  width: NODE_WIDTH,
+  height: NODE_HEIGHT,
+};
 const NODE_GAP_X = 50;
 const NODE_GAP_Y = 50;
+
+const NODE_PAD = 25;
 
 export type FlowRef = React.MutableRefObject<HTMLDivElement> | undefined;
 export const FlowRefContext = React.createContext(undefined as FlowRef);
@@ -50,68 +72,122 @@ const TreeMapView = <M, D, A>({
 }: Props<M, D, A>) => {
   const flowRef: FlowRef = useRef(undefined as unknown as HTMLDivElement);
   const nodeTypes = { customNode: nodeComponent };
-  const depthCounts: number[] = [1];
-  const intermediateElems: IntermediateElem<D>[] = [
-    {
-      id: initElem.id,
-      data: initElem.data,
-      depth: 0,
-      nthInDepth: 0,
-    },
-  ];
 
   const edges: Edge[] = [];
-  const buildElems = (map: M, aux: A, parent: string, depth: number) => {
-    const { id, data, nexts, edgeLabel } = transform(map, parent, aux);
 
-    if (!depthCounts[depth]) {
-      depthCounts[depth] = 0;
+  const buildElem = (
+    {
+      id,
+      data,
+      nexts,
+      edgeLabel,
+      width: initWidth,
+      height: initHeight,
+      submap: rawSubmap,
+    }: TransformResult<M, D, A>,
+    minX = 0,
+    y = 0,
+    parent?: string
+  ): IntermediateElem<D> => {
+    let submap: IntermediateElem<D> | undefined = undefined;
+    let width = initWidth;
+    let height = initHeight;
+    let submapXOffset = 0;
+    if (rawSubmap !== undefined) {
+      submap = buildElem(rawSubmap, 0, y + height + NODE_PAD);
+      const submapWidth = submap.maxX - submap.minX + NODE_PAD * 2;
+      submapXOffset = Math.max(width - submapWidth, 0) / 2;
+      width = Math.max(submapWidth, width);
+      height = submap.maxY - y + NODE_PAD;
     }
 
-    const nthInDepth = depthCounts[depth]++;
-    intermediateElems.push({ id, data, depth, nthInDepth });
-
-    edges.push({
-      id: `edge-${parent}-${id}`,
-      source: parent,
-      target: `${id}`,
-      ...(edgeLabel ? { label: edgeLabel } : {}),
+    let maxX = minX;
+    let maxY = y + height;
+    const nextElems = nexts.map(([aux, nextMap]) => {
+      const transformed = transform(nextMap, id, aux);
+      const next = buildElem(transformed, maxX, y + height + NODE_GAP_Y, id);
+      maxX = Math.max(next.maxX + NODE_GAP_X, maxX);
+      maxY = Math.max(next.maxY, maxY);
+      return next;
     });
+    const childXOffset = Math.max(minX + width - (maxX - NODE_GAP_X), 0) / 2;
+    maxX = Math.max(minX + width, maxX - NODE_GAP_X);
 
-    for (const [aux, nextMap] of nexts) {
-      buildElems(nextMap, aux, `${id}`, depth + 1);
+    if (parent !== undefined) {
+      edges.push({
+        id: `${parent}-${id}`,
+        source: parent,
+        target: id,
+        ...(edgeLabel ? { label: edgeLabel } : {}),
+      });
     }
+
+    const elem = {
+      id,
+      data,
+      width,
+      height,
+      minX,
+      maxX,
+      nexts: nextElems,
+      childXOffset,
+      y,
+      maxY,
+      submap,
+      submapXOffset,
+    };
+    return elem;
   };
 
-  for (const [aux, nextMap] of initElem.nexts) {
-    buildElems(nextMap, aux, `${initElem.id}`, 1);
-  }
+  const elem = buildElem(initElem);
+  const nodes: Node<D & Dims>[] = [];
 
-  const maxWidth = Math.max(...depthCounts);
-  const nodes = intermediateElems.map(
-    ({ id, data, depth, nthInDepth }): Node<D> => {
-      const x =
-        (nthInDepth + (maxWidth - (depthCounts[depth] || 0)) / 2 + 0.5) *
-          (NODE_WIDTH + NODE_GAP_X) -
-        NODE_WIDTH / 2;
-      const y = depth * (NODE_HEIGHT + NODE_GAP_Y) + NODE_GAP_Y;
-      return {
-        id: `${id}`,
-        position: { x, y },
-        type: 'customNode',
-        data,
-        style: {
-          width: `${NODE_WIDTH}px`,
-          height: `${NODE_HEIGHT}px`,
-          display: 'flex',
-          justifyContent: 'center',
-        },
-        draggable: false,
-        connectable: false,
-        selectable: true,
-      };
+  const buildNodes = (
+    {
+      id,
+      data,
+      width,
+      height,
+      minX,
+      maxX,
+      y,
+      nexts,
+      childXOffset,
+      submap,
+      submapXOffset,
+    }: IntermediateElem<D>,
+    xOffset = 0
+  ) => {
+    const x = (minX + maxX) / 2 - width / 2 + xOffset;
+    nodes.push({
+      id: `${id}`,
+      position: { x, y },
+      type: 'customNode',
+      data: {
+        width,
+        height,
+        ...data,
+      },
+      style: {
+        width: `${width}px`,
+        height: `${height}px`,
+        display: 'flex',
+        justifyContent: 'center',
+      },
+      draggable: false,
+      connectable: false,
+      selectable: true,
+    });
+
+    if (submap !== undefined) {
+      buildNodes(submap, xOffset + submapXOffset + NODE_PAD);
     }
-  );
+
+    nexts.forEach(next => {
+      buildNodes(next, xOffset + childXOffset);
+    });
+  };
+  buildNodes(elem);
 
   const ret = (
     <div className="tree-map-view">
@@ -125,13 +201,11 @@ const TreeMapView = <M, D, A>({
           nodeTypes={nodeTypes}
         >
           <Controls showInteractive={false} />
-          <Background color="#aaa" gap={16} />
+          <Background color="#aaa" gap={25} />
         </ReactFlow>
       </FlowRefContext.Provider>
     </div>
   );
-
-  console.log({ nodes, edges, initElem, ret });
 
   return ret;
 };

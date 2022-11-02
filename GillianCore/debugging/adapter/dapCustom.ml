@@ -1,7 +1,7 @@
 open DebugProtocolEx
-open Debugger.DebuggerTypes
 module L = Logging
 module DL = Debugger_log
+module ExecMap = Debugger_utils.ExecMap
 
 module Events (Debugger : Debugger.S) = struct
   module Debug_state_update_event = struct
@@ -78,7 +78,8 @@ module Commands (Debugger : Debugger.S) = struct
     let type_ = "jump"
 
     module Arguments = struct
-      type t = { id : L.ReportId.t } [@@deriving yojson]
+      type t = { proc_name : string; [@key "procName"] id : L.ReportId.t }
+      [@@deriving yojson]
     end
 
     module Result = struct
@@ -92,10 +93,24 @@ module Commands (Debugger : Debugger.S) = struct
 
     module Arguments = struct
       type t = {
+        proc_name : string; [@key "procName"]
         prev_id : L.ReportId.t; [@key "prevId"]
-        branch_case : Debugger.PackagedBranchCase.t option; [@key "branchCase"]
+        branch_case : ExecMap.Packaged.branch_case option; [@key "branchCase"]
       }
       [@@deriving yojson]
+    end
+
+    module Result = struct
+      type t = { success : bool; err : string option [@default None] }
+      [@@deriving make, yojson]
+    end
+  end
+
+  module Start_proc_command = struct
+    let type_ = "startProc"
+
+    module Arguments = struct
+      type t = { proc_name : string [@key "procName"] } [@@deriving yojson]
     end
 
     module Result = struct
