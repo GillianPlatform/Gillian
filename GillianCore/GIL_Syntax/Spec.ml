@@ -67,14 +67,7 @@ let pp fmt spec =
     | true -> Fmt.string fmt "incomplete "
     | false -> ()
   in
-  let name =
-    let matches =
-      Str.string_match (Str.regexp "[A-Za-z][A-Za-z0-9_]*") spec.spec_name 0
-    in
-    if matches && Str.match_end () == String.length spec.spec_name then
-      spec.spec_name
-    else "\"" ^ spec.spec_name ^ "\""
-  in
+  let name = Pp_utils.maybe_quote_ident spec.spec_name in
   Fmt.pf fmt "@[<v 2>@[<h>%aspec %s(%a)@]@\n%a@]" pp_incomplete
     spec.spec_incomplete name
     Fmt.(list ~sep:comma string)

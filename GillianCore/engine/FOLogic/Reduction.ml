@@ -258,9 +258,6 @@ let get_equal_expressions (pfs : PFS.t) nle =
            | Eq (le1, le2) when Expr.equal le1 nle -> le2 :: ac
            | Eq (le2, le1) when Expr.equal le1 nle -> le2 :: ac
            | Eq (e, EList el) | Eq (EList el, e) -> (
-               L.tmi (fun m ->
-                   m "GOT IN HERE WITH ELEMENT: %a AND LIST: %a" Expr.pp e
-                     Expr.pp (EList el));
                match List_utils.index_of nle el with
                | None -> ac
                | Some index -> Expr.list_nth e index :: ac)

@@ -185,6 +185,7 @@ let rec full_pp fmt a =
   | Star (a1, a2) -> Fmt.pf fmt "%a *@ %a" full_pp a1 full_pp a2
   | Emp -> Fmt.string fmt "emp"
   | Pred (name, params) ->
+      let name = Pp_utils.maybe_quote_ident name in
       Fmt.pf fmt "@[<h>%s(%a)@]" name
         (Fmt.list ~sep:Fmt.comma Expr.full_pp)
         params
@@ -202,6 +203,7 @@ let rec pp fmt a =
   | Star (a1, a2) -> Fmt.pf fmt "%a *@ %a" pp a1 pp a2
   | Emp -> Fmt.string fmt "emp"
   | Pred (name, params) ->
+      let name = Pp_utils.maybe_quote_ident name in
       Fmt.pf fmt "@[<h>%s(%a)@]" name (Fmt.list ~sep:Fmt.comma Expr.pp) params
   | Types tls ->
       let pp_tl f (e, t) = Fmt.pf f "%a : %s" Expr.pp e (Type.str t) in

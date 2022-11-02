@@ -279,8 +279,11 @@ let unfold_spec
   let spec_sspecs =
     List.concat (List.map (aux spec.spec_name) spec.spec_sspecs)
   in
-  assert (spec_sspecs <> []);
-  { spec with spec_sspecs }
+  match spec_sspecs with
+  | [] -> Fmt.failwith "unfolding in spec at preprocessing led to no spec!"
+  | _ ->
+      ();
+      { spec with spec_sspecs }
 
 let unfold_lemma
     (preds : (string, Pred.t) Hashtbl.t)

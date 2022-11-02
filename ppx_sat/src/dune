@@ -1,6 +1,6 @@
 (library
  (name ppx_sat)
- (public_name ppx_sat)
+ (public_name gillian.ppx_sat)
  (kind ppx_rewriter)
  (libraries ppxlib ppx_sat_expander)
  (preprocess no_preprocessing))
