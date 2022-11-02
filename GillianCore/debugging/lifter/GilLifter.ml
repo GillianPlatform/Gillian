@@ -61,7 +61,7 @@ struct
       id_map
       { kind; id; unifys; errors; cmd_report : cmd_report; branch_path }
       () =
-    let display = cmd_report.cmd_display in
+    let display = Fmt.to_to_string Cmd.pp_indexed cmd_report.cmd in
     let data = { id; display; unifys; errors; submap; branch_path; parent } in
     let cmd =
       match kind with
@@ -118,12 +118,6 @@ struct
   let handle_cmd prev_id branch_case exec_data state =
     let { root_proc; id_map; _ } = state in
     let current_proc = get_proc_name exec_data in
-    DL.to_file
-      (Fmt.str
-         "HANDLE GIL current: '%s', root: '%s', eq: %b, hidden: %b, cmd: %s"
-         current_proc root_proc (current_proc = root_proc)
-         (Annot.is_hidden exec_data.cmd_report.annot)
-         exec_data.cmd_report.cmd_display);
     if root_proc <> current_proc || Annot.is_hidden exec_data.cmd_report.annot
     then ExecNext (Some prev_id, None)
     else

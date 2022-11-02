@@ -80,7 +80,6 @@ module type S = sig
         proc_line : int;
         time : float;
         cmd : int Cmd.t;
-        cmd_display : string;
         callstack : CallStack.t;
         annot : Annot.t;
         branching : int;
