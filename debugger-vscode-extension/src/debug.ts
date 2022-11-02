@@ -172,10 +172,17 @@ export async function getUnification(
   }
 }
 
-export async function jumpToCmd(id: number) {
+export async function jumpToCmd(procName: string, id: number) {
   const session = vscode.debug.activeDebugSession;
   if (session !== undefined) {
-    const result = await session.customRequest('jump', { id });
+    console.log('Requesting jump', {
+      procName,
+      id,
+    });
+    const result = await session.customRequest('jump', {
+      procName,
+      id,
+    });
     if (!result.success) {
       vscode.window.showErrorMessage(result.err || 'jumpToCmd: unknown error');
     }
@@ -183,17 +190,34 @@ export async function jumpToCmd(id: number) {
 }
 
 export async function execSpecificCmd(
+  procName: string,
   prevId: number,
   branchCase: BranchCase | null
 ) {
   const session = vscode.debug.activeDebugSession;
   if (session !== undefined) {
+    console.log('Requesting step specific', {
+      procName,
+      prevId,
+      branchCase,
+    });
     const result = await session.customRequest('stepSpecific', {
+      procName,
       prevId,
       branchCase,
     });
     if (!result.success) {
       vscode.window.showErrorMessage(result.err || 'help');
+    }
+  }
+}
+
+export async function startProc(procName: string) {
+  const session = vscode.debug.activeDebugSession;
+  if (session !== undefined) {
+    const result = await session.customRequest('startProc', { procName });
+    if (!result.success) {
+      vscode.window.showErrorMessage(result.err || 'startProc: unknown error');
     }
   }
 }

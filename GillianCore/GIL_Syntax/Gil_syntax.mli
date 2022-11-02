@@ -671,6 +671,7 @@ module Cmd : sig
     | ReturnNormal  (** Normal return *)
     | ReturnError  (** Error return *)
     | Fail of string * Expr.t list  (** Failure *)
+  [@@deriving yojson]
 
   (** Pretty-printer *)
   val pp : pp_label:'a Fmt.t -> Format.formatter -> 'a t -> unit
@@ -909,7 +910,9 @@ module BranchCase : sig
     | SpecExec of Flag.t
     | LAction of Yojson.Safe.t list
     | LActionFail of int
-  [@@deriving yojson]
+  [@@deriving yojson, show]
+
+  type path = t list [@@deriving yojson]
 end
 
 module Annot : sig
@@ -923,7 +926,11 @@ module Annot : sig
     ?origin_loc:Location.t ->
     ?origin_id:int ->
     ?loop_info:string list ->
+    ?hidden:bool ->
     ?expansion_kind:expansion_kind ->
+    ?loop_prefix:bool ->
+    ?end_of_cmd:bool ->
+    ?is_return:bool ->
     unit ->
     t
 
@@ -942,6 +949,12 @@ module Annot : sig
   val hide : t -> t
   val get_expansion_kind : t -> expansion_kind
   val set_expansion_kind : expansion_kind -> t -> t
+  val is_loop_prefix : t -> bool
+  val set_loop_prefix : ?is_prefix:bool -> t -> t
+  val is_end_of_cmd : t -> bool
+  val set_end_of_cmd : t -> t
+  val is_return : t -> bool
+  val set_return : t -> t
 end
 
 module Proc : sig

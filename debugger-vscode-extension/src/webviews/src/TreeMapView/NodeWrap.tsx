@@ -11,6 +11,7 @@ type NodeWrapProps = {
   noSourceHandle?: boolean;
   width?: number;
   height?: number;
+  contentHeight?: number;
   root?: boolean;
   selected?: boolean;
   error?: boolean;
@@ -26,6 +27,7 @@ const NodeWrap: FC<NodeWrapProps> = ({
   noSourceHandle = false,
   width = NODE_WIDTH,
   height = NODE_HEIGHT,
+  contentHeight = NODE_HEIGHT,
   root = false,
   selected = false,
   error = false,
@@ -45,6 +47,11 @@ const NodeWrap: FC<NodeWrapProps> = ({
     classes.unshift('node-error');
   }
 
+  const bgClasses = ['node-background'];
+  if (height > contentHeight) {
+    bgClasses.unshift('node-background-border');
+  }
+
   const getFlowViewport = () => {
     const flow = flowRef!.current;
     const elems = flow.getElementsByClassName('react-flow__viewport');
@@ -53,14 +60,7 @@ const NodeWrap: FC<NodeWrapProps> = ({
   };
 
   const nodeWrap = (
-    <div
-      className={classes.join(' ')}
-      style={{
-        width: `${width}px`,
-        height: `${height}px`,
-        position: 'absolute',
-      }}
-    >
+    <>
       {noTargetHandle ? undefined : (
         <Handle
           type="target"
@@ -70,10 +70,22 @@ const NodeWrap: FC<NodeWrapProps> = ({
         />
       )}
       <div
-        className="node-content"
-        style={{ width: `${width}px`, height: `${height}px` }}
+        className={classes.join(' ')}
+        style={{
+          width: `${width}px`,
+          height: `${height}px`,
+          position: 'absolute',
+        }}
       >
-        {children}
+        <div
+          className="node-content"
+          style={{ width: `${width}px`, height: `${contentHeight}px` }}
+        >
+          {children}
+          <div className={bgClasses.join(' ')} />
+        </div>
+
+        <div className="node-border" />
       </div>
       {noSourceHandle ? undefined : (
         <Handle
@@ -83,8 +95,7 @@ const NodeWrap: FC<NodeWrapProps> = ({
           isConnectable={false}
         />
       )}
-      <div className="node-background" />
-    </div>
+    </>
   );
 
   if (tooltip) {

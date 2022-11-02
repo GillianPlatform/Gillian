@@ -17,11 +17,12 @@ module Make
     (External : External.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t) (Runners : sig
       val runners : Bulk.Runner.t list
-    end)
-    (Gil_to_tl_lifter : Debugger.Gil_to_tl_lifter.S
-                          with type memory = SMemory.t
-                           and type memory_error = SMemory.err_t
-                           and type tl_ast = PC.tl_ast) =
+    end) (Lifter : functor (V : Verifier.S) ->
+      Debugger_lifter.S
+        with type memory = SMemory.t
+         and type memory_error = SMemory.err_t
+         and type tl_ast = PC.tl_ast
+         and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t) =
 struct
   module CState = CState.Make (CMemory)
 
@@ -37,8 +38,9 @@ struct
     PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
 
   module Verification = Verifier.Make (SState) (SPState) (External)
+  module Lifter = Lifter (Verification)
   module Abductor = Abductor.Make (SPState) (External)
-  module Debugger = Debugger.Make (ID) (PC) (Verification) (Gil_to_tl_lifter)
+  module Debugger = Debugger.Make (ID) (PC) (Verification) (Lifter)
   module DebugAdapter = DebugAdapter.Make (Debugger)
 
   let entry_point =

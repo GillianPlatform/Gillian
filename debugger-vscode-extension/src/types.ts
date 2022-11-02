@@ -12,8 +12,7 @@ type Submap =
   | readonly ['Proc', string];
 
 export type CmdData = {
-  readonly id: number;
-  readonly originId: number | null;
+  readonly ids: readonly number[];
   readonly display: string;
   readonly unifys: readonly (readonly [number, UnifyKind, UnifyResult])[];
   readonly errors: readonly string[];
@@ -22,9 +21,12 @@ export type CmdData = {
 
 export type ExecMap =
   | readonly ['Nothing']
-  | readonly ['Cmd', CmdData, ExecMap]
-  | readonly ['BranchCmd', CmdData, [BranchCase, ExecMap][]]
-  | readonly ['FinalCmd', CmdData];
+  | readonly ['Cmd', { data: CmdData; next: ExecMap }]
+  | readonly [
+      'BranchCmd',
+      { data: CmdData; nexts: [BranchCase, [null, ExecMap]][] }
+    ]
+  | readonly ['FinalCmd', { data: CmdData }];
 
 // #endregion
 
@@ -68,10 +70,10 @@ export type DebugProcState = {
 };
 
 export type DebugState = {
-  readonly mainProc : string;
-  readonly currentProc : string;
+  readonly mainProc: string;
+  readonly currentProc: string;
   readonly procs: Record<string, DebugProcState>;
-}
+};
 
 export type UnifyStep =
   | readonly ['Assertion', AssertionData]
@@ -117,11 +119,13 @@ type RequestStateUpdateMsg = {
 
 type RequestJump = {
   readonly type: 'request_jump';
+  readonly procName: string;
   readonly cmdId: number;
 };
 
 type RequestExecSpecific = {
   readonly type: 'request_exec_specific';
+  readonly procName: string;
   readonly prevId: number;
   readonly branchCase: BranchCase | null;
 };
@@ -131,10 +135,16 @@ type RequestUnification = {
   readonly id: number;
 };
 
+type RequestStartProc = {
+  readonly type: 'request_start_proc';
+  readonly procName: string;
+};
+
 export type MessageFromWebview =
   | RequestStateUpdateMsg
   | RequestJump
   | RequestExecSpecific
-  | RequestUnification;
+  | RequestUnification
+  | RequestStartProc;
 
 // #endregion

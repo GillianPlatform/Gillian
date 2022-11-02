@@ -1,5 +1,4 @@
 open DebugProtocolEx
-open Debugger.DebuggerTypes
 module DL = Debugger_log
 
 module Make (Debugger : Debugger.S) = struct

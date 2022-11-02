@@ -1,9 +1,46 @@
+let pp_option pp = Fmt.option ~none:(Fmt.any "None") pp
+let pp_list ?(sep = Fmt.any ", ") = Fmt.list ~sep
+
 module Hashtbl = struct
   (** Extension of Hashtbl with functions to serialize to and deserialize
     from yojson. A Hashtbl is a represented as a list of key-value pairs,
     where a key-value pair is list of two elements.*)
 
   include Hashtbl
+
+  let map f tbl =
+    let tbl' = create (length tbl) in
+    iter
+      (fun k v ->
+        let k', v' = f k v in
+        replace tbl' k' v')
+      tbl;
+    tbl'
+
+  let map_values f tbl = map (fun k v -> (k, f v)) tbl
+
+  let find_map f tbl =
+    let exception Found in
+    let result = ref None in
+    let aux () =
+      Hashtbl.iter
+        (fun k v ->
+          match f k v with
+          | None -> ()
+          | x ->
+              result := x;
+              raise Found)
+        tbl
+    in
+    try
+      aux ();
+      None
+    with Found -> !result
+
+  let hd tbl =
+    match find_map (fun k v -> Some (k, v)) tbl with
+    | None -> failwith "Hashtbl.hd"
+    | Some v -> v
 
   let of_yojson
       (key_of_yojson : Yojson.Safe.t -> ('a, string) result)

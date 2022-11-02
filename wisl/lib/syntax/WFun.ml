@@ -8,6 +8,7 @@ type t = {
   return_expr : WExpr.t;
   floc : CodeLoc.t;
   fid : int;
+  is_loop_body : bool;
 }
 
 let get_id f = f.fid

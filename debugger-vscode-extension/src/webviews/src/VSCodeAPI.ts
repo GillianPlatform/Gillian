@@ -33,16 +33,25 @@ class VSCodeWrapper {
   }
 }
 
-export const execSpecific = (prevId: number, branchCase: BranchCase) => {
+export const execSpecific = (procName: string, prevId: number, branchCase: BranchCase) => {
   VSCodeAPI.postMessage({
     type: 'request_exec_specific',
+    procName,
     prevId,
     branchCase,
   });
 };
 
-export const jumpToId = (id: number) => {
-  VSCodeAPI.postMessage({ type: 'request_jump', cmdId: id });
+export const jumpToId = (procName: string, id: number) => {
+  VSCodeAPI.postMessage({
+    type: 'request_jump',
+    procName,
+    cmdId: id
+  });
+};
+
+export const startProc = (procName: string) => {
+  VSCodeAPI.postMessage({ type: 'request_start_proc', procName });
 };
 
 // Singleton to prevent multiple fetches of VsCodeAPI.
