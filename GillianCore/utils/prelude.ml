@@ -13,7 +13,7 @@ module Hashtbl = struct
     iter
       (fun k v ->
         let k', v' = f k v in
-        add tbl' k' v')
+        replace tbl' k' v')
       tbl;
     tbl'
 
