@@ -1122,7 +1122,13 @@ struct
                         (Fmt.Dump.list State.pp_err)
                         errs);
                   raise (State.Internal_State_Error (errs, state)))
-            else Fmt.failwith "Local Action Failed: %a" Cmd.pp_indexed cmd)
+            else
+              let pp_err ft (a, errs) =
+                Fmt.pf ft "FAILURE: Action %s failed with: %a" a
+                  (Fmt.Dump.list State.pp_err)
+                  errs
+              in
+              Fmt.failwith "%a\n@?" (Fmt.styled `Red pp_err) (a, errs))
     (* Logic command *)
     | Logic lcmd -> (
         DL.log (fun m -> m "LCmd");
