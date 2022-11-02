@@ -50,7 +50,7 @@ module type S = sig
   val initialize : ExecMode.t -> unit
 end
 
-module Dummy : S = struct
+module Dummy : S with type init_data = unit = struct
   module TargetLangOptions = struct
     type t = unit
 

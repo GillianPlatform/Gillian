@@ -77,7 +77,7 @@ module type S = sig
   val apply_fix : t -> PFS.t -> TypEnv.t -> c_fix_t -> t
 end
 
-module Dummy : S = struct
+module Dummy : S with type init_data = unit = struct
   type init_data = unit
   type vt = SVal.M.t
   type st = SVal.SESubst.t

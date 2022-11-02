@@ -55,4 +55,4 @@ end
 
 (** Dummy ParserAndCompiler that will simply always fail. This is used when someone wants to build a command line interface
     to only reason about GIL. *)
-module Dummy : S
+module Dummy : S with type init_data = unit
