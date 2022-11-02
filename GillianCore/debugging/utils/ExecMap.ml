@@ -9,11 +9,20 @@ let kind_of_cases = function
   | [] -> Normal
   | cases -> Branch (List.map (fun case -> (case, ())) cases)
 
-type ('c, 'd, 'bd) t =
+type ('branch_case, 'cmd_data, 'branch_data) t =
   | Nothing
-  | Cmd of { data : 'd; mutable next : ('c, 'd, 'bd) t }
-  | BranchCmd of { data : 'd; nexts : ('c, 'bd * ('c, 'd, 'bd) t) Hashtbl.t }
-  | FinalCmd of { data : 'd }
+  | Cmd of {
+      data : 'cmd_data;
+      mutable next : ('branch_case, 'cmd_data, 'branch_data) t;
+    }
+  | BranchCmd of {
+      data : 'cmd_data;
+      nexts :
+        ( 'branch_case,
+          'branch_data * ('branch_case, 'cmd_data, 'branch_data) t )
+        Hashtbl.t;
+    }
+  | FinalCmd of { data : 'cmd_data }
 [@@deriving yojson]
 
 type stop_at = StartOfPath | EndOfPath | BeforeNothing
@@ -70,7 +79,8 @@ module Packaged = struct
   }
   [@@deriving yojson]
 
-  type ('c, 'd, 'bd) _map = ('c, 'd, 'bd) t
+  type ('branch_case, 'cmd_data, 'branch_data) _map =
+    ('branch_case, 'cmd_data, 'branch_data) t
   (* Need this to avoid name conflict *)
   [@@deriving yojson]
 
