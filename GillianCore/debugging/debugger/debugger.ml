@@ -66,6 +66,7 @@ struct
 
   type breakpoints = (string, Breakpoints.t) Hashtbl.t
   type tl_ast = PC.tl_ast
+  type unify_result = UnifyMap.unify_result = Success | Failure
 
   module UnifyMap = UnifyMap.Make (Verification)
 
@@ -460,7 +461,7 @@ struct
               |> Result.get_ok
             in
             let kind = unify_report.unify_kind in
-            let result = UnifyMap.(if success then Success else Failure) in
+            let result = if success then Success else Failure in
             (id, kind, result))
 
   let show_result_errors = function

@@ -9,7 +9,6 @@ module Make (Verification : Verifier.S) = struct
   open Verification.SUnifier.Logging
   open L.LoggingConstants
 
-  type result = unify_result = Success | Failure [@@deriving yojson]
   type kind = Unifier.unify_kind [@@deriving yojson]
 
   type substitution = {
