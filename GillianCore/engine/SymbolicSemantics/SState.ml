@@ -504,7 +504,7 @@ module Make (SMemory : SMemory.S) :
       asrts_store @ SMemory.assertions heap @ asrts_pfs
       @ [ Types (TypEnv.to_list_expr gamma) ]
 
-  let evaluate_slcmd (_ : UP.prog) (_ : SLCmd.t) (_ : t) :
+  let evaluate_slcmd (_ : 'a UP.prog) (_ : SLCmd.t) (_ : t) :
       (t list, string) result =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 

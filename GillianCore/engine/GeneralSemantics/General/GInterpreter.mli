@@ -14,6 +14,8 @@ module type S = sig
   (** Data necessary to initialize the state, language-dependent *)
   type init_data
 
+  type annot
+
   module Val : Val.S with type t = vt
   module Store : Store.S with type t = store_t and type vt = vt
 
@@ -81,7 +83,7 @@ module type S = sig
         time : float;
         cmd : int Cmd.t;
         callstack : CallStack.t;
-        annot : Annot.t;
+        annot : annot;
         branching : int;
         state : state_t;
         branch_case : branch_case option;
@@ -106,18 +108,23 @@ module type S = sig
 
   val call_graph : CallGraph.t
   val reset : unit -> unit
-  val evaluate_lcmds : UP.prog -> LCmd.t list -> state_t -> state_t list
+  val evaluate_lcmds : annot UP.prog -> LCmd.t list -> state_t -> state_t list
 
   val init_evaluate_proc :
     (result_t -> 'a) ->
-    UP.prog ->
+    annot UP.prog ->
     string ->
     string list ->
     state_t ->
     'a cont_func
 
   val evaluate_proc :
-    (result_t -> 'a) -> UP.prog -> string -> string list -> state_t -> 'a list
+    (result_t -> 'a) ->
+    annot UP.prog ->
+    string ->
+    string list ->
+    state_t ->
+    'a list
 end
 
 (** General GIL Interpreter *)
@@ -129,7 +136,8 @@ module Make
                with type vt = Val.t
                 and type st = ESubst.t
                 and type store_t = Store.t)
-    (External : External.S) :
+    (PC : ParserAndCompiler.S)
+    (External : External.S with type annot = PC.Annot.t) :
   S
     with type vt = Val.t
      and type st = ESubst.t
@@ -139,3 +147,4 @@ module Make
      and type state_vt = State.vt
      and type heap_t = State.heap_t
      and type init_data = State.init_data
+     and type annot = PC.Annot.t

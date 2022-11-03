@@ -4,7 +4,7 @@ module Flag = Gillian.Gil_syntax.Flag
 (* JSIL procedures extended with string labels *)
 type t = {
   name : string;
-  body : (Annot.t * string option * LabCmd.t) array;
+  body : (JAnnot.t * string option * LabCmd.t) array;
   params : string list;
   spec : Spec.t option;
 }

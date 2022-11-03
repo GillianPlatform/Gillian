@@ -174,6 +174,8 @@ type err = Errors.errmsg
 (* TODO: Include some form of the C AST *)
 type tl_ast = unit
 
+module Annot = CAnnot
+
 let pp_err fmt e = Driveraux.print_error fmt e
 
 let get_or_print_and_die = function

@@ -6,6 +6,7 @@ module type S = sig
   type heap_t
   type state
   type m_err
+  type annot
 
   module SPState :
     PState.S
@@ -25,11 +26,12 @@ module type S = sig
        and type state_t = state
        and type heap_t = heap_t
        and type state_err_t = SPState.err_t
+       and type annot = annot
 
   module SUnifier : Unifier.S with type st = SVal.SESubst.t
 
   type t
-  type prog_t = (Annot.t, int) Prog.t
+  type prog_t = (annot, int) Prog.t
   type proc_tests = (string * t) list [@@deriving to_yojson]
 
   val start_time : float ref
@@ -70,14 +72,15 @@ module Make
                   and type store_t = SState.store_t
                   and type preds_t = Preds.SPreds.t
                   and type init_data = SState.init_data)
-    (External : External.S) =
+    (PC : ParserAndCompiler.S)
+    (External : External.S with type annot = PC.Annot.t) =
 struct
   module L = Logging
   module SSubst = SVal.SESubst
   module SPState = SPState
 
   module SAInterpreter =
-    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SPState) (External)
+    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SPState) (PC) (External)
 
   module Normaliser = Normaliser.Make (SPState)
 
@@ -85,6 +88,7 @@ struct
   type state = SPState.t
   type heap_t = SPState.heap_t
   type m_err = SPState.m_err_t
+  type annot = PC.Annot.t
 
   module SUnifier =
     Unifier.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
@@ -108,7 +112,7 @@ struct
   }
   [@@deriving to_yojson]
 
-  type prog_t = (Annot.t, int) Prog.t
+  type prog_t = (annot, int) Prog.t
   type proc_tests = (string * t) list
 
   let proc_tests_to_yojson tests =
@@ -303,7 +307,7 @@ struct
         let () =
           L.verbose (fun fmt -> fmt "EXACT: Examining hiding in predicates")
         in
-        let prog : UP.prog =
+        let prog : annot UP.prog =
           {
             preds;
             specs = Hashtbl.create 1;
@@ -806,7 +810,7 @@ struct
     success
 
   (* FIXME: This function name is very bad! *)
-  let verify_up_to_procs (prog : UP.prog) (test : t) : UP.prog =
+  let verify_up_to_procs (prog : annot UP.prog) (test : t) : annot UP.prog =
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
     match test.flag with
     | Some _ ->
@@ -817,7 +821,7 @@ struct
         { prog with coverage = Hashtbl.create 1 }
     | None -> raise (Failure "Debugging lemmas unsupported!")
 
-  let verify (prog : UP.prog) (test : t) : bool =
+  let verify (prog : annot UP.prog) (test : t) : bool =
     let state = test.pre_state in
 
     (* Printf.printf "Inside verify with a test for %s\n" test.name; *)
@@ -858,7 +862,7 @@ struct
       method! visit_GUnfold _ pred_name = SS.singleton pred_name
     end
 
-  let filter_internal_preds (prog : UP.prog) (pred_names : SS.t) =
+  let filter_internal_preds (prog : annot UP.prog) (pred_names : SS.t) =
     SS.filter
       (fun pred_name ->
         let pred = Prog.get_pred_exn prog.prog pred_name in
@@ -872,14 +876,14 @@ struct
       method! visit_ApplyLem _ lemma_name _ _ = SS.singleton lemma_name
     end
 
-  let filter_internal_lemmas (prog : UP.prog) (lemma_names : SS.t) =
+  let filter_internal_lemmas (prog : annot UP.prog) (lemma_names : SS.t) =
     SS.filter
       (fun lemma_name ->
         let lemma = Prog.get_lemma_exn prog.prog lemma_name in
         not lemma.lemma_internal)
       lemma_names
 
-  let record_proc_dependencies proc_name (prog : UP.prog) =
+  let record_proc_dependencies proc_name (prog : annot UP.prog) =
     let proc = Prog.get_proc_exn prog.prog proc_name in
     let preds_used =
       filter_internal_preds prog (pred_extracting_visitor#visit_proc () proc)
@@ -894,7 +898,7 @@ struct
       (CallGraph.add_proc_lemma_use SAInterpreter.call_graph proc_name)
       lemmas_used
 
-  let record_lemma_dependencies lemma_name (prog : UP.prog) =
+  let record_lemma_dependencies lemma_name (prog : annot UP.prog) =
     let lemma = Prog.get_lemma_exn prog.prog lemma_name in
     let preds_used =
       filter_internal_preds prog (pred_extracting_visitor#visit_lemma () lemma)
@@ -910,7 +914,7 @@ struct
       (CallGraph.add_lemma_call SAInterpreter.call_graph lemma_name)
       lemmas_used
 
-  let record_preds_used_by_pred pred_name (prog : UP.prog) =
+  let record_preds_used_by_pred pred_name (prog : annot UP.prog) =
     let pred = Prog.get_pred_exn prog.prog pred_name in
     let preds_used =
       filter_internal_preds prog (pred_extracting_visitor#visit_pred () pred)
@@ -930,7 +934,7 @@ struct
       ~init_data
       (prog : prog_t)
       (pnames_to_verify : SS.t)
-      (lnames_to_verify : SS.t) : UP.prog * t list * t list =
+      (lnames_to_verify : SS.t) : annot UP.prog * t list * t list =
     let ipreds = UP.init_preds prog.preds in
     match ipreds with
     | Error e ->
@@ -1256,7 +1260,11 @@ struct
   end
 end
 
-module From_scratch (SMemory : SMemory.S) (External : External.S) = struct
+module From_scratch
+    (SMemory : SMemory.S)
+    (PC : ParserAndCompiler.S)
+    (External : External.S with type annot = PC.Annot.t) =
+struct
   module INTERNAL__ = struct
     module SState = SState.Make (SMemory)
   end
@@ -1266,5 +1274,6 @@ module From_scratch (SMemory : SMemory.S) (External : External.S) = struct
       (INTERNAL__.SState)
       (PState.Make (SVal.M) (SVal.SESubst) (SStore) (INTERNAL__.SState)
          (Preds.SPreds))
+      (PC)
       (External)
 end

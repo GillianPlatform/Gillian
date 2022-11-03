@@ -3,6 +3,7 @@ module type S = sig
   type heap_t
   type state
   type m_err
+  type annot
 
   module SPState :
     PState.S
@@ -22,11 +23,12 @@ module type S = sig
        and type state_t = state
        and type heap_t = heap_t
        and type state_err_t = SPState.err_t
+       and type annot = annot
 
   module SUnifier : Unifier.S with type st = SVal.SESubst.t
 
   type t
-  type prog_t = (Annot.t, int) Prog.t
+  type prog_t = (annot, int) Prog.t
   type proc_tests = (string * t) list [@@deriving to_yojson]
 
   val start_time : float ref
@@ -67,10 +69,12 @@ module Make
                   and type store_t = SState.store_t
                   and type preds_t = Preds.SPreds.t
                   and type init_data = SState.init_data)
-    (External : External.S) :
+    (PC : ParserAndCompiler.S)
+    (External : External.S with type annot = PC.Annot.t) :
   S
     with type heap_t = SPState.heap_t
      and type m_err = SPState.m_err_t
      and type state = SPState.t
      and type st = SPState.st
      and module SPState = SPState
+     and type annot = PC.Annot.t

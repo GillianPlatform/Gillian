@@ -5,6 +5,8 @@ type init_data = unit
 type err = unit
 type tl_ast = WProg.t
 
+module Annot = WAnnot
+
 let pp_err _ () = ()
 
 let parse_with_error token lexbuf =

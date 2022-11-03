@@ -163,7 +163,7 @@ end = struct
   let unfolding_vals (_ : t) (_ : Formula.t list) : vt list =
     raise (Failure "ERROR: unfolding_vals called for non-abstract execution")
 
-  let evaluate_slcmd (_ : UP.prog) (_ : SLCmd.t) (_ : t) :
+  let evaluate_slcmd (_ : 'a UP.prog) (_ : SLCmd.t) (_ : t) :
       (t list, string) result =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 

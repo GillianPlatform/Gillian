@@ -72,7 +72,7 @@ let pp ~(show_labels : bool) ~(pp_label : 'a Fmt.t) fmt labproc =
 let pp_labeled fmt c = pp ~show_labels:true ~pp_label:Fmt.string fmt c
 let pp_indexed fmt c = pp ~show_labels:false ~pp_label:Fmt.int fmt c
 
-let indexed_of_labeled (lproc : (Annot.t, string) t) : (Annot.t, int) t =
+let indexed_of_labeled (lproc : ('annot, string) t) : ('annot, int) t =
   let no_of_cmds = Array.length lproc.proc_body in
 
   (* First create a mapping Hashtabl lab -> line *)
@@ -152,13 +152,13 @@ let indexed_of_labeled (lproc : (Annot.t, string) t) : (Annot.t, int) t =
   in
   let mapping = map_labels_to_numbers in
   let b = convert_to_indexed mapping in
-  let proc : (Annot.t, int) t = { lproc with proc_body = b } in
+  let proc : ('annot, int) t = { lproc with proc_body = b } in
   proc
 
 let check_proc_spec_correspondence
-    (procedures : (string, (Annot.t, 'a) t) Hashtbl.t) : unit =
+    (procedures : (string, ('annot, 'a) t) Hashtbl.t) : unit =
   Hashtbl.iter
-    (fun _ (proc : (Annot.t, 'a) t) ->
+    (fun _ (proc : ('annot, 'a) t) ->
       match proc.proc_spec with
       | None -> ()
       | Some spec -> (

@@ -3,17 +3,19 @@ module DL = Debugger_log
 open Lifter
 
 module Make
-    (Verifier : Verifier.S)
-    (SMemory : SMemory.S)
-    (PC : ParserAndCompiler.S) :
+    (PC : ParserAndCompiler.S)
+    (Verifier : Verifier.S with type annot = PC.Annot.t)
+    (SMemory : SMemory.S) :
   S
     with type memory = SMemory.t
      and type tl_ast = PC.tl_ast
      and type memory_error = SMemory.err_t
-     and type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t =
-struct
+     and type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t
+     and type annot = PC.Annot.t = struct
   open ExecMap
+  module Annot = PC.Annot
 
+  type annot = PC.Annot.t
   type branch_case = BranchCase.t [@@deriving yojson]
   type branch_path = BranchCase.path [@@deriving yojson]
 

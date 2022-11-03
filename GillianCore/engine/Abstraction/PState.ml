@@ -491,7 +491,7 @@ module Make
     (state, preds, pred_defs, variants)
 
   let unify_invariant
-      (prog : UP.prog)
+      (prog : 'a UP.prog)
       (revisited : bool)
       (astate : t)
       (a : Asrt.t)
@@ -803,7 +803,7 @@ module Make
     @param preds Current predicate set
     @return List of states/predicate sets resulting from the evaluation
   *)
-  let evaluate_slcmd (prog : UP.prog) (lcmd : SLCmd.t) (astate : t) :
+  let evaluate_slcmd (prog : 'a UP.prog) (lcmd : SLCmd.t) (astate : t) :
       (t list, string) result =
     let state, _, _, _ = astate in
 

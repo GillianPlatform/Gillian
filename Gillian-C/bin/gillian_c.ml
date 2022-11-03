@@ -1,17 +1,20 @@
 open Cgil_lib
 module SMemory = Gillian.Monadic.MonadicSMemory.Lift (MonadicSMemory)
 
-module Gil_to_c_lifter (Verification : Gillian.Abstraction.Verifier.S) = struct
+module Gil_to_c_lifter
+    (Verification : Gillian.Abstraction.Verifier.S
+                      with type annot = CParserAndCompiler.Annot.t) =
+struct
   include
-    Gillian.Debugger.Lifter.GilLifter.Make (Verification) (SMemory)
-      (ParserAndCompiler)
+    Gillian.Debugger.Lifter.GilLifter.Make (CParserAndCompiler) (Verification)
+      (SMemory)
 
   let add_variables = MonadicSMemory.Lift.add_variables
 end
 
 module CLI =
-  Gillian.CommandLine.Make (Global_env) (CMemory) (SMemory) (External.M)
-    (ParserAndCompiler)
+  Gillian.CommandLine.Make (Global_env) (CMemory) (SMemory) (CParserAndCompiler)
+    (External.M)
     (struct
       let runners : Gillian.Bulk.Runner.t list =
         [ (module CRunner); (module SRunner) ]

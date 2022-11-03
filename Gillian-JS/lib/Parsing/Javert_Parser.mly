@@ -669,7 +669,7 @@ cmd_with_annot:
           loc_source = $startpos.pos_fname;
         }
       in
-      let annot : Annot.t = Annot.make ~origin_loc () in
+      let annot : JAnnot.t = JAnnot.make ~origin_loc () in
       annot, cmd
     }
 

@@ -19,7 +19,10 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
   module Interpreter =
     GInterpreter.Make (Outcome.Val) (Outcome.ESubst) (Outcome.Store)
       (Outcome.State)
+      (PC)
       (Outcome.External)
+
+  module Gil_parsing = Gil_parsing.Make (PC)
 
   let cmd_name = Suite.cmd_name
   let exec_mode = Suite.exec_mode

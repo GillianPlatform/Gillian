@@ -33,12 +33,12 @@ type pred = { pred : Pred.t; up : t }
 type spec = { spec : Spec.t; up : t }
 type lemma = { lemma : Lemma.t; up : t }
 
-type prog = {
+type 'annot prog = {
   preds : (string, pred) Hashtbl.t;
   specs : (string, spec) Hashtbl.t;
   lemmas : (string, lemma) Hashtbl.t;
   coverage : (string * int, int) Hashtbl.t;
-  prog : (Annot.t, int) Prog.t;
+  prog : ('annot, int) Prog.t;
 }
 
 (** Knowledge bases *)
@@ -946,7 +946,8 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
     Ok u_preds
   with UPError e -> Error e
 
-let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : (prog, up_err_t) result =
+let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : ('a prog, up_err_t) result
+    =
   let all_specs : Spec.t list = Prog.get_specs prog in
 
   let lemmas : Lemma.t list = Prog.get_lemmas prog in
@@ -999,10 +1000,13 @@ let get_pred_def (pred_defs : preds_tbl_t) (name : string) : pred =
   with _ -> raise (Failure (Printf.sprintf "DEATH. PRED %s NOT DEFINED" name))
 
 let init_pred_defs () : preds_tbl_t = Hashtbl.create Config.medium_tbl_size
-let get_procs (prog : prog) : ('a, int) Proc.t list = Prog.get_procs prog.prog
-let get_bispecs (prog : prog) : BiSpec.t list = Prog.get_bispecs prog.prog
 
-let get_lemma (prog : prog) (name : string) : (lemma, unit) result =
+let get_procs (prog : 'a prog) : ('a, int) Proc.t list =
+  Prog.get_procs prog.prog
+
+let get_bispecs (prog : 'a prog) : BiSpec.t list = Prog.get_bispecs prog.prog
+
+let get_lemma (prog : 'a prog) (name : string) : (lemma, unit) result =
   match Hashtbl.find_opt prog.lemmas name with
   | Some lemma -> Ok lemma
   | None -> Error ()
@@ -1080,7 +1084,7 @@ let pp_normal_spec
     Fmt.(list ~sep:(any "@\n") pp_sspec)
     normal_specs
 
-let add_spec (prog : prog) (spec : Spec.t) : unit =
+let add_spec (prog : 'a prog) (spec : Spec.t) : unit =
   let params = KB.of_list (List.map (fun x -> Expr.PVar x) spec.spec_params) in
   let proc =
     match Prog.get_proc prog.prog spec.spec_name with
@@ -1163,18 +1167,19 @@ let add_spec (prog : prog) (spec : Spec.t) : unit =
   Hashtbl.replace prog.prog.procs spec.spec_name
     { proc with proc_spec = Some new_uspec.spec }
 
-let remove_spec (prog : prog) spec_name =
+let remove_spec (prog : 'a prog) spec_name =
   let proc = Prog.get_proc_exn prog.prog spec_name in
   Hashtbl.replace prog.prog.procs spec_name { proc with proc_spec = None };
   Hashtbl.remove prog.specs spec_name
 
-let update_coverage (prog : prog) (proc_name : string) (index : int) : unit =
+let update_coverage (prog : 'a prog) (proc_name : string) (index : int) : unit =
   try
     let count = Hashtbl.find prog.coverage (proc_name, index) in
     Hashtbl.replace prog.coverage (proc_name, index) (count + 1)
   with Not_found -> Hashtbl.replace prog.coverage (proc_name, index) 0
 
-let first_time_running (prog : prog) (proc_name : string) (index : int) : bool =
+let first_time_running (prog : 'a prog) (proc_name : string) (index : int) :
+    bool =
   not (Hashtbl.mem prog.coverage (proc_name, index))
 
 let pp_pred_defs fmt pred_defs =

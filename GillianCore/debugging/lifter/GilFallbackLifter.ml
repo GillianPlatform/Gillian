@@ -12,23 +12,24 @@ module Make
     (PC : ParserAndCompiler.S)
     (TLLifter : functor
       (Gil : GilLifterWithState)
-      (V : Verifier.S)
+      (V : Verifier.S with type annot = PC.Annot.t)
       ->
       S
         with type memory = SMemory.t
          and type tl_ast = PC.tl_ast
          and type memory_error = SMemory.err_t
-         and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t)
-    (Verifier : Verifier.S) :
+         and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t
+         and type annot = PC.Annot.t)
+    (Verifier : Verifier.S with type annot = PC.Annot.t) :
   S
     with type memory = SMemory.t
      and type tl_ast = PC.tl_ast
      and type memory_error = SMemory.err_t
-     and type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t =
-struct
+     and type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t
+     and type annot = PC.Annot.t = struct
   let gil_state = ref None
 
-  module GilLifter = GilLifter.Make (Verifier) (SMemory) (PC)
+  module GilLifter = GilLifter.Make (PC) (Verifier) (SMemory)
 
   module GilLifterWithState = struct
     module Lifter = GilLifter
@@ -48,6 +49,7 @@ struct
   type tl_ast = PC.tl_ast
   type memory_error = SMemory.err_t
   type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t
+  type annot = PC.Annot.t
 
   let init proc_name tl_ast exec_data =
     let gil, gil_result = GilLifter.init proc_name tl_ast exec_data in

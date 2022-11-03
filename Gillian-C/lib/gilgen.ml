@@ -170,7 +170,7 @@ let rec trans_expr ~fname ~local_env expr =
       let symb_loc = Global_env.location_of_symbol name in
       ([], EList [ Lit (Loc symb_loc); Expr.zero_i ])
 
-let annot_ctx ctx = Annot.make ~loop_info:ctx.loop_stack ()
+let annot_ctx ctx = CAnnot.make ~loop_info:ctx.loop_stack ()
 
 (* let empty_annot = Annot.make () *)
 
@@ -546,7 +546,7 @@ let rec trans_stmt ~fname ~context stmt =
            "Cannot compile builtin function %a : Not implemented yet"
            PrintCsharpminor.print_stmt s)
 
-let empty_annot = Annot.make ()
+let empty_annot = CAnnot.make ()
 let add_empty_annots l = List.map (fun a -> (empty_annot, None, a)) l
 
 let alloc_var fname (name, sz) =
@@ -606,8 +606,8 @@ let trans_function
     | [ (a, b, c) ] ->
         [
           (a, b, c);
-          (Annot.make (), None, Assignment ("ret", Expr.zero_i));
-          (Annot.make (), None, ReturnNormal);
+          (CAnnot.make (), None, Assignment ("ret", Expr.zero_i));
+          (CAnnot.make (), None, ReturnNormal);
         ]
     | a :: b -> a :: add_return b
   in

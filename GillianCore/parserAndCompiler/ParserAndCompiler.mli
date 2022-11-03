@@ -1,8 +1,8 @@
 (** This defines an interface that allows a user to indicate how to parse their own programming language,
     preprocess the obtained language and compile it to GIL (type [Prog.t]) *)
 
-type ('tl_ast, 'init_data) compiled_progs = {
-  gil_progs : (string * (Annot.t, string) Prog.t) list;
+type ('annot, 'tl_ast, 'init_data) compiled_progs = {
+  gil_progs : (string * ('annot, string) Prog.t) list;
   source_files : SourceFiles.t;
   tl_ast : 'tl_ast;
   init_data : 'init_data;
@@ -28,6 +28,9 @@ module type S = sig
   (** Type of the target language AST *)
   type tl_ast
 
+  (** Type of the TL's GIL annotations *)
+  module Annot : Annot.S
+
   (** Pretty printer for type {!err} *)
   val pp_err : Format.formatter -> err -> unit
 
@@ -35,7 +38,7 @@ module type S = sig
       then compiles them to a single or a set of GIL programs. The returned GIL
       program(s) should be ready to be analysed. *)
   val parse_and_compile_files :
-    string list -> ((tl_ast, init_data) compiled_progs, err) result
+    string list -> ((Annot.t, tl_ast, init_data) compiled_progs, err) result
 
   (** [other_imports] is an association list that maps extensions to a parser
       and compiler. For example, it is possible to import a JSIL file in a GIL

@@ -201,7 +201,7 @@ struct
     let _, state, _ = bi_state in
     State.to_assertions ?to_keep state
 
-  let evaluate_slcmd (prog : UP.prog) (lcmd : SLCmd.t) (bi_state : t) :
+  let evaluate_slcmd (prog : 'a UP.prog) (lcmd : SLCmd.t) (bi_state : t) :
       (t list, string) result =
     let procs, state, state_af = bi_state in
     Result.bind (State.evaluate_slcmd prog lcmd state) (fun x ->

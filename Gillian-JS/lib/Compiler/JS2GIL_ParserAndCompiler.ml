@@ -26,6 +26,8 @@ type init_data = unit
 type err = JSParserErr of JS_Parser.Error.t | JS2GILErr of string
 type tl_ast = JavaScriptSource of JS_Parser.Syntax.exp | JsilSource
 
+module Annot = Jsil_syntax.JAnnot
+
 let pp_err fmt = function
   | JS2GILErr s -> Fmt.pf fmt "%s" s
   | JSParserErr s -> Fmt.pf fmt "Parsing error: %s\n" (JS_Parser.Error.str s)

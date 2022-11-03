@@ -1,8 +1,8 @@
 open Gillian
 
 module Outcome =
-  Bulk.Outcome.Make_Concrete (CMemory) (ParserAndCompiler)
-    (General.External.Dummy)
+  Bulk.Outcome.Make_Concrete (CMemory) (CParserAndCompiler)
+    (General.External.Dummy (CAnnot))
 
 module Suite = struct
   include Bulk.Suite.ByFolder (struct

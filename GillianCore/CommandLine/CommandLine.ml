@@ -14,32 +14,34 @@ module Make
     (ID : Init_data.S)
     (CMemory : CMemory.S with type init_data = ID.t)
     (SMemory : SMemory.S with type init_data = ID.t)
-    (External : External.S)
-    (PC : ParserAndCompiler.S with type init_data = ID.t) (Runners : sig
+    (PC : ParserAndCompiler.S with type init_data = ID.t)
+    (External : External.S with type annot = PC.Annot.t) (Runners : sig
       val runners : Bulk.Runner.t list
-    end) (Lifter : functor (V : Verifier.S) ->
+    end) (Lifter : functor (V : Verifier.S with type annot = PC.Annot.t) ->
       Debugger_lifter.S
         with type memory = SMemory.t
          and type memory_error = SMemory.err_t
          and type tl_ast = PC.tl_ast
-         and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t) =
+         and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t
+         and type annot = PC.Annot.t) =
 struct
+  module Gil_parsing = Gil_parsing.Make (PC)
   module CState = CState.Make (CMemory)
 
   module CInterpreter =
-    GInterpreter.Make (CVal.M) (CVal.CESubst) (CStore) (CState) (External)
+    GInterpreter.Make (CVal.M) (CVal.CESubst) (CStore) (CState)
 
   module SState = SState.Make (SMemory)
 
   module SInterpreter =
-    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (External)
+    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (PC) (External)
 
   module SPState =
     PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
 
-  module Verification = Verifier.Make (SState) (SPState) (External)
+  module Verification = Verifier.Make (SState) (SPState) (PC) (External)
   module Lifter = Lifter (Verification)
-  module Abductor = Abductor.Make (SPState) (External)
+  module Abductor = Abductor.Make (SPState) (PC) (External)
   module Debugger = Debugger.Make (ID) (PC) (Verification) (Lifter)
   module DebugAdapter = DebugAdapter.Make (Debugger)
 
@@ -293,6 +295,8 @@ struct
   end
 
   module CInterpreterConsole = struct
+    module CInterpreter = CInterpreter (PC) (External)
+
     let return_to_exit (ret_ok : bool) : unit =
       match ret_ok with
       | false -> exit 1
@@ -382,7 +386,7 @@ struct
   end
 
   module SInterpreterConsole = struct
-    let run (prog : UP.prog) init_data incremental source_files =
+    let run (prog : PC.Annot.t UP.prog) init_data incremental source_files =
       let open ResultsDir in
       let open ChangeTracker in
       let run_main prog =
