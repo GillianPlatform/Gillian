@@ -2,6 +2,8 @@ module L = Logging
 module DL = Debugger_log
 open Lifter
 
+type rid = L.ReportId.t [@@deriving yojson, show]
+
 module Make
     (PC : ParserAndCompiler.S)
     (Verifier : Verifier.S with type annot = PC.Annot.t)
@@ -125,16 +127,18 @@ module Make
     else
       let new_cmd = new_cmd id_map exec_data in
       let failwith s =
-        DL.log (fun m ->
-            m
-              ~json:
-                [
-                  ("state", dump state);
-                  ("exec_data", exec_data_to_yojson exec_data);
-                ]
-              "handle_cmd: %s" s)
+        DL.failwith
+          (fun () ->
+            [
+              ("state", dump state); ("exec_data", exec_data_to_yojson exec_data);
+            ])
+          ("handle_cmd: " ^ s)
       in
-      let map = Hashtbl.find id_map prev_id in
+      let map =
+        match Hashtbl.find_opt id_map prev_id with
+        | Some map -> map
+        | None -> failwith (Fmt.str "couldn't find prev_id %a!" pp_rid prev_id)
+      in
       (match map with
       | Cmd cmd when cmd.next = Nothing ->
           let parent = Some (map, None) in

@@ -811,6 +811,10 @@ struct
   end
 
   module DebugVerificationConsole = struct
+    let manual =
+      let doc = "Disable automatic folding and unfolding heuristics." in
+      Arg.(value & flag & info [ "m"; "manual" ] ~doc)
+
     let debug_verify_info =
       let doc = "Starts Gillian in debugging mode for verification" in
       let man =
@@ -823,10 +827,11 @@ struct
       in
       Cmd.info "debugverify" ~doc ~man
 
-    let start_debug_adapter () =
+    let start_debug_adapter manual () =
+      Config.manual_proof := manual;
       Lwt_main.run (DebugAdapter.start Lwt_io.stdin Lwt_io.stdout)
 
-    let debug_verify_t = with_common Term.(const start_debug_adapter)
+    let debug_verify_t = with_common Term.(const start_debug_adapter $ manual)
     let debug_verify_cmd = Cmd.v debug_verify_info debug_verify_t
   end
 

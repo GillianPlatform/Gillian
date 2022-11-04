@@ -125,6 +125,11 @@
           ],
           "default": null,
           "description": "Specifies the path to the Gillian source repository used to execute/debug a program."
+        },
+        "gillianDebugger.useManualProof": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enables manual proof mode, i.e. disables automatical folding/unfolding."
         }
       }
     },
