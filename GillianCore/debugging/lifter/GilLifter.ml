@@ -121,40 +121,43 @@ module Make
 
   let handle_cmd prev_id branch_case exec_data state =
     let { root_proc; id_map; _ } = state in
+    let new_cmd = new_cmd id_map exec_data in
+    let failwith s =
+      DL.failwith
+        (fun () ->
+          [
+            ("state", dump state);
+            ("exec_data", exec_data_to_yojson exec_data);
+            ("prev_id", rid_to_yojson prev_id);
+            ("branch_case", opt_to_yojson branch_case_to_yojson branch_case);
+          ])
+        ("handle_cmd: " ^ s)
+    in
+    let map =
+      match Hashtbl.find_opt id_map prev_id with
+      | Some map -> map
+      | None -> failwith (Fmt.str "couldn't find prev_id %a!" pp_rid prev_id)
+    in
+    (match map with
+    | Cmd cmd when cmd.next = Nothing ->
+        let parent = Some (map, None) in
+        cmd.next <- new_cmd ~parent ()
+    | Cmd _ -> failwith "cmd.next not Nothing!"
+    | BranchCmd { nexts; _ } -> (
+        match branch_case with
+        | None -> failwith "HORROR - need branch case to insert to branch cmd!"
+        | Some case -> (
+            match Hashtbl.find_opt nexts case with
+            | Some ((), Nothing) ->
+                let parent = Some (map, Some case) in
+                Hashtbl.replace nexts case ((), new_cmd ~parent ())
+            | _ -> failwith "colliding cases in branch cmd"))
+    | _ -> failwith "can't insert to Nothing or FinalCmd");
+    let { id; cmd_report; _ } = exec_data in
     let current_proc = get_proc_name exec_data in
-    if root_proc <> current_proc || Annot.is_hidden exec_data.cmd_report.annot
-    then ExecNext (Some prev_id, None)
-    else
-      let new_cmd = new_cmd id_map exec_data in
-      let failwith s =
-        DL.failwith
-          (fun () ->
-            [
-              ("state", dump state); ("exec_data", exec_data_to_yojson exec_data);
-            ])
-          ("handle_cmd: " ^ s)
-      in
-      let map =
-        match Hashtbl.find_opt id_map prev_id with
-        | Some map -> map
-        | None -> failwith (Fmt.str "couldn't find prev_id %a!" pp_rid prev_id)
-      in
-      (match map with
-      | Cmd cmd when cmd.next = Nothing ->
-          let parent = Some (map, None) in
-          cmd.next <- new_cmd ~parent ()
-      | BranchCmd { nexts; _ } -> (
-          match branch_case with
-          | None ->
-              failwith "HORROR - need branch case to insert to branch cmd!"
-          | Some case -> (
-              match Hashtbl.find_opt nexts case with
-              | Some ((), Nothing) ->
-                  let parent = Some (map, Some case) in
-                  Hashtbl.replace nexts case ((), new_cmd ~parent ())
-              | _ -> failwith "colliding cases in branch cmd"))
-      | _ -> failwith "can't insert to Nothing or FinalCmd");
-      Stop
+    if root_proc <> current_proc || Annot.is_hidden cmd_report.annot then
+      ExecNext (Some id, None)
+    else Stop
 
   let package_case _ = Packaged.package_case
 

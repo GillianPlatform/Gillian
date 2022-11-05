@@ -11,7 +11,7 @@ module Annot = WParserAndCompiler.Annot
 open Annot
 open Debugger.Lifter
 
-type rid = L.ReportId.t [@@deriving yojson]
+type rid = L.ReportId.t [@@deriving yojson, show]
 
 let cmd_to_yojson = Cmd.to_yojson (fun x -> `Int x)
 
@@ -396,42 +396,54 @@ struct
             Branch cases
         | _ -> failwith "convert_kind: unsupported branch case!")
 
-  let insert_new_cmd
+  let rec insert_new_cmd
       (new_cmd : parent:parent -> unit -> map)
       (id : rid)
       (gil_case : BranchCase.t option)
-      id_map =
-    let map = Hashtbl.find id_map id in
-    match map with
-    | Cmd c ->
-        let parent = Some (map, None) in
-        c.next <- new_cmd ~parent ()
-    | BranchCmd { nexts; _ } -> (
-        match gil_case with
-        | None ->
+      state =
+    let { id_map; gil_state; _ } = state in
+    match Hashtbl.find_opt id_map id with
+    | None -> (
+        DL.log (fun m ->
+            m
+              "WislLifter.insert_new_cmd: couldn't find id %a; attempting with \
+               previous step from GIL."
+              pp_rid id);
+        match gil_state |> GilLifter.previous_step id with
+        | None -> failwith ""
+        | Some (prev_id, _) -> insert_new_cmd new_cmd prev_id gil_case state)
+    | Some map -> (
+        match map with
+        | Cmd c ->
+            let parent = Some (map, None) in
+            c.next <- new_cmd ~parent ()
+        | BranchCmd { nexts; _ } -> (
+            match gil_case with
+            | None ->
+                failwith
+                  "insert_new_cmd: HORROR - need branch case to insert to \
+                   branch cmd!"
+            | Some gil_case ->
+                let case, bdata =
+                  Hashtbl.find_map
+                    (fun case (bdata, next) ->
+                      if snd bdata <> gil_case then None
+                      else
+                        match next with
+                        | Nothing -> Some (case, bdata)
+                        | _ ->
+                            failwith
+                              "insert_new_cmd: HORROR - tried to insert into \
+                               non-Nothing!")
+                    nexts
+                  |> Option.get
+                in
+                let parent = Some (map, Some case) in
+                Hashtbl.replace nexts case (bdata, new_cmd ~parent ()))
+        | _ ->
             failwith
-              "insert_new_cmd: HORROR - need branch case to insert to branch \
-               cmd!"
-        | Some gil_case ->
-            let case, bdata =
-              Hashtbl.find_map
-                (fun case (bdata, next) ->
-                  if snd bdata <> gil_case then None
-                  else
-                    match next with
-                    | Nothing -> Some (case, bdata)
-                    | _ ->
-                        failwith
-                          "insert_new_cmd: HORROR - tried to insert into \
-                           non-Nothing!")
-                nexts
-              |> Option.get
-            in
-            let parent = Some (map, Some case) in
-            Hashtbl.replace nexts case (bdata, new_cmd ~parent ()))
-    | _ ->
-        failwith
-          "insert_new_cmd: HORROR - tried to insert to FinalCmd or Nothing!"
+              "insert_new_cmd: HORROR - tried to insert to FinalCmd or Nothing!"
+        )
 
   let prepare_basic_cmd ?display ?(final = false) tl_ast id_map exec_data =
     let { cmd_report; _ } = exec_data in
@@ -533,7 +545,7 @@ struct
             in
             (match state.map with
             | Nothing -> state.map <- new_cmd ~parent:None ()
-            | _ -> insert_new_cmd new_cmd prev_id branch_case id_map);
+            | _ -> insert_new_cmd new_cmd prev_id branch_case state);
             Stop
         | Finished
             { ids; display; unifys; errors; cmd_kind; submap; fun_call_name } ->
@@ -550,7 +562,7 @@ struct
                 ~submap
             in
             let prev_id, branch_case = state.before_partial |> Option.get in
-            insert_new_cmd new_cmd prev_id branch_case id_map;
+            insert_new_cmd new_cmd prev_id branch_case state;
             state.before_partial <- None;
             Stop)
 
