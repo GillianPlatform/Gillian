@@ -64,6 +64,33 @@ const NodeWrap: FC<NodeWrapProps> = ({
     return elem;
   };
 
+  let content = (
+    <div
+      className="node-content"
+      style={{ width: `${width}px`, height: `${contentHeight}px` }}
+    >
+      {children}
+      <div className={bgClasses.join(' ')} />
+    </div>
+  );
+
+  if (tooltip) {
+    const maxWidth = Math.max(width, NODE_WIDTH * 2);
+    content = (
+      <Tippy
+        content={tooltip}
+        maxWidth={`${maxWidth}px`}
+        interactive
+        className="tooltip"
+        // Append to viewport, since node width constrains tooltip width
+        appendTo={getFlowViewport}
+        placement="bottom"
+      >
+        {content}
+      </Tippy>
+    );
+  }
+
   const nodeWrap = (
     <>
       {noTargetHandle ? undefined : (
@@ -82,14 +109,7 @@ const NodeWrap: FC<NodeWrapProps> = ({
           position: 'absolute',
         }}
       >
-        <div
-          className="node-content"
-          style={{ width: `${width}px`, height: `${contentHeight}px` }}
-        >
-          {children}
-          <div className={bgClasses.join(' ')} />
-        </div>
-
+        {content}
         <div className="node-border" />
       </div>
       {noSourceHandle ? undefined : (
@@ -103,21 +123,6 @@ const NodeWrap: FC<NodeWrapProps> = ({
     </>
   );
 
-  if (tooltip) {
-    return (
-      <Tippy
-        content={tooltip}
-        maxWidth={`${NODE_WIDTH * 2}px`}
-        interactive
-        className="tooltip"
-        // Append to viewport, since node width constrains tooltip width
-        appendTo={getFlowViewport}
-        placement="bottom"
-      >
-        {nodeWrap}
-      </Tippy>
-    );
-  }
   return nodeWrap;
 };
 
