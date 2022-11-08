@@ -15,7 +15,7 @@ module Make
     (CMemory : CMemory.S with type init_data = ID.t)
     (SMemory : SMemory.S with type init_data = ID.t)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
-    (External : External.S with type annot = PC.Annot.t) (Runners : sig
+    (External : External.T(PC.Annot).S) (Runners : sig
       val runners : Bulk.Runner.t list
     end) (Lifter : functor (V : Verifier.S with type annot = PC.Annot.t) ->
       Debugger_lifter.S

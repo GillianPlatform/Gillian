@@ -70,7 +70,7 @@ module Make
                   and type preds_t = Preds.SPreds.t
                   and type init_data = SState.init_data)
     (PC : ParserAndCompiler.S)
-    (External : External.S with type annot = PC.Annot.t) :
+    (External : External.T(PC.Annot).S) :
   S
     with type heap_t = SPState.heap_t
      and type m_err = SPState.m_err_t

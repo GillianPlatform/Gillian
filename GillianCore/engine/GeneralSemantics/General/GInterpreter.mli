@@ -137,7 +137,7 @@ module Make
                 and type st = ESubst.t
                 and type store_t = Store.t)
     (PC : ParserAndCompiler.S)
-    (External : External.S with type annot = PC.Annot.t) :
+    (External : External.T(PC.Annot).S) :
   S
     with type vt = Val.t
      and type st = ESubst.t

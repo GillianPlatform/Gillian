@@ -139,14 +139,14 @@ module Make
                 and type st = ESubst.t
                 and type store_t = Store.t)
     (PC : ParserAndCompiler.S)
-    (External : External.S with type annot = PC.Annot.t) =
+    (External : External.T(PC.Annot).S) =
 struct
   (* *************** *
    * Auxiliary Types *
    * *************** *)
 
   module CallStack = CallStack.Make (Val) (Store)
-  module External = External.Make (Val) (ESubst) (Store) (State) (CallStack)
+  module External = External (Val) (ESubst) (Store) (State) (CallStack)
   module Val = Val
   module State = State
   module Store = Store

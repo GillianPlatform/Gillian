@@ -7,7 +7,7 @@ module Make
                   and type store_t = SStore.t
                   and type preds_t = Preds.SPreds.t)
     (PC : ParserAndCompiler.S)
-    (External : External.S with type annot = PC.Annot.t) =
+    (External : External.T(PC.Annot).S) =
 struct
   module L = Logging
   module SSubst = SVal.SESubst
@@ -433,7 +433,7 @@ end
 module From_scratch
     (SMemory : SMemory.S)
     (PC : ParserAndCompiler.S)
-    (External : External.S with type annot = PC.Annot.t) =
+    (External : External.T(PC.Annot).S) =
   Make
     (PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState.Make (SMemory))
        (Preds.SPreds))
