@@ -716,17 +716,14 @@ struct
            aux cont_func)
 
   let launch file_name proc_name =
-    let () = Fmt_tty.setup_std_outputs () in
-    let () = Config.current_exec_mode := Verification in
-    let () = PC.initialize Verification in
-    let () = Config.stats := false in
-    let () = Config.lemma_proof := true in
-    let () = Config.manual_proof := false in
-    let () =
-      match proc_name with
-      | None -> ()
-      | Some proc_name -> Config.Verification.set_procs_to_verify [ proc_name ]
-    in
+    Fmt_tty.setup_std_outputs ();
+    Config.current_exec_mode := Verification;
+    PC.initialize Verification;
+    Config.stats := false;
+    Config.lemma_proof := true;
+    (match proc_name with
+    | None -> ()
+    | Some proc_name -> Config.Verification.set_procs_to_verify [ proc_name ]);
     (* If the file is a GIL file, assume it is already compiled *)
     let already_compiled = is_gil_file file_name in
     let outfile_opt = None in

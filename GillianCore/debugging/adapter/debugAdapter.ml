@@ -14,7 +14,7 @@ module Make (Debugger : Debugger.S) = struct
     try%lwt
       Config.debug := true;
       let rpc = Debug_rpc.create ~in_ ~out () in
-      let () = DL.setup rpc in
+      DL.setup rpc;
       Printexc.record_backtrace true;
       let cancel = ref (fun () -> ()) in
       Lwt.async (fun () ->

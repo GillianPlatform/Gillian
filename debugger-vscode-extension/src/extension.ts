@@ -60,15 +60,18 @@ class DebugAdapterExecutableFactory
         break;
     }
 
+    const config = vscode.workspace.getConfiguration('gillianDebugger');
+
     const gillianSourceRepository: string =
-      vscode.workspace.getConfiguration('gillianDebugger')
-        .gillianSourceRepository === null
+      config.gillianSourceRepository === null
         ? __dirname + '/../..'
-        : vscode.workspace.getConfiguration('gillianDebugger')
-            .gillianSourceRepository;
+        : config.gillianSourceRepository;
 
     const command = 'esy';
     const args = ['x', gillianExecutableCommand, 'debugverify', '-r', 'db'];
+    if (config.useManualProof) {
+      args.push('-m');
+    }
     const options = {
       cwd: gillianSourceRepository,
     };
