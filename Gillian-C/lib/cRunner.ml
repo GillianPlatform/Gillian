@@ -2,7 +2,7 @@ open Gillian
 
 module Outcome =
   Bulk.Outcome.Make_Concrete (CMemory) (CParserAndCompiler)
-    (General.External.Dummy (CAnnot))
+    (General.External.Dummy (Gil_syntax.Annot.Basic))
 
 module Suite = struct
   include Bulk.Suite.ByFolder (struct

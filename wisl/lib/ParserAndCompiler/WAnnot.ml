@@ -4,6 +4,7 @@ type t = {
   origin_loc : Gil_syntax.Location.t option;
       (** Better not to know what this is for *)
   origin_id : int option;  (** Origin Id, that should be abstracted away *)
+  loop_info : string list;
   expansion_kind : expansion_kind; [@default NoExpansion]
       (** Does this command expand (i.e. calling a loop body proc)? If so, how? *)
   is_hidden : bool; [@default false]
@@ -17,7 +18,8 @@ type t = {
 }
 [@@deriving yojson, make]
 
-let from_loc ?origin_loc () = make ?origin_loc ()
+let make_basic ?origin_loc ?loop_info () = make ?origin_loc ?loop_info ()
 let get_origin_loc { origin_loc; _ } = origin_loc
-let get_loop_info (_ : t) = []
+let get_loop_info { loop_info; _ } = loop_info
+let set_loop_info loop_info annot = { annot with loop_info }
 let is_hidden { is_hidden; _ } = is_hidden

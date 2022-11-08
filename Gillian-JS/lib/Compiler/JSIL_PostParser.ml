@@ -20,8 +20,8 @@ let populate () : unit =
   Hashtbl.replace reserved_properties "length"
     ("$larr_proto", "ArrayObj", "ArrayProto")
 
-let post_parse_lcmd (cmd : JAnnot.t * string option * LabCmd.t) :
-    (JAnnot.t * string option * LabCmd.t) list =
+let post_parse_lcmd (cmd : Annot.Basic.t * string option * LabCmd.t) :
+    (Annot.Basic.t * string option * LabCmd.t) list =
   let annot, lab, cmd = cmd in
   match !Javert_utils.Js_config.cosette with
   | true -> [ (annot, lab, cmd) ]
@@ -399,8 +399,8 @@ let create_post_scope_pred
     normalised = false;
   }
 
-let bi_post_parse_cmd (cmd : JAnnot.t * string option * LabCmd.t) :
-    (JAnnot.t * string option * LabCmd.t) list =
+let bi_post_parse_cmd (cmd : Annot.Basic.t * string option * LabCmd.t) :
+    (Annot.Basic.t * string option * LabCmd.t) list =
   let annot, lab, cmd = cmd in
 
   match cmd with

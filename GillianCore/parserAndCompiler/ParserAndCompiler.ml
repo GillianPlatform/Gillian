@@ -63,7 +63,7 @@ module Dummy : S with type init_data = unit = struct
   type init_data = unit
   type tl_ast = unit
 
-  module Annot = Annot.Default
+  module Annot = Annot.Basic
 
   type err = unit
 

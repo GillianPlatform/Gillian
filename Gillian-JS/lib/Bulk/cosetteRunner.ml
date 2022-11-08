@@ -4,7 +4,7 @@ module Outcome =
   Bulk.Outcome.Make_Symbolic
     (Semantics.Symbolic)
     (Js2jsil_lib.JS2GIL_ParserAndCompiler)
-    (General.External.Dummy (Jsil_syntax.JAnnot))
+    (General.External.Dummy (Gil_syntax.Annot.Basic))
 
 module Suite = struct
   include Bulk.Suite.ByFolder (struct

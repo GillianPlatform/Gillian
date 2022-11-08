@@ -560,7 +560,7 @@ gcmd_with_annot:
           loc_source = $startpos.pos_fname;
         }
       in
-      let annot : PC.Annot.t = PC.Annot.from_loc ~origin_loc ()
+      let annot : PC.Annot.t = PC.Annot.make_basic ~origin_loc ()
       in annot, cmd
     };
 (*** GIL commands ***)

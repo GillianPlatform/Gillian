@@ -1,10 +1,10 @@
-module Annot = Gillian.Gil_syntax.Annot
+module Annot = Gillian.Gil_syntax.Annot.Basic
 module Flag = Gillian.Gil_syntax.Flag
 
 (* JSIL procedures extended with string labels *)
 type t = {
   name : string;
-  body : (JAnnot.t * string option * LabCmd.t) array;
+  body : (Annot.t * string option * LabCmd.t) array;
   params : string list;
   spec : Spec.t option;
 }

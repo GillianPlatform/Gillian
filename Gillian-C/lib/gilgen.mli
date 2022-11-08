@@ -14,7 +14,7 @@ type compilation_data = {
   symbols : symbol list;
 }
 
-val make_init_proc : string Cmd.t list -> (CAnnot.t, string) Proc.t
+val make_init_proc : string Cmd.t list -> (Annot.Basic.t, string) Proc.t
 
 val trans_program :
   ?exec_mode:ExecMode.t ->
@@ -23,7 +23,7 @@ val trans_program :
   filepath:string ->
   mangled_syms:(string, string) Hashtbl.t ->
   Csharpminor.program ->
-  (CAnnot.t, string) Prog.t * compilation_data
+  (Annot.Basic.t, string) Prog.t * compilation_data
 
 val trans_program_with_annots :
   exec_mode:ExecMode.t ->
@@ -32,4 +32,4 @@ val trans_program_with_annots :
   mangled_syms:(string, string) Hashtbl.t ->
   Csharpminor.program ->
   CLogic.CProg.t ->
-  (CAnnot.t, string) Prog.t * compilation_data
+  (Annot.Basic.t, string) Prog.t * compilation_data
