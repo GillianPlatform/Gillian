@@ -5,7 +5,7 @@ import {
   VSCodeDivider,
 } from '@vscode/webview-ui-toolkit/react';
 import { CmdData } from '../../../types';
-import { NODE_HEIGHT, Dims } from '../TreeMapView/TreeMapView';
+import { Dims } from '../TreeMapView/TreeMapView';
 import NodeWrap from '../TreeMapView/NodeWrap';
 import { NodeProps } from 'react-flow-renderer';
 import { Code } from '../util';
@@ -13,6 +13,7 @@ import { Code } from '../util';
 import './ExecMap.css';
 
 export type ExecMapNodeData =
+  { isActive: boolean } & (
   | {
       type: 'Cmd';
       cmdData: CmdData;
@@ -29,10 +30,11 @@ export type ExecMapNodeData =
   | {
       type: 'Root';
       procName: string;
-    };
+    }
+  );
 
 const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & Dims>) => {
-  const { type, width, height } = data;
+  const { type, isActive, width, height } = data;
   if (type === 'Empty') {
     return (
       <NodeWrap
@@ -41,6 +43,7 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & Dims>) => {
         noTargetHandle={!data.hasParent}
         width={width}
         height={height}
+        active={isActive}
       >
         <VSCodeButton
           appearance="icon"
@@ -56,7 +59,13 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & Dims>) => {
 
   if (type === 'Root') {
     return (
-      <NodeWrap root noTargetHandle width={width} height={height}>
+      <NodeWrap
+        root
+        noTargetHandle
+        width={width}
+        height={height}
+        active={isActive}
+      >
         <span className="node-title">
           <Code>{data.procName}</Code>
         </span>
@@ -122,6 +131,7 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & Dims>) => {
       tooltip={tooltip}
       width={width}
       height={height}
+      active={isActive}
     >
       <pre>{cmdData.display}</pre>
       <div className="node-button-row">

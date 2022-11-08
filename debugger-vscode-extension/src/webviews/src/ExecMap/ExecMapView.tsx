@@ -35,6 +35,7 @@ const ExecMapView = ({ state }: Props) => {
     data: {
       type: 'Root',
       procName: mainProcName,
+      isActive: currentProcName === mainProcName,
     },
     nexts: [[{ procName: mainProcName }, usedExecMap]],
     width: NODE_WIDTH,
@@ -55,6 +56,7 @@ const ExecMapView = ({ state }: Props) => {
     const { procName, branchCase = null, hasParent = true } = aux;
     const procState = procs[procName];
     const edgeLabel = branchCase ? <>{branchCase.display[1]}</> : undefined;
+    const isActive = procName === currentProcName;
 
     if (map[0] == 'Nothing') {
       if (parent === undefined) {
@@ -65,6 +67,7 @@ const ExecMapView = ({ state }: Props) => {
         data: {
           type: 'Empty',
           hasParent: true,
+          isActive,
           exec: () => {
             execSpecific(procName, +parent, branchCase as BranchCase);
           },
@@ -104,6 +107,7 @@ const ExecMapView = ({ state }: Props) => {
             data: {
               type: 'Empty',
               hasParent: false,
+              isActive: false,
               exec: () => {
                 startProc(submapProcName);
               },
@@ -135,6 +139,7 @@ const ExecMapView = ({ state }: Props) => {
         isCurrentCmd,
         isFinal: map[0] === 'FinalCmd',
         hasParent,
+        isActive,
         jump: () => {
           jumpToId(procName, cmdData.ids[0]);
         },

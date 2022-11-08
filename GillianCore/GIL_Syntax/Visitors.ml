@@ -58,7 +58,7 @@ module Collectors = struct
       method! visit_ALoc () x = Containers.SS.singleton x
       method! visit_Loc () x = Containers.SS.singleton x
       method! visit_'label () (_ : int) = self#zero
-      method! visit_'annot () (_ : Annot.t) = self#zero
+      method! visit_'annot () () = self#zero
     end
 
   let pvar_collector =
@@ -67,7 +67,7 @@ module Collectors = struct
       inherit Utils.ss_monoid
       method! visit_PVar () x = Containers.SS.singleton x
       method! visit_'label () (_ : int) = self#zero
-      method! visit_'annot () (_ : Annot.t) = self#zero
+      method! visit_'annot () () = self#zero
     end
 
   let lvar_collector =
@@ -86,7 +86,7 @@ module Collectors = struct
         else Containers.SS.empty
 
       method! visit_'label _ (_ : int) = self#zero
-      method! visit_'annot _ (_ : Annot.t) = self#zero
+      method! visit_'annot _ () = self#zero
     end
 
   let cloc_collector =
@@ -95,7 +95,7 @@ module Collectors = struct
       inherit Utils.ss_monoid
       method! visit_Loc () x = Containers.SS.singleton x
       method! visit_'label () (_ : int) = self#zero
-      method! visit_'annot () (_ : Annot.t) = self#zero
+      method! visit_'annot () () = self#zero
     end
 
   let aloc_collector =
@@ -104,7 +104,7 @@ module Collectors = struct
       inherit Utils.ss_monoid
       method! visit_ALoc () x = Containers.SS.singleton x
       method! visit_'label () (_ : int) = self#zero
-      method! visit_'annot () (_ : Annot.t) = self#zero
+      method! visit_'annot () () = self#zero
     end
 
   let loc_collector =
@@ -126,7 +126,7 @@ module Collectors = struct
         else Containers.SS.empty
 
       method! visit_'label _ (_ : int) = self#zero
-      method! visit_'annot _ (_ : Annot.t) = self#zero
+      method! visit_'annot _ () = self#zero
     end
 
   let substitutable_collector =
@@ -136,7 +136,7 @@ module Collectors = struct
       method! visit_ALoc () x = Containers.SS.singleton x
       method! visit_LVar () x = Containers.SS.singleton x
       method! visit_'label () (_ : int) = self#zero
-      method! visit_'annot () (_ : Annot.t) = self#zero
+      method! visit_'annot () () = self#zero
     end
 
   let list_collector =
@@ -144,7 +144,7 @@ module Collectors = struct
       inherit [_] reduce
       inherit Utils.non_ordered_list_monoid
       method! visit_'label () (_ : int) = self#zero
-      method! visit_'annot () (_ : Annot.t) = self#zero
+      method! visit_'annot () () = self#zero
 
       method! visit_LList () ls =
         [ TypeDef__.EList (List.map (fun x -> TypeDef__.Lit x) ls) ]
@@ -168,7 +168,7 @@ module Substs = struct
         | Lit (Loc loc) -> subst loc
         | _ -> super#visit_expr () e
 
-      method! visit_'annot () (x : Annot.t) = x
+      method! visit_'annot () () = ()
       method! visit_'label () (x : int) = x
     end
 end

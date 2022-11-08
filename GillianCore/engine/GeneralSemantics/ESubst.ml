@@ -362,7 +362,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
                        "DEATH: subst_in_expr: Cannot convert fresh expression \
                         to a value"))
 
-      method! visit_'annot _ (this : Annot.t) = this
+      method! visit_'annot _ (this : unit) = this
       method! visit_'label _ (this : int) = this
 
       method! visit_LVar () this _ =

@@ -1,4 +1,4 @@
-module L = Logging
+module L = Gillian.Logging
 
 type t = {
   imports : (string * bool) list;

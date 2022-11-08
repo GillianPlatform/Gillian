@@ -38,7 +38,7 @@ struct
     @param j Optional error index
     @return Resulting configuration
   *)
-  let execute_eval prog state cs i x v_args j =
+  let execute_eval (prog : ('a, int) GProg.t) state cs i x v_args j =
     let store = State.get_store state in
     let v_args = v_args @ [ Val.from_literal Undefined ] in
     match v_args with
@@ -202,7 +202,7 @@ struct
     @return Resulting configuration
   *)
   let execute
-      (prog : (Annot.t, int) GProg.t)
+      (prog : ('a, int) GProg.t)
       (state : State.t)
       (cs : CallStack.t)
       (i : int)

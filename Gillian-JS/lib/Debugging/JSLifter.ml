@@ -1,11 +1,14 @@
 open Gil_syntax
 open Semantics
 open Debugger.Utils
+module PC = Js2jsil_lib.JS2GIL_ParserAndCompiler
 
-module Make (Verification : Gillian.Abstraction.Verifier.S) = struct
+module Make
+    (Verification : Gillian.Abstraction.Verifier.S with type annot = PC.Annot.t) =
+struct
   module GilLifter =
-    Gillian.Debugger.Lifter.GilLifter.Make (Verification) (Semantics.Symbolic)
-      (Js2jsil_lib.JS2GIL_ParserAndCompiler)
+    Gillian.Debugger.Lifter.GilLifter.Make (PC) (Verification)
+      (Semantics.Symbolic)
 
   include GilLifter
 

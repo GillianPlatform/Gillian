@@ -16,6 +16,7 @@ module type S = sig
   type state_vt [@@deriving yojson, show]
   type heap_t
   type init_data
+  type annot
 
   module Val : Val.S with type t = vt
   module Store : Store.S with type t = store_t and type vt = vt
@@ -84,7 +85,7 @@ module type S = sig
         time : float;
         cmd : int Cmd.t;
         callstack : CallStack.t;
-        annot : Annot.t;
+        annot : annot;
         branching : int;
         state : state_t;
         branch_case : branch_case option;
@@ -109,18 +110,23 @@ module type S = sig
 
   val call_graph : CallGraph.t
   val reset : unit -> unit
-  val evaluate_lcmds : UP.prog -> LCmd.t list -> state_t -> state_t list
+  val evaluate_lcmds : annot UP.prog -> LCmd.t list -> state_t -> state_t list
 
   val init_evaluate_proc :
     (result_t -> 'a) ->
-    UP.prog ->
+    annot UP.prog ->
     string ->
     string list ->
     state_t ->
     'a cont_func
 
   val evaluate_proc :
-    (result_t -> 'a) -> UP.prog -> string -> string list -> state_t -> 'a list
+    (result_t -> 'a) ->
+    annot UP.prog ->
+    string ->
+    string list ->
+    state_t ->
+    'a list
 end
 
 (** General GIL Interpreter *)
@@ -132,7 +138,8 @@ module Make
                with type vt = Val.t
                 and type st = ESubst.t
                 and type store_t = Store.t)
-    (External : External.S) =
+    (PC : ParserAndCompiler.S)
+    (External : External.T(PC.Annot).S) =
 struct
   (* *************** *
    * Auxiliary Types *
@@ -143,6 +150,7 @@ struct
   module Val = Val
   module State = State
   module Store = Store
+  module Annot = PC.Annot
 
   type vt = Val.t
   type st = ESubst.t
@@ -150,6 +158,7 @@ struct
   type state_t = State.t [@@deriving yojson]
   type state_err_t = State.err_t [@@deriving yojson]
   type init_data = State.init_data
+  type annot = Annot.t [@@deriving yojson]
 
   let pp_state_err_t = State.pp_err
   let show_state_err_t = Fmt.to_to_string pp_state_err_t
@@ -264,7 +273,7 @@ struct
         time : float;
         cmd : int Cmd.t;
         callstack : CallStack.t;
-        annot : Annot.t;
+        annot : annot;
         branching : int;
         state : state_t;
         branch_case : branch_case option;
@@ -450,7 +459,7 @@ struct
    * Auxiliary Functions *
    * ******************* *)
 
-  let get_cmd (prog : UP.prog) (cs : CallStack.t) (i : int) :
+  let get_cmd (prog : annot UP.prog) (cs : CallStack.t) (i : int) :
       string * (Annot.t * int Cmd.t) =
     let pid = CallStack.get_cur_proc_id cs in
     let proc = Prog.get_proc prog.prog pid in
@@ -462,8 +471,11 @@ struct
     let annot, _, cmd = proc.proc_body.(i) in
     (pid, (annot, cmd))
 
-  let get_predecessor (prog : UP.prog) (cs : CallStack.t) (prev : int) (i : int)
-      : int =
+  let get_predecessor
+      (prog : annot UP.prog)
+      (cs : CallStack.t)
+      (prev : int)
+      (i : int) : int =
     let pid = CallStack.get_cur_proc_id cs in
     try Hashtbl.find prog.prog.predecessors (pid, prev, i)
     with _ ->
@@ -526,8 +538,8 @@ struct
     @param preds Current predicate set
     @return List of states/predicate sets resulting from the evaluation
   *)
-  let rec evaluate_lcmd (prog : UP.prog) (lcmd : LCmd.t) (state : State.t) :
-      State.t list =
+  let rec evaluate_lcmd (prog : annot UP.prog) (lcmd : LCmd.t) (state : State.t)
+      : State.t list =
     print_lconfiguration lcmd state;
 
     let eval_expr = make_eval_expr state in
@@ -669,8 +681,10 @@ struct
         | Ok result -> result
         | Error msg -> L.fail msg)
 
-  and evaluate_lcmds (prog : UP.prog) (lcmds : LCmd.t list) (state : State.t) :
-      State.t list =
+  and evaluate_lcmds
+      (prog : annot UP.prog)
+      (lcmds : LCmd.t list)
+      (state : State.t) : State.t list =
     match lcmds with
     | [] -> [ state ]
     | lcmd :: rest_lcmds ->
@@ -691,7 +705,7 @@ struct
 *)
 
   let rec evaluate_cmd
-      (prog : UP.prog)
+      (prog : annot UP.prog)
       (state : State.t)
       (cs : CallStack.t)
       (iframes : invariant_frames)
@@ -738,7 +752,7 @@ struct
         List.concat_map eval_in_state states
 
   and evaluate_cmd_after_frame_handling
-      (prog : UP.prog)
+      (prog : annot UP.prog)
       (state : State.t)
       (cs : CallStack.t)
       (iframes : invariant_frames)
@@ -1446,7 +1460,7 @@ struct
     snd (State.simplify ~save:true ~kill_new_lvars:true state)
 
   let protected_evaluate_cmd
-      (prog : UP.prog)
+      (prog : annot UP.prog)
       (state : State.t)
       (cs : CallStack.t)
       (iframes : invariant_frames)
@@ -1507,7 +1521,7 @@ struct
   let rec evaluate_cmd_step
       (ret_fun : result_t -> 'a)
       (retry : bool)
-      (prog : UP.prog)
+      (prog : annot UP.prog)
       (hold_results : 'a list)
       (on_hold : (cconf_t * string) list)
       (confs : cconf_t list)
@@ -1804,7 +1818,7 @@ struct
   *)
   let init_evaluate_proc
       (ret_fun : result_t -> 'a)
-      (prog : UP.prog)
+      (prog : annot UP.prog)
       (name : string)
       (params : string list)
       (state : State.t) : 'a cont_func =
@@ -1866,7 +1880,7 @@ struct
 *)
   let evaluate_proc
       (ret_fun : result_t -> 'a)
-      (prog : UP.prog)
+      (prog : annot UP.prog)
       (name : string)
       (params : string list)
       (state : State.t) : 'a list =

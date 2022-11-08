@@ -23,19 +23,19 @@ struct
     [ (end_state, cs, i, i + 1) ]
 
   (**
-    General External Procedure Treatment
-    @param prog GIL program
-    @param state Current state
-    @param cs Current call stack
-    @param i Current index
-    @param x Variable that stores the result
-    @param pid Procedure identifier
-    @param v_args Parameters
-    @param j Optional error index
-    @return Resulting configuration
-  *)
+  General External Procedure Treatment
+  @param prog GIL program
+  @param state Current state
+  @param cs Current call stack
+  @param i Current index
+  @param x Variable that stores the result
+  @param pid Procedure identifier
+  @param v_args Parameters
+  @param j Optional error index
+  @return Resulting configuration
+*)
   let execute
-      (prog : (Annot.t, int) Prog.t)
+      (prog : ('a, int) Prog.t)
       (state : State.t)
       (cs : CallStack.t)
       (i : int)

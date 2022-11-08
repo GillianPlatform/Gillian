@@ -83,24 +83,34 @@ let set_rpc_command_handler rpc ?name module_ f =
       | Some name -> [ ("dap_cmd", `String name) ]
       | None -> []
     in
+    let err_json backtrace = name_json @ [ ("backtrace", `String backtrace) ] in
     let%lwt () =
       match name with
       | Some name -> log_async (fun m -> m "%s request received" name)
       | None -> Lwt.return_unit
     in
+
     try%lwt f x with
     | FailureJson (e, json) ->
-        let json = name_json @ json in
+        let backtrace = Printexc.get_backtrace () in
+        let err_json = err_json backtrace in
+        let json = err_json @ json in
         log_async (fun m -> m ~json "[Error] %s" e);%lwt
         failwith e
     | Failure e ->
-        log_async (fun m -> m ~json:name_json "[Error] %s" e);%lwt
+        let backtrace = Printexc.get_backtrace () in
+        let err_json = err_json backtrace in
+        log_async (fun m -> m ~json:err_json "[Error] %s" e);%lwt
         failwith e
     | Invalid_argument e as err ->
-        log_async (fun m -> m ~json:name_json "[Error] %s" e);%lwt
+        let backtrace = Printexc.get_backtrace () in
+        let err_json = err_json backtrace in
+        log_async (fun m -> m ~json:err_json "[Error] %s" e);%lwt
         raise err
     | Not_found ->
-        log_async (fun m -> m ~json:name_json "[Error] Not found");%lwt
+        let backtrace = Printexc.get_backtrace () in
+        let err_json = err_json backtrace in
+        log_async (fun m -> m ~json:err_json "[Error] Not found");%lwt
         raise Not_found
   in
   Debug_rpc.set_command_handler rpc module_ f

@@ -410,7 +410,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
   | LReturnNormal -> [ (lab, GCmd.ReturnNormal) ]
   | LReturnError -> [ (lab, GCmd.ReturnError) ]
 
-let jsil2core_proc (proc : EProc.t) : (Annot.t, string) GProc.t =
+let jsil2core_proc (proc : EProc.t) : ('a, string) GProc.t =
   let body = Array.to_list proc.body in
   let body' =
     List.concat
@@ -437,7 +437,7 @@ let translate_tbl (tbl : (string, 'a) Hashtbl.t) (f : 'a -> 'b) :
   Hashtbl.iter (fun k v -> Hashtbl.add tbl' k (f v)) tbl;
   tbl'
 
-let jsil2core_prog (prog : EProg.t) : (Annot.t, string) GProg.t =
+let jsil2core_prog (prog : EProg.t) : ('a, string) GProg.t =
   let new_procs = Hashtbl.create Config.big_tbl_size in
 
   Hashtbl.iter
@@ -446,7 +446,7 @@ let jsil2core_prog (prog : EProg.t) : (Annot.t, string) GProg.t =
       Hashtbl.add new_procs proc'.proc_name proc')
     prog.procs;
 
-  let result : (Annot.t, string) GProg.t =
+  let result : (Annot.Basic.t, string) GProg.t =
     {
       imports = prog.imports;
       preds = translate_tbl prog.preds jsil2gil_pred;

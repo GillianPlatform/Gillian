@@ -35,7 +35,7 @@ let list_lexprs_collector =
     method private zero = Expr.Set.empty
     method private plus = Expr.Set.union
     method! visit_'label () (_ : int) = self#zero
-    method! visit_'annot () (_ : Annot.t) = self#zero
+    method! visit_'annot () () = self#zero
 
     method! visit_expr () e =
       match e with

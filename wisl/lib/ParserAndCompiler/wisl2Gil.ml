@@ -66,7 +66,7 @@ let rec compile_val v =
   | VList l -> Literal.LList (List.map compile_val l)
 
 let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
-    (Annot.t * string option * string Cmd.t) list * Expr.t =
+    (WAnnot.t * string option * string Cmd.t) list * Expr.t =
   let gen_str = Generators.gen_str fname in
   let compile_expr = compile_expr ~fname ~is_loop_prefix in
   let expr_of_string s = Expr.Lit (Literal.String s) in
@@ -124,9 +124,9 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
       in
       ( cmdl1 @ cmdl2
         @ [
-            ( Annot.make ~origin_id:(get_id expr)
+            ( WAnnot.make ~origin_id:(get_id expr)
                 ~origin_loc:(CodeLoc.to_location (get_loc expr))
-                ~loop_prefix:is_loop_prefix (),
+                ~is_loop_prefix (),
               None,
               call_i_plus );
           ],
@@ -586,7 +586,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
       vars
   in
   let annot_while =
-    Annot.make ~origin_id:(WStmt.get_id while_stmt)
+    WAnnot.make ~origin_id:(WStmt.get_id while_stmt)
       ~origin_loc:(CodeLoc.to_location while_loc)
       ()
   in
@@ -594,17 +594,17 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
     | cmd :: rest ->
         let annot_while =
           match rest with
-          | [] -> annot_while |> Annot.set_end_of_cmd
+          | [] -> { annot_while with is_end_of_cmd = true }
           | _ -> annot_while
         in
         map_reassign_vars ((annot_while, None, cmd) :: acc) rest
     | [] -> List.rev acc
   in
+  let annot_call_while =
+    { annot_while with expansion_kind = Proc loop_fname }
+  in
   let lab_cmds =
-    ( Annot.(set_expansion_kind (Function loop_fname) annot_while),
-      None,
-      call_cmd )
-    :: map_reassign_vars [] reassign_vars
+    (annot_call_while, None, call_cmd) :: map_reassign_vars [] reassign_vars
   in
   (lab_cmds, loop_funct)
 
@@ -649,7 +649,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       let comp_body, bodlab = get_or_create_lab comp_body lbody_lab in
       let endlab = gen_str end_lab in
       let annot_while =
-        Annot.make ~origin_id:sid_while ~origin_loc:(CodeLoc.to_location sloc)
+        WAnnot.make ~origin_id:sid_while ~origin_loc:(CodeLoc.to_location sloc)
           ()
       in
       let loopcmd = Cmd.GuardedGoto (guard, bodlab, endlab) in
@@ -668,7 +668,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   | { snode = Skip; sid; sloc } :: rest ->
       let cmd = Cmd.Skip in
       let annot =
-        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let comp_rest, new_functions = compile_list rest in
       ((annot, None, cmd) :: comp_rest, new_functions)
@@ -677,7 +677,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       let cmdle, comp_e = compile_expr e in
       let cmd = Cmd.Assignment (v, comp_e) in
       let annot =
-        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let comp_rest, new_functions = compile_list rest in
       (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
@@ -685,7 +685,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   | { snode = Dispose e; sid; sloc } :: rest ->
       let cmdle, comp_e = compile_expr e in
       let annot =
-        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let faillab, ctnlab = (gen_str fail_lab, gen_str ctn_lab) in
       let testcmd =
@@ -715,7 +715,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   | { snode = Lookup (x, e); sid; sloc } :: rest ->
       let cmdle, comp_e = compile_expr e in
       let annot =
-        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let v_get = gen_str gvar in
       let getcmd =
@@ -734,7 +734,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   (* Property Update *)
   | { snode = Update (e1, e2); sid; sloc } :: rest ->
       let annot =
-        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let cmdle1, comp_e1 = compile_expr e1 in
       let cmdle2, comp_e2 = compile_expr e2 in
@@ -764,7 +764,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   (* Object Creation *)
   | { snode = New (x, k); sid; sloc } :: rest ->
       let annot =
-        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let newcmd =
         Cmd.LAction (x, alloc, [ Expr.Lit (Literal.Int (Z.of_int k)) ])
@@ -786,19 +786,17 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       in
       let cmd = Cmd.Call (x, expr_fn, params, None, bindings) in
       let annot =
-        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let comp_rest, new_functions = compile_list rest in
       (List.concat cmdles @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
   (* If-Else bloc *)
   | { snode = If (e, sl1, sl2); sid; sloc } :: rest ->
       let annot =
-        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
-      let annot_hidden = Annot.hide annot in
-      let annot_prefix =
-        annot |> Annot.set_loop_prefix ~is_prefix:is_loop_prefix
-      in
+      let annot_hidden = { annot with is_hidden = true } in
+      let annot_prefix = { annot with is_loop_prefix } in
       let cmdle, guard = compile_expr e in
       let comp_sl1, new_functions1 = compile_list sl1 in
       let comp_sl2, new_functions2 = compile_list sl2 in
@@ -820,7 +818,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   (* Logic commands *)
   | { snode = Logic lcmd; sid; sloc } :: rest ->
       let annot =
-        Annot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
       let to_assert_opt, clcmd = compile_lcmd lcmd in
       let lcmds =
@@ -902,19 +900,19 @@ let rec compile_function
   in
   let cmdle, comp_ret_expr = compile_expr ~fname:name return_expr in
   let ret_annot =
-    Annot.make
+    WAnnot.make
       ~origin_loc:(CodeLoc.to_location (WExpr.get_loc return_expr))
-      ~origin_id:(WExpr.get_id return_expr) ()
+      ~origin_id:(WExpr.get_id return_expr) ~is_return:true ()
   in
   let retassigncmds =
     cmdle
     @ [
-        ( ret_annot |> Annot.set_return,
+        ( ret_annot,
           None,
           Cmd.Assignment (Gillian.Utils.Names.return_variable, comp_ret_expr) );
       ]
   in
-  let retcmd = (ret_annot |> Annot.set_return, None, Cmd.ReturnNormal) in
+  let retcmd = (ret_annot, None, Cmd.ReturnNormal) in
   let lbody_withret = lbodylist @ retassigncmds @ [ retcmd ] in
   let gil_body = Array.of_list lbody_withret in
   let gil_spec = Option.map (compile_spec ~fname:name) spec in

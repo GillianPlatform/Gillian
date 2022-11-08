@@ -7,6 +7,8 @@ module ExecMap = Debugger.Utils.ExecMap
 module UnifyMap = Debugger.Utils.UnifyMap
 open Syntaxes.Option
 module ExtList = Utils.ExtList
+module Annot = WParserAndCompiler.Annot
+open Annot
 open Debugger.Lifter
 
 type rid = L.ReportId.t [@@deriving yojson]
@@ -15,13 +17,14 @@ let cmd_to_yojson = Cmd.to_yojson (fun x -> `Int x)
 
 module Make
     (Gil : Gillian.Debugger.Lifter.GilFallbackLifter.GilLifterWithState)
-    (Verification : Engine.Verifier.S) =
+    (Verification : Engine.Verifier.S with type annot = Annot.t) =
 struct
   open ExecMap
 
   type memory_error = WislSMemory.err_t
   type tl_ast = WParserAndCompiler.tl_ast
   type memory = WislSMemory.t
+  type annot = Annot.t
 
   module CmdReport = Verification.SAInterpreter.Logging.ConfigReport
   module GilLifter = Gil.Lifter
@@ -31,7 +34,7 @@ struct
   type branch_data = rid * BranchCase.t [@@deriving yojson]
 
   let annot_to_wisl_stmt annot wisl_ast =
-    let origin_id = Annot.get_origin_id annot in
+    let origin_id = annot.origin_id in
     let wprog = WProg.get_by_id wisl_ast origin_id in
     match wprog with
     | `WStmt wstmt ->
@@ -132,7 +135,7 @@ struct
       | NoPartial
 
     let create annot tl_ast stmt exec_data =
-      let* origin_id = Annot.get_origin_id annot in
+      let* origin_id = annot.origin_id in
       let* display = get_origin_node_str tl_ast (Some origin_id) in
       let { cmd_report; _ } = exec_data in
       let gil_cmd = CmdReport.(cmd_report.cmd) in
@@ -146,8 +149,7 @@ struct
       | _ -> (
           let d = make_partial_data display in
           d |> update_partial_data exec_data;
-          if annot |> Annot.is_return then
-            Some (Return { d }, StepAgain (None, None))
+          if annot.is_return then Some (Return { d }, StepAgain (None, None))
           else
             let* stmt in
             match stmt with
@@ -190,10 +192,10 @@ struct
                 match gil_cmd with
                 | Cmd.Call _ ->
                     let submap =
-                      match annot |> Annot.get_expansion_kind with
-                      | Annot.NoExpansion ->
+                      match annot.expansion_kind with
+                      | NoExpansion ->
                           failwith "Call for While has no expansion!"
-                      | Annot.Function p -> ExecMap.Proc p
+                      | Proc p -> Proc p
                     in
                     let partial = While { d; submap } in
                     Some (partial, StepAgain (None, None))
@@ -262,7 +264,7 @@ struct
           | While { submap; _ } -> (
               match gil_cmd with
               | Cmd.Assignment _ ->
-                  if annot |> Annot.is_end_of_cmd then finished ~submap Normal
+                  if annot.is_end_of_cmd then finished ~submap Normal
                   else StepAgain (None, None)
               | _ -> failwith "expected Call for While!")
           | Return _ -> StepAgain (None, None))
@@ -272,7 +274,7 @@ struct
         let cmd_report = exec_data.cmd_report in
         CmdReport.(cmd_report.annot)
       in
-      (let* origin_id = Annot.get_origin_id annot in
+      (let* origin_id = annot.origin_id in
        let stmt = annot_to_wisl_stmt annot tl_ast in
        match Hashtbl.find_opt partial_cmds origin_id with
        | Some partial ->
@@ -434,7 +436,7 @@ struct
   let prepare_basic_cmd ?display ?(final = false) tl_ast id_map exec_data =
     let { cmd_report; _ } = exec_data in
     let annot = CmdReport.(cmd_report.annot) in
-    let origin_id = Annot.get_origin_id annot in
+    let { origin_id; expansion_kind; _ } = annot in
     let display =
       match display with
       | Some d -> d
@@ -446,16 +448,16 @@ struct
       exec_data
     in
     let submap =
-      match Annot.get_expansion_kind annot with
+      match expansion_kind with
       | NoExpansion -> NoSubmap
-      | Function p -> Proc p
+      | Proc p -> Proc p
     in
     let kind = if final then Final else convert_kind id kind in
     new_cmd id_map kind [ id ] display unifys errors gil_branch_path ~submap
 
   let handle_loop_prefix exec_data =
     let annot = CmdReport.(exec_data.cmd_report.annot) in
-    if annot |> Annot.is_loop_prefix then
+    if annot.is_loop_prefix then
       Some
         (match exec_data.cmd_report.cmd with
         | Cmd.GuardedGoto _ ->
@@ -468,8 +470,7 @@ struct
     let+ tl_ast in
     CmdReport.(
       let annot = exec_data.cmd_report.annot in
-      DL.log (fun m ->
-          m "LIFT INIT - is loop prefix: %b" (annot |> Annot.is_loop_prefix)));
+      DL.log (fun m -> m "LIFT INIT - is loop prefix: %b" annot.is_loop_prefix));
     let partial_cmds = Hashtbl.create 0 in
     let id_map = Hashtbl.create 0 in
     let before_partial = None in

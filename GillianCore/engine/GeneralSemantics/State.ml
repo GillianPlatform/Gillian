@@ -118,10 +118,10 @@ module type S = sig
   (** Turns a state into a list of assertions *)
   val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
 
-  val evaluate_slcmd : UP.prog -> SLCmd.t -> t -> (t list, string) result
+  val evaluate_slcmd : 'a UP.prog -> SLCmd.t -> t -> (t list, string) result
 
   val unify_invariant :
-    UP.prog -> bool -> t -> Asrt.t -> string list -> (t * t) list
+    'a UP.prog -> bool -> t -> Asrt.t -> string list -> (t * t) list
 
   val frame_on : t -> (string * t) list -> string list -> t list
 

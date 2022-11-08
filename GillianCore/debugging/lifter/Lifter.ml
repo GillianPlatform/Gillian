@@ -5,9 +5,9 @@ type rid = L.ReportId.t [@@deriving yojson]
 type unify_result = UnifyMap.unify_result = Success | Failure
 [@@deriving yojson]
 
-type ('err, 'ast) memory_error_info = {
+type ('err, 'annot, 'ast) memory_error_info = {
   error : 'err;  (** The memory error that needs to be lifted *)
-  command : (int Cmd.t * Annot.t) option;  (** The command where it happened *)
+  command : (int Cmd.t * 'annot) option;  (** The command where it happened *)
   tl_ast : 'ast option;
 }
 
@@ -39,6 +39,7 @@ module type S = sig
   type tl_ast
   type memory
   type cmd_report
+  type annot
 
   val init :
     string ->
@@ -82,7 +83,7 @@ module type S = sig
     ?at_id:rid -> t -> (Logging.ReportId.t * BranchCase.t option) option
 
   val memory_error_to_exception_info :
-    (memory_error, tl_ast) memory_error_info -> exception_info
+    (memory_error, annot, tl_ast) memory_error_info -> exception_info
 
   val add_variables :
     store:(string * Expr.t) list ->

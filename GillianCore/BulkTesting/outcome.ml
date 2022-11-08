@@ -17,7 +17,7 @@ module type S = sig
   module ParserAndCompiler :
     ParserAndCompiler.S with type init_data = State.init_data
 
-  module External : External.S
+  module External : External.T(ParserAndCompiler.Annot).S
 
   type t =
     | ParseAndCompileError of ParserAndCompiler.err
@@ -46,7 +46,7 @@ module Make
       val init : init_data -> t
     end)
     (PC : ParserAndCompiler.S with type init_data = StateP.init_data)
-    (ExternalP : External.S) :
+    (ExternalP : External.T(PC.Annot).S) :
   S
     with module Val = ValP
      and module ESubst = ESubstP

@@ -61,8 +61,8 @@ let add_initial_label cmds lab metadata =
 let prefix_lcmds
     (lcmds : LCmd.t list)
     (invariant : (Asrt.t * string list) option)
-    (cmds : (Annot.t * string option * LabCmd.t) list) :
-    (Annot.t * string option * LabCmd.t) list =
+    (cmds : (Annot.Basic.t * string option * LabCmd.t) list) :
+    (Annot.Basic.t * string option * LabCmd.t) list =
   let lcmds =
     Option.fold
       ~some:(fun (inv, binders) ->
@@ -764,7 +764,7 @@ let annotate_cmds_top_level metadata cmds =
         x_is - the list of variables that may hold error values
   *)
 let rec translate_expr tr_ctx e :
-    (Annot.t * string option * LabCmd.t) list * Expr.t * string list =
+    (Annot.Basic.t * string option * LabCmd.t) list * Expr.t * string list =
   let f = translate_expr tr_ctx in
 
   let find_var_er_index v : int option =
@@ -784,8 +784,8 @@ let rec translate_expr tr_ctx e :
 
   (* All the other commands must get the offsets and nothing else *)
   let js_loc = e.JS_Parser.Syntax.exp_loc in
-  let metadata : Annot.t =
-    Annot.make
+  let metadata : Annot.Basic.t =
+    Annot.Basic.make_basic
       ~origin_loc:(JS_Utils.lift_flow_loc js_loc)
       ~loop_info:tr_ctx.tr_loops ()
   in
@@ -4121,8 +4121,8 @@ and translate_statement tr_ctx e =
 
   (* All the other commands must get the offsets and nothing else *)
   let origin_loc = JS_Utils.lift_flow_loc e.JS_Parser.Syntax.exp_loc in
-  let metadata : Annot.t =
-    Annot.make ~origin_loc ~loop_info:tr_ctx.tr_loops ()
+  let metadata : Annot.Basic.t =
+    Annot.Basic.make_basic ~origin_loc ~loop_info:tr_ctx.tr_loops ()
   in
   let annotate_cmds = annotate_cmds_top_level metadata in
   let annotate_cmd cmd lab = annotate_cmd_top_level metadata (lab, cmd) in
@@ -5501,7 +5501,7 @@ and translate_statement tr_ctx e =
       let cmds2 = add_initial_label cmds2 body metadata in
 
       (* Set up the new annotation *)
-      let metadata = Annot.set_loop_info metadata new_loops in
+      let metadata = metadata |> Annot.Basic.set_loop_info new_loops in
       let annotate_loop_cmds = annotate_cmds_top_level metadata in
 
       let cmds =
@@ -5886,7 +5886,7 @@ and translate_statement tr_ctx e =
       let fe = translate_expr new_ctx in
 
       (* Set up the new annotation *)
-      let metadata = Annot.set_loop_info metadata new_loops in
+      let metadata = metadata |> Annot.Basic.set_loop_info new_loops in
       let annotate_cmd = annotate_cmd_top_level metadata in
       let annotate_cmds = annotate_cmds_top_level metadata in
 
@@ -6037,7 +6037,7 @@ and translate_statement tr_ctx e =
     *)
       (* When we hit a return, we automatically exit all loops *)
       let new_ctx = update_tr_ctx ~loops:[] tr_ctx in
-      let metadata = Annot.set_loop_info metadata [] in
+      let metadata = metadata |> Annot.Basic.set_loop_info [] in
       let annotate_cmd cmd lab = annotate_cmd_top_level metadata (lab, cmd) in
       match e with
       | None ->
@@ -6656,7 +6656,7 @@ let make_final_cmd vars final_lab final_var origin_loc =
         let vars = List.map (fun x_r -> PVar x_r) vars in
         LPhiAssignment [ (final_var, vars) ]
   in
-  (Annot.make ~origin_loc (), Some final_lab, cmd_final)
+  (Annot.Basic.make_basic ~origin_loc (), Some final_lab, cmd_final)
 
 let translate_fun_decls (top_level : bool) (sc_var : string) (cur_index : int) e
     =
@@ -6682,7 +6682,9 @@ let translate_fun_decls (top_level : bool) (sc_var : string) (cur_index : int) e
 
 let generate_main e strictness spec : EProc.t =
   let origin_loc = JS_Utils.lift_flow_loc e.JS_Parser.Syntax.exp_loc in
-  let annotate_cmd cmd lab = (Annot.make ~origin_loc (), lab, cmd) in
+  let annotate_cmd cmd lab =
+    (Annot.Basic.make_basic ~origin_loc (), lab, cmd)
+  in
 
   let new_var = fresh_var () in
   let setup_heap_ass =
@@ -6746,7 +6748,9 @@ let generate_main e strictness spec : EProc.t =
   let ctx = make_translation_ctx main_fid [ main_fid ] sc_var_main strictness in
   let cmds_hoist_fdecls = translate_fun_decls true sc_var_main 0 e in
   let cmds_hoist_fdecls =
-    annotate_cmds_top_level (Annot.make ~origin_loc ()) cmds_hoist_fdecls
+    annotate_cmds_top_level
+      (Annot.Basic.make_basic ~origin_loc ())
+      cmds_hoist_fdecls
   in
 
   let cmds_e, x_e, errs, _, _, _ = translate_statement ctx e in
@@ -6819,9 +6823,13 @@ let generate_main e strictness spec : EProc.t =
 
 let generate_proc_eval new_fid ?use_cc e strictness vis_fid : EProc.t =
   let origin_loc = JS_Utils.lift_flow_loc e.JS_Parser.Syntax.exp_loc in
-  let annotate_cmd cmd lab = (Annot.make ~origin_loc (), lab, cmd) in
+  let annotate_cmd cmd lab =
+    (Annot.Basic.make_basic ~origin_loc (), lab, cmd)
+  in
   let annotate_cmds cmds =
-    List.map (fun (lab, cmd) -> (Annot.make ~origin_loc (), lab, cmd)) cmds
+    List.map
+      (fun (lab, cmd) -> (Annot.Basic.make_basic ~origin_loc (), lab, cmd))
+      cmds
   in
   let var_sc_proc = JS2JSIL_Helpers.var_sc_first in
 
@@ -6953,7 +6961,9 @@ let generate_proc_eval new_fid ?use_cc e strictness vis_fid : EProc.t =
 
 let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
   let origin_loc = JS_Utils.lift_flow_loc e.JS_Parser.Syntax.exp_loc in
-  let annotate_cmd cmd lab = (Annot.make ~origin_loc (), lab, cmd) in
+  let annotate_cmd cmd lab =
+    (Annot.Basic.make_basic ~origin_loc (), lab, cmd)
+  in
 
   let var_sc_proc = JS2JSIL_Helpers.var_sc_first in
 
@@ -6971,7 +6981,9 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
     translate_fun_decls false var_sc_proc (List.length vis_fid - 1) e
   in
   let cmds_hoist_fdecls =
-    annotate_cmds_top_level (Annot.make ~origin_loc ()) cmds_hoist_fdecls
+    annotate_cmds_top_level
+      (Annot.Basic.make_basic ~origin_loc ())
+      cmds_hoist_fdecls
   in
 
   (* x_er_m := new (null)   *)
@@ -7025,13 +7037,13 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
   let x_argList_act = fresh_var () in
   let cmds_arg_obj =
     [
-      (Annot.make ~origin_loc (), None, LArguments x_argList_pre);
-      ( Annot.make ~origin_loc (),
+      (Annot.Basic.make_basic ~origin_loc (), None, LArguments x_argList_pre);
+      ( Annot.Basic.make_basic ~origin_loc (),
         None,
         LBasic
           (Assignment (x_argList_act, UnOp (Cdr, UnOp (Cdr, PVar x_argList_pre))))
       );
-      ( Annot.make ~origin_loc (),
+      ( Annot.Basic.make_basic ~origin_loc (),
         None,
         LCall
           ( var_args,
@@ -7039,7 +7051,7 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
             [ PVar x_argList_act ],
             None,
             None ) );
-      ( Annot.make ~origin_loc (),
+      ( Annot.Basic.make_basic ~origin_loc (),
         None,
         LBasic (Mutation (PVar var_er, Lit (String "arguments"), PVar var_args))
       );

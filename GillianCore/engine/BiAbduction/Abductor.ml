@@ -6,7 +6,8 @@ module Make
                   and type st = SVal.SESubst.t
                   and type store_t = SStore.t
                   and type preds_t = Preds.SPreds.t)
-    (External : External.S) =
+    (PC : ParserAndCompiler.S)
+    (External : External.T(PC.Annot).S) =
 struct
   module L = Logging
   module SSubst = SVal.SESubst
@@ -14,12 +15,14 @@ struct
   module SBAState = BiState.Make (SVal.M) (SVal.SESubst) (SStore) (SPState)
 
   module SBAInterpreter =
-    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SBAState) (External)
+    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SBAState) (PC)
+      (External)
 
   type bi_state_t = SBAState.t
   type abs_state = SPState.t
   type result_t = SBAInterpreter.result_t
   type t = { name : string; params : string list; state : bi_state_t }
+  type annot = PC.Annot.t
 
   let make_id_subst (a : Asrt.t) : SSubst.t =
     let lvars = Asrt.lvars a in
@@ -42,7 +45,7 @@ struct
     SSubst.init bindings'
 
   let make_spec
-      (_ : UP.prog)
+      (_ : annot UP.prog)
       (name : string)
       (params : string list)
       (bi_state_i : bi_state_t)
@@ -167,7 +170,7 @@ struct
     (* update_statistics "make_spec_AbsBi" (time() -. start_time); *)
     (sspec, spec)
 
-  let testify ~init_data ~(prog : UP.prog) (bi_spec : BiSpec.t) : t list =
+  let testify ~init_data ~(prog : annot UP.prog) (bi_spec : BiSpec.t) : t list =
     L.verbose (fun m -> m "Bi-testifying: %s" bi_spec.bispec_name);
     let proc_names = Prog.get_proc_names prog.prog in
     let params = SS.of_list bi_spec.bispec_params in
@@ -192,8 +195,10 @@ struct
     in
     List.concat_map make_test bi_spec.bispec_pres
 
-  let run_test (ret_fun : result_t -> Spec.t * bool) (prog : UP.prog) (test : t)
-      : (Spec.t * bool) list =
+  let run_test
+      (ret_fun : result_t -> Spec.t * bool)
+      (prog : annot UP.prog)
+      (test : t) : (Spec.t * bool) list =
     let state = SBAState.copy test.state in
     try SBAInterpreter.evaluate_proc ret_fun prog test.name test.params state
     with Failure msg ->
@@ -202,7 +207,7 @@ struct
       []
 
   let process_sym_exec_result
-      (prog : UP.prog)
+      (prog : annot UP.prog)
       (name : string)
       (params : string list)
       (state_i : bi_state_t)
@@ -226,7 +231,7 @@ struct
         in
         (sspec, true)
 
-  let run_tests (prog : UP.prog) (tests : t list) =
+  let run_tests (prog : annot UP.prog) (tests : t list) =
     let rec run_tests_aux tests succ_specs bug_specs =
       match tests with
       | [] -> (succ_specs, bug_specs)
@@ -245,7 +250,7 @@ struct
     run_tests_aux tests [] []
 
   let get_test_results
-      (prog : UP.prog)
+      (prog : annot UP.prog)
       (succ_specs : Spec.t list)
       (bug_specs : Spec.t list) =
     let succ_specs, error_specs =
@@ -301,7 +306,7 @@ struct
 
   let str_concat = String.concat ", "
 
-  let test_procs ~init_data (prog : UP.prog) =
+  let test_procs ~init_data (prog : annot UP.prog) =
     L.verbose (fun m -> m "Starting bi-abductive testing in normal mode");
     let proc_names = Prog.get_noninternal_proc_names prog.prog in
     L.verbose (fun m -> m "Proc names: %s" (str_concat proc_names));
@@ -320,7 +325,7 @@ struct
     String.equal (Spec.hash_of_t spec_a) (Spec.hash_of_t spec_b)
 
   let test_procs_incrementally
-      (prog : UP.prog)
+      (prog : annot UP.prog)
       ~(init_data : SPState.init_data)
       ~(prev_results : BiAbductionResults.t)
       ~(reverse_graph : CallGraph.t)
@@ -383,7 +388,7 @@ struct
 
   let test_prog
       ~init_data
-      (prog : UP.prog)
+      (prog : annot UP.prog)
       (incremental : bool)
       (source_files : SourceFiles.t option) : unit =
     let open ResultsDir in
@@ -425,8 +430,12 @@ struct
       write_biabduction_results cur_source_files call_graph ~diff:"" results
 end
 
-module From_scratch (SMemory : SMemory.S) (External : External.S) =
+module From_scratch
+    (SMemory : SMemory.S)
+    (PC : ParserAndCompiler.S)
+    (External : External.T(PC.Annot).S) =
   Make
     (PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState.Make (SMemory))
        (Preds.SPreds))
-       (External)
+       (PC)
+    (External)

@@ -1,141 +1,143 @@
 {
   open Lexing
 
-  exception Syntax_error of string
+  module Make (PC : ParserAndCompiler.S) = struct
+    exception Syntax_error of string
+    
+    module GIL_Parser = GIL_Parser.Make (PC)
+    let keyword_table = Hashtbl.create 307
 
-  let keyword_table = Hashtbl.create 307
+    let _ = List.iter (fun (kwd, tok) -> Hashtbl.add keyword_table kwd tok)
+    [
+        (* Type literals *)
+        "Undefined", GIL_Parser.UNDEFTYPELIT;
+        "Null",      GIL_Parser.NULLTYPELIT;
+        "Empty",     GIL_Parser.EMPTYTYPELIT;
+        "None",      GIL_Parser.NONETYPELIT;
+        "Bool",      GIL_Parser.BOOLTYPELIT;
+        "Int",       GIL_Parser.INTTYPELIT;
+        "Num",       GIL_Parser.NUMTYPELIT;
+        "Str",       GIL_Parser.STRTYPELIT;
+        "Obj",       GIL_Parser.OBJTYPELIT;
+        "List",      GIL_Parser.LISTTYPELIT;
+        "Type",      GIL_Parser.TYPETYPELIT;
+        "Set",       GIL_Parser.SETTYPELIT;
 
-  let _ = List.iter (fun (kwd, tok) -> Hashtbl.add keyword_table kwd tok)
-  [
-      (* Type literals *)
-      "Undefined", GIL_Parser.UNDEFTYPELIT;
-      "Null",      GIL_Parser.NULLTYPELIT;
-      "Empty",     GIL_Parser.EMPTYTYPELIT;
-      "None",      GIL_Parser.NONETYPELIT;
-      "Bool",      GIL_Parser.BOOLTYPELIT;
-      "Int",       GIL_Parser.INTTYPELIT;
-      "Num",       GIL_Parser.NUMTYPELIT;
-      "Str",       GIL_Parser.STRTYPELIT;
-      "Obj",       GIL_Parser.OBJTYPELIT;
-      "List",      GIL_Parser.LISTTYPELIT;
-      "Type",      GIL_Parser.TYPETYPELIT;
-      "Set",       GIL_Parser.SETTYPELIT;
+        (* Literals *)
+        "undefined", GIL_Parser.UNDEFINED;
+        "null",      GIL_Parser.NULL;
+        "empty",     GIL_Parser.EMPTY;
+        "true",      GIL_Parser.TRUE;
+        "false",     GIL_Parser.FALSE;
+        "nan",       GIL_Parser.NAN;
+        "inf",       GIL_Parser.INFINITY;
+        "nil",       GIL_Parser.LSTNIL;
 
-      (* Literals *)
-      "undefined", GIL_Parser.UNDEFINED;
-      "null",      GIL_Parser.NULL;
-      "empty",     GIL_Parser.EMPTY;
-      "true",      GIL_Parser.TRUE;
-      "false",     GIL_Parser.FALSE;
-      "nan",       GIL_Parser.NAN;
-      "inf",       GIL_Parser.INFINITY;
-      "nil",       GIL_Parser.LSTNIL;
+        (* Binary operators *)
+        "and",     GIL_Parser.AND;
+        "or",      GIL_Parser.OR;
+        "m_atan2", GIL_Parser.M_ATAN2;
 
-      (* Binary operators *)
-      "and",     GIL_Parser.AND;
-      "or",      GIL_Parser.OR;
-      "m_atan2", GIL_Parser.M_ATAN2;
+        (* Unary operators *)
+        "not",           GIL_Parser.NOT;
+        "isNaN",         GIL_Parser.M_ISNAN;
+        "m_abs",         GIL_Parser.M_ABS;
+        "m_acos",        GIL_Parser.M_ACOS;
+        "m_asin",        GIL_Parser.M_ASIN;
+        "m_atan",        GIL_Parser.M_ATAN;
+        "m_ceil",        GIL_Parser.M_CEIL;
+        "m_cos",         GIL_Parser.M_COS;
+        "m_exp",         GIL_Parser.M_EXP;
+        "m_floor",       GIL_Parser.M_FLOOR;
+        "m_log",         GIL_Parser.M_LOG;
+        "m_round",       GIL_Parser.M_ROUND;
+        "m_sgn",         GIL_Parser.M_SGN;
+        "m_sin",         GIL_Parser.M_SIN;
+        "m_sqrt",        GIL_Parser.M_SQRT;
+        "m_tan",         GIL_Parser.M_TAN;
+        "as_int",        GIL_Parser.NUMTOINT;
+        "as_num",        GIL_Parser.INTTONUM;
+        "num_to_string", GIL_Parser.TOSTRING;
+        "num_to_int",    GIL_Parser.TOINT;
+        "num_to_uint16", GIL_Parser.TOUINT16;
+        "num_to_int32",  GIL_Parser.TOINT32;
+        "num_to_uint32", GIL_Parser.TOUINT32;
+        "string_to_num", GIL_Parser.TONUMBER;
+        "car",           GIL_Parser.CAR;
+        "cdr",           GIL_Parser.CDR;
+        "set_to_list",   GIL_Parser.SETTOLIST;
 
-      (* Unary operators *)
-      "not",           GIL_Parser.NOT;
-      "isNaN",         GIL_Parser.M_ISNAN;
-      "m_abs",         GIL_Parser.M_ABS;
-      "m_acos",        GIL_Parser.M_ACOS;
-      "m_asin",        GIL_Parser.M_ASIN;
-      "m_atan",        GIL_Parser.M_ATAN;
-      "m_ceil",        GIL_Parser.M_CEIL;
-      "m_cos",         GIL_Parser.M_COS;
-      "m_exp",         GIL_Parser.M_EXP;
-      "m_floor",       GIL_Parser.M_FLOOR;
-      "m_log",         GIL_Parser.M_LOG;
-      "m_round",       GIL_Parser.M_ROUND;
-      "m_sgn",         GIL_Parser.M_SGN;
-      "m_sin",         GIL_Parser.M_SIN;
-      "m_sqrt",        GIL_Parser.M_SQRT;
-      "m_tan",         GIL_Parser.M_TAN;
-      "as_int",        GIL_Parser.NUMTOINT;
-      "as_num",        GIL_Parser.INTTONUM;
-      "num_to_string", GIL_Parser.TOSTRING;
-      "num_to_int",    GIL_Parser.TOINT;
-      "num_to_uint16", GIL_Parser.TOUINT16;
-      "num_to_int32",  GIL_Parser.TOINT32;
-      "num_to_uint32", GIL_Parser.TOUINT32;
-      "string_to_num", GIL_Parser.TONUMBER;
-      "car",           GIL_Parser.CAR;
-      "cdr",           GIL_Parser.CDR;
-      "set_to_list",   GIL_Parser.SETTOLIST;
-
-      (* Expression keywords *)
-      "typeOf", GIL_Parser.TYPEOF;
+        (* Expression keywords *)
+        "typeOf", GIL_Parser.TYPEOF;
 
 
-      (* Command keywords *)
-      "skip",         GIL_Parser.SKIP;
-      "args",         GIL_Parser.ARGUMENTS;
-      "goto",         GIL_Parser.GOTO;
-      "with",         GIL_Parser.WITH;
-      "apply",        GIL_Parser.APPLY;
-      "PHI",          GIL_Parser.PHI;
-      "return",       GIL_Parser.RETURN;
-      "throw",        GIL_Parser.THROW;
-      "extern",       GIL_Parser.EXTERN;
+        (* Command keywords *)
+        "skip",         GIL_Parser.SKIP;
+        "args",         GIL_Parser.ARGUMENTS;
+        "goto",         GIL_Parser.GOTO;
+        "with",         GIL_Parser.WITH;
+        "apply",        GIL_Parser.APPLY;
+        "PHI",          GIL_Parser.PHI;
+        "return",       GIL_Parser.RETURN;
+        "throw",        GIL_Parser.THROW;
+        "extern",       GIL_Parser.EXTERN;
 
-      (* Logical expressions: most match with the program expressions *)
-      "none", GIL_Parser.LNONE;
+        (* Logical expressions: most match with the program expressions *)
+        "none", GIL_Parser.LNONE;
 
-      (* Logic assertions *)
-      "True",         GIL_Parser.LTRUE;
-      "False",        GIL_Parser.LFALSE;
-      "emp",          GIL_Parser.LEMP;
-      "types",        GIL_Parser.LTYPES;
-      "forall",       GIL_Parser.LFORALL;
+        (* Logic assertions *)
+        "True",         GIL_Parser.LTRUE;
+        "False",        GIL_Parser.LFALSE;
+        "emp",          GIL_Parser.LEMP;
+        "types",        GIL_Parser.LTYPES;
+        "forall",       GIL_Parser.LFORALL;
 
-      (* Logic predicates *)
-      "abstract", GIL_Parser.ABSTRACT;
-      "pure", GIL_Parser.PURE;
-      "pred", GIL_Parser.PRED;
-      "nounfold", GIL_Parser.NOUNFOLD;
-      "facts", GIL_Parser.FACTS;
+        (* Logic predicates *)
+        "abstract", GIL_Parser.ABSTRACT;
+        "pure", GIL_Parser.PURE;
+        "pred", GIL_Parser.PRED;
+        "nounfold", GIL_Parser.NOUNFOLD;
+        "facts", GIL_Parser.FACTS;
 
-      (* Logic commands *)
-      "fold",         GIL_Parser.FOLD;
-      "unfold",       GIL_Parser.UNFOLD;
-      "unfold_all",   GIL_Parser.UNFOLDALL;
-      "symb_exec",    GIL_Parser.SYMBEXEC;
-      "if",           GIL_Parser.LIF;
-      "then",         GIL_Parser.LTHEN;
-      "else",         GIL_Parser.LELSE;
-      "macro",        GIL_Parser.MACRO;
-      "invariant",    GIL_Parser.INVARIANT;
-      "assert",       GIL_Parser.ASSERT;
-      "assume",       GIL_Parser.ASSUME;
-      "assume_type",  GIL_Parser.ASSUME_TYPE;
-      "fresh_svar",   GIL_Parser.FRESH_SVAR;
-      "bind",         GIL_Parser.BIND;
-      "existentials", GIL_Parser.EXISTENTIALS;
-      "sep_assert",   GIL_Parser.SEPASSERT;
-      "branch",       GIL_Parser.BRANCH;
-      "use_subst",    GIL_Parser.USESUBST;
-      "hides",        GIL_Parser.HIDES;
+        (* Logic commands *)
+        "fold",         GIL_Parser.FOLD;
+        "unfold",       GIL_Parser.UNFOLD;
+        "unfold_all",   GIL_Parser.UNFOLDALL;
+        "symb_exec",    GIL_Parser.SYMBEXEC;
+        "if",           GIL_Parser.LIF;
+        "then",         GIL_Parser.LTHEN;
+        "else",         GIL_Parser.LELSE;
+        "macro",        GIL_Parser.MACRO;
+        "invariant",    GIL_Parser.INVARIANT;
+        "assert",       GIL_Parser.ASSERT;
+        "assume",       GIL_Parser.ASSUME;
+        "assume_type",  GIL_Parser.ASSUME_TYPE;
+        "fresh_svar",   GIL_Parser.FRESH_SVAR;
+        "bind",         GIL_Parser.BIND;
+        "existentials", GIL_Parser.EXISTENTIALS;
+        "sep_assert",   GIL_Parser.SEPASSERT;
+        "branch",       GIL_Parser.BRANCH;
+        "use_subst",    GIL_Parser.USESUBST;
+        "hides",        GIL_Parser.HIDES;
 
-      (* Procedure specification keywords *)
-      "axiomatic",    GIL_Parser.AXIOMATIC;
-      "incomplete",   GIL_Parser.INCOMPLETE;
-      "lemma",        GIL_Parser.LEMMA;
-      "variant",      GIL_Parser.VARIANT;
-      "spec",         GIL_Parser.SPEC;
-      "bispec",       GIL_Parser.BISPEC;
-      "normal",       GIL_Parser.NORMAL;
-      "error",        GIL_Parser.ERROR;
-      "fail",         GIL_Parser.FAIL;
+        (* Procedure specification keywords *)
+        "axiomatic",    GIL_Parser.AXIOMATIC;
+        "incomplete",   GIL_Parser.INCOMPLETE;
+        "lemma",        GIL_Parser.LEMMA;
+        "variant",      GIL_Parser.VARIANT;
+        "spec",         GIL_Parser.SPEC;
+        "bispec",       GIL_Parser.BISPEC;
+        "normal",       GIL_Parser.NORMAL;
+        "error",        GIL_Parser.ERROR;
+        "fail",         GIL_Parser.FAIL;
 
-      (* Procedure definition keywords *)
-      "proc", GIL_Parser.PROC;
+        (* Procedure definition keywords *)
+        "proc", GIL_Parser.PROC;
 
-      (* Others *)
-      "import", GIL_Parser.IMPORT;
-      "verify", GIL_Parser.VERIFY;
-    ]
+        (* Others *)
+        "import", GIL_Parser.IMPORT;
+        "verify", GIL_Parser.VERIFY;
+      ]
 }
 
 let digit = ['0'-'9']
@@ -326,3 +328,7 @@ and read_init_data buf =
   | eof     { raise (Syntax_error ("Init_data is not terminated")) }
   | "#end_init_data" { GIL_Parser.INIT_DATA (Yojson.Safe.from_string (Buffer.contents buf)) }
   | _        { Buffer.add_string buf (Lexing.lexeme lexbuf); read_init_data buf lexbuf }
+
+{
+  end
+}
