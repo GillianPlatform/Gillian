@@ -130,7 +130,7 @@ struct
                      d.out_paths |> ExtList.append (case, path)
                  | EndWithBranch _ ->
                      failwith "EndWithBranch on branching cmd not supported!")
-      | Normal | Final -> (
+      | Normal -> (
           let path = (id, None) :: d.inner_path in
           match end_kind with
           | NotEnd -> ()
@@ -139,7 +139,8 @@ struct
               let case = Gil count in
               d.unknown_outs_count <- count + 1;
               d.out_paths |> ExtList.append (case, path)
-          | EndWithBranch case -> d.out_paths |> ExtList.append (case, path)));
+          | EndWithBranch case -> d.out_paths |> ExtList.append (case, path))
+      | Final -> ());
       match (d.submap, annot.nest_kind) with
       | _, NoNest -> ()
       | NoSubmap, Proc p -> d.submap <- Proc p
@@ -173,7 +174,7 @@ struct
       let errors = errors |> ExtList.to_list in
       let cmd_kind =
         match out_paths |> ExtList.to_list with
-        | [ (_, [ (_, None) ]) ] -> if is_final then Final else Normal
+        | [] | [ (_, [ (_, None) ]) ] -> if is_final then Final else Normal
         | paths ->
             let cases =
               paths
@@ -403,7 +404,7 @@ struct
                             DL.log (fun m ->
                                 m
                                   "Inserting without gil case; attempting to \
-                                   step back for link");
+                                   look back for link");
                             aux new_id
                         | _ ->
                             failwith
