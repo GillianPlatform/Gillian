@@ -503,13 +503,13 @@ struct
         | Finished _ ->
             state.cont_func <- None;
             failwith "HORROR: Shouldn't encounter Finished when debugging!"
-        | EndOfBranch (result, cont_func) ->
+        | EndOfBranch (result, cont_func) -> (
             state.cont_func <- Some cont_func;
             let prev =
               let+ content, type_ = L.LogQueryer.get_report prev_id_in_frame in
               (prev_id_in_frame, content, type_)
             in
-            (match prev with
+            match prev with
             | Some (prev_id, content, type_) when type_ = ContentType.cmd -> (
                 let prev_prev_id =
                   L.LogQueryer.get_previous_report_id prev_id |> Option.get
@@ -533,25 +533,21 @@ struct
                   |> Lifter.handle_cmd prev_prev_id cmd.branch_case exec_data
                 in
                 match handler_result with
-                | Stop -> ()
-                | _ ->
+                | ExecNext (id, branch_case) ->
                     DL.log (fun m ->
-                        m
-                          ~json:
-                            [
-                              ( "handler_result",
-                                Lift.handle_cmd_result_to_yojson handler_result
-                              );
-                              ("lifter_state", Lifter.dump state.lifter_state);
-                            ]
-                          "HORROR: Lifter didn't give Stop for Final cmd!"))
+                        m "EXEC NEXT (%a, %a)" (pp_option pp_rid) id
+                          (pp_option BranchCase.pp) branch_case);
+                    let id = id |> Option.get in
+                    execute_step id ?branch_case dbg state
+                | Stop ->
+                    DL.log (fun m -> m "STOP (end)");
+                    (ReachedEnd, None))
             | Some (prev_id, _, type_) ->
                 Fmt.failwith "EndOfBranch: prev cmd (%a) is '%s', not '%s'!"
                   pp_rid prev_id type_ ContentType.cmd
             | None ->
                 Fmt.failwith "EndOfBranch: prev id '%a' doesn't exist!" pp_rid
-                  prev_id_in_frame);
-            (ReachedEnd, None)
+                  prev_id_in_frame)
         | Continue (cur_report_id, branch_path, new_branch_cases, cont_func)
           -> (
             match cur_report_id with
