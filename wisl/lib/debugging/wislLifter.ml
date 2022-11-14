@@ -257,7 +257,7 @@ struct
     mutable map : map;
     id_map : (rid, map) Hashtbl.t; [@to_yojson fun _ -> `Null]
     mutable before_partial : (rid * BranchCase.t option) option;
-    is_loop_func : bool;
+    mutable is_loop_func : bool;
   }
   [@@deriving to_yojson]
 
@@ -459,44 +459,7 @@ struct
           | _ -> ExecNext (None, None))
     | _ -> None
 
-  let init_opt proc_name tl_ast exec_data =
-    let gil_state = Gil.get_state () in
-    let+ tl_ast in
-    let partial_cmds = Hashtbl.create 0 in
-    let id_map = Hashtbl.create 0 in
-    let before_partial = None in
-    let map, result, is_loop_func =
-      match handle_loop_prefix exec_data with
-      | Some result -> (Nothing, result, true)
-      | None -> (
-          match PartialCmds.handle exec_data tl_ast partial_cmds with
-          | None ->
-              let new_cmd = prepare_basic_cmd tl_ast id_map exec_data in
-              (new_cmd ~parent:None (), Stop, false)
-          | Some (StepAgain result) -> (Nothing, ExecNext result, false)
-          | Some (Finished _) ->
-              failwith "init: HORROR - Finished PartialCmd on init!")
-    in
-    let state =
-      {
-        proc_name;
-        gil_state;
-        tl_ast;
-        partial_cmds;
-        map;
-        id_map;
-        before_partial;
-        is_loop_func;
-      }
-    in
-    (state, result)
-
-  let init proc_name tl_ast exec_data =
-    match init_opt proc_name tl_ast exec_data with
-    | None -> failwith "init: wislLifter needs a tl_ast!"
-    | Some x -> x
-
-  let handle_cmd prev_id branch_case (exec_data : exec_data) state =
+  let init_or_handle prev_id branch_case exec_data state =
     let { id; _ } = exec_data in
     DL.log (fun m ->
         m
@@ -504,15 +467,20 @@ struct
             [
               ("state", dump state); ("exec_data", exec_data_to_yojson exec_data);
             ]
-          "HANDLING %a (prev %a)" L.ReportId.pp id L.ReportId.pp prev_id);
+          "HANDLING %a (prev %a)" L.ReportId.pp id (pp_option L.ReportId.pp)
+          prev_id);
     let { tl_ast; partial_cmds; id_map; proc_name; is_loop_func; _ } = state in
     match handle_loop_prefix exec_data with
-    | Some result -> result
+    | Some result ->
+        state.is_loop_func <- true;
+        result
     | None -> (
         match PartialCmds.handle exec_data tl_ast partial_cmds with
         | Some (StepAgain result) ->
             if Option.is_none state.before_partial then
-              state.before_partial <- Some (prev_id, branch_case);
+              prev_id
+              |> Option.iter (fun prev_id ->
+                     state.before_partial <- Some (prev_id, branch_case));
             ExecNext result
         | None ->
             let display, final =
@@ -523,9 +491,14 @@ struct
             let new_cmd =
               prepare_basic_cmd ?display ~final tl_ast id_map exec_data
             in
-            (match state.map with
-            | Nothing -> state.map <- new_cmd ~parent:None ()
-            | _ -> insert_new_cmd new_cmd id prev_id branch_case state);
+            (match (state.map, prev_id) with
+            | Nothing, _ -> state.map <- new_cmd ~parent:None ()
+            | _, Some prev_id ->
+                insert_new_cmd new_cmd id prev_id branch_case state
+            | _, _ ->
+                failwith
+                  "HORROR - tried to insert to non-Nothing map without \
+                   previous id!");
             Stop
         | Some (Finished { ids; display; unifys; errors; cmd_kind; submap }) ->
             let gil_branch_path =
@@ -536,12 +509,46 @@ struct
                 ~submap
             in
             let prev_id, branch_case =
-              state.before_partial
-              |> Option.value ~default:(prev_id, branch_case)
+              match state.before_partial with
+              | Some (prev_id, branch_case) ->
+                  state.before_partial <- None;
+                  (Some prev_id, branch_case)
+              | None -> (prev_id, branch_case)
             in
-            insert_new_cmd new_cmd id prev_id branch_case state;
-            state.before_partial <- None;
+            (match prev_id with
+            | Some prev_id ->
+                insert_new_cmd new_cmd id prev_id branch_case state
+            | None -> state.map <- new_cmd ~parent:None ());
             Stop)
+
+  let init_opt proc_name tl_ast exec_data =
+    let gil_state = Gil.get_state () in
+    let+ tl_ast in
+    let partial_cmds = Hashtbl.create 0 in
+    let id_map = Hashtbl.create 0 in
+    let before_partial = None in
+    let state =
+      {
+        proc_name;
+        gil_state;
+        tl_ast;
+        partial_cmds;
+        map = Nothing;
+        id_map;
+        before_partial;
+        is_loop_func = false;
+      }
+    in
+    let result = init_or_handle None None exec_data state in
+    (state, result)
+
+  let init proc_name tl_ast exec_data =
+    match init_opt proc_name tl_ast exec_data with
+    | None -> failwith "init: wislLifter needs a tl_ast!"
+    | Some x -> x
+
+  let handle_cmd prev_id branch_case (exec_data : exec_data) state =
+    init_or_handle (Some prev_id) branch_case exec_data state
 
   let get_gil_map _ = failwith "get_gil_map: not implemented!"
 
