@@ -440,6 +440,7 @@ struct
               "Debugger: don't know how to handle report of type '%s'!" t)
 
   let unify result proc_name prev_id dbg =
+    let open Verification.SUnifier.Logging in
     match dbg.tests |> List.assoc_opt proc_name with
     | None ->
         DL.failwith
@@ -447,27 +448,39 @@ struct
             let tests_json = Verification.proc_tests_to_yojson dbg.tests in
             [ ("tests", tests_json) ])
           (Fmt.str "No test found for proc `%s`!" proc_name)
-    | Some test -> (
-        match L.LogQueryer.get_unify_for prev_id with
-        | Some _ ->
-            DL.log (fun m ->
-                m "Unification for %a already exists; skipping unify" pp_rid
-                  prev_id);
-            None
-        | None ->
-            DL.log (fun m -> m "Unifying result for %a" pp_rid prev_id);
-            let success =
-              Verification.Debug.analyse_result test prev_id result
-            in
-            let+ id, content = L.LogQueryer.get_unify_for prev_id in
-            let unify_report =
-              content |> Yojson.Safe.from_string
-              |> Verification.SUnifier.Logging.UnifyReport.of_yojson
-              |> Result.get_ok
-            in
-            let kind = unify_report.unify_kind in
-            let result = if success then Success else Failure in
-            (id, kind, result))
+    | Some test ->
+        let id, content, success =
+          match L.LogQueryer.get_unify_for prev_id with
+          | Some (id, content) ->
+              let success =
+                L.LogQueryer.get_unify_results id
+                |> List.exists (fun (_, content) ->
+                       let result =
+                         content |> Yojson.Safe.from_string
+                         |> UnifyResultReport.of_yojson |> Result.get_ok
+                       in
+                       match result with
+                       | Success _ -> true
+                       | Failure _ -> false)
+              in
+              (id, content, success)
+          | None ->
+              DL.log (fun m -> m "Unifying result for %a" pp_rid prev_id);
+              let success =
+                Verification.Debug.analyse_result test prev_id result
+              in
+              let id, content =
+                L.LogQueryer.get_unify_for prev_id |> Option.get
+              in
+              (id, content, success)
+        in
+        let unify_report =
+          content |> Yojson.Safe.from_string |> UnifyReport.of_yojson
+          |> Result.get_ok
+        in
+        let kind = unify_report.unify_kind in
+        let result = if success then Success else Failure in
+        (id, kind, result)
 
   let show_result_errors = function
     | ExecRes.RSucc _ -> []
@@ -520,9 +533,7 @@ struct
                 in
                 let proc_name = (List.hd cmd.callstack).pid in
                 let errors = show_result_errors result in
-                let unifys =
-                  unify result proc_name prev_id cfg |> Option.to_list
-                in
+                let unifys = [ unify result proc_name prev_id cfg ] in
                 state |> update_report_id_and_inspection_fields prev_id cfg;
                 let exec_data =
                   Lift.make_executed_cmd_data ExecMap.Final prev_id cmd ~unifys

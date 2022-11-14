@@ -42,3 +42,12 @@ let get_unify_for id =
   |> List.find_map (fun (id, type_, content) ->
          if type_ = LoggingConstants.ContentType.unify then Some (id, content)
          else None)
+
+let rec get_unify_results id =
+  get_children_of id
+  |> List.concat_map (fun (id, type_, content) ->
+         if type_ = LoggingConstants.ContentType.unify_case then
+           get_unify_results id
+         else if type_ = LoggingConstants.ContentType.unify_result then
+           [ (id, content) ]
+         else [])
