@@ -822,10 +822,10 @@ struct
                       L.verbose (fun m ->
                           m
                             "Produce GA failed for: %a!\n\
-                             with Message: %s. Might have lost some paths ?"
+                             with Message: %a. Might have lost some paths ?"
                             Asrt.pp
                             (Asrt.GA (a, ins, outs))
-                            msg);
+                            (pp_list SPState.pp_err_t) msg);
                       acc)
                 [] astates
             in

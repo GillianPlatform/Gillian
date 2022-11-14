@@ -108,7 +108,12 @@ module type S = sig
 
   val call_graph : CallGraph.t
   val reset : unit -> unit
-  val evaluate_lcmds : annot UP.prog -> LCmd.t list -> state_t -> state_t list
+
+  val evaluate_lcmds :
+    annot UP.prog ->
+    LCmd.t list ->
+    state_t ->
+    (state_t list, state_err_t list) result
 
   val init_evaluate_proc :
     (result_t -> 'a) ->

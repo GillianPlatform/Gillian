@@ -40,7 +40,7 @@ module Make (SMemory : SMemory.S) :
   type st = SVal.M.et
   type heap_t = SMemory.t [@@deriving yojson]
   type store_t = SStore.t [@@deriving yojson]
-  type m_err_t = SMemory.err_t [@@deriving yojson]
+  type m_err_t = SMemory.err_t [@@deriving yojson, show]
   type t = heap_t * store_t * PFS.t * TypEnv.t * SS.t [@@deriving yojson]
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type init_data = SMemory.init_data
@@ -51,7 +51,7 @@ module Make (SMemory : SMemory.S) :
     | FSVars of SS.t
     | FAsrt of Asrt.t
 
-  type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson]
+  type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson, show]
   type action_ret = ASucc of (t * vt list) list | AFail of err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
 
@@ -505,7 +505,7 @@ module Make (SMemory : SMemory.S) :
       @ [ Types (TypEnv.to_list_expr gamma) ]
 
   let evaluate_slcmd (_ : 'a UP.prog) (_ : SLCmd.t) (_ : t) :
-      (t list, string) result =
+      (t list, err_t list) result =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 
   let unify_invariant _ _ _ _ _ =
@@ -524,7 +524,8 @@ module Make (SMemory : SMemory.S) :
       (_ : t)
       (_ : string)
       (_ : vt list)
-      (_ : (string * (string * vt) list) option) : (t * Flag.t) list =
+      (_ : (string * (string * vt) list) option) :
+      ((t * Flag.t) list, err_t list) result =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
 
   let unfolding_vals (_ : t) (fs : Formula.t list) : vt list =
@@ -575,7 +576,7 @@ module Make (SMemory : SMemory.S) :
   let produce_posts (_ : t) (_ : st) (_ : Asrt.t list) : t list =
     raise (Failure "produce_posts from non-abstract symbolic state.")
 
-  let produce (_ : t) (_ : st) (_ : Asrt.t) : (t list, string) result =
+  let produce (_ : t) (_ : st) (_ : Asrt.t) : (t list, err_t list) result =
     raise (Failure "produce_post from non-abstract symbolic state.")
 
   let fresh_val (_ : t) : vt = LVar (LVar.alloc ())

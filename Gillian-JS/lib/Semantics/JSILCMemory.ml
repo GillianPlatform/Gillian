@@ -13,7 +13,7 @@ module M : Memory_S with type init_data = unit = struct
   type st = Subst.t
 
   (** Errors *)
-  type err_t = unit
+  type err_t = unit [@@deriving show]
 
   type action_ret = ASucc of (t * vt list) | AFail of err_t list
 

@@ -21,7 +21,7 @@ module type S = sig
   (** Errors *)
   type m_err_t
 
-  type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson]
+  type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson, show]
   type fix_t
 
   exception Internal_State_Error of err_t list * t
@@ -118,7 +118,7 @@ module type S = sig
   (** Turns a state into a list of assertions *)
   val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
 
-  val evaluate_slcmd : 'a UP.prog -> SLCmd.t -> t -> (t list, string) result
+  val evaluate_slcmd : 'a UP.prog -> SLCmd.t -> t -> (t list, err_t list) result
 
   val unify_invariant :
     'a UP.prog -> bool -> t -> Asrt.t -> string list -> (t * t) list
@@ -131,7 +131,7 @@ module type S = sig
     string ->
     vt list ->
     (string * (string * vt) list) option ->
-    (t * Flag.t) list
+    ((t * Flag.t) list, err_t list) result
 
   val unfolding_vals : t -> Formula.t list -> vt list
   val automatic_unfold : t -> vt list -> (t list, string) result
@@ -140,7 +140,7 @@ module type S = sig
   val clean_up : ?keep:Expr.Set.t -> t -> unit
   val unify_assertion : t -> st -> UP.step -> u_res
   val produce_posts : t -> st -> Asrt.t list -> t list
-  val produce : t -> st -> Asrt.t -> (t list, string) result
+  val produce : t -> st -> Asrt.t -> (t list, err_t list) result
   val update_subst : t -> st -> unit
   val mem_constraints : t -> Formula.t list
   val can_fix : err_t list -> bool

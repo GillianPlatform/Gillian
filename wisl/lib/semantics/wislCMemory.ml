@@ -4,7 +4,7 @@ module Literal = Gillian.Gil_syntax.Literal
 type init_data = unit
 type vt = Values.t
 type st = Subst.t
-type err_t = unit
+type err_t = unit [@@deriving show]
 type t = WislCHeap.t
 type action_ret = ASucc of (t * vt list) | AFail of err_t list
 

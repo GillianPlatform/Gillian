@@ -12,7 +12,7 @@ module type S = sig
   type st = SVal.SESubst.t
 
   type c_fix_t
-  type err_t
+  type err_t [@@deriving show]
 
   (** Type of GIL general states *)
   type t [@@deriving yojson]

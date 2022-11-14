@@ -23,8 +23,8 @@ end = struct
   type heap_t = CMemory.t
   type t = CMemory.t * CStore.t * vt list
   type fix_t
-  type m_err_t = CMemory.err_t
-  type err_t = (m_err_t, vt) StateErr.err_t
+  type m_err_t = CMemory.err_t [@@deriving show]
+  type err_t = (m_err_t, vt) StateErr.err_t [@@deriving show]
   type init_data = CMemory.init_data
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
@@ -157,14 +157,15 @@ end = struct
       (_ : t)
       (_ : string)
       (_ : vt list)
-      (_ : (string * (string * vt) list) option) : (t * Flag.t) list =
+      (_ : (string * (string * vt) list) option) :
+      ((t * Flag.t) list, err_t list) result =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
 
   let unfolding_vals (_ : t) (_ : Formula.t list) : vt list =
     raise (Failure "ERROR: unfolding_vals called for non-abstract execution")
 
   let evaluate_slcmd (_ : 'a UP.prog) (_ : SLCmd.t) (_ : t) :
-      (t list, string) result =
+      (t list, err_t list) result =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 
   let unify_invariant _ _ _ _ _ =
@@ -189,7 +190,7 @@ end = struct
   let produce_posts (_ : t) (_ : st) (_ : Asrt.t list) : t list =
     raise (Failure "produce_posts from concrete state.")
 
-  let produce (_ : t) (_ : st) (_ : Asrt.t) : (t list, string) result =
+  let produce (_ : t) (_ : st) (_ : Asrt.t) : (t list, err_t list) result =
     raise (Failure "produce_post from non-abstract symbolic state.")
 
   let update_subst (_ : t) (_ : st) : unit = ()

@@ -12,7 +12,7 @@ open Gillian.Logic
 
 module M = struct
   type init_data = unit
-  type vt = SVal.t [@@deriving yojson]
+  type vt = SVal.t [@@deriving yojson, show]
 
   (** Type of JSIL general states *)
   type t = SHeap.t [@@deriving yojson]
@@ -26,14 +26,14 @@ module M = struct
     | FCell of vt * vt
     | FMetadata of vt
     | FPure of Formula.t
-  [@@deriving yojson]
+  [@@deriving yojson, show]
 
   type c_fix_t =
     | CFLoc of string
     | CFCell of vt * vt * vt
     | CFMetadata of vt * vt
 
-  type err_t = vt list * i_fix_t list list * Formula.t [@@deriving yojson]
+  type err_t = vt list * i_fix_t list list * Formula.t [@@deriving yojson, show]
 
   type action_ret =
     | ASucc of (t * vt list * Formula.t list * (string * Type.t) list) list
