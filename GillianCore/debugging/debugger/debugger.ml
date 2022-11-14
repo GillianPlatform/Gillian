@@ -449,7 +449,7 @@ struct
             [ ("tests", tests_json) ])
           (Fmt.str "No test found for proc `%s`!" proc_name)
     | Some test ->
-        let id, content, success =
+        let+ id, content, success =
           match L.LogQueryer.get_unify_for prev_id with
           | Some (id, content) ->
               let success =
@@ -463,15 +463,13 @@ struct
                        | Success _ -> true
                        | Failure _ -> false)
               in
-              (id, content, success)
+              Some (id, content, success)
           | None ->
               DL.log (fun m -> m "Unifying result for %a" pp_rid prev_id);
               let success =
                 Verification.Debug.analyse_result test prev_id result
               in
-              let id, content =
-                L.LogQueryer.get_unify_for prev_id |> Option.get
-              in
+              let+ id, content = L.LogQueryer.get_unify_for prev_id in
               (id, content, success)
         in
         let unify_report =
@@ -533,7 +531,9 @@ struct
                 in
                 let proc_name = (List.hd cmd.callstack).pid in
                 let errors = show_result_errors result in
-                let unifys = [ unify result proc_name prev_id cfg ] in
+                let unifys =
+                  unify result proc_name prev_id cfg |> Option.to_list
+                in
                 state |> update_report_id_and_inspection_fields prev_id cfg;
                 let exec_data =
                   Lift.make_executed_cmd_data ExecMap.Final prev_id cmd ~unifys
