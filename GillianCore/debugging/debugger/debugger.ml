@@ -644,10 +644,49 @@ struct
     let { cfg; _ } = dbg in
     let report_state = L.ReportState.clone cfg.report_state_base in
     let open Verification.SAInterpreter in
-    let rec aux = function
+    let rec aux prev_id = function
       | Finished _ ->
           Error "HORROR: Shouldn't encounter Finished when debugging!"
-      | EndOfBranch _ -> Error "Nothing to run"
+      | EndOfBranch (result, cont_func) -> (
+          match prev_id with
+          | None -> Error "Nothing to run"
+          | Some prev_id ->
+              let lifter_state, _ =
+                let prev_content, _ =
+                  L.LogQueryer.get_report prev_id |> Option.get
+                in
+                let cmd =
+                  prev_content |> Yojson.Safe.from_string
+                  |> Logging.ConfigReport.of_yojson |> Result.get_ok
+                in
+                let exec_data =
+                  let unifys =
+                    unify result proc_name prev_id cfg |> Option.to_list
+                  in
+                  let errors = show_result_errors result in
+                  Lift.make_executed_cmd_data ExecMap.Final prev_id cmd ~unifys
+                    ~errors []
+                in
+                Lifter.init proc_name cfg.tl_ast exec_data
+              in
+              let state =
+                {
+                  cont_func = Some cont_func;
+                  breakpoints = Hashtbl.create 0;
+                  cur_report_id = prev_id;
+                  top_level_scopes;
+                  frames = [];
+                  variables = Hashtbl.create 0;
+                  errors = [];
+                  cur_cmd = None;
+                  proc_name = None;
+                  unify_maps = [];
+                  lifter_state;
+                  report_state;
+                }
+              in
+              state |> update_report_id_and_inspection_fields prev_id cfg;
+              Ok (state, ReachedEnd))
       | Continue (cur_report_id, branch_path, new_branch_cases, cont_func) -> (
           match cur_report_id with
           | None ->
@@ -659,7 +698,21 @@ struct
               let content, type_ = Option.get @@ L.LogQueryer.get_report id in
               if type_ = ContentType.proc_init then (
                 DL.log (fun m -> m "Debugger.launch: Skipping proc_init...");
-                aux (cont_func ~path:[] ()))
+                aux (Some id) (cont_func ~path:[] ()))
+              else if
+                L.LogQueryer.get_cmd_results id
+                |> List.for_all (fun (_, content) ->
+                       let result =
+                         content |> Yojson.Safe.from_string
+                         |> Logging.CmdResult.of_yojson |> Result.get_ok
+                       in
+                       result.errors <> [])
+              then (
+                DL.log (fun m ->
+                    m
+                      "Init: no results for cmd (or all results have error); \
+                       assuming eob, stepping again...");
+                aux (Some id) (cont_func ~path:[] ()))
               else
                 let cmd =
                   Result.get_ok
@@ -720,7 +773,7 @@ struct
              Verification.verify_up_to_procs ~init_data:cfg.init_data ~proc_name
                cfg.prog
            in
-           aux cont_func)
+           aux None cont_func)
 
   let launch file_name proc_name =
     Fmt_tty.setup_std_outputs ();
