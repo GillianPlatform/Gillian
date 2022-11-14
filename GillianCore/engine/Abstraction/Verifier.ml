@@ -845,12 +845,13 @@ struct
               raise
                 (Failure (Printf.sprintf "Lemma %s WITHOUT proof" test.name))
             else true (* It's already correct *)
-        | Some proof ->
+        | Some proof -> (
             let msg = "Verifying lemma " ^ test.name ^ "... " in
             L.tmi (fun fmt -> fmt "%s" msg);
             Fmt.pr "%s@?" msg;
-            let rets = SAInterpreter.evaluate_lcmds prog proof state in
-            analyse_lemma_results test rets)
+            match SAInterpreter.evaluate_lcmds prog proof state with
+            | Ok rets -> analyse_lemma_results test rets
+            | Error _ -> false))
 
   let pred_extracting_visitor =
     object

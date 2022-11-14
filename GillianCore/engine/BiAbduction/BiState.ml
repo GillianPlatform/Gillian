@@ -17,7 +17,7 @@ struct
   type heap_t = State.heap_t
   type state_t = State.t
   type t = SS.t * state_t * state_t
-  type err_t = State.err_t [@@deriving yojson]
+  type err_t = State.err_t [@@deriving yojson, show]
   type fix_t = State.fix_t
   type m_err_t = State.m_err_t
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
@@ -202,7 +202,7 @@ struct
     State.to_assertions ?to_keep state
 
   let evaluate_slcmd (prog : 'a UP.prog) (lcmd : SLCmd.t) (bi_state : t) :
-      (t list, string) result =
+      (t list, err_t list) result =
     let procs, state, state_af = bi_state in
     Result.bind (State.evaluate_slcmd prog lcmd state) (fun x ->
         Ok (List.map (fun state' -> (procs, state', state_af)) x))
@@ -387,7 +387,8 @@ struct
       (bi_state : t)
       (x : string)
       (args : vt list)
-      (_ : (string * (string * vt) list) option) : (t * Flag.t) list =
+      (_ : (string * (string * vt) list) option) :
+      ((t * Flag.t) list, err_t list) result =
     (* let start_time = time() in *)
     L.(
       verbose (fun m ->
@@ -495,12 +496,12 @@ struct
            ret_states)
     in
     (* update_statistics "run_spec" (time() -. start_time); *)
-    result
+    Ok result
 
   let produce_posts (_ : t) (_ : st) (_ : Asrt.t list) : t list =
     raise (Failure "produce_posts from bi_state.")
 
-  let produce (_ : t) (_ : st) (_ : Asrt.t) : (t list, string) result =
+  let produce (_ : t) (_ : st) (_ : Asrt.t) : (t list, err_t list) result =
     raise (Failure "produce_posts from bi_state.")
 
   let unify_assertion (_ : t) (_ : st) (_ : UP.step) : u_res =

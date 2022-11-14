@@ -2,6 +2,7 @@ open Literal
 open BranchCase
 module L = Logging
 module DL = Debugger_log
+open Syntaxes.Result
 
 type branch_case = BranchCase.t [@@deriving yojson]
 
@@ -110,7 +111,12 @@ module type S = sig
 
   val call_graph : CallGraph.t
   val reset : unit -> unit
-  val evaluate_lcmds : annot UP.prog -> LCmd.t list -> state_t -> state_t list
+
+  val evaluate_lcmds :
+    annot UP.prog ->
+    LCmd.t list ->
+    state_t ->
+    (state_t list, state_err_t list) result
 
   val init_evaluate_proc :
     (result_t -> 'a) ->
@@ -539,7 +545,7 @@ struct
     @return List of states/predicate sets resulting from the evaluation
   *)
   let rec evaluate_lcmd (prog : annot UP.prog) (lcmd : LCmd.t) (state : State.t)
-      : State.t list =
+      : (State.t list, state_err_t list) result =
     print_lconfiguration lcmd state;
 
     let eval_expr = make_eval_expr state in
@@ -547,7 +553,7 @@ struct
     | AssumeType (e, t) -> (
         let v_x = eval_expr e in
         match State.assume_t state v_x t with
-        | Some state' -> [ state' ]
+        | Some state' -> Ok [ state' ]
         | _ ->
             Fmt.failwith
               "ERROR: AssumeType: Cannot assume type %s for expression %a."
@@ -572,23 +578,24 @@ struct
         (* Printf.printf "Considering the following disjuncts: %s\n" *)
         (* I commented the following, because it builds a string and discards it ? *)
         (* (String.concat "; " (List.map (fun (f, _) -> Formula.str f) fos));  *)
-        List.concat
-          (List.map
-             (fun (f'', state) ->
-               match State.assume_a state [ f'' ] with
-               | Some state' -> [ state' ]
-               | _ -> [])
-             fos)
+        Ok
+          (List.concat
+             (List.map
+                (fun (f'', state) ->
+                  match State.assume_a state [ f'' ] with
+                  | Some state' -> [ state' ]
+                  | _ -> [])
+                fos))
     | FreshSVar x ->
         let new_svar = Generators.fresh_svar () in
         let state' = State.add_spec_vars state (SS.singleton new_svar) in
         let v = Val.from_expr (LVar new_svar) |> Option.get in
-        [ update_store state' x v ]
+        Ok [ update_store state' x v ]
     | Assert f -> (
         let store_subst = Store.to_ssubst (State.get_store state) in
         let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
         match State.assert_a state [ f' ] with
-        | true -> [ state ]
+        | true -> Ok [ state ]
         | false ->
             let err = StateErr.EPure f' in
             let failing_model = State.sat_check_f state [ Not f' ] in
@@ -644,17 +651,17 @@ struct
         | Some (False, True) -> evaluate_lcmds prog lcmds_e state
         | Some (foe, nfoe) ->
             let state' = State.copy state in
-            let then_states =
-              Option.fold
-                ~some:(fun state -> evaluate_lcmds prog lcmds_t state)
-                ~none:[]
-                (State.assume_a state [ foe ])
+            let* then_states =
+              State.assume_a state [ foe ]
+              |> Option.fold
+                   ~some:(fun state -> evaluate_lcmds prog lcmds_t state)
+                   ~none:(Ok [])
             in
-            let else_states =
-              Option.fold
-                ~some:(fun state -> evaluate_lcmds prog lcmds_e state)
-                ~none:[]
-                (State.assume_a state' [ nfoe ])
+            let+ else_states =
+              State.assume_a state' [ nfoe ]
+              |> Option.fold
+                   ~some:(fun state -> evaluate_lcmds prog lcmds_e state)
+                   ~none:(Ok [])
             in
             then_states @ else_states
         | None ->
@@ -675,22 +682,23 @@ struct
             ~none:[]
             (State.assume_a state' [ Not fof ])
         in
-        state @ state'
-    | SL sl_cmd -> (
-        match State.evaluate_slcmd prog sl_cmd state with
-        | Ok result -> result
-        | Error msg -> L.fail msg)
+        Ok (state @ state')
+    | SL sl_cmd -> State.evaluate_slcmd prog sl_cmd state
 
   and evaluate_lcmds
       (prog : annot UP.prog)
       (lcmds : LCmd.t list)
-      (state : State.t) : State.t list =
+      (state : State.t) : (State.t list, state_err_t list) result =
     match lcmds with
-    | [] -> [ state ]
+    | [] -> Ok [ state ]
     | lcmd :: rest_lcmds ->
-        let rets = evaluate_lcmd prog lcmd state in
-        List.concat
-          (List.map (fun state -> evaluate_lcmds prog rest_lcmds state) rets)
+        let* rets = evaluate_lcmd prog lcmd state in
+        let+ next_rets =
+          rets
+          |> List_utils.map_results (fun state ->
+                 evaluate_lcmds prog rest_lcmds state)
+        in
+        List.concat next_rets
 
   (**
   Evaluation of commands
@@ -901,37 +909,52 @@ struct
                 let subst = eval_subst_list state subst in
                 L.verbose (fun fmt -> fmt "ABOUT TO USE THE SPEC OF %s" pid);
                 (* print_to_all ("\tStarting run spec: " ^ pid); *)
-                let rets : (State.t * Flag.t) list =
+                let rets : ((State.t * Flag.t) list, state_err_t list) result =
                   State.run_spec spec state x args subst
                 in
-                (* print_to_all ("\tFinished run spec: " ^ pid); *)
-                L.verbose (fun fmt ->
-                    fmt "Run_spec returned %d Results" (List.length rets));
-                let b_counter =
-                  if List.length rets > 1 then b_counter + 1 else b_counter
-                in
                 match rets with
-                | (ret_state, fl) :: rest_rets ->
-                    let others =
-                      List.map
-                        (fun (ret_state, fl) ->
-                          process_ret false ret_state fl b_counter None)
-                        rest_rets
+                | Ok rets -> (
+                    (* print_to_all ("\tFinished run spec: " ^ pid); *)
+                    L.verbose (fun fmt ->
+                        fmt "Run_spec returned %d Results" (List.length rets));
+                    let b_counter =
+                      if List.length rets > 1 then b_counter + 1 else b_counter
                     in
-                    process_ret true ret_state fl b_counter (Some others)
-                    :: others
-                (* Run spec returned no results *)
-                | _ -> (
-                    match spec.spec.spec_incomplete with
-                    | true ->
-                        L.normal (fun fmt ->
-                            fmt "Proceeding with symbolic execution.");
-                        symb_exec_proc ()
-                    | false ->
-                        L.fail
-                          (Format.asprintf
-                             "ERROR: Unable to use specification of function %s"
-                             spec.spec.spec_name))))
+                    match rets with
+                    | (ret_state, fl) :: rest_rets ->
+                        let others =
+                          List.map
+                            (fun (ret_state, fl) ->
+                              process_ret false ret_state fl b_counter None)
+                            rest_rets
+                        in
+                        process_ret true ret_state fl b_counter (Some others)
+                        :: others
+                    (* Run spec returned no results *)
+                    | _ -> (
+                        match spec.spec.spec_incomplete with
+                        | true ->
+                            L.normal (fun fmt ->
+                                fmt "Proceeding with symbolic execution.");
+                            symb_exec_proc ()
+                        | false ->
+                            L.fail
+                              (Format.asprintf
+                                 "ERROR: Unable to use specification of \
+                                  function %s"
+                                 spec.spec.spec_name)))
+                | Error errors ->
+                    let errors = errors |> List.map (fun e -> ExecErr.ESt e) in
+                    [
+                      ConfErr
+                        {
+                          callstack = cs;
+                          proc_idx = i;
+                          error_state = state;
+                          errors;
+                          branch_path;
+                        };
+                    ]))
         | None ->
             if Hashtbl.mem prog.prog.bi_specs pid then
               [
@@ -1175,33 +1198,44 @@ struct
                   ~prev_idx:i ~loop_ids ~next_idx:(i + 1)
                   ~branch_count:b_counter ())
               frames_and_states
-        | _ ->
-            let resulting_states : State.t list =
-              evaluate_lcmd prog lcmd state
-            in
-            let b_counter =
-              if List.length resulting_states > 1 then b_counter + 1
-              else b_counter
-            in
-            List.mapi
-              (fun ix state ->
-                let branch_case =
-                  if List.length resulting_states > 1 then Some (LCmd ix)
-                  else None
+        | _ -> (
+            match evaluate_lcmd prog lcmd state with
+            | Ok resulting_states ->
+                let b_counter =
+                  if List.length resulting_states > 1 then b_counter + 1
+                  else b_counter
                 in
-                let new_branches =
-                  match (ix, resulting_states) with
-                  | 0, _ :: rest ->
-                      Some
-                        (List.mapi
-                           (fun ix state -> (state, i, LCmd (ix + 1)))
-                           rest)
-                  | _ -> None
-                in
-                make_confcont ~state ~callstack:cs ~invariant_frames:iframes
-                  ~prev_idx:i ~loop_ids ~next_idx:(i + 1)
-                  ~branch_count:b_counter ?branch_case ?new_branches ())
-              resulting_states)
+                resulting_states
+                |> List.mapi (fun ix state ->
+                       let branch_case =
+                         if List.length resulting_states > 1 then Some (LCmd ix)
+                         else None
+                       in
+                       let new_branches =
+                         match (ix, resulting_states) with
+                         | 0, _ :: rest ->
+                             Some
+                               (List.mapi
+                                  (fun ix state -> (state, i, LCmd (ix + 1)))
+                                  rest)
+                         | _ -> None
+                       in
+                       make_confcont ~state ~callstack:cs
+                         ~invariant_frames:iframes ~prev_idx:i ~loop_ids
+                         ~next_idx:(i + 1) ~branch_count:b_counter ?branch_case
+                         ?new_branches ())
+            | Error errors ->
+                let errors = errors |> List.map (fun e -> ExecErr.ESt e) in
+                [
+                  ConfErr
+                    {
+                      callstack = cs;
+                      proc_idx = i;
+                      error_state = state;
+                      errors;
+                      branch_path;
+                    };
+                ]))
     (* Unconditional goto *)
     | Goto j ->
         [

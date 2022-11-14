@@ -10,7 +10,7 @@ module type S = sig
   type st = SVal.SESubst.t
 
   type c_fix_t
-  type err_t [@@deriving yojson]
+  type err_t [@@deriving yojson, show]
 
   (** Type of GIL general states *)
   type t [@@deriving yojson]
@@ -82,7 +82,7 @@ module Dummy : S with type init_data = unit = struct
   type vt = SVal.M.t
   type st = SVal.SESubst.t
   type c_fix_t = unit
-  type err_t = unit [@@deriving yojson]
+  type err_t = unit [@@deriving yojson, show]
   type t = unit [@@deriving yojson]
 
   type action_ret =

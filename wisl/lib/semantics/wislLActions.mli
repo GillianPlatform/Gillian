@@ -11,7 +11,7 @@ type ac =
   | Alloc
   | Dispose
 
-type ga = Cell | Bound | Freed [@@deriving yojson]
+type ga = Cell | Bound | Freed [@@deriving yojson, show]
 
 val str_ac : ac -> string
 val ac_from_str : string -> ac

@@ -10,7 +10,7 @@ type err =
   | MemoryLeak
   | OutOfBounds of (int option * string * Expr.t)
   | InvalidLocation
-[@@deriving yojson]
+[@@deriving yojson, show]
 
 val init : unit -> t
 val alloc : t -> int -> string

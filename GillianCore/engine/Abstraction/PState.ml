@@ -70,7 +70,7 @@ module Make
   type abs_t = Preds.abs_t
   type state_t = State.t
   type preds_t = Preds.t
-  type err_t = State.err_t [@@deriving yojson]
+  type err_t = State.err_t [@@deriving yojson, show]
   type fix_t = State.fix_t
   type m_err_t = State.m_err_t
 
@@ -734,8 +734,8 @@ module Make
                           let msg =
                             Fmt.str
                               "UNIFY INVARIANT FAILURE: %a\n\
-                               unable to produce variable bindings: %s." Asrt.pp
-                              a e
+                               unable to produce variable bindings: %a." Asrt.pp
+                              a (pp_list pp_err_t) e
                           in
                           L.fail msg)
                   states
@@ -782,11 +782,11 @@ module Make
             let frame_asrt = Asrt.star (to_assertions frame) in
             let full_subst = make_id_subst frame_asrt in
             match SUnifier.produce astate full_subst frame_asrt with
-            | Error msg ->
+            | Error errs ->
                 L.fail
                   (Format.asprintf
-                     "Unable to produce frame for loop %s, because of :\n%s" id
-                     msg)
+                     "Unable to produce frame for loop %s, because of :\n%a" id
+                     (pp_list pp_err_t) errs)
             | Ok l -> l
           in
           (* TODO: FIX THIS FOR MULTI-STATES *)
@@ -804,7 +804,7 @@ module Make
     @return List of states/predicate sets resulting from the evaluation
   *)
   let evaluate_slcmd (prog : 'a UP.prog) (lcmd : SLCmd.t) (astate : t) :
-      (t list, string) result =
+      (t list, err_t list) result =
     let state, _, _, _ = astate in
 
     let eval_expr e =
@@ -813,66 +813,73 @@ module Make
         raise (Internal_State_Error (errs, astate))
     in
 
-    let result =
+    let result : (t list, err_t list) result =
       match lcmd with
       | SymbExec -> failwith "Impossible: Untreated SymbExec"
       | Fold (pname, les, folding_info) -> (
           let () = L.verbose (fun fmt -> fmt "Folding predicate: %s\n" pname) in
           let pred = UP.get_pred_def prog.preds pname in
-          match pred.pred.pred_abstract with
-          | true ->
-              raise
-                (Failure
-                   (Format.asprintf "Impossible: Fold of abstract predicate %s"
-                      pname))
-          | false -> (
-              let vs = List.map eval_expr les in
-              let params = List.map (fun (x, _) -> x) pred.pred.pred_params in
-              let i_bindings =
-                Option.fold
-                  ~some:(fun (_, bindings) ->
-                    List.map (fun (x, e) -> (Expr.LVar x, eval_expr e)) bindings)
-                  ~none:[] folding_info
-              in
-              let param_bindings =
-                if List.length params = List.length vs then
-                  List.combine params vs
-                else List.combine (Pred.in_params pred.pred) vs
-              in
-              let param_bindings =
-                List.map (fun (x, v) -> (Expr.PVar x, v)) param_bindings
-              in
-              let subst = ESubst.init (i_bindings @ param_bindings) in
-              match SUnifier.unify astate subst pred.up LogicCommand with
-              | UPUSucc [ (astate', subst', _) ] ->
-                  let _, preds', _, _ = astate' in
-                  let arg_vs =
-                    if List.length params = List.length vs then vs
-                    else
-                      let out_params = Pred.out_params pred.pred in
-                      let vs_outs =
-                        List.map
-                          (fun x ->
-                            let v_x = ESubst.get subst' (PVar x) in
-                            match v_x with
-                            | Some v_x -> v_x
-                            | None ->
-                                raise (Failure "DEATH. evaluate_slcmd. fold"))
-                          out_params
-                      in
-                      Pred.combine_ins_outs pred.pred vs vs_outs
-                  in
-                  Preds.extend ~pure:pred.pred.pred_pure preds' (pname, arg_vs);
-                  Ok [ astate' ]
-              | _ ->
-                  let msg =
-                    Fmt.str
-                      "@[<h>IMPOSSIBLE FOLD for %s(%a) with folding_info: %a@]"
-                      pname
-                      Fmt.(list ~sep:comma Val.pp)
-                      vs SLCmd.pp_folding_info folding_info
-                  in
-                  raise (Failure msg)))
+          if pred.pred.pred_abstract then
+            raise
+              (Failure
+                 (Format.asprintf "Impossible: Fold of abstract predicate %s"
+                    pname))
+          else
+            let vs = List.map eval_expr les in
+            let params = List.map (fun (x, _) -> x) pred.pred.pred_params in
+            let i_bindings =
+              Option.fold
+                ~some:(fun (_, bindings) ->
+                  List.map (fun (x, e) -> (Expr.LVar x, eval_expr e)) bindings)
+                ~none:[] folding_info
+            in
+            let param_bindings =
+              if List.length params = List.length vs then List.combine params vs
+              else List.combine (Pred.in_params pred.pred) vs
+            in
+            let param_bindings =
+              List.map (fun (x, v) -> (Expr.PVar x, v)) param_bindings
+            in
+            let subst = ESubst.init (i_bindings @ param_bindings) in
+            match SUnifier.unify astate subst pred.up LogicCommand with
+            | UPUSucc [] ->
+                let msg =
+                  Fmt.str
+                    "@[<h>HORROR: fold vanished for %s(%a) with folding_info: \
+                     %a@]"
+                    pname
+                    Fmt.(list ~sep:comma Val.pp)
+                    vs SLCmd.pp_folding_info folding_info
+                in
+                failwith msg
+            | UPUSucc succs ->
+                let astates =
+                  succs
+                  |> List.map (fun (astate', subst', _) ->
+                         let _, preds', _, _ = astate' in
+                         let arg_vs =
+                           if List.length params = List.length vs then vs
+                           else
+                             let out_params = Pred.out_params pred.pred in
+                             let vs_outs =
+                               List.map
+                                 (fun x ->
+                                   let v_x = ESubst.get subst' (PVar x) in
+                                   match v_x with
+                                   | Some v_x -> v_x
+                                   | None ->
+                                       raise
+                                         (Failure "DEATH. evaluate_slcmd. fold"))
+                                 out_params
+                             in
+                             Pred.combine_ins_outs pred.pred vs vs_outs
+                         in
+                         Preds.extend ~pure:pred.pred.pred_pure preds'
+                           (pname, arg_vs);
+                         astate')
+                in
+                Ok astates
+            | UPUFail e -> Error e)
       | Unfold (pname, les, unfold_info, b) -> (
           let pred = UP.get_pred_def prog.preds pname in
           match pred.pred.pred_abstract with
@@ -1094,7 +1101,7 @@ module Make
                                  produce variable bindings."
                                 Asrt.pp a
                             in
-                            Error msg)
+                            Error [ StateErr.EOther msg ])
                   | UPUSucc _ ->
                       raise
                         (Exceptions.Unsupported
@@ -1158,10 +1165,7 @@ module Make
                          let _, astates = simplify ~unification:true astate in
                          astates)
                        rets)
-              | Error _ ->
-                  Error
-                    (Format.asprintf "Cannot apply lemma %s in state\n%a" lname
-                       pp astate)))
+              | Error e -> Error e))
       | Invariant _ ->
           raise
             (Failure "Invariant must be treated by the unify_invariant function")
@@ -1176,23 +1180,15 @@ module Make
       (astate : t)
       (x : string)
       (args : vt list)
-      (subst : (string * (string * vt) list) option) : (t * Flag.t) list =
-    let results =
-      match subst with
-      | None ->
-          run_spec_aux spec.spec.spec_name spec.spec.spec_params spec.up astate
-            (Some x) args
-      | Some (_, subst_lst) ->
-          run_spec_aux ~existential_bindings:subst_lst spec.spec.spec_name
-            spec.spec.spec_params spec.up astate (Some x) args
-    in
-    match results with
-    | Ok results -> results
-    | Error _ ->
-        L.normal (fun fmt ->
-            fmt "WARNING: Unable to use specification of function %s"
-              spec.spec.spec_name);
-        []
+      (subst : (string * (string * vt) list) option) :
+      ((t * Flag.t) list, err_t list) result =
+    match subst with
+    | None ->
+        run_spec_aux spec.spec.spec_name spec.spec.spec_params spec.up astate
+          (Some x) args
+    | Some (_, subst_lst) ->
+        run_spec_aux ~existential_bindings:subst_lst spec.spec.spec_name
+          spec.spec.spec_params spec.up astate (Some x) args
 
   let unify
       (astate : t)
@@ -1232,7 +1228,8 @@ module Make
     let state, _, _, _ = astate in
     State.clean_up state
 
-  let produce (astate : t) (subst : st) (a : Asrt.t) : (t list, string) result =
+  let produce (astate : t) (subst : st) (a : Asrt.t) :
+      (t list, err_t list) result =
     SUnifier.produce astate subst a
 
   let unify_assertion (astate : t) (subst : st) (step : UP.step) : u_res =
