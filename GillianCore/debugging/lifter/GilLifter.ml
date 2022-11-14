@@ -131,7 +131,7 @@ module Make
             ("prev_id", rid_to_yojson prev_id);
             ("branch_case", opt_to_yojson branch_case_to_yojson branch_case);
           ])
-        ("handle_cmd: " ^ s)
+        ("GilLifter.handle_cmd: " ^ s)
     in
     let map =
       match Hashtbl.find_opt id_map prev_id with
