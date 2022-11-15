@@ -134,6 +134,12 @@
       }
     },
     "menus": {
+      "debug/toolBar": [
+        {
+          "command": "extension.gillian-debug.showDebuggerWebview",
+          "when": "debugType == gillian"
+        }
+      ],
       "editor/title/run": [
         {
           "command": "extension.gillian-debug.runEditorContents",
@@ -208,7 +214,8 @@
       },
       {
         "command": "extension.gillian-debug.showDebuggerWebview",
-        "title": "Show Gillian debugger panel"
+        "title": "Show Gillian debugger panel",
+        "icon": "$(window)"
       }
     ],
     "breakpoints": [
