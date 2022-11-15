@@ -78,6 +78,7 @@ let of_binop b =
   | WBinOp.AND | WBinOp.OR -> (WBool, WBool, WBool)
   | WBinOp.LSTCONS -> (WAny, WList, WList)
   | WBinOp.LSTCAT -> (WList, WList, WList)
+  | WBinOp.LSTNTH -> (WList, WInt, WAny)
   | WBinOp.PLUS | WBinOp.MINUS -> (WAny, WAny, WAny)
 
 (* TODO: improve this, because we can add Ints AND Pointers *)

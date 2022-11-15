@@ -16,6 +16,7 @@ type t =
   | LSTCONS
   (* list construction a::l, only for logic *)
   | LSTCAT
+  | LSTNTH
 
 (* list concatenation, only for logic *)
 
@@ -37,6 +38,7 @@ let pp fmt b =
   | NEQ -> s "!="
   | LSTCAT -> s "@"
   | LSTCONS -> s "::"
+  | LSTNTH -> s "lnth"
 
 let str = Format.asprintf "%a" pp
 

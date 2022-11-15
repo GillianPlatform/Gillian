@@ -101,6 +101,7 @@ rule read =
   | "&&"     { AND }
   | "||"     { OR }
   | "!="     { NEQ }
+  | "lnth"   { LSTNTH }
   (* unary operators *)
   | "not"    { NOT (curr lexbuf) }
   | "emp"    { EMP (curr lexbuf) }

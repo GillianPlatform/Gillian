@@ -52,6 +52,7 @@
 %token NEQ             /* != */
 %token LSTCONS         /* :: */
 %token LSTCAT          /* @ */
+%token LSTNTH          /* lnth */
 
 (* Unary operators *)
 %token <CodeLoc.t> NOT HEAD TAIL REV LEN SUB
@@ -291,7 +292,7 @@ binop:
   | MOD          { WBinOp.MOD }
   | AND          { WBinOp.AND }
   | OR           { WBinOp.OR }
-  | NEQ          { WBinOp.NEQ}
+  | NEQ          { WBinOp.NEQ }
 
 unop_with_loc:
   | loc = NOT  { (loc, WUnOp.NOT) }
@@ -583,6 +584,7 @@ logic_binop:
   | b = binop { b }
   | LSTCONS { WBinOp.LSTCONS }
   | LSTCAT { WBinOp.LSTCAT }
+  | LSTNTH { WBinOp.LSTNTH }
 
 logic_value_with_loc:
   | lv = value_with_loc { lv }

@@ -42,6 +42,7 @@ let compile_binop b =
     | MOD -> BinOp.IMod
     | AND -> BinOp.BAnd
     | OR -> BinOp.BOr
+    | LSTNTH -> BinOp.LstNth
     (* operators that do not exist in gil are compiled separately *)
     | _ ->
         failwith
