@@ -1,9 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import { ReactFlowProvider } from 'react-flow-renderer';
 import App from './App';
 import useDebugStore from './store';
 import './vscode.css';
 import VSCodeAPI from './VSCodeAPI';
+import * as events from './events';
 
 VSCodeAPI.onMessage(e => {
   const message = e.data;
@@ -30,6 +32,8 @@ VSCodeAPI.onMessage(e => {
 
   if (message.type === 'unify_update') {
     store.loadUnification(message.unifyId, message.unifyMap);
+  } else if (message.type === 'reset_view') {
+    events.publish('resetView');
   }
 });
 
