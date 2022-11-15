@@ -515,10 +515,14 @@ struct
                   (Some prev_id, branch_case)
               | None -> (prev_id, branch_case)
             in
-            (match prev_id with
-            | Some prev_id ->
+            (match (state.map, prev_id) with
+            | Nothing, _ -> state.map <- new_cmd ~parent:None ()
+            | _, Some prev_id ->
                 insert_new_cmd new_cmd id prev_id branch_case state
-            | None -> state.map <- new_cmd ~parent:None ());
+            | _, _ ->
+                failwith
+                  "HORROR - tried to insert to non-Nothing map without \
+                   previous id!");
             Stop)
 
   let init_opt proc_name tl_ast exec_data =
