@@ -194,7 +194,7 @@ const TreeMapView = <M, D, A>({
     });
 
     if (submap !== undefined) {
-      buildNodes(submap, xOffset + submapXOffset + NODE_PAD);
+      buildNodes(submap, x + submapXOffset + NODE_PAD);
     }
 
     nexts.forEach(next => {
