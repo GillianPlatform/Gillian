@@ -60,7 +60,7 @@ const ExecMapView = ({ state }: Props) => {
 
     if (map[0] == 'Nothing') {
       if (parent === undefined) {
-        throw '\'Nothing\' node has no parent!';
+        throw '`Nothing` node has no parent!';
       }
       return {
         id: `empty${emptyCount++}`,

@@ -84,7 +84,7 @@ const TreeMapView = <M, D, A>({
     return () => {
       events.unsubscribe('resetView');
     };
-  }, [reactFlowInstance])
+  }, [reactFlowInstance]);
   const nodeTypes = { customNode: nodeComponent };
 
   const edges: Edge[] = [];
@@ -228,6 +228,6 @@ const TreeMapViewWrap = <M, D, A>(props: Props<M, D, A>) => (
   <ReactFlowProvider>
     <TreeMapView {...props} />
   </ReactFlowProvider>
-)
+);
 
 export default TreeMapViewWrap;

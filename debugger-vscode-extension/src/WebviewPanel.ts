@@ -37,7 +37,7 @@ export class WebviewPanel {
   public static render(extensionUri: vscode.Uri) {
     if (WebviewPanel.currentPanel) {
       WebviewPanel.currentPanel._panel.reveal(vscode.ViewColumn.Beside);
-      WebviewPanel.currentPanel.sendMessage({ type: 'reset_view' })
+      WebviewPanel.currentPanel.sendMessage({ type: 'reset_view' });
     } else {
       const panel = vscode.window.createWebviewPanel(
         'gillian-debug',

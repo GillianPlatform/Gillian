@@ -1,22 +1,24 @@
 import { debug, DebugConfiguration, DebugSession, window } from 'vscode';
 
-let debugSession : DebugSession | null = null;
+let debugSession: DebugSession | null = null;
 let isDebugStarting = false;
 
-debug.onDidStartDebugSession((session) => {
-  debugSession = session
+debug.onDidStartDebugSession(session => {
+  debugSession = session;
 });
 
 debug.onDidTerminateDebugSession(() => {
-  debugSession = null
+  debugSession = null;
 });
 
-
 async function checkForExistingDebugSession() {
-  if (debugSession === null)
-    return true;
-  const response = await window.showInformationMessage("Only one Gillian debugger can run at a time.\nTerminate old session and continue?", "OK", "Cancel")
-  if (response === "OK") {
+  if (debugSession === null) return true;
+  const response = await window.showInformationMessage(
+    'Only one Gillian debugger can run at a time.\nTerminate old session and continue?',
+    'OK',
+    'Cancel'
+  );
+  if (response === 'OK') {
     await debug.stopDebugging(debugSession);
     return true;
   }
@@ -27,13 +29,11 @@ export async function startDebugging(
   config: DebugConfiguration,
   noDebug = false
 ) {
-  if (isDebugStarting)
-    return;
+  if (isDebugStarting) return;
   isDebugStarting = true;
   try {
     const canContinue = await checkForExistingDebugSession();
-    if (!canContinue)
-      return;
+    if (!canContinue) return;
     const validInputs = new Set(['wisl', 'js', 'c']);
     const validateInput = (input: string) => {
       if (!validInputs.has(input)) {
