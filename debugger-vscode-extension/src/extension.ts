@@ -8,7 +8,7 @@ import * as vscode from 'vscode';
 import { ProviderResult } from 'vscode';
 import { activateCodeLens } from './activateCodeLens';
 import { activateDebug } from './debug';
-import * as vscodeVariables from 'vscode-variables';
+import vscodeVariables from './vscodeVariables';
 
 export function activate(context: vscode.ExtensionContext) {
   activateDebug(context, new DebugAdapterExecutableFactory());
@@ -69,6 +69,7 @@ class DebugAdapterExecutableFactory
     }
 
     const config = vscode.workspace.getConfiguration('gillianDebugger');
+    console.log('Configuring debugger...', { config });
 
     let args = ['debugverify', '-r', 'db'];
     if (config.useManualProof) {
@@ -81,21 +82,21 @@ class DebugAdapterExecutableFactory
       cwd = expandPath(config.outputDirectory || '~/.gillian');
       let binDirectory = config.binDirectory;
       if (!binDirectory)
-        throw 'Please specify the location of Gillian binaries'
+        throw 'Please specify the location of Gillian binaries';
       binDirectory = expandPath(binDirectory);
       vscode.workspace.fs.createDirectory(vscode.Uri.file(cwd));
       cmd = `${binDirectory}/${langCmd}`;
     } else {
       let sourceDirectory = config.sourceDirectory;
       if (!sourceDirectory)
-        throw 'Please specify the location of Gillian source code'
+        throw 'Please specify the location of Gillian source code';
       sourceDirectory = expandPath(sourceDirectory);
       cwd = sourceDirectory;
       cmd = 'esy';
       args = ['x', langCmd].concat(args);
     }
 
-    console.log('about to start debugger!', { cmd, args, cwd, config });
+    console.log('Starting debugger...', { cmd, args, cwd });
     const options = { cwd };
     executable = new vscode.DebugAdapterExecutable(cmd, args, options);
 
