@@ -15,7 +15,6 @@
   "engines": {
     "vscode": "^1.54.0"
   },
-  "icon": "TODO",
   "categories": [
     "Debuggers"
   ],
@@ -90,11 +89,13 @@
     "react-error-boundary": "^3.1.4",
     "react-flow-renderer": "^10.3.5",
     "ts-debounce": "^3.0.0",
+    "vscode-variables": "^0.1.3",
     "yup": "^0.32.9",
     "zod": "^3.0.0-alpha.33",
     "zustand": "^3.3.3"
   },
   "main": "./out/extension.js",
+  "extensionDependencies": [ "gillian.code-gillian" ],
   "babel": {
     "presets": [
       "@babel/preset-env",
@@ -116,15 +117,35 @@
   ],
   "contributes": {
     "configuration": {
-      "title": "gillian-debugger",
+      "title": "Gillian Debugger",
       "properties": {
-        "gillianDebugger.gillianSourceRepository": {
-          "type": [
-            "string",
-            "null"
+        "gillianDebugger.outputDirectory": {
+          "type": "string",
+          "default": "~/.gillian",
+          "description": "Gillian's output directory, i.e. where logs will be stored."
+        },
+        "gillianDebugger.runMode": {
+          "type": "string",
+          "enum": [
+            "installed",
+            "source"
           ],
-          "default": null,
-          "description": "Specifies the path to the Gillian source repository used to execute/debug a program."
+          "default": "source",
+          "enumDescriptions": [
+            "Run installed Gillian binaries",
+            "Run Gillian from source, using esy"
+          ],
+          "description": "Specifies how to run Gillian."
+        },
+        "gillianDebugger.binDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "The location of the Gillian binaries, if you're using installed Gillian."
+        },
+        "gillianDebugger.sourceDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "The location of the Gillian source code, if you're running from source."
         },
         "gillianDebugger.useManualProof": {
           "type": "boolean",

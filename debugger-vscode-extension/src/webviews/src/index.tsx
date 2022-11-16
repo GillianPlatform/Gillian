@@ -1,6 +1,5 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { ReactFlowProvider } from 'react-flow-renderer';
 import App from './App';
 import useDebugStore from './store';
 import './vscode.css';
