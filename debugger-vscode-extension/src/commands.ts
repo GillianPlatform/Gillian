@@ -12,6 +12,7 @@ debug.onDidTerminateDebugSession(() => {
 });
 
 async function checkForExistingDebugSession() {
+  if (!debug.activeDebugSession) debugSession = null;
   if (debugSession === null) return true;
   const response = await window.showInformationMessage(
     'Only one Gillian debugger can run at a time.\nTerminate old session and continue?',
