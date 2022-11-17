@@ -1,11 +1,13 @@
 {
-  "name": "gillian-debugger",
-  "displayName": "Gillian Debugger",
-  "version": "0.0.1",
-  "description": "Debugger for Gillian.",
+  "name": "gillian-debugger-unofficial",
+  "displayName": "Gillian Debugger (Unofficial)",
+  "version": "0.0.5",
+  "description": "(Unofficial) Debugger for Gillian.\n\nMade for a 2022 student lab, for the Scalable Software Engineering course at Imperial",
+  "preview": true,
+  "publisher": "natkarmios-icl",
   "author": {
-    "name": "Verified Trustworthy Software Specification Group at Imperial College",
-    "url": "https://vtss.doc.ic.ac.uk"
+    "name": "Nat Karmios",
+    "url": "https://github.com/natkarmios"
   },
   "homepage": "GillianDev.github.io",
   "license": "BSD-3-Clause",
