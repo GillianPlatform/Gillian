@@ -89,3 +89,6 @@ javert-test262
 
 # Temporary databases for logs
 *.db
+
+# Built docs
+_docs

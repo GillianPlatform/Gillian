@@ -51,6 +51,14 @@
   },
   "scripts": {
     "format-check": "dune build @fmt",
+    "odoc": "sh -c \"esy x dune build @doc && ./scripts/sync_odoc.sh > /dev/null\"",
+    "odoc:watch:build": "dune build @doc --watch",
+    "odoc:watch:sync": "./scripts/watch_odoc.sh > /dev/null",
+    "odoc:watch": "concurrently \"esy odoc:watch:build\" \"esy odoc:watch:sync\"",
+    "sphinx": "sh -c \"sphinx-build sphinx _docs/sphinx/ \"",
+    "sphinx:watch": "sh -c \"sphinx-autobuild sphinx _docs/sphinx/ \"",
+    "docs": "./scripts/build_docs.sh",
+    "docs:watch": "concurrently \"esy odoc:watch:build\" \"esy odoc:watch:sync\" \"esy sphinx:watch\"",
     "format": "dune build @fmt --auto-promote",
     "js:init:env": "Gillian-JS/scripts/setup_environment.sh",
     "c:init:env": "Gillian-C/scripts/setup_environment.sh",
@@ -92,7 +100,8 @@
     "@opam/ocaml-lsp-server": "1.12.2",
     "@opam/odoc": "*",
     "@opam/ocamlformat": "0.20.1",
-    "@opam/ocamlfind": "*"
+    "@opam/ocamlfind": "*",
+    "concurrently": "^7.6.0"
   },
   "resolutions": {
     "@opam/conf-sqlite3":
