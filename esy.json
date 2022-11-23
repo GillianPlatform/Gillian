@@ -64,11 +64,11 @@
     "odoc": "sh -c \"esy x dune build @doc && ./scripts/sync_odoc.sh > /dev/null\"",
     "odoc:watch:build": "dune build @doc --watch",
     "odoc:watch:sync": "./scripts/watch_odoc.sh > /dev/null",
-    "odoc:watch": "concurrently \"esy odoc:watch:build\" \"esy odoc:watch:sync\"",
+    "odoc:watch": "concurrently -p none \"esy odoc:watch:build\" \"esy odoc:watch:sync\"",
     "sphinx": "sh -c \"sphinx-build sphinx _docs/sphinx/ \"",
     "sphinx:watch": "sh -c \"sphinx-autobuild sphinx _docs/sphinx/ \"",
     "docs": "./scripts/build_docs.sh",
-    "docs:watch": "concurrently \"esy odoc:watch:build\" \"esy odoc:watch:sync\" \"esy sphinx:watch\""
+    "docs:watch": "concurrently -n odoc,odoc-sync,sphinx -c cyan,blue,yellow \"esy odoc:watch:build\" \"esy odoc:watch:sync\" \"esy sphinx:watch\""
   },
   "dependencies": {
     "@opam/alcotest": "1.0.1",

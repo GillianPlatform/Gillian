@@ -13,7 +13,7 @@ from typing import Tuple
 
 from docutils import nodes
 
-GILLIAN_HOME = '../'
+GILLIAN_HOME = './'
 ODOC_BUILD_DIR = '_docs/odoc/'
 ODOC_PATH = 'odoc/'
 OPAM_CACHE = None
@@ -30,8 +30,8 @@ def setup(app):
     if OPAM_CACHE is not None:
         raise ValueError('package_role: opam cache already set!!!')
     OPAM_CACHE = {}
-    for path, _, files in os.walk('..'):
-        if re.match("^../_opam/", path):
+    for path, _, files in os.walk('.'):
+        if re.match("^./_opam/", path):
             continue
         for file in files:
             parts = re.match("^([^/]*)[.]opam$", file)
