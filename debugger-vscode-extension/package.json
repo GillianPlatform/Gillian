@@ -27,16 +27,16 @@
     "url": "https://github.com/GillianPlatform/Gillian/issues"
   },
   "scripts": {
-    "vscode:prepublish": "run-s clean compile",
+    "extension:build": "webpack",
+    "extension:watch": "tsc -watch -p ./",
+    "webview:build": "TAILWIND_MODE='build' snowpack build",
+    "webview:watch": "nodemon --watch src/webviews/ -e 'ts,tsx,css' --exec snowpack build",
+    "build": "run-s extension:build webview:build",
+    "watch": "run-p extension:watch webview:watch",
     "clean": "rm -rf out dist",
-    "compile": "run-s webpack:build webview:build",
     "lint": "eslint . --ext .ts,.tsx",
-    "watch": "tsc -watch -p ./",
     "format": "prettier --write **/*.ts **/*.tsx",
-    "dev": "nodemon --watch src/webviews/ -e 'ts,tsx,css' --exec snowpack build",
-    "build": "TAILWIND_MODE='build' snowpack build",
-    "webpack:build": "webpack",
-    "webview:build": "TAILWIND_MODE='build' snowpack build"
+    "vscode:prepublish": "run-s clean compile"
   },
   "devDependencies": {
     "@babel/core": "^7.13.14",
