@@ -1,20 +1,29 @@
-type expansion_kind = NoExpansion | Proc of string [@@deriving yojson]
+type nest_kind =
+  | NoNest  (** This command doesn't contain a nest *)
+  | Proc of string
+      (** This command "nests" the execution of another (named) procedure *)
+[@@deriving yojson]
+
+type stmt_end_kind = NotEnd | EndNormal | EndWithBranch of WBranchCase.t
+[@@deriving yojson]
+
+(** How does this command map to a WISL statment? *)
+type stmt_kind =
+  | Single  (** A command that maps one-to-one with a WISL statement *)
+  | LoopPrefix  (** A command in the prefix of a loop body function *)
+  | Multi of stmt_end_kind
+      (** A command that makes up part of a WISL statement, and whether this is the last cmd of said statement *)
+[@@deriving yojson]
 
 type t = {
   origin_loc : Gil_syntax.Location.t option;
       (** Better not to know what this is for *)
   origin_id : int option;  (** Origin Id, that should be abstracted away *)
   loop_info : string list;
-  expansion_kind : expansion_kind; [@default NoExpansion]
-      (** Does this command expand (i.e. calling a loop body proc)? If so, how? *)
+  stmt_kind : stmt_kind; [@default Single]
+  nest_kind : nest_kind; [@default NoNest]
   is_hidden : bool; [@default false]
       (** Should this command be hidden when debugging? *)
-  is_loop_prefix : bool; [@default false]
-      (** Marks commands before the start of a loop body *)
-  is_end_of_cmd : bool; [@default false]
-      (** Marks the final command in a sequence of commands originating from one WISL statement *)
-  is_return : bool; [@default false]
-      (** Marks commands that are part of the return sequence *)
 }
 [@@deriving yojson, make]
 

@@ -14,7 +14,7 @@ module ALoc : Allocators.S with type t = string
 module Var : sig
   (** GIL Variables *)
 
-  type t = string [@@deriving yojson]
+  type t = string [@@deriving yojson, show]
 
   module Set : module type of Containers.SS
 
@@ -53,7 +53,7 @@ module Type : sig
     | ListType  (** Type of lists *)
     | TypeType  (** Type of types *)
     | SetType  (** Type of sets *)
-  [@@deriving yojson, eq]
+  [@@deriving yojson, eq, show]
 
   (** Printer *)
   val str : t -> string

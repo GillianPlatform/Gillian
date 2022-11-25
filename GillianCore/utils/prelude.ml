@@ -150,6 +150,13 @@ module Hashset = struct
   let to_seq (h : 'a t) : 'a Seq.t = Hashtbl.to_seq_keys h
 end
 
+module Stack = struct
+  include Stack
+
+  let to_yojson elem_to_yojson (s : 'a t) : Yojson.Safe.t =
+    `List (to_seq s |> Seq.map elem_to_yojson |> List.of_seq)
+end
+
 module SS = Containers.SS
 module SI = Containers.SI
 module SN = Containers.SN

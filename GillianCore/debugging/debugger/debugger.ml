@@ -440,6 +440,7 @@ struct
               "Debugger: don't know how to handle report of type '%s'!" t)
 
   let unify result proc_name prev_id dbg =
+    let open Verification.SUnifier.Logging in
     match dbg.tests |> List.assoc_opt proc_name with
     | None ->
         DL.failwith
@@ -447,27 +448,37 @@ struct
             let tests_json = Verification.proc_tests_to_yojson dbg.tests in
             [ ("tests", tests_json) ])
           (Fmt.str "No test found for proc `%s`!" proc_name)
-    | Some test -> (
-        match L.LogQueryer.get_unify_for prev_id with
-        | Some _ ->
-            DL.log (fun m ->
-                m "Unification for %a already exists; skipping unify" pp_rid
-                  prev_id);
-            None
-        | None ->
-            DL.log (fun m -> m "Unifying result for %a" pp_rid prev_id);
-            let success =
-              Verification.Debug.analyse_result test prev_id result
-            in
-            let+ id, content = L.LogQueryer.get_unify_for prev_id in
-            let unify_report =
-              content |> Yojson.Safe.from_string
-              |> Verification.SUnifier.Logging.UnifyReport.of_yojson
-              |> Result.get_ok
-            in
-            let kind = unify_report.unify_kind in
-            let result = if success then Success else Failure in
-            (id, kind, result))
+    | Some test ->
+        let+ id, content, success =
+          match L.LogQueryer.get_unify_for prev_id with
+          | Some (id, content) ->
+              let success =
+                L.LogQueryer.get_unify_results id
+                |> List.exists (fun (_, content) ->
+                       let result =
+                         content |> Yojson.Safe.from_string
+                         |> UnifyResultReport.of_yojson |> Result.get_ok
+                       in
+                       match result with
+                       | Success _ -> true
+                       | Failure _ -> false)
+              in
+              Some (id, content, success)
+          | None ->
+              DL.log (fun m -> m "Unifying result for %a" pp_rid prev_id);
+              let success =
+                Verification.Debug.analyse_result test prev_id result
+              in
+              let+ id, content = L.LogQueryer.get_unify_for prev_id in
+              (id, content, success)
+        in
+        let unify_report =
+          content |> Yojson.Safe.from_string |> UnifyReport.of_yojson
+          |> Result.get_ok
+        in
+        let kind = unify_report.unify_kind in
+        let result = if success then Success else Failure in
+        (id, kind, result)
 
   let show_result_errors = function
     | ExecRes.RSucc _ -> []
@@ -503,13 +514,13 @@ struct
         | Finished _ ->
             state.cont_func <- None;
             failwith "HORROR: Shouldn't encounter Finished when debugging!"
-        | EndOfBranch (result, cont_func) ->
+        | EndOfBranch (result, cont_func) -> (
             state.cont_func <- Some cont_func;
             let prev =
               let+ content, type_ = L.LogQueryer.get_report prev_id_in_frame in
               (prev_id_in_frame, content, type_)
             in
-            (match prev with
+            match prev with
             | Some (prev_id, content, type_) when type_ = ContentType.cmd -> (
                 let prev_prev_id =
                   L.LogQueryer.get_previous_report_id prev_id |> Option.get
@@ -533,25 +544,21 @@ struct
                   |> Lifter.handle_cmd prev_prev_id cmd.branch_case exec_data
                 in
                 match handler_result with
-                | Stop -> ()
-                | _ ->
+                | ExecNext (id, branch_case) ->
                     DL.log (fun m ->
-                        m
-                          ~json:
-                            [
-                              ( "handler_result",
-                                Lift.handle_cmd_result_to_yojson handler_result
-                              );
-                              ("lifter_state", Lifter.dump state.lifter_state);
-                            ]
-                          "HORROR: Lifter didn't give Stop for Final cmd!"))
+                        m "EXEC NEXT (%a, %a)" (pp_option pp_rid) id
+                          (pp_option BranchCase.pp) branch_case);
+                    let id = id |> Option.get in
+                    execute_step id ?branch_case dbg state
+                | Stop ->
+                    DL.log (fun m -> m "STOP (end)");
+                    (ReachedEnd, None))
             | Some (prev_id, _, type_) ->
                 Fmt.failwith "EndOfBranch: prev cmd (%a) is '%s', not '%s'!"
                   pp_rid prev_id type_ ContentType.cmd
             | None ->
                 Fmt.failwith "EndOfBranch: prev id '%a' doesn't exist!" pp_rid
-                  prev_id_in_frame);
-            (ReachedEnd, None)
+                  prev_id_in_frame)
         | Continue (cur_report_id, branch_path, new_branch_cases, cont_func)
           -> (
             match cur_report_id with
@@ -637,10 +644,49 @@ struct
     let { cfg; _ } = dbg in
     let report_state = L.ReportState.clone cfg.report_state_base in
     let open Verification.SAInterpreter in
-    let rec aux = function
+    let rec aux prev_id = function
       | Finished _ ->
           Error "HORROR: Shouldn't encounter Finished when debugging!"
-      | EndOfBranch _ -> Error "Nothing to run"
+      | EndOfBranch (result, cont_func) -> (
+          match prev_id with
+          | None -> Error "Nothing to run"
+          | Some prev_id ->
+              let lifter_state, _ =
+                let prev_content, _ =
+                  L.LogQueryer.get_report prev_id |> Option.get
+                in
+                let cmd =
+                  prev_content |> Yojson.Safe.from_string
+                  |> Logging.ConfigReport.of_yojson |> Result.get_ok
+                in
+                let exec_data =
+                  let unifys =
+                    unify result proc_name prev_id cfg |> Option.to_list
+                  in
+                  let errors = show_result_errors result in
+                  Lift.make_executed_cmd_data ExecMap.Final prev_id cmd ~unifys
+                    ~errors []
+                in
+                Lifter.init proc_name cfg.tl_ast exec_data
+              in
+              let state =
+                {
+                  cont_func = Some cont_func;
+                  breakpoints = Hashtbl.create 0;
+                  cur_report_id = prev_id;
+                  top_level_scopes;
+                  frames = [];
+                  variables = Hashtbl.create 0;
+                  errors = [];
+                  cur_cmd = None;
+                  proc_name = None;
+                  unify_maps = [];
+                  lifter_state;
+                  report_state;
+                }
+              in
+              state |> update_report_id_and_inspection_fields prev_id cfg;
+              Ok (state, ReachedEnd))
       | Continue (cur_report_id, branch_path, new_branch_cases, cont_func) -> (
           match cur_report_id with
           | None ->
@@ -652,7 +698,21 @@ struct
               let content, type_ = Option.get @@ L.LogQueryer.get_report id in
               if type_ = ContentType.proc_init then (
                 DL.log (fun m -> m "Debugger.launch: Skipping proc_init...");
-                aux (cont_func ~path:[] ()))
+                aux (Some id) (cont_func ~path:[] ()))
+              else if
+                L.LogQueryer.get_cmd_results id
+                |> List.for_all (fun (_, content) ->
+                       let result =
+                         content |> Yojson.Safe.from_string
+                         |> Logging.CmdResult.of_yojson |> Result.get_ok
+                       in
+                       result.errors <> [])
+              then (
+                DL.log (fun m ->
+                    m
+                      "Init: no results for cmd (or all results have error); \
+                       assuming eob, stepping again...");
+                aux (Some id) (cont_func ~path:[] ()))
               else
                 let cmd =
                   Result.get_ok
@@ -713,7 +773,7 @@ struct
              Verification.verify_up_to_procs ~init_data:cfg.init_data ~proc_name
                cfg.prog
            in
-           aux cont_func)
+           aux None cont_func)
 
   let launch file_name proc_name =
     Fmt_tty.setup_std_outputs ();

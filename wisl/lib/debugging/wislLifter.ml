@@ -9,11 +9,10 @@ open Syntaxes.Option
 module ExtList = Utils.ExtList
 module Annot = WParserAndCompiler.Annot
 open Annot
+open WBranchCase
 open Debugger.Lifter
 
 type rid = L.ReportId.t [@@deriving yojson, show]
-
-let cmd_to_yojson = Cmd.to_yojson (fun x -> `Int x)
 
 module Make
     (Gil : Gillian.Debugger.Lifter.GilFallbackLifter.GilLifterWithState)
@@ -30,8 +29,9 @@ struct
   module GilLifter = Gil.Lifter
 
   type cmd_report = CmdReport.t [@@deriving yojson]
-  type branch_case = IfElse of bool | LCmd of int [@@deriving yojson]
-  type branch_data = rid * BranchCase.t [@@deriving yojson]
+  type branch_case = WBranchCase.t [@@deriving yojson]
+  type branch_data = rid * BranchCase.t option [@@deriving yojson]
+  type exec_data = cmd_report executed_cmd_data [@@deriving yojson]
 
   let annot_to_wisl_stmt annot wisl_ast =
     let origin_id = annot.origin_id in
@@ -77,16 +77,23 @@ struct
     parent : parent; [@to_yojson fun _ -> `Null]
   }
 
-  and parent = (map * branch_case option) option [@@deriving yojson]
+  and parent = (map * (branch_data * branch_case) option) option
+  [@@deriving yojson]
 
   module PartialCmds = struct
     type partial_data = {
       display : string;
       ids : rid ExtList.t;
       errors : string ExtList.t;
+      mutable submap : map submap;
+      mutable inner_path : branch_data list;
       unifys :
         (rid * Engine.Unifier.unify_kind * UnifyMap.unify_result) ExtList.t;
+      unexplored_paths : branch_data list Stack.t;
+      out_paths : (branch_case * branch_data list) ExtList.t;
+      mutable unknown_outs_count : int;
     }
+    [@@deriving to_yojson]
 
     let make_partial_data display =
       {
@@ -94,32 +101,59 @@ struct
         ids = ExtList.make ();
         errors = ExtList.make ();
         unifys = ExtList.make ();
+        submap = NoSubmap;
+        inner_path = [];
+        unexplored_paths = Stack.create ();
+        out_paths = ExtList.make ();
+        unknown_outs_count = 0;
       }
 
-    type partial =
-      | VarAssign of { d : partial_data; target_var : string }
-      | Dispose of { d : partial_data }
-      | Lookup of { d : partial_data; target_var : string }
-      | Update of { d : partial_data; mutable get_cmd_found : bool }
-      | FunCall of { d : partial_data; target_var : string }
-      | While of { d : partial_data; submap : map submap }
-      | Return of { d : partial_data }
+    type t = (int, partial_data) Hashtbl.t [@@deriving to_yojson]
 
-    type t = (int, partial) Hashtbl.t
-
-    let get_partial_data = function
-      | VarAssign { d; _ }
-      | Dispose { d }
-      | Lookup { d; _ }
-      | Update { d; _ }
-      | FunCall { d; _ }
-      | While { d; _ }
-      | Return { d } -> d
-
-    let update_partial_data { id; unifys; errors; _ } d =
+    let update_partial_data end_kind exec_data d =
+      let { id; unifys; errors; cmd_report; _ } = exec_data in
+      let annot = CmdReport.(cmd_report.annot) in
       d.ids |> ExtList.append id;
       unifys |> List.iter (fun unify -> d.unifys |> ExtList.append unify);
-      errors |> List.iter (fun error -> d.errors |> ExtList.append error)
+      errors |> List.iter (fun error -> d.errors |> ExtList.append error);
+      (match exec_data.kind with
+      | Branch cases ->
+          cases
+          |> List.iter (fun (case, _) ->
+                 let path = (id, Some case) :: d.inner_path in
+                 match end_kind with
+                 | NotEnd -> d.unexplored_paths |> Stack.push path
+                 | EndNormal ->
+                     let count = d.unknown_outs_count in
+                     let case = Gil count in
+                     d.unknown_outs_count <- count + 1;
+                     d.out_paths |> ExtList.append (case, path)
+                 | EndWithBranch _ ->
+                     failwith "EndWithBranch on branching cmd not supported!")
+      | Normal -> (
+          let path = (id, None) :: d.inner_path in
+          match end_kind with
+          | NotEnd -> ()
+          | EndNormal ->
+              let count = d.unknown_outs_count in
+              let case = Gil count in
+              d.unknown_outs_count <- count + 1;
+              d.out_paths |> ExtList.append (case, path)
+          | EndWithBranch case -> d.out_paths |> ExtList.append (case, path))
+      | Final -> ());
+      match (d.submap, annot.nest_kind) with
+      | _, NoNest -> ()
+      | NoSubmap, Proc p -> d.submap <- Proc p
+      | _, _ ->
+          DL.failwith
+            (fun () ->
+              [
+                ("annot", Annot.to_yojson annot);
+                ("exec_data", exec_data_to_yojson exec_data);
+                ("partial_data", partial_data_to_yojson d);
+              ])
+            "WislLifter.update_partial_data: multiple submaps in WISL \
+             statement!"
 
     type partial_cmd_result =
       | Finished of {
@@ -129,176 +163,101 @@ struct
           errors : string list;
           cmd_kind : (branch_case, branch_data) cmd_kind;
           submap : map submap;
-          fun_call_name : string option;
         }
       | StepAgain of (rid option * BranchCase.t option)
-      | NoPartial
 
-    let create annot tl_ast stmt exec_data =
-      let* origin_id = annot.origin_id in
-      let* display = get_origin_node_str tl_ast (Some origin_id) in
-      let { cmd_report; _ } = exec_data in
-      let gil_cmd = CmdReport.(cmd_report.cmd) in
+    let make_finished_partial
+        is_final
+        { ids; display; unifys; errors; out_paths; submap; _ } =
+      let ids = ids |> ExtList.to_list in
+      let unifys = unifys |> ExtList.to_list in
+      let errors = errors |> ExtList.to_list in
+      let cmd_kind =
+        match out_paths |> ExtList.to_list with
+        | [] | [ (_, [ (_, None) ]) ] -> if is_final then Final else Normal
+        | paths ->
+            let cases =
+              paths
+              |> List.map (fun (case, path) ->
+                     let branch_data = List.hd path in
+                     (case, branch_data))
+            in
+            Branch cases
+      in
+      Finished { ids; display; unifys; errors; cmd_kind; submap }
+
+    let update annot (d : partial_data) (exec_data : exec_data) :
+        partial_cmd_result =
       let failwith s =
         DL.failwith
-          (fun () -> [ ("gil_cmd", cmd_to_yojson gil_cmd) ])
-          ("PartialCmds.create: " ^ s)
+          (fun () ->
+            [
+              ("annot", Annot.to_yojson annot);
+              ("exec_data", exec_data_to_yojson exec_data);
+              ("partial_data", partial_data_to_yojson d);
+            ])
+          ("WislLifter.PartialCmds.update: " ^ s)
       in
-      match exec_data.kind with
-      | Final -> None
-      | _ -> (
-          let d = make_partial_data display in
-          d |> update_partial_data exec_data;
-          if annot.is_return then Some (Return { d }, StepAgain (None, None))
-          else
-            let* stmt in
-            match stmt with
-            | WStmt.VarAssign (v, _) -> (
-                match gil_cmd with
-                | Cmd.Assignment (v', _) when v = v' -> None
-                | _ ->
-                    let partial = VarAssign { d; target_var = v } in
-                    Some (partial, StepAgain (None, None)))
-            | WStmt.Dispose _ -> (
-                match gil_cmd with
-                | Cmd.GuardedGoto _ ->
-                    let partial = Dispose { d } in
-                    Some
-                      ( partial,
-                        StepAgain (None, Some (BranchCase.GuardedGoto true)) )
-                | _ -> failwith "first cmd of Dispose wasn't GuardedGoto!")
-            | WStmt.Lookup (x, _) ->
-                let partial = Lookup { d; target_var = x } in
-                Some (partial, StepAgain (None, None))
-            | WStmt.Update _ -> (
-                match gil_cmd with
-                | Cmd.LAction (_, action, _)
-                  when WislLActions.(ac_from_str action = SetCell) ->
-                    failwith "first cmd of Update was SetCell!"
-                | Cmd.LAction (_, action, _)
-                  when WislLActions.(ac_from_str action = GetCell) ->
-                    let partial = Update { d; get_cmd_found = true } in
-                    Some (partial, StepAgain (None, None))
-                | _ ->
-                    let partial = Update { d; get_cmd_found = false } in
-                    Some (partial, StepAgain (None, None)))
-            | WStmt.FunCall (x, _, _, _) -> (
-                match gil_cmd with
-                | Cmd.Call (x', _, _, _, _) when x = x' -> None
-                | _ ->
-                    let partial = FunCall { d; target_var = x } in
-                    Some (partial, StepAgain (None, None)))
-            | WStmt.While _ -> (
-                match gil_cmd with
-                | Cmd.Call _ ->
-                    let submap =
-                      match annot.expansion_kind with
-                      | NoExpansion ->
-                          failwith "Call for While has no expansion!"
-                      | Proc p -> Proc p
-                    in
-                    let partial = While { d; submap } in
-                    Some (partial, StepAgain (None, None))
-                | _ -> failwith "first cmd of While wasn't Call!")
-            | _ -> None)
+      let end_kind =
+        match annot.stmt_kind with
+        | Multi b -> b
+        | _ -> failwith "tried to update partial with non-Multi cmd!"
+      in
+      d |> update_partial_data end_kind exec_data;
+      let is_final, result =
+        match (exec_data.kind, end_kind) with
+        | Final, _ -> (true, None)
+        | _, (EndNormal | EndWithBranch _) | Branch _, _ -> (false, None)
+        | Normal, _ -> (false, Some (StepAgain (None, None)))
+      in
+      match result with
+      | Some r -> r
+      | None -> (
+          match d.unexplored_paths |> Stack.pop_opt with
+          | Some path ->
+              let id, gil_case = List.hd path in
+              d.inner_path <- path;
+              StepAgain (Some id, gil_case)
+          | None -> make_finished_partial is_final d)
 
-    let update partial exec_data =
-      let { cmd_report; _ } = exec_data in
-      let gil_cmd = CmdReport.(cmd_report.cmd) in
-      partial |> get_partial_data |> update_partial_data exec_data;
-      let annot = CmdReport.(cmd_report.annot) in
-      let failwith s =
-        DL.failwith
-          (fun () -> [ ("gil_cmd", cmd_to_yojson gil_cmd) ])
-          ("PartialCmds.update: " ^ s)
-      in
-      let finished ?(submap = NoSubmap) ?fun_call_name cmd_kind =
-        let { display; ids; unifys; errors } = get_partial_data partial in
-        let ids = ids |> ExtList.to_list in
-        let unifys = unifys |> ExtList.to_list in
-        let errors = errors |> ExtList.to_list in
-        Finished
-          { ids; display; unifys; errors; cmd_kind; submap; fun_call_name }
-      in
-      match exec_data.kind with
-      | Final -> finished Final
-      | _ -> (
-          match partial with
-          | VarAssign { target_var; _ } -> (
-              match gil_cmd with
-              | Cmd.Assignment (v, _) when v = target_var -> finished Normal
-              | _ -> StepAgain (None, None))
-          | Dispose { d } -> (
-              match gil_cmd with
-              | Cmd.LAction (_, action, _)
-                when WislLActions.(ac_from_str action = Dispose) ->
-                  if d.ids |> ExtList.length <> 2 then
-                    failwith "expected 2 ids when finishing Dispose!";
-                  finished Normal
-              | _ -> failwith "expected Dispose LAction for Dispose!")
-          | Lookup { target_var; _ } -> (
-              match gil_cmd with
-              | Cmd.Assignment (x, _) when x = target_var -> finished Normal
-              | _ -> StepAgain (None, None))
-          | Update ({ get_cmd_found; _ } as u) -> (
-              match gil_cmd with
-              | Cmd.LAction (_, action, _)
-                when WislLActions.(ac_from_str action = SetCell) ->
-                  if get_cmd_found then finished Normal
-                  else failwith "encountered SetCell before GetCell in Update!"
-              | Cmd.LAction (_, action, _)
-                when WislLActions.(ac_from_str action = GetCell) ->
-                  if get_cmd_found then
-                    failwith "encountered GetCell twice in Update!"
-                  else u.get_cmd_found <- true;
-                  StepAgain (None, None)
-              | _ ->
-                  if get_cmd_found then
-                    failwith
-                      "SetCell should immediately follow GetCell in Update!"
-                  else StepAgain (None, None))
-          | FunCall { target_var; _ } -> (
-              match gil_cmd with
-              | Cmd.Call (x, _, _, _, _) when x = target_var -> finished Normal
-              | _ -> StepAgain (None, None))
-          | While { submap; _ } -> (
-              match gil_cmd with
-              | Cmd.Assignment _ ->
-                  if annot.is_end_of_cmd then finished ~submap Normal
-                  else StepAgain (None, None)
-              | _ -> failwith "expected Call for While!")
-          | Return _ -> StepAgain (None, None))
+    let create annot tl_ast =
+      match annot.stmt_kind with
+      | Multi NotEnd ->
+          let* origin_id = annot.origin_id in
+          let+ display = get_origin_node_str tl_ast (Some origin_id) in
+          make_partial_data display
+      | _ -> None
 
     let handle exec_data tl_ast partial_cmds =
       let annot =
         let cmd_report = exec_data.cmd_report in
         CmdReport.(cmd_report.annot)
       in
-      (let* origin_id = annot.origin_id in
-       let stmt = annot_to_wisl_stmt annot tl_ast in
-       match Hashtbl.find_opt partial_cmds origin_id with
-       | Some partial ->
-           let result = update partial exec_data in
-           (match result with
-           | Finished _ -> Hashtbl.remove partial_cmds origin_id
-           | _ -> ());
-           Some result
-       | None ->
-           let+ partial, result = create annot tl_ast stmt exec_data in
-           Hashtbl.add partial_cmds origin_id partial;
-           result)
-      |> Option.value ~default:NoPartial
+      let* origin_id = annot.origin_id in
+      let+ partial_data =
+        match Hashtbl.find_opt partial_cmds origin_id with
+        | None ->
+            let+ pd = create annot tl_ast in
+            Hashtbl.add partial_cmds origin_id pd;
+            pd
+        | pd -> pd
+      in
+      let result = update annot partial_data exec_data in
+      (match result with
+      | Finished _ -> Hashtbl.remove partial_cmds origin_id
+      | _ -> ());
+      result
   end
 
   type t = {
     proc_name : string;
     gil_state : GilLifter.t; [@to_yojson GilLifter.dump]
     tl_ast : tl_ast; [@to_yojson fun _ -> `Null]
-    partial_cmds : PartialCmds.t; [@to_yojson fun _ -> `Null]
+    partial_cmds : PartialCmds.t;
     mutable map : map;
     id_map : (rid, map) Hashtbl.t; [@to_yojson fun _ -> `Null]
     mutable before_partial : (rid * BranchCase.t option) option;
-    is_loop_func : bool;
+    mutable is_loop_func : bool;
   }
   [@@deriving to_yojson]
 
@@ -341,7 +300,7 @@ struct
           let parent_path = path_of_map parent_map in
           match case with
           | None -> parent_path
-          | Some case -> case :: parent_path)
+          | Some (_, case) -> case :: parent_path)
     in
     let data =
       {
@@ -358,12 +317,15 @@ struct
     let cmd =
       match kind with
       | Normal -> Cmd { data; next = Nothing }
-      | Branch cases ->
-          let nexts = Hashtbl.create (List.length cases) in
-          cases
-          |> List.iter (fun (case, bdata) ->
-                 Hashtbl.add nexts case (bdata, Nothing));
-          BranchCmd { data; nexts }
+      | Branch cases -> (
+          match cases with
+          | [ (Gil _, (_, None)) ] -> Cmd { data; next = Nothing }
+          | _ ->
+              let nexts = Hashtbl.create (List.length cases) in
+              cases
+              |> List.iter (fun (case, bdata) ->
+                     Hashtbl.add nexts case (bdata, Nothing));
+              BranchCmd { data; nexts })
       | Final -> FinalCmd { data }
     in
     ids |> List.iter (fun id -> Hashtbl.replace id_map id cmd);
@@ -381,7 +343,7 @@ struct
               cases
               |> List.map (fun (case, _) ->
                      match case with
-                     | BranchCase.GuardedGoto b -> (IfElse b, (id, case))
+                     | BranchCase.GuardedGoto b -> (IfElse b, (id, Some case))
                      | _ -> failwith "convert_kind: inconsistent branch cases!")
             in
             Branch cases
@@ -390,7 +352,7 @@ struct
               cases
               |> List.map (fun (case, _) ->
                      match case with
-                     | BranchCase.LCmd lcmd -> (LCmd lcmd, (id, case))
+                     | BranchCase.LCmd lcmd -> (LCmd lcmd, (id, Some case))
                      | _ -> failwith "convert_kind: inconsistent branch cases!")
             in
             Branch cases
@@ -398,57 +360,76 @@ struct
 
   let rec insert_new_cmd
       (new_cmd : parent:parent -> unit -> map)
+      (new_id : rid)
       (id : rid)
       (gil_case : BranchCase.t option)
       state =
+    let failwith s = failwith ("WislLifter.insert_new_cmd: " ^ s) in
     let { id_map; gil_state; _ } = state in
     match Hashtbl.find_opt id_map id with
     | None -> (
         DL.log (fun m ->
-            m
-              "WislLifter.insert_new_cmd: couldn't find id %a; attempting with \
-               previous step from GIL."
+            m "couldn't find id %a; attempting with previous step from GIL."
               pp_rid id);
         match gil_state |> GilLifter.previous_step id with
-        | None -> failwith ""
-        | Some (prev_id, _) -> insert_new_cmd new_cmd prev_id gil_case state)
+        | None -> failwith "couldn't step back any farther!"
+        | Some (prev_id, _) ->
+            insert_new_cmd new_cmd new_id prev_id gil_case state)
     | Some map -> (
         match map with
         | Cmd c ->
             let parent = Some (map, None) in
             c.next <- new_cmd ~parent ()
-        | BranchCmd { nexts; _ } -> (
-            match gil_case with
-            | None ->
-                failwith
-                  "insert_new_cmd: HORROR - need branch case to insert to \
-                   branch cmd!"
-            | Some gil_case ->
-                let case, bdata =
-                  Hashtbl.find_map
-                    (fun case (bdata, next) ->
-                      if snd bdata <> gil_case then None
-                      else
-                        match next with
-                        | Nothing -> Some (case, bdata)
+        | BranchCmd { nexts; _ } ->
+            let case, next, bdata =
+              match gil_case with
+              | None ->
+                  let rec aux new_id =
+                    let result =
+                      nexts
+                      |> Hashtbl.find_map (fun case (bdata, next) ->
+                             match bdata with
+                             | case_id, None when case_id = new_id ->
+                                 Some (case, next, bdata)
+                             | _ -> None)
+                    in
+                    match result with
+                    | Some r -> r
+                    | None -> (
+                        let prev =
+                          gil_state |> GilLifter.previous_step new_id
+                        in
+                        match prev with
+                        | Some (new_id, _) ->
+                            DL.log (fun m ->
+                                m
+                                  "Inserting without gil case; attempting to \
+                                   look back for link");
+                            aux new_id
                         | _ ->
                             failwith
-                              "insert_new_cmd: HORROR - tried to insert into \
-                               non-Nothing!")
+                              "HORROR - tried to insert without branch case!")
+                  in
+                  aux new_id
+              | Some gil_case ->
+                  Hashtbl.find_map
+                    (fun case (bdata, next) ->
+                      let gil_case' = bdata |> snd |> Option.get in
+                      if gil_case <> gil_case' then None
+                      else Some (case, next, bdata))
                     nexts
                   |> Option.get
-                in
-                let parent = Some (map, Some case) in
-                Hashtbl.replace nexts case (bdata, new_cmd ~parent ()))
-        | _ ->
-            failwith
-              "insert_new_cmd: HORROR - tried to insert to FinalCmd or Nothing!"
-        )
+            in
+            if next <> Nothing then
+              failwith "HORROR - tried to insert to non-Nothing!";
+            let parent = Some (map, Some (bdata, case)) in
+            Hashtbl.replace nexts case (bdata, new_cmd ~parent ())
+        | _ -> failwith "HORROR - tried to insert to FinalCmd or Nothing!")
 
   let prepare_basic_cmd ?display ?(final = false) tl_ast id_map exec_data =
     let { cmd_report; _ } = exec_data in
     let annot = CmdReport.(cmd_report.annot) in
-    let { origin_id; expansion_kind; _ } = annot in
+    let { origin_id; nest_kind; _ } = annot in
     let display =
       match display with
       | Some d -> d
@@ -460,8 +441,8 @@ struct
       exec_data
     in
     let submap =
-      match expansion_kind with
-      | NoExpansion -> NoSubmap
+      match nest_kind with
+      | NoNest -> NoSubmap
       | Proc p -> Proc p
     in
     let kind = if final then Final else convert_kind id kind in
@@ -469,72 +450,39 @@ struct
 
   let handle_loop_prefix exec_data =
     let annot = CmdReport.(exec_data.cmd_report.annot) in
-    if annot.is_loop_prefix then
-      Some
-        (match exec_data.cmd_report.cmd with
-        | Cmd.GuardedGoto _ ->
-            ExecNext (None, Some (BranchCase.GuardedGoto true))
-        | _ -> ExecNext (None, None))
-    else None
+    match annot.stmt_kind with
+    | LoopPrefix ->
+        Some
+          (match exec_data.cmd_report.cmd with
+          | Cmd.GuardedGoto _ ->
+              ExecNext (None, Some (BranchCase.GuardedGoto true))
+          | _ -> ExecNext (None, None))
+    | _ -> None
 
-  let init_opt proc_name tl_ast exec_data =
-    let gil_state = Gil.get_state () in
-    let+ tl_ast in
-    CmdReport.(
-      let annot = exec_data.cmd_report.annot in
-      DL.log (fun m -> m "LIFT INIT - is loop prefix: %b" annot.is_loop_prefix));
-    let partial_cmds = Hashtbl.create 0 in
-    let id_map = Hashtbl.create 0 in
-    let before_partial = None in
-    let map, result, is_loop_func =
-      match handle_loop_prefix exec_data with
-      | Some result -> (Nothing, result, true)
-      | None -> (
-          match PartialCmds.handle exec_data tl_ast partial_cmds with
-          | StepAgain result -> (Nothing, ExecNext result, false)
-          | NoPartial ->
-              let new_cmd = prepare_basic_cmd tl_ast id_map exec_data in
-              (new_cmd ~parent:None (), Stop, false)
-          | Finished _ -> failwith "init: HORROR - Finished PartialCmd on init!"
-          )
-    in
-    let state =
-      {
-        proc_name;
-        gil_state;
-        tl_ast;
-        partial_cmds;
-        map;
-        id_map;
-        before_partial;
-        is_loop_func;
-      }
-    in
-    (state, result)
-
-  let init proc_name tl_ast exec_data =
-    match init_opt proc_name tl_ast exec_data with
-    | None -> failwith "init: wislLifter needs a tl_ast!"
-    | Some x -> x
-
-  let handle_cmd
-      prev_id
-      branch_case
-      (exec_data : cmd_report executed_cmd_data)
-      state =
+  let init_or_handle prev_id branch_case exec_data state =
+    let { id; _ } = exec_data in
     DL.log (fun m ->
-        m "HANDLING %a (prev %a)" L.ReportId.pp exec_data.id L.ReportId.pp
+        m
+          ~json:
+            [
+              ("state", dump state); ("exec_data", exec_data_to_yojson exec_data);
+            ]
+          "HANDLING %a (prev %a)" L.ReportId.pp id (pp_option L.ReportId.pp)
           prev_id);
     let { tl_ast; partial_cmds; id_map; proc_name; is_loop_func; _ } = state in
     match handle_loop_prefix exec_data with
-    | Some result -> result
+    | Some result ->
+        state.is_loop_func <- true;
+        result
     | None -> (
         match PartialCmds.handle exec_data tl_ast partial_cmds with
-        | StepAgain result ->
+        | Some (StepAgain result) ->
             if Option.is_none state.before_partial then
-              state.before_partial <- Some (prev_id, branch_case);
+              prev_id
+              |> Option.iter (fun prev_id ->
+                     state.before_partial <- Some (prev_id, branch_case));
             ExecNext result
-        | NoPartial ->
+        | None ->
             let display, final =
               if is_loop_func && get_fun_call_name exec_data = Some proc_name
               then (Some "<end of loop>", true)
@@ -543,17 +491,16 @@ struct
             let new_cmd =
               prepare_basic_cmd ?display ~final tl_ast id_map exec_data
             in
-            (match state.map with
-            | Nothing -> state.map <- new_cmd ~parent:None ()
-            | _ -> insert_new_cmd new_cmd prev_id branch_case state);
+            (match (state.map, prev_id) with
+            | Nothing, _ -> state.map <- new_cmd ~parent:None ()
+            | _, Some prev_id ->
+                insert_new_cmd new_cmd id prev_id branch_case state
+            | _, _ ->
+                failwith
+                  "HORROR - tried to insert to non-Nothing map without \
+                   previous id!");
             Stop
-        | Finished
-            { ids; display; unifys; errors; cmd_kind; submap; fun_call_name } ->
-            let display, cmd_kind =
-              if is_loop_func && fun_call_name = Some proc_name then
-                ("<end of loop>", Final)
-              else (display, cmd_kind)
-            in
+        | Some (Finished { ids; display; unifys; errors; cmd_kind; submap }) ->
             let gil_branch_path =
               GilLifter.path_of_id (List.hd ids) state.gil_state
             in
@@ -561,19 +508,74 @@ struct
               new_cmd id_map cmd_kind ids display unifys errors gil_branch_path
                 ~submap
             in
-            let prev_id, branch_case = state.before_partial |> Option.get in
-            insert_new_cmd new_cmd prev_id branch_case state;
-            state.before_partial <- None;
+            let prev_id, branch_case =
+              match state.before_partial with
+              | Some (prev_id, branch_case) ->
+                  state.before_partial <- None;
+                  (Some prev_id, branch_case)
+              | None -> (prev_id, branch_case)
+            in
+            (match (state.map, prev_id) with
+            | Nothing, _ -> state.map <- new_cmd ~parent:None ()
+            | _, Some prev_id ->
+                insert_new_cmd new_cmd id prev_id branch_case state
+            | _, _ ->
+                failwith
+                  "HORROR - tried to insert to non-Nothing map without \
+                   previous id!");
             Stop)
+
+  let init_opt proc_name tl_ast exec_data =
+    let gil_state = Gil.get_state () in
+    let+ tl_ast in
+    let partial_cmds = Hashtbl.create 0 in
+    let id_map = Hashtbl.create 0 in
+    let before_partial = None in
+    let state =
+      {
+        proc_name;
+        gil_state;
+        tl_ast;
+        partial_cmds;
+        map = Nothing;
+        id_map;
+        before_partial;
+        is_loop_func = false;
+      }
+    in
+    let result = init_or_handle None None exec_data state in
+    (state, result)
+
+  let init proc_name tl_ast exec_data =
+    match init_opt proc_name tl_ast exec_data with
+    | None -> failwith "init: wislLifter needs a tl_ast!"
+    | Some x -> x
+
+  let handle_cmd prev_id branch_case (exec_data : exec_data) state =
+    init_or_handle (Some prev_id) branch_case exec_data state
 
   let get_gil_map _ = failwith "get_gil_map: not implemented!"
 
-  let package_case _ (case : branch_case) : Packaged.branch_case =
+  let package_case (bd : branch_data) (case : branch_case) :
+      Packaged.branch_case =
     let json = branch_case_to_yojson case in
     let kind, display =
       match case with
       | IfElse b -> ("IfElse", ("If/Else", Fmt.str "%B" b))
       | LCmd x -> ("LCmd", ("Logical command", Fmt.str "%d" x))
+      | Gil _ -> (
+          let id, gil_case = bd in
+          match gil_case with
+          | Some gil_case ->
+              let kind_display, display =
+                Packaged.(package_case gil_case).display
+              in
+              let kind = "GIL" in
+              let kind_display = Fmt.str "(GIL) %s" kind_display in
+              let display = Fmt.str "(%a) %s" pp_rid id display in
+              (kind, (kind_display, display))
+          | None -> ("GIL", ("(GIL) Unknown", Fmt.str "(%a) Unknown" pp_rid id))
+          )
     in
     { kind; display; json }
 
@@ -635,7 +637,7 @@ struct
         in
         match Hashtbl.find_opt nexts case with
         | None -> failwith "branch case not found!"
-        | Some ((id, case), _) -> (id, Some case))
+        | Some ((id, case), _) -> (id, case))
 
   let previous_step id { id_map; _ } =
     match Hashtbl.find id_map id with
@@ -643,7 +645,9 @@ struct
     | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } ->
         let+ parent, case = data.parent in
         let id = id_of_map parent in
-        let case = case |> Option.map (package_case ()) in
+        let case =
+          case |> Option.map (fun (bdata, case) -> package_case bdata case)
+        in
         (id, case)
 
   let select_next_path case id { gil_state; _ } =
@@ -668,7 +672,7 @@ struct
           match
             Hashtbl.find_map
               (fun _ ((id, gil_case), next) ->
-                if next = Nothing then Some (id, Some gil_case) else None)
+                if next = Nothing then Some (id, gil_case) else None)
               nexts
           with
           | None -> Hashtbl.find_map (fun _ (_, next) -> aux next) nexts

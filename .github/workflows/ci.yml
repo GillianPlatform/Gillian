@@ -20,15 +20,15 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
       - name: Installing esy
-        run: sudo npm install -g esy@0.6.10 --unsafe-perm
+        run: sudo npm install -g esy@0.6.12 --unsafe-perm
       - name: Restore Cache
         id: restore-cache
         uses: actions/cache@v1
         with:
           path: _export
-          key: ${{ runner.os }}-esy-0.6.10-${{ hashFiles('esy.lock/index.json') }}
+          key: ${{ runner.os }}-esy-0.6.12-${{ hashFiles('esy.lock/index.json') }}
           restore-keys: |
-            ${{ runner.os }}-esy-0.6.10-
+            ${{ runner.os }}-esy-0.6.12-
       - name: Esy install
         run: "esy install"
       - name: Import Cache

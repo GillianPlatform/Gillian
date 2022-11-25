@@ -8,7 +8,7 @@ module SS = Gillian.Utils.Containers.SS
 type init_data = unit
 type vt = Values.t
 type st = Subst.t
-type err_t = WislSHeap.err [@@deriving yojson]
+type err_t = WislSHeap.err [@@deriving yojson, show]
 type c_fix_t = unit
 type t = WislSHeap.t [@@deriving yojson]
 

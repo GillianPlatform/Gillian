@@ -6,7 +6,7 @@ module Expr = Gillian.Gil_syntax.Expr
 type init_data = Global_env.t
 type vt = Values.t
 type st = Subst.t
-type err_t = unit
+type err_t = unit [@@deriving show]
 
 let pp_err _ () = ()
 
