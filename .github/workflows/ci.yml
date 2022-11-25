@@ -17,13 +17,13 @@ jobs:
         operating-system: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
       - name: Installing esy
         run: sudo npm install -g esy@0.6.12 --unsafe-perm
       - name: Restore Cache
         id: restore-cache
-        uses: actions/cache@v1
+        uses: actions/cache@v3
         with:
           path: _export
           key: ${{ runner.os }}-esy-0.6.12-${{ hashFiles('esy.lock/index.json') }}
@@ -47,7 +47,7 @@ jobs:
       - name: Building release
         run: "esy release"
       - name: Sending artifact for next jobs
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ runner.os }}-release
           path: _release
@@ -65,18 +65,18 @@ jobs:
     needs: build
     steps:
       - name: download release
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v3
         with:
           name: ${{ runner.os }}-release
           path: release
       - name: setting up node
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
       - name: install release
         run: |
           yarn global add file://$(pwd)/release
           echo "$(yarn global bin)" >> $GITHUB_PATH
       - name: checkout project
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: Gillian
       - name: init env
@@ -97,18 +97,18 @@ jobs:
     needs: build
     steps:
       - name: download release
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v3
         with:
           name: ${{ runner.os }}-release
           path: release
       - name: setting up node
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
       - name: install release
         run: |
           yarn global add file://$(pwd)/release
           echo "$(yarn global bin)" >> $GITHUB_PATH
       - name: checkout project
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: Gillian
       - name: init env
@@ -130,18 +130,18 @@ jobs:
     needs: build
     steps:
       - name: download release
-        uses: actions/download-artifact@v1.0.0
+        uses: actions/download-artifact@v3
         with:
           name: ${{ runner.os }}-release
           path: release
       - name: setting up node
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
       - name: install release
         run: |
           yarn global add file://$(pwd)/release
           echo "$(yarn global bin)" >> $GITHUB_PATH
       - name: checkout project
-        uses: actions/checkout@v2.0.0
+        uses: actions/checkout@v3
         with:
           repository: GillianPlatform/javert-test262
           path: test262
@@ -158,18 +158,18 @@ jobs:
     needs: build
     steps:
       - name: download release
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v3
         with:
           name: ${{ runner.os }}-release
           path: release
       - name: setting up node
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
       - name: install release
         run: |
           yarn global add file://$(pwd)/release
           echo "$(yarn global bin)" >> $GITHUB_PATH
       - name: checkout project
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: GillianPlatform/collections-c-for-gillian
           path: collections-c
@@ -187,18 +187,18 @@ jobs:
     needs: build
     steps:
       - name: download release
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v3
         with:
           name: ${{ runner.os }}-release
           path: release
       - name: setting up node
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
       - name: install release
         run: |
           yarn global add file://$(pwd)/release
           echo "$(yarn global bin)" >> $GITHUB_PATH
       - name: checkout project
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: Gillian
       - name: Symbolic Testing Buckets.js
