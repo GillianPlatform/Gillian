@@ -89,65 +89,65 @@ jobs:
         run: "make"
         working-directory: "Gillian/Gillian-C/examples/amazon/"
 
-  gillian_js_tests:
-    strategy:
-      matrix:
-        operating-system: [macos-latest, ubuntu-latest]
-    runs-on: ${{ matrix.operating-system }}
-    needs: build
-    steps:
-      - name: download release
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ runner.os }}-release
-          path: release
-      - name: setting up node
-        uses: actions/setup-node@v3
-      - name: install release
-        run: |
-          yarn global add file://$(pwd)/release
-          echo "$(yarn global bin)" >> $GITHUB_PATH
-      - name: checkout project
-        uses: actions/checkout@v3
-        with:
-          path: Gillian
-      - name: init env
-        run: "Gillian-JS/scripts/setup_environment.sh"
-        working-directory: "Gillian"
-      - name: Test JaVerT
-        run: "./testJaVerT.sh"
-        working-directory: "Gillian/Gillian-JS/environment/"
-      - name: Test Amazon
-        run: "make"
-        working-directory: "Gillian/Gillian-JS/Examples/Amazon/"
+  # gillian_js_tests:
+  #   strategy:
+  #     matrix:
+  #       operating-system: [macos-latest, ubuntu-latest]
+  #   runs-on: ${{ matrix.operating-system }}
+  #   needs: build
+  #   steps:
+  #     - name: download release
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: ${{ runner.os }}-release
+  #         path: release
+  #     - name: setting up node
+  #       uses: actions/setup-node@v3
+  #     - name: install release
+  #       run: |
+  #         yarn global add file://$(pwd)/release
+  #         echo "$(yarn global bin)" >> $GITHUB_PATH
+  #     - name: checkout project
+  #       uses: actions/checkout@v3
+  #       with:
+  #         path: Gillian
+  #     - name: init env
+  #       run: "Gillian-JS/scripts/setup_environment.sh"
+  #       working-directory: "Gillian"
+  #     - name: Test JaVerT
+  #       run: "./testJaVerT.sh"
+  #       working-directory: "Gillian/Gillian-JS/environment/"
+  #     - name: Test Amazon
+  #       run: "make"
+  #       working-directory: "Gillian/Gillian-JS/Examples/Amazon/"
 
-  test262:
-    if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
-    strategy:
-      matrix:
-        operating-system: [macos-latest]
-    runs-on: ${{ matrix.operating-system }}
-    needs: build
-    steps:
-      - name: download release
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ runner.os }}-release
-          path: release
-      - name: setting up node
-        uses: actions/setup-node@v3
-      - name: install release
-        run: |
-          yarn global add file://$(pwd)/release
-          echo "$(yarn global bin)" >> $GITHUB_PATH
-      - name: checkout project
-        uses: actions/checkout@v3
-        with:
-          repository: GillianPlatform/javert-test262
-          path: test262
-          ref: 93e0d0b04093cabc3234a776eec5cc3e165f3b1a
-      - name: Test262
-        run: "gillian-js test262 test262/test --ci"
+  # test262:
+  #   if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
+  #   strategy:
+  #     matrix:
+  #       operating-system: [macos-latest]
+  #   runs-on: ${{ matrix.operating-system }}
+  #   needs: build
+  #   steps:
+  #     - name: download release
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: ${{ runner.os }}-release
+  #         path: release
+  #     - name: setting up node
+  #       uses: actions/setup-node@v3
+  #     - name: install release
+  #       run: |
+  #         yarn global add file://$(pwd)/release
+  #         echo "$(yarn global bin)" >> $GITHUB_PATH
+  #     - name: checkout project
+  #       uses: actions/checkout@v3
+  #       with:
+  #         repository: GillianPlatform/javert-test262
+  #         path: test262
+  #         ref: 93e0d0b04093cabc3234a776eec5cc3e165f3b1a
+  #     - name: Test262
+  #       run: "gillian-js test262 test262/test --ci"
 
   collections-c:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
@@ -178,31 +178,31 @@ jobs:
         run: "./runGillianTests.sh"
         working-directory: collections-c
 
-  test-Buckets:
-    if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
-    strategy:
-      matrix:
-        operating-system: [macos-latest]
-    runs-on: ${{ matrix.operating-system }}
-    needs: build
-    steps:
-      - name: download release
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ runner.os }}-release
-          path: release
-      - name: setting up node
-        uses: actions/setup-node@v3
-      - name: install release
-        run: |
-          yarn global add file://$(pwd)/release
-          echo "$(yarn global bin)" >> $GITHUB_PATH
-      - name: checkout project
-        uses: actions/checkout@v3
-        with:
-          path: Gillian
-      - name: Symbolic Testing Buckets.js
-        run: "gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci"
+  # test-Buckets:
+  #   if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
+  #   strategy:
+  #     matrix:
+  #       operating-system: [macos-latest]
+  #   runs-on: ${{ matrix.operating-system }}
+  #   needs: build
+  #   steps:
+  #     - name: download release
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: ${{ runner.os }}-release
+  #         path: release
+  #     - name: setting up node
+  #       uses: actions/setup-node@v3
+  #     - name: install release
+  #       run: |
+  #         yarn global add file://$(pwd)/release
+  #         echo "$(yarn global bin)" >> $GITHUB_PATH
+  #     - name: checkout project
+  #       uses: actions/checkout@v3
+  #       with:
+  #         path: Gillian
+  #     - name: Symbolic Testing Buckets.js
+  #       run: "gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci"
 
   test-docker:
     runs-on: ubuntu-latest
