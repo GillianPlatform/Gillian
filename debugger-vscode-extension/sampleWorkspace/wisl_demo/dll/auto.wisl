@@ -1,0 +1,137 @@
+// Doubly-linked list segment, unfolding from the left
+predicate dlsegl(+x, +y, +v, +w, alpha : List) {
+  (x == y) * (v == w) * (alpha == nil);
+  (x -b> #a, #z, w) * (alpha == #a :: #beta) * dlsegl(#z, y, v, x, #beta)
+}
+
+// Doubly-linked list segment, unfolding from the right
+predicate dlsegr(+x, +y, +v, +w, alpha : List) {
+  (x == y) * (v == w) * (alpha == nil);
+  (v -b> #a, y, #z) * (alpha == #beta @ [#a]) * dlsegr(x, v, #z, w, #beta)
+}
+
+// Appending an element from the right to the left-unfolding dlseg
+lemma dlsegl_append_right {
+  statement:
+    forall x, v, z, w, alpha, a, y.
+      dlsegl(x, v, z, w, alpha) * (v -> a, y, z) |- dlsegl(x, y, v, w, alpha @ [ a ])
+
+  variant: len alpha
+
+  proof:
+    unfold dlsegl(x, v, z, w, alpha);
+    if (alpha = nil) {
+      fold dlsegl(y, y, v, v, []);
+      fold dlsegl(x, y, v, w, a :: alpha)
+    } else {
+      assert {bind: #b, #l, #beta} (alpha == #b :: #beta) * (x -> #b, #l, w) * dlsegl(#l, v, z, x, #beta);
+      apply dlsegl_append_right(#l, v, z, x, #beta, a, y);
+      fold dlsegl(x, y, v, w, alpha @ [ a ])
+    }
+}
+
+// Appending an element from the left to the right-unfolding dlseg
+lemma dlsegr_append_left {
+  statement:
+    forall x, a, z, w, y, v, alpha.
+      (x -> a, z, w) * dlsegr(z, y, v, x, alpha) |- dlsegr(x, y, v, w, a :: alpha)
+
+  variant: len alpha
+
+  proof:
+    unfold dlsegr(z, y, v, x, alpha);
+    if (#alpha = nil) {
+      fold dlsegr(x, x, w, w, [], 0);
+      fold dlsegr(x, y, v, w, a :: alpha)
+    } else {
+      assert {bind: #b, #l, #beta} (alpha == #beta @ [#b]) * (v -> #b, y, #l) * dlsegr(z, v, #l, x, #beta);
+      apply dlsegr_append_left(x, a, z, w, v, #l, #beta);
+      fold dlsegr(x, y, v, w, a :: alpha)
+    }
+}
+
+// Left-to-right
+lemma dlseg_l_to_r {
+  statement:
+    forall x, y, v, w, alpha.
+      dlsegl(x, y, v, w, alpha) |- dlsegr(x, y, v, w, alpha)
+
+  variant: len alpha
+
+  proof:
+    unfold dlsegl(x, y, v, w, alpha);
+    if (alpha = nil) {
+      fold dlsegr(x, y, v, w, alpha)
+    } else {
+      assert {bind: #a, #z, #beta} (x -> #a, #z, w) * dlsegl(#z, y, v, x, #beta);
+      apply dlseg_l_to_r(#z, y, v, x, #beta);
+      apply dlsegr_append_left(x, #a, #z, w, y, v, #beta)
+    }
+}
+
+// Right-to-left
+lemma dlseg_r_to_l {
+  statement:
+    forall x, y, v, w, alpha.
+      dlsegr(x, y, v, w, alpha) |- dlsegl(x, y, v, w, alpha)
+
+  variant: len alpha
+
+  proof:
+    unfold dlsegr(x, y, v, w, alpha);
+    if (alpha = nil) {
+      fold dlsegl(x, y, v, w, alpha)
+    } else {
+      assert {bind: #a, #z, #beta} (v -b> #a, y, #z) * dlsegr(x, v, #z, w, #beta);
+      apply dlseg_r_to_l(x, v, #z, w, #beta);
+      apply dlsegl_append_right(x, v, #z, w, #beta, #a, y)
+    }
+}
+
+// Doubly-linked list
+predicate dlist(+x, +y, alpha) {
+  dlsegl(x, null, y, null, alpha)
+}
+
+
+// Concatenation of two dlsegs
+lemma dlseg_concat {
+  statement:
+    forall x_a, v_a, w_a, alpha, x_b, y_b, v_b, beta.
+      dlsegl(x_a, x_b, v_a, w_a, alpha) * dlsegl(x_b, y_b, v_b, v_a, beta)
+        |- dlsegl(x_a, y_b, v_b, w_a, (alpha @ beta))
+
+  proof:
+    unfold dlsegl(x_a, x_b, v_a, w_a, alpha);
+    if (alpha != []) {
+      assert {bind: #a, #z_a, #gamma} (x_a -> #a, #z_a, w_a) * dlsegl(#z_a, x_b, v_a, x_a, #gamma);
+      apply dlseg_concat(#z_a, v_a, x_a, #gamma, x_b, y_b, v_b, beta);
+      fold dlsegl(x_a, y_b, v_b, w_a, (alpha @ beta))
+    }
+}
+
+// List concatenation
+{ (x_a == #x_a) * (v_a == #v_a) * (x_b == #x_b) * (v_b == #v_b) *
+  dlist(#x_a, #v_a, #alpha) * dlist(#x_b, #v_b, #beta) }
+function concat(x_a, v_a, x_b, v_b) {
+  r := new(2);
+  if (x_a = null) {
+    [r] := x_b;
+    [r+1] := v_b
+  } else {
+    if (x_b = null) {
+      [r] := x_a;
+      [r+1] := v_a
+    } else {
+      [[ apply dlseg_l_to_r(#x_a, null, #v_a, null, #alpha) ]];
+      [v_a + 1] := x_b;
+      [x_b + 2] := v_a;
+      [[ apply dlseg_r_to_l(#x_a, #x_b, #v_a, null, #alpha) ]];
+      [[ apply dlseg_concat(#x_a, #v_a, null, #alpha, #x_b, null, #v_b, #beta) ]];
+      [r] := x_a;
+      [r+1] := v_b
+    }
+  };
+  return r
+}
+{ (ret -> #h, #t) * dlist(#h, #t, #alpha @ #beta) }

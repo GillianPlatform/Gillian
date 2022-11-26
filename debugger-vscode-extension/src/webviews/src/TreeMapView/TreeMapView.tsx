@@ -1,12 +1,15 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import ReactFlow, {
   Background,
   Edge,
   Controls,
   Node,
   NodeProps,
+  useReactFlow,
+  ReactFlowProvider,
 } from 'react-flow-renderer';
 
+import * as events from '../events';
 import './TreeMapView.css';
 
 export type TransformResult<M, D, A> = {
@@ -70,7 +73,18 @@ const TreeMapView = <M, D, A>({
   transform,
   nodeComponent,
 }: Props<M, D, A>) => {
+  const reactFlowInstance = useReactFlow();
   const flowRef: FlowRef = useRef(undefined as unknown as HTMLDivElement);
+
+  useEffect(() => {
+    events.subscribe('resetView', () => {
+      reactFlowInstance.setViewport({ x: 0, y: 0, zoom: 1 });
+    });
+
+    return () => {
+      events.unsubscribe('resetView');
+    };
+  }, [reactFlowInstance]);
   const nodeTypes = { customNode: nodeComponent };
 
   const edges: Edge[] = [];
@@ -180,7 +194,7 @@ const TreeMapView = <M, D, A>({
     });
 
     if (submap !== undefined) {
-      buildNodes(submap, xOffset + submapXOffset + NODE_PAD);
+      buildNodes(submap, x + submapXOffset + NODE_PAD);
     }
 
     nexts.forEach(next => {
@@ -210,4 +224,10 @@ const TreeMapView = <M, D, A>({
   return ret;
 };
 
-export default TreeMapView;
+const TreeMapViewWrap = <M, D, A>(props: Props<M, D, A>) => (
+  <ReactFlowProvider>
+    <TreeMapView {...props} />
+  </ReactFlowProvider>
+);
+
+export default TreeMapViewWrap;

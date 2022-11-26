@@ -12,8 +12,7 @@ import { Code } from '../util';
 
 import './ExecMap.css';
 
-export type ExecMapNodeData =
-  { isActive: boolean } & (
+export type ExecMapNodeData = { isActive: boolean } & (
   | {
       type: 'Cmd';
       cmdData: CmdData;
@@ -31,7 +30,7 @@ export type ExecMapNodeData =
       type: 'Root';
       procName: string;
     }
-  );
+);
 
 const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & Dims>) => {
   const { type, isActive, width, height } = data;

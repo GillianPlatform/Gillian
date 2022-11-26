@@ -107,7 +107,11 @@ type UnifyUpdateMsg = {
   readonly unifyMap: UnifyMap;
 };
 
-export type MessageToWebview = StateUpdateMsg | UnifyUpdateMsg;
+type ResetViewMsg = {
+  readonly type: 'reset_view';
+};
+
+export type MessageToWebview = StateUpdateMsg | UnifyUpdateMsg | ResetViewMsg;
 
 // #endregion
 

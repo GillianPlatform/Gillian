@@ -8,6 +8,7 @@ import { DebugState } from '../../../types';
 import ExecMapView from '../ExecMap/ExecMapView';
 import useStore from '../store';
 import UnifyView from '../UnifyView/UnifyView';
+import * as events from '../events';
 
 import './DebuggerPanel.css';
 
@@ -17,6 +18,16 @@ const DebuggerPanel = () => {
     ({ unifyState: { path } }) => path && path.length > 0
   );
   const [activeTab, setActiveTab] = useState('debug-exec-tab');
+
+  useEffect(() => {
+    events.subscribe('resetView', () => {
+      setActiveTab('debug-exec-tab');
+    });
+
+    return () => {
+      events.unsubscribe('resetView');
+    };
+  }, []);
 
   useEffect(() => {
     if (!hasUnify) {
