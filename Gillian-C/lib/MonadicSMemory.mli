@@ -8,6 +8,6 @@ module Lift : sig
     memory:t ->
     is_gil_file:'a ->
     get_new_scope_id:(unit -> int) ->
-    (int, variable list) Hashtbl.t ->
+    (int, Variable.t list) Hashtbl.t ->
     scope list
 end

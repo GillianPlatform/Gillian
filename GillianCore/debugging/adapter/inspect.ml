@@ -1,3 +1,4 @@
+module DVariable = Variable
 open DebugProtocolEx
 module DL = Debugger_log
 
@@ -44,7 +45,7 @@ module Make (Debugger : Debugger.S) = struct
         let variables = Debugger.get_variables args.variables_reference dbg in
         let variables =
           variables
-          |> List.map (fun (var : variable) ->
+          |> List.map (fun (var : DVariable.t) ->
                  let name = var.name in
                  let value = var.value in
                  let type_ = var.type_ in

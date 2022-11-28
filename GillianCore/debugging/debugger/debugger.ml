@@ -44,7 +44,7 @@ module type S = sig
   val terminate : debug_state -> unit
   val get_frames : debug_state -> frame list
   val get_scopes : debug_state -> scope list
-  val get_variables : int -> debug_state -> variable list
+  val get_variables : int -> debug_state -> Variable.t list
   val get_exception_info : debug_state -> exception_info
   val set_breakpoints : string option -> int list -> debug_state -> unit
 end
@@ -83,7 +83,7 @@ struct
              cur_report_id and could be refactored to use this *)
     mutable top_level_scopes : scope list;
     mutable frames : frame list;
-    mutable variables : variables;
+    mutable variables : Variable.ts;
     mutable errors : err_t list;
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
     mutable proc_name : string option;
@@ -207,7 +207,8 @@ struct
 
   let is_gil_file file_name = Filename.check_suffix file_name "gil"
 
-  let get_pure_formulae_vars (state : state_t) : variable list =
+  let get_pure_formulae_vars (state : state_t) : Variable.t list =
+    let open Variable in
     Verification.SPState.get_pfs state
     |> PFS.to_list
     |> List.map (fun formula ->
@@ -215,7 +216,8 @@ struct
            { name = ""; value; type_ = None; var_ref = 0 })
     |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 
-  let get_typ_env_vars (state : state_t) : variable list =
+  let get_typ_env_vars (state : state_t) : Variable.t list =
+    let open Variable in
     let typ_env = Verification.SPState.get_typ_env state in
     TypEnv.to_list typ_env
     |> List.sort (fun (v, _) (w, _) -> Stdlib.compare v w)
@@ -224,7 +226,8 @@ struct
            { name; value; type_ = None; var_ref = 0 })
     |> List.sort (fun v w -> Stdlib.compare v.name w.name)
 
-  let get_pred_vars (state : state_t) : variable list =
+  let get_pred_vars (state : state_t) : Variable.t list =
+    let open Variable in
     Verification.SPState.get_preds state
     |> Preds.SPreds.to_list
     |> List.map (fun pred ->
@@ -233,7 +236,7 @@ struct
     |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 
   let create_variables (state : state_t option) (is_gil_file : bool) :
-      scope list * variables =
+      scope list * Variable.ts =
     let variables = Hashtbl.create 0 in
     (* New scope ids must be higher than last top level scope id to prevent
        duplicate scope ids *)
@@ -1041,7 +1044,7 @@ struct
     let state = dbg |> get_proc_state in
     state.top_level_scopes
 
-  let get_variables (var_ref : int) (dbg : debug_state) : variable list =
+  let get_variables (var_ref : int) (dbg : debug_state) : Variable.t list =
     let state = dbg |> get_proc_state in
     match Hashtbl.find_opt state.variables var_ref with
     | None -> []

@@ -341,12 +341,12 @@ let get_store_vars store is_gil_file =
             -> match_offset rest loc Fmt.string
           | _ -> Fmt.to_to_string (Fmt.hbox Expr.pp) value
         in
-        Some ({ name = var; value; type_ = None; var_ref = 0 } : variable))
+        Some ({ name = var; value; type_ = None; var_ref = 0 } : Variable.t))
     store
   |> List.sort Stdlib.compare
 
 let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
-    variable list =
+    Variable.t list =
   let vstr = Fmt.to_to_string (Fmt.hbox Expr.pp) in
   let compare_offsets (v, _) (w, _) =
     try
@@ -359,37 +359,37 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
     with _ -> (* Do not sort the offsets if an exception has occurred *)
               0
   in
-  let cell_vars l : variable list =
+  let cell_vars l : Variable.t list =
     List.sort compare_offsets l
-    |> List.map (fun (offset, value) : variable ->
+    |> List.map (fun (offset, value) : Variable.t ->
            (* Display offset as a number to match the printing of WISL pointers *)
            let offset_str =
              match offset with
              | Expr.Lit (Int o) -> Z.to_string o
              | other -> vstr other
            in
-           create_leaf_variable offset_str (vstr value) ())
+           Variable.create_leaf offset_str (vstr value) ())
   in
   smemory |> Hashtbl.to_seq
   |> Seq.map (fun (loc, blocks) ->
          match blocks with
-         | Block.Freed -> create_leaf_variable loc "freed" ()
+         | Block.Freed -> Variable.create_leaf loc "freed" ()
          | Allocated { data; bound } ->
              let bound =
                match bound with
                | None -> "none"
                | Some bound -> string_of_int bound
              in
-             let bound = create_leaf_variable "bound" bound () in
+             let bound = Variable.create_leaf "bound" bound () in
              let cells_id = get_new_scope_id () in
              let () =
                Hashtbl.replace variables cells_id
                  (cell_vars (SFVL.to_list data))
              in
-             let cells = create_node_variable "cells" cells_id () in
+             let cells = Variable.create_node "cells" cells_id () in
              let loc_id = get_new_scope_id () in
              let () = Hashtbl.replace variables loc_id [ bound; cells ] in
-             create_node_variable loc loc_id ~value:"allocated" ())
+             Variable.create_node loc loc_id ~value:"allocated" ())
   |> List.of_seq
 
 let add_debugger_variables

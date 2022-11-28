@@ -951,13 +951,13 @@ module Lift = struct
 
   let get_store_vars store =
     store
-    |> List.map (fun (var, value) : variable ->
+    |> List.map (fun (var, value) : Variable.t ->
            let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
-           create_leaf_variable var value ())
-    |> List.sort (fun (v : variable) w -> Stdlib.compare v.name w.name)
+           Variable.create_leaf var value ())
+    |> List.sort (fun (v : Variable.t) w -> Stdlib.compare v.name w.name)
 
   let make_node ~get_new_scope_id ~variables ~name ~value ?(children = []) () :
-      variable =
+      Variable.t =
     let var_ref = get_new_scope_id () in
     let () =
       match children with

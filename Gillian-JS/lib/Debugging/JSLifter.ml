@@ -15,25 +15,31 @@ struct
   let to_str pp = Fmt.to_to_string (Fmt.hbox pp)
 
   (* TODO: All of this node stuff should be refactored to hide the scope id *)
-  let create_node_var name nodes get_new_scope_id (variables : variables) =
+  let create_node_var name nodes get_new_scope_id (variables : Variable.ts) =
     let id = get_new_scope_id () in
     let () = Hashtbl.replace variables id nodes in
-    (id, create_node_variable name id ())
+    (id, Variable.create_node name id ())
 
   let get_store_vars store =
     store
-    |> List.map (fun (var, value) : variable ->
+    |> List.map (fun (var, value) : Variable.t ->
            let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
-           create_leaf_variable var value ())
-    |> List.sort (fun v w -> Stdlib.compare v.name w.name)
+           Variable.create_leaf var value ())
+    |> List.sort (fun (v : Variable.t) (w : Variable.t) ->
+           Stdlib.compare v.name w.name)
 
-  let add_properties_vars properties get_new_scope_id (variables : variables) =
-    let add_lst_vars name to_string lst get_new_scope_id (variables : variables)
-        =
+  let add_properties_vars properties get_new_scope_id (variables : Variable.ts)
+      =
+    let add_lst_vars
+        name
+        to_string
+        lst
+        get_new_scope_id
+        (variables : Variable.ts) =
       let list_nodes =
         List.mapi
           (fun index element ->
-            create_leaf_variable (string_of_int index) (to_string element) ())
+            Variable.create_leaf (string_of_int index) (to_string element) ())
           lst
       in
       let _, node =
@@ -52,7 +58,7 @@ struct
              | Expr.Lit (Literal.LList lst) ->
                  add_lst_vars name (to_str Literal.pp) lst get_new_scope_id
                    variables
-             | _ -> create_leaf_variable name (to_str Expr.pp value) ())
+             | _ -> Variable.create_leaf name (to_str Expr.pp value) ())
       |> List.of_seq
     in
     let _, node =
@@ -60,18 +66,18 @@ struct
     in
     node
 
-  let add_memory_vars smemory get_new_scope_id (variables : variables) =
+  let add_memory_vars smemory get_new_scope_id (variables : Variable.ts) =
     let sorted_locs_with_vals = Symbolic.sorted_locs_with_vals smemory in
-    let value_nodes (loc, ((properties, domain), metadata)) : variable =
+    let value_nodes (loc, ((properties, domain), metadata)) : Variable.t =
       let () = ignore properties in
       let properties =
         add_properties_vars properties get_new_scope_id variables
       in
       let domain =
-        create_leaf_variable "domain" (to_str (Fmt.option Expr.pp) domain) ()
+        Variable.create_leaf "domain" (to_str (Fmt.option Expr.pp) domain) ()
       in
       let metadata =
-        create_leaf_variable "metadata"
+        Variable.create_leaf "metadata"
           (to_str (Fmt.option ~none:(Fmt.any "unknown") Expr.pp) metadata)
           ()
       in
@@ -79,7 +85,7 @@ struct
       let () =
         Hashtbl.replace variables loc_id [ properties; domain; metadata ]
       in
-      create_node_variable loc loc_id ()
+      Variable.create_node loc loc_id ()
     in
     List.map value_nodes sorted_locs_with_vals
 
@@ -87,16 +93,16 @@ struct
       (loc : string)
       smemory
       get_new_scope_id
-      (variables : variables)
+      (variables : Variable.ts)
       (loc_to_scope_id : (string, int) Hashtbl.t) : unit =
-    let rec add_lit_vars name lit : variable =
+    let rec add_lit_vars name lit : Variable.t =
       match lit with
       | Literal.Loc loc ->
           let () =
             add_loc_vars loc smemory get_new_scope_id variables loc_to_scope_id
           in
           let id = Hashtbl.find loc_to_scope_id loc in
-          create_node_variable name id ()
+          Variable.create_node name id ()
       | LList lst ->
           let nodes =
             List.mapi
@@ -107,7 +113,7 @@ struct
           in
           let _, node = create_node_var name nodes get_new_scope_id variables in
           node
-      | _ -> create_leaf_variable name (to_str Literal.pp lit) ()
+      | _ -> Variable.create_leaf name (to_str Literal.pp lit) ()
     in
     let add_expr_vars name expr =
       match expr with
@@ -116,7 +122,7 @@ struct
             add_loc_vars loc smemory get_new_scope_id variables loc_to_scope_id
           in
           let id = Hashtbl.find loc_to_scope_id loc in
-          create_node_variable name id ()
+          Variable.create_node name id ()
       (* TODO: The below causes a stack overflow error in large pieces of
          code, so they is probably a more efficient way to write this algorithm
          or something else is just incorrect*)
@@ -131,7 +137,7 @@ struct
              let _, node = create_node_var name nodes get_new_scope_id variables in
              node
          | Expr.Lit lit   -> add_lit_vars name lit *)
-      | _ -> create_leaf_variable name (to_str Expr.pp expr) ()
+      | _ -> Variable.create_leaf name (to_str Expr.pp expr) ()
     in
     let add_properties_vars properties =
       let property_nodes =
@@ -199,10 +205,10 @@ struct
           match SHeap.get smemory loc with
           | None -> []
           | Some ((properties, domain), metadata_opt) ->
-              let metadata_node metadata_opt : variable =
+              let metadata_node metadata_opt : Variable.t =
                 let name = "metadata" in
                 match metadata_opt with
-                | None -> create_leaf_variable name "unknown" ()
+                | None -> Variable.create_leaf name "unknown" ()
                 | Some metadata -> (
                     match metadata with
                     | Expr.ALoc child_loc ->
@@ -211,16 +217,16 @@ struct
                             variables loc_to_scope_id
                         in
                         let id = Hashtbl.find loc_to_scope_id child_loc in
-                        create_node_variable name id ()
+                        Variable.create_node name id ()
                     | _ ->
-                        create_leaf_variable name (to_str Expr.pp metadata) ())
+                        Variable.create_leaf name (to_str Expr.pp metadata) ())
               in
               let properties = add_properties_vars properties in
               (* let properties =
                    add_properties_vars properties get_new_scope_id variables
                  in *)
               let domain =
-                create_leaf_variable "domain"
+                Variable.create_leaf "domain"
                   (to_str (Fmt.option Expr.pp) domain)
                   ()
               in
@@ -236,7 +242,7 @@ struct
       ~memory
       ~is_gil_file
       ~get_new_scope_id
-      (variables : variables) =
+      (variables : Variable.ts) =
     if is_gil_file then
       let store_id = get_new_scope_id () in
       let memory_id = get_new_scope_id () in

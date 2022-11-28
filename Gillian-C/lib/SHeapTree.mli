@@ -99,10 +99,10 @@ module Lift : sig
     make_node:
       (name:string ->
       value:string ->
-      ?children:variable list ->
+      ?children:Variable.t list ->
       unit ->
-      variable) ->
+      Variable.t) ->
     loc:string ->
     t ->
-    variable
+    Variable.t
 end

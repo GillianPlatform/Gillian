@@ -73,9 +73,9 @@ module Range = struct
         ~(make_node :
            name:string ->
            value:string ->
-           ?children:variable list ->
+           ?children:Variable.t list ->
            unit ->
-           variable)
+           Variable.t)
         (low, high) =
       let str = Fmt.to_to_string (Fmt.hbox Expr.pp) in
       let from = make_node ~name:"From" ~value:(str low) () in
@@ -548,10 +548,10 @@ module Tree = struct
         ~(make_node :
            name:string ->
            value:string ->
-           ?children:variable list ->
+           ?children:Variable.t list ->
            unit ->
-           variable)
-        (tree : t) : variable =
+           Variable.t)
+        (tree : t) : Variable.t =
       let as_variable = as_variable ~make_node in
       let str pp = Fmt.to_to_string (Fmt.hbox pp) in
       let name = (str Range.pp) tree.span in
@@ -1560,11 +1560,11 @@ module Lift = struct
       ~(make_node :
          name:string ->
          value:string ->
-         ?children:variable list ->
+         ?children:Variable.t list ->
          unit ->
-         variable)
+         Variable.t)
       ~loc
-      t : variable =
+      t : Variable.t =
     match t with
     | Freed -> make_node ~name:loc ~value:"Freed" ()
     | Tree { bounds; root } ->

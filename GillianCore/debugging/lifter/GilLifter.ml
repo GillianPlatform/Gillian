@@ -301,14 +301,14 @@ module Make
     in
     let store_vars =
       store
-      |> List.map (fun (var, value) : variable ->
+      |> List.map (fun (var, value) : Variable.t ->
              let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
-             create_leaf_variable var value ())
-      |> List.sort (fun (v : variable) w -> Stdlib.compare v.name w.name)
+             Variable.create_leaf var value ())
+      |> List.sort (fun (v : Variable.t) w -> Stdlib.compare v.name w.name)
     in
     let memory_vars =
       [
-        create_leaf_variable ""
+        Variable.create_leaf ""
           (Fmt.to_to_string (Fmt.hbox SMemory.pp) memory)
           ();
       ]

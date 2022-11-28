@@ -37,7 +37,7 @@ module type S = sig
   val terminate : debug_state -> unit
   val get_frames : debug_state -> frame list
   val get_scopes : debug_state -> scope list
-  val get_variables : int -> debug_state -> variable list
+  val get_variables : int -> debug_state -> Variable.t list
   val get_exception_info : debug_state -> exception_info
   val set_breakpoints : string option -> int list -> debug_state -> unit
 end
