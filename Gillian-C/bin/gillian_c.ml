@@ -6,7 +6,7 @@ module Gil_to_c_lifter
                       with type annot = CParserAndCompiler.Annot.t) =
 struct
   include
-    Gillian.Debugger.Lifter.GilLifter.Make (CParserAndCompiler) (Verification)
+    Gillian.Debugger.Lifter.Gil_lifter.Make (CParserAndCompiler) (Verification)
       (SMemory)
 
   let add_variables = MonadicSMemory.Lift.add_variables

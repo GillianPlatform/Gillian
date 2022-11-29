@@ -1,7 +1,7 @@
 open Lifter
 open Syntaxes.Option
 
-module type GilLifterWithState = sig
+module type Gil_lifterWithState = sig
   module Lifter : Lifter.S
 
   val get_state : unit -> Lifter.t
@@ -11,7 +11,7 @@ module Make
     (SMemory : SMemory.S)
     (PC : ParserAndCompiler.S)
     (TLLifter : functor
-      (Gil : GilLifterWithState)
+      (Gil : Gil_lifterWithState)
       (V : Verifier.S with type annot = PC.Annot.t)
       ->
       S
@@ -29,18 +29,18 @@ module Make
      and type annot = PC.Annot.t = struct
   let gil_state = ref None
 
-  module GilLifter = GilLifter.Make (PC) (Verifier) (SMemory)
+  module Gil_lifter = Gil_lifter.Make (PC) (Verifier) (SMemory)
 
-  module GilLifterWithState = struct
-    module Lifter = GilLifter
+  module Gil_lifterWithState = struct
+    module Lifter = Gil_lifter
 
     let get_state () = !gil_state |> Option.get
   end
 
-  module TLLifter = TLLifter (GilLifterWithState) (Verifier)
+  module TLLifter = TLLifter (Gil_lifterWithState) (Verifier)
 
   type t = {
-    gil : GilLifter.t; [@to_yojson GilLifter.dump]
+    gil : Gil_lifter.t; [@to_yojson Gil_lifter.dump]
     tl : TLLifter.t option; [@to_yojson opt_to_yojson TLLifter.dump]
   }
   [@@deriving to_yojson]
@@ -52,7 +52,7 @@ module Make
   type annot = PC.Annot.t
 
   let init proc_name tl_ast exec_data =
-    let gil, gil_result = GilLifter.init proc_name tl_ast exec_data in
+    let gil, gil_result = Gil_lifter.init proc_name tl_ast exec_data in
     gil_state := Some gil;
     let ret =
       match TLLifter.init_opt proc_name tl_ast exec_data with
@@ -67,14 +67,14 @@ module Make
   let dump = to_yojson
 
   let handle_cmd prev_id branch_case exec_data { gil; tl } =
-    match gil |> GilLifter.handle_cmd prev_id branch_case exec_data with
+    match gil |> Gil_lifter.handle_cmd prev_id branch_case exec_data with
     | Stop -> (
         match tl with
         | None -> Stop
         | Some tl -> tl |> TLLifter.handle_cmd prev_id branch_case exec_data)
     | r -> r
 
-  let get_gil_map state = state.gil |> GilLifter.get_gil_map
+  let get_gil_map state = state.gil |> Gil_lifter.get_gil_map
 
   let get_lifted_map_opt state =
     let+ tl = state.tl in
@@ -88,42 +88,42 @@ module Make
   let get_unifys_at_id id { gil; tl } =
     match tl with
     | Some tl -> tl |> TLLifter.get_unifys_at_id id
-    | None -> gil |> GilLifter.get_unifys_at_id id
+    | None -> gil |> Gil_lifter.get_unifys_at_id id
 
   let get_root_id { gil; tl } =
     match tl with
     | Some tl -> tl |> TLLifter.get_root_id
-    | None -> gil |> GilLifter.get_root_id
+    | None -> gil |> Gil_lifter.get_root_id
 
   let path_of_id id { gil; tl } =
     match tl with
     | Some tl -> tl |> TLLifter.path_of_id id
-    | None -> gil |> GilLifter.path_of_id id
+    | None -> gil |> Gil_lifter.path_of_id id
 
   let existing_next_steps id { gil; tl } =
     match tl with
     | Some tl -> tl |> TLLifter.existing_next_steps id
-    | None -> gil |> GilLifter.existing_next_steps id
+    | None -> gil |> Gil_lifter.existing_next_steps id
 
   let next_step_specific id case { gil; tl } =
     match tl with
     | Some tl -> tl |> TLLifter.next_step_specific id case
-    | None -> gil |> GilLifter.next_step_specific id case
+    | None -> gil |> Gil_lifter.next_step_specific id case
 
   let previous_step id { gil; tl } =
     match tl with
     | Some tl -> tl |> TLLifter.previous_step id
-    | None -> gil |> GilLifter.previous_step id
+    | None -> gil |> Gil_lifter.previous_step id
 
   let select_next_path case id { gil; tl } =
     match tl with
     | Some tl -> tl |> TLLifter.select_next_path case id
-    | None -> gil |> GilLifter.select_next_path case id
+    | None -> gil |> Gil_lifter.select_next_path case id
 
   let find_unfinished_path ?at_id { gil; tl } =
     match tl with
     | Some tl -> tl |> TLLifter.find_unfinished_path ?at_id
-    | None -> gil |> GilLifter.find_unfinished_path ?at_id
+    | None -> gil |> Gil_lifter.find_unfinished_path ?at_id
 
   let memory_error_to_exception_info = TLLifter.memory_error_to_exception_info
   let add_variables = TLLifter.add_variables

@@ -28,5 +28,5 @@ type scope = { name : string; id : int }
 type exception_info = { id : string; description : string option }
 
 module Variable = Variable
-module ExecMap = ExecMap
-module UnifyMap = UnifyMap
+module Exec_map = Exec_map
+module Unify_map = Unify_map

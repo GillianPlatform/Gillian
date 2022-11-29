@@ -45,13 +45,13 @@ type stop_at =
 type unification = {
   id : L.ReportId.t;
   kind : Unifier.unify_kind;
-  result : UnifyMap.unify_result;
+  result : Unify_map.unify_result;
 }
 [@@deriving yojson]
 
 type 't submap =
   | NoSubmap
-  | Submap of 't  (** Embed an [ExecMap] as a submap *)
+  | Submap of 't  (** Embed an [Exec_map] as a submap *)
   | Proc of string  (** Embed the execution of another proc as a submap *)
 [@@deriving yojson]
 
@@ -71,7 +71,7 @@ let find_path pred map =
 let find_path_exn pred map =
   match find_path pred map with
   | Some path -> path
-  | None -> failwith "ExecMap.find_path"
+  | None -> failwith "Exec_map.find_path"
 
 (** Gets the node at the given path *)
 let at_path ?(stop_at = EndOfPath) path map =
@@ -96,9 +96,9 @@ let at_path ?(stop_at = EndOfPath) path map =
 let at_path_exn ?(stop_at = EndOfPath) path map =
   match at_path ~stop_at path map with
   | Some map -> map
-  | None -> failwith "ExecMap.at_path"
+  | None -> failwith "Exec_map.at_path"
 
-(** An ExecMap to be passed to the debugger frontend and displayed *)
+(** An Exec_map to be passed to the debugger frontend and displayed *)
 module Packaged = struct
   type branch_case = {
     kind : string;
@@ -145,7 +145,7 @@ module Packaged = struct
     in
     { kind; display; json }
 
-  (** Converts an ExecMap to a packaged ExecMap *)
+  (** Converts an Exec_map to a packaged Exec_map *)
   let package package_data package_case (map : ('c, 'd, 'bd) _map) : t =
     let rec aux map =
       match map with

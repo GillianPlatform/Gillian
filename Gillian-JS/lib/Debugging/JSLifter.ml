@@ -6,11 +6,11 @@ module PC = Js2jsil_lib.JS2GIL_ParserAndCompiler
 module Make
     (Verification : Gillian.Abstraction.Verifier.S with type annot = PC.Annot.t) =
 struct
-  module GilLifter =
-    Gillian.Debugger.Lifter.GilLifter.Make (PC) (Verification)
+  module Gil_lifter =
+    Gillian.Debugger.Lifter.Gil_lifter.Make (PC) (Verification)
       (Semantics.Symbolic)
 
-  include GilLifter
+  include Gil_lifter
 
   let to_str pp = Fmt.to_to_string (Fmt.hbox pp)
 

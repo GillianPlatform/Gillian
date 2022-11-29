@@ -1,4 +1,4 @@
-module type GilLifterWithState = sig
+module type Gil_lifterWithState = sig
   module Lifter : Lifter.S
 
   val get_state : unit -> Lifter.t
@@ -8,7 +8,7 @@ module Make
     (SMemory : SMemory.S)
     (PC : ParserAndCompiler.S)
     (TLLifter : functor
-      (Gil : GilLifterWithState)
+      (Gil : Gil_lifterWithState)
       (V : Verifier.S with type annot = PC.Annot.t)
       ->
       Lifter.S

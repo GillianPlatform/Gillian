@@ -2,7 +2,7 @@ module type S = sig
   type tl_ast
   type debug_state
 
-  module UnifyMap : sig
+  module Unify_map : sig
     type t [@@deriving yojson]
   end
 
@@ -12,7 +12,7 @@ module type S = sig
     val get_debug_state : debug_state -> debug_state_view
 
     val get_unification :
-      Logging.ReportId.t -> debug_state -> Logging.ReportId.t * UnifyMap.t
+      Logging.ReportId.t -> debug_state -> Logging.ReportId.t * Unify_map.t
   end
 
   val launch : string -> string option -> (debug_state, string) result
@@ -26,7 +26,7 @@ module type S = sig
 
   val step_specific :
     string ->
-    ExecMap.Packaged.branch_case option ->
+    Exec_map.Packaged.branch_case option ->
     Logging.ReportId.t ->
     debug_state ->
     (stop_reason, string) result

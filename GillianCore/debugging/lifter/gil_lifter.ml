@@ -12,7 +12,7 @@ module Make
      and type memory_error = SMemory.err_t
      and type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t
      and type annot = PC.Annot.t = struct
-  open ExecMap
+  open Exec_map
   module Annot = PC.Annot
 
   type annot = PC.Annot.t
@@ -20,7 +20,7 @@ module Make
   type branch_path = BranchCase.path [@@deriving yojson]
 
   (* Some fields are Null'd in yojson to stop huge memory inefficiency *)
-  type map = (branch_case, cmd_data, unit) ExecMap.t
+  type map = (branch_case, cmd_data, unit) Exec_map.t
 
   and cmd_data = {
     id : L.ReportId.t;
@@ -129,7 +129,7 @@ module Make
             ("prev_id", L.ReportId.to_yojson prev_id);
             ("branch_case", opt_to_yojson branch_case_to_yojson branch_case);
           ])
-        ("GilLifter.handle_cmd: " ^ s)
+        ("Gil_lifter.handle_cmd: " ^ s)
     in
     let map =
       match Hashtbl.find_opt id_map prev_id with
@@ -216,7 +216,7 @@ module Make
   let next_step_specific id case _ =
     let case =
       case
-      |> Option.map (fun (case : ExecMap.Packaged.branch_case) ->
+      |> Option.map (fun (case : Exec_map.Packaged.branch_case) ->
              case.json |> BranchCase.of_yojson |> Result.get_ok)
     in
     (id, case)
@@ -231,7 +231,7 @@ module Make
         | Some
             ((Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data }), case)
           ->
-            let case = case |> Option.map ExecMap.Packaged.package_gil_case in
+            let case = case |> Option.map Exec_map.Packaged.package_gil_case in
             Some (data.id, case))
 
   let select_next_path case id state =

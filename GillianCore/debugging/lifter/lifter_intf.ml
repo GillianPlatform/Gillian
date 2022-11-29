@@ -1,5 +1,5 @@
 module Types = struct
-  type unify_result = UnifyMap.unify_result = Success | Failure
+  type unify_result = Unify_map.unify_result = Success | Failure
   [@@deriving yojson]
 
   type ('err, 'annot, 'ast) memory_error_info = {
@@ -10,10 +10,10 @@ module Types = struct
   }
 
   type 'cmd_report executed_cmd_data = {
-    kind : (BranchCase.t, unit) ExecMap.cmd_kind;
+    kind : (BranchCase.t, unit) Exec_map.cmd_kind;
     id : Logging.ReportId.t;
     cmd_report : 'cmd_report;
-    unifys : ExecMap.unification list;
+    unifys : Exec_map.unification list;
     errors : string list;
     branch_path : BranchCase.path;
   }
@@ -56,10 +56,10 @@ module type S = sig
     t ->
     handle_cmd_result
 
-  val get_gil_map : t -> ExecMap.Packaged.t
-  val get_lifted_map_opt : t -> ExecMap.Packaged.t option
-  val get_lifted_map : t -> ExecMap.Packaged.t
-  val get_unifys_at_id : Logging.ReportId.t -> t -> ExecMap.unification list
+  val get_gil_map : t -> Exec_map.Packaged.t
+  val get_lifted_map_opt : t -> Exec_map.Packaged.t option
+  val get_lifted_map : t -> Exec_map.Packaged.t
+  val get_unifys_at_id : Logging.ReportId.t -> t -> Exec_map.unification list
   val get_root_id : t -> Logging.ReportId.t option
   val path_of_id : Logging.ReportId.t -> t -> BranchCase.path
 
@@ -68,14 +68,14 @@ module type S = sig
 
   val next_step_specific :
     Logging.ReportId.t ->
-    ExecMap.Packaged.branch_case option ->
+    Exec_map.Packaged.branch_case option ->
     t ->
     Logging.ReportId.t * BranchCase.t option
 
   val previous_step :
     Logging.ReportId.t ->
     t ->
-    (Logging.ReportId.t * ExecMap.Packaged.branch_case option) option
+    (Logging.ReportId.t * Exec_map.Packaged.branch_case option) option
 
   val select_next_path :
     BranchCase.t option -> Logging.ReportId.t -> t -> BranchCase.path
@@ -107,10 +107,10 @@ module type Intf = sig
   module type S = S
 
   val make_executed_cmd_data :
-    (BranchCase.t, unit) ExecMap.cmd_kind ->
+    (BranchCase.t, unit) Exec_map.cmd_kind ->
     Logging.ReportId.t ->
     'cmd_report ->
-    ?unifys:ExecMap.unification list ->
+    ?unifys:Exec_map.unification list ->
     ?errors:string list ->
     BranchCase.path ->
     'cmd_report executed_cmd_data

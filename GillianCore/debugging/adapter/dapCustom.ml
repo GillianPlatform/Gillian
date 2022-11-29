@@ -1,7 +1,7 @@
 open DebugProtocolEx
 module L = Logging
 module DL = Debugger_log
-module ExecMap = Debugger_utils.ExecMap
+module Exec_map = Debugger_utils.Exec_map
 
 module Events (Debugger : Debugger.S) = struct
   module Debug_state_update_event = struct
@@ -68,7 +68,7 @@ module Commands (Debugger : Debugger.S) = struct
     module Result = struct
       type t = {
         unify_id : L.ReportId.t; [@key "unifyId"]
-        unify_map : Debugger.UnifyMap.t; [@key "unifyMap"]
+        unify_map : Debugger.Unify_map.t; [@key "unifyMap"]
       }
       [@@deriving yojson, make]
     end
@@ -95,7 +95,7 @@ module Commands (Debugger : Debugger.S) = struct
       type t = {
         proc_name : string; [@key "procName"]
         prev_id : L.ReportId.t; [@key "prevId"]
-        branch_case : ExecMap.Packaged.branch_case option; [@key "branchCase"]
+        branch_case : Exec_map.Packaged.branch_case option; [@key "branchCase"]
       }
       [@@deriving yojson]
     end

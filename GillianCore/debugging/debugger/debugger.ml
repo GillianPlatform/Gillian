@@ -1,7 +1,7 @@
 module L = Logging
 module DL = Debugger_log
 module Lift = Debugger_lifter
-module ExecMap = ExecMap
+module Exec_map = Exec_map
 open Syntaxes.Option
 
 type rid = L.ReportId.t [@@deriving show, yojson]
@@ -14,7 +14,7 @@ module type S = sig
   type tl_ast
   type debug_state
 
-  module UnifyMap : sig
+  module Unify_map : sig
     type t [@@deriving yojson]
   end
 
@@ -22,7 +22,7 @@ module type S = sig
     type debug_state_view [@@deriving yojson]
 
     val get_debug_state : debug_state -> debug_state_view
-    val get_unification : rid -> debug_state -> rid * UnifyMap.t
+    val get_unification : rid -> debug_state -> rid * Unify_map.t
   end
 
   val launch : string -> string option -> (debug_state, string) result
@@ -33,7 +33,7 @@ module type S = sig
 
   val step_specific :
     string ->
-    ExecMap.Packaged.branch_case option ->
+    Exec_map.Packaged.branch_case option ->
     Logging.ReportId.t ->
     debug_state ->
     (stop_reason, string) result
@@ -71,9 +71,9 @@ struct
 
   type breakpoints = (string, Breakpoints.t) Hashtbl.t
   type tl_ast = PC.tl_ast
-  type unify_result = UnifyMap.unify_result = Success | Failure
+  type unify_result = Unify_map.unify_result = Success | Failure
 
-  module UnifyMap = UnifyMap.Make (Verification)
+  module Unify_map = Unify_map.Make (Verification)
 
   type debug_proc_state = {
     mutable cont_func : result_t cont_func_f option;
@@ -87,7 +87,7 @@ struct
     mutable errors : err_t list;
     mutable cur_cmd : (int Cmd.t * Annot.t) option;
     mutable proc_name : string option;
-    mutable unify_maps : (rid * UnifyMap.t) list;
+    mutable unify_maps : (rid * Unify_map.t) list;
     lifter_state : Lifter.t;
     report_state : L.ReportState.t;
   }
@@ -131,10 +131,10 @@ struct
 
   module Inspect = struct
     type debug_proc_state_view = {
-      exec_map : ExecMap.Packaged.t; [@key "execMap"]
-      lifted_exec_map : ExecMap.Packaged.t option; [@key "liftedExecMap"]
+      exec_map : Exec_map.Packaged.t; [@key "execMap"]
+      lifted_exec_map : Exec_map.Packaged.t option; [@key "liftedExec_map"]
       current_cmd_id : rid; [@key "currentCmdId"]
-      unifys : ExecMap.unification list;
+      unifys : Exec_map.unification list;
       proc_name : string; [@key "procName"]
     }
     [@@deriving yojson]
@@ -193,7 +193,7 @@ struct
       match state.unify_maps |> List.assoc_opt unify_id with
       | Some map -> (unify_id, map)
       | None ->
-          let map = UnifyMap.build unify_id in
+          let map = Unify_map.build unify_id in
           state.unify_maps <- (unify_id, map) :: state.unify_maps;
           (unify_id, map)
   end
@@ -537,11 +537,11 @@ struct
                 let unifys =
                   match unify result proc_name prev_id cfg with
                   | None -> []
-                  | Some (id, kind, result) -> [ ExecMap.{ id; kind; result } ]
+                  | Some (id, kind, result) -> [ Exec_map.{ id; kind; result } ]
                 in
                 state |> update_report_id_and_inspection_fields prev_id cfg;
                 let exec_data =
-                  Lift.make_executed_cmd_data ExecMap.Final prev_id cmd ~unifys
+                  Lift.make_executed_cmd_data Exec_map.Final prev_id cmd ~unifys
                     ~errors branch_path
                 in
                 let handler_result =
@@ -595,7 +595,7 @@ struct
                 else (
                   state
                   |> update_report_id_and_inspection_fields cur_report_id cfg;
-                  ExecMap.(
+                  Exec_map.(
                     let cmd =
                       Result.get_ok
                         (content |> Yojson.Safe.from_string
@@ -603,7 +603,7 @@ struct
                     in
                     let cmd_kind =
                       match new_branch_cases with
-                      | Some cases -> ExecMap.kind_of_cases cases
+                      | Some cases -> Exec_map.kind_of_cases cases
                       | None -> Normal
                     in
                     let unifys =
@@ -617,18 +617,18 @@ struct
                           match state.unify_maps |> List.assoc_opt unify_id with
                           | Some map -> map
                           | None ->
-                              let map = UnifyMap.build unify_id in
+                              let map = Unify_map.build unify_id in
                               state.unify_maps <-
                                 (unify_id, map) :: state.unify_maps;
                               map
                         in
-                        let result = unify_map |> UnifyMap.result in
+                        let result = unify_map |> Unify_map.result in
                         (unify_id, fst unify_map, result)
                       in
                       match unify with
                       | None -> []
                       | Some (id, kind, result) ->
-                          [ ExecMap.{ id; kind; result } ]
+                          [ Exec_map.{ id; kind; result } ]
                     in
                     let exec_data =
                       Lift.make_executed_cmd_data cmd_kind cur_report_id cmd
@@ -674,10 +674,10 @@ struct
                     match unify result proc_name prev_id cfg with
                     | None -> []
                     | Some (id, kind, result) ->
-                        [ ExecMap.{ id; kind; result } ]
+                        [ Exec_map.{ id; kind; result } ]
                   in
                   let errors = show_result_errors result in
-                  Lift.make_executed_cmd_data ExecMap.Final prev_id cmd ~unifys
+                  Lift.make_executed_cmd_data Exec_map.Final prev_id cmd ~unifys
                     ~errors []
                 in
                 Lifter.init proc_name cfg.tl_ast exec_data
@@ -734,7 +734,7 @@ struct
                 in
                 let lifter_state, handler_result =
                   let kind =
-                    ExecMap.kind_of_cases
+                    Exec_map.kind_of_cases
                     @@ Option.value ~default:[] new_branch_cases
                   in
                   let exec_data =
@@ -833,7 +833,7 @@ struct
   let jump_state_to_id id cfg state =
     try
       DL.log (fun m -> m "Jumping to id %a" pp_rid id);
-      (* state.exec_map |> snd |> ExecMap.path_of_id id |> ignore; *)
+      (* state.exec_map |> snd |> Exec_map.path_of_id id |> ignore; *)
       (* TODO *)
       state |> update_report_id_and_inspection_fields id cfg;
       Ok ()

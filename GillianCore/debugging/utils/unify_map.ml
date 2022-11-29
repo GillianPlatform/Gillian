@@ -45,7 +45,7 @@ module Make (Verification : Verifier.S) = struct
     let rec aux id =
       let children = L.LogQueryer.get_children_of id in
       if children = [] then
-        Fmt.failwith "UnifyMap.result_of_id: report %a has no children!"
+        Fmt.failwith "Unify_map.result_of_id: report %a has no children!"
           L.ReportId.pp id;
       match
         children
@@ -107,20 +107,20 @@ module Make (Verification : Verifier.S) = struct
           | [ child ] -> Some child
           | _ ->
               Fmt.failwith
-                "UnifyMap.build_seg: assertion %a has multiple children!"
+                "Unify_map.build_seg: assertion %a has multiple children!"
                 L.ReportId.pp id
         in
         if type_ <> ContentType.unify then
           Fmt.failwith
-            "UnifyMap.build_seg: report %a (child of assertion %a) has type %s \
-             (expected %s)!"
+            "Unify_map.build_seg: report %a (child of assertion %a) has type \
+             %s (expected %s)!"
             L.ReportId.pp child_id L.ReportId.pp id type_ ContentType.unify;
         (child_id, result_of_id child_id)
       in
       let seg =
         match L.LogQueryer.get_next_report_ids id with
         | [] ->
-            Fmt.failwith "UnifyMap.build_seg: assertion %a has no next!"
+            Fmt.failwith "Unify_map.build_seg: assertion %a has no next!"
               L.ReportId.pp id
         | [ next_id ] ->
             let content, type_ =
@@ -128,7 +128,7 @@ module Make (Verification : Verifier.S) = struct
             in
             build_seg ~prev_substs:substitutions (next_id, type_, content)
         | _ ->
-            Fmt.failwith "UnifyMap.build_seg: assertion %a has multiple nexts!"
+            Fmt.failwith "Unify_map.build_seg: assertion %a has multiple nexts!"
               L.ReportId.pp id
       in
       Assertion ({ id; fold; assertion; substitutions }, seg)
@@ -145,18 +145,18 @@ module Make (Verification : Verifier.S) = struct
       UnifyResult (id, result)
     else
       Fmt.failwith
-        "UnifyMap.build_seg: report %a has invalid type (%s) for unify_seg!"
+        "Unify_map.build_seg: report %a has invalid type (%s) for unify_seg!"
         L.ReportId.pp id type_
 
   (** Given the ID of a (non-fold) unification or a unify case (when folding), build the representative [unify_seg] *)
   let build_case id : unify_seg =
     match L.LogQueryer.get_children_of ~roots_only:true id with
     | [] ->
-        Fmt.failwith "UnifyMap.build_case: id %a has no children!" L.ReportId.pp
-          id
+        Fmt.failwith "Unify_map.build_case: id %a has no children!"
+          L.ReportId.pp id
     | [ child ] -> build_seg child
     | _ ->
-        Fmt.failwith "UnifyMap.build_case: id %a has multiple children!"
+        Fmt.failwith "Unify_map.build_case: id %a has multiple children!"
           L.ReportId.pp id
 
   (** Given the ID of a folding unification, build the representative [unify_seg] of each case *)
@@ -167,11 +167,12 @@ module Make (Verification : Verifier.S) = struct
       | [] -> acc
       | [ (id, type_, _) ] ->
           if type_ <> ContentType.unify_case then
-            Fmt.failwith "UnifyMap.build_cases: %a has type %s (expected %s)!"
+            Fmt.failwith "Unify_map.build_cases: %a has type %s (expected %s)!"
               L.ReportId.pp id type_ ContentType.unify_case
           else aux id acc
       | _ ->
-          Fmt.failwith "UnifyMap.build_cases: unify_case %a has multiple nexts!"
+          Fmt.failwith
+            "Unify_map.build_cases: unify_case %a has multiple nexts!"
             L.ReportId.pp id
     in
 
@@ -193,7 +194,7 @@ module Make (Verification : Verifier.S) = struct
         | [ child ] -> child
         | _ ->
             Fmt.failwith
-              "UnifyMap.build: unify id %a should have one root child!"
+              "Unify_map.build: unify id %a should have one root child!"
               L.ReportId.pp unify_id
       in
       if type_ = ContentType.unify_case then
