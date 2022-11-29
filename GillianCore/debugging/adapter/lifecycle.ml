@@ -1,8 +1,13 @@
-open DebugProtocolEx
+open Debug_protocol_ext
+
+(**/**)
+
 module DL = Debugger_log
 
+(**/**)
+
 module Make (Debugger : Debugger.S) = struct
-  open DapCustom.Events (Debugger)
+  open Custom_events (Debugger)
 
   let run launch_args dbg rpc =
     let promise, resolver = Lwt.task () in

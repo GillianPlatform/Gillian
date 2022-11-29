@@ -1,9 +1,14 @@
-open DebugProtocolEx
+open Debug_protocol_ext
+
+(**/**)
+
 module DL = Debugger_log
 
+(**/**)
+
 module Make (Debugger : Debugger.S) = struct
-  open DapCustom.Events (Debugger)
-  open DapCustom.Commands (Debugger)
+  open Custom_events (Debugger)
+  open Custom_commands (Debugger)
 
   let run dbg rpc =
     let send_stopped_events = send_stopped_events dbg rpc in

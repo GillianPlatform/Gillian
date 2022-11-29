@@ -1,9 +1,30 @@
-open DebugProtocolEx
+include Debug_protocol
+
+(**/**)
+
 module L = Logging
 module DL = Debugger_log
 module Exec_map = Debugger_utils.Exec_map
 
-module Events (Debugger : Debugger.S) = struct
+(**/**)
+
+(** Extension of the Launch command to include custom arguments *)
+module Launch_command = struct
+  let type_ = Launch_command.type_
+
+  module Arguments = struct
+    type t = {
+      program : string;
+      stop_on_entry : bool; [@default false] [@key "stopOnEntry"]
+      procedure_name : string option; [@default None] [@key "procedureName"]
+    }
+    [@@deriving yojson { strict = false }]
+  end
+
+  module Result = Launch_command.Result
+end
+
+module Custom_events (Debugger : Debugger.S) = struct
   module Debug_state_update_event = struct
     let type_ = "debugStateUpdate"
 
@@ -45,7 +66,7 @@ module Events (Debugger : Debugger.S) = struct
       (Debugger.Inspect.get_debug_state dbg)
 end
 
-module Commands (Debugger : Debugger.S) = struct
+module Custom_commands (Debugger : Debugger.S) = struct
   module Debugger_state_command = struct
     let type_ = "debuggerState"
 

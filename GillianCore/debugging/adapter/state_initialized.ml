@@ -1,5 +1,10 @@
-open DebugProtocolEx
+open Debug_protocol_ext
+
+(**/**)
+
 module DL = Debugger_log
+
+(**/**)
 
 module Make (Debugger : Debugger.S) = struct
   let run rpc =
@@ -10,7 +15,7 @@ module Make (Debugger : Debugger.S) = struct
     in
     DL.set_rpc_command_handler rpc ~name:"Launch"
       (module Launch_command)
-      (fun (launch_args : DebugProtocolEx.Launch_command.Arguments.t) ->
+      (fun (launch_args : Launch_command.Arguments.t) ->
         prevent_reenter ();
         let () =
           match
