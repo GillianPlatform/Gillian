@@ -1,3 +1,5 @@
+(** @canonical Gillian.Debugger.Logging *)
+
 module JsonMap : sig
   type t = (string * Yojson.Safe.t) list
 end

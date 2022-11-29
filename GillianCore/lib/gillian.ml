@@ -8,7 +8,9 @@ module Bulk = Bulk
 module Monadic = Monadic
 
 module Debugger = struct
+  (** @inline *)
   include Debugger
+
   module Logging = Debugger_log
   module Utils = Debugger_utils
   module Lifter = Debugger_lifter

@@ -1,3 +1,5 @@
+(** @canonical Gillian.Debugger.Utils *)
+
 (** Converts a GIL location (column number starts from 0) to a VSCode location (column number starts from 1) *)
 let location_to_display_location
     ({ loc_start; loc_end; loc_source } : Location.t) : Location.t =

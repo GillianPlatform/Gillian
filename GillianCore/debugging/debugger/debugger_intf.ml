@@ -55,8 +55,15 @@ module type Make = functor
   -> S
 
 module type Intf = sig
+  (** @canonical Gillian.Debugger.S *)
   module type S = S
+
+  (**/**)
+
   module type Make = Make
 
+  (**/**)
+
+  (** @canonical Gillian.Debugger.Make *)
   module Make : Make
 end
