@@ -13,7 +13,7 @@ module Types = struct
     kind : (BranchCase.t, unit) ExecMap.cmd_kind;
     id : Logging.ReportId.t;
     cmd_report : 'cmd_report;
-    unifys : ExecMap.unifys;
+    unifys : ExecMap.unification list;
     errors : string list;
     branch_path : BranchCase.path;
   }
@@ -59,7 +59,7 @@ module type S = sig
   val get_gil_map : t -> ExecMap.Packaged.t
   val get_lifted_map_opt : t -> ExecMap.Packaged.t option
   val get_lifted_map : t -> ExecMap.Packaged.t
-  val get_unifys_at_id : Logging.ReportId.t -> t -> ExecMap.unifys
+  val get_unifys_at_id : Logging.ReportId.t -> t -> ExecMap.unification list
   val get_root_id : t -> Logging.ReportId.t option
   val path_of_id : Logging.ReportId.t -> t -> BranchCase.path
 
@@ -110,7 +110,7 @@ module type Intf = sig
     (BranchCase.t, unit) ExecMap.cmd_kind ->
     Logging.ReportId.t ->
     'cmd_report ->
-    ?unifys:ExecMap.unifys ->
+    ?unifys:ExecMap.unification list ->
     ?errors:string list ->
     BranchCase.path ->
     'cmd_report executed_cmd_data

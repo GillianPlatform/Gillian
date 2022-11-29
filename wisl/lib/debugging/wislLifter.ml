@@ -69,7 +69,7 @@ struct
   and cmd_data = {
     ids : rid list;
     display : string;
-    unifys : unifys;
+    unifys : unification list;
     errors : string list;
     submap : map submap;
     gil_branch_path : BranchCase.path;
@@ -87,8 +87,7 @@ struct
       errors : string ExtList.t;
       mutable submap : map submap;
       mutable inner_path : branch_data list;
-      unifys :
-        (rid * Engine.Unifier.unify_kind * UnifyMap.unify_result) ExtList.t;
+      unifys : unification ExtList.t;
       unexplored_paths : branch_data list Stack.t;
       out_paths : (branch_case * branch_data list) ExtList.t;
       mutable unknown_outs_count : int;
@@ -159,7 +158,7 @@ struct
       | Finished of {
           ids : rid list;
           display : string;
-          unifys : unifys;
+          unifys : unification list;
           errors : string list;
           cmd_kind : (branch_case, branch_data) cmd_kind;
           submap : map submap;
@@ -460,7 +459,7 @@ struct
     | _ -> None
 
   let init_or_handle prev_id branch_case exec_data state =
-    let { id; _ } = exec_data in
+    let Debugger.Lifter.{ id; _ } = exec_data in
     DL.log (fun m ->
         m
           ~json:
@@ -568,7 +567,7 @@ struct
           match gil_case with
           | Some gil_case ->
               let kind_display, display =
-                Packaged.(package_case gil_case).display
+                Packaged.(package_gil_case gil_case).display
               in
               let kind = "GIL" in
               let kind_display = Fmt.str "(GIL) %s" kind_display in

@@ -25,7 +25,7 @@ module Make
   and cmd_data = {
     id : L.ReportId.t;
     display : string;
-    unifys : unifys;
+    unifys : unification list;
     errors : string list;
     submap : map submap;
     branch_path : branch_path;
@@ -158,7 +158,7 @@ module Make
       ExecNext (Some id, None)
     else Stop
 
-  let package_case _ = Packaged.package_case
+  let package_case _ = Packaged.package_gil_case
 
   let package_data package { id; display; unifys; errors; submap; _ } =
     let submap =
@@ -231,7 +231,7 @@ module Make
         | Some
             ((Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data }), case)
           ->
-            let case = case |> Option.map ExecMap.Packaged.package_case in
+            let case = case |> Option.map ExecMap.Packaged.package_gil_case in
             Some (data.id, case))
 
   let select_next_path case id state =

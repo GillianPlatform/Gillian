@@ -134,7 +134,7 @@ struct
       exec_map : ExecMap.Packaged.t; [@key "execMap"]
       lifted_exec_map : ExecMap.Packaged.t option; [@key "liftedExecMap"]
       current_cmd_id : rid; [@key "currentCmdId"]
-      unifys : ExecMap.unifys;
+      unifys : ExecMap.unification list;
       proc_name : string; [@key "procName"]
     }
     [@@deriving yojson]
@@ -535,7 +535,9 @@ struct
                 let proc_name = (List.hd cmd.callstack).pid in
                 let errors = show_result_errors result in
                 let unifys =
-                  unify result proc_name prev_id cfg |> Option.to_list
+                  match unify result proc_name prev_id cfg with
+                  | None -> []
+                  | Some (id, kind, result) -> [ ExecMap.{ id; kind; result } ]
                 in
                 state |> update_report_id_and_inspection_fields prev_id cfg;
                 let exec_data =
@@ -605,23 +607,28 @@ struct
                       | None -> Normal
                     in
                     let unifys =
-                      (DL.log (fun m ->
-                           m "getting unify_result for %a" pp_rid cur_report_id);
-                       let+ unify_id, _ =
-                         L.LogQueryer.get_unify_for cur_report_id
-                       in
-                       let unify_map =
-                         match state.unify_maps |> List.assoc_opt unify_id with
-                         | Some map -> map
-                         | None ->
-                             let map = UnifyMap.build unify_id in
-                             state.unify_maps <-
-                               (unify_id, map) :: state.unify_maps;
-                             map
-                       in
-                       let result = unify_map |> UnifyMap.result in
-                       (unify_id, fst unify_map, result))
-                      |> Option.to_list
+                      let unify =
+                        DL.log (fun m ->
+                            m "getting unify_result for %a" pp_rid cur_report_id);
+                        let+ unify_id, _ =
+                          L.LogQueryer.get_unify_for cur_report_id
+                        in
+                        let unify_map =
+                          match state.unify_maps |> List.assoc_opt unify_id with
+                          | Some map -> map
+                          | None ->
+                              let map = UnifyMap.build unify_id in
+                              state.unify_maps <-
+                                (unify_id, map) :: state.unify_maps;
+                              map
+                        in
+                        let result = unify_map |> UnifyMap.result in
+                        (unify_id, fst unify_map, result)
+                      in
+                      match unify with
+                      | None -> []
+                      | Some (id, kind, result) ->
+                          [ ExecMap.{ id; kind; result } ]
                     in
                     let exec_data =
                       Lift.make_executed_cmd_data cmd_kind cur_report_id cmd
@@ -664,7 +671,10 @@ struct
                 in
                 let exec_data =
                   let unifys =
-                    unify result proc_name prev_id cfg |> Option.to_list
+                    match unify result proc_name prev_id cfg with
+                    | None -> []
+                    | Some (id, kind, result) ->
+                        [ ExecMap.{ id; kind; result } ]
                   in
                   let errors = show_result_errors result in
                   Lift.make_executed_cmd_data ExecMap.Final prev_id cmd ~unifys
