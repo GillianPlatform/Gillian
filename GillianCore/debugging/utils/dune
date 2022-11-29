@@ -1,8 +1,16 @@
 (library
  (name debugger_utils)
- (public_name gillian.debugging.utils)
+ (package gillian)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson lwt_ppx))
  (libraries engine gil_syntax utils debugger_log)
- (flags :standard -open Engine -open Utils -open Utils.Prelude -open
-   Gil_syntax))
+ (flags
+  :standard
+  -open
+  Engine
+  -open
+  Utils
+  -open
+  Utils.Prelude
+  -open
+  Gil_syntax))

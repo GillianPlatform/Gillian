@@ -1,7 +1,13 @@
 (library
  (name test262)
- (libraries semantics javert_utils gillian js2jsil_lib ppx_deriving.runtime
-   str gillian.alcotest-runner)
+ (libraries
+  semantics
+  javert_utils
+  gillian
+  js2jsil_lib
+  ppx_deriving.runtime
+  str
+  gillian.alcotest-runner)
  (preprocess
   (pps ppx_deriving.std))
  (flags :standard -open Javert_utils))

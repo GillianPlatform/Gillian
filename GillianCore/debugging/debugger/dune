@@ -2,10 +2,32 @@
 
 (library
  (name debugger)
- (public_name gillian.debugger)
- (libraries str fmt.tty engine gil_syntax incrementalAnalysis logging
-   parserAndCompiler utils debugger_log debugger_utils debugger_lifter)
+ (package gillian)
+ (libraries
+  str
+  fmt.tty
+  engine
+  gil_syntax
+  incrementalAnalysis
+  logging
+  parserAndCompiler
+  utils
+  debugger_log
+  debugger_utils
+  debugger_lifter)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson))
- (flags :standard -open Utils -open Utils.Prelude -open Engine -open
-   Gil_syntax -open IncrementalAnalysis -open Debugger_utils))
+ (flags
+  :standard
+  -open
+  Utils
+  -open
+  Utils.Prelude
+  -open
+  Engine
+  -open
+  Gil_syntax
+  -open
+  IncrementalAnalysis
+  -open
+  Debugger_utils))

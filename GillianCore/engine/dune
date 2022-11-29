@@ -2,10 +2,28 @@
 
 (library
  (name engine)
- (public_name gillian.engine)
- (libraries utils z3_encoding menhirLib fmt cmdliner str gil_syntax
-   gil_parsing logging incrementalAnalysis debugger_log)
+ (package gillian)
+ (libraries
+  utils
+  z3_encoding
+  menhirLib
+  fmt
+  cmdliner
+  str
+  gil_syntax
+  gil_parsing
+  logging
+  incrementalAnalysis
+  debugger_log)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson))
- (flags :standard -open Utils -open Gil_syntax -open Utils.Prelude -open
-   IncrementalAnalysis))
+ (flags
+  :standard
+  -open
+  Utils
+  -open
+  Gil_syntax
+  -open
+  Utils.Prelude
+  -open
+  IncrementalAnalysis))

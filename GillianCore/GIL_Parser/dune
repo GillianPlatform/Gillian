@@ -1,6 +1,6 @@
 (library
  (name gil_parsing)
- (public_name gillian.gil_parsing)
+ (package gillian)
  (libraries utils gil_syntax str yojson parserAndCompiler)
  (flags :standard -open Utils -open Utils.Prelude -open Gil_syntax))
 
