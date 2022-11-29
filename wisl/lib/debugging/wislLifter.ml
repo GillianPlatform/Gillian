@@ -15,7 +15,7 @@ open Debugger.Lifter
 type rid = L.ReportId.t [@@deriving yojson, show]
 
 module Make
-    (Gil : Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifterWithState)
+    (Gil : Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state)
     (Verification : Engine.Verifier.S with type annot = Annot.t) =
 struct
   open Exec_map
