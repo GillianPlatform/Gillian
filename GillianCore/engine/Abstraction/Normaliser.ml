@@ -66,8 +66,9 @@ struct
           method! visit_BinOp ctx this le' op n =
             match (op, n) with
             | LstNth, Lit (Int i) -> (
+                let ( >>= ) = Option.bind in
                 match
-                  let vs = Hashtbl.find new_lists le' in
+                  Hashtbl.find_opt new_lists le' >>= fun vs ->
                   List.nth_opt vs (Z.to_int i)
                 with
                 | Some v -> v
