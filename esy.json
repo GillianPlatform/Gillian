@@ -64,7 +64,7 @@
     "odoc": "sh -c \"esy x dune build @doc && ./scripts/sync_odoc.sh > /dev/null\"",
     "odoc:watch:build": "dune build @doc --watch",
     "odoc:watch:sync": "./scripts/watch_odoc.sh > /dev/null",
-    "odoc:watch": "concurrently -p none \"esy odoc:watch:build\" \"esy odoc:watch:sync\"",
+    "odoc:watch": "concurrently -n odoc,sync -c cyan,blue \"esy odoc:watch:build\" \"esy odoc:watch:sync\"",
     "sphinx": "sphinx-build sphinx _docs/sphinx/",
     "sphinx:watch": "sphinx-autobuild sphinx _docs/sphinx/",
     "docs": "./scripts/build_docs.sh",

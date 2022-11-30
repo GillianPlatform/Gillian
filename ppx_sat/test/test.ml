@@ -1,3 +1,4 @@
+open Gillian
 open Gil_syntax
 open Monadic.Delayed
 open Formula.Infix
