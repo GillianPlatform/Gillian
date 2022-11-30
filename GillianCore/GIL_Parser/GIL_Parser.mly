@@ -1,4 +1,4 @@
-%parameter<PC : ParserAndCompiler.S>
+%parameter<Annot : Annot.S>
 
 %{
 open Parser_state
@@ -267,7 +267,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %type <NOp.t>        nop_target
 %type <Formula.t>    pure_assertion_target
 
-%type <(PC.Annot.t, string) Prog.t * Yojson.Safe.t> gmain_target
+%type <(Annot.t, string) Prog.t * Yojson.Safe.t> gmain_target
 %type <Expr.t> top_level_expr_target
 
 %type <Spec.st> g_sspec_target
@@ -560,7 +560,7 @@ gcmd_with_annot:
           loc_source = $startpos.pos_fname;
         }
       in
-      let annot : PC.Annot.t = PC.Annot.make_basic ~origin_loc ()
+      let annot : Annot.t = Annot.make_basic ~origin_loc ()
       in annot, cmd
     };
 (*** GIL commands ***)

@@ -7,11 +7,11 @@ module Preprocess_GCmd = PreProcessing_Utils.M (struct
   let successors = Cmd.successors
 end)
 
-module Make (PC : ParserAndCompiler.S) = struct
-  type annot = PC.Annot.t
+module Make (Annot : Annot.S) = struct
+  type annot = Annot.t
 
-  module GIL_Lexer = GIL_Lexer.Make (PC)
-  module GIL_Parser = GIL_Parser.Make (PC)
+  module GIL_Lexer = GIL_Lexer.Make (Annot)
+  module GIL_Parser = GIL_Parser.Make (Annot)
 
   type parsing_result = {
     labeled_prog : (annot, string) Prog.t;
