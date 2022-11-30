@@ -31,6 +31,7 @@ COPY . .
 RUN rm -rf _esy _build debugger-vscode-extension/node_modules *.install *.log *.db
 
 RUN esy install
+RUN esy import-dependencies _export
 
 RUN esy
 
