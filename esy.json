@@ -60,7 +60,15 @@
     "install-githooks": "./githooks/install.ml",
     "clean-githooks": "./githooks/clean.ml",
     "clean": "dune clean",
-    "watch": "dune build @install --promote-install-files --watch"
+    "watch": "dune build @install --promote-install-files --watch",
+    "odoc": "sh -c \"esy x dune build @doc && ./scripts/sync_odoc.sh > /dev/null\"",
+    "odoc:watch:build": "dune build @doc --watch",
+    "odoc:watch:sync": "./scripts/watch_odoc.sh > /dev/null",
+    "odoc:watch": "concurrently -p none \"esy odoc:watch:build\" \"esy odoc:watch:sync\"",
+    "sphinx": "sphinx-build sphinx _docs/sphinx/",
+    "sphinx:watch": "sphinx-autobuild sphinx _docs/sphinx/",
+    "docs": "./scripts/build_docs.sh",
+    "docs:watch": "concurrently -n odoc,odoc-sync,sphinx -c cyan,blue,yellow \"esy odoc:watch:build\" \"esy odoc:watch:sync\" \"esy sphinx:watch\""
   },
   "dependencies": {
     "@opam/alcotest": "1.0.1",
@@ -92,7 +100,8 @@
     "@opam/ocaml-lsp-server": "1.12.2",
     "@opam/odoc": "*",
     "@opam/ocamlformat": "0.20.1",
-    "@opam/ocamlfind": "*"
+    "@opam/ocamlfind": "*",
+    "concurrently": "^7.6.0"
   },
   "resolutions": {
     "@opam/conf-sqlite3":
