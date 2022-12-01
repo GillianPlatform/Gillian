@@ -22,7 +22,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
       (PC)
       (Outcome.External)
 
-  module Gil_parsing = Gil_parsing.Make (PC)
+  module Gil_parsing = Gil_parsing.Make (PC.Annot)
 
   let cmd_name = Suite.cmd_name
   let exec_mode = Suite.exec_mode

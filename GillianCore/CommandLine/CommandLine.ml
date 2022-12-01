@@ -25,7 +25,7 @@ module Make
          and type cmd_report = V.SAInterpreter.Logging.ConfigReport.t
          and type annot = PC.Annot.t) =
 struct
-  module Gil_parsing = Gil_parsing.Make (PC)
+  module Gil_parsing = Gil_parsing.Make (PC.Annot)
   module CState = CState.Make (CMemory)
 
   module CInterpreter =

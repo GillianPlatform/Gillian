@@ -65,7 +65,7 @@ module Make
 struct
   open L.LoggingConstants
   open Verification.SAInterpreter
-  module Gil_parsing = Gil_parsing.Make (PC)
+  module Gil_parsing = Gil_parsing.Make (PC.Annot)
   module Breakpoints = Set.Make (Int)
   module Annot = PC.Annot
 

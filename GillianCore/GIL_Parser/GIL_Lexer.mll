@@ -1,10 +1,10 @@
 {
   open Lexing
 
-  module Make (PC : ParserAndCompiler.S) = struct
+  module Make (Annot : Annot.S) = struct
     exception Syntax_error of string
     
-    module GIL_Parser = GIL_Parser.Make (PC)
+    module GIL_Parser = GIL_Parser.Make (Annot)
     let keyword_table = Hashtbl.create 307
 
     let _ = List.iter (fun (kwd, tok) -> Hashtbl.add keyword_table kwd tok)

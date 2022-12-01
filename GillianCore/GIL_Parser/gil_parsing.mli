@@ -1,6 +1,6 @@
-module Make (PC : ParserAndCompiler.S) : sig
+module Make (Annot : Annot.S) : sig
   type parsing_result = {
-    labeled_prog : (PC.Annot.t, string) Prog.t;
+    labeled_prog : (Annot.t, string) Prog.t;
     init_data : Yojson.Safe.t;  (** Will be `Null if no [init_data] is parsed *)
   }
 
@@ -19,15 +19,15 @@ module Make (PC : ParserAndCompiler.S) : sig
       [parse_and_compile_jsil_file] is a function that takes a file path, parses
       the file as a JSIL program, and compiles this to a GIL program. *)
   val eprog_to_prog :
-    other_imports:(string * (string -> (PC.Annot.t, string) Prog.t)) list ->
-    (PC.Annot.t, string) Prog.t ->
-    (PC.Annot.t, int) Prog.t
+    other_imports:(string * (string -> (Annot.t, string) Prog.t)) list ->
+    (Annot.t, string) Prog.t ->
+    (Annot.t, int) Prog.t
 
   (** Caches a mapping from the output GIL filepaths to the corresponding
       sring-labelled GIL programs. Can be called before [eprog_to_prog] in order
       to allow the import-resolving mechanism to work without having to first
       write the GIL programs to file. *)
-  val cache_labelled_progs : (string * (PC.Annot.t, string) Prog.t) list -> unit
+  val cache_labelled_progs : (string * (Annot.t, string) Prog.t) list -> unit
 
   (** Takes a lexbuf and simply parses a literal *)
   val parse_literal : Lexing.lexbuf -> Literal.t
