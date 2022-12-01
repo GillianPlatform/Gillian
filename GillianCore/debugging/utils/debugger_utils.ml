@@ -29,6 +29,17 @@ type frame = {
 type scope = { name : string; id : int }
 type exception_info = { id : string; description : string option }
 
-module Variable = Variable
-module Exec_map = Exec_map
-module Unify_map = Unify_map
+module Variable = struct
+  (** @inline *)
+  include Variable
+end
+
+module Exec_map = struct
+  (** @inline *)
+  include Exec_map
+end
+
+module Unify_map = struct
+  (** @inline *)
+  include Unify_map
+end

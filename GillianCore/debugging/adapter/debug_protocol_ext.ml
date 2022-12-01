@@ -89,7 +89,7 @@ module Custom_commands (Debugger : Debugger.S) = struct
     module Result = struct
       type t = {
         unify_id : L.ReportId.t; [@key "unifyId"]
-        unify_map : Debugger.Unify_map.t; [@key "unifyMap"]
+        unify_map : Unify_map.t; [@key "unifyMap"]
       }
       [@@deriving yojson, make]
     end

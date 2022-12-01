@@ -2,10 +2,6 @@ module type S = sig
   type tl_ast
   type debug_state
 
-  module Unify_map : sig
-    type t [@@deriving yojson]
-  end
-
   module Inspect : sig
     type debug_state_view [@@deriving yojson]
 

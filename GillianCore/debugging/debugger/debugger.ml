@@ -34,7 +34,9 @@ functor
     type tl_ast = PC.tl_ast
     type unify_result = Unify_map.unify_result = Success | Failure
 
-    module Unify_map = Unify_map.Make (Verification)
+    let build_unify_map =
+      let module Build = Unify_map.Make_builder (Verification) in
+      Build.f
 
     type debug_proc_state = {
       mutable cont_func : result_t cont_func_f option;
@@ -155,7 +157,7 @@ functor
         match state.unify_maps |> List.assoc_opt unify_id with
         | Some map -> (unify_id, map)
         | None ->
-            let map = Unify_map.build unify_id in
+            let map = build_unify_map unify_id in
             state.unify_maps <- (unify_id, map) :: state.unify_maps;
             (unify_id, map)
     end
@@ -597,7 +599,7 @@ functor
                             with
                             | Some map -> map
                             | None ->
-                                let map = Unify_map.build unify_id in
+                                let map = build_unify_map unify_id in
                                 state.unify_maps <-
                                   (unify_id, map) :: state.unify_maps;
                                 map
