@@ -22,7 +22,8 @@ let src_after =
 let deps = runtime @ src_before @ src_after
 
 let copy f =
-  Printf.sprintf {|(copy %s %s)|} f (Filename.basename f)
+  let basename = (Filename.basename f) in
+  Printf.sprintf {|(bash "rm -f %s && ln -s %s %s")|} basename f basename
 
 let src_files = ["sll_a.c"; "sll_b.c"];;
 
@@ -33,7 +34,7 @@ Printf.ksprintf J.send {|
   (copy_files %s)
 
   (rule
-    (deps %s)
+    (deps (sandbox always) %s)
     (alias runtest)
     (action
       (progn
