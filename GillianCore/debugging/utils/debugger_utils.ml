@@ -24,6 +24,7 @@ type frame = {
   end_line : int;
   end_column : int;
 }
+[@@deriving make]
 
 (* TODO: this should contain a variable list *)
 type scope = { name : string; id : int }
