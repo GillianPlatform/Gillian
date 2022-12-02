@@ -11,10 +11,16 @@ type Submap =
   | readonly ['Submap', ExecMap]
   | readonly ['Proc', string];
 
+type Unification = {
+  readonly id: number;
+  readonly kind: UnifyKind;
+  readonly result: UnifyResult;
+};
+
 export type CmdData = {
   readonly ids: readonly number[];
   readonly display: string;
-  readonly unifys: readonly (readonly [number, UnifyKind, UnifyResult])[];
+  readonly unifys: readonly Unification[];
   readonly errors: readonly string[];
   readonly submap: Submap;
 };
@@ -65,7 +71,7 @@ export type DebugProcState = {
   readonly execMap: ExecMap;
   readonly liftedExecMap: ExecMap | null;
   readonly currentCmdId: number;
-  readonly unifys: readonly (readonly [number, UnifyKind, UnifyResult])[];
+  readonly unifys: readonly Unification[];
   readonly procName: string;
 };
 
@@ -79,14 +85,14 @@ export type UnifyStep =
   | readonly ['Assertion', AssertionData]
   | readonly ['Result', number, UnifyResult];
 
-export type Unification = {
+export type UnificationState = {
   readonly map: unknown; // TODO: fix when Immer supports recursive types
   readonly selected?: UnifyStep;
 };
 
 export type UnifyState = {
   readonly path: number[];
-  readonly unifications: Record<number, Unification | undefined>;
+  readonly unifications: Record<number, UnificationState | undefined>;
 };
 
 export type State = {

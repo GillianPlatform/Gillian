@@ -1,5 +1,10 @@
 import React from 'react';
-import { Unification, UnifyMap, UnifySeg, UnifyStep } from '../../../types';
+import {
+  UnificationState,
+  UnifyMap,
+  UnifySeg,
+  UnifyStep,
+} from '../../../types';
 import TreeMapView, {
   TransformFunc,
   TransformResult,
@@ -12,7 +17,7 @@ import { getUnifyName } from '../util';
 import useStore from '../store';
 
 type Props = {
-  unification: Unification;
+  unification: UnificationState;
   selectStep: (step: UnifyStep) => void;
 };
 
