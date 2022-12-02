@@ -65,3 +65,6 @@ let resolve_loc_name ~pc loc =
 let reduce_expr ~pc expr =
   Reduction.reduce_lexpr ~unification:pc.Pc.unification ~pfs:(build_full_pfs pc)
     ~gamma:(build_full_gamma pc) expr
+
+let get_equal_expressions ~pc expr =
+  Reduction.get_equal_expressions (build_full_pfs pc) expr

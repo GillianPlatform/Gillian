@@ -91,6 +91,12 @@ let reduce e ~curr_pc =
 let resolve_loc l ~curr_pc =
   [ Branch.make ~pc:curr_pc ~value:(FOSolver.resolve_loc_name ~pc:curr_pc l) ]
 
+let get_equal_expressions e ~curr_pc =
+  [
+    Branch.make ~pc:curr_pc
+      ~value:(FOSolver.get_equal_expressions ~pc:curr_pc e);
+  ]
+
 module Syntax = struct
   let ( let* ) = bind
   let ( let+ ) = map

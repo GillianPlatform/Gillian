@@ -17,6 +17,8 @@ val branch_entailment : (Formula.t * (unit -> 'a t)) list -> 'a t
 val branch_on :
   Formula.t -> then_:(unit -> 'a t) -> else_:(unit -> 'a t) -> 'a t
 
+val get_equal_expressions : Expr.t -> Expr.t list t
+
 module Syntax : sig
   val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
   val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
