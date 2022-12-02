@@ -97,7 +97,7 @@ functor
     module Inspect = struct
       type debug_proc_state_view = {
         exec_map : Exec_map.Packaged.t; [@key "execMap"]
-        lifted_exec_map : Exec_map.Packaged.t option; [@key "liftedExec_map"]
+        lifted_exec_map : Exec_map.Packaged.t option; [@key "liftedExecMap"]
         current_cmd_id : L.ReportId.t; [@key "currentCmdId"]
         unifys : Exec_map.unification list;
         proc_name : string; [@key "procName"]
@@ -870,13 +870,11 @@ functor
             Step
 
       let select_next branch_case nexts =
-        let id, _ =
-          match branch_case with
-          | Some branch_case ->
-              List.find (fun (_, bc) -> bc |> Option.get = branch_case) nexts
-          | None -> List.hd nexts
-        in
-        id
+        match branch_case with
+        | Some branch_case ->
+            List.find_opt (fun (_, bc) -> bc |> Option.get = branch_case) nexts
+            |> Option.map fst
+        | None -> Some (List.hd nexts |> fst)
 
       let step_forwards prev_id_in_frame branch_case state dbg =
         let { cfg; _ } = dbg in
@@ -885,7 +883,7 @@ functor
             state.lifter_state |> Lifter.existing_next_steps state.cur_report_id
           with
           | [] -> None
-          | nexts -> Some (select_next branch_case nexts)
+          | nexts -> select_next branch_case nexts
         in
         match next_id with
         | None ->
