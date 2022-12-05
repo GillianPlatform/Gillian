@@ -43,7 +43,7 @@ struct
   module Lifter = Lifter (Verification)
   module Abductor = Abductor.Make (SPState) (PC) (External)
   module Debugger = Debugger.Make (ID) (PC) (Verification) (Lifter)
-  module DebugAdapter = DebugAdapter.Make (Debugger)
+  module DebugAdapter = Debug_adapter.Make (Debugger)
 
   let entry_point =
     let doc = "Entry point of execution." in

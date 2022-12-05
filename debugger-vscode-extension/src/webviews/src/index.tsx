@@ -16,7 +16,7 @@ VSCodeAPI.onMessage(e => {
     const currentProcState = state.procs[state.currentProc];
     const { unifys } = currentProcState;
     if (unifys.length > 0) {
-      const [unifyId, ,] = unifys[0];
+      const unifyId = unifys[0].id;
       const isInStore = store.selectBaseUnification(unifyId);
       if (!isInStore) {
         VSCodeAPI.postMessage({

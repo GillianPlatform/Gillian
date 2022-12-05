@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Unification, UnifyKind, UnifyMap } from '../../types';
+import { UnificationState, UnifyKind, UnifyMap } from '../../types';
 import { Store } from './store';
 
 export const Code: React.FC = ({ children }) => (
@@ -25,7 +25,9 @@ export const getBaseUnification = ({ unifyState }: Store) => {
   return baseUnification;
 };
 
-export const showUnificationKind = (unification: Unification | undefined) => {
+export const showUnificationKind = (
+  unification: UnificationState | undefined
+) => {
   if (!unification) return undefined;
   return showUnifyKind((unification.map as UnifyMap)[0]);
 };

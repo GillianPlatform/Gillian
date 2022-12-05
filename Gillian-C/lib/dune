@@ -7,7 +7,13 @@
 
 (library
  (name cgil_lib)
- (libraries gillian gillian.alcotest-runner compcert batteries printbox
-   gillian.ppx_sat.runtime ppx_deriving_yojson.runtime)
+ (libraries
+  gillian
+  gillian.alcotest-runner
+  compcert
+  batteries
+  printbox
+  gillian.ppx_sat.runtime
+  ppx_deriving_yojson.runtime)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson gillian.ppx_sat)))

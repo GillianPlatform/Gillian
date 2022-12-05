@@ -1,6 +1,6 @@
 module Make (Debugger : Debugger.S) = struct
   module Lifecycle = Lifecycle.Make (Debugger)
-  module TimeTravel = TimeTravel.Make (Debugger)
+  module TimeTravel = Time_travel.Make (Debugger)
   module Inspect = Inspect.Make (Debugger)
   module Breakpoints = Breakpoints.Make (Debugger)
 

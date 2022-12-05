@@ -8,5 +8,5 @@ val add_debugger_variables :
   memory:t ->
   is_gil_file:bool ->
   get_new_scope_id:(unit -> int) ->
-  Gillian.Debugger.Utils.variables ->
+  Gillian.Debugger.Utils.Variable.ts ->
   Gillian.Debugger.Utils.scope list

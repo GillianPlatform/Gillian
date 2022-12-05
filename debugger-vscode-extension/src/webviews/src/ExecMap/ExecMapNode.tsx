@@ -76,7 +76,7 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & Dims>) => {
 
   const unifyBadge = (() => {
     if (cmdData.unifys.length > 0) {
-      const [, , [result]] = cmdData.unifys[0];
+      const [result] = cmdData.unifys[0].result;
       const colorStyle = result === 'Success' ? {} : { color: 'red' };
       return (
         <>

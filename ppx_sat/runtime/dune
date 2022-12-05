@@ -1,4 +1,5 @@
 (library
  (name ppx_sat_runtime)
  (public_name gillian.ppx_sat.runtime)
- (libraries gillian.monadic gillian.gil_syntax))
+ (libraries gillian)
+ (flags :standard -open Gillian))

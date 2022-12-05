@@ -1,8 +1,13 @@
-open DebugProtocolEx
+open Debug_protocol_ext
+
+(**/**)
+
 module DL = Debugger_log
 
+(**/**)
+
 module Make (Debugger : Debugger.S) = struct
-  open DapCustom.Commands (Debugger)
+  open Custom_commands (Debugger)
 
   let run dbg rpc =
     DL.set_rpc_command_handler rpc ~name:"Threads"
@@ -44,7 +49,7 @@ module Make (Debugger : Debugger.S) = struct
         let variables = Debugger.get_variables args.variables_reference dbg in
         let variables =
           variables
-          |> List.map (fun (var : variable) ->
+          |> List.map (fun (var : Debugger_utils.Variable.t) ->
                  let name = var.name in
                  let value = var.value in
                  let type_ = var.type_ in

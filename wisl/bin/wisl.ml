@@ -8,7 +8,9 @@ module CLI =
     (WParserAndCompiler)
     (Gillian.General.External.Dummy (WParserAndCompiler.Annot))
     (Gillian.Bulk.Runner.DummyRunners)
-    (Lifter.GilFallbackLifter.Make (WSemantics.WislSMemory) (WParserAndCompiler)
+    (Lifter.Gil_fallback_lifter.Make
+       (WSemantics.WislSMemory)
+       (WParserAndCompiler)
        (WDebugging.WislLifter.Make))
 
 let () = CLI.main ()

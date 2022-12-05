@@ -2,8 +2,6 @@ module L = Logging
 module DL = Debugger_log
 open Lifter
 
-type rid = L.ReportId.t [@@deriving yojson, show]
-
 module Make
     (PC : ParserAndCompiler.S)
     (Verifier : Verifier.S with type annot = PC.Annot.t)
@@ -14,7 +12,7 @@ module Make
      and type memory_error = SMemory.err_t
      and type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t
      and type annot = PC.Annot.t = struct
-  open ExecMap
+  open Exec_map
   module Annot = PC.Annot
 
   type annot = PC.Annot.t
@@ -22,12 +20,12 @@ module Make
   type branch_path = BranchCase.path [@@deriving yojson]
 
   (* Some fields are Null'd in yojson to stop huge memory inefficiency *)
-  type map = (branch_case, cmd_data, unit) ExecMap.t
+  type map = (branch_case, cmd_data, unit) Exec_map.t
 
   and cmd_data = {
-    id : rid;
+    id : L.ReportId.t;
     display : string;
-    unifys : unifys;
+    unifys : unification list;
     errors : string list;
     submap : map submap;
     branch_path : branch_path;
@@ -38,7 +36,7 @@ module Make
   type t = {
     map : map;
     root_proc : string;
-    id_map : (rid, map) Hashtbl.t; [@to_yojson fun _ -> `Null]
+    id_map : (L.ReportId.t, map) Hashtbl.t; [@to_yojson fun _ -> `Null]
   }
   [@@deriving to_yojson]
 
@@ -108,7 +106,7 @@ module Make
     | Ok (map, branch_path) -> (map, branch_path)
     | Error s ->
         DL.failwith
-          (fun () -> [ ("id", rid_to_yojson id); ("state", dump state) ])
+          (fun () -> [ ("id", L.ReportId.to_yojson id); ("state", dump state) ])
           ("at_id: " ^ s)
 
   let init _ _ exec_data =
@@ -128,15 +126,16 @@ module Make
           [
             ("state", dump state);
             ("exec_data", exec_data_to_yojson exec_data);
-            ("prev_id", rid_to_yojson prev_id);
+            ("prev_id", L.ReportId.to_yojson prev_id);
             ("branch_case", opt_to_yojson branch_case_to_yojson branch_case);
           ])
-        ("GilLifter.handle_cmd: " ^ s)
+        ("Gil_lifter.handle_cmd: " ^ s)
     in
     let map =
       match Hashtbl.find_opt id_map prev_id with
       | Some map -> map
-      | None -> failwith (Fmt.str "couldn't find prev_id %a!" pp_rid prev_id)
+      | None ->
+          failwith (Fmt.str "couldn't find prev_id %a!" L.ReportId.pp prev_id)
     in
     (match map with
     | Cmd cmd when cmd.next = Nothing ->
@@ -159,7 +158,7 @@ module Make
       ExecNext (Some id, None)
     else Stop
 
-  let package_case _ = Packaged.package_case
+  let package_case _ = Packaged.package_gil_case
 
   let package_data package { id; display; unifys; errors; submap; _ } =
     let submap =
@@ -181,7 +180,7 @@ module Make
     match state |> at_id id |> fst with
     | Nothing ->
         DL.failwith
-          (fun () -> [ ("id", rid_to_yojson id); ("state", dump state) ])
+          (fun () -> [ ("id", L.ReportId.to_yojson id); ("state", dump state) ])
           "get_unifys_at_id: HORROR - map is Nothing!"
     | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } -> data.unifys
 
@@ -217,7 +216,7 @@ module Make
   let next_step_specific id case _ =
     let case =
       case
-      |> Option.map (fun (case : ExecMap.Packaged.branch_case) ->
+      |> Option.map (fun (case : Exec_map.Packaged.branch_case) ->
              case.json |> BranchCase.of_yojson |> Result.get_ok)
     in
     (id, case)
@@ -232,7 +231,7 @@ module Make
         | Some
             ((Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data }), case)
           ->
-            let case = case |> Option.map ExecMap.Packaged.package_case in
+            let case = case |> Option.map Exec_map.Packaged.package_gil_case in
             Some (data.id, case))
 
   let select_next_path case id state =
@@ -241,7 +240,7 @@ module Make
       DL.failwith
         (fun () ->
           [
-            ("id", rid_to_yojson id);
+            ("id", L.ReportId.to_yojson id);
             ("state", dump state);
             ("case", opt_to_yojson branch_case_to_yojson case);
           ])
@@ -265,7 +264,7 @@ module Make
             (fun () ->
               [
                 ("state", dump state);
-                ("at_id", opt_to_yojson rid_to_yojson at_id);
+                ("at_id", opt_to_yojson L.ReportId.to_yojson at_id);
               ])
             "find_unfinished_path: started at Nothing"
       | Cmd { data = { id; _ }; next = Nothing } -> Some (id, None)
@@ -301,14 +300,14 @@ module Make
     in
     let store_vars =
       store
-      |> List.map (fun (var, value) : variable ->
+      |> List.map (fun (var, value) : Variable.t ->
              let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
-             create_leaf_variable var value ())
-      |> List.sort (fun (v : variable) w -> Stdlib.compare v.name w.name)
+             Variable.create_leaf var value ())
+      |> List.sort (fun (v : Variable.t) w -> Stdlib.compare v.name w.name)
     in
     let memory_vars =
       [
-        create_leaf_variable ""
+        Variable.create_leaf ""
           (Fmt.to_to_string (Fmt.hbox SMemory.pp) memory)
           ();
       ]

@@ -3,8 +3,8 @@ open WSyntax
 open Gil_syntax
 module L = Logging
 module DL = Debugger_log
-module ExecMap = Debugger.Utils.ExecMap
-module UnifyMap = Debugger.Utils.UnifyMap
+module Exec_map = Debugger.Utils.Exec_map
+module Unify_map = Debugger.Utils.Unify_map
 open Syntaxes.Option
 module ExtList = Utils.ExtList
 module Annot = WParserAndCompiler.Annot
@@ -15,10 +15,10 @@ open Debugger.Lifter
 type rid = L.ReportId.t [@@deriving yojson, show]
 
 module Make
-    (Gil : Gillian.Debugger.Lifter.GilFallbackLifter.GilLifterWithState)
+    (Gil : Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state)
     (Verification : Engine.Verifier.S with type annot = Annot.t) =
 struct
-  open ExecMap
+  open Exec_map
 
   type memory_error = WislSMemory.err_t
   type tl_ast = WParserAndCompiler.tl_ast
@@ -26,7 +26,7 @@ struct
   type annot = Annot.t
 
   module CmdReport = Verification.SAInterpreter.Logging.ConfigReport
-  module GilLifter = Gil.Lifter
+  module Gil_lifter = Gil.Lifter
 
   type cmd_report = CmdReport.t [@@deriving yojson]
   type branch_case = WBranchCase.t [@@deriving yojson]
@@ -64,12 +64,12 @@ struct
             failwith "get_fun_call_name: function name wasn't a literal expr!")
     | _ -> None
 
-  type map = (branch_case, cmd_data, branch_data) ExecMap.t
+  type map = (branch_case, cmd_data, branch_data) Exec_map.t
 
   and cmd_data = {
     ids : rid list;
     display : string;
-    unifys : unifys;
+    unifys : unification list;
     errors : string list;
     submap : map submap;
     gil_branch_path : BranchCase.path;
@@ -87,8 +87,7 @@ struct
       errors : string ExtList.t;
       mutable submap : map submap;
       mutable inner_path : branch_data list;
-      unifys :
-        (rid * Engine.Unifier.unify_kind * UnifyMap.unify_result) ExtList.t;
+      unifys : unification ExtList.t;
       unexplored_paths : branch_data list Stack.t;
       out_paths : (branch_case * branch_data list) ExtList.t;
       mutable unknown_outs_count : int;
@@ -159,7 +158,7 @@ struct
       | Finished of {
           ids : rid list;
           display : string;
-          unifys : unifys;
+          unifys : unification list;
           errors : string list;
           cmd_kind : (branch_case, branch_data) cmd_kind;
           submap : map submap;
@@ -251,7 +250,7 @@ struct
 
   type t = {
     proc_name : string;
-    gil_state : GilLifter.t; [@to_yojson GilLifter.dump]
+    gil_state : Gil_lifter.t; [@to_yojson Gil_lifter.dump]
     tl_ast : tl_ast; [@to_yojson fun _ -> `Null]
     partial_cmds : PartialCmds.t;
     mutable map : map;
@@ -371,7 +370,7 @@ struct
         DL.log (fun m ->
             m "couldn't find id %a; attempting with previous step from GIL."
               pp_rid id);
-        match gil_state |> GilLifter.previous_step id with
+        match gil_state |> Gil_lifter.previous_step id with
         | None -> failwith "couldn't step back any farther!"
         | Some (prev_id, _) ->
             insert_new_cmd new_cmd new_id prev_id gil_case state)
@@ -397,7 +396,7 @@ struct
                     | Some r -> r
                     | None -> (
                         let prev =
-                          gil_state |> GilLifter.previous_step new_id
+                          gil_state |> Gil_lifter.previous_step new_id
                         in
                         match prev with
                         | Some (new_id, _) ->
@@ -460,7 +459,7 @@ struct
     | _ -> None
 
   let init_or_handle prev_id branch_case exec_data state =
-    let { id; _ } = exec_data in
+    let Debugger.Lifter.{ id; _ } = exec_data in
     DL.log (fun m ->
         m
           ~json:
@@ -502,7 +501,7 @@ struct
             Stop
         | Some (Finished { ids; display; unifys; errors; cmd_kind; submap }) ->
             let gil_branch_path =
-              GilLifter.path_of_id (List.hd ids) state.gil_state
+              Gil_lifter.path_of_id (List.hd ids) state.gil_state
             in
             let new_cmd =
               new_cmd id_map cmd_kind ids display unifys errors gil_branch_path
@@ -568,7 +567,7 @@ struct
           match gil_case with
           | Some gil_case ->
               let kind_display, display =
-                Packaged.(package_case gil_case).display
+                Packaged.(package_gil_case gil_case).display
               in
               let kind = "GIL" in
               let kind_display = Fmt.str "(GIL) %s" kind_display in
@@ -609,7 +608,7 @@ struct
     gil_path_of_map map
 
   let existing_next_steps id { gil_state; id_map; _ } =
-    GilLifter.existing_next_steps id gil_state
+    Gil_lifter.existing_next_steps id gil_state
     |> List.filter (fun (id, _) -> Hashtbl.mem id_map id)
 
   let next_step_specific id case state =
@@ -651,7 +650,7 @@ struct
         (id, case)
 
   let select_next_path case id { gil_state; _ } =
-    GilLifter.select_next_path case id gil_state
+    Gil_lifter.select_next_path case id gil_state
 
   let find_unfinished_path ?at_id state =
     let { map; id_map; _ } = state in
