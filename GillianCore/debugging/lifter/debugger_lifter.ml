@@ -1,4 +1,6 @@
-(** @canonical Gillian.Debugger.Lifter *)
+(** @canonical Gillian.Debugger.Lifter
+
+  The mechanism for lifting execution of GIL commands to a target language. *)
 
 include Lifter
 

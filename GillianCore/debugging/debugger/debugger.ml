@@ -139,7 +139,7 @@ functor
               in
               let exec_map = state.lifter_state |> Lifter.get_gil_map in
               let lifted_exec_map =
-                state.lifter_state |> Lifter.get_lifted_map_opt
+                state.lifter_state |> Lifter.get_lifted_map
               in
               let proc =
                 { exec_map; lifted_exec_map; current_cmd_id; unifys; proc_name }
@@ -702,7 +702,7 @@ functor
               let exec_data, _ =
                 build_final_cmd_data prev_content result prev_id [] dbg
               in
-              Lifter.init proc_name cfg.tl_ast exec_data
+              Lifter.init_exn proc_name cfg.tl_ast exec_data
             in
             let state =
               make_debug_proc_state ~cont_func ~cur_report_id:prev_id
@@ -718,7 +718,7 @@ functor
           Exec_map.kind_of_cases cases
         in
         let exec_data = Lift.make_executed_cmd_data kind id cmd branch_path in
-        Lifter.init proc_name cfg.tl_ast exec_data
+        Lifter.init_exn proc_name cfg.tl_ast exec_data
 
       let handle_continue
           proc_name
@@ -983,7 +983,7 @@ functor
       let { cfg; _ } = dbg in
       let** state = dbg |> get_proc_state ~proc_name in
       let id, branch_case =
-        state.lifter_state |> Lifter.next_step_specific prev_id branch_case
+        state.lifter_state |> Lifter.next_gil_step prev_id branch_case
       in
       let++ () = state |> jump_state_to_id id cfg in
       state |> step_case ?branch_case dbg

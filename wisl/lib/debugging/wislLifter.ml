@@ -524,7 +524,7 @@ struct
                    previous id!");
             Stop)
 
-  let init_opt proc_name tl_ast exec_data =
+  let init proc_name tl_ast exec_data =
     let gil_state = Gil.get_state () in
     let+ tl_ast in
     let partial_cmds = Hashtbl.create 0 in
@@ -545,8 +545,8 @@ struct
     let result = init_or_handle None None exec_data state in
     (state, result)
 
-  let init proc_name tl_ast exec_data =
-    match init_opt proc_name tl_ast exec_data with
+  let init_exn proc_name tl_ast exec_data =
+    match init proc_name tl_ast exec_data with
     | None -> failwith "init: wislLifter needs a tl_ast!"
     | Some x -> x
 
@@ -588,8 +588,8 @@ struct
     Packaged.{ ids; display; unifys; errors; submap }
 
   let package = Packaged.package package_data package_case
-  let get_lifted_map { map; _ } = package map
-  let get_lifted_map_opt state = Some (get_lifted_map state)
+  let get_lifted_map_exn { map; _ } = package map
+  let get_lifted_map state = Some (get_lifted_map_exn state)
 
   let get_unifys_at_id id { id_map; _ } =
     let map = Hashtbl.find id_map id in
@@ -611,7 +611,7 @@ struct
     Gil_lifter.existing_next_steps id gil_state
     |> List.filter (fun (id, _) -> Hashtbl.mem id_map id)
 
-  let next_step_specific id case state =
+  let next_gil_step id case state =
     let failwith s =
       DL.failwith
         (fun () ->
@@ -620,7 +620,7 @@ struct
             ("id", rid_to_yojson id);
             ("case", opt_to_yojson Packaged.branch_case_to_yojson case);
           ])
-        ("next_step_specific: " ^ s)
+        ("next_gil_step: " ^ s)
     in
     match (Hashtbl.find state.id_map id, case) with
     | Nothing, _ -> failwith "HORROR - cmd at id is Nothing!"

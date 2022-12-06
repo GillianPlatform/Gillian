@@ -109,13 +109,13 @@ module Make
           (fun () -> [ ("id", L.ReportId.to_yojson id); ("state", dump state) ])
           ("at_id: " ^ s)
 
-  let init _ _ exec_data =
+  let init_exn _ _ exec_data =
     let id_map = Hashtbl.create 1 in
     let map = new_cmd id_map exec_data ~parent:None () in
     let root_proc = get_proc_name exec_data in
     ({ map; root_proc; id_map }, Stop)
 
-  let init_opt _ _ exec_data = Some (init "" None exec_data)
+  let init _ _ exec_data = Some (init_exn "" None exec_data)
 
   let handle_cmd prev_id branch_case exec_data state =
     let { root_proc; id_map; _ } = state in
@@ -171,9 +171,9 @@ module Make
 
   let package = Packaged.package package_data package_case
   let get_gil_map state = package state.map
-  let get_lifted_map_opt _ = None
+  let get_lifted_map _ = None
 
-  let get_lifted_map _ =
+  let get_lifted_map_exn _ =
     failwith "get_lifted_map not implemented for GIL lifter"
 
   let get_unifys_at_id id state =
@@ -213,7 +213,7 @@ module Make
             in
             List.rev nexts)
 
-  let next_step_specific id case _ =
+  let next_gil_step id case _ =
     let case =
       case
       |> Option.map (fun (case : Exec_map.Packaged.branch_case) ->

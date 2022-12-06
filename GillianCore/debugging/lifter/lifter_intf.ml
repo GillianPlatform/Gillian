@@ -28,27 +28,38 @@ end
 include Types
 
 module type S = sig
+  (** The lifter's state *)
   type t
+
   type memory_error
   type tl_ast
   type memory
   type cmd_report
   type annot
 
-  val init :
-    string ->
-    tl_ast option ->
-    cmd_report executed_cmd_data ->
-    t * handle_cmd_result
+  (** Given a proc name, a tl_ast, and the data from the first executed GIL
+    command, initialise the lifter's state and handle the first command.
 
-  val init_opt :
+    Returns [None] if lifting is unsupported (i.e. if [tl_ast] is [None]). *)
+  val init :
     string ->
     tl_ast option ->
     cmd_report executed_cmd_data ->
     (t * handle_cmd_result) option
 
+  (** Exception-raising version of {!init}. *)
+  val init_exn :
+    string ->
+    tl_ast option ->
+    cmd_report executed_cmd_data ->
+    t * handle_cmd_result
+
+  (** Gives a JSON representation of the lifter's state.
+
+    Used for debugging problems with the lifter.*)
   val dump : t -> Yojson.Safe.t
 
+  (** Handles the execution result of a GIL command. *)
   val handle_cmd :
     Logging.ReportId.t ->
     BranchCase.t option ->
@@ -56,30 +67,63 @@ module type S = sig
     t ->
     handle_cmd_result
 
+  (** Gets the non-lifted execution map of GIL commands.
+
+    In most cases, it's recommended to use a {!Gil_fallback_lifter}, and just
+    defer this call to the GIL lifter. *)
   val get_gil_map : t -> Exec_map.Packaged.t
-  val get_lifted_map_opt : t -> Exec_map.Packaged.t option
-  val get_lifted_map : t -> Exec_map.Packaged.t
+
+  (** Gets the lifted execution map.
+
+    Returns [None] if lifting is not supported. *)
+  val get_lifted_map : t -> Exec_map.Packaged.t option
+
+  (** Exception-raising version of {!get_lifted_map}. *)
+  val get_lifted_map_exn : t -> Exec_map.Packaged.t
+
+  (** Gives a list of unifications that occurred at the specified command. *)
   val get_unifys_at_id : Logging.ReportId.t -> t -> Exec_map.unification list
+
+  (** Gives the id of the root (first) command in the execution map. *)
   val get_root_id : t -> Logging.ReportId.t option
+
+  (** Gives the path of (GIL) branch cases that lead to the specified command. *)
   val path_of_id : Logging.ReportId.t -> t -> BranchCase.path
 
+  (** Gets a list of ID/branch-case pairs that correspond to any commands that
+    directly succeed the specified command. *)
   val existing_next_steps :
     Logging.ReportId.t -> t -> (Logging.ReportId.t * BranchCase.t option) list
 
-  val next_step_specific :
+  (** Translates a command ID and (packaged) TL branch case to the command ID
+    and GIL branch case necessary to step forward. *)
+  val next_gil_step :
     Logging.ReportId.t ->
     Exec_map.Packaged.branch_case option ->
     t ->
     Logging.ReportId.t * BranchCase.t option
 
+  (** If the given command has a previous command, gives its ID, and
+    the TL branch case that connects them (if applicable). *)
   val previous_step :
     Logging.ReportId.t ->
     t ->
     (Logging.ReportId.t * Exec_map.Packaged.branch_case option) option
 
+  (** Gives a branch path that steps forward from the given command.
+  
+    If the given command branches, the desired branch case can be specified. *)
   val select_next_path :
     BranchCase.t option -> Logging.ReportId.t -> t -> BranchCase.path
 
+  (** Gives a branch path under the specified command (or the root command, if
+    not specified) that hasn't yet been fully explored.
+
+    The order in which unfinished branches are given in later calls is
+    unimportant.
+    
+    Returns [None] if all paths under the specified command have been fully
+    explored. *)
   val find_unfinished_path :
     ?at_id:Logging.ReportId.t ->
     t ->
