@@ -9,7 +9,7 @@ Building Documentation
 First, install the necessary prerequisites: ::
 
   opam install odoc
-  pip install sphinx sphinx-rtd-theme
+  pip install sphinx furo
 
 Then, to build: ::
 
