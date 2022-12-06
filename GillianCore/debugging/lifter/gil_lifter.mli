@@ -1,3 +1,5 @@
+(** A basic "GIL-to-GIL" lifter implementation. *)
+
 module Make
     (PC : ParserAndCompiler.S)
     (V : Verifier.S with type annot = PC.Annot.t)

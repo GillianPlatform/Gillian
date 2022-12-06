@@ -25,8 +25,14 @@ module type Make = functor
      and type annot = PC.Annot.t
 
 module type Intf = sig
+  (** A {!Gil_lifter}, along with a function to get its state *)
   module type Gil_lifter_with_state = Gil_lifter_with_state
+
+  (**/**)
+
   module type Make = Make
+
+  (**/**)
 
   module Make : Make
 end
