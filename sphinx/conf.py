@@ -116,7 +116,7 @@ html_theme_options = {
   'light_css_variables': {
     'color-brand-primary': '#b5393a',
     'color-brand-content': '#437d89',
-    'color-code-background': '#f6f8fa',
+    'color-code-background': 'hsl(210deg, 2%, 68%, 0.0625)',
   },
   'dark_css_variables': {
     'color-brand-primary': '#e9494b',
