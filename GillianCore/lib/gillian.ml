@@ -8,7 +8,7 @@ module Bulk = Bulk
 module Monadic = Monadic
 
 module Debugger = struct
-  module Logging = Debugger_log
+  module Logging = Debugger_log.Public
   module Utils = Debugger_utils
   module Lifter = Debugger_lifter
 end
