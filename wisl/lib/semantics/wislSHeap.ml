@@ -400,7 +400,7 @@ let add_debugger_variables
     variables =
   let store_id = get_new_scope_id () in
   let memory_id = get_new_scope_id () in
-  let scopes : scope list =
+  let scopes : Variable.scope list =
     [ { id = store_id; name = "Store" }; { id = memory_id; name = "Memory" } ]
   in
   let store_vars = get_store_vars store is_gil_file in
@@ -408,7 +408,8 @@ let add_debugger_variables
   let vars = [ store_vars; memory_vars ] in
   let () =
     List.iter2
-      (fun (scope : scope) vars -> Hashtbl.replace variables scope.id vars)
+      (fun (scope : Variable.scope) vars ->
+        Hashtbl.replace variables scope.id vars)
       scopes vars
   in
   scopes

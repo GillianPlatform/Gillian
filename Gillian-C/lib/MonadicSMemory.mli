@@ -9,5 +9,5 @@ module Lift : sig
     is_gil_file:'a ->
     get_new_scope_id:(unit -> int) ->
     (int, Variable.t list) Hashtbl.t ->
-    scope list
+    Variable.scope list
 end

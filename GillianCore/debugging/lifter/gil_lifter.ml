@@ -291,11 +291,11 @@ module Make
     { id = Fmt.to_to_string SMemory.pp_err error; description = None }
 
   let add_variables ~store ~memory ~is_gil_file ~get_new_scope_id variables :
-      scope list =
+      Variable.scope list =
     let () = ignore is_gil_file in
     let store_id = get_new_scope_id () in
     let memory_id = get_new_scope_id () in
-    let scopes : scope list =
+    let scopes : Variable.scope list =
       [ { id = store_id; name = "Store" }; { id = memory_id; name = "Memory" } ]
     in
     let store_vars =

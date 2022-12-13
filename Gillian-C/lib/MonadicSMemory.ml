@@ -994,11 +994,12 @@ module Lift = struct
     Debugger_log.log (fun fmt ->
         fmt "There are %d heap vars" (List.length heap_vars));
     Hashtbl.replace variables heap_id heap_vars;
-    [
-      { id = store_id; name = "Store" };
-      { id = heap_id; name = "Heap" }
-      (* { id = genv_id; name = "Global Environment" }; *);
-    ]
+    Variable.
+      [
+        { id = store_id; name = "Store" };
+        { id = heap_id; name = "Heap" }
+        (* { id = genv_id; name = "Global Environment" }; *);
+      ]
 end
 
 (** Things defined for BiAbduction *)

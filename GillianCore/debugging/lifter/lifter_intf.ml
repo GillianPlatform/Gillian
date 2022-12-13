@@ -138,7 +138,7 @@ module type S = sig
     is_gil_file:bool ->
     get_new_scope_id:(unit -> int) ->
     Variable.ts ->
-    scope list
+    Variable.scope list
 end
 
 module type Intf = sig
