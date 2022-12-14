@@ -76,4 +76,9 @@ module Logging = struct
 end
 
 module IncrementalAnalysis = IncrementalAnalysis
-module Utils = Utils
+
+(** General utilities *)
+module Utils = struct
+  (** @inline *)
+  include Utils
+end

@@ -336,6 +336,7 @@ let unfold_bispec
   { bi_spec with bispec_pres }
 
 let remove_equalities_between_binders_and_lvars binders assertion =
+  let module Union_find = Preprocessing_utils.Union_find in
   let is_binder x = List.mem x binders in
   let priority x y =
     match (is_binder x, is_binder y) with
