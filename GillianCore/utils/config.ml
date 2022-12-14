@@ -1,7 +1,8 @@
-(** This file contains some configurations for the framework.
-    Mostly composed of modifiable flags, or hardcoded values.  *)
+(** Configuration for the framework
 
-(** {2 global config} *)
+  This mostly consists of modifiable flags and hardcoded values *)
+
+(** {2 Global config} *)
 
 let results_dir, set_result_dir =
   let rd = ref ".gillian" in
@@ -11,6 +12,11 @@ let entry_point = ref "main"
 let ci = ref false
 let current_exec_mode : Exec_mode.t ref = ref Exec_mode.Verification
 let previously_normalised = ref false
+let unfolding = ref true
+let manual_proof = ref false
+
+(* let perform_syntax_checks = ref false *)
+let lemma_proof = ref false
 
 (* FIXME: it seems like ngil files are never used anymore *)
 
@@ -20,29 +26,20 @@ let small_tbl_size = 1
 let medium_tbl_size = 1
 let big_tbl_size = 1
 
-(** {2 Bi-abduction configuration}
-    These values seem to never be modified.. *)
+(** {2 Bi-abduction config}
+  These values seem to never be modified *)
 
 let specs_to_stdout = ref false
-
-(** This value seems to never be modified *)
 let bug_specs_propagation = ref false
 
-(** {2 Debugging configuration} *)
+(** {2 Debugging config} *)
 
+(** Whether Gillian is running in debugger mode *)
 let debug = ref false
 
-(** {2 Printing configuration} *)
+(** {2 Printing config} *)
 
 let no_heap = ref false
-
-(** {2 Global configuration} *)
-
-let unfolding = ref true
-let manual_proof = ref false
-
-(* let perform_syntax_checks = ref false *)
-let lemma_proof = ref false
 
 (** {2 Parallel threading} *)
 
@@ -76,6 +73,7 @@ let dump_smt = ref false
 let bulk_print_all_failures = ref true
 
 (** {2 Runtime settings} *)
+
 let set_runtime_paths, get_runtime_paths =
   let runtime_paths : string list ref = ref [] in
   let set ?env_var ls =

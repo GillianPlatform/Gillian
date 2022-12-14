@@ -1,3 +1,7 @@
+(** Convenience function for comparison
+    
+  Returns a variant that can easily be matched against *)
+
 type comparison = Gt | Lt | Eq
 
 let cmp x y =
