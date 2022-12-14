@@ -134,7 +134,7 @@ Here is how Memory models are defined in the paper:
 
     **Definition** *(Concrete Memory Model)*: A concrete memory model, :math:`M \in \mathbb{M}`, is a triple :math:`\langle |M|, A, \underline{\mathsf{ea}}\rangle`, consisting of a set of concrete memories, :math:`|M| \ni \mu`, a set of actions :math:`A \ni \alpha`, and the action execution function :math:`\underline{\mathsf{ea}} : A \rightarrow |M| \rightarrow \mathcal{V} \rightarrow \wp(|M| \times \mathcal{V})`, pretty-printed :math:`\mu.\alpha(v) \rightsquigarrow (\mu', v)`.
 
-    **Definition** *(Symbolic Memory Model)*: A symbolic memory model, :math:`\hat M \in \mathbb{M}`, is a triple :math:`\langle |\hat M|, A, \hat{\underline{\mathsf{ea}}}\rangle`, consisting of a set of symbolic memories, :math:`|\hat M| \ni \hat \mu`, a set of actions :math:`A \ni \alpha`, and the action execution function :math:`\underline{\mathsf{ea}} : A \rightarrow |M| \rightarrow \mathcal{V} \rightarrow \wp(|M| \times \mathcal{V})$, pretty-printed $\mu.\alpha(v) \rightsquigarrow (\mu', v)`, pretty-printed :math:`\hat \mu.\alpha(\hat e) \rightarrow (\mu', \hat e', \pi ')`.
+    **Definition** *(Symbolic Memory Model)*: A symbolic memory model, :math:`\hat M \in \mathbb{M}`, is a triple :math:`\langle |\hat M|, A, \hat{\underline{\mathsf{ea}}}\rangle`, consisting of a set of symbolic memories, :math:`|\hat M| \ni \hat \mu`, a set of actions :math:`A \ni \alpha`, and the action execution function :math:`\underline{\mathsf{ea}} : A \rightarrow |M| \rightarrow \mathcal{V} \rightarrow \wp(|M| \times \mathcal{V})`, pretty-printed :math:`\mu.\alpha(v) \rightsquigarrow (\mu', v)`, pretty-printed :math:`\hat \mu.\alpha(\hat e) \rightarrow (\mu', \hat e', \pi ')`.
 
 In the implementation, Concrete Memory Models and Symbolic Memory Models have an interface a bit more complex. The complete interface can be found in the files ``GillianCore/engine/SymbolicSemantics/SMemory.ml`` and ``GillianCore/engine/ConcreteSemantics/CMemory.ml``.
 
@@ -166,7 +166,7 @@ It is also added that:
     - :math:`\mathsf{setStore}`, for replacing the entire store of a given state with a new store, denoted by :math:`\sigma.\mathsf{setStore}(\rho)`;
     - :math:`\mathsf{getStore}`, for obtaining the store of the given state, denoted by :math:`\sigma.\mathsf{getStore}()`;
     - :math:`\{ \mathsf{eval}_e \}_{e \in \mathcal{E}}` for evaluationg the expression :math:`e` in a given state, denoted by :math:`\sigma.\mathsf{eval}_e(-)`;
-    - :math:`\mathsf{assume}`, for extending the given state with the information denoted by its argument value, denoted by $\sigma.\mathsf{assume}(v);
+    - :math:`\mathsf{assume}`, for extending the given state with the information denoted by its argument value, denoted by :math:`\sigma.\mathsf{assume}(v)`;
     - :math:`\mathsf{uSym}` and :math:`\mathsf{iSym}`, for generating new uninterpreted and interpreted symbols, respectively. From now on, we work with proper state models.
 
 In the implementation, the interface of state models, available in ``GillianCore/engine/GeneralSemantics/State.ml`` is a bit difference and more complex.
@@ -214,7 +214,7 @@ In the paper allocators have the following definition:
 
     pretty-printed as :math:`\xi.\mathsf{alloc}(j)\rightharpoonup_{\mathsf Y}(\xi', y)`, which takes an allocation record :math:`\xi`, a, allocation site :math:`j`, and an allocation range :math:`Y \subseteq \mathsf Y`, and returns a fresh value :math:`y \in Y`, together with the appropriately updated allocation record :math:`\xi'`.
 
-    Intuitively, an allocation record maintains information about already allocated values. This apporach is complementary to [the free set approach](https://doi.org/10.1007/978-3-540-78499-9_15), where information is maintained about values that can still be allocated. An allocation site :math:`j` is the program point associated with either the :math:`\mathsf{uSym}_j` or the :math:`\mathsf{iSym}_j` command.
+    Intuitively, an allocation record maintains information about already allocated values. This apporach is complementary to `the free set approach <https://doi.org/10.1007/978-3-540-78499-9_15>`_, where information is maintained about values that can still be allocated. An allocation site :math:`j` is the program point associated with either the :math:`\mathsf{uSym}_j` or the :math:`\mathsf{iSym}_j` command.
 
 This could be interpreted in terms of OCaml module signature as:
 
