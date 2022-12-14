@@ -53,7 +53,7 @@ Linux / macOS
 
    This may take a while, as esy will install and build sandboxed versions of every dependency, including OCaml and Z3.
 
-   .. image:: xkz3.png
+   .. image:: _static/img/xkz3.png
       :alt: The #1 programmer excuse for legitimately slacking off: "I'm building Z3"
       :align: center
 
