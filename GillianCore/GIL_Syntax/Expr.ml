@@ -252,7 +252,7 @@ let rec map_opt
   let map_e = map_opt f_before f_after in
   let f_after = Option.value ~default:(fun x -> x) f_after in
 
-  let aux args f = List_utils.map_option map_e args |> Option.map f in
+  let aux args f = List_utils.flaky_map map_e args |> Option.map f in
 
   match f_before expr with
   | None, _ -> None

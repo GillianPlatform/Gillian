@@ -285,7 +285,7 @@ let rec get_length_of_list (lst : Expr.t) : int option =
       | Lit (Int len) -> Some (Z.to_int len)
       | _ -> None)
   | NOp (LstCat, les) -> (
-      match List_utils.map_option f les with
+      match List_utils.flaky_map f les with
       | None -> None
       | Some lens ->
           let lens = List.fold_left Int.add 0 lens in
