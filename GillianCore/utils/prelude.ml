@@ -1,16 +1,22 @@
+(** [Option] pretty-printer *)
 let pp_option pp = Fmt.option ~none:(Fmt.any "None") pp
+
+(** [List] pretty-printer *)
 let pp_list ?(sep = Fmt.any ", ") = Fmt.list ~sep
 
+(** Given an [of_yojson] function, converts a string to the desired type *)
 let of_yojson_string of_yojson s =
   s |> Yojson.Safe.from_string |> of_yojson |> Result.get_ok
 
+(** Extension of Hashtbl with functions to serialize to and deserialize
+  from yojson, along with some other helpers
+  
+  A Hashtbl is a represented as a list of key-value pairs,
+  where a key-value pair is list of two elements*)
 module Hashtbl = struct
-  (** Extension of Hashtbl with functions to serialize to and deserialize
-    from yojson. A Hashtbl is a represented as a list of key-value pairs,
-    where a key-value pair is list of two elements.*)
-
   include Hashtbl
 
+  (** Analog to {!List.map} *)
   let map f tbl =
     let tbl' = create (length tbl) in
     iter
@@ -20,8 +26,7 @@ module Hashtbl = struct
       tbl;
     tbl'
 
-  let map_values f tbl = map (fun k v -> (k, f v)) tbl
-
+  (** Analog to {!List.find_map} *)
   let find_map f tbl =
     let exception Found in
     let result = ref None in
@@ -39,11 +44,6 @@ module Hashtbl = struct
       aux ();
       None
     with Found -> !result
-
-  let hd tbl =
-    match find_map (fun k v -> Some (k, v)) tbl with
-    | None -> failwith "Hashtbl.hd"
-    | Some v -> v
 
   let of_yojson
       (key_of_yojson : Yojson.Safe.t -> ('a, string) result)
@@ -80,11 +80,11 @@ module Hashtbl = struct
     `List (hashtbl |> to_seq |> Seq.map kv_to_yojson |> List.of_seq)
 end
 
+(** Extension of Map with functions to serialize to and deserialize from yojson
+  
+  A Map is a represented as a list of key-value pairs, where a
+  key-value pair is list of two elements *)
 module Map = struct
-  (** Extension of Map with functions to serialize to and deserialize from
-yojson. A Map is a represented as a list of key-value pairs, where a
-key-value pair is list of two elements. *)
-
   module type OrderedType = sig
     type t [@@deriving yojson]
 
@@ -136,23 +136,42 @@ key-value pair is list of two elements. *)
   end
 end
 
+(** Represents a set of values, with no duplicates *)
 module Hashset = struct
   type 'a t = ('a, unit) Hashtbl.t
 
+  (** Makes an empty [Hashset] *)
   let empty ?(size = 1) () : 'a t = Hashtbl.create size
+
+  (** Checks if an element is in the set *)
   let mem (h : 'a t) (x : 'a) = Hashtbl.mem h x
+
+  (** Adds an element to the set *)
   let add (h : 'a t) (x : 'a) = Hashtbl.replace h x ()
+
+  (** Removes an element from the set *)
   let remove (h : 'a t) (x : 'a) = Hashtbl.remove h x
+
+  (** Returns the size of the set *)
   let length (h : 'a t) = Hashtbl.length h
+
+  (** Applies [f] to each element of the set *)
   let iter f set = Hashtbl.iter (fun x () -> f x) set
 
+  (** Filters the set in-place *)
   let filter_in_place (h : 'a t) (f : 'a -> bool) =
     Hashtbl.filter_map_inplace (fun x () -> if f x then Some () else None) h
 
+  (** Clones the set *)
   let copy (h : 'a t) = Hashtbl.copy h
+
+  (** Gives a sequence of all items in the set *)
   let to_seq (h : 'a t) : 'a Seq.t = Hashtbl.to_seq_keys h
 end
 
+(** Extension of Stack with functions to serialize to and deserialize from yojson
+  
+  A Stack is a last-in-first-out collection of elements *)
 module Stack = struct
   include Stack
 
@@ -165,9 +184,11 @@ module SI = Containers.SI
 module SN = Containers.SN
 module Syntaxes = Syntaxes
 
+(** Converts an [Option] to yojson *)
 let opt_to_yojson (to_yojson : 'a -> Yojson.Safe.t) = function
   | None -> `Null
   | Some x -> to_yojson x
 
+(** Converts a list of values to yojson *)
 let list_to_yojson (to_yojson : 'a -> Yojson.Safe.t) xs =
   `List (xs |> List.map to_yojson)

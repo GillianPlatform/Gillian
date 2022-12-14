@@ -157,8 +157,8 @@ let hd_tl = function
 let hd_opt = function
   | x :: _ -> Some x
   | [] -> None
-  
-  (** [Option]-returning version of {!List.tl}*)
+
+(** [Option]-returning version of {!List.tl}*)
 let rec tl_opt = function
   | [] -> None
   | [ x ] -> Some x
