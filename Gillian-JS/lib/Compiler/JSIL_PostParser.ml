@@ -75,7 +75,7 @@ let post_parse_eprog (eprog : EProg.t) : EProg.t =
 let expr_from_fid (fid : string) : Expr.t =
   if fid = JS2JSIL_Helpers.main_fid then
     Expr.Lit (Loc JS2JSIL_Helpers.locGlobName)
-  else Expr.LVar (Names.lvar_from_str fid)
+  else Expr.LVar (Names.make_lvar_name fid)
 
 let make_sc (vis_list : string list) : Expr.t list =
   let chopped_vis_list =
@@ -188,7 +188,7 @@ let scope_info_to_assertion
                 let proto_asrt = Asrt.Pred ("JSObject", [ proc_x_prototype ]) in
                 [ fun_obj_asrt; proto_asrt; a_xval ]
           else if SS.mem x args then
-            let x_val : Expr.t = LVar (Names.svar_from_str x) in
+            let x_val : Expr.t = LVar (Names.make_svar_name x) in
             let asrts_x = asrts_js_val x_val in
             Pure (Eq (PVar x, x_val)) :: asrts_x
           else []

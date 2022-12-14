@@ -1,3 +1,5 @@
+(** Most-used helper functions, [Stdlib] extensions *)
+
 (** [Option] pretty-printer *)
 let pp_option pp = Fmt.option ~none:(Fmt.any "None") pp
 
