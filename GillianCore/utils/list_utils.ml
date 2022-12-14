@@ -1,4 +1,4 @@
-(** List utility functions *)
+(** Helper functions for {!List}s *)
 
 (** Cross product of two lists, l1 and l2, combining its elements with function f
 

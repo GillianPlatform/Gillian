@@ -1,3 +1,5 @@
+(** Helper functions for [Option]s*)
+
 (** Similar to {!Option.value}, but with a thunk for the default value *)
 let or_else f = function
   | Some x -> x
