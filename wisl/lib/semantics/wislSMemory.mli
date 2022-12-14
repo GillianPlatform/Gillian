@@ -1,3 +1,5 @@
+open Gillian.Debugger.Utils
+
 include
   Gillian.Symbolic.Memory_S
     with type err_t = WislSHeap.err
@@ -8,5 +10,5 @@ val add_debugger_variables :
   memory:t ->
   is_gil_file:bool ->
   get_new_scope_id:(unit -> int) ->
-  Gillian.Debugger.Utils.Variable.ts ->
-  Gillian.Debugger.Utils.scope list
+  Variable.ts ->
+  Variable.scope list

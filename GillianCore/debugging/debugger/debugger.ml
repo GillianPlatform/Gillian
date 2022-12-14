@@ -44,7 +44,7 @@ functor
       mutable cur_report_id : L.ReportId.t;
       (* TODO: The below fields only depend on the
                cur_report_id and could be refactored to use this *)
-      mutable top_level_scopes : scope list;
+      mutable top_level_scopes : Variable.scope list;
       mutable frames : frame list;
       mutable variables : Variable.ts; [@default Hashtbl.create 0]
       mutable errors : err_t list;
@@ -139,7 +139,7 @@ functor
               in
               let exec_map = state.lifter_state |> Lifter.get_gil_map in
               let lifted_exec_map =
-                state.lifter_state |> Lifter.get_lifted_map_opt
+                state.lifter_state |> Lifter.get_lifted_map
               in
               let proc =
                 { exec_map; lifted_exec_map; current_cmd_id; unifys; proc_name }
@@ -164,12 +164,14 @@ functor
             (unify_id, map)
     end
 
-    let top_level_scopes : scope list =
+    let top_level_scopes : Variable.scope list =
       let top_level_scope_names =
         (* [ "Store"; "Heap"; "Pure Formulae"; "Typing Environment"; "Predicates" ] *)
         [ "Pure Formulae"; "Typing Environment"; "Predicates" ]
       in
-      List.mapi (fun i name -> { name; id = i + 1 }) top_level_scope_names
+      List.mapi
+        (fun i name -> Variable.{ name; id = i + 1 })
+        top_level_scope_names
 
     let is_gil_file file_name = Filename.check_suffix file_name "gil"
 
@@ -182,7 +184,7 @@ functor
              { name = ""; value; type_ = None; var_ref = 0 })
       |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 
-    let get_typ_env_vars (state : state_t) : Variable.t list =
+    let get_type_env_vars (state : state_t) : Variable.t list =
       let open Variable in
       let typ_env = Verification.SPState.get_typ_env state in
       TypEnv.to_list typ_env
@@ -356,7 +358,7 @@ functor
                 Some (cmd, annot))
 
       let create_variables (state : state_t option) (is_gil_file : bool) :
-          scope list * Variable.ts =
+          Variable.scope list * Variable.ts =
         let variables = Hashtbl.create 0 in
         (* New scope ids must be higher than last top level scope id to prevent
            duplicate scope ids *)
@@ -378,12 +380,14 @@ functor
                   ~get_new_scope_id variables
               in
               let pure_formulae_vars = get_pure_formulae_vars state in
-              let typ_env_vars = get_typ_env_vars state in
+              let type_env_vars = get_type_env_vars state in
               let pred_vars = get_pred_vars state in
-              let vars_list = [ pure_formulae_vars; typ_env_vars; pred_vars ] in
+              let vars_list =
+                [ pure_formulae_vars; type_env_vars; pred_vars ]
+              in
               let () =
                 List.iter2
-                  (fun (scope : scope) vars ->
+                  (fun (scope : Variable.scope) vars ->
                     Hashtbl.replace variables scope.id vars)
                   top_level_scopes vars_list
               in
@@ -702,7 +706,7 @@ functor
               let exec_data, _ =
                 build_final_cmd_data prev_content result prev_id [] dbg
               in
-              Lifter.init proc_name cfg.tl_ast exec_data
+              Lifter.init_exn proc_name cfg.tl_ast exec_data
             in
             let state =
               make_debug_proc_state ~cont_func ~cur_report_id:prev_id
@@ -718,7 +722,7 @@ functor
           Exec_map.kind_of_cases cases
         in
         let exec_data = Lift.make_executed_cmd_data kind id cmd branch_path in
-        Lifter.init proc_name cfg.tl_ast exec_data
+        Lifter.init_exn proc_name cfg.tl_ast exec_data
 
       let handle_continue
           proc_name
@@ -983,7 +987,7 @@ functor
       let { cfg; _ } = dbg in
       let** state = dbg |> get_proc_state ~proc_name in
       let id, branch_case =
-        state.lifter_state |> Lifter.next_step_specific prev_id branch_case
+        state.lifter_state |> Lifter.next_gil_step prev_id branch_case
       in
       let++ () = state |> jump_state_to_id id cfg in
       state |> step_case ?branch_case dbg

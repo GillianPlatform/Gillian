@@ -7,8 +7,9 @@ module General = Engine.General
 module Bulk = Bulk
 module Monadic = Monadic
 
+(** Modules for the debugger and related TL-lifting *)
 module Debugger = struct
-  module Logging = Debugger_log
+  module Logging = Debugger_log.Public
   module Utils = Debugger_utils
   module Lifter = Debugger_lifter
 end

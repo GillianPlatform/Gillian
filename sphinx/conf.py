@@ -98,18 +98,31 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinx_rtd_theme"
+html_theme = "furo"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-html_theme_options = {'logo_only': True}
-# html_logo = "logo.svg"
+# html_logo = "_static/img/logo.svg"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+html_theme_options = {
+  'light_logo': 'img/logo_light.svg',
+  'dark_logo': 'img/logo_dark.svg',
+  'sidebar_hide_name': True,
+  'light_css_variables': {
+    'color-brand-primary': '#b5393a',
+    'color-brand-content': '#437d89',
+    'color-code-background': 'hsl(210deg, 2%, 68%, 0.0625)',
+  },
+  'dark_css_variables': {
+    'color-brand-primary': '#e9494b',
+    'color-brand-content': '#5dacbc',
+  },
+}
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.

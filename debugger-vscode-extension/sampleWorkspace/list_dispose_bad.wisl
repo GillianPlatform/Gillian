@@ -1,0 +1,17 @@
+predicate list(+x) {
+    (x == null);
+    (x -> #v, #z) * list(#z)
+}
+
+{ (x == #x) * list(#x) }
+function list_dispose(x) {
+    if (not (x = null)) {  
+        t := [x+1];
+        u := list_dispose(t);
+        free(x)
+    } else {
+      skip
+    };
+    return null
+}
+{ emp }

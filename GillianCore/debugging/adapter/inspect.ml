@@ -37,7 +37,7 @@ module Make (Debugger : Debugger.S) = struct
         let scopes = Debugger.get_scopes dbg in
         let scopes =
           scopes
-          |> List.map (fun (scope : scope) ->
+          |> List.map (fun (scope : Debugger_utils.Variable.scope) ->
                  let name = scope.name in
                  let variables_reference = scope.id in
                  Scope.make ~name ~variables_reference ~expensive:false ())

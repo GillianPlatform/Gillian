@@ -41,18 +41,18 @@ functor
     type cmd_report = Verifier.SAInterpreter.Logging.ConfigReport.t
     type annot = PC.Annot.t
 
-    let init proc_name tl_ast exec_data =
-      let gil, gil_result = Gil_lifter.init proc_name tl_ast exec_data in
+    let init_exn proc_name tl_ast exec_data =
+      let gil, gil_result = Gil_lifter.init_exn proc_name tl_ast exec_data in
       gil_state := Some gil;
       let ret =
-        match TLLifter.init_opt proc_name tl_ast exec_data with
+        match TLLifter.init proc_name tl_ast exec_data with
         | None -> ({ gil; tl = None }, gil_result)
         | Some (tl, tl_result) -> ({ gil; tl = Some tl }, tl_result)
       in
       ret
 
-    let init_opt proc_name tl_ast exec_data =
-      Some (init proc_name tl_ast exec_data)
+    let init proc_name tl_ast exec_data =
+      Some (init_exn proc_name tl_ast exec_data)
 
     let dump = to_yojson
 
@@ -66,12 +66,12 @@ functor
 
     let get_gil_map state = state.gil |> Gil_lifter.get_gil_map
 
-    let get_lifted_map_opt state =
-      let+ tl = state.tl in
+    let get_lifted_map state =
+      let* tl = state.tl in
       tl |> TLLifter.get_lifted_map
 
-    let get_lifted_map state =
-      match get_lifted_map_opt state with
+    let get_lifted_map_exn state =
+      match get_lifted_map state with
       | None -> failwith "Can't get lifted map!"
       | Some map -> map
 
@@ -95,10 +95,10 @@ functor
       | Some tl -> tl |> TLLifter.existing_next_steps id
       | None -> gil |> Gil_lifter.existing_next_steps id
 
-    let next_step_specific id case { gil; tl } =
+    let next_gil_step id case { gil; tl } =
       match tl with
-      | Some tl -> tl |> TLLifter.next_step_specific id case
-      | None -> gil |> Gil_lifter.next_step_specific id case
+      | Some tl -> tl |> TLLifter.next_gil_step id case
+      | None -> gil |> Gil_lifter.next_gil_step id case
 
     let previous_step id { gil; tl } =
       match tl with

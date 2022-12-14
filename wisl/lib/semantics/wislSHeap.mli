@@ -1,5 +1,6 @@
 open Gillian.Symbolic
 open Gil_syntax
+open Gillian.Debugger.Utils
 
 type t [@@deriving yojson]
 
@@ -61,5 +62,5 @@ val add_debugger_variables :
   memory:t ->
   is_gil_file:bool ->
   get_new_scope_id:(unit -> int) ->
-  Gillian.Debugger.Utils.Variable.ts ->
-  Gillian.Debugger.Utils.scope list
+  Variable.ts ->
+  Variable.scope list

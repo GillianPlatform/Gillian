@@ -2,21 +2,21 @@ Welcome to Gillian
 ====================
 
 .. toctree::
-   :maxdepth: 2
-
-   about
-   papers_talks
-   license
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Using Gillian
+   :titlesonly:
 
    install
+   develop
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contributing to Gillian
+   :titlesonly:
+   :caption: Instantiations
 
-   docs
+   c/index
+   js/index
 
+.. toctree::
+   :titlesonly:
+   :caption: About Gillian
+
+   publications/index
+   license
