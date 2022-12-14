@@ -3,55 +3,57 @@
 open SVal
 module L = Logging
 
-type t = Formula.t ExtList.t [@@deriving yojson]
+type t = Formula.t Ext_list.t [@@deriving yojson]
 
 (**************************************)
 (** Pure formulae functions          **)
 
 (**************************************)
 
-let init () : t = ExtList.make ()
+let init () : t = Ext_list.make ()
 
 let equal (pfs1 : t) (pfs2 : t) : bool =
-  ExtList.for_all2 Formula.equal pfs1 pfs2
+  Ext_list.for_all2 Formula.equal pfs1 pfs2
 
-let to_list : t -> Formula.t list = ExtList.to_list
-let of_list : Formula.t list -> t = ExtList.of_list
+let to_list : t -> Formula.t list = Ext_list.to_list
+let of_list : Formula.t list -> t = Ext_list.of_list
 
 let to_set pfs =
-  ExtList.fold_left (fun acc el -> Formula.Set.add el acc) Formula.Set.empty pfs
+  Ext_list.fold_left
+    (fun acc el -> Formula.Set.add el acc)
+    Formula.Set.empty pfs
 
-let mem (pfs : t) (f : Formula.t) = ExtList.mem ~equal:Formula.equal f pfs
+let mem (pfs : t) (f : Formula.t) = Ext_list.mem ~equal:Formula.equal f pfs
 
 let extend (pfs : t) (a : Formula.t) : unit =
-  if not (mem pfs a) then ExtList.add a pfs
+  if not (mem pfs a) then Ext_list.add a pfs
 
-let clear (pfs : t) : unit = ExtList.clear pfs
-let length (pfs : t) = ExtList.length pfs
-let copy (pfs : t) : t = ExtList.copy pfs
-let merge_into_left (pfs_l : t) (pfs_r : t) : unit = ExtList.concat pfs_l pfs_r
+let clear (pfs : t) : unit = Ext_list.clear pfs
+let length (pfs : t) = Ext_list.length pfs
+let copy (pfs : t) : t = Ext_list.copy pfs
+let merge_into_left (pfs_l : t) (pfs_r : t) : unit = Ext_list.concat pfs_l pfs_r
 
 let set (pfs : t) (reset : Formula.t list) : unit =
   clear pfs;
   merge_into_left pfs (of_list reset)
 
 let substitution (subst : SESubst.t) (pfs : t) : unit =
-  ExtList.map_inplace (SESubst.substitute_formula ~partial:true subst) pfs
+  Ext_list.map_inplace (SESubst.substitute_formula ~partial:true subst) pfs
 
 let subst_expr_for_expr (to_subst : Expr.t) (subst_with : Expr.t) (pfs : t) :
     unit =
-  ExtList.map_inplace (Formula.subst_expr_for_expr ~to_subst ~subst_with) pfs
+  Ext_list.map_inplace (Formula.subst_expr_for_expr ~to_subst ~subst_with) pfs
 
 let lvars (pfs : t) : SS.t =
-  ExtList.fold_left (fun ac a -> SS.union ac (Formula.lvars a)) SS.empty pfs
+  Ext_list.fold_left (fun ac a -> SS.union ac (Formula.lvars a)) SS.empty pfs
 
 let alocs (pfs : t) : SS.t =
-  ExtList.fold_left (fun ac a -> SS.union ac (Formula.alocs a)) SS.empty pfs
+  Ext_list.fold_left (fun ac a -> SS.union ac (Formula.alocs a)) SS.empty pfs
 
 let clocs (pfs : t) : SS.t =
-  ExtList.fold_left (fun ac a -> SS.union ac (Formula.clocs a)) SS.empty pfs
+  Ext_list.fold_left (fun ac a -> SS.union ac (Formula.clocs a)) SS.empty pfs
 
-let pp = Fmt.vbox (ExtList.pp ~sep:Fmt.cut Formula.pp)
+let pp = Fmt.vbox (Ext_list.pp ~sep:Fmt.cut Formula.pp)
 
 let sort (p_formulae : t) : unit =
   let pfl = to_list p_formulae in
@@ -70,19 +72,19 @@ let sort (p_formulae : t) : unit =
   in
   set p_formulae (var_eqs @ llen_eqs @ others)
 
-let iter = ExtList.iter
-let fold_left = ExtList.fold_left
-let map_inplace = ExtList.map_inplace
-let remove_duplicates pfs = ExtList.remove_duplicates pfs
-let filter_map_stop = ExtList.filter_map_stop
-let filter_stop_cond = ExtList.filter_stop_cond
-let filter = ExtList.filter
-let filter_map = ExtList.filter_map
-let exists = ExtList.exists
-let get_nth = ExtList.nth
+let iter = Ext_list.iter
+let fold_left = Ext_list.fold_left
+let map_inplace = Ext_list.map_inplace
+let remove_duplicates pfs = Ext_list.remove_duplicates pfs
+let filter_map_stop = Ext_list.filter_map_stop
+let filter_stop_cond = Ext_list.filter_stop_cond
+let filter = Ext_list.filter
+let filter_map = Ext_list.filter_map
+let exists = Ext_list.exists
+let get_nth = Ext_list.nth
 
 let clean_up pfs =
-  ExtList.filter
+  Ext_list.filter
     (fun (pf : Formula.t) ->
       match pf with
       | Formula.ILessEq (Lit (Int x), UnOp (LstLen, _)) when x = Z.zero -> false

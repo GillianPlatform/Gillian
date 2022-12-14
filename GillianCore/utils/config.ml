@@ -9,7 +9,7 @@ let results_dir, set_result_dir =
 
 let entry_point = ref "main"
 let ci = ref false
-let current_exec_mode : ExecMode.t ref = ref ExecMode.Verification
+let current_exec_mode : Exec_mode.t ref = ref Exec_mode.Verification
 let previously_normalised = ref false
 
 (* FIXME: it seems like ngil files are never used anymore *)

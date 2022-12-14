@@ -1,7 +1,7 @@
 module ByFolder = Bulk.Suite.ByFolder (struct
   let max_depth = 2
   let cmd_name = "test262"
-  let exec_mode = Utils.ExecMode.Concrete
+  let exec_mode = Utils.Exec_mode.Concrete
 end)
 
 type test_type = Positive | Negative [@@deriving show]

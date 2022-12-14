@@ -1010,7 +1010,7 @@ let rec reduce_lexpr_loop
         let fidx = f idx in
         match fidx with
         (* Index is a non-negative integer *)
-        | Lit (Num n) when Arith_Utils.is_int n && 0. <= n -> (
+        | Lit (Num n) when Arith_utils.is_int n && 0. <= n -> (
             match lexpr_is_string gamma fle with
             | true ->
                 Option.value
