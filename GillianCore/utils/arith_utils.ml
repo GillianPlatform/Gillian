@@ -1,4 +1,5 @@
-(* This is very tricky, -0 has to not be an int *)
+(** Utility functions for floating point arithmetic *)
+
 (** Checks if a float is an integer
     
   Note that [-0] is {b not} considered an integer *)
