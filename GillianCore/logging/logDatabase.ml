@@ -145,6 +145,7 @@ let get_next_reports id =
   rc |> check_result_code db ~log:"fold: get nexts";
   children
 
+(* TODO: elapsed_time bad, change to use parent/child check *)
 let get_previously_freed_annot loc =
   let db = get_db () in
   let stmt =

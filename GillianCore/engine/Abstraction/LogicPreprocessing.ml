@@ -631,4 +631,4 @@ let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
       only_specs = onlyspecs';
     }
   in
-  L.with_normal_phase ~title:"Logic preprocessing" (fun () -> f prog unfold)
+  L.Phase.with_normal ~title:"Logic preprocessing" (fun () -> f prog unfold)

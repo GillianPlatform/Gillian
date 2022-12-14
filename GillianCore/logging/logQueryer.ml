@@ -1,7 +1,4 @@
-(**
-    Module for querying the reports stored by the database reporter.
-    Queries will return None if the LogQueryer is not enabled.
-*)
+(** @canonical Gillian.Logging.LogQueryer *)
 
 let with_enabled func = if LogDatabase.is_enabled () then func () else None
 

@@ -55,14 +55,16 @@ let normal ?title ?severity msgf = log Normal ?title ?severity msgf
 let verbose ?title ?severity msgf = log Verbose ?title ?severity msgf
 let tmi ?title ?severity msgf = log TMI ?title ?severity msgf
 
-let normal_specific ?title ?severity loggable type_ =
-  log_specific Normal ?title ?severity loggable type_
+module Specific = struct
+  let normal ?title ?severity loggable type_ =
+    log_specific Normal ?title ?severity loggable type_
 
-let verbose_specific ?title ?severity loggable type_ =
-  log_specific Verbose ?title ?severity loggable type_
+  let verbose ?title ?severity loggable type_ =
+    log_specific Verbose ?title ?severity loggable type_
 
-let tmi_specific ?title ?severity loggable type_ =
-  log_specific TMI ?title ?severity loggable type_
+  let tmi ?title ?severity loggable type_ =
+    log_specific TMI ?title ?severity loggable type_
+end
 
 let print_to_all (str : string) =
   normal (fun m -> m "%s" str);
@@ -74,32 +76,35 @@ let fail msg =
   raise (Failure msg)
 
 let set_previous = ReportBuilder.set_previous
-let get_parent = ReportBuilder.get_parent
-let set_parent = ReportBuilder.set_parent
-let release_parent = ReportBuilder.release_parent
 
-let with_parent_id id f =
-  match id with
-  | None -> f ()
-  | Some id -> (
-      set_parent id;
-      let result =
-        try Ok (f ())
-        with e ->
-          Printf.printf "Original Backtrace:\n%s" (Printexc.get_backtrace ());
-          Error e
-      in
-      release_parent (Some id);
-      match result with
-      | Ok ok -> ok
-      | Error e -> raise e)
+module Parent = struct
+  let get = ReportBuilder.get_parent
+  let set = ReportBuilder.set_parent
+  let release = ReportBuilder.release_parent
 
-let with_parent ?title ?(lvl = Mode.Normal) ?severity loggable type_ f =
-  let id =
-    Option.bind loggable (fun loggable ->
-        log_specific lvl ?title ?severity loggable type_)
-  in
-  with_parent_id id f
+  let with_id id f =
+    match id with
+    | None -> f ()
+    | Some id -> (
+        set id;
+        let result =
+          try Ok (f ())
+          with e ->
+            Printf.printf "Original Backtrace:\n%s" (Printexc.get_backtrace ());
+            Error e
+        in
+        release (Some id);
+        match result with
+        | Ok ok -> ok
+        | Error e -> raise e)
+
+  let with_specific ?title ?(lvl = Mode.Normal) ?severity loggable type_ f =
+    let id =
+      Option.bind loggable (fun loggable ->
+          log_specific lvl ?title ?severity loggable type_)
+    in
+    with_id id f
+end
 
 let start_phase level ?title ?severity () =
   if will_log_on_any_reporter LoggingConstants.ContentType.phase then
@@ -111,33 +116,32 @@ let start_phase level ?title ?severity () =
     | None -> None
   else None
 
-let normal_phase = start_phase Normal
-let verbose_phase = start_phase Verbose
-let tmi_phase = start_phase TMI
+module Phase = struct
+  let normal = start_phase Normal
+  let verbose = start_phase Verbose
+  let tmi = start_phase TMI
 
-let end_phase id =
-  if will_log_on_any_reporter LoggingConstants.ContentType.phase then
-    ReportBuilder.end_phase id
+  let stop id =
+    if will_log_on_any_reporter LoggingConstants.ContentType.phase then
+      ReportBuilder.end_phase id
 
-let with_phase level ?title ?severity f =
-  let phase = start_phase level ?title ?severity () in
-  let result =
-    try Ok (f ())
-    with e ->
-      Printf.printf "Original Backtrace:\n%s" (Printexc.get_backtrace ());
-      Error e
-  in
-  ReportBuilder.end_phase phase;
-  match result with
-  | Ok ok -> ok
-  | Error e -> raise e
+  let with_phase level ?title ?severity f =
+    let phase = start_phase level ?title ?severity () in
+    let result =
+      try Ok (f ())
+      with e ->
+        Printf.printf "Original Backtrace:\n%s" (Printexc.get_backtrace ());
+        Error e
+    in
+    ReportBuilder.end_phase phase;
+    match result with
+    | Ok ok -> ok
+    | Error e -> raise e
 
-let with_normal_phase ?title ?severity f = with_phase Normal ?title ?severity f
-
-let with_verbose_phase ?title ?severity f =
-  with_phase Verbose ?title ?severity f
-
-let with_tmi_phase ?title ?severity f = with_phase TMI ?title ?severity f
+  let with_normal ?title ?severity f = with_phase Normal ?title ?severity f
+  let with_verbose ?title ?severity f = with_phase Verbose ?title ?severity f
+  let with_tmi ?title ?severity f = with_phase TMI ?title ?severity f
+end
 
 let dummy_pp fmt _ =
   Fmt.pf fmt "!!! YOU SHOULDN'T BE SEEING THIS PRETTY PRINT !!!"

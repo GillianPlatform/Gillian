@@ -1,3 +1,5 @@
+(** @canonical Gillian.Logging.ReportId *)
+
 type t = int64 [@@deriving yojson]
 
 val next : unit -> t

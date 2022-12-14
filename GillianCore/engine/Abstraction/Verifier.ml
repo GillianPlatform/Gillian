@@ -734,7 +734,7 @@ struct
           DL.log (fun m ->
               m "Unify: setting parent to %a" (Fmt.option L.ReportId.pp)
                 parent_id);
-          L.with_parent_id parent_id (fun () ->
+          L.Parent.with_id parent_id (fun () ->
               let store = SPState.get_store final_state in
               let () =
                 SStore.filter store (fun x v ->
@@ -1083,7 +1083,7 @@ struct
       ?(proc_name : string option)
       ~(init_data : SPState.init_data)
       (prog : prog_t) : SAInterpreter.result_t SAInterpreter.cont_func =
-    L.with_normal_phase ~title:"Program verification" (fun () ->
+    L.Phase.with_normal ~title:"Program verification" (fun () ->
         (* Analyse all procedures and lemmas *)
         let procs_to_verify =
           SS.of_list (Prog.get_noninternal_proc_names prog)
@@ -1213,7 +1213,7 @@ struct
         let call_graph = SAInterpreter.call_graph in
         write_verif_results cur_source_files call_graph ~diff:"" global_results
     in
-    L.with_normal_phase ~title:"Program verification" (fun () ->
+    L.Phase.with_normal ~title:"Program verification" (fun () ->
         f prog incremental source_files)
 
   module Debug = struct

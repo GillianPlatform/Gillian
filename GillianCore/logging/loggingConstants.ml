@@ -1,3 +1,5 @@
+(** @canonical Gillian.Logging.LoggingConstants*)
+
 (** Allowed strings for the type_ field of a report *)
 module ContentType = struct
   let debug = "debug"
