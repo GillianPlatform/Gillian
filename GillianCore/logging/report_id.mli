@@ -1,4 +1,4 @@
-(** @canonical Gillian.Logging.ReportId *)
+(** @canonical Gillian.Logging.Report_id *)
 
 type t = int64 [@@deriving yojson]
 

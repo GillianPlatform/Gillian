@@ -1,7 +1,7 @@
-(** @canonical Gillian.Logging.LoggingConstants*)
+(** @canonical Gillian.Logging.Logging_constants*)
 
-(** Allowed strings for the type_ field of a report *)
-module ContentType = struct
+(** Allowed strings for the [type_] field of a report *)
+module Content_type = struct
   let debug = "debug"
   let phase = "phase"
   let proc_init = "proc_init"
@@ -15,4 +15,8 @@ module ContentType = struct
   let assertion = "assertion"
   let annotated_action = "annotated_action"
   let set_freed_info = "set_freed_info"
+end
+
+module Severity = struct
+  type t = Info | Log | Success | Error | Warning [@@deriving enum, yojson]
 end

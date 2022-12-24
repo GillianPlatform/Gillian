@@ -7,7 +7,7 @@ let out_channel = ref None
 let formatter = ref None
 
 let accepted_types =
-  LoggingConstants.ContentType.
+  Logging_constants.Content_type.
     [ debug; assertion; phase; cmd; unify; unify_result ]
 
 let initialize () =

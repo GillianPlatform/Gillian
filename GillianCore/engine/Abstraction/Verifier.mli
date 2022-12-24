@@ -53,7 +53,7 @@ module type S = sig
     val get_tests_for_prog : init_data:SPState.init_data -> prog_t -> proc_tests
 
     val analyse_result :
-      t -> Logging.ReportId.t -> SAInterpreter.result_t -> bool
+      t -> Logging.Report_id.t -> SAInterpreter.result_t -> bool
   end
 end
 

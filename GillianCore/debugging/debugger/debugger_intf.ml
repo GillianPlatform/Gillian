@@ -8,13 +8,13 @@ module type S = sig
     val get_debug_state : debug_state -> debug_state_view
 
     val get_unification :
-      Logging.ReportId.t -> debug_state -> Logging.ReportId.t * Unify_map.t
+      Logging.Report_id.t -> debug_state -> Logging.Report_id.t * Unify_map.t
   end
 
   val launch : string -> string option -> (debug_state, string) result
 
   val jump_to_id :
-    string -> Logging.ReportId.t -> debug_state -> (unit, string) result
+    string -> Logging.Report_id.t -> debug_state -> (unit, string) result
 
   val jump_to_start : debug_state -> unit
   val step_in : ?reverse:bool -> debug_state -> stop_reason
@@ -23,7 +23,7 @@ module type S = sig
   val step_specific :
     string ->
     Exec_map.Packaged.branch_case option ->
-    Logging.ReportId.t ->
+    Logging.Report_id.t ->
     debug_state ->
     (stop_reason, string) result
 

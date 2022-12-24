@@ -202,7 +202,7 @@ module Make
       let as_parent report f =
         L.Parent.with_specific
           (Some (to_loggable report))
-          L.LoggingConstants.ContentType.unify f
+          L.Logging_constants.Content_type.unify f
     end
 
     module UnifyCaseReport = struct
@@ -213,7 +213,7 @@ module Make
 
       let log report =
         L.Specific.normal (to_loggable report)
-          L.LoggingConstants.ContentType.unify_case
+          L.Logging_constants.Content_type.unify_case
     end
 
     module UnifyResultReport = struct
@@ -255,7 +255,7 @@ module Make
 
       let log report =
         L.Specific.normal (to_loggable report)
-          L.LoggingConstants.ContentType.unify_result
+          L.Logging_constants.Content_type.unify_result
     end
 
     let structure_unify_case_reports
@@ -1257,7 +1257,7 @@ module Make
     in
 
     L.Parent.with_specific assertion_loggable
-      L.LoggingConstants.ContentType.assertion (fun () ->
+      L.Logging_constants.Content_type.assertion (fun () ->
         let p, outs = step in
         let result =
           match (p : Asrt.t) with
@@ -1520,7 +1520,7 @@ module Make
 
   and unify_up'
       ~is_post
-      (parent_ids : L.ReportId.t list ref)
+      (parent_ids : L.Report_id.t list ref)
       (s_states : search_state') : up_u_res =
     let s_states, errs_so_far = s_states in
     L.(

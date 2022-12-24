@@ -1,13 +1,10 @@
-type severity = Info | Log | Success | Error | Warning
-[@@deriving enum, yojson]
-
 type t = {
-  id : ReportId.t;
+  id : Report_id.t;
   title : string;
   elapsed_time : float;
-  previous : ReportId.t option;
-  parent : ReportId.t option;
+  previous : Report_id.t option;
+  parent : Report_id.t option;
   content : Loggable.t;
-  severity : severity;
+  severity : Logging_constants.Severity.t;
   type_ : string;
 }

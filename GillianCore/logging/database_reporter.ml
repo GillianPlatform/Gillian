@@ -3,11 +3,11 @@
 *)
 
 let initialize () =
-  LogDatabase.reset_db ();
-  LogDatabase.create_db ()
+  Log_database.reset_db ();
+  Log_database.create_db ()
 
 let will_log (type_ : string) =
-  not LoggingConstants.ContentType.(type_ = debug || type_ = phase)
+  not Logging_constants.Content_type.(type_ = debug || type_ = phase)
 
 let log (report : Report.t) =
   if will_log report.type_ then
@@ -21,11 +21,12 @@ let log (report : Report.t) =
         (Yojson.Safe.to_string (Loggable.loggable_to_yojson report.content))
     in
     let severity =
-      Sqlite3.Data.INT (Int64.of_int (Report.severity_to_enum report.severity))
+      Sqlite3.Data.INT
+        (Int64.of_int (Logging_constants.Severity.to_enum report.severity))
     in
     let type_ = Sqlite3.Data.TEXT report.type_ in
 
-    LogDatabase.store_report ~id ~title ~elapsed_time ~previous ~parent ~content
-      ~severity ~type_
+    Log_database.store_report ~id ~title ~elapsed_time ~previous ~parent
+      ~content ~severity ~type_
 
-let wrap_up () = LogDatabase.close_db ()
+let wrap_up () = Log_database.close_db ()

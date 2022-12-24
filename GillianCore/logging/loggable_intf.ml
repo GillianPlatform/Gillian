@@ -18,19 +18,11 @@ end
 include Types
 
 module type Intf = sig
-  (** @inline *)
-  include module type of struct
-    (** @inline *)
-    include Types
-  end
+  type t
 
-  (** Pretty prints the contents of a loggable *)
   val pp : t -> Format.formatter -> unit
-
-  (** Converts a loggable to Yojson *)
   val loggable_to_yojson : t -> Yojson.Safe.t
 
-  (** Returns a loggable, given the required functions and content *)
   val make :
     (Format.formatter -> 'a -> unit) ->
     (Yojson.Safe.t -> ('a, string) result) ->
@@ -38,6 +30,6 @@ module type Intf = sig
     'a ->
     t
 
-  (** Returns a loggable given a string to be logged *)
+  (** Returns a simple loggable of a string *)
   val make_string : string -> t
 end

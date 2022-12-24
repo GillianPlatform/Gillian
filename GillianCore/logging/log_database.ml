@@ -10,7 +10,7 @@ let get_db () =
   match !db with
   | None ->
       error
-        "Unable to get database. Ensure that LogDatabase.create_db has been \
+        "Unable to get database. Ensure that Log_database.create_db has been \
          called."
   | Some db -> db
 
@@ -136,7 +136,7 @@ let get_next_reports id =
   let rc, children =
     Sqlite3.fold stmt
       ~f:(fun results row ->
-        let id : ReportId.t = Sqlite3.Data.to_int64_exn row.(0) in
+        let id : Report_id.t = Sqlite3.Data.to_int64_exn row.(0) in
         let type_ = Sqlite3.Data.to_string_exn row.(1) in
         let content = Sqlite3.Data.to_string_exn row.(2) in
         (id, type_, content) :: results)
@@ -156,10 +156,10 @@ let get_previously_freed_annot loc =
        ORDER BY elapsed_time DESC LIMIT 1;"
   in
   Sqlite3.bind stmt 1
-    (Sqlite3.Data.TEXT LoggingConstants.ContentType.annotated_action)
+    (Sqlite3.Data.TEXT Logging_constants.Content_type.annotated_action)
   |> check_result_code db ~log:"get previous freed annot bind annotated_action";
   Sqlite3.bind stmt 2
-    (Sqlite3.Data.TEXT LoggingConstants.ContentType.set_freed_info)
+    (Sqlite3.Data.TEXT Logging_constants.Content_type.set_freed_info)
   |> check_result_code db ~log:"get previous freed annot bind set_freed_info";
   Sqlite3.bind stmt 3 (Sqlite3.Data.TEXT loc)
   |> check_result_code db ~log:"get previous freed annot bind loc";
@@ -181,7 +181,7 @@ let get_children_of roots_only id =
   let rc, children =
     Sqlite3.fold stmt
       ~f:(fun results row ->
-        let id : ReportId.t = Sqlite3.Data.to_int64_exn row.(0) in
+        let id : Report_id.t = Sqlite3.Data.to_int64_exn row.(0) in
         let type_ = Sqlite3.Data.to_string_exn row.(1) in
         let content = Sqlite3.Data.to_string_exn row.(2) in
         (id, type_, content) :: results)

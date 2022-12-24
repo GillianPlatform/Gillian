@@ -12,7 +12,7 @@ open Annot
 open WBranchCase
 open Debugger.Lifter
 
-type rid = L.ReportId.t [@@deriving yojson, show]
+type rid = L.Report_id.t [@@deriving yojson, show]
 
 module Make
     (Gil : Gillian.Debugger.Lifter.Gil_fallback_lifter.Gil_lifter_with_state)
@@ -466,7 +466,7 @@ struct
             [
               ("state", dump state); ("exec_data", exec_data_to_yojson exec_data);
             ]
-          "HANDLING %a (prev %a)" L.ReportId.pp id (pp_option L.ReportId.pp)
+          "HANDLING %a (prev %a)" L.Report_id.pp id (pp_option L.Report_id.pp)
           prev_id);
     let { tl_ast; partial_cmds; id_map; proc_name; is_loop_func; _ } = state in
     match handle_loop_prefix exec_data with
@@ -745,7 +745,7 @@ struct
             Fmt.str "%s at %a" msg_prefix Location.pp origin_loc)
 
   let get_previously_freed_annot loc =
-    let annot = Logging.LogQueryer.get_previously_freed_annot loc in
+    let annot = Logging.Log_queryer.get_previously_freed_annot loc in
     match annot with
     | None -> None
     | Some annot ->

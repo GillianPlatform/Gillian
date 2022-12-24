@@ -24,7 +24,7 @@ module Public : sig
   val to_file : string -> unit
 
   (** Logs a message (as with {!log}), but attaches the type and (parsed) content of the specified report. *)
-  val show_report : Logging.ReportId.t -> string -> unit
+  val show_report : Logging.Report_id.t -> string -> unit
 
   (** Raises an exception with a string message and attached JSON.
 

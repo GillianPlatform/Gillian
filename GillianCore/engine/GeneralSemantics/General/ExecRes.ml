@@ -9,7 +9,7 @@ type ('state, 'value, 'err) t =
       flag : Flag.t;
       ret_val : 'value;
       final_state : 'state;
-      last_report : Logging.ReportId.t option;
+      last_report : Logging.Report_id.t option;
     }
 [@@deriving yojson]
 

@@ -1,5 +1,5 @@
-module ReportState = struct
-  type t = { previous : ReportId.t option ref; parents : ReportId.t Stack.t }
+module Report_state = struct
+  type t = { previous : Report_id.t option ref; parents : Report_id.t Stack.t }
 
   let make () = { previous = ref None; parents = Stack.create () }
 
@@ -18,7 +18,7 @@ module ReportState = struct
     result
 end
 
-open ReportState
+open Report_state
 
 let get_previous () =
   let { previous; _ } = !active_state in
@@ -44,14 +44,14 @@ let release_parent = function
   | Some rid as id_opt ->
       let { previous; parents } = !active_state in
       let parent_id = Stack.pop parents in
-      assert (ReportId.equal rid parent_id);
+      assert (Report_id.equal rid parent_id);
       previous := id_opt
 
 let make
     ?title
     ~(content : Loggable.t)
     ~(type_ : string)
-    ?(severity = Report.Log)
+    ?(severity = Logging_constants.Severity.Log)
     () =
   let title =
     match title with
@@ -60,7 +60,7 @@ let make
   in
   let report : Report.t =
     {
-      id = ReportId.next ();
+      id = Report_id.next ();
       title;
       elapsed_time = Sys.time ();
       previous = get_previous ();
@@ -78,7 +78,7 @@ let start_phase level ?title ?severity () =
     let report =
       make ?title
         ~content:(Loggable.make_string "*** Phase ***")
-        ~type_:LoggingConstants.ContentType.phase ?severity ()
+        ~type_:Logging_constants.Content_type.phase ?severity ()
     in
     set_parent report.id;
     Some report)

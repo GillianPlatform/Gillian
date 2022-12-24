@@ -30,22 +30,19 @@ end
 (** Modules for logging (to the file log and the report database) *)
 module Logging = struct
   open Logging
-
-  (** Constants for logging *)
-  module LoggingConstants = LoggingConstants
+  module Logging_constants = Logging_constants
 
   (** Types and functions for controlling log levels *)
   module Mode = Mode
 
-  (** The type of report IDs *)
-  module ReportId = ReportId
+  module Report_id = Report_id
 
   (** Module specifying functions required for a type to be loggable *)
   module Loggable = Loggable
 
   (** Module for querying the reports stored by the database reporter.
-    Queries will return None if the LogQueryer is not enabled. *)
-  module LogQueryer = LogQueryer
+    Queries will return None if the Log_queryer is not enabled. *)
+  module Log_queryer = Log_queryer
 
   (** Logs a message at the [Normal] logging level given a message format *)
   let normal = normal
@@ -61,7 +58,7 @@ module Logging = struct
 
   (** Logs a type given a {!Loggable.t} and its content
     type (which should be one of the predefined strings in
-    {!module-LoggingConstants.module-ContentType}). Returns the logged report id if it has
+    {!module-Logging_constants.module-Content_type}). Returns the logged report id if it has
     been logged. *)
   module Specific = Specific
 

@@ -56,7 +56,7 @@ module type S = sig
     val get_tests_for_prog : init_data:SPState.init_data -> prog_t -> proc_tests
 
     val analyse_result :
-      t -> Logging.ReportId.t -> SAInterpreter.result_t -> bool
+      t -> Logging.Report_id.t -> SAInterpreter.result_t -> bool
   end
 end
 
@@ -732,7 +732,8 @@ struct
             | id -> id
           in
           DL.log (fun m ->
-              m "Unify: setting parent to %a" (Fmt.option L.ReportId.pp)
+              m "Unify: setting parent to %a"
+                (Fmt.option L.Report_id.pp)
                 parent_id);
           L.Parent.with_id parent_id (fun () ->
               let store = SPState.get_store final_state in

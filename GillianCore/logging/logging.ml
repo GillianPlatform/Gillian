@@ -1,11 +1,11 @@
-module LoggingConstants = LoggingConstants
+module Logging_constants = Logging_constants
 module Mode = Mode
 module Report = Report
 module Reporter = Reporter
 module Loggable = Loggable
-module LogQueryer = LogQueryer
-module ReportId = ReportId
-module ReportState = ReportBuilder.ReportState
+module Log_queryer = Log_queryer
+module Report_id = Report_id
+module Report_state = Report_builder.Report_state
 
 let () =
   Printexc.register_printer (function
@@ -13,8 +13,8 @@ let () =
         Some (Format.asprintf "!!!!!!!!!!\nFAILURE:\n%s\n!!!!!!!!!!\n\n" s)
     | _ -> None)
 
-let file_reporter : Reporter.t = (module FileReporter)
-let database_reporter : Reporter.t = (module DatabaseReporter)
+let file_reporter : Reporter.t = (module File_reporter)
+let database_reporter : Reporter.t = (module Database_reporter)
 let reporters = ref []
 
 let initialize (reporters_to_initialize : (module Reporter.S) list) =
@@ -31,12 +31,12 @@ let will_log_on_any_reporter (type_ : string) =
   List.exists (fun reporter -> Reporter.will_log reporter type_) !reporters
 
 let log lvl ?title ?severity msgf =
-  let type_ = LoggingConstants.ContentType.debug in
+  let type_ = Logging_constants.Content_type.debug in
   if Mode.should_log lvl && will_log_on_any_reporter type_ then
     let report =
-      ReportBuilder.make ?title
+      Report_builder.make ?title
         ~content:
-          (Loggable.make PackedPP.pp PackedPP.of_yojson PackedPP.to_yojson
+          (Loggable.make Packed_pp.pp Packed_pp.of_yojson Packed_pp.to_yojson
              (PP msgf))
         ~type_ ?severity ()
     in
@@ -45,7 +45,7 @@ let log lvl ?title ?severity msgf =
 let log_specific lvl ?title ?severity loggable type_ =
   if Mode.should_log lvl && will_log_on_any_reporter type_ then
     let report =
-      ReportBuilder.make ?title ~content:loggable ~type_ ?severity ()
+      Report_builder.make ?title ~content:loggable ~type_ ?severity ()
     in
     let () = log_on_all_reporters report in
     Some report.id
@@ -75,12 +75,12 @@ let fail msg =
   normal ~severity:Error (fun m -> m "%a" Format.pp_print_string msg);
   raise (Failure msg)
 
-let set_previous = ReportBuilder.set_previous
+let set_previous = Report_builder.set_previous
 
 module Parent = struct
-  let get = ReportBuilder.get_parent
-  let set = ReportBuilder.set_parent
-  let release = ReportBuilder.release_parent
+  let get = Report_builder.get_parent
+  let set = Report_builder.set_parent
+  let release = Report_builder.release_parent
 
   let with_id id f =
     match id with
@@ -107,8 +107,8 @@ module Parent = struct
 end
 
 let start_phase level ?title ?severity () =
-  if will_log_on_any_reporter LoggingConstants.ContentType.phase then
-    let phase_report = ReportBuilder.start_phase level ?title ?severity () in
+  if will_log_on_any_reporter Logging_constants.Content_type.phase then
+    let phase_report = Report_builder.start_phase level ?title ?severity () in
     match phase_report with
     | Some phase_report ->
         let () = log_on_all_reporters phase_report in
@@ -122,8 +122,8 @@ module Phase = struct
   let tmi = start_phase TMI
 
   let stop id =
-    if will_log_on_any_reporter LoggingConstants.ContentType.phase then
-      ReportBuilder.end_phase id
+    if will_log_on_any_reporter Logging_constants.Content_type.phase then
+      Report_builder.end_phase id
 
   let with_phase level ?title ?severity f =
     let phase = start_phase level ?title ?severity () in
@@ -133,7 +133,7 @@ module Phase = struct
         Printf.printf "Original Backtrace:\n%s" (Printexc.get_backtrace ());
         Error e
     in
-    ReportBuilder.end_phase phase;
+    Report_builder.end_phase phase;
     match result with
     | Ok ok -> ok
     | Error e -> raise e

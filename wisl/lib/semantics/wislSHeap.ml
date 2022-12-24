@@ -92,7 +92,7 @@ let set_freed_with_logging heap loc =
     Logging.Specific.normal
       (Logging.Loggable.make set_freed_info_pp set_freed_info_of_yojson
          set_freed_info_to_yojson set_freed_info)
-      Logging.LoggingConstants.ContentType.set_freed_info
+      Logging.Logging_constants.Content_type.set_freed_info
   in
   Hashtbl.replace heap loc Block.Freed
 

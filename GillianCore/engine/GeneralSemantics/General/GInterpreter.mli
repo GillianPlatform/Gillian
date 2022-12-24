@@ -39,7 +39,7 @@ module type S = sig
         next_idx : int;
         loop_ids : string list;
         branch_count : int;
-        prev_cmd_report_id : Logging.ReportId.t option;
+        prev_cmd_report_id : Logging.Report_id.t option;
         branch_case : branch_case option;
         branch_path : branch_path;
         new_branches : (state_t * int * branch_case) list;
@@ -70,7 +70,7 @@ module type S = sig
   and 'a cont_func =
     | Finished of 'a list
     | Continue of
-        (Logging.ReportId.t option
+        (Logging.Report_id.t option
         * branch_path
         * branch_case list option
         * 'a cont_func_f)

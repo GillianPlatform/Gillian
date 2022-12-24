@@ -78,7 +78,7 @@ type stop_at =
 
 (** Data about a unification *)
 type unification = {
-  id : L.ReportId.t;
+  id : L.Report_id.t;
   kind : Unifier.unify_kind;
   result : Unify_map.unify_result;
 }
@@ -156,7 +156,7 @@ module Packaged = struct
   type t = (branch_case, cmd_data, unit) _map
 
   and cmd_data = {
-    ids : L.ReportId.t list;
+    ids : L.Report_id.t list;
     display : string;
     unifys : unification list;
     errors : string list;

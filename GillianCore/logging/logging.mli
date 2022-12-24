@@ -1,5 +1,9 @@
-(** @canonical Gillian.Logging.LoggingConstants *)
-module LoggingConstants = LoggingConstants
+(** @canonical Gillian.Logging.Logging_constants *)
+module Logging_constants = Logging_constants
+
+open Logging_constants
+
+(** @canonical Gillian.Logging.Loggable *)
 
 (** @canonical Gillian.Logging.Mode *)
 module Mode : sig
@@ -22,8 +26,8 @@ module Mode : sig
   val pp : Format.formatter -> t -> unit
 end
 
-(** @canonical Gillian.Logging.ReportId *)
-module ReportId : sig
+(** @canonical Gillian.Logging.Report_id *)
+module Report_id : sig
   type t [@@deriving yojson]
 
   val equal : t -> t -> bool
@@ -49,23 +53,23 @@ val file_reporter : Reporter.t
 (** @canonical Gillian.Logging.Loggable *)
 module Loggable : module type of Loggable
 
-(** @canonical Gillian.Logging.LogQueryer *)
-module LogQueryer : sig
+(** @canonical Gillian.Logging.Log_queryer *)
+module Log_queryer : sig
   (** Gets content and type (in that order) of the given ID *)
-  val get_report : ReportId.t -> (string * string) option
+  val get_report : Report_id.t -> (string * string) option
 
   (** Gets the ID of the report that precedes the given ID *)
-  val get_previous_report_id : ReportId.t -> ReportId.t option
+  val get_previous_report_id : Report_id.t -> Report_id.t option
 
   (** Gets the ID, content and type (in that order) of all reports
     that directly succeed the given ID *)
-  val get_next_reports : ReportId.t -> (ReportId.t * string * string) list
+  val get_next_reports : Report_id.t -> (Report_id.t * string * string) list
 
   (** As with {!get_next_reports}, but only gives IDs *)
-  val get_next_report_ids : ReportId.t -> ReportId.t list
+  val get_next_report_ids : Report_id.t -> Report_id.t list
 
   (** Gets the ID of the "first" report that succeeds the given ID *)
-  val get_next_report_id : ReportId.t -> ReportId.t option
+  val get_next_report_id : Report_id.t -> Report_id.t option
 
   (** Gets the annotation corresponding to the previous set-freed action
      for a given location in the current phase, if it exists *)
@@ -75,19 +79,19 @@ module LogQueryer : sig
 
     If [roots_only] is true, only gets children with no previous; defaults to [false] *)
   val get_children_of :
-    ?roots_only:bool -> ReportId.t -> (ReportId.t * string * string) list
+    ?roots_only:bool -> Report_id.t -> (Report_id.t * string * string) list
 
   (** Gets the ID and content of any children of the given ID with type ["cmd_result"] *)
-  val get_cmd_results : ReportId.t -> (ReportId.t * string) list
+  val get_cmd_results : Report_id.t -> (Report_id.t * string) list
 
   (** Gets the ID and content of a child, with type ["unify"], of the given ID (if it exists) *)
-  val get_unify_for : ReportId.t -> (ReportId.t * string) option
+  val get_unify_for : Report_id.t -> (Report_id.t * string) option
 
   (** Returns the ID and content of all children of the given ID with type ["unify_result"] *)
-  val get_unify_results : ReportId.t -> (ReportId.t * string) list
+  val get_unify_results : Report_id.t -> (Report_id.t * string) list
 end
 
-module ReportState : sig
+module Report_state : sig
   type t
 
   val make : unit -> t
@@ -106,20 +110,20 @@ val wrap_up : unit -> unit
 
 val normal :
   ?title:string ->
-  ?severity:Report.severity ->
+  ?severity:Severity.t ->
   ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
   unit
 
 val verbose :
   ?title:string ->
-  ?severity:Report.severity ->
+  ?severity:Severity.t ->
   ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
   unit
 
 (** Logs a message at the [TMI] logging level given a message format *)
 val tmi :
   ?title:string ->
-  ?severity:Report.severity ->
+  ?severity:Severity.t ->
   ((('a, Format.formatter, unit) format -> 'a) -> unit) ->
   unit
 
@@ -128,26 +132,26 @@ module Specific : sig
   (** Logs a {!Loggable.t} at the [Normal] log level *)
   val normal :
     ?title:string ->
-    ?severity:Report.severity ->
+    ?severity:Severity.t ->
     Loggable.t ->
     string ->
-    ReportId.t option
+    Report_id.t option
 
   (** Logs a {!Loggable.t} at the [Verbose] log level *)
   val verbose :
     ?title:string ->
-    ?severity:Report.severity ->
+    ?severity:Severity.t ->
     Loggable.t ->
     string ->
-    ReportId.t option
+    Report_id.t option
 
   (** Logs a {!Loggable.t} at the [TMI] log level *)
   val tmi :
     ?title:string ->
-    ?severity:Report.severity ->
+    ?severity:Severity.t ->
     Loggable.t ->
     string ->
-    ReportId.t option
+    Report_id.t option
 end
 
 (** Writes the string and then raises a failure. *)
@@ -156,56 +160,48 @@ val fail : string -> 'a
 (** Output the strings in every file and prints it to stdout *)
 val print_to_all : string -> unit
 
-(** @canonical Gillian.Logging.Phase
-
-  Functions for managing phases *)
+(** @canonical Gillian.Logging.Phase *)
 module Phase : sig
   (** Starts a phase with logging level set to [Normal] *)
   val normal :
-    ?title:string -> ?severity:Report.severity -> unit -> ReportId.t option
+    ?title:string -> ?severity:Severity.t -> unit -> Report_id.t option
 
   (** Starts a phase with logging level set to [Verbose] *)
   val verbose :
-    ?title:string -> ?severity:Report.severity -> unit -> ReportId.t option
+    ?title:string -> ?severity:Severity.t -> unit -> Report_id.t option
 
   (** Starts a phase with logging level set to [TMI] *)
-  val tmi :
-    ?title:string -> ?severity:Report.severity -> unit -> ReportId.t option
+  val tmi : ?title:string -> ?severity:Severity.t -> unit -> Report_id.t option
 
   (** Ends the phase corresponding to the specified report id *)
-  val stop : ReportId.t option -> unit
+  val stop : Report_id.t option -> unit
 
   (** Runs the specified function within a phase with logging level set to
       [Normal] *)
-  val with_normal :
-    ?title:string -> ?severity:Report.severity -> (unit -> 'a) -> 'a
+  val with_normal : ?title:string -> ?severity:Severity.t -> (unit -> 'a) -> 'a
 
   (** Runs the specified function within a phase with logging level set to
       [Verbose] *)
-  val with_verbose :
-    ?title:string -> ?severity:Report.severity -> (unit -> 'a) -> 'a
+  val with_verbose : ?title:string -> ?severity:Severity.t -> (unit -> 'a) -> 'a
 
   (** Runs the specified function within a phase with logging level set to
       [TMI] *)
-  val with_tmi :
-    ?title:string -> ?severity:Report.severity -> (unit -> 'a) -> 'a
+  val with_tmi : ?title:string -> ?severity:Severity.t -> (unit -> 'a) -> 'a
 end
 
-val set_previous : ReportId.t option -> unit
+val set_previous : Report_id.t option -> unit
 
-(** @canonical Gillian.Logging.Parent
-
-  Functions for managing the parent of new reports *)
+(** @canonical Gillian.Logging.Parent *)
 module Parent : sig
-  val get : unit -> ReportId.t option
-  val set : ReportId.t -> unit
-  val release : ReportId.t option -> unit
-  val with_id : ReportId.t option -> (unit -> 'a) -> 'a
+  val get : unit -> Report_id.t option
+  val set : Report_id.t -> unit
+  val release : Report_id.t option -> unit
+  val with_id : Report_id.t option -> (unit -> 'a) -> 'a
 
   val with_specific :
     ?title:string ->
     ?lvl:Mode.level ->
-    ?severity:Report.severity ->
+    ?severity:Severity.t ->
     Loggable.t option ->
     string ->
     (unit -> 'a) ->
