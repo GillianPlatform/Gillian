@@ -788,7 +788,7 @@ struct
     let id = Fmt.to_to_string WislSMemory.pp_err info.error in
     let description =
       match info.error with
-      | WislSHeap.MissingResource missing_resource_error_info ->
+      | WislSHeap.Err.MissingResource missing_resource_error_info ->
           Some
             (get_missing_resource_msg missing_resource_error_info info.command
                info.tl_ast)

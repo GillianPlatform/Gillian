@@ -5,14 +5,18 @@ module Solver = Gillian.Logic.FOSolver
 module Reduction = Gillian.Logic.Reduction
 open Gillian.Debugger.Utils
 
-type err =
-  | MissingResource of (WislLActions.ga * string * Expr.t option)
-  | DoubleFree of string
-  | UseAfterFree of string
-  | MemoryLeak
-  | OutOfBounds of (int option * string * Expr.t)
-  | InvalidLocation
-[@@deriving yojson, show]
+module Err = struct
+  type t =
+    | MissingResource of (WislLActions.ga * string * Expr.t option)
+    | DoubleFree of string
+    | UseAfterFree of string
+    | MemoryLeak of string
+    | OutOfBounds of (int option * string * Expr.t)
+    | InvalidLocation of Expr.t
+  [@@deriving yojson, show { with_path = false }]
+end
+
+open Err
 
 module Block = struct
   type t = Freed | Allocated of { data : SFVL.t; bound : int option }
@@ -220,7 +224,7 @@ let rem_bound heap loc =
 let get_freed heap loc =
   match Hashtbl.find_opt heap loc with
   | Some Block.Freed -> Ok ()
-  | Some _ -> Error MemoryLeak
+  | Some _ -> Error (MemoryLeak loc)
   | None -> Error (MissingResource (Freed, loc, None))
 
 let set_freed heap loc = set_freed_with_logging heap loc
@@ -231,7 +235,7 @@ let rem_freed heap loc =
       Hashtbl.remove heap loc;
       Ok ()
   | None -> Error (MissingResource (Freed, loc, None))
-  | Some _ -> Error MemoryLeak
+  | Some _ -> Error (MemoryLeak loc)
 
 (***** Some things specific to symbolic heaps ********)
 

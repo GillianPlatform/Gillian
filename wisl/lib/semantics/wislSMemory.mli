@@ -2,7 +2,7 @@ open Gillian.Debugger.Utils
 
 include
   Gillian.Symbolic.Memory_S
-    with type err_t = WislSHeap.err
+    with type err_t = WislSHeap.Err.t
      and type init_data = unit
 
 val add_debugger_variables :

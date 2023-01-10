@@ -4,18 +4,20 @@ open Gillian.Debugger.Utils
 
 type t [@@deriving yojson]
 
-type err =
-  | MissingResource of (WislLActions.ga * string * Expr.t option)
-  | DoubleFree of string
-  | UseAfterFree of string
-  | MemoryLeak
-  | OutOfBounds of (int option * string * Expr.t)
-  | InvalidLocation
-[@@deriving yojson, show]
+module Err : sig
+  type t =
+    | MissingResource of (WislLActions.ga * string * Expr.t option)
+    | DoubleFree of string
+    | UseAfterFree of string
+    | MemoryLeak of string
+    | OutOfBounds of (int option * string * Expr.t)
+    | InvalidLocation of Expr.t
+  [@@deriving yojson, show]
+end
 
 val init : unit -> t
 val alloc : t -> int -> string
-val dispose : t -> string -> (unit, err) Result.t
+val dispose : t -> string -> (unit, Err.t) Result.t
 val clean_up : Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
 
 val get_cell :
@@ -24,7 +26,7 @@ val get_cell :
   t ->
   string ->
   Expr.t ->
-  (string * Expr.t * Expr.t, err) result
+  (string * Expr.t * Expr.t, Err.t) result
 
 val set_cell :
   pfs:PureContext.t ->
@@ -33,15 +35,15 @@ val set_cell :
   string ->
   Expr.t ->
   Expr.t ->
-  (unit, err) result
+  (unit, Err.t) result
 
-val rem_cell : t -> string -> Expr.t -> (unit, err) result
-val get_bound : t -> string -> (int, err) result
-val set_bound : t -> string -> int -> (unit, err) result
-val rem_bound : t -> string -> (unit, err) result
-val get_freed : t -> string -> (unit, err) result
+val rem_cell : t -> string -> Expr.t -> (unit, Err.t) result
+val get_bound : t -> string -> (int, Err.t) result
+val set_bound : t -> string -> int -> (unit, Err.t) result
+val rem_bound : t -> string -> (unit, Err.t) result
+val get_freed : t -> string -> (unit, Err.t) result
 val set_freed : t -> string -> unit
-val rem_freed : t -> string -> (unit, err) result
+val rem_freed : t -> string -> (unit, Err.t) result
 val pp : t Fmt.t
 val copy : t -> t
 val lvars : t -> SS.t

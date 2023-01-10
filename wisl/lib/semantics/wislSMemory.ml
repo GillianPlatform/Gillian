@@ -8,7 +8,7 @@ module SS = Gillian.Utils.Containers.SS
 type init_data = unit
 type vt = Values.t
 type st = Subst.t
-type err_t = WislSHeap.err [@@deriving yojson, show]
+type err_t = WislSHeap.Err.t [@@deriving yojson, show]
 type c_fix_t = unit
 type t = WislSHeap.t [@@deriving yojson]
 
@@ -19,119 +19,79 @@ type action_ret =
 let init () = WislSHeap.init ()
 let clear _ = WislSHeap.init ()
 
-let resolve_loc pfs gamma loc =
-  Gillian.Logic.FOSolver.resolve_loc_name ~pfs ~gamma loc
+let with_resolved_loc ~pfs ~gamma loc f =
+  match FOSolver.resolve_loc_name ~pfs ~gamma loc with
+  | Some loc_name -> f loc_name
+  | None -> AFail [ InvalidLocation loc ]
+
+let resolve_or_create_loc ~pfs ~gamma loc =
+  (* If we can't find the location, we create a new location and we
+      add to the path condition that it is equal to the given loc *)
+  match FOSolver.resolve_loc_name ~pfs ~gamma loc with
+  | Some loc_name -> (loc_name, [])
+  | None ->
+      let al = ALoc.alloc () in
+      (al, [ Formula.Eq (Expr.ALoc al, loc) ])
 
 let get_cell heap pfs gamma (loc : vt) (offset : vt) =
-  match FOSolver.resolve_loc_name ~pfs ~gamma loc with
-  | None -> AFail [ InvalidLocation ]
-  | Some loc -> (
-      match WislSHeap.get_cell ~pfs ~gamma heap loc offset with
-      | Error err -> AFail [ err ]
-      | Ok (loc, ofs, value) ->
-          let loc = Expr.loc_from_loc_name loc in
-          ASucc [ (heap, [ loc; ofs; value ], [], []) ])
+  with_resolved_loc ~pfs ~gamma loc @@ fun loc ->
+  match WislSHeap.get_cell ~pfs ~gamma heap loc offset with
+  | Error err -> AFail [ err ]
+  | Ok (loc, ofs, value) ->
+      let loc = Expr.loc_from_loc_name loc in
+      ASucc [ (heap, [ loc; ofs; value ], [], []) ]
 
 let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) =
-  let loc_name, new_pfs =
-    (* If we can't find the location, we create a new location and we
-         add to the path condition that it is equal to the given loc *)
-    let resolved_loc_opt = resolve_loc pfs gamma loc in
-    match resolved_loc_opt with
-    | Some loc_name ->
-        if Gillian.Utils.Names.is_aloc_name loc_name then (loc_name, [])
-        else (loc_name, [])
-    | None ->
-        let al = ALoc.alloc () in
-        (al, [ Formula.Eq (Expr.ALoc al, loc) ])
-  in
+  let loc_name, new_pfs = resolve_or_create_loc ~pfs ~gamma loc in
   match WislSHeap.set_cell ~pfs ~gamma heap loc_name offset value with
   | Error e -> AFail [ e ]
   | Ok () -> ASucc [ (heap, [], new_pfs, []) ]
 
 let rem_cell heap pfs gamma (loc : vt) (offset : vt) =
-  match FOSolver.resolve_loc_name ~pfs ~gamma loc with
-  | Some loc_name -> (
-      match WislSHeap.rem_cell heap loc_name offset with
-      | Error e -> AFail [ e ]
-      | Ok () -> ASucc [ (heap, [], [], []) ])
-  | None ->
-      (* loc does not evaluate to a location, or we can't find it. *)
-      AFail [ InvalidLocation ]
+  with_resolved_loc ~pfs ~gamma loc @@ fun loc_name ->
+  match WislSHeap.rem_cell heap loc_name offset with
+  | Error e -> AFail [ e ]
+  | Ok () -> ASucc [ (heap, [], [], []) ]
 
 let get_bound heap pfs gamma loc =
-  match FOSolver.resolve_loc_name ~pfs ~gamma loc with
-  | Some loc_name -> (
-      match WislSHeap.get_bound heap loc_name with
-      | Error e -> AFail [ e ]
-      | Ok b ->
-          let b = Expr.int b in
-          let loc = Expr.loc_from_loc_name loc_name in
-          ASucc [ (heap, [ loc; b ], [], []) ])
-  | None -> AFail [ InvalidLocation ]
+  with_resolved_loc ~pfs ~gamma loc @@ fun loc_name ->
+  match WislSHeap.get_bound heap loc_name with
+  | Error e -> AFail [ e ]
+  | Ok b ->
+      let b = Expr.int b in
+      let loc = Expr.loc_from_loc_name loc_name in
+      ASucc [ (heap, [ loc; b ], [], []) ]
 
 let set_bound heap pfs gamma (loc : vt) (bound : int) =
-  let loc_name, new_pfs =
-    (* If we can't find the location, we create a new location and we
-         add to the path condition that it is equal to the given loc *)
-    let resolved_loc_opt = resolve_loc pfs gamma loc in
-    match resolved_loc_opt with
-    | Some loc_name ->
-        if Gillian.Utils.Names.is_aloc_name loc_name then (loc_name, [])
-        else (loc_name, [])
-    | None ->
-        let al = ALoc.alloc () in
-        (al, [ Formula.Eq (Expr.ALoc al, loc) ])
-  in
+  let loc_name, new_pfs = resolve_or_create_loc ~pfs ~gamma loc in
   match WislSHeap.set_bound heap loc_name bound with
   | Error e -> AFail [ e ]
   | Ok () -> ASucc [ (heap, [], new_pfs, []) ]
 
 let rem_bound heap pfs gamma loc =
-  match FOSolver.resolve_loc_name ~pfs ~gamma loc with
-  | Some loc_name -> (
-      match WislSHeap.rem_bound heap loc_name with
-      | Error e -> AFail [ e ]
-      | Ok () -> ASucc [ (heap, [], [], []) ])
-  | None ->
-      (* loc does not evaluate to a location, or we can't find it. *)
-      AFail [ InvalidLocation ]
+  with_resolved_loc ~pfs ~gamma loc @@ fun loc_name ->
+  match WislSHeap.rem_bound heap loc_name with
+  | Error e -> AFail [ e ]
+  | Ok () -> ASucc [ (heap, [], [], []) ]
 
 let get_freed heap pfs gamma loc =
-  match FOSolver.resolve_loc_name ~pfs ~gamma loc with
-  | Some loc_name -> (
-      match WislSHeap.get_freed heap loc_name with
-      | Error e -> AFail [ e ]
-      | Ok () ->
-          let loc = Expr.loc_from_loc_name loc_name in
-          ASucc [ (heap, [ loc ], [], []) ])
-  | None -> AFail [ InvalidLocation ]
+  with_resolved_loc ~pfs ~gamma loc @@ fun loc_name ->
+  match WislSHeap.get_freed heap loc_name with
+  | Error e -> AFail [ e ]
+  | Ok () ->
+      let loc = Expr.loc_from_loc_name loc_name in
+      ASucc [ (heap, [ loc ], [], []) ]
 
 let set_freed heap pfs gamma (loc : vt) =
-  let loc_name, new_pfs =
-    (* If we can't find the location, we create a new location and we
-         add to the path condition that it is equal to the given loc *)
-    let resolved_loc_opt = resolve_loc pfs gamma loc in
-    match resolved_loc_opt with
-    | Some loc_name ->
-        if Gillian.Utils.Names.is_aloc_name loc_name then (loc_name, [])
-        else (loc_name, [])
-    | None ->
-        let al = ALoc.alloc () in
-        (al, [ Formula.Eq (Expr.ALoc al, loc) ])
-  in
+  let loc_name, new_pfs = resolve_or_create_loc ~pfs ~gamma loc in
   let () = WislSHeap.set_freed heap loc_name in
   ASucc [ (heap, [], new_pfs, []) ]
 
 let rem_freed heap pfs gamma loc =
-  match FOSolver.resolve_loc_name ~pfs ~gamma loc with
-  | Some loc_name -> (
-      match WislSHeap.rem_freed heap loc_name with
-      | Error e -> AFail [ e ]
-      | Ok () -> ASucc [ (heap, [], [], []) ])
-  | None ->
-      (* loc does not evaluate to a location, or we can't find it. *)
-      AFail [ InvalidLocation ]
+  with_resolved_loc ~pfs ~gamma loc @@ fun loc_name ->
+  match WislSHeap.rem_freed heap loc_name with
+  | Error e -> AFail [ e ]
+  | Ok () -> ASucc [ (heap, [], [], []) ]
 
 let alloc heap _pfs _gamma (size : int) =
   let loc = WislSHeap.alloc heap size in
@@ -143,13 +103,11 @@ let alloc heap _pfs _gamma (size : int) =
         [] );
     ]
 
-let dispose heap pfs gamma loc_expr =
-  match resolve_loc pfs gamma loc_expr with
-  | Some loc_name -> (
-      match WislSHeap.dispose heap loc_name with
-      | Ok () -> ASucc [ (heap, [], [], []) ]
-      | Error e -> AFail [ e ])
-  | None -> AFail [ InvalidLocation ]
+let dispose heap pfs gamma loc =
+  with_resolved_loc ~pfs ~gamma loc @@ fun loc_name ->
+  match WislSHeap.dispose heap loc_name with
+  | Ok () -> ASucc [ (heap, [], [], []) ]
+  | Error e -> AFail [ e ]
 
 let execute_action ?unification:_ name heap pfs gamma args =
   let action = WislLActions.ac_from_str name in
@@ -270,18 +228,19 @@ let pp_by_need _ fmt h = pp fmt h
 
 (* TODO: Implement properly *)
 let get_print_info _ _ = (SS.empty, SS.empty)
+let pp_err = WislSHeap.Err.pp
 
-let pp_err fmt t =
-  Fmt.string fmt
-    (match t with
-    | WislSHeap.MissingResource _ -> "Missing Resource"
-    | DoubleFree _ -> "Double Free"
-    | UseAfterFree _ -> "Use After Free"
-    | MemoryLeak -> "Memory Leak"
-    | OutOfBounds _ -> "Out Of Bounds"
-    | InvalidLocation -> "Invalid Location")
+let get_recovery_vals _ (err : WislSHeap.Err.t) =
+  match err with
+  | MissingResource (_, loc, ofs) ->
+      let loc = Expr.loc_from_loc_name loc in
+      let ofs = Option.fold ~none:[] ~some:(fun x -> [ x ]) ofs in
+      loc :: ofs
+  | OutOfBounds (_, loc, ofs) -> [ Expr.loc_from_loc_name loc; ofs ]
+  | DoubleFree loc | UseAfterFree loc | MemoryLeak loc ->
+      [ Expr.loc_from_loc_name loc ]
+  | InvalidLocation e -> [ e ]
 
-let get_recovery_vals _ _ = []
 let pp_c_fix _ _ = ()
 let substitution_in_place ~pfs:_ ~gamma:_ = WislSHeap.substitution_in_place
 let fresh_val _ = Expr.LVar (LVar.alloc ())
