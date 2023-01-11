@@ -1092,12 +1092,18 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
   if Gillian.Utils.(ExecMode.biabduction_exec !Config.current_exec_mode) then
     Hashtbl.iter
       (fun name proc ->
+        let pre =
+          List.map
+            (fun var -> Asrt.Pure (Eq (Expr.PVar var, Expr.LVar ("#" ^ var))))
+            proc.Proc.proc_params
+          |> Asrt.star
+        in
         let bispec =
           BiSpec.
             {
               bispec_name = name;
               bispec_params = proc.Proc.proc_params;
-              bispec_pres = [ Emp ];
+              bispec_pres = [ pre ];
               bispec_normalised = false;
             }
         in
