@@ -9,7 +9,13 @@ type init_data = unit
 type vt = Values.t
 type st = Subst.t
 type err_t = WislSHeap.Err.t [@@deriving yojson, show]
-type c_fix_t = unit
+
+type c_fix_t =
+  | AddCell of { loc : string; ofs : Expr.t; value : Expr.t }
+  | AddBound of string * int
+  | AddFreed of string
+[@@deriving show { with_path = false }]
+
 type t = WislSHeap.t [@@deriving yojson]
 
 type action_ret =
@@ -241,7 +247,7 @@ let get_recovery_vals _ (err : WislSHeap.Err.t) =
       [ Expr.loc_from_loc_name loc ]
   | InvalidLocation e -> [ e ]
 
-let pp_c_fix _ _ = ()
+let pp_c_fix = pp_c_fix_t
 let substitution_in_place ~pfs:_ ~gamma:_ = WislSHeap.substitution_in_place
 let fresh_val _ = Expr.LVar (LVar.alloc ())
 
@@ -253,7 +259,38 @@ let alocs heap = WislSHeap.alocs heap
 let assertions ?to_keep:_ heap = WislSHeap.assertions heap
 let mem_constraints _ = []
 let is_overlapping_asrt _ = false
-let apply_fix m _ _ _ = m
-let get_fixes ?simple_fix:_ _ _ _ _ = []
+
+let apply_fix m pfs gamma fix =
+  match fix with
+  | AddBound (_loc, _i) -> failwith "cannot fix bound yet"
+  | AddFreed loc ->
+      WislSHeap.set_freed m loc;
+      m
+  | AddCell { loc; ofs; value } ->
+      WislSHeap.set_cell ~pfs ~gamma m loc ofs value |> Result.get_ok;
+      m
+
+let get_fixes ?simple_fix:_ _t _pfs _gamma (err : WislSHeap.Err.t) =
+  let make_simple fix = ([ fix ], [], SS.empty, []) in
+  let l = List.map make_simple in
+  match err with
+  | MissingResource (Bound, loc, None) ->
+      l [ AddBound (loc, 1); AddBound (loc, 2); AddBound (loc, 3) ]
+  | MissingResource (Cell, loc, Some ofs) ->
+      let new_var = LVar.alloc () in
+      let value = Expr.LVar new_var in
+      let set = SS.singleton new_var in
+      [ ([ AddCell { loc; ofs; value } ], [], set, []) ]
+  | MissingResource (Freed, loc, None) -> l [ AddFreed loc ]
+  | DoubleFree _ | UseAfterFree _ | MemoryLeak _ | OutOfBounds _ ->
+      failwith "unreachable, cannot be fixed"
+  | MissingResource ((Bound | Freed), _, Some _ | Cell, _, None) ->
+      failwith "invalid error"
+  | InvalidLocation loc ->
+      let new_loc = ALoc.alloc () in
+      let new_formula = Formula.Eq (Expr.ALoc new_loc, loc) in
+      let set = SS.singleton new_loc in
+      [ ([], [ new_formula ], set, []) ]
+
 let get_failing_constraint _ = Formula.True
 let add_debugger_variables = WislSHeap.add_debugger_variables
