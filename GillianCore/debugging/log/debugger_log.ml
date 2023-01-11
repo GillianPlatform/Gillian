@@ -62,7 +62,7 @@ module Public = struct
   let show_report id msg =
     log (fun m ->
         let report_json : Yojson.Safe.t =
-          match L.LogQueryer.get_report id with
+          match L.Log_queryer.get_report id with
           | Some (content, type_) ->
               `Assoc
                 [

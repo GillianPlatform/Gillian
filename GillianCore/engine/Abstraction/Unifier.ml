@@ -200,9 +200,9 @@ module Make
       let to_loggable = L.Loggable.make pp of_yojson to_yojson
 
       let as_parent report f =
-        L.with_parent
+        L.Parent.with_specific
           (Some (to_loggable report))
-          L.LoggingConstants.ContentType.unify f
+          L.Logging_constants.Content_type.unify f
     end
 
     module UnifyCaseReport = struct
@@ -212,8 +212,8 @@ module Make
       let to_loggable = L.Loggable.make L.dummy_pp of_yojson to_yojson
 
       let log report =
-        L.normal_specific (to_loggable report)
-          L.LoggingConstants.ContentType.unify_case
+        L.Specific.normal (to_loggable report)
+          L.Logging_constants.Content_type.unify_case
     end
 
     module UnifyResultReport = struct
@@ -254,8 +254,8 @@ module Make
       let to_loggable = L.Loggable.make pp of_yojson to_yojson
 
       let log report =
-        L.normal_specific (to_loggable report)
-          L.LoggingConstants.ContentType.unify_result
+        L.Specific.normal (to_loggable report)
+          L.Logging_constants.Content_type.unify_result
     end
 
     let structure_unify_case_reports
@@ -274,7 +274,7 @@ module Make
         match !parent_ids_ref with
         | [] -> raise (Failure "Mismatched case depth and parent_id list!")
         | parent_id :: rest ->
-            L.release_parent (Some parent_id);
+            L.Parent.release (Some parent_id);
             parent_ids_ref := rest
       done;
       if is_new_case then
@@ -283,7 +283,7 @@ module Make
         in
         match new_parent_id with
         | Some new_parent_id ->
-            L.set_parent new_parent_id;
+            L.Parent.set new_parent_id;
             parent_ids_ref := new_parent_id :: !parent_ids_ref;
             target_case_depth
         | None -> target_case_depth
@@ -1256,8 +1256,8 @@ module Make
       else None
     in
 
-    L.with_parent assertion_loggable L.LoggingConstants.ContentType.assertion
-      (fun () ->
+    L.Parent.with_specific assertion_loggable
+      L.Logging_constants.Content_type.assertion (fun () ->
         let p, outs = step in
         let result =
           match (p : Asrt.t) with
@@ -1520,7 +1520,7 @@ module Make
 
   and unify_up'
       ~is_post
-      (parent_ids : L.ReportId.t list ref)
+      (parent_ids : L.Report_id.t list ref)
       (s_states : search_state') : up_u_res =
     let s_states, errs_so_far = s_states in
     L.(
@@ -1626,7 +1626,7 @@ module Make
       (states, errs)
     in
     let res = unify_up' ~is_post parent_ids s_states in
-    List.iter (fun parent_id -> L.release_parent (Some parent_id)) !parent_ids;
+    List.iter (fun parent_id -> L.Parent.release (Some parent_id)) !parent_ids;
     res
 
   and unify

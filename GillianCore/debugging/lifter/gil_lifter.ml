@@ -23,7 +23,7 @@ module Make
   type map = (branch_case, cmd_data, unit) Exec_map.t
 
   and cmd_data = {
-    id : L.ReportId.t;
+    id : L.Report_id.t;
     display : string;
     unifys : unification list;
     errors : string list;
@@ -36,7 +36,7 @@ module Make
   type t = {
     map : map;
     root_proc : string;
-    id_map : (L.ReportId.t, map) Hashtbl.t; [@to_yojson fun _ -> `Null]
+    id_map : (L.Report_id.t, map) Hashtbl.t; [@to_yojson fun _ -> `Null]
   }
   [@@deriving to_yojson]
 
@@ -106,7 +106,8 @@ module Make
     | Ok (map, branch_path) -> (map, branch_path)
     | Error s ->
         DL.failwith
-          (fun () -> [ ("id", L.ReportId.to_yojson id); ("state", dump state) ])
+          (fun () ->
+            [ ("id", L.Report_id.to_yojson id); ("state", dump state) ])
           ("at_id: " ^ s)
 
   let init_exn _ _ exec_data =
@@ -126,7 +127,7 @@ module Make
           [
             ("state", dump state);
             ("exec_data", exec_data_to_yojson exec_data);
-            ("prev_id", L.ReportId.to_yojson prev_id);
+            ("prev_id", L.Report_id.to_yojson prev_id);
             ("branch_case", opt_to_yojson branch_case_to_yojson branch_case);
           ])
         ("Gil_lifter.handle_cmd: " ^ s)
@@ -135,7 +136,7 @@ module Make
       match Hashtbl.find_opt id_map prev_id with
       | Some map -> map
       | None ->
-          failwith (Fmt.str "couldn't find prev_id %a!" L.ReportId.pp prev_id)
+          failwith (Fmt.str "couldn't find prev_id %a!" L.Report_id.pp prev_id)
     in
     (match map with
     | Cmd cmd when cmd.next = Nothing ->
@@ -180,7 +181,8 @@ module Make
     match state |> at_id id |> fst with
     | Nothing ->
         DL.failwith
-          (fun () -> [ ("id", L.ReportId.to_yojson id); ("state", dump state) ])
+          (fun () ->
+            [ ("id", L.Report_id.to_yojson id); ("state", dump state) ])
           "get_unifys_at_id: HORROR - map is Nothing!"
     | Cmd { data; _ } | BranchCmd { data; _ } | FinalCmd { data } -> data.unifys
 
@@ -240,7 +242,7 @@ module Make
       DL.failwith
         (fun () ->
           [
-            ("id", L.ReportId.to_yojson id);
+            ("id", L.Report_id.to_yojson id);
             ("state", dump state);
             ("case", opt_to_yojson branch_case_to_yojson case);
           ])
@@ -264,7 +266,7 @@ module Make
             (fun () ->
               [
                 ("state", dump state);
-                ("at_id", opt_to_yojson L.ReportId.to_yojson at_id);
+                ("at_id", opt_to_yojson L.Report_id.to_yojson at_id);
               ])
             "find_unfinished_path: started at Nothing"
       | Cmd { data = { id; _ }; next = Nothing } -> Some (id, None)

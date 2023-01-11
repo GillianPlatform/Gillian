@@ -1,18 +1,4 @@
-(** Module specifying functions required for a type to be loggable *)
-module type S = sig
-  (** Type to be logged *)
-  type t [@@deriving yojson]
-
-  (** Pretty printer for the type *)
-  val pp : Format.formatter -> t -> unit
-end
-
-(* Type for a module which specifies functions required for a type to be loggable *)
-type 'a unpacked = (module S with type t = 'a)
-
-(** Type storing the functions required to log the specified type and the
-    actual content to be logged *)
-type t = L : ('a unpacked * 'a) -> t
+include Loggable_intf
 
 (** Calls the pretty print function of a loggable on its content *)
 let pp (loggable : t) (formatter : Format.formatter) =

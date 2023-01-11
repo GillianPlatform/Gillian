@@ -42,7 +42,7 @@ module type S = sig
         next_idx : int;
         loop_ids : string list;
         branch_count : int;
-        prev_cmd_report_id : L.ReportId.t option;
+        prev_cmd_report_id : L.Report_id.t option;
         branch_case : branch_case option;
         branch_path : branch_path;
         new_branches : (state_t * int * branch_case) list;
@@ -73,7 +73,7 @@ module type S = sig
   and 'a cont_func =
     | Finished of 'a list
     | Continue of
-        (Logging.ReportId.t option
+        (Logging.Report_id.t option
         * branch_path
         * branch_case list option
         * 'a cont_func_f)
@@ -192,7 +192,7 @@ struct
         next_idx : int;
         loop_ids : string list;
         branch_count : int;
-        prev_cmd_report_id : L.ReportId.t option;
+        prev_cmd_report_id : L.Report_id.t option;
         branch_case : branch_case option;
         branch_path : branch_path;
         new_branches : (state_t * int * branch_case) list;
@@ -264,7 +264,7 @@ struct
   and 'a cont_func =
     | Finished of 'a list
     | Continue of
-        (Logging.ReportId.t option
+        (Logging.Report_id.t option
         * branch_path
         * branch_case list option
         * 'a cont_func_f)
@@ -323,9 +323,9 @@ struct
         L.Loggable.make (pp state_printer) of_yojson to_yojson
 
       let log state_printer report =
-        L.normal_specific
+        L.Specific.normal
           (to_loggable state_printer report)
-          L.LoggingConstants.ContentType.cmd
+          L.Logging_constants.Content_type.cmd
     end
 
     module CmdResult = struct
@@ -344,9 +344,9 @@ struct
         CallStack.pp fmt cmd_step.callstack
 
       let to_loggable = L.Loggable.make pp of_yojson to_yojson
-      let log type_ report = L.normal_specific (to_loggable report) type_
+      let log type_ report = L.Specific.normal (to_loggable report) type_
 
-      open L.LoggingConstants.ContentType
+      open L.Logging_constants.Content_type
 
       let log_result = log cmd_result
       let log_init = log proc_init
@@ -364,8 +364,8 @@ struct
       let to_loggable = L.Loggable.make pp of_yojson to_yojson
 
       let log report =
-        L.normal_specific (to_loggable report)
-          L.LoggingConstants.ContentType.annotated_action
+        L.Specific.normal (to_loggable report)
+          L.Logging_constants.Content_type.annotated_action
     end
 
     let log_configuration
@@ -374,7 +374,7 @@ struct
         (cs : CallStack.t)
         (i : int)
         (b_counter : int)
-        (branch_case : branch_case option) : L.ReportId.t option =
+        (branch_case : branch_case option) : L.Report_id.t option =
       let annot, cmd = cmd in
       let state_printer =
         match !Config.pbn with
@@ -721,7 +721,7 @@ struct
       (prev_loop_ids : string list)
       (i : int)
       (b_counter : int)
-      (report_id_ref : L.ReportId.t option ref)
+      (report_id_ref : L.Report_id.t option ref)
       (branch_path : branch_path)
       (branch_case : branch_case option) : cconf_t list =
     let _, (annot, _) = get_cmd prog cs i in
@@ -768,7 +768,7 @@ struct
       (prev_loop_ids : string list)
       (i : int)
       (b_counter : int)
-      (report_id_ref : L.ReportId.t option ref)
+      (report_id_ref : L.Report_id.t option ref)
       (branch_path : branch_path)
       (branch_case : branch_case option) : cconf_t list =
     let store = State.get_store state in
@@ -787,7 +787,7 @@ struct
     log_configuration annot_cmd state cs i b_counter branch_case
     |> Option.iter (fun report_id ->
            report_id_ref := Some report_id;
-           L.set_parent report_id);
+           L.Parent.set report_id);
 
     let branch_path = List_utils.cons_opt branch_case branch_path in
     let make_confcont =
@@ -1502,7 +1502,7 @@ struct
       (prev_loop_ids : string list)
       (i : int)
       (b_counter : int)
-      (report_id_ref : L.ReportId.t option ref)
+      (report_id_ref : L.Report_id.t option ref)
       (branch_path : branch_path)
       (branch_case : branch_case option) : cconf_t list =
     let states =
@@ -1586,8 +1586,8 @@ struct
           if is_first then (
             prev_cmd_report_id
             |> Option.iter (fun prev_report_id ->
-                   L.release_parent !parent_id_ref;
-                   L.set_parent prev_report_id;
+                   L.Parent.release !parent_id_ref;
+                   L.Parent.set prev_report_id;
                    parent_id_ref := Some prev_report_id);
             DL.log (fun m ->
                 m
@@ -1637,7 +1637,7 @@ struct
     in
 
     Fun.protect
-      ~finally:(fun () -> L.release_parent !parent_id_ref)
+      ~finally:(fun () -> L.Parent.release !parent_id_ref)
       (fun () ->
         let conf, rest_confs =
           match branch_path with
@@ -1771,7 +1771,7 @@ struct
             log_configuration annot_cmd state cs i b_counter branch_case
             |> Option.iter (fun report_id ->
                    parent_id_ref := Some report_id;
-                   L.set_parent report_id);
+                   L.Parent.set report_id);
             continue_or_pause [] (fun ?path () -> f rest_confs path results)
         | ( Some
               (ConfErr
@@ -1789,7 +1789,7 @@ struct
         | Some (ConfFinish { flag; ret_val; final_state; branch_path }), _ ->
             let result =
               ExecRes.RSucc
-                { flag; ret_val; final_state; last_report = L.get_parent () }
+                { flag; ret_val; final_state; last_report = L.Parent.get () }
             in
             let results = (branch_path, result) :: results in
             if !Config.debug then end_of_branch results

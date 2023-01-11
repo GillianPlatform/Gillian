@@ -49,7 +49,7 @@ let parse_and_compile_files files =
     let wprog = parse_file path in
     Ok (create_compilation_result path (compile ~filepath:path wprog) wprog)
   in
-  Logging.with_normal_phase ~title:"Program parsing and compilation" (fun () ->
+  Logging.Phase.with_normal ~title:"Program parsing and compilation" (fun () ->
       f files)
 
 let other_imports = []

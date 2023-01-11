@@ -6,16 +6,16 @@ module Types = struct
 
   (** A substitution, and the ID of the assertion where it was learned *)
   type substitution = {
-    assert_id : Logging.ReportId.t; [@key "assertId"]
+    assert_id : Logging.Report_id.t; [@key "assertId"]
     subst : string * string;
   }
   [@@deriving yojson]
 
   (** Represents one step of a unification *)
   type assertion_data = {
-    id : Logging.ReportId.t;
+    id : Logging.Report_id.t;
         (** The report ID of the assertion in the log database *)
-    fold : (Logging.ReportId.t * unify_result) option;
+    fold : (Logging.Report_id.t * unify_result) option;
         (** The ID of the fold unification and its result, if this assertion requires a fold *)
     assertion : string;  (** The string representation of this assertion *)
     substitutions : substitution list;
@@ -26,7 +26,7 @@ module Types = struct
   (** A segment of unification *)
   type unify_seg =
     | Assertion of assertion_data * unify_seg  (** A single assertion *)
-    | UnifyResult of Logging.ReportId.t * unify_result
+    | UnifyResult of Logging.Report_id.t * unify_result
         (** The end of this unification segment *)
   [@@deriving yojson]
 
@@ -41,7 +41,7 @@ include Types
 
 module type Build = sig
   (** Given the ID of a unification, build the representative unification map *)
-  val f : Logging.ReportId.t -> t
+  val f : Logging.Report_id.t -> t
 end
 
 module type Make_builder = functor (Verification : Verifier.S) -> Build

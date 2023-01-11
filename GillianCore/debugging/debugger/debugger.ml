@@ -24,11 +24,11 @@ functor
                and type annot = PC.Annot.t)
   ->
   struct
-    open L.LoggingConstants
     open Verification.SAInterpreter
     module Gil_parsing = Gil_parsing.Make (PC.Annot)
     module Breakpoints = Set.Make (Int)
     module Annot = PC.Annot
+    module Content_type = L.Logging_constants.Content_type
 
     type breakpoints = (string, Breakpoints.t) Hashtbl.t
     type tl_ast = PC.tl_ast
@@ -41,7 +41,7 @@ functor
     type debug_proc_state = {
       mutable cont_func : result_t cont_func_f option;
       mutable breakpoints : breakpoints; [@default Hashtbl.create 0]
-      mutable cur_report_id : L.ReportId.t;
+      mutable cur_report_id : L.Report_id.t;
       (* TODO: The below fields only depend on the
                cur_report_id and could be refactored to use this *)
       mutable top_level_scopes : Variable.scope list;
@@ -50,9 +50,9 @@ functor
       mutable errors : err_t list;
       mutable cur_cmd : (int Cmd.t * Annot.t) option;
       mutable proc_name : string option;
-      mutable unify_maps : (L.ReportId.t * Unify_map.t) list;
+      mutable unify_maps : (L.Report_id.t * Unify_map.t) list;
       lifter_state : Lifter.t;
-      report_state : L.ReportState.t;
+      report_state : L.Report_state.t;
     }
     [@@deriving make]
 
@@ -63,7 +63,7 @@ functor
       tl_ast : tl_ast option;
       tests : (string * Verification.t) list;
       main_proc_name : string;
-      report_state_base : L.ReportState.t;
+      report_state_base : L.Report_state.t;
       init_data : ID.t;
     }
     [@@deriving make]
@@ -86,7 +86,7 @@ functor
       | None -> Error ("get_proc_state: couldn't find proc " ^ proc_name)
       | Some proc_state ->
           if activate_report_state then
-            L.ReportState.activate proc_state.report_state;
+            L.Report_state.activate proc_state.report_state;
           Ok proc_state
 
     let get_proc_state_exn ?proc_name ?(activate_report_state = true) dbg =
@@ -98,7 +98,7 @@ functor
       type debug_proc_state_view = {
         exec_map : Exec_map.Packaged.t; [@key "execMap"]
         lifted_exec_map : Exec_map.Packaged.t option; [@key "liftedExecMap"]
-        current_cmd_id : L.ReportId.t; [@key "currentCmdId"]
+        current_cmd_id : L.Report_id.t; [@key "currentCmdId"]
         unifys : Exec_map.unification list;
         proc_name : string; [@key "procName"]
       }
@@ -332,14 +332,14 @@ functor
 
     module Update_proc_state = struct
       let get_cmd id =
-        match L.LogQueryer.get_report id with
+        match L.Log_queryer.get_report id with
         | None ->
             Fmt.failwith
               "Unable to find report id '%a'. Check the logging level is set \
                correctly"
-              L.ReportId.pp id
+              L.Report_id.pp id
         | Some (content, type_) ->
-            if type_ <> ContentType.cmd then
+            if type_ <> Content_type.cmd then
               Fmt.failwith
                 "Debugger: don't know how to handle report of type '%s'!" type_
             else
@@ -427,7 +427,7 @@ functor
         | Some test -> test
 
       let is_unify_successful id =
-        L.LogQueryer.get_unify_results id
+        L.Log_queryer.get_unify_results id
         |> List.exists (fun (_, content) ->
                let result =
                  content |> Yojson.Safe.from_string
@@ -438,15 +438,15 @@ functor
                | Failure _ -> false)
 
       let do_unify prev_id test result =
-        DL.log (fun m -> m "Unifying result for %a" L.ReportId.pp prev_id);
+        DL.log (fun m -> m "Unifying result for %a" L.Report_id.pp prev_id);
         let success = Verification.Debug.analyse_result test prev_id result in
-        let+ id, content = L.LogQueryer.get_unify_for prev_id in
+        let+ id, content = L.Log_queryer.get_unify_for prev_id in
         (id, content, success)
 
       let f result proc_name prev_id dbg =
         let test = get_test dbg proc_name in
         let+ id, content, success =
-          match L.LogQueryer.get_unify_for prev_id with
+          match L.Log_queryer.get_unify_for prev_id with
           | Some (id, content) -> Some (id, content, is_unify_successful id)
           | None -> do_unify prev_id test result
         in
@@ -482,19 +482,19 @@ functor
       open Verification.SAInterpreter.Logging
 
       type execute_step =
-        L.ReportId.t ->
+        L.Report_id.t ->
         ?branch_case:BranchCase.t ->
         ?branch_path:BranchCase.path ->
         debug_state ->
         debug_proc_state ->
-        stop_reason * L.ReportId.t option
+        stop_reason * L.Report_id.t option
 
       let get_branch_path prev_id case path state =
         DL.log (fun m ->
             m
               ~json:
                 [
-                  ("id", L.ReportId.to_yojson prev_id);
+                  ("id", L.Report_id.to_yojson prev_id);
                   ("lifter_state", state.lifter_state |> Lifter.dump);
                 ]
               "Grabbing path for step...");
@@ -523,7 +523,7 @@ functor
         match result with
         | ExecNext (id, branch_case) ->
             DL.log (fun m ->
-                m "EXEC NEXT (%a, %a)" (pp_option L.ReportId.pp) id
+                m "EXEC NEXT (%a, %a)" (pp_option L.Report_id.pp) id
                   (pp_option BranchCase.pp) branch_case);
             let id = Option_utils.coalesce id default_next_id |> Option.get in
             execute_step id ?branch_case dbg state
@@ -533,8 +533,8 @@ functor
         let get_unifys cur_report_id state =
           let unify =
             DL.log (fun m ->
-                m "getting unify_result for %a" L.ReportId.pp cur_report_id);
-            let+ unify_id, _ = L.LogQueryer.get_unify_for cur_report_id in
+                m "getting unify_result for %a" L.Report_id.pp cur_report_id);
+            let+ unify_id, _ = L.Log_queryer.get_unify_for cur_report_id in
             let unify_map =
               match state.unify_maps |> List.assoc_opt unify_id with
               | Some map -> map
@@ -556,12 +556,12 @@ functor
             ~on_eob
             ~continue
             id =
-          let content, type_ = Option.get @@ L.LogQueryer.get_report id in
-          if type_ = ContentType.proc_init then (
+          let content, type_ = Option.get @@ L.Log_queryer.get_report id in
+          if type_ = Content_type.proc_init then (
             DL.log (fun m -> m "Debugger.%s: Skipping proc_init..." log_context);
             on_proc_init ())
           else if
-            L.LogQueryer.get_cmd_results id
+            L.Log_queryer.get_cmd_results id
             |> List.for_all (fun (_, content) ->
                    let result =
                      content |> of_yojson_string CmdResult.of_yojson
@@ -611,7 +611,7 @@ functor
                  |> handle_lifter_result ~default_next_id:cur_report_id
                       execute_step dbg state (fun () ->
                         DL.log (fun m ->
-                            m "STOP (%a)" L.ReportId.pp cur_report_id);
+                            m "STOP (%a)" L.Report_id.pp cur_report_id);
                         (Step, Some cur_report_id)))
       end
 
@@ -620,18 +620,18 @@ functor
       module Handle_end_of_branch = struct
         let get_prev prev_id =
           let prev =
-            let+ content, type_ = L.LogQueryer.get_report prev_id in
+            let+ content, type_ = L.Log_queryer.get_report prev_id in
             (prev_id, content, type_)
           in
           match prev with
-          | Some (prev_id, content, type_) when type_ = ContentType.cmd ->
+          | Some (prev_id, content, type_) when type_ = Content_type.cmd ->
               (prev_id, content)
           | Some (prev_id, _, type_) ->
               Fmt.failwith "EndOfBranch: prev cmd (%a) is '%s', not '%s'!"
-                L.ReportId.pp prev_id type_ ContentType.cmd
+                L.Report_id.pp prev_id type_ Content_type.cmd
           | None ->
               Fmt.failwith "EndOfBranch: prev id '%a' doesn't exist!"
-                L.ReportId.pp prev_id
+                L.Report_id.pp prev_id
 
         let f
             (execute_step : execute_step)
@@ -645,7 +645,7 @@ functor
           state.cont_func <- Some cont_func;
           let prev_id, content = get_prev prev_id_in_frame in
           let prev_prev_id =
-            L.LogQueryer.get_previous_report_id prev_id |> Option.get
+            L.Log_queryer.get_previous_report_id prev_id |> Option.get
           in
           let exec_data, cmd =
             build_final_cmd_data content result prev_id branch_path dbg
@@ -701,7 +701,7 @@ functor
         | Some prev_id ->
             let lifter_state, _ =
               let prev_content, _ =
-                L.LogQueryer.get_report prev_id |> Option.get
+                L.Log_queryer.get_report prev_id |> Option.get
               in
               let exec_data, _ =
                 build_final_cmd_data prev_content result prev_id [] dbg
@@ -752,7 +752,7 @@ functor
                  handler_result
                  |> Execute_step.handle_lifter_result execute_step
                       ~default_next_id:id dbg proc_state (fun () ->
-                        DL.log (fun m -> m "STOP (%a)" L.ReportId.pp id);
+                        DL.log (fun m -> m "STOP (%a)" L.Report_id.pp id);
                         (Step, Some id))
                in
                let id = id |> Option.get in
@@ -781,13 +781,13 @@ functor
 
       let f proc_name dbg =
         let { cfg; _ } = dbg in
-        let report_state = L.ReportState.clone cfg.report_state_base in
+        let report_state = L.Report_state.clone cfg.report_state_base in
         Config.Verification.(
           let procs_to_verify = !procs_to_verify in
           if not (procs_to_verify |> List.mem proc_name) then
             set_procs_to_verify (procs_to_verify @ [ proc_name ]));
         report_state
-        |> L.ReportState.with_state (do_launch proc_name report_state dbg)
+        |> L.Report_state.with_state (do_launch proc_name report_state dbg)
     end
 
     let launch_proc = Launch_proc.f
@@ -806,7 +806,7 @@ functor
         let proc_name =
           proc_name |> Option_utils.or_else (fun () -> tests |> List.hd |> fst)
         in
-        let report_state_base = L.ReportState.(clone global_state) in
+        let report_state_base = L.Report_state.(clone global_state) in
         let cfg =
           make_debug_cfg ~source_file:file_name ?source_files ~prog ?tl_ast
             ~tests ~main_proc_name:proc_name ~report_state_base ~init_data ()
@@ -827,7 +827,7 @@ functor
           { cfg; procs = Hashtbl.create 0; cur_proc_name = proc_name }
         in
         let++ main_proc_state, _ = dbg |> launch_proc proc_name in
-        main_proc_state.report_state |> L.ReportState.activate;
+        main_proc_state.report_state |> L.Report_state.activate;
         Hashtbl.add dbg.procs proc_name main_proc_state;
         dbg
     end
@@ -836,7 +836,7 @@ functor
 
     let jump_state_to_id id cfg state =
       try
-        DL.log (fun m -> m "Jumping to id %a" L.ReportId.pp id);
+        DL.log (fun m -> m "Jumping to id %a" L.Report_id.pp id);
         (* state.exec_map |> snd |> Exec_map.path_of_id id |> ignore; *)
         (* TODO *)
         state |> update_proc_state id cfg;
@@ -1010,7 +1010,7 @@ functor
             m
               ~json:
                 [
-                  ("current_id", L.ReportId.to_yojson current_id);
+                  ("current_id", L.Report_id.to_yojson current_id);
                   ("lifter_state", state.lifter_state |> Lifter.dump);
                 ]
               "Debugger.run")
@@ -1066,7 +1066,7 @@ functor
       stop_reason
 
     let terminate dbg =
-      L.ReportState.(activate global_state);
+      L.Report_state.(activate global_state);
       Verification.postprocess_files dbg.cfg.source_files;
       if !Config.stats then Statistics.print_statistics ();
       L.wrap_up ()

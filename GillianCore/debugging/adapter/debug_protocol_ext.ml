@@ -83,12 +83,12 @@ module Custom_commands (Debugger : Debugger.S) = struct
     let type_ = "unification"
 
     module Arguments = struct
-      type t = { id : L.ReportId.t } [@@deriving yojson]
+      type t = { id : L.Report_id.t } [@@deriving yojson]
     end
 
     module Result = struct
       type t = {
-        unify_id : L.ReportId.t; [@key "unifyId"]
+        unify_id : L.Report_id.t; [@key "unifyId"]
         unify_map : Unify_map.t; [@key "unifyMap"]
       }
       [@@deriving yojson, make]
@@ -99,7 +99,7 @@ module Custom_commands (Debugger : Debugger.S) = struct
     let type_ = "jump"
 
     module Arguments = struct
-      type t = { proc_name : string; [@key "procName"] id : L.ReportId.t }
+      type t = { proc_name : string; [@key "procName"] id : L.Report_id.t }
       [@@deriving yojson]
     end
 
@@ -115,7 +115,7 @@ module Custom_commands (Debugger : Debugger.S) = struct
     module Arguments = struct
       type t = {
         proc_name : string; [@key "procName"]
-        prev_id : L.ReportId.t; [@key "prevId"]
+        prev_id : L.Report_id.t; [@key "prevId"]
         branch_case : Exec_map.Packaged.branch_case option; [@key "branchCase"]
       }
       [@@deriving yojson]

@@ -134,7 +134,7 @@ module Make (Annot : Annot.S) = struct
       Parser_state.reset ();
       { labeled_prog = { prog with procs; preds; lemmas }; init_data }
     in
-    L.with_normal_phase ~title:"Program parsing" (fun () -> f path)
+    L.Phase.with_normal ~title:"Program parsing" (fun () -> f path)
 
   let cached_progs = Hashtbl.create Config.small_tbl_size
   let cache_gil_prog path prog = Hashtbl.add cached_progs path prog
