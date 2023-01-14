@@ -52,7 +52,7 @@ module Make (SMemory : SMemory.S) :
     | FAsrt of Asrt.t
 
   type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson, show]
-  type action_ret = ASucc of (t * vt list) list | AFail of err_t list
+  type action_ret = ((t * vt list) list, err_t list) result
   type u_res = UWTF | USucc of t | UFail of err_t list
 
   exception Internal_State_Error of err_t list * t
@@ -189,9 +189,9 @@ module Make (SMemory : SMemory.S) :
       (args : vt list) : action_ret =
     let heap, store, pfs, gamma, vars = state in
     match SMemory.execute_action ~unification action heap pfs gamma args with
-    | SMemory.ASucc ret_succs ->
+    | Ok ret_succs ->
         let result =
-          ASucc
+          Ok
             (List.map
                (fun (new_heap, v, new_fofs, new_types) ->
                  let new_store = SStore.copy store in
@@ -203,7 +203,7 @@ module Make (SMemory : SMemory.S) :
                ret_succs)
         in
         result
-    | SMemory.AFail errs -> AFail (lift_merrs errs)
+    | Error errs -> Error (lift_merrs errs)
 
   let ga_to_setter (a_id : string) = SMemory.ga_to_setter a_id
   let ga_to_getter (a_id : string) = SMemory.ga_to_getter a_id

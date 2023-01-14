@@ -1027,8 +1027,8 @@ struct
         AnnotatedAction.log { annot; action_name = a } |> ignore;
         let v_es = List.map eval_expr es in
         match State.execute_action a state v_es with
-        | ASucc [] -> failwith "HORROR: Successful action resulted in no states"
-        | ASucc ((state', vs) :: rest_rets) -> (
+        | Ok [] -> failwith "HORROR: Successful action resulted in no states"
+        | Ok ((state', vs) :: rest_rets) -> (
             DL.log (fun m ->
                 m
                   ~json:
@@ -1036,7 +1036,7 @@ struct
                       ("state'", state_t_to_yojson state');
                       ("vs", `List (List.map state_vt_to_yojson vs));
                     ]
-                  "ASucc");
+                  "Ok");
             let e' = Expr.EList (List.map Val.to_expr vs) in
             let v' = eval_expr e' in
             let state'' = update_store state' x v' in
@@ -1100,12 +1100,12 @@ struct
                   ~invariant_frames:iframes ~prev_idx:i ~loop_ids
                   ~next_idx:(i + 1) ~branch_count:b_counter ()
                 :: rest_confs)
-        | AFail errs ->
+        | Error errs ->
             DL.log (fun m ->
                 m
                   ~json:
                     [ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
-                  "AFail");
+                  "Error");
             if not (ExecMode.concrete_exec !Config.current_exec_mode) then (
               let expr_params = List.map Val.to_expr v_es in
               let recovery_params =

@@ -30,7 +30,7 @@ end = struct
 
   exception Internal_State_Error of err_t list * t
 
-  type action_ret = ASucc of (t * vt list) list | AFail of err_t list
+  type action_ret = ((t * vt list) list, err_t list) result
   type u_res = UWTF | USucc of t | UFail of err_t list
 
   let lift_merrs (errs : m_err_t list) : err_t list =
@@ -46,8 +46,8 @@ end = struct
       (args : vt list) : action_ret =
     let heap, store, locs = state in
     match CMemory.execute_action action heap args with
-    | CMemory.ASucc (heap, vs) -> ASucc [ ((heap, store, locs), vs) ]
-    | CMemory.AFail errs -> AFail (lift_merrs errs)
+    | Ok (heap, vs) -> Ok [ ((heap, store, locs), vs) ]
+    | Error errs -> Error (lift_merrs errs)
 
   let ga_to_setter _ = failwith "ga_to_setter for CState"
   let ga_to_getter _ = failwith "ga_to_getter for CState"

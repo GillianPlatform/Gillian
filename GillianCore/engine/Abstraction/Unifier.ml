@@ -511,13 +511,13 @@ module Make
         else
           let vs = List.map Option.get vs in
           match State.execute_action ~unification:true setter state vs with
-          | ASucc successes ->
+          | Ok successes ->
               Ok
                 (List.map
                    (fun (state', _) ->
                      (state', Preds.copy preds, pred_defs, Hashtbl.copy variants))
                    successes)
-          | AFail errs -> Error errs)
+          | Error errs -> Error errs)
     | Types les -> (
         L.verbose (fun fmt -> fmt "Types assertion.");
         let state' =
@@ -1274,7 +1274,7 @@ module Make
                         Fmt.(list ~sep:comma Val.pp)
                         vs_ins));
                 match State.execute_action getter state vs_ins with
-                | ASucc [ (state', vs') ] -> (
+                | Ok [ (state', vs') ] -> (
                     (* L.(
                        verbose (fun m ->
                            m "@[<v 2>Got state:@\n%a@] and values @[<h>%a@]" State.pp
@@ -1286,7 +1286,7 @@ module Make
                     in
                     let remover = State.ga_to_deleter a_id in
                     match State.execute_action remover state' vs_ins' with
-                    | ASucc [ (state'', _) ] -> (
+                    | Ok [ (state'', _) ] -> (
                         (* Separate outs into direct unifiables and others*)
                         let success, fail_pf =
                           unify_ins_outs_lists state'' subst step outs vs_outs
@@ -1297,18 +1297,18 @@ module Make
                         | false ->
                             UFail
                               [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ])
-                    | ASucc _ ->
+                    | Ok _ ->
                         raise
                           (Exceptions.Unsupported
                              "unify_assertion: action remover returns multiple \
                               results")
-                    | AFail errs -> UFail errs)
-                | ASucc _ ->
+                    | Error errs -> UFail errs)
+                | Ok _ ->
                     raise
                       (Exceptions.Unsupported
                          "unify_assertion: action getter returns multiple \
                           results")
-                | AFail errs -> UFail errs)
+                | Error errs -> UFail errs)
           | Pred (pname, les) -> (
               L.verbose (fun m -> m "Unifying predicate assertion");
               (* Perform substitution in all predicate parameters *)

@@ -88,7 +88,7 @@ module Make
 
   module SUnifier = Unifier.Make (Val) (ESubst) (Store) (State) (Preds)
 
-  type action_ret = ASucc of (t * vt list) list | AFail of err_t list
+  type action_ret = ((t * vt list) list, err_t list) result
   type u_res = UWTF | USucc of t | UFail of err_t list
 
   let init_with_pred_table pred_defs init_data =
@@ -1277,15 +1277,15 @@ module Make
       (args : vt list) : action_ret =
     let state, preds, pred_defs, variants = astate in
     match State.execute_action ~unification action state args with
-    | State.ASucc rets ->
+    | Ok rets ->
         let rets' =
           List.map
             (fun (st, outs) ->
               ((st, Preds.copy preds, pred_defs, variants), outs))
             rets
         in
-        ASucc rets'
-    | State.AFail errs -> AFail errs
+        Ok rets'
+    | Error errs -> Error errs
 
   let mem_constraints (astate : t) : Formula.t list =
     let state, _, _, _ = astate in

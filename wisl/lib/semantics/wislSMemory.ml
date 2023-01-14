@@ -12,9 +12,10 @@ type err_t = WislSHeap.err [@@deriving yojson, show]
 type c_fix_t = unit
 type t = WislSHeap.t [@@deriving yojson]
 
-type action_ret =
-  | ASucc of (t * vt list * Formula.t list * (string * Type.t) list) list
-  | AFail of err_t list
+type action_ret = (
+  (t * vt list * Formula.t list * (string * Type.t) list) list,
+  err_t list
+  ) result
 
 let init () = WislSHeap.init ()
 let clear _ = WislSHeap.init ()
@@ -24,13 +25,13 @@ let resolve_loc pfs gamma loc =
 
 let get_cell heap pfs gamma (loc : vt) (offset : vt) =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
-  | None -> AFail [ InvalidLocation ]
+  | None -> Error [ WislSHeap.InvalidLocation ]
   | Some loc -> (
       match WislSHeap.get_cell ~pfs ~gamma heap loc offset with
-      | Error err -> AFail [ err ]
+      | Error err -> Error [ err ]
       | Ok (loc, ofs, value) ->
           let loc = Expr.loc_from_loc_name loc in
-          ASucc [ (heap, [ loc; ofs; value ], [], []) ])
+          Ok [ (heap, [ loc; ofs; value ], [], []) ])
 
 let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) =
   let loc_name, new_pfs =
@@ -46,29 +47,29 @@ let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) =
         (al, [ Formula.Eq (Expr.ALoc al, loc) ])
   in
   match WislSHeap.set_cell ~pfs ~gamma heap loc_name offset value with
-  | Error e -> AFail [ e ]
-  | Ok () -> ASucc [ (heap, [], new_pfs, []) ]
+  | Error e -> Error [ e ]
+  | Ok () -> Ok [ (heap, [], new_pfs, []) ]
 
 let rem_cell heap pfs gamma (loc : vt) (offset : vt) =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
   | Some loc_name -> (
       match WislSHeap.rem_cell heap loc_name offset with
-      | Error e -> AFail [ e ]
-      | Ok () -> ASucc [ (heap, [], [], []) ])
+      | Error e -> Error [ e ]
+      | Ok () -> Ok [ (heap, [], [], []) ])
   | None ->
       (* loc does not evaluate to a location, or we can't find it. *)
-      AFail [ InvalidLocation ]
+      Error [ InvalidLocation ]
 
 let get_bound heap pfs gamma loc =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
   | Some loc_name -> (
       match WislSHeap.get_bound heap loc_name with
-      | Error e -> AFail [ e ]
+      | Error e -> Error [ e ]
       | Ok b ->
           let b = Expr.int b in
           let loc = Expr.loc_from_loc_name loc_name in
-          ASucc [ (heap, [ loc; b ], [], []) ])
-  | None -> AFail [ InvalidLocation ]
+          Ok [ (heap, [ loc; b ], [], []) ])
+  | None -> Error [ InvalidLocation ]
 
 let set_bound heap pfs gamma (loc : vt) (bound : int) =
   let loc_name, new_pfs =
@@ -84,28 +85,28 @@ let set_bound heap pfs gamma (loc : vt) (bound : int) =
         (al, [ Formula.Eq (Expr.ALoc al, loc) ])
   in
   match WislSHeap.set_bound heap loc_name bound with
-  | Error e -> AFail [ e ]
-  | Ok () -> ASucc [ (heap, [], new_pfs, []) ]
+  | Error e -> Error [ e ]
+  | Ok () -> Ok [ (heap, [], new_pfs, []) ]
 
 let rem_bound heap pfs gamma loc =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
   | Some loc_name -> (
       match WislSHeap.rem_bound heap loc_name with
-      | Error e -> AFail [ e ]
-      | Ok () -> ASucc [ (heap, [], [], []) ])
+      | Error e -> Error [ e ]
+      | Ok () -> Ok [ (heap, [], [], []) ])
   | None ->
       (* loc does not evaluate to a location, or we can't find it. *)
-      AFail [ InvalidLocation ]
+      Error [ InvalidLocation ]
 
 let get_freed heap pfs gamma loc =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
   | Some loc_name -> (
       match WislSHeap.get_freed heap loc_name with
-      | Error e -> AFail [ e ]
+      | Error e -> Error [ e ]
       | Ok () ->
           let loc = Expr.loc_from_loc_name loc_name in
-          ASucc [ (heap, [ loc ], [], []) ])
-  | None -> AFail [ InvalidLocation ]
+          Ok [ (heap, [ loc ], [], []) ])
+  | None -> Error [ InvalidLocation ]
 
 let set_freed heap pfs gamma (loc : vt) =
   let loc_name, new_pfs =
@@ -121,21 +122,21 @@ let set_freed heap pfs gamma (loc : vt) =
         (al, [ Formula.Eq (Expr.ALoc al, loc) ])
   in
   let () = WislSHeap.set_freed heap loc_name in
-  ASucc [ (heap, [], new_pfs, []) ]
+  Ok [ (heap, [], new_pfs, []) ]
 
 let rem_freed heap pfs gamma loc =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
   | Some loc_name -> (
       match WislSHeap.rem_freed heap loc_name with
-      | Error e -> AFail [ e ]
-      | Ok () -> ASucc [ (heap, [], [], []) ])
+      | Error e -> Error [ e ]
+      | Ok () -> Ok [ (heap, [], [], []) ])
   | None ->
       (* loc does not evaluate to a location, or we can't find it. *)
-      AFail [ InvalidLocation ]
+      Error [ InvalidLocation ]
 
 let alloc heap _pfs _gamma (size : int) =
   let loc = WislSHeap.alloc heap size in
-  ASucc
+  Ok
     [
       ( heap,
         [ Expr.Lit (Literal.Loc loc); Expr.Lit (Literal.Int Z.zero) ],
@@ -147,9 +148,9 @@ let dispose heap pfs gamma loc_expr =
   match resolve_loc pfs gamma loc_expr with
   | Some loc_name -> (
       match WislSHeap.dispose heap loc_name with
-      | Ok () -> ASucc [ (heap, [], [], []) ]
-      | Error e -> AFail [ e ])
-  | None -> AFail [ InvalidLocation ]
+      | Ok () -> Ok [ (heap, [], [], []) ]
+      | Error e -> Error [ e ])
+  | None -> Error [ InvalidLocation ]
 
 let execute_action ?unification:_ name heap pfs gamma args =
   let action = WislLActions.ac_from_str name in

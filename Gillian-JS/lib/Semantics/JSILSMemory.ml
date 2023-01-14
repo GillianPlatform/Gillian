@@ -35,9 +35,10 @@ module M = struct
 
   type err_t = vt list * i_fix_t list list * Formula.t [@@deriving yojson, show]
 
-  type action_ret =
-    | ASucc of (t * vt list * Formula.t list * (string * Type.t) list) list
-    | AFail of err_t list
+  type action_ret = (
+    (t * vt list * Formula.t list * (string * Type.t) list) list,
+    err_t list
+  ) result
 
   let pp_i_fix ft (i_fix : i_fix_t) : unit =
     let open Fmt in
@@ -164,7 +165,7 @@ module M = struct
                   ((Fmt.to_to_string Expr.pp) le)))
     in
     SHeap.init_object heap loc_name ~is_empty:ie mv;
-    ASucc [ (heap, [ loc ], [], []) ]
+    Ok [ (heap, [ loc ], [], []) ]
 
   let set_cell
       (heap : t)
@@ -175,7 +176,7 @@ module M = struct
       (v : vt) : action_ret =
     let loc_name, _, new_pfs = fresh_loc ~loc pfs gamma in
     SHeap.set_fv_pair heap loc_name prop v;
-    ASucc [ (heap, [], new_pfs, []) ]
+    Ok [ (heap, [], new_pfs, []) ]
 
   let get_cell
       (heap : t)
@@ -227,7 +228,7 @@ module M = struct
           L.tmi (fun m ->
               m "metadata: %a" Fmt.(option ~none:(any "None") Expr.pp) mtdt);
           match SFVL.get prop fv_list with
-          | Some ffv -> ASucc [ (heap, [ loc; prop; ffv ], [], []) ]
+          | Some ffv -> Ok [ (heap, [ loc; prop; ffv ], [], []) ]
           | None -> (
               match
                 ( dom,
@@ -236,13 +237,13 @@ module M = struct
                     fv_list )
               with
               | None, None ->
-                  AFail
+                  Error
                     [
                       make_gc_error loc_name prop (SFVL.field_names fv_list)
                         None;
                     ]
               | _, Some (ffn, ffv) ->
-                  ASucc [ (heap, [ loc; ffn; ffv ], [], []) ]
+                  Ok [ (heap, [ loc; ffn; ffv ], [], []) ]
               | Some dom, None ->
                   let a_set_inclusion : Formula.t = Not (SetMem (prop, dom)) in
                   if
@@ -258,7 +259,7 @@ module M = struct
                     in
                     let fv_list' = SFVL.add prop (Lit Nono) fv_list in
                     SHeap.set heap loc_name fv_list' (Some new_domain) mtdt;
-                    ASucc [ (heap, [ loc; prop; Lit Nono ], [], []) ])
+                    Ok [ (heap, [ loc; prop; Lit Nono ], [], []) ])
                   else
                     let f_names : Expr.t list = SFVL.field_names fv_list in
                     let full_knowledge : Formula.t = Eq (dom, ESet f_names) in
@@ -307,20 +308,20 @@ module M = struct
                         | true ->
                             [ (heap, [ loc; prop; Lit Nono ], [ new_f ], []) ]
                       in
-                      ASucc (rets @ dom_ret))
+                      Ok (rets @ dom_ret))
                     else
-                      AFail
+                      Error
                         [
                           make_gc_error loc_name prop (SFVL.field_names fv_list)
                             (Some dom);
                         ]))
-        ~none:(AFail [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], False) ])
+        ~none:(Error [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], Formula.False) ])
         (SHeap.get heap loc_name)
     in
 
     let result =
       Option.fold ~some:get_cell_from_loc
-        ~none:(AFail [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], False) ])
+        ~none:(Error [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], Formula.False) ])
         loc_name
     in
     result
@@ -340,7 +341,7 @@ module M = struct
         ~none:() (SHeap.get heap loc_name)
     in
     Option.fold ~some:f ~none:() (get_loc_name pfs gamma loc);
-    ASucc [ (heap, [], [], []) ]
+    Ok [ (heap, [], [], []) ]
 
   let set_domain
       (heap : t)
@@ -355,7 +356,7 @@ module M = struct
     | Some ((fv_list, _), mtdt) ->
         (* TODO: This probably needs to be a bit more sophisticated *)
         SHeap.set heap loc_name fv_list (Some dom) mtdt);
-    ASucc [ (heap, [], new_pfs, []) ]
+    Ok [ (heap, [], new_pfs, []) ]
 
   let get_metadata (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) :
       action_ret =
@@ -372,16 +373,16 @@ module M = struct
         else Expr.Lit (Loc loc_name)
       in
       match SHeap.get heap loc_name with
-      | None -> AFail [ make_gm_error loc_name ]
+      | None -> Error [ make_gm_error loc_name ]
       | Some ((_, _), mtdt) ->
           Option.fold
-            ~some:(fun mtdt -> ASucc [ (heap, [ loc; mtdt ], [], []) ])
-            ~none:(AFail [ make_gm_error loc_name ])
+            ~some:(fun mtdt -> Ok [ (heap, [ loc; mtdt ], [], []) ])
+            ~none:(Error [ make_gm_error loc_name ])
             mtdt
     in
 
     Option.fold ~some:f
-      ~none:(AFail [ ([ loc ], [ [ FLoc loc; FMetadata loc ] ], False) ])
+      ~none:(Error [ ([ loc ], [ [ FLoc loc; FMetadata loc ] ], Formula.False) ])
       loc_name
 
   let set_metadata
@@ -402,7 +403,7 @@ module M = struct
           PFS.extend pfs (Eq (mtdt, omet))
         else SHeap.set heap loc_name fv_list dom (Some mtdt));
     L.tmi (fun m -> m "Done setting metadata.");
-    ASucc [ (heap, [], new_pfs, []) ]
+    Ok [ (heap, [], new_pfs, []) ]
 
   let delete_object (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) :
       action_ret =
@@ -412,7 +413,7 @@ module M = struct
     | Some loc_name ->
         if SHeap.has_loc heap loc_name then (
           SHeap.remove heap loc_name;
-          ASucc [ (heap, [], [], []) ])
+          Ok [ (heap, [], [], []) ])
         else raise (Failure "delete_obj. Unknown Location")
     | None -> raise (Failure "delete_obj. Unknown Location")
 
@@ -465,11 +466,11 @@ module M = struct
                   pos_fv_list props
               in
               SHeap.set heap loc_name new_fv_list (Some e_dom) mtdt;
-              ASucc [ (heap, [ loc; e_dom ], [], []) ]
+              Ok [ (heap, [ loc; e_dom ], [], []) ]
           | _ -> raise (Failure "DEATH. get_partial_domain. dom_diff"))
     in
     let result =
-      Option.fold ~some:f ~none:(AFail [ ([ loc ], [], False) ]) loc_name
+      Option.fold ~some:f ~none:(Error [ ([ loc ], [], Formula.False) ]) loc_name
     in
     result
 
@@ -496,13 +497,13 @@ module M = struct
             let _, pos_fv_list =
               SFVL.partition (fun _ fv -> fv = Lit Nono) fv_list
             in
-            ASucc
+            Ok
               [ (heap, [ loc; EList (SFVL.field_names pos_fv_list) ], [], []) ]
           else raise (Failure "DEATH. TODO. get_full_domain. incomplete domain")
     in
 
     let result =
-      Option.fold ~some:f ~none:(AFail [ ([ loc ], [], False) ]) loc_name
+      Option.fold ~some:f ~none:(Error [ ([ loc ], [], Formula.False) ]) loc_name
     in
     result
 
@@ -516,7 +517,7 @@ module M = struct
         ~none:() (SHeap.get heap loc_name)
     in
     Option.fold ~some:f ~none:() (get_loc_name pfs gamma loc);
-    ASucc [ (heap, [], [], []) ]
+    Ok [ (heap, [], [], []) ]
 
   let execute_action
       ?unification:_
@@ -560,7 +561,7 @@ module M = struct
       | _ -> raise (Failure "Internal Error. execute_action. setMetadata")
     else if action = JSILNames.delMetadata then
       match args with
-      | [ _ ] -> ASucc [ (heap, [], [], []) ]
+      | [ _ ] -> Ok [ (heap, [], [], []) ]
       | _ -> raise (Failure "Internal Error. execute_action. delMetadata")
     else if action = JSILNames.getProps then
       match args with
@@ -814,7 +815,7 @@ module M = struct
     (* Missing metadata: create new, no new variables *)
     | CFMetadata (l, v) -> (
         match set_metadata mem pfs gamma l v with
-        | ASucc [ (mem, [], new_pfs, []) ] ->
+        | Ok [ (mem, [], new_pfs, []) ] ->
             List.iter (fun f -> PFS.extend pfs f) new_pfs;
             mem
         | _ -> raise (Failure "Bi-abduction: cannot fix metadata."))
@@ -826,12 +827,12 @@ module M = struct
           else Lit (Loc loc_name)
         in
         match alloc mem pfs (Some loc) ~is_empty:true None with
-        | ASucc [ (mem, [ loc' ], [], []) ] when loc' = loc -> mem
+        | Ok [ (mem, [ loc' ], [], []) ] when loc' = loc -> mem
         | _ -> raise (Failure "Bi-abduction: cannot fix missing location."))
     (* Missing cell: create new *)
     | CFCell (l, p, v) -> (
         match set_cell mem pfs gamma l p v with
-        | ASucc [ (mem, [], new_pfs, []) ] ->
+        | Ok [ (mem, [], new_pfs, []) ] ->
             List.iter (fun f -> PFS.extend pfs f) new_pfs;
             mem
         | _ -> raise (Failure "Bi-abduction: cannot fix cell."))

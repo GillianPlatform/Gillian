@@ -72,9 +72,10 @@ module Lift (MSM : S) :
   let assertions ?to_keep t =
     List.map Engine.Reduction.reduce_assertion (assertions ?to_keep t)
 
-  type action_ret =
-    | ASucc of (t * vt list * Formula.t list * (string * Type.t) list) list
-    | AFail of err_t list
+  type action_ret = (
+    (t * vt list * Formula.t list * (string * Type.t) list) list,
+    err_t list
+    ) result
 
   let execute_action ?(unification = false) action_name mem pfs gamma params =
     let process = execute_action ~action_name mem params in
@@ -99,7 +100,7 @@ module Lift (MSM : S) :
     in
     let successes, failures = split results in
     let is_empty list = Int.equal (List.compare_length_with list 0) 0 in
-    if not (is_empty failures) then AFail failures
+    if not (is_empty failures) then Error failures
     else
       let asucs =
         List.map
@@ -107,7 +108,7 @@ module Lift (MSM : S) :
             (t, vtl, List.of_seq (Formula.Set.to_seq fset), glis))
           successes
       in
-      ASucc asucs
+      Ok asucs
 
   let substitution_in_place ~pfs ~gamma subst mem :
       (t * Formula.Set.t * (string * Type.t) list) list =
