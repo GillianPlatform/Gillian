@@ -17,7 +17,7 @@ module type S = sig
   (** Type of GIL general states *)
   type t [@@deriving yojson]
 
-  type action_ret = Success of (t * vt list) | Failure of err_t
+  type action_ret = ((t * vt list), err_t) result
 
   (** Initialisation *)
   val init : init_data -> t
@@ -90,8 +90,8 @@ module Lift (MSM : S) :
         | [] -> (acc_succ, acc_fail)
         | br :: rest -> (
             match Branch.value br with
-            | Failure err -> aux acc_succ (err :: acc_fail) rest
-            | Success s ->
+            | Error err -> aux acc_succ (err :: acc_fail) rest
+            | Ok s ->
                 aux
                   ((Branch.learned br, Branch.learned_types br, s) :: acc_succ)
                   acc_fail rest)

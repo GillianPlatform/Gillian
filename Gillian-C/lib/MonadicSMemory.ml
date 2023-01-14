@@ -480,7 +480,7 @@ let of_yojson m =
     (fun mem -> { genv = Global_env.empty; mem = ref mem })
     (Mem.of_yojson m)
 
-type action_ret = Success of (t * vt list) | Failure of err_t
+type action_ret = ((t * vt list), err_t) result
 
 let make_branch ~heap ?(rets = []) () = (heap, rets)
 
@@ -855,10 +855,7 @@ let get_print_info _ _ = (SS.empty, SS.empty)
 
 (* let str_noheap _ = "NO HEAP PRINTED" *)
 
-let lift_res res =
-  match res with
-  | Ok a -> Success a
-  | Error e -> Failure e
+let lift_res res = res
 
 let pp_branch fmt branch =
   let _, values = branch in
