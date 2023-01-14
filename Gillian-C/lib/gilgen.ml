@@ -12,7 +12,7 @@ type context = {
   block_stack : string list;
   local_env : string list;
   gil_annot : Gil_logic_gen.gil_annots;
-  exec_mode : ExecMode.t;
+  exec_mode : Exec_mode.t;
   loop_stack : string list;
 }
 
@@ -493,13 +493,13 @@ let rec trans_stmt ~fname ~context stmt =
               gil_lcmds
           in
           (* We should filter assert_s in verif, and assert_v in symb *)
-          if ExecMode.concrete_exec context.exec_mode then [] else gil_lcmds
+          if Exec_mode.concrete_exec context.exec_mode then [] else gil_lcmds
       | `Invariant inv ->
           let inv = Cmd.Logic (SL inv) in
           set_invariant inv;
           [])
   | Sbuiltin (_, AST.EF_annot_val _, _)
-    when not (ExecMode.symbolic_exec context.exec_mode) ->
+    when not (Exec_mode.symbolic_exec context.exec_mode) ->
       failwith
         (Format.asprintf
            "The following statement looks like symbolic testing annotations to \
@@ -563,7 +563,7 @@ let alloc_var fname (name, sz) =
 
 let trans_function
     ?(gil_annot = Gil_logic_gen.empty)
-    ?(exec_mode = ExecMode.Verification)
+    ?(exec_mode = Exec_mode.Verification)
     filepath
     fname
     fdef =
@@ -689,7 +689,7 @@ let is_builtin_func func_name =
   List.mem func_name builtins
 
 let is_gil_func func_name exec_mode =
-  ExecMode.symbolic_exec exec_mode
+  Exec_mode.symbolic_exec exec_mode
   && (String.equal func_name Builtin_Functions.assume_f
      || String.equal func_name Builtin_Functions.assert_f)
 
@@ -714,7 +714,7 @@ type compilation_data = {
 
 let rec trans_globdefs
     ?(gil_annot = Gil_logic_gen.empty)
-    ?(exec_mode = ExecMode.Verification)
+    ?(exec_mode = Exec_mode.Verification)
     ~clight_prog
     ~global_syms
     ~filepath
@@ -738,7 +738,7 @@ let rec trans_globdefs
       in
       let target = symbol in
       let new_bi_specs =
-        if ExecMode.biabduction_exec exec_mode then
+        if Exec_mode.biabduction_exec exec_mode then
           Gil_logic_gen.generate_bispec clight_prog symbol id f :: bi_specs
         else []
       in
@@ -819,7 +819,7 @@ let make_init_proc init_cmds =
     }
 
 let trans_program
-    ?(exec_mode = ExecMode.Verification)
+    ?(exec_mode = Exec_mode.Verification)
     ?(gil_annot = Gil_logic_gen.empty)
     ~clight_prog
     ~filepath
@@ -903,9 +903,9 @@ let trans_program_with_annots
     prog
     annots =
   let gil_annot =
-    if ExecMode.verification_exec exec_mode then
+    if Exec_mode.verification_exec exec_mode then
       Gil_logic_gen.trans_annots clight_prog annots filepath
-    else if ExecMode.biabduction_exec exec_mode then
+    else if Exec_mode.biabduction_exec exec_mode then
       Gil_logic_gen.gen_bi_preds clight_prog
     else Gil_logic_gen.empty
   in

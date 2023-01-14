@@ -53,7 +53,7 @@ module type S = sig
   val env_var_import_path : string option
 
   (** Function that will be executed at initialisation. It will be passed the current execution mode as parameter *)
-  val initialize : ExecMode.t -> unit
+  val initialize : Exec_mode.t -> unit
 end
 
 (** Dummy ParserAndCompiler that will simply always fail. This is used when someone wants to build a command line interface

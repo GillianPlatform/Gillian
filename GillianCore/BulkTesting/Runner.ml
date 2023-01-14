@@ -1,6 +1,6 @@
 module type S = sig
   val cmd_name : string
-  val exec_mode : ExecMode.t
+  val exec_mode : Exec_mode.t
   val run_all : test_suite_path:string -> incremental:bool -> unit
 end
 
@@ -161,7 +161,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
 
   let run_all ~test_suite_path ~incremental =
     let () = Fmt.pr "Registering tests...\n@?" in
-    let is_wpst = ExecMode.symbolic_exec exec_mode in
+    let is_wpst = Exec_mode.symbolic_exec exec_mode in
     let list_files =
       List.filter Suite.filter_source (Utils.Io_utils.get_files test_suite_path)
     in

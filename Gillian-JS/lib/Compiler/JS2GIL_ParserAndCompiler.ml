@@ -57,14 +57,14 @@ let parse_and_compile_js path =
     let js_prog = JS_Parser.parse_string_exn ~program_path:path e_str in
     let (ext_prog : Jsil_syntax.EProg.t), _, _ =
       JS2JSIL_Compiler.js2jsil ~filename:path js_prog
-        (ExecMode.verification_exec !Config.current_exec_mode)
+        (Exec_mode.verification_exec !Config.current_exec_mode)
     in
     let ext_prog =
       if !Config.unfolding then JSIL_PostParser.post_parse_eprog ext_prog
       else ext_prog
     in
     let ext_prog =
-      if ExecMode.biabduction_exec !Config.current_exec_mode then
+      if Exec_mode.biabduction_exec !Config.current_exec_mode then
         JSIL_PostParser.bi_post_parse_eprog ext_prog JS2JSIL_Compiler.cc_tbl
           JS2JSIL_Compiler.vis_tbl
       else ext_prog
@@ -113,7 +113,7 @@ let import_paths = Javert_utils.Js_config.import_paths
 let env_var_import_path = Some "GILLIAN_JS_RUNTIME_PATH"
 
 let initialize exec_mode =
-  let open ExecMode in
+  let open Exec_mode in
   Config.lemma_proof := false;
   Javert_utils.Js_config.cosette :=
     biabduction_exec exec_mode || symbolic_exec exec_mode;

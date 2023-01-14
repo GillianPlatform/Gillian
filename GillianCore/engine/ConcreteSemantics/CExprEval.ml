@@ -1,4 +1,4 @@
-open Arith_Utils
+open Arith_utils
 module CStore = Store.Make (CVal.M)
 
 (* Expression Evaluation *)

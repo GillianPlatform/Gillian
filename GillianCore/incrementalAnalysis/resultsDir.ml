@@ -33,7 +33,7 @@ let prev_results_exist () =
       let file_path = Filename.concat results_dir filename in
       Io_utils.load_file file_path
     in
-    let prev_exec_mode = ExecMode.of_string (read_str Filenames.exec_mode) in
+    let prev_exec_mode = Exec_mode.of_string (read_str Filenames.exec_mode) in
     prev_exec_mode = !Config.current_exec_mode
 
 let delete_results_dir () = Io_utils.rm_rf (results_dir ())
@@ -114,7 +114,7 @@ let write_results_dir sources call_graph ~diff =
   create_results_dir ();
   write_json (SourceFiles.to_yojson sources) Filenames.sources;
   write_json (CallGraph.to_yojson call_graph) Filenames.call_graph;
-  write_str (ExecMode.to_string !Config.current_exec_mode) Filenames.exec_mode;
+  write_str (Exec_mode.to_string !Config.current_exec_mode) Filenames.exec_mode;
   write_str diff Filenames.diff
 
 let write_verif_results sources call_graph ~diff results =
@@ -149,4 +149,4 @@ let write_bulk_symbolic_results ~tests_ran sources_table call_graph_table =
   write_str_list tests_ran Filenames.tests_ran;
   write_table sources_table Filenames.sources_dir SourceFiles.to_yojson;
   write_table call_graph_table Filenames.call_graphs_dir CallGraph.to_yojson;
-  write_str (ExecMode.to_string !Config.current_exec_mode) Filenames.exec_mode
+  write_str (Exec_mode.to_string !Config.current_exec_mode) Filenames.exec_mode

@@ -6,7 +6,7 @@ module DL = Debugger_log
 module Exec_map = Debugger.Utils.Exec_map
 module Unify_map = Debugger.Utils.Unify_map
 open Syntaxes.Option
-module ExtList = Utils.ExtList
+module Ext_list = Utils.Ext_list
 module Annot = WParserAndCompiler.Annot
 open Annot
 open WBranchCase
@@ -83,13 +83,13 @@ struct
   module PartialCmds = struct
     type partial_data = {
       display : string;
-      ids : rid ExtList.t;
-      errors : string ExtList.t;
+      ids : rid Ext_list.t;
+      errors : string Ext_list.t;
       mutable submap : map submap;
       mutable inner_path : branch_data list;
-      unifys : unification ExtList.t;
+      unifys : unification Ext_list.t;
       unexplored_paths : branch_data list Stack.t;
-      out_paths : (branch_case * branch_data list) ExtList.t;
+      out_paths : (branch_case * branch_data list) Ext_list.t;
       mutable unknown_outs_count : int;
     }
     [@@deriving to_yojson]
@@ -97,13 +97,13 @@ struct
     let make_partial_data display =
       {
         display;
-        ids = ExtList.make ();
-        errors = ExtList.make ();
-        unifys = ExtList.make ();
+        ids = Ext_list.make ();
+        errors = Ext_list.make ();
+        unifys = Ext_list.make ();
         submap = NoSubmap;
         inner_path = [];
         unexplored_paths = Stack.create ();
-        out_paths = ExtList.make ();
+        out_paths = Ext_list.make ();
         unknown_outs_count = 0;
       }
 
@@ -112,9 +112,9 @@ struct
     let update_partial_data end_kind exec_data d =
       let { id; unifys; errors; cmd_report; _ } = exec_data in
       let annot = CmdReport.(cmd_report.annot) in
-      d.ids |> ExtList.append id;
-      unifys |> List.iter (fun unify -> d.unifys |> ExtList.append unify);
-      errors |> List.iter (fun error -> d.errors |> ExtList.append error);
+      d.ids |> Ext_list.append id;
+      unifys |> List.iter (fun unify -> d.unifys |> Ext_list.append unify);
+      errors |> List.iter (fun error -> d.errors |> Ext_list.append error);
       (match exec_data.kind with
       | Branch cases ->
           cases
@@ -126,7 +126,7 @@ struct
                      let count = d.unknown_outs_count in
                      let case = Gil count in
                      d.unknown_outs_count <- count + 1;
-                     d.out_paths |> ExtList.append (case, path)
+                     d.out_paths |> Ext_list.append (case, path)
                  | EndWithBranch _ ->
                      failwith "EndWithBranch on branching cmd not supported!")
       | Normal -> (
@@ -137,8 +137,8 @@ struct
               let count = d.unknown_outs_count in
               let case = Gil count in
               d.unknown_outs_count <- count + 1;
-              d.out_paths |> ExtList.append (case, path)
-          | EndWithBranch case -> d.out_paths |> ExtList.append (case, path))
+              d.out_paths |> Ext_list.append (case, path)
+          | EndWithBranch case -> d.out_paths |> Ext_list.append (case, path))
       | Final -> ());
       match (d.submap, annot.nest_kind) with
       | _, NoNest -> ()
@@ -168,11 +168,11 @@ struct
     let make_finished_partial
         is_final
         { ids; display; unifys; errors; out_paths; submap; _ } =
-      let ids = ids |> ExtList.to_list in
-      let unifys = unifys |> ExtList.to_list in
-      let errors = errors |> ExtList.to_list in
+      let ids = ids |> Ext_list.to_list in
+      let unifys = unifys |> Ext_list.to_list in
+      let errors = errors |> Ext_list.to_list in
       let cmd_kind =
-        match out_paths |> ExtList.to_list with
+        match out_paths |> Ext_list.to_list with
         | [] | [ (_, [ (_, None) ]) ] -> if is_final then Final else Normal
         | paths ->
             let cases =
