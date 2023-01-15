@@ -17,7 +17,7 @@ module type S = sig
   (** Type of GIL general states *)
   type t [@@deriving yojson]
 
-  type action_ret = ((t * vt list), err_t) result
+  type action_ret = (t * vt list, err_t) result
 
   (** Initialisation *)
   val init : init_data -> t
@@ -72,10 +72,10 @@ module Lift (MSM : S) :
   let assertions ?to_keep t =
     List.map Engine.Reduction.reduce_assertion (assertions ?to_keep t)
 
-  type action_ret = (
-    (t * vt list * Formula.t list * (string * Type.t) list) list,
-    err_t list
-    ) result
+  type action_ret =
+    ( (t * vt list * Formula.t list * (string * Type.t) list) list,
+      err_t list )
+    result
 
   let execute_action ?(unification = false) action_name mem pfs gamma params =
     let process = execute_action ~action_name mem params in

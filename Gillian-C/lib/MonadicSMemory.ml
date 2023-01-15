@@ -480,7 +480,7 @@ let of_yojson m =
     (fun mem -> { genv = Global_env.empty; mem = ref mem })
     (Mem.of_yojson m)
 
-type action_ret = ((t * vt list), err_t) result
+type action_ret = (t * vt list, err_t) result
 
 let make_branch ~heap ?(rets = []) () = (heap, rets)
 

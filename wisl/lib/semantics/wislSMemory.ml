@@ -12,10 +12,10 @@ type err_t = WislSHeap.err [@@deriving yojson, show]
 type c_fix_t = unit
 type t = WislSHeap.t [@@deriving yojson]
 
-type action_ret = (
-  (t * vt list * Formula.t list * (string * Type.t) list) list,
-  err_t list
-  ) result
+type action_ret =
+  ( (t * vt list * Formula.t list * (string * Type.t) list) list,
+    err_t list )
+  result
 
 let init () = WislSHeap.init ()
 let clear _ = WislSHeap.init ()

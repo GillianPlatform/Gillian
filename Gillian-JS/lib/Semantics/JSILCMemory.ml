@@ -15,7 +15,7 @@ module M : Memory_S with type init_data = unit = struct
   (** Errors *)
   type err_t = unit [@@deriving show]
 
-  type action_ret = ((t * vt list), err_t list) result
+  type action_ret = (t * vt list, err_t list) result
 
   let pp = CHeap.pp
   let copy = CHeap.copy

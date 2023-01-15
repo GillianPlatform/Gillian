@@ -11,7 +11,7 @@ type err_t = unit [@@deriving show]
 let pp_err _ () = ()
 
 type t = { mem : Compcert.Memory.Mem.mem; genv : Global_env.t }
-type action_ret = ((t * vt list), err_t list) result
+type action_ret = (t * vt list, err_t list) result
 
 let init genv = { mem = Mem.empty; genv }
 let copy x = x
@@ -66,7 +66,8 @@ let execute_move heap params =
       | Some lmemval -> (
           match Mem.storebytes heap.mem block_1 z_ofs_1 lmemval with
           | None -> Error []
-          | Some mem -> Ok ({ heap with mem }, [ Literal.Loc loc_1; Int ofs_1 ])))
+          | Some mem -> Ok ({ heap with mem }, [ Literal.Loc loc_1; Int ofs_1 ])
+          ))
   | _ -> failwith "invalid call to move"
 
 let execute_free heap params =

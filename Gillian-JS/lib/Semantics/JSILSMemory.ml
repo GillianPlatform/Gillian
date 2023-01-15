@@ -35,10 +35,10 @@ module M = struct
 
   type err_t = vt list * i_fix_t list list * Formula.t [@@deriving yojson, show]
 
-  type action_ret = (
-    (t * vt list * Formula.t list * (string * Type.t) list) list,
-    err_t list
-  ) result
+  type action_ret =
+    ( (t * vt list * Formula.t list * (string * Type.t) list) list,
+      err_t list )
+    result
 
   let pp_i_fix ft (i_fix : i_fix_t) : unit =
     let open Fmt in
@@ -242,8 +242,7 @@ module M = struct
                       make_gc_error loc_name prop (SFVL.field_names fv_list)
                         None;
                     ]
-              | _, Some (ffn, ffv) ->
-                  Ok [ (heap, [ loc; ffn; ffv ], [], []) ]
+              | _, Some (ffn, ffv) -> Ok [ (heap, [ loc; ffn; ffv ], [], []) ]
               | Some dom, None ->
                   let a_set_inclusion : Formula.t = Not (SetMem (prop, dom)) in
                   if
@@ -315,13 +314,15 @@ module M = struct
                           make_gc_error loc_name prop (SFVL.field_names fv_list)
                             (Some dom);
                         ]))
-        ~none:(Error [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], Formula.False) ])
+        ~none:
+          (Error [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], Formula.False) ])
         (SHeap.get heap loc_name)
     in
 
     let result =
       Option.fold ~some:get_cell_from_loc
-        ~none:(Error [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], Formula.False) ])
+        ~none:
+          (Error [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], Formula.False) ])
         loc_name
     in
     result
@@ -382,7 +383,8 @@ module M = struct
     in
 
     Option.fold ~some:f
-      ~none:(Error [ ([ loc ], [ [ FLoc loc; FMetadata loc ] ], Formula.False) ])
+      ~none:
+        (Error [ ([ loc ], [ [ FLoc loc; FMetadata loc ] ], Formula.False) ])
       loc_name
 
   let set_metadata
@@ -470,7 +472,9 @@ module M = struct
           | _ -> raise (Failure "DEATH. get_partial_domain. dom_diff"))
     in
     let result =
-      Option.fold ~some:f ~none:(Error [ ([ loc ], [], Formula.False) ]) loc_name
+      Option.fold ~some:f
+        ~none:(Error [ ([ loc ], [], Formula.False) ])
+        loc_name
     in
     result
 
@@ -497,13 +501,14 @@ module M = struct
             let _, pos_fv_list =
               SFVL.partition (fun _ fv -> fv = Lit Nono) fv_list
             in
-            Ok
-              [ (heap, [ loc; EList (SFVL.field_names pos_fv_list) ], [], []) ]
+            Ok [ (heap, [ loc; EList (SFVL.field_names pos_fv_list) ], [], []) ]
           else raise (Failure "DEATH. TODO. get_full_domain. incomplete domain")
     in
 
     let result =
-      Option.fold ~some:f ~none:(Error [ ([ loc ], [], Formula.False) ]) loc_name
+      Option.fold ~some:f
+        ~none:(Error [ ([ loc ], [], Formula.False) ])
+        loc_name
     in
     result
 

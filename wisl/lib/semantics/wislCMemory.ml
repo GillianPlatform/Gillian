@@ -6,7 +6,7 @@ type vt = Values.t
 type st = Subst.t
 type err_t = unit [@@deriving show]
 type t = WislCHeap.t
-type action_ret = ((t * vt list), err_t list) result
+type action_ret = (t * vt list, err_t list) result
 
 let init = WislCHeap.init
 let copy = WislCHeap.copy
