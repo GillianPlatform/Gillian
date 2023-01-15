@@ -855,8 +855,6 @@ let get_print_info _ _ = (SS.empty, SS.empty)
 
 (* let str_noheap _ = "NO HEAP PRINTED" *)
 
-let lift_res res = res
-
 let pp_branch fmt branch =
   let _, values = branch in
   Fmt.pf fmt "Returns: %a@.(Ignoring heap)" (Fmt.Dump.list Expr.pp) values
@@ -865,7 +863,7 @@ let lift_dr_and_log res =
   let pp_res = Fmt.Dump.result ~ok:pp_branch ~error:pp_err in
   Delayed.map res (fun res ->
       Logging.verbose (fun fmt -> fmt "Resulting in: %a" pp_res res);
-      lift_res res)
+      res)
 
 (* Actual action execution *)
 
