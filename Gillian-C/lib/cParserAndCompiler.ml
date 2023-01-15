@@ -465,7 +465,7 @@ let init_compcert () =
 let initialize exec_mode =
   init_compcert ();
   match exec_mode with
-  | Gillian.Utils.ExecMode.BiAbduction ->
+  | Gillian.Utils.Exec_mode.BiAbduction ->
       Gillian.Utils.Config.bi_unfold_depth := 2;
       Gillian.Utils.Config.delay_entailment := true
   | Verification -> Gillian.Utils.Config.delay_entailment := true

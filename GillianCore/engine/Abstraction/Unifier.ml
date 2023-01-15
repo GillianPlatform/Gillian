@@ -391,7 +391,7 @@ module Make
               fmt "Extended values: %a"
                 Fmt.(brackets (list ~sep:comma Val.pp))
                 vs);
-          let vs_inter = List_utils.list_inter vs in_args in
+          let vs_inter = List_utils.intersect vs in_args in
           let es_inter =
             List.fold_left
               (fun ac e -> Expr.Set.add e ac)
@@ -442,7 +442,7 @@ module Make
       | true -> 0
       | false ->
           let out_args = Pred.out_args pred_def args in
-          let vs_inter = List_utils.list_inter vs out_args in
+          let vs_inter = List_utils.intersect vs out_args in
           let es_inter =
             List.fold_left
               (fun ac e -> Expr.Set.add e ac)
@@ -1282,7 +1282,7 @@ module Make
                              Fmt.(list ~sep:comma Val.pp)
                              vs')); *)
                     let vs_ins', vs_outs =
-                      List_utils.divide_list_by_index vs' (List.length vs_ins)
+                      List_utils.split_at vs' (List.length vs_ins)
                     in
                     let remover = State.ga_to_deleter a_id in
                     match State.execute_action remover state' vs_ins' with

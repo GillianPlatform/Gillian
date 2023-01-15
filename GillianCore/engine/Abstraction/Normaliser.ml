@@ -145,7 +145,7 @@ struct
               | _, _ -> BinOp (nle1, LstNth, nle2))
           | StrNth -> (
               match (nle1, nle2) with
-              | Lit (String s), Lit (Num n) when Arith_Utils.is_int n ->
+              | Lit (String s), Lit (Num n) when Arith_utils.is_int n ->
                   let s =
                     try String.make 1 s.[int_of_float n]
                     with _ -> raise (Failure "String index out of bounds")

@@ -1,4 +1,4 @@
-(** Prefixes constants for variable names and name testers *)
+(** Prefix constants for variable names, with testers and builders *)
 
 (** {2 Special names} *)
 
@@ -23,6 +23,7 @@ let lvar_prefix = "_lvar_"
 let lvar_prefix_bi = "_lvar_bi_"
 
 (** {2 Name testers} *)
+
 let is_pvar_name (name : string) : bool =
   try
     name.[0] <> '#'
@@ -43,7 +44,7 @@ let is_spec_var_name (name : string) : bool =
 let is_lloc_name (name : string) : bool =
   try String.sub name 0 2 = lloc_prefix with _ -> false
 
-(** {2 name builders} *)
+(** {2 Name builders} *)
 
-let lvar_from_str (name : string) : string = lvar_prefix ^ name
-let svar_from_str (name : string) : string = "#" ^ name
+let make_lvar_name (name : string) : string = lvar_prefix ^ name
+let make_svar_name (name : string) : string = "#" ^ name

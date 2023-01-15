@@ -13,7 +13,7 @@ module type S = sig
   val beforeEach : unit -> unit
   val init_suite : string list -> unit
   val cmd_name : string
-  val exec_mode : ExecMode.t
+  val exec_mode : Exec_mode.t
 end
 
 module Dummy = struct
@@ -33,13 +33,13 @@ module Dummy = struct
   let init_suite _ = fail ()
   let filter_source _ = fail ()
   let beforeTest _ _ = fail ()
-  let exec_mode = ExecMode.Concrete
+  let exec_mode = Exec_mode.Concrete
 end
 
 module ByFolder (P : sig
   val max_depth : int
   val cmd_name : string
-  val exec_mode : ExecMode.t
+  val exec_mode : Exec_mode.t
 end) =
 struct
   (** This defines a very simple way of handling tests.

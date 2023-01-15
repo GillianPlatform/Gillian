@@ -243,7 +243,7 @@ struct
 
   module CompilerConsole = struct
     let mode =
-      let open ExecMode in
+      let open Exec_mode in
       let doc = "Compile for Verification mode" in
       let verif =
         (Verification, Arg.info [ "ver"; "verif"; "verification" ] ~doc)

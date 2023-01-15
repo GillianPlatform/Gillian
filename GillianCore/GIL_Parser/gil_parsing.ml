@@ -1,7 +1,7 @@
 open Lexing
 module L = Logging
 
-module Preprocess_GCmd = PreProcessing_Utils.M (struct
+module Preprocess_GCmd = Preprocessing_utils.M (struct
   type t = int Cmd.t
 
   let successors = Cmd.successors

@@ -1,3 +1,5 @@
+module Union_find = Union_find
+
 module M (GraphNode : sig
   type t
 

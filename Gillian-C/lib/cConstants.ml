@@ -1,4 +1,4 @@
-module ExecMode = Gillian.Utils.ExecMode
+module Exec_mode = Gillian.Utils.Exec_mode
 
 module Architecture = struct
   type t = Arch64 | Arch32
@@ -21,12 +21,16 @@ module GEnvConfig = struct
 end
 
 module Imports = struct
-  open ExecMode
+  open Exec_mode
   open Architecture
 
   let env_path_var = "GILLIAN_C_RUNTIME_PATH"
 
-  type t = { file : string; arch : Architecture.t list; exec : ExecMode.t list }
+  type t = {
+    file : string;
+    arch : Architecture.t list;
+    exec : Exec_mode.t list;
+  }
 
   (** All imports, should not be used as such, imports should be selected using the [import] function *)
   let all_imports =

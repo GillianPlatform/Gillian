@@ -101,7 +101,7 @@ val get_relevant_info :
 val filter_map_stop :
   (Formula.t -> [ `Stop | `Filter | `Replace of Formula.t ]) -> t -> bool
 
-(** See Gillian.Utils.ExtList.filter_stop_cond *)
+(** See Gillian.Utils.Ext_list.filter_stop_cond *)
 val filter_stop_cond :
   keep:(Formula.t -> bool) -> cond:(Formula.t -> bool) -> t -> bool
 

@@ -33,7 +33,7 @@ module type S = sig
   val cmd_name : string
 
   (** Execution mode that will be used for init in command-line *)
-  val exec_mode : ExecMode.t
+  val exec_mode : Exec_mode.t
 end
 
 module Dummy : S
@@ -41,5 +41,5 @@ module Dummy : S
 module ByFolder (P : sig
   val max_depth : int
   val cmd_name : string
-  val exec_mode : ExecMode.t
+  val exec_mode : Exec_mode.t
 end) : S

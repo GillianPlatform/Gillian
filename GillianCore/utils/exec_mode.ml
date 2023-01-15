@@ -1,4 +1,8 @@
+(** Gillian's execution modes *)
+
 type t = Concrete | Verification | Symbolic | BiAbduction
+
+(** {2 Variant checkers} *)
 
 let concrete_exec = function
   | Concrete -> true
@@ -16,12 +20,27 @@ let biabduction_exec = function
   | BiAbduction -> true
   | _ -> false
 
+(** {2 [Exec_mode]s that satisfy conditions }*)
+
+(** All modes *)
 let all_exec = [ Concrete; Verification; Symbolic; BiAbduction ]
-let non_bi_exec = [ Concrete; Verification; Symbolic ]
+
+(** Modes that make use of predicates *)
 let exec_with_preds = [ Verification; BiAbduction ]
+
+(** Modes that use bi-abduction *)
 let bi_exec = [ BiAbduction ]
+
+(** Modes that {i don't} use bi-abduction*)
+let non_bi_exec = [ Concrete; Verification; Symbolic ]
+
+(** Modes that use verification*)
 let ver_exec = [ Verification ]
+
+(** Modes that {i don't} use verification*)
 let non_ver_exec = [ Concrete; Symbolic; BiAbduction ]
+
+(** {2 String converters} *)
 
 let to_string = function
   | Concrete -> "concrete"

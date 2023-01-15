@@ -1,3 +1,7 @@
+(** Some common instances of {!Set} *)
+
+(**/**)
+
 module MyInt = struct
   type t = int
 
@@ -16,11 +20,10 @@ module MyBool = struct
   let compare = Stdlib.compare
 end
 
-module SS = struct
-  (** Extension of SS with functions to serialize to and deserialize from
-    yojson. A SS is a represented as a list of key-value pairs, where a
-    key-value pair is list of two elements. *)
+(**/**)
 
+(** A {!Set} of [string]s*)
+module SS = struct
   include Set.Make (String)
 
   let to_yojson (set : t) : Yojson.Safe.t =
@@ -43,6 +46,11 @@ module SS = struct
     | _ -> Fmt.error "Invalid json set: %a" Yojson.Safe.pp yojson
 end
 
+(** A {!Set} of [int]s*)
 module SI = Set.Make (MyInt)
+
+(** A {!Set} of [bool]s*)
 module SB = Set.Make (MyBool)
+
+(** A {!Set} of [float]s*)
 module SN = Set.Make (MyNumber)

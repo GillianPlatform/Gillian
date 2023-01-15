@@ -1,7 +1,9 @@
+(** Input/output helper functions *)
+
 (** Create a folder safely *)
 let safe_mkdir path = if not (Sys.file_exists path) then Unix.mkdir path 0o777
 
-(** Delete a folder and all its contents *)
+(** Recursively delete a folder and its contents *)
 let rec rm_r path =
   if Sys.is_directory path then (
     Sys.readdir path
@@ -9,14 +11,16 @@ let rec rm_r path =
     Unix.rmdir path)
   else Sys.remove path
 
+(** Same as {!rm_r}, but doesn't fail if the path doesn't exist *)
 let rm_rf path = if Sys.file_exists path then rm_r path
 
-(** Save string to file *)
+(** Write string to file *)
 let save_file path data =
   let oc = open_out path in
   output_string oc data;
   close_out oc
 
+(** Same as {!save_file}, but uses a formatter *)
 let save_file_pp
     (path : string)
     (pretty_printer : Format.formatter -> 'a -> unit)
@@ -27,7 +31,7 @@ let save_file_pp
   Format.pp_print_flush foc ();
   close_out oc
 
-(** Load a file given its path *)
+(** Read a file *)
 let load_file f : string =
   let ic = open_in f in
   let n = in_channel_length ic in
@@ -36,7 +40,7 @@ let load_file f : string =
   close_in ic;
   Bytes.to_string s
 
-(** List files within a directory recursively *)
+(** Read multiple files *)
 let get_files path =
   let open Unix in
   let rec walk acc_files paths_left =

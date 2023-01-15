@@ -285,7 +285,7 @@ let rec get_length_of_list (lst : Expr.t) : int option =
       | Lit (Int len) -> Some (Z.to_int len)
       | _ -> None)
   | NOp (LstCat, les) -> (
-      match List_utils.map_option f les with
+      match List_utils.flaky_map f les with
       | None -> None
       | Some lens ->
           let lens = List.fold_left Int.add 0 lens in
@@ -1010,7 +1010,7 @@ let rec reduce_lexpr_loop
         let fidx = f idx in
         match fidx with
         (* Index is a non-negative integer *)
-        | Lit (Num n) when Arith_Utils.is_int n && 0. <= n -> (
+        | Lit (Num n) when Arith_utils.is_int n && 0. <= n -> (
             match lexpr_is_string gamma fle with
             | true ->
                 Option.value

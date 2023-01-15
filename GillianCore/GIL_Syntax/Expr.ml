@@ -252,7 +252,7 @@ let rec map_opt
   let map_e = map_opt f_before f_after in
   let f_after = Option.value ~default:(fun x -> x) f_after in
 
-  let aux args f = List_utils.map_option map_e args |> Option.map f in
+  let aux args f = List_utils.flaky_map map_e args |> Option.map f in
 
   match f_before expr with
   | None, _ -> None
@@ -445,8 +445,8 @@ let pvars (e : t) : SS.t = Visitors.Collectors.pvar_collector#visit_expr () e
 
 let var_to_expr (x : string) : t =
   if Names.is_lvar_name x then LVar x
-  else if Names.is_aloc_name x then ALoc x
-  else if Names.is_pvar_name x then PVar x
+  else if is_aloc_name x then ALoc x
+  else if is_pvar_name x then PVar x
   else raise (Failure ("var_to_expr: Impossible unifiable: " ^ x))
 
 let is_unifiable (e : t) : bool =

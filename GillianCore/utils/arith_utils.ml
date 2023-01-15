@@ -1,12 +1,20 @@
-(* This is very tricky, -0 has to not be an int *)
+(** Utility functions for floating point arithmetic *)
+
+(** Checks if a float is an integer
+    
+  Note that [-0] is {b not} considered an integer *)
 let is_int (f : float) : bool =
   let f' = float_of_int (int_of_float f) in
   f = f' && copysign 1.0 f = copysign 1.0 f'
 
+(** Checks if a flot is not NaN or infinite *)
 let is_normal (f : float) =
   let fc = Float.classify_float f in
   not (fc = FP_infinite || fc = FP_nan)
 
+(** Rounds a float towards 0
+    
+  Returns 0 if NaN, and unchanged if infinite*)
 let to_int n =
   match classify_float n with
   | FP_nan -> 0.
@@ -15,6 +23,7 @@ let to_int n =
   | FP_normal | FP_subnormal ->
       (if n < 0. then -1. else 1.) *. floor (abs_float n)
 
+(** Same as {!to_int}, but overflows as if it's a signed 32-bit int *)
 let to_int32 n =
   match classify_float n with
   | FP_normal | FP_subnormal ->
@@ -28,6 +37,7 @@ let to_int32 n =
       if int32bit >= i31 then int32bit -. i32 else int32bit
   | _ -> 0.
 
+(** Same as {!to_int32}, but for unsigned 32-bit ints *)
 let to_uint32 n =
   match classify_float n with
   | FP_normal | FP_subnormal ->
@@ -40,6 +50,7 @@ let to_uint32 n =
       int32bit
   | _ -> 0.
 
+(** Same as {!to_uint32}, but for unsigned 16-bit ints *)
 let to_uint16 n =
   match classify_float n with
   | FP_normal | FP_subnormal ->
@@ -92,7 +103,9 @@ let int32_right_shift x y =
 let uint32_right_shift x y = Z.shift_right x (Z.to_int y)
 let uint64_int_right_shift x y = Z.shift_right x (Z.to_int y)
 
-(* This is intended to work on positive floats! *)
+(** Stringifies a float, adapting based on its size, or whether it's an integer
+    
+  Assumes the float is normal and positive *)
 let string_of_pos_float num =
   (* Is the number an integer? *)
   let inum = int_of_float num in
@@ -111,6 +124,7 @@ let string_of_pos_float num =
     (* e+0 -> e+ *)
     Str.replace_first re "e\\1" (Float.to_string num)
 
+(** Stringifies a float, considering negative and abnormal cases *)
 let rec float_to_string_inner n =
   if Float.is_nan n then "NaN"
   else if n = 0.0 || n = -0.0 then "0"

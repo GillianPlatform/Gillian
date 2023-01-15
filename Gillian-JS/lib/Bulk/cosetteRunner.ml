@@ -10,7 +10,7 @@ module Suite = struct
   include Bulk.Suite.ByFolder (struct
     let max_depth = 1
     let cmd_name = "cosette-bulk"
-    let exec_mode = Gillian.Utils.ExecMode.Symbolic
+    let exec_mode = Gillian.Utils.Exec_mode.Symbolic
   end)
 
   let contains_bug s =
