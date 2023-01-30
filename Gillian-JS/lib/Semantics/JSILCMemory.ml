@@ -15,7 +15,7 @@ module M : Memory_S with type init_data = unit = struct
   (** Errors *)
   type err_t = unit [@@deriving show]
 
-  type action_ret = ASucc of (t * vt list) | AFail of err_t list
+  type action_ret = (t * vt list, err_t list) result
 
   let pp = CHeap.pp
   let copy = CHeap.copy
@@ -36,7 +36,7 @@ module M : Memory_S with type init_data = unit = struct
         | None -> CObject.remove obj prop
         | Some v when Values.to_literal v = Some Nono -> CObject.remove obj prop
         | Some v -> CObject.set obj prop v);
-        ASucc (heap, [])
+        Ok (heap, [])
 
   let get_cell ?(remove : bool option) (heap : t) (loc : vt) (prop : vt) :
       action_ret =
@@ -51,10 +51,10 @@ module M : Memory_S with type init_data = unit = struct
       raise (Failure "Concrete get_cell. Remove Option must be implemented!")
     else
       match CHeap.get heap loc with
-      | None -> AFail []
+      | None -> Error []
       | Some (obj, _) ->
           let v = Option.value ~default:Literal.Nono (CObject.get obj prop) in
-          ASucc (heap, [ Loc loc; String prop; v ])
+          Ok (heap, [ Loc loc; String prop; v ])
 
   let get_domain ?expected_props:_ ?(remove : bool option) (heap : t) (loc : vt)
       : action_ret =
@@ -69,10 +69,10 @@ module M : Memory_S with type init_data = unit = struct
       raise (Failure "Concrete get_domain. Remove Option must be implemented!")
     else
       match CHeap.get heap loc with
-      | None -> AFail []
+      | None -> Error []
       | Some (obj, _) ->
           let props = CObject.properties obj in
-          ASucc
+          Ok
             ( heap,
               [
                 Loc loc;
@@ -91,8 +91,8 @@ module M : Memory_S with type init_data = unit = struct
         (Failure "Concrete get_metadata. Remove Option must be implemented!")
     else
       match CHeap.get heap loc with
-      | None -> AFail []
-      | Some (_, vm) -> ASucc (heap, [ Loc loc; vm ])
+      | None -> Error []
+      | Some (_, vm) -> Ok (heap, [ Loc loc; vm ])
 
   let delete_object (heap : t) (loc : vt) : action_ret =
     let loc =
@@ -104,7 +104,7 @@ module M : Memory_S with type init_data = unit = struct
     | None -> raise (Failure "delete_obj. location does NOT exist in the heap")
     | Some _ ->
         CHeap.remove heap loc;
-        ASucc (heap, [])
+        Ok (heap, [])
 
   let alloc (heap : t) (loc : vt option) (mv : vt) : action_ret =
     let new_loc =
@@ -115,7 +115,7 @@ module M : Memory_S with type init_data = unit = struct
     in
     CHeap.set heap new_loc (CObject.init (), mv);
     let new_loc_lit : Literal.t = Loc new_loc in
-    ASucc (heap, [ new_loc_lit ])
+    Ok (heap, [ new_loc_lit ])
 
   (** Execute action *)
   let execute_action (action : string) (heap : t) (args : vt list) : action_ret

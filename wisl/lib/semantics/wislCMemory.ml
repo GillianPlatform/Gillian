@@ -6,7 +6,7 @@ type vt = Values.t
 type st = Subst.t
 type err_t = unit [@@deriving show]
 type t = WislCHeap.t
-type action_ret = ASucc of (t * vt list) | AFail of err_t list
+type action_ret = (t * vt list, err_t list) result
 
 let init = WislCHeap.init
 let copy = WislCHeap.copy
@@ -22,8 +22,8 @@ let get_cell heap params =
     match params with
     | [ Loc loc; Int offset ] -> (
         match WislCHeap.get heap loc (Z.to_int offset) with
-        | Some value -> ASucc (heap, [ Loc loc; Int offset; value ])
-        | None -> AFail [])
+        | Some value -> Ok (heap, [ Loc loc; Int offset; value ])
+        | None -> Error [])
     | l ->
         failwith
           (Printf.sprintf
@@ -35,7 +35,7 @@ let set_cell heap params =
     match params with
     | [ Loc loc; Int offset; value ] ->
         let () = WislCHeap.set heap loc (Z.to_int offset) value in
-        ASucc (heap, [])
+        Ok (heap, [])
     | l ->
         failwith
           (Printf.sprintf
@@ -47,7 +47,7 @@ let rem_cell heap params =
     match params with
     | [ Loc loc; Int offset ] ->
         let () = WislCHeap.remove heap loc (Z.to_int offset) in
-        ASucc (heap, [])
+        Ok (heap, [])
     | l ->
         failwith
           (Printf.sprintf
@@ -60,7 +60,7 @@ let alloc heap params =
     | [ Int size ] when Z.geq size Z.one ->
         let loc = WislCHeap.alloc heap (Z.to_int size) in
         let litloc = Loc loc in
-        ASucc (heap, [ litloc; Int Z.zero ])
+        Ok (heap, [ litloc; Int Z.zero ])
         (* returns a pointer to the first element *)
     | l ->
         failwith
@@ -73,7 +73,7 @@ let dispose heap params =
   match params with
   | [ Loc obj ] ->
       let () = WislCHeap.dispose heap obj in
-      ASucc (heap, [])
+      Ok (heap, [])
   | l ->
       failwith
         (Printf.sprintf

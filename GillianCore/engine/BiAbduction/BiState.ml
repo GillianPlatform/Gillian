@@ -25,7 +25,7 @@ struct
 
   exception Internal_State_Error of err_t list * t
 
-  type action_ret = ASucc of (t * vt list) list | AFail of err_t list
+  type action_ret = ((t * vt list) list, err_t list) result
   type u_res = UWTF | USucc of t | UFail of err_t list
 
   let merge_action_results (rets : action_ret list) : action_ret =
@@ -33,7 +33,7 @@ struct
       List.partition
         (fun ret ->
           match ret with
-          | ASucc _ -> true
+          | Ok _ -> true
           | _ -> false)
         rets
     in
@@ -42,21 +42,21 @@ struct
         List.map
           (fun ret ->
             match ret with
-            | AFail errs -> errs
+            | Error errs -> errs
             | _ -> [])
           ret_fails
       in
-      AFail (List.concat errs)
+      Error (List.concat errs)
     else
       let rets =
         List.map
           (fun ret ->
             match ret with
-            | ASucc rets -> rets
+            | Ok rets -> rets
             | _ -> [])
           ret_succs
       in
-      ASucc (List.concat rets)
+      Ok (List.concat rets)
 
   let get_pred_defs (bi_state : t) : UP.preds_tbl_t option =
     let _, state, _ = bi_state in
@@ -546,12 +546,12 @@ struct
       (args : vt list) : action_ret =
     let procs, state, state_af = astate in
     match State.execute_action ~unification action state args with
-    | State.ASucc rets ->
+    | Ok rets ->
         let rets' =
           List.map (fun (st, outs) -> ((procs, st, state_af), outs)) rets
         in
-        ASucc rets'
-    | State.AFail errs when State.can_fix errs ->
+        Ok rets'
+    | Error errs when State.can_fix errs ->
         L.(
           verbose (fun m ->
               m "BState: EA: %d errors and they can be fixed."
@@ -571,7 +571,7 @@ struct
         in
         let rets = List_utils.get_list_somes rets in
         merge_action_results rets
-    | State.AFail errs -> AFail errs
+    | Error errs -> Error errs
 
   let get_equal_values bi_state =
     let _, state, _ = bi_state in

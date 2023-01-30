@@ -7,7 +7,7 @@ let get_metadata cstate cval =
   in
   try
     match act_ret with
-    | ASucc [ (_, [ _; e ]) ] -> Some e
+    | Ok [ (_, [ _; e ]) ] -> Some e
     | _ -> None
   with _ -> None
 
@@ -18,7 +18,7 @@ let get_cell cstate loc prop =
   in
   try
     match act_ret with
-    | ASucc [ (_, [ _; _; cell ]) ] -> Some cell
+    | Ok [ (_, [ _; _; cell ]) ] -> Some cell
     | _ -> None
   with _ -> None
 
