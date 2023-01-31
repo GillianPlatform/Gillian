@@ -90,4 +90,5 @@ javert-test262
 *.db
 
 # Built docs
-_docs
+_docs/odoc
+_docs/sphinx
