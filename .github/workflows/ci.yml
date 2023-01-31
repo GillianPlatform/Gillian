@@ -270,7 +270,7 @@ jobs:
         run: |
           git config --global user.email "<>" \
           && git config --global user.name "GitHub Actions" \
-          && git clone https://${{ secrets.DOCS_USER }}:${{ secrets.DOCS_TOKEN }}@github.com/GillianPlatform/GillianPlatform.github.io.git docs-repo \
+          && git clone https://${{ secrets.DOCS_USER }}:${{ secrets.DOCS_TOKEN }}@github.com/GillianPlatform/GillianPlatform.github.io.git docs-repo --branch master \
           && cd docs-repo \
           && rm * -rf \
           && cp -r ../docs/* . \
