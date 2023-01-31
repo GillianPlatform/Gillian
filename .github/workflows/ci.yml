@@ -8,6 +8,7 @@ on:
 
 env:
   NODE_VERSION: 16
+  UBUNTU_VERSION: ubuntu-20.04
   DOCKER_TEST_TAG: gillian:test
 
 jobs:
