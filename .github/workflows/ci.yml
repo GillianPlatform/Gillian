@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        operating-system: [macos-latest, ubuntu-latest]
+        operating-system: [macos-latest, env.UBUNTU_VERSION]
     runs-on: ${{ matrix.operating-system }}
     steps:
       - uses: actions/checkout@v3
@@ -76,7 +76,7 @@ jobs:
   gillian_c_tests:
     strategy:
       matrix:
-        operating-system: [macos-latest, ubuntu-latest]
+        operating-system: [macos-latest, env.UBUNTU_VERSION]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
@@ -110,7 +110,7 @@ jobs:
   # gillian_js_tests:
   #   strategy:
   #     matrix:
-  #       operating-system: [macos-latest, ubuntu-latest]
+  #       operating-system: [macos-latest, env.UBUNTU_VERSION]
   #   runs-on: ${{ matrix.operating-system }}
   #   needs: build
   #   steps:
@@ -231,7 +231,7 @@ jobs:
   #       run: "gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci"
 
   test-docker:
-    runs-on: ubuntu-latest
+    runs-on: env.UBUNTU_VERSION
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -256,7 +256,7 @@ jobs:
 
   deploy-docs:
     if: github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
+    runs-on: env.UBUNTU_VERSION
     needs: [build, gillian_c_tests, collections-c]
     strategy:
       fail-fast: false
