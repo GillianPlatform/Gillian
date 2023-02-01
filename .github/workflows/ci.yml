@@ -7,8 +7,7 @@ on:
     branches: [master]
 
 env:
-  NODE_VERSION: 16
-  UBUNTU_VERSION: ubuntu-20.04
+  NODE_VERSION: 18
   DOCKER_TEST_TAG: gillian:test
 
 jobs:
@@ -16,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        operating-system: [macos-latest, env.UBUNTU_VERSION]
+        operating-system: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     steps:
       - uses: actions/checkout@v3
@@ -76,7 +75,7 @@ jobs:
   gillian_c_tests:
     strategy:
       matrix:
-        operating-system: [macos-latest, env.UBUNTU_VERSION]
+        operating-system: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
@@ -110,7 +109,7 @@ jobs:
   # gillian_js_tests:
   #   strategy:
   #     matrix:
-  #       operating-system: [macos-latest, env.UBUNTU_VERSION]
+  #       operating-system: [macos-latest, ubuntu-latest]
   #   runs-on: ${{ matrix.operating-system }}
   #   needs: build
   #   steps:
@@ -231,7 +230,7 @@ jobs:
   #       run: "gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci"
 
   test-docker:
-    runs-on: env.UBUNTU_VERSION
+    runs-on: ubuntu-latest
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -256,7 +255,7 @@ jobs:
 
   deploy-docs:
     if: github.ref == 'refs/heads/master'
-    runs-on: env.UBUNTU_VERSION
+    runs-on: ubuntu-latest
     needs: [build, gillian_c_tests, collections-c]
     strategy:
       fail-fast: false

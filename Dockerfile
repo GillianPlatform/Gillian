@@ -1,4 +1,4 @@
-FROM node:16-bullseye
+FROM node:latest
 
 LABEL maintaner "Sacha \"Giltho\" Ayoun"
 
