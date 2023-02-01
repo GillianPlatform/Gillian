@@ -243,9 +243,9 @@ jobs:
         uses: actions/cache@v3
         with:
           path: _export
-          key: ${{ runner.os }}-esy-0.6.12-${{ hashFiles('esy.lock/index.json') }}
+          key: docker-esy-0.6.12-${{ hashFiles('esy.lock/index.json') }}
           restore-keys: |
-            ${{ runner.os }}-esy-0.6.12-
+            docker-esy-0.6.12-
       - name: build and export to docker
         uses: docker/build-push-action@v3
         with:
@@ -254,6 +254,12 @@ jobs:
           tags: ${{ env.DOCKER_TEST_TAG }}
       - name: test
         run: docker run --rm ${{ env.DOCKER_TEST_TAG }} esy test
+      - name: extract dependencies from docker
+        run: |
+          docker run --name deps ${{ env.DOCKER_TEST_TAG }} bash -c "esy cleanup . && esy export-dependencies"
+          docker cp deps:_export ./
+          docker rm deps
+        if: steps.restore-cache.outputs.cache-hit != 'true'
 
   deploy-docs:
     if: github.ref == 'refs/heads/master'
