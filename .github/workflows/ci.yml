@@ -257,7 +257,7 @@ jobs:
       - name: extract dependencies from docker
         run: |
           docker run --name deps ${{ env.DOCKER_TEST_TAG }} bash -c "esy cleanup . && esy export-dependencies"
-          docker cp deps:_export ./
+          docker cp deps:/app/Gillian/_export ./
           docker rm deps
         if: steps.restore-cache.outputs.cache-hit != 'true'
 
