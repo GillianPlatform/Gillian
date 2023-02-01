@@ -61,11 +61,13 @@ jobs:
           path: _release
       - name: Building docs
         run: "esy docs"
+        if: runner.os == 'Linux'
       - name: Sending docs artifact
         uses: actions/upload-artifact@v3
         with:
           name: ${{ runner.os }}-docs
           path: _docs
+        if: runner.os == 'Linux'
       - name: Setting dependency cache
         run: |
           esy cleanup .
