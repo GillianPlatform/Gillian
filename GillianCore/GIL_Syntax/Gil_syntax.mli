@@ -275,6 +275,8 @@ module Expr : sig
   (** Lit (Int Z.one) *)
   val one_i : t
 
+  val int_to_num : t -> t
+  val num_to_int : t -> t
   val type_ : Type.t -> t
   val list : t list -> t
   val list_length : t -> t

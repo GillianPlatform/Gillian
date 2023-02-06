@@ -1,18 +1,19 @@
 open Jsil_syntax
 open Javert_utils
-module GAsrt = Gillian.Gil_syntax.Asrt
-module GSLCmd = Gillian.Gil_syntax.SLCmd
-module GLCmd = Gillian.Gil_syntax.LCmd
-module GSpec = Gillian.Gil_syntax.Spec
-module GLemma = Gillian.Gil_syntax.Lemma
-module GPred = Gillian.Gil_syntax.Pred
-module GMacro = Gillian.Gil_syntax.Macro
-module GProc = Gillian.Gil_syntax.Proc
-module GProg = Gillian.Gil_syntax.Prog
-module GBiSpec = Gillian.Gil_syntax.BiSpec
-module GCmd = Gillian.Gil_syntax.Cmd
-module Expr = Gillian.Gil_syntax.Expr
-module Annot = Gillian.Gil_syntax.Annot
+module Gil = Gillian.Gil_syntax
+module GAsrt = Gil.Asrt
+module GSLCmd = Gil.SLCmd
+module GLCmd = Gil.LCmd
+module GSpec = Gil.Spec
+module GLemma = Gil.Lemma
+module GPred = Gil.Pred
+module GMacro = Gil.Macro
+module GProc = Gil.Proc
+module GProg = Gil.Prog
+module GBiSpec = Gil.BiSpec
+module GCmd = Gil.Cmd
+module Expr = Gil.Expr
+module Annot = Gil.Annot
 
 (**
  *  Fresh identifiers
@@ -151,6 +152,38 @@ let jsil2gil_bispec (bispec : BiSpec.t) : GBiSpec.t =
     bispec_normalised = bispec.normalised;
   }
 
+let rec jsil2gil_expr (e : Expr.t) : Expr.t =
+  let f = jsil2gil_expr in
+  match e with
+  | UnOp (op, e) -> (
+      let e = Expr.UnOp (op, f e) in
+      match op with
+      | Gil.UnOp.LstLen -> Expr.int_to_num e
+      | _ -> e)
+  | BinOp (e1, op, e2) ->
+      let e1 = f e1 in
+      let e2 =
+        match op with
+        | Gil.BinOp.LstNth -> Expr.num_to_int (f e2)
+        | _ -> f e2
+      in
+      BinOp (e1, op, e2)
+  | LstSub (lst, start, len) ->
+      let lst = f lst in
+      let start = Expr.num_to_int (f start) in
+      let len = Expr.num_to_int (f len) in
+      LstSub (lst, start, len)
+  | NOp (op, es) ->
+      let es = es |> List.map f in
+      NOp (op, es)
+  | EList es ->
+      let es = es |> List.map f in
+      EList es
+  | ESet es ->
+      let es = es |> List.map f in
+      ESet es
+  | _ -> e
+
 let jsil2core (lab : string option) (cmd : LabCmd.t) :
     (string option * string GCmd.t) list =
   match cmd with
@@ -163,8 +196,8 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
 
     *)
   | LBasic (New (x, e1, e2)) ->
-      let e1 = Option.value ~default:(Expr.Lit Empty) e1 in
-      let e2 = Option.value ~default:(Expr.Lit Null) e2 in
+      let e1 = Option.value ~default:(Expr.Lit Empty) e1 |> jsil2gil_expr in
+      let e2 = Option.value ~default:(Expr.Lit Null) e2 |> jsil2gil_expr in
       let aux1 = fresh_var () in
       let e' = Expr.BinOp (Expr.PVar aux1, LstNth, Lit (Num 0.)) in
       let cmd1 : string GCmd.t =
@@ -182,6 +215,8 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
           else: x    := l-nth(aux3, 2)
     *)
   | LBasic (Lookup (x, e1, e2)) ->
+      let e1 = jsil2gil_expr e1 in
+      let e2 = jsil2gil_expr e2 in
       let aux1 = fresh_var () in
       let aux2 = fresh_var () in
       let aux3 = fresh_var () in
@@ -217,6 +252,9 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
                 aux5 := [SetCell](l-nth(aux4, 0), l-nth(aux4, 1), aux3)
     *)
   | LBasic (Mutation (e1, e2, e3)) ->
+      let e1 = jsil2gil_expr e1 in
+      let e2 = jsil2gil_expr e2 in
+      let e3 = jsil2gil_expr e3 in
       let aux1 = fresh_var () in
       let aux2 = fresh_var () in
       let aux3 = fresh_var () in
@@ -244,6 +282,8 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
           else: aux4 := [DeleteCell](l-nth(aux3, 0), l-nth(aux3, 1))
     *)
   | LBasic (Delete (e1, e2)) ->
+      let e1 = jsil2gil_expr e1 in
+      let e2 = jsil2gil_expr e2 in
       let aux1 = fresh_var () in
       let aux2 = fresh_var () in
       let aux3 = fresh_var () in
@@ -284,6 +324,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
        else: aux3 := [DeleteObject](l-nth(aux2, 0))
     *)
   | LBasic (DeleteObj e) ->
+      let e = jsil2gil_expr e in
       let aux1 = fresh_var () in
       let aux2 = fresh_var () in
       let aux3 = fresh_var () in
@@ -315,6 +356,8 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
                 x    := not (l-nth(aux3, 2) = none)
     *)
   | LBasic (HasField (x, e1, e2)) ->
+      let e1 = jsil2gil_expr e1 in
+      let e2 = jsil2gil_expr e2 in
       let aux1 = fresh_var () in
       let aux2 = fresh_var () in
       let aux3 = fresh_var () in
@@ -339,6 +382,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
          else: x := l-nth(aux2, 1)
     *)
   | LBasic (GetFields (x, e)) ->
+      let e = jsil2gil_expr e in
       let aux1 = fresh_var () in
       let aux2 = fresh_var () in
       let then_lab = fresh_then () in
@@ -374,6 +418,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
 
     *)
   | LBasic (MetaData (x, e)) ->
+      let e = jsil2gil_expr e in
       let aux1 = fresh_var () in
       let aux2 = fresh_var () in
       let then_lab = fresh_then () in
@@ -401,12 +446,24 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       ]
   | LLogic lcmd -> [ (lab, GCmd.Logic (jsil2gil_lcmd lcmd)) ]
   | LGoto j -> [ (lab, GCmd.Goto j) ]
-  | LGuardedGoto (e, j, k) -> [ (lab, GCmd.GuardedGoto (e, j, k)) ]
-  | LCall (x, e, es, j, subst) -> [ (lab, GCmd.Call (x, e, es, j, subst)) ]
-  | LECall (x, e, es, j) -> [ (lab, GCmd.ECall (x, e, es, j)) ]
-  | LApply (x, e, j) -> [ (lab, GCmd.Apply (x, e, j)) ]
+  | LGuardedGoto (e, j, k) ->
+      let e = jsil2gil_expr e in
+      [ (lab, GCmd.GuardedGoto (e, j, k)) ]
+  | LCall (x, e, es, j, subst) ->
+      let e = jsil2gil_expr e in
+      let es = List.map jsil2gil_expr es in
+      [ (lab, GCmd.Call (x, e, es, j, subst)) ]
+  | LECall (x, e, es, j) ->
+      let e = jsil2gil_expr e in
+      let es = List.map jsil2gil_expr es in
+      [ (lab, GCmd.ECall (x, e, es, j)) ]
+  | LApply (x, e, j) ->
+      let e = jsil2gil_expr e in
+      [ (lab, GCmd.Apply (x, e, j)) ]
   | LArguments x -> [ (lab, GCmd.Arguments x) ]
-  | LPhiAssignment es -> [ (lab, GCmd.PhiAssignment es) ]
+  | LPhiAssignment es ->
+      let es = List.map (fun (x, e) -> (x, List.map jsil2gil_expr e)) es in
+      [ (lab, GCmd.PhiAssignment es) ]
   | LReturnNormal -> [ (lab, GCmd.ReturnNormal) ]
   | LReturnError -> [ (lab, GCmd.ReturnError) ]
 
