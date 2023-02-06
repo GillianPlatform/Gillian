@@ -75,6 +75,12 @@ and binop =
   | LeftShiftL
   | SignedRightShiftL
   | UnsignedRightShiftL
+  | BitwiseAndF
+  | BitwiseOrF
+  | BitwiseXorF
+  | LeftShiftF
+  | SignedRightShiftF
+  | UnsignedRightShiftF
   | M_atan2
   | M_pow
   | LstNth

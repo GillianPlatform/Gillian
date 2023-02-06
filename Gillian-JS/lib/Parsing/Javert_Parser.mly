@@ -378,12 +378,12 @@ binop_target:
   | MOD                { BinOp.FMod }
   | AND                { BinOp.BAnd }
   | OR                 { BinOp.BOr }
-  | BITWISEAND         { BinOp.BitwiseAnd }
-  | BITWISEOR          { BinOp.BitwiseOr}
-  | BITWISEXOR         { BinOp.BitwiseXor }
-  | LEFTSHIFT          { BinOp.LeftShift }
-  | SIGNEDRIGHTSHIFT   { BinOp.SignedRightShift }
-  | UNSIGNEDRIGHTSHIFT { BinOp.UnsignedRightShift }
+  | BITWISEAND         { BinOp.BitwiseAndF }
+  | BITWISEOR          { BinOp.BitwiseOrF }
+  | BITWISEXOR         { BinOp.BitwiseXorF }
+  | LEFTSHIFT          { BinOp.LeftShiftF }
+  | SIGNEDRIGHTSHIFT   { BinOp.SignedRightShiftF }
+  | UNSIGNEDRIGHTSHIFT { BinOp.UnsignedRightShiftF }
   | M_ATAN2            { BinOp.M_atan2 }
   | M_POW              { BinOp.M_pow }
   | STRCAT             { BinOp.StrCat }

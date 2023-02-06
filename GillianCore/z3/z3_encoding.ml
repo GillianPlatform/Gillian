@@ -651,6 +651,12 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
   | LeftShiftL
   | SignedRightShiftL
   | UnsignedRightShiftL
+  | BitwiseAndF
+  | BitwiseOrF
+  | BitwiseXorF
+  | LeftShiftF
+  | SignedRightShiftF
+  | UnsignedRightShiftF
   | M_atan2
   | M_pow
   | StrCat ->

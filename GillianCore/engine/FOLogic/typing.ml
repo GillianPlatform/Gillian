@@ -101,6 +101,12 @@ module Infer_types_to_gamma = struct
       | SignedRightShift
       | UnsignedRightShift
       | SignedRightShiftL
+      | BitwiseAndF
+      | BitwiseOrF
+      | BitwiseXorF
+      | LeftShiftF
+      | SignedRightShiftF
+      | UnsignedRightShiftF
       | M_atan2
       | M_pow -> (Some NumberType, Some NumberType, Some NumberType)
     in
