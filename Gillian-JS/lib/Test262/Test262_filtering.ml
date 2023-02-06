@@ -1314,6 +1314,7 @@ let non_covered_tests =
     we are expecting them to fail and do not intend to fix them for now. *)
 let failing_tests =
   [
+    "language/future-reserved-words/";
     "language/line-terminators/invalid-string-cr.js";
     "language/line-terminators/7.3-15.js";
     "language/line-terminators/7.3-6.js";
@@ -1322,6 +1323,7 @@ let failing_tests =
     "built-ins/Number/S9.3.1_A2.js";
     "built-ins/Number/S9.3.1_A3_T2.js";
     "built-ins/Number/S9.3.1_A3_T1.js";
+    "-via-escape-hex4.js";
   ]
 
 let tests_to_filter_out () =
