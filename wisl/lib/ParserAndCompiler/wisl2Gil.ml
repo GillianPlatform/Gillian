@@ -1088,6 +1088,27 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
   let gil_preds = make_hashtbl get_pred_name comp_preds in
   let gil_lemmas = make_hashtbl get_lemma_name comp_lemmas in
   let proc_names = Hashtbl.fold (fun s _ l -> s :: l) gil_procs [] in
+  let bi_specs = Hashtbl.create 1 in
+  if Gillian.Utils.(Exec_mode.biabduction_exec !Config.current_exec_mode) then
+    Hashtbl.iter
+      (fun name proc ->
+        let pre =
+          List.map
+            (fun var -> Asrt.Pure (Eq (Expr.PVar var, Expr.LVar ("#" ^ var))))
+            proc.Proc.proc_params
+          |> Asrt.star
+        in
+        let bispec =
+          BiSpec.
+            {
+              bispec_name = name;
+              bispec_params = proc.Proc.proc_params;
+              bispec_pres = [ pre ];
+              bispec_normalised = false;
+            }
+        in
+        Hashtbl.replace bi_specs name bispec)
+      gil_procs;
   Prog.
     {
       imports =
@@ -1096,8 +1117,8 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
       preds = gil_preds;
       procs = gil_procs;
       proc_names;
+      bi_specs;
       only_specs = Hashtbl.create 1;
       macros = Hashtbl.create 1;
-      bi_specs = Hashtbl.create 1;
       predecessors = Hashtbl.create 1;
     }
