@@ -1,4 +1,7 @@
+(** @canonical Gillian.Gil_syntax.Location *)
 module Location : sig
+  (** Representation of a location in a source file *)
+
   type position = { pos_line : int; pos_column : int } [@@deriving yojson]
 
   type t = { loc_start : position; loc_end : position; loc_source : string }
@@ -8,9 +11,23 @@ module Location : sig
   val pp : t Fmt.t
 end
 
-module LVar : Allocators.S with type t = string
-module ALoc : Allocators.S with type t = string
+(** @canonical Gillian.Gil_syntax.LVar *)
+module LVar : sig
+  (** Allocator for logical variable names *)
 
+  (** @inline *)
+  include Allocators.S with type t = string
+end
+
+(** @canonical Gillian.Gil_syntax.ALoc *)
+module ALoc : sig
+  (** Allocator for (sybolic) memory locations *)
+
+  (** @inline *)
+  include Allocators.S with type t = string
+end
+
+(** @canonical Gillian.Gil_syntax.Var *)
 module Var : sig
   (** GIL Variables *)
 
@@ -21,15 +38,17 @@ module Var : sig
   val str : t -> string
 end
 
+(** @canonical Gillian.Gil_syntax.Constant *)
 module Constant : sig
-  (** {b GIL Constants } *)
+  (** GIL Constants *)
+
   type t =
     | Min_float  (** The smallest float *)
     | Max_float  (** The largest float *)
-    | MaxSafeInteger  (** 2^53 - 1 **)
+    | MaxSafeInteger  (** [2^53 - 1] *)
     | Epsilon  (** Smallest positive number *)
     | Random  (** A random number between 0 and 1 *)
-    | Pi  (** The number pi *)
+    | Pi  (** The number [pi] *)
     | UTCTime  (** Current UTC time *)
     | LocalTime  (** Current local time *)
   [@@deriving yojson]
@@ -38,8 +57,10 @@ module Constant : sig
   val str : t -> string
 end
 
+(** @canonical Gillian.Gil_syntax.Type *)
 module Type : sig
-  (** {b GIL Types } *)
+  (** GIL Types *)
+
   type t =
     | UndefinedType  (** Type of Undefined *)
     | NullType  (** Type of Null *)
@@ -62,8 +83,10 @@ module Type : sig
   module Set : Set.S with type elt := t
 end
 
+(** @canonical Gillian.Gil_syntax.Literal *)
 module Literal : sig
-  (** {b GIL Literals } *)
+  (** GIL Literals *)
+
   type t =
     | Undefined  (** The literal [undefined] *)
     | Null  (** The literal [null] *)
@@ -82,24 +105,26 @@ module Literal : sig
   (** Pretty-printer *)
   val pp : t Fmt.t
 
-  (** [typeof lit] returns the type of the literal [lit] *)
+  (** Returns the type of a literal *)
   val type_of : t -> Type.t
 
-  (** [evaluate_constant c] evaluates the constant [c] *)
+  (** Evaluates a constant *)
   val evaluate_constant : Constant.t -> t
 
-  (** [from_list lst] builds a GIL list [LList lst] from the OCaml list [lst] *)
+  (** Builds a GIL list from an OCaml list *)
   val from_list : t list -> t
 
-  (** [to_list lit] returns [Some l] if [lit = LList l], and otherwise [None] *)
+  (** Expands a list literal to a list of literals, or [None] if not a list *)
   val to_list : t -> t list option
 
-  (** [base_elements lit] Returns a list of all non-list literals occurring in [lit] *)
+  (** Returns a list of all non-list literals in a literal *)
   val base_elements : t -> t list
 end
 
+(** @canonical Gillian.Gil_syntax.UnOp *)
 module UnOp : sig
-  (** {b GIL Unary Operators } *)
+  (** GIL Unary Operators *)
+
   type t =
     | IUnaryMinus  (** Integer unary minus *)
     | FUnaryMinus  (** Float unary minus *)
@@ -147,8 +172,10 @@ module UnOp : sig
   val str : t -> string
 end
 
+(** @canonical Gillian.Gil_syntax.BinOp *)
 module BinOp : sig
-  (** {b GIL Binary Operators } *)
+  (** GIL Binary Operators *)
+
   type t =
     | Equal  (** Equality *)
     | ILessThan  (** Less for integers *)
@@ -194,8 +221,10 @@ module BinOp : sig
   val str : t -> string
 end
 
+(** @canonical Gillian.Gil_syntax.NOp *)
 module NOp : sig
-  (** {b GIL N-ary Operators } *)
+  (** GIL N-ary Operators *)
+
   type t =
     | LstCat  (** List concatenation *)
     | SetUnion  (** Set union *)
@@ -206,8 +235,10 @@ module NOp : sig
   val str : t -> string
 end
 
+(** @canonical Gillian.Gil_syntax.Expr *)
 module Expr : sig
-  (** {b GIL Expressions } *)
+  (** GIL Expressions *)
+
   type t =
     | Lit of Literal.t  (** GIL literals *)
     | PVar of string  (** GIL program variables *)
@@ -220,6 +251,9 @@ module Expr : sig
     | EList of t list  (** Lists of expressions *)
     | ESet of t list  (** Sets of expressions *)
   [@@deriving yojson]
+
+  (** {2: Helpers for building expressions}
+    Operations will be optimised away if possible, e.g. [type_ (EList x)] will give [Lit (Type ListType)] directly instead of using {!UnOp.TypeOf} *)
 
   val lit : Literal.t -> t
   val num : float -> t
@@ -248,17 +282,26 @@ module Expr : sig
   val imod : t -> t -> t
 
   module Infix : sig
+    (** Floating point math *)
+
     val ( +. ) : t -> t -> t
     val ( -. ) : t -> t -> t
     val ( *. ) : t -> t -> t
     val ( /. ) : t -> t -> t
+
+    (** Integer math *)
+
     val ( + ) : t -> t -> t
     val ( - ) : t -> t -> t
     val ( * ) : t -> t -> t
     val ( / ) : t -> t -> t
+
+    (** {2: } *)
+
+    (** Boolean not *)
     val not : t -> t
 
-    (** [a @+ b] is [list_cat a b] *)
+    (** List concatenation *)
     val ( @+ ) : t -> t -> t
   end
 
@@ -350,8 +393,10 @@ module Expr : sig
   val sub_expr : t -> t -> bool
 end
 
+(** @canonical Gillian.Gil_syntax.Formula *)
 module Formula : sig
-  (** {b GIL Formulae } *)
+  (** GIL Formulae *)
+
   type t =
     | True  (** Logical true *)
     | False  (** Logical false *)
@@ -376,7 +421,7 @@ module Formula : sig
   (** Sets of formulae *)
   module Set : Set.S with type elt := t
 
-  (** Deprecated. Use {!Visitors.endo} instead *)
+  (** @deprecated Use {!Visitors.endo} instead *)
   val map :
     (t -> t * bool) option ->
     (t -> t) option ->
@@ -497,8 +542,10 @@ module Formula : sig
   end
 end
 
+(** @canonical Gillian.Gil_syntax.Asrt *)
 module Asrt : sig
-  (** {b GIL Assertions } *)
+  (** GIL Assertions *)
+
   type t =
     | Emp  (** Empty heap *)
     | Star of t * t  (** Separating conjunction *)
@@ -517,7 +564,7 @@ module Asrt : sig
   (** Sets of assertions *)
   module Set : Set.S with type elt := t
 
-  (** Deprecated, use {!Visitors.endo} instead. *)
+  (** @deprecated Use {!Visitors.endo} instead *)
   val map :
     (t -> t * bool) option ->
     (t -> t) option ->
@@ -593,8 +640,10 @@ module Asrt : sig
   end
 end
 
+(** @canonical Gillian.Gil_syntax.SLCmd *)
 module SLCmd : sig
-  (** {b GIL Separation-Logic Commands} *)
+  (** GIL Separation-Logic Commands *)
+
   type t =
     | Fold of string * Expr.t list * (string * (string * Expr.t) list) option
         (** Fold predicate *)
@@ -606,7 +655,7 @@ module SLCmd : sig
     | Invariant of Asrt.t * string list  (** Invariant *)
     | SymbExec
 
-  (** Deprecated. Use {!Visitors.endo} instead *)
+  (** @deprecated Use {!Visitors.endo} instead *)
   val map :
     (t -> t) option ->
     (Asrt.t -> Asrt.t) option ->
@@ -623,8 +672,10 @@ module SLCmd : sig
   val pp : Format.formatter -> t -> unit
 end
 
+(** @canonical Gillian.Gil_syntax.LCmd *)
 module LCmd : sig
-  (** {b GIL Logical Commands} *)
+  (** GIL Logical Commands *)
+
   type t =
     | If of Expr.t * t list * t list  (** If-then-else *)
     | Branch of Formula.t  (** Branching on a FO formual *)
@@ -633,9 +684,9 @@ module LCmd : sig
     | Assume of Formula.t  (** Assume *)
     | AssumeType of Expr.t * Type.t  (** Assume Type *)
     | FreshSVar of string  (** x := fresh_svar() *)
-    | SL of SLCmd.t  (** Separation-logic-related commands ({!type:SLCmd.t}) *)
+    | SL of SLCmd.t  (** Separation-logic command *)
 
-  (** Deprecated. Use {!Visitors} instead *)
+  (** @deprecated Use {!Visitors.endo} instead *)
   val map :
     (t -> t) option ->
     (Expr.t -> Expr.t) option ->
@@ -648,8 +699,9 @@ module LCmd : sig
   val pp : t Fmt.t
 end
 
+(** @canonical Gillian.Gil_syntax.Cmd *)
 module Cmd : sig
-  (** {b GIL Commands} *)
+  (** GIL Commands *)
 
   (** Optional bindings for procedure calls *)
   type logic_bindings_t = string * (string * Expr.t) list
@@ -697,8 +749,10 @@ module Cmd : sig
   val locs : 'a t -> Containers.SS.t
 end
 
+(** @canonical Gillian.Gil_syntax.Pred *)
 module Pred : sig
-  (** {b GIL Predicates} *)
+  (** GIL Predicates *)
+
   type t = {
     pred_name : string;  (** Name of the predicate *)
     pred_source_path : string option;
@@ -766,8 +820,9 @@ module Pred : sig
   val get : (string, t) Hashtbl.t -> string -> t
 end
 
+(** @canonical Gillian.Gil_syntax.Lemma *)
 module Lemma : sig
-  (** {b GIL Lemmas} *)
+  (** GIL Lemmas *)
 
   type spec = {
     lemma_hyp : Asrt.t;  (** Hypothesis *)
@@ -797,8 +852,10 @@ module Lemma : sig
   val add_param_bindings : t -> t
 end
 
+(** @canonical Gillian.Gil_syntax.Macro *)
 module Macro : sig
-  (** {b GIL Macros } *)
+  (** GIL Macros *)
+
   type t = {
     macro_name : string;  (** Name of the macro *)
     macro_params : string list;  (** Actual parameters *)
@@ -815,8 +872,9 @@ module Macro : sig
   val get : (string, t) Hashtbl.t -> string -> t option
 end
 
+(** @canonical Gillian.Gil_syntax.Flag *)
 module Flag : sig
-  (** {b Return flags for GIL specifications}. *)
+  (** Return-flags for GIL specifications *)
 
   type t = Normal  (** Normal return *) | Error  (** Error return *)
   [@@deriving yojson]
@@ -827,8 +885,11 @@ module Flag : sig
   module Set : Set.S with type elt := t
 end
 
+(** @canonical Gillian.Gil_syntax.Spec *)
 module Spec : sig
-  (** {b GIL specifications}. *)
+  (** GIL specifications *)
+
+  (** Single specification *)
   type st = {
     ss_pre : Asrt.t;  (** Precondition *)
     ss_posts : Asrt.t list;  (** Postcondition *)
@@ -837,9 +898,8 @@ module Spec : sig
     ss_to_verify : bool;  (** Should the spec be verified? *)
     ss_label : (string * string list) option;
   }
-  (** Single GIL specifications. *)
 
-  (** {b Full GIL specifications}. *)
+  (** Full specification *)
   type t = {
     spec_name : string;  (** Procedure/spec name *)
     spec_params : string list;  (** Procedure/spec parameters *)
@@ -874,7 +934,7 @@ module Spec : sig
   (** Makes the types of parameters explicit in the assertions *)
   val parameter_types : (string, Pred.t) Hashtbl.t -> t -> t
 
-  (** For legacy purpose, some functions use string sets instead of string lists existentials.
+  (** @deprecated For legacy purposes, some functions use string sets instead of string list existentials.
     This function allows for a smooth translation *)
   val label_vars_to_set :
     ('a * Utils.Containers.SS.elt list) option ->
@@ -887,8 +947,10 @@ module Spec : sig
   val hash_of_t : t -> string
 end
 
+(** @canonical Gillian.Gil_syntax.BiSpec *)
 module BiSpec : sig
   (** Bi-abductive specifications *)
+
   type t = {
     bispec_name : string;  (** Procedure/spec name *)
     bispec_params : string list;  (** Procedure/spec parameters *)
@@ -905,19 +967,34 @@ module BiSpec : sig
   val pp : Format.formatter -> t -> unit
 end
 
+(** @canonical Gillian.Gil_syntax.BranchCase *)
 module BranchCase : sig
+  (** Reasons for a branch in execution.
+
+    These are used to reason about execution when using the debugger.
+
+    {i Note: most of these haven't yet been properly reasoned about, so they won't be very informative. } *)
+
   type t =
-    | GuardedGoto of bool
-    | LCmd of int
-    | SpecExec of Flag.t
-    | LAction of Yojson.Safe.t list
-    | LActionFail of int
+    | GuardedGoto of bool  (** Effectively if/else; either true or false case *)
+    | LCmd of int  (** Logical command *)
+    | SpecExec of Flag.t  (** Spec execution *)
+    | LAction of Yojson.Safe.t list  (** Logical action *)
+    | LActionFail of int  (** {i Failed} logical action*)
   [@@deriving yojson, show]
 
+  (** A list of branch cases describes the path of execution.
+      
+    Every termination of a symbolic execution is uniquely identified by its branch path. *)
   type path = t list [@@deriving yojson]
 end
 
+(** @canonical Gillian.Gil_syntax.Annot *)
 module Annot : sig
+  (** Annotations for GIL commands
+      
+    This is parametric on the target language. *)
+
   module type S = sig
     type t [@@deriving yojson]
 
@@ -933,12 +1010,15 @@ module Annot : sig
   module Basic : S
 end
 
+(** @canonical Gillian.Gil_syntax.Proc *)
 module Proc : sig
-  (** Labeled procedures. Every command is annotated with a label, and the gotos indicate to which label one should jump.
+  (** Labeled GIL procedures
+  
+    Every command is annotated with a label, and the gotos indicate to which label one should jump.
     Labels can be of any type. However, we say "labeled" when the labels are strings, and "indexed" when the labels are integers.
     Most functions in Gillian that work with indexed procedures assume for efficiency that the label of the i-th command is always Some i
-    (starting from 0).
- *)
+    (starting from 0). *)
+
   type ('annot, 'label) t = {
     proc_name : string;
     proc_source_path : string option;
@@ -974,17 +1054,23 @@ module Proc : sig
     (string, ('annot, 'a) t) Hashtbl.t -> unit
 end
 
+(** @canonical Gillian.Gil_syntax.Prog *)
 module Prog : sig
+  (** A full GIL program *)
+
   type ('annot, 'label) t = {
     imports : (string * bool) list;
-    lemmas : (string, Lemma.t) Hashtbl.t;
-    preds : (string, Pred.t) Hashtbl.t;
+        (** List of imported GIL files, and whether each has to be verified *)
+    lemmas : (string, Lemma.t) Hashtbl.t;  (** Lemmas *)
+    preds : (string, Pred.t) Hashtbl.t;  (** Predicates *)
     only_specs : (string, Spec.t) Hashtbl.t;
-    procs : (string, ('annot, 'label) Proc.t) Hashtbl.t;
-    macros : (string, Macro.t) Hashtbl.t;
-    bi_specs : (string, BiSpec.t) Hashtbl.t;
-    proc_names : string list;
+        (** Specs without function definitions *)
+    procs : (string, ('annot, 'label) Proc.t) Hashtbl.t;  (** Proceudes *)
+    macros : (string, Macro.t) Hashtbl.t;  (** Macros *)
+    bi_specs : (string, BiSpec.t) Hashtbl.t;  (** Bi-abductive specs *)
+    proc_names : string list;  (** Names of the procedures *)
     predecessors : (string * int * int, int) Hashtbl.t;
+        (** Table used for Phi-assignment *)
   }
 
   (** Makes a full program *)
@@ -1127,7 +1213,10 @@ module Prog : sig
   val pp_indexed : Format.formatter -> ('a, int) t -> unit
 end
 
+(** @canonical Gillian.Gil_syntax.Visitors *)
 module Visitors : sig
+  (** Classes for traversing the GIL AST *)
+
   class ['b] endo :
     object ('b)
       constraint
