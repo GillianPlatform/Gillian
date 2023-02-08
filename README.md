@@ -16,12 +16,7 @@ The project contains:
 ```
 
 ## Documentation
-
-- For using Gillian as a library to build your analysis tool, please follow [these instructions](https://gillianplatform.github.io/docs/start)
-- For Gillian-JS, please follow [these instructions](https://gillianplatform.github.io/docs/js/intro)
-- For Gillian-C, please follow [these instructions](https://gillianplatform.github.io/docs/c/intro)
-- For developing the Gillian platform or playing with its code, please follow [these instructions](https://gillianplatform.github.io/docs/development/install)
-
+You can view the latest documentation [here](https://GillianPlatform.github.io).
 
 # License
 Gillian is licensed under the [BSD-3 License](https://choosealicense.com/licenses/bsd-3-clause/).
