@@ -166,7 +166,7 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
         };
       ];
     lemma_proof = Option.map (List.map jsil2gil_lcmd) lemma.proof;
-    lemma_variant = lemma.variant;
+    lemma_variant = Option.map jsil2gil_expr lemma.variant;
     lemma_existentials = lemma.existentials;
   }
 
@@ -183,7 +183,7 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
       List.map
         (fun (info, asrt) -> (info, jsil2gil_asrt asrt, []))
         pred.definitions;
-    pred_facts = pred.facts;
+    pred_facts = List.map jsil2gil_formula pred.facts;
     pred_pure = pred.pure;
     pred_abstract = pred.abstract;
     pred_nounfold = pred.nounfold;
@@ -221,7 +221,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let e1 = fe @@ Option.value ~default:(Expr.Lit Empty) e1 in
       let e2 = fe @@ Option.value ~default:(Expr.Lit Null) e2 in
       let aux1 = fresh_var () in
-      let e' = Expr.BinOp (Expr.PVar aux1, LstNth, Lit (Num 0.)) in
+      let e' = Expr.BinOp (Expr.PVar aux1, LstNth, Expr.zero_i) in
       let cmd1 : string GCmd.t =
         GCmd.LAction (aux1, JSILNames.alloc, [ e1; e2 ])
       in
@@ -242,7 +242,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let aux3 = fresh_var () in
       let then_lab = fresh_then () in
       let else_lab = fresh_else () in
-      let lnth_expr : Expr.t = BinOp (Expr.PVar aux3, LstNth, Lit (Num 2.)) in
+      let lnth_expr : Expr.t = BinOp (Expr.PVar aux3, LstNth, Expr.int 2) in
       let cmd1 : string GCmd.t = Assignment (aux1, fe e1) in
       let cmd2 : string GCmd.t = Assignment (aux2, fe e2) in
       let cmd3 : string GCmd.t =
@@ -277,8 +277,8 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let aux3 = fresh_var () in
       let aux4 = fresh_var () in
       let aux5 = fresh_var () in
-      let e1' = Expr.BinOp (Expr.PVar aux4, LstNth, Expr.Lit (Num 0.)) in
-      let e2' = Expr.BinOp (Expr.PVar aux4, LstNth, Expr.Lit (Num 1.)) in
+      let e1' = Expr.BinOp (Expr.PVar aux4, LstNth, Expr.zero_i) in
+      let e2' = Expr.BinOp (Expr.PVar aux4, LstNth, Expr.one_i) in
       let cmd1 : string GCmd.t = Assignment (aux1, fe e1) in
       let cmd2 : string GCmd.t = Assignment (aux2, fe e2) in
       let cmd3 : string GCmd.t = Assignment (aux3, fe e3) in
@@ -305,9 +305,9 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let aux4 = fresh_var () in
       let then_lab = fresh_then () in
       let else_lab = fresh_else () in
-      let e1' = Expr.BinOp (Expr.PVar aux3, LstNth, Lit (Num 0.)) in
-      let e2' = Expr.BinOp (Expr.PVar aux3, LstNth, Lit (Num 1.)) in
-      let e3' = Expr.BinOp (Expr.PVar aux3, LstNth, Lit (Num 2.)) in
+      let e1' = Expr.BinOp (Expr.PVar aux3, LstNth, Expr.zero_i) in
+      let e2' = Expr.BinOp (Expr.PVar aux3, LstNth, Expr.one_i) in
+      let e3' = Expr.BinOp (Expr.PVar aux3, LstNth, Expr.int 2) in
       let cmd1 : string GCmd.t = Assignment (aux1, fe e1) in
       let cmd2 : string GCmd.t = Assignment (aux2, fe e2) in
       let cmd3 : string GCmd.t =
@@ -342,8 +342,8 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let aux1 = fresh_var () in
       let aux2 = fresh_var () in
       let aux3 = fresh_var () in
-      let e1 = Expr.BinOp (Expr.PVar aux2, LstNth, Lit (Num 0.)) in
-      let e2 = Expr.BinOp (Expr.PVar aux2, LstNth, Lit (Num 1.)) in
+      let e1 = Expr.BinOp (Expr.PVar aux2, LstNth, Expr.zero_i) in
+      let e2 = Expr.BinOp (Expr.PVar aux2, LstNth, Expr.one_i) in
       let then_lab = fresh_then () in
       let else_lab = fresh_else () in
       let cmd1 : string GCmd.t = Assignment (aux1, fe e) in
@@ -375,8 +375,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let aux3 = fresh_var () in
       let e =
         Expr.UnOp
-          ( UNot,
-            BinOp (BinOp (PVar aux3, LstNth, Lit (Num 2.)), Equal, Lit Nono) )
+          (UNot, BinOp (BinOp (PVar aux3, LstNth, Expr.int 2), Equal, Lit Nono))
       in
       let cmd1 : string GCmd.t = Assignment (aux1, fe e1) in
       let cmd2 : string GCmd.t = Assignment (aux2, fe e2) in
@@ -410,7 +409,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
         Fail (JSILNames.resourceError, [ Expr.PVar aux1 ])
       in
       let cmd5 : string GCmd.t =
-        Assignment (x, BinOp (PVar aux2, LstNth, Lit (Num 1.)))
+        Assignment (x, BinOp (PVar aux2, LstNth, Expr.one_i))
       in
       [
         (lab, cmd1);
@@ -433,7 +432,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let aux2 = fresh_var () in
       let then_lab = fresh_then () in
       let else_lab = fresh_else () in
-      let e' : Expr.t = BinOp (Expr.PVar aux2, LstNth, Lit (Num 1.)) in
+      let e' : Expr.t = BinOp (Expr.PVar aux2, LstNth, Expr.one_i) in
       let cmd1 : string GCmd.t = Assignment (aux1, fe e) in
       let cmd2 : string GCmd.t =
         LAction (aux2, JSILNames.getMetadata, [ Expr.PVar aux1 ])
@@ -445,7 +444,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
         Fail (JSILNames.resourceError, [ Expr.PVar aux1 ])
       in
       let cmd5 : string GCmd.t =
-        Assignment (x, BinOp (Expr.PVar aux2, LstNth, Lit (Num 1.)))
+        Assignment (x, BinOp (Expr.PVar aux2, LstNth, Expr.one_i))
       in
       [
         (lab, cmd1);

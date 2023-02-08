@@ -679,7 +679,7 @@ var SdkSuite = function (suiteId) { };
                 #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                        #part_two, #ECKs,
                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
-                #errorMessage) *
+                #edkDef, #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(AlgorithmSuiteIdentifier : #ASIObject) * AlgorithmSuiteIdentifierObject(#ASIObject) *
@@ -695,7 +695,7 @@ var SdkSuite = function (suiteId) { };
                  #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                         #part_two, #ECKs,
                         #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
-                 #errorMessage) *
+                 #edkDef, #errorMessage) *
 
           (#definition == "Complete") *
           HeaderInfo(ret, #version, #type, #suiteId, #messageId, #ECKs, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #rawHeaderData, #headerIv, #headerAuthTag) *
@@ -715,7 +715,7 @@ var SdkSuite = function (suiteId) { };
                  #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                         #part_two, #ECKs,
                         #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
-                 #errorMessage) *
+                 #edkDef, #errorMessage) *
 
           (definition == "Incomplete") * (ret == false) *
 
@@ -736,7 +736,7 @@ var SdkSuite = function (suiteId) { };
                 #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                        #part_two, #ECKs,
                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
-                #errorMessage) *
+                #edkDef, #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(AlgorithmSuiteIdentifier : #ASIObject) * AlgorithmSuiteIdentifierObject(#ASIObject) *
@@ -753,7 +753,7 @@ var SdkSuite = function (suiteId) { };
                  #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                         #part_two, #ECKs,
                         #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
-                 #errorMessage) *
+                 #edkDef, #errorMessage) *
 
           ErrorObjectWithMessage(ret, #errorMessage) *
 
@@ -779,15 +779,15 @@ function deserializeMessageHeader(messageBuffer) {
     messageBuffer.byteLength
   )
 
-  /* @tactic unfold Header(#definition, #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #errorMessage) */
+  /* @tactic unfold Header(#definition, #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #edkDef, #errorMessage) */
   /* @tactic
       if (#definition = "Complete") then {
-        unfold CHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
+        unfold CHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #edkDef)
           [bind: (#stringId := #stringId) and (#tagLength := #tagLength)]
       } else { if (#definition = "Incomplete") then {
-          unfold IHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
+          unfold IHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #edkDef)
         } else {
-          unfold BHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #errorMessage)
+          unfold BHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #edkDef, #errorMessage)
         }
       } */
 
