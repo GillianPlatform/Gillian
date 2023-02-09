@@ -12,7 +12,7 @@ pure pred rawToUInt8(+bytes:List, x:Int) :
     (0i i<=# #b0) * (#b0 i<# 256i);
 
 pure pred rawToUInt8JS(+bytes:List, n:Num) :
-    rawToUInt8(bytes, x) * (n == (as_num x));
+    rawToUInt8(bytes, #x) * (n == (as_num #x));
 
 (* Interpretation: two bytes as an unsigned 16-bit integer *)
 @nopath
@@ -29,7 +29,7 @@ pure pred rawToUInt16(+bytes:List, +littleEndian:Bool, x:Int) :
       (x == (#b1 i* 256i) i+ #b0);
 
 pure pred rawToUInt16JS(+bytes:List, +littleEndian:Bool, n:Num) :
-    rawToUInt16(bytes, littleEndian, x) * (n == (as_num x));
+    rawToUInt16(bytes, littleEndian, #x) * (n == (as_num #x));
 
 (* Interpretation: four bytes as an unsigned 32-bit integer *)
 @nopath
@@ -50,4 +50,4 @@ pure pred rawToUInt32(+bytes:List, +littleEndian:Bool, x:Int) :
       (x == (#b3 i* 16777216i) i+ (#b2 i* 65536i) i+ (#b1 i* 256i) i+ #b0);
 
 pure pred rawToUInt32JS(+bytes:List, +littleEndian:Bool, n:Num) :
-    rawToUInt32(bytes, littleEndian, x) * (n == (as_num x));
+    rawToUInt32(bytes, littleEndian, #x) * (n == (as_num #x));
