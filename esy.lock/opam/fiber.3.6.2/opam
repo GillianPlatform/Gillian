@@ -1,6 +1,7 @@
 opam-version: "2.0"
-synopsis: "Element ordering"
-description: "Element ordering"
+synopsis: "Structured concurrency library"
+description:
+  "This library offers no backwards compatibility guarantees. Use at your own risk."
 maintainer: ["Jane Street Group, LLC <opensource@janestreet.com>"]
 authors: ["Jane Street Group, LLC <opensource@janestreet.com>"]
 license: "MIT"
@@ -10,6 +11,8 @@ bug-reports: "https://github.com/ocaml/dune/issues"
 depends: [
   "dune" {>= "3.5"}
   "ocaml" {>= "4.08.0"}
+  "stdune" {= version}
+  "dyn" {= version}
   "odoc" {with-doc}
 ]
 dev-repo: "git+https://github.com/ocaml/dune.git"
@@ -29,10 +32,10 @@ build: [
   ]
 ]
 url {
-  src: "https://github.com/ocaml/dune/releases/download/3.6.0/dune-3.6.0.tbz"
+  src: "https://github.com/ocaml/dune/releases/download/3.6.2/dune-3.6.2.tbz"
   checksum: [
-    "sha256=08a0c6c9521604e60cf36afba036ecf1b107df51eed14a2fb7eef6cfdd2bf278"
-    "sha512=71b94cb7cad4c6f998da5bd59fe3c6d0b4a4188896ae04aa0ffff7142ced0b93bce3a88c3b5b7b7c8c948d10ccfb2fb81fcf764aa421b595e061ac3049fa8870"
+    "sha256=b6d4ab848efb04aa2a325d0015d32ed4414ed7130ec7aa12f98158eff445cf3c"
+    "sha512=d0dd69ada2f1583319a2d6f679b8d49998059117c3258805ee69ae3e71d47bfab7a9c646f19b5fc43a6ccdef934eb87de5bb81205fcd60968bed8bf1790cf0a3"
   ]
 }
-x-commit-hash: "c3b75bdfd3763b39aaac8baa5104312ac701d501"
+x-commit-hash: "c939c2b0f7a470cedd189988c61cd307a3cedace"

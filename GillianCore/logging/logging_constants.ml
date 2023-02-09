@@ -8,7 +8,6 @@ module Content_type = struct
   let cmd = "cmd"
   let cmd_result = "cmd_result"
   let cmd_step = "cmd_step" (* TODO: Remove *)
-
   let unify = "unify"
   let unify_case = "unify_case"
   let unify_result = "unify_result"

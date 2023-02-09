@@ -4336,8 +4336,8 @@ and translate_statement tr_ctx e =
           with _ ->
             if (not (tcf_lab = None)) && tcf_lab = js_lab then
               make_finally_blocks_iter rest finally_blocks
-                (cur_break_vars @ [ var ])
-                errs rets outer_breaks inner_breaks conts
+                (cur_break_vars @ [ var ]) errs rets outer_breaks inner_breaks
+                conts
             else
               raise
                 (Failure

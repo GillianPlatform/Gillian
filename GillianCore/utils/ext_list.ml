@@ -227,7 +227,7 @@ let of_yojson v_of_yojson = function
       let open Syntaxes.Result in
       List.fold_left
         (fun acc el ->
-          let* acc in
+          let* acc = acc in
           let* el = v_of_yojson el in
           let () = append el acc in
           Ok acc)
