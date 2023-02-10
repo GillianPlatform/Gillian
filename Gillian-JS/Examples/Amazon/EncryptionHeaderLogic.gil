@@ -38,8 +38,8 @@ lemma CElementsElementLength(buffer, readPos, eCount, fCount, eList, prefix, ele
     if (not (#prefix = {{ }})) then {
         sep_assert (CElement(#buffer, #readPos, #fCount, #fList, #elementLength)) [bind: #elementLength];
         sep_assert (#prefix == l+ ({{ #head }}, #rest)) [bind: #head, #rest];
-        sep_assert (CElements(#buffer, (#readPos + #elementLength), (#eCount - 1), #fCount, l+ (#rest, {{#element}}, #suffix), #restESLength)) [bind: #restESLength];
-        apply CElementsElementLength(#buffer, (#readPos + #elementLength), (#eCount - 1), #fCount, l+ (#rest, {{#element}}, #suffix), #rest, #element, #suffix)
+        sep_assert (CElements(#buffer, (#readPos i+ #elementLength), (#eCount i- 1i), #fCount, l+ (#rest, {{#element}}, #suffix), #restESLength)) [bind: #restESLength];
+        apply CElementsElementLength(#buffer, (#readPos i+ #elementLength), (#eCount i- 1i), #fCount, l+ (#rest, {{#element}}, #suffix), #rest, #element, #suffix)
     }
  *]
 
@@ -59,6 +59,18 @@ lemma PrependCElementI(buffer, readPos, fCount1, fList1, eLength1, fCount2, fLis
           sep_assert (CElement(#buffer, 2i i+ (l-len #fl1) i+ #readPos, #fCount1 i- 1i, #rfl1, #reL1)) [bind: #reL1];
           apply PrependCElementI(#buffer, 2i i+ (l-len #fl1) i+ #readPos, #fCount1 i- 1i, #rfl1, #reL1, #fCount2, #fList2, #eLength2)
       }
+  *]
+
+lemma PrependCElementIJS(buffer, readPos, fCount1, fList1, eLength1, fCount2, fList2, eLength2)
+  [[
+      CElementJS(#buffer, #readPos, #fCount1, #fList1, #eLength1) *
+      IElementJS(#buffer, #readPos + #eLength1, #fCount2, #fList2, #eLength2)
+  ]]
+  [[
+      IElementJS(#buffer, #readPos, #fCount1 + #fCount2, l+ (#fList1, #fList2), #eLength1 + #eLength2)
+  ]]
+  [*
+      apply PrependCElementI(#buffer, (as_int #readPos), (as_int #fCount1), #fList1, (as_int #eLength1), (as_int #fCount2), #fList2, (as_int #eLength2))
   *]
 
 (******************************
@@ -127,6 +139,12 @@ pred IElement(+buffer : List, +readPos : Int, +fCount : Int, fList : List, eLeng
     *)
   facts: (0i i<=# readPos) and (readPos i<=# (l-len buffer)) and (0i i<# fCount) and (0i i<=# eLength);
 
+nounfold pred IElementJS(+buffer : List, +readPos : Num, +fCount : Num, fList : List, eLength : Num) :
+  IElement(buffer, #readPosI, #fCountI, fList, #eLengthI) *
+    (readPos == (as_num #readPosI)) *
+    (fCount == (as_num #fCountI)) *
+    (eLength == (as_num #eLengthI));
+
 (* Appending the first field of a given incomplete element to a complete element on its left *)
 lemma AppendFieldCI(buffer, readPos, fCount1, fList1, eLength1, fCount2, field, fList2, eLength2)
 [[
@@ -193,7 +211,13 @@ pred IElements(+buffer : List, +readPos : Int, +eCount : Int, +fCount : Int,
     (eList == l+ ({{ #fList }}, #restEList)) * (esLength == (#eLength i+ #restESLength));
   facts: (0i i<=# readPos) and (readPos i<=# (l-len buffer)) and (0i i<# eCount) and (0i i<# fCount) and (0i i<=# esLength);
 
-
+nounfold pred IElementsJS(+buffer : List, +readPos : Num, +eCount : Num, +fCount : Num,
+                          eList : List, esLength : Num) :
+  IElements(buffer, #readPosI, #eCountI, #fCountI, eList, #esLengthI) *
+    (readPos == (as_num #readPosI)) *
+    (eCount == (as_num #eCountI)) *
+    (fCount == (as_num #fCountI)) *
+    (esLength == (as_num #esLengthI));
 
 (****************************
  ****************************
@@ -228,6 +252,12 @@ pred CElement(+buffer : List, +readPos : Int, +fCount : Int, element : List, len
   *)
   facts: (0i i<=# readPos) and (0i i<=# fCount) and (0i i<=# length) and ((readPos i+ length) i<=# (l-len buffer)) and ((l-len element) == fCount)
          and ((0i i<# length) \/ (fCount == 0i));
+
+nounfold pred CElementJS(+buffer : List, +readPos : Num, +fCount : Num, element : List, length : Num) :
+  CElement(buffer, #readPosI, #fCountI, element, #lengthI) *
+    (readPos == (as_num #readPosI)) *
+    (fCount == (as_num #fCountI)) *
+    (length == (as_num #lengthI));
 
 (* The length of an element is not smaller than the length of its first field *)
 lemma CElementFirstFieldLength(buffer, readPos, fCount, field, restFields, eLength)
@@ -300,6 +330,14 @@ pred CElements(+buffer : List, +readPos : Int, +eCount : Int, +fCount : Int,
   facts: (0i i<=# readPos) and (0i i<=# eCount) and (0i i<# fCount) and (0i i<=# length) and
          ((readPos i+ length) i<=# (l-len buffer)) and (eCount == (l-len elements));
 
+nounfold pred CElementsJS(+buffer : List, +readPos : Num, +eCount : Num, +fCount : Num,
+                          elements : List, length : Num) :
+  CElements(buffer, #readPosI, #eCountI, #fCountI, elements, #lengthI) *
+    (readPos == (as_num #readPosI)) *
+    (eCount == (as_num #eCountI)) *
+    (fCount == (as_num #fCountI)) *
+    (length == (as_num #lengthI));
+
 (* Appending a complete element to the given complete elements from the right *)
 lemma CElementsAppend(buffer, readPos, eCount, fCount, eList, esLength, fList, eLength)
 [[
@@ -307,7 +345,7 @@ lemma CElementsAppend(buffer, readPos, eCount, fCount, eList, esLength, fList, e
       CElement(#buffer, #readPos i+ #esLength, #fCount, #fList, #eLength)
   ]]
   [[
-      CElements(#buffer, #readPos, #eCount i+ 1i, #fCount, l+ (#eList, {{ #fList }}), #esLength + #eLength)
+      CElements(#buffer, #readPos, #eCount i+ 1i, #fCount, l+ (#eList, {{ #fList }}), #esLength i+ #eLength)
   ]]
   [*
       apply CElementNonEmptyPositiveLength(#buffer, #readPos i+ #esLength, #fCount, #fList, #eLength);
@@ -360,7 +398,7 @@ nounfold pred Element(definition : Str, +buffer : List, +readPos : Int,
  ****************************)
 
 
-(* A general element sequene is either a complete or an incomplete element sequence *)
+(* A general element sequence is either a complete or an incomplete element sequence *)
 @nopath
 nounfold pred Elements(definition : Str, +buffer : List, +readPos : Int,
                        +eCount : Int, +fCount : Int, eList : List,
@@ -368,6 +406,15 @@ nounfold pred Elements(definition : Str, +buffer : List, +readPos : Int,
   (definition == "Complete") * CElements(buffer, readPos, eCount, fCount, eList, esLength),
   (definition == "Incomplete") * IElements(buffer, readPos, eCount, fCount, eList, esLength);
   facts: (0i i<=# readPos) and (readPos i<=# (l-len buffer)) and (0i i<=# eCount) and (0i i<# fCount) and (0i i<=# esLength);
+
+nounfold pred ElementsJS(definition : Str, +buffer : List, +readPos : Num,
+                         +eCount : Num, +fCount : Num, eList : List,
+                         esLength : Num) :
+  Elements(definition, buffer, #readPosI, #eCountI, #fCountI, eList, #esLengthI) *
+    (readPos == (as_num #readPosI)) *
+    (eCount == (as_num #eCountI)) *
+    (fCount == (as_num #fCountI)) *
+    (esLength == (as_num #esLengthI));
 
 lemma ElementsShift(buffer, readPos, eCount, fCount, shift)
   [[  Elements(#definition, #buffer, #readPos, #eCount, #fCount, #eList, #esLength) *
@@ -389,8 +436,8 @@ lemma PrependCElementsE(definition, buffer, readPos, eCount1, fCount, fList1, es
         [bind: (#element := #fList) and (#eLength := #eLength) and (#restElements := #restElements) and (#restLength := #restESLength)] ;
       if (0i i< #eCount1) then {
           apply PrependCElementsE(#definition, #buffer, #readPos i+ #eLength, #eCount1 i- 1i, #fCount, #restElements, #restESLength, #eCount2, #fList2, #esLength2);
-          unfold Elements(#definition, #buffer, (#eLength + #readPos), ((-1i i+ #eCount1) i+ #eCount2), #fCount, l+ (#restElements, #fList2), (#restESLength i+ #esLength2));
-          if (definition = "Incomplete") then {
+          unfold Elements(#definition, #buffer, (#eLength i+ #readPos), ((-1i i+ #eCount1) i+ #eCount2), #fCount, l+ (#restElements, #fList2), (#restESLength i+ #esLength2));
+          if (#definition = "Incomplete") then {
               fold IElements(#buffer, #readPos, #eCount1 i+ #eCount2, #fCount, l+ (#fList1, #fList2), #esLength1 i+ #esLength2)
           }
       }
