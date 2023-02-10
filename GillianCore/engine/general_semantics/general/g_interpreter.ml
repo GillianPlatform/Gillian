@@ -33,7 +33,7 @@ struct
   type vt = Val.t
   type st = ESubst.t
   type store_t = Store.t
-  type state_t = State.t [@@deriving yojson]
+  type state_t = State.t [@@deriving yojson, show]
   type state_err_t = State.err_t [@@deriving yojson]
   type init_data = State.init_data
   type annot = Annot.t [@@deriving yojson]
@@ -306,6 +306,18 @@ struct
   let max_branching = 100
 
   exception Interpreter_error of err_t list * State.t
+
+  let () =
+    Printexc.register_printer (function
+      | Interpreter_error (errs, state) ->
+          let msg =
+            Fmt.str
+              "Interpreter error!\n\n=== Errors ===\n%a\n\n=== State ===\n%a"
+              (Fmt.list ~sep:(Fmt.any "\n") pp_err_t)
+              errs pp_state_t state
+          in
+          Some msg
+      | _ -> None)
 
   (** Internal error, carrying a string description *)
   exception Internal_error of string
