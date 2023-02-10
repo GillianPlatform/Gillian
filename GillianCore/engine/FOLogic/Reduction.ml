@@ -1662,9 +1662,13 @@ let rec reduce_lexpr_loop
         | _ -> (
             match op with
             | Equal -> (
-                if flel = fler then Lit (Bool true)
+                if Expr.equal flel fler then Lit (Bool true)
                 else if
-                  PFS.mem pfs (Eq (flel, fler)) || PFS.mem pfs (Eq (fler, flel))
+                  PFS.exists
+                    (fun e ->
+                      Formula.equal e (Eq (flel, fler))
+                      || Formula.equal e (Eq (fler, flel)))
+                    pfs
                 then Lit (Bool true)
                 else if
                   PFS.mem pfs (Not (Eq (flel, fler)))
@@ -1675,8 +1679,14 @@ let rec reduce_lexpr_loop
                   let t2, _, _ = Typing.type_lexpr gamma fler in
                   match (t1, t2) with
                   | Some t1, Some t2 ->
-                      if t1 = t2 then def else Lit (Bool false)
-                  | _, _ -> def)
+                      if Type.equal t1 t2 then def else Lit (Bool false)
+                  | _, _ -> (
+                      match (flel, fler) with
+                      | UnOp (NumToInt, flel'), _ ->
+                          BinOp (flel', op, UnOp (IntToNum, fler))
+                      | _, UnOp (NumToInt, fler') ->
+                          BinOp (UnOp (IntToNum, flel), op, fler')
+                      | _, _ -> def))
             | (FPlus | FMinus) when lexpr_is_number ~gamma def ->
                 simplify_num_arithmetic_lexpr pfs gamma def
             | (IPlus | IMinus) when lexpr_is_int ~gamma def ->
@@ -2301,8 +2311,7 @@ let rec reduce_formula_loop
     let fe = reduce_lexpr_loop ~unification pfs gamma in
     let result : Formula.t =
       match a with
-      | Eq (e1, e2) when e1 = e2 && lexpr_is_list gamma e1 ->
-          True (* Why only lists? *)
+      | Eq (e1, e2) when Expr.equal e1 e2 -> True
       (* DEDICATED SIMPLIFICATIONS - this should probably be handled properly by Z3... *)
       | Eq (BinOp (Lit (Num x), FPlus, LVar y), LVar z)
         when x <> 0. && String.equal y z -> False
@@ -2386,6 +2395,8 @@ let rec reduce_formula_loop
                     | Expr.EList (_ :: _) | Lit (LList (_ :: _)) -> true
                     | _ -> false)
                   les -> False
+      | Eq (UnOp (NumToInt, le), re) -> Eq (le, UnOp (IntToNum, re))
+      | Eq (le, UnOp (NumToInt, re)) -> Eq (UnOp (IntToNum, le), re)
       | And (a1, a2) -> (
           let fa1 = f a1 in
           let fa2 = f a2 in
