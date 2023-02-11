@@ -386,6 +386,9 @@ let rec simple_ins_formula (kb : KB.t) (pf : Formula.t) : KB.t list =
       let ins_pf = f pf in
       let ins = List.map (fun ins -> KB.diff ins binders) ins_pf in
       List.map minimise_unifiables ins
+  | IsInt e ->
+      e |> simple_ins_expr |> List_utils.remove_duplicates
+      |> List.map minimise_unifiables
 
 (** [ins_outs_formula kb pf] returns a list of possible ins-outs pairs
     for a given formula [pf] under a given knowledge base [kb] *)

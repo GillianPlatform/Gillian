@@ -288,6 +288,7 @@ module Expr : sig
   val typeof : t -> t
   val fmod : t -> t -> t
   val imod : t -> t -> t
+  val type_eq : t -> Type.t -> t
 
   module Infix : sig
     (** Floating point math *)
@@ -421,6 +422,7 @@ module Formula : sig
     | SetMem of Expr.t * Expr.t  (** Set membership *)
     | SetSub of Expr.t * Expr.t  (** Set subsetness *)
     | ForAll of (string * Type.t option) list * t  (** Forall *)
+    | IsInt of Expr.t  (** IsInt e <=> (e : float) /\ (e % 1. == 0) *)
   [@@deriving yojson, eq]
 
   val of_bool : bool -> t
@@ -1340,6 +1342,7 @@ module Visitors : sig
            ; visit_FLessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
            ; visit_ILess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
            ; visit_ILessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_IsInt : 'c -> Formula.t -> Expr.t -> Formula.t
            ; visit_ListType : 'c -> Type.t -> Type.t
            ; visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
            ; visit_Loc : 'c -> Literal.t -> string -> Literal.t
@@ -1600,6 +1603,7 @@ module Visitors : sig
       method visit_FLessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
       method visit_ILess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
       method visit_ILessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+      method visit_IsInt : 'c -> Formula.t -> Expr.t -> Formula.t
       method visit_ListType : 'c -> Type.t -> Type.t
       method visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
       method visit_Loc : 'c -> Literal.t -> string -> Literal.t
@@ -1854,6 +1858,7 @@ module Visitors : sig
            ; visit_FLessEq : 'c -> Expr.t -> Expr.t -> 'f
            ; visit_ILess : 'c -> Expr.t -> Expr.t -> 'f
            ; visit_ILessEq : 'c -> Expr.t -> Expr.t -> 'f
+           ; visit_IsInt : 'c -> Expr.t -> 'f
            ; visit_ILessThan : 'c -> 'f
            ; visit_ILessThanEqual : 'c -> 'f
            ; visit_FLessThan : 'c -> 'f
@@ -2082,6 +2087,7 @@ module Visitors : sig
       method visit_FLessEq : 'c -> Expr.t -> Expr.t -> 'f
       method visit_ILess : 'c -> Expr.t -> Expr.t -> 'f
       method visit_ILessEq : 'c -> Expr.t -> Expr.t -> 'f
+      method visit_IsInt : 'c -> Expr.t -> 'f
       method visit_ILessThan : 'c -> 'f
       method visit_ILessThanEqual : 'c -> 'f
       method visit_FLessThan : 'c -> 'f
@@ -2324,6 +2330,7 @@ module Visitors : sig
            ; visit_FLessEq : 'c -> Expr.t -> Expr.t -> unit
            ; visit_ILess : 'c -> Expr.t -> Expr.t -> unit
            ; visit_ILessEq : 'c -> Expr.t -> Expr.t -> unit
+           ; visit_IsInt : 'c -> Expr.t -> unit
            ; visit_ListType : 'c -> unit
            ; visit_Lit : 'c -> Literal.t -> unit
            ; visit_Loc : 'c -> string -> unit
@@ -2551,6 +2558,7 @@ module Visitors : sig
       method visit_FLessEq : 'c -> Expr.t -> Expr.t -> unit
       method visit_ILess : 'c -> Expr.t -> Expr.t -> unit
       method visit_ILessEq : 'c -> Expr.t -> Expr.t -> unit
+      method visit_IsInt : 'c -> Expr.t -> unit
       method visit_ListType : 'c -> unit
       method visit_Lit : 'c -> Literal.t -> unit
       method visit_Loc : 'c -> string -> unit

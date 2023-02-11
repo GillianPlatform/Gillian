@@ -130,6 +130,7 @@ let imod a b =
   | _ -> BinOp (a, IMod, b)
 
 let type_ t = Lit (Type t)
+let type_eq e t = BinOp (typeof e, Equal, type_ t)
 
 module Infix = struct
   let ( +. ) a b =

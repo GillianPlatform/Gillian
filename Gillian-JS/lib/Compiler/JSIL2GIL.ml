@@ -86,6 +86,7 @@ let rec jsil2gil_formula (f : Gil.Formula.t) : Gil.Formula.t =
   | SetMem (e1, e2) -> SetMem (fe e1, fe e2)
   | SetSub (e1, e2) -> SetSub (fe e1, fe e2)
   | ForAll (qts, f) -> ForAll (qts, ff f)
+  | IsInt e -> IsInt (fe e)
 
 let rec jsil2gil_asrt (a : Asrt.t) : GAsrt.t =
   let f = jsil2gil_asrt in

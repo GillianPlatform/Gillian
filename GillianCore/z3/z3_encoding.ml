@@ -830,6 +830,7 @@ and encode_assertion ~(gamma : tyenv) (a : Formula.t) : Encoding.t =
   | SetSub (le1, le2) ->
       Set.mk_subset ctx (get_set (fe le1)) (get_set (fe le2)) >- SetType
   | ForAll (bt, a) -> encode_forall ~gamma bt a
+  | IsInt e -> Arithmetic.Real.mk_is_integer ctx (get_num (fe e)) >- BooleanType
 
 (* ****************
    * SATISFIABILITY *

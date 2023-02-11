@@ -957,6 +957,7 @@ let rec reduce_lexpr_loop
     (* Base sets *)
     | ESet les -> ESet (Expr.Set.elements (Expr.Set.of_list (List.map f les)))
     | UnOp (NumToInt, UnOp (IntToNum, le)) -> f le
+    | UnOp (IntToNum, UnOp (NumToInt, le)) when PFS.mem pfs (IsInt le) -> f le
     (* Number-to-string-to-number-to-string-to... *)
     | UnOp (ToNumberOp, UnOp (ToStringOp, le)) -> (
         let fle = f le in
