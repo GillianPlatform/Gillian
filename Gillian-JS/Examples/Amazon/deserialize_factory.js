@@ -140,10 +140,10 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
           } */
       if (readPos + 2 > dataView.byteLength)
         /* @tactic
-            apply PrependCElementI(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remElList, #remElLength);
-            assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remElsLength);
-            assert Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
-            apply PrependCElementsE(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remElsList, #remElsLength)
+            apply PrependCElementIJS(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remElList, #remElLength);
+            assert IElementJS(#view, #outerLoopReadPos, #fCount, #fList, #remElsLength);
+            assert ElementsJS(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+            apply PrependCElementsEJS(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remElsList, #remElsLength)
         */
         return false
 
@@ -152,10 +152,10 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
 
       if (readPos + length > dataView.byteLength)
         /* @tactic
-            apply PrependCElementI(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remElList, #remElLength);
-            assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remElsLength);
-            assert Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
-            apply PrependCElementsE(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remElsList, #remElsLength)
+            apply PrependCElementIJS(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remElList, #remElLength);
+            assert IElementJS(#view, #outerLoopReadPos, #fCount, #fList, #remElsLength);
+            assert ElementsJS(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+            apply PrependCElementsEJS(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remElsList, #remElsLength)
         */
         return false
 
@@ -172,17 +172,17 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
     }
 
     /* @tactic
-        unfold CElement(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength);
-        apply CElementsAppend(#view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #doneElList, #doneElLength) */
+        unfold CElementJS(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength);
+        apply CElementsAppendJS(#view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #doneElList, #doneElLength) */
     elements.push(element);
   }
 
   /* @tactic
-      unfold Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+      unfold ElementsJS(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
       if (#definition = "Complete") then {
-          unfold CElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength)
+          unfold CElementsJS(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength)
       } else {
-          unfold IElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength)
+          unfold IElementsJS(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength)
       } */
   return { elements, readPos }
 }
