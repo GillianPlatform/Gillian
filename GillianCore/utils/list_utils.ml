@@ -180,3 +180,10 @@ let map_results f l =
         | Error e -> Error e)
   in
   aux [] l
+
+let for_alli f l =
+  let rec aux i = function
+    | [] -> true
+    | x :: xs -> if f i x then aux (i + 1) xs else false
+  in
+  aux 0 l
