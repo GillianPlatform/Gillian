@@ -160,7 +160,7 @@ let rec learn_expr
   | UnOp (IUnaryMinus, e') -> f (UnOp (IUnaryMinus, e)) e'
   | UnOp (FUnaryMinus, e') -> f (UnOp (FUnaryMinus, e)) e'
   (* Converting int to num is invertible *)
-  | UnOp (IntToNum, e') -> f (UnOp (NumToInt, e)) e'
+  | UnOp (IntToNum, e') -> f (UnOp (NumToInt, base_expr)) e'
   (* TODO: Finish the remaining invertible unary operators *)
   | UnOp _ -> []
   (* EList is iteratively invertible *)
