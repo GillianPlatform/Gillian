@@ -1,4 +1,9 @@
-module Gil_syntax = Gil_syntax
+(** Modules for the GIL intermediate language and its syntax *)
+module Gil_syntax = struct
+  (** @inline *)
+  include Gil_syntax
+end
+
 module Gil_parsing = Gil_parsing
 module CommandLine = CommandLine
 module Symbolic = Engine.Symbolic

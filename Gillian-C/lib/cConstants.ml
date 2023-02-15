@@ -199,7 +199,6 @@ module Prefix = struct
   let switch_lab = "switch"
   let case_lab = "case"
   let loc = "$l" (* This should rather be imported from Gillian directly *)
-
   let internal_preds = "i__"
   let generated_preds = "p__"
   let lloc = "#loc"

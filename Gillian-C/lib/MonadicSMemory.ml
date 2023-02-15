@@ -426,7 +426,7 @@ module Mem = struct
       let++ map =
         List.fold_left
           (fun acc (old_loc, new_loc) ->
-            let** acc in
+            let** acc = acc in
             Logging.verbose (fun fmt ->
                 fmt "SHOULD Merge locs: %s --> %a" old_loc Expr.pp new_loc);
             Logging.tmi (fun fmt -> fmt "IN MEMORY: %a" pp_full acc);

@@ -1527,7 +1527,7 @@ let merge ~old_tree ~new_tree =
               let++ tree =
                 List.fold_left
                   (fun acc (tree_node : Tree.t) ->
-                    let** acc in
+                    let** acc = acc in
                     let replace_node _ = Ok tree_node in
                     let rebuild_parent = Tree.of_children in
                     let++ _, tree =

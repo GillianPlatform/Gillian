@@ -526,7 +526,7 @@ struct
 
   let init proc_name tl_ast exec_data =
     let gil_state = Gil.get_state () in
-    let+ tl_ast in
+    let+ tl_ast = tl_ast in
     let partial_cmds = Hashtbl.create 0 in
     let id_map = Hashtbl.create 0 in
     let before_partial = None in

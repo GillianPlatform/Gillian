@@ -5,10 +5,10 @@
 type t = TypeDef__.constant =
   | Min_float  (** The smallest float *)
   | Max_float  (** The largest float *)
-  | MaxSafeInteger  (** {% 2^53 - 1 %} **)
+  | MaxSafeInteger  (** {m 2^{53} - 1} *)
   | Epsilon  (** Smallest positive number *)
   | Random  (** A random number between 0 and 1 *)
-  | Pi  (** The number {% \pi %} *)
+  | Pi  (** The number {m \pi} *)
   | UTCTime  (** Current UTC time *)
   | LocalTime  (** Current local time *)
 [@@deriving eq, ord]

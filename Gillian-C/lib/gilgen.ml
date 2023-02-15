@@ -229,7 +229,6 @@ let is_assert_call = is_call Builtin_Functions.assert_f
 let is_assume_call = is_call Builtin_Functions.assume_f
 let is_printf_call = is_call "printf"
 let last_invariant = ref None (* Dirty hack *)
-
 let set_invariant l = last_invariant := Some l
 
 let get_invariant () =

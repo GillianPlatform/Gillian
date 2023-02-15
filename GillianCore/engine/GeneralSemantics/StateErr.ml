@@ -5,7 +5,8 @@ type ('mem_err, 'value) err_t =
   | EPure of Formula.t (* Missing formula that should be true *)
   | EVar of Var.t (* Undefined variable *)
   | EAsrt of ('value list * Formula.t * Asrt.t list list)
-  | EOther of string (* We want all errors to be proper errors - this is a temporary placeholder *)
+  | EOther of string
+    (* We want all errors to be proper errors - this is a temporary placeholder *)
 [@@deriving yojson, show]
 
 let get_recovery_vals

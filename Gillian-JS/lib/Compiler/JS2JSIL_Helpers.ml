@@ -127,7 +127,6 @@ let putValueName = "i__putValue"
 (* 8.7.2             *)
 
 let createDefaultObjectName = "create_default_object" (* 15.2.2.1          *)
-
 let toObjectName = "i__toObject"
 
 (* 9.9               *)
@@ -137,9 +136,7 @@ let toStringName = "i__toString"
 (* 9.8               *)
 
 let toStringComputedName = "i__toStringComputed" (* ???               *)
-
 let deletePropertyName = "deleteProperty" (* 8.12.7            *)
-
 let syntaxErrorName = "SyntaxError"
 
 (* 15.1.4.13         *)
@@ -161,7 +158,6 @@ let toNumberName = "i__toNumber"
 (* 9.3 - Table 12    *)
 
 let toPrimitiveName = "i__toPrimitive" (* 9.1 - Table 10    *)
-
 let toInt32Name = "i__toInt32"
 
 (* 9.5               *)
@@ -171,7 +167,6 @@ let toUInt32Name = "i__toUint32"
 (* 9.6               *)
 
 let abstractComparisonName = "i__abstractComparison" (* 11.8.5            *)
-
 let hasPropertyName = "hasProperty"
 
 (* 8.12.6            *)
@@ -181,9 +176,7 @@ let abstractEqualityComparisonName = "i__abstractEquality"
 (* 11.9.3            *)
 
 let strictEqualityComparisonName = "i__strictEquality" (* 11.9.6            *)
-
 let defineOwnPropertyName = "defineOwnProperty" (* 8.12.9            *)
-
 let checkAssignmentErrorsName = "i__checkAssignmentErrors"
 let checkParametersName = "i__checkParameters"
 let getEnumFieldsName = "i__getAllEnumerableFields"
