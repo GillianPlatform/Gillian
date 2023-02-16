@@ -127,9 +127,8 @@ module Phase = struct
   let tmi = start TMI
 
   let stop id =
-    if will_log_on_any_reporter Logging_constants.Content_type.phase then (
-      Report_builder.end_phase id;
-      !reporters |> List.iter Reporter.end_phase)
+    Report_builder.end_phase id;
+    if Option.is_some id then !reporters |> List.iter Reporter.end_phase
 
   let with_phase level ?title ?severity f =
     let phase = start level ?title ?severity () in
