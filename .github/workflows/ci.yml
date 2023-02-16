@@ -265,7 +265,7 @@ jobs:
   deploy-docs:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    needs: [build, gillian_c_tests, collections-c]
+    needs: [build]
     strategy:
       fail-fast: false
     steps:
