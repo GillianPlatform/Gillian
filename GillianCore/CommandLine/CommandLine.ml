@@ -101,10 +101,7 @@ struct
     in
     let c = Arg.(list & conv (parse, print)) in
     let default : reporter_info list =
-      [
-        { name = "file"; reporter = L.file_reporter };
-        { name = "html"; reporter = L.html_reporter };
-      ]
+      [ { name = "html"; reporter = L.html_reporter } ]
     in
     let doc =
       "Controls which reporters are used when logging. The value REPORTERS \
