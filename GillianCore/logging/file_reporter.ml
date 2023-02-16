@@ -28,6 +28,9 @@ let log (report : Report.t) : unit =
           Format.fprintf formatter "@,@?"
       | _ -> ())
 
+let start_phase () = ()
+let end_phase () = ()
+
 let wrap_up () =
   match !out_channel with
   | None -> ()

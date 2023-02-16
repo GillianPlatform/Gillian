@@ -56,6 +56,7 @@ racket/compiled
 *.aux
 *.out
 *.log
+*.log.html
 tutorial/main.pdf
 
 # esy + docker stuff

@@ -12,6 +12,12 @@ module type S = sig
   (** Logs a report *)
   val log : Report.t -> unit
 
+  (** Called when a phase starts *)
+  val start_phase : unit -> unit
+
+  (** Called when a phase ends *)
+  val end_phase : unit -> unit
+
   (** Runs any clean up code *)
   val wrap_up : unit -> unit
 end
@@ -32,6 +38,14 @@ let will_log (reporter : t) (type_ : string) : bool =
 let log (reporter : t) (report : Report.t) : unit =
   let (module R) = reporter in
   R.log report
+
+let start_phase (reporter : t) : unit =
+  let (module R) = reporter in
+  R.start_phase ()
+
+let end_phase (reporter : t) : unit =
+  let (module R) = reporter in
+  R.end_phase ()
 
 (** Calls a given reporter module's `wrap_up` function *)
 let wrap_up (reporter : t) : unit =

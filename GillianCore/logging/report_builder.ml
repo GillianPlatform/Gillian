@@ -75,9 +75,13 @@ let make
 
 let start_phase level ?title ?severity () =
   if Mode.should_log level then (
+    let msg =
+      match title with
+      | None -> "*** Phase ***"
+      | Some title -> "*** Phase: " ^ title ^ " ***"
+    in
     let report =
-      make ?title
-        ~content:(Loggable.make_string "*** Phase ***")
+      make ?title ~content:(Loggable.make_string msg)
         ~type_:Logging_constants.Content_type.phase ?severity ()
     in
     set_parent report.id;

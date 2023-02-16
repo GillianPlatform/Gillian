@@ -1,11 +1,20 @@
 include Loggable_intf
 
+type 'a log_f = Format.formatter -> 'a -> unit
+
 (** Calls the pretty print function of a loggable on its content *)
 let pp (loggable : t) (formatter : Format.formatter) =
   match loggable with
   | L (t, content) ->
       let (module T) = t in
       T.pp formatter content
+
+(** Gets logger funcs for HTML output *)
+let pp_html (loggable : t) (formatter : Format.formatter) =
+  match loggable with
+  | L (t, content) ->
+      let (module T) = t in
+      T.pp_html formatter content
 
 (** Converts a loggable to Yojson *)
 let loggable_to_yojson = function
@@ -16,14 +25,17 @@ let loggable_to_yojson = function
 (** Returns a loggable, given the required functions and content *)
 let make
     (type a)
-    (pp : Format.formatter -> a -> unit)
+    (pp : a log_f)
+    ?(pp_html : a log_f option)
     (of_yojson : Yojson.Safe.t -> (a, string) result)
     (to_yojson : a -> Yojson.Safe.t)
     (content : a) : t =
+  let pp_html = Option.value ~default:pp pp_html in
   let module M = struct
     type t = a
 
     let pp = pp
+    let pp_html = pp_html
     let of_yojson = of_yojson
     let to_yojson = to_yojson
   end in

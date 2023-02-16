@@ -29,4 +29,6 @@ let log (report : Report.t) =
     Log_database.store_report ~id ~title ~elapsed_time ~previous ~parent
       ~content ~severity ~type_
 
+let start_phase () = ()
+let end_phase () = ()
 let wrap_up () = Log_database.close_db ()

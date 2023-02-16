@@ -4,6 +4,9 @@ module type S = sig
 
   (** Pretty printer for the type *)
   val pp : Format.formatter -> t -> unit
+
+  (** {i HTML} pretty printer for the type *)
+  val pp_html : Format.formatter -> t -> unit
 end
 
 module Types = struct
@@ -21,10 +24,12 @@ module type Intf = sig
   type t
 
   val pp : t -> Format.formatter -> unit
+  val pp_html : t -> Format.formatter -> unit
   val loggable_to_yojson : t -> Yojson.Safe.t
 
   val make :
     (Format.formatter -> 'a -> unit) ->
+    ?pp_html:(Format.formatter -> 'a -> unit) ->
     (Yojson.Safe.t -> ('a, string) result) ->
     ('a -> Yojson.Safe.t) ->
     'a ->

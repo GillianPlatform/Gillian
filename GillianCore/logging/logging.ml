@@ -15,6 +15,7 @@ let () =
 
 let file_reporter : Reporter.t = (module File_reporter)
 let database_reporter : Reporter.t = (module Database_reporter)
+let html_reporter : Reporter.t = (module Html_reporter)
 let reporters = ref []
 
 let initialize (reporters_to_initialize : (module Reporter.S) list) =
@@ -106,34 +107,39 @@ module Parent = struct
     with_id id f
 end
 
-let start_phase level ?title ?severity () =
-  if will_log_on_any_reporter Logging_constants.Content_type.phase then
-    let phase_report = Report_builder.start_phase level ?title ?severity () in
-    match phase_report with
-    | Some phase_report ->
-        let () = log_on_all_reporters phase_report in
-        Some phase_report.id
-    | None -> None
-  else None
-
 module Phase = struct
-  let normal = start_phase Normal
-  let verbose = start_phase Verbose
-  let tmi = start_phase TMI
+  let start level ?title ?severity () =
+    if will_log_on_any_reporter Logging_constants.Content_type.phase then
+      let phase_report = Report_builder.start_phase level ?title ?severity () in
+      let id =
+        match phase_report with
+        | Some phase_report ->
+            let () = log_on_all_reporters phase_report in
+            let () = !reporters |> List.iter Reporter.start_phase in
+            Some phase_report.id
+        | None -> None
+      in
+      id
+    else None
+
+  let normal = start Normal
+  let verbose = start Verbose
+  let tmi = start TMI
 
   let stop id =
-    if will_log_on_any_reporter Logging_constants.Content_type.phase then
-      Report_builder.end_phase id
+    if will_log_on_any_reporter Logging_constants.Content_type.phase then (
+      Report_builder.end_phase id;
+      !reporters |> List.iter Reporter.end_phase)
 
   let with_phase level ?title ?severity f =
-    let phase = start_phase level ?title ?severity () in
+    let phase = start level ?title ?severity () in
     let result =
       try Ok (f ())
       with e ->
         Printf.printf "Original Backtrace:\n%s" (Printexc.get_backtrace ());
         Error e
     in
-    Report_builder.end_phase phase;
+    stop phase;
     match result with
     | Ok ok -> ok
     | Error e -> raise e

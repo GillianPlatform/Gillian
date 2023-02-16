@@ -91,6 +91,7 @@ struct
     let parse : string -> (reporter_info, [> `Msg of string ]) Result.t =
       function
       | "file" -> Ok { name = "file"; reporter = L.file_reporter }
+      | "html" -> Ok { name = "html"; reporter = L.html_reporter }
       | "database" | "db" ->
           Ok { name = "database"; reporter = L.database_reporter }
       | other -> Error (`Msg ("unknown value \"" ^ other ^ "\""))
@@ -100,7 +101,10 @@ struct
     in
     let c = Arg.(list & conv (parse, print)) in
     let default : reporter_info list =
-      [ { name = "file"; reporter = L.file_reporter } ]
+      [
+        { name = "file"; reporter = L.file_reporter };
+        { name = "html"; reporter = L.html_reporter };
+      ]
     in
     let doc =
       "Controls which reporters are used when logging. The value REPORTERS \

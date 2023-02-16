@@ -48,6 +48,7 @@ module Reporter : sig
 end
 
 val database_reporter : Reporter.t
+val html_reporter : Reporter.t
 val file_reporter : Reporter.t
 
 (** @canonical Gillian.Logging.Loggable *)
