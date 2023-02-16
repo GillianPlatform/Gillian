@@ -1,0 +1,104 @@
+html {
+  --lh: 1rem;
+  --side-color: #919191;
+  line-height: var(--lh);
+}
+
+.container {
+  margin-left: 50px;
+  border-left: 1px solid var(--side-color);
+  padding-left: 4px;
+}
+
+.phase {
+  border-left: 1px solid black;
+  padding-left: 4px;
+  overflow: hidden;
+}
+
+.phase :nth-child(1) {
+  margin-top: 0;
+}
+
+.phase-button {
+  position: absolute;
+  left: 50px;
+  width: 1.2em;
+  height: 1.2em;
+  background-color: black;
+  color: white;
+  font-size: 0.8em;
+  border-radius: 100%;
+  box-sizing: border-box;
+  padding-left: 1px;
+  padding-top: 1px;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.phase-button:has(+ .phase:empty),
+.phase-button[collapsed] + .phase > .phase-button{
+  display: none;
+}
+
+.phase-button::before {
+  content: "▼";
+}
+
+.phase-button[collapsed] {
+  padding-top: 0px;
+  padding-left: 3px;
+}
+
+.phase-button[collapsed]::before {
+  content: "▶";
+}
+
+.phase-button:hover + .phase {
+  border-color: red !important;
+}
+
+.phase-button[collapsed] + .phase {
+  height: 0;
+  border-top: 1px solid black;
+}
+
+pre {
+  margin: 0;
+}
+
+.msg {
+  margin-top: 1em;
+}
+
+.msg:hover {
+  background-color: #f5f5f5;
+}
+
+.msg[collapsed] {
+  --max-lines: 1;
+  height: calc(var(--lh) * var(--max-lines));
+  overflow-y: hidden;
+  border-bottom: 1px dotted black;
+}
+
+.msg-line {
+  min-height: var(--lh);
+}
+
+.line-num {
+  position: absolute;
+  color: var(--side-color);
+  left: 5px;
+  width: 40px;
+  text-align: right;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.msg[collapsed] .line-num:not(:first-of-type),
+.phase-button[collapsed] + .phase .line-num {
+  display: none;
+}
