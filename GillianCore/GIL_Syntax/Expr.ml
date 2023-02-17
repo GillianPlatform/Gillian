@@ -361,8 +361,7 @@ let alocs (le : t) : SS.t = Visitors.Collectors.aloc_collector#visit_expr () le
 (** Get all the concrete locations in --e-- *)
 let clocs (le : t) : SS.t = Visitors.Collectors.cloc_collector#visit_expr () le
 
-let locs (le : t) : SS.t =
-  Visitors.Collectors.loc_collector#visit_expr SS.empty le
+let locs (le : t) : SS.t = Visitors.Collectors.loc_collector#visit_expr () le
 
 (** Get all substitutables in --e-- *)
 let substitutables (le : t) : SS.t =

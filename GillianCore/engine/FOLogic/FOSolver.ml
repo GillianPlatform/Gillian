@@ -93,8 +93,13 @@ let check_satisfiability
          (Sys.time () -. t); *)
     result
 
-let sat ~unification ~pfs ~gamma formulae : bool =
-  check_satisfiability ~unification (formulae @ PFS.to_list pfs) gamma
+let sat ~unification ~pfs ~gamma formula : bool =
+  let relevant_info =
+    (Formula.pvars formula, Formula.lvars formula, Formula.locs formula)
+  in
+  check_satisfiability ~unification ~relevant_info
+    (formula :: PFS.to_list pfs)
+    gamma
 
 (** ************
   * ENTAILMENT *
