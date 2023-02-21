@@ -84,6 +84,10 @@ let check_satisfiability
   in
   let axioms = get_axioms fs gamma in
   let fs = Formula.Set.union fs axioms in
+  L.verbose (fun m ->
+      m "CheckSat: With Axioms: %a"
+        (Fmt.Dump.iter Formula.Set.iter Fmt.nop Formula.pp)
+        fs);
   if Formula.Set.is_empty fs then true
   else if Formula.Set.mem False fs then false
   else
@@ -94,12 +98,17 @@ let check_satisfiability
     result
 
 let sat ~unification ~pfs ~gamma formula : bool =
-  let relevant_info =
-    (Formula.pvars formula, Formula.lvars formula, Formula.locs formula)
-  in
-  check_satisfiability ~unification ~relevant_info
-    (formula :: PFS.to_list pfs)
-    gamma
+  let formula = Reduction.reduce_formula ~unification ~pfs ~gamma formula in
+  match formula with
+  | True -> true
+  | False -> false
+  | _ ->
+      let relevant_info =
+        (Formula.pvars formula, Formula.lvars formula, Formula.locs formula)
+      in
+      check_satisfiability ~unification ~relevant_info
+        (formula :: PFS.to_list pfs)
+        gamma
 
 (** ************
   * ENTAILMENT *
