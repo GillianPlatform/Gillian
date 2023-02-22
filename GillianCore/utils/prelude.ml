@@ -1,4 +1,6 @@
-(** Most-used helper functions, [Stdlib] extensions *)
+(** @canonical Gillian.Utils.Prelude
+  
+  Most-used helper functions, [Stdlib] extensions *)
 
 (** [Option] pretty-printer *)
 let pp_option pp = Fmt.option ~none:(Fmt.any "None") pp
@@ -181,9 +183,16 @@ module Stack = struct
     `List (to_seq s |> Seq.map elem_to_yojson |> List.of_seq)
 end
 
+(** @canonical Gillian.Utils.Containers.SS *)
 module SS = Containers.SS
+
+(** @canonical Gillian.Utils.Containers.SI *)
 module SI = Containers.SI
+
+(** @canonical Gillian.Utils.Containers.SN *)
 module SN = Containers.SN
+
+(** @canonical Gillian.Utils.Syntaxes *)
 module Syntaxes = Syntaxes
 
 (** Converts an [Option] to yojson *)

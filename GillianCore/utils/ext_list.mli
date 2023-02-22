@@ -1,4 +1,6 @@
-(** A variable-length list
+(** @canonical Gillian.Utils.Ext_list
+
+  A variable-length list
   
   A lot of functions here are self-explanatory analogs of {!List} functions *)
 

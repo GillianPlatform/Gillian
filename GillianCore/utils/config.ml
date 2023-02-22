@@ -89,6 +89,7 @@ let set_runtime_paths, get_runtime_paths =
   let get () = !runtime_paths in
   (set, get)
 
+(** @canonical Gillian.Utils.Config.Verification *)
 module Verification = struct
   let exact = ref false
   let procs_to_verify = ref ([] : string list)

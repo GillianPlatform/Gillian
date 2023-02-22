@@ -1,5 +1,3 @@
-(**/**)
-
 module type S = sig
   type t [@@deriving yojson, eq, ord]
 
@@ -16,8 +14,6 @@ module type S_with_stringify = sig
   val of_string : string -> t
 end
 
-(**/**)
-
 module type Intf = sig
   (** Allocators's resetters should be registered so that Bulk Execution can reset them at every start *)
   val register_resetter : (unit -> unit) -> unit
@@ -25,15 +21,28 @@ module type Intf = sig
   (** Resets all registered allocators *)
   val reset_all : unit -> unit
 
-  module type S = S
-  module type S_with_stringify = S_with_stringify
+  (** @canonical Gillian.Utils.Allocators.S *)
+  module type S = sig
+    (** @inline *)
+    include S
+  end
 
-  (** A basic int allocator
+  (** @canonical Gillian.Utils.Allocators.S_with_stringify *)
+  module type S_with_stringify = sig
+    (** @inline *)
+    include S_with_stringify
+  end
+
+  (** @canonical Gillian.Utils.Allocators.Basic
+  
+    A basic int allocator
       
     Automatically registers a resetter *)
   module Basic () : S_with_stringify with type t = int
 
-  (** Wraps an allocator [A] with a string prefix
+  (** @canonical Gillian.Utils.Allocators.Make_with_prefix
+  
+    Wraps an allocator [A] with a string prefix
       
     Assumes that [A]'s resetter has already been registered *)
   module Make_with_prefix

@@ -22,8 +22,10 @@ end
 
 (**/**)
 
-(** A {!Set} of [string]s*)
+(** @canonical Gillian.Utils.Containers.SS *)
 module SS = struct
+  (** A {!Set} of [string]s *)
+
   include Set.Make (String)
 
   let to_yojson (set : t) : Yojson.Safe.t =
@@ -46,11 +48,23 @@ module SS = struct
     | _ -> Fmt.error "Invalid json set: %a" Yojson.Safe.pp yojson
 end
 
-(** A {!Set} of [int]s*)
-module SI = Set.Make (MyInt)
+(** @canonical Gillian.Utils.Containers.SI *)
+module SI = struct
+  (** A {!Set} of [int]s *)
 
-(** A {!Set} of [bool]s*)
-module SB = Set.Make (MyBool)
+  include Set.Make (MyInt)
+end
 
-(** A {!Set} of [float]s*)
-module SN = Set.Make (MyNumber)
+(** @canonical Gillian.Utils.Containers.SB *)
+module SB = struct
+  (** A {!Set} of [bool]s *)
+
+  include Set.Make (MyBool)
+end
+
+(** @canonical Gillian.Utils.Containers.SN *)
+module SN = struct
+  (** A {!Set} of [float]s *)
+
+  include Set.Make (MyNumber)
+end
