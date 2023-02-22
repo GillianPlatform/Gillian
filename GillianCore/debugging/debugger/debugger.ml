@@ -254,7 +254,7 @@ functor
         | None -> ()
 
       (* TODO: Find a common place to put the three functions here which are
-         duplicated in CommandLine.ml *)
+         duplicated in Command_line.ml *)
       let convert_other_imports oi =
         List.map
           (fun (ext, f) ->

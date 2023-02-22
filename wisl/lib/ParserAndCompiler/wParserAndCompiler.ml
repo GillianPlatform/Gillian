@@ -31,7 +31,7 @@ let parse_file file =
 let compile = Wisl2Gil.compile
 
 let create_compilation_result path prog wprog =
-  let open CommandLine.ParserAndCompiler in
+  let open Command_line.ParserAndCompiler in
   let open IncrementalAnalysis in
   let source_files = SourceFiles.make () in
   let () = SourceFiles.add_source_file source_files ~path in
@@ -57,4 +57,4 @@ let initialize _ = ()
 let env_var_import_path = Some WConfig.import_env_var
 
 module TargetLangOptions =
-  Gillian.CommandLine.ParserAndCompiler.Dummy.TargetLangOptions
+  Gillian.Command_line.ParserAndCompiler.Dummy.TargetLangOptions

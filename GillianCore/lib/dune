@@ -6,7 +6,7 @@
   utils
   gil_syntax
   gil_parsing
-  commandLine
+  command_line
   bulk
   ;gillian_bulk_rely
   logging

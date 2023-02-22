@@ -1,5 +1,7 @@
-(** This defines an interface that allows a user to indicate how to parse their own programming language,
-    preprocess the obtained language and compile it to GIL (type [Prog.t]) *)
+(** @canonical Gillian.Command_line.ParserAndCompiler
+
+  This defines an interface that allows a user to indicate how to parse their own programming language,
+  preprocess the obtained language and compile it to GIL (type [Prog.t]) *)
 
 type ('annot, 'tl_ast, 'init_data) compiled_progs = {
   gil_progs : (string * ('annot, string) Prog.t) list;
@@ -8,6 +10,7 @@ type ('annot, 'tl_ast, 'init_data) compiled_progs = {
   init_data : 'init_data;
 }
 
+(** @canonical Gillian.Command_line.ParserAndCompiler.S *)
 module type S = sig
   module TargetLangOptions : sig
     (** Command line options specific to the target language. *)
