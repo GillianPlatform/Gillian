@@ -4,7 +4,14 @@ module Gil_syntax = struct
   include Gil_syntax
 end
 
-module Gil_parsing = Gil_parsing
+(** The GIL parser
+    
+  This is parametric over target languages, via the [Annot] module parameter. *)
+module Gil_parsing = struct
+  (** @inline *)
+  include Gil_parsing
+end
+
 module CommandLine = CommandLine
 module Symbolic = Engine.Symbolic
 module Concrete = Engine.Concrete

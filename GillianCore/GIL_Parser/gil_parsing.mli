@@ -1,6 +1,7 @@
+(** @canonical Gillian.Gil_parsing.Make *)
 module Make (Annot : Annot.S) : sig
   type parsing_result = {
-    labeled_prog : (Annot.t, string) Prog.t;
+    labeled_prog : (Annot.t, string) Prog.t;  (** The parsed program *)
     init_data : Yojson.Safe.t;  (** Will be `Null if no [init_data] is parsed *)
   }
 
@@ -29,8 +30,9 @@ module Make (Annot : Annot.S) : sig
       write the GIL programs to file. *)
   val cache_labelled_progs : (string * (Annot.t, string) Prog.t) list -> unit
 
-  (** Takes a lexbuf and simply parses a literal *)
+  (** Parses a [Literal.t] from a lexbuf; raises [Failure] if parsing fails. *)
   val parse_literal : Lexing.lexbuf -> Literal.t
 
+  (** Parses a [Expr.t] from a lexbuf; raises [Failure] if parsing fails. *)
   val parse_expression : Lexing.lexbuf -> Expr.t
 end
