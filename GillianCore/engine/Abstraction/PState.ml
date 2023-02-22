@@ -16,7 +16,7 @@ module type S = sig
     init_data:init_data ->
     store:store_t ->
     pfs:PFS.t ->
-    gamma:TypEnv.t ->
+    gamma:Type_env.t ->
     spec_vars:SS.t ->
     unit ->
     t
@@ -105,7 +105,7 @@ module Make
       ~(init_data : init_data)
       ~(store : store_t)
       ~(pfs : PFS.t)
-      ~(gamma : TypEnv.t)
+      ~(gamma : Type_env.t)
       ~(spec_vars : SS.t)
       () : t =
     let state = State.make_s ~init_data ~store ~pfs ~gamma ~spec_vars in

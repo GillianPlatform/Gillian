@@ -1,9 +1,10 @@
+(** @canonical Gillian.Symbolic.Type_env
+  
+  Interface for typing environments *)
+
 open SVal
 
-(*************************************
- * Interface for Typing Environments *
-**************************************)
-
+(** @canonical Gillian.Symbolic.Type_env.t *)
 type t [@@deriving yojson]
 
 val as_hashtbl : t -> (string, Type.t) Hashtbl.t

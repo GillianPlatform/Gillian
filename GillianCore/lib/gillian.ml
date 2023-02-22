@@ -18,7 +18,11 @@ module Command_line = struct
   include Command_line
 end
 
-module Symbolic = Engine.Symbolic
+module Symbolic = struct
+  (** @inline *)
+  include Engine.Symbolic
+end
+
 module Concrete = Engine.Concrete
 module General = Engine.General
 module Bulk = Bulk

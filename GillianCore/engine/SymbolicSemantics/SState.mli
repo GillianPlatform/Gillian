@@ -5,13 +5,13 @@ module type S = sig
     init_data:init_data ->
     store:store_t ->
     pfs:PFS.t ->
-    gamma:TypEnv.t ->
+    gamma:Type_env.t ->
     spec_vars:SS.t ->
     t
 
   val init : init_data -> t
   val clear_resource : t -> t
-  val get_typ_env : t -> TypEnv.t
+  val get_typ_env : t -> Type_env.t
   val get_pfs : t -> PFS.t
   val get_lvars_for_exact : t -> Var.Set.t
 

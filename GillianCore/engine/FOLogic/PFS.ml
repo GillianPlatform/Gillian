@@ -1,14 +1,7 @@
-(** GIL Pure Formulae *)
-
 open SVal
 module L = Logging
 
 type t = Formula.t Ext_list.t [@@deriving yojson]
-
-(**************************************)
-(** Pure formulae functions          **)
-
-(**************************************)
 
 let init () : t = Ext_list.make ()
 

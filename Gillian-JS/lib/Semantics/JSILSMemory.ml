@@ -7,7 +7,7 @@ module SSubst = Gillian.Symbolic.Subst
 module L = Logging
 module SVal = Gillian.Symbolic.Values
 module PFS = Gillian.Symbolic.PureContext
-module TypEnv = Gillian.Symbolic.TypEnv
+module Type_env = Gillian.Symbolic.Type_env
 open Gillian.Logic
 
 module M = struct
@@ -124,7 +124,7 @@ module M = struct
   let get_loc_name pfs gamma =
     Gillian.Logic.FOSolver.resolve_loc_name ~pfs ~gamma
 
-  let fresh_loc ?(loc : vt option) (pfs : PFS.t) (gamma : TypEnv.t) :
+  let fresh_loc ?(loc : vt option) (pfs : PFS.t) (gamma : Type_env.t) :
       string * vt * Formula.t list =
     match loc with
     | Some loc -> (
@@ -170,7 +170,7 @@ module M = struct
   let set_cell
       (heap : t)
       (pfs : PFS.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (loc : vt)
       (prop : vt)
       (v : vt) : action_ret =
@@ -181,7 +181,7 @@ module M = struct
   let get_cell
       (heap : t)
       (pfs : PFS.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (loc : vt)
       (prop : vt) : action_ret =
     let loc_name = get_loc_name pfs gamma loc in
@@ -330,7 +330,7 @@ module M = struct
   let remove_cell
       (heap : t)
       (pfs : PFS.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (loc : vt)
       (prop : vt) : action_ret =
     let heap = SHeap.copy heap in
@@ -347,7 +347,7 @@ module M = struct
   let set_domain
       (heap : t)
       (pfs : PFS.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (loc : vt)
       (dom : vt) : action_ret =
     let loc_name, _, new_pfs = fresh_loc ~loc pfs gamma in
@@ -359,7 +359,7 @@ module M = struct
         SHeap.set heap loc_name fv_list (Some dom) mtdt);
     Ok [ (heap, [], new_pfs, []) ]
 
-  let get_metadata (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) :
+  let get_metadata (heap : t) (pfs : PFS.t) (gamma : Type_env.t) (loc : vt) :
       action_ret =
     let loc_name = get_loc_name pfs gamma loc in
 
@@ -390,7 +390,7 @@ module M = struct
   let set_metadata
       (heap : t)
       (pfs : PFS.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (loc : vt)
       (mtdt : vt) : action_ret =
     L.tmi (fun m -> m "Trying to set metadata.");
@@ -407,7 +407,7 @@ module M = struct
     L.tmi (fun m -> m "Done setting metadata.");
     Ok [ (heap, [], new_pfs, []) ]
 
-  let delete_object (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) :
+  let delete_object (heap : t) (pfs : PFS.t) (gamma : Type_env.t) (loc : vt) :
       action_ret =
     let loc_name = get_loc_name pfs gamma loc in
 
@@ -422,7 +422,7 @@ module M = struct
   let get_partial_domain
       (heap : t)
       (pfs : PFS.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (loc : vt)
       (e_dom : vt) : action_ret =
     let loc_name = get_loc_name pfs gamma loc in
@@ -478,7 +478,7 @@ module M = struct
     in
     result
 
-  let get_full_domain (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) :
+  let get_full_domain (heap : t) (pfs : PFS.t) (gamma : Type_env.t) (loc : vt) :
       action_ret =
     let loc_name = get_loc_name pfs gamma loc in
     let f loc_name =
@@ -512,7 +512,7 @@ module M = struct
     in
     result
 
-  let remove_domain (heap : t) (pfs : PFS.t) (gamma : TypEnv.t) (loc : vt) :
+  let remove_domain (heap : t) (pfs : PFS.t) (gamma : Type_env.t) (loc : vt) :
       action_ret =
     let f (loc_name : string) : unit =
       Option.fold
@@ -529,7 +529,7 @@ module M = struct
       (action : string)
       (heap : t)
       (pfs : PFS.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (args : vt list) : action_ret =
     if action = JSILNames.getCell then
       match args with
@@ -611,8 +611,10 @@ module M = struct
   type fix_result =
     c_fix_t list * Formula.t list * Containers.SS.t * GAsrt.t list
 
-  let complete_fix_simple_js (pfs : PFS.t) (gamma : TypEnv.t) (i_fix : i_fix_t)
-      : fix_result list =
+  let complete_fix_simple_js
+      (pfs : PFS.t)
+      (gamma : Type_env.t)
+      (i_fix : i_fix_t) : fix_result list =
     match i_fix with
     | FLoc v ->
         (* Get a fresh location *)
@@ -677,7 +679,7 @@ module M = struct
   (* Fix completion: simple *)
   let complete_fix_simple_jsil
       (pfs : PFS.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (i_fix : i_fix_t) : fix_result list =
     if !Js_config.js then complete_fix_simple_js pfs gamma i_fix
     else
@@ -712,13 +714,15 @@ module M = struct
           ]
       | FPure f -> [ ([], [ f ], Containers.SS.empty, []) ]
 
-  let complete_fix_full_js (pfs : PFS.t) (gamma : TypEnv.t) (i_fix : i_fix_t) :
-      fix_result list =
+  let complete_fix_full_js (pfs : PFS.t) (gamma : Type_env.t) (i_fix : i_fix_t)
+      : fix_result list =
     match i_fix with
     | _ -> complete_fix_simple_js pfs gamma i_fix
 
-  let complete_fix_full_jsil (pfs : PFS.t) (gamma : TypEnv.t) (i_fix : i_fix_t)
-      : fix_result list =
+  let complete_fix_full_jsil
+      (pfs : PFS.t)
+      (gamma : Type_env.t)
+      (i_fix : i_fix_t) : fix_result list =
     if !Js_config.js then complete_fix_full_js pfs gamma i_fix
     else
       match i_fix with
@@ -757,7 +761,7 @@ module M = struct
       ?simple_fix:(sf = true)
       (_ : t)
       (pfs : PFS.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (err : err_t) : fix_result list =
     let pp_fix_result ft res =
       let open Fmt in
@@ -815,7 +819,8 @@ module M = struct
 
     completed_fixes
 
-  let apply_fix (mem : t) (pfs : PFS.t) (gamma : TypEnv.t) (fix : c_fix_t) : t =
+  let apply_fix (mem : t) (pfs : PFS.t) (gamma : Type_env.t) (fix : c_fix_t) : t
+      =
     match fix with
     (* Missing metadata: create new, no new variables *)
     | CFMetadata (l, v) -> (

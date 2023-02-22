@@ -9,8 +9,8 @@ exception Break
 
 let rec infer_types_to_gamma
     (flag : bool)
-    (gamma : TypEnv.t)
-    (new_gamma : TypEnv.t)
+    (gamma : Type_env.t)
+    (new_gamma : Type_env.t)
     (le : Expr.t)
     (tt : Type.t) : bool =
   let f = infer_types_to_gamma flag gamma new_gamma in
@@ -21,10 +21,10 @@ let rec infer_types_to_gamma
   (* Variables are reverse-typable if they are already typable *)
   (* with the target type or if they are not typable           *)
   | LVar var | PVar var -> (
-      match (TypEnv.get gamma var, TypEnv.get new_gamma var) with
+      match (Type_env.get gamma var, Type_env.get new_gamma var) with
       | Some t, None | None, Some t -> t = tt
       | None, None ->
-          TypEnv.update new_gamma var tt;
+          Type_env.update new_gamma var tt;
           true
       | Some t1, Some t2 -> t1 = t2)
   (* Abstract locations are reverse-typable if the target type is ObjectType *)
@@ -127,9 +127,9 @@ let rec infer_types_to_gamma
 
 let reverse_type_lexpr
     (flag : bool)
-    (gamma : TypEnv.t)
-    (e_types : (Expr.t * Type.t) list) : TypEnv.t option =
-  let new_gamma = TypEnv.init () in
+    (gamma : Type_env.t)
+    (e_types : (Expr.t * Type.t) list) : Type_env.t option =
+  let new_gamma = Type_env.init () in
   let ret =
     List.fold_left
       (fun ac (e, t) -> ac && infer_types_to_gamma flag gamma new_gamma e t)
@@ -137,14 +137,14 @@ let reverse_type_lexpr
   in
   if ret then Some new_gamma else None
 
-let safe_extend_gamma (gamma : TypEnv.t) (le : Expr.t) (t : Type.t) : unit =
+let safe_extend_gamma (gamma : Type_env.t) (le : Expr.t) (t : Type.t) : unit =
   let new_gamma = reverse_type_lexpr true gamma [ (le, t) ] in
   match new_gamma with
-  | Some new_gamma -> TypEnv.extend gamma new_gamma
+  | Some new_gamma -> Type_env.extend gamma new_gamma
   | None ->
       let msg =
         Fmt.str "ERROR: Safe Extend Gamma: Untypable expression: %a in @[%a@]"
-          Expr.pp le TypEnv.pp gamma
+          Expr.pp le Type_env.pp gamma
       in
       L.fail msg
 
@@ -183,7 +183,7 @@ let rec infer_types_expr gamma le : unit =
   (* FIXME: Specify cases *)
   | _ -> ()
 
-let rec infer_types_formula (gamma : TypEnv.t) (a : Formula.t) : unit =
+let rec infer_types_formula (gamma : Type_env.t) (a : Formula.t) : unit =
   let f = infer_types_formula gamma in
   let e = safe_extend_gamma gamma in
 
@@ -214,7 +214,7 @@ let rec infer_types_formula (gamma : TypEnv.t) (a : Formula.t) : unit =
 (* Type checking *)
 (*****************)
 
-let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
+let rec type_lexpr (gamma : Type_env.t) (le : Expr.t) :
     Type.t option * bool * Formula.t list =
   let f = type_lexpr gamma in
   let def_pos (ot : Type.t option) = (ot, true, []) in
@@ -224,7 +224,7 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
     let outcome = reverse_type_lexpr true gamma [ (le, tt) ] in
     Option.fold
       ~some:(fun new_gamma ->
-        TypEnv.extend gamma new_gamma;
+        Type_env.extend gamma new_gamma;
         (Some tt, true, constraints))
       ~none:def_neg outcome
   in
@@ -253,7 +253,7 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
     (* Literals are always typable *)
     | Lit lit -> def_pos (Some (Literal.type_of lit))
     (* Variables are typable if in gamma, otherwise no, but typing continues *)
-    | LVar var | PVar var -> def_pos (TypEnv.get gamma var)
+    | LVar var | PVar var -> def_pos (Type_env.get gamma var)
     (* Abstract locations are always typable, by construction *)
     | ALoc _ -> def_pos (Some ObjectType)
     (* Lists are always typable *)
@@ -418,8 +418,8 @@ let rec type_lexpr (gamma : TypEnv.t) (le : Expr.t) :
 
   result
 
-let te_of_list (vt : (Expr.t * Type.t) list) : TypEnv.t option =
-  let result = TypEnv.init () in
+let te_of_list (vt : (Expr.t * Type.t) list) : Type_env.t option =
+  let result = Type_env.init () in
   try
     List.iter
       (fun (e, t) ->
@@ -428,10 +428,10 @@ let te_of_list (vt : (Expr.t * Type.t) list) : TypEnv.t option =
             let t' = Literal.type_of l in
             if t <> t' then raise Break
         | LVar x | PVar x ->
-            if TypEnv.mem result x then (
-              let t' = TypEnv.get_unsafe result x in
+            if Type_env.mem result x then (
+              let t' = Type_env.get_unsafe result x in
               if t <> t' then raise Break)
-            else TypEnv.update result x t
+            else Type_env.update result x t
         | _ -> (
             let t', _, _ = type_lexpr result e in
             match t' with
@@ -441,22 +441,22 @@ let te_of_list (vt : (Expr.t * Type.t) list) : TypEnv.t option =
     Some result
   with Break -> None
 
-let naively_infer_type_information (pfs : PFS.t) (gamma : TypEnv.t) : unit =
+let naively_infer_type_information (pfs : PFS.t) (gamma : Type_env.t) : unit =
   PFS.iter
     (fun a ->
       match (a : Formula.t) with
       | Eq (LVar x, le) | Eq (le, LVar x) ->
-          if not (TypEnv.mem gamma x) then
+          if not (Type_env.mem gamma x) then
             let le_type, _, _ = type_lexpr gamma le in
             Option.fold
-              ~some:(fun x_type -> TypEnv.update gamma x x_type)
+              ~some:(fun x_type -> Type_env.update gamma x x_type)
               ~none:() le_type
       | Eq (UnOp (TypeOf, LVar x), Lit (Type t))
-      | Eq (Lit (Type t), UnOp (TypeOf, LVar x)) -> TypEnv.update gamma x t
+      | Eq (Lit (Type t), UnOp (TypeOf, LVar x)) -> Type_env.update gamma x t
       | _ -> ())
     pfs
 
-let substitution_in_place (subst : SSubst.t) (gamma : TypEnv.t) : unit =
+let substitution_in_place (subst : SSubst.t) (gamma : Type_env.t) : unit =
   let ve_pairs : (Expr.t * Expr.t) list = SSubst.to_list subst in
   let et_pairs : (Expr.t * Type.t) list =
     List.fold_left
@@ -465,11 +465,11 @@ let substitution_in_place (subst : SSubst.t) (gamma : TypEnv.t) : unit =
         | Expr.LVar x | PVar x ->
             Option.fold
               ~some:(fun x_type ->
-                TypEnv.remove gamma x;
+                Type_env.remove gamma x;
                 (e, x_type) :: ac)
-              ~none:ac (TypEnv.get gamma x)
+              ~none:ac (Type_env.get gamma x)
         | _ -> ac)
       [] ve_pairs
   in
   let gamma' = reverse_type_lexpr true gamma et_pairs in
-  Option.fold ~some:(fun gamma' -> TypEnv.extend gamma gamma') ~none:() gamma'
+  Option.fold ~some:(fun gamma' -> Type_env.extend gamma gamma') ~none:() gamma'

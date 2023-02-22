@@ -1,4 +1,8 @@
-(** Type of Gillian pure formulae *)
+(** @canonical Gillian.Symbolic.PureContext
+    
+GIL pure formulae *)
+
+(** @canonical Gillian.Symbolic.PureContext.t *)
 type t [@@deriving yojson]
 
 (** [init ()] returns a fresh empty collection of pure formulae *)
