@@ -62,6 +62,7 @@ struct
                   (Gil_parsing));
         (module Act_console.Make (ID) (PC) (Abductor) (Gil_parsing));
         (module Debug_verification_console.Make (PC) (Debug_adapter));
+        (module Bulk_console.Make (PC) (Runners));
       ]
     in
     let cmds =
