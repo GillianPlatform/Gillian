@@ -43,31 +43,32 @@ struct
     in
     return_to_exit (valid_concrete_result ret)
 
+  let parse_eprog files already_compiled =
+    if not already_compiled then (
+      let progs =
+        ParserAndCompiler.get_progs_or_fail PC.pp_err
+          (PC.parse_and_compile_files files)
+      in
+      let e_progs, init_data = (progs.gil_progs, progs.init_data) in
+      Gil_parsing.cache_labelled_progs (List.tl e_progs);
+      (snd (List.hd e_progs), init_data))
+    else
+      let Gil_parsing.{ labeled_prog; init_data } =
+        Gil_parsing.parse_eprog_from_file (List.hd files)
+      in
+      let init_data =
+        match ID.of_yojson init_data with
+        | Ok d -> d
+        | Error e -> failwith e
+      in
+      (labeled_prog, init_data)
+
   let exec files already_compiled debug outfile_opt no_heap entry_point () =
     let () = Config.current_exec_mode := Concrete in
     let () = PC.initialize Concrete in
     let () = Config.no_heap := no_heap in
     let () = Config.entry_point := entry_point in
-    let e_prog, init_data =
-      if not already_compiled then (
-        let progs =
-          ParserAndCompiler.get_progs_or_fail PC.pp_err
-            (PC.parse_and_compile_files files)
-        in
-        let e_progs, init_data = (progs.gil_progs, progs.init_data) in
-        Gil_parsing.cache_labelled_progs (List.tl e_progs);
-        (snd (List.hd e_progs), init_data))
-      else
-        let Gil_parsing.{ labeled_prog; init_data } =
-          Gil_parsing.parse_eprog_from_file (List.hd files)
-        in
-        let init_data =
-          match ID.of_yojson init_data with
-          | Ok d -> d
-          | Error e -> failwith e
-        in
-        (labeled_prog, init_data)
-    in
+    let e_prog, init_data = parse_eprog files already_compiled in
     let () =
       burn_gil ~init_data:(ID.to_yojson init_data) ~pp_prog:Prog.pp_labeled
         e_prog outfile_opt

@@ -48,33 +48,36 @@ struct
     let doc = "Exact verification" in
     Arg.(value & flag & info [ "exv"; "exact" ] ~doc)
 
+  let parse_eprog files already_compiled =
+    if not already_compiled then
+      let progs =
+        ParserAndCompiler.get_progs_or_fail PC.pp_err
+          (PC.parse_and_compile_files files)
+      in
+      let e_progs = progs.gil_progs in
+      let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
+      let e_prog = snd (List.hd e_progs) in
+      let source_files = progs.source_files in
+      (e_prog, progs.init_data, Some source_files)
+    else
+      let e_prog, init_data =
+        let Gil_parsing.{ labeled_prog; init_data } =
+          Gil_parsing.parse_eprog_from_file (List.hd files)
+        in
+        let init_data =
+          match ID.of_yojson init_data with
+          | Ok d -> d
+          | Error e -> failwith e
+        in
+        (labeled_prog, init_data)
+      in
+      (e_prog, init_data, None)
+
   let process_files files already_compiled outfile_opt no_unfold incremental =
     Verification.start_time := Sys.time ();
     Fmt.pr "Parsing and compiling...\n@?";
     let e_prog, init_data, source_files_opt =
-      if not already_compiled then
-        let progs =
-          ParserAndCompiler.get_progs_or_fail PC.pp_err
-            (PC.parse_and_compile_files files)
-        in
-        let e_progs = progs.gil_progs in
-        let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
-        let e_prog = snd (List.hd e_progs) in
-        let source_files = progs.source_files in
-        (e_prog, progs.init_data, Some source_files)
-      else
-        let e_prog, init_data =
-          let Gil_parsing.{ labeled_prog; init_data } =
-            Gil_parsing.parse_eprog_from_file (List.hd files)
-          in
-          let init_data =
-            match ID.of_yojson init_data with
-            | Ok d -> d
-            | Error e -> failwith e
-          in
-          (labeled_prog, init_data)
-        in
-        (e_prog, init_data, None)
+      parse_eprog files already_compiled
     in
     let () =
       burn_gil ~pp_prog:Prog.pp_labeled ~init_data:(ID.to_yojson init_data)

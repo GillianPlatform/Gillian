@@ -16,16 +16,17 @@ struct
   module Common_args = Common_args.Make (PC)
   open Common_args
 
-  let run (prog : PC.Annot.t UP.prog) init_data incremental source_files =
-    let open ResultsDir in
-    let open ChangeTracker in
-    let run_main prog =
+  module Run = struct
+    open ResultsDir
+    open ChangeTracker
+
+    let run_main prog init_data =
       ignore
         (SInterpreter.evaluate_proc
            (fun x -> x)
            prog !Config.entry_point [] (SState.init init_data))
-    in
-    if incremental && prev_results_exist () then
+
+    let run_incr source_files prog init_data =
       (* Only re-run program if transitive callees of main proc have changed *)
       let cur_source_files =
         match source_files with
@@ -34,8 +35,9 @@ struct
       in
       let prev_source_files, prev_call_graph = read_symbolic_results () in
       let proc_changes =
-        get_sym_changes prog.prog ~prev_source_files ~prev_call_graph
-          ~cur_source_files
+        get_sym_changes
+          UP.(prog.prog)
+          ~prev_source_files ~prev_call_graph ~cur_source_files
       in
       let changed_procs =
         SS.of_list
@@ -43,56 +45,68 @@ struct
          @ proc_changes.dependent_procs)
       in
       if SS.mem !Config.entry_point changed_procs then
-        let () = run_main prog in
+        let () = run_main prog init_data in
         let cur_call_graph = SInterpreter.call_graph in
         let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
         write_symbolic_results cur_source_files cur_call_graph ~diff
       else write_symbolic_results cur_source_files prev_call_graph ~diff:""
-    else
+
+    let rerun_all source_files prog init_data =
       (* Always re-run program *)
       let cur_source_files =
         Option.value ~default:(SourceFiles.make ()) source_files
       in
-      let () = run_main prog in
+      let () = run_main prog init_data in
       let call_graph = SInterpreter.call_graph in
       write_symbolic_results cur_source_files call_graph ~diff:""
 
+    let f (prog : PC.Annot.t UP.prog) init_data incremental source_files =
+      if incremental && prev_results_exist () then
+        run_incr source_files prog init_data
+      else rerun_all source_files prog init_data
+  end
+
+  let run = Run.f
+
+  let parse_eprog files already_compiled =
+    if not already_compiled then
+      let () =
+        L.verbose (fun m ->
+            m
+              "@\n\
+               *** Stage 1: Parsing program in original language and compiling \
+               to Gil. ***@\n")
+      in
+      let progs =
+        ParserAndCompiler.get_progs_or_fail PC.pp_err
+          (PC.parse_and_compile_files files)
+      in
+      let init_data = progs.init_data in
+      let e_progs = progs.gil_progs in
+      let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
+      let e_prog = snd (List.hd e_progs) in
+      let source_files = progs.source_files in
+      (e_prog, init_data, Some source_files)
+    else
+      let () =
+        L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
+      in
+      let e_prog, init_data =
+        let Gil_parsing.{ labeled_prog; init_data } =
+          Gil_parsing.parse_eprog_from_file (List.hd files)
+        in
+        let init_data =
+          match ID.of_yojson init_data with
+          | Ok d -> d
+          | Error e -> failwith e
+        in
+        (labeled_prog, init_data)
+      in
+      (e_prog, init_data, None)
+
   let process_files files already_compiled outfile_opt incremental =
     let e_prog, init_data, source_files_opt =
-      if not already_compiled then
-        let () =
-          L.verbose (fun m ->
-              m
-                "@\n\
-                 *** Stage 1: Parsing program in original language and \
-                 compiling to Gil. ***@\n")
-        in
-        let progs =
-          ParserAndCompiler.get_progs_or_fail PC.pp_err
-            (PC.parse_and_compile_files files)
-        in
-        let init_data = progs.init_data in
-        let e_progs = progs.gil_progs in
-        let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
-        let e_prog = snd (List.hd e_progs) in
-        let source_files = progs.source_files in
-        (e_prog, init_data, Some source_files)
-      else
-        let () =
-          L.verbose (fun m -> m "@\n*** Stage 1: Parsing Gil program. ***@\n")
-        in
-        let e_prog, init_data =
-          let Gil_parsing.{ labeled_prog; init_data } =
-            Gil_parsing.parse_eprog_from_file (List.hd files)
-          in
-          let init_data =
-            match ID.of_yojson init_data with
-            | Ok d -> d
-            | Error e -> failwith e
-          in
-          (labeled_prog, init_data)
-        in
-        (e_prog, init_data, None)
+      parse_eprog files already_compiled
     in
     let () =
       burn_gil ~pp_prog:Prog.pp_labeled ~init_data:(ID.to_yojson init_data)
