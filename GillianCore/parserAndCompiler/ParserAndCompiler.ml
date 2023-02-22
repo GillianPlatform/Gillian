@@ -5,6 +5,17 @@ type ('annot, 'tl_ast, 'init_data) compiled_progs = {
   init_data : 'init_data;
 }
 
+let get_progs_or_fail pp_err = function
+  | Ok progs -> (
+      match progs.gil_progs with
+      | [] ->
+          Fmt.pr "Error: expected at least one GIL program\n";
+          exit 1
+      | _ -> progs)
+  | Error err ->
+      Fmt.pr "Error during compilation to GIL:\n%a" pp_err err;
+      exit 1
+
 module type S = sig
   module TargetLangOptions : sig
     (** Command line options specific to the target language. *)

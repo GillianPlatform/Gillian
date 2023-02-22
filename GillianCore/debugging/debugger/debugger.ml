@@ -236,32 +236,6 @@ functor
         in
         (labeled_prog, init_data, None, None)
 
-      let burn_gil ~init_data prog outfile_opt =
-        match outfile_opt with
-        | Some outfile ->
-            let outc = open_out outfile in
-            let fmt = Format.formatter_of_out_channel outc in
-            let () =
-              match init_data with
-              | `Null -> ()
-              | init_data ->
-                  Fmt.pf fmt "#begin_init_data@\n%a@\n#end_init_data@\n"
-                    (Yojson.Safe.pretty_print ~std:true)
-                    init_data
-            in
-            let () = Prog.pp_labeled fmt prog in
-            close_out outc
-        | None -> ()
-
-      (* TODO: Find a common place to put the three functions here which are
-         duplicated in Command_line.ml *)
-      let convert_other_imports oi =
-        List.map
-          (fun (ext, f) ->
-            let fun_with_exn s = Stdlib.Result.get_ok (f s) in
-            (ext, fun_with_exn))
-          oi
-
       let log_procs procs =
         DL.log (fun m ->
             let proc_to_yojson =
@@ -279,9 +253,12 @@ functor
           if already_compiled then parse_gil_file (List.hd files)
           else compile_tl_files files
         in
-        burn_gil ~init_data:(ID.to_yojson init_data) e_prog outfile_opt;
+        Command_line_utils.burn_gil ~init_data:(ID.to_yojson init_data)
+          ~pp_prog:Prog.pp_labeled e_prog outfile_opt;
         (* Prog.perform_syntax_checks e_prog; *)
-        let other_imports = convert_other_imports PC.other_imports in
+        let other_imports =
+          Command_line_utils.convert_other_imports PC.other_imports
+        in
         let prog = Gil_parsing.eprog_to_prog ~other_imports e_prog in
         L.verbose (fun m ->
             m "@\nProgram as parsed:@\n%a@\n" Prog.pp_indexed prog);

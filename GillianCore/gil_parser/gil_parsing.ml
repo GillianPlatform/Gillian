@@ -1,5 +1,6 @@
 open Lexing
 module L = Logging
+include Gil_parsing_intf
 
 module Preprocess_GCmd = Preprocessing_utils.M (struct
   type t = int Cmd.t

@@ -10,6 +10,11 @@ type ('annot, 'tl_ast, 'init_data) compiled_progs = {
   init_data : 'init_data;
 }
 
+val get_progs_or_fail :
+  (Format.formatter -> 'e -> unit) ->
+  (('a, 'b, 'c) compiled_progs, 'e) result ->
+  ('a, 'b, 'c) compiled_progs
+
 (** @canonical Gillian.Command_line.ParserAndCompiler.S *)
 module type S = sig
   module TargetLangOptions : sig
