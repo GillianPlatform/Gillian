@@ -1,4 +1,6 @@
-(** Gillian's execution modes *)
+(** @canonical Gillian.Utils.Exec_mode
+
+  Gillian's execution modes *)
 
 type t = Concrete | Verification | Symbolic | BiAbduction
 
