@@ -84,10 +84,6 @@ let check_satisfiability
   in
   let axioms = get_axioms fs gamma in
   let fs = Formula.Set.union fs axioms in
-  L.verbose (fun m ->
-      m "CheckSat: With Axioms: %a"
-        (Fmt.Dump.iter Formula.Set.iter Fmt.nop Formula.pp)
-        fs);
   if Formula.Set.is_empty fs then true
   else if Formula.Set.mem False fs then false
   else
