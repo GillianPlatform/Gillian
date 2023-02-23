@@ -1,3 +1,4 @@
+(** @canonical Gillian.Concrete.State.S *)
 module type S = sig
   include
     State.S
@@ -8,6 +9,7 @@ module type S = sig
   val init : init_data -> t
 end
 
+(** @canonical Gillian.Concrete.State.Make *)
 module Make (CMemory : CMemory.S) : sig
   include
     State.S

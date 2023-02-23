@@ -24,7 +24,12 @@ module Symbolic = struct
   include Engine.Symbolic
 end
 
-module Concrete = Engine.Concrete
+(** Interfaces for concrete exectuion, including concrete memory model *)
+module Concrete = struct
+  (** @inline *)
+  include Engine.Concrete
+end
+
 module General = Engine.General
 module Bulk = Bulk
 module Monadic = Monadic
