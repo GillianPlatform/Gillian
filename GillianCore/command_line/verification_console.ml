@@ -8,7 +8,6 @@ module Make
     (Verification : Verifier.S
                       with type annot = PC.Annot.t
                        and type SPState.init_data = ID.t)
-    (External : External.T(PC.Annot).S)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
 struct
   module Common_args = Common_args.Make (PC)

@@ -53,13 +53,10 @@ struct
       [
         (module Compiler_console.Make (PC));
         (module C_interpreter_console.Make (ID) (PC) (CState) (CInterpreter)
-                  (External)
                   (Gil_parsing));
         (module S_interpreter_console.Make (ID) (PC) (SState) (SInterpreter)
-                  (External)
                   (Gil_parsing));
-        (module Verification_console.Make (ID) (PC) (Verification) (External)
-                  (Gil_parsing));
+        (module Verification_console.Make (ID) (PC) (Verification) (Gil_parsing));
         (module Act_console.Make (ID) (PC) (Abductor) (Gil_parsing));
         (module Debug_verification_console.Make (PC) (Debug_adapter));
         (module Bulk_console.Make (PC) (Runners));
