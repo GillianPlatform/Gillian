@@ -19,7 +19,7 @@ module type S = sig
        and type preds_t = Preds.SPreds.t
 
   module SAInterpreter :
-    GInterpreter.S
+    G_interpreter.S
       with type vt = SVal.M.t
        and type st = st
        and type store_t = SStore.t
@@ -80,7 +80,8 @@ struct
   module SPState = SPState
 
   module SAInterpreter =
-    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SPState) (PC) (External)
+    G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SPState) (PC)
+      (External)
 
   module Normaliser = Normaliser.Make (SPState)
 

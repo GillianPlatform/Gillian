@@ -16,7 +16,7 @@ module type S = sig
        and type preds_t = Preds.SPreds.t
 
   module SAInterpreter :
-    GInterpreter.S
+    G_interpreter.S
       with type vt = SVal.M.t
        and type st = st
        and type store_t = SStore.t

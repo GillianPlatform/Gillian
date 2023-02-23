@@ -17,7 +17,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
   module PC = Outcome.ParserAndCompiler
 
   module Interpreter =
-    GInterpreter.Make (Outcome.Val) (Outcome.ESubst) (Outcome.Store)
+    G_interpreter.Make (Outcome.Val) (Outcome.ESubst) (Outcome.Store)
       (Outcome.State)
       (PC)
       (Outcome.External)

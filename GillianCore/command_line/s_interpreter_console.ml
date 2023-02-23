@@ -7,9 +7,9 @@ module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
     (SState : SState.S with type init_data = ID.t)
-    (SInterpreter : GInterpreter.S
-                      with type annot = PC.Annot.t
-                       and type state_t = SState.t)
+    (S_interpreter : G_interpreter.S
+                       with type annot = PC.Annot.t
+                        and type state_t = SState.t)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
 struct
   module Common_args = Common_args.Make (PC)
@@ -21,7 +21,7 @@ struct
 
     let run_main prog init_data =
       ignore
-        (SInterpreter.evaluate_proc
+        (S_interpreter.evaluate_proc
            (fun x -> x)
            prog !Config.entry_point [] (SState.init init_data))
 
@@ -45,7 +45,7 @@ struct
       in
       if SS.mem !Config.entry_point changed_procs then
         let () = run_main prog init_data in
-        let cur_call_graph = SInterpreter.call_graph in
+        let cur_call_graph = S_interpreter.call_graph in
         let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
         write_symbolic_results cur_source_files cur_call_graph ~diff
       else write_symbolic_results cur_source_files prev_call_graph ~diff:""
@@ -56,7 +56,7 @@ struct
         Option.value ~default:(SourceFiles.make ()) source_files
       in
       let () = run_main prog init_data in
-      let call_graph = SInterpreter.call_graph in
+      let call_graph = S_interpreter.call_graph in
       write_symbolic_results cur_source_files call_graph ~diff:""
 
     let f (prog : PC.Annot.t UP.prog) init_data incremental source_files =

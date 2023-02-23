@@ -1,4 +1,4 @@
-(** @canonical Gillian.General.GInterpreter
+(** @canonical Gillian.General.G_interpreter
 
   The GIL interpreter *)
 
@@ -8,7 +8,7 @@ type branch_case = BranchCase.t
 
 (**/**)
 
-(** @canonical Gillian.General.GInterpreter.S *)
+(** @canonical Gillian.General.G_interpreter.S *)
 module type S = sig
   module Call_stack : Call_stack.S
 
@@ -32,44 +32,53 @@ module type S = sig
   type err_t = (vt, state_err_t) Exec_err.t [@@deriving show, yojson]
   type branch_path = branch_case list [@@deriving yojson]
 
+  type conf_err = {
+    callstack : Call_stack.t;
+    proc_idx : int;
+    error_state : state_t;
+    errors : err_t list;
+    branch_path : branch_path;
+  }
+
+  type conf_cont = {
+    state : state_t;
+    callstack : Call_stack.t;
+    invariant_frames : invariant_frames;
+    prev_idx : int;
+    next_idx : int;
+    loop_ids : string list;
+    branch_count : int;
+    prev_cmd_report_id : Logging.Report_id.t option;
+    branch_case : branch_case option;
+    branch_path : branch_path;
+    new_branches : (state_t * int * branch_case) list;
+  }
+
+  (** Equal to conf_cont + the id of the required spec *)
+  type conf_finish = {
+    flag : Flag.t;
+    ret_val : state_vt;
+    final_state : state_t;
+    branch_path : branch_path;
+  }
+
+  type conf_susp = {
+    spec_id : string;
+    state : state_t;
+    callstack : Call_stack.t;
+    invariant_frames : invariant_frames;
+    prev_idx : int;
+    next_idx : int;
+    loop_ids : string list;
+    branch_count : int;
+    branch_path : branch_path;
+  }
+
   type cconf_t =
-    | ConfErr of {
-        callstack : Call_stack.t;
-        proc_idx : int;
-        error_state : state_t;
-        errors : err_t list;
-        branch_path : branch_path;
-      }
-    | ConfCont of {
-        state : state_t;
-        callstack : Call_stack.t;
-        invariant_frames : invariant_frames;
-        prev_idx : int;
-        next_idx : int;
-        loop_ids : string list;
-        branch_count : int;
-        prev_cmd_report_id : Logging.Report_id.t option;
-        branch_case : branch_case option;
-        branch_path : branch_path;
-        new_branches : (state_t * int * branch_case) list;
-      }
-    | ConfFinish of {
-        flag : Flag.t;
-        ret_val : state_vt;
-        final_state : state_t;
-        branch_path : branch_path;
-      }  (** Equal to Conf cont + the id of the required spec *)
-    | ConfSusp of {
-        spec_id : string;
-        state : state_t;
-        callstack : Call_stack.t;
-        invariant_frames : invariant_frames;
-        prev_idx : int;
-        next_idx : int;
-        loop_ids : string list;
-        branch_count : int;
-        branch_path : branch_path;
-      }
+    | ConfErr of conf_err
+    | ConfCont of conf_cont
+    | ConfFinish of conf_finish
+    | ConfSusp of conf_susp
 
   type conf_t = BConfErr of err_t list | BConfCont of state_t
   type result_t = (state_t, state_vt, err_t) Exec_res.t
@@ -141,7 +150,7 @@ module type S = sig
     'a list
 end
 
-(** @canonical Gillian.General.GInterpreter.Make *)
+(** @canonical Gillian.General.G_interpreter.Make *)
 module Make
     (Val : Val.S)
     (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)

@@ -26,44 +26,54 @@ module type S = sig
   type err_t = (vt, state_err_t) Exec_err.t [@@deriving show, yojson]
   type branch_path = branch_case list [@@deriving yojson]
 
+  type conf_err = {
+    callstack : Call_stack.t;
+    proc_idx : int;
+    error_state : state_t;
+    errors : err_t list;
+    branch_path : branch_path;
+  }
+
+  type conf_cont = {
+    state : state_t;
+    callstack : Call_stack.t;
+    invariant_frames : invariant_frames;
+    prev_idx : int;
+    next_idx : int;
+    loop_ids : string list;
+    branch_count : int;
+    prev_cmd_report_id : Logging.Report_id.t option;
+    branch_case : branch_case option;
+    branch_path : branch_path;
+    new_branches : (state_t * int * branch_case) list;
+  }
+
+  (** Equal to conf_cont + the id of the required spec *)
+  type conf_finish = {
+    flag : Flag.t;
+    ret_val : state_vt;
+    final_state : state_t;
+    branch_path : branch_path;
+  }
+
+  type conf_susp = {
+    spec_id : string;
+    state : state_t;
+    callstack : Call_stack.t;
+    invariant_frames : invariant_frames;
+    prev_idx : int;
+    next_idx : int;
+    loop_ids : string list;
+    branch_count : int;
+    branch_path : branch_path;
+  }
+
+  (** Type of configurations: state, call stack, previous index, previous loop ids, current index, branching *)
   type cconf_t =
-    | ConfErr of {
-        callstack : Call_stack.t;
-        proc_idx : int;
-        error_state : state_t;
-        errors : err_t list;
-        branch_path : branch_path;
-      }
-    | ConfCont of {
-        state : state_t;
-        callstack : Call_stack.t;
-        invariant_frames : invariant_frames;
-        prev_idx : int;
-        next_idx : int;
-        loop_ids : string list;
-        branch_count : int;
-        prev_cmd_report_id : L.Report_id.t option;
-        branch_case : branch_case option;
-        branch_path : branch_path;
-        new_branches : (state_t * int * branch_case) list;
-      }
-    | ConfFinish of {
-        flag : Flag.t;
-        ret_val : state_vt;
-        final_state : state_t;
-        branch_path : branch_path;
-      }  (** Equal to Conf cont + the id of the required spec *)
-    | ConfSusp of {
-        spec_id : string;
-        state : state_t;
-        callstack : Call_stack.t;
-        invariant_frames : invariant_frames;
-        prev_idx : int;
-        next_idx : int;
-        loop_ids : string list;
-        branch_count : int;
-        branch_path : branch_path;
-      }
+    | ConfErr of conf_err
+    | ConfCont of conf_cont
+    | ConfFinish of conf_finish
+    | ConfSusp of conf_susp
 
   type conf_t = BConfErr of err_t list | BConfCont of state_t
   type result_t = (state_t, state_vt, err_t) Exec_res.t
@@ -175,45 +185,58 @@ struct
   type err_t = (Val.t, state_err_t) Exec_err.t [@@deriving show, yojson]
   type branch_path = branch_case list [@@deriving yojson]
 
+  type conf_err = {
+    callstack : Call_stack.t;
+    proc_idx : int;
+    error_state : state_t;
+    errors : err_t list;
+    branch_path : branch_path;
+  }
+  [@@deriving yojson]
+
+  type conf_cont = {
+    state : state_t;
+    callstack : Call_stack.t;
+    invariant_frames : invariant_frames;
+    prev_idx : int;
+    next_idx : int;
+    loop_ids : string list;
+    branch_count : int;
+    prev_cmd_report_id : Logging.Report_id.t option;
+    branch_case : branch_case option;
+    branch_path : branch_path;
+    new_branches : (state_t * int * branch_case) list;
+  }
+  [@@deriving yojson]
+
+  (** Equal to conf_cont + the id of the required spec *)
+  type conf_finish = {
+    flag : Flag.t;
+    ret_val : state_vt;
+    final_state : state_t;
+    branch_path : branch_path;
+  }
+  [@@deriving yojson]
+
+  type conf_susp = {
+    spec_id : string;
+    state : state_t;
+    callstack : Call_stack.t;
+    invariant_frames : invariant_frames;
+    prev_idx : int;
+    next_idx : int;
+    loop_ids : string list;
+    branch_count : int;
+    branch_path : branch_path;
+  }
+  [@@deriving yojson]
+
   (** Type of configurations: state, call stack, previous index, previous loop ids, current index, branching *)
   type cconf_t =
-    | ConfErr of {
-        callstack : Call_stack.t;
-        proc_idx : int;
-        error_state : state_t;
-        errors : err_t list;
-        branch_path : branch_path;
-      }
-    | ConfCont of {
-        state : State.t;
-        callstack : Call_stack.t;
-        invariant_frames : invariant_frames;
-        prev_idx : int;
-        next_idx : int;
-        loop_ids : string list;
-        branch_count : int;
-        prev_cmd_report_id : L.Report_id.t option;
-        branch_case : branch_case option;
-        branch_path : branch_path;
-        new_branches : (state_t * int * branch_case) list;
-      }
-    | ConfFinish of {
-        flag : Flag.t;
-        ret_val : State.vt;
-        final_state : State.t;
-        branch_path : branch_path;
-      }  (** Equal to Conf cont + the id of the required spec *)
-    | ConfSusp of {
-        spec_id : string;
-        state : state_t;
-        callstack : Call_stack.t;
-        invariant_frames : invariant_frames;
-        prev_idx : int;
-        next_idx : int;
-        loop_ids : string list;
-        branch_count : int;
-        branch_path : branch_path;
-      }
+    | ConfErr of conf_err
+    | ConfCont of conf_cont
+    | ConfFinish of conf_finish
+    | ConfSusp of conf_susp
   [@@deriving yojson]
 
   let make_confcont
@@ -544,161 +567,179 @@ struct
     @param preds Current predicate set
     @return List of states/predicate sets resulting from the evaluation
   *)
-  let rec evaluate_lcmd (prog : annot UP.prog) (lcmd : LCmd.t) (state : State.t)
-      : (State.t list, state_err_t list) result =
-    print_lconfiguration lcmd state;
+  module Evaluate_lcmd = struct
+    let eval_assumetype e t state eval_expr =
+      let v_x = eval_expr e in
+      match State.assume_t state v_x t with
+      | Some state' -> Ok [ state' ]
+      | _ ->
+          Fmt.failwith
+            "ERROR: AssumeType: Cannot assume type %s for expression %a."
+            (Type.str t) Expr.pp e
 
-    let eval_expr = make_eval_expr state in
-    match lcmd with
-    | AssumeType (e, t) -> (
-        let v_x = eval_expr e in
-        match State.assume_t state v_x t with
-        | Some state' -> Ok [ state' ]
-        | _ ->
-            Fmt.failwith
-              "ERROR: AssumeType: Cannot assume type %s for expression %a."
-              (Type.str t) Expr.pp e)
-    | Assume f ->
-        let store_subst = Store.to_ssubst (State.get_store state) in
-        let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
-        (* Printf.printf "Assuming %s\n" (Formula.str f'); *)
-        let fos =
-          if Exec_mode.biabduction_exec !Config.current_exec_mode then
-            let fos = Formula.get_disjuncts f' in
-            match fos with
-            | [] -> []
-            | [ f' ] -> [ (f', state) ]
-            | f' :: other_fos ->
-                let new_fos_states =
-                  List.map (fun f'' -> (f'', State.copy state)) other_fos
-                in
-                (f', state) :: new_fos_states
-          else [ (f', state) ]
-        in
-        (* Printf.printf "Considering the following disjuncts: %s\n" *)
-        (* I commented the following, because it builds a string and discards it ? *)
-        (* (String.concat "; " (List.map (fun (f, _) -> Formula.str f) fos));  *)
-        Ok
-          (List.concat
-             (List.map
-                (fun (f'', state) ->
-                  match State.assume_a state [ f'' ] with
-                  | Some state' -> [ state' ]
-                  | _ -> [])
-                fos))
-    | FreshSVar x ->
-        let new_svar = Generators.fresh_svar () in
-        let state' = State.add_spec_vars state (SS.singleton new_svar) in
-        let v = Val.from_expr (LVar new_svar) |> Option.get in
-        Ok [ update_store state' x v ]
-    | Assert f -> (
-        let store_subst = Store.to_ssubst (State.get_store state) in
-        let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
-        match State.assert_a state [ f' ] with
-        | true -> Ok [ state ]
-        | false ->
-            let err = StateErr.EPure f' in
-            let failing_model = State.sat_check_f state [ Not f' ] in
-            let msg =
-              Fmt.str
-                "Assert failed with argument @[<h>%a@].@\n\
-                 @[<v 2>Failing Model:@\n\
-                 %a@]@\n"
-                Formula.pp f'
-                Fmt.(option ~none:(any "CANNOT CREATE MODEL") ESubst.pp)
-                failing_model
-            in
-            if not (Exec_mode.biabduction_exec !Config.current_exec_mode) then
-              Printf.printf "%s" msg;
-            L.normal (fun m -> m "%s" msg);
-            raise (Interpreter_error ([ ESt err ], state)))
-    | Macro (name, args) -> (
-        let macro = Macro.get prog.prog.macros name in
-        match macro with
-        | None ->
-            L.verbose (fun m ->
-                m "@[<v 2>Current MACRO TABLE:\n%a\n@]" Macro.pp_tbl
-                  prog.prog.macros);
-            raise
-              (Failure
-                 (Fmt.str "NO MACRO found when executing: @[<h>%a@]" LCmd.pp
-                    lcmd))
-        | Some macro ->
-            let expand_macro (macro : Macro.t) (args : Expr.t list) :
-                LCmd.t list =
-              let params = macro.macro_params in
-              let params_card = List.length params in
-              let args_card = List.length args in
-              if params_card <> args_card then
-                raise
-                  (Failure
-                     (Printf.sprintf
-                        "Macro %s called with incorrect number of parameters: \
-                         %d instead of %d."
-                        macro.macro_name args_card params_card));
-              let subst = SVal.SSubst.init (List.combine params args) in
-              let lcmds = macro.macro_definition in
-              List.map (SVal.SSubst.substitute_lcmd subst ~partial:true) lcmds
-            in
-            let lcmds = expand_macro macro args in
-            evaluate_lcmds prog lcmds state)
+    let eval_assume f state =
+      let store_subst = Store.to_ssubst (State.get_store state) in
+      let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
+      (* Printf.printf "Assuming %s\n" (Formula.str f'); *)
+      let fos =
+        if Exec_mode.biabduction_exec !Config.current_exec_mode then
+          let fos = Formula.get_disjuncts f' in
+          match fos with
+          | [] -> []
+          | [ f' ] -> [ (f', state) ]
+          | f' :: other_fos ->
+              let new_fos_states =
+                List.map (fun f'' -> (f'', State.copy state)) other_fos
+              in
+              (f', state) :: new_fos_states
+        else [ (f', state) ]
+      in
+      (* Printf.printf "Considering the following disjuncts: %s\n" *)
+      (* I commented the following, because it builds a string and discards it ? *)
+      (* (String.concat "; " (List.map (fun (f, _) -> Formula.str f) fos));  *)
+      Ok
+        (List.concat
+           (List.map
+              (fun (f'', state) ->
+                match State.assume_a state [ f'' ] with
+                | Some state' -> [ state' ]
+                | _ -> [])
+              fos))
+
+    let eval_freshsvar x state =
+      let new_svar = Generators.fresh_svar () in
+      let state' = State.add_spec_vars state (SS.singleton new_svar) in
+      let v = Val.from_expr (LVar new_svar) |> Option.get in
+      Ok [ update_store state' x v ]
+
+    let eval_assert f state =
+      let store_subst = Store.to_ssubst (State.get_store state) in
+      let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
+      match State.assert_a state [ f' ] with
+      | true -> Ok [ state ]
+      | false ->
+          let err = StateErr.EPure f' in
+          let failing_model = State.sat_check_f state [ Not f' ] in
+          let msg =
+            Fmt.str
+              "Assert failed with argument @[<h>%a@].@\n\
+               @[<v 2>Failing Model:@\n\
+               %a@]@\n"
+              Formula.pp f'
+              Fmt.(option ~none:(any "CANNOT CREATE MODEL") ESubst.pp)
+              failing_model
+          in
+          if not (Exec_mode.biabduction_exec !Config.current_exec_mode) then
+            Printf.printf "%s" msg;
+          L.normal (fun m -> m "%s" msg);
+          raise (Interpreter_error ([ ESt err ], state))
+
+    let eval_macro name args lcmd prog state eval_lcmds =
+      let macro = Macro.get UP.(prog.prog.macros) name in
+      match macro with
+      | None ->
+          L.verbose (fun m ->
+              m "@[<v 2>Current MACRO TABLE:\n%a\n@]" Macro.pp_tbl
+                UP.(prog.prog.macros));
+          raise
+            (Failure
+               (Fmt.str "NO MACRO found when executing: @[<h>%a@]" LCmd.pp lcmd))
+      | Some macro ->
+          let expand_macro (macro : Macro.t) (args : Expr.t list) : LCmd.t list
+              =
+            let params = macro.macro_params in
+            let params_card = List.length params in
+            let args_card = List.length args in
+            if params_card <> args_card then
+              raise
+                (Failure
+                   (Printf.sprintf
+                      "Macro %s called with incorrect number of parameters: %d \
+                       instead of %d."
+                      macro.macro_name args_card params_card));
+            let subst = SVal.SSubst.init (List.combine params args) in
+            let lcmds = macro.macro_definition in
+            List.map (SVal.SSubst.substitute_lcmd subst ~partial:true) lcmds
+          in
+          let lcmds = expand_macro macro args in
+          eval_lcmds prog lcmds state
+
     (* We have to understand what is the intended semantics of the logic if *)
-    | If (e, lcmds_t, lcmds_e) -> (
-        let ve = eval_expr e in
-        let e = Val.to_expr ve in
-        match Formula.lift_logic_expr e with
-        | Some (True, False) -> evaluate_lcmds prog lcmds_t state
-        | Some (False, True) -> evaluate_lcmds prog lcmds_e state
-        | Some (foe, nfoe) ->
-            let state' = State.copy state in
-            let* then_states =
-              State.assume_a state [ foe ]
-              |> Option.fold
-                   ~some:(fun state -> evaluate_lcmds prog lcmds_t state)
-                   ~none:(Ok [])
-            in
-            let+ else_states =
-              State.assume_a state' [ nfoe ]
-              |> Option.fold
-                   ~some:(fun state -> evaluate_lcmds prog lcmds_e state)
-                   ~none:(Ok [])
-            in
-            then_states @ else_states
-        | None ->
-            raise
-              (Failure
-                 "Non-boolean expression in the condition of the logical if"))
-    | Branch fof ->
-        let state' = State.copy state in
-        let state =
-          Option.fold
-            ~some:(fun x -> [ x ])
-            ~none:[]
-            (State.assume_a state [ fof ])
-        in
-        let state' =
-          Option.fold
-            ~some:(fun x -> [ x ])
-            ~none:[]
-            (State.assume_a state' [ Not fof ])
-        in
-        Ok (state @ state')
-    | SL sl_cmd -> State.evaluate_slcmd prog sl_cmd state
+    let eval_if e lcmds_t lcmds_e prog state eval_expr eval_lcmds =
+      let ve = eval_expr e in
+      let e = Val.to_expr ve in
+      match Formula.lift_logic_expr e with
+      | Some (True, False) -> eval_lcmds prog lcmds_t state
+      | Some (False, True) -> eval_lcmds prog lcmds_e state
+      | Some (foe, nfoe) ->
+          let state' = State.copy state in
+          let* then_states =
+            State.assume_a state [ foe ]
+            |> Option.fold
+                 ~some:(fun state -> eval_lcmds prog lcmds_t state)
+                 ~none:(Ok [])
+          in
+          let+ else_states =
+            State.assume_a state' [ nfoe ]
+            |> Option.fold
+                 ~some:(fun state -> eval_lcmds prog lcmds_e state)
+                 ~none:(Ok [])
+          in
+          then_states @ else_states
+      | None ->
+          raise
+            (Failure "Non-boolean expression in the condition of the logical if")
 
-  and evaluate_lcmds
-      (prog : annot UP.prog)
-      (lcmds : LCmd.t list)
-      (state : State.t) : (State.t list, state_err_t list) result =
-    match lcmds with
-    | [] -> Ok [ state ]
-    | lcmd :: rest_lcmds ->
-        let* rets = evaluate_lcmd prog lcmd state in
-        let+ next_rets =
-          rets
-          |> List_utils.map_results (fun state ->
-                 evaluate_lcmds prog rest_lcmds state)
-        in
-        List.concat next_rets
+    let eval_branch fof state =
+      let state' = State.copy state in
+      let state =
+        Option.fold
+          ~some:(fun x -> [ x ])
+          ~none:[]
+          (State.assume_a state [ fof ])
+      in
+      let state' =
+        Option.fold
+          ~some:(fun x -> [ x ])
+          ~none:[]
+          (State.assume_a state' [ Not fof ])
+      in
+      Ok (state @ state')
+
+    let rec eval_lcmd (prog : annot UP.prog) (lcmd : LCmd.t) (state : State.t) :
+        (State.t list, state_err_t list) result =
+      print_lconfiguration lcmd state;
+
+      let eval_expr = make_eval_expr state in
+      match lcmd with
+      | AssumeType (e, t) -> eval_assumetype e t state eval_expr
+      | Assume f -> eval_assume f state
+      | FreshSVar x -> eval_freshsvar x state
+      | Assert f -> eval_assert f state
+      | Macro (name, args) -> eval_macro name args lcmd prog state eval_lcmds
+      | If (e, lcmds_t, lcmds_e) ->
+          eval_if e lcmds_t lcmds_e prog state eval_expr eval_lcmds
+      | Branch fof -> eval_branch fof state
+      | SL sl_cmd -> State.evaluate_slcmd prog sl_cmd state
+
+    and eval_lcmds
+        (prog : annot UP.prog)
+        (lcmds : LCmd.t list)
+        (state : State.t) : (State.t list, state_err_t list) result =
+      match lcmds with
+      | [] -> Ok [ state ]
+      | lcmd :: rest_lcmds ->
+          let* rets = eval_lcmd prog lcmd state in
+          let+ next_rets =
+            rets
+            |> List_utils.map_results (fun state ->
+                   eval_lcmds prog rest_lcmds state)
+          in
+          List.concat next_rets
+  end
+
+  let evaluate_lcmd = Evaluate_lcmd.eval_lcmd
+  let evaluate_lcmds = Evaluate_lcmd.eval_lcmds
 
   (**
   Evaluation of commands
@@ -712,309 +753,295 @@ struct
   @return List of configurations resulting from the evaluation
 *)
 
-  let rec evaluate_cmd
-      (prog : annot UP.prog)
-      (state : State.t)
-      (cs : Call_stack.t)
-      (iframes : invariant_frames)
-      (prev : int)
-      (prev_loop_ids : string list)
-      (i : int)
-      (b_counter : int)
-      (report_id_ref : L.Report_id.t option ref)
-      (branch_path : branch_path)
-      (branch_case : branch_case option) : cconf_t list =
-    let _, (annot, _) = get_cmd prog cs i in
+  module Evaluate_cmd = struct
+    type make_confcont =
+      state:state_t ->
+      callstack:Call_stack.t ->
+      invariant_frames:invariant_frames ->
+      prev_idx:int ->
+      next_idx:int ->
+      loop_ids:string list ->
+      branch_count:int ->
+      ?branch_case:branch_case ->
+      ?new_branches:(state_t * int * branch_case) list ->
+      unit ->
+      cconf_t
 
-    (* The full list of loop ids is the concatenation
-       of the loop ids of the current procedure plus
-       the loop ids that have come from the call stack *)
-    let loop_ids = Annot.get_loop_info annot @ Call_stack.get_loop_ids cs in
+    type eval_state = {
+      prog : annot UP.prog;
+      store : store_t;
+      annot : annot;
+      i : int;
+      cs : Call_stack.t;
+      iframes : invariant_frames;
+      loop_ids : string list;
+      b_counter : int;
+      state : state_t;
+      prev : int;
+      prev_loop_ids : string list;
+      make_confcont : make_confcont;
+      eval_expr : Expr.t -> Val.t;
+      loop_action : loop_action;
+      branch_path : branch_path;
+    }
 
-    let loop_action : loop_action =
-      if Exec_mode.verification_exec !Config.current_exec_mode then
-        understand_loop_action loop_ids prev_loop_ids
-      else Nothing
-    in
-    let eval_in_state state =
-      evaluate_cmd_after_frame_handling prog state cs iframes prev prev_loop_ids
-        i b_counter report_id_ref branch_path branch_case
-    in
-    match loop_action with
-    | Nothing -> eval_in_state state
-    | FrameOff id ->
-        L.verbose (fun fmt -> fmt "INFO: Expecting to frame off %s" id);
-        eval_in_state state
-    | Malformed -> L.fail "Malformed loop identifiers"
-    | FrameOn ids ->
-        L.verbose (fun fmt -> fmt "INFO: Going to frame on %a" pp_str_list ids);
-        let states = State.frame_on state iframes ids in
-        let n = List.length states in
-        if n == 0 then
-          L.normal (fun fmt -> fmt "WARNING: FRAMING ON RESULTED IN 0 STATES !")
-        else if n > 1 then
-          L.verbose (fun fmt ->
-              fmt
-                "WARNING: FRAMING ON AFTER EXITING LOOP BRANCHED INTO %i STATES"
-                n);
-        List.concat_map eval_in_state states
+    module Do_eval = struct
+      module Eval_proc_call = struct
+        let get_pid_or_error pid state =
+          match Val.to_literal pid with
+          | Some (String pid) -> pid
+          | Some _ ->
+              let err = [ Exec_err.EProc pid ] in
+              raise (Interpreter_error (err, state))
+          | None ->
+              raise
+                (Internal_error
+                   "Procedure Call Error - unlifting procedure ID failed")
 
-  and evaluate_cmd_after_frame_handling
-      (prog : annot UP.prog)
-      (state : State.t)
-      (cs : Call_stack.t)
-      (iframes : invariant_frames)
-      (prev : int)
-      (prev_loop_ids : string list)
-      (i : int)
-      (b_counter : int)
-      (report_id_ref : L.Report_id.t option ref)
-      (branch_path : branch_path)
-      (branch_case : branch_case option) : cconf_t list =
-    let store = State.get_store state in
-    let eval_expr = make_eval_expr state in
-    let proc_name, annot_cmd = get_cmd prog cs i in
-    let annot, cmd = annot_cmd in
-    let loop_ids = Annot.get_loop_info annot @ Call_stack.get_loop_ids cs in
-    let loop_action : loop_action =
-      if Exec_mode.verification_exec !Config.current_exec_mode then
-        understand_loop_action loop_ids prev_loop_ids
-      else Nothing
-    in
-    (* if !Config.stats then Statistics.exec_cmds := !Statistics.exec_cmds + 1; *)
-    UP.update_coverage prog proc_name i;
+        let get_spec_and_params (prog : annot UP.prog) pid state =
+          let proc = Prog.get_proc prog.prog pid in
+          let spec = Hashtbl.find_opt prog.specs pid in
+          let params =
+            match (proc, spec) with
+            | Some proc, _ -> Proc.get_params proc
+            | None, Some spec -> Spec.get_params spec.spec
+            | _ ->
+                raise
+                  (Interpreter_error
+                     ([ EProc (Val.from_literal (String pid)) ], state))
+          in
+          (spec, params)
 
-    log_configuration annot_cmd state cs i b_counter branch_case
-    |> Option.iter (fun report_id ->
-           report_id_ref := Some report_id;
-           L.Parent.set report_id);
+        let build_args v_args params =
+          let prmlen = List.length params in
+          let args = Array.make prmlen (Val.from_literal Undefined) in
+          let () =
+            List.iteri
+              (fun i v_arg -> if i < prmlen then args.(i) <- v_arg)
+              v_args
+          in
+          Array.to_list args
 
-    let branch_path = List_utils.cons_opt branch_case branch_path in
-    let make_confcont =
-      make_confcont ?prev_cmd_report_id:!report_id_ref ~branch_path
-    in
-    DL.log (fun m ->
-        m
-          ~json:[ ("path", branch_path_to_yojson branch_path) ]
-          "GInterpreter: stepping with path");
+        let process_ret pid j eval_state is_first ret_state fl b_counter others
+            : cconf_t =
+          let { i; cs; make_confcont; iframes; loop_ids; _ } = eval_state in
+          let new_cs =
+            match is_first with
+            | true -> Call_stack.copy cs
+            | false -> cs
+          in
 
-    let evaluate_procedure_call x pid v_args j subst =
-      let pid =
-        match Val.to_literal pid with
-        | Some (String pid) -> pid
-        | Some _ ->
-            let err = [ Exec_err.EProc pid ] in
-            raise (Interpreter_error (err, state))
-        | None ->
-            raise
-              (Internal_error
-                 "Procedure Call Error - unlifting procedure ID failed")
-      in
-
-      let proc = Prog.get_proc prog.prog pid in
-      let spec = Hashtbl.find_opt prog.specs pid in
-      let params =
-        match (proc, spec) with
-        | Some proc, _ -> Proc.get_params proc
-        | None, Some spec -> Spec.get_params spec.spec
-        | _ ->
-            raise
-              (Interpreter_error
-                 ([ EProc (Val.from_literal (String pid)) ], state))
-      in
-      let caller = Call_stack.get_cur_proc_id cs in
-      let () = CallGraph.add_proc_call call_graph caller pid in
-      let prmlen = List.length params in
-
-      let args = Array.make prmlen (Val.from_literal Undefined) in
-      let () =
-        List.iteri (fun i v_arg -> if i < prmlen then args.(i) <- v_arg) v_args
-      in
-      let args = Array.to_list args in
-
-      let process_ret is_first ret_state fl b_counter others : cconf_t =
-        let new_cs =
-          match is_first with
-          | true -> Call_stack.copy cs
-          | false -> cs
-        in
-
-        let new_j =
-          match (fl, j) with
-          | Flag.Normal, _ -> i + 1
-          | Flag.Error, Some j -> j
-          | Flag.Error, None ->
-              let msg =
-                Printf.sprintf
-                  "SYNTAX ERROR: No error label provided when calling \
-                   procedure %s"
-                  pid
-              in
-              L.normal (fun fmt -> fmt "%s" msg);
-              raise (Syntax_error msg)
-        in
-
-        let branch_case = SpecExec fl in
-        let branch_case, new_branches =
-          match (is_first, others) with
-          | _, Some (_ :: _ as others) ->
-              let new_branches =
-                Some
-                  (List_utils.get_list_somes
-                  @@ List.map
-                       (fun conf ->
-                         match conf with
-                         | ConfCont { state; next_idx; _ } ->
-                             Some (state, next_idx, branch_case)
-                         | _ -> None)
-                       others)
-              in
-              (Some branch_case, new_branches)
-          | false, _ -> (Some branch_case, None)
-          | _ -> (None, None)
-        in
-
-        make_confcont ~state:ret_state ~callstack:new_cs
-          ~invariant_frames:iframes ~prev_idx:i ~loop_ids ~next_idx:new_j
-          ~branch_count:b_counter ?branch_case ?new_branches ()
-      in
-
-      let is_internal_proc proc_name =
-        (Prog.get_proc_exn prog.prog proc_name).proc_internal
-      in
-
-      let symb_exec_proc () =
-        let new_store = Store.init (List.combine params args) in
-        let old_store = State.get_store state in
-        let state' = State.set_store state new_store in
-        let cs' =
-          (* Note the new loop identifiers *)
-          Call_stack.push cs ~pid ~arguments:v_args ~store:old_store ~loop_ids
-            ~ret_var:x ~call_index:i ~continue_index:(i + 1) ?error_index:j ()
-        in
-        [
-          make_confcont ~state:state' ~callstack:cs' ~invariant_frames:iframes
-            ~prev_idx:(-1) ~loop_ids ~next_idx:0 ~branch_count:b_counter ();
-        ]
-      in
-
-      let spec_exec_proc () =
-        match spec with
-        | Some spec -> (
-            match !symb_exec_next with
-            | true ->
-                symb_exec_next := false;
-                symb_exec_proc ()
-            | false -> (
-                let subst = eval_subst_list state subst in
-                L.verbose (fun fmt -> fmt "ABOUT TO USE THE SPEC OF %s" pid);
-                (* print_to_all ("\tStarting run spec: " ^ pid); *)
-                let rets : ((State.t * Flag.t) list, state_err_t list) result =
-                  State.run_spec spec state x args subst
+          let new_j =
+            match (fl, j) with
+            | Flag.Normal, _ -> i + 1
+            | Flag.Error, Some j -> j
+            | Flag.Error, None ->
+                let msg =
+                  Printf.sprintf
+                    "SYNTAX ERROR: No error label provided when calling \
+                     procedure %s"
+                    pid
                 in
-                match rets with
-                | Ok rets -> (
-                    (* print_to_all ("\tFinished run spec: " ^ pid); *)
-                    L.verbose (fun fmt ->
-                        fmt "Run_spec returned %d Results" (List.length rets));
-                    let b_counter =
-                      if List.length rets > 1 then b_counter + 1 else b_counter
-                    in
-                    match rets with
-                    | (ret_state, fl) :: rest_rets ->
-                        let others =
-                          List.map
-                            (fun (ret_state, fl) ->
-                              process_ret false ret_state fl b_counter None)
-                            rest_rets
-                        in
-                        process_ret true ret_state fl b_counter (Some others)
-                        :: others
-                    (* Run spec returned no results *)
-                    | _ -> (
-                        match spec.spec.spec_incomplete with
-                        | true ->
-                            L.normal (fun fmt ->
-                                fmt "Proceeding with symbolic execution.");
-                            symb_exec_proc ()
-                        | false ->
-                            L.fail
-                              (Format.asprintf
-                                 "ERROR: Unable to use specification of \
-                                  function %s"
-                                 spec.spec.spec_name)))
-                | Error errors ->
-                    let errors = errors |> List.map (fun e -> Exec_err.ESt e) in
-                    [
-                      ConfErr
-                        {
-                          callstack = cs;
-                          proc_idx = i;
-                          error_state = state;
-                          errors;
-                          branch_path;
-                        };
-                    ]))
-        | None ->
-            if Hashtbl.mem prog.prog.bi_specs pid then
-              [
-                ConfSusp
-                  {
-                    spec_id = pid;
-                    state;
-                    callstack = cs;
-                    invariant_frames = iframes;
-                    prev_idx = prev;
-                    loop_ids = prev_loop_ids;
-                    next_idx = i;
-                    branch_path;
-                    branch_count = b_counter;
-                  };
-              ]
-            else symb_exec_proc ()
-      in
+                L.normal (fun fmt -> fmt "%s" msg);
+                raise (Syntax_error msg)
+          in
 
-      match Exec_mode.biabduction_exec !Config.current_exec_mode with
-      | true -> (
-          match
-            ( pid = caller,
-              is_internal_proc pid,
-              Call_stack.recursive_depth cs pid >= !Config.bi_unroll_depth )
-          with
-          (* In bi-abduction, reached max depth of recursive calls *)
-          | _, _, true -> []
-          (* In bi-abduction, recursive call *)
-          | true, false, _ -> symb_exec_proc ()
-          (* TODO: When JS internals work
-             | true, false, false
-               when List.length
-                      (List.filter is_internal_proc (Call_stack.get_cur_procs cs))
-                    < !Config.bi_no_spec_depth -> symb_exec_proc () *)
-          | _ -> spec_exec_proc ())
-      | false -> spec_exec_proc ()
-    in
+          let branch_case = SpecExec fl in
+          let branch_case, new_branches =
+            match (is_first, others) with
+            | _, Some (_ :: _ as others) ->
+                let new_branches =
+                  Some
+                    (List_utils.get_list_somes
+                    @@ List.map
+                         (fun conf ->
+                           match conf with
+                           | ConfCont { state; next_idx; _ } ->
+                               Some (state, next_idx, branch_case)
+                           | _ -> None)
+                         others)
+                in
+                (Some branch_case, new_branches)
+            | false, _ -> (Some branch_case, None)
+            | _ -> (None, None)
+          in
 
-    match cmd with
-    (* Skip *)
-    | Skip ->
-        [
-          make_confcont ~state ~callstack:cs ~invariant_frames:iframes
-            ~prev_idx:i ~loop_ids ~next_idx:(i + 1) ~branch_count:b_counter ();
-        ]
-    (* Assignment *)
-    | Assignment (x, e) ->
-        DL.log (fun m ->
-            m
-              ~json:[ ("target", `String x); ("expr", Expr.to_yojson e) ]
-              "Assignment");
-        let v = eval_expr e in
-        let state' = update_store state x v in
-        [
-          make_confcont ~state:state' ~callstack:cs ~invariant_frames:iframes
-            ~prev_idx:i ~loop_ids ~next_idx:(i + 1) ~branch_count:b_counter ();
-        ]
-    (* Action *)
-    | LAction (x, a, es) -> (
+          make_confcont ~state:ret_state ~callstack:new_cs
+            ~invariant_frames:iframes ~prev_idx:i ~loop_ids ~next_idx:new_j
+            ~branch_count:b_counter ?branch_case ?new_branches ()
+
+        let symb_exec_proc x pid v_args j params args eval_state () =
+          let { cs; state; i; loop_ids; b_counter; iframes; make_confcont; _ } =
+            eval_state
+          in
+          let new_store = Store.init (List.combine params args) in
+          let old_store = State.get_store state in
+          let state' = State.set_store state new_store in
+          let cs' =
+            (* Note the new loop identifiers *)
+            Call_stack.push cs ~pid ~arguments:v_args ~store:old_store ~loop_ids
+              ~ret_var:x ~call_index:i ~continue_index:(i + 1) ?error_index:j ()
+          in
+          [
+            make_confcont ~state:state' ~callstack:cs' ~invariant_frames:iframes
+              ~prev_idx:(-1) ~loop_ids ~next_idx:0 ~branch_count:b_counter ();
+          ]
+
+        let exec_with_spec spec x j args pid subst symb_exec_proc eval_state =
+          let { state; i; b_counter; cs; branch_path; _ } = eval_state in
+          let process_ret = process_ret pid j eval_state in
+          match !symb_exec_next with
+          | true ->
+              symb_exec_next := false;
+              symb_exec_proc ()
+          | false -> (
+              let subst = eval_subst_list state subst in
+              L.verbose (fun fmt -> fmt "ABOUT TO USE THE SPEC OF %s" pid);
+              (* print_to_all ("\tStarting run spec: " ^ pid); *)
+              let rets : ((State.t * Flag.t) list, state_err_t list) result =
+                State.run_spec spec state x args subst
+              in
+              match rets with
+              | Ok rets -> (
+                  (* print_to_all ("\tFinished run spec: " ^ pid); *)
+                  L.verbose (fun fmt ->
+                      fmt "Run_spec returned %d Results" (List.length rets));
+                  let b_counter =
+                    if List.length rets > 1 then b_counter + 1 else b_counter
+                  in
+                  match rets with
+                  | (ret_state, fl) :: rest_rets ->
+                      let others =
+                        List.map
+                          (fun (ret_state, fl) ->
+                            process_ret false ret_state fl b_counter None)
+                          rest_rets
+                      in
+                      process_ret true ret_state fl b_counter (Some others)
+                      :: others
+                  (* Run spec returned no results *)
+                  | _ -> (
+                      match spec.spec.spec_incomplete with
+                      | true ->
+                          L.normal (fun fmt ->
+                              fmt "Proceeding with symbolic execution.");
+                          symb_exec_proc ()
+                      | false ->
+                          L.fail
+                            (Format.asprintf
+                               "ERROR: Unable to use specification of function \
+                                %s"
+                               spec.spec.spec_name)))
+              | Error errors ->
+                  let errors = errors |> List.map (fun e -> Exec_err.ESt e) in
+                  [
+                    ConfErr
+                      {
+                        callstack = cs;
+                        proc_idx = i;
+                        error_state = state;
+                        errors;
+                        branch_path;
+                      };
+                  ])
+
+        let exec_without_spec pid symb_exec_proc eval_state =
+          let {
+            prog;
+            cs;
+            state;
+            i;
+            b_counter;
+            iframes;
+            prev;
+            prev_loop_ids;
+            branch_path;
+            _;
+          } =
+            eval_state
+          in
+          if Hashtbl.mem prog.prog.bi_specs pid then
+            [
+              ConfSusp
+                {
+                  spec_id = pid;
+                  state;
+                  callstack = cs;
+                  invariant_frames = iframes;
+                  prev_idx = prev;
+                  loop_ids = prev_loop_ids;
+                  next_idx = i;
+                  branch_path;
+                  branch_count = b_counter;
+                };
+            ]
+          else symb_exec_proc ()
+
+        let f x pid v_args j subst eval_state =
+          let { prog; cs; state; _ } = eval_state in
+          let pid = get_pid_or_error pid state in
+
+          let spec, params = get_spec_and_params prog pid state in
+          let caller = Call_stack.get_cur_proc_id cs in
+          let () = CallGraph.add_proc_call call_graph caller pid in
+          let args = build_args v_args params in
+
+          let is_internal_proc proc_name =
+            (Prog.get_proc_exn prog.prog proc_name).proc_internal
+          in
+
+          let symb_exec_proc =
+            symb_exec_proc x pid v_args j params args eval_state
+          in
+
+          let spec_exec_proc () =
+            match spec with
+            | Some spec ->
+                exec_with_spec spec x j args pid subst symb_exec_proc eval_state
+            | None -> exec_without_spec pid symb_exec_proc eval_state
+          in
+
+          match Exec_mode.biabduction_exec !Config.current_exec_mode with
+          | true -> (
+              match
+                ( pid = caller,
+                  is_internal_proc pid,
+                  Call_stack.recursive_depth cs pid >= !Config.bi_unroll_depth
+                )
+              with
+              (* In bi-abduction, reached max depth of recursive calls *)
+              | _, _, true -> []
+              (* In bi-abduction, recursive call *)
+              | true, false, _ -> symb_exec_proc ()
+              (* TODO: When JS internals work
+                 | true, false, false
+                   when List.length
+                          (List.filter is_internal_proc (Call_stack.get_cur_procs cs))
+                        < !Config.bi_no_spec_depth -> symb_exec_proc () *)
+              | _ -> spec_exec_proc ())
+          | false -> spec_exec_proc ()
+      end
+
+      let eval_proc_call = Eval_proc_call.f
+
+      (* Action *)
+      let eval_laction x a es state =
+        let {
+          annot;
+          i;
+          cs;
+          iframes;
+          loop_ids;
+          b_counter;
+          state;
+          prev;
+          prev_loop_ids;
+          make_confcont;
+          eval_expr;
+          _;
+        } =
+          state
+        in
         DL.log (fun m ->
             m
               ~json:
@@ -1165,9 +1192,26 @@ struct
                   (Fmt.Dump.list State.pp_err)
                   errs
               in
-              Fmt.failwith "%a\n@?" (Fmt.styled `Red pp_err) (a, errs))
-    (* Logic command *)
-    | Logic lcmd -> (
+              Fmt.failwith "%a\n@?" (Fmt.styled `Red pp_err) (a, errs)
+
+      (* Logic command *)
+      let eval_logic (lcmd : LCmd.t) state =
+        let {
+          prog;
+          i;
+          cs;
+          iframes;
+          loop_ids;
+          b_counter;
+          state;
+          prev_loop_ids;
+          make_confcont;
+          loop_action;
+          branch_path;
+          _;
+        } =
+          state
+        in
         DL.log (fun m -> m "LCmd");
         match lcmd with
         | SL SymbExec ->
@@ -1235,15 +1279,23 @@ struct
                       errors;
                       branch_path;
                     };
-                ]))
-    (* Unconditional goto *)
-    | Goto j ->
-        [
-          make_confcont ~state ~callstack:cs ~invariant_frames:iframes
-            ~prev_idx:i ~loop_ids ~next_idx:j ~branch_count:b_counter ();
-        ]
-    (* Conditional goto *)
-    | GuardedGoto (e, j, k) -> (
+                ])
+
+      (* Conditional goto *)
+      let eval_guarded_goto e j k state =
+        let {
+          i;
+          cs;
+          iframes;
+          loop_ids;
+          b_counter;
+          state;
+          make_confcont;
+          eval_expr;
+          _;
+        } =
+          state
+        in
         let vt = eval_expr e in
         let lvt = Val.to_literal vt in
         let vf =
@@ -1325,8 +1377,24 @@ struct
             match pid with
             | 0 -> [ List.hd result ]
             | _ -> List.tl result)
-        | false -> result)
-    | PhiAssignment lxarr ->
+        | false -> result
+
+      let eval_phi_assignment lxarr eval_state =
+        let {
+          eval_expr;
+          prog;
+          cs;
+          prev;
+          i;
+          make_confcont;
+          iframes;
+          b_counter;
+          loop_ids;
+          state;
+          _;
+        } =
+          eval_state
+        in
         DL.log (fun m -> m "PhiAssignment");
         let j = get_predecessor prog cs prev i in
         let state' =
@@ -1341,15 +1409,32 @@ struct
           make_confcont ~state:state' ~callstack:cs ~invariant_frames:iframes
             ~prev_idx:i ~loop_ids ~next_idx:(i + 1) ~branch_count:b_counter ();
         ]
-    (* Function call *)
-    | Call (x, e, args, j, subst) ->
+
+      (* Function call *)
+      let eval_call x e args j subst eval_state =
+        let { eval_expr; _ } = eval_state in
         DL.log (fun m -> m "Call");
         let pid = eval_expr e in
         let v_args = List.map eval_expr args in
-        let result = evaluate_procedure_call x pid v_args j subst in
+        let result = eval_proc_call x pid v_args j subst eval_state in
         result
-    (* External function call *)
-    | ECall (x, pid, args, j) ->
+
+      (* External function call *)
+      let eval_ecall x (pid : Expr.t) args j eval_state =
+        let {
+          eval_expr;
+          make_confcont;
+          iframes;
+          prog;
+          state;
+          cs;
+          i;
+          b_counter;
+          loop_ids;
+          _;
+        } =
+          eval_state
+        in
         DL.log (fun m -> m "ECall");
         let pid =
           match pid with
@@ -1366,8 +1451,10 @@ struct
             make_confcont ~state ~callstack:cs ~invariant_frames:iframes
               ~prev_idx:i ~loop_ids ~next_idx:j ~branch_count:b_counter ())
           (External.execute prog.prog state cs i x pid v_args j)
-    (* Function application *)
-    | Apply (x, pid_args, j) -> (
+
+      (* Function application *)
+      let eval_apply x pid_args j state =
+        let { eval_expr; _ } = state in
         DL.log (fun m -> m "Apply");
         let v_pid_args = eval_expr pid_args in
         let v_pid_args_list = Val.to_list v_pid_args in
@@ -1375,24 +1462,27 @@ struct
         | Some v_pid_args_list ->
             let pid = List.hd v_pid_args_list in
             let v_args = List.tl v_pid_args_list in
-            evaluate_procedure_call x pid v_args j None
+            eval_proc_call x pid v_args j None state
         | None ->
             raise
               (Failure
                  (Fmt.str "Apply not called with a list: @[<h>%a@]" Val.pp
-                    v_pid_args)))
-    (* Arguments *)
-    | Arguments x ->
-        DL.log (fun m -> m "Arguments");
-        let args = Call_stack.get_cur_args cs in
-        let args = Val.from_list args in
-        let state' = update_store state x args in
-        [
-          make_confcont ~state:state' ~callstack:cs ~invariant_frames:iframes
-            ~prev_idx:i ~loop_ids ~next_idx:(i + 1) ~branch_count:b_counter ();
-        ]
-    (* Normal-mode return *)
-    | ReturnNormal ->
+                    v_pid_args))
+
+      let eval_return_normal eval_state =
+        let {
+          store;
+          cs;
+          loop_ids;
+          branch_path;
+          make_confcont;
+          state;
+          iframes;
+          b_counter;
+          _;
+        } =
+          eval_state
+        in
         let v_ret = Store.get store Names.return_variable in
         let result =
           match (v_ret, cs) with
@@ -1441,8 +1531,21 @@ struct
         in
         L.verbose (fun m -> m "Returning.");
         result
-    (* Error-mode return *)
-    | ReturnError -> (
+
+      let eval_return_error eval_state =
+        let {
+          store;
+          cs;
+          loop_ids;
+          branch_path;
+          make_confcont;
+          state;
+          iframes;
+          b_counter;
+          _;
+        } =
+          eval_state
+        in
         let v_ret = Store.get store Names.return_variable in
         match (v_ret, cs) with
         | None, _ ->
@@ -1483,12 +1586,193 @@ struct
             make_confcont ~state:state'' ~callstack:cs'
               ~invariant_frames:iframes ~prev_idx:prev' ~loop_ids:start_loop_ids
               ~next_idx:j ~branch_count:b_counter ()
-        | _ -> raise (Failure "Malformed callstack"))
-    (* Explicit failure *)
-    | Fail (fail_code, fail_params) ->
-        let fail_params = List.map (State.eval_expr state) fail_params in
-        let err = Exec_err.EFailReached { fail_code; fail_params } in
-        raise (Interpreter_error ([ err ], state))
+        | _ -> raise (Failure "Malformed callstack")
+
+      let f (cmd : int Cmd.t) eval_state =
+        let {
+          eval_expr;
+          make_confcont;
+          state;
+          cs;
+          iframes;
+          loop_ids;
+          i;
+          b_counter;
+          _;
+        } =
+          eval_state
+        in
+        match cmd with
+        (* Skip *)
+        | Skip ->
+            [
+              make_confcont ~state ~callstack:cs ~invariant_frames:iframes
+                ~prev_idx:i ~loop_ids ~next_idx:(i + 1) ~branch_count:b_counter
+                ();
+            ]
+        (* Assignment *)
+        | Assignment (x, e) ->
+            DL.log (fun m ->
+                m
+                  ~json:[ ("target", `String x); ("expr", Expr.to_yojson e) ]
+                  "Assignment");
+            let v = eval_expr e in
+            let state' = update_store state x v in
+            [
+              make_confcont ~state:state' ~callstack:cs
+                ~invariant_frames:iframes ~prev_idx:i ~loop_ids
+                ~next_idx:(i + 1) ~branch_count:b_counter ();
+            ]
+        | LAction (x, a, es) -> eval_laction x a es eval_state
+        | Logic lcmd -> eval_logic lcmd eval_state
+        (* Unconditional goto *)
+        | Goto j ->
+            [
+              make_confcont ~state ~callstack:cs ~invariant_frames:iframes
+                ~prev_idx:i ~loop_ids ~next_idx:j ~branch_count:b_counter ();
+            ]
+        | GuardedGoto (e, j, k) -> eval_guarded_goto e j k eval_state
+        | PhiAssignment lxarr -> eval_phi_assignment lxarr eval_state
+        | Call (x, e, args, j, subst) -> eval_call x e args j subst eval_state
+        | ECall (x, pid, args, j) -> eval_ecall x pid args j eval_state
+        | Apply (x, pid_args, j) -> eval_apply x pid_args j eval_state
+        (* Arguments *)
+        | Arguments x ->
+            DL.log (fun m -> m "Arguments");
+            let args = Call_stack.get_cur_args cs in
+            let args = Val.from_list args in
+            let state' = update_store state x args in
+            [
+              make_confcont ~state:state' ~callstack:cs
+                ~invariant_frames:iframes ~prev_idx:i ~loop_ids
+                ~next_idx:(i + 1) ~branch_count:b_counter ();
+            ]
+        (* Normal-mode return *)
+        | ReturnNormal -> eval_return_normal eval_state
+        (* Error-mode return *)
+        | ReturnError -> eval_return_error eval_state
+        (* Explicit failure *)
+        | Fail (fail_code, fail_params) ->
+            let fail_params = List.map (State.eval_expr state) fail_params in
+            let err = Exec_err.EFailReached { fail_code; fail_params } in
+            raise (Interpreter_error ([ err ], state))
+    end
+
+    let do_eval = Do_eval.f
+
+    let rec eval_cmd
+        (prog : annot UP.prog)
+        (state : State.t)
+        (cs : Call_stack.t)
+        (iframes : invariant_frames)
+        (prev : int)
+        (prev_loop_ids : string list)
+        (i : int)
+        (b_counter : int)
+        (report_id_ref : L.Report_id.t option ref)
+        (branch_path : branch_path)
+        (branch_case : branch_case option) : cconf_t list =
+      let _, (annot, _) = get_cmd prog cs i in
+
+      (* The full list of loop ids is the concatenation
+         of the loop ids of the current procedure plus
+         the loop ids that have come from the call stack *)
+      let loop_ids = Annot.get_loop_info annot @ Call_stack.get_loop_ids cs in
+
+      let loop_action : loop_action =
+        if Exec_mode.verification_exec !Config.current_exec_mode then
+          understand_loop_action loop_ids prev_loop_ids
+        else Nothing
+      in
+      let eval_in_state state =
+        eval_cmd_after_frame_handling prog state cs iframes prev prev_loop_ids i
+          b_counter report_id_ref branch_path branch_case
+      in
+      match loop_action with
+      | Nothing -> eval_in_state state
+      | FrameOff id ->
+          L.verbose (fun fmt -> fmt "INFO: Expecting to frame off %s" id);
+          eval_in_state state
+      | Malformed -> L.fail "Malformed loop identifiers"
+      | FrameOn ids ->
+          L.verbose (fun fmt ->
+              fmt "INFO: Going to frame on %a" pp_str_list ids);
+          let states = State.frame_on state iframes ids in
+          let n = List.length states in
+          if n == 0 then
+            L.normal (fun fmt ->
+                fmt "WARNING: FRAMING ON RESULTED IN 0 STATES !")
+          else if n > 1 then
+            L.verbose (fun fmt ->
+                fmt
+                  "WARNING: FRAMING ON AFTER EXITING LOOP BRANCHED INTO %i \
+                   STATES"
+                  n);
+          List.concat_map eval_in_state states
+
+    and eval_cmd_after_frame_handling
+        (prog : annot UP.prog)
+        (state : State.t)
+        (cs : Call_stack.t)
+        (iframes : invariant_frames)
+        (prev : int)
+        (prev_loop_ids : string list)
+        (i : int)
+        (b_counter : int)
+        (report_id_ref : L.Report_id.t option ref)
+        (branch_path : branch_path)
+        (branch_case : branch_case option) : cconf_t list =
+      let store = State.get_store state in
+      let eval_expr = make_eval_expr state in
+      let proc_name, annot_cmd = get_cmd prog cs i in
+      let annot, cmd = annot_cmd in
+      let loop_ids = Annot.get_loop_info annot @ Call_stack.get_loop_ids cs in
+      let loop_action : loop_action =
+        if Exec_mode.verification_exec !Config.current_exec_mode then
+          understand_loop_action loop_ids prev_loop_ids
+        else Nothing
+      in
+      (* if !Config.stats then Statistics.exec_cmds := !Statistics.exec_cmds + 1; *)
+      UP.update_coverage prog proc_name i;
+
+      log_configuration annot_cmd state cs i b_counter branch_case
+      |> Option.iter (fun report_id ->
+             report_id_ref := Some report_id;
+             L.Parent.set report_id);
+
+      let branch_path = List_utils.cons_opt branch_case branch_path in
+      let make_confcont =
+        make_confcont ?prev_cmd_report_id:!report_id_ref ~branch_path
+      in
+      DL.log (fun m ->
+          m
+            ~json:[ ("path", branch_path_to_yojson branch_path) ]
+            "G_interpreter: stepping with path");
+
+      let eval_state =
+        {
+          prog;
+          store;
+          annot;
+          i;
+          cs;
+          iframes;
+          loop_ids;
+          b_counter;
+          state;
+          prev;
+          prev_loop_ids;
+          make_confcont;
+          eval_expr;
+          loop_action;
+          branch_path;
+        }
+      in
+
+      do_eval cmd eval_state
+  end
+
+  let evaluate_cmd = Evaluate_cmd.eval_cmd
 
   let simplify state =
     snd (State.simplify ~save:true ~kill_new_lvars:true state)
@@ -1552,19 +1836,37 @@ struct
   @preds preds Current predicate set
   @return Continuation function specifying the next step of evaluation
   *)
-  let rec evaluate_cmd_step
-      (ret_fun : result_t -> 'a)
-      (retry : bool)
-      (prog : annot UP.prog)
-      (hold_results : 'a list)
-      (on_hold : (cconf_t * string) list)
-      (confs : cconf_t list)
-      (branch_path : branch_path option)
-      (results : (branch_path * result_t) list) : 'a cont_func =
-    let f = evaluate_cmd_step ret_fun retry prog hold_results on_hold in
-    let parent_id_ref = ref None in
+  module Evaluate_cmd_step = struct
+    type 'a f =
+      cconf_t list ->
+      branch_path option ->
+      (branch_path * result_t) list ->
+      'a cont_func
 
-    let log_confcont is_first = function
+    type 'a eval_step =
+      (result_t -> 'a) ->
+      bool ->
+      annot UP.prog ->
+      'a list ->
+      (cconf_t * string) list ->
+      'a f
+
+    type 'a eval_step_state = {
+      ret_fun : result_t -> 'a;
+      retry : bool;
+      prog : annot UP.prog;
+      hold_results : 'a list;
+      on_hold : (cconf_t * string) list;
+      branch_path : branch_path option;
+      results : (branch_path * result_t) list;
+      conf : cconf_t option;
+      rest_confs : cconf_t list;
+      parent_id_ref : L.Report_id.t option ref;
+      f : 'a f;
+      eval_step : 'a eval_step;
+    }
+
+    let log_confcont parent_id_ref is_first = function
       | ConfCont
           {
             state;
@@ -1596,13 +1898,14 @@ struct
           CmdResult.log_result cmd_step |> ignore;
           Some cmd_step
       | _ -> None
-    in
 
-    let continue_or_pause rest_confs cont_func =
+    let continue_or_pause rest_confs cont_func eval_step_state =
+      let { parent_id_ref; branch_path; _ } = eval_step_state in
       match rest_confs with
       | ConfCont { branch_case; new_branches; branch_path; _ } :: _ ->
           rest_confs
-          |> List.iteri (fun i conf -> log_confcont (i = 0) conf |> ignore);
+          |> List.iteri (fun i conf ->
+                 log_confcont parent_id_ref (i = 0) conf |> ignore);
           let new_branch_cases =
             branch_case
             |> Option.map (fun branch_case ->
@@ -1634,196 +1937,282 @@ struct
             let branch_path = Option.value branch_path ~default:[] in
             Continue (!parent_id_ref, branch_path, None, cont_func)
           else cont_func ()
-    in
 
-    Fun.protect
-      ~finally:(fun () -> L.Parent.release !parent_id_ref)
-      (fun () ->
-        let conf, rest_confs =
-          match branch_path with
+    let select_conf branch_path confs =
+      match branch_path with
+      | None ->
+          DL.log (fun m ->
+              m "HORROR: branch_path shouldn't be None when debugging!");
+          List_utils.hd_tl confs
+      | Some branch_path ->
+          confs
+          |> List_utils.pop_where (fun conf -> cconf_path conf = branch_path)
+
+    let debug_log conf rest_confs =
+      DL.log (fun m ->
+          let conf_json =
+            match conf with
+            | None -> `Null
+            | Some conf -> cconf_t_to_yojson conf
+          in
+          m
+            ~json:
+              [
+                ("conf", conf_json);
+                ("rest_confs", `List (List.map cconf_t_to_yojson rest_confs));
+              ]
+            "G_interpreter.evaluate_cmd_step: Evaluating conf")
+
+    let end_of_branch ?branch_case results eval_step_state =
+      let { conf; rest_confs; branch_path; ret_fun; f; _ } = eval_step_state in
+      match branch_path with
+      | None -> failwith "HORROR: branch_path shouldn't be None when debugging!"
+      | Some branch_path -> (
+          match results |> List.assoc_opt branch_path with
           | None ->
-              DL.log (fun m ->
-                  m "HORROR: branch_path shouldn't be None when debugging!");
-              List_utils.hd_tl confs
-          | Some branch_path ->
-              confs
-              |> List_utils.pop_where (fun conf ->
-                     cconf_path conf = branch_path)
+              DL.failwith
+                (fun () ->
+                  let result_jsons =
+                    results
+                    |> List.map (fun (path, result) ->
+                           `Assoc
+                             [
+                               ("path", branch_path_to_yojson path);
+                               ("result", result_t_to_yojson result);
+                             ])
+                  in
+                  let conf_json =
+                    match conf with
+                    | None -> `Null
+                    | Some conf -> cconf_t_to_yojson conf
+                  in
+                  [
+                    ("branch_path", branch_path_to_yojson branch_path);
+                    ( "branch_case",
+                      opt_to_yojson branch_case_to_yojson branch_case );
+                    ("results", `List result_jsons);
+                    ("conf", conf_json);
+                    ("rest_confs", `List (List.map cconf_t_to_yojson rest_confs));
+                  ])
+                "No result for branch path!"
+          | Some result ->
+              EndOfBranch
+                (ret_fun result, fun ?path () -> f rest_confs path results))
+
+    module Handle_conf = struct
+      let none eval_step_state =
+        let {
+          results;
+          rest_confs;
+          hold_results;
+          retry;
+          prog;
+          on_hold;
+          eval_step;
+          ret_fun;
+          _;
+        } =
+          eval_step_state
         in
-
-        DL.log (fun m ->
-            let conf_json =
-              match conf with
-              | None -> `Null
-              | Some conf -> cconf_t_to_yojson conf
-            in
-            m
-              ~json:
-                [
-                  ("conf", conf_json);
-                  ("rest_confs", `List (List.map cconf_t_to_yojson rest_confs));
-                ]
-              "GInterpreter.evaluate_cmd_step: Evaluating conf");
-
-        let end_of_branch ?branch_case results =
-          match branch_path with
-          | None ->
-              failwith "HORROR: branch_path shouldn't be None when debugging!"
-          | Some branch_path -> (
-              match results |> List.assoc_opt branch_path with
-              | None ->
-                  DL.failwith
-                    (fun () ->
-                      let result_jsons =
-                        results
-                        |> List.map (fun (path, result) ->
-                               `Assoc
-                                 [
-                                   ("path", branch_path_to_yojson path);
-                                   ("result", result_t_to_yojson result);
-                                 ])
-                      in
-                      let conf_json =
-                        match conf with
-                        | None -> `Null
-                        | Some conf -> cconf_t_to_yojson conf
-                      in
-                      [
-                        ("branch_path", branch_path_to_yojson branch_path);
-                        ( "branch_case",
-                          opt_to_yojson branch_case_to_yojson branch_case );
-                        ("results", `List result_jsons);
-                        ("conf", conf_json);
-                        ( "rest_confs",
-                          `List (List.map cconf_t_to_yojson rest_confs) );
-                      ])
-                    "No result for branch path!"
-              | Some result ->
-                  EndOfBranch
-                    (ret_fun result, fun ?path () -> f rest_confs path results))
-        in
-
-        match (conf, rest_confs) with
-        | None, _ :: _ -> end_of_branch results
-        | None, [] when !Config.debug -> end_of_branch results
-        | None, [] ->
+        match rest_confs with
+        | _ :: _ -> end_of_branch results eval_step_state
+        | [] when !Config.debug -> end_of_branch results eval_step_state
+        | [] ->
             let results =
               List.map (fun (_, result) -> ret_fun result) results
             in
             let results = hold_results @ results in
             if not retry then Finished results
-            else (
-              L.(verbose (fun m -> m "Relaunching suspended confs"));
-              let hold_confs =
-                List.filter_map
-                  (fun (conf, pid) ->
-                    if Hashtbl.mem prog.specs pid then Some conf else None)
-                  on_hold
-              in
-              continue_or_pause hold_confs (fun ?path () ->
-                  evaluate_cmd_step ret_fun false prog results [] hold_confs
-                    path []))
-        | ( Some
-              (ConfCont
-                {
-                  state;
-                  callstack = cs;
-                  invariant_frames = iframes;
-                  prev_idx = prev;
-                  loop_ids = prev_loop_ids;
-                  next_idx = i;
-                  branch_count = b_counter;
-                  prev_cmd_report_id;
-                  branch_path;
-                  branch_case;
-                  _;
-                }),
-            _ )
-          when b_counter < max_branching ->
-            L.set_previous prev_cmd_report_id;
-            let next_confs =
-              protected_evaluate_cmd prog state cs iframes prev prev_loop_ids i
-                b_counter parent_id_ref branch_path branch_case
-            in
-            continue_or_pause next_confs (fun ?path () ->
-                f (next_confs @ rest_confs) path results)
-        | ( Some
-              (ConfCont
-                {
-                  state;
-                  callstack = cs;
-                  next_idx = i;
-                  branch_count = b_counter;
-                  prev_cmd_report_id;
-                  branch_case;
-                  _;
-                }),
-            _ ) ->
-            let _, annot_cmd = get_cmd prog cs i in
-            Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
-            L.set_previous prev_cmd_report_id;
-            L.(
-              verbose (fun m ->
-                  m
-                    "Stopping Symbolic Execution due to MAX BRANCHING with %d. \
-                     STOPPING CONF:\n"
-                    b_counter));
-            log_configuration annot_cmd state cs i b_counter branch_case
-            |> Option.iter (fun report_id ->
-                   parent_id_ref := Some report_id;
-                   L.Parent.set report_id);
-            continue_or_pause [] (fun ?path () -> f rest_confs path results)
-        | ( Some
-              (ConfErr
-                { callstack; proc_idx; error_state; errors; branch_path }),
-            _ ) ->
-            let proc = Call_stack.get_cur_proc_id callstack in
-            let result =
-              Exec_res.RFail { proc; proc_idx; error_state; errors }
-            in
-            let results = (branch_path, result) :: results in
-            if !Config.debug then end_of_branch results
             else
-              continue_or_pause rest_confs (fun ?path () ->
-                  f rest_confs path results)
-        | Some (ConfFinish { flag; ret_val; final_state; branch_path }), _ ->
-            let result =
-              Exec_res.RSucc
-                { flag; ret_val; final_state; last_report = L.Parent.get () }
-            in
-            let results = (branch_path, result) :: results in
-            if !Config.debug then end_of_branch results
-            else
-              continue_or_pause rest_confs (fun ?path () ->
-                  f rest_confs path results)
-        | ( Some
-              (ConfSusp
-                {
-                  spec_id = fid;
-                  state;
-                  callstack;
-                  invariant_frames;
-                  prev_idx;
-                  loop_ids;
-                  next_idx;
-                  branch_count;
-                  branch_path;
-                }),
-            _ )
-          when retry ->
-            let conf =
-              make_confcont ~state ~callstack ~invariant_frames ~prev_idx
-                ~loop_ids ~next_idx ~branch_count ~branch_path ()
-            in
-            L.(
-              verbose (fun m ->
-                  m "Suspending a computation that was trying to call %s" fid));
-            continue_or_pause [] (fun ?path () ->
-                evaluate_cmd_step ret_fun retry prog hold_results
-                  ((conf, fid) :: on_hold) rest_confs path results)
-        | Some _, _ ->
-            continue_or_pause rest_confs (fun ?path () ->
-                f rest_confs path results))
+              (L.(verbose (fun m -> m "Relaunching suspended confs"));
+               let hold_confs =
+                 List.filter_map
+                   (fun (conf, pid) ->
+                     if Hashtbl.mem prog.specs pid then Some conf else None)
+                   on_hold
+               in
+               continue_or_pause hold_confs (fun ?path () ->
+                   eval_step ret_fun false prog results [] hold_confs path []))
+                eval_step_state
+
+      let cont (cconf : conf_cont) eval_step_state =
+        let { prog; parent_id_ref; f; rest_confs; results; _ } =
+          eval_step_state
+        in
+        let {
+          state;
+          callstack = cs;
+          invariant_frames = iframes;
+          prev_idx = prev;
+          loop_ids = prev_loop_ids;
+          next_idx = i;
+          branch_count = b_counter;
+          prev_cmd_report_id;
+          branch_path;
+          branch_case;
+          _;
+        } =
+          cconf
+        in
+        L.set_previous prev_cmd_report_id;
+        let next_confs =
+          protected_evaluate_cmd prog state cs iframes prev prev_loop_ids i
+            b_counter parent_id_ref branch_path branch_case
+        in
+        continue_or_pause next_confs
+          (fun ?path () -> f (next_confs @ rest_confs) path results)
+          eval_step_state
+
+      let max_branch (cconf : conf_cont) eval_step_state =
+        let { f; rest_confs; results; parent_id_ref; prog; _ } =
+          eval_step_state
+        in
+        let {
+          state;
+          callstack = cs;
+          next_idx = i;
+          branch_count = b_counter;
+          prev_cmd_report_id;
+          branch_case;
+          _;
+        } =
+          cconf
+        in
+        let _, annot_cmd = get_cmd prog cs i in
+        Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
+        L.set_previous prev_cmd_report_id;
+        L.(
+          verbose (fun m ->
+              m
+                "Stopping Symbolic Execution due to MAX BRANCHING with %d. \
+                 STOPPING CONF:\n"
+                b_counter));
+        log_configuration annot_cmd state cs i b_counter branch_case
+        |> Option.iter (fun report_id ->
+               parent_id_ref := Some report_id;
+               L.Parent.set report_id);
+        continue_or_pause []
+          (fun ?path () -> f rest_confs path results)
+          eval_step_state
+
+      let err (cconf : conf_err) eval_step_state =
+        let { results; rest_confs; f; _ } = eval_step_state in
+        let { callstack; proc_idx; error_state; errors; branch_path } = cconf in
+        let proc = Call_stack.get_cur_proc_id callstack in
+        let result = Exec_res.RFail { proc; proc_idx; error_state; errors } in
+        let results = (branch_path, result) :: results in
+        if !Config.debug then end_of_branch results eval_step_state
+        else
+          continue_or_pause rest_confs
+            (fun ?path () -> f rest_confs path results)
+            eval_step_state
+
+      let finish (cconf : conf_finish) eval_step_state =
+        let { results; rest_confs; f; _ } = eval_step_state in
+        let { flag; ret_val; final_state; branch_path } = cconf in
+        let result =
+          Exec_res.RSucc
+            { flag; ret_val; final_state; last_report = L.Parent.get () }
+        in
+        let results = (branch_path, result) :: results in
+        if !Config.debug then end_of_branch results eval_step_state
+        else
+          continue_or_pause rest_confs
+            (fun ?path () -> f rest_confs path results)
+            eval_step_state
+
+      let susp (cconf : conf_susp) eval_step_state =
+        let {
+          eval_step;
+          ret_fun;
+          retry;
+          prog;
+          hold_results;
+          on_hold;
+          results;
+          rest_confs;
+          _;
+        } =
+          eval_step_state
+        in
+        let {
+          spec_id = fid;
+          state;
+          callstack;
+          invariant_frames;
+          prev_idx;
+          loop_ids;
+          next_idx;
+          branch_count;
+          branch_path;
+          _;
+        } =
+          cconf
+        in
+        let conf =
+          make_confcont ~state ~callstack ~invariant_frames ~prev_idx ~loop_ids
+            ~next_idx ~branch_count ~branch_path ()
+        in
+        L.(
+          verbose (fun m ->
+              m "Suspending a computation that was trying to call %s" fid));
+        continue_or_pause []
+          (fun ?path () ->
+            eval_step ret_fun retry prog hold_results ((conf, fid) :: on_hold)
+              rest_confs path results)
+          eval_step_state
+    end
+
+    let rec eval_step
+        (ret_fun : result_t -> 'a)
+        (retry : bool)
+        (prog : annot UP.prog)
+        (hold_results : 'a list)
+        (on_hold : (cconf_t * string) list)
+        (confs : cconf_t list)
+        (branch_path : branch_path option)
+        (results : (branch_path * result_t) list) : 'a cont_func =
+      let f = eval_step ret_fun retry prog hold_results on_hold in
+      let parent_id_ref = ref None in
+
+      Fun.protect
+        ~finally:(fun () -> L.Parent.release !parent_id_ref)
+        (fun () ->
+          let conf, rest_confs = select_conf branch_path confs in
+          let eval_step_state =
+            {
+              ret_fun;
+              retry;
+              prog;
+              hold_results;
+              on_hold;
+              branch_path;
+              results;
+              conf;
+              rest_confs;
+              parent_id_ref;
+              f;
+              eval_step;
+            }
+          in
+          debug_log conf rest_confs;
+
+          match conf with
+          | None -> Handle_conf.none eval_step_state
+          | Some (ConfCont ({ branch_count; _ } as c))
+            when branch_count < max_branching ->
+              Handle_conf.cont c eval_step_state
+          | Some (ConfCont c) -> Handle_conf.max_branch c eval_step_state
+          | Some (ConfErr c) -> Handle_conf.err c eval_step_state
+          | Some (ConfFinish c) -> Handle_conf.finish c eval_step_state
+          | Some (ConfSusp c) when retry -> Handle_conf.susp c eval_step_state
+          | Some _ ->
+              continue_or_pause rest_confs
+                (fun ?path () -> f rest_confs path results)
+                eval_step_state)
+  end
+
+  let evaluate_cmd_step = Evaluate_cmd_step.eval_step
 
   (**
   Evaluates commands iteratively

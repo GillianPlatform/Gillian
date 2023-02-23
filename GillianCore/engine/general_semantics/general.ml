@@ -40,10 +40,10 @@ module External = struct
   include External
 end
 
-(** @canonical Gillian.General.GInterpreter *)
-module GInterpreter = struct
+(** @canonical Gillian.General.G_interpreter *)
+module G_interpreter = struct
   (** @inline *)
-  include GInterpreter
+  include G_interpreter
 end
 
 (** @canonical Gillian.General.Exec_err *)
