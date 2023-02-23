@@ -698,7 +698,7 @@ struct
 
   let analyse_proc_result test flag ?parent_id result =
     match (result : SAInterpreter.result_t) with
-    | ExecRes.RFail { proc; proc_idx; error_state; errors } ->
+    | Exec_res.RFail { proc; proc_idx; error_state; errors } ->
         L.verbose (fun m ->
             m
               "VERIFICATION FAILURE: Procedure %s, Command %d\n\
@@ -714,7 +714,7 @@ struct
               errors);
         if not !Config.debug then Fmt.pr "f @?";
         false
-    | ExecRes.RSucc { flag = fl; final_state; last_report; _ } ->
+    | Exec_res.RSucc { flag = fl; final_state; last_report; _ } ->
         if Some fl <> test.flag then (
           L.normal (fun m ->
               m

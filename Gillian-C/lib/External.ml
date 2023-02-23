@@ -10,7 +10,7 @@ module M
                with type vt = Val.t
                 and type st = ESubst.t
                 and type store_t = Store.t)
-    (CallStack : CallStack.S with type vt = Val.t and type store_t = Store.t) =
+    (Call_stack : Call_stack.S with type vt = Val.t and type store_t = Store.t) =
 struct
   let execute_printf _prog state cs i x v_args _j =
     let store = State.get_store state in
@@ -37,7 +37,7 @@ struct
   let execute
       (prog : ('a, int) Prog.t)
       (state : State.t)
-      (cs : CallStack.t)
+      (cs : Call_stack.t)
       (i : int)
       (x : string)
       (pid : string)

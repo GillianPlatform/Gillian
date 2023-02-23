@@ -1,8 +1,10 @@
-(**
-    Interface for GIL General States.
-    They are considered to be mutable.
-*)
+(** @canonical Gillian.General.State
 
+  Interface for GIL General States.
+  
+  They are considered to be mutable. *)
+
+(** @canonical Gillian.General.State.S *)
 module type S = sig
   (** Type of GIL values *)
   type vt [@@deriving yojson, show]

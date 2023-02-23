@@ -285,7 +285,7 @@ functor
     let rec call_stack_to_frames call_stack next_proc_body_idx prog =
       match call_stack with
       | [] -> []
-      | (se : CallStack.stack_element) :: rest ->
+      | (se : Call_stack.stack_element) :: rest ->
           let start_line, start_column, end_line, end_column, source_path =
             (let* proc = Prog.get_proc prog se.pid in
              let annot, _, _ = proc.proc_body.(next_proc_body_idx) in
@@ -326,7 +326,7 @@ functor
       let get_cur_cmd (cmd : Lifter.cmd_report) cfg =
         match cmd.callstack with
         | [] -> None
-        | (se : CallStack.stack_element) :: _ -> (
+        | (se : Call_stack.stack_element) :: _ -> (
             let proc = Prog.get_proc cfg.prog se.pid in
             match proc with
             | None -> None
@@ -436,8 +436,8 @@ functor
     let unify = Unify.f
 
     let show_result_errors = function
-      | ExecRes.RSucc _ -> []
-      | ExecRes.RFail { errors; _ } -> errors |> List.map show_err_t
+      | Exec_res.RSucc _ -> []
+      | Exec_res.RFail { errors; _ } -> errors |> List.map show_err_t
 
     let build_final_cmd_data content result prev_id branch_path dbg =
       let { cfg; _ } = dbg in
@@ -1070,7 +1070,7 @@ functor
         { id = Fmt.to_to_string Logging.pp_err error; description = None }
       in
       match error with
-      | ExecErr.ESt state_error -> (
+      | Exec_err.ESt state_error -> (
           match state_error with
           | StateErr.EMem merr ->
               Lifter.memory_error_to_exception_info

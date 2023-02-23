@@ -30,7 +30,12 @@ module Concrete = struct
   include Engine.Concrete
 end
 
-module General = Engine.General
+(** Various interfaces, used across execution modes *)
+module General = struct
+  (** @inline *)
+  include Engine.General
+end
+
 module Bulk = Bulk
 module Monadic = Monadic
 

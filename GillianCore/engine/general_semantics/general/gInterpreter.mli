@@ -1,7 +1,16 @@
+(** @canonical Gillian.General.GInterpreter
+
+  The GIL interpreter *)
+
+(**/**)
+
 type branch_case = BranchCase.t
 
+(**/**)
+
+(** @canonical Gillian.General.GInterpreter.S *)
 module type S = sig
-  module CallStack : CallStack.S
+  module Call_stack : Call_stack.S
 
   type vt
   type st
@@ -20,12 +29,12 @@ module type S = sig
   module Store : Store.S with type t = store_t and type vt = vt
 
   type invariant_frames = (string * state_t) list
-  type err_t = (vt, state_err_t) ExecErr.t [@@deriving show, yojson]
+  type err_t = (vt, state_err_t) Exec_err.t [@@deriving show, yojson]
   type branch_path = branch_case list [@@deriving yojson]
 
   type cconf_t =
     | ConfErr of {
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         proc_idx : int;
         error_state : state_t;
         errors : err_t list;
@@ -33,7 +42,7 @@ module type S = sig
       }
     | ConfCont of {
         state : state_t;
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         invariant_frames : invariant_frames;
         prev_idx : int;
         next_idx : int;
@@ -53,7 +62,7 @@ module type S = sig
     | ConfSusp of {
         spec_id : string;
         state : state_t;
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         invariant_frames : invariant_frames;
         prev_idx : int;
         next_idx : int;
@@ -63,7 +72,7 @@ module type S = sig
       }
 
   type conf_t = BConfErr of err_t list | BConfCont of state_t
-  type result_t = (state_t, state_vt, err_t) ExecRes.t
+  type result_t = (state_t, state_vt, err_t) Exec_res.t
 
   type 'a cont_func_f = ?path:branch_path -> unit -> 'a cont_func
 
@@ -82,7 +91,7 @@ module type S = sig
         proc_line : int;
         time : float;
         cmd : int Cmd.t;
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         annot : annot;
         branching : int;
         state : state_t;
@@ -93,7 +102,7 @@ module type S = sig
 
     module CmdResult : sig
       type t = {
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         proc_body_index : int;
         state : state_t option;
         errors : err_t list;
@@ -102,7 +111,7 @@ module type S = sig
       [@@deriving yojson]
     end
 
-    val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
+    val pp_err : Format.formatter -> (vt, state_err_t) Exec_err.t -> unit
     val pp_result : Format.formatter -> result_t list -> unit
   end
 
@@ -132,7 +141,7 @@ module type S = sig
     'a list
 end
 
-(** General GIL Interpreter *)
+(** @canonical Gillian.General.GInterpreter.Make *)
 module Make
     (Val : Val.S)
     (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)

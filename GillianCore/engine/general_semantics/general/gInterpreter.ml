@@ -7,7 +7,7 @@ open Syntaxes.Result
 type branch_case = BranchCase.t [@@deriving yojson]
 
 module type S = sig
-  module CallStack : CallStack.S
+  module Call_stack : Call_stack.S
 
   type vt
   type st
@@ -23,12 +23,12 @@ module type S = sig
   module Store : Store.S with type t = store_t and type vt = vt
 
   type invariant_frames = (string * state_t) list
-  type err_t = (vt, state_err_t) ExecErr.t [@@deriving show, yojson]
+  type err_t = (vt, state_err_t) Exec_err.t [@@deriving show, yojson]
   type branch_path = branch_case list [@@deriving yojson]
 
   type cconf_t =
     | ConfErr of {
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         proc_idx : int;
         error_state : state_t;
         errors : err_t list;
@@ -36,7 +36,7 @@ module type S = sig
       }
     | ConfCont of {
         state : state_t;
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         invariant_frames : invariant_frames;
         prev_idx : int;
         next_idx : int;
@@ -56,7 +56,7 @@ module type S = sig
     | ConfSusp of {
         spec_id : string;
         state : state_t;
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         invariant_frames : invariant_frames;
         prev_idx : int;
         next_idx : int;
@@ -66,7 +66,7 @@ module type S = sig
       }
 
   type conf_t = BConfErr of err_t list | BConfCont of state_t
-  type result_t = (state_t, state_vt, err_t) ExecRes.t
+  type result_t = (state_t, state_vt, err_t) Exec_res.t
 
   type 'a cont_func_f = ?path:branch_path -> unit -> 'a cont_func
 
@@ -85,7 +85,7 @@ module type S = sig
         proc_line : int;
         time : float;
         cmd : int Cmd.t;
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         annot : annot;
         branching : int;
         state : state_t;
@@ -96,7 +96,7 @@ module type S = sig
 
     module CmdResult : sig
       type t = {
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         proc_body_index : int;
         state : state_t option;
         errors : err_t list;
@@ -105,7 +105,7 @@ module type S = sig
       [@@deriving yojson]
     end
 
-    val pp_err : Format.formatter -> (vt, state_err_t) ExecErr.t -> unit
+    val pp_err : Format.formatter -> (vt, state_err_t) Exec_err.t -> unit
     val pp_result : Format.formatter -> result_t list -> unit
   end
 
@@ -151,8 +151,8 @@ struct
    * Auxiliary Types *
    * *************** *)
 
-  module CallStack = CallStack.Make (Val) (Store)
-  module External = External (Val) (ESubst) (Store) (State) (CallStack)
+  module Call_stack = Call_stack.Make (Val) (Store)
+  module External = External (Val) (ESubst) (Store) (State) (Call_stack)
   module Val = Val
   module State = State
   module Store = Store
@@ -172,13 +172,13 @@ struct
   type state_vt = State.vt [@@deriving yojson, show]
   type heap_t = State.heap_t
   type invariant_frames = (string * State.t) list [@@deriving yojson]
-  type err_t = (Val.t, state_err_t) ExecErr.t [@@deriving show, yojson]
+  type err_t = (Val.t, state_err_t) Exec_err.t [@@deriving show, yojson]
   type branch_path = branch_case list [@@deriving yojson]
 
   (** Type of configurations: state, call stack, previous index, previous loop ids, current index, branching *)
   type cconf_t =
     | ConfErr of {
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         proc_idx : int;
         error_state : state_t;
         errors : err_t list;
@@ -186,7 +186,7 @@ struct
       }
     | ConfCont of {
         state : State.t;
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         invariant_frames : invariant_frames;
         prev_idx : int;
         next_idx : int;
@@ -206,7 +206,7 @@ struct
     | ConfSusp of {
         spec_id : string;
         state : state_t;
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         invariant_frames : invariant_frames;
         prev_idx : int;
         next_idx : int;
@@ -257,7 +257,7 @@ struct
         List_utils.cons_opt branch_case branch_path
 
   type conf_t = BConfErr of err_t list | BConfCont of State.t
-  type result_t = (State.t, State.vt, err_t) ExecRes.t [@@deriving yojson]
+  type result_t = (State.t, State.vt, err_t) Exec_res.t [@@deriving yojson]
 
   type 'a cont_func_f = ?path:branch_path -> unit -> 'a cont_func
 
@@ -278,7 +278,7 @@ struct
         proc_line : int;
         time : float;
         cmd : int Cmd.t;
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         annot : annot;
         branching : int;
         state : state_t;
@@ -310,13 +310,13 @@ struct
            @\n\
            %a@\n\
            ------------------------------------------------------@]\n"
-          (CallStack.get_cur_proc_id cs)
+          (Call_stack.get_cur_proc_id cs)
           i time Cmd.pp_indexed cmd pp_str_list
-          (CallStack.get_cur_procs cs)
+          (Call_stack.get_cur_procs cs)
           pp_str_list
           (Annot.get_loop_info annot)
           pp_str_list
-          (CallStack.get_loop_ids cs)
+          (Call_stack.get_loop_ids cs)
           branching state_printer state
 
       let to_loggable state_printer =
@@ -330,7 +330,7 @@ struct
 
     module CmdResult = struct
       type t = {
-        callstack : CallStack.t;
+        callstack : Call_stack.t;
         proc_body_index : int;
         state : state_t option;
         errors : err_t list;
@@ -341,7 +341,7 @@ struct
       let pp fmt cmd_step =
         (* TODO: Cmd step should contain all things in a configuration
                  print the same contents as log_configuration *)
-        CallStack.pp fmt cmd_step.callstack
+        Call_stack.pp fmt cmd_step.callstack
 
       let to_loggable = L.Loggable.make pp of_yojson to_yojson
       let log type_ report = L.Specific.normal (to_loggable report) type_
@@ -371,7 +371,7 @@ struct
     let log_configuration
         (cmd : Annot.t * int Cmd.t)
         (state : State.t)
-        (cs : CallStack.t)
+        (cs : Call_stack.t)
         (i : int)
         (b_counter : int)
         (branch_case : branch_case option) : L.Report_id.t option =
@@ -400,8 +400,8 @@ struct
              ------------------------------------------------------@]@\n"
             (Sys.time ()) LCmd.pp lcmd State.pp state)
 
-    let pp_err = ExecErr.pp Val.pp State.pp_err
-    let pp_single_result ft res = ExecRes.pp State.pp Val.pp pp_err ft res
+    let pp_err = Exec_err.pp Val.pp State.pp_err
+    let pp_single_result ft res = Exec_res.pp State.pp Val.pp pp_err ft res
 
     (** Configuration pretty-printer *)
     let pp_result (ft : Format.formatter) (reslt : result_t list) : unit =
@@ -465,9 +465,9 @@ struct
    * Auxiliary Functions *
    * ******************* *)
 
-  let get_cmd (prog : annot UP.prog) (cs : CallStack.t) (i : int) :
+  let get_cmd (prog : annot UP.prog) (cs : Call_stack.t) (i : int) :
       string * (Annot.t * int Cmd.t) =
-    let pid = CallStack.get_cur_proc_id cs in
+    let pid = Call_stack.get_cur_proc_id cs in
     let proc = Prog.get_proc prog.prog pid in
     let proc =
       match proc with
@@ -479,10 +479,10 @@ struct
 
   let get_predecessor
       (prog : annot UP.prog)
-      (cs : CallStack.t)
+      (cs : Call_stack.t)
       (prev : int)
       (i : int) : int =
-    let pid = CallStack.get_cur_proc_id cs in
+    let pid = Call_stack.get_cur_proc_id cs in
     try Hashtbl.find prog.prog.predecessors (pid, prev, i)
     with _ ->
       raise
@@ -510,7 +510,7 @@ struct
    fun e ->
     try State.eval_expr state e
     with State.Internal_State_Error (errs, s) ->
-      raise (Interpreter_error (List.map (fun x -> ExecErr.ESt x) errs, s))
+      raise (Interpreter_error (List.map (fun x -> Exec_err.ESt x) errs, s))
 
   let check_loop_ids actual expected =
     match actual = expected with
@@ -715,7 +715,7 @@ struct
   let rec evaluate_cmd
       (prog : annot UP.prog)
       (state : State.t)
-      (cs : CallStack.t)
+      (cs : Call_stack.t)
       (iframes : invariant_frames)
       (prev : int)
       (prev_loop_ids : string list)
@@ -729,7 +729,7 @@ struct
     (* The full list of loop ids is the concatenation
        of the loop ids of the current procedure plus
        the loop ids that have come from the call stack *)
-    let loop_ids = Annot.get_loop_info annot @ CallStack.get_loop_ids cs in
+    let loop_ids = Annot.get_loop_info annot @ Call_stack.get_loop_ids cs in
 
     let loop_action : loop_action =
       if Exec_mode.verification_exec !Config.current_exec_mode then
@@ -762,7 +762,7 @@ struct
   and evaluate_cmd_after_frame_handling
       (prog : annot UP.prog)
       (state : State.t)
-      (cs : CallStack.t)
+      (cs : Call_stack.t)
       (iframes : invariant_frames)
       (prev : int)
       (prev_loop_ids : string list)
@@ -775,7 +775,7 @@ struct
     let eval_expr = make_eval_expr state in
     let proc_name, annot_cmd = get_cmd prog cs i in
     let annot, cmd = annot_cmd in
-    let loop_ids = Annot.get_loop_info annot @ CallStack.get_loop_ids cs in
+    let loop_ids = Annot.get_loop_info annot @ Call_stack.get_loop_ids cs in
     let loop_action : loop_action =
       if Exec_mode.verification_exec !Config.current_exec_mode then
         understand_loop_action loop_ids prev_loop_ids
@@ -803,7 +803,7 @@ struct
         match Val.to_literal pid with
         | Some (String pid) -> pid
         | Some _ ->
-            let err = [ ExecErr.EProc pid ] in
+            let err = [ Exec_err.EProc pid ] in
             raise (Interpreter_error (err, state))
         | None ->
             raise
@@ -822,7 +822,7 @@ struct
               (Interpreter_error
                  ([ EProc (Val.from_literal (String pid)) ], state))
       in
-      let caller = CallStack.get_cur_proc_id cs in
+      let caller = Call_stack.get_cur_proc_id cs in
       let () = CallGraph.add_proc_call call_graph caller pid in
       let prmlen = List.length params in
 
@@ -835,7 +835,7 @@ struct
       let process_ret is_first ret_state fl b_counter others : cconf_t =
         let new_cs =
           match is_first with
-          | true -> CallStack.copy cs
+          | true -> Call_stack.copy cs
           | false -> cs
         in
 
@@ -889,7 +889,7 @@ struct
         let state' = State.set_store state new_store in
         let cs' =
           (* Note the new loop identifiers *)
-          CallStack.push cs ~pid ~arguments:v_args ~store:old_store ~loop_ids
+          Call_stack.push cs ~pid ~arguments:v_args ~store:old_store ~loop_ids
             ~ret_var:x ~call_index:i ~continue_index:(i + 1) ?error_index:j ()
         in
         [
@@ -944,7 +944,7 @@ struct
                                   function %s"
                                  spec.spec.spec_name)))
                 | Error errors ->
-                    let errors = errors |> List.map (fun e -> ExecErr.ESt e) in
+                    let errors = errors |> List.map (fun e -> Exec_err.ESt e) in
                     [
                       ConfErr
                         {
@@ -979,7 +979,7 @@ struct
           match
             ( pid = caller,
               is_internal_proc pid,
-              CallStack.recursive_depth cs pid >= !Config.bi_unroll_depth )
+              Call_stack.recursive_depth cs pid >= !Config.bi_unroll_depth )
           with
           (* In bi-abduction, reached max depth of recursive calls *)
           | _, _, true -> []
@@ -988,7 +988,7 @@ struct
           (* TODO: When JS internals work
              | true, false, false
                when List.length
-                      (List.filter is_internal_proc (CallStack.get_cur_procs cs))
+                      (List.filter is_internal_proc (Call_stack.get_cur_procs cs))
                     < !Config.bi_no_spec_depth -> symb_exec_proc () *)
           | _ -> spec_exec_proc ())
       | false -> spec_exec_proc ()
@@ -1051,7 +1051,7 @@ struct
                        LAction (r_vs |> List.map state_vt_to_yojson)
                      in
                      ( make_confcont ~state:r_state'
-                         ~callstack:(CallStack.copy cs)
+                         ~callstack:(Call_stack.copy cs)
                          ~invariant_frames:iframes ~prev_idx:i ~loop_ids
                          ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
                          (),
@@ -1225,7 +1225,7 @@ struct
                          ~next_idx:(i + 1) ~branch_count:b_counter ?branch_case
                          ?new_branches ())
             | Error errors ->
-                let errors = errors |> List.map (fun e -> ExecErr.ESt e) in
+                let errors = errors |> List.map (fun e -> Exec_err.ESt e) in
                 [
                   ConfErr
                     {
@@ -1302,7 +1302,7 @@ struct
           sp
           |> List.mapi (fun j ((state, next), case) ->
                  make_confcont ~state
-                   ~callstack:(if j = 0 then cs else CallStack.copy cs)
+                   ~callstack:(if j = 0 then cs else Call_stack.copy cs)
                    ~invariant_frames:iframes ~prev_idx:i ~loop_ids
                    ~next_idx:next ~branch_count:b_counter
                    ~branch_case:(GuardedGoto case)
@@ -1384,7 +1384,7 @@ struct
     (* Arguments *)
     | Arguments x ->
         DL.log (fun m -> m "Arguments");
-        let args = CallStack.get_cur_args cs in
+        let args = Call_stack.get_cur_args cs in
         let args = Val.from_list args in
         let state' = update_store state x args in
         [
@@ -1487,7 +1487,7 @@ struct
     (* Explicit failure *)
     | Fail (fail_code, fail_params) ->
         let fail_params = List.map (State.eval_expr state) fail_params in
-        let err = ExecErr.EFailReached { fail_code; fail_params } in
+        let err = Exec_err.EFailReached { fail_code; fail_params } in
         raise (Interpreter_error ([ err ], state))
 
   let simplify state =
@@ -1496,7 +1496,7 @@ struct
   let protected_evaluate_cmd
       (prog : annot UP.prog)
       (state : State.t)
-      (cs : CallStack.t)
+      (cs : Call_stack.t)
       (iframes : invariant_frames)
       (prev : int)
       (prev_loop_ids : string list)
@@ -1535,7 +1535,7 @@ struct
                   callstack = cs;
                   proc_idx = i;
                   error_state;
-                  errors = List.map (fun x -> ExecErr.ESt x) errs;
+                  errors = List.map (fun x -> Exec_err.ESt x) errs;
                   branch_path = List_utils.cons_opt branch_case branch_path;
                 };
             ])
@@ -1777,9 +1777,9 @@ struct
               (ConfErr
                 { callstack; proc_idx; error_state; errors; branch_path }),
             _ ) ->
-            let proc = CallStack.get_cur_proc_id callstack in
+            let proc = Call_stack.get_cur_proc_id callstack in
             let result =
-              ExecRes.RFail { proc; proc_idx; error_state; errors }
+              Exec_res.RFail { proc; proc_idx; error_state; errors }
             in
             let results = (branch_path, result) :: results in
             if !Config.debug then end_of_branch results
@@ -1788,7 +1788,7 @@ struct
                   f rest_confs path results)
         | Some (ConfFinish { flag; ret_val; final_state; branch_path }), _ ->
             let result =
-              ExecRes.RSucc
+              Exec_res.RSucc
                 { flag; ret_val; final_state; last_report = L.Parent.get () }
             in
             let results = (branch_path, result) :: results in
@@ -1874,8 +1874,8 @@ struct
               raise (Failure "Symbolic State does NOT contain formal parameter"))
         params
     in
-    let cs : CallStack.t =
-      CallStack.push CallStack.empty ~pid:name ~arguments ~loop_ids:[]
+    let cs : Call_stack.t =
+      Call_stack.push Call_stack.empty ~pid:name ~arguments ~loop_ids:[]
         ~ret_var:"out" ~call_index:(-1) ~continue_index:(-1) ~error_index:(-1)
         ()
     in

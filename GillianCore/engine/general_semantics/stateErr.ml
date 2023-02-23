@@ -1,3 +1,6 @@
+(** @canonical Gillian.General.StateErr *)
+
+(** @canonical Gillian.General.StateErr.err_t *)
 type ('mem_err, 'value) err_t =
   | EMem of 'mem_err  (** Memory error, depends on instantiation *)
   | EType of 'value * Type.t option * Type.t

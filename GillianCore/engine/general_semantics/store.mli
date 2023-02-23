@@ -1,8 +1,10 @@
-(**
-  Interface for GIL Stores.
-  GIL stores are mappings from GIL variables to GIL values.
-  GIL stores are mutable.
-*)
+(** @canonical Gillian.General.Store
+
+  Interface for GIL Stores
+
+  GIL stores are (mutable) mappings from GIL variables to GIL values. *)
+
+(** @canonical Gillian.General.Store.S *)
 module type S = sig
   (** Type of GIL values *)
   type vt
@@ -68,4 +70,5 @@ module type S = sig
   val lvars : t -> Var.Set.t
 end
 
+(** @canonical Gillian.General.Store.Make *)
 module Make (Val : Val.S) : S with type vt = Val.t
