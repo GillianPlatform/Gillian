@@ -27,8 +27,6 @@ struct
   let is_concrete = Expr.is_concrete
 end
 
-(** @canonical Gillian.Symbolic.Values *)
-and SSubst : (Subst.S with type vt = M.t) = Subst.Make (M)
-
-(** @canonical Gillian.Symbolic.Values *)
+(** @canonical Gillian.Symbolic.Subst *)
 and SESubst : (ESubst.S with type vt = M.t) = ESubst.Make (M)
+and SSubst : (Subst.S with type vt = M.t) = Subst.Make (M)

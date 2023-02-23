@@ -42,7 +42,7 @@ end
 
 (** @canonical Gillian.Symbolic.Memory_S
   
-  Interface for a symblic memory model *)
+  Interface for a symbolic memory model *)
 module type Memory_S = SMemory.S
 
 (** @canonical Gillian.Symbolic.Dummy_memory *)

@@ -18,6 +18,7 @@ module Command_line = struct
   include Command_line
 end
 
+(** Interfaces for symbolic exectuion, including symbolic memory model *)
 module Symbolic = struct
   (** @inline *)
   include Engine.Symbolic
