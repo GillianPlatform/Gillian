@@ -3,147 +3,9 @@ open BranchCase
 module L = Logging
 module DL = Debugger_log
 open Syntaxes.Result
+include G_interpreter_intf
 
 type branch_case = BranchCase.t [@@deriving yojson]
-
-module type S = sig
-  module Call_stack : Call_stack.S
-
-  type vt
-  type st
-  type store_t
-  type state_t
-  type state_err_t [@@deriving show]
-  type state_vt [@@deriving yojson, show]
-  type heap_t
-  type init_data
-  type annot
-
-  module Val : Val.S with type t = vt
-  module Store : Store.S with type t = store_t and type vt = vt
-
-  type invariant_frames = (string * state_t) list
-  type err_t = (vt, state_err_t) Exec_err.t [@@deriving show, yojson]
-  type branch_path = branch_case list [@@deriving yojson]
-
-  type conf_err = {
-    callstack : Call_stack.t;
-    proc_idx : int;
-    error_state : state_t;
-    errors : err_t list;
-    branch_path : branch_path;
-  }
-
-  type conf_cont = {
-    state : state_t;
-    callstack : Call_stack.t;
-    invariant_frames : invariant_frames;
-    prev_idx : int;
-    next_idx : int;
-    loop_ids : string list;
-    branch_count : int;
-    prev_cmd_report_id : Logging.Report_id.t option;
-    branch_case : branch_case option;
-    branch_path : branch_path;
-    new_branches : (state_t * int * branch_case) list;
-  }
-
-  (** Equal to conf_cont + the id of the required spec *)
-  type conf_finish = {
-    flag : Flag.t;
-    ret_val : state_vt;
-    final_state : state_t;
-    branch_path : branch_path;
-  }
-
-  type conf_susp = {
-    spec_id : string;
-    state : state_t;
-    callstack : Call_stack.t;
-    invariant_frames : invariant_frames;
-    prev_idx : int;
-    next_idx : int;
-    loop_ids : string list;
-    branch_count : int;
-    branch_path : branch_path;
-  }
-
-  (** Type of configurations: state, call stack, previous index, previous loop ids, current index, branching *)
-  type cconf_t =
-    | ConfErr of conf_err
-    | ConfCont of conf_cont
-    | ConfFinish of conf_finish
-    | ConfSusp of conf_susp
-
-  type conf_t = BConfErr of err_t list | BConfCont of state_t
-  type result_t = (state_t, state_vt, err_t) Exec_res.t
-
-  type 'a cont_func_f = ?path:branch_path -> unit -> 'a cont_func
-
-  and 'a cont_func =
-    | Finished of 'a list
-    | Continue of
-        (Logging.Report_id.t option
-        * branch_path
-        * branch_case list option
-        * 'a cont_func_f)
-    | EndOfBranch of 'a * 'a cont_func_f
-
-  module Logging : sig
-    module ConfigReport : sig
-      type t = {
-        proc_line : int;
-        time : float;
-        cmd : int Cmd.t;
-        callstack : Call_stack.t;
-        annot : annot;
-        branching : int;
-        state : state_t;
-        branch_case : branch_case option;
-      }
-      [@@deriving yojson]
-    end
-
-    module CmdResult : sig
-      type t = {
-        callstack : Call_stack.t;
-        proc_body_index : int;
-        state : state_t option;
-        errors : err_t list;
-        branch_case : branch_case option;
-      }
-      [@@deriving yojson]
-    end
-
-    val pp_err : Format.formatter -> (vt, state_err_t) Exec_err.t -> unit
-    val pp_result : Format.formatter -> result_t list -> unit
-  end
-
-  val call_graph : CallGraph.t
-  val reset : unit -> unit
-
-  val evaluate_lcmds :
-    annot UP.prog ->
-    LCmd.t list ->
-    state_t ->
-    (state_t list, state_err_t list) result
-
-  val init_evaluate_proc :
-    (result_t -> 'a) ->
-    annot UP.prog ->
-    string ->
-    string list ->
-    state_t ->
-    'a cont_func
-
-  val evaluate_proc :
-    (result_t -> 'a) ->
-    annot UP.prog ->
-    string ->
-    string list ->
-    state_t ->
-    'a list
-end
 
 (** General GIL Interpreter *)
 module Make
@@ -185,59 +47,61 @@ struct
   type err_t = (Val.t, state_err_t) Exec_err.t [@@deriving show, yojson]
   type branch_path = branch_case list [@@deriving yojson]
 
-  type conf_err = {
-    callstack : Call_stack.t;
-    proc_idx : int;
-    error_state : state_t;
-    errors : err_t list;
-    branch_path : branch_path;
-  }
-  [@@deriving yojson]
-
-  type conf_cont = {
-    state : state_t;
-    callstack : Call_stack.t;
-    invariant_frames : invariant_frames;
-    prev_idx : int;
-    next_idx : int;
-    loop_ids : string list;
-    branch_count : int;
-    prev_cmd_report_id : Logging.Report_id.t option;
-    branch_case : branch_case option;
-    branch_path : branch_path;
-    new_branches : (state_t * int * branch_case) list;
-  }
-  [@@deriving yojson]
-
-  (** Equal to conf_cont + the id of the required spec *)
-  type conf_finish = {
-    flag : Flag.t;
-    ret_val : state_vt;
-    final_state : state_t;
-    branch_path : branch_path;
-  }
-  [@@deriving yojson]
-
-  type conf_susp = {
-    spec_id : string;
-    state : state_t;
-    callstack : Call_stack.t;
-    invariant_frames : invariant_frames;
-    prev_idx : int;
-    next_idx : int;
-    loop_ids : string list;
-    branch_count : int;
-    branch_path : branch_path;
-  }
-  [@@deriving yojson]
-
   (** Type of configurations: state, call stack, previous index, previous loop ids, current index, branching *)
-  type cconf_t =
-    | ConfErr of conf_err
-    | ConfCont of conf_cont
-    | ConfFinish of conf_finish
-    | ConfSusp of conf_susp
-  [@@deriving yojson]
+  module CConf = struct
+    type err = {
+      callstack : Call_stack.t;
+      proc_idx : int;
+      error_state : state_t;
+      errors : err_t list;
+      branch_path : branch_path;
+    }
+    [@@deriving yojson]
+
+    type cont = {
+      state : state_t;
+      callstack : Call_stack.t;
+      invariant_frames : invariant_frames;
+      prev_idx : int;
+      next_idx : int;
+      loop_ids : string list;
+      branch_count : int;
+      prev_cmd_report_id : Logging.Report_id.t option;
+      branch_case : branch_case option;
+      branch_path : branch_path;
+      new_branches : (state_t * int * branch_case) list;
+    }
+    [@@deriving yojson]
+
+    (** Equal to conf_cont + the id of the required spec *)
+    type finish = {
+      flag : Flag.t;
+      ret_val : state_vt;
+      final_state : state_t;
+      branch_path : branch_path;
+    }
+    [@@deriving yojson]
+
+    type susp = {
+      spec_id : string;
+      state : state_t;
+      callstack : Call_stack.t;
+      invariant_frames : invariant_frames;
+      prev_idx : int;
+      next_idx : int;
+      loop_ids : string list;
+      branch_count : int;
+      branch_path : branch_path;
+    }
+    [@@deriving yojson]
+
+    type t =
+      | ConfErr of err
+      | ConfCont of cont
+      | ConfFinish of finish
+      | ConfSusp of susp
+    [@@deriving yojson]
+  end
 
   let make_confcont
       ~state
@@ -257,7 +121,7 @@ struct
       if List.length callstack > 1 then (None, [])
       else (branch_case, new_branches)
     in
-    ConfCont
+    CConf.ConfCont
       {
         state;
         callstack;
@@ -272,12 +136,14 @@ struct
         new_branches;
       }
 
-  let cconf_path = function
-    | ConfErr { branch_path; _ } -> branch_path
-    | ConfFinish { branch_path; _ } -> branch_path
-    | ConfSusp { branch_path; _ } -> branch_path
-    | ConfCont { branch_path; branch_case; _ } ->
-        List_utils.cons_opt branch_case branch_path
+  let cconf_path =
+    CConf.(
+      function
+      | ConfErr { branch_path; _ } -> branch_path
+      | ConfFinish { branch_path; _ } -> branch_path
+      | ConfSusp { branch_path; _ } -> branch_path
+      | ConfCont { branch_path; branch_case; _ } ->
+          List_utils.cons_opt branch_case branch_path)
 
   type conf_t = BConfErr of err_t list | BConfCont of State.t
   type result_t = (State.t, State.vt, err_t) Exec_res.t [@@deriving yojson]
@@ -765,7 +631,7 @@ struct
       ?branch_case:branch_case ->
       ?new_branches:(state_t * int * branch_case) list ->
       unit ->
-      cconf_t
+      CConf.t
 
     type eval_state = {
       prog : annot UP.prog;
@@ -823,7 +689,7 @@ struct
           Array.to_list args
 
         let process_ret pid j eval_state is_first ret_state fl b_counter others
-            : cconf_t =
+            : CConf.t =
           let { i; cs; make_confcont; iframes; loop_ids; _ } = eval_state in
           let new_cs =
             match is_first with
@@ -856,7 +722,7 @@ struct
                     @@ List.map
                          (fun conf ->
                            match conf with
-                           | ConfCont { state; next_idx; _ } ->
+                           | CConf.ConfCont { state; next_idx; _ } ->
                                Some (state, next_idx, branch_case)
                            | _ -> None)
                          others)
@@ -962,7 +828,7 @@ struct
           in
           if Hashtbl.mem prog.prog.bi_specs pid then
             [
-              ConfSusp
+              CConf.ConfSusp
                 {
                   spec_id = pid;
                   state;
@@ -1495,7 +1361,7 @@ struct
                    should be re-added once stdout has been redirected. *)
               (* Fmt.pr "n @?"; *)
               [
-                ConfFinish
+                CConf.ConfFinish
                   {
                     flag = Normal;
                     ret_val = v_ret;
@@ -1554,7 +1420,7 @@ struct
             check_loop_ids loop_ids start_loop_ids;
             Fmt.pr "e @?";
             [
-              ConfFinish
+              CConf.ConfFinish
                 {
                   flag = Error;
                   ret_val = v_ret;
@@ -1671,7 +1537,7 @@ struct
         (b_counter : int)
         (report_id_ref : L.Report_id.t option ref)
         (branch_path : branch_path)
-        (branch_case : branch_case option) : cconf_t list =
+        (branch_case : branch_case option) : CConf.t list =
       let _, (annot, _) = get_cmd prog cs i in
 
       (* The full list of loop ids is the concatenation
@@ -1721,7 +1587,7 @@ struct
         (b_counter : int)
         (report_id_ref : L.Report_id.t option ref)
         (branch_path : branch_path)
-        (branch_case : branch_case option) : cconf_t list =
+        (branch_case : branch_case option) : CConf.t list =
       let store = State.get_store state in
       let eval_expr = make_eval_expr state in
       let proc_name, annot_cmd = get_cmd prog cs i in
@@ -1788,7 +1654,7 @@ struct
       (b_counter : int)
       (report_id_ref : L.Report_id.t option ref)
       (branch_path : branch_path)
-      (branch_case : branch_case option) : cconf_t list =
+      (branch_case : branch_case option) : CConf.t list =
     let states =
       match get_cmd prog cs i with
       | _, (_, LAction _) -> simplify state
@@ -1837,8 +1703,10 @@ struct
   @return Continuation function specifying the next step of evaluation
   *)
   module Evaluate_cmd_step = struct
+    open CConf
+
     type 'a f =
-      cconf_t list ->
+      CConf.t list ->
       branch_path option ->
       (branch_path * result_t) list ->
       'a cont_func
@@ -1848,7 +1716,7 @@ struct
       bool ->
       annot UP.prog ->
       'a list ->
-      (cconf_t * string) list ->
+      (CConf.t * string) list ->
       'a f
 
     type 'a eval_step_state = {
@@ -1856,11 +1724,11 @@ struct
       retry : bool;
       prog : annot UP.prog;
       hold_results : 'a list;
-      on_hold : (cconf_t * string) list;
+      on_hold : (CConf.t * string) list;
       branch_path : branch_path option;
       results : (branch_path * result_t) list;
-      conf : cconf_t option;
-      rest_confs : cconf_t list;
+      conf : CConf.t option;
+      rest_confs : CConf.t list;
       parent_id_ref : L.Report_id.t option ref;
       f : 'a f;
       eval_step : 'a eval_step;
@@ -1953,13 +1821,13 @@ struct
           let conf_json =
             match conf with
             | None -> `Null
-            | Some conf -> cconf_t_to_yojson conf
+            | Some conf -> CConf.to_yojson conf
           in
           m
             ~json:
               [
                 ("conf", conf_json);
-                ("rest_confs", `List (List.map cconf_t_to_yojson rest_confs));
+                ("rest_confs", `List (List.map CConf.to_yojson rest_confs));
               ]
             "G_interpreter.evaluate_cmd_step: Evaluating conf")
 
@@ -1984,7 +1852,7 @@ struct
                   let conf_json =
                     match conf with
                     | None -> `Null
-                    | Some conf -> cconf_t_to_yojson conf
+                    | Some conf -> CConf.to_yojson conf
                   in
                   [
                     ("branch_path", branch_path_to_yojson branch_path);
@@ -1992,7 +1860,7 @@ struct
                       opt_to_yojson branch_case_to_yojson branch_case );
                     ("results", `List result_jsons);
                     ("conf", conf_json);
-                    ("rest_confs", `List (List.map cconf_t_to_yojson rest_confs));
+                    ("rest_confs", `List (List.map CConf.to_yojson rest_confs));
                   ])
                 "No result for branch path!"
           | Some result ->
@@ -2035,7 +1903,7 @@ struct
                    eval_step ret_fun false prog results [] hold_confs path []))
                 eval_step_state
 
-      let cont (cconf : conf_cont) eval_step_state =
+      let cont (cconf : CConf.cont) eval_step_state =
         let { prog; parent_id_ref; f; rest_confs; results; _ } =
           eval_step_state
         in
@@ -2063,7 +1931,7 @@ struct
           (fun ?path () -> f (next_confs @ rest_confs) path results)
           eval_step_state
 
-      let max_branch (cconf : conf_cont) eval_step_state =
+      let max_branch (cconf : CConf.cont) eval_step_state =
         let { f; rest_confs; results; parent_id_ref; prog; _ } =
           eval_step_state
         in
@@ -2095,7 +1963,7 @@ struct
           (fun ?path () -> f rest_confs path results)
           eval_step_state
 
-      let err (cconf : conf_err) eval_step_state =
+      let err (cconf : CConf.err) eval_step_state =
         let { results; rest_confs; f; _ } = eval_step_state in
         let { callstack; proc_idx; error_state; errors; branch_path } = cconf in
         let proc = Call_stack.get_cur_proc_id callstack in
@@ -2107,7 +1975,7 @@ struct
             (fun ?path () -> f rest_confs path results)
             eval_step_state
 
-      let finish (cconf : conf_finish) eval_step_state =
+      let finish (cconf : CConf.finish) eval_step_state =
         let { results; rest_confs; f; _ } = eval_step_state in
         let { flag; ret_val; final_state; branch_path } = cconf in
         let result =
@@ -2121,7 +1989,7 @@ struct
             (fun ?path () -> f rest_confs path results)
             eval_step_state
 
-      let susp (cconf : conf_susp) eval_step_state =
+      let susp (cconf : CConf.susp) eval_step_state =
         let {
           eval_step;
           ret_fun;
@@ -2168,8 +2036,8 @@ struct
         (retry : bool)
         (prog : annot UP.prog)
         (hold_results : 'a list)
-        (on_hold : (cconf_t * string) list)
-        (confs : cconf_t list)
+        (on_hold : (CConf.t * string) list)
+        (confs : CConf.t list)
         (branch_path : branch_path option)
         (results : (branch_path * result_t) list) : 'a cont_func =
       let f = eval_step ret_fun retry prog hold_results on_hold in
@@ -2269,7 +2137,7 @@ struct
         ()
     in
     let proc_body_index = 0 in
-    let conf : cconf_t =
+    let conf : CConf.t =
       make_confcont ~state ~callstack:cs ~invariant_frames:[] ~prev_idx:(-1)
         ~loop_ids:[] ~next_idx:proc_body_index ~branch_count:0 ~branch_path:[]
         ()

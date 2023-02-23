@@ -481,7 +481,9 @@ functor
           | None -> state.lifter_state |> Lifter.select_next_path case prev_id
         in
         DL.log (fun m ->
-            m ~json:[ ("path", branch_path_to_yojson branch_path) ] "Got path");
+            m
+              ~json:[ ("path", BranchCase.path_to_yojson branch_path) ]
+              "Got path");
         branch_path
 
       let check_cur_report_id = function
