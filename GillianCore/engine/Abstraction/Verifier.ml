@@ -126,7 +126,7 @@ struct
 
   let reset () =
     VerificationResults.reset global_results;
-    SAInterpreter.reset ()
+    SAInterpreter.reset_call_graph ()
 
   module Hides_derivations = struct
     (** For a given definition of a predicate, this function derives the

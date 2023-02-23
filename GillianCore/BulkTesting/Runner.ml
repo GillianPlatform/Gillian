@@ -74,7 +74,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
 
   let before_execution () =
     Allocators.reset_all ();
-    Interpreter.reset ()
+    Interpreter.reset_call_graph ()
 
   let should_execute prog filename prev_results_opt =
     match prev_results_opt with

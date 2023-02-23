@@ -314,7 +314,7 @@ struct
   exception Syntax_error of string
 
   let call_graph = CallGraph.make ~init_capacity:128 ()
-  let reset () = CallGraph.reset call_graph
+  let reset_call_graph () = CallGraph.reset call_graph
 
   (* Often-used values *)
   let vtrue = Val.from_literal (Bool true)
