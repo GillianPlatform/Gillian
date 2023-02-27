@@ -869,30 +869,6 @@ let find_list_length_eqs (pfs : PFS.t) (e : Expr.t) : Cint.t list =
   in
   List.rev found_lengths
 
-let reduce_lstnth_lstsub les =
-  let list_start = ref None in
-  let len = Z.of_int (List.length les) in
-  let is_valid =
-    les
-    |> List_utils.for_alli (fun i le ->
-           match le with
-           | Expr.BinOp
-               ( Expr.LstSub (list', start', Lit (Int len')),
-                 LstNth,
-                 Lit (Int i') )
-             when Z.equal len len' && Z.equal (Z.of_int i) i' -> (
-               match !list_start with
-               | None ->
-                   list_start := Some (list', start');
-                   true
-               | Some (list, start) ->
-                   Expr.equal list list' && Expr.equal start start')
-           | _ -> false)
-  in
-  match (!list_start, is_valid) with
-  | Some (list, start), true -> Some (Expr.LstSub (list, start, Lit (Int len)))
-  | _ -> None
-
 (**
   Reduction of logical expressions
   - gamma is used for:
@@ -966,21 +942,18 @@ let rec reduce_lexpr_loop
     (* Base lists *)
     | EList les -> (
         let fles = List.map f les in
-        match reduce_lstnth_lstsub fles with
-        | Some e -> e
-        | None -> (
-            let all_literals =
-              let rec loop l =
-                match l with
-                | [] -> Some []
-                | Expr.Lit l :: r -> Option.map (fun x -> l :: x) (loop r)
-                | _ -> None
-              in
-              loop fles
-            in
-            match all_literals with
-            | Some lits -> Expr.Lit (LList lits)
-            | None -> EList fles))
+        let all_literals =
+          let rec loop l =
+            match l with
+            | [] -> Some []
+            | Expr.Lit l :: r -> Option.map (fun x -> l :: x) (loop r)
+            | _ -> None
+          in
+          loop fles
+        in
+        match all_literals with
+        | Some lits -> Expr.Lit (LList lits)
+        | None -> EList fles)
     (* Base sets *)
     | ESet les -> ESet (Expr.Set.elements (Expr.Set.of_list (List.map f les)))
     | UnOp (NumToInt, UnOp (IntToNum, le)) -> f le
