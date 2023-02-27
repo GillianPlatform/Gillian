@@ -262,6 +262,11 @@ module Axiomatised_operations = struct
     FuncDecl.mk_func_decl ctx (mk_string_symb "s-len") [ ints_sort ]
       numbers_sort
 
+  let llen_fun =
+    FuncDecl.mk_func_decl ctx (mk_string_symb "l-len")
+      [ Lit_operations.z3_list_of_literal_sort ]
+      ints_sort
+
   let num2str_fun =
     FuncDecl.mk_func_decl ctx (mk_string_symb "num2str") [ numbers_sort ]
       ints_sort
@@ -604,12 +609,20 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
               "SMT encoding: Construct not supported yet - binop: %s"
               (BinOp.str op)))
 
-let encode_unop (op : UnOp.t) le =
+let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
   let open Encoding in
   match op with
   | IUnaryMinus -> Arithmetic.mk_unary_minus ctx (get_int le) >- IntType
   | FUnaryMinus -> Arithmetic.mk_unary_minus ctx (get_num le) >- NumberType
-  | LstLen -> Z3.Seq.mk_seq_length ctx (get_list le) >- IntType
+  | LstLen ->
+      (* If we only use an LVar as an argument to llen, then encode it as an uninterpreted function. *)
+      let enc =
+        match e with
+        | Expr.LVar l when SS.mem l llen_lvars ->
+            Axiomatised_operations.llen_fun <| get_list le
+        | _ -> Z3.Seq.mk_seq_length ctx (get_list le)
+      in
+      enc >- IntType
   | StrLen -> Axiomatised_operations.slen_fun <| get_string le >- NumberType
   | ToStringOp -> Axiomatised_operations.num2str_fun <| get_num le >- StringType
   | ToNumberOp ->
@@ -662,9 +675,12 @@ let encode_unop (op : UnOp.t) le =
       flush stdout;
       raise (Failure msg)
 
-let rec encode_logical_expression ~(gamma : tyenv) (le : Expr.t) : Encoding.t =
+let rec encode_logical_expression
+    ~(gamma : tyenv)
+    ~(llen_lvars : SS.t)
+    (le : Expr.t) : Encoding.t =
   let open Encoding in
-  let f = encode_logical_expression ~gamma in
+  let f = encode_logical_expression ~gamma ~llen_lvars in
 
   match le with
   | Lit lit -> encode_lit lit
@@ -677,7 +693,7 @@ let rec encode_logical_expression ~(gamma : tyenv) (le : Expr.t) : Encoding.t =
           ZExpr.mk_const_s ctx var sort >- ty)
   | ALoc var -> ZExpr.mk_const_s ctx var ints_sort >- ObjectType
   | PVar _ -> raise (Failure "Program variable in pure formula: FIRE")
-  | UnOp (op, le) -> encode_unop op (f le)
+  | UnOp (op, le) -> encode_unop ~llen_lvars ~e:le op (f le)
   | BinOp (le1, op, le2) -> encode_binop op (f le1) (f le2)
   | NOp (SetUnion, les) ->
       let les = List.map (fun le -> get_set (f le)) les in
@@ -700,12 +716,12 @@ let rec encode_logical_expression ~(gamma : tyenv) (le : Expr.t) : Encoding.t =
       let len = get_int (f len) in
       Z3.Seq.mk_seq_extract ctx lst start len >- ListType
 
-let rec encode_forall ~gamma quantified_vars assertion =
+let rec encode_forall ~gamma ~llen_lvars quantified_vars assertion =
   let open Encoding in
   match quantified_vars with
   | [] ->
       (* A quantified assertion with no quantified variables is just the assertion *)
-      encode_assertion ~gamma assertion
+      encode_assertion ~gamma ~llen_lvars assertion
   | _ ->
       (* Start by updating gamma with the information provided by quantifier types.
          There's very few foralls, so it's ok to copy the gamma entirely *)
@@ -718,7 +734,7 @@ let rec encode_forall ~gamma quantified_vars assertion =
         quantified_vars;
       (* Not the same gamma now!*)
       let encoded_assertion =
-        match encode_assertion ~gamma assertion with
+        match encode_assertion ~gamma ~llen_lvars assertion with
         | { kind = Native BooleanType; expr } -> expr
         | _ -> failwith "the thing inside forall is not boolean!"
       in
@@ -740,9 +756,10 @@ let rec encode_forall ~gamma quantified_vars assertion =
       let quantifier_expr = Quantifier.expr_of_quantifier quantifier in
       ZExpr.simplify quantifier_expr None >- BooleanType
 
-and encode_assertion ~(gamma : tyenv) (a : Formula.t) : Encoding.t =
-  let f = encode_assertion ~gamma in
-  let fe = encode_logical_expression ~gamma in
+and encode_assertion ~(gamma : tyenv) ~(llen_lvars : SS.t) (a : Formula.t) :
+    Encoding.t =
+  let f = encode_assertion ~gamma ~llen_lvars in
+  let fe = encode_logical_expression ~gamma ~llen_lvars in
   let open Encoding in
   match a with
   | Not a -> Boolean.mk_not ctx (get_bool (f a)) >- BooleanType
@@ -768,15 +785,18 @@ and encode_assertion ~(gamma : tyenv) (a : Formula.t) : Encoding.t =
       Set.mk_membership ctx le1' le2' >- SetType
   | SetSub (le1, le2) ->
       Set.mk_subset ctx (get_set (fe le1)) (get_set (fe le2)) >- SetType
-  | ForAll (bt, a) -> encode_forall ~gamma bt a
+  | ForAll (bt, a) -> encode_forall ~gamma ~llen_lvars bt a
   | IsInt e -> Arithmetic.Real.mk_is_integer ctx (get_num (fe e)) >- BooleanType
 
 (* ****************
    * SATISFIABILITY *
    * **************** *)
 
-let encode_assertion_top_level ~(gamma : tyenv) (a : Formula.t) : ZExpr.expr =
-  try (encode_assertion ~gamma (Formula.push_in_negations a)).expr
+let encode_assertion_top_level
+    ~(gamma : tyenv)
+    ~(llen_lvars : SS.t)
+    (a : Formula.t) : ZExpr.expr =
+  try (encode_assertion ~gamma ~llen_lvars (Formula.push_in_negations a)).expr
   with Z3.Error s as exn ->
     let msg =
       Fmt.str "Failed to encode %a in gamma %a with error %s\n" Formula.pp a
@@ -785,6 +805,25 @@ let encode_assertion_top_level ~(gamma : tyenv) (a : Formula.t) : ZExpr.expr =
     Logging.print_to_all msg;
     raise exn
 
+(** Gets the list of lvar names that are only used in llen *)
+let lvars_only_in_llen (assertions : Formula.Set.t) : SS.t =
+  let inspector =
+    object
+      inherit [_] Visitors.iter as super
+      val mutable llen_vars = SS.empty
+      val mutable other_vars = SS.empty
+      method get_diff = SS.diff llen_vars other_vars
+
+      method! visit_expr () e =
+        match e with
+        | UnOp (UnOp.LstLen, Expr.LVar l) -> llen_vars <- SS.add l llen_vars
+        | LVar l -> other_vars <- SS.add l other_vars
+        | _ -> super#visit_expr () e
+    end
+  in
+  assertions |> Formula.Set.iter (inspector#visit_formula ());
+  inspector#get_diff
+
 (** For a given set of pure formulae and its associated gamma, return the corresponding encoding *)
 let encode_assertions (assertions : Formula.Set.t) (gamma : tyenv) :
     ZExpr.expr list =
@@ -792,10 +831,11 @@ let encode_assertions (assertions : Formula.Set.t) (gamma : tyenv) :
   match Hashtbl.find_opt encoding_cache assertions with
   | Some encoding -> encoding
   | None ->
+      let llen_lvars = lvars_only_in_llen assertions in
       (* Encode assertions *)
       let encoded_assertions =
         List.map
-          (encode_assertion_top_level ~gamma)
+          (encode_assertion_top_level ~gamma ~llen_lvars)
           (Formula.Set.elements assertions)
       in
       (* Cache *)

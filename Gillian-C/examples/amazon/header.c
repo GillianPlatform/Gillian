@@ -594,6 +594,7 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
             valid_aws_byte_cursor_ptr(#cur, #restLength, #cbptr, #restEDKsAndRest) * \
             valid_edk_array_list_ptr(#edk_al, #alloc, #acc) * \
             (len #acc == #i) * (#eList == #acc @ #restEDKs) * \
+            (#i <=# #edk_count) * \
             Elements(#edkDef, #restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength) * \
             (#restLength == len #restEDKsAndRest) * \
             (#rest_count == (#edk_count - #i)) * \
