@@ -113,6 +113,8 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token SETTOLIST
 %token LSTLEN
 %token STRLEN
+%token NUMTOINT
+%token INTTONUM
 (* Expression keywords *)
 %token TYPEOF
 %token ASSUME
@@ -165,6 +167,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LARROW
 %token LEMP
 %token EMPTYFIELDS
+%token ISINT
 (*%token LEXISTS *)
 %token LFORALL
 %token LTYPES
@@ -365,6 +368,8 @@ unop_target:
   | LSTREV      { UnOp.LstRev }
   | STRLEN      { UnOp.StrLen }
   | SETTOLIST   { UnOp.SetToList }
+  | INTTONUM    { UnOp.IntToNum }
+  | NUMTOINT    { UnOp.NumToInt }
 
 binop_target:
   | EQUAL              { BinOp.Equal }
@@ -447,6 +452,7 @@ pure_assertion_target:
   | left_ass=pure_assertion_target; LOR; right_ass=pure_assertion_target
     { Formula.Or (left_ass, right_ass) }
   | LNOT; ass=pure_assertion_target { Formula.Not (ass) }
+  | ISINT; expr=expr_target { Formula.IsInt (expr) }
   | LTRUE { Formula.True }
   | LFALSE { Formula.False }
   | left_expr=expr_target; LEQUAL; right_expr=expr_target
@@ -1011,6 +1017,8 @@ js_pure_assertion_target:
 (* ! Q *)
   | LNOT; ass=js_pure_assertion_target
     { JSAsrt.Not (ass) }
+(* is-int P *)
+  | ISINT; expr=js_lexpr_target { JSAsrt.IsInt (expr) }
 (* true *)
   | LTRUE
     { JSAsrt.True }
