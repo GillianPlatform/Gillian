@@ -387,6 +387,12 @@ module Type_lexpr = struct
         | BitwiseXorL
         | LeftShiftL
         | SignedRightShiftL
+        | BitwiseAndF
+        | BitwiseOrF
+        | BitwiseXorF
+        | LeftShiftF
+        | SignedRightShiftF
+        | UnsignedRightShiftF
         | M_atan2
         | M_pow ->
             infer_type le NumberType constraints

@@ -9,6 +9,7 @@ module Location : sig
 
   val none : t
   val pp : t Fmt.t
+  val pp_log_opt : Format.formatter -> t option -> unit
 end
 
 (** @canonical Gillian.Gil_syntax.LVar *)
