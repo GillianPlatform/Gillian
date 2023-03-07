@@ -5,7 +5,7 @@ import {
   VSCodeDivider,
 } from '@vscode/webview-ui-toolkit/react';
 import { CmdData } from '../../../types';
-import { Dims } from '../TreeMapView/TreeMapView';
+import type { Dims } from '../TreeMapView/TreeMapView';
 import NodeWrap from '../TreeMapView/NodeWrap';
 import { NodeProps } from 'react-flow-renderer';
 import { Code } from '../util';

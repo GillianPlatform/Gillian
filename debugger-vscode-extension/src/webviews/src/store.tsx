@@ -1,6 +1,7 @@
 import produce, { Draft, enableMapSet } from 'immer';
 import create, { State as ZState, StateCreator } from 'zustand';
 import { DebuggerState, UnifyMap, State, UnifyStep } from '../../types';
+import { requestUnification } from './VSCodeAPI';
 
 enableMapSet();
 const immer =
@@ -13,13 +14,14 @@ const immer =
 export type Store = State & {
   updateDebuggerState: (debuggerState: DebuggerState) => void;
   loadUnification: (unifyId: number, map: UnifyMap) => void;
+  requestUnification: (unifyId: number) => void;
   selectBaseUnification: (unifyId: number) => boolean;
   clearUnification: () => void;
   pushUnification: (unifyId: number) => boolean;
   popUnifications: (n: number) => void;
   selectUnifyStep: (step: UnifyStep) => void;
   toggleExecNodeExpanded: (id: string) => void;
-  toggleUnifyNodeExpanded: (id: string) => void;
+  toggleUnifyNodeExpanded: (id: number) => void;
 };
 
 const useStore = create<Store>(
@@ -39,7 +41,13 @@ const useStore = create<Store>(
       },
       loadUnification: (unifyId, map) => {
         set(({ unifyState }) => {
-          unifyState.unifications[unifyId] = { map };
+          unifyState.unifications[unifyId] = { id: unifyId, map };
+        });
+      },
+      requestUnification: unifyId => {
+        requestUnification(unifyId);
+        set(({ unifyState }) => {
+          unifyState.unifications[unifyId] = undefined;
         });
       },
       selectBaseUnification: unifyId => {
@@ -83,7 +91,7 @@ const useStore = create<Store>(
           else expandedExecNodes.add(id);
         });
       },
-      toggleUnifyNodeExpanded: (id: string) => {
+      toggleUnifyNodeExpanded: (id: number) => {
         set(({ unifyState: { expandedNodes } }) => {
           if (expandedNodes.has(id)) expandedNodes.delete(id);
           else expandedNodes.add(id);
@@ -98,6 +106,7 @@ export const mutateStore = () =>
     ({
       updateDebuggerState,
       loadUnification,
+      requestUnification,
       selectBaseUnification,
       clearUnification,
       pushUnification,
@@ -108,6 +117,7 @@ export const mutateStore = () =>
     }) => ({
       updateDebuggerState,
       loadUnification,
+      requestUnification,
       selectBaseUnification,
       clearUnification,
       pushUnification,

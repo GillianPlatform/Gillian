@@ -6,11 +6,7 @@ import TreeMapView, {
 } from '../TreeMapView/TreeMapView';
 import { execSpecific, jumpToId, startProc } from '../VSCodeAPI';
 import ExecMapNode, { ExecMapNodeData } from './ExecMapNode';
-import {
-  NODE_WIDTH,
-  NODE_HEIGHT,
-  DEFAULT_NODE_SIZE,
-} from '../TreeMapView/TreeMapView';
+import { NODE_HEIGHT, DEFAULT_NODE_SIZE } from '../TreeMapView/TreeMapView';
 
 export type Props = {
   state: DebuggerState;
@@ -40,8 +36,7 @@ const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
       isActive: currentProcName === mainProcName,
     },
     nexts: [[{ procName: mainProcName }, usedExecMap]],
-    width: NODE_WIDTH,
-    height: NODE_HEIGHT,
+    ...DEFAULT_NODE_SIZE,
   };
 
   const cleanNexts = (

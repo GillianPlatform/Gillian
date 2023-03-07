@@ -2,6 +2,7 @@ import React from 'react';
 import {
   UnificationState,
   UnifyMap,
+  UnifyMapInner,
   UnifySeg,
   UnifyStep,
 } from '../../../types';
@@ -19,14 +20,24 @@ import useStore from '../store';
 type Props = {
   unification: UnificationState;
   selectStep: (step: UnifyStep) => void;
-  expandedNodes: Set<string>;
+  unifications: Record<number, UnificationState | undefined>;
+  expandedNodes: Set<number>;
+  requestUnification: (id: number) => void;
+  toggleNodeExpanded: (id: number) => void;
 };
 
 type M = UnifySeg;
 type D = UnifyMapNodeData;
 type A = null;
 
-const UnifyMapView = ({ unification, selectStep, expandedNodes }: Props) => {
+const UnifyMapView = ({
+  unification,
+  selectStep,
+  expandedNodes,
+  unifications,
+  requestUnification,
+  toggleNodeExpanded,
+}: Props) => {
   const unifyMap = (unification.map as UnifyMap)[1];
   const selectedId = (() => {
     if (!unification.selected) {
@@ -41,22 +52,29 @@ const UnifyMapView = ({ unification, selectStep, expandedNodes }: Props) => {
   })();
 
   const [title, subtitle] = useStore(state => getUnifyName(state));
-  const initElem: TransformResult<M, D, A> = {
-    id: 'root',
+  const buildInitElem = (
+    id: number,
+    title: React.ReactNode,
+    subtitle: React.ReactNode = <></>,
+    map: UnifyMapInner
+  ): TransformResult<M, D, A> => ({
+    id: `root-${id}`,
     data: {
       type: 'Root',
       title,
       subtitle,
     },
     nexts: (() => {
-      if (unifyMap[0] === 'Direct') {
-        return [[null, unifyMap[1]]];
+      if (map[0] === 'Direct') {
+        return [[null, map[1]]];
       } else {
-        return unifyMap[1].map(seg => [null, seg]);
+        return map[1].map(seg => [null, seg]);
       }
     })(),
     ...DEFAULT_NODE_SIZE,
-  };
+  });
+
+  const initElem = buildInitElem(unification.id, title, subtitle, unifyMap);
 
   const transform: TransformFunc<M, D, A> = map => {
     if (map[0] === 'UnifyResult') {
@@ -76,18 +94,53 @@ const UnifyMapView = ({ unification, selectStep, expandedNodes }: Props) => {
     }
 
     const [, assertionData, next] = map;
-    const { id } = assertionData;
+    const isSelected = assertionData.id === selectedId;
+    const { id, fold } = assertionData;
+
+    const expanded = expandedNodes.has(id);
+    const [submap, hasSubmap] = (() => {
+      // No fold
+      if (fold === null) return [undefined, false];
+
+      const foldId = fold[0];
+
+      // Fold unification hasn't been requested yet
+      if (!(foldId in unifications)) {
+        requestUnification(foldId);
+        return [undefined, true];
+      }
+
+      const unification = unifications[foldId];
+
+      // Fold unification is loading or hidden
+      if (unification === undefined || !expanded) return [undefined, true];
+
+      const map = unification.map as UnifyMap;
+
+      const initElem = buildInitElem(foldId, <i>Fold</i>, undefined, map[1]);
+      return [initElem, true];
+    })();
+
+    const toggleExpanded = hasSubmap
+      ? () => {
+          toggleNodeExpanded(id);
+        }
+      : undefined;
+
     return {
       id: `${id}`,
       data: {
         type: 'Assertion',
         assertionData,
-        isSelected: id === selectedId,
+        isSelected,
         setSelected: () => {
           selectStep(['Assertion', assertionData]);
         },
+        expanded,
+        toggleExpanded,
       },
       nexts: [[null, next]],
+      submap,
       ...DEFAULT_NODE_SIZE,
     };
   };
