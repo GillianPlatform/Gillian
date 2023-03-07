@@ -3,7 +3,7 @@ import * as debug from './debug';
 
 import { getNonce } from './lib';
 import {
-  DebugState,
+  DebuggerState,
   MessageFromWebview,
   MessageToWebview,
   UnifyMap,
@@ -58,7 +58,7 @@ export class WebviewPanel {
 
   private async handleMessage(e: MessageFromWebview) {
     if (e.type === 'request_state_update') {
-      const state = await debug.getDebugState();
+      const state = await debug.getDebuggerState();
       if (state !== undefined) {
         this.updateState(state);
       }
@@ -77,7 +77,7 @@ export class WebviewPanel {
     }
   }
 
-  public updateState(state: DebugState) {
+  public updateState(state: DebuggerState) {
     console.info('Got state', state);
     this.sendMessage({ type: 'state_update', state });
   }

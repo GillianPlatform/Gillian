@@ -12,7 +12,7 @@ VSCodeAPI.onMessage(e => {
 
   if (message.type === 'state_update') {
     const { state } = message;
-    store.updateDebugState(state);
+    store.updateDebuggerState(state);
     const currentProcState = state.procs[state.currentProc];
     const { unifys } = currentProcState;
     if (unifys.length > 0) {

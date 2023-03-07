@@ -9,7 +9,7 @@ import {
 } from 'vscode';
 
 import { startDebugging } from './commands';
-import { BranchCase, DebugState, UnifyMap } from './types';
+import { BranchCase, DebuggerState, UnifyMap } from './types';
 import { WebviewPanel } from './WebviewPanel';
 
 type LogEvent = {
@@ -33,7 +33,7 @@ function handleCustomDebugEvent({
       console.log(`<D> ${msg}`, json);
     }
   } else if (event === 'debugStateUpdate') {
-    WebviewPanel.currentPanel?.updateState(body as DebugState);
+    WebviewPanel.currentPanel?.updateState(body as DebuggerState);
   } else {
     console.error(`Unhandled custom event '${event}'`);
   }
@@ -149,10 +149,10 @@ class ConfigurationProvider implements vscode.DebugConfigurationProvider {
   }
 }
 
-export async function getDebugState() {
+export async function getDebuggerState() {
   const session = vscode.debug.activeDebugSession;
   if (session !== undefined) {
-    const state: DebugState = await session.customRequest('debuggerState');
+    const state: DebuggerState = await session.customRequest('debuggerState');
     return state;
   }
 }

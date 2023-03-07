@@ -1,6 +1,6 @@
 import produce, { Draft, enableMapSet } from 'immer';
 import create, { State as ZState, StateCreator } from 'zustand';
-import { DebugState, UnifyMap, State, UnifyStep, UnifyKind } from '../../types';
+import { DebuggerState, UnifyMap, State, UnifyStep } from '../../types';
 
 enableMapSet();
 const immer =
@@ -11,13 +11,15 @@ const immer =
     config(fn => set(produce<T>(fn)), get, api);
 
 export type Store = State & {
-  updateDebugState: (debugState: DebugState) => void;
+  updateDebuggerState: (debuggerState: DebuggerState) => void;
   loadUnification: (unifyId: number, map: UnifyMap) => void;
   selectBaseUnification: (unifyId: number) => boolean;
   clearUnification: () => void;
   pushUnification: (unifyId: number) => boolean;
   popUnifications: (n: number) => void;
   selectUnifyStep: (step: UnifyStep) => void;
+  toggleExecNodeExpanded: (id: string) => void;
+  toggleUnifyNodeExpanded: (id: string) => void;
 };
 
 const useStore = create<Store>(
@@ -29,9 +31,11 @@ const useStore = create<Store>(
       unifyState: {
         path: [],
         unifications: {},
+        expandedNodes: new Set(),
       },
-      updateDebugState: debugState => {
-        set(() => ({ debugState }));
+      expandedExecNodes: new Set(),
+      updateDebuggerState: debuggerState => {
+        set(() => ({ debuggerState }));
       },
       loadUnification: (unifyId, map) => {
         set(({ unifyState }) => {
@@ -41,12 +45,14 @@ const useStore = create<Store>(
       selectBaseUnification: unifyId => {
         set(({ unifyState }) => {
           unifyState.path = [unifyId];
+          unifyState.expandedNodes.clear();
         });
         return isUnifyInStore(unifyId);
       },
       clearUnification: () => {
         set(({ unifyState }) => {
           unifyState.path = [];
+          unifyState.expandedNodes.clear();
         });
       },
       pushUnification: (unifyId: number) => {
@@ -71,6 +77,18 @@ const useStore = create<Store>(
           }
         });
       },
+      toggleExecNodeExpanded: (id: string) => {
+        set(({ expandedExecNodes }) => {
+          if (expandedExecNodes.has(id)) expandedExecNodes.delete(id);
+          else expandedExecNodes.add(id);
+        });
+      },
+      toggleUnifyNodeExpanded: (id: string) => {
+        set(({ unifyState: { expandedNodes } }) => {
+          if (expandedNodes.has(id)) expandedNodes.delete(id);
+          else expandedNodes.add(id);
+        });
+      },
     };
   })
 );
@@ -78,21 +96,25 @@ const useStore = create<Store>(
 export const mutateStore = () =>
   useStore(
     ({
-      updateDebugState,
+      updateDebuggerState,
       loadUnification,
       selectBaseUnification,
       clearUnification,
       pushUnification,
       popUnifications,
       selectUnifyStep,
+      toggleExecNodeExpanded,
+      toggleUnifyNodeExpanded,
     }) => ({
-      updateDebugState,
+      updateDebuggerState,
       loadUnification,
       selectBaseUnification,
       clearUnification,
       pushUnification,
       popUnifications,
       selectUnifyStep,
+      toggleExecNodeExpanded,
+      toggleUnifyNodeExpanded,
     })
   );
 

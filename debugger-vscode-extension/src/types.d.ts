@@ -75,7 +75,7 @@ export type DebugProcState = {
   readonly procName: string;
 };
 
-export type DebugState = {
+export type DebuggerState = {
   readonly mainProc: string;
   readonly currentProc: string;
   readonly procs: Record<string, DebugProcState>;
@@ -93,18 +93,20 @@ export type UnificationState = {
 export type UnifyState = {
   readonly path: number[];
   readonly unifications: Record<number, UnificationState | undefined>;
+  readonly expandedNodes: Set<string>;
 };
 
 export type State = {
-  readonly debugState?: DebugState;
+  readonly debuggerState?: DebuggerState;
   readonly unifyState: UnifyState;
+  readonly expandedExecNodes: Set<string>;
 };
 
 // #region MessageToWebview
 
 type StateUpdateMsg = {
   readonly type: 'state_update';
-  readonly state: DebugState;
+  readonly state: DebuggerState;
 };
 
 type UnifyUpdateMsg = {

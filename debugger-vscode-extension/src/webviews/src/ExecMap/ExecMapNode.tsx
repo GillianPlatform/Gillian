@@ -20,6 +20,8 @@ export type ExecMapNodeData = { isActive: boolean } & (
       isCurrentCmd: boolean;
       hasParent: boolean;
       jump: () => void;
+      expanded: boolean;
+      toggleExpanded?: () => void;
     }
   | {
       type: 'Empty';
@@ -72,35 +74,42 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & Dims>) => {
     );
   }
 
-  const { cmdData, isFinal, isCurrentCmd, hasParent } = data;
+  const {
+    cmdData,
+    isFinal,
+    isCurrentCmd,
+    hasParent,
+    expanded,
+    toggleExpanded,
+    jump,
+  } = data;
 
   const unifyBadge = (() => {
-    if (cmdData.unifys.length > 0) {
-      const [result] = cmdData.unifys[0].result;
-      const colorStyle = result === 'Success' ? {} : { color: 'red' };
-      return (
-        <>
-          <VSCodeBadge>
-            <div
-              style={colorStyle}
-              className={`codicon codicon-${
-                result === 'Success' ? 'pass' : 'error'
-              }`}
-            />
-            &nbsp;
-            <div style={colorStyle}>Unify</div>
-          </VSCodeBadge>
+    if (cmdData.unifys.length === 0) return <></>;
+
+    const [result] = cmdData.unifys[0].result;
+    const colorStyle = result === 'Success' ? {} : { color: 'red' };
+    return (
+      <>
+        <VSCodeBadge>
+          <div
+            style={colorStyle}
+            className={`codicon codicon-${
+              result === 'Success' ? 'pass' : 'error'
+            }`}
+          />
           &nbsp;
-        </>
-      );
-    } else {
-      return <></>;
-    }
+          <div style={colorStyle}>Unify</div>
+        </VSCodeBadge>
+        &nbsp;
+      </>
+    );
   })();
 
-  let errorTooltip = <></>;
-  if (cmdData.errors.length > 0) {
-    errorTooltip = (
+  const errorTooltip = (() => {
+    if (cmdData.errors.length === 0) return <></>;
+
+    return (
       <>
         <VSCodeDivider />
         <div className="tooltip-error">
@@ -112,7 +121,24 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & Dims>) => {
         </div>
       </>
     );
-  }
+  })();
+
+  const expandButton = (() => {
+    if (toggleExpanded === undefined) return <></>;
+
+    const icon = expanded ? 'chevron-down' : 'chevron-right';
+
+    return (
+      <VSCodeButton
+        appearance="icon"
+        aria-label="Expand / Collapse"
+        title="Expand / Collapse"
+        onClick={toggleExpanded}
+      >
+        <span className={`codicon codicon-${icon}`} />
+      </VSCodeButton>
+    );
+  })();
 
   const tooltip = (
     <div className="tooltip">
@@ -140,10 +166,11 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & Dims>) => {
           aria-label="Jump here"
           title="Jump here"
           disabled={isCurrentCmd}
-          onClick={isCurrentCmd ? undefined : data.jump}
+          onClick={isCurrentCmd ? undefined : jump}
         >
           <span className="codicon codicon-target" />
         </VSCodeButton>
+        {expandButton}
       </div>
     </NodeWrap>
   );

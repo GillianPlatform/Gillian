@@ -8,7 +8,9 @@ import UnifyData from './UnifyData';
 import UnifyMapView from './UnifyMapView';
 
 const UnifyView = () => {
-  const { path, unifications } = useStore(({ unifyState }) => unifyState);
+  const { path, unifications, expandedNodes } = useStore(
+    ({ unifyState }) => unifyState
+  );
   const selectStep = useStore(({ selectUnifyStep }) => selectUnifyStep);
 
   const hasUnify = path && path.length > 0;
@@ -35,7 +37,7 @@ const UnifyView = () => {
 
       return <Loading refresh={load} />;
     }
-    return <UnifyMapView {...{ unification, selectStep }} />;
+    return <UnifyMapView {...{ unification, selectStep, expandedNodes }} />;
   })();
 
   return (

@@ -7,14 +7,18 @@ import VSCodeAPI from './VSCodeAPI';
 import './style.css';
 
 const App = () => {
-  const { debugState } = useStore();
+  const { debuggerState } = useStore();
 
   const refresh = () => {
     VSCodeAPI.postMessage({ type: 'request_state_update' });
   };
 
   const content =
-    debugState === undefined ? <Loading {...{ refresh }} /> : <DebuggerPanel />;
+    debuggerState === undefined ? (
+      <Loading {...{ refresh }} />
+    ) : (
+      <DebuggerPanel />
+    );
 
   return (
     <div style={{ margin: '10px', boxSizing: 'border-box' }}>{content}</div>

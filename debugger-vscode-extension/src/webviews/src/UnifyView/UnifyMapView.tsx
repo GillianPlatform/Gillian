@@ -19,13 +19,14 @@ import useStore from '../store';
 type Props = {
   unification: UnificationState;
   selectStep: (step: UnifyStep) => void;
+  expandedNodes: Set<string>;
 };
 
 type M = UnifySeg;
 type D = UnifyMapNodeData;
 type A = null;
 
-const UnifyMapView = ({ unification, selectStep }: Props) => {
+const UnifyMapView = ({ unification, selectStep, expandedNodes }: Props) => {
   const unifyMap = (unification.map as UnifyMap)[1];
   const selectedId = (() => {
     if (!unification.selected) {
@@ -92,7 +93,9 @@ const UnifyMapView = ({ unification, selectStep }: Props) => {
   };
 
   return (
-    <TreeMapView {...{ initElem, transform, nodeComponent: UnifyMapNode }} />
+    <TreeMapView
+      {...{ initElem, transform, nodeComponent: UnifyMapNode, expandedNodes }}
+    />
   );
 };
 

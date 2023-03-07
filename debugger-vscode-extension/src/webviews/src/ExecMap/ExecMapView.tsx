@@ -1,5 +1,5 @@
 import React from 'react';
-import { BranchCase, DebugState, ExecMap } from '../../../types';
+import { BranchCase, DebuggerState, ExecMap } from '../../../types';
 import TreeMapView, {
   TransformResult,
   TransformFunc,
@@ -13,7 +13,9 @@ import {
 } from '../TreeMapView/TreeMapView';
 
 export type Props = {
-  state: DebugState;
+  state: DebuggerState;
+  expandedNodes: Set<string>;
+  toggleNodeExpanded: (id: string) => void;
 };
 
 type M = ExecMap;
@@ -24,7 +26,7 @@ type A = {
   hasParent?: boolean;
 };
 
-const ExecMapView = ({ state }: Props) => {
+const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
   const { mainProc: mainProcName, currentProc: currentProcName, procs } = state;
   const mainProc = procs[mainProcName];
   const { execMap, liftedExecMap } = mainProc;
@@ -90,10 +92,18 @@ const ExecMapView = ({ state }: Props) => {
       }
     })();
 
+    const id = `${cmdData.ids[0]}`;
+    const expanded = expandedNodes.has(id);
+
+    let hasSubmap = false;
     const submap = (() => {
-      if (cmdData.submap[0] === 'NoSubmap') {
-        return undefined;
-      } else if (cmdData.submap[0] === 'Submap') {
+      if (cmdData.submap[0] === 'NoSubmap') return undefined;
+
+      hasSubmap = true;
+
+      if (!expanded) return undefined;
+
+      if (cmdData.submap[0] === 'Submap') {
         return transform(cmdData.submap[1], undefined, {
           procName,
           hasParent: false,
@@ -127,12 +137,18 @@ const ExecMapView = ({ state }: Props) => {
       }
     })();
 
+    const toggleExpanded = hasSubmap
+      ? () => {
+          toggleNodeExpanded(id);
+        }
+      : undefined;
+
     const isCurrentCmd =
       procName === currentProcName &&
       cmdData.ids.includes(procState.currentCmdId);
 
     return {
-      id: `${cmdData.ids[0]}`,
+      id,
       data: {
         type: 'Cmd',
         cmdData,
@@ -143,6 +159,8 @@ const ExecMapView = ({ state }: Props) => {
         jump: () => {
           jumpToId(procName, cmdData.ids[0]);
         },
+        expanded,
+        toggleExpanded,
       },
       nexts,
       edgeLabel,

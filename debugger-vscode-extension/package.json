@@ -28,7 +28,7 @@
   },
   "scripts": {
     "extension:build": "webpack",
-    "extension:watch": "tsc -watch -p ./",
+    "extension:watch": "tsc --watch --preserveWatchOutput -p ./",
     "webview:build": "TAILWIND_MODE='build' snowpack build",
     "webview:watch": "nodemon --watch src/webviews/ -e 'ts,tsx,css' --exec snowpack build",
     "build": "run-s extension:build webview:build",
