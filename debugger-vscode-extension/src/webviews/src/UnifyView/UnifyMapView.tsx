@@ -127,6 +127,11 @@ const UnifyMapView = ({
         }
       : undefined;
 
+    const [nexts, result]: [[null, UnifySeg][], boolean | undefined] = (() => {
+      if (next[0] !== 'UnifyResult') return [[[null, next]], undefined];
+      if (next[2][0] === 'Success') return [[], true];
+      return [[], false];
+    })();
     return {
       id: `${id}`,
       data: {
@@ -138,8 +143,9 @@ const UnifyMapView = ({
         },
         expanded,
         toggleExpanded,
+        result,
       },
-      nexts: [[null, next]],
+      nexts,
       submap,
       ...DEFAULT_NODE_SIZE,
     };

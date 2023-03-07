@@ -15,6 +15,7 @@ export type UnifyMapNodeData =
       setSelected: () => void;
       expanded: boolean;
       toggleExpanded?: () => void;
+      result?: boolean;
     }
   | {
       type: 'Result';
@@ -65,8 +66,14 @@ const UnifyMapNode = ({ data }: NodeProps<UnifyMapNodeData & Dims>) => {
     );
   }
 
-  const { isSelected, setSelected, assertionData, toggleExpanded, expanded } =
-    data;
+  const {
+    isSelected,
+    setSelected,
+    assertionData,
+    toggleExpanded,
+    expanded,
+    result,
+  } = data;
 
   const { fold } = assertionData;
   const foldBadge = (() => {
@@ -108,7 +115,13 @@ const UnifyMapNode = ({ data }: NodeProps<UnifyMapNodeData & Dims>) => {
   })();
 
   return (
-    <NodeWrap selected={isSelected} width={width} height={height}>
+    <NodeWrap
+      selected={isSelected}
+      noSourceHandle={result !== undefined}
+      error={result === false}
+      width={width}
+      height={height}
+    >
       <pre>{assertionData.assertion}</pre>
       <div className="node-button-row">
         {foldBadge}
