@@ -47,6 +47,10 @@ You can automatically format the code by running:
 
 It's recommended that you install the provided git hooks (by running ``githooks/install.ml``) to enforce code style.
 
+We advise using `the _intf trick <https://www.craigfe.io/posts/the-intf-trick>`_ where appropriate to avoid code duplication.
+
+When you have a function that returns an ``option``, and an extension-raising equivalent, you should name them ``foo`` and ``foo_exn`` respectively, rather than ``foo_opt`` and ``foo``.
+
 Documentation
 =============
 
