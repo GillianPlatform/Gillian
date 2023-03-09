@@ -1,0 +1,16 @@
+
+function simple(x) {
+    r := [x];
+    return r
+}
+
+ function llen(x) {
+    if (x = null) {
+        n := 0
+    } else {
+        t := [x+1];
+        n := llen(t);
+        n := n + 1
+    };
+    return n
+}

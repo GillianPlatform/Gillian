@@ -1,0 +1,7 @@
+
+{ (x == #x) * (y == #y) * (x == 5)}
+function read(x, y) {
+    r := [y];
+    return r
+}
+{ (ret == y) }

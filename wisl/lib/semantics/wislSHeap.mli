@@ -10,7 +10,7 @@ type err =
   | UseAfterFree of string
   | MemoryLeak
   | OutOfBounds of (int option * string * Expr.t)
-  | InvalidLocation
+  | InvalidLocation of Expr.t
 [@@deriving yojson, show]
 
 val init : unit -> t
