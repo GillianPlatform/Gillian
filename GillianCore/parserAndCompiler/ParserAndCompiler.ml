@@ -5,7 +5,7 @@ type ('annot, 'tl_ast, 'init_data) compiled_progs = {
   init_data : 'init_data;
 }
 
-let get_progs_or_fail pp_err = function
+let get_progs_or_fail ~pp_err = function
   | Ok progs -> (
       match progs.gil_progs with
       | [] ->

@@ -11,7 +11,7 @@ type ('annot, 'tl_ast, 'init_data) compiled_progs = {
 }
 
 val get_progs_or_fail :
-  (Format.formatter -> 'e -> unit) ->
+  pp_err:(Format.formatter -> 'e -> unit) ->
   (('a, 'b, 'c) compiled_progs, 'e) result ->
   ('a, 'b, 'c) compiled_progs
 

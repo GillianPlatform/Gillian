@@ -77,7 +77,7 @@ struct
                to Gil. ***@\n")
       in
       let progs =
-        ParserAndCompiler.get_progs_or_fail PC.pp_err
+        ParserAndCompiler.get_progs_or_fail ~pp_err:PC.pp_err
           (PC.parse_and_compile_files files)
       in
       let init_data = progs.init_data in
