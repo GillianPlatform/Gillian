@@ -10,7 +10,7 @@ import React, { useEffect, useMemo } from 'react';
 import { UnifyMap, UnifySeg, UnifyStep } from '../../../types';
 import useStore, { mutateStore } from '../store';
 import { Code, showBaseUnifyKind } from '../util';
-import VSCodeAPI from '../VSCodeAPI';
+import { requestUnification } from '../VSCodeAPI';
 
 import './UnifyData.css';
 
@@ -29,7 +29,7 @@ const extractTargets = (seg: UnifySeg): { [key: number]: UnifyStep } => {
 };
 
 const UnifyData = ({ selectStep }: Props) => {
-  const mainProcName = useStore(store => store.debugState?.mainProc || '');
+  const mainProcName = useStore(store => store.debuggerState?.mainProc || '');
   const [{ path, unifications }, baseUnifyKind] = useStore(store => [
     store.unifyState,
     showBaseUnifyKind(store),
@@ -127,10 +127,7 @@ const UnifyData = ({ selectStep }: Props) => {
       const stepInFold = () => {
         const isInStore = pushUnification(foldId);
         if (!isInStore) {
-          VSCodeAPI.postMessage({
-            type: 'request_unification',
-            id: foldId,
-          });
+          requestUnification(foldId);
         }
       };
       stepInFoldButton = (

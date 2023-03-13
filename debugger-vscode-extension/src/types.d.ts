@@ -60,10 +60,11 @@ export type UnifyKind = [
   'Postcondition' | 'Fold' | 'FunctionCall' | 'Invariant' | 'LogicCommand'
 ];
 
-export type UnifyMap = readonly [
-  UnifyKind,
-  readonly ['Direct', UnifySeg] | readonly ['Fold', UnifySeg[]]
-];
+export type UnifyMapInner =
+  | readonly ['Direct', UnifySeg]
+  | readonly ['Fold', UnifySeg[]];
+
+export type UnifyMap = readonly [UnifyKind, UnifyMapInner];
 
 // #endregion
 
@@ -75,7 +76,7 @@ export type DebugProcState = {
   readonly procName: string;
 };
 
-export type DebugState = {
+export type DebuggerState = {
   readonly mainProc: string;
   readonly currentProc: string;
   readonly procs: Record<string, DebugProcState>;
@@ -86,6 +87,7 @@ export type UnifyStep =
   | readonly ['Result', number, UnifyResult];
 
 export type UnificationState = {
+  readonly id: number;
   readonly map: unknown; // TODO: fix when Immer supports recursive types
   readonly selected?: UnifyStep;
 };
@@ -93,18 +95,20 @@ export type UnificationState = {
 export type UnifyState = {
   readonly path: number[];
   readonly unifications: Record<number, UnificationState | undefined>;
+  readonly expandedNodes: Set<number>;
 };
 
 export type State = {
-  readonly debugState?: DebugState;
+  readonly debuggerState?: DebuggerState;
   readonly unifyState: UnifyState;
+  readonly expandedExecNodes: Set<string>;
 };
 
 // #region MessageToWebview
 
 type StateUpdateMsg = {
   readonly type: 'state_update';
-  readonly state: DebugState;
+  readonly state: DebuggerState;
 };
 
 type UnifyUpdateMsg = {
@@ -121,7 +125,7 @@ export type MessageToWebview = StateUpdateMsg | UnifyUpdateMsg | ResetViewMsg;
 
 // #endregion
 
-// #region MessageFromWebiew
+// #region MessageFromWebview
 
 type RequestStateUpdateMsg = {
   readonly type: 'request_state_update';
