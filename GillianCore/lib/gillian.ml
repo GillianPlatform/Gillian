@@ -12,7 +12,12 @@ module Gil_parsing = struct
   include Gil_parsing
 end
 
-module CommandLine = CommandLine
+(** Gillian's command-line interface *)
+module Command_line = struct
+  (** @inline *)
+  include Command_line
+end
+
 module Symbolic = Engine.Symbolic
 module Concrete = Engine.Concrete
 module General = Engine.General

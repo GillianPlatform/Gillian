@@ -1,5 +1,5 @@
 module CLI =
-  Gillian.CommandLine.Make
+  Gillian.Command_line.Make
     (Gillian.General.Init_data.Dummy)
     (Semantics.Concrete)
     (Semantics.Symbolic)

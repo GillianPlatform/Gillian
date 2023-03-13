@@ -1,14 +1,22 @@
 open Containers
 
+module type S = sig
+  type init_data
+  type annot
+
+  val test_prog :
+    init_data:init_data -> annot UP.prog -> bool -> SourceFiles.t option -> unit
+end
+
 module Make
     (SPState : PState.S
                  with type vt = SVal.M.t
                   and type st = SVal.SESubst.t
                   and type store_t = SStore.t
                   and type preds_t = Preds.SPreds.t)
-    (PC : ParserAndCompiler.S)
-    (External : External.T(PC.Annot).S) =
-struct
+    (PC : ParserAndCompiler.S with type init_data = SPState.init_data)
+    (External : External.T(PC.Annot).S) :
+  S with type annot = PC.Annot.t and type init_data = PC.init_data = struct
   module L = Logging
   module SSubst = SVal.SESubst
   module Normaliser = Normaliser.Make (SPState)
@@ -19,10 +27,10 @@ struct
       (External)
 
   type bi_state_t = SBAState.t
-  type abs_state = SPState.t
   type result_t = SBAInterpreter.result_t
   type t = { name : string; params : string list; state : bi_state_t }
   type annot = PC.Annot.t
+  type init_data = PC.init_data
 
   let make_id_subst (a : Asrt.t) : SSubst.t =
     let lvars = Asrt.lvars a in
@@ -432,7 +440,7 @@ end
 
 module From_scratch
     (SMemory : SMemory.S)
-    (PC : ParserAndCompiler.S)
+    (PC : ParserAndCompiler.S with type init_data = SMemory.init_data)
     (External : External.T(PC.Annot).S) =
   Make
     (PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState.Make (SMemory))

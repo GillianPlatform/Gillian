@@ -13,7 +13,8 @@ struct
 end
 
 module CLI =
-  Gillian.CommandLine.Make (Global_env) (CMemory) (SMemory) (CParserAndCompiler)
+  Gillian.Command_line.Make (Global_env) (CMemory) (SMemory)
+    (CParserAndCompiler)
     (External.M)
     (struct
       let runners : Gillian.Bulk.Runner.t list =

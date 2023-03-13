@@ -33,7 +33,7 @@ let pp_err fmt = function
   | JSParserErr s -> Fmt.pf fmt "Parsing error: %s\n" (JS_Parser.Error.str s)
 
 let create_compilation_result path prog tl_prog =
-  let open CommandLine.ParserAndCompiler in
+  let open Command_line.ParserAndCompiler in
   let open IncrementalAnalysis in
   let source_files = SourceFiles.make () in
   (* TODO (Alexis): Track any require()'d modules *)

@@ -1,7 +1,8 @@
-(** @canonical Gillian.Gil_parsing.Make *)
-module Make (Annot : Annot.S) : sig
+module type S = sig
+  type annot
+
   type parsing_result = {
-    labeled_prog : (Annot.t, string) Prog.t;  (** The parsed program *)
+    labeled_prog : (annot, string) Prog.t;  (** The parsed program *)
     init_data : Yojson.Safe.t;  (** Will be `Null if no [init_data] is parsed *)
   }
 
@@ -20,19 +21,25 @@ module Make (Annot : Annot.S) : sig
       [parse_and_compile_jsil_file] is a function that takes a file path, parses
       the file as a JSIL program, and compiles this to a GIL program. *)
   val eprog_to_prog :
-    other_imports:(string * (string -> (Annot.t, string) Prog.t)) list ->
-    (Annot.t, string) Prog.t ->
-    (Annot.t, int) Prog.t
+    other_imports:(string * (string -> (annot, string) Prog.t)) list ->
+    (annot, string) Prog.t ->
+    (annot, int) Prog.t
 
   (** Caches a mapping from the output GIL filepaths to the corresponding
       sring-labelled GIL programs. Can be called before [eprog_to_prog] in order
       to allow the import-resolving mechanism to work without having to first
       write the GIL programs to file. *)
-  val cache_labelled_progs : (string * (Annot.t, string) Prog.t) list -> unit
+  val cache_labelled_progs : (string * (annot, string) Prog.t) list -> unit
 
   (** Parses a [Literal.t] from a lexbuf; raises [Failure] if parsing fails. *)
   val parse_literal : Lexing.lexbuf -> Literal.t
 
   (** Parses a [Expr.t] from a lexbuf; raises [Failure] if parsing fails. *)
   val parse_expression : Lexing.lexbuf -> Expr.t
+end
+
+module type Intf = sig
+  module type S = S
+
+  module Make (Annot : Annot.S) : S with type annot = Annot.t
 end
