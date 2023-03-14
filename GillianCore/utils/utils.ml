@@ -22,6 +22,12 @@ module Config = struct
   include Config
 end
 
+(** @canonical Gillian.Utils.Command_line_utils *)
+module Command_line_utils = struct
+  (** @inline *)
+  include Command_line_utils
+end
+
 (** @canonical Gillian.Utils.Containers *)
 module Containers = struct
   (** @inline *)

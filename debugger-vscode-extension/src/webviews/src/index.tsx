@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import App from './App';
 import useDebugStore from './store';
 import './vscode.css';
-import VSCodeAPI from './VSCodeAPI';
+import VSCodeAPI, { requestUnification } from './VSCodeAPI';
 import * as events from './events';
 
 VSCodeAPI.onMessage(e => {
@@ -12,17 +12,14 @@ VSCodeAPI.onMessage(e => {
 
   if (message.type === 'state_update') {
     const { state } = message;
-    store.updateDebugState(state);
+    store.updateDebuggerState(state);
     const currentProcState = state.procs[state.currentProc];
     const { unifys } = currentProcState;
     if (unifys.length > 0) {
       const unifyId = unifys[0].id;
       const isInStore = store.selectBaseUnification(unifyId);
       if (!isInStore) {
-        VSCodeAPI.postMessage({
-          type: 'request_unification',
-          id: unifyId,
-        });
+        requestUnification(unifyId);
       }
     } else {
       store.clearUnification();

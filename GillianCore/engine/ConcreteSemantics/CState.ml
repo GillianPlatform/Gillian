@@ -6,6 +6,16 @@ open Literal
 (*                   *)
 (*********************)
 
+module type S = sig
+  include
+    State.S
+      with type st = CVal.CESubst.t
+       and type vt = Literal.t
+       and type store_t = CStore.t
+
+  val init : init_data -> t
+end
+
 module Make
     (CMemory : CMemory.S with type vt = CVal.M.t and type st = CVal.M.st) : sig
   include

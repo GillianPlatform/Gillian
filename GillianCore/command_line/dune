@@ -1,5 +1,5 @@
 (library
- (name commandLine)
+ (name command_line)
  (package gillian)
  (libraries
   cmdliner

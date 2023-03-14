@@ -330,7 +330,7 @@ let get_included_headers deps_file =
 
 let create_compilation_result gil_progs genv =
   let open IncrementalAnalysis in
-  let open CommandLine.ParserAndCompiler in
+  let open Command_line.ParserAndCompiler in
   let source_files = SourceFiles.make () in
   let gil_progs =
     List.map

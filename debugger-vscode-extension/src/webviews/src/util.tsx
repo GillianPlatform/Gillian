@@ -39,7 +39,7 @@ export const getUnifyName = (store: Store): [ReactNode, ReactNode] => {
   const { path, unifications } = store.unifyState;
   if (path.length < 2) {
     const kind = showBaseUnifyKind(store);
-    const procName = store.debugState?.mainProc || 'unknown proc';
+    const procName = store.debuggerState?.mainProc || 'unknown proc';
     return [
       <>
         Unify <Code>{procName}</Code>
