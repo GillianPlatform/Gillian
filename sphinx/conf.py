@@ -123,6 +123,7 @@ html_theme_options = {
     'color-brand-content': '#5dacbc',
   },
 }
+html_favicon = '_static/img/favicon.ico'
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.

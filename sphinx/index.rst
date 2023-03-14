@@ -6,6 +6,7 @@ Welcome to Gillian
 
    install
    develop
+   debugger
 
 .. toctree::
    :titlesonly:
