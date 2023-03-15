@@ -311,12 +311,11 @@ module Expr : sig
   (** Maps with expressions as keys *)
   module Map : Map.S with type key := t
 
-  (** Equality *)
+  (** Equality (derived) *)
   val equal : t -> t -> bool
 
-  (** Mapper *)
-
-  (* val map : (t -> t * bool) -> (t -> t) option -> t -> t *)
+  (** Comparison (derived) *)
+  val compare : t -> t -> int
 
   (** Optional mapper *)
   val map_opt : (t -> t option * bool) -> (t -> t) option -> t -> t option
