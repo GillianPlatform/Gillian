@@ -105,11 +105,13 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
   while (elementCount--) {
     /* @tactic
         unfold ElementsJS(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+        unfold Elements(#definition, #view, (as_int #outerLoopReadPos), (as_int #eLeft), (as_int #fCount), #remElsList, (as_int #remElsLength));
         if (#definition = "Complete") then {
-            unfold CElementsJS(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) [bind: (#element := #fList) and (#eLength := #eLength)]
+            unfold CElements(#view, (as_int #outerLoopReadPos), (as_int #eLeft), (as_int #fCount), #remElsList, (as_int #remElsLength)) [bind: (#element := #fList) and (#eLength := #eLengthI)]
         } else {
-            unfold IElementsJS(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) [bind: (#fList := #fList) and (#eLength := #eLength)]
-        } */
+            unfold IElements(#view, (as_int #outerLoopReadPos), (as_int #eLeft), (as_int #fCount), #remElsList, (as_int #remElsLength)) [bind: (#fList := #fList) and (#eLength := #eLengthI)]
+        };
+        assert (#eLength == (as_num #eLengthI)) [bind: #eLength] */
     var element = []
     var fieldCount = fieldsPerElement
 
