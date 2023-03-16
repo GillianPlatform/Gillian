@@ -98,9 +98,7 @@ module M = struct
         in
         ufl_vs @ metadata_recovery_vals
 
-  let assertions ?to_keep:_ (heap : t) : GAsrt.t list =
-    List.map JSIL2GIL.jsil2gil_asrt (SHeap.assertions heap)
-
+  let assertions ?to_keep:_ (heap : t) : GAsrt.t list = SHeap.assertions heap
   let lvars (heap : t) : Containers.SS.t = SHeap.lvars heap
   let alocs (heap : t) : Containers.SS.t = SHeap.alocs heap
 

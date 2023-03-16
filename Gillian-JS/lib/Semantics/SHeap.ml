@@ -1,7 +1,7 @@
 (** JSIL Symbolic Heap *)
 
 open Gillian.Gil_syntax
-open Jsil_syntax
+open Javert_utils
 module SSubst = Gillian.Symbolic.Subst
 module L = Logging
 
@@ -348,12 +348,12 @@ let assertions (heap : t) : Asrt.t list =
     let fv_assertions = SFVL.assertions le_loc fv_list in
     let domain =
       Option.fold
-        ~some:(fun domain -> [ Asrt.EmptyFields (le_loc, domain) ])
+        ~some:(fun domain -> [ Asrt_utils.empty_fields ~loc:le_loc ~domain ])
         ~none:[] domain
     in
     let metadata =
       match metadata with
-      | Some metadata -> [ Asrt.MetaData (le_loc, metadata) ]
+      | Some metadata -> [ Asrt_utils.metadata ~loc:le_loc ~metadata ]
       | None -> []
     in
     fv_assertions @ domain @ metadata

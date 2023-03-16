@@ -94,9 +94,10 @@ let rec jsil2gil_asrt (a : Asrt.t) : GAsrt.t =
   match a with
   | Emp -> Emp
   | Star (a1, a2) -> Star (f a1, f a2)
-  | PointsTo (e1, e2, e3) -> GA (JSILNames.aCell, [ fe e1; fe e2 ], [ fe e3 ])
-  | MetaData (e1, e2) -> GA (JSILNames.aMetadata, [ fe e1 ], [ fe e2 ])
-  | EmptyFields (e1, e2) -> GA (JSILNames.aProps, [ fe e1; fe e2 ], [])
+  | PointsTo (e1, e2, e3) ->
+      Asrt_utils.points_to ~loc:(fe e1) ~field:(fe e2) ~value:(fe e3)
+  | MetaData (e1, e2) -> Asrt_utils.metadata ~loc:(fe e1) ~metadata:(fe e2)
+  | EmptyFields (e1, e2) -> Asrt_utils.empty_fields ~loc:(fe e1) ~domain:(fe e2)
   | Pred (pn, es) -> Pred (pn, List.map fe es)
   | Pure f -> Pure (jsil2gil_formula f)
   | Types vts -> Types (List.map (fun (v, t) -> (fe v, t)) vts)
