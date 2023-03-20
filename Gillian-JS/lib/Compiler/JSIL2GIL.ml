@@ -44,7 +44,7 @@ let rec jsil2gil_asrt (a : Asrt.t) : GAsrt.t =
   | PointsTo (e1, e2, e3) -> GA (JSILNames.aCell, [ e1; e2 ], [ e3 ])
   | MetaData (e1, e2) -> GA (JSILNames.aMetadata, [ e1 ], [ e2 ])
   | EmptyFields (e1, e2) -> GA (JSILNames.aProps, [ e1; e2 ], [])
-  | Pred (pn, es) -> Pred (pn, es)
+  | Pred (pn, es) -> Pred (Expr.string pn, es)
   | Pure f -> Pure f
   | Types vts -> Types vts
 

@@ -2,7 +2,8 @@
 type t = TypeDef__.assertion =
   | Emp  (** Empty heap             *)
   | Star of t * t  (** Separating conjunction *)
-  | Pred of string * Expr.t list  (** Predicates             *)
+  | Pred of Expr.t * Expr.t list
+      (** Dynamic predicate, Expr is, most of the time, a concrete string *)
   | Pure of Formula.t  (** Pure formula           *)
   | Types of (Expr.t * Type.t) list  (** Typing assertion       *)
   | GA of string * Expr.t list * Expr.t list  (** Core assertion         *)
@@ -125,7 +126,11 @@ let pred_names (a : t) : string list =
     object
       inherit [_] Visitors.reduce
       inherit Visitors.Utils.non_ordered_list_monoid
-      method! visit_Pred () name _ = [ name ]
+
+      method! visit_Pred () name _ =
+        match name with
+        | Expr.Lit (String name) -> [ name ]
+        | _ -> []
     end
   in
   collector#visit_assertion () a
@@ -185,7 +190,11 @@ let rec full_pp fmt a =
   | Star (a1, a2) -> Fmt.pf fmt "%a *@ %a" full_pp a1 full_pp a2
   | Emp -> Fmt.string fmt "emp"
   | Pred (name, params) ->
-      let name = Pp_utils.maybe_quote_ident name in
+      let name =
+        match name with
+        | Expr.Lit (String name) -> Pp_utils.maybe_quote_ident name
+        | _ -> Fmt.str "@[<h>{%a}@]" Expr.full_pp name
+      in
       Fmt.pf fmt "@[<h>%s(%a)@]" name
         (Fmt.list ~sep:Fmt.comma Expr.full_pp)
         params
@@ -203,7 +212,11 @@ let rec pp fmt a =
   | Star (a1, a2) -> Fmt.pf fmt "%a *@ %a" pp a1 pp a2
   | Emp -> Fmt.string fmt "emp"
   | Pred (name, params) ->
-      let name = Pp_utils.maybe_quote_ident name in
+      let name =
+        match name with
+        | Expr.Lit (String name) -> Pp_utils.maybe_quote_ident name
+        | _ -> Fmt.str "@[<h>{%a}@]" Expr.pp name
+      in
       Fmt.pf fmt "@[<h>%s(%a)@]" name (Fmt.list ~sep:Fmt.comma Expr.pp) params
   | Types tls ->
       let pp_tl f (e, t) = Fmt.pf f "%a : %s" Expr.pp e (Type.str t) in

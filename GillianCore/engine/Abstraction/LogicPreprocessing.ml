@@ -20,10 +20,10 @@ let rec auto_unfold
         (List_utils.cross_product (au_rec a1) (au_rec a2) (fun asrt1 asrt2 ->
              Asrt.Star (asrt1, asrt2)))
   (* Recursive and non-unfolding predicates *)
-  | Pred (name, _)
+  | Pred (Expr.Lit (String name), _)
     when (Hashtbl.find rec_tbl name && not unfold_rec_predicates)
          || (Hashtbl.find predicates name).pred_nounfold -> [ asrt ]
-  | Pred (name, args) when Hashtbl.mem unfolded_preds name ->
+  | Pred (Expr.Lit (String name), args) when Hashtbl.mem unfolded_preds name ->
       L.verbose (fun fmt ->
           fmt "Unfolding predicate: %s with nounfold %b" name
             (Hashtbl.find predicates name).pred_nounfold);
@@ -40,7 +40,7 @@ let rec auto_unfold
       let subst = SVal.SSubst.init combined in
       let defs = List.map (fun (_, def, _) -> def) pred.pred_definitions in
       List.map (SVal.SSubst.substitute_asrt subst ~partial:false) defs
-  | Pred (name, args) -> (
+  | Pred (Expr.Lit (String name), args) -> (
       try
         L.tmi (fun fmt -> fmt "AutoUnfold: %a : %s" Asrt.pp asrt name);
         let pred : Pred.t = Hashtbl.find predicates name in

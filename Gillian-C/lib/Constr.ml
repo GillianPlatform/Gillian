@@ -39,7 +39,7 @@ end
 module Others = struct
   open CConstants
 
-  let pred name params = Asrt.Pred (name, params)
+  let pred name params = Asrt.Pred (Expr.Lit (String name), params)
 
   let malloced_abst ~ptr ~total_size =
     pred Internal_Predicates.malloced [ ptr; total_size ]

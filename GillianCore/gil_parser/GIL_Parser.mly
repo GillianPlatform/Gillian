@@ -677,7 +677,7 @@ g_assertion_target:
 (* x(e1, ..., en) *)
   | name = proc_name; LBRACE; params = separated_list(COMMA, expr_target); RBRACE
     { (* validate_pred_assertion (name, params); *)
-      Asrt.Pred (name, params)
+      Asrt.Pred (Expr.Lit (String name), params)
     }
 (* types (type_pairs) *)
   | LTYPES; LBRACE; type_pairs = separated_list(COMMA, type_env_pair_target); RBRACE

@@ -548,7 +548,9 @@ module Asrt : sig
   type t =
     | Emp  (** Empty heap *)
     | Star of t * t  (** Separating conjunction *)
-    | Pred of string * Expr.t list  (** Predicates *)
+    | Pred of Expr.t * Expr.t list
+        (** Dynamic predicate call, most of the type,
+            the predicate name is a concrete string *)
     | Pure of Formula.t  (** Pure formula *)
     | Types of (Expr.t * Type.t) list  (** Typing assertion *)
     | GA of string * Expr.t list * Expr.t list  (** Core assertion *)
@@ -1374,7 +1376,7 @@ module Visitors : sig
            ; visit_PhiAssignment :
                'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
            ; visit_Pi : 'c -> Constant.t -> Constant.t
-           ; visit_Pred : 'c -> Asrt.t -> string -> Expr.t list -> Asrt.t
+           ; visit_Pred : 'c -> Asrt.t -> Expr.t -> Expr.t list -> Asrt.t
            ; visit_Pure : 'c -> Asrt.t -> Formula.t -> Asrt.t
            ; visit_Random : 'c -> Constant.t -> Constant.t
            ; visit_ReturnError : 'c -> 'f Cmd.t -> 'f Cmd.t
@@ -1630,7 +1632,7 @@ module Visitors : sig
         'c -> 'f Cmd.t -> (string * Expr.t list) list -> 'f Cmd.t
 
       method visit_Pi : 'c -> Constant.t -> Constant.t
-      method visit_Pred : 'c -> Asrt.t -> string -> Expr.t list -> Asrt.t
+      method visit_Pred : 'c -> Asrt.t -> Expr.t -> Expr.t list -> Asrt.t
       method visit_Pure : 'c -> Asrt.t -> Formula.t -> Asrt.t
       method visit_Random : 'c -> Constant.t -> Constant.t
       method visit_ReturnError : 'c -> 'f Cmd.t -> 'f Cmd.t
@@ -1888,7 +1890,7 @@ module Visitors : sig
            ; visit_Pi : 'c -> 'f
            ; visit_IPlus : 'c -> 'f
            ; visit_FPlus : 'c -> 'f
-           ; visit_Pred : 'c -> string -> Expr.t list -> 'f
+           ; visit_Pred : 'c -> Expr.t -> Expr.t list -> 'f
            ; visit_Pure : 'c -> Formula.t -> 'f
            ; visit_Random : 'c -> 'f
            ; visit_ReturnError : 'c -> 'f
@@ -2110,7 +2112,7 @@ module Visitors : sig
       method visit_Pi : 'c -> 'f
       method visit_IPlus : 'c -> 'f
       method visit_FPlus : 'c -> 'f
-      method visit_Pred : 'c -> string -> Expr.t list -> 'f
+      method visit_Pred : 'c -> Expr.t -> Expr.t list -> 'f
       method visit_Pure : 'c -> Formula.t -> 'f
       method visit_Random : 'c -> 'f
       method visit_ReturnError : 'c -> 'f
@@ -2333,7 +2335,7 @@ module Visitors : sig
            ; visit_PVar : 'c -> string -> unit
            ; visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
            ; visit_Pi : 'c -> unit
-           ; visit_Pred : 'c -> string -> Expr.t list -> unit
+           ; visit_Pred : 'c -> Expr.t -> Expr.t list -> unit
            ; visit_Pure : 'c -> Formula.t -> unit
            ; visit_Random : 'c -> unit
            ; visit_ReturnError : 'c -> unit
@@ -2554,7 +2556,7 @@ module Visitors : sig
       method visit_PVar : 'c -> string -> unit
       method visit_PhiAssignment : 'c -> (string * Expr.t list) list -> unit
       method visit_Pi : 'c -> unit
-      method visit_Pred : 'c -> string -> Expr.t list -> unit
+      method visit_Pred : 'c -> Expr.t -> Expr.t list -> unit
       method visit_Pure : 'c -> Formula.t -> unit
       method visit_Random : 'c -> unit
       method visit_ReturnError : 'c -> unit

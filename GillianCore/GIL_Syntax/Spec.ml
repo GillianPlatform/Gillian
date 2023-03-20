@@ -79,7 +79,7 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (spec : t) : t =
   let pt_asrt (a : Asrt.t) : Asrt.t =
     let f_a_after a : Asrt.t =
       match (a : Asrt.t) with
-      | Pred (name, les) ->
+      | Pred (Expr.Lit (String name), les) ->
           let pred =
             try Hashtbl.find preds name
             with _ ->

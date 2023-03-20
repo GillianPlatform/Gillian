@@ -103,7 +103,7 @@ module type S = sig
 end
 
 module Make
-    (Val : Val.S)
+    (Val : Val.S with type t = Expr.t)
     (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
     (Store : Store.S with type vt = Val.t)
     (State : SState.S
@@ -539,12 +539,19 @@ module Make
     | Pred (pname, les) ->
         L.verbose (fun fmt -> fmt "Predicate assertion.");
         let vs = List.map (subst_in_expr subst) les in
-        let failure = List.exists (fun x -> x = None) vs in
+        let failure = List.exists Option.is_none vs in
         if failure then
           other_state_err
             "Produce Simple Assertion: Subst does not cover the pred ins"
         else
           let vs = List.map Option.get vs in
+          let pname =
+            match State.eval_expr state pname with
+            | Expr.Lit (String name) -> name
+            | _ ->
+                Fmt.failwith "Produce Simple Assertion: Unresolved predicate %a"
+                  Expr.pp pname
+          in
           let pred_def = Hashtbl.find pred_defs pname in
           let+ (ostate : t list) =
             match pred_def.pred.pred_facts with

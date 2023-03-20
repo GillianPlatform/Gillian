@@ -182,15 +182,11 @@ let check_pvars (predicates : (string, t) Hashtbl.t) : unit =
 
   Hashtbl.iter check_pred_pvars predicates
 
-(**
-   GIL Predicates can have non-pvar parameters - to say that a given parameter
-   always has a certain value...
-  *)
 let explicit_param_types (preds : (string, t) Hashtbl.t) (pred : t) : t =
   let pt_asrt (a : Asrt.t) : Asrt.t =
     let f_a_after a : Asrt.t =
       match (a : Asrt.t) with
-      | Pred (name, les) ->
+      | Pred (Expr.Lit (String name), les) ->
           let pred =
             try Hashtbl.find preds name
             with _ ->

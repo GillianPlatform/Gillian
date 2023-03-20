@@ -153,7 +153,7 @@ and formula =
 and assertion =
   | Emp
   | Star of assertion * assertion
-  | Pred of string * expr list
+  | Pred of expr * expr list
   | Pure of formula
   | Types of (expr * typ) list
   | GA of string * expr list * expr list

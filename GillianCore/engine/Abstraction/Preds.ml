@@ -281,7 +281,7 @@ module Make
     let preds = to_list preds in
     let pred_to_assert (n, a) =
       let args = List.map Val.to_expr a in
-      Asrt.Pred (n, args)
+      Asrt.Pred (Expr.Lit (String n), args)
     in
     List.sort Asrt.compare (List.map pred_to_assert preds)
 

@@ -193,7 +193,9 @@ let rec compile_lexpr ?(fname = "main") (lexpr : WLExpr.t) :
         let gvars1, asrtl1, comp_expr1 = compile_lexpr e1 in
         let gvars2, asrtl2, comp_expr2 = compile_lexpr e2 in
         let pred_i_plus =
-          Asrt.Pred (internal_pred, [ comp_expr1; comp_expr2; Expr.LVar lout ])
+          Asrt.Pred
+            ( Expr.string @@ internal_pred,
+              [ comp_expr1; comp_expr2; Expr.LVar lout ] )
         in
         ( gvars1 @ gvars2 @ [ lout ],
           asrtl1 @ asrtl2 @ [ pred_i_plus ],
@@ -264,28 +266,38 @@ let rec compile_lformula ?(fname = "main") formula : Asrt.t list * Formula.t =
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
         let expr_l_var_out = Expr.LVar (gen_str sgvar) in
-        let pred = Asrt.Pred (internal_pred_lt, [ c1; c2; expr_l_var_out ]) in
+        let pred =
+          Asrt.Pred (Expr.string @@ internal_pred_lt, [ c1; c2; expr_l_var_out ])
+        in
         ( a1 @ a2 @ [ pred ],
           Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
     | LGreater (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
         let expr_l_var_out = Expr.LVar (gen_str sgvar) in
-        let pred = Asrt.Pred (internal_pred_gt, [ c1; c2; expr_l_var_out ]) in
+        let pred =
+          Asrt.Pred (Expr.string @@ internal_pred_gt, [ c1; c2; expr_l_var_out ])
+        in
         ( a1 @ a2 @ [ pred ],
           Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
     | LLessEq (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
         let expr_l_var_out = Expr.LVar (gen_str sgvar) in
-        let pred = Asrt.Pred (internal_pred_leq, [ c1; c2; expr_l_var_out ]) in
+        let pred =
+          Asrt.Pred
+            (Expr.string @@ internal_pred_leq, [ c1; c2; expr_l_var_out ])
+        in
         ( a1 @ a2 @ [ pred ],
           Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
     | LGreaterEq (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
         let expr_l_var_out = Expr.LVar (gen_str sgvar) in
-        let pred = Asrt.Pred (internal_pred_geq, [ c1; c2; expr_l_var_out ]) in
+        let pred =
+          Asrt.Pred
+            (Expr.string @@ internal_pred_geq, [ c1; c2; expr_l_var_out ])
+        in
         ( a1 @ a2 @ [ pred ],
           Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) ))
 
@@ -390,7 +402,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
         let exsl, all, el = list_split_3 (List.map compile_lexpr lel) in
         let exs = List.concat exsl in
         let al = List.concat all in
-        (exs, concat_star (Asrt.Pred (pr, el)) al)
+        (exs, concat_star (Asrt.Pred (Expr.string @@ pr, el)) al)
     | LPure lf ->
         let al, f = compile_lformula lf in
         ([], concat_star (Asrt.Pure f) al))

@@ -139,7 +139,7 @@ let assert_of_member cenv members id typ =
       pvofs + fo
     in
     let args = pvloc :: ofs :: args_without_ins in
-    let pred_call = Asrt.Pred (pred_name, args) in
+    let pred_call = Asrt.Pred (Expr.string pred_name, args) in
     list_is_components ** pred_call
   else if
     match typ with
@@ -168,12 +168,17 @@ let assert_of_member cenv members id typ =
       let open Internal_Predicates in
       let open VTypes in
       match typ with
-      | Tint _ -> (mk int_type lvval, Asrt.Pred (int_get, [ pvmember; lvval ]))
+      | Tint _ ->
+          ( mk int_type lvval,
+            Asrt.Pred (Expr.string int_get, [ pvmember; lvval ]) )
       | Tlong _ ->
-          (mk long_type lvval, Asrt.Pred (long_get, [ pvmember; lvval ]))
+          ( mk long_type lvval,
+            Asrt.Pred (Expr.string long_get, [ pvmember; lvval ]) )
       | Tfloat _ ->
-          (mk float_type lvval, Asrt.Pred (float_get, [ pvmember; lvval ]))
-      | Tpointer _ -> (pvmember, Asrt.Pred (is_ptr_opt, [ pvmember ]))
+          ( mk float_type lvval,
+            Asrt.Pred (Expr.string float_get, [ pvmember; lvval ]) )
+      | Tpointer _ ->
+          (pvmember, Asrt.Pred (Expr.string is_ptr_opt, [ pvmember ]))
       | _ ->
           failwith
             (Printf.sprintf "unhandled struct field type for now : %s"
@@ -459,7 +464,9 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
   let tloc = types ObjectType in
   (* let mk_num n = Expr.Lit (Num (float_of_int n)) in *)
   (* let zero = mk_num 0 in *)
-  let ptr_call p l o = Asrt.Pred (Internal_Predicates.ptr_get, [ p; l; o ]) in
+  let ptr_call p l o =
+    Asrt.Pred (Expr.string Internal_Predicates.ptr_get, [ p; l; o ])
+  in
   let sz = function
     | CSVal.Sint _ -> 4
     | Slong _ -> 8
@@ -573,7 +580,7 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
         split3_expr_comp (List.map trans_expr el)
       in
       let pr =
-        Asrt.Pred (struct_pred, [ locv; ofsv ] @ params_fields)
+        Asrt.Pred (Expr.string struct_pred, [ locv; ofsv ] @ params_fields)
         ** fold_star more_asrt
       in
       pr ** to_assert ** malloc_chunk siz
@@ -614,7 +621,7 @@ let rec trans_asrt ~fname ~ann asrt =
       ma ** Pure fp
   | Pred (p, cel) ->
       let ap, _, gel = split3_expr_comp (List.map trans_expr cel) in
-      fold_star ap ** Pred (p, gel)
+      fold_star ap ** Pred (Expr.string p, gel)
   | Emp -> Emp
   | PointsTo { ptr = s; constr = c; typ } -> trans_constr ~fname ~typ ann s c
 
@@ -901,7 +908,7 @@ let opt_gen param_name pred_name struct_params =
   let def_null = pvar == null in
   let def_rec =
     (pvar == loc_list) ** types ObjectType loc
-    ** Pred (pred_name, loc :: lv_params)
+    ** Pred (Expr.string pred_name, loc :: lv_params)
   in
   [ def_null; def_rec ]
 
@@ -953,7 +960,7 @@ let asserts_of_rec_member cenv members id typ =
           (null, pvmember == null);
           ( obj,
             (pvmember == obj) ** types ObjectType lvval
-            ** Pred (p_name, lvval :: struct_params) );
+            ** Pred (Expr.string p_name, lvval :: struct_params) );
         ]
         (* (pvmember, Asrt.Pred (is_ptr_to_0_opt, [ pvmember ])) *)
     | _ ->
@@ -1125,7 +1132,7 @@ let predicate_from_triple (pn, csmt, ct) =
     | Ctypes.Tpointer (Ctypes.Tstruct (id, _), _) -> true_name id
     | _ -> failwith "Cannot happen"
   in
-  let pred pname = Asrt.Pred (pname, [ Expr.PVar pn ]) in
+  let pred pname = Asrt.Pred (Expr.string pname, [ Expr.PVar pn ]) in
   let open Internal_Predicates in
   match csmt with
   | AST.Tint when (not Archi.ptr64) && is_c_ptr_to_struct ct ->
