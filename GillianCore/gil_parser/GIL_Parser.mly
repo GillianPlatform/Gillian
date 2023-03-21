@@ -843,7 +843,7 @@ hides_target:
     { hides }
 
 lemma_head_target:
-  lemma_name = VAR; LBRACE; lemma_params = separated_list(COMMA, VAR); RBRACE
+  lemma_name = proc_name; LBRACE; lemma_params = separated_list(COMMA, VAR); RBRACE
   {
     (lemma_name, lemma_params)
   }
