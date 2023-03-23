@@ -1,6 +1,6 @@
 (library
  (name monadic)
- (package gillian)
+ (public_name gillian.monadic)
  (flags -open Utils.Prelude)
  (libraries gil_syntax engine utils fmt logging)
  (preprocess

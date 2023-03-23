@@ -1,6 +1,6 @@
 (library
  (name bulk)
- (package gillian)
+ (public_name gillian.bulk)
  (libraries engine gil_syntax utils parserAndCompiler incrementalAnalysis)
  (flags
   :standard
