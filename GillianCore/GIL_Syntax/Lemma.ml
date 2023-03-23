@@ -41,7 +41,8 @@ let pp fmt lemma =
     | false -> ()
   in
   Fmt.pf fmt "%a%a@[<v 2>lemma %s(%a)@ %a@ %a@]" pp_path_opt
-    lemma.lemma_source_path pp_internal lemma.lemma_internal lemma.lemma_name
+    lemma.lemma_source_path pp_internal lemma.lemma_internal
+    (Pp_utils.maybe_quote_ident lemma.lemma_name)
     (Fmt.list ~sep:(Fmt.any ", ") Fmt.string)
     lemma.lemma_params
     (Fmt.list ~sep:Fmt.sp pp_spec)
