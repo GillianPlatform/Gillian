@@ -22,6 +22,8 @@ let return ?(learned = []) ?(learned_types = []) final_value ~curr_pc =
   let new_pc = Pc.extend (Pc.extend_types curr_pc learned_types) learned in
   [ Branch.make ~pc:new_pc ~value:final_value ]
 
+let vanish () ~curr_pc = []
+
 let bind (x : 'a t) (f : 'a -> 'b t) ~curr_pc =
   List.concat_map
     (fun b -> f ~curr_pc:(Branch.pc b) (Branch.value b))
