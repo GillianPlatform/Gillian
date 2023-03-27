@@ -1025,10 +1025,8 @@ lvar_type_target:
 
 
 type_env_pair_target:
-  | lvar = logic_variable_target; COLON; the_type=type_target
-    { (lvar, the_type) }
-  | pvar = program_variable_target; COLON; the_type=type_target
-    { (pvar, the_type) }
+  | e = expr_target; COLON; the_type=type_target
+    { (e, the_type) }
 ;
 
 logic_variable_target:
