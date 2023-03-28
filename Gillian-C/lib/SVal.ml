@@ -91,7 +91,7 @@ let of_gil_expr_almost_concrete ?(gamma = Type_env.init ()) gexpr =
       Some (SVlong value, [])
   | _ -> None
 
-let of_gil_expr ?(pfs = PureContext.init ()) ?(gamma = Type_env.init ()) sval_e
+let of_gil_expr ?(pfs = Pure_context.init ()) ?(gamma = Type_env.init ()) sval_e
     =
   Logging.verbose (fun fmt -> fmt "OF_GIL_EXPR : %a" Expr.pp sval_e);
   let possible_exprs =
@@ -106,7 +106,7 @@ let of_gil_expr ?(pfs = PureContext.init ()) ?(gamma = Type_env.init ()) sval_e
     None possible_exprs
 
 let of_gil_expr_exn
-    ?(pfs = PureContext.init ())
+    ?(pfs = Pure_context.init ())
     ?(gamma = Type_env.init ())
     gexp =
   match of_gil_expr ~pfs ~gamma gexp with

@@ -18,8 +18,8 @@ module Subst = struct
   include SVal.SESubst
 end
 
-(** @canonical Gillian.Symbolic.PureContext *)
-module PureContext = struct
+(** @canonical Gillian.Symbolic.Pure_context *)
+module Pure_context = struct
   (** @inline *)
   include PFS
 end
