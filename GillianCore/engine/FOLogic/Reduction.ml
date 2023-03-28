@@ -1,3 +1,5 @@
+(** @canonical Gillian.Symbolic.FO_logic.Reduction *)
+
 (* When reduction fails *)
 exception ReductionException of Expr.t * string
 
@@ -209,7 +211,7 @@ let find_equalities (pfs : PFS.t) (le : Expr.t) : Expr.t list =
 (* TYPING HELPER FUNCTIONS *)
 (***************************)
 
-let typable (gamma : TypEnv.t) (le : Expr.t) (target_type : Type.t) : bool =
+let typable (gamma : Type_env.t) (le : Expr.t) (target_type : Type.t) : bool =
   let t, success, _ = Typing.type_lexpr gamma le in
   if success then
     Option.fold
@@ -222,31 +224,31 @@ let typable (gamma : TypEnv.t) (le : Expr.t) (target_type : Type.t) : bool =
   else
     let msg : string =
       Fmt.str "TYPE ERROR: %a not typable in typing environment %a" Expr.pp le
-        TypEnv.pp gamma
+        Type_env.pp gamma
     in
     L.fail msg
 
 (* Lists *)
-let lexpr_is_list (gamma : TypEnv.t) (le : Expr.t) : bool =
+let lexpr_is_list (gamma : Type_env.t) (le : Expr.t) : bool =
   typable gamma le ListType
 
 (* Strings *)
-let lexpr_is_string (gamma : TypEnv.t) (le : Expr.t) : bool =
+let lexpr_is_string (gamma : Type_env.t) (le : Expr.t) : bool =
   typable gamma le StringType
 
 (* Numbers *)
-let lexpr_is_number ?(gamma = TypEnv.init ()) (le : Expr.t) : bool =
+let lexpr_is_number ?(gamma = Type_env.init ()) (le : Expr.t) : bool =
   typable gamma le NumberType
 
-let lexpr_is_int ?(gamma = TypEnv.init ()) (le : Expr.t) : bool =
+let lexpr_is_int ?(gamma = Type_env.init ()) (le : Expr.t) : bool =
   typable gamma le IntType
 
 (* Booleans *)
-let lexpr_is_bool (gamma : TypEnv.t) (le : Expr.t) : bool =
+let lexpr_is_bool (gamma : Type_env.t) (le : Expr.t) : bool =
   typable gamma le BooleanType
 
 (* Sets *)
-let lexpr_is_set (gamma : TypEnv.t) (le : Expr.t) : bool =
+let lexpr_is_set (gamma : Type_env.t) (le : Expr.t) : bool =
   typable gamma le SetType
 
 let get_equal_expressions (pfs : PFS.t) nle =
@@ -876,7 +878,7 @@ let rec reduce_lexpr_loop
     ?(unification = false)
     ?(reduce_lvars = false)
     (pfs : PFS.t)
-    (gamma : TypEnv.t)
+    (gamma : Type_env.t)
     (le : Expr.t) =
   let f = reduce_lexpr_loop ~unification ~reduce_lvars pfs gamma in
 
@@ -1918,15 +1920,17 @@ and reduce_lexpr
     ?(unification = false)
     ?(reduce_lvars = false)
     ?(pfs = PFS.init ())
-    ?(gamma = TypEnv.init ())
+    ?(gamma = Type_env.init ())
     (le : Expr.t) =
   (* let t = Sys.time () in *)
   let result = reduce_lexpr_loop ~unification ~reduce_lvars pfs gamma le in
   (* Utils.Statistics.update_statistics "Reduce Expression" (Sys.time () -. t); *)
   result
 
-and simplify_num_arithmetic_lexpr (pfs : PFS.t) (gamma : TypEnv.t) (le : Expr.t)
-    =
+and simplify_num_arithmetic_lexpr
+    (pfs : PFS.t)
+    (gamma : Type_env.t)
+    (le : Expr.t) =
   let f = reduce_lexpr_loop pfs gamma in
   match le with
   | BinOp (l, FPlus, Lit (Num 0.)) | BinOp (Lit (Num 0.), FPlus, l) -> l
@@ -1945,8 +1949,10 @@ and simplify_num_arithmetic_lexpr (pfs : PFS.t) (gamma : TypEnv.t) (le : Expr.t)
       Cnum.to_expr (Cnum.plus cl cr)
   | _ -> le
 
-and simplify_int_arithmetic_lexpr (pfs : PFS.t) (gamma : TypEnv.t) (le : Expr.t)
-    =
+and simplify_int_arithmetic_lexpr
+    (pfs : PFS.t)
+    (gamma : Type_env.t)
+    (le : Expr.t) =
   let f = reduce_lexpr_loop pfs gamma in
   match le with
   | BinOp (l, IPlus, Lit (Int z)) when Z.equal z Z.zero -> l
@@ -2207,7 +2213,7 @@ and substitute_for_list_length (pfs : PFS.t) (le : Expr.t) : Expr.t =
     (fun le (len_expr, _lex) -> substitute_for_specific_length pfs len_expr le)
     le len_eqs
 
-let resolve_expr_to_location (pfs : PFS.t) (gamma : TypEnv.t) (e : Expr.t) :
+let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
     string option =
   let max_fuel = 5 in
 
@@ -2286,7 +2292,7 @@ let rec reduce_formula_loop
     ?(rpfs = false)
     (unification : bool)
     (pfs : PFS.t)
-    (gamma : TypEnv.t)
+    (gamma : Type_env.t)
     ?(previous = Formula.True)
     (a : Formula.t) : Formula.t =
   if Formula.equal a previous then a
@@ -2595,7 +2601,7 @@ let rec reduce_formula_loop
               | Lit Nono, PVar _ | PVar _, Lit Nono -> default re1 re2
               (* JOSE: Why are we considering the case of a logical variable being bound to None? *)
               | Lit Nono, LVar x | LVar x, Lit Nono -> (
-                  let tx = TypEnv.get gamma x in
+                  let tx = Type_env.get gamma x in
                   match tx with
                   | None -> default re1 re2
                   | Some tx -> if tx = NoneType then default re1 re2 else False)
@@ -2714,7 +2720,7 @@ let rec reduce_formula_loop
           (* Think about quantifier instantiation *)
           (* Collect binders that are in gamma *)
           let binders_in_gamma =
-            List.map (fun (b, _) -> (b, TypEnv.get gamma b)) bt
+            List.map (fun (b, _) -> (b, Type_env.get gamma b)) bt
           in
           let ra = f a in
           let vars = Formula.lvars a in
@@ -2729,8 +2735,8 @@ let rec reduce_formula_loop
           List.iter
             (fun (b, t) ->
               match t with
-              | None -> TypEnv.remove gamma b
-              | Some t -> TypEnv.update gamma b t)
+              | None -> Type_env.remove gamma b
+              | Some t -> Type_env.update gamma b t)
             binders_in_gamma;
           result
       | _ -> a
@@ -2743,13 +2749,13 @@ let reduce_formula
     ?(rpfs = false)
     ?time:_
     ?(pfs : PFS.t = PFS.init ())
-    ?(gamma = TypEnv.init ())
+    ?(gamma = Type_env.init ())
     (a : Formula.t) : Formula.t =
   reduce_formula_loop ~top_level:true ~rpfs unification pfs gamma a
 
 let relate_llen
     (pfs : PFS.t)
-    (gamma : TypEnv.t)
+    (gamma : Type_env.t)
     (e : Expr.t)
     (lcat : Expr.t list) : (Formula.t * Containers.SS.t) option =
   (* Loop *)
@@ -2848,7 +2854,7 @@ let relate_llen
 
 let understand_lstcat
     (pfs : PFS.t)
-    (gamma : TypEnv.t)
+    (gamma : Type_env.t)
     (lcat : Expr.t list)
     (rcat : Expr.t list) : (Formula.t * Containers.SS.t) option =
   L.verbose (fun fmt ->
@@ -2910,7 +2916,7 @@ let reduce_types (a : Asrt.t) : Asrt.t =
 let rec reduce_assertion_loop
     (unification : bool)
     (pfs : PFS.t)
-    (gamma : TypEnv.t)
+    (gamma : Type_env.t)
     (a : Asrt.t) : Asrt.t =
   let f = reduce_assertion_loop unification pfs gamma in
 
@@ -2978,7 +2984,7 @@ let rec separate (a : Asrt.t) =
 let reduce_assertion
     ?(unification = false)
     ?(pfs = PFS.init ())
-    ?(gamma = TypEnv.init ())
+    ?(gamma = Type_env.init ())
     (a : Asrt.t) : Asrt.t =
   let a = reduce_types a in
 

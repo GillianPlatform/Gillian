@@ -469,6 +469,34 @@ and evaluate_nop (nop : NOp.t) (ll : Literal.t list) : CVal.M.t =
            [] ll)
   | _ -> raise (Exceptions.Unsupported "Concrete evaluate_nop: set operators")
 
+and evaluate_elist store (ll : Expr.t list) : CVal.M.t =
+  match ll with
+  | [] -> LList []
+  | e :: ll -> (
+      let ve = evaluate_expr store e in
+      let vll = evaluate_expr store (EList ll) in
+      match vll with
+      | LList vll -> LList (ve :: vll)
+      | _ ->
+          raise
+            (Exceptions.Impossible
+               "eval_expr concrete: list reduces to non-list"))
+
+and evaluate_lstsub (store : CStore.t) (e1 : Expr.t) (e2 : Expr.t) (e3 : Expr.t)
+    : CVal.M.t =
+  let ee = evaluate_expr store in
+  let ve1 = ee e1 in
+  let ve2 = ee e2 in
+  let ve3 = ee e3 in
+  match (ve1, ve2, ve3) with
+  | LList les, Int start, Int len ->
+      let sub_list =
+        List_utils.list_sub les (Z.to_int start) (Z.to_int len) |> Option.get
+      in
+      LList sub_list
+  | _ ->
+      raise (Exceptions.Impossible "eval_expr concrete: lstsub type mismatch")
+
 and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
   try
     let ee = evaluate_expr store in
@@ -487,33 +515,8 @@ and evaluate_expr (store : CStore.t) (e : Expr.t) : CVal.M.t =
     | BinOp (e1, bop, e2) -> evaluate_binop store bop e1 e2
     | UnOp (unop, e) -> evaluate_unop unop (ee e)
     | NOp (nop, le) -> evaluate_nop nop (List.map ee le)
-    | EList ll -> (
-        match ll with
-        | [] -> LList []
-        | e :: ll -> (
-            let ve = ee e in
-            let vll = ee (EList ll) in
-            match vll with
-            | LList vll -> LList (ve :: vll)
-            | _ ->
-                raise
-                  (Exceptions.Impossible
-                     "eval_expr concrete: list reduces to non-list")))
-    | LstSub (e1, e2, e3) -> (
-        let ve1 = ee e1 in
-        let ve2 = ee e2 in
-        let ve3 = ee e3 in
-        match (ve1, ve2, ve3) with
-        | LList les, Int start, Int len ->
-            let sub_list =
-              List_utils.list_sub les (Z.to_int start) (Z.to_int len)
-              |> Option.get
-            in
-            LList sub_list
-        | _ ->
-            raise
-              (Exceptions.Impossible "eval_expr concrete: lstsub type mismatch")
-        )
+    | EList ll -> evaluate_elist store ll
+    | LstSub (e1, e2, e3) -> evaluate_lstsub store e1 e2 e3
     | ALoc _ | LVar _ | ESet _ ->
         raise (Exceptions.Impossible "eval_expr concrete: aloc, lvar, or set")
   with

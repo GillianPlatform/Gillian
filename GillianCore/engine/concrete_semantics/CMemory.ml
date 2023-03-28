@@ -1,3 +1,4 @@
+(** @canonical Gillian.Concrete.Memory_S *)
 module type S = sig
   type init_data
 

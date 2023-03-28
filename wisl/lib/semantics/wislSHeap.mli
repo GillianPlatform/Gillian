@@ -19,16 +19,16 @@ val dispose : t -> string -> (unit, err) Result.t
 val clean_up : Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
 
 val get_cell :
-  pfs:PureContext.t ->
-  gamma:TypEnv.t ->
+  pfs:Pure_context.t ->
+  gamma:Type_env.t ->
   t ->
   string ->
   Expr.t ->
   (string * Expr.t * Expr.t, err) result
 
 val set_cell :
-  pfs:PureContext.t ->
-  gamma:TypEnv.t ->
+  pfs:Pure_context.t ->
+  gamma:Type_env.t ->
   t ->
   string ->
   Expr.t ->

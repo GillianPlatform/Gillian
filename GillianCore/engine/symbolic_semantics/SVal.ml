@@ -1,11 +1,6 @@
-(*********************)
-(*                   *)
-(*  Symbolic values  *)
-(*                   *)
-(*********************)
-
 module L = Logging
 
+(** @canonical Gillian.Symbolic.Values *)
 module rec M :
   (Val.S with type t = Expr.t and type st = SSubst.t and type et = SESubst.t) =
 struct
@@ -32,5 +27,6 @@ struct
   let is_concrete = Expr.is_concrete
 end
 
-and SSubst : (Subst.S with type vt = M.t) = Subst.Make (M)
+(** @canonical Gillian.Symbolic.Subst *)
 and SESubst : (ESubst.S with type vt = M.t) = ESubst.Make (M)
+and SSubst : (Subst.S with type vt = M.t) = Subst.Make (M)

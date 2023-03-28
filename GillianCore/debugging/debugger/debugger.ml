@@ -187,7 +187,7 @@ functor
     let get_type_env_vars (state : state_t) : Variable.t list =
       let open Variable in
       let typ_env = Verification.SPState.get_typ_env state in
-      TypEnv.to_list typ_env
+      Type_env.to_list typ_env
       |> List.sort (fun (v, _) (w, _) -> Stdlib.compare v w)
       |> List.map (fun (name, value) ->
              let value = Type.str value in

@@ -18,8 +18,18 @@ module Command_line = struct
   include Command_line
 end
 
-module Symbolic = Engine.Symbolic
-module Concrete = Engine.Concrete
+(** Interfaces for symbolic exectuion, including symbolic memory model *)
+module Symbolic = struct
+  (** @inline *)
+  include Engine.Symbolic
+end
+
+(** Interfaces for concrete exectuion, including concrete memory model *)
+module Concrete = struct
+  (** @inline *)
+  include Engine.Concrete
+end
+
 module General = Engine.General
 module Bulk = Bulk
 module Monadic = Monadic

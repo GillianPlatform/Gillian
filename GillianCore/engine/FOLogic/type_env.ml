@@ -33,7 +33,7 @@ let get_unsafe (x : t) (var : string) : Type.t =
   match Hashtbl.mem x var with
   | true -> Hashtbl.find x var
   | false ->
-      raise (Failure ("TypEnv.get_unsafe: variable " ^ var ^ " not found."))
+      raise (Failure ("Type_env.get_unsafe: variable " ^ var ^ " not found."))
 
 (* Get all unifiable elements *)
 let unifiables (x : t) : SS.t =
@@ -87,8 +87,8 @@ let update (te : t) (x : string) (t : Type.t) : unit =
       ignore
         (failwith
            (Format.asprintf
-              "TypEnv update: Conflict: %s has type %s but required extension \
-               is %s"
+              "Type_env update: Conflict: %s has type %s but required \
+               extension is %s"
               x (Type.str t') (Type.str t)))
 
 let remove (te : t) (x : string) : unit = Hashtbl.remove te x

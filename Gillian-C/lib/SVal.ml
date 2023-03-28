@@ -36,7 +36,7 @@ let tptr = Compcert.AST.coq_Tptr
 
 let is_loc gamma loc =
   let r_opt =
-    let* loc_t = TypEnv.get gamma loc in
+    let* loc_t = Type_env.get gamma loc in
     match loc_t with
     | Type.ObjectType -> Some true
     | _ -> Some false
@@ -58,15 +58,15 @@ let zero_of_chunk chunk =
 
 let is_loc_ofs gamma loc ofs =
   let r_opt =
-    let* loc_t = TypEnv.get gamma loc in
-    let* ofs_t = TypEnv.get gamma ofs in
+    let* loc_t = Type_env.get gamma loc in
+    let* ofs_t = Type_env.get gamma ofs in
     match (loc_t, ofs_t) with
     | Type.ObjectType, Type.IntType -> Some true
     | _ -> Some false
   in
   Option.value ~default:false r_opt
 
-let of_gil_expr_almost_concrete ?(gamma = TypEnv.init ()) gexpr =
+let of_gil_expr_almost_concrete ?(gamma = Type_env.init ()) gexpr =
   let open Expr in
   let open CConstants.VTypes in
   match gexpr with
@@ -91,10 +91,11 @@ let of_gil_expr_almost_concrete ?(gamma = TypEnv.init ()) gexpr =
       Some (SVlong value, [])
   | _ -> None
 
-let of_gil_expr ?(pfs = PureContext.init ()) ?(gamma = TypEnv.init ()) sval_e =
+let of_gil_expr ?(pfs = Pure_context.init ()) ?(gamma = Type_env.init ()) sval_e
+    =
   Logging.verbose (fun fmt -> fmt "OF_GIL_EXPR : %a" Expr.pp sval_e);
   let possible_exprs =
-    sval_e :: FOLogic.Reduction.get_equal_expressions pfs sval_e
+    sval_e :: FO_logic.Reduction.get_equal_expressions pfs sval_e
   in
   List.fold_left
     (fun ac exp ->
@@ -104,8 +105,10 @@ let of_gil_expr ?(pfs = PureContext.init ()) ?(gamma = TypEnv.init ()) sval_e =
       | _ -> ac)
     None possible_exprs
 
-let of_gil_expr_exn ?(pfs = PureContext.init ()) ?(gamma = TypEnv.init ()) gexp
-    =
+let of_gil_expr_exn
+    ?(pfs = Pure_context.init ())
+    ?(gamma = Type_env.init ())
+    gexp =
   match of_gil_expr ~pfs ~gamma gexp with
   | Some s -> s
   | None ->

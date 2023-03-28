@@ -161,11 +161,11 @@ let _resolve_set_existentials
     (lpfs : PFS.t)
     (rpfs : PFS.t)
     exists
-    (gamma : TypEnv.t) =
+    (gamma : Type_env.t) =
   let exists = ref exists in
 
   let set_exists =
-    SS.filter (fun x -> TypEnv.get gamma x = Some SetType) !exists
+    SS.filter (fun x -> Type_env.get gamma x = Some SetType) !exists
   in
   if SS.cardinal set_exists > 0 then (
     let intersections =
@@ -287,8 +287,8 @@ let _resolve_set_existentials
                   SESubst.put temp_subst (LVar v) rhs;
                   PFS.substitution temp_subst rpfs;
                   exists := SS.remove v !exists;
-                  while TypEnv.mem gamma v do
-                    TypEnv.remove gamma v
+                  while Type_env.mem gamma v do
+                    Type_env.remove gamma v
                   done;
                   None
               | _ -> Some (Formula.Eq (lhs, rhs))
@@ -315,7 +315,7 @@ let simplify_pfs_and_gamma
     ?(existentials : SS.t option)
     (lpfs : PFS.t)
     ?(rpfs : PFS.t option)
-    (gamma : TypEnv.t) : SESubst.t * SS.t =
+    (gamma : Type_env.t) : SESubst.t * SS.t =
   (* let t = Sys.time () in *)
   let rpfs : PFS.t = Option.value ~default:(PFS.init ()) rpfs in
   let existentials : SS.t ref =
@@ -325,7 +325,7 @@ let simplify_pfs_and_gamma
   let key : simpl_key_type =
     {
       kill_new_lvars;
-      gamma_list = TypEnv.to_list gamma;
+      gamma_list = Type_env.to_list gamma;
       pfs_list = PFS.to_list lpfs;
       existentials = !existentials;
       unification;
@@ -338,7 +338,7 @@ let simplify_pfs_and_gamma
       let { simpl_gamma; simpl_pfs; simpl_existentials; subst } =
         Hashtbl.find simplification_cache key
       in
-      TypEnv.reset gamma simpl_gamma;
+      Type_env.reset gamma simpl_gamma;
       PFS.set lpfs simpl_pfs;
 
       (* Deal with rpfs *)
@@ -352,7 +352,7 @@ let simplify_pfs_and_gamma
       L.verbose (fun m ->
           m "With unification: %s" (if unification then "Yes" else "No"));
       L.verbose (fun m -> m "PFS:@\n@[%a@]\n" PFS.pp lpfs);
-      L.verbose (fun m -> m "Gamma:@\n@[%a@]\n" TypEnv.pp gamma);
+      L.verbose (fun m -> m "Gamma:@\n@[%a@]\n" Type_env.pp gamma);
 
       let result = SESubst.init [] in
 
@@ -365,7 +365,7 @@ let simplify_pfs_and_gamma
 
       (* Unit types *)
       let simplify_unit_types () =
-        TypEnv.iter gamma (fun x t ->
+        Type_env.iter gamma (fun x t ->
             let e = Expr.from_var_name x in
             match t with
             | UndefinedType -> SESubst.put result e (Lit Undefined)
@@ -398,7 +398,7 @@ let simplify_pfs_and_gamma
         (* These we must not encounter here *)
         | ForAll (bt, _) ->
             let lx, _ = List.split bt in
-            List.iter (fun x -> TypEnv.remove gamma x) lx;
+            List.iter (fun x -> Type_env.remove gamma x) lx;
             `Replace whole
         (* And is expanded *)
         | And (a1, a2) ->
@@ -626,12 +626,12 @@ let simplify_pfs_and_gamma
                               let* () =
                                 match le with
                                 | LVar v' -> (
-                                    match TypEnv.get gamma v with
+                                    match Type_env.get gamma v with
                                     | None -> Ok ()
                                     | Some t -> (
-                                        match TypEnv.get gamma v' with
+                                        match Type_env.get gamma v' with
                                         | None ->
-                                            TypEnv.update gamma v' t;
+                                            Type_env.update gamma v' t;
                                             Ok ()
                                         | Some t' ->
                                             if t <> t' then
@@ -650,16 +650,16 @@ let simplify_pfs_and_gamma
                                     match le_type with
                                     | None -> Ok ()
                                     | Some t -> (
-                                        match TypEnv.get gamma v with
+                                        match Type_env.get gamma v with
                                         | None ->
-                                            TypEnv.update gamma v t;
+                                            Type_env.update gamma v t;
                                             Ok ()
                                         | Some tv ->
                                             if t <> tv then
                                               Error "Type mismatch"
                                             else Ok ()))
                                 | false ->
-                                    TypEnv.remove gamma v;
+                                    Type_env.remove gamma v;
                                     Ok ()
                               in
                               Ok ()
@@ -669,9 +669,9 @@ let simplify_pfs_and_gamma
                         | Ok () -> `Filter))
                 | UnOp (TypeOf, LVar v), Lit (Type t)
                 | Lit (Type t), UnOp (TypeOf, LVar v) -> (
-                    match TypEnv.get gamma v with
+                    match Type_env.get gamma v with
                     | None ->
-                        TypEnv.update gamma v t;
+                        Type_env.update gamma v t;
                         `Filter
                     | Some tv ->
                         if t <> tv then stop_explain "Type mismatch"
@@ -876,11 +876,11 @@ let simplify_pfs_and_gamma
           sanitise_pfs_no_store ~unification gamma lpfs;
 
           let current_lvars = SS.union (PFS.lvars lpfs) (PFS.lvars rpfs) in
-          TypEnv.iter gamma (fun v _ ->
+          Type_env.iter gamma (fun v _ ->
               if SS.mem v !vars_to_kill && not (SS.mem v current_lvars) then
-                TypEnv.remove gamma v);
+                Type_env.remove gamma v);
 
-          TypEnv.iter gamma (fun v t ->
+          Type_env.iter gamma (fun v t ->
               match t with
               | Type.ListType ->
                   PFS.extend lpfs
@@ -894,11 +894,11 @@ let simplify_pfs_and_gamma
 
       L.verbose (fun m -> m "PFS/Gamma simplification completed:\n");
       L.(verbose (fun m -> m "PFS:@\n%a@\n" PFS.pp lpfs));
-      L.(verbose (fun m -> m "Gamma:@\n%a@\n" TypEnv.pp gamma));
+      L.(verbose (fun m -> m "Gamma:@\n%a@\n" Type_env.pp gamma));
 
       let cached_simplification =
         {
-          simpl_gamma = TypEnv.to_list gamma;
+          simpl_gamma = Type_env.to_list gamma;
           simpl_pfs = PFS.to_list lpfs;
           simpl_existentials = !existentials;
           subst = SESubst.copy result;
@@ -942,7 +942,7 @@ let simplify_implication
     (exists : SS.t)
     (lpfs : PFS.t)
     (rpfs : PFS.t)
-    (gamma : TypEnv.t) =
+    (gamma : Type_env.t) =
   (* let t = Sys.time () in *)
   List.iter
     (fun (pf : Formula.t) ->
@@ -980,7 +980,7 @@ let simplify_implication
            Gamma:\n\
            %a\n"
           (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
-          exists PFS.pp lpfs PFS.pp rpfs TypEnv.pp gamma));
+          exists PFS.pp lpfs PFS.pp rpfs Type_env.pp gamma));
   (* Utils.Statistics.update_statistics "FOS: SimplifyImplication"
      (Sys.time () -. t); *)
   exists
@@ -992,7 +992,7 @@ let admissible_assertion (a : Asrt.t) : bool =
           ((Fmt.to_to_string Asrt.full_pp) a)));
 
   let pfs = PFS.init () in
-  let gamma = TypEnv.init () in
+  let gamma = Type_env.init () in
 
   let a = Asrt.pvars_to_lvars a in
 
@@ -1006,7 +1006,7 @@ let admissible_assertion (a : Asrt.t) : bool =
         List.iter
           (fun (le, t) ->
             match (le : Expr.t) with
-            | LVar x | PVar x -> TypEnv.update gamma x t
+            | LVar x | PVar x -> Type_env.update gamma x t
             | _ -> ())
           ets
     | _ -> ()

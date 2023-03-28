@@ -1,9 +1,4 @@
-(*********************)
-(*                   *)
-(*  Concrete values  *)
-(*                   *)
-(*********************)
-
+(** @canonical Gillian.Concrete.Values *)
 module rec M :
   (Val.S with type t = Literal.t and type st = CSubst.t and type et = CESubst.t) =
 struct
@@ -33,5 +28,6 @@ struct
   let is_concrete (_ : t) = true
 end
 
+(** @canonical Gillian.Concrete.Subst *)
 and CSubst : (Subst.S with type vt = M.t) = Subst.Make (M)
 and CESubst : (ESubst.S with type vt = M.t) = ESubst.Make (M)

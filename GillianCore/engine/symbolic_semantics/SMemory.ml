@@ -31,7 +31,7 @@ module type S = sig
     string ->
     t ->
     PFS.t ->
-    TypEnv.t ->
+    Type_env.t ->
     vt list ->
     action_ret
 
@@ -51,7 +51,7 @@ module type S = sig
 
   val substitution_in_place :
     pfs:PFS.t ->
-    gamma:TypEnv.t ->
+    gamma:Type_env.t ->
     st ->
     t ->
     (t * Formula.Set.t * (string * Type.t) list) list
@@ -71,11 +71,11 @@ module type S = sig
     ?simple_fix:bool ->
     t ->
     PFS.t ->
-    TypEnv.t ->
+    Type_env.t ->
     err_t ->
     (c_fix_t list * Formula.t list * Containers.SS.t * Asrt.t list) list
 
-  val apply_fix : t -> PFS.t -> TypEnv.t -> c_fix_t -> t
+  val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t
 end
 
 module Dummy : S with type init_data = unit = struct

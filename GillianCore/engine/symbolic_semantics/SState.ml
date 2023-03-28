@@ -10,13 +10,13 @@ module type S = sig
     init_data:init_data ->
     store:store_t ->
     pfs:PFS.t ->
-    gamma:TypEnv.t ->
+    gamma:Type_env.t ->
     spec_vars:SS.t ->
     t
 
   val init : init_data -> t
   val clear_resource : t -> t
-  val get_typ_env : t -> TypEnv.t
+  val get_typ_env : t -> Type_env.t
   val get_pfs : t -> PFS.t
   val get_lvars_for_exact : t -> Var.Set.t
 
@@ -41,7 +41,7 @@ module Make (SMemory : SMemory.S) :
   type heap_t = SMemory.t [@@deriving yojson]
   type store_t = SStore.t [@@deriving yojson]
   type m_err_t = SMemory.err_t [@@deriving yojson, show]
-  type t = heap_t * store_t * PFS.t * TypEnv.t * SS.t [@@deriving yojson]
+  type t = heap_t * store_t * PFS.t * Type_env.t * SS.t [@@deriving yojson]
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type init_data = SMemory.init_data
 
@@ -82,7 +82,7 @@ module Make (SMemory : SMemory.S) :
        @[<v 2>TYPING ENVIRONMENT:@\n\
        %a@]"
       (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
-      svars SStore.pp store pp_heap heap PFS.pp pfs TypEnv.pp gamma
+      svars SStore.pp store pp_heap heap PFS.pp pfs Type_env.pp gamma
 
   let pp_by_need pvars cmd_lvars cmd_locs fmt state =
     let memory, store, pfs, gamma, svars = state in
@@ -164,21 +164,21 @@ module Make (SMemory : SMemory.S) :
       svars (SStore.pp_by_need pvars) store pp_memory memory
       (PFS.pp_by_need (pvars, lvars, locs))
       pfs
-      (TypEnv.pp_by_need (List.fold_left SS.union SS.empty [ pvars; lvars ]))
+      (Type_env.pp_by_need (List.fold_left SS.union SS.empty [ pvars; lvars ]))
       gamma
 
   let init init_data =
     ( SMemory.init init_data,
       SStore.init [],
       PFS.init (),
-      TypEnv.init (),
+      Type_env.init (),
       SS.empty )
 
   let make_s
       ~(init_data : init_data)
       ~(store : SStore.t)
       ~(pfs : PFS.t)
-      ~(gamma : TypEnv.t)
+      ~(gamma : Type_env.t)
       ~(spec_vars : SS.t) : t =
     (SMemory.init init_data, store, pfs, gamma, spec_vars)
 
@@ -196,8 +196,10 @@ module Make (SMemory : SMemory.S) :
                (fun (new_heap, v, new_fofs, new_types) ->
                  let new_store = SStore.copy store in
                  let new_pfs = PFS.copy pfs in
-                 let new_gamma = TypEnv.copy gamma in
-                 List.iter (fun (x, t) -> TypEnv.update new_gamma x t) new_types;
+                 let new_gamma = Type_env.copy gamma in
+                 List.iter
+                   (fun (x, t) -> Type_env.update new_gamma x t)
+                   new_types;
                  List.iter (fun fof -> PFS.extend new_pfs fof) new_fofs;
                  ((new_heap, new_store, new_pfs, new_gamma, vars), v))
                ret_succs)
@@ -304,7 +306,7 @@ module Make (SMemory : SMemory.S) :
     match Typing.reverse_type_lexpr true gamma [ (v, t) ] with
     | None -> None
     | Some gamma' ->
-        TypEnv.extend gamma gamma';
+        Type_env.extend gamma gamma';
         Some state
 
   let sat_check (state : t) (v : Expr.t) : bool =
@@ -387,7 +389,7 @@ module Make (SMemory : SMemory.S) :
       | [] -> failwith "Impossible: memory substitution returned []"
       | [ (mem, lpfs, lgamma) ] ->
           let () = Formula.Set.iter (PFS.extend pfs) lpfs in
-          let () = List.iter (fun (t, v) -> TypEnv.update gamma t v) lgamma in
+          let () = List.iter (fun (t, v) -> Type_env.update gamma t v) lgamma in
           if not kill_new_lvars then
             Typing.naively_infer_type_information pfs gamma;
           [ (mem, store, pfs, gamma, svars) ]
@@ -395,10 +397,10 @@ module Make (SMemory : SMemory.S) :
           List.map
             (fun (mem, lpfs, lgamma) ->
               let bpfs = PFS.copy pfs in
-              let bgamma = TypEnv.copy gamma in
+              let bgamma = Type_env.copy gamma in
               let () = Formula.Set.iter (PFS.extend bpfs) lpfs in
               let () =
-                List.iter (fun (t, v) -> TypEnv.update bgamma t v) lgamma
+                List.iter (fun (t, v) -> Type_env.update bgamma t v) lgamma
               in
               if not kill_new_lvars then
                 Typing.naively_infer_type_information bpfs bgamma;
@@ -452,7 +454,7 @@ module Make (SMemory : SMemory.S) :
       ( SMemory.copy heap,
         SStore.copy store,
         PFS.copy pfs,
-        TypEnv.copy gamma,
+        Type_env.copy gamma,
         svars )
     in
     result
@@ -470,7 +472,7 @@ module Make (SMemory : SMemory.S) :
     SMemory.lvars heap
     |> SS.union (SStore.lvars store)
     |> SS.union (PFS.lvars pfs)
-    |> SS.union (TypEnv.lvars gamma)
+    |> SS.union (Type_env.lvars gamma)
     |> SS.union svars
 
   let get_lvars_for_exact (state : t) : Var.Set.t =
@@ -499,10 +501,11 @@ module Make (SMemory : SMemory.S) :
       List.sort Asrt.compare
         (List.map (fun f -> Asrt.Pure f) (SStore.assertions store'))
     in
-    if TypEnv.empty gamma then asrts_store @ SMemory.assertions heap @ asrts_pfs
+    if Type_env.empty gamma then
+      asrts_store @ SMemory.assertions heap @ asrts_pfs
     else
       asrts_store @ SMemory.assertions heap @ asrts_pfs
-      @ [ Types (TypEnv.to_list_expr gamma) ]
+      @ [ Types (Type_env.to_list_expr gamma) ]
 
   let evaluate_slcmd (_ : 'a UP.prog) (_ : SLCmd.t) (_ : t) :
       (t list, err_t list) result =
@@ -556,16 +559,16 @@ module Make (SMemory : SMemory.S) :
     | [] -> failwith "IMPOSSIBLE: SMemory always returns at least one memory"
     | [ (mem, lpfs, lgamma) ] ->
         let () = Formula.Set.iter (PFS.extend pfs) lpfs in
-        let () = List.iter (fun (t, v) -> TypEnv.update gamma t v) lgamma in
+        let () = List.iter (fun (t, v) -> Type_env.update gamma t v) lgamma in
         [ (mem, store, pfs, gamma, svars) ]
     | multi_mems ->
         List.map
           (fun (mem, lpfs, lgamma) ->
             let bpfs = PFS.copy pfs in
-            let bgamma = TypEnv.copy gamma in
+            let bgamma = Type_env.copy gamma in
             let () = Formula.Set.iter (PFS.extend bpfs) lpfs in
             let () =
-              List.iter (fun (t, v) -> TypEnv.update bgamma t v) lgamma
+              List.iter (fun (t, v) -> Type_env.update bgamma t v) lgamma
             in
             (mem, SStore.copy store, bpfs, bgamma, svars))
           multi_mems
@@ -603,7 +606,7 @@ module Make (SMemory : SMemory.S) :
         (fun x e ac ->
           match e with
           | LVar y -> (
-              match TypEnv.get gamma y with
+              match Type_env.get gamma y with
               | Some ObjectType -> (
                   match
                     Reduction.resolve_expr_to_location pfs gamma (LVar y)
@@ -683,7 +686,7 @@ module Make (SMemory : SMemory.S) :
   let get_failing_constraint (err : err_t) : Formula.t =
     StateErr.get_failing_constraint err SMemory.get_failing_constraint
 
-  let normalise_fix (pfs : PFS.t) (gamma : TypEnv.t) (fix : fix_t list) :
+  let normalise_fix (pfs : PFS.t) (gamma : Type_env.t) (fix : fix_t list) :
       fix_t list option =
     let fixes, pfs', svars, asrts =
       List.fold_right
