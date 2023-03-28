@@ -2,7 +2,7 @@
 
 (library
  (name engine)
- (package gillian)
+ (public_name gillian.engine)
  (libraries
   utils
   z3_encoding
