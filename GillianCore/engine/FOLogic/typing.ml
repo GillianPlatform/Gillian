@@ -8,9 +8,16 @@ exception Break
 (* ******************** *)
 
 module Infer_types_to_gamma = struct
-  type f = Expr.t -> Type.t -> bool
+  open Type
 
-  let infer_unop (f : f) (op : UnOp.t) (le : Expr.t) (tt : Type.t) =
+  let rec infer_unop
+      (flag : bool)
+      (gamma : Type_env.t)
+      (new_gamma : Type_env.t)
+      (op : UnOp.t)
+      (le : Expr.t)
+      (tt : Type.t) =
+    let f = f flag gamma new_gamma in
     match op with
     | UNot -> tt = BooleanType && f le BooleanType
     | M_isNaN -> tt = BooleanType && f le NumberType
@@ -47,12 +54,15 @@ module Infer_types_to_gamma = struct
     | StrLen -> tt = NumberType && f le StringType
     | SetToList -> tt = ListType && f le SetType
 
-  let infer_binop
-      (f : f)
+  and infer_binop
+      (flag : bool)
+      (gamma : Type_env.t)
+      (new_gamma : Type_env.t)
       (op : BinOp.t)
       (le1 : Expr.t)
       (le2 : Expr.t)
       (tt : Type.t) =
+    let f = f flag gamma new_gamma in
     let (rqt1 : Type.t option), (rqt2 : Type.t option), (rt : Type.t option) =
       match op with
       | Equal -> (None, None, Some BooleanType)
@@ -101,7 +111,7 @@ module Infer_types_to_gamma = struct
     | None -> true
     | Some rt -> tt = rt
 
-  let rec f
+  and f
       (flag : bool)
       (gamma : Type_env.t)
       (new_gamma : Type_env.t)
@@ -134,8 +144,8 @@ module Infer_types_to_gamma = struct
         tt = ListType && List.for_all (fun x -> f x ListType) les
     | LstSub (le1, le2, le3) ->
         tt = ListType && f le1 ListType && f le2 IntType && f le3 IntType
-    | UnOp (op, le) -> infer_unop f op le tt
-    | BinOp (le1, op, le2) -> infer_binop f op le1 le2 tt
+    | UnOp (op, le) -> infer_unop flag gamma new_gamma op le tt
+    | BinOp (le1, op, le2) -> infer_binop flag gamma new_gamma op le1 le2 tt
 end
 
 let infer_types_to_gamma = Infer_types_to_gamma.f
