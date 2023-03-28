@@ -1,6 +1,6 @@
 (library
  (name debugger_utils)
- (package gillian)
+ (public_name gillian.debugger_utils)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson lwt_ppx))
  (libraries engine gil_syntax utils debugger_log)

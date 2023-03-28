@@ -1,5 +1,5 @@
 (library
  (name parserAndCompiler)
- (package gillian)
+ (public_name gillian.parserAndCompiler)
  (libraries cmdliner gil_syntax utils incrementalAnalysis)
  (flags :standard -open Gil_syntax -open Utils -open IncrementalAnalysis))

@@ -1,6 +1,6 @@
 (library
  (name debug_adapter)
- (package gillian)
+ (public_name gillian.debug_adapter)
  ; This has to use ppx_deriving_yojson
  ; to work with ocaml-dap
  (preprocess

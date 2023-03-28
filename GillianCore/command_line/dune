@@ -1,6 +1,6 @@
 (library
  (name command_line)
- (package gillian)
+ (public_name gillian.command_line)
  (libraries
   cmdliner
   fmt.tty
