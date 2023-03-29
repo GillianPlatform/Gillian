@@ -71,7 +71,11 @@ let parameter_types (preds : (string, Pred.t) Hashtbl.t) (lemma : t) : t =
                 | None -> ac_types
                 | Some t_x -> (le, t_x) :: ac_types)
               []
-              (List.combine pred.pred_params les)
+              (try List.combine pred.pred_params les
+               with Invalid_argument _ ->
+                 Fmt.failwith
+                   "Invalid number of arguments: %a.\nInside of lemma: %s"
+                   Asrt.pp a lemma.lemma_name)
           in
           Star (Types ac_types, a)
       | _ -> a
