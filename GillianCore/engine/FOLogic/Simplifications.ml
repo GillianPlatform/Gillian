@@ -1018,4 +1018,8 @@ let admissible_assertion (a : Asrt.t) : bool =
     if res then L.tmi (fun m -> m "Admissible !!")
     else L.tmi (fun m -> m "Not admissible !!");
     res
-  with _ -> false
+  with e ->
+    L.tmi (fun m ->
+        m "Considered not admissible because of exception!! %s"
+          (Printexc.to_string e));
+    false
