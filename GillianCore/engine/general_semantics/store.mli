@@ -70,5 +70,4 @@ module type S = sig
   val lvars : t -> Var.Set.t
 end
 
-(** @canonical Gillian.General.Store.Make *)
 module Make (Val : Val.S) : S with type vt = Val.t

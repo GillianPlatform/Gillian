@@ -83,7 +83,6 @@ module type S = sig
   val substitute_lcmd : t -> partial:bool -> LCmd.t -> LCmd.t
 end
 
-(** @canonical Gillian.General.Subst.Make *)
 module Make (Val : Val.S) : S with type vt = Val.t = struct
   module L = Logging
 

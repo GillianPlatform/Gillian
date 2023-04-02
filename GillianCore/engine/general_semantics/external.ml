@@ -2,7 +2,6 @@
 
   Interface for executing external functions *)
 
-(** @canonical Gillian.General.External.T *)
 module T (Annot : Annot.S) = struct
   module type S = functor
     (Val : Val.S)

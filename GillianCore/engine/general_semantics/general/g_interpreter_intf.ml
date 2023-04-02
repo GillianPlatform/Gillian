@@ -162,7 +162,6 @@ module type Intf = sig
   (** @canonical Gillian.General.G_interpreter.S *)
   module type S = S
 
-  (** @canonical Gillian.General.G_interpreter.Make *)
   module Make
       (Val : Val.S)
       (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)

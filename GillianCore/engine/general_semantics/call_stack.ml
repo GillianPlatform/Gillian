@@ -104,7 +104,6 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
 end
 
-(** @canonical Gillian.General.Call_stack.Make *)
 module Make (Val : Val.S) (Store : Store.S with type vt = Val.t) :
   S with type vt = Val.t and type store_t = Store.t = struct
   type vt = Val.t [@@deriving yojson]
