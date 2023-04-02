@@ -36,16 +36,16 @@ function needs(condition, errorMessage) {
     @id readElements
 
     @pred nounfold innerLoopInvariantFacts(+definition, +remElsList, +view, +innerLoopReadPos, +fLeft, +remElList, +eLength, +remElsLength, +doneElLength, remElLength) :
-      (definition == "Complete") * CElementJS(view, innerLoopReadPos, fLeft, remElList, remElLength) * (eLength == doneElLength + remElLength),
-      (definition == "Incomplete") * (remElsList == {{ }}) * IElementJS(view, innerLoopReadPos, fLeft, remElList, remElLength) * (remElsLength == doneElLength + remElLength),
-      (definition == "Incomplete") * (! (remElsList == {{ }})) * CElementJS(view, innerLoopReadPos, fLeft, remElList, remElLength) * (eLength == doneElLength + remElLength);
+      (definition == "Complete") * CElement(view, innerLoopReadPos, fLeft, remElList, remElLength) * (eLength == doneElLength + remElLength),
+      (definition == "Incomplete") * (remElsList == {{ }}) * IElement(view, innerLoopReadPos, fLeft, remElList, remElLength) * (remElsLength == doneElLength + remElLength),
+      (definition == "Incomplete") * (! (remElsList == {{ }})) * CElement(view, innerLoopReadPos, fLeft, remElList, remElLength) * (eLength == doneElLength + remElLength);
 
     @pre
       (elementCount == #eCount) * (fieldsPerElement == #fCount) * (buffer == #buffer) * (readPos == #readPos) *
-      Uint8Array(#buffer, #ab, #viewOffset, #viewSize) *
+      Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
       (#view == l-sub(#data, #viewOffset, #viewSize)) *
-      ElementsJS(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
+      Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
 
       scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
       JSInternals ()
@@ -54,7 +54,7 @@ function needs(condition, errorMessage) {
       (#definition == "Complete") *
       Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
-      ElementsJS(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
+      Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
       scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
       JSInternals () *
 
@@ -65,9 +65,9 @@ function needs(condition, errorMessage) {
             (#ret_readPos == #readPos + #esLength);
 
       (#definition == "Incomplete") *
-      Uint8Array(#buffer, #ab, #viewOffset, #viewSize) *
+      Uint8Array (#buffer, #ab, #viewOffset, #viewSize) *
       ArrayBuffer(#ab, #data) *
-      ElementsJS(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
+      Elements(#definition, #view, #readPos, #eCount, #fCount, #eList, #esLength) *
 
       scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
       JSInternals () *
@@ -95,8 +95,8 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
       scope(element: _) * scope(fieldCount: _) * scope(fieldBinary: _) * scope(length: _) *
       JSInternals() *
 
-      CElementsJS(#view, #readPos, #eCount - #eLeft, #fCount, #doneElsList, #doneElsLength) *
-      ElementsJS(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) *
+      CElements(#view, #readPos, #eCount - #eLeft, #fCount, #doneElsList, #doneElsLength) *
+      Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) *
       (#eList == l+ (#doneElsList, #remElsList)) *
       (#esLength == #doneElsLength + #remElsLength) *
       (#readPos + #doneElsLength == #outerLoopReadPos) *
@@ -104,14 +104,12 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
       [bind : #doneEls, #outerLoopReadPos, #eLeft, #remElsList, #remElsLength, #doneElsList, #doneElsLength] */
   while (elementCount--) {
     /* @tactic
-        unfold ElementsJS(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
-        unfold Elements(#definition, #view, (as_int #outerLoopReadPos), (as_int #eLeft), (as_int #fCount), #remElsList, (as_int #remElsLength));
+        unfold Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
         if (#definition = "Complete") then {
-            unfold CElements(#view, (as_int #outerLoopReadPos), (as_int #eLeft), (as_int #fCount), #remElsList, (as_int #remElsLength)) [bind: (#element := #fList) and (#eLength := #eLengthI)]
+            unfold CElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) [bind: (#element := #fList) and (#eLength := #eLength)]
         } else {
-            unfold IElements(#view, (as_int #outerLoopReadPos), (as_int #eLeft), (as_int #fCount), #remElsList, (as_int #remElsLength)) [bind: (#fList := #fList) and (#eLength := #eLengthI)]
-        };
-        assert (#eLength == (as_num #eLengthI)) [bind: #eLength] */
+            unfold IElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) [bind: (#fList := #fList) and (#eLength := #eLength)]
+        } */
     var element = []
     var fieldCount = fieldsPerElement
 
@@ -122,7 +120,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
         scope(fieldBinary: _) * scope(length: _) *
         JSInternals() *
 
-        CElementJS(#view, #outerLoopReadPos, #fCount - #fLeft, #doneElList, #doneElLength) *
+        CElement(#view, #outerLoopReadPos, #fCount - #fLeft, #doneElList, #doneElLength) *
         (#fList == l+ (#doneElList, #remElList)) *
         innerLoopInvariantFacts(#definition, #remElsList, #view, #innerLoopReadPos, #fLeft, #remElList, #eLength, #remElsLength, #doneElLength, #remElLength) *
         (#outerLoopReadPos + #doneElLength == #innerLoopReadPos) *
@@ -132,20 +130,20 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
       /* @tactic
           unfold innerLoopInvariantFacts(#definition, #remElsList, #view, #innerLoopReadPos, #fLeft, #remElList, #eLength, #remElsLength, #doneElLength, #remElLength);
           if (#definition = "Complete") then {
-              unfold CElementJS(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength)
+              unfold CElement(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength)
           } else {
               if (#remElsList = {{ }}) then {
-                  unfold IElementJS(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength)
+                  unfold IElement(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength)
               } else {
-                  unfold CElementJS(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength)
+                  unfold CElement(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength)
               }
           } */
       if (readPos + 2 > dataView.byteLength)
         /* @tactic
-            apply PrependCElementIJS(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remElList, #remElLength);
-            assert IElementJS(#view, #outerLoopReadPos, #fCount, #fList, #remElsLength);
-            assert ElementsJS(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
-            apply PrependCElementsEJS(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remElsList, #remElsLength)
+            apply PrependCElementI(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remElList, #remElLength);
+            assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remElsLength);
+            assert Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+            apply PrependCElementsE(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remElsList, #remElsLength)
         */
         return false
 
@@ -154,10 +152,10 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
 
       if (readPos + length > dataView.byteLength)
         /* @tactic
-            apply PrependCElementIJS(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remElList, #remElLength);
-            assert IElementJS(#view, #outerLoopReadPos, #fCount, #fList, #remElsLength);
-            assert ElementsJS(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
-            apply PrependCElementsEJS(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remElsList, #remElsLength)
+            apply PrependCElementI(#view, #outerLoopReadPos, (#fCount - #fLeft), #doneElList, #doneElLength, #fLeft, #remElList, #remElLength);
+            assert IElement(#view, #outerLoopReadPos, #fCount, #fList, #remElsLength);
+            assert Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+            apply PrependCElementsE(#definition, #view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #eLeft, #remElsList, #remElsLength)
         */
         return false
 
@@ -174,17 +172,17 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
     }
 
     /* @tactic
-        unfold CElementJS(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength);
-        apply CElementsAppendJS(#view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #doneElList, #doneElLength) */
+        unfold CElement(#view, #innerLoopReadPos, #fLeft, #remElList, #remElLength);
+        apply CElementsAppend(#view, #readPos, (#eCount - #eLeft), #fCount, #doneElsList, #doneElsLength, #doneElList, #doneElLength) */
     elements.push(element);
   }
 
   /* @tactic
-      unfold ElementsJS(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
+      unfold Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
       if (#definition = "Complete") then {
-          unfold CElementsJS(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength)
+          unfold CElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength)
       } else {
-          unfold IElementsJS(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength)
+          unfold IElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength)
       } */
   return { elements, readPos }
 }
@@ -681,7 +679,7 @@ var SdkSuite = function (suiteId) { };
                 #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                        #part_two, #ECKs,
                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
-                #edkDef, #errorMessage) *
+                #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(AlgorithmSuiteIdentifier : #ASIObject) * AlgorithmSuiteIdentifierObject(#ASIObject) *
@@ -697,7 +695,7 @@ var SdkSuite = function (suiteId) { };
                  #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                         #part_two, #ECKs,
                         #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
-                 #edkDef, #errorMessage) *
+                 #errorMessage) *
 
           (#definition == "Complete") *
           HeaderInfo(ret, #version, #type, #suiteId, #messageId, #ECKs, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #rawHeaderData, #headerIv, #headerAuthTag) *
@@ -717,7 +715,7 @@ var SdkSuite = function (suiteId) { };
                  #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                         #part_two, #ECKs,
                         #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
-                 #edkDef, #errorMessage) *
+                 #errorMessage) *
 
           (definition == "Incomplete") * (ret == false) *
 
@@ -738,7 +736,7 @@ var SdkSuite = function (suiteId) { };
                 #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                        #part_two, #ECKs,
                        #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
-                #edkDef, #errorMessage) *
+                #errorMessage) *
 
          scope(needs : #needs) * JSFunctionObject(#needs, "needs", #n_sc, #n_len, #n_proto) *
          scope(AlgorithmSuiteIdentifier : #ASIObject) * AlgorithmSuiteIdentifierObject(#ASIObject) *
@@ -755,7 +753,7 @@ var SdkSuite = function (suiteId) { };
                  #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength,
                         #part_two, #ECKs,
                         #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag,
-                 #edkDef, #errorMessage) *
+                 #errorMessage) *
 
           ErrorObjectWithMessage(ret, #errorMessage) *
 
@@ -781,15 +779,15 @@ function deserializeMessageHeader(messageBuffer) {
     messageBuffer.byteLength
   )
 
-  /* @tactic unfold Header(#definition, #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #edkDef, #errorMessage) */
+  /* @tactic unfold Header(#definition, #view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #errorMessage) */
   /* @tactic
       if (#definition = "Complete") then {
-        unfold CHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #edkDef)
+        unfold CHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
           [bind: (#stringId := #stringId) and (#tagLength := #tagLength)]
       } else { if (#definition = "Incomplete") then {
-          unfold IHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #edkDef)
+          unfold IHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag)
         } else {
-          unfold BHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #edkDef, #errorMessage)
+          unfold BHeader(#view, #part_one, #version, #type, #suiteId, #messageId, #ECLength, #part_two, #ECKs, #part_three, #EDKs, #contentType, #headerIvLength, #frameLength, #headerLength, #headerIv, #headerAuthTag, #errorMessage)
         }
       } */
 
