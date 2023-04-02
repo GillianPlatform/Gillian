@@ -23,13 +23,13 @@ module type S = sig
     | ParseAndCompileError of ParserAndCompiler.err
     | FailedExec of string
     | FinishedExec of
-        (State.t, Val.t, (Val.t, State.err_t) ExecErr.t) ExecRes.t list
+        (State.t, Val.t, (Val.t, State.err_t) Exec_err.t) Exec_res.t list
 
   val pp_what_test_did : Format.formatter -> t -> unit
 
   val pp_what_branch_did :
     Format.formatter ->
-    (State.t, Val.t, (Val.t, State.err_t) ExecErr.t) ExecRes.t ->
+    (State.t, Val.t, (Val.t, State.err_t) Exec_err.t) Exec_res.t ->
     unit
 end
 
@@ -65,7 +65,7 @@ module Make
     | ParseAndCompileError of ParserAndCompiler.err
     | FailedExec of string
     | FinishedExec of
-        (State.t, Val.t, (Val.t, State.err_t) ExecErr.t) ExecRes.t list
+        (State.t, Val.t, (Val.t, State.err_t) Exec_err.t) Exec_res.t list
 
   let pp_what_test_did fmt = function
     | ParseAndCompileError e ->
@@ -80,13 +80,13 @@ module Make
           "finished its execution with failure in proc %s at command %i with \
            errors: %a"
           proc proc_idx
-          (Fmt.Dump.list (ExecErr.pp Val.pp State.pp_err))
+          (Fmt.Dump.list (Exec_err.pp Val.pp State.pp_err))
           errors
     | FinishedExec _ ->
         Fmt.pf fmt "finished its execution with several branches"
 
   let pp_what_branch_did fmt b =
-    ExecRes.pp_what_exec_did Val.pp (ExecErr.pp Val.pp State.pp_err) fmt b
+    Exec_res.pp_what_exec_did Val.pp (Exec_err.pp Val.pp State.pp_err) fmt b
 end
 
 module Make_Concrete (CMemory : CMemory.S) =

@@ -1,3 +1,6 @@
+(** @canonical Gillian.General.Exec_err *)
+
+(** @canonical Gillian.General.Exec_err.t *)
 type ('value, 'state_err) t =
   | EProc of 'value  (** Incorrect procedure identifier *)
   | ESt of 'state_err  (** Memory Error *)

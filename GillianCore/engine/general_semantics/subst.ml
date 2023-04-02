@@ -1,8 +1,10 @@
-(**
-    Interface for GIL Substitutions.
-    GIL substitutions are mappings from GIL Variables to GIL Values.
-    GIL substitutions are mutable.
-*)
+(** @canonical Gillian.General.Subst
+
+  Interface for GIL Substitutions.
+  GIL substitutions are mappings from GIL Variables to GIL Values.
+  GIL substitutions are mutable. *)
+
+(** @canonical Gillian.General.Subst.S *)
 module type S = sig
   (** Type of GIL values *)
   type vt

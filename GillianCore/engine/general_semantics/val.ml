@@ -1,4 +1,8 @@
-(** Interface for GIL Values *)
+(** @canonical Gillian.General.Val
+
+  Interface for GIL Values *)
+
+(** @canonical Gillian.General.Val.S *)
 module type S = sig
   (** Type of GIL values *)
   type t [@@deriving yojson]

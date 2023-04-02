@@ -1,5 +1,8 @@
-(** Implementation of GIL call stacks *)
+(** @canonical Gillian.General.Call_stack
+    
+  Implementation of GIL call stacks *)
 
+(** @canonical Gillian.General.Call_stack.S *)
 module type S = sig
   type vt
   type store_t

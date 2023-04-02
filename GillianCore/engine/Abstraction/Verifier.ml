@@ -19,7 +19,7 @@ module type S = sig
        and type preds_t = Preds.SPreds.t
 
   module SAInterpreter :
-    GInterpreter.S
+    G_interpreter.S
       with type vt = SVal.M.t
        and type st = st
        and type store_t = SStore.t
@@ -80,7 +80,8 @@ struct
   module SPState = SPState
 
   module SAInterpreter =
-    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SPState) (PC) (External)
+    G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SPState) (PC)
+      (External)
 
   module Normaliser = Normaliser.Make (SPState)
 
@@ -125,7 +126,7 @@ struct
 
   let reset () =
     VerificationResults.reset global_results;
-    SAInterpreter.reset ()
+    SAInterpreter.reset_call_graph ()
 
   module Hides_derivations = struct
     (** For a given definition of a predicate, this function derives the
@@ -698,7 +699,7 @@ struct
 
   let analyse_proc_result test flag ?parent_id result =
     match (result : SAInterpreter.result_t) with
-    | ExecRes.RFail { proc; proc_idx; error_state; errors } ->
+    | Exec_res.RFail { proc; proc_idx; error_state; errors } ->
         L.verbose (fun m ->
             m
               "VERIFICATION FAILURE: Procedure %s, Command %d\n\
@@ -714,7 +715,7 @@ struct
               errors);
         if not !Config.debug then Fmt.pr "f @?";
         false
-    | ExecRes.RSucc { flag = fl; final_state; last_report; _ } ->
+    | Exec_res.RSucc { flag = fl; final_state; last_report; _ } ->
         if Some fl <> test.flag then (
           L.normal (fun m ->
               m

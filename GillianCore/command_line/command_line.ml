@@ -21,13 +21,13 @@ struct
   module Gil_parsing = Gil_parsing.Make (PC.Annot)
   module CState = CState.Make (CMemory)
 
-  module CInterpreter =
-    GInterpreter.Make (CVal.M) (CVal.CESubst) (CStore) (CState) (PC) (External)
+  module C_interpreter =
+    G_interpreter.Make (CVal.M) (CVal.CESubst) (CStore) (CState) (PC) (External)
 
   module SState = SState.Make (SMemory)
 
-  module SInterpreter =
-    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (PC) (External)
+  module S_interpreter =
+    G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (PC) (External)
 
   module SPState =
     PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
@@ -52,9 +52,9 @@ struct
     let consoles : (module Console.S) list =
       [
         (module Compiler_console.Make (PC));
-        (module C_interpreter_console.Make (ID) (PC) (CState) (CInterpreter)
+        (module C_interpreter_console.Make (ID) (PC) (CState) (C_interpreter)
                   (Gil_parsing));
-        (module S_interpreter_console.Make (ID) (PC) (SState) (SInterpreter)
+        (module S_interpreter_console.Make (ID) (PC) (SState) (S_interpreter)
                   (Gil_parsing));
         (module Verification_console.Make (ID) (PC) (Verification) (Gil_parsing));
         (module Act_console.Make (ID) (PC) (Abductor) (Gil_parsing));

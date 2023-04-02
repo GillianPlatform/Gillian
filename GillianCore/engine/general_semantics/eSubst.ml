@@ -1,8 +1,10 @@
-(**
-    Interface for GIL Extended Substitutions (e-substitutions).
-    GIL e-substitutions are mappings from GIL Variables to GIL Values.
-    GIL e-substitutions are mutable.
-*)
+(** @canonical Gillian.General.ESubst
+
+  Interface for GIL Extended Substitutions (e-substitutions)
+
+  GIL e-substitutions are (mutable) mappings from GIL Variables to GIL Values. *)
+
+(** @canonical Gillian.General.ESubst.S *)
 module type S = sig
   (** Type of GIL values *)
   type vt
