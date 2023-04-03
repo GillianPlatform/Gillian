@@ -3,7 +3,7 @@
 
   module Make (Annot : Annot.S) = struct
     exception Syntax_error of string
-    
+
     module GIL_Parser = GIL_Parser.Make (Annot)
     let keyword_table = Hashtbl.create 307
 
@@ -98,6 +98,7 @@
         "pred", GIL_Parser.PRED;
         "nounfold", GIL_Parser.NOUNFOLD;
         "facts", GIL_Parser.FACTS;
+        "cost", GIL_Parser.PUCOST;
 
         (* Logic commands *)
         "fold",         GIL_Parser.FOLD;
