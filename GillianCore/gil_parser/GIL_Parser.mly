@@ -176,6 +176,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token PRED
 %token NOUNFOLD
 %token FACTS
+%token PUCOST
 (* Logic commands *)
 %token OLCMD
 %token CLCMD
@@ -791,6 +792,10 @@ g_pred_facts_target:
   FACTS; COLON; facts = separated_nonempty_list(AND, pure_assertion_target); SCOLON
   { facts }
 
+g_pred_cost_target:
+  PUCOST; COLON; pu_cost = g_assertion_target; SCOLON
+  { pu_cost }
+
 (* pred name (arg1, ..., argn) : def1, ..., defn ; *)
 g_pred_target:
   no_path = option(NO_PATH);
@@ -803,6 +808,7 @@ g_pred_target:
   pred_definitions = option(g_pred_def_target);
   SCOLON
   pred_facts=option(g_pred_facts_target);
+  pred_cost=option(g_pred_cost_target);
   {
     let pred_abstract = Option.is_some abstract in
     let pred_pure = Option.is_some pure in
@@ -828,6 +834,7 @@ g_pred_target:
         pred_ins;
         pred_definitions;
         pred_facts;
+        pred_cost;
         pred_pure;
         pred_abstract;
         pred_nounfold;
@@ -1176,4 +1183,3 @@ type_target:
   | TYPETYPELIT  { Type.TypeType }
   | SETTYPELIT   { Type.SetType }
 ;
-
