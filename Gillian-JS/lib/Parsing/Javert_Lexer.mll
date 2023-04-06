@@ -68,6 +68,8 @@
       "car",           Javert_Parser.CAR;
       "cdr",           Javert_Parser.CDR;
       "set_to_list",   Javert_Parser.SETTOLIST;
+      "as_num",        Javert_Parser.INTTONUM;
+      "as_int",        Javert_Parser.NUMTOINT;
 
       (* Expression keywords *)
       "typeOf", Javert_Parser.TYPEOF;
@@ -245,6 +247,7 @@ rule read = parse
   | "<#"                 { Javert_Parser.LLESSTHAN       }
   | "<=#"                { Javert_Parser.LLESSTHANEQUAL  }
   | "s<#"                { Javert_Parser.LLESSTHANSTRING }
+  | "is-int"             { Javert_Parser.ISINT }
   (* Separating conjunction uses the same symbol as product, token TIMES *)
   | "->"                 { Javert_Parser.LARROW      }
 (* Logic commands *)

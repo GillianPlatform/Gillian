@@ -101,6 +101,12 @@ module Infer_types_to_gamma = struct
       | SignedRightShift
       | UnsignedRightShift
       | SignedRightShiftL
+      | BitwiseAndF
+      | BitwiseOrF
+      | BitwiseXorF
+      | LeftShiftF
+      | SignedRightShiftF
+      | UnsignedRightShiftF
       | M_atan2
       | M_pow -> (Some NumberType, Some NumberType, Some NumberType)
     in
@@ -284,8 +290,9 @@ module Type_lexpr = struct
           | Car | Cdr ->
               (ListType, [ Formula.ILessEq (Expr.one_i, UnOp (LstLen, e)) ])
           | LstRev | SetToList -> (ListType, [])
-          | IUnaryMinus | FUnaryMinus | LstLen | IntToNum -> (IntType, [])
+          | IUnaryMinus | LstLen | NumToInt -> (IntType, [])
           | BitwiseNot
+          | FUnaryMinus
           | M_abs
           | M_acos
           | M_asin
@@ -305,7 +312,7 @@ module Type_lexpr = struct
           | ToUint32Op
           | ToInt32Op
           | ToNumberOp
-          | NumToInt
+          | IntToNum
           | StrLen -> (NumberType, [])
         in
         infer_type gamma le tt (new_constraints @ constraints)
@@ -380,6 +387,12 @@ module Type_lexpr = struct
         | BitwiseXorL
         | LeftShiftL
         | SignedRightShiftL
+        | BitwiseAndF
+        | BitwiseOrF
+        | BitwiseXorF
+        | LeftShiftF
+        | SignedRightShiftF
+        | UnsignedRightShiftF
         | M_atan2
         | M_pow ->
             infer_type le NumberType constraints

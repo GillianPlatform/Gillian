@@ -297,6 +297,7 @@ struct
       | SetSub (le1, le2) -> SetSub (fe le1, fe le2)
       | SetMem (le1, le2) -> SetMem (fe le1, fe le2)
       | ForAll (bt, a) -> ForAll (bt, fant a)
+      | IsInt e -> IsInt (fe e)
       | _ ->
           let msg =
             Fmt.str

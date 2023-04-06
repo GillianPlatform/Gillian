@@ -607,9 +607,9 @@ let translate_binop_equality _ _ x1_v x2_v non_strict non_negated err =
 let translate_bitwise_bin_op x1 x2 x1_v x2_v bbop err =
   let bbop : BinOp.t =
     match bbop with
-    | JS_Parser.Syntax.Bitand -> BitwiseAnd
-    | JS_Parser.Syntax.Bitor -> BitwiseOr
-    | JS_Parser.Syntax.Bitxor -> BitwiseXor
+    | JS_Parser.Syntax.Bitand -> BitwiseAndF
+    | JS_Parser.Syntax.Bitor -> BitwiseOrF
+    | JS_Parser.Syntax.Bitxor -> BitwiseXorF
     | _ -> raise (Failure "Illegal bitwise operator")
   in
 
@@ -3064,7 +3064,7 @@ let rec translate_expr tr_ctx e :
 
       let new_cmds, new_errs, x_r =
         translate_bitwise_shift x1 x2 x1_v x2_v toInt32Name toUInt32Name
-          LeftShift tr_ctx.tr_err_lab
+          LeftShiftF tr_ctx.tr_err_lab
       in
       let cmds =
         annotate_first_cmd
@@ -3103,7 +3103,7 @@ let rec translate_expr tr_ctx e :
 
       let new_cmds, new_errs, x_r =
         translate_bitwise_shift x1 x2 x1_v x2_v toInt32Name toUInt32Name
-          SignedRightShift tr_ctx.tr_err_lab
+          SignedRightShiftF tr_ctx.tr_err_lab
       in
       let cmds =
         annotate_first_cmd
@@ -3142,7 +3142,7 @@ let rec translate_expr tr_ctx e :
 
       let new_cmds, new_errs, x_r =
         translate_bitwise_shift x1 x2 x1_v x2_v toUInt32Name toUInt32Name
-          UnsignedRightShift tr_ctx.tr_err_lab
+          UnsignedRightShiftF tr_ctx.tr_err_lab
       in
       let cmds =
         annotate_first_cmd
@@ -3863,13 +3863,13 @@ let rec translate_expr tr_ctx e :
             translate_multiplicative_binop x1 x2 x1_v x2_v op tr_ctx.tr_err_lab
         | JS_Parser.Syntax.Ursh ->
             translate_bitwise_shift x1 x2 x1_v x2_v toUInt32Name toUInt32Name
-              SignedRightShift tr_ctx.tr_err_lab
+              SignedRightShiftF tr_ctx.tr_err_lab
         | JS_Parser.Syntax.Lsh ->
             translate_bitwise_shift x1 x2 x1_v x2_v toInt32Name toUInt32Name
-              LeftShift tr_ctx.tr_err_lab
+              LeftShiftF tr_ctx.tr_err_lab
         | JS_Parser.Syntax.Rsh ->
             translate_bitwise_shift x1 x2 x1_v x2_v toInt32Name toUInt32Name
-              UnsignedRightShift tr_ctx.tr_err_lab
+              UnsignedRightShiftF tr_ctx.tr_err_lab
         | JS_Parser.Syntax.Bitand
         | JS_Parser.Syntax.Bitor
         | JS_Parser.Syntax.Bitxor ->

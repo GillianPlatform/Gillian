@@ -120,7 +120,7 @@ axiomatic spec DVP_getUint8 (xsc, vthis, byteOffset)
        (#view == l-sub(#data, #viewOffset, #viewSize)) ]]
     [[ DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
        (#raw == l-sub (#view, #byteOffset, #elementSize)) *
-       rawToUInt8(#raw, ret) ]]
+       rawToUInt8JS(#raw, ret) ]]
     normal
 
 axiomatic spec DVP_getUint16 (xsc, vthis, byteOffset, littleEndian)
@@ -130,7 +130,7 @@ axiomatic spec DVP_getUint16 (xsc, vthis, byteOffset, littleEndian)
        (#view == l-sub(#data, #viewOffset, #viewSize)) ]]
     [[ DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
        (#raw == l-sub (#view, #byteOffset, #elementSize)) *
-       rawToUInt16(#raw, false, ret) ]]
+       rawToUInt16JS(#raw, false, ret) ]]
     normal;
 
     [[ (vthis == #vthis) * (byteOffset == #byteOffset) * (littleEndian == #littleEndian) *
@@ -139,7 +139,7 @@ axiomatic spec DVP_getUint16 (xsc, vthis, byteOffset, littleEndian)
        (#view == l-sub(#data, #viewOffset, #viewSize)) ]]
     [[ DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
        (#raw== l-sub (#view, #byteOffset, #elementSize)) *
-       rawToUInt16(#raw, #littleEndian, ret) ]]
+       rawToUInt16JS(#raw, #littleEndian, ret) ]]
     normal
 
 axiomatic spec DVP_getUint32 (xsc, vthis, byteOffset, littleEndian)
@@ -149,7 +149,7 @@ axiomatic spec DVP_getUint32 (xsc, vthis, byteOffset, littleEndian)
        (#view == l-sub(#data, #viewOffset, #viewSize)) ]]
     [[ DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
        (#raw == l-sub (#view, #byteOffset, #elementSize)) *
-       rawToUInt32(#raw, false, ret) ]]
+       rawToUInt32JS(#raw, false, ret) ]]
     normal;
 
     [[ (vthis == #vthis) * (byteOffset == #byteOffset) * (littleEndian == #littleEndian) *
@@ -158,5 +158,5 @@ axiomatic spec DVP_getUint32 (xsc, vthis, byteOffset, littleEndian)
        (#view == l-sub(#data, #viewOffset, #viewSize)) ]]
     [[ DataView(#vthis, #buffer, #viewOffset, #viewSize) * ArrayBuffer(#buffer, #data) *
        (#raw == l-sub (#view, #byteOffset, #elementSize)) *
-       rawToUInt32(#raw, #littleEndian, ret) ]]
+       rawToUInt32JS(#raw, #littleEndian, ret) ]]
     normal

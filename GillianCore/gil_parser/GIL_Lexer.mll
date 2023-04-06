@@ -247,6 +247,7 @@ rule read = parse
   | "<#"                 { GIL_Parser.FLLESSTHAN       }
   | "<=#"                { GIL_Parser.FLLESSTHANEQUAL  }
   | "s<#"                { GIL_Parser.LSLESSTHAN }
+  | "is-int"             { GIL_Parser.ISINT }
   (* Separating conjunction uses the same symbol as product, token TIMES *)
 (* Logic commands *)
   | "[*"                 { GIL_Parser.OLCMD     }

@@ -1,18 +1,19 @@
 open Jsil_syntax
 open Javert_utils
-module GAsrt = Gillian.Gil_syntax.Asrt
-module GSLCmd = Gillian.Gil_syntax.SLCmd
-module GLCmd = Gillian.Gil_syntax.LCmd
-module GSpec = Gillian.Gil_syntax.Spec
-module GLemma = Gillian.Gil_syntax.Lemma
-module GPred = Gillian.Gil_syntax.Pred
-module GMacro = Gillian.Gil_syntax.Macro
-module GProc = Gillian.Gil_syntax.Proc
-module GProg = Gillian.Gil_syntax.Prog
-module GBiSpec = Gillian.Gil_syntax.BiSpec
-module GCmd = Gillian.Gil_syntax.Cmd
-module Expr = Gillian.Gil_syntax.Expr
-module Annot = Gillian.Gil_syntax.Annot
+module Gil = Gillian.Gil_syntax
+module GAsrt = Gil.Asrt
+module GSLCmd = Gil.SLCmd
+module GLCmd = Gil.LCmd
+module GSpec = Gil.Spec
+module GLemma = Gil.Lemma
+module GPred = Gil.Pred
+module GMacro = Gil.Macro
+module GProc = Gil.Proc
+module GProg = Gil.Prog
+module GBiSpec = Gil.BiSpec
+module GCmd = Gil.Cmd
+module Expr = Gil.Expr
+module Annot = Gil.Annot
 
 (**
  *  Fresh identifiers
@@ -36,37 +37,92 @@ let reset_generators () =
   reset_else ();
   reset_var ()
 
+let rec jsil2gil_expr (e : Expr.t) : Expr.t =
+  let f = jsil2gil_expr in
+  match e with
+  | UnOp (op, e') -> (
+      let e = Expr.UnOp (op, f e') in
+      match op with
+      | Gil.UnOp.LstLen -> Expr.int_to_num e
+      | _ -> e)
+  | BinOp (e1, op, e2) ->
+      let e1 = f e1 in
+      let e2 =
+        match op with
+        | Gil.BinOp.LstNth -> Expr.num_to_int (f e2)
+        | _ -> f e2
+      in
+      BinOp (e1, op, e2)
+  | LstSub (lst, start, len) ->
+      let lst = f lst in
+      let start = Expr.num_to_int (f start) in
+      let len = Expr.num_to_int (f len) in
+      LstSub (lst, start, len)
+  | NOp (op, es) ->
+      let es = es |> List.map f in
+      NOp (op, es)
+  | EList es ->
+      let es = es |> List.map f in
+      EList es
+  | ESet es ->
+      let es = es |> List.map f in
+      ESet es
+  | _ -> e
+
+let rec jsil2gil_formula (f : Gil.Formula.t) : Gil.Formula.t =
+  let ff = jsil2gil_formula in
+  let fe = jsil2gil_expr in
+  match f with
+  | True | False -> f
+  | Not f -> Not (ff f)
+  | And (f1, f2) -> And (ff f1, ff f2)
+  | Or (f1, f2) -> Or (ff f1, ff f2)
+  | Eq (e1, e2) -> Eq (fe e1, fe e2)
+  | FLess (e1, e2) -> FLess (fe e1, fe e2)
+  | FLessEq (e1, e2) -> FLessEq (fe e1, fe e2)
+  | ILess (e1, e2) -> ILess (fe e1, fe e2)
+  | ILessEq (e1, e2) -> ILessEq (fe e1, fe e2)
+  | StrLess (e1, e2) -> StrLess (fe e1, fe e2)
+  | SetMem (e1, e2) -> SetMem (fe e1, fe e2)
+  | SetSub (e1, e2) -> SetSub (fe e1, fe e2)
+  | ForAll (qts, f) -> ForAll (qts, ff f)
+  | IsInt e -> IsInt (fe e)
+
 let rec jsil2gil_asrt (a : Asrt.t) : GAsrt.t =
   let f = jsil2gil_asrt in
+  let fe = jsil2gil_expr in
   match a with
   | Emp -> Emp
   | Star (a1, a2) -> Star (f a1, f a2)
-  | PointsTo (e1, e2, e3) -> GA (JSILNames.aCell, [ e1; e2 ], [ e3 ])
-  | MetaData (e1, e2) -> GA (JSILNames.aMetadata, [ e1 ], [ e2 ])
-  | EmptyFields (e1, e2) -> GA (JSILNames.aProps, [ e1; e2 ], [])
-  | Pred (pn, es) -> Pred (pn, es)
-  | Pure f -> Pure f
-  | Types vts -> Types vts
+  | PointsTo (e1, e2, e3) ->
+      Asrt_utils.points_to ~loc:(fe e1) ~field:(fe e2) ~value:(fe e3)
+  | MetaData (e1, e2) -> Asrt_utils.metadata ~loc:(fe e1) ~metadata:(fe e2)
+  | EmptyFields (e1, e2) -> Asrt_utils.empty_fields ~loc:(fe e1) ~domain:(fe e2)
+  | Pred (pn, es) -> Pred (pn, List.map fe es)
+  | Pure f -> Pure (jsil2gil_formula f)
+  | Types vts -> Types (List.map (fun (v, t) -> (fe v, t)) vts)
 
 let jsil2gil_slcmd (slcmd : SLCmd.t) : GSLCmd.t =
   match slcmd with
-  | Fold (pn, es, info) -> Fold (pn, es, info)
-  | Unfold (pn, es, info, b) -> Unfold (pn, es, info, b)
+  | Fold (pn, es, info) -> Fold (pn, List.map jsil2gil_expr es, info)
+  | Unfold (pn, es, info, b) -> Unfold (pn, List.map jsil2gil_expr es, info, b)
   | GUnfold pn -> GUnfold pn
-  | ApplyLem (x, es, xs) -> ApplyLem (x, es, xs)
+  | ApplyLem (x, es, xs) -> ApplyLem (x, List.map jsil2gil_expr es, xs)
   | SepAssert (a, xs) -> SepAssert (jsil2gil_asrt a, xs)
   | Invariant (a, xs) -> Invariant (jsil2gil_asrt a, xs)
 
 let rec jsil2gil_lcmd (lcmd : LCmd.t) : GLCmd.t =
   let f = jsil2gil_lcmd in
   let fs = List.map f in
+  let fe = jsil2gil_expr in
+  let ff = jsil2gil_formula in
   match lcmd with
-  | If (e, lcmds1, lcmds2) -> If (e, fs lcmds1, fs lcmds2)
-  | Branch f -> Branch f
-  | Macro (x, es) -> Macro (x, es)
-  | Assert f -> Assert f
-  | Assume f -> Assume f
-  | AssumeType (x, t) -> AssumeType (x, t)
+  | If (e, lcmds1, lcmds2) -> If (fe e, fs lcmds1, fs lcmds2)
+  | Branch f -> Branch (ff f)
+  | Macro (x, es) -> Macro (x, List.map fe es)
+  | Assert f -> Assert (ff f)
+  | Assume f -> Assume (ff f)
+  | AssumeType (x, t) -> AssumeType (fe x, t)
   | FreshSVar x -> FreshSVar x
   | SL slcmd -> SL (jsil2gil_slcmd slcmd)
 
@@ -107,12 +163,12 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
         {
           lemma_hyp = jsil2gil_asrt lemma.pre;
           lemma_concs = List.map jsil2gil_asrt lemma.posts;
-          lemma_spec_variant = lemma.variant;
+          lemma_spec_variant = Option.map jsil2gil_expr lemma.variant;
           lemma_spec_hides = None;
         };
       ];
     lemma_proof = Option.map (List.map jsil2gil_lcmd) lemma.proof;
-    lemma_variant = lemma.variant;
+    lemma_variant = Option.map jsil2gil_expr lemma.variant;
     lemma_existentials = lemma.existentials;
   }
 
@@ -129,7 +185,7 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
       List.map
         (fun (info, asrt) -> (info, jsil2gil_asrt asrt, []))
         pred.definitions;
-    pred_facts = pred.facts;
+    pred_facts = List.map jsil2gil_formula pred.facts;
     pred_pure = pred.pure;
     pred_abstract = pred.abstract;
     pred_nounfold = pred.nounfold;
@@ -153,9 +209,10 @@ let jsil2gil_bispec (bispec : BiSpec.t) : GBiSpec.t =
 
 let jsil2core (lab : string option) (cmd : LabCmd.t) :
     (string option * string GCmd.t) list =
+  let fe = jsil2gil_expr in
   match cmd with
   | LBasic Skip -> [ (lab, GCmd.Skip) ]
-  | LBasic (Assignment (x, e)) -> [ (lab, GCmd.Assignment (x, e)) ]
+  | LBasic (Assignment (x, e)) -> [ (lab, GCmd.Assignment (x, fe e)) ]
   (*
       C(x := new(l1, l2) :-
         lab: aux1 := [new](l1, l2);
@@ -163,10 +220,10 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
 
     *)
   | LBasic (New (x, e1, e2)) ->
-      let e1 = Option.value ~default:(Expr.Lit Empty) e1 in
-      let e2 = Option.value ~default:(Expr.Lit Null) e2 in
+      let e1 = fe @@ Option.value ~default:(Expr.Lit Empty) e1 in
+      let e2 = fe @@ Option.value ~default:(Expr.Lit Null) e2 in
       let aux1 = fresh_var () in
-      let e' = Expr.BinOp (Expr.PVar aux1, LstNth, Lit (Num 0.)) in
+      let e' = Expr.BinOp (Expr.PVar aux1, LstNth, Expr.zero_i) in
       let cmd1 : string GCmd.t =
         GCmd.LAction (aux1, JSILNames.alloc, [ e1; e2 ])
       in
@@ -187,9 +244,9 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let aux3 = fresh_var () in
       let then_lab = fresh_then () in
       let else_lab = fresh_else () in
-      let lnth_expr : Expr.t = BinOp (Expr.PVar aux3, LstNth, Lit (Num 2.)) in
-      let cmd1 : string GCmd.t = Assignment (aux1, e1) in
-      let cmd2 : string GCmd.t = Assignment (aux2, e2) in
+      let lnth_expr : Expr.t = BinOp (Expr.PVar aux3, LstNth, Expr.int 2) in
+      let cmd1 : string GCmd.t = Assignment (aux1, fe e1) in
+      let cmd2 : string GCmd.t = Assignment (aux2, fe e2) in
       let cmd3 : string GCmd.t =
         LAction (aux3, JSILNames.getCell, [ Expr.PVar aux1; Expr.PVar aux2 ])
       in
@@ -222,11 +279,11 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let aux3 = fresh_var () in
       let aux4 = fresh_var () in
       let aux5 = fresh_var () in
-      let e1' = Expr.BinOp (Expr.PVar aux4, LstNth, Expr.Lit (Num 0.)) in
-      let e2' = Expr.BinOp (Expr.PVar aux4, LstNth, Expr.Lit (Num 1.)) in
-      let cmd1 : string GCmd.t = Assignment (aux1, e1) in
-      let cmd2 : string GCmd.t = Assignment (aux2, e2) in
-      let cmd3 : string GCmd.t = Assignment (aux3, e3) in
+      let e1' = Expr.BinOp (Expr.PVar aux4, LstNth, Expr.zero_i) in
+      let e2' = Expr.BinOp (Expr.PVar aux4, LstNth, Expr.one_i) in
+      let cmd1 : string GCmd.t = Assignment (aux1, fe e1) in
+      let cmd2 : string GCmd.t = Assignment (aux2, fe e2) in
+      let cmd3 : string GCmd.t = Assignment (aux3, fe e3) in
       let cmd4 : string GCmd.t =
         LAction (aux4, JSILNames.getCell, [ Expr.PVar aux1; Expr.PVar aux2 ])
       in
@@ -250,11 +307,11 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let aux4 = fresh_var () in
       let then_lab = fresh_then () in
       let else_lab = fresh_else () in
-      let e1' = Expr.BinOp (Expr.PVar aux3, LstNth, Lit (Num 0.)) in
-      let e2' = Expr.BinOp (Expr.PVar aux3, LstNth, Lit (Num 1.)) in
-      let e3' = Expr.BinOp (Expr.PVar aux3, LstNth, Lit (Num 2.)) in
-      let cmd1 : string GCmd.t = Assignment (aux1, e1) in
-      let cmd2 : string GCmd.t = Assignment (aux2, e2) in
+      let e1' = Expr.BinOp (Expr.PVar aux3, LstNth, Expr.zero_i) in
+      let e2' = Expr.BinOp (Expr.PVar aux3, LstNth, Expr.one_i) in
+      let e3' = Expr.BinOp (Expr.PVar aux3, LstNth, Expr.int 2) in
+      let cmd1 : string GCmd.t = Assignment (aux1, fe e1) in
+      let cmd2 : string GCmd.t = Assignment (aux2, fe e2) in
       let cmd3 : string GCmd.t =
         LAction (aux3, JSILNames.getCell, [ Expr.PVar aux1; Expr.PVar aux2 ])
       in
@@ -287,11 +344,11 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let aux1 = fresh_var () in
       let aux2 = fresh_var () in
       let aux3 = fresh_var () in
-      let e1 = Expr.BinOp (Expr.PVar aux2, LstNth, Lit (Num 0.)) in
-      let e2 = Expr.BinOp (Expr.PVar aux2, LstNth, Lit (Num 1.)) in
+      let e1 = Expr.BinOp (Expr.PVar aux2, LstNth, Expr.zero_i) in
+      let e2 = Expr.BinOp (Expr.PVar aux2, LstNth, Expr.one_i) in
       let then_lab = fresh_then () in
       let else_lab = fresh_else () in
-      let cmd1 : string GCmd.t = Assignment (aux1, e) in
+      let cmd1 : string GCmd.t = Assignment (aux1, fe e) in
       let cmd2 : string GCmd.t =
         LAction (aux2, JSILNames.getAllProps, [ Expr.PVar aux1 ])
       in
@@ -320,11 +377,10 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let aux3 = fresh_var () in
       let e =
         Expr.UnOp
-          ( UNot,
-            BinOp (BinOp (PVar aux3, LstNth, Lit (Num 2.)), Equal, Lit Nono) )
+          (UNot, BinOp (BinOp (PVar aux3, LstNth, Expr.int 2), Equal, Lit Nono))
       in
-      let cmd1 : string GCmd.t = Assignment (aux1, e1) in
-      let cmd2 : string GCmd.t = Assignment (aux2, e2) in
+      let cmd1 : string GCmd.t = Assignment (aux1, fe e1) in
+      let cmd2 : string GCmd.t = Assignment (aux2, fe e2) in
       let cmd3 : string GCmd.t =
         LAction (aux3, JSILNames.getCell, [ Expr.PVar aux1; Expr.PVar aux2 ])
       in
@@ -343,7 +399,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let aux2 = fresh_var () in
       let then_lab = fresh_then () in
       let else_lab = fresh_else () in
-      let cmd1 : string GCmd.t = Assignment (aux1, e) in
+      let cmd1 : string GCmd.t = Assignment (aux1, fe e) in
       let cmd2 : string GCmd.t =
         LAction (aux2, JSILNames.getAllProps, [ Expr.PVar aux1 ])
       in
@@ -355,7 +411,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
         Fail (JSILNames.resourceError, [ Expr.PVar aux1 ])
       in
       let cmd5 : string GCmd.t =
-        Assignment (x, BinOp (PVar aux2, LstNth, Lit (Num 1.)))
+        Assignment (x, BinOp (PVar aux2, LstNth, Expr.one_i))
       in
       [
         (lab, cmd1);
@@ -378,8 +434,8 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       let aux2 = fresh_var () in
       let then_lab = fresh_then () in
       let else_lab = fresh_else () in
-      let e' : Expr.t = BinOp (Expr.PVar aux2, LstNth, Lit (Num 1.)) in
-      let cmd1 : string GCmd.t = Assignment (aux1, e) in
+      let e' : Expr.t = BinOp (Expr.PVar aux2, LstNth, Expr.one_i) in
+      let cmd1 : string GCmd.t = Assignment (aux1, fe e) in
       let cmd2 : string GCmd.t =
         LAction (aux2, JSILNames.getMetadata, [ Expr.PVar aux1 ])
       in
@@ -390,7 +446,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
         Fail (JSILNames.resourceError, [ Expr.PVar aux1 ])
       in
       let cmd5 : string GCmd.t =
-        Assignment (x, BinOp (Expr.PVar aux2, LstNth, Lit (Num 1.)))
+        Assignment (x, BinOp (Expr.PVar aux2, LstNth, Expr.one_i))
       in
       [
         (lab, cmd1);
@@ -401,12 +457,15 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       ]
   | LLogic lcmd -> [ (lab, GCmd.Logic (jsil2gil_lcmd lcmd)) ]
   | LGoto j -> [ (lab, GCmd.Goto j) ]
-  | LGuardedGoto (e, j, k) -> [ (lab, GCmd.GuardedGoto (e, j, k)) ]
-  | LCall (x, e, es, j, subst) -> [ (lab, GCmd.Call (x, e, es, j, subst)) ]
-  | LECall (x, e, es, j) -> [ (lab, GCmd.ECall (x, e, es, j)) ]
-  | LApply (x, e, j) -> [ (lab, GCmd.Apply (x, e, j)) ]
+  | LGuardedGoto (e, j, k) -> [ (lab, GCmd.GuardedGoto (fe e, j, k)) ]
+  | LCall (x, e, es, j, subst) ->
+      [ (lab, GCmd.Call (x, fe e, List.map fe es, j, subst)) ]
+  | LECall (x, e, es, j) -> [ (lab, GCmd.ECall (x, fe e, List.map fe es, j)) ]
+  | LApply (x, e, j) -> [ (lab, GCmd.Apply (x, fe e, j)) ]
   | LArguments x -> [ (lab, GCmd.Arguments x) ]
-  | LPhiAssignment es -> [ (lab, GCmd.PhiAssignment es) ]
+  | LPhiAssignment es ->
+      let es = List.map (fun (x, e) -> (x, List.map fe e)) es in
+      [ (lab, GCmd.PhiAssignment es) ]
   | LReturnNormal -> [ (lab, GCmd.ReturnNormal) ]
   | LReturnError -> [ (lab, GCmd.ReturnError) ]
 

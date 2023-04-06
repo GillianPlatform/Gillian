@@ -135,6 +135,7 @@ module type S = sig
   val evaluate_lcmds :
     annot UP.prog ->
     LCmd.t list ->
+    ?annot:annot option ->
     state_t ->
     (state_t list, state_err_t list) result
 

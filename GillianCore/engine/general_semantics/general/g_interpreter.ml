@@ -33,7 +33,7 @@ struct
   type vt = Val.t
   type st = ESubst.t
   type store_t = Store.t
-  type state_t = State.t [@@deriving yojson]
+  type state_t = State.t [@@deriving yojson, show]
   type state_err_t = State.err_t [@@deriving yojson]
   type init_data = State.init_data
   type annot = Annot.t [@@deriving yojson]
@@ -193,6 +193,7 @@ struct
            --%s: %i--@\n\
            TIME: %f@\n\
            CMD: %a@\n\
+           LOC: %a@\n\
            PROCS: %a@\n\
            LOOPS: %a ++ %a@\n\
            BRANCHING: %d@\n\
@@ -200,7 +201,9 @@ struct
            %a@\n\
            ------------------------------------------------------@]\n"
           (Call_stack.get_cur_proc_id cs)
-          i time Cmd.pp_indexed cmd pp_str_list
+          i time Cmd.pp_indexed cmd Location.pp_log_opt
+          (Annot.get_origin_loc annot)
+          pp_str_list
           (Call_stack.get_cur_procs cs)
           pp_str_list
           (Annot.get_loop_info annot)
@@ -278,16 +281,21 @@ struct
         (ConfigReport.make ~proc_line:i ~time:(Sys.time ()) ~cmd ~callstack:cs
            ~annot ~branching:b_counter ~state ?branch_case ())
 
-    let print_lconfiguration (lcmd : LCmd.t) (state : State.t) : unit =
+    let print_lconfiguration
+        (lcmd : LCmd.t)
+        (annot : annot option)
+        (state : State.t) : unit =
+      let loc = Option.bind annot Annot.get_origin_loc in
       L.normal (fun m ->
           m
             "@[------------------------------------------------------@\n\
              TIME: %f@\n\
              LCMD: %a@\n\
+             LOC: %a@\n\
              @\n\
              %a@\n\
              ------------------------------------------------------@]@\n"
-            (Sys.time ()) LCmd.pp lcmd State.pp state)
+            (Sys.time ()) LCmd.pp lcmd Location.pp_log_opt loc State.pp state)
 
     let pp_err = Exec_err.pp Val.pp State.pp_err
     let pp_single_result ft res = Exec_res.pp State.pp Val.pp pp_err ft res
@@ -306,6 +314,18 @@ struct
   let max_branching = 100
 
   exception Interpreter_error of err_t list * State.t
+
+  let () =
+    Printexc.register_printer (function
+      | Interpreter_error (errs, state) ->
+          let msg =
+            Fmt.str
+              "Interpreter error!\n\n=== Errors ===\n%a\n\n=== State ===\n%a"
+              (Fmt.list ~sep:(Fmt.any "\n") pp_err_t)
+              errs pp_state_t state
+          in
+          Some msg
+      | _ -> None)
 
   (** Internal error, carrying a string description *)
   exception Internal_error of string
@@ -500,7 +520,23 @@ struct
           L.normal (fun m -> m "%s" msg);
           raise (Interpreter_error ([ ESt err ], state))
 
-    let eval_macro name args lcmd prog state eval_lcmds =
+    let eval_branch fof state =
+      let state' = State.copy state in
+      let state =
+        Option.fold
+          ~some:(fun x -> [ x ])
+          ~none:[]
+          (State.assume_a state [ fof ])
+      in
+      let state' =
+        Option.fold
+          ~some:(fun x -> [ x ])
+          ~none:[]
+          (State.assume_a state' [ Not fof ])
+      in
+      Ok (state @ state')
+
+    let rec eval_macro name args lcmd prog annot state =
       let macro = Macro.get UP.(prog.prog.macros) name in
       match macro with
       | None ->
@@ -528,27 +564,27 @@ struct
             List.map (SVal.SSubst.substitute_lcmd subst ~partial:true) lcmds
           in
           let lcmds = expand_macro macro args in
-          eval_lcmds prog lcmds state
+          eval_lcmds prog lcmds ~annot state
 
     (* We have to understand what is the intended semantics of the logic if *)
-    let eval_if e lcmds_t lcmds_e prog state eval_expr eval_lcmds =
+    and eval_if e lcmds_t lcmds_e prog annot state eval_expr =
       let ve = eval_expr e in
       let e = Val.to_expr ve in
       match Formula.lift_logic_expr e with
-      | Some (True, False) -> eval_lcmds prog lcmds_t state
-      | Some (False, True) -> eval_lcmds prog lcmds_e state
+      | Some (True, False) -> eval_lcmds prog lcmds_t ~annot state
+      | Some (False, True) -> eval_lcmds prog lcmds_e ~annot state
       | Some (foe, nfoe) ->
           let state' = State.copy state in
           let* then_states =
             State.assume_a state [ foe ]
             |> Option.fold
-                 ~some:(fun state -> eval_lcmds prog lcmds_t state)
+                 ~some:(fun state -> eval_lcmds prog lcmds_t ~annot state)
                  ~none:(Ok [])
           in
           let+ else_states =
             State.assume_a state' [ nfoe ]
             |> Option.fold
-                 ~some:(fun state -> eval_lcmds prog lcmds_e state)
+                 ~some:(fun state -> eval_lcmds prog lcmds_e ~annot state)
                  ~none:(Ok [])
           in
           then_states @ else_states
@@ -556,25 +592,12 @@ struct
           raise
             (Failure "Non-boolean expression in the condition of the logical if")
 
-    let eval_branch fof state =
-      let state' = State.copy state in
-      let state =
-        Option.fold
-          ~some:(fun x -> [ x ])
-          ~none:[]
-          (State.assume_a state [ fof ])
-      in
-      let state' =
-        Option.fold
-          ~some:(fun x -> [ x ])
-          ~none:[]
-          (State.assume_a state' [ Not fof ])
-      in
-      Ok (state @ state')
-
-    let rec eval_lcmd (prog : annot UP.prog) (lcmd : LCmd.t) (state : State.t) :
-        (State.t list, state_err_t list) result =
-      print_lconfiguration lcmd state;
+    and eval_lcmd
+        (prog : annot UP.prog)
+        (lcmd : LCmd.t)
+        ?(annot : annot option)
+        (state : State.t) : (State.t list, state_err_t list) result =
+      print_lconfiguration lcmd annot state;
 
       let eval_expr = make_eval_expr state in
       match lcmd with
@@ -582,24 +605,25 @@ struct
       | Assume f -> eval_assume f state
       | FreshSVar x -> eval_freshsvar x state
       | Assert f -> eval_assert f state
-      | Macro (name, args) -> eval_macro name args lcmd prog state eval_lcmds
+      | Macro (name, args) -> eval_macro name args lcmd prog annot state
       | If (e, lcmds_t, lcmds_e) ->
-          eval_if e lcmds_t lcmds_e prog state eval_expr eval_lcmds
+          eval_if e lcmds_t lcmds_e prog annot state eval_expr
       | Branch fof -> eval_branch fof state
       | SL sl_cmd -> State.evaluate_slcmd prog sl_cmd state
 
     and eval_lcmds
         (prog : annot UP.prog)
         (lcmds : LCmd.t list)
+        ?(annot : annot option = None)
         (state : State.t) : (State.t list, state_err_t list) result =
       match lcmds with
       | [] -> Ok [ state ]
       | lcmd :: rest_lcmds ->
-          let* rets = eval_lcmd prog lcmd state in
+          let* rets = eval_lcmd prog lcmd ?annot state in
           let+ next_rets =
             rets
             |> List_utils.map_results (fun state ->
-                   eval_lcmds prog rest_lcmds state)
+                   eval_lcmds prog rest_lcmds ~annot state)
           in
           List.concat next_rets
   end
@@ -1074,6 +1098,7 @@ struct
           make_confcont;
           loop_action;
           branch_path;
+          annot;
           _;
         } =
           state
@@ -1109,7 +1134,7 @@ struct
                   ~branch_count:b_counter ())
               frames_and_states
         | _ -> (
-            match evaluate_lcmd prog lcmd state with
+            match evaluate_lcmd prog lcmd ~annot state with
             | Ok resulting_states ->
                 let b_counter =
                   if List.length resulting_states > 1 then b_counter + 1

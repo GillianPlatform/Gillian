@@ -9,6 +9,7 @@ module Location : sig
 
   val none : t
   val pp : t Fmt.t
+  val pp_log_opt : Format.formatter -> t option -> unit
 end
 
 (** @canonical Gillian.Gil_syntax.LVar *)
@@ -207,6 +208,12 @@ module BinOp : sig
     | LeftShiftL  (** Left bitshift 64bit *)
     | SignedRightShiftL  (** Signed right bitshift 64bit *)
     | UnsignedRightShiftL  (** Unsigned right bitshift 64bit *)
+    | BitwiseAndF  (** Bitwise conjunction float *)
+    | BitwiseOrF  (** Bitwise disjunction float *)
+    | BitwiseXorF  (** Bitwise exclusive disjunction float *)
+    | LeftShiftF  (** Left bitshift float *)
+    | SignedRightShiftF  (** Signed right bitshift float *)
+    | UnsignedRightShiftF  (** Unsigned right bitshift float *)
     | M_atan2  (** Arctangent y/x *)
     | M_pow  (** Power *)
     | LstNth  (** Nth element of a string *)
@@ -269,6 +276,8 @@ module Expr : sig
   (** Lit (Int Z.one) *)
   val one_i : t
 
+  val int_to_num : t -> t
+  val num_to_int : t -> t
   val type_ : Type.t -> t
   val list : t list -> t
   val list_length : t -> t
@@ -280,6 +289,7 @@ module Expr : sig
   val typeof : t -> t
   val fmod : t -> t -> t
   val imod : t -> t -> t
+  val type_eq : t -> Type.t -> t
 
   module Infix : sig
     (** Floating point math *)
@@ -413,6 +423,7 @@ module Formula : sig
     | SetMem of Expr.t * Expr.t  (** Set membership *)
     | SetSub of Expr.t * Expr.t  (** Set subsetness *)
     | ForAll of (string * Type.t option) list * t  (** Forall *)
+    | IsInt of Expr.t  (** IsInt e <=> (e : float) /\ (e % 1. == 0) *)
   [@@deriving yojson, eq]
 
   val of_bool : bool -> t
@@ -1239,11 +1250,14 @@ module Visitors : sig
            ; visit_BinOp : 'c -> Expr.t -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
            ; visit_BitwiseAnd : 'c -> BinOp.t -> BinOp.t
            ; visit_BitwiseAndL : 'c -> BinOp.t -> BinOp.t
+           ; visit_BitwiseAndF : 'c -> BinOp.t -> BinOp.t
            ; visit_BitwiseNot : 'c -> UnOp.t -> UnOp.t
            ; visit_BitwiseOr : 'c -> BinOp.t -> BinOp.t
            ; visit_BitwiseOrL : 'c -> BinOp.t -> BinOp.t
+           ; visit_BitwiseOrF : 'c -> BinOp.t -> BinOp.t
            ; visit_BitwiseXor : 'c -> BinOp.t -> BinOp.t
            ; visit_BitwiseXorL : 'c -> BinOp.t -> BinOp.t
+           ; visit_BitwiseXorF : 'c -> BinOp.t -> BinOp.t
            ; visit_Bool : 'c -> Literal.t -> bool -> Literal.t
            ; visit_BooleanType : 'c -> Type.t -> Type.t
            ; visit_Branch : 'c -> LCmd.t -> Formula.t -> LCmd.t
@@ -1324,10 +1338,12 @@ module Visitors : sig
            ; visit_LVar : 'c -> Expr.t -> string -> Expr.t
            ; visit_LeftShift : 'c -> BinOp.t -> BinOp.t
            ; visit_LeftShiftL : 'c -> BinOp.t -> BinOp.t
+           ; visit_LeftShiftF : 'c -> BinOp.t -> BinOp.t
            ; visit_FLess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
            ; visit_FLessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
            ; visit_ILess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
            ; visit_ILessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+           ; visit_IsInt : 'c -> Formula.t -> Expr.t -> Formula.t
            ; visit_ListType : 'c -> Type.t -> Type.t
            ; visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
            ; visit_Loc : 'c -> Literal.t -> string -> Literal.t
@@ -1391,6 +1407,7 @@ module Visitors : sig
            ; visit_SetUnion : 'c -> NOp.t -> NOp.t
            ; visit_SignedRightShift : 'c -> BinOp.t -> BinOp.t
            ; visit_SignedRightShiftL : 'c -> BinOp.t -> BinOp.t
+           ; visit_SignedRightShiftF : 'c -> BinOp.t -> BinOp.t
            ; visit_Skip : 'c -> 'f Cmd.t -> 'f Cmd.t
            ; visit_FreshSVar : 'c -> LCmd.t -> string -> LCmd.t
            ; visit_Star : 'c -> Asrt.t -> Asrt.t -> Asrt.t -> Asrt.t
@@ -1429,6 +1446,7 @@ module Visitors : sig
                SLCmd.t
            ; visit_UnsignedRightShift : 'c -> BinOp.t -> BinOp.t
            ; visit_UnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
+           ; visit_UnsignedRightShiftF : 'c -> BinOp.t -> BinOp.t
            ; visit_assertion : 'c -> Asrt.t -> Asrt.t
            ; visit_bindings :
                'c ->
@@ -1479,11 +1497,14 @@ module Visitors : sig
       method visit_BinOp : 'c -> Expr.t -> Expr.t -> BinOp.t -> Expr.t -> Expr.t
       method visit_BitwiseAnd : 'c -> BinOp.t -> BinOp.t
       method visit_BitwiseAndL : 'c -> BinOp.t -> BinOp.t
+      method visit_BitwiseAndF : 'c -> BinOp.t -> BinOp.t
       method visit_BitwiseNot : 'c -> UnOp.t -> UnOp.t
       method visit_BitwiseOr : 'c -> BinOp.t -> BinOp.t
       method visit_BitwiseOrL : 'c -> BinOp.t -> BinOp.t
+      method visit_BitwiseOrF : 'c -> BinOp.t -> BinOp.t
       method visit_BitwiseXor : 'c -> BinOp.t -> BinOp.t
       method visit_BitwiseXorL : 'c -> BinOp.t -> BinOp.t
+      method visit_BitwiseXorF : 'c -> BinOp.t -> BinOp.t
       method visit_Bool : 'c -> Literal.t -> bool -> Literal.t
       method visit_BooleanType : 'c -> Type.t -> Type.t
       method visit_Branch : 'c -> LCmd.t -> Formula.t -> LCmd.t
@@ -1578,10 +1599,12 @@ module Visitors : sig
       method visit_LVar : 'c -> Expr.t -> string -> Expr.t
       method visit_LeftShift : 'c -> BinOp.t -> BinOp.t
       method visit_LeftShiftL : 'c -> BinOp.t -> BinOp.t
+      method visit_LeftShiftF : 'c -> BinOp.t -> BinOp.t
       method visit_FLess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
       method visit_FLessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
       method visit_ILess : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
       method visit_ILessEq : 'c -> Formula.t -> Expr.t -> Expr.t -> Formula.t
+      method visit_IsInt : 'c -> Formula.t -> Expr.t -> Formula.t
       method visit_ListType : 'c -> Type.t -> Type.t
       method visit_Lit : 'c -> Expr.t -> Literal.t -> Expr.t
       method visit_Loc : 'c -> Literal.t -> string -> Literal.t
@@ -1647,6 +1670,7 @@ module Visitors : sig
       method visit_SetUnion : 'c -> NOp.t -> NOp.t
       method visit_SignedRightShift : 'c -> BinOp.t -> BinOp.t
       method visit_SignedRightShiftL : 'c -> BinOp.t -> BinOp.t
+      method visit_SignedRightShiftF : 'c -> BinOp.t -> BinOp.t
       method visit_Skip : 'c -> 'f Cmd.t -> 'f Cmd.t
       method visit_FreshSVar : 'c -> LCmd.t -> string -> LCmd.t
       method visit_Star : 'c -> Asrt.t -> Asrt.t -> Asrt.t -> Asrt.t
@@ -1687,6 +1711,7 @@ module Visitors : sig
 
       method visit_UnsignedRightShift : 'c -> BinOp.t -> BinOp.t
       method visit_UnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
+      method visit_UnsignedRightShiftF : 'c -> BinOp.t -> BinOp.t
 
       method private visit_array :
         'env 'a. ('env -> 'a -> 'a) -> 'env -> 'a array -> 'a array
@@ -1773,11 +1798,14 @@ module Visitors : sig
            ; visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> 'f
            ; visit_BitwiseAnd : 'c -> 'f
            ; visit_BitwiseAndL : 'c -> 'f
+           ; visit_BitwiseAndF : 'c -> 'f
            ; visit_BitwiseNot : 'c -> 'f
            ; visit_BitwiseOr : 'c -> 'f
            ; visit_BitwiseOrL : 'c -> 'f
+           ; visit_BitwiseOrF : 'c -> 'f
            ; visit_BitwiseXor : 'c -> 'f
            ; visit_BitwiseXorL : 'c -> 'f
+           ; visit_BitwiseXorF : 'c -> 'f
            ; visit_Bool : 'c -> bool -> 'f
            ; visit_BooleanType : 'c -> 'f
            ; visit_Branch : 'c -> Formula.t -> 'f
@@ -1826,10 +1854,12 @@ module Visitors : sig
            ; visit_LVar : 'c -> LVar.t -> 'f
            ; visit_LeftShift : 'c -> 'f
            ; visit_LeftShiftL : 'c -> 'f
+           ; visit_LeftShiftF : 'c -> 'f
            ; visit_FLess : 'c -> Expr.t -> Expr.t -> 'f
            ; visit_FLessEq : 'c -> Expr.t -> Expr.t -> 'f
            ; visit_ILess : 'c -> Expr.t -> Expr.t -> 'f
            ; visit_ILessEq : 'c -> Expr.t -> Expr.t -> 'f
+           ; visit_IsInt : 'c -> Expr.t -> 'f
            ; visit_ILessThan : 'c -> 'f
            ; visit_ILessThanEqual : 'c -> 'f
            ; visit_FLessThan : 'c -> 'f
@@ -1904,6 +1934,7 @@ module Visitors : sig
            ; visit_SetUnion : 'c -> 'f
            ; visit_SignedRightShift : 'c -> 'f
            ; visit_SignedRightShiftL : 'c -> 'f
+           ; visit_SignedRightShiftF : 'c -> 'f
            ; visit_Skip : 'c -> 'f
            ; visit_FreshSVar : 'c -> string -> 'f
            ; visit_Star : 'c -> Asrt.t -> Asrt.t -> 'f
@@ -1945,6 +1976,7 @@ module Visitors : sig
                'f
            ; visit_UnsignedRightShift : 'c -> 'f
            ; visit_UnsignedRightShiftL : 'c -> 'f
+           ; visit_UnsignedRightShiftF : 'c -> 'f
            ; visit_assertion : 'c -> Asrt.t -> 'f
            ; visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
            ; visit_binop : 'c -> BinOp.t -> 'f
@@ -1988,11 +2020,14 @@ module Visitors : sig
       method visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> 'f
       method visit_BitwiseAnd : 'c -> 'f
       method visit_BitwiseAndL : 'c -> 'f
+      method visit_BitwiseAndF : 'c -> 'f
       method visit_BitwiseNot : 'c -> 'f
       method visit_BitwiseOr : 'c -> 'f
       method visit_BitwiseOrL : 'c -> 'f
+      method visit_BitwiseOrF : 'c -> 'f
       method visit_BitwiseXor : 'c -> 'f
       method visit_BitwiseXorL : 'c -> 'f
+      method visit_BitwiseXorF : 'c -> 'f
       method visit_Bool : 'c -> bool -> 'f
       method visit_BooleanType : 'c -> 'f
       method visit_Branch : 'c -> Formula.t -> 'f
@@ -2048,10 +2083,12 @@ module Visitors : sig
       method visit_LVar : 'c -> LVar.t -> 'f
       method visit_LeftShift : 'c -> 'f
       method visit_LeftShiftL : 'c -> 'f
+      method visit_LeftShiftF : 'c -> 'f
       method visit_FLess : 'c -> Expr.t -> Expr.t -> 'f
       method visit_FLessEq : 'c -> Expr.t -> Expr.t -> 'f
       method visit_ILess : 'c -> Expr.t -> Expr.t -> 'f
       method visit_ILessEq : 'c -> Expr.t -> Expr.t -> 'f
+      method visit_IsInt : 'c -> Expr.t -> 'f
       method visit_ILessThan : 'c -> 'f
       method visit_ILessThanEqual : 'c -> 'f
       method visit_FLessThan : 'c -> 'f
@@ -2126,6 +2163,7 @@ module Visitors : sig
       method visit_SetUnion : 'c -> 'f
       method visit_SignedRightShift : 'c -> 'f
       method visit_SignedRightShiftL : 'c -> 'f
+      method visit_SignedRightShiftF : 'c -> 'f
       method visit_Skip : 'c -> 'f
       method visit_FreshSVar : 'c -> string -> 'f
       method visit_Star : 'c -> Asrt.t -> Asrt.t -> 'f
@@ -2169,6 +2207,7 @@ module Visitors : sig
 
       method visit_UnsignedRightShift : 'c -> 'f
       method visit_UnsignedRightShiftL : 'c -> 'f
+      method visit_UnsignedRightShiftF : 'c -> 'f
       method visit_assertion : 'c -> Asrt.t -> 'f
       method visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
       method visit_binop : 'c -> BinOp.t -> 'f
@@ -2215,11 +2254,14 @@ module Visitors : sig
            ; visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> unit
            ; visit_BitwiseAnd : 'c -> unit
            ; visit_BitwiseAndL : 'c -> unit
+           ; visit_BitwiseAndF : 'c -> unit
            ; visit_BitwiseNot : 'c -> unit
            ; visit_BitwiseOr : 'c -> unit
            ; visit_BitwiseOrL : 'c -> unit
+           ; visit_BitwiseOrF : 'c -> unit
            ; visit_BitwiseXor : 'c -> unit
            ; visit_BitwiseXorL : 'c -> unit
+           ; visit_BitwiseXorF : 'c -> unit
            ; visit_Bool : 'c -> bool -> unit
            ; visit_BooleanType : 'c -> unit
            ; visit_Branch : 'c -> Formula.t -> unit
@@ -2284,10 +2326,12 @@ module Visitors : sig
            ; visit_LVar : 'c -> string -> unit
            ; visit_LeftShift : 'c -> unit
            ; visit_LeftShiftL : 'c -> unit
+           ; visit_LeftShiftF : 'c -> unit
            ; visit_FLess : 'c -> Expr.t -> Expr.t -> unit
            ; visit_FLessEq : 'c -> Expr.t -> Expr.t -> unit
            ; visit_ILess : 'c -> Expr.t -> Expr.t -> unit
            ; visit_ILessEq : 'c -> Expr.t -> Expr.t -> unit
+           ; visit_IsInt : 'c -> Expr.t -> unit
            ; visit_ListType : 'c -> unit
            ; visit_Lit : 'c -> Literal.t -> unit
            ; visit_Loc : 'c -> string -> unit
@@ -2350,6 +2394,7 @@ module Visitors : sig
            ; visit_SetUnion : 'c -> unit
            ; visit_SignedRightShift : 'c -> unit
            ; visit_SignedRightShiftL : 'c -> unit
+           ; visit_SignedRightShiftF : 'c -> unit
            ; visit_Skip : 'c -> unit
            ; visit_FreshSVar : 'c -> string -> unit
            ; visit_Star : 'c -> Asrt.t -> Asrt.t -> unit
@@ -2387,6 +2432,7 @@ module Visitors : sig
                unit
            ; visit_UnsignedRightShift : 'c -> unit
            ; visit_UnsignedRightShiftL : 'c -> unit
+           ; visit_UnsignedRightShiftF : 'c -> unit
            ; visit_assertion : 'c -> Asrt.t -> unit
            ; visit_bindings : 'c -> string * (string * Expr.t) list -> unit
            ; visit_binop : 'c -> BinOp.t -> unit
@@ -2429,11 +2475,14 @@ module Visitors : sig
       method visit_BinOp : 'c -> Expr.t -> BinOp.t -> Expr.t -> unit
       method visit_BitwiseAnd : 'c -> unit
       method visit_BitwiseAndL : 'c -> unit
+      method visit_BitwiseAndF : 'c -> unit
       method visit_BitwiseNot : 'c -> unit
       method visit_BitwiseOr : 'c -> unit
       method visit_BitwiseOrL : 'c -> unit
+      method visit_BitwiseOrF : 'c -> unit
       method visit_BitwiseXor : 'c -> unit
       method visit_BitwiseXorL : 'c -> unit
+      method visit_BitwiseXorF : 'c -> unit
       method visit_Bool : 'c -> bool -> unit
       method visit_BooleanType : 'c -> unit
       method visit_Branch : 'c -> Formula.t -> unit
@@ -2505,10 +2554,12 @@ module Visitors : sig
       method visit_LVar : 'c -> string -> unit
       method visit_LeftShift : 'c -> unit
       method visit_LeftShiftL : 'c -> unit
+      method visit_LeftShiftF : 'c -> unit
       method visit_FLess : 'c -> Expr.t -> Expr.t -> unit
       method visit_FLessEq : 'c -> Expr.t -> Expr.t -> unit
       method visit_ILess : 'c -> Expr.t -> Expr.t -> unit
       method visit_ILessEq : 'c -> Expr.t -> Expr.t -> unit
+      method visit_IsInt : 'c -> Expr.t -> unit
       method visit_ListType : 'c -> unit
       method visit_Lit : 'c -> Literal.t -> unit
       method visit_Loc : 'c -> string -> unit
@@ -2571,6 +2622,7 @@ module Visitors : sig
       method visit_SetUnion : 'c -> unit
       method visit_SignedRightShift : 'c -> unit
       method visit_SignedRightShiftL : 'c -> unit
+      method visit_SignedRightShiftF : 'c -> unit
       method visit_Skip : 'c -> unit
       method visit_FreshSVar : 'c -> string -> unit
       method visit_Star : 'c -> Asrt.t -> Asrt.t -> unit
@@ -2610,6 +2662,7 @@ module Visitors : sig
 
       method visit_UnsignedRightShift : 'c -> unit
       method visit_UnsignedRightShiftL : 'c -> unit
+      method visit_UnsignedRightShiftF : 'c -> unit
 
       method private visit_array :
         'env 'a. ('env -> 'a -> unit) -> 'env -> 'a array -> unit

@@ -350,7 +350,7 @@ let rec evaluate_binop
       | ILessThan ->
           binary_int_bool_thing lit1 lit2
             (fun x y -> x < y)
-            "Type Error: Less than: expected numbers, got "
+            "Type Error: Less than: expected integers, got "
       | FLessThan ->
           binary_num_bool_thing lit1 lit2
             (fun x y -> x < y)
@@ -362,7 +362,7 @@ let rec evaluate_binop
       | ILessThanEqual ->
           binary_int_bool_thing lit1 lit2
             (fun x y -> x <= y)
-            "Type Error: Less than or equal: expected numbers, got "
+            "Type Error: Less than or equal: expected integers, got "
       | FLessThanEqual ->
           binary_num_bool_thing lit1 lit2
             (fun x y -> x <= y)
@@ -372,13 +372,13 @@ let rec evaluate_binop
             "Type Error: Integer Addition: expected integers, got "
       | IMinus ->
           binary_int_thing lit1 lit2 Z.sub
-            "Type Error: Subtraction: expected numbers, got "
+            "Type Error: Subtraction: expected integers, got "
       | ITimes ->
           binary_int_thing lit1 lit2 Z.mul
-            "Type Error: Multiplication: expected numbers, got "
+            "Type Error: Multiplication: expected integers, got "
       | IDiv ->
           binary_int_thing lit1 lit2 Z.div
-            "Type Error: Division: expected numbers, got "
+            "Type Error: Division: expected integers, got "
       | IMod ->
           binary_int_thing lit1 lit2 Z.( mod )
             "Type Error: IModulus: expected ints, got "
@@ -418,26 +418,45 @@ let rec evaluate_binop
             "Type Error: Signed right shift: expected numbers, got "
       | UnsignedRightShift ->
           binary_int_thing lit1 lit2 uint32_right_shift
-            "Type Error: Unsigned right shift: expected numbers, got "
+            "Type Error: Unsigned right shift: expected integers, got "
       | BitwiseAndL ->
           binary_int_thing lit1 lit2 int64_bitwise_and
-            "Type Error: Bitwise 64bit conjunction: expected numbers, got "
+            "Type Error: Bitwise 64bit conjunction: expected integers, got "
       | BitwiseOrL ->
           binary_int_thing lit1 lit2 int64_bitwise_or
-            "Type Error: Bitwise 64bit disjunction: expected numbers, got "
+            "Type Error: Bitwise 64bit disjunction: expected integers, got "
       | BitwiseXorL ->
           binary_int_thing lit1 lit2 int64_bitwise_xor
             "Type Error: Bitwise 64bit exclusive disjunction: expected \
              numbers, got "
       | LeftShiftL ->
           binary_int_thing lit1 lit2 int64_left_shift
-            "Type Error: 64bit Left shift: expected numbers, got "
+            "Type Error: 64bit Left shift: expected integers, got "
       | SignedRightShiftL ->
           binary_num_thing lit1 lit2 int64_right_shift
             "Type Error: 64bit Signed right shift: expected numbers, got "
       | UnsignedRightShiftL ->
           binary_int_thing lit1 lit2 uint32_right_shift
-            "Type Error: 64bit Unsigned right shift: expected numbers, got "
+            "Type Error: 64bit Unsigned right shift: expected integers, got "
+      | BitwiseAndF ->
+          binary_num_thing lit1 lit2 int32_bitwise_and
+            "Type Error: Bitwise float conjunction: expected floats, got "
+      | BitwiseOrF ->
+          binary_num_thing lit1 lit2 int32_bitwise_or
+            "Type Error: Bitwise float disjunction: expected floats, got "
+      | BitwiseXorF ->
+          binary_num_thing lit1 lit2 int32_bitwise_xor
+            "Type Error: Bitwise float exclusive disjunction: expected floats, \
+             got "
+      | LeftShiftF ->
+          binary_num_thing lit1 lit2 int32_left_shift
+            "Type Error: Float Left shift: expected floats, got "
+      | SignedRightShiftF ->
+          binary_num_thing lit1 lit2 int32_right_shift
+            "Type Error: Float Signed right shift: expected floats, got "
+      | UnsignedRightShiftF ->
+          binary_num_thing lit1 lit2 uint32_right_shift_f
+            "Type Error: Float Unsigned right shift: expected floats, got "
       | M_atan2 ->
           binary_num_thing lit1 lit2 atan2
             "Type Error: Arc tangent: expected numbers, got "

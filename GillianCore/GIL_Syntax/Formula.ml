@@ -14,6 +14,7 @@ type t = TypeDef__.formula =
   | SetMem of Expr.t * Expr.t  (** Set membership *)
   | SetSub of Expr.t * Expr.t  (** Set subsetness *)
   | ForAll of (string * Type.t option) list * t  (** Forall *)
+  | IsInt of Expr.t  (** IsInt e <=> (e : float) /\ (e % 1. == 0) *)
 [@@deriving eq]
 
 let to_yojson = TypeDef__.formula_to_yojson
@@ -77,6 +78,7 @@ let rec map
       | SetMem (e1, e2) -> SetMem (map_e e1, map_e e2)
       | SetSub (e1, e2) -> SetSub (map_e e1, map_e e2)
       | ForAll (bt, a) -> ForAll (bt, map_a a)
+      | IsInt e -> IsInt (map_e e)
     in
     f_a_after a''
 
@@ -130,6 +132,7 @@ let rec map_opt
           | SetMem (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> SetMem (e1, e2))
           | SetSub (e1, e2) -> aux_e e1 e2 (fun e1 e2 -> SetSub (e1, e2))
           | ForAll (bt, a) -> aux_a_single a (fun a -> ForAll (bt, a))
+          | IsInt e -> map_e e |> Option.map (fun e -> IsInt e)
         in
         Option.map f_a_after a''
 
@@ -230,6 +233,7 @@ let rec pp_parametric pp_expr fmt f =
   | SetMem (e1, e2) -> Fmt.pf fmt "(%a --e-- %a)" pp_expr e1 pp_expr e2
   (* e1 --s-- e2 *)
   | SetSub (e1, e2) -> Fmt.pf fmt "(%a --s-- %a)" pp_expr e1 pp_expr e2
+  | IsInt e -> Fmt.pf fmt "(is_int %a)" pp_expr e
 
 let pp = pp_parametric Expr.pp
 let full_pp = pp_parametric Expr.full_pp
@@ -298,6 +302,12 @@ let rec to_expr (a : t) : Expr.t option =
   | StrLess (le1, le2) -> Some (Expr.BinOp (le1, BinOp.SLessThan, le2))
   | SetMem (le1, le2) -> Some (Expr.BinOp (le1, BinOp.BSetMem, le2))
   | SetSub (le1, le2) -> Some (Expr.BinOp (le1, BinOp.BSetSub, le2))
+  | IsInt e ->
+      let is_float = Expr.type_eq e Type.NumberType in
+      let is_whole =
+        Expr.BinOp (Expr.fmod e (Expr.num 1.), BinOp.Equal, Expr.num 0.)
+      in
+      Some (Expr.BinOp (is_float, BinOp.BAnd, is_whole))
 
 let rec conjunct (asrts : t list) : t =
   match asrts with

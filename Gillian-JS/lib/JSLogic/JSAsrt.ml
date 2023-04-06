@@ -15,6 +15,7 @@ type pt =
   | ForAll of (string * Type.t) list * pt
   | SetMem of JSExpr.t * JSExpr.t
   | SetSub of JSExpr.t * JSExpr.t
+  | IsInt of JSExpr.t
 
 type t =
   | Pure of pt
@@ -57,6 +58,7 @@ let rec js2jsil_pure (scope_le : Expr.t option) (a : pt) : Formula.t =
       Formula.ForAll (new_binders, f a)
   | SetMem (le1, le2) -> Formula.SetMem (fe le1, fe le2)
   | SetSub (le1, le2) -> Formula.SetSub (fe le1, fe le2)
+  | IsInt e -> Formula.IsInt (fe e)
 
 let rec js2jsil
     (cur_fid : string option)

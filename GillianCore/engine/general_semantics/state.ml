@@ -122,6 +122,9 @@ module type S = sig
 
   val evaluate_slcmd : 'a UP.prog -> SLCmd.t -> t -> (t list, err_t list) result
 
+  (** [unify_invariant prog revisited state invariant binders] returns a list of pairs of states.
+      In each pair, the first element is the framed off state, and the second one is the invariant,
+      i.e. the state obtained by producing the invariant *)
   val unify_invariant :
     'a UP.prog -> bool -> t -> Asrt.t -> string list -> (t * t) list
 

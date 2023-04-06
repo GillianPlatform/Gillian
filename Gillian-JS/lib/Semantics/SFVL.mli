@@ -2,9 +2,12 @@
  * Interface for JSIL Symbolic FV-lists *
 *****************************************)
 
-type field_name = Gillian.Gil_syntax.Expr.t
-type field_value = Gillian.Gil_syntax.Expr.t
-type t = field_value Gillian.Gil_syntax.Expr.Map.t [@@deriving yojson]
+open Gillian.Gil_syntax
+open Gillian.Symbolic
+
+type field_name = Expr.t
+type field_value = Expr.t
+type t = field_value Expr.Map.t [@@deriving yojson]
 
 val add : field_name -> field_value -> t -> t
 val empty : t
@@ -20,9 +23,9 @@ val pp : Format.formatter -> t -> unit
 val union : t -> t -> t
 val lvars : t -> Containers.SS.t
 val alocs : t -> Containers.SS.t
-val assertions : Gillian.Gil_syntax.Expr.t -> t -> Jsil_syntax.Asrt.t list
-val substitution : Gillian.Symbolic.Subst.t -> bool -> t -> t
-val selective_substitution : Gillian.Symbolic.Subst.t -> bool -> t -> t
+val assertions : Expr.t -> t -> Asrt.t list
+val substitution : Subst.t -> bool -> t -> t
+val selective_substitution : Subst.t -> bool -> t -> t
 val is_well_formed : t -> bool
-val wf_assertions : t -> Gillian.Gil_syntax.Formula.t list
+val wf_assertions : t -> Formula.t list
 val to_list : t -> (field_name * field_value) list
