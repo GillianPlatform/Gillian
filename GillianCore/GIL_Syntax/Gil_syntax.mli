@@ -602,9 +602,6 @@ module Asrt : sig
   (** Get all locations in [a] *)
   val locs : t -> SS.t
 
-  (** Get all the variables in [a] (includes lvars, pvars, alocs and clocs) *)
-  val vars : t -> SS.t
-
   (** Returns a list with the names of the predicates that occur in [a] *)
   val pred_names : t -> string list
 

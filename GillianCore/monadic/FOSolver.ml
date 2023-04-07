@@ -36,7 +36,7 @@ let sat ~(pc : Pc.t) formula =
   | False ->
       Logging.verbose (fun fmt -> fmt "Discharged sat before Z3");
       false
-  | formula -> FOSolver.sat ~unification:pc.unification ~pfs ~gamma [ formula ]
+  | formula -> FOSolver.sat ~unification:pc.unification ~pfs ~gamma formula
 
 let check_entailment ~(pc : Pc.t) formula =
   let pfs, gamma = (build_full_pfs pc, build_full_gamma pc) in

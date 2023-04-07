@@ -22,7 +22,7 @@ val sat :
   unification:bool ->
   pfs:PFS.t ->
   gamma:Type_env.t ->
-  Gil_syntax.Formula.t list ->
+  Gil_syntax.Formula.t ->
   bool
 
 (** [check_entailment existentials lpfs rpfs gamma] checks whether or not

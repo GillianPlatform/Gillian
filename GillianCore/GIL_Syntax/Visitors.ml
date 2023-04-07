@@ -111,20 +111,8 @@ module Collectors = struct
     object (self)
       inherit [_] reduce
       inherit Utils.ss_monoid
-      method! visit_ALoc _ x = Containers.SS.singleton x
-      method! visit_Loc _ x = Containers.SS.singleton x
-      method! visit_PVar _ x = Containers.SS.singleton x
-
-      method! visit_ForAll exclude binders f =
-        (* Quantified variables need to be excluded *)
-        let univ_quant, _ = List.split binders in
-        let exclude = Containers.SS.add_seq (List.to_seq univ_quant) exclude in
-        self#visit_formula exclude f
-
-      method! visit_LVar exclude x =
-        if not (Containers.SS.mem x exclude) then Containers.SS.singleton x
-        else Containers.SS.empty
-
+      method! visit_ALoc () x = Containers.SS.singleton x
+      method! visit_Loc () x = Containers.SS.singleton x
       method! visit_'label _ (_ : int) = self#zero
       method! visit_'annot _ () = self#zero
     end
