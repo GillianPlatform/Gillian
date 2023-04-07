@@ -214,13 +214,7 @@ let find_equalities (pfs : PFS.t) (le : Expr.t) : Expr.t list =
 let typable (gamma : Type_env.t) (le : Expr.t) (target_type : Type.t) : bool =
   let t, success, _ = Typing.type_lexpr gamma le in
   if success then
-    Option.fold
-      ~some:(fun t -> Type.equal t target_type)
-      ~none:
-        (match le with
-        | LVar _ | PVar _ -> true
-        | _ -> false)
-      t
+    Option.fold ~some:(fun t -> Type.equal t target_type) ~none:true t
   else
     let msg : string =
       Fmt.str "TYPE ERROR: %a not typable in typing environment %a" Expr.pp le
@@ -278,25 +272,16 @@ let rec get_length_of_list (lst : Expr.t) : int option =
   let f = get_length_of_list in
 
   match lst with
-  | PVar _ -> None
-  | LVar _ -> None
   | Lit (LList l) -> Some (List.length l)
   | EList l -> Some (List.length l)
-  | LstSub (_, _, len) -> (
-      match len with
-      | Lit (Int len) -> Some (Z.to_int len)
-      | _ -> None)
+  | LstSub (_, _, Lit (Int len)) -> Some (Z.to_int len)
   | NOp (LstCat, les) -> (
       match List_utils.flaky_map f les with
       | None -> None
       | Some lens ->
           let lens = List.fold_left Int.add 0 lens in
           Some lens)
-  | _ ->
-      raise
-        (Failure
-           (Printf.sprintf "get_length_of_list: list equals %s, impossible"
-              ((Fmt.to_to_string Expr.pp) lst)))
+  | _ -> None
 
 (* Finding the nth element of a list *)
 let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
@@ -318,7 +303,7 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
   (* Nothing can be done for variables *)
   | PVar _ | LVar _ ->
       let lst' = resolve_list lst (PFS.to_list pfs) in
-      if lst = lst' then None else f lst' idx
+      if Expr.equal lst lst' then None else f lst' idx
   (* Base lists of literals and logical expressions *)
   | Lit (LList l) ->
       assert (idx < List.length l);
@@ -347,11 +332,7 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
             if idx < llen then (lel, idx) else (NOp (LstCat, ler), idx - llen)
           in
           f lst idx)
-  | _ ->
-      raise
-        (Failure
-           (Printf.sprintf "get_nth_of_list: list equals %s, impossible"
-              ((Fmt.to_to_string Expr.pp) lst)))
+  | _ -> None
 
 (* Finding the nth element of a list *)
 let get_head_and_tail_of_list ~pfs lst =
