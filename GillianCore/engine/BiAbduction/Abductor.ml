@@ -23,7 +23,7 @@ module Make
   module SBAState = BiState.Make (SVal.M) (SVal.SESubst) (SStore) (SPState)
 
   module SBAInterpreter =
-    GInterpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SBAState) (PC)
+    G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SBAState) (PC)
       (External)
 
   type bi_state_t = SBAState.t

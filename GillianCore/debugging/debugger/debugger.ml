@@ -187,7 +187,7 @@ functor
     let get_type_env_vars (state : state_t) : Variable.t list =
       let open Variable in
       let typ_env = Verification.SPState.get_typ_env state in
-      TypEnv.to_list typ_env
+      Type_env.to_list typ_env
       |> List.sort (fun (v, _) (w, _) -> Stdlib.compare v w)
       |> List.map (fun (name, value) ->
              let value = Type.str value in
@@ -285,7 +285,7 @@ functor
     let rec call_stack_to_frames call_stack next_proc_body_idx prog =
       match call_stack with
       | [] -> []
-      | (se : CallStack.stack_element) :: rest ->
+      | (se : Call_stack.stack_element) :: rest ->
           let start_line, start_column, end_line, end_column, source_path =
             (let* proc = Prog.get_proc prog se.pid in
              let annot, _, _ = proc.proc_body.(next_proc_body_idx) in
@@ -326,7 +326,7 @@ functor
       let get_cur_cmd (cmd : Lifter.cmd_report) cfg =
         match cmd.callstack with
         | [] -> None
-        | (se : CallStack.stack_element) :: _ -> (
+        | (se : Call_stack.stack_element) :: _ -> (
             let proc = Prog.get_proc cfg.prog se.pid in
             match proc with
             | None -> None
@@ -436,8 +436,8 @@ functor
     let unify = Unify.f
 
     let show_result_errors = function
-      | ExecRes.RSucc _ -> []
-      | ExecRes.RFail { errors; _ } -> errors |> List.map show_err_t
+      | Exec_res.RSucc _ -> []
+      | Exec_res.RFail { errors; _ } -> errors |> List.map show_err_t
 
     let build_final_cmd_data content result prev_id branch_path dbg =
       let { cfg; _ } = dbg in
@@ -481,7 +481,9 @@ functor
           | None -> state.lifter_state |> Lifter.select_next_path case prev_id
         in
         DL.log (fun m ->
-            m ~json:[ ("path", branch_path_to_yojson branch_path) ] "Got path");
+            m
+              ~json:[ ("path", BranchCase.path_to_yojson branch_path) ]
+              "Got path");
         branch_path
 
       let check_cur_report_id = function
@@ -1070,7 +1072,7 @@ functor
         { id = Fmt.to_to_string Logging.pp_err error; description = None }
       in
       match error with
-      | ExecErr.ESt state_error -> (
+      | Exec_err.ESt state_error -> (
           match state_error with
           | StateErr.EMem merr ->
               Lifter.memory_error_to_exception_info

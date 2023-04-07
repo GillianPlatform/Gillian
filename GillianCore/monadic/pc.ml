@@ -1,11 +1,11 @@
 open Gil_syntax
-module PureContext = Engine.PFS
-module TypEnv = Engine.TypEnv
+module Pure_context = Engine.PFS
+module Type_env = Engine.Type_env
 module FOSolver = Engine.FOSolver
 
 type t = {
-  pfs : PureContext.t;
-  gamma : TypEnv.t;
+  pfs : Pure_context.t;
+  gamma : Type_env.t;
   learned : Formula.Set.t;
   learned_types : (string * Type.t) list;
   unification : bool;
@@ -13,8 +13,8 @@ type t = {
 
 let copy { pfs; gamma; learned; learned_types; unification } =
   {
-    pfs = PureContext.copy pfs;
-    gamma = TypEnv.copy gamma;
+    pfs = Pure_context.copy pfs;
+    gamma = Type_env.copy gamma;
     learned;
     learned_types;
     unification;
@@ -36,7 +36,7 @@ let make
   }
 
 let init ?(unification = false) () =
-  make ~pfs:(PureContext.init ()) ~gamma:(TypEnv.init ()) ~unification ()
+  make ~pfs:(Pure_context.init ()) ~gamma:(Type_env.init ()) ~unification ()
 
 let empty = init ()
 
@@ -100,8 +100,8 @@ let pp =
          Fmt.field "pfs"
            (fun x -> x.pfs)
            (fun fmt pfs ->
-             (Fmt.Dump.list Formula.pp) fmt (PureContext.to_list pfs));
-         Fmt.field "gamma" (fun x -> x.gamma) TypEnv.pp;
+             (Fmt.Dump.list Formula.pp) fmt (Pure_context.to_list pfs));
+         Fmt.field "gamma" (fun x -> x.gamma) Type_env.pp;
          Fmt.field "learned"
            (fun x -> Formula.Set.to_seq x.learned)
            (Fmt.Dump.seq Formula.pp);

@@ -82,4 +82,4 @@ let js2jsil_st
     ( Asrt.star
         ([ pre'; a_scope ] (* a_mds_ers @ a_scope_mds @ *) @ [ a_this ]
         @ params_not_empty @ params_not_none @ params_and_lists),
-      List.map (fun post -> Asrt.star [ post; a_this; a_scope ]) post' )
+      post' )

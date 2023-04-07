@@ -10,3 +10,9 @@ let none =
 let pp fmt loc =
   Fmt.pf fmt "%i:%i-%i:%i" loc.loc_start.pos_line loc.loc_start.pos_column
     loc.loc_end.pos_line loc.loc_end.pos_column
+
+let pp_log_opt fmt loc =
+  match loc with
+  | Some { loc_start; loc_source; _ } ->
+      Fmt.pf fmt "%s:%d:%d" loc_source loc_start.pos_line loc_start.pos_column
+  | None -> Fmt.pf fmt "unknown loc"

@@ -35,6 +35,12 @@ type t = TypeDef__.binop =
   | LeftShiftL  (** Left bitshift 64bit *)
   | SignedRightShiftL  (** Signed right bitshift 64bit *)
   | UnsignedRightShiftL  (** Right bitshift 64bit *)
+  | BitwiseAndF  (** Bitwise conjunction float *)
+  | BitwiseOrF  (** Bitwise disjunction float *)
+  | BitwiseXorF  (** Bitwise exclusive disjunction float *)
+  | LeftShiftF  (** Left bitshift float *)
+  | SignedRightShiftF  (** Signed right bitshift float *)
+  | UnsignedRightShiftF  (** Unsigned right bitshift float *)
   (* Mathematics *)
   | M_atan2  (** Arctangent y/x *)
   | M_pow  (** Power *)
@@ -84,6 +90,12 @@ let str (x : t) =
   | LeftShiftL -> "<<l"
   | SignedRightShiftL -> ">>l"
   | UnsignedRightShiftL -> ">>>l"
+  | BitwiseAndF -> "&f"
+  | BitwiseOrF -> "|f"
+  | BitwiseXorF -> "^f"
+  | LeftShiftF -> "<<f"
+  | SignedRightShiftF -> ">>f"
+  | UnsignedRightShiftF -> ">>>f"
   | M_atan2 -> "m_atan2"
   | M_pow -> "**"
   | LstNth -> "l-nth"

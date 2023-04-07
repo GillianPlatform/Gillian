@@ -5,9 +5,9 @@ module Make
     (ID : Init_data.S)
     (PC : ParserAndCompiler.S with type init_data = ID.t)
     (CState : CState.S with type init_data = ID.t)
-    (CInterpreter : GInterpreter.S
-                      with type annot = PC.Annot.t
-                       and type state_t = CState.t)
+    (C_interpreter : G_interpreter.S
+                       with type annot = PC.Annot.t
+                        and type state_t = CState.t)
     (Gil_parsing : Gil_parsing.S with type annot = PC.Annot.t) : Console.S =
 struct
   module Common_args = Common_args.Make (PC)
@@ -18,11 +18,11 @@ struct
     | false -> exit 1
     | true -> ()
 
-  let valid_concrete_result (ret : CInterpreter.result_t list) : bool =
+  let valid_concrete_result (ret : C_interpreter.result_t list) : bool =
     assert (List.length ret = 1);
     let ret = List.hd ret in
     match ret with
-    | ExecRes.RSucc { flag = Flag.Normal; _ } -> true
+    | Exec_res.RSucc { flag = Flag.Normal; _ } -> true
     | _ -> false
 
   let run debug (prog : ('a, int) Prog.t) init_data : unit =
@@ -32,13 +32,14 @@ struct
       | _ -> failwith "Program could not be initialised"
     in
     let ret =
-      CInterpreter.evaluate_proc
+      C_interpreter.evaluate_proc
         (fun x -> x)
         prog !Config.entry_point [] (CState.init init_data)
     in
     let () =
       if debug then
-        Format.printf "Final state: @\n%a@\n" CInterpreter.Logging.pp_result ret
+        Format.printf "Final state: @\n%a@\n" C_interpreter.Logging.pp_result
+          ret
     in
     return_to_exit (valid_concrete_result ret)
 

@@ -39,7 +39,7 @@ let cfg =
     ("proof", "false");
     ("unsat_core", "false");
     ("auto_config", "true");
-    ("timeout", "16384");
+    ("timeout", "30000");
   ]
 
 let ctx : Z3.context = Z3.mk_context cfg
@@ -100,6 +100,9 @@ module Type_operations = struct
 end
 
 module Lit_operations = struct
+  let literal_symbol = mk_string_symb "GIL_Literal"
+  let literal_sort_ref = Datatype.mk_sort_ref ctx literal_symbol
+
   let gil_undefined_constructor =
     Datatype.mk_constructor ctx
       (mk_string_symb "Undefined")
@@ -151,55 +154,29 @@ module Lit_operations = struct
     Datatype.mk_constructor ctx (mk_string_symb "List")
       (mk_string_symb "isList")
       [ mk_string_symb "listValue" ]
-      [ None ] [ 1 ]
+      [ Some (Z3.Seq.mk_seq_sort ctx literal_sort_ref) ]
+      [ 0 ]
 
   let gil_none_constructor =
     Datatype.mk_constructor ctx (mk_string_symb "None")
       (mk_string_symb "isNone") [] [] []
 
-  (* GIL List Type constructors *)
-  let gil_list_nil_constructor =
-    Datatype.mk_constructor ctx (mk_string_symb "Nil") (mk_string_symb "isNil")
-      [] [] []
-
-  let gil_list_cons_constructor =
-    Datatype.mk_constructor ctx (mk_string_symb "Cons")
-      (mk_string_symb "isCons")
-      [ mk_string_symb "head"; mk_string_symb "tail" ]
-      [ None; None ] [ 0; 1 ]
-
-  let literal_and_literal_list_sorts =
-    Datatype.mk_sorts ctx
-      [ mk_string_symb "GIL_Literal"; mk_string_symb "GIL_Literal_List" ]
+  let z3_gil_literal_sort =
+    Datatype.mk_sort ctx literal_symbol
       [
-        [
-          gil_undefined_constructor;
-          gil_null_constructor;
-          gil_empty_constructor;
-          gil_bool_constructor;
-          gil_int_constructor;
-          gil_num_constructor;
-          gil_string_constructor;
-          gil_loc_constructor;
-          gil_type_constructor;
-          gil_list_constructor;
-          gil_none_constructor;
-        ];
-        [ gil_list_nil_constructor; gil_list_cons_constructor ];
+        gil_undefined_constructor;
+        gil_null_constructor;
+        gil_empty_constructor;
+        gil_bool_constructor;
+        gil_int_constructor;
+        gil_num_constructor;
+        gil_string_constructor;
+        gil_loc_constructor;
+        gil_type_constructor;
+        gil_list_constructor;
+        gil_none_constructor;
       ]
 
-  let z3_gil_literal_sort = List.nth literal_and_literal_list_sorts 0
-  let z3_gil_list_sort = List.nth literal_and_literal_list_sorts 1
-  let gil_list_constructors = Datatype.get_constructors z3_gil_list_sort
-  let nil_constructor = List.nth gil_list_constructors 0
-  let cons_constructor = List.nth gil_list_constructors 1
-  let gil_list_accessors = Datatype.get_accessors z3_gil_list_sort
-  let head_accessor = List.nth (List.nth gil_list_accessors 1) 0
-  let tail_accessor = List.nth (List.nth gil_list_accessors 1) 1
-  (* let gil_list_recognizers = Datatype.get_recognizers z3_gil_list_sort *)
-
-  (* let nil_recognizer = List.nth gil_list_recognizers 0 *)
-  (* let cons_recognizer = List.nth gil_list_recognizers 1 *)
   let z3_literal_constructors = Datatype.get_constructors z3_gil_literal_sort
   let undefined_constructor = List.nth z3_literal_constructors 0
   let null_constructor = List.nth z3_literal_constructors 1
@@ -233,22 +210,10 @@ module Lit_operations = struct
   let type_recognizer = List.nth gil_literal_recognizers 8
   let list_recognizer = List.nth gil_literal_recognizers 9
   let none_recognizer = List.nth gil_literal_recognizers 10
+  let z3_list_of_literal_sort = Z3.Seq.mk_seq_sort ctx z3_gil_literal_sort
 end
 
 let z3_gil_literal_sort = Lit_operations.z3_gil_literal_sort
-let z3_gil_list_sort = Lit_operations.z3_gil_list_sort
-
-module List_operations = struct
-  open Lit_operations
-
-  let nil_constructor = nil_constructor
-  let cons_constructor = cons_constructor
-  let head_accessor = head_accessor
-  let tail_accessor = tail_accessor
-  (* let nil_recognizer = nil_recognizer *)
-  (* let cons_recognizer = cons_recognizer *)
-end
-
 let z3_gil_set_sort = Set.mk_sort ctx z3_gil_literal_sort
 
 module Extended_literal_operations = struct
@@ -299,7 +264,7 @@ module Axiomatised_operations = struct
 
   let llen_fun =
     FuncDecl.mk_func_decl ctx (mk_string_symb "l-len")
-      [ Lit_operations.z3_gil_list_sort ]
+      [ Lit_operations.z3_list_of_literal_sort ]
       ints_sort
 
   let num2str_fun =
@@ -319,19 +284,10 @@ module Axiomatised_operations = struct
       [ ints_sort; numbers_sort ]
       ints_sort
 
-  let lnth_fun =
-    FuncDecl.mk_func_decl ctx (mk_string_symb "l-nth")
-      [ z3_gil_list_sort; ints_sort ]
-      z3_gil_literal_sort
-
-  let lcat_fun =
-    FuncDecl.mk_func_decl ctx (mk_string_symb "l-cat")
-      [ z3_gil_list_sort; z3_gil_list_sort ]
-      z3_gil_list_sort
-
   let lrev_fun =
-    FuncDecl.mk_func_decl ctx (mk_string_symb "l-rev") [ z3_gil_list_sort ]
-      z3_gil_list_sort
+    FuncDecl.mk_func_decl ctx (mk_string_symb "l-rev")
+      [ Lit_operations.z3_list_of_literal_sort ]
+      Lit_operations.z3_list_of_literal_sort
 end
 
 let mk_z3_set les =
@@ -347,22 +303,9 @@ let mk_z3_set les =
   result
 
 let mk_z3_list les =
-  let empty_list = List_operations.nil_constructor $$ [] in
-  let mk_z3_list_core les =
-    let rec loop les cur_list =
-      match les with
-      | [] -> cur_list
-      | le :: rest_les ->
-          let new_cur_list =
-            List_operations.cons_constructor $$ [ le; cur_list ]
-          in
-          loop rest_les new_cur_list
-    in
-    let result = loop les empty_list in
-    result
-  in
-  try mk_z3_list_core (List.rev les)
-  with _ -> raise (Failure "DEATH: mk_z3_list")
+  match les with
+  | [] -> Z3.Seq.mk_seq_empty ctx Lit_operations.z3_list_of_literal_sort
+  | _ -> List.map (Z3.Seq.mk_seq_unit ctx) les |> Z3.Seq.mk_seq_concat ctx
 
 let str_codes = Hashtbl.create 1000
 let str_codes_inv = Hashtbl.create 1000
@@ -407,7 +350,7 @@ module Encoding = struct
 
   let native_sort_of_type = function
     | Type.IntType | StringType | ObjectType -> ints_sort
-    | ListType -> Lit_operations.z3_gil_list_sort
+    | ListType -> Lit_operations.z3_list_of_literal_sort
     | BooleanType -> booleans_sort
     | NumberType -> reals_sort
     | UndefinedType | NoneType | EmptyType | NullType -> z3_gil_literal_sort
@@ -631,7 +574,7 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
   | LstNth ->
       let lst' = get_list p1 in
       let index' = get_int p2 in
-      Axiomatised_operations.lnth_fun $$ [ lst'; index' ] |> simply_wrapped
+      Z3.Seq.mk_seq_nth ctx lst' index' |> simply_wrapped
   | StrNth ->
       let str' = get_string p1 in
       let index' = get_num p2 in
@@ -651,6 +594,12 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
   | LeftShiftL
   | SignedRightShiftL
   | UnsignedRightShiftL
+  | BitwiseAndF
+  | BitwiseOrF
+  | BitwiseXorF
+  | LeftShiftF
+  | SignedRightShiftF
+  | UnsignedRightShiftF
   | M_atan2
   | M_pow
   | StrCat ->
@@ -660,20 +609,32 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
               "SMT encoding: Construct not supported yet - binop: %s"
               (BinOp.str op)))
 
-let encode_unop (op : UnOp.t) le =
+let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
   let open Encoding in
   match op with
   | IUnaryMinus -> Arithmetic.mk_unary_minus ctx (get_int le) >- IntType
   | FUnaryMinus -> Arithmetic.mk_unary_minus ctx (get_num le) >- NumberType
-  | LstLen -> Axiomatised_operations.llen_fun <| get_list le >- IntType
+  | LstLen ->
+      (* If we only use an LVar as an argument to llen, then encode it as an uninterpreted function. *)
+      let enc =
+        match e with
+        | Expr.LVar l when SS.mem l llen_lvars ->
+            Axiomatised_operations.llen_fun <| get_list le
+        | _ -> Z3.Seq.mk_seq_length ctx (get_list le)
+      in
+      enc >- IntType
   | StrLen -> Axiomatised_operations.slen_fun <| get_string le >- NumberType
   | ToStringOp -> Axiomatised_operations.num2str_fun <| get_num le >- StringType
   | ToNumberOp ->
       Axiomatised_operations.str2num_fun <| get_string le >- NumberType
   | ToIntOp -> Axiomatised_operations.num2int_fun <| get_num le >- NumberType
   | UNot -> Boolean.mk_not ctx (get_bool le) >- BooleanType
-  | Cdr -> List_operations.tail_accessor <| get_list le >- ListType
-  | Car -> List_operations.head_accessor <| get_list le |> simply_wrapped
+  | Cdr ->
+      let list = get_list le in
+      Z3.Seq.mk_seq_extract ctx list (mk_int_i 1)
+        (Z3.Seq.mk_seq_length ctx list)
+      >- ListType
+  | Car -> Z3.Seq.mk_seq_nth ctx (get_list le) (mk_int_i 0) |> simply_wrapped
   | TypeOf -> typeof_expression le >- TypeType
   | ToUint32Op ->
       let op_le_n =
@@ -714,9 +675,12 @@ let encode_unop (op : UnOp.t) le =
       flush stdout;
       raise (Failure msg)
 
-let rec encode_logical_expression ~(gamma : tyenv) (le : Expr.t) : Encoding.t =
+let rec encode_logical_expression
+    ~(gamma : tyenv)
+    ~(llen_lvars : SS.t)
+    (le : Expr.t) : Encoding.t =
   let open Encoding in
-  let f = encode_logical_expression ~gamma in
+  let f = encode_logical_expression ~gamma ~llen_lvars in
 
   match le with
   | Lit lit -> encode_lit lit
@@ -729,7 +693,7 @@ let rec encode_logical_expression ~(gamma : tyenv) (le : Expr.t) : Encoding.t =
           ZExpr.mk_const_s ctx var sort >- ty)
   | ALoc var -> ZExpr.mk_const_s ctx var ints_sort >- ObjectType
   | PVar _ -> raise (Failure "Program variable in pure formula: FIRE")
-  | UnOp (op, le) -> encode_unop op (f le)
+  | UnOp (op, le) -> encode_unop ~llen_lvars ~e:le op (f le)
   | BinOp (le1, op, le2) -> encode_binop op (f le1) (f le2)
   | NOp (SetUnion, les) ->
       let les = List.map (fun le -> get_set (f le)) les in
@@ -738,29 +702,26 @@ let rec encode_logical_expression ~(gamma : tyenv) (le : Expr.t) : Encoding.t =
       let les = List.map (fun le -> get_set (f le)) les in
       Set.mk_intersection ctx les >- SetType
   | NOp (LstCat, les) ->
-      List.fold_left
-        (fun ac next ->
-          (* Unpack ac *)
-          let ac = get_list ac in
-          (* Unpack next one *)
-          let next = get_list (f next) in
-          Axiomatised_operations.lcat_fun $$ [ ac; next ] >- ListType)
-        (f (List.hd les))
-        (List.tl les)
+      let les = List.map (fun le -> get_list (f le)) les in
+      Z3.Seq.mk_seq_concat ctx les >- ListType
   | EList les ->
       let args = List.map (fun le -> simple_wrap (f le)) les in
       mk_z3_list args >- ListType
   | ESet les ->
       let args = List.map (fun le -> simple_wrap (f le)) les in
       mk_z3_set args >- SetType
-  | LstSub _ -> Fmt.failwith "Unsupported LstSub: %a" Expr.pp le
+  | LstSub (lst, start, len) ->
+      let lst = get_list (f lst) in
+      let start = get_int (f start) in
+      let len = get_int (f len) in
+      Z3.Seq.mk_seq_extract ctx lst start len >- ListType
 
-let rec encode_forall ~gamma quantified_vars assertion =
+let rec encode_forall ~gamma ~llen_lvars quantified_vars assertion =
   let open Encoding in
   match quantified_vars with
   | [] ->
       (* A quantified assertion with no quantified variables is just the assertion *)
-      encode_assertion ~gamma assertion
+      encode_assertion ~gamma ~llen_lvars assertion
   | _ ->
       (* Start by updating gamma with the information provided by quantifier types.
          There's very few foralls, so it's ok to copy the gamma entirely *)
@@ -773,7 +734,7 @@ let rec encode_forall ~gamma quantified_vars assertion =
         quantified_vars;
       (* Not the same gamma now!*)
       let encoded_assertion =
-        match encode_assertion ~gamma assertion with
+        match encode_assertion ~gamma ~llen_lvars assertion with
         | { kind = Native BooleanType; expr } -> expr
         | _ -> failwith "the thing inside forall is not boolean!"
       in
@@ -795,9 +756,10 @@ let rec encode_forall ~gamma quantified_vars assertion =
       let quantifier_expr = Quantifier.expr_of_quantifier quantifier in
       ZExpr.simplify quantifier_expr None >- BooleanType
 
-and encode_assertion ~(gamma : tyenv) (a : Formula.t) : Encoding.t =
-  let f = encode_assertion ~gamma in
-  let fe = encode_logical_expression ~gamma in
+and encode_assertion ~(gamma : tyenv) ~(llen_lvars : SS.t) (a : Formula.t) :
+    Encoding.t =
+  let f = encode_assertion ~gamma ~llen_lvars in
+  let fe = encode_logical_expression ~gamma ~llen_lvars in
   let open Encoding in
   match a with
   | Not a -> Boolean.mk_not ctx (get_bool (f a)) >- BooleanType
@@ -823,14 +785,18 @@ and encode_assertion ~(gamma : tyenv) (a : Formula.t) : Encoding.t =
       Set.mk_membership ctx le1' le2' >- SetType
   | SetSub (le1, le2) ->
       Set.mk_subset ctx (get_set (fe le1)) (get_set (fe le2)) >- SetType
-  | ForAll (bt, a) -> encode_forall ~gamma bt a
+  | ForAll (bt, a) -> encode_forall ~gamma ~llen_lvars bt a
+  | IsInt e -> Arithmetic.Real.mk_is_integer ctx (get_num (fe e)) >- BooleanType
 
 (* ****************
    * SATISFIABILITY *
    * **************** *)
 
-let encode_assertion_top_level ~(gamma : tyenv) (a : Formula.t) : ZExpr.expr =
-  try (encode_assertion ~gamma (Formula.push_in_negations a)).expr
+let encode_assertion_top_level
+    ~(gamma : tyenv)
+    ~(llen_lvars : SS.t)
+    (a : Formula.t) : ZExpr.expr =
+  try (encode_assertion ~gamma ~llen_lvars (Formula.push_in_negations a)).expr
   with Z3.Error s as exn ->
     let msg =
       Fmt.str "Failed to encode %a in gamma %a with error %s\n" Formula.pp a
@@ -839,6 +805,25 @@ let encode_assertion_top_level ~(gamma : tyenv) (a : Formula.t) : ZExpr.expr =
     Logging.print_to_all msg;
     raise exn
 
+(** Gets the list of lvar names that are only used in llen *)
+let lvars_only_in_llen (assertions : Formula.Set.t) : SS.t =
+  let inspector =
+    object
+      inherit [_] Visitors.iter as super
+      val mutable llen_vars = SS.empty
+      val mutable other_vars = SS.empty
+      method get_diff = SS.diff llen_vars other_vars
+
+      method! visit_expr () e =
+        match e with
+        | UnOp (UnOp.LstLen, Expr.LVar l) -> llen_vars <- SS.add l llen_vars
+        | LVar l -> other_vars <- SS.add l other_vars
+        | _ -> super#visit_expr () e
+    end
+  in
+  assertions |> Formula.Set.iter (inspector#visit_formula ());
+  inspector#get_diff
+
 (** For a given set of pure formulae and its associated gamma, return the corresponding encoding *)
 let encode_assertions (assertions : Formula.Set.t) (gamma : tyenv) :
     ZExpr.expr list =
@@ -846,10 +831,11 @@ let encode_assertions (assertions : Formula.Set.t) (gamma : tyenv) :
   match Hashtbl.find_opt encoding_cache assertions with
   | Some encoding -> encoding
   | None ->
+      let llen_lvars = lvars_only_in_llen assertions in
       (* Encode assertions *)
       let encoded_assertions =
         List.map
-          (encode_assertion_top_level ~gamma)
+          (encode_assertion_top_level ~gamma ~llen_lvars)
           (Formula.Set.elements assertions)
       in
       (* Cache *)

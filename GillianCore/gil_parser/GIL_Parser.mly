@@ -165,6 +165,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token FLLESSTHAN
 %token FLLESSTHANEQUAL
 %token LSLESSTHAN
+%token ISINT
 %token LEMP
 (*%token LEXISTS *)
 %token LFORALL
@@ -240,6 +241,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %left LAND
 %left separating_conjunction
 %right LNOT
+%right ISINT
 %nonassoc LEQUAL ILLESSTHAN ILLESSTHANEQUAL FLLESSTHAN FLLESSTHANEQUAL LSLESSTHAN
 %nonassoc SETMEM SETSUB LSETMEM LSETSUB
 (* Program operators have higher precedence.*)
@@ -1009,6 +1011,9 @@ pure_assertion_target:
 (* forall X, Y, Z . P *)
   | LFORALL; vars = separated_nonempty_list(COMMA, lvar_type_target); DOT; ass = pure_assertion_target
     { Formula.ForAll (vars, ass) }
+(* is-int E *)
+  | ISINT; expr=expr_target
+    { Formula.IsInt (expr) }
 (* (P) *)
   | LBRACE; f=pure_assertion_target; RBRACE
     { f }

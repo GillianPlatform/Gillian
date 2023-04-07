@@ -1,2 +1,3 @@
 (library
- (name javert_utils))
+ (name javert_utils)
+ (libraries gillian))

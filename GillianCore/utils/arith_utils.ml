@@ -101,6 +101,16 @@ let int32_right_shift x y =
   Int32.to_float (Int32.shift_right l r)
 
 let uint32_right_shift x y = Z.shift_right x (Z.to_int y)
+
+let uint32_right_shift_f x y =
+  let i31 = 2. ** 31. in
+  let i32 = 2. ** 32. in
+  let signedx = if x >= i31 then x -. i32 else x in
+  let left = Int32.of_float signedx in
+  let right = int_of_float y mod 32 in
+  let r = Int32.to_float (Int32.shift_right_logical left right) in
+  if r < 0. then r +. i32 else r
+
 let uint64_int_right_shift x y = Z.shift_right x (Z.to_int y)
 
 (** Stringifies a float, adapting based on its size, or whether it's an integer

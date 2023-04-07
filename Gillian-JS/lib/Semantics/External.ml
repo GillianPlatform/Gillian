@@ -15,9 +15,9 @@ module M
                with type vt = Val.t
                 and type st = ESubst.t
                 and type store_t = Store.t)
-    (CallStack : CallStack.S with type vt = Val.t and type store_t = Store.t) =
+    (Call_stack : Call_stack.S with type vt = Val.t and type store_t = Store.t) =
 struct
-  (* module CallStack = CallStack.M(Val)(Store) *)
+  (* module Call_stack = Call_stack.M(Val)(Store) *)
 
   let update_store state x v =
     let store = State.get_store state in
@@ -63,7 +63,7 @@ struct
                       strictness
                       || JS_Parser.Syntax.script_and_strict e_js.exp_stx
                     in
-                    let cur_proc_id = CallStack.get_cur_proc_id cs in
+                    let cur_proc_id = Call_stack.get_cur_proc_id cs in
                     Ok
                       (JS2JSIL_Compiler.js2jsil_eval prog cur_proc_id strictness
                          e_js)
@@ -97,9 +97,9 @@ struct
                     let new_store = Store.init (List.combine params args) in
                     let old_store = State.get_store state in
                     let state' = State.set_store state new_store in
-                    let loop_ids = CallStack.get_loop_ids cs in
+                    let loop_ids = Call_stack.get_loop_ids cs in
                     let cs' =
-                      CallStack.push cs ~pid:proc_eval ~arguments:eval_v_args
+                      Call_stack.push cs ~pid:proc_eval ~arguments:eval_v_args
                         ~store:old_store ~loop_ids ~ret_var:x ~call_index:i
                         ~continue_index:(i + 1) ?error_index:j ()
                     in
@@ -172,7 +172,7 @@ struct
                 match e.JS_Parser.Syntax.exp_stx with
                 | JS_Parser.Syntax.Function
                     (strictness, Some "THISISANELABORATENAME", params, body) ->
-                    let cur_proc_id = CallStack.get_cur_proc_id cs in
+                    let cur_proc_id = Call_stack.get_cur_proc_id cs in
                     let new_proc =
                       JS2JSIL_Compiler.js2jsil_function_constructor_prop prog
                         cur_proc_id params strictness body
@@ -204,7 +204,7 @@ struct
   let execute
       (prog : ('a, int) GProg.t)
       (state : State.t)
-      (cs : CallStack.t)
+      (cs : Call_stack.t)
       (i : int)
       (x : string)
       (pid : string)

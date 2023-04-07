@@ -75,6 +75,12 @@ and binop =
   | LeftShiftL
   | SignedRightShiftL
   | UnsignedRightShiftL
+  | BitwiseAndF
+  | BitwiseOrF
+  | BitwiseXorF
+  | LeftShiftF
+  | SignedRightShiftF
+  | UnsignedRightShiftF
   | M_atan2
   | M_pow
   | LstNth
@@ -149,6 +155,7 @@ and formula =
   | SetMem of expr * expr
   | SetSub of expr * expr
   | ForAll of (string * typ option) list * formula
+  | IsInt of expr
 
 and assertion =
   | Emp
