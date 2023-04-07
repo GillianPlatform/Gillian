@@ -738,7 +738,7 @@ g_logic_cmd_target:
     { LCmd.SL (SepAssert (a, Option.value ~default:[ ] binders)) }
 
 (* apply lemma_name(args) [bind: x, y ] *)
-   | APPLY; lemma_name = VAR; LBRACE; params = separated_list(COMMA, expr_target); RBRACE; binders = option(binders_target)
+   | APPLY; lemma_name = proc_name; LBRACE; params = separated_list(COMMA, expr_target); RBRACE; binders = option(binders_target)
     {
       let binders = Option.value ~default:[] binders in
       LCmd.SL (ApplyLem (lemma_name, params, binders))
@@ -1030,10 +1030,8 @@ lvar_type_target:
 
 
 type_env_pair_target:
-  | lvar = logic_variable_target; COLON; the_type=type_target
-    { (lvar, the_type) }
-  | pvar = program_variable_target; COLON; the_type=type_target
-    { (pvar, the_type) }
+  | e = expr_target; COLON; the_type=type_target
+    { (e, the_type) }
 ;
 
 logic_variable_target:

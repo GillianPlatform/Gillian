@@ -1151,43 +1151,68 @@ module Make
                   (list ~sep:semi
                      (parens (pair ~sep:comma Expr.pp Expr.full_pp))))
               outs);
-        let outs = List.map (fun (u, e) -> (u, Val.from_expr e)) outs in
-        if List.exists (fun (_, e) -> e = None) outs then
-          L.fail "INTERNAL ERROR: Not all expressions convertible to values"
-        else
-          let outs = List.map (fun (u, ov) -> (u, Option.get ov)) outs in
-          let () = List.iter (fun (u, v) -> ESubst.put subst u v) outs in
-          let eos = List.map (ESubst.subst_in_expr_opt subst) eos in
-          if List.exists (fun x -> x = None) eos then
-            let msg = "INTERNAL ERROR: Not all ins known" in
-            L.fail msg
-          else
-            let eos = List.map (fun eo -> Val.from_expr (Option.get eo)) eos in
-            if List.exists (fun x -> x = None) eos then
-              raise
-                (Failure
-                   "INTERNAL ERROR: Not all expressions convertible to values")
-            else
-              let eos = List.map Option.get eos in
-              let success, fail_pf =
-                try
-                  List.fold_left2
-                    (fun ac vd od ->
-                      let success, _ = ac in
-                      if not success then ac
-                      else
-                        let pf : Formula.t =
-                          Eq (Val.to_expr vd, Val.to_expr od)
-                        in
-                        let success = State.assert_a state [ pf ] in
-                        (success, pf))
-                    (true, True) vos eos
-                with Invalid_argument _ ->
-                  Fmt.failwith
-                    "Invalid amount of args for the following UP step : %a"
-                    UP.step_pp step
+        let outs =
+          List.map
+            (fun (u, e) ->
+              let v =
+                match Val.from_expr e with
+                | None ->
+                    let msg =
+                      Fmt.str
+                        "INTERNAL ERROR: Not all expressions convertible to \
+                         values: %a"
+                        Expr.full_pp e
+                    in
+                    L.fail msg
+                | Some e -> e
               in
-              (success, fail_pf)
+              (u, v))
+            outs
+        in
+        List.iter (fun (u, v) -> ESubst.put subst u v) outs;
+        let eos =
+          List.map
+            (fun e ->
+              let subst_e =
+                match ESubst.subst_in_expr_opt subst e with
+                | None ->
+                    let msg =
+                      Fmt.str
+                        "INTERNAL ERROR: Not all ins known, I don't know this \
+                         one: %a"
+                        Expr.full_pp e
+                    in
+                    L.fail msg
+                | Some e -> e
+              in
+              match Val.from_expr subst_e with
+              | None ->
+                  let msg =
+                    Fmt.str
+                      "INTERNAL ERROR: Not all expressions convertible to \
+                       values: %a"
+                      Expr.full_pp subst_e
+                  in
+                  L.fail msg
+              | Some v -> v)
+            eos
+        in
+        let success, fail_pf =
+          try
+            List.fold_left2
+              (fun ac vd od ->
+                let success, _ = ac in
+                if not success then ac
+                else
+                  let pf : Formula.t = Eq (Val.to_expr vd, Val.to_expr od) in
+                  let success = State.assert_a state [ pf ] in
+                  (success, pf))
+              (true, True) vos eos
+          with Invalid_argument _ ->
+            Fmt.failwith "Invalid amount of args for the following UP step : %a"
+              UP.step_pp step
+        in
+        (success, fail_pf)
 
   and unify_assertion
       ?(is_post = false)
