@@ -19,10 +19,15 @@ let rec auto_unfold
       List.filter Simplifications.admissible_assertion
         (List_utils.cross_product (au_rec a1) (au_rec a2) (fun asrt1 asrt2 ->
              Asrt.Star (asrt1, asrt2)))
-  (* Recursive and non-unfolding predicates *)
+  (* We don't unfold:
+      - Recursive predicates (except in some very specific cases)
+      - predicates marked with no-unfold
+      - predicates with a guard *)
   | Pred (name, _)
     when (Hashtbl.find rec_tbl name && not unfold_rec_predicates)
-         || (Hashtbl.find predicates name).pred_nounfold -> [ asrt ]
+         ||
+         let pred = Hashtbl.find predicates name in
+         pred.pred_nounfold || Option.is_some pred.pred_cost -> [ asrt ]
   | Pred (name, args) when Hashtbl.mem unfolded_preds name ->
       L.verbose (fun fmt ->
           fmt "Unfolding predicate: %s with nounfold %b" name

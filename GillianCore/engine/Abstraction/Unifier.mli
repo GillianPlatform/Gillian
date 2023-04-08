@@ -67,7 +67,7 @@ module type S = sig
     end
   end
 
-  type gp_ret = GPSucc of (t * vt list) list | GPFail of err_t list
+  type gp_ret = ((t * vt list) list, err_t list) result
   type u_res = UWTF | USucc of t | UFail of err_t list
   type unfold_info_t = (string * string) list
 

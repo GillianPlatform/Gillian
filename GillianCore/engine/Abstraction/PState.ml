@@ -840,54 +840,47 @@ module Make
                 Ok astates
             | UPUFail e -> Error e)
       | Unfold (pname, les, unfold_info, b) -> (
+          (* Unfoldig predicate with name [pname] and arguments [les].
+             [unfold_info] is (FIXME: ???)
+             and [b] says if the predicate should be unfolded entirely (up to 10 times, otherwise failure) *)
+          (* 1) We retrieve the definition of the predicate to unfold and make sure
+             it is not abstract and hence can be unfolded. *)
           let pred = UP.get_pred_def prog.preds pname in
-          match pred.pred.pred_abstract with
-          | true ->
-              raise
-                (Failure
-                   (Format.asprintf
-                      "Impossible: Unfold of abstract predicate %s" pname))
-          | false -> (
-              let vs = List.map eval_expr les in
-              let vs_ins = Pred.in_args pred.pred vs in
-              let vs = List.map (fun x -> Some x) vs in
-              (* FIXME: make sure correct number of params *)
-              match SUnifier.get_pred astate pname vs None with
-              | GPSucc [] ->
-                  Fmt.failwith "HORROR - unfold vanished: %a" SLCmd.pp lcmd
-              | GPSucc succs ->
-                  let astates =
-                    succs
-                    |> List.concat_map (fun (_, vs') ->
-                           L.verbose (fun m ->
-                               m "@[<h>Returned values: %a@]"
-                                 Fmt.(list ~sep:comma Val.pp)
-                                 vs');
-                           let vs =
-                             Pred.combine_ins_outs pred.pred vs_ins vs'
-                           in
-                           L.verbose (fun m ->
-                               m
-                                 "@[<h>LCMD Unfold about to happen with rec %b \
-                                  info: %a@]"
-                                 b SLCmd.pp_unfold_info unfold_info);
-                           if b then SUnifier.rec_unfold astate pname vs
-                           else (
-                             L.verbose (fun m ->
-                                 m "@[<h>Values: %a@]"
-                                   Fmt.(list ~sep:comma Val.pp)
-                                   vs);
-                             List.concat_map
-                               (fun (_, state) ->
-                                 let _, states =
-                                   simplify ~kill_new_lvars:true
-                                     ~unification:true state
-                                 in
-                                 states)
-                               (SUnifier.unfold astate pname vs unfold_info)))
+          if pred.pred.pred_abstract then
+            Fmt.failwith "Impossible: Unfold of abstract predicate %s" pname;
+          (* 2) We evaluate the arguments, filter to keep only the in-parameters
+             (which are sufficient to trigger the unfold) *)
+          let vs = List.map eval_expr les in
+          let vs_ins = Pred.in_args pred.pred vs in
+          let vs = List.map (fun x -> Some x) vs in
+          (* FIXME: make sure correct number of params *)
+          (* 3) We consume the predicate from the state. *)
+          match SUnifier.get_pred astate pname vs None with
+          | Ok [] -> Fmt.failwith "HORROR - unfold vanished: %a" SLCmd.pp lcmd
+          | Ok succs ->
+              let ( let* ) x f = List.concat_map f x in
+              let astates =
+                let* _, vs' = succs in
+                L.verbose (fun m ->
+                    m "@[<h>Returned values: %a@]"
+                      Fmt.(list ~sep:comma Val.pp)
+                      vs');
+                let vs = Pred.combine_ins_outs pred.pred vs_ins vs' in
+                L.verbose (fun m ->
+                    m "@[<h>LCMD Unfold about to happen with rec %b info: %a@]"
+                      b SLCmd.pp_unfold_info unfold_info);
+                if b then SUnifier.rec_unfold astate pname vs
+                else (
+                  L.verbose (fun m ->
+                      m "@[<h>Values: %a@]" Fmt.(list ~sep:comma Val.pp) vs);
+                  let* _, state = SUnifier.unfold astate pname vs unfold_info in
+                  let _, states =
+                    simplify ~kill_new_lvars:true ~unification:true state
                   in
-                  Ok astates
-              | GPFail errors -> Error errors))
+                  states)
+              in
+              Ok astates
+          | Error errors -> Error errors)
       | GUnfold pname ->
           let astates = SUnifier.unfold_all astate pname in
           let astates =
