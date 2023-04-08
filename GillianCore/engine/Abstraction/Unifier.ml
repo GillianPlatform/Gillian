@@ -19,7 +19,7 @@ module type S = sig
   type t = state_t * preds_t * UP.preds_tbl_t * variants_t
   type post_res = (Flag.t * Asrt.t list) option
   type search_state = (t * st * UP.t) list * err_t list
-  type up_u_res = UPUSucc of (t * st * post_res) list | UPUFail of err_t list
+  type up_u_res = ((t * st * post_res) list, err_t list) result
 
   module Logging : sig
     module AstateRec : sig
@@ -138,9 +138,11 @@ module Make
   type unfold_info_t = (string * string) list
   type gp_ret = ((t * vt list) list, err_t list) result
   type u_res = UWTF | USucc of t | UFail of err_t list
-  type up_u_res = UPUSucc of (t * st * post_res) list | UPUFail of err_t list
+  type up_u_res = ((t * st * post_res) list, err_t list) result
 
-  (* Results of the get_pred operation *)
+  (* This module implements what could be called the "verification" monad.
+     Each step may branch, but if any branch fails, then the entirety of the
+     process fails. *)
   module List_res = struct
     type nonrec 'a t = ('a list, err_t list) result
 
@@ -1063,14 +1065,10 @@ module Make
         let vs_ins = Pred.in_args pred.pred vs in
         let vs_ins = List.map Option.get vs_ins in
         let subst = ESubst.init (List.combine param_ins vs_ins) in
-        (* 3) We unify *)
-        let up_res_to_res = function
-          | UPUSucc succ -> Ok succ
-          | UPUFail err -> Error err
-        in
+        (* 3) We unify ag*)
         let open List_res.Syntax in
         let* astate', subst', _ =
-          unify ~is_post ?in_unification astate subst up Fold |> up_res_to_res
+          unify ~is_post ?in_unification astate subst up Fold
         in
         L.verbose (fun m -> m "Recursive fold success.");
         let out_params = Pred.out_params pred_def in
@@ -1544,7 +1542,7 @@ module Make
             (List.length s_states)));
     let f = unify_up' ~is_post parent_ids in
     match s_states with
-    | [] -> UPUFail errs_so_far
+    | [] -> Error errs_so_far
     | ((state, subst, up), target_case_depth, is_new_case) :: rest -> (
         let case_depth =
           structure_unify_case_reports parent_ids target_case_depth is_new_case
@@ -1572,9 +1570,7 @@ module Make
             | _ -> UFail [])
         in
         match ret with
-        | UWTF ->
-            L.verbose (fun fmt -> fmt "Impossible. UWTF.");
-            UPUSucc []
+        | UWTF -> L.fail "Impossible, WTF?"
         | USucc state' -> (
             match UP.next up with
             | None ->
@@ -1593,7 +1589,7 @@ module Make
                        posts;
                      })
                 |> ignore;
-                UPUSucc [ (state', subst, posts) ]
+                List_res.return (state', subst, posts)
             | Some [ (up, lab) ] ->
                 if complete_subst subst lab then
                   f
@@ -1653,47 +1649,15 @@ module Make
       (unify_kind : unify_kind) : up_u_res =
     let astate_i = copy_astate astate in
     let subst_i = ESubst.copy subst in
-
-    let merge_upu_res (rets : up_u_res list) : up_u_res =
-      L.verbose (fun fmt -> fmt "Inside merge_upu_res");
-      let ret_succs, ret_fails =
-        List.partition
-          (fun ret ->
-            match ret with
-            | UPUSucc _ -> true
-            | _ -> false)
-          rets
-      in
-      if ret_fails <> [] then
-        let errs =
-          List.map
-            (fun ret ->
-              match ret with
-              | UPUFail errs -> errs
-              | _ -> [])
-            ret_fails
-        in
-        UPUFail (List.concat errs)
-      else
-        let rets =
-          List.map
-            (fun ret ->
-              match ret with
-              | UPUSucc rets -> rets
-              | _ -> [])
-            ret_succs
-        in
-        UPUSucc (List.concat rets)
-    in
     UnifyReport.as_parent
       { astate = AstateRec.from astate; subst; up; unify_kind }
       (fun () ->
         let ret = unify_up ~is_post ([ (astate, subst, up) ], []) in
         match ret with
-        | UPUSucc _ ->
+        | Ok _ ->
             L.verbose (fun fmt -> fmt "Unifier.unify: Success");
             ret
-        | UPUFail errs
+        | Error errs
           when !Config.unfolding && State.can_fix errs && not in_unification ->
             L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
             let state, _, _, _ = astate_i in
@@ -1708,23 +1672,19 @@ module Make
             let sp, worked = unfold_with_vals astate_i vals in
             if not worked then (
               L.normal (fun m -> m "Unify. No predicates found to unfold.");
-              UPUFail errs)
+              Error errs)
             else (
               L.verbose (fun m ->
                   m "Unfolding successful: %d results" (List.length sp));
-              let rets =
-                List.map
-                  (fun (_, astate) ->
-                    match unfold_concrete_preds astate with
-                    | None -> UPUSucc []
-                    | Some (_, astate) ->
-                        (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
-                        let subst'' = ESubst.copy subst_i in
-                        unify_up ~is_post ([ (astate, subst'', up) ], []))
-                  sp
-              in
-              merge_upu_res rets)
-        | UPUFail _ ->
+              let open List_res.Syntax in
+              let* _, astate = Ok sp in
+              match unfold_concrete_preds astate with
+              | None -> Error []
+              | Some (_, astate) ->
+                  (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
+                  let subst'' = ESubst.copy subst_i in
+                  unify_up ~is_post ([ (astate, subst'', up) ], []))
+        | Error _ ->
             L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
             ret)
 end

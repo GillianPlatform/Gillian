@@ -19,7 +19,7 @@ module type S = sig
   type t = state_t * preds_t * UP.preds_tbl_t * variants_t
   type post_res = (Flag.t * Asrt.t list) option
   type search_state = (t * st * UP.t) list * err_t list
-  type up_u_res = UPUSucc of (t * st * post_res) list | UPUFail of err_t list
+  type up_u_res = ((t * st * post_res) list, err_t list) result
 
   module Logging : sig
     module AstateRec : sig

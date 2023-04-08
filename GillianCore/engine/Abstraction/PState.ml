@@ -354,7 +354,7 @@ module Make
           UP.pp up);
 
     match SUnifier.unify astate' subst up FunctionCall with
-    | UPUSucc rets ->
+    | Ok rets ->
         let acceptable =
           match !Config.Verification.exact with
           | false -> true
@@ -440,7 +440,7 @@ module Make
           (* FIXME: Cannot pass an appropriate error for the moment *)
           let err = [] in
           Error err
-    | UPUFail errs ->
+    | Error errs ->
         let msg =
           Fmt.str
             "WARNING: Failed to unify against the precondition of procedure %s"
@@ -582,8 +582,8 @@ module Make
     let ( let+ ) x f = List.map f x in
     let* new_state, subst', _ =
       match SUnifier.unify astate subst up Invariant with
-      | UPUSucc states -> states
-      | UPUFail errs ->
+      | Ok states -> states
+      | Error errs ->
           let fail_pfs : Formula.t list =
             List.map State.get_failing_constraint errs
           in
@@ -801,7 +801,7 @@ module Make
             in
             let subst = ESubst.init (i_bindings @ param_bindings) in
             match SUnifier.unify astate subst pred.up LogicCommand with
-            | UPUSucc [] ->
+            | Ok [] ->
                 let msg =
                   Fmt.str
                     "@[<h>HORROR: fold vanished for %s(%a) with folding_info: \
@@ -811,7 +811,7 @@ module Make
                     vs SLCmd.pp_folding_info folding_info
                 in
                 failwith msg
-            | UPUSucc succs ->
+            | Ok succs ->
                 let astates =
                   succs
                   |> List.map (fun (astate', subst', _) ->
@@ -838,7 +838,7 @@ module Make
                          astate')
                 in
                 Ok astates
-            | UPUFail e -> Error e)
+            | Error e -> Error e)
       | Unfold (pname, les, unfold_info, b) -> (
           (* Unfoldig predicate with name [pname] and arguments [les].
              [unfold_info] is (FIXME: ???)
@@ -981,7 +981,7 @@ module Make
                   let subst = ESubst.init bindings in
                   let u_ret = SUnifier.unify astate subst up LogicCommand in
                   match u_ret with
-                  | UPUSucc [ (new_state, subst', _) ] -> (
+                  | Ok [ (new_state, subst', _) ] -> (
                       (* Successful Unification *)
                       let lbinders = List.map (fun x -> Expr.LVar x) binders in
                       let new_bindings =
@@ -1064,12 +1064,12 @@ module Make
                                 Asrt.pp a
                             in
                             Error [ StateErr.EOther msg ])
-                  | UPUSucc _ ->
+                  | Ok _ ->
                       raise
                         (Exceptions.Unsupported
                            "sep_assert: unification resulted in multiple \
                             returns")
-                  | UPUFail errs ->
+                  | Error errs ->
                       let fail_pfs : Formula.t list =
                         List.map State.get_failing_constraint errs
                       in
@@ -1160,7 +1160,7 @@ module Make
     let result =
       let is_post = unify_type = Unifier.Postcondition in
       match SUnifier.unify ~is_post astate subst up unify_type with
-      | SUnifier.UPUSucc _ -> true
+      | Ok _ -> true
       | _ -> false
     in
     L.verbose (fun fmt -> fmt "PSTATE.unify: Success: %b" result);
