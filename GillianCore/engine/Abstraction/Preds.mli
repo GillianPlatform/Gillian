@@ -24,7 +24,11 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
   val pp_pabs : Format.formatter -> abs_t -> unit
 
-  val get_pred :
+  (** [consume_pred ~maintain pred_state name args_opt ins f_eq] removes the predicate best matching the triple
+      [(name, args_opt, ins)] using an equality function on values [f_eq].
+      It does so in place, and if maintain is true, the predicate is matched
+        but not actually removed from the state.  *)
+  val consume_pred :
     maintain:bool ->
     t ->
     string ->

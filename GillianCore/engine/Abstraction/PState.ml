@@ -855,7 +855,7 @@ module Make
           let vs = List.map (fun x -> Some x) vs in
           (* FIXME: make sure correct number of params *)
           (* 3) We consume the predicate from the state. *)
-          match SUnifier.get_pred astate pname vs None with
+          match SUnifier.consume_pred astate pname vs None with
           | Ok [] -> Fmt.failwith "HORROR - unfold vanished: %a" SLCmd.pp lcmd
           | Ok succs ->
               let ( let* ) x f = List.concat_map f x in

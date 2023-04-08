@@ -92,7 +92,11 @@ module type S = sig
     unify_kind ->
     up_u_res
 
-  val get_pred :
+  (** Consumes a predicate from the state.
+      If the predicate is not "verbatim" in our set of preds,
+      and it is not abstract and we are not in manual mode,
+      we attempt to fold it. *)
+  val consume_pred :
     ?is_post:bool ->
     ?in_unification:bool ->
     t ->

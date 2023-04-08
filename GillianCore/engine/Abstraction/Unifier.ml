@@ -92,7 +92,7 @@ module type S = sig
     unify_kind ->
     up_u_res
 
-  val get_pred :
+  val consume_pred :
     ?is_post:bool ->
     ?in_unification:bool ->
     t ->
@@ -998,7 +998,7 @@ module Make
       If the predicate is not "verbatim" in our set of preds,
       and it is not abstract and we are not in manual mode,
       we attempt to fold it. *)
-  let rec get_pred
+  let rec consume_pred
       ?(is_post = false)
       ?(in_unification : bool option)
       (astate : t)
@@ -1008,7 +1008,7 @@ module Make
       =
     L.(
       tmi (fun m ->
-          m "get_pred %s. args: @[<h>%a@]" pname
+          m "Unifier.consume_pred %s. args: @[<h>%a@]" pname
             Fmt.(list ~sep:comma (Dump.option Val.pp))
             vs));
 
@@ -1019,7 +1019,7 @@ module Make
     let return = List_res.return in
     (* we attempt to consume the pred as-is from our state. *)
     match
-      Preds.get_pred ~maintain:pred_pure preds pname vs
+      Preds.consume_pred ~maintain:pred_pure preds pname vs
         (Containers.SI.of_list pred_def.pred_ins)
         (State.equals state)
     with
@@ -1347,7 +1347,7 @@ module Make
                       Fmt.(brackets (list ~sep:comma Val.pp))
                       vs_ins);
                 match
-                  get_pred ~is_post ~in_unification:true astate pname vs
+                  consume_pred ~is_post ~in_unification:true astate pname vs
                     (Some (subst, step, outs, les_outs))
                 with
                 | Ok [] ->
