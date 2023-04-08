@@ -1024,12 +1024,12 @@ struct
                     [ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
                   "Error");
             if not (Exec_mode.concrete_exec !Config.current_exec_mode) then (
-              let expr_params = List.map Val.to_expr v_es in
               let recovery_params =
-                List.concat_map Expr.base_elements expr_params
-              in
-              let recovery_params =
-                List.map Option.get (List.map Val.from_expr recovery_params)
+                let open Utils.Syntaxes.List in
+                let* v = v_es in
+                let e = Val.to_expr v in
+                let+ base_elem = Expr.base_elements e in
+                Option.get (Val.from_expr base_elem)
               in
               let recovery_vals =
                 State.get_recovery_vals state errs @ recovery_params
@@ -1064,7 +1064,7 @@ struct
                         ~loop_ids:prev_loop_ids ~next_idx:i
                         ~branch_count:b_counter ?branch_case ?new_branches ())
                     recovery_states
-              | _ ->
+              | Error _ ->
                   let pp_err ft (a, errs) =
                     Fmt.pf ft "FAILURE: Action %s failed with: %a" a
                       (Fmt.Dump.list State.pp_err)
