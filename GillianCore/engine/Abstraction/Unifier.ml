@@ -781,28 +781,26 @@ module Make
             states @ acc)
       [] asrts
 
-  let use_unfold_info
-      (unfold_info : (string * string) list option)
-      (pred : Pred.t)
+  (** [extend_subts_with_bindings unfold_info pred state subst] takes:
+      - A state
+      - A substitution
+      - A list of pairs of lvar names
+      And extends the substitution with the pairs
+      [(#x, eval_expr #y)] for each pair [(x, y)] *)
+  let extend_subst_with_bindings
       (state : State.t)
-      (subst : ESubst.t) : Asrt.t list =
-    let result = List.map (fun (_, x, _) -> x) pred.pred_definitions in
-    let () =
-      match unfold_info with
-      | None -> ()
-      | Some bindings ->
-          let bindings =
-            List.map
-              (fun (x, y) -> (Expr.LVar x, State.eval_expr state (Expr.LVar y)))
-              bindings
-          in
-          ESubst.extend subst bindings;
-          L.(
-            verbose (fun m ->
-                m "@[<v 2>Using unfold info, obtained subst:@\n%a@\n" ESubst.pp
-                  subst))
+      (subst : ESubst.t)
+      (bindings : (string * string) list) : unit =
+    let bindings =
+      List.map
+        (fun (x, y) -> (Expr.LVar x, State.eval_expr state (Expr.LVar y)))
+        bindings
     in
-    result
+    ESubst.extend subst bindings;
+    L.(
+      verbose (fun m ->
+          m "@[<v 2>Using unfold info, obtained subst:@\n%a@]@\n" ESubst.pp
+            subst))
 
   let unfold
       (astate : t)
@@ -833,12 +831,21 @@ module Make
       | None -> SS.empty
       | Some bindings -> SS.of_list (snd (List.split bindings))
     in
+    let () =
+      Option.iter (extend_subst_with_bindings state subst_i) unfold_info
+    in
+    let definitions =
+      List.map (fun (_, def, _) -> def) pred.data.pred_definitions
+    in
     let rets =
-      match use_unfold_info unfold_info pred.data state subst_i with
+      match definitions with
       | [] ->
           Fmt.failwith "Cannot Unfold Predicate %s with No Definitions"
             pred.data.pred_name
       | first_def :: rest_defs ->
+          (* We separate the first case from the rest because we
+             only copy the state for the remaining branches if there are more
+             than 1 definition *)
           L.(
             verbose (fun m ->
                 m "Going to produce %d definitions with subst@\n%a"
@@ -857,17 +864,24 @@ module Make
             (fun acc res ->
               match res with
               | Error errs ->
-                  errs
-                  |> List.iter (fun err ->
-                         L.verbose (fun m -> m "Warning: %a" pp_err_t err));
+                  (* If a production fails, it means this branch is not
+                     possible, we log and ignore. *)
+                  List.iter
+                    (fun err ->
+                      L.verbose (fun m -> m "Warning: %a" pp_err_t err))
+                    errs;
                   acc
               | Ok astates ->
-                  List.concat_map
-                    (fun x ->
-                      let subst, states = simplify_astate ~unification:true x in
-                      List.map (fun state -> (subst, state)) states)
-                    astates
-                  @ acc)
+                  let open Syntaxes.List in
+                  let new_states =
+                    let* state = astates in
+                    let subst, states =
+                      simplify_astate ~unification:true state
+                    in
+                    let+ state = states in
+                    (subst, state)
+                  in
+                  new_states @ acc)
             []
             (first_results :: rest_results)
     in

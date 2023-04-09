@@ -74,7 +74,13 @@ module type S = sig
   val produce_assertion : t -> st -> Asrt.t -> (t list, err_t list) result
   val produce : t -> st -> Asrt.t -> (t list, err_t list) result
   val produce_posts : t -> st -> Asrt.t list -> t list
+
+  (** [unfold state name args unfold_info] returns a 
+      list of pairs (subst, state), resulting from unfolding
+      the predicate [name(..args..)] from the given state.
+      unfold_info contains information about how to bind new variables. *)
   val unfold : t -> string -> vt list -> unfold_info_t option -> (st * t) list
+
   val rec_unfold : ?fuel:int -> t -> string -> vt list -> t list
   val unfold_all : t -> string -> t list
   val unfold_with_vals : t -> vt list -> (st * t) list * bool
