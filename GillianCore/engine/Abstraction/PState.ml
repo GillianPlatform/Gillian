@@ -482,7 +482,7 @@ module Make
     List.iter
       (fun (name, vs) ->
         let pred_def = Hashtbl.find pred_defs name in
-        if not pred_def.pred.pred_pure then
+        if not pred_def.data.pred_pure then
           let _ =
             Preds.pop preds (fun (name', vs') -> name' = name && vs' = vs)
           in
@@ -778,14 +778,14 @@ module Make
       | Fold (pname, les, folding_info) -> (
           let () = L.verbose (fun fmt -> fmt "Folding predicate: %s\n" pname) in
           let pred = UP.get_pred_def prog.preds pname in
-          if pred.pred.pred_abstract then
+          if pred.data.pred_abstract then
             raise
               (Failure
                  (Format.asprintf "Impossible: Fold of abstract predicate %s"
                     pname))
           else
             let vs = List.map eval_expr les in
-            let params = List.map (fun (x, _) -> x) pred.pred.pred_params in
+            let params = List.map (fun (x, _) -> x) pred.data.pred_params in
             let i_bindings =
               Option.fold
                 ~some:(fun (_, bindings) ->
@@ -794,7 +794,7 @@ module Make
             in
             let param_bindings =
               if List.length params = List.length vs then List.combine params vs
-              else List.combine (Pred.in_params pred.pred) vs
+              else List.combine (Pred.in_params pred.data) vs
             in
             let param_bindings =
               List.map (fun (x, v) -> (Expr.PVar x, v)) param_bindings
@@ -819,7 +819,7 @@ module Make
                          let arg_vs =
                            if List.length params = List.length vs then vs
                            else
-                             let out_params = Pred.out_params pred.pred in
+                             let out_params = Pred.out_params pred.data in
                              let vs_outs =
                                List.map
                                  (fun x ->
@@ -831,9 +831,9 @@ module Make
                                          (Failure "DEATH. evaluate_slcmd. fold"))
                                  out_params
                              in
-                             Pred.combine_ins_outs pred.pred vs vs_outs
+                             Pred.combine_ins_outs pred.data vs vs_outs
                          in
-                         Preds.extend ~pure:pred.pred.pred_pure preds'
+                         Preds.extend ~pure:pred.data.pred_pure preds'
                            (pname, arg_vs);
                          astate')
                 in
@@ -846,12 +846,12 @@ module Make
           (* 1) We retrieve the definition of the predicate to unfold and make sure
              it is not abstract and hence can be unfolded. *)
           let pred = UP.get_pred_def prog.preds pname in
-          if pred.pred.pred_abstract then
+          if pred.data.pred_abstract then
             Fmt.failwith "Impossible: Unfold of abstract predicate %s" pname;
           (* 2) We evaluate the arguments, filter to keep only the in-parameters
              (which are sufficient to trigger the unfold) *)
           let vs = List.map eval_expr les in
-          let vs_ins = Pred.in_args pred.pred vs in
+          let vs_ins = Pred.in_args pred.data vs in
           let vs = List.map (fun x -> Some x) vs in
           (* FIXME: make sure correct number of params *)
           (* 3) We consume the predicate from the state. *)
@@ -865,7 +865,7 @@ module Make
                     m "@[<h>Returned values: %a@]"
                       Fmt.(list ~sep:comma Val.pp)
                       vs');
-                let vs = Pred.combine_ins_outs pred.pred vs_ins vs' in
+                let vs = Pred.combine_ins_outs pred.data vs_ins vs' in
                 L.verbose (fun m ->
                     m "@[<h>LCMD Unfold about to happen with rec %b info: %a@]"
                       b SLCmd.pp_unfold_info unfold_info);
@@ -1110,11 +1110,11 @@ module Make
               let existential_bindings =
                 List.map2
                   (fun x y -> (x, Option.get (Val.from_expr (Expr.LVar y))))
-                  lemma.lemma.lemma_existentials binders
+                  lemma.data.lemma_existentials binders
               in
               let rets =
-                run_spec_aux ~existential_bindings lname
-                  lemma.lemma.lemma_params lemma.up astate None v_args
+                run_spec_aux ~existential_bindings lname lemma.data.lemma_params
+                  lemma.up astate None v_args
               in
               match rets with
               | Ok rets ->
@@ -1146,11 +1146,11 @@ module Make
       ((t * Flag.t) list, err_t list) result =
     match subst with
     | None ->
-        run_spec_aux spec.spec.spec_name spec.spec.spec_params spec.up astate
+        run_spec_aux spec.data.spec_name spec.data.spec_params spec.up astate
           (Some x) args
     | Some (_, subst_lst) ->
-        run_spec_aux ~existential_bindings:subst_lst spec.spec.spec_name
-          spec.spec.spec_params spec.up astate (Some x) args
+        run_spec_aux ~existential_bindings:subst_lst spec.data.spec_name
+          spec.data.spec_params spec.up astate (Some x) args
 
   let unify
       (astate : t)
@@ -1211,7 +1211,7 @@ module Make
   let set_pred (astate : t) (pred : abs_t) : unit =
     let _, preds, preds_table, _ = astate in
     let pred_name, _ = pred in
-    let pure = (Hashtbl.find preds_table pred_name).pred.pred_pure in
+    let pure = (Hashtbl.find preds_table pred_name).data.pred_pure in
     Preds.extend ~pure preds pred
 
   let update_subst (astate : t) (subst : st) : unit =

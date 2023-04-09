@@ -321,7 +321,7 @@ struct
         let pred_ins =
           Hashtbl.fold
             (fun name (pred_with_up : UP.pred) pred_ins ->
-              Hashtbl.add pred_ins name pred_with_up.pred.pred_ins;
+              Hashtbl.add pred_ins name pred_with_up.data.pred_ins;
               pred_ins)
             preds
             (Hashtbl.create Config.medium_tbl_size)
@@ -332,9 +332,9 @@ struct
               UP.
                 {
                   up_pred with
-                  pred =
+                  data =
                     derive_predicate_hiding ~preds ~prog ~init_data ~pred_ins
-                      up_pred.pred;
+                      up_pred.data;
                 })
           preds
   end
@@ -954,7 +954,7 @@ struct
         let () =
           Hashtbl.iter
             (fun name (up_pred : UP.pred) ->
-              Hashtbl.replace preds_with_hiding name up_pred.pred)
+              Hashtbl.replace preds_with_hiding name up_pred.data)
             preds
         in
 
@@ -964,7 +964,7 @@ struct
         let pred_ins =
           Hashtbl.fold
             (fun name (pred : UP.pred) pred_ins ->
-              Hashtbl.add pred_ins name pred.pred.pred_ins;
+              Hashtbl.add pred_ins name pred.data.pred_ins;
               pred_ins)
             preds
             (Hashtbl.create Config.medium_tbl_size)
@@ -1226,7 +1226,7 @@ struct
       let pred_ins =
         Hashtbl.fold
           (fun name (pred : UP.pred) pred_ins ->
-            Hashtbl.add pred_ins name pred.pred.pred_ins;
+            Hashtbl.add pred_ins name pred.data.pred_ins;
             pred_ins)
           preds
           (Hashtbl.create Config.medium_tbl_size)

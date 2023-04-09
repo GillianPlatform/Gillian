@@ -370,11 +370,9 @@ module Make
     in
 
     let get_pred_def (name : string) : Pred.t =
-      try
-        let pred = Hashtbl.find pred_defs name in
-        pred.pred
-      with _ ->
-        raise (Failure "ERROR: get_pred_with_vs: Predicate doesn't exist.")
+      match Hashtbl.find_opt pred_defs name with
+      | Some pred -> pred.data
+      | None -> failwith "ERROR: get_pred_with_vs: Predicate doesn't exist."
     in
 
     let apply_strategies (strategies : (string * Val.t list -> int) list) :
@@ -575,11 +573,11 @@ module Make
           let vs = List.map Option.get vs in
           let pred_def = Hashtbl.find pred_defs pname in
           let+ (ostate : t list) =
-            match pred_def.pred.pred_facts with
+            match pred_def.data.pred_facts with
             | [] -> Ok [ astate ]
             | facts ->
                 (* let t = Sys.time () in *)
-                let params, _ = List.split pred_def.pred.pred_params in
+                let params, _ = List.split pred_def.data.pred_params in
                 let params = List.map (fun x -> Expr.PVar x) params in
                 let facts =
                   List.fold_left
@@ -601,7 +599,7 @@ module Make
                    (Sys.time () -. t); *)
                 result
           in
-          let pure = pred_def.pred.pred_pure in
+          let pure = pred_def.data.pred_pure in
           (* FIXME: We could copy only when more than one result, less expensive *)
           List.map
             (fun (state, preds, pred_defs, variants) ->
@@ -813,7 +811,7 @@ module Make
       (unfold_info : (string * string) list option) : (ESubst.t * t) list =
     let state, preds, pred_defs, variants = astate in
     let pred = UP.get_pred_def pred_defs pname in
-    let params = List.map (fun (x, _) -> Expr.PVar x) pred.pred.pred_params in
+    let params = List.map (fun (x, _) -> Expr.PVar x) pred.data.pred_params in
     L.verbose (fun m ->
         m
           "Combine going to explode. PredName: @[<h>%s@]. Params: @[<h>%a]. \
@@ -836,10 +834,10 @@ module Make
       | Some bindings -> SS.of_list (snd (List.split bindings))
     in
     let rets =
-      match use_unfold_info unfold_info pred.pred state subst_i with
+      match use_unfold_info unfold_info pred.data state subst_i with
       | [] ->
           Fmt.failwith "Cannot Unfold Predicate %s with No Definitions"
-            pred.pred.pred_name
+            pred.data.pred_name
       | first_def :: rest_defs ->
           L.(
             verbose (fun m ->
@@ -950,7 +948,7 @@ module Make
 
     let should_unfold (pname, vs) =
       let pred = UP.get_pred_def pred_defs pname in
-      Pred.in_args pred.pred vs
+      Pred.in_args pred.data vs
       |> List.for_all (fun in_arg ->
              match Val.to_literal in_arg with
              | None -> false
@@ -1014,7 +1012,7 @@ module Make
 
     let state, preds, pred_defs, _ = astate in
     let pred = UP.get_pred_def pred_defs pname in
-    let pred_def = pred.pred in
+    let pred_def = pred.data in
     let pred_pure = pred_def.pred_pure in
     let return = List_res.return in
     (* we attempt to consume the pred as-is from our state. *)
@@ -1051,7 +1049,7 @@ module Make
         (* Recursive Case - Folding required *)
         let () =
           L.verbose (fun fmt ->
-              fmt "Auto-folding predicate: %s\n" pred.pred.pred_name)
+              fmt "Auto-folding predicate: %s\n" pred.data.pred_name)
         in
         L.verbose (fun m -> m "Recursive case - attempting to fold.");
         (* FIXME: the folding is done manually! The logic should be factored out from here
@@ -1060,9 +1058,9 @@ module Make
         let up = pred.up in
         L.verbose (fun m -> m "Predicate unification plan: %a" UP.pp up);
         (* 2) We create our initial substitution *)
-        let param_ins = Pred.in_params pred.pred in
+        let param_ins = Pred.in_params pred.data in
         let param_ins = List.map (fun x -> Expr.PVar x) param_ins in
-        let vs_ins = Pred.in_args pred.pred vs in
+        let vs_ins = Pred.in_args pred.data vs in
         let vs_ins = List.map Option.get vs_ins in
         let subst = ESubst.init (List.combine param_ins vs_ins) in
         (* 3) We unify ag*)
@@ -1331,7 +1329,7 @@ module Make
               let vs = List.map (subst_in_expr_opt astate subst) les in
               (* Get the ins of the predicate *)
               let pred = UP.get_pred_def pred_defs pname in
-              let pred_def = pred.pred in
+              let pred_def = pred.data in
               let vs_ins = Pred.in_args pred_def vs in
               let les_outs = Pred.out_args pred_def les in
               (* All of which must have survived substitution *)

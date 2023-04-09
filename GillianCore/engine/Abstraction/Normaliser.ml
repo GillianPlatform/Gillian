@@ -635,7 +635,7 @@ struct
                   normalisation."
                  pn)
         | Some pred_def ->
-            let params, _ = List.split pred_def.pred.pred_params in
+            let params, _ = List.split pred_def.data.pred_params in
             let params = List.map (fun x -> Expr.PVar x) params in
             let facts =
               List.fold_left
@@ -645,7 +645,7 @@ struct
                       Formula.subst_expr_for_expr ~to_subst:param ~subst_with:le
                         fact)
                     facts)
-                pred_def.pred.pred_facts (List.combine params les)
+                pred_def.data.pred_facts (List.combine params les)
             in
             List.iter (fun fact -> PFS.extend pfs fact) facts;
             SPreds.extend preds (pn, List.map fe les))

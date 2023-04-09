@@ -12,9 +12,10 @@ type step = Asrt.t * outs [@@deriving yojson]
 val step_pp : step Fmt.t
 
 type t [@@deriving yojson]
-type pred = { pred : Pred.t; up : t }
-type spec = { spec : Spec.t; up : t }
-type lemma = { lemma : Lemma.t; up : t }
+type 'a with_up = { up : t; data : 'a }
+type pred = Pred.t with_up
+type spec = Spec.t with_up
+type lemma = Lemma.t with_up
 
 type 'annot prog = {
   preds : (string, pred) Hashtbl.t;

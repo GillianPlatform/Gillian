@@ -29,9 +29,10 @@ type t =
   | LabPhantomInner of (t * (string * SS.t) option) list
 [@@deriving yojson]
 
-type pred = { pred : Pred.t; up : t }
-type spec = { spec : Spec.t; up : t }
-type lemma = { lemma : Lemma.t; up : t }
+type 'a with_up = { up : t; data : 'a }
+type pred = Pred.t with_up
+type spec = Spec.t with_up
+type lemma = Lemma.t with_up
 
 type 'annot prog = {
   preds : (string, pred) Hashtbl.t;
@@ -862,7 +863,7 @@ let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
               verbose (fun m ->
                   m "Successfully created UP of specification of %s"
                     spec.spec_name));
-            Hashtbl.replace u_specs spec.spec_name { spec; up })
+            Hashtbl.replace u_specs spec.spec_name { data = spec; up })
       specs;
     Ok u_specs
   with UPError e -> Error e
@@ -898,7 +899,7 @@ let init_lemmas (preds : (string, int list) Hashtbl.t) (lemmas : Lemma.t list) :
             L.(
               verbose (fun m ->
                   m "Successfully created UP of Lemma %s" lemma.lemma_name));
-            Hashtbl.replace u_lemmas lemma.lemma_name { lemma; up })
+            Hashtbl.replace u_lemmas lemma.lemma_name { data = lemma; up })
       lemmas;
     Ok u_lemmas
   with UPError e -> Error e
@@ -946,7 +947,7 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
         | Ok up ->
             L.verbose (fun m ->
                 m "Successfully created UP of predicate %s:\n%a" name pp up);
-            Hashtbl.replace u_preds name { pred; up })
+            Hashtbl.replace u_preds name { data = pred; up })
       preds;
     Ok u_preds
   with UPError e -> Error e
@@ -967,7 +968,7 @@ let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : ('a prog, up_err_t) result
       let pred_ins =
         Hashtbl.fold
           (fun name (pred : pred) pred_ins ->
-            Hashtbl.add pred_ins name pred.pred.pred_ins;
+            Hashtbl.add pred_ins name pred.data.pred_ins;
             pred_ins)
           preds_tbl
           (Hashtbl.create Config.medium_tbl_size)
@@ -999,10 +1000,9 @@ let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : ('a prog, up_err_t) result
                 }))
 
 let get_pred_def (pred_defs : preds_tbl_t) (name : string) : pred =
-  try
-    let up_pred = Hashtbl.find pred_defs name in
-    up_pred
-  with _ -> raise (Failure (Printf.sprintf "DEATH. PRED %s NOT DEFINED" name))
+  match Hashtbl.find_opt pred_defs name with
+  | Some up_pred -> up_pred
+  | None -> Fmt.failwith "DEATH. PRED %s NOT DEFINED" name
 
 let init_pred_defs () : preds_tbl_t = Hashtbl.create Config.medium_tbl_size
 
@@ -1030,15 +1030,15 @@ let rec pp_asrt
       | None -> (
           try
             let pred = get_pred_def preds name in
-            let out_params = Pred.out_params pred.pred in
-            let out_args = Pred.out_args pred.pred args in
-            let in_args = Pred.in_args pred.pred args in
+            let out_params = Pred.out_params pred.data in
+            let out_args = Pred.out_args pred.data args in
+            let in_args = Pred.in_args pred.data args in
             let out_params_args = List.combine out_params out_args in
             let pp_out_params_args fmt (x, e) =
               Fmt.pf fmt "@[<h>%s: %a@]" x Expr.pp e
             in
             Fmt.pf fmt "%s(@[<h>%a@])" name
-              (Pred.pp_ins_outs pred.pred Expr.pp pp_out_params_args)
+              (Pred.pp_ins_outs pred.data Expr.pp pp_out_params_args)
               (in_args, out_params_args)
           with _ -> Asrt.pp fmt a))
   | a -> Asrt.pp fmt a
@@ -1100,7 +1100,7 @@ let add_spec (prog : 'a prog) (spec : Spec.t) : unit =
   let pred_ins =
     Hashtbl.fold
       (fun name (pred : pred) pred_ins ->
-        Hashtbl.add pred_ins name pred.pred.pred_ins;
+        Hashtbl.add pred_ins name pred.data.pred_ins;
         pred_ins)
       prog.preds
       (Hashtbl.create Config.medium_tbl_size)
@@ -1131,12 +1131,12 @@ let add_spec (prog : 'a prog) (spec : Spec.t) : unit =
         L.(
           verbose (fun m ->
               m "Successfully created UP of specification of %s" spec.spec_name));
-        let new_spec : spec = { spec; up } in
+        let new_spec : spec = { data = spec; up } in
         new_spec
   in
 
   let extend_spec (uspec : spec) (sspecs : Spec.st list) : spec =
-    let spec = Spec.extend uspec.spec sspecs in
+    let spec = Spec.extend uspec.data sspecs in
     let ups =
       List.map
         (fun (asrt, posts) -> (asrt, s_init params pred_ins asrt, posts))
@@ -1152,13 +1152,13 @@ let add_spec (prog : 'a prog) (spec : Spec.t) : unit =
                     "WARNING!!! IT IS NOT POSSIBLE TO BUILD UP FOR INFERRED \
                      SPEC of %s!PRE:@\n\
                      @[%a@]@\n"
-                    uspec.spec.spec_name Asrt.pp pre);
+                    uspec.data.spec_name Asrt.pp pre);
               (* Printf.printf "%s" msg; *)
               g_up
           | Ok pre_up -> add_up g_up (pre_up, posts) [])
         uspec.up ups
     in
-    let uspec' : spec = { spec; up = new_gup } in
+    let uspec' : spec = { data = spec; up = new_gup } in
     uspec'
   in
 
@@ -1170,7 +1170,7 @@ let add_spec (prog : 'a prog) (spec : Spec.t) : unit =
 
   Hashtbl.replace prog.specs spec.spec_name new_uspec;
   Hashtbl.replace prog.prog.procs spec.spec_name
-    { proc with proc_spec = Some new_uspec.spec }
+    { proc with proc_spec = Some new_uspec.data }
 
 let remove_spec (prog : 'a prog) spec_name =
   let proc = Prog.get_proc_exn prog.prog spec_name in
@@ -1188,5 +1188,5 @@ let first_time_running (prog : 'a prog) (proc_name : string) (index : int) :
   not (Hashtbl.mem prog.coverage (proc_name, index))
 
 let pp_pred_defs fmt pred_defs =
-  let pp_binding fmt (_, up_pred) = Pred.pp fmt up_pred.pred in
+  let pp_binding fmt (_, up_pred) = Pred.pp fmt up_pred.data in
   Fmt.(hashtbl ~sep:(any "@\n") pp_binding) fmt pred_defs

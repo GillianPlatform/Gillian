@@ -694,7 +694,7 @@ struct
           let params =
             match (proc, spec) with
             | Some proc, _ -> Proc.get_params proc
-            | None, Some spec -> Spec.get_params spec.spec
+            | None, Some spec -> Spec.get_params spec.data
             | _ ->
                 raise
                   (Interpreter_error
@@ -811,7 +811,7 @@ struct
                       :: others
                   (* Run spec returned no results *)
                   | _ -> (
-                      match spec.spec.spec_incomplete with
+                      match spec.data.spec_incomplete with
                       | true ->
                           L.normal (fun fmt ->
                               fmt "Proceeding with symbolic execution.");
@@ -821,7 +821,7 @@ struct
                             (Format.asprintf
                                "ERROR: Unable to use specification of function \
                                 %s"
-                               spec.spec.spec_name)))
+                               spec.data.spec_name)))
               | Error errors ->
                   let errors = errors |> List.map (fun e -> Exec_err.ESt e) in
                   [

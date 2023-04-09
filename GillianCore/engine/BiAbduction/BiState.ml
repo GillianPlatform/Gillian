@@ -393,7 +393,7 @@ struct
     L.(
       verbose (fun m ->
           m "INSIDE RUN spec of %s with the following UP:@\n%a@\n"
-            spec.spec.spec_name UP.pp spec.up));
+            spec.data.spec_name UP.pp spec.up));
     (* FIXME: CARE *)
     let subst_i, states = simplify bi_state in
     assert (List.length states = 1);
@@ -409,7 +409,7 @@ struct
 
     let old_store = State.get_store state in
 
-    let new_store = Store.init (List.combine spec.spec.spec_params args) in
+    let new_store = Store.init (List.combine spec.data.spec_params args) in
     let state' = State.set_store state new_store in
     let store_bindings = Store.bindings new_store in
     let store_bindings =
@@ -423,7 +423,7 @@ struct
             "@[<v 2>About to use the spec of %s with the following UP inside \
              BI-ABDUCTION:@\n\
              %a@]@\n"
-            spec.spec.spec_name UP.pp spec.up));
+            spec.data.spec_name UP.pp spec.up));
     let ret_states = unify procs state' state_af subst spec.up in
     L.(
       verbose (fun m ->
@@ -440,7 +440,7 @@ struct
                    let msg =
                      Printf.sprintf
                        "SYNTAX ERROR: Spec of %s does not have a postcondition"
-                       spec.spec.spec_name
+                       spec.data.spec_name
                    in
                    L.normal (fun m -> m "%s" msg);
                    raise (Failure msg)
