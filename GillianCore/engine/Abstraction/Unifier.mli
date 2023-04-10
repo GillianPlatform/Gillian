@@ -4,6 +4,7 @@ type unify_kind =
   | FunctionCall
   | Invariant
   | LogicCommand
+  | PredicateGuard
 [@@deriving yojson]
 
 module type S = sig
@@ -79,11 +80,26 @@ module type S = sig
       list of pairs (subst, state), resulting from unfolding
       the predicate [name(..args..)] from the given state.
       unfold_info contains information about how to bind new variables. *)
-  val unfold : t -> string -> vt list -> unfold_info_t option -> (st * t) list
+  val unfold :
+    ?additional_bindings:unfold_info_t ->
+    t ->
+    string ->
+    vt list ->
+    (st * t, err_t) List_res.t
 
-  val rec_unfold : ?fuel:int -> t -> string -> vt list -> t list
-  val unfold_all : t -> string -> t list
-  val unfold_with_vals : t -> vt list -> (st * t) list * bool
+  val rec_unfold : ?fuel:int -> t -> string -> vt list -> (t, err_t) List_res.t
+  val unfold_all : t -> string -> (t, err_t) List_res.t
+
+  (** Tries to unfold the given predicate in the state.
+      If it manages, it returns the new set of states and corresponding
+      substitutions, otherwise, it returns None. *)
+  val unfold_with_vals : t -> vt list -> (st * t) list option
+
+  (** Unfolds 1 predicate for which all arguments are concrete.
+      - If it finds one:
+        - if it succeeds to unfold, it returns Some (Some subst, new_state )
+        - if it fails to unfold it returns None
+      - If it doesn't find one, it returns Some (None, input_state) *)
   val unfold_concrete_preds : t -> (st option * t) option
 
   val unify_assertion :

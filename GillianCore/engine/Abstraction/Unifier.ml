@@ -4,6 +4,7 @@ type unify_kind =
   | FunctionCall
   | Invariant
   | LogicCommand
+  | PredicateGuard
 [@@deriving yojson]
 
 module type S = sig
@@ -74,10 +75,17 @@ module type S = sig
   val produce_assertion : t -> st -> Asrt.t -> (t list, err_t list) result
   val produce : t -> st -> Asrt.t -> (t list, err_t list) result
   val produce_posts : t -> st -> Asrt.t list -> t list
-  val unfold : t -> string -> vt list -> unfold_info_t option -> (st * t) list
-  val rec_unfold : ?fuel:int -> t -> string -> vt list -> t list
-  val unfold_all : t -> string -> t list
-  val unfold_with_vals : t -> vt list -> (st * t) list * bool
+
+  val unfold :
+    ?additional_bindings:unfold_info_t ->
+    t ->
+    string ->
+    vt list ->
+    (st * t, err_t) List_res.t
+
+  val rec_unfold : ?fuel:int -> t -> string -> vt list -> (t, err_t) List_res.t
+  val unfold_all : t -> string -> (t, err_t) List_res.t
+  val unfold_with_vals : t -> vt list -> (st * t) list option
   val unfold_concrete_preds : t -> (st option * t) option
 
   val unify_assertion :
@@ -353,7 +361,7 @@ module Make
 
     let get_pred_def (name : string) : Pred.t =
       match Hashtbl.find_opt pred_defs name with
-      | Some pred -> pred.data
+      | Some pred -> pred.pred
       | None -> failwith "ERROR: get_pred_with_vs: Predicate doesn't exist."
     in
 
@@ -555,11 +563,11 @@ module Make
           let vs = List.map Option.get vs in
           let pred_def = Hashtbl.find pred_defs pname in
           let+ (ostate : t list) =
-            match pred_def.data.pred_facts with
+            match pred_def.pred.pred_facts with
             | [] -> Ok [ astate ]
             | facts ->
                 (* let t = Sys.time () in *)
-                let params, _ = List.split pred_def.data.pred_params in
+                let params, _ = List.split pred_def.pred.pred_params in
                 let params = List.map (fun x -> Expr.PVar x) params in
                 let facts =
                   List.fold_left
@@ -581,7 +589,7 @@ module Make
                    (Sys.time () -. t); *)
                 result
           in
-          let pure = pred_def.data.pred_pure in
+          let pure = pred_def.pred.pred_pure in
           (* FIXME: We could copy only when more than one result, less expensive *)
           List.map
             (fun (state, preds, pred_defs, variants) ->
@@ -763,6 +771,23 @@ module Make
             states @ acc)
       [] asrts
 
+  let complete_subst (subst : ESubst.t) (lab : (string * SS.t) option) : bool =
+    match lab with
+    | None -> true
+    | Some (_, existentials) ->
+        List.fold_left
+          (fun ac x ->
+            let lvar_x = Expr.LVar x in
+            if not (ESubst.mem subst lvar_x) then (
+              let v_x = Val.from_expr lvar_x in
+              match v_x with
+              | None -> false
+              | Some v_x ->
+                  ESubst.put subst lvar_x v_x;
+                  true)
+            else ac)
+          true (SS.elements existentials)
+
   (** [extend_subts_with_bindings unfold_info pred state subst] takes:
       - A state
       - A substitution
@@ -784,14 +809,30 @@ module Make
           m "@[<v 2>Using unfold info, obtained subst:@\n%a@]@\n" ESubst.pp
             subst))
 
-  let unfold
+  let rec unfold
+      ?(additional_bindings = [])
       (astate : t)
       (pname : string)
-      (args : Val.t list)
-      (unfold_info : (string * string) list option) : (ESubst.t * t) list =
-    let state, preds, pred_defs, variants = astate in
+      (args : Val.t list) : (ESubst.t * t, err_t) List_res.t =
+    let _, _, pred_defs, _ = astate in
     let pred = UP.get_pred_def pred_defs pname in
-    let params = List.map (fun (x, _) -> Expr.PVar x) pred.data.pred_params in
+    let params = List.map (fun (x, _) -> Expr.PVar x) pred.pred.pred_params in
+
+    let open List_res.Syntax in
+    let* state, preds, pred_defs, variants =
+      match pred.pred.pred_guard with
+      | None -> Ok [ astate ]
+      | Some _ ->
+          let in_params = Pred.in_params pred.pred in
+          let in_params = List.map (fun x -> Expr.PVar x) in_params in
+          let in_args = Pred.in_args pred.pred args in
+          let subst = ESubst.init (List.combine in_params in_args) in
+          let+ s, _, _ =
+            unify ~is_post:false ~in_unification:true astate subst
+              (Option.get pred.guard_up) PredicateGuard
+          in
+          s
+    in
     L.verbose (fun m ->
         m
           "Combine going to explode. PredName: @[<h>%s@]. Params: @[<h>%a]. \
@@ -805,25 +846,22 @@ module Make
 
     L.(
       verbose (fun m ->
-          m "unfold with unfold_info with:@\n%a@\n" SLCmd.pp_unfold_info
-            unfold_info));
+          m "unfold with unfold_info with additional bindings@\n%a@\n"
+            Fmt.(Dump.list (pair string string))
+            additional_bindings));
 
     let new_spec_vars =
-      match unfold_info with
-      | None -> SS.empty
-      | Some bindings -> SS.of_list (snd (List.split bindings))
+      List.to_seq additional_bindings |> Seq.map snd |> SS.of_seq
     in
-    let () =
-      Option.iter (extend_subst_with_bindings state subst_i) unfold_info
-    in
+    let () = extend_subst_with_bindings state subst_i additional_bindings in
     let definitions =
-      List.map (fun (_, def, _) -> def) pred.data.pred_definitions
+      List.map (fun (_, def, _) -> def) pred.pred.pred_definitions
     in
     let rets =
       match definitions with
       | [] ->
           Fmt.failwith "Cannot Unfold Predicate %s with No Definitions"
-            pred.data.pred_name
+            pred.pred.pred_name
       | first_def :: rest_defs ->
           (* We separate the first case from the rest because we
              only copy the state for the remaining branches if there are more
@@ -878,121 +916,52 @@ module Make
                 Fmt.pf f' "Result %d@\nSTATE:@\n  @[%a@]@\nSUBST:@[<h>%a@]@\n" i
                   pp_astate astate ESubst.pp subst))
           rets);
-    rets
+    Ok rets
 
-  let rec rec_unfold
-      ?(fuel = 10)
-      (astate : t)
-      (pname : string)
-      (args : Val.t list) : t list =
-    if fuel = 0 then failwith "RECURSIVE UNFOLD: OUT OF FUEL"
-    else
-      let _, astates = List.split (unfold astate pname args None) in
-      List.concat_map
-        (fun astate ->
-          let _, preds, _, _ = astate in
-          match Preds.remove_by_name preds pname with
-          | Some (pname, vs) -> rec_unfold ~fuel:(fuel - 1) astate pname vs
-          | None -> [ astate ])
-        astates
-
-  let unfold_all (astate : t) (pname : string) : t list =
-    let _, preds, _, _ = astate in
-    match Preds.remove_by_name preds pname with
-    | None -> [ astate ]
-    | Some (pname, vs) -> rec_unfold astate pname vs
-
-  let unfold_with_vals (astate : t) (vs : Val.t list) :
-      (ESubst.t * t) list * bool =
+  and unfold_with_vals (astate : t) (vs : Val.t list) :
+      (ESubst.t * t) list option =
     L.(
       verbose (fun m ->
           m "@[<v 2>Starting unfold_with_vals: @[<h>%a@]@\n%a.@\n"
             Fmt.(list ~sep:comma Val.pp)
             vs pp_astate astate));
 
-    if !Config.manual_proof then ([ (ESubst.init [], astate) ], false)
+    if !Config.manual_proof then None
     else
       match get_pred_with_vs astate vs with
-      | Some (pname, v_args) ->
+      | Some (pname, v_args) -> (
           L.(verbose (fun m -> m "FOUND STH TO UNFOLD!!!!\n"));
-          let rets = unfold (copy_astate astate) pname v_args None in
-          L.(
-            verbose (fun m ->
-                m "Unfold complete: %s(@[<h>%a@]): %d" pname
-                  Fmt.(list ~sep:comma Val.pp)
-                  v_args (List.length rets)));
-          List.iteri
-            (fun i (subst, astate) ->
+          let rets = unfold (copy_astate astate) pname v_args in
+          match rets with
+          | Ok rets ->
               L.(
                 verbose (fun m ->
-                    m "Result of UNFOLD %d:@\n  @[%a]@\nSubst:@\n  @[%a]@\n" i
-                      pp_astate astate ESubst.pp subst)))
-            rets;
-          (rets, true)
+                    m "Unfold complete: %s(@[<h>%a@]): %d" pname
+                      Fmt.(list ~sep:comma Val.pp)
+                      v_args (List.length rets)));
+              List.iteri
+                (fun i (subst, astate) ->
+                  L.(
+                    verbose (fun m ->
+                        m "Result of UNFOLD %d:@\n  @[%a]@\nSubst:@\n  @[%a]@\n"
+                          i pp_astate astate ESubst.pp subst)))
+                rets;
+              Some rets
+          | Error errs ->
+              L.verbose (fun m ->
+                  m "Unfolding failed in unfold_with_vals: %a"
+                    Fmt.(list ~sep:(any "\n") pp_err_t)
+                    errs);
+              None)
       | None ->
           L.(verbose (fun m -> m "NOTHING TO UNFOLD!!!!\n"));
-          ([ (ESubst.init [], astate) ], false)
-
-  let unfold_concrete_preds (astate : t) : (st option * t) option =
-    let _, preds, pred_defs, _ = astate in
-
-    let is_unfoldable_lit lit =
-      match lit with
-      | Loc _ | LList _ -> false
-      | _ -> true
-    in
-
-    let should_unfold (pname, vs) =
-      let pred = UP.get_pred_def pred_defs pname in
-      Pred.in_args pred.data vs
-      |> List.for_all (fun in_arg ->
-             match Val.to_literal in_arg with
-             | None -> false
-             | Some lit -> is_unfoldable_lit lit)
-    in
-
-    let pred_to_unfold = Preds.pop preds should_unfold in
-    match pred_to_unfold with
-    | Some (name, vs) -> (
-        let next_states = unfold astate name vs None in
-        match next_states with
-        | [] -> None
-        | [ (subst, astate'') ] ->
-            L.(
-              verbose (fun m ->
-                  m "unfold_concrete_preds WORKED. Unfolded: %s(@[<h>%a])" name
-                    Fmt.(list ~sep:comma Val.pp)
-                    vs));
-            Some (Some subst, astate'')
-        | _ ->
-            raise
-              (Failure
-                 "Impossible: pred with concrete ins unfolded to multiple \
-                  states."))
-    | None -> Some (None, astate)
-
-  let complete_subst (subst : ESubst.t) (lab : (string * SS.t) option) : bool =
-    match lab with
-    | None -> true
-    | Some (_, existentials) ->
-        List.fold_left
-          (fun ac x ->
-            let lvar_x = Expr.LVar x in
-            if not (ESubst.mem subst lvar_x) then (
-              let v_x = Val.from_expr lvar_x in
-              match v_x with
-              | None -> false
-              | Some v_x ->
-                  ESubst.put subst lvar_x v_x;
-                  true)
-            else ac)
-          true (SS.elements existentials)
+          None
 
   (** Consumes a predicate from the state.
       If the predicate is not "verbatim" in our set of preds,
       and it is not abstract and we are not in manual mode,
       we attempt to fold it. *)
-  let rec consume_pred
+  and consume_pred
       ?(is_post = false)
       ?(in_unification = false)
       (astate : t)
@@ -1008,7 +977,7 @@ module Make
 
     let state, preds, pred_defs, _ = astate in
     let pred = UP.get_pred_def pred_defs pname in
-    let pred_def = pred.data in
+    let pred_def = pred.pred in
     let pred_pure = pred_def.pred_pure in
     let return = List_res.return in
     (* we attempt to consume the pred as-is from our state. *)
@@ -1047,12 +1016,12 @@ module Make
            Interestingly, if the predicate has a guard, this will produce it but not remove it. *)
         let () =
           L.verbose (fun fmt ->
-              fmt "Auto-folding predicate: %s\n" pred.data.pred_name)
+              fmt "Auto-folding predicate: %s\n" pred.pred.pred_name)
         in
         L.verbose (fun m -> m "Recursive case - attempting to fold.");
 
         let open List_res.Syntax in
-        let vs_ins = Pred.in_args pred.data vs in
+        let vs_ins = Pred.in_args pred.pred vs in
         let vs_ins = List.map Option.get vs_ins in
         let* folded =
           fold ~is_post ~in_unification ~state:astate ~unify_kind:Fold pred
@@ -1294,7 +1263,7 @@ module Make
               let vs = List.map (subst_in_expr_opt astate subst) les in
               (* Get the ins of the predicate *)
               let pred = UP.get_pred_def pred_defs pname in
-              let pred_def = pred.data in
+              let pred_def = pred.pred in
               let vs_ins = Pred.in_args pred_def vs in
               let les_outs = Pred.out_args pred_def les in
               (* All of which must have survived substitution *)
@@ -1621,7 +1590,8 @@ module Make
             L.verbose (fun fmt -> fmt "Unifier.unify: Success");
             ret
         | Error errs
-          when !Config.unfolding && State.can_fix errs && not in_unification ->
+          when !Config.unfolding && State.can_fix errs && not in_unification
+          -> (
             L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
             let state, _, _, _ = astate_i in
             let vals = State.get_recovery_vals state errs in
@@ -1632,21 +1602,21 @@ module Make
                      to unfold. Looking for: @[<h>%a@]"
                     Fmt.(list ~sep:comma Val.pp)
                     vals));
-            let sp, worked = unfold_with_vals astate_i vals in
-            if not worked then (
-              L.normal (fun m -> m "Unify. No predicates found to unfold.");
-              Error errs)
-            else (
-              L.verbose (fun m ->
-                  m "Unfolding successful: %d results" (List.length sp));
-              let open List_res.Syntax in
-              let* _, astate = Ok sp in
-              match unfold_concrete_preds astate with
-              | None -> Error []
-              | Some (_, astate) ->
-                  (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
-                  let subst'' = ESubst.copy subst_i in
-                  unify_up ~is_post ([ (astate, subst'', up) ], []))
+            match unfold_with_vals astate_i vals with
+            | None ->
+                L.normal (fun m -> m "Unify. No predicates found to unfold.");
+                Error errs
+            | Some sp -> (
+                L.verbose (fun m ->
+                    m "Unfolding successful: %d results" (List.length sp));
+                let open List_res.Syntax in
+                let* _, astate = Ok sp in
+                match unfold_concrete_preds astate with
+                | None -> Error []
+                | Some (_, astate) ->
+                    (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
+                    let subst'' = ESubst.copy subst_i in
+                    unify_up ~is_post ([ (astate, subst'', up) ], [])))
         | Error _ ->
             L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
             ret)
@@ -1659,22 +1629,22 @@ module Make
       ~(state : t)
       (pred : UP.pred)
       (args : vt list) : (t, err_t) List_res.t =
-    let pred_name = pred.data.pred_name in
+    let pred_name = pred.pred.pred_name in
     L.verbose (fun fmt -> fmt "Folding predicate: %s\n" pred_name);
-    if pred.data.pred_abstract then
+    if pred.pred.pred_abstract then
       Fmt.failwith "Impossible: Folding abstract predicate %s" pred_name;
-    L.verbose (fun m -> m "Predicate unification plan: %a" UP.pp pred.up);
-    let params = List.map (fun (x, _) -> x) pred.data.pred_params in
+    L.verbose (fun m -> m "Predicate unification plan: %a" UP.pp pred.def_up);
+    let params = List.map (fun (x, _) -> x) pred.pred.pred_params in
     let param_bindings =
       if List.compare_lengths params args = 0 then List.combine params args
-      else List.combine (Pred.in_params pred.data) args
+      else List.combine (Pred.in_params pred.pred) args
     in
     let param_bindings =
       List.map (fun (x, v) -> (Expr.PVar x, v)) param_bindings
     in
     let subst = ESubst.init (additional_bindings @ param_bindings) in
     let unify_result =
-      unify ~is_post ~in_unification state subst pred.up unify_kind
+      unify ~is_post ~in_unification state subst pred.def_up unify_kind
     in
     let () =
       match unify_result with
@@ -1692,7 +1662,7 @@ module Make
     let arg_vs =
       if List.compare_lengths params args = 0 then args
       else
-        let out_params = Pred.out_params pred.data in
+        let out_params = Pred.out_params pred.pred in
         let vs_outs =
           List.map
             (fun x ->
@@ -1707,13 +1677,78 @@ module Make
               m "Out parameters : @[<h>%a@]"
                 Fmt.(list ~sep:comma Val.pp)
                 vs_outs));
-        Pred.combine_ins_outs pred.data args vs_outs
+        Pred.combine_ins_outs pred.pred args vs_outs
     in
     (* We extend the list of predicates with our newly folded predicate. *)
-    Preds.extend ~pure:pred.data.pred_pure preds' (pred_name, arg_vs);
+    Preds.extend ~pure:pred.pred.pred_pure preds' (pred_name, arg_vs);
     (* If the predicate has a guard, we also produce it in our state,
        otherwise we return the just current state *)
-    match pred.data.pred_guard with
+    match pred.pred.pred_guard with
     | None -> List_res.return astate'
     | Some guard -> produce astate' subst' guard
+
+  and unfold_concrete_preds (astate : t) : (st option * t) option =
+    let _, preds, pred_defs, _ = astate in
+
+    let is_unfoldable_lit lit =
+      match lit with
+      | Loc _ | LList _ -> false
+      | _ -> true
+    in
+
+    let should_unfold (pname, vs) =
+      (* Find a predicate with only concrete args
+         and without a guard. *)
+      let pred = UP.get_pred_def pred_defs pname in
+      Option.is_none pred.pred.pred_guard
+      && Pred.in_args pred.pred vs
+         |> List.for_all (fun in_arg ->
+                match Val.to_literal in_arg with
+                | None -> false
+                | Some lit -> is_unfoldable_lit lit)
+    in
+
+    let pred_to_unfold = Preds.pop preds should_unfold in
+    match pred_to_unfold with
+    | Some (name, vs) -> (
+        let next_states = unfold astate name vs in
+        match next_states with
+        | Ok [] -> None
+        | Ok [ (subst, astate'') ] ->
+            L.(
+              verbose (fun m ->
+                  m "unfold_concrete_preds WORKED. Unfolded: %s(@[<h>%a])" name
+                    Fmt.(list ~sep:comma Val.pp)
+                    vs));
+            Some (Some subst, astate'')
+        | Ok _ ->
+            failwith
+              "Impossible: pred with concrete ins unfolded to multiple states."
+        | Error errs ->
+            Fmt.failwith
+              "Impossible: pred with concrete ins and no guard failed to \
+               unfold with errors: %a"
+              Fmt.(Dump.list pp_err_t)
+              errs)
+    | None -> Some (None, astate)
+
+  let rec rec_unfold
+      ?(fuel = 10)
+      (astate : t)
+      (pname : string)
+      (args : Val.t list) : (t, err_t) List_res.t =
+    if fuel = 0 then failwith "RECURSIVE UNFOLD: OUT OF FUEL"
+    else
+      let open List_res.Syntax in
+      let* _, astate = unfold astate pname args in
+      let _, preds, _, _ = astate in
+      match Preds.remove_by_name preds pname with
+      | Some (pname, vs) -> rec_unfold ~fuel:(fuel - 1) astate pname vs
+      | None -> List_res.return astate
+
+  let unfold_all (astate : t) (pname : string) : (t, err_t) List_res.t =
+    let _, preds, _, _ = astate in
+    match Preds.remove_by_name preds pname with
+    | None -> List_res.return astate
+    | Some (pname, vs) -> rec_unfold astate pname vs
 end

@@ -30,9 +30,9 @@ type t =
 [@@deriving yojson]
 
 type 'a with_up = { up : t; data : 'a }
-type pred = Pred.t with_up
 type spec = Spec.t with_up
 type lemma = Lemma.t with_up
+type pred = { pred : Pred.t; def_up : t; guard_up : t option }
 
 type 'annot prog = {
   preds : (string, pred) Hashtbl.t;
@@ -947,7 +947,7 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
         | Ok up ->
             L.verbose (fun m ->
                 m "Successfully created UP of predicate %s:\n%a" name pp up);
-            Hashtbl.replace u_preds name { data = pred; up })
+            Hashtbl.replace u_preds name { pred; def_up = up; guard_up = None })
       preds;
     Ok u_preds
   with UPError e -> Error e
@@ -968,7 +968,7 @@ let init_prog ?preds_tbl (prog : ('a, int) Prog.t) : ('a prog, up_err_t) result
       let pred_ins =
         Hashtbl.fold
           (fun name (pred : pred) pred_ins ->
-            Hashtbl.add pred_ins name pred.data.pred_ins;
+            Hashtbl.add pred_ins name pred.pred.pred_ins;
             pred_ins)
           preds_tbl
           (Hashtbl.create Config.medium_tbl_size)
@@ -1030,15 +1030,15 @@ let rec pp_asrt
       | None -> (
           try
             let pred = get_pred_def preds name in
-            let out_params = Pred.out_params pred.data in
-            let out_args = Pred.out_args pred.data args in
-            let in_args = Pred.in_args pred.data args in
+            let out_params = Pred.out_params pred.pred in
+            let out_args = Pred.out_args pred.pred args in
+            let in_args = Pred.in_args pred.pred args in
             let out_params_args = List.combine out_params out_args in
             let pp_out_params_args fmt (x, e) =
               Fmt.pf fmt "@[<h>%s: %a@]" x Expr.pp e
             in
             Fmt.pf fmt "%s(@[<h>%a@])" name
-              (Pred.pp_ins_outs pred.data Expr.pp pp_out_params_args)
+              (Pred.pp_ins_outs pred.pred Expr.pp pp_out_params_args)
               (in_args, out_params_args)
           with _ -> Asrt.pp fmt a))
   | a -> Asrt.pp fmt a
@@ -1100,7 +1100,7 @@ let add_spec (prog : 'a prog) (spec : Spec.t) : unit =
   let pred_ins =
     Hashtbl.fold
       (fun name (pred : pred) pred_ins ->
-        Hashtbl.add pred_ins name pred.data.pred_ins;
+        Hashtbl.add pred_ins name pred.pred.pred_ins;
         pred_ins)
       prog.preds
       (Hashtbl.create Config.medium_tbl_size)
@@ -1188,5 +1188,5 @@ let first_time_running (prog : 'a prog) (proc_name : string) (index : int) :
   not (Hashtbl.mem prog.coverage (proc_name, index))
 
 let pp_pred_defs fmt pred_defs =
-  let pp_binding fmt (_, up_pred) = Pred.pp fmt up_pred.data in
+  let pp_binding fmt (_, up_pred) = Pred.pp fmt up_pred.pred in
   Fmt.(hashtbl ~sep:(any "@\n") pp_binding) fmt pred_defs

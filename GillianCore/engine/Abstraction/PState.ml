@@ -183,23 +183,21 @@ module Make
            match (!Config.unfolding && unfold, Val.to_expr v) with
            | _, Lit (Bool true) -> [ astate' ]
            | false, _ -> [ astate' ]
-           | true, _ ->
+           | true, _ -> (
                let unfold_vals = Expr.base_elements (Val.to_expr v) in
                let unfold_vals = List.map Val.from_expr unfold_vals in
                let unfold_vals =
                  List.map Option.get
                    (List.filter (fun x -> x <> None) unfold_vals)
                in
-               let next_states, worked =
-                 SUnifier.unfold_with_vals astate' unfold_vals
-               in
-               if not worked then [ astate' ]
-               else
-                 List.concat_map
-                   (fun (_, astate) ->
-                     let _, astates = simplify ~kill_new_lvars:false astate in
-                     astates)
-                   next_states)
+               match SUnifier.unfold_with_vals astate' unfold_vals with
+               | None -> [ astate' ]
+               | Some next_states ->
+                   List.concat_map
+                     (fun (_, astate) ->
+                       let _, astates = simplify ~kill_new_lvars:false astate in
+                       astates)
+                     next_states))
          (State.assume ~unfold state v))
 
   let assume_a
@@ -482,7 +480,7 @@ module Make
     List.iter
       (fun (name, vs) ->
         let pred_def = Hashtbl.find pred_defs name in
-        if not pred_def.data.pred_pure then
+        if not pred_def.pred.pred_pure then
           let _ =
             Preds.pop preds (fun (name', vs') -> name' = name && vs' = vs)
           in
@@ -786,55 +784,51 @@ module Make
           in
           SUnifier.fold ~additional_bindings ~unify_kind:LogicCommand
             ~state:astate pred vs
-      | Unfold (pname, les, unfold_info, b) -> (
+      | Unfold (pname, les, additional_bindings, b) ->
           (* Unfoldig predicate with name [pname] and arguments [les].
              [unfold_info] is (FIXME: ???)
              and [b] says if the predicate should be unfolded entirely (up to 10 times, otherwise failure) *)
           (* 1) We retrieve the definition of the predicate to unfold and make sure
              it is not abstract and hence can be unfolded. *)
+          let open List_res.Syntax in
           let pred = UP.get_pred_def prog.preds pname in
-          if pred.data.pred_abstract then
+          if pred.pred.pred_abstract then
             Fmt.failwith "Impossible: Unfold of abstract predicate %s" pname;
           (* 2) We evaluate the arguments, filter to keep only the in-parameters
              (which are sufficient to trigger the unfold) *)
           let vs = List.map eval_expr les in
-          let vs_ins = Pred.in_args pred.data vs in
+          let vs_ins = Pred.in_args pred.pred vs in
           let vs = List.map (fun x -> Some x) vs in
           (* FIXME: make sure correct number of params *)
           (* 3) We consume the predicate from the state. *)
-          match SUnifier.consume_pred astate pname vs None with
-          | Ok [] -> Fmt.failwith "HORROR - unfold vanished: %a" SLCmd.pp lcmd
-          | Ok succs ->
-              let ( let* ) x f = List.concat_map f x in
-              let astates =
-                let* _, vs' = succs in
-                L.verbose (fun m ->
-                    m "@[<h>Returned values: %a@]"
-                      Fmt.(list ~sep:comma Val.pp)
-                      vs');
-                let vs = Pred.combine_ins_outs pred.data vs_ins vs' in
-                L.verbose (fun m ->
-                    m "@[<h>LCMD Unfold about to happen with rec %b info: %a@]"
-                      b SLCmd.pp_unfold_info unfold_info);
-                if b then SUnifier.rec_unfold astate pname vs
-                else (
-                  L.verbose (fun m ->
-                      m "@[<h>Values: %a@]" Fmt.(list ~sep:comma Val.pp) vs);
-                  let* _, state = SUnifier.unfold astate pname vs unfold_info in
-                  let _, states =
-                    simplify ~kill_new_lvars:true ~unification:true state
-                  in
-                  states)
-              in
-              Ok astates
-          | Error errors -> Error errors)
-      | GUnfold pname ->
-          let astates = SUnifier.unfold_all astate pname in
-          let astates =
-            List.concat_map
-              (fun astate -> snd (simplify ~kill_new_lvars:true astate))
-              astates
+          let cons_res = SUnifier.consume_pred astate pname vs None in
+          let () =
+            match cons_res with
+            | Ok [] -> Fmt.failwith "HORROR - unfold vanished: %a" SLCmd.pp lcmd
+            | _ -> ()
           in
+          let* _, vs' = cons_res in
+          L.verbose (fun m ->
+              m "@[<h>Returned values: %a@]" Fmt.(list ~sep:comma Val.pp) vs');
+          let vs = Pred.combine_ins_outs pred.pred vs_ins vs' in
+          L.verbose (fun m ->
+              m "@[<h>LCMD Unfold about to happen with rec %b info: %a@]" b
+                SLCmd.pp_unfold_info additional_bindings);
+          if b then SUnifier.rec_unfold astate pname vs
+          else (
+            L.verbose (fun m ->
+                m "@[<h>Values: %a@]" Fmt.(list ~sep:comma Val.pp) vs);
+            let* _, state =
+              SUnifier.unfold ?additional_bindings astate pname vs
+            in
+            let _, states =
+              simplify ~kill_new_lvars:true ~unification:true state
+            in
+            Ok states)
+      | GUnfold pname ->
+          let open List_res.Syntax in
+          let* astate = SUnifier.unfold_all astate pname in
+          let _, astates = simplify ~kill_new_lvars:true astate in
           Ok astates
       | SepAssert (a, binders) -> (
           if not (List.for_all Names.is_lvar_name binders) then
@@ -1158,7 +1152,7 @@ module Make
   let set_pred (astate : t) (pred : abs_t) : unit =
     let _, preds, preds_table, _ = astate in
     let pred_name, _ = pred in
-    let pure = (Hashtbl.find preds_table pred_name).data.pred_pure in
+    let pure = (Hashtbl.find preds_table pred_name).pred.pred_pure in
     Preds.extend ~pure preds pred
 
   let update_subst (astate : t) (subst : st) : unit =
@@ -1199,9 +1193,9 @@ module Make
     State.get_recovery_vals state vs
 
   let automatic_unfold (astate : t) (rvs : vt list) : (t list, string) result =
-    let next_states, worked = SUnifier.unfold_with_vals astate rvs in
-    if not worked then Error "Automatic unfold failed"
-    else Ok (List.map (fun (_, astate) -> astate) next_states)
+    match SUnifier.unfold_with_vals astate rvs with
+    | None -> Error "Automatic unfold failed"
+    | Some next_states -> Ok (List.map (fun (_, astate) -> astate) next_states)
 
   let get_failing_constraint = State.get_failing_constraint
   let can_fix = State.can_fix
