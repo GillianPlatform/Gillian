@@ -67,7 +67,7 @@ module type S = sig
     end
   end
 
-  type gp_ret = ((t * vt list) list, err_t list) result
+  type gp_ret = (t * vt list, err_t) List_res.t
   type u_res = UWTF | USucc of t | UFail of err_t list
   type unfold_info_t = (string * string) list
 
@@ -91,6 +91,16 @@ module type S = sig
     UP.t ->
     unify_kind ->
     up_u_res
+
+  val fold :
+    ?is_post:bool ->
+    ?in_unification:bool ->
+    ?additional_bindings:(Expr.t * vt) list ->
+    unify_kind:unify_kind ->
+    state:t ->
+    UP.pred ->
+    vt list ->
+    (t, err_t) List_res.t
 
   val consume_pred :
     ?is_post:bool ->
@@ -136,37 +146,9 @@ module Make
   type search_state = s_state list * err_t list
   type search_state' = (s_state * int * bool) list * err_t list
   type unfold_info_t = (string * string) list
-  type gp_ret = ((t * vt list) list, err_t list) result
+  type gp_ret = (t * vt list, err_t) List_res.t
   type u_res = UWTF | USucc of t | UFail of err_t list
-  type up_u_res = ((t * st * post_res) list, err_t list) result
-
-  (* This module implements what could be called the "verification" monad.
-     Each step may branch, but if any branch fails, then the entirety of the
-     process fails. *)
-  module List_res = struct
-    type nonrec 'a t = ('a list, err_t list) result
-
-    let return (v : 'a) : 'a t = Ok [ v ]
-
-    let bind (x : 'a t) (f : 'a -> 'b t) : 'b t =
-      match x with
-      | Error errs -> Error errs
-      | Ok l ->
-          (* Could be using rev_append to make it more efficient,
-             but I think the lists are usually tiny here *)
-          List.fold_left
-            (fun acc x ->
-              match (acc, f x) with
-              | Ok l, Ok l' -> Ok (l @ l')
-              | Error l, Error l' -> Error (l @ l')
-              | Ok _, (Error _ as err) -> err
-              | (Error _ as err), Ok _ -> err)
-            (Ok []) l
-
-    module Syntax = struct
-      let ( let* ) = bind
-    end
-  end
+  type up_u_res = (t * st * post_res, err_t) List_res.t
 
   module Logging = struct
     let pp_variants : (string * Expr.t option) Fmt.t =
@@ -1012,7 +994,7 @@ module Make
       we attempt to fold it. *)
   let rec consume_pred
       ?(is_post = false)
-      ?(in_unification : bool option)
+      ?(in_unification = false)
       (astate : t)
       (pname : string)
       (vs : vt option list)
@@ -1059,58 +1041,27 @@ module Make
             | Ok () -> return (astate, vs)
             | Error fail_pf ->
                 Error [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ]))
-    | None when (not !Config.manual_proof) && not pred_def.pred_abstract -> (
+    | None when (not !Config.manual_proof) && not pred_def.pred_abstract ->
         (* Recursive Case - Folding required *)
+        (* The predicate will be folded (if possible) and then removed from the state.
+           Interestingly, if the predicate has a guard, this will produce it but not remove it. *)
         let () =
           L.verbose (fun fmt ->
               fmt "Auto-folding predicate: %s\n" pred.data.pred_name)
         in
         L.verbose (fun m -> m "Recursive case - attempting to fold.");
-        (* FIXME: the folding is done manually! The logic should be factored out from here
-           and PState.evaluate_slcmd.Fold *)
-        (* 1) We get the UP for that predicate *)
-        let up = pred.up in
-        L.verbose (fun m -> m "Predicate unification plan: %a" UP.pp up);
-        (* 2) We create our initial substitution *)
-        let param_ins = Pred.in_params pred.data in
-        let param_ins = List.map (fun x -> Expr.PVar x) param_ins in
+
+        let open List_res.Syntax in
         let vs_ins = Pred.in_args pred.data vs in
         let vs_ins = List.map Option.get vs_ins in
-        let subst = ESubst.init (List.combine param_ins vs_ins) in
-        (* 3) We unify ag*)
-        let open List_res.Syntax in
-        let* astate', subst', _ =
-          unify ~is_post ?in_unification astate subst up Fold
+        let* folded =
+          fold ~is_post ~in_unification ~state:astate ~unify_kind:Fold pred
+            vs_ins
         in
-        L.verbose (fun m -> m "Recursive fold success.");
-        let out_params = Pred.out_params pred_def in
-        let out_params = List.map (fun x -> Expr.PVar x) out_params in
-        let vs_outs = List.map (ESubst.get subst') out_params in
-        L.(
-          verbose (fun m ->
-              m "Out parameters : @[<h>%a@]"
-                Fmt.(list ~sep:comma (option ~none:(any "None") Val.pp))
-                vs_outs));
-        let failure = List.exists Option.is_none vs_outs in
-        if failure then Error [ StateErr.EAsrt (vs_ins, True, []) ]
-        else
-          let vs = List.map Option.get vs_outs in
-          match fold_outs_info with
-          | None -> return (astate', vs)
-          | Some (subst, step, outs, les_outs) -> (
-              L.(
-                verbose (fun m ->
-                    m
-                      "learned the outs of a predicate. going to unify \
-                       (@[<h>%a@]) against (@[<h>%a@])!!!@\n"
-                      Fmt.(list ~sep:comma Val.pp)
-                      vs
-                      Fmt.(list ~sep:comma Expr.pp)
-                      les_outs));
-              match unify_ins_outs_lists state subst step outs vs les_outs with
-              | Ok () -> return (astate', vs)
-              | Error fail_pf ->
-                  Error [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ]))
+        (* Supposedly, we don't need a guard to make sure we're not looping indefinitely:
+           if the fold worked, then consume_pred should not take this branch on the next try.
+           We should still be keeping an eye on this in case something loops indefinitely. *)
+        consume_pred ~is_post ~in_unification folded pname vs fold_outs_info
     | _ -> Error [ StateErr.EPure False ]
 
   and unify_ins_outs_lists
@@ -1699,4 +1650,70 @@ module Make
         | Error _ ->
             L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
             ret)
+
+  and fold
+      ?(is_post = false)
+      ?(in_unification = false)
+      ?(additional_bindings = [])
+      ~unify_kind
+      ~(state : t)
+      (pred : UP.pred)
+      (args : vt list) : (t, err_t) List_res.t =
+    let pred_name = pred.data.pred_name in
+    L.verbose (fun fmt -> fmt "Folding predicate: %s\n" pred_name);
+    if pred.data.pred_abstract then
+      Fmt.failwith "Impossible: Folding abstract predicate %s" pred_name;
+    L.verbose (fun m -> m "Predicate unification plan: %a" UP.pp pred.up);
+    let params = List.map (fun (x, _) -> x) pred.data.pred_params in
+    let param_bindings =
+      if List.compare_lengths params args = 0 then List.combine params args
+      else List.combine (Pred.in_params pred.data) args
+    in
+    let param_bindings =
+      List.map (fun (x, v) -> (Expr.PVar x, v)) param_bindings
+    in
+    let subst = ESubst.init (additional_bindings @ param_bindings) in
+    let unify_result =
+      unify ~is_post ~in_unification state subst pred.up unify_kind
+    in
+    let () =
+      match unify_result with
+      | Ok [] ->
+          Fmt.(
+            failwith "@[<h>HORROR: fold vanished for %s(%a) with bindings: %a@]"
+              pred_name (Dump.list Val.pp) args
+              (Dump.list @@ Dump.pair Expr.pp Val.pp)
+              additional_bindings)
+      | _ -> ()
+    in
+    let open List_res.Syntax in
+    let* astate', subst', _ = unify_result in
+    let _, preds', _, _ = astate' in
+    let arg_vs =
+      if List.compare_lengths params args = 0 then args
+      else
+        let out_params = Pred.out_params pred.data in
+        let vs_outs =
+          List.map
+            (fun x ->
+              match ESubst.get subst' (PVar x) with
+              | Some v_x -> v_x
+              | None ->
+                  failwith "DEATH. Didnt learn all the outs while folding.")
+            out_params
+        in
+        L.(
+          verbose (fun m ->
+              m "Out parameters : @[<h>%a@]"
+                Fmt.(list ~sep:comma Val.pp)
+                vs_outs));
+        Pred.combine_ins_outs pred.data args vs_outs
+    in
+    (* We extend the list of predicates with our newly folded predicate. *)
+    Preds.extend ~pure:pred.data.pred_pure preds' (pred_name, arg_vs);
+    (* If the predicate has a guard, we also produce it in our state,
+       otherwise we return the just current state *)
+    match pred.data.pred_guard with
+    | None -> List_res.return astate'
+    | Some guard -> produce astate' subst' guard
 end

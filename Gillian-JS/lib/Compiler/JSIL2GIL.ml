@@ -186,7 +186,7 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
         (fun (info, asrt) -> (info, jsil2gil_asrt asrt, []))
         pred.definitions;
     pred_facts = List.map jsil2gil_formula pred.facts;
-    pred_cost = None;
+    pred_guard = None;
     (* TODO: Support for predicates with tokens *)
     pred_pure = pred.pure;
     pred_abstract = pred.abstract;

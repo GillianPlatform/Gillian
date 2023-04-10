@@ -9,7 +9,7 @@ type t = TypeDef__.pred = {
     ((string * string list) option * Asrt.t * string list) list;
       (** Predicate definitions  *)
   pred_facts : Formula.t list;  (** Facts that hold for every definition *)
-  pred_cost : Asrt.t option;  (** Cost for unfolding the predicate *)
+  pred_guard : Asrt.t option;  (** Cost for unfolding the predicate *)
   pred_pure : bool;  (** Is the predicate pure  *)
   pred_abstract : bool;  (** Is the predicate abstract *)
   pred_nounfold : bool;  (** Should the predicate be unfolded automatically *)

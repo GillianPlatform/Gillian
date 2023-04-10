@@ -273,7 +273,7 @@ let gen_pred_of_struct cenv ann struct_name =
         pred_num_params;
         pred_params;
         pred_facts = [ (* FIXME: there are probably some facts to get *) ];
-        pred_cost = None;
+        pred_guard = None;
         pred_pure = false;
         pred_abstract = false;
         pred_nounfold = false;
@@ -697,7 +697,7 @@ let trans_abs_pred ~filepath cl_pred =
       pred_ins;
       pred_definitions = [];
       pred_facts = [];
-      pred_cost = None;
+      pred_guard = None;
       pred_pure;
       pred_abstract = true;
       pred_nounfold = true;
@@ -738,7 +738,7 @@ let trans_pred ~ann ~filepath cl_pred =
       pred_definitions;
       (* FIXME: ADD SUPPORT FOR FACTS *)
       pred_facts = [];
-      pred_cost = None;
+      pred_guard = None;
       pred_pure;
       pred_abstract = false;
       pred_nounfold = no_unfold;
@@ -1072,7 +1072,7 @@ let gen_rec_pred_of_struct cenv ann struct_name =
         pred_params;
         pred_facts = [];
         pred_pure = false;
-        pred_cost = None;
+        pred_guard = None;
         pred_abstract = false;
         pred_nounfold = false;
         pred_normalised = false;
@@ -1091,7 +1091,7 @@ let gen_rec_pred_of_struct cenv ann struct_name =
         pred_num_params = 1;
         pred_params = [ (opt_param_name, Some Type.ListType) ];
         pred_facts = [];
-        pred_cost = None;
+        pred_guard = None;
         pred_pure = false;
         pred_abstract = false;
         pred_nounfold = false;

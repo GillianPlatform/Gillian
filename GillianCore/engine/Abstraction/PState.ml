@@ -772,73 +772,20 @@ module Make
         raise (Internal_State_Error (errs, astate))
     in
 
-    let result : (t list, err_t list) result =
+    let result : (t, err_t) List_res.t =
       match lcmd with
       | SymbExec -> failwith "Impossible: Untreated SymbExec"
-      | Fold (pname, les, folding_info) -> (
-          let () = L.verbose (fun fmt -> fmt "Folding predicate: %s\n" pname) in
+      | Fold (pname, les, fold_info) ->
+          let vs = List.map eval_expr les in
           let pred = UP.get_pred_def prog.preds pname in
-          if pred.data.pred_abstract then
-            raise
-              (Failure
-                 (Format.asprintf "Impossible: Fold of abstract predicate %s"
-                    pname))
-          else
-            let vs = List.map eval_expr les in
-            let params = List.map (fun (x, _) -> x) pred.data.pred_params in
-            let i_bindings =
-              Option.fold
-                ~some:(fun (_, bindings) ->
-                  List.map (fun (x, e) -> (Expr.LVar x, eval_expr e)) bindings)
-                ~none:[] folding_info
-            in
-            let param_bindings =
-              if List.length params = List.length vs then List.combine params vs
-              else List.combine (Pred.in_params pred.data) vs
-            in
-            let param_bindings =
-              List.map (fun (x, v) -> (Expr.PVar x, v)) param_bindings
-            in
-            let subst = ESubst.init (i_bindings @ param_bindings) in
-            match SUnifier.unify astate subst pred.up LogicCommand with
-            | Ok [] ->
-                let msg =
-                  Fmt.str
-                    "@[<h>HORROR: fold vanished for %s(%a) with folding_info: \
-                     %a@]"
-                    pname
-                    Fmt.(list ~sep:comma Val.pp)
-                    vs SLCmd.pp_folding_info folding_info
-                in
-                failwith msg
-            | Ok succs ->
-                let astates =
-                  succs
-                  |> List.map (fun (astate', subst', _) ->
-                         let _, preds', _, _ = astate' in
-                         let arg_vs =
-                           if List.length params = List.length vs then vs
-                           else
-                             let out_params = Pred.out_params pred.data in
-                             let vs_outs =
-                               List.map
-                                 (fun x ->
-                                   let v_x = ESubst.get subst' (PVar x) in
-                                   match v_x with
-                                   | Some v_x -> v_x
-                                   | None ->
-                                       raise
-                                         (Failure "DEATH. evaluate_slcmd. fold"))
-                                 out_params
-                             in
-                             Pred.combine_ins_outs pred.data vs vs_outs
-                         in
-                         Preds.extend ~pure:pred.data.pred_pure preds'
-                           (pname, arg_vs);
-                         astate')
-                in
-                Ok astates
-            | Error e -> Error e)
+          let additional_bindings =
+            Option.fold
+              ~some:(fun (_, bindings) ->
+                List.map (fun (x, e) -> (Expr.LVar x, eval_expr e)) bindings)
+              ~none:[] fold_info
+          in
+          SUnifier.fold ~additional_bindings ~unify_kind:LogicCommand
+            ~state:astate pred vs
       | Unfold (pname, les, unfold_info, b) -> (
           (* Unfoldig predicate with name [pname] and arguments [les].
              [unfold_info] is (FIXME: ???)

@@ -98,6 +98,19 @@ module type S = sig
     unify_kind ->
     up_u_res
 
+  (** Folds a predicate in the state, consuming its definition and
+      producing the folded predicate.
+      If the predicate has a guard, the guard is produced. *)
+  val fold :
+    ?is_post:bool ->
+    ?in_unification:bool ->
+    ?additional_bindings:(Expr.t * vt) list ->
+    unify_kind:unify_kind ->
+    state:t ->
+    UP.pred ->
+    vt list ->
+    (t, err_t) List_res.t
+
   (** Consumes a predicate from the state.
       If the predicate is not "verbatim" in our set of preds,
       and it is not abstract and we are not in manual mode,

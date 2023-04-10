@@ -214,7 +214,7 @@ and pred = {
   pred_definitions :
     ((string * string list) option * assertion * string list) list;
   pred_facts : formula list;
-  pred_cost : assertion option;
+  pred_guard : assertion option;
   pred_pure : bool;
   pred_abstract : bool;
   pred_nounfold : bool;

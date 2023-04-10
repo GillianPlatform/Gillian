@@ -900,7 +900,7 @@ let compile_pred filepath pred =
       pred_normalised = false;
       (* FIXME: ADD SUPPORT FOR FACTS, COST, ABSTRACT, PURE *)
       pred_facts = [];
-      pred_cost = None;
+      pred_guard = None;
       pred_abstract = false;
       pred_pure = false;
       pred_nounfold = pred.pred_nounfold;

@@ -27,7 +27,7 @@ let rec auto_unfold
     when (Hashtbl.find rec_tbl name && not unfold_rec_predicates)
          ||
          let pred = Hashtbl.find predicates name in
-         pred.pred_nounfold || Option.is_some pred.pred_cost -> [ asrt ]
+         pred.pred_nounfold || Option.is_some pred.pred_guard -> [ asrt ]
   | Pred (name, args) when Hashtbl.mem unfolded_preds name ->
       L.verbose (fun fmt ->
           fmt "Unfolding predicate: %s with nounfold %b" name

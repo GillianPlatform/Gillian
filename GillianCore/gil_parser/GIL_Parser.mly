@@ -808,7 +808,7 @@ g_pred_target:
   pred_definitions = option(g_pred_def_target);
   SCOLON
   pred_facts=option(g_pred_facts_target);
-  pred_cost=option(g_pred_cost_target);
+  pred_guard=option(g_pred_cost_target);
   {
     let pred_abstract = Option.is_some abstract in
     let pred_pure = Option.is_some pure in
@@ -834,7 +834,7 @@ g_pred_target:
         pred_ins;
         pred_definitions;
         pred_facts;
-        pred_cost;
+        pred_guard;
         pred_pure;
         pred_abstract;
         pred_nounfold;
