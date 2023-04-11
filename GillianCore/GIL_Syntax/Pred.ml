@@ -321,3 +321,17 @@ let empty_pred_tbl () = Hashtbl.create Config.small_tbl_size
 let get (pred_defs : (string, t) Hashtbl.t) (name : string) : t =
   try Hashtbl.find pred_defs name
   with _ -> raise (Failure "DEATH. PRED NOT FOUND!")
+
+(* Given a predicate name, if it is a guarded predicate, returns the name of the
+   closing token. *)
+let close_token_name (pred : t) : string =
+  if Option.is_none pred.pred_guard then
+    failwith "close_token_name called on non-guarded predicate";
+  pred.pred_name ^ "€close"
+
+let close_token_call (pred : t) : Asrt.t =
+  let name = close_token_name pred in
+  let args =
+    in_args pred pred.pred_params |> List.map (fun (x, _t) -> Expr.PVar x)
+  in
+  Asrt.Pred (name, args)

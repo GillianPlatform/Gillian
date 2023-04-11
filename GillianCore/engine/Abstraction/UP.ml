@@ -934,6 +934,11 @@ let init_preds (preds : (string, Pred.t) Hashtbl.t) :
               let lab' =
                 Option.map (fun (s, vars) -> (s, SS.of_list vars)) lab
               in
+              let def =
+                if Option.is_some pred.pred_guard then
+                  Asrt.Star (def, Pred.close_token_call pred)
+                else def
+              in
               (def, (lab', None, hides)))
             pred.pred_definitions
         in

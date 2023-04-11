@@ -826,6 +826,14 @@ module Pred : sig
 
   (** Retrieves a predicate definition by name *)
   val get : (string, t) Hashtbl.t -> string -> t
+
+  (** Given a guarded predicate, return the name of its close token.
+      Fails if the predicate isn't guarded. *)
+  val close_token_name : t -> string
+
+  (** Given a guarded predicate, return a "call" to its close token.
+      The arguments given are PVars with the same name as the ins of the predicate. *)
+  val close_token_call : t -> Asrt.t
 end
 
 (** @canonical Gillian.Gil_syntax.Lemma *)
