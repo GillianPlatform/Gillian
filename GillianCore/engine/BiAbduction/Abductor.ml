@@ -52,6 +52,11 @@ module Make
     in
     SSubst.init bindings'
 
+  let rec filter_ret_variable = function
+    | Asrt.Pure (Eq (PVar "ret", _) as p) -> [ Asrt.Pure p ]
+    | Asrt.Star (a, b) -> filter_ret_variable a @ filter_ret_variable b
+    | Asrt.Pure _ | Asrt.Emp | Asrt.Types _ | Asrt.GA _ | Asrt.Pred _ -> []
+
   let make_spec
       (_ : annot UP.prog)
       (name : string)
@@ -89,10 +94,19 @@ module Make
            let spost = Asrt.star (List.sort Asrt.compare (SPState.to_assertions ~to_keep:pvars state_f')) in
            post, spost
          ) else ( *)
+      L.verbose (fun m ->
+          m "PVars are: %s\n" (String.concat ", " (SS.elements pvars)));
+      (* Filter pvars which are not 'ret' *)
       let post =
         Asrt.star
           (List.sort Asrt.compare
              (SPState.to_assertions ~to_keep:pvars state_f))
+      in
+      (* Filter the generated post condition for only return variable *)
+      let post =
+        match filter_ret_variable post with
+        | x :: _ -> x
+        | [] -> failwith "No return variable identified"
       in
       (post, post)
       (* ) *)

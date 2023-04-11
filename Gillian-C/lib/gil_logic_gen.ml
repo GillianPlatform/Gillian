@@ -1110,10 +1110,6 @@ let gen_bi_preds clight_prog =
     structs_not_annot
 
 let predicate_from_triple (pn, csmt, ct) =
-  let is_c_ptr_to_struct = function
-    | Ctypes.Tpointer (Ctypes.Tstruct _, _) -> true
-    | _ -> false
-  in
   let is_c_ptr_to_scalar = function
     | Ctypes.Tpointer ((Tfloat _ | Tint _ | Tlong _), _) -> true
     | _ -> false
@@ -1126,17 +1122,9 @@ let predicate_from_triple (pn, csmt, ct) =
     | Ctypes.Tpointer (Tlong _, _) -> is_ptr_to_long_opt
     | _ -> failwith "Cannot happen"
   in
-  let struct_name = function
-    | Ctypes.Tpointer (Ctypes.Tstruct (id, _), _) -> true_name id
-    | _ -> failwith "Cannot happen"
-  in
   let pred pname = Asrt.Pred (pname, [ Expr.PVar pn ]) in
   let open Internal_Predicates in
   match csmt with
-  | AST.Tint when (not Archi.ptr64) && is_c_ptr_to_struct ct ->
-      pred (opt_rec_pred_name_of_struct (struct_name ct))
-  | AST.Tlong when Archi.ptr64 && is_c_ptr_to_struct ct ->
-      pred (opt_rec_pred_name_of_struct (struct_name ct))
   | AST.Tint when (not Archi.ptr64) && is_c_ptr_to_scalar ct ->
       pred (pred_name_of_ptr_scal ct)
   | AST.Tlong when Archi.ptr64 && is_c_ptr_to_scalar ct ->
@@ -1151,6 +1139,9 @@ let predicate_from_triple (pn, csmt, ct) =
            "Don't know how to handle the following type as a bispec function \
             parameter %s"
            (PrintAST.name_of_type csmt))
+
+let simple_predicate_from_triple (pn, _, _) =
+  Asrt.Pure (Eq (Expr.PVar pn, Expr.LVar ("#" ^ pn)))
 
 let generate_bispec clight_prog fname ident f =
   let rec combine a b c =
@@ -1170,11 +1161,15 @@ let generate_bispec clight_prog fname ident f =
   let pred_list = List.map predicate_from_triple triples in
   let prec_without_genv = fold_star pred_list in
   let prec = prec_without_genv in
+
+  let logicals_list = List.map simple_predicate_from_triple triples in
+  let logicals_without_genv = fold_star logicals_list in
+  let logicals = logicals_without_genv in
   BiSpec.
     {
       bispec_name = fname;
       bispec_params = true_params;
-      bispec_pres = [ prec ];
+      bispec_pres = [ Asrt.Star (logicals, prec) ];
       bispec_normalised = false;
     }
 
