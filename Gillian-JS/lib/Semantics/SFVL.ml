@@ -4,7 +4,7 @@ open Containers
 module Expr = Gillian.Gil_syntax.Expr
 module SSubst = Gillian.Symbolic.Subst
 open Gillian.Gil_syntax
-open Jsil_syntax
+open Javert_utils
 module L = Logging
 
 type field_name = Expr.t
@@ -79,7 +79,7 @@ let assertions (loc : Expr.t) (sfvl : t) : Asrt.t list =
   List.rev
     (Expr.Map.fold
        (fun field value (ac : Asrt.t list) ->
-         PointsTo (loc, field, value) :: ac)
+         Asrt_utils.points_to ~loc ~field ~value :: ac)
        sfvl [])
 
 (* Substitution *)

@@ -87,7 +87,7 @@
     "@opam/visitors": ">=2.3",
     "@opam/yojson": "^1.7.0",
     "@opam/zarith": ">=1.12",
-    "@opam/z3": "giltho/esy-z3#af5e964fa357594105f27b5fd5f7df4611ea8b04",
+    "@opam/z3": "giltho/esy-z3#f4557cea18930982ceb02d8ff13dbff2be9e02d4",
     "compcert": "giltho/CompCert#3a6f14016f0c9aaab2ddcdd61492e5fe54f12259",
     "ocaml": "4.14.x"
   },
@@ -104,7 +104,6 @@
     "concurrently": "^7.6.0"
   },
   "resolutions": {
-    "@opam/conf-sqlite3":
-      "ManasJayanth/esy-sqlite:esy.json#28dfc73a8eda790213a8359ad708231069ed7079"
+    "@opam/conf-sqlite3": "ManasJayanth/esy-sqlite:esy.json#28dfc73a8eda790213a8359ad708231069ed7079"
   }
 }

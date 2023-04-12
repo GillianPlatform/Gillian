@@ -5,7 +5,7 @@ module L = Logging
   * SATISFIABILITY *
   * **************** **)
 
-let get_axioms (fs : Formula.Set.t) (_ : TypEnv.t) : Formula.Set.t =
+let get_axioms (fs : Formula.Set.t) (_ : Type_env.t) : Formula.Set.t =
   Formula.Set.fold
     (fun (pf : Formula.t) (result : Formula.Set.t) ->
       match pf with
@@ -23,13 +23,13 @@ let simplify_pfs_and_gamma
     ?(unification = false)
     ?relevant_info
     (fs : Formula.t list)
-    (gamma : TypEnv.t) : Formula.Set.t * TypEnv.t * SESubst.t =
+    (gamma : Type_env.t) : Formula.Set.t * Type_env.t * SESubst.t =
   let pfs, gamma =
     match relevant_info with
-    | None -> (PFS.of_list fs, TypEnv.copy gamma)
+    | None -> (PFS.of_list fs, Type_env.copy gamma)
     | Some relevant_info ->
         ( PFS.filter_with_info relevant_info (PFS.of_list fs),
-          TypEnv.filter_with_info relevant_info gamma )
+          Type_env.filter_with_info relevant_info gamma )
   in
   let subst, _ =
     Simplifications.simplify_pfs_and_gamma ~unification pfs gamma
@@ -38,10 +38,10 @@ let simplify_pfs_and_gamma
   let fs_set = Formula.Set.of_list fs_lst in
   (fs_set, gamma, subst)
 
-let check_satisfiability_with_model (fs : Formula.t list) (gamma : TypEnv.t) :
+let check_satisfiability_with_model (fs : Formula.t list) (gamma : Type_env.t) :
     SESubst.t option =
   let fs, gamma, subst = simplify_pfs_and_gamma fs gamma in
-  let model = Z3_encoding.check_sat_core fs (TypEnv.as_hashtbl gamma) in
+  let model = Z3_encoding.check_sat_core fs (Type_env.as_hashtbl gamma) in
   let lvars =
     List.fold_left
       (fun ac vs ->
@@ -65,7 +65,9 @@ let check_satisfiability_with_model (fs : Formula.t list) (gamma : TypEnv.t) :
   | None -> None
   | Some model -> (
       try
-        Z3_encoding.lift_z3_model model (TypEnv.as_hashtbl gamma) update z3_vars;
+        Z3_encoding.lift_z3_model model
+          (Type_env.as_hashtbl gamma)
+          update z3_vars;
         Some subst
       with _ -> None)
 
@@ -74,7 +76,7 @@ let check_satisfiability
     ?time:_
     ?relevant_info
     (fs : Formula.t list)
-    (gamma : TypEnv.t) : bool =
+    (gamma : Type_env.t) : bool =
   (* let t = if time = "" then 0. else Sys.time () in *)
   L.verbose (fun m -> m "Entering FOSolver.check_satisfiability");
   let fs, gamma, _ =
@@ -85,14 +87,24 @@ let check_satisfiability
   if Formula.Set.is_empty fs then true
   else if Formula.Set.mem False fs then false
   else
-    let result = Z3_encoding.check_sat fs (TypEnv.as_hashtbl gamma) in
+    let result = Z3_encoding.check_sat fs (Type_env.as_hashtbl gamma) in
     (* if time <> "" then
        Utils.Statistics.update_statistics ("FOS: CheckSat: " ^ time)
          (Sys.time () -. t); *)
     result
 
-let sat ~unification ~pfs ~gamma formulae : bool =
-  check_satisfiability ~unification (formulae @ PFS.to_list pfs) gamma
+let sat ~unification ~pfs ~gamma formula : bool =
+  let formula = Reduction.reduce_formula ~unification ~pfs ~gamma formula in
+  match formula with
+  | True -> true
+  | False -> false
+  | _ ->
+      let relevant_info =
+        (Formula.pvars formula, Formula.lvars formula, Formula.locs formula)
+      in
+      check_satisfiability ~unification ~relevant_info
+        (formula :: PFS.to_list pfs)
+        gamma
 
 (** ************
   * ENTAILMENT *
@@ -103,7 +115,7 @@ let check_entailment
     (existentials : SS.t)
     (left_fs : PFS.t)
     (right_fs : Formula.t list)
-    (gamma : TypEnv.t) : bool =
+    (gamma : Type_env.t) : bool =
   L.verbose (fun m ->
       m
         "Preparing entailment check:@\n\
@@ -114,7 +126,7 @@ let check_entailment
          Gamma:@\n\
          %a@\n"
         (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
-        existentials PFS.pp left_fs PFS.pp (PFS.of_list right_fs) TypEnv.pp
+        existentials PFS.pp left_fs PFS.pp (PFS.of_list right_fs) Type_env.pp
         gamma);
 
   (* SOUNDNESS !!DANGER!!: call to simplify_implication       *)
@@ -122,7 +134,7 @@ let check_entailment
   (* Remove from the typing environment the unused variables  *)
   (* let t = Sys.time () in *)
   let left_fs = PFS.copy left_fs in
-  let gamma = TypEnv.copy gamma in
+  let gamma = Type_env.copy gamma in
   let right_fs = PFS.of_list right_fs in
   let left_lvars = PFS.lvars left_fs in
   let right_lvars = PFS.lvars right_fs in
@@ -130,13 +142,15 @@ let check_entailment
     Simplifications.simplify_implication ~unification existentials left_fs
       right_fs gamma
   in
-  TypEnv.filter_vars_in_place gamma (SS.union left_lvars right_lvars);
+  Type_env.filter_vars_in_place gamma (SS.union left_lvars right_lvars);
 
   (* Separate gamma into existentials and non-existentials *)
   let left_fs = PFS.to_list left_fs in
   let right_fs = PFS.to_list right_fs in
-  let gamma_left = TypEnv.filter gamma (fun v -> not (SS.mem v existentials)) in
-  let gamma_right = TypEnv.filter gamma (fun v -> SS.mem v existentials) in
+  let gamma_left =
+    Type_env.filter gamma (fun v -> not (SS.mem v existentials))
+  in
+  let gamma_right = Type_env.filter gamma (fun v -> SS.mem v existentials) in
 
   (* If left side is false, return false *)
   if List.mem Formula.False (left_fs @ right_fs) then false
@@ -175,7 +189,7 @@ let check_entailment
         else
           let binders =
             List.map
-              (fun x -> (x, TypEnv.get gamma_right x))
+              (fun x -> (x, Type_env.get gamma_right x))
               (SS.elements existentials)
           in
           ForAll (binders, Formula.disjunct right_fs)
@@ -187,7 +201,7 @@ let check_entailment
       let ret =
         Z3_encoding.check_sat
           (Formula.Set.of_list (PFS.to_list formulae))
-          (TypEnv.as_hashtbl gamma_left)
+          (Type_env.as_hashtbl gamma_left)
       in
       L.(verbose (fun m -> m "Entailment returned %b" (not ret)));
       (* Utils.Statistics.update_statistics "FOS: CheckEntailment"

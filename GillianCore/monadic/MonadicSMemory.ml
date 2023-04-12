@@ -56,11 +56,11 @@ module type S = sig
     ?simple_fix:bool ->
     t ->
     PFS.t ->
-    TypEnv.t ->
+    Type_env.t ->
     err_t ->
     (c_fix_t list * Formula.t list * Containers.SS.t * Asrt.t list) list
 
-  val apply_fix : t -> PFS.t -> TypEnv.t -> c_fix_t -> t
+  val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
 end
@@ -80,7 +80,7 @@ module Lift (MSM : S) :
   let execute_action ?(unification = false) action_name mem pfs gamma params =
     let process = execute_action ~action_name mem params in
     let pfs = PFS.copy pfs in
-    let gamma = TypEnv.copy gamma in
+    let gamma = Type_env.copy gamma in
     (* let _ = Simplifications.simplify_pfs_and_gamma ~unification ~kill_new_lvars:true ~save_spec_vars:(Containers.SS.empty, true) pfs gamma in *)
     let curr_pc = Pc.make ~unification ~pfs ~gamma () in
     let results = Delayed.resolve ~curr_pc process in

@@ -7,7 +7,7 @@ exception ReductionException of Gil_syntax.Expr.t * string
     If successful, it returns that location, together with any
     bindings learned during the resolution. *)
 val resolve_expr_to_location :
-  PFS.t -> TypEnv.t -> Gil_syntax.Expr.t -> string option
+  PFS.t -> Type_env.t -> Gil_syntax.Expr.t -> string option
 
 (** [get_equal_expressions pfs e] returns a list of expressions that
     equal [e] under the pure formulae [pfs]. *)
@@ -15,7 +15,7 @@ val get_equal_expressions : PFS.t -> Gil_syntax.Expr.t -> Gil_syntax.Expr.t list
 
 val understand_lstcat :
   PFS.t ->
-  TypEnv.t ->
+  Type_env.t ->
   Expr.t list ->
   Expr.t list ->
   (Formula.t * Containers.SS.t) option
@@ -27,7 +27,7 @@ val reduce_lexpr :
   ?unification:bool ->
   ?reduce_lvars:bool ->
   ?pfs:PFS.t ->
-  ?gamma:TypEnv.t ->
+  ?gamma:Type_env.t ->
   Gil_syntax.Expr.t ->
   Gil_syntax.Expr.t
 
@@ -39,7 +39,7 @@ val reduce_formula :
   ?rpfs:bool ->
   ?time:string ->
   ?pfs:PFS.t ->
-  ?gamma:TypEnv.t ->
+  ?gamma:Type_env.t ->
   Gil_syntax.Formula.t ->
   Gil_syntax.Formula.t
 
@@ -49,8 +49,9 @@ val reduce_formula :
 val reduce_assertion :
   ?unification:bool ->
   ?pfs:PFS.t ->
-  ?gamma:TypEnv.t ->
+  ?gamma:Type_env.t ->
   Gil_syntax.Asrt.t ->
   Gil_syntax.Asrt.t
 
-val is_tautology : ?pfs:PFS.t -> ?gamma:TypEnv.t -> Gil_syntax.Formula.t -> bool
+val is_tautology :
+  ?pfs:PFS.t -> ?gamma:Type_env.t -> Gil_syntax.Formula.t -> bool

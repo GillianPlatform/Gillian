@@ -17,7 +17,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
   module PC = Outcome.ParserAndCompiler
 
   module Interpreter =
-    GInterpreter.Make (Outcome.Val) (Outcome.ESubst) (Outcome.Store)
+    G_interpreter.Make (Outcome.Val) (Outcome.ESubst) (Outcome.Store)
       (Outcome.State)
       (PC)
       (Outcome.External)
@@ -74,14 +74,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
 
   let before_execution () =
     Allocators.reset_all ();
-    Interpreter.reset ()
-
-  let convert_other_imports oi =
-    List.map
-      (fun (ext, f) ->
-        let fun_with_exn s = Stdlib.Result.get_ok (f s) in
-        (ext, fun_with_exn))
-      oi
+    Interpreter.reset_call_graph ()
 
   let should_execute prog filename prev_results_opt =
     match prev_results_opt with
@@ -126,7 +119,9 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
             let () = Hashtbl.add cur_source_files filename progs.source_files in
             let () = Gil_parsing.cache_labelled_progs (List.tl e_progs) in
             let e_prog = snd (List.hd e_progs) in
-            let other_imports = convert_other_imports PC.other_imports in
+            let other_imports =
+              Command_line_utils.convert_other_imports PC.other_imports
+            in
             let prog = Gil_parsing.eprog_to_prog ~other_imports e_prog in
             if should_execute prog filename prev_results_opt then
               match UP.init_prog prog with

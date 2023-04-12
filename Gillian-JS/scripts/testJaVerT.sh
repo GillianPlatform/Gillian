@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 if [[ -z "${GITHUB_ACTIONS}" ]]; then
 	echo "Building test environment..."
 	esy x true > /dev/null 2>&1

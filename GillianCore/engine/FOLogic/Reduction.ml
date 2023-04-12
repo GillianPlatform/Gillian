@@ -1,3 +1,5 @@
+(** @canonical Gillian.Symbolic.FO_logic.Reduction *)
+
 (* When reduction fails *)
 exception ReductionException of Expr.t * string
 
@@ -209,44 +211,38 @@ let find_equalities (pfs : PFS.t) (le : Expr.t) : Expr.t list =
 (* TYPING HELPER FUNCTIONS *)
 (***************************)
 
-let typable (gamma : TypEnv.t) (le : Expr.t) (target_type : Type.t) : bool =
+let typable (gamma : Type_env.t) (le : Expr.t) (target_type : Type.t) : bool =
   let t, success, _ = Typing.type_lexpr gamma le in
   if success then
-    Option.fold
-      ~some:(fun t -> Type.equal t target_type)
-      ~none:
-        (match le with
-        | LVar _ | PVar _ -> true
-        | _ -> false)
-      t
+    Option.fold ~some:(fun t -> Type.equal t target_type) ~none:true t
   else
     let msg : string =
       Fmt.str "TYPE ERROR: %a not typable in typing environment %a" Expr.pp le
-        TypEnv.pp gamma
+        Type_env.pp gamma
     in
     L.fail msg
 
 (* Lists *)
-let lexpr_is_list (gamma : TypEnv.t) (le : Expr.t) : bool =
+let lexpr_is_list (gamma : Type_env.t) (le : Expr.t) : bool =
   typable gamma le ListType
 
 (* Strings *)
-let lexpr_is_string (gamma : TypEnv.t) (le : Expr.t) : bool =
+let lexpr_is_string (gamma : Type_env.t) (le : Expr.t) : bool =
   typable gamma le StringType
 
 (* Numbers *)
-let lexpr_is_number ?(gamma = TypEnv.init ()) (le : Expr.t) : bool =
+let lexpr_is_number ?(gamma = Type_env.init ()) (le : Expr.t) : bool =
   typable gamma le NumberType
 
-let lexpr_is_int ?(gamma = TypEnv.init ()) (le : Expr.t) : bool =
+let lexpr_is_int ?(gamma = Type_env.init ()) (le : Expr.t) : bool =
   typable gamma le IntType
 
 (* Booleans *)
-let lexpr_is_bool (gamma : TypEnv.t) (le : Expr.t) : bool =
+let lexpr_is_bool (gamma : Type_env.t) (le : Expr.t) : bool =
   typable gamma le BooleanType
 
 (* Sets *)
-let lexpr_is_set (gamma : TypEnv.t) (le : Expr.t) : bool =
+let lexpr_is_set (gamma : Type_env.t) (le : Expr.t) : bool =
   typable gamma le SetType
 
 let get_equal_expressions (pfs : PFS.t) nle =
@@ -276,25 +272,16 @@ let rec get_length_of_list (lst : Expr.t) : int option =
   let f = get_length_of_list in
 
   match lst with
-  | PVar _ -> None
-  | LVar _ -> None
   | Lit (LList l) -> Some (List.length l)
   | EList l -> Some (List.length l)
-  | LstSub (_, _, len) -> (
-      match len with
-      | Lit (Int len) -> Some (Z.to_int len)
-      | _ -> None)
+  | LstSub (_, _, Lit (Int len)) -> Some (Z.to_int len)
   | NOp (LstCat, les) -> (
       match List_utils.flaky_map f les with
       | None -> None
       | Some lens ->
           let lens = List.fold_left Int.add 0 lens in
           Some lens)
-  | _ ->
-      raise
-        (Failure
-           (Printf.sprintf "get_length_of_list: list equals %s, impossible"
-              ((Fmt.to_to_string Expr.pp) lst)))
+  | _ -> None
 
 (* Finding the nth element of a list *)
 let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
@@ -316,7 +303,7 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
   (* Nothing can be done for variables *)
   | PVar _ | LVar _ ->
       let lst' = resolve_list lst (PFS.to_list pfs) in
-      if lst = lst' then None else f lst' idx
+      if Expr.equal lst lst' then None else f lst' idx
   (* Base lists of literals and logical expressions *)
   | Lit (LList l) ->
       assert (idx < List.length l);
@@ -345,11 +332,7 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
             if idx < llen then (lel, idx) else (NOp (LstCat, ler), idx - llen)
           in
           f lst idx)
-  | _ ->
-      raise
-        (Failure
-           (Printf.sprintf "get_nth_of_list: list equals %s, impossible"
-              ((Fmt.to_to_string Expr.pp) lst)))
+  | _ -> None
 
 (* Finding the nth element of a list *)
 let get_head_and_tail_of_list ~pfs lst =
@@ -867,16 +850,51 @@ let find_list_length_eqs (pfs : PFS.t) (e : Expr.t) : Cint.t list =
   in
   List.rev found_lengths
 
+let rec reduce_binop_inttonum_const
+    unification
+    reduce_lvars
+    pfs
+    gamma
+    (l : Expr.t)
+    (r : Expr.t)
+    (op : BinOp.t) : Expr.t option =
+  let open Utils.Syntaxes.Option in
+  let f = reduce_lexpr_loop ~unification ~reduce_lvars pfs gamma in
+  match (l, r) with
+  | Lit (Num x), UnOp (IntToNum, e) | UnOp (IntToNum, e), Lit (Num x) ->
+      let* () = if snd (modf x) = 0.0 then Some () else None in
+      let l = Expr.Lit (Int (Z.of_float x)) in
+      let r = f e in
+      let+ op =
+        BinOp.(
+          match op with
+          | Equal -> Some Equal
+          | FLessThan -> Some ILessThan
+          | FLessThanEqual -> Some ILessThanEqual
+          | FPlus -> Some IPlus
+          | FMinus -> Some IMinus
+          | FTimes -> Some ITimes
+          | BitwiseAndF -> Some BitwiseAnd
+          | BitwiseOrF -> Some BitwiseOr
+          | BitwiseXorF -> Some BitwiseXor
+          | LeftShiftF -> Some LeftShiftF
+          | SignedRightShiftF -> Some SignedRightShift
+          | UnsignedRightShiftF -> Some UnsignedRightShift
+          | _ -> None)
+      in
+      Expr.BinOp (l, op, r)
+  | _ -> None
+
 (**
   Reduction of logical expressions
   - gamma is used for:
   - pfs  are used for: Car, Cdr, SetDiff
 *)
-let rec reduce_lexpr_loop
+and reduce_lexpr_loop
     ?(unification = false)
     ?(reduce_lvars = false)
     (pfs : PFS.t)
-    (gamma : TypEnv.t)
+    (gamma : Type_env.t)
     (le : Expr.t) =
   let f = reduce_lexpr_loop ~unification ~reduce_lvars pfs gamma in
 
@@ -955,6 +973,7 @@ let rec reduce_lexpr_loop
     (* Base sets *)
     | ESet les -> ESet (Expr.Set.elements (Expr.Set.of_list (List.map f les)))
     | UnOp (NumToInt, UnOp (IntToNum, le)) -> f le
+    | UnOp (IntToNum, UnOp (NumToInt, le)) when PFS.mem pfs (IsInt le) -> f le
     (* Number-to-string-to-number-to-string-to... *)
     | UnOp (ToNumberOp, UnOp (ToStringOp, le)) -> (
         let fle = f le in
@@ -1658,244 +1677,276 @@ let rec reduce_lexpr_loop
                 raise (ReductionException (def, err_msg))
             | e -> raise e)
         | _ -> (
-            match op with
-            | Equal -> (
-                if flel = fler then Lit (Bool true)
-                else if
-                  PFS.mem pfs (Eq (flel, fler)) || PFS.mem pfs (Eq (fler, flel))
-                then Lit (Bool true)
-                else if
-                  PFS.mem pfs (Not (Eq (flel, fler)))
-                  || PFS.mem pfs (Not (Eq (fler, flel)))
-                then Lit (Bool false)
-                else
-                  let t1, _, _ = Typing.type_lexpr gamma flel in
-                  let t2, _, _ = Typing.type_lexpr gamma fler in
-                  match (t1, t2) with
-                  | Some t1, Some t2 ->
-                      if t1 = t2 then def else Lit (Bool false)
-                  | _, _ -> def)
-            | (FPlus | FMinus) when lexpr_is_number ~gamma def ->
-                simplify_num_arithmetic_lexpr pfs gamma def
-            | (IPlus | IMinus) when lexpr_is_int ~gamma def ->
-                simplify_int_arithmetic_lexpr pfs gamma def
-            | FTimes when lexpr_is_number ~gamma def -> (
-                match (flel, fler) with
-                (* 1 is the neutral *)
-                | Lit (Num 1.), x | x, Lit (Num 1.) -> x
-                | Lit (Num x), _ when x == nan -> Lit (Num nan)
-                | _, Lit (Num x) when x == nan -> Lit (Num nan)
-                | BinOp (Lit (Num x), FTimes, y), Lit (Num z)
-                | Lit (Num z), BinOp (Lit (Num x), FTimes, y) ->
-                    BinOp (Lit (Num (z *. x)), FTimes, y)
-                (* Rest *)
-                | _, _ -> def)
-            | ITimes when lexpr_is_int ~gamma def -> (
-                match (flel, fler) with
-                | Lit (Int z), x when Z.equal z Z.one -> x
-                | x, Lit (Int z) when Z.equal z Z.one -> x
-                | (Lit (Int z) as zero), _ when Z.equal z Z.zero -> zero
-                | _, (Lit (Int z) as zero) when Z.equal z Z.zero -> zero
-                | BinOp (Lit (Int x), ITimes, y), Lit (Int z)
-                | Lit (Int z), BinOp (Lit (Int x), ITimes, y) ->
-                    BinOp (Lit (Int (Z.mul z x)), ITimes, y)
-                | _, _ -> def)
-            | FDiv when lexpr_is_number ~gamma def -> (
-                match (flel, fler) with
-                (* 1 is the neutral *)
-                | x, Lit (Num 1.) -> x
-                | _, _ -> def)
-            | IDiv when lexpr_is_int ~gamma def -> (
-                match (flel, fler) with
-                | x, Lit (Int o) when Z.equal o Z.one -> x
-                | _, _ -> def)
-            | BAnd when lexpr_is_bool gamma def -> (
-                match (flel, fler) with
-                (* 1 is the neutral *)
-                | Lit (Bool true), x | x, Lit (Bool true) -> x
-                | Lit (Bool false), _ | _, Lit (Bool false) -> Lit (Bool false)
-                (* Rest *)
-                | _, _ ->
-                    let fal, nfal = Option.get (Formula.lift_logic_expr flel) in
-                    let far, nfar = Option.get (Formula.lift_logic_expr fler) in
-                    if PFS.mem pfs nfal || PFS.mem pfs nfar then
-                      Lit (Bool false)
-                    else if PFS.mem pfs fal then f fler
-                    else if PFS.mem pfs far then f flel
-                    else BinOp (flel, BAnd, fler))
-            | BOr when lexpr_is_bool gamma def -> (
-                match (flel, fler) with
-                (* 1 is the neutral *)
-                | Lit (Bool true), _ | _, Lit (Bool true) -> Lit (Bool true)
-                | Lit (Bool false), x | x, Lit (Bool false) -> x
-                (* Rest *)
-                | _, _ ->
-                    let fal, nfal = Option.get (Formula.lift_logic_expr flel) in
-                    let far, nfar = Option.get (Formula.lift_logic_expr fler) in
-                    if PFS.mem pfs fal || PFS.mem pfs far then Lit (Bool true)
-                    else if PFS.mem pfs nfal then f fler
-                    else if PFS.mem pfs nfar then f flel
-                    else BinOp (flel, BOr, fler))
-            | StrCat when lexpr_is_string gamma def -> (
-                match (flel, fler) with
-                (* Empty list is the neutral *)
-                | x, Lit (String "") | Lit (String ""), x -> x
-                (* Rest *)
-                | BinOp (el, StrCat, Lit (String s1)), Lit (String s2) ->
-                    f (BinOp (el, StrCat, Lit (String (s1 ^ s2))))
-                | _, _ -> def)
-            | SetDiff when lexpr_is_set gamma def -> (
-                let pfs = PFS.to_list pfs in
-                if contained_in_union pfs flel fler then ESet []
-                else
-                  match (flel, fler) with
-                  | x, y when x = y -> ESet []
-                  | ESet [], _ -> ESet []
-                  | x, ESet [] -> x
-                  | ESet left, ESet right
-                    when Expr.all_literals left && Expr.all_literals right ->
-                      ESet
-                        (Expr.Set.elements
-                           (Expr.Set.diff (Expr.Set.of_list left)
-                              (Expr.Set.of_list right)))
-                  | ESet left, s when Expr.all_literals left ->
-                      if List.for_all (fun x -> set_member pfs x s) left then
-                        ESet []
-                      else def
-                  | ESet left, ESet right ->
-                      L.verbose (fun fmt -> fmt "Inside relevant SetDiff case.");
-                      let candidate_result =
-                        Expr.Set.elements
-                          (Expr.Set.diff (Expr.Set.of_list left)
-                             (Expr.Set.of_list right))
-                      in
-                      L.verbose (fun fmt ->
-                          fmt "Candidate result: %a"
-                            Fmt.(brackets (list ~sep:comma Expr.pp))
-                            candidate_result);
-                      let result =
-                        if
-                          List.for_all
-                            (fun x -> not_set_member pfs x (ESet right))
-                            candidate_result
-                        then Expr.ESet candidate_result
-                        else def
-                      in
-                      L.verbose (fun fmt ->
-                          fmt "Actual result: %a" Expr.pp result);
-                      result
-                  | NOp (SetUnion, les), _ ->
-                      let diffs =
-                        List.map (fun le -> f (BinOp (le, SetDiff, fler))) les
-                      in
-                      NOp (SetUnion, diffs)
-                  | _, NOp (SetUnion, les) ->
-                      f
-                        (NOp
-                           ( SetInter,
-                             List.map
-                               (fun le -> Expr.BinOp (flel, SetDiff, le))
-                               les ))
-                  | x, ESet [ el ]
-                    when List.mem (Formula.Not (SetMem (el, x))) pfs -> x
-                  | LVar _, _ ->
-                      if set_subset pfs flel fler then ESet [] else def
-                  | ESet les, fler -> (
-                      (* We must know that the elements of les are all different, and for that we need the pure formulae *)
-                      match all_different pfs les with
-                      | false -> def
-                      | true ->
-                          let _, rest =
-                            List.partition (fun x -> set_member pfs x fler) les
+            match
+              reduce_binop_inttonum_const unification reduce_lvars pfs gamma
+                flel fler op
+            with
+            | Some e -> e
+            | None -> (
+                match op with
+                | Equal -> (
+                    if Expr.equal flel fler then Lit (Bool true)
+                    else if
+                      PFS.exists
+                        (fun e ->
+                          Formula.equal e (Eq (flel, fler))
+                          || Formula.equal e (Eq (fler, flel)))
+                        pfs
+                    then Lit (Bool true)
+                    else if
+                      PFS.mem pfs (Not (Eq (flel, fler)))
+                      || PFS.mem pfs (Not (Eq (fler, flel)))
+                    then Lit (Bool false)
+                    else
+                      let t1, _, _ = Typing.type_lexpr gamma flel in
+                      let t2, _, _ = Typing.type_lexpr gamma fler in
+                      match (t1, t2) with
+                      | Some t1, Some t2 ->
+                          if Type.equal t1 t2 then def else Lit (Bool false)
+                      | _, _ -> (
+                          match (flel, fler) with
+                          | UnOp (NumToInt, flel'), _ ->
+                              BinOp (flel', op, UnOp (IntToNum, fler))
+                          | _, UnOp (NumToInt, fler') ->
+                              BinOp (UnOp (IntToNum, flel), op, fler')
+                          | _, _ -> def))
+                | (FPlus | FMinus) when lexpr_is_number ~gamma def ->
+                    simplify_num_arithmetic_lexpr pfs gamma def
+                | (IPlus | IMinus) when lexpr_is_int ~gamma def ->
+                    simplify_int_arithmetic_lexpr pfs gamma def
+                | FTimes when lexpr_is_number ~gamma def -> (
+                    match (flel, fler) with
+                    (* 1 is the neutral *)
+                    | Lit (Num 1.), x | x, Lit (Num 1.) -> x
+                    | Lit (Num x), _ when x == nan -> Lit (Num nan)
+                    | _, Lit (Num x) when x == nan -> Lit (Num nan)
+                    | BinOp (Lit (Num x), FTimes, y), Lit (Num z)
+                    | Lit (Num z), BinOp (Lit (Num x), FTimes, y) ->
+                        BinOp (Lit (Num (z *. x)), FTimes, y)
+                    (* Rest *)
+                    | _, _ -> def)
+                | ITimes when lexpr_is_int ~gamma def -> (
+                    match (flel, fler) with
+                    | Lit (Int z), x when Z.equal z Z.one -> x
+                    | x, Lit (Int z) when Z.equal z Z.one -> x
+                    | (Lit (Int z) as zero), _ when Z.equal z Z.zero -> zero
+                    | _, (Lit (Int z) as zero) when Z.equal z Z.zero -> zero
+                    | BinOp (Lit (Int x), ITimes, y), Lit (Int z)
+                    | Lit (Int z), BinOp (Lit (Int x), ITimes, y) ->
+                        BinOp (Lit (Int (Z.mul z x)), ITimes, y)
+                    | _, _ -> def)
+                | FDiv when lexpr_is_number ~gamma def -> (
+                    match (flel, fler) with
+                    (* 1 is the neutral *)
+                    | x, Lit (Num 1.) -> x
+                    | _, _ -> def)
+                | IDiv when lexpr_is_int ~gamma def -> (
+                    match (flel, fler) with
+                    | x, Lit (Int o) when Z.equal o Z.one -> x
+                    | _, _ -> def)
+                | BAnd when lexpr_is_bool gamma def -> (
+                    match (flel, fler) with
+                    (* 1 is the neutral *)
+                    | Lit (Bool true), x | x, Lit (Bool true) -> x
+                    | Lit (Bool false), _ | _, Lit (Bool false) ->
+                        Lit (Bool false)
+                    (* Rest *)
+                    | _, _ ->
+                        let fal, nfal =
+                          Option.get (Formula.lift_logic_expr flel)
+                        in
+                        let far, nfar =
+                          Option.get (Formula.lift_logic_expr fler)
+                        in
+                        if PFS.mem pfs nfal || PFS.mem pfs nfar then
+                          Lit (Bool false)
+                        else if PFS.mem pfs fal then f fler
+                        else if PFS.mem pfs far then f flel
+                        else BinOp (flel, BAnd, fler))
+                | BOr when lexpr_is_bool gamma def -> (
+                    match (flel, fler) with
+                    (* 1 is the neutral *)
+                    | Lit (Bool true), _ | _, Lit (Bool true) -> Lit (Bool true)
+                    | Lit (Bool false), x | x, Lit (Bool false) -> x
+                    (* Rest *)
+                    | _, _ ->
+                        let fal, nfal =
+                          Option.get (Formula.lift_logic_expr flel)
+                        in
+                        let far, nfar =
+                          Option.get (Formula.lift_logic_expr fler)
+                        in
+                        if PFS.mem pfs fal || PFS.mem pfs far then
+                          Lit (Bool true)
+                        else if PFS.mem pfs nfal then f fler
+                        else if PFS.mem pfs nfar then f flel
+                        else BinOp (flel, BOr, fler))
+                | StrCat when lexpr_is_string gamma def -> (
+                    match (flel, fler) with
+                    (* Empty list is the neutral *)
+                    | x, Lit (String "") | Lit (String ""), x -> x
+                    (* Rest *)
+                    | BinOp (el, StrCat, Lit (String s1)), Lit (String s2) ->
+                        f (BinOp (el, StrCat, Lit (String (s1 ^ s2))))
+                    | _, _ -> def)
+                | SetDiff when lexpr_is_set gamma def -> (
+                    let pfs = PFS.to_list pfs in
+                    if contained_in_union pfs flel fler then ESet []
+                    else
+                      match (flel, fler) with
+                      | x, y when x = y -> ESet []
+                      | ESet [], _ -> ESet []
+                      | x, ESet [] -> x
+                      | ESet left, ESet right
+                        when Expr.all_literals left && Expr.all_literals right
+                        ->
+                          ESet
+                            (Expr.Set.elements
+                               (Expr.Set.diff (Expr.Set.of_list left)
+                                  (Expr.Set.of_list right)))
+                      | ESet left, s when Expr.all_literals left ->
+                          if List.for_all (fun x -> set_member pfs x s) left
+                          then ESet []
+                          else def
+                      | ESet left, ESet right ->
+                          L.verbose (fun fmt ->
+                              fmt "Inside relevant SetDiff case.");
+                          let candidate_result =
+                            Expr.Set.elements
+                              (Expr.Set.diff (Expr.Set.of_list left)
+                                 (Expr.Set.of_list right))
                           in
-                          if
-                            List.for_all
-                              (fun x -> not_set_member pfs x fler)
-                              rest
-                          then ESet rest
-                          else BinOp (ESet rest, SetDiff, fler))
-                  | _, _ -> def)
-            (* let hM = f (BinOp (flel, SetSub, fler)) in
-               (match hM with
-               | Lit (Bool true) -> ESet []
-               | _ -> def)) *)
-            | BSetMem when lexpr_is_bool gamma def -> (
-                match (flel, fler) with
-                | _, ESet [] -> Lit (Bool false)
-                | _, ESet [ x ] -> BinOp (flel, Equal, x)
-                | le, ESet les -> (
-                    match List.mem le les with
-                    | true -> Lit (Bool true)
-                    | false -> (
-                        match le with
-                        | Lit _ ->
-                            if Expr.all_literals les then Lit (Bool false)
+                          L.verbose (fun fmt ->
+                              fmt "Candidate result: %a"
+                                Fmt.(brackets (list ~sep:comma Expr.pp))
+                                candidate_result);
+                          let result =
+                            if
+                              List.for_all
+                                (fun x -> not_set_member pfs x (ESet right))
+                                candidate_result
+                            then Expr.ESet candidate_result
                             else def
-                        | _ -> def))
-                | _, _ -> def)
-            | BSetSub when lexpr_is_bool gamma def -> (
-                match (flel, fler) with
-                | ESet [], _ -> Lit (Bool true)
-                | _, ESet [] -> Lit (Bool false)
-                | ESet left, ESet right
-                  when Expr.all_literals left && Expr.all_literals right ->
-                    Lit
-                      (Bool
-                         (Expr.Set.subset (Expr.Set.of_list left)
-                            (Expr.Set.of_list right)))
-                | LVar _, NOp (SetUnion, les) ->
-                    if List.mem flel les then Lit (Bool true) else def
-                | _, _ -> def)
-            | FLessThan ->
-                let success, el, er = Cnum.cut flel fler in
-                let nexpr = Expr.BinOp (el, FLessThan, er) in
-                if success then f nexpr else nexpr
-            | ILessThan -> (
-                match (flel, fler) with
-                | x, fler
-                  when let fler_len = substitute_for_list_length pfs fler in
-                       match fler_len with
-                       | UnOp (LstLen, _) -> true
-                       | _ -> false ->
-                    f
-                      (BinOp
-                         ( BinOp (x, IPlus, Lit (Int Z.one)),
-                           ILessThanEqual,
-                           fler ))
-                | UnOp (LstLen, _), Lit (Int n) when Z.leq n Z.zero ->
-                    Lit (Bool false)
-                | UnOp (LstLen, le), Lit (Int z) when Z.equal z Z.one ->
-                    BinOp (le, Equal, EList [])
-                | _ ->
-                    let success, el, er = Cint.cut flel fler in
-                    let nexpr = Expr.BinOp (el, ILessThan, er) in
+                          in
+                          L.verbose (fun fmt ->
+                              fmt "Actual result: %a" Expr.pp result);
+                          result
+                      | NOp (SetUnion, les), _ ->
+                          let diffs =
+                            List.map
+                              (fun le -> f (BinOp (le, SetDiff, fler)))
+                              les
+                          in
+                          NOp (SetUnion, diffs)
+                      | _, NOp (SetUnion, les) ->
+                          f
+                            (NOp
+                               ( SetInter,
+                                 List.map
+                                   (fun le -> Expr.BinOp (flel, SetDiff, le))
+                                   les ))
+                      | x, ESet [ el ]
+                        when List.mem (Formula.Not (SetMem (el, x))) pfs -> x
+                      | LVar _, _ ->
+                          if set_subset pfs flel fler then ESet [] else def
+                      | ESet les, fler -> (
+                          (* We must know that the elements of les are all different, and for that we need the pure formulae *)
+                          match all_different pfs les with
+                          | false -> def
+                          | true ->
+                              let _, rest =
+                                List.partition
+                                  (fun x -> set_member pfs x fler)
+                                  les
+                              in
+                              if
+                                List.for_all
+                                  (fun x -> not_set_member pfs x fler)
+                                  rest
+                              then ESet rest
+                              else BinOp (ESet rest, SetDiff, fler))
+                      | _, _ -> def)
+                (* let hM = f (BinOp (flel, SetSub, fler)) in
+                   (match hM with
+                   | Lit (Bool true) -> ESet []
+                   | _ -> def)) *)
+                | BSetMem when lexpr_is_bool gamma def -> (
+                    match (flel, fler) with
+                    | _, ESet [] -> Lit (Bool false)
+                    | _, ESet [ x ] -> BinOp (flel, Equal, x)
+                    | le, ESet les -> (
+                        match List.mem le les with
+                        | true -> Lit (Bool true)
+                        | false -> (
+                            match le with
+                            | Lit _ ->
+                                if Expr.all_literals les then Lit (Bool false)
+                                else def
+                            | _ -> def))
+                    | _, _ -> def)
+                | BSetSub when lexpr_is_bool gamma def -> (
+                    match (flel, fler) with
+                    | ESet [], _ -> Lit (Bool true)
+                    | _, ESet [] -> Lit (Bool false)
+                    | ESet left, ESet right
+                      when Expr.all_literals left && Expr.all_literals right ->
+                        Lit
+                          (Bool
+                             (Expr.Set.subset (Expr.Set.of_list left)
+                                (Expr.Set.of_list right)))
+                    | LVar _, NOp (SetUnion, les) ->
+                        if List.mem flel les then Lit (Bool true) else def
+                    | _, _ -> def)
+                | FLessThan ->
+                    let success, el, er = Cnum.cut flel fler in
+                    let nexpr = Expr.BinOp (el, FLessThan, er) in
                     if success then f nexpr else nexpr
-                    (* | _, _ ->
+                | ILessThan -> (
+                    match (flel, fler) with
+                    | x, fler
+                      when let fler_len = substitute_for_list_length pfs fler in
+                           match fler_len with
+                           | UnOp (LstLen, _) -> true
+                           | _ -> false ->
                         f
                           (BinOp
-                             (BinOp (flel, FMinus, fler), FLessThan, Lit (Num 0.))) *)
-                )
-            | FLessThanEqual -> (
-                let success, el, er = Cnum.cut flel fler in
-                if success then f (BinOp (el, FLessThanEqual, er))
-                else
-                  match
-                    check_ge_zero_num ~top_level:true pfs
-                      (f (BinOp (fler, FMinus, flel)))
-                  with
-                  | Some x -> Lit (Bool x)
-                  | None -> def)
-            | ILessThanEqual -> (
-                let success, el, er = Cint.cut flel fler in
-                if success then f (BinOp (el, ILessThanEqual, er))
-                else
-                  match
-                    check_ge_zero_int ~top_level:true pfs
-                      (f (BinOp (fler, IMinus, flel)))
-                  with
-                  | Some x -> Lit (Bool x)
-                  | None -> def)
-            | _ -> def))
+                             ( BinOp (x, IPlus, Lit (Int Z.one)),
+                               ILessThanEqual,
+                               fler ))
+                    | UnOp (LstLen, _), Lit (Int n) when Z.leq n Z.zero ->
+                        Lit (Bool false)
+                    | UnOp (LstLen, le), Lit (Int z) when Z.equal z Z.one ->
+                        BinOp (le, Equal, EList [])
+                    | _ ->
+                        let success, el, er = Cint.cut flel fler in
+                        let nexpr = Expr.BinOp (el, ILessThan, er) in
+                        if success then f nexpr else nexpr
+                        (* | _, _ ->
+                            f
+                              (BinOp
+                                 (BinOp (flel, FMinus, fler), FLessThan, Lit (Num 0.))) *)
+                    )
+                | FLessThanEqual -> (
+                    let success, el, er = Cnum.cut flel fler in
+                    if success then f (BinOp (el, FLessThanEqual, er))
+                    else
+                      match
+                        check_ge_zero_num ~top_level:true pfs
+                          (f (BinOp (fler, FMinus, flel)))
+                      with
+                      | Some x -> Lit (Bool x)
+                      | None -> def)
+                | ILessThanEqual -> (
+                    let success, el, er = Cint.cut flel fler in
+                    if success then f (BinOp (el, ILessThanEqual, er))
+                    else
+                      match
+                        check_ge_zero_int ~top_level:true pfs
+                          (f (BinOp (fler, IMinus, flel)))
+                      with
+                      | Some x -> Lit (Bool x)
+                      | None -> def)
+                | _ -> def)))
     (* The remaining cases cannot be reduced *)
     | _ -> le
   in
@@ -1918,15 +1969,17 @@ and reduce_lexpr
     ?(unification = false)
     ?(reduce_lvars = false)
     ?(pfs = PFS.init ())
-    ?(gamma = TypEnv.init ())
+    ?(gamma = Type_env.init ())
     (le : Expr.t) =
   (* let t = Sys.time () in *)
   let result = reduce_lexpr_loop ~unification ~reduce_lvars pfs gamma le in
   (* Utils.Statistics.update_statistics "Reduce Expression" (Sys.time () -. t); *)
   result
 
-and simplify_num_arithmetic_lexpr (pfs : PFS.t) (gamma : TypEnv.t) (le : Expr.t)
-    =
+and simplify_num_arithmetic_lexpr
+    (pfs : PFS.t)
+    (gamma : Type_env.t)
+    (le : Expr.t) =
   let f = reduce_lexpr_loop pfs gamma in
   match le with
   | BinOp (l, FPlus, Lit (Num 0.)) | BinOp (Lit (Num 0.), FPlus, l) -> l
@@ -1945,8 +1998,10 @@ and simplify_num_arithmetic_lexpr (pfs : PFS.t) (gamma : TypEnv.t) (le : Expr.t)
       Cnum.to_expr (Cnum.plus cl cr)
   | _ -> le
 
-and simplify_int_arithmetic_lexpr (pfs : PFS.t) (gamma : TypEnv.t) (le : Expr.t)
-    =
+and simplify_int_arithmetic_lexpr
+    (pfs : PFS.t)
+    (gamma : Type_env.t)
+    (le : Expr.t) =
   let f = reduce_lexpr_loop pfs gamma in
   match le with
   | BinOp (l, IPlus, Lit (Int z)) when Z.equal z Z.zero -> l
@@ -2207,7 +2262,7 @@ and substitute_for_list_length (pfs : PFS.t) (le : Expr.t) : Expr.t =
     (fun le (len_expr, _lex) -> substitute_for_specific_length pfs len_expr le)
     le len_eqs
 
-let resolve_expr_to_location (pfs : PFS.t) (gamma : TypEnv.t) (e : Expr.t) :
+let resolve_expr_to_location (pfs : PFS.t) (gamma : Type_env.t) (e : Expr.t) :
     string option =
   let max_fuel = 5 in
 
@@ -2286,7 +2341,7 @@ let rec reduce_formula_loop
     ?(rpfs = false)
     (unification : bool)
     (pfs : PFS.t)
-    (gamma : TypEnv.t)
+    (gamma : Type_env.t)
     ?(previous = Formula.True)
     (a : Formula.t) : Formula.t =
   if Formula.equal a previous then a
@@ -2295,8 +2350,7 @@ let rec reduce_formula_loop
     let fe = reduce_lexpr_loop ~unification pfs gamma in
     let result : Formula.t =
       match a with
-      | Eq (e1, e2) when e1 = e2 && lexpr_is_list gamma e1 ->
-          True (* Why only lists? *)
+      | Eq (e1, e2) when Expr.equal e1 e2 -> True
       (* DEDICATED SIMPLIFICATIONS - this should probably be handled properly by Z3... *)
       | Eq (BinOp (Lit (Num x), FPlus, LVar y), LVar z)
         when x <> 0. && String.equal y z -> False
@@ -2380,6 +2434,8 @@ let rec reduce_formula_loop
                     | Expr.EList (_ :: _) | Lit (LList (_ :: _)) -> true
                     | _ -> false)
                   les -> False
+      | Eq (UnOp (NumToInt, le), re) -> Eq (le, UnOp (IntToNum, re))
+      | Eq (le, UnOp (NumToInt, re)) -> Eq (UnOp (IntToNum, le), re)
       | And (a1, a2) -> (
           let fa1 = f a1 in
           let fa2 = f a2 in
@@ -2595,10 +2651,10 @@ let rec reduce_formula_loop
               | Lit Nono, PVar _ | PVar _, Lit Nono -> default re1 re2
               (* JOSE: Why are we considering the case of a logical variable being bound to None? *)
               | Lit Nono, LVar x | LVar x, Lit Nono -> (
-                  let tx = TypEnv.get gamma x in
+                  let tx = Type_env.get gamma x in
                   match tx with
-                  | None -> default re1 re2
-                  | Some tx -> if tx = NoneType then default re1 re2 else False)
+                  | None | Some NoneType -> default re1 re2
+                  | _ -> False)
               | Lit Nono, _ | _, Lit Nono -> False
               | Lit (Bool true), BinOp (e1, FLessThan, e2) -> FLess (e1, e2)
               | Lit (Bool false), BinOp (e1, FLessThan, e2) ->
@@ -2710,11 +2766,20 @@ let rec reduce_formula_loop
               | False -> eq
               | _ -> Or (ac, eq))
             False result
+      | IsInt e -> (
+          match fe e with
+          | UnOp (UnOp.IntToNum, e) -> (
+              let t, _, _ = Typing.type_lexpr gamma e in
+              match t with
+              | Some IntType -> True
+              | Some _ -> False
+              | None -> f @@ Eq (UnOp (TypeOf, e), Lit (Type IntType)))
+          | _ -> a)
       | ForAll (bt, a) ->
           (* Think about quantifier instantiation *)
           (* Collect binders that are in gamma *)
           let binders_in_gamma =
-            List.map (fun (b, _) -> (b, TypEnv.get gamma b)) bt
+            List.map (fun (b, _) -> (b, Type_env.get gamma b)) bt
           in
           let ra = f a in
           let vars = Formula.lvars a in
@@ -2729,8 +2794,8 @@ let rec reduce_formula_loop
           List.iter
             (fun (b, t) ->
               match t with
-              | None -> TypEnv.remove gamma b
-              | Some t -> TypEnv.update gamma b t)
+              | None -> Type_env.remove gamma b
+              | Some t -> Type_env.update gamma b t)
             binders_in_gamma;
           result
       | _ -> a
@@ -2743,13 +2808,13 @@ let reduce_formula
     ?(rpfs = false)
     ?time:_
     ?(pfs : PFS.t = PFS.init ())
-    ?(gamma = TypEnv.init ())
+    ?(gamma = Type_env.init ())
     (a : Formula.t) : Formula.t =
   reduce_formula_loop ~top_level:true ~rpfs unification pfs gamma a
 
 let relate_llen
     (pfs : PFS.t)
-    (gamma : TypEnv.t)
+    (gamma : Type_env.t)
     (e : Expr.t)
     (lcat : Expr.t list) : (Formula.t * Containers.SS.t) option =
   (* Loop *)
@@ -2848,7 +2913,7 @@ let relate_llen
 
 let understand_lstcat
     (pfs : PFS.t)
-    (gamma : TypEnv.t)
+    (gamma : Type_env.t)
     (lcat : Expr.t list)
     (rcat : Expr.t list) : (Formula.t * Containers.SS.t) option =
   L.verbose (fun fmt ->
@@ -2910,7 +2975,7 @@ let reduce_types (a : Asrt.t) : Asrt.t =
 let rec reduce_assertion_loop
     (unification : bool)
     (pfs : PFS.t)
-    (gamma : TypEnv.t)
+    (gamma : Type_env.t)
     (a : Asrt.t) : Asrt.t =
   let f = reduce_assertion_loop unification pfs gamma in
 
@@ -2978,7 +3043,7 @@ let rec separate (a : Asrt.t) =
 let reduce_assertion
     ?(unification = false)
     ?(pfs = PFS.init ())
-    ?(gamma = TypEnv.init ())
+    ?(gamma = Type_env.init ())
     (a : Asrt.t) : Asrt.t =
   let a = reduce_types a in
 

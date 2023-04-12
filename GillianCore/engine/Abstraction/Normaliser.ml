@@ -108,7 +108,7 @@ struct
       ?(no_types = false)
       ?(store = SStore.init [])
       ?(subst = SESubst.init [])
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (le : Expr.t) =
     let f = normalise_lexpr ~no_types ~store ~subst gamma in
 
@@ -176,7 +176,7 @@ struct
                   match nle1 with
                   | Lit llit -> Lit (Type (Literal.type_of llit))
                   | LVar lvar -> (
-                      try Lit (Type (TypEnv.get_unsafe gamma lvar))
+                      try Lit (Type (Type_env.get_unsafe gamma lvar))
                       with _ ->
                         UnOp (TypeOf, LVar lvar)
                         (* raise (Failure (Printf.sprintf "Logical variables always have a type, in particular: %s." lvar))) *)
@@ -228,19 +228,19 @@ struct
     result
 
   let extend_typing_env_using_assertion_info
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (a_list : Formula.t list) : unit =
     List.iter
       (fun a ->
         match (a : Formula.t) with
         | Eq (LVar x, le) | Eq (le, LVar x) | Eq (PVar x, le) | Eq (le, PVar x)
           -> (
-            let x_type = TypEnv.get gamma x in
+            let x_type = Type_env.get gamma x in
             match x_type with
             | None ->
                 let le_type, _, _ = Typing.type_lexpr gamma le in
                 Option.fold
-                  ~some:(fun x_type -> TypEnv.update gamma x x_type)
+                  ~some:(fun x_type -> Type_env.update gamma x x_type)
                   ~none:() le_type
             | Some _ -> ())
         | _ -> ())
@@ -254,7 +254,7 @@ struct
   let normalise_logic_expression
       ?(no_types = false)
       (store : SStore.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (subst : SESubst.t)
       (le : Expr.t) : Expr.t =
     let le' = normalise_lexpr ~no_types ~store ~subst gamma le in
@@ -270,7 +270,7 @@ struct
   let rec normalise_pure_assertion
       ?(no_types = false)
       (store : SStore.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (subst : SESubst.t)
       (assertion : Formula.t) : Formula.t =
     let fa = normalise_pure_assertion ~no_types store gamma subst in
@@ -297,6 +297,7 @@ struct
       | SetSub (le1, le2) -> SetSub (fe le1, fe le2)
       | SetMem (le1, le2) -> SetMem (fe le1, fe le2)
       | ForAll (bt, a) -> ForAll (bt, fant a)
+      | IsInt e -> IsInt (fe e)
       | _ ->
           let msg =
             Fmt.str
@@ -310,7 +311,7 @@ struct
 
   let normalise_pure_assertions
       (store : SStore.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (subst : SESubst.t)
       (args : SS.t option)
       (fs : Formula.t list) : PFS.t =
@@ -560,7 +561,7 @@ struct
   (** Normalise type assertions (Intialise type environment *)
   let normalise_types
       (store : SStore.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (subst : SESubst.t)
       (type_list : (Expr.t * Type.t) list) : bool =
     L.verbose (fun m -> m "Normalising types: %d" (List.length type_list));
@@ -589,7 +590,7 @@ struct
              in
              Option.fold
                ~some:(fun new_gamma ->
-                 TypEnv.extend gamma new_gamma;
+                 Type_env.extend gamma new_gamma;
                  true)
                ~none:false new_gamma)
           le_type
@@ -603,7 +604,7 @@ struct
             match fe le with
             | Lit lit -> Literal.type_of lit = t
             | LVar x ->
-                TypEnv.update gamma x t;
+                Type_env.update gamma x t;
                 true
             | PVar _ -> raise (Failure "DEATH. normalise_type_assertions")
             | le -> type_check_lexpr le t)
@@ -617,7 +618,7 @@ struct
       (pred_defs : (string, UP.pred) Hashtbl.t)
       (store : SStore.t)
       (pfs : PFS.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (subst : SVal.SESubst.t)
       (pred_asrts : (string * Expr.t list) list) : SPreds.t =
     let fe = normalise_logic_expression store gamma subst in
@@ -724,7 +725,7 @@ struct
   let normalise_core_asrts
       (store : SStore.t)
       (pfs : PFS.t)
-      (gamma : TypEnv.t)
+      (gamma : Type_env.t)
       (svars : SS.t)
       (subst : SESubst.t)
       (c_asrts : (string * Expr.t list * Expr.t list) list) :
@@ -908,7 +909,7 @@ struct
 
     (* Step 2a -- Create empty symbolic heap, symbolic store, typing environment, and substitution *)
     let store = SStore.init [] in
-    let gamma = TypEnv.init () in
+    let gamma = Type_env.init () in
     let subst = SESubst.init [] in
 
     (* Step 2b -- Separate assertion *)

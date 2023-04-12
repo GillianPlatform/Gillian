@@ -187,7 +187,7 @@ functor
     let get_type_env_vars (state : state_t) : Variable.t list =
       let open Variable in
       let typ_env = Verification.SPState.get_typ_env state in
-      TypEnv.to_list typ_env
+      Type_env.to_list typ_env
       |> List.sort (fun (v, _) (w, _) -> Stdlib.compare v w)
       |> List.map (fun (name, value) ->
              let value = Type.str value in
@@ -236,32 +236,6 @@ functor
         in
         (labeled_prog, init_data, None, None)
 
-      let burn_gil ~init_data prog outfile_opt =
-        match outfile_opt with
-        | Some outfile ->
-            let outc = open_out outfile in
-            let fmt = Format.formatter_of_out_channel outc in
-            let () =
-              match init_data with
-              | `Null -> ()
-              | init_data ->
-                  Fmt.pf fmt "#begin_init_data@\n%a@\n#end_init_data@\n"
-                    (Yojson.Safe.pretty_print ~std:true)
-                    init_data
-            in
-            let () = Prog.pp_labeled fmt prog in
-            close_out outc
-        | None -> ()
-
-      (* TODO: Find a common place to put the three functions here which are
-         duplicated in CommandLine.ml *)
-      let convert_other_imports oi =
-        List.map
-          (fun (ext, f) ->
-            let fun_with_exn s = Stdlib.Result.get_ok (f s) in
-            (ext, fun_with_exn))
-          oi
-
       let log_procs procs =
         DL.log (fun m ->
             let proc_to_yojson =
@@ -279,9 +253,12 @@ functor
           if already_compiled then parse_gil_file (List.hd files)
           else compile_tl_files files
         in
-        burn_gil ~init_data:(ID.to_yojson init_data) e_prog outfile_opt;
+        Command_line_utils.burn_gil ~init_data:(ID.to_yojson init_data)
+          ~pp_prog:Prog.pp_labeled e_prog outfile_opt;
         (* Prog.perform_syntax_checks e_prog; *)
-        let other_imports = convert_other_imports PC.other_imports in
+        let other_imports =
+          Command_line_utils.convert_other_imports PC.other_imports
+        in
         let prog = Gil_parsing.eprog_to_prog ~other_imports e_prog in
         L.verbose (fun m ->
             m "@\nProgram as parsed:@\n%a@\n" Prog.pp_indexed prog);
@@ -308,7 +285,7 @@ functor
     let rec call_stack_to_frames call_stack next_proc_body_idx prog =
       match call_stack with
       | [] -> []
-      | (se : CallStack.stack_element) :: rest ->
+      | (se : Call_stack.stack_element) :: rest ->
           let start_line, start_column, end_line, end_column, source_path =
             (let* proc = Prog.get_proc prog se.pid in
              let annot, _, _ = proc.proc_body.(next_proc_body_idx) in
@@ -349,7 +326,7 @@ functor
       let get_cur_cmd (cmd : Lifter.cmd_report) cfg =
         match cmd.callstack with
         | [] -> None
-        | (se : CallStack.stack_element) :: _ -> (
+        | (se : Call_stack.stack_element) :: _ -> (
             let proc = Prog.get_proc cfg.prog se.pid in
             match proc with
             | None -> None
@@ -459,8 +436,8 @@ functor
     let unify = Unify.f
 
     let show_result_errors = function
-      | ExecRes.RSucc _ -> []
-      | ExecRes.RFail { errors; _ } -> errors |> List.map show_err_t
+      | Exec_res.RSucc _ -> []
+      | Exec_res.RFail { errors; _ } -> errors |> List.map show_err_t
 
     let build_final_cmd_data content result prev_id branch_path dbg =
       let { cfg; _ } = dbg in
@@ -504,7 +481,9 @@ functor
           | None -> state.lifter_state |> Lifter.select_next_path case prev_id
         in
         DL.log (fun m ->
-            m ~json:[ ("path", branch_path_to_yojson branch_path) ] "Got path");
+            m
+              ~json:[ ("path", BranchCase.path_to_yojson branch_path) ]
+              "Got path");
         branch_path
 
       let check_cur_report_id = function
@@ -1093,7 +1072,7 @@ functor
         { id = Fmt.to_to_string Logging.pp_err error; description = None }
       in
       match error with
-      | ExecErr.ESt state_error -> (
+      | Exec_err.ESt state_error -> (
           match state_error with
           | StateErr.EMem merr ->
               Lifter.memory_error_to_exception_info

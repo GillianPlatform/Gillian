@@ -7,39 +7,47 @@
  ****************************************)
 
 (* Interpretation: one byte as an unsigned 8-bit integer *)
-pure pred rawToUInt8(+bytes:List, num:Num) :
-    (bytes == {{ #b0 }}) * (num == #b0) *
-    (0 <=# #b0) * (#b0 <# 256);
+pure pred rawToUInt8(+bytes:List, x:Int) :
+    (bytes == {{ #b0 }}) * (x == #b0) *
+    (0i i<=# #b0) * (#b0 i<# 256i);
+
+pure pred rawToUInt8JS(+bytes:List, n:Num) :
+    rawToUInt8(bytes, #x) * (n == (as_num #x));
 
 (* Interpretation: two bytes as an unsigned 16-bit integer *)
 @nopath
-pure pred rawToUInt16(+bytes:List, +littleEndian:Bool, num:Num) :
+pure pred rawToUInt16(+bytes:List, +littleEndian:Bool, x:Int) :
     (littleEndian == false) *
       (bytes == {{ #b0, #b1 }}) *
-      (0 <=# #b0) * (#b0 <# 256) *
-      (0 <=# #b1) * (#b1 <# 256) *
-      (num == (#b0 * 256) + #b1),
+      (0i i<=# #b0) * (#b0 i<# 256i) *
+      (0i i<=# #b1) * (#b1 i<# 256i) *
+      (x == (#b0 i* 256i) i+ #b1),
     (littleEndian == true) *
       (bytes == {{ #b0, #b1 }}) *
-      (0 <=# #b0) * (#b0 <# 256) *
-      (0 <=# #b1) * (#b1 <# 256) *
-      (num == (#b1 * 256) + #b0);
+      (0i i<=# #b0) * (#b0 i<# 256i) *
+      (0i i<=# #b1) * (#b1 i<# 256i) *
+      (x == (#b1 i* 256i) i+ #b0);
 
+pure pred rawToUInt16JS(+bytes:List, +littleEndian:Bool, n:Num) :
+    rawToUInt16(bytes, littleEndian, #x) * (n == (as_num #x));
 
 (* Interpretation: four bytes as an unsigned 32-bit integer *)
 @nopath
-pure pred rawToUInt32(+bytes:List, +littleEndian:Bool, num:Num) :
+pure pred rawToUInt32(+bytes:List, +littleEndian:Bool, x:Int) :
     (littleEndian == false) *
       (bytes == {{ #b0, #b1, #b2, #b3 }}) *
-      (0 <=# #b0) * (#b0 <# 256) *
-      (0 <=# #b1) * (#b1 <# 256) *
-      (0 <=# #b2) * (#b2 <# 256) *
-      (0 <=# #b3) * (#b3 <# 256) *
-      (num == (#b0 * 16777216) + (#b1 * 65536) + (#b2 * 256) + #b3),
+      (0i i<=# #b0) * (#b0 i<# 256i) *
+      (0i i<=# #b1) * (#b1 i<# 256i) *
+      (0i i<=# #b2) * (#b2 i<# 256i) *
+      (0i i<=# #b3) * (#b3 i<# 256i) *
+      (x == (#b0 i* 16777216i) i+ (#b1 i* 65536i) i+ (#b2 i* 256i) i+ #b3),
     (littleEndian == true) *
       (bytes == {{ #b0, #b1, #b2, #b3 }}) *
-      (0 <=# #b0) * (#b0 <# 256) *
-      (0 <=# #b1) * (#b1 <# 256) *
-      (0 <=# #b2) * (#b2 <# 256) *
-      (0 <=# #b3) * (#b3 <# 256) *
-      (num == (#b3 * 16777216) + (#b2 * 65536) + (#b1 * 256) + #b0);    
+      (0i i<=# #b0) * (#b0 i<# 256i) *
+      (0i i<=# #b1) * (#b1 i<# 256i) *
+      (0i i<=# #b2) * (#b2 i<# 256i) *
+      (0i i<=# #b3) * (#b3 i<# 256i) *
+      (x == (#b3 i* 16777216i) i+ (#b2 i* 65536i) i+ (#b1 i* 256i) i+ #b0);
+
+pure pred rawToUInt32JS(+bytes:List, +littleEndian:Bool, n:Num) :
+    rawToUInt32(bytes, littleEndian, #x) * (n == (as_num #x));

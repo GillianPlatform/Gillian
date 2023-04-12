@@ -29,6 +29,14 @@ let bool b = lit (Bool b)
 let zero_i = int_z Z.zero
 let one_i = int_z Z.one
 
+let num_to_int = function
+  | Lit (Num n) -> int (int_of_float n)
+  | e -> UnOp (NumToInt, e)
+
+let int_to_num = function
+  | Lit (Int n) -> num (Z.to_float n)
+  | e -> UnOp (IntToNum, e)
+
 let typeof x =
   match x with
   | ALoc _ | Lit (Loc _) -> Lit (Type ObjectType)
@@ -122,6 +130,7 @@ let imod a b =
   | _ -> BinOp (a, IMod, b)
 
 let type_ t = Lit (Type t)
+let type_eq e t = BinOp (typeof e, Equal, type_ t)
 
 module Infix = struct
   let ( +. ) a b =
@@ -352,8 +361,7 @@ let alocs (le : t) : SS.t = Visitors.Collectors.aloc_collector#visit_expr () le
 (** Get all the concrete locations in --e-- *)
 let clocs (le : t) : SS.t = Visitors.Collectors.cloc_collector#visit_expr () le
 
-let locs (le : t) : SS.t =
-  Visitors.Collectors.loc_collector#visit_expr SS.empty le
+let locs (le : t) : SS.t = Visitors.Collectors.loc_collector#visit_expr () le
 
 (** Get all substitutables in --e-- *)
 let substitutables (le : t) : SS.t =

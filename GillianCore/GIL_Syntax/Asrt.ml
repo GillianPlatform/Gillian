@@ -112,12 +112,7 @@ let clocs (a : t) : SS.t =
   Visitors.Collectors.cloc_collector#visit_assertion () a
 
 (* Get all the concrete locations in [a] *)
-let locs (a : t) : SS.t =
-  Visitors.Collectors.loc_collector#visit_assertion SS.empty a
-
-(* Get all the variables in [a] *)
-let vars (a : t) : SS.t =
-  Visitors.Collectors.loc_collector#visit_assertion SS.empty a
+let locs (a : t) : SS.t = Visitors.Collectors.loc_collector#visit_assertion () a
 
 (* Returns a list with the names of the predicates that occur in --a-- *)
 let pred_names (a : t) : string list =

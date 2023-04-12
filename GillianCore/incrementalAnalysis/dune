@@ -1,6 +1,6 @@
 (library
  (name incrementalAnalysis)
- (package gillian)
+ (public_name gillian.incrementalAnalysis)
  (libraries utils gil_syntax fmt)
  (preprocess
   (pps ppx_deriving_yojson))

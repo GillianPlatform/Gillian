@@ -1,6 +1,6 @@
 module FOSolver = Engine.FOSolver
 module PFS = Engine.PFS
-module TypEnv = Engine.TypEnv
+module Type_env = Engine.Type_env
 module Reduction = Engine.Reduction
 module Formula = Gil_syntax.Formula
 
@@ -15,8 +15,8 @@ let build_full_pfs (pc : Pc.t) =
 let build_full_gamma (pc : Pc.t) =
   if pc.learned_types = [] then pc.gamma
   else
-    let copied = TypEnv.copy pc.gamma in
-    List.iter (fun (x, t) -> TypEnv.update copied x t) pc.learned_types;
+    let copied = Type_env.copy pc.gamma in
+    List.iter (fun (x, t) -> Type_env.update copied x t) pc.learned_types;
     copied
 
 let sat ~(pc : Pc.t) formula =
@@ -36,7 +36,7 @@ let sat ~(pc : Pc.t) formula =
   | False ->
       Logging.verbose (fun fmt -> fmt "Discharged sat before Z3");
       false
-  | formula -> FOSolver.sat ~unification:pc.unification ~pfs ~gamma [ formula ]
+  | formula -> FOSolver.sat ~unification:pc.unification ~pfs ~gamma formula
 
 let check_entailment ~(pc : Pc.t) formula =
   let pfs, gamma = (build_full_pfs pc, build_full_gamma pc) in

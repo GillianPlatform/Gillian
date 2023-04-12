@@ -411,8 +411,8 @@ module Mem = struct
   let store
       chunk
       mem
-      ?(pfs = PureContext.init ())
-      ?(gamma = TypEnv.init ())
+      ?(pfs = Pure_context.init ())
+      ?(gamma = Type_env.init ())
       (loc : vt)
       (ofs : int)
       (value : SVal.t) : (t, err_t list) Result.t =
