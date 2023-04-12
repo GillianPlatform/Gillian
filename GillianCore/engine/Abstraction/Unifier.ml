@@ -930,7 +930,7 @@ module Make
     else
       match get_pred_with_vs astate vs with
       | Some (pname, v_args) -> (
-          L.(verbose (fun m -> m "FOUND STH TO UNFOLD!!!!\n"));
+          L.(verbose (fun m -> m "FOUND STH TO UNFOLD: %s!!!!\n" pname));
           let rets = unfold (copy_astate astate) pname v_args in
           match rets with
           | Ok rets ->

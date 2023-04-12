@@ -600,6 +600,19 @@ let add_closing_tokens preds =
     |> List.of_seq
     (* Can't keep the sequence, or we'd be modifying the hashtbl while iterating over it. *)
   in
+  (* We add the the close_token to each definition. *)
+  List.to_seq guarded_predicates
+  |> Seq.map (fun (pred : Pred.t) ->
+         {
+           pred with
+           pred_definitions =
+             List.map
+               (fun (x, def, y) ->
+                 (x, Asrt.Star (def, Pred.close_token_call pred), y))
+               pred.pred_definitions;
+         })
+  |> Seq.iter (fun (pred : Pred.t) -> Hashtbl.replace preds pred.pred_name pred);
+  (* We add the close tokens to the table. *)
   List.iter
     (fun (pred : Pred.t) ->
       let pred_name = Pred.close_token_name pred in
@@ -624,7 +637,7 @@ let add_closing_tokens preds =
             pred_normalised = false;
           }
       in
-      Hashtbl.add preds pred_name close_token)
+      Hashtbl.replace preds pred_name close_token)
     guarded_predicates
 
 let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
