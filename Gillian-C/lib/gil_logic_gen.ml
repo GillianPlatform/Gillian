@@ -1162,14 +1162,14 @@ let generate_bispec clight_prog fname ident f =
   let prec_without_genv = fold_star pred_list in
   let prec = prec_without_genv in
 
-  let logicals_list = List.map simple_predicate_from_triple triples in
-  let logicals_without_genv = fold_star logicals_list in
-  let logicals = logicals_without_genv in
+  (* let logicals_list = List.map simple_predicate_from_triple triples in
+     let logicals_without_genv = fold_star logicals_list in
+     let logicals = logicals_without_genv in *)
   BiSpec.
     {
       bispec_name = fname;
       bispec_params = true_params;
-      bispec_pres = [ Asrt.Star (logicals, prec) ];
+      bispec_pres = [ prec ];
       bispec_normalised = false;
     }
 
