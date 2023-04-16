@@ -47,7 +47,7 @@ const DebuggerPanel = () => {
             setActiveTab('debug-exec-tab');
           }}
         >
-          EXEC MAP
+          EXECUTION
         </VSCodePanelTab>
         <VSCodePanelTab
           id="debug-unify-tab"
@@ -55,7 +55,7 @@ const DebuggerPanel = () => {
             setActiveTab('debug-unify-tab');
           }}
         >
-          UNIFICATION
+          MATCHING
         </VSCodePanelTab>
 
         <VSCodePanelView id="debug-exec-panel">
