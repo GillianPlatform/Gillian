@@ -100,9 +100,9 @@ module Mem = struct
   let empty = { map = SMap.empty; last_op = Other }
   let copy x = x
 
-  let get_tree_res map loc_name =
+  let get_tree_res map loc_name ofs_opt =
     DR.of_option
-      ~none:(MissingLocResource (Single, loc_name, None))
+      ~none:(MissingLocResource (Single, loc_name, ofs_opt))
       (SMap.find_opt loc_name map)
 
   let get_or_create_tree map loc_name =
@@ -120,19 +120,19 @@ module Mem = struct
   let weak_valid_pointer { map; _ } loc ofs =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res map loc_name in
+    let** tree = get_tree_res map loc_name (Some ofs) in
     map_lift_err loc_name (SHeapTree.weak_valid_pointer tree ofs)
 
   let getcurperm { map; _ } loc ofs =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res map loc_name in
+    let** tree = get_tree_res map loc_name (Some ofs) in
     map_lift_err loc_name (SHeapTree.get_perm_at tree ofs)
 
   let drop_perm { map; _ } loc low high new_perm =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res map loc_name in
+    let** tree = get_tree_res map loc_name None in
     let++ new_tree =
       map_lift_err loc_name (SHeapTree.drop_perm tree low high new_perm)
     in
@@ -141,7 +141,7 @@ module Mem = struct
   let store { map; _ } loc chunk ofs value =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res map loc_name in
+    let** tree = get_tree_res map loc_name (Some ofs) in
     let++ new_tree =
       map_lift_err loc_name (SHeapTree.store tree chunk ofs value)
     in
@@ -150,7 +150,7 @@ module Mem = struct
   let load { map; _ } loc chunk ofs =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res map loc_name in
+    let** tree = get_tree_res map loc_name (Some ofs) in
     let++ value, new_tree =
       map_lift_err loc_name (SHeapTree.load tree chunk ofs)
     in
@@ -159,14 +159,14 @@ module Mem = struct
   let free { map; _ } loc low high =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res map loc_name in
+    let** tree = get_tree_res map loc_name None in
     let++ new_tree = map_lift_err loc_name (SHeapTree.free tree low high) in
     make_other @@ SMap.add loc_name new_tree map
 
   let get_single { map; _ } loc ofs chunk =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res map loc_name in
+    let** tree = get_tree_res map loc_name (Some ofs) in
     let++ sval, perm, new_tree =
       map_lift_err loc_name (SHeapTree.get_single tree ofs chunk)
     in
@@ -212,7 +212,7 @@ module Mem = struct
           MonadicSVal.SVArray.empty,
           Some Perm.Freeable )
     else
-      let** tree = get_tree_res map loc_name in
+      let** tree = get_tree_res map loc_name (Some ofs) in
       let++ sarr, perm, new_tree =
         map_lift_err loc_name (SHeapTree.get_array tree ofs size chunk)
       in
@@ -253,7 +253,7 @@ module Mem = struct
   let get_freed { map; _ } loc =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res map loc_name in
+    let** tree = get_tree_res map loc_name None in
     DR.of_result (SHeapTree.get_freed tree) |> map_lift_err loc_name
 
   let set_freed { map; _ } loc =
@@ -280,7 +280,7 @@ module Mem = struct
     if%sat high #<= low then
       DR.ok (make ~last_op map, loc_name, Some Perm.Freeable)
     else
-      let** tree = get_tree_res map loc_name in
+      let** tree = get_tree_res map loc_name None in
       let++ new_tree, perm =
         map_lift_err loc_name (sheap_getter tree low high)
       in
@@ -345,7 +345,7 @@ module Mem = struct
   let get_bounds { map; _ } loc =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res map loc_name in
+    let** tree = get_tree_res map loc_name None in
     let++ bounds =
       map_lift_err loc_name (DR.of_result (SHeapTree.get_bounds tree))
     in
@@ -363,7 +363,7 @@ module Mem = struct
   let rem_bounds { map; _ } loc =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res map loc_name in
+    let** tree = get_tree_res map loc_name None in
     let++ tree_rem =
       map_lift_err loc_name (DR.of_result (SHeapTree.rem_bounds tree))
     in
@@ -376,8 +376,8 @@ module Mem = struct
     else
       let** dst_loc_name = resolve_loc_result dst_loc in
       let** src_loc_name = resolve_loc_result src_loc in
-      let** dst_tree = get_tree_res map dst_loc_name in
-      let** src_tree = get_tree_res map src_loc_name in
+      let** dst_tree = get_tree_res map dst_loc_name (Some dst_ofs) in
+      let** src_tree = get_tree_res map src_loc_name (Some src_ofs) in
       let++ new_dst_tree =
         DR.map_error (SHeapTree.move dst_tree dst_ofs src_tree src_ofs sz)
           (fun err ->
@@ -1036,4 +1036,14 @@ let get_fixes _heap _pfs _gamma err =
       [ ([], [ Formula.Eq (new_expr, loc) ], SS.empty, []) ]
   | _ -> []
 
-let apply_fix _heap _pfs _gamma _fix = failwith "Not ready for bi-abdcution"
+(* let apply_fix _heap _pfs _gamma _fix = failwith "Not ready for bi-abdcution" *)
+let apply_fix heap _pfs _gamma fix =
+  match fix with
+  | AddSingle { loc; ofs; value } -> (
+      let loc = Expr.loc_from_loc_name loc in
+      (* NOTE: What should "chunk sval perm" be assigned to? *)
+      let+ mem = Mem.set_single !(heap.mem) loc ofs in
+      match mem with
+      | Ok [ (mem, [], new_pfs, []) ] -> mem
+      | _ -> raise (Failure "Bi-abduction: cannot fix cell."))
+(* Mem.set_single !(heap.mem) loc ofs chunk sval perm in *)
