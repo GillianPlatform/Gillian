@@ -1,6 +1,7 @@
 module GUtils = Gillian.Utils
 module Result = Stdlib.Result
 open Gillian.Monadic
+open LActions
 module DR = Delayed_result
 module DO = Delayed_option
 open Delayed.Syntax
@@ -38,9 +39,11 @@ let expr_of_loc_name loc_name =
 type vt = Values.t
 type st = Subst.t
 
+(* let ga = LActions.ga *)
+
 type err_t =
   | InvalidLocation of Expr.t
-  | MissingLocResource of string
+  | MissingLocResource of (LActions.ga * string * Expr.t option)
   | SHeapTreeErr of {
       at_locations : string list;
       sheaptree_err : SHeapTree.err;
@@ -98,13 +101,16 @@ module Mem = struct
   let copy x = x
 
   let get_tree_res map loc_name =
-    DR.of_option ~none:(MissingLocResource loc_name)
+    DR.of_option
+      ~none:(MissingLocResource (Single, loc_name, None))
       (SMap.find_opt loc_name map)
 
   let get_or_create_tree map loc_name =
     match SMap.find_opt loc_name map with
     | Some t -> Delayed.return t
     | None -> Delayed.return SHeapTree.empty
+
+  (***** Implementation of local actions *****)
 
   let alloc ({ map; _ } : t) low high : t * string =
     let loc = ALoc.alloc () in
@@ -819,7 +825,8 @@ let execute_genvgetdef heap params =
 
 (* Complete fixes  *)
 
-type c_fix_t
+(* type c_fix_t *)
+type c_fix_t = AddSingle of { loc : string; ofs : Expr.t; value : Expr.t }
 
 (* Pretty printing utils *)
 
@@ -829,7 +836,7 @@ let pp_err fmt (e : err_t) =
   match e with
   | InvalidLocation loc ->
       Fmt.pf fmt "'%a' cannot be resolved as a location" Expr.pp loc
-  | MissingLocResource l ->
+  | MissingLocResource (_, l, _) ->
       Fmt.pf fmt "No block associated with location '%s'" l
   | SHeapTreeErr { at_locations; sheaptree_err } ->
       Fmt.pf fmt "Tree at location%a raised: <%a>"
@@ -1005,12 +1012,28 @@ let get_recovery_tactic _ err =
     match err with
     | InvalidLocation e ->
         List.map (fun x -> Expr.LVar x) (SS.elements (Expr.lvars e))
-    | MissingLocResource l -> [ Expr.loc_from_loc_name l ]
+    | MissingLocResource (_, l, _) -> [ Expr.loc_from_loc_name l ]
     | SHeapTreeErr { at_locations; _ } ->
         List.map Expr.loc_from_loc_name at_locations
   in
   Recovery_tactic.try_unfold values
 
 let get_failing_constraint _e = failwith "Not ready for bi-abduction yet"
-let get_fixes _heap _pfs _gamma _err = failwith "Not ready for bi-abduction yet"
+
+(* let get_fixes ?simple_fix:_ _heap _pfs _gamma _err =
+   failwith "Not ready for bi-abduction yet" *)
+let get_fixes _heap _pfs _gamma err =
+  Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
+  match err with
+  | MissingLocResource (Single, loc, Some ofs) ->
+      let new_var = LVar.alloc () in
+      let value = Expr.LVar new_var in
+      let set = SS.singleton new_var in
+      [ ([ AddSingle { loc; ofs; value } ], [], set, []) ]
+  | InvalidLocation loc ->
+      let new_loc = ALoc.alloc () in
+      let new_expr = Expr.ALoc new_loc in
+      [ ([], [ Formula.Eq (new_expr, loc) ], SS.empty, []) ]
+  | _ -> []
+
 let apply_fix _heap _pfs _gamma _fix = failwith "Not ready for bi-abdcution"

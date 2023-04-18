@@ -35,6 +35,7 @@ type ac =
   | AMem of mem_ac  (** Actions related to the global environment *)
 
 type ga = Single | Array | Hole | Zeros | Bounds | Freed
+[@@deriving yojson, show]
 
 (** {3 Serialization of actions} *)
 
