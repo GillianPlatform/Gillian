@@ -88,7 +88,7 @@ module Make
 
   module SUnifier = Unifier.Make (Val) (ESubst) (Store) (State) (Preds)
 
-  type action_ret = ((t * vt list) list, err_t list) result
+  type action_ret = (t * vt list) list * err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
 
   let init_with_pred_table pred_defs init_data =
@@ -695,7 +695,7 @@ module Make
       let invariant_state = set_store invariant_state store in
       match SUnifier.produce invariant_state full_subst a_produce with
       (* FIXME: Should allow several new states ? *)
-      | Ok ([ _new_astate ] as new_astates) ->
+      | ([ _new_astate ] as new_astates), [] ->
           let* new_state, new_preds, pred_defs, variants = new_astates in
           let new_state' =
             State.add_spec_vars new_state (SS.of_list lvar_binders)
@@ -706,7 +706,7 @@ module Make
           in
           let+ invariant_state = invariant_states in
           (copy frame_state, invariant_state)
-      | Ok _ ->
+      | _ :: _, [] ->
           let msg =
             Fmt.str
               "UNIFY INVARIANT FAILURE: several states produced. Supposedly \
@@ -715,7 +715,7 @@ module Make
                above case general"
           in
           L.fail msg
-      | Error e ->
+      | _, e ->
           let msg =
             Fmt.str
               "UNIFY INVARIANT FAILURE: %a\n\
@@ -741,12 +741,12 @@ module Make
             let frame_asrt = Asrt.star (to_assertions frame) in
             let full_subst = make_id_subst frame_asrt in
             match SUnifier.produce astate full_subst frame_asrt with
-            | Error errs ->
+            | _, (_ :: _ as errs) ->
                 L.fail
                   (Format.asprintf
                      "Unable to produce frame for loop %s, because of :\n%a" id
                      (pp_list pp_err_t) errs)
-            | Ok l -> l
+            | l, _ -> l
           in
           (* TODO: FIX THIS FOR MULTI-STATES *)
           let _, states = simplify ~kill_new_lvars:true astate in
@@ -1038,7 +1038,7 @@ module Make
                         match
                           SUnifier.produce new_state full_subst a_produce
                         with
-                        | Ok new_astates ->
+                        | (_ :: _ as new_astates), [] ->
                             List.concat_map
                               (fun new_astate ->
                                 let new_state, new_preds, pred_defs, variants =
@@ -1197,8 +1197,7 @@ module Make
     let state, _, _, _ = astate in
     State.clean_up state
 
-  let produce (astate : t) (subst : st) (a : Asrt.t) :
-      (t list, err_t list) result =
+  let produce (astate : t) (subst : st) (a : Asrt.t) : t list * err_t list =
     SUnifier.produce astate subst a
 
   let unify_assertion (astate : t) (subst : st) (step : UP.step) : u_res =
@@ -1235,16 +1234,13 @@ module Make
       (astate : t)
       (args : vt list) : action_ret =
     let state, preds, pred_defs, variants = astate in
-    match State.execute_action ~unification action state args with
-    | Ok rets ->
-        let rets' =
-          List.map
-            (fun (st, outs) ->
-              ((st, Preds.copy preds, pred_defs, variants), outs))
-            rets
-        in
-        Ok rets'
-    | Error errs -> Error errs
+    let rets, errs = State.execute_action ~unification action state args in
+    let rets =
+      rets
+      |> List.map (fun (st, outs) ->
+             ((st, Preds.copy preds, pred_defs, variants), outs))
+    in
+    (rets, errs)
 
   let mem_constraints (astate : t) : Formula.t list =
     let state, _, _, _ = astate in
@@ -1287,9 +1283,9 @@ module Make
               | Some os -> (
                   let subst = make_id_subst ga in
                   match produce os subst ga with
-                  | Ok [ x ] -> Some x
-                  | Ok _ -> failwith "multiple productions in bi-abduction"
-                  | Error _ -> None)
+                  | [ x ], [] -> Some x
+                  | _ :: _, _ -> failwith "multiple productions in bi-abduction"
+                  | _ -> None)
               | None -> None)
             (Some state) asrts
         in

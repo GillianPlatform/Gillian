@@ -187,3 +187,14 @@ let for_alli f l =
     | x :: xs -> if f i x then aux (i + 1) xs else false
   in
   aux 0 l
+
+let bi_concat l =
+  let rec aux xs ys = function
+    | (xs', ys') :: rest -> aux (xs @ xs') (ys @ ys') rest
+    | [] -> (xs, ys)
+  in
+  aux [] [] l
+
+let empty = function
+  | [] -> true
+  | _ -> false

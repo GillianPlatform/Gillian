@@ -36,9 +36,7 @@ module M = struct
   type err_t = vt list * i_fix_t list list * Formula.t [@@deriving yojson, show]
 
   type action_ret =
-    ( (t * vt list * Formula.t list * (string * Type.t) list) list,
-      err_t list )
-    result
+    (t * vt list * Formula.t list * (string * Type.t) list) list * err_t list
 
   let pp_i_fix ft (i_fix : i_fix_t) : unit =
     let open Fmt in
@@ -163,7 +161,7 @@ module M = struct
                   ((Fmt.to_to_string Expr.pp) le)))
     in
     SHeap.init_object heap loc_name ~is_empty:ie mv;
-    Ok [ (heap, [ loc ], [], []) ]
+    ([ (heap, [ loc ], [], []) ], [])
 
   let set_cell
       (heap : t)
@@ -174,7 +172,7 @@ module M = struct
       (v : vt) : action_ret =
     let loc_name, _, new_pfs = fresh_loc ~loc pfs gamma in
     SHeap.set_fv_pair heap loc_name prop v;
-    Ok [ (heap, [], new_pfs, []) ]
+    ([ (heap, [], new_pfs, []) ], [])
 
   let get_cell
       (heap : t)
@@ -217,16 +215,16 @@ module M = struct
       | None -> ([ loc; prop ], fix_new_property :: fixes_exist_props, ff)
     in
 
-    let get_cell_from_loc loc_name =
-      Option.fold
-        ~some:(fun ((fv_list, dom), mtdt) ->
+    let get_cell_from_loc loc_name : action_ret =
+      match SHeap.get heap loc_name with
+      | Some ((fv_list, dom), mtdt) -> (
           L.tmi (fun m -> m "fv_list: %a" SFVL.pp fv_list);
           L.tmi (fun m ->
               m "domain: %a" Fmt.(option ~none:(any "None") Expr.pp) dom);
           L.tmi (fun m ->
               m "metadata: %a" Fmt.(option ~none:(any "None") Expr.pp) mtdt);
           match SFVL.get prop fv_list with
-          | Some ffv -> Ok [ (heap, [ loc; prop; ffv ], [], []) ]
+          | Some ffv -> ([ (heap, [ loc; prop; ffv ], [], []) ], [])
           | None -> (
               match
                 ( dom,
@@ -235,12 +233,12 @@ module M = struct
                     fv_list )
               with
               | None, None ->
-                  Error
+                  ( [],
                     [
                       make_gc_error loc_name prop (SFVL.field_names fv_list)
                         None;
-                    ]
-              | _, Some (ffn, ffv) -> Ok [ (heap, [ loc; ffn; ffv ], [], []) ]
+                    ] )
+              | _, Some (ffn, ffv) -> ([ (heap, [ loc; ffn; ffv ], [], []) ], [])
               | Some dom, None ->
                   let a_set_inclusion : Formula.t = Not (SetMem (prop, dom)) in
                   if
@@ -256,7 +254,7 @@ module M = struct
                     in
                     let fv_list' = SFVL.add prop (Lit Nono) fv_list in
                     SHeap.set heap loc_name fv_list' (Some new_domain) mtdt;
-                    Ok [ (heap, [ loc; prop; Lit Nono ], [], []) ])
+                    ([ (heap, [ loc; prop; Lit Nono ], [], []) ], []))
                   else
                     let f_names : Expr.t list = SFVL.field_names fv_list in
                     let full_knowledge : Formula.t = Eq (dom, ESet f_names) in
@@ -305,22 +303,20 @@ module M = struct
                         | true ->
                             [ (heap, [ loc; prop; Lit Nono ], [ new_f ], []) ]
                       in
-                      Ok (rets @ dom_ret))
+                      (rets @ dom_ret, []))
                     else
-                      Error
+                      ( [],
                         [
                           make_gc_error loc_name prop (SFVL.field_names fv_list)
                             (Some dom);
-                        ]))
-        ~none:
-          (Error [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], Formula.False) ])
-        (SHeap.get heap loc_name)
+                        ] )))
+      | None ->
+          ([], [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], Formula.False) ])
     in
 
     let result =
       Option.fold ~some:get_cell_from_loc
-        ~none:
-          (Error [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], Formula.False) ])
+        ~none:([], [ ([], [ [ FLoc loc; FCell (loc, prop) ] ], Formula.False) ])
         loc_name
     in
     result
@@ -340,7 +336,7 @@ module M = struct
         ~none:() (SHeap.get heap loc_name)
     in
     Option.fold ~some:f ~none:() (get_loc_name pfs gamma loc);
-    Ok [ (heap, [], [], []) ]
+    ([ (heap, [], [], []) ], [])
 
   let set_domain
       (heap : t)
@@ -355,7 +351,7 @@ module M = struct
     | Some ((fv_list, _), mtdt) ->
         (* TODO: This probably needs to be a bit more sophisticated *)
         SHeap.set heap loc_name fv_list (Some dom) mtdt);
-    Ok [ (heap, [], new_pfs, []) ]
+    ([ (heap, [], new_pfs, []) ], [])
 
   let get_metadata (heap : t) (pfs : PFS.t) (gamma : Type_env.t) (loc : vt) :
       action_ret =
@@ -366,24 +362,17 @@ module M = struct
       ([ loc ], [ [ FMetadata loc ] ], False)
     in
 
-    let f loc_name =
-      let loc =
-        if Names.is_aloc_name loc_name then Expr.ALoc loc_name
-        else Expr.Lit (Loc loc_name)
-      in
-      match SHeap.get heap loc_name with
-      | None -> Error [ make_gm_error loc_name ]
-      | Some ((_, _), mtdt) ->
-          Option.fold
-            ~some:(fun mtdt -> Ok [ (heap, [ loc; mtdt ], [], []) ])
-            ~none:(Error [ make_gm_error loc_name ])
-            mtdt
-    in
-
-    Option.fold ~some:f
-      ~none:
-        (Error [ ([ loc ], [ [ FLoc loc; FMetadata loc ] ], Formula.False) ])
-      loc_name
+    match loc_name with
+    | Some loc_name -> (
+        let loc =
+          if Names.is_aloc_name loc_name then Expr.ALoc loc_name
+          else Expr.Lit (Loc loc_name)
+        in
+        match SHeap.get heap loc_name with
+        | None -> ([], [ make_gm_error loc_name ])
+        | Some (_, Some mtdt) -> ([ (heap, [ loc; mtdt ], [], []) ], [])
+        | _ -> ([], [ make_gm_error loc_name ]))
+    | None -> ([], [ ([ loc ], [ [ FLoc loc; FMetadata loc ] ], Formula.False) ])
 
   let set_metadata
       (heap : t)
@@ -403,7 +392,7 @@ module M = struct
           PFS.extend pfs (Eq (mtdt, omet))
         else SHeap.set heap loc_name fv_list dom (Some mtdt));
     L.tmi (fun m -> m "Done setting metadata.");
-    Ok [ (heap, [], new_pfs, []) ]
+    ([ (heap, [], new_pfs, []) ], [])
 
   let delete_object (heap : t) (pfs : PFS.t) (gamma : Type_env.t) (loc : vt) :
       action_ret =
@@ -413,7 +402,7 @@ module M = struct
     | Some loc_name ->
         if SHeap.has_loc heap loc_name then (
           SHeap.remove heap loc_name;
-          Ok [ (heap, [], [], []) ])
+          ([ (heap, [], [], []) ], []))
         else raise (Failure "delete_obj. Unknown Location")
     | None -> raise (Failure "delete_obj. Unknown Location")
 
@@ -428,87 +417,79 @@ module M = struct
     L.verbose (fun fmt -> fmt "Get partial domain");
     L.verbose (fun fmt -> fmt "Expected domain: %a" SVal.pp e_dom);
 
-    let f loc_name =
-      let loc = Expr.loc_from_loc_name loc_name in
-      match SHeap.get heap loc_name with
-      | None -> raise (Failure "DEATH. get_partial_domain. illegal loc_name")
-      | Some ((_, None), _) ->
-          raise (Failure "DEATH. get_partial_domain. missing domain")
-      | Some ((fv_list, Some dom), mtdt) -> (
-          L.verbose (fun fmt -> fmt "Domain: %a" Expr.pp dom);
-          let none_fv_list, pos_fv_list =
-            SFVL.partition (fun _ fv -> fv = Lit Nono) fv_list
-          in
-          (* Called from the entailment - compute all negative resource associated with
-             the location whose name is loc_name *)
-          let none_props = SFVL.field_names none_fv_list in
-          L.verbose (fun fmt ->
-              fmt "None-props in heap: %a"
-                Fmt.(brackets (list ~sep:comma Expr.pp))
-                none_props);
-          let dom' = Expr.BinOp (dom, SetDiff, ESet none_props) in
-          let dom'' =
-            Reduction.reduce_lexpr ?gamma:(Some gamma) ?pfs:(Some pfs) dom'
-          in
+    match loc_name with
+    | Some loc_name -> (
+        let loc = Expr.loc_from_loc_name loc_name in
+        match SHeap.get heap loc_name with
+        | None -> raise (Failure "DEATH. get_partial_domain. illegal loc_name")
+        | Some ((_, None), _) ->
+            raise (Failure "DEATH. get_partial_domain. missing domain")
+        | Some ((fv_list, Some dom), mtdt) -> (
+            L.verbose (fun fmt -> fmt "Domain: %a" Expr.pp dom);
+            let none_fv_list, pos_fv_list =
+              SFVL.partition (fun _ fv -> fv = Lit Nono) fv_list
+            in
+            (* Called from the entailment - compute all negative resource associated with
+               the location whose name is loc_name *)
+            let none_props = SFVL.field_names none_fv_list in
+            L.verbose (fun fmt ->
+                fmt "None-props in heap: %a"
+                  Fmt.(brackets (list ~sep:comma Expr.pp))
+                  none_props);
+            let dom' = Expr.BinOp (dom, SetDiff, ESet none_props) in
+            let dom'' =
+              Reduction.reduce_lexpr ?gamma:(Some gamma) ?pfs:(Some pfs) dom'
+            in
 
-          (* Expected dom - dom *)
-          let dom_diff = Expr.BinOp (e_dom, SetDiff, dom'') in
-          let dom_diff' =
-            Reduction.reduce_lexpr ?gamma:(Some gamma) ?pfs:(Some pfs) dom_diff
-          in
+            (* Expected dom - dom *)
+            let dom_diff = Expr.BinOp (e_dom, SetDiff, dom'') in
+            let dom_diff' =
+              Reduction.reduce_lexpr ?gamma:(Some gamma) ?pfs:(Some pfs)
+                dom_diff
+            in
 
-          (* if dom_diff' != {} then we have to put the excess properties in the heap as nones *)
-          match dom_diff' with
-          | ESet props ->
-              let new_fv_list =
-                List.fold_left
-                  (fun fv_list prop -> SFVL.add prop (Lit Nono) fv_list)
-                  pos_fv_list props
-              in
-              SHeap.set heap loc_name new_fv_list (Some e_dom) mtdt;
-              Ok [ (heap, [ loc; e_dom ], [], []) ]
-          | _ -> raise (Failure "DEATH. get_partial_domain. dom_diff"))
-    in
-    let result =
-      Option.fold ~some:f
-        ~none:(Error [ ([ loc ], [], Formula.False) ])
-        loc_name
-    in
-    result
+            (* if dom_diff' != {} then we have to put the excess properties in the heap as nones *)
+            match dom_diff' with
+            | ESet props ->
+                let new_fv_list =
+                  List.fold_left
+                    (fun fv_list prop -> SFVL.add prop (Lit Nono) fv_list)
+                    pos_fv_list props
+                in
+                SHeap.set heap loc_name new_fv_list (Some e_dom) mtdt;
+                ([ (heap, [ loc; e_dom ], [], []) ], [])
+            | _ -> raise (Failure "DEATH. get_partial_domain. dom_diff")))
+    | None -> ([], [ ([ loc ], [], Formula.False) ])
 
   let get_full_domain (heap : t) (pfs : PFS.t) (gamma : Type_env.t) (loc : vt) :
       action_ret =
     let loc_name = get_loc_name pfs gamma loc in
-    let f loc_name =
-      let loc = Expr.loc_from_loc_name loc_name in
-      match SHeap.get heap loc_name with
-      | None ->
-          (* This should never happen *)
-          raise (Failure "DEATH. get_full_domain. illegal loc_name")
-      | Some ((_, None), _) ->
-          (* This is not correct *)
-          raise (Failure "DEATH. TODO. get_full_domain. missing domain")
-      | Some ((fv_list, Some dom), _) ->
-          let props = SFVL.field_names fv_list in
-          let a_set_equality : Formula.t = Eq (dom, ESet props) in
-          let solver_ret =
-            FOSolver.check_entailment Containers.SS.empty pfs [ a_set_equality ]
-              gamma
-          in
-          if solver_ret then
-            let _, pos_fv_list =
-              SFVL.partition (fun _ fv -> fv = Lit Nono) fv_list
+    match loc_name with
+    | Some loc_name -> (
+        let loc = Expr.loc_from_loc_name loc_name in
+        match SHeap.get heap loc_name with
+        | None ->
+            (* This should never happen *)
+            raise (Failure "DEATH. get_full_domain. illegal loc_name")
+        | Some ((_, None), _) ->
+            (* This is not correct *)
+            raise (Failure "DEATH. TODO. get_full_domain. missing domain")
+        | Some ((fv_list, Some dom), _) ->
+            let props = SFVL.field_names fv_list in
+            let a_set_equality : Formula.t = Eq (dom, ESet props) in
+            let solver_ret =
+              FOSolver.check_entailment Containers.SS.empty pfs
+                [ a_set_equality ] gamma
             in
-            Ok [ (heap, [ loc; EList (SFVL.field_names pos_fv_list) ], [], []) ]
-          else raise (Failure "DEATH. TODO. get_full_domain. incomplete domain")
-    in
-
-    let result =
-      Option.fold ~some:f
-        ~none:(Error [ ([ loc ], [], Formula.False) ])
-        loc_name
-    in
-    result
+            if solver_ret then
+              let _, pos_fv_list =
+                SFVL.partition (fun _ fv -> fv = Lit Nono) fv_list
+              in
+              ( [ (heap, [ loc; EList (SFVL.field_names pos_fv_list) ], [], []) ],
+                [] )
+            else
+              raise (Failure "DEATH. TODO. get_full_domain. incomplete domain"))
+    | None -> ([], [ ([ loc ], [], Formula.False) ])
 
   let remove_domain (heap : t) (pfs : PFS.t) (gamma : Type_env.t) (loc : vt) :
       action_ret =
@@ -520,7 +501,7 @@ module M = struct
         ~none:() (SHeap.get heap loc_name)
     in
     Option.fold ~some:f ~none:() (get_loc_name pfs gamma loc);
-    Ok [ (heap, [], [], []) ]
+    ([ (heap, [], [], []) ], [])
 
   let execute_action
       ?unification:_
@@ -564,7 +545,7 @@ module M = struct
       | _ -> raise (Failure "Internal Error. execute_action. setMetadata")
     else if action = JSILNames.delMetadata then
       match args with
-      | [ _ ] -> Ok [ (heap, [], [], []) ]
+      | [ _ ] -> ([ (heap, [], [], []) ], [])
       | _ -> raise (Failure "Internal Error. execute_action. delMetadata")
     else if action = JSILNames.getProps then
       match args with
@@ -823,7 +804,7 @@ module M = struct
     (* Missing metadata: create new, no new variables *)
     | CFMetadata (l, v) -> (
         match set_metadata mem pfs gamma l v with
-        | Ok [ (mem, [], new_pfs, []) ] ->
+        | [ (mem, [], new_pfs, []) ], [] ->
             List.iter (fun f -> PFS.extend pfs f) new_pfs;
             mem
         | _ -> raise (Failure "Bi-abduction: cannot fix metadata."))
@@ -835,12 +816,12 @@ module M = struct
           else Lit (Loc loc_name)
         in
         match alloc mem pfs (Some loc) ~is_empty:true None with
-        | Ok [ (mem, [ loc' ], [], []) ] when loc' = loc -> mem
+        | [ (mem, [ loc' ], [], []) ], [] when loc' = loc -> mem
         | _ -> raise (Failure "Bi-abduction: cannot fix missing location."))
     (* Missing cell: create new *)
     | CFCell (l, p, v) -> (
         match set_cell mem pfs gamma l p v with
-        | Ok [ (mem, [], new_pfs, []) ] ->
+        | [ (mem, [], new_pfs, []) ], [] ->
             List.iter (fun f -> PFS.extend pfs f) new_pfs;
             mem
         | _ -> raise (Failure "Bi-abduction: cannot fix cell."))

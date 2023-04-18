@@ -25,38 +25,8 @@ struct
 
   exception Internal_State_Error of err_t list * t
 
-  type action_ret = ((t * vt list) list, err_t list) result
+  type action_ret = (t * vt list) list * err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
-
-  let merge_action_results (rets : action_ret list) : action_ret =
-    let ret_succs, ret_fails =
-      List.partition
-        (fun ret ->
-          match ret with
-          | Ok _ -> true
-          | _ -> false)
-        rets
-    in
-    if ret_fails <> [] then
-      let errs =
-        List.map
-          (fun ret ->
-            match ret with
-            | Error errs -> errs
-            | _ -> [])
-          ret_fails
-      in
-      Error (List.concat errs)
-    else
-      let rets =
-        List.map
-          (fun ret ->
-            match ret with
-            | Ok rets -> rets
-            | _ -> [])
-          ret_succs
-      in
-      Ok (List.concat rets)
 
   let get_pred_defs (bi_state : t) : UP.preds_tbl_t option =
     let _, state, _ = bi_state in
@@ -501,7 +471,7 @@ struct
   let produce_posts (_ : t) (_ : st) (_ : Asrt.t list) : t list =
     raise (Failure "produce_posts from bi_state.")
 
-  let produce (_ : t) (_ : st) (_ : Asrt.t) : (t list, err_t list) result =
+  let produce (_ : t) (_ : st) (_ : Asrt.t) : t list * err_t list =
     raise (Failure "produce_posts from bi_state.")
 
   let unify_assertion (_ : t) (_ : st) (_ : UP.step) : u_res =
@@ -545,19 +515,18 @@ struct
       (astate : t)
       (args : vt list) : action_ret =
     let procs, state, state_af = astate in
-    match State.execute_action ~unification action state args with
-    | Ok rets ->
-        let rets' =
-          List.map (fun (st, outs) -> ((procs, st, state_af), outs)) rets
-        in
-        Ok rets'
-    | Error errs when State.can_fix errs ->
+    let rets, errs = State.execute_action ~unification action state args in
+    let rets =
+      rets |> List.map (fun (st, outs) -> ((procs, st, state_af), outs))
+    in
+    let fix_rets, errs =
+      if State.can_fix errs then (
         L.(
           verbose (fun m ->
               m "BState: EA: %d errors and they can be fixed."
                 (List.length errs)));
         let rets =
-          List.map
+          List.filter_map
             (fun fix ->
               let state' = State.copy state in
               let state_af' = State.copy state_af in
@@ -569,9 +538,10 @@ struct
               | _ -> None)
             (State.get_fixes ~simple_fix:false state errs)
         in
-        let rets = List_utils.get_list_somes rets in
-        merge_action_results rets
-    | Error errs -> Error errs
+        List_utils.bi_concat rets)
+      else ([], errs)
+    in
+    (rets @ fix_rets, errs)
 
   let get_equal_values bi_state =
     let _, state, _ = bi_state in

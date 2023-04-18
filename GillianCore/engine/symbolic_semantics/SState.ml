@@ -52,7 +52,7 @@ module Make (SMemory : SMemory.S) :
     | FAsrt of Asrt.t
 
   type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson, show]
-  type action_ret = ((t * vt list) list, err_t list) result
+  type action_ret = (t * vt list) list * err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
 
   exception Internal_State_Error of err_t list * t
@@ -188,24 +188,21 @@ module Make (SMemory : SMemory.S) :
       (state : t)
       (args : vt list) : action_ret =
     let heap, store, pfs, gamma, vars = state in
-    match SMemory.execute_action ~unification action heap pfs gamma args with
-    | Ok ret_succs ->
-        let result =
-          Ok
-            (List.map
-               (fun (new_heap, v, new_fofs, new_types) ->
-                 let new_store = SStore.copy store in
-                 let new_pfs = PFS.copy pfs in
-                 let new_gamma = Type_env.copy gamma in
-                 List.iter
-                   (fun (x, t) -> Type_env.update new_gamma x t)
-                   new_types;
-                 List.iter (fun fof -> PFS.extend new_pfs fof) new_fofs;
-                 ((new_heap, new_store, new_pfs, new_gamma, vars), v))
-               ret_succs)
-        in
-        result
-    | Error errs -> Error (lift_merrs errs)
+    let ret_succs, errs =
+      SMemory.execute_action ~unification action heap pfs gamma args
+    in
+    let ret_succs =
+      ret_succs
+      |> List.map (fun (new_heap, v, new_fofs, new_types) ->
+             let new_store = SStore.copy store in
+             let new_pfs = PFS.copy pfs in
+             let new_gamma = Type_env.copy gamma in
+             List.iter (fun (x, t) -> Type_env.update new_gamma x t) new_types;
+             List.iter (fun fof -> PFS.extend new_pfs fof) new_fofs;
+             ((new_heap, new_store, new_pfs, new_gamma, vars), v))
+    in
+    let errs = lift_merrs errs in
+    (ret_succs, errs)
 
   let ga_to_setter (a_id : string) = SMemory.ga_to_setter a_id
   let ga_to_getter (a_id : string) = SMemory.ga_to_getter a_id
@@ -579,7 +576,7 @@ module Make (SMemory : SMemory.S) :
   let produce_posts (_ : t) (_ : st) (_ : Asrt.t list) : t list =
     raise (Failure "produce_posts from non-abstract symbolic state.")
 
-  let produce (_ : t) (_ : st) (_ : Asrt.t) : (t list, err_t list) result =
+  let produce (_ : t) (_ : st) (_ : Asrt.t) : t list * err_t list =
     raise (Failure "produce_post from non-abstract symbolic state.")
 
   let fresh_val (_ : t) : vt = LVar (LVar.alloc ())

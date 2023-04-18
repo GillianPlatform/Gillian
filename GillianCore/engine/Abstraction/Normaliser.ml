@@ -816,19 +816,16 @@ struct
             let new_states =
               List.fold_left
                 (fun acc astate ->
-                  match
+                  let astates, errs =
                     SPState.produce astate subst (Asrt.GA (a, ins, outs))
-                  with
-                  | Ok astates -> astates @ acc
-                  | Error msg ->
-                      L.verbose (fun m ->
-                          m
-                            "Produce GA failed for: %a!\n\
-                             with Message: %a. Might have lost some paths ?"
-                            Asrt.pp
-                            (Asrt.GA (a, ins, outs))
-                            (pp_list SPState.pp_err_t) msg);
-                      acc)
+                  in
+                  L.verbose (fun m ->
+                      m
+                        "Produce GA errored for: %a!\n\
+                         with Message: %a. Might have lost some paths ?" Asrt.pp
+                        (Asrt.GA (a, ins, outs))
+                        (pp_list SPState.pp_err_t) errs);
+                  astates @ acc)
                 [] astates
             in
             loop new_states rest

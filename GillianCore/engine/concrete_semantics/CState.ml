@@ -40,7 +40,7 @@ end = struct
 
   exception Internal_State_Error of err_t list * t
 
-  type action_ret = ((t * vt list) list, err_t list) result
+  type action_ret = (t * vt list) list * err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
 
   let lift_merrs (errs : m_err_t list) : err_t list =
@@ -56,8 +56,8 @@ end = struct
       (args : vt list) : action_ret =
     let heap, store, locs = state in
     match CMemory.execute_action action heap args with
-    | Ok (heap, vs) -> Ok [ ((heap, store, locs), vs) ]
-    | Error errs -> Error (lift_merrs errs)
+    | Ok (heap, vs) -> ([ ((heap, store, locs), vs) ], [])
+    | Error errs -> ([], lift_merrs errs)
 
   let ga_to_setter _ = failwith "ga_to_setter for CState"
   let ga_to_getter _ = failwith "ga_to_getter for CState"
@@ -200,7 +200,7 @@ end = struct
   let produce_posts (_ : t) (_ : st) (_ : Asrt.t list) : t list =
     raise (Failure "produce_posts from concrete state.")
 
-  let produce (_ : t) (_ : st) (_ : Asrt.t) : (t list, err_t list) result =
+  let produce (_ : t) (_ : st) (_ : Asrt.t) : t list * err_t list =
     raise (Failure "produce_post from non-abstract symbolic state.")
 
   let update_subst (_ : t) (_ : st) : unit = ()

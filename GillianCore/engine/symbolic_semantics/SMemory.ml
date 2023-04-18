@@ -16,9 +16,7 @@ module type S = sig
   type t [@@deriving yojson]
 
   type action_ret =
-    ( (t * vt list * Formula.t list * (string * Type.t) list) list,
-      err_t list )
-    result
+    (t * vt list * Formula.t list * (string * Type.t) list) list * err_t list
 
   (** Initialisation *)
   val init : init_data -> t
@@ -87,9 +85,7 @@ module Dummy : S with type init_data = unit = struct
   type t = unit [@@deriving yojson]
 
   type action_ret =
-    ( (t * vt list * Formula.t list * (string * Type.t) list) list,
-      err_t list )
-    result
+    (t * vt list * Formula.t list * (string * Type.t) list) list * err_t list
 
   let init () = ()
   let clear () = ()

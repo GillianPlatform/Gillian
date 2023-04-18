@@ -102,7 +102,7 @@ module Make
       let af_asrt = Asrt.star (SPState.to_assertions state_af) in
       let af_subst = make_id_subst af_asrt in
       match SPState.produce state_i af_subst af_asrt with
-      | Ok [ state_i' ] ->
+      | [ state_i' ], [] ->
           (* FIXME: NOT WORKING DUE TO SIMPLIFICATION TYPE CHANGING *)
           let _ = SPState.simplify ~kill_new_lvars:true state_i' in
           let pre =
@@ -118,8 +118,8 @@ module Make
                  (* let state_i'' = JSCleanUp.exec prog state_i'' name true in  *)
                  Asrt.star (List.sort Asrt.compare (SPState.to_assertions ~to_keep:pvars state_i''))) in *)
           (pre, pre)
-      | Ok _ -> failwith "Bi-abduction: anti-frame branched"
-      | Error _ ->
+      | _ :: _, _ -> failwith "Bi-abduction: anti-frame branched"
+      | _ ->
           raise
             (Failure "Bi-abduction: cannot produce anti-frame in initial state")
     in

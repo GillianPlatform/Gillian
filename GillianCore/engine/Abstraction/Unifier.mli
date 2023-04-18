@@ -71,8 +71,8 @@ module type S = sig
   type u_res = UWTF | USucc of t | UFail of err_t list
   type unfold_info_t = (string * string) list
 
-  val produce_assertion : t -> st -> Asrt.t -> (t list, err_t list) result
-  val produce : t -> st -> Asrt.t -> (t list, err_t list) result
+  val produce_assertion : t -> st -> Asrt.t -> t list * err_t list
+  val produce : t -> st -> Asrt.t -> t list * err_t list
   val produce_posts : t -> st -> Asrt.t list -> t list
   val unfold : t -> string -> vt list -> unfold_info_t option -> (st * t) list
   val rec_unfold : ?fuel:int -> t -> string -> vt list -> t list

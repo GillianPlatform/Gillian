@@ -73,11 +73,10 @@ module Lift (MSM : S) :
     List.map Engine.Reduction.reduce_assertion (assertions ?to_keep t)
 
   type action_ret =
-    ( (t * vt list * Formula.t list * (string * Type.t) list) list,
-      err_t list )
-    result
+    (t * vt list * Formula.t list * (string * Type.t) list) list * err_t list
 
-  let execute_action ?(unification = false) action_name mem pfs gamma params =
+  let execute_action ?(unification = false) action_name mem pfs gamma params :
+      action_ret =
     let process = execute_action ~action_name mem params in
     let pfs = PFS.copy pfs in
     let gamma = Type_env.copy gamma in
@@ -99,16 +98,13 @@ module Lift (MSM : S) :
       aux [] [] res
     in
     let successes, failures = split results in
-    let is_empty list = Int.equal (List.compare_length_with list 0) 0 in
-    if not (is_empty failures) then Error failures
-    else
-      let asucs =
-        List.map
-          (fun (fset, glis, (t, vtl)) ->
-            (t, vtl, List.of_seq (Formula.Set.to_seq fset), glis))
-          successes
-      in
-      Ok asucs
+    let asucs =
+      List.map
+        (fun (fset, glis, (t, vtl)) ->
+          (t, vtl, List.of_seq (Formula.Set.to_seq fset), glis))
+        successes
+    in
+    (asucs, failures)
 
   let substitution_in_place ~pfs ~gamma subst mem :
       (t * Formula.Set.t * (string * Type.t) list) list =

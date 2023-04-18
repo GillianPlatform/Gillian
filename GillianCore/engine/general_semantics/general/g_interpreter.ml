@@ -943,146 +943,154 @@ struct
               "LAction");
         AnnotatedAction.log { annot; action_name = a } |> ignore;
         let v_es = List.map eval_expr es in
-        match State.execute_action a state v_es with
-        | Ok [] -> failwith "HORROR: Successful action resulted in no states"
-        | Ok ((state', vs) :: rest_rets) -> (
-            DL.log (fun m ->
-                m
-                  ~json:
-                    [
-                      ("state'", state_t_to_yojson state');
-                      ("vs", `List (List.map state_vt_to_yojson vs));
-                    ]
-                  "Ok");
-            let e' = Expr.EList (List.map Val.to_expr vs) in
-            let v' = eval_expr e' in
-            let state'' = update_store state' x v' in
-            let rest_confs, new_branches =
-              List.split
-              @@ List.map
-                   (fun (r_state, r_vs) ->
-                     let r_e = Expr.EList (List.map Val.to_expr r_vs) in
-                     let r_v = eval_expr r_e in
-                     let r_state' = update_store r_state x r_v in
-                     let branch_case =
-                       LAction (r_vs |> List.map state_vt_to_yojson)
-                     in
-                     ( make_confcont ~state:r_state'
-                         ~callstack:(Call_stack.copy cs)
-                         ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                         ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
-                         (),
-                       (r_state', i + 1, branch_case) ))
-                   rest_rets
-            in
-            let ret_len = 1 + List.length rest_rets in
-            let b_counter = b_counter + if ret_len > 1 then 1 else 0 in
-            let branch_case = LAction (vs |> List.map state_vt_to_yojson) in
-            match
-              (ret_len >= 3 && !Config.parallel, ret_len = 2 && !Config.parallel)
-              (* XXX: && !Config.act_threads < !Config.max_threads ) *)
-            with
-            | true, _ -> (
-                (* print_endline (Printf.sprintf "Action returned >=3: %d" (!Config.act_threads + 2)); *)
-                let pid = Unix.fork () in
-                match pid with
-                | 0 -> (
-                    let pid = Unix.fork () in
-                    match pid with
-                    | 0 -> List.tl rest_confs
-                    | _ -> [ List.hd rest_confs ])
-                | _ ->
-                    [
-                      make_confcont ~state:state'' ~callstack:cs
-                        ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                        ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
-                        ~new_branches ();
-                    ])
-            | false, true -> (
-                (* Can split into two threads *)
-                let b_counter = b_counter + 1 in
-                (* print_endline (Printf.sprintf "Action returned 2: %d" (!Config.act_threads + 1)); *)
-                let pid = Unix.fork () in
-                match pid with
-                | 0 ->
-                    [
-                      make_confcont ~state:state'' ~callstack:cs
-                        ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                        ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
-                        ~new_branches ();
-                    ]
-                | _ -> rest_confs)
-            | _ ->
-                make_confcont ~state:state'' ~callstack:cs
-                  ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                  ~next_idx:(i + 1) ~branch_count:b_counter ()
-                :: rest_confs)
-        | Error errs ->
-            DL.log (fun m ->
-                m
-                  ~json:
-                    [ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
-                  "Error");
-            if not (Exec_mode.concrete_exec !Config.current_exec_mode) then (
-              let expr_params = List.map Val.to_expr v_es in
-              let recovery_params =
-                List.concat_map Expr.base_elements expr_params
-              in
-              let recovery_params =
-                List.map Option.get (List.map Val.from_expr recovery_params)
-              in
-              let recovery_vals =
-                State.get_recovery_vals state errs @ recovery_params
-              in
-              let recovery_states : (State.t list, string) result =
-                State.automatic_unfold state recovery_vals
-              in
-              match recovery_states with
-              | Ok recovery_states ->
-                  let b_counter =
-                    b_counter + if List.length recovery_states = 1 then 0 else 1
-                  in
-                  List.mapi
-                    (fun ix state ->
-                      let branch_case =
-                        if List.length recovery_states > 1 then
-                          Some (LActionFail ix)
-                        else None
-                      in
-                      let new_branches =
-                        match (ix, recovery_states) with
-                        | 0, _ :: rest ->
-                            Some
-                              (List.mapi
-                                 (fun ix state ->
-                                   (state, i, LActionFail (ix + 1)))
-                                 rest)
-                        | _ -> None
-                      in
-                      make_confcont ~state ~callstack:cs
-                        ~invariant_frames:iframes ~prev_idx:prev
-                        ~loop_ids:prev_loop_ids ~next_idx:i
-                        ~branch_count:b_counter ?branch_case ?new_branches ())
-                    recovery_states
+        let rets, errs = State.execute_action a state v_es in
+        if List_utils.empty rets && List_utils.empty errs then
+          failwith "HORROR: Successful action resulted in no states";
+        let (state', vs), rest_rets = (List.hd rets, List.tl rets) in
+        let rets_confs =
+          DL.log (fun m ->
+              m
+                ~json:
+                  [
+                    ("state'", state_t_to_yojson state');
+                    ("vs", `List (List.map state_vt_to_yojson vs));
+                  ]
+                "Ok");
+          let e' = Expr.EList (List.map Val.to_expr vs) in
+          let v' = eval_expr e' in
+          let state'' = update_store state' x v' in
+          let rest_confs, new_branches =
+            List.split
+            @@ List.map
+                 (fun (r_state, r_vs) ->
+                   let r_e = Expr.EList (List.map Val.to_expr r_vs) in
+                   let r_v = eval_expr r_e in
+                   let r_state' = update_store r_state x r_v in
+                   let branch_case =
+                     LAction (r_vs |> List.map state_vt_to_yojson)
+                   in
+                   ( make_confcont ~state:r_state'
+                       ~callstack:(Call_stack.copy cs) ~invariant_frames:iframes
+                       ~prev_idx:i ~loop_ids ~next_idx:(i + 1)
+                       ~branch_count:b_counter ~branch_case (),
+                     (r_state', i + 1, branch_case) ))
+                 rest_rets
+          in
+          let ret_len = 1 + List.length rest_rets in
+          let b_counter = b_counter + if ret_len > 1 then 1 else 0 in
+          let branch_case = LAction (vs |> List.map state_vt_to_yojson) in
+          match
+            (ret_len >= 3 && !Config.parallel, ret_len = 2 && !Config.parallel)
+            (* XXX: && !Config.act_threads < !Config.max_threads ) *)
+          with
+          | true, _ -> (
+              (* print_endline (Printf.sprintf "Action returned >=3: %d" (!Config.act_threads + 2)); *)
+              let pid = Unix.fork () in
+              match pid with
+              | 0 -> (
+                  let pid = Unix.fork () in
+                  match pid with
+                  | 0 -> List.tl rest_confs
+                  | _ -> [ List.hd rest_confs ])
               | _ ->
-                  let pp_err ft (a, errs) =
-                    Fmt.pf ft "FAILURE: Action %s failed with: %a" a
-                      (Fmt.Dump.list State.pp_err)
-                      errs
-                  in
-                  Fmt.pr "%a\n@?" (Fmt.styled `Red pp_err) (a, errs);
-                  L.normal ~title:"failure" ~severity:Error (fun m ->
-                      m "Action call failed with:@.%a"
+                  [
+                    make_confcont ~state:state'' ~callstack:cs
+                      ~invariant_frames:iframes ~prev_idx:i ~loop_ids
+                      ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
+                      ~new_branches ();
+                  ])
+          | false, true -> (
+              (* Can split into two threads *)
+              let b_counter = b_counter + 1 in
+              (* print_endline (Printf.sprintf "Action returned 2: %d" (!Config.act_threads + 1)); *)
+              let pid = Unix.fork () in
+              match pid with
+              | 0 ->
+                  [
+                    make_confcont ~state:state'' ~callstack:cs
+                      ~invariant_frames:iframes ~prev_idx:i ~loop_ids
+                      ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
+                      ~new_branches ();
+                  ]
+              | _ -> rest_confs)
+          | _ ->
+              make_confcont ~state:state'' ~callstack:cs
+                ~invariant_frames:iframes ~prev_idx:i ~loop_ids
+                ~next_idx:(i + 1) ~branch_count:b_counter ()
+              :: rest_confs
+        in
+        let recovery_confs =
+          match errs with
+          | [] -> []
+          | _ ->
+              DL.log (fun m ->
+                  m
+                    ~json:
+                      [ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
+                    "Error");
+              if not (Exec_mode.concrete_exec !Config.current_exec_mode) then (
+                let expr_params = List.map Val.to_expr v_es in
+                let recovery_params =
+                  List.concat_map Expr.base_elements expr_params
+                in
+                let recovery_params =
+                  List.map Option.get (List.map Val.from_expr recovery_params)
+                in
+                let recovery_vals =
+                  State.get_recovery_vals state errs @ recovery_params
+                in
+                let recovery_states : (State.t list, string) result =
+                  State.automatic_unfold state recovery_vals
+                in
+                match recovery_states with
+                | Ok recovery_states ->
+                    let b_counter =
+                      b_counter
+                      + if List.length recovery_states = 1 then 0 else 1
+                    in
+                    List.mapi
+                      (fun ix state ->
+                        let branch_case =
+                          if List.length recovery_states > 1 then
+                            Some (LActionFail ix)
+                          else None
+                        in
+                        let new_branches =
+                          match (ix, recovery_states) with
+                          | 0, _ :: rest ->
+                              Some
+                                (List.mapi
+                                   (fun ix state ->
+                                     (state, i, LActionFail (ix + 1)))
+                                   rest)
+                          | _ -> None
+                        in
+                        make_confcont ~state ~callstack:cs
+                          ~invariant_frames:iframes ~prev_idx:prev
+                          ~loop_ids:prev_loop_ids ~next_idx:i
+                          ~branch_count:b_counter ?branch_case ?new_branches ())
+                      recovery_states
+                | _ ->
+                    let pp_err ft (a, errs) =
+                      Fmt.pf ft "FAILURE: Action %s failed with: %a" a
                         (Fmt.Dump.list State.pp_err)
-                        errs);
-                  raise (State.Internal_State_Error (errs, state)))
-            else
-              let pp_err ft (a, errs) =
-                Fmt.pf ft "FAILURE: Action %s failed with: %a" a
-                  (Fmt.Dump.list State.pp_err)
-                  errs
-              in
-              Fmt.failwith "%a\n@?" (Fmt.styled `Red pp_err) (a, errs)
+                        errs
+                    in
+                    Fmt.pr "%a\n@?" (Fmt.styled `Red pp_err) (a, errs);
+                    L.normal ~title:"failure" ~severity:Error (fun m ->
+                        m "Action call failed with:@.%a"
+                          (Fmt.Dump.list State.pp_err)
+                          errs);
+                    raise (State.Internal_State_Error (errs, state)))
+              else
+                let pp_err ft (a, errs) =
+                  Fmt.pf ft "FAILURE: Action %s failed with: %a" a
+                    (Fmt.Dump.list State.pp_err)
+                    errs
+                in
+                Fmt.failwith "%a\n@?" (Fmt.styled `Red pp_err) (a, errs)
+        in
+        rets_confs @ recovery_confs
 
       (* Logic command *)
       let eval_logic (lcmd : LCmd.t) state =

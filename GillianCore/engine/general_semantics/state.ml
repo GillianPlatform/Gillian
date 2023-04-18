@@ -28,7 +28,7 @@ module type S = sig
 
   exception Internal_State_Error of err_t list * t
 
-  type action_ret = ((t * vt list) list, err_t list) result
+  type action_ret = (t * vt list) list * err_t list
   type u_res = UWTF | USucc of t | UFail of err_t list
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type init_data
@@ -145,7 +145,7 @@ module type S = sig
   val clean_up : ?keep:Expr.Set.t -> t -> unit
   val unify_assertion : t -> st -> UP.step -> u_res
   val produce_posts : t -> st -> Asrt.t list -> t list
-  val produce : t -> st -> Asrt.t -> (t list, err_t list) result
+  val produce : t -> st -> Asrt.t -> t list * err_t list
   val update_subst : t -> st -> unit
   val mem_constraints : t -> Formula.t list
   val can_fix : err_t list -> bool
