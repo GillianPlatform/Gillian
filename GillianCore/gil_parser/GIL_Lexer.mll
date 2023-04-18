@@ -98,7 +98,7 @@
         "pred", GIL_Parser.PRED;
         "nounfold", GIL_Parser.NOUNFOLD;
         "facts", GIL_Parser.FACTS;
-        "cost", GIL_Parser.PUCOST;
+        "guard", GIL_Parser.PUGUARD;
 
         (* Logic commands *)
         "fold",         GIL_Parser.FOLD;

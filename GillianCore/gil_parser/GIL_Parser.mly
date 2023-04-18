@@ -176,7 +176,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token PRED
 %token NOUNFOLD
 %token FACTS
-%token PUCOST
+%token PUGUARD
 (* Logic commands *)
 %token OLCMD
 %token CLCMD
@@ -793,8 +793,8 @@ g_pred_facts_target:
   { facts }
 
 g_pred_cost_target:
-  PUCOST; COLON; pu_cost = g_assertion_target; SCOLON
-  { pu_cost }
+  PUGUARD; COLON; pu_guard = g_assertion_target; SCOLON
+  { pu_guard }
 
 (* pred name (arg1, ..., argn) : def1, ..., defn ; *)
 g_pred_target:

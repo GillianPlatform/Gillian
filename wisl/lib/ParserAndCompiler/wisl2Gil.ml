@@ -898,7 +898,7 @@ let compile_pred filepath pred =
       pred_ins;
       pred_definitions = List.map build_def pred_definitions;
       pred_normalised = false;
-      (* FIXME: ADD SUPPORT FOR FACTS, COST, ABSTRACT, PURE *)
+      (* FIXME: ADD SUPPORT FOR FACTS, GUARD, ABSTRACT, PURE *)
       pred_facts = [];
       pred_guard = None;
       pred_abstract = false;
