@@ -367,6 +367,8 @@ module Make (SMemory : SMemory.S) :
       Simplifications.simplify_pfs_and_gamma ~kill_new_lvars pfs gamma
         ~unification ~save_spec_vars
     in
+    Logging.verbose (fun fmt ->
+        fmt "Subst before filter, to be applied to memory:\n%a" SSubst.pp subst);
     let subst =
       SSubst.filter subst (fun x _ ->
           match x with
