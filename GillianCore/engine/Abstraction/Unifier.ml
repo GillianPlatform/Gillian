@@ -350,34 +350,26 @@ module Make
   let subst_in_expr (subst : ESubst.t) (le : Expr.t) : Val.t option =
     Val.from_expr (ESubst.subst_in_expr subst ~partial:false le)
 
-  let get_pred_with_vs (astate : t) (vs : Val.t list) : abs_t option =
-    let state, preds, pred_defs, _ = astate in
-
+  module Predicate_selection_strategies = struct
     let print_local_info (i : int) (name : string) (args : Val.t list) : unit =
       L.verbose (fun m ->
           m "Strategy %d: Examining %s(@[<h>%a@])" i name
             Fmt.(list ~sep:comma Val.pp)
             args)
-    in
 
-    let get_pred_def (name : string) : Pred.t =
+    let get_pred_def ~pred_defs (name : string) : Pred.t =
       match Hashtbl.find_opt pred_defs name with
-      | Some pred -> pred.pred
+      | Some pred -> pred.UP.pred
       | None -> failwith "ERROR: get_pred_with_vs: Predicate doesn't exist."
-    in
-
-    let apply_strategies (strategies : (string * Val.t list -> int) list) :
-        (string * Val.t list) option =
-      List.fold_left
-        (fun ac strategy ->
-          if ac <> None then ac else Preds.strategic_choice preds strategy)
-        None strategies
-    in
 
     (* Strategy 1: The values that we are looking for are in the in-parameters *)
-    let strategy_1 ((name, args) : string * Val.t list) : int =
+    let strategy_1
+        ~pred_defs
+        ~state
+        ~values
+        ((name, args) : string * Val.t list) : int =
       print_local_info 1 name args;
-      let pred_def = get_pred_def name in
+      let pred_def = get_pred_def ~pred_defs name in
       match pred_def.pred_abstract with
       | true -> 0
       | false ->
@@ -395,8 +387,8 @@ module Make
           L.verbose (fun fmt ->
               fmt "Original values: %a"
                 Fmt.(brackets (list ~sep:comma Val.pp))
-                vs);
-          let vs = State.get_equal_values state vs in
+                values);
+          let vs = State.get_equal_values state values in
           let vs =
             vs
             @ List.map Option.get
@@ -430,12 +422,11 @@ module Make
                 (Expr.Set.elements es_inter));
 
           Expr.Set.cardinal es_inter
-    in
 
     (* Strategy 2: Predicate has all literals as in-parameters *)
-    let strategy_2 ((name, args) : string * Val.t list) : int =
+    let strategy_2 ~pred_defs ((name, args) : string * Val.t list) : int =
       print_local_info 2 name args;
-      let pred_def = get_pred_def name in
+      let pred_def = get_pred_def ~pred_defs name in
       match pred_def.pred_abstract with
       | true -> 0
       | false ->
@@ -449,17 +440,17 @@ module Make
               (List.map Val.to_expr in_args)
           in
           if List.for_all (fun x -> x = true) all_literals then 1 else 0
-    in
 
     (* Strategy 3: The values that we are looking for are in the out-parameters *)
-    let strategy_3 ((name, args) : string * Val.t list) : int =
+    let strategy_3 ~pred_defs ~values ((name, args) : string * Val.t list) : int
+        =
       print_local_info 3 name args;
-      let pred_def = get_pred_def name in
+      let pred_def = get_pred_def ~pred_defs name in
       match pred_def.pred_abstract with
       | true -> 0
       | false ->
           let out_args = Pred.out_args pred_def args in
-          let vs_inter = List_utils.intersect vs out_args in
+          let vs_inter = List_utils.intersect values out_args in
           let es_inter =
             List.fold_left
               (fun ac e -> Expr.Set.add e ac)
@@ -480,12 +471,12 @@ module Make
                    (List.map (Fmt.to_to_string Expr.pp)
                       (Expr.Set.elements es_inter))));
           Expr.Set.cardinal es_inter
-    in
 
-    (* Strategy 3: Predicate has non-literal parameters in pure formulae *)
-    let strategy_4 ((name, args) : string * Val.t list) : int =
+    (* Strategy 4: Predicate has non-literal parameters in pure formulae *)
+    let strategy_4 ~pred_defs ~state ((name, args) : string * Val.t list) : int
+        =
       print_local_info 4 name args;
-      let pred_def = get_pred_def name in
+      let pred_def = get_pred_def ~pred_defs name in
       match pred_def.pred_abstract with
       | true -> 0
       | false ->
@@ -496,8 +487,23 @@ module Make
           in
           let inter = SS.inter lvars_args lvars_state in
           SS.cardinal inter
+  end
+
+  let consume_pred_with_vs (astate : t) (values : Val.t list) : abs_t option =
+    let state, preds, pred_defs, _ = astate in
+
+    let apply_strategies (strategies : (string * Val.t list -> int) list) :
+        (string * Val.t list) option =
+      List.find_map (Preds.strategic_choice preds) strategies
     in
-    apply_strategies [ strategy_1; strategy_2; strategy_3; strategy_4 ]
+    let open Predicate_selection_strategies in
+    apply_strategies
+      [
+        strategy_1 ~state ~values ~pred_defs;
+        strategy_2 ~pred_defs;
+        strategy_3 ~pred_defs ~values;
+        strategy_4 ~pred_defs ~state;
+      ]
 
   let rec produce_assertion (astate : t) (subst : ESubst.t) (a : Asrt.t) :
       (t list, err_t list) result =
@@ -919,6 +925,19 @@ module Make
           rets);
     Ok rets
 
+  (* and fold_guarded_with_vals (astate : t) (vs : Val.t list) : t list option =
+     L.(
+       verbose (fun m ->
+           m "@[<v 2>Starting fold_guarded_with_vals: @[<h>%a@]@\n%a.@\n"
+             Fmt.(list ~sep:comma Val.pp)
+             vs pp_astate astate));
+     if !Config.manual_proof then None
+     else
+       match get_preds_with_vs astate vs with
+       | Some (pname, v_) | None ->
+           L.(verbose (fun m -> m "No predicate found to fold!"));
+           None *)
+
   and unfold_with_vals (astate : t) (vs : Val.t list) :
       (ESubst.t * t) list option =
     L.(
@@ -929,7 +948,7 @@ module Make
 
     if !Config.manual_proof then None
     else
-      match get_pred_with_vs astate vs with
+      match consume_pred_with_vs astate vs with
       | Some (pname, v_args) -> (
           L.(verbose (fun m -> m "FOUND STH TO UNFOLD: %s!!!!\n" pname));
           let rets = unfold (copy_astate astate) pname v_args in
@@ -1746,7 +1765,7 @@ module Make
     L.verbose (fun m -> m "Attempting to recover");
     let- fold_error =
       match tactic.try_fold with
-      | Some _ -> Error "Can't recover using fold yet"
+      | Some _fold_values -> Error "Can't automatically fold yet."
       | None ->
           L.verbose (fun m -> m "No fold recovery tactic");
           Error "None"

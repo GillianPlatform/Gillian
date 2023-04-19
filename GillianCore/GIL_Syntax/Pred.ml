@@ -326,12 +326,14 @@ let get (pred_defs : (string, t) Hashtbl.t) (name : string) : t =
   try Hashtbl.find pred_defs name
   with _ -> raise (Failure "DEATH. PRED NOT FOUND!")
 
+let close_suffix = "€€close"
+
 (* Given a predicate name, if it is a guarded predicate, returns the name of the
    closing token. *)
 let close_token_name (pred : t) : string =
   if Option.is_none pred.pred_guard then
     failwith "close_token_name called on non-guarded predicate";
-  pred.pred_name ^ "€close"
+  pred.pred_name ^ close_suffix
 
 let close_token_call (pred : t) : Asrt.t =
   let name = close_token_name pred in
@@ -339,3 +341,12 @@ let close_token_call (pred : t) : Asrt.t =
     in_args pred pred.pred_params |> List.map (fun (x, _t) -> Expr.PVar x)
   in
   Asrt.Pred (name, args)
+
+(* Given a name, if it's a close_token name, returns the name of the corresponding predicate,
+   otherwise return None. *)
+let pred_name_from_close_token_name (close_token : string) : string option =
+  if String.ends_with ~suffix:close_suffix close_token then
+    Some
+      (String.sub close_token 0
+         (String.length close_token - String.length close_suffix))
+  else None

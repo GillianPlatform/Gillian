@@ -16,7 +16,11 @@ module type S = sig
   val is_empty : t -> bool
   val extend : ?pure:bool -> t -> abs_t -> unit
   val pop : t -> (abs_t -> bool) -> abs_t option
+
+  (** Given a strategy, consumes a predicate and returns it.
+      This function will modify the preds in place *)
   val strategic_choice : t -> (abs_t -> int) -> abs_t option
+
   val remove_by_name : t -> string -> abs_t option
   val find_pabs_by_name : t -> string -> abs_t list
   val get_lvars : t -> SS.t
