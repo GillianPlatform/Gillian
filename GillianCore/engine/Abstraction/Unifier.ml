@@ -1637,7 +1637,13 @@ module Make
     let params = List.map (fun (x, _) -> x) pred.pred.pred_params in
     let param_bindings =
       if List.compare_lengths params args = 0 then List.combine params args
-      else List.combine (Pred.in_params pred.pred) args
+      else
+        try List.combine (Pred.in_params pred.pred) args
+        with Invalid_argument _ ->
+          Fmt.failwith "invalid number of parameter while folding: %s%a"
+            pred.pred.pred_name
+            Fmt.(parens @@ hbox @@ list ~sep:comma Val.pp)
+            args
     in
     let param_bindings =
       List.map (fun (x, v) -> (Expr.PVar x, v)) param_bindings
