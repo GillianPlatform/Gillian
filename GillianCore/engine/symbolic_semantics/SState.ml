@@ -367,21 +367,33 @@ module Make (SMemory : SMemory.S) :
       Simplifications.simplify_pfs_and_gamma ~kill_new_lvars pfs gamma
         ~unification ~save_spec_vars
     in
-    Logging.verbose (fun fmt ->
-        fmt "Subst before filter, to be applied to memory:\n%a" SSubst.pp subst);
     let subst =
       SSubst.filter subst (fun x _ ->
           match x with
           | LVar x | PVar x | ALoc x -> not (SS.mem x svars)
           | _ -> true)
     in
-    SSubst.iter subst (fun k v ->
-        if Expr.is_unifiable v then
-          match SSubst.mem subst v with
-          | true -> SSubst.put subst k (Option.get (SSubst.get subst v))
-          | false -> ());
+    (* Sometimes, [simplify_pfs_and_gamma] leaves abstract locations on the
+       rhs of the subst that should be gone, according to itself.
+       We filter that. *)
+    let subst = SSubst.to_list subst in
+    let loc_subst =
+      subst
+      |> List.filter (fun (x, _) ->
+             match x with
+             | Expr.ALoc _ | Lit (Loc _) -> true
+             | _ -> false)
+      |> SSubst.init
+    in
+    let subst =
+      List.map
+        (fun (x, y) -> (x, SSubst.subst_in_expr loc_subst ~partial:true y))
+        subst
+      |> SSubst.init
+    in
     Logging.verbose (fun fmt ->
-        fmt "Filtered subst, to be applied to memory:\n%a" SSubst.pp subst);
+        fmt "Filtered and fixed subst, to be applied to memory:\n%a" SSubst.pp
+          subst);
     SStore.substitution_in_place subst store;
 
     let memories = SMemory.substitution_in_place ~pfs ~gamma subst heap in
