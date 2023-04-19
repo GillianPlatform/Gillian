@@ -807,7 +807,7 @@ module Make
             | Ok [] -> Fmt.failwith "HORROR - unfold vanished: %a" SLCmd.pp lcmd
             | _ -> ()
           in
-          let* _, vs' = cons_res in
+          let* astate, vs' = cons_res in
           L.verbose (fun m ->
               m "@[<h>Returned values: %a@]" Fmt.(list ~sep:comma Val.pp) vs');
           let vs = Pred.combine_ins_outs pred.pred vs_ins vs' in
