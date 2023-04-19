@@ -16,7 +16,7 @@ module type S = sig
   val is_empty : t -> bool
   val extend : ?pure:bool -> t -> abs_t -> unit
   val pop : t -> (abs_t -> bool) -> abs_t option
-  val strategic_choice : t -> (abs_t -> int) -> abs_t option
+  val strategic_choice : consume:bool -> t -> (abs_t -> int) -> abs_t option
   val remove_by_name : t -> string -> abs_t option
   val find_pabs_by_name : t -> string -> abs_t list
   val get_lvars : t -> SS.t
@@ -92,7 +92,7 @@ module Make
     preds := new_list;
     value
 
-  let strategic_choice preds (f : 'a -> int) =
+  let strategic_choice ~consume preds (f : 'a -> int) =
     let rec val_and_remove passed idx lst =
       match (idx, lst) with
       | 0, hd :: tl -> (List.rev passed @ tl, hd)
@@ -110,7 +110,8 @@ module Make
     if max = 0 then None
     else
       let new_list, value = val_and_remove [] idx !preds in
-      preds := new_list;
+      (* We remove iff consume is true *)
+      if consume then preds := new_list;
       Some value
 
   let pop_all preds f =

@@ -17,9 +17,10 @@ module type S = sig
   val extend : ?pure:bool -> t -> abs_t -> unit
   val pop : t -> (abs_t -> bool) -> abs_t option
 
-  (** Given a strategy, consumes a predicate and returns it.
-      This function will modify the preds in place *)
-  val strategic_choice : t -> (abs_t -> int) -> abs_t option
+  (** Given a strategy finds a predicate best matching it (int is non-null and highest possible).
+      If consume is true, and the function returns [Some _], the predicate is also removed from
+      the preds. *)
+  val strategic_choice : consume:bool -> t -> (abs_t -> int) -> abs_t option
 
   val remove_by_name : t -> string -> abs_t option
   val find_pabs_by_name : t -> string -> abs_t list

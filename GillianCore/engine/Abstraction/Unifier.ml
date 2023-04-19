@@ -494,7 +494,7 @@ module Make
 
     let apply_strategies (strategies : (string * Val.t list -> int) list) :
         (string * Val.t list) option =
-      List.find_map (Preds.strategic_choice preds) strategies
+      List.find_map (Preds.strategic_choice ~consume:true preds) strategies
     in
     let open Predicate_selection_strategies in
     apply_strategies
