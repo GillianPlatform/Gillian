@@ -59,7 +59,9 @@ module type S = sig
     err_t ->
     (c_fix_t list * Formula.t list * Containers.SS.t * Asrt.t list) list
 
-  val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t
+  val apply_fix :
+    t -> PFS.t -> Type_env.t -> c_fix_t -> (t, err_t) result Delayed.t
+
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
 end
@@ -110,6 +112,17 @@ struct
           successes
       in
       Ok asucs
+
+  let apply_fix heap pfs gamma fix =
+    let res = apply_fix heap pfs gamma fix in
+    let curr_pc = Pc.make ~unification:false ~pfs ~gamma () in
+    let results = Delayed.resolve ~curr_pc res in
+    match results with
+    | [ br ] -> (
+        match Branch.value br with
+        | Ok x -> x
+        | Error err -> raise (Failure "Bi-abduction: cannot fix cell."))
+    | _ -> raise (Failure "Bi-abduction: cannot fix cell.")
 
   let substitution_in_place ~pfs ~gamma subst mem :
       (t * Formula.Set.t * (string * Type.t) list) list =

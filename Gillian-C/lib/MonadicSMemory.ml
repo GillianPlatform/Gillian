@@ -1039,31 +1039,14 @@ let get_fixes _heap _pfs _gamma err =
   | _ -> []
 
 (* let apply_fix _heap _pfs _gamma _fix = failwith "Not ready for bi-abdcution" *)
-(* let apply_fix heap _pfs _gamma fix =
-   match fix with
-   | AddSingle { loc; ofs; value; chunk } -> (
-       let loc = Expr.loc_from_loc_name loc in
-       (* NOTE: What should "chunk sval perm" be assigned to? *)
-       (* sval corresponds to the value. So change value to sval type *)
-       let* sval = SVal.of_gil_expr_exn value in
-       let perm = Perm.Writable in
-       let* mem = Mem.set_single !(heap.mem) loc ofs chunk sval perm in
-       match mem with
-       | Ok m -> { heap with mem = ref m }
-       | _ -> raise (Failure "Error")) *)
-
 let apply_fix heap _pfs _gamma fix =
+  let open DR.Syntax in
   match fix with
-  | AddSingle { loc; ofs; value; chunk } -> (
+  | AddSingle { loc; ofs; value; chunk } ->
       let loc = Expr.loc_from_loc_name loc in
       (* NOTE: What should "chunk sval perm" be assigned to? *)
       (* sval corresponds to the value. So change value to sval type *)
       let* sval = SVal.of_gil_expr_exn value in
       let perm = Perm.Writable in
-      let+ mem = Mem.set_single !(heap.mem) loc ofs chunk sval perm in
-      match mem with
-      | Ok mem -> { heap with mem = ref mem }
-      | _ -> heap)
-
-(* | _ -> raise (Failure "Bi-abduction: cannot fix cell.")) *)
-(* Mem.set_single !(heap.mem) loc ofs chunk sval perm in *)
+      let++ mem = Mem.set_single !(heap.mem) loc ofs chunk sval perm in
+      { heap with mem = ref mem }
