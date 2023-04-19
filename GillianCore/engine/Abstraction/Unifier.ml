@@ -505,6 +505,35 @@ module Make
         strategy_4 ~pred_defs ~state;
       ]
 
+  let select_guarded_predicate_to_fold (astate : t) (values : Val.t list) :
+      abs_t option =
+    let state, preds, pred_defs, _ = astate in
+    let wrap_strat f (name, args) =
+      if Option.is_some (Pred.pred_name_from_close_token_name name) then
+        f (name, args)
+      else 0
+    in
+    let strategies =
+      let open Predicate_selection_strategies in
+      List.map wrap_strat
+        [
+          strategy_1 ~state ~values ~pred_defs;
+          strategy_2 ~pred_defs;
+          strategy_3 ~pred_defs ~values;
+          strategy_4 ~pred_defs ~state;
+        ]
+    in
+    let close_token =
+      List.find_map (Preds.strategic_choice ~consume:false preds) strategies
+    in
+    match close_token with
+    | None -> None
+    | Some (close_token, args) ->
+        let actual_pred =
+          Option.get (Pred.pred_name_from_close_token_name close_token)
+        in
+        Some (actual_pred, args)
+
   let rec produce_assertion (astate : t) (subst : ESubst.t) (a : Asrt.t) :
       (t list, err_t list) result =
     let open Syntaxes.Result in
@@ -925,18 +954,30 @@ module Make
           rets);
     Ok rets
 
-  (* and fold_guarded_with_vals (astate : t) (vs : Val.t list) : t list option =
-     L.(
-       verbose (fun m ->
-           m "@[<v 2>Starting fold_guarded_with_vals: @[<h>%a@]@\n%a.@\n"
-             Fmt.(list ~sep:comma Val.pp)
-             vs pp_astate astate));
-     if !Config.manual_proof then None
-     else
-       match get_preds_with_vs astate vs with
-       | Some (pname, v_) | None ->
-           L.(verbose (fun m -> m "No predicate found to fold!"));
-           None *)
+  and fold_guarded_with_vals (astate : t) (vs : Val.t list) :
+      (t list, string) result =
+    L.(
+      verbose (fun m ->
+          m "@[<v 2>Starting fold_guarded_with_vals: @[<h>%a@]@\n%a.@\n"
+            Fmt.(list ~sep:comma Val.pp)
+            vs pp_astate astate));
+    if !Config.manual_proof then Error "Manual proof"
+    else
+      match select_guarded_predicate_to_fold astate vs with
+      | Some (pname, v_args) -> (
+          L.(verbose (fun m -> m "FOUND STH TO FOLD: %s!!!!\n" pname));
+          let _, _, pred_defs, _ = astate in
+          let pred = UP.get_pred_def pred_defs pname in
+          let rets =
+            fold ~in_unification:true ~unify_kind:Fold
+              ~state:(copy_astate astate) pred v_args
+          in
+          match rets with
+          | Ok rets -> Ok rets
+          | Error _ -> Error "fold_guareded_with_vals: Failed to fold")
+      | None ->
+          L.(verbose (fun m -> m "No predicate found to fold!"));
+          Error "No predicate found to fold!"
 
   and unfold_with_vals (astate : t) (vs : Val.t list) :
       (ESubst.t * t) list option =
@@ -1765,7 +1806,7 @@ module Make
     L.verbose (fun m -> m "Attempting to recover");
     let- fold_error =
       match tactic.try_fold with
-      | Some _fold_values -> Error "Can't automatically fold yet."
+      | Some fold_values -> fold_guarded_with_vals astate fold_values
       | None ->
           L.verbose (fun m -> m "No fold recovery tactic");
           Error "None"
