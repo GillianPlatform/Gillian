@@ -1088,6 +1088,7 @@ module Make
           fold ~is_post ~in_unification ~state:astate ~unify_kind:Fold pred
             vs_ins
         in
+        L.verbose (fun m -> m "DONE FOLDING: ????? %a" pp_astate folded);
         (* Supposedly, we don't need a guard to make sure we're not looping indefinitely:
            if the fold worked, then consume_pred should not take this branch on the next try.
            We should still be keeping an eye on this in case something loops indefinitely. *)
