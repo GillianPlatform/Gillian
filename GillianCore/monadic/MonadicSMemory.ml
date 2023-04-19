@@ -47,7 +47,7 @@ module type S = sig
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
   val mem_constraints : t -> Formula.t list
   val pp_c_fix : Format.formatter -> c_fix_t -> unit
-  val get_recovery_vals : t -> err_t -> vt list
+  val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t
   val pp_err : Format.formatter -> err_t -> unit
   val get_failing_constraint : err_t -> Formula.t
 

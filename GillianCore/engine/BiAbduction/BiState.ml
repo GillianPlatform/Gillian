@@ -518,11 +518,11 @@ struct
   let apply_fixes (_ : t) (_ : fix_t list) : t option * Asrt.t list =
     raise (Failure "apply_fixes not implemented in MakeBiState")
 
-  let get_recovery_vals (_ : t) (_ : err_t list) : vt list =
-    raise (Failure "get_recovery_vals not implemented in MakeBiState")
+  let get_recovery_tactic (_ : t) (_ : err_t list) =
+    raise (Failure "get_recovery_tactic not implemented in MakeBiState")
 
-  let automatic_unfold _ _ : (t list, string) result =
-    Error "Automatic unfold not supported in bi-abduction yet"
+  let try_recovering _ _ : (t list, string) result =
+    Error "try_recovering not supported in bi-abduction yet"
 
   (** new functions *)
 

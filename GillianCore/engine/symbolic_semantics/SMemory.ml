@@ -63,7 +63,7 @@ module type S = sig
   val assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
   val mem_constraints : t -> Formula.t list
   val pp_c_fix : Format.formatter -> c_fix_t -> unit
-  val get_recovery_vals : t -> err_t -> vt list
+  val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t
   val pp_err : Format.formatter -> err_t -> unit
   val get_failing_constraint : err_t -> Formula.t
 
@@ -113,7 +113,7 @@ module Dummy : S with type init_data = unit = struct
   let assertions ?to_keep:_ _ = failwith "Please implement SMemory"
   let mem_constraints _ = failwith "Please implement SMemory"
   let pp_c_fix _ _ = ()
-  let get_recovery_vals _ _ = failwith "Please implement SMemory"
+  let get_recovery_tactic _ _ = failwith "Please implement SMemory"
   let pp_err _ _ = ()
   let get_failing_constraint _ = failwith "Please implement SMemory"
   let get_fixes ?simple_fix:_ _ _ _ _ = failwith "Please implement SMemory"

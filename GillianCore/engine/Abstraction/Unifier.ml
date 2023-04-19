@@ -85,6 +85,7 @@ module type S = sig
 
   val rec_unfold : ?fuel:int -> t -> string -> vt list -> (t, err_t) List_res.t
   val unfold_all : t -> string -> (t, err_t) List_res.t
+  val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
   val unfold_with_vals : t -> vt list -> (st * t) list option
   val unfold_concrete_preds : t -> (st option * t) option
 
@@ -1594,23 +1595,24 @@ module Make
           -> (
             L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
             let state, _, _, _ = astate_i in
-            let vals = State.get_recovery_vals state errs in
+            let tactics = State.get_recovery_tactic state errs in
             L.(
               verbose (fun m ->
                   m
-                    "Unify. Unable to unify. Checking if there are predicates \
-                     to unfold. Looking for: @[<h>%a@]"
-                    Fmt.(list ~sep:comma Val.pp)
-                    vals));
-            match unfold_with_vals astate_i vals with
-            | None ->
-                L.normal (fun m -> m "Unify. No predicates found to unfold.");
+                    "Unify. Unable to unify. About to attempt the following \
+                     recovery tactic:\n\
+                     %a"
+                    (Recovery_tactic.pp Val.pp)
+                    tactics));
+            match try_recovering astate_i tactics with
+            | Error msg ->
+                L.normal (fun m -> m "Unify. Recovery tactic failed: %s" msg);
                 Error errs
-            | Some sp -> (
+            | Ok sp -> (
                 L.verbose (fun m ->
                     m "Unfolding successful: %d results" (List.length sp));
                 let open List_res.Syntax in
-                let* _, astate = Ok sp in
+                let* astate = Ok sp in
                 match unfold_concrete_preds astate with
                 | None -> Error []
                 | Some (_, astate) ->
@@ -1737,6 +1739,27 @@ module Make
               Fmt.(Dump.list pp_err_t)
               errs)
     | None -> Some (None, astate)
+
+  and try_recovering (astate : t) (tactic : vt Recovery_tactic.t) :
+      (t list, string) result =
+    let open Syntaxes.Result in
+    L.verbose (fun m -> m "Attempting to recover");
+    let- fold_error =
+      match tactic.try_fold with
+      | Some _ -> Error "Can't recover using fold yet"
+      | None ->
+          L.verbose (fun m -> m "No fold recovery tactic");
+          Error "None"
+    in
+    let- unfold_error =
+      (* This matches the legacy behaviour *)
+      let unfold_values = Option.value ~default:[] tactic.try_unfold in
+      match unfold_with_vals astate unfold_values with
+      | None -> Error "Automatic unfold failed"
+      | Some next_states ->
+          Ok (List.map (fun (_, astate) -> astate) next_states)
+    in
+    Fmt.error "try_fold: %s\ntry_unfold: %s" fold_error unfold_error
 
   let rec rec_unfold
       ?(fuel = 10)

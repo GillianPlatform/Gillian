@@ -6,6 +6,12 @@
 module Result = struct
   let ( let+ ) f o = Result.map o f
   let ( let* ) o f = Result.bind o f
+
+  (** Bind error *)
+  let ( let- ) o f =
+    match o with
+    | Ok _ as ok -> ok
+    | Error e -> f e
 end
 
 (** @canonical Gillian.Utils.Syntaxes.Option *)

@@ -35,7 +35,7 @@ module type S = sig
   val deabstract : t -> state_t * bool
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
   val set_pred : t -> abs_t -> unit
-  val automatic_unfold : t -> vt list -> (t list, string) result
+  val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
 end
 
 module Make
@@ -1188,14 +1188,13 @@ module Make
   let pp_err = State.pp_err
   let pp_fix = State.pp_fix
 
-  let get_recovery_vals astate vs =
+  let get_recovery_tactic astate vs =
     let state, _, _, _ = astate in
-    State.get_recovery_vals state vs
+    State.get_recovery_tactic state vs
 
-  let automatic_unfold (astate : t) (rvs : vt list) : (t list, string) result =
-    match SUnifier.unfold_with_vals astate rvs with
-    | None -> Error "Automatic unfold failed"
-    | Some next_states -> Ok (List.map (fun (_, astate) -> astate) next_states)
+  let try_recovering (astate : t) (tactic : vt Recovery_tactic.t) :
+      (t list, string) result =
+    SUnifier.try_recovering astate tactic
 
   let get_failing_constraint = State.get_failing_constraint
   let can_fix = State.can_fix

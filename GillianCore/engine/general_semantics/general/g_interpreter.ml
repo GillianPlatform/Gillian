@@ -1024,18 +1024,22 @@ struct
                     [ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
                   "Error");
             if not (Exec_mode.concrete_exec !Config.current_exec_mode) then (
-              let recovery_params =
-                let open Utils.Syntaxes.List in
-                let* v = v_es in
-                let e = Val.to_expr v in
-                let+ base_elem = Expr.base_elements e in
-                Option.get (Val.from_expr base_elem)
+              let tactic_from_params =
+                let recovery_params =
+                  let open Utils.Syntaxes.List in
+                  let* v = v_es in
+                  let e = Val.to_expr v in
+                  let+ base_elem = Expr.base_elements e in
+                  Option.get (Val.from_expr base_elem)
+                in
+                Recovery_tactic.try_unfold recovery_params
               in
               let recovery_vals =
-                State.get_recovery_vals state errs @ recovery_params
+                State.get_recovery_tactic state errs
+                |> Recovery_tactic.merge tactic_from_params
               in
               let recovery_states : (State.t list, string) result =
-                State.automatic_unfold state recovery_vals
+                State.try_recovering state recovery_vals
               in
               match recovery_states with
               | Ok recovery_states ->
@@ -1064,7 +1068,8 @@ struct
                         ~loop_ids:prev_loop_ids ~next_idx:i
                         ~branch_count:b_counter ?branch_case ?new_branches ())
                     recovery_states
-              | Error _ ->
+              | Error msg ->
+                  L.verbose (fun m -> m "Couldn't recover because: %s" msg);
                   let pp_err ft (a, errs) =
                     Fmt.pf ft "FAILURE: Action %s failed with: %a" a
                       (Fmt.Dump.list State.pp_err)

@@ -90,6 +90,9 @@ module type S = sig
   val rec_unfold : ?fuel:int -> t -> string -> vt list -> (t, err_t) List_res.t
   val unfold_all : t -> string -> (t, err_t) List_res.t
 
+  (** Tries recovering from an error using the provided recovery tactic. *)
+  val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
+
   (** Tries to unfold the given predicate in the state.
       If it manages, it returns the new set of states and corresponding
       substitutions, otherwise, it returns None. *)

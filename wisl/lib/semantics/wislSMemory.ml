@@ -1,6 +1,7 @@
 open Gillian.Symbolic
 open Gillian.Gil_syntax
 open Gillian.Logic
+module Recovery_tactic = Gillian.General.Recovery_tactic
 module Logging = Gillian.Logging
 module SFVL = SFVL
 module SS = Gillian.Utils.Containers.SS
@@ -282,7 +283,18 @@ let pp_err fmt t =
     | OutOfBounds _ -> "Out Of Bounds"
     | InvalidLocation -> "Invalid Location")
 
-let get_recovery_vals _ _ = []
+let get_recovery_tactic _ e =
+  match e with
+  | WislSHeap.MissingResource (_, loc, ofs) ->
+      let loc = Expr.loc_from_loc_name loc in
+      let ofs =
+        match ofs with
+        | None -> []
+        | Some ofs -> [ ofs ]
+      in
+      Recovery_tactic.try_unfold (loc :: ofs)
+  | _ -> Recovery_tactic.none
+
 let pp_c_fix _ _ = ()
 let substitution_in_place ~pfs:_ ~gamma:_ = WislSHeap.substitution_in_place
 let fresh_val _ = Expr.LVar (LVar.alloc ())

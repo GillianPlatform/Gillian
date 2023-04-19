@@ -8,6 +8,7 @@ module L = Logging
 module SVal = Gillian.Symbolic.Values
 module PFS = Gillian.Symbolic.Pure_context
 module Type_env = Gillian.Symbolic.Type_env
+module Recovery_tactic = Gillian.General.Recovery_tactic
 open Gillian.Logic
 
 module M = struct
@@ -69,7 +70,7 @@ module M = struct
     pf ft "@[<h><[%a], %a, %a>@]" (list ~sep:comma SVal.pp) vs Formula.pp f
       (list ~sep:semi pp_fixes) fixes
 
-  let get_recovery_vals (heap : t) (err : err_t) : vt list =
+  let get_recovery_tactic (heap : t) (err : err_t) =
     let ufl_vs, _, _ = err in
     L.verbose (fun fmt ->
         fmt "JSIL SMemory: Recovery values: %a"
@@ -83,20 +84,23 @@ module M = struct
           | _ -> false)
         ufl_vs
     in
-    match ufl_alocs with
-    | [] -> ufl_vs
-    | alocs ->
-        let imeta = SHeap.get_inv_metadata heap in
-        (* Perhaps we are looking for metadata? *)
-        let metadata_recovery_vals =
-          List.fold_left
-            (fun mrvs aloc ->
-              match Hashtbl.find_opt imeta aloc with
-              | Some md -> md :: mrvs
-              | _ -> mrvs)
-            [] alocs
-        in
-        ufl_vs @ metadata_recovery_vals
+    let values =
+      match ufl_alocs with
+      | [] -> ufl_vs
+      | alocs ->
+          let imeta = SHeap.get_inv_metadata heap in
+          (* Perhaps we are looking for metadata? *)
+          let metadata_recovery_vals =
+            List.fold_left
+              (fun mrvs aloc ->
+                match Hashtbl.find_opt imeta aloc with
+                | Some md -> md :: mrvs
+                | _ -> mrvs)
+              [] alocs
+          in
+          ufl_vs @ metadata_recovery_vals
+    in
+    Recovery_tactic.try_unfold values
 
   let assertions ?to_keep:_ (heap : t) : GAsrt.t list = SHeap.assertions heap
   let lvars (heap : t) : Containers.SS.t = SHeap.lvars heap
