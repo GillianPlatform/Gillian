@@ -370,140 +370,131 @@ module Make
         ((name, args) : string * Val.t list) : int =
       print_local_info 1 name args;
       let pred_def = get_pred_def ~pred_defs name in
-      match pred_def.pred_abstract with
-      | true -> 0
-      | false ->
-          let one_level_list_expander args =
-            List.concat_map
-              (fun (x : vt) ->
-                match Val.to_expr x with
-                | EList ls ->
-                    List.map (fun x -> Option.get (Val.from_expr x)) ls
-                | _ -> [ x ])
-              args
-          in
-          let in_args = one_level_list_expander (Pred.in_args pred_def args) in
+      let one_level_list_expander args =
+        List.concat_map
+          (fun (x : vt) ->
+            match Val.to_expr x with
+            | EList ls -> List.map (fun x -> Option.get (Val.from_expr x)) ls
+            | _ -> [ x ])
+          args
+      in
+      let in_args = one_level_list_expander (Pred.in_args pred_def args) in
 
-          L.verbose (fun fmt ->
-              fmt "Original values: %a"
-                Fmt.(brackets (list ~sep:comma Val.pp))
-                values);
-          let vs = State.get_equal_values state values in
-          let vs =
-            vs
-            @ List.map Option.get
-                (List.map Val.from_expr
-                   (List.concat_map Expr.base_elements (List.map Val.to_expr vs)))
-          in
-          let vs = List.sort_uniq compare vs in
-          L.verbose (fun fmt ->
-              fmt "Extended values: %a"
-                Fmt.(brackets (list ~sep:comma Val.pp))
-                vs);
-          let vs_inter = List_utils.intersect vs in_args in
-          let es_inter =
-            List.fold_left
-              (fun ac e -> Expr.Set.add e ac)
-              Expr.Set.empty
-              (List.map Val.to_expr vs_inter)
-          in
-          let es_inter =
-            Expr.Set.filter
-              (fun e ->
-                match e with
-                | Lit _ -> false
-                | _ -> true)
-              es_inter
-          in
-          L.verbose (fun m ->
-              m "get_pred_with_vs. Strategy 1. Intersection of cardinal %i: %a"
-                (Expr.Set.cardinal es_inter)
-                (Fmt.Dump.list Expr.pp)
-                (Expr.Set.elements es_inter));
+      L.verbose (fun fmt ->
+          fmt "Original values: %a"
+            Fmt.(brackets (list ~sep:comma Val.pp))
+            values);
+      let vs = State.get_equal_values state values in
+      let vs =
+        vs
+        @ List.map Option.get
+            (List.map Val.from_expr
+               (List.concat_map Expr.base_elements (List.map Val.to_expr vs)))
+      in
+      let vs = List.sort_uniq compare vs in
+      L.verbose (fun fmt ->
+          fmt "Extended values: %a" Fmt.(brackets (list ~sep:comma Val.pp)) vs);
+      let vs_inter = List_utils.intersect vs in_args in
+      let es_inter =
+        List.fold_left
+          (fun ac e -> Expr.Set.add e ac)
+          Expr.Set.empty
+          (List.map Val.to_expr vs_inter)
+      in
+      let es_inter =
+        Expr.Set.filter
+          (fun e ->
+            match e with
+            | Lit _ -> false
+            | _ -> true)
+          es_inter
+      in
+      L.verbose (fun m ->
+          m "get_pred_with_vs. Strategy 1. Intersection of cardinal %i: %a"
+            (Expr.Set.cardinal es_inter)
+            (Fmt.Dump.list Expr.pp)
+            (Expr.Set.elements es_inter));
 
-          Expr.Set.cardinal es_inter
+      Expr.Set.cardinal es_inter
 
     (* Strategy 2: Predicate has all literals as in-parameters *)
     let strategy_2 ~pred_defs ((name, args) : string * Val.t list) : int =
       print_local_info 2 name args;
       let pred_def = get_pred_def ~pred_defs name in
-      match pred_def.pred_abstract with
-      | true -> 0
-      | false ->
-          let in_args = Pred.in_args pred_def args in
-          let all_literals =
-            List.map
-              (fun (x : Expr.t) ->
-                match x with
-                | Lit _ -> true
-                | _ -> false)
-              (List.map Val.to_expr in_args)
-          in
-          if List.for_all (fun x -> x = true) all_literals then 1 else 0
+      let in_args = Pred.in_args pred_def args in
+      let all_literals =
+        List.for_all
+          (fun (x : Val.t) ->
+            match Val.to_expr x with
+            | Lit _ -> true
+            | _ -> false)
+          in_args
+      in
+      if all_literals then 1 else 0
 
     (* Strategy 3: The values that we are looking for are in the out-parameters *)
     let strategy_3 ~pred_defs ~values ((name, args) : string * Val.t list) : int
         =
       print_local_info 3 name args;
       let pred_def = get_pred_def ~pred_defs name in
-      match pred_def.pred_abstract with
-      | true -> 0
-      | false ->
-          let out_args = Pred.out_args pred_def args in
-          let vs_inter = List_utils.intersect values out_args in
-          let es_inter =
-            List.fold_left
-              (fun ac e -> Expr.Set.add e ac)
-              Expr.Set.empty
-              (List.map Val.to_expr vs_inter)
-          in
-          let es_inter =
-            Expr.Set.filter
-              (fun e ->
-                match e with
-                | Lit _ -> false
-                | _ -> true)
-              es_inter
-          in
-          L.verbose (fun m ->
-              m "get_pred_with_vs. Strategy 3. Intersection: %s"
-                (String.concat ", "
-                   (List.map (Fmt.to_to_string Expr.pp)
-                      (Expr.Set.elements es_inter))));
-          Expr.Set.cardinal es_inter
+      let out_args = Pred.out_args pred_def args in
+      let vs_inter = List_utils.intersect values out_args in
+      let es_inter =
+        List.fold_left
+          (fun ac e -> Expr.Set.add e ac)
+          Expr.Set.empty
+          (List.map Val.to_expr vs_inter)
+      in
+      let es_inter =
+        Expr.Set.filter
+          (fun e ->
+            match e with
+            | Lit _ -> false
+            | _ -> true)
+          es_inter
+      in
+      L.verbose (fun m ->
+          m "get_pred_with_vs. Strategy 3. Intersection: %s"
+            (String.concat ", "
+               (List.map (Fmt.to_to_string Expr.pp)
+                  (Expr.Set.elements es_inter))));
+      Expr.Set.cardinal es_inter
 
     (* Strategy 4: Predicate has non-literal parameters in pure formulae *)
-    let strategy_4 ~pred_defs ~state ((name, args) : string * Val.t list) : int
-        =
+    let strategy_4 ~state ((name, args) : string * Val.t list) : int =
       print_local_info 4 name args;
-      let pred_def = get_pred_def ~pred_defs name in
-      match pred_def.pred_abstract with
-      | true -> 0
-      | false ->
-          let lvars_state = State.get_spec_vars state in
-          let lvars_args =
-            List.fold_left SS.union SS.empty
-              (List.map (fun x -> Expr.lvars (Val.to_expr x)) args)
-          in
-          let inter = SS.inter lvars_args lvars_state in
-          SS.cardinal inter
+      let lvars_state = State.get_spec_vars state in
+      let lvars_args =
+        List.fold_left SS.union SS.empty
+          (List.map (fun x -> Expr.lvars (Val.to_expr x)) args)
+      in
+      let inter = SS.inter lvars_args lvars_state in
+      SS.cardinal inter
   end
 
   let consume_pred_with_vs (astate : t) (values : Val.t list) : abs_t option =
     let state, preds, pred_defs, _ = astate in
+
+    let wrap_strategy f (name, args) =
+      let pred = Predicate_selection_strategies.get_pred_def ~pred_defs name in
+      if pred.pred_abstract then 0 else f (name, args)
+    in
 
     let apply_strategies (strategies : (string * Val.t list -> int) list) :
         (string * Val.t list) option =
       List.find_map (Preds.strategic_choice ~consume:true preds) strategies
     in
     let open Predicate_selection_strategies in
-    apply_strategies
+    let strategies =
       [
         strategy_1 ~state ~values ~pred_defs;
         strategy_2 ~pred_defs;
         strategy_3 ~pred_defs ~values;
-        strategy_4 ~pred_defs ~state;
+        strategy_4 ~state;
       ]
+    in
+    let strategies = List.map wrap_strategy strategies in
+    apply_strategies strategies
 
   let select_guarded_predicate_to_fold (astate : t) (values : Val.t list) :
       abs_t option =
@@ -520,7 +511,7 @@ module Make
           strategy_1 ~state ~values ~pred_defs;
           strategy_2 ~pred_defs;
           strategy_3 ~pred_defs ~values;
-          strategy_4 ~pred_defs ~state;
+          strategy_4 ~state;
         ]
     in
     let close_token =
