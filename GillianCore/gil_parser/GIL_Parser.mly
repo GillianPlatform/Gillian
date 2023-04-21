@@ -717,15 +717,15 @@ g_logic_cmd_target:
     { LCmd.SL (Fold (name, les, fold_info)) }
 
 (* unfold x(e1, ..., en) [ def with #x := le1 and ... ] *)
-  | UNFOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
+  | UNFOLD; name = proc_name; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
     { LCmd.SL (Unfold (name, les, unfold_info, false)) }
 
 (* unfold* x(e1, ..., en) [ def with #x := le1 and ... ] *)
-  | RECUNFOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
+  | RECUNFOLD; name = proc_name; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
     { LCmd.SL (Unfold (name, les, unfold_info, true)) }
 
 (* unfold_all x *)
-  | UNFOLDALL; name = VAR
+  | UNFOLDALL; name = proc_name
     { LCmd.SL (GUnfold name) }
 
   | SYMBEXEC { LCmd.SL SymbExec }
