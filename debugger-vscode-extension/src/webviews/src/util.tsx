@@ -42,9 +42,9 @@ export const getUnifyName = (store: Store): [ReactNode, ReactNode] => {
     const procName = store.debuggerState?.mainProc || 'unknown proc';
     return [
       <>
-        Unify <Code>{procName}</Code>
+        <Code>{procName}</Code>
       </>,
-      <>{kind}</>,
+      <>Match {kind}</>,
     ];
   }
   const prevStep = unifications[path[1]!]!.selected!;
