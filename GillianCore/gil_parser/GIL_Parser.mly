@@ -713,7 +713,7 @@ g_named_assertion_target:
 
 g_logic_cmd_target:
 (* fold x(e1, ..., en) *)
-  | FOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(logic_bindings_target)
+  | FOLD; name = proc_name; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(logic_bindings_target)
     { LCmd.SL (Fold (name, les, fold_info)) }
 
 (* unfold x(e1, ..., en) [ def with #x := le1 and ... ] *)
