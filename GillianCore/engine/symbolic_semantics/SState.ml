@@ -373,13 +373,27 @@ module Make (SMemory : SMemory.S) :
           | LVar x | PVar x | ALoc x -> not (SS.mem x svars)
           | _ -> true)
     in
-    SSubst.iter subst (fun k v ->
-        if Expr.is_unifiable v then
-          match SSubst.mem subst v with
-          | true -> SSubst.put subst k (Option.get (SSubst.get subst v))
-          | false -> ());
+    (* Sometimes, [simplify_pfs_and_gamma] leaves abstract locations on the
+       rhs of the subst that should be gone, according to itself.
+       We filter that. *)
+    let subst = SSubst.to_list subst in
+    let loc_subst =
+      subst
+      |> List.filter (fun (x, _) ->
+             match x with
+             | Expr.ALoc _ | Lit (Loc _) -> true
+             | _ -> false)
+      |> SSubst.init
+    in
+    let subst =
+      List.map
+        (fun (x, y) -> (x, SSubst.subst_in_expr loc_subst ~partial:true y))
+        subst
+      |> SSubst.init
+    in
     Logging.verbose (fun fmt ->
-        fmt "Filtered subst, to be applied to memory:\n%a" SSubst.pp subst);
+        fmt "Filtered and fixed subst, to be applied to memory:\n%a" SSubst.pp
+          subst);
     SStore.substitution_in_place subst store;
 
     let memories = SMemory.substitution_in_place ~pfs ~gamma subst heap in
@@ -658,27 +672,36 @@ module Make (SMemory : SMemory.S) :
           vs
     | FAsrt ga -> Fmt.pf fmt "SFSVar(@[<h>%a@])" Asrt.pp ga
 
-  let get_recovery_vals (state : t) (errs : err_t list) : vt list =
+  let get_recovery_tactic (state : t) (errs : err_t list) : vt Recovery_tactic.t
+      =
     let heap, _, pfs, _, _ = state in
-    let vs = StateErr.get_recovery_vals errs (SMemory.get_recovery_vals heap) in
-    let svs = ES.of_list vs in
-    let extras =
-      PFS.fold_left
-        (fun exs pf ->
-          match pf with
-          | Eq (ALoc loc, LVar x)
-            when ES.mem (ALoc loc) svs && Names.is_spec_var_name x ->
-              Expr.LVar x :: exs
-          | Eq (LVar x, ALoc loc)
-            when ES.mem (ALoc loc) svs && Names.is_spec_var_name x ->
-              Expr.LVar x :: exs
-          | _ -> exs)
-        [] pfs
+    let memory_tactic =
+      StateErr.get_recovery_tactic errs (SMemory.get_recovery_tactic heap)
     in
-    ES.elements (ES.of_list (vs @ extras))
+    if Recovery_tactic.is_none memory_tactic then memory_tactic
+    else
+      PFS.fold_left
+        (fun (acc : vt Recovery_tactic.t) pf ->
+          match pf with
+          | Eq ((ALoc _ as loc), LVar x) | Eq (LVar x, (ALoc _ as loc)) ->
+              if Names.is_spec_var_name x then
+                let try_fold =
+                  Option.map
+                    (fun l -> if List.mem loc l then Expr.LVar x :: l else l)
+                    acc.try_fold
+                in
+                let try_unfold =
+                  Option.map
+                    (fun l -> if List.mem loc l then Expr.LVar x :: l else l)
+                    acc.try_unfold
+                in
+                { try_fold; try_unfold }
+              else acc
+          | _ -> acc)
+        memory_tactic pfs
 
-  let automatic_unfold _ _ : (t list, string) result =
-    Error "Automatic unfold not supported in symbolic execution"
+  let try_recovering _ _ : (t list, string) result =
+    Error "try_recovering not supported in symbolic execution"
 
   let pp_err = StateErr.pp_err SMemory.pp_err SVal.M.pp
   let can_fix = StateErr.can_fix

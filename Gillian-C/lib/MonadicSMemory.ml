@@ -10,6 +10,7 @@ module Logging = Gillian.Logging
 module SS = GUtils.Containers.SS
 module SVal = MonadicSVal
 module Debugger = Gillian.Debugger
+module Recovery_tactic = Gillian.General.Recovery_tactic
 
 (* Some utils first *)
 
@@ -999,12 +1000,16 @@ end
 
 (** Things defined for BiAbduction *)
 
-let get_recovery_vals _ = function
-  | InvalidLocation e ->
-      List.map (fun x -> Expr.LVar x) (SS.elements (Expr.lvars e))
-  | MissingLocResource l -> [ Expr.loc_from_loc_name l ]
-  | SHeapTreeErr { at_locations; _ } ->
-      List.map Expr.loc_from_loc_name at_locations
+let get_recovery_tactic _ err =
+  let values =
+    match err with
+    | InvalidLocation e ->
+        List.map (fun x -> Expr.LVar x) (SS.elements (Expr.lvars e))
+    | MissingLocResource l -> [ Expr.loc_from_loc_name l ]
+    | SHeapTreeErr { at_locations; _ } ->
+        List.map Expr.loc_from_loc_name at_locations
+  in
+  Recovery_tactic.try_unfold values
 
 let get_failing_constraint _e = failwith "Not ready for bi-abduction yet"
 

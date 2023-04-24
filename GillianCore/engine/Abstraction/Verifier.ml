@@ -207,12 +207,12 @@ struct
       in
       let* subst =
         match unification_result with
-        | UPUSucc [ (_, subst, _) ] -> Ok subst
-        | UPUSucc _ ->
+        | Ok [ (_, subst, _) ] -> Ok subst
+        | Ok _ ->
             Error
               "EXACT: ERROR: initial definition unified against in multiple \
                ways"
-        | UPUFail _ ->
+        | Error _ ->
             Error "EXACT: ERROR: cannot unify against initial definition"
       in
       L.verbose (fun fmt -> fmt "EXACT: Obtained subst: %a" SSubst.pp subst);

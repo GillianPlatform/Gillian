@@ -16,7 +16,7 @@ module type S = sig
   val is_empty : t -> bool
   val extend : ?pure:bool -> t -> abs_t -> unit
   val pop : t -> (abs_t -> bool) -> abs_t option
-  val strategic_choice : t -> (abs_t -> int) -> abs_t option
+  val strategic_choice : consume:bool -> t -> (abs_t -> int) -> abs_t option
   val remove_by_name : t -> string -> abs_t option
   val find_pabs_by_name : t -> string -> abs_t list
   val get_lvars : t -> SS.t
@@ -24,7 +24,7 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
   val pp_pabs : Format.formatter -> abs_t -> unit
 
-  val get_pred :
+  val consume_pred :
     maintain:bool ->
     t ->
     string ->
@@ -92,7 +92,7 @@ module Make
     preds := new_list;
     value
 
-  let strategic_choice preds (f : 'a -> int) =
+  let strategic_choice ~consume preds (f : 'a -> int) =
     let rec val_and_remove passed idx lst =
       match (idx, lst) with
       | 0, hd :: tl -> (List.rev passed @ tl, hd)
@@ -110,7 +110,8 @@ module Make
     if max = 0 then None
     else
       let new_list, value = val_and_remove [] idx !preds in
-      preds := new_list;
+      (* We remove iff consume is true *)
+      if consume then preds := new_list;
       Some value
 
   let pop_all preds f =
@@ -166,7 +167,7 @@ module Make
   let get_all ~maintain f p = if maintain then find_all p f else pop_all p f
 
   (** TODO: EFICIENCY ISSUE!!! *)
-  let get_pred
+  let consume_pred
       ~(maintain : bool)
       (preds : t)
       (name : string)
@@ -187,7 +188,7 @@ module Make
     in
     let outs_count = List.fold_left (fun sum i -> sum + i) 0 outs_count in
     L.verbose (fun fmt ->
-        fmt "Preds.get_pred: Looking for: %s%a" name lov_pp args);
+        fmt "Preds.consume_pred: Looking for: %s%a" name lov_pp args);
     (* Evaluate a candidate predicate with respect to the desired ins and outs and an equality function *)
     let eval_cand_with_fun
         (candidate : vt list)
@@ -239,7 +240,8 @@ module Make
     let frame_off name args =
       match maintain with
       | true -> Some (name, args)
-      | false -> pop preds (fun pred -> pred = (name, args))
+      | false ->
+          pop preds (fun pred -> [%eq: string * Val.t list] pred (name, args))
     in
     let candidates = find_all preds (fun (pname, _) -> name = pname) in
     let candidates = List.map (fun (_, args) -> args) candidates in
@@ -247,7 +249,7 @@ module Make
         fmt "Found %d candidates: \n%a" (List.length candidates)
           Fmt.(list ~sep:(any "@\n") lv_pp)
           candidates);
-    let syntactic_result = find_pred candidates args ( = ) in
+    let syntactic_result = find_pred candidates args Val.equal in
     match syntactic_result with
     | true, _, o, syntactic_result when o = outs_count ->
         frame_off name syntactic_result

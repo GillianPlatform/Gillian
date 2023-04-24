@@ -210,11 +210,11 @@ end = struct
 
   let pp_fix _ _ = raise (Failure "str_of_fix from non-symbolic state.")
 
-  let get_recovery_vals _ =
-    raise (Failure "get_recovery_vals from non-symbolic state.")
+  let get_recovery_tactic _ =
+    raise (Failure "get_recovery_tactic from non-symbolic state.")
 
-  let automatic_unfold _ _ : (t list, string) result =
-    Error "Automatic unfold not supported in concrete execution"
+  let try_recovering _ _ : (t list, string) result =
+    Error "try_recovering not supported in concrete execution"
 
   let pp_err fmt (err : err_t) : unit =
     match err with
