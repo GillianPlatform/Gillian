@@ -62,6 +62,7 @@ module type S = sig
   val apply_fix :
     t -> PFS.t -> Type_env.t -> c_fix_t -> (t, err_t) result Delayed.t
 
+  (* val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t *)
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
 end
@@ -114,13 +115,17 @@ struct
       Ok asucs
 
   let apply_fix heap pfs gamma fix =
+    Logging.verbose (fun m -> m "Bi-abduction trying to apply fix");
     let res = apply_fix heap pfs gamma fix in
     let curr_pc = Pc.make ~unification:false ~pfs ~gamma () in
     let results = Delayed.resolve ~curr_pc res in
     match results with
     | [ br ] -> (
         match Branch.value br with
-        | Ok x -> x
+        | Ok x ->
+            Logging.verbose (fun m ->
+                m "Print state after applying fixes %a" pp x);
+            x
         | Error err -> raise (Failure "Bi-abduction: cannot fix cell."))
     | _ -> raise (Failure "Bi-abduction: cannot fix cell.")
 

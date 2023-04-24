@@ -8,6 +8,7 @@ open Delayed.Syntax
 open Gillian.Symbolic
 open Gillian.Gil_syntax
 module Logging = Gillian.Logging
+module PFS = Gillian.Symbolic.Pure_context
 module SS = GUtils.Containers.SS
 module SVal = MonadicSVal
 module Debugger = Gillian.Debugger
@@ -151,7 +152,7 @@ module Mem = struct
   let load { map; _ } loc chunk ofs =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res map loc_name (Some ofs) None in
+    let** tree = get_tree_res map loc_name (Some ofs) (Some chunk) in
     let++ value, new_tree =
       map_lift_err loc_name (SHeapTree.load tree chunk ofs)
     in
@@ -832,7 +833,12 @@ type c_fix_t =
 
 (* Pretty printing utils *)
 
-let pp_c_fix _fmt _c_fix = failwith "Not ready for bi-abduction yet"
+let pp_c_fix fmt c_fix =
+  match c_fix with
+  | AddSingle { loc : string; ofs : Expr.t; value : Expr.t; chunk : Chunk.t } ->
+      Fmt.pf fmt "AddSingle(%s, %a, %a, %a)" loc Expr.pp ofs Expr.pp value
+        Chunk.pp chunk
+(* failwith "Bi-abduction TODO: implement function pp_c_fix" *)
 
 let pp_err fmt (e : err_t) =
   match e with
@@ -840,9 +846,12 @@ let pp_err fmt (e : err_t) =
       Fmt.pf fmt "'%a' cannot be resolved as a location" Expr.pp loc
   | MissingLocResource (ga, l, vt, chunk) ->
       Fmt.pf fmt
-        "No block associated with location '%s'. Associated data: core_pred: \
-         %s, value: %a, chunk: %a"
-        l (LActions.str_ga ga) (Fmt.Dump.option Expr.pp) vt
+        "No block associated with location '%s'. Associated data: \n\
+        \ * location: '%s'\n\
+        \ * core_pred: %s\n\
+        \ * value: %a \n\
+        \ * chunk: %a \n"
+        l l (LActions.str_ga ga) (Fmt.Dump.option Expr.pp) vt
         (Fmt.Dump.option Chunk.pp) chunk
   | SHeapTreeErr { at_locations; sheaptree_err } ->
       Fmt.pf fmt "Tree at location%a raised: <%a>"
@@ -881,6 +890,14 @@ let lift_dr_and_log res =
 
 (* Actual action execution *)
 
+let filter_errors dr =
+  Delayed.bind dr (fun res ->
+      match res with
+      | Ok _ -> Delayed.return res
+      | Error err ->
+          Logging.tmi (fun m -> m "Filtering error branch: %a" pp_err err);
+          Delayed.vanish ())
+
 let execute_action ~action_name heap params =
   Logging.verbose (fun fmt ->
       fmt "Executing action %s with params %a" action_name pp_params params);
@@ -897,7 +914,7 @@ let execute_action ~action_name heap params =
     | AMem Free -> execute_free heap params
     | AMem Move -> execute_move heap params
     | AMem GetSingle -> execute_get_single heap params
-    | AMem SetSingle -> execute_set_single heap params
+    | AMem SetSingle -> execute_set_single heap params |> filter_errors
     | AMem RemSingle -> execute_rem_single heap params
     | AMem GetArray -> execute_get_array heap params
     | AMem SetArray -> execute_set_array heap params
@@ -1024,7 +1041,8 @@ let get_recovery_tactic _ err =
   in
   Recovery_tactic.try_unfold values
 
-let get_failing_constraint _e = failwith "Not ready for bi-abduction yet"
+let get_failing_constraint _e =
+  failwith "Bi-abduction TODO: implement function get_failing_constraint"
 
 let get_fixes _heap _pfs _gamma err =
   Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
@@ -1035,20 +1053,51 @@ let get_fixes _heap _pfs _gamma err =
       let set = SS.singleton new_var in
       [ ([ AddSingle { loc; ofs; value; chunk } ], [], set, []) ]
   | InvalidLocation loc ->
+      Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
       [ ([], [ Formula.Eq (new_expr, loc) ], SS.empty, []) ]
   | _ -> []
 
-(* let apply_fix _heap _pfs _gamma _fix = failwith "Not ready for bi-abdcution" *)
-let apply_fix heap _pfs _gamma fix =
+let apply_fix heap pfs gamma fix =
+  Logging.verbose (fun m ->
+      m "Applying fixes for error (Gillian-C/lib/MonadicSMemory.ml)");
   let open DR.Syntax in
   match fix with
+  (* | _ -> heap *)
   | AddSingle { loc; ofs; value; chunk } ->
+      Logging.verbose (fun m ->
+          m
+            "Applying AddSingle fix for error\n\
+            \ * location: '%s'\n\
+            \ * core_pred: %a\n\
+            \ * value: %a \n\
+            \ * chunk: %a \n"
+            loc Expr.pp ofs Expr.pp value Chunk.pp chunk);
+
+      (* Extend Gamma *)
+      let new_gamma = Type_env.init () in
+      Type_env.update new_gamma loc Type.ListType;
+      Type_env.extend gamma new_gamma;
+
+      (* Extend PFS *)
       let loc = Expr.loc_from_loc_name loc in
-      (* NOTE: What should "chunk sval perm" be assigned to? *)
+      PFS.extend pfs (Eq (UnOp (UnOp.TypeOf, loc), Lit (Type Type.ListType)));
+      PFS.extend pfs (Eq (Expr.list_length loc, Lit (Int (Z.of_int 2))));
+      PFS.extend pfs (Eq (Expr.list_nth loc 0, Lit (String "int")));
+      PFS.extend pfs
+        (Eq (UnOp (UnOp.TypeOf, Expr.list_nth loc 1), Lit (Type Type.IntType)));
+      Logging.verbose (fun m -> m "!!! New PFS %a" PFS.pp pfs);
+
+      Logging.verbose (fun m ->
+          m "1 Beforing setting the memory, the heap is: %a" pp heap);
       (* sval corresponds to the value. So change value to sval type *)
       let* sval = SVal.of_gil_expr_exn value in
       let perm = Perm.Writable in
       let++ mem = Mem.set_single !(heap.mem) loc ofs chunk sval perm in
+
+      (* Let's print the heap here - to see if anything got added to the memory *)
+      Logging.verbose (fun m -> m "4 Printing the fix %a" pp heap);
+
       { heap with mem = ref mem }
+(* heap *)

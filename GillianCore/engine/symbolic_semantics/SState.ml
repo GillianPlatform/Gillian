@@ -802,9 +802,14 @@ module Make (SMemory : SMemory.S) :
 
     let apply_fix (heap : heap_t) (new_vars : SS.t) (fix : fix_t) :
         heap_t * SS.t =
+      (* Logging.verbose (fun m ->
+          m
+            "Applying fixes for error \
+             (GillianCore/engine/symbolic_semantics/SState.ml)"); *)
       match fix with
       (* Apply fix in memory - this may change the pfs and gamma *)
       | MFix fix ->
+          L.verbose (fun m -> m "SState: before applying fixes %a" pp state);
           let heap' = SMemory.apply_fix heap pfs gamma fix in
           (heap', new_vars)
       | FPure f ->
@@ -832,6 +837,7 @@ module Make (SMemory : SMemory.S) :
     in
     (* FIXME: this unused heap' variable is suspicious *)
     let _heap', new_vars = apply_fixes_rec heap SS.empty fixes in
+    L.verbose (fun m -> m "SState: after applying fixes %a" pp state);
     (Some (heap, store, pfs, gamma, SS.union svars new_vars), !gas)
 
   let get_equal_values state les =
