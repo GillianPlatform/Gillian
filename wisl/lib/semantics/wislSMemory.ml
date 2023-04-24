@@ -287,11 +287,7 @@ let get_recovery_tactic _ e =
   match e with
   | WislSHeap.MissingResource (_, loc, ofs) ->
       let loc = Expr.loc_from_loc_name loc in
-      let ofs =
-        match ofs with
-        | None -> []
-        | Some ofs -> [ ofs ]
-      in
+      let ofs = Option.to_list ofs in
       Recovery_tactic.try_unfold (loc :: ofs)
   | _ -> Recovery_tactic.none
 
