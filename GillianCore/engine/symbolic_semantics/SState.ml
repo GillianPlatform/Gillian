@@ -772,6 +772,10 @@ module Make (SMemory : SMemory.S) :
           result
       | _ -> raise (Failure "DEATH: get_fixes: error cannot be fixed.")
     in
+    L.tmi (fun m ->
+        m "All fixes before normalisation: %a"
+          Fmt.Dump.(list @@ list @@ list @@ pp_fix)
+          one_step_fixes);
     (* Cartesian product of the fixes *)
     let product = List_utils.list_product one_step_fixes in
     let candidate_fixes = List.concat product in

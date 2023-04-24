@@ -838,8 +838,12 @@ let pp_err fmt (e : err_t) =
   match e with
   | InvalidLocation loc ->
       Fmt.pf fmt "'%a' cannot be resolved as a location" Expr.pp loc
-  | MissingLocResource (_, l, _, _) ->
-      Fmt.pf fmt "No block associated with location '%s'" l
+  | MissingLocResource (ga, l, vt, chunk) ->
+      Fmt.pf fmt
+        "No block associated with location '%s'. Associated data: core_pred: \
+         %s, value: %a, chunk: %a"
+        l (LActions.str_ga ga) (Fmt.Dump.option Expr.pp) vt
+        (Fmt.Dump.option Chunk.pp) chunk
   | SHeapTreeErr { at_locations; sheaptree_err } ->
       Fmt.pf fmt "Tree at location%a raised: <%a>"
         (fun fmt l ->
@@ -1022,8 +1026,6 @@ let get_recovery_tactic _ err =
 
 let get_failing_constraint _e = failwith "Not ready for bi-abduction yet"
 
-(* let get_fixes ?simple_fix:_ _heap _pfs _gamma _err =
-   failwith "Not ready for bi-abduction yet" *)
 let get_fixes _heap _pfs _gamma err =
   Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
   match err with
