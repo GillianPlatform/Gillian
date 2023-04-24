@@ -798,7 +798,7 @@ module Make
              (which are sufficient to trigger the unfold) *)
           let vs = List.map eval_expr les in
           let vs_ins = Pred.in_args pred.pred vs in
-          let vs = List.map (fun x -> Some x) vs in
+          let vs = List.map Option.some vs in
           (* FIXME: make sure correct number of params *)
           (* 3) We consume the predicate from the state. *)
           let cons_res = SUnifier.consume_pred astate pname vs None in
