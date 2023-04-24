@@ -99,7 +99,7 @@ const ExecMapNode = ({ data }: NodeProps<ExecMapNodeData & Dims>) => {
             }`}
           />
           &nbsp;
-          <div style={colorStyle}>Unify</div>
+          <div style={colorStyle}>Match</div>
         </VSCodeBadge>
         &nbsp;
       </>
