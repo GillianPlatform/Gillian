@@ -56,7 +56,6 @@ let types t e =
       static_error () (* Maybe a more precise message ? *)
   | _ -> Emp
 
-let fold_star l = List.fold_left ( ** ) Emp l
 let fold_and l = List.fold_left (fun a b -> a #&& b) Formula.True l
 
 let to_assrt_of_gen_form f =
@@ -261,7 +260,7 @@ let gen_pred_of_struct cenv ann struct_name =
 
   let holes = get_holes comp.co_members in
   let holes_asserts = List.map assert_of_hole holes in
-  let def = fold_star holes_asserts ** def_without_holes in
+  let def = Asrt.star holes_asserts ** def_without_holes in
   (* TODO (Alexis): How to handle changes in structs? *)
   let n_pred =
     Pred.
@@ -575,7 +574,7 @@ let trans_constr ?fname:_ ~(typ : CAssert.points_to_type) ann s c =
       in
       let pr =
         Asrt.Pred (struct_pred, [ locv; ofsv ] @ params_fields)
-        ** fold_star more_asrt
+        ** Asrt.star more_asrt
       in
       pr ** to_assert ** malloc_chunk siz
 
@@ -615,7 +614,7 @@ let rec trans_asrt ~fname ~ann asrt =
       ma ** Pure fp
   | Pred (p, cel) ->
       let ap, _, gel = split3_expr_comp (List.map trans_expr cel) in
-      fold_star ap ** Pred (p, gel)
+      Asrt.star ap ** Pred (p, gel)
   | Emp -> Emp
   | PointsTo { ptr = s; constr = c; typ } -> trans_constr ~fname ~typ ann s c
 
@@ -673,7 +672,7 @@ let trans_asrt_annot da =
            | Some t -> (ex, types t (Expr.LVar ex)))
          existentials)
   in
-  let a = fold_star typsb in
+  let a = Asrt.star typsb in
   (a, (label, exs))
 
 let trans_abs_pred ~filepath cl_pred =
@@ -895,244 +894,15 @@ let get_clight_fun clight_prog ident =
   in
   act_f
 
-let opt_gen param_name pred_name struct_params =
-  let lv_params = List.map (fun (s, _) -> Expr.LVar ("#" ^ s)) struct_params in
-  let loc = Expr.LVar "#loc" in
-  let null = Expr.Lit (LList [ String VTypes.long_type; Int Z.zero ]) in
-  let pvar = Expr.PVar param_name in
-  let loc_list = Expr.EList [ loc; Expr.zero_i ] in
-  let def_null = pvar == null in
-  let def_rec =
-    (pvar == loc_list) ** types ObjectType loc
-    ** Pred (pred_name, loc :: lv_params)
-  in
-  [ def_null; def_rec ]
-
-let asserts_of_rec_member cenv members id typ =
-  let open Ctypes in
-  let mk t v = Expr.EList [ Lit (String t); v ] in
-  let field_name = true_name id in
-  let pvmember = Expr.PVar field_name in
-  let field_val_name = "#i__" ^ field_name ^ "_v" in
-  let lvval = Expr.LVar field_val_name in
-  let pvloc = Expr.PVar loc_param_name in
-  let pvoffs = Expr.zero_i in
-  (* let pvoffs = Expr.PVar offs_param_name in *)
-  let res_to_map =
-    let open VTypes in
-    match typ with
-    | Tint _ ->
-        let e = mk int_type lvval in
-        [ (e, (pvmember == mk int_type lvval) ** types IntType lvval) ]
-    (* (mk int_type lvval, Asrt.Pred (int_get, [ pvmember; lvval ])) *)
-    | Tlong _ ->
-        let e = mk int_type lvval in
-        [ (e, (pvmember == mk long_type lvval) ** types IntType lvval) ]
-    | Tfloat _ ->
-        let e = mk int_type lvval in
-        [ (e, (pvmember == mk float_type lvval) ** types NumberType lvval) ]
-    | Tpointer (Tstruct (id, _), _) ->
-        let struct_name = true_name id in
-        let p_name = rec_pred_name_of_struct struct_name in
-        let null = Expr.Lit (LList [ String long_type; Int Z.zero ]) in
-        let obj = Expr.EList [ lvval; Expr.zero_i ] in
-        let comp_opt = Maps.PTree.get id cenv in
-        let comp =
-          match comp_opt with
-          | None ->
-              failwith
-                (Printf.sprintf "Structure %s is undefined !" struct_name)
-          | Some c -> c
-        in
-        let struct_params =
-          List.map
-            (function
-              | Member_plain (i, _) ->
-                  Expr.LVar ("#" ^ field_name ^ "__" ^ true_name i)
-              | Member_bitfield _ -> failwith "Unsupported bitfield members")
-            comp.co_members
-        in
-        [
-          (null, pvmember == null);
-          ( obj,
-            (pvmember == obj) ** types ObjectType lvval
-            ** Pred (p_name, lvval :: struct_params) );
-        ]
-        (* (pvmember, Asrt.Pred (is_ptr_to_0_opt, [ pvmember ])) *)
-    | _ ->
-        failwith
-          (Printf.sprintf "unhandled struct field type for now : %s"
-             (PrintCsyntax.name_cdecl field_name typ))
-  in
-  let fo =
-    match field_offset cenv id members with
-    | Errors.OK (f, Full) -> Expr.Lit (Int (ValueTranslation.int_of_z f))
-    | Errors.OK _ -> failwith "Unsupported bitfield members"
-    | Errors.Error e ->
-        failwith
-          (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
-             e)
-  in
-  let sz = Expr.Lit (Int (ValueTranslation.int_of_z (sizeof cenv typ))) in
-  let perm_exp =
-    Expr.Lit (String (ValueTranslation.string_of_permission Memtype.Freeable))
-  in
-  let mem_ga = LActions.str_ga Single in
-  let ga_asrt sval =
-    Asrt.GA
-      (mem_ga, [ pvloc; pvoffs ++ fo; pvoffs ++ fo ++ sz ], [ sval; perm_exp ])
-  in
-  List.map (fun (sval, asrt) -> ga_asrt sval ** asrt) res_to_map
-
-let gen_rec_pred_of_struct cenv ann struct_name =
-  let pred_name = rec_pred_name_of_struct struct_name in
-  let opt_pred_name = opt_rec_pred_name_of_struct struct_name in
-  let pred_ins = [ 0 ] in
-  let id = id_of_string struct_name in
-  let comp_opt = Maps.PTree.get id cenv in
-  let comp =
-    match comp_opt with
-    | None ->
-        failwith (Printf.sprintf "Structure %s is undefined !" struct_name)
-    | Some c -> c
-  in
-  let open Ctypes in
-  let () =
-    match comp.co_su with
-    | Union -> failwith "union shouldn't be handled by this function"
-    | Struct -> ()
-  in
-  let first_params =
-    [
-      (loc_param_name, Some Type.ObjectType)
-      (* (offs_param_name, Some Type.NumberType) *)
-      (* TODO: For now, offset HAS to be 0, that will change *);
-    ]
-  in
-  let struct_params =
-    List.map
-      (function
-        | Member_plain (i, _) -> (true_name i, Some Type.ListType)
-        | _ -> failwith "Unsupported bitfield members")
-      comp.co_members
-  in
-  let pred_params = first_params @ struct_params in
-  let pred_num_params = List.length pred_params in
-  let defs_without_holes =
-    List.fold_left
-      (fun al member ->
-        match member with
-        | Member_bitfield _ -> failwith "Unsupported bitfield members"
-        | Member_plain (id, typ) ->
-            let new_al = asserts_of_rec_member cenv comp.co_members id typ in
-            let list_of_list =
-              List.map (fun a -> List.map (fun na -> a ** na) new_al) al
-            in
-            List.concat list_of_list)
-      [ Asrt.Emp ] comp.co_members
-  in
-  let fo idp =
-    match field_offset cenv idp comp.co_members with
-    | Errors.OK (f, Full) -> ValueTranslation.int_of_z f
-    | Errors.OK _ -> failwith "Unsupported bitfield members"
-    | Errors.Error e ->
-        failwith
-          (Format.asprintf "Invalid member offset : %a@?" Driveraux.print_error
-             e)
-  in
-  let sz t = ValueTranslation.int_of_z (sizeof cenv t) in
-  let rec get_holes memb =
-    match memb with
-    | [] -> []
-    | [ _a ] -> []
-    | Member_plain (ida, t) :: Member_plain (idb, _) :: r ->
-        let end_a = Z.add (fo ida) (sz t) in
-        let start_b = fo idb in
-        if end_a < start_b then (end_a, start_b) :: get_holes r else get_holes r
-    | _ -> failwith "Unsupported bitfield members"
-  in
-  let holes = get_holes comp.co_members in
-  let hole_assert = fold_star (List.map assert_of_hole holes) in
-  let siz = ValueTranslation.int_of_z comp.Ctypes.co_sizeof in
-  let zero = Expr.int 0 in
-  let malloc = malloc_chunk_asrt (Expr.PVar loc_param_name) zero siz in
-  let pred_definitions =
-    List.map
-      (fun def -> (None, def ** hole_assert ** malloc, []))
-      defs_without_holes
-  in
-  let rec_pred =
-    Pred.
-      {
-        pred_name;
-        pred_source_path = None;
-        pred_internal = true;
-        pred_ins;
-        pred_num_params;
-        pred_params;
-        pred_facts = [];
-        pred_pure = false;
-        pred_guard = None;
-        pred_abstract = false;
-        pred_nounfold = false;
-        pred_normalised = false;
-        pred_definitions;
-      }
-  in
-  let opt_param_name = "x" in
-  let opt_defs = opt_gen opt_param_name pred_name struct_params in
-  let opt_pred =
-    Pred.
-      {
-        pred_name = opt_pred_name;
-        pred_source_path = None;
-        pred_internal = true;
-        pred_ins = [ 0 ];
-        pred_num_params = 1;
-        pred_params = [ (opt_param_name, Some Type.ListType) ];
-        pred_facts = [];
-        pred_guard = None;
-        pred_pure = false;
-        pred_abstract = false;
-        pred_nounfold = false;
-        pred_normalised = false;
-        pred_definitions = List.map (fun x -> (None, x, [])) opt_defs;
-      }
-  in
-  { ann with preds = opt_pred :: rec_pred :: ann.preds }
-
-let gen_bi_preds clight_prog =
-  let open Ctypes in
-  let structs_not_annot = get_structs_not_annot clight_prog.prog_types in
-  List.fold_left
-    (gen_rec_pred_of_struct clight_prog.prog_comp_env)
-    { empty with cenv = clight_prog.prog_comp_env }
-    structs_not_annot
-
-let predicate_from_triple (pn, csmt, ct) =
-  let is_c_ptr_to_scalar = function
-    | Ctypes.Tpointer ((Tfloat _ | Tint _ | Tlong _), _) -> true
-    | _ -> false
-  in
-  let pred_name_of_ptr_scal =
-    let open Internal_Predicates in
-    function
-    | Ctypes.Tpointer (Tfloat _, _) -> is_ptr_to_single_opt
-    | Ctypes.Tpointer (Tint _, _) -> is_ptr_to_int_opt
-    | Ctypes.Tpointer (Tlong _, _) -> is_ptr_to_long_opt
-    | _ -> failwith "Cannot happen"
-  in
-  let pred pname = Asrt.Pred (pname, [ Expr.PVar pn ]) in
+let predicate_from_triple (e, csmt, ct) =
+  let pred pname = Asrt.Pred (pname, [ e ]) in
   let open Internal_Predicates in
-  match csmt with
-  | AST.Tint when (not Archi.ptr64) && is_c_ptr_to_scalar ct ->
-      pred (pred_name_of_ptr_scal ct)
-  | AST.Tlong when Archi.ptr64 && is_c_ptr_to_scalar ct ->
-      pred (pred_name_of_ptr_scal ct)
-  | AST.Tint -> pred is_int
-  | AST.Tlong -> pred is_long
-  | AST.Tsingle -> pred is_single
-  | AST.Tfloat -> pred is_float
+  match (csmt, ct) with
+  | _, Ctypes.Tpointer _ -> pred is_ptr_opt
+  | AST.Tint, _ -> pred is_int
+  | AST.Tlong, _ -> pred is_long
+  | AST.Tsingle, _ -> pred is_single
+  | AST.Tfloat, _ -> pred is_float
   | _ ->
       failwith
         (Printf.sprintf
@@ -1155,21 +925,24 @@ let generate_bispec clight_prog fname ident f =
   let true_params = List.map true_name params in
   let clight_fun = get_clight_fun clight_prog ident in
   let cligh_params = clight_fun.Clight.fn_params in
-  let triples = combine true_params sig_args cligh_params in
+  let mk_lvar x = Expr.LVar ("#" ^ x) in
+  let lvars = List.map mk_lvar true_params in
+  let equalities =
+    Asrt.star
+      (List.map
+         (fun x -> Asrt.Pure (Formula.Eq (Expr.PVar x, mk_lvar x)))
+         true_params)
+  in
   (* Right now, triples are : (param_name, csharpminor type, c type)
      The C type will be used to discriminate long/int from pointers *)
+  let triples = combine lvars sig_args cligh_params in
   let pred_list = List.map predicate_from_triple triples in
-  let prec_without_genv = fold_star pred_list in
-  let prec = prec_without_genv in
-
-  (* let logicals_list = List.map simple_predicate_from_triple triples in
-     let logicals_without_genv = fold_star logicals_list in
-     let logicals = logicals_without_genv in *)
+  let pre = equalities ** Asrt.star pred_list in
   BiSpec.
     {
       bispec_name = fname;
       bispec_params = true_params;
-      bispec_pres = [ prec ];
+      bispec_pres = [ pre ];
       bispec_normalised = false;
     }
 

@@ -904,8 +904,6 @@ let trans_program_with_annots
   let gil_annot =
     if Exec_mode.verification_exec exec_mode then
       Gil_logic_gen.trans_annots clight_prog annots filepath
-      (* else if Exec_mode.biabduction_exec exec_mode then
-         Gil_logic_gen.gen_bi_preds clight_prog *)
     else Gil_logic_gen.empty
   in
   let non_annotated_prog, compilation_data =

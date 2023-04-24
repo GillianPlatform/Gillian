@@ -208,12 +208,6 @@ let rec pp fmt a =
       let pp_e_l = Fmt.list ~sep:Fmt.comma Expr.pp in
       Fmt.pf fmt "@[<h><%s>(%a; %a)@]" a pp_e_l ins pp_e_l outs
 
-let star (asses : t list) : t =
-  List.fold_left
-    (fun ac a ->
-      if not (a = Emp) then if ac = Emp then a else Star (ac, a) else ac)
-    Emp asses
-
 let subst_clocs (subst : string -> Expr.t) (a : t) : t =
   map None None
     (Some (Expr.subst_clocs subst))
@@ -233,6 +227,8 @@ module Infix = struct
     | Pure True, x | x, Pure True | Emp, x | x, Emp -> x
     | _ -> Star (a, b)
 end
+
+let star (asrts : t list) : t = List.fold_left Infix.( ** ) Emp asrts
 
 let pvars_to_lvars (a : t) : t =
   let ff = Formula.pvars_to_lvars in
