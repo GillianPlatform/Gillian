@@ -1,0 +1,518 @@
+//
+// SLL predicates
+//
+
+// With addresses, including first
+predicate SLL_addrs_incl(+x, xs : List) {
+  // Empty SLL
+  (x == null) * (xs == []);
+  // One SLL node and the rest
+  (x -b> #v, #y) * SLL_addrs_incl(#y, #xs) * (xs == x :: #xs)
+}
+
+// With addresses, excluding first
+predicate SLL_addrs_excl(+x, xs : List) {
+  // Empty SLL
+  (x == null) * (xs == []);
+  // One SLL node and the rest
+  (x -b> #v, #y) * SLL_addrs_excl(#y, #xs) * (xs == #y :: #xs)
+}
+
+// With values
+predicate SLL_vals(+x, vs : List) {
+  // Empty SLL
+  (x == null) * (vs == []);
+  // One SLL node and the rest
+  (x -b> #v, #y) * SLL_vals(#y, #vs) * (vs == #v :: #vs)
+}
+
+// With addresses, including first, and values
+predicate SLL_incl(+x, xs : List, vs : List) {
+  // Empty SLL
+  (x == null) * (xs == []) * (vs == []);
+  // One SLL node and the rest
+  (x -b> #v, #y) * SLL_incl(#y, #xs, #vs) * (xs == x :: #xs) * (vs == #v :: #vs)
+}
+
+// With addresses, excluding first, and values
+predicate SLL_excl(+x, xs : List, vs : List) {
+  // Empty SLL
+  (x == null) * (xs == []) * (vs == []);
+  // One SLL node and the rest
+  (x -b> #v, #y) * SLL_excl(#y, #xs, #vs) * (xs == #y :: #xs) * (vs == #v :: #vs)
+}
+
+// With length
+predicate SLL_len(+x, n : Int) {
+  // Empty SLL
+  (x == null) * (n == 0);
+  // One SLL node and the rest
+  (x -b> #v, #y) * SLL_len(#y, n - 1)
+}
+
+//
+// SLLseg predicates
+//
+
+// With length
+predicate SLLseg_len(+x, y, n : Int) {
+  (x == y) * (n == 0);
+  (x -b> #v, #z) * SLLseg_len(#z, y, n - 1) * (0 <# n)
+}
+
+// With values
+predicate SLLseg_vals(+x, y, vs) {
+  (x == y) * (vs == []);
+  (x -b> #v, #next) * SLLseg_vals(#next, y, #vs) * (vs == #v :: #vs)
+}
+
+//
+// Pure predicate for list membership
+//
+
+predicate list_member(+vs, +v, r : Bool) {
+  (vs == []) * (r == false);
+  (vs == v :: #rest) * (r == true) * list_member(#rest, v, #mem);
+  (vs == #v :: #rest) * (! (#v == v)) * list_member(#rest, v, r)
+}
+
+//
+// Predicate for freed list nodes
+//
+predicate freed_nodes(xs) {
+    (xs == [ null ]);
+    (xs == #x :: #xs) * freed(#x) * freed_nodes(#xs)
+}
+
+//
+//
+// Lemmas
+//
+//
+
+// SLLseg_vals + trailing node -> larger, non-empty SLLseg_vals
+lemma SSLseg_vals_append {
+  statement:
+    forall x.
+      SLLseg_vals(#x, #y, #vs) * (#y -b> #v, #z) |- SLLseg_vals(#x, #z, #vs @ [ #v ])
+
+  variant: (len #vs)
+
+  proof:
+    unfold SLLseg_vals(#x, #y, #vs);
+    if (not (#x = #y)) {
+      assert {bind: #nnext} (#x + 1 -> #nnext);
+      apply SSLseg_vals_append(#nnext);
+      fold SLLseg_vals(#x, #z, #vs @ [ #v ])
+    } else {
+      fold SLLseg_vals(#y, #z, [ #v ])
+    }
+}
+
+// SLLseg_vals + SLL_vals -> SLL_vals
+lemma SLLseg_vals_concat_SLL_vals {
+  statement:
+    forall x.
+      SLLseg_vals(#x, #y, #vx) * SLL_vals(#y, #vy) |- SLL_vals (#x, #vx @ #vy)
+
+  variant: (len #vx)
+
+  proof:
+    unfold SLLseg_vals(#x, #y, #vx);
+    if (not (#vx = [])){
+      assert {bind: #nnext} (#x + 1 -> #nnext);
+      apply SLLseg_vals_concat_SLL_vals(#nnext)
+    }
+}
+
+// A null-terminating SLLseg_vals is an SLL_vals
+lemma SLLseg_vals_to_SLL_vals {
+  statement:
+    forall x.
+      SLLseg_vals(#x, null, #vs) |- SLL_vals(#x, #vs)
+
+  variant: len #vs
+
+  proof:
+    unfold SLLseg_vals(#x, null, #vs);
+    if (not (#vs = [])) {
+      assert {bind: #nv, #nnext} (#x -b> #nv, #nnext);
+      apply SLLseg_vals_to_SLL_vals(#nnext)
+    };
+    fold SLL_vals(#x, #vs)
+}
+
+// SLLseg_len + trailing node -> larger, non-empty SLLseg_len
+lemma SSLseg_len_append_lr {
+  statement:
+    forall x.
+      SLLseg_len(#x, #y, #n) * (#y -b> #v, #z) |- SLLseg_len(#x, #z, #n + 1) * (0 <=# #n)
+
+  variant: #n
+
+  proof:
+    unfold SLLseg_len(#x, #y, #n);
+    if (not (#n = 0)) {
+      assert {bind: #nnext} (#x + 1 -> #nnext);
+      apply SSLseg_len_append_lr(#nnext)
+    };
+    fold SLLseg_len(#x, #z, #n + 1)
+}
+
+// non-empty SLLseg_len -> smaller SLLseg_len + trailing node
+lemma SSLseg_len_append_rl {
+  statement:
+    forall x.
+      SLLseg_len(#x, #z, #n + 1) * (0 <=# #n) |- SLLseg_len(#x, #y, #n) * (#y -b> #v, #z)
+
+  variant: #n
+
+  proof:
+    unfold SLLseg_len(#x, #z, #n + 1);
+    assert {bind: #nnext} (#x + 1 -> #nnext);
+    if (not (#n = 0)) {
+        apply SSLseg_len_append_rl(#nnext);
+        assert {bind: #y} SLLseg_len(#nnext, #y, #n - 1);
+        fold SLLseg_len(#x, #y, #n)
+    }
+}
+
+// A null-terminating SLLseg_len is an SLL_len
+lemma SLLseg_len_to_SLL_len {
+  statement:
+    forall x.
+      SLLseg_len(#x, null, #n) |- SLL_len(#x, #n)
+
+  variant: #n
+
+  proof:
+    unfold SLLseg_len(#x, null, #n);
+    if (not (#n = 0)) {
+      assert {bind: #nv, #nnext} (#x -b> #nv, #nnext);
+      apply SLLseg_len_to_SLL_len(#nnext)
+    };
+    fold SLL_len(#x, #n)
+}
+
+// List membership-concat compatibility
+lemma list_member_concat {
+  statement:
+    forall vs1, vs2, v.
+      list_member(#vs1, #v, #r1) * list_member(#vs2, #v, #r2) |- list_member(#vs1 @ #vs2, #v, (#r1 || #r2))
+
+  variant: len #vs1
+
+  proof:
+    unfold list_member(#vs1, #v, #r1);
+    if (not (#vs1 = [])) {
+      assert {bind: #nv1, #nvs1, #nr1} (#vs1 == #nv1 :: #nvs1) * list_member(#nvs1, v, #nr1);
+      apply list_member_concat(#nvs1, #vs2, #v)
+    }
+}
+
+//
+//
+//  Examples
+//
+//
+
+//
+// 00. Allocating an SLL node with the given value
+//
+function SLL_allocate_node(v){
+  t := new(2);
+  [t] := v;
+  return t
+}
+
+//
+// 01. Prepending a given value to a given SLL
+//
+
+// General pre-condition
+predicate SLL_prepend_pre(def, +x, xs, vs, n) {
+    (def == 0) * SLL_addrs_incl(x, xs) * (vs == []) * (n == 0);
+    (def == 2) * SLL_vals(x, vs) * (xs == []) * (n == 0);
+    (def == 3) * SLL_incl(x, xs, vs) * (n == 0);
+    (def == 5) * SLL_len(x, n) * (xs == []) * (vs == [])
+}
+
+// General post-condition
+predicate SLL_prepend_post(+def, +x, +xs, +k, +vs, +n, +retval) {
+    (def == 0) * SLL_addrs_incl(retval, retval :: xs);
+    (def == 2) * SLL_vals(retval, k :: vs);
+    (def == 3) * SLL_incl(retval, retval :: xs, k :: vs);
+    (def == 5) * SLL_len(retval, n + 1) * (xs == [])
+}
+
+// Specified algorithm
+{ (x == #x) * (k == #k) * SLL_prepend_pre(#def, #x, #xs, #vs, #n) }
+function SLL_prepend(x, k){
+    z := SLL_allocate_node(k);
+    [z + 1] := x;
+    return z
+}
+{ SLL_prepend_post(#def, #x, #xs, #k, #vs, #n, ret) }
+
+//
+// 02r. List length
+//
+
+// General pre-condition
+predicate SLL_length_pre(def, +x, var : Int) {
+    (def == 0) * SLL_addrs_incl(x, #xs) * (var == len #xs);
+    (def == 1) * SLL_addrs_excl(x, #xs) * (var == len #xs);
+    (def == 2) * SLL_vals(x, #vs) * (var == len #vs);
+    (def == 3) * SLL_incl(x, #xs, #vs) * (var == len #xs);
+    (def == 4) * SLL_excl(x, #xs, #vs) * (var == len #xs);
+    (def == 5) * SLL_len(x, #n) * (var == #n)
+}
+
+// General post-condition
+predicate SLL_length_post(+def, +x, +retval) {
+    (def == 0) * SLL_addrs_incl(x, #xs) * (retval == len #xs);
+    (def == 1) * SLL_addrs_excl(x, #xs) * (retval == len #xs);
+    (def == 2) * SLL_vals(x, #vs) * (retval == len #vs);
+    (def == 3) * SLL_incl(x, #xs, #vs) * (retval == len #xs);
+    (def == 4) * SLL_excl(x, #xs, #vs) * (retval == len #xs);
+    (def == 5) * SLL_len(x, retval)
+}
+
+// Specified algorithm
+{ (x == #x) * SLL_length_pre(#def, #x, #var) } with variant: #var
+function SLL_length(x) {
+  if (x = null){
+    n := 0
+  } else {
+    t := [x + 1];
+    n := SLL_length(t);
+    n := 1 + n
+  };
+  return n
+}
+{ SLL_length_post(#def, #x, ret) }
+
+//
+// 02i. List Length
+//
+
+// Specified algorithm
+{ (x == #x) * SLL_len(x, #n) }
+function SLL_length_iter(x) {
+  y := x;
+  n := 0;
+  [[ invariant {bind: n, y, #ny}
+        SLLseg_len(x, y, n) * SLL_len(y, #ny) * (#n == n + #ny)
+        with variant: #ny ]];
+  while (not (y = null)) {
+    y := [y + 1];
+    n := n + 1;
+    [[ apply SSLseg_len_append_lr(x) ]]
+  };
+  [[ apply SLLseg_len_to_SLL_len(x) ]];
+  return n
+}
+{ SLL_len(#x, #n) * (ret == n) }
+
+//
+// 03r. List concatenation
+//
+
+// General pre-condition
+predicate SLL_concat_pre(def, +x, +y, xx, xy, vx, vy, nx, ny, var : Int) {
+    (def == 0) * SLL_addrs_incl(x, xx) * SLL_addrs_incl(y, xy) * (vx == []) * (vy == []) * (nx == 0) * (ny == 0) * (var == len xx);
+    (def == 2) * SLL_vals(x, vx) * SLL_vals(y, vy) * (xx == []) * (xy == []) * (nx == 0) * (ny == 0) * (var == len vx);
+    (def == 3) * SLL_incl(x, xx, vx) * SLL_incl(y, xy, vy) * (nx == 0) * (ny == 0) * (var == len vx);
+    (def == 5) * SLL_len(x, nx) * SLL_len(y, ny) * (xx == []) * (xy == []) * (vx == []) * (vy == []) * (var == nx)
+}
+
+// General post-condition
+predicate SLL_concat_post(+def, +x, +y, +xx, +xy, +vx, +vy, +nx, +ny, +retval) {
+    (def == 0) * SLL_addrs_incl(retval, xx @ xy);
+    (def == 2) * SLL_vals(retval, vx @ vy);
+    (def == 3) * SLL_incl(retval, xx @ xy, vx @ vy);
+    (def == 5) * SLL_len(retval, nx + ny)
+}
+
+// Specified algorithm
+{(x == #x) * (y == #y) * SLL_concat_pre(#def, #x, #y, #xx, #xy, #vx, #vy, #nx, #ny, #var) } with variant: #var
+function SLL_concat(x, y) {
+  if (x = null){
+    x := y
+  } else {
+    t := [x + 1];
+    z := SLL_concat(t, y);
+    [x + 1] := z
+  };
+  return x
+}
+{ SLL_concat_post(#def, #x, #y, #xx, #xy, #vx, #vy, #nx, #ny, ret) }
+
+//
+// 03i. List concatenation
+//
+
+// Specified algorithm
+{(x == #x) * (y == #y) * SLL_vals(#x, #vx) * SLL_vals(#y, #vy) }
+function SLL_concat_iter(x, y){
+  if (x = null) {
+    head := y
+  } else {
+    head := x;
+    prev := head;
+    next := [x + 1];
+    [[ invariant {bind: prev, next, #vs1, #vs2, #v}
+          SLLseg_vals(head, prev, #vs1) * (prev -b> #v, next) * SLL_vals(next, #vs2) *
+          (#vx == #vs1 @ (#v :: #vs2)) with variant: (len #vs2) ]];
+    while (not (next = null)) {
+        prev := next;
+        next := [next + 1];
+        [[ apply SSLseg_vals_append(head) ]]
+    };
+    [prev + 1] := y;
+    [[ apply SSLseg_vals_append(head) ]];
+    [[ apply SLLseg_vals_concat_SLL_vals(head) ]]
+  };
+  return head
+}
+{ SLL_vals(ret, #vx @ #vy) }
+
+//
+// 04r. Reversing a given SLL
+//
+
+// General pre-condition
+predicate SLL_reverse_pre(def, +x, xs, vs, n, var) {
+    (def == 0) * SLL_addrs_incl(x, xs) * (vs == []) * (n == 0) * (var == len xs);
+    (def == 2) * SLL_vals(x, vs) * (xs == []) * (n == 0) * (var == len vs);
+    (def == 3) * SLL_incl(x, xs, vs) * (n == 0) * (var == len xs);
+    (def == 5) * SLL_len(x, n) * (xs == []) * (vs == []) * (var == n)
+}
+
+// General post-condition
+predicate SLL_reverse_post(+def, +x, +xs, +vs, +n, +retval) {
+    (def == 0) * SLL_addrs_incl(retval, rev xs) * (vs == []) * (n == 0);
+    (def == 2) * SLL_vals(retval, rev vs) * (xs == []) * (n == 0);
+    (def == 3) * SLL_incl(retval, rev xs, rev vs) * (n == 0);
+    (def == 5) * SLL_len(retval, n) * (xs == []) * (vs == [])
+}
+
+// Specified algorithm
+{ (x == #x) * SLL_reverse_pre(#def, #x, #xs, #vs, #n, #var) } with variant: #var
+function SLL_reverse(x){
+  if (not (x = null)) {
+    t := [x + 1];
+    [x + 1] := null;
+    z := SLL_reverse(t);
+    y := SLL_concat(z, x)
+  } else {
+    y := null
+  };
+  return y
+}
+{ SLL_reverse_post(#def, #x, #xs, #vs, #n, ret) }
+
+//
+// 05r. List Membership
+//
+
+// General pre-condition
+predicate SLL_member_pre(def, +x, vs, var : Int) {
+    (def == 2) * SLL_vals(x, vs) * (var == len vs);
+    (def == 3) * SLL_incl(x, #xs, vs) * (var == len vs);
+    (def == 4) * SLL_excl(x, #xs, vs) * (var == len vs)
+}
+
+predicate nounfold SLL_member_post(+def, +x, +vs) {
+    (def == 2) * SLL_vals(x, vs);
+    (def == 3) * SLL_incl(x, #xs, vs);
+    (def == 4) * SLL_excl(x, #xs, vs)
+}
+
+// Specified algorithm
+{ (x == #x) * (k == #k) * SLL_member_pre(#def, #x, #vs, #var) * list_member(#vs, #k, #r) } with variant: #var
+function SLL_member(x, k){
+  found := false;
+  if (x = null){
+    skip
+  } else {
+    v := [x];
+    if (v = k){
+      found := true
+    } else {
+      t := [x + 1];
+      found := SLL_member(t, k)
+    }
+  };
+  return found
+}
+{ SLL_member_post(#def, #x, #vs) * list_member(#vs, #k, #r) * (ret == #r) }
+
+//
+// 05i. List membership
+//
+{ (x == #x) * (k == #k) * SLL_vals(#x, #vs) * list_member(#vs, #k, #r) }
+function SLL_member_iter(x, k) {
+  found := false;
+  next := x;
+  [[ invariant {bind: found, next, #beta, #gamma, #rg}
+       SLLseg_vals(x, next, #beta) * SLL_vals(next, #gamma) *
+         (#alpha == (#beta @ #gamma)) * (#r == (found || #rg)) *
+           list_member(#beta, k, found) * list_member(#gamma, k, #rg)
+     with variant: (len #gamma) ]] ;
+  while ((found = false) && (not (next = null))) {
+    [[ assert found == false ]];
+    [[ assert {bind: #v} next -> #v ]];
+    v := [ next ];
+    found := (v = k);
+    next := [next + 1];
+    [[ apply SSLseg_vals_append(x) ]];
+    [[ unfold list_member(#gamma, k, #rg) ]];
+    [[ apply list_member_concat(#beta, [ #v ], k) ]]
+  };
+  [[
+     if (found = false) {
+       apply SLLseg_vals_to_SLL_vals(#x)
+     } else {
+       assert {bind: #beta, #gamma} SLLseg_vals(#x, next, #beta) * SLL_vals(next, #gamma);
+       apply list_member_concat(#beta, #gamma, #k);
+       apply SLLseg_vals_concat_SLL_vals(#x)
+     }
+  ]];
+  return found
+}
+{ SLL_vals(#x, #vs) * list_member(#vs, #k, #r) * (ret == #r) }
+
+//
+// 06r. Freeing a given SLL
+//
+
+// General pre-condition
+predicate SLL_free_pre(def, +x, xs, var : Int) {
+    (def == 0) * SLL_addrs_incl(x, xs) * (var == len xs);
+    (def == 1) * SLL_addrs_excl(x, xs) * (var == len xs);
+    (def == 3) * SLL_incl(x, xs, #vs) * (var == len xs);
+    (def == 4) * SLL_excl(x, xs, #vs) * (var == len xs)
+}
+
+// General post-condition
+predicate SLL_free_post(+def, +x, +xs) {
+    (def == 0) * freed_nodes(xs @ [ null ]);
+    (def == 1) * freed_nodes(x :: xs);
+    (def == 3) * freed_nodes(xs @ [ null ]);
+    (def == 4) * freed_nodes(x :: xs)
+}
+
+// Specified algorithm
+{ (x == #x) * SLL_free_pre(#def, #x, #xs, #var) } with variant: #var
+function SLL_free(x){
+  if (x = null) {
+    skip
+  } else {
+    t := [x + 1];
+    z := SLL_free(t);
+    free(x)
+  };
+  return null
+}
+{ (ret == null) * SLL_free_post(#def, #x, #xs)}
