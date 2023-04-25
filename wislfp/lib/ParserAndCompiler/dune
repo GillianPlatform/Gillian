@@ -6,8 +6,8 @@
  (flags --explain))
 
 (library
- (name wParserAndCompiler)
- (libraries gillian wSyntax wUtils wSemantics)
+ (name pwParserAndCompiler)
+ (libraries gillian pwSyntax pwUtils pwSemantics)
  (preprocess
   (pps ppx_deriving.std ppx_deriving_yojson))
- (flags :standard -open WSyntax -open WUtils -open WSemantics))
+ (flags :standard -open PwSyntax -open PwUtils -open PwSemantics))

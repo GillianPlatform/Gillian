@@ -1,4 +1,4 @@
 (install
  (files wisl_core.gil wisl_pointer_arith.gil)
  (section share)
- (package wisl))
+ (package wislfp))

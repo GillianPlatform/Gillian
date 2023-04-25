@@ -1,4 +1,4 @@
 (library
- (name wSyntax)
- (libraries wUtils)
- (flags :standard -open WUtils))
+ (name pwSyntax)
+ (libraries pwUtils)
+ (flags :standard -open PwUtils))

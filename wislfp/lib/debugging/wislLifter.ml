@@ -1,5 +1,5 @@
-open WSemantics
-open WSyntax
+open PwSemantics
+open PwSyntax
 open Gil_syntax
 module L = Logging
 module DL = Debugger_log
@@ -7,7 +7,7 @@ module Exec_map = Debugger.Utils.Exec_map
 module Unify_map = Debugger.Utils.Unify_map
 open Syntaxes.Option
 module Ext_list = Utils.Ext_list
-module Annot = WParserAndCompiler.Annot
+module Annot = PwParserAndCompiler.Annot
 open Annot
 open WBranchCase
 open Debugger.Lifter
@@ -21,7 +21,7 @@ struct
   open Exec_map
 
   type memory_error = WislSMemory.err_t
-  type tl_ast = WParserAndCompiler.tl_ast
+  type tl_ast = PwParserAndCompiler.tl_ast
   type memory = WislSMemory.t
   type annot = Annot.t
 

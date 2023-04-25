@@ -3,7 +3,7 @@
 ;   (libraries camelot wisl))
 
 (executable
- (name wisl)
- (public_name wisl)
- (package wisl)
- (libraries gillian wSemantics wParserAndCompiler wUtils wDebugging))
+ (name wislfp)
+ (public_name wislfp)
+ (package wislfp)
+ (libraries gillian pwSemantics pwParserAndCompiler pwUtils pwDebugging))

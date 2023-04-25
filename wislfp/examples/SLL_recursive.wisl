@@ -16,19 +16,19 @@ function llen(x) {
 }
 { list(#x, #alpha) * (ret == len(#alpha)) }
 
-{ (x == #x) * (y == #y) * list(#x, #alpha) * list(#y, #beta) }
-function concat(x, y) {
-    if (x = null) {
-        r := y
-    } else {
-        t := [x+1];
-        ct := concat(t, y);
-        [x+1] := ct;
-        r := x
-    };
-    return r
-}
-{ list(ret, #alpha @ #beta) }
+// { (x == #x) * (y == #y) * list(#x, #alpha) * list(#y, #beta) }
+// function concat(x, y) {
+//     if (x = null) {
+//         r := y
+//     } else {
+//         t := [x+1];
+//         ct := concat(t, y);
+//         [x+1] := ct;
+//         r := x
+//     };
+//     return r
+// }
+// { list(ret, #alpha @ #beta) }
 
 
 // { list(#x, #alpha) * (v == #v) }
