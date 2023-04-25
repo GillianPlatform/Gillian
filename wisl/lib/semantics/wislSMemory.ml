@@ -275,17 +275,23 @@ let pp_by_need _ fmt h = pp fmt h
 let get_print_info _ _ = (SS.empty, SS.empty)
 
 let pp_err fmt t =
-  Fmt.string fmt
-    (match t with
-    | WislSHeap.MissingResource _ -> "Missing Resource"
-    | DoubleFree _ -> "Double Free"
-    | UseAfterFree _ -> "Use After Free"
-    | MemoryLeak -> "Memory Leak"
-    | OutOfBounds _ -> "Out Of Bounds"
-    | InvalidLocation _ -> "Invalid Location")
+  match t with
+  | WislSHeap.MissingResource _ -> Fmt.pf fmt "Missing Resource"
+  | DoubleFree _ -> Fmt.pf fmt "Double Free"
+  | UseAfterFree _ -> Fmt.pf fmt "Use After Free"
+  | MemoryLeak -> Fmt.pf fmt "Memory Leak"
+  | OutOfBounds _ -> Fmt.pf fmt "Out Of Bounds"
+  | InvalidLocation loc ->
+      Fmt.pf fmt "Invalid Location: '%a' cannot be resolved as a location"
+        Expr.pp loc
 
 let get_recovery_vals _ _ = []
-let pp_c_fix _ _ = ()
+
+let pp_c_fix fmt c_fix =
+  match c_fix with
+  | AddCell { loc : string; ofs : Expr.t; value : Expr.t } ->
+      Fmt.pf fmt "AddCell(%s, %a, %a)" loc Expr.pp ofs Expr.pp value
+
 let substitution_in_place ~pfs:_ ~gamma:_ = WislSHeap.substitution_in_place
 let fresh_val _ = Expr.LVar (LVar.alloc ())
 
@@ -300,6 +306,7 @@ let is_overlapping_asrt _ = false
 
 (* let apply_fix m _ _ _ = m *)
 let apply_fix m pfs gamma fix =
+  Logging.verbose (fun m -> m "Applying fixes for error");
   match fix with
   | AddCell { loc; ofs; value } ->
       WislSHeap.set_cell ~pfs ~gamma m loc ofs value |> Result.get_ok;
