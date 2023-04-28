@@ -150,7 +150,7 @@ module type S = sig
   val mem_constraints : t -> Formula.t list
   val can_fix : err_t list -> bool
   val get_failing_constraint : err_t -> Formula.t
-  val get_fixes : ?simple_fix:bool -> t -> err_t list -> fix_t list list
+  val get_fixes : t -> err_t list -> fix_t list list
   val apply_fixes : t -> fix_t list -> t option * Asrt.t list
   val get_equal_values : t -> vt list -> vt list
   val get_heap : t -> heap_t

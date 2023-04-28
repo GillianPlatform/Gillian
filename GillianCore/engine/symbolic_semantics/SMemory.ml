@@ -68,7 +68,6 @@ module type S = sig
   val get_failing_constraint : err_t -> Formula.t
 
   val get_fixes :
-    ?simple_fix:bool ->
     t ->
     PFS.t ->
     Type_env.t ->
@@ -116,6 +115,6 @@ module Dummy : S with type init_data = unit = struct
   let get_recovery_tactic _ _ = failwith "Please implement SMemory"
   let pp_err _ _ = ()
   let get_failing_constraint _ = failwith "Please implement SMemory"
-  let get_fixes ?simple_fix:_ _ _ _ _ = failwith "Please implement SMemory"
+  let get_fixes _ _ _ _ = failwith "Please implement SMemory"
   let apply_fix _ _ _ _ = failwith "Please implement SMemory"
 end

@@ -511,8 +511,7 @@ struct
 
   (* to throw errors: *)
 
-  let get_fixes ?simple_fix:(_ = true) (_ : t) (_ : err_t list) :
-      fix_t list list =
+  let get_fixes (_ : t) (_ : err_t list) : fix_t list list =
     raise (Failure "get_fixes not implemented in MakeBiState")
 
   let apply_fixes (_ : t) (_ : fix_t list) : t option * Asrt.t list =
@@ -567,7 +566,7 @@ struct
               | Some state', Some state_af' ->
                   Some (execute_action action (procs, state', state_af') args)
               | _ -> None)
-            (State.get_fixes ~simple_fix:false state errs)
+            (State.get_fixes state errs)
         in
         let rets = List_utils.get_list_somes rets in
         merge_action_results rets

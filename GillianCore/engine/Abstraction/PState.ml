@@ -1199,11 +1199,10 @@ module Make
   let get_failing_constraint = State.get_failing_constraint
   let can_fix = State.can_fix
 
-  let get_fixes ?simple_fix:(sf = true) (state : t) (errs : err_t list) :
-      fix_t list list =
+  let get_fixes (state : t) (errs : err_t list) : fix_t list list =
     L.verbose (fun m -> m "AState: get_fixes");
     let st, _, _, _ = state in
-    State.get_fixes ~simple_fix:sf st errs
+    State.get_fixes st errs
 
   let apply_fixes (state : t) (fixes : fix_t list) : t option * Asrt.t list =
     L.verbose (fun m -> m "AState: apply_fixes");

@@ -304,6 +304,6 @@ let assertions ?to_keep:_ heap = WislSHeap.assertions heap
 let mem_constraints _ = []
 let is_overlapping_asrt _ = false
 let apply_fix m _ _ _ = m
-let get_fixes ?simple_fix:_ _ _ _ _ = []
+let get_fixes _ _ _ _ = []
 let get_failing_constraint _ = Formula.True
 let add_debugger_variables = WislSHeap.add_debugger_variables

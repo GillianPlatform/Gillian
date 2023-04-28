@@ -736,8 +736,7 @@ module Make (SMemory : SMemory.S) :
         L.verbose (fun m -> m "Warning: invalid fix.");
         None
 
-  let get_fixes ?simple_fix:(sf = true) (state : t) (errs : err_t list) :
-      fix_t list list =
+  let get_fixes (state : t) (errs : err_t list) : fix_t list list =
     let pp_fixes fmt fixes =
       Fmt.pf fmt "[[ %a ]]" (Fmt.list ~sep:(Fmt.any ", ") pp_fix) fixes
     in
@@ -756,7 +755,7 @@ module Make (SMemory : SMemory.S) :
                   if svars == SS.empty then []
                   else
                     [ FSVars svars ] @ List.map (fun asrt -> FAsrt asrt) asrts)
-                (SMemory.get_fixes ~simple_fix:sf heap pfs gamma err)
+                (SMemory.get_fixes heap pfs gamma err)
           | EPure f ->
               let result = [ [ FPure f ] ] in
               L.verbose (fun m ->

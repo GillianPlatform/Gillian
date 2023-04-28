@@ -53,7 +53,6 @@ module type S = sig
 
   (* FIXME: This is not working *)
   val get_fixes :
-    ?simple_fix:bool ->
     t ->
     PFS.t ->
     Type_env.t ->
