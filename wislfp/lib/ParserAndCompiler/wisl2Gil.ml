@@ -630,6 +630,8 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   let dispose = WislLActions.str_ac WislLActions.Dispose in
   let getcell = WislLActions.str_ac WislLActions.GetCell in
   let alloc = WislLActions.str_ac WislLActions.Alloc in
+  let load = WislLActions.str_ac WislLActions.Load in
+  let store = WislLActions.str_ac WislLActions.Store in
   let open WStmt in
   match stmtl with
   | [] -> ([], [])
@@ -723,11 +725,11 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
         in
         (mk ~stmt_kind:(Multi NotEnd) (), mk ~stmt_kind:(Multi EndNormal) ())
       in
-      let v_get = gen_str gvar in
+      let v_load = gen_str gvar in
       let getcmd =
-        Cmd.LAction (v_get, getcell, [ nth comp_e 0; nth comp_e 1 ])
+        Cmd.LAction (v_load, load, [ nth comp_e 0; nth comp_e 1 ])
       in
-      let getvalcmd = Cmd.Assignment (x, nth (Expr.PVar v_get) 2) in
+      let getvalcmd = Cmd.Assignment (x, nth (Expr.PVar v_load) 2) in
       let comp_rest, new_functions = compile_list rest in
       ( cmdle
         @ [ (get_annot, None, getcmd); (getval_annot, None, getvalcmd) ]
@@ -736,8 +738,8 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   (*
           x := [e] =>
           ce := Ce(e); // (bunch of commands and then assign the result to ce)
-          v_get := [getcell](ce[0], ce[1]);
-          x := v_get[2];
+          v_load := [load](ce[0], ce[1]);
+          x := v_load[2];
       *)
   (* Property Update *)
   | { snode = Update (e1, e2); sid; sloc } :: rest ->
@@ -749,14 +751,14 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       in
       let cmdle1, comp_e1 = compile_expr e1 in
       let cmdle2, comp_e2 = compile_expr e2 in
-      let v_get = gen_str gvar in
+      let v_load = gen_str gvar in
       let getcmd =
-        Cmd.LAction (v_get, getcell, [ nth comp_e1 0; nth comp_e1 1 ])
+        Cmd.LAction (v_load, load, [ nth comp_e1 0; nth comp_e1 1 ])
       in
-      let e_v_get = Expr.PVar v_get in
-      let v_set = gen_str gvar in
+      let e_v_get = Expr.PVar v_load in
+      let v_store = gen_str gvar in
       let setcmd =
-        Cmd.LAction (v_set, setcell, [ nth e_v_get 0; nth e_v_get 1; comp_e2 ])
+        Cmd.LAction (v_store, store, [ nth e_v_get 0; nth e_v_get 1; comp_e2 ])
       in
       let comp_rest, new_functions = compile_list rest in
       ( cmdle1 @ cmdle2
@@ -767,10 +769,10 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
           ce2 := Ce(e2);
           l1 := ce1[0];
           o1 := ce1[1];
-          v_get := [getcell](l1, l2);
-          l2 := v_get[0];
-          o2 := v_get[1];
-          u := [setcell](l2, o2, ce2);
+          v_load := [load](l1, l2);
+          l2 := v_load[0];
+          o2 := v_load[1];
+          u := [store](l2, o2, ce2);
   *)
   (* Object Creation *)
   | { snode = New (x, k); sid; sloc } :: rest ->
