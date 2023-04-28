@@ -11,6 +11,7 @@ type err =
   | MemoryLeak
   | OutOfBounds of (int option * string * Expr.t)
   | InvalidLocation
+  | DuplicatedResource
 [@@deriving yojson, show]
 
 val init : unit -> t

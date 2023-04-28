@@ -319,7 +319,8 @@ let pp_err fmt t =
     | UseAfterFree _ -> "Use After Free"
     | MemoryLeak -> "Memory Leak"
     | OutOfBounds _ -> "Out Of Bounds"
-    | InvalidLocation -> "Invalid Location")
+    | InvalidLocation -> "Invalid Location"
+    | DuplicatedResource -> "Duplicated Resource")
 
 let get_recovery_vals _ _ = []
 let pp_c_fix _ _ = ()

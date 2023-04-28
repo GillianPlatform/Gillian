@@ -626,9 +626,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
     | _ -> failwith "Cannot call get_or_create_lab with en empty list"
   in
   let nth = Expr.list_nth in
-  let setcell = WislLActions.str_ac WislLActions.SetCell in
   let dispose = WislLActions.str_ac WislLActions.Dispose in
-  let getcell = WislLActions.str_ac WislLActions.GetCell in
   let alloc = WislLActions.str_ac WislLActions.Alloc in
   let load = WislLActions.str_ac WislLActions.Load in
   let store = WislLActions.str_ac WislLActions.Store in

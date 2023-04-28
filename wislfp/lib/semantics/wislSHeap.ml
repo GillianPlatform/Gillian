@@ -13,6 +13,7 @@ type err =
   | MemoryLeak
   | OutOfBounds of (int option * string * Expr.t)
   | InvalidLocation
+  | DuplicatedResource
 [@@deriving yojson, show]
 
 module Block = struct
@@ -266,6 +267,7 @@ let set_bound ~pfs ~gamma heap loc bound =
   let prev = Option.value ~default:Block.empty (Hashtbl.find_opt heap loc) in
   match prev with
   | Freed -> Error (UseAfterFree loc)
+  | Allocated { bound = Some _; _} -> Error (DuplicatedResource)
   | Allocated { data; permission = q;_ } ->
     let fl = Formula.Infix.(q #< (Expr.num 1.0)) in
     let can_be_less = Solver.check_satisfiability 
