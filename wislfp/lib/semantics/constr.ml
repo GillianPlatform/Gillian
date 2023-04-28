@@ -1,9 +1,9 @@
 open WislLActions
 open Gil_syntax
 
-let cell ~loc ~offset ~value =
+let cell ~loc ~offset ~value ~permission =
   let cell = str_ga Cell in
-  Asrt.GA (cell, [ loc; offset ], [ value ])
+  Asrt.GA (cell, [ loc; offset; permission ], [ value ])
 
 let bound ~loc ~bound =
   let bound_ga = str_ga Bound in

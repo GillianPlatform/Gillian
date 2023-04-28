@@ -4,6 +4,7 @@ open Gillian.Gil_syntax
 module Solver = Gillian.Logic.FOSolver
 module Reduction = Gillian.Logic.Reduction
 open Gillian.Debugger.Utils
+module PFS = Gillian.Logic.PFS
 
 type err =
   | MissingResource of (WislLActions.ga * string * Expr.t option)
@@ -15,26 +16,26 @@ type err =
 [@@deriving yojson, show]
 
 module Block = struct
-  type t = Freed | Allocated of { data : SFVL.t; bound : int option }
+  type t = Freed | Allocated of { data : SFVL.t; bound : int option; permission : Expr.t }
   [@@deriving yojson]
 
-  let empty = Allocated { data = SFVL.empty; bound = None }
+  let empty = Allocated { data = SFVL.empty; bound = None ; permission = Lit (Num 1.0)}
 
   let substitution ~partial subst block =
     match block with
     | Freed -> Freed
-    | Allocated { data; bound } ->
+    | Allocated { data; bound; permission } ->
         let data = SFVL.substitution subst partial data in
-        Allocated { data; bound }
+        Allocated { data; bound; permission }
 
   let assertions ~loc block =
     let eloc = Expr.loc_from_loc_name loc in
     match block with
     | Freed -> [ Constr.freed ~loc:eloc ]
-    | Allocated { data; bound } ->
+    | Allocated { data; bound; permission } ->
         let data_asrts =
           SFVL.assertions_with_constructor
-            ~constr:(fun loc offset value -> Constr.cell ~loc ~offset ~value)
+            ~constr:(fun loc offset value -> Constr.cell ~loc ~offset ~value ~permission ) 
             eloc data
         in
         let bound_asrt =
@@ -47,8 +48,8 @@ module Block = struct
   let pp ~loc fmt block =
     match block with
     | Freed -> Fmt.pf fmt "%s -> FREED" loc
-    | Allocated { data; bound } ->
-        Fmt.pf fmt "%s -> @[<v>BOUND: %a@ %a@]" loc
+    | Allocated { data; bound; permission } ->
+        Fmt.pf fmt "%s -%a> @[<v>BOUND: %a@ %a@]" loc Expr.pp permission
           (Fmt.option ~none:(Fmt.any "NONE") Fmt.int)
           bound
           (Fmt.braces @@ Fmt.vbox
@@ -59,12 +60,12 @@ module Block = struct
   let lvars block =
     match block with
     | Freed -> SS.empty
-    | Allocated { data; _ } -> SFVL.lvars data
+    | Allocated { data; bound = _; permission; } -> SS.union (SFVL.lvars data) (Expr.lvars permission)
 
   let alocs block =
     match block with
     | Freed -> SS.empty
-    | Allocated { data; _ } -> SFVL.alocs data
+    | Allocated { data; bound = _; permission } -> SS.union (SFVL.alocs data) (Expr.alocs permission)
 end
 
 type t = (string, Block.t) Hashtbl.t [@@deriving yojson]
@@ -108,34 +109,46 @@ let alloc (heap : t) size =
   in
   let l = get_list (size - 1) in
   let sfvl = SFVL.of_list l in
-  let block = Block.Allocated { data = sfvl; bound = Some size } in
+  let block = Block.Allocated { data = sfvl; bound = Some size; permission = Lit (Num 1.0)} in
   let () = Hashtbl.replace heap loc block in
   loc
 
-let dispose (heap : t) loc =
+let dispose ~pfs ~gamma (heap : t) loc =
   match Hashtbl.find_opt heap loc with
   | None -> Error (MissingResource (Cell, loc, None))
-  | Some (Allocated { data = _; bound = None }) ->
-      Error (MissingResource (Bound, loc, None))
   | Some Freed -> Error (DoubleFree loc)
-  | Some (Allocated { data; bound = Some i }) ->
-      let has_all =
-        let so_far = ref true in
-        for i = 0 to i - 1 do
-          so_far := !so_far && (Option.is_some @@ SFVL.get (Expr.int i) data)
-        done;
-        !so_far
+  | Some (Allocated { data = _; bound = None ; _}) ->
+      Error (MissingResource (Bound, loc, None))
+  | Some (Allocated {data; bound = Some i; permission = q}) ->
+      let fl = Formula.Infix.(q #< (Expr.num 1.0)) in
+      let can_be_less = Solver.check_satisfiability 
+        (fl :: PFS.to_list pfs) gamma
       in
-      if has_all then
-        let () = set_freed_with_logging heap loc in
-        Ok ()
-      else Error (MissingResource (Bound, loc, None))
+      if can_be_less then
+        Error (MissingResource (Cell, loc, Some q))
+      else
+        let has_all =
+          let so_far = ref true in
+          for i = 0 to i - 1 do
+            so_far := !so_far && (Option.is_some @@ SFVL.get (Expr.int i) data)
+          done;
+          !so_far
+        in
+        if has_all then
+          let () = set_freed_with_logging heap loc in
+          Ok ()
+        else Error (MissingResource (Bound, loc, None))
 
-let get_cell ~pfs ~gamma heap loc ofs =
+
+(* Helper function: Performs the corresponding correctness checks for a cell assertion
+      with an optional check for permission accounting, which is useful in the case of producers,
+      but not for regular load operations.
+ *)
+let access_cell ~pfs ~gamma heap loc ofs permission_check =
   match Hashtbl.find_opt heap loc with
   | None -> Error (MissingResource (Cell, loc, Some ofs))
   | Some Block.Freed -> Error (UseAfterFree loc)
-  | Some (Allocated { data; bound }) -> (
+  | Some (Allocated { data; bound; permission = q }) -> (
       let maybe_out_of_bound =
         match bound with
         | None -> false
@@ -146,26 +159,42 @@ let get_cell ~pfs ~gamma heap loc ofs =
       in
       if maybe_out_of_bound then Error (OutOfBounds (bound, loc, ofs))
       else
-        match SFVL.get ofs data with
-        | Some v -> Ok (loc, ofs, v)
-        | None -> (
-            match
-              SFVL.get_first
-                (fun name -> Solver.is_equal ~pfs ~gamma name ofs)
-                data
-            with
-            | Some (o, v) -> Ok (loc, o, v)
-            | None -> Error (MissingResource (Cell, loc, Some ofs))))
+        if permission_check q then
+          Error (MissingResource (Cell, loc, Some q))
+        else
+          match SFVL.get ofs data with
+          | Some v -> Ok (loc, ofs, q, v)
+          | None -> (
+              match
+                SFVL.get_first
+                  (fun name -> Solver.is_equal ~pfs ~gamma name ofs)
+                  data
+              with
+              | Some (o, v) -> Ok (loc, o, q, v)
+              | None -> Error (MissingResource (Cell, loc, Some ofs))))  
 
-let set_cell ~pfs ~gamma heap loc_name ofs v =
+let load ~pfs ~gamma heap loc ofs =
+  match access_cell ~pfs ~gamma heap loc ofs (fun _ -> false) with
+  | Error e -> Error e
+  | Ok (_, _, _, v) -> Ok v
+
+let get_cell ~pfs ~gamma heap loc ofs out_perm =
+  let fl = fun q -> Formula.Infix.(q #< out_perm) in
+  let permission_check = fun q -> Solver.check_satisfiability ((fl q) :: PFS.to_list pfs) gamma in
+  access_cell ~pfs ~gamma heap loc ofs permission_check
+
+  (* Helper function: Performs the preliminary checks common to the set_cell and store
+    operations and applies the "in_bounds" operation if the access to the allocated
+    cell is within bounds *)
+let overwrite_cell ~pfs ~gamma heap loc_name ofs v out_perm in_bounds = 
   match Hashtbl.find_opt heap loc_name with
   | None ->
       let data = SFVL.add ofs v SFVL.empty in
       let bound = None in
-      let () = Hashtbl.replace heap loc_name (Allocated { data; bound }) in
-      Ok ()
+      let () = Hashtbl.replace heap loc_name (Allocated { data; bound; permission = out_perm }) in
+      Ok ([])
   | Some Block.Freed -> Error (UseAfterFree loc_name)
-  | Some (Allocated { data; bound }) ->
+  | Some (Allocated { data; bound; permission = q }) ->
       let maybe_out_of_bound =
         match bound with
         | None -> false
@@ -176,45 +205,88 @@ let set_cell ~pfs ~gamma heap loc_name ofs v =
       in
       if maybe_out_of_bound then Error (UseAfterFree loc_name)
       else
-        let equality_test = Solver.is_equal ~pfs ~gamma in
-        let data = SFVL.add_with_test ~equality_test ofs v data in
-        let () = Hashtbl.replace heap loc_name (Allocated { data; bound }) in
-        Ok ()
+        in_bounds data bound q
 
-let rem_cell heap loc offset =
+let store ~pfs ~gamma heap loc_name ofs v =
+  let in_bounds = fun data bound q ->
+    let fl = Formula.Infix.(q #< (Expr.num 1.0)) in
+    let can_be_less = Solver.check_satisfiability 
+      (fl :: PFS.to_list pfs) gamma
+    in
+    if can_be_less then
+      Error (MissingResource (Cell, loc_name, Some q))
+    else
+      let equality_test = Solver.is_equal ~pfs ~gamma in
+      let data = SFVL.add_with_test ~equality_test ofs v data in
+      let () = Hashtbl.replace heap loc_name (Block.Allocated { data; bound; permission = q }) in
+      Ok ([])
+  in match overwrite_cell ~pfs ~gamma heap loc_name ofs v (Expr.num 1.0) in_bounds with
+    | Error e -> Error e
+    | Ok (_) -> Ok ()
+
+let set_cell ~pfs ~gamma heap loc_name ofs v out_perm =
+  let in_bounds = fun data bound q ->
+    match SFVL.get ofs data with
+    | None -> failwith ("Block at location " ^ loc_name ^ "has no data at in bounds offset")
+    | Some value ->
+      let eq = Formula.Infix.(value #== v) in
+      let new_perm = Expr.BinOp(q, FPlus, out_perm) in
+      let fl = Formula.Infix.(new_perm #<= (Expr.num 1.0)) in
+      let () = Hashtbl.replace heap loc_name (Block.Allocated { data; bound; permission = new_perm }) in
+      Ok ([eq; fl])
+  in overwrite_cell ~pfs ~gamma heap loc_name ofs v out_perm in_bounds
+
+let rem_cell heap loc offset out_perm =
   match Hashtbl.find_opt heap loc with
   | None -> Error (MissingResource (Cell, loc, Some offset))
   | Some Block.Freed -> Error (UseAfterFree loc)
-  | Some (Allocated { bound; data }) ->
+  | Some (Allocated { bound; data; permission = q }) ->
       let data = SFVL.remove offset data in
-      let () = Hashtbl.replace heap loc (Allocated { bound; data }) in
+      (* Would there be a need to check that out_perm <= q ? 
+         I think not, since we already check that in getcell *)
+      let new_perm = Expr.BinOp (q, FMinus, out_perm) in
+      let () = Hashtbl.replace heap loc (Allocated { bound; data; permission = new_perm }) in
       Ok ()
 
-let get_bound heap loc =
+let get_bound ~pfs ~gamma heap loc out_perm =
   match Hashtbl.find_opt heap loc with
   | Some Block.Freed -> Error (UseAfterFree loc)
   | None -> Error (MissingResource (Cell, loc, None))
   | Some (Allocated { bound = None; _ }) ->
       Error (MissingResource (Bound, loc, None))
-  | Some (Allocated { bound = Some bound; _ }) -> Ok bound
+  | Some (Allocated { bound = Some bound; permission = q; _ }) -> 
+      let fl = Formula.Infix.(q #< out_perm) in
+      let has_less_perm = Solver.check_satisfiability (fl :: PFS.to_list pfs) gamma in
+      if has_less_perm then
+        Error (MissingResource (Bound, loc, Some q))
+      else
+        Ok bound
 
-let set_bound heap loc bound =
+let set_bound ~pfs ~gamma heap loc bound =
   let prev = Option.value ~default:Block.empty (Hashtbl.find_opt heap loc) in
   match prev with
   | Freed -> Error (UseAfterFree loc)
-  | Allocated { data; _ } ->
-      let changed = Block.Allocated { data; bound = Some bound } in
-      let () = Hashtbl.replace heap loc changed in
-      Ok ()
+  | Allocated { data; permission = q;_ } ->
+    let fl = Formula.Infix.(q #< (Expr.num 1.0)) in
+    let can_be_less = Solver.check_satisfiability 
+      (fl :: PFS.to_list pfs) gamma
+    in
+    if can_be_less then
+      Error (MissingResource (Bound, loc, Some q))
+    else
+    let changed = Block.Allocated { data; bound = Some bound; permission = q } in
+    let () = Hashtbl.replace heap loc changed in
+    Ok ()
 
-let rem_bound heap loc =
+let rem_bound heap loc out_perm =
   match Hashtbl.find_opt heap loc with
   | Some Block.Freed -> Error (UseAfterFree loc)
   | None -> Error (MissingResource (Cell, loc, None))
   | Some (Allocated { bound = None; _ }) ->
       Error (MissingResource (Bound, loc, None))
-  | Some (Allocated { data; _ }) ->
-      let () = Hashtbl.replace heap loc (Allocated { data; bound = None }) in
+  | Some (Allocated { data; permission = q;_ }) ->
+      let new_perm = Expr.BinOp (q, FMinus, out_perm) in
+      let () = Hashtbl.replace heap loc (Allocated { data; bound = None; permission = new_perm }) in
       Ok ()
 
 let get_freed heap loc =
@@ -250,13 +322,13 @@ let merge_loc (heap : t) new_loc old_loc : unit =
       let new_block = Option.value ~default:Block.empty new_block in
       match (old_block, new_block) with
       | _, Freed | Freed, _ -> failwith "merging non-freed and freed block"
-      | ( Allocated { data = old_data; bound = old_bound },
-          Allocated { data = new_data; bound = new_bound } ) ->
+      | ( Allocated { data = old_data; bound = old_bound; _ },
+          Allocated { data = new_data; bound = new_bound; permission } ) ->
           let data = SFVL.union new_data old_data in
           let bound =
             if Option.is_some new_bound then new_bound else old_bound
           in
-          let () = Hashtbl.replace heap new_loc (Allocated { data; bound }) in
+          let () = Hashtbl.replace heap new_loc (Allocated { data; bound; permission }) in
           Hashtbl.remove heap old_loc)
 
 let substitution_in_place subst heap :
@@ -374,7 +446,7 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
   |> Seq.map (fun (loc, blocks) ->
          match blocks with
          | Block.Freed -> Variable.create_leaf loc "freed" ()
-         | Allocated { data; bound } ->
+         | Allocated { data; bound; _ } ->
              let bound =
                match bound with
                | None -> "none"
@@ -422,7 +494,7 @@ let clean_up (keep : Expr.Set.t) (heap : t) : Expr.Set.t * Expr.Set.t =
       (fun (aloc : string) (block : Block.t) forgettables ->
         match block with
         | Freed -> forgettables
-        | Allocated { data; bound } -> (
+        | Allocated { data; bound; _} -> (
             match
               (SFVL.is_empty data, bound, Expr.Set.mem (ALoc aloc) keep)
             with

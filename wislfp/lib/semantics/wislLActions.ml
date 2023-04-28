@@ -10,6 +10,8 @@ type ac =
   | RemBound
   | Alloc
   | Dispose
+  | Load
+  | Store
 
 type ga = Cell | Bound | Freed [@@deriving yojson, show]
 
@@ -25,6 +27,8 @@ let str_ac = function
   | GetBound -> "getbound"
   | SetBound -> "setbound"
   | RemBound -> "rembound"
+  | Load -> "load"
+  | Store -> "store"
 
 let ac_from_str = function
   | "setcell" -> SetCell
@@ -38,6 +42,8 @@ let ac_from_str = function
   | "rembound" -> RemBound
   | "alloc" -> Alloc
   | "dispose" -> Dispose
+  | "load" -> Load
+  | "store" -> Store
   | ac -> failwith ("Unknown local action for wisl : " ^ ac)
 
 let str_ga = function

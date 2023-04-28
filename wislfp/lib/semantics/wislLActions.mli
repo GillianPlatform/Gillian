@@ -10,6 +10,8 @@ type ac =
   | RemBound
   | Alloc
   | Dispose
+  | Load
+  | Store
 
 type ga = Cell | Bound | Freed [@@deriving yojson, show]
 
