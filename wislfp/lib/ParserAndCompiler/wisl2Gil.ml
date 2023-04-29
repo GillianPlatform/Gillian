@@ -741,36 +741,27 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       *)
   (* Property Update *)
   | { snode = Update (e1, e2); sid; sloc } :: rest ->
-      let get_annot, set_annot =
+      let store_annot =
         let mk =
           WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
-        in
-        (mk ~stmt_kind:(Multi NotEnd) (), mk ~stmt_kind:(Multi EndNormal) ())
+        in mk ~stmt_kind:(Multi EndNormal) ()
       in
       let cmdle1, comp_e1 = compile_expr e1 in
       let cmdle2, comp_e2 = compile_expr e2 in
-      let v_load = gen_str gvar in
-      let getcmd =
-        Cmd.LAction (v_load, load, [ nth comp_e1 0; nth comp_e1 1 ])
-      in
-      let e_v_get = Expr.PVar v_load in
       let v_store = gen_str gvar in
-      let setcmd =
-        Cmd.LAction (v_store, store, [ nth e_v_get 0; nth e_v_get 1; comp_e2 ])
+      let storecmd =
+        Cmd.LAction (v_store, store, [ nth comp_e1 0; nth comp_e1 1; comp_e2 ])
       in
       let comp_rest, new_functions = compile_list rest in
       ( cmdle1 @ cmdle2
-        @ ((get_annot, None, getcmd) :: (set_annot, None, setcmd) :: comp_rest),
+        @ ((store_annot, None, storecmd) :: comp_rest),
         new_functions )
   (* [e1] := e2 =>
           ce1 := Ce(e1);
           ce2 := Ce(e2);
           l1 := ce1[0];
           o1 := ce1[1];
-          v_load := [load](l1, l2);
-          l2 := v_load[0];
-          o2 := v_load[1];
-          u := [store](l2, o2, ce2);
+          u := [store](l1, o1, ce2);
   *)
   (* Object Creation *)
   | { snode = New (x, k); sid; sloc } :: rest ->

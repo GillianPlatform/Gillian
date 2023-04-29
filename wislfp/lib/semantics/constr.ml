@@ -3,7 +3,7 @@ open Gil_syntax
 
 let cell ~loc ~offset ~value ~permission =
   let cell = str_ga Cell in
-  Asrt.GA (cell, [ loc; offset; permission ], [ value ])
+  Asrt.GA (cell, [ loc; offset; permission ], [ value; permission ])
 
 let bound ~loc ~bound =
   let bound_ga = str_ga Bound in
