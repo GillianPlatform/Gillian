@@ -5,6 +5,7 @@ module Solver = Gillian.Logic.FOSolver
 module Reduction = Gillian.Logic.Reduction
 open Gillian.Debugger.Utils
 module PFS = Gillian.Logic.PFS
+module L = Logging
 
 type err =
   | MissingResource of (WislLActions.ga * string * Expr.t option)
@@ -208,19 +209,23 @@ let overwrite_cell ~pfs ~gamma heap loc_name ofs v out_perm in_bounds =
       else
         in_bounds data bound q
 
+(* Helper function: Extends the block data with a new cell at offset ofs with the value v. *)
+let extend_block ~pfs ~gamma heap loc_name ofs v data bound q =
+  let equality_test = Solver.is_equal ~pfs ~gamma in
+  let data = SFVL.add_with_test ~equality_test ofs v data in
+  let () = Hashtbl.replace heap loc_name (Block.Allocated { data; bound; permission = q }) in
+  Ok ([])
+
 let store ~pfs ~gamma heap loc_name ofs v =
   let in_bounds = fun data bound q ->
     let fl = Formula.Infix.(q #< (Expr.num 1.0)) in
-    let can_be_less = Solver.check_satisfiability 
+    let can_be_less = Solver.check_satisfiability
       (fl :: PFS.to_list pfs) gamma
     in
     if can_be_less then
       Error (MissingResource (Cell, loc_name, Some q))
     else
-      let equality_test = Solver.is_equal ~pfs ~gamma in
-      let data = SFVL.add_with_test ~equality_test ofs v data in
-      let () = Hashtbl.replace heap loc_name (Block.Allocated { data; bound; permission = q }) in
-      Ok ([])
+      extend_block ~pfs ~gamma heap loc_name ofs v data bound q
   in match overwrite_cell ~pfs ~gamma heap loc_name ofs v (Expr.num 1.0) in_bounds with
     | Error e -> Error e
     | Ok (_) -> Ok ()
@@ -228,7 +233,7 @@ let store ~pfs ~gamma heap loc_name ofs v =
 let set_cell ~pfs ~gamma heap loc_name ofs v out_perm =
   let in_bounds = fun data bound q ->
     match SFVL.get ofs data with
-    | None -> failwith ("Block at location " ^ loc_name ^ "has no data at in bounds offset")
+    | None -> extend_block ~pfs ~gamma heap loc_name ofs v data bound q
     | Some value ->
       let eq = Formula.Infix.(value #== v) in
       let new_perm = Expr.BinOp(q, FPlus, out_perm) in

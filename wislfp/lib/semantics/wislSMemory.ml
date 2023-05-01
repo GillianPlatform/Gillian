@@ -206,7 +206,7 @@ let execute_action ?unification:_ name heap pfs gamma args =
                args))
   | SetCell -> (
       match args with
-      | [ loc_expr; offset_expr; value_expr; permission ] ->
+      | [ loc_expr; offset_expr; permission; value_expr ] ->
           set_cell heap pfs gamma loc_expr offset_expr value_expr permission
       | args ->
           failwith
