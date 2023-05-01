@@ -1049,22 +1049,30 @@ let get_fixes _heap _pfs _gamma err =
   match err with
   | MissingLocResource (Single, loc, Some ofs, Some chunk) ->
       let new_var = LVar.alloc () in
+      let set = SS.singleton new_var in
+      let new_var_e = Expr.LVar new_var in
       (* Initialize value based on chunk type (float, int or long) *)
-      let value =
+      let value, vtype =
         let open CConstants.VTypes in
         match chunk with
         | Mfloat32 | Mfloat64 ->
-            Expr.Lit (LList [ String float_type; Num (float_of_int 0) ])
-        | Mint64 -> Expr.Lit (LList [ String long_type; Int Z.zero ])
-        | _ -> Expr.Lit (LList [ String int_type; Int Z.zero ])
+            (Expr.EList [ Expr.string float_type; new_var_e ], Type.NumberType)
+        | Mint64 ->
+            (Expr.EList [ Expr.string long_type; new_var_e ], Type.IntType)
+        | _ -> (Expr.EList [ Expr.string int_type; new_var_e ], Type.IntType)
       in
-      let set = SS.singleton new_var in
-      [ ([ AddSingle { loc; ofs; value; chunk } ], [], set, []) ]
+      [
+        ( [ AddSingle { loc; ofs; value; chunk } ],
+          [],
+          [ (new_var, vtype) ],
+          set,
+          [] );
+      ]
   | InvalidLocation loc ->
       Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
-      [ ([], [ Formula.Eq (new_expr, loc) ], SS.empty, []) ]
+      [ ([], [ Formula.Eq (new_expr, loc) ], [], SS.empty, []) ]
   | _ -> []
 
 let apply_fix heap _pfs _gamma fix =

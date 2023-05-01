@@ -61,7 +61,12 @@ module type S = sig
     PFS.t ->
     Type_env.t ->
     err_t ->
-    (c_fix_t list * Formula.t list * Containers.SS.t * Asrt.t list) list
+    (c_fix_t list
+    * Formula.t list
+    * (string * Type.t) list
+    * Containers.SS.t
+    * Asrt.t list)
+    list
 
   val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t
 end
