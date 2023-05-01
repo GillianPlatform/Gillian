@@ -1049,8 +1049,15 @@ let get_fixes _heap _pfs _gamma err =
   match err with
   | MissingLocResource (Single, loc, Some ofs, Some chunk) ->
       let new_var = LVar.alloc () in
-      (* let value = Expr.LVar new_var in *)
-      let value = Expr.Lit (LList [ String "int"; Int Z.zero ]) in
+      (* Initialize value based on chunk type (float, int or long) *)
+      let value =
+        let open CConstants.VTypes in
+        match chunk with
+        | Mfloat32 | Mfloat64 ->
+            Expr.Lit (LList [ String float_type; Num (float_of_int 0) ])
+        | Mint64 -> Expr.Lit (LList [ String long_type; Int Z.zero ])
+        | _ -> Expr.Lit (LList [ String int_type; Int Z.zero ])
+      in
       let set = SS.singleton new_var in
       [ ([ AddSingle { loc; ofs; value; chunk } ], [], set, []) ]
   | InvalidLocation loc ->
@@ -1065,7 +1072,6 @@ let apply_fix heap _pfs _gamma fix =
       m "Applying fixes for error (Gillian-C/lib/MonadicSMemory.ml)");
   let open DR.Syntax in
   match fix with
-  (* | _ -> heap *)
   | AddSingle { loc; ofs; value; chunk } ->
       Logging.verbose (fun m ->
           m
@@ -1076,32 +1082,20 @@ let apply_fix heap _pfs _gamma fix =
             \ * chunk: %a \n"
             loc Expr.pp ofs Expr.pp value Chunk.pp chunk);
 
-      (*
-             (* Extend Gamma *)
-             let new_gamma = Type_env.init () in
-             Type_env.update new_gamma loc Type.ListType;
-             Type_env.extend gamma new_gamma;
-
-             (* Extend PFS *)
-             let loc = Expr.loc_from_loc_name loc in
-             PFS.extend pfs (Eq (UnOp (UnOp.TypeOf, loc), Lit (Type Type.ListType)));
-             PFS.extend pfs (Eq (Expr.list_length loc, Lit (Int (Z.of_int 2))));
-             PFS.extend pfs (Eq (Expr.list_nth loc 0, Lit (String "int")));
-             PFS.extend pfs
-               (Eq (UnOp (UnOp.TypeOf, Expr.list_nth loc 1), Lit (Type Type.IntType)));
-             Logging.verbose (fun m -> m "!!! New PFS %a" PFS.pp pfs); *)
       let loc = Expr.loc_from_loc_name loc in
-      Logging.verbose (fun m ->
-          m "1 Beforing setting the memory, the heap is: %a" pp heap);
+      (* Logging.verbose (fun m ->
+          m "1 Before setting the memory, \n HEAP: %a\n PFS: %a\n Gamma: %a\n"
+            pp heap PFS.pp pfs Type_env.pp gamma); *)
       (* sval corresponds to the value. So change value to sval type *)
       let* sval = SVal.of_gil_expr_exn value in
-      Logging.verbose (fun m ->
-          m "2 Beforing setting the memory, the heap is: %a" pp heap);
+      (* Logging.verbose (fun m ->
+          m "2 Before setting the memory, \n HEAP: %a\n PFS: %a\n Gamma: %a\n"
+            pp heap PFS.pp pfs Type_env.pp gamma); *)
       let perm = Perm.Writable in
       let++ mem = Mem.set_single !(heap.mem) loc ofs chunk sval perm in
 
-      (* Let's print the heap here - to see if anything got added to the memory *)
-      Logging.verbose (fun m -> m "4 Printing the fix %a" pp heap);
-
+      (* Logging.verbose (fun m ->
+          m "4 Printing the fix \n HEAP: %a\n PFS: %a\n Gamma: %a\n" pp
+            { heap with mem = ref mem }
+            PFS.pp pfs Type_env.pp gamma); *)
       { heap with mem = ref mem }
-(* heap *)

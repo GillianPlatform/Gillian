@@ -802,10 +802,6 @@ module Make (SMemory : SMemory.S) :
 
     let apply_fix (heap : heap_t) (new_vars : SS.t) (fix : fix_t) :
         heap_t * SS.t =
-      (* Logging.verbose (fun m ->
-          m
-            "Applying fixes for error \
-             (GillianCore/engine/symbolic_semantics/SState.ml)"); *)
       match fix with
       (* Apply fix in memory - this may change the pfs and gamma *)
       | MFix fix ->
