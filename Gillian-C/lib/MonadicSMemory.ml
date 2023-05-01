@@ -1049,7 +1049,8 @@ let get_fixes _heap _pfs _gamma err =
   match err with
   | MissingLocResource (Single, loc, Some ofs, Some chunk) ->
       let new_var = LVar.alloc () in
-      let value = Expr.LVar new_var in
+      (* let value = Expr.LVar new_var in *)
+      let value = Expr.Lit (LList [ String "int"; Int Z.zero ]) in
       let set = SS.singleton new_var in
       [ ([ AddSingle { loc; ofs; value; chunk } ], [], set, []) ]
   | InvalidLocation loc ->
@@ -1059,7 +1060,7 @@ let get_fixes _heap _pfs _gamma err =
       [ ([], [ Formula.Eq (new_expr, loc) ], SS.empty, []) ]
   | _ -> []
 
-let apply_fix heap pfs gamma fix =
+let apply_fix heap _pfs _gamma fix =
   Logging.verbose (fun m ->
       m "Applying fixes for error (Gillian-C/lib/MonadicSMemory.ml)");
   let open DR.Syntax in
@@ -1075,24 +1076,27 @@ let apply_fix heap pfs gamma fix =
             \ * chunk: %a \n"
             loc Expr.pp ofs Expr.pp value Chunk.pp chunk);
 
-      (* Extend Gamma *)
-      let new_gamma = Type_env.init () in
-      Type_env.update new_gamma loc Type.ListType;
-      Type_env.extend gamma new_gamma;
+      (*
+             (* Extend Gamma *)
+             let new_gamma = Type_env.init () in
+             Type_env.update new_gamma loc Type.ListType;
+             Type_env.extend gamma new_gamma;
 
-      (* Extend PFS *)
+             (* Extend PFS *)
+             let loc = Expr.loc_from_loc_name loc in
+             PFS.extend pfs (Eq (UnOp (UnOp.TypeOf, loc), Lit (Type Type.ListType)));
+             PFS.extend pfs (Eq (Expr.list_length loc, Lit (Int (Z.of_int 2))));
+             PFS.extend pfs (Eq (Expr.list_nth loc 0, Lit (String "int")));
+             PFS.extend pfs
+               (Eq (UnOp (UnOp.TypeOf, Expr.list_nth loc 1), Lit (Type Type.IntType)));
+             Logging.verbose (fun m -> m "!!! New PFS %a" PFS.pp pfs); *)
       let loc = Expr.loc_from_loc_name loc in
-      PFS.extend pfs (Eq (UnOp (UnOp.TypeOf, loc), Lit (Type Type.ListType)));
-      PFS.extend pfs (Eq (Expr.list_length loc, Lit (Int (Z.of_int 2))));
-      PFS.extend pfs (Eq (Expr.list_nth loc 0, Lit (String "int")));
-      PFS.extend pfs
-        (Eq (UnOp (UnOp.TypeOf, Expr.list_nth loc 1), Lit (Type Type.IntType)));
-      Logging.verbose (fun m -> m "!!! New PFS %a" PFS.pp pfs);
-
       Logging.verbose (fun m ->
           m "1 Beforing setting the memory, the heap is: %a" pp heap);
       (* sval corresponds to the value. So change value to sval type *)
       let* sval = SVal.of_gil_expr_exn value in
+      Logging.verbose (fun m ->
+          m "2 Beforing setting the memory, the heap is: %a" pp heap);
       let perm = Perm.Writable in
       let++ mem = Mem.set_single !(heap.mem) loc ofs chunk sval perm in
 
