@@ -176,6 +176,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token PRED
 %token NOUNFOLD
 %token FACTS
+%token PUGUARD
 (* Logic commands *)
 %token OLCMD
 %token CLCMD
@@ -712,19 +713,19 @@ g_named_assertion_target:
 
 g_logic_cmd_target:
 (* fold x(e1, ..., en) *)
-  | FOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(logic_bindings_target)
+  | FOLD; name = proc_name; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; fold_info = option(logic_bindings_target)
     { LCmd.SL (Fold (name, les, fold_info)) }
 
 (* unfold x(e1, ..., en) [ def with #x := le1 and ... ] *)
-  | UNFOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
+  | UNFOLD; name = proc_name; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
     { LCmd.SL (Unfold (name, les, unfold_info, false)) }
 
 (* unfold* x(e1, ..., en) [ def with #x := le1 and ... ] *)
-  | RECUNFOLD; name = VAR; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
+  | RECUNFOLD; name = proc_name; LBRACE; les=separated_list(COMMA, expr_target); RBRACE; unfold_info = option(unfold_info_target)
     { LCmd.SL (Unfold (name, les, unfold_info, true)) }
 
 (* unfold_all x *)
-  | UNFOLDALL; name = VAR
+  | UNFOLDALL; name = proc_name
     { LCmd.SL (GUnfold name) }
 
   | SYMBEXEC { LCmd.SL SymbExec }
@@ -791,6 +792,10 @@ g_pred_facts_target:
   FACTS; COLON; facts = separated_nonempty_list(AND, pure_assertion_target); SCOLON
   { facts }
 
+g_pred_cost_target:
+  PUGUARD; COLON; pu_guard = g_assertion_target; SCOLON
+  { pu_guard }
+
 (* pred name (arg1, ..., argn) : def1, ..., defn ; *)
 g_pred_target:
   no_path = option(NO_PATH);
@@ -803,6 +808,7 @@ g_pred_target:
   pred_definitions = option(g_pred_def_target);
   SCOLON
   pred_facts=option(g_pred_facts_target);
+  pred_guard=option(g_pred_cost_target);
   {
     let pred_abstract = Option.is_some abstract in
     let pred_pure = Option.is_some pure in
@@ -828,6 +834,7 @@ g_pred_target:
         pred_ins;
         pred_definitions;
         pred_facts;
+        pred_guard;
         pred_pure;
         pred_abstract;
         pred_nounfold;
@@ -1176,4 +1183,3 @@ type_target:
   | TYPETYPELIT  { Type.TypeType }
   | SETTYPELIT   { Type.SetType }
 ;
-

@@ -9,6 +9,7 @@ type t = TypeDef__.pred = {
     ((string * string list) option * Asrt.t * string list) list;
       (** Predicate definitions  *)
   pred_facts : Formula.t list;  (** Facts that hold for every definition *)
+  pred_guard : Asrt.t option;  (** Cost for unfolding the predicate *)
   pred_pure : bool;  (** Is the predicate pure  *)
   pred_abstract : bool;  (** Is the predicate abstract *)
   pred_nounfold : bool;  (** Should the predicate be unfolded automatically *)
@@ -126,16 +127,20 @@ let pp fmt pred =
           Fmt.(list ~sep:(any " and ") Formula.pp)
           facts
   in
+  let pp_guard fmt = function
+    | None -> ()
+    | Some guard -> Fmt.pf fmt "guard: %a;@\n" Asrt.pp guard
+  in
   let pp_defs fmt = function
     | [] -> ()
     | defs -> Fmt.pf fmt ":@ %a" (Fmt.list ~sep:Fmt.comma pp_def) defs
   in
   let name = Pp_utils.maybe_quote_ident pred.pred_name in
-  Fmt.pf fmt "%a%a@[<hov 2>%a%a%apred %s%a %a@];@\n%a" pp_path_opt
+  Fmt.pf fmt "%a%a@[<hov 2>%a%a%apred %s%a %a@];@\n%a%a" pp_path_opt
     pred.pred_source_path pp_internal pred.pred_internal pp_abstract
     pred.pred_abstract pp_pure pred.pred_pure pp_nounfold pred.pred_nounfold
     name (Fmt.parens pp_params) pred.pred_params pp_defs pred.pred_definitions
-    pp_facts pred.pred_facts
+    pp_facts pred.pred_facts pp_guard pred.pred_guard
 
 (* Fmt.pf fmt
    "%a%a@[<hov 2>@[<h>%a%a%apred %s(%a) :@]@\n%a;%a@]@\n" pp_path_opt
@@ -320,3 +325,28 @@ let empty_pred_tbl () = Hashtbl.create Config.small_tbl_size
 let get (pred_defs : (string, t) Hashtbl.t) (name : string) : t =
   try Hashtbl.find pred_defs name
   with _ -> raise (Failure "DEATH. PRED NOT FOUND!")
+
+let close_suffix = "€€close"
+
+(* Given a predicate name, if it is a guarded predicate, returns the name of the
+   closing token. *)
+let close_token_name (pred : t) : string =
+  if Option.is_none pred.pred_guard then
+    failwith "close_token_name called on non-guarded predicate";
+  pred.pred_name ^ close_suffix
+
+let close_token_call (pred : t) : Asrt.t =
+  let name = close_token_name pred in
+  let args =
+    in_args pred pred.pred_params |> List.map (fun (x, _t) -> Expr.PVar x)
+  in
+  Asrt.Pred (name, args)
+
+(* Given a name, if it's a close_token name, returns the name of the corresponding predicate,
+   otherwise return None. *)
+let pred_name_from_close_token_name (close_token : string) : string option =
+  if String.ends_with ~suffix:close_suffix close_token then
+    Some
+      (String.sub close_token 0
+         (String.length close_token - String.length close_suffix))
+  else None

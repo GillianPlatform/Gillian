@@ -12,16 +12,18 @@ type ('mem_err, 'value) err_t =
     (* We want all errors to be proper errors - this is a temporary placeholder *)
 [@@deriving yojson, show]
 
-let get_recovery_vals
+let get_recovery_tactic
     (errs : ('a, 'b) err_t list)
-    (mem_recovery_vals : 'a -> 'b list) : 'b list =
+    (mem_recovery_tactics : 'a -> 'b Recovery_tactic.t) : 'b Recovery_tactic.t =
   let f err =
     match err with
-    | EMem err -> mem_recovery_vals err
-    | EAsrt (xs, _, _) -> xs
-    | _ -> []
+    | EMem err -> mem_recovery_tactics err
+    | EAsrt (xs, _, _) -> Recovery_tactic.try_unfold xs
+    | _ -> Recovery_tactic.none
   in
-  List.concat (List.map f errs)
+  List.fold_left
+    (fun acc x -> Recovery_tactic.merge (f x) acc)
+    Recovery_tactic.none errs
 
 let pp_err
     (pp_m_err : Format.formatter -> 'a -> unit)

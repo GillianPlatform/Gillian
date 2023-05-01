@@ -9,7 +9,7 @@ import {
 import React, { useEffect, useMemo } from 'react';
 import { UnifyMap, UnifySeg, UnifyStep } from '../../../types';
 import useStore, { mutateStore } from '../store';
-import { Code, showBaseUnifyKind } from '../util';
+import { Code, getUnifyName, showBaseUnifyKind } from '../util';
 import { requestUnification } from '../VSCodeAPI';
 
 import './UnifyData.css';
@@ -35,6 +35,7 @@ const UnifyData = ({ selectStep }: Props) => {
     showBaseUnifyKind(store),
   ]);
   const { pushUnification, popUnifications } = mutateStore();
+  const [title, subtitle] = useStore(state => getUnifyName(state));
 
   useEffect(() => {
     console.log('Showing unify data', path, unifications);
@@ -58,7 +59,7 @@ const UnifyData = ({ selectStep }: Props) => {
   const unifyNames = [
     <>
       <span>
-        Unify <Code>{mainProcName}</Code> ({baseUnifyKind})
+        {title} ({subtitle})
       </span>
     </>,
   ];
