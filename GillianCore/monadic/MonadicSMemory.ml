@@ -64,8 +64,10 @@ module type S = sig
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
 end
 
+(* FIXME: Lift should not be necessary, the monad should just match !!! *)
 module Lift (MSM : S) :
-  SMemory.S with type t = MSM.t and type init_data = MSM.init_data = struct
+  Legacy_s_memory.S with type t = MSM.t and type init_data = MSM.init_data =
+struct
   include MSM
 
   let assertions ?to_keep t =

@@ -88,7 +88,7 @@ module Make
 
   module SUnifier = Unifier.Make (Val) (ESubst) (Store) (State) (Preds)
 
-  type action_ret = ((t * vt list) list, err_t list) result
+  type action_ret = (t * vt list, err_t) result list
   type u_res = UWTF | USucc of t | UFail of err_t list
 
   let init_with_pred_table pred_defs init_data =
@@ -1168,17 +1168,12 @@ module Make
       (action : string)
       (astate : t)
       (args : vt list) : action_ret =
+    let open Syntaxes.List in
     let state, preds, pred_defs, variants = astate in
-    match State.execute_action ~unification action state args with
-    | Ok rets ->
-        let rets' =
-          List.map
-            (fun (st, outs) ->
-              ((st, Preds.copy preds, pred_defs, variants), outs))
-            rets
-        in
-        Ok rets'
-    | Error errs -> Error errs
+    let+ result = State.execute_action ~unification action state args in
+    match result with
+    | Ok (st, outs) -> Ok ((st, Preds.copy preds, pred_defs, variants), outs)
+    | Error err -> Error err
 
   let mem_constraints (astate : t) : Formula.t list =
     let state, _, _, _ = astate in
@@ -1199,7 +1194,7 @@ module Make
   let get_failing_constraint = State.get_failing_constraint
   let can_fix = State.can_fix
 
-  let get_fixes (state : t) (errs : err_t list) : fix_t list list =
+  let get_fixes (state : t) (errs : err_t) : fix_t list =
     L.verbose (fun m -> m "AState: get_fixes");
     let st, _, _, _ = state in
     State.get_fixes st errs
