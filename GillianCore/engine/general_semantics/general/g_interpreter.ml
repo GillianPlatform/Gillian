@@ -945,7 +945,7 @@ struct
         let v_es = List.map eval_expr es in
         match State.execute_action a state v_es with
         | Ok [] -> failwith "HORROR: Successful action resulted in no states"
-        | Ok ((state', vs) :: rest_rets) -> (
+        | Ok ((state', vs) :: rest_rets) ->
             DL.log (fun m ->
                 m
                   ~json:
@@ -978,45 +978,10 @@ struct
             let ret_len = 1 + List.length rest_rets in
             let b_counter = b_counter + if ret_len > 1 then 1 else 0 in
             let branch_case = LAction (vs |> List.map state_vt_to_yojson) in
-            match
-              (ret_len >= 3 && !Config.parallel, ret_len = 2 && !Config.parallel)
-              (* XXX: && !Config.act_threads < !Config.max_threads ) *)
-            with
-            | true, _ -> (
-                (* print_endline (Printf.sprintf "Action returned >=3: %d" (!Config.act_threads + 2)); *)
-                let pid = Unix.fork () in
-                match pid with
-                | 0 -> (
-                    let pid = Unix.fork () in
-                    match pid with
-                    | 0 -> List.tl rest_confs
-                    | _ -> [ List.hd rest_confs ])
-                | _ ->
-                    [
-                      make_confcont ~state:state'' ~callstack:cs
-                        ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                        ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
-                        ~new_branches ();
-                    ])
-            | false, true -> (
-                (* Can split into two threads *)
-                let b_counter = b_counter + 1 in
-                (* print_endline (Printf.sprintf "Action returned 2: %d" (!Config.act_threads + 1)); *)
-                let pid = Unix.fork () in
-                match pid with
-                | 0 ->
-                    [
-                      make_confcont ~state:state'' ~callstack:cs
-                        ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                        ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
-                        ~new_branches ();
-                    ]
-                | _ -> rest_confs)
-            | _ ->
-                make_confcont ~state:state'' ~callstack:cs
-                  ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                  ~next_idx:(i + 1) ~branch_count:b_counter ()
-                :: rest_confs)
+            make_confcont ~state:state'' ~callstack:cs ~invariant_frames:iframes
+              ~branch_case ~prev_idx:i ~loop_ids ~next_idx:(i + 1)
+              ~branch_count:b_counter ~new_branches ()
+            :: rest_confs
         | Error errs ->
             DL.log (fun m ->
                 m
@@ -1246,34 +1211,21 @@ struct
           if can_put_t && can_put_f && List.length sp > 1 then b_counter + 1
           else b_counter
         in
-        let result =
+        List.mapi
+          (fun j ((state, next), case) ->
+            make_confcont ~state
+              ~callstack:(if j = 0 then cs else Call_stack.copy cs)
+              ~invariant_frames:iframes ~prev_idx:i ~loop_ids ~next_idx:next
+              ~branch_count:b_counter ~branch_case:(GuardedGoto case)
+              ~new_branches:
+                (if j = 0 then
+                 List.map
+                   (fun ((state, next), case) ->
+                     (state, next, GuardedGoto case))
+                   (List.tl sp)
+                else [])
+              ())
           sp
-          |> List.mapi (fun j ((state, next), case) ->
-                 make_confcont ~state
-                   ~callstack:(if j = 0 then cs else Call_stack.copy cs)
-                   ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                   ~next_idx:next ~branch_count:b_counter
-                   ~branch_case:(GuardedGoto case)
-                   ~new_branches:
-                     (if j = 0 then
-                      List.map
-                        (fun ((state, next), case) ->
-                          (state, next, GuardedGoto case))
-                        (List.tl sp)
-                     else [])
-                   ())
-        in
-        match
-          List.length result = 2 && !Config.parallel
-          (* XXX: && !Config.act_threads < !Config.max_threads *)
-        with
-        | true -> (
-            (* print_endline (Printf.sprintf "Conditional goto: %d" (!Config.act_threads + 1)); *)
-            let pid = Unix.fork () in
-            match pid with
-            | 0 -> [ List.hd result ]
-            | _ -> List.tl result)
-        | false -> result
 
       let eval_phi_assignment lxarr eval_state =
         let {
