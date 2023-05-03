@@ -51,13 +51,7 @@ let right_combine (lst1 : 'a list) (lst2 : 'b list) : ('a * 'b) list =
   loop lst1 lst2 []
 
 (** Filters [None]s from a list while unwrapping the [Some]s *)
-let get_list_somes (lst : 'a option list) : 'a list =
-  let rec aux = function
-    | [] -> []
-    | Some x :: r -> x :: aux r
-    | None :: r -> aux r
-  in
-  aux lst
+let get_list_somes (lst : 'a option list) : 'a list = List.filter_map Fun.id lst
 
 (** Splits a list at a specified index *)
 let split_at (lst : 'a list) (len : int) : 'a list * 'a list =

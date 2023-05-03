@@ -542,25 +542,25 @@ module Make
     L.verbose (fun m -> m "STATE: %a" pp_astate astate);
 
     match a with
-    | GA (a_id, ins, outs) -> (
+    | GA (a_id, ins, outs) ->
         L.verbose (fun fmt -> fmt "Memory action.");
         let setter = State.ga_to_setter a_id in
 
         let vs = List.map (subst_in_expr subst) (ins @ outs) in
-        let failure = List.exists (fun x -> x = None) vs in
+        let failure = List.exists Option.is_none vs in
         if failure then
           failwith
             "Produce Simple Assertion: Subst does not cover the action ins"
         else
           let vs = List.map Option.get vs in
-          match State.execute_action ~unification:true setter state vs with
-          | Ok successes ->
-              Ok
-                (List.map
-                   (fun (state', _) ->
-                     (state', Preds.copy preds, pred_defs, Hashtbl.copy variants))
-                   successes)
-          | Error errs -> Error errs)
+          (* We filter action errors, in theory, production cannot fail, it may only vanish. *)
+          State.execute_action ~unification:true setter state vs
+          |> List.filter_map (function
+               | Ok (state', _) ->
+                   Some
+                     (state', Preds.copy preds, pred_defs, Hashtbl.copy variants)
+               | Error _ -> None)
+          |> Result.ok
     | Types les -> (
         L.verbose (fun fmt -> fmt "Types assertion.");
         let state' =
@@ -1272,7 +1272,7 @@ module Make
                         Fmt.(list ~sep:comma Val.pp)
                         vs_ins));
                 match State.execute_action getter state vs_ins with
-                | Ok [ (state', vs') ] -> (
+                | [ Ok (state', vs') ] -> (
                     (* L.(
                        verbose (fun m ->
                            m "@[<v 2>Got state:@\n%a@] and values @[<h>%a@]" State.pp
@@ -1284,7 +1284,7 @@ module Make
                     in
                     let remover = State.ga_to_deleter a_id in
                     match State.execute_action remover state' vs_ins' with
-                    | Ok [ (state'', _) ] -> (
+                    | [ Ok (state'', _) ] -> (
                         (* Separate outs into direct unifiables and others*)
                         match
                           unify_ins_outs_lists state'' subst step outs vs_outs
@@ -1294,18 +1294,36 @@ module Make
                         | Error fail_pf ->
                             UFail
                               [ EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ]) ])
-                    | Ok _ ->
+                    | results -> (
+                        let only_errors =
+                          List.filter_map
+                            (function
+                              | Error e -> Some e
+                              | Ok _ -> None)
+                            results
+                        in
+                        match only_errors with
+                        | [] ->
+                            raise
+                              (Exceptions.Unsupported
+                                 "unify_assertion: action remover returns \
+                                  multiple results")
+                        | errs -> UFail errs))
+                | results -> (
+                    let only_errors =
+                      List.filter_map
+                        (function
+                          | Error e -> Some e
+                          | Ok _ -> None)
+                        results
+                    in
+                    match only_errors with
+                    | [] ->
                         raise
                           (Exceptions.Unsupported
-                             "unify_assertion: action remover returns multiple \
+                             "unify_assertion: action getter returns multiple \
                               results")
-                    | Error errs -> UFail errs)
-                | Ok _ ->
-                    raise
-                      (Exceptions.Unsupported
-                         "unify_assertion: action getter returns multiple \
-                          results")
-                | Error errs -> UFail errs)
+                    | errs -> UFail errs))
           | Pred (pname, les) -> (
               L.verbose (fun m -> m "Unifying predicate assertion");
               (* Perform substitution in all predicate parameters *)
@@ -1633,6 +1651,7 @@ module Make
       (unify_kind : unify_kind) : up_u_res =
     let astate_i = copy_astate astate in
     let subst_i = ESubst.copy subst in
+    let can_fix errs = List.exists State.can_fix errs in
     UnifyReport.as_parent
       { astate = AstateRec.from astate; subst; up; unify_kind }
       (fun () ->
@@ -1642,8 +1661,7 @@ module Make
             L.verbose (fun fmt -> fmt "Unifier.unify: Success");
             ret
         | Error errs
-          when !Config.unfolding && State.can_fix errs && not in_unification
-          -> (
+          when !Config.unfolding && can_fix errs && not in_unification -> (
             L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
             let state, _, _, _ = astate_i in
             let tactics = State.get_recovery_tactic state errs in

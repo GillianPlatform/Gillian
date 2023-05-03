@@ -13,8 +13,8 @@ for filename in $folder/*.c; do
     [ -f "$filename" ] || break
     echo $filename
     if [ "$count" = "count" ]; then
-        time gillian-c wpst "$filename" -s --stats
+        time gillian-c wpst "$filename" -l disabled --stats
     else
-        time gillian-c wpst "$filename" -s --parallel
+        time gillian-c wpst "$filename" -l disabled
     fi
 done

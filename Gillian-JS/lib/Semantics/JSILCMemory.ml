@@ -15,7 +15,7 @@ module M : Memory_S with type init_data = unit = struct
   (** Errors *)
   type err_t = unit [@@deriving show]
 
-  type action_ret = (t * vt list, err_t list) result
+  type action_ret = (t * vt list, err_t) result
 
   let pp = CHeap.pp
   let copy = CHeap.copy
@@ -51,7 +51,7 @@ module M : Memory_S with type init_data = unit = struct
       raise (Failure "Concrete get_cell. Remove Option must be implemented!")
     else
       match CHeap.get heap loc with
-      | None -> Error []
+      | None -> Error ()
       | Some (obj, _) ->
           let v = Option.value ~default:Literal.Nono (CObject.get obj prop) in
           Ok (heap, [ Loc loc; String prop; v ])
@@ -69,7 +69,7 @@ module M : Memory_S with type init_data = unit = struct
       raise (Failure "Concrete get_domain. Remove Option must be implemented!")
     else
       match CHeap.get heap loc with
-      | None -> Error []
+      | None -> Error ()
       | Some (obj, _) ->
           let props = CObject.properties obj in
           Ok
@@ -91,7 +91,7 @@ module M : Memory_S with type init_data = unit = struct
         (Failure "Concrete get_metadata. Remove Option must be implemented!")
     else
       match CHeap.get heap loc with
-      | None -> Error []
+      | None -> Error ()
       | Some (_, vm) -> Ok (heap, [ Loc loc; vm ])
 
   let delete_object (heap : t) (loc : vt) : action_ret =

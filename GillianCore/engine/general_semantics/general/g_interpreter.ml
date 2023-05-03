@@ -914,8 +914,19 @@ struct
 
       let eval_proc_call = Eval_proc_call.f
 
+      let split_results results =
+        let oks, errs =
+          List.fold_left
+            (fun (oks, errs) res ->
+              match res with
+              | Ok ok -> (ok :: oks, errs)
+              | Error err -> (oks, err :: errs))
+            ([], []) results
+        in
+        (List.rev oks, List.rev errs)
+
       (* Action *)
-      let eval_laction x a es state =
+      let eval_laction ~branch_path x a es state =
         let {
           annot;
           i;
@@ -942,152 +953,137 @@ struct
                 ]
               "LAction");
         AnnotatedAction.log { annot; action_name = a } |> ignore;
+        let open Utils.Syntaxes.List in
         let v_es = List.map eval_expr es in
-        match State.execute_action a state v_es with
-        | Ok [] -> failwith "HORROR: Successful action resulted in no states"
-        | Ok ((state', vs) :: rest_rets) -> (
-            DL.log (fun m ->
-                m
-                  ~json:
-                    [
-                      ("state'", state_t_to_yojson state');
-                      ("vs", `List (List.map state_vt_to_yojson vs));
-                    ]
-                  "Ok");
-            let e' = Expr.EList (List.map Val.to_expr vs) in
-            let v' = eval_expr e' in
-            let state'' = update_store state' x v' in
-            let rest_confs, new_branches =
-              List.split
-              @@ List.map
-                   (fun (r_state, r_vs) ->
-                     let r_e = Expr.EList (List.map Val.to_expr r_vs) in
-                     let r_v = eval_expr r_e in
-                     let r_state' = update_store r_state x r_v in
-                     let branch_case =
-                       LAction (r_vs |> List.map state_vt_to_yojson)
-                     in
-                     ( make_confcont ~state:r_state'
-                         ~callstack:(Call_stack.copy cs)
-                         ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                         ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
-                         (),
-                       (r_state', i + 1, branch_case) ))
-                   rest_rets
-            in
-            let ret_len = 1 + List.length rest_rets in
-            let b_counter = b_counter + if ret_len > 1 then 1 else 0 in
-            let branch_case = LAction (vs |> List.map state_vt_to_yojson) in
-            match
-              (ret_len >= 3 && !Config.parallel, ret_len = 2 && !Config.parallel)
-              (* XXX: && !Config.act_threads < !Config.max_threads ) *)
-            with
-            | true, _ -> (
-                (* print_endline (Printf.sprintf "Action returned >=3: %d" (!Config.act_threads + 2)); *)
-                let pid = Unix.fork () in
-                match pid with
-                | 0 -> (
-                    let pid = Unix.fork () in
-                    match pid with
-                    | 0 -> List.tl rest_confs
-                    | _ -> [ List.hd rest_confs ])
-                | _ ->
-                    [
-                      make_confcont ~state:state'' ~callstack:cs
-                        ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                        ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
-                        ~new_branches ();
-                    ])
-            | false, true -> (
-                (* Can split into two threads *)
-                let b_counter = b_counter + 1 in
-                (* print_endline (Printf.sprintf "Action returned 2: %d" (!Config.act_threads + 1)); *)
-                let pid = Unix.fork () in
-                match pid with
-                | 0 ->
-                    [
-                      make_confcont ~state:state'' ~callstack:cs
-                        ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                        ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
-                        ~new_branches ();
-                    ]
-                | _ -> rest_confs)
-            | _ ->
-                make_confcont ~state:state'' ~callstack:cs
-                  ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                  ~next_idx:(i + 1) ~branch_count:b_counter ()
-                :: rest_confs)
-        | Error errs ->
-            DL.log (fun m ->
-                m
-                  ~json:
-                    [ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
-                  "Error");
-            if not (Exec_mode.concrete_exec !Config.current_exec_mode) then (
-              let tactic_from_params =
-                let recovery_params =
-                  let open Utils.Syntaxes.List in
-                  let* v = v_es in
-                  let e = Val.to_expr v in
-                  let+ base_elem = Expr.base_elements e in
-                  Option.get (Val.from_expr base_elem)
+        let oks, errors = State.execute_action a state v_es |> split_results in
+        let oks =
+          match oks with
+          | [] -> []
+          | (state', vs) :: rest_rets ->
+              DL.log (fun m ->
+                  m
+                    ~json:
+                      [
+                        ("state'", state_t_to_yojson state');
+                        ("vs", `List (List.map state_vt_to_yojson vs));
+                      ]
+                    "Ok");
+              let e' = Expr.EList (List.map Val.to_expr vs) in
+              let v' = eval_expr e' in
+              let state'' = update_store state' x v' in
+              let rest_confs, new_branches =
+                List.split
+                @@ List.map
+                     (fun (r_state, r_vs) ->
+                       let r_e = Expr.EList (List.map Val.to_expr r_vs) in
+                       let r_v = eval_expr r_e in
+                       let r_state' = update_store r_state x r_v in
+                       let branch_case =
+                         LAction (r_vs |> List.map state_vt_to_yojson)
+                       in
+                       ( make_confcont ~state:r_state'
+                           ~callstack:(Call_stack.copy cs)
+                           ~invariant_frames:iframes ~prev_idx:i ~loop_ids
+                           ~next_idx:(i + 1) ~branch_count:b_counter
+                           ~branch_case (),
+                         (r_state', i + 1, branch_case) ))
+                     rest_rets
+              in
+              let ret_len = 1 + List.length rest_rets in
+              let b_counter = b_counter + if ret_len > 1 then 1 else 0 in
+              let branch_case = LAction (vs |> List.map state_vt_to_yojson) in
+              make_confcont ~state:state'' ~callstack:cs
+                ~invariant_frames:iframes ~branch_case ~prev_idx:i ~loop_ids
+                ~next_idx:(i + 1) ~branch_count:b_counter ~new_branches ()
+              :: rest_confs
+        in
+        let errors =
+          match errors with
+          | [] -> []
+          | errs ->
+              DL.log (fun m ->
+                  m
+                    ~json:
+                      [ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
+                    "Error");
+              if not (Exec_mode.concrete_exec !Config.current_exec_mode) then (
+                let tactic_from_params =
+                  let recovery_params =
+                    let* v = v_es in
+                    let e = Val.to_expr v in
+                    let+ base_elem = Expr.base_elements e in
+                    Option.get (Val.from_expr base_elem)
+                  in
+                  Recovery_tactic.try_unfold recovery_params
                 in
-                Recovery_tactic.try_unfold recovery_params
-              in
-              let recovery_vals =
-                State.get_recovery_tactic state errs
-                |> Recovery_tactic.merge tactic_from_params
-              in
-              let recovery_states : (State.t list, string) result =
-                State.try_recovering state recovery_vals
-              in
-              match recovery_states with
-              | Ok recovery_states ->
-                  let b_counter =
-                    b_counter + if List.length recovery_states = 1 then 0 else 1
-                  in
-                  List.mapi
-                    (fun ix state ->
-                      let branch_case =
-                        if List.length recovery_states > 1 then
-                          Some (LActionFail ix)
-                        else None
-                      in
-                      let new_branches =
-                        match (ix, recovery_states) with
-                        | 0, _ :: rest ->
-                            Some
-                              (List.mapi
-                                 (fun ix state ->
-                                   (state, i, LActionFail (ix + 1)))
-                                 rest)
-                        | _ -> None
-                      in
-                      make_confcont ~state ~callstack:cs
-                        ~invariant_frames:iframes ~prev_idx:prev
-                        ~loop_ids:prev_loop_ids ~next_idx:i
-                        ~branch_count:b_counter ?branch_case ?new_branches ())
-                    recovery_states
-              | Error msg ->
-                  L.verbose (fun m -> m "Couldn't recover because: %s" msg);
-                  let pp_err ft (a, errs) =
-                    Fmt.pf ft "FAILURE: Action %s failed with: %a" a
-                      (Fmt.Dump.list State.pp_err)
-                      errs
-                  in
-                  Fmt.pr "%a\n@?" (Fmt.styled `Red pp_err) (a, errs);
-                  L.normal ~title:"failure" ~severity:Error (fun m ->
-                      m "Action call failed with:@.%a"
+                let recovery_vals =
+                  State.get_recovery_tactic state errs
+                  |> Recovery_tactic.merge tactic_from_params
+                in
+                let recovery_states : (State.t list, string) result =
+                  State.try_recovering state recovery_vals
+                in
+                match recovery_states with
+                | Ok recovery_states ->
+                    let b_counter =
+                      b_counter
+                      + if List.length recovery_states = 1 then 0 else 1
+                    in
+                    List.mapi
+                      (fun ix state ->
+                        let branch_case =
+                          if List.length recovery_states > 1 then
+                            Some (LActionFail ix)
+                          else None
+                        in
+                        let new_branches =
+                          match (ix, recovery_states) with
+                          | 0, _ :: rest ->
+                              Some
+                                (List.mapi
+                                   (fun ix state ->
+                                     (state, i, LActionFail (ix + 1)))
+                                   rest)
+                          | _ -> None
+                        in
+                        make_confcont ~state ~callstack:cs
+                          ~invariant_frames:iframes ~prev_idx:prev
+                          ~loop_ids:prev_loop_ids ~next_idx:i
+                          ~branch_count:b_counter ?branch_case ?new_branches ())
+                      recovery_states
+                | Error msg ->
+                    L.verbose (fun m -> m "Couldn't recover because: %s" msg);
+                    let pp_err ft (a, errs) =
+                      Fmt.pf ft "FAILURE: Action %s failed with: %a" a
                         (Fmt.Dump.list State.pp_err)
-                        errs);
-                  raise (State.Internal_State_Error (errs, state)))
-            else
-              let pp_err ft (a, errs) =
-                Fmt.pf ft "FAILURE: Action %s failed with: %a" a
-                  (Fmt.Dump.list State.pp_err)
-                  errs
-              in
-              Fmt.failwith "%a\n@?" (Fmt.styled `Red pp_err) (a, errs)
+                        errs
+                    in
+                    Fmt.pr "%a\n@?" (Fmt.styled `Red pp_err) (a, errs);
+                    L.normal ~title:"failure" ~severity:Error (fun m ->
+                        m "Action call failed with:@.%a"
+                          (Fmt.Dump.list State.pp_err)
+                          errs);
+
+                    [
+                      ConfErr
+                        (* (errs, state) *)
+                        {
+                          callstack = cs;
+                          proc_idx = i;
+                          error_state = state;
+                          errors = List.map (fun x -> Exec_err.ESt x) errs;
+                          branch_path;
+                        };
+                    ])
+              else
+                let pp_err ft (a, errs) =
+                  Fmt.pf ft "FAILURE: Action %s failed with: %a" a
+                    (Fmt.Dump.list State.pp_err)
+                    errs
+                in
+                Fmt.failwith "%a\n@?" (Fmt.styled `Red pp_err) (a, errs)
+        in
+        oks @ errors
 
       (* Logic command *)
       let eval_logic (lcmd : LCmd.t) state =
@@ -1246,34 +1242,21 @@ struct
           if can_put_t && can_put_f && List.length sp > 1 then b_counter + 1
           else b_counter
         in
-        let result =
+        List.mapi
+          (fun j ((state, next), case) ->
+            make_confcont ~state
+              ~callstack:(if j = 0 then cs else Call_stack.copy cs)
+              ~invariant_frames:iframes ~prev_idx:i ~loop_ids ~next_idx:next
+              ~branch_count:b_counter ~branch_case:(GuardedGoto case)
+              ~new_branches:
+                (if j = 0 then
+                 List.map
+                   (fun ((state, next), case) ->
+                     (state, next, GuardedGoto case))
+                   (List.tl sp)
+                else [])
+              ())
           sp
-          |> List.mapi (fun j ((state, next), case) ->
-                 make_confcont ~state
-                   ~callstack:(if j = 0 then cs else Call_stack.copy cs)
-                   ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                   ~next_idx:next ~branch_count:b_counter
-                   ~branch_case:(GuardedGoto case)
-                   ~new_branches:
-                     (if j = 0 then
-                      List.map
-                        (fun ((state, next), case) ->
-                          (state, next, GuardedGoto case))
-                        (List.tl sp)
-                     else [])
-                   ())
-        in
-        match
-          List.length result = 2 && !Config.parallel
-          (* XXX: && !Config.act_threads < !Config.max_threads *)
-        with
-        | true -> (
-            (* print_endline (Printf.sprintf "Conditional goto: %d" (!Config.act_threads + 1)); *)
-            let pid = Unix.fork () in
-            match pid with
-            | 0 -> [ List.hd result ]
-            | _ -> List.tl result)
-        | false -> result
 
       let eval_phi_assignment lxarr eval_state =
         let {
@@ -1494,6 +1477,7 @@ struct
           loop_ids;
           i;
           b_counter;
+          branch_path;
           _;
         } =
           eval_state
@@ -1519,7 +1503,7 @@ struct
                 ~invariant_frames:iframes ~prev_idx:i ~loop_ids
                 ~next_idx:(i + 1) ~branch_count:b_counter ();
             ]
-        | LAction (x, a, es) -> eval_laction x a es eval_state
+        | LAction (x, a, es) -> eval_laction ~branch_path x a es eval_state
         | Logic lcmd -> eval_logic lcmd eval_state
         (* Unconditional goto *)
         | Goto j ->

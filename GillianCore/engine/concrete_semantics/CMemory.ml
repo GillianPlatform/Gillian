@@ -14,7 +14,7 @@ module type S = sig
   (** Type of GIL general states *)
   type t
 
-  type action_ret = (t * vt list, err_t list) result
+  type action_ret = (t * vt list, err_t) result
 
   (** Initialisation *)
   val init : init_data -> t
