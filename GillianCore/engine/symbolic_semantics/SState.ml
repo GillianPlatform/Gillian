@@ -52,15 +52,12 @@ module Make (SMemory : SMemory.S) :
     | FAsrt of Asrt.t
 
   type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson, show]
-  type action_ret = ((t * vt list) list, err_t list) result
+  type action_ret = (t * vt list, err_t) result list
   type u_res = UWTF | USucc of t | UFail of err_t list
 
   exception Internal_State_Error of err_t list * t
 
   module ES = Expr.Set
-
-  let lift_merrs (errs : m_err_t list) : err_t list =
-    List.map (fun x -> StateErr.EMem x) errs
 
   let pp fmt state =
     let heap, store, pfs, gamma, svars = state in
@@ -187,25 +184,16 @@ module Make (SMemory : SMemory.S) :
       (action : string)
       (state : t)
       (args : vt list) : action_ret =
+    let open Syntaxes.List in
     let heap, store, pfs, gamma, vars = state in
-    match SMemory.execute_action ~unification action heap pfs gamma args with
-    | Ok ret_succs ->
-        let result =
-          Ok
-            (List.map
-               (fun (new_heap, v, new_fofs, new_types) ->
-                 let new_store = SStore.copy store in
-                 let new_pfs = PFS.copy pfs in
-                 let new_gamma = Type_env.copy gamma in
-                 List.iter
-                   (fun (x, t) -> Type_env.update new_gamma x t)
-                   new_types;
-                 List.iter (fun fof -> PFS.extend new_pfs fof) new_fofs;
-                 ((new_heap, new_store, new_pfs, new_gamma, vars), v))
-               ret_succs)
-        in
-        result
-    | Error errs -> Error (lift_merrs errs)
+    let pc = Gpc.make ~unification ~pfs ~gamma () in
+    let+ Gbranch.{ value; pc } = SMemory.execute_action action heap pc args in
+    match value with
+    | Ok (new_heap, vs) ->
+        let store = SStore.copy store in
+        let new_state = (new_heap, store, pc.pfs, pc.gamma, vars) in
+        Ok (new_state, vs)
+    | Error err -> Error (StateErr.EMem err)
 
   let ga_to_setter (a_id : string) = SMemory.ga_to_setter a_id
   let ga_to_getter (a_id : string) = SMemory.ga_to_getter a_id
@@ -736,67 +724,61 @@ module Make (SMemory : SMemory.S) :
         L.verbose (fun m -> m "Warning: invalid fix.");
         None
 
-  let get_fixes ?simple_fix:(sf = true) (state : t) (errs : err_t list) :
-      fix_t list list =
+  (* FIXME: I'm not entirely sure of what this is doing now. Is the product still the right thing to do?
+     Possibly not. *)
+  let get_fixes (state : t) (err : err_t) : fix_t list =
     let pp_fixes fmt fixes =
       Fmt.pf fmt "[[ %a ]]" (Fmt.list ~sep:(Fmt.any ", ") pp_fix) fixes
     in
     L.verbose (fun m -> m "SState: get_fixes");
     let heap, _, pfs, gamma, _ = state in
-    let one_step_fixes : fix_t list list list =
-      List.map
-        (fun (err : err_t) ->
-          match err with
-          | EMem err ->
-              List.map
-                (fun (mfixes, pfixes, svars, asrts) ->
-                  List.map (fun l -> MFix l) mfixes
-                  @ List.map (fun pf -> FPure pf) pfixes
-                  @
-                  if svars == SS.empty then []
-                  else
-                    [ FSVars svars ] @ List.map (fun asrt -> FAsrt asrt) asrts)
-                (SMemory.get_fixes ~simple_fix:sf heap pfs gamma err)
-          | EPure f ->
-              let result = [ [ FPure f ] ] in
-              L.verbose (fun m ->
-                  m "@[<v 2>Memory: Fixes found:@\n%a@]"
-                    (Fmt.list ~sep:(Fmt.any "@\n") pp_fixes)
-                    result);
-              result
-          | EAsrt (_, _, fixes) ->
-              let result =
+    let one_step_fixes : fix_t list list =
+      match err with
+      | EMem err ->
+          List.map
+            (fun (mfixes, pfixes, svars, asrts) ->
+              List.map (fun l -> MFix l) mfixes
+              @ List.map (fun pf -> FPure pf) pfixes
+              @
+              if svars == SS.empty then []
+              else [ FSVars svars ] @ List.map (fun asrt -> FAsrt asrt) asrts)
+            (SMemory.get_fixes heap pfs gamma err)
+      | EPure f ->
+          let result = [ [ FPure f ] ] in
+          L.verbose (fun m ->
+              m "@[<v 2>Memory: Fixes found:@\n%a@]"
+                (Fmt.list ~sep:(Fmt.any "@\n") pp_fixes)
+                result);
+          result
+      | EAsrt (_, _, fixes) ->
+          let result =
+            List.map
+              (fun (fixes : Asrt.t list) ->
                 List.map
-                  (fun (fixes : Asrt.t list) ->
-                    List.map
-                      (fun (fix : Asrt.t) ->
-                        match fix with
-                        | Pure fix -> FPure fix
-                        | _ ->
-                            raise
-                              (Exceptions.Impossible
-                                 "Non-pure fix for an assertion failure"))
-                      fixes)
-                  fixes
-              in
-              L.verbose (fun m ->
-                  m "@[<v 2>Memory: Fixes found:@\n%a@]"
-                    (Fmt.list ~sep:(Fmt.any "@\n") pp_fixes)
-                    result);
-              result
-          | _ -> raise (Failure "DEATH: get_fixes: error cannot be fixed."))
-        errs
+                  (fun (fix : Asrt.t) ->
+                    match fix with
+                    | Pure fix -> FPure fix
+                    | _ ->
+                        raise
+                          (Exceptions.Impossible
+                             "Non-pure fix for an assertion failure"))
+                  fixes)
+              fixes
+          in
+          L.verbose (fun m ->
+              m "@[<v 2>Memory: Fixes found:@\n%a@]"
+                (Fmt.list ~sep:(Fmt.any "@\n") pp_fixes)
+                result);
+          result
+      | _ -> raise (Failure "DEATH: get_fixes: error cannot be fixed.")
     in
     (* Cartesian product of the fixes *)
     let product = List_utils.list_product one_step_fixes in
-    let candidate_fixes = List.map (fun ll -> List.concat ll) product in
-    let normalised_fixes =
-      List.map (fun fix -> normalise_fix pfs gamma fix) candidate_fixes
-    in
-    let result = List_utils.get_list_somes normalised_fixes in
+    let candidate_fixes = List.concat product in
+    let normalised_fixes = normalise_fix pfs gamma candidate_fixes in
+    let result = Option.value ~default:[] normalised_fixes in
     L.(verbose (fun m -> m "Normalised fixes: %i" (List.length result)));
-    L.verbose (fun m ->
-        m "%a" (Fmt.list ~sep:(Fmt.any "@\n@\n") pp_fixes) result);
+    L.verbose (fun m -> m "%a" (Fmt.list ~sep:(Fmt.any "@\n@\n") pp_fix) result);
     result
 
   (**

@@ -41,10 +41,6 @@ let debug = ref false
 
 let no_heap = ref false
 
-(** {2 Parallel threading} *)
-
-let parallel = ref false
-
 (** {2 Limited printing} *)
 
 let pbn = ref false

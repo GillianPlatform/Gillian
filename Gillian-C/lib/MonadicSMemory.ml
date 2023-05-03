@@ -1012,8 +1012,5 @@ let get_recovery_tactic _ err =
   Recovery_tactic.try_unfold values
 
 let get_failing_constraint _e = failwith "Not ready for bi-abduction yet"
-
-let get_fixes ?simple_fix:_ _heap _pfs _gamma _err =
-  failwith "Not ready for bi-abduction yet"
-
+let get_fixes _heap _pfs _gamma _err = failwith "Not ready for bi-abduction yet"
 let apply_fix _heap _pfs _gamma _fix = failwith "Not ready for bi-abdcution"

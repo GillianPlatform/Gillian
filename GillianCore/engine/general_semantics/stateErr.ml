@@ -49,23 +49,15 @@ let pp_err
         asrtss
   | EOther msg -> Fmt.pf fmt "%s" msg
 
-let can_fix (errs : ('a, 'b) err_t list) : bool =
-  let result =
-    List.exists
-      (fun e ->
-        match e with
-        | EMem _ -> true
-        | EPure pf -> Reduction.reduce_formula pf <> False
-        | EAsrt (_, pf, _) ->
-            let result = Reduction.reduce_formula pf <> True in
-            Logging.verbose (fun fmt ->
-                fmt "Can fix: intermediate: %a: %b" Formula.pp pf result);
-            result
-        | _ -> false)
-      errs
-  in
-  Logging.verbose (fun fmt -> fmt "Can fix: overall %b" result);
-  result
+let can_fix (err : ('a, 'b) err_t) : bool =
+  match err with
+  | EMem _ -> true
+  | EPure pf -> Reduction.reduce_formula pf <> False
+  | EAsrt (_, pf, _) ->
+      let result = Reduction.reduce_formula pf <> True in
+      Logging.verbose (fun fmt -> fmt "Can fix: %a: %b" Formula.pp pf result);
+      result
+  | _ -> false
 
 let get_failing_constraint (err : ('a, 'b) err_t) (mem_fc : 'a -> Formula.t) :
     Formula.t =

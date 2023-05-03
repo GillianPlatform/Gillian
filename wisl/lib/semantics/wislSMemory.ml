@@ -316,7 +316,7 @@ let apply_fix m pfs gamma fix =
       WislSHeap.set_cell ~pfs ~gamma m loc ofs value |> Result.get_ok;
       m
 
-let get_fixes ?simple_fix:_ _m _pfs _gamma (err : err_t) =
+let get_fixes _ _ _ (err : err_t) =
   Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
   match err with
   | MissingResource (Cell, loc, Some ofs) ->
