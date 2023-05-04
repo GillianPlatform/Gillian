@@ -10,7 +10,7 @@ type init_data = unit
 type vt = Values.t
 type st = Subst.t
 type err_t = WislSHeap.err [@@deriving yojson, show]
-type c_fix_t = unit
+type c_fix_t = AddCell of { loc : string; ofs : Expr.t; value : Expr.t }
 type t = WislSHeap.t [@@deriving yojson]
 
 type action_ret =
@@ -26,7 +26,7 @@ let resolve_loc pfs gamma loc =
 
 let get_cell heap pfs gamma (loc : vt) (offset : vt) =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
-  | None -> Error [ WislSHeap.InvalidLocation ]
+  | None -> Error [ WislSHeap.InvalidLocation loc ]
   | Some loc -> (
       match WislSHeap.get_cell ~pfs ~gamma heap loc offset with
       | Error err -> Error [ err ]
@@ -59,7 +59,7 @@ let rem_cell heap pfs gamma (loc : vt) (offset : vt) =
       | Ok () -> Ok [ (heap, [], [], []) ])
   | None ->
       (* loc does not evaluate to a location, or we can't find it. *)
-      Error [ InvalidLocation ]
+      Error [ InvalidLocation loc ]
 
 let get_bound heap pfs gamma loc =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
@@ -70,7 +70,7 @@ let get_bound heap pfs gamma loc =
           let b = Expr.int b in
           let loc = Expr.loc_from_loc_name loc_name in
           Ok [ (heap, [ loc; b ], [], []) ])
-  | None -> Error [ InvalidLocation ]
+  | None -> Error [ InvalidLocation loc ]
 
 let set_bound heap pfs gamma (loc : vt) (bound : int) =
   let loc_name, new_pfs =
@@ -97,7 +97,7 @@ let rem_bound heap pfs gamma loc =
       | Ok () -> Ok [ (heap, [], [], []) ])
   | None ->
       (* loc does not evaluate to a location, or we can't find it. *)
-      Error [ InvalidLocation ]
+      Error [ InvalidLocation loc ]
 
 let get_freed heap pfs gamma loc =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
@@ -107,7 +107,7 @@ let get_freed heap pfs gamma loc =
       | Ok () ->
           let loc = Expr.loc_from_loc_name loc_name in
           Ok [ (heap, [ loc ], [], []) ])
-  | None -> Error [ InvalidLocation ]
+  | None -> Error [ InvalidLocation loc ]
 
 let set_freed heap pfs gamma (loc : vt) =
   let loc_name, new_pfs =
@@ -133,7 +133,7 @@ let rem_freed heap pfs gamma loc =
       | Ok () -> Ok [ (heap, [], [], []) ])
   | None ->
       (* loc does not evaluate to a location, or we can't find it. *)
-      Error [ InvalidLocation ]
+      Error [ InvalidLocation loc ]
 
 let alloc heap _pfs _gamma (size : int) =
   let loc = WislSHeap.alloc heap size in
@@ -151,7 +151,7 @@ let dispose heap pfs gamma loc_expr =
       match WislSHeap.dispose heap loc_name with
       | Ok () -> Ok [ (heap, [], [], []) ]
       | Error e -> Error [ e ])
-  | None -> Error [ InvalidLocation ]
+  | None -> Error [ InvalidLocation loc_expr ]
 
 let execute_action ?unification:_ name heap pfs gamma args =
   let action = WislLActions.ac_from_str name in
@@ -274,14 +274,20 @@ let pp_by_need _ fmt h = pp fmt h
 let get_print_info _ _ = (SS.empty, SS.empty)
 
 let pp_err fmt t =
-  Fmt.string fmt
-    (match t with
-    | WislSHeap.MissingResource _ -> "Missing Resource"
-    | DoubleFree _ -> "Double Free"
-    | UseAfterFree _ -> "Use After Free"
-    | MemoryLeak -> "Memory Leak"
-    | OutOfBounds _ -> "Out Of Bounds"
-    | InvalidLocation -> "Invalid Location")
+  match t with
+  | WislSHeap.MissingResource _ -> Fmt.pf fmt "Missing Resource"
+  | DoubleFree _ -> Fmt.pf fmt "Double Free"
+  | UseAfterFree _ -> Fmt.pf fmt "Use After Free"
+  | MemoryLeak -> Fmt.pf fmt "Memory Leak"
+  | OutOfBounds _ -> Fmt.pf fmt "Out Of Bounds"
+  | InvalidLocation loc ->
+      Fmt.pf fmt "Invalid Location: '%a' cannot be resolved as a location"
+        Expr.pp loc
+
+let pp_c_fix fmt c_fix =
+  match c_fix with
+  | AddCell { loc : string; ofs : Expr.t; value : Expr.t } ->
+      Fmt.pf fmt "AddCell(%s, %a, %a)" loc Expr.pp ofs Expr.pp value
 
 let get_recovery_tactic _ e =
   match e with
@@ -291,7 +297,6 @@ let get_recovery_tactic _ e =
       Recovery_tactic.try_unfold (loc :: ofs)
   | _ -> Recovery_tactic.none
 
-let pp_c_fix _ _ = ()
 let substitution_in_place ~pfs:_ ~gamma:_ = WislSHeap.substitution_in_place
 let fresh_val _ = Expr.LVar (LVar.alloc ())
 
@@ -303,7 +308,27 @@ let alocs heap = WislSHeap.alocs heap
 let assertions ?to_keep:_ heap = WislSHeap.assertions heap
 let mem_constraints _ = []
 let is_overlapping_asrt _ = false
-let apply_fix m _ _ _ = m
-let get_fixes _ _ _ _ = []
+
+let apply_fix m pfs gamma fix =
+  Logging.verbose (fun m -> m "Applying fixes for error");
+  match fix with
+  | AddCell { loc; ofs; value } ->
+      WislSHeap.set_cell ~pfs ~gamma m loc ofs value |> Result.get_ok;
+      m
+
+let get_fixes _ _ _ (err : err_t) =
+  Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
+  match err with
+  | MissingResource (Cell, loc, Some ofs) ->
+      let new_var = LVar.alloc () in
+      let value = Expr.LVar new_var in
+      let set = SS.singleton new_var in
+      [ ([ AddCell { loc; ofs; value } ], [], set, []) ]
+  | InvalidLocation loc ->
+      let new_loc = ALoc.alloc () in
+      let new_expr = Expr.ALoc new_loc in
+      [ ([], [ Formula.Eq (new_expr, loc) ], SS.empty, []) ]
+  | _ -> []
+
 let get_failing_constraint _ = Formula.True
 let add_debugger_variables = WislSHeap.add_debugger_variables
