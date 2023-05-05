@@ -717,25 +717,27 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   (* Property Lookup *)
   | { snode = Lookup (x, e); sid; sloc } :: rest ->
       let cmdle, comp_e = compile_expr e in
-      let get_annot =
+      let load_annot, loadval_annot =
         let mk =
           WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
         in
-        mk ~stmt_kind:(Multi EndNormal) ()
+        (mk ~stmt_kind:(Multi NotEnd) (), mk ~stmt_kind:(Multi EndNormal) ())
       in
-      let getcmd =
-        Cmd.LAction (x, load, [ nth comp_e 0; nth comp_e 1 ])
+      let v_load = gen_str gvar in
+      let loadcmd =
+        Cmd.LAction (v_load, load, [ nth comp_e 0; nth comp_e 1 ])
       in
+      let loadvalcmd = Cmd.Assignment (x, nth (Expr.PVar v_load) 0) in
       let comp_rest, new_functions = compile_list rest in
       ( cmdle
-        @ [ (get_annot, None, getcmd) ]
+        @ [ (load_annot, None, loadcmd); (loadval_annot, None, loadvalcmd) ]
         @ comp_rest,
         new_functions )
   (*
           x := [e] =>
           ce := Ce(e); // (bunch of commands and then assign the result to ce)
           v_load := [load](ce[0], ce[1]);
-          x := v_load[2];
+          x := v_load[0];
       *)
   (* Property Update *)
   | { snode = Update (e1, e2); sid; sloc } :: rest ->
