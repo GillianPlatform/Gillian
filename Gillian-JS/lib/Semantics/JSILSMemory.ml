@@ -8,6 +8,7 @@ module L = Logging
 module SVal = Gillian.Symbolic.Values
 module PFS = Gillian.Symbolic.Pure_context
 module Type_env = Gillian.Symbolic.Type_env
+module Recovery_tactic = Gillian.General.Recovery_tactic
 open Gillian.Logic
 
 module M = struct
@@ -69,7 +70,7 @@ module M = struct
     pf ft "@[<h><[%a], %a, %a>@]" (list ~sep:comma SVal.pp) vs Formula.pp f
       (list ~sep:semi pp_fixes) fixes
 
-  let get_recovery_vals (heap : t) (err : err_t) : vt list =
+  let get_recovery_tactic (heap : t) (err : err_t) =
     let ufl_vs, _, _ = err in
     L.verbose (fun fmt ->
         fmt "JSIL SMemory: Recovery values: %a"
@@ -83,20 +84,23 @@ module M = struct
           | _ -> false)
         ufl_vs
     in
-    match ufl_alocs with
-    | [] -> ufl_vs
-    | alocs ->
-        let imeta = SHeap.get_inv_metadata heap in
-        (* Perhaps we are looking for metadata? *)
-        let metadata_recovery_vals =
-          List.fold_left
-            (fun mrvs aloc ->
-              match Hashtbl.find_opt imeta aloc with
-              | Some md -> md :: mrvs
-              | _ -> mrvs)
-            [] alocs
-        in
-        ufl_vs @ metadata_recovery_vals
+    let values =
+      match ufl_alocs with
+      | [] -> ufl_vs
+      | alocs ->
+          let imeta = SHeap.get_inv_metadata heap in
+          (* Perhaps we are looking for metadata? *)
+          let metadata_recovery_vals =
+            List.fold_left
+              (fun mrvs aloc ->
+                match Hashtbl.find_opt imeta aloc with
+                | Some md -> md :: mrvs
+                | _ -> mrvs)
+              [] alocs
+          in
+          ufl_vs @ metadata_recovery_vals
+    in
+    Recovery_tactic.try_unfold values
 
   let assertions ?to_keep:_ (heap : t) : GAsrt.t list = SHeap.assertions heap
   let lvars (heap : t) : Containers.SS.t = SHeap.lvars heap
@@ -609,10 +613,8 @@ module M = struct
   type fix_result =
     c_fix_t list * Formula.t list * Containers.SS.t * GAsrt.t list
 
-  let complete_fix_simple_js
-      (pfs : PFS.t)
-      (gamma : Type_env.t)
-      (i_fix : i_fix_t) : fix_result list =
+  let complete_fix_js (pfs : PFS.t) (gamma : Type_env.t) (i_fix : i_fix_t) :
+      fix_result list =
     match i_fix with
     | FLoc v ->
         (* Get a fresh location *)
@@ -675,92 +677,36 @@ module M = struct
     | FPure f -> [ ([], [ f ], Containers.SS.empty, []) ]
 
   (* Fix completion: simple *)
-  let complete_fix_simple_jsil
-      (pfs : PFS.t)
-      (gamma : Type_env.t)
-      (i_fix : i_fix_t) : fix_result list =
-    if !Js_config.js then complete_fix_simple_js pfs gamma i_fix
-    else
-      match i_fix with
-      | FLoc v ->
-          (* Get a fresh location *)
-          let loc_name, _, new_pfs = fresh_loc ~loc:v pfs gamma in
-          (* TODO: If the initial value denoting the location was a variable, we may need to save it as a spec var *)
-          [ ([ CFLoc loc_name ], new_pfs, Containers.SS.empty, []) ]
-      | FCell (l, p) ->
-          (* Fresh variable to denote the property value *)
-          let vvar = LVar.alloc () in
-          let v : vt = LVar vvar in
-          (* Value is not none - we always bi-abduce presence *)
-          let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
-          [
-            ( [ CFCell (l, p, v) ],
-              [ not_none ],
-              Containers.SS.singleton vvar,
-              [] );
-          ]
-      | FMetadata l ->
-          (* Fresh variable to denote the property value *)
-          let vvar = LVar.alloc () in
-          let v : vt = LVar vvar in
-          let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
-          [
-            ( [ CFMetadata (l, v) ],
-              [ not_none ],
-              Containers.SS.singleton vvar,
-              [] );
-          ]
-      | FPure f -> [ ([], [ f ], Containers.SS.empty, []) ]
-
-  let complete_fix_full_js (pfs : PFS.t) (gamma : Type_env.t) (i_fix : i_fix_t)
-      : fix_result list =
+  let complete_fix_jsil (pfs : PFS.t) (gamma : Type_env.t) (i_fix : i_fix_t) :
+      fix_result list =
     match i_fix with
-    | _ -> complete_fix_simple_js pfs gamma i_fix
-
-  let complete_fix_full_jsil
-      (pfs : PFS.t)
-      (gamma : Type_env.t)
-      (i_fix : i_fix_t) : fix_result list =
-    if !Js_config.js then complete_fix_full_js pfs gamma i_fix
-    else
-      match i_fix with
-      | FLoc v ->
-          (* Get a fresh location *)
-          let loc_name, _, new_pfs = fresh_loc ~loc:v pfs gamma in
-          (* TODO: If the initial value denoting the location was a variable, we may need to save it as a spec var *)
-          [ ([ CFLoc loc_name ], new_pfs, Containers.SS.empty, []) ]
-      | FCell (l, p) ->
-          (* Fresh variable to denote the property value *)
-          let vvar = LVar.alloc () in
-          let v : vt = LVar vvar in
-          (* Value is not none - we always bi-abduce presence *)
-          let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
-          [
-            ( [ CFCell (l, p, v) ],
-              [ not_none ],
-              Containers.SS.singleton vvar,
-              [] );
-          ]
-      | FMetadata l ->
-          (* Fresh variable to denote the property value *)
-          let vvar = LVar.alloc () in
-          let v : vt = LVar vvar in
-          let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
-          [
-            ( [ CFMetadata (l, v) ],
-              [ not_none ],
-              Containers.SS.singleton vvar,
-              [] );
-          ]
-      | FPure f -> [ ([], [ f ], Containers.SS.empty, []) ]
+    | FLoc v ->
+        (* Get a fresh location *)
+        let loc_name, _, new_pfs = fresh_loc ~loc:v pfs gamma in
+        (* TODO: If the initial value denoting the location was a variable, we may need to save it as a spec var *)
+        [ ([ CFLoc loc_name ], new_pfs, Containers.SS.empty, []) ]
+    | FCell (l, p) ->
+        (* Fresh variable to denote the property value *)
+        let vvar = LVar.alloc () in
+        let v : vt = LVar vvar in
+        (* Value is not none - we always bi-abduce presence *)
+        let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
+        [
+          ([ CFCell (l, p, v) ], [ not_none ], Containers.SS.singleton vvar, []);
+        ]
+    | FMetadata l ->
+        (* Fresh variable to denote the property value *)
+        let vvar = LVar.alloc () in
+        let v : vt = LVar vvar in
+        let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
+        [
+          ([ CFMetadata (l, v) ], [ not_none ], Containers.SS.singleton vvar, []);
+        ]
+    | FPure f -> [ ([], [ f ], Containers.SS.empty, []) ]
 
   (* An error can have multiple fixes *)
-  let get_fixes
-      ?simple_fix:(sf = true)
-      (_ : t)
-      (pfs : PFS.t)
-      (gamma : Type_env.t)
-      (err : err_t) : fix_result list =
+  let get_fixes (_ : t) (pfs : PFS.t) (gamma : Type_env.t) (err : err_t) :
+      fix_result list =
     let pp_fix_result ft res =
       let open Fmt in
       let fixes, pfs, svars, gasrts = res in
@@ -783,7 +729,7 @@ module M = struct
           fixes);
 
     let complete =
-      if sf then complete_fix_simple_jsil else complete_fix_full_jsil
+      if !Js_config.js then complete_fix_js else complete_fix_jsil
     in
 
     let complete_ifixes (ifixes : i_fix_t list) : fix_result list =

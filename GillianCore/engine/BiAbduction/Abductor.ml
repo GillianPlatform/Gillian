@@ -365,7 +365,7 @@ module Make
               let prev_spec =
                 BiAbductionResults.get_spec_exn prev_results proc_name
               in
-              let new_spec = (Hashtbl.find prog.specs proc_name).spec in
+              let new_spec = (Hashtbl.find prog.specs proc_name).data in
               if not (specs_equal prev_spec new_spec) then (
                 L.verbose (fun m -> m "The spec of %s has changed" proc_name);
                 (* Must also check immediate callers *)

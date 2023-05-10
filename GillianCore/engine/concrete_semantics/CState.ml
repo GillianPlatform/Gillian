@@ -40,11 +40,8 @@ end = struct
 
   exception Internal_State_Error of err_t list * t
 
-  type action_ret = ((t * vt list) list, err_t list) result
+  type action_ret = (t * vt list, err_t) result list
   type u_res = UWTF | USucc of t | UFail of err_t list
-
-  let lift_merrs (errs : m_err_t list) : err_t list =
-    List.map (fun x -> StateErr.EMem x) errs
 
   let init init_data : t = (CMemory.init init_data, CStore.init [], [])
   let get_pred_defs (_ : t) : UP.preds_tbl_t option = None
@@ -56,8 +53,8 @@ end = struct
       (args : vt list) : action_ret =
     let heap, store, locs = state in
     match CMemory.execute_action action heap args with
-    | Ok (heap, vs) -> Ok [ ((heap, store, locs), vs) ]
-    | Error errs -> Error (lift_merrs errs)
+    | Ok (heap, vs) -> [ Ok ((heap, store, locs), vs) ]
+    | Error err -> [ Error (StateErr.EMem err) ]
 
   let ga_to_setter _ = failwith "ga_to_setter for CState"
   let ga_to_getter _ = failwith "ga_to_getter for CState"
@@ -210,11 +207,11 @@ end = struct
 
   let pp_fix _ _ = raise (Failure "str_of_fix from non-symbolic state.")
 
-  let get_recovery_vals _ =
-    raise (Failure "get_recovery_vals from non-symbolic state.")
+  let get_recovery_tactic _ =
+    raise (Failure "get_recovery_tactic from non-symbolic state.")
 
-  let automatic_unfold _ _ : (t list, string) result =
-    Error "Automatic unfold not supported in concrete execution"
+  let try_recovering _ _ : (t list, string) result =
+    Error "try_recovering not supported in concrete execution"
 
   let pp_err fmt (err : err_t) : unit =
     match err with
@@ -228,10 +225,10 @@ end = struct
           (Exceptions.Unsupported
              "Concrete printer: non-memory and non-type error")
 
-  let can_fix (_ : err_t list) : bool = false
+  let can_fix (_ : err_t) : bool = false
   let get_failing_constraint (_ : err_t) : Formula.t = True
 
-  let get_fixes ?simple_fix:_ (_ : t) (_ : err_t list) : fix_t list list =
+  let get_fixes (_ : t) (_ : err_t) : fix_t list =
     raise (Failure "Concrete: get_fixes not implemented in CState.Make")
 
   let apply_fixes (_ : t) (_ : fix_t list) : t option * Asrt.t list =

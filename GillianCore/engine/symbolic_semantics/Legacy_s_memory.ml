@@ -15,6 +15,11 @@ module type S = sig
   (** Type of GIL general states *)
   type t [@@deriving yojson]
 
+  type action_ret =
+    ( (t * vt list * Formula.t list * (string * Type.t) list) list,
+      err_t list )
+    result
+
   (** Initialisation *)
   val init : init_data -> t
 
@@ -22,7 +27,13 @@ module type S = sig
 
   (** Execute action *)
   val execute_action :
-    string -> t -> Gpc.t -> vt list -> (t * vt list, err_t) Symex_ret.t
+    ?unification:bool ->
+    string ->
+    t ->
+    PFS.t ->
+    Type_env.t ->
+    vt list ->
+    action_ret
 
   val ga_to_setter : string -> string
   val ga_to_getter : string -> string
@@ -74,9 +85,17 @@ module Dummy : S with type init_data = unit = struct
   type err_t = unit [@@deriving yojson, show]
   type t = unit [@@deriving yojson]
 
+  type action_ret =
+    ( (t * vt list * Formula.t list * (string * Type.t) list) list,
+      err_t list )
+    result
+
   let init () = ()
   let clear () = ()
-  let execute_action _ _ _ _ = failwith "Please implement SMemory"
+
+  let execute_action ?unification:_ _ _ _ _ _ =
+    failwith "Please implement SMemory"
+
   let ga_to_setter _ = failwith "Please implement SMemory"
   let ga_to_getter _ = failwith "Please implement SMemory"
   let ga_to_deleter _ = failwith "Please implement SMemory"
@@ -98,4 +117,29 @@ module Dummy : S with type init_data = unit = struct
   let get_failing_constraint _ = failwith "Please implement SMemory"
   let get_fixes _ _ _ _ = failwith "Please implement SMemory"
   let apply_fix _ _ _ _ = failwith "Please implement SMemory"
+end
+
+module Modernize (Old_memory : S) = struct
+  include Old_memory
+
+  let execute_action action_name heap (pc : Gpc.t) args =
+    let open Syntaxes.List in
+    match
+      execute_action ~unification:pc.unification action_name heap pc.pfs
+        pc.gamma args
+    with
+    | Ok oks ->
+        let+ new_heap, v, new_fofs, new_types = oks in
+        let new_pfs = PFS.copy pc.pfs in
+        let new_gamma = Type_env.copy pc.gamma in
+        List.iter (fun (x, t) -> Type_env.update new_gamma x t) new_types;
+        List.iter (fun fof -> PFS.extend new_pfs fof) new_fofs;
+        let new_pc =
+          Gpc.make ~unification:pc.unification ~pfs:new_pfs ~gamma:new_gamma ()
+        in
+        Gbranch.{ pc = new_pc; value = Ok (new_heap, v) }
+    | Error errs ->
+        let+ err = errs in
+        let pc = Gpc.copy pc in
+        Gbranch.{ pc; value = Error err }
 end

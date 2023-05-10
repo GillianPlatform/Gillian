@@ -717,22 +717,38 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   (* Property Lookup *)
   | { snode = Lookup (x, e); sid; sloc } :: rest ->
       let cmdle, comp_e = compile_expr e in
-      let get_annot, getval_annot =
+      let annot, annot_final =
         let mk =
           WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
         in
         (mk ~stmt_kind:(Multi NotEnd) (), mk ~stmt_kind:(Multi EndNormal) ())
       in
       let v_get = gen_str gvar in
-      let getcmd =
+      let faillab, ctnlab = (gen_str fail_lab, gen_str ctn_lab) in
+      let checkptrcmd =
+        Cmd.GuardedGoto
+          ( Expr.BinOp
+              ( Expr.UnOp (UnOp.TypeOf, comp_e),
+                BinOp.Equal,
+                Expr.Lit (Literal.Type ListType) ),
+            ctnlab,
+            faillab )
+      in
+      let failcmd = Cmd.Fail ("InvalidPointer", []) in
+      let lookupcmd =
         Cmd.LAction (v_get, getcell, [ nth comp_e 0; nth comp_e 1 ])
       in
       let getvalcmd = Cmd.Assignment (x, nth (Expr.PVar v_get) 2) in
+      let cmds =
+        [
+          (annot, None, checkptrcmd);
+          (annot_final, Some faillab, failcmd);
+          (annot, Some ctnlab, lookupcmd);
+          (annot_final, None, getvalcmd);
+        ]
+      in
       let comp_rest, new_functions = compile_list rest in
-      ( cmdle
-        @ [ (get_annot, None, getcmd); (getval_annot, None, getvalcmd) ]
-        @ comp_rest,
-        new_functions )
+      (cmdle @ cmds @ comp_rest, new_functions)
   (*
           x := [e] =>
           ce := Ce(e); // (bunch of commands and then assign the result to ce)
@@ -898,8 +914,9 @@ let compile_pred filepath pred =
       pred_ins;
       pred_definitions = List.map build_def pred_definitions;
       pred_normalised = false;
-      (* FIXME: ADD SUPPORT FOR ABSTRACT, PURE, NOUNFOLD *)
+      (* FIXME: ADD SUPPORT FOR FACTS, GUARD, ABSTRACT, PURE *)
       pred_facts = [];
+      pred_guard = None;
       pred_abstract = false;
       pred_pure = false;
       pred_nounfold = pred.pred_nounfold;
@@ -1088,6 +1105,27 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
   let gil_preds = make_hashtbl get_pred_name comp_preds in
   let gil_lemmas = make_hashtbl get_lemma_name comp_lemmas in
   let proc_names = Hashtbl.fold (fun s _ l -> s :: l) gil_procs [] in
+  let bi_specs = Hashtbl.create 1 in
+  if Gillian.Utils.(Exec_mode.biabduction_exec !Config.current_exec_mode) then
+    Hashtbl.iter
+      (fun name proc ->
+        let pre =
+          List.map
+            (fun var -> Asrt.Pure (Eq (Expr.PVar var, Expr.LVar ("#" ^ var))))
+            proc.Proc.proc_params
+          |> Asrt.star
+        in
+        let bispec =
+          BiSpec.
+            {
+              bispec_name = name;
+              bispec_params = proc.Proc.proc_params;
+              bispec_pres = [ pre ];
+              bispec_normalised = false;
+            }
+        in
+        Hashtbl.replace bi_specs name bispec)
+      gil_procs;
   Prog.
     {
       imports =
@@ -1096,8 +1134,8 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
       preds = gil_preds;
       procs = gil_procs;
       proc_names;
+      bi_specs;
       only_specs = Hashtbl.create 1;
       macros = Hashtbl.create 1;
-      bi_specs = Hashtbl.create 1;
       predecessors = Hashtbl.create 1;
     }

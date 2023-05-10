@@ -131,7 +131,6 @@ struct
       outfile_opt
       no_heap
       stats
-      parallel
       incremental
       entry_point
       () =
@@ -140,7 +139,6 @@ struct
     let () = PC.initialize Symbolic in
     let () = Printexc.record_backtrace @@ L.Mode.enabled () in
     let () = Config.stats := stats in
-    let () = Config.parallel := parallel in
     let () = Config.no_heap := no_heap in
     let () = Config.entry_point := entry_point in
     let () = process_files files already_compiled outfile_opt incremental in
@@ -156,7 +154,7 @@ struct
   let wpst_t =
     Term.(
       const wpst $ files $ already_compiled $ output_gil $ no_heap $ stats
-      $ parallel $ incremental $ entry_point)
+      $ incremental $ entry_point)
 
   let wpst_info =
     let doc = "Symbolically executes a file of the target language" in

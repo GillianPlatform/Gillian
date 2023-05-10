@@ -94,6 +94,12 @@ module Syntaxes = struct
   include Syntaxes
 end
 
+(** @canonical Gillian.Utils.List_res *)
+module List_res = struct
+  (** @inline *)
+  include List_res
+end
+
 (**/**)
 
 module Preprocessing_utils = Preprocessing_utils

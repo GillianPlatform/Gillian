@@ -57,3 +57,8 @@ module Init_data = struct
   (** @inline *)
   include Init_data
 end
+
+module Recovery_tactic = struct
+  (** @inline *)
+  include Recovery_tactic
+end
