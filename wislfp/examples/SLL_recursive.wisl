@@ -1,6 +1,6 @@
 predicate list(+x, alpha) {
     (x == null) * (alpha == nil);
-    (x -> #v, #z) * list(#z, #beta) * (alpha == #v::#beta)
+    (x -b> #v, #z) * list(#z, #beta) * (alpha == #v::#beta)
 }
 
 // { (x == #x) * list(#x, #alpha) }

@@ -1,15 +1,18 @@
 open Gillian.Debugger
 
+module SMemory =
+Gillian.Symbolic.Legacy_s_memory.Modernize (PwSemantics.WislSMemory)
+
 module CLI =
   Gillian.Command_line.Make
     (Gillian.General.Init_data.Dummy)
     (PwSemantics.WislCMemory)
-    (PwSemantics.WislSMemory)
+    (SMemory)
     (PwParserAndCompiler)
     (Gillian.General.External.Dummy (PwParserAndCompiler.Annot))
     (Gillian.Bulk.Runner.DummyRunners)
     (Lifter.Gil_fallback_lifter.Make
-       (PwSemantics.WislSMemory)
+       (SMemory)
        (PwParserAndCompiler)
        (PwDebugging.WislLifter.Make))
 
