@@ -35,6 +35,7 @@ rule read =
   | "free"   { DELETE (curr lexbuf) }
   | "dispose"{ DELETE (curr lexbuf) }
   | "function" { FUNCTION (curr lexbuf) }
+  | "par"    { PAR (curr lexbuf) }
   | "predicate" { PREDICATE (curr lexbuf) }
   | "invariant" { INVARIANT (curr lexbuf) }
   | "return" { RETURN (curr lexbuf) }

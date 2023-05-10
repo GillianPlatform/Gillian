@@ -1523,6 +1523,7 @@ struct
                 ~prev_idx:i ~loop_ids ~next_idx:j ~branch_count:b_counter ();
             ]
         | GuardedGoto (e, j, k) -> eval_guarded_goto e j k eval_state
+        | Par _ -> failwith "not implemented"
         | PhiAssignment lxarr -> eval_phi_assignment lxarr eval_state
         | Call (x, e, args, j, subst) -> eval_call x e args j subst eval_state
         | ECall (x, pid, args, j) -> eval_ecall x pid args j eval_state

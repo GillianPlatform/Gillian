@@ -1,7 +1,7 @@
 %token EOF
 
 (* key words *)
-%token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP NEW DELETE
+%token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP NEW DELETE PAR
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
 %token <CodeLoc.t> INVARIANT FOLD UNFOLD NOUNFOLD APPLY ASSERT EXIST FORALL
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
@@ -188,6 +188,18 @@ logic_cmds:
   | LCMD; lcmds = separated_list(SEMICOLON, logic_command); RCBRACE { lcmds }
  */
 
+function_call:
+  | lx = IDENTIFIER; ASSIGN; lf = IDENTIFIER; LBRACE; params = expr_list; lend = RBRACE
+    { let (lstart, x) = lx in
+      let (_, f) = lf in
+      let bare_stmt = WStmt.FunCall (x, f, params, None) in
+      let loc = CodeLoc.merge lstart lend in
+      WStmt.make bare_stmt loc
+    }
+
+function_call_list:
+  sl = separated_nonempty_list(SEMICOLON, function_call) { sl }
+
 
 statement:
   | loc = SKIP { WStmt.make WStmt.Skip loc }
@@ -218,10 +230,10 @@ statement:
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc
     }
-  | lx = IDENTIFIER; ASSIGN; lf = IDENTIFIER; LBRACE; params = expr_list; lend = RBRACE
-    { let (lstart, x) = lx in
-      let (_, f) = lf in
-      let bare_stmt = WStmt.FunCall (x, f, params, None) in
+  | function_call
+  | lstart = PAR; LCBRACE; fs = function_call_list; lend = RCBRACE;
+    {
+      let bare_stmt = WStmt.Par (fs) in
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc
     }

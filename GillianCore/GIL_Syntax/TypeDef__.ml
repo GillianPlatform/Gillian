@@ -193,6 +193,7 @@ and 'label cmd =
   | Logic of lcmd
   | Goto of 'label
   | GuardedGoto of expr * 'label * 'label
+  | Par of ('label cmd) list
   | Call of string * expr * expr list * 'label option * bindings option
   | ECall of string * expr * expr list * 'label option
   | Apply of string * expr * 'label option

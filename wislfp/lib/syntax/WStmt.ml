@@ -11,6 +11,7 @@ type tt =
     (* The last bit is only for internal use *)
   | While of WExpr.t * t list
   | If of WExpr.t * t list * t list
+  | Par of t list
   | Logic of WLCmd.t
 
 and t = { sid : int; sloc : CodeLoc.t; snode : tt }
@@ -46,6 +47,10 @@ and pp fmt stmt =
       Format.fprintf fmt
         "@[@[<v 2>if(%a) {@\n%a@]@\n@[<v 2>} else {@\n%a@]@\n}@]" WExpr.pp e
         pp_list s1 pp_list s2
+  | Par s ->
+      Format.fprintf fmt
+        "@[@[<v 2>par {@\n%a@]@\n}@]" pp_list s
+
   | Logic lcmd -> Format.fprintf fmt "@[[[ %a ]]@]" WLCmd.pp lcmd
 
 and pp_head fmt stmt =
@@ -76,6 +81,8 @@ let functions_called_by_list sl =
     | { snode = While (_, slp); _ } :: r -> aux (aux already slp @ already) r
     | { snode = If (_, slp1, slp2); _ } :: r ->
         aux (aux already slp1 @ aux already slp2 @ already) r
+    | {snode = Par s; _} :: r ->
+        aux (aux already s @ already) r
     | _l :: r -> aux already r
   in
   aux [] sl
@@ -93,6 +100,7 @@ let rec get_by_id id stmt =
     | While (e, sl) -> expr_getter e |>> (list_visitor, sl)
     | If (e, sl1, sl2) ->
         expr_getter e |>> (list_visitor, sl1) |>> (list_visitor, sl2)
+    | Par s -> list_visitor s
     | Logic lcmd -> lcmd_getter lcmd
     | New _ | Skip -> `None
   in

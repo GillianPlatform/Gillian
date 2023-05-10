@@ -105,8 +105,8 @@ let indexed_of_labeled (lproc : ('annot, string) t) : ('annot, int) t =
       Array.map
         (function
           | spec, l, labeled_cmd ->
-              let indexed_cmd : int Cmd.t =
-                match (labeled_cmd : string Cmd.t) with
+              let rec indexed_cmd (cmd: string Cmd.t) : int Cmd.t =
+                match (cmd : string Cmd.t) with
                 | Skip -> Cmd.Skip
                 | Assignment (x, e) -> Cmd.Assignment (x, e)
                 | LAction (x, la_name, es) -> Cmd.LAction (x, la_name, es)
@@ -114,6 +114,7 @@ let indexed_of_labeled (lproc : ('annot, string) t) : ('annot, int) t =
                 | GuardedGoto (e, lt, lf) ->
                     Cmd.GuardedGoto
                       (e, find_with_error mapping lt, find_with_error mapping lf)
+                | Par fs -> Cmd.Par (List.map indexed_cmd fs)
                 | Call (x, e, le, ol, subst) ->
                     Cmd.Call
                       ( x,
@@ -145,7 +146,7 @@ let indexed_of_labeled (lproc : ('annot, string) t) : ('annot, int) t =
                 | Fail (et, es) -> Cmd.Fail (et, es)
                 | Logic lcmd -> Cmd.Logic lcmd
               in
-              (spec, l, indexed_cmd))
+              (spec, l, indexed_cmd labeled_cmd))
         cmds_nolab
     in
     cmds

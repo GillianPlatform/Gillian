@@ -720,6 +720,7 @@ module Cmd : sig
     | Logic of LCmd.t  (** Logic commands *)
     | Goto of 'label  (** Unconditional goto *)
     | GuardedGoto of Expr.t * 'label * 'label  (** Conditional goto *)
+    | Par of ('label t) list
     | Call of
         string * Expr.t * Expr.t list * 'label option * logic_bindings_t option
         (** Procedure call *)

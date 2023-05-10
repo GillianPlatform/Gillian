@@ -9,6 +9,7 @@ type tt =
       (** x := f(e1, ..., en), last bit should be ignored *)
   | While of WExpr.t * t list  (** while (e) \{ s \} *)
   | If of WExpr.t * t list * t list  (** if (e) \{ s \} else \{ s \} *)
+  | Par of t list
   | Logic of WLCmd.t  (** logic command *)
 
 and t = { sid : int; sloc : CodeLoc.t; snode : tt }
