@@ -36,22 +36,24 @@ let overwrite_cell pfs gamma (loc : vt) action =
     | None ->
         let al = ALoc.alloc () in
         (al, [ Formula.Eq (Expr.ALoc al, loc) ])
-  in action new_pfs loc_name
+  in
+  action new_pfs loc_name
 
 let store heap pfs gamma (loc : vt) (offset : vt) (value : vt) =
-  let action = fun new_pfs loc_name ->
+  let action new_pfs loc_name =
     match WislSHeap.store ~pfs ~gamma heap loc_name offset value with
     | Error e -> Error [ e ]
     | Ok () -> Ok [ (heap, [], new_pfs, []) ]
-  in overwrite_cell pfs gamma loc action
+  in
+  overwrite_cell pfs gamma loc action
 
 let load heap pfs gamma (loc : vt) (offset : vt) =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
   | None -> Error [ WislSHeap.InvalidLocation ]
-  | Some loc -> 
-    match WislSHeap.load ~pfs ~gamma heap loc offset with
-    | Error err -> Error [ err ]
-    | Ok (value) -> Ok [ (heap, [value], [], []) ]
+  | Some loc -> (
+      match WislSHeap.load ~pfs ~gamma heap loc offset with
+      | Error err -> Error [ err ]
+      | Ok value -> Ok [ (heap, [ value ], [], []) ])
 
 let get_cell heap pfs gamma (loc : vt) (offset : vt) permission =
   match resolve_loc pfs gamma loc with
@@ -64,11 +66,14 @@ let get_cell heap pfs gamma (loc : vt) (offset : vt) permission =
           Ok [ (heap, [ loc; ofs; value; q ], [], []) ])
 
 let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) permission =
-  let action = fun new_pfs loc_name ->
-    match WislSHeap.set_cell ~pfs ~gamma heap loc_name offset value permission with
+  let action new_pfs loc_name =
+    match
+      WislSHeap.set_cell ~pfs ~gamma heap loc_name offset value permission
+    with
     | Error e -> Error [ e ]
-    | Ok (fls) -> Ok [ (heap, [], fls @ new_pfs, []) ]
-  in overwrite_cell pfs gamma loc action
+    | Ok fls -> Ok [ (heap, [], fls @ new_pfs, []) ]
+  in
+  overwrite_cell pfs gamma loc action
 
 let rem_cell heap pfs gamma (loc : vt) (offset : vt) permission =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
@@ -159,7 +164,11 @@ let alloc heap _pfs _gamma (size : int) =
   Ok
     [
       ( heap,
-        [ Expr.Lit (Literal.Loc loc); Expr.Lit (Literal.Int Z.zero); Expr.Lit (Literal.Num 1.0) ],
+        [
+          Expr.Lit (Literal.Loc loc);
+          Expr.Lit (Literal.Int Z.zero);
+          Expr.Lit (Literal.Num 1.0);
+        ],
         [],
         [] );
     ]
@@ -182,19 +191,18 @@ let execute_action ?unification:_ name heap pfs gamma args =
       | args ->
           failwith
             (Format.asprintf
-              "Invalid Store Call for WISL, with parameters : [ %a ]"
-              (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-              args))
+               "Invalid Store Call for WISL, with parameters : [ %a ]"
+               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+               args))
   | Load -> (
       match args with
-      | [ loc_expr; offset_expr ] ->
-          load heap pfs gamma loc_expr offset_expr
+      | [ loc_expr; offset_expr ] -> load heap pfs gamma loc_expr offset_expr
       | args ->
           failwith
             (Format.asprintf
-              "Invalid Load Call for WISL, with parameters : [ %a ]"
-              (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-              args))
+               "Invalid Load Call for WISL, with parameters : [ %a ]"
+               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+               args))
   | GetCell -> (
       match args with
       | [ loc_expr; offset_expr; permission ] ->
@@ -336,7 +344,8 @@ let assertions ?to_keep:_ heap = WislSHeap.assertions heap
 let mem_constraints _ = []
 let is_overlapping_asrt _ = false
 let apply_fix m _ _ _ = m
-let get_fixes  _ _ _ _ = []
+let get_fixes _ _ _ _ = []
+
 let get_recovery_tactic _ e =
   match e with
   | WislSHeap.MissingResource (_, loc, ofs) ->
@@ -344,5 +353,6 @@ let get_recovery_tactic _ e =
       let ofs = Option.to_list ofs in
       Recovery_tactic.try_unfold (loc :: ofs)
   | _ -> Recovery_tactic.none
+
 let get_failing_constraint _ = Formula.True
 let add_debugger_variables = WislSHeap.add_debugger_variables

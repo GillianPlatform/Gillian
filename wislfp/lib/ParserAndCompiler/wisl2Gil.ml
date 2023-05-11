@@ -744,7 +744,8 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       let store_annot =
         let mk =
           WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
-        in mk ~stmt_kind:(Multi EndNormal) ()
+        in
+        mk ~stmt_kind:(Multi EndNormal) ()
       in
       let cmdle1, comp_e1 = compile_expr e1 in
       let cmdle2, comp_e2 = compile_expr e2 in
@@ -753,8 +754,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
         Cmd.LAction (v_store, store, [ nth comp_e1 0; nth comp_e1 1; comp_e2 ])
       in
       let comp_rest, new_functions = compile_list rest in
-      ( cmdle1 @ cmdle2
-        @ ((store_annot, None, storecmd) :: comp_rest),
+      ( cmdle1 @ cmdle2 @ ((store_annot, None, storecmd) :: comp_rest),
         new_functions )
   (* [e1] := e2 =>
           ce1 := Ce(e1);

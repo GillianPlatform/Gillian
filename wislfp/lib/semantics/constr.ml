@@ -5,10 +5,10 @@ let cell ~loc ~offset ~value ~permission =
   let cell = str_ga Cell in
   Asrt.GA (cell, [ loc; offset; permission ], [ value; permission ])
 
-let bound ~loc ~bound =
+let bound ~loc ~bound ~permission =
   let bound_ga = str_ga Bound in
   let bound = Expr.int bound in
-  Asrt.GA (bound_ga, [ loc ], [ bound ])
+  Asrt.GA (bound_ga, [ loc ], [ bound; permission ])
 
 let freed ~loc =
   let freed = str_ga Freed in

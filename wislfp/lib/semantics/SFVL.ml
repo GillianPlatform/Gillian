@@ -6,7 +6,7 @@ open Gillian.Gil_syntax
 module L = Gillian.Logging
 
 type field_name = Expr.t [@@deriving yojson]
-type field_value = Expr.t [@@deriving yojson]
+type field_value = { value : Expr.t; permission : Expr.t } [@@deriving yojson]
 
 (* Definition *)
 type t = field_value Expr.Map.t [@@deriving yojson]
@@ -80,14 +80,21 @@ let add_with_test
 let lvars (sfvl : t) : SS.t =
   let gllv = Expr.lvars in
   Expr.Map.fold
-    (fun e_field e_val ac -> SS.union ac (SS.union (gllv e_field) (gllv e_val)))
+    (fun e_field e_val ac ->
+      ac
+      |> SS.union (gllv e_field)
+      |> SS.union (gllv e_val.value)
+      |> SS.union (gllv e_val.permission))
     sfvl SS.empty
 
 (** Returns the abstract locations occuring in --sfvl-- *)
 let alocs (sfvl : t) : SS.t =
   Expr.Map.fold
     (fun e_field e_val ac ->
-      SS.union ac (SS.union (Expr.alocs e_field) (Expr.alocs e_val)))
+      ac
+      |> SS.union (Expr.alocs e_field)
+      |> SS.union (Expr.alocs e_val.value)
+      |> SS.union (Expr.alocs e_val.permission))
     sfvl SS.empty
 
 (* Substitution *)
@@ -96,8 +103,9 @@ let substitution (subst : SSubst.t) (partial : bool) (fv_list : t) : t =
   Expr.Map.fold
     (fun le_field le_val ac ->
       let sf = f_subst le_field in
-      let sv = f_subst le_val in
-      Expr.Map.add sf sv ac)
+      let value = f_subst le_val.value in
+      let permission = f_subst le_val.permission in
+      Expr.Map.add sf { value; permission } ac)
     fv_list Expr.Map.empty
 
 let assertions_with_constructor ~constr loc sfvl =
