@@ -143,7 +143,8 @@ module Mem = struct
   let store { map; _ } loc chunk ofs value =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res map loc_name (Some ofs) None in
+    let** tree = get_tree_res map loc_name (Some ofs) (Some chunk) in
+    Logging.verbose (fun m -> m "Got inside store -  %a" Expr.pp ofs);
     let++ new_tree =
       map_lift_err loc_name (SHeapTree.store tree chunk ofs value)
     in
@@ -843,10 +844,12 @@ let pp_c_fix fmt c_fix =
 let pp_err fmt (e : err_t) =
   match e with
   | InvalidLocation loc ->
-      Fmt.pf fmt "'%a' cannot be resolved as a location" Expr.pp loc
+      Fmt.pf fmt "[InvalidLocation] '%a' cannot be resolved as a location"
+        Expr.pp loc
   | MissingLocResource (ga, l, vt, chunk) ->
       Fmt.pf fmt
-        "No block associated with location '%s'. Associated data: \n\
+        "[MissingLocResource] No block associated with location '%s'. \
+         Associated data: \n\
         \ * location: '%s'\n\
         \ * core_pred: %s\n\
         \ * value: %a \n\
@@ -854,7 +857,7 @@ let pp_err fmt (e : err_t) =
         l l (LActions.str_ga ga) (Fmt.Dump.option Expr.pp) vt
         (Fmt.Dump.option Chunk.pp) chunk
   | SHeapTreeErr { at_locations; sheaptree_err } ->
-      Fmt.pf fmt "Tree at location%a raised: <%a>"
+      Fmt.pf fmt "[SHeapTreeErr] Tree at location%a raised: <%a>"
         (fun fmt l ->
           match l with
           | [ s ] -> Fmt.pf fmt " '%s'" s
@@ -1069,7 +1072,6 @@ let get_fixes _heap _pfs _gamma err =
           [] );
       ]
   | InvalidLocation loc ->
-      Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
       [ ([], [ Formula.Eq (new_expr, loc) ], [], SS.empty, []) ]
