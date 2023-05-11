@@ -213,6 +213,7 @@ module Make
       (prog : annot UP.prog)
       (test : t) : (Spec.t * bool) list =
     let state = SBAState.copy test.state in
+    let state = SBAState.add_spec_vars state (SBAState.get_lvars state) in
     try SBAInterpreter.evaluate_proc ret_fun prog test.name test.params state
     with Failure msg ->
       L.print_to_all
