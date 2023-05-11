@@ -230,7 +230,7 @@ statement:
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc
     }
-  | function_call
+  | s = function_call { s }
   | lstart = PAR; LCBRACE; fs = function_call_list; lend = RCBRACE;
     {
       let bare_stmt = WStmt.Par (fs) in
