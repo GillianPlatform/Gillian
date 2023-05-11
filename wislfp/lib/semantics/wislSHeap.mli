@@ -16,16 +16,13 @@ type err =
 
 val init : unit -> t
 val alloc : t -> int -> string
-val dispose : 
-pfs:Pure_context.t ->
-gamma:Type_env.t ->
-t -> 
-string ->
-(unit, err) Result.t
+
+val dispose :
+  pfs:Pure_context.t -> gamma:Type_env.t -> t -> string -> (unit, err) Result.t
 
 val clean_up : Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
 
-val load:
+val load :
   pfs:Pure_context.t ->
   gamma:Type_env.t ->
   t ->
@@ -33,7 +30,7 @@ val load:
   Expr.t ->
   (Expr.t, err) result
 
-val store:
+val store :
   pfs:Pure_context.t ->
   gamma:Type_env.t ->
   t ->
@@ -62,6 +59,7 @@ val set_cell :
   (Formula.t list, err) result
 
 val rem_cell : t -> string -> Expr.t -> Expr.t -> (unit, err) result
+
 val get_bound :
   pfs:Pure_context.t ->
   gamma:Type_env.t ->
@@ -77,6 +75,7 @@ val set_bound :
   string ->
   int ->
   (unit, err) result
+
 val rem_bound : t -> string -> Expr.t -> (unit, err) result
 val get_freed : t -> string -> (unit, err) result
 val set_freed : t -> string -> unit

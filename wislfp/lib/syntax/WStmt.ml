@@ -47,10 +47,7 @@ and pp fmt stmt =
       Format.fprintf fmt
         "@[@[<v 2>if(%a) {@\n%a@]@\n@[<v 2>} else {@\n%a@]@\n}@]" WExpr.pp e
         pp_list s1 pp_list s2
-  | Par s ->
-      Format.fprintf fmt
-        "@[@[<v 2>par {@\n%a@]@\n}@]" pp_list s
-
+  | Par s -> Format.fprintf fmt "@[@[<v 2>par {@\n%a@]@\n}@]" pp_list s
   | Logic lcmd -> Format.fprintf fmt "@[[[ %a ]]@]" WLCmd.pp lcmd
 
 and pp_head fmt stmt =
@@ -81,8 +78,7 @@ let functions_called_by_list sl =
     | { snode = While (_, slp); _ } :: r -> aux (aux already slp @ already) r
     | { snode = If (_, slp1, slp2); _ } :: r ->
         aux (aux already slp1 @ aux already slp2 @ already) r
-    | {snode = Par s; _} :: r ->
-        aux (aux already s @ already) r
+    | { snode = Par s; _ } :: r -> aux (aux already s @ already) r
     | _l :: r -> aux already r
   in
   aux [] sl

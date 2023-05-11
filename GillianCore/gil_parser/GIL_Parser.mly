@@ -582,10 +582,9 @@ gcmd_target:
   | GOTO LBRACKET; e=expr_target; RBRACKET; i=VAR; j=VAR
     { Cmd.GuardedGoto (e, i, j) }
 (* x := e(e1, ..., en) with j use_subst [bla - #x: bla, #y: ble] *)
-  | v=VAR; DEFEQ; e=expr_target;
-    LBRACE; es=separated_list(COMMA, expr_target); RBRACE; oi = option(call_with_target); subst = option(use_subst_target)
+  | f=function_call
     {
-      Cmd.Call (v, e, es, oi, subst)
+      Cmd.Call f
     }
 (* x := e(e1, ..., en) with j *)
   | v=VAR; DEFEQ; EXTERN; pname=VAR;
@@ -617,6 +616,13 @@ gcmd_target:
       { Cmd.Fail (v, es) }
 ;
 
+
+function_call:
+  var_name=VAR; DEFEQ; fct_name=expr_target;
+    LBRACE; args=separated_list(COMMA, expr_target); RBRACE; err_lab = option(call_with_target); bindings = option(use_subst_target)
+  {
+    Cmd.{ var_name; fct_name; args; err_lab; bindings }
+  }
 
 g_only_spec_target:
 (* only <spec> *)

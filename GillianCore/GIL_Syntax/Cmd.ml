@@ -9,6 +9,15 @@ module SS = Containers.SS
 
 type logic_bindings_t = string * (string * Expr.t) list [@@deriving yojson]
 
+type 'label function_call = 'label TypeDef__.function_call = {
+  var_name : string;
+  fct_name : Expr.t;
+  args : Expr.t list;
+  err_lab : 'label option;
+  bindings : logic_bindings_t option;
+}
+[@@deriving yojson]
+
 type 'label t = 'label TypeDef__.cmd =
   | Skip  (** Skip                *)
   | Assignment of string * Expr.t  (** Assignment          *)
@@ -16,12 +25,10 @@ type 'label t = 'label TypeDef__.cmd =
   | Logic of LCmd.t  (** GIL Logic commands *)
   | Goto of 'label  (** Unconditional goto  *)
   | GuardedGoto of Expr.t * 'label * 'label  (** Conditional goto    *)
-  | Par of ('label t) list
-  | Call of
-      string * Expr.t * Expr.t list * 'label option * logic_bindings_t option
-      (** Procedure call *)
+  | Call of 'label function_call  (** Procedure call *)
   | ECall of string * Expr.t * Expr.t list * 'label option
       (** External Procedure call           *)
+  | Par of 'label function_call list  (** Parallel composition *)
   | Apply of string * Expr.t * 'label option
       (** Application-style procedure call  *)
   | Arguments of string  (** Arguments of the current function *)
@@ -33,8 +40,11 @@ type 'label t = 'label TypeDef__.cmd =
 
 let fold = List.fold_left SS.union SS.empty
 
-let rec pvars (cmd : 'label t) : SS.t =
+let pvars (cmd : 'label t) : SS.t =
   let pvars_es es = fold (List.map Expr.pvars es) in
+  let pvars_fcall { var_name = x; fct_name = e; args = es; _ } =
+    SS.union (SS.add x (Expr.pvars e)) (pvars_es es)
+  in
   match cmd with
   | Skip -> SS.empty
   | Assignment (x, e) -> SS.add x (Expr.pvars e)
@@ -42,8 +52,11 @@ let rec pvars (cmd : 'label t) : SS.t =
   | Logic lcmd -> LCmd.pvars lcmd
   | Goto _ -> SS.empty
   | GuardedGoto (e, _, _) -> Expr.pvars e
-  | Par fs -> fold (List.map (fun f -> pvars f) fs)
-  | Call (x, e, es, _, _) -> SS.union (SS.add x (Expr.pvars e)) (pvars_es es)
+  | Par fcalls ->
+      List.fold_left
+        (fun acc f -> pvars_fcall f |> SS.union acc)
+        SS.empty fcalls
+  | Call fcall -> pvars_fcall fcall
   | ECall (x, e, es, _) -> SS.union (SS.add x (Expr.pvars e)) (pvars_es es)
   | Apply (x, e, _) -> SS.add x (Expr.pvars e)
   | Arguments x -> SS.singleton x
@@ -51,8 +64,11 @@ let rec pvars (cmd : 'label t) : SS.t =
   | ReturnNormal | ReturnError -> SS.singleton "ret"
   | Fail (_, es) -> pvars_es es
 
-let rec lvars (cmd : 'label t) : SS.t =
+let lvars (cmd : 'label t) : SS.t =
   let lvars_es es = fold (List.map Expr.lvars es) in
+  let lvars_fcall { fct_name = e; args = es; _ } =
+    SS.union (Expr.lvars e) (lvars_es es)
+  in
   match cmd with
   | Skip -> SS.empty
   | Assignment (_, e) -> Expr.lvars e
@@ -60,8 +76,11 @@ let rec lvars (cmd : 'label t) : SS.t =
   | Logic lcmd -> LCmd.lvars lcmd
   | Goto _ -> SS.empty
   | GuardedGoto (e, _, _) -> Expr.lvars e
-  | Par fs -> fold (List.map (fun f -> lvars f) fs)
-  | Call (_, e, es, _, _) -> SS.union (Expr.lvars e) (lvars_es es)
+  | Par fcalls ->
+      List.fold_left
+        (fun acc f -> lvars_fcall f |> SS.union acc)
+        SS.empty fcalls
+  | Call fcall -> lvars_fcall fcall
   | ECall (_, e, es, _) -> SS.union (Expr.lvars e) (lvars_es es)
   | Apply (_, e, _) -> Expr.lvars e
   | Arguments _ -> SS.empty
@@ -69,8 +88,11 @@ let rec lvars (cmd : 'label t) : SS.t =
   | ReturnNormal | ReturnError -> SS.empty
   | Fail (_, es) -> lvars_es es
 
-let rec locs (cmd : 'label t) : SS.t =
+let locs (cmd : 'label t) : SS.t =
   let locs_es es = fold (List.map Expr.locs es) in
+  let locs_fcall { fct_name = e; args = es; _ } =
+    SS.union (Expr.lvars e) (locs_es es)
+  in
   match cmd with
   | Skip -> SS.empty
   | Assignment (_, e) -> Expr.locs e
@@ -78,8 +100,9 @@ let rec locs (cmd : 'label t) : SS.t =
   | Logic lcmd -> LCmd.lvars lcmd
   | Goto _ -> SS.empty
   | GuardedGoto (e, _, _) -> Expr.locs e
-  | Par fs -> fold (List.map (fun f -> locs f) fs)
-  | Call (_, e, es, _, _) -> SS.union (Expr.lvars e) (locs_es es)
+  | Par fcalls ->
+      List.fold_left (fun acc f -> locs_fcall f |> SS.union acc) SS.empty fcalls
+  | Call fcall -> locs_fcall fcall
   | ECall (_, e, es, _) -> SS.union (Expr.lvars e) (locs_es es)
   | Apply (_, e, _) -> Expr.locs e
   | Arguments _ -> SS.empty
@@ -87,16 +110,19 @@ let rec locs (cmd : 'label t) : SS.t =
   | ReturnNormal | ReturnError -> SS.empty
   | Fail (_, es) -> locs_es es
 
-let rec successors (cmd : int t) (i : int) : int list =
+let successors (cmd : int t) (i : int) : int list =
   match cmd with
   | Goto j -> [ j ]
   | GuardedGoto (_, j, k) -> [ j; k ]
-  | Par (f :: fs) -> successors f (i + List.length fs + 2) (* We want to resume execution one label past the last function call *)
   | Par [] -> failwith "Encountered a par constructor with no function calls!"
-  | Call (_, _, _, j, _) | ECall (_, _, _, j) | Apply (_, _, j) -> (
-      match j with
-      | None -> [ i + 1 ]
-      | Some j -> [ i + 1; j ])
+  | Par fcalls ->
+      if List.exists (fun f -> Option.is_some f.err_lab) fcalls then
+        failwith
+          "Invalid GIL program: parallel calls may not have error labels!";
+      [ i + 1 ]
+      (* We want to resume execution one label past the last function call *)
+  | Call { err_lab; _ } | ECall (_, _, _, err_lab) | Apply (_, _, err_lab) ->
+      (i + 1) :: Option.to_list err_lab
   | ReturnNormal | ReturnError | Fail _ -> []
   | Skip | Assignment _ | LAction _ | Logic _ | Arguments _ | PhiAssignment _ ->
       [ i + 1 ]
@@ -114,9 +140,14 @@ let pp_logic_bindings =
   Fmt.brackets aux
 
 (** GIL All Statements *)
-let rec pp ~(pp_label : 'a Fmt.t) fmt (cmd : 'a t) =
+let pp ~(pp_label : 'a Fmt.t) fmt (cmd : 'a t) =
   let pp_params = Fmt.list ~sep:Fmt.comma Expr.pp in
-  let pp_error f er = Fmt.pf f " with %a" pp_label er in
+  let pp_error fmt er = Fmt.pf fmt " with %a" pp_label er in
+  let pp_fcall fmt { var_name; fct_name; args; err_lab; bindings } =
+    let pp_subst fmt lbs = Fmt.pf fmt " use_subst %a" pp_logic_bindings lbs in
+    Fmt.pf fmt "%s := %a(@[%a@])%a%a" var_name Expr.pp fct_name pp_params args
+      (Fmt.option pp_error) err_lab (Fmt.option pp_subst) bindings
+  in
   match cmd with
   | Skip -> Fmt.string fmt "skip"
   | Assignment (x, e) -> Fmt.pf fmt "%s := @[%a@]" x Expr.pp e
@@ -124,13 +155,8 @@ let rec pp ~(pp_label : 'a Fmt.t) fmt (cmd : 'a t) =
   | Goto j -> Fmt.pf fmt "goto %a" pp_label j
   | GuardedGoto (e, j, k) ->
       Fmt.pf fmt "@[<h>goto [%a] %a %a@]" Expr.pp e pp_label j pp_label k
-  | Par fs ->
-      Fmt.pf fmt "@[<h>par [%a]@]"
-        Fmt.(list ~sep:semi (pp ~pp_label)) fs
-  | Call (var, name, args, error, subst) ->
-      let pp_subst f lbs = Fmt.pf f " use_subst %a" pp_logic_bindings lbs in
-      Fmt.pf fmt "%s := %a(@[%a@])%a%a" var Expr.pp name pp_params args
-        (Fmt.option pp_error) error (Fmt.option pp_subst) subst
+  | Par fs -> Fmt.pf fmt "@[<h>par [%a]@]" Fmt.(list ~sep:semi pp_fcall) fs
+  | Call fcall -> pp_fcall fmt fcall
   | ECall (var, name, args, error) ->
       Fmt.pf fmt "%s := extern %a(@[%a@])%a" var Expr.pp name pp_params args
         (Fmt.option pp_error) error
@@ -151,3 +177,7 @@ let rec pp ~(pp_label : 'a Fmt.t) fmt (cmd : 'a t) =
 
 let pp_labeled = pp ~pp_label:Fmt.string
 let pp_indexed = pp ~pp_label:Fmt.int
+
+(* Legacy interface to simplify migration *)
+let call (var_name, fct_name, args, err_lab, bindings) =
+  Call { var_name; fct_name; args; err_lab; bindings }
