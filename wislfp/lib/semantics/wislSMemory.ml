@@ -63,7 +63,7 @@ let get_cell heap pfs gamma (loc : vt) (offset : vt) permission =
       | Error err -> Error [ err ]
       | Ok (loc, ofs, q, value) ->
           let loc = Expr.loc_from_loc_name loc in
-          Ok [ (heap, [ loc; ofs; value; q ], [], []) ])
+          Ok [ (heap, [ loc; ofs; q; value ], [], []) ])
 
 let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) permission =
   let action new_pfs loc_name =
@@ -93,7 +93,7 @@ let get_bound heap pfs gamma loc permission =
       | Ok (b, perm) ->
           let b = Expr.int b in
           let loc = Expr.loc_from_loc_name loc_name in
-          Ok [ (heap, [ loc; b; perm ], [], []) ])
+          Ok [ (heap, [ loc; perm; b ], [], []) ])
   | None -> Error [ InvalidLocation ]
 
 let set_bound heap pfs gamma (loc : vt) (bound : int) permission =
@@ -164,11 +164,7 @@ let alloc heap _pfs _gamma (size : int) =
   Ok
     [
       ( heap,
-        [
-          Expr.Lit (Literal.Loc loc);
-          Expr.Lit (Literal.Int Z.zero);
-          Expr.Lit (Literal.Num 1.0);
-        ],
+        [ Expr.Lit (Literal.Loc loc); Expr.Lit (Literal.Int Z.zero) ],
         [],
         [] );
     ]
@@ -244,7 +240,7 @@ let execute_action ?unification:_ name heap pfs gamma args =
                args))
   | SetBound -> (
       match args with
-      | [ loc_expr; Expr.Lit (Int b); permission ] ->
+      | [ loc_expr; permission; Expr.Lit (Int b) ] ->
           set_bound heap pfs gamma loc_expr (Z.to_int b) permission
       | args ->
           failwith

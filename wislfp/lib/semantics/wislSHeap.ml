@@ -333,7 +333,7 @@ let set_bound heap loc b out_perm =
           Ok []
       | Some (_, permission) ->
           let full_perm = Expr.num 1.0 in
-          let new_perm = Expr.BinOp (permission, FPlus, out_perm) in
+          let new_perm = Expr.Infix.(permission +. out_perm) in
           let fl = Formula.Infix.(new_perm#<=.full_perm) in
           let () =
             Hashtbl.replace heap loc
@@ -348,7 +348,7 @@ let rem_bound ~pfs ~gamma heap loc out_perm =
   | Some (Allocated { bound = None; _ }) ->
       Error (MissingResource (Bound, loc, None))
   | Some (Allocated { data; bound = Some (n, q) }) ->
-      let new_perm = Expr.BinOp (q, FMinus, out_perm) in
+      let new_perm = Expr.Infix.(q -. out_perm) in
       let bound =
         if Solver.is_equal ~pfs ~gamma new_perm (Expr.num 0.0) then None
         else Some (n, new_perm)

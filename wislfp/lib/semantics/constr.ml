@@ -3,12 +3,12 @@ open Gil_syntax
 
 let cell ~loc ~offset ~value ~permission =
   let cell = str_ga Cell in
-  Asrt.GA (cell, [ loc; offset; permission ], [ value; permission ])
+  Asrt.GA (cell, [ loc; offset; permission ], [ value ])
 
 let bound ~loc ~bound ~permission =
   let bound_ga = str_ga Bound in
   let bound = Expr.int bound in
-  Asrt.GA (bound_ga, [ loc ], [ bound; permission ])
+  Asrt.GA (bound_ga, [ loc; permission ], [ bound ])
 
 let freed ~loc =
   let freed = str_ga Freed in
