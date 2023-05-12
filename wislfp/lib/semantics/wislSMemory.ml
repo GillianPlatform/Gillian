@@ -179,130 +179,148 @@ let dispose heap pfs gamma loc_expr =
 
 let execute_action ?unification:_ name heap pfs gamma args =
   let action = WislLActions.ac_from_str name in
-  match action with
-  | Store -> (
-      match args with
-      | [ loc_expr; offset_expr; value_expr ] ->
-          store heap pfs gamma loc_expr offset_expr value_expr
-      | args ->
-          failwith
-            (Format.asprintf
-               "Invalid Store Call for WISL, with parameters : [ %a ]"
-               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args))
-  | Load -> (
-      match args with
-      | [ loc_expr; offset_expr ] -> load heap pfs gamma loc_expr offset_expr
-      | args ->
-          failwith
-            (Format.asprintf
-               "Invalid Load Call for WISL, with parameters : [ %a ]"
-               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args))
-  | GetCell -> (
-      match args with
-      | [ loc_expr; offset_expr; permission ] ->
-          get_cell heap pfs gamma loc_expr offset_expr permission
-      | args ->
-          failwith
-            (Format.asprintf
-               "Invalid GetCell Call for WISL, with parameters : [ %a ]"
-               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args))
-  | SetCell -> (
-      match args with
-      | [ loc_expr; offset_expr; permission; value_expr ] ->
-          set_cell heap pfs gamma loc_expr offset_expr value_expr permission
-      | args ->
-          failwith
-            (Format.asprintf
-               "Invalid SetCell Call for WISL, with parameters : [ %a ]"
-               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args))
-  | RemCell -> (
-      match args with
-      | [ loc_expr; offset_expr; permission ] ->
-          rem_cell heap pfs gamma loc_expr offset_expr permission
-      | args ->
-          failwith
-            (Format.asprintf
-               "Invalid RemCell Call for WISL, with parameters : [ %a ]"
-               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args))
-  | GetBound -> (
-      match args with
-      | [ loc_expr; permission ] -> get_bound heap pfs gamma loc_expr permission
-      | args ->
-          failwith
-            (Format.asprintf
-               "Invalid GetBound Call for WISL, with parameters : [ %a ]"
-               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args))
-  | SetBound -> (
-      match args with
-      | [ loc_expr; permission; Expr.Lit (Int b) ] ->
-          set_bound heap pfs gamma loc_expr (Z.to_int b) permission
-      | args ->
-          failwith
-            (Format.asprintf
-               "Invalid SetBound Call for WISL, with parameters : [ %a ]"
-               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args))
-  | RemBound -> (
-      match args with
-      | [ loc_expr; permission ] -> rem_bound heap pfs gamma loc_expr permission
-      | args ->
-          failwith
-            (Format.asprintf
-               "Invalid RemBound Call for WISL, with parameters : [ %a ]"
-               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args))
-  | GetFreed -> (
-      match args with
-      | [ loc_expr ] -> get_freed heap pfs gamma loc_expr
-      | args ->
-          failwith
-            (Format.asprintf
-               "Invalid GetFreed Call for WISL, with parameters : [ %a ]"
-               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args))
-  | SetFreed -> (
-      match args with
-      | [ loc_expr ] -> set_freed heap pfs gamma loc_expr
-      | args ->
-          failwith
-            (Format.asprintf
-               "Invalid SetFreed Call for WISL, with parameters : [ %a ]"
-               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args))
-  | RemFreed -> (
-      match args with
-      | [ loc_expr ] -> rem_freed heap pfs gamma loc_expr
-      | args ->
-          failwith
-            (Format.asprintf
-               "Invalid RemFreed Call for WISL, with parameters : [ %a ]"
-               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args))
-  | Alloc -> (
-      match args with
-      | [ Expr.Lit (Literal.Int size) ] when Z.geq size Z.one ->
-          alloc heap pfs gamma (Z.to_int size)
-      | args ->
-          failwith
-            (Format.asprintf
-               "Invalid Alloc Call for WISL, with parameters : [ %a ]"
-               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args))
-  | Dispose -> (
-      match args with
-      | [ loc_expr ] -> dispose heap pfs gamma loc_expr
-      | args ->
-          failwith
-            (Format.asprintf
-               "Invalid Dispose Call for WISL, with parameters : [ %a ]"
-               (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
-               args))
+  let ret =
+    match action with
+    | Store -> (
+        match args with
+        | [ loc_expr; offset_expr; value_expr ] ->
+            store heap pfs gamma loc_expr offset_expr value_expr
+        | args ->
+            failwith
+              (Format.asprintf
+                 "Invalid Store Call for WISL, with parameters : [ %a ]"
+                 (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+                 args))
+    | Load -> (
+        match args with
+        | [ loc_expr; offset_expr ] -> load heap pfs gamma loc_expr offset_expr
+        | args ->
+            failwith
+              (Format.asprintf
+                 "Invalid Load Call for WISL, with parameters : [ %a ]"
+                 (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+                 args))
+    | GetCell -> (
+        match args with
+        | [ loc_expr; offset_expr; permission ] ->
+            get_cell heap pfs gamma loc_expr offset_expr permission
+        | args ->
+            failwith
+              (Format.asprintf
+                 "Invalid GetCell Call for WISL, with parameters : [ %a ]"
+                 (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+                 args))
+    | SetCell -> (
+        match args with
+        | [ loc_expr; offset_expr; permission; value_expr ] ->
+            set_cell heap pfs gamma loc_expr offset_expr value_expr permission
+        | args ->
+            failwith
+              (Format.asprintf
+                 "Invalid SetCell Call for WISL, with parameters : [ %a ]"
+                 (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+                 args))
+    | RemCell -> (
+        match args with
+        | [ loc_expr; offset_expr; permission ] ->
+            rem_cell heap pfs gamma loc_expr offset_expr permission
+        | args ->
+            failwith
+              (Format.asprintf
+                 "Invalid RemCell Call for WISL, with parameters : [ %a ]"
+                 (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+                 args))
+    | GetBound -> (
+        match args with
+        | [ loc_expr; permission ] ->
+            get_bound heap pfs gamma loc_expr permission
+        | args ->
+            failwith
+              (Format.asprintf
+                 "Invalid GetBound Call for WISL, with parameters : [ %a ]"
+                 (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+                 args))
+    | SetBound -> (
+        match args with
+        | [ loc_expr; permission; Expr.Lit (Int b) ] ->
+            set_bound heap pfs gamma loc_expr (Z.to_int b) permission
+        | args ->
+            failwith
+              (Format.asprintf
+                 "Invalid SetBound Call for WISL, with parameters : [ %a ]"
+                 (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+                 args))
+    | RemBound -> (
+        match args with
+        | [ loc_expr; permission ] ->
+            rem_bound heap pfs gamma loc_expr permission
+        | args ->
+            failwith
+              (Format.asprintf
+                 "Invalid RemBound Call for WISL, with parameters : [ %a ]"
+                 (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+                 args))
+    | GetFreed -> (
+        match args with
+        | [ loc_expr ] -> get_freed heap pfs gamma loc_expr
+        | args ->
+            failwith
+              (Format.asprintf
+                 "Invalid GetFreed Call for WISL, with parameters : [ %a ]"
+                 (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+                 args))
+    | SetFreed -> (
+        match args with
+        | [ loc_expr ] -> set_freed heap pfs gamma loc_expr
+        | args ->
+            failwith
+              (Format.asprintf
+                 "Invalid SetFreed Call for WISL, with parameters : [ %a ]"
+                 (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+                 args))
+    | RemFreed -> (
+        match args with
+        | [ loc_expr ] -> rem_freed heap pfs gamma loc_expr
+        | args ->
+            failwith
+              (Format.asprintf
+                 "Invalid RemFreed Call for WISL, with parameters : [ %a ]"
+                 (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+                 args))
+    | Alloc -> (
+        match args with
+        | [ Expr.Lit (Literal.Int size) ] when Z.geq size Z.one ->
+            alloc heap pfs gamma (Z.to_int size)
+        | args ->
+            failwith
+              (Format.asprintf
+                 "Invalid Alloc Call for WISL, with parameters : [ %a ]"
+                 (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+                 args))
+    | Dispose -> (
+        match args with
+        | [ loc_expr ] -> dispose heap pfs gamma loc_expr
+        | args ->
+            failwith
+              (Format.asprintf
+                 "Invalid Dispose Call for WISL, with parameters : [ %a ]"
+                 (WPrettyUtils.pp_list ~sep:(format_of_string "; ") Values.pp)
+                 args))
+  in
+  Logging.verbose (fun m ->
+      m "Action %s resulted in %a"
+        (WislLActions.str_ac action)
+        Fmt.(
+          result
+            ~ok:
+              (Dump.list (fun ft (h, vs, fs, tys) ->
+                   pf ft "(%a, %a, %a, %a)" WislSHeap.pp h (Dump.list Expr.pp)
+                     vs (Dump.list Formula.pp) fs
+                     (Dump.list @@ Dump.pair string Type.pp)
+                     tys))
+            ~error:(Dump.list WislSHeap.pp_err))
+        ret);
+  ret
 
 let ga_to_setter = WislLActions.ga_to_setter_str
 let ga_to_getter = WislLActions.ga_to_getter_str
