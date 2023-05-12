@@ -163,7 +163,7 @@ let check_sfvl ~pfs ~gamma ofs data none_case success_case =
     match
       SFVL.get_first (fun name -> Solver.is_equal ~pfs ~gamma name ofs) data
     with
-    | None -> none_case
+    | None -> none_case ()
     | Some (o, SFVL.{ value; permission }) -> success_case o value permission
   in
   let some SFVL.{ value; permission } = success_case ofs value permission in
@@ -189,7 +189,7 @@ let access_cell ~pfs ~gamma heap loc ofs permission_check =
               Error (OutOfBounds (Some n, loc, ofs))
             else Ok ()
       in
-      let none_case = Error (MissingResource (Cell, loc, Some ofs)) in
+      let none_case () = Error (MissingResource (Cell, loc, Some ofs)) in
       let success_case ofs value permission =
         if permission_check permission then
           Error (MissingResource (Cell, loc, Some permission))
@@ -212,11 +212,11 @@ let get_cell ~pfs ~gamma heap loc ofs out_perm =
 (* Helper function: Performs the preliminary checks common to the set_cell and store
    operations and applies the "in_bounds" operation if the access to the allocated
    cell is within bounds *)
-let overwrite_cell ~pfs ~gamma heap loc_name ofs v in_bounds =
+let overwrite_cell ~pfs ~gamma heap loc_name ofs v out_perm in_bounds =
   match Hashtbl.find_opt heap loc_name with
   | None ->
       let data =
-        SFVL.add ofs SFVL.{ value = v; permission = Expr.num 1.0 } SFVL.empty
+        SFVL.add ofs SFVL.{ value = v; permission = out_perm } SFVL.empty
       in
       let bound = None in
       let () = Hashtbl.replace heap loc_name (Allocated { data; bound }) in
@@ -247,7 +247,7 @@ let store ~pfs ~gamma heap loc_name ofs v =
     let can_be_less q =
       Solver.check_satisfiability (fl q :: PFS.to_list pfs) gamma
     in
-    let none_case =
+    let none_case () =
       extend_block ~pfs ~gamma heap loc_name ofs v data bound (Expr.num 1.0)
     in
     let some_case ofs _ permission =
@@ -257,15 +257,18 @@ let store ~pfs ~gamma heap loc_name ofs v =
     in
     check_sfvl ~pfs ~gamma ofs data none_case some_case
   in
-  match overwrite_cell ~pfs ~gamma heap loc_name ofs v in_bounds with
+  match
+    overwrite_cell ~pfs ~gamma heap loc_name ofs v (Expr.num 1.0) in_bounds
+  with
   | Error e -> Error e
   | Ok _ -> Ok ()
 
 let set_cell ~pfs ~gamma heap loc_name ofs v out_perm =
   let in_bounds data bound =
     let full_perm = Expr.num 1.0 in
-    let none_case =
-      extend_block ~pfs ~gamma heap loc_name ofs v data bound full_perm
+    Logging.verbose (fun m -> m "The outer permission is: %a" Expr.pp out_perm);
+    let none_case () =
+      extend_block ~pfs ~gamma heap loc_name ofs v data bound out_perm
     in
     let some_case _ value permission =
       let eq = Formula.Infix.(value #== v) in
@@ -278,7 +281,7 @@ let set_cell ~pfs ~gamma heap loc_name ofs v out_perm =
     in
     check_sfvl ~pfs ~gamma ofs data none_case some_case
   in
-  overwrite_cell ~pfs ~gamma heap loc_name ofs v in_bounds
+  overwrite_cell ~pfs ~gamma heap loc_name ofs v out_perm in_bounds
 
 let rem_cell ~pfs ~gamma heap loc offset out_perm =
   match Hashtbl.find_opt heap loc with
