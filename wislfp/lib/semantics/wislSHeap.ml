@@ -138,7 +138,8 @@ let dispose ~pfs ~gamma (heap : t) loc =
   | Some (Allocated { data = _; bound = None; _ }) ->
       Error (MissingResource (Bound, loc, None))
   | Some (Allocated { data; bound = Some (i, perm) }) ->
-      let fl q = Formula.Infix.(q #<. (Expr.num 1.0)) in
+      let full_perm = Expr.num 1.0 in
+      let fl q = Formula.Infix.(q#<.full_perm) in
       let can_be_less q =
         Solver.check_satisfiability (fl q :: PFS.to_list pfs) gamma
       in
@@ -150,7 +151,9 @@ let dispose ~pfs ~gamma (heap : t) loc =
           match SFVL.get (Expr.int i) data with
           | None -> Error (MissingResource (Bound, loc, None))
           | Some { permission = q; _ } ->
-              if can_be_less q then Error (MissingResource (Cell, loc, Some q))
+              if can_be_less q then
+                let missing_permission = Expr.Infix.(full_perm -. q) in
+                Error (MissingResource (Cell, loc, Some missing_permission))
               else Ok ()
         in
         let+ () = Seq.init i Fun.id |> Seq.fold_left check_entry (Ok ()) in
@@ -191,21 +194,24 @@ let access_cell ~pfs ~gamma heap loc ofs permission_check =
       in
       let none_case () = Error (MissingResource (Cell, loc, Some ofs)) in
       let success_case ofs value permission =
-        if permission_check permission then
-          Error (MissingResource (Cell, loc, Some permission))
-        else Ok (loc, ofs, permission, value)
+        match permission_check permission with
+        | Some missing_permission ->
+            Error (MissingResource (Cell, loc, Some missing_permission))
+        | None -> Ok (loc, ofs, permission, value)
       in
       check_sfvl ~pfs ~gamma ofs data none_case success_case
 
 let load ~pfs ~gamma heap loc ofs =
-  match access_cell ~pfs ~gamma heap loc ofs (fun _ -> false) with
+  match access_cell ~pfs ~gamma heap loc ofs (fun _ -> None) with
   | Error e -> Error e
   | Ok (_, _, _, v) -> Ok v
 
 let get_cell ~pfs ~gamma heap loc ofs out_perm =
   let fl q = Formula.Infix.(q#<.out_perm) in
   let permission_check q =
-    Solver.check_satisfiability (fl q :: PFS.to_list pfs) gamma
+    if Solver.check_satisfiability (fl q :: PFS.to_list pfs) gamma then
+      Some Expr.Infix.(out_perm -. q)
+    else None
   in
   access_cell ~pfs ~gamma heap loc ofs permission_check
 
@@ -243,7 +249,8 @@ let extend_block ~pfs ~gamma heap loc_name ofs value data bound permission =
 
 let store ~pfs ~gamma heap loc_name ofs v =
   let in_bounds (data : SFVL.t) bound =
-    let fl q = Formula.Infix.(q #<. (Expr.num 1.0)) in
+    let full_perm = Expr.num 1.0 in
+    let fl q = Formula.Infix.(q#<.full_perm) in
     let can_be_less q =
       Solver.check_satisfiability (fl q :: PFS.to_list pfs) gamma
     in
@@ -252,7 +259,8 @@ let store ~pfs ~gamma heap loc_name ofs v =
     in
     let some_case ofs _ permission =
       if can_be_less permission then
-        Error (MissingResource (Cell, loc_name, Some permission))
+        let missing_permission = Expr.Infix.(full_perm -. permission) in
+        Error (MissingResource (Cell, loc_name, Some missing_permission))
       else extend_block ~pfs ~gamma heap loc_name ofs v data bound permission
     in
     check_sfvl ~pfs ~gamma ofs data none_case some_case
@@ -315,7 +323,9 @@ let get_bound ~pfs ~gamma heap loc out_perm =
       let has_less_perm =
         Solver.check_satisfiability (fl :: PFS.to_list pfs) gamma
       in
-      if has_less_perm then Error (MissingResource (Bound, loc, Some q))
+      if has_less_perm then
+        let missing_permission = Expr.Infix.(out_perm -. q) in
+        Error (MissingResource (Bound, loc, Some missing_permission))
       else Ok bound
 
 let set_bound heap loc b out_perm =
