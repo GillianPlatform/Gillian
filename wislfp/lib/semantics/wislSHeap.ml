@@ -14,7 +14,6 @@ type err =
   | MemoryLeak
   | OutOfBounds of (int option * string * Expr.t)
   | InvalidLocation
-  | DuplicatedResource
 [@@deriving yojson, show]
 
 module Block = struct
@@ -331,8 +330,16 @@ let set_bound heap loc b out_perm =
             Hashtbl.replace heap loc
               (Block.Allocated { data; bound = Some (b, out_perm) })
           in
-          Ok ()
-      | Some (_, _) -> failwith "Not yet implemented")
+          Ok []
+      | Some (_, permission) ->
+          let full_perm = Expr.num 1.0 in
+          let new_perm = Expr.BinOp (permission, FPlus, out_perm) in
+          let fl = Formula.Infix.(new_perm#<=.full_perm) in
+          let () =
+            Hashtbl.replace heap loc
+              (Block.Allocated { data; bound = Some (b, new_perm) })
+          in
+          Ok [ fl ])
 
 let rem_bound ~pfs ~gamma heap loc out_perm =
   match Hashtbl.find_opt heap loc with
@@ -493,7 +500,7 @@ let add_memory_vars (smemory : t) (get_new_scope_id : unit -> int) variables :
   in
   let cell_vars l : Variable.t list =
     List.sort compare_offsets l
-    |> List.map (fun (offset, value) : Variable.t ->
+    |> List.map (fun (offset, SFVL.{ value; _ }) : Variable.t ->
            (* Display offset as a number to match the printing of WISL pointers *)
            let offset_str =
              match offset with

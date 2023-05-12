@@ -20,6 +20,9 @@ let pp ft sfvl =
      (hbox (parens (pair ~sep:(any " :") Expr.pp Expr.pp))))
     ft sfvl
 
+let fv_pp fmt { value; permission } =
+  Fmt.pf fmt "%a [%a]" Expr.pp value Expr.pp permission
+
 (*************************************)
 (** Field Value List Functions      **)
 
@@ -42,15 +45,15 @@ let partition f sfvl = Expr.Map.partition f sfvl
 let remove = Expr.Map.remove
 
 let union =
-  Expr.Map.union (fun k fvl fvr ->
+  Expr.Map.union (fun k (fvl : field_value) (fvr : field_value) ->
       L.(
         verbose (fun m ->
             m
               "WARNING: SFVL.union: merging with field in both lists (%s: %s \
                and %s), choosing left."
               ((Fmt.to_to_string Expr.pp) k)
-              ((Fmt.to_to_string Expr.pp) fvl)
-              ((Fmt.to_to_string Expr.pp) fvr)));
+              ((Fmt.to_to_string fv_pp) fvl)
+              ((Fmt.to_to_string fv_pp) fvr)));
       Some fvl)
 
 let to_list fv_list = fold (fun f v ac -> (f, v) :: ac) fv_list []

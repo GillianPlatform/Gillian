@@ -78,7 +78,7 @@ let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) permission =
 let rem_cell heap pfs gamma (loc : vt) (offset : vt) permission =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
   | Some loc_name -> (
-      match WislSHeap.rem_cell heap loc_name offset permission with
+      match WislSHeap.rem_cell ~pfs ~gamma heap loc_name offset permission with
       | Error e -> Error [ e ]
       | Ok () -> Ok [ (heap, [], [], []) ])
   | None ->
@@ -90,13 +90,13 @@ let get_bound heap pfs gamma loc permission =
   | Some loc_name -> (
       match WislSHeap.get_bound ~pfs ~gamma heap loc_name permission with
       | Error e -> Error [ e ]
-      | Ok b ->
+      | Ok (b, perm) ->
           let b = Expr.int b in
           let loc = Expr.loc_from_loc_name loc_name in
-          Ok [ (heap, [ loc; b ], [], []) ])
+          Ok [ (heap, [ loc; b; perm ], [], []) ])
   | None -> Error [ InvalidLocation ]
 
-let set_bound heap pfs gamma (loc : vt) (bound : int) =
+let set_bound heap pfs gamma (loc : vt) (bound : int) permission =
   let loc_name, new_pfs =
     (* If we can't find the location, we create a new location and we
          add to the path condition that it is equal to the given loc *)
@@ -109,14 +109,14 @@ let set_bound heap pfs gamma (loc : vt) (bound : int) =
         let al = ALoc.alloc () in
         (al, [ Formula.Eq (Expr.ALoc al, loc) ])
   in
-  match WislSHeap.set_bound ~pfs ~gamma heap loc_name bound with
+  match WislSHeap.set_bound heap loc_name bound permission with
   | Error e -> Error [ e ]
-  | Ok () -> Ok [ (heap, [], new_pfs, []) ]
+  | Ok fls -> Ok [ (heap, [], fls @ new_pfs, []) ]
 
 let rem_bound heap pfs gamma loc permission =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
   | Some loc_name -> (
-      match WislSHeap.rem_bound heap loc_name permission with
+      match WislSHeap.rem_bound ~pfs ~gamma heap loc_name permission with
       | Error e -> Error [ e ]
       | Ok () -> Ok [ (heap, [], [], []) ])
   | None ->
@@ -244,8 +244,8 @@ let execute_action ?unification:_ name heap pfs gamma args =
                args))
   | SetBound -> (
       match args with
-      | [ loc_expr; Expr.Lit (Int b) ] ->
-          set_bound heap pfs gamma loc_expr (Z.to_int b)
+      | [ loc_expr; Expr.Lit (Int b); permission ] ->
+          set_bound heap pfs gamma loc_expr (Z.to_int b) permission
       | args ->
           failwith
             (Format.asprintf
@@ -328,8 +328,7 @@ let pp_err fmt t =
     | UseAfterFree _ -> "Use After Free"
     | MemoryLeak -> "Memory Leak"
     | OutOfBounds _ -> "Out Of Bounds"
-    | InvalidLocation -> "Invalid Location"
-    | DuplicatedResource -> "Duplicated Resource")
+    | InvalidLocation -> "Invalid Location")
 
 let pp_c_fix _ _ = ()
 let substitution_in_place ~pfs:_ ~gamma:_ = WislSHeap.substitution_in_place
