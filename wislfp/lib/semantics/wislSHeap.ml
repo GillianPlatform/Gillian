@@ -265,11 +265,7 @@ let set_cell ~pfs ~gamma heap loc_name ofs v out_perm =
   let in_bounds data bound =
     let full_perm = Expr.num 1.0 in
     let none_case =
-      let open Syntaxes.Result in
-      let+ formulae =
-        extend_block ~pfs ~gamma heap loc_name ofs v data bound full_perm
-      in
-      Formula.Infix.(out_perm #== full_perm) :: formulae
+      extend_block ~pfs ~gamma heap loc_name ofs v data bound full_perm
     in
     let some_case _ value permission =
       let eq = Formula.Infix.(value #== v) in
