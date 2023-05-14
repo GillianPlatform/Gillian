@@ -230,7 +230,7 @@ let overwrite_cell ~pfs ~gamma heap loc_name ofs v out_perm in_bounds =
   | Some Block.Freed -> Error (UseAfterFree loc_name)
   | Some (Allocated { data; bound }) -> (
       match bound with
-      | None -> Error (MissingResource (Bound, loc_name, Some ofs))
+      | None -> in_bounds data None
       | Some (n, perm) ->
           let expr_n = Expr.int n in
           let open Formula.Infix in
@@ -254,9 +254,7 @@ let store ~pfs ~gamma heap loc_name ofs v =
     let can_be_less q =
       Solver.check_satisfiability (fl q :: PFS.to_list pfs) gamma
     in
-    let none_case () =
-      extend_block ~pfs ~gamma heap loc_name ofs v data bound (Expr.num 1.0)
-    in
+    let none_case () = Error (MissingResource (Cell, loc_name, Some ofs)) in
     let some_case ofs _ permission =
       if can_be_less permission then
         let missing_permission = Expr.Infix.(full_perm -. permission) in
@@ -274,7 +272,6 @@ let store ~pfs ~gamma heap loc_name ofs v =
 let set_cell ~pfs ~gamma heap loc_name ofs v out_perm =
   let in_bounds data bound =
     let full_perm = Expr.num 1.0 in
-    Logging.verbose (fun m -> m "The outer permission is: %a" Expr.pp out_perm);
     let none_case () =
       extend_block ~pfs ~gamma heap loc_name ofs v data bound out_perm
     in
@@ -302,11 +299,10 @@ let rem_cell ~pfs ~gamma heap loc offset out_perm =
             "Called rem_cell with an offset that is not in the data SFVL!"
       | Some SFVL.{ value; permission } ->
           let data = SFVL.remove offset data in
-          let new_perm = Expr.BinOp (permission, FMinus, out_perm) in
+          let new_perm = Expr.Infix.(permission -. out_perm) in
           let data =
-            if Solver.is_equal ~pfs ~gamma new_perm (Expr.num 0.0) then
-              SFVL.add offset SFVL.{ value; permission = new_perm } data
-            else data
+            if Solver.is_equal ~pfs ~gamma new_perm (Expr.num 0.0) then data
+            else SFVL.add offset SFVL.{ value; permission = new_perm } data
           in
           let () = Hashtbl.replace heap loc (Allocated { data; bound }) in
           Ok ())
