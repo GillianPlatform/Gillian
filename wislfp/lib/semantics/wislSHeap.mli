@@ -11,7 +11,6 @@ type err =
   | MemoryLeak
   | OutOfBounds of (int option * string * Expr.t)
   | InvalidLocation
-  | DuplicatedResource
 [@@deriving yojson, show]
 
 val init : unit -> t
@@ -58,7 +57,14 @@ val set_cell :
   Expr.t ->
   (Formula.t list, err) result
 
-val rem_cell : t -> string -> Expr.t -> Expr.t -> (unit, err) result
+val rem_cell :
+  pfs:Pure_context.t ->
+  gamma:Type_env.t ->
+  t ->
+  string ->
+  Expr.t ->
+  Expr.t ->
+  (unit, err) result
 
 val get_bound :
   pfs:Pure_context.t ->
@@ -66,17 +72,18 @@ val get_bound :
   t ->
   string ->
   Expr.t ->
-  (int, err) result
+  (int * Expr.t, err) result
 
-val set_bound :
+val set_bound : t -> string -> int -> Expr.t -> (Formula.t list, err) result
+
+val rem_bound :
   pfs:Pure_context.t ->
   gamma:Type_env.t ->
   t ->
   string ->
-  int ->
+  Expr.t ->
   (unit, err) result
 
-val rem_bound : t -> string -> Expr.t -> (unit, err) result
 val get_freed : t -> string -> (unit, err) result
 val set_freed : t -> string -> unit
 val rem_freed : t -> string -> (unit, err) result

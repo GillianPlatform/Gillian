@@ -12,16 +12,18 @@ type ('mem_err, 'value) err_t =
     (* We want all errors to be proper errors - this is a temporary placeholder *)
 [@@deriving yojson, show]
 
-let get_recovery_vals
+let get_recovery_tactic
     (errs : ('a, 'b) err_t list)
-    (mem_recovery_vals : 'a -> 'b list) : 'b list =
+    (mem_recovery_tactics : 'a -> 'b Recovery_tactic.t) : 'b Recovery_tactic.t =
   let f err =
     match err with
-    | EMem err -> mem_recovery_vals err
-    | EAsrt (xs, _, _) -> xs
-    | _ -> []
+    | EMem err -> mem_recovery_tactics err
+    | EAsrt (xs, _, _) -> Recovery_tactic.try_unfold xs
+    | _ -> Recovery_tactic.none
   in
-  List.concat (List.map f errs)
+  List.fold_left
+    (fun acc x -> Recovery_tactic.merge (f x) acc)
+    Recovery_tactic.none errs
 
 let pp_err
     (pp_m_err : Format.formatter -> 'a -> unit)
@@ -47,23 +49,15 @@ let pp_err
         asrtss
   | EOther msg -> Fmt.pf fmt "%s" msg
 
-let can_fix (errs : ('a, 'b) err_t list) : bool =
-  let result =
-    List.exists
-      (fun e ->
-        match e with
-        | EMem _ -> true
-        | EPure pf -> Reduction.reduce_formula pf <> False
-        | EAsrt (_, pf, _) ->
-            let result = Reduction.reduce_formula pf <> True in
-            Logging.verbose (fun fmt ->
-                fmt "Can fix: intermediate: %a: %b" Formula.pp pf result);
-            result
-        | _ -> false)
-      errs
-  in
-  Logging.verbose (fun fmt -> fmt "Can fix: overall %b" result);
-  result
+let can_fix (err : ('a, 'b) err_t) : bool =
+  match err with
+  | EMem _ -> true
+  | EPure pf -> Reduction.reduce_formula pf <> False
+  | EAsrt (_, pf, _) ->
+      let result = Reduction.reduce_formula pf <> True in
+      Logging.verbose (fun fmt -> fmt "Can fix: %a: %b" Formula.pp pf result);
+      result
+  | _ -> false
 
 let get_failing_constraint (err : ('a, 'b) err_t) (mem_fc : 'a -> Formula.t) :
     Formula.t =

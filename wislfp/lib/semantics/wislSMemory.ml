@@ -1,6 +1,7 @@
 open Gillian.Symbolic
 open Gillian.Gil_syntax
 open Gillian.Logic
+module Recovery_tactic = Gillian.General.Recovery_tactic
 module Logging = Gillian.Logging
 module SFVL = SFVL
 module SS = Gillian.Utils.Containers.SS
@@ -62,7 +63,7 @@ let get_cell heap pfs gamma (loc : vt) (offset : vt) permission =
       | Error err -> Error [ err ]
       | Ok (loc, ofs, q, value) ->
           let loc = Expr.loc_from_loc_name loc in
-          Ok [ (heap, [ loc; ofs; value; q ], [], []) ])
+          Ok [ (heap, [ loc; ofs; q; value ], [], []) ])
 
 let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) permission =
   let action new_pfs loc_name =
@@ -77,7 +78,7 @@ let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) permission =
 let rem_cell heap pfs gamma (loc : vt) (offset : vt) permission =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
   | Some loc_name -> (
-      match WislSHeap.rem_cell heap loc_name offset permission with
+      match WislSHeap.rem_cell ~pfs ~gamma heap loc_name offset permission with
       | Error e -> Error [ e ]
       | Ok () -> Ok [ (heap, [], [], []) ])
   | None ->
@@ -89,13 +90,13 @@ let get_bound heap pfs gamma loc permission =
   | Some loc_name -> (
       match WislSHeap.get_bound ~pfs ~gamma heap loc_name permission with
       | Error e -> Error [ e ]
-      | Ok b ->
+      | Ok (b, perm) ->
           let b = Expr.int b in
           let loc = Expr.loc_from_loc_name loc_name in
-          Ok [ (heap, [ loc; b ], [], []) ])
+          Ok [ (heap, [ loc; perm; b ], [], []) ])
   | None -> Error [ InvalidLocation ]
 
-let set_bound heap pfs gamma (loc : vt) (bound : int) =
+let set_bound heap pfs gamma (loc : vt) (bound : int) permission =
   let loc_name, new_pfs =
     (* If we can't find the location, we create a new location and we
          add to the path condition that it is equal to the given loc *)
@@ -108,14 +109,14 @@ let set_bound heap pfs gamma (loc : vt) (bound : int) =
         let al = ALoc.alloc () in
         (al, [ Formula.Eq (Expr.ALoc al, loc) ])
   in
-  match WislSHeap.set_bound ~pfs ~gamma heap loc_name bound with
+  match WislSHeap.set_bound heap loc_name bound permission with
   | Error e -> Error [ e ]
-  | Ok () -> Ok [ (heap, [], new_pfs, []) ]
+  | Ok fls -> Ok [ (heap, [], fls @ new_pfs, []) ]
 
 let rem_bound heap pfs gamma loc permission =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
   | Some loc_name -> (
-      match WislSHeap.rem_bound heap loc_name permission with
+      match WislSHeap.rem_bound ~pfs ~gamma heap loc_name permission with
       | Error e -> Error [ e ]
       | Ok () -> Ok [ (heap, [], [], []) ])
   | None ->
@@ -163,11 +164,7 @@ let alloc heap _pfs _gamma (size : int) =
   Ok
     [
       ( heap,
-        [
-          Expr.Lit (Literal.Loc loc);
-          Expr.Lit (Literal.Int Z.zero);
-          Expr.Lit (Literal.Num 1.0);
-        ],
+        [ Expr.Lit (Literal.Loc loc); Expr.Lit (Literal.Int Z.zero) ],
         [],
         [] );
     ]
@@ -245,8 +242,8 @@ let execute_action ?unification:_ name heap pfs gamma args =
                  args))
     | SetBound -> (
         match args with
-        | [ loc_expr; Expr.Lit (Int b) ] ->
-            set_bound heap pfs gamma loc_expr (Z.to_int b)
+        | [ loc_expr; permission; Expr.Lit (Int b) ] ->
+            set_bound heap pfs gamma loc_expr (Z.to_int b) permission
         | args ->
             failwith
               (Format.asprintf
@@ -345,10 +342,8 @@ let pp_err fmt t =
     | UseAfterFree _ -> "Use After Free"
     | MemoryLeak -> "Memory Leak"
     | OutOfBounds _ -> "Out Of Bounds"
-    | InvalidLocation -> "Invalid Location"
-    | DuplicatedResource -> "Duplicated Resource")
+    | InvalidLocation -> "Invalid Location")
 
-let get_recovery_vals _ _ = []
 let pp_c_fix _ _ = ()
 let substitution_in_place ~pfs:_ ~gamma:_ = WislSHeap.substitution_in_place
 let fresh_val _ = Expr.LVar (LVar.alloc ())
@@ -362,6 +357,15 @@ let assertions ?to_keep:_ heap = WislSHeap.assertions heap
 let mem_constraints _ = []
 let is_overlapping_asrt _ = false
 let apply_fix m _ _ _ = m
-let get_fixes ?simple_fix:_ _ _ _ _ = []
+let get_fixes _ _ _ _ = []
+
+let get_recovery_tactic _ e =
+  match e with
+  | WislSHeap.MissingResource (_, loc, ofs) ->
+      let loc = Expr.loc_from_loc_name loc in
+      let ofs = Option.to_list ofs in
+      Recovery_tactic.try_unfold (loc :: ofs)
+  | _ -> Recovery_tactic.none
+
 let get_failing_constraint _ = Formula.True
 let add_debugger_variables = WislSHeap.add_debugger_variables

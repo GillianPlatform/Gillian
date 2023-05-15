@@ -104,7 +104,6 @@ struct
       outfile_opt
       no_heap
       stats
-      parallel
       should_emit_specs
       specs_to_stdout
       incremental
@@ -115,7 +114,6 @@ struct
     let () = PC.initialize BiAbduction in
     let () = Config.stats := stats in
     let () = Config.no_heap := no_heap in
-    let () = Config.parallel := parallel in
     let () = Config.bi_unroll_depth := bi_unroll_depth in
     let () = Config.bi_no_spec_depth := bi_no_spec_depth in
     let () = Config.specs_to_stdout := specs_to_stdout in
@@ -129,8 +127,8 @@ struct
   let act_t =
     Term.(
       const act $ files $ already_compiled $ output_gil $ no_heap $ stats
-      $ parallel $ should_emit_specs $ specs_to_stdout $ incremental
-      $ bi_unroll_depth $ bi_no_spec_depth)
+      $ should_emit_specs $ specs_to_stdout $ incremental $ bi_unroll_depth
+      $ bi_no_spec_depth)
 
   let act_info =
     let doc =

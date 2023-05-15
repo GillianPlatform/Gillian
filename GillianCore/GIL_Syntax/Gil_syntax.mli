@@ -786,6 +786,7 @@ module Pred : sig
       ((string * string list) option * Asrt.t * string list) list;
         (** Predicate definitions *)
     pred_facts : Formula.t list;  (** Facts that hold for every definition *)
+    pred_guard : Asrt.t option;  (** Cost for unfolding the predicate *)
     pred_pure : bool;  (** Is the predicate pure? *)
     pred_abstract : bool;  (**  Is the predicate abstract? *)
     pred_nounfold : bool;  (** Should the predicate be unfolded? *)
@@ -839,6 +840,18 @@ module Pred : sig
 
   (** Retrieves a predicate definition by name *)
   val get : (string, t) Hashtbl.t -> string -> t
+
+  (** Given a guarded predicate, return the name of its close token.
+      Fails if the predicate isn't guarded. *)
+  val close_token_name : t -> string
+
+  (** Given a guarded predicate, return a "call" to its close token.
+      The arguments given are PVars with the same name as the ins of the predicate. *)
+  val close_token_call : t -> Asrt.t
+
+  (** Given a name, if it's a close_token name, returns the name of the corresponding predicate,
+   otherwise return None. *)
+  val pred_name_from_close_token_name : string -> string option
 end
 
 (** @canonical Gillian.Gil_syntax.Lemma *)
@@ -1005,7 +1018,7 @@ module BranchCase : sig
   [@@deriving yojson, show]
 
   (** A list of branch cases describes the path of execution.
-      
+
     Every termination of a symbolic execution is uniquely identified by its branch path. *)
   type path = t list [@@deriving yojson]
 end
@@ -1013,7 +1026,7 @@ end
 (** @canonical Gillian.Gil_syntax.Annot *)
 module Annot : sig
   (** Annotations for GIL commands
-      
+
     This is parametric on the target language. *)
 
   module type S = sig
@@ -1034,7 +1047,7 @@ end
 (** @canonical Gillian.Gil_syntax.Proc *)
 module Proc : sig
   (** Labeled GIL procedures
-  
+
     Every command is annotated with a label, and the gotos indicate to which label one should jump.
     Labels can be of any type. However, we say "labeled" when the labels are strings, and "indexed" when the labels are integers.
     Most functions in Gillian that work with indexed procedures assume for efficiency that the label of the i-th command is always Some i

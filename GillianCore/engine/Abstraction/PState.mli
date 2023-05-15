@@ -37,7 +37,7 @@ module type S = sig
   val deabstract : t -> state_t * bool
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
   val set_pred : t -> abs_t -> unit
-  val automatic_unfold : t -> vt list -> (t list, string) result
+  val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
 end
 
 module Make

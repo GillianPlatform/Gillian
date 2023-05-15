@@ -75,7 +75,7 @@ In order to clone it, simply run, from the Gillian folder:
 There are two ways of launching the tests:
 
 - Using the ``bulk-wpst`` command of Gillian-C which has a nicer output (using Rely), but cannot run the tests in parallel.
-- Using a bash script that will call ``gillian-c wpst`` as many times as there are files to test, but supports parallel mode (this is the one we used for measures).
+- Using a bash script that will call ``gillian-c wpst`` as many times as there are files to test, but supports parallel mode (this is the one we used for measures). (NOTE: since then, we removed the option for parallel mode, and plan of having a better implementation in the future)
 
 Using bulk-wpst
 """""""""""""""

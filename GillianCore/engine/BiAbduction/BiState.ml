@@ -25,38 +25,8 @@ struct
 
   exception Internal_State_Error of err_t list * t
 
-  type action_ret = ((t * vt list) list, err_t list) result
+  type action_ret = (t * vt list, err_t) result list
   type u_res = UWTF | USucc of t | UFail of err_t list
-
-  let merge_action_results (rets : action_ret list) : action_ret =
-    let ret_succs, ret_fails =
-      List.partition
-        (fun ret ->
-          match ret with
-          | Ok _ -> true
-          | _ -> false)
-        rets
-    in
-    if ret_fails <> [] then
-      let errs =
-        List.map
-          (fun ret ->
-            match ret with
-            | Error errs -> errs
-            | _ -> [])
-          ret_fails
-      in
-      Error (List.concat errs)
-    else
-      let rets =
-        List.map
-          (fun ret ->
-            match ret with
-            | Ok rets -> rets
-            | _ -> [])
-          ret_succs
-      in
-      Ok (List.concat rets)
 
   let get_pred_defs (bi_state : t) : UP.preds_tbl_t option =
     let _, state, _ = bi_state in
@@ -303,11 +273,11 @@ struct
                     Fmt.(list ~sep:(any "@\n") State.pp_err)
                     errs ESubst.pp subst);
 
-              if State.can_fix errs then (
+              if List.exists State.can_fix errs then (
                 L.(verbose (fun m -> m "CAN FIX!!!"));
                 L.verbose (fun m ->
                     m "@[<v 2>My state is:@\n%a@]" State.pp state);
-                let ffixes = State.get_fixes state errs in
+                let ffixes = List.map (State.get_fixes state) errs in
                 let fixed_states =
                   List.map
                     (fun new_fixes ->
@@ -393,7 +363,7 @@ struct
     L.(
       verbose (fun m ->
           m "INSIDE RUN spec of %s with the following UP:@\n%a@\n"
-            spec.spec.spec_name UP.pp spec.up));
+            spec.data.spec_name UP.pp spec.up));
     (* FIXME: CARE *)
     let subst_i, states = simplify bi_state in
     assert (List.length states = 1);
@@ -409,7 +379,7 @@ struct
 
     let old_store = State.get_store state in
 
-    let new_store = Store.init (List.combine spec.spec.spec_params args) in
+    let new_store = Store.init (List.combine spec.data.spec_params args) in
     let state' = State.set_store state new_store in
     let store_bindings = Store.bindings new_store in
     let store_bindings =
@@ -423,7 +393,7 @@ struct
             "@[<v 2>About to use the spec of %s with the following UP inside \
              BI-ABDUCTION:@\n\
              %a@]@\n"
-            spec.spec.spec_name UP.pp spec.up));
+            spec.data.spec_name UP.pp spec.up));
     let ret_states = unify procs state' state_af subst spec.up in
     L.(
       verbose (fun m ->
@@ -440,7 +410,7 @@ struct
                    let msg =
                      Printf.sprintf
                        "SYNTAX ERROR: Spec of %s does not have a postcondition"
-                       spec.spec.spec_name
+                       spec.data.spec_name
                    in
                    L.normal (fun m -> m "%s" msg);
                    raise (Failure msg)
@@ -511,18 +481,17 @@ struct
 
   (* to throw errors: *)
 
-  let get_fixes ?simple_fix:(_ = true) (_ : t) (_ : err_t list) :
-      fix_t list list =
+  let get_fixes (_ : t) (_ : err_t) : fix_t list =
     raise (Failure "get_fixes not implemented in MakeBiState")
 
   let apply_fixes (_ : t) (_ : fix_t list) : t option * Asrt.t list =
     raise (Failure "apply_fixes not implemented in MakeBiState")
 
-  let get_recovery_vals (_ : t) (_ : err_t list) : vt list =
-    raise (Failure "get_recovery_vals not implemented in MakeBiState")
+  let get_recovery_tactic (_ : t) (_ : err_t list) =
+    raise (Failure "get_recovery_tactic not implemented in MakeBiState")
 
-  let automatic_unfold _ _ : (t list, string) result =
-    Error "Automatic unfold not supported in bi-abduction yet"
+  let try_recovering _ _ : (t list, string) result =
+    Error "try_recovering not supported in bi-abduction yet"
 
   (** new functions *)
 
@@ -544,34 +513,22 @@ struct
       (action : string)
       (astate : t)
       (args : vt list) : action_ret =
+    let open Syntaxes.List in
     let procs, state, state_af = astate in
-    match State.execute_action ~unification action state args with
-    | Ok rets ->
-        let rets' =
-          List.map (fun (st, outs) -> ((procs, st, state_af), outs)) rets
-        in
-        Ok rets'
-    | Error errs when State.can_fix errs ->
-        L.(
-          verbose (fun m ->
-              m "BState: EA: %d errors and they can be fixed."
-                (List.length errs)));
-        let rets =
-          List.map
-            (fun fix ->
-              let state' = State.copy state in
-              let state_af' = State.copy state_af in
-              let state', _ = State.apply_fixes state' fix in
-              let state_af', _ = State.apply_fixes state_af' fix in
-              match (state', state_af') with
-              | Some state', Some state_af' ->
-                  Some (execute_action action (procs, state', state_af') args)
-              | _ -> None)
-            (State.get_fixes ~simple_fix:false state errs)
-        in
-        let rets = List_utils.get_list_somes rets in
-        merge_action_results rets
-    | Error errs -> Error errs
+    let* ret = State.execute_action ~unification action state args in
+    match ret with
+    | Ok (st, outs) -> [ Ok ((procs, st, state_af), outs) ]
+    | Error err when not (State.can_fix err) -> [ Error err ]
+    | Error err -> (
+        let fix = State.get_fixes state err in
+        let state' = State.copy state in
+        let state_af' = State.copy state_af in
+        let state', _ = State.apply_fixes state' fix in
+        let state_af', _ = State.apply_fixes state_af' fix in
+        match (state', state_af') with
+        | Some state', Some state_af' ->
+            execute_action action (procs, state', state_af') args
+        | _ -> (* If we fail to fix, we give up *) [])
 
   let get_equal_values bi_state =
     let _, state, _ = bi_state in

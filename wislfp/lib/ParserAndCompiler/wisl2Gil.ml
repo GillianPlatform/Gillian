@@ -347,9 +347,12 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
             expr_offset )
     in
     let eloc, eoffs = (Expr.LVar loc, gil_add expr_offset curr) in
-    let cell = WislLActions.(str_ga Cell) in
     let bound =
-      if start && block then [ Constr.bound ~loc:eloc ~bound:(List.length lle) ]
+      if start && block then
+        [
+          Constr.bound ~loc:eloc ~bound:(List.length lle)
+            ~permission:(Expr.num 1.0);
+        ]
       else []
     in
     match lle with
@@ -363,7 +366,8 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
         let exs2, la2, e2 = compile_lexpr le in
         ( exs1 @ exs2,
           concat_star
-            (Asrt.GA (cell, [ eloc; eoffs ], [ e2 ]))
+            (Constr.cell ~loc:eloc ~offset:eoffs ~value:e2
+               ~permission:(Expr.num 1.0))
             (bound @ la1 @ la2) )
     | le :: r ->
         let exs2, la2, e2 = compile_lexpr le in
@@ -374,7 +378,8 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
         in
         ( exs1 @ exs2 @ exs3,
           concat_star
-            (Asrt.GA (cell, [ eloc; eoffs ], [ e2 ]))
+            (Constr.cell ~loc:eloc ~offset:eoffs ~value:e2
+               ~permission:(Expr.num 1.0))
             (bound @ (la3 :: (la1 @ la2))) )
   in
   WLAssert.(
@@ -892,6 +897,7 @@ let compile_pred filepath pred =
       pred_definitions = List.map build_def pred_definitions;
       pred_normalised = false;
       (* FIXME: ADD SUPPORT FOR ABSTRACT, PURE, NOUNFOLD *)
+      pred_guard = None;
       pred_facts = [];
       pred_abstract = false;
       pred_pure = false;

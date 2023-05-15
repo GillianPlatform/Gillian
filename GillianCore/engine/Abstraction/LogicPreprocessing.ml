@@ -19,10 +19,15 @@ let rec auto_unfold
       List.filter Simplifications.admissible_assertion
         (List_utils.cross_product (au_rec a1) (au_rec a2) (fun asrt1 asrt2 ->
              Asrt.Star (asrt1, asrt2)))
-  (* Recursive and non-unfolding predicates *)
+  (* We don't unfold:
+      - Recursive predicates (except in some very specific cases)
+      - predicates marked with no-unfold
+      - predicates with a guard *)
   | Pred (name, _)
     when (Hashtbl.find rec_tbl name && not unfold_rec_predicates)
-         || (Hashtbl.find predicates name).pred_nounfold -> [ asrt ]
+         ||
+         let pred = Hashtbl.find predicates name in
+         pred.pred_nounfold || Option.is_some pred.pred_guard -> [ asrt ]
   | Pred (name, args) when Hashtbl.mem unfolded_preds name ->
       L.verbose (fun fmt ->
           fmt "Unfolding predicate: %s with nounfold %b" name
@@ -587,6 +592,54 @@ let add_hides_to_spec lemma_name spec =
   let hidings = lemma_spec_hidings lemma_name spec in
   { spec with lemma_spec_hides = Some hidings }
 
+(* For each guarded predicate, we add an abstract close token to the predicate table. *)
+let add_closing_tokens preds =
+  let guarded_predicates =
+    Hashtbl.to_seq_values preds
+    |> Seq.filter (fun (pred : Pred.t) -> Option.is_some pred.pred_guard)
+    |> List.of_seq
+    (* Can't keep the sequence, or we'd be modifying the hashtbl while iterating over it. *)
+  in
+  (* We add the the close_token to each definition. *)
+  List.to_seq guarded_predicates
+  |> Seq.map (fun (pred : Pred.t) ->
+         {
+           pred with
+           pred_definitions =
+             List.map
+               (fun (x, def, y) ->
+                 (x, Asrt.Star (def, Pred.close_token_call pred), y))
+               pred.pred_definitions;
+         })
+  |> Seq.iter (fun (pred : Pred.t) -> Hashtbl.replace preds pred.pred_name pred);
+  (* We add the close tokens to the table. *)
+  List.iter
+    (fun (pred : Pred.t) ->
+      let pred_name = Pred.close_token_name pred in
+      let pred_params = Pred.in_args pred pred.pred_params in
+      let pred_num_params = List.length pred_params in
+      let pred_ins = List.init pred_num_params Fun.id in
+      let close_token =
+        Pred.
+          {
+            pred_name;
+            pred_source_path = pred.pred_source_path;
+            pred_internal = false;
+            pred_num_params;
+            pred_params;
+            pred_ins;
+            pred_facts = [];
+            pred_definitions = [];
+            pred_guard = None;
+            pred_pure = false;
+            pred_abstract = true;
+            pred_nounfold = true;
+            pred_normalised = false;
+          }
+      in
+      Hashtbl.replace preds pred_name close_token)
+    guarded_predicates
+
 let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
   let f (prog : ('a, int) Prog.t) unfold =
     let procs = prog.procs in
@@ -623,6 +676,7 @@ let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
           (* create_partial_matches procs'';  *)
           (preds'', procs'', bi_specs, lemmas'', onlyspecs')
     in
+    add_closing_tokens preds'';
     {
       prog with
       preds = preds'';

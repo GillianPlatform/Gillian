@@ -1,8 +1,11 @@
 open Gillian
 
+module SMemory =
+  Gillian.Symbolic.Legacy_s_memory.Modernize
+    (Monadic.MonadicSMemory.Lift (MonadicSMemory))
+
 module Outcome =
-  Bulk.Outcome.Make_Symbolic
-    (Monadic.MonadicSMemory.Lift (MonadicSMemory)) (CParserAndCompiler)
+  Bulk.Outcome.Make_Symbolic (SMemory) (CParserAndCompiler)
     (General.External.Dummy (Gil_syntax.Annot.Basic))
 
 module Suite = struct

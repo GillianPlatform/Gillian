@@ -1,7 +1,7 @@
 open Gillian.Debugger.Utils
 
 include
-  Gillian.Symbolic.Memory_S
+  Gillian.Symbolic.Legacy_s_memory.S
     with type err_t = WislSHeap.err
      and type init_data = unit
 

@@ -91,11 +91,6 @@ module Make (PC : ParserAndCompiler.S) = struct
     in
     Arg.(value & flag & info [ "stats" ] ~doc)
 
-  let parallel =
-    let docv = "PARALLEL" in
-    let doc = "Enable parallel execution, default is false" in
-    Arg.(value & flag & info [ "p"; "parallel" ] ~doc ~docv)
-
   let no_print_failures =
     let doc =
       "Do not print the list of all the failed tests at the end of the bulk \

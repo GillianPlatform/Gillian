@@ -1,0 +1,5 @@
+
+function read(x, y) {
+    r := [y];
+    return r
+}

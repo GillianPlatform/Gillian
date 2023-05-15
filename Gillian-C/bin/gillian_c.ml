@@ -1,5 +1,6 @@
 open Cgil_lib
-module SMemory = Gillian.Monadic.MonadicSMemory.Lift (MonadicSMemory)
+module Legacy = Gillian.Monadic.MonadicSMemory.Lift (MonadicSMemory)
+module SMemory = Gillian.Symbolic.Legacy_s_memory.Modernize (Legacy)
 
 module Gil_to_c_lifter
     (Verification : Gillian.Abstraction.Verifier.S

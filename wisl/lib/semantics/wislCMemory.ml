@@ -6,7 +6,7 @@ type vt = Values.t
 type st = Subst.t
 type err_t = unit [@@deriving show]
 type t = WislCHeap.t
-type action_ret = (t * vt list, err_t list) result
+type action_ret = (t * vt list, err_t) result
 
 let init = WislCHeap.init
 let copy = WislCHeap.copy
@@ -23,7 +23,7 @@ let get_cell heap params =
     | [ Loc loc; Int offset ] -> (
         match WislCHeap.get heap loc (Z.to_int offset) with
         | Some value -> Ok (heap, [ Loc loc; Int offset; value ])
-        | None -> Error [])
+        | None -> Error ())
     | l ->
         failwith
           (Printf.sprintf
