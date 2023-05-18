@@ -1058,7 +1058,9 @@ let get_fixes _heap _pfs _gamma err =
       let value, vtype =
         let open CConstants.VTypes in
         match chunk with
-        | Mfloat32 | Mfloat64 ->
+        | Mfloat32 ->
+            (Expr.EList [ Expr.string single_type; new_var_e ], Type.NumberType)
+        | Mfloat64 ->
             (Expr.EList [ Expr.string float_type; new_var_e ], Type.NumberType)
         | Mint64 ->
             (Expr.EList [ Expr.string long_type; new_var_e ], Type.IntType)

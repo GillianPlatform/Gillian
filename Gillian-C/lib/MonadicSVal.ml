@@ -121,7 +121,7 @@ let of_gil_expr_exn sval_e =
       Logging.verbose (fun m -> m "!!! of_gil_expr_exn failed");
       raise (NotACompCertValue sval_e)
   | Some value ->
-      Logging.verbose (fun m -> m "!!! of_gil_expr_exn succeeded");
+      Logging.verbose (fun m -> m "!!! of_gil_expr_exn succeeded %a" pp value);
       Delayed.return value
 
 let to_gil_expr_undelayed = to_gil_expr
