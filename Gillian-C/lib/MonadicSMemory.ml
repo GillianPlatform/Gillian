@@ -1079,7 +1079,7 @@ let get_fixes _heap _pfs _gamma err =
       [ ([], [ Formula.Eq (new_expr, loc) ], [], SS.empty, []) ]
   | _ -> []
 
-let apply_fix heap _pfs _gamma fix =
+let apply_fix heap fix =
   Logging.verbose (fun m ->
       m "Applying fixes for error (Gillian-C/lib/MonadicSMemory.ml)");
   let open DR.Syntax in

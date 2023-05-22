@@ -723,7 +723,11 @@ module Make (SMemory : SMemory.S) :
     (* Check SAT for some notion of checking SAT *)
     let mfixes = List.map (fun fix -> MFix fix) fixes in
     let asrts = List.map (fun fix -> FAsrt fix) asrts in
-    let ftys = FTypes types in
+    let ftys =
+      match types with
+      | [] -> []
+      | _ -> [ FTypes types ]
+    in
     let gamma' =
       let gamma' = Type_env.copy gamma in
       let () = List.iter (fun (x, y) -> Type_env.update gamma' x y) types in
@@ -737,7 +741,7 @@ module Make (SMemory : SMemory.S) :
     | true ->
         let pfixes = List.map (fun pfix -> FPure pfix) pfs' in
         Some
-          ((ftys :: (if svars = SS.empty then [] else [ FSVars svars ]))
+          ((ftys @ if svars = SS.empty then [] else [ FSVars svars ])
           @ pfixes @ asrts @ mfixes)
     | false ->
         L.verbose (fun m -> m "Warning: invalid fix.");
@@ -757,7 +761,9 @@ module Make (SMemory : SMemory.S) :
           List.map
             (fun (mfixes, pfixes, types, svars, asrts) ->
               List.map (fun pf -> FPure pf) pfixes
-              @ (if types = [] then [] else [ FTypes types ])
+              @ (match types with
+                | [] -> []
+                | _ -> [ FTypes types ])
               @ (if svars == SS.empty then [] else [ FSVars svars ])
               @ List.map (fun asrt -> FAsrt asrt) asrts
               @ List.map (fun l -> MFix l) mfixes)

@@ -64,8 +64,7 @@ module type S = sig
     * Asrt.t list)
     list
 
-  val apply_fix :
-    t -> PFS.t -> Type_env.t -> c_fix_t -> (t, err_t) result Delayed.t
+  val apply_fix : t -> c_fix_t -> (t, err_t) result Delayed.t
 
   (* val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t *)
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
@@ -121,7 +120,7 @@ struct
 
   let apply_fix heap pfs gamma fix =
     Logging.verbose (fun m -> m "Bi-abduction trying to apply fix");
-    let res = apply_fix heap pfs gamma fix in
+    let res = apply_fix heap fix in
     let curr_pc = Pc.make ~unification:false ~pfs ~gamma () in
     let results = Delayed.resolve ~curr_pc res in
     match results with

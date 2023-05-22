@@ -315,7 +315,7 @@ struct
                           let subst_in_place =
                             State.substitution_in_place new_subst state_af'
                           in
-                          assert (subst_in_place = []);
+                          assert (List.length subst_in_place = 1);
 
                           L.(
                             verbose (fun m ->
@@ -520,15 +520,17 @@ struct
     | Ok (st, outs) -> [ Ok ((procs, st, state_af), outs) ]
     | Error err when not (State.can_fix err) -> [ Error err ]
     | Error err -> (
-        let fix = State.get_fixes state err in
-        let state' = State.copy state in
-        let state_af' = State.copy state_af in
-        let state', _ = State.apply_fixes state' fix in
-        let state_af', _ = State.apply_fixes state_af' fix in
-        match (state', state_af') with
-        | Some state', Some state_af' ->
-            execute_action action (procs, state', state_af') args
-        | _ -> (* If we fail to fix, we give up *) [])
+        match State.get_fixes state err with
+        | [] -> [] (* No fix, we stop *)
+        | fix -> (
+            let state' = State.copy state in
+            let state_af' = State.copy state_af in
+            let state', _ = State.apply_fixes state' fix in
+            let state_af', _ = State.apply_fixes state_af' fix in
+            match (state', state_af') with
+            | Some state', Some state_af' ->
+                execute_action action (procs, state', state_af') args
+            | _ -> (* If we fail to fix, we give up *) []))
 
   let get_equal_values bi_state =
     let _, state, _ = bi_state in
