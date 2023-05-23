@@ -635,6 +635,17 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   let alloc = WislLActions.str_ac WislLActions.Alloc in
   let load = WislLActions.str_ac WislLActions.Load in
   let store = WislLActions.str_ac WislLActions.Store in
+  let create_func_call x fn el to_bind =
+    let expr_fn = gil_expr_of_str fn in
+    let cmdles, params = List.split (List.map compile_expr el) in
+    let bindings =
+      match to_bind with
+      | Some (spec_name, lvars) ->
+          Some (spec_name, List.map (fun x -> (x, Expr.LVar x)) lvars)
+      | None -> None
+    in
+    (x, expr_fn, params, bindings, cmdles)
+  in
   let open WStmt in
   match stmtl with
   | [] -> ([], [])
@@ -782,16 +793,31 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
           x := [alloc](k); // this is already a pointer
   *)
   (* Parallel composition *)
-  | { snode = Par _; _ } :: _ -> failwith "not implemented"
+  | { snode = Par funcs; sid; sloc } :: rest ->
+      let lambda f =
+        match f with
+        | { snode = FunCall (x, fn, el, to_bind); _ } ->
+            let var_name, fct_name, args, bindings, cmdles =
+              create_func_call x fn el to_bind
+            in
+            (Cmd.{ var_name; fct_name; args; err_lab = None; bindings }, cmdles)
+        | _ ->
+            failwith
+              "Parallel composition called with a node different from FunCall!"
+      in
+      let zipped = List.map lambda funcs in
+      let fcs = List.map (fun (f, _) -> f) zipped in
+      let cmdles = List.concat @@ List.map (fun (_, s) -> s) zipped in
+      let cmd = Cmd.Par fcs in
+      let annot =
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
+      let comp_rest, new_functions = compile_list rest in
+      (List.concat cmdles @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
   (* Function call *)
   | { snode = FunCall (x, fn, el, to_bind); sid; sloc } :: rest ->
-      let expr_fn = gil_expr_of_str fn in
-      let cmdles, params = List.split (List.map compile_expr el) in
-      let bindings =
-        match to_bind with
-        | Some (spec_name, lvars) ->
-            Some (spec_name, List.map (fun x -> (x, Expr.LVar x)) lvars)
-        | None -> None
+      let x, expr_fn, params, bindings, cmdles =
+        create_func_call x fn el to_bind
       in
       let cmd = Cmd.call (x, expr_fn, params, None, bindings) in
       let annot =

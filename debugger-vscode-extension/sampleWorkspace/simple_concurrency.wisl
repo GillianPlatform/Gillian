@@ -1,0 +1,32 @@
+predicate is_zero(+x, y) {
+    (x == 0) * (y == 1);
+    (! (x == 0)) * (y == 0)
+}
+
+{ (x == #x) }
+function f(x) {
+    if (x = 0) {
+        n := 1
+    } else {
+        n := 0
+    };
+    return n
+}
+{ is_zero(#x, ret) }
+
+{ emp }
+function conc() {
+    x := 0;
+    y := 1;
+    par {
+        fst := f(x);
+        snd := f(y)
+    };
+    if (fst = 1 || snd = 1) {
+        n := 1
+    } else {
+        n := 0
+    };
+    return n
+}
+{ ret == 1 }
