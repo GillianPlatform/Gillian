@@ -468,10 +468,10 @@ struct
     (* update_statistics "run_spec" (time() -. start_time); *)
     Ok result
 
-  let run_par_spec :
-      (UP.spec * string * vt list * (string * (string * vt) list) option) list ->
-      t ->
-      ((t * Flag.t) list, err_t list) result =
+  let run_par_spec
+      (_ :
+        (UP.spec * string * vt list * (string * (string * vt) list) option) list)
+      (_ : t) : ((t * Flag.t) list, err_t list) result =
     raise (Failure "ERROR: run_par_spec called for bi-abduction")
 
   let produce_posts (_ : t) (_ : st) (_ : Asrt.t list) : t list =
