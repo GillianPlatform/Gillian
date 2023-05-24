@@ -22,7 +22,7 @@ function conc() {
         fst := f(x);
         snd := f(y)
     };
-    if (fst = 1 || snd = 1) {
+    if ((fst = 1) || (snd = 1)) {
         n := 1
     } else {
         n := 0

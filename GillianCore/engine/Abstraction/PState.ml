@@ -353,9 +353,16 @@ module Make
             let ( let++ ) x f = List.concat_map f x in
             let lambda acc (frame_state, subst, posts) =
               let* acc = acc in
+              let frame_state = set_store frame_state (Store.copy old_store) in
               let* rets = run_par_spec_aux rest frame_state in
-              (* match run_par_spec_aux rest frame_state with
-                 | Error errs -> *)
+              let frames =
+                match rets with
+                | [] -> [ frame_state ]
+                | l -> List.map fst l
+              in
+              L.verbose (fun m ->
+                  m "Returned from recursive call with length %s"
+                    (string_of_int @@ List.length rets));
               let fl, posts =
                 match posts with
                 | Some (fl, posts) -> (fl, posts)
@@ -370,13 +377,18 @@ module Make
               in
               (* OK FOR DELAY ENTAILMENT *)
               let res =
+                let++ frame_state = frames in
+                let frame_store = get_store frame_state in
+                let frame_state =
+                  set_store frame_state (Store.copy new_store)
+                in
                 let++ final_state =
                   SUnifier.produce_posts frame_state subst posts
                 in
                 let final_store = get_store final_state in
                 let v_ret = Store.get final_store Names.return_variable in
                 let final_state =
-                  set_store final_state (Store.copy old_store)
+                  set_store final_state (Store.copy frame_store)
                 in
                 let v_ret =
                   Option.value
@@ -393,7 +405,7 @@ module Make
                       fl ))
                   final_states
               in
-              Ok (acc @ res @ rets)
+              Ok (acc @ res)
             in
             List.fold_left lambda (Ok []) rets
         | Error errs ->
