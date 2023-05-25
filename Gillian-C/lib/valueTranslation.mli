@@ -9,8 +9,8 @@ val int_of_z : Compcert.Camlcoq.Z.t -> Z.t
 
 (** {3 Memory chunk serialization} *)
 
-val string_of_chunk : Compcert.AST.memory_chunk -> string
-val chunk_of_string : string -> Compcert.AST.memory_chunk
+val string_of_chunk : Chunk.t -> string
+val chunk_of_string : string -> Chunk.t
 
 (** {3 Value serialization} *)
 

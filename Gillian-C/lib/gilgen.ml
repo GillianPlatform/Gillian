@@ -138,10 +138,11 @@ let rec trans_expr ~fname ~local_env expr =
   match expr with
   | Evar id -> ([], PVar (true_name id))
   | Econst const -> ([], Lit (trans_const const))
-  | Eload (chunk, expp) ->
+  | Eload (compcert_chunk, expp) ->
       let cl, e = trans_expr expp in
       let gvar = gen_str Prefix.gvar in
       let loadv = Expr.Lit (Literal.String Internal_Functions.loadv) in
+      let chunk = Chunk.of_compcert_ast_chunk compcert_chunk in
       let cmd =
         Cmd.Call (gvar, loadv, [ expr_of_chunk chunk; e ], None, None)
       in
@@ -338,9 +339,10 @@ let rec trans_stmt ~fname ~context stmt =
   | Sgoto lab ->
       let gil_lab = trans_label lab in
       [ (annot_ctx context, None, Cmd.Goto gil_lab) ]
-  | Sstore (chunk, vaddr, v) ->
+  | Sstore (compcert_chunk, vaddr, v) ->
       let addr_eval_cmds, eaddr = trans_expr vaddr in
       let v_eval_cmds, ev = trans_expr v in
+      let chunk = Chunk.of_compcert_ast_chunk compcert_chunk in
       let chunk_string = ValueTranslation.string_of_chunk chunk in
       let chunk_expr = Expr.Lit (Literal.String chunk_string) in
       let annot_addr_eval = add_annots ~ctx:context addr_eval_cmds in
