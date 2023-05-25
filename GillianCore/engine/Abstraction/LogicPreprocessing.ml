@@ -43,7 +43,7 @@ let rec auto_unfold
             name (List.length args) (List.length params)
       in
       let subst = SVal.SSubst.init combined in
-      let defs = List.map (fun (_, def, _) -> def) pred.pred_definitions in
+      let defs = List.map (fun (_, def) -> def) pred.pred_definitions in
       List.map (SVal.SSubst.substitute_asrt subst ~partial:false) defs
   | Pred (name, args) -> (
       try
@@ -59,7 +59,7 @@ let rec auto_unfold
               (List.length pred.pred_definitions));
         let new_asrts =
           List.map
-            (fun (_, a, _) ->
+            (fun (_, a) ->
               L.tmi (fun fmt -> fmt "Before Auto Unfolding: %a" Asrt.pp a);
               let facts =
                 List.map (fun fact -> Asrt.Pure fact) pred.pred_facts
@@ -120,7 +120,7 @@ let find_recursive_preds (preds : (string, Pred.t) Hashtbl.t) :
         let neighbours =
           List.concat
             (List.map
-               (fun (_, asrt, _) -> Asrt.pred_names asrt)
+               (fun (_, asrt) -> Asrt.pred_names asrt)
                pred.pred_definitions)
         in
         (* Compute the smallest index reachable from its neighbours *)
@@ -154,13 +154,11 @@ let simplify_and_prune (pred : Pred.t) : Pred.t =
         (List.length pred.pred_definitions));
   let new_defs =
     List.map
-      (fun (oc, x, hides) -> (oc, Reduction.reduce_assertion x, hides))
+      (fun (oc, x) -> (oc, Reduction.reduce_assertion x))
       pred.pred_definitions
   in
   let new_defs =
-    List.filter
-      (fun (_, x, _) -> Simplifications.admissible_assertion x)
-      new_defs
+    List.filter (fun (_, x) -> Simplifications.admissible_assertion x) new_defs
   in
   L.verbose (fun fmt ->
       fmt "Predicate %s left with %d definitions after pruning." pred.pred_name
@@ -188,7 +186,7 @@ let find_pure_preds (preds : (string, Pred.t) Hashtbl.t) :
         let pred = Hashtbl.find preds pred_name in
         let is_pure =
           List.for_all
-            (fun (_, asrt, _) -> Asrt.is_pure_asrt asrt)
+            (fun (_, asrt) -> Asrt.is_pure_asrt asrt)
             pred.pred_definitions
         in
 
@@ -210,7 +208,7 @@ let unfold_preds (preds : (string, Pred.t) Hashtbl.t) :
         let deps =
           List.sort_uniq compare
             (List.concat_map
-               (fun (_, asrt, _) -> Asrt.pred_names asrt)
+               (fun (_, asrt) -> Asrt.pred_names asrt)
                pred.pred_definitions)
         in
         (name, deps) :: res)
@@ -234,15 +232,11 @@ let unfold_preds (preds : (string, Pred.t) Hashtbl.t) :
     (fun (name, _) ->
       let pred = Hashtbl.find preds name in
       L.verbose (fun fmt -> fmt "Unfolding predicate: %s" pred.pred_name);
-      let definitions' :
-          ((string * string list) option * Asrt.t * string list) list =
-        List.flatten
-          (List.map
-             (fun (os, a, hides) ->
-               List.map
-                 (fun a -> (os, a, hides))
-                 (auto_unfold preds recursion_info a))
-             pred.pred_definitions)
+      let definitions' : ((string * string list) option * Asrt.t) list =
+        List.concat_map
+          (fun (os, a) ->
+            List.map (fun a -> (os, a)) (auto_unfold preds recursion_info a))
+          pred.pred_definitions
       in
       L.verbose (fun fmt ->
           fmt "Definitions' has a length of %d" (List.length definitions'));
@@ -308,12 +302,7 @@ let unfold_lemma
     List.map
       (fun lemma_hyp ->
         Lemma.
-          {
-            lemma_hyp;
-            lemma_concs;
-            lemma_spec_variant = lemma.lemma_variant;
-            lemma_spec_hides = spec.lemma_spec_hides;
-          })
+          { lemma_hyp; lemma_concs; lemma_spec_variant = lemma.lemma_variant })
       lemma_hyps
   in
   {
@@ -452,8 +441,8 @@ let explicit_param_types
       let defs =
         pred1.pred_definitions
         @ List.map
-            (fun (oid, a, hides) ->
-              (oid, SVal.SSubst.substitute_asrt subst ~partial:true a, hides))
+            (fun (oid, a) ->
+              (oid, SVal.SSubst.substitute_asrt subst ~partial:true a))
             pred2.pred_definitions
       in
       { pred1 with pred_definitions = defs }
@@ -563,35 +552,6 @@ let unfold_bispecs
                  Hashtbl.replace procs name { proc with Proc.spec = Some { spec with sspecs = spec.sspecs @ [ sspec ] } }
      ) procs *)
 
-(** Only use in exact mode, as assertion may fail in over-approx mode *)
-let lemma_spec_hidings (lemma_name : string) (spec : Lemma.spec) =
-  let pre_lvars =
-    SS.filter Names.is_spec_var_name (Asrt.lvars spec.lemma_hyp)
-  in
-  let post_lvars =
-    SS.filter Names.is_spec_var_name (Asrt.lvars (List.hd spec.lemma_concs))
-  in
-  L.verbose (fun fmt ->
-      fmt "Hidden logicals for one spec of lemma %s" lemma_name);
-  L.verbose (fun fmt ->
-      fmt "Logical variables of pre-condition: %a"
-        Fmt.(list ~sep:comma string)
-        (SS.elements pre_lvars));
-  L.verbose (fun fmt ->
-      fmt "Logical variables of post-condition: %a"
-        Fmt.(list ~sep:comma string)
-        (SS.elements post_lvars));
-  let hidden_variables = SS.diff pre_lvars post_lvars in
-  L.verbose (fun fmt ->
-      fmt "Hidden logicals: %a"
-        Fmt.(list ~sep:comma string)
-        (SS.elements hidden_variables));
-  SS.elements (SS.diff pre_lvars post_lvars)
-
-let add_hides_to_spec lemma_name spec =
-  let hidings = lemma_spec_hidings lemma_name spec in
-  { spec with lemma_spec_hides = Some hidings }
-
 (* For each guarded predicate, we add an abstract close token to the predicate table. *)
 let add_closing_tokens preds =
   let guarded_predicates =
@@ -607,8 +567,8 @@ let add_closing_tokens preds =
            pred with
            pred_definitions =
              List.map
-               (fun (x, def, y) ->
-                 (x, Asrt.Star (def, Pred.close_token_call pred), y))
+               (fun (x, def) ->
+                 (x, Asrt.Star (def, Pred.close_token_call pred)))
                pred.pred_definitions;
          })
   |> Seq.iter (fun (pred : Pred.t) -> Hashtbl.replace preds pred.pred_name pred);
@@ -651,16 +611,9 @@ let preprocess (prog : ('a, int) Prog.t) (unfold : bool) : ('a, int) Prog.t =
 
     let () =
       Hashtbl.filter_map_inplace
-        (fun name lemma ->
+        (fun _ lemma ->
           let lemma = Lemma.add_param_bindings lemma in
-          if !Config.Verification.exact then
-            Some
-              {
-                lemma with
-                lemma_specs =
-                  List.map (add_hides_to_spec name) lemma.lemma_specs;
-              }
-          else Some lemma)
+          Some lemma)
         lemmas'
     in
 

@@ -13,14 +13,6 @@ module type S = sig
   val clear_resource : t -> t
   val get_typ_env : t -> Type_env.t
   val get_pfs : t -> PFS.t
-  val get_lvars_for_exact : t -> Var.Set.t
-
-  val hides :
-    is_post:bool ->
-    used_unifiables:Expr.Set.t ->
-    exprs_to_hide:Expr.t list ->
-    t ->
-    (unit, Expr.t) result
 end
 
 module Make (SMemory : SMemory.S) :
