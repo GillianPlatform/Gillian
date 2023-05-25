@@ -140,7 +140,7 @@ let alloc heap _pfs _gamma (size : int) =
   Ok
     [
       ( heap,
-        [ Expr.Lit (Literal.Loc loc); Expr.Lit (Literal.Int Z.zero) ],
+        [ Expr.ALoc loc; Expr.Lit (Literal.Int Z.zero) ],
         [],
         [] );
     ]
