@@ -164,7 +164,6 @@ let jsil2gil_lemma (lemma : Lemma.t) : GLemma.t =
           lemma_hyp = jsil2gil_asrt lemma.pre;
           lemma_concs = List.map jsil2gil_asrt lemma.posts;
           lemma_spec_variant = Option.map jsil2gil_expr lemma.variant;
-          lemma_spec_hides = None;
         };
       ];
     lemma_proof = Option.map (List.map jsil2gil_lcmd) lemma.proof;
@@ -182,9 +181,7 @@ let jsil2gil_pred (pred : Pred.t) : GPred.t =
     pred_params = pred.params;
     pred_ins = pred.ins;
     pred_definitions =
-      List.map
-        (fun (info, asrt) -> (info, jsil2gil_asrt asrt, []))
-        pred.definitions;
+      List.map (fun (info, asrt) -> (info, jsil2gil_asrt asrt)) pred.definitions;
     pred_facts = List.map jsil2gil_formula pred.facts;
     pred_guard = None;
     (* TODO: Support for predicates with tokens *)

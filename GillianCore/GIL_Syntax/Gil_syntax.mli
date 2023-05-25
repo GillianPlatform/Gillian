@@ -768,8 +768,7 @@ module Pred : sig
     pred_params : (string * Type.t option) list;
         (** Parameter names and (optional) types *)
     pred_ins : int list;  (** Ins *)
-    pred_definitions :
-      ((string * string list) option * Asrt.t * string list) list;
+    pred_definitions : ((string * string list) option * Asrt.t) list;
         (** Predicate definitions *)
     pred_facts : Formula.t list;  (** Facts that hold for every definition *)
     pred_guard : Asrt.t option;  (** Cost for unfolding the predicate *)
@@ -848,7 +847,6 @@ module Lemma : sig
     lemma_hyp : Asrt.t;  (** Hypothesis *)
     lemma_concs : Asrt.t list;  (** Conclusion *)
     lemma_spec_variant : Expr.t option;  (** Variant *)
-    lemma_spec_hides : string list option;  (** Over-approximating logicals *)
   }
 
   type t = {

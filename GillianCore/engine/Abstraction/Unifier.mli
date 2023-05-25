@@ -105,8 +105,7 @@ module type S = sig
       - If it doesn't find one, it returns Some (None, input_state) *)
   val unfold_concrete_preds : t -> (st option * t) option
 
-  val unify_assertion :
-    ?is_post:bool -> t -> st -> string list option -> UP.step -> u_res
+  val unify_assertion : ?is_post:bool -> t -> st -> UP.step -> u_res
 
   val unify :
     ?is_post:bool ->

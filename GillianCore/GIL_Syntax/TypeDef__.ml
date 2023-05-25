@@ -211,8 +211,7 @@ and pred = {
   pred_num_params : int;
   pred_params : (string * typ option) list;
   pred_ins : int list;
-  pred_definitions :
-    ((string * string list) option * assertion * string list) list;
+  pred_definitions : ((string * string list) option * assertion) list;
   pred_facts : formula list;
   pred_guard : assertion option;
   pred_pure : bool;
@@ -225,7 +224,6 @@ and lemma_spec = {
   lemma_hyp : assertion;
   lemma_concs : assertion list;
   lemma_spec_variant : expr option;
-  lemma_spec_hides : string list option;
 }
 
 and lemma = {
