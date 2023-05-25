@@ -55,20 +55,31 @@ let load heap pfs gamma (loc : vt) (offset : vt) =
       | Error err -> Error [ err ]
       | Ok value -> Ok [ (heap, [ value ], [], []) ])
 
-let get_cell heap pfs gamma (loc : vt) (offset : vt) permission =
+let get_cell ~unification heap pfs gamma (loc : vt) (offset : vt) permission =
   match resolve_loc pfs gamma loc with
   | None -> Error [ WislSHeap.InvalidLocation ]
   | Some loc -> (
-      match WislSHeap.get_cell ~pfs ~gamma heap loc offset permission with
+      match
+        WislSHeap.get_cell ~unification ~pfs ~gamma heap loc offset permission
+      with
       | Error err -> Error [ err ]
       | Ok (loc, ofs, q, value) ->
           let loc = Expr.loc_from_loc_name loc in
           Ok [ (heap, [ loc; ofs; q; value ], [], []) ])
 
-let set_cell heap pfs gamma (loc : vt) (offset : vt) (value : vt) permission =
+let set_cell
+    ~unification
+    heap
+    pfs
+    gamma
+    (loc : vt)
+    (offset : vt)
+    (value : vt)
+    permission =
   let action new_pfs loc_name =
     match
-      WislSHeap.set_cell ~pfs ~gamma heap loc_name offset value permission
+      WislSHeap.set_cell ~unification ~pfs ~gamma heap loc_name offset value
+        permission
     with
     | Error e -> Error [ e ]
     | Ok fls -> Ok [ (heap, [], fls @ new_pfs, []) ]
@@ -85,10 +96,12 @@ let rem_cell heap pfs gamma (loc : vt) (offset : vt) permission =
       (* loc does not evaluate to a location, or we can't find it. *)
       Error [ InvalidLocation ]
 
-let get_bound heap pfs gamma loc permission =
+let get_bound ~unification heap pfs gamma loc permission =
   match FOSolver.resolve_loc_name ~pfs ~gamma loc with
   | Some loc_name -> (
-      match WislSHeap.get_bound ~pfs ~gamma heap loc_name permission with
+      match
+        WislSHeap.get_bound ~unification ~pfs ~gamma heap loc_name permission
+      with
       | Error e -> Error [ e ]
       | Ok (b, perm) ->
           let b = Expr.int b in
@@ -169,15 +182,15 @@ let alloc heap _pfs _gamma (size : int) =
         [] );
     ]
 
-let dispose heap pfs gamma loc_expr =
+let dispose ~unification heap pfs gamma loc_expr =
   match resolve_loc pfs gamma loc_expr with
   | Some loc_name -> (
-      match WislSHeap.dispose heap ~pfs ~gamma loc_name with
+      match WislSHeap.dispose ~unification heap ~pfs ~gamma loc_name with
       | Ok () -> Ok [ (heap, [], [], []) ]
       | Error e -> Error [ e ])
   | None -> Error [ InvalidLocation ]
 
-let execute_action ?unification:_ name heap pfs gamma args =
+let execute_action ?(unification = false) name heap pfs gamma args =
   let action = WislLActions.ac_from_str name in
   let ret =
     match action with
@@ -203,7 +216,7 @@ let execute_action ?unification:_ name heap pfs gamma args =
     | GetCell -> (
         match args with
         | [ loc_expr; offset_expr; permission ] ->
-            get_cell heap pfs gamma loc_expr offset_expr permission
+            get_cell ~unification heap pfs gamma loc_expr offset_expr permission
         | args ->
             failwith
               (Format.asprintf
@@ -213,7 +226,8 @@ let execute_action ?unification:_ name heap pfs gamma args =
     | SetCell -> (
         match args with
         | [ loc_expr; offset_expr; permission; value_expr ] ->
-            set_cell heap pfs gamma loc_expr offset_expr value_expr permission
+            set_cell ~unification heap pfs gamma loc_expr offset_expr value_expr
+              permission
         | args ->
             failwith
               (Format.asprintf
@@ -233,7 +247,7 @@ let execute_action ?unification:_ name heap pfs gamma args =
     | GetBound -> (
         match args with
         | [ loc_expr; permission ] ->
-            get_bound heap pfs gamma loc_expr permission
+            get_bound ~unification heap pfs gamma loc_expr permission
         | args ->
             failwith
               (Format.asprintf
@@ -299,7 +313,7 @@ let execute_action ?unification:_ name heap pfs gamma args =
                  args))
     | Dispose -> (
         match args with
-        | [ loc_expr ] -> dispose heap pfs gamma loc_expr
+        | [ loc_expr ] -> dispose ~unification heap pfs gamma loc_expr
         | args ->
             failwith
               (Format.asprintf

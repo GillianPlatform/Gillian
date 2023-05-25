@@ -149,7 +149,7 @@ let rec infer_single_assert_step asser known =
   let rec infer_formula f k =
     match WLFormula.get f with
     | WLFormula.LTrue | WLFormula.LFalse -> k
-    | WLFormula.LNot f -> infer_formula f k
+    | WLFormula.LNot _ -> TypeMap.empty
     | WLFormula.LAnd (f1, f2) | WLFormula.LOr (f1, f2) ->
         infer_formula f2 (infer_formula f1 known)
     | WLFormula.LEq (le1, le2) -> (

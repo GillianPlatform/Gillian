@@ -131,7 +131,7 @@ let alloc (heap : t) size =
   let () = Hashtbl.replace heap loc block in
   loc
 
-let dispose ~pfs ~gamma (heap : t) loc =
+let dispose ~unification ~pfs ~gamma (heap : t) loc =
   match Hashtbl.find_opt heap loc with
   | None -> Error (MissingResource (Cell, loc, None))
   | Some Freed -> Error (DoubleFree loc)
@@ -141,7 +141,7 @@ let dispose ~pfs ~gamma (heap : t) loc =
       let full_perm = Expr.num 1.0 in
       let fl q = Formula.Infix.(q#<.full_perm) in
       let can_be_less q =
-        Solver.check_satisfiability (fl q :: PFS.to_list pfs) gamma
+        Solver.check_satisfiability ~unification (fl q :: PFS.to_list pfs) gamma
       in
       if can_be_less perm then Error (MissingResource (Bound, loc, None))
       else
@@ -176,7 +176,7 @@ let check_sfvl ~pfs ~gamma ofs data none_case success_case =
       with an optional check for permission accounting, which is useful in the case of producers,
       but not for regular load operations.
 *)
-let access_cell ~pfs ~gamma heap loc ofs permission_check =
+let access_cell ~unification ~pfs ~gamma heap loc ofs permission_check =
   match Hashtbl.find_opt heap loc with
   | None -> Error (MissingResource (Cell, loc, Some ofs))
   | Some Block.Freed -> Error (UseAfterFree loc)
@@ -188,7 +188,7 @@ let access_cell ~pfs ~gamma heap loc ofs permission_check =
         | Some (n, _) ->
             let expr_n = Expr.int n in
             let open Formula.Infix in
-            if Solver.sat ~unification:false ~pfs ~gamma expr_n #<= ofs then
+            if Solver.sat ~unification ~pfs ~gamma expr_n #<= ofs then
               Error (OutOfBounds (Some n, loc, ofs))
             else Ok ()
       in
@@ -202,23 +202,34 @@ let access_cell ~pfs ~gamma heap loc ofs permission_check =
       check_sfvl ~pfs ~gamma ofs data none_case success_case
 
 let load ~pfs ~gamma heap loc ofs =
-  match access_cell ~pfs ~gamma heap loc ofs (fun _ -> None) with
+  match
+    access_cell ~unification:false ~pfs ~gamma heap loc ofs (fun _ -> None)
+  with
   | Error e -> Error e
   | Ok (_, _, _, v) -> Ok v
 
-let get_cell ~pfs ~gamma heap loc ofs out_perm =
+let get_cell ~unification ~pfs ~gamma heap loc ofs out_perm =
   let fl q = Formula.Infix.(q#<.out_perm) in
   let permission_check q =
-    if Solver.check_satisfiability (fl q :: PFS.to_list pfs) gamma then
-      Some Expr.Infix.(out_perm -. q)
+    if Solver.check_satisfiability ~unification (fl q :: PFS.to_list pfs) gamma
+    then Some Expr.Infix.(out_perm -. q)
     else None
   in
-  access_cell ~pfs ~gamma heap loc ofs permission_check
+  access_cell ~unification ~pfs ~gamma heap loc ofs permission_check
 
 (* Helper function: Performs the preliminary checks common to the set_cell and store
    operations and applies the "in_bounds" operation if the access to the allocated
    cell is within bounds *)
-let overwrite_cell ~pfs ~gamma heap loc_name ofs v out_perm in_bounds =
+let overwrite_cell
+    ~unification
+    ~pfs
+    ~gamma
+    heap
+    loc_name
+    ofs
+    v
+    out_perm
+    in_bounds =
   match Hashtbl.find_opt heap loc_name with
   | None ->
       let data =
@@ -234,7 +245,7 @@ let overwrite_cell ~pfs ~gamma heap loc_name ofs v out_perm in_bounds =
       | Some (n, perm) ->
           let expr_n = Expr.int n in
           let open Formula.Infix in
-          if Solver.sat ~unification:false ~pfs ~gamma expr_n #<= ofs then
+          if Solver.sat ~unification ~pfs ~gamma expr_n #<= ofs then
             Error (MissingResource (Bound, loc_name, Some ofs))
           else in_bounds data (Some (n, perm)))
 
@@ -264,12 +275,13 @@ let store ~pfs ~gamma heap loc_name ofs v =
     check_sfvl ~pfs ~gamma ofs data none_case some_case
   in
   match
-    overwrite_cell ~pfs ~gamma heap loc_name ofs v (Expr.num 1.0) in_bounds
+    overwrite_cell ~unification:false ~pfs ~gamma heap loc_name ofs v
+      (Expr.num 1.0) in_bounds
   with
   | Error e -> Error e
   | Ok _ -> Ok ()
 
-let set_cell ~pfs ~gamma heap loc_name ofs v out_perm =
+let set_cell ~unification ~pfs ~gamma heap loc_name ofs v out_perm =
   let in_bounds data bound =
     let full_perm = Expr.num 1.0 in
     let none_case () =
@@ -286,7 +298,7 @@ let set_cell ~pfs ~gamma heap loc_name ofs v out_perm =
     in
     check_sfvl ~pfs ~gamma ofs data none_case some_case
   in
-  overwrite_cell ~pfs ~gamma heap loc_name ofs v out_perm in_bounds
+  overwrite_cell ~unification ~pfs ~gamma heap loc_name ofs v out_perm in_bounds
 
 let rem_cell ~pfs ~gamma heap loc offset out_perm =
   match Hashtbl.find_opt heap loc with
@@ -307,7 +319,7 @@ let rem_cell ~pfs ~gamma heap loc offset out_perm =
           let () = Hashtbl.replace heap loc (Allocated { data; bound }) in
           Ok ())
 
-let get_bound ~pfs ~gamma heap loc out_perm =
+let get_bound ~unification ~pfs ~gamma heap loc out_perm =
   match Hashtbl.find_opt heap loc with
   | Some Block.Freed -> Error (UseAfterFree loc)
   | None -> Error (MissingResource (Cell, loc, None))
@@ -317,7 +329,7 @@ let get_bound ~pfs ~gamma heap loc out_perm =
       let _, q = bound in
       let fl = Formula.Infix.(q#<.out_perm) in
       let has_less_perm =
-        Solver.check_satisfiability (fl :: PFS.to_list pfs) gamma
+        Solver.check_satisfiability ~unification (fl :: PFS.to_list pfs) gamma
       in
       if has_less_perm then
         let missing_permission = Expr.Infix.(out_perm -. q) in

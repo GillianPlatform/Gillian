@@ -266,7 +266,7 @@ module Make (SMemory : SMemory.S) :
     let _, _, pfs, gamma, _ = state in
     let ps =
       List.map
-        (Reduction.reduce_formula
+        (Reduction.reduce_formula ~unification
            ~time:("SState: assume_a: " ^ time)
            ~pfs ~gamma)
         ps
