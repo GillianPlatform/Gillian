@@ -130,19 +130,20 @@ let trans_binop_expr ~fname binop te1 te2 =
   | Omulfs -> call BinOp_Functions.mulfs
   | _ -> failwith "Unhandled"
 
-let rec trans_expr ~fname ~local_env expr =
-  let trans_expr = trans_expr ~fname ~local_env in
+let rec trans_expr ~clight_prog ~fname ~local_env expr =
+  let trans_expr = trans_expr ~clight_prog ~fname ~local_env in
   let trans_binop_expr = trans_binop_expr ~fname in
   let gen_str = Generators.gen_str ~fname in
   let open Expr in
   match expr with
   | Evar id -> ([], PVar (true_name id))
   | Econst const -> ([], Lit (trans_const const))
-  | Eload (compcert_chunk, expp) ->
+  | Eload (_compcert_chunk, expp) ->
       let cl, e = trans_expr expp in
       let gvar = gen_str Prefix.gvar in
       let loadv = Expr.Lit (Literal.String Internal_Functions.loadv) in
-      let chunk = Chunk.of_compcert_ast_chunk compcert_chunk in
+      (* let chunk = Chunk.of_compcert_ast_chunk compcert_chunk in *)
+      let chunk = Chunk.Mptr in
       let cmd =
         Cmd.Call (gvar, loadv, [ expr_of_chunk chunk; e ], None, None)
       in
@@ -241,11 +242,15 @@ let get_invariant () =
   last_invariant := None;
   i
 
-let rec trans_stmt ~fname ~context stmt =
-  let trans_stmt ?(context = context) = trans_stmt ~fname ~context in
+let rec trans_stmt ~clight_prog ~fname ~context stmt =
+  let trans_stmt ?(context = context) =
+    trans_stmt ~clight_prog ~fname ~context
+  in
   let make_symb_gen = make_symb_gen ~fname in
   (* Default context is the given context *)
-  let trans_expr = trans_expr ~fname ~local_env:context.local_env in
+  let trans_expr =
+    trans_expr ~clight_prog ~fname ~local_env:context.local_env
+  in
   let gen_str = Generators.gen_str ~fname in
   match stmt with
   | Sskip -> [ (annot_ctx context, None, Cmd.Skip) ]
@@ -565,6 +570,7 @@ let alloc_var fname (name, sz) =
 let trans_function
     ?(gil_annot = Gil_logic_gen.empty)
     ?(exec_mode = Exec_mode.Verification)
+    ~clight_prog
     filepath
     fname
     fdef =
@@ -598,7 +604,7 @@ let trans_function
       [ (empty_annot, None, Cmd.Call (gvar, expr_fn, [], None, None)) ]
     else []
   in
-  let body = trans_stmt ~fname ~context fn_body in
+  let body = trans_stmt ~clight_prog ~fname ~context fn_body in
   let body_with_registrations =
     init_genv @ register_vars @ register_temps @ body
   in
@@ -751,7 +757,8 @@ let rec trans_globdefs
       ( new_def :: genv_defs,
         init_acts,
         new_bi_specs,
-        trans_function ~gil_annot ~exec_mode filepath symbol f :: fs,
+        trans_function ~clight_prog ~gil_annot ~exec_mode filepath symbol f
+        :: fs,
         new_syms )
   | (id, Gfun (External f)) :: r
     when (is_builtin_func (true_name id) && not_implemented f)
