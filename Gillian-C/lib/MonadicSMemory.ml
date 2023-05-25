@@ -1064,10 +1064,21 @@ let get_fixes _heap _pfs _gamma err =
             (Expr.EList [ Expr.string float_type; new_var_e ], Type.NumberType)
         | Mint64 ->
             (Expr.EList [ Expr.string long_type; new_var_e ], Type.IntType)
+        (* TODO: Change this *)
+        | Mptr ->
+            if Compcert.Archi.ptr64 then
+              (Expr.EList [ Expr.string long_type; new_var_e ], Type.IntType)
+            else (Expr.EList [ Expr.string int_type; new_var_e ], Type.IntType)
         | _ -> (Expr.EList [ Expr.string int_type; new_var_e ], Type.IntType)
       in
+      (* TODO: Change this *)
+      let new_chunk =
+        match chunk with
+        | Mptr -> Chunk.Mint64
+        | _ -> chunk
+      in
       [
-        ( [ AddSingle { loc; ofs; value; chunk } ],
+        ( [ AddSingle { loc; ofs; value; chunk = new_chunk } ],
           [],
           [ (new_var, vtype) ],
           set,

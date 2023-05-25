@@ -19,7 +19,7 @@ let of_compcert_ast_chunk : Compcert.AST.memory_chunk -> t = function
   | Mint64 -> Mint64
   | Mfloat32 -> Mfloat32
   | Mfloat64 -> Mfloat64
-  | Many32 | Many64 -> Mptr
+  | Many32 | Many64 -> Mptr (* Should we fail with error here instead? *)
 
 let to_compcert_ast_chunk : t -> Compcert.AST.memory_chunk = function
   | Mint8signed -> Mint8signed

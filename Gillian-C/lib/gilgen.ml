@@ -130,20 +130,82 @@ let trans_binop_expr ~fname binop te1 te2 =
   | Omulfs -> call BinOp_Functions.mulfs
   | _ -> failwith "Unhandled"
 
-let rec trans_expr ~clight_prog ~fname ~local_env expr =
-  let trans_expr = trans_expr ~clight_prog ~fname ~local_env in
+let rec num_to_integer_h n index =
+  let open BinNums in
+  match n with
+  | Coq_xI x ->
+      int_of_float (2. ** float_of_int index) + num_to_integer_h x (index + 1)
+  | Coq_xO x -> num_to_integer_h x (index + 1)
+  | Coq_xH -> 1
+
+let num_to_integer n = num_to_integer_h n 0
+
+let rec pp_expr fmt expr =
+  match expr with
+  | Evar id -> Fmt.pf fmt "Evar id NUM[%d]" (num_to_integer id)
+  | Eaddrof _id -> Fmt.pf fmt "Eaddrof id"
+  | Econst _constant -> Fmt.pf fmt "Econst constant"
+  | Eunop (_unop, e) -> Fmt.pf fmt "Eunop unop (%a)" pp_expr e
+  | Ebinop (_binop, e1, e2) ->
+      Fmt.pf fmt "Ebinop binop (%a) (%a)" pp_expr e1 pp_expr e2
+  | Eload (_memory_chunk, e) -> Fmt.pf fmt "Eload mem_chunk (%a)" pp_expr e
+
+let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
+  let trans_expr = trans_expr ~clight_prog ~fname ~fid ~local_env in
   let trans_binop_expr = trans_binop_expr ~fname in
   let gen_str = Generators.gen_str ~fname in
   let open Expr in
+  Logging.verbose (fun m -> m "[!!!] FUNCTION NAME: %s" fname);
+  Logging.verbose (fun m -> m "[!!!] FUNCTION fid: %d" (num_to_integer fid));
+  Logging.verbose (fun m -> m "[!!!] %a" pp_expr expr);
   match expr with
   | Evar id -> ([], PVar (true_name id))
   | Econst const -> ([], Lit (trans_const const))
-  | Eload (_compcert_chunk, expp) ->
+  | Eload (compcert_chunk, expp) ->
       let cl, e = trans_expr expp in
       let gvar = gen_str Prefix.gvar in
       let loadv = Expr.Lit (Literal.String Internal_Functions.loadv) in
-      (* let chunk = Chunk.of_compcert_ast_chunk compcert_chunk in *)
-      let chunk = Chunk.Mptr in
+
+      (* Lookup type of variable using Clight program to determine whether it is a pointer *)
+      let chunk =
+        match compcert_chunk with
+        (* Check whether chunk is a pointer - Mint64 or Mint32 can be pointer types *)
+        | Mint64 | Mint32 ->
+            let () =
+              match expp with
+              (* Get the id of the variable from CSharpMinor *)
+              | Ebinop (_, Evar id, _) ->
+                  Logging.verbose (fun m ->
+                      m "ID of variable: [%d]" (num_to_integer id));
+                  let open Clight in
+                  (* Look up the function id of the Clight program *)
+                  let clight_fun =
+                    Gil_logic_gen.get_clight_fun clight_prog fid
+                  in
+                  Logging.verbose (fun m -> m "BEGINNING SEARCH FOR VARS");
+                  let rec search_clight_fun_vars clight_fun_vars =
+                    match clight_fun_vars with
+                    | (var_id, _) :: xs ->
+                        Logging.verbose (fun m ->
+                            m "FUNCTION VARIABLE IDENTS: %d"
+                              (num_to_integer var_id));
+                        if var_id = id then true else search_clight_fun_vars xs
+                    | [] ->
+                        Logging.verbose (fun m -> m "COMPLETED SEARCH");
+                        false
+                  in
+                  let clight_fun_vars = clight_fun.fn_vars in
+                  if search_clight_fun_vars clight_fun_vars then
+                    Logging.verbose (fun m -> m "YES")
+                  else Logging.verbose (fun m -> m "NO");
+                  ()
+              | _ -> Logging.verbose (fun m -> m "Not found")
+            in
+            Chunk.Mptr
+        | _ -> Chunk.of_compcert_ast_chunk compcert_chunk
+      in
+
+      (*  *)
       let cmd =
         Cmd.Call (gvar, loadv, [ expr_of_chunk chunk; e ], None, None)
       in
@@ -242,14 +304,14 @@ let get_invariant () =
   last_invariant := None;
   i
 
-let rec trans_stmt ~clight_prog ~fname ~context stmt =
+let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
   let trans_stmt ?(context = context) =
-    trans_stmt ~clight_prog ~fname ~context
+    trans_stmt ~clight_prog ~fname ~fid ~context
   in
   let make_symb_gen = make_symb_gen ~fname in
   (* Default context is the given context *)
   let trans_expr =
-    trans_expr ~clight_prog ~fname ~local_env:context.local_env
+    trans_expr ~clight_prog ~fname ~fid ~local_env:context.local_env
   in
   let gen_str = Generators.gen_str ~fname in
   match stmt with
@@ -573,7 +635,8 @@ let trans_function
     ~clight_prog
     filepath
     fname
-    fdef =
+    fdef
+    fid =
   let { fn_sig = _; fn_params; fn_vars; fn_temps; fn_body } = fdef in
   (* Getting rid of the ids immediately *)
   let fn_vars = List.map (fun (id, sz) -> (true_name id, sz)) fn_vars in
@@ -604,7 +667,7 @@ let trans_function
       [ (empty_annot, None, Cmd.Call (gvar, expr_fn, [], None, None)) ]
     else []
   in
-  let body = trans_stmt ~clight_prog ~fname ~context fn_body in
+  let body = trans_stmt ~clight_prog ~fname ~fid ~context fn_body in
   let body_with_registrations =
     init_genv @ register_vars @ register_temps @ body
   in
@@ -757,7 +820,7 @@ let rec trans_globdefs
       ( new_def :: genv_defs,
         init_acts,
         new_bi_specs,
-        trans_function ~clight_prog ~gil_annot ~exec_mode filepath symbol f
+        trans_function ~clight_prog ~gil_annot ~exec_mode filepath symbol f id
         :: fs,
         new_syms )
   | (id, Gfun (External f)) :: r
