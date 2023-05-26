@@ -474,7 +474,8 @@ logic_assertion:
         | [a] -> WLExpr.get_loc a
         | _::r -> get_lend r
       in
-      let bare_assert = WLAssert.LPointsTo (le1, le2) in
+      let le_perm = List.map (fun expr -> (None, expr)) le2 in
+      let bare_assert = WLAssert.LPointsTo (le1, le_perm) in
       let lstart = WLExpr.get_loc le1 in
       let lend = get_lend le2 in
       let loc = CodeLoc.merge lstart lend in
@@ -486,7 +487,8 @@ logic_assertion:
         | [a] -> WLExpr.get_loc a
         | _::r -> get_lend r
       in
-      let bare_assert = WLAssert.LBlockPointsTo (le1, le2) in
+      let le_perm = List.map (fun expr -> (None, expr)) le2 in
+      let bare_assert = WLAssert.LBlockPointsTo (le1, le_perm) in
       let lstart = WLExpr.get_loc le1 in
       let lend = get_lend le2 in
       let loc = CodeLoc.merge lstart lend in

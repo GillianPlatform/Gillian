@@ -309,7 +309,7 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
       ?(ptr_opt = None)
       ?(curr = 0)
       (le1 : WLExpr.t)
-      (lle : WLExpr.t list) : string list * Asrt.t =
+      (lle : (WLExpr.t option * WLExpr.t) list) : string list * Asrt.t =
     let compile_pointsto = compile_pointsto ~start:false in
     let exs1, la1, (loc, offset), expr_offset =
       match ptr_opt with
@@ -363,24 +363,34 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
               least one value\n\
               It is not the case in : %a" WLAssert.pp asser)
     | [ le ] ->
+        let perm, le = le in
         let exs2, la2, e2 = compile_lexpr le in
-        ( exs1 @ exs2,
+        let exs3, la3, e3 =
+          match perm with
+          | None -> ([], [], Expr.num 1.0)
+          | Some perm -> compile_lexpr perm
+        in
+        ( exs1 @ exs2 @ exs3,
           concat_star
-            (Constr.cell ~loc:eloc ~offset:eoffs ~value:e2
-               ~permission:(Expr.num 1.0))
-            (bound @ la1 @ la2) )
+            (Constr.cell ~loc:eloc ~offset:eoffs ~value:e2 ~permission:e3)
+            (bound @ la1 @ la2 @ la3) )
     | le :: r ->
+        let perm, le = le in
         let exs2, la2, e2 = compile_lexpr le in
-        let exs3, la3 =
+        let exs3, la3, e3 =
+          match perm with
+          | None -> ([], [], Expr.num 1.0)
+          | Some perm -> compile_lexpr perm
+        in
+        let exs4, la4 =
           compile_pointsto ~block
             ~ptr_opt:(Some (loc, offset))
             le1 r ~curr:(curr + 1)
         in
-        ( exs1 @ exs2 @ exs3,
+        ( exs1 @ exs2 @ exs3 @ exs4,
           concat_star
-            (Constr.cell ~loc:eloc ~offset:eoffs ~value:e2
-               ~permission:(Expr.num 1.0))
-            (bound @ (la3 :: (la1 @ la2))) )
+            (Constr.cell ~loc:eloc ~offset:eoffs ~value:e2 ~permission:e3)
+            (bound @ (la4 :: (la1 @ la2 @ la3))) )
   in
   WLAssert.(
     match get asser with

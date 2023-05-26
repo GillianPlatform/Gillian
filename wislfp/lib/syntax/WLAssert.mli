@@ -2,9 +2,9 @@ type tt =
   | LEmp
   | LStar of t * t
   | LPred of string * WLExpr.t list
-  | LPointsTo of WLExpr.t * WLExpr.t list
+  | LPointsTo of WLExpr.t * (WLExpr.t option * WLExpr.t) list
       (** x -> a, b <=> (x -> a) * (x+1 -> b) *)
-  | LBlockPointsTo of WLExpr.t * WLExpr.t list
+  | LBlockPointsTo of WLExpr.t * (WLExpr.t option * WLExpr.t) list
   | LPure of WLFormula.t
 
 and t

@@ -174,14 +174,24 @@ let rec infer_single_assert_step asser known =
       infer_single_assert_step la2 (infer_single_assert_step la1 known)
   | WLAssert.LPred (_, lel) -> List.fold_left infer_logic_expr known lel
   | WLAssert.LPointsTo (le1, le2) ->
+      let le_perm =
+        List.map Option.get @@ List.filter Option.is_some @@ List.map fst le2
+      in
+      let le2 = List.map snd le2 in
       let inferred =
         List.fold_left infer_logic_expr (infer_logic_expr known le1) le2
       in
+      let inferred = List.fold_left infer_logic_expr inferred le_perm in
       needs_to_be le1 WList inferred
   | WLAssert.LBlockPointsTo (le1, le2) ->
+      let le_perm =
+        List.map Option.get @@ List.filter Option.is_some @@ List.map fst le2
+      in
+      let le2 = List.map snd le2 in
       let inferred =
         List.fold_left infer_logic_expr (infer_logic_expr known le1) le2
       in
+      let inferred = List.fold_left infer_logic_expr inferred le_perm in
       needs_to_be le1 WList inferred
   | WLAssert.LPure f -> infer_formula f known
 
