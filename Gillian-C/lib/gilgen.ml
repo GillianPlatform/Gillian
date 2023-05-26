@@ -140,18 +140,18 @@ let rec num_to_integer_h n index =
 
 let num_to_integer n = num_to_integer_h n 0
 
-let pp_coq_type fmt typ =
-  let open Ctypes in
-  match typ with
-  | Tvoid -> Fmt.pf fmt "Tvoid"
-  | Tint _ -> Fmt.pf fmt "Tint"
-  | Tlong _ -> Fmt.pf fmt "Tlong"
-  | Tfloat _ -> Fmt.pf fmt "Tfloat"
-  | Tpointer _ -> Fmt.pf fmt "Tpointer"
-  | Tarray _ -> Fmt.pf fmt "Tarray"
-  | Tfunction _ -> Fmt.pf fmt "Tfunction"
-  | Tstruct _ -> Fmt.pf fmt "Tstruct"
-  | Tunion _ -> Fmt.pf fmt "Tunion"
+(* let pp_coq_type fmt typ =
+   let open Ctypes in
+   match typ with
+   | Tvoid -> Fmt.pf fmt "Tvoid"
+   | Tint _ -> Fmt.pf fmt "Tint"
+   | Tlong _ -> Fmt.pf fmt "Tlong"
+   | Tfloat _ -> Fmt.pf fmt "Tfloat"
+   | Tpointer _ -> Fmt.pf fmt "Tpointer"
+   | Tarray _ -> Fmt.pf fmt "Tarray"
+   | Tfunction _ -> Fmt.pf fmt "Tfunction"
+   | Tstruct _ -> Fmt.pf fmt "Tstruct"
+   | Tunion _ -> Fmt.pf fmt "Tunion" *)
 
 let rec pp_expr fmt expr =
   match expr with
@@ -185,62 +185,11 @@ let rec pp_stmt fmt stmt =
       Fmt.pf fmt "[stmt] Slabel (%d, %a)" (num_to_integer label) pp_stmt s
   | Sgoto label -> Fmt.pf fmt "[stmt] Sgoto (%d)" (num_to_integer label)
 
-let rec pp_clight_expr fmt expr =
-  let open Clight in
-  match expr with
-  | Econst_int _ -> Fmt.pf fmt "Econst_int (UNDEFINED)"
-  | Econst_float _ -> Fmt.pf fmt "Econst_float (UNDEFINED)"
-  | Econst_single _ -> Fmt.pf fmt "Econst_single (UNDEFINED)"
-  | Econst_long _ -> Fmt.pf fmt "Econst_long (UNDEFINED)"
-  | Evar (id, _type) ->
-      Fmt.pf fmt "Evar (ID:%d) (UNDEFINED)" (num_to_integer id)
-  | Etempvar (id, typ) ->
-      Fmt.pf fmt "Etempvar (%d) (%a)" (num_to_integer id) pp_coq_type typ
-  | Ederef (e, typ) ->
-      Fmt.pf fmt "Ederef (%a) (%a)" pp_clight_expr e pp_coq_type typ
-  | Eaddrof _ -> Fmt.pf fmt "Eaddrof (UNDEFINED)"
-  | Eunop (_, e, _) -> Fmt.pf fmt "Eunop BINOP %a (SOME TYPE)" pp_clight_expr e
-  | Ebinop (_, e1, e2, _) ->
-      Fmt.pf fmt "Ebinop BINOP %a %a (SOME TYPE)" pp_clight_expr e1
-        pp_clight_expr e2
-  | Ecast _ -> Fmt.pf fmt "Ecast (UNDEFINED)"
-  | Efield (e, id, typ) ->
-      Fmt.pf fmt "Efield (%a) (%d) (%a)" pp_clight_expr e (num_to_integer id)
-        pp_coq_type typ
-  | Esizeof _ -> Fmt.pf fmt "Esizeof (UNDEFINED)"
-  | Ealignof _ -> Fmt.pf fmt "Ealignof (UNDEFINED)"
-
-let rec pp_clight_stmt fmt statement =
-  let open Clight in
-  match statement with
-  | Sskip -> Fmt.pf fmt "Sskip"
-  | Sassign (e1, e2) ->
-      Fmt.pf fmt "Sassign (%a) (%a)" pp_clight_expr e1 pp_clight_expr e2
-  | Sset (id, e) ->
-      Fmt.pf fmt "Sset (%d) (%a)" (num_to_integer id) pp_clight_expr e
-  | Scall _ -> Fmt.pf fmt "Scall"
-  | Sbuiltin _ -> Fmt.pf fmt "Sbuiltin"
-  | Ssequence (s1, s2) ->
-      Fmt.pf fmt "Ssequence (%a) (%a)" pp_clight_stmt s1 pp_clight_stmt s2
-  | Sifthenelse _ -> Fmt.pf fmt "Sifthenelse "
-  | Sloop (s1, s2) ->
-      Fmt.pf fmt "Sloop (%a, %a)" pp_clight_stmt s1 pp_clight_stmt s2
-  | Sbreak -> Fmt.pf fmt "Sbreak"
-  | Scontinue -> Fmt.pf fmt "Scontinue"
-  | Sreturn _ -> Fmt.pf fmt "Sreturn "
-  | Sswitch _ -> Fmt.pf fmt "Sswitch "
-  | Slabel (label, s) ->
-      Fmt.pf fmt "Slabel (%d, %a)" (num_to_integer label) pp_clight_stmt s
-  | Sgoto label -> Fmt.pf fmt "[stmt] Sgoto (%d)" (num_to_integer label)
-
 let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
   let trans_expr = trans_expr ~clight_prog ~fname ~fid ~local_env in
   let trans_binop_expr = trans_binop_expr ~fname in
   let gen_str = Generators.gen_str ~fname in
   let open Expr in
-  Logging.verbose (fun m -> m "[!!!] FUNCTION NAME: %s" fname);
-  Logging.verbose (fun m -> m "[!!!] FUNCTION fid: %d" (num_to_integer fid));
-  Logging.verbose (fun m -> m "[!!!] %a" pp_expr expr);
   match expr with
   | Evar id -> ([], PVar (true_name id))
   | Econst const -> ([], Lit (trans_const const))
@@ -253,56 +202,34 @@ let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
       let chunk =
         match compcert_chunk with
         (* Check whether chunk is a pointer - Mint64 or Mint32 can be pointer types *)
-        | Mint64 | Mint32 ->
-            let () =
+        | Mint64 | Mint32 -> (
+            let typ =
               match expp with
               (* Get the id of the variable from CSharpMinor *)
-              | Ebinop (_, Evar _id, _) ->
+              | Ebinop (_, Evar id, _) ->
                   let open Clight in
-                  let id = BinNums.Coq_xH in
-                  Logging.verbose (fun m ->
-                      m "ID of variable: [%d]" (num_to_integer id));
-                  (* Look up the function id of the Clight program *)
-                  let clight_funs = clight_prog.Ctypes.prog_defs in
-                  let rec pp_clight_funs fmt clight_funs =
-                    match clight_funs with
-                    | (id, _f) :: xs ->
-                        Fmt.pf fmt "Function ID: %d\n" (num_to_integer id);
-                        pp_clight_funs fmt xs
-                    | [] -> Fmt.pf fmt "End of functions\n\n"
-                  in
-                  let () =
-                    Logging.verbose (fun m ->
-                        m "Printing Clight functions\n%a" pp_clight_funs
-                          clight_funs)
+                  let rec find_var var_list =
+                    match var_list with
+                    | (var_id, var_typ) :: vs ->
+                        if var_id == id then var_typ else find_var vs
+                    | _ ->
+                        failwith
+                          (Printf.sprintf
+                             "Variable with ident %d was not found inside \
+                              function %s of Clight"
+                             (num_to_integer id) fname)
                   in
                   let clight_fun =
                     Gil_logic_gen.get_clight_fun clight_prog fid
                   in
-                  let clight_fun_body = clight_fun.fn_body in
-                  Logging.verbose (fun m ->
-                      m "[clight function body] %a " pp_clight_stmt
-                        clight_fun_body);
-                  (* let clight_tmp_vars = clight_fun.fn_temps *)
-                  let rec search_list vs =
-                    match vs with
-                    | (v_id, v_typ) :: xs ->
-                        Logging.verbose (fun m ->
-                            m "Found Temp Var: id:%d, \n%a"
-                              (num_to_integer v_id) pp_coq_type v_typ);
-                        search_list xs
-                    | _ -> Logging.verbose (fun m -> m "No more Temp Vars")
-                  in
-                  Logging.verbose (fun m ->
-                      m "[clight function vars list length] %d"
-                        (List.length clight_fun.fn_params));
-                  search_list
+                  find_var
                     (clight_fun.fn_params @ clight_fun.fn_vars
                    @ clight_fun.fn_temps)
-                  (*  *)
-              | _ -> Logging.verbose (fun m -> m "Not found")
+              | _ -> failwith (Printf.sprintf "Unexpected type")
             in
-            Chunk.Mptr
+            match typ with
+            | Tpointer _ -> Chunk.Mptr
+            | _ -> Chunk.of_compcert_ast_chunk compcert_chunk)
         | _ -> Chunk.of_compcert_ast_chunk compcert_chunk
       in
 

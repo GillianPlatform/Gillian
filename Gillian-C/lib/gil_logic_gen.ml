@@ -894,26 +894,6 @@ let get_clight_fun clight_prog ident =
   in
   act_f
 
-(* let find_ident clight_prog fid ident =
-   let _, f =
-     List.find (fun (a, _) -> Camlcoq.P.eq a fid) clight_prog.Ctypes.prog_defs
-   in
-   let act_f =
-     match f with
-     | Gfun (Internal fp) -> fp
-     | _ ->
-         failwith
-           (Printf.sprintf "This is not a function it seems : %s" (true_name fid))
-   in
-   let rec search_clight_fun_vars clight_fun_vars =
-     match clight_fun_vars with
-     | (var_id, _) :: xs ->
-         if var_id = ident then true else search_clight_fun_vars xs
-     | [] -> false
-   in
-   let clight_fun_vars = act_f.fn_vars in
-   search_clight_fun_vars clight_fun_vars *)
-
 let predicate_from_triple (e, csmt, ct) =
   let pred pname = Asrt.Pred (pname, [ e ]) in
   let open Internal_Predicates in
