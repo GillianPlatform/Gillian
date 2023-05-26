@@ -150,6 +150,41 @@ let rec pp_expr fmt expr =
       Fmt.pf fmt "Ebinop binop (%a) (%a)" pp_expr e1 pp_expr e2
   | Eload (_memory_chunk, e) -> Fmt.pf fmt "Eload mem_chunk (%a)" pp_expr e
 
+let rec pp_clight_stmt fmt statement =
+  let open Clight in
+  match statement with
+  (* | Sskip -> Fmt.pf fmt "Sskip"
+     | Sassign _ -> Fmt.pf fmt "Sskip"
+     | Sset _ -> Fmt.pf fmt "Sskip"
+     | Scall _ -> Fmt.pf fmt "Sskip"
+     | Sbuiltin _ -> Fmt.pf fmt "Sskip"
+     | Ssequence _ -> Fmt.pf fmt "Sskip"
+     | Sifthenelse _ -> Fmt.pf fmt "Sskip"
+     | Sloop _ -> Fmt.pf fmt "Sskip"
+     | Sbreak -> Fmt.pf fmt "Sskip"
+     | Scontinue -> Fmt.pf fmt "Sskip"
+     | Sreturn _ -> Fmt.pf fmt "Sskip"
+     | Sswitch _ -> Fmt.pf fmt "Sskip"
+     | Slabel _ -> Fmt.pf fmt "Sskip"
+     | Sgoto _ -> Fmt.pf fmt "Sskip" *)
+  | Sskip -> Fmt.pf fmt "Sskip"
+  | Sassign (_, _) -> Fmt.pf fmt "Sassign"
+  | Sset (id, _) -> Fmt.pf fmt "Sset (%d)" (num_to_integer id)
+  | Scall _ -> Fmt.pf fmt "Scall"
+  | Sbuiltin _ -> Fmt.pf fmt "Sbuiltin"
+  | Ssequence (s1, s2) ->
+      Fmt.pf fmt "Ssequence (%a) (%a)" pp_clight_stmt s1 pp_clight_stmt s2
+  | Sifthenelse _ -> Fmt.pf fmt "Sifthenelse "
+  | Sloop (s1, s2) ->
+      Fmt.pf fmt "Sloop (%a, %a)" pp_clight_stmt s1 pp_clight_stmt s2
+  | Sbreak -> Fmt.pf fmt "Sbreak"
+  | Scontinue -> Fmt.pf fmt "Scontinue"
+  | Sreturn _ -> Fmt.pf fmt "Sreturn "
+  | Sswitch _ -> Fmt.pf fmt "Sswitch "
+  | Slabel (label, s) ->
+      Fmt.pf fmt "Slabel (%d, %a)" (num_to_integer label) pp_clight_stmt s
+  | Sgoto label -> Fmt.pf fmt "[stmt] Sgoto (%d)" (num_to_integer label)
+
 let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
   let trans_expr = trans_expr ~clight_prog ~fname ~fid ~local_env in
   let trans_binop_expr = trans_binop_expr ~fname in
@@ -174,7 +209,8 @@ let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
             let () =
               match expp with
               (* Get the id of the variable from CSharpMinor *)
-              | Ebinop (_, Evar id, _) ->
+              | Ebinop (_, Evar _id, _) ->
+                  let id = BinNums.Coq_xH in
                   Logging.verbose (fun m ->
                       m "ID of variable: [%d]" (num_to_integer id));
                   let open Clight in
@@ -182,20 +218,23 @@ let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
                   let clight_fun =
                     Gil_logic_gen.get_clight_fun clight_prog fid
                   in
-                  Logging.verbose (fun m -> m "BEGINNING SEARCH FOR VARS");
+                  (* Print out the name of the function *)
+                  let clight_fun_body = clight_fun.fn_body in
+                  Logging.verbose (fun m ->
+                      m "[clight function body] %a " pp_clight_stmt
+                        clight_fun_body);
                   let rec search_clight_fun_vars clight_fun_vars =
                     match clight_fun_vars with
                     | (var_id, _) :: xs ->
                         Logging.verbose (fun m ->
-                            m "FUNCTION VARIABLE IDENTS: %d"
-                              (num_to_integer var_id));
+                            m "FUNCTION VARIABLE IDENTS: var_id:%d id:%d"
+                              (num_to_integer var_id) (num_to_integer id));
                         if var_id = id then true else search_clight_fun_vars xs
                     | [] ->
                         Logging.verbose (fun m -> m "COMPLETED SEARCH");
                         false
                   in
-                  let clight_fun_vars = clight_fun.fn_vars in
-                  if search_clight_fun_vars clight_fun_vars then
+                  if search_clight_fun_vars clight_fun.fn_vars then
                     Logging.verbose (fun m -> m "YES")
                   else Logging.verbose (fun m -> m "NO");
                   ()
@@ -304,6 +343,28 @@ let get_invariant () =
   last_invariant := None;
   i
 
+let rec pp_stmt fmt stmt =
+  match stmt with
+  | Sskip -> Fmt.pf fmt "[stmt] Sskip"
+  | Sset (id, e) ->
+      Fmt.pf fmt "[stmt] Sset (%d, %a)" (num_to_integer id) pp_expr e
+  | Sstore (chunk, e1, e2) ->
+      Fmt.pf fmt "[stmt] Sstore (%a, %a, %a)" Chunk.pp
+        (Chunk.of_compcert_ast_chunk chunk)
+        pp_expr e1 pp_expr e2
+  | Scall _ -> Fmt.pf fmt "[stmt] Scall"
+  | Sbuiltin _ -> Fmt.pf fmt "[stmt] Sbuiltin"
+  | Sseq (s1, s2) -> Fmt.pf fmt "[stmt] Sseq (%a, %a)" pp_stmt s1 pp_stmt s2
+  | Sifthenelse _ -> Fmt.pf fmt "[stmt] Sifthenelse "
+  | Sloop s -> Fmt.pf fmt "[stmt] Sloop (%a)" pp_stmt s
+  | Sblock s -> Fmt.pf fmt "[stmt] Sblock (%a)" pp_stmt s
+  | Sexit _ -> Fmt.pf fmt "[stmt] Sexit "
+  | Sswitch _ -> Fmt.pf fmt "[stmt] Sswitch "
+  | Sreturn _ -> Fmt.pf fmt "[stmt] Sreturn "
+  | Slabel (label, s) ->
+      Fmt.pf fmt "[stmt] Slabel (%d, %a)" (num_to_integer label) pp_stmt s
+  | Sgoto label -> Fmt.pf fmt "[stmt] Sgoto (%d)" (num_to_integer label)
+
 let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
   let trans_stmt ?(context = context) =
     trans_stmt ~clight_prog ~fname ~fid ~context
@@ -314,6 +375,8 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
     trans_expr ~clight_prog ~fname ~fid ~local_env:context.local_env
   in
   let gen_str = Generators.gen_str ~fname in
+  Logging.verbose (fun m -> m "[!!!] TRANSLATING STATEMENT");
+  Logging.verbose (fun m -> m "[!!!] %a" pp_stmt stmt);
   match stmt with
   | Sskip -> [ (annot_ctx context, None, Cmd.Skip) ]
   | Sset (id, exp) ->
