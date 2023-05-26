@@ -283,9 +283,22 @@ let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
                   Logging.verbose (fun m ->
                       m "[clight function body] %a " pp_clight_stmt
                         clight_fun_body);
+                  (* let clight_tmp_vars = clight_fun.fn_temps *)
+                  let rec search_list vs =
+                    match vs with
+                    | (v_id, v_typ) :: xs ->
+                        Logging.verbose (fun m ->
+                            m "Found Temp Var: id:%d, \n%a"
+                              (num_to_integer v_id) pp_coq_type v_typ);
+                        search_list xs
+                    | _ -> Logging.verbose (fun m -> m "No more Temp Vars")
+                  in
                   Logging.verbose (fun m ->
                       m "[clight function vars list length] %d"
-                        (List.length clight_fun.fn_vars))
+                        (List.length clight_fun.fn_params));
+                  search_list
+                    (clight_fun.fn_params @ clight_fun.fn_vars
+                   @ clight_fun.fn_temps)
                   (*  *)
               | _ -> Logging.verbose (fun m -> m "Not found")
             in
