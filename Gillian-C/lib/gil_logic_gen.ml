@@ -154,7 +154,7 @@ let assert_of_member cenv members id typ =
     let n_e = Expr.int_z n in
     let chunk =
       match Ctypes.access_mode ty with
-      | By_value chunk -> Chunk.of_compcert_ast_chunk chunk
+      | By_value chunk -> Chunk.of_compcert chunk
       | _ -> failwith "Array in a structure containing complicated types"
     in
     Constr.Core.array ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~size:n_e
@@ -180,7 +180,7 @@ let assert_of_member cenv members id typ =
     in
     let chunk =
       match Ctypes.access_mode typ with
-      | By_value chunk -> Chunk.of_compcert_ast_chunk chunk
+      | By_value chunk -> Chunk.of_compcert chunk
       | _ -> failwith "Invalid access mode for some type"
     in
     let ga_asrt =

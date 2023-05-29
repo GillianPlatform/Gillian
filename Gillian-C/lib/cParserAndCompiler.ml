@@ -282,12 +282,12 @@ let parse_and_compile_file path exec_mode =
   let last_clight = get_or_print_and_die (SimplLocals.transf_program clight) in
   let csm = get_or_print_and_die (Cshmgen.transl_program last_clight) in
   let () =
-    (* if !Config.burn_csm then *)
-    let pathcsm = Filename.chop_extension path ^ ".csm" in
-    let oc = open_out pathcsm in
-    let fmt = Format.formatter_of_out_channel oc in
-    let () = Format.fprintf fmt "%a" PrintCsharpminor.print_program csm in
-    close_out oc
+    if !Config.burn_csm then
+      let pathcsm = Filename.chop_extension path ^ ".csm" in
+      let oc = open_out pathcsm in
+      let fmt = Format.formatter_of_out_channel oc in
+      let () = Format.fprintf fmt "%a" PrintCsharpminor.print_program csm in
+      close_out oc
   in
   let mangled_syms = Hashtbl.create small_tbl_size in
   let annots = parse_annots path in

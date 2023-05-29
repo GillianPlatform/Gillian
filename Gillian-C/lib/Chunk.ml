@@ -8,9 +8,9 @@ type t =
   | Mfloat32
   | Mfloat64
   | Mptr
-[@@deriving yojson]
+[@@deriving eq, yojson]
 
-let of_compcert_ast_chunk : Compcert.AST.memory_chunk -> t = function
+let of_compcert : Compcert.AST.memory_chunk -> t = function
   | Mint8signed -> Mint8signed
   | Mint8unsigned -> Mint8unsigned
   | Mint16signed -> Mint16signed
@@ -21,7 +21,7 @@ let of_compcert_ast_chunk : Compcert.AST.memory_chunk -> t = function
   | Mfloat64 -> Mfloat64
   | Many32 | Many64 -> Mptr (* Should we fail with error here instead? *)
 
-let to_compcert_ast_chunk : t -> Compcert.AST.memory_chunk = function
+let to_compcert : t -> Compcert.AST.memory_chunk = function
   | Mint8signed -> Mint8signed
   | Mint8unsigned -> Mint8unsigned
   | Mint16signed -> Mint16signed
@@ -62,46 +62,17 @@ let type_of = function
   | Mfloat32 -> Compcert.AST.Tsingle
   | Mfloat64 -> Compcert.AST.Tfloat
   | Mptr ->
-      if Compcert.Archi.ptr64 then Compcert.AST.Tany64 else Compcert.AST.Tany32
+      if Compcert.Archi.ptr64 then Compcert.AST.Tlong else Compcert.AST.Tint
   | _ -> Tint
 
 let size chunk =
   let open Compcert in
-  let open BinNums in
-  let value =
-    match chunk with
-    | Mint8signed -> Memdata.size_chunk Mint8signed
-    | Mint8unsigned -> Memdata.size_chunk Mint8unsigned
-    | Mint16signed -> Memdata.size_chunk Mint16signed
-    | Mint16unsigned -> Memdata.size_chunk Mint16unsigned
-    | Mint32 -> Memdata.size_chunk Mint32
-    | Mint64 -> Memdata.size_chunk Mint64
-    | Mfloat32 -> Memdata.size_chunk Mfloat32
-    | Mfloat64 -> Memdata.size_chunk Mfloat64
-    | Mptr ->
-        if Compcert.Archi.ptr64 then Zpos (Coq_xO (Coq_xO (Coq_xO Coq_xH)))
-        else Zpos (Coq_xO (Coq_xO Coq_xH))
-  in
-  Camlcoq.Z.to_int value
+  to_compcert chunk |> Memdata.size_chunk |> Camlcoq.Z.to_int
 
 let size_expr chunk = Gil_syntax.Expr.int (size chunk)
 
 let align chunk =
   let open Compcert in
-  let open BinNums in
-  let value =
-    match chunk with
-    | Mint8signed -> Memdata.align_chunk Mint8signed
-    | Mint8unsigned -> Memdata.align_chunk Mint8unsigned
-    | Mint16signed -> Memdata.align_chunk Mint16signed
-    | Mint16unsigned -> Memdata.align_chunk Mint16unsigned
-    | Mint32 -> Memdata.align_chunk Mint32
-    | Mint64 -> Memdata.align_chunk Mint64
-    | Mfloat32 -> Memdata.align_chunk Mfloat32
-    | Mfloat64 -> Memdata.align_chunk Mfloat64
-    | Mptr -> Zpos (Coq_xO (Coq_xO Coq_xH))
-  in
-  Camlcoq.Z.to_int value
+  to_compcert chunk |> Memdata.align_chunk |> Camlcoq.Z.to_int
 
-let equal chunk1 chunk2 = chunk1 = chunk2
 let ptr = Mptr

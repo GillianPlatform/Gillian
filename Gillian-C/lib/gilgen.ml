@@ -169,8 +169,7 @@ let rec pp_stmt fmt stmt =
   | Sset (id, e) ->
       Fmt.pf fmt "[stmt] Sset (%d, %a)" (num_to_integer id) pp_expr e
   | Sstore (chunk, e1, e2) ->
-      Fmt.pf fmt "[stmt] Sstore (%a, %a, %a)" Chunk.pp
-        (Chunk.of_compcert_ast_chunk chunk)
+      Fmt.pf fmt "[stmt] Sstore (%a, %a, %a)" Chunk.pp (Chunk.of_compcert chunk)
         pp_expr e1 pp_expr e2
   | Scall _ -> Fmt.pf fmt "[stmt] Scall"
   | Sbuiltin _ -> Fmt.pf fmt "[stmt] Sbuiltin"
@@ -206,31 +205,34 @@ let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
             let typ =
               match expp with
               (* Get the id of the variable from CSharpMinor *)
-              | Ebinop (_, Evar id, _) ->
+              | Ebinop (_, Evar id, _) -> (
                   let open Clight in
-                  let rec find_var var_list =
-                    match var_list with
-                    | (var_id, var_typ) :: vs ->
-                        if var_id == id then var_typ else find_var vs
-                    | _ ->
-                        failwith
-                          (Printf.sprintf
-                             "Variable with ident %d was not found inside \
-                              function %s of Clight"
-                             (num_to_integer id) fname)
-                  in
                   let clight_fun =
                     Gil_logic_gen.get_clight_fun clight_prog fid
                   in
-                  find_var
-                    (clight_fun.fn_params @ clight_fun.fn_vars
-                   @ clight_fun.fn_temps)
+                  let all_vars =
+                    clight_fun.fn_params @ clight_fun.fn_vars
+                    @ clight_fun.fn_temps
+                  in
+
+                  match
+                    List.find_map
+                      (fun (var_id, var_typ) ->
+                        if Camlcoq.P.eq id var_id then Some var_typ else None)
+                      all_vars
+                  with
+                  | Some t -> t
+                  | None ->
+                      Fmt.failwith
+                        "Variable with ident %d was not found inside function \
+                         %s of Clight"
+                        (num_to_integer id) fname)
               | _ -> failwith (Printf.sprintf "Unexpected type")
             in
             match typ with
             | Tpointer _ -> Chunk.Mptr
-            | _ -> Chunk.of_compcert_ast_chunk compcert_chunk)
-        | _ -> Chunk.of_compcert_ast_chunk compcert_chunk
+            | _ -> Chunk.of_compcert compcert_chunk)
+        | _ -> Chunk.of_compcert compcert_chunk
       in
 
       (*  *)
@@ -339,7 +341,7 @@ let get_invariant () =
        Fmt.pf fmt "[stmt] Sset (%d, %a)" (num_to_integer id) pp_expr e
    | Sstore (chunk, e1, e2) ->
        Fmt.pf fmt "[stmt] Sstore (%a, %a, %a)" Chunk.pp
-         (Chunk.of_compcert_ast_chunk chunk)
+         (Chunk.of_compcert chunk)
          pp_expr e1 pp_expr e2
    | Scall _ -> Fmt.pf fmt "[stmt] Scall"
    | Sbuiltin _ -> Fmt.pf fmt "[stmt] Sbuiltin"
@@ -461,7 +463,7 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
   | Sstore (compcert_chunk, vaddr, v) ->
       let addr_eval_cmds, eaddr = trans_expr vaddr in
       let v_eval_cmds, ev = trans_expr v in
-      let chunk = Chunk.of_compcert_ast_chunk compcert_chunk in
+      let chunk = Chunk.of_compcert compcert_chunk in
       let chunk_string = ValueTranslation.string_of_chunk chunk in
       let chunk_expr = Expr.Lit (Literal.String chunk_string) in
       let annot_addr_eval = add_annots ~ctx:context addr_eval_cmds in

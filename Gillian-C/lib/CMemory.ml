@@ -29,8 +29,7 @@ let execute_store heap params =
   | [ String chunk_name; Loc loc; Int ofs; value ] -> (
       let compcert_val = ValueTranslation.compcert_of_gil value in
       let compcert_chunk =
-        Chunk.to_compcert_ast_chunk
-          (ValueTranslation.chunk_of_string chunk_name)
+        Chunk.to_compcert (ValueTranslation.chunk_of_string chunk_name)
       in
       let block = ValueTranslation.block_of_loc_name loc in
       let z_ofs = Compcert.Camlcoq.Z.of_sint (Z.to_int ofs) in
@@ -44,8 +43,7 @@ let execute_load heap params =
   match params with
   | [ Literal.String chunk_name; Loc loc_name; Int offset ] -> (
       let compcert_chunk =
-        Chunk.to_compcert_ast_chunk
-          (ValueTranslation.chunk_of_string chunk_name)
+        Chunk.to_compcert (ValueTranslation.chunk_of_string chunk_name)
       in
       let z_offset = ValueTranslation.z_of_int offset in
       let block = ValueTranslation.block_of_loc_name loc_name in
