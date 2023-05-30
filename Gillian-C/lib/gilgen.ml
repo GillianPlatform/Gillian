@@ -6,6 +6,10 @@ module Logging = Gillian.Logging
 module SS = Gillian.Utils.Containers.SS
 module Annot = Annot.Basic
 
+(* PRINTING STATEMENTS *)
+
+(*  *)
+
 let true_name = ValueTranslation.true_name
 
 type context = {
@@ -130,6 +134,7 @@ let trans_binop_expr ~fname binop te1 te2 =
   | Omulfs -> call BinOp_Functions.mulfs
   | _ -> failwith "Unhandled"
 
+(* Note: This function should be in the Camlcoq library. Implement it from there. *)
 let rec num_to_integer_h n index =
   let open BinNums in
   match n with
@@ -159,9 +164,11 @@ let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
         (* Check whether chunk is a pointer - Mint64 or Mint32 can be pointer types *)
         | Mint64 | Mint32 -> (
             let typ =
+              Logging.verbose (fun m ->
+                  m "ELoad expr type: %a" PrintCsharpminor.print_expr expp);
               match expp with
               (* Get the id of the variable from CSharpMinor *)
-              | Ebinop (_, Evar id, _) -> (
+              | Evar id | Ebinop (_, Evar id, _) -> (
                   let open Clight in
                   let clight_fun =
                     Gil_logic_gen.get_clight_fun clight_prog fid
@@ -183,7 +190,10 @@ let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
                         "Variable with ident %d was not found inside function \
                          %s of Clight"
                         (num_to_integer id) fname)
-              | _ -> failwith (Printf.sprintf "Unexpected type")
+              | _ ->
+                  failwith
+                    (Printf.sprintf
+                       "Unexpected expression for ELoad (expression load)")
             in
             match typ with
             | Tpointer _ -> Chunk.Mptr
@@ -393,9 +403,59 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
       let gil_lab = trans_label lab in
       [ (annot_ctx context, None, Cmd.Goto gil_lab) ]
   | Sstore (compcert_chunk, vaddr, v) ->
+      Logging.verbose (fun m ->
+          m "<!!!> Inside SStore:\n %a\n %a\n" PrintCsharpminor.print_expr vaddr
+            PrintCsharpminor.print_expr v);
       let addr_eval_cmds, eaddr = trans_expr vaddr in
       let v_eval_cmds, ev = trans_expr v in
-      let chunk = Chunk.of_compcert compcert_chunk in
+      (* let chunk = Chunk.of_compcert compcert_chunk in *)
+      (* So what we want to do is to determine whether vaddr is a pointer or not. If it is, then we will need to make the chunk a pointer! *)
+      let chunk =
+        match compcert_chunk with
+        (* Check whether chunk is a pointer - Mint64 or Mint32 can be pointer types *)
+        | Mint64 | Mint32 -> (
+            let typ =
+              match vaddr with
+              (* Note: There may be different types of expressions which occur on the LHS of an an assignment, and it is not necessarily an Evar id.
+                 For example, Struct.field = value, arr[10] = value, etc. These will need to be handled. *)
+              | Evar id | Ebinop (_, Evar id, _) -> (
+                  Logging.verbose (fun m ->
+                      m "Evar identified %d" (num_to_integer id));
+                  let open Clight in
+                  let clight_fun =
+                    Gil_logic_gen.get_clight_fun clight_prog fid
+                  in
+                  let all_vars =
+                    clight_fun.fn_params @ clight_fun.fn_vars
+                    @ clight_fun.fn_temps
+                  in
+                  match
+                    List.find_map
+                      (fun (var_id, var_typ) ->
+                        if Camlcoq.P.eq id var_id then Some var_typ else None)
+                      all_vars
+                  with
+                  | Some t -> t
+                  | None ->
+                      failwith
+                        (Printf.sprintf
+                           "Variable with ident %d was not found inside \
+                            function %s of Clight"
+                           (num_to_integer id) fname))
+              | _ ->
+                  failwith
+                    (Printf.sprintf
+                       "Unexpected expression for SStore (expression load)")
+            in
+            match typ with
+            | Tpointer _ ->
+                Logging.verbose (fun m -> m "TPointer identified");
+                Chunk.Mptr
+            | _ ->
+                Logging.verbose (fun m -> m "Other Type idenified");
+                Chunk.of_compcert compcert_chunk)
+        | _ -> Chunk.of_compcert compcert_chunk
+      in
       let chunk_string = ValueTranslation.string_of_chunk chunk in
       let chunk_expr = Expr.Lit (Literal.String chunk_string) in
       let annot_addr_eval = add_annots ~ctx:context addr_eval_cmds in
