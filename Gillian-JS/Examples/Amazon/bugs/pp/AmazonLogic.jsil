@@ -117,7 +117,7 @@ lemma PrependCElementsE(definition, buffer, readPos, eCount1, fCount, fList1, es
 ]]
 [*
     unfold CElements(#buffer, #readPos, #eCount1, #fCount, #fList1, #esLength1)
-      [bind: (#element := #fList) and (#eLength := #eLength) and (#restElements := #restElements) and (#restLength := #restESLength)] ;
+      [bind: (#fList := #element) and (#eLength := #eLength) and (#restElements := #restElements) and (#restESLength := #restLength)] ;
     if (0 < #eCount1) then {
         apply PrependCElementsE(#definition, #buffer, #readPos + #eLength, #eCount1 - 1, #fCount, #restElements, #restESLength, #eCount2, #fList2, #esLength2);
         unfold Elements(#definition, #buffer, (#eLength + #readPos), ((-1. + #eCount1) + #eCount2), #fCount, l+ (#restElements, #fList2), (#restESLength + #esLength2));
@@ -768,9 +768,9 @@ lemma FirstProjFunction(lst1, proj1, lst2, proj2)
     (#proj1 == #proj2)
 ]]
 [*
-    unfold FirstProj(#lst1, #proj1) [bind: (#fst := #fst1) and (#rest := #rest1) and (#fProjRest := #fProjRest1)];
+    unfold FirstProj(#lst1, #proj1) [bind: (#fst1 := #fst) and (#rest1 := #rest) and (#fProjRest1 := #fProjRest)];
     if (not (#lst1 = {{ }})) then {
-        unfold FirstProj(#lst2, #proj2) [bind: (#fst := #fst2) and (#rest := #rest2) and (#fProjRest := #fProjRest2)];
+        unfold FirstProj(#lst2, #proj2) [bind: (#fst2 := #fst) and (#rest2 := #rest) and (#fProjRest2 := #fProjRest)];
         apply FirstProjFunction(#rest1, #fProjRest1, #rest2, #fProjRest2)
     }
  *]
@@ -850,9 +850,9 @@ lemma ListToSetFunction(lst1, set1, lst2, set2)
     (#set1 == #set2)
 ]]
 [*
-    unfold ListToSet(#lst1, #set1) [bind: (#e := #h1) and (#restLst := #t1) and (#restSet := #restSet1)];
+    unfold ListToSet(#lst1, #set1) [bind: (#h1 := #e) and (#t1 := #restLst) and (#restSet1 := #restSet)];
     if (not (#lst1 = {{ }})) then {
-        unfold ListToSet(#lst2, #set2) [bind: (#e := #h2) and (#restLst := #t2) and (#restSet := #restSet2)];
+        unfold ListToSet(#lst2, #set2) [bind: (#h2 := #e) and (#t2 := #restLst) and (#restSet2 := #restSet)];
         apply ListToSetFunction(#t1, #restSet1, #t2, #restSet2)
     }
  *]
@@ -867,7 +867,7 @@ lemma ListToSetUnion(lst1, lst2)
 ]]
 [*
     sep_assert (#x == l+ (#lst1, #lst2)) [bind: #x];
-    unfold ListToSet(#lst1, #set1) [bind: (#e := #h1) and (#restLst := #rest1) and (#restSet := #restSet1)];
+    unfold ListToSet(#lst1, #set1) [bind: (#h1 := #e) and (#rest1 := #restLst) and (#restSet1 := #restSet)];
     if (#lst1 = {{ }}) then {
         apply ListToSetFunction(#lst2, #set2, #x, #uset)
     } else {
@@ -1019,9 +1019,9 @@ lemma UniqueAppendElement(lst, element)
     Unique(l+ (#lst, {{ #element }}))
 ]]
 [*
-    unfold Unique(#lst) [bind: (#fst := #fst) and (#rest := #rest) and (#setRest := #setRest1)];
+    unfold Unique(#lst) [bind: (#fst := #fst) and (#rest := #rest) and (#setRest1 := #setRest)];
     if (not (#lst = {{ }})) then {
-        unfold ListToSet(#lst, #set) [bind: (#restSet := #setRest2)];
+        unfold ListToSet(#lst, #set) [bind: (#setRest2 := #restSet)];
         apply ListToSetFunction(#rest, #setRest1, #rest, #setRest2);
         apply UniqueAppendElement(#rest, #element);
         apply ListToSetAddElement(#rest, #setRest2, #element)

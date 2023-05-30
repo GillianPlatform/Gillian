@@ -17,9 +17,9 @@ pure pred FirstProj(+lst : List, fProj : List) : (lst == {{  }}) *
 lemma FirstProjFunction(lst1, proj1, lst2, proj2)
   [[  FirstProj(#lst1, #proj1) * FirstProj(#lst2, #proj2) * (#lst1 == #lst2) ]]
   [[  (#proj1 == #proj2) ]]
-  [*  unfold FirstProj(#lst1, #proj1)  [bind: (#fst := #fst1) and (#rest := #rest1) and (#fProjRest := #fProjRest1)];
+  [*  unfold FirstProj(#lst1, #proj1)  [bind: (#fst1 := #fst) and (#rest1 := #rest) and (#fProjRest1 := #fProjRest)];
       if ((not (#lst1 = {{  }}))) then {
-        unfold FirstProj(#lst2, #proj2)  [bind: (#fst := #fst2) and (#rest := #rest2) and (#fProjRest := #fProjRest2)];
+        unfold FirstProj(#lst2, #proj2)  [bind: (#fst2 := #fst) and (#rest2 := #rest) and (#fProjRest2 := #fProjRest)];
         apply FirstProjFunction(#rest1, #fProjRest1, #rest2, #fProjRest2) 
       }
   *]

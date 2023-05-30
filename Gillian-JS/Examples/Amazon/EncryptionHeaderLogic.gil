@@ -363,7 +363,7 @@ lemma PrependCElementsE(definition, buffer, readPos, eCount1, fCount, fList1, es
 ]]
 [*
     unfold CElements(#buffer, #readPos, #eCount1, #fCount, #fList1, #esLength1)
-      [bind: (#element := #fList) and (#eLength := #eLength) and (#restElements := #restElements) and (#restLength := #restESLength)] ;
+      [bind: (#fList := #element) and (#eLength := #eLength) and (#restElements := #restElements) and (#restESLength := #restLength)] ;
     if (0 < #eCount1) then {
         apply PrependCElementsE(#definition, #buffer, #readPos + #eLength, #eCount1 - 1, #fCount, #restElements, #restESLength, #eCount2, #fList2, #esLength2);
         unfold Elements(#definition, #buffer, (#eLength + #readPos), ((-1. + #eCount1) + #eCount2), #fCount, l+ (#restElements, #fList2), (#restESLength + #esLength2));
