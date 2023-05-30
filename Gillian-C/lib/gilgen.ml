@@ -6,10 +6,6 @@ module Logging = Gillian.Logging
 module SS = Gillian.Utils.Containers.SS
 module Annot = Annot.Basic
 
-(* PRINTING STATEMENTS *)
-
-(*  *)
-
 let true_name = ValueTranslation.true_name
 
 type context = {
@@ -408,8 +404,6 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
             PrintCsharpminor.print_expr v);
       let addr_eval_cmds, eaddr = trans_expr vaddr in
       let v_eval_cmds, ev = trans_expr v in
-      (* let chunk = Chunk.of_compcert compcert_chunk in *)
-      (* So what we want to do is to determine whether vaddr is a pointer or not. If it is, then we will need to make the chunk a pointer! *)
       let chunk =
         match compcert_chunk with
         (* Check whether chunk is a pointer - Mint64 or Mint32 can be pointer types *)

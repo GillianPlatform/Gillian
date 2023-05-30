@@ -1051,39 +1051,48 @@ let get_fixes _heap _pfs _gamma err =
   Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
   match err with
   | MissingLocResource (Single, loc, Some ofs, Some chunk) ->
-      let new_var = LVar.alloc () in
-      let set = SS.singleton new_var in
-      let new_var_e = Expr.LVar new_var in
-      (* Initialize value based on chunk type (float, int or long) *)
-      let value, vtype =
+      let value, vtypes, set =
         let open CConstants.VTypes in
         match chunk with
         | Mfloat32 ->
-            (Expr.EList [ Expr.string single_type; new_var_e ], Type.NumberType)
+            let new_var = LVar.alloc () in
+            let set = SS.singleton new_var in
+            let new_var_e = Expr.LVar new_var in
+            ( Expr.EList [ Expr.string single_type; new_var_e ],
+              [ (new_var, Type.NumberType) ],
+              set )
         | Mfloat64 ->
-            (Expr.EList [ Expr.string float_type; new_var_e ], Type.NumberType)
+            let new_var = LVar.alloc () in
+            let set = SS.singleton new_var in
+            let new_var_e = Expr.LVar new_var in
+            ( Expr.EList [ Expr.string float_type; new_var_e ],
+              [ (new_var, Type.NumberType) ],
+              set )
         | Mint64 ->
-            (Expr.EList [ Expr.string long_type; new_var_e ], Type.IntType)
-        (* TODO: Change this *)
+            let new_var = LVar.alloc () in
+            let set = SS.singleton new_var in
+            let new_var_e = Expr.LVar new_var in
+            ( Expr.EList [ Expr.string long_type; new_var_e ],
+              [ (new_var, Type.IntType) ],
+              set )
         | Mptr ->
-            if Compcert.Archi.ptr64 then
-              (Expr.EList [ Expr.string long_type; new_var_e ], Type.IntType)
-            else (Expr.EList [ Expr.string int_type; new_var_e ], Type.IntType)
-        | _ -> (Expr.EList [ Expr.string int_type; new_var_e ], Type.IntType)
+            let new_var = LVar.alloc () in
+            let new_var_e = Expr.LVar new_var in
+            let new_var2 = LVar.alloc () in
+            let new_var_e2 = Expr.LVar new_var2 in
+            let set = SS.add new_var2 (SS.singleton new_var) in
+            ( Expr.EList [ new_var_e; new_var_e2 ],
+              [ (new_var, Type.ObjectType); (new_var2, Type.IntType) ],
+              set )
+        | _ ->
+            let new_var = LVar.alloc () in
+            let set = SS.singleton new_var in
+            let new_var_e = Expr.LVar new_var in
+            ( Expr.EList [ Expr.string int_type; new_var_e ],
+              [ (new_var, Type.IntType) ],
+              set )
       in
-      (* TODO: Change this *)
-      let new_chunk =
-        match chunk with
-        | Mptr -> Chunk.Mint64
-        | _ -> chunk
-      in
-      [
-        ( [ AddSingle { loc; ofs; value; chunk = new_chunk } ],
-          [],
-          [ (new_var, vtype) ],
-          set,
-          [] );
-      ]
+      [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
   | InvalidLocation loc ->
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
