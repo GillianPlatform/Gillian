@@ -322,10 +322,10 @@ int parse_edk(struct aws_allocator *allocator, struct aws_cryptosdk_edk *edk,
     GILLIAN(
         "if (#definition = `Complete`) { \
             unfold CElement(#content, 0, 3, #edk_content, #element_length) \
-            [[bind #field: #pid, #restFields: #rf1]] \
+            [[bind #pid: #field, #rf1: #restFields]] \
         } else { \
             unfold IElement(#content, 0, 3, #edk_content, #element_length) \
-            [[bind #fLength: #l1, #restFList: #rf1, #restELength: #rel1]] \
+            [[bind #l1: #fLength, #rf1: #restFList, #rel1: #restELength]] \
         }");
 
     if (!aws_byte_cursor_read_be16(cur, &field_len))
@@ -338,10 +338,10 @@ int parse_edk(struct aws_allocator *allocator, struct aws_cryptosdk_edk *edk,
     GILLIAN(
         "if (#definition = `Complete`) { \
             unfold CElement(#content, 2 + len #pid, 2, #rf1, #element_length - (2 + len #pid)) \
-            [[bind #field: #pinfo, #restFields: #rf2]] \
+            [[bind #pinfo: #field, #rf2: #restFields]] \
         } else { \
             unfold IElement(#content, #l1, 2, #rf1, #rel1) \
-            [[bind #fLength: #l2, #restFList: #rf2, #restELength: #rel2]] \
+            [[bind #l2: #fLength, #rf2: #restFList, #rel2: #restELength]] \
         }");
 
     if (!aws_byte_cursor_read_be16(cur, &field_len))
@@ -353,7 +353,7 @@ int parse_edk(struct aws_allocator *allocator, struct aws_cryptosdk_edk *edk,
 
     GILLIAN(
         "if (#definition = `Complete`) { \
-            unfold CElement(#content, 2 + len #pid + 2 + len #pinfo, 1, #rf2, #element_length - (2 + len #pid + 2 + len #pinfo)) [[bind #field: #ctxt]] \
+            unfold CElement(#content, 2 + len #pid + 2 + len #pinfo, 1, #rf2, #element_length - (2 + len #pid + 2 + len #pinfo)) [[bind #ctxt: #field]] \
         } else { \
             unfold IElement(#content, #l1 + #l2, 1, #rf2, #rel2) \
         }");
@@ -440,7 +440,7 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
             #suiteId, #messageId, #ECLength, #part_two, #ECKs, \
             #part_three, #EDKs, #contentType, #headerIvLength, \
             #frameLength, #headerLength, #headerIv, #headerAuthTag, #edkDef, #errorMessage) \
-        [[ bind #ECDef : #ECDef ]]");
+        [[ bind #ECDef: #ECDef ]]");
 
     GILLIAN(
         "if (#definition = `Complete`) { \
@@ -448,20 +448,20 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
                 #suiteId, #messageId, #ECLength, #part_two, #ECKs, \
                 #part_three, #EDKs, #contentType, #headerIvLength, \
                 #frameLength, #headerLength, #headerIv, #headerAuthTag, #edkDef) \
-            [[bind #tagLength: #tagLength, #edks : #edks, #EDKsLength : #EDKsLength]] \
+            [[bind #tagLength: #tagLength, #edks: #edks, #EDKsLength: #EDKsLength]] \
         } else { \
             if (#definition = `Incomplete`) { \
                 unfold IHeader(#data, #part_one, #version, #type, \
                     #suiteId, #messageId, #ECLength, #part_two, #ECKs, \
                     #part_three, #EDKs, #contentType, #headerIvLength, \
                     #frameLength, #headerLength, #headerIv, #headerAuthTag, #edkDef) \
-                [[bind #tagLength: #tagLength, #edks : #edks, #EDKsLength : #EDKsLength]] \
+                [[bind #tagLength: #tagLength, #edks: #edks, #EDKsLength: #EDKsLength]] \
             } else { \
                 unfold BHeader(#data, #part_one, #version, #type, \
                     #suiteId, #messageId, #ECLength, #part_two, #ECKs, \
                     #part_three, #EDKs, #contentType, #headerIvLength, \
                     #frameLength, #headerLength, #headerIv, #headerAuthTag, #ECDef, #edkDef, #errorMessage) \
-                [[bind #tagLength: #tagLength, #edks : #edks, #EDKsLength : #EDKsLength, #EC: #BEC]] \
+                [[bind #tagLength: #tagLength, #edks: #edks, #EDKsLength: #EDKsLength, #BEC: #EC]] \
             } \
         }");
 
@@ -616,12 +616,12 @@ int aws_cryptosdk_hdr_parse(struct aws_cryptosdk_hdr *hdr,
         GILLIAN(
             "if (#edkDef = `Complete`) { \
                 unfold CElements(#restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength) \
-                [[bind #element : #e, #eLength : #el ]]; \
+                [[bind #e: #element, #el: #eLength ]]; \
                 apply CElementsShift(#restEDKsAndRest, #el, #rest_count - 1, 3, #el) \
             } else { \
                 if (#edkDef = `Incomplete`) { \
                     unfold IElements(#restEDKsAndRest, 0, #rest_count, 3, #restEDKs, #restEDKLength) \
-                    [[bind #fList: #e, #eLength: #el]]; \
+                    [[bind #e: #fList, #el: #eLength]]; \
                     if (! (#restEDKs = [])) { \
                         apply IElementsShift(#restEDKsAndRest, #el, #rest_count - 1, 3, #el) \
                     } \
