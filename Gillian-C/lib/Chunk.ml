@@ -19,7 +19,7 @@ let of_compcert : Compcert.AST.memory_chunk -> t = function
   | Mint64 -> Mint64
   | Mfloat32 -> Mfloat32
   | Mfloat64 -> Mfloat64
-  | Many32 | Many64 -> Mptr (* Should we fail with error here instead? *)
+  | Many32 | Many64 -> failwith "Unsupported Concert Chunk Many32 or Many64"
 
 let to_compcert : t -> Compcert.AST.memory_chunk = function
   | Mint8signed -> Mint8signed
@@ -30,7 +30,7 @@ let to_compcert : t -> Compcert.AST.memory_chunk = function
   | Mint64 -> Mint64
   | Mfloat32 -> Mfloat32
   | Mfloat64 -> Mfloat64
-  | Mptr -> if Compcert.Archi.ptr64 then Many32 else Many64
+  | Mptr -> if Compcert.Archi.ptr64 then Mint64 else Mint32
 
 let of_string = function
   | "int8signed" -> Mint8signed

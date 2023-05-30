@@ -140,50 +140,6 @@ let rec num_to_integer_h n index =
 
 let num_to_integer n = num_to_integer_h n 0
 
-(* let pp_coq_type fmt typ =
-   let open Ctypes in
-   match typ with
-   | Tvoid -> Fmt.pf fmt "Tvoid"
-   | Tint _ -> Fmt.pf fmt "Tint"
-   | Tlong _ -> Fmt.pf fmt "Tlong"
-   | Tfloat _ -> Fmt.pf fmt "Tfloat"
-   | Tpointer _ -> Fmt.pf fmt "Tpointer"
-   | Tarray _ -> Fmt.pf fmt "Tarray"
-   | Tfunction _ -> Fmt.pf fmt "Tfunction"
-   | Tstruct _ -> Fmt.pf fmt "Tstruct"
-   | Tunion _ -> Fmt.pf fmt "Tunion" *)
-
-let rec pp_expr fmt expr =
-  match expr with
-  | Evar id -> Fmt.pf fmt "Evar id NUM[%d]" (num_to_integer id)
-  | Eaddrof _id -> Fmt.pf fmt "Eaddrof id"
-  | Econst _constant -> Fmt.pf fmt "Econst constant"
-  | Eunop (_unop, e) -> Fmt.pf fmt "Eunop unop (%a)" pp_expr e
-  | Ebinop (_binop, e1, e2) ->
-      Fmt.pf fmt "Ebinop binop (%a) (%a)" pp_expr e1 pp_expr e2
-  | Eload (_memory_chunk, e) -> Fmt.pf fmt "Eload mem_chunk (%a)" pp_expr e
-
-let rec pp_stmt fmt stmt =
-  match stmt with
-  | Sskip -> Fmt.pf fmt "[stmt] Sskip"
-  | Sset (id, e) ->
-      Fmt.pf fmt "[stmt] Sset (%d, %a)" (num_to_integer id) pp_expr e
-  | Sstore (chunk, e1, e2) ->
-      Fmt.pf fmt "[stmt] Sstore (%a, %a, %a)" Chunk.pp (Chunk.of_compcert chunk)
-        pp_expr e1 pp_expr e2
-  | Scall _ -> Fmt.pf fmt "[stmt] Scall"
-  | Sbuiltin _ -> Fmt.pf fmt "[stmt] Sbuiltin"
-  | Sseq (s1, s2) -> Fmt.pf fmt "[stmt] Sseq (%a, %a)" pp_stmt s1 pp_stmt s2
-  | Sifthenelse _ -> Fmt.pf fmt "[stmt] Sifthenelse "
-  | Sloop s -> Fmt.pf fmt "[stmt] Sloop (%a)" pp_stmt s
-  | Sblock s -> Fmt.pf fmt "[stmt] Sblock (%a)" pp_stmt s
-  | Sexit _ -> Fmt.pf fmt "[stmt] Sexit "
-  | Sswitch _ -> Fmt.pf fmt "[stmt] Sswitch "
-  | Sreturn _ -> Fmt.pf fmt "[stmt] Sreturn "
-  | Slabel (label, s) ->
-      Fmt.pf fmt "[stmt] Slabel (%d, %a)" (num_to_integer label) pp_stmt s
-  | Sgoto label -> Fmt.pf fmt "[stmt] Sgoto (%d)" (num_to_integer label)
-
 let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
   let trans_expr = trans_expr ~clight_prog ~fname ~fid ~local_env in
   let trans_binop_expr = trans_binop_expr ~fname in
@@ -334,28 +290,6 @@ let get_invariant () =
   last_invariant := None;
   i
 
-(* let rec pp_stmt fmt stmt =
-   match stmt with
-   | Sskip -> Fmt.pf fmt "[stmt] Sskip"
-   | Sset (id, e) ->
-       Fmt.pf fmt "[stmt] Sset (%d, %a)" (num_to_integer id) pp_expr e
-   | Sstore (chunk, e1, e2) ->
-       Fmt.pf fmt "[stmt] Sstore (%a, %a, %a)" Chunk.pp
-         (Chunk.of_compcert chunk)
-         pp_expr e1 pp_expr e2
-   | Scall _ -> Fmt.pf fmt "[stmt] Scall"
-   | Sbuiltin _ -> Fmt.pf fmt "[stmt] Sbuiltin"
-   | Sseq (s1, s2) -> Fmt.pf fmt "[stmt] Sseq (%a, %a)" pp_stmt s1 pp_stmt s2
-   | Sifthenelse _ -> Fmt.pf fmt "[stmt] Sifthenelse "
-   | Sloop s -> Fmt.pf fmt "[stmt] Sloop (%a)" pp_stmt s
-   | Sblock s -> Fmt.pf fmt "[stmt] Sblock (%a)" pp_stmt s
-   | Sexit _ -> Fmt.pf fmt "[stmt] Sexit "
-   | Sswitch _ -> Fmt.pf fmt "[stmt] Sswitch "
-   | Sreturn _ -> Fmt.pf fmt "[stmt] Sreturn "
-   | Slabel (label, s) ->
-       Fmt.pf fmt "[stmt] Slabel (%d, %a)" (num_to_integer label) pp_stmt s
-   | Sgoto label -> Fmt.pf fmt "[stmt] Sgoto (%d)" (num_to_integer label) *)
-
 let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
   let trans_stmt ?(context = context) =
     trans_stmt ~clight_prog ~fname ~fid ~context
@@ -366,8 +300,6 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
     trans_expr ~clight_prog ~fname ~fid ~local_env:context.local_env
   in
   let gen_str = Generators.gen_str ~fname in
-  Logging.verbose (fun m -> m "[!!!] TRANSLATING STATEMENT");
-  Logging.verbose (fun m -> m "[!!!] %a" pp_stmt stmt);
   match stmt with
   | Sskip -> [ (annot_ctx context, None, Cmd.Skip) ]
   | Sset (id, exp) ->

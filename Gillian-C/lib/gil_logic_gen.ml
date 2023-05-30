@@ -97,6 +97,30 @@ let get_structs_not_annot struct_types =
   already_annot_structs := newly_annot;
   structs_not_annot
 
+(* Custom Ctypes.access_mode function for our custom Chunk type *)
+let access_mode_by_value =
+  let open Ctypes in
+  function
+  | Tint (i, s, _) -> (
+      match i with
+      | I8 -> (
+          match s with
+          | Signed -> Some Chunk.Mint8signed
+          | Unsigned -> Some Chunk.Mint8unsigned)
+      | I16 -> (
+          match s with
+          | Signed -> Some Chunk.Mint16signed
+          | Unsigned -> Some Chunk.Mint16unsigned)
+      | I32 -> Some Chunk.Mint32
+      | IBool -> Some Chunk.Mint8unsigned)
+  | Tlong (_, _) -> Some Chunk.Mint64
+  | Tfloat (f, _) -> (
+      match f with
+      | F32 -> Some Chunk.Mfloat32
+      | F64 -> Some Chunk.Mfloat64)
+  | Tpointer (_, _) -> Some Chunk.Mptr
+  | _ -> None
+
 let assert_of_member cenv members id typ =
   let open Ctypes in
   let field_name = true_name id in
@@ -153,8 +177,8 @@ let assert_of_member cenv members id typ =
     let n = ValueTranslation.int_of_z n in
     let n_e = Expr.int_z n in
     let chunk =
-      match Ctypes.access_mode ty with
-      | By_value chunk -> Chunk.of_compcert chunk
+      match access_mode_by_value ty with
+      | Some chunk -> chunk
       | _ -> failwith "Array in a structure containing complicated types"
     in
     Constr.Core.array ~loc:pvloc ~ofs:(pvofs ++ fo) ~chunk ~size:n_e
@@ -179,8 +203,8 @@ let assert_of_member cenv members id typ =
                (PrintCsyntax.name_cdecl field_name typ))
     in
     let chunk =
-      match Ctypes.access_mode typ with
-      | By_value chunk -> Chunk.of_compcert chunk
+      match access_mode_by_value typ with
+      | Some chunk -> chunk
       | _ -> failwith "Invalid access mode for some type"
     in
     let ga_asrt =
