@@ -2,14 +2,23 @@ type t =
   | NEQ
   | EQUAL
   | LESSTHAN
+  | FLESSTHAN
   | GREATERTHAN
+  | FGREATERTHAN
   | LESSEQUAL
+  | FLESSEQUAL
   | GREATEREQUAL
+  | FGREATEREQUAL
   | PLUS
+  | FPLUS
   | MINUS
+  | FMINUS
   | TIMES
+  | FTIMES
   | DIV
+  | FDIV
   | MOD
+  | FMOD
   | AND
   | OR
   (* Lists are only for the logic *)
@@ -25,14 +34,23 @@ let pp fmt b =
   match b with
   | EQUAL -> s "="
   | LESSTHAN -> s "<"
+  | FLESSTHAN -> s "f<"
   | GREATERTHAN -> s ">"
+  | FGREATERTHAN -> s "f>"
   | LESSEQUAL -> s "<="
+  | FLESSEQUAL -> s "f<="
   | GREATEREQUAL -> s ">="
+  | FGREATEREQUAL -> s "f>="
   | PLUS -> s "+"
+  | FPLUS -> s "f+"
   | MINUS -> s "-"
+  | FMINUS -> s "f-"
   | TIMES -> s "*"
+  | FTIMES -> s "f*"
   | DIV -> s "/"
+  | FDIV -> s "f/"
   | MOD -> s "%"
+  | FMOD -> s "f%"
   | AND -> s "&&"
   | OR -> s "||"
   | NEQ -> s "!="

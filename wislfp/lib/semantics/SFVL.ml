@@ -50,11 +50,13 @@ let union =
         verbose (fun m ->
             m
               "WARNING: SFVL.union: merging with field in both lists (%s: %s \
-               and %s), choosing left."
+               and %s), adding permissions."
               ((Fmt.to_to_string Expr.pp) k)
               ((Fmt.to_to_string fv_pp) fvl)
               ((Fmt.to_to_string fv_pp) fvr)));
-      Some fvl)
+      let { value; permission = lperm } = fvl in
+      let { permission = rperm; _ } = fvr in
+      Some { value; permission = Expr.Infix.(lperm +. rperm) })
 
 let to_list fv_list = fold (fun f v ac -> (f, v) :: ac) fv_list []
 

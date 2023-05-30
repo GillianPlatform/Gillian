@@ -14,6 +14,7 @@ let gvars = "gvar_" digit+ (* generated variables during compilation *)
 let identifier = letter(letter|digit|'_')*
 let lvar = '#' (letter|digit|'_'|'$')*
 let integer = digit+
+let float = digit '.' digit?
 let loc = "$l" (letter|digit|'_')*
 let white = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
@@ -66,9 +67,13 @@ rule read =
   | "\\/"    { LOR }
   | "=="     { LEQ }
   | "<#"     { LLESS }
+  | "f<#"    { FLLESS }
   | "<=#"    { LLESSEQ }
+  | "f<=#"   { FLLESSEQ }
   | ">#"     { LGREATER }
+  | "f>#"    { FLGREATER }
   | ">=#"    { LGREATEREQ }
+  | "f>=#"   { FLGREATEREQ }
   (* punctuation *)
   | "-{"     { SETOPEN (curr lexbuf) }
   | "}-"     { SETCLOSE (curr lexbuf) }
@@ -91,14 +96,23 @@ rule read =
   | '@'      { LSTCAT }
   | '='      { EQUAL }
   | ">="     { GREATEREQUAL }
+  | "f>="    { FGREATEREQUAL }
   | '>'      { GREATERTHAN }
+  | "f>"     { FGREATERTHAN }
   | '<'      { LESSTHAN }
+  | "f<"     { FLESSTHAN }
   | "<="     { LESSEQUAL }
+  | "f<="    { FLESSEQUAL }
   | '+'      { PLUS }
+  | "f+"     { FPLUS }
   | '-'      { MINUS }
+  | "f-"     { FMINUS }
   | '*'      { TIMES }
+  | "f*"     { FTIMES }
   | '/'      { DIV }
+  | "f/"     { FDIV }
   | '%'      { MOD }
+  | "f%"     { FMOD }
   | "&&"     { AND }
   | "||"     { OR }
   | "!="     { NEQ }
@@ -115,6 +129,7 @@ rule read =
   (* identifiers *)
   | white    { read lexbuf }
   | newline  { new_line lexbuf; read lexbuf }
+  | float    { FLOAT (curr lexbuf, float_of_string (Lexing.lexeme lexbuf)) }
   | integer   { INTEGER (curr lexbuf, int_of_string (Lexing.lexeme lexbuf)) }
   | gvars    { IDENTIFIER (curr lexbuf, (Lexing.lexeme lexbuf)^"_user") } (* if it has a name of generated var, we add _user *)
   | identifier { IDENTIFIER (curr lexbuf, Lexing.lexeme lexbuf) }

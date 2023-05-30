@@ -197,16 +197,16 @@ let access_cell ~unification ~pfs ~gamma heap loc ofs permission_check =
         match permission_check permission with
         | Some missing_permission ->
             Error (MissingResource (Cell, loc, Some missing_permission))
-        | None -> Ok (loc, ofs, permission, value)
+        | None -> Ok (loc, ofs, value)
       in
       check_sfvl ~pfs ~gamma ofs data none_case success_case
 
 let load ~pfs ~gamma heap loc ofs =
-  match
+  let open Syntaxes.Result in
+  let+ _, _, v =
     access_cell ~unification:false ~pfs ~gamma heap loc ofs (fun _ -> None)
-  with
-  | Error e -> Error e
-  | Ok (_, _, _, v) -> Ok v
+  in
+  v
 
 let get_cell ~unification ~pfs ~gamma heap loc ofs out_perm =
   let fl q = Formula.Infix.(q#<.out_perm) in
@@ -289,7 +289,7 @@ let set_cell ~unification ~pfs ~gamma heap loc_name ofs v out_perm =
     in
     let some_case _ value permission =
       let eq = Formula.Infix.(value #== v) in
-      let new_perm = Expr.BinOp (permission, FPlus, out_perm) in
+      let new_perm = Expr.Infix.(permission +. out_perm) in
       let fl = Formula.Infix.(new_perm#<=.full_perm) in
       let () =
         Hashtbl.replace heap loc_name (Block.Allocated { data; bound })

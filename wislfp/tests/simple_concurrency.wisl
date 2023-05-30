@@ -1,0 +1,31 @@
+predicate is_zero(+x, y) {
+    (x == 0) * (y == 1);
+    (! (x == 0)) * (y == 0)
+}
+
+{ (x == #x) * (p == #p) * (#p f<=# 1.0) * (#x -> (#p: #v)) }
+function f(x, p) {
+    n := [x];
+    if (n = 0) {
+        r := 1
+    } else {
+        r := 0
+    };
+    return r
+}
+{ is_zero(#v, ret) *  (#x -> (#p: #v)) }
+
+{ emp }
+function conc() {
+    x := new(2);
+    [x] := 0;
+    [x + 1] := 0;
+    par {
+        fst := f(x, 0.5);
+        snd := f(x + 1, 0.5)
+    };
+    [x] := fst;
+    [x + 1] := snd;
+    return x
+}
+{ ret -> 1, 1 }

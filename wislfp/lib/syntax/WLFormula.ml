@@ -8,9 +8,13 @@ type tt =
   | LOr of t * t
   | LEq of WLExpr.t * WLExpr.t
   | LLess of WLExpr.t * WLExpr.t
+  | FLLess of WLExpr.t * WLExpr.t
   | LGreater of WLExpr.t * WLExpr.t
+  | FLGreater of WLExpr.t * WLExpr.t
   | LLessEq of WLExpr.t * WLExpr.t
+  | FLLessEq of WLExpr.t * WLExpr.t
   | LGreaterEq of WLExpr.t * WLExpr.t
+  | FLGreaterEq of WLExpr.t * WLExpr.t
 
 and t = { wlfid : int; wlfloc : CodeLoc.t; wlfnode : tt }
 
@@ -30,9 +34,13 @@ let rec not f =
   | LAnd (f1, f2) -> make (LOr (not f1, not f2))
   | LOr (f1, f2) -> make (LAnd (not f1, not f2))
   | LLess (e1, e2) -> make (LGreaterEq (e1, e2))
+  | FLLess (e1, e2) -> make (FLGreaterEq (e1, e2))
   | LLessEq (e1, e2) -> make (LGreater (e1, e2))
+  | FLLessEq (e1, e2) -> make (FLGreater (e1, e2))
   | LGreater (e1, e2) -> make (LLessEq (e1, e2))
+  | FLGreater (e1, e2) -> make (FLLessEq (e1, e2))
   | LGreaterEq (e1, e2) -> make (LLess (e1, e2))
+  | FLGreaterEq (e1, e2) -> make (FLLess (e1, e2))
   | LEq _ -> make (LNot f)
 
 let rec lexpr_is_true ?(codeloc = CodeLoc.dummy) lexpr =
@@ -48,9 +56,13 @@ let rec lexpr_is_true ?(codeloc = CodeLoc.dummy) lexpr =
     | LBinOp (e1, AND, e2) -> LAnd (f e1, f e2)
     | LBinOp (e1, OR, e2) -> LOr (f e1, f e2)
     | LBinOp (e1, LESSTHAN, e2) -> LLess (e1, e2)
+    | LBinOp (e1, FLESSTHAN, e2) -> FLLess (e1, e2)
     | LBinOp (e1, LESSEQUAL, e2) -> LLessEq (e1, e2)
+    | LBinOp (e1, FLESSEQUAL, e2) -> FLLessEq (e1, e2)
     | LBinOp (e1, GREATERTHAN, e2) -> LGreater (e1, e2)
+    | LBinOp (e1, FGREATERTHAN, e2) -> FLGreater (e1, e2)
     | LBinOp (e1, GREATEREQUAL, e2) -> LGreaterEq (e1, e2)
+    | LBinOp (e1, FGREATEREQUAL, e2) -> FLGreaterEq (e1, e2)
     | LUnOp (NOT, e) -> LNot (f e)
     | PVar _ ->
         let ttrue = WLExpr.make (LVal (Bool true)) codeloc in
@@ -70,9 +82,13 @@ let rec get_vars_and_lvars f =
       double_union (get_vars_and_lvars f1) (get_vars_and_lvars f2)
   | LEq (e1, e2)
   | LLess (e1, e2)
+  | FLLess (e1, e2)
   | LGreater (e1, e2)
+  | FLGreater (e1, e2)
   | LLessEq (e1, e2)
-  | LGreaterEq (e1, e2) ->
+  | FLLessEq (e1, e2)
+  | LGreaterEq (e1, e2)
+  | FLGreaterEq (e1, e2) ->
       double_union (WLExpr.get_vars_and_lvars e1) (WLExpr.get_vars_and_lvars e2)
   | _ -> (SS.empty, SS.empty)
 
@@ -85,9 +101,13 @@ let rec get_by_id id lf =
     | LAnd (lf1, lf2) | LOr (lf1, lf2) -> getter lf1 |>> (getter, lf2)
     | LEq (le1, le2)
     | LLess (le1, le2)
+    | FLLess (le1, le2)
     | LGreater (le1, le2)
+    | FLGreater (le1, le2)
     | LLessEq (le1, le2)
-    | LGreaterEq (le1, le2) -> lexpr_getter le1 |>> (lexpr_getter, le2)
+    | FLLessEq (le1, le2)
+    | LGreaterEq (le1, le2)
+    | FLGreaterEq (le1, le2) -> lexpr_getter le1 |>> (lexpr_getter, le2)
     | _ -> `None
   in
   let self_or_none = if get_id lf = id then `WLFormula lf else `None in
@@ -104,12 +124,20 @@ let rec pp fmt formula =
       Format.fprintf fmt "@[(%a) == (%a)@]" WLExpr.pp le1 WLExpr.pp le2
   | LLess (le1, le2) ->
       Format.fprintf fmt "@[(%a) <# (%a)@]" WLExpr.pp le1 WLExpr.pp le2
+  | FLLess (le1, le2) ->
+      Format.fprintf fmt "@[(%a) f<# (%a)@]" WLExpr.pp le1 WLExpr.pp le2
   | LGreater (le1, le2) ->
       Format.fprintf fmt "@[(%a) ># (%a)@]" WLExpr.pp le1 WLExpr.pp le2
+  | FLGreater (le1, le2) ->
+      Format.fprintf fmt "@[(%a) f># (%a)@]" WLExpr.pp le1 WLExpr.pp le2
   | LLessEq (le1, le2) ->
       Format.fprintf fmt "@[(%a) <=# (%a)@]" WLExpr.pp le1 WLExpr.pp le2
+  | FLLessEq (le1, le2) ->
+      Format.fprintf fmt "@[(%a) f<=# (%a)@]" WLExpr.pp le1 WLExpr.pp le2
   | LGreaterEq (le1, le2) ->
       Format.fprintf fmt "@[(%a) >=# (%a)@]" WLExpr.pp le1 WLExpr.pp le2
+  | FLGreaterEq (le1, le2) ->
+      Format.fprintf fmt "@[(%a) f>=# (%a)@]" WLExpr.pp le1 WLExpr.pp le2
 
 let str = Format.asprintf "%a" pp
 
@@ -126,8 +154,12 @@ let rec substitution (subst : (string, WLExpr.tt) Hashtbl.t) (frm : t) : t =
     | LOr (frm1, frm2) -> LOr (f frm1, f frm2)
     | LEq (e1, e2) -> LEq (fe e1, fe e2)
     | LLess (e1, e2) -> LLess (fe e1, fe e2)
+    | FLLess (e1, e2) -> FLLess (fe e1, fe e2)
     | LGreater (e1, e2) -> LGreater (fe e1, fe e2)
+    | FLGreater (e1, e2) -> FLGreater (fe e1, fe e2)
     | LLessEq (e1, e2) -> LLessEq (fe e1, fe e2)
+    | FLLessEq (e1, e2) -> FLLessEq (fe e1, fe e2)
     | LGreaterEq (e1, e2) -> LGreaterEq (fe e1, fe e2)
+    | FLGreaterEq (e1, e2) -> FLGreaterEq (fe e1, fe e2)
   in
   { wlfid; wlfloc; wlfnode }

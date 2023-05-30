@@ -26,6 +26,7 @@ let compile_type t =
     | WString -> Some Type.StringType
     | WPtr -> Some Type.ObjectType
     | WInt -> Some Type.IntType
+    | WFloat -> Some Type.NumberType
     | WSet -> Some Type.SetType
     | WAny -> None)
 
@@ -34,12 +35,19 @@ let compile_binop b =
     match b with
     | EQUAL -> BinOp.Equal
     | LESSTHAN -> BinOp.ILessThan
+    | FLESSTHAN -> BinOp.FLessThan
     | LESSEQUAL -> BinOp.ILessThanEqual
+    | FLESSEQUAL -> BinOp.FLessThanEqual
     | PLUS -> BinOp.IPlus
+    | FPLUS -> BinOp.FPlus
     | MINUS -> BinOp.IMinus
+    | FMINUS -> BinOp.FMinus
     | TIMES -> BinOp.ITimes
+    | FTIMES -> BinOp.FTimes
     | DIV -> BinOp.IDiv
+    | FDIV -> BinOp.FDiv
     | MOD -> BinOp.IMod
+    | FMOD -> BinOp.FMod
     | AND -> BinOp.BAnd
     | OR -> BinOp.BOr
     | LSTNTH -> BinOp.LstNth
@@ -63,6 +71,7 @@ let rec compile_val v =
   | Bool b -> Literal.Bool b
   | Null -> Literal.Null
   | Int n -> Literal.Int (Z.of_int n)
+  | Float x -> Literal.Num x
   | Str s -> Literal.String s
   | VList l -> Literal.LList (List.map compile_val l)
 
@@ -267,6 +276,10 @@ let rec compile_lformula ?(fname = "main") formula : Asrt.t list * Formula.t =
         let pred = Asrt.Pred (internal_pred_lt, [ c1; c2; expr_l_var_out ]) in
         ( a1 @ a2 @ [ pred ],
           Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
+    | FLLess (le1, le2) ->
+        let _, a1, c1 = compile_lexpr le1 in
+        let _, a2, c2 = compile_lexpr le2 in
+        (a1 @ a2, Formula.FLess (c1, c2))
     | LGreater (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
@@ -274,6 +287,10 @@ let rec compile_lformula ?(fname = "main") formula : Asrt.t list * Formula.t =
         let pred = Asrt.Pred (internal_pred_gt, [ c1; c2; expr_l_var_out ]) in
         ( a1 @ a2 @ [ pred ],
           Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
+    | FLGreater (le1, le2) ->
+        let _, a1, c1 = compile_lexpr le1 in
+        let _, a2, c2 = compile_lexpr le2 in
+        (a1 @ a2, Formula.FLess (c2, c1))
     | LLessEq (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
@@ -281,13 +298,21 @@ let rec compile_lformula ?(fname = "main") formula : Asrt.t list * Formula.t =
         let pred = Asrt.Pred (internal_pred_leq, [ c1; c2; expr_l_var_out ]) in
         ( a1 @ a2 @ [ pred ],
           Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
+    | FLLessEq (le1, le2) ->
+        let _, a1, c1 = compile_lexpr le1 in
+        let _, a2, c2 = compile_lexpr le2 in
+        (a1 @ a2, Formula.FLessEq (c1, c2))
     | LGreaterEq (le1, le2) ->
         let _, a1, c1 = compile_lexpr le1 in
         let _, a2, c2 = compile_lexpr le2 in
         let expr_l_var_out = Expr.LVar (gen_str sgvar) in
         let pred = Asrt.Pred (internal_pred_geq, [ c1; c2; expr_l_var_out ]) in
         ( a1 @ a2 @ [ pred ],
-          Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) ))
+          Formula.Eq (expr_l_var_out, Expr.Lit (Literal.Bool true)) )
+    | FLGreaterEq (le1, le2) ->
+        let _, a1, c1 = compile_lexpr le1 in
+        let _, a2, c2 = compile_lexpr le2 in
+        (a1 @ a2, Formula.FLessEq (c2, c1)))
 
 (* compile_lassert returns the compiled assertion + the list of generated existentials *)
 let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =

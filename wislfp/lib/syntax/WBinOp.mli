@@ -2,14 +2,23 @@ type t =
   | NEQ
   | EQUAL
   | LESSTHAN
+  | FLESSTHAN
   | GREATERTHAN
+  | FGREATERTHAN
   | LESSEQUAL
+  | FLESSEQUAL
   | GREATEREQUAL
+  | FGREATEREQUAL
   | PLUS
+  | FPLUS
   | MINUS
+  | FMINUS
   | TIMES
+  | FTIMES
   | DIV
+  | FDIV
   | MOD
+  | FMOD
   | AND
   | OR
   (* Lists are only for the logic *)

@@ -63,9 +63,9 @@ let get_cell ~unification heap pfs gamma (loc : vt) (offset : vt) permission =
         WislSHeap.get_cell ~unification ~pfs ~gamma heap loc offset permission
       with
       | Error err -> Error [ err ]
-      | Ok (loc, ofs, q, value) ->
+      | Ok (loc, ofs, value) ->
           let loc = Expr.loc_from_loc_name loc in
-          Ok [ (heap, [ loc; ofs; q; value ], [], []) ])
+          Ok [ (heap, [ loc; ofs; permission; value ], [], []) ])
 
 let set_cell
     ~unification
@@ -174,13 +174,7 @@ let rem_freed heap pfs gamma loc =
 
 let alloc heap _pfs _gamma (size : int) =
   let loc = WislSHeap.alloc heap size in
-  Ok
-    [
-      ( heap,
-        [ Expr.ALoc loc; Expr.Lit (Literal.Int Z.zero) ],
-        [],
-        [] );
-    ]
+  Ok [ (heap, [ Expr.ALoc loc; Expr.Lit (Literal.Int Z.zero) ], [], []) ]
 
 let dispose ~unification heap pfs gamma loc_expr =
   match resolve_loc pfs gamma loc_expr with

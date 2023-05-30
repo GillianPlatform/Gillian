@@ -51,7 +51,7 @@ val get_cell :
   string ->
   Expr.t ->
   Expr.t ->
-  (string * Expr.t * Expr.t * Expr.t, err) result
+  (string * Expr.t * Expr.t, err) result
 
 val set_cell :
   unification:bool ->
