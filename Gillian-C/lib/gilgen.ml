@@ -130,17 +130,6 @@ let trans_binop_expr ~fname binop te1 te2 =
   | Omulfs -> call BinOp_Functions.mulfs
   | _ -> failwith "Unhandled"
 
-(* Note: This function should be in the Camlcoq library. Implement it from there. *)
-let rec num_to_integer_h n index =
-  let open BinNums in
-  match n with
-  | Coq_xI x ->
-      int_of_float (2. ** float_of_int index) + num_to_integer_h x (index + 1)
-  | Coq_xO x -> num_to_integer_h x (index + 1)
-  | Coq_xH -> int_of_float (2. ** float_of_int index)
-
-let num_to_integer n = num_to_integer_h n 0
-
 let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
   let trans_expr = trans_expr ~clight_prog ~fname ~fid ~local_env in
   let trans_binop_expr = trans_binop_expr ~fname in
@@ -185,7 +174,7 @@ let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
                       Fmt.failwith
                         "Variable with ident %d was not found inside function \
                          %s of Clight"
-                        (num_to_integer id) fname)
+                        (Camlcoq.P.to_int id) fname)
               | _ ->
                   failwith
                     (Printf.sprintf
@@ -414,7 +403,7 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
                  For example, Struct.field = value, arr[10] = value, etc. These will need to be handled. *)
               | Evar id | Ebinop (_, Evar id, _) -> (
                   Logging.verbose (fun m ->
-                      m "Evar identified %d" (num_to_integer id));
+                      m "Evar identified %d" (Camlcoq.P.to_int id));
                   let open Clight in
                   let clight_fun =
                     Gil_logic_gen.get_clight_fun clight_prog fid
@@ -435,7 +424,7 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
                         (Printf.sprintf
                            "Variable with ident %d was not found inside \
                             function %s of Clight"
-                           (num_to_integer id) fname))
+                           (Camlcoq.P.to_int id) fname))
               | _ ->
                   failwith
                     (Printf.sprintf
