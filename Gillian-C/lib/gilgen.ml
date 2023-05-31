@@ -130,6 +130,110 @@ let trans_binop_expr ~fname binop te1 te2 =
   | Omulfs -> call BinOp_Functions.mulfs
   | _ -> failwith "Unhandled"
 
+let get_typ_from_id clight_prog fid id =
+  let open Clight in
+  let clight_fun = Gil_logic_gen.get_clight_fun clight_prog fid in
+  let all_vars =
+    clight_fun.fn_params @ clight_fun.fn_vars @ clight_fun.fn_temps
+  in
+  match
+    List.find_map
+      (fun (var_id, var_typ) ->
+        if Camlcoq.P.eq id var_id then Some var_typ else None)
+      all_vars
+  with
+  | Some t -> t
+  | None ->
+      Fmt.failwith
+        "Variable with ident %d was not found inside function of Clight"
+        (Camlcoq.P.to_int id)
+
+(* Convert the compcert chunk to Gillian chunk by checking if Csm expression
+   evalutes to a pointer chunk *)
+let to_gil_chunk_h clight_prog fid compcert_chunk expp =
+  Logging.verbose (fun m ->
+      m "*** Expression Printed: %a ***" PrintCsharpminor.print_expr expp);
+  match expp with
+  | Evar id -> (
+      let typ = get_typ_from_id clight_prog fid id in
+      match typ with
+      | Tpointer (Tstruct _, _) -> Chunk.Mptr
+      | Tpointer _ -> Chunk.Mptr
+      | _ -> Chunk.of_compcert compcert_chunk)
+  | Ebinop (_, Evar id, Econst (Olongconst n))
+  | Ebinop (_, Evar id, Econst (Ointconst n)) -> (
+      let typ = get_typ_from_id clight_prog fid id in
+      match typ with
+      | Tpointer (tptr_typ, _) -> (
+          match tptr_typ with
+          | Tstruct (struct_id, _attr) -> (
+              (* Search for the struct_id within the composite definitions *)
+              let members_opt =
+                List.find_map
+                  (fun (Ctypes.Composite (composite_def_id, _, m, _)) ->
+                    if Camlcoq.P.eq struct_id composite_def_id then Some m
+                    else None)
+                  clight_prog.prog_types
+              in
+              let members =
+                match members_opt with
+                | Some members -> members
+                | None -> failwith "Failed to get the members of the struct"
+              in
+              Logging.verbose (fun m -> m "*** Passed finding members ***");
+              let fx m =
+                match m with
+                | Ctypes.Member_plain (member_id, member_typ) ->
+                    let offset =
+                      match
+                        Ctypes.field_offset clight_prog.prog_comp_env member_id
+                          members
+                      with
+                      | Errors.OK (f, Full) -> f
+                      | Errors.OK _ -> failwith "Unsupported bitfield members"
+                      | Errors.Error e ->
+                          failwith
+                            (Format.asprintf "Invalid member offset : %a@?"
+                               Driveraux.print_error e)
+                    in
+                    if offset = n then Some member_typ else None
+                | Ctypes.Member_bitfield _ -> None
+              in
+              let member_typ_opt = List.find_map fx members in
+              match member_typ_opt with
+              | Some member_typ -> (
+                  match member_typ with
+                  | Tpointer _ ->
+                      Logging.verbose (fun m ->
+                          m "*** Found an actual Tpointer ***");
+                      Chunk.Mptr
+                  | _ ->
+                      Logging.verbose (fun m ->
+                          m "*** Didn't find an actual Tpointer ***");
+                      Chunk.of_compcert compcert_chunk)
+              | None -> Chunk.Mptr)
+          | _ ->
+              Logging.verbose (fun m ->
+                  m "*** Tpointer did not point to a struct ***");
+              Chunk.Mptr)
+      | _ -> Chunk.of_compcert compcert_chunk)
+  | _ ->
+      failwith
+        (Printf.sprintf "Unexpected expression for ELoad (expression load)")
+
+let to_gil_chunk clight_prog fid compcert_chunk expp =
+  match compcert_chunk with
+  (* Check whether chunk is a pointer - Mint64 or Mint32 can be pointer types *)
+  | Compcert.AST.Mint64 when Compcert.Archi.ptr64 ->
+      Logging.verbose (fun m -> m "Case Mint64 when Compcert.Archi.ptr64");
+      to_gil_chunk_h clight_prog fid compcert_chunk expp
+  | Compcert.AST.Mint32 when not Compcert.Archi.ptr64 ->
+      Logging.verbose (fun m -> m "Case Mint32 when not Compcert.Archi.ptr64");
+      to_gil_chunk_h clight_prog fid compcert_chunk expp
+  | _ ->
+      Logging.verbose (fun m -> m "Case _");
+      Chunk.of_compcert compcert_chunk
+
 let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
   let trans_expr = trans_expr ~clight_prog ~fname ~fid ~local_env in
   let trans_binop_expr = trans_binop_expr ~fname in
@@ -143,50 +247,8 @@ let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
       let gvar = gen_str Prefix.gvar in
       let loadv = Expr.Lit (Literal.String Internal_Functions.loadv) in
 
-      (* Lookup type of variable using Clight program to determine whether it is a pointer *)
-      let chunk =
-        match compcert_chunk with
-        (* Check whether chunk is a pointer - Mint64 or Mint32 can be pointer types *)
-        | Mint64 | Mint32 -> (
-            let typ =
-              Logging.verbose (fun m ->
-                  m "ELoad expr type: %a" PrintCsharpminor.print_expr expp);
-              match expp with
-              (* Get the id of the variable from CSharpMinor *)
-              | Evar id | Ebinop (_, Evar id, _) -> (
-                  let open Clight in
-                  let clight_fun =
-                    Gil_logic_gen.get_clight_fun clight_prog fid
-                  in
-                  let all_vars =
-                    clight_fun.fn_params @ clight_fun.fn_vars
-                    @ clight_fun.fn_temps
-                  in
+      let chunk = to_gil_chunk clight_prog fid compcert_chunk expp in
 
-                  match
-                    List.find_map
-                      (fun (var_id, var_typ) ->
-                        if Camlcoq.P.eq id var_id then Some var_typ else None)
-                      all_vars
-                  with
-                  | Some t -> t
-                  | None ->
-                      Fmt.failwith
-                        "Variable with ident %d was not found inside function \
-                         %s of Clight"
-                        (Camlcoq.P.to_int id) fname)
-              | _ ->
-                  failwith
-                    (Printf.sprintf
-                       "Unexpected expression for ELoad (expression load)")
-            in
-            match typ with
-            | Tpointer _ -> Chunk.Mptr
-            | _ -> Chunk.of_compcert compcert_chunk)
-        | _ -> Chunk.of_compcert compcert_chunk
-      in
-
-      (*  *)
       let cmd =
         Cmd.Call (gvar, loadv, [ expr_of_chunk chunk; e ], None, None)
       in
