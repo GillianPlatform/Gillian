@@ -818,14 +818,14 @@ module Make
       - A substitution
       - A list of pairs of lvar names
       And extends the substitution with the pairs
-      [(#x, eval_expr #y)] for each pair [(x, y)] *)
+      [(#y, eval_expr #x)] for each pair [(x, y)] *)
   let extend_subst_with_bindings
       (state : State.t)
       (subst : ESubst.t)
       (bindings : (string * string) list) : unit =
     let bindings =
       List.map
-        (fun (x, y) -> (Expr.LVar x, State.eval_expr state (Expr.LVar y)))
+        (fun (x, y) -> (Expr.LVar y, State.eval_expr state (Expr.LVar x)))
         bindings
     in
     ESubst.extend subst bindings;
@@ -876,7 +876,7 @@ module Make
             additional_bindings));
 
     let new_spec_vars =
-      List.to_seq additional_bindings |> Seq.map snd |> SS.of_seq
+      List.to_seq additional_bindings |> Seq.map fst |> SS.of_seq
     in
     let () = extend_subst_with_bindings state subst_i additional_bindings in
     let definitions =
