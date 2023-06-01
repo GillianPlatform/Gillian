@@ -211,10 +211,10 @@ let rec get_struct_id clight_prog fid expr =
    evalutes to a pointer chunk *)
 let to_gil_chunk_h clight_prog fid compcert_chunk expp =
   match expp with
+  | Eaddrof _ -> Chunk.of_compcert compcert_chunk
   | Evar id -> (
-      let typ = get_typ_from_id clight_prog fid id in
-      match typ with
-      | Tpointer _ -> Chunk.Mptr
+      match get_typ_from_id clight_prog fid id with
+      | Tpointer (Tpointer _, _) -> Chunk.Mptr
       | _ -> Chunk.of_compcert compcert_chunk)
   | Ebinop (_, e, Econst (Ointconst ofs))
   | Ebinop (_, e, Econst (Olongconst ofs)) -> (
@@ -224,7 +224,7 @@ let to_gil_chunk_h clight_prog fid compcert_chunk expp =
       | Some member_typ -> (
           match member_typ with
           | Tpointer _ ->
-              Logging.verbose (fun m -> m " Found an actual Tpointer ");
+              Logging.verbose (fun m -> m " Found a pointer ");
               Chunk.Mptr
           | _ -> Chunk.of_compcert compcert_chunk)
       | None -> Chunk.Mptr)
@@ -237,9 +237,7 @@ let to_gil_chunk clight_prog fid compcert_chunk expp =
       to_gil_chunk_h clight_prog fid compcert_chunk expp
   | Compcert.AST.Mint32 when not Compcert.Archi.ptr64 ->
       to_gil_chunk_h clight_prog fid compcert_chunk expp
-  | _ ->
-      Logging.verbose (fun m -> m "Case _");
-      Chunk.of_compcert compcert_chunk
+  | _ -> Chunk.of_compcert compcert_chunk
 
 let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
   let trans_expr = trans_expr ~clight_prog ~fname ~fid ~local_env in
