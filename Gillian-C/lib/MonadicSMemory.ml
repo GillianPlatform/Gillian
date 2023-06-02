@@ -1139,6 +1139,6 @@ let apply_fix heap fix =
 
       let loc = Expr.loc_from_loc_name loc in
       let* sval = SVal.of_gil_expr_exn value in
-      let perm = Perm.Writable in
+      let perm = Perm.Freeable in
       let++ mem = Mem.set_single !(heap.mem) loc ofs chunk sval perm in
       { heap with mem = ref mem }
