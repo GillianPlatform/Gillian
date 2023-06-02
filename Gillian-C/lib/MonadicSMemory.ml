@@ -1050,49 +1050,74 @@ let get_failing_constraint _e =
 let get_fixes _heap _pfs _gamma err =
   Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
   match err with
-  | MissingLocResource (Single, loc, Some ofs, Some chunk) ->
-      let value, vtypes, set =
-        let open CConstants.VTypes in
-        match chunk with
-        | Mfloat32 ->
-            let new_var = LVar.alloc () in
-            let set = SS.singleton new_var in
-            let new_var_e = Expr.LVar new_var in
-            ( Expr.EList [ Expr.string single_type; new_var_e ],
-              [ (new_var, Type.NumberType) ],
-              set )
-        | Mfloat64 ->
-            let new_var = LVar.alloc () in
-            let set = SS.singleton new_var in
-            let new_var_e = Expr.LVar new_var in
-            ( Expr.EList [ Expr.string float_type; new_var_e ],
-              [ (new_var, Type.NumberType) ],
-              set )
-        | Mint64 ->
-            let new_var = LVar.alloc () in
-            let set = SS.singleton new_var in
-            let new_var_e = Expr.LVar new_var in
-            ( Expr.EList [ Expr.string long_type; new_var_e ],
-              [ (new_var, Type.IntType) ],
-              set )
-        | Mptr ->
-            let new_var = LVar.alloc () in
-            let new_var_e = Expr.LVar new_var in
-            let new_var2 = LVar.alloc () in
-            let new_var_e2 = Expr.LVar new_var2 in
-            let set = SS.add new_var2 (SS.singleton new_var) in
-            ( Expr.EList [ new_var_e; new_var_e2 ],
-              [ (new_var, Type.ObjectType); (new_var2, Type.IntType) ],
-              set )
-        | _ ->
-            let new_var = LVar.alloc () in
-            let set = SS.singleton new_var in
-            let new_var_e = Expr.LVar new_var in
-            ( Expr.EList [ Expr.string int_type; new_var_e ],
-              [ (new_var, Type.IntType) ],
-              set )
-      in
-      [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
+  | MissingLocResource (Single, loc, Some ofs, Some chunk) -> (
+      let open CConstants.VTypes in
+      match chunk with
+      | Mfloat32 ->
+          let new_var = LVar.alloc () in
+          let set = SS.singleton new_var in
+          let new_var_e = Expr.LVar new_var in
+          let value = Expr.EList [ Expr.string single_type; new_var_e ] in
+          let vtypes = [ (new_var, Type.NumberType) ] in
+          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
+      | Mfloat64 ->
+          let new_var = LVar.alloc () in
+          let set = SS.singleton new_var in
+          let new_var_e = Expr.LVar new_var in
+          let value = Expr.EList [ Expr.string float_type; new_var_e ] in
+          let vtypes = [ (new_var, Type.NumberType) ] in
+          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
+      | Mint64 ->
+          let new_var = LVar.alloc () in
+          let set = SS.singleton new_var in
+          let new_var_e = Expr.LVar new_var in
+          let value = Expr.EList [ Expr.string long_type; new_var_e ] in
+          let vtypes = [ (new_var, Type.IntType) ] in
+          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
+      | Mptr ->
+          Logging.verbose (fun m -> m "Mptr loc %s" loc);
+          Logging.verbose (fun m -> m "Mptr ofs %a" Expr.pp ofs);
+          let new_var1 = LVar.alloc () in
+          let new_var_e1 = Expr.LVar new_var1 in
+          let new_var2 = LVar.alloc () in
+          let new_var_e2 = Expr.LVar new_var2 in
+          let set = SS.add new_var2 (SS.singleton new_var1) in
+          let value = Expr.EList [ new_var_e1; new_var_e2 ] in
+          let vtypes =
+            [ (new_var1, Type.ObjectType); (new_var2, Type.IntType) ]
+          in
+          let chunk2, value2 =
+            if Compcert.Archi.ptr64 then
+              ( Chunk.Mint64,
+                Expr.EList [ Expr.string long_type; Expr.Lit (Int Z.zero) ] )
+            else
+              ( Chunk.Mint32,
+                Expr.EList [ Expr.string int_type; Expr.Lit (Int Z.zero) ] )
+          in
+          [
+            ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []);
+            (* TODO: Check second AddSingle operation *)
+            ( [
+                AddSingle
+                  {
+                    loc = new_var2;
+                    ofs = new_var_e2;
+                    value = value2;
+                    chunk = chunk2;
+                  };
+              ],
+              [],
+              [],
+              SS.empty,
+              [] );
+          ]
+      | _ ->
+          let new_var = LVar.alloc () in
+          let set = SS.singleton new_var in
+          let new_var_e = Expr.LVar new_var in
+          let value = Expr.EList [ Expr.string int_type; new_var_e ] in
+          let vtypes = [ (new_var, Type.IntType) ] in
+          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ])
   | InvalidLocation loc ->
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
@@ -1100,8 +1125,6 @@ let get_fixes _heap _pfs _gamma err =
   | _ -> []
 
 let apply_fix heap fix =
-  Logging.verbose (fun m ->
-      m "Applying fixes for error (Gillian-C/lib/MonadicSMemory.ml)");
   let open DR.Syntax in
   match fix with
   | AddSingle { loc; ofs; value; chunk } ->
@@ -1115,19 +1138,7 @@ let apply_fix heap fix =
             loc Expr.pp ofs Expr.pp value Chunk.pp chunk);
 
       let loc = Expr.loc_from_loc_name loc in
-      (* Logging.verbose (fun m ->
-          m "1 Before setting the memory, \n HEAP: %a\n PFS: %a\n Gamma: %a\n"
-            pp heap PFS.pp pfs Type_env.pp gamma); *)
-      (* sval corresponds to the value. So change value to sval type *)
       let* sval = SVal.of_gil_expr_exn value in
-      (* Logging.verbose (fun m ->
-          m "2 Before setting the memory, \n HEAP: %a\n PFS: %a\n Gamma: %a\n"
-            pp heap PFS.pp pfs Type_env.pp gamma); *)
       let perm = Perm.Writable in
       let++ mem = Mem.set_single !(heap.mem) loc ofs chunk sval perm in
-
-      (* Logging.verbose (fun m ->
-          m "4 Printing the fix \n HEAP: %a\n PFS: %a\n Gamma: %a\n" pp
-            { heap with mem = ref mem }
-            PFS.pp pfs Type_env.pp gamma); *)
       { heap with mem = ref mem }
