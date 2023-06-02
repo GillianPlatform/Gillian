@@ -395,18 +395,20 @@ module Node = struct
         Ok (decoded, exact_perm)
     | MemVal
         { mem_val = Array { chunk = Mint8unsigned; values }; exact_perm; _ }
-      when Chunk.equal chunk Mint32 ->
+      when Chunk.equal chunk Mint32
+           || (Chunk.equal chunk Mptr && not Compcert.Archi.ptr64) ->
         let+ decoded = decode_bytes_to_unsigned_int ~chunk values 4 in
         Ok (decoded, exact_perm)
     | MemVal
         { mem_val = Array { chunk = Mint8unsigned; values }; exact_perm; _ }
-      when Chunk.equal chunk Mint64 ->
+      when Chunk.equal chunk Mint64
+           || (Chunk.equal chunk Mptr && Compcert.Archi.ptr64) ->
         let+ decoded = decode_bytes_to_unsigned_int ~chunk values 8 in
         Ok (decoded, exact_perm)
     | MemVal { mem_val = Array { chunk = chunk_b; values }; exact_perm; _ }
       when Chunk.equal chunk chunk_b ->
         let* values = SVArr.reduce values in
-        if Chunk.equal chunk Chunk.ptr then
+        if Chunk.could_be_ptr chunk then
           match values with
           | AllZeros -> DR.ok (SVal.zero_of_chunk chunk, exact_perm)
           | Arr (EList [ a ]) -> (
@@ -477,7 +479,8 @@ module Node = struct
           else (AllUndef, exact_perm))
     | MemVal
         { mem_val = Array { chunk = Mint8unsigned; values }; exact_perm; _ }
-      when Chunk.equal chunk Mint64 -> (
+      when Chunk.equal chunk Mint64
+           || (Chunk.equal chunk Mptr && Compcert.Archi.ptr64) -> (
         match size with
         | Expr.Lit (Int amount) ->
             let amount = Z.to_int amount in
@@ -502,7 +505,11 @@ module Node = struct
       | SVlong _, Mint64
       | SVsingle _, Mfloat32
       | SVfloat _, Mfloat64 -> Single { chunk; value = sval }
-      | Sptr _, c when Chunk.equal c Chunk.ptr -> Single { chunk; value = sval }
+      | SVlong _, Mptr when Compcert.Archi.ptr64 ->
+          Single { chunk; value = sval }
+      | SVint _, Mptr when not Compcert.Archi.ptr64 ->
+          Single { chunk; value = sval }
+      | Sptr _, c when Chunk.could_be_ptr c -> Single { chunk; value = sval }
       | _ -> Single { chunk; value = SUndefined }
     in
     MemVal { exact_perm = Some perm; min_perm = perm; mem_val }

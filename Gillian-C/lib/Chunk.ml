@@ -76,3 +76,9 @@ let align chunk =
   to_compcert chunk |> Memdata.align_chunk |> Camlcoq.Z.to_int
 
 let ptr = Mptr
+
+let could_be_ptr = function
+  | Mptr -> true
+  | Mint64 when Compcert.Archi.ptr64 -> true
+  | Mint32 when not Compcert.Archi.ptr64 -> true
+  | _ -> false
