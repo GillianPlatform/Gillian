@@ -277,7 +277,18 @@ struct
                 L.(verbose (fun m -> m "CAN FIX!!!"));
                 L.verbose (fun m ->
                     m "@[<v 2>My state is:@\n%a@]" State.pp state);
-                let ffixes = List.map (State.get_fixes state) errs in
+                let ffixes =
+                  List.filter_map
+                    (fun err ->
+                      match State.get_fixes state err with
+                      | [] -> None
+                      | fixes -> Some fixes)
+                    errs
+                in
+                L.verbose (fun m ->
+                    m "Fixes:\n%a\n"
+                      (Fmt.Dump.list @@ Fmt.Dump.list @@ State.pp_fix)
+                      ffixes);
                 let fixed_states =
                   List.map
                     (fun new_fixes ->
