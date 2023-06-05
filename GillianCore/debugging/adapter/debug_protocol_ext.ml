@@ -99,8 +99,7 @@ module Custom_commands (Debugger : Debugger.S) = struct
     let type_ = "jump"
 
     module Arguments = struct
-      type t = { proc_name : string; [@key "procName"] id : L.Report_id.t }
-      [@@deriving yojson]
+      type t = { id : L.Report_id.t } [@@deriving yojson]
     end
 
     module Result = struct
@@ -114,7 +113,6 @@ module Custom_commands (Debugger : Debugger.S) = struct
 
     module Arguments = struct
       type t = {
-        proc_name : string; [@key "procName"]
         prev_id : L.Report_id.t; [@key "prevId"]
         branch_case : Exec_map.Packaged.branch_case option; [@key "branchCase"]
       }

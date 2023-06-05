@@ -33,19 +33,17 @@ class VSCodeWrapper {
   }
 }
 
-export const execSpecific = (procName: string, prevId: number, branchCase: BranchCase) => {
+export const execSpecific = (prevId: number, branchCase: BranchCase) => {
   VSCodeAPI.postMessage({
     type: 'request_exec_specific',
-    procName,
     prevId,
     branchCase,
   });
 };
 
-export const jumpToId = (procName: string, id: number) => {
+export const jumpToId = (id: number) => {
   VSCodeAPI.postMessage({
     type: 'request_jump',
-    procName,
     cmdId: id
   });
 };

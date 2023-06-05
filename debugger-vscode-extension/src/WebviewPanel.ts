@@ -63,9 +63,9 @@ export class WebviewPanel {
         this.updateState(state);
       }
     } else if (e.type === 'request_jump') {
-      await debug.jumpToCmd(e.procName, e.cmdId);
+      await debug.jumpToCmd(e.cmdId);
     } else if (e.type === 'request_exec_specific') {
-      await debug.execSpecificCmd(e.procName, e.prevId, e.branchCase);
+      await debug.execSpecificCmd(e.prevId, e.branchCase);
     } else if (e.type === 'request_unification') {
       const unifyData = await debug.getUnification(e.id);
       if (unifyData !== undefined) {

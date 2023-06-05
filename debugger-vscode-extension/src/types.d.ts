@@ -133,13 +133,11 @@ type RequestStateUpdateMsg = {
 
 type RequestJump = {
   readonly type: 'request_jump';
-  readonly procName: string;
   readonly cmdId: number;
 };
 
 type RequestExecSpecific = {
   readonly type: 'request_exec_specific';
-  readonly procName: string;
   readonly prevId: number;
   readonly branchCase: BranchCase | null;
 };

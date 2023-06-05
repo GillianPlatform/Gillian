@@ -74,10 +74,24 @@ functor
       mutable cur_proc_name : string;
     }
 
-    let get_proc_state ?proc_name ?(activate_report_state = true) dbg =
+    let get_proc_name_of_id id =
+      let content, type_ =
+        L.Log_queryer.get_report id
+        |> Option_utils.or_else (fun () ->
+               Fmt.failwith "Couldn't get report for %a" L.Report_id.pp id)
+      in
+      DL.log (fun m -> m "=== TYPE %s ===" type_);
+      if type_ <> L.Logging_constants.Content_type.cmd then
+        Fmt.failwith "Report %a is not type '%s'" L.Report_id.pp id
+          L.Logging_constants.Content_type.cmd;
+      let cmd = content |> of_yojson_string Logging.ConfigReport.of_yojson in
+      cmd.proc_name
+
+    let get_proc_state ?cmd_id ?(activate_report_state = true) dbg =
       let proc_name =
-        match proc_name with
-        | Some proc_name ->
+        match cmd_id with
+        | Some cmd_id ->
+            let proc_name = get_proc_name_of_id cmd_id in
             dbg.cur_proc_name <- proc_name;
             proc_name
         | None -> dbg.cur_proc_name
@@ -89,8 +103,8 @@ functor
             L.Report_state.activate proc_state.report_state;
           Ok proc_state
 
-    let get_proc_state_exn ?proc_name ?(activate_report_state = true) dbg =
-      match get_proc_state ?proc_name ~activate_report_state dbg with
+    let get_proc_state_exn ?cmd_id ?(activate_report_state = true) dbg =
+      match get_proc_state ?cmd_id ~activate_report_state dbg with
       | Ok proc_state -> proc_state
       | Error msg -> failwith msg
 
@@ -822,9 +836,9 @@ functor
         Ok ()
       with Failure msg -> Error msg
 
-    let jump_to_id proc_name id dbg =
+    let jump_to_id id dbg =
       let { cfg; _ } = dbg in
-      let** state = dbg |> get_proc_state ~proc_name in
+      let** state = dbg |> get_proc_state ~cmd_id:id in
       state |> jump_state_to_id id cfg
 
     let jump_to_start dbg =
@@ -962,9 +976,9 @@ functor
       let state = dbg |> get_proc_state_exn in
       step_case ~reverse dbg state
 
-    let step_specific proc_name branch_case prev_id dbg =
+    let step_specific branch_case prev_id dbg =
       let { cfg; _ } = dbg in
-      let** state = dbg |> get_proc_state ~proc_name in
+      let** state = dbg |> get_proc_state ~cmd_id:prev_id in
       let id, branch_case =
         state.lifter_state |> Lifter.next_gil_step prev_id branch_case
       in
