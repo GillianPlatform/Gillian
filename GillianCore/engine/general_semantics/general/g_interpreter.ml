@@ -172,6 +172,7 @@ struct
         branching : int;
         state : state_t;
         branch_case : branch_case option;
+        proc_name : string;
       }
       [@@deriving yojson, make]
 
@@ -266,7 +267,8 @@ struct
         (cs : Call_stack.t)
         (i : int)
         (b_counter : int)
-        (branch_case : branch_case option) : L.Report_id.t option =
+        (branch_case : branch_case option)
+        (proc_name : string) : L.Report_id.t option =
       let annot, cmd = cmd in
       let state_printer =
         match !Config.pbn with
@@ -278,8 +280,8 @@ struct
             State.pp_by_need pvars lvars locs
       in
       ConfigReport.log state_printer
-        (ConfigReport.make ~proc_line:i ~time:(Sys.time ()) ~cmd ~callstack:cs
-           ~annot ~branching:b_counter ~state ?branch_case ())
+        (ConfigReport.make ~proc_name ~proc_line:i ~time:(Sys.time ()) ~cmd
+           ~callstack:cs ~annot ~branching:b_counter ~state ?branch_case ())
 
     let print_lconfiguration
         (lcmd : LCmd.t)
@@ -1615,7 +1617,7 @@ struct
       (* if !Config.stats then Statistics.exec_cmds := !Statistics.exec_cmds + 1; *)
       UP.update_coverage prog proc_name i;
 
-      log_configuration annot_cmd state cs i b_counter branch_case
+      log_configuration annot_cmd state cs i b_counter branch_case proc_name
       |> Option.iter (fun report_id ->
              report_id_ref := Some report_id;
              L.Parent.set report_id);
@@ -1960,7 +1962,7 @@ struct
         } =
           cconf
         in
-        let _, annot_cmd = get_cmd prog cs i in
+        let proc_name, annot_cmd = get_cmd prog cs i in
         Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
         L.set_previous prev_cmd_report_id;
         L.(
@@ -1969,7 +1971,7 @@ struct
                 "Stopping Symbolic Execution due to MAX BRANCHING with %d. \
                  STOPPING CONF:\n"
                 b_counter));
-        log_configuration annot_cmd state cs i b_counter branch_case
+        log_configuration annot_cmd state cs i b_counter branch_case proc_name
         |> Option.iter (fun report_id ->
                parent_id_ref := Some report_id;
                L.Parent.set report_id);

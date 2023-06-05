@@ -66,7 +66,7 @@ const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
           hasParent: true,
           isActive,
           exec: () => {
-            execSpecific(procName, +parent, branchCase as BranchCase);
+            execSpecific(+parent, branchCase as BranchCase);
           },
         },
         nexts: [],
@@ -152,7 +152,7 @@ const ExecMapView = ({ state, expandedNodes, toggleNodeExpanded }: Props) => {
         hasParent,
         isActive,
         jump: () => {
-          jumpToId(procName, cmdData.ids[0]);
+          jumpToId(cmdData.ids[0]);
         },
         expanded,
         toggleExpanded,
