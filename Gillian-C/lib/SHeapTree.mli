@@ -7,7 +7,7 @@ type err =
   | BufferOverrun
   | InsufficientPermission of { required : Perm.t; actual : Perm.t }
   | InvalidAlignment of { alignment : int; offset : Expr.t }
-  | MissingResource
+  | MissingResource of { ofs : Expr.t option; chunk : Chunk.t option }
   | Unhandled of string
   | RemovingNotOwned
   | WrongMemVal
