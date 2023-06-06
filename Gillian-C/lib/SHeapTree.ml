@@ -10,12 +10,14 @@ module CoreP = Constr.Core
 
 let log_string s = Logging.verbose (fun fmt -> fmt "SHEAPTREE CHECKING: %s" s)
 
+type missingResourceType = Unfixable | Fixable of (Expr.t * Chunk.t)
+
 type err =
   | UseAfterFree
   | BufferOverrun
   | InsufficientPermission of { required : Perm.t; actual : Perm.t }
   | InvalidAlignment of { alignment : int; offset : Expr.t }
-  | MissingResource of { ofs : Expr.t option; chunk : Chunk.t option }
+  | MissingResource of missingResourceType
   | Unhandled of string
   | RemovingNotOwned
   | WrongMemVal
@@ -32,10 +34,10 @@ let pp_err fmt = function
   | InvalidAlignment { alignment; offset } ->
       Fmt.pf fmt "Invalid alignment: %d should divide %a" alignment Expr.pp
         offset
-  | MissingResource { ofs = Some ofs; chunk = Some chunk } ->
-      Fmt.pf fmt "MissingResource (Offset: %a) (Chunk: %a)" Expr.pp ofs Chunk.pp
-        chunk
-  | MissingResource _ -> Fmt.pf fmt "MissingResource"
+  | MissingResource Unfixable -> Fmt.pf fmt "Unfixable MissingResource"
+  | MissingResource (Fixable (ofs, chunk)) ->
+      Fmt.pf fmt "Fixable MissingResource with Offset: %a Chunk: %a" Expr.pp ofs
+        Chunk.pp chunk
   | Unhandled e -> Fmt.pf fmt "Unhandled error with message : %s" e
   | RemovingNotOwned -> Fmt.pf fmt "Removing not owned"
   | WrongMemVal -> Fmt.pf fmt "WrongMemVal"
@@ -198,8 +200,7 @@ module Node = struct
     | None -> Ok ()
     | Some required -> (
         match node with
-        | NotOwned Totally ->
-            Error (MissingResource { ofs = None; chunk = None })
+        | NotOwned Totally -> Error (MissingResource Unfixable)
         | NotOwned Partially ->
             failwith
               "SHeapTree Check Permission Error: Memory Partially Not Owned \
@@ -211,8 +212,7 @@ module Node = struct
 
   let exact_perm = function
     | NotOwned Partially -> `KeepLooking
-    | NotOwned Totally ->
-        `StopLooking (Error (MissingResource { ofs = None; chunk = None }))
+    | NotOwned Totally -> `StopLooking (Error (MissingResource Unfixable))
     | MemVal { exact_perm = None; _ } -> `KeepLooking
     | MemVal { exact_perm = Some x; _ } -> `StopLooking (Ok x)
 
@@ -385,21 +385,16 @@ module Node = struct
         else Delayed.return SVal.SUndefined
     | _ -> Delayed.return SVal.SUndefined
 
-  let decode ~chunk t =
+  let decode ~low ~chunk t =
     let open Delayed.Syntax in
-    Logging.verbose (fun m -> m "<!!!> Here");
     match t with
-    | NotOwned Totally ->
-        DR.error (MissingResource { ofs = None; chunk = None })
+    | NotOwned Totally -> DR.error (MissingResource (Fixable (low, chunk)))
     | NotOwned Partially ->
-        Logging.verbose (fun m -> m "<!!!> Partially");
         Logging.verbose (fun fmt ->
             fmt
               "SHeapTree Decode Error: Memory Partially Not Owned (Currently \
                Unsupported)");
-        failwith
-          "SHeapTree Decode Error: Memory Partially Not Owned (Currently \
-           Unsupported)"
+        DR.error (MissingResource Unfixable)
     | MemVal { mem_val = Zeros; exact_perm; _ } ->
         DR.ok (SVal.zero_of_chunk chunk, exact_perm)
     | MemVal { mem_val = Undef _; exact_perm; _ } ->
@@ -456,7 +451,7 @@ module Node = struct
     | MemVal { mem_val = Array { chunk = _; _ }; exact_perm; _ } ->
         DR.ok (SVal.SUndefined, exact_perm)
 
-  let decode_arr ~size ~chunk t =
+  let decode_arr ~low ~size ~chunk t =
     let open Delayed.Syntax in
     let split_array_in ~size ~amount arr =
       match arr with
@@ -488,16 +483,13 @@ module Node = struct
       get_values arrs
     in
     match t with
-    | NotOwned Totally ->
-        DR.error (MissingResource { ofs = None; chunk = None })
+    | NotOwned Totally -> DR.error (MissingResource (Fixable (low, chunk)))
     | NotOwned Partially ->
         Logging.verbose (fun fmt ->
             fmt
               "SHeapTree Decode Array Error: Memory Partially Not Owned \
                (Currently Unsupported)");
-        failwith
-          "SHeapTree Decode Array Error: Memory Partially Not Owned (Currently \
-           Unsupported)"
+        DR.error (MissingResource Unfixable)
     | MemVal { mem_val = Zeros; exact_perm; _ } ->
         DR.ok (SVArr.AllZeros, exact_perm)
     | MemVal { mem_val = Undef _; exact_perm; _ } ->
@@ -926,7 +918,7 @@ module Tree = struct
     let rebuild_parent = with_children in
     let range = Range.of_low_chunk_and_size low chunk size in
     let** framed, tree = frame_range t ~replace_node ~rebuild_parent range in
-    let+* arr, perm = Node.decode_arr ~size ~chunk framed.node in
+    let+* arr, perm = Node.decode_arr ~size ~low ~chunk framed.node in
     Ok (arr, perm, tree)
 
   let set_array
@@ -953,7 +945,7 @@ module Tree = struct
     let range = Range.of_low_and_chunk low chunk in
     let** framed, tree = frame_range t ~replace_node ~rebuild_parent range in
     let node = framed.node in
-    let++ sval, perm = Node.decode ~chunk node in
+    let++ sval, perm = Node.decode ~low ~chunk node in
     (sval, perm, tree)
 
   let set_single
@@ -975,16 +967,13 @@ module Tree = struct
     let range = Range.of_low_and_chunk low chunk in
     let replace_node node =
       match node.node with
-      | Node.NotOwned Totally ->
-          Error (MissingResource { ofs = Some low; chunk = Some chunk })
+      | Node.NotOwned Totally -> Error (MissingResource (Fixable (low, chunk)))
       | Node.NotOwned Partially ->
           Logging.verbose (fun fmt ->
               fmt
                 "SHeapTree Load Error: Memory Partially Not Owned (Currently \
                  Unsupported)");
-          failwith
-            "SHeapTree Load Error: Memory Partially Not Owned (Currently \
-             Unsupported)"
+          Error (MissingResource Unfixable)
       | MemVal { min_perm; _ } ->
           if min_perm >=% Readable then Ok node
           else
@@ -993,7 +982,7 @@ module Tree = struct
     in
     let rebuild_parent = with_children in
     let** framed, tree = frame_range t ~replace_node ~rebuild_parent range in
-    let++ sval, _ = Node.decode ~chunk framed.node in
+    let++ sval, _ = Node.decode ~low ~chunk framed.node in
     (sval, tree)
 
   let store (t : t) (low : Expr.t) (chunk : Chunk.t) (sval : SVal.t) :
@@ -1003,16 +992,13 @@ module Tree = struct
     let range = Range.of_low_and_chunk low chunk in
     let replace_node node =
       match node.node with
-      | NotOwned Totally ->
-          Error (MissingResource { ofs = Some low; chunk = Some chunk })
+      | NotOwned Totally -> Error (MissingResource (Fixable (low, chunk)))
       | NotOwned Partially ->
           Logging.verbose (fun fmt ->
               fmt
                 "SHeapTree Store Error: Memory Partially Not Owned (Currently \
                  Unsupported)");
-          failwith
-            "SHeapTree Store Error: Memory Partially Not Owned (Currently \
-             Unsupported)"
+          Error (MissingResource Unfixable)
       | MemVal { min_perm; _ } ->
           if min_perm >=% Writable then
             Ok (sval_leaf ~low ~chunk ~value:sval ~perm:min_perm)
@@ -1039,7 +1025,7 @@ module Tree = struct
           else rec_call right
     in
     if%sat Range.is_inside range span then rec_call tree
-    else DR.error (MissingResource { ofs = None; chunk = None })
+    else DR.error (MissingResource Unfixable)
 
   let weak_valid_pointer (tree : t) (ofs : Expr.t) : (bool, err) DR.t =
     let open Delayed.Syntax in
@@ -1065,15 +1051,14 @@ module Tree = struct
     let range = Range.make low high in
     let replace_node node =
       match node.node with
-      | NotOwned Totally -> Error (MissingResource { ofs = None; chunk = None })
+      | NotOwned Totally ->
+          Error (MissingResource Unfixable) (* No chunk available to fix *)
       | NotOwned Partially ->
           Logging.verbose (fun fmt ->
               fmt
                 "SHeapTree Drop Permission Error: Memory Partially Not Owned \
                  (Currently Unsupported)");
-          failwith
-            "SHeapTree Drop Permission Error: Memory Partially Not Owned \
-             (Currently Unsupported)"
+          Error (MissingResource Unfixable)
       | MemVal { min_perm = Freeable; _ } -> Ok (rec_set_perm node)
       | MemVal { min_perm; _ } ->
           Error
@@ -1243,7 +1228,7 @@ let get_perm_at t ofs =
       in
       if%sat is_in_bounds then
         match root with
-        | None -> DR.error (MissingResource { ofs = None; chunk = None })
+        | None -> DR.error (MissingResource Unfixable)
         | Some root ->
             let++ perm = Tree.get_perm_at root ofs in
             Some perm
@@ -1262,7 +1247,7 @@ let weak_valid_pointer (t : t) (ofs : Expr.t) : (bool, err) DR.t =
       if%sat is_sure_false bounds ofs then DR.ok false
       else
         match root with
-        | None -> DR.error (MissingResource { ofs = None; chunk = None })
+        | None -> DR.error (MissingResource Unfixable)
         | Some root -> Tree.weak_valid_pointer root ofs)
 
 let get_bounds = function
@@ -1296,7 +1281,7 @@ let drop_perm t low high new_perm =
   | Freed -> DR.error UseAfterFree
   | Tree { bounds; root } -> (
       match root with
-      | None -> DR.error (MissingResource { ofs = None; chunk = None })
+      | None -> DR.error (MissingResource Unfixable)
       | Some tree ->
           let++ new_root = Tree.drop_perm tree low high new_perm in
           Tree { bounds; root = Some new_root })
@@ -1310,11 +1295,11 @@ let free t low high =
   | Tree tree -> (
       (* Can only free if entirely freeable *)
       match bounds with
-      | None -> DR.error (MissingResource { ofs = None; chunk = None })
+      | None -> DR.error (MissingResource Unfixable)
       | Some bounds ->
           if%ent Range.is_equal (low, high) bounds then
             match tree.root with
-            | None -> DR.error (MissingResource { ofs = None; chunk = None })
+            | None -> DR.error (MissingResource Unfixable)
             | Some root ->
                 let+* node, _ = Tree.get_node root (low, high) in
                 Result.map
@@ -1334,7 +1319,7 @@ let get_single t low chunk =
     let** root = DR.of_result (get_root t) in
     match root with
     (* TODO: What should the offset be in this case *)
-    | None -> DR.error (MissingResource { ofs = None; chunk = None })
+    | None -> DR.error (MissingResource (Fixable (low, chunk)))
     | Some root ->
         let** value, perm, root_framed = Tree.get_single root low chunk in
         let++ wroot = DR.of_result (with_root t root_framed) in
@@ -1368,7 +1353,7 @@ let get_array t low size chunk =
   if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
-    | None -> DR.error (MissingResource { ofs = None; chunk = None })
+    | None -> DR.error (MissingResource (Fixable (low, chunk)))
     | Some root ->
         let** array, perm, root_framed = Tree.get_array root low chunk size in
         let++ wroot = DR.of_result (with_root t root_framed) in
@@ -1396,23 +1381,20 @@ let get_simple_mem_val ~expected_mem_val t low high =
   if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
-    | None -> DR.error (MissingResource { ofs = None; chunk = None })
+    | None -> DR.error (MissingResource Unfixable)
     | Some root ->
         let** node, root_framed = Tree.get_node root range in
         let res =
           match node with
           | MemVal { mem_val; exact_perm = perm; _ }
             when Node.eq_mem_val mem_val expected_mem_val -> Ok perm
-          | NotOwned Totally ->
-              Error (MissingResource { ofs = None; chunk = None })
+          | NotOwned Totally -> Error (MissingResource Unfixable)
           | NotOwned Partially ->
               Logging.verbose (fun fmt ->
                   fmt
                     "SHeapTree Get Simple Memory Value Error: Memory Partially \
                      Not Owned (Currently Unsupported)");
-              failwith
-                "SHeapTree Get Simple Memory Value Error: Memory Partially Not \
-                 Owned (Currently Unsupported)"
+              Error (MissingResource Unfixable)
           | _ -> Error WrongMemVal
         in
         let++ wroot =
@@ -1480,7 +1462,7 @@ let load t chunk ofs =
   if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
-    | None -> DR.error (MissingResource { ofs = Some ofs; chunk = Some chunk })
+    | None -> DR.error (MissingResource (Fixable (ofs, chunk)))
     | Some root ->
         let** value, root = Tree.load root ofs chunk in
         let++ wroot = DR.of_result (with_root t root) in
@@ -1495,7 +1477,7 @@ let store t chunk ofs value =
   if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
-    | None -> DR.error (MissingResource { ofs = Some ofs; chunk = Some chunk })
+    | None -> DR.error (MissingResource (Fixable (ofs, chunk)))
     | Some root ->
         let** root = Tree.store root ofs chunk value in
         DR.of_result (with_root t root)
@@ -1511,7 +1493,7 @@ let move dst_tree dst_ofs src_tree src_ofs size =
   if%sat is_in_bounds src_range src_span then
     let** src_root = DR.of_result (get_root src_tree) in
     match src_root with
-    | None -> DR.error (MissingResource { ofs = None; chunk = None })
+    | None -> DR.error (MissingResource Unfixable)
     | Some src_root ->
         let** framed, _ =
           Tree.frame_range src_root
@@ -1521,22 +1503,20 @@ let move dst_tree dst_ofs src_tree src_ofs size =
         in
         let** () =
           match framed.node with
-          | NotOwned _ ->
-              DR.error (MissingResource { ofs = None; chunk = None })
+          | NotOwned _ -> DR.error (MissingResource Unfixable)
           | _ -> DR.ok ()
         in
         let** dst_span = DR.of_result (get_bounds dst_tree) in
         if%sat is_in_bounds dst_range dst_span then
           let** dst_root = DR.of_result (get_root dst_tree) in
           match dst_root with
-          | None -> DR.error (MissingResource { ofs = None; chunk = None })
+          | None -> DR.error (MissingResource Unfixable)
           | Some dst_root ->
               let** _, new_dst_root =
                 Tree.frame_range dst_root
                   ~replace_node:(fun current ->
                     match current.node with
-                    | NotOwned _ ->
-                        Error (MissingResource { ofs = None; chunk = None })
+                    | NotOwned _ -> Error (MissingResource Unfixable)
                     | _ -> Ok (Tree.realign framed dst_ofs))
                   ~rebuild_parent:Tree.of_children dst_range
               in

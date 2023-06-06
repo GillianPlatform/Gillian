@@ -2,5 +2,5 @@
 
 void unsafeFunction() {
     char buffer[5];
-    strcpy(buffer, "Helo"); // Buffer overflow occurs here
+    strcpy(buffer, "Hello World"); // Buffer overflow occurs here
 }

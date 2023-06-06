@@ -2,12 +2,14 @@ open Gil_syntax
 open Utils.Containers
 open Monadic
 
+type missingResourceType = Unfixable | Fixable of (Expr.t * Chunk.t)
+
 type err =
   | UseAfterFree
   | BufferOverrun
   | InsufficientPermission of { required : Perm.t; actual : Perm.t }
   | InvalidAlignment of { alignment : int; offset : Expr.t }
-  | MissingResource of { ofs : Expr.t option; chunk : Chunk.t option }
+  | MissingResource of missingResourceType
   | Unhandled of string
   | RemovingNotOwned
   | WrongMemVal

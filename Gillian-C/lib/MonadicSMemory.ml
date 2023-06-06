@@ -1126,10 +1126,8 @@ let get_fixes _heap _pfs _gamma err =
       let new_expr = Expr.ALoc new_loc in
       [ ([], [ Formula.Eq (new_expr, loc) ], [], SS.empty, []) ]
   | SHeapTreeErr
-      {
-        at_locations;
-        sheaptree_err = MissingResource { ofs = Some ofs; chunk = Some chunk };
-      } -> (
+      { at_locations; sheaptree_err = MissingResource (Fixable (ofs, chunk)) }
+    -> (
       match at_locations with
       | [ loc ] -> get_add_single_fix loc ofs chunk
       | _ ->
