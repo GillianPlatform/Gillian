@@ -28,6 +28,7 @@
 %token <CodeLoc.t> TLIST
 %token <CodeLoc.t> TINT
 %token <CodeLoc.t> TBOOL
+%token <CodeLoc.t> TFLOAT
 
 (* names *)
 %token <CodeLoc.t * string> IDENTIFIER
@@ -411,6 +412,7 @@ type_target:
   | TLIST { WType.WList }
   | TINT { WType.WInt }
   | TBOOL { WType.WBool }
+  | TFLOAT { WType.WFloat }
 
 pred_param_ins:
   | inp = option(PLUS); lx = IDENTIFIER; option(preceded(COLON, type_target))

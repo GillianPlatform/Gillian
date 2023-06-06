@@ -14,7 +14,7 @@ let gvars = "gvar_" digit+ (* generated variables during compilation *)
 let identifier = letter(letter|digit|'_')*
 let lvar = '#' (letter|digit|'_'|'$')*
 let integer = digit+
-let float = digit '.' digit?
+let float = digit* '.' digit*
 let loc = "$l" (letter|digit|'_')*
 let white = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
@@ -56,6 +56,7 @@ rule read =
   | "List" { TLIST (curr lexbuf) }
   | "Int" { TINT (curr lexbuf) }
   | "Bool" { TBOOL (curr lexbuf) }
+  | "Float" { TFLOAT (curr lexbuf) }
   (* strings and comments *)
   | '"'      { let () = l_start_string := curr lexbuf in
                read_string (Buffer.create 17) lexbuf }
