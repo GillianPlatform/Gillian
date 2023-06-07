@@ -52,6 +52,7 @@ rule read =
   | "lemma"  { LEMMA (curr lexbuf) }
   | "forall" { FORALL (curr lexbuf) }
   | "bind" { EXIST (curr lexbuf) }
+  | "spec" { SPEC (curr lexbuf) }
   (* types *)
   | "List" { TLIST (curr lexbuf) }
   | "Int" { TINT (curr lexbuf) }

@@ -676,7 +676,24 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
     let bindings =
       match to_bind with
       | Some (spec_name, lvars) ->
-          Some (spec_name, List.map (fun x -> (x, Expr.LVar x)) lvars)
+          let lvar_names = List.map fst lvars in
+          let compiled_lexprs =
+            List.map (fun (_, expr) -> compile_lexpr expr) lvars
+          in
+          let lvar_vals =
+            List.map
+              (fun tuple ->
+                match tuple with
+                | [], [], vals -> vals
+                | _ ->
+                    failwith
+                      "Something went wrong when compiling lexpr for a \
+                       function call. The exprs passed might not have been \
+                       lvars.")
+              compiled_lexprs
+          in
+          let lvars = List.combine lvar_names lvar_vals in
+          Some (spec_name, lvars)
       | None -> None
     in
     (x, expr_fn, params, bindings, cmdles)

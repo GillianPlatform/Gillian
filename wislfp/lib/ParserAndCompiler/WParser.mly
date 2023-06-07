@@ -5,6 +5,7 @@
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
 %token <CodeLoc.t> INVARIANT FOLD UNFOLD NOUNFOLD APPLY ASSERT EXIST FORALL
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
+%token <CodeLoc.t> SPEC
 
 (* punctuation *)
 %token <CodeLoc.t> COLON            /* : */
@@ -154,11 +155,23 @@ definitions:
     { let (fs, ps, ls) = fpdcl in
       (f::fs, ps, ls) }
 
+spec_bindings:
+| lstart = LBRACK; SPEC; spec_name = IDENTIFIER; COLON; vs_with_loc = separated_list(COMMA, LVAR); RBRACK
+  { let (_, variables) = List.split vs_with_loc in
+    let (_, spec_name) = spec_name in
+    (lstart, spec_name, variables) }
+
 fct_with_specs:
   | lstart = LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
     post = logic_assertion; lend = RCBRACE
     { let loc = CodeLoc.merge lstart lend in
       WFun.add_spec f pre post variant loc }
+  | bindings = spec_bindings; LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
+  post = logic_assertion; lend = RCBRACE
+  { let lstart, spec_name, lvars = bindings in
+    let existentials = Some (spec_name, lvars) in
+    let loc = CodeLoc.merge lstart lend in
+    WFun.add_spec ?existentials f pre post variant loc }
   | f = fct { f }
 
 fct:
@@ -203,11 +216,34 @@ logic_cmds:
   | LCMD; lcmds = separated_list(SEMICOLON, logic_command); RCBRACE { lcmds }
  */
 
+logical_binding:
+  | LBRACE; lhs = LVAR; COLON; rhs = LVAR; RBRACE
+  { let (_, lhs) = lhs in
+    let (loc, rhs) = rhs in
+    let bare_lexpr = WLExpr.LVar rhs in
+    let expr = WLExpr.make bare_lexpr loc in
+    (lhs, expr)
+  }
+
+passed_logical_bindings:
+  | LBRACK; spec_name = IDENTIFIER; COLON; bindings = separated_nonempty_list(COMMA, logical_binding); lend = RBRACK
+  { let (_, spec_name) = spec_name in
+    (spec_name, bindings, lend)
+  }
+
 function_call:
   | lx = IDENTIFIER; ASSIGN; lf = IDENTIFIER; LBRACE; params = expr_list; lend = RBRACE
     { let (lstart, x) = lx in
       let (_, f) = lf in
       let bare_stmt = WStmt.FunCall (x, f, params, None) in
+      let loc = CodeLoc.merge lstart lend in
+      WStmt.make bare_stmt loc
+    }
+  | lx = IDENTIFIER; ASSIGN; lf = IDENTIFIER; LBRACE; params = expr_list; RBRACE; bindings = passed_logical_bindings 
+    { let (lstart, x) = lx in
+      let (_, f) = lf in
+      let (spec_name, bindings, lend) = bindings in
+      let bare_stmt = WStmt.FunCall (x, f, params, Some (spec_name, bindings)) in
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc
     }
