@@ -117,6 +117,7 @@ struct
     let () = Config.bi_unroll_depth := bi_unroll_depth in
     let () = Config.bi_no_spec_depth := bi_no_spec_depth in
     let () = Config.specs_to_stdout := specs_to_stdout in
+    let () = Config.max_branching := bi_unroll_depth in
     let () =
       process_files files already_compiled outfile_opt should_emit_specs
         incremental

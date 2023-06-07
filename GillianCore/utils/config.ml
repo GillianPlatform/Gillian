@@ -14,6 +14,7 @@ let current_exec_mode : Exec_mode.t ref = ref Exec_mode.Verification
 let previously_normalised = ref false
 let unfolding = ref true
 let manual_proof = ref false
+let max_branching = ref 100
 
 (* let perform_syntax_checks = ref false *)
 let lemma_proof = ref false

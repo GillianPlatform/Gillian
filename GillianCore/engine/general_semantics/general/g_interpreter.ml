@@ -311,8 +311,6 @@ struct
 
   open Logging
 
-  let max_branching = 100
-
   exception Interpreter_error of err_t list * State.t
 
   let () =
@@ -2082,7 +2080,7 @@ struct
           match conf with
           | None -> Handle_conf.none eval_step_state
           | Some (ConfCont ({ branch_count; _ } as c))
-            when branch_count < max_branching ->
+            when branch_count < !Config.max_branching ->
               Handle_conf.cont c eval_step_state
           | Some (ConfCont c) -> Handle_conf.max_branch c eval_step_state
           | Some (ConfErr c) -> Handle_conf.err c eval_step_state
