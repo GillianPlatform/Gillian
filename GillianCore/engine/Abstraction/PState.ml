@@ -1194,7 +1194,7 @@ module Make
   let get_failing_constraint = State.get_failing_constraint
   let can_fix = State.can_fix
 
-  let get_fixes (state : t) (errs : err_t) : fix_t list =
+  let get_fixes (state : t) (errs : err_t) : fix_t list list =
     L.verbose (fun m -> m "AState: get_fixes");
     let st, _, _, _ = state in
     State.get_fixes st errs

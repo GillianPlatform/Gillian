@@ -228,7 +228,7 @@ end = struct
   let can_fix (_ : err_t) : bool = false
   let get_failing_constraint (_ : err_t) : Formula.t = True
 
-  let get_fixes (_ : t) (_ : err_t) : fix_t list =
+  let get_fixes (_ : t) (_ : err_t) : fix_t list list =
     raise (Failure "Concrete: get_fixes not implemented in CState.Make")
 
   let apply_fixes (_ : t) (_ : fix_t list) : t option * Asrt.t list =

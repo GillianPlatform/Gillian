@@ -285,6 +285,7 @@ struct
                       | fixes -> Some fixes)
                     errs
                 in
+                let ffixes = List.concat ffixes in
                 L.verbose (fun m ->
                     m "Fixes:\n%a\n"
                       (Fmt.Dump.list @@ Fmt.Dump.list @@ State.pp_fix)
@@ -492,7 +493,7 @@ struct
 
   (* to throw errors: *)
 
-  let get_fixes (_ : t) (_ : err_t) : fix_t list =
+  let get_fixes (_ : t) (_ : err_t) : fix_t list list =
     raise (Failure "get_fixes not implemented in MakeBiState")
 
   let apply_fixes (_ : t) (_ : fix_t list) : t option * Asrt.t list =
@@ -533,7 +534,8 @@ struct
     | Error err -> (
         match State.get_fixes state err with
         | [] -> [] (* No fix, we stop *)
-        | fix -> (
+        | fixes -> (
+            let* fix = fixes in
             let state' = State.copy state in
             let state_af' = State.copy state_af in
             let state', _ = State.apply_fixes state' fix in

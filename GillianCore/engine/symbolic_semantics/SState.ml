@@ -747,13 +747,12 @@ module Make (SMemory : SMemory.S) :
         L.verbose (fun m -> m "Warning: invalid fix.");
         None
 
-  (* FIXME: I'm not entirely sure of what this is doing now. Is the product still the right thing to do?
-     Possibly not. *)
-  let get_fixes (state : t) (err : err_t) : fix_t list =
+  (* get_fixes returns a list of possible fixes.
+     Each "fix" is actually a list of fix_t, each of which have to be applied to the same state *)
+  let get_fixes (state : t) (err : err_t) : fix_t list list =
     let pp_fixes fmt fixes =
       Fmt.pf fmt "[[ %a ]]" (Fmt.list ~sep:(Fmt.any ", ") pp_fix) fixes
     in
-    L.verbose (fun m -> m "SState: get_fixes");
     let heap, _, pfs, gamma, _ = state in
     let one_step_fixes : fix_t list list =
       match err with
@@ -803,12 +802,10 @@ module Make (SMemory : SMemory.S) :
           Fmt.Dump.(list @@ list @@ pp_fix)
           one_step_fixes);
     (* Cartesian product of the fixes *)
-    let product = List_utils.list_product one_step_fixes in
-    let candidate_fixes = List.concat product in
-    let normalised_fixes = normalise_fix pfs gamma candidate_fixes in
-    let result = Option.value ~default:[] normalised_fixes in
+    let result = List.filter_map (normalise_fix pfs gamma) one_step_fixes in
     L.(verbose (fun m -> m "Normalised fixes: %i" (List.length result)));
-    L.verbose (fun m -> m "%a" (Fmt.list ~sep:(Fmt.any "@\n@\n") pp_fix) result);
+    L.verbose (fun m ->
+        m "%a" (Fmt.list ~sep:(Fmt.any "@\n@\n") (Fmt.Dump.list pp_fix)) result);
     result
 
   (**
