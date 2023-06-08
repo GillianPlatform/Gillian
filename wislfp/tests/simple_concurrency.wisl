@@ -73,3 +73,15 @@ function conc_reads_same_loc(x) {
     return y
 }
 { (#x -> #v) * ret -> #v + 5, #v + 10}
+
+// should fail
+{ emp }
+function conc_writes_same_loc() {
+    x := new(1);
+    par {
+        u := write(x, 2);
+        u := write(x, 3)
+    };
+    return x
+}
+{ ret == 2 \/ ret == 3 }

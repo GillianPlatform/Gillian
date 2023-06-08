@@ -1,0 +1,3 @@
+predicate lambda_term(+x, v, t1, t2, p) {
+    x -> (p: 0), (p: v), (p: t1) * (t2 == null) * lambda_term(t1, #v1, #t11, #t12, p)
+}

@@ -1,0 +1,45 @@
+// tree holds the list representation of a pre-order traveresal of a binary tree with root at x.
+predicate binary_tree(+x, tree, +p: Float) {
+    (x == null) * (tree == nil);
+    (x -> (p: #a), (p: #l), (p: #r)) * binary_tree(#l, #left, p) * binary_tree(#r, #right, p) * (tree == #a::(#left @ #right))
+}
+
+predicate tree_height(+x, h: Int, +p: Float) {
+    (x == null) * (h == 0);
+    (x -> (p: #a), (p: #l), (p: #r)) * tree_height(#l, #hl, p) * tree_height(#r, #hr, p) * (#hl >=# #hr) * (h == #hl + 1);
+    (x -> (p: #a), (p: #l), (p: #r)) * tree_height(#l, #hl, p) * tree_height(#r, #hr, p) * (#hl <# #hr) * (h == #hr + 1)
+}
+
+predicate is_int(+a: Int) {
+    emp
+}
+
+{ (a == #a) * is_int(#a) * (b == #b) * is_int(#b) }
+function max(a, b) {
+    if (a > b) {
+        r := a
+    } else {
+        r := b
+    };
+    return r
+}
+{ (#a ># #b /\ ret == #a) \/ (#a <=# #b /\ ret == #b) * is_int(ret)}
+
+[ spec height_spec: #p ]
+{ (t == #t) *  binary_tree(#t, #tree, #p) }
+function height(t) {
+    if (t = null) {
+        r := 0
+    } else {
+        lt := [t + 1];
+        rt := [t + 2];
+        par {
+            lh := height(lt)[height_spec: (#p: #p)];
+            rh := height(rt)[height_spec: (#p: #p)]
+        };
+        r := max(lh, rh)
+    };
+    return r
+}
+{ tree_height(#t, ret, #p) }
+
