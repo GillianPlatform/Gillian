@@ -14,17 +14,6 @@ predicate is_int(+a: Int) {
     emp
 }
 
-{ (a == #a) * is_int(#a) * (b == #b) * is_int(#b) }
-function max(a, b) {
-    if (a > b) {
-        r := a
-    } else {
-        r := b
-    };
-    return r
-}
-{ (#a ># #b /\ ret == #a) \/ (#a <=# #b /\ ret == #b) * is_int(ret)}
-
 [ spec height_spec: #p ]
 { (t == #t) *  binary_tree(#t, #tree, #p) }
 function height(t) {
@@ -34,12 +23,15 @@ function height(t) {
         lt := [t + 1];
         rt := [t + 2];
         par {
-            lh := height(lt)[height_spec: (#p: #p)];
-            rh := height(rt)[height_spec: (#p: #p)]
+            lh := height(lt) [height_spec: (#p: #p)];
+            rh := height(rt) [height_spec: (#p: #p)]
         };
-        r := max(lh, rh)
+        if (lh >= rh) {
+            r := lh + 1
+        } else {
+            r := rh + 1
+        }
     };
     return r
 }
 { tree_height(#t, ret, #p) }
-
