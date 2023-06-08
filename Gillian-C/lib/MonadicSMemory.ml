@@ -1103,48 +1103,7 @@ let get_fixes _heap _pfs _gamma err =
             [],
             SS.empty,
             [] );
-          (* ( [
-               AddSingle
-                 {
-                   loc = ptr_loc;
-                   ofs = ptr_ofs;
-                   value = ptr_value;
-                   chunk = ptr_chunk;
-                 };
-             ],
-             [],
-             [],
-             SS.empty,
-             [] ); *)
         ]
-        (* let new_var1 = LVar.alloc () in
-           let new_var_e1 = Expr.LVar new_var1 in
-           let new_var2 = LVar.alloc () in
-           let new_var_e2 = Expr.LVar new_var2 in
-           let set = SS.add new_var2 (SS.singleton new_var1) in
-           let value = Expr.EList [ new_var_e1; new_var_e2 ] in
-           let vtypes =
-             [ (new_var1, Type.ObjectType); (new_var2, Type.IntType) ]
-           in
-           let chunk2, value2 =
-             if Compcert.Archi.ptr64 then
-               ( Chunk.Mint64,
-                 Expr.EList [ Expr.string long_type; Expr.Lit (Int Z.zero) ] )
-             else
-               ( Chunk.Mint32,
-                 Expr.EList [ Expr.string int_type; Expr.Lit (Int Z.zero) ] )
-           in
-           let ofs2 =
-             Expr.BinOp (Expr.Lit (Int Z.zero), BinOp.IPlus, Expr.Lit (Int Z.zero))
-           in
-           [
-             ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []);
-             ( [ AddSingle { loc; ofs = ofs2; value = value2; chunk = chunk2 } ],
-               [],
-               [],
-               SS.empty,
-               [] );
-           ] *)
     | _ ->
         let new_var = LVar.alloc () in
         let set = SS.singleton new_var in
@@ -1160,15 +1119,15 @@ let get_fixes _heap _pfs _gamma err =
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
       [ ([], [ Formula.Eq (new_expr, loc) ], [], SS.empty, []) ]
-  (* | SHeapTreeErr
-       { at_locations; sheaptree_err = MissingResource (Fixable (ofs, chunk)) }
-     -> (
-       match at_locations with
-       | [ loc ] -> get_add_single_fix loc ofs chunk
-       | _ ->
-           Logging.verbose (fun m ->
-               m "SHeapTreeErr: Unsupported for more than 1 location");
-           []) *)
+  | SHeapTreeErr
+      { at_locations; sheaptree_err = MissingResource (Fixable (ofs, chunk)) }
+    -> (
+      match at_locations with
+      | [ loc ] -> get_add_single_fix loc ofs chunk
+      | _ ->
+          Logging.verbose (fun m ->
+              m "SHeapTreeErr: Unsupported for more than 1 location");
+          [])
   | _ -> []
 
 let apply_fix heap fix =
