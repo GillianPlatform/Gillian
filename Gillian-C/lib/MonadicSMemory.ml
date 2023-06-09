@@ -44,8 +44,13 @@ type st = Subst.t
 
 type err_t =
   | InvalidLocation of Expr.t
-  | MissingLocResource of
-      (LActions.ga * string * Expr.t option * Chunk.t option)
+  | MissingLocResource of {
+      is_store : bool;
+      action : LActions.ga;
+      loc_name : string;
+      ofs_opt : Expr.t option;
+      chunk_opt : Chunk.t option;
+    }
   | SHeapTreeErr of {
       at_locations : string list;
       sheaptree_err : SHeapTree.err;
@@ -102,9 +107,11 @@ module Mem = struct
   let empty = { map = SMap.empty; last_op = Other }
   let copy x = x
 
-  let get_tree_res map loc_name ofs_opt chunk_ofs =
+  let get_tree_res ?(is_store = false) map loc_name ofs_opt chunk_opt =
     DR.of_option
-      ~none:(MissingLocResource (Single, loc_name, ofs_opt, chunk_ofs))
+      ~none:
+        (MissingLocResource
+           { is_store; action = Single; loc_name; ofs_opt; chunk_opt })
       (SMap.find_opt loc_name map)
 
   let get_or_create_tree map loc_name =
@@ -143,7 +150,9 @@ module Mem = struct
   let store { map; _ } loc chunk ofs value =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
-    let** tree = get_tree_res map loc_name (Some ofs) (Some chunk) in
+    let** tree =
+      get_tree_res ~is_store:true map loc_name (Some ofs) (Some chunk)
+    in
     Logging.verbose (fun m -> m "Got inside store -  %a" Expr.pp ofs);
     let++ new_tree =
       map_lift_err loc_name (SHeapTree.store tree chunk ofs value)
@@ -831,6 +840,12 @@ let execute_genvgetdef heap params =
 (* type c_fix_t *)
 type c_fix_t =
   | AddSingle of { loc : string; ofs : Expr.t; value : Expr.t; chunk : Chunk.t }
+  | AddUnitialized of {
+      loc : string;
+      low : Expr.t;
+      high : Expr.t;
+      chunk : Chunk.t;
+    }
 
 (* Pretty printing utils *)
 
@@ -839,23 +854,27 @@ let pp_c_fix fmt c_fix =
   | AddSingle { loc : string; ofs : Expr.t; value : Expr.t; chunk : Chunk.t } ->
       Fmt.pf fmt "AddSingle(%s, %a, %a, %a)" loc Expr.pp ofs Expr.pp value
         Chunk.pp chunk
-(* failwith "Bi-abduction TODO: implement function pp_c_fix" *)
+  | AddUnitialized
+      { loc : string; low : Expr.t; high : Expr.t; chunk : Chunk.t } ->
+      Fmt.pf fmt "AddUnitialized(%s, %a, %a, %a)" loc Expr.pp low Expr.pp high
+        Chunk.pp chunk
 
 let pp_err fmt (e : err_t) =
   match e with
   | InvalidLocation loc ->
       Fmt.pf fmt "[InvalidLocation] '%a' cannot be resolved as a location"
         Expr.pp loc
-  | MissingLocResource (ga, l, vt, chunk) ->
+  | MissingLocResource { is_store; action; loc_name; ofs_opt; chunk_opt } ->
       Fmt.pf fmt
         "[MissingLocResource] No block associated with location '%s'. \
          Associated data: \n\
+        \ * is_store: '%B'\n\
         \ * location: '%s'\n\
         \ * core_pred: %s\n\
         \ * value: %a \n\
         \ * chunk: %a \n"
-        l l (LActions.str_ga ga) (Fmt.Dump.option Expr.pp) vt
-        (Fmt.Dump.option Chunk.pp) chunk
+        loc_name is_store loc_name (LActions.str_ga action)
+        (Fmt.Dump.option Expr.pp) ofs_opt (Fmt.Dump.option Chunk.pp) chunk_opt
   | SHeapTreeErr { at_locations; sheaptree_err } ->
       Fmt.pf fmt "[SHeapTreeErr] Tree at location%a raised: <%a>"
         (fun fmt l ->
@@ -1038,7 +1057,9 @@ let get_recovery_tactic _ err =
     match err with
     | InvalidLocation e ->
         List.map (fun x -> Expr.LVar x) (SS.elements (Expr.lvars e))
-    | MissingLocResource (_, l, _, _) -> [ Expr.loc_from_loc_name l ]
+    | MissingLocResource
+        { is_store = _; action = _; loc_name; ofs_opt = _; chunk_opt = _ } ->
+        [ Expr.loc_from_loc_name loc_name ]
     | SHeapTreeErr { at_locations; _ } ->
         List.map Expr.loc_from_loc_name at_locations
   in
@@ -1047,9 +1068,14 @@ let get_recovery_tactic _ err =
 let get_failing_constraint _e =
   failwith "Bi-abduction TODO: implement function get_failing_constraint"
 
+let of_low_chunk low chunk =
+  let open Expr.Infix in
+  let len = Expr.int (Chunk.size chunk) in
+  low + len
+
 let get_fixes _heap _pfs _gamma err =
   Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
-  let get_add_single_fix loc ofs chunk =
+  let get_add_single_fix ?(is_store = false) loc ofs chunk =
     let open CConstants.VTypes in
     match chunk with
     | Chunk.Mfloat32 ->
@@ -1058,21 +1084,57 @@ let get_fixes _heap _pfs _gamma err =
         let new_var_e = Expr.LVar new_var in
         let value = Expr.EList [ Expr.string single_type; new_var_e ] in
         let vtypes = [ (new_var, Type.NumberType) ] in
-        [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
+        if is_store then
+          [
+            ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []);
+            ( [
+                AddUnitialized
+                  { loc; low = ofs; high = of_low_chunk ofs chunk; chunk };
+              ],
+              [],
+              [],
+              SS.empty,
+              [] );
+          ]
+        else [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
     | Mfloat64 ->
         let new_var = LVar.alloc () in
         let set = SS.singleton new_var in
         let new_var_e = Expr.LVar new_var in
         let value = Expr.EList [ Expr.string float_type; new_var_e ] in
         let vtypes = [ (new_var, Type.NumberType) ] in
-        [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
+        if is_store then
+          [
+            ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []);
+            ( [
+                AddUnitialized
+                  { loc; low = ofs; high = of_low_chunk ofs chunk; chunk };
+              ],
+              [],
+              [],
+              SS.empty,
+              [] );
+          ]
+        else [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
     | Mint64 ->
         let new_var = LVar.alloc () in
         let set = SS.singleton new_var in
         let new_var_e = Expr.LVar new_var in
         let value = Expr.EList [ Expr.string long_type; new_var_e ] in
         let vtypes = [ (new_var, Type.IntType) ] in
-        [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
+        if is_store then
+          [
+            ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []);
+            ( [
+                AddUnitialized
+                  { loc; low = ofs; high = of_low_chunk ofs chunk; chunk };
+              ],
+              [],
+              [],
+              SS.empty,
+              [] );
+          ]
+        else [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
     | Mptr ->
         Logging.verbose (fun m -> m "Mptr loc %s" loc);
         Logging.verbose (fun m -> m "Mptr ofs %a" Expr.pp ofs);
@@ -1090,31 +1152,62 @@ let get_fixes _heap _pfs _gamma err =
         let vtypes =
           [ (new_var1, Type.ObjectType); (new_var2, Type.IntType) ]
         in
-        (* Probably, the offset of the pointer should be previous value + 8 in arch64 *)
-        (* let ptr_ofs = Expr.BinOp value BinOp.IPlus (Expr.Lit (Int (add (mul two two) two))) in *)
-        (* let ptr_value =
-             Expr.EList [ Expr.string long_type; Expr.Lit (Int Z.zero) ]
-           in
-           let ptr_chunk = Chunk.Mint64 in *)
-        [
-          ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []);
-          ( [ AddSingle { loc; ofs; value = null_ptr; chunk } ],
-            [],
-            [],
-            SS.empty,
-            [] );
-        ]
+        if is_store then
+          [
+            ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []);
+            ( [
+                AddUnitialized
+                  { loc; low = ofs; high = of_low_chunk ofs chunk; chunk };
+              ],
+              [],
+              [],
+              SS.empty,
+              [] );
+            ( [ AddSingle { loc; ofs; value = null_ptr; chunk } ],
+              [],
+              [],
+              SS.empty,
+              [] );
+          ]
+        else
+          [
+            ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []);
+            ( [ AddSingle { loc; ofs; value = null_ptr; chunk } ],
+              [],
+              [],
+              SS.empty,
+              [] );
+          ]
     | _ ->
         let new_var = LVar.alloc () in
         let set = SS.singleton new_var in
         let new_var_e = Expr.LVar new_var in
         let value = Expr.EList [ Expr.string int_type; new_var_e ] in
         let vtypes = [ (new_var, Type.IntType) ] in
-        [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
+        if is_store then
+          [
+            ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []);
+            ( [
+                AddUnitialized
+                  { loc; low = ofs; high = of_low_chunk ofs chunk; chunk };
+              ],
+              [],
+              [],
+              SS.empty,
+              [] );
+          ]
+        else [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
   in
+
   match err with
-  | MissingLocResource (Single, loc, Some ofs, Some chunk) ->
-      get_add_single_fix loc ofs chunk
+  | MissingLocResource
+      {
+        is_store;
+        action = Single;
+        loc_name;
+        ofs_opt = Some ofs;
+        chunk_opt = Some chunk;
+      } -> get_add_single_fix ~is_store loc_name ofs chunk
   | InvalidLocation loc ->
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
@@ -1146,4 +1239,17 @@ let apply_fix heap fix =
       let* sval = SVal.of_gil_expr_exn value in
       let perm = Perm.Freeable in
       let++ mem = Mem.set_single !(heap.mem) loc ofs chunk sval perm in
+      { heap with mem = ref mem }
+  | AddUnitialized { loc; low; high; chunk } ->
+      Logging.verbose (fun m ->
+          m
+            "Applying AddUnitialized fix for error\n\
+            \ * location: '%s'\n\
+            \ * low: %a\n\
+            \ * high: %a \n\
+            \ * chunk: %a \n"
+            loc Expr.pp low Expr.pp high Chunk.pp chunk);
+      let loc = Expr.loc_from_loc_name loc in
+      let perm = Perm.Freeable in
+      let++ mem = Mem.set_hole !(heap.mem) loc low high perm in
       { heap with mem = ref mem }
