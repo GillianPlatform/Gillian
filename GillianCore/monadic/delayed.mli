@@ -9,6 +9,8 @@ val return :
 
 val resolve_loc : Expr.t -> string option t
 val reduce : Expr.t -> Expr.t t
+val entails : Formula.t list -> Formula.t -> bool t
+val check_sat : Formula.t -> bool t
 val bind : 'a t -> ('a -> 'b t) -> 'b t
 val map : 'a t -> ('a -> 'b) -> 'b t
 val vanish : unit -> 'a t
