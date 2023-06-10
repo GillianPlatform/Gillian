@@ -2468,26 +2468,6 @@ let rec reduce_formula_loop
           | ILess (e1, e2) -> ILessEq (e2, e1)
           | ILessEq (e1, e2) -> ILess (e2, e1)
           | _ -> Not fa)
-      | Eq (e1, Lit (Bool true))
-        when match e1 with
-             | UnOp (_, _) | BinOp (_, _, _) -> true
-             | _ -> false -> (
-          match Formula.lift_logic_expr e1 with
-          | None ->
-              raise
-                (ReductionException
-                   (e1, "Boolean expression cannot be lifted to a formula"))
-          | Some (f1, _) -> f f1)
-      | Eq (Lit (Bool true), e1)
-        when match e1 with
-             | UnOp (_, _) | BinOp (_, _, _) -> true
-             | _ -> false -> (
-          match Formula.lift_logic_expr e1 with
-          | None ->
-              raise
-                (ReductionException
-                   (e1, "Boolean expression cannot be lifted to a formula"))
-          | Some (f1, _) -> f f1)
       | Eq (e1, e2) -> (
           let re1 = fe e1 in
           let re2 = fe e2 in
