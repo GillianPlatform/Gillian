@@ -16,24 +16,21 @@ predicate list_member(+vs, +v, r : Bool){
   (vs == #v :: #rest) * (! (#v == v)) * list_member(#rest, v, r)
 }
 
-predicate replaced(+vs, +ws, +v, +w, r: Bool) {
-    (vs == []) * (ws == []) * (r == true);
-    (! (len vs == len ws)) * (r == false);
-    (vs == v :: #restvs) * (ws == w :: #restws) * replaced(#restvs, #restws, v, w, r);
-    (vs == v :: #restvs) * (ws == #w :: #restws) * (! (#w == w)) * (r == false);
-    (vs == #v :: #restvs) * (ws == #v :: #restws) * (! (#v == v)) * replaced(#restvs, #restws, v, w, r);
-    (vs == #v :: #restvs) * (ws == #w :: #restws) * (! (#v == v)) * (! (#w == #v)) * (r == false)
+predicate replaced(+vs, +ws, +v, +w) {
+    (vs == []) * (ws == []);
+    (vs == v :: #restvs) * (ws == w :: #restws) * replaced(#restvs, #restws, v, w);
+    (vs == #v :: #restvs) * (ws == #v :: #restws) * (! (#v == v)) * replaced(#restvs, #restws, v, w)
 }
 
 lemma replaced_concat {
     statement:
       forall vs1, ws1, vs2, ws2, v, w.
-        replaced(vs1, ws1, v, w, true) * replaced(vs2, ws2, v, w, true) |- replaced(vs1 @ vs2, ws1 @ ws2, v, w, true)
+        replaced(vs1, ws1, v, w) * replaced(vs2, ws2, v, w) |- replaced(vs1 @ vs2, ws1 @ ws2, v, w)
 
     proof:
-      unfold replaced(vs1, ws1, v, w, true);
+      unfold replaced(vs1, ws1, v, w);
       if (not (vs1 = [])) {
-        assert {bind: #nv, #nw, #nvs1, #nws1} (vs1 == #nv :: #nvs1) * (ws1 == #nw :: #nws1) * replaced(#nvs1, #nws1, v, w, true);
+        assert {bind: #nv, #nw, #nvs1, #nws1} (vs1 == #nv :: #nvs1) * (ws1 == #nw :: #nws1) * replaced(#nvs1, #nws1, v, w);
         apply replaced_concat(#nvs1, #nws1, vs2, ws2, v, w)
       }
 }
@@ -120,7 +117,7 @@ function find(t, v) {
 }
 { binary_tree(#t, #tree, #p) * list_member(#tree, #v, ret) }
 
-{ (t == #t) * (v == #v) * (w == #w) * binary_tree(#t, #tree, 1.0)}
+{ (t == #t) * (v == #v) * (w == #w) * binary_tree(#t, #tree, 1.0) }
 function replace(t, v, w) {
     if (t = null) {
         skip
@@ -143,4 +140,4 @@ function replace(t, v, w) {
     };
     return 0
 }
-{ binary_tree(#t, #r_tree, 1.0) * replaced(#tree, #r_tree, #v, #w, true)}
+{ binary_tree(#t, #r_tree, 1.0) * replaced(#tree, #r_tree, #v, #w) }

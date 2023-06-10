@@ -256,7 +256,8 @@ let extend_block ~pfs ~gamma heap loc_name ofs value data bound permission =
     SFVL.add_with_test ~equality_test ofs SFVL.{ value; permission } data
   in
   let () = Hashtbl.replace heap loc_name (Block.Allocated { data; bound }) in
-  Ok []
+  let fl = Formula.Infix.(permission #>. (Expr.num 0.0)) in
+  Ok [ fl ]
 
 let store ~pfs ~gamma heap loc_name ofs v =
   let in_bounds (data : SFVL.t) bound =
