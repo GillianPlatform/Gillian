@@ -10,6 +10,51 @@ predicate tree_height(+x, h: Int, +p: Float) {
     (x -> (p: #a), (p: #l), (p: #r)) * tree_height(#l, #hl, p) * tree_height(#r, #hr, p) * (#hl <# #hr) * (h == #hr + 1)
 }
 
+predicate list_member(+vs, +v, r : Bool){
+  (vs == []) * (r == false);
+  (vs == v :: #rest) * (r == true);
+  (vs == #v :: #rest) * (! (#v == v)) * list_member(#rest, v, r)
+}
+
+predicate replaced(+vs, +ws, +v, +w, r: Bool) {
+    (vs == []) * (ws == []) * (r == true);
+    (! (len vs == len ws)) * (r == false);
+    (vs == v :: #restvs) * (ws == w :: #restws) * replaced(#restvs, #restws, v, w, r);
+    (vs == v :: #restvs) * (ws == #w :: #restws) * (! (#w == w)) * (r == false);
+    (vs == #v :: #restvs) * (ws == #v :: #restws) * (! (#v == v)) * replaced(#restvs, #restws, v, w, r);
+    (vs == #v :: #restvs) * (ws == #w :: #restws) * (! (#v == v)) * (! (#w == #v)) * (r == false)
+}
+
+lemma replaced_concat {
+    statement:
+      forall vs1, ws1, vs2, ws2, v, w.
+        replaced(vs1, ws1, v, w, true) * replaced(vs2, ws2, v, w, true) |- replaced(vs1 @ vs2, ws1 @ ws2, v, w, true)
+
+    proof:
+      unfold replaced(vs1, ws1, v, w, true);
+      if (not (vs1 = [])) {
+        assert {bind: #nv, #nw, #nvs1, #nws1} (vs1 == #nv :: #nvs1) * (ws1 == #nw :: #nws1) * replaced(#nvs1, #nws1, v, w, true);
+        apply replaced_concat(#nvs1, #nws1, vs2, ws2, v, w)
+      }
+}
+
+lemma list_member_concat {
+  statement:
+    forall vs1, vs2, v.
+      list_member(vs1, v, #r1) * list_member(vs2, v, #r2) |- list_member(vs1 @ vs2, v, (#r1 || #r2))
+
+  proof:
+    unfold list_member(vs1, v, #r1);
+    if (not (vs1 = [])) {
+      if (hd vs1 = v) {
+        fold list_member(vs1 @ vs2, v, true)
+      } else {
+        assert {bind: #nv1, #nvs1, #nr1} (vs1 == #nv1 :: #nvs1) * list_member(#nvs1, v, #nr1);
+        apply list_member_concat(#nvs1, vs2, v)
+      }
+    }
+}
+
 predicate is_int(+a: Int) {
     emp
 }
@@ -48,3 +93,54 @@ function height(t) {
     return r
 }
 { tree_height(#t, ret, #p) }
+
+[ spec find_spec: #p ]
+{ (t == #t) * (v == #v) * binary_tree(#t, #tree, #p) }
+function find(t, v) {
+    if (t = null) {
+        r := false
+    } else {
+        x := [t];
+        if (x = v) {
+            r := true
+        } else {
+            lt := [t + 1];
+            rt := [t + 2];
+            par {
+                is_in_left := find(lt, v);
+                is_in_right := find(rt, v)
+            };
+            r := is_in_left || is_in_right;
+            [[assert {bind: #left, #right} binary_tree(lt, #left, #p) * binary_tree(rt, #right, #p)]];
+            [[apply list_member_concat(#left, #right, #v)]];
+            [[fold list_member(x :: (#left @ #right), #v, r)]]
+        }
+    };
+    return r
+}
+{ binary_tree(#t, #tree, #p) * list_member(#tree, #v, ret) }
+
+{ (t == #t) * (v == #v) * (w == #w) * binary_tree(#t, #tree, 1.0)}
+function replace(t, v, w) {
+    if (t = null) {
+        skip
+    } else {
+        x := [t];
+        if (x = v) {
+            [t] := w
+        } else {
+            skip
+        };
+        lt := [t + 1];
+        rt := [t + 2];
+        [[assert {bind: #left_tree, #right_tree} binary_tree(lt, #left_tree, 1.0) * binary_tree(rt, #right_tree, 1.0)]];
+        par {
+            u := replace(lt, v, w);
+            u := replace(rt, v, w)
+        };
+        [[assert {bind: #left_r_tree, #right_r_tree} binary_tree(lt, #left_r_tree, 1.0) * binary_tree(rt, #right_r_tree, 1.0)]];
+        [[apply replaced_concat(#left_tree, #left_r_tree, #right_tree, #right_r_tree, #v, #w)]]
+    };
+    return 0
+}
+{ binary_tree(#t, #r_tree, 1.0) * replaced(#tree, #r_tree, #v, #w, true)}
