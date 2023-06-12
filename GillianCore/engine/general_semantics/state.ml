@@ -28,7 +28,7 @@ module type S = sig
 
   exception Internal_State_Error of err_t list * t
 
-  type action_ret = (t * vt list, err_t) result list
+  type action_ret = (t * vt list, err_t) Res_list.t
   type u_res = UWTF | USucc of t | UFail of err_t list
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type init_data
@@ -75,7 +75,6 @@ module type S = sig
   (** Value Equality *)
   val equals : t -> vt -> vt -> bool
 
-  (** Value Type *)
   val get_type : t -> vt -> Type.t option
 
   (** State simplification *)

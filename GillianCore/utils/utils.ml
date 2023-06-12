@@ -82,6 +82,12 @@ module Option_utils = struct
   include Option_utils
 end
 
+(** @canonical Gillian.Utils.Result_utils *)
+module Result_utils = struct
+  (** @inline *)
+  include Result_utils
+end
+
 (** @canonical Gillian.Utils.Prelude *)
 module Prelude = struct
   (** @inline *)
