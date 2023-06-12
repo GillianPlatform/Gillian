@@ -2,7 +2,9 @@ open Gil_syntax
 open Utils.Containers
 open Monadic
 
-type missingResourceType = Unfixable | Fixable of (Expr.t * Chunk.t)
+type missingResourceType =
+  | Unfixable
+  | Fixable of { is_store : bool; low : Expr.t; chunk : Chunk.t }
 
 type err =
   | UseAfterFree

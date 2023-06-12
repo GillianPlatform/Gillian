@@ -10,7 +10,11 @@ module CoreP = Constr.Core
 
 let log_string s = Logging.verbose (fun fmt -> fmt "SHEAPTREE CHECKING: %s" s)
 
-type missingResourceType = Unfixable | Fixable of (Expr.t * Chunk.t)
+(* type missingResourceType = Unfixable | Fixable of (Expr.t * Chunk.t) *)
+
+type missingResourceType =
+  | Unfixable
+  | Fixable of { is_store : bool; low : Expr.t; chunk : Chunk.t }
 
 type err =
   | UseAfterFree
@@ -35,9 +39,10 @@ let pp_err fmt = function
       Fmt.pf fmt "Invalid alignment: %d should divide %a" alignment Expr.pp
         offset
   | MissingResource Unfixable -> Fmt.pf fmt "Unfixable MissingResource"
-  | MissingResource (Fixable (ofs, chunk)) ->
-      Fmt.pf fmt "Fixable MissingResource with Offset: %a Chunk: %a" Expr.pp ofs
-        Chunk.pp chunk
+  | MissingResource (Fixable { is_store; low; chunk }) ->
+      Fmt.pf fmt
+        "Fixable MissingResource (is_store: %B) with Offset: %a Chunk: %a"
+        is_store Expr.pp low Chunk.pp chunk
   | Unhandled e -> Fmt.pf fmt "Unhandled error with message : %s" e
   | RemovingNotOwned -> Fmt.pf fmt "Removing not owned"
   | WrongMemVal -> Fmt.pf fmt "WrongMemVal"
@@ -388,7 +393,8 @@ module Node = struct
   let decode ~low ~chunk t =
     let open Delayed.Syntax in
     match t with
-    | NotOwned Totally -> DR.error (MissingResource (Fixable (low, chunk)))
+    | NotOwned Totally ->
+        DR.error (MissingResource (Fixable { is_store = false; low; chunk }))
     | NotOwned Partially ->
         Logging.verbose (fun fmt ->
             fmt
@@ -483,7 +489,8 @@ module Node = struct
       get_values arrs
     in
     match t with
-    | NotOwned Totally -> DR.error (MissingResource (Fixable (low, chunk)))
+    | NotOwned Totally ->
+        DR.error (MissingResource (Fixable { is_store = false; low; chunk }))
     | NotOwned Partially ->
         Logging.verbose (fun fmt ->
             fmt
@@ -967,7 +974,8 @@ module Tree = struct
     let range = Range.of_low_and_chunk low chunk in
     let replace_node node =
       match node.node with
-      | Node.NotOwned Totally -> Error (MissingResource (Fixable (low, chunk)))
+      | Node.NotOwned Totally ->
+          Error (MissingResource (Fixable { is_store = false; low; chunk }))
       | Node.NotOwned Partially ->
           Logging.verbose (fun fmt ->
               fmt
@@ -992,7 +1000,8 @@ module Tree = struct
     let range = Range.of_low_and_chunk low chunk in
     let replace_node node =
       match node.node with
-      | NotOwned Totally -> Error (MissingResource (Fixable (low, chunk)))
+      | NotOwned Totally ->
+          Error (MissingResource (Fixable { is_store = true; low; chunk }))
       | NotOwned Partially ->
           Logging.verbose (fun fmt ->
               fmt
@@ -1319,7 +1328,8 @@ let get_single t low chunk =
     let** root = DR.of_result (get_root t) in
     match root with
     (* TODO: What should the offset be in this case *)
-    | None -> DR.error (MissingResource (Fixable (low, chunk)))
+    | None ->
+        DR.error (MissingResource (Fixable { is_store = false; low; chunk }))
     | Some root ->
         let** value, perm, root_framed = Tree.get_single root low chunk in
         let++ wroot = DR.of_result (with_root t root_framed) in
@@ -1353,7 +1363,8 @@ let get_array t low size chunk =
   if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
-    | None -> DR.error (MissingResource (Fixable (low, chunk)))
+    | None ->
+        DR.error (MissingResource (Fixable { is_store = false; low; chunk }))
     | Some root ->
         let** array, perm, root_framed = Tree.get_array root low chunk size in
         let++ wroot = DR.of_result (with_root t root_framed) in
@@ -1462,7 +1473,9 @@ let load t chunk ofs =
   if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
-    | None -> DR.error (MissingResource (Fixable (ofs, chunk)))
+    | None ->
+        DR.error
+          (MissingResource (Fixable { is_store = false; low = ofs; chunk }))
     | Some root ->
         let** value, root = Tree.load root ofs chunk in
         let++ wroot = DR.of_result (with_root t root) in
@@ -1477,7 +1490,9 @@ let store t chunk ofs value =
   if%sat is_in_bounds range span then
     let** root = DR.of_result (get_root t) in
     match root with
-    | None -> DR.error (MissingResource (Fixable (ofs, chunk)))
+    | None ->
+        DR.error
+          (MissingResource (Fixable { is_store = false; low = ofs; chunk }))
     | Some root ->
         let** root = Tree.store root ofs chunk value in
         DR.of_result (with_root t root)

@@ -1075,8 +1075,9 @@ let of_low_chunk low chunk =
 
 let get_fixes _heap _pfs _gamma err =
   Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
-  let get_fixes_h ?(is_store = false) loc ofs chunk =
+  let get_fixes_h is_store loc ofs chunk =
     let open CConstants.VTypes in
+    (* let fixes = [] in *)
     let fixes =
       match chunk with
       | Chunk.Mfloat32 ->
@@ -1149,7 +1150,6 @@ let get_fixes _heap _pfs _gamma err =
     in
     fixes
   in
-
   match err with
   | MissingLocResource
       {
@@ -1158,16 +1158,18 @@ let get_fixes _heap _pfs _gamma err =
         loc_name;
         ofs_opt = Some ofs;
         chunk_opt = Some chunk;
-      } -> get_fixes_h ~is_store loc_name ofs chunk
+      } -> get_fixes_h is_store loc_name ofs chunk
   | InvalidLocation loc ->
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
       [ ([], [ Formula.Eq (new_expr, loc) ], [], SS.empty, []) ]
   | SHeapTreeErr
-      { at_locations; sheaptree_err = MissingResource (Fixable (ofs, chunk)) }
-    -> (
+      {
+        at_locations;
+        sheaptree_err = MissingResource (Fixable { is_store; low; chunk });
+      } -> (
       match at_locations with
-      | [ loc ] -> get_fixes_h loc ofs chunk
+      | [ loc ] -> get_fixes_h is_store loc low chunk
       | _ ->
           Logging.verbose (fun m ->
               m "SHeapTreeErr: Unsupported for more than 1 location");
