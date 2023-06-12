@@ -87,7 +87,6 @@ let of_chunk_and_expr chunk e =
 let of_gil_expr sval_e =
   let open Formula.Infix in
   let open Patterns in
-  (* let open DR.Syntax in *)
   Logging.verbose (fun fmt -> fmt "OF_GIL_EXPR : %a" Expr.pp sval_e);
   let* sval_e = Delayed.reduce sval_e in
   match%ent sval_e with
@@ -110,19 +109,13 @@ let of_gil_expr sval_e =
   | float_typ -> DO.some (SVfloat (Expr.list_nth sval_e 1))
   | long_typ -> DO.some (SVlong (Expr.list_nth sval_e 1))
   | single_typ -> DO.some (SVsingle (Expr.list_nth sval_e 1))
-  | _ ->
-      Logging.verbose (fun fmt -> fmt "The last guard");
-      DO.none ()
+  | _ -> DO.none ()
 
 let of_gil_expr_exn sval_e =
   let* value_opt = of_gil_expr sval_e in
   match value_opt with
-  | None ->
-      Logging.verbose (fun m -> m "!!! of_gil_expr_exn failed");
-      raise (NotACompCertValue sval_e)
-  | Some value ->
-      Logging.verbose (fun m -> m "!!! of_gil_expr_exn succeeded %a" pp value);
-      Delayed.return value
+  | None -> raise (NotACompCertValue sval_e)
+  | Some value -> Delayed.return value
 
 let to_gil_expr_undelayed = to_gil_expr
 

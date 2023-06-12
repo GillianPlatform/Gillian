@@ -84,10 +84,10 @@ enum cc_stat array_new_conf(ArrayConf const *const conf, Array **out) {
     if (!ar)
         return CC_ERR_ALLOC;
 
-    void **buff = conf->mem_alloc(conf->capacity * sizeof(void *));
+    void **buff = malloc(conf->capacity * sizeof(void *));
 
     if (!buff) {
-        conf->mem_free(ar);
+        free(ar);
         return CC_ERR_ALLOC;
     }
 

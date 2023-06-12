@@ -1102,8 +1102,6 @@ let get_fixes _heap _pfs _gamma err =
           let vtypes = [ (new_var, Type.IntType) ] in
           [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
       | Mptr ->
-          Logging.verbose (fun m -> m "Mptr loc %s" loc);
-          Logging.verbose (fun m -> m "Mptr ofs %a" Expr.pp ofs);
           let new_var1 = LVar.alloc () in
           let new_var_e1 = Expr.LVar new_var1 in
           let new_var2 = LVar.alloc () in

@@ -185,51 +185,19 @@ let get_struct_member_type
   in
   List.find_map fx members
 
-let rec pp_expr fmt expr =
-  match expr with
-  | Evar id -> Fmt.pf fmt "Evar (%d)" (Camlcoq.P.to_int id)
-  | Eaddrof id -> Fmt.pf fmt "Eaddrof (%d)" (Camlcoq.P.to_int id)
-  | Econst (Olongconst n) ->
-      Fmt.pf fmt "Econst %a" PrintCsharpminor.print_expr (Econst (Olongconst n))
-  | Econst _ -> Fmt.pf fmt "Econst constant"
-  | Eunop (_unop, e) -> Fmt.pf fmt "Eunop unop (%a)" pp_expr e
-  | Ebinop (_binop, e1, e2) ->
-      Fmt.pf fmt "Ebinop +l (%a) (%a)" pp_expr e1 pp_expr e2
-  | Eload (memory_chunk, e) ->
-      Fmt.pf fmt "Eload %a (%a)" Chunk.pp
-        (Chunk.of_compcert memory_chunk)
-        pp_expr e
-
 let rec get_struct_id clight_prog fname fid expr =
   match expr with
   | Eaddrof id -> (
       match get_typ_from_id clight_prog fid id with
       | Tstruct (struct_id, _) -> struct_id
-      | Tpointer (Tstruct (struct_id, _), _) ->
-          Logging.verbose (fun m ->
-              m "Printing expression %a" PrintCsharpminor.print_expr
-                (Eaddrof id));
-          Logging.verbose (fun m -> m "4 Failed inside function %s" fname);
-          (* failwith "Wrong, type was something"  *)
-          struct_id
-      | _ ->
-          Logging.verbose (fun m ->
-              m "Printing expression %a" PrintCsharpminor.print_expr
-                (Eaddrof id));
-          Logging.verbose (fun m -> m "1 Failed inside function %s" fname);
-          failwith "Wrong, type was something")
+      | Tpointer (Tstruct (struct_id, _), _) -> struct_id
+      | _ -> failwith "Wrong, type was something")
   | Evar id -> (
       match get_typ_from_id clight_prog fid id with
       | Tpointer (Tstruct (struct_id, _), _) -> struct_id
       (* Dereferencing a pointer to a pointer here *)
-      | Tpointer (Tpointer (Tstruct (struct_id, _), _), _) ->
-          Logging.verbose (fun m -> m "2 Matched this case");
-          struct_id (* failwith "Wrong, type was something" *)
-      | _ ->
-          Logging.verbose (fun m -> m "2 Failed inside function %s" fname);
-          Logging.verbose (fun m ->
-              m "Printing expression %a" PrintCsharpminor.print_expr (Evar id));
-          failwith "Wrong, type was something")
+      | Tpointer (Tpointer (Tstruct (struct_id, _), _), _) -> struct_id
+      | _ -> failwith "Wrong, type was something")
   | Ebinop (_, expr', Econst (Ointconst ofs))
   | Ebinop (_, expr', Econst (Olongconst ofs)) -> (
       let struct_id = get_struct_id clight_prog fname fid expr' in
@@ -243,26 +211,12 @@ let rec get_struct_id clight_prog fname fid expr =
   | Eload (_memory_chunk, expr') ->
       let struct_id = get_struct_id clight_prog fname fid expr' in
       struct_id
-  | _ ->
-      Logging.verbose (fun m ->
-          m "Struct id failed expr: %a : %a" PrintCsharpminor.print_expr expr
-            pp_expr expr);
-      failwith "Unsupported expression passed to get_struct_id"
+  | _ -> failwith "Unsupported expression passed to get_struct_id"
 
 (* Convert the compcert chunk to Gillian chunk by checking if Csm expression
    evalutes to a pointer chunk *)
 let to_gil_chunk_h clight_prog fname fid compcert_chunk expp =
-  Logging.verbose (fun m ->
-      m "Expression is \n%a\n%a" PrintCsharpminor.print_expr expp pp_expr expp);
   match expp with
-  (* | Eaddrof id -> (
-      match get_typ_from_id clight_prog fid id with
-      | Tpointer _ ->
-          Logging.verbose (fun m -> m "Tpointer");
-          Chunk.Mptr
-      | _ ->
-          Logging.verbose (fun m -> m "Other type");
-          Chunk.of_compcert compcert_chunk) *)
   | Eaddrof _id -> if Compcert.Archi.ptr64 then Chunk.Mint64 else Chunk.Mint32
   | Evar id -> (
       match get_typ_from_id clight_prog fid id with
@@ -270,27 +224,16 @@ let to_gil_chunk_h clight_prog fname fid compcert_chunk expp =
       | _ -> Chunk.of_compcert compcert_chunk)
   | Ebinop (_, e, Econst (Ointconst ofs))
   | Ebinop (_, e, Econst (Olongconst ofs)) -> (
-      Logging.verbose (fun m -> m "Ebinop expr case 1 %a" pp_expr e);
       let struct_id = get_struct_id clight_prog fname fid e in
       let member_typ_opt = get_struct_member_type clight_prog struct_id ofs in
       match member_typ_opt with
       | Some member_typ -> (
           match member_typ with
-          | Tpointer _ ->
-              Logging.verbose (fun m -> m " Found a pointer ");
-              Chunk.Mptr
+          | Tpointer _ -> Chunk.Mptr
           | _ -> Chunk.of_compcert compcert_chunk)
       | None -> Chunk.Mptr)
-  | Ebinop (_, e1, e2) ->
-      Logging.verbose (fun m ->
-          m "Ebinop expr case: \n%a\n%a" PrintCsharpminor.print_expr e1
-            PrintCsharpminor.print_expr e2);
-      Chunk.of_compcert compcert_chunk
-  | _ ->
-      Logging.verbose (fun m ->
-          m "to_gil_chunk_h failed expr: \n%a\n%a" PrintCsharpminor.print_expr
-            expp pp_expr expp);
-      failwith (Printf.sprintf "Unexpected expression")
+  | Ebinop (_, _e1, _e2) -> Chunk.of_compcert compcert_chunk
+  | _ -> failwith (Printf.sprintf "Unexpected expression")
 
 let to_gil_chunk clight_prog fname fid compcert_chunk expp =
   match compcert_chunk with
@@ -517,9 +460,6 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
       let gil_lab = trans_label lab in
       [ (annot_ctx context, None, Cmd.Goto gil_lab) ]
   | Sstore (compcert_chunk, vaddr, v) ->
-      Logging.verbose (fun m ->
-          m "<!!!> Inside SStore (fun: %s):\n vaddr:%a\n v:%a\n" fname
-            PrintCsharpminor.print_expr vaddr PrintCsharpminor.print_expr v);
       let addr_eval_cmds, eaddr = trans_expr vaddr in
       let v_eval_cmds, ev = trans_expr v in
       let chunk = to_gil_chunk clight_prog fname fid compcert_chunk vaddr in

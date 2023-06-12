@@ -1,4 +1,7 @@
-/*
+/* Note: Keep this here since we are testing on modified versions of Array and 
+ * List libraries anyway.
+ *
+ * ---------------------------------------------------------------------------
  * Collections-C
  * Copyright (C) 2013-2014 Srđan Panić <srdja.panic@gmail.com>
  *

@@ -51,7 +51,6 @@ module type S = sig
   val pp_err : Format.formatter -> err_t -> unit
   val get_failing_constraint : err_t -> Formula.t
 
-  (* FIXME: This is not working *)
   val get_fixes :
     t ->
     PFS.t ->
@@ -65,8 +64,6 @@ module type S = sig
     list
 
   val apply_fix : t -> c_fix_t -> (t, err_t) result Delayed.t
-
-  (* val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t *)
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
 end
