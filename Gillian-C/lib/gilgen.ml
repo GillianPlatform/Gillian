@@ -837,7 +837,11 @@ let set_global_var symbol v =
 let intern_impl_of_extern_function ext_f =
   let open AST in
   match ext_f with
-  | EF_malloc -> (CConstants.Internal_Functions.malloc, false)
+  | EF_malloc ->
+      ( (if !Config.alloc_can_fail then
+         CConstants.Internal_Functions.malloc_can_fail
+        else CConstants.Internal_Functions.malloc),
+        false )
   | EF_free -> (CConstants.Internal_Functions.free, false)
   | EF_memcpy _ -> (CConstants.Internal_Functions.memcpy, false)
   | EF_external ([ 'c'; 'a'; 'l'; 'l'; 'o'; 'c' ], _) ->

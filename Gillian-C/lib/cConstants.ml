@@ -74,6 +74,7 @@ end
 module Internal_Functions = struct
   let initialize_genv = "i__initialize_genv"
   let malloc = "i__malloc"
+  let malloc_can_fail = "i__malloc_can_fail"
   let calloc = "i__calloc"
   let memmove = "i__memmove"
   let memcpy = "i__memcpy"

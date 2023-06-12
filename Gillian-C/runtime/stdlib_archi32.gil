@@ -16,6 +16,19 @@ proc i__malloc(vsz) {
       return
 };
 
+proc i__malloc_can_fail(vsz) {
+          x := fresh_svar();
+          goto [ x = 0i ] ctn fl;
+    fl:   ret := {{ "int", 0i }};
+          return;
+    ctn:  sz := "i__alloc_size"(vsz);
+          bl := [mem_alloc](-4i, sz);
+          b := l-nth(bl, 0i);
+          u := [mem_store]("int32", b, -4i, vsz);
+          ret := {{ b, 0i }};
+          return
+};
+
 proc i__free(ptr) {
          goto [ ptr = {{ "int", 0i }} ] end cta;
    cta:  goto [ l-nth(ptr, 1i) = 0i ] ctb die;
