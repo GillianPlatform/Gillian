@@ -2,7 +2,6 @@ open Literal
 open BranchCase
 module L = Logging
 module DL = Debugger_log
-open Syntaxes.Result
 include G_interpreter_intf
 
 type branch_case = BranchCase.t [@@deriving yojson]
@@ -457,17 +456,20 @@ struct
     let eval_assumetype e t state eval_expr =
       let v_x = eval_expr e in
       match State.assume_t state v_x t with
-      | Some state' -> Ok [ state' ]
+      | Some state' -> [ Ok state' ]
       | _ ->
-          Fmt.failwith
-            "ERROR: AssumeType: Cannot assume type %s for expression %a."
-            (Type.str t) Expr.pp e
+          L.normal (fun m ->
+              m "ERROR: AssumeType: Cannot assume type %s for expression %a."
+                (Type.str t) Expr.pp e);
+          []
 
     let eval_assume f state =
       let store_subst = Store.to_ssubst (State.get_store state) in
       let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
       (* Printf.printf "Assuming %s\n" (Formula.str f'); *)
-      let fos =
+      let open Syntaxes.List in
+      let* f'', state =
+        (* Sacha: I don't know why something different is happening in bi-exec *)
         if Exec_mode.biabduction_exec !Config.current_exec_mode then
           let fos = Formula.get_disjuncts f' in
           match fos with
@@ -483,26 +485,21 @@ struct
       (* Printf.printf "Considering the following disjuncts: %s\n" *)
       (* I commented the following, because it builds a string and discards it ? *)
       (* (String.concat "; " (List.map (fun (f, _) -> Formula.str f) fos));  *)
-      Ok
-        (List.concat
-           (List.map
-              (fun (f'', state) ->
-                match State.assume_a state [ f'' ] with
-                | Some state' -> [ state' ]
-                | _ -> [])
-              fos))
+      match State.assume_a state [ f'' ] with
+      | Some state' -> Res_list.return state'
+      | _ -> Res_list.vanish
 
     let eval_freshsvar x state =
       let new_svar = Generators.fresh_svar () in
       let state' = State.add_spec_vars state (SS.singleton new_svar) in
       let v = Val.from_expr (LVar new_svar) |> Option.get in
-      Ok [ update_store state' x v ]
+      Res_list.return (update_store state' x v)
 
     let eval_assert f state =
       let store_subst = Store.to_ssubst (State.get_store state) in
       let f' = SVal.SESubst.substitute_formula store_subst ~partial:true f in
       match State.assert_a state [ f' ] with
-      | true -> Ok [ state ]
+      | true -> Res_list.return state
       | false ->
           let err = StateErr.EPure f' in
           let failing_model = State.sat_check_f state [ Not f' ] in
@@ -518,53 +515,48 @@ struct
           if not (Exec_mode.biabduction_exec !Config.current_exec_mode) then
             Printf.printf "%s" msg;
           L.normal (fun m -> m "%s" msg);
-          raise (Interpreter_error ([ ESt err ], state))
+          Res_list.error_with err
 
     let eval_branch fof state =
       let state' = State.copy state in
-      let state =
-        Option.fold
-          ~some:(fun x -> [ x ])
-          ~none:[]
-          (State.assume_a state [ fof ])
+      let left_states =
+        match State.assume_a state [ fof ] with
+        | Some state -> Res_list.return state
+        | None -> Res_list.vanish
       in
-      let state' =
-        Option.fold
-          ~some:(fun x -> [ x ])
-          ~none:[]
-          (State.assume_a state' [ Not fof ])
+      let right_states =
+        match State.assume_a state' [ Not fof ] with
+        | Some state -> Res_list.return state
+        | None -> Res_list.vanish
       in
-      Ok (state @ state')
+      left_states @ right_states
 
     let rec eval_macro name args lcmd prog annot state =
-      let macro = Macro.get UP.(prog.prog.macros) name in
-      match macro with
-      | None ->
-          L.verbose (fun m ->
-              m "@[<v 2>Current MACRO TABLE:\n%a\n@]" Macro.pp_tbl
-                UP.(prog.prog.macros));
+      let macro =
+        match Macro.get UP.(prog.prog.macros) name with
+        | Some macro -> macro
+        | None ->
+            L.verbose (fun m ->
+                m "@[<v 2>Current MACRO TABLE:\n%a\n@]" Macro.pp_tbl
+                  UP.(prog.prog.macros));
+            Fmt.failwith "NO MACRO found when executing: @[<h>%a@]" LCmd.pp lcmd
+      in
+      let lcmds =
+        let params = macro.macro_params in
+        let params_card = List.length params in
+        let args_card = List.length args in
+        if params_card <> args_card then
           raise
             (Failure
-               (Fmt.str "NO MACRO found when executing: @[<h>%a@]" LCmd.pp lcmd))
-      | Some macro ->
-          let expand_macro (macro : Macro.t) (args : Expr.t list) : LCmd.t list
-              =
-            let params = macro.macro_params in
-            let params_card = List.length params in
-            let args_card = List.length args in
-            if params_card <> args_card then
-              raise
-                (Failure
-                   (Printf.sprintf
-                      "Macro %s called with incorrect number of parameters: %d \
-                       instead of %d."
-                      macro.macro_name args_card params_card));
-            let subst = SVal.SSubst.init (List.combine params args) in
-            let lcmds = macro.macro_definition in
-            List.map (SVal.SSubst.substitute_lcmd subst ~partial:true) lcmds
-          in
-          let lcmds = expand_macro macro args in
-          eval_lcmds prog lcmds ~annot state
+               (Printf.sprintf
+                  "Macro %s called with incorrect number of parameters: %d \
+                   instead of %d."
+                  macro.macro_name args_card params_card));
+        let subst = SVal.SSubst.init (List.combine params args) in
+        let lcmds = macro.macro_definition in
+        List.map (SVal.SSubst.substitute_lcmd subst ~partial:true) lcmds
+      in
+      eval_lcmds prog lcmds ~annot state
 
     (* We have to understand what is the intended semantics of the logic if *)
     and eval_if e lcmds_t lcmds_e prog annot state eval_expr =
@@ -575,17 +567,15 @@ struct
       | Some (False, True) -> eval_lcmds prog lcmds_e ~annot state
       | Some (foe, nfoe) ->
           let state' = State.copy state in
-          let* then_states =
-            State.assume_a state [ foe ]
-            |> Option.fold
-                 ~some:(fun state -> eval_lcmds prog lcmds_t ~annot state)
-                 ~none:(Ok [])
+          let then_states =
+            match State.assume_a state [ foe ] with
+            | Some state -> eval_lcmds prog lcmds_t ~annot state
+            | None -> Res_list.vanish
           in
-          let+ else_states =
-            State.assume_a state' [ nfoe ]
-            |> Option.fold
-                 ~some:(fun state -> eval_lcmds prog lcmds_e ~annot state)
-                 ~none:(Ok [])
+          let else_states =
+            match State.assume_a state' [ nfoe ] with
+            | Some state -> eval_lcmds prog lcmds_e ~annot state
+            | None -> Res_list.vanish
           in
           then_states @ else_states
       | None ->
@@ -596,7 +586,7 @@ struct
         (prog : annot UP.prog)
         (lcmd : LCmd.t)
         ?(annot : annot option)
-        (state : State.t) : (State.t list, state_err_t list) result =
+        (state : State.t) : (State.t, state_err_t) Res_list.t =
       print_lconfiguration lcmd annot state;
 
       let eval_expr = make_eval_expr state in
@@ -615,17 +605,13 @@ struct
         (prog : annot UP.prog)
         (lcmds : LCmd.t list)
         ?(annot : annot option = None)
-        (state : State.t) : (State.t list, state_err_t list) result =
+        (state : State.t) : (State.t, state_err_t) Res_list.t =
+      let open Res_list.Syntax in
       match lcmds with
-      | [] -> Ok [ state ]
+      | [] -> Res_list.return state
       | lcmd :: rest_lcmds ->
-          let* rets = eval_lcmd prog lcmd ?annot state in
-          let+ next_rets =
-            rets
-            |> List_utils.map_results (fun state ->
-                   eval_lcmds prog rest_lcmds ~annot state)
-          in
-          List.concat next_rets
+          let** new_state = eval_lcmd prog lcmd ?annot state in
+          eval_lcmds prog rest_lcmds ~annot new_state
   end
 
   let evaluate_lcmd = Evaluate_lcmd.eval_lcmd
@@ -784,22 +770,52 @@ struct
           | true ->
               symb_exec_next := false;
               symb_exec_proc ()
-          | false -> (
+          | false ->
               let subst = eval_subst_list state subst in
               L.verbose (fun fmt -> fmt "ABOUT TO USE THE SPEC OF %s" pid);
               (* print_to_all ("\tStarting run spec: " ^ pid); *)
-              let rets : ((State.t * Flag.t) list, state_err_t list) result =
+              let (ret : (State.t * Flag.t, state_err_t) Res_list.t) =
                 State.run_spec spec state x args subst
               in
-              match rets with
-              | Ok rets -> (
-                  (* print_to_all ("\tFinished run spec: " ^ pid); *)
-                  L.verbose (fun fmt ->
-                      fmt "Run_spec returned %d Results" (List.length rets));
-                  let b_counter =
-                    if List.length rets > 1 then b_counter + 1 else b_counter
-                  in
-                  match rets with
+              L.verbose (fun fmt ->
+                  fmt "Run_spec returned %d Results" (List.length ret));
+              if ret = [] then
+                if spec.data.spec_incomplete then (
+                  L.normal (fun fmt ->
+                      fmt "Proceeding with symbolic execution.");
+                  symb_exec_proc ())
+                else
+                  [
+                    CConf.ConfErr
+                      {
+                        callstack = cs;
+                        proc_idx = i;
+                        error_state = state;
+                        errors =
+                          [
+                            Exec_err.ESt
+                              (EOther
+                                 (Fmt.str
+                                    "Error: Unable to use specification of \
+                                     function %s"
+                                    spec.data.spec_name));
+                          ];
+                        branch_path;
+                      };
+                  ]
+              else
+                let successes, errors =
+                  List.partition_map
+                    (function
+                      | Ok x -> Left x
+                      | Error x -> Right (Exec_err.ESt x))
+                    ret
+                in
+                let b_counter =
+                  if List.length successes > 1 then b_counter + 1 else b_counter
+                in
+                let success_confs =
+                  match successes with
                   | (ret_state, fl) :: rest_rets ->
                       let others =
                         List.map
@@ -809,31 +825,24 @@ struct
                       in
                       process_ret true ret_state fl b_counter (Some others)
                       :: others
-                  (* Run spec returned no results *)
-                  | _ -> (
-                      match spec.data.spec_incomplete with
-                      | true ->
-                          L.normal (fun fmt ->
-                              fmt "Proceeding with symbolic execution.");
-                          symb_exec_proc ()
-                      | false ->
-                          L.fail
-                            (Format.asprintf
-                               "ERROR: Unable to use specification of function \
-                                %s"
-                               spec.data.spec_name)))
-              | Error errors ->
-                  let errors = errors |> List.map (fun e -> Exec_err.ESt e) in
-                  [
-                    ConfErr
-                      {
-                        callstack = cs;
-                        proc_idx = i;
-                        error_state = state;
-                        errors;
-                        branch_path;
-                      };
-                  ])
+                  | _ -> failwith "unreachable"
+                in
+                let error_confs =
+                  match errors with
+                  | [] -> []
+                  | errors ->
+                      [
+                        CConf.ConfErr
+                          {
+                            callstack = cs;
+                            proc_idx = i;
+                            error_state = state;
+                            errors;
+                            branch_path;
+                          };
+                      ]
+                in
+                success_confs @ error_confs
 
         let exec_without_spec pid symb_exec_proc eval_state =
           let {
@@ -1123,55 +1132,74 @@ struct
         | SL (Invariant (a, binders)) ->
             assert (loop_action = FrameOff (List.hd loop_ids));
             (* let () = Fmt.pr "\nEstablishing invariant... @?" in *)
-            let frames_and_states : (State.t * State.t) list =
+            let frames_and_states =
               State.unify_invariant prog false state a binders
             in
             (* let () = Fmt.pr "\nSuccessfully established invariant. @?" in *)
             List.map
-              (fun (frame, state) ->
-                let iframes = (List.hd loop_ids, frame) :: iframes in
-                make_confcont ~state ~callstack:cs ~invariant_frames:iframes
-                  ~prev_idx:i ~loop_ids ~next_idx:(i + 1)
-                  ~branch_count:b_counter ())
+              (fun ret ->
+                match ret with
+                | Ok (frame, state) ->
+                    let iframes = (List.hd loop_ids, frame) :: iframes in
+                    make_confcont ~state ~callstack:cs ~invariant_frames:iframes
+                      ~prev_idx:i ~loop_ids ~next_idx:(i + 1)
+                      ~branch_count:b_counter ()
+                | Error err ->
+                    let errors = [ Exec_err.ESt err ] in
+                    ConfErr
+                      {
+                        callstack = cs;
+                        proc_idx = i;
+                        error_state = state;
+                        errors;
+                        branch_path;
+                      })
               frames_and_states
-        | _ -> (
-            match evaluate_lcmd prog lcmd ~annot state with
-            | Ok resulting_states ->
-                let b_counter =
-                  if List.length resulting_states > 1 then b_counter + 1
-                  else b_counter
-                in
-                resulting_states
-                |> List.mapi (fun ix state ->
-                       let branch_case =
-                         if List.length resulting_states > 1 then Some (LCmd ix)
-                         else None
-                       in
-                       let new_branches =
-                         match (ix, resulting_states) with
-                         | 0, _ :: rest ->
-                             Some
-                               (List.mapi
-                                  (fun ix state -> (state, i, LCmd (ix + 1)))
-                                  rest)
-                         | _ -> None
-                       in
-                       make_confcont ~state ~callstack:cs
-                         ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                         ~next_idx:(i + 1) ~branch_count:b_counter ?branch_case
-                         ?new_branches ())
-            | Error errors ->
-                let errors = errors |> List.map (fun e -> Exec_err.ESt e) in
-                [
-                  ConfErr
-                    {
-                      callstack = cs;
-                      proc_idx = i;
-                      error_state = state;
-                      errors;
-                      branch_path;
-                    };
-                ])
+        | _ ->
+            let all_results = evaluate_lcmd prog lcmd ~annot state in
+            let successes, errors = Res_list.split all_results in
+            let success_confs =
+              let has_branched = List.length successes > 1 in
+              let b_counter =
+                if has_branched then b_counter + 1 else b_counter
+              in
+              successes
+              |> List.mapi (fun ix state ->
+                     let branch_case =
+                       if has_branched then Some (LCmd ix) else None
+                     in
+                     let new_branches =
+                       match (ix, successes) with
+                       | 0, _ :: rest ->
+                           Some
+                             (List.mapi
+                                (fun ix state -> (state, i, LCmd (ix + 1)))
+                                rest)
+                       | _ -> None
+                     in
+                     make_confcont ~state ~callstack:cs
+                       ~invariant_frames:iframes ~prev_idx:i ~loop_ids
+                       ~next_idx:(i + 1) ~branch_count:b_counter ?branch_case
+                       ?new_branches ())
+            in
+            let error_conf =
+              match errors with
+              | [] -> []
+              | errors ->
+                  let errors = errors |> List.map (fun e -> Exec_err.ESt e) in
+
+                  [
+                    CConf.ConfErr
+                      {
+                        callstack = cs;
+                        proc_idx = i;
+                        error_state = state;
+                        errors;
+                        branch_path;
+                      };
+                  ]
+            in
+            success_confs @ error_conf
 
       (* Conditional goto *)
       let eval_guarded_goto e j k state =
@@ -1395,10 +1423,14 @@ struct
               let to_frame_on =
                 loop_ids_to_frame_on_at_the_end loop_ids start_loop_ids
               in
-              let ( let+ ) x f = List.map f x in
+              let open Syntaxes.List in
               let+ state =
+                (* Framing on should never fail.. *)
                 if Exec_mode.verification_exec !Config.current_exec_mode then
                   State.frame_on state iframes to_frame_on
+                  |> List.filter_map (function
+                       | Ok x -> Some x
+                       | _ -> None)
                 else [ state ]
               in
               let state' = State.set_store state old_store in
@@ -1456,8 +1488,12 @@ struct
             in
             let ( let+ ) x f = List.map f x in
             let+ state =
+              (* Framing on should never fail *)
               if Exec_mode.verification_exec !Config.current_exec_mode then
                 State.frame_on state iframes to_frame_on
+                |> List.filter_map (function
+                     | Ok x -> Some x
+                     | _ -> None)
               else [ state ]
             in
             let state' = State.set_store state old_store in
@@ -1577,7 +1613,13 @@ struct
       | FrameOn ids ->
           L.verbose (fun fmt ->
               fmt "INFO: Going to frame on %a" pp_str_list ids);
-          let states = State.frame_on state iframes ids in
+          (* Framing on should never fail *)
+          let states =
+            State.frame_on state iframes ids
+            |> List.filter_map (function
+                 | Ok x -> Some x
+                 | _ -> None)
+          in
           let n = List.length states in
           if n == 0 then
             L.normal (fun fmt ->

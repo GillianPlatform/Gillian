@@ -58,73 +58,56 @@ module Make
       (params : string list)
       (bi_state_i : bi_state_t)
       (bi_state_f : bi_state_t)
-      (fl : Flag.t) : Spec.t * Spec.t =
-    (* let start_time = time() in *)
+      (fl : Flag.t) : Spec.t =
+    let open Syntaxes.List in
+    let sspecs =
+      (* let start_time = time() in *)
 
-    (* HMMMMM *)
-    (* let _              = SBAState.simplify ~kill_new_lvars:true bi_state_f in *)
-    let state_i, _ = SBAState.get_components bi_state_i in
-    let state_f, state_af = SBAState.get_components bi_state_f in
-    let pvars = SS.of_list (Names.return_variable :: params) in
+      (* HMMMMM *)
+      (* let _              = SBAState.simplify ~kill_new_lvars:true bi_state_f in *)
+      let state_i, _ = SBAState.get_components bi_state_i in
+      let state_f, state_af = SBAState.get_components bi_state_f in
+      let pvars = SS.of_list (Names.return_variable :: params) in
 
-    L.verbose (fun m ->
-        m
-          "Going to create a spec for @[<h>%s(%a)@]\n\
-           @[<v 2>AF:@\n\
-           %a@]@\n\
-           @[<v 2>Final STATE:@\n\
-           %a@]"
-          name
-          Fmt.(list ~sep:comma string)
-          params SPState.pp state_af SPState.pp state_f);
+      L.verbose (fun m ->
+          m
+            "Going to create a spec for @[<h>%s(%a)@]\n\
+             @[<v 2>AF:@\n\
+             %a@]@\n\
+             @[<v 2>Final STATE:@\n\
+             %a@]"
+            name
+            Fmt.(list ~sep:comma string)
+            params SPState.pp state_af SPState.pp state_f);
 
-    let post, spost =
-      (* FIXME: NOT WORKING DUE TO SIMPLIFICATION TYPE CHANGING *)
-      let _ = SPState.simplify ~kill_new_lvars:true state_f in
-      (* TODO: Come up with a generic cleaning mechanism *)
-      (* if ((name <> "main") && !Config.js) then (
-           let state_f'  = SPState.copy state_f in
-           (* let state_f'  = JSCleanUp.exec prog state_f' name false in  *)
-           let post  = Asrt.star (List.sort Asrt.compare (SPState.to_assertions ~to_keep:pvars state_f)) in
-           let spost = Asrt.star (List.sort Asrt.compare (SPState.to_assertions ~to_keep:pvars state_f')) in
-           post, spost
-         ) else ( *)
-      let post =
+      let* post =
+        let _, finals_simplified =
+          SPState.simplify ~kill_new_lvars:true state_f
+        in
+        let+ final_simplified = finals_simplified in
         Asrt.star
           (List.sort Asrt.compare
-             (SPState.to_assertions ~to_keep:pvars state_f))
+             (SPState.to_assertions ~to_keep:pvars final_simplified))
       in
-      (post, post)
-      (* ) *)
-    in
 
-    let pre, spre =
-      let af_asrt = Asrt.star (SPState.to_assertions state_af) in
-      let af_subst = make_id_subst af_asrt in
-      match SPState.produce state_i af_subst af_asrt with
-      | Ok [ state_i' ] ->
-          (* FIXME: NOT WORKING DUE TO SIMPLIFICATION TYPE CHANGING *)
-          let _ = SPState.simplify ~kill_new_lvars:true state_i' in
-          let pre =
+      let+ pre =
+        let af_asrt = Asrt.star (SPState.to_assertions state_af) in
+        let af_subst = make_id_subst af_asrt in
+        let* af_produce_res = SPState.produce state_i af_subst af_asrt in
+        match af_produce_res with
+        | Ok state_i' ->
+            let _, simplifieds =
+              SPState.simplify ~kill_new_lvars:true state_i'
+            in
+            let+ simplified = simplifieds in
             Asrt.star
               (List.sort Asrt.compare
-                 (SPState.to_assertions ~to_keep:pvars state_i'))
-          in
-          (* TODO: Come up with a generic cleaning mechanism *)
-          (* let spre = (match (name <> "main") && !Config.js with
-             | false -> pre
-             | true ->
-                 let state_i'' = SPState.copy state_i' in
-                 (* let state_i'' = JSCleanUp.exec prog state_i'' name true in  *)
-                 Asrt.star (List.sort Asrt.compare (SPState.to_assertions ~to_keep:pvars state_i''))) in *)
-          (pre, pre)
-      | Ok _ -> failwith "Bi-abduction: anti-frame branched"
-      | Error _ ->
-          raise
-            (Failure "Bi-abduction: cannot produce anti-frame in initial state")
-    in
-
-    let make_spec_aux pre post =
+                 (SPState.to_assertions ~to_keep:pvars simplified))
+        | Error _ ->
+            raise
+              (Failure
+                 "Bi-abduction: cannot produce anti-frame in initial state")
+      in
       let post_clocs = Asrt.clocs post in
       let pre_clocs = Asrt.clocs pre in
       let new_clocs = SS.diff post_clocs pre_clocs in
@@ -138,34 +121,27 @@ module Make
         | None -> Lit (Loc cloc)
       in
       let new_post = Asrt.subst_clocs subst_fun post in
-
-      let spec : Spec.t =
+      Spec.
+        {
+          ss_pre = pre;
+          ss_posts = [ new_post ];
+          ss_variant = None;
+          ss_flag = fl;
+          ss_to_verify = false;
+          ss_label = None;
+        }
+    in
+    let spec =
+      Spec.
         {
           spec_name = name;
           spec_params = params;
-          spec_sspecs =
-            [
-              {
-                ss_pre = pre;
-                ss_posts = [ new_post ];
-                (* FIXME: Understand variant, but probably nothing can be done automatically *)
-                ss_variant = None;
-                ss_flag = fl;
-                ss_to_verify = false;
-                ss_label = None;
-              };
-            ];
+          spec_sspecs = sspecs;
           spec_normalised = true;
           spec_incomplete = true;
           spec_to_verify = false;
         }
-      in
-      spec
     in
-
-    let spec = make_spec_aux pre post in
-    let sspec = make_spec_aux spre spost in
-
     L.verbose (fun m ->
         m
           "@[<v 2>Created a spec for @[<h>%s(%a)@] successfully. Here is the \
@@ -174,9 +150,7 @@ module Make
           name
           Fmt.(list ~sep:comma string)
           params Spec.pp spec);
-
-    (* update_statistics "make_spec_AbsBi" (time() -. start_time); *)
-    (sspec, spec)
+    spec
 
   let testify ~init_data ~(prog : annot UP.prog) (bi_spec : BiSpec.t) : t list =
     L.verbose (fun m -> m "Bi-testifying: %s" bi_spec.bispec_name);
@@ -224,20 +198,18 @@ module Make
     let state_i = SBAState.copy state_i in
     match result with
     | RFail { error_state; _ } ->
-        let sspec, spec =
-          process_spec name params state_i error_state Flag.Error
-        in
-        if !Config.bug_specs_propagation then UP.add_spec prog spec;
-        (sspec, false)
+        let spec = process_spec name params state_i error_state Flag.Error in
+        UP.add_spec prog spec;
+        (spec, false)
     | RSucc { flag; final_state; _ } ->
-        let sspec, spec = process_spec name params state_i final_state flag in
+        let spec = process_spec name params state_i final_state flag in
         let () =
           try UP.add_spec prog spec
           with _ ->
             L.fail
               (Format.asprintf "When trying to build an UP for %s, I died!" name)
         in
-        (sspec, true)
+        (spec, true)
 
   let run_tests (prog : annot UP.prog) (tests : t list) =
     let rec run_tests_aux tests succ_specs bug_specs =

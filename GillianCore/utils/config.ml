@@ -32,7 +32,6 @@ let big_tbl_size = 1
   These values seem to never be modified *)
 
 let specs_to_stdout = ref false
-let bug_specs_propagation = ref false
 
 (** {2 Debugging config} *)
 

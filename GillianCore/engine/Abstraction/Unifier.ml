@@ -20,7 +20,6 @@ module type S = sig
   type t = state_t * preds_t * UP.preds_tbl_t * variants_t
   type post_res = (Flag.t * Asrt.t list) option
   type search_state = (t * st * UP.t) list * err_t list
-  type up_u_res = (t * st * post_res, err_t) Res_list.t
 
   module Logging : sig
     module AstateRec : sig
@@ -68,8 +67,6 @@ module type S = sig
     end
   end
 
-  type gp_ret = (t * vt list, err_t) Res_list.t
-  type u_res = (t, err_t) Res_list.t
   type unfold_info_t = (string * string) list
 
   val produce_assertion : t -> st -> Asrt.t -> (t, err_t) Res_list.t
@@ -88,7 +85,9 @@ module type S = sig
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
   val unfold_with_vals : t -> vt list -> (st * t) list option
   val unfold_concrete_preds : t -> (st option * t) option
-  val unify_assertion : ?is_post:bool -> t -> st -> UP.step -> u_res
+
+  val unify_assertion :
+    ?is_post:bool -> t -> st -> UP.step -> (t, err_t) Res_list.t
 
   val unify :
     ?is_post:bool ->
@@ -97,7 +96,7 @@ module type S = sig
     st ->
     UP.t ->
     unify_kind ->
-    up_u_res
+    (t * st * post_res, err_t) Res_list.t
 
   val fold :
     ?is_post:bool ->
@@ -116,7 +115,7 @@ module type S = sig
     string ->
     vt option list ->
     (st * UP.step * UP.outs * Expr.t list) option ->
-    gp_ret
+    (t * vt list, err_t) Res_list.t
 end
 
 module Make
@@ -153,9 +152,6 @@ module Make
   type search_state = s_state list * err_t list
   type search_state' = (s_state * int * bool) list * err_t list
   type unfold_info_t = (string * string) list
-  type gp_ret = (t * vt list, err_t) Res_list.t
-  type u_res = (t, err_t) Res_list.t
-  type up_u_res = (t * st * post_res, err_t) Res_list.t
 
   (* This is mostly to do with Gillian legacy.
      We have to handle UX and OX separately, or otherwise
@@ -772,17 +768,17 @@ module Make
     let* asrt = asrts in
     let subst = ESubst.copy subst in
     let state = copy_astate state in
-    let* result = produce state subst asrt in
-    match result with
-    | Error err ->
-        L.verbose (fun m -> m "Warning: %a" pp_err_t err);
-        [] (* Ignoring errors *)
-    | Ok state ->
-        ESubst.iter subst (fun e v ->
-            match e with
-            | PVar x -> ignore (update_store state x v)
-            | _ -> ());
-        [ state ]
+    produce state subst asrt
+    |> List.filter_map (function
+         | Error err ->
+             L.verbose (fun m -> m "Warning: %a" pp_err_t err);
+             None (* Ignoring errors *)
+         | Ok state ->
+             ESubst.iter subst (fun e v ->
+                 match e with
+                 | PVar x -> ignore (update_store state x v)
+                 | _ -> ());
+             Some state)
   (* List.fold_left
      (fun acc asrt ->
        let subst = ESubst.copy subst in
@@ -1018,8 +1014,8 @@ module Make
       (astate : t)
       (pname : string)
       (vs : vt option list)
-      (fold_outs_info : (st * UP.step * UP.outs * Expr.t list) option) : gp_ret
-      =
+      (fold_outs_info : (st * UP.step * UP.outs * Expr.t list) option) :
+      (t * vt list, err_t) Res_list.t =
     L.(
       tmi (fun m ->
           m "Unifier.consume_pred %s. args: @[<h>%a@]" pname
@@ -1492,64 +1488,81 @@ module Make
            So now, we're going to do something different depending on UX or OX mode.
            In OX mode:
               - In case of success, we continue unifying on the same path. If we're at the end of the path, we successfully stop
-              - If there is a least one error, it means unification of that path failed. We try the next path (recursive call)*)
-        match ret with
-        | USuccess state' -> (
-            match UP.next up with
-            | None ->
-                let posts = UP.posts up in
-                UnifyResultReport.log
-                  (Success
-                     {
-                       remaining_states =
-                         List.map
-                           (fun ((astate, subst, up), _, _) :
-                                UnifyResultReport.remaining_state ->
-                             { astate = AstateRec.from astate; subst; up })
-                           rest;
-                       astate = AstateRec.from state';
-                       subst;
-                       posts;
-                     })
-                |> ignore;
-                List_res.return (state', subst, posts)
-            | Some [ (up, lab) ] ->
-                if complete_subst subst lab then
-                  explore_next_states
-                    ( ((state', subst, up), case_depth, false) :: rest,
-                      errs_so_far )
-                else explore_next_states (rest, errs_so_far)
-            | Some ((up, lab) :: ups') ->
-                let next_states =
-                  List.map
-                    (fun (up, lab) ->
-                      let new_subst = ESubst.copy subst in
-                      let new_state = copy_astate state' in
-                      if complete_subst new_subst lab then
-                        Some (new_state, new_subst, up)
-                      else None)
-                    ups'
-                in
-                let next_states = List_utils.get_list_somes next_states in
-                let next_states =
-                  if complete_subst subst lab then
-                    (state', subst, up) :: next_states
-                  else next_states
-                in
-                let next_states =
-                  next_states
-                  |> List.map (fun state -> (state, case_depth + 1, true))
-                in
-                explore_next_states (next_states @ rest, errs_so_far)
-            | Some [] -> L.fail "ERROR: unify_up: empty unification plan")
-        | UAbort errors ->
+              - If there is a least one error, it means unification of that path failed. We try the next path (recursive call) *)
+        let successes, errors =
+          List.partition_map
+            (function
+              | Ok x -> Left x
+              | Error x -> Right x)
+            ret
+        in
+        match (ux, successes, errors) with
+        | true, _, _ :: _ ->
+            L.fail "ERROR: IMPOSSIBLE! UNIFICATION ERRORS IN UX MODE!!!!"
+        | false, _, _ :: _ ->
             UnifyResultReport.log
               (Failure
                  { astate = AstateRec.from state; cur_step; subst; errors })
             |> ignore;
-            explore_next_states (rest, errors @ errs_so_far))
+            explore_next_states (rest, errors @ errs_so_far)
+        | false, [], [] ->
+            L.fail "OX UNIFICATION SUCCEEDED WITH NOTHING! MEDOOOOOO!!!!!"
+        | false, _ :: _ :: _, [] -> L.fail "DEATH. OX UNIFICATION BRANCHED"
+        | ux, successes, [] -> (
+            match UP.next up with
+            | None ->
+                let posts = UP.posts up in
+                List.iter
+                  (fun state' ->
+                    UnifyResultReport.log
+                      (Success
+                         {
+                           remaining_states =
+                             List.map
+                               (fun ((astate, subst, up), _, _) :
+                                    UnifyResultReport.remaining_state ->
+                                 { astate = AstateRec.from astate; subst; up })
+                               rest;
+                           astate = AstateRec.from state';
+                           subst;
+                           posts;
+                         })
+                    |> ignore)
+                  successes;
+                let these_successes =
+                  List.map (fun state -> (state, subst, posts)) successes
+                in
+                if ux then
+                  let other_paths = explore_next_states (rest, errs_so_far) in
+                  match other_paths with
+                  | UAbort _ | UVanish -> USuccess these_successes
+                  | USuccess other_paths ->
+                      USuccess (these_successes @ other_paths)
+                else USuccess these_successes
+            | Some [ (up, lab) ] ->
+                let continue_states =
+                  if complete_subst subst lab then
+                    List.map
+                      (fun state' -> ((state', subst, up), case_depth, false))
+                      successes
+                  else []
+                in
+                explore_next_states (continue_states @ rest, errs_so_far)
+            | Some (_ :: _ as ups) ->
+                let open Syntaxes.List in
+                let next_states =
+                  let* up, lab = ups in
+                  if complete_subst subst lab then
+                    let+ state' = successes in
+                    let new_state = copy_astate state' in
+                    let new_subst = ESubst.copy subst in
+                    ((new_state, new_subst, up), case_depth + 1, true)
+                  else []
+                in
+                explore_next_states (next_states @ rest, errs_so_far)
+            | Some [] -> L.fail "ERROR: unify_up: empty unification plan"))
 
-  and unify_up ~is_post (s_states : search_state) : up_u_res =
+  and unify_up ~is_post (s_states : search_state) : internal_up_u_res =
     let () =
       L.verbose (fun fmt -> fmt "Unify UP: is-post: %a" Fmt.bool is_post)
     in
@@ -1569,50 +1582,67 @@ module Make
       (astate : t)
       (subst : ESubst.t)
       (up : UP.t)
-      (unify_kind : unify_kind) : up_u_res =
+      (unify_kind : unify_kind) : (t * st * post_res, err_t) Res_list.t =
     let astate_i = copy_astate astate in
     let subst_i = ESubst.copy subst in
     let can_fix errs = List.exists State.can_fix errs in
+
+    let rec handle_ret ~try_recover ret =
+      match ret with
+      | UVanish ->
+          L.verbose (fun m -> m "Unifier.unify: Vanish");
+          Res_list.vanish
+      | USuccess successes ->
+          L.verbose (fun fmt -> fmt "Unifier.unify: Success");
+          Res_list.just_oks successes
+      | UAbort errs
+        when try_recover && !Config.unfolding && can_fix errs
+             && not in_unification -> (
+          L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
+          if !Config.under_approximation then
+            L.fail "UNIFICATION ABORTED IN UX MODE???";
+          let state, _, _, _ = astate_i in
+          let tactics = State.get_recovery_tactic state errs in
+          L.(
+            verbose (fun m ->
+                m
+                  "Unify. Unable to unify. About to attempt the following \
+                   recovery tactic:\n\
+                   %a"
+                  (Recovery_tactic.pp Val.pp)
+                  tactics));
+          match try_recovering astate_i tactics with
+          | Error msg ->
+              L.normal (fun m -> m "Unify. Recovery tactic failed: %s" msg);
+              Res_list.just_errors errs
+          | Ok sp -> (
+              L.verbose (fun m ->
+                  m "Unfolding successful: %d results" (List.length sp));
+              let open Syntaxes.List in
+              let* astate = sp in
+              match unfold_concrete_preds astate with
+              | None ->
+                  let error =
+                    StateErr.EOther "Unfolding concrete value failed???"
+                  in
+                  Res_list.error_with error
+              | Some (_, astate) ->
+                  (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
+                  let subst'' = ESubst.copy subst_i in
+                  let new_ret =
+                    unify_up ~is_post ([ (astate, subst'', up) ], [])
+                  in
+                  (* We already tried recovering once and it failed, we stop here *)
+                  handle_ret ~try_recover:false new_ret))
+      | UAbort errors ->
+          L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
+          Res_list.just_errors errors
+    in
     UnifyReport.as_parent
       { astate = AstateRec.from astate; subst; up; unify_kind }
       (fun () ->
         let ret = unify_up ~is_post ([ (astate, subst, up) ], []) in
-        (* Ok so here we're going to do a trick*)
-        match ret with
-        | Ok _ ->
-            L.verbose (fun fmt -> fmt "Unifier.unify: Success");
-            ret
-        | Error errs
-          when !Config.unfolding && can_fix errs && not in_unification -> (
-            L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
-            let state, _, _, _ = astate_i in
-            let tactics = State.get_recovery_tactic state errs in
-            L.(
-              verbose (fun m ->
-                  m
-                    "Unify. Unable to unify. About to attempt the following \
-                     recovery tactic:\n\
-                     %a"
-                    (Recovery_tactic.pp Val.pp)
-                    tactics));
-            match try_recovering astate_i tactics with
-            | Error msg ->
-                L.normal (fun m -> m "Unify. Recovery tactic failed: %s" msg);
-                Error errs
-            | Ok sp -> (
-                L.verbose (fun m ->
-                    m "Unfolding successful: %d results" (List.length sp));
-                let open List_res.Syntax in
-                let* astate = Ok sp in
-                match unfold_concrete_preds astate with
-                | None -> Error []
-                | Some (_, astate) ->
-                    (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
-                    let subst'' = ESubst.copy subst_i in
-                    unify_up ~is_post ([ (astate, subst'', up) ], [])))
-        | Error _ ->
-            L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
-            ret)
+        handle_ret ~try_recover:true ret)
 
   and fold
       ?(is_post = false)
@@ -1745,10 +1775,33 @@ module Make
   and try_recovering (astate : t) (tactic : vt Recovery_tactic.t) :
       (t list, string) result =
     let open Syntaxes.Result in
+    if !Config.under_approximation then
+      L.fail "Recovery tactics not handled in UX mode";
     L.verbose (fun m -> m "Attempting to recover");
     let- fold_error =
       match tactic.try_fold with
-      | Some fold_values -> fold_guarded_with_vals astate fold_values
+      | Some fold_values -> (
+          let res = fold_guarded_with_vals astate fold_values in
+          let errors =
+            List.filter_map
+              (function
+                | Error e -> Some e
+                | _ -> None)
+              res
+          in
+          match errors with
+          | [] ->
+              let successes =
+                List.filter_map
+                  (function
+                    | Ok x -> Some x
+                    | _ -> None)
+                  res
+              in
+              Ok successes
+          | _ ->
+              let error_string = Fmt.str "%a" Fmt.(Dump.list string) errors in
+              Error error_string)
       | None ->
           L.verbose (fun m -> m "No fold recovery tactic");
           Error "None"

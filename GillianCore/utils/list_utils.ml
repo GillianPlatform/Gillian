@@ -181,3 +181,12 @@ let for_alli f l =
     | x :: xs -> if f i x then aux (i + 1) xs else false
   in
   aux 0 l
+
+let at_least_two f l =
+  let rec aux ~found_one = function
+    | [] -> false
+    | x :: r ->
+        if f x then if found_one then true else aux ~found_one:true r
+        else aux ~found_one r
+  in
+  aux ~found_one:false l

@@ -434,16 +434,18 @@ struct
     L.verbose (fun m ->
         m "Analyse result: About to unify one postcondition of %s. post: %a"
           test.name UP.pp test.post_up);
-    match SPState.unify state subst test.post_up Unifier.Postcondition with
-    | true ->
-        L.verbose (fun m ->
-            m "Analyse result: Postcondition unified successfully");
-        VerificationResults.set_result global_results test.name test.id true;
-        true
-    | false ->
-        L.normal (fun m -> m "Analyse result: Postcondition not unifiable.");
-        VerificationResults.set_result global_results test.name test.id false;
-        false
+    let unification_result =
+      SPState.unifies state subst test.post_up Unifier.Postcondition
+    in
+    L.normal (fun m ->
+        m "Analysis result: Postcondition %a"
+          (fun ft b ->
+            Fmt.string ft
+            @@ if b then "unified successfully" else "not unifiable")
+          unification_result);
+    VerificationResults.set_result global_results test.name test.id
+      unification_result;
+    unification_result
 
   let make_post_subst (test : t) (post_state : SPState.t) : SSubst.t =
     let subst_lst =
@@ -564,8 +566,7 @@ struct
     in
     if rets = [] then (
       L.(
-        normal (fun m ->
-            m "ERROR: Function %s evaluates to 0 results." test.name));
+        normal (fun m -> m "ERROR: Lemma %s evaluates to 0 results." test.name));
       exit 1);
     print_success_or_failure success;
     success
@@ -610,9 +611,13 @@ struct
             let msg = "Verifying lemma " ^ test.name ^ "... " in
             L.tmi (fun fmt -> fmt "%s" msg);
             Fmt.pr "%s@?" msg;
-            match SAInterpreter.evaluate_lcmds prog proof state with
-            | Ok rets -> analyse_lemma_results test rets
-            | Error _ -> false))
+            let lemma_evaluation_results =
+              SAInterpreter.evaluate_lcmds prog proof state
+            in
+            let successes, errors = Res_list.split lemma_evaluation_results in
+            match errors with
+            | [] -> analyse_lemma_results test successes
+            | _ -> false))
 
   let pred_extracting_visitor =
     object
