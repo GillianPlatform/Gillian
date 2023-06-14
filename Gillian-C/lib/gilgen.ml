@@ -143,10 +143,24 @@ let get_typ_from_id clight_prog fid id =
       all_vars
   with
   | Some t -> t
-  | None ->
-      Fmt.failwith
-        "Variable with ident %d was not found inside function of Clight"
-        (Camlcoq.P.to_int id)
+  | None -> (
+      (* This is not a local variable, we're going to look at global variables *)
+      match
+        List.find_map
+          (fun (var_id, glob_def) ->
+            if Camlcoq.P.eq id var_id then
+              match glob_def with
+              | AST.Gfun _ -> failwith "Dereferecing a function????"
+              | Gvar v -> Some v.gvar_info
+            else None)
+          clight_prog.prog_defs
+      with
+      | Some t -> t
+      | None ->
+          Fmt.failwith
+            "Variable with ident %d(%s) was not found inside either Clight \
+             function or globals"
+            (Camlcoq.P.to_int id) (true_name id))
 
 (* Return type of a member within a struct using the struct member offset *)
 let get_struct_member_type
