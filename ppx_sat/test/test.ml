@@ -37,7 +37,7 @@ module Test_if_sat = struct
   let starting_pc x =
     Monadic.Pc.make
       ~pfs:(Engine.PFS.of_list [ Formula.Not x #== one ])
-      ~gamma:(Engine.Type_env.init ()) ()
+      ~gamma:(Engine.Type_env.init ()) ~unification:false ()
 
   let results =
     let x = Expr.LVar "x" in
@@ -61,7 +61,7 @@ module Test_match_ent = struct
   let pc_with_two x =
     Monadic.Pc.make
       ~pfs:(Engine.PFS.of_list [ x #== two ])
-      ~gamma:(Engine.Type_env.init ()) ()
+      ~gamma:(Engine.Type_env.init ()) ~unification:false ()
 
   let results_no_info =
     let x = Expr.LVar "x" in

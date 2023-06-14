@@ -468,18 +468,20 @@ let ins_outs_assertion
   | _ ->
       raise (Failure "Impossible: non-simple assertion in ins_outs_assertion.")
 
-let rec collect_simple_asrts (a : Asrt.t) : Asrt.t list =
-  let f = collect_simple_asrts in
-  match a with
-  | Pure True | Emp -> []
-  | Pure (And (f1, f2)) -> f (Pure f1) @ f (Pure f2)
-  | Pure _ | Pred _ | GA _ -> [ a ]
-  | Types _ -> (
-      let a = Reduction.reduce_assertion a in
-      match a with
-      | Types les -> List.map (fun e -> Asrt.Types [ e ]) les
-      | _ -> f a)
-  | Star (a1, a2) -> f a1 @ f a2
+let collect_simple_asrts a =
+  let rec aux (a : Asrt.t) : Asrt.t Seq.t =
+    match a with
+    | Pure True | Emp -> Seq.empty
+    | Pure (And (f1, f2)) -> Seq.append (aux (Pure f1)) (aux (Pure f2))
+    | Pure _ | Pred _ | GA _ -> Seq.return a
+    | Types _ -> (
+        let a = Reduction.reduce_assertion a in
+        match a with
+        | Types les -> Seq.map (fun e -> Asrt.Types [ e ]) (List.to_seq les)
+        | _ -> aux a)
+    | Star (a1, a2) -> Seq.append (aux a1) (aux a2)
+  in
+  List.of_seq (aux a)
 
 let s_init (kb : KB.t) (preds : (string, int list) Hashtbl.t) (a : Asrt.t) :
     (pt, Asrt.t list) result =

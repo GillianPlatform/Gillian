@@ -28,8 +28,7 @@ module type S = sig
 
   exception Internal_State_Error of err_t list * t
 
-  type action_ret = (t * vt list, err_t) result list
-  type u_res = UWTF | USucc of t | UFail of err_t list
+  type action_ret = (t * vt list, err_t) Res_list.t
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
   type init_data
 
@@ -75,7 +74,6 @@ module type S = sig
   (** Value Equality *)
   val equals : t -> vt -> vt -> bool
 
-  (** Value Type *)
   val get_type : t -> vt -> Type.t option
 
   (** State simplification *)
@@ -120,15 +118,20 @@ module type S = sig
   (** Turns a state into a list of assertions *)
   val to_assertions : ?to_keep:Containers.SS.t -> t -> Asrt.t list
 
-  val evaluate_slcmd : 'a UP.prog -> SLCmd.t -> t -> (t list, err_t list) result
+  val evaluate_slcmd : 'a UP.prog -> SLCmd.t -> t -> (t, err_t) Res_list.t
 
   (** [unify_invariant prog revisited state invariant binders] returns a list of pairs of states.
       In each pair, the first element is the framed off state, and the second one is the invariant,
       i.e. the state obtained by producing the invariant *)
   val unify_invariant :
-    'a UP.prog -> bool -> t -> Asrt.t -> string list -> (t * t) list
+    'a UP.prog ->
+    bool ->
+    t ->
+    Asrt.t ->
+    string list ->
+    (t * t, err_t) Res_list.t
 
-  val frame_on : t -> (string * t) list -> string list -> t list
+  val frame_on : t -> (string * t) list -> string list -> (t, err_t) Res_list.t
 
   val run_spec :
     UP.spec ->
@@ -136,16 +139,16 @@ module type S = sig
     string ->
     vt list ->
     (string * (string * vt) list) option ->
-    ((t * Flag.t) list, err_t list) result
+    (t * Flag.t, err_t) Res_list.t
 
   val unfolding_vals : t -> Formula.t list -> vt list
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
   val substitution_in_place : ?subst_all:bool -> st -> t -> t list
   val fresh_val : t -> vt
   val clean_up : ?keep:Expr.Set.t -> t -> unit
-  val unify_assertion : t -> st -> UP.step -> u_res
+  val unify_assertion : t -> st -> UP.step -> (t, err_t) Res_list.t
   val produce_posts : t -> st -> Asrt.t list -> t list
-  val produce : t -> st -> Asrt.t -> (t list, err_t list) result
+  val produce : t -> st -> Asrt.t -> (t, err_t) Res_list.t
   val update_subst : t -> st -> unit
   val mem_constraints : t -> Formula.t list
   val can_fix : err_t -> bool

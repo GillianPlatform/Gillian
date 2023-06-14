@@ -70,50 +70,19 @@ end
 
 (* FIXME: Lift should not be necessary, the monad should just match !!! *)
 module Lift (MSM : S) :
-  Legacy_s_memory.S with type t = MSM.t and type init_data = MSM.init_data =
-struct
+  SMemory.S with type t = MSM.t and type init_data = MSM.init_data = struct
   include MSM
 
   let assertions ?to_keep t =
     List.map Engine.Reduction.reduce_assertion (assertions ?to_keep t)
 
-  type action_ret =
-    ( (t * vt list * Formula.t list * (string * Type.t) list) list,
-      err_t list )
-    result
-
-  let execute_action ?(unification = false) action_name mem pfs gamma params =
+  let execute_action action_name mem gpc params =
+    let open Syntaxes.List in
     let process = execute_action ~action_name mem params in
-    let pfs = PFS.copy pfs in
-    let gamma = Type_env.copy gamma in
-    (* let _ = Simplifications.simplify_pfs_and_gamma ~unification ~kill_new_lvars:true ~save_spec_vars:(Containers.SS.empty, true) pfs gamma in *)
-    let curr_pc = Pc.make ~unification ~pfs ~gamma () in
-    let results = Delayed.resolve ~curr_pc process in
-    let split res =
-      let rec aux acc_succ acc_fail res =
-        match res with
-        | [] -> (acc_succ, acc_fail)
-        | br :: rest -> (
-            match Branch.value br with
-            | Error err -> aux acc_succ (err :: acc_fail) rest
-            | Ok s ->
-                aux
-                  ((Branch.learned br, Branch.learned_types br, s) :: acc_succ)
-                  acc_fail rest)
-      in
-      aux [] [] res
-    in
-    let successes, failures = split results in
-    let is_empty list = Int.equal (List.compare_length_with list 0) 0 in
-    if not (is_empty failures) then Error failures
-    else
-      let asucs =
-        List.map
-          (fun (fset, glis, (t, vtl)) ->
-            (t, vtl, List.of_seq (Formula.Set.to_seq fset), glis))
-          successes
-      in
-      Ok asucs
+    let curr_pc = Pc.of_gpc gpc in
+    let+ Branch.{ pc; value } = Delayed.resolve ~curr_pc process in
+    let gpc = Pc.to_gpc pc in
+    Gbranch.{ pc = gpc; value }
 
   let apply_fix heap pfs gamma fix =
     Logging.verbose (fun m -> m "Bi-abduction trying to apply fix");
@@ -133,7 +102,7 @@ struct
   let substitution_in_place ~pfs ~gamma subst mem :
       (t * Formula.Set.t * (string * Type.t) list) list =
     let process = substitution_in_place subst mem in
-    let curr_pc = Pc.make ~pfs ~gamma () in
+    let curr_pc = Pc.make ~unification:false ~pfs ~gamma () in
     match Delayed.resolve ~curr_pc process with
     | [] -> failwith "substitution killed every branch, that cannot happen"
     | leeloo_dallas_multibranch ->
