@@ -59,10 +59,16 @@ struct
         None
 
   let assume ?(unfold = false) (bi_state : t) (v : vt) : t list =
-    let open Syntaxes.List in
     let procs, state, state_af = bi_state in
-    let+ state' = State.assume ~unfold state v in
-    (procs, state', state_af)
+    let new_states = State.assume ~unfold state v in
+    match new_states with
+    | [] -> []
+    | first_state :: rest ->
+        (* Slight optim, we don't copy the anti_frame if we have only one state. *)
+        let rest =
+          List.map (fun state' -> (procs, state', State.copy state_af)) rest
+        in
+        (procs, first_state, state_af) :: rest
 
   let assume_a
       ?(unification = false)
