@@ -46,7 +46,6 @@ module Make (SMemory : SMemory.S) :
 
   type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson, show]
   type action_ret = (t * vt list, err_t) result list
-  type u_res = UWTF | USucc of t | UFail of err_t list
 
   exception Internal_State_Error of err_t list * t
 
@@ -491,7 +490,7 @@ module Make (SMemory : SMemory.S) :
       @ [ Types (Type_env.to_list_expr gamma) ]
 
   let evaluate_slcmd (_ : 'a UP.prog) (_ : SLCmd.t) (_ : t) :
-      (t list, err_t list) result =
+      (t, err_t) Res_list.t =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 
   let unify_invariant _ _ _ _ _ =
@@ -510,8 +509,7 @@ module Make (SMemory : SMemory.S) :
       (_ : t)
       (_ : string)
       (_ : vt list)
-      (_ : (string * (string * vt) list) option) :
-      ((t * Flag.t) list, err_t list) result =
+      (_ : (string * (string * vt) list) option) =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
 
   let unfolding_vals (_ : t) (fs : Formula.t list) : vt list =
@@ -556,13 +554,13 @@ module Make (SMemory : SMemory.S) :
             (mem, SStore.copy store, bpfs, bgamma, svars))
           multi_mems
 
-  let unify_assertion (_ : t) (_ : st) (_ : UP.step) : u_res =
+  let unify_assertion (_ : t) (_ : st) (_ : UP.step) : (t, err_t) Res_list.t =
     raise (Failure "Unify assertion from non-abstract symbolic state.")
 
   let produce_posts (_ : t) (_ : st) (_ : Asrt.t list) : t list =
     raise (Failure "produce_posts from non-abstract symbolic state.")
 
-  let produce (_ : t) (_ : st) (_ : Asrt.t) : (t list, err_t list) result =
+  let produce (_ : t) (_ : st) (_ : Asrt.t) : (t, err_t) Res_list.t =
     raise (Failure "produce_post from non-abstract symbolic state.")
 
   let fresh_val (_ : t) : vt = LVar (LVar.alloc ())
@@ -782,7 +780,14 @@ module Make (SMemory : SMemory.S) :
           Fmt.Dump.(list @@ list @@ pp_fix)
           one_step_fixes);
     (* Cartesian product of the fixes *)
-    let result = List.filter_map (normalise_fix pfs gamma) one_step_fixes in
+    let result =
+      List.filter_map
+        (fun fix ->
+          match normalise_fix pfs gamma fix with
+          | None | Some [] -> None
+          | other -> other)
+        one_step_fixes
+    in
     L.(verbose (fun m -> m "Normalised fixes: %i" (List.length result)));
     L.verbose (fun m ->
         m "%a" (Fmt.list ~sep:(Fmt.any "@\n@\n") (Fmt.Dump.list pp_fix)) result);

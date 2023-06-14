@@ -309,12 +309,6 @@ let rec to_expr (a : t) : Expr.t option =
       in
       Some (Expr.BinOp (is_float, BinOp.BAnd, is_whole))
 
-let rec conjunct (asrts : t list) : t =
-  match asrts with
-  | [] -> True
-  | [ a ] -> a
-  | a :: r_asrts -> And (a, conjunct r_asrts)
-
 let rec disjunct (asrts : t list) : t =
   match asrts with
   | [] -> True
@@ -421,3 +415,9 @@ end
 let pvars_to_lvars (pf : t) : t =
   let fe = Expr.pvars_to_lvars in
   map None None (Some fe) pf
+
+let rec conjunct (asrts : t list) : t =
+  match asrts with
+  | [] -> True
+  | [ a ] -> a
+  | a :: r_asrts -> Infix.( #&& ) a (conjunct r_asrts)

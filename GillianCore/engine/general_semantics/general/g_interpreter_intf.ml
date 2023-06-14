@@ -138,7 +138,7 @@ module type S = sig
     LCmd.t list ->
     ?annot:annot option ->
     state_t ->
-    (state_t list, state_err_t list) result
+    (state_t, state_err_t) Res_list.t
 
   (** Begins execution of a proc, given parameters and initial state *)
   val init_evaluate_proc :

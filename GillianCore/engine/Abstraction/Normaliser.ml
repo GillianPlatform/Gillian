@@ -769,8 +769,8 @@ struct
 
   let produce_core_asrts
       (astate : SPState.t)
-      (core_asrts : (string * Expr.t list * Expr.t list) list) :
-      (SPState.t list, string) result =
+      (core_asrts : (string * Expr.t list * Expr.t list) list) : SPState.t list
+      =
     let f_aux (es : Expr.t list) : SS.t * SS.t =
       List.fold_left
         (fun (ret1, ret2) e ->
@@ -804,49 +804,30 @@ struct
         m "Subst in produce asrts:\n%a"
           (* FIXME: Shouldn't use PFS.to_list but Fmt.iter and PFS.iter *)
           SESubst.full_pp subst);
-
-    let rec loop
-        (astates : SPState.t list)
-        (core_asrts : (string * Expr.t list * Expr.t list) list) :
-        (SPState.t list, string) result =
-      match core_asrts with
-      | [] -> Ok astates
-      | (a, ins, outs) :: rest -> (
-          try
-            let new_states =
-              List.fold_left
-                (fun acc astate ->
-                  match
-                    SPState.produce astate subst (Asrt.GA (a, ins, outs))
-                  with
-                  | Ok astates -> astates @ acc
-                  | Error msg ->
-                      L.verbose (fun m ->
-                          m
-                            "Produce GA failed for: %a!\n\
-                             with Message: %a. Might have lost some paths ?"
-                            Asrt.pp
-                            (Asrt.GA (a, ins, outs))
-                            (pp_list SPState.pp_err_t) msg);
-                      acc)
-                [] astates
-            in
-            loop new_states rest
-          with Failure msg ->
-            L.verbose (fun m ->
-                m "Produce GA failed for: %a with error %s\n" Asrt.pp
-                  (Asrt.GA (a, ins, outs))
-                  msg);
-            raise (Failure msg))
-    in
     L.verbose (fun m ->
         m "CORE ASSERTIONS TO PRODUCE: %a"
           (Fmt.Dump.list (fun fmt (a, b, c) ->
                Fmt.pf fmt "(%s, %a, %a)" a (Fmt.Dump.list Expr.pp) b
                  (Fmt.Dump.list Expr.pp) c))
           core_asrts);
-    let result = loop [ astate ] core_asrts in
-    result
+    core_asrts
+    |> List.fold_left
+         (fun current_states (a, ins, outs) ->
+           let open Syntaxes.List in
+           let* current_state = current_states in
+           SPState.produce current_state subst (Asrt.GA (a, ins, outs))
+           |> (* If some production fails, we ignore *)
+           List.filter_map (function
+             | Ok x -> Some x
+             | Error msg ->
+                 L.verbose (fun m ->
+                     m
+                       "One branch of produce GA failed for: %a!\n\
+                        with Message: %a. Might have lost some paths ?" Asrt.pp
+                       (Asrt.GA (a, ins, outs))
+                       SPState.pp_err_t msg);
+                 None))
+         [ astate ]
 
   let subst_to_pfs ?(svars : SS.t option) (subst : SESubst.t) : Formula.t list =
     let subst_lvs = SESubst.to_list subst in
@@ -963,39 +944,28 @@ struct
             ~spec_vars:svars ()
         in
         let astate = SPState.set_preds astate preds' in
-        let astate = produce_core_asrts astate c_asrts' in
+        let open Syntaxes.List in
+        let res =
+          let* astate = produce_core_asrts astate c_asrts' in
 
-        match astate with
-        | Error msg ->
+          (* Step 8 -- Check if the symbolic state makes sense *)
+          let mem_constraints = SPState.mem_constraints astate in
+          if
+            FOSolver.check_satisfiability
+              (mem_constraints @ PFS.to_list pfs)
+              gamma
+          then (
+            (* Step 9 -- Final simplifications - TO SIMPLIFY!!! *)
+            let _, states = SPState.simplify ~unification:true astate in
+            let+ state = states in
             L.verbose (fun m ->
-                m "WARNING: normalise_assertion: returning error");
-            Error msg
-        | Ok astates ->
-            Ok
-              (List.concat
-                 (List.filter_map
-                    (fun astate ->
-                      (* Step 8 -- Check if the symbolic state makes sense *)
-                      let mem_constraints = SPState.mem_constraints astate in
-                      if
-                        FOSolver.check_satisfiability
-                          (mem_constraints @ PFS.to_list pfs)
-                          gamma
-                      then (
-                        (* Step 9 -- Final simplifications - TO SIMPLIFY!!! *)
-                        let _, states =
-                          SPState.simplify ~unification:true astate
-                        in
-                        L.verbose (fun m ->
-                            m "AFTER NORMALISATION: %d states: @\n%a"
-                              (List.length states) SPState.pp astate);
-                        Some
-                          (List.map
-                             (fun state -> (state, SESubst.copy subst))
-                             states))
-                      else (
-                        L.verbose (fun m ->
-                            m "WARNING: normalise_assertion: returning None");
-                        None))
-                    astates)))
+                m "AFTER NORMALISATION: %d states: @\n%a" (List.length states)
+                  SPState.pp astate);
+            (state, SESubst.copy subst))
+          else (
+            L.verbose (fun m ->
+                m "WARNING: normalise_assertion: returning None");
+            [])
+        in
+        Ok res)
 end
