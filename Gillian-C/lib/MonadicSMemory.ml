@@ -129,12 +129,16 @@ module Mem = struct
   let weak_valid_pointer { map; _ } loc ofs =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
+    (* The corresponding missing error should be a missing bound *)
     let** tree = get_tree_res map loc_name (Some ofs) None in
     map_lift_err loc_name (SHeapTree.weak_valid_pointer tree ofs)
 
   let getcurperm { map; _ } loc ofs =
     let open DR.Syntax in
     let** loc_name = resolve_loc_result loc in
+    (* The corresponding missing error should be a missing bound.
+       Though getcurperm is only used for pointer validity checking,
+       we should move that logic to something more fixable. *)
     let** tree = get_tree_res map loc_name (Some ofs) None in
     map_lift_err loc_name (SHeapTree.get_perm_at tree ofs)
 
@@ -1068,7 +1072,7 @@ let get_recovery_tactic _ err =
 let get_failing_constraint _e =
   failwith "Bi-abduction TODO: implement function get_failing_constraint"
 
-let of_low_chunk low chunk =
+let offset_by_chunk low chunk =
   let open Expr.Infix in
   let len = Expr.int (Chunk.size chunk) in
   low + len
@@ -1137,7 +1141,7 @@ let get_fixes _heap _pfs _gamma err =
       if is_store then
         ( [
             AddUnitialized
-              { loc; low = ofs; high = of_low_chunk ofs chunk; chunk };
+              { loc; low = ofs; high = offset_by_chunk ofs chunk; chunk };
           ],
           [],
           [],

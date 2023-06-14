@@ -48,18 +48,6 @@ let pp_err fmt = function
   | WrongMemVal -> Fmt.pf fmt "WrongMemVal"
   | MemoryNotFreed -> Fmt.pf fmt "MemoryNotFreed"
 
-let err_equal a b =
-  match (a, b) with
-  | MissingResource _, MissingResource _ -> true
-  | UseAfterFree, UseAfterFree -> true
-  | BufferOverrun, BufferOverrun -> true
-  | ( InsufficientPermission { required = ra; actual = aa },
-      InsufficientPermission { required = rb; actual = ab } ) ->
-      let open Perm.Infix in
-      ra =% rb && aa =% ab
-  | Unhandled a, Unhandled b -> String.equal a b
-  | _ -> false
-
 type 'a or_error = ('a, err) Result.t
 type 'a d_or_error = ('a, err) DR.t
 
@@ -205,11 +193,7 @@ module Node = struct
     | None -> Ok ()
     | Some required -> (
         match node with
-        | NotOwned Totally -> Error (MissingResource Unfixable)
-        | NotOwned Partially ->
-            failwith
-              "SHeapTree Check Permission Error: Memory Partially Not Owned \
-               (Currently Unsupported)"
+        | NotOwned _ -> Error (MissingResource Unfixable)
         | MemVal { min_perm = actual; _ } ->
             let open Perm.Infix in
             if actual >=% required then Ok ()
@@ -457,7 +441,7 @@ module Node = struct
     | MemVal { mem_val = Array { chunk = _; _ }; exact_perm; _ } ->
         DR.ok (SVal.SUndefined, exact_perm)
 
-  let decode_arr ~low ~size ~chunk t =
+  let decode_arr ~low:_ ~size ~chunk t =
     let open Delayed.Syntax in
     let split_array_in ~size ~amount arr =
       match arr with
@@ -489,13 +473,13 @@ module Node = struct
       get_values arrs
     in
     match t with
-    | NotOwned Totally ->
-        DR.error (MissingResource (Fixable { is_store = false; low; chunk }))
-    | NotOwned Partially ->
+    | NotOwned _ ->
         Logging.verbose (fun fmt ->
             fmt
-              "SHeapTree Decode Array Error: Memory Partially Not Owned \
-               (Currently Unsupported)");
+              "Right now, we can't fix array errors easily without adding more \
+               fixes. Right now we can only fix single accesses.\n\
+              \           We should at least be able to fix it for concrete \
+               arrays");
         DR.error (MissingResource Unfixable)
     | MemVal { mem_val = Zeros; exact_perm; _ } ->
         DR.ok (SVArr.AllZeros, exact_perm)
