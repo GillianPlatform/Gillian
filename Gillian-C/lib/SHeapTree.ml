@@ -391,7 +391,7 @@ module Node = struct
         DR.ok (SVal.SUndefined, exact_perm)
     | MemVal { mem_val = Single { chunk = m_chunk; value }; exact_perm; _ } ->
         DR.ok
-          (if Chunk.equal m_chunk chunk then (value, exact_perm)
+          (if Chunk.phy_equal m_chunk chunk then (value, exact_perm)
           else (SUndefined, exact_perm))
     | MemVal
         { mem_val = Array { chunk = Mint8unsigned; values }; exact_perm; _ }

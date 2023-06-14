@@ -217,7 +217,10 @@ let rec get_struct_id clight_prog fname fid expr =
    evalutes to a pointer chunk *)
 let to_gil_chunk_h clight_prog fname fid compcert_chunk expp =
   match expp with
-  | Eaddrof _id -> if Compcert.Archi.ptr64 then Chunk.Mint64 else Chunk.Mint32
+  | Eaddrof id -> (
+      match get_typ_from_id clight_prog fid id with
+      | Tpointer _ -> Chunk.Mptr
+      | _ -> if Compcert.Archi.ptr64 then Chunk.Mint64 else Chunk.Mint32)
   | Evar id -> (
       match get_typ_from_id clight_prog fid id with
       | Tpointer (Tpointer _, _) -> Chunk.Mptr
