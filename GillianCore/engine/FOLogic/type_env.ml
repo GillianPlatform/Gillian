@@ -84,12 +84,9 @@ let update (te : t) (x : string) (t : Type.t) : unit =
   | None -> Hashtbl.replace te x t
   | Some t' when t' = t -> ()
   | Some t' ->
-      ignore
-        (failwith
-           (Format.asprintf
-              "Type_env update: Conflict: %s has type %s but required \
-               extension is %s"
-              x (Type.str t') (Type.str t)))
+      Fmt.failwith
+        "Type_env update: Conflict: %s has type %s but required extension is %s"
+        x (Type.str t') (Type.str t)
 
 let remove (te : t) (x : string) : unit = Hashtbl.remove te x
 

@@ -41,7 +41,6 @@ end = struct
   exception Internal_State_Error of err_t list * t
 
   type action_ret = (t * vt list, err_t) result list
-  type u_res = UWTF | USucc of t | UFail of err_t list
 
   let init init_data : t = (CMemory.init init_data, CStore.init [], [])
   let get_pred_defs (_ : t) : UP.preds_tbl_t option = None
@@ -164,15 +163,14 @@ end = struct
       (_ : t)
       (_ : string)
       (_ : vt list)
-      (_ : (string * (string * vt) list) option) :
-      ((t * Flag.t) list, err_t list) result =
+      (_ : (string * (string * vt) list) option) =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
 
   let unfolding_vals (_ : t) (_ : Formula.t list) : vt list =
     raise (Failure "ERROR: unfolding_vals called for non-abstract execution")
 
   let evaluate_slcmd (_ : 'a UP.prog) (_ : SLCmd.t) (_ : t) :
-      (t list, err_t list) result =
+      (t, err_t) Res_list.t =
     raise (Failure "ERROR: evaluate_slcmd called for non-abstract execution")
 
   let unify_invariant _ _ _ _ _ =
@@ -191,13 +189,13 @@ end = struct
 
   let clean_up ?keep:_ _ = raise (Failure "Cleanup of concrete state.")
 
-  let unify_assertion (_ : t) (_ : st) (_ : UP.step) : u_res =
+  let unify_assertion (_ : t) (_ : st) (_ : UP.step) =
     raise (Failure "Unify assertion from concrete state.")
 
   let produce_posts (_ : t) (_ : st) (_ : Asrt.t list) : t list =
     raise (Failure "produce_posts from concrete state.")
 
-  let produce (_ : t) (_ : st) (_ : Asrt.t) : (t list, err_t list) result =
+  let produce (_ : t) (_ : st) (_ : Asrt.t) =
     raise (Failure "produce_post from non-abstract symbolic state.")
 
   let update_subst (_ : t) (_ : st) : unit = ()

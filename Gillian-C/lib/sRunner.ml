@@ -1,8 +1,5 @@
 open Gillian
-
-module SMemory =
-  Gillian.Symbolic.Legacy_s_memory.Modernize
-    (Monadic.MonadicSMemory.Lift (MonadicSMemory))
+module SMemory = Monadic.MonadicSMemory.Lift (MonadicSMemory)
 
 module Outcome =
   Bulk.Outcome.Make_Symbolic (SMemory) (CParserAndCompiler)
