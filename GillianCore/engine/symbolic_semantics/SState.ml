@@ -18,14 +18,6 @@ module type S = sig
   val clear_resource : t -> t
   val get_typ_env : t -> Type_env.t
   val get_pfs : t -> PFS.t
-  val get_lvars_for_exact : t -> Var.Set.t
-
-  val hides :
-    is_post:bool ->
-    used_unifiables:Expr.Set.t ->
-    exprs_to_hide:Expr.t list ->
-    t ->
-    (unit, Expr.t) result
 end
 
 module Make (SMemory : SMemory.S) :
@@ -478,18 +470,6 @@ module Make (SMemory : SMemory.S) :
     |> SS.union (Type_env.lvars gamma)
     |> SS.union svars
 
-  let get_lvars_for_exact (state : t) : Var.Set.t =
-    let heap, store, pfs, _, _ = state in
-    SStore.lvars store
-    |> SS.union (SMemory.lvars heap)
-    |> SS.union (PFS.lvars pfs)
-
-  let get_alocs_for_exact (state : t) : Var.Set.t =
-    let heap, store, pfs, _, _ = state in
-    SStore.alocs store
-    |> SS.union (SMemory.alocs heap)
-    |> SS.union (PFS.alocs pfs)
-
   let to_assertions ?(to_keep : SS.t option) (state : t) : Asrt.t list =
     let heap, store, pfs, gamma, _ = state in
     let store' =
@@ -872,82 +852,4 @@ module Make (SMemory : SMemory.S) :
   let get_pfs state =
     let _, _, pfs, _, _ = state in
     pfs
-
-  let hides
-      ~is_post
-      ~(used_unifiables : ES.t)
-      ~(exprs_to_hide : vt list)
-      (state : t) =
-    let elist_pp = Fmt.list ~sep:Fmt.comma Expr.pp in
-    let () =
-      L.verbose (fun fmt ->
-          fmt
-            "\nEXACT: HIDES: In-post: %a\nUsed: %a\nTo hide: %a\n\nSTATE:\n%a\n"
-            Fmt.bool is_post elist_pp
-            (ES.elements used_unifiables)
-            elist_pp exprs_to_hide pp state)
-    in
-    let heap, store, pfs, gamma, _ = copy state in
-    let store = if is_post then SStore.init [] else store in
-    let state = (heap, store, pfs, gamma, SS.empty) in
-    let subst, states = simplify ~kill_new_lvars:true state in
-    List.fold_left
-      (fun outcome state ->
-        let heap, _, pfs, _, _ = state in
-        PFS.clean_up pfs;
-        let used_unifiables =
-          ES.map (SSubst.subst_in_expr ~partial:true subst) used_unifiables
-        in
-        let exprs_to_hide =
-          List.map (SSubst.subst_in_expr ~partial:true subst) exprs_to_hide
-        in
-        let () =
-          L.verbose (fun fmt ->
-              fmt "EXACT: Hides after subst: %a" elist_pp exprs_to_hide)
-        in
-        match outcome with
-        | Error _ -> outcome
-        | Ok () -> (
-            let _, keep = SMemory.clean_up ~keep:used_unifiables heap in
-            let used_unifiables = ES.union used_unifiables keep in
-            let () =
-              L.verbose (fun fmt ->
-                  fmt "STATE after memory clean-up:\n%a\n" pp state)
-            in
-            let () =
-              L.verbose (fun fmt ->
-                  fmt "Used unifiables: %a" elist_pp
-                    (Expr.Set.elements used_unifiables))
-            in
-            let hides_lvars =
-              List.fold_left SS.union SS.empty
-                (List.map Expr.lvars exprs_to_hide)
-            in
-            let hides_alocs =
-              List.fold_left SS.union SS.empty
-                (List.map Expr.alocs exprs_to_hide)
-            in
-            let state_lvars = get_lvars_for_exact state in
-            let state_alocs = get_alocs_for_exact state in
-            let inter =
-              SS.inter
-                (SS.union hides_lvars hides_alocs)
-                (SS.union state_lvars state_alocs)
-            in
-            match SS.is_empty inter with
-            | true -> Ok ()
-            | false ->
-                let non_hidable_expr = SS.min_elt inter in
-                let non_hidable_expr =
-                  match Names.is_lvar_name non_hidable_expr with
-                  | true -> Expr.LVar non_hidable_expr
-                  | false -> ALoc non_hidable_expr
-                in
-                let () =
-                  L.verbose (fun fmt ->
-                      fmt "EXACT: ERROR: hidden expression in state: %a" Expr.pp
-                        non_hidable_expr)
-                in
-                Error non_hidable_expr))
-      (Ok ()) states
 end

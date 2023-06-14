@@ -109,6 +109,7 @@ module type S = sig
         branching : int;
         state : state_t;
         branch_case : BranchCase.t option;
+        proc_name : string;
       }
       [@@deriving yojson]
     end

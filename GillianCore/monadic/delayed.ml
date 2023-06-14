@@ -87,11 +87,23 @@ let map x f ~curr_pc =
       { b with value = f b.value })
     (x ~curr_pc)
 
-let reduce e ~curr_pc =
-  [ Branch.make ~pc:curr_pc ~value:(FOSolver.reduce_expr ~pc:curr_pc e) ]
+let delayed_eval f x ~curr_pc =
+  [ Branch.make ~pc:curr_pc ~value:(f ~pc:curr_pc x) ]
 
-let resolve_loc l ~curr_pc =
-  [ Branch.make ~pc:curr_pc ~value:(FOSolver.resolve_loc_name ~pc:curr_pc l) ]
+let delayed_eval2 f x y ~curr_pc =
+  [ Branch.make ~pc:curr_pc ~value:(f ~pc:curr_pc x y) ]
+
+let reduce = delayed_eval FOSolver.reduce_expr
+let resolve_loc = delayed_eval FOSolver.resolve_loc_name
+
+let entails =
+  let entails ~pc lhs rhs =
+    let temp_pc = Pc.extend pc lhs in
+    FOSolver.check_entailment ~pc:temp_pc rhs
+  in
+  delayed_eval2 entails
+
+let check_sat = delayed_eval FOSolver.sat
 
 module Syntax = struct
   let ( let* ) = bind

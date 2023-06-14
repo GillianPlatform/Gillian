@@ -47,8 +47,8 @@ module Make (Debugger : Debugger.S) = struct
         send_stopped_events stop_reason);
     DL.set_rpc_command_handler rpc ~name:"Jump"
       (module Jump_command)
-      (fun { proc_name; id } ->
-        match dbg |> Debugger.jump_to_id proc_name id with
+      (fun { id } ->
+        match dbg |> Debugger.jump_to_id id with
         | Error e ->
             Lwt.return
               (Jump_command.Result.make ~success:false ~err:(Some e) ())
@@ -57,8 +57,8 @@ module Make (Debugger : Debugger.S) = struct
             Lwt.return (Jump_command.Result.make ~success:true ()));
     DL.set_rpc_command_handler rpc ~name:"Step specific"
       (module Step_specific_command)
-      (fun { proc_name; prev_id; branch_case } ->
-        match dbg |> Debugger.step_specific proc_name branch_case prev_id with
+      (fun { prev_id; branch_case } ->
+        match dbg |> Debugger.step_specific branch_case prev_id with
         | Error e ->
             Lwt.return
               (Step_specific_command.Result.make ~success:false ~err:(Some e) ())

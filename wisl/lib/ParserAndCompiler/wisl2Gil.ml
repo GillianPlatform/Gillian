@@ -902,7 +902,7 @@ let compile_pred filepath pred =
   let pred_params = List.map getGILTypes paramsWISLType in
   let build_def pred_def =
     let _, casrt = compile_lassert pred_def in
-    (None, casrt, [])
+    (None, casrt)
   in
   Pred.
     {
@@ -1074,7 +1074,6 @@ let compile_lemma
             lemma_hyp;
             lemma_concs = [ post ];
             lemma_spec_variant = lemma_variant;
-            lemma_spec_hides = None;
           };
         ];
       lemma_existentials;

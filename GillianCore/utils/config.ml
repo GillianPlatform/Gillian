@@ -4,6 +4,8 @@
 
 (** {2 Global config} *)
 
+let under_approximation = ref false
+
 let results_dir, set_result_dir =
   let rd = ref ".gillian" in
   ((fun () -> !rd), fun r -> rd := r)
@@ -88,7 +90,6 @@ let set_runtime_paths, get_runtime_paths =
 
 (** @canonical Gillian.Utils.Config.Verification *)
 module Verification = struct
-  let exact = ref false
   let procs_to_verify = ref ([] : string list)
   let lemmas_to_verify = ref ([] : string list)
   let verify_only_some_of_the_things = ref false

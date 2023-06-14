@@ -301,7 +301,7 @@ let gen_pred_of_struct cenv ann struct_name =
         pred_abstract = false;
         pred_nounfold = false;
         pred_normalised = false;
-        pred_definitions = [ (None, def, []) ];
+        pred_definitions = [ (None, def) ];
       }
   in
   { ann with preds = n_pred :: ann.preds }
@@ -744,10 +744,10 @@ let trans_pred ~ann ~filepath cl_pred =
     List.map
       (fun (d, a) ->
         match d with
-        | None -> (None, trans_asrt ~fname:pred_name ~ann a, [])
+        | None -> (None, trans_asrt ~fname:pred_name ~ann a)
         | Some da ->
             let ada, gda = trans_asrt_annot da in
-            (Some gda, ada ** trans_asrt ~fname:pred_name ~ann a, []))
+            (Some gda, ada ** trans_asrt ~fname:pred_name ~ann a))
       definitions
   in
   Pred.
@@ -815,15 +815,7 @@ let trans_lemma ~ann ~filepath lemma =
   in
   (* TODO: Bring in variant and OX *)
   let lemma_specs =
-    [
-      Lemma.
-        {
-          lemma_hyp;
-          lemma_concs;
-          lemma_spec_variant = None;
-          lemma_spec_hides = None;
-        };
-    ]
+    [ Lemma.{ lemma_hyp; lemma_concs; lemma_spec_variant = None } ]
   in
   Lemma.
     {

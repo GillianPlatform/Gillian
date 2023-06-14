@@ -275,10 +275,6 @@ module Make
     let state, preds, _, _ = astate in
     SS.union (State.get_lvars state) (Preds.get_lvars preds)
 
-  let get_lvars_for_exact (astate : t) : Var.Set.t =
-    let state, preds, _, _ = astate in
-    SS.union (State.get_lvars_for_exact state) (Preds.get_lvars preds)
-
   let to_assertions ?(to_keep : SS.t option) (astate : t) : Asrt.t list =
     let state, preds, _, _ = astate in
     let s_asrts = State.to_assertions ?to_keep state in
@@ -353,91 +349,39 @@ module Make
 
     match SUnifier.unify astate' subst up FunctionCall with
     | Ok rets ->
-        let acceptable =
-          match !Config.Verification.exact with
-          | false -> true
-          | true ->
-              let check_variant (state : t) (subst : st) =
-                let bstate, _, _, variants = state in
-                let variant = Hashtbl.find_opt variants name in
-                match variant with
-                | None -> true
-                | Some None ->
-                    (* FIXME: This should be an error *)
-                    failwith
-                      ("Error: " ^ name
-                     ^ ": Recursive call in exact verification without a \
-                        variant")
-                | Some (Some variant) -> (
-                    let new_variant = ESubst.subst_in_expr_opt subst variant in
-                    let () =
-                      L.verbose (fun fmt ->
-                          fmt "New variant: %a" (Fmt.Dump.option Expr.pp)
-                            new_variant)
-                    in
-                    match new_variant with
-                    | None ->
-                        failwith
-                          ("ERROR: " ^ name
-                         ^ ": recursive call variant substitution failure")
-                    | Some new_variant -> (
-                        let variant_check =
-                          Expr.UnOp
-                            (UnOp.UNot, BinOp (new_variant, ILessThan, variant))
-                        in
-                        let variant_check = Val.from_expr variant_check in
-                        match variant_check with
-                        | None ->
-                            failwith
-                              ("ERROR: " ^ name
-                             ^ ": variant could not be converted to a value")
-                        | Some variant_check ->
-                            not (State.sat_check bstate variant_check)))
-              in
-              List.for_all
-                (fun (state, subst, _) -> check_variant state subst)
-                rets
-        in
-        if acceptable then
-          Ok
-            ((* Successful Unification *)
-             let ( let++ ) x f = List.concat_map f x in
-             let++ frame_state, subst, posts = rets in
-             let fl, posts =
-               match posts with
-               | Some (fl, posts) -> (fl, posts)
-               | _ ->
-                   let msg =
-                     Printf.sprintf
-                       "SYNTAX ERROR: Spec of %s does not have a postcondition"
-                       name
-                   in
-                   L.normal (fun m -> m "%s" msg);
-                   raise (Failure msg)
-             in
-             (* OK FOR DELAY ENTAILMENT *)
-             let++ final_state =
-               SUnifier.produce_posts frame_state subst posts
-             in
-             let final_store = get_store final_state in
-             let v_ret = Store.get final_store Names.return_variable in
-             let final_state = set_store final_state (Store.copy old_store) in
-             let v_ret =
-               Option.value
-                 ~default:(Option.get (Val.from_expr (Lit Undefined)))
-                 v_ret
-             in
-             let final_state = update_store final_state x v_ret in
-             let _, final_states = simplify ~unification:true final_state in
-             List.map
-               (fun final_state ->
-                 ( snd (Option.get (SUnifier.unfold_concrete_preds final_state)),
-                   fl ))
-               final_states)
-        else
-          (* FIXME: Cannot pass an appropriate error for the moment *)
-          let err = [] in
-          Error err
+        Ok
+          ((* Successful Unification *)
+           let ( let++ ) x f = List.concat_map f x in
+           let++ frame_state, subst, posts = rets in
+           let fl, posts =
+             match posts with
+             | Some (fl, posts) -> (fl, posts)
+             | _ ->
+                 let msg =
+                   Printf.sprintf
+                     "SYNTAX ERROR: Spec of %s does not have a postcondition"
+                     name
+                 in
+                 L.normal (fun m -> m "%s" msg);
+                 raise (Failure msg)
+           in
+           (* OK FOR DELAY ENTAILMENT *)
+           let++ final_state = SUnifier.produce_posts frame_state subst posts in
+           let final_store = get_store final_state in
+           let v_ret = Store.get final_store Names.return_variable in
+           let final_state = set_store final_state (Store.copy old_store) in
+           let v_ret =
+             Option.value
+               ~default:(Option.get (Val.from_expr (Lit Undefined)))
+               v_ret
+           in
+           let final_state = update_store final_state x v_ret in
+           let _, final_states = simplify ~unification:true final_state in
+           List.map
+             (fun final_state ->
+               ( snd (Option.get (SUnifier.unfold_concrete_preds final_state)),
+                 fl ))
+             final_states)
     | Error errs ->
         let msg =
           Fmt.str
@@ -533,7 +477,7 @@ module Make
     in
     let up =
       (* FIXME: UNDERSTAND IF THE OX SHOULD BE [] *)
-      UP.init known_unifiables Expr.Set.empty pred_ins [ (a, (None, None, [])) ]
+      UP.init known_unifiables Expr.Set.empty pred_ins [ (a, (None, None)) ]
     in
     (* This will not do anything in the original pass,
        but will do precisely what is needed in the re-establishment *)
@@ -879,7 +823,7 @@ module Make
 
               let up =
                 UP.init known_unifiables Expr.Set.empty pred_ins
-                  [ (a, (None, None, [])) ]
+                  [ (a, (None, None)) ]
               in
               let vars_to_forget = SS.inter state_lvars (SS.of_list binders) in
               if vars_to_forget <> SS.empty then (
@@ -1136,7 +1080,7 @@ module Make
     SUnifier.produce astate subst a
 
   let unify_assertion (astate : t) (subst : st) (step : UP.step) : u_res =
-    match SUnifier.unify_assertion astate subst None step with
+    match SUnifier.unify_assertion astate subst step with
     | UWTF -> UWTF
     | USucc astate' -> USucc astate'
     | UFail errs -> UFail errs
@@ -1237,9 +1181,6 @@ module Make
   let get_pfs pstate =
     let state, _, _, _ = pstate in
     State.get_pfs state
-
-  let hides ~is_post:_ ~used_unifiables:_ ~exprs_to_hide:_ _ =
-    failwith "Check for hidden variables only available from symbolic states."
 
   let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
     (* TODO: Deserialize other components of pstate *)

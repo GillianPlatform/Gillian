@@ -106,7 +106,7 @@ function readElements(elementCount, fieldsPerElement, buffer, readPos) {
     /* @tactic
         unfold Elements(#definition, #view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength);
         if (#definition = "Complete") then {
-            unfold CElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) [bind: (#element := #fList) and (#eLength := #eLength)]
+            unfold CElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) [bind: (#fList := #element) and (#eLength := #eLength)]
         } else {
             unfold IElements(#view, #outerLoopReadPos, #eLeft, #fCount, #remElsList, #remElsLength) [bind: (#fList := #fList) and (#eLength := #eLength)]
         } */
@@ -376,7 +376,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
             unfold ArrayStructure(#elements, #pairsCount);
             unfold UniqueOrDuplicated(#definition, #rProps, {{ }}, #rProps);
             unfold UniqueOrDuplicated(#definition, #leftRProps, #doneRProps, #leftRProps);
-            unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count) [bind: (#elementContents := #ECK) and (#rest := #rest_left)];
+            unfold ArrayOfArraysOfUInt8ArraysContents(#elements, #left, #count, #pairsCount - #count) [bind: (#ECK := #elementContents) and (#rest_left := #rest)];
             apply CElementsElementLength(#EC, 2., ((256. * #b0) + #b1), 2., #ECKs, #done, #ECK, #rest_left);
             assert (#ECK == {{ #new_prop, #new_value }})
     */
@@ -391,7 +391,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
         @tactic
             assert (toUtf8(#new_prop, #utf8NProp)) [bind: #utf8NProp];
             assert (toUtf8(#new_value, #utf8NVal)) [bind: #utf8NVal];
-            unfold ObjectTable(#dECObj, #utf8Done) [bind: (#pList := #doneProps) and (#pSet := #donePropsSet)];
+            unfold ObjectTable(#dECObj, #utf8Done) [bind: (#doneProps := #pList) and (#donePropsSet := #pSet)];
             apply FirstProjConcatSplit(#ECKs, #done, #left);
             apply ProduceListToSet(#doneRProps); apply ProduceListToSet(#leftRProps);
             assert (ListToSet(#doneRProps, #doneRPropsSet)) [bind: #doneRPropsSet];
@@ -404,7 +404,7 @@ function decodeEncryptionContext(encodedEncryptionContext) {
                 apply ObjectTableAbsentProperty(#dECObj, #utf8Done, #utf8NProp)
             } else {
                 apply FirstProjToUtf8MapPairCompat(#done);
-                unfold Duplicated(#doneRProps, #leftRProps) [bind: (#preSet := #doneRPropsSet2)];
+                unfold Duplicated(#doneRProps, #leftRProps) [bind: (#doneRPropsSet2 := #preSet)];
                 apply ListToSetFunction(#doneRProps, #doneRPropsSet, #doneRProps, #doneRPropsSet2);
                 if (#new_prop -e- #doneRPropsSet) then {
                     apply InListToUtf8(#new_prop, #doneRProps);

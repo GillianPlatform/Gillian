@@ -205,21 +205,21 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
         GILLIAN(
             "if (#elementsDef = `Complete`) {"
             "  unfold CElements(#buffer_content, 2 + #consumedLength, #togo, 2, #restElements, #restLength)"
-            "    [[bind #element: #kvPair, #eLength: #this_length, #restElements: #newRestElements, #restLength: #newRestEsLength]];"
+            "    [[bind #kvPair: #element, #this_length: #eLength, #newRestElements: #restElements, #newRestEsLength: #restLength]];"
             "  assert [[bind #this_key, #this_value]] (#kvPair == [#this_key, #this_value]);"
             "  unfold CElement(#buffer_content, 2 + #consumedLength, 2, [#this_key, #this_value], #this_length)"
-            "    [[bind #fLength: #key_length, #restLength: #value_length]]"
+            "    [[bind #key_length: #fLength, #value_length: #restLength]]"
             "} else {"
             "  unfold IElements(#buffer_content, 2 + #consumedLength, #togo, 2, #restElements, #restLength) "
-            "    [[bind #fList: #maybePartialKvPair]];"
+            "    [[bind #maybePartialKvPair: #fList]];"
             "  if (#restElements = []) {"
             "    unfold IElement(#buffer_content, 2 + #consumedLength, 2, #maybePartialKvPair, #this_length)"
-            "      [[bind #fLength: #key_length]];"
+            "      [[bind #key_length: #fLength]];"
             "    branch #consumedLength == 0"
             "  } else {"
             "    assert [[bind #this_key, #this_value]] (#maybePartialKvPair == [#this_key, #this_value]);"
             "    unfold CElement(#buffer_content, 2 + #consumedLength, 2, [#this_key, #this_value], #this_length) "
-            "      [[bind #fLength: #key_length, #restLength: #value_length]]"
+            "      [[bind #key_length: #fLength, #value_length: #restLength]]"
             "  }"
             "}");
 
@@ -266,7 +266,7 @@ int aws_cryptosdk_enc_ctx_deserialize(struct aws_allocator *alloc,
         GILLIAN("apply ProduceListToSet(#consumedUtf8Keys)");
         GILLIAN(
             "if (#errorMessage = `decodeEncryptionContext: Duplicate encryption context key value.`) { \
-                unfold Duplicated(#consumedKeys, #restKeys) [[bind #preSet: #consumedKeySetAlias]]; \
+                unfold Duplicated(#consumedKeys, #restKeys) [[bind #consumedKeySetAlias: #preSet]]; \
                 apply ListToSetFunction(#consumedKeys, #consumedKeySet, #consumedKeys, #consumedKeySetAlias) \
             } else { \
                 apply ProduceListToSet(#restKeys); \

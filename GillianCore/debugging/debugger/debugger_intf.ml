@@ -12,16 +12,12 @@ module type S = sig
   end
 
   val launch : string -> string option -> (debug_state, string) result
-
-  val jump_to_id :
-    string -> Logging.Report_id.t -> debug_state -> (unit, string) result
-
+  val jump_to_id : Logging.Report_id.t -> debug_state -> (unit, string) result
   val jump_to_start : debug_state -> unit
   val step_in : ?reverse:bool -> debug_state -> stop_reason
   val step : ?reverse:bool -> debug_state -> stop_reason
 
   val step_specific :
-    string ->
     Exec_map.Packaged.branch_case option ->
     Logging.Report_id.t ->
     debug_state ->
