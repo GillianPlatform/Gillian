@@ -943,19 +943,19 @@ let execute_action ~action_name heap params =
     | AMem SetSingle -> execute_set_single heap params |> filter_errors
     | AMem RemSingle -> execute_rem_single heap params
     | AMem GetArray -> execute_get_array heap params
-    | AMem SetArray -> execute_set_array heap params
+    | AMem SetArray -> execute_set_array heap params |> filter_errors
     | AMem RemArray -> execute_rem_array heap params
     | AMem GetBounds -> execute_get_bounds heap params
-    | AMem SetBounds -> execute_set_bounds heap params
+    | AMem SetBounds -> execute_set_bounds heap params |> filter_errors
     | AMem RemBounds -> execute_rem_bounds heap params
     | AMem GetHole -> execute_get_hole heap params
-    | AMem SetHole -> execute_set_hole heap params
+    | AMem SetHole -> execute_set_hole heap params |> filter_errors
     | AMem RemHole -> execute_rem_hole heap params
     | AMem GetZeros -> execute_get_zeros heap params
-    | AMem SetZeros -> execute_set_zeros heap params
+    | AMem SetZeros -> execute_set_zeros heap params |> filter_errors
     | AMem RemZeros -> execute_rem_zeros heap params
     | AMem GetFreed -> execute_get_freed heap params
-    | AMem SetFreed -> execute_set_freed heap params
+    | AMem SetFreed -> execute_set_freed heap params |> filter_errors
     | AMem RemFreed -> execute_rem_freed heap params
     | AGEnv GetDef -> execute_genvgetdef heap params
   in

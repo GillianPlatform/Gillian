@@ -59,19 +59,10 @@ struct
         None
 
   let assume ?(unfold = false) (bi_state : t) (v : vt) : t list =
+    let open Syntaxes.List in
     let procs, state, state_af = bi_state in
-    let v_not = Val.from_expr (Expr.UnOp (UNot, Val.to_expr v)) in
-    let bi_abduce =
-      Option.fold ~some:(fun v -> State.sat_check state v) ~none:true v_not
-    in
-    List.map
-      (fun state' ->
-        if bi_abduce then
-          match State.assume ~unfold state_af v with
-          | [ state_af' ] -> (procs, state', state_af')
-          | _ -> raise (Failure "DEATH. ASSUME BI-ABDUCTION")
-        else (procs, state', state_af))
-      (State.assume ~unfold state v)
+    let+ state' = State.assume ~unfold state v in
+    (procs, state', state_af)
 
   let assume_a
       ?(unification = false)

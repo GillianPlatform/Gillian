@@ -231,21 +231,22 @@ module Make (SMemory : SMemory.S) :
     L.verbose (fun fmt -> fmt "Assuming expression: %a" Expr.pp v);
     let _, _, pfs, gamma, _ = state in
     let result =
-      if v = Lit (Bool true) then [ state ]
-      else if v = Lit (Bool false) then []
-      else
-        (* let t = time() in *)
-        let v_asrt =
-          match
-            Formula.lift_logic_expr (Reduction.reduce_lexpr ~pfs ~gamma v)
-          with
-          | Some (v_asrt, _) -> v_asrt
-          | _ -> False
-        in
-        if v_asrt = False then []
-        else (
-          PFS.extend pfs v_asrt;
-          [ state ])
+      match v with
+      | Lit (Bool true) -> [ state ]
+      | Lit (Bool false) -> [ state ]
+      | _ ->
+          (* let t = time() in *)
+          let v_asrt =
+            match
+              Formula.lift_logic_expr (Reduction.reduce_lexpr ~pfs ~gamma v)
+            with
+            | Some (v_asrt, _) -> v_asrt
+            | _ -> False
+          in
+          if v_asrt = False then []
+          else (
+            PFS.extend pfs v_asrt;
+            [ state ])
     in
     result
 

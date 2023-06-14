@@ -20,13 +20,7 @@ let copy { pfs; gamma; learned; learned_types; unification } =
     unification;
   }
 
-let make
-    ~pfs
-    ~gamma
-    ?(unification = false)
-    ?(learned = [])
-    ?(learned_types = [])
-    () =
+let make ~pfs ~gamma ~unification ?(learned = []) ?(learned_types = []) () =
   {
     pfs;
     gamma;
@@ -114,3 +108,15 @@ let pp =
 let diff pca pcb =
   ( Formula.Set.diff pca.learned pcb.learned,
     Formula.Set.diff pcb.learned pca.learned )
+
+let of_gpc (gpc : Engine.Gpc.t) =
+  let Engine.Gpc.{ pfs; gamma; unification } = gpc in
+  make ~pfs ~gamma ~unification ()
+
+let to_gpc (pc : t) =
+  let { pfs; gamma; unification; learned; learned_types } = pc in
+  let pfs = Pure_context.copy pfs in
+  let gamma = Type_env.copy gamma in
+  Formula.Set.iter (Pure_context.extend pfs) learned;
+  List.iter (fun (x, y) -> Type_env.update gamma x y) learned_types;
+  Engine.Gpc.{ pfs; gamma; unification }
