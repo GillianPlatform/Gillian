@@ -10,6 +10,22 @@ type t =
   | Mptr
 [@@deriving eq, yojson]
 
+(* Physical equality: values should be decoded the same way *)
+let phy_equal a b =
+  match (a, b) with
+  | Mint8signed, Mint8signed
+  | Mint8unsigned, Mint8unsigned
+  | Mint16signed, Mint16signed
+  | Mint16unsigned, Mint16unsigned
+  | Mint32, Mint32
+  | Mint64, Mint64
+  | Mfloat32, Mfloat32
+  | Mfloat64, Mfloat64
+  | Mptr, Mptr -> true
+  | Mint32, Mptr | Mptr, Mint32 -> not Compcert.Archi.ptr64
+  | Mint64, Mptr | Mptr, Mint64 -> Compcert.Archi.ptr64
+  | _ -> false
+
 let of_compcert : Compcert.AST.memory_chunk -> t = function
   | Mint8signed -> Mint8signed
   | Mint8unsigned -> Mint8unsigned
