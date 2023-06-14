@@ -611,7 +611,11 @@ module M = struct
   let prop_abduce_both_in_js = [ "hasOwnProperty" ]
 
   type fix_result =
-    c_fix_t list * Formula.t list * Containers.SS.t * GAsrt.t list
+    c_fix_t list
+    * Formula.t list
+    * (string * Type.t) list
+    * Containers.SS.t
+    * GAsrt.t list
 
   let complete_fix_js (pfs : PFS.t) (gamma : Type_env.t) (i_fix : i_fix_t) :
       fix_result list =
@@ -620,10 +624,10 @@ module M = struct
         (* Get a fresh location *)
         let loc_name, _, new_pfs = fresh_loc ~loc:v pfs gamma in
         (* TODO: If the initial value denoting the location was a variable, we may need to save it as a spec var *)
-        [ ([ CFLoc loc_name ], new_pfs, Containers.SS.empty, []) ]
+        [ ([ CFLoc loc_name ], new_pfs, [], Containers.SS.empty, []) ]
     | FCell (l, p) -> (
         let none_fix () =
-          ([ CFCell (l, p, Lit Nono) ], [], Containers.SS.empty, [])
+          ([ CFCell (l, p, Lit Nono) ], [], [], Containers.SS.empty, [])
         in
 
         let some_fix () =
@@ -646,6 +650,7 @@ module M = struct
           in
           ( [ CFCell (l, p, descriptor) ],
             [ asrt_empty; asrt_none; asrt_list ],
+            [],
             Containers.SS.singleton vvar,
             [] )
         in
@@ -671,10 +676,11 @@ module M = struct
                   Lit (Loc JS2JSIL_Helpers.locObjPrototype) );
             ],
             [],
+            [],
             Containers.SS.empty,
             [] );
         ]
-    | FPure f -> [ ([], [ f ], Containers.SS.empty, []) ]
+    | FPure f -> [ ([], [ f ], [], Containers.SS.empty, []) ]
 
   (* Fix completion: simple *)
   let complete_fix_jsil (pfs : PFS.t) (gamma : Type_env.t) (i_fix : i_fix_t) :
@@ -684,7 +690,7 @@ module M = struct
         (* Get a fresh location *)
         let loc_name, _, new_pfs = fresh_loc ~loc:v pfs gamma in
         (* TODO: If the initial value denoting the location was a variable, we may need to save it as a spec var *)
-        [ ([ CFLoc loc_name ], new_pfs, Containers.SS.empty, []) ]
+        [ ([ CFLoc loc_name ], new_pfs, [], Containers.SS.empty, []) ]
     | FCell (l, p) ->
         (* Fresh variable to denote the property value *)
         let vvar = LVar.alloc () in
@@ -692,7 +698,11 @@ module M = struct
         (* Value is not none - we always bi-abduce presence *)
         let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
         [
-          ([ CFCell (l, p, v) ], [ not_none ], Containers.SS.singleton vvar, []);
+          ( [ CFCell (l, p, v) ],
+            [ not_none ],
+            [],
+            Containers.SS.singleton vvar,
+            [] );
         ]
     | FMetadata l ->
         (* Fresh variable to denote the property value *)
@@ -700,23 +710,30 @@ module M = struct
         let v : vt = LVar vvar in
         let not_none : Formula.t = Not (Eq (v, Lit Nono)) in
         [
-          ([ CFMetadata (l, v) ], [ not_none ], Containers.SS.singleton vvar, []);
+          ( [ CFMetadata (l, v) ],
+            [ not_none ],
+            [],
+            Containers.SS.singleton vvar,
+            [] );
         ]
-    | FPure f -> [ ([], [ f ], Containers.SS.empty, []) ]
+    | FPure f -> [ ([], [ f ], [], Containers.SS.empty, []) ]
 
   (* An error can have multiple fixes *)
   let get_fixes (_ : t) (pfs : PFS.t) (gamma : Type_env.t) (err : err_t) :
       fix_result list =
     let pp_fix_result ft res =
       let open Fmt in
-      let fixes, pfs, svars, gasrts = res in
+      let fixes, pfs, tys, svars, gasrts = res in
       pf ft
         "@[<v 2>@[<h>[[ %a ]]@]@\n\
          @[<h>with PFS:%a@]@\n\
+         @[<h>with Types:%a@]@\n\
          @[<h>spec vars: %a@]@\n\
          @[<h>predicates: %a@]@]" (list ~sep:comma pp_c_fix) fixes
         (list ~sep:comma Formula.pp)
         pfs
+        (list ~sep:comma (pair ~sep:Fmt.(any ": ") string Type.pp))
+        tys
         (iter ~sep:comma Containers.SS.iter string)
         svars (list ~sep:comma GAsrt.pp) gasrts
     in
@@ -739,13 +756,15 @@ module M = struct
         List.map
           (fun fixes ->
             List.fold_right
-              (fun (mfix, pfs, svars, gasrts) (mfix', pfs', svars', gasrts') ->
+              (fun (mfix, pfs, tys, svars, gasrts)
+                   (mfix', pfs', tys', svars', gasrts') ->
                 ( mfix @ mfix',
                   pfs @ pfs',
+                  tys @ tys',
                   Containers.SS.union svars svars',
                   gasrts @ gasrts' ))
               fixes
-              ([], [], Containers.SS.empty, []))
+              ([], [], [], Containers.SS.empty, []))
           completed_ifixes
       in
 

@@ -30,7 +30,9 @@ type mem_ac =
 
 type genv_ac = GetDef
 type ac = AGEnv of genv_ac | AMem of mem_ac
+
 type ga = Single | Array | Hole | Zeros | Bounds | Freed
+[@@deriving yojson, show]
 
 (* Some things about the semantics of these Actions *)
 

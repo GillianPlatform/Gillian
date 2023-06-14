@@ -78,6 +78,11 @@ module Make
           Fmt.(list ~sep:comma string)
           params SPState.pp state_af SPState.pp state_f);
 
+    (* Drop all pvars except ret/err from state *)
+    let () =
+      SStore.filter (SPState.get_store state_f) (fun x v ->
+          if x = Names.return_variable then Some v else None)
+    in
     let post, spost =
       (* FIXME: NOT WORKING DUE TO SIMPLIFICATION TYPE CHANGING *)
       let _ = SPState.simplify ~kill_new_lvars:true state_f in
@@ -208,6 +213,7 @@ module Make
       (prog : annot UP.prog)
       (test : t) : (Spec.t * bool) list =
     let state = SBAState.copy test.state in
+    let state = SBAState.add_spec_vars state (SBAState.get_lvars state) in
     try SBAInterpreter.evaluate_proc ret_fun prog test.name test.params state
     with Failure msg ->
       L.print_to_all
@@ -240,11 +246,14 @@ module Make
         (sspec, true)
 
   let run_tests (prog : annot UP.prog) (tests : t list) =
-    let rec run_tests_aux tests succ_specs bug_specs =
+    let num_tests = List.length tests in
+    Fmt.pr "Running tests on %d procs.\n@?" num_tests;
+    let rec run_tests_aux tests succ_specs bug_specs i =
       match tests with
       | [] -> (succ_specs, bug_specs)
       | test :: rest ->
           L.verbose (fun m -> m "Running bi-abduction on %s\n" test.name);
+          Fmt.pr "Testing %s... @?" test.name;
           let rets =
             run_test
               (process_sym_exec_result prog test.name test.params test.state)
@@ -253,9 +262,13 @@ module Make
           let cur_succ_specs, cur_bug_specs = List.partition snd rets in
           let new_succ_specs = succ_specs @ List.map fst cur_succ_specs in
           let new_bug_specs = bug_specs @ List.map fst cur_bug_specs in
-          run_tests_aux rest new_succ_specs new_bug_specs
+          Fmt.pr "%dS %dB (%d/%d)\n@?"
+            (List.length cur_succ_specs)
+            (List.length cur_bug_specs)
+            i num_tests;
+          run_tests_aux rest new_succ_specs new_bug_specs (i + 1)
     in
-    run_tests_aux tests [] []
+    run_tests_aux tests [] [] 1
 
   let get_test_results
       (prog : annot UP.prog)

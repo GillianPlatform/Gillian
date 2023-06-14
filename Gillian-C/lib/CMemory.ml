@@ -28,10 +28,12 @@ let execute_store heap params =
   match params with
   | [ String chunk_name; Loc loc; Int ofs; value ] -> (
       let compcert_val = ValueTranslation.compcert_of_gil value in
-      let chunk = ValueTranslation.chunk_of_string chunk_name in
+      let compcert_chunk =
+        Chunk.to_compcert (ValueTranslation.chunk_of_string chunk_name)
+      in
       let block = ValueTranslation.block_of_loc_name loc in
       let z_ofs = Compcert.Camlcoq.Z.of_sint (Z.to_int ofs) in
-      let res = Mem.store chunk heap.mem block z_ofs compcert_val in
+      let res = Mem.store compcert_chunk heap.mem block z_ofs compcert_val in
       match res with
       | Some mem -> Ok ({ heap with mem }, [])
       | None -> Error ())
@@ -40,7 +42,9 @@ let execute_store heap params =
 let execute_load heap params =
   match params with
   | [ Literal.String chunk_name; Loc loc_name; Int offset ] -> (
-      let compcert_chunk = ValueTranslation.chunk_of_string chunk_name in
+      let compcert_chunk =
+        Chunk.to_compcert (ValueTranslation.chunk_of_string chunk_name)
+      in
       let z_offset = ValueTranslation.z_of_int offset in
       let block = ValueTranslation.block_of_loc_name loc_name in
       let res = Mem.load compcert_chunk heap.mem block z_offset in

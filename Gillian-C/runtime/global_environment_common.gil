@@ -123,11 +123,10 @@ proc i__chunk_and_value_of_num_init_data(init_data) {
 };
 
 proc i__store_init_addrof(sym, o_to_store, b, ofs) {
-  chk := "i__ptr_chunk"();
   ll := [genv_getsymbol](sym);
   l := l-nth(ll, 1i);
   ptr := {{ l, o_to_store }};
-  u := [mem_store](chk, b, ofs, ptr);
+  u := [mem_store]("ptr", b, ofs, ptr);
   ret := null;
   return
 };

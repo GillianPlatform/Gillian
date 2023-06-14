@@ -277,7 +277,19 @@ struct
                 L.(verbose (fun m -> m "CAN FIX!!!"));
                 L.verbose (fun m ->
                     m "@[<v 2>My state is:@\n%a@]" State.pp state);
-                let ffixes = List.map (State.get_fixes state) errs in
+                let ffixes =
+                  List.filter_map
+                    (fun err ->
+                      match State.get_fixes state err with
+                      | [] -> None
+                      | fixes -> Some fixes)
+                    errs
+                in
+                let ffixes = List.concat ffixes in
+                L.verbose (fun m ->
+                    m "Fixes:\n%a\n"
+                      (Fmt.Dump.list @@ Fmt.Dump.list @@ State.pp_fix)
+                      ffixes);
                 let fixed_states =
                   List.map
                     (fun new_fixes ->
@@ -315,7 +327,7 @@ struct
                           let subst_in_place =
                             State.substitution_in_place new_subst state_af'
                           in
-                          assert (subst_in_place = []);
+                          assert (List.length subst_in_place = 1);
 
                           L.(
                             verbose (fun m ->
@@ -481,7 +493,7 @@ struct
 
   (* to throw errors: *)
 
-  let get_fixes (_ : t) (_ : err_t) : fix_t list =
+  let get_fixes (_ : t) (_ : err_t) : fix_t list list =
     raise (Failure "get_fixes not implemented in MakeBiState")
 
   let apply_fixes (_ : t) (_ : fix_t list) : t option * Asrt.t list =
@@ -520,15 +532,18 @@ struct
     | Ok (st, outs) -> [ Ok ((procs, st, state_af), outs) ]
     | Error err when not (State.can_fix err) -> [ Error err ]
     | Error err -> (
-        let fix = State.get_fixes state err in
-        let state' = State.copy state in
-        let state_af' = State.copy state_af in
-        let state', _ = State.apply_fixes state' fix in
-        let state_af', _ = State.apply_fixes state_af' fix in
-        match (state', state_af') with
-        | Some state', Some state_af' ->
-            execute_action action (procs, state', state_af') args
-        | _ -> (* If we fail to fix, we give up *) [])
+        match State.get_fixes state err with
+        | [] -> [] (* No fix, we stop *)
+        | fixes -> (
+            let* fix = fixes in
+            let state' = State.copy state in
+            let state_af' = State.copy state_af in
+            let state', _ = State.apply_fixes state' fix in
+            let state_af', _ = State.apply_fixes state_af' fix in
+            match (state', state_af') with
+            | Some state', Some state_af' ->
+                execute_action action (procs, state', state_af') args
+            | _ -> (* If we fail to fix, we give up *) []))
 
   let get_equal_values bi_state =
     let _, state, _ = bi_state in

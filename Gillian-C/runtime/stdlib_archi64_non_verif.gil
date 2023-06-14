@@ -1,3 +1,5 @@
+#internal
+
 proc i__calloc(vnelem, velsiz) {
       nelem := "i__alloc_size"(vnelem);
       elsiz := "i__alloc_size"(velsiz);

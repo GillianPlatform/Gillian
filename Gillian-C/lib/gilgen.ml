@@ -130,18 +130,152 @@ let trans_binop_expr ~fname binop te1 te2 =
   | Omulfs -> call BinOp_Functions.mulfs
   | _ -> failwith "Unhandled"
 
-let rec trans_expr ~fname ~local_env expr =
-  let trans_expr = trans_expr ~fname ~local_env in
+let get_typ_from_id clight_prog fid id =
+  let open Clight in
+  let clight_fun = Gil_logic_gen.get_clight_fun clight_prog fid in
+  let all_vars =
+    clight_fun.fn_params @ clight_fun.fn_vars @ clight_fun.fn_temps
+  in
+  match
+    List.find_map
+      (fun (var_id, var_typ) ->
+        if Camlcoq.P.eq id var_id then Some var_typ else None)
+      all_vars
+  with
+  | Some t -> t
+  | None -> (
+      (* This is not a local variable, we're going to look at global variables *)
+      match
+        List.find_map
+          (fun (var_id, glob_def) ->
+            if Camlcoq.P.eq id var_id then
+              match glob_def with
+              | AST.Gfun _ -> failwith "Dereferecing a function????"
+              | Gvar v -> Some v.gvar_info
+            else None)
+          clight_prog.prog_defs
+      with
+      | Some t -> t
+      | None ->
+          Fmt.failwith
+            "Variable with ident %d(%s) was not found inside either Clight \
+             function or globals"
+            (Camlcoq.P.to_int id) (true_name id))
+
+(* Return type of a member within a struct using the struct member offset *)
+let get_struct_member_type
+    (clight_prog : Clight.coq_function Ctypes.program)
+    struct_id
+    member_offset =
+  let members_opt =
+    (* An optional list of the members of the struct *)
+    List.find_map
+      (fun (Ctypes.Composite (composite_def_id, _, m, _)) ->
+        if Camlcoq.P.eq struct_id composite_def_id then Some m else None)
+      clight_prog.prog_types
+  in
+  let members =
+    (* A list of the members of the struct *)
+    match members_opt with
+    | Some members -> members
+    | None -> failwith "Failed to get the members of the struct"
+  in
+  let fx m =
+    match m with
+    | Ctypes.Member_plain (member_id, member_typ) ->
+        let offset =
+          match
+            Ctypes.field_offset clight_prog.prog_comp_env member_id members
+          with
+          | Errors.OK (f, Full) -> f
+          | Errors.OK _ -> failwith "Unsupported bitfield members"
+          | Errors.Error e ->
+              failwith
+                (Format.asprintf "Invalid member offset : %a@?"
+                   Driveraux.print_error e)
+        in
+        if offset = member_offset then Some member_typ else None
+    | Ctypes.Member_bitfield _ -> None
+  in
+  List.find_map fx members
+
+let rec get_struct_id clight_prog fname fid expr =
+  match expr with
+  | Eaddrof id -> (
+      match get_typ_from_id clight_prog fid id with
+      | Tstruct (struct_id, _) -> struct_id
+      | Tpointer (Tstruct (struct_id, _), _) -> struct_id
+      | _ -> failwith "Wrong, type was something")
+  | Evar id -> (
+      match get_typ_from_id clight_prog fid id with
+      | Tpointer (Tstruct (struct_id, _), _) -> struct_id
+      (* Dereferencing a pointer to a pointer here *)
+      | Tpointer (Tpointer (Tstruct (struct_id, _), _), _) -> struct_id
+      | _ -> failwith "Wrong, type was something")
+  | Ebinop (_, expr', Econst (Ointconst ofs))
+  | Ebinop (_, expr', Econst (Olongconst ofs)) -> (
+      let struct_id = get_struct_id clight_prog fname fid expr' in
+      let member_typ_opt = get_struct_member_type clight_prog struct_id ofs in
+      match member_typ_opt with
+      (* Note: What's the significance of both cases below *)
+      | Some (Tpointer (Tstruct (struct_id, _), _)) -> struct_id
+      | Some (Tstruct (struct_id, _)) -> struct_id
+      | _ -> failwith "Didn't find a struct here")
+  (* Double check this case - it looks suspicious *)
+  | Eload (_memory_chunk, expr') ->
+      let struct_id = get_struct_id clight_prog fname fid expr' in
+      struct_id
+  | _ -> failwith "Unsupported expression passed to get_struct_id"
+
+(* Convert the compcert chunk to Gillian chunk by checking if Csm expression
+   evalutes to a pointer chunk *)
+let to_gil_chunk_h clight_prog fname fid compcert_chunk expp =
+  match expp with
+  | Eaddrof id -> (
+      match get_typ_from_id clight_prog fid id with
+      | Tpointer _ -> Chunk.Mptr
+      | _ -> if Compcert.Archi.ptr64 then Chunk.Mint64 else Chunk.Mint32)
+  | Evar id -> (
+      match get_typ_from_id clight_prog fid id with
+      | Tpointer (Tpointer _, _) -> Chunk.Mptr
+      | _ -> Chunk.of_compcert compcert_chunk)
+  | Ebinop (_, e, Econst (Ointconst ofs))
+  | Ebinop (_, e, Econst (Olongconst ofs)) -> (
+      let struct_id = get_struct_id clight_prog fname fid e in
+      let member_typ_opt = get_struct_member_type clight_prog struct_id ofs in
+      match member_typ_opt with
+      | Some member_typ -> (
+          match member_typ with
+          | Tpointer _ -> Chunk.Mptr
+          | _ -> Chunk.of_compcert compcert_chunk)
+      | None -> Chunk.Mptr)
+  | Ebinop (_, _e1, _e2) -> Chunk.of_compcert compcert_chunk
+  | _ -> failwith (Printf.sprintf "Unexpected expression")
+
+let to_gil_chunk clight_prog fname fid compcert_chunk expp =
+  match compcert_chunk with
+  (* Check whether chunk is a pointer - Mint64 or Mint32 can be pointer types *)
+  | Compcert.AST.Mint64 when Compcert.Archi.ptr64 ->
+      to_gil_chunk_h clight_prog fname fid compcert_chunk expp
+  | Compcert.AST.Mint32 when not Compcert.Archi.ptr64 ->
+      to_gil_chunk_h clight_prog fname fid compcert_chunk expp
+  | _ -> Chunk.of_compcert compcert_chunk
+
+let rec trans_expr ~clight_prog ~fname ~fid ~local_env expr =
+  let trans_expr = trans_expr ~clight_prog ~fname ~fid ~local_env in
   let trans_binop_expr = trans_binop_expr ~fname in
   let gen_str = Generators.gen_str ~fname in
   let open Expr in
   match expr with
   | Evar id -> ([], PVar (true_name id))
   | Econst const -> ([], Lit (trans_const const))
-  | Eload (chunk, expp) ->
+  | Eload (compcert_chunk, expp) ->
       let cl, e = trans_expr expp in
       let gvar = gen_str Prefix.gvar in
       let loadv = Expr.Lit (Literal.String Internal_Functions.loadv) in
+
+      let chunk = to_gil_chunk clight_prog fname fid compcert_chunk expp in
+
       let cmd =
         Cmd.Call (gvar, loadv, [ expr_of_chunk chunk; e ], None, None)
       in
@@ -240,11 +374,15 @@ let get_invariant () =
   last_invariant := None;
   i
 
-let rec trans_stmt ~fname ~context stmt =
-  let trans_stmt ?(context = context) = trans_stmt ~fname ~context in
+let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
+  let trans_stmt ?(context = context) =
+    trans_stmt ~clight_prog ~fname ~fid ~context
+  in
   let make_symb_gen = make_symb_gen ~fname in
   (* Default context is the given context *)
-  let trans_expr = trans_expr ~fname ~local_env:context.local_env in
+  let trans_expr =
+    trans_expr ~clight_prog ~fname ~fid ~local_env:context.local_env
+  in
   let gen_str = Generators.gen_str ~fname in
   match stmt with
   | Sskip -> [ (annot_ctx context, None, Cmd.Skip) ]
@@ -338,9 +476,10 @@ let rec trans_stmt ~fname ~context stmt =
   | Sgoto lab ->
       let gil_lab = trans_label lab in
       [ (annot_ctx context, None, Cmd.Goto gil_lab) ]
-  | Sstore (chunk, vaddr, v) ->
+  | Sstore (compcert_chunk, vaddr, v) ->
       let addr_eval_cmds, eaddr = trans_expr vaddr in
       let v_eval_cmds, ev = trans_expr v in
+      let chunk = to_gil_chunk clight_prog fname fid compcert_chunk vaddr in
       let chunk_string = ValueTranslation.string_of_chunk chunk in
       let chunk_expr = Expr.Lit (Literal.String chunk_string) in
       let annot_addr_eval = add_annots ~ctx:context addr_eval_cmds in
@@ -563,9 +702,11 @@ let alloc_var fname (name, sz) =
 let trans_function
     ?(gil_annot = Gil_logic_gen.empty)
     ?(exec_mode = Exec_mode.Verification)
+    ~clight_prog
     filepath
     fname
-    fdef =
+    fdef
+    fid =
   let { fn_sig = _; fn_params; fn_vars; fn_temps; fn_body } = fdef in
   (* Getting rid of the ids immediately *)
   let fn_vars = List.map (fun (id, sz) -> (true_name id, sz)) fn_vars in
@@ -596,7 +737,7 @@ let trans_function
       [ (empty_annot, None, Cmd.Call (gvar, expr_fn, [], None, None)) ]
     else []
   in
-  let body = trans_stmt ~fname ~context fn_body in
+  let body = trans_stmt ~clight_prog ~fname ~fid ~context fn_body in
   let body_with_registrations =
     init_genv @ register_vars @ register_temps @ body
   in
@@ -653,7 +794,11 @@ let set_global_var symbol v =
 let intern_impl_of_extern_function ext_f =
   let open AST in
   match ext_f with
-  | EF_malloc -> (CConstants.Internal_Functions.malloc, false)
+  | EF_malloc ->
+      ( (if !Config.alloc_can_fail then
+         CConstants.Internal_Functions.malloc_can_fail
+        else CConstants.Internal_Functions.malloc),
+        false )
   | EF_free -> (CConstants.Internal_Functions.free, false)
   | EF_memcpy _ -> (CConstants.Internal_Functions.memcpy, false)
   | EF_external ([ 'c'; 'a'; 'l'; 'l'; 'o'; 'c' ], _) ->
@@ -749,7 +894,8 @@ let rec trans_globdefs
       ( new_def :: genv_defs,
         init_acts,
         new_bi_specs,
-        trans_function ~gil_annot ~exec_mode filepath symbol f :: fs,
+        trans_function ~clight_prog ~gil_annot ~exec_mode filepath symbol f id
+        :: fs,
         new_syms )
   | (id, Gfun (External f)) :: r
     when (is_builtin_func (true_name id) && not_implemented f)
@@ -904,8 +1050,6 @@ let trans_program_with_annots
   let gil_annot =
     if Exec_mode.verification_exec exec_mode then
       Gil_logic_gen.trans_annots clight_prog annots filepath
-    else if Exec_mode.biabduction_exec exec_mode then
-      Gil_logic_gen.gen_bi_preds clight_prog
     else Gil_logic_gen.empty
   in
   let non_annotated_prog, compilation_data =

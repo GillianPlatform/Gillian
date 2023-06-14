@@ -50,7 +50,7 @@ let is_zero = function
   | _ -> false
 
 let zero_of_chunk chunk =
-  match Compcert.AST.type_of_chunk chunk with
+  match Chunk.type_of chunk with
   | Tany32 | Tint -> SVint Expr.zero_i
   | Tany64 | Tlong -> SVlong Expr.zero_i
   | Tsingle -> SVsingle (Lit (Num 0.))

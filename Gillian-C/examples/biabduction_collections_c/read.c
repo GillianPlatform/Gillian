@@ -1,0 +1,1 @@
+int getValue(int *ptr) { return *ptr; }

@@ -1,4 +1,4 @@
-type t = Compcert.AST.memory_chunk =
+type t =
   | Mint8signed
   | Mint8unsigned
   | Mint16signed
@@ -7,9 +7,46 @@ type t = Compcert.AST.memory_chunk =
   | Mint64
   | Mfloat32
   | Mfloat64
-  | Many32
-  | Many64
-[@@deriving yojson]
+  | Mptr
+[@@deriving eq, yojson]
+
+(* Physical equality: values should be decoded the same way *)
+let phy_equal a b =
+  match (a, b) with
+  | Mint8signed, Mint8signed
+  | Mint8unsigned, Mint8unsigned
+  | Mint16signed, Mint16signed
+  | Mint16unsigned, Mint16unsigned
+  | Mint32, Mint32
+  | Mint64, Mint64
+  | Mfloat32, Mfloat32
+  | Mfloat64, Mfloat64
+  | Mptr, Mptr -> true
+  | Mint32, Mptr | Mptr, Mint32 -> not Compcert.Archi.ptr64
+  | Mint64, Mptr | Mptr, Mint64 -> Compcert.Archi.ptr64
+  | _ -> false
+
+let of_compcert : Compcert.AST.memory_chunk -> t = function
+  | Mint8signed -> Mint8signed
+  | Mint8unsigned -> Mint8unsigned
+  | Mint16signed -> Mint16signed
+  | Mint16unsigned -> Mint16unsigned
+  | Mint32 -> Mint32
+  | Mint64 -> Mint64
+  | Mfloat32 -> Mfloat32
+  | Mfloat64 -> Mfloat64
+  | Many32 | Many64 -> failwith "Unsupported Concert Chunk Many32 or Many64"
+
+let to_compcert : t -> Compcert.AST.memory_chunk = function
+  | Mint8signed -> Mint8signed
+  | Mint8unsigned -> Mint8unsigned
+  | Mint16signed -> Mint16signed
+  | Mint16unsigned -> Mint16unsigned
+  | Mint32 -> Mint32
+  | Mint64 -> Mint64
+  | Mfloat32 -> Mfloat32
+  | Mfloat64 -> Mfloat64
+  | Mptr -> if Compcert.Archi.ptr64 then Mint64 else Mint32
 
 let of_string = function
   | "int8signed" -> Mint8signed
@@ -20,8 +57,7 @@ let of_string = function
   | "int64" -> Mint64
   | "float32" -> Mfloat32
   | "float64" -> Mfloat64
-  | "any32" -> Many32
-  | "any64" -> Many64
+  | "ptr" -> Mptr
   | str -> failwith ("unknown chunk : " ^ str)
 
 let to_string = function
@@ -33,21 +69,32 @@ let to_string = function
   | Mint64 -> "int64"
   | Mfloat32 -> "float32"
   | Mfloat64 -> "float64"
-  | Many32 -> "any32"
-  | Many64 -> "any64"
+  | Mptr -> "ptr"
 
 let pp fmt chunk = Fmt.pf fmt "%s" (to_string chunk)
-let type_of = Compcert.AST.type_of_chunk
+
+let type_of = function
+  | Mint64 -> Compcert.AST.Tlong
+  | Mfloat32 -> Compcert.AST.Tsingle
+  | Mfloat64 -> Compcert.AST.Tfloat
+  | Mptr ->
+      if Compcert.Archi.ptr64 then Compcert.AST.Tlong else Compcert.AST.Tint
+  | _ -> Tint
 
 let size chunk =
   let open Compcert in
-  Camlcoq.Z.to_int (Memdata.size_chunk chunk)
+  to_compcert chunk |> Memdata.size_chunk |> Camlcoq.Z.to_int
 
 let size_expr chunk = Gil_syntax.Expr.int (size chunk)
 
 let align chunk =
   let open Compcert in
-  Camlcoq.Z.to_int (Memdata.align_chunk chunk)
+  to_compcert chunk |> Memdata.align_chunk |> Camlcoq.Z.to_int
 
-let equal = Compcert.AST.chunk_eq
-let ptr = Compcert.AST.coq_Mptr
+let ptr = Mptr
+
+let could_be_ptr = function
+  | Mptr -> true
+  | Mint64 when Compcert.Archi.ptr64 -> true
+  | Mint32 when not Compcert.Archi.ptr64 -> true
+  | _ -> false

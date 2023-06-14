@@ -16,6 +16,47 @@ proc i__binop_cmplu_le(v1, v2) {
   unde: fail[comparison]("Undefined behavior : comparing pointers in different blocks")
 };
 
+proc i__binop_cmplu_lt(v1, v2) {
+        goto [ (l-nth(v1, 0i) = "long") and (l-nth(v2, 0i) = "long") ] blon els;
+  blon: ret := "i__value_of_bool"(l-nth(v1, 1i) i< l-nth(v2, 1i));
+        return;
+  els:  goto [
+            (typeOf(l-nth(v1, 0i)) = Obj)
+        and (typeOf(l-nth(v2, 0i)) = Obj)
+        and (l-nth(v1, 0i) = l-nth(v2, 0i))
+        ] smbl unde; (* tests if both are pointers withing the same block *)
+  smbl: ret := "i__value_of_bool"(l-nth(v1, 1i) i< l-nth(v2, 1i));
+        return;
+  unde: fail[comparison]("Undefined behavior : comparing pointers in different blocks")
+};
+
+proc i__binop_cmplu_gt(v1, v2) {
+        goto [ (l-nth(v1, 0i) = "long") and (l-nth(v2, 0i) = "long") ] blon els;
+  blon: ret := "i__value_of_bool"(not (l-nth(v1, 1i) i<= l-nth(v2, 1i)));
+        return;
+  els:  goto [
+            (typeOf(l-nth(v1, 0i)) = Obj)
+        and (typeOf(l-nth(v2, 0i)) = Obj)
+        and (l-nth(v1, 0i) = l-nth(v2, 0i))
+        ] smbl unde; (* tests if both are pointers withing the same block *)
+  smbl: ret := "i__value_of_bool"(not (l-nth(v1, 1i) i<= l-nth(v2, 1i)));
+        return;
+  unde: fail[comparison]("Undefined behavior : comparing pointers in different blocks")
+};
+
+proc i__binop_cmplu_ge(v1, v2) {
+        goto [ (l-nth(v1, 0i) = "long") and (l-nth(v2, 0i) = "long") ] blon els;
+  blon: ret := "i__value_of_bool"(not (l-nth(v1, 1i) i< l-nth(v2, 1i)));
+        return;
+  els:  goto [
+            (typeOf(l-nth(v1, 0i)) = Obj)
+        and (typeOf(l-nth(v2, 0i)) = Obj)
+        and (l-nth(v1, 0i) = l-nth(v2, 0i))
+        ] smbl unde; (* tests if both are pointers withing the same block *)
+  smbl: ret := "i__value_of_bool"(not (l-nth(v1, 1i) i< l-nth(v2, 1i)));
+        return;
+  unde: fail[comparison]("Undefined behavior : comparing pointers in different blocks")
+};
 
 (* In bi-abduction, either the pointers/numbers are really equal, or we return false,
    we're giving behaviour to other stuff *)

@@ -20,6 +20,7 @@ module TargetLangOptions = struct
     fstruct_passing : bool;
     pp_full_trees : bool;
     allocated_functions : bool;
+    alloc_can_fail : bool;
   }
 
   let term =
@@ -90,6 +91,10 @@ module TargetLangOptions = struct
     let allocated_functions =
       Arg.(value & flag & info [ "allocated-functions" ] ~docs ~doc)
     in
+    let doc = "If flag is set, allocation may fail and return NULL." in
+    let alloc_can_fail =
+      Arg.(value & flag & info [ "alloc-can-fail" ] ~docs ~doc)
+    in
     let opt
         include_dirs
         source_dirs
@@ -101,7 +106,8 @@ module TargetLangOptions = struct
         verbose_compcert
         fstruct_passing
         pp_full_trees
-        allocated_functions =
+        allocated_functions
+        alloc_can_fail =
       {
         include_dirs;
         source_dirs;
@@ -114,12 +120,13 @@ module TargetLangOptions = struct
         fstruct_passing;
         pp_full_trees;
         allocated_functions;
+        alloc_can_fail;
       }
     in
     Term.(
       const opt $ include_dirs $ source_dirs $ bcsm $ hgenv $ no_warnings
       $ hundef $ hmultdef $ verbose_compcert $ fstruct_passing $ pp_full_trees
-      $ allocated_functions)
+      $ allocated_functions $ alloc_can_fail)
 
   let apply
       {
@@ -134,6 +141,7 @@ module TargetLangOptions = struct
         fstruct_passing;
         pp_full_trees;
         allocated_functions;
+        alloc_can_fail;
       } =
     let rec get_c_paths dirs =
       match dirs with
@@ -155,7 +163,8 @@ module TargetLangOptions = struct
     Config.verbose_compcert := verbose_compcert;
     Config_compcert.Features.set_fstruct_passing fstruct_passing;
     Config.pp_full_tree := pp_full_trees;
-    Config.allocated_functions := allocated_functions
+    Config.allocated_functions := allocated_functions;
+    Config.alloc_can_fail := alloc_can_fail
 end
 
 type init_data = Global_env.t

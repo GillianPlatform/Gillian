@@ -16,6 +16,19 @@ proc i__malloc(vsz) {
       return
 };
 
+proc i__malloc_can_fail(vsz) {
+          x := fresh_svar();
+          goto [ x = 0i ] ctn fl;
+    fl:   ret := {{ "long", 0i }};
+          return;
+    ctn: sz := "i__alloc_size"(vsz);
+          bl := [mem_alloc](-8i, sz);
+          b := l-nth(bl, 0i);
+          u := [mem_store]("int64", b, -8i, vsz);
+          ret := {{ b, 0i }};
+          return
+};
+
 proc i__init_to_zero(b, curr, max) {
            goto [curr = max] end ctn;
       ctn: u := [mem_store] ("int8unsigned", b, curr, {{ "int", 0i }});

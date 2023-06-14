@@ -323,11 +323,11 @@ let get_fixes _ _ _ (err : err_t) =
       let new_var = LVar.alloc () in
       let value = Expr.LVar new_var in
       let set = SS.singleton new_var in
-      [ ([ AddCell { loc; ofs; value } ], [], set, []) ]
+      [ ([ AddCell { loc; ofs; value } ], [], [], set, []) ]
   | InvalidLocation loc ->
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
-      [ ([], [ Formula.Eq (new_expr, loc) ], SS.empty, []) ]
+      [ ([], [ Formula.Eq (new_expr, loc) ], [], SS.empty, []) ]
   | _ -> []
 
 let get_failing_constraint _ = Formula.True

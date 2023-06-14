@@ -40,6 +40,7 @@ module Make (SMemory : SMemory.S) :
   type fix_t =
     | MFix of SMemory.c_fix_t
     | FPure of Formula.t
+    | FTypes of (string * Type.t) list
     | FSVars of SS.t
     | FAsrt of Asrt.t
 
@@ -634,11 +635,15 @@ module Make (SMemory : SMemory.S) :
   let pp_fix fmt = function
     | MFix mf -> SMemory.pp_c_fix fmt mf
     | FPure f -> Fmt.pf fmt "SFPure(%a)" Formula.pp f
+    | FTypes ts ->
+        Fmt.pf fmt "SFTypes(%a)"
+          Fmt.(list ~sep:comma (pair ~sep:(any ": ") string Type.pp))
+          ts
     | FSVars vs ->
         Fmt.pf fmt "SFSVar(@[<h>%a@])"
           (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
           vs
-    | FAsrt ga -> Fmt.pf fmt "SFSVar(@[<h>%a@])" Asrt.pp ga
+    | FAsrt ga -> Fmt.pf fmt "SFAsrt(@[<h>%a@])" Asrt.pp ga
 
   let get_recovery_tactic (state : t) (errs : err_t list) : vt Recovery_tactic.t
       =
@@ -679,49 +684,68 @@ module Make (SMemory : SMemory.S) :
 
   let normalise_fix (pfs : PFS.t) (gamma : Type_env.t) (fix : fix_t list) :
       fix_t list option =
-    let fixes, pfs', svars, asrts =
+    let fixes, pfs', svars, types, asrts =
       List.fold_right
-        (fun fix (mfix, pfs, svars, asrts) ->
+        (fun fix (mfix, pfs, svars, types, asrts) ->
           match fix with
-          | MFix mfix' -> (mfix' :: mfix, pfs, svars, asrts)
+          | MFix mfix' -> (mfix' :: mfix, pfs, svars, types, asrts)
           | FPure pf' ->
-              (mfix, (if pf' = True then pfs else pf' :: pfs), svars, asrts)
-          | FSVars svars' -> (mfix, pfs, SS.union svars' svars, asrts)
-          | FAsrt ga -> (mfix, pfs, svars, ga :: asrts))
-        fix ([], [], SS.empty, [])
+              ( mfix,
+                (if pf' = True then pfs else pf' :: pfs),
+                svars,
+                types,
+                asrts )
+          | FTypes ts -> (mfix, pfs, svars, ts @ types, asrts)
+          | FSVars svars' -> (mfix, pfs, SS.union svars' svars, types, asrts)
+          | FAsrt ga -> (mfix, pfs, svars, types, ga :: asrts))
+        fix ([], [], SS.empty, [], [])
     in
     (* Check SAT for some notion of checking SAT *)
     let mfixes = List.map (fun fix -> MFix fix) fixes in
     let asrts = List.map (fun fix -> FAsrt fix) asrts in
-    let is_sat = FOSolver.check_satisfiability (PFS.to_list pfs @ pfs') gamma in
+    let ftys =
+      match types with
+      | [] -> []
+      | _ -> [ FTypes types ]
+    in
+    let gamma' =
+      let gamma' = Type_env.copy gamma in
+      let () = List.iter (fun (x, y) -> Type_env.update gamma' x y) types in
+      gamma'
+    in
+
+    let is_sat =
+      FOSolver.check_satisfiability (PFS.to_list pfs @ pfs') gamma'
+    in
     match is_sat with
     | true ->
         let pfixes = List.map (fun pfix -> FPure pfix) pfs' in
         Some
-          ((if svars = SS.empty then [] else [ FSVars svars ])
-          @ pfixes @ mfixes @ asrts)
+          ((ftys @ if svars = SS.empty then [] else [ FSVars svars ])
+          @ pfixes @ asrts @ mfixes)
     | false ->
         L.verbose (fun m -> m "Warning: invalid fix.");
         None
 
-  (* FIXME: I'm not entirely sure of what this is doing now. Is the product still the right thing to do?
-     Possibly not. *)
-  let get_fixes (state : t) (err : err_t) : fix_t list =
+  (* get_fixes returns a list of possible fixes.
+     Each "fix" is actually a list of fix_t, each of which have to be applied to the same state *)
+  let get_fixes (state : t) (err : err_t) : fix_t list list =
     let pp_fixes fmt fixes =
       Fmt.pf fmt "[[ %a ]]" (Fmt.list ~sep:(Fmt.any ", ") pp_fix) fixes
     in
-    L.verbose (fun m -> m "SState: get_fixes");
     let heap, _, pfs, gamma, _ = state in
     let one_step_fixes : fix_t list list =
       match err with
       | EMem err ->
           List.map
-            (fun (mfixes, pfixes, svars, asrts) ->
-              List.map (fun l -> MFix l) mfixes
-              @ List.map (fun pf -> FPure pf) pfixes
-              @
-              if svars == SS.empty then []
-              else [ FSVars svars ] @ List.map (fun asrt -> FAsrt asrt) asrts)
+            (fun (mfixes, pfixes, types, svars, asrts) ->
+              List.map (fun pf -> FPure pf) pfixes
+              @ (match types with
+                | [] -> []
+                | _ -> [ FTypes types ])
+              @ (if svars == SS.empty then [] else [ FSVars svars ])
+              @ List.map (fun asrt -> FAsrt asrt) asrts
+              @ List.map (fun l -> MFix l) mfixes)
             (SMemory.get_fixes heap pfs gamma err)
       | EPure f ->
           let result = [ [ FPure f ] ] in
@@ -752,13 +776,16 @@ module Make (SMemory : SMemory.S) :
           result
       | _ -> raise (Failure "DEATH: get_fixes: error cannot be fixed.")
     in
+
+    L.tmi (fun m ->
+        m "All fixes before normalisation: %a"
+          Fmt.Dump.(list @@ list @@ pp_fix)
+          one_step_fixes);
     (* Cartesian product of the fixes *)
-    let product = List_utils.list_product one_step_fixes in
-    let candidate_fixes = List.concat product in
-    let normalised_fixes = normalise_fix pfs gamma candidate_fixes in
-    let result = Option.value ~default:[] normalised_fixes in
+    let result = List.filter_map (normalise_fix pfs gamma) one_step_fixes in
     L.(verbose (fun m -> m "Normalised fixes: %i" (List.length result)));
-    L.verbose (fun m -> m "%a" (Fmt.list ~sep:(Fmt.any "@\n@\n") pp_fix) result);
+    L.verbose (fun m ->
+        m "%a" (Fmt.list ~sep:(Fmt.any "@\n@\n") (Fmt.Dump.list pp_fix)) result);
     result
 
   (**
@@ -781,10 +808,14 @@ module Make (SMemory : SMemory.S) :
       match fix with
       (* Apply fix in memory - this may change the pfs and gamma *)
       | MFix fix ->
+          L.verbose (fun m -> m "SState: before applying fixes %a" pp state);
           let heap' = SMemory.apply_fix heap pfs gamma fix in
           (heap', new_vars)
       | FPure f ->
           PFS.extend pfs f;
+          (heap, new_vars)
+      | FTypes types ->
+          List.iter (fun (x, y) -> Type_env.update gamma x y) types;
           (heap, new_vars)
       | FSVars vars -> (heap, SS.union new_vars vars)
       | FAsrt ga ->
@@ -796,19 +827,15 @@ module Make (SMemory : SMemory.S) :
           (heap, new_vars)
     in
 
-    let rec apply_fixes_rec
-        (heap : heap_t)
-        (new_vars : SS.t)
-        (fixes : fix_t list) : heap_t * SS.t =
-      match fixes with
-      | [] -> (heap, new_vars)
-      | fix :: rest ->
-          let heap', new_vars' = apply_fix heap new_vars fix in
-          apply_fixes_rec heap' new_vars' rest
+    let heap', new_vars =
+      List.fold_left
+        (fun (h, v) f ->
+          L.verbose (fun m -> m "applying fix: %a" pp_fix f);
+          apply_fix h v f)
+        (heap, SS.empty) fixes
     in
-    (* FIXME: this unused heap' variable is suspicious *)
-    let _heap', new_vars = apply_fixes_rec heap SS.empty fixes in
-    (Some (heap, store, pfs, gamma, SS.union svars new_vars), !gas)
+    L.verbose (fun m -> m "SState: after applying fixes %a" pp state);
+    (Some (heap', store, pfs, gamma, SS.union svars new_vars), !gas)
 
   let get_equal_values state les =
     let _, _, pfs, _, _ = state in

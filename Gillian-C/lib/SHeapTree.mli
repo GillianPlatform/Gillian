@@ -2,19 +2,22 @@ open Gil_syntax
 open Utils.Containers
 open Monadic
 
+type missingResourceType =
+  | Unfixable
+  | Fixable of { is_store : bool; low : Expr.t; chunk : Chunk.t }
+
 type err =
   | UseAfterFree
   | BufferOverrun
   | InsufficientPermission of { required : Perm.t; actual : Perm.t }
   | InvalidAlignment of { alignment : int; offset : Expr.t }
-  | MissingResource
+  | MissingResource of missingResourceType
   | Unhandled of string
   | RemovingNotOwned
   | WrongMemVal
   | MemoryNotFreed
 
 val pp_err : err Fmt.t
-val err_equal : err -> err -> bool
 
 type 'a or_error = ('a, err) Result.t
 type 'a d_or_error = ('a, err) Delayed_result.t
@@ -22,6 +25,7 @@ type 'a d_or_error = ('a, err) Delayed_result.t
 module Range : sig
   type t = Expr.t * Expr.t
 
+  val of_low_and_chunk : Expr.t -> Chunk.t -> t
   val of_low_chunk_and_size : Expr.t -> Chunk.t -> Expr.t -> t
 end
 
