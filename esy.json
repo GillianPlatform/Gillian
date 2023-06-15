@@ -15,13 +15,15 @@
       "esy-installer gillian.install",
       "esy-installer gillian-js.install",
       "esy-installer gillian-c.install",
-      "esy-installer wisl.install"
+      "esy-installer wisl.install",
+      "esy-installer wislfp.install"
     ],
     "release": {
       "bin": [
         "gillian-js",
         "gillian-c",
-        "wisl"
+        "wisl",
+        "wislfp"
       ],
       "includePackages": [
         "root",
@@ -37,6 +39,10 @@
       },
       "WISL_RUNTIME_PATH": {
         "val": "#{self.share}/wisl",
+        "scope": "global"
+      },
+      "WISLFP_RUNTIME_PATH": {
+        "val": "#{self.share}/wislfp",
         "scope": "global"
       },
       "GILLIAN_C_RUNTIME_PATH": {

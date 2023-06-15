@@ -1,0 +1,7 @@
+(copy_files ../runtime/*.gil)
+
+(rule
+ (deps wisl_core.gil wisl_pointer_arith.gil DLL_recursive.wisl)
+ (alias runtest)
+ (action
+  (run wisl verify -l disabled -R . DLL_recursive.wisl)))

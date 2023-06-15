@@ -1,5 +1,6 @@
 (dirs
  wisl
+ wislfp
  GillianCore
  Gillian-Rely-Runner
  Gillian-JS

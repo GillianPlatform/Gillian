@@ -1,0 +1,6 @@
+(library
+ (name pwDebugging)
+ (libraries gillian str pwParserAndCompiler pwSemantics pwSyntax pwUtils)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson))
+ (flags :standard -open PwUtils -open Gillian -open Gillian.Utils.Prelude))

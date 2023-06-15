@@ -1,0 +1,6 @@
+(library
+ (name pwSemantics)
+ (libraries pwSyntax pwUtils gillian fmt)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson))
+ (flags :standard -open PwUtils -open Utils.Prelude))

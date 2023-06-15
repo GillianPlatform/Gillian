@@ -1,0 +1,138 @@
+#internal
+
+import "wisl_core.gil";
+
+(******** INTERNAL FUNCTIONS REGARDING POINTER AND NUMBER OPERATIONS ********)
+
+proc i__ptr_add (ptr, add_offset) {
+  loc := l-nth(ptr, 0i);
+  offset := l-nth(ptr, 1i);
+  ret := {{ loc, offset i+ add_offset }};
+  return
+};
+
+proc i__add (el, er) {
+        goto [((typeOf el) = List) and ((typeOf er) = Int)] lip linp;
+        (* Left is a pointer and right is a number *)
+  lip:  ret := "i__ptr_add" (el, er);
+        return;
+        (* Left is not a pointer *)
+  linp: goto [((typeOf er) = List) and ((typeOf el) = Int)] rip rinp;
+        (* Right is a pointer and left is a number *)
+  rip:  ret := "i__ptr_add" (er, el);
+        return;
+        (* Both left and right are numbers *)
+  rinp: goto [((typeOf el) = Int) and ((typeOf el) = Int)] nadd err;
+  nadd: ret := el i+ er;
+        return;
+        (* Incorrect types *)
+  err:  err_msg := "Addition: Incorrect Types";
+        fail [err_msg] (el, er)
+};
+
+proc i__minus (el, er) {
+        goto [(typeOf el) = List] lip linp;
+        (* Left is a pointer *)
+  lip:  mer := i- er;
+        ret := "i__ptr_add" (el, mer);
+        goto end;
+        (* Left is not a pointer *)
+  linp: ret := el i- er;
+  end:  return
+};
+
+
+proc i__leq (el, er) {
+        goto [(typeOf el) = List] lip linp;
+  lip:  locl := l-nth(el, 0i); (* left is a pointer, we assume both are, otherwise, type error *)
+        locr := l-nth(er, 0i);
+        goto [locr = locr] ok nok;
+  nok:  message := "Cannot compare pointers from different blocks";
+        fail [message] (locl, locr);
+  ok:   offsetl := l-nth(el, 1i);
+        offsetr := l-nth(er, 1i);
+        ret := offsetl i<= offsetr;
+        return;
+  linp: ret := el i<= er; (* we assume that both are integer *)
+        return
+};
+
+proc i__lt (el, er) {
+        goto [(typeOf el) = List] lip linp;
+  lip:  locl := l-nth(el, 0i); (* left is a pointer, we assume both are, otherwise, type error *)
+        locr := l-nth(er, 0i);
+        goto [locr = locr] ok nok;
+  nok:  message := "Cannot compare these two values";
+        fail [message] (locl, locr);
+  ok:   offsetl := l-nth(el, 1i);
+        offsetr := l-nth(er, 1i);
+        ret := offsetl i< offsetr;
+        return;
+  linp: ret := el i< er; (* we assume that both are integer *)
+        return
+};
+
+proc i__geq (el, er) {
+        goto [(typeOf el) = List] lip linp;
+  lip:  locl := l-nth(el, 0i); (* left is a pointer, we assume both are, otherwise, type error *)
+        locr := l-nth(er, 0i);
+        goto [locr = locr] ok nok;
+  nok:  message := "Cannot compare these two values";
+        fail [message] (locl, locr);
+  ok:   offsetl := l-nth(el, 1i);
+        offsetr := l-nth(er, 1i);
+        ret := not (offsetl i< offsetr);
+        return;
+  linp: ret := not (el i< er); (* we assume that both are integer *)
+        return
+};
+
+proc i__gt (el, er) {
+        goto [(typeOf el) = List] lip linp;
+  lip:  locl := l-nth(el, 0i); (* left is a pointer, we assume both are, otherwise, type error *)
+        locr := l-nth(er, 0i);
+        goto [locr = locr] ok nok;
+  nok:  message := "Cannot compare these two values";
+        fail [message] (locl, locr);
+  ok:   offsetl := l-nth(el, 1.);
+        offsetr := l-nth(er, 1.);
+        ret := not (offsetl i<= offsetr);
+        return;
+  linp: ret := not (el i<= er); (* we assume that both are integer *)
+        return
+};
+
+
+(******** PREDICATES REGARDING POINTER AND NUMBER OPERATIONS ********)
+
+(* i__pred_add(x, y, z) is true if executing i__add(x, y) would return z *)
+pred i__pred_add (+el, +er, out):
+      types(el: List, er: Int) * (el == {{ #loc, #offset }}) * (out == {{ #loc, #offset i+ er }}),
+      types(er: List, el: Int) * (er == {{ #loc, #offset}}) * (out == {{ #loc, #offset i+ el }}),
+      types(er: Int, el: Int) * (out == er i+ el);
+
+(* i__pred_minus(x, y, z) is true if executing i__minus(x, y) would return z *)
+pred i__pred_minus (+el, +er, out):
+      types(el: List, er: Int) * (el == {{ #loc, #offset }}) * (out == {{ #loc, #offset i- er }}),
+      types(er: Int, el: Int) * (out == el i- er);
+
+(* i__pred_lt(x, y, z) is true if executing i__lt(x, y) would return z *)
+pred i__pred_lt (+el, +er, out):
+      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (#offsetl i< #offsetr)),
+      types(el: Int, er: Int) * (out == (el i< er));
+
+(* i__pred_gt(x, y, z) is true if executing i__gt(x, y) would return z *)
+pred i__pred_gt (+el, +er, out):
+      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (not (#offsetl i<= #offsetr))),
+      types(el: Int, er: Int) * (out == (not (el i<= er)));
+
+(* i__pred_leq(x, y, z) is true if executing i__leq(x, y) would return z *)
+pred i__pred_leq (+el, +er, out):
+      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (#offsetl i<= #offsetr)),
+      types(el: Int, er: Int) * (out == (el i<= er));
+
+(* i__pred_geq(x, y, z) is true if executing i__geq(x, y) would return z *)
+pred i__pred_geq (+el, +er, out):
+      types(el: List, er: List) * (el == {{ #locl, #offsetl }}) * (er == {{ #locr, #offsetr }}) * (#locr == #locl) * (out == (not (#offsetl i< #offsetr))),
+      types(el: Int, er: Int) * (out == (not (el i< er)));
+

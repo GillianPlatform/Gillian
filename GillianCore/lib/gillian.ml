@@ -49,6 +49,7 @@ end
 module Logic = struct
   module Reduction = Engine.Reduction
   module FOSolver = Engine.FOSolver
+  module PFS = Engine.PFS
   module Simplifications = Engine.Simplifications
 end
 

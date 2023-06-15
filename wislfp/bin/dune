@@ -1,0 +1,9 @@
+; (executables
+;   (names cwisl wislverify)
+;   (libraries camelot wisl))
+
+(executable
+ (name wislfp)
+ (public_name wislfp)
+ (package wislfp)
+ (libraries gillian pwSemantics pwParserAndCompiler pwUtils pwDebugging))
