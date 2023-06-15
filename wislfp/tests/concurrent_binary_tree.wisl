@@ -104,8 +104,8 @@ function find(t, v) {
             lt := [t + 1];
             rt := [t + 2];
             par {
-                is_in_left := find(lt, v);
-                is_in_right := find(rt, v)
+                is_in_left := find(lt, v) [ find_spec: (#p: #p) ];
+                is_in_right := find(rt, v) [ find_spec: (#p: #p) ]
             };
             r := is_in_left || is_in_right;
             [[assert {bind: #left, #right} binary_tree(lt, #left, #p) * binary_tree(rt, #right, #p)]];

@@ -17,10 +17,19 @@ function read(x, p) {
     };
     return r
 }
-{ is_zero(#v, ret) *  (#x -> (#p: #v)) }
+{ is_zero(#v, ret) * (#x -> (#p: #v)) }
 
 { (x == #x) * (v == #v) * (#x -> (1.0: #y))}
 function write(x, v) {
+    [x] := v;
+    return 0
+}
+{ (ret == 0) * (#x -> #v) }
+
+//should fail
+[spec incorrect_write: #p]
+{ (x == #x) * (v == #v) * (#p f<=# 1.0) * (#x -> (#p: #v))}
+function incorrect_write(x, v) {
     [x] := v;
     return 0
 }
