@@ -227,17 +227,10 @@ let overwrite_cell
     heap
     loc_name
     ofs
-    v
-    out_perm
+    block_missing
     in_bounds =
   match Hashtbl.find_opt heap loc_name with
-  | None ->
-      let data =
-        SFVL.add ofs SFVL.{ value = v; permission = out_perm } SFVL.empty
-      in
-      let bound = None in
-      let () = Hashtbl.replace heap loc_name (Allocated { data; bound }) in
-      Ok []
+  | None -> block_missing ()
   | Some Block.Freed -> Error (UseAfterFree loc_name)
   | Some (Allocated { data; bound }) -> (
       match bound with
@@ -260,6 +253,7 @@ let extend_block ~pfs ~gamma heap loc_name ofs value data bound permission =
   Ok [ fl ]
 
 let store ~pfs ~gamma heap loc_name ofs v =
+  let block_missing () = Error (MissingResource (Cell, loc_name, Some ofs)) in
   let in_bounds (data : SFVL.t) bound =
     let full_perm = Expr.num 1.0 in
     let fl q = Formula.Infix.(q#<.full_perm) in
@@ -276,13 +270,21 @@ let store ~pfs ~gamma heap loc_name ofs v =
     check_sfvl ~pfs ~gamma ofs data none_case some_case
   in
   match
-    overwrite_cell ~unification:false ~pfs ~gamma heap loc_name ofs v
-      (Expr.num 1.0) in_bounds
+    overwrite_cell ~unification:false ~pfs ~gamma heap loc_name ofs
+      block_missing in_bounds
   with
   | Error e -> Error e
   | Ok _ -> Ok ()
 
 let set_cell ~unification ~pfs ~gamma heap loc_name ofs v out_perm =
+  let block_missing () =
+    let data =
+      SFVL.add ofs SFVL.{ value = v; permission = out_perm } SFVL.empty
+    in
+    let bound = None in
+    let () = Hashtbl.replace heap loc_name (Block.Allocated { data; bound }) in
+    Ok []
+  in
   let in_bounds data bound =
     let full_perm = Expr.num 1.0 in
     let none_case () =
@@ -299,7 +301,8 @@ let set_cell ~unification ~pfs ~gamma heap loc_name ofs v out_perm =
     in
     check_sfvl ~pfs ~gamma ofs data none_case some_case
   in
-  overwrite_cell ~unification ~pfs ~gamma heap loc_name ofs v out_perm in_bounds
+  overwrite_cell ~unification ~pfs ~gamma heap loc_name ofs block_missing
+    in_bounds
 
 let rem_cell ~pfs ~gamma heap loc offset out_perm =
   match Hashtbl.find_opt heap loc with
