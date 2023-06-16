@@ -218,8 +218,8 @@ let get_cell ~unification ~pfs ~gamma heap loc ofs out_perm =
   access_cell ~unification ~pfs ~gamma heap loc ofs permission_check
 
 (* Helper function: Performs the preliminary checks common to the set_cell and store
-   operations and applies the "in_bounds" operation if the access to the allocated
-   cell is within bounds *)
+   operations and applies the "block_missing" operation if the block cannot be found
+   in the heap "in_bounds" operation if the access to the allocated cell is within bounds *)
 let overwrite_cell
     ~unification
     ~pfs
