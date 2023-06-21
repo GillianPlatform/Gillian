@@ -203,7 +203,7 @@ module Make
     let state_i = SBAState.copy state_i in
     match result with
     | RFail { error_state; _ } ->
-        let spec = process_spec name params state_i error_state Flag.Error in
+        let spec = process_spec name params state_i error_state Flag.Bug in
         UP.add_spec prog spec;
         (spec, false)
     | RSucc { flag; final_state; _ } ->
