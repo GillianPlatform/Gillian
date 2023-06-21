@@ -202,7 +202,7 @@ and 'label cmd =
   | ReturnError
   | Fail of string * expr list
 
-and flag = Normal | Error
+and flag = Normal | Error | Bug
 
 and pred = {
   pred_name : string;

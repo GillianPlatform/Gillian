@@ -698,28 +698,20 @@ struct
           in
           Array.to_list args
 
-        let process_ret pid j eval_state is_first ret_state fl b_counter others
-            : CConf.t =
+        let process_ret_cont
+            new_j
+            eval_state
+            is_first
+            ret_state
+            fl
+            b_counter
+            others =
           let { i; cs; make_confcont; iframes; loop_ids; _ } = eval_state in
+
           let new_cs =
             match is_first with
             | true -> Call_stack.copy cs
             | false -> cs
-          in
-
-          let new_j =
-            match (fl, j) with
-            | Flag.Normal, _ -> i + 1
-            | Flag.Error, Some j -> j
-            | Flag.Error, None ->
-                let msg =
-                  Printf.sprintf
-                    "SYNTAX ERROR: No error label provided when calling \
-                     procedure %s"
-                    pid
-                in
-                L.normal (fun fmt -> fmt "%s" msg);
-                raise (Syntax_error msg)
           in
 
           let branch_case = SpecExec fl in
@@ -745,6 +737,50 @@ struct
           make_confcont ~state:ret_state ~callstack:new_cs
             ~invariant_frames:iframes ~prev_idx:i ~loop_ids ~next_idx:new_j
             ~branch_count:b_counter ?branch_case ?new_branches ()
+
+        let process_ret
+            pid
+            j
+            eval_state
+            is_first
+            ret_state
+            fl
+            b_counter
+            others
+            spec_name : CConf.t =
+          let { i; cs; branch_path; _ } = eval_state in
+          let process_ret_cont new_j =
+            process_ret_cont new_j eval_state is_first ret_state fl b_counter
+              others
+          in
+
+          match (fl, j) with
+          | Flag.Normal, _ -> process_ret_cont (i + 1)
+          | Flag.Error, Some j -> process_ret_cont j
+          | Flag.Error, None ->
+              let msg =
+                Printf.sprintf
+                  "SYNTAX ERROR: No error label provided when calling \
+                   procedure %s"
+                  pid
+              in
+              L.normal (fun fmt -> fmt "%s" msg);
+              raise (Syntax_error msg)
+          | Flag.Bug, _ ->
+              ConfErr
+                {
+                  callstack = cs;
+                  proc_idx = i;
+                  error_state = ret_state;
+                  errors =
+                    [
+                      Exec_err.ESt
+                        (EOther
+                           (Fmt.str "Error: tried to use bug spec '%s'"
+                              spec_name));
+                    ];
+                  branch_path;
+                }
 
         let symb_exec_proc x pid v_args j params args eval_state () =
           let { cs; state; i; loop_ids; b_counter; iframes; make_confcont; _ } =
@@ -817,13 +853,16 @@ struct
                 let success_confs =
                   match successes with
                   | (ret_state, fl) :: rest_rets ->
+                      let spec_name = spec.data.spec_name in
                       let others =
                         List.map
                           (fun (ret_state, fl) ->
-                            process_ret false ret_state fl b_counter None)
+                            process_ret false ret_state fl b_counter None
+                              spec_name)
                           rest_rets
                       in
                       process_ret true ret_state fl b_counter (Some others)
+                        spec_name
                       :: others
                   | _ -> failwith "unreachable"
                 in
@@ -2003,7 +2042,8 @@ struct
           cconf
         in
         let proc_name, annot_cmd = get_cmd prog cs i in
-        Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
+        if !Config.current_exec_mode <> Exec_mode.BiAbduction then
+          Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
         L.set_previous prev_cmd_report_id;
         L.(
           verbose (fun m ->
