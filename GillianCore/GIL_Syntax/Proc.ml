@@ -103,49 +103,46 @@ let indexed_of_labeled (lproc : ('annot, string) t) : ('annot, int) t =
     in
     let cmds =
       Array.map
-        (function
-          | spec, l, labeled_cmd ->
-              let indexed_cmd : int Cmd.t =
-                match (labeled_cmd : string Cmd.t) with
-                | Skip -> Cmd.Skip
-                | Assignment (x, e) -> Cmd.Assignment (x, e)
-                | LAction (x, la_name, es) -> Cmd.LAction (x, la_name, es)
-                | Goto lab -> Cmd.Goto (find_with_error mapping lab)
-                | GuardedGoto (e, lt, lf) ->
-                    Cmd.GuardedGoto
-                      (e, find_with_error mapping lt, find_with_error mapping lf)
-                | Call (x, e, le, ol, subst) ->
-                    Cmd.Call
-                      ( x,
-                        e,
-                        le,
-                        (match ol with
-                        | None -> None
-                        | Some lab -> Some (find_with_error mapping lab)),
-                        subst )
-                | ECall (x, e, le, ol) ->
-                    Cmd.ECall
-                      ( x,
-                        e,
-                        le,
-                        match ol with
-                        | None -> None
-                        | Some lab -> Some (find_with_error mapping lab) )
-                | Apply (x, le, ol) ->
-                    Cmd.Apply
-                      ( x,
-                        le,
-                        match ol with
-                        | None -> None
-                        | Some lab -> Some (find_with_error mapping lab) )
-                | Arguments var -> Cmd.Arguments var
-                | PhiAssignment xargs -> Cmd.PhiAssignment xargs
-                | ReturnNormal -> Cmd.ReturnNormal
-                | ReturnError -> Cmd.ReturnError
-                | Fail (et, es) -> Cmd.Fail (et, es)
-                | Logic lcmd -> Cmd.Logic lcmd
-              in
-              (spec, l, indexed_cmd))
+        (fun (spec, l, labeled_cmd) ->
+          let indexed_fcall (fcall : string Cmd.function_call) :
+              int Cmd.function_call =
+            let Cmd.{ var_name; fct_name; args; err_lab; bindings } = fcall in
+            {
+              var_name;
+              fct_name;
+              args;
+              err_lab = Option.map (find_with_error mapping) err_lab;
+              bindings;
+            }
+          in
+          let indexed_cmd (cmd : string Cmd.t) : int Cmd.t =
+            match (cmd : string Cmd.t) with
+            | Skip -> Cmd.Skip
+            | Assignment (x, e) -> Cmd.Assignment (x, e)
+            | LAction (x, la_name, es) -> Cmd.LAction (x, la_name, es)
+            | Goto lab -> Cmd.Goto (find_with_error mapping lab)
+            | GuardedGoto (e, lt, lf) ->
+                Cmd.GuardedGoto
+                  (e, find_with_error mapping lt, find_with_error mapping lf)
+            | Par fs -> Cmd.Par (List.map indexed_fcall fs)
+            | Call fcall -> Cmd.Call (indexed_fcall fcall)
+            | ECall (x, e, le, ol) ->
+                Cmd.ECall (x, e, le, Option.map (find_with_error mapping) ol)
+            | Apply (x, le, ol) ->
+                Cmd.Apply
+                  ( x,
+                    le,
+                    match ol with
+                    | None -> None
+                    | Some lab -> Some (find_with_error mapping lab) )
+            | Arguments var -> Cmd.Arguments var
+            | PhiAssignment xargs -> Cmd.PhiAssignment xargs
+            | ReturnNormal -> Cmd.ReturnNormal
+            | ReturnError -> Cmd.ReturnError
+            | Fail (et, es) -> Cmd.Fail (et, es)
+            | Logic lcmd -> Cmd.Logic lcmd
+          in
+          (spec, l, indexed_cmd labeled_cmd))
         cmds_nolab
     in
     cmds

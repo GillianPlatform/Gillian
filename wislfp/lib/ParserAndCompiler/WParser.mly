@@ -1,10 +1,11 @@
 %token EOF
 
 (* key words *)
-%token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP NEW DELETE
+%token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP NEW DELETE PAR
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
 %token <CodeLoc.t> INVARIANT FOLD UNFOLD NOUNFOLD APPLY ASSERT EXIST FORALL
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
+%token <CodeLoc.t> SPEC
 
 (* punctuation *)
 %token <CodeLoc.t> COLON            /* : */
@@ -28,25 +29,36 @@
 %token <CodeLoc.t> TLIST
 %token <CodeLoc.t> TINT
 %token <CodeLoc.t> TBOOL
+%token <CodeLoc.t> TFLOAT
 
 (* names *)
 %token <CodeLoc.t * string> IDENTIFIER
 
 (* values *)
 %token <CodeLoc.t * int> INTEGER
+%token <CodeLoc.t * float> FLOAT
 %token <CodeLoc.t * string> STRING
 
 (* Binary operators *)
 %token EQUAL           /* = */
 %token LESSTHAN        /* < */
+%token FLESSTHAN       /* f< */
 %token GREATERTHAN     /* > */
+%token FGREATERTHAN    /* f> */
 %token LESSEQUAL       /* <= */
+%token FLESSEQUAL      /* f<= */
 %token GREATEREQUAL    /* => */
+%token FGREATEREQUAL   /* f=> */
 %token PLUS            /* + */
+%token FPLUS           /* f+ */
 %token MINUS           /* - */
+%token FMINUS          /* f- */
 %token TIMES           /* * */
+%token FTIMES          /* f* */
 %token DIV             /* / */
+%token FDIV            /* f/ */
 %token MOD             /* % */
+%token FMOD            /* f% */
 %token AND             /* && */
 %token OR              /* || */
 %token NEQ             /* != */
@@ -64,9 +76,13 @@
 %token LOR            /* \/ */
 %token LEQ            /* == */
 %token LLESS           /* <#  */
+%token FLLESS          /* f<#  */
 %token LLESSEQ         /* <=# */
+%token FLLESSEQ        /* f<=# */
 %token LGREATER        /* >#  */
+%token FLGREATER       /* f>#  */
 %token LGREATEREQ      /* >=# */
+%token FLGREATEREQ     /* f>=# */
 
 (* Logic *)
 %token <CodeLoc.t> EMP LTRUE LFALSE LSTNIL LNOT
@@ -75,16 +91,16 @@
 (* Precedence *)
 %left LOR
 %left LAND separating_conjunction
-%nonassoc LEQ LLESS LLESSEQ LGREATER LGREATEREQ
+%nonassoc LEQ LLESS FLLESS LLESSEQ FLLESSEQ LGREATER FLGREATER LGREATEREQ FLGREATEREQ
 %nonassoc LNOT
 %left OR
 %left AND
 %nonassoc EQUAL NEQ
-%nonassoc LESSTHAN LESSEQUAL GREATERTHAN GREATEREQUAL
+%nonassoc LESSTHAN FLESSTHAN LESSEQUAL FLESSEQUAL GREATERTHAN FGREATERTHAN GREATEREQUAL FGREATEREQUAL
 %nonassoc LSTCONS
 %left LSTCAT
-%left PLUS MINUS
-%left TIMES DIV MOD
+%left PLUS FPLUS MINUS FMINUS
+%left TIMES FTIMES DIV FDIV MOD
 
 %nonassoc binop_prec
 %nonassoc unop_prec
@@ -139,11 +155,23 @@ definitions:
     { let (fs, ps, ls) = fpdcl in
       (f::fs, ps, ls) }
 
+spec_bindings:
+| lstart = LBRACK; SPEC; spec_name = IDENTIFIER; COLON; vs_with_loc = separated_list(COMMA, LVAR); RBRACK
+  { let (_, variables) = List.split vs_with_loc in
+    let (_, spec_name) = spec_name in
+    (lstart, spec_name, variables) }
+
 fct_with_specs:
   | lstart = LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
     post = logic_assertion; lend = RCBRACE
     { let loc = CodeLoc.merge lstart lend in
       WFun.add_spec f pre post variant loc }
+  | bindings = spec_bindings; LCBRACE; pre = logic_assertion; RCBRACE; variant = option(with_variant_def); f = fct; LCBRACE;
+  post = logic_assertion; lend = RCBRACE
+  { let lstart, spec_name, lvars = bindings in
+    let existentials = Some (spec_name, lvars) in
+    let loc = CodeLoc.merge lstart lend in
+    WFun.add_spec ?existentials f pre post variant loc }
   | f = fct { f }
 
 fct:
@@ -188,6 +216,41 @@ logic_cmds:
   | LCMD; lcmds = separated_list(SEMICOLON, logic_command); RCBRACE { lcmds }
  */
 
+logical_binding:
+  | LBRACE; lhs = LVAR; COLON; rhs = LVAR; RBRACE
+  { let (_, lhs) = lhs in
+    let (loc, rhs) = rhs in
+    let bare_lexpr = WLExpr.LVar rhs in
+    let expr = WLExpr.make bare_lexpr loc in
+    (lhs, expr)
+  }
+
+passed_logical_bindings:
+  | LBRACK; spec_name = IDENTIFIER; COLON; bindings = separated_nonempty_list(COMMA, logical_binding); lend = RBRACK
+  { let (_, spec_name) = spec_name in
+    (spec_name, bindings, lend)
+  }
+
+function_call:
+  | lx = IDENTIFIER; ASSIGN; lf = IDENTIFIER; LBRACE; params = expr_list; lend = RBRACE
+    { let (lstart, x) = lx in
+      let (_, f) = lf in
+      let bare_stmt = WStmt.FunCall (x, f, params, None) in
+      let loc = CodeLoc.merge lstart lend in
+      WStmt.make bare_stmt loc
+    }
+  | lx = IDENTIFIER; ASSIGN; lf = IDENTIFIER; LBRACE; params = expr_list; RBRACE; bindings = passed_logical_bindings 
+    { let (lstart, x) = lx in
+      let (_, f) = lf in
+      let (spec_name, bindings, lend) = bindings in
+      let bare_stmt = WStmt.FunCall (x, f, params, Some (spec_name, bindings)) in
+      let loc = CodeLoc.merge lstart lend in
+      WStmt.make bare_stmt loc
+    }
+
+function_call_list:
+  sl = separated_nonempty_list(SEMICOLON, function_call) { sl }
+
 
 statement:
   | loc = SKIP { WStmt.make WStmt.Skip loc }
@@ -218,10 +281,10 @@ statement:
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc
     }
-  | lx = IDENTIFIER; ASSIGN; lf = IDENTIFIER; LBRACE; params = expr_list; lend = RBRACE
-    { let (lstart, x) = lx in
-      let (_, f) = lf in
-      let bare_stmt = WStmt.FunCall (x, f, params, None) in
+  | s = function_call { s }
+  | lstart = PAR; LCBRACE; fs = function_call_list; lend = RCBRACE;
+    {
+      let bare_stmt = WStmt.Par (fs) in
       let loc = CodeLoc.merge lstart lend in
       WStmt.make bare_stmt loc
     }
@@ -280,19 +343,28 @@ expression:
       WExpr.make bare_expr loc } %prec unop_prec
 
 binop:
-  | EQUAL        { WBinOp.EQUAL }
-  | LESSTHAN     { WBinOp.LESSTHAN }
-  | GREATERTHAN  { WBinOp.GREATERTHAN }
-  | LESSEQUAL    { WBinOp.LESSEQUAL }
-  | GREATEREQUAL { WBinOp.GREATEREQUAL }
-  | PLUS         { WBinOp.PLUS }
-  | MINUS        { WBinOp.MINUS }
-  | TIMES        { WBinOp.TIMES }
-  | DIV          { WBinOp.DIV }
-  | MOD          { WBinOp.MOD }
-  | AND          { WBinOp.AND }
-  | OR           { WBinOp.OR }
-  | NEQ          { WBinOp.NEQ }
+  | EQUAL         { WBinOp.EQUAL }
+  | LESSTHAN      { WBinOp.LESSTHAN }
+  | FLESSTHAN     { WBinOp.FLESSTHAN }
+  | GREATERTHAN   { WBinOp.GREATERTHAN }
+  | FGREATERTHAN  { WBinOp.FGREATERTHAN }
+  | LESSEQUAL     { WBinOp.LESSEQUAL }
+  | FLESSEQUAL    { WBinOp.FLESSEQUAL }
+  | GREATEREQUAL  { WBinOp.GREATEREQUAL }
+  | FGREATEREQUAL { WBinOp.FGREATEREQUAL }
+  | PLUS          { WBinOp.PLUS }
+  | FPLUS         { WBinOp.FPLUS }
+  | MINUS         { WBinOp.MINUS }
+  | FMINUS        { WBinOp.FMINUS }
+  | TIMES         { WBinOp.TIMES }
+  | FTIMES        { WBinOp.FTIMES }
+  | DIV           { WBinOp.DIV }
+  | FDIV          { WBinOp.FDIV }
+  | MOD           { WBinOp.MOD }
+  | FMOD          { WBinOp.FMOD }
+  | AND           { WBinOp.AND }
+  | OR            { WBinOp.OR }
+  | NEQ           { WBinOp.NEQ }
 
 unop_with_loc:
   | loc = NOT  { (loc, WUnOp.NOT) }
@@ -302,6 +374,7 @@ unop_with_loc:
   | loc = TAIL { (loc, WUnOp.TAIL) }
 
 value_with_loc:
+  | lf = FLOAT    { let (loc, f) = lf in (loc, WVal.Float f)}
   | lf = INTEGER  { let (loc, f) = lf in (loc, WVal.Int f) }
   | ls = STRING   { let (loc, s) = ls in (loc, WVal.Str s) }
   | loc = TRUE    { (loc, WVal.Bool true) }
@@ -375,6 +448,7 @@ type_target:
   | TLIST { WType.WList }
   | TINT { WType.WInt }
   | TBOOL { WType.WBool }
+  | TFLOAT { WType.WFloat }
 
 pred_param_ins:
   | inp = option(PLUS); lx = IDENTIFIER; option(preceded(COLON, type_target))
@@ -437,6 +511,12 @@ lvar_or_pvar:
   | x = IDENTIFIER { x }
   | lx = LVAR { lx }
 
+logic_expression_with_permission:
+  | LBRACE; perm = logic_expression; COLON; expr = logic_expression; RBRACE;
+    { (Some perm, expr) }
+  | expr = logic_expression;
+    { (None, expr) }
+
 logic_assertion:
   | lstart = LBRACE; la = logic_assertion; lend = RBRACE;
     { let bare_assert = WLAssert.get la in
@@ -455,11 +535,11 @@ logic_assertion:
       let lstart, lend = WLAssert.get_loc la1, WLAssert.get_loc la2 in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc } %prec separating_conjunction
-  | le1 = logic_expression; ARROW; le2 = separated_nonempty_list(COMMA, logic_expression)
+  | le1 = logic_expression; ARROW; le2 = separated_nonempty_list(COMMA, logic_expression_with_permission)
     { let rec get_lend lel =
         match lel with
         | []  -> failwith "Nonempty list cannot be empty"
-        | [a] -> WLExpr.get_loc a
+        | [(_, a)] -> WLExpr.get_loc a
         | _::r -> get_lend r
       in
       let bare_assert = WLAssert.LPointsTo (le1, le2) in
@@ -467,11 +547,11 @@ logic_assertion:
       let lend = get_lend le2 in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
-  | le1 = logic_expression; BLOCK_ARROW; le2 = separated_nonempty_list(COMMA, logic_expression)
+  | le1 = logic_expression; BLOCK_ARROW; le2 = separated_nonempty_list(COMMA, logic_expression_with_permission)
     { let rec get_lend lel =
         match lel with
         | []  -> failwith "Nonempty list cannot be empty"
-        | [a] -> WLExpr.get_loc a
+        | [(_, a)] -> WLExpr.get_loc a
         | _::r -> get_lend r
       in
       let bare_assert = WLAssert.LBlockPointsTo (le1, le2) in
@@ -499,20 +579,40 @@ logic_pure_formula:
       let loc = CodeLoc.merge lstart lend in
       let bare_form = WLFormula.LLess (le1, le2) in
       WLFormula.make bare_form loc }
+  | le1 = logic_expression; FLLESS; le2 = logic_expression
+    { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
+      let loc = CodeLoc.merge lstart lend in
+      let bare_form = WLFormula.FLLess (le1, le2) in
+      WLFormula.make bare_form loc }
   | le1 = logic_expression; LLESSEQ; le2 = logic_expression
     { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
       let loc = CodeLoc.merge lstart lend in
       let bare_form = WLFormula.LLessEq (le1, le2) in
+      WLFormula.make bare_form loc }
+  | le1 = logic_expression; FLLESSEQ; le2 = logic_expression
+    { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
+      let loc = CodeLoc.merge lstart lend in
+      let bare_form = WLFormula.FLLessEq (le1, le2) in
       WLFormula.make bare_form loc }
   | le1 = logic_expression; LGREATEREQ; le2 = logic_expression
     { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
       let loc = CodeLoc.merge lstart lend in
       let bare_form = WLFormula.LGreaterEq (le1, le2) in
       WLFormula.make bare_form loc }
+  | le1 = logic_expression; FLGREATEREQ; le2 = logic_expression
+    { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
+      let loc = CodeLoc.merge lstart lend in
+      let bare_form = WLFormula.FLGreaterEq (le1, le2) in
+      WLFormula.make bare_form loc }
   | le1 = logic_expression; LGREATER; le2 = logic_expression
     { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
       let loc = CodeLoc.merge lstart lend in
       let bare_form = WLFormula.LGreater (le1, le2) in
+      WLFormula.make bare_form loc }
+  | le1 = logic_expression; FLGREATER; le2 = logic_expression
+    { let lstart, lend = WLExpr.get_loc le1, WLExpr.get_loc le2 in
+      let loc = CodeLoc.merge lstart lend in
+      let bare_form = WLFormula.FLGreater (le1, le2) in
       WLFormula.make bare_form loc }
   | lstart = LNOT; la = logic_pure_formula
     { let bare_form = WLFormula.LNot la in

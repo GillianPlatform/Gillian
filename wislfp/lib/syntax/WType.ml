@@ -6,6 +6,7 @@ type t =
   | WString
   | WPtr
   | WInt
+  | WFloat
   | WAny
   | WSet
 
@@ -34,6 +35,7 @@ let pp fmt t =
   | WString -> s "String"
   | WPtr -> s "Pointer"
   | WInt -> s "Int"
+  | WFloat -> s "Float"
   | WAny -> s "Any"
   | WSet -> s "Set"
 
@@ -53,6 +55,7 @@ let of_val v =
   match v with
   | Bool _ -> WBool
   | Int _ -> WInt
+  | Float _ -> WFloat
   | Str _ -> WString
   | Null -> WNull
   | VList _ -> WList
@@ -74,12 +77,18 @@ let of_binop b =
   | WBinOp.GREATERTHAN
   | WBinOp.LESSEQUAL
   | WBinOp.GREATEREQUAL -> (WInt, WInt, WBool)
+  | WBinOp.FLESSTHAN
+  | WBinOp.FGREATERTHAN
+  | WBinOp.FLESSEQUAL
+  | WBinOp.FGREATEREQUAL -> (WFloat, WFloat, WBool)
   | WBinOp.TIMES | WBinOp.DIV | WBinOp.MOD -> (WInt, WInt, WInt)
+  | WBinOp.FTIMES | WBinOp.FDIV | WBinOp.FMOD -> (WFloat, WFloat, WFloat)
   | WBinOp.AND | WBinOp.OR -> (WBool, WBool, WBool)
   | WBinOp.LSTCONS -> (WAny, WList, WList)
   | WBinOp.LSTCAT -> (WList, WList, WList)
   | WBinOp.LSTNTH -> (WList, WInt, WAny)
   | WBinOp.PLUS | WBinOp.MINUS -> (WAny, WAny, WAny)
+  | WBinOp.FPLUS | WBinOp.FMINUS -> (WFloat, WFloat, WFloat)
 
 (* TODO: improve this, because we can add Ints AND Pointers *)
 
@@ -149,7 +158,7 @@ let rec infer_single_assert_step asser known =
   let rec infer_formula f k =
     match WLFormula.get f with
     | WLFormula.LTrue | WLFormula.LFalse -> k
-    | WLFormula.LNot f -> infer_formula f k
+    | WLFormula.LNot _ -> TypeMap.empty
     | WLFormula.LAnd (f1, f2) | WLFormula.LOr (f1, f2) ->
         infer_formula f2 (infer_formula f1 known)
     | WLFormula.LEq (le1, le2) -> (
@@ -167,6 +176,16 @@ let rec infer_single_assert_step asser known =
         let inferred = infer_logic_expr (infer_logic_expr known le1) le2 in
         let inferredp = needs_to_be le1 WInt (needs_to_be le2 WInt inferred) in
         TypeMap.add bare_le1 WInt (TypeMap.add bare_le2 WInt inferredp)
+    | WLFormula.FLLess (le1, le2)
+    | WLFormula.FLGreater (le1, le2)
+    | WLFormula.FLLessEq (le1, le2)
+    | WLFormula.FLGreaterEq (le1, le2) ->
+        let bare_le1, bare_le2 = (WLExpr.get le1, WLExpr.get le2) in
+        let inferred = infer_logic_expr (infer_logic_expr known le1) le2 in
+        let inferredp =
+          needs_to_be le1 WFloat (needs_to_be le2 WFloat inferred)
+        in
+        TypeMap.add bare_le1 WFloat (TypeMap.add bare_le2 WFloat inferredp)
   in
   match WLAssert.get asser with
   | WLAssert.LEmp -> known
@@ -174,13 +193,27 @@ let rec infer_single_assert_step asser known =
       infer_single_assert_step la2 (infer_single_assert_step la1 known)
   | WLAssert.LPred (_, lel) -> List.fold_left infer_logic_expr known lel
   | WLAssert.LPointsTo (le1, le2) ->
+      let le_perm =
+        List.map Option.get @@ List.filter Option.is_some @@ List.map fst le2
+      in
+      let le2 = List.map snd le2 in
       let inferred =
         List.fold_left infer_logic_expr (infer_logic_expr known le1) le2
       in
+      let inferred =
+        List.fold_left (fun acc p -> needs_to_be p WFloat acc) inferred le_perm
+      in
       needs_to_be le1 WList inferred
   | WLAssert.LBlockPointsTo (le1, le2) ->
+      let le_perm =
+        List.map Option.get @@ List.filter Option.is_some @@ List.map fst le2
+      in
+      let le2 = List.map snd le2 in
       let inferred =
         List.fold_left infer_logic_expr (infer_logic_expr known le1) le2
+      in
+      let inferred =
+        List.fold_left (fun acc p -> needs_to_be p WFloat acc) inferred le_perm
       in
       needs_to_be le1 WList inferred
   | WLAssert.LPure f -> infer_formula f known

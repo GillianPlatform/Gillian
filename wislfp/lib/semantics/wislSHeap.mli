@@ -17,7 +17,12 @@ val init : unit -> t
 val alloc : t -> int -> string
 
 val dispose :
-  pfs:Pure_context.t -> gamma:Type_env.t -> t -> string -> (unit, err) Result.t
+  unification:bool ->
+  pfs:Pure_context.t ->
+  gamma:Type_env.t ->
+  t ->
+  string ->
+  (unit, err) Result.t
 
 val clean_up : Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
 
@@ -39,15 +44,17 @@ val store :
   (unit, err) result
 
 val get_cell :
+  unification:bool ->
   pfs:Pure_context.t ->
   gamma:Type_env.t ->
   t ->
   string ->
   Expr.t ->
   Expr.t ->
-  (string * Expr.t * Expr.t * Expr.t, err) result
+  (string * Expr.t * Expr.t, err) result
 
 val set_cell :
+  unification:bool ->
   pfs:Pure_context.t ->
   gamma:Type_env.t ->
   t ->
@@ -67,6 +74,7 @@ val rem_cell :
   (unit, err) result
 
 val get_bound :
+  unification:bool ->
   pfs:Pure_context.t ->
   gamma:Type_env.t ->
   t ->

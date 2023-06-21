@@ -6,9 +6,13 @@ type tt =
   | LOr of t * t
   | LEq of WLExpr.t * WLExpr.t
   | LLess of WLExpr.t * WLExpr.t
+  | FLLess of WLExpr.t * WLExpr.t
   | LGreater of WLExpr.t * WLExpr.t
+  | FLGreater of WLExpr.t * WLExpr.t
   | LLessEq of WLExpr.t * WLExpr.t
+  | FLLessEq of WLExpr.t * WLExpr.t
   | LGreaterEq of WLExpr.t * WLExpr.t
+  | FLGreaterEq of WLExpr.t * WLExpr.t
 
 and t
 

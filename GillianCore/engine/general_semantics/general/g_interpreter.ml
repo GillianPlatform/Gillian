@@ -835,6 +835,55 @@ struct
                       };
                   ])
 
+        let exec_par_with_spec fcs eval_state =
+          let { state; i; b_counter; cs; branch_path; _ } = eval_state in
+          let process_ret = process_ret "par" None eval_state in
+          let fcs =
+            List.map
+              (fun (spec, x, pid, args, subst) ->
+                let subst = eval_subst_list state subst in
+                L.verbose (fun fmt -> fmt "ABOUT TO USE THE SPEC OF %s" pid);
+                (spec, x, args, subst))
+              fcs
+          in
+          let rets : ((State.t * Flag.t) list, state_err_t list) result =
+            State.run_par_spec fcs state
+          in
+          match rets with
+          | Ok rets -> (
+              L.verbose (fun fmt ->
+                  fmt "Run_par_spec returned %d Results" (List.length rets));
+              let b_counter =
+                if List.length rets > 1 then b_counter + 1 else b_counter
+              in
+              match rets with
+              | (ret_state, fl) :: rest_rets ->
+                  let others =
+                    List.map
+                      (fun (ret_state, fl) ->
+                        process_ret false ret_state fl b_counter None)
+                      rest_rets
+                  in
+                  process_ret true ret_state fl b_counter (Some others)
+                  :: others
+              | _ ->
+                  L.fail
+                    (Format.asprintf
+                       "ERROR: Unable to use specification of a function in \
+                        parallel composition"))
+          | Error errors ->
+              let errors = errors |> List.map (fun e -> Exec_err.ESt e) in
+              [
+                CConf.ConfErr
+                  {
+                    callstack = cs;
+                    proc_idx = i;
+                    error_state = state;
+                    errors;
+                    branch_path;
+                  };
+              ]
+
         let exec_without_spec pid symb_exec_proc eval_state =
           let {
             prog;
@@ -910,9 +959,27 @@ struct
                         < !Config.bi_no_spec_depth -> symb_exec_proc () *)
               | _ -> spec_exec_proc ())
           | false -> spec_exec_proc ()
+
+        let par_f fcs eval_state =
+          let { prog; state; _ } = eval_state in
+          let fcs =
+            List.map
+              (fun (var_name, pid, v_args, bindings) ->
+                let pid = get_pid_or_error pid state in
+                let spec, params = get_spec_and_params prog pid state in
+                let args = build_args v_args params in
+                match spec with
+                | Some spec -> (spec, var_name, pid, args, bindings)
+                | None ->
+                    failwith
+                      "Found function without specification in a parallel call")
+              fcs
+          in
+          exec_par_with_spec fcs eval_state
       end
 
       let eval_proc_call = Eval_proc_call.f
+      let eval_par_proc_call = Eval_proc_call.par_f
 
       let split_results results =
         let oks, errs =
@@ -1298,6 +1365,17 @@ struct
         let result = eval_proc_call x pid v_args j subst eval_state in
         result
 
+      let eval_par_call fcs eval_state =
+        let { eval_expr; _ } = eval_state in
+        let lambda Cmd.{ var_name; fct_name; args; bindings; _ } =
+          DL.log (fun m -> m "Call");
+          let pid = eval_expr fct_name in
+          let v_args = List.map eval_expr args in
+          (var_name, pid, v_args, bindings)
+        in
+        let fcs = List.map lambda fcs in
+        eval_par_proc_call fcs eval_state
+
       (* External function call *)
       let eval_ecall x (pid : Expr.t) args j eval_state =
         let {
@@ -1512,8 +1590,10 @@ struct
                 ~prev_idx:i ~loop_ids ~next_idx:j ~branch_count:b_counter ();
             ]
         | GuardedGoto (e, j, k) -> eval_guarded_goto e j k eval_state
+        | Par fcs -> eval_par_call fcs eval_state
         | PhiAssignment lxarr -> eval_phi_assignment lxarr eval_state
-        | Call (x, e, args, j, subst) -> eval_call x e args j subst eval_state
+        | Call { var_name; fct_name; args; err_lab; bindings } ->
+            eval_call var_name fct_name args err_lab bindings eval_state
         | ECall (x, pid, args, j) -> eval_ecall x pid args j eval_state
         | Apply (x, pid_args, j) -> eval_apply x pid_args j eval_state
         (* Arguments *)

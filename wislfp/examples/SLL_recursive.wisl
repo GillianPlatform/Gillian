@@ -62,15 +62,15 @@ function copy(x) {
 }
 { list(#x, #alpha) * list(ret, #alpha) }
 
-{ list(x, #alpha) }
-function dispose_list(x) {
-    if (x = null) {
-        skip
-    } else {
-        tail := [x+1];
-        u := dispose_list(tail);
-        dispose(x)
-    };
-    return null
-}
-{ emp }
+// { list(x, #alpha) }
+// function dispose_list(x) {
+//     if (x = null) {
+//         skip
+//     } else {
+//         tail := [x+1];
+//         u := dispose_list(tail);
+//         dispose(x)
+//     };
+//     return null
+// }
+// { emp }

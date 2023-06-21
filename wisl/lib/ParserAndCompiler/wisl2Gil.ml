@@ -121,7 +121,7 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
       let cmdl1, comp_expr1 = compile_expr e1 in
       let cmdl2, comp_expr2 = compile_expr e2 in
       let call_i_plus =
-        Cmd.Call
+        Cmd.call
           (call_var, internal_func, [ comp_expr1; comp_expr2 ], None, None)
       in
       ( cmdl1 @ cmdl2
@@ -573,7 +573,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
   in
   let retv = gen_str gvar in
   let call_cmd =
-    Cmd.Call
+    Cmd.call
       ( retv,
         Lit (String loop_fname),
         List.map (fun x -> Expr.PVar x) vars,
@@ -811,7 +811,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
             Some (spec_name, List.map (fun x -> (x, Expr.LVar x)) lvars)
         | None -> None
       in
-      let cmd = Cmd.Call (x, expr_fn, params, None, bindings) in
+      let cmd = Cmd.call (x, expr_fn, params, None, bindings) in
       let annot =
         WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in

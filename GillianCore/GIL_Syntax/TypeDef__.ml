@@ -186,6 +186,14 @@ and lcmd =
   | FreshSVar of string
   | SL of slcmd
 
+and 'label function_call = {
+  var_name : string;
+  fct_name : expr;
+  args : expr list;
+  err_lab : 'label option;
+  bindings : bindings option;
+}
+
 and 'label cmd =
   | Skip
   | Assignment of string * expr
@@ -193,8 +201,9 @@ and 'label cmd =
   | Logic of lcmd
   | Goto of 'label
   | GuardedGoto of expr * 'label * 'label
-  | Call of string * expr * expr list * 'label option * bindings option
+  | Call of 'label function_call
   | ECall of string * expr * expr list * 'label option
+  | Par of 'label function_call list
   | Apply of string * expr * 'label option
   | Arguments of string
   | PhiAssignment of (string * expr list) list

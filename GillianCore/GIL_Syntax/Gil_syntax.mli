@@ -713,6 +713,14 @@ module Cmd : sig
   (** Optional bindings for procedure calls *)
   type logic_bindings_t = string * (string * Expr.t) list
 
+  type 'label function_call = {
+    var_name : string;
+    fct_name : Expr.t;
+    args : Expr.t list;
+    err_lab : 'label option;
+    bindings : logic_bindings_t option;
+  }
+
   type 'label t =
     | Skip  (** Skip *)
     | Assignment of string * Expr.t  (** Variable Assignment *)
@@ -720,11 +728,10 @@ module Cmd : sig
     | Logic of LCmd.t  (** Logic commands *)
     | Goto of 'label  (** Unconditional goto *)
     | GuardedGoto of Expr.t * 'label * 'label  (** Conditional goto *)
-    | Call of
-        string * Expr.t * Expr.t list * 'label option * logic_bindings_t option
-        (** Procedure call *)
+    | Call of 'label function_call  (** Procedure call *)
     | ECall of string * Expr.t * Expr.t list * 'label option
         (** External Procedure call *)
+    | Par of 'label function_call list  (** Parallel procedure calls *)
     | Apply of string * Expr.t * 'label option
         (** Application-style procedure call *)
     | Arguments of string  (** Arguments of the currently executing function *)
@@ -733,6 +740,13 @@ module Cmd : sig
     | ReturnError  (** Error return *)
     | Fail of string * Expr.t list  (** Failure *)
   [@@deriving yojson]
+
+  (** Legacy interface to simplify migration to the new call definition as a record *)
+  val call :
+    string * Expr.t * Expr.t list * 'label option * logic_bindings_t option ->
+    'label t
+
+  (** @deprecated Use {!Visitors.endo} instead *)
 
   (** Pretty-printer *)
   val pp : pp_label:'a Fmt.t -> Format.formatter -> 'a t -> unit
@@ -1271,15 +1285,7 @@ module Visitors : sig
            ; visit_Bool : 'c -> Literal.t -> bool -> Literal.t
            ; visit_BooleanType : 'c -> Type.t -> Type.t
            ; visit_Branch : 'c -> LCmd.t -> Formula.t -> LCmd.t
-           ; visit_Call :
-               'c ->
-               'f Cmd.t ->
-               string ->
-               Expr.t ->
-               Expr.t list ->
-               'f option ->
-               (string * (string * Expr.t) list) option ->
-               'f Cmd.t
+           ; visit_Call : 'c -> 'f Cmd.t -> 'f Cmd.function_call -> 'f Cmd.t
            ; visit_Car : 'c -> UnOp.t -> UnOp.t
            ; visit_Cdr : 'c -> UnOp.t -> UnOp.t
            ; visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
@@ -1291,6 +1297,7 @@ module Visitors : sig
                Expr.t list ->
                'f option ->
                'f Cmd.t
+           ; visit_Par : 'c -> 'f Cmd.t -> 'f Cmd.function_call list -> 'f Cmd.t
            ; visit_EList : 'c -> Expr.t -> Expr.t list -> Expr.t
            ; visit_ESet : 'c -> Expr.t -> Expr.t list -> Expr.t
            ; visit_Emp : 'c -> Asrt.t -> Asrt.t
@@ -1464,6 +1471,8 @@ module Visitors : sig
                string * (string * Expr.t) list
            ; visit_binop : 'c -> BinOp.t -> BinOp.t
            ; visit_bispec : 'c -> BiSpec.t -> BiSpec.t
+           ; visit_function_call :
+               'c -> 'f Cmd.function_call -> 'f Cmd.function_call
            ; visit_cmd : 'c -> 'f Cmd.t -> 'f Cmd.t
            ; visit_constant : 'c -> Constant.t -> Constant.t
            ; visit_expr : 'c -> Expr.t -> Expr.t
@@ -1518,17 +1527,7 @@ module Visitors : sig
       method visit_Bool : 'c -> Literal.t -> bool -> Literal.t
       method visit_BooleanType : 'c -> Type.t -> Type.t
       method visit_Branch : 'c -> LCmd.t -> Formula.t -> LCmd.t
-
-      method visit_Call :
-        'c ->
-        'f Cmd.t ->
-        string ->
-        Expr.t ->
-        Expr.t list ->
-        'f option ->
-        (string * (string * Expr.t) list) option ->
-        'f Cmd.t
-
+      method visit_Call : 'c -> 'f Cmd.t -> 'f Cmd.function_call -> 'f Cmd.t
       method visit_Car : 'c -> UnOp.t -> UnOp.t
       method visit_Cdr : 'c -> UnOp.t -> UnOp.t
       method visit_Constant : 'c -> Literal.t -> Constant.t -> Literal.t
@@ -1542,6 +1541,7 @@ module Visitors : sig
         'f option ->
         'f Cmd.t
 
+      method visit_Par : 'c -> 'f Cmd.t -> 'f Cmd.function_call list -> 'f Cmd.t
       method visit_EList : 'c -> Expr.t -> Expr.t list -> Expr.t
       method visit_ESet : 'c -> Expr.t -> Expr.t list -> Expr.t
       method visit_Emp : 'c -> Asrt.t -> Asrt.t
@@ -1736,6 +1736,10 @@ module Visitors : sig
       method private visit_bool : 'env. 'env -> bool -> bool
       method private visit_bytes : 'env. 'env -> bytes -> bytes
       method private visit_char : 'env. 'env -> char -> char
+
+      method visit_function_call :
+        'c -> 'f Cmd.function_call -> 'f Cmd.function_call
+
       method visit_cmd : 'c -> 'f Cmd.t -> 'f Cmd.t
       method visit_constant : 'c -> Constant.t -> Constant.t
       method visit_expr : 'c -> Expr.t -> Expr.t
@@ -1819,14 +1823,7 @@ module Visitors : sig
            ; visit_Bool : 'c -> bool -> 'f
            ; visit_BooleanType : 'c -> 'f
            ; visit_Branch : 'c -> Formula.t -> 'f
-           ; visit_Call :
-               'c ->
-               string ->
-               Expr.t ->
-               Expr.t list ->
-               'g option ->
-               (string * (string * Expr.t) list) option ->
-               'f
+           ; visit_Call : 'c -> 'g Cmd.function_call -> 'f
            ; visit_Car : 'c -> 'f
            ; visit_Cdr : 'c -> 'f
            ; visit_Constant : 'c -> Constant.t -> 'f
@@ -1834,6 +1831,7 @@ module Visitors : sig
            ; visit_FDiv : 'c -> 'f
            ; visit_ECall :
                'c -> string -> Expr.t -> Expr.t list -> 'g option -> 'f
+           ; visit_Par : 'c -> 'g Cmd.function_call list -> 'f
            ; visit_EList : 'c -> Expr.t list -> 'f
            ; visit_ESet : 'c -> Expr.t list -> 'f
            ; visit_Emp : 'c -> 'f
@@ -1991,6 +1989,7 @@ module Visitors : sig
            ; visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
            ; visit_binop : 'c -> BinOp.t -> 'f
            ; visit_bispec : 'c -> BiSpec.t -> 'f
+           ; visit_function_call : 'c -> 'g Cmd.function_call -> 'f
            ; visit_cmd : 'c -> 'g Cmd.t -> 'f
            ; visit_constant : 'c -> Constant.t -> 'f
            ; visit_expr : 'c -> Expr.t -> 'f
@@ -2041,16 +2040,7 @@ module Visitors : sig
       method visit_Bool : 'c -> bool -> 'f
       method visit_BooleanType : 'c -> 'f
       method visit_Branch : 'c -> Formula.t -> 'f
-
-      method visit_Call :
-        'c ->
-        string ->
-        Expr.t ->
-        Expr.t list ->
-        'g option ->
-        (string * (string * Expr.t) list) option ->
-        'f
-
+      method visit_Call : 'c -> 'g Cmd.function_call -> 'f
       method visit_Car : 'c -> 'f
       method visit_Cdr : 'c -> 'f
       method visit_Constant : 'c -> Constant.t -> 'f
@@ -2060,6 +2050,7 @@ module Visitors : sig
       method visit_ECall :
         'c -> string -> Expr.t -> Expr.t list -> 'g option -> 'f
 
+      method visit_Par : 'c -> 'g Cmd.function_call list -> 'f
       method visit_EList : 'c -> Expr.t list -> 'f
       method visit_ESet : 'c -> Expr.t list -> 'f
       method visit_Emp : 'c -> 'f
@@ -2222,6 +2213,7 @@ module Visitors : sig
       method visit_bindings : 'c -> string * (string * Expr.t) list -> 'f
       method visit_binop : 'c -> BinOp.t -> 'f
       method visit_bispec : 'c -> BiSpec.t -> 'f
+      method visit_function_call : 'c -> 'g Cmd.function_call -> 'f
       method visit_cmd : 'c -> 'g Cmd.t -> 'f
       method visit_constant : 'c -> Constant.t -> 'f
       method visit_expr : 'c -> Expr.t -> 'f
@@ -2275,19 +2267,13 @@ module Visitors : sig
            ; visit_Bool : 'c -> bool -> unit
            ; visit_BooleanType : 'c -> unit
            ; visit_Branch : 'c -> Formula.t -> unit
-           ; visit_Call :
-               'c ->
-               string ->
-               Expr.t ->
-               Expr.t list ->
-               'f option ->
-               Cmd.logic_bindings_t option ->
-               unit
+           ; visit_Call : 'c -> 'f Cmd.function_call -> unit
            ; visit_Car : 'c -> unit
            ; visit_Cdr : 'c -> unit
            ; visit_Constant : 'c -> Constant.t -> unit
            ; visit_ECall :
                'c -> string -> Expr.t -> Expr.t list -> 'f option -> unit
+           ; visit_Par : 'c -> 'f Cmd.function_call list -> unit
            ; visit_EList : 'c -> Expr.t list -> unit
            ; visit_ESet : 'c -> Expr.t list -> unit
            ; visit_Emp : 'c -> unit
@@ -2447,6 +2433,7 @@ module Visitors : sig
            ; visit_bindings : 'c -> string * (string * Expr.t) list -> unit
            ; visit_binop : 'c -> BinOp.t -> unit
            ; visit_bispec : 'c -> BiSpec.t -> unit
+           ; visit_function_call : 'c -> 'f Cmd.function_call -> unit
            ; visit_cmd : 'c -> 'f Cmd.t -> unit
            ; visit_constant : 'c -> Constant.t -> unit
            ; visit_expr : 'c -> Expr.t -> unit
@@ -2496,16 +2483,7 @@ module Visitors : sig
       method visit_Bool : 'c -> bool -> unit
       method visit_BooleanType : 'c -> unit
       method visit_Branch : 'c -> Formula.t -> unit
-
-      method visit_Call :
-        'c ->
-        string ->
-        Expr.t ->
-        Expr.t list ->
-        'f option ->
-        (string * (string * Expr.t) list) option ->
-        unit
-
+      method visit_Call : 'c -> 'f Cmd.function_call -> unit
       method visit_Car : 'c -> unit
       method visit_Cdr : 'c -> unit
       method visit_Constant : 'c -> Constant.t -> unit
@@ -2513,6 +2491,7 @@ module Visitors : sig
       method visit_ECall :
         'c -> string -> Expr.t -> Expr.t list -> 'f option -> unit
 
+      method visit_Par : 'c -> 'f Cmd.function_call list -> unit
       method visit_EList : 'c -> Expr.t list -> unit
       method visit_ESet : 'c -> Expr.t list -> unit
       method visit_Emp : 'c -> unit
@@ -2684,6 +2663,7 @@ module Visitors : sig
       method private visit_bool : 'env. 'env -> bool -> unit
       method private visit_bytes : 'env. 'env -> bytes -> unit
       method private visit_char : 'env. 'env -> char -> unit
+      method visit_function_call : 'c -> 'f Cmd.function_call -> unit
       method visit_cmd : 'c -> 'f Cmd.t -> unit
       method visit_constant : 'c -> Constant.t -> unit
       method visit_expr : 'c -> Expr.t -> unit

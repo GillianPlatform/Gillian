@@ -137,13 +137,7 @@ let rem_freed heap pfs gamma loc =
 
 let alloc heap _pfs _gamma (size : int) =
   let loc = WislSHeap.alloc heap size in
-  Ok
-    [
-      ( heap,
-        [ Expr.Lit (Literal.Loc loc); Expr.Lit (Literal.Int Z.zero) ],
-        [],
-        [] );
-    ]
+  Ok [ (heap, [ Expr.ALoc loc; Expr.Lit (Literal.Int Z.zero) ], [], []) ]
 
 let dispose heap pfs gamma loc_expr =
   match resolve_loc pfs gamma loc_expr with

@@ -310,6 +310,114 @@ module Make
         let state' = set_store state store in
         state'
 
+  let rec run_par_spec_aux fcs astate =
+    match fcs with
+    | [] -> Ok []
+    | (existential_bindings, name, params, up, x, args) :: rest -> (
+        L.verbose (fun m ->
+            m "INSIDE RUN spec of %s with the following UP:@\n%a@\n" name UP.pp
+              up);
+
+        let old_store = get_store astate in
+        let new_store =
+          try Store.init (List.combine params args)
+          with Invalid_argument _ ->
+            let message =
+              Fmt.str
+                "Running spec of %s which takes %i parameters with the \
+                 following %i arguments : %a"
+                name (List.length params) (List.length args)
+                (Fmt.Dump.list Val.pp) args
+            in
+            raise (Invalid_argument message)
+        in
+        let astate' = set_store astate new_store in
+        let existential_bindings =
+          Option.value ~default:[] existential_bindings
+        in
+        let existential_bindings =
+          List.map (fun (x, v) -> (Expr.LVar x, v)) existential_bindings
+        in
+        let store_bindings = Store.bindings new_store in
+        let store_bindings =
+          List.map (fun (x, v) -> (Expr.PVar x, v)) store_bindings
+        in
+        let subst = ESubst.init (existential_bindings @ store_bindings) in
+
+        L.verbose (fun m ->
+            m "About to use the spec of %s with the following UP:@\n%a@\n" name
+              UP.pp up);
+        match SUnifier.unify astate' subst up FunctionCall with
+        | Ok rets ->
+            let open Syntaxes.Result in
+            let ( let++ ) x f = List.concat_map f x in
+            let lambda acc (frame_state, subst, posts) =
+              let* acc = acc in
+              let frame_state = set_store frame_state (Store.copy old_store) in
+              let* rets = run_par_spec_aux rest frame_state in
+              let frames =
+                match rets with
+                | [] -> [ frame_state ]
+                | l -> List.map fst l
+              in
+              L.verbose (fun m ->
+                  m "Returned from recursive call with length %s"
+                    (string_of_int @@ List.length rets));
+              let fl, posts =
+                match posts with
+                | Some (fl, posts) -> (fl, posts)
+                | _ ->
+                    let msg =
+                      Printf.sprintf
+                        "SYNTAX ERROR: Spec of %s does not have a postcondition"
+                        name
+                    in
+                    L.normal (fun m -> m "%s" msg);
+                    raise (Failure msg)
+              in
+              (* OK FOR DELAY ENTAILMENT *)
+              let res =
+                let++ frame_state = frames in
+                let frame_store = get_store frame_state in
+                let frame_state =
+                  set_store frame_state (Store.copy new_store)
+                in
+                let++ final_state =
+                  SUnifier.produce_posts frame_state subst posts
+                in
+                let final_store = get_store final_state in
+                let v_ret = Store.get final_store Names.return_variable in
+                let final_state =
+                  set_store final_state (Store.copy frame_store)
+                in
+                let v_ret =
+                  Option.value
+                    ~default:(Option.get (Val.from_expr (Lit Undefined)))
+                    v_ret
+                in
+                let final_state = update_store final_state x v_ret in
+                let _, final_states = simplify ~unification:true final_state in
+                List.map
+                  (fun final_state ->
+                    ( snd
+                        (Option.get
+                           (SUnifier.unfold_concrete_preds final_state)),
+                      fl ))
+                  final_states
+              in
+              Ok (acc @ res)
+            in
+            List.fold_left lambda (Ok []) rets
+        | Error errs ->
+            let msg =
+              Fmt.str
+                "WARNING: Failed to unify against the precondition of \
+                 procedure %s"
+                name
+            in
+            L.normal (fun m -> m "%s" msg);
+            Error errs)
+
   (* FIXME: This needs to change -> we need to return a unification ret type, so we can
       compose with bi-abduction at the spec level *)
   let run_spec_aux
@@ -1092,6 +1200,28 @@ module Make
     | Some (_, subst_lst) ->
         run_spec_aux ~existential_bindings:subst_lst spec.data.spec_name
           spec.data.spec_params spec.up astate (Some x) args
+
+  let run_par_spec
+      (fcs :
+        (UP.spec * string * vt list * (string * (string * vt) list) option) list)
+      (astate : t) : ((t * Flag.t) list, err_t list) result =
+    let fcs =
+      List.map
+        (fun ((spec : UP.spec), x, args, subst) ->
+          let existential_bindings =
+            match subst with
+            | Some (_, subst_lst) -> Some subst_lst
+            | None -> None
+          in
+          ( existential_bindings,
+            spec.data.spec_name,
+            spec.data.spec_params,
+            spec.up,
+            Some x,
+            args ))
+        fcs
+    in
+    run_par_spec_aux fcs astate
 
   let unify
       (astate : t)

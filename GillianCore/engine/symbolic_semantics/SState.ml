@@ -266,7 +266,7 @@ module Make (SMemory : SMemory.S) :
     let _, _, pfs, gamma, _ = state in
     let ps =
       List.map
-        (Reduction.reduce_formula
+        (Reduction.reduce_formula ~unification
            ~time:("SState: assume_a: " ^ time)
            ~pfs ~gamma)
         ps
@@ -532,6 +532,12 @@ module Make (SMemory : SMemory.S) :
       (_ : (string * (string * vt) list) option) :
       ((t * Flag.t) list, err_t list) result =
     raise (Failure "ERROR: run_spec called for non-abstract execution")
+
+  let run_par_spec
+      (_ :
+        (UP.spec * string * vt list * (string * (string * vt) list) option) list)
+      (_ : t) : ((t * Flag.t) list, err_t list) result =
+    raise (Failure "ERROR: run_par_spec called for non-abstract execution")
 
   let unfolding_vals (_ : t) (fs : Formula.t list) : vt list =
     let lvars =
