@@ -80,6 +80,31 @@ let dispose heap params =
            "Invalid parameters for Wisl Dispose Local Action : [ %s ] "
            (String.concat ", " (List.map vstr l)))
 
+let load heap params =
+  let open Literal in
+  match params with
+  | [ Loc loc; Int offset ] -> (
+      match WislCHeap.load heap loc (Z.to_int offset) with
+      | Some value -> Ok (heap, [ value ])
+      | None -> Error ())
+  | l ->
+      failwith
+        (Printf.sprintf
+           "Invalid parameters for Wisl load local action : [ %s ] "
+           (String.concat ", " (List.map vstr l)))
+
+let store heap params =
+  let open Literal in
+  match params with
+  | [ Loc loc; Int offset; value ] ->
+      let () = WislCHeap.store heap loc (Z.to_int offset) value in
+      Ok (heap, [])
+  | l ->
+      failwith
+        (Printf.sprintf
+           "Invalid parameters for Wisl Store Local Action : [ %s ] "
+           (String.concat ", " (List.map vstr l)))
+
 let execute_action name heap params =
   let action = WislLActions.ac_from_str name in
   WislLActions.(
@@ -89,6 +114,8 @@ let execute_action name heap params =
     | RemCell -> rem_cell heap params
     | Alloc -> alloc heap params
     | Dispose -> dispose heap params
+    | Load -> load heap params
+    | Store -> store heap params
     | _ -> failwith "Can't use consumer and producers in concrete execution")
 
 (** Non-implemented functions *)

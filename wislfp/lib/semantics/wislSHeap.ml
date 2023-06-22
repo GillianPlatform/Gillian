@@ -4,7 +4,7 @@ open Gillian.Gil_syntax
 module Solver = Gillian.Logic.FOSolver
 module Reduction = Gillian.Logic.Reduction
 open Gillian.Debugger.Utils
-module PFS = Gillian.Logic.PFS
+module PFS = Gillian.Symbolic.Pure_context
 module L = Logging
 
 type err =

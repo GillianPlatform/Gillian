@@ -25,6 +25,8 @@ let dispose heap loc =
     (fun (l, _) v -> if loc = l then None else Some v)
     heap
 
+let load heap loc ofs = Hashtbl.find_opt heap (loc, ofs)
+let store heap loc ofs v = Hashtbl.replace heap (loc, ofs) v
 let copy heap = Hashtbl.copy heap
 
 (* small things useful for printing *)
