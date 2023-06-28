@@ -40,16 +40,24 @@ let sat ~(pc : Pc.t) formula =
 
 let check_entailment ~(pc : Pc.t) formula =
   let pfs, gamma = (build_full_pfs pc, build_full_gamma pc) in
-  let f =
-    Engine.Reduction.reduce_formula ~unification:pc.unification ~gamma ~pfs
-      formula
-  in
-  match f with
-  | True -> true
-  | False -> false
-  | _ ->
-      FOSolver.check_entailment ~unification:pc.unification
-        Utils.Containers.SS.empty pfs [ f ] gamma
+  try
+    let f =
+      Engine.Reduction.reduce_formula ~unification:pc.unification ~gamma ~pfs
+        formula
+    in
+    match f with
+    | True -> true
+    | False -> false
+    | _ ->
+        FOSolver.check_entailment ~unification:pc.unification
+          Utils.Containers.SS.empty pfs [ f ] gamma
+  with Engine.Reduction.ReductionException (e, msg) ->
+    Logging.verbose (fun m ->
+        m
+          "check_entailment: couldn't check due to an error reducing %a - %s\n\
+           Formula:%a"
+          Gil_syntax.Expr.pp e msg Formula.pp formula);
+    false
 
 let of_comp_fun comp ~(pc : Pc.t) e1 e2 =
   comp ~pfs:(build_full_pfs pc) ~gamma:(build_full_gamma pc) e1 e2

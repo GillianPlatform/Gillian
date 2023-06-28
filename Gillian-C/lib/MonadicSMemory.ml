@@ -834,7 +834,13 @@ let execute_rem_bounds heap params =
 let execute_genvgetdef heap params =
   match params with
   | [ Expr.Lit (Loc loc) ] ->
-      let def = Global_env.find_def heap.genv loc in
+      let def =
+        match Global_env.find_def_opt heap.genv loc with
+        | Some def -> def
+        | None ->
+            Fmt.failwith "execute_genvgetdef: couldn't find %s\nGENV:\n%a" loc
+              Global_env.pp heap.genv
+      in
       let v = Global_env.serialize_def def in
       DR.ok (make_branch ~heap ~rets:[ Expr.Lit (Loc loc); Expr.Lit v ] ())
   | _ -> fail_ungracefully "genv_getdef" params

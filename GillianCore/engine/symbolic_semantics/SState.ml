@@ -257,30 +257,36 @@ module Make (SMemory : SMemory.S) :
       (state : t)
       (ps : Formula.t list) : t option =
     let _, _, pfs, gamma, _ = state in
-    let ps =
-      List.map
-        (Reduction.reduce_formula
-           ~time:("SState: assume_a: " ^ time)
-           ~pfs ~gamma)
-        ps
-    in
-    let result =
-      if
-        production
-        || FOSolver.check_satisfiability
+    try
+      let ps =
+        List.map
+          (Reduction.reduce_formula
              ~time:("SState: assume_a: " ^ time)
-             ~unification
-             (ps @ PFS.to_list pfs)
-             gamma
-      then (
-        List.iter (PFS.extend pfs) ps;
-        Some state)
-      else (
-        Logging.verbose (fun m ->
-            m "assume_a: Couldn't assume %a" (Fmt.Dump.list Formula.pp) ps);
-        None)
-    in
-    result
+             ~pfs ~gamma)
+          ps
+      in
+      let result =
+        if
+          production
+          || FOSolver.check_satisfiability
+               ~time:("SState: assume_a: " ^ time)
+               ~unification
+               (ps @ PFS.to_list pfs)
+               gamma
+        then (
+          List.iter (PFS.extend pfs) ps;
+          Some state)
+        else (
+          Logging.verbose (fun m ->
+              m "assume_a: Couldn't assume %a" (Fmt.Dump.list Formula.pp) ps);
+          None)
+      in
+      result
+    with Reduction.ReductionException (e, msg) ->
+      Logging.verbose (fun m ->
+          m "assume_a: Couldn't assume due to an error reducing %a - %s\nps: %a"
+            Expr.pp e msg (Fmt.Dump.list Formula.pp) ps);
+      None
 
   let assume_t (state : t) (v : vt) (t : Type.t) : t option =
     let _, _, _, gamma, _ = state in
