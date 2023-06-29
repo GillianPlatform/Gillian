@@ -216,30 +216,73 @@ module Make
         in
         (spec, true)
 
+  type proc_stats = {
+    gil_size : int;
+    mutable tests : int;
+    mutable succs : int;
+    mutable bugs : int;
+    mutable time : float;
+  }
+
+  let pp_proc_stats fmt { gil_size; tests; succs; bugs; time } =
+    Fmt.pf fmt "%d, %d, %d, %d, %f" gil_size tests succs bugs time
+
   let run_tests (prog : annot UP.prog) (tests : t list) =
     let num_tests = List.length tests in
     Fmt.pr "Running tests on %d procs.\n@?" num_tests;
+
+    let stats : (string * proc_stats) list ref = ref [] in
+    let get_stats name get_gil_size =
+      match List.assoc_opt name !stats with
+      | Some s -> s
+      | None ->
+          let gil_size = get_gil_size () in
+          let s = { gil_size; tests = 0; succs = 0; bugs = 0; time = 0.0 } in
+          stats := (name, s) :: !stats;
+          s
+    in
+
     let rec run_tests_aux tests succ_specs bug_specs i =
       match tests with
       | [] -> (succ_specs, bug_specs)
       | test :: rest ->
           L.verbose (fun m -> m "Running bi-abduction on %s\n" test.name);
           Fmt.pr "Testing %s... @?" test.name;
+          let start_time = Sys.time () in
           let rets =
             run_test
               (process_sym_exec_result prog test.name test.params test.state)
               prog test
           in
+          let end_time = Sys.time () in
+          let stats =
+            get_stats test.name (fun () ->
+                match Hashtbl.find_opt prog.prog.procs test.name with
+                | None -> -1
+                | Some prog -> Array.length prog.proc_body)
+          in
           let cur_succ_specs, cur_bug_specs = List.partition snd rets in
           let new_succ_specs = succ_specs @ List.map fst cur_succ_specs in
           let new_bug_specs = bug_specs @ List.map fst cur_bug_specs in
+
+          stats.tests <- stats.tests + 1;
+          stats.succs <- stats.succs + List.length cur_succ_specs;
+          stats.bugs <- stats.bugs + List.length cur_bug_specs;
+          stats.time <- stats.time +. (end_time -. start_time);
           Fmt.pr "%dS %dB (%d/%d)\n@?"
             (List.length cur_succ_specs)
             (List.length cur_bug_specs)
             i num_tests;
+
           run_tests_aux rest new_succ_specs new_bug_specs (i + 1)
     in
-    run_tests_aux tests [] [] 1
+    let result = run_tests_aux tests [] [] 1 in
+    Fmt.pr "\nTest results:\nProc, Tests, Succs, Bugs, Time\n";
+    !stats |> List.rev
+    |> List.iter (fun (name, stats) ->
+           Fmt.pr "%s, %a\n" name pp_proc_stats stats);
+    Fmt.pr "@?";
+    result
 
   let get_test_results
       (prog : annot UP.prog)
