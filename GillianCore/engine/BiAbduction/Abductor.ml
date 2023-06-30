@@ -201,19 +201,20 @@ module Make
       (result : result_t) : Spec.t * bool =
     let process_spec = make_spec prog in
     let state_i = SBAState.copy state_i in
+    let add_spec spec =
+      try UP.add_spec prog spec
+      with _ ->
+        L.fail
+          (Format.asprintf "When trying to build an UP for %s, I died!" name)
+    in
     match result with
     | RFail { error_state; _ } ->
         let spec = process_spec name params state_i error_state Flag.Bug in
-        UP.add_spec prog spec;
+        add_spec spec;
         (spec, false)
     | RSucc { flag; final_state; _ } ->
         let spec = process_spec name params state_i final_state flag in
-        let () =
-          try UP.add_spec prog spec
-          with _ ->
-            L.fail
-              (Format.asprintf "When trying to build an UP for %s, I died!" name)
-        in
+        add_spec spec;
         (spec, true)
 
   type proc_stats = {
@@ -277,7 +278,7 @@ module Make
           run_tests_aux rest new_succ_specs new_bug_specs (i + 1)
     in
     let result = run_tests_aux tests [] [] 1 in
-    Fmt.pr "\nTest results:\nProc, Tests, Succs, Bugs, Time\n";
+    Fmt.pr "\nTest results:\nProc, GIL Commands, Tests, Succs, Bugs, Time\n";
     !stats |> List.rev
     |> List.iter (fun (name, stats) ->
            Fmt.pr "%s, %a\n" name pp_proc_stats stats);

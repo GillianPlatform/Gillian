@@ -42,7 +42,6 @@ module Make (SMemory : SMemory.S) :
     | FPure of Formula.t
     | FTypes of (string * Type.t) list
     | FSVars of SS.t
-    | FAsrt of Asrt.t
 
   type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson, show]
   type action_ret = (t * vt list, err_t) result list
@@ -648,7 +647,6 @@ module Make (SMemory : SMemory.S) :
         Fmt.pf fmt "SFSVar(@[<h>%a@])"
           (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
           vs
-    | FAsrt ga -> Fmt.pf fmt "SFAsrt(@[<h>%a@])" Asrt.pp ga
 
   let get_recovery_tactic (state : t) (errs : err_t list) : vt Recovery_tactic.t
       =
@@ -701,13 +699,11 @@ module Make (SMemory : SMemory.S) :
                 types,
                 asrts )
           | FTypes ts -> (mfix, pfs, svars, ts @ types, asrts)
-          | FSVars svars' -> (mfix, pfs, SS.union svars' svars, types, asrts)
-          | FAsrt ga -> (mfix, pfs, svars, types, ga :: asrts))
+          | FSVars svars' -> (mfix, pfs, SS.union svars' svars, types, asrts))
         fix ([], [], SS.empty, [], [])
     in
     (* Check SAT for some notion of checking SAT *)
     let mfixes = List.map (fun fix -> MFix fix) fixes in
-    let asrts = List.map (fun fix -> FAsrt fix) asrts in
     let ftys =
       match types with
       | [] -> []
@@ -743,13 +739,12 @@ module Make (SMemory : SMemory.S) :
       match err with
       | EMem err ->
           List.map
-            (fun (mfixes, pfixes, types, svars, asrts) ->
+            (fun (mfixes, pfixes, types, svars) ->
               List.map (fun pf -> FPure pf) pfixes
               @ (match types with
                 | [] -> []
                 | _ -> [ FTypes types ])
               @ (if svars == SS.empty then [] else [ FSVars svars ])
-              @ List.map (fun asrt -> FAsrt asrt) asrts
               @ List.map (fun l -> MFix l) mfixes)
             (SMemory.get_fixes heap pfs gamma err)
       | EPure f ->
@@ -809,45 +804,35 @@ module Make (SMemory : SMemory.S) :
    [apply_fixes state fixes] applies the fixes [fixes] to the state [state],
    and returns the resulting state, if successful.
    *)
-  let apply_fixes (state : t) (fixes : fix_t list) : t option * Asrt.t list =
+  let apply_fixes (state : t) (fixes : fix_t list) : t list =
     L.verbose (fun m -> m "SState: apply_fixes");
-    let heap, store, pfs, gamma, svars = state in
-
-    let gas = ref [] in
-
-    let apply_fix (heap : heap_t) (new_vars : SS.t) (fix : fix_t) :
-        heap_t * SS.t =
+    let apply_fix (states : t list) (fix : fix_t) : t list =
+      L.verbose (fun m -> m "applying fix: %a" pp_fix fix);
+      let open Syntaxes.List in
+      let* this_state = states in
+      let heap, store, pfs, gamma, svars = this_state in
       match fix with
       (* Apply fix in memory - this may change the pfs and gamma *)
       | MFix fix ->
           L.verbose (fun m -> m "SState: before applying fixes %a" pp state);
-          let heap' = SMemory.apply_fix heap pfs gamma fix in
-          (heap', new_vars)
+          let+ Gbranch.{ value = heap; pc } =
+            SMemory.apply_fix heap pfs gamma fix
+          in
+          (heap, store, pc.pfs, pc.gamma, svars)
       | FPure f ->
           PFS.extend pfs f;
-          (heap, new_vars)
+          [ this_state ]
       | FTypes types ->
           List.iter (fun (x, y) -> Type_env.update gamma x y) types;
-          (heap, new_vars)
-      | FSVars vars -> (heap, SS.union new_vars vars)
-      | FAsrt ga ->
-          L.verbose (fun m ->
-              m
-                "Warning: Non-abstract states do not support assertion fixes, \
-                 hoping you're actually in an abstract state");
-          gas := !gas @ [ ga ];
-          (heap, new_vars)
+          [ this_state ]
+      | FSVars vars -> [ (heap, store, pfs, gamma, SS.union vars svars) ]
     in
 
-    let heap', new_vars =
-      List.fold_left
-        (fun (h, v) f ->
-          L.verbose (fun m -> m "applying fix: %a" pp_fix f);
-          apply_fix h v f)
-        (heap, SS.empty) fixes
-    in
-    L.verbose (fun m -> m "SState: after applying fixes %a" pp state);
-    (Some (heap', store, pfs, gamma, SS.union svars new_vars), !gas)
+    let result = List.fold_left apply_fix [ state ] fixes in
+
+    L.verbose (fun m ->
+        m "SState: after applying fixes %a" (Fmt.Dump.list pp) result);
+    result
 
   let get_equal_values state les =
     let _, _, pfs, _, _ = state in

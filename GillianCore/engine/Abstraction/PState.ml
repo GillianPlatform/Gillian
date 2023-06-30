@@ -1061,28 +1061,12 @@ module Make
     let st, _, _, _ = state in
     State.get_fixes st errs
 
-  let apply_fixes (state : t) (fixes : fix_t list) : t option * Asrt.t list =
+  let apply_fixes (state : t) (fixes : fix_t list) : t list =
+    let open Syntaxes.List in
     L.verbose (fun m -> m "AState: apply_fixes");
     let st, preds, pht, variants = state in
-    let ost, asrts = State.apply_fixes st fixes in
-    match ost with
-    | None -> (None, [])
-    | Some st ->
-        let state = (st, preds, pht, variants) in
-        let ost =
-          List.fold_left
-            (fun os ga ->
-              match os with
-              | Some os -> (
-                  let subst = make_id_subst ga in
-                  match produce os subst ga with
-                  | [ Ok x ] -> Some x
-                  | Ok _ :: _ -> failwith "multiple productions in bi-abduction"
-                  | _ -> None)
-              | None -> None)
-            (Some state) asrts
-        in
-        (ost, [])
+    let+ st = State.apply_fixes st fixes in
+    (st, preds, pht, variants)
 
   let get_equal_values astate =
     let state, _, _, _ = astate in

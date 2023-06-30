@@ -277,48 +277,40 @@ struct
             (* TODO: a better implementation here might be to say that apply_fix returns a list of fixed states, possibly empty *)
             let state' = State.copy state in
             let state_af' = State.copy state_af in
-            let state', _ = State.apply_fixes state' fixes in
-            let state_af', _ = State.apply_fixes state_af' fixes in
-            match state' with
-            | None -> []
-            | Some state' ->
-                let state_af' = Option.get state_af' in
-                L.verbose (fun m -> m "BEFORE THE SIMPLIFICATION!!!");
-                let new_subst, states = State.simplify state' in
-                let state' =
-                  match states with
-                  | [ x ] -> x
-                  | _ ->
-                      L.fail
-                        "Expected exactly one state after simplifying fixed \
-                         state"
-                in
-                L.verbose (fun m ->
-                    m "@[<v 2>SIMPLIFICATION SUBST:@\n%a@]" ESubst.pp new_subst);
-                let subst' = compose_substs subst new_subst in
-                L.(
-                  verbose (fun m ->
-                      m "@[<v 2>AF BEFORE SIMPLIFICATION:@\n%a@]@\n" State.pp
-                        state_af'));
-                let svars = State.get_spec_vars state' in
-                ESubst.filter_in_place new_subst (fun x x_v ->
-                    match x with
-                    | LVar x -> if SS.mem x svars then None else Some x_v
-                    | _ -> Some x_v);
-                let subst_afs =
-                  State.substitution_in_place new_subst state_af'
-                in
-                let state_af' =
-                  match subst_afs with
-                  | [ x ] -> x
-                  | _ ->
-                      L.fail "Subst in place is not allowed to branch on AF!!!!"
-                in
-                L.(
-                  verbose (fun m ->
-                      m "@[<v 2>AF AFTER SIMPLIFICATION:@\n%a@]\n" State.pp
-                        state_af'));
-                search (state', state_af', subst', up))
+            let* state' = State.apply_fixes state' fixes in
+            let* state_af' = State.apply_fixes state_af' fixes in
+            L.verbose (fun m -> m "BEFORE THE SIMPLIFICATION!!!");
+            let new_subst, states = State.simplify state' in
+            let state' =
+              match states with
+              | [ x ] -> x
+              | _ ->
+                  L.fail
+                    "Expected exactly one state after simplifying fixed state"
+            in
+            L.verbose (fun m ->
+                m "@[<v 2>SIMPLIFICATION SUBST:@\n%a@]" ESubst.pp new_subst);
+            let subst' = compose_substs subst new_subst in
+            L.(
+              verbose (fun m ->
+                  m "@[<v 2>AF BEFORE SIMPLIFICATION:@\n%a@]@\n" State.pp
+                    state_af'));
+            let svars = State.get_spec_vars state' in
+            ESubst.filter_in_place new_subst (fun x x_v ->
+                match x with
+                | LVar x -> if SS.mem x svars then None else Some x_v
+                | _ -> Some x_v);
+            let subst_afs = State.substitution_in_place new_subst state_af' in
+            let state_af' =
+              match subst_afs with
+              | [ x ] -> x
+              | _ -> L.fail "Subst in place is not allowed to branch on AF!!!!"
+            in
+            L.(
+              verbose (fun m ->
+                  m "@[<v 2>AF AFTER SIMPLIFICATION:@\n%a@]\n" State.pp
+                    state_af'));
+            search (state', state_af', subst', up))
     in
     search (state, state_af, subst, up)
 
@@ -451,7 +443,7 @@ struct
   let get_fixes (_ : t) (_ : err_t) : fix_t list list =
     raise (Failure "get_fixes not implemented in MakeBiState")
 
-  let apply_fixes (_ : t) (_ : fix_t list) : t option * Asrt.t list =
+  let apply_fixes (_ : t) (_ : fix_t list) : t list =
     raise (Failure "apply_fixes not implemented in MakeBiState")
 
   let get_recovery_tactic (_ : t) (_ : err_t list) =
@@ -489,16 +481,13 @@ struct
     | Error err -> (
         match State.get_fixes state err with
         | [] -> [] (* No fix, we stop *)
-        | fixes -> (
+        | fixes ->
             let* fix = fixes in
             let state' = State.copy state in
             let state_af' = State.copy state_af in
-            let state', _ = State.apply_fixes state' fix in
-            let state_af', _ = State.apply_fixes state_af' fix in
-            match (state', state_af') with
-            | Some state', Some state_af' ->
-                execute_action action (procs, state', state_af') args
-            | _ -> (* If we fail to fix, we give up *) []))
+            let* state' = State.apply_fixes state' fix in
+            let* state_af' = State.apply_fixes state_af' fix in
+            execute_action action (procs, state', state_af') args)
 
   let get_equal_values bi_state =
     let _, state, _ = bi_state in

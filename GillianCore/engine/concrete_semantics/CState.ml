@@ -229,7 +229,7 @@ end = struct
   let get_fixes (_ : t) (_ : err_t) : fix_t list list =
     raise (Failure "Concrete: get_fixes not implemented in CState.Make")
 
-  let apply_fixes (_ : t) (_ : fix_t list) : t option * Asrt.t list =
+  let apply_fixes (_ : t) (_ : fix_t list) : t list =
     raise (Failure "Concrete: apply_fixes not implemented in CState.Make")
 
   let get_equal_values _ vs = vs

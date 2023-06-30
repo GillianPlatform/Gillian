@@ -72,14 +72,10 @@ module type S = sig
     PFS.t ->
     Type_env.t ->
     err_t ->
-    (c_fix_t list
-    * Formula.t list
-    * (string * Type.t) list
-    * Containers.SS.t
-    * Asrt.t list)
+    (c_fix_t list * Formula.t list * (string * Type.t) list * Containers.SS.t)
     list
 
-  val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t
+  val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t list
 end
 
 module Dummy : S with type init_data = unit = struct
@@ -147,4 +143,10 @@ module Modernize (Old_memory : S) = struct
         let+ err = errs in
         let pc = Gpc.copy pc in
         Gbranch.{ pc; value = Error err }
+
+  let apply_fix heap pfs gamma fix =
+    let open Syntaxes.List in
+    let+ heap = apply_fix heap pfs gamma fix in
+    let pc = Gpc.make ~unification:true ~pfs ~gamma () in
+    Gbranch.{ pc; value = heap }
 end
