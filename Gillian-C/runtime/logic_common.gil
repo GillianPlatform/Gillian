@@ -19,8 +19,14 @@ pred i__is_ptr_to_0 (e: List):
   types(#loc : Obj);
 
 pred i__is_ptr (e: List):
-  (e == {{ #loc, #ofs }}) *
+  (e == {{ #loc, #ofs }}) * (0i i<=# #ofs) *
   types(#loc : Obj, #ofs : Int);
+  
+pred i__is_bounded_int(e: List, min: Int, max: Int):
+  (e == {{ "int", #k }}) * types(#k : Int) * (min i<=# #k) * (#k i<=# max);
+
+pred i__is_bounded_long(e: List, min: Int, max: Int):
+  (e == {{ "long", #k }}) * types(#k : Int) * (min i<=# #k) * (#k i<=# max);
 
 (* Actual value getters *)
 
@@ -40,7 +46,7 @@ pred i__ptr_to_0 (+e : List, l : Obj):
   (e == {{ l, 0i }});
 
 pred i__ptr (+e: List, l: Obj, o: Int):
-  (e == {{ l, o }});
+  (e == {{ l, o }}) * (0i i<=# o);
 
 (* arrays *)
 

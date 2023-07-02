@@ -910,13 +910,34 @@ let get_clight_fun clight_prog ident =
   in
   act_f
 
+let bit_size = function
+  | Ctypes.I8 -> 8
+  | I16 -> 16
+  | I32 -> 32
+  | IBool -> 1
+
+let bounds signedness bit_size =
+  let bit_size_m_1 = bit_size - 1 in
+  let open Z in
+  let min, max =
+    match signedness with
+    | Ctypes.Signed -> (neg (one lsl bit_size_m_1), (one lsl bit_size_m_1) - one)
+    | Unsigned -> (zero, (one lsl bit_size) - one)
+  in
+  (Expr.int_z min, Expr.int_z max)
+
 let predicate_from_triple (e, csmt, ct) =
   let pred pname = Asrt.Pred (pname, [ e ]) in
   let open Internal_Predicates in
   match (csmt, ct) with
+  | _, Ctypes.Tpointer (Tfunction _, _) -> pred is_ptr_to_0
   | _, Ctypes.Tpointer _ -> pred is_ptr_opt
-  | AST.Tint, _ -> pred is_int
-  | AST.Tlong, _ -> pred is_long
+  | AST.Tint, Tint (size, signedness, _) ->
+      let min, max = bounds signedness (bit_size size) in
+      Asrt.Pred (Internal_Predicates.is_bounded_int, [ e; min; max ])
+  | AST.Tlong, Tlong (signedness, _) ->
+      let min, max = bounds signedness 64 in
+      Asrt.Pred (Internal_Predicates.is_bounded_long, [ e; min; max ])
   | AST.Tsingle, _ -> pred is_single
   | AST.Tfloat, _ -> pred is_float
   | _ ->

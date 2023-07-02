@@ -206,7 +206,6 @@ module Prefix = struct
 end
 
 module Internal_Predicates = struct
-  let is_int = Prefix.internal_preds ^ "is_int"
   let is_ptr_to_0 = Prefix.internal_preds ^ "is_ptr_to_0"
   let is_ptr = Prefix.internal_preds ^ "is_ptr"
   let is_ptr_to_0_opt = Prefix.internal_preds ^ "is_ptr_to_0_opt"
@@ -215,7 +214,10 @@ module Internal_Predicates = struct
   let is_ptr_to_float_opt = Prefix.internal_preds ^ "is_ptr_to_float_opt"
   let is_ptr_to_long_opt = Prefix.internal_preds ^ "is_ptr_to_long_opt"
   let is_ptr_to_single_opt = Prefix.internal_preds ^ "is_ptr_to_single_opt"
+  let is_int = Prefix.internal_preds ^ "is_int"
+  let is_bounded_int = Prefix.internal_preds ^ "is_bounded_int"
   let is_long = Prefix.internal_preds ^ "is_long"
+  let is_bounded_long = Prefix.internal_preds ^ "is_bounded_long"
   let is_single = Prefix.internal_preds ^ "is_single"
   let is_float = Prefix.internal_preds ^ "is_float"
 
