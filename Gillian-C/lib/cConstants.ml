@@ -38,14 +38,21 @@ module Imports = struct
       (* Common *)
       { file = "unops_common.gil"; arch = any_arch; exec = all_exec };
       { file = "internals.gil"; arch = any_arch; exec = all_exec };
+      { file = "binops_common.gil"; arch = any_arch; exec = all_exec };
+      { file = "logic_common.gil"; arch = any_arch; exec = exec_with_preds };
+      { file = "string.gil"; arch = any_arch; exec = all_exec };
+      (* Global environment *)
       {
         file = "global_environment_common.gil";
         arch = any_arch;
         exec = all_exec;
       };
-      { file = "binops_common.gil"; arch = any_arch; exec = all_exec };
-      { file = "logic_common.gil"; arch = any_arch; exec = exec_with_preds };
-      { file = "string.gil"; arch = any_arch; exec = all_exec };
+      {
+        file = "global_environment_non_bi.gil";
+        arch = any_arch;
+        exec = non_bi_exec;
+      };
+      { file = "global_environment_bi.gil"; arch = any_arch; exec = bi_exec };
       (* Arch64 specific *)
       { file = "stdlib_archi64.gil"; arch = a64; exec = all_exec };
       { file = "stdlib_archi64_verif.gil"; arch = a64; exec = ver_exec };

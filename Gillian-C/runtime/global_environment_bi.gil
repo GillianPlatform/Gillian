@@ -1,0 +1,16 @@
+#internal
+
+(* In bi-abduction, we'll have a lot of function pointers we can't resolve.
+   We'll drop all those paths because they're not interesting. *)
+proc i__get_function_name(v_ptr) {
+         (* The value given should be a pointer *)
+         (* The offset for a pointer to a function should always be 0i *)
+         goto [(typeOf v_ptr = List) and (typeOf (l-nth (v_ptr, 0i)) = Obj) and (l-nth (v_ptr, 1i) = 0i)] ctn1 fl;
+  ctn1:  defl := [genv_getdef](l-nth(v_ptr, 0i));
+         typ := l-nth(l-nth(defl, 1i), 0i);
+         val := l-nth(l-nth(defl, 1i), 1i);
+         goto [typ = "function"] ctn2 fl;
+  ctn2:  ret := val;
+         return;
+  fl:    assume(False)
+};
