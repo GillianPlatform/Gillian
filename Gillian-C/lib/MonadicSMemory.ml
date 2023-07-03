@@ -833,7 +833,7 @@ let execute_rem_bounds heap params =
 
 let execute_genvgetdef heap params =
   match params with
-  | [ (Expr.Lit (Loc loc) | Expr.ALoc loc) ] -> (
+  | [ (Expr.Lit (Loc loc) | Expr.ALoc loc | Expr.LVar loc) ] -> (
       match Global_env.find_def_opt heap.genv loc with
       | Some def ->
           let v = Global_env.serialize_def def in

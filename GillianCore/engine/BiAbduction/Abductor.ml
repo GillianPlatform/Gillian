@@ -88,7 +88,16 @@ module Make
         let _, finals_simplified =
           SPState.simplify ~kill_new_lvars:true state_f
         in
-        let+ final_simplified = finals_simplified in
+        let* final_simplified = finals_simplified in
+        let+ () =
+          (* Final admissibility check *)
+          match
+            SPState.assume_a state_f ~time:"Bi-abd post: final check"
+              ~unification:true [ True ]
+          with
+          | Some _ -> [ () ]
+          | _ -> []
+        in
         Asrt.star
           (List.sort Asrt.compare
              (SPState.to_assertions ~to_keep:pvars final_simplified))
@@ -103,7 +112,16 @@ module Make
             let _, simplifieds =
               SPState.simplify ~kill_new_lvars:true state_i'
             in
-            let+ simplified = simplifieds in
+            let* simplified = simplifieds in
+            let+ () =
+              (* Final admissibility check *)
+              match
+                SPState.assume_a state_i' ~time:"Bi-abd post: final check"
+                  ~unification:true [ True ]
+              with
+              | Some _ -> [ () ]
+              | _ -> []
+            in
             Asrt.star
               (List.sort Asrt.compare
                  (SPState.to_assertions ~to_keep:pvars simplified))
