@@ -313,6 +313,15 @@ module Node = struct
             Delayed.map
               (SVArr.concat_knowing_size (values, size_l) (AllUndef, size_r))
               (fun values -> mk (Array { chunk; values }))
+        | Undef _, Array { chunk; values } ->
+            let size_l, size_r =
+              let open Expr.Infix in
+              let size_chunk = Chunk.size_expr chunk in
+              (size_a / size_chunk, size_b / size_chunk)
+            in
+            Delayed.map
+              (SVArr.concat_knowing_size (AllUndef, size_l) (values, size_r))
+              (fun values -> mk (Array { chunk; values }))
         | Array { chunk; values }, Zeros ->
             let size_l, size_r =
               let open Expr.Infix in
@@ -321,15 +330,6 @@ module Node = struct
             in
             Delayed.map
               (SVArr.concat_knowing_size (values, size_l) (AllZeros, size_r))
-              (fun values -> mk (Array { chunk; values }))
-        | Undef _, Array { chunk; values } ->
-            let size_l, size_r =
-              let open Expr.Infix in
-              let size_chunk = Chunk.size_expr chunk in
-              (size_a / size_chunk, size_b / size_chunk)
-            in
-            Delayed.map
-              (SVArr.concat_knowing_size (AllUndef, size_r) (values, size_l))
               (fun values -> mk (Array { chunk; values }))
         | Zeros, Array { chunk; values } ->
             let size_l, size_r =
