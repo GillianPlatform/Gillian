@@ -360,6 +360,24 @@ module Make
 
   let str_concat = String.concat ", "
 
+  let sort_tests_by_callgraph tests callgraph =
+    Fmt.pr "Got callgraph:\n%a\n" Call_graph.pp callgraph;
+    let rec aux acc rest_tests = function
+      | [] -> (acc, rest_tests)
+      | name :: rest ->
+          let test, rest_tests =
+            List_utils.pop_where (fun t -> t.name = name) rest_tests
+          in
+          aux (acc @ Option.to_list test) rest_tests rest
+    in
+    let sorted_tests, rest_tests =
+      aux [] tests (Call_graph.get_sorted_names callgraph)
+    in
+    let rest_sorted_tests =
+      rest_tests |> List.sort (fun t1 t2 -> Stdlib.compare t1.name t2.name)
+    in
+    sorted_tests @ rest_sorted_tests
+
   let test_procs ~init_data (prog : annot UP.prog) =
     L.verbose (fun m -> m "Starting bi-abductive testing in normal mode");
     let proc_names = Prog.get_noninternal_proc_names prog.prog in
@@ -369,7 +387,7 @@ module Make
     let tests = List.concat_map (testify ~init_data ~prog) bi_specs in
     let test_names tests = str_concat (List.map (fun t -> t.name) tests) in
     L.verbose (fun m -> m "I have tests for: %s" (test_names tests));
-    let tests = List.sort (fun t1 t2 -> Stdlib.compare t1.name t2.name) tests in
+    let tests = sort_tests_by_callgraph tests prog.prog.proc_call_graph in
     L.verbose (fun m -> m "I have tests for: %s" (test_names tests));
     let succ_specs, bug_specs = run_tests prog tests in
     get_test_results prog succ_specs bug_specs
@@ -382,7 +400,7 @@ module Make
       (prog : annot UP.prog)
       ~(init_data : SPState.init_data)
       ~(prev_results : BiAbductionResults.t)
-      ~(reverse_graph : CallGraph.t)
+      ~(reverse_graph : Call_graph.t)
       ~(changed_procs : string list)
       ~(to_test : string list) =
     L.verbose (fun m -> m "Starting bi-abductive testing in incremental mode");
@@ -463,14 +481,14 @@ module Make
       in
       let to_test = proc_changes.changed_procs @ proc_changes.new_procs in
       let to_prune = proc_changes.changed_procs @ proc_changes.deleted_procs in
-      let reverse_graph = CallGraph.to_reverse_graph prev_call_graph in
+      let reverse_graph = Call_graph.to_reverse_graph prev_call_graph in
       let cur_results =
         test_procs_incrementally prog ~init_data ~prev_results ~reverse_graph
           ~changed_procs:proc_changes.changed_procs ~to_test
       in
       let cur_call_graph = SBAInterpreter.call_graph in
-      let () = CallGraph.prune_procs prev_call_graph to_prune in
-      let call_graph = CallGraph.merge prev_call_graph cur_call_graph in
+      let () = Call_graph.prune_procs prev_call_graph to_prune in
+      let call_graph = Call_graph.merge prev_call_graph cur_call_graph in
       let results = BiAbductionResults.merge prev_results cur_results in
       let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
       write_biabduction_results cur_source_files call_graph ~diff results

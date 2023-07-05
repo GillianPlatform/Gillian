@@ -101,21 +101,22 @@ let get_changed_elements
 
 let get_proc_changes prog =
   get_changed_elements ~extract_elems:(get_procs_with_path prog)
-    ~cg_contains:CallGraph.contains_proc ~cg_get_all:CallGraph.get_proc_names
+    ~cg_contains:Call_graph.contains_proc ~cg_get_all:Call_graph.get_proc_names
     ~cur_elems:(Prog.get_proc_names prog)
 
 let get_pred_changes prog =
   get_changed_elements ~extract_elems:(get_preds_with_path prog)
-    ~cg_contains:CallGraph.contains_pred ~cg_get_all:CallGraph.get_pred_names
+    ~cg_contains:Call_graph.contains_pred ~cg_get_all:Call_graph.get_pred_names
     ~cur_elems:(Prog.get_noninternal_pred_names prog)
 
 let get_lemma_changes prog =
   get_changed_elements
     ~extract_elems:(get_lemmas_with_path prog)
-    ~cg_contains:CallGraph.contains_lemma ~cg_get_all:CallGraph.get_lemma_names
+    ~cg_contains:Call_graph.contains_lemma
+    ~cg_get_all:Call_graph.get_lemma_names
     ~cur_elems:(Prog.get_noninternal_lemma_names prog)
 
-let map_to_names call_graph = List.map (CallGraph.get_name call_graph)
+let map_to_names call_graph = List.map (Call_graph.get_name call_graph)
 
 let get_proc_callers
     reverse_graph
@@ -124,7 +125,7 @@ let get_proc_callers
     ~filter_id
     () =
   (* Perform a breadth-first traversal of the reverse call graph *)
-  let open CallGraph in
+  let open Call_graph in
   let rec get_callers visited to_visit dep_procs =
     match to_visit with
     | [] -> dep_procs
@@ -147,7 +148,7 @@ let get_proc_callers
 
 let get_dependent_procs_and_lemmas reverse_graph start_ids ~filter_id =
   (* Perform a breadth-first traversal of the reverse call graph *)
-  let open CallGraph in
+  let open Call_graph in
   let rec get_dependents visited to_visit dep_procs dep_lemmas =
     match to_visit with
     | [] -> (dep_procs, dep_lemmas)
@@ -186,11 +187,11 @@ let get_sym_changes prog ~prev_source_files ~prev_call_graph ~cur_source_files =
   let changed_procs, new_procs, deleted_procs =
     get_proc_changes prog changed_files new_files prev_call_graph
   in
-  let reverse_graph = CallGraph.to_reverse_graph prev_call_graph in
+  let reverse_graph = Call_graph.to_reverse_graph prev_call_graph in
   (* Determine all transitive callers of changed procedures *)
-  let changed_proc_ids = List.map CallGraph.id_of_proc_name changed_procs in
-  let changed_set = CallGraph.IdSet.of_list changed_proc_ids in
-  let filter_id id = not (CallGraph.IdSet.mem id changed_set) in
+  let changed_proc_ids = List.map Call_graph.id_of_proc_name changed_procs in
+  let changed_set = Call_graph.IdSet.of_list changed_proc_ids in
+  let filter_id id = not (Call_graph.IdSet.mem id changed_set) in
   let callers = get_proc_callers reverse_graph changed_proc_ids ~filter_id () in
   { changed_procs; new_procs; deleted_procs; dependent_procs = to_list callers }
 
@@ -208,20 +209,20 @@ let get_verif_changes prog ~prev_source_files ~prev_call_graph ~cur_source_files
   let changed_lemmas, new_lemmas, deleted_lemmas =
     get_lemma_changes prog changed_files new_files prev_call_graph
   in
-  let reverse_graph = CallGraph.to_reverse_graph prev_call_graph in
-  let changed_proc_ids = List.map CallGraph.id_of_proc_name changed_procs in
-  let changed_pred_ids = List.map CallGraph.id_of_pred_name changed_preds in
-  let changed_lemma_ids = List.map CallGraph.id_of_lemma_name changed_lemmas in
+  let reverse_graph = Call_graph.to_reverse_graph prev_call_graph in
+  let changed_proc_ids = List.map Call_graph.id_of_proc_name changed_procs in
+  let changed_pred_ids = List.map Call_graph.id_of_pred_name changed_preds in
+  let changed_lemma_ids = List.map Call_graph.id_of_lemma_name changed_lemmas in
   let changed_ids =
-    CallGraph.IdSet.of_list
+    Call_graph.IdSet.of_list
       (changed_proc_ids @ changed_pred_ids @ changed_lemma_ids)
   in
 
   (* Determine closest callers with specs of changed procedures *)
-  let filter_id id = not (CallGraph.IdSet.mem id changed_ids) in
+  let filter_id id = not (Call_graph.IdSet.mem id changed_ids) in
   let stop_search id =
     let not_in_start_ids = not (List.mem id changed_proc_ids) in
-    let proc_name = CallGraph.get_name reverse_graph id in
+    let proc_name = Call_graph.get_name reverse_graph id in
     let proc = Prog.get_proc_exn prog proc_name in
     not_in_start_ids && Option.is_some proc.proc_spec
   in
@@ -251,10 +252,10 @@ let get_verif_changes prog ~prev_source_files ~prev_call_graph ~cur_source_files
     } )
 
 let get_callers prog ~reverse_graph ~excluded_procs ~proc_name =
-  let start_id = CallGraph.id_of_proc_name proc_name in
-  let excluded_ids = List.map CallGraph.id_of_proc_name excluded_procs in
-  let excluded_ids_set = CallGraph.IdSet.of_list excluded_ids in
-  let filter_id id = not (CallGraph.IdSet.mem id excluded_ids_set) in
+  let start_id = Call_graph.id_of_proc_name proc_name in
+  let excluded_ids = List.map Call_graph.id_of_proc_name excluded_procs in
+  let excluded_ids_set = Call_graph.IdSet.of_list excluded_ids in
+  let filter_id id = not (Call_graph.IdSet.mem id excluded_ids_set) in
   let stop_search id =
     let not_start_proc = Stdlib.compare id start_id != 0 in
     let proc = Prog.get_proc_exn prog proc_name in

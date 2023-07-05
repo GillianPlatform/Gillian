@@ -129,7 +129,7 @@ module type S = sig
     val pp_result : Format.formatter -> result_t list -> unit
   end
 
-  val call_graph : CallGraph.t
+  val call_graph : Call_graph.t
   val reset_call_graph : unit -> unit
 
   (** Evaluates a list of logical commands, in the context of a given state *)

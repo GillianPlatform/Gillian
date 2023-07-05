@@ -1092,6 +1092,7 @@ module Prog : sig
     proc_names : string list;  (** Names of the procedures *)
     predecessors : (string * int * int, int) Hashtbl.t;
         (** Table used for Phi-assignment *)
+    proc_call_graph : Call_graph.t;
   }
 
   (** Makes a full program *)
@@ -1105,6 +1106,7 @@ module Prog : sig
     bi_specs:(string, BiSpec.t) Hashtbl.t ->
     proc_names:string list ->
     predecessors:(string * int * int, int) Hashtbl.t ->
+    ?proc_call_graph:Call_graph.t ->
     unit ->
     ('annot, 'label) t
 
@@ -1118,6 +1120,7 @@ module Prog : sig
     macros:(string, Macro.t) Hashtbl.t ->
     bi_specs:(string, BiSpec.t) Hashtbl.t ->
     proc_names:string list ->
+    ?proc_call_graph:Call_graph.t ->
     unit ->
     ('annot, string) t
 
@@ -1130,6 +1133,7 @@ module Prog : sig
     only_specs:(string, Spec.t) Hashtbl.t ->
     macros:(string, Macro.t) Hashtbl.t ->
     bi_specs:(string, BiSpec.t) Hashtbl.t ->
+    ?proc_call_graph:Call_graph.t ->
     unit ->
     ('annot, int) t
 

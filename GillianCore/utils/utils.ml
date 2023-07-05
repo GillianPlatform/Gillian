@@ -10,6 +10,12 @@ module Arith_utils = struct
   include Arith_utils
 end
 
+(** @canonical Gillian.Utils.Call_graph *)
+module Call_graph = struct
+  (** @inline *)
+  include Call_graph
+end
+
 (** @canonical Gillian.Utils.Compare *)
 module Compare = struct
   (** @inline *)

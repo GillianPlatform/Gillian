@@ -659,10 +659,10 @@ struct
       filter_internal_lemmas prog (lemma_extracting_visitor#visit_proc () proc)
     in
     SS.iter
-      (CallGraph.add_proc_pred_use SAInterpreter.call_graph proc_name)
+      (Call_graph.add_proc_pred_use SAInterpreter.call_graph proc_name)
       preds_used;
     SS.iter
-      (CallGraph.add_proc_lemma_use SAInterpreter.call_graph proc_name)
+      (Call_graph.add_proc_lemma_use SAInterpreter.call_graph proc_name)
       lemmas_used
 
   let record_lemma_dependencies lemma_name (prog : annot UP.prog) =
@@ -675,10 +675,10 @@ struct
         (lemma_extracting_visitor#visit_lemma () lemma)
     in
     SS.iter
-      (CallGraph.add_lemma_pred_use SAInterpreter.call_graph lemma_name)
+      (Call_graph.add_lemma_pred_use SAInterpreter.call_graph lemma_name)
       preds_used;
     SS.iter
-      (CallGraph.add_lemma_call SAInterpreter.call_graph lemma_name)
+      (Call_graph.add_lemma_call SAInterpreter.call_graph lemma_name)
       lemmas_used
 
   let record_preds_used_by_pred pred_name (prog : annot UP.prog) =
@@ -687,7 +687,7 @@ struct
       filter_internal_preds prog (pred_extracting_visitor#visit_pred () pred)
     in
     SS.iter
-      (CallGraph.add_pred_call SAInterpreter.call_graph pred_name)
+      (Call_graph.add_pred_call SAInterpreter.call_graph pred_name)
       preds_used
 
   let check_previously_verified prev_results cur_verified =
@@ -912,8 +912,8 @@ struct
           lemma_changes.changed_lemmas @ lemma_changes.deleted_lemmas
           @ lemma_changes.dependent_lemmas
         in
-        let () = CallGraph.prune_procs prev_call_graph procs_to_prune in
-        let () = CallGraph.prune_lemmas prev_call_graph lemmas_to_prune in
+        let () = Call_graph.prune_procs prev_call_graph procs_to_prune in
+        let () = Call_graph.prune_lemmas prev_call_graph lemmas_to_prune in
         let () =
           VerificationResults.prune results (procs_to_prune @ lemmas_to_prune)
         in
@@ -935,7 +935,7 @@ struct
         in
         let cur_call_graph = SAInterpreter.call_graph in
         let cur_results = global_results in
-        let call_graph = CallGraph.merge prev_call_graph cur_call_graph in
+        let call_graph = Call_graph.merge prev_call_graph cur_call_graph in
         let results = VerificationResults.merge results cur_results in
         let diff = Fmt.str "%a" ChangeTracker.pp_proc_changes proc_changes in
         write_verif_results cur_source_files call_graph ~diff results)

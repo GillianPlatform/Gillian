@@ -1125,16 +1125,8 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
         in
         Hashtbl.replace bi_specs name bispec)
       gil_procs;
-  Prog.
-    {
-      imports =
-        List.map (fun imp -> (imp, false)) WislConstants.internal_imports;
-      lemmas = gil_lemmas;
-      preds = gil_preds;
-      procs = gil_procs;
-      proc_names;
-      bi_specs;
-      only_specs = Hashtbl.create 1;
-      macros = Hashtbl.create 1;
-      predecessors = Hashtbl.create 1;
-    }
+  Prog.make
+    ~imports:(List.map (fun imp -> (imp, false)) WislConstants.internal_imports)
+    ~lemmas:gil_lemmas ~preds:gil_preds ~procs:gil_procs ~proc_names ~bi_specs
+    ~only_specs:(Hashtbl.create 1) ~macros:(Hashtbl.create 1)
+    ~predecessors:(Hashtbl.create 1) ()

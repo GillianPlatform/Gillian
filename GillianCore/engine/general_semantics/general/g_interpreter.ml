@@ -332,8 +332,8 @@ struct
   (** Syntax error, carrying a string description *)
   exception Syntax_error of string
 
-  let call_graph = CallGraph.make ~init_capacity:128 ()
-  let reset_call_graph () = CallGraph.reset call_graph
+  let call_graph = Call_graph.make ~init_capacity:128 ()
+  let reset_call_graph () = Call_graph.reset call_graph
 
   (* Often-used values *)
   let vtrue = Val.from_literal (Bool true)
@@ -921,7 +921,7 @@ struct
 
           let spec, params = get_spec_and_params prog pid state in
           let caller = Call_stack.get_cur_proc_id cs in
-          let () = CallGraph.add_proc_call call_graph caller pid in
+          let () = Call_graph.add_proc_call call_graph caller pid in
           let args = build_args v_args params in
 
           let is_internal_proc proc_name =
