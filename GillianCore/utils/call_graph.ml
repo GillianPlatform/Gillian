@@ -244,7 +244,6 @@ let select_with_least_children call_graph =
   |> Option.map fst
 
 let get_sorted_names call_graph =
-  let call_graph = to_reverse_graph call_graph in
   let rec aux acc =
     match select_leaves call_graph with
     | [] -> (

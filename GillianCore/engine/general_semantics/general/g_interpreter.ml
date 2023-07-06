@@ -898,7 +898,8 @@ struct
           } =
             eval_state
           in
-          if Hashtbl.mem prog.prog.bi_specs pid then
+          if Hashtbl.mem prog.prog.bi_specs pid then (
+            Fmt.pr "Susping!\n";
             [
               CConf.ConfSusp
                 {
@@ -912,7 +913,7 @@ struct
                   branch_path;
                   branch_count = b_counter;
                 };
-            ]
+            ])
           else symb_exec_proc ()
 
         let f x pid v_args j subst eval_state =
@@ -935,8 +936,11 @@ struct
           let spec_exec_proc () =
             match spec with
             | Some spec ->
+                Fmt.pr "Calling %s WITH SPEC\n" pid;
                 exec_with_spec spec x j args pid subst symb_exec_proc eval_state
-            | None -> exec_without_spec pid symb_exec_proc eval_state
+            | None ->
+                Fmt.pr "Without %s WITHOUT SPEC\n" pid;
+                exec_without_spec pid symb_exec_proc eval_state
           in
 
           match Exec_mode.biabduction_exec !Config.current_exec_mode with
@@ -2086,6 +2090,7 @@ struct
             eval_step_state
 
       let susp (cconf : CConf.susp) eval_step_state =
+        Fmt.pr "Handing susp!\n";
         let {
           eval_step;
           ret_fun;

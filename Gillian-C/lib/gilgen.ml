@@ -551,7 +551,7 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
         match ex with
         | Csharpminor.Eaddrof l -> [ true_name l ]
         | _ ->
-            Fmt.pr "Scall with unknown function!";
+            Fmt.pr "Scall with unknown function!\n";
             []
       in
       let leftvar =
@@ -966,7 +966,7 @@ let rec trans_globdefs
         new_bi_specs,
         proc :: fs,
         new_syms,
-        (symbol, callees) :: fcalls )
+        (symbol, original_sym, callees) :: fcalls )
   | (id, Gfun (External f)) :: r
     when (is_builtin_func (true_name id) && not_implemented f)
          || is_gil_func (true_name id) exec_mode ->
@@ -1035,15 +1035,22 @@ let make_init_proc init_cmds =
 
 let make_callgraph fcalls =
   let call_graph = Call_graph.make () in
-  let fnames = List.map fst fcalls |> SS.of_list in
-  SS.iter (Call_graph.add_proc call_graph) fnames;
+  let fnames = Hashtbl.create (List.length fcalls * 2) in
   fcalls
-  |> List.iter (fun (caller, callees) ->
+  |> List.iter (fun (sym, original_sym, _) ->
+         Call_graph.add_proc call_graph sym;
+         Hashtbl.add fnames sym sym;
+         Hashtbl.add fnames original_sym sym);
+  fcalls
+  |> List.iter (fun (caller, _, callees) ->
          callees
          |> List.iter (fun callee ->
-                if SS.mem callee fnames then
-                  Call_graph.add_proc_call call_graph caller callee
-                else Fmt.pr "Callee %s (called by %s) not found\n" callee caller));
+                match Hashtbl.find_opt fnames callee with
+                | Some callee ->
+                    Fmt.pr "Adding %s->%s!\n" caller callee;
+                    Call_graph.add_proc_call call_graph caller callee
+                | None ->
+                    Fmt.pr "Callee %s (called by %s) not found\n" callee caller));
   call_graph
 
 let trans_program

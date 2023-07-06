@@ -343,18 +343,16 @@ module Make
   let str_concat = String.concat ", "
 
   let sort_tests_by_callgraph tests callgraph =
-    Fmt.pr "Got callgraph:\n%a\n" Call_graph.pp callgraph;
     let rec aux acc rest_tests = function
       | [] -> (acc, rest_tests)
       | name :: rest ->
-          let test, rest_tests =
-            List_utils.pop_where (fun t -> t.name = name) rest_tests
+          let selected_tests, rest_tests =
+            List.partition (fun t -> t.name = name) rest_tests
           in
-          aux (acc @ Option.to_list test) rest_tests rest
+          aux (acc @ selected_tests) rest_tests rest
     in
-    let sorted_tests, rest_tests =
-      aux [] tests (Call_graph.get_sorted_names callgraph)
-    in
+    let callgraph_order = Call_graph.get_sorted_names callgraph in
+    let sorted_tests, rest_tests = aux [] tests callgraph_order in
     let rest_sorted_tests =
       rest_tests |> List.sort (fun t1 t2 -> Stdlib.compare t1.name t2.name)
     in
