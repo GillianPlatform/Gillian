@@ -936,10 +936,10 @@ struct
           let spec_exec_proc () =
             match spec with
             | Some spec ->
-                Fmt.pr "Calling %s WITH SPEC\n" pid;
+                (* Fmt.pr "Calling %s WITH SPEC\n" pid; *)
                 exec_with_spec spec x j args pid subst symb_exec_proc eval_state
             | None ->
-                Fmt.pr "Without %s WITHOUT SPEC\n" pid;
+                (* Fmt.pr "Calling %s WITHOUT SPEC\n" pid; *)
                 exec_without_spec pid symb_exec_proc eval_state
           in
 

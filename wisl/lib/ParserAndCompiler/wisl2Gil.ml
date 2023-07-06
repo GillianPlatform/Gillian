@@ -960,6 +960,9 @@ let rec compile_function
       proc_body = gil_body;
       proc_spec = gil_spec;
       proc_params = params;
+      proc_aliases = [];
+      proc_calls = [];
+      (* TODO *)
     }
   :: other_procs
 

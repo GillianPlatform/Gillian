@@ -767,6 +767,7 @@ let trans_function
     ?(gil_annot = Gil_logic_gen.empty)
     ?(exec_mode = Exec_mode.Verification)
     ~clight_prog
+    ~original_fname
     filepath
     fname
     fdef
@@ -818,18 +819,17 @@ let trans_function
   in
   let body_with_reg_and_ret = add_return body_with_registrations in
   let params = List.map true_name fn_params in
-  let proc =
-    Proc.
-      {
-        proc_name = fname;
-        proc_source_path = Some filepath;
-        proc_internal = false;
-        proc_body = Array.of_list body_with_reg_and_ret;
-        proc_params = params;
-        proc_spec = None;
-      }
-  in
-  (proc, callees)
+  Proc.
+    {
+      proc_name = fname;
+      proc_source_path = Some filepath;
+      proc_internal = false;
+      proc_body = Array.of_list body_with_reg_and_ret;
+      proc_params = params;
+      proc_spec = None;
+      proc_aliases = [ original_fname ];
+      proc_calls = callees;
+    }
 
 let set_global_var symbol v =
   let loc = Global_env.location_of_symbol symbol in
@@ -937,10 +937,10 @@ let rec trans_globdefs
       ~mangled_syms
   in
   match globdefs with
-  | [] -> ([], [], [], [], [], [])
+  | [] -> ([], [], [], [], [])
   | (id, Gfun (Internal f)) :: r ->
       (* Internally-defined function (has either file or global scope) *)
-      let genv_defs, init_acts, bi_specs, fs, syms, fcalls = trans_globdefs r in
+      let genv_defs, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let original_sym = true_name id in
       let has_global_scope = SS.mem original_sym global_syms in
       let symbol =
@@ -958,15 +958,11 @@ let rec trans_globdefs
         if has_global_scope then { name = symbol; defined = true } :: syms
         else syms
       in
-      let proc, callees =
-        trans_function ~clight_prog ~gil_annot ~exec_mode filepath symbol f id
+      let proc =
+        trans_function ~clight_prog ~gil_annot ~exec_mode
+          ~original_fname:original_sym filepath symbol f id
       in
-      ( new_def :: genv_defs,
-        init_acts,
-        new_bi_specs,
-        proc :: fs,
-        new_syms,
-        (symbol, original_sym, callees) :: fcalls )
+      (new_def :: genv_defs, init_acts, new_bi_specs, proc :: fs, new_syms)
   | (id, Gfun (External f)) :: r
     when (is_builtin_func (true_name id) && not_implemented f)
          || is_gil_func (true_name id) exec_mode ->
@@ -974,29 +970,29 @@ let rec trans_globdefs
       trans_globdefs r
   | (id, Gfun (External f)) :: r when not_implemented f ->
       (* Externally-defined, non-built-in function *)
-      let defs, init_acts, bi_specs, fs, syms, fcalls = trans_globdefs r in
+      let defs, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let symbol = true_name id in
       let new_sym = { name = symbol; defined = false } in
-      (defs, init_acts, bi_specs, fs, new_sym :: syms, fcalls)
+      (defs, init_acts, bi_specs, fs, new_sym :: syms)
   | (id, Gfun (External f)) :: r ->
       (* Externally-defined, built-in function with existing implementation *)
       let symbol = true_name id in
-      let defs, init_acts, bi_specs, fs, syms, fcalls = trans_globdefs r in
+      let defs, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let target, is_ext_call = intern_impl_of_extern_function f in
       if not is_ext_call then
         let new_def = (symbol, Global_env.FunDef target) in
-        (new_def :: defs, init_acts, bi_specs, fs, syms, fcalls)
-      else (defs, init_acts, bi_specs, fs, syms, fcalls)
+        (new_def :: defs, init_acts, bi_specs, fs, syms)
+      else (defs, init_acts, bi_specs, fs, syms)
   | (id, Gvar v) :: r
     when Camlcoq.Z.to_int (init_data_list_size v.gvar_init) == 0 ->
       (* Externally-defined global variable *)
-      let defs, init_acts, bi_specs, fs, syms, fcalls = trans_globdefs r in
+      let defs, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let symbol = true_name id in
       let new_sym = { name = symbol; defined = false } in
-      (defs, init_acts, bi_specs, fs, new_sym :: syms, fcalls)
+      (defs, init_acts, bi_specs, fs, new_sym :: syms)
   | (id, Gvar v) :: r ->
       (* Internally-defined global variable (has either file or global scope) *)
-      let defs, init_acts, bi_specs, fs, syms, fcalls = trans_globdefs r in
+      let defs, init_acts, bi_specs, fs, syms = trans_globdefs r in
       let original_sym = true_name id in
       let has_global_scope = SS.mem original_sym global_syms in
       let symbol =
@@ -1009,7 +1005,7 @@ let rec trans_globdefs
         if has_global_scope then { name = symbol; defined = true } :: syms
         else syms
       in
-      (new_def :: defs, new_cmd :: init_acts, bi_specs, fs, new_syms, fcalls)
+      (new_def :: defs, new_cmd :: init_acts, bi_specs, fs, new_syms)
 
 let make_init_proc init_cmds =
   let end_cmds =
@@ -1031,27 +1027,9 @@ let make_init_proc init_cmds =
       proc_params = [];
       proc_spec = None;
       proc_body = Array.of_list all_cmds;
+      proc_aliases = [];
+      proc_calls = [];
     }
-
-let make_callgraph fcalls =
-  let call_graph = Call_graph.make () in
-  let fnames = Hashtbl.create (List.length fcalls * 2) in
-  fcalls
-  |> List.iter (fun (sym, original_sym, _) ->
-         Call_graph.add_proc call_graph sym;
-         Hashtbl.add fnames sym sym;
-         Hashtbl.add fnames original_sym sym);
-  fcalls
-  |> List.iter (fun (caller, _, callees) ->
-         callees
-         |> List.iter (fun callee ->
-                match Hashtbl.find_opt fnames callee with
-                | Some callee ->
-                    Fmt.pr "Adding %s->%s!\n" caller callee;
-                    Call_graph.add_proc_call call_graph caller callee
-                | None ->
-                    Fmt.pr "Callee %s (called by %s) not found\n" callee caller));
-  call_graph
 
 let trans_program
     ?(exec_mode = Exec_mode.Verification)
@@ -1062,11 +1040,10 @@ let trans_program
     prog =
   let AST.{ prog_defs; prog_public; _ } = prog in
   let global_syms = SS.of_list (List.map true_name prog_public) in
-  let genv_defs, init_acts, bi_specs, procedures, symbols, fcalls =
+  let genv_defs, init_acts, bi_specs, procedures, symbols =
     trans_globdefs ~clight_prog ~exec_mode ~gil_annot ~global_syms ~filepath
       ~mangled_syms prog_defs
   in
-  let proc_call_graph = make_callgraph fcalls in
   let make_hashtbl get_name deflist =
     let hashtbl = Hashtbl.create 1 in
     let () =
@@ -1086,7 +1063,6 @@ let trans_program
         proc_names = List.map get_proc_name procedures;
         procs = make_hashtbl get_proc_name procedures;
         predecessors = Hashtbl.create 1;
-        proc_call_graph;
       },
     { genv_defs; genv_init_cmds = init_acts; symbols } )
 

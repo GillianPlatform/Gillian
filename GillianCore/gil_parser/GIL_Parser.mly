@@ -522,6 +522,8 @@ gproc_target:
         proc_body = Array.of_list cmd_list;
         proc_params;
         proc_spec;
+        proc_aliases = [];
+        proc_calls = [];
       }
   }
 ;

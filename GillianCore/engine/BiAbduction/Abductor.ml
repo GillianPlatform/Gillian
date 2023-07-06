@@ -5,7 +5,12 @@ module type S = sig
   type annot
 
   val test_prog :
-    init_data:init_data -> annot UP.prog -> bool -> SourceFiles.t option -> unit
+    init_data:init_data ->
+    ?call_graph:Call_graph.t ->
+    annot UP.prog ->
+    bool ->
+    SourceFiles.t option ->
+    unit
 end
 
 module Make
@@ -358,7 +363,7 @@ module Make
     in
     sorted_tests @ rest_sorted_tests
 
-  let test_procs ~init_data (prog : annot UP.prog) =
+  let test_procs ~init_data ~call_graph (prog : annot UP.prog) =
     L.verbose (fun m -> m "Starting bi-abductive testing in normal mode");
     let proc_names = Prog.get_noninternal_proc_names prog.prog in
     L.verbose (fun m -> m "Proc names: %s" (str_concat proc_names));
@@ -367,7 +372,7 @@ module Make
     let tests = List.concat_map (testify ~init_data ~prog) bi_specs in
     let test_names tests = str_concat (List.map (fun t -> t.name) tests) in
     L.verbose (fun m -> m "I have tests for: %s" (test_names tests));
-    let tests = sort_tests_by_callgraph tests prog.prog.proc_call_graph in
+    let tests = sort_tests_by_callgraph tests call_graph in
     L.verbose (fun m -> m "I have tests for: %s" (test_names tests));
     let succ_specs, bug_specs = run_tests prog tests in
     get_test_results prog succ_specs bug_specs
@@ -440,6 +445,7 @@ module Make
 
   let test_prog
       ~init_data
+      ?(call_graph = Call_graph.make ())
       (prog : annot UP.prog)
       (incremental : bool)
       (source_files : SourceFiles.t option) : unit =
@@ -477,9 +483,9 @@ module Make
       let cur_source_files =
         Option.value ~default:(SourceFiles.make ()) source_files
       in
-      let call_graph = SBAInterpreter.call_graph in
-      let results = test_procs ~init_data prog in
-      write_biabduction_results cur_source_files call_graph ~diff:"" results
+      let dyn_call_graph = SBAInterpreter.call_graph in
+      let results = test_procs ~init_data ~call_graph prog in
+      write_biabduction_results cur_source_files dyn_call_graph ~diff:"" results
 end
 
 module From_scratch
