@@ -1263,8 +1263,9 @@ module Make
             let remover = State.ga_to_deleter a_id in
             let vs_ins = List.map (subst_in_expr_opt astate subst) e_ins in
             let failure = List.exists (fun x -> x = None) vs_ins in
-            if failure then
-              if !Config.under_approximation then [] else make_resource_fail ()
+            if failure then (
+              Fmt.pr "I don't know all ins for %a????" Asrt.pp p;
+              if !Config.under_approximation then [] else make_resource_fail ())
             else
               let vs_ins = List.map Option.get vs_ins in
               L.(
@@ -1320,9 +1321,10 @@ module Make
                 match consume_pred_res with
                 | [] ->
                     let msg = "CONSUME_PRED VANISHED! MEDOOOOOO!!!!!" in
+                    L.verbose ~severity:Warning (fun m -> m "%s" msg);
                     if not !Config.under_approximation then
-                      L.verbose ~severity:Warning (fun m -> m "%s" msg);
-                    Fmt.failwith "%s\n@?" msg
+                      Fmt.failwith "%s\n@?" msg
+                    else ()
                 | _ -> ()
               in
               let++ astate', _ = consume_pred_res in

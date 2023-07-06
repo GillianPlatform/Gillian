@@ -2209,7 +2209,7 @@ struct
       (name : string)
       (params : string list)
       (state : State.t) : 'a cont_func =
-    let () = CallGraph.add_proc call_graph name in
+    let () = Call_graph.add_proc call_graph name in
     L.normal (fun m ->
         m
           ("*******************************************@\n"
