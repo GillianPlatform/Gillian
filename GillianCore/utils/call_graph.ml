@@ -1,3 +1,5 @@
+open Prelude
+
 type ntype = Proc | Pred | Lemma [@@deriving yojson]
 
 module Node : sig
@@ -11,6 +13,7 @@ module Node : sig
 
   val make : string -> ntype -> string -> string list -> t
   val add_child : t -> string -> unit
+  val remove_child : t -> string -> unit
   val pp : Format.formatter -> t -> unit
 end = struct
   type t = {
@@ -23,6 +26,12 @@ end = struct
 
   let make id ntype name children = { id; ntype; name; children }
   let add_child node child_id = node.children <- child_id :: node.children
+
+  let remove_child node child_id =
+    let children =
+      node.children |> List.filter (fun id -> not (id = child_id))
+    in
+    node.children <- children
 
   let pp fmt node =
     let pp_succ fmt = Fmt.pf fmt "    |--> <%s>" in
@@ -174,6 +183,10 @@ let is_lemma call_graph id =
 
 let remove call_graph id = Hashtbl.remove call_graph.nodes id
 
+let remove_with_edges call_graph id =
+  Hashtbl.remove_all call_graph.nodes id;
+  call_graph.nodes |> Hashtbl.iter (fun _ node -> Node.remove_child node id)
+
 let prune_procs call_graph proc_names =
   let proc_ids = List.map id_of_proc_name proc_names in
   List.iter (remove call_graph) proc_ids
@@ -210,3 +223,39 @@ let merge call_graph other_graph =
       other_graph.nodes
   in
   call_graph
+
+let select_leaves call_graph =
+  Hashtbl.fold
+    (fun id (node : Node.t) acc ->
+      match node.children with
+      | [] -> (id, node.name) :: acc
+      | _ -> acc)
+    call_graph.nodes []
+
+let select_with_least_children call_graph =
+  Hashtbl.fold
+    (fun id (node : Node.t) acc ->
+      let len = List.length node.children in
+      match acc with
+      | None -> Some ((id, node.name), len)
+      | Some (_, len') when len < len' -> Some ((id, node.name), len)
+      | _ -> acc)
+    call_graph.nodes None
+  |> Option.map fst
+
+let get_sorted_names call_graph =
+  let call_graph = to_reverse_graph call_graph in
+  let rec aux acc =
+    match select_leaves call_graph with
+    | [] -> (
+        match select_with_least_children call_graph with
+        | None -> acc (* Call graph is empty *)
+        | Some (id, name) ->
+            remove_with_edges call_graph id;
+            name :: acc)
+    | leaves ->
+        let ids, names = List.split leaves in
+        List.iter (remove_with_edges call_graph) ids;
+        aux (names @ acc)
+  in
+  aux [] |> List.rev

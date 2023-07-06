@@ -17,21 +17,21 @@ val pp_proc_changes : Format.formatter -> proc_changes -> unit
 val get_changes :
   ('a, 'b) Prog.t ->
   prev_source_files:SourceFiles.t ->
-  prev_call_graph:CallGraph.t ->
+  prev_call_graph:Call_graph.t ->
   cur_source_files:SourceFiles.t ->
   proc_changes
 
 val get_sym_changes :
   ('a, 'b) Prog.t ->
   prev_source_files:SourceFiles.t ->
-  prev_call_graph:CallGraph.t ->
+  prev_call_graph:Call_graph.t ->
   cur_source_files:SourceFiles.t ->
   proc_changes
 
 val get_verif_changes :
   ('a, 'b) Prog.t ->
   prev_source_files:SourceFiles.t ->
-  prev_call_graph:CallGraph.t ->
+  prev_call_graph:Call_graph.t ->
   cur_source_files:SourceFiles.t ->
   proc_changes * lemma_changes
 
@@ -40,7 +40,7 @@ val get_verif_changes :
     way. *)
 val get_callers :
   ('a, 'b) Prog.t ->
-  reverse_graph:CallGraph.t ->
+  reverse_graph:Call_graph.t ->
   excluded_procs:string list ->
   proc_name:string ->
   string list

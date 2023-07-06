@@ -17,6 +17,7 @@ type ('annot, 'label) t = {
   (* Hints for bi-abduction *)
   proc_names : string list;
   predecessors : (string * int * int, int) Hashtbl.t;
+  proc_call_graph : Call_graph.t;
 }
 
 let make
@@ -29,7 +30,11 @@ let make
     ~bi_specs
     ~proc_names
     ~predecessors
+    ?proc_call_graph
     () =
+  let proc_call_graph =
+    proc_call_graph |> Option_utils.or_else (fun () -> Call_graph.make ())
+  in
   {
     imports;
     lemmas;
@@ -40,6 +45,7 @@ let make
     bi_specs;
     proc_names;
     predecessors;
+    proc_call_graph;
   }
 
 let make_labeled ~(procs : (string, ('annot, string) Proc.t) Hashtbl.t) =
@@ -70,7 +76,7 @@ let create () =
     ~procs:(Hashtbl.create big_tbl_size)
     ~macros:(Hashtbl.create small_tbl_size)
     ~bi_specs:(Hashtbl.create big_tbl_size)
-    ~proc_names:[] ()
+    ~proc_names:[] ~proc_call_graph:(Call_graph.make ()) ()
 
 let get_lemmas (prog : ('a, 'b) t) : Lemma.t list =
   Hashtbl.fold (fun _ lemma ac -> lemma :: ac) prog.lemmas []

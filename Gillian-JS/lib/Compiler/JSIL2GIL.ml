@@ -505,16 +505,13 @@ let jsil2core_prog (prog : EProg.t) : ('a, string) GProg.t =
     prog.procs;
 
   let result : (Annot.Basic.t, string) GProg.t =
-    {
-      imports = prog.imports;
-      preds = translate_tbl prog.preds jsil2gil_pred;
-      lemmas = translate_tbl prog.lemmas jsil2gil_lemma;
-      only_specs = translate_tbl prog.only_specs jsil2gil_spec;
-      procs = new_procs;
-      macros = translate_tbl prog.macros jsil2gil_macro;
-      bi_specs = translate_tbl prog.bi_specs jsil2gil_bispec;
-      proc_names = prog.proc_names;
-      predecessors = Hashtbl.create 1;
-    }
+    GProg.make ~imports:prog.imports
+      ~preds:(translate_tbl prog.preds jsil2gil_pred)
+      ~lemmas:(translate_tbl prog.lemmas jsil2gil_lemma)
+      ~only_specs:(translate_tbl prog.only_specs jsil2gil_spec)
+      ~procs:new_procs
+      ~macros:(translate_tbl prog.macros jsil2gil_macro)
+      ~bi_specs:(translate_tbl prog.bi_specs jsil2gil_bispec)
+      ~proc_names:prog.proc_names ~predecessors:(Hashtbl.create 1) ()
   in
   result

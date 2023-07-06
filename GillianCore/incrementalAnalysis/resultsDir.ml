@@ -45,7 +45,7 @@ let read_json filename =
 
 let read_results_dir () =
   let sources = SourceFiles.of_yojson (read_json Filenames.sources) in
-  let call_graph = CallGraph.of_yojson (read_json Filenames.call_graph) in
+  let call_graph = Call_graph.of_yojson (read_json Filenames.call_graph) in
   (Result.get_ok sources, Result.get_ok call_graph)
 
 let read_verif_results () =
@@ -85,7 +85,7 @@ let read_bulk_symbolic_results () =
   in
   let call_graphs =
     read_table Filenames.call_graphs_dir (fun x ->
-        Result.get_ok (CallGraph.of_yojson x))
+        Result.get_ok (Call_graph.of_yojson x))
   in
   (source_files, call_graphs)
 
@@ -113,7 +113,7 @@ let write_results_dir sources call_graph ~diff =
   delete_results_dir ();
   create_results_dir ();
   write_json (SourceFiles.to_yojson sources) Filenames.sources;
-  write_json (CallGraph.to_yojson call_graph) Filenames.call_graph;
+  write_json (Call_graph.to_yojson call_graph) Filenames.call_graph;
   write_str (Exec_mode.to_string !Config.current_exec_mode) Filenames.exec_mode;
   write_str diff Filenames.diff
 
@@ -148,5 +148,5 @@ let write_bulk_symbolic_results ~tests_ran sources_table call_graph_table =
   create_results_dir ();
   write_str_list tests_ran Filenames.tests_ran;
   write_table sources_table Filenames.sources_dir SourceFiles.to_yojson;
-  write_table call_graph_table Filenames.call_graphs_dir CallGraph.to_yojson;
+  write_table call_graph_table Filenames.call_graphs_dir Call_graph.to_yojson;
   write_str (Exec_mode.to_string !Config.current_exec_mode) Filenames.exec_mode

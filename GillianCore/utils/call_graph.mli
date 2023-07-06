@@ -46,6 +46,10 @@ val id_of_pred_name : string -> id
 val id_of_lemma_name : string -> id
 val get_name : t -> id -> string
 
+(** Sorting *)
+
+val get_sorted_names : t -> string list
+
 (** {3 Serialization} *)
 
 val pp : Format.formatter -> t -> unit

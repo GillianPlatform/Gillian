@@ -29,7 +29,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
 
   type prev_results = {
     source_files : (string, SourceFiles.t) Hashtbl.t;
-    call_graphs : (string, CallGraph.t) Hashtbl.t;
+    call_graphs : (string, Call_graph.t) Hashtbl.t;
   }
 
   let cur_source_files = Hashtbl.create Config.small_tbl_size
@@ -135,7 +135,7 @@ module Make (Backend : functor (Outcome : Outcome.S) (Suite : Suite.S) ->
                       (State.init progs.init_data)
                   in
                   let call_graph = Interpreter.call_graph in
-                  let copy = CallGraph.merge (CallGraph.make ()) call_graph in
+                  let copy = Call_graph.merge (Call_graph.make ()) call_graph in
                   let () = Hashtbl.add cur_call_graphs filename copy in
                   let () = tests_ran := filename :: !tests_ran in
                   FinishedExec ret
