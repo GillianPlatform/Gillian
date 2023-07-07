@@ -1085,11 +1085,16 @@ let offset_by_chunk low chunk =
   let len = Expr.int (Chunk.size chunk) in
   low + len
 
+let can_fix err =
+  match err with
+  | InvalidLocation _ | MissingLocResource _
+  | SHeapTreeErr { sheaptree_err = MissingResource _; _ } -> true
+  | _ -> false
+
 let get_fixes _heap _pfs _gamma err =
   Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
   let get_fixes_h is_store loc ofs chunk =
     let open CConstants.VTypes in
-    (* let fixes = [] in *)
     let fixes =
       match chunk with
       | Chunk.Mfloat32 ->

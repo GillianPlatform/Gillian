@@ -66,6 +66,7 @@ module type S = sig
   val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t
   val pp_err : Format.formatter -> err_t -> unit
   val get_failing_constraint : err_t -> Formula.t
+  val can_fix : err_t -> bool
 
   val get_fixes :
     t ->
@@ -118,6 +119,7 @@ module Dummy : S with type init_data = unit = struct
   let get_failing_constraint _ = failwith "Please implement SMemory"
   let get_fixes _ _ _ _ = failwith "Please implement SMemory"
   let apply_fix _ _ _ _ = failwith "Please implement SMemory"
+  let can_fix _ = failwith "Please implement SMemory"
 end
 
 module Modernize (Old_memory : S) = struct

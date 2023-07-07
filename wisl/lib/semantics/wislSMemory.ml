@@ -330,5 +330,9 @@ let get_fixes _ _ _ (err : err_t) =
       [ ([], [ Formula.Eq (new_expr, loc) ], [], SS.empty) ]
   | _ -> []
 
+let can_fix = function
+  | WislSHeap.InvalidLocation _ | MissingResource _ -> true
+  | _ -> false
+
 let get_failing_constraint _ = Formula.True
 let add_debugger_variables = WislSHeap.add_debugger_variables

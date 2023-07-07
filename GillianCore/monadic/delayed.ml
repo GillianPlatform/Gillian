@@ -37,19 +37,23 @@ let branch_on
   match guard with
   | True -> then_ () ~curr_pc
   | False -> else_ () ~curr_pc
-  | guard ->
-      let guard_sat = FOSolver.sat ~pc:curr_pc guard in
-      if not guard_sat then (* [Not guard)] has to be sat *)
-        else_ () ~curr_pc
-      else
-        let then_branches = then_ () ~curr_pc:(Pc.extend curr_pc [ guard ]) in
-        let not_guard = Formula.Infix.fnot guard in
-        if FOSolver.sat ~pc:curr_pc not_guard then
-          let else_branches =
-            else_ () ~curr_pc:(Pc.extend curr_pc [ not_guard ])
-          in
-          then_branches @ else_branches
-        else then_branches
+  | guard -> (
+      try
+        let guard_sat = FOSolver.sat ~pc:curr_pc guard in
+        if not guard_sat then (* [Not guard)] has to be sat *)
+          else_ () ~curr_pc
+        else
+          let then_branches = then_ () ~curr_pc:(Pc.extend curr_pc [ guard ]) in
+          let not_guard = Formula.Infix.fnot guard in
+          if FOSolver.sat ~pc:curr_pc not_guard then
+            let else_branches =
+              else_ () ~curr_pc:(Pc.extend curr_pc [ not_guard ])
+            in
+            then_branches @ else_branches
+          else then_branches
+      with Z3_encoding.Z3Unknown ->
+        Fmt.pr "TIMED OUT ON: %a" Formula.pp guard;
+        vanish () ~curr_pc)
 
 let if_sure
     (guard : Formula.t)

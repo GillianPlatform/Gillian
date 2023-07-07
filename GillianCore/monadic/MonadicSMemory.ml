@@ -59,6 +59,7 @@ module type S = sig
     (c_fix_t list * Formula.t list * (string * Type.t) list * Containers.SS.t)
     list
 
+  val can_fix : err_t -> bool
   val apply_fix : t -> c_fix_t -> (t, err_t) result Delayed.t
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t

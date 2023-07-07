@@ -550,9 +550,7 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
       let callee =
         match ex with
         | Csharpminor.Eaddrof l -> [ true_name l ]
-        | _ ->
-            Fmt.pr "Scall with unknown function!\n";
-            []
+        | _ -> []
       in
       let leftvar =
         match optid with

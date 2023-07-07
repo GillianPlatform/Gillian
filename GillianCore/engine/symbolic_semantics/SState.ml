@@ -680,7 +680,7 @@ module Make (SMemory : SMemory.S) :
     Error "try_recovering not supported in symbolic execution"
 
   let pp_err = StateErr.pp_err SMemory.pp_err SVal.M.pp
-  let can_fix = StateErr.can_fix
+  let can_fix = StateErr.can_fix SMemory.can_fix
 
   let get_failing_constraint (err : err_t) : Formula.t =
     StateErr.get_failing_constraint err SMemory.get_failing_constraint

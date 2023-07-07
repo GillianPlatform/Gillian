@@ -1598,8 +1598,9 @@ module Make
           L.verbose (fun fmt -> fmt "Unifier.unify: Success");
           Res_list.just_oks successes
       | UAbort errs
-        when try_recover && !Config.unfolding && can_fix errs
-             && not in_unification -> (
+        when try_recover && !Config.unfolding
+             && Exec_mode.verification_exec !Config.current_exec_mode
+             && (not in_unification) && can_fix errs -> (
           L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
           if !Config.under_approximation then
             L.fail "UNIFICATION ABORTED IN UX MODE???";

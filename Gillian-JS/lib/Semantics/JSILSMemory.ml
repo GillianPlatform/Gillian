@@ -765,6 +765,8 @@ module M = struct
 
     completed_fixes
 
+  let can_fix _ = true
+
   let apply_fix (mem : t) (pfs : PFS.t) (gamma : Type_env.t) (fix : c_fix_t) :
       t list =
     let res =

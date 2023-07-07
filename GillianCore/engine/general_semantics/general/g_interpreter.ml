@@ -1058,7 +1058,7 @@ struct
                     ~json:
                       [ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
                     "Error");
-              if not (Exec_mode.concrete_exec !Config.current_exec_mode) then (
+              if Exec_mode.verification_exec !Config.current_exec_mode then (
                 let tactic_from_params =
                   let recovery_params =
                     let* v = v_es in
@@ -1128,12 +1128,17 @@ struct
                         };
                     ])
               else
-                let pp_err ft (a, errs) =
-                  Fmt.pf ft "FAILURE: Action %s failed with: %a" a
-                    (Fmt.Dump.list State.pp_err)
-                    errs
-                in
-                Fmt.failwith "%a\n@?" (Fmt.styled `Red pp_err) (a, errs)
+                [
+                  ConfErr
+                    (* (errs, state) *)
+                    {
+                      callstack = cs;
+                      proc_idx = i;
+                      error_state = state;
+                      errors = List.map (fun x -> Exec_err.ESt x) errs;
+                      branch_path;
+                    };
+                ]
         in
         oks @ errors
 
@@ -2051,9 +2056,7 @@ struct
         L.set_previous prev_cmd_report_id;
         L.(
           verbose (fun m ->
-              m
-                "Stopping Symbolic Execution due to MAX BRANCHING with %d. \
-                 STOPPING CONF:\n"
+              m "Stopping Symbolic Execution due to MAX BRANCHING with %d."
                 b_counter));
         log_configuration annot_cmd state cs i b_counter branch_case proc_name
         |> Option.iter (fun report_id ->
