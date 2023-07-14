@@ -719,7 +719,7 @@ module Make
           let cons_res = SUnifier.consume_pred astate pname vs None in
           let () =
             match (cons_res, !Config.under_approximation) with
-            | [], true ->
+            | [], false ->
                 Fmt.failwith
                   "HORROR - unfold vanished while consuming folded predicate: \
                    %a"

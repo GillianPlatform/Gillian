@@ -438,6 +438,9 @@ module Node = struct
               (SVArr.to_single_value ~chunk values)
           in
           Ok (single, exact_perm)
+    | MemVal { mem_val = Array { chunk = c; values }; exact_perm; _ }
+      when Chunk.size c < Chunk.size chunk == SVArr.sure_is_all_zeros values ->
+        DR.ok (SVal.zero_of_chunk chunk, exact_perm)
     | MemVal { mem_val = Array { chunk = _; _ }; exact_perm; _ } ->
         DR.ok (SVal.SUndefined, exact_perm)
 
