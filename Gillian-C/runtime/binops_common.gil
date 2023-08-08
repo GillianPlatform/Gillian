@@ -27,7 +27,7 @@ proc i__binop_cmpl_ge(v1, v2) {
 proc i__binop_cmpl_eq(v1, v2) {
         goto [ l-nth(v1, 0i) = "long" ] llon unde;
   llon: goto [ l-nth(v2, 0i) = "long" ] blon unde;
-  blon: ret := "i__value_of_bool"(l-nth(v1, 1i) i< l-nth(v2, 1i));
+  blon: ret := "i__value_of_bool"(l-nth(v1, 1i) = l-nth(v2, 1i));
         return;
   unde: fail[comparison]("Using long comparison operator for non-long elements")
 };
