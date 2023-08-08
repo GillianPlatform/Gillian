@@ -104,6 +104,8 @@
     "concurrently": "^7.6.0"
   },
   "resolutions": {
-    "@opam/conf-sqlite3": "ManasJayanth/esy-sqlite:esy.json#28dfc73a8eda790213a8359ad708231069ed7079"
+    "@opam/conf-sqlite3": "ManasJayanth/esy-sqlite:esy.json#28dfc73a8eda790213a8359ad708231069ed7079",
+    "esy-gmp": "NatKarmios/esy-gmp:package.json#d68dce1a9aacc0534cca93d84d2b7f9c8105ee87",
+    "@opam/conf-python-3-7": "NatKarmios/conf-python-3-7:conf-python-3-7.opam#1a624b3cd5738a6a0f51f5638b5d101ad2c9844b"
   }
 }
