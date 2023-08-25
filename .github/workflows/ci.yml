@@ -232,7 +232,7 @@ jobs:
   #     - name: Symbolic Testing Buckets.js
   #       run: "gillian-js cosette-bulk Gillian/Gillian-JS/Examples/Cosette/Buckets --ci"
 
-  test-docker:
+  build-docker:
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -247,10 +247,11 @@ jobs:
           key: docker-esy-0.6.12-${{ hashFiles('esy.lock/index.json') }}
           restore-keys: |
             docker-esy-0.6.12-
-      - name: build and export to docker
-        uses: docker/build-push-action@v3
+      - name: build and export docker image
+        uses: docker/build-push-action@v4
         with:
           context: .
+          engine: docker
           load: true
           tags: ${{ env.DOCKER_TEST_TAG }}
       - name: test
