@@ -147,7 +147,7 @@ jobs:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
     strategy:
       matrix:
-        operating-system: [macos-latest]
+        operating-system: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
@@ -177,7 +177,7 @@ jobs:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
     strategy:
       matrix:
-        operating-system: [macos-latest]
+        operating-system: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
