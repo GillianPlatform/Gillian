@@ -78,7 +78,7 @@ jobs:
   gillian_c_tests:
     strategy:
       matrix:
-        operating-system: [macos-latest, ubuntu-latest]
+        operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
@@ -112,7 +112,7 @@ jobs:
   gillian_js_tests:
     strategy:
       matrix:
-        operating-system: [macos-latest, ubuntu-latest]
+        operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
@@ -147,7 +147,7 @@ jobs:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
     strategy:
       matrix:
-        operating-system: [macos-latest, ubuntu-latest]
+        operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
@@ -177,7 +177,7 @@ jobs:
     if: ( github.event_name == 'pull_request') && ( github.base_ref == 'master')
     strategy:
       matrix:
-        operating-system: [macos-latest, ubuntu-latest]
+        operating-system: [ubuntu-latest]
     runs-on: ${{ matrix.operating-system }}
     needs: build
     steps:
