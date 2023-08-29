@@ -13,7 +13,8 @@ RUN apt-get install -y \
   curl \
   git \
   zsh \
-  m4
+  m4 \
+  python3
 
 RUN npm install -g esy@0.6.12 --unsafe-perm
 

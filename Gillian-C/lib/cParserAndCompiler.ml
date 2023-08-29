@@ -316,7 +316,7 @@ let parse_and_compile_file path exec_mode =
 exception Linker_error
 
 let linker_error msg symbols =
-  let () = SS.iter (fun sym -> Printf.printf "%s '%s'\n" msg sym) symbols in
+  let () = SS.iter (fun sym -> Fmt.pr "%s '%s'\n@?" msg sym) symbols in
   raise Linker_error
 
 let current_arch =

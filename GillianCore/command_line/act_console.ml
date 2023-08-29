@@ -62,6 +62,30 @@ struct
     let out_path = Filename.concat dirname (fname ^ "_bi.gil") in
     Io_utils.save_file_pp out_path Prog.pp_labeled e_prog
 
+  let make_callgraph (prog : ('a, 'b) Prog.t) =
+    let fcalls =
+      Hashtbl.fold
+        (fun _ proc acc ->
+          Proc.(proc.proc_name, proc.proc_aliases, proc.proc_calls) :: acc)
+        prog.procs []
+    in
+    let call_graph = Call_graph.make () in
+    let fnames = Hashtbl.create (List.length fcalls * 2) in
+    fcalls
+    |> List.iter (fun (sym, aliases, _) ->
+           Call_graph.add_proc call_graph sym;
+           Hashtbl.add fnames sym sym;
+           aliases |> List.iter (fun alias -> Hashtbl.add fnames alias sym));
+    fcalls
+    |> List.iter (fun (caller, _, callees) ->
+           callees
+           |> List.iter (fun callee ->
+                  match Hashtbl.find_opt fnames callee with
+                  | Some callee ->
+                      Call_graph.add_proc_call call_graph caller callee
+                  | None -> ()));
+    call_graph
+
   let process_files
       files
       already_compiled
@@ -84,6 +108,7 @@ struct
         ~other_imports:(convert_other_imports PC.other_imports)
         e_prog
     in
+    let call_graph = make_callgraph prog in
     let () =
       L.normal (fun m -> m "@\n*** Stage 2: DONE transforming the program.@\n")
     in
@@ -94,7 +119,8 @@ struct
     | Error _ -> failwith "Creation of unification plans failed."
     | Ok prog' ->
         let () =
-          Abductor.test_prog ~init_data prog' incremental source_files_opt
+          Abductor.test_prog ~init_data ~call_graph prog' incremental
+            source_files_opt
         in
         if should_emit_specs then emit_specs e_prog prog' file
 
@@ -118,6 +144,7 @@ struct
     let () = Config.bi_no_spec_depth := bi_no_spec_depth in
     let () = Config.specs_to_stdout := specs_to_stdout in
     let () = Config.max_branching := bi_unroll_depth in
+    let () = Config.under_approximation := true in
     let () =
       process_files files already_compiled outfile_opt should_emit_specs
         incremental

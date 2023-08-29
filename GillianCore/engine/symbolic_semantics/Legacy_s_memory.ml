@@ -66,20 +66,17 @@ module type S = sig
   val get_recovery_tactic : t -> err_t -> vt Recovery_tactic.t
   val pp_err : Format.formatter -> err_t -> unit
   val get_failing_constraint : err_t -> Formula.t
+  val can_fix : err_t -> bool
 
   val get_fixes :
     t ->
     PFS.t ->
     Type_env.t ->
     err_t ->
-    (c_fix_t list
-    * Formula.t list
-    * (string * Type.t) list
-    * Containers.SS.t
-    * Asrt.t list)
+    (c_fix_t list * Formula.t list * (string * Type.t) list * Containers.SS.t)
     list
 
-  val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t
+  val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t list
 end
 
 module Dummy : S with type init_data = unit = struct
@@ -122,6 +119,7 @@ module Dummy : S with type init_data = unit = struct
   let get_failing_constraint _ = failwith "Please implement SMemory"
   let get_fixes _ _ _ _ = failwith "Please implement SMemory"
   let apply_fix _ _ _ _ = failwith "Please implement SMemory"
+  let can_fix _ = failwith "Please implement SMemory"
 end
 
 module Modernize (Old_memory : S) = struct
@@ -147,4 +145,10 @@ module Modernize (Old_memory : S) = struct
         let+ err = errs in
         let pc = Gpc.copy pc in
         Gbranch.{ pc; value = Error err }
+
+  let apply_fix heap pfs gamma fix =
+    let open Syntaxes.List in
+    let+ heap = apply_fix heap pfs gamma fix in
+    let pc = Gpc.make ~unification:true ~pfs ~gamma () in
+    Gbranch.{ pc; value = heap }
 end

@@ -38,14 +38,21 @@ module Imports = struct
       (* Common *)
       { file = "unops_common.gil"; arch = any_arch; exec = all_exec };
       { file = "internals.gil"; arch = any_arch; exec = all_exec };
+      { file = "binops_common.gil"; arch = any_arch; exec = all_exec };
+      { file = "logic_common.gil"; arch = any_arch; exec = exec_with_preds };
+      { file = "string.gil"; arch = any_arch; exec = all_exec };
+      (* Global environment *)
       {
         file = "global_environment_common.gil";
         arch = any_arch;
         exec = all_exec;
       };
-      { file = "binops_common.gil"; arch = any_arch; exec = all_exec };
-      { file = "logic_common.gil"; arch = any_arch; exec = exec_with_preds };
-      { file = "string.gil"; arch = any_arch; exec = all_exec };
+      {
+        file = "global_environment_non_bi.gil";
+        arch = any_arch;
+        exec = non_bi_exec;
+      };
+      { file = "global_environment_bi.gil"; arch = any_arch; exec = bi_exec };
       (* Arch64 specific *)
       { file = "stdlib_archi64.gil"; arch = a64; exec = all_exec };
       { file = "stdlib_archi64_verif.gil"; arch = a64; exec = ver_exec };
@@ -206,7 +213,6 @@ module Prefix = struct
 end
 
 module Internal_Predicates = struct
-  let is_int = Prefix.internal_preds ^ "is_int"
   let is_ptr_to_0 = Prefix.internal_preds ^ "is_ptr_to_0"
   let is_ptr = Prefix.internal_preds ^ "is_ptr"
   let is_ptr_to_0_opt = Prefix.internal_preds ^ "is_ptr_to_0_opt"
@@ -215,7 +221,10 @@ module Internal_Predicates = struct
   let is_ptr_to_float_opt = Prefix.internal_preds ^ "is_ptr_to_float_opt"
   let is_ptr_to_long_opt = Prefix.internal_preds ^ "is_ptr_to_long_opt"
   let is_ptr_to_single_opt = Prefix.internal_preds ^ "is_ptr_to_single_opt"
+  let is_int = Prefix.internal_preds ^ "is_int"
+  let is_bounded_int = Prefix.internal_preds ^ "is_bounded_int"
   let is_long = Prefix.internal_preds ^ "is_long"
+  let is_bounded_long = Prefix.internal_preds ^ "is_bounded_long"
   let is_single = Prefix.internal_preds ^ "is_single"
   let is_float = Prefix.internal_preds ^ "is_float"
 

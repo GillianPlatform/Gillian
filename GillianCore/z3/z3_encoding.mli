@@ -1,3 +1,5 @@
+exception Z3Unknown
+
 (** [check_sat_core pfs gamma]
     checks whether or not the pure formulae [pfs] are satisfiable
     under the typing environment [gamma]. If this is the case,

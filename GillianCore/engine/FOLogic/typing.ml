@@ -88,12 +88,6 @@ module Infer_types_to_gamma = struct
       | UnsignedRightShiftL
       | BitwiseOrL
       | BitwiseAndL
-      | BitwiseXorL -> (Some IntType, Some IntType, Some IntType)
-      | FPlus
-      | FMinus
-      | FTimes
-      | FMod
-      | FDiv
       | BitwiseAnd
       | BitwiseOr
       | BitwiseXor
@@ -101,6 +95,12 @@ module Infer_types_to_gamma = struct
       | SignedRightShift
       | UnsignedRightShift
       | SignedRightShiftL
+      | BitwiseXorL -> (Some IntType, Some IntType, Some IntType)
+      | FPlus
+      | FMinus
+      | FTimes
+      | FMod
+      | FDiv
       | BitwiseAndF
       | BitwiseOrF
       | BitwiseXorF
@@ -369,13 +369,12 @@ module Type_lexpr = struct
         | BSetSub -> infer_type le BooleanType constraints
         | SetDiff -> infer_type le SetType constraints
         | StrCat -> infer_type le StringType constraints
-        | IPlus | IMinus | ITimes | IDiv | IMod | UnsignedRightShiftL ->
-            infer_type le IntType constraints
-        | FPlus
-        | FMinus
-        | FTimes
-        | FDiv
-        | FMod
+        | IPlus
+        | IMinus
+        | ITimes
+        | IDiv
+        | IMod
+        | UnsignedRightShiftL
         | BitwiseAnd
         | BitwiseOr
         | BitwiseXor
@@ -386,7 +385,12 @@ module Type_lexpr = struct
         | BitwiseOrL
         | BitwiseXorL
         | LeftShiftL
-        | SignedRightShiftL
+        | SignedRightShiftL -> infer_type le IntType constraints
+        | FPlus
+        | FMinus
+        | FTimes
+        | FDiv
+        | FMod
         | BitwiseAndF
         | BitwiseOrF
         | BitwiseXorF

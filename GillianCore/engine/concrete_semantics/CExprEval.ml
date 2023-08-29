@@ -402,22 +402,25 @@ let rec evaluate_binop
           binary_num_thing lit1 lit2 mod_float
             "Type Error: FModulus: expected numbers, got "
       | BitwiseAnd ->
-          binary_num_thing lit1 lit2 int32_bitwise_and
+          binary_int_thing lit1 lit2 Z.logand
             "Type Error: Bitwise conjunction: expected numbers, got "
       | BitwiseOr ->
-          binary_num_thing lit1 lit2 int32_bitwise_or
+          binary_int_thing lit1 lit2 Z.logor
             "Type Error: Bitwise disjunction: expected numbers, got "
       | BitwiseXor ->
-          binary_num_thing lit1 lit2 int32_bitwise_xor
+          binary_int_thing lit1 lit2 Z.logxor
             "Type Error: Bitwise exclusive disjunction: expected numbers, got "
       | LeftShift ->
-          binary_num_thing lit1 lit2 int32_left_shift
+          binary_int_thing lit1 lit2
+            (fun x y -> Z.shift_left x (Z.to_int y))
             "Type Error: Left shift: expected numbers, got "
       | SignedRightShift ->
-          binary_num_thing lit1 lit2 int32_right_shift
+          binary_int_thing lit1 lit2
+            (fun x y -> Z.shift_right x (Z.to_int y))
             "Type Error: Signed right shift: expected numbers, got "
       | UnsignedRightShift ->
-          binary_int_thing lit1 lit2 uint32_right_shift
+          binary_int_thing lit1 lit2
+            (fun x y -> Z.shift_right x (Z.to_int y))
             "Type Error: Unsigned right shift: expected integers, got "
       | BitwiseAndL ->
           binary_int_thing lit1 lit2 int64_bitwise_and
@@ -433,10 +436,12 @@ let rec evaluate_binop
           binary_int_thing lit1 lit2 int64_left_shift
             "Type Error: 64bit Left shift: expected integers, got "
       | SignedRightShiftL ->
-          binary_num_thing lit1 lit2 int64_right_shift
+          binary_int_thing lit1 lit2
+            (fun x y -> Z.shift_right x (Z.to_int y))
             "Type Error: 64bit Signed right shift: expected numbers, got "
       | UnsignedRightShiftL ->
-          binary_int_thing lit1 lit2 uint32_right_shift
+          binary_int_thing lit1 lit2
+            (fun x y -> Z.shift_right x (Z.to_int y))
             "Type Error: 64bit Unsigned right shift: expected integers, got "
       | BitwiseAndF ->
           binary_num_thing lit1 lit2 int32_bitwise_and

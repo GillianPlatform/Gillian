@@ -225,6 +225,7 @@ module Infix = struct
   let ( ** ) a b =
     match (a, b) with
     | Pure True, x | x, Pure True | Emp, x | x, Emp -> x
+    | (Pure False as fl), _ | _, (Pure False as fl) -> fl
     | _ -> Star (a, b)
 end
 

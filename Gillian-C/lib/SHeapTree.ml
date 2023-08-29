@@ -313,6 +313,15 @@ module Node = struct
             Delayed.map
               (SVArr.concat_knowing_size (values, size_l) (AllUndef, size_r))
               (fun values -> mk (Array { chunk; values }))
+        | Undef _, Array { chunk; values } ->
+            let size_l, size_r =
+              let open Expr.Infix in
+              let size_chunk = Chunk.size_expr chunk in
+              (size_a / size_chunk, size_b / size_chunk)
+            in
+            Delayed.map
+              (SVArr.concat_knowing_size (AllUndef, size_l) (values, size_r))
+              (fun values -> mk (Array { chunk; values }))
         | Array { chunk; values }, Zeros ->
             let size_l, size_r =
               let open Expr.Infix in
@@ -321,15 +330,6 @@ module Node = struct
             in
             Delayed.map
               (SVArr.concat_knowing_size (values, size_l) (AllZeros, size_r))
-              (fun values -> mk (Array { chunk; values }))
-        | Undef _, Array { chunk; values } ->
-            let size_l, size_r =
-              let open Expr.Infix in
-              let size_chunk = Chunk.size_expr chunk in
-              (size_a / size_chunk, size_b / size_chunk)
-            in
-            Delayed.map
-              (SVArr.concat_knowing_size (AllUndef, size_r) (values, size_l))
               (fun values -> mk (Array { chunk; values }))
         | Zeros, Array { chunk; values } ->
             let size_l, size_r =
@@ -438,6 +438,9 @@ module Node = struct
               (SVArr.to_single_value ~chunk values)
           in
           Ok (single, exact_perm)
+    | MemVal { mem_val = Array { chunk = c; values }; exact_perm; _ }
+      when Chunk.size c < Chunk.size chunk == SVArr.sure_is_all_zeros values ->
+        DR.ok (SVal.zero_of_chunk chunk, exact_perm)
     | MemVal { mem_val = Array { chunk = _; _ }; exact_perm; _ } ->
         DR.ok (SVal.SUndefined, exact_perm)
 
@@ -788,6 +791,13 @@ module Tree = struct
           let* new_right = add_to_the_right right addition in
           of_children_s ~left ~right:new_right
     in
+    let rec add_to_the_left t addition : t Delayed.t =
+      match t.children with
+      | None -> of_children_s ~left:addition ~right:t
+      | Some (left, right) ->
+          let* new_left = add_to_the_left left addition in
+          of_children_s ~left:new_left ~right
+    in
     let rec frame_inside ~replace_node ~rebuild_parent (t : t) (range : Range.t)
         =
       Logging.verbose (fun fmt ->
@@ -808,21 +818,39 @@ module Tree = struct
               log_string "mid strictly in range";
               Range.point_strictly_inside mid range
             then
-              let _, h = range in
+              let l, h = range in
               let upper_range = (mid, h) in
-              let dont_replace_node t = Ok t in
-              let** _, right =
-                frame_inside ~replace_node:dont_replace_node
-                  ~rebuild_parent:with_children right upper_range
-              in
-              let* extracted, right_opt = extract right upper_range in
-              let* left = add_to_the_right left extracted in
-              let* new_self =
-                match right_opt with
-                | Some right -> of_children_s ~left ~right
-                | None -> Delayed.return left
-              in
-              frame_inside ~replace_node ~rebuild_parent new_self range
+              let dont_replace_node = Result.ok in
+              if%sat
+                (* High-range already good *)
+                Range.is_equal upper_range right.span
+              then
+                let lower_range = (l, mid) in
+                let** _, left =
+                  frame_inside ~replace_node:dont_replace_node
+                    ~rebuild_parent:with_children left lower_range
+                in
+                let* extracted, left_opt = extract left lower_range in
+                let* right = add_to_the_left right extracted in
+                let* new_self =
+                  match left_opt with
+                  | Some left -> of_children_s ~left ~right
+                  | None -> Delayed.return right
+                in
+                frame_inside ~replace_node ~rebuild_parent new_self range
+              else
+                let** _, right =
+                  frame_inside ~replace_node:dont_replace_node
+                    ~rebuild_parent:with_children right upper_range
+                in
+                let* extracted, right_opt = extract right upper_range in
+                let* left = add_to_the_right left extracted in
+                let* new_self =
+                  match right_opt with
+                  | Some right -> of_children_s ~left ~right
+                  | None -> Delayed.return left
+                in
+                frame_inside ~replace_node ~rebuild_parent new_self range
             else
               if%sat
                 log_string "range inside left";

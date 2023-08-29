@@ -114,8 +114,10 @@ let of_gil_expr sval_e =
 let of_gil_expr_exn sval_e =
   let* value_opt = of_gil_expr sval_e in
   match value_opt with
-  | None -> raise (NotACompCertValue sval_e)
   | Some value -> Delayed.return value
+  | None ->
+      if !Gillian.Utils.Config.under_approximation then Delayed.vanish ()
+      else raise (NotACompCertValue sval_e)
 
 let to_gil_expr_undelayed = to_gil_expr
 

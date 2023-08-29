@@ -20,6 +20,8 @@
   string.gil
   unops_common.gil
   global_environment_common.gil
+  global_environment_non_bi.gil
+  global_environment_bi.gil
   global_environment_archi64.gil
   global_environment_archi32.gil)
  (section share)

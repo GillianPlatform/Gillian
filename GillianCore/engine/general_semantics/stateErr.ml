@@ -49,9 +49,9 @@ let pp_err
         asrtss
   | EOther msg -> Fmt.pf fmt "%s" msg
 
-let can_fix (err : ('a, 'b) err_t) : bool =
+let can_fix (can_fix_mem : 'a -> bool) (err : ('a, 'b) err_t) : bool =
   match err with
-  | EMem _ -> true
+  | EMem mem_err -> can_fix_mem mem_err
   | EPure pf -> Reduction.reduce_formula pf <> False
   | EAsrt (_, pf, _) ->
       let result = Reduction.reduce_formula pf <> True in

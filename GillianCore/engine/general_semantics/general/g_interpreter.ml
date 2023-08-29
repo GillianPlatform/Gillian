@@ -332,8 +332,8 @@ struct
   (** Syntax error, carrying a string description *)
   exception Syntax_error of string
 
-  let call_graph = CallGraph.make ~init_capacity:128 ()
-  let reset_call_graph () = CallGraph.reset call_graph
+  let call_graph = Call_graph.make ~init_capacity:128 ()
+  let reset_call_graph () = Call_graph.reset call_graph
 
   (* Often-used values *)
   let vtrue = Val.from_literal (Bool true)
@@ -698,28 +698,20 @@ struct
           in
           Array.to_list args
 
-        let process_ret pid j eval_state is_first ret_state fl b_counter others
-            : CConf.t =
+        let process_ret_cont
+            new_j
+            eval_state
+            is_first
+            ret_state
+            fl
+            b_counter
+            others =
           let { i; cs; make_confcont; iframes; loop_ids; _ } = eval_state in
+
           let new_cs =
             match is_first with
             | true -> Call_stack.copy cs
             | false -> cs
-          in
-
-          let new_j =
-            match (fl, j) with
-            | Flag.Normal, _ -> i + 1
-            | Flag.Error, Some j -> j
-            | Flag.Error, None ->
-                let msg =
-                  Printf.sprintf
-                    "SYNTAX ERROR: No error label provided when calling \
-                     procedure %s"
-                    pid
-                in
-                L.normal (fun fmt -> fmt "%s" msg);
-                raise (Syntax_error msg)
           in
 
           let branch_case = SpecExec fl in
@@ -745,6 +737,50 @@ struct
           make_confcont ~state:ret_state ~callstack:new_cs
             ~invariant_frames:iframes ~prev_idx:i ~loop_ids ~next_idx:new_j
             ~branch_count:b_counter ?branch_case ?new_branches ()
+
+        let process_ret
+            pid
+            j
+            eval_state
+            is_first
+            ret_state
+            fl
+            b_counter
+            others
+            spec_name : CConf.t =
+          let { i; cs; branch_path; _ } = eval_state in
+          let process_ret_cont new_j =
+            process_ret_cont new_j eval_state is_first ret_state fl b_counter
+              others
+          in
+
+          match (fl, j) with
+          | Flag.Normal, _ -> process_ret_cont (i + 1)
+          | Flag.Error, Some j -> process_ret_cont j
+          | Flag.Error, None ->
+              let msg =
+                Printf.sprintf
+                  "SYNTAX ERROR: No error label provided when calling \
+                   procedure %s"
+                  pid
+              in
+              L.normal (fun fmt -> fmt "%s" msg);
+              raise (Syntax_error msg)
+          | Flag.Bug, _ ->
+              ConfErr
+                {
+                  callstack = cs;
+                  proc_idx = i;
+                  error_state = ret_state;
+                  errors =
+                    [
+                      Exec_err.ESt
+                        (EOther
+                           (Fmt.str "Error: tried to use bug spec '%s'"
+                              spec_name));
+                    ];
+                  branch_path;
+                }
 
         let symb_exec_proc x pid v_args j params args eval_state () =
           let { cs; state; i; loop_ids; b_counter; iframes; make_confcont; _ } =
@@ -817,13 +853,16 @@ struct
                 let success_confs =
                   match successes with
                   | (ret_state, fl) :: rest_rets ->
+                      let spec_name = spec.data.spec_name in
                       let others =
                         List.map
                           (fun (ret_state, fl) ->
-                            process_ret false ret_state fl b_counter None)
+                            process_ret false ret_state fl b_counter None
+                              spec_name)
                           rest_rets
                       in
                       process_ret true ret_state fl b_counter (Some others)
+                        spec_name
                       :: others
                   | _ -> failwith "unreachable"
                 in
@@ -859,7 +898,8 @@ struct
           } =
             eval_state
           in
-          if Hashtbl.mem prog.prog.bi_specs pid then
+          if Hashtbl.mem prog.prog.bi_specs pid then (
+            Fmt.pr "Susping!\n";
             [
               CConf.ConfSusp
                 {
@@ -873,7 +913,7 @@ struct
                   branch_path;
                   branch_count = b_counter;
                 };
-            ]
+            ])
           else symb_exec_proc ()
 
         let f x pid v_args j subst eval_state =
@@ -882,7 +922,7 @@ struct
 
           let spec, params = get_spec_and_params prog pid state in
           let caller = Call_stack.get_cur_proc_id cs in
-          let () = CallGraph.add_proc_call call_graph caller pid in
+          let () = Call_graph.add_proc_call call_graph caller pid in
           let args = build_args v_args params in
 
           let is_internal_proc proc_name =
@@ -896,8 +936,11 @@ struct
           let spec_exec_proc () =
             match spec with
             | Some spec ->
+                (* Fmt.pr "Calling %s WITH SPEC\n" pid; *)
                 exec_with_spec spec x j args pid subst symb_exec_proc eval_state
-            | None -> exec_without_spec pid symb_exec_proc eval_state
+            | None ->
+                (* Fmt.pr "Calling %s WITHOUT SPEC\n" pid; *)
+                exec_without_spec pid symb_exec_proc eval_state
           in
 
           match Exec_mode.biabduction_exec !Config.current_exec_mode with
@@ -1015,7 +1058,7 @@ struct
                     ~json:
                       [ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
                     "Error");
-              if not (Exec_mode.concrete_exec !Config.current_exec_mode) then (
+              if Exec_mode.verification_exec !Config.current_exec_mode then (
                 let tactic_from_params =
                   let recovery_params =
                     let* v = v_es in
@@ -1085,12 +1128,17 @@ struct
                         };
                     ])
               else
-                let pp_err ft (a, errs) =
-                  Fmt.pf ft "FAILURE: Action %s failed with: %a" a
-                    (Fmt.Dump.list State.pp_err)
-                    errs
-                in
-                Fmt.failwith "%a\n@?" (Fmt.styled `Red pp_err) (a, errs)
+                [
+                  ConfErr
+                    (* (errs, state) *)
+                    {
+                      callstack = cs;
+                      proc_idx = i;
+                      error_state = state;
+                      errors = List.map (fun x -> Exec_err.ESt x) errs;
+                      branch_path;
+                    };
+                ]
         in
         oks @ errors
 
@@ -2003,13 +2051,12 @@ struct
           cconf
         in
         let proc_name, annot_cmd = get_cmd prog cs i in
-        Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
+        if !Config.current_exec_mode <> Exec_mode.BiAbduction then
+          Printf.printf "WARNING: MAX BRANCHING STOP: %d.\n" b_counter;
         L.set_previous prev_cmd_report_id;
         L.(
           verbose (fun m ->
-              m
-                "Stopping Symbolic Execution due to MAX BRANCHING with %d. \
-                 STOPPING CONF:\n"
+              m "Stopping Symbolic Execution due to MAX BRANCHING with %d."
                 b_counter));
         log_configuration annot_cmd state cs i b_counter branch_case proc_name
         |> Option.iter (fun report_id ->
@@ -2046,6 +2093,7 @@ struct
             eval_step_state
 
       let susp (cconf : CConf.susp) eval_step_state =
+        Fmt.pr "Handing susp!\n";
         let {
           eval_step;
           ret_fun;
@@ -2169,7 +2217,7 @@ struct
       (name : string)
       (params : string list)
       (state : State.t) : 'a cont_func =
-    let () = CallGraph.add_proc call_graph name in
+    let () = Call_graph.add_proc call_graph name in
     L.normal (fun m ->
         m
           ("*******************************************@\n"

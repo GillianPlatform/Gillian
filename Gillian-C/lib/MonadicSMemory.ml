@@ -833,10 +833,18 @@ let execute_rem_bounds heap params =
 
 let execute_genvgetdef heap params =
   match params with
-  | [ Expr.Lit (Loc loc) ] ->
-      let def = Global_env.find_def heap.genv loc in
-      let v = Global_env.serialize_def def in
-      DR.ok (make_branch ~heap ~rets:[ Expr.Lit (Loc loc); Expr.Lit v ] ())
+  | [ (Expr.Lit (Loc loc) | Expr.ALoc loc | Expr.LVar loc) ] -> (
+      match Global_env.find_def_opt heap.genv loc with
+      | Some def ->
+          let v = Global_env.serialize_def def in
+          DR.ok (make_branch ~heap ~rets:[ Expr.Lit (Loc loc); Expr.Lit v ] ())
+      | None ->
+          (* If we can't find a function, in UX mode we give up, while in OX mode we
+             signal. *)
+          if !Gillian.Utils.Config.under_approximation then Delayed.vanish ()
+          else
+            Fmt.failwith "execute_genvgetdef: couldn't find %s\nGENV:\n%a" loc
+              Global_env.pp heap.genv)
   | _ -> fail_ungracefully "genv_getdef" params
 
 (* Complete fixes  *)
@@ -1077,11 +1085,16 @@ let offset_by_chunk low chunk =
   let len = Expr.int (Chunk.size chunk) in
   low + len
 
+let can_fix err =
+  match err with
+  | InvalidLocation _ | MissingLocResource _
+  | SHeapTreeErr { sheaptree_err = MissingResource _; _ } -> true
+  | _ -> false
+
 let get_fixes _heap _pfs _gamma err =
   Logging.verbose (fun m -> m "Getting fixes for error : %a" pp_err err);
   let get_fixes_h is_store loc ofs chunk =
     let open CConstants.VTypes in
-    (* let fixes = [] in *)
     let fixes =
       match chunk with
       | Chunk.Mfloat32 ->
@@ -1090,21 +1103,21 @@ let get_fixes _heap _pfs _gamma err =
           let new_var_e = Expr.LVar new_var in
           let value = Expr.EList [ Expr.string single_type; new_var_e ] in
           let vtypes = [ (new_var, Type.NumberType) ] in
-          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
+          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set) ]
       | Mfloat64 ->
           let new_var = LVar.alloc () in
           let set = SS.singleton new_var in
           let new_var_e = Expr.LVar new_var in
           let value = Expr.EList [ Expr.string float_type; new_var_e ] in
           let vtypes = [ (new_var, Type.NumberType) ] in
-          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
+          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set) ]
       | Mint64 ->
           let new_var = LVar.alloc () in
           let set = SS.singleton new_var in
           let new_var_e = Expr.LVar new_var in
           let value = Expr.EList [ Expr.string long_type; new_var_e ] in
           let vtypes = [ (new_var, Type.IntType) ] in
-          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
+          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set) ]
       | Mptr ->
           let new_var1 = LVar.alloc () in
           let new_var_e1 = Expr.LVar new_var1 in
@@ -1121,12 +1134,11 @@ let get_fixes _heap _pfs _gamma err =
             [ (new_var1, Type.ObjectType); (new_var2, Type.IntType) ]
           in
           [
-            ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []);
+            ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set);
             ( [ AddSingle { loc; ofs; value = null_ptr; chunk } ],
               [],
               [],
-              SS.empty,
-              [] );
+              SS.empty );
           ]
       | _ ->
           let new_var = LVar.alloc () in
@@ -1134,7 +1146,7 @@ let get_fixes _heap _pfs _gamma err =
           let new_var_e = Expr.LVar new_var in
           let value = Expr.EList [ Expr.string int_type; new_var_e ] in
           let vtypes = [ (new_var, Type.IntType) ] in
-          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set, []) ]
+          [ ([ AddSingle { loc; ofs; value; chunk } ], [], vtypes, set) ]
     in
     (* Additional fix for store operation to handle case of unitialized memory *)
     let fixes =
@@ -1145,8 +1157,7 @@ let get_fixes _heap _pfs _gamma err =
           ],
           [],
           [],
-          SS.empty,
-          [] )
+          SS.empty )
         :: fixes
       else fixes
     in
@@ -1164,7 +1175,7 @@ let get_fixes _heap _pfs _gamma err =
   | InvalidLocation loc ->
       let new_loc = ALoc.alloc () in
       let new_expr = Expr.ALoc new_loc in
-      [ ([], [ Formula.Eq (new_expr, loc) ], [], SS.empty, []) ]
+      [ ([], [ Formula.Eq (new_expr, loc) ], [], SS.empty) ]
   | SHeapTreeErr
       {
         at_locations;

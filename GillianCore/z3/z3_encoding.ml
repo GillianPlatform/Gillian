@@ -16,6 +16,8 @@ module Solver = Z3.Solver
 module Symbol = Z3.Symbol
 module ZExpr = Z3.Expr
 
+exception Z3Unknown
+
 (* Note: I could probably have some static check instead of dynamic check
    using GADTs that my z3 exprs are correctly typed. *)
 
@@ -913,20 +915,22 @@ let check_sat_core (fs : Formula.Set.t) (gamma : tyenv) : Model.model option =
   let ret_value =
     match ret with
     | Solver.UNKNOWN ->
-        Format.printf
-          "FATAL ERROR: Z3 returned UNKNOWN for SAT question:\n\
-           %a\n\
-           with gamma:\n\
-           @[%a@]\n\n\n\
-           Reason: %s\n\n\
-           Solver:\n\
-           %a\n\
-           @?"
-          (Fmt.iter ~sep:(Fmt.any ", ") Formula.Set.iter Formula.pp)
-          fs pp_tyenv gamma
-          (Z3.Solver.get_reason_unknown master_solver)
-          (Fmt.list ~sep:(Fmt.any "\n\n") Fmt.string)
-          (List.map Z3.Expr.to_string encoded_assertions);
+        if !Utils.Config.under_approximation then raise Z3Unknown
+        else
+          Format.printf
+            "FATAL ERROR: Z3 returned UNKNOWN for SAT question:\n\
+             %a\n\
+             with gamma:\n\
+             @[%a@]\n\n\n\
+             Reason: %s\n\n\
+             Solver:\n\
+             %a\n\
+             @?"
+            (Fmt.iter ~sep:(Fmt.any ", ") Formula.Set.iter Formula.pp)
+            fs pp_tyenv gamma
+            (Z3.Solver.get_reason_unknown master_solver)
+            (Fmt.list ~sep:(Fmt.any "\n\n") Fmt.string)
+            (List.map Z3.Expr.to_string encoded_assertions);
         exit 1
     | SATISFIABLE -> Solver.get_model master_solver
     | UNSATISFIABLE -> None

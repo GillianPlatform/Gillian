@@ -202,7 +202,7 @@ and 'label cmd =
   | ReturnError
   | Fail of string * expr list
 
-and flag = Normal | Error
+and flag = Normal | Error | Bug
 
 and pred = {
   pred_name : string;
@@ -275,6 +275,8 @@ and ('annot, 'label) proc = {
   proc_body : ('annot * 'label option * 'label cmd) array;
   proc_params : string list;
   proc_spec : spec option;
+  proc_aliases : string list;
+  proc_calls : string list;
 }
 [@@deriving
   visitors { variety = "reduce" },

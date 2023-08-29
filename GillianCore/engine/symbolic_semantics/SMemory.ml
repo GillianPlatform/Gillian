@@ -61,14 +61,11 @@ module type S = sig
     PFS.t ->
     Type_env.t ->
     err_t ->
-    (c_fix_t list
-    * Formula.t list
-    * (string * Type.t) list
-    * Containers.SS.t
-    * Asrt.t list)
+    (c_fix_t list * Formula.t list * (string * Type.t) list * Containers.SS.t)
     list
 
-  val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t
+  val can_fix : err_t -> bool
+  val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t Gbranch.t list
 end
 
 module Dummy : S with type init_data = unit = struct
@@ -103,4 +100,5 @@ module Dummy : S with type init_data = unit = struct
   let get_failing_constraint _ = failwith "Please implement SMemory"
   let get_fixes _ _ _ _ = failwith "Please implement SMemory"
   let apply_fix _ _ _ _ = failwith "Please implement SMemory"
+  let can_fix _ = failwith "Please implement SMemory"
 end

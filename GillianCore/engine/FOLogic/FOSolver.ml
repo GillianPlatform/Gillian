@@ -25,11 +25,11 @@ let simplify_pfs_and_gamma
     (fs : Formula.t list)
     (gamma : Type_env.t) : Formula.Set.t * Type_env.t * SESubst.t =
   let pfs, gamma =
-    match relevant_info with
-    | None -> (PFS.of_list fs, Type_env.copy gamma)
-    | Some relevant_info ->
+    match (relevant_info, !Config.under_approximation) with
+    | Some relevant_info, false ->
         ( PFS.filter_with_info relevant_info (PFS.of_list fs),
           Type_env.filter_with_info relevant_info gamma )
+    | _ -> (PFS.of_list fs, Type_env.copy gamma)
   in
   let subst, _ =
     Simplifications.simplify_pfs_and_gamma ~unification pfs gamma

@@ -49,6 +49,12 @@ module Hashtbl = struct
       None
     with Found -> !result
 
+  let rec remove_all tbl e =
+    if mem tbl e then (
+      remove tbl e;
+      remove_all tbl e)
+    else ()
+
   let of_yojson
       (key_of_yojson : Yojson.Safe.t -> ('a, string) result)
       (val_of_yojson : Yojson.Safe.t -> ('b, string) result)

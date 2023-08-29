@@ -4,6 +4,7 @@ open Csharpminor
 open CConstants
 module Logging = Gillian.Logging
 module SS = Gillian.Utils.Containers.SS
+module Call_graph = Gillian.Utils.Call_graph
 module Annot = Annot.Basic
 
 let true_name = ValueTranslation.true_name
@@ -374,7 +375,8 @@ let get_invariant () =
   last_invariant := None;
   i
 
-let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
+let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt :
+    (Annot.t * string option * string Cmd.t) list * string list =
   let trans_stmt ?(context = context) =
     trans_stmt ~clight_prog ~fname ~fid ~context
   in
@@ -385,28 +387,37 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
   in
   let gen_str = Generators.gen_str ~fname in
   match stmt with
-  | Sskip -> [ (annot_ctx context, None, Cmd.Skip) ]
+  | Sskip -> ([ (annot_ctx context, None, Cmd.Skip) ], [])
   | Sset (id, exp) ->
       let cmds, te = trans_expr exp in
       let var_name = true_name id in
       let ncmd = Cmd.Assignment (var_name, te) in
       let lab_ncmd = (annot_ctx context, None, ncmd) in
-      add_annots ~ctx:context cmds @ [ lab_ncmd ]
+      let cmds = add_annots ~ctx:context cmds @ [ lab_ncmd ] in
+      (cmds, [])
   | Sseq (s1, Sskip) -> trans_stmt s1
   | Sseq (Sskip, s2) -> trans_stmt s2
   | Sseq (s1, s2) ->
       (* Making sure it's compiled in that order for the invariant to make sense *)
-      let ts1 = trans_stmt s1 in
-      let ts2 = trans_stmt s2 in
-      ts1 @ ts2
+      let ts1, callees1 = trans_stmt s1 in
+      let ts2, callees2 = trans_stmt s2 in
+      (ts1 @ ts2, callees1 @ callees2)
   | Sifthenelse (exp, s1, s2) ->
       let then_lab = gen_str Prefix.then_lab in
       let else_lab = gen_str Prefix.else_lab in
       let endif_lab = gen_str Prefix.endif_lab in
       let leading_cmds, texp = trans_expr exp in
       let annot_leading_cmds = add_annots ~ctx:context leading_cmds in
-      let then_lab, ts1 = change_first_lab then_lab (trans_stmt s1) in
-      let else_lab, ts2 = change_first_lab else_lab (trans_stmt s2) in
+      let then_lab, ts1, calles1 =
+        let cmds, callees = trans_stmt s1 in
+        let then_lab, cmds = change_first_lab then_lab cmds in
+        (then_lab, cmds, callees)
+      in
+      let else_lab, ts2, callees2 =
+        let cmds, callees = trans_stmt s2 in
+        let else_lab, cmds = change_first_lab else_lab cmds in
+        (else_lab, cmds, callees)
+      in
       let bool_of_val =
         Expr.Lit (Literal.String Internal_Functions.bool_of_val)
       in
@@ -419,17 +430,24 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
       let lab_guard = (annot_ctx context, None, guard) in
       let lab_goto_end = (annot_ctx context, None, goto_end) in
       let lab_end_cmd = (annot_ctx context, Some endif_lab, end_cmd) in
-      annot_leading_cmds @ [ a_bov; lab_guard ] @ ts1 @ [ lab_goto_end ] @ ts2
-      @ [ lab_end_cmd ]
+      let cmds =
+        annot_leading_cmds @ [ a_bov; lab_guard ] @ ts1 @ [ lab_goto_end ] @ ts2
+        @ [ lab_end_cmd ]
+      in
+      (cmds, calles1 @ callees2)
   | Sloop s ->
       let loop_lab = gen_str Prefix.loop_lab in
       let nctx = { context with loop_stack = loop_lab :: context.loop_stack } in
       let invariant = add_annots ~ctx:nctx (get_invariant ()) in
-      let loop_lab, ts =
-        change_first_lab loop_lab (invariant @ trans_stmt ~context:nctx s)
+      let loop_lab, ts, callees =
+        let loop_cmds, callees = trans_stmt ~context:nctx s in
+        let loop_lab, cmds =
+          change_first_lab loop_lab (invariant @ loop_cmds)
+        in
+        (loop_lab, cmds, callees)
       in
       let goto_cmd = (annot_ctx nctx, None, Cmd.Goto loop_lab) in
-      ts @ [ goto_cmd ]
+      (ts @ [ goto_cmd ], callees)
   | Sblock s ->
       let block_lab = gen_str Prefix.end_block_lab in
       let nctx =
@@ -437,14 +455,14 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
       in
       (* Add the new label to the stack *)
       let skip_cmd = (annot_ctx context, Some block_lab, Cmd.Skip) in
-      let ts = trans_stmt ~context:nctx s in
-      ts @ [ skip_cmd ]
+      let ts, callees = trans_stmt ~context:nctx s in
+      (ts @ [ skip_cmd ], callees)
   | Sexit n ->
       let n_ocaml = Camlcoq.Nat.to_int n in
       let lab = List.nth context.block_stack n_ocaml in
       let goto_cmd = (annot_ctx context, None, Cmd.Goto lab) in
-      [ goto_cmd ]
-  | Sreturn rval_opt -> (
+      ([ goto_cmd ], [])
+  | Sreturn rval_opt ->
       let leading_cmds, rexpr =
         match rval_opt with
         | None -> ([], Expr.Lit Literal.Null)
@@ -458,24 +476,32 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
       in
       let freecmd_opt = make_free_cmd fname context.local_env in
       let return = (annot_ctx context, None, Cmd.ReturnNormal) in
-      match freecmd_opt with
-      | Some freecmd ->
-          let annot_freecmd = (annot_ctx context, None, freecmd) in
-          annotated_leading_cmds @ [ ret_assign; annot_freecmd; return ]
-      | None -> annotated_leading_cmds @ [ ret_assign; return ])
+      let cmds =
+        match freecmd_opt with
+        | Some freecmd ->
+            let annot_freecmd = (annot_ctx context, None, freecmd) in
+            annotated_leading_cmds @ [ ret_assign; annot_freecmd; return ]
+        | None -> annotated_leading_cmds @ [ ret_assign; return ]
+      in
+      (cmds, [])
   | Slabel (lab, s) ->
       (* If the translated thing already has a label, we add a skip before with the right label,
          otherwise, we put the label in the translated thing *)
       let gil_lab = trans_label lab in
-      let gil_lab_or_already_exists, ts =
-        change_first_lab gil_lab (trans_stmt s)
+      let gil_lab_or_already_exists, ts, callees =
+        let cmds, callees = trans_stmt s in
+        let gil_lab, cmds = change_first_lab gil_lab cmds in
+        (gil_lab, cmds, callees)
       in
-      if not (String.equal gil_lab gil_lab_or_already_exists) then
-        (annot_ctx context, Some gil_lab, Cmd.Skip) :: ts
-      else ts
+      let cmds =
+        if not (String.equal gil_lab gil_lab_or_already_exists) then
+          (annot_ctx context, Some gil_lab, Cmd.Skip) :: ts
+        else ts
+      in
+      (cmds, callees)
   | Sgoto lab ->
       let gil_lab = trans_label lab in
-      [ (annot_ctx context, None, Cmd.Goto gil_lab) ]
+      ([ (annot_ctx context, None, Cmd.Goto gil_lab) ], [])
   | Sstore (compcert_chunk, vaddr, v) ->
       let addr_eval_cmds, eaddr = trans_expr vaddr in
       let v_eval_cmds, ev = trans_expr v in
@@ -489,19 +515,22 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
       let cmd =
         Cmd.Call (gvar, storev, [ chunk_expr; eaddr; ev ], None, None)
       in
-      annot_addr_eval @ annot_v_eval @ [ (annot_ctx context, None, cmd) ]
+      let cmds =
+        annot_addr_eval @ annot_v_eval @ [ (annot_ctx context, None, cmd) ]
+      in
+      (cmds, [])
   | Scall (None, _, ex, [ e ]) when is_assert_call ex ->
       let cmds, egil = trans_expr e in
       let one = Expr.EList [ Lit (String VTypes.int_type); Expr.one_i ] in
       let form = Formula.Eq (egil, one) in
       let assert_cmd = Cmd.Logic (Assert form) in
-      add_annots ~ctx:context (cmds @ [ assert_cmd ])
+      (add_annots ~ctx:context (cmds @ [ assert_cmd ]), [])
   | Scall (None, _, ex, [ e ]) when is_assume_call ex ->
       let cmds, egil = trans_expr e in
       let one = Expr.EList [ Lit (String VTypes.int_type); Expr.one_i ] in
       let form = Formula.Eq (egil, one) in
       let assert_cmd = Cmd.Logic (Assume form) in
-      add_annots ~ctx:context (cmds @ [ assert_cmd ])
+      (add_annots ~ctx:context (cmds @ [ assert_cmd ]), [])
   | Scall (None, _, ex, args) when is_printf_call ex ->
       let cmds, egil = List.split (List.map trans_expr args) in
       let leftvar = gen_str Prefix.gvar in
@@ -512,9 +541,17 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
             egil,
             None )
       in
-      (List.concat cmds |> add_annots ~ctx:context)
-      @ [ (annot_ctx context, None, cmd) ]
+      let cmds =
+        (List.concat cmds |> add_annots ~ctx:context)
+        @ [ (annot_ctx context, None, cmd) ]
+      in
+      (cmds, [])
   | Scall (optid, _, ex, lexp) ->
+      let callee =
+        match ex with
+        | Csharpminor.Eaddrof l -> [ true_name l ]
+        | _ -> []
+      in
       let leftvar =
         match optid with
         | None -> gen_str Prefix.gvar
@@ -535,12 +572,15 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
       let call_cmd =
         Cmd.Call (leftvar, Expr.PVar fname_var, trans_params, None, None)
       in
-      add_annots ~ctx:context leading_fn
-      @ add_annots ~ctx:context leading_params
-      @ [
-          (annot_ctx context, None, get_fname);
-          (annot_ctx context, None, call_cmd);
-        ]
+      let cmds =
+        add_annots ~ctx:context leading_fn
+        @ add_annots ~ctx:context leading_params
+        @ [
+            (annot_ctx context, None, get_fname);
+            (annot_ctx context, None, call_cmd);
+          ]
+      in
+      (cmds, callee)
   | Sswitch (is_long, guard, lab_stmts) ->
       let leading_guard, guard_expr = trans_expr guard in
       let num =
@@ -563,23 +603,35 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
         match l_stmts with
         | LSnil when had_default ->
             let lab = gen_str Prefix.endswitch_lab in
-            ([], [ (annot_ctx context, Some lab, Cmd.Skip) ], lab, "")
+            ([], [ (annot_ctx context, Some lab, Cmd.Skip) ], lab, "", [])
         | LSnil ->
             let lab = gen_str Prefix.default_lab in
-            ([], [ (annot_ctx context, Some lab, Cmd.Skip) ], lab, lab)
+            ([], [ (annot_ctx context, Some lab, Cmd.Skip) ], lab, lab, [])
         | LScons (None, s, r) ->
-            let switches, cases, next_lab, _ = make_switch true r in
-            let default_lab, trans_case =
-              change_first_lab (gen_str Prefix.default_lab) (trans_stmt s)
+            let switches, cases, next_lab, _, callees1 = make_switch true r in
+            let default_lab, trans_case, callees2 =
+              let cmds, callees = trans_stmt s in
+              let default_lab, cmds =
+                change_first_lab (gen_str Prefix.default_lab) cmds
+              in
+              (default_lab, cmds, callees)
             in
-            (switches, trans_case @ cases, next_lab, default_lab)
+            ( switches,
+              trans_case @ cases,
+              next_lab,
+              default_lab,
+              callees1 @ callees2 )
         | LScons (Some l, s, r) ->
-            let switches, cases, next_lab, def_lab =
+            let switches, cases, next_lab, def_lab, callees1 =
               make_switch had_default r
             in
             let g = Expr.BinOp (guard_expr, BinOp.Equal, num l) in
-            let case_lab, trans_case =
-              change_first_lab (gen_str Prefix.case_lab) (trans_stmt s)
+            let case_lab, trans_case, callees2 =
+              let cmds, callees = trans_stmt s in
+              let case_lab, cmds =
+                change_first_lab (gen_str Prefix.case_lab) cmds
+              in
+              (case_lab, cmds, callees)
             in
             let switch_lab = gen_str Prefix.switch_lab in
             let goto =
@@ -587,9 +639,13 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
                 Some switch_lab,
                 Cmd.GuardedGoto (g, case_lab, next_lab) )
             in
-            (goto :: switches, trans_case @ cases, switch_lab, def_lab)
+            ( goto :: switches,
+              trans_case @ cases,
+              switch_lab,
+              def_lab,
+              callees1 @ callees2 )
       in
-      let switches, cases, first_switch_lab, def_lab =
+      let switches, cases, first_switch_lab, def_lab, callees =
         make_switch false lab_stmts
       in
       let goto_default =
@@ -598,10 +654,13 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
             def_lab,
             first_switch_lab )
       in
-      add_annots ~ctx:context leading_guard
-      @ ((annot_ctx context, None, goto_default) :: switches)
-      @ cases
-  | Sbuiltin (None, AST.EF_annot (_, s, _), []) -> (
+      let cmds =
+        add_annots ~ctx:context leading_guard
+        @ ((annot_ctx context, None, goto_default) :: switches)
+        @ cases
+      in
+      (cmds, callees)
+  | Sbuiltin (None, AST.EF_annot (_, s, _), []) ->
       let string_lcmd =
         let buffer = Buffer.create 1000 in
         let () = List.iter (fun x -> Buffer.add_char buffer x) s in
@@ -623,19 +682,22 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
       let compiled =
         Gil_logic_gen.trans_lcmd ~fname ~ann:context.gil_annot lcmd
       in
-      match compiled with
-      | `Normal gil_lcmds ->
-          let gil_lcmds =
-            List.map
-              (fun lc -> (annot_ctx context, None, Cmd.Logic lc))
-              gil_lcmds
-          in
-          (* We should filter assert_s in verif, and assert_v in symb *)
-          if Exec_mode.concrete_exec context.exec_mode then [] else gil_lcmds
-      | `Invariant inv ->
-          let inv = Cmd.Logic (SL inv) in
-          set_invariant inv;
-          [])
+      let cmds =
+        match compiled with
+        | `Normal gil_lcmds ->
+            let gil_lcmds =
+              List.map
+                (fun lc -> (annot_ctx context, None, Cmd.Logic lc))
+                gil_lcmds
+            in
+            (* We should filter assert_s in verif, and assert_v in symb *)
+            if Exec_mode.concrete_exec context.exec_mode then [] else gil_lcmds
+        | `Invariant inv ->
+            let inv = Cmd.Logic (SL inv) in
+            set_invariant inv;
+            []
+      in
+      (cmds, [])
   | Sbuiltin (_, AST.EF_annot_val _, _)
     when not (Exec_mode.symbolic_exec context.exec_mode) ->
       failwith
@@ -648,22 +710,22 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
     when String.equal
            (String.init (List.length s) (List.nth s))
            CConstants.Symbolic_Constr.symb_int ->
-      make_symb_gen ~ctx:context id CConstants.VTypes.int_type
+      (make_symb_gen ~ctx:context id CConstants.VTypes.int_type, [])
   | Sbuiltin (Some id, AST.EF_annot_val (_, s, _), [ _ ])
     when String.equal
            (String.init (List.length s) (List.nth s))
            CConstants.Symbolic_Constr.symb_long ->
-      make_symb_gen ~ctx:context id CConstants.VTypes.long_type
+      (make_symb_gen ~ctx:context id CConstants.VTypes.long_type, [])
   | Sbuiltin (Some id, AST.EF_annot_val (_, s, _), [ _ ])
     when String.equal
            (String.init (List.length s) (List.nth s))
            CConstants.Symbolic_Constr.symb_single ->
-      make_symb_gen ~ctx:context id CConstants.VTypes.single_type
+      (make_symb_gen ~ctx:context id CConstants.VTypes.single_type, [])
   | Sbuiltin (Some id, AST.EF_annot_val (_, s, _), [ _ ])
     when String.equal
            (String.init (List.length s) (List.nth s))
            CConstants.Symbolic_Constr.symb_float ->
-      make_symb_gen ~ctx:context id CConstants.VTypes.float_type
+      (make_symb_gen ~ctx:context id CConstants.VTypes.float_type, [])
   | Sbuiltin (None, AST.EF_memcpy (sz, al), [ dst; src ]) ->
       let sz = ValueTranslation.int_of_z sz in
       let al = ValueTranslation.int_of_z al in
@@ -678,7 +740,7 @@ let rec trans_stmt ~clight_prog ~fname ~fid ~context stmt =
             None,
             None )
       in
-      add_annots ~ctx:context (cmds_dst @ cmds_src @ [ call ])
+      (add_annots ~ctx:context (cmds_dst @ cmds_src @ [ call ]), [])
   | Sbuiltin (_optid, _exf, _params) as s ->
       failwith
         (Format.asprintf
@@ -703,6 +765,7 @@ let trans_function
     ?(gil_annot = Gil_logic_gen.empty)
     ?(exec_mode = Exec_mode.Verification)
     ~clight_prog
+    ~original_fname
     filepath
     fname
     fdef
@@ -737,7 +800,7 @@ let trans_function
       [ (empty_annot, None, Cmd.Call (gvar, expr_fn, [], None, None)) ]
     else []
   in
-  let body = trans_stmt ~clight_prog ~fname ~fid ~context fn_body in
+  let body, callees = trans_stmt ~clight_prog ~fname ~fid ~context fn_body in
   let body_with_registrations =
     init_genv @ register_vars @ register_temps @ body
   in
@@ -762,6 +825,8 @@ let trans_function
       proc_body = Array.of_list body_with_reg_and_ret;
       proc_params = params;
       proc_spec = None;
+      proc_aliases = [ original_fname ];
+      proc_calls = callees;
     }
 
 let set_global_var symbol v =
@@ -891,12 +956,11 @@ let rec trans_globdefs
         if has_global_scope then { name = symbol; defined = true } :: syms
         else syms
       in
-      ( new_def :: genv_defs,
-        init_acts,
-        new_bi_specs,
-        trans_function ~clight_prog ~gil_annot ~exec_mode filepath symbol f id
-        :: fs,
-        new_syms )
+      let proc =
+        trans_function ~clight_prog ~gil_annot ~exec_mode
+          ~original_fname:original_sym filepath symbol f id
+      in
+      (new_def :: genv_defs, init_acts, new_bi_specs, proc :: fs, new_syms)
   | (id, Gfun (External f)) :: r
     when (is_builtin_func (true_name id) && not_implemented f)
          || is_gil_func (true_name id) exec_mode ->
@@ -961,6 +1025,8 @@ let make_init_proc init_cmds =
       proc_params = [];
       proc_spec = None;
       proc_body = Array.of_list all_cmds;
+      proc_aliases = [];
+      proc_calls = [];
     }
 
 let trans_program
