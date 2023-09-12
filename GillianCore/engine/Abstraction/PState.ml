@@ -981,10 +981,6 @@ module Make
     let state, preds, _, variants = astate in
     (state, preds, pred_defs, variants)
 
-  let fresh_val (astate : t) : vt =
-    let state, _, _, _ = astate in
-    State.fresh_val state
-
   let fresh_loc ?(loc : vt option) (astate : t) : vt =
     let state, _, _, _ = astate in
     State.fresh_loc ?loc state

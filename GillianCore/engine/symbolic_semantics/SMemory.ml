@@ -45,7 +45,6 @@ module type S = sig
     t ->
     (t * Formula.Set.t * (string * Type.t) list) list
 
-  val fresh_val : t -> vt
   val clean_up : ?keep:Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
   val lvars : t -> Containers.SS.t
   val alocs : t -> Containers.SS.t
@@ -88,7 +87,6 @@ module Dummy : S with type init_data = unit = struct
   let pp_by_need _ _ _ = ()
   let get_print_info _ _ = failwith "Please implement SMemory"
   let substitution_in_place ~pfs:_ ~gamma:_ _ _ = []
-  let fresh_val _ = failwith "Please implement SMemory"
   let clean_up ?keep:_ _ = failwith "Please implement SMemory"
   let lvars _ = failwith "Please implement SMemory"
   let alocs _ = failwith "Please implement SMemory"

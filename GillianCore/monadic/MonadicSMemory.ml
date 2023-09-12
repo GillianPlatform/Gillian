@@ -40,7 +40,6 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
 
   val substitution_in_place : st -> t -> t Delayed.t
-  val fresh_val : t -> vt
   val clean_up : ?keep:Expr.Set.t -> t -> Expr.Set.t * Expr.Set.t
   val lvars : t -> Containers.SS.t
   val alocs : t -> Containers.SS.t

@@ -984,8 +984,6 @@ let substitution_in_place subst heap =
   | Ok mem -> { mem = ref mem; genv }
   | Error e -> Fmt.failwith "Error in substitution: %a" SHeapTree.pp_err e
 
-let fresh_val _ = Expr.LVar (LVar.alloc ())
-
 let clean_up ?(keep = Expr.Set.empty) _ : Expr.Set.t * Expr.Set.t =
   (Expr.Set.empty, keep)
 

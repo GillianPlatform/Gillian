@@ -569,8 +569,6 @@ module Make (SMemory : SMemory.S) :
   let produce (_ : t) (_ : st) (_ : Asrt.t) : (t, err_t) Res_list.t =
     raise (Failure "produce_post from non-abstract symbolic state.")
 
-  let fresh_val (_ : t) : vt = LVar (LVar.alloc ())
-
   let clean_up ?(keep = ES.empty) (state : t) : unit =
     let heap, store, _, _, _ = state in
     let keep =

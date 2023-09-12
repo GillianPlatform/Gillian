@@ -187,8 +187,6 @@ struct
   let substitution_in_place ?subst_all:_ (_ : st) (_ : t) =
     raise (Failure "substitution_in_place inside BI STATE")
 
-  let fresh_val (_ : t) : vt = raise (Failure "fresh_val inside BI STATE")
-
   let fresh_loc ?loc:_ (_ : t) : vt =
     raise (Failure "fresh_loc inside BI STATE")
 

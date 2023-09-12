@@ -110,8 +110,6 @@ module M = struct
     SHeap.clean_up heap;
     (Expr.Set.empty, keep)
 
-  let fresh_val (_ : t) : vt = LVar (LVar.alloc ())
-
   let substitution_in_place ~pfs:_ ~gamma:_ (subst : st) (heap : t) =
     SHeap.substitution_in_place subst heap;
     [ (heap, Formula.Set.empty, []) ]

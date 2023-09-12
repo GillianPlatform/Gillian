@@ -298,7 +298,6 @@ let get_recovery_tactic _ e =
   | _ -> Recovery_tactic.none
 
 let substitution_in_place ~pfs:_ ~gamma:_ = WislSHeap.substitution_in_place
-let fresh_val _ = Expr.LVar (LVar.alloc ())
 
 let clean_up ?(keep = Expr.Set.empty) (mem : t) : Expr.Set.t * Expr.Set.t =
   WislSHeap.clean_up keep mem

@@ -181,9 +181,6 @@ end = struct
 
   let substitution_in_place ?subst_all:_ (_ : st) (_ : t) : t list = []
 
-  let fresh_val (_ : t) =
-    raise (Failure "fresh_val not implemented in concrete state")
-
   let fresh_loc ?loc:_ (_ : t) =
     raise (Failure "fresh_loc not implemented in concrete state")
 
