@@ -127,6 +127,7 @@ let fmod a b =
 let imod a b =
   match (a, b) with
   | Lit (Int a), Lit (Int b) -> Lit (Int (Z.( mod ) a b))
+  | _, Lit (Int b) when Z.equal b Z.one -> zero_i
   | _ -> BinOp (a, IMod, b)
 
 let type_ t = Lit (Type t)

@@ -1,0 +1,6 @@
+(library
+ (name kanillian_compiler)
+ (libraries gillian yojson irep_lib kutils goto_lib kcommons memory_model)
+ (flags :standard -open Goto_lib -open Kcommons)
+ (preprocess
+  (pps ppx_deriving.std)))

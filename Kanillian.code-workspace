@@ -1,0 +1,31 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../kani"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"stdlib.h": "c",
+			"stdio.h": "c",
+			"slist.h": "c",
+			"algorithm": "c",
+			"__bit_reference": "cpp",
+			"__string": "cpp",
+			"cstring": "cpp",
+			"tuple": "c",
+			"string.h": "c",
+			"random": "c",
+			"ranges": "c",
+			"base.h": "c"
+		},
+		"ocaml.sandbox": {
+			"kind": "esy",
+			"root": "${workspaceFolder:Kanillian}"
+		},
+		"typescript.tsc.autoDetect": "off"
+	}
+}

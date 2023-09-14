@@ -30,6 +30,7 @@ type 'label t = 'label TypeDef__.cmd =
   | Fail of string * Expr.t list  (** Failure             *)
 [@@deriving yojson]
 
+let equal = TypeDef__.equal_cmd
 let fold = List.fold_left SS.union SS.empty
 
 let pvars (cmd : 'label t) : SS.t =

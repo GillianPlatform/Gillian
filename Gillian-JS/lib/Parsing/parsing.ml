@@ -30,7 +30,7 @@ let parse_from_string start str =
            str msg)
   | _ ->
       failwith
-        (Printf.sprintf "Unkown parsing error while parsing the string :@\n%s"
+        (Printf.sprintf "Unknown parsing error while parsing the string :@\n%s"
            str)
 
 let parse_js_pre_from_string :

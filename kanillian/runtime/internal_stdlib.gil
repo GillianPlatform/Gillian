@@ -1,0 +1,56 @@
+#internal
+
+proc i__malloc(sz) {
+      chunk := "i__ptr_chunk"();
+      ptr_sz := "i__ptr_size"();
+      bl := [mem_alloc](i- ptr_sz, sz);
+      b := l-nth(bl, 0i);
+      u := [mem_store](chunk, b, i- ptr_sz, sz);
+      ret := {{ b, 0i }};
+      return
+};
+
+proc i__free(ptr) {
+         chunk := "i__ptr_chunk"();
+         ptr_sz := "i__ptr_size"();
+         sz := [mem_load](chunk, l-nth(ptr, 0i), l-nth(ptr, 1i) i- ptr_sz);
+         sz := l-nth(sz, 0i);
+         goto [ sz i< 0i ] die ctn;
+   die:  fail[free]("Deallocating a pointer of negative size");
+   ctn:  u := [mem_free](l-nth(ptr, 0i), l-nth(ptr, 1i) i- ptr_sz, l-nth(ptr, 1i) i+ sz);
+         ret := undefined;
+         return
+};
+
+proc i__memmove(ptr1, ptr2, sz) {
+      ret := [mem_move](l-nth(ptr1, 0i), l-nth(ptr1, 1i), l-nth(ptr2, 0i), l-nth(ptr2, 1i), sz);
+      return
+};
+
+proc i__memcpy(ptr1, ptr2, sz) {
+      ret := [mem_move](l-nth(ptr1, 0i), l-nth(ptr1, 1i), l-nth(ptr2, 0i), l-nth(ptr2, 1i), sz);
+      return
+};
+
+proc i__memcmp(ptr1, ptr2, sz) {
+      (* FIXME: This is invalid in C, but valid for the Kani use cases (only check equality to 0) *)
+           goto [sz i<= 0i] zer cmp;
+      zer: ret := 0i;
+           return;
+      cmp: leftl := [mem_getArray](l-nth(ptr1, 0i), l-nth(ptr1, 1i), sz, "u8");
+           rightl := [mem_getArray](l-nth(ptr2, 0i), l-nth(ptr2, 1i), sz, "u8");
+           left := l-nth(leftl, 4i);
+           right := l-nth(rightl, 4i);
+           ret := "i__value_of_bool"(not (left = right));
+           return
+};
+
+proc i__memset(ptr, vc, n) {
+            n := n i- 1i;
+      loop: goto [not (n i< 0i)] ctn end;
+      ctn:  u := [mem_store]("u8", l-nth(ptr, 0i), l-nth(ptr, 1i) i+ n, vc);
+            n := n i- 1i;
+            goto loop;
+      end:  ret := undefined;
+            return
+};

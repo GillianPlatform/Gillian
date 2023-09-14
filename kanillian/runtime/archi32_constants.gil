@@ -1,0 +1,16 @@
+#internal
+
+proc i__archi_usize_bounds() {
+  ret := {{ 0i, 4294967295i }};
+  return
+};
+
+proc i__ptr_chunk() {
+  ret := "u32";
+  return
+};
+
+proc i__ptr_size() {
+  ret := 4i;
+  return
+};

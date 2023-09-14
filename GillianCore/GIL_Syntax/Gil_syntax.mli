@@ -732,7 +732,7 @@ module Cmd : sig
     | ReturnNormal  (** Normal return *)
     | ReturnError  (** Error return *)
     | Fail of string * Expr.t list  (** Failure *)
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   (** Pretty-printer *)
   val pp : pp_label:'a Fmt.t -> Format.formatter -> 'a t -> unit
@@ -1028,7 +1028,12 @@ module Annot : sig
     val is_hidden : t -> bool
   end
 
-  module Basic : S
+  module Basic : sig
+    include S
+
+    val equal : t -> t -> bool
+    val make : ?origin_loc:Location.t -> ?loop_info:string list -> unit -> t
+  end
 end
 
 (** @canonical Gillian.Gil_syntax.Proc *)

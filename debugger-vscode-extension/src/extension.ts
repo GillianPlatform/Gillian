@@ -27,8 +27,7 @@ function expandPath(s: string): string {
 }
 
 class DebugAdapterExecutableFactory
-  implements vscode.DebugAdapterDescriptorFactory
-{
+  implements vscode.DebugAdapterDescriptorFactory {
   // The following use of a DebugAdapter factory shows how to control what debug adapter executable is used.
   // Since the code implements the default behavior, it is absolutely not neccessary and we show it here only for educational purpose.
 
@@ -54,6 +53,9 @@ class DebugAdapterExecutableFactory
             break;
           case 'c':
             langCmd = 'gillian-c';
+            break;
+          case 'kani':
+            langCmd = 'kanillian';
             break;
           case 'wisl':
           default:

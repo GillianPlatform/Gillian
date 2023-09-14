@@ -35,10 +35,10 @@ export async function startDebugging(
   try {
     const canContinue = await checkForExistingDebugSession();
     if (!canContinue) return;
-    const validInputs = new Set(['wisl', 'js', 'c']);
+    const validInputs = new Set(['wisl', 'js', 'c', 'kani']);
     const validateInput = (input: string) => {
       if (!validInputs.has(input)) {
-        return 'The target language must be one of: wisl, js, c';
+        return 'The target language must be one of: wisl, js, c, kani';
       }
 
       return null;

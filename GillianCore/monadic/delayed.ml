@@ -1,5 +1,6 @@
 module Formula = Gil_syntax.Formula
 module Expr = Gil_syntax.Expr
+module Type = Gil_syntax.Type
 
 exception NonExhaustiveEntailment of Formula.t list
 
@@ -108,6 +109,25 @@ let entails =
   delayed_eval2 entails
 
 let check_sat = delayed_eval FOSolver.sat
+
+let is_always_true (f : Formula.t) ~curr_pc =
+  FOSolver.check_entailment ~pc:curr_pc f
+
+let assert_ (f : Formula.t) exn ~curr_pc =
+  if FOSolver.check_entailment ~pc:curr_pc f then
+    [ Branch.make ~pc:curr_pc ~value:() ]
+  else raise exn
+
+let has_type (e : Expr.t) (t : Type.t) ~curr_pc =
+  let ret value = [ Branch.make ~pc:curr_pc ~value ] in
+  match FOSolver.resolve_type ~pc:curr_pc e with
+  | Some t' when Type.equal t t' -> ret true
+  | _ -> ret false
+
+let assert_type (e : Expr.t) (t : Type.t) exn ~curr_pc =
+  match FOSolver.resolve_type ~pc:curr_pc e with
+  | Some t' when Type.equal t t' -> [ Branch.make ~pc:curr_pc ~value:() ]
+  | _ -> raise exn
 
 module Syntax = struct
   let ( let* ) = bind

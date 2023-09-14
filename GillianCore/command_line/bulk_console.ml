@@ -14,8 +14,8 @@ struct
     in
     let run test_suite_path npaf incremental () =
       let () = Config.current_exec_mode := exec_mode in
-      let () = PC.initialize exec_mode in
       let () = Config.bulk_print_all_failures := not npaf in
+      let () = PC.initialize exec_mode in
       let () = Logging.Mode.set_mode Disabled in
       let () = Printexc.record_backtrace false in
       Runner.run_all runner ~test_suite_path ~incremental
