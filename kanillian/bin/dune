@@ -1,0 +1,5 @@
+(executable
+ (name kanillian)
+ (public_name kanillian)
+ (libraries kanillian_lib cgil_lib gillian memory_model)
+ (package kanillian))

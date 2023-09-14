@@ -15,10 +15,12 @@
       "esy-installer gillian.install",
       "esy-installer gillian-js.install",
       "esy-installer gillian-c.install",
-      "esy-installer wisl.install"
+      "esy-installer wisl.install",
+      "esy-installer kanillian.install"
     ],
     "release": {
       "bin": [
+        "kanillian",
         "gillian-js",
         "gillian-c",
         "wisl"
@@ -42,6 +44,10 @@
       "GILLIAN_C_RUNTIME_PATH": {
         "scope": "global",
         "val": "#{self.share}/gillian-c"
+      },
+      "KANILLIAN_RUNTIME_PATH": {
+        "scope": "global",
+        "val": "#{self.share}/kanillian"
       },
       "CPATH": {
         "scope": "global",

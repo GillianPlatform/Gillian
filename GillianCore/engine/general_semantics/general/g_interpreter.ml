@@ -363,10 +363,10 @@ struct
         (* We have exited at least one loop *)
         | n ->
             let ids = Option.get (List_utils.list_sub previous 0 (-n)) in
-            let rest =
+            let rEState =
               Option.get (List_utils.list_sub previous (-n) (len_prev + n))
             in
-            if rest <> current then Malformed else FrameOn ids)
+            if rEState <> current then Malformed else FrameOn ids)
 
   (* ******************* *
    * Auxiliary Functions *
@@ -417,7 +417,7 @@ struct
    fun e ->
     try State.eval_expr state e
     with State.Internal_State_Error (errs, s) ->
-      raise (Interpreter_error (List.map (fun x -> Exec_err.ESt x) errs, s))
+      raise (Interpreter_error (List.map (fun x -> Exec_err.EState x) errs, s))
 
   let check_loop_ids actual expected =
     match actual = expected with
@@ -469,7 +469,7 @@ struct
       let open Syntaxes.List in
       let* f'', state =
         (* Sacha: I don't know why something different is happening in bi-exec *)
-        if Exec_mode.biabduction_exec !Config.current_exec_mode then
+        if Exec_mode.is_biabduction_exec !Config.current_exec_mode then
           let fos = Formula.get_disjuncts f' in
           match fos with
           | [] -> []
@@ -511,7 +511,7 @@ struct
               Fmt.(option ~none:(any "CANNOT CREATE MODEL") ESubst.pp)
               failing_model
           in
-          if not (Exec_mode.biabduction_exec !Config.current_exec_mode) then
+          if not (Exec_mode.is_biabduction_exec !Config.current_exec_mode) then
             Printf.printf "%s" msg;
           L.normal (fun m -> m "%s" msg);
           Res_list.error_with err
@@ -751,7 +751,7 @@ struct
                   error_state = ret_state;
                   errors =
                     [
-                      Exec_err.ESt
+                      Exec_err.EState
                         (EOther
                            (Fmt.str "Error: tried to use bug spec '%s'"
                               spec_name));
@@ -806,7 +806,7 @@ struct
                         error_state = state;
                         errors =
                           [
-                            Exec_err.ESt
+                            Exec_err.EState
                               (EOther
                                  (Fmt.str
                                     "Error: Unable to use specification of \
@@ -821,7 +821,7 @@ struct
                   List.partition_map
                     (function
                       | Ok x -> Left x
-                      | Error x -> Right (Exec_err.ESt x))
+                      | Error x -> Right (Exec_err.EState x))
                     ret
                 in
                 let b_counter, has_branched =
@@ -913,7 +913,7 @@ struct
                 exec_without_spec pid symb_exec_proc eval_state
           in
 
-          match Exec_mode.biabduction_exec !Config.current_exec_mode with
+          match Exec_mode.is_biabduction_exec !Config.current_exec_mode with
           | true -> (
               match
                 ( pid = caller,
@@ -1025,7 +1025,7 @@ struct
                     ~json:
                       [ ("errs", `List (List.map state_err_t_to_yojson errs)) ]
                     "Error");
-              if Exec_mode.verification_exec !Config.current_exec_mode then (
+              if Exec_mode.is_verification_exec !Config.current_exec_mode then (
                 let tactic_from_params =
                   let recovery_params =
                     let* v = v_es in
@@ -1078,7 +1078,7 @@ struct
                           callstack = cs;
                           proc_idx = i;
                           error_state = state;
-                          errors = List.map (fun x -> Exec_err.ESt x) errs;
+                          errors = List.map (fun x -> Exec_err.EState x) errs;
                           branch_path;
                         };
                     ])
@@ -1090,7 +1090,7 @@ struct
                       callstack = cs;
                       proc_idx = i;
                       error_state = state;
-                      errors = List.map (fun x -> Exec_err.ESt x) errs;
+                      errors = List.map (fun x -> Exec_err.EState x) errs;
                       branch_path;
                     };
                 ]
@@ -1148,7 +1148,7 @@ struct
                       ~prev_idx:i ~loop_ids ~next_idx:(i + 1)
                       ~branch_count:b_counter ()
                 | Error err ->
-                    let errors = [ Exec_err.ESt err ] in
+                    let errors = [ Exec_err.EState err ] in
                     ConfErr
                       {
                         callstack = cs;
@@ -1180,7 +1180,9 @@ struct
               match errors with
               | [] -> []
               | errors ->
-                  let errors = errors |> List.map (fun e -> Exec_err.ESt e) in
+                  let errors =
+                    errors |> List.map (fun e -> Exec_err.EState e)
+                  in
 
                   [
                     CConf.ConfErr
@@ -1412,7 +1414,7 @@ struct
               let open Syntaxes.List in
               let+ state =
                 (* Framing on should never fail.. *)
-                if Exec_mode.verification_exec !Config.current_exec_mode then
+                if Exec_mode.is_verification_exec !Config.current_exec_mode then
                   State.frame_on state iframes to_frame_on
                   |> List.filter_map (function
                        | Ok x -> Some x
@@ -1475,7 +1477,7 @@ struct
             let ( let+ ) x f = List.map f x in
             let+ state =
               (* Framing on should never fail *)
-              if Exec_mode.verification_exec !Config.current_exec_mode then
+              if Exec_mode.is_verification_exec !Config.current_exec_mode then
                 State.frame_on state iframes to_frame_on
                 |> List.filter_map (function
                      | Ok x -> Some x
@@ -1582,7 +1584,7 @@ struct
       let loop_ids = Annot.get_loop_info annot @ Call_stack.get_loop_ids cs in
 
       let loop_action : loop_action =
-        if Exec_mode.verification_exec !Config.current_exec_mode then
+        if Exec_mode.is_verification_exec !Config.current_exec_mode then
           understand_loop_action loop_ids prev_loop_ids
         else Nothing
       in
@@ -1636,7 +1638,7 @@ struct
       let annot, cmd = annot_cmd in
       let loop_ids = Annot.get_loop_info annot @ Call_stack.get_loop_ids cs in
       let loop_action : loop_action =
-        if Exec_mode.verification_exec !Config.current_exec_mode then
+        if Exec_mode.is_verification_exec !Config.current_exec_mode then
           understand_loop_action loop_ids prev_loop_ids
         else Nothing
       in
@@ -1727,7 +1729,7 @@ struct
                   callstack = cs;
                   proc_idx = i;
                   error_state;
-                  errors = List.map (fun x -> Exec_err.ESt x) errs;
+                  errors = List.map (fun x -> Exec_err.EState x) errs;
                   branch_path = List_utils.cons_opt branch_case branch_path;
                 };
             ])

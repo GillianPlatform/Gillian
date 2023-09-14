@@ -24,7 +24,7 @@ let old_fun_tbl : pre_fun_tbl_type = Hashtbl.create medium_tbl_size
 let vis_tbl : vis_tbl_type = Hashtbl.create medium_tbl_size
 
 let if_verification a b =
-  let cond = Exec_mode.verification_exec !Config.current_exec_mode in
+  let cond = Exec_mode.is_verification_exec !Config.current_exec_mode in
   if cond then a else b
 
 let print_position outx lexbuf =
@@ -2202,7 +2202,7 @@ let rec translate_expr tr_ctx e :
       in
       ([ cmd1; cmd2 ], x_v, [])
   | JS_Parser.Syntax.Call (e_f, xes)
-    when Gillian.Utils.(Exec_mode.biabduction_exec !Config.current_exec_mode)
+    when Gillian.Utils.(Exec_mode.is_biabduction_exec !Config.current_exec_mode)
          &&
          match e_f.JS_Parser.Syntax.exp_stx with
          | JS_Parser.Syntax.Var bi_annot
@@ -7283,9 +7283,9 @@ let js2jsil_function_constructor_prop
 
 let compute_imports (for_verification : bool) : string list =
   if for_verification then js2jsil_logic_imports
-  else if Exec_mode.biabduction_exec !Config.current_exec_mode then
+  else if Exec_mode.is_biabduction_exec !Config.current_exec_mode then
     js2jsil_imports_bi
-  else if Exec_mode.symbolic_exec !Config.current_exec_mode then
+  else if Exec_mode.is_symbolic_exec !Config.current_exec_mode then
     js2jsil_imports_cosette
   else js2jsil_imports
 

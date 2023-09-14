@@ -15,6 +15,7 @@ module Set = Z3.Set
 module Solver = Z3.Solver
 module Symbol = Z3.Symbol
 module ZExpr = Z3.Expr
+module Z3Num = Z3.FloatingPoint
 
 exception Z3Unknown
 
@@ -49,12 +50,13 @@ let ( <| ) constr e = ZExpr.mk_app ctx constr [ e ]
 let ( $$ ) const l = ZExpr.mk_app ctx const l
 let booleans_sort = Boolean.mk_sort ctx
 let ints_sort = Arithmetic.Integer.mk_sort ctx
-let reals_sort = Arithmetic.Real.mk_sort ctx
+let reals_sort = Z3Num.mk_sort_double ctx
 let numbers_sort = reals_sort
 let mk_string_symb s = Symbol.mk_string ctx s
 let mk_int_i = Arithmetic.Integer.mk_numeral_i ctx
 let mk_int_s = Arithmetic.Integer.mk_numeral_s ctx
-let mk_num_s = Arithmetic.Real.mk_numeral_s ctx
+
+(* let mk_num_s s = Z3Num.mk_numeral_s ctx s reals_sort *)
 let mk_lt = Arithmetic.mk_lt ctx
 let mk_le = Arithmetic.mk_le ctx
 let mk_add e1 e2 = Arithmetic.mk_add ctx [ e1; e2 ]
@@ -504,9 +506,13 @@ let rec encode_lit (lit : Literal.t) : Encoding.t =
         let i_arg = mk_int_s (Z.to_string i) in
         native ~ty:IntType i_arg
     | Num n ->
-        let sfn = Float.to_string n in
-        let n_arg = mk_num_s sfn in
-        native ~ty:NumberType n_arg
+        let res =
+          if Float.is_infinite n then
+            Z3Num.mk_inf ctx reals_sort (Float.sign_bit n)
+          else if Float.is_nan n then Z3Num.mk_nan ctx reals_sort
+          else Z3Num.mk_numeral_f ctx n reals_sort
+        in
+        native ~ty:NumberType res
     | String s ->
         let s_arg = encode_string s in
         native ~ty:StringType s_arg
@@ -648,8 +654,10 @@ let encode_unop ~llen_lvars ~e (op : UnOp.t) le =
       let le_lst = get_list le in
       let n_le = Axiomatised_operations.lrev_fun <| le_lst in
       n_le >- ListType
-  | NumToInt -> Arithmetic.Real.mk_real2int ctx (get_num le) >- IntType
-  | IntToNum -> Arithmetic.Integer.mk_int2real ctx (get_int le) >- NumberType
+  | NumToInt ->
+      Arithmetic.Real.mk_real2int ctx (Z3Num.mk_to_real ctx (get_num le))
+      >- IntType
+  | IntToNum -> failwith "IntToNum not available"
   | BitwiseNot
   | M_isNaN
   | M_abs

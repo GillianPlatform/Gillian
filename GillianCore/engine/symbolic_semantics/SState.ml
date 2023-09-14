@@ -43,7 +43,7 @@ module Make (SMemory : SMemory.S) :
     | FTypes of (string * Type.t) list
     | FSVars of SS.t
 
-  type err_t = (m_err_t, vt) StateErr.err_t [@@deriving yojson, show]
+  type err_t = (m_err_t, vt) StateErr.t [@@deriving yojson, show]
   type action_ret = (t * vt list, err_t) result list
 
   exception Internal_State_Error of err_t list * t

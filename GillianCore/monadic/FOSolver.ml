@@ -3,6 +3,7 @@ module PFS = Engine.PFS
 module Type_env = Engine.Type_env
 module Reduction = Engine.Reduction
 module Formula = Gil_syntax.Formula
+module Typing = Engine.Typing
 
 (** FIXME: optimization? *)
 let build_full_pfs (pc : Pc.t) =
@@ -73,3 +74,10 @@ let resolve_loc_name ~pc loc =
 let reduce_expr ~pc expr =
   Reduction.reduce_lexpr ~unification:pc.Pc.unification ~pfs:(build_full_pfs pc)
     ~gamma:(build_full_gamma pc) expr
+
+let resolve_type ~(pc : Pc.t) expr =
+  (* TODO: I don't know what that how parameter means.
+     I'm copying what Reduction does.
+     Typing is not documented - ask Petar. *)
+  let t, how, _ = Typing.type_lexpr pc.gamma expr in
+  if how then t else None

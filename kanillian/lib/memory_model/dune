@@ -1,0 +1,14 @@
+(library
+ (name memory_model)
+ (libraries
+  gillian
+  gillian.ppx_sat.runtime
+  ppx_deriving_yojson.runtime
+  ppx_deriving.runtime
+  batteries
+  printbox ; we want to get rid of printbox as a dependency
+  kcommons
+  kutils)
+ (flags -open Kcommons)
+ (preprocess
+  (pps gillian.ppx_sat ppx_deriving_yojson ppx_deriving.std)))

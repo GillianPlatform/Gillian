@@ -1,0 +1,31 @@
+#internal
+
+proc i__rust_alloc(size, align) {
+  ret := "i__malloc"(size);
+  return
+};
+
+proc i__rust_alloc_zeroed(sz, align) {
+  bl := [mem_alloc](-8i, sz);
+  b := l-nth(bl, 0i);
+  u := [mem_store]("u64", b, -8i, sz);
+  i := "i__store_zeros"(b, sz);
+  ret := {{ b, 0i }};
+  return
+};
+
+proc i__rust_dealloc(ptr, size, align) {
+  ret := "i__free"(ptr);
+  return
+};
+
+proc i__rust_realloc(ptr, old_size, align, new_size) {
+      ret := "i__malloc"(new_size);
+      goto [new_size i< old_size] ns os;
+  ns: to_copy := new_size;
+      goto th;
+  os: to_copy := old_size;
+  th: u := "i__memcpy"(ret, ptr, to_copy);
+      u := "i__free"(ptr);
+      return
+};

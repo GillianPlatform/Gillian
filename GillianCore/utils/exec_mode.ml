@@ -4,21 +4,19 @@
 
 type t = Concrete | Verification | Symbolic | BiAbduction
 
-(** {2 Variant checkers} *)
-
-let concrete_exec = function
+let is_concrete_exec = function
   | Concrete -> true
   | _ -> false
 
-let symbolic_exec = function
+let is_symbolic_exec = function
   | Symbolic -> true
   | _ -> false
 
-let verification_exec = function
+let is_verification_exec = function
   | Verification -> true
   | _ -> false
 
-let biabduction_exec = function
+let is_biabduction_exec = function
   | BiAbduction -> true
   | _ -> false
 
@@ -41,6 +39,9 @@ let ver_exec = [ Verification ]
 
 (** Modes that {i don't} use verification*)
 let non_ver_exec = [ Concrete; Symbolic; BiAbduction ]
+
+let concrete_exec = [ Concrete ]
+let non_concrete_exec = [ Verification; Symbolic; BiAbduction ]
 
 (** {2 String converters} *)
 

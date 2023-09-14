@@ -20,6 +20,10 @@ val branch_entailment : (Formula.t * (unit -> 'a t)) list -> 'a t
 val branch_on :
   Formula.t -> then_:(unit -> 'a t) -> else_:(unit -> 'a t) -> 'a t
 
+val assert_ : Formula.t -> exn -> unit t
+val assert_type : Expr.t -> Type.t -> exn -> unit t
+val has_type : Expr.t -> Type.t -> bool t
+
 module Syntax : sig
   val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
   val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
