@@ -22,7 +22,7 @@ module type S = sig
   val domain : t -> Var.Set.t
 
   (** Store filtering *)
-  val filter : t -> (Var.t -> vt -> vt option) -> unit
+  val filter_map_inplace : t -> (Var.t -> vt -> vt option) -> unit
 
   (** Store fold *)
   val fold : t -> (Var.t -> vt -> 'a -> 'a) -> 'a -> 'a
@@ -63,9 +63,6 @@ module type S = sig
   (** Converts the store into an ssubst *)
   val to_ssubst : t -> SESubst.t
 
-  (** Symbolic indices *)
-  val symbolics : t -> Var.Set.t
-
   (** Logical variables *)
   val lvars : t -> Var.Set.t
 end
@@ -78,8 +75,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   type vt = Val.t [@@deriving yojson]
 
   (** Actual type of GIL Stores *)
-  type t = { conc : (Var.t, vt) Hashtbl.t; symb : (Var.t, vt) Hashtbl.t }
-  [@@deriving yojson]
+  type t = (Var.t, vt) Hashtbl.t [@@deriving yojson]
 
   (**
     Store initialisation
@@ -88,18 +84,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return Newly constructed and initialised store
   *)
   let init (vars_and_vals : (Var.t * vt) list) : t =
-    let new_store =
-      {
-        conc = Hashtbl.create Config.big_tbl_size;
-        symb = Hashtbl.create Config.big_tbl_size;
-      }
-    in
-    List.iter
-      (fun (x, v) ->
-        if Val.is_concrete v then Hashtbl.replace new_store.conc x v
-        else Hashtbl.replace new_store.symb x v)
-      vars_and_vals;
-    new_store
+    Hashtbl.of_seq (List.to_seq vars_and_vals)
 
   (**
     Store copy
@@ -107,8 +92,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param store Target store
     @return Copy of the given store
   *)
-  let copy (store : t) : t =
-    { conc = Hashtbl.copy store.conc; symb = Hashtbl.copy store.symb }
+  let copy (store : t) : t = Hashtbl.copy store
 
   (**
     Store lookup
@@ -117,9 +101,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param x Target variable
     @return Optional value of the variable in the store
   *)
-  let get (store : t) (x : Var.t) : vt option =
-    let result = Hashtbl.find_opt store.conc x in
-    if result = None then Hashtbl.find_opt store.symb x else result
+  let get (store : t) (x : Var.t) : vt option = Hashtbl.find_opt store x
 
   (**
     Store get with throw
@@ -132,11 +114,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
   let get_unsafe (store : t) (v : Var.t) : vt =
     match get store v with
     | Some result -> result
-    | None ->
-        raise
-          (Failure
-             (Printf.sprintf "Store.get_unsafe: variable %s not found in store"
-                v))
+    | None -> Fmt.failwith "Store.get_unsafe: variable %s not found in store" v
 
   (**
     Store update (in-place)
@@ -145,13 +123,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param x Target variable
     @param v Value to be put
   *)
-  let put (store : t) (x : Var.t) (v : vt) : unit =
-    let add, rem =
-      if Val.is_concrete v then (store.conc, store.symb)
-      else (store.symb, store.conc)
-    in
-    Hashtbl.replace add x v;
-    Hashtbl.remove rem x
+  let put (store : t) (x : Var.t) (v : vt) : unit = Hashtbl.replace store x v
 
   (**
     Store removal (in-place)
@@ -159,9 +131,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param store Target store
     @param x Target variable
   *)
-  let remove (store : t) (x : Var.t) : unit =
-    Hashtbl.remove store.conc x;
-    Hashtbl.remove store.symb x
+  let remove (store : t) (x : Var.t) : unit = Hashtbl.remove store x
 
   (**
     Store membership check
@@ -170,8 +140,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param x Target variable
     @return true if the variable is in the store, false otherwise
   *)
-  let mem (store : t) (x : Var.t) : bool =
-    Hashtbl.mem store.conc x || Hashtbl.mem store.symb x
+  let mem (store : t) (x : Var.t) : bool = Hashtbl.mem store x
 
   (**
     Store iterator
@@ -179,9 +148,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param store Target store
     @param f Iterator function
   *)
-  let iter (store : t) (f : Var.t -> vt -> unit) : unit =
-    Hashtbl.iter f store.conc;
-    Hashtbl.iter f store.symb
+  let iter (store : t) (f : Var.t -> vt -> unit) : unit = Hashtbl.iter f store
 
   (**
     Store fold
@@ -191,7 +158,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param ac Accumulator
   *)
   let fold (store : t) (f : Var.t -> vt -> 'a -> 'a) (ac : 'a) : 'a =
-    Hashtbl.fold f store.symb (Hashtbl.fold f store.conc ac)
+    Hashtbl.fold f store ac
 
   (**
     Store bindings
@@ -200,7 +167,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return Bindings of the store formatted as (variable, value)
   *)
   let bindings (store : t) : (Var.t * vt) list =
-    fold store (fun x le ac -> (x, le) :: ac) []
+    Hashtbl.to_seq store |> List.of_seq
 
   (**
     Store domain
@@ -209,7 +176,7 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @return Set of variables that are in the domain of the store
   *)
   let domain (store : t) : Var.Set.t =
-    Var.Set.of_list (fold store (fun x _ ac -> x :: ac) [])
+    Hashtbl.to_seq_keys store |> Var.Set.of_seq
 
   (**
     Store filtering (in-place)
@@ -217,9 +184,8 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param store Target store
     @param f The filtering function
   *)
-  let filter (store : t) (f : Var.t -> vt -> vt option) : unit =
-    Hashtbl.filter_map_inplace f store.conc;
-    Hashtbl.filter_map_inplace f store.symb
+  let filter_map_inplace (store : t) (f : Var.t -> vt -> vt option) : unit =
+    Hashtbl.filter_map_inplace f store
 
   (**
     Store partition
@@ -242,10 +208,13 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     @param xs List of variables to be projected
     @return New store that only contains the projected variables
   *)
-  let projection (store : t) (xs : Var.t list) : t =
-    let y = init [] in
-    List.iter (fun v -> if mem store v then put y v (get_unsafe store v)) xs;
-    y
+  let projection (store : t) (vars : Var.t list) : t =
+    let projected = Hashtbl.create (List.length vars) in
+    List.iter
+      (fun var ->
+        get store var |> Option.iter (fun value -> put projected var value))
+      vars;
+    projected
 
   (**
     Store printer
@@ -288,17 +257,8 @@ module Make (Val : Val.S) : S with type vt = Val.t = struct
     iter store (fun x v -> SESubst.put subst (Expr.PVar x) (Val.to_expr v));
     subst
 
-  (**
-    Variables that can be affected by substitution
-
-    @param target store
-    @return Set of variables that can be affected by substitution
-  *)
-  let symbolics (store : t) : Var.Set.t =
-    Hashtbl.fold (fun v _ ac -> Var.Set.add v ac) store.symb Var.Set.empty
-
   let lvars (store : t) : Var.Set.t =
     Hashtbl.fold
       (fun _ v ac -> Var.Set.union ac (Expr.lvars (Val.to_expr v)))
-      store.symb Var.Set.empty
+      store Var.Set.empty
 end

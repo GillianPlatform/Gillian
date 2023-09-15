@@ -500,7 +500,7 @@ struct
           L.Parent.with_id parent_id (fun () ->
               let store = SPState.get_store final_state in
               let () =
-                SStore.filter store (fun x v ->
+                SStore.filter_map_inplace store (fun x v ->
                     if x = Names.return_variable then Some v else None)
               in
               let subst = make_post_subst test final_state in

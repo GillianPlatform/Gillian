@@ -19,7 +19,7 @@ val pp : Format.formatter -> t -> unit
 val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
 val iter : t -> (Var.t -> Expr.t -> unit) -> unit
 val fold : t -> (Var.t -> Expr.t -> 'a -> 'a) -> 'a -> 'a
-val filter : t -> (Var.t -> Expr.t -> Expr.t option) -> unit
+val filter_map_inplace : t -> (Var.t -> Expr.t -> Expr.t option) -> unit
 val vars : t -> Var.Set.t
 val lvars : t -> Var.Set.t
 val clocs : t -> Var.Set.t
@@ -29,5 +29,4 @@ val substitution_in_place : ?subst_all:bool -> SVal.SESubst.t -> t -> unit
 val is_well_formed : t -> bool
 val bindings : t -> (Var.t * vt) list
 val to_ssubst : t -> SVal.SESubst.t
-val symbolics : t -> Var.Set.t
 val is_in : t -> Expr.t -> bool

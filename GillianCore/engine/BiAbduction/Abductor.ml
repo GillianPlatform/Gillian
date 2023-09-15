@@ -86,7 +86,7 @@ module Make
             params SPState.pp state_af SPState.pp state_f);
       (* Drop all pvars except ret/err from the state *)
       let () =
-        SStore.filter (SPState.get_store state_f) (fun x v ->
+        SStore.filter_map_inplace (SPState.get_store state_f) (fun x v ->
             if x = Names.return_variable then Some v else None)
       in
       let* post =
