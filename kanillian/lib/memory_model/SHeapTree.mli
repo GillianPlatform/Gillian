@@ -13,6 +13,7 @@ type err =
   | WrongMemVal
   | MemoryNotFreed
   | LoadingPoison
+[@@deriving yojson]
 
 val pp_err : err Fmt.t
 val err_equal : err -> err -> bool

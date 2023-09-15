@@ -45,7 +45,7 @@ type err_t =
       sheaptree_err : SHeapTree.err;
     }
   | GEnvErr of GEnv.err_t
-[@@deriving show]
+[@@deriving show, yojson]
 
 let lift_sheaptree_err loc (err : SHeapTree.err) =
   SHeapTreeErr { at_locations = [ loc ]; sheaptree_err = err }

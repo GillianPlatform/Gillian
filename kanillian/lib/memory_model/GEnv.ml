@@ -1,4 +1,4 @@
-type err_t = Symbol_not_found of string [@@deriving show]
+type err_t = Symbol_not_found of string [@@deriving show, yojson]
 
 module Make (Def_value : sig
   type t
@@ -32,6 +32,8 @@ struct
 
   let pp_err_t = pp_err_t
   let show_err_t = show_err_t
+  let err_t_of_yojson = err_t_of_yojson
+  let err_t_to_yojson = err_t_to_yojson
 
   type def = FunDef of Def_value.t | GlobVar of Def_value.t
 

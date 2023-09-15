@@ -1,4 +1,4 @@
-type err_t = Symbol_not_found of string [@@deriving show]
+type err_t = Symbol_not_found of string [@@deriving show, yojson]
 
 module Concrete : sig
   open Gil_syntax
@@ -43,7 +43,7 @@ end
 module Symbolic : sig
   open Gil_syntax
 
-  type nonrec err_t = err_t [@@deriving show]
+  type nonrec err_t = err_t [@@deriving show, yojson]
   type def = FunDef of Expr.t | GlobVar of Expr.t
 
   val serialize_def : def -> Expr.t

@@ -19,6 +19,7 @@ type err =
   | WrongMemVal
   | MemoryNotFreed
   | LoadingPoison
+[@@deriving yojson]
 
 exception FatalErr of err
 

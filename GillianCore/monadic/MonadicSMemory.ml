@@ -12,7 +12,7 @@ module type S = sig
   type st = SVal.SESubst.t
 
   type c_fix_t
-  type err_t [@@deriving show]
+  type err_t [@@deriving show, yojson]
 
   (** Type of GIL general states *)
   type t [@@deriving yojson]
@@ -109,11 +109,4 @@ module Lift (MSM : S) :
 
   let of_yojson = MSM.of_yojson
   let to_yojson = MSM.to_yojson
-
-  let err_t_of_yojson _ =
-    failwith
-      "Please implement err_t_of_yojson to enable logging this type to a \
-       database"
-
-  let err_t_to_yojson _ = `String "MonadicSMemory.Lift: dummy yojson!"
 end

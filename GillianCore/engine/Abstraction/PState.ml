@@ -1082,19 +1082,42 @@ module Make
 
   let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
     (* TODO: Deserialize other components of pstate *)
+    let rec aux = function
+      | Some state, Some preds, Some variants, [] ->
+          Ok (state, preds, UP.init_pred_defs (), variants)
+      | None, preds, variants, ("state", state_yojson) :: rest -> (
+          match State.of_yojson state_yojson with
+          | Ok state -> aux (Some state, preds, variants, rest)
+          | Error e -> Error e)
+      | state, None, variants, ("preds", preds_yojson) :: rest -> (
+          match Preds.of_yojson preds_yojson with
+          | Ok preds -> aux (state, Some preds, variants, rest)
+          | Error e -> Error e)
+      | state, preds, None, ("variants", variants_yojson) :: rest -> (
+          match variants_t_of_yojson variants_yojson with
+          | Ok variants -> aux (state, preds, Some variants, rest)
+          | Error e -> Error e)
+      | _ -> Error "Cannot parse yojson into PState"
+    in
     match yojson with
-    | `Assoc
-        [
-          ("state", state_yojson);
-          ("preds", preds_yojson);
-          ("variants", variants_yojson);
-        ] ->
-        Result.bind (State.of_yojson state_yojson) (fun state ->
-            Result.bind (Preds.of_yojson preds_yojson) (fun (preds : Preds.t) ->
-                variants_t_of_yojson variants_yojson
-                |> Result.map (fun variants ->
-                       (state, preds, UP.init_pred_defs (), variants))))
+    | `Assoc sections -> aux (None, None, None, sections)
     | _ -> Error "Cannot parse yojson into PState"
+
+  (* let of_yojson (yojson : Yojson.Safe.t) : (t, string) result =
+     (* TODO: Deserialize other components of pstate *)
+     match yojson with
+     | `Assoc
+         [
+           ("state", state_yojson);
+           ("preds", preds_yojson);
+           ("variants", variants_yojson);
+         ] ->
+         Result.bind (State.of_yojson state_yojson) (fun state ->
+             Result.bind (Preds.of_yojson preds_yojson) (fun (preds : Preds.t) ->
+                 variants_t_of_yojson variants_yojson
+                 |> Result.map (fun variants ->
+                        (state, preds, UP.init_pred_defs (), variants))))
+     | _ -> Error "Cannot parse yojson into PState" *)
 
   let to_yojson pstate =
     (* TODO: Serialize other components of pstate *)

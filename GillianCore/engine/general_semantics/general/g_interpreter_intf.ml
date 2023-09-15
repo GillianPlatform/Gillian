@@ -112,6 +112,9 @@ module type S = sig
         proc_name : string;
       }
       [@@deriving yojson]
+
+      val pp :
+        (Format.formatter -> state_t -> unit) -> Format.formatter -> t -> unit
     end
 
     module CmdResult : sig
