@@ -2,19 +2,10 @@ open Names
 open Containers
 module L = Logging
 module SESubst = SVal.SESubst
-module SPreds = Preds.SPreds
-module SWands = Wands.SWands
 
 let new_lvar_name var = lvar_prefix ^ var
 
-module Make
-    (SPState : PState.S
-                 with type vt = SVal.M.t
-                  and type st = SVal.SESubst.t
-                  and type store_t = SStore.t
-                  and type preds_t = SPreds.t
-                  and type wands_t = SWands.t) =
-struct
+module Make (SPState : PState.S) = struct
   (*  ------------------------------------------------------------------
    *  List Preprocessing
    *  ------------------------------------------------------------------
@@ -544,7 +535,7 @@ struct
       * Formula.t list
       * (Expr.t * Type.t) list
       * (string * Expr.t list) list
-      * SWands.wand list =
+      * Wands.wand list =
     let f = separate_assertion in
 
     match a with
@@ -618,7 +609,7 @@ struct
 
     result
 
-  let normalise_wands (wands : SWands.wand list) : SWands.t = SWands.init wands
+  let normalise_wands (wands : Wands.wand list) : Wands.t = Wands.init wands
 
   (** Normalise Predicate Assertions (Initialise Predicate Set) *)
   let normalise_preds
@@ -627,9 +618,9 @@ struct
       (pfs : PFS.t)
       (gamma : Type_env.t)
       (subst : SVal.SESubst.t)
-      (pred_asrts : (string * Expr.t list) list) : SPreds.t =
+      (pred_asrts : (string * Expr.t list) list) : Preds.t =
     let fe = normalise_logic_expression store gamma subst in
-    let preds = SPreds.init [] in
+    let preds = Preds.init [] in
 
     List.iter
       (fun (pn, les) ->
@@ -655,7 +646,7 @@ struct
                 pred_def.pred.pred_facts (List.combine params les)
             in
             List.iter (fun fact -> PFS.extend pfs fact) facts;
-            SPreds.extend preds (pn, List.map fe les))
+            Preds.extend preds (pn, List.map fe les))
       pred_asrts;
 
     preds

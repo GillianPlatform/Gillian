@@ -14,19 +14,14 @@ module type S = sig
 end
 
 module Make
-    (SPState : PState.S
-                 with type vt = SVal.M.t
-                  and type st = SVal.SESubst.t
-                  and type store_t = SStore.t
-                  and type preds_t = Preds.SPreds.t
-                  and type wands_t = Wands.SWands.t)
+    (SPState : PState.S)
     (PC : ParserAndCompiler.S with type init_data = SPState.init_data)
     (External : External.T(PC.Annot).S) :
   S with type annot = PC.Annot.t and type init_data = PC.init_data = struct
   module L = Logging
   module SSubst = SVal.SESubst
   module Normaliser = Normaliser.Make (SPState)
-  module SBAState = BiState.Make (SVal.M) (SVal.SESubst) (SStore) (SPState)
+  module SBAState = BiState.Make (SPState)
 
   module SBAInterpreter =
     G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SBAState) (PC)
@@ -528,9 +523,4 @@ module From_scratch
     (SMemory : SMemory.S)
     (PC : ParserAndCompiler.S with type init_data = SMemory.init_data)
     (External : External.T(PC.Annot).S) =
-  Make
-    (PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState.Make (SMemory))
-       (Preds.SPreds)
-       (Wands.SWands))
-       (PC)
-    (External)
+  Make (PState.Make (SState.Make (SMemory))) (PC) (External)

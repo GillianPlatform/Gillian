@@ -1,10 +1,4 @@
-module Make
-    (SPState : PState.S
-                 with type vt = SVal.M.t
-                  and type st = SVal.SESubst.t
-                  and type store_t = SStore.t
-                  and type preds_t = Preds.SPreds.t
-                  and type wands_t = Wands.SWands.t) : sig
+module Make (SPState : PState.S) : sig
   (** [normalise_assertion ?pred_defs ?gamma ?pvars a] normalises the
       assertion [a] starting from the typing environment [gamma]
       considering the predicate table [pred_defs] and program variables [pvars].

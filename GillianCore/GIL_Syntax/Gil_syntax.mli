@@ -269,6 +269,7 @@ module Expr : sig
   val int_z : Z.t -> t
   val string : string -> t
   val bool : bool -> t
+  val to_literal : t -> Literal.t option
 
   (** Lit (Int Z.zero) *)
   val zero_i : t

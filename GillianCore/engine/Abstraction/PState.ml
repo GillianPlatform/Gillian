@@ -6,11 +6,9 @@ module type S = sig
   include SState.S
 
   type state_t
-  type preds_t
-  type wands_t
   type abs_t = string * vt list
 
-  val expose : t -> state_t * preds_t * wands_t * UP.preds_tbl_t * variants_t
+  val expose : t -> state_t * Preds.t * Wands.t * UP.preds_tbl_t * variants_t
 
   val make_p :
     preds:UP.preds_tbl_t ->
@@ -25,10 +23,10 @@ module type S = sig
   val init_with_pred_table : UP.preds_tbl_t -> init_data -> t
 
   (** Get preds of given symbolic state *)
-  val get_preds : t -> preds_t
+  val get_preds : t -> Preds.t
 
   (** Set preds of given symbolic state *)
-  val set_preds : t -> preds_t -> t
+  val set_preds : t -> Preds.t -> t
 
   val set_variants : t -> variants_t -> t
   val unifies : t -> st -> UP.t -> Unifier.unify_kind -> bool
@@ -38,30 +36,16 @@ module type S = sig
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
 end
 
-module Make
-    (Val : Val.S)
-    (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
-    (Store : Store.S with type vt = Val.t)
-    (State : SState.S
-               with type vt = Val.t
-                and type st = ESubst.t
-                and type store_t = Store.t)
-    (Preds : Preds.S with type vt = Val.t and type st = ESubst.t)
-    (Wands : Wands.S with type vt = Val.t and type st = ESubst.t) :
+module Make (State : SState.S) :
   S
-    with type vt = Val.t
-     and type st = ESubst.t
-     and type store_t = Store.t
-     and type state_t = State.t
-     and type preds_t = Preds.t
-     and type wands_t = Wands.t
+    with type state_t = State.t
      and type heap_t = State.heap_t
      and type m_err_t = State.m_err_t
      and type init_data = State.init_data = struct
   open Containers
   open Literal
   module L = Logging
-  module SUnifier = Unifier.Make (Val) (ESubst) (Store) (State) (Preds) (Wands)
+  module SUnifier = Unifier.Make (State)
 
   type init_data = State.init_data
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
@@ -74,14 +58,12 @@ module Make
     variants : variants_t;
   }
 
-  type vt = Val.t [@@deriving yojson, show]
-  type st = ESubst.t
-  type store_t = Store.t
+  type vt = Expr.t [@@deriving yojson, show]
+  type st = SVal.SESubst.t
+  type store_t = SStore.t
   type heap_t = State.heap_t
   type abs_t = Preds.abs_t
   type state_t = State.t
-  type preds_t = Preds.t
-  type wands_t = Wands.t
   type err_t = State.err_t [@@deriving yojson, show]
   type fix_t = State.fix_t
   type m_err_t = State.m_err_t
@@ -158,7 +140,7 @@ module Make
       ?(save = false)
       ?(kill_new_lvars : bool option)
       ?(unification = false)
-      (astate : t) : ESubst.t * t list =
+      (astate : t) : SVal.SESubst.t * t list =
     let subst, states =
       State.simplify ~save ?kill_new_lvars ~unification astate.state
     in
@@ -174,9 +156,9 @@ module Make
     with State.Internal_State_Error (errs, _) ->
       raise (Internal_State_Error (errs, astate))
 
-  let get_store (astate : t) : Store.t = State.get_store astate.state
+  let get_store (astate : t) : SStore.t = State.get_store astate.state
 
-  let set_store (astate : t) (store : Store.t) : t =
+  let set_store (astate : t) (store : SStore.t) : t =
     { astate with state = State.set_store astate.state store }
 
   let get_preds (astate : t) : Preds.t = astate.preds
@@ -185,19 +167,15 @@ module Make
   let set_variants (astate : t) (variants : variants_t) : t =
     { astate with variants }
 
-  let assume ?(unfold = false) (astate : t) (v : Val.t) : t list =
+  let assume ?(unfold = false) (astate : t) (v : Expr.t) : t list =
     let open Syntaxes.List in
     let* state = State.assume ~unfold astate.state v in
     let astate' = { astate with state } in
-    match (!Config.unfolding && unfold, Val.to_expr v) with
+    match (!Config.unfolding && unfold, v) with
     | _, Lit (Bool true) -> [ astate' ]
     | false, _ -> [ astate' ]
     | true, _ -> (
-        let unfold_vals = Expr.base_elements (Val.to_expr v) in
-        let unfold_vals = List.map Val.from_expr unfold_vals in
-        let unfold_vals =
-          List.map Option.get (List.filter (fun x -> x <> None) unfold_vals)
-        in
+        let unfold_vals = Expr.base_elements v in
         match SUnifier.unfold_with_vals astate' unfold_vals with
         | None -> [ astate' ]
         | Some next_states ->
@@ -215,23 +193,24 @@ module Make
     | Some state -> Some { astate with state }
     | None -> None
 
-  let assume_t (astate : t) (v : Val.t) (t : Type.t) : t option =
+  let assume_t (astate : t) (v : Expr.t) (t : Type.t) : t option =
     match State.assume_t astate.state v t with
     | Some state -> Some { astate with state }
     | None -> None
 
-  let sat_check (astate : t) (v : Val.t) : bool = State.sat_check astate.state v
+  let sat_check (astate : t) (v : Expr.t) : bool =
+    State.sat_check astate.state v
 
-  let sat_check_f (astate : t) (fs : Formula.t list) : ESubst.t option =
+  let sat_check_f (astate : t) (fs : Formula.t list) : SVal.SESubst.t option =
     State.sat_check_f astate.state fs
 
   let assert_a (astate : t) (fs : Formula.t list) : bool =
     State.assert_a astate.state fs
 
-  let equals (astate : t) (v1 : Val.t) (v2 : Val.t) : bool =
+  let equals (astate : t) (v1 : Expr.t) (v2 : Expr.t) : bool =
     State.equals astate.state v1 v2
 
-  let get_type (astate : t) (v : Val.t) : Type.t option =
+  let get_type (astate : t) (v : Expr.t) : Type.t option =
     State.get_type astate.state v
 
   let copy (astate : t) : t =
@@ -244,7 +223,7 @@ module Make
       variants = Hashtbl.copy variants;
     }
 
-  let simplify_val (astate : t) (v : Val.t) : Val.t =
+  let simplify_val (astate : t) (v : Expr.t) : Expr.t =
     State.simplify_val astate.state v
 
   let pp_variants : (string * Expr.t option) Fmt.t =
@@ -300,7 +279,9 @@ module Make
       Hashtbl.iter
         (fun func variant ->
           Hashtbl.add subst_variants func
-            (Option.map (ESubst.subst_in_expr subst ~partial:true) variant))
+            (Option.map
+               (SVal.SESubst.subst_in_expr subst ~partial:true)
+               variant))
         variants
     in
     List.map
@@ -314,12 +295,12 @@ module Make
         })
       (State.substitution_in_place ~subst_all subst state)
 
-  let update_store (state : t) (x : string option) (v : Val.t) : t =
+  let update_store (state : t) (x : string option) (v : Expr.t) : t =
     match x with
     | None -> state
     | Some x ->
         let store = get_store state in
-        let _ = Store.put store x v in
+        let _ = SStore.put store x v in
         let state' = set_store state store in
         state'
 
@@ -337,13 +318,13 @@ module Make
         m "INSIDE RUN spec of %s with the following UP:@\n%a@\n" name UP.pp up);
     let old_store = get_store astate in
     let new_store =
-      try Store.init (List.combine params args)
+      try SStore.init (List.combine params args)
       with Invalid_argument _ ->
         let message =
           Fmt.str
             "Running spec of %s which takes %i parameters with the following \
              %i arguments : %a"
-            name (List.length params) (List.length args) (Fmt.Dump.list Val.pp)
+            name (List.length params) (List.length args) (Fmt.Dump.list Expr.pp)
             args
         in
         raise (Invalid_argument message)
@@ -353,11 +334,11 @@ module Make
     let existential_bindings =
       List.map (fun (x, v) -> (Expr.LVar x, v)) existential_bindings
     in
-    let store_bindings = Store.bindings new_store in
+    let store_bindings = SStore.bindings new_store in
     let store_bindings =
       List.map (fun (x, v) -> (Expr.PVar x, v)) store_bindings
     in
-    let subst = ESubst.init (existential_bindings @ store_bindings) in
+    let subst = SVal.SESubst.init (existential_bindings @ store_bindings) in
 
     L.verbose (fun m ->
         m "About to use the spec of %s with the following UP:@\n%a@\n" name
@@ -384,11 +365,9 @@ module Make
     (* OK FOR DELAY ENTAILMENT *)
     let* final_state = SUnifier.produce_posts frame_state subst posts in
     let final_store = get_store final_state in
-    let v_ret = Store.get final_store Names.return_variable in
-    let final_state = set_store final_state (Store.copy old_store) in
-    let v_ret =
-      Option.value ~default:(Option.get (Val.from_expr (Lit Undefined))) v_ret
-    in
+    let v_ret = SStore.get final_store Names.return_variable in
+    let final_state = set_store final_state (SStore.copy old_store) in
+    let v_ret = Option.value ~default:(Lit Undefined) v_ret in
     let final_state = update_store final_state x v_ret in
     let _, final_states = simplify ~unification:true final_state in
     let+ final_state = final_states in
@@ -397,31 +376,24 @@ module Make
     in
     Ok (with_unfolded_concrete, fl)
 
-  let fresh_subst (xs : SS.t) : ESubst.t =
+  let fresh_subst (xs : SS.t) : SVal.SESubst.t =
     let xs = SS.elements xs in
     let bindings =
-      List.map
-        (fun x ->
-          (Expr.LVar x, Option.get (Val.from_expr (LVar (LVar.alloc ())))))
-        xs
+      List.map (fun x -> (Expr.LVar x, Expr.LVar (LVar.alloc ()))) xs
     in
-    ESubst.init bindings
+    SVal.SESubst.init bindings
 
-  let make_id_subst (a : Asrt.t) : ESubst.t =
+  let make_id_subst (a : Asrt.t) : SVal.SESubst.t =
     let lvars = Asrt.lvars a in
     let alocs = Asrt.alocs a in
     let lvars_subst =
-      List.map
-        (fun x -> (Expr.LVar x, Option.get (Val.from_expr (LVar x))))
-        (SS.elements lvars)
+      List.map (fun x -> (Expr.LVar x, Expr.LVar x)) (SS.elements lvars)
     in
     let alocs_subst =
-      List.map
-        (fun x -> (Expr.ALoc x, Option.get (Val.from_expr (ALoc x))))
-        (SS.elements alocs)
+      List.map (fun x -> (Expr.ALoc x, Expr.ALoc x)) (SS.elements alocs)
     in
     let subst_lst = lvars_subst @ alocs_subst in
-    ESubst.init subst_lst
+    SVal.SESubst.init subst_lst
 
   let clear_resource (astate : t) =
     let { state; preds; wands = _; pred_defs; variants } = astate in
@@ -445,7 +417,7 @@ module Make
       (a : Asrt.t)
       (binders : string list) : (t * t, err_t) Res_list.t =
     let store = State.get_store astate.state in
-    let pvars_store = Store.domain store in
+    let pvars_store = SStore.domain store in
     let pvars_a = Asrt.pvars a in
     let pvars_diff = SS.diff pvars_a pvars_store in
     L.verbose (fun m -> m "%s" (String.concat ", " (SS.elements pvars_diff)));
@@ -492,7 +464,7 @@ module Make
       L.verbose (fun m ->
           m "Forget @[%a@] with subst: %a"
             Fmt.(iter ~sep:comma SS.iter string)
-            vars_to_forget ESubst.pp oblivion_subst);
+            vars_to_forget SVal.SESubst.pp oblivion_subst);
 
       (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
       let subst_in_place =
@@ -513,8 +485,8 @@ module Make
         (fun (e : Expr.t) ->
           let binding =
             match e with
-            | PVar x -> Store.get (State.get_store astate.state) x
-            | LVar _ | ALoc _ -> Val.from_expr e
+            | PVar x -> SStore.get (State.get_store astate.state) x
+            | LVar _ | ALoc _ -> Some e
             | _ ->
                 raise
                   (Failure
@@ -523,7 +495,7 @@ module Make
           (e, Option.get binding))
         (Expr.Set.elements known_unifiables)
     in
-    let subst = ESubst.init bindings in
+    let subst = SVal.SESubst.init bindings in
     let open Res_list.Syntax in
     let open Syntaxes.List in
     let** new_state, subst', _ =
@@ -543,7 +515,7 @@ module Make
                   @[<v 2>Failing Model:@\n\
                   %a@]@\n"
                  Asrt.pp a State.pp_err err
-                 Fmt.(option ~none:(any "CANNOT CREATE MODEL") ESubst.pp)
+                 Fmt.(option ~none:(any "CANNOT CREATE MODEL") SVal.SESubst.pp)
                  failing_model)
           in
           Error (StateErr.EPure fail_pfs)
@@ -551,10 +523,12 @@ module Make
     (* Successful Unification *)
     (* TODO: Should the frame state have the subst produced? *)
     let frame_state = copy new_state in
-    let frame_state = set_store frame_state (Store.init []) in
+    let frame_state = set_store frame_state (SStore.init []) in
 
     let lbinders = List.map (fun x -> Expr.LVar x) lvar_binders in
-    let new_bindings = List.map (fun e -> (e, ESubst.get subst' e)) lbinders in
+    let new_bindings =
+      List.map (fun e -> (e, SVal.SESubst.get subst' e)) lbinders
+    in
     let success = List.for_all (fun (_, x_v) -> x_v <> None) new_bindings in
     if not success then
       raise (Failure "UNIFY INVARIANT FAILURE: binders not captured")
@@ -564,14 +538,14 @@ module Make
       in
       let bindings =
         List.filter
-          (fun (e, v) -> (not (List.mem e lbinders)) && e <> Val.to_expr v)
-          (ESubst.to_list subst')
+          (fun (e, v) -> (not (List.mem e lbinders)) && not (Expr.equal e v))
+          (SVal.SESubst.to_list subst')
       in
       L.verbose (fun fmt ->
           fmt "Additional bindings: %a"
             Fmt.(
               brackets
-                (list ~sep:semi (parens (pair ~sep:comma Expr.pp Val.pp))))
+                (list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp))))
             bindings);
       let known_pvars =
         SS.elements (SS.diff pvars_a (SS.of_list pvar_binders))
@@ -583,7 +557,7 @@ module Make
                | Expr.PVar x when List.mem x pvar_binders -> false
                | UnOp (LstLen, _) -> false
                | _ -> true)
-        |> List.map (fun (e, e_v) -> Asrt.Pure (Eq (e, Val.to_expr e_v)))
+        |> List.map (fun (e, e_v) -> Asrt.Pure (Eq (e, e_v)))
       in
       let a_bindings = Asrt.star bindings in
       let subst_bindings = make_id_subst a_bindings in
@@ -591,7 +565,7 @@ module Make
         List.map
           (fun x ->
             ( Expr.PVar x,
-              Option.get (Store.get (State.get_store astate.state) x) ))
+              Option.get (SStore.get (State.get_store astate.state) x) ))
           known_pvars
       in
       let pvar_subst_list_bound =
@@ -600,19 +574,14 @@ module Make
           pvar_binders
       in
       let full_subst = make_id_subst a in
-      let pvar_subst_list_bound =
-        List.map
-          (fun (x, y) -> (x, Option.get (Val.from_expr y)))
-          pvar_subst_list_bound
-      in
       let pvar_subst_list = pvar_subst_list_known @ pvar_subst_list_bound in
-      let pvar_subst = ESubst.init pvar_subst_list in
-      let _ = ESubst.merge_left full_subst subst_bindings in
-      let _ = ESubst.merge_left full_subst pvar_subst in
+      let pvar_subst = SVal.SESubst.init pvar_subst_list in
+      let _ = SVal.SESubst.merge_left full_subst subst_bindings in
+      let _ = SVal.SESubst.merge_left full_subst pvar_subst in
       L.verbose (fun fmt -> fmt "Invariant v1: %a" Asrt.pp a);
       let a_substed =
         Reduction.reduce_assertion
-          (ESubst.substitute_asrt subst_bindings ~partial:true a)
+          (SVal.SESubst.substitute_asrt subst_bindings ~partial:true a)
       in
       L.verbose (fun fmt -> fmt "Invariant v2: %a" Asrt.pp a_substed);
       let a_produce =
@@ -629,7 +598,7 @@ module Make
               | Expr.PVar x -> x
               | _ -> failwith "Impossible"
             in
-            Store.put store x v)
+            SStore.put store x v)
           pvar_subst_list
       in
       let invariant_state = set_store invariant_state store in
@@ -744,7 +713,7 @@ module Make
           in
           let** astate, vs' = cons_res in
           L.verbose (fun m ->
-              m "@[<h>Returned values: %a@]" Fmt.(list ~sep:comma Val.pp) vs');
+              m "@[<h>Returned values: %a@]" Fmt.(list ~sep:comma Expr.pp) vs');
           let vs = Pred.combine_ins_outs pred.pred vs_ins vs' in
           L.verbose (fun m ->
               m "@[<h>LCMD Unfold about to happen with rec %b info: %a@]" b
@@ -752,7 +721,7 @@ module Make
           if b then SUnifier.rec_unfold astate pname vs
           else (
             L.verbose (fun m ->
-                m "@[<h>Values: %a@]" Fmt.(list ~sep:comma Val.pp) vs);
+                m "@[<h>Values: %a@]" Fmt.(list ~sep:comma Expr.pp) vs);
             let** _, state =
               SUnifier.unfold ?additional_bindings astate pname vs
             in
@@ -768,7 +737,7 @@ module Make
           if not (List.for_all Names.is_lvar_name binders) then
             failwith "Binding of pure variables in *-assert.";
           let store = State.get_store astate.state in
-          let pvars_store = Store.domain store in
+          let pvars_store = SStore.domain store in
           let pvars_a = Asrt.pvars a in
           let pvars_diff = SS.diff pvars_a pvars_store in
           L.verbose (fun m ->
@@ -778,7 +747,7 @@ module Make
              List.map (fun pvar : err_t -> EVar pvar) (SS.elements pvars_diff)
            in
            raise (Internal_State_Error (pvars_errs, astate)));
-          let store_subst = Store.to_ssubst store in
+          let store_subst = SStore.to_ssubst store in
           let a = SVal.SESubst.substitute_asrt store_subst ~partial:true a in
           (* let known_vars   = SS.diff (SS.filter is_spec_var_name (Asrt.lvars a)) (SS.of_list binders) in *)
           let state_lvars = State.get_lvars astate.state in
@@ -813,7 +782,7 @@ module Make
             L.verbose (fun m ->
                 m "Forget @[%a@] with subst: %a"
                   Fmt.(iter ~sep:comma SS.iter string)
-                  vars_to_forget ESubst.pp oblivion_subst);
+                  vars_to_forget SVal.SESubst.pp oblivion_subst);
 
             (* TODO: THIS SUBST IN PLACE MUST NOT BRANCH *)
             let subst_in_place = substitution_in_place oblivion_subst astate in
@@ -837,11 +806,11 @@ module Make
                       raise
                         (Failure "Impossible: unifiable not an lvar or an aloc")
                 in
-                (id, Option.get (Val.from_expr e)))
+                (id, e))
               (Expr.Set.elements known_unifiables)
           in
           (* let old_astate = copy astate in *)
-          let subst = ESubst.init bindings in
+          let subst = SVal.SESubst.init bindings in
           let open Syntaxes.List in
           let* unification_result =
             SUnifier.unify astate subst up LogicCommand
@@ -851,7 +820,7 @@ module Make
               (* Successful Unification *)
               let lbinders = List.map (fun x -> Expr.LVar x) binders in
               let new_bindings =
-                List.map (fun e -> (e, ESubst.get subst' e)) lbinders
+                List.map (fun e -> (e, SVal.SESubst.get subst' e)) lbinders
               in
               let success =
                 List.for_all (fun (_, x_v) -> x_v <> None) new_bindings
@@ -859,31 +828,24 @@ module Make
               if not success then
                 raise (Failure "Assert failed - binders not captured");
               let additional_bindings =
-                let eq_temp e vl =
-                  let vl_e = Val.to_expr vl in
-                  Expr.equal e vl_e
-                in
                 List.filter
                   (fun (e, v) ->
-                    (not (List.mem e lbinders)) && not (eq_temp e v))
-                  (ESubst.to_list subst')
+                    (not (List.mem e lbinders)) && not (Expr.equal e v))
+                  (SVal.SESubst.to_list subst')
               in
               let new_bindings =
-                new_bindings
-                @ List.map (fun (x, y) -> (x, Some y)) additional_bindings
+                List.map (fun (x, y) -> (x, Option.get y)) new_bindings
+                @ additional_bindings
               in
               let new_bindings =
-                List.map
-                  (fun (e, e_v) ->
-                    Asrt.Pure (Eq (e, Val.to_expr (Option.get e_v))))
-                  new_bindings
+                List.map (fun (e, e_v) -> Asrt.Pure (Eq (e, e_v))) new_bindings
               in
               let a_new_bindings = Asrt.star new_bindings in
               let subst_bindings = make_id_subst a_new_bindings in
               let full_subst = make_id_subst a in
-              let _ = ESubst.merge_left full_subst subst_bindings in
+              let _ = SVal.SESubst.merge_left full_subst subst_bindings in
               let a_substed =
-                ESubst.substitute_asrt subst_bindings ~partial:true a
+                SVal.SESubst.substitute_asrt subst_bindings ~partial:true a
               in
               let a_produce = Asrt.star [ a_new_bindings; a_substed ] in
               let result =
@@ -924,7 +886,7 @@ module Make
                    @[<v 2>Failing Model:@\n\
                    %a@]@\n"
                   Asrt.pp a State.pp_err err
-                  Fmt.(option ~none:(any "CANNOT CREATE MODEL") ESubst.pp)
+                  Fmt.(option ~none:(any "CANNOT CREATE MODEL") SVal.SESubst.pp)
                   failing_model
               in
               L.print_to_all msg;
@@ -942,7 +904,7 @@ module Make
              (String.concat ", " binders) (String.concat ", " lemma.lemma.existentials); *)
           let existential_bindings =
             List.map2
-              (fun x y -> (x, Option.get (Val.from_expr (Expr.LVar y))))
+              (fun x y -> (x, Expr.LVar y))
               lemma.data.lemma_existentials binders
           in
           let** astate, _ =

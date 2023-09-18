@@ -4,7 +4,11 @@ module L = Logging
 module SSubst = SVal.SESubst
 
 module type S = sig
-  include State.S
+  include
+    State.S
+      with type vt = Expr.t
+       and type st = SVal.SESubst.t
+       and type store_t = SStore.t
 
   val make_s :
     init_data:init_data ->
@@ -22,10 +26,7 @@ end
 
 module Make (SMemory : SMemory.S) :
   S
-    with type st = SVal.SESubst.t
-     and type vt = SVal.M.t
-     and type store_t = SStore.t
-     and type heap_t = SMemory.t
+    with type heap_t = SMemory.t
      and type m_err_t = SMemory.err_t
      and type init_data = SMemory.init_data = struct
   type vt = SVal.M.t [@@deriving yojson, show]

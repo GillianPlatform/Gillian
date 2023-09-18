@@ -6,11 +6,9 @@ module type S = sig
   include SState.S
 
   type state_t
-  type preds_t
-  type wands_t
   type abs_t = string * vt list
 
-  val expose : t -> state_t * preds_t * wands_t * UP.preds_tbl_t * variants_t
+  val expose : t -> state_t * Preds.t * Wands.t * UP.preds_tbl_t * variants_t
 
   val make_p :
     preds:UP.preds_tbl_t ->
@@ -25,10 +23,10 @@ module type S = sig
   val init_with_pred_table : UP.preds_tbl_t -> init_data -> t
 
   (** Get preds of given symbolic state *)
-  val get_preds : t -> preds_t
+  val get_preds : t -> Preds.t
 
   (** Set preds of given symbolic state *)
-  val set_preds : t -> preds_t -> t
+  val set_preds : t -> Preds.t -> t
 
   (** Set variants of given symbolic state *)
   val set_variants : t -> variants_t -> t
@@ -40,23 +38,9 @@ module type S = sig
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
 end
 
-module Make
-    (Val : Val.S)
-    (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
-    (Store : Store.S with type vt = Val.t)
-    (State : SState.S
-               with type vt = Val.t
-                and type st = ESubst.t
-                and type store_t = Store.t)
-    (Preds : Preds.S with type vt = Val.t and type st = ESubst.t)
-    (Wands : Wands.S with type vt = Val.t and type st = ESubst.t) :
+module Make (State : SState.S) :
   S
-    with type vt = Val.t
-     and type st = ESubst.t
-     and type store_t = Store.t
-     and type state_t = State.t
-     and type preds_t = Preds.t
-     and type wands_t = Wands.t
+    with type state_t = State.t
      and type heap_t = State.heap_t
      and type m_err_t = State.m_err_t
      and type init_data = State.init_data

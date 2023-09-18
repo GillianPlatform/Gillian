@@ -8,48 +8,41 @@ type unify_kind =
 [@@deriving yojson]
 
 module type S = sig
-  module Val : Val.S
-  module ESubst : ESubst.S with type vt = Val.t and type t = Val.et
-
-  type vt
-  type st
   type err_t
   type state_t
-  type preds_t
-  type wands_t
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
 
   type t = {
     state : state_t;
-    preds : preds_t;
-    wands : wands_t;
+    preds : Preds.t;
+    wands : Wands.t;
     pred_defs : UP.preds_tbl_t;
     variants : variants_t;
   }
 
   type post_res = (Flag.t * Asrt.t list) option
-  type search_state = (t * st * UP.t) list * err_t list
+  type search_state = (t * SVal.SESubst.t * UP.t) list * err_t list
 
   module Logging : sig
     module AstateRec : sig
       type t = {
         state : state_t;
-        preds : preds_t;
-        wands : wands_t;
+        preds : Preds.t;
+        wands : Wands.t;
         variants : variants_t;
       }
       [@@deriving yojson]
     end
 
     module AssertionReport : sig
-      type t = { step : UP.step; subst : ESubst.t; astate : AstateRec.t }
+      type t = { step : UP.step; subst : SVal.SESubst.t; astate : AstateRec.t }
       [@@deriving yojson]
     end
 
     module UnifyReport : sig
       type t = {
         astate : AstateRec.t;
-        subst : ESubst.t;
+        subst : SVal.SESubst.t;
         up : UP.t;
         unify_kind : unify_kind;
       }
@@ -57,7 +50,7 @@ module type S = sig
     end
 
     module UnifyCaseReport : sig
-      type t = { astate : AstateRec.t; subst : st; up : UP.t }
+      type t = { astate : AstateRec.t; subst : SVal.SESubst.t; up : UP.t }
       [@@deriving yojson]
     end
 
@@ -67,13 +60,13 @@ module type S = sig
       type t =
         | Success of {
             astate : AstateRec.t;
-            subst : st;
+            subst : SVal.SESubst.t;
             posts : (Flag.t * Asrt.t list) option;
             remaining_states : remaining_state list;
           }
         | Failure of {
             cur_step : UP.step option;
-            subst : st;
+            subst : SVal.SESubst.t;
             astate : AstateRec.t;
             errors : err_t list;
           }
@@ -83,9 +76,9 @@ module type S = sig
 
   type unfold_info_t = (string * string) list
 
-  val produce_assertion : t -> st -> Asrt.t -> (t, err_t) Res_list.t
-  val produce : t -> st -> Asrt.t -> (t, err_t) Res_list.t
-  val produce_posts : t -> st -> Asrt.t list -> t list
+  val produce_assertion : t -> SVal.SESubst.t -> Asrt.t -> (t, err_t) Res_list.t
+  val produce : t -> SVal.SESubst.t -> Asrt.t -> (t, err_t) Res_list.t
+  val produce_posts : t -> SVal.SESubst.t -> Asrt.t list -> t list
 
   (** [unfold state name args unfold_info] returns a 
       list of pairs (subst, state), resulting from unfolding
@@ -95,38 +88,40 @@ module type S = sig
     ?additional_bindings:unfold_info_t ->
     t ->
     string ->
-    vt list ->
-    (st * t, err_t) Res_list.t
+    Expr.t list ->
+    (SVal.SESubst.t * t, err_t) Res_list.t
 
-  val rec_unfold : ?fuel:int -> t -> string -> vt list -> (t, err_t) Res_list.t
+  val rec_unfold :
+    ?fuel:int -> t -> string -> Expr.t list -> (t, err_t) Res_list.t
+
   val unfold_all : t -> string -> (t, err_t) Res_list.t
 
   (** Tries recovering from an error using the provided recovery tactic. *)
-  val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
+  val try_recovering : t -> Expr.t Recovery_tactic.t -> (t list, string) result
 
   (** Tries to unfold the given predicate in the state.
       If it manages, it returns the new set of states and corresponding
       substitutions, otherwise, it returns None. *)
-  val unfold_with_vals : t -> vt list -> (st * t) list option
+  val unfold_with_vals : t -> Expr.t list -> (SVal.SESubst.t * t) list option
 
   (** Unfolds 1 predicate for which all arguments are concrete.
       - If it finds one:
         - if it succeeds to unfold, it returns Some (Some subst, new_state )
         - if it fails to unfold it returns None
       - If it doesn't find one, it returns Some (None, input_state) *)
-  val unfold_concrete_preds : t -> (st option * t) option
+  val unfold_concrete_preds : t -> (SVal.SESubst.t option * t) option
 
   val unify_assertion :
-    ?is_post:bool -> t -> st -> UP.step -> (t, err_t) Res_list.t
+    ?is_post:bool -> t -> SVal.SESubst.t -> UP.step -> (t, err_t) Res_list.t
 
   val unify :
     ?is_post:bool ->
     ?in_unification:bool ->
     t ->
-    st ->
+    SVal.SESubst.t ->
     UP.t ->
     unify_kind ->
-    (t * st * post_res, err_t) Res_list.t
+    (t * SVal.SESubst.t * post_res, err_t) Res_list.t
 
   (** Folds a predicate in the state, consuming its definition and
       producing the folded predicate.
@@ -134,11 +129,11 @@ module type S = sig
   val fold :
     ?is_post:bool ->
     ?in_unification:bool ->
-    ?additional_bindings:(Expr.t * vt) list ->
+    ?additional_bindings:(Expr.t * Expr.t) list ->
     unify_kind:unify_kind ->
     state:t ->
     UP.pred ->
-    vt list ->
+    Expr.t list ->
     (t, err_t) Res_list.t
 
   (** Consumes a predicate from the state.
@@ -150,25 +145,10 @@ module type S = sig
     ?in_unification:bool ->
     t ->
     string ->
-    vt option list ->
-    (st * UP.step * UP.outs * Expr.t list) option ->
-    (t * vt list, err_t) Res_list.t
+    Expr.t option list ->
+    (SVal.SESubst.t * UP.step * UP.outs * Expr.t list) option ->
+    (t * Expr.t list, err_t) Res_list.t
 end
 
-module Make
-    (Val : Val.S)
-    (ESubst : ESubst.S with type vt = Val.t and type t = Val.et)
-    (Store : Store.S with type vt = Val.t)
-    (State : SState.S
-               with type vt = Val.t
-                and type st = ESubst.t
-                and type store_t = Store.t)
-    (Preds : Preds.S with type vt = Val.t and type st = ESubst.t)
-    (Wands : Wands.S with type vt = Val.t and type st = ESubst.t) :
-  S
-    with type vt = Val.t
-     and type st = ESubst.t
-     and type state_t = State.t
-     and type preds_t = Preds.t
-     and type wands_t = Wands.t
-     and type err_t = State.err_t
+module Make (State : SState.S) :
+  S with type state_t = State.t and type err_t = State.err_t

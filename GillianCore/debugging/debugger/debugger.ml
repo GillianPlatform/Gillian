@@ -211,11 +211,9 @@ functor
     let get_pred_vars (state : state_t) : Variable.t list =
       let open Variable in
       Verification.SPState.get_preds state
-      |> Preds.SPreds.to_list
+      |> Preds.to_list
       |> List.map (fun pred ->
-             let value =
-               Fmt.to_to_string (Fmt.hbox Preds.SPreds.pp_pabs) pred
-             in
+             let value = Fmt.to_to_string (Fmt.hbox Preds.pp_pabs) pred in
              { name = ""; value; type_ = None; var_ref = 0 })
       |> List.sort (fun v w -> Stdlib.compare v.value w.value)
 

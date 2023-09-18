@@ -334,6 +334,10 @@ let to_list (le : t) : t list option =
 (** From list to expression *)
 let from_list les = EList les
 
+let to_literal = function
+  | Lit lit -> Some lit
+  | _ -> None
+
 (** Fold *)
 let rec fold
     (f_ac : t -> 'b -> 'b -> 'a list -> 'a)

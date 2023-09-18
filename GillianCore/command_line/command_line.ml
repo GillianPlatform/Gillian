@@ -29,10 +29,7 @@ struct
   module S_interpreter =
     G_interpreter.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (PC) (External)
 
-  module SPState =
-    PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
-      (Wands.SWands)
-
+  module SPState = PState.Make (SState)
   module Verification = Verifier.Make (SState) (SPState) (PC) (External)
   module Lifter = Lifter (Verification)
   module Abductor = Abductor.Make (SPState) (PC) (External)
