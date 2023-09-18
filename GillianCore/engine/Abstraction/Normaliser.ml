@@ -3,6 +3,7 @@ open Containers
 module L = Logging
 module SESubst = SVal.SESubst
 module SPreds = Preds.SPreds
+module SWands = Wands.SWands
 
 let new_lvar_name var = lvar_prefix ^ var
 
@@ -11,7 +12,8 @@ module Make
                  with type vt = SVal.M.t
                   and type st = SVal.SESubst.t
                   and type store_t = SStore.t
-                  and type preds_t = SPreds.t) =
+                  and type preds_t = SPreds.t
+                  and type wands_t = SWands.t) =
 struct
   (*  ------------------------------------------------------------------
    *  List Preprocessing
@@ -541,22 +543,25 @@ struct
       (string * Expr.t list * Expr.t list) list
       * Formula.t list
       * (Expr.t * Type.t) list
-      * (string * Expr.t list) list =
+      * (string * Expr.t list) list
+      * SWands.wand list =
     let f = separate_assertion in
 
     match a with
     | Star (al, ar) ->
-        let core_asrts_l, pure_l, types_l, preds_l = f al in
-        let core_asrts_r, pure_r, types_r, preds_r = f ar in
+        let core_asrts_l, pure_l, types_l, preds_l, wands_l = f al in
+        let core_asrts_r, pure_r, types_r, preds_r, wands_r = f ar in
         ( core_asrts_l @ core_asrts_r,
           pure_l @ pure_r,
           types_l @ types_r,
-          preds_l @ preds_r )
-    | GA (a, es1, es2) -> ([ (a, es1, es2) ], [], [], [])
-    | Emp -> ([], [], [], [])
-    | Types lst -> ([], [], lst, [])
-    | Pred (name, params) -> ([], [], [], [ (name, params) ])
-    | Pure f -> ([], [ f ], [], [])
+          preds_l @ preds_r,
+          wands_l @ wands_r )
+    | GA (a, es1, es2) -> ([ (a, es1, es2) ], [], [], [], [])
+    | Wand { lhs; rhs } -> ([], [], [], [], [ { lhs; rhs } ])
+    | Emp -> ([], [], [], [], [])
+    | Types lst -> ([], [], lst, [], [])
+    | Pred (name, params) -> ([], [], [], [ (name, params) ], [])
+    | Pure f -> ([], [ f ], [], [], [])
 
   (** Normalise type assertions (Intialise type environment *)
   let normalise_types
@@ -612,6 +617,8 @@ struct
     in
 
     result
+
+  let normalise_wands (wands : SWands.wand list) : SWands.t = SWands.init wands
 
   (** Normalise Predicate Assertions (Initialise Predicate Set) *)
   let normalise_preds
@@ -894,7 +901,7 @@ struct
     let subst = SESubst.init [] in
 
     (* Step 2b -- Separate assertion *)
-    let c_asrts, pfs, types, preds =
+    let c_asrts, pfs, types, preds, wands =
       try separate_assertion a
       with Failure msg ->
         L.verbose (fun m -> m "I died here terribly with msg: %s!\n" msg);
@@ -939,6 +946,7 @@ struct
 
         (* Step 7 -- Construct the state *)
         let preds' = normalise_preds pred_defs store pfs gamma subst preds in
+        let _wands' = normalise_wands wands in
         let astate : SPState.t =
           SPState.make_p ~preds:pred_defs ~init_data ~store ~pfs ~gamma
             ~spec_vars:svars ()

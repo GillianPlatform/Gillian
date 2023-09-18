@@ -18,7 +18,8 @@ module Make
                  with type vt = SVal.M.t
                   and type st = SVal.SESubst.t
                   and type store_t = SStore.t
-                  and type preds_t = Preds.SPreds.t)
+                  and type preds_t = Preds.SPreds.t
+                  and type wands_t = Wands.SWands.t)
     (PC : ParserAndCompiler.S with type init_data = SPState.init_data)
     (External : External.T(PC.Annot).S) :
   S with type annot = PC.Annot.t and type init_data = PC.init_data = struct
@@ -529,6 +530,7 @@ module From_scratch
     (External : External.T(PC.Annot).S) =
   Make
     (PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState.Make (SMemory))
-       (Preds.SPreds))
+       (Preds.SPreds)
+       (Wands.SWands))
        (PC)
     (External)

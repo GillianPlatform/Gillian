@@ -17,6 +17,7 @@ module type S = sig
        and type heap_t = heap_t
        and type m_err_t = m_err
        and type preds_t = Preds.SPreds.t
+       and type wands_t = Wands.SWands.t
 
   module SAInterpreter :
     G_interpreter.S
@@ -70,6 +71,7 @@ module Make
                   and type st = SState.st
                   and type state_t = SState.t
                   and type store_t = SState.store_t
+                  and type wands_t = Wands.SWands.t
                   and type preds_t = Preds.SPreds.t
                   and type init_data = SState.init_data)
     (PC : ParserAndCompiler.S)
@@ -93,6 +95,7 @@ struct
 
   module SUnifier =
     Unifier.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
+      (Wands.SWands)
 
   let print_success_or_failure success =
     if success then Fmt.pr "%a" (Fmt.styled `Green Fmt.string) "Success\n"
@@ -1025,7 +1028,8 @@ struct
     Make
       (INTERNAL__.SState)
       (PState.Make (SVal.M) (SVal.SESubst) (SStore) (INTERNAL__.SState)
-         (Preds.SPreds))
+         (Preds.SPreds)
+         (Wands.SWands))
       (PC)
       (External)
 end

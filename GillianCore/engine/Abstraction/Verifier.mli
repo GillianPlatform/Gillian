@@ -14,6 +14,7 @@ module type S = sig
        and type heap_t = heap_t
        and type m_err_t = m_err
        and type preds_t = Preds.SPreds.t
+       and type wands_t = Wands.SWands.t
 
   module SAInterpreter :
     G_interpreter.S
@@ -68,6 +69,7 @@ module Make
                   and type state_t = SState.t
                   and type store_t = SState.store_t
                   and type preds_t = Preds.SPreds.t
+                  and type wands_t = Wands.SWands.t
                   and type init_data = SState.init_data)
     (PC : ParserAndCompiler.S)
     (External : External.T(PC.Annot).S) :

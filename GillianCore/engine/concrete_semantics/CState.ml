@@ -43,7 +43,6 @@ end = struct
   type action_ret = (t * vt list, err_t) result list
 
   let init init_data : t = (CMemory.init init_data, CStore.init [], [])
-  let get_pred_defs (_ : t) : UP.preds_tbl_t option = None
 
   let execute_action
       ?unification:_
@@ -71,11 +70,6 @@ end = struct
   let set_store state store =
     let heap, _, locs = state in
     (heap, store, locs)
-
-  let to_loc (state : t) (loc : vt) : (t * vt) option =
-    match loc with
-    | Literal.Loc _ -> Some (state, loc)
-    | _ -> None
 
   let assume ?unfold:_ (state : t) (l : Literal.t) : t list =
     match l with

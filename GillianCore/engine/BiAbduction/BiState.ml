@@ -27,10 +27,6 @@ struct
 
   type action_ret = (t * vt list, err_t) result list
 
-  let get_pred_defs (bi_state : t) : UP.preds_tbl_t option =
-    let _, state, _ = bi_state in
-    State.get_pred_defs state
-
   let make ~(procs : SS.t) ~(state : State.t) ~(init_data : State.init_data) : t
       =
     (procs, state, State.init init_data)
@@ -49,14 +45,6 @@ struct
     let procs, state, af_state = bi_state in
     let state' = State.set_store state store in
     (procs, state', af_state)
-
-  let to_loc (bi_state : t) (v : vt) : (t * vt) option =
-    let procs, state, af_state = bi_state in
-    match State.to_loc state v with
-    | Some (state', loc) -> Some ((procs, state', af_state), loc)
-    | None ->
-        (* BIABDUCTION TODO: CREATE A NEW OBJECT *)
-        None
 
   let assume ?(unfold = false) (bi_state : t) (v : vt) : t list =
     let procs, state, state_af = bi_state in

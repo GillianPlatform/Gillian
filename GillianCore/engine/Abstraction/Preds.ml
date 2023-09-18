@@ -67,7 +67,10 @@ module Make
   let copy (preds : t) : t = ref !preds
 
   (** Returns true if --preds-- is empty *)
-  let is_empty (preds : t) : bool = List.compare_length_with !preds 0 = 0
+  let is_empty (preds : t) : bool =
+    match !preds with
+    | [] -> true
+    | _ -> false
 
   (** Extends --preds-- with --pa-- *)
   let extend ?(pure = false) (preds : t) (pa : abs_t) : unit =
@@ -155,8 +158,7 @@ module Make
 
   let pp fmt preds =
     let lpreds = to_list preds in
-    if List.length lpreds != 0 then
-      (Fmt.list ~sep:(Fmt.any "@\n") pp_pabs) fmt lpreds
+    (Fmt.list ~sep:(Fmt.any "@\n") pp_pabs) fmt lpreds
 
   let find (preds : t) (sel : abs_t -> bool) : abs_t option =
     List.find_opt sel !preds

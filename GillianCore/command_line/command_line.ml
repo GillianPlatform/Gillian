@@ -31,6 +31,7 @@ struct
 
   module SPState =
     PState.Make (SVal.M) (SVal.SESubst) (SStore) (SState) (Preds.SPreds)
+      (Wands.SWands)
 
   module Verification = Verifier.Make (SState) (SPState) (PC) (External)
   module Lifter = Lifter (Verification)

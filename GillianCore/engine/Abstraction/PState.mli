@@ -7,9 +7,10 @@ module type S = sig
 
   type state_t
   type preds_t
+  type wands_t
   type abs_t = string * vt list
 
-  val expose : t -> state_t * preds_t * UP.preds_tbl_t * variants_t
+  val expose : t -> state_t * preds_t * wands_t * UP.preds_tbl_t * variants_t
 
   val make_p :
     preds:UP.preds_tbl_t ->
@@ -34,7 +35,6 @@ module type S = sig
 
   val unifies : t -> st -> UP.t -> Unifier.unify_kind -> bool
   val add_pred_defs : UP.preds_tbl_t -> t -> t
-  val deabstract : t -> state_t * bool
   val get_all_preds : ?keep:bool -> (abs_t -> bool) -> t -> abs_t list
   val set_pred : t -> abs_t -> unit
   val try_recovering : t -> vt Recovery_tactic.t -> (t list, string) result
@@ -48,13 +48,15 @@ module Make
                with type vt = Val.t
                 and type st = ESubst.t
                 and type store_t = Store.t)
-    (Preds : Preds.S with type vt = Val.t and type st = ESubst.t) :
+    (Preds : Preds.S with type vt = Val.t and type st = ESubst.t)
+    (Wands : Wands.S with type vt = Val.t and type st = ESubst.t) :
   S
     with type vt = Val.t
      and type st = ESubst.t
      and type store_t = Store.t
      and type state_t = State.t
      and type preds_t = Preds.t
+     and type wands_t = Wands.t
      and type heap_t = State.heap_t
      and type m_err_t = State.m_err_t
      and type init_data = State.init_data

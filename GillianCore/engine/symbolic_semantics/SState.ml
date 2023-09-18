@@ -189,7 +189,6 @@ module Make (SMemory : SMemory.S) :
   let ga_to_setter (a_id : string) = SMemory.ga_to_setter a_id
   let ga_to_getter (a_id : string) = SMemory.ga_to_getter a_id
   let ga_to_deleter (a_id : string) = SMemory.ga_to_deleter a_id
-  let get_pred_defs (_ : t) : UP.preds_tbl_t option = None
   let is_overlapping_asrt (a : string) : bool = SMemory.is_overlapping_asrt a
 
   let eval_expr (state : t) (e : Expr.t) : vt =
@@ -428,25 +427,6 @@ module Make (SMemory : SMemory.S) :
   let simplify_val (state : t) (v : vt) : vt =
     let _, _, pfs, gamma, _ = state in
     Reduction.reduce_lexpr ~gamma ~pfs v
-
-  let to_loc (state : t) (loc : vt) : (t * vt) option =
-    let _, _, pfs, gamma, _ = state in
-    let loc = Reduction.reduce_lexpr ~gamma ~pfs loc in
-    match loc with
-    | Lit (Loc _) | ALoc _ -> Some (state, loc)
-    | LVar x -> (
-        match Reduction.resolve_expr_to_location pfs gamma (LVar x) with
-        | Some loc_name ->
-            if is_aloc_name loc_name then Some (state, ALoc loc_name)
-            else Some (state, Lit (Loc loc_name))
-        | None ->
-            let new_aloc = ALoc.alloc () in
-            let p : Formula.t = Eq (LVar x, ALoc new_aloc) in
-            if FOSolver.check_satisfiability (p :: PFS.to_list pfs) gamma then (
-              PFS.extend pfs p;
-              Some (state, Expr.ALoc new_aloc))
-            else None)
-    | _ -> None
 
   let copy (state : t) : t =
     let heap, store, pfs, gamma, svars = state in

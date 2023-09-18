@@ -16,14 +16,28 @@ module type S = sig
   type err_t
   type state_t
   type preds_t
+  type wands_t
   type variants_t = (string, Expr.t option) Hashtbl.t [@@deriving yojson]
-  type t = state_t * preds_t * UP.preds_tbl_t * variants_t
+
+  type t = {
+    state : state_t;
+    preds : preds_t;
+    wands : wands_t;
+    pred_defs : UP.preds_tbl_t;
+    variants : variants_t;
+  }
+
   type post_res = (Flag.t * Asrt.t list) option
   type search_state = (t * st * UP.t) list * err_t list
 
   module Logging : sig
     module AstateRec : sig
-      type t = { state : state_t; preds : preds_t; variants : variants_t }
+      type t = {
+        state : state_t;
+        preds : preds_t;
+        wands : wands_t;
+        variants : variants_t;
+      }
       [@@deriving yojson]
     end
 
@@ -149,10 +163,12 @@ module Make
                with type vt = Val.t
                 and type st = ESubst.t
                 and type store_t = Store.t)
-    (Preds : Preds.S with type vt = Val.t and type st = ESubst.t) :
+    (Preds : Preds.S with type vt = Val.t and type st = ESubst.t)
+    (Wands : Wands.S with type vt = Val.t and type st = ESubst.t) :
   S
     with type vt = Val.t
      and type st = ESubst.t
      and type state_t = State.t
      and type preds_t = Preds.t
+     and type wands_t = Wands.t
      and type err_t = State.err_t
