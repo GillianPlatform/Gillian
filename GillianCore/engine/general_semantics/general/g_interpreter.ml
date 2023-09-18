@@ -864,7 +864,7 @@ struct
                       process_ret true ret_state fl b_counter (Some others)
                         spec_name
                       :: others
-                  | _ -> failwith "unreachable"
+                  | [] -> []
                 in
                 let error_confs =
                   match errors with

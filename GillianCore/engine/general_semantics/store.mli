@@ -22,7 +22,7 @@ module type S = sig
   val domain : t -> Var.Set.t
 
   (** Store filtering *)
-  val filter : t -> (Var.t -> vt -> vt option) -> unit
+  val filter_map_inplace : t -> (Var.t -> vt -> vt option) -> unit
 
   (** Store fold *)
   val fold : t -> (Var.t -> vt -> 'a -> 'a) -> 'a -> 'a
@@ -62,9 +62,6 @@ module type S = sig
 
   (** Converts the store into an ssubst *)
   val to_ssubst : t -> SVal.SESubst.t
-
-  (** Symbolic indices *)
-  val symbolics : t -> Var.Set.t
 
   (** Logical variables *)
   val lvars : t -> Var.Set.t
