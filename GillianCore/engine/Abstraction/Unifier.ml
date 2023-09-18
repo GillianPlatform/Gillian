@@ -167,7 +167,7 @@ module Make (State : SState.S) :
     let pp_astate fmt astate =
       let { state; preds; wands; variants; _ } = astate in
       Fmt.pf fmt "%a@\nPREDS:@\n%a@\nWANDS:@\n%a@\nVARIANTS:@\n%a@\n" State.pp
-        state Wands.pp wands Preds.pp preds
+        state Preds.pp preds Wands.pp wands
         (Fmt.hashtbl ~sep:Fmt.semi pp_variants)
         variants
 

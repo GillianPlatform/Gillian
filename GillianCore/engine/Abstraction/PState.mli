@@ -8,8 +8,6 @@ module type S = sig
   type state_t
   type abs_t = string * vt list
 
-  val expose : t -> state_t * Preds.t * Wands.t * UP.preds_tbl_t * variants_t
-
   val make_p :
     preds:UP.preds_tbl_t ->
     init_data:init_data ->

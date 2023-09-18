@@ -8,8 +8,6 @@ module type S = sig
   type state_t
   type abs_t = string * vt list
 
-  val expose : t -> state_t * Preds.t * Wands.t * UP.preds_tbl_t * variants_t
-
   val make_p :
     preds:UP.preds_tbl_t ->
     init_data:init_data ->
@@ -132,9 +130,6 @@ module Make (State : SState.S) :
 
   let make_s ~init_data:_ ~store:_ ~pfs:_ ~gamma:_ ~spec_vars:_ : t =
     failwith "Calling make_s on a PState"
-
-  let expose state =
-    (state.state, state.preds, state.wands, state.pred_defs, state.variants)
 
   let simplify
       ?(save = false)
@@ -858,11 +853,11 @@ module Make (State : SState.S) :
                 let subst, new_states =
                   State.simplify ~kill_new_lvars:true new_state'
                 in
-                let () = Preds.substitution_in_place subst astate.preds in
-                let () = Wands.substitution_in_place subst astate.wands in
+                let () = Preds.substitution_in_place subst new_astate.preds in
+                let () = Wands.substitution_in_place subst new_astate.wands in
                 let+ new_state = new_states in
 
-                Ok (copy_with_state astate new_state)
+                Ok (copy_with_state new_astate new_state)
               in
               Res_list.map_error
                 (fun _ ->
