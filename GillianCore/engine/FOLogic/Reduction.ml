@@ -2978,23 +2978,23 @@ let rec reduce_assertion_loop
     (gamma : Type_env.t)
     (a : Asrt.t) : Asrt.t =
   let f = reduce_assertion_loop unification pfs gamma in
-
+  let fe = reduce_lexpr_loop ~unification pfs gamma in
   let result =
     match a with
     (* Empty heap *)
     | Emp -> Asrt.Emp
     (* Star *)
     | Star (a1, a2) -> (
-        let fa1 = f a1 in
-        let fa2 = f a2 in
-        match ((fa1 : Asrt.t), (fa2 : Asrt.t)) with
+        match (f a1, f a2) with
         | Emp, a | a, Emp -> a
         | Pure False, _ | _, Pure False -> Asrt.Pure False
         | Pure True, a | a, Pure True -> a
-        | _, _ -> Star (fa1, fa2))
+        | fa1, fa2 -> Star (fa1, fa2))
+    | Wand { lhs = lname, largs; rhs = rname, rargs } ->
+        Wand
+          { lhs = (lname, List.map fe largs); rhs = (rname, List.map fe rargs) }
     (* Predicates *)
-    | Pred (name, les) ->
-        Pred (name, List.map (reduce_lexpr_loop ~unification pfs gamma) les)
+    | Pred (name, les) -> Pred (name, List.map fe les)
     (* Pure assertions *)
     | Pure True -> Emp
     | Pure f ->
@@ -3014,31 +3014,21 @@ let rec reduce_assertion_loop
           if lvt = [] then Emp else Types lvt
         with WrongType -> Pure False)
     (* General action *)
-    | GA (act, l_ins, l_outs) ->
-        GA
-          ( act,
-            List.map (reduce_lexpr_loop ~unification pfs gamma) l_ins,
-            List.map (reduce_lexpr_loop ~unification pfs gamma) l_outs )
+    | GA (act, l_ins, l_outs) -> GA (act, List.map fe l_ins, List.map fe l_outs)
   in
+
   if a <> result && not (a == result) then (
     L.(tmi (fun m -> m "Reduce_assertion: %a -> %a" Asrt.pp a Asrt.pp result));
     f result)
   else result
 
-let rec separate (a : Asrt.t) =
+let rec extract_lvar_equalities (a : Asrt.t) =
   match a with
-  | Emp -> ([], [], [], [])
-  | Pred _ -> ([], [], [], [ a ])
-  | Pure pf ->
-      let pfs = Formula.split_conjunct_formulae pf in
-      let a = List.map (fun pf -> Asrt.Pure pf) pfs in
-      ([], a, [], [])
-  | Types _ -> ([], [], [ a ], [])
-  | GA _ -> ([ a ], [], [], [])
-  | Star (a1, a2) ->
-      let m1, pu1, t1, pr1 = separate a1 in
-      let m2, pu2, t2, pr2 = separate a2 in
-      (m1 @ m2, pu1 @ pu2, t1 @ t2, pr1 @ pr2)
+  | Pure (Eq (LVar x, v) | Eq (v, LVar x)) ->
+      if Names.is_lvar_name x && not (Names.is_spec_var_name x) then [ (x, v) ]
+      else []
+  | Star (a1, a2) -> extract_lvar_equalities a1 @ extract_lvar_equalities a2
+  | _ -> []
 
 let reduce_assertion
     ?(unification = false)
@@ -3049,25 +3039,19 @@ let reduce_assertion
 
   let rec loop (a : Asrt.t) =
     let a' = reduce_assertion_loop unification pfs gamma a in
-    let _, pure, _, _ = separate a' in
+    let equalities = extract_lvar_equalities a' in
     let a' =
       List.fold_left
-        (fun a (pf : Asrt.t) ->
-          match pf with
-          | Pure (Eq (LVar v, x)) | Pure (Eq (x, LVar v)) ->
-              if Names.is_lvar_name v && not (Names.is_spec_var_name v) then
-                let subst =
-                  Asrt.subst_expr_for_expr ~to_subst:(LVar v) ~subst_with:x
-                in
-                match x with
-                | Lit _ -> subst a
-                | LVar w when v <> w -> subst a
-                | EList lx when not (Var.Set.mem v (Expr.lvars (EList lx))) ->
-                    subst a
-                | _ -> a
-              else a
+        (fun a (v, x) ->
+          let subst =
+            Asrt.subst_expr_for_expr ~to_subst:(LVar v) ~subst_with:x
+          in
+          match x with
+          | Lit _ -> subst a
+          | LVar w when v <> w -> subst a
+          | EList lx when not (Var.Set.mem v (Expr.lvars (EList lx))) -> subst a
           | _ -> a)
-        a' pure
+        a' equalities
     in
     let a' = reduce_assertion_loop unification pfs gamma a' in
     if a' <> a && not (a' == a) then loop a' else a'

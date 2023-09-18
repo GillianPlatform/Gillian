@@ -164,6 +164,7 @@ and assertion =
   | Pure of formula
   | Types of (expr * typ) list
   | GA of string * expr list * expr list
+  | Wand of { lhs : string * expr list; rhs : string * expr list }
 
 and bindings = string * (string * expr) list
 

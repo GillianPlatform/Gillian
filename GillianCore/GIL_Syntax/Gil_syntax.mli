@@ -563,6 +563,8 @@ module Asrt : sig
     | Pure of Formula.t  (** Pure formula *)
     | Types of (Expr.t * Type.t) list  (** Typing assertion *)
     | GA of string * Expr.t list * Expr.t list  (** Core assertion *)
+    | Wand of { lhs : string * Expr.t list; rhs : string * Expr.t list }
+        (** Magic wand of the form [P(...) -* Q(...)] *)
   [@@deriving yojson]
 
   (** Comparison of assertions *)
@@ -1329,6 +1331,12 @@ module Visitors : sig
                Formula.t
            ; visit_GA :
                'c -> Asrt.t -> string -> Expr.t list -> Expr.t list -> Asrt.t
+           ; visit_Wand :
+               'c ->
+               Asrt.t ->
+               string * Expr.t list ->
+               string * Expr.t list ->
+               Asrt.t
            ; visit_GUnfold : 'c -> SLCmd.t -> string -> SLCmd.t
            ; visit_Goto : 'c -> 'f Cmd.t -> 'f -> 'f Cmd.t
            ; visit_GuardedGoto :
@@ -1584,6 +1592,9 @@ module Visitors : sig
 
       method visit_GA :
         'c -> Asrt.t -> string -> Expr.t list -> Expr.t list -> Asrt.t
+
+      method visit_Wand :
+        'c -> Asrt.t -> string * Expr.t list -> string * Expr.t list -> Asrt.t
 
       method visit_GUnfold : 'c -> SLCmd.t -> string -> SLCmd.t
       method visit_Goto : 'c -> 'f Cmd.t -> 'f -> 'f Cmd.t
@@ -1860,6 +1871,8 @@ module Visitors : sig
            ; visit_ForAll :
                'c -> (string * Type.t option) list -> Formula.t -> 'f
            ; visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> 'f
+           ; visit_Wand :
+               'c -> string * Expr.t list -> string * Expr.t list -> 'f
            ; visit_GUnfold : 'c -> string -> 'f
            ; visit_Goto : 'c -> 'g -> 'f
            ; visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
@@ -2090,6 +2103,10 @@ module Visitors : sig
         'c -> (string * Type.t option) list -> Formula.t -> 'f
 
       method visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> 'f
+
+      method visit_Wand :
+        'c -> string * Expr.t list -> string * Expr.t list -> 'f
+
       method visit_GUnfold : 'c -> string -> 'f
       method visit_Goto : 'c -> 'g -> 'f
       method visit_GuardedGoto : 'c -> Expr.t -> 'g -> 'g -> 'f
@@ -2324,6 +2341,8 @@ module Visitors : sig
            ; visit_ForAll :
                'c -> (string * Type.t option) list -> Formula.t -> unit
            ; visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> unit
+           ; visit_Wand :
+               'c -> string * Expr.t list -> string * Expr.t list -> unit
            ; visit_GUnfold : 'c -> string -> unit
            ; visit_Goto : 'c -> 'f -> unit
            ; visit_GuardedGoto : 'c -> Expr.t -> 'f -> 'f -> unit
@@ -2553,6 +2572,10 @@ module Visitors : sig
         'c -> (string * Type.t option) list -> Formula.t -> unit
 
       method visit_GA : 'c -> string -> Expr.t list -> Expr.t list -> unit
+
+      method visit_Wand :
+        'c -> string * Expr.t list -> string * Expr.t list -> unit
+
       method visit_GUnfold : 'c -> string -> unit
       method visit_Goto : 'c -> 'f -> unit
       method visit_GuardedGoto : 'c -> Expr.t -> 'f -> 'f -> unit
