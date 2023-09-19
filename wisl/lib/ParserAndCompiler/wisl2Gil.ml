@@ -391,6 +391,14 @@ let rec compile_lassert ?(fname = "main") asser : string list * Asrt.t =
         let exs = List.concat exsl in
         let al = List.concat all in
         (exs, concat_star (Asrt.Pred (pr, el)) al)
+    | LWand { lhs = lname, largs; rhs = rname, rargs } ->
+        let exs1, al1, el1 = list_split_3 (List.map compile_lexpr largs) in
+        let exs2, al2, el2 = list_split_3 (List.map compile_lexpr rargs) in
+        let exs = List.concat (exs1 @ exs2) in
+        let al = List.concat (al1 @ al2) in
+        ( exs,
+          concat_star (Asrt.Wand { lhs = (lname, el1); rhs = (rname, el2) }) al
+        )
     | LPure lf ->
         let al, f = compile_lformula lf in
         ([], concat_star (Asrt.Pure f) al))

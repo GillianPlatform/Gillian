@@ -59,6 +59,7 @@ rule read =
                read_string (Buffer.create 17) lexbuf }
   | "//"     { read_comment lexbuf }
   (* logical binary stuff *)
+  | "-*"     { WAND }
   | "->"     { ARROW }
   | "-b>"   { BLOCK_ARROW }
   | "/\\"    { LAND }

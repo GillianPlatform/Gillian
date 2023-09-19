@@ -465,6 +465,16 @@ let ins_outs_assertion
   | Types [ (e, _) ] ->
       let ins = simple_ins_expr e in
       List.map (fun ins -> (ins, [])) ins
+  | Wand { lhs = _, largs; rhs = rname, rargs } ->
+      let r_ins = get_pred_ins rname in
+      let _, llie, lloe =
+        List.fold_left
+          (fun (i, lie, loe) arg ->
+            if List.mem i r_ins then (i + 1, arg :: lie, loe)
+            else (i + 1, lie, arg :: loe))
+          (0, [], []) rargs
+      in
+      ins_and_outs_from_lists kb (largs @ List.rev llie) lloe
   | _ ->
       raise (Failure "Impossible: non-simple assertion in ins_outs_assertion.")
 

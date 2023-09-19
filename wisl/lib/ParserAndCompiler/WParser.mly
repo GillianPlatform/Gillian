@@ -58,15 +58,16 @@
 %token <CodeLoc.t> NOT HEAD TAIL REV LEN SUB
 
 (* Logic Binary *)
-%token ARROW          /* -> */
+%token WAND           /* -*   */
+%token ARROW          /* ->   */
 %token BLOCK_ARROW    /* -b-> */
-%token LAND           /* /\ */
-%token LOR            /* \/ */
-%token LEQ            /* == */
-%token LLESS           /* <#  */
-%token LLESSEQ         /* <=# */
-%token LGREATER        /* >#  */
-%token LGREATEREQ      /* >=# */
+%token LAND           /* /\   */
+%token LOR            /* \/   */
+%token LEQ            /* ==   */
+%token LLESS          /* <#   */
+%token LLESSEQ        /* <=#  */
+%token LGREATER       /* >#   */
+%token LGREATEREQ     /* >=#  */
 
 (* Logic *)
 %token <CodeLoc.t> EMP LTRUE LFALSE LSTNIL LNOT
@@ -442,6 +443,16 @@ logic_assertion:
     { let bare_assert = WLAssert.get la in
       let loc = CodeLoc.merge lstart lend in
       WLAssert.make bare_assert loc }
+  | lname = IDENTIFIER; LBRACE; largs = separated_list(COMMA, logic_expression); RBRACE;
+    WAND;
+    rname = IDENTIFIER; LBRACE; rargs = separated_list(COMMA, logic_expression); lend = RBRACE
+    {
+      let (lstart, lname) = lname in
+      let (_, rname) = rname in
+      let bare_assert = WLAssert.LWand { lhs = (lname, largs); rhs = (rname, rargs) } in
+      let loc = CodeLoc.merge lstart lend in
+      WLAssert.make bare_assert loc
+    }
   | lpr = IDENTIFIER; LBRACE; params = separated_list(COMMA, logic_expression); lend = RBRACE
     { let (lstart, pr) = lpr in
       let bare_assert = WLAssert.LPred (pr, params) in

@@ -26,6 +26,9 @@ module type S = sig
   (** Set preds of given symbolic state *)
   val set_preds : t -> Preds.t -> t
 
+  (** Set preds of given symbolic state *)
+  val set_wands : t -> Wands.t -> t
+
   val set_variants : t -> variants_t -> t
   val unifies : t -> st -> UP.t -> Unifier.unify_kind -> bool
   val add_pred_defs : UP.preds_tbl_t -> t -> t
@@ -158,6 +161,7 @@ module Make (State : SState.S) :
 
   let get_preds (astate : t) : Preds.t = astate.preds
   let set_preds (astate : t) (preds : Preds.t) : t = { astate with preds }
+  let set_wands astate wands = { astate with wands }
 
   let set_variants (astate : t) (variants : variants_t) : t =
     { astate with variants }

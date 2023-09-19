@@ -937,12 +937,13 @@ module Make (SPState : PState.S) = struct
 
         (* Step 7 -- Construct the state *)
         let preds' = normalise_preds pred_defs store pfs gamma subst preds in
-        let _wands' = normalise_wands wands in
+        let wands' = normalise_wands wands in
         let astate : SPState.t =
           SPState.make_p ~preds:pred_defs ~init_data ~store ~pfs ~gamma
             ~spec_vars:svars ()
         in
         let astate = SPState.set_preds astate preds' in
+        let astate = SPState.set_wands astate wands' in
         let open Syntaxes.List in
         let res =
           let* astate = produce_core_asrts astate c_asrts' in
