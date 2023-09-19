@@ -110,10 +110,10 @@ let pp fmt preds =
 let find (preds : t) (sel : abs_t -> bool) : abs_t option =
   List.find_opt sel !preds
 
-let find_all (preds : t) (sel : abs_t -> bool) : abs_t list =
-  List.find_all sel !preds
+let filter (preds : t) (sel : abs_t -> bool) : abs_t list =
+  List.filter sel !preds
 
-let get_all ~maintain f p = if maintain then find_all p f else pop_all p f
+let get_all ~maintain f p = if maintain then filter p f else pop_all p f
 
 (** TODO: EFICIENCY ISSUE!!! *)
 let consume_pred
@@ -124,18 +124,18 @@ let consume_pred
     (ins : Containers.SI.t)
     (f_eq : vt -> vt -> bool) : abs_t option =
   (* Auxiliary printers *)
-  let lv_pp = Fmt.(parens (list ~sep:comma Expr.pp)) in
-  let ov_pp = Fmt.(option ~none:(any "None") Expr.pp) in
-  let lov_pp = Fmt.(parens (list ~sep:comma ov_pp)) in
+  let lv_pp = Fmt.Dump.list Expr.pp in
+  let lov_pp = Fmt.Dump.(list (option Expr.pp)) in
   (* How many ins do we need to find *)
   let ins_count = Containers.SI.cardinal ins in
   (* How many outs do we know *)
-  let outs_count =
-    List.mapi
-      (fun i arg -> if Containers.SI.mem i ins || arg = None then 0 else 1)
-      args
+  let _, known_outs_count =
+    List.fold_left
+      (fun (i, acc) arg ->
+        if Containers.SI.mem i ins || Option.is_none arg then (i + 1, acc)
+        else (i + 1, acc + 1))
+      (0, 0) args
   in
-  let outs_count = List.fold_left (fun sum i -> sum + i) 0 outs_count in
   L.verbose (fun fmt ->
       fmt "Preds.consume_pred: Looking for: %s%a" name lov_pp args);
   (* Evaluate a candidate predicate with respect to the desired ins and outs and an equality function *)
@@ -150,7 +150,7 @@ let consume_pred
           match tv with
           | None -> (ic, oc)
           (* First check syntactic equality and only then try f_eq *)
-          | Some tv when cv <> tv && not (f_eq cv tv) -> (ic, oc)
+          | Some tv when (not (Expr.equal cv tv)) && not (f_eq cv tv) -> (ic, oc)
           | _ -> if Containers.SI.mem i ins then (ic + 1, oc) else (ic, oc + 1))
         (0, 0) candidate targets
     in
@@ -166,7 +166,7 @@ let consume_pred
     List.fold_left
       (fun (b', i', o', result) candidate ->
         let ccurrent = (b', i', o', result) in
-        if i' = ins_count && o' = outs_count then ccurrent
+        if i' = ins_count && o' = known_outs_count then ccurrent
         else
           let b, (i, o) =
             try
@@ -192,7 +192,7 @@ let consume_pred
     | false ->
         pop preds (fun pred -> [%eq: string * Expr.t list] pred (name, args))
   in
-  let candidates = find_all preds (fun (pname, _) -> name = pname) in
+  let candidates = filter preds (fun (pname, _) -> name = pname) in
   let candidates = List.map (fun (_, args) -> args) candidates in
   L.verbose (fun fmt ->
       fmt "Found %d candidates: \n%a" (List.length candidates)
@@ -200,7 +200,7 @@ let consume_pred
         candidates);
   let syntactic_result = find_pred candidates args Expr.equal in
   match syntactic_result with
-  | true, _, o, syntactic_result when o = outs_count ->
+  | true, _, o, syntactic_result when o = known_outs_count ->
       frame_off name syntactic_result
   | true, _, o, syntactic_result -> (
       let semantic_result = find_pred candidates args f_eq in

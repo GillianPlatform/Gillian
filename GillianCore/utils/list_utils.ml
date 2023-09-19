@@ -190,3 +190,24 @@ let at_least_two f l =
         else aux ~found_one r
   in
   aux ~found_one:false l
+
+let[@ocaml.tail_mod_cons] rec filter_mapi i f = function
+  | [] -> []
+  | x :: r -> (
+      match f i x with
+      | None -> filter_mapi (i + 1) f r
+      | Some x -> x :: filter_mapi (i + 1) f r)
+
+let filter_mapi f l = filter_mapi 0 f l
+
+let get_and_remove_nth n l =
+  let found = ref None in
+  let[@ocaml.tail_mod_cons] rec aux i = function
+    | [] -> []
+    | x :: r ->
+        if i = n then (
+          found := Some x;
+          r)
+        else x :: aux (i + 1) r
+  in
+  (!found, aux 0 l)

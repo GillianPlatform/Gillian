@@ -94,12 +94,9 @@ module type S = sig
   val try_recovering : t -> Expr.t Recovery_tactic.t -> (t list, string) result
   val unfold_with_vals : t -> Expr.t list -> (SVal.SESubst.t * t) list option
   val unfold_concrete_preds : t -> (SVal.SESubst.t option * t) option
-
-  val unify_assertion :
-    ?is_post:bool -> t -> SVal.SESubst.t -> UP.step -> (t, err_t) Res_list.t
+  val unify_assertion : t -> SVal.SESubst.t -> UP.step -> (t, err_t) Res_list.t
 
   val unify :
-    ?is_post:bool ->
     ?in_unification:bool ->
     t ->
     SVal.SESubst.t ->
@@ -108,7 +105,6 @@ module type S = sig
     (t * SVal.SESubst.t * post_res, err_t) Res_list.t
 
   val fold :
-    ?is_post:bool ->
     ?in_unification:bool ->
     ?additional_bindings:(Expr.t * Expr.t) list ->
     unify_kind:unify_kind ->
@@ -118,12 +114,11 @@ module type S = sig
     (t, err_t) Res_list.t
 
   val consume_pred :
-    ?is_post:bool ->
     ?in_unification:bool ->
+    ?fold_outs_info:SVal.SESubst.t * UP.step * UP.outs * Expr.t list ->
     t ->
     string ->
     Expr.t option list ->
-    (SVal.SESubst.t * UP.step * UP.outs * Expr.t list) option ->
     (t * Expr.t list, err_t) Res_list.t
 end
 
@@ -623,10 +618,17 @@ module Make (State : SState.S) :
         in
         let pure = pred_def.pred.pred_pure in
         let preds = Preds.copy preds in
+        let wands = Wands.copy wands in
         let state = State.copy state in
         let variants = Hashtbl.copy variants in
         Preds.extend ~pure preds (pname, vs);
         { state; preds; wands; pred_defs; variants }
+    | Wand { lhs = lname, largs; rhs = rname, rargs } ->
+        L.verbose (fun m -> m "Wand assertion.");
+        let largs = List.map (subst_in_expr subst) largs in
+        let rargs = List.map (subst_in_expr subst) rargs in
+        Wands.extend wands Wands.{ lhs = (lname, largs); rhs = (rname, rargs) };
+        Res_list.return astate
     | Pure (Eq (PVar x, le)) | Pure (Eq (le, PVar x)) -> (
         L.verbose (fun fmt -> fmt "Pure assertion.");
         match SVal.SESubst.get subst (PVar x) with
@@ -648,12 +650,11 @@ module Make (State : SState.S) :
               opt_res
         | None ->
             let v = subst_in_expr subst le in
-            L.(
-              verbose (fun m ->
-                  m
-                    "UNHAPPY. update_store inside produce assertions with prog \
-                     variable: %s!!!\n"
-                    x));
+            L.verbose (fun m ->
+                m
+                  "UNHAPPY. update_store inside produce assertions with prog \
+                   variable: %s!!!\n"
+                  x);
             Res_list.return (update_store astate x v))
     | Pure f -> (
         L.verbose (fun fmt -> fmt "Pure assertion.");
@@ -665,9 +666,9 @@ module Make (State : SState.S) :
                  let pvars, lvars, locs = Formula.get_print_info f' in
                  State.pp_by_need pvars lvars locs
            in
-           L.(
+           L.
              verbose (fun m ->
-                  m "About to assume %a in state:\n%a" Formula.pp f' pp_state state)); *)
+                  m "About to assume %a in state:\n%a" Formula.pp f' pp_state state); *)
         (* FIXME: Understand why this causes a bug in Gillian-C *)
         match
           State.assume_a ~unification:true ~production:!Config.delay_entailment
@@ -729,27 +730,25 @@ module Make (State : SState.S) :
 
   let produce (astate : t) (subst : SVal.SESubst.t) (a : Asrt.t) :
       (t, err_t) Res_list.t =
-    L.(
-      verbose (fun m ->
-          m
-            "@[-----------------@\n\
-             -----------------@\n\
-             Produce assertion: @[%a@]@]" Asrt.pp a));
+    L.verbose (fun m ->
+        m
+          "@[-----------------@\n\
+           -----------------@\n\
+           Produce assertion: @[%a@]@]" Asrt.pp a);
     let sas = UP.collect_simple_asrts a in
     produce_asrt_list astate subst sas
 
   let produce_posts (state : t) (subst : SVal.SESubst.t) (asrts : Asrt.t list) :
       t list =
     let open Syntaxes.List in
-    L.(
-      verbose (fun m ->
-          m
-            "@[<v 2>Produce posts: There are %d postconditions to produce. And \
-             here they are:@\n\
-             %a@]"
-            (List.length asrts)
-            Fmt.(list ~sep:(any "@\n") Asrt.pp)
-            asrts));
+    L.verbose (fun m ->
+        m
+          "@[<v 2>Produce posts: There are %d postconditions to produce. And \
+           here they are:@\n\
+           %a@]"
+          (List.length asrts)
+          Fmt.(list ~sep:(any "@\n") Asrt.pp)
+          asrts);
     let* asrt = asrts in
     let subst = SVal.SESubst.copy subst in
     let state = copy_astate state in
@@ -795,10 +794,11 @@ module Make (State : SState.S) :
         bindings
     in
     SVal.SESubst.extend subst bindings;
-    L.(
-      verbose (fun m ->
-          m "@[<v 2>Using unfold info, obtained subst:@\n%a@]@\n"
-            SVal.SESubst.pp subst))
+    L.verbose (fun m ->
+        m "@[<v 2>Using unfold info, obtained subst:@\n%a@]@\n" SVal.SESubst.pp
+          subst)
+
+  let resource_fail = Res_list.error_with (StateErr.EAsrt ([], True, []))
 
   (* WARNING: At the moment, unfold behaves over-approximately, it will return only success of only error.
      We only use unfold and fold in OX mode right now, and we don't quite know the meaning of UX fold/unfold. *)
@@ -820,8 +820,8 @@ module Make (State : SState.S) :
           let in_args = Pred.in_args pred.pred args in
           let subst = SVal.SESubst.init (List.combine in_params in_args) in
           let++ s, _, _ =
-            unify ~is_post:false ~in_unification:true astate subst
-              (Option.get pred.guard_up) PredicateGuard
+            unify ~in_unification:true astate subst (Option.get pred.guard_up)
+              PredicateGuard
           in
           s
     in
@@ -836,11 +836,10 @@ module Make (State : SState.S) :
           args);
     let subst_i = SVal.SESubst.init (List_utils.right_combine params args) in
 
-    L.(
-      verbose (fun m ->
-          m "unfold with unfold_info with additional bindings@\n%a@\n"
-            Fmt.(Dump.list (pair string string))
-            additional_bindings));
+    L.verbose (fun m ->
+        m "unfold with unfold_info with additional bindings@\n%a@\n"
+          Fmt.(Dump.list (pair string string))
+          additional_bindings);
 
     let new_spec_vars =
       List.to_seq additional_bindings |> Seq.map fst |> SS.of_seq
@@ -859,11 +858,10 @@ module Make (State : SState.S) :
           (* We separate the first case from the rest because we
              only copy the state for the remaining branches if there are more
              than 1 definition *)
-          L.(
-            verbose (fun m ->
-                m "Going to produce %d definitions with subst@\n%a"
-                  (List.length (first_def :: rest_defs))
-                  SVal.SESubst.pp subst_i));
+          L.verbose (fun m ->
+              m "Going to produce %d definitions with subst@\n%a"
+                (List.length (first_def :: rest_defs))
+                SVal.SESubst.pp subst_i);
           let state' = State.add_spec_vars state new_spec_vars in
           let astate = { state = state'; preds; wands; pred_defs; variants } in
           let rest_results =
@@ -898,16 +896,15 @@ module Make (State : SState.S) :
 
   and fold_guarded_with_vals (astate : t) (vs : Expr.t list) :
       (t, string) Res_list.t =
-    L.(
-      verbose (fun m ->
-          m "@[<v 2>Starting fold_guarded_with_vals: @[<h>%a@]@\n%a.@\n"
-            Fmt.(list ~sep:comma Expr.pp)
-            vs pp_astate astate));
+    L.verbose (fun m ->
+        m "@[<v 2>Starting fold_guarded_with_vals: @[<h>%a@]@\n%a.@\n"
+          Fmt.(list ~sep:comma Expr.pp)
+          vs pp_astate astate);
     if !Config.manual_proof then Res_list.error_with "Manual proof"
     else
       match select_guarded_predicate_to_fold astate vs with
       | Some (pname, v_args) ->
-          L.(verbose (fun m -> m "FOUND STH TO FOLD: %s!!!!\n" pname));
+          L.verbose (fun m -> m "FOUND STH TO FOLD: %s!!!!\n" pname);
           let pred = UP.get_pred_def astate.pred_defs pname in
           let rets =
             fold ~in_unification:true ~unify_kind:Fold
@@ -917,22 +914,21 @@ module Make (State : SState.S) :
             (fun _ -> "fold_guarded_with_vals: Failed to fold")
             rets
       | None ->
-          L.(verbose (fun m -> m "No predicate found to fold!"));
+          L.verbose (fun m -> m "No predicate found to fold!");
           Res_list.error_with "No predicate found to fold!"
 
   and unfold_with_vals (astate : t) (vs : Expr.t list) :
       (SVal.SESubst.t * t) list option =
-    L.(
-      verbose (fun m ->
-          m "@[<v 2>Starting unfold_with_vals: @[<h>%a@]@\n%a.@\n"
-            Fmt.(list ~sep:comma Expr.pp)
-            vs pp_astate astate));
+    L.verbose (fun m ->
+        m "@[<v 2>Starting unfold_with_vals: @[<h>%a@]@\n%a.@\n"
+          Fmt.(list ~sep:comma Expr.pp)
+          vs pp_astate astate);
 
     if !Config.manual_proof then None
     else
       match consume_pred_with_vs astate vs with
       | Some (pname, v_args) -> (
-          L.(verbose (fun m -> m "FOUND STH TO UNFOLD: %s!!!!\n" pname));
+          L.verbose (fun m -> m "FOUND STH TO UNFOLD: %s!!!!\n" pname);
           let rets = unfold (copy_astate astate) pname v_args in
           let only_errors =
             List.filter_map
@@ -943,11 +939,10 @@ module Make (State : SState.S) :
           in
           match only_errors with
           | [] ->
-              L.(
-                verbose (fun m ->
-                    m "Unfold complete: %s(@[<h>%a@]): %d" pname
-                      Fmt.(list ~sep:comma Expr.pp)
-                      v_args (List.length rets)));
+              L.verbose (fun m ->
+                  m "Unfold complete: %s(@[<h>%a@]): %d" pname
+                    Fmt.(list ~sep:comma Expr.pp)
+                    v_args (List.length rets));
               let only_successes =
                 List.filter_map
                   (function
@@ -963,27 +958,83 @@ module Make (State : SState.S) :
                     only_errors);
               None)
       | None ->
-          L.(verbose (fun m -> m "NOTHING TO UNFOLD!!!!\n"));
+          L.verbose (fun m -> m "NOTHING TO UNFOLD!!!!\n");
           None
+
+  and consume_wand
+      ~fold_outs_info
+      (astate : t)
+      (subst : SVal.SESubst.t)
+      (wand : Wands.wand) =
+    let open Res_list.Syntax in
+    L.verbose (fun m -> m "Unifying wand assertion");
+    (* We start by building the query *)
+    let** query =
+      let query_opt =
+        Wands.make_query ~pred_defs:astate.pred_defs
+          ~subst:(subst_in_expr_opt astate subst)
+          wand
+      in
+      match query_opt with
+      | None ->
+          L.verbose (fun m ->
+              m "Cannot unify: not all in-parameters known for wand");
+          resource_fail
+      | Some query -> Res_list.return query
+    in
+    let semantic_eq = State.equals astate.state in
+    L.tmi (fun m -> m "Unifier.consume_wand @[<h>%a@]" Wands.pp_query query);
+    match
+      Wands.consume_wand ~pred_defs:astate.pred_defs ~semantic_eq astate.wands
+        query
+    with
+    | Some wand -> (
+        (* The wand was found *)
+        L.verbose (fun m ->
+            m "Returning the following wand (before checking outs equality): %a"
+              Wands.pp_wand wand);
+        let _, wand_outs =
+          Wands.wand_ins_outs ~pred_defs:astate.pred_defs wand
+        in
+        let subst, step, outs, les_outs = fold_outs_info in
+        L.verbose (fun m ->
+            m
+              "learnd the outs of the magic wand. going to unify (@[<h>%a@]) \
+               against (@[<h>%a@])!!!"
+              Fmt.(list ~sep:comma Expr.pp)
+              wand_outs
+              Fmt.(list ~sep:comma Expr.pp)
+              les_outs);
+        match
+          unify_ins_outs_lists astate.state subst step outs wand_outs les_outs
+        with
+        | Success new_state -> Res_list.return { astate with state = new_state }
+        | Abort fail_pf ->
+            let error =
+              StateErr.EAsrt ([], Not fail_pf, [ [ Pure fail_pf ] ])
+            in
+            Res_list.error_with error
+        | Vanish -> Res_list.vanish)
+    | None ->
+        L.verbose (fun m ->
+            m "Could not find any match for the required wand!!!");
+        Res_list.error_with (StateErr.EPure False)
 
   (** Consumes a predicate from the state.
       If the predicate is not "verbatim" in our set of preds,
       and it is not abstract and we are not in manual mode,
       we attempt to fold it. *)
   and consume_pred
-      ?(is_post = false)
       ?(in_unification = false)
+      ?(fold_outs_info :
+         (SVal.SESubst.t * UP.step * UP.outs * Expr.t list) option)
       (astate : t)
       (pname : string)
-      (vs : Expr.t option list)
-      (fold_outs_info :
-        (SVal.SESubst.t * UP.step * UP.outs * Expr.t list) option) :
-      (t * Expr.t list, err_t) Res_list.t =
-    L.(
-      tmi (fun m ->
-          m "Unifier.consume_pred %s. args: @[<h>%a@]" pname
-            Fmt.(list ~sep:comma (Dump.option Expr.pp))
-            vs));
+      (vs : Expr.t option list) : (t * Expr.t list, err_t) Res_list.t =
+    L.tmi (fun m ->
+        m "Unifier.consume_pred %s. args: @[<h>%a@]" pname
+          Fmt.(list ~sep:comma (Dump.option Expr.pp))
+          vs);
 
     let { state; preds; wands; pred_defs; variants } = astate in
     let pred = UP.get_pred_def pred_defs pname in
@@ -997,24 +1048,22 @@ module Make (State : SState.S) :
     with
     | Some (_, vs) -> (
         (* It was in our set of preds! *)
-        L.(
-          verbose (fun m ->
-              m "Returning the following vs: @[<h>%a@]"
-                Fmt.(list ~sep:comma Expr.pp)
-                vs));
+        L.verbose (fun m ->
+            m "Returning the following vs: @[<h>%a@]"
+              Fmt.(list ~sep:comma Expr.pp)
+              vs);
         let vs = Pred.out_args pred_def vs in
         match fold_outs_info with
         | None -> Res_list.return (astate, vs)
         | Some (subst, step, outs, les_outs) -> (
-            L.(
-              verbose (fun m ->
-                  m
-                    "learned the outs of a predicate. going to unify \
-                     (@[<h>%a@]) against (@[<h>%a@])!!!@\n"
-                    Fmt.(list ~sep:comma Expr.pp)
-                    vs
-                    Fmt.(list ~sep:comma Expr.pp)
-                    les_outs));
+            L.verbose (fun m ->
+                m
+                  "learned the outs of a predicate. going to unify (@[<h>%a@]) \
+                   against (@[<h>%a@])!!!@\n"
+                  Fmt.(list ~sep:comma Expr.pp)
+                  vs
+                  Fmt.(list ~sep:comma Expr.pp)
+                  les_outs);
             match unify_ins_outs_lists state subst step outs vs les_outs with
             | Success new_state ->
                 Res_list.return
@@ -1039,13 +1088,12 @@ module Make (State : SState.S) :
         let vs_ins = Pred.in_args pred.pred vs in
         let vs_ins = List.map Option.get vs_ins in
         let** folded =
-          fold ~is_post ~in_unification ~state:astate ~unify_kind:Fold pred
-            vs_ins
+          fold ~in_unification:true ~state:astate ~unify_kind:Fold pred vs_ins
         in
         (* Supposedly, we don't need a guard to make sure we're not looping indefinitely:
            if the fold worked, then consume_pred should not take this branch on the next try.
            We should still be keeping an eye on this in case something loops indefinitely. *)
-        consume_pred ~is_post ~in_unification folded pname vs fold_outs_info
+        consume_pred ?fold_outs_info ~in_unification folded pname vs
     | _ -> Res_list.error_with (StateErr.EPure False)
 
   and unify_ins_outs_lists
@@ -1121,17 +1169,10 @@ module Make (State : SState.S) :
           Fmt.failwith "Invalid amount of args for the following UP step : %a"
             UP.step_pp step)
 
-  and unify_assertion
-      ?(is_post = false)
-      (astate : t)
-      (subst : SVal.SESubst.t)
-      (step : UP.step) : (t, err_t) Res_list.t =
+  and unify_assertion (astate : t) (subst : SVal.SESubst.t) (step : UP.step) :
+      (t, err_t) Res_list.t =
     (* Auxiliary function for actions and predicates, with indexed outs *)
     let { state; wands; preds; pred_defs; variants } = astate in
-
-    let make_resource_fail () =
-      Res_list.error_with (StateErr.EAsrt ([], True, []))
-    in
 
     let assertion_loggable =
       if L.Mode.enabled () then
@@ -1202,14 +1243,13 @@ module Make (State : SState.S) :
             let failure = List.exists (fun x -> x = None) vs_ins in
             if failure then (
               Fmt.pr "I don't know all ins for %a????" Asrt.pp p;
-              if !Config.under_approximation then [] else make_resource_fail ())
+              if !Config.under_approximation then [] else resource_fail)
             else
               let vs_ins = List.map Option.get vs_ins in
-              L.(
-                verbose (fun m ->
-                    m "Executing action: %s with ins: @[<h>%a@]" getter
-                      Fmt.(list ~sep:comma Expr.pp)
-                      vs_ins));
+              L.verbose (fun m ->
+                  m "Executing action: %s with ins: @[<h>%a@]" getter
+                    Fmt.(list ~sep:comma Expr.pp)
+                    vs_ins);
               let** state', vs' = State.execute_action getter state vs_ins in
               let vs_ins', vs_outs =
                 List_utils.split_at vs' (List.length vs_ins)
@@ -1244,7 +1284,7 @@ module Make (State : SState.S) :
             let failure = List.exists (fun x -> x = None) vs_ins in
             if failure then (
               L.verbose (fun m -> m "Cannot unify: not all in-parameters known");
-              make_resource_fail ())
+              resource_fail)
             else
               let vs_ins = List.map Option.get vs_ins in
               L.verbose (fun m ->
@@ -1252,8 +1292,8 @@ module Make (State : SState.S) :
                     Fmt.(brackets (list ~sep:comma Expr.pp))
                     vs_ins);
               let consume_pred_res =
-                consume_pred ~is_post ~in_unification:true astate pname vs
-                  (Some (subst, step, outs, les_outs))
+                consume_pred astate pname vs
+                  ~fold_outs_info:(subst, step, outs, les_outs)
               in
               let () =
                 match consume_pred_res with
@@ -1267,6 +1307,13 @@ module Make (State : SState.S) :
               in
               let++ astate', _ = consume_pred_res in
               astate'
+        | Wand { lhs; rhs } ->
+            let les_outs =
+              let pred = (UP.get_pred_def pred_defs (fst rhs)).pred in
+              Pred.out_args pred (snd rhs)
+            in
+            let fold_outs_info = (subst, step, outs, les_outs) in
+            consume_wand ~fold_outs_info astate subst { lhs; rhs }
         (* Conjunction should not be here *)
         | Pure (Formula.And _) ->
             raise (Failure "Unify assertion: And: should have been reduced")
@@ -1367,16 +1414,13 @@ module Make (State : SState.S) :
         (* LTrue, LFalse, LEmp, LStar *)
         | _ -> raise (Failure "Illegal Assertion in Unification Plan"))
 
-  and unify_up'
-      ~is_post
-      (parent_ids : L.Report_id.t list ref)
-      (s_states : search_state') : internal_up_u_res =
+  and unify_up' (parent_ids : L.Report_id.t list ref) (s_states : search_state')
+      : internal_up_u_res =
     let s_states, errs_so_far = s_states in
-    L.(
-      verbose (fun m ->
-          m "Unify UP: There are %d states left to consider."
-            (List.length s_states)));
-    let explore_next_states = unify_up' ~is_post parent_ids in
+    L.verbose (fun m ->
+        m "Unify UP: There are %d states left to consider."
+          (List.length s_states));
+    let explore_next_states = unify_up' parent_ids in
     let ux = !Config.under_approximation in
     match s_states with
     | [] ->
@@ -1392,7 +1436,7 @@ module Make (State : SState.S) :
           match cur_step with
           | None -> Res_list.return state
           | Some cur_step -> (
-              try unify_assertion ~is_post state subst cur_step
+              try unify_assertion state subst cur_step
               with err -> (
                 L.verbose (fun fmt ->
                     fmt
@@ -1497,22 +1541,18 @@ module Make (State : SState.S) :
                 explore_next_states (next_states @ rest, errs_so_far)
             | Some [] -> L.fail "ERROR: unify_up: empty unification plan"))
 
-  and unify_up ~is_post (s_states : search_state) : internal_up_u_res =
-    let () =
-      L.verbose (fun fmt -> fmt "Unify UP: is-post: %a" Fmt.bool is_post)
-    in
+  and unify_up (s_states : search_state) : internal_up_u_res =
     let parent_ids = ref [] in
     let s_states =
       let states, errs = s_states in
       let states = states |> List.map (fun state -> (state, 0, false)) in
       (states, errs)
     in
-    let res = unify_up' ~is_post parent_ids s_states in
+    let res = unify_up' parent_ids s_states in
     List.iter (fun parent_id -> L.Parent.release (Some parent_id)) !parent_ids;
     res
 
   and unify
-      ?(is_post = false)
       ?(in_unification = false)
       (astate : t)
       (subst : SVal.SESubst.t)
@@ -1540,14 +1580,13 @@ module Make (State : SState.S) :
             L.fail "UNIFICATION ABORTED IN UX MODE???";
           let { state; _ } = astate_i in
           let tactics = State.get_recovery_tactic state errs in
-          L.(
-            verbose (fun m ->
-                m
-                  "Unify. Unable to unify. About to attempt the following \
-                   recovery tactic:\n\
-                   %a"
-                  (Recovery_tactic.pp Expr.pp)
-                  tactics));
+          L.verbose (fun m ->
+              m
+                "Unify. Unable to unify. About to attempt the following \
+                 recovery tactic:\n\
+                 %a"
+                (Recovery_tactic.pp Expr.pp)
+                tactics);
           match try_recovering astate_i tactics with
           | Error msg ->
               L.normal (fun m -> m "Unify. Recovery tactic failed: %s" msg);
@@ -1566,9 +1605,7 @@ module Make (State : SState.S) :
               | Some (_, astate) ->
                   (* let subst'' = compose_substs (Subst.to_list subst_i) subst (Subst.init []) in *)
                   let subst'' = SVal.SESubst.copy subst_i in
-                  let new_ret =
-                    unify_up ~is_post ([ (astate, subst'', up) ], [])
-                  in
+                  let new_ret = unify_up ([ (astate, subst'', up) ], []) in
                   (* We already tried recovering once and it failed, we stop here *)
                   handle_ret ~try_recover:false new_ret))
       | UAbort errors ->
@@ -1578,11 +1615,10 @@ module Make (State : SState.S) :
     UnifyReport.as_parent
       { astate = AstateRec.from astate; subst; up; unify_kind }
       (fun () ->
-        let ret = unify_up ~is_post ([ (astate, subst, up) ], []) in
+        let ret = unify_up ([ (astate, subst, up) ], []) in
         handle_ret ~try_recover:true ret)
 
   and fold
-      ?(is_post = false)
       ?(in_unification = false)
       ?(additional_bindings = [])
       ~unify_kind
@@ -1610,7 +1646,7 @@ module Make (State : SState.S) :
     in
     let subst = SVal.SESubst.init (additional_bindings @ param_bindings) in
     let unify_result =
-      unify ~is_post ~in_unification state subst pred.def_up unify_kind
+      unify ~in_unification state subst pred.def_up unify_kind
     in
     let () =
       match unify_result with
@@ -1638,11 +1674,8 @@ module Make (State : SState.S) :
                   failwith "DEATH. Didnt learn all the outs while folding.")
             out_params
         in
-        L.(
-          verbose (fun m ->
-              m "Out parameters : @[<h>%a@]"
-                Fmt.(list ~sep:comma Expr.pp)
-                vs_outs));
+        L.verbose (fun m ->
+            m "Out parameters : @[<h>%a@]" Fmt.(list ~sep:comma Expr.pp) vs_outs);
         Pred.combine_ins_outs pred.pred args vs_outs
     in
     (* We extend the list of predicates with our newly folded predicate. *)
@@ -1681,11 +1714,10 @@ module Make (State : SState.S) :
         match next_states with
         | [] -> None
         | [ Ok (subst, astate'') ] ->
-            L.(
-              verbose (fun m ->
-                  m "unfold_concrete_preds WORKED. Unfolded: %s(@[<h>%a])" name
-                    Fmt.(list ~sep:comma Expr.pp)
-                    vs));
+            L.verbose (fun m ->
+                m "unfold_concrete_preds WORKED. Unfolded: %s(@[<h>%a])" name
+                  Fmt.(list ~sep:comma Expr.pp)
+                  vs);
             Some (Some subst, astate'')
         | next_states -> (
             let oks =

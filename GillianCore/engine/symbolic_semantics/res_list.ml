@@ -41,6 +41,13 @@ let split t =
       | Error x -> Right x)
     t
 
+let all =
+  let rec loop vs = function
+    | [] -> return (List.rev vs)
+    | t :: ts -> bind t (fun v -> loop (v :: vs) ts)
+  in
+  fun ts -> loop [] ts
+
 module Syntax = struct
   let ( let** ) = bind
   let ( let++ ) x f = map f x

@@ -696,7 +696,7 @@ module Make (State : SState.S) :
           let vs = List.map Option.some vs in
           (* FIXME: make sure correct number of params *)
           (* 3) We consume the predicate from the state. *)
-          let cons_res = SUnifier.consume_pred astate pname vs None in
+          let cons_res = SUnifier.consume_pred astate pname vs in
           let () =
             match (cons_res, !Config.under_approximation) with
             | [], false ->
@@ -939,10 +939,7 @@ module Make (State : SState.S) :
     if !Config.under_approximation then
       failwith
         "WE CAN'T CHECK IF SOMETHING FULLY UNIFIES IN UNDER-APPROXIMATION MODE";
-    let unification_results =
-      let is_post = unify_type = Unifier.Postcondition in
-      SUnifier.unify ~is_post astate subst up unify_type
-    in
+    let unification_results = SUnifier.unify astate subst up unify_type in
     let success = List.for_all Result.is_ok unification_results in
     L.verbose (fun fmt -> fmt "PSTATE.unifies: Success: %b" success);
     success

@@ -111,11 +111,9 @@ module type S = sig
       - If it doesn't find one, it returns Some (None, input_state) *)
   val unfold_concrete_preds : t -> (SVal.SESubst.t option * t) option
 
-  val unify_assertion :
-    ?is_post:bool -> t -> SVal.SESubst.t -> UP.step -> (t, err_t) Res_list.t
+  val unify_assertion : t -> SVal.SESubst.t -> UP.step -> (t, err_t) Res_list.t
 
   val unify :
-    ?is_post:bool ->
     ?in_unification:bool ->
     t ->
     SVal.SESubst.t ->
@@ -127,7 +125,6 @@ module type S = sig
       producing the folded predicate.
       If the predicate has a guard, the guard is produced. *)
   val fold :
-    ?is_post:bool ->
     ?in_unification:bool ->
     ?additional_bindings:(Expr.t * Expr.t) list ->
     unify_kind:unify_kind ->
@@ -141,12 +138,11 @@ module type S = sig
       and it is not abstract and we are not in manual mode,
       we attempt to fold it. *)
   val consume_pred :
-    ?is_post:bool ->
     ?in_unification:bool ->
+    ?fold_outs_info:SVal.SESubst.t * UP.step * UP.outs * Expr.t list ->
     t ->
     string ->
     Expr.t option list ->
-    (SVal.SESubst.t * UP.step * UP.outs * Expr.t list) option ->
     (t * Expr.t list, err_t) Res_list.t
 end
 
