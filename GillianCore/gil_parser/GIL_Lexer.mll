@@ -177,6 +177,7 @@ rule read = parse
 
 (* Binary operators *)
   | "="                  { GIL_Parser.EQ     }
+  | "-*"                 { GIL_Parser.WAND   }
 
   | "i<"                 { GIL_Parser.ILT    }
   | "i>"                 { GIL_Parser.IGT    }
@@ -252,6 +253,7 @@ rule read = parse
 (* Logic commands *)
   | "[*"                 { GIL_Parser.OLCMD     }
   | "*]"                 { GIL_Parser.CLCMD     }
+  | "package"            { GIL_Parser.PACKAGE   }
   | "unfold*"            { GIL_Parser.RECUNFOLD }
   (**
     macro, assert are elsewhere
