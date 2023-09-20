@@ -120,6 +120,8 @@ module type S = sig
     string ->
     Expr.t option list ->
     (t * Expr.t list, err_t) Res_list.t
+
+  val package_wand : t -> Wands.wand -> (t, err_t) Res_list.t
 end
 
 module Make (State : SState.S) :
@@ -1803,4 +1805,91 @@ module Make (State : SState.S) :
     match Preds.remove_by_name astate.preds pname with
     | None -> Res_list.return astate
     | Some (pname, vs) -> rec_unfold astate pname vs
+
+  module Wand_packaging = struct
+    let get_defs (pred : Pred.t) largs =
+      if pred.pred_abstract then [ Asrt.Pred (pred.pred_name, largs) ]
+      else
+        let unfolded_pred =
+          Hashtbl.find_opt LogicPreprocessing.unfolded_preds pred.pred_name
+        in
+        match unfolded_pred with
+        | Some pred -> List.map snd pred.pred_definitions
+        | None -> List.map snd pred.pred_definitions
+
+    let make_lhs_states ~pred_defs ~init_data (lname, largs) =
+      let open Syntaxes.List in
+      let lhs_pred = (UP.get_pred_def pred_defs lname).pred in
+      let subst =
+        let params =
+          List.map (fun (x, _) -> Expr.PVar x) lhs_pred.pred_params
+        in
+        let bindings = List.combine params largs in
+        SVal.SESubst.init bindings
+      in
+      let spec_vars =
+        List.fold_left
+          (fun acc arg -> SS.union acc (Expr.lvars arg))
+          SS.empty largs
+      in
+      let* lhs_def = get_defs lhs_pred largs in
+      let state =
+        State.make_s ~init_data ~spec_vars ~pfs:(PFS.init ())
+          ~gamma:(Type_env.init ()) ~store:(SStore.init [])
+      in
+      let astate =
+        {
+          state;
+          preds = Preds.init [];
+          wands = Wands.init [];
+          pred_defs;
+          variants = Hashtbl.create 0;
+        }
+      in
+      let subst = SVal.SESubst.copy subst in
+      let* produced = produce astate subst lhs_def in
+      match produced with
+      | Error _ -> []
+      | Ok state ->
+          let _, simplified = simplify_astate ~unification:true state in
+          simplified
+
+    let get_ups ~pred_defs (rname, rargs) =
+      let open Syntaxes.List in
+      let pred_ins =
+        let table = Hashtbl.create (Hashtbl.length pred_defs) in
+        Hashtbl.iter
+          (fun name (pred : UP.pred) ->
+            Hashtbl.add table name pred.pred.pred_ins)
+          pred_defs;
+        table
+      in
+      let pred = UP.get_pred_def pred_defs rname in
+      let+ def = get_defs pred.pred rargs in
+      let kb =
+        List.fold_left
+          (fun acc (param, _) -> Expr.Set.add (PVar param) acc)
+          Expr.Set.empty pred.pred.pred_params
+      in
+      let up = UP.init kb Expr.Set.empty pred_ins [ (def, (None, None)) ] in
+      match up with
+      | Error e ->
+          Fmt.failwith "Package Wand: couldn't create up because of %a"
+            (Fmt.Dump.list @@ Fmt.Dump.list Asrt.pp)
+            e
+      | Ok up -> up
+
+    let package_wand (astate : t) (wand : Wands.wand) : (t, err_t) Res_list.t =
+      (* First, we create a state that matches the lhs,
+         trying to unfold the content if possible if possible. *)
+      let _lhs_states =
+        let init_data = State.get_init_data astate.state in
+        make_lhs_states ~init_data ~pred_defs:astate.pred_defs wand.lhs
+      in
+      let _rhs_ups = get_ups ~pred_defs:astate.pred_defs wand.rhs in
+      failwith "bite"
+  end
+
+  let package_wand : t -> Wands.wand -> (t, err_t) Res_list.t =
+    Wand_packaging.package_wand
 end

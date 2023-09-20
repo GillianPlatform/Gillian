@@ -23,6 +23,7 @@ module type S = sig
   (** Initialisation *)
   val init : init_data -> t
 
+  val get_init_data : t -> init_data
   val clear : t -> t
 
   (** Execute action *)
@@ -92,6 +93,7 @@ module Dummy : S with type init_data = unit = struct
     result
 
   let init () = ()
+  let get_init_data () = ()
   let clear () = ()
 
   let execute_action ?unification:_ _ _ _ _ _ =

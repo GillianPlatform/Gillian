@@ -520,6 +520,7 @@ let just_functions genv =
   else Mem.empty
 
 let init genv = { genv; mem = ref (just_functions genv) }
+let get_init_data { genv; _ } = genv
 let clear { genv; _ } = { genv; mem = ref (just_functions genv) }
 let copy h = { genv = h.genv; mem = ref (Mem.copy !(h.mem)) }
 

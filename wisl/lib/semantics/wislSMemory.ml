@@ -19,6 +19,7 @@ type action_ret =
   result
 
 let init () = WislSHeap.init ()
+let get_init_data _ = ()
 let clear _ = WislSHeap.init ()
 
 let resolve_loc pfs gamma loc =

@@ -659,6 +659,8 @@ module SLCmd : sig
         (** Fold predicate *)
     | Unfold of string * Expr.t list * (string * string) list option * bool
         (** Unfold predicate *)
+    | Package of { lhs : string * Expr.t list; rhs : string * Expr.t list }
+        (** Magic wand packaging *)
     | GUnfold of string  (** Global Unfold *)
     | ApplyLem of string * Expr.t list * string list  (** Apply lemma *)
     | SepAssert of Asrt.t * string list  (** Assert *)
@@ -1467,6 +1469,12 @@ module Visitors : sig
                (string * string) list option ->
                bool ->
                SLCmd.t
+           ; visit_Package :
+               'c ->
+               SLCmd.t ->
+               string * Expr.t list ->
+               string * Expr.t list ->
+               SLCmd.t
            ; visit_UnsignedRightShift : 'c -> BinOp.t -> BinOp.t
            ; visit_UnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
            ; visit_UnsignedRightShiftF : 'c -> BinOp.t -> BinOp.t
@@ -1736,6 +1744,9 @@ module Visitors : sig
         bool ->
         SLCmd.t
 
+      method visit_Package :
+        'c -> SLCmd.t -> string * Expr.t list -> string * Expr.t list -> SLCmd.t
+
       method visit_UnsignedRightShift : 'c -> BinOp.t -> BinOp.t
       method visit_UnsignedRightShiftL : 'c -> BinOp.t -> BinOp.t
       method visit_UnsignedRightShiftF : 'c -> BinOp.t -> BinOp.t
@@ -2004,6 +2015,8 @@ module Visitors : sig
                (string * string) list option ->
                bool ->
                'f
+           ; visit_Package :
+               'c -> string * Expr.t list -> string * Expr.t list -> 'f
            ; visit_UnsignedRightShift : 'c -> 'f
            ; visit_UnsignedRightShiftL : 'c -> 'f
            ; visit_UnsignedRightShiftF : 'c -> 'f
@@ -2240,6 +2253,9 @@ module Visitors : sig
         bool ->
         'f
 
+      method visit_Package :
+        'c -> string * Expr.t list -> string * Expr.t list -> 'f
+
       method visit_UnsignedRightShift : 'c -> 'f
       method visit_UnsignedRightShiftL : 'c -> 'f
       method visit_UnsignedRightShiftF : 'c -> 'f
@@ -2468,6 +2484,8 @@ module Visitors : sig
                (string * string) list option ->
                bool ->
                unit
+           ; visit_Package :
+               'c -> string * Expr.t list -> string * Expr.t list -> unit
            ; visit_UnsignedRightShift : 'c -> unit
            ; visit_UnsignedRightShiftL : 'c -> unit
            ; visit_UnsignedRightShiftF : 'c -> unit
@@ -2702,6 +2720,9 @@ module Visitors : sig
         (string * string) list option ->
         bool ->
         unit
+
+      method visit_Package :
+        'c -> string * Expr.t list -> string * Expr.t list -> unit
 
       method visit_UnsignedRightShift : 'c -> unit
       method visit_UnsignedRightShiftL : 'c -> unit

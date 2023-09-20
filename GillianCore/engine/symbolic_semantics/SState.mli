@@ -14,6 +14,7 @@ module type S = sig
     t
 
   val init : init_data -> t
+  val get_init_data : t -> init_data
   val clear_resource : t -> t
   val get_typ_env : t -> Type_env.t
   val get_pfs : t -> PFS.t

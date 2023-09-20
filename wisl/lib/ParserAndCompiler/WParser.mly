@@ -3,7 +3,7 @@
 (* key words *)
 %token <CodeLoc.t> TRUE FALSE NULL WHILE IF ELSE SKIP NEW DELETE
 %token <CodeLoc.t> FUNCTION RETURN PREDICATE LEMMA
-%token <CodeLoc.t> INVARIANT FOLD UNFOLD NOUNFOLD APPLY ASSERT EXIST FORALL
+%token <CodeLoc.t> INVARIANT PACKAGE FOLD UNFOLD NOUNFOLD APPLY ASSERT EXIST FORALL
 %token <CodeLoc.t> STATEMENT WITH VARIANT PROOF
 
 (* punctuation *)
@@ -385,6 +385,10 @@ pred_param_ins:
 
 
 logic_command:
+  | lstart = PACKAGE; LBRACE; w = wand; lend = RBRACE
+    { let (lhs, rhs, _) = w in
+      let loc = CodeLoc.merge lstart lend in
+      WLCmd.make (Package { lhs; rhs }) loc }
   | lstart = FOLD; lpr = IDENTIFIER;
       LBRACE; params = separated_list(COMMA, logic_expression); lend = RBRACE
     { let (_, pr) = lpr in
@@ -438,21 +442,26 @@ lvar_or_pvar:
   | x = IDENTIFIER { x }
   | lx = LVAR { lx }
 
-logic_assertion:
-  | lstart = LBRACE; la = logic_assertion; lend = RBRACE;
-    { let bare_assert = WLAssert.get la in
-      let loc = CodeLoc.merge lstart lend in
-      WLAssert.make bare_assert loc }
+wand:
   | lname = IDENTIFIER; LBRACE; largs = separated_list(COMMA, logic_expression); RBRACE;
     WAND;
     rname = IDENTIFIER; LBRACE; rargs = separated_list(COMMA, logic_expression); lend = RBRACE
     {
       let (lstart, lname) = lname in
       let (_, rname) = rname in
-      let bare_assert = WLAssert.LWand { lhs = (lname, largs); rhs = (rname, rargs) } in
       let loc = CodeLoc.merge lstart lend in
-      WLAssert.make bare_assert loc
+      ((lname, largs), (rname, rargs), loc)
     }
+
+
+logic_assertion:
+  | lstart = LBRACE; la = logic_assertion; lend = RBRACE;
+    { let bare_assert = WLAssert.get la in
+      let loc = CodeLoc.merge lstart lend in
+      WLAssert.make bare_assert loc }
+  | wand = wand
+    { let (lhs, rhs, loc) = wand in
+      WLAssert.make (LWand { lhs; rhs }) loc }
   | lpr = IDENTIFIER; LBRACE; params = separated_list(COMMA, logic_expression); lend = RBRACE
     { let (lstart, pr) = lpr in
       let bare_assert = WLAssert.LPred (pr, params) in

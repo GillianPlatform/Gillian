@@ -18,6 +18,7 @@ module type S = sig
   (** Initialisation *)
   val init : init_data -> t
 
+  val get_init_data : t -> init_data
   val clear : t -> t
 
   (** Execute action *)
@@ -76,6 +77,7 @@ module Dummy : S with type init_data = unit = struct
   type t = unit [@@deriving yojson]
 
   let init () = ()
+  let get_init_data () = ()
   let clear () = ()
   let execute_action _ _ _ _ = failwith "Please implement SMemory"
   let ga_to_setter _ = failwith "Please implement SMemory"

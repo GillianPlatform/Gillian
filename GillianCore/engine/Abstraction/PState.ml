@@ -104,6 +104,8 @@ module Make (State : SState.S) :
       variants = empty_variants;
     }
 
+  let get_init_data astate = State.get_init_data astate.state
+
   let copy_with_state (astate : t) (state : state_t) =
     {
       state;
@@ -686,7 +688,7 @@ module Make (State : SState.S) :
             ~state:astate pred vs
       | Unfold (pname, les, additional_bindings, b) ->
           (* Unfoldig predicate with name [pname] and arguments [les].
-             [unfold_info] is (FIXME: ???)
+             [additional_bindings] is the set set of additional bindings that may be learned when unfolding,
              and [b] says if the predicate should be unfolded entirely (up to 10 times, otherwise failure) *)
           (* 1) We retrieve the definition of the predicate to unfold and make sure
              it is not abstract and hence can be unfolded. *)
@@ -728,6 +730,7 @@ module Make (State : SState.S) :
               simplify ~kill_new_lvars:true ~unification:true state
             in
             Res_list.just_oks states)
+      | Package { lhs; rhs } -> SUnifier.package_wand astate { lhs; rhs }
       | GUnfold pname ->
           let** astate = SUnifier.unfold_all astate pname in
           let _, astates = simplify ~kill_new_lvars:true astate in

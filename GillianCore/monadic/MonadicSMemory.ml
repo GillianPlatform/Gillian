@@ -22,6 +22,7 @@ module type S = sig
   (** Initialisation *)
   val init : init_data -> t
 
+  val get_init_data : t -> init_data
   val clear : t -> t
 
   (** Execute action *)

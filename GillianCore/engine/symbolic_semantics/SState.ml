@@ -19,6 +19,7 @@ module type S = sig
     t
 
   val init : init_data -> t
+  val get_init_data : t -> init_data
   val clear_resource : t -> t
   val get_typ_env : t -> Type_env.t
   val get_pfs : t -> PFS.t
@@ -485,8 +486,9 @@ module Make (SMemory : SMemory.S) :
 
   let clear_resource (state : t) : t =
     let memory, store, pfs, gamma, svars = state in
-
     (SMemory.clear memory, store, pfs, gamma, svars)
+
+  let get_init_data (mem, _, _, _, _) = SMemory.get_init_data mem
 
   let frame_on _ _ _ =
     raise (Failure "ERROR: framing called for symbolic execution")

@@ -119,6 +119,7 @@ module M = struct
   let get_print_info = SHeap.get_print_info
   let copy (heap : t) : t = SHeap.copy heap
   let init () : t = SHeap.init ()
+  let get_init_data _ = ()
   let clear (_ : t) = init () (* We don't maintain any context *)
 
   let get_loc_name pfs gamma =

@@ -39,6 +39,7 @@ rule read =
   | "invariant" { INVARIANT (curr lexbuf) }
   | "return" { RETURN (curr lexbuf) }
   | "fold"   { FOLD (curr lexbuf) }
+  | "package" { PACKAGE (curr lexbuf) }
   | "unfold" { UNFOLD (curr lexbuf) }
   | "nounfold" { NOUNFOLD (curr lexbuf) }
   | "apply"  { APPLY (curr lexbuf) }
