@@ -121,7 +121,7 @@ module type S = sig
     Expr.t option list ->
     (t * Expr.t list, err_t) Res_list.t
 
-  val package_wand : t -> Wands.wand -> (t, err_t) Res_list.t
+  val package_wand : t -> Wands.wand -> (t, err_t) List_res.t
 end
 
 module Make (State : SState.S) :
@@ -317,6 +317,21 @@ module Make (State : SState.S) :
   end
 
   open Logging
+
+  let clear_resource (astate : t) =
+    let { state; preds; wands = _; pred_defs; variants } = astate in
+    let state = State.clear_resource state in
+    let preds_list = Preds.to_list preds in
+    List.iter
+      (fun (name, vs) ->
+        let pred_def = Hashtbl.find pred_defs name in
+        if not pred_def.pred.pred_pure then
+          let _ =
+            Preds.pop preds (fun (name', vs') -> name' = name && vs' = vs)
+          in
+          ())
+      preds_list;
+    { state; preds; wands = Wands.init []; pred_defs; variants }
 
   type handle_pure_result = Success of state_t | Abort of Formula.t | Vanish
 
@@ -626,6 +641,8 @@ module Make (State : SState.S) :
         Preds.extend ~pure preds (pname, vs);
         { state; preds; wands; pred_defs; variants }
     | Wand { lhs = lname, largs; rhs = rname, rargs } ->
+        if !Config.under_approximation then
+          L.fail "Wand assertions are not supported in under-approximation mode";
         L.verbose (fun m -> m "Wand assertion.");
         let largs = List.map (subst_in_expr subst) largs in
         let rargs = List.map (subst_in_expr subst) rargs in
@@ -1310,6 +1327,7 @@ module Make (State : SState.S) :
               let++ astate', _ = consume_pred_res in
               astate'
         | Wand { lhs; rhs } ->
+            if !Config.under_approximation then L.fail "Wand in under-approx";
             let les_outs =
               let pred = (UP.get_pred_def pred_defs (fst rhs)).pred in
               Pred.out_args pred (snd rhs)
@@ -1807,8 +1825,26 @@ module Make (State : SState.S) :
     | Some (pname, vs) -> rec_unfold astate pname vs
 
   module Wand_packaging = struct
+    type package_state = {
+      lhs_state : t;
+      current_state : t;
+      rhs_states : t list;
+      up : UP.t;
+      subst : SVal.SESubst.t;
+    }
+
+    let copy_package_state pstate =
+      {
+        lhs_state = copy_astate pstate.lhs_state;
+        current_state = copy_astate pstate.current_state;
+        rhs_states = List.map copy_astate pstate.rhs_states;
+        up = pstate.up;
+        subst = SVal.SESubst.copy pstate.subst;
+      }
+
     let get_defs (pred : Pred.t) largs =
-      if pred.pred_abstract then [ Asrt.Pred (pred.pred_name, largs) ]
+      if pred.pred_abstract || Option.is_some pred.pred_guard then
+        [ Asrt.Pred (pred.pred_name, largs) ]
       else
         let unfolded_pred =
           Hashtbl.find_opt LogicPreprocessing.unfolded_preds pred.pred_name
@@ -1817,7 +1853,20 @@ module Make (State : SState.S) :
         | Some pred -> List.map snd pred.pred_definitions
         | None -> List.map snd pred.pred_definitions
 
-    let make_lhs_states ~pred_defs ~init_data (lname, largs) =
+    let empty_state ~pred_defs ~init_data ~spec_vars =
+      let state =
+        State.make_s ~init_data ~spec_vars ~pfs:(PFS.init ())
+          ~gamma:(Type_env.init ()) ~store:(SStore.init [])
+      in
+      {
+        state;
+        preds = Preds.init [];
+        wands = Wands.init [];
+        pred_defs;
+        variants = Hashtbl.create 0;
+      }
+
+    let make_lhs_states ~pred_defs ~empty_state (lname, largs) =
       let open Syntaxes.List in
       let lhs_pred = (UP.get_pred_def pred_defs lname).pred in
       let subst =
@@ -1827,26 +1876,9 @@ module Make (State : SState.S) :
         let bindings = List.combine params largs in
         SVal.SESubst.init bindings
       in
-      let spec_vars =
-        List.fold_left
-          (fun acc arg -> SS.union acc (Expr.lvars arg))
-          SS.empty largs
-      in
       let* lhs_def = get_defs lhs_pred largs in
-      let state =
-        State.make_s ~init_data ~spec_vars ~pfs:(PFS.init ())
-          ~gamma:(Type_env.init ()) ~store:(SStore.init [])
-      in
-      let astate =
-        {
-          state;
-          preds = Preds.init [];
-          wands = Wands.init [];
-          pred_defs;
-          variants = Hashtbl.create 0;
-        }
-      in
       let subst = SVal.SESubst.copy subst in
+      let astate = copy_astate empty_state in
       let* produced = produce astate subst lhs_def in
       match produced with
       | Error _ -> []
@@ -1854,42 +1886,210 @@ module Make (State : SState.S) :
           let _, simplified = simplify_astate ~unification:true state in
           simplified
 
-    let get_ups ~pred_defs (rname, rargs) =
-      let open Syntaxes.List in
-      let pred_ins =
-        let table = Hashtbl.create (Hashtbl.length pred_defs) in
-        Hashtbl.iter
-          (fun name (pred : UP.pred) ->
-            Hashtbl.add table name pred.pred.pred_ins)
-          pred_defs;
-        table
-      in
-      let pred = UP.get_pred_def pred_defs rname in
-      let+ def = get_defs pred.pred rargs in
-      let kb =
-        List.fold_left
-          (fun acc (param, _) -> Expr.Set.add (PVar param) acc)
-          Expr.Set.empty pred.pred.pred_params
-      in
-      let up = UP.init kb Expr.Set.empty pred_ins [ (def, (None, None)) ] in
-      match up with
-      | Error e ->
-          Fmt.failwith "Package Wand: couldn't create up because of %a"
-            (Fmt.Dump.list @@ Fmt.Dump.list Asrt.pp)
-            e
-      | Ok up -> up
+    (* let get_ups ~pred_defs (rname, rargs) =
+       let open Syntaxes.List in
+       let pred_ins =
+         let table = Hashtbl.create (Hashtbl.length pred_defs) in
+         Hashtbl.iter
+           (fun name (pred : UP.pred) ->
+             Hashtbl.add table name pred.pred.pred_ins)
+           pred_defs;
+         table
+       in
+       let pred = UP.get_pred_def pred_defs rname in
+       let+ def = get_defs pred.pred rargs in
+       let kb =
+         List.fold_left
+           (fun acc (param, _) -> Expr.Set.add (PVar param) acc)
+           Expr.Set.empty pred.pred.pred_params
+       in
+       let up = UP.init kb Expr.Set.empty pred_ins [ (def, (None, None)) ] in
+       match up with
+       | Error e ->
+           Fmt.failwith "Package Wand: couldn't create up because of %a"
+             (Fmt.Dump.list @@ Fmt.Dump.list Asrt.pp)
+             e
+       | Ok up -> up *)
 
-    let package_wand (astate : t) (wand : Wands.wand) : (t, err_t) Res_list.t =
+    let unify_assertion astate subst step =
+      (* We are in OX mode, unification may not branch. If it does, something is very wrong.
+         Mainly because the substitution is performed in place.
+         This function simplifies the return type of unify-assertion: it returns a single outcome if it's a success. *)
+      let res = unify_assertion astate subst step in
+      let successes, errors = Res_list.split res in
+      match (successes, errors) with
+      | [ x ], [] -> Ok x
+      | [], errs -> Error errs
+      | _ ->
+          Fmt.failwith
+            "Impossible: unify-assertion branched in OX mode: %d successes and \
+             %d errors"
+            (List.length successes) (List.length errors)
+
+    (* Produce assertion cannot fail, if it does it should actually vanish.
+       We simplify the signature by actually doing so *)
+    let produce_assertion astate subst a =
+      let res = produce_assertion astate subst a in
+      List.filter_map
+        (function
+          | Ok x -> Some x
+          | Error _ -> None)
+        res
+
+    let package_case_step
+        ({ lhs_state; current_state; rhs_states; up; subst } as package_state) :
+        (package_state, err_t list) Result.t =
+      let open Syntaxes.List in
+      match UP.head up with
+      | None ->
+          L.verbose (fun m -> m "Finished one case of wand packaging!");
+          Ok package_state
+      | Some step -> (
+          L.verbose (fun m ->
+              m "Wand about to consume RHS step: %a" Asrt.pp (fst step));
+          (* States are modified in place unfortunately.. so we have to copy them just in case *)
+          let subst_save_1 = SVal.SESubst.copy subst in
+          let lhs_state_save = copy_astate lhs_state in
+          (* First we try to consume from the lhs_state. *)
+          match unify_assertion lhs_state subst step with
+          | Ok new_lhs_state ->
+              let new_rhs_states =
+                let* rhs_state = rhs_states in
+                produce_assertion rhs_state subst (fst step)
+              in
+              Ok
+                {
+                  lhs_state = new_lhs_state;
+                  current_state;
+                  rhs_states = new_rhs_states;
+                  up;
+                  subst;
+                }
+          | Error lhs_errs -> (
+              L.verbose (fun m ->
+                  m
+                    "Wand: failed to consume from LHS! Going to try and \
+                     consume from current state!");
+              match unify_assertion current_state subst_save_1 step with
+              | Ok new_current_state ->
+                  let new_rhs_states =
+                    let* rhs_state = rhs_states in
+                    produce_assertion rhs_state subst_save_1 (fst step)
+                  in
+                  Ok
+                    {
+                      lhs_state = lhs_state_save;
+                      current_state = new_current_state;
+                      rhs_states = new_rhs_states;
+                      up;
+                      subst = subst_save_1;
+                    }
+              | Error current_errs ->
+                  L.verbose (fun m -> m "Couldn't consume from anywhere!!");
+                  Error (lhs_errs @ current_errs)))
+
+    let rec package_case (state : package_state) =
+      let open Syntaxes.Result in
+      let* state = package_case_step state in
+      match UP.next state.up with
+      | None -> List_res.return state
+      | Some [] -> L.fail "empty UP??"
+      | Some ((f_up, f_lab) :: rest) ->
+          let rest =
+            List.map
+              (fun (up, lab) ->
+                assert (Option.is_none lab);
+                { (copy_package_state state) with up })
+              rest
+          in
+          assert (Option.is_none f_lab);
+          let first = { state with up = f_up } in
+          List.fold_left
+            (fun acc state ->
+              let open Syntaxes.Result in
+              let* acc = acc in
+              let+ state = package_case state in
+              state @ acc)
+            (Ok []) (first :: rest)
+
+    let package_wand (astate : t) (wand : Wands.wand) : (t, err_t) List_res.t =
+      if !Config.under_approximation then
+        Fmt.failwith "Wand packaging not handled in UX mode";
       (* First, we create a state that matches the lhs,
-         trying to unfold the content if possible if possible. *)
-      let _lhs_states =
-        let init_data = State.get_init_data astate.state in
-        make_lhs_states ~init_data ~pred_defs:astate.pred_defs wand.lhs
+         trying to unfold the content if possible. *)
+      let lhs_states =
+        make_lhs_states
+          ~empty_state:(clear_resource (copy_astate astate))
+          ~pred_defs:astate.pred_defs wand.lhs
       in
-      let _rhs_ups = get_ups ~pred_defs:astate.pred_defs wand.rhs in
-      failwith "bite"
+      let rpred = UP.get_pred_def astate.pred_defs (fst wand.rhs) in
+      (* let lpred = UP.get_pred_def astate.pred_defs (fst wand.lhs) in *)
+      let rhs_up =
+        if Option.is_some rpred.pred.pred_guard then
+          L.fail "Magic Wand rhs is guarded!";
+        rpred.def_up
+      in
+      let subst =
+        let rparams =
+          List.map (fun (x, _) -> Expr.PVar x) rpred.pred.pred_params
+        in
+        L.verbose (fun m ->
+            m "RPARAMS: %a; RARGS: %a" (Fmt.Dump.list Expr.pp) rparams
+              (Fmt.Dump.list Expr.pp) (snd wand.rhs));
+        let all_bindings = List.combine rparams (snd wand.rhs) in
+        let in_bindings = Pred.in_args rpred.pred all_bindings in
+        SVal.SESubst.init in_bindings
+      in
+      let start_states =
+        match lhs_states with
+        | [] -> failwith "wand lhs is False!"
+        | first :: rest ->
+            let rhs_state =
+              empty_state ~pred_defs:astate.pred_defs ~spec_vars:SS.empty
+                ~init_data:(State.get_init_data astate.state)
+            in
+            let rest_pack_states =
+              List.map
+                (fun lhs_state ->
+                  {
+                    lhs_state;
+                    current_state = copy_astate astate;
+                    rhs_states = [ copy_astate rhs_state ];
+                    subst = SVal.SESubst.copy subst;
+                    up = rhs_up;
+                  })
+                rest
+            in
+            let first_pack_state =
+              {
+                lhs_state = first;
+                current_state = astate;
+                rhs_states = [ rhs_state ];
+                subst;
+                up = rhs_up;
+              }
+            in
+            first_pack_state :: rest_pack_states
+      in
+      L.verbose (fun m ->
+          m "About to start consuming rhs of wand. Currently %d search states"
+            (List.length start_states));
+      let final_states =
+        List.fold_left
+          (fun acc state ->
+            let open Syntaxes.Result in
+            let* acc = acc in
+            let+ case = package_case state in
+            case @ acc)
+          (Ok []) start_states
+      in
+      Result.map
+        (fun states -> List.map (fun state -> state.current_state) states)
+        final_states
   end
 
-  let package_wand : t -> Wands.wand -> (t, err_t) Res_list.t =
-    Wand_packaging.package_wand
+  let package_wand t wand =
+    match Wand_packaging.package_wand t wand with
+    | Ok [] -> failwith "WAND VANISHED???"
+    | r -> r
 end

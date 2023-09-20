@@ -606,7 +606,9 @@ struct
             let successes, errors = Res_list.split lemma_evaluation_results in
             match errors with
             | [] -> analyse_lemma_results test successes
-            | _ -> false))
+            | _ ->
+                print_success_or_failure false;
+                false))
 
   let pred_extracting_visitor =
     object

@@ -48,6 +48,11 @@ let all =
   in
   fun ts -> loop [] ts
 
+let of_list_res (lr : ('a, 'b) List_res.t) =
+  match lr with
+  | Ok x -> just_oks x
+  | Error y -> just_errors y
+
 module Syntax = struct
   let ( let** ) = bind
   let ( let++ ) x f = map f x

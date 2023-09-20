@@ -730,7 +730,17 @@ module Make (State : SState.S) :
               simplify ~kill_new_lvars:true ~unification:true state
             in
             Res_list.just_oks states)
-      | Package { lhs; rhs } -> SUnifier.package_wand astate { lhs; rhs }
+      | Package { lhs; rhs } ->
+          let++ astate =
+            let res = SUnifier.package_wand astate { lhs; rhs } in
+            L.verbose (fun m ->
+                m "wand package returned %a"
+                  (List_res.pp ~ok:pp ~err:pp_err_t)
+                  res);
+            Res_list.of_list_res res
+          in
+          Wands.extend astate.wands { lhs; rhs };
+          astate
       | GUnfold pname ->
           let** astate = SUnifier.unfold_all astate pname in
           let _, astates = simplify ~kill_new_lvars:true astate in

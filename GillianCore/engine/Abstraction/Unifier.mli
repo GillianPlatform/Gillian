@@ -145,7 +145,7 @@ module type S = sig
     Expr.t option list ->
     (t * Expr.t list, err_t) Res_list.t
 
-  val package_wand : t -> Wands.wand -> (t, err_t) Res_list.t
+  val package_wand : t -> Wands.wand -> (t, err_t) List_res.t
 end
 
 module Make (State : SState.S) :

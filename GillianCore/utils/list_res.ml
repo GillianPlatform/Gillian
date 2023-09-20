@@ -3,6 +3,9 @@
    process fails. *)
 type ('a, 'b) t = ('a list, 'b list) result
 
+let pp ~ok ~err =
+  Fmt.Dump.result ~ok:(Fmt.Dump.list ok) ~error:(Fmt.Dump.list err)
+
 let return (v : 'a) : ('a, 'b) t = Ok [ v ]
 
 let bind (x : ('a, 'e) t) (f : 'a -> ('b, 'e) t) : ('b, 'e) t =
