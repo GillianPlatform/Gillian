@@ -520,6 +520,12 @@ let just_functions genv =
   else Mem.empty
 
 let init genv = { genv; mem = ref (just_functions genv) }
+
+let sure_is_nonempty _ =
+  (* TODO: Implementing this would require filtering functions
+           from the global environment. We over-approximate by returning false *)
+  false
+
 let get_init_data { genv; _ } = genv
 let clear { genv; _ } = { genv; mem = ref (just_functions genv) }
 let copy h = { genv = h.genv; mem = ref (Mem.copy !(h.mem)) }

@@ -18,6 +18,8 @@ module M = struct
   (** Type of JSIL general states *)
   type t = SHeap.t [@@deriving yojson]
 
+  let sure_is_nonempty _ = (* TODO: Implement *) false
+
   (** Type of JSIL substitutions *)
   type st = SSubst.t
 

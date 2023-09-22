@@ -336,3 +336,4 @@ let can_fix = function
 
 let get_failing_constraint _ = Formula.True
 let add_debugger_variables = WislSHeap.add_debugger_variables
+let sure_is_nonempty t = not (WislSHeap.is_empty t)

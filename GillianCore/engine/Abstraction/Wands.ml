@@ -36,6 +36,11 @@ let pp_query ft query =
 
 type t = wand list ref [@@deriving yojson]
 
+let sure_is_nonempty wands =
+  match !wands with
+  | [] -> false
+  | _ -> true
+
 (** Returns the number of wand assertions *)
 let length x = List.length !x
 

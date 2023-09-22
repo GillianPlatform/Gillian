@@ -23,6 +23,7 @@ module type S = sig
   val clear_resource : t -> t
   val get_typ_env : t -> Type_env.t
   val get_pfs : t -> PFS.t
+  val sure_is_nonempty : t -> bool
 end
 
 module Make (SMemory : SMemory.S) :
@@ -73,6 +74,8 @@ module Make (SMemory : SMemory.S) :
        %a@]"
       (Fmt.iter ~sep:Fmt.comma SS.iter Fmt.string)
       svars SStore.pp store pp_heap heap PFS.pp pfs Type_env.pp gamma
+
+  let sure_is_nonempty (memory, _, _, _, _) = SMemory.sure_is_nonempty memory
 
   let pp_by_need pvars cmd_lvars cmd_locs fmt state =
     let memory, store, pfs, gamma, svars = state in

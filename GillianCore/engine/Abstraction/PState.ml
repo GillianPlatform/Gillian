@@ -105,6 +105,7 @@ module Make (State : SState.S) :
     }
 
   let get_init_data astate = State.get_init_data astate.state
+  let sure_is_nonempty t = State.sure_is_nonempty t.state
 
   let copy_with_state (astate : t) (state : state_t) =
     {

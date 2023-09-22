@@ -77,6 +77,7 @@ module type S = sig
     list
 
   val apply_fix : t -> PFS.t -> Type_env.t -> c_fix_t -> t list
+  val sure_is_nonempty : t -> bool
 end
 
 module Dummy : S with type init_data = unit = struct
@@ -120,6 +121,7 @@ module Dummy : S with type init_data = unit = struct
   let get_fixes _ _ _ _ = failwith "Please implement SMemory"
   let apply_fix _ _ _ _ = failwith "Please implement SMemory"
   let can_fix _ = failwith "Please implement SMemory"
+  let sure_is_nonempty _ = failwith "Please implement SMemory"
 end
 
 module Modernize (Old_memory : S) = struct

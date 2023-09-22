@@ -18,6 +18,7 @@ module type S = sig
   val clear_resource : t -> t
   val get_typ_env : t -> Type_env.t
   val get_pfs : t -> PFS.t
+  val sure_is_nonempty : t -> bool
 end
 
 module Make (SMemory : SMemory.S) :

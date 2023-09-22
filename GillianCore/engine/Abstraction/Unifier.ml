@@ -1825,6 +1825,12 @@ module Make (State : SState.S) :
     | Some (pname, vs) -> rec_unfold astate pname vs
 
   module Wand_packaging = struct
+    let non_empty_message =
+      "The magic wand didn't swallow the whole footprint of its lhs. This \
+       means it is very probably uninteresting. However, it doesn't mean that \
+       the package does not hold! This is an error because it is probably a \
+       mistake but it would not be unsound to continue."
+
     type package_state = {
       lhs_state : t;
       current_state : t;
@@ -2012,6 +2018,9 @@ module Make (State : SState.S) :
               state @ acc)
             (Ok []) (first :: rest)
 
+    let astate_sure_is_nonempty (astate : t) =
+      State.sure_is_nonempty astate.state
+
     let package_wand (astate : t) (wand : Wands.wand) : (t, err_t) List_res.t =
       if !Config.under_approximation then
         Fmt.failwith "Wand packaging not handled in UX mode";
@@ -2083,9 +2092,23 @@ module Make (State : SState.S) :
             case @ acc)
           (Ok []) start_states
       in
-      Result.map
-        (fun states -> List.map (fun state -> state.current_state) states)
-        final_states
+      Result.bind final_states (fun states ->
+          let all_res =
+            List.map
+              (fun state ->
+                if astate_sure_is_nonempty state.lhs_state then (
+                  (* Note that failing here is optional. Packaging the wand anyway is correct,
+                     though it would almost certainly lead to a verification error.
+                     If this behaviour ever comes an issue, it could be deactivate through a feature flag. *)
+                  L.normal (fun m ->
+                      m
+                        "Error: AN LHS STATE WAS NOT ENTIRELY DEPLETED, THE \
+                         MAGIC WAND IS NON INTERESTING");
+                  Error [ StateErr.EOther non_empty_message ])
+                else Ok state.current_state)
+              states
+          in
+          Result_utils.all all_res)
   end
 
   let package_wand t wand =

@@ -63,6 +63,7 @@ module type S = sig
   val apply_fix : t -> c_fix_t -> (t, err_t) result Delayed.t
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
+  val sure_is_nonempty : t -> bool
 end
 
 (* FIXME: Lift should not be necessary, the monad should just match !!! *)
