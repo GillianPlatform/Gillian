@@ -35,29 +35,18 @@ export async function startDebugging(
   try {
     const canContinue = await checkForExistingDebugSession();
     if (!canContinue) return;
-    const validInputs = new Set(['wisl', 'js', 'c', 'kani']);
-    const validateInput = (input: string) => {
-      if (!validInputs.has(input)) {
-        return 'The target language must be one of: wisl, js, c, kani';
-      }
-
-      return null;
-    };
+    const validLangs = ['wisl', 'js', 'c', 'kani'];
 
     const fileExtension = config.program.split('.').pop();
     if (fileExtension === 'gil') {
-      const targetLanguage = await window.showInputBox({
-        prompt: 'Target language',
-        value: 'wisl',
-        valueSelection: [0, 5],
-        placeHolder: 'e.g. wisl, js, c',
-        validateInput: validateInput,
+      const targetLanguage = await window.showQuickPick(validLangs, {
+        title: 'Target language',
       });
       config = {
         targetLanguage: targetLanguage,
         ...config,
       };
-      if (!targetLanguage || !validInputs.has(targetLanguage)) {
+      if (!targetLanguage || !validLangs.includes(targetLanguage)) {
         // Do not start debugger if invalid target language specified for GIL file
         return;
       }
