@@ -185,9 +185,11 @@ module Make
               | None -> failwith "inserted branch case not found on parent!"))
       | _ -> failwith "can't insert to Nothing or FinalCmd"
     in
-    match (should_skip_cmd exec_data state, to_exec @ state.to_exec) with
-    | true, (id, case) :: to_exec ->
-        state.to_exec <- to_exec;
+    if should_skip_cmd exec_data state then
+      state.to_exec <- to_exec @ state.to_exec;
+    match state.to_exec with
+    | (id, case) :: rest_to_exec ->
+        state.to_exec <- rest_to_exec;
         ExecNext (Some id, case)
     | _ -> Stop
 
