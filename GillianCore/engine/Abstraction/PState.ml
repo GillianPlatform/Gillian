@@ -175,29 +175,27 @@ module Make
 
   let assume ?(unfold = false) (astate : t) (v : Val.t) : t list =
     let state, preds, pred_defs, variants = astate in
-    List.concat
-      (List.map
-         (fun state ->
-           let astate' = (state, preds, pred_defs, variants) in
-           match (!Config.unfolding && unfold, Val.to_expr v) with
-           | _, Lit (Bool true) -> [ astate' ]
-           | false, _ -> [ astate' ]
-           | true, _ -> (
-               let unfold_vals = Expr.base_elements (Val.to_expr v) in
-               let unfold_vals = List.map Val.from_expr unfold_vals in
-               let unfold_vals =
-                 List.map Option.get
-                   (List.filter (fun x -> x <> None) unfold_vals)
-               in
-               match SUnifier.unfold_with_vals astate' unfold_vals with
-               | None -> [ astate' ]
-               | Some next_states ->
-                   List.concat_map
-                     (fun (_, astate) ->
-                       let _, astates = simplify ~kill_new_lvars:false astate in
-                       astates)
-                     next_states))
-         (State.assume ~unfold state v))
+    List.concat_map
+      (fun state ->
+        let astate' = (state, preds, pred_defs, variants) in
+        match (!Config.unfolding && unfold, Val.to_expr v) with
+        | _, Lit (Bool true) -> [ astate' ]
+        | false, _ -> [ astate' ]
+        | true, _ -> (
+            let unfold_vals = Expr.base_elements (Val.to_expr v) in
+            let unfold_vals = List.map Val.from_expr unfold_vals in
+            let unfold_vals =
+              List.map Option.get (List.filter (fun x -> x <> None) unfold_vals)
+            in
+            match SUnifier.unfold_with_vals astate' unfold_vals with
+            | None -> [ astate' ]
+            | Some next_states ->
+                List.concat_map
+                  (fun (_, astate) ->
+                    let _, astates = simplify ~kill_new_lvars:false astate in
+                    astates)
+                  next_states))
+      (State.assume ~unfold state v)
 
   let assume_a
       ?(unification = false)

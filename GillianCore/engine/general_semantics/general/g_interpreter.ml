@@ -1053,6 +1053,7 @@ struct
                         let branch_case =
                           if num_states > 1 then Some (LActionFail ix) else None
                         in
+                        let cs = if ix = 0 then cs else Call_stack.copy cs in
                         make_confcont ~state ~callstack:cs
                           ~invariant_frames:iframes ~prev_idx:prev
                           ~loop_ids:prev_loop_ids ~next_idx:i

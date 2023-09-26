@@ -101,8 +101,6 @@ struct
           _ =
         let { ext; _ } = debug_state in
         let unify =
-          DL.log (fun m ->
-              m "getting unify_result for %a" L.Report_id.pp cur_report_id);
           let+ unify_id, _ = L.Log_queryer.get_unify_for cur_report_id in
           let unify_map =
             match ext.unify_maps |> List.assoc_opt unify_id with
