@@ -148,6 +148,29 @@ module Modernize (Old_memory : S) = struct
         let pc = Gpc.copy pc in
         Gbranch.{ pc; value = Error err }
 
+  let consume core_pred heap (pc : Gpc.t) args =
+    let open Syntaxes.List in
+    let getter = ga_to_getter core_pred in
+    let deleter = ga_to_deleter core_pred in
+    let* get_res = execute_action getter heap pc args in
+    match get_res.value with
+    | Error _ -> [ get_res ]
+    | Ok (heap', vs) -> (
+        let vs_ins, vs_outs = List_utils.split_at vs (List.length args) in
+        let+ rem_res = execute_action deleter heap' get_res.pc vs_ins in
+        match rem_res.value with
+        | Error _ -> rem_res
+        | Ok (heap'', _) -> { rem_res with value = Ok (heap'', vs_outs) })
+
+  let produce core_pred heap (pc : Gpc.t) args =
+    let open Syntaxes.List in
+    let setter = ga_to_setter core_pred in
+    let* set_res = execute_action setter heap pc args in
+    match set_res.value with
+    | Error _ ->
+        [] (* It's ok for failing producers to vanish, no unsoundness *)
+    | Ok (heap', _) -> [ { set_res with value = heap' } ]
+
   let apply_fix heap pfs gamma fix =
     let open Syntaxes.List in
     let+ heap = apply_fix heap pfs gamma fix in

@@ -44,19 +44,15 @@ end = struct
 
   let init init_data : t = (CMemory.init init_data, CStore.init [], [])
 
-  let execute_action
-      ?unification:_
-      (action : string)
-      (state : t)
-      (args : vt list) : action_ret =
+  let execute_action (action : string) (state : t) (args : vt list) : action_ret
+      =
     let heap, store, locs = state in
     match CMemory.execute_action action heap args with
     | Ok (heap, vs) -> [ Ok ((heap, store, locs), vs) ]
     | Error err -> [ Error (StateErr.EMem err) ]
 
-  let ga_to_setter _ = failwith "ga_to_setter for CState"
-  let ga_to_getter _ = failwith "ga_to_getter for CState"
-  let ga_to_deleter _ = failwith "ga_to_deleter for CState"
+  let produce_core_pred _ _ _ = failwith "cannot produce in concrete state"
+  let consume_core_pred _ _ _ = failwith "cannot consume in concrete state"
   let is_overlapping_asrt _ = failwith "is_overlapping_assert for CState"
 
   let eval_expr state e =

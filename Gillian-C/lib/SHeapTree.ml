@@ -51,13 +51,6 @@ let pp_err fmt = function
 type 'a or_error = ('a, err) Result.t
 type 'a d_or_error = ('a, err) DR.t
 
-module PathTaken = struct
-  (** Going through a tree can become quite expensive.
-      Remover is always called right after the getter, so we take note of the last path taken and on remove we just go for it directly.  *)
-
-  type t = Left | Right | Here [@@deriving yojson]
-end
-
 module Range = struct
   type t = Expr.t * Expr.t [@@deriving yojson]
 
@@ -171,7 +164,6 @@ module Node = struct
     | _ -> t
 
   let undefined ~perm = make_owned ~perm ~mem_val:(Undef Totally)
-  let not_owned = NotOwned Totally
 
   let pp fmt = function
     | NotOwned qty -> Fmt.pf fmt "%s NOT OWNED" (str_qty qty)
@@ -555,12 +547,7 @@ module Node = struct
 end
 
 module Tree = struct
-  type t = {
-    node : Node.t;
-    span : Range.t;
-    children : (t * t) option;
-    last_path : PathTaken.t option; [@ignore]
-  }
+  type t = { node : Node.t; span : Range.t; children : (t * t) option }
   [@@deriving yojson]
 
   module Lift = struct
@@ -615,7 +602,7 @@ module Tree = struct
     | NotOwned Totally -> true
     | _ -> false
 
-  let make ~node ~span ?children () = { node; span; children; last_path = None }
+  let make ~node ~span ?children () = { node; span; children }
 
   (* Used to change the position of a tree. The start of the tree is going to be [start], but the spans don't change. *)
   let rec realign t start =
@@ -635,7 +622,7 @@ module Tree = struct
     make ~node:t.node ~span ?children ()
 
   let with_children t ~left ~right =
-    Delayed.return { t with children = Some (left, right); last_path = None }
+    Delayed.return { t with children = Some (left, right) }
 
   let of_children_s ~left ~right =
     let open Delayed.Syntax in
@@ -652,7 +639,7 @@ module Tree = struct
           None
       | _ -> Some (left, right)
     in
-    { span; children; node; last_path = None }
+    { span; children; node }
 
   let of_children _ ~left ~right = of_children_s ~left ~right
 
@@ -661,8 +648,9 @@ module Tree = struct
     let new_node =
       Node.update_parent_perm node ~left:left.node ~right:right.node
     in
-    Delayed.return
-      { node = new_node; span; children = Some (left, right); last_path = None }
+    Delayed.return { node = new_node; span; children = Some (left, right) }
+
+  let remove_node x = Ok (make ~node:(NotOwned Totally) ~span:x.span ())
 
   let sval_leaf ~low ~perm ~value ~chunk =
     let node = Node.encode ~perm ~chunk value in
@@ -678,12 +666,7 @@ module Tree = struct
     make ~node:(Node.undefined ~perm) ~span ()
 
   let create_root range =
-    {
-      children = None;
-      span = range;
-      node = NotOwned Totally;
-      last_path = Some Here;
-    }
+    { children = None; span = range; node = NotOwned Totally }
 
   let rec split ~range t : (Node.t * t * t) Delayed.t =
     (* this function splits a tree and returns the node in the given range *)
@@ -808,7 +791,7 @@ module Tree = struct
       then (
         log_string "Range does equal span, replacing.";
         match replace_node t with
-        | Ok new_tree -> DR.ok (t, { new_tree with last_path = Some Here })
+        | Ok new_tree -> DR.ok (t, new_tree)
         | Error err -> DR.error err)
       else
         match t.children with
@@ -860,7 +843,7 @@ module Tree = struct
                   frame_inside ~replace_node ~rebuild_parent left range
                 in
                 let+ new_parent = rebuild_parent t ~left ~right in
-                Ok (node, { new_parent with last_path = Some Left })
+                Ok (node, new_parent)
               else
                 if%sat
                   log_string "range inside right";
@@ -870,7 +853,7 @@ module Tree = struct
                     frame_inside ~replace_node ~rebuild_parent right range
                   in
                   let+ new_parent = rebuild_parent t ~left ~right in
-                  Ok (node, { new_parent with last_path = Some Right })
+                  Ok (node, new_parent)
                 else (
                   Logging.verbose (fun fmt ->
                       fmt
@@ -889,58 +872,33 @@ module Tree = struct
     let* root = extend_if_needed t range in
     frame_inside ~replace_node ~rebuild_parent root range
 
-  let get_node (t : t) range : (Node.t * t, err) DR.t =
+  let cons_node (t : t) range : (Node.t * t, err) DR.t =
     let open DR.Syntax in
-    let replace_node x = Ok x in
-    let rebuild_parent = with_children in
+    let replace_node x = remove_node x in
+    let rebuild_parent = of_children in
     let++ framed, rest = frame_range t ~replace_node ~rebuild_parent range in
     (framed.node, rest)
 
-  let set_node (t : t) range node : (t, err) DR.t =
+  let prod_node (t : t) range node : (t, err) DR.t =
     let open DR.Syntax in
     let replace_node _ = Ok (make ~node ~span:range ()) in
     let rebuild_parent = of_children in
     let++ _, t = frame_range t ~replace_node ~rebuild_parent range in
     t
 
-  let rem_last_get (t : t) : t =
-    let rebuild
-        ({ span = lspan; node = lnode; _ } as left)
-        ({ span = rspan; node = rnode; _ } as right) =
-      let span = (fst lspan, snd rspan) in
-      match (lnode, rnode) with
-      | NotOwned Totally, NotOwned Totally ->
-          make ~node:(NotOwned Totally) ~span ()
-      | _ -> make ~node:(NotOwned Partially) ~span ~children:(left, right) ()
-    in
-    let rec loop { span; children; last_path; _ } =
-      match last_path with
-      | None -> failwith "Imposible, removing last get, but can't follow a path"
-      | Some Here -> make ~node:Node.not_owned ~span ()
-      | Some Left ->
-          let left, right = Option.get children in
-          let left = loop left in
-          rebuild left right
-      | Some Right ->
-          let left, right = Option.get children in
-          let right = loop right in
-          rebuild left right
-    in
-    loop t
-
-  let get_array (t : t) (low : Expr.t) (chunk : Chunk.t) (size : Expr.t) :
+  let cons_array (t : t) (low : Expr.t) (chunk : Chunk.t) (size : Expr.t) :
       (SVArr.t * Perm.t option * t, err) DR.t =
     let open DR.Syntax in
     let open Delayed.Syntax in
     let* size = Delayed.reduce size in
-    let replace_node x = Ok x in
-    let rebuild_parent = with_children in
+    let replace_node = remove_node in
+    let rebuild_parent = of_children in
     let range = Range.of_low_chunk_and_size low chunk size in
     let** framed, tree = frame_range t ~replace_node ~rebuild_parent range in
     let+* arr, perm = Node.decode_arr ~size ~low ~chunk framed.node in
     Ok (arr, perm, tree)
 
-  let set_array
+  let prod_array
       (t : t)
       (low : Expr.t)
       (size : Expr.t)
@@ -956,18 +914,18 @@ module Tree = struct
     let+ () = SVArr.learn_chunk ~chunk ~size array in
     Ok t
 
-  let get_single (t : t) (low : Expr.t) (chunk : Chunk.t) :
+  let cons_single (t : t) (low : Expr.t) (chunk : Chunk.t) :
       (SVal.t * Perm.t option * t, err) DR.t =
     let open DR.Syntax in
-    let replace_node x = Ok x in
-    let rebuild_parent = with_children in
+    let replace_node x = remove_node x in
+    let rebuild_parent = of_children in
     let range = Range.of_low_and_chunk low chunk in
     let** framed, tree = frame_range t ~replace_node ~rebuild_parent range in
     let node = framed.node in
     let++ sval, perm = Node.decode ~low ~chunk node in
     (sval, perm, tree)
 
-  let set_single
+  let prod_single
       (t : t)
       (low : Expr.t)
       (chunk : Chunk.t)
@@ -1061,12 +1019,12 @@ module Tree = struct
 
   let drop_perm (t : t) (low : Expr.t) (high : Expr.t) (perm : Perm.t) :
       (t, err) DR.t =
-    let rec rec_set_perm { node; span; children; last_path } =
+    let rec rec_set_perm { node; span; children } =
       let node = Node.drop_perm_exn ~perm node in
       let children =
         Option.map (fun (a, b) -> (rec_set_perm a, rec_set_perm b)) children
       in
-      { node; span; children; last_path }
+      { node; span; children }
     in
     let open DR.Syntax in
     let range = Range.make low high in
@@ -1150,7 +1108,7 @@ module Tree = struct
       ~svarr_subst
       ~sval_subst
       ~le_subst
-      { node; span; children; last_path } =
+      { node; span; children } =
     let node = Node.substitution ~sval_subst ~svarr_subst node in
     let span = Range.substitution ~le_subst span in
     let children =
@@ -1160,7 +1118,7 @@ module Tree = struct
           (f left, f right))
         children
     in
-    { node; span; children; last_path }
+    { node; span; children }
 
   let box t =
     let rec flatten_tree { node; span; children; _ } =
@@ -1229,10 +1187,6 @@ let alocs = function
         (Option.fold ~none:SS.empty ~some:Range.alocs bounds)
         (Option.fold ~none:SS.empty ~some:Tree.alocs root)
 
-let get_root = function
-  | Freed -> Error UseAfterFree
-  | Tree x -> Ok x.root
-
 let is_in_bounds range bounds =
   match bounds with
   | None -> Formula.True
@@ -1271,19 +1225,14 @@ let weak_valid_pointer (t : t) (ofs : Expr.t) : (bool, err) DR.t =
         | None -> DR.error (MissingResource Unfixable)
         | Some root -> Tree.weak_valid_pointer root ofs)
 
-let get_bounds = function
+let cons_bounds = function
   | Freed -> Error UseAfterFree
-  | Tree x -> Ok x.bounds
+  | Tree x -> Ok (x.bounds, Tree { x with bounds = None })
 
-let set_bounds t bounds =
+let prod_bounds t bounds =
   match t with
   | Freed -> Error UseAfterFree
   | Tree x -> Ok (Tree { x with bounds })
-
-let rem_bounds t =
-  match t with
-  | Freed -> Error UseAfterFree
-  | Tree x -> Ok (Tree { x with bounds = None })
 
 let with_root_opt t root =
   match t with
@@ -1309,20 +1258,19 @@ let drop_perm t low high new_perm =
 
 let free t low high =
   let open DR.Syntax in
-  let** bounds = DR.of_result (get_bounds t) in
   match t with
   (* Can't free something already freed *)
   | Freed -> DR.error UseAfterFree
-  | Tree tree -> (
+  | Tree { root; bounds } -> (
       (* Can only free if entirely freeable *)
       match bounds with
       | None -> DR.error (MissingResource Unfixable)
       | Some bounds ->
           if%ent Range.is_equal (low, high) bounds then
-            match tree.root with
+            match root with
             | None -> DR.error (MissingResource Unfixable)
             | Some root ->
-                let+* node, _ = Tree.get_node root (low, high) in
+                let+* node, _ = Tree.cons_node root (low, high) in
                 Result.map
                   (fun () -> Freed)
                   (Node.check_perm (Some Freeable) node)
@@ -1332,125 +1280,133 @@ let free t low high =
                  "Freeing only part of an object (this might need fixing in \
                   the MM)"))
 
-let get_single t low chunk =
+let cons_single t low chunk =
   let open DR.Syntax in
   let range = Range.of_low_and_chunk low chunk in
-  let** span = DR.of_result (get_bounds t) in
-  if%sat is_in_bounds range span then
-    let** root = DR.of_result (get_root t) in
-    match root with
-    (* TODO: What should the offset be in this case *)
-    | None ->
-        DR.error (MissingResource (Fixable { is_store = false; low; chunk }))
-    | Some root ->
-        let** value, perm, root_framed = Tree.get_single root low chunk in
-        let++ wroot = DR.of_result (with_root t root_framed) in
-        (value, perm, wroot)
-  else DR.error BufferOverrun
+  match t with
+  | Freed -> DR.error UseAfterFree
+  | Tree { bounds; root } ->
+      if%sat is_in_bounds range bounds then
+        match root with
+        (* TODO: What should the offset be in this case *)
+        | None ->
+            DR.error
+              (MissingResource (Fixable { is_store = false; low; chunk }))
+        | Some root ->
+            let** value, perm, root_framed = Tree.cons_single root low chunk in
+            let++ wroot = DR.of_result (with_root t root_framed) in
+            (value, perm, wroot)
+      else DR.error BufferOverrun
 
-let set_single t low chunk sval perm =
+let prod_single t low chunk sval perm =
   let open DR.Syntax in
   let range = Range.of_low_and_chunk low chunk in
-  let** root = DR.of_result (get_root t) in
-  let root = Option.value root ~default:(Tree.create_root range) in
-  let** root_set = Tree.set_single root low chunk sval perm in
-  let** bounds = DR.of_result (get_bounds t) in
-  let learned =
-    match bounds with
-    | None -> []
-    | Some bounds -> [ Range.is_inside range bounds ]
-  in
-  DR.of_result ~learned (with_root t root_set)
-
-let rem_last_get t =
   match t with
-  | Tree { root = Some root; bounds } ->
-      Tree { bounds; root = Some (Tree.rem_last_get root) }
-  | _ -> failwith "Impossible, removing last get with something absurd"
+  | Freed -> DR.error UseAfterFree
+  | Tree { root; bounds } ->
+      let root = Option.value root ~default:(Tree.create_root range) in
+      let** root_set = Tree.prod_single root low chunk sval perm in
+      let learned =
+        match bounds with
+        | None -> []
+        | Some bounds -> [ Range.is_inside range bounds ]
+      in
+      DR.of_result ~learned (with_root t root_set)
 
-let get_array t low size chunk =
+let cons_array t low size chunk =
   let open DR.Syntax in
   let range = Range.of_low_chunk_and_size low chunk size in
-  let** span = DR.of_result (get_bounds t) in
-  if%sat is_in_bounds range span then
-    let** root = DR.of_result (get_root t) in
-    match root with
-    | None ->
-        DR.error (MissingResource (Fixable { is_store = false; low; chunk }))
-    | Some root ->
-        let** array, perm, root_framed = Tree.get_array root low chunk size in
-        let++ wroot = DR.of_result (with_root t root_framed) in
-        (array, perm, wroot)
-  else DR.error BufferOverrun
+  match t with
+  | Freed -> DR.error UseAfterFree
+  | Tree { bounds; root } ->
+      if%sat is_in_bounds range bounds then
+        match root with
+        | None ->
+            DR.error
+              (MissingResource (Fixable { is_store = false; low; chunk }))
+        | Some root ->
+            let** array, perm, root_framed =
+              Tree.cons_array root low chunk size
+            in
+            let++ wroot = DR.of_result (with_root t root_framed) in
+            (array, perm, wroot)
+      else DR.error BufferOverrun
 
-let set_array t low size chunk array perm =
+let prod_array t low size chunk array perm =
   let open DR.Syntax in
   let range = Range.of_low_chunk_and_size low chunk size in
-  let** root = DR.of_result (get_root t) in
-  let root = Option.value root ~default:(Tree.create_root range) in
-  let** root_set = Tree.set_array root low size chunk array perm in
-  let** bounds = DR.of_result (get_bounds t) in
-  let learned =
-    match bounds with
-    | None -> []
-    | Some bounds -> [ Range.is_inside range bounds ]
-  in
-  DR.of_result ~learned (with_root t root_set)
-
-let get_simple_mem_val ~expected_mem_val t low high =
-  let open DR.Syntax in
-  let range = (low, high) in
-  let** span = DR.of_result (get_bounds t) in
-  if%sat is_in_bounds range span then
-    let** root = DR.of_result (get_root t) in
-    match root with
-    | None -> DR.error (MissingResource Unfixable)
-    | Some root ->
-        let** node, root_framed = Tree.get_node root range in
-        let res =
-          match node with
-          | MemVal { mem_val; exact_perm = perm; _ }
-            when Node.eq_mem_val mem_val expected_mem_val -> Ok perm
-          | NotOwned Totally -> Error (MissingResource Unfixable)
-          | NotOwned Partially ->
-              Logging.verbose (fun fmt ->
-                  fmt
-                    "SHeapTree Get Simple Memory Value Error: Memory Partially \
-                     Not Owned (Currently Unsupported)");
-              Error (MissingResource Unfixable)
-          | _ -> Error WrongMemVal
-        in
-        let++ wroot =
-          DR.of_result
-            (Result.bind res (fun perm ->
-                 Result.map (fun mem -> (mem, perm)) (with_root t root_framed)))
-        in
-        wroot
-  else DR.error BufferOverrun
-
-let set_simple_mem_val ~mem_val t low high perm =
-  let open DR.Syntax in
-  let range = (low, high) in
-  let** root = DR.of_result (get_root t) in
-  let root = Option.value ~default:(Tree.create_root range) root in
-  let** root_set = Tree.set_node root range (Node.make_owned ~perm ~mem_val) in
-  let** bounds = DR.of_result (get_bounds t) in
-  let learned =
-    match bounds with
-    | None -> []
-    | Some bounds -> [ Range.is_inside range bounds ]
-  in
-  DR.of_result ~learned (with_root t root_set)
-
-let get_hole = get_simple_mem_val ~expected_mem_val:(Undef Totally)
-let set_hole = set_simple_mem_val ~mem_val:(Undef Totally)
-let get_zeros = get_simple_mem_val ~expected_mem_val:Zeros
-let set_zeros = set_simple_mem_val ~mem_val:Zeros
-
-let get_freed t =
   match t with
-  | Freed -> Ok ()
-  | _ -> Error MemoryNotFreed
+  | Freed -> DR.error UseAfterFree
+  | Tree { bounds; root } ->
+      let root = Option.value root ~default:(Tree.create_root range) in
+      let** root_set = Tree.prod_array root low size chunk array perm in
+      let learned =
+        match bounds with
+        | None -> []
+        | Some bounds -> [ Range.is_inside range bounds ]
+      in
+      DR.of_result ~learned (with_root t root_set)
+
+let cons_simple_mem_val ~expected_mem_val t low high =
+  let open DR.Syntax in
+  let range = (low, high) in
+  match t with
+  | Freed -> DR.error UseAfterFree
+  | Tree { bounds; root } ->
+      if%sat is_in_bounds range bounds then
+        match root with
+        | None -> DR.error (MissingResource Unfixable)
+        | Some root ->
+            let** node, root_framed = Tree.cons_node root range in
+            let res =
+              match node with
+              | MemVal { mem_val; exact_perm = perm; _ }
+                when Node.eq_mem_val mem_val expected_mem_val -> Ok perm
+              | NotOwned Totally -> Error (MissingResource Unfixable)
+              | NotOwned Partially ->
+                  Logging.verbose (fun fmt ->
+                      fmt
+                        "SHeapTree Get Simple Memory Value Error: Memory \
+                         Partially Not Owned (Currently Unsupported)");
+                  Error (MissingResource Unfixable)
+              | _ -> Error WrongMemVal
+            in
+            let++ wroot =
+              DR.of_result
+                (Result.bind res (fun perm ->
+                     Result.map
+                       (fun mem -> (mem, perm))
+                       (with_root t root_framed)))
+            in
+            wroot
+      else DR.error BufferOverrun
+
+let prod_simple_mem_val ~mem_val t low high perm =
+  let open DR.Syntax in
+  let range = (low, high) in
+  match t with
+  | Freed -> DR.error UseAfterFree
+  | Tree { bounds; root } ->
+      let root = Option.value ~default:(Tree.create_root range) root in
+      let** root_set =
+        Tree.prod_node root range (Node.make_owned ~perm ~mem_val)
+      in
+      let learned =
+        match bounds with
+        | None -> []
+        | Some bounds -> [ Range.is_inside range bounds ]
+      in
+      DR.of_result ~learned (with_root t root_set)
+
+let cons_hole = cons_simple_mem_val ~expected_mem_val:(Undef Totally)
+let prod_hole = prod_simple_mem_val ~mem_val:(Undef Totally)
+let cons_zeros = cons_simple_mem_val ~expected_mem_val:Zeros
+let prod_zeros = prod_simple_mem_val ~mem_val:Zeros
+
+let is_freed t =
+  match t with
+  | Freed -> true
+  | _ -> false
 
 let allocated_function : t =
   Tree
@@ -1462,7 +1418,6 @@ let allocated_function : t =
             node = Node.make_owned ~perm:Nonempty ~mem_val:(Undef Totally);
             span = (Expr.zero_i, Expr.one_i);
             children = None;
-            last_path = None;
           };
     }
 
@@ -1481,34 +1436,36 @@ let load t chunk ofs =
   (* FIXME: this should be reestablished asap *)
   (* let** () = check_valid_alignment chunk ofs in *)
   let range = Range.of_low_and_chunk ofs chunk in
-  let** span = DR.of_result (get_bounds t) in
-  if%sat is_in_bounds range span then
-    let** root = DR.of_result (get_root t) in
-    match root with
-    | None ->
-        DR.error
-          (MissingResource (Fixable { is_store = false; low = ofs; chunk }))
-    | Some root ->
-        let** value, root = Tree.load root ofs chunk in
-        let++ wroot = DR.of_result (with_root t root) in
-        (value, wroot)
-  else DR.error BufferOverrun
+  match t with
+  | Freed -> DR.error UseAfterFree
+  | Tree { bounds; root } ->
+      if%sat is_in_bounds range bounds then
+        match root with
+        | None ->
+            DR.error
+              (MissingResource (Fixable { is_store = false; low = ofs; chunk }))
+        | Some root ->
+            let** value, root = Tree.load root ofs chunk in
+            let++ wroot = DR.of_result (with_root t root) in
+            (value, wroot)
+      else DR.error BufferOverrun
 
 let store t chunk ofs value =
   let open DR.Syntax in
   (* let** () = check_valid_alignment chunk ofs in *)
   let range = Range.of_low_and_chunk ofs chunk in
-  let** span = DR.of_result (get_bounds t) in
-  if%sat is_in_bounds range span then
-    let** root = DR.of_result (get_root t) in
-    match root with
-    | None ->
-        DR.error
-          (MissingResource (Fixable { is_store = false; low = ofs; chunk }))
-    | Some root ->
-        let** root = Tree.store root ofs chunk value in
-        DR.of_result (with_root t root)
-  else DR.error BufferOverrun
+  match t with
+  | Freed -> DR.error UseAfterFree
+  | Tree { bounds; root } ->
+      if%sat is_in_bounds range bounds then
+        match root with
+        | None ->
+            DR.error
+              (MissingResource (Fixable { is_store = false; low = ofs; chunk }))
+        | Some root ->
+            let** root = Tree.store root ofs chunk value in
+            DR.of_result (with_root t root)
+      else DR.error BufferOverrun
 
 let move dst_tree dst_ofs src_tree src_ofs size =
   let open DR.Syntax in
@@ -1516,40 +1473,40 @@ let move dst_tree dst_ofs src_tree src_ofs size =
     let open Expr.Infix in
     ((dst_ofs, dst_ofs + size), (src_ofs, src_ofs + size))
   in
-  let** src_span = DR.of_result (get_bounds src_tree) in
-  if%sat is_in_bounds src_range src_span then
-    let** src_root = DR.of_result (get_root src_tree) in
-    match src_root with
-    | None -> DR.error (MissingResource Unfixable)
-    | Some src_root ->
-        let** framed, _ =
-          Tree.frame_range src_root
-            ~replace_node:(fun x -> Ok x)
-            ~rebuild_parent:(fun t ~left:_ ~right:_ -> Delayed.return t)
-            src_range
-        in
-        let** () =
-          match framed.node with
-          | NotOwned _ -> DR.error (MissingResource Unfixable)
-          | _ -> DR.ok ()
-        in
-        let** dst_span = DR.of_result (get_bounds dst_tree) in
-        if%sat is_in_bounds dst_range dst_span then
-          let** dst_root = DR.of_result (get_root dst_tree) in
-          match dst_root with
-          | None -> DR.error (MissingResource Unfixable)
-          | Some dst_root ->
-              let** _, new_dst_root =
-                Tree.frame_range dst_root
-                  ~replace_node:(fun current ->
-                    match current.node with
-                    | NotOwned _ -> Error (MissingResource Unfixable)
-                    | _ -> Ok (Tree.realign framed dst_ofs))
-                  ~rebuild_parent:Tree.of_children dst_range
-              in
-              DR.of_result (with_root dst_tree new_dst_root)
-        else DR.error BufferOverrun
-  else DR.error BufferOverrun
+  match (src_tree, dst_tree) with
+  | Freed, _ | _, Freed -> DR.error UseAfterFree
+  | ( Tree { bounds = src_bounds; root = src_root },
+      Tree { bounds = dst_bounds; root = dst_root } ) ->
+      if%sat is_in_bounds src_range src_bounds then
+        match src_root with
+        | None -> DR.error (MissingResource Unfixable)
+        | Some src_root ->
+            let** framed, _ =
+              Tree.frame_range src_root
+                ~replace_node:(fun x -> Ok x)
+                ~rebuild_parent:(fun t ~left:_ ~right:_ -> Delayed.return t)
+                src_range
+            in
+            let** () =
+              match framed.node with
+              | NotOwned _ -> DR.error (MissingResource Unfixable)
+              | _ -> DR.ok ()
+            in
+            if%sat is_in_bounds dst_range dst_bounds then
+              match dst_root with
+              | None -> DR.error (MissingResource Unfixable)
+              | Some dst_root ->
+                  let** _, new_dst_root =
+                    Tree.frame_range dst_root
+                      ~replace_node:(fun current ->
+                        match current.node with
+                        | NotOwned _ -> Error (MissingResource Unfixable)
+                        | _ -> Ok (Tree.realign framed dst_ofs))
+                      ~rebuild_parent:Tree.of_children dst_range
+                  in
+                  DR.of_result (with_root dst_tree new_dst_root)
+            else DR.error BufferOverrun
+      else DR.error BufferOverrun
 
 let assertions ~loc t =
   let loc = Expr.loc_from_loc_name loc in

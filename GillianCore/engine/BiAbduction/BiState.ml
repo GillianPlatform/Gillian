@@ -445,20 +445,14 @@ module Make (State : SState.S) = struct
   let pp_fix = State.pp_fix
   let get_failing_constraint = State.get_failing_constraint
   let can_fix = State.can_fix
-  let ga_to_setter (a : string) : string = State.ga_to_setter a
-  let ga_to_getter (a : string) : string = State.ga_to_getter a
-  let ga_to_deleter (a : string) : string = State.ga_to_deleter a
 
-  let rec execute_action
-      ?(unification = false)
-      (action : string)
-      (astate : t)
-      (args : Expr.t list) : action_ret =
+  let rec execute_action (action : string) (astate : t) (args : Expr.t list) :
+      action_ret =
     let open Syntaxes.List in
     let procs, state, state_af = astate in
-    let* ret = State.execute_action ~unification action state args in
+    let* ret = State.execute_action action state args in
     match ret with
-    | Ok (subst, outs) -> [ Ok ((procs, subst, state_af), outs) ]
+    | Ok (state', outs) -> [ Ok ((procs, state', state_af), outs) ]
     | Error err when not (State.can_fix err) -> [ Error err ]
     | Error err -> (
         match State.get_fixes state err with
@@ -470,6 +464,30 @@ module Make (State : SState.S) = struct
             let* state' = State.apply_fixes state' fix in
             let* state_af' = State.apply_fixes state_af' fix in
             execute_action action (procs, state', state_af') args)
+
+  let rec consume_core_pred core_pred astate args =
+    let open Syntaxes.List in
+    let procs, state, state_af = astate in
+    let* ret = State.consume_core_pred core_pred state args in
+    match ret with
+    | Ok (state', outs) -> [ Ok ((procs, state', state_af), outs) ]
+    | Error err when not (State.can_fix err) -> [ Error err ]
+    | Error err -> (
+        match State.get_fixes state err with
+        | [] -> [] (* No fixes, we stop *)
+        | fixes ->
+            let* fix = fixes in
+            let state' = State.copy state in
+            let state_af' = State.copy state_af in
+            let* state' = State.apply_fixes state' fix in
+            let* state_af' = State.apply_fixes state_af' fix in
+            consume_core_pred core_pred (procs, state', state_af') args)
+
+  let produce_core_pred core_pred astate args =
+    let open Syntaxes.List in
+    let procs, state, state_af = astate in
+    let+ state' = State.produce_core_pred core_pred state args in
+    (procs, state', state_af)
 
   let get_equal_values bi_state =
     let _, state, _ = bi_state in

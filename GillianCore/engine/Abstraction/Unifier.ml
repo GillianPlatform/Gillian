@@ -573,23 +573,19 @@ module Make (State : SState.S) :
     match a with
     | GA (a_id, ins, outs) ->
         L.verbose (fun fmt -> fmt "Memory action.");
-        let setter = State.ga_to_setter a_id in
 
         let vs = List.map (subst_in_expr subst) (ins @ outs) in
         (* We filter action errors, in theory, production cannot fail, it may only vanish. *)
-        State.execute_action ~unification:true setter state vs
-        |> List.filter_map (function
-             | Ok (state', _) ->
-                 Some
-                   (Ok
-                      {
-                        state = state';
-                        preds = Preds.copy preds;
-                        wands = Wands.copy wands;
-                        pred_defs;
-                        variants = Hashtbl.copy variants;
-                      })
-             | Error _ -> None)
+        State.produce_core_pred a_id state vs
+        |> List.map (fun state' ->
+               Ok
+                 {
+                   state = state';
+                   preds = Preds.copy preds;
+                   wands = Wands.copy wands;
+                   pred_defs;
+                   variants = Hashtbl.copy variants;
+                 })
     | Types les -> (
         L.verbose (fun fmt -> fmt "Types assertion.");
         let state' =
@@ -1256,8 +1252,6 @@ module Make (State : SState.S) :
         let open Res_list.Syntax in
         match (p : Asrt.t) with
         | GA (a_id, e_ins, e_outs) -> (
-            let getter = State.ga_to_getter a_id in
-            let remover = State.ga_to_deleter a_id in
             let vs_ins = List.map (subst_in_expr_opt astate subst) e_ins in
             let failure = List.exists (fun x -> x = None) vs_ins in
             if failure then (
@@ -1266,14 +1260,12 @@ module Make (State : SState.S) :
             else
               let vs_ins = List.map Option.get vs_ins in
               L.verbose (fun m ->
-                  m "Executing action: %s with ins: @[<h>%a@]" getter
+                  m "Executing consume: %s with ins: @[<h>%a@]" a_id
                     Fmt.(list ~sep:comma Expr.pp)
                     vs_ins);
-              let** state', vs' = State.execute_action getter state vs_ins in
-              let vs_ins', vs_outs =
-                List_utils.split_at vs' (List.length vs_ins)
+              let** state'', vs_outs =
+                State.consume_core_pred a_id state vs_ins
               in
-              let** state'', _ = State.execute_action remover state' vs_ins' in
               (* Separate outs into direct unifiables and others*)
               match
                 unify_ins_outs_lists state'' subst step outs vs_outs e_outs

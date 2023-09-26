@@ -23,11 +23,17 @@ module type S = sig
 
   (** Execute action *)
   val execute_action :
-    string -> t -> Gpc.t -> vt list -> (t * vt list, err_t) Symex_ret.t
+    string -> t -> Gpc.t -> vt list -> (t * vt list, err_t) Symex.result
 
-  val ga_to_setter : string -> string
-  val ga_to_getter : string -> string
-  val ga_to_deleter : string -> string
+  (* Consumers have the same signature as action executors,
+     but take a core-predicate name as parameter instead of action name.
+     Theoretically, errors for consumers are different: they're logical errors or missing errors,
+     as opposed to language error and missing errors. *)
+  val consume :
+    string -> t -> Gpc.t -> vt list -> (t * vt list, err_t) Symex.result
+
+  (* Producers cannot fail *)
+  val produce : string -> t -> Gpc.t -> vt list -> t Symex.t
   val is_overlapping_asrt : string -> bool
 
   (** State Copy *)
@@ -81,9 +87,8 @@ module Dummy : S with type init_data = unit = struct
   let get_init_data () = ()
   let clear () = ()
   let execute_action _ _ _ _ = failwith "Please implement SMemory"
-  let ga_to_setter _ = failwith "Please implement SMemory"
-  let ga_to_getter _ = failwith "Please implement SMemory"
-  let ga_to_deleter _ = failwith "Please implement SMemory"
+  let consume _ _ _ _ = failwith "Please implement SMemory"
+  let produce _ _ _ _ = failwith "Please implement SMemory"
   let is_overlapping_asrt _ = failwith "Please implement SMemory"
   let copy () = ()
   let pp _ _ = ()

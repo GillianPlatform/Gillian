@@ -995,20 +995,25 @@ module Make (State : SState.S) :
   let update_subst (astate : t) (subst : st) : unit =
     State.update_subst astate.state subst
 
-  let ga_to_setter (a : string) : string = State.ga_to_setter a
-  let ga_to_getter (a : string) : string = State.ga_to_getter a
-  let ga_to_deleter (a : string) : string = State.ga_to_deleter a
-
-  let execute_action
-      ?(unification = false)
-      (action : string)
-      (astate : t)
-      (args : vt list) : action_ret =
+  let execute_action (action : string) (astate : t) (args : vt list) :
+      action_ret =
     let open Syntaxes.List in
-    let+ result = State.execute_action ~unification action astate.state args in
+    let+ result = State.execute_action action astate.state args in
     match result with
     | Ok (state, outs) -> Ok (copy_with_state astate state, outs)
     | Error err -> Error err
+
+  let consume_core_pred core_pred astate in_args =
+    let open Syntaxes.List in
+    let+ result = State.consume_core_pred core_pred astate.state in_args in
+    match result with
+    | Ok (state, outs) -> Ok (copy_with_state astate state, outs)
+    | Error err -> Error err
+
+  let produce_core_pred core_pred astate args =
+    let open Syntaxes.List in
+    let+ state = State.produce_core_pred core_pred astate.state args in
+    copy_with_state astate state
 
   let mem_constraints (astate : t) : Formula.t list =
     State.mem_constraints astate.state

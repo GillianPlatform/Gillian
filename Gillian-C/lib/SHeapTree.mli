@@ -38,24 +38,22 @@ val freed : t
 val is_empty : t -> bool
 val lvars : t -> SS.t
 val alocs : t -> SS.t
-val get_bounds : t -> Range.t option or_error
-val set_bounds : t -> Range.t option -> t or_error
-val rem_bounds : t -> t or_error
+val cons_bounds : t -> (Range.t option * t) or_error
+val prod_bounds : t -> Range.t option -> t or_error
 
-val get_single :
+val cons_single :
   t -> Expr.t -> Chunk.t -> (SVal.t * Perm.t option * t) d_or_error
 
-val set_single : t -> Expr.t -> Chunk.t -> SVal.t -> Perm.t -> t d_or_error
-val rem_last_get : t -> t
+val prod_single : t -> Expr.t -> Chunk.t -> SVal.t -> Perm.t -> t d_or_error
 
-val get_array :
+val cons_array :
   t ->
   Expr.t ->
   Expr.t ->
   Chunk.t ->
   (MonadicSVal.SVArray.t * Perm.t option * t) d_or_error
 
-val set_array :
+val prod_array :
   t ->
   Expr.t ->
   Expr.t ->
@@ -64,11 +62,10 @@ val set_array :
   Perm.t ->
   t d_or_error
 
-val get_hole : t -> Expr.t -> Expr.t -> (t * Perm.t option) d_or_error
-val set_hole : t -> Expr.t -> Expr.t -> Perm.t -> t d_or_error
-val get_zeros : t -> Expr.t -> Expr.t -> (t * Perm.t option) d_or_error
-val set_zeros : t -> Expr.t -> Expr.t -> Perm.t -> t d_or_error
-val get_freed : t -> unit or_error
+val cons_hole : t -> Expr.t -> Expr.t -> (t * Perm.t option) d_or_error
+val prod_hole : t -> Expr.t -> Expr.t -> Perm.t -> t d_or_error
+val cons_zeros : t -> Expr.t -> Expr.t -> (t * Perm.t option) d_or_error
+val prod_zeros : t -> Expr.t -> Expr.t -> Perm.t -> t d_or_error
 val alloc : Expr.t -> Expr.t -> t
 val store : t -> Chunk.t -> Expr.t -> SVal.t -> t d_or_error
 val load : t -> Chunk.t -> Expr.t -> (SVal.t * t) d_or_error
@@ -76,6 +73,7 @@ val free : t -> Expr.t -> Expr.t -> t d_or_error
 val drop_perm : t -> Expr.t -> Expr.t -> Perm.t -> t d_or_error
 val get_perm_at : t -> Expr.t -> Perm.t option d_or_error
 val weak_valid_pointer : t -> Expr.t -> bool d_or_error
+val is_freed : t -> bool
 
 (** An allocated function always has the exact same tree *)
 val allocated_function : t

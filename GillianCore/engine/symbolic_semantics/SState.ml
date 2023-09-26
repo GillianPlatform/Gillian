@@ -175,14 +175,11 @@ module Make (SMemory : SMemory.S) :
       ~(spec_vars : SS.t) : t =
     (SMemory.init init_data, store, pfs, gamma, spec_vars)
 
-  let execute_action
-      ?(unification = false)
-      (action : string)
-      (state : t)
-      (args : vt list) : action_ret =
+  let execute_action (action : string) (state : t) (args : vt list) : action_ret
+      =
     let open Syntaxes.List in
     let heap, store, pfs, gamma, vars = state in
-    let pc = Gpc.make ~unification ~pfs ~gamma () in
+    let pc = Gpc.make ~unification:false ~pfs ~gamma () in
     let+ Gbranch.{ value; pc } = SMemory.execute_action action heap pc args in
     match value with
     | Ok (new_heap, vs) ->
@@ -191,9 +188,28 @@ module Make (SMemory : SMemory.S) :
         Ok (new_state, vs)
     | Error err -> Error (StateErr.EMem err)
 
-  let ga_to_setter (a_id : string) = SMemory.ga_to_setter a_id
-  let ga_to_getter (a_id : string) = SMemory.ga_to_getter a_id
-  let ga_to_deleter (a_id : string) = SMemory.ga_to_deleter a_id
+  let consume_core_pred core_pred state in_args =
+    let open Syntaxes.List in
+    let heap, store, pfs, gamma, vars = state in
+    let pc = Gpc.make ~unification:true ~pfs ~gamma () in
+    let+ Gbranch.{ value; pc } = SMemory.consume core_pred heap pc in_args in
+    match value with
+    | Ok (new_heap, vs) ->
+        let store = SStore.copy store in
+        let new_state = (new_heap, store, pc.pfs, pc.gamma, vars) in
+        Ok (new_state, vs)
+    | Error err -> Error (StateErr.EMem err)
+
+  let produce_core_pred core_pred state args =
+    let open Syntaxes.List in
+    let heap, store, pfs, gamma, vars = state in
+    (* unification false is suspicious here *)
+    let pc = Gpc.make ~unification:false ~pfs ~gamma () in
+    let+ Gbranch.{ value = new_heap; pc } =
+      SMemory.produce core_pred heap pc args
+    in
+    (new_heap, store, pc.pfs, pc.gamma, vars)
+
   let is_overlapping_asrt (a : string) : bool = SMemory.is_overlapping_asrt a
 
   let eval_expr (state : t) (e : Expr.t) : vt =

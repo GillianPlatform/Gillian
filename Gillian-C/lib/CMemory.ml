@@ -151,27 +151,4 @@ let execute_action name heap params =
   | AMem Free -> execute_free heap params
   | AMem Move -> execute_move heap params
   | AGEnv GetDef -> execute_genvgetdef heap params
-  | AMem
-      ( GetSingle
-      | SetSingle
-      | RemSingle
-      | GetArray
-      | SetArray
-      | RemArray
-      | GetBounds
-      | SetBounds
-      | RemBounds
-      | GetHole
-      | SetHole
-      | RemHole
-      | GetZeros
-      | SetZeros
-      | RemZeros
-      | GetFreed
-      | SetFreed
-      | RemFreed ) ->
-      failwith
-        (Printf.sprintf
-           "%s is an action related to a General Assertion, it should never be \
-            called during a concrete execution"
-           name)
+  | AMem SetZeros -> failwith "cannot execute set_zeros in concrete memory"
