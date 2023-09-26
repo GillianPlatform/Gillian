@@ -94,3 +94,6 @@ javert-test262
 # Built docs
 _docs/odoc
 _docs/sphinx
+
+# Memtraces
+*.ctf

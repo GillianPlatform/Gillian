@@ -39,6 +39,8 @@ struct
   module Debug_adapter = Debug_adapter.Make (Debugger)
 
   let main () =
+    Memtrace.trace_if_requested ();
+
     let doc = "An analysis toolchain" in
 
     let man =
