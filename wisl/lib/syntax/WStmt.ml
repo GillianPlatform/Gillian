@@ -3,7 +3,7 @@ open VisitorUtils
 type tt =
   | Skip
   | VarAssign of string * WExpr.t
-  | Fresh of string  (** fresh x *)
+  | Fresh of string
   | New of string * int
   | Dispose of WExpr.t
   | Lookup of string * WExpr.t (* x := [e] *)
@@ -13,8 +13,8 @@ type tt =
   | While of WExpr.t * t list
   | If of WExpr.t * t list * t list
   | Logic of WLCmd.t
-  | Assert of WExpr.t  (** non-SL assertion *)
-  | Assume of WExpr.t  (** non-SL assumption *)
+  | Assert of WExpr.t
+  | Assume of WExpr.t
 
 and t = { sid : int; sloc : CodeLoc.t; snode : tt }
 

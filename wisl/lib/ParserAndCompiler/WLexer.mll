@@ -31,7 +31,7 @@ rule read =
   | "if"     { IF (curr lexbuf) }
   | "else"   { ELSE (curr lexbuf) }
   | "skip"   { SKIP (curr lexbuf) }
-  | "fresh" { FRESH (curr lexbuf) }
+  | "fresh"  { FRESH (curr lexbuf) }
   | "new"    { NEW (curr lexbuf) }
   | "free"   { DELETE (curr lexbuf) }
   | "dispose"{ DELETE (curr lexbuf) }

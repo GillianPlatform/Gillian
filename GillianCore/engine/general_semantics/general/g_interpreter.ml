@@ -115,11 +115,6 @@ struct
       ?branch_case
       ?(new_branches = [])
       () =
-    (* We only want to track branches for the base function. *)
-    let branch_case, new_branches =
-      if List.length callstack > 1 then (None, [])
-      else (branch_case, new_branches)
-    in
     CConf.ConfCont
       {
         state;

@@ -171,8 +171,8 @@ module Packaged = struct
       match case with
       | GuardedGoto b -> ("GuardedGoto", ("If/Else", Fmt.str "%B" b))
       | LCmd x -> ("LCmd", ("Logical command", Fmt.str "%d" x))
-      | SpecExec (fl, ix) ->
-          ("SpecExec", ("Spec exec", Fmt.str "%a-%d" Flag.pp fl ix))
+      | SpecExec (fl, i) ->
+          ("SpecExec", ("Spec exec", Fmt.str "%a-%d" Flag.pp fl i))
       | LAction json ->
           let s = Yojson.Safe.to_string (`List json) in
           ("LAction", ("Logical action", s))
