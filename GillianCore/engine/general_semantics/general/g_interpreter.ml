@@ -1336,18 +1336,18 @@ struct
         in
         List.mapi
           (fun j ((state, next), case) ->
+            let new_branches =
+              if j <> 0 then []
+              else
+                sp |> List.tl
+                |> List.map (fun ((state, next), case) ->
+                       (state, next, GuardedGoto case))
+            in
             make_confcont ~state
               ~callstack:(if j = 0 then cs else Call_stack.copy cs)
               ~invariant_frames:iframes ~prev_idx:i ~loop_ids ~next_idx:next
               ~branch_count:b_counter ~branch_case:(GuardedGoto case)
-              ~new_branches:
-                (if j = 0 then
-                 List.map
-                   (fun ((state, next), case) ->
-                     (state, next, GuardedGoto case))
-                   (List.tl sp)
-                else [])
-              ())
+              ~new_branches ())
           sp
 
       let eval_phi_assignment lxarr eval_state =
