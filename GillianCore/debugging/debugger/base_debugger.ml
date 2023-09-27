@@ -542,10 +542,7 @@ struct
                  update_proc_state cur_report_id debug_state proc_state;
                  let open Exec_map in
                  let cmd = content |> of_yojson_string ConfigReport.of_yojson in
-                 let cmd_kind =
-                   new_branch_cases
-                   |> Option.fold ~none:Normal ~some:Exec_map.kind_of_cases
-                 in
+                 let cmd_kind = Exec_map.kind_of_cases new_branch_cases in
                  let unifys = get_unifys cur_report_id debug_state proc_state in
                  let exec_data =
                    Lift.make_executed_cmd_data cmd_kind cur_report_id cmd
@@ -627,9 +624,9 @@ struct
             | EndOfBranch (result, cont_func) ->
                 handle_end_of_branch f prev_id_in_frame result cont_func
                   branch_path debug_state proc_state
-            | Continue (cur_report_id, branch_path, new_branch_cases, cont_func)
+            | Continue { report_id; branch_path; new_branch_cases; cont_func }
               ->
-                handle_continue f prev_id_in_frame cur_report_id branch_case
+                handle_continue f prev_id_in_frame report_id branch_case
                   branch_path new_branch_cases cont_func debug_state proc_state)
     end
 
@@ -669,14 +666,18 @@ struct
             proc_state |> update_proc_state prev_id debug_state;
             Ok (proc_state, ReachedEnd)
 
-      let init_lifter proc_name id cmd branch_path new_branch_cases debug_state
-          =
+      let init_lifter
+          ~proc_name
+          ~report_id
+          ~cmd_report
+          ~branch_path
+          ~new_branch_cases
+          debug_state =
         let { proc_names; tl_ast; prog; _ } = debug_state in
-        let kind =
-          let cases = Option.value ~default:[] new_branch_cases in
-          Exec_map.kind_of_cases cases
+        let kind = Exec_map.kind_of_cases new_branch_cases in
+        let exec_data =
+          Lift.make_executed_cmd_data kind report_id cmd_report branch_path
         in
-        let exec_data = Lift.make_executed_cmd_data kind id cmd branch_path in
         Lifter.init_exn ~proc_name ~all_procs:proc_names tl_ast prog exec_data
 
       let handle_continue
@@ -694,10 +695,12 @@ struct
         |> Execute_step.Handle_continue.get_report_and_check_type
              ~log_context:"launch_proc" ~on_proc_init:aux ~on_eob:aux
              ~continue:(fun content ->
-               let cmd = content |> of_yojson_string ConfigReport.of_yojson in
+               let cmd_report =
+                 content |> of_yojson_string ConfigReport.of_yojson
+               in
                let lifter_state, handler_result =
-                 init_lifter proc_name id cmd branch_path new_branch_cases
-                   debug_state
+                 init_lifter ~proc_name ~report_id:id ~cmd_report ~branch_path
+                   ~new_branch_cases debug_state
                in
                let proc_state =
                  let make ext =
@@ -733,8 +736,8 @@ struct
         | EndOfBranch (result, cont_func) ->
             handle_end_of_branch proc_name result prev_id report_state cont_func
               debug_state
-        | Continue (cur_report_id, branch_path, new_branch_cases, cont_func) ->
-            handle_continue proc_name new_branch_cases branch_path cur_report_id
+        | Continue { report_id; branch_path; new_branch_cases; cont_func } ->
+            handle_continue proc_name new_branch_cases branch_path report_id
               build_proc_state cont_func report_state debug_state
 
       let f proc_name debug_state =

@@ -68,7 +68,6 @@ struct
       prev_cmd_report_id : Logging.Report_id.t option;
       branch_case : branch_case option;
       branch_path : branch_path;
-      new_branches : (state_t * int * branch_case) list;
     }
     [@@deriving yojson]
 
@@ -100,58 +99,59 @@ struct
       | ConfFinish of finish
       | ConfSusp of susp
     [@@deriving yojson]
-  end
 
-  let make_confcont
-      ~state
-      ~callstack
-      ~invariant_frames
-      ~prev_idx
-      ~next_idx
-      ~loop_ids
-      ~branch_count
-      ~branch_path
-      ?prev_cmd_report_id
-      ?branch_case
-      ?(new_branches = [])
-      () =
-    CConf.ConfCont
-      {
-        state;
-        callstack;
-        invariant_frames;
-        prev_idx;
-        next_idx;
-        loop_ids;
-        branch_count;
-        branch_path;
-        prev_cmd_report_id;
-        branch_case;
-        new_branches;
-      }
+    let make_cont
+        ~state
+        ~callstack
+        ~invariant_frames
+        ~prev_idx
+        ~next_idx
+        ~loop_ids
+        ~branch_count
+        ~branch_path
+        ?prev_cmd_report_id
+        ?branch_case
+        () =
+      ConfCont
+        {
+          state;
+          callstack;
+          invariant_frames;
+          prev_idx;
+          next_idx;
+          loop_ids;
+          branch_count;
+          branch_path;
+          prev_cmd_report_id;
+          branch_case;
+        }
 
-  let cconf_path =
-    CConf.(
-      function
+    let get_branch_case = function
+      | ConfCont { branch_case; _ } -> branch_case
+      | _ -> None
+
+    let get_branch_path = function
       | ConfErr { branch_path; _ } -> branch_path
       | ConfFinish { branch_path; _ } -> branch_path
       | ConfSusp { branch_path; _ } -> branch_path
       | ConfCont { branch_path; branch_case; _ } ->
-          List_utils.cons_opt branch_case branch_path)
+          List_utils.cons_opt branch_case branch_path
+  end
 
   type conf_t = BConfErr of err_t list | BConfCont of State.t
   type result_t = (State.t, State.vt, err_t) Exec_res.t [@@deriving yojson]
 
-  type 'a cont_func_f = ?path:branch_path -> unit -> 'a cont_func
+  type 'result cont_func_f = ?path:BranchCase.path -> unit -> 'result cont_func
 
-  and 'a cont_func =
-    | Finished of 'a list
-    | Continue of
-        (Logging.Report_id.t option
-        * branch_path
-        * branch_case list option
-        * 'a cont_func_f)
-    | EndOfBranch of 'a * 'a cont_func_f
+  and 'result cont_func =
+    | Finished of 'result list
+    | Continue of {
+        report_id : Logging.Report_id.t option;
+        branch_path : BranchCase.path;
+        new_branch_cases : BranchCase.t list;
+        cont_func : 'result cont_func_f;
+      }
+    | EndOfBranch of 'result * 'result cont_func_f
 
   module Logging = struct
     let pp_str_list = Fmt.(brackets (list ~sep:comma string))
@@ -634,7 +634,6 @@ struct
       loop_ids:string list ->
       branch_count:int ->
       ?branch_case:branch_case ->
-      ?new_branches:(state_t * int * branch_case) list ->
       unit ->
       CConf.t
 
@@ -721,30 +720,15 @@ struct
             count := result + 1;
             result
           in
-          let branch_case = SpecExec (fl, get_count fl) in
-          let branch_case, new_branches =
+          let branch_case =
             match (is_first, others) with
-            | _, Some (_ :: _ as others) ->
-                let new_branches =
-                  Some
-                    (List_utils.get_list_somes
-                    @@ List.map
-                         (fun (conf, fl) ->
-                           match conf with
-                           | CConf.ConfCont { state; next_idx; _ } ->
-                               Some
-                                 (state, next_idx, SpecExec (fl, get_count fl))
-                           | _ -> None)
-                         others)
-                in
-                (Some branch_case, new_branches)
-            | false, _ -> (Some branch_case, None)
-            | _ -> (None, None)
+            | false, _ | _, Some (_ :: _) -> Some (SpecExec (fl, get_count fl))
+            | _ -> None
           in
 
           make_confcont ~state:ret_state ~callstack:new_cs
             ~invariant_frames:iframes ~prev_idx:i ~loop_ids ~next_idx:new_j
-            ~branch_count:b_counter ?branch_case ?new_branches ()
+            ~branch_count:b_counter ?branch_case ()
 
         let process_ret
             pid
@@ -1034,30 +1018,27 @@ struct
               let e' = Expr.EList (List.map Val.to_expr vs) in
               let v' = eval_expr e' in
               let state'' = update_store state' x v' in
-              let rest_confs, new_branches =
-                List.split
-                @@ List.map
-                     (fun (r_state, r_vs) ->
+              let rest_confs =
+                rest_rets
+                |> List.map (fun (r_state, r_vs) ->
                        let r_e = Expr.EList (List.map Val.to_expr r_vs) in
                        let r_v = eval_expr r_e in
                        let r_state' = update_store r_state x r_v in
                        let branch_case =
                          LAction (r_vs |> List.map state_vt_to_yojson)
                        in
-                       ( make_confcont ~state:r_state'
-                           ~callstack:(Call_stack.copy cs)
-                           ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                           ~next_idx:(i + 1) ~branch_count:b_counter
-                           ~branch_case (),
-                         (r_state', i + 1, branch_case) ))
-                     rest_rets
+                       make_confcont ~state:r_state'
+                         ~callstack:(Call_stack.copy cs)
+                         ~invariant_frames:iframes ~prev_idx:i ~loop_ids
+                         ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
+                         ())
               in
               let ret_len = 1 + List.length rest_rets in
               let b_counter = b_counter + if ret_len > 1 then 1 else 0 in
               let branch_case = LAction (vs |> List.map state_vt_to_yojson) in
               make_confcont ~state:state'' ~callstack:cs
                 ~invariant_frames:iframes ~branch_case ~prev_idx:i ~loop_ids
-                ~next_idx:(i + 1) ~branch_count:b_counter ~new_branches ()
+                ~next_idx:(i + 1) ~branch_count:b_counter ()
               :: rest_confs
         in
         let errors =
@@ -1088,31 +1069,19 @@ struct
                 in
                 match recovery_states with
                 | Ok recovery_states ->
+                    let num_states = List.length recovery_states in
                     let b_counter =
-                      b_counter
-                      + if List.length recovery_states = 1 then 0 else 1
+                      b_counter + if num_states = 1 then 0 else 1
                     in
                     List.mapi
                       (fun ix state ->
                         let branch_case =
-                          if List.length recovery_states > 1 then
-                            Some (LActionFail ix)
-                          else None
-                        in
-                        let new_branches =
-                          match (ix, recovery_states) with
-                          | 0, _ :: rest ->
-                              Some
-                                (List.mapi
-                                   (fun ix state ->
-                                     (state, i, LActionFail (ix + 1)))
-                                   rest)
-                          | _ -> None
+                          if num_states > 1 then Some (LActionFail ix) else None
                         in
                         make_confcont ~state ~callstack:cs
                           ~invariant_frames:iframes ~prev_idx:prev
                           ~loop_ids:prev_loop_ids ~next_idx:i
-                          ~branch_count:b_counter ?branch_case ?new_branches ())
+                          ~branch_count:b_counter ?branch_case ())
                       recovery_states
                 | Error msg ->
                     L.verbose (fun m -> m "Couldn't recover because: %s" msg);
@@ -1218,7 +1187,8 @@ struct
             let all_results = evaluate_lcmd prog lcmd ~annot state in
             let successes, errors = Res_list.split all_results in
             let success_confs =
-              let has_branched = List.length successes > 1 in
+              let num_successes = List.length successes in
+              let has_branched = num_successes > 1 in
               let b_counter =
                 if has_branched then b_counter + 1 else b_counter
               in
@@ -1227,19 +1197,9 @@ struct
                      let branch_case =
                        if has_branched then Some (LCmd ix) else None
                      in
-                     let new_branches =
-                       match (ix, successes) with
-                       | 0, _ :: rest ->
-                           Some
-                             (List.mapi
-                                (fun ix state -> (state, i, LCmd (ix + 1)))
-                                rest)
-                       | _ -> None
-                     in
                      make_confcont ~state ~callstack:cs
                        ~invariant_frames:iframes ~prev_idx:i ~loop_ids
-                       ~next_idx:(i + 1) ~branch_count:b_counter ?branch_case
-                       ?new_branches ())
+                       ~next_idx:(i + 1) ~branch_count:b_counter ?branch_case ())
             in
             let error_conf =
               match errors with
@@ -1331,18 +1291,10 @@ struct
         in
         List.mapi
           (fun j ((state, next), case) ->
-            let new_branches =
-              if j <> 0 then []
-              else
-                sp |> List.tl
-                |> List.map (fun ((state, next), case) ->
-                       (state, next, GuardedGoto case))
-            in
             make_confcont ~state
               ~callstack:(if j = 0 then cs else Call_stack.copy cs)
               ~invariant_frames:iframes ~prev_idx:i ~loop_ids ~next_idx:next
-              ~branch_count:b_counter ~branch_case:(GuardedGoto case)
-              ~new_branches ())
+              ~branch_count:b_counter ~branch_case:(GuardedGoto case) ())
           sp
 
       let eval_phi_assignment lxarr eval_state =
@@ -1723,7 +1675,7 @@ struct
 
       let branch_path = List_utils.cons_opt branch_case branch_path in
       let make_confcont =
-        make_confcont ?prev_cmd_report_id:!report_id_ref ~branch_path
+        CConf.make_cont ?prev_cmd_report_id:!report_id_ref ~branch_path
       in
       DL.log (fun m ->
           m
@@ -1882,20 +1834,29 @@ struct
           Some cmd_step
       | _ -> None
 
-    let continue_or_pause rest_confs cont_func eval_step_state =
+    let continue_or_pause
+        ?(new_confs = false)
+        rest_confs
+        cont_func
+        eval_step_state =
       let { parent_id_ref; branch_path; _ } = eval_step_state in
       match rest_confs with
-      | ConfCont { branch_case; new_branches; branch_path; _ } :: _ ->
+      | ConfCont { branch_path; _ } :: _ ->
           rest_confs
           |> List.iteri (fun i conf ->
                  log_confcont parent_id_ref (i = 0) conf |> ignore);
           let new_branch_cases =
-            branch_case
-            |> Option.map (fun branch_case ->
-                   branch_case
-                   :: (new_branches |> List.map (fun (_, _, case) -> case)))
+            if new_confs then
+              rest_confs |> List.filter_map CConf.get_branch_case
+            else []
           in
-          Continue (!parent_id_ref, branch_path, new_branch_cases, cont_func)
+          Continue
+            {
+              report_id = !parent_id_ref;
+              branch_path;
+              new_branch_cases;
+              cont_func;
+            }
       | ConfErr
           {
             callstack;
@@ -1914,11 +1875,23 @@ struct
               branch_case = None;
             }
           |> ignore;
-          Continue (!parent_id_ref, branch_path, None, cont_func)
+          Continue
+            {
+              report_id = !parent_id_ref;
+              branch_path;
+              new_branch_cases = [];
+              cont_func;
+            }
       | _ ->
           if !Config.debug then
             let branch_path = Option.value branch_path ~default:[] in
-            Continue (!parent_id_ref, branch_path, None, cont_func)
+            Continue
+              {
+                report_id = !parent_id_ref;
+                branch_path;
+                new_branch_cases = [];
+                cont_func;
+              }
           else cont_func ()
 
     let select_conf branch_path confs =
@@ -1929,7 +1902,8 @@ struct
           List_utils.hd_tl confs
       | Some branch_path ->
           confs
-          |> List_utils.pop_where (fun conf -> cconf_path conf = branch_path)
+          |> List_utils.pop_where (fun conf ->
+                 CConf.get_branch_path conf = branch_path)
 
     let debug_log conf rest_confs =
       DL.log (fun m ->
@@ -2042,7 +2016,7 @@ struct
           protected_evaluate_cmd prog state cs iframes prev prev_loop_ids i
             b_counter parent_id_ref branch_path branch_case
         in
-        continue_or_pause next_confs
+        continue_or_pause ~new_confs:true next_confs
           (fun ?path () -> f (next_confs @ rest_confs) path results)
           eval_step_state
 
@@ -2133,8 +2107,8 @@ struct
           cconf
         in
         let conf =
-          make_confcont ~state ~callstack ~invariant_frames ~prev_idx ~loop_ids
-            ~next_idx ~branch_count ~branch_path ()
+          CConf.make_cont ~state ~callstack ~invariant_frames ~prev_idx
+            ~loop_ids ~next_idx ~branch_count ~branch_path ()
         in
         L.(
           verbose (fun m ->
@@ -2206,7 +2180,7 @@ struct
   let rec evaluate_cmd_iter (init_func : 'a cont_func) : 'a list =
     match init_func with
     | Finished results -> results
-    | Continue (_, _, _, cont_func) -> evaluate_cmd_iter (cont_func ())
+    | Continue { cont_func; _ } -> evaluate_cmd_iter (cont_func ())
     | EndOfBranch _ ->
         failwith "HORROR: EndOfBranch encountered in continuous eval!"
 
@@ -2253,7 +2227,7 @@ struct
     in
     let proc_body_index = 0 in
     let conf : CConf.t =
-      make_confcont ~state ~callstack:cs ~invariant_frames:[] ~prev_idx:(-1)
+      CConf.make_cont ~state ~callstack:cs ~invariant_frames:[] ~prev_idx:(-1)
         ~loop_ids:[] ~next_idx:proc_body_index ~branch_count:0 ~branch_path:[]
         ()
     in
@@ -2268,11 +2242,14 @@ struct
         }
     in
     Continue
-      ( report_id,
-        [],
-        None,
-        fun ?path () ->
-          evaluate_cmd_step ret_fun true prog [] [] [ conf ] path [] )
+      {
+        report_id;
+        branch_path = [];
+        new_branch_cases = [];
+        cont_func =
+          (fun ?path () ->
+            evaluate_cmd_step ret_fun true prog [] [] [ conf ] path []);
+      }
 
   (**
   Evaluation of procedures
