@@ -3,6 +3,7 @@ open VisitorUtils
 type tt =
   | Skip
   | VarAssign of string * WExpr.t
+  | Fresh of string  (** fresh x *)
   | New of string * int
   | Dispose of WExpr.t
   | Lookup of string * WExpr.t (* x := [e] *)
@@ -12,6 +13,8 @@ type tt =
   | While of WExpr.t * t list
   | If of WExpr.t * t list * t list
   | Logic of WLCmd.t
+  | Assert of WExpr.t  (** non-SL assertion *)
+  | Assume of WExpr.t  (** non-SL assumption *)
 
 and t = { sid : int; sloc : CodeLoc.t; snode : tt }
 
@@ -30,6 +33,7 @@ and pp fmt stmt =
   match get stmt with
   | Skip -> Format.fprintf fmt "@[%s@]" "skip"
   | VarAssign (v, e) -> Format.fprintf fmt "@[%s := %a@]" v WExpr.pp e
+  | Fresh v -> Format.fprintf fmt "@[fresh %s@]" v
   | New (v, r) -> Format.fprintf fmt "@[%s := new(%i)@]" v r
   | Dispose e -> Format.fprintf fmt "@[free@ %a@]" WExpr.pp e
   | Lookup (v, e) -> Format.fprintf fmt "@[%s := [%a]@]" v WExpr.pp e
@@ -47,6 +51,8 @@ and pp fmt stmt =
         "@[@[<v 2>if(%a) {@\n%a@]@\n@[<v 2>} else {@\n%a@]@\n}@]" WExpr.pp e
         pp_list s1 pp_list s2
   | Logic lcmd -> Format.fprintf fmt "@[[[ %a ]]@]" WLCmd.pp lcmd
+  | Assert e -> Format.fprintf fmt "@[assert %a@]" WExpr.pp e
+  | Assume e -> Format.fprintf fmt "@[assume %a@]" WExpr.pp e
 
 and pp_head fmt stmt =
   match get stmt with
@@ -87,14 +93,15 @@ let rec get_by_id id stmt =
   let lcmd_getter = WLCmd.get_by_id id in
   let aux s =
     match get s with
-    | Dispose e | Lookup (_, e) | VarAssign (_, e) -> expr_getter e
+    | Dispose e | Lookup (_, e) | VarAssign (_, e) | Assert e | Assume e ->
+        expr_getter e
     | Update (e1, e2) -> expr_getter e1 |>> (expr_getter, e2)
     | FunCall (_, _, el, _) -> expr_list_visitor el
     | While (e, sl) -> expr_getter e |>> (list_visitor, sl)
     | If (e, sl1, sl2) ->
         expr_getter e |>> (list_visitor, sl1) |>> (list_visitor, sl2)
     | Logic lcmd -> lcmd_getter lcmd
-    | New _ | Skip -> `None
+    | Fresh _ | New _ | Skip -> `None
   in
   let self_or_none = if get_id stmt = id then `WStmt stmt else `None in
   self_or_none |>> (aux, stmt)

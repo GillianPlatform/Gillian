@@ -31,6 +31,7 @@ rule read =
   | "if"     { IF (curr lexbuf) }
   | "else"   { ELSE (curr lexbuf) }
   | "skip"   { SKIP (curr lexbuf) }
+  | "fresh" { FRESH (curr lexbuf) }
   | "new"    { NEW (curr lexbuf) }
   | "free"   { DELETE (curr lexbuf) }
   | "dispose"{ DELETE (curr lexbuf) }
@@ -43,6 +44,7 @@ rule read =
   | "nounfold" { NOUNFOLD (curr lexbuf) }
   | "apply"  { APPLY (curr lexbuf) }
   | "assert" { ASSERT (curr lexbuf) }
+  | "assume" { ASSUME (curr lexbuf) }
   | "with" { WITH (curr lexbuf) }
   | "variant" { VARIANT (curr lexbuf) }
   | "statement" { STATEMENT (curr lexbuf) }

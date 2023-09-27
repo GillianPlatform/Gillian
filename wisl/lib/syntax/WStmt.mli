@@ -1,6 +1,7 @@
 type tt =
   | Skip
   | VarAssign of string * WExpr.t  (** x := e *)
+  | Fresh of string  (** fresh x *)
   | New of string * int  (** x := new(k) *)
   | Dispose of WExpr.t  (** free(e) *)
   | Lookup of string * WExpr.t  (** x := [e] *)
@@ -10,6 +11,8 @@ type tt =
   | While of WExpr.t * t list  (** while (e) \{ s \} *)
   | If of WExpr.t * t list * t list  (** if (e) \{ s \} else \{ s \} *)
   | Logic of WLCmd.t  (** logic command *)
+  | Assert of WExpr.t  (** non-SL assertion *)
+  | Assume of WExpr.t  (** non-SL assumption *)
 
 and t = { sid : int; sloc : CodeLoc.t; snode : tt }
 
