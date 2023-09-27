@@ -714,7 +714,19 @@ struct
             | false -> cs
           in
 
-          let branch_case = SpecExec fl in
+          let succ_count = ref 0 in
+          let err_count = ref 0 in
+          let get_count fl =
+            let count =
+              match fl with
+              | Flag.Normal -> succ_count
+              | _ -> err_count
+            in
+            let result = !count in
+            count := result + 1;
+            result
+          in
+          let branch_case = SpecExec (fl, get_count fl) in
           let branch_case, new_branches =
             match (is_first, others) with
             | _, Some (_ :: _ as others) ->
@@ -722,10 +734,11 @@ struct
                   Some
                     (List_utils.get_list_somes
                     @@ List.map
-                         (fun conf ->
+                         (fun (conf, fl) ->
                            match conf with
                            | CConf.ConfCont { state; next_idx; _ } ->
-                               Some (state, next_idx, branch_case)
+                               Some
+                                 (state, next_idx, SpecExec (fl, get_count fl))
                            | _ -> None)
                          others)
                 in
@@ -857,13 +870,16 @@ struct
                       let others =
                         List.map
                           (fun (ret_state, fl) ->
-                            process_ret false ret_state fl b_counter None
-                              spec_name)
+                            let conf =
+                              process_ret false ret_state fl b_counter None
+                                spec_name
+                            in
+                            (conf, fl))
                           rest_rets
                       in
                       process_ret true ret_state fl b_counter (Some others)
                         spec_name
-                      :: others
+                      :: List.map fst others
                   | [] -> []
                 in
                 let error_confs =

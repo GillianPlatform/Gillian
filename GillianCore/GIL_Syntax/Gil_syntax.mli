@@ -999,7 +999,7 @@ module BranchCase : sig
   type t =
     | GuardedGoto of bool  (** Effectively if/else; either true or false case *)
     | LCmd of int  (** Logical command *)
-    | SpecExec of Flag.t  (** Spec execution *)
+    | SpecExec of Flag.t * int  (** Spec execution *)
     | LAction of Yojson.Safe.t list  (** Logical action *)
     | LActionFail of int  (** {i Failed} logical action*)
   [@@deriving yojson, show]
