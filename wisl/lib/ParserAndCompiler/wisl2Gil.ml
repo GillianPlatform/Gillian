@@ -602,7 +602,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         map_reassign_vars ((annot_while, None, cmd) :: acc) rest
     | [] -> List.rev acc
   in
-  let annot_call_while = { annot_while with nest_kind = Proc loop_fname } in
+  let annot_call_while = { annot_while with nest_kind = LoopBody loop_fname } in
   let lab_cmds =
     (annot_call_while, None, call_cmd) :: map_reassign_vars [] reassign_vars
   in
@@ -824,7 +824,8 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       in
       let cmd = Cmd.Call (x, expr_fn, params, None, bindings) in
       let annot =
-        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
+          ~nest_kind:(FunCall fn) ()
       in
       let comp_rest, new_functions = compile_list rest in
       (List.concat cmdles @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
@@ -969,7 +970,7 @@ let rec compile_function
     let mk =
       WAnnot.make
         ~origin_loc:(CodeLoc.to_location (WExpr.get_loc return_expr))
-        ~origin_id:(WExpr.get_id return_expr)
+        ~origin_id:(WExpr.get_id return_expr) ~is_return:true
     in
     (mk ~stmt_kind:(Multi NotEnd) (), mk ~stmt_kind:(Multi EndNormal) ())
   in

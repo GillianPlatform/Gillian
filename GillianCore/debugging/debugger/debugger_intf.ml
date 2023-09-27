@@ -1,37 +1,35 @@
 module type S = sig
   type tl_ast
-  type debug_state
+  type t
 
   module Inspect : sig
     type debug_state_view [@@deriving yojson]
 
-    val get_debug_state : debug_state -> debug_state_view
-
-    val get_unification :
-      Logging.Report_id.t -> debug_state -> Logging.Report_id.t * Unify_map.t
+    val get_debug_state : t -> debug_state_view
+    val get_unify_map : Logging.Report_id.t -> t -> Unify_map.t
   end
 
-  val launch : string -> string option -> (debug_state, string) result
-  val jump_to_id : Logging.Report_id.t -> debug_state -> (unit, string) result
-  val jump_to_start : debug_state -> unit
-  val step_in : ?reverse:bool -> debug_state -> stop_reason
-  val step : ?reverse:bool -> debug_state -> stop_reason
+  val launch : string -> string option -> (t, string) result
+  val jump_to_id : Logging.Report_id.t -> t -> (unit, string) result
+  val jump_to_start : t -> unit
+  val step_in : ?reverse:bool -> t -> stop_reason
+  val step : ?reverse:bool -> t -> stop_reason
 
   val step_specific :
     Exec_map.Packaged.branch_case option ->
     Logging.Report_id.t ->
-    debug_state ->
+    t ->
     (stop_reason, string) result
 
-  val step_out : debug_state -> stop_reason
-  val run : ?reverse:bool -> ?launch:bool -> debug_state -> stop_reason
-  val start_proc : string -> debug_state -> (stop_reason, string) result
-  val terminate : debug_state -> unit
-  val get_frames : debug_state -> frame list
-  val get_scopes : debug_state -> Variable.scope list
-  val get_variables : int -> debug_state -> Variable.t list
-  val get_exception_info : debug_state -> exception_info
-  val set_breakpoints : string option -> int list -> debug_state -> unit
+  val step_out : t -> stop_reason
+  val run : ?reverse:bool -> ?launch:bool -> t -> stop_reason
+  val start_proc : string -> t -> (stop_reason, string) result
+  val terminate : t -> unit
+  val get_frames : t -> frame list
+  val get_scopes : t -> Variable.scope list
+  val get_variables : int -> t -> Variable.t list
+  val get_exception_info : t -> exception_info
+  val set_breakpoints : string option -> int list -> t -> unit
 end
 
 module type Make = functor
@@ -56,6 +54,11 @@ module type Intf = sig
 
   (**/**)
 
-  (** @canonical Gillian.Debugger.Make *)
-  module Make : Make
+  module Verification_debugger : sig
+    module Make : Make
+  end
+
+  module Symbolic_debugger : sig
+    module Make : Make
+  end
 end

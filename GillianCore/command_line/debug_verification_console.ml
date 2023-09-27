@@ -21,6 +21,7 @@ module Make (PC : ParserAndCompiler.S) (Debug_adapter : Debug_adapter.S) :
     Cmd.info "debugverify" ~doc ~man
 
   let start_debug_adapter manual () =
+    Config.current_exec_mode := Utils.Exec_mode.Verification;
     Config.manual_proof := manual;
     Lwt_main.run (Debug_adapter.start Lwt_io.stdin Lwt_io.stdout)
 

@@ -42,15 +42,19 @@ module type S = sig
 
     Returns [None] if lifting is unsupported (i.e. if [tl_ast] is [None]). *)
   val init :
-    string ->
+    proc_name:string ->
+    all_procs:string list ->
     tl_ast option ->
+    (annot, int) Prog.t ->
     cmd_report executed_cmd_data ->
     (t * handle_cmd_result) option
 
   (** Exception-raising version of {!init}. *)
   val init_exn :
-    string ->
+    proc_name:string ->
+    all_procs:string list ->
     tl_ast option ->
+    (annot, int) Prog.t ->
     cmd_report executed_cmd_data ->
     t * handle_cmd_result
 

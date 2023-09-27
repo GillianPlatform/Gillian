@@ -190,10 +190,14 @@ module Packaged = struct
           Cmd { data = package_data aux data; next = aux next }
       | BranchCmd { data; nexts } ->
           let data = package_data aux data in
+          let all_cases =
+            nexts |> Hashtbl.to_seq |> List.of_seq
+            |> List.map (fun (c, (bd, _)) -> (c, bd))
+          in
           let nexts =
             nexts
             |> Hashtbl.map (fun case (bdata, next) ->
-                   let case = package_case bdata case in
+                   let case = package_case bdata case all_cases in
                    let next = aux next in
                    (case, ((), next)))
           in
