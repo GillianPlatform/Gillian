@@ -160,3 +160,5 @@ export type MessageFromWebview =
   | RequestStartProc;
 
 // #endregion
+
+export type ExecMode = 'debugverify' | 'debugwpst';

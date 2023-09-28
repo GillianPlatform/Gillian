@@ -231,7 +231,7 @@
         "icon": "$(play)"
       },
       {
-        "command": "extension.code-lens.debugProcedure",
+        "command": "extension.gillian-debug.debugProcedure",
         "title": "Debug Procedure"
       },
       {

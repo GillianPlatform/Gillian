@@ -71,7 +71,9 @@ class DebugAdapterExecutableFactory
     const config = vscode.workspace.getConfiguration('gillianDebugger');
     console.log('Configuring debugger...', { config });
 
-    let args = ['debugverify', '-r', 'db'];
+    const mode = _session.configuration.execMode || 'debugverify';
+
+    let args = [mode, '-r', 'db'];
     if (config.useManualProof) {
       args.push('-m');
     }
