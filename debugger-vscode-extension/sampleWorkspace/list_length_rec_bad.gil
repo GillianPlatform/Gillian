@@ -2,8 +2,8 @@ import "wisl_pointer_arith.gil", "wisl_core.gil";
 
 
 pred list(+x, alpha : List) : (x == null) * (alpha == {{  }}),
-  <cell>(_lvar_0, _lvar_1; #v) * <cell>(_lvar_0, (_lvar_1 i+ 1i); #z) *
-  types(_lvar_0 : Obj, _lvar_1 : Int) * (x == {{ _lvar_0, _lvar_1 }}) *
+  <cell>(#wisl__0, #wisl__1; #v) * <cell>(#wisl__0, (#wisl__1 i+ 1i); #z) *
+  types(#wisl__0 : Obj, #wisl__1 : Int) * (x == {{ #wisl__0, #wisl__1 }}) *
   list(#z, #beta) * (alpha == l+ ({{ #v }}, #beta));
 
 spec llen(x)
@@ -18,7 +18,9 @@ proc llen(x) {
   fail0:     fail [InvalidBlockPointer](x);
   continue0: gvar0 := [dispose](l-nth(x, 0i));
              gvar1 := "i__add"(x, 1i);
-             gvar2 := [getcell](l-nth(gvar1, 0i), l-nth(gvar1, 1i));
+             goto [((typeOf gvar1) = List)] continue1 fail1;
+  fail1:     fail [InvalidPointer]();
+  continue1: gvar2 := [getcell](l-nth(gvar1, 0i), l-nth(gvar1, 1i));
              t := l-nth(gvar2, 2i);
              n := "llen"(t);
              gvar3 := "i__add"(n, 1i);
