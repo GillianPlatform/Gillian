@@ -1020,24 +1020,24 @@ struct
               let state'' = update_store state' x v' in
               let rest_confs =
                 rest_rets
-                |> List.map (fun (r_state, r_vs) ->
+                |> List.mapi (fun ix (r_state, r_vs) ->
                        let r_e = Expr.EList (List.map Val.to_expr r_vs) in
                        let r_v = eval_expr r_e in
                        let r_state' = update_store r_state x r_v in
-                       let branch_case =
-                         LAction (r_vs |> List.map state_vt_to_yojson)
-                       in
+                       let branch_case = LAction (ix + 1) in
                        make_confcont ~state:r_state'
                          ~callstack:(Call_stack.copy cs)
                          ~invariant_frames:iframes ~prev_idx:i ~loop_ids
                          ~next_idx:(i + 1) ~branch_count:b_counter ~branch_case
                          ())
               in
-              let ret_len = 1 + List.length rest_rets in
-              let b_counter = b_counter + if ret_len > 1 then 1 else 0 in
-              let branch_case = LAction (vs |> List.map state_vt_to_yojson) in
+              let b_counter, branch_case =
+                match rest_rets with
+                | [] -> (b_counter, None)
+                | _ -> (b_counter + 1, Some (LAction 1))
+              in
               make_confcont ~state:state'' ~callstack:cs
-                ~invariant_frames:iframes ~branch_case ~prev_idx:i ~loop_ids
+                ~invariant_frames:iframes ?branch_case ~prev_idx:i ~loop_ids
                 ~next_idx:(i + 1) ~branch_count:b_counter ()
               :: rest_confs
         in

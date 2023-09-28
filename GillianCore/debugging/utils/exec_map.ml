@@ -173,11 +173,9 @@ module Packaged = struct
       | LCmd x -> ("LCmd", ("Logical command", Fmt.str "%d" x))
       | SpecExec (fl, i) ->
           ("SpecExec", ("Spec exec", Fmt.str "%a-%d" Flag.pp fl i))
-      | LAction json ->
-          let s = Yojson.Safe.to_string (`List json) in
-          ("LAction", ("Logical action", s))
+      | LAction x -> ("LAction", ("Logical action", Fmt.str "L%d" x))
       | LActionFail x ->
-          ("LActionFail", ("Logical action failure", Fmt.str "%d" x))
+          ("LActionFail", ("Logical action failure", Fmt.str "LF%d" x))
     in
     { kind; display; json }
 
