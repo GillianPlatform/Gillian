@@ -112,6 +112,10 @@ struct
         ?prev_cmd_report_id
         ?branch_case
         () =
+      (* TODO this needs some optimising; big concrete tests like Test262 use
+         way too much memory due to long branch paths.
+         For now, just don't think about it when we're not debugging. *)
+      let branch_case = if !Config.debug then branch_case else None in
       ConfCont
         {
           state;
