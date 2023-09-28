@@ -19,6 +19,12 @@ module type S = sig
   val get_typ_env : t -> Type_env.t
   val get_pfs : t -> PFS.t
   val sure_is_nonempty : t -> bool
+  val consume_core_pred : string -> t -> vt list -> action_ret
+  val produce_core_pred : string -> t -> vt list -> t list
+
+  (** See {!val:SMemory.S.split_further} *)
+  val split_core_pred_further :
+    string -> vt list -> err_t -> (vt list list * vt list) option
 end
 
 module Make (SMemory : SMemory.S) :

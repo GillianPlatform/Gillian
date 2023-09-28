@@ -63,6 +63,10 @@ module type S = sig
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
   val sure_is_nonempty : t -> bool
+
+  (** See {!val:SMemory.S.split_further} *)
+  val split_further :
+    string -> vt list -> err_t -> (vt list list * vt list) option
 end
 
 (* FIXME: Lift should not be necessary, the monad should just match !!! *)

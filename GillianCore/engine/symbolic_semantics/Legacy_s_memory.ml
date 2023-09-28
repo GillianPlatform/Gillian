@@ -176,4 +176,6 @@ module Modernize (Old_memory : S) = struct
     let+ heap = apply_fix heap pfs gamma fix in
     let pc = Gpc.make ~unification:true ~pfs ~gamma () in
     Gbranch.{ pc; value = heap }
+
+  let split_further _ _ _ = None
 end

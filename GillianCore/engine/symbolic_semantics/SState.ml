@@ -24,6 +24,12 @@ module type S = sig
   val get_typ_env : t -> Type_env.t
   val get_pfs : t -> PFS.t
   val sure_is_nonempty : t -> bool
+  val consume_core_pred : string -> t -> vt list -> action_ret
+  val produce_core_pred : string -> t -> vt list -> t list
+
+  (** See {!val:SMemory.S.split_further} *)
+  val split_core_pred_further :
+    string -> vt list -> err_t -> (vt list list * vt list) option
 end
 
 module Make (SMemory : SMemory.S) :
@@ -199,6 +205,11 @@ module Make (SMemory : SMemory.S) :
         let new_state = (new_heap, store, pc.pfs, pc.gamma, vars) in
         Ok (new_state, vs)
     | Error err -> Error (StateErr.EMem err)
+
+  let split_core_pred_further core_pred ins err =
+    match err with
+    | StateErr.EMem err -> SMemory.split_further core_pred ins err
+    | _ -> None
 
   let produce_core_pred core_pred state args =
     let open Syntaxes.List in

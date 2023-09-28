@@ -572,7 +572,7 @@ module Make (State : SState.S) :
 
     match a with
     | GA (a_id, ins, outs) ->
-        L.verbose (fun fmt -> fmt "Memory action.");
+        L.verbose (fun fmt -> fmt "Memory producer.");
 
         let vs = List.map (subst_in_expr subst) (ins @ outs) in
         (* We filter action errors, in theory, production cannot fail, it may only vanish. *)
@@ -1884,30 +1884,21 @@ module Make (State : SState.S) :
           let _, simplified = simplify_astate ~unification:true state in
           simplified
 
-    (* let get_ups ~pred_defs (rname, rargs) =
-       let open Syntaxes.List in
-       let pred_ins =
-         let table = Hashtbl.create (Hashtbl.length pred_defs) in
-         Hashtbl.iter
-           (fun name (pred : UP.pred) ->
-             Hashtbl.add table name pred.pred.pred_ins)
-           pred_defs;
-         table
-       in
-       let pred = UP.get_pred_def pred_defs rname in
-       let+ def = get_defs pred.pred rargs in
-       let kb =
-         List.fold_left
-           (fun acc (param, _) -> Expr.Set.add (PVar param) acc)
-           Expr.Set.empty pred.pred.pred_params
-       in
-       let up = UP.init kb Expr.Set.empty pred_ins [ (def, (None, None)) ] in
-       match up with
-       | Error e ->
-           Fmt.failwith "Package Wand: couldn't create up because of %a"
-             (Fmt.Dump.list @@ Fmt.Dump.list Asrt.pp)
-             e
-       | Ok up -> up *)
+    (* let try_split_up_head up errors astate subst =
+       let open Syntaxes.Option in
+       match (Option.get (UP.head up), errors) with
+       | (GA (core_pred, ins, outs), out_learn), [ err ] ->
+           let vs_ins =
+             List.map
+               (fun x -> subst_in_expr_opt astate subst x |> Option.get)
+               ins
+           in
+           let+ new_ins_l, new_outs  = State.split_core_pred_further core_pred vs_ins err in
+           let out_amount = List.length outs in
+           let gas = List.map (fun )
+       | _ -> None *)
+
+    let try_split_up_head _ _ _ _ = None
 
     let unify_assertion astate subst step =
       (* We are in OX mode, unification may not branch. If it does, something is very wrong.
@@ -1934,7 +1925,7 @@ module Make (State : SState.S) :
           | Error _ -> None)
         res
 
-    let package_case_step
+    let rec package_case_step
         ({ lhs_state; current_state; rhs_states; up; subst } as package_state) :
         (package_state, err_t list) Result.t =
       let open Syntaxes.List in
@@ -1946,7 +1937,7 @@ module Make (State : SState.S) :
           L.verbose (fun m ->
               m "Wand about to consume RHS step: %a" Asrt.pp (fst step));
           (* States are modified in place unfortunately.. so we have to copy them just in case *)
-          let subst_save_1 = SVal.SESubst.copy subst in
+          let subst_save = SVal.SESubst.copy subst in
           let lhs_state_save = copy_astate lhs_state in
           (* First we try to consume from the lhs_state. *)
           match unify_assertion lhs_state subst step with
@@ -1964,27 +1955,45 @@ module Make (State : SState.S) :
                   subst;
                 }
           | Error lhs_errs -> (
-              L.verbose (fun m ->
-                  m
-                    "Wand: failed to consume from LHS! Going to try and \
-                     consume from current state!");
-              match unify_assertion current_state subst_save_1 step with
-              | Ok new_current_state ->
-                  let new_rhs_states =
-                    let* rhs_state = rhs_states in
-                    produce_assertion rhs_state subst_save_1 (fst step)
-                  in
-                  Ok
+              (* First, let us see if it is a core predicate that we can
+                 split and get part in the lhs and part in the current state *)
+              let split_option =
+                try_split_up_head up lhs_errs lhs_state_save subst_save
+              in
+              match split_option with
+              | Some up ->
+                  package_case_step
                     {
                       lhs_state = lhs_state_save;
-                      current_state = new_current_state;
-                      rhs_states = new_rhs_states;
+                      current_state;
+                      rhs_states;
                       up;
-                      subst = subst_save_1;
+                      subst = subst_save;
                     }
-              | Error current_errs ->
-                  L.verbose (fun m -> m "Couldn't consume from anywhere!!");
-                  Error (lhs_errs @ current_errs)))
+              | None -> (
+                  L.verbose (fun m ->
+                      m
+                        "Wand: failed to consume from LHS! Going to try and \
+                         consume from current state!");
+                  (* let lhs_state_save_2 = copy_astate lhs_state_save in
+                     let subst_save_2 = SVal.SESubst.copy subst_save_1 in *)
+                  match unify_assertion current_state subst_save step with
+                  | Ok new_current_state ->
+                      let new_rhs_states =
+                        let* rhs_state = rhs_states in
+                        produce_assertion rhs_state subst_save (fst step)
+                      in
+                      Ok
+                        {
+                          lhs_state = lhs_state_save;
+                          current_state = new_current_state;
+                          rhs_states = new_rhs_states;
+                          up;
+                          subst = subst_save;
+                        }
+                  | Error current_errs ->
+                      L.verbose (fun m -> m "Couldn't consume from anywhere!!");
+                      Error (lhs_errs @ current_errs))))
 
     let rec package_case (state : package_state) =
       let open Syntaxes.Result in

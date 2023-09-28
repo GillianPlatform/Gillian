@@ -51,8 +51,6 @@ end = struct
     | Ok (heap, vs) -> [ Ok ((heap, store, locs), vs) ]
     | Error err -> [ Error (StateErr.EMem err) ]
 
-  let produce_core_pred _ _ _ = failwith "cannot produce in concrete state"
-  let consume_core_pred _ _ _ = failwith "cannot consume in concrete state"
   let is_overlapping_asrt _ = failwith "is_overlapping_assert for CState"
 
   let eval_expr state e =

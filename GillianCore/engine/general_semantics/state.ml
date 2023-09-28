@@ -33,8 +33,6 @@ module type S = sig
   type init_data
 
   val execute_action : string -> t -> vt list -> action_ret
-  val consume_core_pred : string -> t -> vt list -> action_ret
-  val produce_core_pred : string -> t -> vt list -> t list
   val is_overlapping_asrt : string -> bool
 
   (** Expression Evaluation *)
