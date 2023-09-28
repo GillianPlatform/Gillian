@@ -201,97 +201,93 @@ module Make (State : SState.S) = struct
     if not !Config.under_approximation then (
       L.print_to_all "Running bi-abduction without under-approximation?\n";
       exit 1);
-
     let open Syntaxes.List in
-    let rec search next_states =
-      let state, state_af, subst, up = next_states in
-      let cur_step : UP.step option = UP.head up in
-      let unification_results =
-        match UP.head up with
-        | None -> Res_list.return state
-        | Some a -> State.unify_assertion state subst a
-      in
-      (* if we have more than one result, we need to copy our state all over the place *)
-      let should_copy =
-        match unification_results with
-        | _ :: _ :: _ -> true
-        | _ -> false
-      in
-      let* unification_result = unification_results in
-      match unification_result with
-      | Ok state' -> (
-          match UP.next up with
-          | None ->
-              L.verbose (fun m -> m "ONE SPEC IS DONE!!!@\n");
-
-              [
-                ( state',
-                  State.copy state_af,
-                  SVal.SESubst.copy subst,
-                  UP.posts up );
-              ]
-          | Some [ (up, _) ] when not should_copy ->
-              (* We only have one next step, and one unification result, we can avoid the copy *)
-              search (state', state_af, subst, up)
-          | Some ups' ->
-              let* up, _ = ups' in
-              let state' = State.copy state' in
-              let state_af' = State.copy state_af in
-              let subst' = SVal.SESubst.copy subst in
-              search (state', state_af', subst', up))
-      | Error err ->
-          let cur_asrt = Option.map fst cur_step in
-          L.verbose (fun m ->
-              m
-                "@[<v 2>WARNING: Unify Assertion Failed: %a with error: %a. \
-                 CUR SUBST:@\n\
-                 %a@]@\n"
-                Fmt.(option ~none:(any "no assertion - phantom node") Asrt.pp)
-                cur_asrt State.pp_err err SVal.SESubst.pp subst);
-          if not (State.can_fix err) then (
-            L.(verbose (fun m -> m "CANNOT FIX!!!"));
-            [])
-          else (
-            L.(verbose (fun m -> m "May be able to fix!!!"));
-            let* fixes = State.get_fixes state err in
-            (* TODO: a better implementation here might be to say that apply_fix returns a list of fixed states, possibly empty *)
-            let state' = State.copy state in
-            let state_af' = State.copy state_af in
-            let* state' = State.apply_fixes state' fixes in
-            let* state_af' = State.apply_fixes state_af' fixes in
-            L.verbose (fun m -> m "BEFORE THE SIMPLIFICATION!!!");
-            let new_subst, states = State.simplify state' in
-            let state' =
-              match states with
-              | [ x ] -> x
-              | _ ->
-                  L.fail
-                    "Expected exactly one state after simplifying fixed state"
-            in
-            L.verbose (fun m ->
-                m "@[<v 2>SIMPLIFICATION SUBST:@\n%a@]" SVal.SESubst.pp
-                  new_subst);
-            let subst' = compose_substs subst new_subst in
-            L.(
-              verbose (fun m ->
-                  m "@[<v 2>AF BEFORE SIMPLIFICATION:@\n%a@]@\n" State.pp
-                    state_af'));
-            let svars = State.get_spec_vars state' in
-            SVal.SESubst.filter_in_place new_subst (fun x x_v ->
-                match x with
-                | LVar x -> if SS.mem x svars then None else Some x_v
-                | _ -> Some x_v);
-            let subst_afs = State.substitution_in_place new_subst state_af' in
-            let state_af' =
-              match subst_afs with
-              | [ x ] -> x
-              | _ -> L.fail "Subst in place is not allowed to branch on AF!!!!"
-            in
-            L.(
-              verbose (fun m ->
-                  m "@[<v 2>AF AFTER SIMPLIFICATION:@\n%a@]\n" State.pp
-                    state_af'));
-            search (state', state_af', subst', up))
+    let rec search next_state =
+      let state, state_af, subst, up = next_state in
+      match up with
+      | UP.ConsumeStep (step, rest_up) -> (
+          let unification_results = State.unify_assertion state subst step in
+          let should_copy =
+            match unification_results with
+            | _ :: _ :: _ -> true
+            | _ -> false
+          in
+          let* unification_result = unification_results in
+          match unification_result with
+          | Ok state' ->
+              if should_copy then
+                search
+                  ( State.copy state',
+                    State.copy state_af,
+                    SVal.SESubst.copy subst,
+                    rest_up )
+              else search (state', state_af, subst, rest_up)
+          | Error err ->
+              L.verbose (fun m ->
+                  m
+                    "@[<v 2>WARNING: Unify Assertion Failed: %a with error: \
+                     %a. CUR SUBST:@\n\
+                     %a@]@\n"
+                    Asrt.pp (fst step) State.pp_err err SVal.SESubst.pp subst);
+              if not (State.can_fix err) then (
+                L.verbose (fun m -> m "CANNOT FIX!");
+                [])
+              else (
+                L.verbose (fun m -> m "May be able to fix!!!");
+                let* fixes = State.get_fixes state err in
+                (* TODO: a better implementation here might be to say that apply_fix returns a list of fixed states, possibly empty *)
+                let state' = State.copy state in
+                let state_af' = State.copy state_af in
+                let* state' = State.apply_fixes state' fixes in
+                let* state_af' = State.apply_fixes state_af' fixes in
+                L.verbose (fun m -> m "BEFORE THE SIMPLIFICATION!!!");
+                let new_subst, states = State.simplify state' in
+                let state' =
+                  match states with
+                  | [ x ] -> x
+                  | _ ->
+                      L.fail
+                        "Expected exactly one state after simplifying fixed \
+                         state"
+                in
+                L.verbose (fun m ->
+                    m "@[<v 2>SIMPLIFICATION SUBST:@\n%a@]" SVal.SESubst.pp
+                      new_subst);
+                let subst' = compose_substs subst new_subst in
+                L.(
+                  verbose (fun m ->
+                      m "@[<v 2>AF BEFORE SIMPLIFICATION:@\n%a@]@\n" State.pp
+                        state_af'));
+                let svars = State.get_spec_vars state' in
+                SVal.SESubst.filter_in_place new_subst (fun x x_v ->
+                    match x with
+                    | LVar x -> if SS.mem x svars then None else Some x_v
+                    | _ -> Some x_v);
+                let subst_afs =
+                  State.substitution_in_place new_subst state_af'
+                in
+                let state_af' =
+                  match subst_afs with
+                  | [ x ] -> x
+                  | _ ->
+                      L.fail "Subst in place is not allowed to branch on AF!!!!"
+                in
+                L.(
+                  verbose (fun m ->
+                      m "@[<v 2>AF AFTER SIMPLIFICATION:@\n%a@]\n" State.pp
+                        state_af'));
+                search (state', state_af', subst', up)))
+      | Choice (left, right) ->
+          let state_copy = State.copy state in
+          let state_af_copy = State.copy state_af in
+          let subst_copy = SVal.SESubst.copy subst in
+          let left = search (state, state_af, subst, left) in
+          let right = search (state_copy, state_af_copy, subst_copy, right) in
+          left @ right
+      | Finished post ->
+          L.verbose (fun m -> m "ONE SPEC IS DONE!!!@\n");
+          [ (state, state_af, subst, post) ]
+      | LabelStep _ -> L.fail "DEATH: LABEL STEP IN BI-ABDUCTION"
     in
     search (state, state_af, subst, up)
 

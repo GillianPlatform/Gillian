@@ -135,8 +135,18 @@ let ends_with a b = starts_with (List.rev a) (List.rev b)
 let pop_where f =
   let rec aux pre = function
     | [] -> (None, List.rev pre)
-    | x :: xs when f x -> (Some x, List.rev pre @ xs)
+    | x :: xs when f x -> (Some x, List.rev_append pre xs)
     | x :: xs -> aux (x :: pre) xs
+  in
+  aux []
+
+let pop_map f =
+  let rec aux pre = function
+    | [] -> None
+    | x :: xs -> (
+        match f x with
+        | Some res -> Some (res, List.rev_append pre xs)
+        | None -> aux (x :: pre) xs)
   in
   aux []
 

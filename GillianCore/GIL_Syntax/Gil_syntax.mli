@@ -566,7 +566,7 @@ module Asrt : sig
     | GA of string * Expr.t list * Expr.t list  (** Core assertion *)
     | Wand of { lhs : string * Expr.t list; rhs : string * Expr.t list }
         (** Magic wand of the form [P(...) -* Q(...)] *)
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   (** Comparison of assertions *)
   val compare : t -> t -> int
@@ -903,7 +903,7 @@ module Flag : sig
     | Normal  (** Normal return *)
     | Error  (** Error return *)
     | Bug  (** Instant crash - for biabduction *)
-  [@@deriving yojson]
+  [@@deriving yojson, eq]
 
   val str : t -> string
   val pp : t Fmt.t

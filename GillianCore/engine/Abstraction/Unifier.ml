@@ -152,10 +152,7 @@ module Make (State : SState.S) :
   (* This is mostly to do with Gillian legacy.
      We have to handle UX and OX separately, or otherwise
      we'd have to refactor the entirety of the code... *)
-  type internal_up_u_res =
-    | USuccess of (t * SVal.SESubst.t * post_res) list
-    | UAbort of err_t list
-    | UVanish
+  type internal_up_u_res = (t * SVal.SESubst.t * post_res, err_t) List_res.t
 
   module Logging = struct
     let pp_variants : (string * Expr.t option) Fmt.t =
@@ -205,7 +202,7 @@ module Make (State : SState.S) :
       let pp_custom pp_astate pp_subst fmt { step; subst; astate } =
         Fmt.pf fmt
           "Unify assertion: @[<h>%a@]@\nSubst:@\n%a@\n@[<v 2>STATE:@\n%a@]"
-          UP.step_pp step pp_subst subst
+          UP.pp_step step pp_subst subst
           (AstateRec.pp_custom pp_astate)
           astate
 
@@ -272,7 +269,7 @@ module Make (State : SState.S) :
                %a in state @\n\
                %a with errors:@\n\
                %a@]"
-              Fmt.(option ~none:(any "no assertion - phantom node") UP.step_pp)
+              Fmt.(option ~none:(any "no assertion - phantom node") UP.pp_step)
               cur_step SVal.SESubst.pp subst AstateRec.pp astate
               Fmt.(list ~sep:(any "@\n") State.pp_err)
               errors
@@ -295,7 +292,7 @@ module Make (State : SState.S) :
         if is_new_case then target_case_depth - 1 else target_case_depth
       in
       let case_depth = List.length !parent_ids_ref in
-      assert (actual_target_depth <= case_depth + 1);
+      (* assert (actual_target_depth <= case_depth + 1); *)
       for _ = case_depth downto actual_target_depth + 1 do
         match !parent_ids_ref with
         | [] -> raise (Failure "Mismatched case depth and parent_id list!")
@@ -779,19 +776,14 @@ module Make (State : SState.S) :
                  | _ -> ());
              Some state)
 
-  let complete_subst (subst : SVal.SESubst.t) (lab : (string * SS.t) option) :
-      bool =
-    match lab with
-    | None -> true
-    | Some (_, existentials) ->
-        List.fold_left
-          (fun ac x ->
-            let lvar_x = Expr.LVar x in
-            if not (SVal.SESubst.mem subst lvar_x) then (
-              SVal.SESubst.put subst lvar_x lvar_x;
-              true)
-            else ac)
-          true (SS.elements existentials)
+  let complete_subst (subst : SVal.SESubst.t) (lab : string * SS.t) : unit =
+    let _, existentials = lab in
+    SS.iter
+      (fun x ->
+        let lvar = Expr.LVar x in
+        if not (SVal.SESubst.mem subst lvar) then
+          SVal.SESubst.put subst lvar lvar)
+      existentials
 
   (** [extend_subts_with_bindings unfold_info pred state subst] takes:
       - A state
@@ -1182,7 +1174,7 @@ module Make (State : SState.S) :
             (Success state) vos eos
         with Invalid_argument _ ->
           Fmt.failwith "Invalid amount of args for the following UP step : %a"
-            UP.step_pp step)
+            UP.pp_step step)
 
   and unify_assertion (astate : t) (subst : SVal.SESubst.t) (step : UP.step) :
       (t, err_t) Res_list.t =
@@ -1426,6 +1418,33 @@ module Make (State : SState.S) :
         (* LTrue, LFalse, LEmp, LStar *)
         | _ -> raise (Failure "Illegal Assertion in Unification Plan"))
 
+  and unify_assertion_safely state subst step =
+    try unify_assertion state subst step
+    with err -> (
+      L.verbose (fun m ->
+          m
+            "WARNING: UNCAUGHT EXCEPTION IN UNIFY ASSERTION: %s@\n\
+             Here's the backtrace: %s" (Printexc.to_string err)
+            (Printexc.get_backtrace ()));
+      if !Config.under_approximation then
+        let () =
+          L.verbose (fun m -> m "UX mode: vanishing despite exception!")
+        in
+        Res_list.vanish
+      else
+        match fst step with
+        | Pure pf ->
+            let { state = bstate; _ } = state in
+            let vs = State.unfolding_vals bstate [ pf ] in
+            Res_list.error_with (StateErr.EAsrt (vs, Not pf, [ [ Pure pf ] ]))
+        | _ ->
+            let other_error =
+              StateErr.EOther
+                (Fmt.str "Uncaught exception while unifying assertions %a"
+                   Asrt.pp (fst step))
+            in
+            Res_list.error_with other_error)
+
   and unify_up' (parent_ids : L.Report_id.t list ref) (s_states : search_state')
       : internal_up_u_res =
     let s_states, errs_so_far = s_states in
@@ -1437,121 +1456,109 @@ module Make (State : SState.S) :
     match s_states with
     | [] ->
         (* There are no more states to explore: in OX, it means we failed to unify, in UX, it means there are not valid path we know about, we vanish. *)
-        if ux then UVanish else UAbort errs_so_far
-    | ((state, subst, up), target_case_depth, is_new_case) :: rest -> (
+        if ux then List_res.vanish else Error errs_so_far
+    | ((astate, subst, up), target_case_depth, is_new_case)
+      :: rest_search_states -> (
         let case_depth =
           structure_unify_case_reports parent_ids target_case_depth is_new_case
-            state subst up
+            astate subst up
         in
-        let cur_step : UP.step option = UP.head up in
-        let ret =
-          match cur_step with
-          | None -> Res_list.return state
-          | Some cur_step -> (
-              try unify_assertion state subst cur_step
-              with err -> (
-                L.verbose (fun fmt ->
-                    fmt
-                      "WARNING: UNCAUGHT EXCEPTION IN UNIFY-ASSERTION : %s@\n\
-                       Here's the backtrace: %s" (Printexc.to_string err)
-                      (Printexc.get_backtrace ()));
-                if ux then
-                  let () = L.verbose (fun m -> m "UX mode: vanishing!") in
-                  Res_list.vanish
-                else
-                  let a, _ = cur_step in
-                  match a with
-                  | Pure pf ->
-                      let { state = bstate; _ } = state in
-                      let vs = State.unfolding_vals bstate [ pf ] in
-                      Res_list.error_with
-                        (StateErr.EAsrt (vs, Not pf, [ [ Pure pf ] ]))
-                  | _ ->
-                      let other_error =
-                        StateErr.EOther
-                          (Fmt.str
-                             "Uncaught exception while unifying assertions %a"
-                             Asrt.pp a)
-                      in
-                      Res_list.error_with other_error))
-        in
-        (* In theory, errors can only exist in OX mode. If there is a unification error in UX mode, something is terribly wrong.
-           So now, we're going to do something different depending on UX or OX mode.
-           In OX mode:
-              - In case of success, we continue unifying on the same path. If we're at the end of the path, we successfully stop
-              - If there is a least one error, it means unification of that path failed. We try the next path (recursive call) *)
-        let successes, errors =
-          List.partition_map
-            (function
-              | Ok x -> Left x
-              | Error x -> Right x)
-            ret
-        in
-        match (ux, successes, errors) with
-        | true, _, _ :: _ ->
-            L.fail "ERROR: IMPOSSIBLE! UNIFICATION ERRORS IN UX MODE!!!!"
-        | false, _, _ :: _ ->
-            UnifyResultReport.log
-              (Failure
-                 { astate = AstateRec.from state; cur_step; subst; errors })
-            |> ignore;
-            explore_next_states (rest, errors @ errs_so_far)
-        | false, [], [] ->
-            L.fail "OX UNIFICATION SUCCEEDED WITH NOTHING! MEDOOOOOO!!!!!"
-        | false, _ :: _ :: _, [] -> L.fail "DEATH. OX UNIFICATION BRANCHED"
-        | ux, successes, [] -> (
-            match UP.next up with
-            | None ->
-                let posts = UP.posts up in
-                List.iter
-                  (fun state' ->
-                    UnifyResultReport.log
-                      (Success
-                         {
-                           remaining_states =
-                             List.map
-                               (fun ((astate, subst, up), _, _) :
-                                    UnifyResultReport.remaining_state ->
-                                 { astate = AstateRec.from astate; subst; up })
-                               rest;
-                           astate = AstateRec.from state';
-                           subst;
-                           posts;
-                         })
-                    |> ignore)
-                  successes;
-                let these_successes =
-                  List.map (fun state -> (state, subst, posts)) successes
+        match up with
+        | LabelStep (label, rest_up) ->
+            L.verbose (fun m ->
+                m
+                  "Reached LabelStep, about to complete substitution with \
+                   vars: %a"
+                  Fmt.(Dump.iter SS.iter nop string)
+                  (snd label));
+            complete_subst subst label;
+            let current_state = ((astate, subst, rest_up), case_depth, false) in
+            explore_next_states
+              (current_state :: rest_search_states, errs_so_far)
+        | Choice (left_up, right_up) ->
+            L.verbose (fun m ->
+                m "Reached a choice with 2 MPs: about to branch");
+            let astate_copy = copy_astate astate in
+            let subst_copy = SVal.SESubst.copy subst in
+            let left_state = ((astate, subst, left_up), case_depth + 1, true) in
+            let right_state =
+              ((astate_copy, subst_copy, right_up), case_depth + 1, true)
+            in
+            explore_next_states
+              (left_state :: right_state :: rest_search_states, errs_so_far)
+        | Finished posts ->
+            (* We're done with unification of this case.
+               In OX, we may stop, as we proved implication.
+               In UX, we explore more as to extend coverage. *)
+            let remaining_states =
+              List.map
+                (fun ((astate, subst, up), _, _) ->
+                  UnifyCaseReport.{ astate = AstateRec.from astate; subst; up })
+                rest_search_states
+            in
+            ignore
+            @@ UnifyResultReport.log
+                 (Success
+                    {
+                      remaining_states;
+                      astate = AstateRec.from astate;
+                      subst;
+                      posts;
+                    });
+            if ux then
+              let other_paths =
+                match explore_next_states (rest_search_states, errs_so_far) with
+                | Error _ -> failwith "unify_up' failed in UX!"
+                | Ok other_paths -> other_paths
+              in
+              Ok ((astate, subst, posts) :: other_paths)
+            else List_res.return (astate, subst, posts)
+        | ConsumeStep (step, rest_up) -> (
+            let successes, errors =
+              unify_assertion_safely astate subst step
+              |> List.partition_map (function
+                   | Ok x -> Left x
+                   | Error x -> Right x)
+            in
+            match (!Config.under_approximation, successes, errors) with
+            (* We start by handling the crash cases that should never happen *)
+            | true, _, _ :: _ ->
+                L.fail "ERROR: IMPOSSIBLE! UNIFICATION ERRORS IN UX MODE!!!!"
+            | false, [], [] ->
+                L.fail "OX UNIFICATION VANISHED??? MEDOOOOOOOO!!!!!!!!!"
+            | false, _ :: _ :: _, [] -> L.fail "DEATH. OX UNIFICATION BRANCHED"
+            | true, [], _ ->
+                (* Vanished in UX *)
+                explore_next_states (rest_search_states, errs_so_far)
+            | false, _, _ :: _ ->
+                (* Unification failed in OX. We try the next case *)
+                ignore
+                @@ UnifyResultReport.log
+                     (Failure
+                        {
+                          astate = AstateRec.from astate;
+                          cur_step = Some step;
+                          subst;
+                          errors;
+                        });
+                explore_next_states (rest_search_states, errors @ errs_so_far)
+            | _, [ state ], [] ->
+                explore_next_states
+                  ( ((state, subst, rest_up), case_depth, false)
+                    :: rest_search_states,
+                    errs_so_far )
+            | true, first :: rem, [] ->
+                let rem =
+                  List.map
+                    (fun state ->
+                      ( (state, SVal.SESubst.copy subst, rest_up),
+                        case_depth,
+                        false ))
+                    rem
                 in
-                if ux then
-                  let other_paths = explore_next_states (rest, errs_so_far) in
-                  match other_paths with
-                  | UAbort _ | UVanish -> USuccess these_successes
-                  | USuccess other_paths ->
-                      USuccess (these_successes @ other_paths)
-                else USuccess these_successes
-            | Some [ (up, lab) ] ->
-                let continue_states =
-                  if complete_subst subst lab then
-                    List.map
-                      (fun state' -> ((state', subst, up), case_depth, false))
-                      successes
-                  else []
-                in
-                explore_next_states (continue_states @ rest, errs_so_far)
-            | Some (_ :: _ as ups) ->
-                let open Syntaxes.List in
-                let next_states =
-                  let* up, lab = ups in
-                  if complete_subst subst lab then
-                    let+ state' = successes in
-                    let new_state = copy_astate state' in
-                    let new_subst = SVal.SESubst.copy subst in
-                    ((new_state, new_subst, up), case_depth + 1, true)
-                  else []
-                in
-                explore_next_states (next_states @ rest, errs_so_far)
-            | Some [] -> L.fail "ERROR: unify_up: empty unification plan"))
+                explore_next_states
+                  ( ((first, subst, rest_up), case_depth, false) :: rem,
+                    errs_so_far )))
 
   and unify_up (s_states : search_state) : internal_up_u_res =
     let parent_ids = ref [] in
@@ -1577,13 +1584,10 @@ module Make (State : SState.S) :
 
     let rec handle_ret ~try_recover ret =
       match ret with
-      | UVanish ->
-          L.verbose (fun m -> m "Unifier.unify: Vanish");
-          Res_list.vanish
-      | USuccess successes ->
-          L.verbose (fun fmt -> fmt "Unifier.unify: Success");
+      | Ok successes ->
+          L.verbose (fun fmt -> fmt "Unifier.unify: Success (possibly empty)");
           Res_list.just_oks successes
-      | UAbort errs
+      | Error errs
         when try_recover && !Config.unfolding
              && Exec_mode.verification_exec !Config.current_exec_mode
              && (not in_unification) && can_fix errs -> (
@@ -1620,7 +1624,7 @@ module Make (State : SState.S) :
                   let new_ret = unify_up ([ (astate, subst'', up) ], []) in
                   (* We already tried recovering once and it failed, we stop here *)
                   handle_ret ~try_recover:false new_ret))
-      | UAbort errors ->
+      | Error errors ->
           L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
           Res_list.just_errors errors
     in
@@ -1826,8 +1830,6 @@ module Make (State : SState.S) :
     type package_state = {
       lhs_state : t;
       current_state : t;
-      rhs_states : t list;
-      up : UP.t;
       subst : SVal.SESubst.t;
     }
 
@@ -1835,8 +1837,6 @@ module Make (State : SState.S) :
       {
         lhs_state = copy_astate pstate.lhs_state;
         current_state = copy_astate pstate.current_state;
-        rhs_states = List.map copy_astate pstate.rhs_states;
-        up = pstate.up;
         subst = SVal.SESubst.copy pstate.subst;
       }
 
@@ -1850,19 +1850,6 @@ module Make (State : SState.S) :
         match unfolded_pred with
         | Some pred -> List.map snd pred.pred_definitions
         | None -> List.map snd pred.pred_definitions
-
-    let empty_state ~pred_defs ~init_data ~spec_vars =
-      let state =
-        State.make_s ~init_data ~spec_vars ~pfs:(PFS.init ())
-          ~gamma:(Type_env.init ()) ~store:(SStore.init [])
-      in
-      {
-        state;
-        preds = Preds.init [];
-        wands = Wands.init [];
-        pred_defs;
-        variants = Hashtbl.create 0;
-      }
 
     let make_lhs_states ~pred_defs ~empty_state (lname, largs) =
       let open Syntaxes.List in
@@ -1898,13 +1885,13 @@ module Make (State : SState.S) :
            let gas = List.map (fun )
        | _ -> None *)
 
-    let try_split_up_head _ _ _ _ = None
+    let try_split_step _ _ _ _ = None
 
     let unify_assertion astate subst step =
       (* We are in OX mode, unification may not branch. If it does, something is very wrong.
          Mainly because the substitution is performed in place.
          This function simplifies the return type of unify-assertion: it returns a single outcome if it's a success. *)
-      let res = unify_assertion astate subst step in
+      let res = unify_assertion_safely astate subst step in
       let successes, errors = Res_list.split res in
       match (successes, errors) with
       | [ x ], [] -> Ok x
@@ -1917,112 +1904,90 @@ module Make (State : SState.S) :
 
     (* Produce assertion cannot fail, if it does it should actually vanish.
        We simplify the signature by actually doing so *)
-    let produce_assertion astate subst a =
-      let res = produce_assertion astate subst a in
-      List.filter_map
-        (function
-          | Ok x -> Some x
-          | Error _ -> None)
-        res
+    (* let produce_assertion astate subst a =
+       let res = produce_assertion astate subst a in
+       List.filter_map
+         (function
+           | Ok x -> Some x
+           | Error _ -> None)
+         res *)
 
-    let rec package_case_step
-        ({ lhs_state; current_state; rhs_states; up; subst } as package_state) :
+    let rec package_case_step { lhs_state; current_state; subst } step :
         (package_state, err_t list) Result.t =
-      let open Syntaxes.List in
-      match UP.head up with
-      | None ->
-          L.verbose (fun m -> m "Finished one case of wand packaging!");
-          Ok package_state
-      | Some step -> (
-          L.verbose (fun m ->
-              m "Wand about to consume RHS step: %a" Asrt.pp (fst step));
-          (* States are modified in place unfortunately.. so we have to copy them just in case *)
-          let subst_save = SVal.SESubst.copy subst in
-          let lhs_state_save = copy_astate lhs_state in
-          (* First we try to consume from the lhs_state. *)
-          match unify_assertion lhs_state subst step with
-          | Ok new_lhs_state ->
-              let new_rhs_states =
-                let* rhs_state = rhs_states in
-                produce_assertion rhs_state subst (fst step)
-              in
-              Ok
-                {
-                  lhs_state = new_lhs_state;
-                  current_state;
-                  rhs_states = new_rhs_states;
-                  up;
-                  subst;
-                }
-          | Error lhs_errs -> (
-              (* First, let us see if it is a core predicate that we can
-                 split and get part in the lhs and part in the current state *)
-              let split_option =
-                try_split_up_head up lhs_errs lhs_state_save subst_save
-              in
-              match split_option with
-              | Some up ->
-                  package_case_step
-                    {
-                      lhs_state = lhs_state_save;
-                      current_state;
-                      rhs_states;
-                      up;
-                      subst = subst_save;
-                    }
-              | None -> (
-                  L.verbose (fun m ->
-                      m
-                        "Wand: failed to consume from LHS! Going to try and \
-                         consume from current state!");
-                  (* let lhs_state_save_2 = copy_astate lhs_state_save in
-                     let subst_save_2 = SVal.SESubst.copy subst_save_1 in *)
-                  match unify_assertion current_state subst_save step with
-                  | Ok new_current_state ->
-                      let new_rhs_states =
-                        let* rhs_state = rhs_states in
-                        produce_assertion rhs_state subst_save (fst step)
-                      in
-                      Ok
-                        {
-                          lhs_state = lhs_state_save;
-                          current_state = new_current_state;
-                          rhs_states = new_rhs_states;
-                          up;
-                          subst = subst_save;
-                        }
-                  | Error current_errs ->
-                      L.verbose (fun m -> m "Couldn't consume from anywhere!!");
-                      Error (lhs_errs @ current_errs))))
-
-    let rec package_case (state : package_state) =
       let open Syntaxes.Result in
-      let* state = package_case_step state in
-      match UP.next state.up with
-      | None -> List_res.return state
-      | Some [] -> L.fail "empty UP??"
-      | Some ((f_up, f_lab) :: rest) ->
-          let rest =
-            List.map
-              (fun (up, lab) ->
-                assert (Option.is_none lab);
-                { (copy_package_state state) with up })
-              rest
-          in
-          assert (Option.is_none f_lab);
-          let first = { state with up = f_up } in
-          List.fold_left
-            (fun acc state ->
-              let open Syntaxes.Result in
-              let* acc = acc in
-              let+ state = package_case state in
-              state @ acc)
-            (Ok []) (first :: rest)
+      L.verbose (fun m ->
+          m "Wand about to consume RHS step: %a" Asrt.pp (fst step));
+      (* States are modified in place unfortunately.. so we have to copy them just in case *)
+      let subst_save = SVal.SESubst.copy subst in
+      let lhs_state_save = copy_astate lhs_state in
+      (* First we try to consume from the lhs_state *)
+      let- lhs_errs =
+        let+ new_lhs_state = unify_assertion lhs_state subst step in
+        { lhs_state = new_lhs_state; current_state; subst }
+      in
+      (* If it fails, we try splitting the step and we try again *)
+      let- split_errs =
+        let split_option =
+          try_split_step step lhs_errs lhs_state_save subst_save
+        in
+        match split_option with
+        | Some up -> (
+            L.verbose (fun m -> m "We found a way");
+            let res =
+              package_up up
+                {
+                  lhs_state = lhs_state_save;
+                  current_state;
+                  subst = subst_save;
+                }
+            in
+            (* Dirty trick here, without choice, this isn't branching.*)
+            match res with
+            | Ok [ state ] -> Ok state
+            | Ok _ -> L.fail "Wand: branching without choice!"
+            | Error errs -> Error errs)
+        | None -> Error []
+      in
+      L.verbose (fun m ->
+          m
+            "Wand: failed to consume from LHS! Going to try and consume from \
+             current state!");
+      (* let lhs_state_save_2 = copy_astate lhs_state_save in
+         let subst_save_2 = SVal.SESubst.copy subst_save_1 in *)
+      let- current_errs =
+        let+ new_current_state =
+          unify_assertion current_state subst_save step
+        in
+        {
+          lhs_state = lhs_state_save;
+          current_state = new_current_state;
+          subst = subst_save;
+        }
+      in
+      L.verbose (fun m -> m "Couldn't consume from anywhere!!");
+      Error (lhs_errs @ split_errs @ current_errs)
+
+    and package_up up (state : package_state) :
+        (package_state list, err_t list) Result.t =
+      let open Syntaxes.Result in
+      match up with
+      | UP.LabelStep _ -> L.fail "Labeled in wand RHS, can't handle that yet!"
+      | Finished (Some _) -> L.fail "Finished with posts in wand RHS!"
+      | Finished None -> Ok [ state ]
+      | Choice (left_up, right_up) ->
+          let state_copy = copy_package_state state in
+          let* left_res = package_up left_up state in
+          let+ rigth_res = package_up right_up state_copy in
+          left_res @ rigth_res
+      | ConsumeStep (step, rest_up) ->
+          let* state = package_case_step state step in
+          package_up rest_up state
 
     let astate_sure_is_nonempty (astate : t) =
       State.sure_is_nonempty astate.state
 
     let package_wand (astate : t) (wand : Wands.wand) : (t, err_t) List_res.t =
+      let open Syntaxes.Result in
       if !Config.under_approximation then
         Fmt.failwith "Wand packaging not handled in UX mode";
       (* First, we create a state that matches the lhs,
@@ -2054,30 +2019,18 @@ module Make (State : SState.S) :
         match lhs_states with
         | [] -> failwith "wand lhs is False!"
         | first :: rest ->
-            let rhs_state =
-              empty_state ~pred_defs:astate.pred_defs ~spec_vars:SS.empty
-                ~init_data:(State.get_init_data astate.state)
-            in
             let rest_pack_states =
               List.map
                 (fun lhs_state ->
                   {
                     lhs_state;
                     current_state = copy_astate astate;
-                    rhs_states = [ copy_astate rhs_state ];
                     subst = SVal.SESubst.copy subst;
-                    up = rhs_up;
                   })
                 rest
             in
             let first_pack_state =
-              {
-                lhs_state = first;
-                current_state = astate;
-                rhs_states = [ rhs_state ];
-                subst;
-                up = rhs_up;
-              }
+              { lhs_state = first; current_state = astate; subst }
             in
             first_pack_state :: rest_pack_states
       in
@@ -2087,29 +2040,28 @@ module Make (State : SState.S) :
       let final_states =
         List.fold_left
           (fun acc state ->
-            let open Syntaxes.Result in
             let* acc = acc in
-            let+ case = package_case state in
+            let+ case = package_up rhs_up state in
             case @ acc)
           (Ok []) start_states
       in
-      Result.bind final_states (fun states ->
-          let all_res =
-            List.map
-              (fun state ->
-                if astate_sure_is_nonempty state.lhs_state then (
-                  (* Note that failing here is optional. Packaging the wand anyway is correct,
-                     though it would almost certainly lead to a verification error.
-                     If this behaviour ever comes an issue, it could be deactivate through a feature flag. *)
-                  L.normal (fun m ->
-                      m
-                        "Error: AN LHS STATE WAS NOT ENTIRELY DEPLETED, THE \
-                         MAGIC WAND IS NON INTERESTING");
-                  Error [ StateErr.EOther non_empty_message ])
-                else Ok state.current_state)
-              states
-          in
-          Result_utils.all all_res)
+      let* states = final_states in
+      let all_res =
+        List.map
+          (fun state ->
+            if astate_sure_is_nonempty state.lhs_state then (
+              (* Note that failing here is optional. Packaging the wand anyway is correct,
+                 though it would almost certainly lead to a verification error.
+                 If this behaviour ever comes an issue, it could be deactivate through a feature flag. *)
+              L.normal (fun m ->
+                  m
+                    "Error: AN LHS STATE WAS NOT ENTIRELY DEPLETED, THE MAGIC \
+                     WAND IS NON INTERESTING");
+              Error [ StateErr.EOther non_empty_message ])
+            else Ok state.current_state)
+          states
+      in
+      Result_utils.all all_res
   end
 
   let package_wand t wand =

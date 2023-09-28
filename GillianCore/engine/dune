@@ -5,6 +5,7 @@
  (public_name gillian.engine)
  (libraries
   utils
+  printbox
   z3_encoding
   menhirLib
   fmt
