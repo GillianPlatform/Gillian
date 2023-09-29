@@ -699,35 +699,16 @@ struct
         let process_ret_cont
             new_j
             eval_state
-            is_first
+            ix
             ret_state
             fl
             b_counter
-            others =
+            has_branched =
           let { i; cs; make_confcont; iframes; loop_ids; _ } = eval_state in
 
-          let new_cs =
-            match is_first with
-            | true -> Call_stack.copy cs
-            | false -> cs
-          in
-
-          let succ_count = ref 0 in
-          let err_count = ref 0 in
-          let get_count fl =
-            let count =
-              match fl with
-              | Flag.Normal -> succ_count
-              | _ -> err_count
-            in
-            let result = !count in
-            count := result + 1;
-            result
-          in
+          let new_cs = if ix = 0 then cs else Call_stack.copy cs in
           let branch_case =
-            match (is_first, others) with
-            | false, _ | _, Some (_ :: _) -> Some (SpecExec (fl, get_count fl))
-            | _ -> None
+            if has_branched then Some (SpecExec (fl, ix)) else None
           in
 
           make_confcont ~state:ret_state ~callstack:new_cs
@@ -738,16 +719,16 @@ struct
             pid
             j
             eval_state
-            is_first
+            ix
             ret_state
             fl
             b_counter
-            others
+            has_branched
             spec_name : CConf.t =
           let { i; cs; branch_path; _ } = eval_state in
           let process_ret_cont new_j =
-            process_ret_cont new_j eval_state is_first ret_state fl b_counter
-              others
+            process_ret_cont new_j eval_state ix ret_state fl b_counter
+              has_branched
           in
 
           match (fl, j) with
@@ -843,27 +824,17 @@ struct
                       | Error x -> Right (Exec_err.ESt x))
                     ret
                 in
-                let b_counter =
-                  if List.length successes > 1 then b_counter + 1 else b_counter
-                in
-                let success_confs =
+                let b_counter, has_branched =
                   match successes with
-                  | (ret_state, fl) :: rest_rets ->
-                      let spec_name = spec.data.spec_name in
-                      let others =
-                        List.map
-                          (fun (ret_state, fl) ->
-                            let conf =
-                              process_ret false ret_state fl b_counter None
-                                spec_name
-                            in
-                            (conf, fl))
-                          rest_rets
-                      in
-                      process_ret true ret_state fl b_counter (Some others)
-                        spec_name
-                      :: List.map fst others
-                  | [] -> []
+                  | [] -> (b_counter, false)
+                  | _ -> (b_counter + 1, true)
+                in
+                let spec_name = spec.data.spec_name in
+                let success_confs =
+                  successes
+                  |> List.mapi (fun ix (ret_state, fl) ->
+                         process_ret ix ret_state fl b_counter has_branched
+                           spec_name)
                 in
                 let error_confs =
                   match errors with
