@@ -523,16 +523,12 @@ let collect_and_simplify_atoms a =
   let overlapping = List.sort_uniq Stdlib.compare overlapping in
   List.sort Asrt.prioritise (separating @ overlapping)
 
-let s_init ~(preds : (string, int list) Hashtbl.t) (kb : KB.t) (a : Asrt.t) :
-    (step list, Asrt.t list) result =
-  L.verbose (fun m -> m "Entering s-init on: %a\n\nKB: %a\n" Asrt.pp a kb_pp kb);
-  let atoms = collect_and_simplify_atoms a in
+let s_init_atoms ~preds kb atoms =
   let step_of_atom ~kb atom =
     ins_outs_assertion preds kb atom
     |> List.find_map (fun (ins, outs) ->
            if KB.subset ins kb then Some (atom, outs) else None)
   in
-
   let rec search current kb rest =
     L.verbose (fun m ->
         m "KNOWN: @[%a@].@\n@[<v 2>CUR UP:@\n%a@]@\nTO VISIT: @[%a@]" kb_pp kb
@@ -555,6 +551,12 @@ let s_init ~(preds : (string, int list) Hashtbl.t) (kb : KB.t) (a : Asrt.t) :
             search (step :: current) kb rest)
   in
   search [] kb atoms
+
+let s_init ~(preds : (string, int list) Hashtbl.t) (kb : KB.t) (a : Asrt.t) :
+    (step list, Asrt.t list) result =
+  L.verbose (fun m -> m "Entering s-init on: %a\n\nKB: %a\n" Asrt.pp a kb_pp kb);
+  let atoms = collect_and_simplify_atoms a in
+  s_init_atoms ~preds kb atoms
 
 let of_step_list ?post ?label (steps : step list) : t =
   let rec consume_steps = function

@@ -29,7 +29,7 @@ module type S = sig
 
   (** See {!val:SMemory.S.split_further} *)
   val split_core_pred_further :
-    string -> vt list -> err_t -> (vt list list * vt list) option
+    t -> string -> vt list -> err_t -> (vt list list * vt list) option
 end
 
 module Make (SMemory : SMemory.S) :
@@ -206,9 +206,10 @@ module Make (SMemory : SMemory.S) :
         Ok (new_state, vs)
     | Error err -> Error (StateErr.EMem err)
 
-  let split_core_pred_further core_pred ins err =
+  let split_core_pred_further state core_pred ins err =
+    let heap, _, _, _, _ = state in
     match err with
-    | StateErr.EMem err -> SMemory.split_further core_pred ins err
+    | StateErr.EMem err -> SMemory.split_further heap core_pred ins err
     | _ -> None
 
   let produce_core_pred core_pred state args =

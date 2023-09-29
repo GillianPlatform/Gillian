@@ -1871,22 +1871,6 @@ module Make (State : SState.S) :
           let _, simplified = simplify_astate ~unification:true state in
           simplified
 
-    (* let try_split_up_head up errors astate subst =
-       let open Syntaxes.Option in
-       match (Option.get (UP.head up), errors) with
-       | (GA (core_pred, ins, outs), out_learn), [ err ] ->
-           let vs_ins =
-             List.map
-               (fun x -> subst_in_expr_opt astate subst x |> Option.get)
-               ins
-           in
-           let+ new_ins_l, new_outs  = State.split_core_pred_further core_pred vs_ins err in
-           let out_amount = List.length outs in
-           let gas = List.map (fun )
-       | _ -> None *)
-
-    let try_split_step _ _ _ _ = None
-
     let unify_assertion astate subst step =
       (* We are in OX mode, unification may not branch. If it does, something is very wrong.
          Mainly because the substitution is performed in place.
@@ -1902,15 +1886,98 @@ module Make (State : SState.S) :
              %d errors"
             (List.length successes) (List.length errors)
 
-    (* Produce assertion cannot fail, if it does it should actually vanish.
-       We simplify the signature by actually doing so *)
-    (* let produce_assertion astate subst a =
-       let res = produce_assertion astate subst a in
-       List.filter_map
-         (function
-           | Ok x -> Some x
-           | Error _ -> None)
-         res *)
+    let make_pred_ins_table pred_tbl =
+      let tbl = Hashtbl.create (Hashtbl.length pred_tbl) in
+      Hashtbl.iter
+        (fun pname pred -> Hashtbl.add tbl pname pred.UP.pred.pred_ins)
+        pred_tbl;
+      tbl
+
+    let known_unifiables asrt astate =
+      let lvars_a = Asrt.lvars asrt in
+      let lvars =
+        State.get_lvars astate.state
+        |> SS.to_seq
+        |> Seq.filter_map (fun x ->
+               if SS.mem x lvars_a then Some (Expr.LVar x) else None)
+      in
+      let alocs =
+        Asrt.alocs asrt |> SS.to_seq |> Seq.map Expr.loc_from_loc_name
+      in
+      Seq.append lvars alocs |> UP.KB.of_seq
+
+    (* If we can't fully consume something from the lhs, maybe we can still consume a {b fragment} of it.
+        This function tries to split the step into smaller steps, some of which can be consumed from the
+        lhs and some from the current state.
+        The way it behaves is complicated.
+        For example let's say the core predicate [(x, []) ↦ [a, b]] (with 2 ins and 1 out) can be split into
+       - [(x, [0]) ↦ [a]]
+       - [(x, [1]) ↦ [b]]
+       [State.split_core_pred_further] will return something of the form
+       [ ([ [x, [0]], [x, [1]] ], [  {{ l-nth(PVar("0:0"), 0), l-nth(PVar("1:0"), 0) }}  ] ]
+       Indicating that the new ins and how to learn the old outs.
+       In particular, we learn the old out ([[a, b]]) by applying [λx. x[0]]
+       to both the 0th out of the 0th new core pred (0:0)  and the 0th out of the 1st new core pred (1:0).
+    *)
+    let try_split_step ~subst ~astate ~errs (step : UP.step) =
+      let open Syntaxes.Option in
+      match (step, errs) with
+      | (GA (core_pred, ins, outs), _), [ err ] ->
+          let outs =
+            List.map (SVal.SESubst.subst_in_expr subst ~partial:true) outs
+          in
+          let vs_ins =
+            List.map
+              (fun x -> subst_in_expr_opt astate subst x |> Option.get)
+              ins
+          in
+          let+ new_ins_l, new_outs_learn =
+            State.split_core_pred_further astate.state core_pred vs_ins err
+          in
+          let out_amount = List.length outs in
+          let cp_amount = List.length new_ins_l in
+          let all_new_outs =
+            Array.init (cp_amount * out_amount) (fun _ ->
+                Expr.LVar (LVar.alloc ()))
+          in
+          let pvar_subst =
+            let seq =
+              Seq.concat
+              @@ Seq.init cp_amount (fun i ->
+                     Seq.init out_amount (fun j ->
+                         let id = Fmt.str "%d:%d" i j in
+                         (Expr.PVar id, all_new_outs.((i * out_amount) + j))))
+            in
+            SVal.SESubst.of_seq seq
+          in
+          let new_cps =
+            List.mapi
+              (fun cp_i ins ->
+                let outs =
+                  List.init out_amount (fun o_i ->
+                      all_new_outs.((cp_i * out_amount) + o_i))
+                in
+                Asrt.GA (core_pred, ins, outs))
+              new_ins_l
+          in
+          let learning_equalities =
+            List.map2
+              (fun old_out new_out ->
+                let open Formula.Infix in
+                Asrt.Pure old_out #== (subst_in_expr pvar_subst new_out))
+              outs new_outs_learn
+          in
+          let atoms = new_cps @ learning_equalities in
+          (* We use an empty kb, because everything has already been substituted. *)
+          let kb = known_unifiables (Asrt.star atoms) astate in
+          let up_steps =
+            UP.s_init_atoms
+              ~preds:(make_pred_ins_table astate.pred_defs)
+              kb atoms
+          in
+          (* It should not be possible while creating UP for this. *)
+          (Result.get_ok up_steps, all_new_outs, kb)
+      | _ -> None
 
     let rec package_case_step { lhs_state; current_state; subst } step :
         (package_state, err_t list) Result.t =
@@ -1918,51 +1985,61 @@ module Make (State : SState.S) :
       L.verbose (fun m ->
           m "Wand about to consume RHS step: %a" Asrt.pp (fst step));
       (* States are modified in place unfortunately.. so we have to copy them just in case *)
-      let subst_save = SVal.SESubst.copy subst in
-      let lhs_state_save = copy_astate lhs_state in
       (* First we try to consume from the lhs_state *)
       let- lhs_errs =
-        let+ new_lhs_state = unify_assertion lhs_state subst step in
+        let subst = SVal.SESubst.copy subst in
+        let+ new_lhs_state =
+          unify_assertion (copy_astate lhs_state) subst step
+        in
         { lhs_state = new_lhs_state; current_state; subst }
       in
       (* If it fails, we try splitting the step and we try again *)
       let- split_errs =
         let split_option =
-          try_split_step step lhs_errs lhs_state_save subst_save
+          try_split_step ~astate:lhs_state ~subst ~errs:lhs_errs step
         in
         match split_option with
-        | Some up -> (
-            L.verbose (fun m -> m "We found a way");
-            let res =
-              package_up up
-                {
-                  lhs_state = lhs_state_save;
-                  current_state;
-                  subst = subst_save;
-                }
+        | Some (steps, lvars, kb) ->
+            L.verbose (fun m ->
+                m "We found a way to split, here are the steps:@\n%a"
+                  Fmt.(list ~sep:(any "@\n") UP.pp_step)
+                  steps);
+            let temp_subst =
+              UP.KB.to_seq kb
+              |> Seq.map (fun x -> (x, x))
+              |> SVal.SESubst.of_seq
             in
-            (* Dirty trick here, without choice, this isn't branching.*)
-            match res with
-            | Ok [ state ] -> Ok state
-            | Ok _ -> L.fail "Wand: branching without choice!"
-            | Error errs -> Error errs)
+            let temporary_state =
+              {
+                lhs_state = copy_astate lhs_state;
+                current_state = copy_astate current_state;
+                subst = temp_subst;
+              }
+            in
+            let+ state =
+              List.fold_left
+                (fun state step ->
+                  let* state = state in
+                  package_case_step state step)
+                (Ok temporary_state) steps
+            in
+            SVal.SESubst.filter_in_place state.subst (fun x y ->
+                if Array.mem x lvars || UP.KB.mem x kb then None else Some y);
+            L.verbose (fun m ->
+                m "After splitting, I learned the following: %a"
+                  (Fmt.Dump.iter UP.KB.iter Fmt.nop Expr.pp)
+                  (SVal.SESubst.domain state.subst None));
+            SVal.SESubst.merge_left subst state.subst;
+            { state with subst }
         | None -> Error []
       in
       L.verbose (fun m ->
           m
             "Wand: failed to consume from LHS! Going to try and consume from \
              current state!");
-      (* let lhs_state_save_2 = copy_astate lhs_state_save in
-         let subst_save_2 = SVal.SESubst.copy subst_save_1 in *)
       let- current_errs =
-        let+ new_current_state =
-          unify_assertion current_state subst_save step
-        in
-        {
-          lhs_state = lhs_state_save;
-          current_state = new_current_state;
-          subst = subst_save;
-        }
+        let+ new_current_state = unify_assertion current_state subst step in
+        { lhs_state; current_state = new_current_state; subst }
       in
       L.verbose (fun m -> m "Couldn't consume from anywhere!!");
       Error (lhs_errs @ split_errs @ current_errs)

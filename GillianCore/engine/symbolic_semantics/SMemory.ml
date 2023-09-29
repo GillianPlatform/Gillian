@@ -85,12 +85,12 @@ module type S = sig
       And we try and consume the whole thing, but the memory only had [(x, [0]) ↦ [a]] in it.
       Then this function, given the appropriate error, should a pair of two elements:
       - the new ins: [ [ [x, [0]], [x, [1]] ] ]
-      - the new way of learning the outs: [ [  {{ l-nth(PVar("0:1"), 0), l-nth(PVar("1:1"), 1) }}  ] ]
+      - the new way of learning the outs: [ [  {{ l-nth(PVar("0:0"), 0), l-nth(PVar("1:0"), 0) }}   ] ]
       
       {b Important}: it is always sound for this function to return [None], it will just reduce the amount of automation.
       *)
   val split_further :
-    string -> vt list -> err_t -> (vt list list * vt list) option
+    t -> string -> vt list -> err_t -> (vt list list * vt list) option
 end
 
 module Dummy : S with type init_data = unit = struct

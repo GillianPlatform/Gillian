@@ -55,6 +55,12 @@ val learn_expr :
 val ins_outs_expr : KB.t -> Expr.t -> Expr.t -> (KB.t * outs) list
 val collect_simple_asrts : Asrt.t -> Asrt.t list
 
+val s_init_atoms :
+  preds:(string, int list) Hashtbl.t ->
+  KB.t ->
+  Asrt.t list ->
+  (step list, Asrt.t list) result
+
 val init :
   ?use_params:bool ->
   KB.t ->

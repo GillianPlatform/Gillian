@@ -66,7 +66,7 @@ module type S = sig
 
   (** See {!val:SMemory.S.split_further} *)
   val split_further :
-    string -> vt list -> err_t -> (vt list list * vt list) option
+    t -> string -> vt list -> err_t -> (vt list list * vt list) option
 end
 
 (* FIXME: Lift should not be necessary, the monad should just match !!! *)

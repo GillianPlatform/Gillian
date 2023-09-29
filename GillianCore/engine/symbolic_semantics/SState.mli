@@ -24,7 +24,7 @@ module type S = sig
 
   (** See {!val:SMemory.S.split_further} *)
   val split_core_pred_further :
-    string -> vt list -> err_t -> (vt list list * vt list) option
+    t -> string -> vt list -> err_t -> (vt list list * vt list) option
 end
 
 module Make (SMemory : SMemory.S) :

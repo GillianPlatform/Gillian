@@ -1015,8 +1015,8 @@ module Make (State : SState.S) :
     let+ state = State.produce_core_pred core_pred astate.state args in
     copy_with_state astate state
 
-  let split_core_pred_further core_pred ins err =
-    State.split_core_pred_further core_pred ins err
+  let split_core_pred_further astate core_pred ins err =
+    State.split_core_pred_further astate.state core_pred ins err
 
   let mem_constraints (astate : t) : Formula.t list =
     State.mem_constraints astate.state
