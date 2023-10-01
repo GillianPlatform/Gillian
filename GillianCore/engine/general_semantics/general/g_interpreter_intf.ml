@@ -47,7 +47,6 @@ module type S = sig
       prev_cmd_report_id : Logging.Report_id.t option;
       branch_case : BranchCase.t option;
       branch_path : BranchCase.path;
-      new_branches : (state_t * int * BranchCase.t) list;
     }
 
     (** Equal to conf_cont + the id of the required spec *)
@@ -86,16 +85,17 @@ module type S = sig
 
   (** To support the step-by-step behaviour of the debugger, execution is split into thunks; each invocation executes one GIL command.
     By supplying a branch path, a particular branch of execution can be selected. *)
-  type 'a cont_func_f = ?path:BranchCase.path -> unit -> 'a cont_func
+  type 'result cont_func_f = ?path:BranchCase.path -> unit -> 'result cont_func
 
-  and 'a cont_func =
-    | Finished of 'a list
-    | Continue of
-        (Logging.Report_id.t option
-        * BranchCase.path
-        * BranchCase.t list option
-        * 'a cont_func_f)
-    | EndOfBranch of 'a * 'a cont_func_f
+  and 'result cont_func =
+    | Finished of 'result list
+    | Continue of {
+        report_id : Logging.Report_id.t option;
+        branch_path : BranchCase.path;
+        new_branch_cases : BranchCase.t list;
+        cont_func : 'result cont_func_f;
+      }
+    | EndOfBranch of 'result * 'result cont_func_f
 
   (** Types and functions for logging to the database *)
   module Logging : sig

@@ -1,7 +1,8 @@
 type nest_kind =
   | NoNest  (** This command doesn't contain a nest *)
-  | Proc of string
-      (** This command "nests" the execution of another (named) procedure *)
+  | LoopBody of string
+      (** This command nests its loop body an (abstracted) function call *)
+  | FunCall of string  (** This command nests the body of a function call *)
 [@@deriving yojson]
 
 type stmt_end_kind = NotEnd | EndNormal | EndWithBranch of WBranchCase.t
@@ -24,6 +25,7 @@ type t = {
   nest_kind : nest_kind; [@default NoNest]
   is_hidden : bool; [@default false]
       (** Should this command be hidden when debugging? *)
+  is_return : bool; [@default false]
 }
 [@@deriving yojson, make]
 

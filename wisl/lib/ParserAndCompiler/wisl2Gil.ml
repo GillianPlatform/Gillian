@@ -602,7 +602,7 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
         map_reassign_vars ((annot_while, None, cmd) :: acc) rest
     | [] -> List.rev acc
   in
-  let annot_call_while = { annot_while with nest_kind = Proc loop_fname } in
+  let annot_call_while = { annot_while with nest_kind = LoopBody loop_fname } in
   let lab_cmds =
     (annot_call_while, None, call_cmd) :: map_reassign_vars [] reassign_vars
   in
@@ -648,19 +648,22 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       let comp_body, new_functions = compile_list sl in
       let comp_body, bodlab = get_or_create_lab comp_body lbody_lab in
       let endlab = gen_str end_lab in
-      let annot_while =
+      let annot =
         WAnnot.make ~origin_id:sid_while ~origin_loc:(CodeLoc.to_location sloc)
           ()
       in
-      let loopcmd = Cmd.GuardedGoto (guard, bodlab, endlab) in
+      let annot_hidden = WAnnot.{ annot with is_hidden = true } in
       let headlabopt = Some looplab in
-      let loopcmd_lab = (annot_while, headlabopt, loopcmd) in
+      let headcmd = Cmd.Skip in
+      let headcmd_lab = (annot_hidden, headlabopt, headcmd) in
+      let loopcmd = Cmd.GuardedGoto (guard, bodlab, endlab) in
+      let loopcmd_lab = (annot, None, loopcmd) in
       let backcmd = Cmd.Goto looplab in
-      let backcmd_lab = (annot_while, None, backcmd) in
+      let backcmd_lab = (annot_hidden, None, backcmd) in
       let endcmd = Cmd.Skip in
-      let endcmd_lab = (annot_while, Some endlab, endcmd) in
+      let endcmd_lab = (annot_hidden, Some endlab, endcmd) in
       let comp_rest, new_functions_2 = compile_list rest in
-      ( cmdle @ [ loopcmd_lab ] @ comp_body
+      ( [ headcmd_lab ] @ cmdle @ [ loopcmd_lab ] @ comp_body
         @ [ backcmd_lab; endcmd_lab ]
         @ comp_rest,
         new_functions @ new_functions_2 )
@@ -681,6 +684,14 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       in
       let comp_rest, new_functions = compile_list rest in
       (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
+  (* Fresh s-var *)
+  | { snode = Fresh v; sid; sloc } :: rest ->
+      let cmd = Cmd.Logic (LCmd.FreshSVar v) in
+      let annot =
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
+      let comp_rest, new_functions = compile_list rest in
+      ((annot, None, cmd) :: comp_rest, new_functions)
   (* Object Deletion *)
   | { snode = Dispose e; sid; sloc } :: rest ->
       let cmdle, comp_e = compile_expr e in
@@ -813,7 +824,8 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       in
       let cmd = Cmd.Call (x, expr_fn, params, None, bindings) in
       let annot =
-        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
+          ~nest_kind:(FunCall fn) ()
       in
       let comp_rest, new_functions = compile_list rest in
       (List.concat cmdles @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
@@ -863,6 +875,28 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       in
       let comp_rest, new_functions = compile_list rest in
       (cmds_with_annot @ comp_rest, new_functions)
+  | { snode = Assert e; sid; sloc } :: rest ->
+      let annot =
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
+      let cmdle, comp_e = compile_expr e in
+      let cmd =
+        let formula = Formula.Eq (comp_e, Expr.bool true) in
+        Cmd.Logic (LCmd.Assert formula)
+      in
+      let comp_rest, new_functions = compile_list rest in
+      (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
+  | { snode = Assume e; sid; sloc } :: rest ->
+      let annot =
+        WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
+      in
+      let cmdle, comp_e = compile_expr e in
+      let cmd =
+        let formula = Formula.Eq (comp_e, Expr.bool true) in
+        Cmd.Logic (LCmd.Assume formula)
+      in
+      let comp_rest, new_functions = compile_list rest in
+      (cmdle @ [ (annot, None, cmd) ] @ comp_rest, new_functions)
 
 let compile_spec
     ?(fname = "main")
@@ -936,7 +970,7 @@ let rec compile_function
     let mk =
       WAnnot.make
         ~origin_loc:(CodeLoc.to_location (WExpr.get_loc return_expr))
-        ~origin_id:(WExpr.get_id return_expr)
+        ~origin_id:(WExpr.get_id return_expr) ~is_return:true
     in
     (mk ~stmt_kind:(Multi NotEnd) (), mk ~stmt_kind:(Multi EndNormal) ())
   in

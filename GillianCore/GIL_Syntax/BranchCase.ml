@@ -1,8 +1,8 @@
 type t =
   | GuardedGoto of bool
   | LCmd of int
-  | SpecExec of Flag.t
-  | LAction of Yojson.Safe.t list
+  | SpecExec of Flag.t * int
+  | LAction of int
   | LActionFail of int
 [@@deriving show, yojson]
 

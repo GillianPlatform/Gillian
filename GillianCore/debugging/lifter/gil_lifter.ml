@@ -2,6 +2,12 @@ module L = Logging
 module DL = Debugger_log
 open Lifter
 
+module type S = sig
+  include Lifter.S
+
+  val pop_to_exec : t -> (Logging.Report_id.t * BranchCase.t option) option
+end
+
 module Make
     (PC : ParserAndCompiler.S)
     (Verifier : Verifier.S with type annot = PC.Annot.t)
@@ -36,7 +42,9 @@ module Make
   type t = {
     map : map;
     root_proc : string;
+    all_procs : string list;
     id_map : (L.Report_id.t, map) Hashtbl.t; [@to_yojson fun _ -> `Null]
+    mutable to_exec : (L.Report_id.t * BranchCase.t option) list;
   }
   [@@deriving to_yojson]
 
@@ -65,18 +73,22 @@ module Make
       () =
     let display = Fmt.to_to_string Cmd.pp_indexed cmd_report.cmd in
     let data = { id; display; unifys; errors; submap; branch_path; parent } in
-    let cmd =
+    let cmd, to_exec =
       match kind with
-      | Normal -> Cmd { data; next = Nothing }
+      | Normal -> (Cmd { data; next = Nothing }, [ (id, None) ])
       | Branch cases ->
           let nexts = Hashtbl.create (List.length cases) in
-          cases
-          |> List.iter (fun (case, _) -> Hashtbl.add nexts case ((), Nothing));
-          BranchCmd { data; nexts }
-      | Final -> FinalCmd { data }
+          let to_exec =
+            cases
+            |> List.map (fun (case, _) ->
+                   Hashtbl.add nexts case ((), Nothing);
+                   (id, Some case))
+          in
+          (BranchCmd { data; nexts }, to_exec)
+      | Final -> (FinalCmd { data }, [])
     in
     Hashtbl.replace id_map id cmd;
-    cmd
+    (cmd, to_exec)
 
   let get_id_opt = function
     | Nothing -> None
@@ -110,16 +122,28 @@ module Make
             [ ("id", L.Report_id.to_yojson id); ("state", dump state) ])
           ("at_id: " ^ s)
 
-  let init_exn _ _ exec_data =
+  let init_exn ~proc_name ~all_procs _ _ exec_data =
     let id_map = Hashtbl.create 1 in
-    let map = new_cmd id_map exec_data ~parent:None () in
-    let root_proc = get_proc_name exec_data in
-    ({ map; root_proc; id_map }, Stop)
+    let map, _ = new_cmd id_map exec_data ~parent:None () in
+    ({ map; root_proc = proc_name; all_procs; id_map; to_exec = [] }, Stop)
 
-  let init _ _ exec_data = Some (init_exn "" None exec_data)
+  let init ~proc_name ~all_procs tl_ast prog exec_data =
+    Some (init_exn ~proc_name ~all_procs tl_ast prog exec_data)
+
+  let should_skip_cmd (exec_data : cmd_report executed_cmd_data) state : bool =
+    let annot = exec_data.cmd_report.annot in
+    if Annot.is_hidden annot then (
+      DL.log (fun m -> m "Gil_lifter: skipping hidden cmd");
+      true)
+    else
+      let proc_name = get_proc_name exec_data in
+      if not (List.mem proc_name state.all_procs) then (
+        DL.log (fun m -> m "Gil_lifter: skipping cmd from internal proc");
+        true)
+      else false
 
   let handle_cmd prev_id branch_case exec_data state =
-    let { root_proc; id_map; _ } = state in
+    let { id_map; _ } = state in
     let new_cmd = new_cmd id_map exec_data in
     let failwith s =
       DL.failwith
@@ -138,28 +162,36 @@ module Make
       | None ->
           failwith (Fmt.str "couldn't find prev_id %a!" L.Report_id.pp prev_id)
     in
-    (match map with
-    | Cmd cmd when cmd.next = Nothing ->
-        let parent = Some (map, None) in
-        cmd.next <- new_cmd ~parent ()
-    | Cmd _ -> failwith "cmd.next not Nothing!"
-    | BranchCmd { nexts; _ } -> (
-        match branch_case with
-        | None -> failwith "HORROR - need branch case to insert to branch cmd!"
-        | Some case -> (
-            match Hashtbl.find_opt nexts case with
-            | Some ((), Nothing) ->
-                let parent = Some (map, Some case) in
-                Hashtbl.replace nexts case ((), new_cmd ~parent ())
-            | _ -> failwith "colliding cases in branch cmd"))
-    | _ -> failwith "can't insert to Nothing or FinalCmd");
-    let { id; cmd_report; _ } = exec_data in
-    let current_proc = get_proc_name exec_data in
-    if root_proc <> current_proc || Annot.is_hidden cmd_report.annot then
-      ExecNext (Some id, None)
-    else Stop
+    let to_exec =
+      match map with
+      | Cmd cmd when cmd.next = Nothing ->
+          let parent = Some (map, None) in
+          let new_cmd, to_exec = new_cmd ~parent () in
+          cmd.next <- new_cmd;
+          to_exec
+      | Cmd _ -> failwith "cmd.next not Nothing!"
+      | BranchCmd { nexts; _ } -> (
+          match branch_case with
+          | None ->
+              failwith "HORROR - need branch case to insert to branch cmd!"
+          | Some case -> (
+              match Hashtbl.find_opt nexts case with
+              | Some ((), Nothing) ->
+                  let parent = Some (map, Some case) in
+                  let new_cmd, to_exec = new_cmd ~parent () in
+                  Hashtbl.replace nexts case ((), new_cmd);
+                  to_exec
+              | Some ((), _) -> failwith "colliding cases in branch cmd"
+              | None -> failwith "inserted branch case not found on parent!"))
+      | _ -> failwith "can't insert to Nothing or FinalCmd"
+    in
+    match (should_skip_cmd exec_data state, to_exec @ state.to_exec) with
+    | true, (id, case) :: to_exec ->
+        state.to_exec <- to_exec;
+        ExecNext (Some id, case)
+    | _ -> Stop
 
-  let package_case _ = Packaged.package_gil_case
+  let package_case _ case _ = Packaged.package_gil_case case
 
   let package_data package { id; display; unifys; errors; submap; _ } =
     let submap =
@@ -317,4 +349,11 @@ module Make
     let () = Hashtbl.replace variables store_id store_vars in
     let () = Hashtbl.replace variables memory_id memory_vars in
     scopes
+
+  let pop_to_exec state =
+    match state.to_exec with
+    | [] -> None
+    | (id, case) :: to_exec ->
+        state.to_exec <- to_exec;
+        Some (id, case)
 end

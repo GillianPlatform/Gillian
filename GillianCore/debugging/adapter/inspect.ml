@@ -73,8 +73,8 @@ module Make (Debugger : Debugger.S) = struct
     DL.set_rpc_command_handler rpc ~name:"Unification"
       (module Unification_command)
       (fun { id } ->
-        let unify_id, unify_map = dbg |> Debugger.Inspect.get_unification id in
-        let result = Unification_command.Result.make ~unify_id ~unify_map in
+        let unify_map = dbg |> Debugger.Inspect.get_unify_map id in
+        let result = Unification_command.Result.make ~unify_id:id ~unify_map in
         Lwt.return result);
     Lwt.return ()
 end

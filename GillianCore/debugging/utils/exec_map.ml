@@ -171,12 +171,11 @@ module Packaged = struct
       match case with
       | GuardedGoto b -> ("GuardedGoto", ("If/Else", Fmt.str "%B" b))
       | LCmd x -> ("LCmd", ("Logical command", Fmt.str "%d" x))
-      | SpecExec fl -> ("SpecExec", ("Spec exec", Fmt.str "%a" Flag.pp fl))
-      | LAction json ->
-          let s = Yojson.Safe.to_string (`List json) in
-          ("LAction", ("Logical action", s))
+      | SpecExec (fl, i) ->
+          ("SpecExec", ("Spec exec", Fmt.str "%a-%d" Flag.pp fl i))
+      | LAction x -> ("LAction", ("Logical action", Fmt.str "L%d" x))
       | LActionFail x ->
-          ("LActionFail", ("Logical action failure", Fmt.str "%d" x))
+          ("LActionFail", ("Logical action failure", Fmt.str "LF%d" x))
     in
     { kind; display; json }
 
@@ -189,10 +188,14 @@ module Packaged = struct
           Cmd { data = package_data aux data; next = aux next }
       | BranchCmd { data; nexts } ->
           let data = package_data aux data in
+          let all_cases =
+            nexts |> Hashtbl.to_seq |> List.of_seq
+            |> List.map (fun (c, (bd, _)) -> (c, bd))
+          in
           let nexts =
             nexts
             |> Hashtbl.map (fun case (bdata, next) ->
-                   let case = package_case bdata case in
+                   let case = package_case bdata case all_cases in
                    let next = aux next in
                    (case, ((), next)))
           in

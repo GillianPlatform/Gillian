@@ -2,14 +2,13 @@ opam-version: "2.0"
 synopsis: "Unicode character properties for OCaml"
 description: """\
 Uucp is an OCaml library providing efficient access to a selection of
-character properties of the [Unicode character database][1].
+character properties of the [Unicode character database].
 
-Uucp is independent from any Unicode text data structure and has no
-dependencies. It is distributed under the ISC license.
+Uucp is distributed under the ISC license. It has no dependency.
 
-[1]: http://www.unicode.org/reports/tr44/
+Home page: <http://erratique.ch/software/uucp>
 
-Home page: http://erratique.ch/software/uucp"""
+[Unicode character database]: http://www.unicode.org/reports/tr44/"""
 maintainer: "Daniel Bünzli <daniel.buenzl i@erratique.ch>"
 authors: "The uucp programmers"
 license: "ISC"
@@ -18,17 +17,16 @@ homepage: "https://erratique.ch/software/uucp"
 doc: "https://erratique.ch/software/uucp/doc/"
 bug-reports: "https://github.com/dbuenzli/uucp/issues"
 depends: [
-  "ocaml" {>= "4.03.0"}
+  "ocaml" {>= "4.14.0"}
   "ocamlfind" {build}
   "ocamlbuild" {build}
   "topkg" {build & >= "1.0.3"}
-  "uucd" {with-test}
+  "uucd" {with-test & dev & >= "15.1.0" & < "16.0.0"}
   "uunf" {with-test}
-  "uutf" {with-test}
 ]
-depopts: ["uutf" "uunf" "cmdliner"]
+depopts: ["uunf" "cmdliner"]
 conflicts: [
-  "uutf" {< "1.0.1"}
+  "uunf" {< "15.1.0" | >= "16.0.0"}
   "cmdliner" {< "1.1.0"}
 ]
 build: [
@@ -37,8 +35,6 @@ build: [
   "build"
   "--dev-pkg"
   "%{dev}%"
-  "--with-uutf"
-  "%{uutf:installed}%"
   "--with-uunf"
   "%{uunf:installed}%"
   "--with-cmdliner"
@@ -49,7 +45,7 @@ post-messages:
     {failure & (arch = "ppc64" | arch = "arm64")}
 dev-repo: "git+https://erratique.ch/repos/uucp.git"
 url {
-  src: "https://erratique.ch/software/uucp/releases/uucp-15.0.0.tbz"
+  src: "https://erratique.ch/software/uucp/releases/uucp-15.1.0.tbz"
   checksum:
-    "sha512=ee4acff5666961766321e85e287fb9d5b8d50533319f22bf6f4eceb943242df2d0e0f4e775c4a140f68ca142837938eaa5926e22362215a3365ffe7f8768923b"
+    "sha512=998f94fadb72357b15a3042a3d11c31b3e16f281822673f2defdd515cd1394d55de1817628be8bd5c030175f9e62c53630d4139a1c0253800f9fb898b0f11364"
 }

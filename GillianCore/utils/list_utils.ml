@@ -190,3 +190,8 @@ let at_least_two f l =
         else aux ~found_one r
   in
   aux ~found_one:false l
+
+let rec last = function
+  | [] -> None
+  | [ x ] -> Some x
+  | _ :: xs -> last xs

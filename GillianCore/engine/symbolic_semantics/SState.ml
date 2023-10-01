@@ -214,7 +214,11 @@ module Make (SMemory : SMemory.S) :
       in
       (* Perform reduction *)
       if no_reduce then result
-      else Reduction.reduce_lexpr ~gamma ~reduce_lvars:true ~pfs result
+      else
+        try Reduction.reduce_lexpr ~gamma ~reduce_lvars:true ~pfs result
+        with Reduction.ReductionException (expr, msg) ->
+          let msg = Fmt.str "Couldn't reduce %a - %s" Expr.pp expr msg in
+          raise (Internal_State_Error ([ StateErr.EOther msg ], state))
     in
     symb_evaluate_expr e
 

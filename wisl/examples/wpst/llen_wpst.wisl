@@ -1,0 +1,33 @@
+function llen(x) {
+    if (x = null) {
+        n := 0
+    } else {
+        t := [x+1];
+        n := llen(t);
+        n := n + 1
+    };
+    return n
+}
+
+function build_list(size) {
+  i := 0;
+  l := null;
+  while (i < size) {
+    n := new(2);
+    [n] := size - i;
+    [n + 1] := l;
+    l := n;
+    i := i + 1
+  };
+  return l
+}
+
+function main() {
+  fresh x;
+  assume (x >= 2);
+  assume (x <= 3);
+  l := build_list(x);
+  size := llen(l);
+  assert (size = 2);
+  return null
+}
