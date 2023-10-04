@@ -137,6 +137,8 @@ let pp fmt lcmd =
       Fmt.pf fmt "@[%s %s%a %a@]" keyword name (Fmt.parens pp_args) les
         pp_unfold_info unfold_info
   | Package { lhs = lname, largs; rhs = rname, rargs } ->
+      let lname = Pp_utils.maybe_quote_ident lname in
+      let rname = Pp_utils.maybe_quote_ident rname in
       Fmt.pf fmt "@[package (%s(%a) -* %s(%a)) @]" lname pp_args largs rname
         pp_args rargs
   | GUnfold name -> Fmt.pf fmt "unfold_all %s" name
