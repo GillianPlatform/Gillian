@@ -4,7 +4,7 @@ let of_yojson (json : Yojson.Safe.t) : (t, string) result =
   let open Utils.Syntaxes.Result in
   let* symbols =
     match json with
-    | `Assoc [ ("symbolTable", `Assoc symbols) ] -> Ok symbols
+    | `Assoc symbols -> Ok symbols
     | _ -> Error "Invalid symtab.json file"
   in
   let tbl = Hashtbl.create 1000 in

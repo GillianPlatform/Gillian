@@ -62,8 +62,7 @@ type err = string
 
 let pp_err = Fmt.string
 
-let parse_symtab_into_goto file =
-  let json = Yojson.Safe.from_file file in
+let parse_symtab_into_goto json =
   let tbl = Irep_lib.Symtab.of_yojson json in
   Result.map
     (fun tbl ->
@@ -91,15 +90,53 @@ let create_compilation_result path goto_prog gil_prog =
     init_data = ();
   }
 
+let compile_c_to_symtab c_file =
+  let symtab_file = c_file ^ ".symtab.json" in
+  let status =
+    Sys.command
+      (Fmt.str "cbmc %s --show-symbol-table --json-ui > %s" c_file symtab_file)
+  in
+  if status <> 0 then
+    Fmt.failwith "CMBC failed to compile %s with return code %d" c_file status;
+  symtab_file
+
+let load_symtab_from_file file =
+  let json = Yojson.Safe.from_file file in
+  let symtab =
+    match json with
+    | `List objects -> (
+        let symtabs = Yojson.Safe.Util.filter_member "symbolTable" objects in
+        match symtabs with
+        | [ symtab ] -> Ok symtab
+        | [] -> Error "Couldn't find 'symbolTable' field"
+        | _ -> Error "Found multiple 'symbolTable' fields")
+    | _ -> Error "Couldn't find list at top level"
+  in
+  match symtab with
+  | Ok symtab -> symtab
+  | Error msg -> Fmt.failwith "Malformed symtab file - %s" msg
+
 let parse_and_compile_files files =
   let open Kanillian_compiler in
   let open Utils.Syntaxes.Result in
+  (* Call CBMC ourselves *)
   let path =
     match files with
-    | [ p ] -> p
-    | _ -> failwith "Kanillian only handles one symtab file at the moment"
+    | [ p ] -> (
+        match Filename.extension p with
+        | ".json" -> p
+        | ".c" -> compile_c_to_symtab p
+        | ext -> Fmt.failwith "Unknown file type '%s'!" ext)
+    | _ -> failwith "Kanillian only handles one file at the moment"
   in
-  let+ goto_prog = parse_symtab_into_goto path in
+  let path =
+    match Filename.extension path with
+    | ".json" -> path
+    | ".c" -> compile_c_to_symtab path
+    | ext -> Fmt.failwith "Unknown file type '%s'!" ext
+  in
+  let json = load_symtab_from_file path in
+  let+ goto_prog = parse_symtab_into_goto json in
   let goto_prog = Sanitize.sanitize_program goto_prog in
   let context =
     Ctx.make
