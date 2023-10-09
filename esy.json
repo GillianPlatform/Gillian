@@ -71,8 +71,8 @@
     "docs:watch": "concurrently -n odoc,odoc-sync,sphinx -c cyan,blue,yellow \"esy odoc:watch:build\" \"esy odoc:watch:sync\" \"esy sphinx:watch\""
   },
   "dependencies": {
+    "@opam/fpath": "*",
     "@opam/alcotest": "1.0.1",
-    "@opam/batteries": "^3.0.0",
     "@opam/cmdliner": "^1.1.1",
     "@opam/dap": "1.0.6",
     "@opam/dune": "^3.0",
@@ -81,7 +81,7 @@
     "@opam/menhir": "20220210",
     "@opam/ppx_deriving_yojson": "*",
     "@opam/ppxlib": ">=0.18.0",
-    "@opam/printbox": "0.5",
+    "@opam/printbox-text": "^0.6.1",
     "@opam/sqlite3": "5.0.2",
     "@opam/uuidm": "0.9.7",
     "@opam/visitors": ">=2.3",

@@ -384,7 +384,7 @@ let make_branch ~heap ?(rets = []) () = (heap, rets)
 
 let just_functions genv =
   if !Config.allocated_functions then
-    PMap.foldi
+    String_map.fold
       (fun loc def acc ->
         match def with
         | Global_env.FunDef _ -> Mem.allocate_function acc loc
@@ -703,7 +703,7 @@ let pp_err fmt (e : err_t) =
 let pp fmt h =
   let exclude loc =
     try
-      match PMap.find loc h.genv with
+      match String_map.find loc h.genv with
       | Global_env.FunDef _ -> true
       | _ -> false
     with Not_found -> false
@@ -811,7 +811,7 @@ let alocs heap = Mem.alocs heap.mem
 let assertions ?to_keep:_ heap =
   let exclude loc =
     try
-      match PMap.find loc heap.genv with
+      match String_map.find loc heap.genv with
       | Global_env.FunDef _ -> true
       | _ -> false
     with Not_found -> false

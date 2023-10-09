@@ -111,7 +111,12 @@ module type S = sig
       - If it doesn't find one, it returns Some (None, input_state) *)
   val unfold_concrete_preds : t -> (SVal.SESubst.t option * t) option
 
-  val unify_assertion : t -> SVal.SESubst.t -> UP.step -> (t, err_t) Res_list.t
+  val unify_assertion :
+    ?no_auto_fold:bool ->
+    t ->
+    SVal.SESubst.t ->
+    UP.step ->
+    (t, err_t) Res_list.t
 
   val unify :
     ?in_unification:bool ->
@@ -139,7 +144,8 @@ module type S = sig
       we attempt to fold it. *)
   val consume_pred :
     ?in_unification:bool ->
-    ?fold_outs_info:SVal.SESubst.t * UP.step * UP.outs * Expr.t list ->
+    ?fold_outs_info:SVal.SESubst.t * UP.step * Expr.t list ->
+    ?no_auto_fold:bool ->
     t ->
     string ->
     Expr.t option list ->

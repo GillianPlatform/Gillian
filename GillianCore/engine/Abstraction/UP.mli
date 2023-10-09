@@ -61,6 +61,8 @@ val s_init_atoms :
   Asrt.t list ->
   (step list, Asrt.t list) result
 
+val of_step_list : ?post:post -> ?label:label -> step list -> t
+
 val init :
   ?use_params:bool ->
   KB.t ->

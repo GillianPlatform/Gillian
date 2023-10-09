@@ -4,12 +4,12 @@ type def = FunDef of string | GlobVar of string
 let location_of_symbol str = "$l_" ^ str
 
 (** maps location to definition *)
-type t = (string, def) PMap.t
+type t = def String_map.t
 
-let empty = PMap.empty
-let add_fundef genv loc fdef = PMap.add loc (FunDef fdef) genv
-let add_globvar genv loc gvar = PMap.add loc (GlobVar gvar) genv
-let add_def genv loc def = PMap.add loc def genv
+let empty = String_map.empty
+let add_fundef genv loc fdef = String_map.add loc (FunDef fdef) genv
+let add_globvar genv loc gvar = String_map.add loc (GlobVar gvar) genv
+let add_def genv loc def = String_map.add loc def genv
 
 let of_definition_list defs =
   List.fold_left
@@ -18,7 +18,7 @@ let of_definition_list defs =
       add_def genv loc def)
     empty defs
 
-let find_def genv loc = PMap.find loc genv
+let find_def genv loc = String_map.find loc genv
 
 let find_def_opt genv loc =
   try Some (find_def genv loc) with Not_found -> None
@@ -77,7 +77,7 @@ module Serialization = struct
     List.fold_left add_entry empty entries
 
   let to_definition_list genv =
-    PMap.foldi
+    String_map.fold
       (fun loc def acc ->
         let entry =
           match def with
@@ -105,4 +105,4 @@ let pp ft genv =
     in
     pf ft "%s -> %a" loc pp_def def
   in
-  (Fmt.iter_bindings ~sep:(any "@\n") PMap.iter pp_binding) ft genv
+  (Fmt.iter_bindings ~sep:(any "@\n") String_map.iter pp_binding) ft genv

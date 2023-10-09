@@ -17,7 +17,7 @@
     "@opam/menhir": "20220210",
     "@opam/ppx_deriving_yojson": "*",
     "@opam/ppxlib": ">=0.18.0",
-    "@opam/printbox": "0.5",
+    "@opam/printbox-text": "0.6.1",
     "@opam/sqlite3": "5.0.2",
     "@opam/uuidm": "0.9.7",
     "@opam/visitors": ">=2.3",
