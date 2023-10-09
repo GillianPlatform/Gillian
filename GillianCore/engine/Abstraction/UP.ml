@@ -5,14 +5,16 @@ module L = Logging
     with (optionally) the way of constructing them *)
 type outs = (Expr.t * Expr.t) list [@@deriving yojson, eq]
 
-let outs_pp = Fmt.(list ~sep:semi (parens (pair ~sep:comma Expr.pp Expr.pp)))
+let outs_pp =
+  Fmt.(
+    list ~sep:(Fmt.any "; ") (parens (pair ~sep:(Fmt.any ", ") Expr.pp Expr.pp)))
 
 (** The [up_step] type represents a unification plan step,
     consisting of an assertion together with the possible
     learned outs *)
 type step = Asrt.t * outs [@@deriving yojson, eq]
 
-let pp_step = Fmt.Dump.pair Asrt.pp outs_pp
+let pp_step = Fmt.pair ~sep:(Fmt.any ", ") Asrt.pp outs_pp
 let pp_step_list = Fmt.Dump.list pp_step
 
 type label = string * SS.t [@@deriving eq, yojson]
@@ -655,33 +657,31 @@ let init
   | successes, [] -> Ok (build_up successes)
 
 let pp ft up =
-  let rec to_box up =
-    let open PrintBox in
+  let open Fmt in
+  let rec aux ~prefix up =
     match up with
     | Choice (left, right) ->
-        let left, right = (to_box left, to_box right) in
-        [
-          tree (text "CHOICE")
-            [
-              vlist ~bars:false left |> frame; vlist ~bars:false right |> frame;
-            ];
-        ]
+        string ft prefix;
+        pf ft "CHOICE@\n";
+        string ft prefix;
+        string ft "├── ";
+        aux ~prefix:(prefix ^ "│   ") left;
+        string ft prefix;
+        string ft "└──";
+        aux ~prefix:(prefix ^ "   ") right
     | ConsumeStep (step, t) ->
-        let step = Fmt.str "· %a" pp_step step |> text in
-        let rest = to_box t in
-        step :: rest
+        pf ft "@[<h>· %a@]@\n" pp_step step;
+        string ft prefix;
+        aux ~prefix t
     | LabelStep (label, t) ->
-        let label = Fmt.str "· %a" pp_label label |> text in
-        let rest = to_box t in
-        label :: rest
+        pf ft "· %a@\n" pp_label label;
+        string ft prefix;
+        aux ~prefix t
     | Finished post ->
-        let post =
-          "· FINISHED - " ^ Fmt.to_to_string (Fmt.Dump.option pp_post) post
-        in
-        [ text post ]
+        pf ft "===FINISHED=== POST: %a@\n%s@\n" (Fmt.Dump.option pp_post) post
+          prefix
   in
-  let box = PrintBox.vlist ~bars:false (to_box up) in
-  PrintBox_text.pp ft box
+  aux ~prefix:"" up
 
 let init_specs (preds : (string, int list) Hashtbl.t) (specs : Spec.t list) :
     ((string, spec) Hashtbl.t, up_err_t) result =
