@@ -109,6 +109,15 @@ let entails =
 
 let check_sat = delayed_eval FOSolver.sat
 
+let all =
+  let rec loop vs = function
+    | [] -> return (List.rev vs)
+    | t :: ts -> bind t (fun v -> loop (v :: vs) ts)
+  in
+  fun ts -> loop [] ts
+
+let leak_pc_copy () ~(curr_pc : Pc.t) = return (Pc.to_gpc curr_pc) ~curr_pc
+
 module Syntax = struct
   let ( let* ) = bind
   let ( let+ ) = map

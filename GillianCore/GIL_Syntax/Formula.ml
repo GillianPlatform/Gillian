@@ -354,7 +354,7 @@ module Infix = struct
   let ( #== ) a b =
     match (a, b) with
     | Expr.Lit la, Expr.Lit lb -> of_bool (Literal.equal la lb)
-    | a, b when a == b -> True
+    | a, b when Expr.equal a b -> True
     | _ -> Eq (a, b)
 
   let ( #|| ) a b =
