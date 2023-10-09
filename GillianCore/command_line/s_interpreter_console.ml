@@ -20,10 +20,20 @@ struct
     open ChangeTracker
 
     let run_main prog init_data =
-      ignore
-        (S_interpreter.evaluate_proc
-           (fun x -> x)
-           prog !Config.entry_point [] (SState.init init_data))
+      let all_results =
+        S_interpreter.evaluate_proc
+          (fun x -> x)
+          prog !Config.entry_point [] (SState.init init_data)
+      in
+      let success =
+        List.for_all
+          (function
+            | Exec_res.RSucc _ -> true
+            | _ -> false)
+          all_results
+      in
+      if success then Fmt.pr "%a@\n@?" (Fmt.styled `Green Fmt.string) "Success!"
+      else Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors happened!"
 
     let run_incr source_files prog init_data =
       (* Only re-run program if transitive callees of main proc have changed *)
