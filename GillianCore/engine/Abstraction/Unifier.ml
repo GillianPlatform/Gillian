@@ -1369,11 +1369,8 @@ module Make (State : SState.S) :
             let opf = SVal.SESubst.substitute_in_formula_opt subst f in
             match opf with
             | None ->
-                raise
-                  (Failure
-                     (Format.asprintf
-                        "Unification failure: do not know all ins for %a"
-                        Formula.pp f))
+                Fmt.failwith "Unification failure: do not know all ins for %a"
+                  Formula.pp f
             | Some pf -> (
                 let discharges_pf =
                   List.fold_left Formula.Infix.( #&& ) True discharges
@@ -2031,64 +2028,6 @@ module Make (State : SState.S) :
             UP.of_step_list steps
           in
           { init_subst; up; fold_outs_info = (subst, step, out_params, outs) }
-      (* | (GA (core_pred, ins, outs), _), [ err ] ->
-          let outs =
-            List.map (SVal.SESubst.subst_in_expr subst ~partial:true) outs
-          in
-          let vs_ins =
-            List.map
-              (fun x -> subst_in_expr_opt astate subst x |> Option.get)
-              ins
-          in
-          let+ new_ins_l, new_outs_learn =
-            State.split_core_pred_further astate.state core_pred vs_ins err
-          in
-          let out_amount = List.length outs in
-          let cp_amount = List.length new_ins_l in
-          let all_new_outs =
-            Array.init (cp_amount * out_amount) (fun _ ->
-                Expr.LVar (LVar.alloc ()))
-          in
-          let pvar_subst =
-            let seq =
-              Seq.concat
-              @@ Seq.init cp_amount (fun i ->
-                     Seq.init out_amount (fun j ->
-                         let id = Fmt.str "%d:%d" i j in
-                         (Expr.PVar id, all_new_outs.((i * out_amount) + j))))
-            in
-            SVal.SESubst.of_seq seq
-          in
-          let new_cps =
-            List.mapi
-              (fun cp_i ins ->
-                let outs =
-                  List.init out_amount (fun o_i ->
-                      all_new_outs.((cp_i * out_amount) + o_i))
-                in
-                Asrt.GA (core_pred, ins, outs))
-              new_ins_l
-          in
-          let learning_equalities =
-            List.map2
-              (fun old_out new_out ->
-                let open Formula.Infix in
-                Asrt.Pure old_out #== (subst_in_expr pvar_subst new_out))
-              outs new_outs_learn
-          in
-          let atoms = new_cps @ learning_equalities in
-          let kb = known_unifiables (Asrt.star atoms) astate in
-          let up_steps =
-            UP.s_init_atoms
-              ~preds:(make_pred_ins_table astate.pred_defs)
-              kb atoms
-          in
-          let init_subst =
-            UP.KB.to_seq kb |> Seq.map (fun x -> (x, x)) |> SVal.SESubst.of_seq
-          in
-          (* It should not be possible to error while creating UP for this. *)
-          let up = Result.get_ok up_steps |> UP.of_step_list in
-          (up, all_new_outs, init_subst) *)
       | _ -> None
 
     let unify_ins_outs_lists
@@ -2097,6 +2036,14 @@ module Make (State : SState.S) :
         (step : UP.step)
         (obtained : Expr.t list)
         (expected : Expr.t list) : (package_state, err_t list) Result.t =
+      L.verbose (fun m ->
+          m
+            "About to unify ins-outs after splitting!@\n\
+             SUBST: %a@\n\
+             OBTAINED: %a@\n\
+             EXPECTED: %a@\n"
+            SVal.SESubst.pp subst (Fmt.Dump.list Expr.pp) obtained
+            (Fmt.Dump.list Expr.pp) expected);
       let open Syntaxes.List in
       let outs = snd step in
       let pvar_subst =
@@ -2136,7 +2083,7 @@ module Make (State : SState.S) :
         (Ok state) obtained expected
 
     let rec package_case_step { lhs_state; current_state; subst } step :
-        (package_state, err_t list) Result.t =
+        (package_state list, err_t list) Result.t =
       let open Syntaxes.Result in
       L.verbose (fun m ->
           m "Wand about to consume RHS step: %a" Asrt.pp (fst step));
@@ -2147,7 +2094,7 @@ module Make (State : SState.S) :
         let+ new_lhs_state =
           unify_assertion (copy_astate lhs_state) subst step
         in
-        { lhs_state = new_lhs_state; current_state; subst }
+        [ { lhs_state = new_lhs_state; current_state; subst } ]
       in
       (* If it fails, we try splitting the step and we try again *)
       let- split_errs =
@@ -2165,20 +2112,23 @@ module Make (State : SState.S) :
                 subst = init_subst;
               }
             in
-            let* state = package_up up temporary_state in
+            let* states = package_up up temporary_state in
             let old_subst, step, out_params, expected = fold_outs_info in
-            let obtained =
-              List.map
-                (fun x ->
-                  match SVal.SESubst.get state.subst (PVar x) with
-                  | Some x -> x
-                  | None -> Fmt.failwith "Did not learn %s ??" x)
-                out_params
-            in
-            let+ state =
-              unify_ins_outs_lists state old_subst step obtained expected
-            in
-            { state with subst = old_subst }
+            Result_utils.map_bind
+              (fun state ->
+                let obtained =
+                  List.map
+                    (fun x ->
+                      match SVal.SESubst.get state.subst (PVar x) with
+                      | Some x -> x
+                      | None -> Fmt.failwith "Did not learn %s ??" x)
+                    out_params
+                in
+                let+ state =
+                  unify_ins_outs_lists state old_subst step obtained expected
+                in
+                { state with subst = old_subst })
+              states
         | None -> Error []
       in
       L.verbose (fun m ->
@@ -2186,22 +2136,66 @@ module Make (State : SState.S) :
             "Wand: failed to consume from LHS! Going to try and consume from \
              current state!");
       let- current_errs =
-        let+ new_current_state = unify_assertion current_state subst step in
-        { lhs_state; current_state = new_current_state; subst }
+        let unification_outcome = unify_assertion current_state subst step in
+        match unification_outcome with
+        | Ok new_current_state ->
+            Ok [ { lhs_state; current_state = new_current_state; subst } ]
+        | Error errs when !Config.unfolding && List.exists State.can_fix errs
+          -> (
+            (* We go with the usual tactic of trying to unfold.
+               Careful, after that we need *all* cases to be successful!
+               That is the insight from the Viper paper correcting their old error
+               "Sound automation of magic wands" *)
+            let tactics = State.get_recovery_tactic current_state.state errs in
+            L.verbose (fun m ->
+                m
+                  "Trying to recover failing on the current state, obtained \
+                   recovery tactics: %a"
+                  (Recovery_tactic.pp Expr.pp)
+                  tactics);
+            let unfold_values = Option.value ~default:[] tactics.try_unfold in
+            match unfold_with_vals current_state unfold_values with
+            | None -> Error []
+            | Some current_states ->
+                L.verbose (fun m -> m "Successfully unfolded! Let's continue!");
+                let should_copy =
+                  match current_states with
+                  | _ :: _ :: _ -> true
+                  | _ -> false
+                in
+                Result_utils.map_bind
+                  (fun (_, current_state) ->
+                    let lhs_state, subst =
+                      if should_copy then
+                        (copy_astate lhs_state, SVal.SESubst.copy subst)
+                      else (lhs_state, subst)
+                    in
+                    let+ new_current_state =
+                      unify_assertion current_state subst step
+                    in
+                    { lhs_state; current_state = new_current_state; subst })
+                  current_states)
+        | Error errs ->
+            L.verbose (fun m -> m "Cannot recover!");
+            Error errs
       in
       L.verbose (fun m -> m "Couldn't consume from anywhere!!");
       Error (lhs_errs @ split_errs @ current_errs)
 
     and package_up up (state : package_state) :
-        (package_state, err_t list) Result.t =
-      let open Syntaxes.Result in
+        (package_state list, err_t list) Result.t =
+      let open List_res.Syntax in
       match up with
       | UP.LabelStep _ -> L.fail "Labeled in wand RHS, can't handle that yet!"
       | Finished (Some _) -> L.fail "Finished with posts in wand RHS!"
-      | Finished None -> Ok state
+      | Finished None -> List_res.return state
       | Choice (left_up, right_up) ->
+          let ( let- ) = Result_utils.bind_error in
           let state_copy = copy_package_state state in
+          L.verbose (fun m -> m "Trying the left-hand-side first");
           let- left_errs = package_up left_up state in
+          L.verbose (fun m ->
+              m "Left-hand-side failed, trying right-hand-side!");
           let- right_errs = package_up right_up state_copy in
           Error (left_errs @ right_errs)
       | ConsumeStep (step, rest_up) ->
@@ -2267,7 +2261,7 @@ module Make (State : SState.S) :
           (fun acc state ->
             let* acc = acc in
             let+ case = package_up rhs_up state in
-            case :: acc)
+            case @ acc)
           (Ok []) start_states
       in
       let* states = final_states in

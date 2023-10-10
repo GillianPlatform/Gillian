@@ -163,12 +163,16 @@ let resolve_list (le : Expr.t) (pfs : Formula.t list) : Expr.t =
     | Eq (LVar x', le) :: rest when String.equal x' x -> (
         let le' = normalise_list_expressions le in
         match le' with
-        | EList _ | NOp (LstCat, _) -> Some le'
+        (* Weird things can happen where x reduces to e.g. `{{ l-nth(x, 0) }}`.
+           We check absence of cycles *)
+        | (EList _ | NOp (LstCat, _)) when not (SS.mem x (Expr.lvars le')) ->
+            Some le'
         | _ -> search x rest)
     | Eq (le, LVar x') :: rest when String.equal x' x -> (
         let le' = normalise_list_expressions le in
         match le' with
-        | EList _ | NOp (LstCat, _) -> Some le'
+        | (EList _ | NOp (LstCat, _)) when not (SS.mem x (Expr.lvars le')) ->
+            Some le'
         | _ -> search x rest)
     | _ :: rest -> search x rest
   in
@@ -1952,18 +1956,10 @@ and reduce_lexpr_loop
   in
 
   let result = normalise_list_expressions result in
-  let final_result =
-    if not (Expr.equal le result) then (
-      L.(
-        tmi (fun m ->
-            m "\tReduce_lexpr: %s -> %s"
-              ((Fmt.to_to_string Expr.pp) le)
-              ((Fmt.to_to_string Expr.pp) result)));
-      f result)
-    else result
-  in
-
-  final_result
+  if not (Expr.equal le result) then (
+    L.tmi (fun m -> m "\tReduce_lexpr: %a -> %a" Expr.pp le Expr.pp result);
+    f result)
+  else result
 
 and reduce_lexpr
     ?(unification = false)
