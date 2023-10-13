@@ -9,12 +9,12 @@ if [[ -z "${GITHUB_ACTIONS}" ]]; then
 fi
 
 echo "--- verifying SLL ---"
-time kanillian verify verification/list_unbounded.gil
+time kanillian verify verification/list_unbounded.gil -a
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
 echo "--- verifying DLL ---"
-time kanillian verify verification/list_std.gil
+time kanillian verify verification/list_std.gil -a
 rc=$?; if [[ $rc != 0 ]]; then FINAL_RETURN=1; fi
 printf "\n\n"
 
