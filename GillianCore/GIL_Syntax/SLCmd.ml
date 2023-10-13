@@ -143,6 +143,7 @@ let pp fmt lcmd =
         pp_args rargs
   | GUnfold name -> Fmt.pf fmt "unfold_all %s" name
   | ApplyLem (lem_name, lparams, binders) ->
+      let lem_name = Pp_utils.maybe_quote_ident lem_name in
       Fmt.pf fmt "@[apply %s%a %a@]" lem_name (Fmt.parens pp_args) lparams
         pp_binders binders
   | SepAssert (a, binders) ->
