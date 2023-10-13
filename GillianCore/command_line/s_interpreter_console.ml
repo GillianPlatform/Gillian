@@ -166,11 +166,11 @@ struct
     let () = Fmt_tty.setup_std_outputs () in
     let () = Config.json_ui := json_ui in
     let () = Config.current_exec_mode := Symbolic in
-    let () = PC.initialize Symbolic in
     let () = Printexc.record_backtrace @@ L.Mode.enabled () in
     let () = Config.stats := stats in
     let () = Config.no_heap := no_heap in
     let () = Config.entry_point := entry_point in
+    let () = PC.initialize Symbolic in
     let () = process_files files already_compiled outfile_opt incremental in
     let () = if stats then Statistics.print_statistics () in
     (* TODO: wrap-up should be done using [Stdlib.onexit] instead *)
