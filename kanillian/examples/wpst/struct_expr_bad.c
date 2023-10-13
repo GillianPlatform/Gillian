@@ -15,7 +15,6 @@ int sum_plus_2(int x, int y) {
 int main() {
   int a = __nondet_int();
   int b = __nondet_int();
-  __CPROVER_assume(a == -b);
   __CPROVER_assert(sum_plus_2(a, b) == 2, "aaa");
   return 0;
 }

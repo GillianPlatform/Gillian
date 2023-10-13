@@ -11,7 +11,6 @@ struct S get(struct S s, struct S t) {
 int main() {
   struct S t = { __nondet_int() };
   struct S s = { __nondet_int() };
-  __CPROVER_assume(t.x == -s.x);
   struct S z = get(s, t);
   __CPROVER_assert(z.x == 0, "trivial");
   return 0;

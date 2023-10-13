@@ -17,8 +17,6 @@ int assign_y() {
 }
 
 int main(void) {
-  assign_x();
-  assign_y();
   __CPROVER_assert(x > y, "cool");
   return 0;
 }
