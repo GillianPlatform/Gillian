@@ -46,8 +46,12 @@ struct
             | _ -> false)
           all_results
       in
-      if success then Fmt.pr "%a@\n@?" (Fmt.styled `Green Fmt.string) "Success!"
-      else Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors happened!"
+      if success then (
+        Fmt.pr "%a@\n@?" (Fmt.styled `Green Fmt.string) "Success!";
+        exit 0)
+      else (
+        Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors happened!";
+        exit 1)
 
     let run_incr source_files prog init_data =
       (* Only re-run program if transitive callees of main proc have changed *)
