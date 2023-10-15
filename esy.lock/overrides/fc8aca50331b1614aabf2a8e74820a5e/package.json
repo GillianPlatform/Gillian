@@ -2,7 +2,7 @@
   "name": "esy-z3",
   "version": "4.8.12000",
   "description": "z3 packaged for esy",
-  "source": "https://github.com/Z3Prover/z3/archive/refs/tags/z3-4.12.1.tar.gz#md5:faca55780446b99a4de22aa9753bbd39",
+  "source": "https://github.com/Z3Prover/z3/archive/refs/tags/z3-4.12.2.tar.gz#md5:4061317f7948c19abd13041c5a32b057",
   "override": {
     "exportedEnv": {
       "DYLD_LIBRARY_PATH": {
