@@ -1,0 +1,6 @@
+(library
+ (name goto_lib)
+ (libraries irep_lib zarith kcommons)
+ (flags :standard -open Irep_lib -open Kcommons)
+ (preprocess
+  (pps ppx_deriving.std)))

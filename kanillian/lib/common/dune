@@ -1,0 +1,5 @@
+(library
+ (name kcommons)
+ (libraries zarith ppx_deriving.runtime ppx_deriving_yojson.runtime)
+ (preprocess
+  (pps ppx_deriving.std ppx_deriving_yojson)))

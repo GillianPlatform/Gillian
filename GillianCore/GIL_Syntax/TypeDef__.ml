@@ -282,4 +282,5 @@ and ('annot, 'label) proc = {
   visitors { variety = "reduce" },
     visitors { variety = "endo" },
     visitors { variety = "iter" },
-    yojson]
+    yojson,
+    eq]

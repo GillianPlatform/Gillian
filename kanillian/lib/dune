@@ -1,0 +1,4 @@
+(library
+ (name kanillian_lib)
+ (libraries gillian yojson irep_lib kutils goto_lib kanillian_compiler)
+ (flags :standard -open Goto_lib))

@@ -1060,7 +1060,7 @@ struct
         { id = Fmt.to_to_string Logging.pp_err error; description = None }
       in
       match error with
-      | Exec_err.ESt state_error -> (
+      | Exec_err.EState state_error -> (
           match state_error with
           | StateErr.EMem merr ->
               let tl_ast = state.debug_state.tl_ast in

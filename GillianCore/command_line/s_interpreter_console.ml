@@ -15,6 +15,10 @@ struct
   module Common_args = Common_args.Make (PC)
   open Common_args
 
+  let json_ui =
+    let doc = "Output some of the UI in JSON." in
+    Arg.(value & flag & info [ "json-ui" ] ~doc)
+
   module Run = struct
     open ResultsDir
     open ChangeTracker
@@ -25,6 +29,16 @@ struct
           (fun x -> x)
           prog !Config.entry_point [] (SState.init init_data)
       in
+      if !Config.json_ui then (
+        Fmt.pr "===JSON RESULTS===\n@?";
+        let state_to_yojson _ = `Null in
+        let json_results =
+          List.map
+            (Engine.Exec_res.to_yojson state_to_yojson
+               S_interpreter.state_vt_to_yojson S_interpreter.err_t_to_yojson)
+            all_results
+        in
+        Fmt.pr "%a" (Yojson.Safe.pretty_print ~std:true) (`List json_results));
       let success =
         List.for_all
           (function
@@ -32,8 +46,12 @@ struct
             | _ -> false)
           all_results
       in
-      if success then Fmt.pr "%a@\n@?" (Fmt.styled `Green Fmt.string) "Success!"
-      else Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors happened!"
+      if success then (
+        Fmt.pr "%a@\n@?" (Fmt.styled `Green Fmt.string) "Success!";
+        exit 0)
+      else (
+        Fmt.pr "%a@\n@?" (Fmt.styled `Red Fmt.string) "Errors happened!";
+        exit 1)
 
     let run_incr source_files prog init_data =
       (* Only re-run program if transitive callees of main proc have changed *)
@@ -143,28 +161,25 @@ struct
       stats
       incremental
       entry_point
+      json_ui
       () =
     let () = Fmt_tty.setup_std_outputs () in
+    let () = Config.json_ui := json_ui in
     let () = Config.current_exec_mode := Symbolic in
-    let () = PC.initialize Symbolic in
     let () = Printexc.record_backtrace @@ L.Mode.enabled () in
     let () = Config.stats := stats in
     let () = Config.no_heap := no_heap in
     let () = Config.entry_point := entry_point in
+    let () = PC.initialize Symbolic in
     let () = process_files files already_compiled outfile_opt incremental in
     let () = if stats then Statistics.print_statistics () in
-    let () = Logging.wrap_up () in
-    try
-      while true do
-        let _ = Unix.wait () in
-        ()
-      done
-    with Unix.Unix_error (Unix.ECHILD, "wait", _) -> ()
+    (* TODO: wrap-up should be done using [Stdlib.onexit] instead *)
+    Logging.wrap_up ()
 
   let wpst_t =
     Term.(
       const wpst $ files $ already_compiled $ output_gil $ no_heap $ stats
-      $ incremental $ entry_point)
+      $ incremental $ entry_point $ json_ui)
 
   let wpst_info =
     let doc = "Symbolically executes a file of the target language" in

@@ -8,4 +8,9 @@ module type S = sig
   val is_hidden : t -> bool
 end
 
-module Basic : S
+module Basic : sig
+  include S
+
+  val equal : t -> t -> bool
+  val make : ?origin_loc:Location.t -> ?loop_info:string list -> unit -> t
+end

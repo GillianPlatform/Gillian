@@ -562,7 +562,7 @@ let translate_specs
     (old_fun_tbl : pre_fun_tbl_type)
     (new_fun_tbl : fun_tbl_type) =
   (* Understand bi-abduction *)
-  if Exec_mode.biabduction_exec !Config.current_exec_mode then
+  if Exec_mode.is_biabduction_exec !Config.current_exec_mode then
     Hashtbl.iter
       (fun _ (_, _, _, _, (annotations, _, _)) ->
         List.iter

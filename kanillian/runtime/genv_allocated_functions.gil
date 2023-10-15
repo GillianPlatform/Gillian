@@ -1,0 +1,6 @@
+#internal
+
+pred i__glob_fun(+symb:Str, +fname:Str):
+  <genv_symb>(symb; #l) * types(#l: Obj) *
+  <genv_def>(#l; {{ "function", fname }}) *
+  <mem_hole>(#l, 0i, 1i; "Nonempty");

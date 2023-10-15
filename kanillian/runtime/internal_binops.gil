@@ -1,0 +1,183 @@
+#internal
+
+proc i__binop_add_maybe_ptr(v1, v2) {
+        goto [ (typeOf v1) = Int ] llon loth;
+  llon: goto [ (typeOf v2) = Int ] blon llro;
+  blon: ret := v1 i+ v2;
+        (* Check for overflow *)
+        bounds := "i__archi_usize_bounds"();
+        assert ((l-nth(bounds, 0i) i<=# ret) /\ (ret i<=# l-nth(bounds, 1i)));
+        return;
+  llro: goto [ typeOf(l-nth(v2, 0i)) = Obj ] llrp unde;
+  llrp: ret := {{ l-nth(v2, 0i), v1 i+ l-nth(v2, 1i) }};
+        return;
+  loth: goto [ typeOf(l-nth(v1, 0i)) = Obj ] lptr unde;
+  lptr: goto [ (typeOf v2) = Int ] lprl unde;
+  lprl: ret := {{ l-nth(v1, 0i), l-nth(v1, 1i) i+ v2 }};
+        return;
+  unde: fail[Arithmetics]("Invalid values for addition", v1, v2);
+        return
+};
+
+proc i__binop_overflow_plus_maybe_ptr(v1, v2) {
+        goto [ (typeOf v1) = Int ] llon loth;
+  llon: goto [ (typeOf v2) = Int ] blon llro;
+  blon: bounds := "i__archi_usize_bounds"();
+        res := v1 i+ v2;
+        ret := not ((l-nth(bounds, 0i) i<= res) and (res i<= l-nth(bounds, 1i)));
+        return;
+  llro: goto [ typeOf(l-nth(v2, 0i)) = Obj ] llrp unde;
+  llrp: offset := v1 i+ l-nth(v2, 1i);
+        gt_zero := 0i i<= offset;
+        valid := "i__weak_valid_ptr"(l-nth(v2, 0i), offset);
+        ret := not (gt_zero and valid);
+        return;
+  loth: goto [ typeOf(l-nth(v1, 0i)) = Obj ] lptr unde;
+  lptr: goto [ (typeOf v2) = Int ] lprl unde;
+  lprl: offset := v2 i+ l-nth(v1, 1i);
+        gt_zero := 0i i<= offset;
+        valid := "i__weak_valid_ptr"(l-nth(v1, 0i), offset);
+        ret := not (gt_zero and valid);
+        return;
+  unde: fail[Arithmetics]("Invalid values for addition", v1, v2);
+        return
+};
+
+proc i__binop_sub_maybe_ptr(v1, v2) {
+        goto [ (typeOf v1) = Int ] llon loth;
+  llon: goto [ (typeOf v2) = Int ] blon llro;
+  blon: ret := v1 i- v2;
+        (* Check for overflow *)
+        bounds := "i__archi_usize_bounds"();
+        assert ((l-nth(bounds, 0i) i<=# ret) /\ (ret i<=# l-nth(bounds, 1i)));
+        return;
+  llro: goto [ typeOf(l-nth(v2, 0i)) = Obj ] llrp unde;
+  llrp: ret := {{ l-nth(v2, 0i), v1 i- l-nth(v2, 1i) }};
+        return;
+  loth: goto [ typeOf(l-nth(v1, 0i)) = Obj ] lptr unde;
+  lptr: goto [ (typeOf v2) = Int ] lprl unde;
+  lprl: ret := {{ l-nth(v1, 0i), l-nth(v1, 1i) i- v2 }};
+        return;
+  unde: fail[Arithmetics]("Invalid values for addition", v1, v2);
+        return
+};
+
+proc i__binop_mod_maybe_ptr(v1, v2) {
+        goto [ (typeOf v1) = Int ] llon loth;
+  llon: goto [ (typeOf v2) = Int ] blon unde;
+  blon: ret := v1 i% v2;
+        return;
+  loth: goto [ typeOf(l-nth(v1, 0i)) = Obj ] lptr unde;
+  lptr: goto [ (typeOf v2) = Int ] lprl unde;
+  lprl: ret := l-nth(v1, 1i) i% v2;
+        return;
+  unde: fail[Arithmetics]("Invalid values for addition", v1, v2);
+        return
+};
+
+proc i__binop_lesseq_maybe_ptr(v1, v2) {
+        goto [ ((typeOf v1) = Int) and ((typeOf v2) = Int) ] blon els;
+  blon: ret := v1 i<= v2;
+        return;
+  els:  goto [
+            (typeOf(l-nth(v1, 0i)) = Obj)
+        and (typeOf(l-nth(v2, 0i)) = Obj)
+        and (l-nth(v1, 0i) = l-nth(v2, 0i))
+        ] smbl unde; (* tests if both are pointers withing the same block *)
+  smbl: t1 := "i__weak_valid_ptr"(l-nth(v1, 0i), l-nth(v1, 1i));
+        t2 := "i__weak_valid_ptr"(l-nth(v2, 0i), l-nth(v2, 1i));
+        goto [ t1 and t2 ] cmpr unde;
+  cmpr: ret := l-nth(v1, 1i) i<= l-nth(v2, 1i);
+        return;
+  unde: fail[Arithmetics]("Invalid values for <=", v1, v2)
+};
+
+proc i__binop_greatereq_maybe_ptr(v1, v2) {
+        goto [ ((typeOf v1) = Int) and ((typeOf v2) = Int) ] blon els;
+  blon: ret := not (v1 i< v2);
+        return;
+  els:  goto [
+            (typeOf(l-nth(v1, 0i)) = Obj)
+        and (typeOf(l-nth(v2, 0i)) = Obj)
+        and (l-nth(v1, 0i) = l-nth(v2, 0i))
+        ] smbl unde; (* tests if both are pointers withing the same block *)
+  smbl: t1 := "i__weak_valid_ptr"(l-nth(v1, 0i), l-nth(v1, 1i));
+        t2 := "i__weak_valid_ptr"(l-nth(v2, 0i), l-nth(v2, 1i));
+        goto [ t1 and t2 ] cmpr unde;
+  cmpr: ret := not (l-nth(v1, 1i) i< l-nth(v2, 1i));
+        return;
+  unde: fail[Arithmetics]("Invalid values for >=", v1, v2)
+};
+
+proc i__binop_lowerthan_maybe_ptr(v1, v2) {
+        goto [ ((typeOf v1) = Int) and ((typeOf v2) = Int) ] blon els;
+  blon: ret := v1 i< v2;
+        return;
+  els:  goto [
+            (typeOf(l-nth(v1, 0i)) = Obj)
+        and (typeOf(l-nth(v2, 0i)) = Obj)
+        and (l-nth(v1, 0i) = l-nth(v2, 0i))
+        ] smbl unde; (* tests if both are pointers withing the same block *)
+  smbl: t1 := "i__weak_valid_ptr"(l-nth(v1, 0i), l-nth(v1, 1i));
+        t2 := "i__weak_valid_ptr"(l-nth(v2, 0i), l-nth(v2, 1i));
+        goto [ t1 and t2 ] cmpr unde;
+  cmpr: ret := l-nth(v1, 1i) i< l-nth(v2, 1i);
+        return;
+  unde: fail[Arithmetics]("Invalid values for <", v1, v2)
+};
+
+proc i__binop_greaterthan_maybe_ptr(v1, v2) {
+        goto [ ((typeOf v1) = Int) and ((typeOf v2) = Int) ] blon els;
+  blon: ret := not (v1 i<= v2);
+        return;
+  els:  goto [
+            (typeOf(l-nth(v1, 0i)) = Obj)
+        and (typeOf(l-nth(v2, 0i)) = Obj)
+        and (l-nth(v1, 0i) = l-nth(v2, 0i))
+        ] smbl unde; (* tests if both are pointers withing the same block *)
+  smbl: t1 := "i__weak_valid_ptr"(l-nth(v1, 0i), l-nth(v1, 1i));
+        t2 := "i__weak_valid_ptr"(l-nth(v2, 0i), l-nth(v2, 1i));
+        goto [ t1 and t2 ] cmpr unde;
+  cmpr: ret := not (l-nth(v1, 1i) i<= l-nth(v2, 1i));
+        return;
+  unde: fail[Arithmetics]("Invalid values for <", v1, v2)
+};
+
+proc i__binop_equal_maybe_ptr(v1, v2) {
+        goto [ ((typeOf v1) = Int) and ((typeOf v2) = Int) ] blon els1;
+  blon: ret := v1 = v2;
+        return;
+  els1: goto [
+            ((typeOf v1) = List)
+        and ((typeOf v2) = List)
+        ] bobj els2; (* tests if both are pointers withing the same block *)
+  bobj: goto [ (l-nth(v1, 0i) = l-nth(v2, 0i)) ] smbl dfbl;
+  smbl: t1 := "i__weak_valid_ptr"(l-nth(v1, 0i), l-nth(v1, 1i));
+        t2 := "i__weak_valid_ptr"(l-nth(v2, 0i), l-nth(v2, 1i));
+        goto [ t1 and t2 ] cmpr unde;
+  cmpr: ret := l-nth(v1, 1i) = l-nth(v2, 1i);
+        return;
+  dfbl: t1 := "i__valid_pointer"(l-nth(v1, 0i), l-nth(v1, 1i));
+        t2 := "i__valid_pointer"(l-nth(v2, 0i), l-nth(v2, 1i));
+        goto [ t1 and t2 ] refl unde;
+  els2: goto [ ((typeOf v1) = List) and ((typeOf v2) = Int) ] lprl els3;
+  lprl: v1weak := "i__weak_valid_ptr"(l-nth(v1, 0i), l-nth(v1, 1i));
+        goto [ (v2 = 0i) and v1weak ] refl unde;
+  els3: goto [ ((typeOf v2) = List) and ((typeOf v1) = Int) ] llrp unde;
+  llrp: v2weak := "i__weak_valid_ptr"(l-nth(v2, 0i), l-nth(v2, 1i));
+        goto [ (v1 = 0i) and v2weak ] refl unde; 
+  refl: ret := false;
+        return;     
+  unde: fail[Arithmetics]("Invalid values for =", v1, v2)
+};
+
+proc i__binop_notequal_maybe_ptr(v1, v2) {
+      ir := "i__binop_equal_maybe_ptr"(v1, v2);
+      ret := not ir;
+      return
+};
+
+proc i__binop_overflow_plus_u64(v1, v2) {
+      ret := false; (* FIXME: actual check *)
+      return
+};

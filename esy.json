@@ -15,10 +15,12 @@
       "esy-installer gillian.install",
       "esy-installer gillian-js.install",
       "esy-installer gillian-c.install",
-      "esy-installer wisl.install"
+      "esy-installer wisl.install",
+      "esy-installer kanillian.install"
     ],
     "release": {
       "bin": [
+        "kanillian",
         "gillian-js",
         "gillian-c",
         "wisl"
@@ -42,6 +44,10 @@
       "GILLIAN_C_RUNTIME_PATH": {
         "scope": "global",
         "val": "#{self.share}/gillian-c"
+      },
+      "KANILLIAN_RUNTIME_PATH": {
+        "scope": "global",
+        "val": "#{self.share}/kanillian"
       },
       "CPATH": {
         "scope": "global",
@@ -88,7 +94,7 @@
     "@opam/visitors": ">=2.3",
     "@opam/yojson": "^1.7.0",
     "@opam/zarith": ">=1.12",
-    "@opam/z3": "giltho/esy-z3#f4557cea18930982ceb02d8ff13dbff2be9e02d4",
+    "@opam/z3": "NatKarmios/esy-z3#37b3fae3f019bd331a5f3cf22ffa193af1a0cdc2",
     "compcert": "giltho/CompCert#3a6f14016f0c9aaab2ddcdd61492e5fe54f12259",
     "ocaml": "4.14.x"
   },

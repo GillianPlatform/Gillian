@@ -65,9 +65,9 @@ struct
 
   let exec files already_compiled debug outfile_opt no_heap entry_point () =
     let () = Config.current_exec_mode := Concrete in
-    let () = PC.initialize Concrete in
     let () = Config.no_heap := no_heap in
     let () = Config.entry_point := entry_point in
+    let () = PC.initialize Concrete in
     let e_prog, init_data = parse_eprog files already_compiled in
     let () =
       burn_gil ~init_data:(ID.to_yojson init_data) ~pp_prog:Prog.pp_labeled

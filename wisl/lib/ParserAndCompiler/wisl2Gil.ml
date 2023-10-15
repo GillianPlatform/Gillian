@@ -1142,7 +1142,8 @@ let compile ~filepath WProg.{ context; predicates; lemmas } =
   let gil_lemmas = make_hashtbl get_lemma_name comp_lemmas in
   let proc_names = Hashtbl.fold (fun s _ l -> s :: l) gil_procs [] in
   let bi_specs = Hashtbl.create 1 in
-  if Gillian.Utils.(Exec_mode.biabduction_exec !Config.current_exec_mode) then
+  if Gillian.Utils.(Exec_mode.is_biabduction_exec !Config.current_exec_mode)
+  then
     Hashtbl.iter
       (fun name proc ->
         let pre =

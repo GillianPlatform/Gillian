@@ -1,7 +1,7 @@
 (** @canonical Gillian.General.StateErr *)
 
 (** @canonical Gillian.General.StateErr.err_t *)
-type ('mem_err, 'value) err_t =
+type ('mem_err, 'value) t =
   | EMem of 'mem_err  (** Memory error, depends on instantiation *)
   | EType of 'value * Type.t option * Type.t
       (** Incorrect type, depends on value *)
@@ -13,7 +13,7 @@ type ('mem_err, 'value) err_t =
 [@@deriving yojson, show]
 
 let get_recovery_tactic
-    (errs : ('a, 'b) err_t list)
+    (errs : ('a, 'b) t list)
     (mem_recovery_tactics : 'a -> 'b Recovery_tactic.t) : 'b Recovery_tactic.t =
   let f err =
     match err with
@@ -29,7 +29,7 @@ let pp_err
     (pp_m_err : Format.formatter -> 'a -> unit)
     (pp_v : Format.formatter -> 'b -> unit)
     (fmt : Format.formatter)
-    (err : ('a, 'b) err_t) : unit =
+    (err : ('a, 'b) t) : unit =
   match err with
   | EMem m_err -> pp_m_err fmt m_err
   | EType (v, t1, t2) ->
@@ -49,7 +49,7 @@ let pp_err
         asrtss
   | EOther msg -> Fmt.pf fmt "%s" msg
 
-let can_fix (can_fix_mem : 'a -> bool) (err : ('a, 'b) err_t) : bool =
+let can_fix (can_fix_mem : 'a -> bool) (err : ('a, 'b) t) : bool =
   match err with
   | EMem mem_err -> can_fix_mem mem_err
   | EPure pf -> Reduction.reduce_formula pf <> False
@@ -59,7 +59,7 @@ let can_fix (can_fix_mem : 'a -> bool) (err : ('a, 'b) err_t) : bool =
       result
   | _ -> false
 
-let get_failing_constraint (err : ('a, 'b) err_t) (mem_fc : 'a -> Formula.t) :
+let get_failing_constraint (err : ('a, 'b) t) (mem_fc : 'a -> Formula.t) :
     Formula.t =
   match err with
   | EMem m_err -> mem_fc m_err

@@ -1,0 +1,12 @@
+#internal
+
+proc i__unop_object_size(ptr) {
+        goto [ptr = 0i] nul nnul;
+  nul:  ret := 0i;
+        return;
+  nnul: bs := [mem_getBounds](l-nth(ptr, 0i));
+        hb := l-nth(l-nth(bs, 1i), 1i);
+        ofs := l-nth(ptr, 1i);
+        ret := hb i- ofs;
+        return
+};

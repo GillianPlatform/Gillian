@@ -10,7 +10,7 @@ end
 
 module Basic = struct
   type t = { origin_loc : Location.t option; loop_info : string list }
-  [@@deriving yojson, make]
+  [@@deriving yojson, make, eq]
 
   let make_basic = make
   let get_origin_loc { origin_loc; _ } = origin_loc

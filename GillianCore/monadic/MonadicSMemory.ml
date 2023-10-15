@@ -12,7 +12,7 @@ module type S = sig
   type st = SVal.SESubst.t
 
   type c_fix_t
-  type err_t [@@deriving show]
+  type err_t [@@deriving show, yojson]
 
   (** Type of GIL general states *)
   type t [@@deriving yojson]
@@ -62,6 +62,7 @@ module type S = sig
   val apply_fix : t -> c_fix_t -> (t, err_t) result Delayed.t
   val pp_by_need : Containers.SS.t -> Format.formatter -> t -> unit
   val get_print_info : Containers.SS.t -> t -> Containers.SS.t * Containers.SS.t
+  val can_fix : err_t -> bool
 end
 
 (* FIXME: Lift should not be necessary, the monad should just match !!! *)
@@ -108,11 +109,4 @@ module Lift (MSM : S) :
 
   let of_yojson = MSM.of_yojson
   let to_yojson = MSM.to_yojson
-
-  let err_t_of_yojson _ =
-    failwith
-      "Please implement err_t_of_yojson to enable logging this type to a \
-       database"
-
-  let err_t_to_yojson _ = `String "MonadicSMemory.Lift: dummy yojson!"
 end

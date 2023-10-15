@@ -15,6 +15,7 @@ let log_string s = Logging.verbose (fun fmt -> fmt "SHEAPTREE CHECKING: %s" s)
 type missingResourceType =
   | Unfixable
   | Fixable of { is_store : bool; low : Expr.t; chunk : Chunk.t }
+[@@deriving yojson]
 
 type err =
   | UseAfterFree
@@ -26,6 +27,7 @@ type err =
   | RemovingNotOwned
   | WrongMemVal
   | MemoryNotFreed
+[@@deriving yojson]
 
 exception FatalErr of err
 

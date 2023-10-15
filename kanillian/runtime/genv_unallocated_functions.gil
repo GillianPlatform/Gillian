@@ -1,0 +1,5 @@
+#internal
+
+pred i__glob_fun(+symb, +fname):
+  <genv_symb>(symb; #l) *
+  <genv_def>(#l; {{ "function", fname }});
