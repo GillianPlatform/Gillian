@@ -41,7 +41,7 @@ let cfg =
     ("proof", "false");
     ("unsat_core", "false");
     ("auto_config", "true");
-    ("timeout", "60000");
+    ("timeout", "30000");
   ]
 
 let ctx : Z3.context = Z3.mk_context cfg

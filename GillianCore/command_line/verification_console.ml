@@ -94,8 +94,6 @@ struct
       L.verbose (fun m ->
           m "@\nProgram after logic preprocessing:@\n%a@\n" Prog.pp_indexed prog)
     in
-    L.verbose (fun m -> m "Performing full garbage collection!\n");
-    Gc.full_major ();
     Verification.verify_prog ~init_data prog incremental source_files_opt
 
   let verify
