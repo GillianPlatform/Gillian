@@ -1581,7 +1581,7 @@ module Make (State : SState.S) :
     res
 
   and unify
-      ?in_unification:_
+      ?(in_unification = false)
       (astate : t)
       (subst : SVal.SESubst.t)
       (up : UP.t)
@@ -1599,7 +1599,7 @@ module Make (State : SState.S) :
       | Error errs
         when try_recover && !Config.unfolding
              && Exec_mode.verification_exec !Config.current_exec_mode
-             && can_fix errs -> (
+             && (not in_unification) && can_fix errs -> (
           L.verbose (fun fmt -> fmt "Unifier.unify: Failure");
           if !Config.under_approximation then
             L.fail "UNIFICATION ABORTED IN UX MODE???";
