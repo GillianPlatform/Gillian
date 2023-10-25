@@ -1,7 +1,6 @@
-module KAnnot = Annot
 open Gil_syntax
 
-type t = KAnnot.t * string option * string Cmd.t [@@deriving eq]
+type t = K_annot.t * string option * string Cmd.t [@@deriving eq]
 
 let pp ft t =
   let _, lab, cmd = t in
@@ -26,12 +25,12 @@ let get_or_set_fresh_lab ~ctx list =
       (lab, (a, Some lab, b) :: r)
   | (_, Some lab, _) :: _ -> (lab, list)
 
-let make ?loop ?label ?loc ?tl_ref ?stmt_kind cmd : t =
+let make ?loop ?label ?loc ?tl_ref ?is_end_of_stmt cmd : t =
   let annot =
-    KAnnot.make ?origin_loc:loc ?loop_info:loop ?tl_ref ?stmt_kind ()
+    K_annot.make ?origin_loc:loc ?loop_info:loop ?tl_ref ?is_end_of_stmt ()
   in
   (annot, label, cmd)
 
-let make_hloc ?loop ?label ?loc ?tl_ref ?stmt_kind cmd : t =
+let make_hloc ?loop ?label ?loc ?tl_ref ?is_end_of_stmt cmd : t =
   let origin_loc = Option.map compile_location loc in
-  make ?loop ?label ?loc:origin_loc ?tl_ref ?stmt_kind cmd
+  make ?loop ?label ?loc:origin_loc ?tl_ref ?is_end_of_stmt cmd

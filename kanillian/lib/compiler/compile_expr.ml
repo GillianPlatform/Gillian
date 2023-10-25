@@ -1,4 +1,3 @@
-module KAnnot = Annot
 open Helpers
 open Gil_syntax
 module GType = Goto_lib.Type
@@ -449,9 +448,9 @@ let rec nondet_expr ~ctx ~loc ~type_ ~expr_ref () : Val_repr.t Cs.with_body =
                 Memory.write ~ctx ~type_ ~annot:b ~dst:ret_ptr ~src:v
               in
               let block =
-                let tl_ref = KAnnot.(Expr expr_ref) in
+                let tl_ref = K_annot.(Expr expr_ref) in
                 set_first_label
-                  ~annot:(b ~loop:[] ~tl_ref ?stmt_kind:None)
+                  ~annot:(b ~loop:[] ~tl_ref ?is_end_of_stmt:None)
                   block_lab
                   (cmds @ write @ [ b goto_end ])
               in
@@ -881,7 +880,7 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
   let compile_expr = compile_expr ~ctx in
   let loc = Body_item.compile_location expr.location in
   let id = expr.id in
-  let b = Body_item.make ~loc ~tl_ref:(KAnnot.Expr id) in
+  let b = Body_item.make ~loc ~tl_ref:(K_annot.Expr id) ?is_end_of_stmt:None in
   let unhandled feature =
     let cmd = assert_unhandled ~feature [] in
     let v = Val_repr.dummy ~ctx expr.type_ in
@@ -1014,14 +1013,14 @@ and compile_expr ~(ctx : Ctx.t) (expr : GExpr.t) : Val_repr.t Cs.with_body =
           let cmd = b (Cmd.Goto end_lab) in
           Cs.return ~app:[ cmd ] res
         in
-        res_then |> Cs.with_label ~annot:(b ~loop:[] ?stmt_kind:None) then_lab
+        res_then |> Cs.with_label ~annot:(b ~loop:[]) then_lab
       in
       let* res_else =
         let res_else =
           let* t = compile_expr else_ in
           Val_repr.copy_into t res |> Cs.map_l b
         in
-        res_else |> Cs.with_label ~annot:(b ~loop:[] ?stmt_kind:None) else_lab
+        res_else |> Cs.with_label ~annot:(b ~loop:[]) else_lab
       in
       Error.assert_
         (Val_repr.equal res_then res_else)
@@ -1161,10 +1160,12 @@ and compile_statement ~ctx (stmt : Stmt.t) : Val_repr.t Cs.with_body =
   let compile_statement_c = compile_statement ~ctx in
   let compile_expr_c = compile_expr ~ctx in
   let loc = Body_item.compile_location stmt.stmt_location in
-  let b = Body_item.make ~loc ~tl_ref:(KAnnot.Stmt stmt.id) in
+  let b = Body_item.make ~loc ~tl_ref:(K_annot.Stmt stmt.id) in
   let add_annot x = List.map b x in
   let set_first_label_opt label stmts =
-    Helpers.set_first_label_opt ~annot:(b ~loop:[] ?stmt_kind:None) label stmts
+    Helpers.set_first_label_opt
+      ~annot:(b ~loop:[] ?is_end_of_stmt:None)
+      label stmts
   in
   let set_first_label label stmts = set_first_label_opt (Some label) stmts in
   let void app = Cs.return ~app (Val_repr.ByValue (Lit Nono)) in

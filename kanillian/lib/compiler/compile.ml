@@ -1,4 +1,3 @@
-module KAnnot = Annot
 open Gil_syntax
 open Gillian.Utils.Prelude
 module GExpr = Goto_lib.Expr
@@ -228,7 +227,7 @@ let get_missing_function_body ~ctx (func : Program.Func.t) =
   Hashtbl.replace lift_info.stmt_map stmt_id stmt;
   stmt
 
-let compile_function ~ctx (func : Program.Func.t) : (KAnnot.t, string) Proc.t =
+let compile_function ~ctx (func : Program.Func.t) : (K_annot.t, string) Proc.t =
   let f_loc = Body_item.compile_location func.location in
   let body =
     (* If the function has no body, it's assumed to be just non-det *)
@@ -258,7 +257,7 @@ let compile_function ~ctx (func : Program.Func.t) : (KAnnot.t, string) Proc.t =
   in
   let return_block =
     set_first_label
-      ~annot:(b ~loop:[] ?tl_ref:None ?stmt_kind:None)
+      ~annot:(b ~loop:[] ?tl_ref:None ?is_end_of_stmt:None)
       Constants.Kanillian_names.ret_label
       (free_locals @ [ b ReturnNormal ])
   in
@@ -355,7 +354,7 @@ let start_for_harness ~ctx (harness : Program.Func.t) =
   in
   compile_function ~ctx cprover_start
 
-let compile (context : Ctx.t) : (KAnnot.t, string) Prog.t =
+let compile (context : Ctx.t) : (K_annot.t, string) Prog.t =
   let program = context.prog in
   let gil_prog = Prog.create () in
   let gil_prog =

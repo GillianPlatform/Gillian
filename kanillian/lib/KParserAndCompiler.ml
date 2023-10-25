@@ -14,7 +14,7 @@ let other_imports = []
 type init_data = unit
 type tl_ast = Program.t
 
-module Annot = Kanillian_compiler.Annot
+module Annot = Kanillian_compiler.K_annot
 
 module TargetLangOptions = struct
   type t = {

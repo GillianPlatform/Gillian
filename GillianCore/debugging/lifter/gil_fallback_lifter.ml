@@ -21,13 +21,13 @@ functor
 
     module Gil_lifter = Gil_lifter.Make (PC) (Verifier) (SMemory)
 
-    module Gil_lifterWithState = struct
+    module Gil_lifter_with_state = struct
       module Lifter = Gil_lifter
 
       let get_state () = !gil_state |> Option.get
     end
 
-    module TLLifter = TLLifter (Gil_lifterWithState) (Verifier)
+    module TLLifter = TLLifter (Gil_lifter_with_state) (Verifier)
 
     type t = {
       gil : Gil_lifter.t; [@to_yojson Gil_lifter.dump]
