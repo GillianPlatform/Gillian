@@ -208,6 +208,13 @@ module Infix = struct
     | Lit (Int x), Lit (Int y) -> Lit (Int (x / y))
     | _ -> BinOp (a, IDiv, b)
 
+  let ( << ) a b =
+    match (a, b) with
+    | Lit (Int z), _ when Z.equal z Z.zero -> a
+    | _, Lit (Int z) when Z.equal z Z.zero -> a
+    | Lit (Int x), Lit (Int y) -> Lit (Int (Z.shift_left x (Z.to_int y)))
+    | _ -> BinOp (a, LeftShift, b)
+
   let not a =
     match a with
     | Lit (Bool a) -> Lit (Bool (not a))
