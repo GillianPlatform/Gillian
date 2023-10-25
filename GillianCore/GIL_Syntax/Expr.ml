@@ -395,6 +395,11 @@ let rec is_concrete (le : t) : bool =
   | LstSub (e1, e2, e3) -> loop [ e1; e2; e3 ]
   | NOp (_, les) | EList les | ESet les -> loop les
 
+let is_concrete_zero_i (le : t) : bool =
+  match le with
+  | Lit (Int z) -> Z.equal Z.zero z
+  | _ -> false
+
 (** Get all the variables in --e-- *)
 let vars (le : t) : SS.t = Visitors.Collectors.var_collector#visit_expr () le
 

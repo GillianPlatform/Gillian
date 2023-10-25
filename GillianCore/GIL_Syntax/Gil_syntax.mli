@@ -291,6 +291,7 @@ module Expr : sig
   val fmod : t -> t -> t
   val imod : t -> t -> t
   val type_eq : t -> Type.t -> t
+  val is_concrete_zero_i : t -> bool
 
   module Infix : sig
     (** Floating point math *)
