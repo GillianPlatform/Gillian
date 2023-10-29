@@ -202,10 +202,13 @@ module Infix = struct
     | _ -> BinOp (a, ITimes, b)
 
   let ( / ) a b =
-    let open! Z in
     match (a, b) with
-    | x, Lit (Int z) when equal z one -> x
-    | Lit (Int x), Lit (Int y) -> Lit (Int (x / y))
+    | x, Lit (Int z) when Z.equal z Z.one -> x
+    | x, BinOp (a, ITimes, b) when equal x a -> b
+    | x, BinOp (a, ITimes, b) when equal x b -> a
+    | BinOp (a, ITimes, b), x when equal x a -> b
+    | BinOp (a, ITimes, b), x when equal x b -> a
+    | Lit (Int x), Lit (Int y) -> Lit (Int (Z.div x y))
     | _ -> BinOp (a, IDiv, b)
 
   let ( << ) a b =
