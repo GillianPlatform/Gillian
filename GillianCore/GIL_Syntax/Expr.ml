@@ -168,7 +168,19 @@ module Infix = struct
     | Lit (Num x), Lit (Num y) -> Lit (Num (x /. y))
     | _ -> BinOp (a, FDiv, b)
 
-  let ( + ) a b =
+  let ( - ) a b =
+    match (a, b) with
+    | x, Lit (Int z) when Z.equal Z.zero z -> x
+    | Lit (Num 0.), x -> UnOp (IUnaryMinus, x)
+    | Lit (Int x), Lit (Int y) -> Lit (Int (Z.sub x y))
+    | BinOp (x, IPlus, y), z when equal y z -> x
+    | BinOp (x, IPlus, y), z when equal x z -> y
+    | x, y when equal x y -> zero_i
+    | _ -> BinOp (a, IMinus, b)
+
+  let rec ( + ) a b =
+    let plus = ( + ) in
+    let minus = ( - ) in
     let open! Z in
     match (a, b) with
     | Lit (Int z), x when equal z zero -> x
@@ -180,16 +192,10 @@ module Infix = struct
     | BinOp (y, IPlus, Lit (Int x)), Lit (Int z)
     | Lit (Int z), BinOp (y, IPlus, Lit (Int x)) ->
         BinOp (y, IPlus, Lit (Int (x + z)))
+    | UnOp (IUnaryMinus, x), UnOp (IUnaryMinus, y) ->
+        UnOp (IUnaryMinus, plus x y)
+    | x, UnOp (IUnaryMinus, y) -> minus x y
     | _ -> BinOp (a, IPlus, b)
-
-  let ( - ) a b =
-    match (a, b) with
-    | x, Lit (Int z) when Z.equal Z.zero z -> x
-    | Lit (Num 0.), x -> UnOp (IUnaryMinus, x)
-    | Lit (Int x), Lit (Int y) -> Lit (Int (Z.sub x y))
-    | BinOp (x, IPlus, y), z when equal y z -> x
-    | BinOp (x, IPlus, y), z when equal x z -> y
-    | _ -> BinOp (a, IMinus, b)
 
   let ( * ) a b =
     let open! Z in
@@ -217,6 +223,11 @@ module Infix = struct
     | _, Lit (Int z) when Z.equal z Z.zero -> a
     | Lit (Int x), Lit (Int y) -> Lit (Int (Z.shift_left x (Z.to_int y)))
     | _ -> BinOp (a, LeftShift, b)
+
+  let ( ~- ) = function
+    | Lit (Int z) -> Lit (Int (Z.neg z))
+    | UnOp (IUnaryMinus, z) -> z
+    | z -> UnOp (IUnaryMinus, z)
 
   let not a =
     match a with

@@ -308,6 +308,7 @@ module Expr : sig
     val ( * ) : t -> t -> t
     val ( / ) : t -> t -> t
     val ( << ) : t -> t -> t
+    val ( ~- ) : t -> t
 
     (** {2: } *)
 
