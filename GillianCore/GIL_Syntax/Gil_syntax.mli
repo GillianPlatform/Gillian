@@ -286,6 +286,7 @@ module Expr : sig
   val list_nth : t -> int -> t
   val list_nth_e : t -> t -> t
   val list_sub : lst:t -> start:t -> size:t -> t
+  val list_repeat : t -> t -> t
   val list_cons : t -> t -> t
   val list_cat : t -> t -> t
   val typeof : t -> t
