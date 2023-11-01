@@ -2785,6 +2785,26 @@ let rec reduce_formula_loop
           | False, _ | _, True -> True
           | _, False -> f (Not left)
           | _ -> Impl (left, right))
+      | ForAll
+          ( [ (i, Some IntType) ],
+            Impl
+              ( And
+                  ( ILessEq (Lit (Int z), LVar i'),
+                    ILess (LVar i'', UnOp (LstLen, l)) ),
+                Eq (BinOp (l', LstNth, LVar i'''), k) ) )
+        when Z.(equal z zero)
+             && i = i' && i' = i'' && i'' = i''' && Expr.equal l l'
+             &&
+             match l with
+             | EList _ -> true
+             | _ -> false ->
+          let l =
+            match l with
+            | EList l -> l
+            | _ -> failwith "unreachable"
+          in
+          List.map (fun x -> Formula.Infix.(x #== k)) l
+          |> List.fold_left Formula.Infix.( #&& ) Formula.True
       | ForAll (bt, a) ->
           (* Think about quantifier instantiation *)
           (* Collect binders that are in gamma *)
