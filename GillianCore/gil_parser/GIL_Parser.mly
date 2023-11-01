@@ -156,6 +156,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token CASSERT
 %token LAND
 %token LOR
+%token LIMPLIES
 %token LNOT
 %token LTRUE
 %token LFALSE
@@ -239,6 +240,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 (* The later an operator is listed, the higher precedence it is given. *)
 (* Logic operators have lower precedence *)
 %nonassoc DOT
+%left LIMPLIES
 %left LOR
 %left LAND
 %left separating_conjunction
@@ -985,6 +987,9 @@ pure_assertion_target:
 (* P /\ Q *)
   | left_ass=pure_assertion_target; LAND; right_ass=pure_assertion_target
     { Formula.And (left_ass, right_ass) }
+(* A ==> B *)
+  | left_ass = pure_assertion_target; LIMPLIES; right_ass=pure_assertion_target
+    { Formula.Impl (left_ass, right_ass) }
 (* P \/ Q *)
   | left_ass=pure_assertion_target; LOR; right_ass=pure_assertion_target
     { Formula.Or (left_ass, right_ass) }

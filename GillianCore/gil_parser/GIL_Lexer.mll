@@ -176,6 +176,7 @@ rule read = parse
   | "$$LocalTime"        { GIL_Parser.LOCALTIME     }
 
 (* Binary operators *)
+  | "==>"                { GIL_Parser.LIMPLIES   }
   | "="                  { GIL_Parser.EQ     }
   | "-*"                 { GIL_Parser.WAND   }
 

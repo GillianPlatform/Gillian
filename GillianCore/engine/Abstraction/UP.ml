@@ -374,6 +374,7 @@ let rec simple_ins_formula (kb : KB.t) (pf : Formula.t) : KB.t list =
       let ins = List_utils.cross_product ins_pf1 ins_pf2 KB.union in
       let ins = List_utils.remove_duplicates ins in
       List.map minimise_unifiables ins
+  | Impl (f1, f2) -> simple_ins_formula kb (Or (Not f1, f2))
   (* Relational formulae are all treated the same *)
   | Eq (e1, e2)
   | ILess (e1, e2)

@@ -77,6 +77,7 @@ let rec jsil2gil_formula (f : Gil.Formula.t) : Gil.Formula.t =
   | Not f -> Not (ff f)
   | And (f1, f2) -> And (ff f1, ff f2)
   | Or (f1, f2) -> Or (ff f1, ff f2)
+  | Impl (f1, f2) -> Impl (ff f1, ff f2)
   | Eq (e1, e2) -> Eq (fe e1, fe e2)
   | FLess (e1, e2) -> FLess (fe e1, fe e2)
   | FLessEq (e1, e2) -> FLessEq (fe e1, fe e2)

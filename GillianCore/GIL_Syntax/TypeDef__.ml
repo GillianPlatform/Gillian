@@ -147,6 +147,7 @@ and formula =
   | And of formula * formula
   | Or of formula * formula
   | Eq of expr * expr
+  | Impl of formula * formula
   | FLess of expr * expr
   | FLessEq of expr * expr
   | ILess of expr * expr

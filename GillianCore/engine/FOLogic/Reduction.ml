@@ -2771,6 +2771,20 @@ let rec reduce_formula_loop
               | Some _ -> False
               | None -> f @@ Eq (UnOp (TypeOf, e), Lit (Type IntType)))
           | _ -> a)
+      | Impl (left, right) -> (
+          let pfs_with_left =
+            let copy = PFS.copy pfs in
+            let () = PFS.extend copy left in
+            copy
+          in
+          let reduced_left =
+            reduce_formula_loop ~rpfs:true unification pfs_with_left gamma left
+          in
+          match (reduced_left, f right) with
+          | True, _ -> right
+          | False, _ | _, True -> True
+          | _, False -> f (Not left)
+          | _ -> Impl (left, right))
       | ForAll (bt, a) ->
           (* Think about quantifier instantiation *)
           (* Collect binders that are in gamma *)

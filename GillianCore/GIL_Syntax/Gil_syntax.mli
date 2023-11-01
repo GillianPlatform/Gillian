@@ -417,6 +417,7 @@ module Formula : sig
     | And of t * t  (** Logical conjunction *)
     | Or of t * t  (** Logical disjunction *)
     | Eq of Expr.t * Expr.t  (** Expression equality *)
+    | Impl of t * t  (** Logical implication *)
     | FLess of Expr.t * Expr.t  (** Expression less-than for numbers *)
     | FLessEq of Expr.t * Expr.t
         (** Expression less-than-or-equal for numbers *)
@@ -551,7 +552,6 @@ module Formula : sig
     (** [a #>=. b] is [Not FLess (b, a)] *)
     val ( #>=. ) : Expr.t -> Expr.t -> t
 
-    (** [fa #=> fb] is [(fnot fa) #|| fb] *)
     val ( #=> ) : t -> t -> t
   end
 end
@@ -1255,6 +1255,7 @@ module Visitors : sig
            ; visit_'label : 'c -> 'f -> 'f
            ; visit_ALoc : 'c -> Expr.t -> string -> Expr.t
            ; visit_And : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
+           ; visit_Impl : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
            ; visit_Apply :
                'c -> 'f Cmd.t -> string -> Expr.t -> 'f option -> 'f Cmd.t
            ; visit_ApplyLem :
@@ -1512,6 +1513,7 @@ module Visitors : sig
       method visit_'label : 'c -> 'f -> 'f
       method visit_ALoc : 'c -> Expr.t -> string -> Expr.t
       method visit_And : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
+      method visit_Impl : 'c -> Formula.t -> Formula.t -> Formula.t -> Formula.t
 
       method visit_Apply :
         'c -> 'f Cmd.t -> string -> Expr.t -> 'f option -> 'f Cmd.t
@@ -1825,6 +1827,7 @@ module Visitors : sig
            ; visit_'label : 'c -> 'g -> 'f
            ; visit_ALoc : 'c -> ALoc.t -> 'f
            ; visit_And : 'c -> Formula.t -> Formula.t -> 'f
+           ; visit_Impl : 'c -> Formula.t -> Formula.t -> 'f
            ; visit_Apply : 'c -> string -> Expr.t -> 'g option -> 'f
            ; visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> 'f
            ; visit_Arguments : 'c -> string -> 'f
@@ -2052,6 +2055,7 @@ module Visitors : sig
       method visit_'label : 'c -> 'g -> 'f
       method visit_ALoc : 'c -> ALoc.t -> 'f
       method visit_And : 'c -> Formula.t -> Formula.t -> 'f
+      method visit_Impl : 'c -> Formula.t -> Formula.t -> 'f
       method visit_Apply : 'c -> string -> Expr.t -> 'g option -> 'f
       method visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> 'f
       method visit_Arguments : 'c -> string -> 'f
@@ -2294,6 +2298,7 @@ module Visitors : sig
            ; visit_'label : 'c -> 'f -> unit
            ; visit_ALoc : 'c -> string -> unit
            ; visit_And : 'c -> Formula.t -> Formula.t -> unit
+           ; visit_Impl : 'c -> Formula.t -> Formula.t -> unit
            ; visit_Apply : 'c -> string -> Expr.t -> 'f option -> unit
            ; visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> unit
            ; visit_Arguments : 'c -> string -> unit
@@ -2520,6 +2525,7 @@ module Visitors : sig
       method visit_'label : 'c -> 'f -> unit
       method visit_ALoc : 'c -> string -> unit
       method visit_And : 'c -> Formula.t -> Formula.t -> unit
+      method visit_Impl : 'c -> Formula.t -> Formula.t -> unit
       method visit_Apply : 'c -> string -> Expr.t -> 'f option -> unit
       method visit_ApplyLem : 'c -> string -> Expr.t list -> string list -> unit
       method visit_Arguments : 'c -> string -> unit

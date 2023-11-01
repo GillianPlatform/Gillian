@@ -774,6 +774,8 @@ and encode_assertion ~(gamma : tyenv) ~(llen_lvars : SS.t) (a : Formula.t) :
       mk_lt (get_int (fe le1)) (get_int (fe le2)) >- BooleanType
   | ILessEq (le1, le2) ->
       mk_le (get_int (fe le1)) (get_int (fe le2)) >- BooleanType
+  | Impl (a1, a2) ->
+      Boolean.mk_implies ctx (get_bool (f a1)) (get_bool (f a2)) >- BooleanType
   | StrLess (_, _) -> raise (Failure "Z3 encoding does not support STRLESS")
   | True -> Boolean.mk_true ctx >- BooleanType
   | False -> Boolean.mk_false ctx >- BooleanType
