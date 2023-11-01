@@ -954,6 +954,23 @@ let check_sat (fs : Formula.Set.t) (gamma : tyenv) : bool =
       Hashtbl.replace sat_cache fs (Option.is_some ret);
       result
 
+let check_sat_with_model (fs : Formula.Set.t) (gamma : tyenv) :
+    bool * Model.model option =
+  match Hashtbl.find_opt sat_cache fs with
+  | Some result ->
+      L.(verbose (fun m -> m "SAT check cached with result: %b" result));
+      (result, None)
+  | None ->
+      L.(verbose (fun m -> m "SAT check not found in cache."));
+      let ret = check_sat_core fs gamma in
+      L.(
+        verbose (fun m ->
+            m "Adding to cache : @[%a@]" Formula.pp
+              (Formula.conjunct (Formula.Set.elements fs))));
+      let result = Option.is_some ret in
+      Hashtbl.replace sat_cache fs (Option.is_some ret);
+      (result, ret)
+
 let lift_z3_model
     (model : Model.model)
     (gamma : (string, Type.t) Hashtbl.t)
