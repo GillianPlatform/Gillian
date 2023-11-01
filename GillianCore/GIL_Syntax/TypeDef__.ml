@@ -84,6 +84,7 @@ and binop =
   | M_atan2
   | M_pow
   | LstNth
+  | LstRepeat
   | StrCat
   | StrNth
   | SetDiff

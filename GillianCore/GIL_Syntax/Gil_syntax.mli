@@ -217,6 +217,7 @@ module BinOp : sig
     | M_atan2  (** Arctangent y/x *)
     | M_pow  (** Power *)
     | LstNth  (** Nth element of a string *)
+    | LstRepeat  (** Nth element of a string *)
     | StrCat  (** String concatenation *)
     | StrNth  (** Nth element of a string *)
     | SetDiff  (** Set difference *)
@@ -1381,6 +1382,7 @@ module Visitors : sig
            ; visit_LstCat : 'c -> NOp.t -> NOp.t
            ; visit_LstLen : 'c -> UnOp.t -> UnOp.t
            ; visit_LstNth : 'c -> BinOp.t -> BinOp.t
+           ; visit_LstRepeat : 'c -> BinOp.t -> BinOp.t
            ; visit_LstRev : 'c -> UnOp.t -> UnOp.t
            ; visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> Expr.t -> Expr.t
            ; visit_M_abs : 'c -> UnOp.t -> UnOp.t
@@ -1653,6 +1655,7 @@ module Visitors : sig
       method visit_LstCat : 'c -> NOp.t -> NOp.t
       method visit_LstLen : 'c -> UnOp.t -> UnOp.t
       method visit_LstNth : 'c -> BinOp.t -> BinOp.t
+      method visit_LstRepeat : 'c -> BinOp.t -> BinOp.t
       method visit_LstRev : 'c -> UnOp.t -> UnOp.t
       method visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> Expr.t -> Expr.t
       method visit_M_abs : 'c -> UnOp.t -> UnOp.t
@@ -1920,6 +1923,7 @@ module Visitors : sig
            ; visit_LstCat : 'c -> 'f
            ; visit_LstLen : 'c -> 'f
            ; visit_LstNth : 'c -> 'f
+           ; visit_LstRepeat : 'c -> 'f
            ; visit_LstRev : 'c -> 'f
            ; visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> 'f
            ; visit_M_abs : 'c -> 'f
@@ -2157,6 +2161,7 @@ module Visitors : sig
       method visit_LstCat : 'c -> 'f
       method visit_LstLen : 'c -> 'f
       method visit_LstNth : 'c -> 'f
+      method visit_LstRepeat : 'c -> 'f
       method visit_LstRev : 'c -> 'f
       method visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> 'f
       method visit_M_abs : 'c -> 'f
@@ -2402,6 +2407,7 @@ module Visitors : sig
            ; visit_LstCat : 'c -> unit
            ; visit_LstLen : 'c -> unit
            ; visit_LstNth : 'c -> unit
+           ; visit_LstRepeat : 'c -> unit
            ; visit_LstRev : 'c -> unit
            ; visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> unit
            ; visit_M_abs : 'c -> unit
@@ -2638,6 +2644,7 @@ module Visitors : sig
       method visit_LstCat : 'c -> unit
       method visit_LstLen : 'c -> unit
       method visit_LstNth : 'c -> unit
+      method visit_LstRepeat : 'c -> unit
       method visit_LstRev : 'c -> unit
       method visit_LstSub : 'c -> Expr.t -> Expr.t -> Expr.t -> unit
       method visit_M_abs : 'c -> unit

@@ -78,6 +78,7 @@ module Infer_types_to_gamma = struct
       | SetDiff -> (Some SetType, Some SetType, Some SetType)
       | BSetSub -> (Some SetType, Some SetType, Some BooleanType)
       | LstNth -> (Some ListType, Some IntType, None)
+      | LstRepeat -> (None, Some IntType, Some ListType)
       | StrNth -> (Some ListType, Some NumberType, None)
       | IPlus
       | IMinus
@@ -206,6 +207,9 @@ let rec infer_types_expr gamma le : unit =
       | LstNth ->
           e le1 ListType;
           e le2 IntType
+      | LstRepeat ->
+          e le2 IntType;
+          e le ListType
       | StrNth ->
           e le1 StringType;
           e le2 NumberType
@@ -356,6 +360,7 @@ module Type_lexpr = struct
     | true, true -> (
         match op with
         | LstNth -> type_lstnth gamma e1 e2 constraints
+        | LstRepeat -> infer_type le ListType constraints
         | StrNth -> type_strnth gamma e1 e2 constraints
         | Equal
         | ILessThan

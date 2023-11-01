@@ -335,6 +335,17 @@ let rec evaluate_binop
                       "Type Error: List indexing: expected list and number, \
                        got %a and %a"
                       CVal.M.pp lit1 CVal.M.pp lit2)))
+      | LstRepeat -> (
+          match lit2 with
+          | Int n ->
+              let n = Z.to_int n in
+              let elements = List.init n (fun _ -> lit1) in
+              LList elements
+          | _ ->
+              raise
+                (TypeError
+                   (Fmt.str "Type Error: List repeat: expected integer, got %a"
+                      CVal.M.pp lit2)))
       | StrNth -> (
           match (lit1, lit2) with
           | String s, Num n when is_int n ->

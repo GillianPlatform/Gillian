@@ -70,6 +70,12 @@ let list_length x =
   | LstSub (_, _, len) -> len
   | _ -> UnOp (LstLen, x)
 
+let list_repeat x len =
+  match len with
+  | Lit (Int i) when Z.lt i (Z.of_int 100) ->
+      EList (List.init (Z.to_int i) (fun _ -> x))
+  | _ -> BinOp (x, LstRepeat, len)
+
 let list_sub ~lst ~start ~size =
   match (lst, start, size) with
   | EList el, Lit (Int starti), Lit (Int sizei) -> (
@@ -314,7 +320,8 @@ let rec pp fmt e =
   | PVar v | LVar v | ALoc v -> Fmt.string fmt v
   | BinOp (e1, op, e2) -> (
       match op with
-      | LstNth | StrNth -> Fmt.pf fmt "%s(%a, %a)" (BinOp.str op) pp e1 pp e2
+      | LstNth | StrNth | LstRepeat ->
+          Fmt.pf fmt "%s(%a, %a)" (BinOp.str op) pp e1 pp e2
       | _ -> Fmt.pf fmt "(%a %s %a)" pp e1 (BinOp.str op) pp e2)
   | LstSub (e1, e2, e3) -> Fmt.pf fmt "l-sub(%a, %a, %a)" pp e1 pp e2 pp e3
   (* (uop e) *)

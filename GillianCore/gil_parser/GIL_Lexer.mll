@@ -234,6 +234,7 @@ rule read = parse
   | "s-len"              { GIL_Parser.STRLEN }
 (* Expression keywords *)
   | "l-nth"              { GIL_Parser.LSTNTH }
+  | "l-repeat"           { GIL_Parser.LSTREPEAT }
   | "s-nth"              { GIL_Parser.STRNTH }
 (* Command keywords *)
   | ":="                 { GIL_Parser.DEFEQ }

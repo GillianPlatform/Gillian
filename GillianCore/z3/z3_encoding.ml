@@ -348,7 +348,11 @@ let encode_type (t : Type.t) =
       (Failure (Printf.sprintf "DEATH: encode_type with arg: %s" (Type.str t)))
 
 module Encoding = struct
-  type kind = Native of Type.t | Simple_wrapped | Extended_wrapped
+  type kind =
+    | Native of Type.t
+        (** Encoding in z3 of this value uses a z3 Native type, such as Int or Seq. *)
+    | Simple_wrapped  (** Cannot be a set *)
+    | Extended_wrapped  (** Can be a set *)
 
   let native_sort_of_type = function
     | Type.IntType | StringType | ObjectType -> ints_sort
@@ -483,6 +487,65 @@ let typeof_expression (x : Encoding.t) =
             (Extended_literal_operations.singular_elem_accessor <| x.expr);
         ]
 
+let master_solver =
+  let solver = Solver.mk_solver ctx None in
+  Solver.push solver;
+  solver
+
+module RepeatCache = struct
+  module Hashtbl = Hashtbl.Make (struct
+    type t = ZExpr.expr * ZExpr.expr
+
+    let equal = ( = )
+
+    let hash (x, y) =
+      let first = Z3.AST.hash (ZExpr.ast_of_expr x) in
+      let second = Z3.AST.hash (ZExpr.ast_of_expr y) in
+      Stdlib.Hashtbl.hash (first, second)
+  end)
+
+  let cache = Hashtbl.create 0
+
+  let next_var, clear_var_counter =
+    let mk_var counter =
+      ZExpr.mk_const_s ctx
+        ("__repeat_var_" ^ string_of_int counter)
+        Lit_operations.z3_list_of_literal_sort
+    in
+    let var_counter = ref 0 in
+    ( (fun () ->
+        let ret = !var_counter in
+        incr var_counter;
+        mk_var ret),
+      fun () -> var_counter := 0 )
+
+  let index = ZExpr.mk_const_s ctx "__index__" ints_sort
+
+  let clear () =
+    Hashtbl.clear cache;
+    clear_var_counter ()
+
+  let add_constraints var x n =
+    let at_index_is_x = mk_eq (Z3.Seq.mk_seq_nth ctx var index) x in
+    let length = Z3.Seq.mk_seq_length ctx var in
+    let all_eq_x =
+      Quantifier.mk_forall_const ctx [ index ] at_index_is_x None [] [] None
+        None
+      |> Quantifier.expr_of_quantifier
+    in
+    let length_is_n = mk_eq length n in
+    Solver.add master_solver [ all_eq_x; length_is_n ]
+
+  let get x n =
+    match Hashtbl.find_opt cache (x, n) with
+    | None ->
+        let var = next_var () in
+        let () = add_constraints var x n in
+        Hashtbl.add cache (x, n) var;
+        var
+    | Some res -> res
+end
+
 (* Return a native Z3 expr, or a simply_wrapped expr.
    The information is given by the type. *)
 let rec encode_lit (lit : Literal.t) : Encoding.t =
@@ -577,6 +640,10 @@ let encode_binop (op : BinOp.t) (p1 : Encoding.t) (p2 : Encoding.t) : Encoding.t
       let lst' = get_list p1 in
       let index' = get_int p2 in
       Z3.Seq.mk_seq_nth ctx lst' index' |> simply_wrapped
+  | LstRepeat ->
+      let x = simple_wrap p1 in
+      let n = get_int p2 in
+      RepeatCache.get x n >- ListType
   | StrNth ->
       let str' = get_string p1 in
       let index' = get_num p2 in
@@ -846,11 +913,6 @@ let encode_assertions (assertions : Formula.Set.t) (gamma : tyenv) :
       Hashtbl.replace encoding_cache assertions encoded_assertions;
       encoded_assertions
 
-let master_solver =
-  let solver = Solver.mk_solver ctx None in
-  Solver.push solver;
-  solver
-
 let dump_smt =
   let counter = ref 0 in
   let folder =
@@ -887,6 +949,7 @@ let dump_smt =
 
 let reset_solver () =
   Solver.pop master_solver 1;
+  RepeatCache.clear ();
   Solver.push master_solver
 
 let check_sat_core (fs : Formula.Set.t) (gamma : tyenv) : Model.model option =

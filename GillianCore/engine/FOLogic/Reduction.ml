@@ -167,6 +167,8 @@ let resolve_list (le : Expr.t) (pfs : Formula.t list) : Expr.t =
            We check absence of cycles *)
         | (EList _ | NOp (LstCat, _)) when not (SS.mem x (Expr.lvars le')) ->
             Some le'
+        | Expr.BinOp (_, LstRepeat, _) as ret
+          when not (SS.mem x (Expr.lvars ret)) -> Some ret
         | _ -> search x rest)
     | Eq (le, LVar x') :: rest when String.equal x' x -> (
         let le' = normalise_list_expressions le in
@@ -336,6 +338,7 @@ let rec get_nth_of_list (pfs : PFS.t) (lst : Expr.t) (idx : int) : Expr.t option
             if idx < llen then (lel, idx) else (NOp (LstCat, ler), idx - llen)
           in
           f lst idx)
+  | Expr.BinOp (x, LstRepeat, _) -> Some x
   | _ -> None
 
 (* Finding the nth element of a list *)
@@ -1114,6 +1117,10 @@ and reduce_lexpr_loop
         | [] -> ESet []
         | [ x ] -> x
         | _ -> NOp (SetUnion, fles))
+    | BinOp (x, LstRepeat, Lit (Int i)) when Z.lt i (Z.of_int 100) ->
+        let fx = f x in
+        let result = List.init (Z.to_int i) (fun _ -> fx) in
+        EList result
     | NOp (LstCat, LstSub (x1, Lit (Int z), z1) :: LstSub (x2, y2, z3) :: rest)
       when Z.equal z Z.zero && Expr.equal x1 x2 && Expr.equal z1 y2 ->
         f
@@ -1186,6 +1193,7 @@ and reduce_lexpr_loop
           | [ x ] -> x
           | _ -> NOp (SetInter, fles))
     | UnOp (FUnaryMinus, UnOp (FUnaryMinus, e)) -> f e
+    | UnOp (LstLen, BinOp (_, LstRepeat, e)) -> f e
     | UnOp (LstLen, LstSub (_, _, e)) -> f e
     | UnOp (op, le) -> (
         let fle = f le in
