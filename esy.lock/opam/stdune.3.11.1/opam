@@ -1,6 +1,7 @@
 opam-version: "2.0"
-synopsis: "Element ordering"
-description: "Element ordering"
+synopsis: "Dune's unstable standard library"
+description:
+  "This library offers no backwards compatibility guarantees. Use at your own risk."
 maintainer: ["Jane Street Group, LLC <opensource@janestreet.com>"]
 authors: ["Jane Street Group, LLC <opensource@janestreet.com>"]
 license: "MIT"
@@ -10,6 +11,11 @@ bug-reports: "https://github.com/ocaml/dune/issues"
 depends: [
   "dune" {>= "3.5"}
   "ocaml" {>= "4.08.0"}
+  "base-unix"
+  "dyn" {= version}
+  "ordering" {= version}
+  "pp" {>= "1.2.0"}
+  "csexp" {>= "1.5.0"}
   "odoc" {with-doc}
 ]
 dev-repo: "git+https://github.com/ocaml/dune.git"
@@ -30,10 +36,10 @@ build: [
 ]
 url {
   src:
-    "https://github.com/ocaml/dune/releases/download/3.11.0/dune-3.11.0.tbz"
+    "https://github.com/ocaml/dune/releases/download/3.11.1/dune-3.11.1.tbz"
   checksum: [
-    "sha256=1b9c7d7e134a8d3a9d715613f02910ecf31167df1ba226ede921a5fa7b0d6513"
-    "sha512=0f2911bae7371b491dcd0762ddac0ec5498a57b5a8a0915b97e0257e668d8a7e1675d177d12be2cfe39c6adb42276c4c55beb30cc4acf109b0102650a2691057"
+    "sha256=866f2307adadaf7604f3bf9d98bb4098792baa046953a6726c96c40fc5ed3f71"
+    "sha512=c888153b204a16bcfed2636de776bbd5f9ca84484e716cc1e9ef3ba3c904e9dd15a2609ae943cddb6097912623ec54618c58386d6730ff742d746850400fb3cc"
   ]
 }
-x-commit-hash: "e3bfd215dd35cf702b3af66be03f2912b69b0a0a"
+x-commit-hash: "7cbb0e7277c6cacd1ccf7941cac5a03c25fc63cf"
