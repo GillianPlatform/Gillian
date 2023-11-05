@@ -1492,6 +1492,9 @@ and reduce_lexpr_loop
                   | _ -> true)
                &&
                let eqs = get_equal_expressions pfs le in
+               L.tmi (fun fmt ->
+                   fmt "le: %a, z: %s, n: %s" Expr.pp le (Z.to_string z)
+                     (Z.to_string n));
                L.tmi (fun fmt -> fmt "PFS:\n%a" PFS.pp pfs);
                L.tmi (fun fmt ->
                    fmt "Found eqs: %a: %a" Expr.pp le
