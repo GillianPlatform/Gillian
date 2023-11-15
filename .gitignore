@@ -73,6 +73,7 @@ gillian.esy.lock
 */environment
 *.env
 **/.gillian
+gillian_smt_queries
 
 # Dependency graphs
 with-depgraph.esy.lock
