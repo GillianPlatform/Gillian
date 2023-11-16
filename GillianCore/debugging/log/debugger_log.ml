@@ -46,7 +46,17 @@ module Public = struct
     | Some rpc ->
         to_file
           (match json with
-          | _ :: _ -> msg ^ " (+)"
+          | _ :: _ ->
+              let err_info =
+                match List.assoc_opt "backtrace" json with
+                | Some (`String bt) ->
+                    let json_s =
+                      json |> JsonMap.to_yojson |> Yojson.Safe.pretty_to_string
+                    in
+                    Fmt.str "\n%s\n%s" json_s bt
+                | _ -> ""
+              in
+              msg ^ " (+)" ^ err_info
           | [] -> msg);
         Debug_rpc.send_event rpc (module Log_event) { msg; json }
     | None -> Lwt.return_unit
