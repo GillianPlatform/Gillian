@@ -43,6 +43,7 @@ export function activateDebug(
   context: vscode.ExtensionContext,
   factory: vscode.DebugAdapterDescriptorFactory
 ) {
+  console.log("activating!");
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'extension.gillian-debug.runEditorContents',
@@ -87,6 +88,7 @@ export function activateDebug(
       }
     ),
     vscode.debug.onDidStartDebugSession(() => {
+      console.log("we starting");
       WebviewPanel.render(context.extensionUri);
     }),
     vscode.debug.onDidReceiveDebugSessionCustomEvent(handleCustomDebugEvent)

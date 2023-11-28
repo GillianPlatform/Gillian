@@ -6,6 +6,7 @@ import {
   languages,
   Range,
   TextDocument,
+  workspace,
 } from 'vscode';
 import { startDebugging } from './commands';
 import { ExecMode } from './types';
@@ -52,10 +53,12 @@ class DebugCodeLensProvider implements CodeLensProvider {
 
     const reProcedureName = /(.+?)\(/g;
 
-    const lensKinds: [ExecMode, string][] = [
-      ['debugverify', 'Verify '],
-      ['debugwpst', 'Symbolic-debug '],
-    ];
+    const config = workspace.getConfiguration('gillianDebugger');
+    const lensKinds: [ExecMode, string][] = [];
+    if (config.showVerifyLens)
+      lensKinds.push(['debugverify', 'Verify ']);
+    if (config.showSymbolicDebugLens)
+      lensKinds.push(['debugwpst', 'Symbolic-debug ']);
     const lenses: CodeLens[] = [];
     while (reProcedure.exec(text) !== null) {
       reProcedureName.lastIndex = reProcedure.lastIndex;

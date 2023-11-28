@@ -1,10 +1,6 @@
 // #region ExecMap
 
-export type BranchCase = {
-  readonly kind: string;
-  readonly display: [string, string];
-  readonly json: any;
-};
+export type BranchCase = [string, any];
 
 type Submap =
   | readonly ['NoSubmap']
@@ -18,7 +14,8 @@ type Unification = {
 };
 
 export type CmdData = {
-  readonly ids: readonly number[];
+  readonly id: readonly number;
+  readonly all_ids: readonly number[];
   readonly display: string;
   readonly unifys: readonly Unification[];
   readonly errors: readonly string[];
@@ -121,7 +118,11 @@ type ResetViewMsg = {
   readonly type: 'reset_view';
 };
 
-export type MessageToWebview = StateUpdateMsg | UnifyUpdateMsg | ResetViewMsg;
+type ClearStateMsg = {
+  readonly type: 'clear_state';
+}
+
+export type MessageToWebview = StateUpdateMsg | UnifyUpdateMsg | ResetViewMsg | ClearStateMsg;
 
 // #endregion
 
