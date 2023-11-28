@@ -55,17 +55,6 @@ struct
 
       let build_unify_map = Build_map.f
 
-      let get_test debug_state proc_name =
-        let tests = debug_state.ext.tests in
-        match tests |> List.assoc_opt proc_name with
-        | None ->
-            DL.failwith
-              (fun () ->
-                let tests_json = Verification.proc_tests_to_yojson tests in
-                [ ("tests", tests_json) ])
-              (Fmt.str "No test found for proc `%s`!" proc_name)
-        | Some test -> test
-
       let is_unify_successful id =
         L.Log_queryer.get_unify_results id
         |> List.exists (fun (_, content) ->
@@ -84,7 +73,7 @@ struct
         (id, content, success)
 
       let f result proc_name prev_id debug_state =
-        let test = get_test debug_state proc_name in
+        let* test = debug_state.ext.tests |> List.assoc_opt proc_name in
         let+ id, content, success =
           match L.Log_queryer.get_unify_for prev_id with
           | Some (id, content) -> Some (id, content, is_unify_successful id)

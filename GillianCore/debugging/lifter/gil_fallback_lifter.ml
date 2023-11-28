@@ -59,13 +59,14 @@ functor
     let dump = to_yojson
 
     let handle_cmd prev_id branch_case exec_data { gil; tl } =
-      (* TODO: defer skipping to TL lifter *)
-      match gil |> Gil_lifter.handle_cmd prev_id branch_case exec_data with
-      | Stop -> (
-          match tl with
-          | None -> Stop
-          | Some tl -> tl |> TLLifter.handle_cmd prev_id branch_case exec_data)
-      | r -> r
+      let () =
+        match gil |> Gil_lifter.handle_cmd prev_id branch_case exec_data with
+        | Stop _ -> ()
+        | _ -> failwith "HORROR - Gil_lifter didn't give Stop!"
+      in
+      match tl with
+      | None -> Stop None
+      | Some tl -> tl |> TLLifter.handle_cmd prev_id branch_case exec_data
 
     let get_gil_map state = state.gil |> Gil_lifter.get_gil_map
 

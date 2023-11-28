@@ -92,7 +92,7 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
       | PLUS | MINUS | LESSEQUAL | LESSTHAN | GREATEREQUAL | GREATERTHAN -> true
       | _ -> false)
   in
-  let stmt_kind = if is_loop_prefix then WAnnot.LoopPrefix else WAnnot.Single in
+  let stmt_kind = if is_loop_prefix then Some WAnnot.LoopPrefix else None in
   let open WExpr in
   match get expr with
   | Val v -> ([], Expr.Lit (compile_val v))
@@ -128,7 +128,7 @@ let rec compile_expr ?(fname = "main") ?(is_loop_prefix = false) expr :
         @ [
             ( WAnnot.make ~origin_id:(get_id expr)
                 ~origin_loc:(CodeLoc.to_location (get_loc expr))
-                ~stmt_kind (),
+                ?stmt_kind (),
               None,
               call_i_plus );
           ],
@@ -590,19 +590,21 @@ let compile_inv_and_while ~fname ~while_stmt ~invariant =
   let annot_while =
     WAnnot.make ~origin_id:(WStmt.get_id while_stmt)
       ~origin_loc:(CodeLoc.to_location while_loc)
-      ~stmt_kind:(Multi NotEnd) ()
+      ~stmt_kind:(Normal false) ()
   in
   let rec map_reassign_vars acc = function
     | cmd :: rest ->
         let annot_while =
           match rest with
-          | [] -> { annot_while with stmt_kind = Multi EndNormal }
+          | [] -> { annot_while with stmt_kind = Normal true }
           | _ -> annot_while
         in
         map_reassign_vars ((annot_while, None, cmd) :: acc) rest
     | [] -> List.rev acc
   in
-  let annot_call_while = { annot_while with nest_kind = LoopBody loop_fname } in
+  let annot_call_while =
+    { annot_while with nest_kind = Some (LoopBody loop_fname) }
+  in
   let lab_cmds =
     (annot_call_while, None, call_cmd) :: map_reassign_vars [] reassign_vars
   in
@@ -652,7 +654,7 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
         WAnnot.make ~origin_id:sid_while ~origin_loc:(CodeLoc.to_location sloc)
           ()
       in
-      let annot_hidden = WAnnot.{ annot with is_hidden = true } in
+      let annot_hidden = WAnnot.{ annot with stmt_kind = Hidden } in
       let headlabopt = Some looplab in
       let headcmd = Cmd.Skip in
       let headcmd_lab = (annot_hidden, headlabopt, headcmd) in
@@ -696,10 +698,8 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   | { snode = Dispose e; sid; sloc } :: rest ->
       let cmdle, comp_e = compile_expr e in
       let annot, annot_final =
-        let mk =
-          WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
-        in
-        (mk ~stmt_kind:(Multi NotEnd) (), mk ~stmt_kind:(Multi EndNormal) ())
+        WAnnot.make_multi ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
+          ()
       in
       let faillab, ctnlab = (gen_str fail_lab, gen_str ctn_lab) in
       let testcmd =
@@ -729,10 +729,8 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   | { snode = Lookup (x, e); sid; sloc } :: rest ->
       let cmdle, comp_e = compile_expr e in
       let annot, annot_final =
-        let mk =
-          WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
-        in
-        (mk ~stmt_kind:(Multi NotEnd) (), mk ~stmt_kind:(Multi EndNormal) ())
+        WAnnot.make_multi ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
+          ()
       in
       let v_get = gen_str gvar in
       let faillab, ctnlab = (gen_str fail_lab, gen_str ctn_lab) in
@@ -769,10 +767,8 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
   (* Property Update *)
   | { snode = Update (e1, e2); sid; sloc } :: rest ->
       let get_annot, set_annot =
-        let mk =
-          WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
-        in
-        (mk ~stmt_kind:(Multi NotEnd) (), mk ~stmt_kind:(Multi EndNormal) ())
+        WAnnot.make_multi ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc)
+          ()
       in
       let cmdle1, comp_e1 = compile_expr e1 in
       let cmdle2, comp_e2 = compile_expr e2 in
@@ -834,12 +830,13 @@ let rec compile_stmt_list ?(fname = "main") ?(is_loop_prefix = false) stmtl =
       let annot =
         WAnnot.make ~origin_id:sid ~origin_loc:(CodeLoc.to_location sloc) ()
       in
-      let annot_hidden = { annot with is_hidden = true } in
+      let annot_hidden = { annot with stmt_kind = Hidden } in
       let annot_prefix =
         let stmt_kind =
-          WAnnot.(if is_loop_prefix then LoopPrefix else Single)
+          WAnnot.(if is_loop_prefix then LoopPrefix else Normal true)
         in
-        { annot with stmt_kind }
+        let branch_kind = Some WBranchCase.IfElseKind in
+        { annot with stmt_kind; branch_kind }
       in
       let cmdle, guard = compile_expr e in
       let comp_sl1, new_functions1 = compile_list sl1 in
@@ -967,12 +964,9 @@ let rec compile_function
   in
   let cmdle, comp_ret_expr = compile_expr ~fname:name return_expr in
   let ret_annot, final_ret_annot =
-    let mk =
-      WAnnot.make
-        ~origin_loc:(CodeLoc.to_location (WExpr.get_loc return_expr))
-        ~origin_id:(WExpr.get_id return_expr) ~is_return:true
-    in
-    (mk ~stmt_kind:(Multi NotEnd) (), mk ~stmt_kind:(Multi EndNormal) ())
+    WAnnot.make_multi
+      ~origin_loc:(CodeLoc.to_location (WExpr.get_loc return_expr))
+      ~origin_id:(WExpr.get_id return_expr) ~is_return:true ()
   in
   let retassigncmds =
     cmdle

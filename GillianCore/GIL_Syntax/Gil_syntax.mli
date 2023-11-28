@@ -988,8 +988,8 @@ module BiSpec : sig
   val pp : Format.formatter -> t -> unit
 end
 
-(** @canonical Gillian.Gil_syntax.BranchCase *)
-module BranchCase : sig
+(** @canonical Gillian.Gil_syntax.Branch_case *)
+module Branch_case : sig
   (** Reasons for a branch in execution.
 
     These are used to reason about execution when using the debugger.
@@ -1008,6 +1008,8 @@ module BranchCase : sig
 
     Every termination of a symbolic execution is uniquely identified by its branch path. *)
   type path = t list [@@deriving yojson]
+
+  val pp_short : Format.formatter -> t -> unit
 end
 
 (** @canonical Gillian.Gil_syntax.Annot *)

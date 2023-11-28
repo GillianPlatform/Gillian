@@ -135,14 +135,7 @@ let at_path_exn ?(stop_at = EndOfPath) path map =
 
 (** An Exec_map to be passed to the debugger frontend and displayed *)
 module Packaged = struct
-  type branch_case = {
-    kind : string;
-    display : string * string;
-        (** A friendly name for the branch kind and specific branch case to be displayed to the user *)
-    json : Yojson.Safe.t;
-        (** The JSON of the original branch case; this can be target language specific *)
-  }
-  [@@deriving yojson]
+  type branch_case = string * Yojson.Safe.t [@@deriving yojson]
 
   (* Need this to avoid name conflict *)
   (**/**)
@@ -156,7 +149,8 @@ module Packaged = struct
   type t = (branch_case, cmd_data, unit) _map
 
   and cmd_data = {
-    ids : L.Report_id.t list;
+    id : L.Report_id.t;
+    all_ids : L.Report_id.t list;
     display : string;
     unifys : unification list;
     errors : string list;
@@ -165,19 +159,10 @@ module Packaged = struct
   [@@deriving yojson]
 
   (** Converts a GIL branch case to a packaged branch case *)
-  let package_gil_case (case : BranchCase.t) : branch_case =
-    let json = BranchCase.to_yojson case in
-    let kind, display =
-      match case with
-      | GuardedGoto b -> ("GuardedGoto", ("If/Else", Fmt.str "%B" b))
-      | LCmd x -> ("LCmd", ("Logical command", Fmt.str "%d" x))
-      | SpecExec (fl, i) ->
-          ("SpecExec", ("Spec exec", Fmt.str "%a-%d" Flag.pp fl i))
-      | LAction x -> ("LAction", ("Logical action", Fmt.str "L%d" x))
-      | LActionFail x ->
-          ("LActionFail", ("Logical action failure", Fmt.str "LF%d" x))
-    in
-    { kind; display; json }
+  let package_gil_case (case : Branch_case.t) : branch_case =
+    let json = Branch_case.to_yojson case in
+    let display = Fmt.str "%a" Branch_case.pp_short case in
+    (display, json)
 
   (** Converts an Exec_map to a packaged Exec_map *)
   let package package_data package_case (map : ('c, 'd, 'bd) _map) : t =
@@ -195,7 +180,7 @@ module Packaged = struct
           let nexts =
             nexts
             |> Hashtbl.map (fun case (bdata, next) ->
-                   let case = package_case bdata case all_cases in
+                   let case = package_case ~bd:bdata ~all_cases case in
                    let next = aux next in
                    (case, ((), next)))
           in

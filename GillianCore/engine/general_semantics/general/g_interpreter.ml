@@ -1,10 +1,10 @@
 open Literal
-open BranchCase
+open Branch_case
 module L = Logging
 module DL = Debugger_log
 include G_interpreter_intf
 
-type branch_case = BranchCase.t [@@deriving yojson]
+type branch_case = Branch_case.t [@@deriving yojson]
 
 (** General GIL Interpreter *)
 module Make
@@ -145,14 +145,14 @@ struct
   type conf_t = BConfErr of err_t list | BConfCont of State.t
   type result_t = (State.t, State.vt, err_t) Exec_res.t [@@deriving yojson]
 
-  type 'result cont_func_f = ?path:BranchCase.path -> unit -> 'result cont_func
+  type 'result cont_func_f = ?path:Branch_case.path -> unit -> 'result cont_func
 
   and 'result cont_func =
     | Finished of 'result list
     | Continue of {
         report_id : Logging.Report_id.t option;
-        branch_path : BranchCase.path;
-        new_branch_cases : BranchCase.t list;
+        branch_path : Branch_case.path;
+        new_branch_cases : Branch_case.t list;
         cont_func : 'result cont_func_f;
       }
     | EndOfBranch of 'result * 'result cont_func_f
