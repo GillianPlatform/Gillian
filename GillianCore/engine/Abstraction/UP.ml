@@ -205,20 +205,40 @@ let rec learn_expr
   | NOp (LstCat, e :: rest) -> (
       let overall_length = Expr.list_length base_expr in
       let e_length = Expr.list_length e in
-      match is_known_expr kb e_length with
-      | true ->
-          let e_base_expr = Expr.LstSub (base_expr, Expr.zero_i, e_length) in
-          let e_outs = f e_base_expr e in
-          let kb' : KB.t =
-            List.fold_left (fun kb (u, _) -> KB.add u kb) kb e_outs
-          in
-          let rest = Expr.NOp (LstCat, rest) in
-          let rest_base_expr =
-            Expr.LstSub
-              (base_expr, e_length, BinOp (overall_length, IMinus, e_length))
-          in
-          e_outs @ learn_expr kb' rest_base_expr rest
-      | false -> [])
+      if is_known_expr kb e_length then
+        let e_base_expr = Expr.LstSub (base_expr, Expr.zero_i, e_length) in
+        let e_outs = f e_base_expr e in
+        let kb' : KB.t =
+          List.fold_left (fun kb (u, _) -> KB.add u kb) kb e_outs
+        in
+        let rest = Expr.NOp (LstCat, rest) in
+        let rest_base_expr =
+          Expr.LstSub
+            (base_expr, e_length, Expr.Infix.(overall_length - e_length))
+        in
+        e_outs @ learn_expr kb' rest_base_expr rest
+      else
+        match rest with
+        | [ e' ] ->
+            let e'_length = Expr.list_length e' in
+            if is_known_expr kb e'_length then
+              let e'_base_expr =
+                Expr.LstSub
+                  (base_expr, Expr.Infix.(overall_length - e'_length), e'_length)
+              in
+              let e'_outs = f e'_base_expr e' in
+              let kb' : KB.t =
+                List.fold_left (fun kb (u, _) -> KB.add u kb) kb e'_outs
+              in
+              let rest_base_expr =
+                Expr.LstSub
+                  ( base_expr,
+                    Expr.zero_i,
+                    Expr.Infix.(overall_length - e'_length) )
+              in
+              e'_outs @ learn_expr kb' rest_base_expr e
+            else []
+        | _ -> [])
   (* Floating-point plus is invertible *)
   | BinOp (e1, FPlus, e2) -> (
       (* If both operands are known or both are unknown, nothing can be done *)
