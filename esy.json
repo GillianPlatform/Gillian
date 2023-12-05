@@ -94,7 +94,7 @@
     "@opam/visitors": ">=2.3",
     "@opam/yojson": "^1.7.0",
     "@opam/zarith": ">=1.12",
-    "@opam/z3": "GillianPlatform/esy-z3#37b3fae3f019bd331a5f3cf22ffa193af1a0cdc2",
+    "@opam/z3": "GillianPlatform/esy-z3#e8b2ce266d5d8bd67c54bd226c6301f7b180bb09",
     "compcert": "giltho/CompCert#3a6f14016f0c9aaab2ddcdd61492e5fe54f12259",
     "ocaml": "4.14.x"
   },
