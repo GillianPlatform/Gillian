@@ -38,7 +38,7 @@ struct
 
   type cmd_report = CmdReport.t [@@deriving yojson]
   type branch_case = WBranchCase.t [@@deriving yojson]
-  type branch_data = rid * BranchCase.t option [@@deriving yojson]
+  type branch_data = rid * Branch_case.t option [@@deriving yojson]
   type exec_data = cmd_report executed_cmd_data [@@deriving yojson]
   type stack_direction = In | Out of rid
 
@@ -81,7 +81,7 @@ struct
     unifys : unification list;
     errors : string list;
     mutable submap : map submap;
-    gil_branch_path : BranchCase.path;
+    gil_branch_path : Branch_case.path;
     branch_path : branch_case list;
     parent : parent; [@to_yojson fun _ -> `Null]
     callers : rid list;
@@ -176,7 +176,7 @@ struct
 
     type partial_cmd_result =
       | Finished of finished_partial_data
-      | StepAgain of (rid option * BranchCase.t option)
+      | StepAgain of (rid option * Branch_case.t option)
 
     let make_finished_partial
         is_final
@@ -269,7 +269,7 @@ struct
     partial_cmds : PartialCmds.t;
     mutable map : map;
     id_map : (rid, map) Hashtbl.t; [@to_yojson fun _ -> `Null]
-    mutable before_partial : (rid * BranchCase.t option) option;
+    mutable before_partial : (rid * Branch_case.t option) option;
     mutable is_loop_func : bool;
     prog : (annot, int) Prog.t; [@to_yojson fun _ -> `Null]
     func_return_data : (rid, string * int ref) Hashtbl.t;
@@ -401,10 +401,10 @@ struct
     let convert_kind id kind =
       let json cases =
         let cmd_kind_to_yojson =
-          cmd_kind_to_yojson BranchCase.to_yojson (fun () -> `Null)
+          cmd_kind_to_yojson Branch_case.to_yojson (fun () -> `Null)
         in
         let cases_to_yojson cases =
-          cases |> List.map fst |> list_to_yojson BranchCase.to_yojson
+          cases |> List.map fst |> list_to_yojson Branch_case.to_yojson
         in
         [
           ("id", L.Report_id.to_yojson id);
@@ -418,23 +418,23 @@ struct
       | Final -> Final
       | Branch cases -> (
           match cases with
-          | (BranchCase.GuardedGoto _, ()) :: _ ->
+          | (Branch_case.GuardedGoto _, ()) :: _ ->
               let cases =
                 cases
                 |> List.map (fun (case, _) ->
                        match case with
-                       | BranchCase.GuardedGoto b -> (IfElse b, (id, Some case))
+                       | Branch_case.GuardedGoto b -> (IfElse b, (id, Some case))
                        | _ ->
                            failwith cases
                              "convert_kind: inconsistent branch cases!")
               in
               Branch cases
-          | (BranchCase.LCmd _, ()) :: _ ->
+          | (Branch_case.LCmd _, ()) :: _ ->
               let cases =
                 cases
                 |> List.map (fun (case, _) ->
                        match case with
-                       | BranchCase.LCmd lcmd -> (LCmd lcmd, (id, Some case))
+                       | Branch_case.LCmd lcmd -> (LCmd lcmd, (id, Some case))
                        | _ ->
                            failwith cases
                              "convert_kind: inconsistent branch cases!")
@@ -466,7 +466,7 @@ struct
         (new_cmd : parent:parent -> unit -> map)
         (new_id : rid)
         (id : rid)
-        (gil_case : BranchCase.t option)
+        (gil_case : Branch_case.t option)
         (stack_direction : stack_direction option)
         state =
       let failwith s = failwith ("WislLifter.insert_new_cmd: " ^ s) in
@@ -583,7 +583,7 @@ struct
           Some
             (match exec_data.cmd_report.cmd with
             | Cmd.GuardedGoto _ ->
-                ExecNext (None, Some (BranchCase.GuardedGoto true))
+                ExecNext (None, Some (Branch_case.GuardedGoto true))
             | _ -> ExecNext (None, None))
       | _ -> None
 
@@ -721,7 +721,8 @@ struct
                 ("state", dump state);
                 ("exec_data", exec_data_to_yojson exec_data);
                 ("prev_id", (opt_to_yojson L.Report_id.to_yojson) prev_id);
-                ("branch_case", (opt_to_yojson BranchCase.to_yojson) branch_case);
+                ( "branch_case",
+                  (opt_to_yojson Branch_case.to_yojson) branch_case );
               ]
             "HANDLING %a (prev %a)" L.Report_id.pp id (pp_option L.Report_id.pp)
             prev_id);

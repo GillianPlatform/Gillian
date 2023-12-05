@@ -3,7 +3,7 @@
 module type S = sig
   include Lifter.S
 
-  val pop_to_exec : t -> (Logging.Report_id.t * BranchCase.t option) option
+  val pop_to_exec : t -> (Logging.Report_id.t * Branch_case.t option) option
 end
 
 module Make

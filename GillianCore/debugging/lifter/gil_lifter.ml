@@ -5,7 +5,7 @@ open Lifter
 module type S = sig
   include Lifter.S
 
-  val pop_to_exec : t -> (Logging.Report_id.t * BranchCase.t option) option
+  val pop_to_exec : t -> (Logging.Report_id.t * Branch_case.t option) option
 end
 
 module Make
@@ -22,8 +22,8 @@ module Make
   module Annot = PC.Annot
 
   type annot = PC.Annot.t
-  type branch_case = BranchCase.t [@@deriving yojson]
-  type branch_path = BranchCase.path [@@deriving yojson]
+  type branch_case = Branch_case.t [@@deriving yojson]
+  type branch_path = Branch_case.path [@@deriving yojson]
 
   (* Some fields are Null'd in yojson to stop huge memory inefficiency *)
   type map = (branch_case, cmd_data, unit) Exec_map.t
@@ -44,7 +44,7 @@ module Make
     root_proc : string;
     all_procs : string list;
     id_map : (L.Report_id.t, map) Hashtbl.t; [@to_yojson fun _ -> `Null]
-    mutable to_exec : (L.Report_id.t * BranchCase.t option) list;
+    mutable to_exec : (L.Report_id.t * Branch_case.t option) list;
   }
   [@@deriving to_yojson]
 
@@ -253,7 +253,7 @@ module Make
     let case =
       case
       |> Option.map (fun (case : Exec_map.Packaged.branch_case) ->
-             case.json |> BranchCase.of_yojson |> Result.get_ok)
+             case.json |> Branch_case.of_yojson |> Result.get_ok)
     in
     (id, case)
 

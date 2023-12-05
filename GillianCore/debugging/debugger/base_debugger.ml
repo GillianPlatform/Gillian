@@ -447,8 +447,8 @@ struct
 
       type execute_step =
         L.Report_id.t ->
-        ?branch_case:BranchCase.t ->
-        ?branch_path:BranchCase.path ->
+        ?branch_case:Branch_case.t ->
+        ?branch_path:Branch_case.path ->
         debug_state ->
         proc_state ->
         stop_reason * L.Report_id.t option
@@ -469,7 +469,7 @@ struct
         in
         DL.log (fun m ->
             m
-              ~json:[ ("path", BranchCase.path_to_yojson branch_path) ]
+              ~json:[ ("path", Branch_case.path_to_yojson branch_path) ]
               "Got path");
         branch_path
 
@@ -490,7 +490,7 @@ struct
         | ExecNext (id, branch_case) ->
             DL.log (fun m ->
                 m "EXEC NEXT (%a, %a)" (pp_option L.Report_id.pp) id
-                  (pp_option BranchCase.pp) branch_case);
+                  (pp_option Branch_case.pp) branch_case);
             let id = Option_utils.coalesce id default_next_id |> Option.get in
             execute_step id ?branch_case dbg state
         | Stop -> on_stop ()
@@ -892,7 +892,7 @@ struct
 
       let step_until_cond
           ?(reverse = false)
-          ?(branch_case : BranchCase.t option)
+          ?(branch_case : Branch_case.t option)
           (cond : frame -> frame -> int -> int -> bool)
           (debug_state : debug_state)
           (proc_state : proc_state) : stop_reason =

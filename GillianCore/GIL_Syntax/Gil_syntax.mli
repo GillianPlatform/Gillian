@@ -988,8 +988,8 @@ module BiSpec : sig
   val pp : Format.formatter -> t -> unit
 end
 
-(** @canonical Gillian.Gil_syntax.BranchCase *)
-module BranchCase : sig
+(** @canonical Gillian.Gil_syntax.Branch_case *)
+module Branch_case : sig
   (** Reasons for a branch in execution.
 
     These are used to reason about execution when using the debugger.

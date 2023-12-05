@@ -165,8 +165,8 @@ module Packaged = struct
   [@@deriving yojson]
 
   (** Converts a GIL branch case to a packaged branch case *)
-  let package_gil_case (case : BranchCase.t) : branch_case =
-    let json = BranchCase.to_yojson case in
+  let package_gil_case (case : Branch_case.t) : branch_case =
+    let json = Branch_case.to_yojson case in
     let kind, display =
       match case with
       | GuardedGoto b -> ("GuardedGoto", ("If/Else", Fmt.str "%B" b))

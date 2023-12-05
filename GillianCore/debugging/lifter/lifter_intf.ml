@@ -10,18 +10,18 @@ module Types = struct
   }
 
   type 'cmd_report executed_cmd_data = {
-    kind : (BranchCase.t, unit) Exec_map.cmd_kind;
+    kind : (Branch_case.t, unit) Exec_map.cmd_kind;
     id : Logging.Report_id.t;
     cmd_report : 'cmd_report;
     unifys : Exec_map.unification list;
     errors : string list;
-    branch_path : BranchCase.path;
+    branch_path : Branch_case.path;
   }
   [@@deriving yojson]
 
   type handle_cmd_result =
     | Stop
-    | ExecNext of (Logging.Report_id.t option * BranchCase.t option)
+    | ExecNext of (Logging.Report_id.t option * Branch_case.t option)
   [@@deriving yojson]
 end
 
@@ -66,7 +66,7 @@ module type S = sig
   (** Handles the execution result of a GIL command. *)
   val handle_cmd :
     Logging.Report_id.t ->
-    BranchCase.t option ->
+    Branch_case.t option ->
     cmd_report executed_cmd_data ->
     t ->
     handle_cmd_result
@@ -92,12 +92,14 @@ module type S = sig
   val get_root_id : t -> Logging.Report_id.t option
 
   (** Gives the path of (GIL) branch cases that lead to the specified command. *)
-  val path_of_id : Logging.Report_id.t -> t -> BranchCase.path
+  val path_of_id : Logging.Report_id.t -> t -> Branch_case.path
 
   (** Gets a list of ID/branch-case pairs that correspond to any commands that
     directly succeed the specified command. *)
   val existing_next_steps :
-    Logging.Report_id.t -> t -> (Logging.Report_id.t * BranchCase.t option) list
+    Logging.Report_id.t ->
+    t ->
+    (Logging.Report_id.t * Branch_case.t option) list
 
   (** Translates a command ID and (packaged) TL branch case to the command ID
     and GIL branch case necessary to step forward. *)
@@ -105,7 +107,7 @@ module type S = sig
     Logging.Report_id.t ->
     Exec_map.Packaged.branch_case option ->
     t ->
-    Logging.Report_id.t * BranchCase.t option
+    Logging.Report_id.t * Branch_case.t option
 
   (** If the given command has a previous command, gives its ID, and
     the TL branch case that connects them (if applicable). *)
@@ -118,7 +120,7 @@ module type S = sig
   
     If the given command branches, the desired branch case can be specified. *)
   val select_next_path :
-    BranchCase.t option -> Logging.Report_id.t -> t -> BranchCase.path
+    Branch_case.t option -> Logging.Report_id.t -> t -> Branch_case.path
 
   (** Gives a branch path under the specified command (or the root command, if
     not specified) that hasn't yet been fully explored.
@@ -131,7 +133,7 @@ module type S = sig
   val find_unfinished_path :
     ?at_id:Logging.Report_id.t ->
     t ->
-    (Logging.Report_id.t * BranchCase.t option) option
+    (Logging.Report_id.t * Branch_case.t option) option
 
   val memory_error_to_exception_info :
     (memory_error, annot, tl_ast) memory_error_info -> exception_info
@@ -155,11 +157,11 @@ module type Intf = sig
   module type S = S
 
   val make_executed_cmd_data :
-    (BranchCase.t, unit) Exec_map.cmd_kind ->
+    (Branch_case.t, unit) Exec_map.cmd_kind ->
     Logging.Report_id.t ->
     'cmd_report ->
     ?unifys:Exec_map.unification list ->
     ?errors:string list ->
-    BranchCase.path ->
+    Branch_case.path ->
     'cmd_report executed_cmd_data
 end
