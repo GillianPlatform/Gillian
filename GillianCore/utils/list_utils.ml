@@ -175,6 +175,16 @@ let map_results f l =
   in
   aux [] l
 
+let iter_results f l =
+  let rec aux = function
+    | [] -> Ok ()
+    | x :: xs -> (
+        match f x with
+        | Ok () -> aux xs
+        | Error e -> Error e)
+  in
+  aux l
+
 let for_alli f l =
   let rec aux i = function
     | [] -> true
